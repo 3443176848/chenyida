@@ -1,0 +1,3 @@
+primary_internal_code,alternate_internal_code,alternate_type,allowed_customer,allowed_product,approval_required,engineering_note,quality_note,status
+CYD-CAP-000001,CYD-CAP-000002,条件替代,,,Y,需确认容量和耐压一致,需RoHS资料,草稿
+

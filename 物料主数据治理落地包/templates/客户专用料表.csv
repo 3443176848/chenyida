@@ -1,0 +1,3 @@
+internal_item_code,customer_name,customer_item_code,allowed_product,restriction_rule,status,remark
+CYD-CON-000001,客户A,CUS-A-CON-001,折叠屏FPC,仅客户A项目可用,启用,示例
+

@@ -1,0 +1,3 @@
+request_no,request_source,proposed_category,proposed_name,supplier_name,supplier_item_code,engineering_result,quality_result,warehouse_result,finance_result,final_internal_code,final_status,remark
+NMR-20260708-001,供应商导入,DIO,TVS二极管 5V SOD-523,A供应商,A-TVS-5V,待确认,待确认,待确认,待确认,,审核中,示例
+

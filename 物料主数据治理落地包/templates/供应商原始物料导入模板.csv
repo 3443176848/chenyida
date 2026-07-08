@@ -1,0 +1,6 @@
+import_batch_no,supplier_name,raw_item_name,raw_item_code,raw_spec,raw_brand,raw_mpn,purchase_uom,min_order_qty,lead_time_days,last_price,remark
+IMP-20260708-001,A供应商,0402 10UF 16V,A-104-16V,0402 10UF 16V X5R,,PCS,PCS,10000,7,0.012,示例：应自动匹配电容
+IMP-20260708-001,A供应商,0603 10K 1%,A-R-10K-0603,0603 10K 1%,,PCS,PCS,5000,7,0.003,示例：应自动匹配电阻
+IMP-20260708-001,A供应商,FPC CONN 0.5P 24PIN,A-CON-0524,0.5Pitch 24Pin,,PCS,PCS,1000,14,0.18,示例：疑似匹配连接器
+IMP-20260708-001,A供应商,TVS SOD-523 5V,A-TVS-5V,SOD-523 5V,,PCS,PCS,3000,10,0.025,示例：新物料
+

@@ -1,0 +1,24 @@
+# Local runtime data
+chenyida_erp_app/data/
+*.sqlite3
+*.db
+*.log
+*.pid
+
+# Dependency and cache folders
+node_modules/
+**/__pycache__/
+*.py[cod]
+
+# Local agent/workspace metadata
+.agents/
+.codex/
+.git.invalid-empty-backup/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Source reference decks are kept local unless explicitly shared
+*.pptx
