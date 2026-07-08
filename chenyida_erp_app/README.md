@@ -18,6 +18,8 @@
 - 完工入库：生产报工后自动生成成品物料并增加成品库存
 - 品质管理：记录 IQC 来料、IPQC 过程和 FQC 成品检验，跟踪不良类型、责任环节和处置方式
 - 销售交付：创建客户销售订单，按成品库存出货，出货后自动扣减成品库存并更新订单状态
+- 登录与角色权限：管理员、经营、采购、工程、生产、品质、销售分角色使用
+- 系统运维：经营看板、近期操作记录、用户清单、数据库备份与恢复
 - SQLite 本地数据库
 - 浏览器操作界面
 - CSV 导出
@@ -35,6 +37,22 @@ powershell -ExecutionPolicy Bypass -File D:\erp\chenyida_erp_app\run_server.ps1
 ```text
 http://127.0.0.1:8765
 ```
+
+## 默认账号
+
+首次启动会自动创建以下账号：
+
+| 账号 | 初始密码 | 角色 |
+| --- | --- | --- |
+| admin | admin123 | 系统管理员 |
+| manager | manager123 | 经营负责人 |
+| purchase | purchase123 | 采购 |
+| engineering | engineering123 | 工程 |
+| production | production123 | 生产 |
+| quality | quality123 | 品质 |
+| sales | sales123 | 销售 |
+
+投入使用前请先用 `admin / admin123` 登录，在右上角点“修改密码”更换管理员密码。
 
 后台启动脚本也已提供。如果本机允许后台常驻进程，可使用：
 
@@ -69,6 +87,14 @@ http://127.0.0.1:8765
 D:\erp\chenyida_erp_app\data\erp.sqlite3
 ```
 
+系统运维页创建的备份保存在：
+
+```text
+D:\erp\chenyida_erp_app\data\backups
+```
+
+只有系统管理员可以创建或恢复备份。恢复备份会把当前数据库回到备份时点，操作前建议先再创建一个新备份。
+
 首次启动会从以下模板导入初始数据：
 
 ```text
@@ -93,5 +119,5 @@ $node='C:\Users\tu661\.cache\codex-runtimes\codex-primary-runtime\dependencies\n
 验证通过后会生成界面截图：
 
 ```text
-D:\erp\chenyida_erp_app\data\ui-smoke\quality-ui.png
+D:\erp\chenyida_erp_app\data\ui-smoke\operations-ui.png
 ```

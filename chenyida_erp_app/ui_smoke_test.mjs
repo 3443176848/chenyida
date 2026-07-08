@@ -19,7 +19,7 @@ async function waitForServer(proc) {
       throw new Error(`server exited early: ${proc.exitCode}`);
     }
     try {
-      const response = await fetch(`${baseUrl}/api/summary`);
+      const response = await fetch(`${baseUrl}/api/health`);
       if (response.ok) return;
     } catch (error) {
       lastError = error;
@@ -53,6 +53,11 @@ try {
   });
   const page = await browser.newPage({ viewport: { width: 1440, height: 980 } });
   await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.getByText("晨亿达 ERP 登录").waitFor();
+  await page.locator("#loginUsername").fill("admin");
+  await page.locator("#loginPassword").fill("admin123");
+  await page.getByRole("button", { name: "登录" }).click();
+  await page.locator("#userName", { hasText: "系统管理员" }).waitFor();
   await page.getByText("产品工程").first().click();
   await page.getByText("新增产品工程卡").waitFor();
   await page.getByText("BOM 管理").first().click();
@@ -74,7 +79,10 @@ try {
   await page.getByRole("button", { name: "保存检验记录" }).waitFor();
   await page.getByRole("button", { name: "保存检验记录" }).click();
   await page.getByText(/IPQC-/).waitFor();
-  await page.screenshot({ path: path.join(outputDir, "quality-ui.png"), fullPage: true });
+  await page.getByText("系统运维").first().click();
+  await page.getByRole("button", { name: "创建备份" }).waitFor();
+  await page.getByRole("heading", { name: "最近操作" }).waitFor();
+  await page.screenshot({ path: path.join(outputDir, "operations-ui.png"), fullPage: true });
   await browser.close();
   console.log("UI_SMOKE_TEST_OK");
 } finally {

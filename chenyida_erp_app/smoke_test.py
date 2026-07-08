@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -11,21 +12,40 @@ from pathlib import Path
 APP_DIR = Path(__file__).resolve().parent
 PORT = 8766
 BASE_URL = f"http://127.0.0.1:{PORT}"
+SESSION_COOKIE = ""
 
 
-def request(path, method="GET", payload=None):
+def request(path, method="GET", payload=None, expected_status=200):
+    global SESSION_COOKIE
     data = None
     headers = {}
+    if SESSION_COOKIE:
+        headers["Cookie"] = SESSION_COOKIE
     if payload is not None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         headers["Content-Type"] = "application/json; charset=utf-8"
     req = urllib.request.Request(BASE_URL + path, data=data, method=method, headers=headers)
-    with urllib.request.urlopen(req, timeout=5) as response:
-        body = response.read()
-        content_type = response.headers.get("Content-Type", "")
-        if "application/json" in content_type:
-            return json.loads(body.decode("utf-8"))
-        return body.decode("utf-8")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            body = response.read()
+            status = response.status
+            content_type = response.headers.get("Content-Type", "")
+            set_cookie = response.headers.get("Set-Cookie")
+            if set_cookie:
+                SESSION_COOKIE = set_cookie.split(";", 1)[0]
+    except urllib.error.HTTPError as exc:
+        body = exc.read()
+        status = exc.code
+        content_type = exc.headers.get("Content-Type", "")
+    if status != expected_status:
+        raise AssertionError(f"{path} returned {status}, expected {expected_status}: {body!r}")
+    if "application/json" in content_type:
+        data = json.loads(body.decode("utf-8"))
+    else:
+        data = body.decode("utf-8")
+    if isinstance(data, dict):
+        data["_status"] = status
+    return data
 
 
 def wait_ready(proc):
@@ -34,7 +54,7 @@ def wait_ready(proc):
         if proc.poll() is not None:
             raise RuntimeError(f"server exited early: {proc.returncode}")
         try:
-            return request("/api/summary")
+            return request("/api/health")
         except Exception as exc:
             last_error = exc
             time.sleep(0.5)
@@ -62,11 +82,31 @@ def main():
             encoding="utf-8",
         )
         try:
-            summary = wait_ready(proc)
+            wait_ready(proc)
+            unauthenticated = request("/api/summary", expected_status=401)
+            assert unauthenticated["code"] == "UNAUTHENTICATED", unauthenticated
+            session = request("/api/session")
+            assert session["authenticated"] is False, session
+            login = request("/api/login", method="POST", payload={"username": "admin", "password": "admin123"})
+            assert login["user"]["role"] == "admin", login
+            session = request("/api/session")
+            assert session["authenticated"] is True, session
+
+            summary = request("/api/summary")
             assert summary["total_items"] == 4, summary
             assert summary["total_mappings"] == 2, summary
             assert summary["total_products"] == 1, summary
             assert summary["total_boms"] == 1, summary
+            dashboard = request("/api/management-dashboard")
+            assert dashboard["metrics"], dashboard
+            backup_result = request("/api/backups/create", method="POST", payload={})
+            assert backup_result["backup"]["name"].startswith("erp-backup-"), backup_result
+            restored = request("/api/backups/restore", method="POST", payload={"name": backup_result["backup"]["name"]})
+            assert restored["backup"]["name"] == backup_result["backup"]["name"], restored
+            backups = request("/api/backups")["rows"]
+            assert backups, backups
+            users = request("/api/users")["rows"]
+            assert any(user["username"] == "admin" for user in users), users
 
             html = request("/")
             assert "物料主数据治理工作台" in html

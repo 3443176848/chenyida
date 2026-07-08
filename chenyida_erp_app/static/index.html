@@ -13,6 +13,12 @@
         <p>物料主数据治理工作台</p>
       </div>
       <div class="topbar-actions">
+        <span id="userBadge" class="user-badge" hidden>
+          <b id="userName"></b>
+          <small id="userRole"></small>
+        </span>
+        <button id="changePasswordBtn" class="ghost-button" hidden>修改密码</button>
+        <button id="logoutBtn" class="ghost-button" hidden>退出</button>
         <a class="ghost-link" href="/api/export/items.csv">导出物料库</a>
         <a class="ghost-link" href="/api/export/cleaning.csv">导出清洗结果</a>
       </div>
@@ -31,6 +37,7 @@
         <button class="nav" data-tab="production">生产协同</button>
         <button class="nav" data-tab="sales">销售交付</button>
         <button class="nav" data-tab="quality">品质管理</button>
+        <button class="nav" data-tab="operations">系统运维</button>
       </aside>
 
       <section class="content">
@@ -399,8 +406,67 @@
             <table id="qualityDefectsTable"></table>
           </div>
         </section>
+
+        <section id="operations" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>系统运维</h2>
+              <p>查看经营状态、账号权限、数据库备份和最近操作记录。</p>
+            </div>
+            <button id="refreshOpsBtn" class="primary">刷新运维数据</button>
+          </div>
+          <div id="opsMetrics" class="summary-grid ops-grid"></div>
+          <div class="two-panels">
+            <div class="work-panel">
+              <h3>风险提醒</h3>
+              <ul id="opsRisks" class="risk-list"></ul>
+            </div>
+            <div class="work-panel">
+              <h3>数据库备份</h3>
+              <p id="backupAdminHint" class="muted">只有系统管理员可以创建或恢复备份。</p>
+              <div class="button-row">
+                <button id="createBackupBtn" class="primary">创建备份</button>
+              </div>
+              <div class="table-wrap mini spaced">
+                <table id="backupTable"></table>
+              </div>
+            </div>
+          </div>
+          <div class="two-panels spaced">
+            <div class="work-panel">
+              <h3>账号与角色</h3>
+              <div class="table-wrap mini">
+                <table id="usersTable"></table>
+              </div>
+            </div>
+            <div class="work-panel">
+              <h3>最近操作</h3>
+              <div class="table-wrap mini">
+                <table id="opsActivityTable"></table>
+              </div>
+            </div>
+          </div>
+        </section>
       </section>
     </main>
+
+    <div id="loginOverlay" class="login-overlay" hidden>
+      <form id="loginForm" class="login-card">
+        <h2>晨亿达 ERP 登录</h2>
+        <p>请使用分配的账号进入系统。</p>
+        <label>
+          账号
+          <input id="loginUsername" autocomplete="username" value="admin" required />
+        </label>
+        <label>
+          密码
+          <input id="loginPassword" type="password" autocomplete="current-password" value="admin123" required />
+        </label>
+        <button class="primary" type="submit">登录</button>
+        <span id="loginMsg" class="muted"></span>
+        <small>默认管理员：admin / admin123。投入使用前请登录后修改密码。</small>
+      </form>
+    </div>
 
     <dialog id="newItemDialog">
       <form method="dialog" id="newItemForm">
@@ -425,6 +491,29 @@
         <div class="dialog-actions">
           <button value="cancel" class="secondary">取消</button>
           <button id="createItemBtn" value="default" class="primary">生成内部物料</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="passwordDialog">
+      <form method="dialog" id="passwordForm">
+        <h3>修改密码</h3>
+        <label>
+          原密码
+          <input id="oldPassword" type="password" autocomplete="current-password" required />
+        </label>
+        <label>
+          新密码
+          <input id="newPassword" type="password" autocomplete="new-password" minlength="8" required />
+        </label>
+        <label>
+          再输入一次
+          <input id="newPasswordConfirm" type="password" autocomplete="new-password" minlength="8" required />
+        </label>
+        <span id="passwordMsg" class="muted"></span>
+        <div class="dialog-actions">
+          <button id="cancelPasswordBtn" type="button" class="secondary">取消</button>
+          <button class="primary" type="submit">保存</button>
         </div>
       </form>
     </dialog>

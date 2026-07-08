@@ -18,6 +18,10 @@ const state = {
   shipments: [],
   qualityInspections: [],
   qualityDefects: [],
+  session: { authenticated: false, user: null },
+  managementDashboard: null,
+  backups: [],
+  users: [],
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -33,12 +37,18 @@ function toast(message) {
 }
 
 async function api(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   const response = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    credentials: "same-origin",
+    headers,
   });
-  const data = await response.json();
+  const contentType = response.headers.get("Content-Type") || "";
+  const data = contentType.includes("application/json") ? await response.json() : await response.text();
   if (!response.ok) {
+    if (response.status === 401 && !["/api/session", "/api/login"].includes(path)) {
+      showLogin();
+    }
     throw new Error(data.error || "请求失败");
   }
   return data;
@@ -47,6 +57,9 @@ async function api(path, options = {}) {
 function setTab(name) {
   $$(".nav").forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === name));
   $$(".tab").forEach((tab) => tab.classList.toggle("active", tab.id === name));
+  if (name === "operations") {
+    refreshOperations().catch((error) => toast(error.message));
+  }
 }
 
 function pill(level) {
@@ -60,6 +73,41 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function canManageSystem() {
+  return state.session.user?.role === "admin";
+}
+
+function showLogin() {
+  $("#loginOverlay").hidden = false;
+  $("#loginUsername")?.focus();
+}
+
+function hideLogin() {
+  $("#loginOverlay").hidden = true;
+}
+
+function updateUserBar() {
+  const user = state.session.user;
+  $("#userBadge").hidden = !user;
+  $("#logoutBtn").hidden = !user;
+  $("#changePasswordBtn").hidden = !user;
+  if (!user) return;
+  $("#userName").textContent = user.display_name || user.username;
+  $("#userRole").textContent = user.role_label || user.role;
+}
+
+async function loadSession() {
+  const result = await api("/api/session");
+  state.session = result;
+  updateUserBar();
+  if (result.authenticated) {
+    hideLogin();
+  } else {
+    showLogin();
+  }
+  return result;
 }
 
 function renderSummary() {
@@ -87,6 +135,57 @@ function renderSummary() {
       <span>${label}</span>
     </div>
   `).join("");
+}
+
+function renderOperations() {
+  const dashboard = state.managementDashboard || { metrics: [], risks: [], recent_activity: [] };
+  $("#opsMetrics").innerHTML = dashboard.metrics.map((metric) => `
+    <div class="summary-card">
+      <b>${escapeHtml(metric.value)}</b>
+      <span>${escapeHtml(metric.label)}</span>
+      <small>${escapeHtml(metric.hint)}</small>
+    </div>
+  `).join("");
+  $("#opsRisks").innerHTML = dashboard.risks.map((risk) => `
+    <li class="risk ${escapeHtml(risk.level)}">${escapeHtml(risk.text)}</li>
+  `).join("");
+  $("#opsActivityTable").innerHTML = `
+    <thead><tr><th>时间</th><th>动作</th><th>说明</th></tr></thead>
+    <tbody>${dashboard.recent_activity.map((row) => `
+      <tr>
+        <td>${escapeHtml(row.created_at)}</td>
+        <td>${escapeHtml(row.action)}</td>
+        <td>${escapeHtml(row.detail)}</td>
+      </tr>
+    `).join("")}</tbody>
+  `;
+
+  const canManage = canManageSystem();
+  $("#backupAdminHint").hidden = canManage;
+  $("#createBackupBtn").disabled = !canManage;
+  $("#backupTable").innerHTML = `
+    <thead><tr><th>备份文件</th><th>大小</th><th>时间</th><th>操作</th></tr></thead>
+    <tbody>${state.backups.map((row) => `
+      <tr>
+        <td>${escapeHtml(row.name)}</td>
+        <td>${Math.round((Number(row.size) || 0) / 1024)} KB</td>
+        <td>${escapeHtml(row.created_at)}</td>
+        <td><button data-restore-backup="${escapeHtml(row.name)}" ${canManage ? "" : "disabled"}>恢复</button></td>
+      </tr>
+    `).join("") || `<tr><td colspan="4">还没有备份</td></tr>`}</tbody>
+  `;
+  $("#usersTable").innerHTML = `
+    <thead><tr><th>账号</th><th>姓名</th><th>角色</th><th>状态</th><th>最近登录</th></tr></thead>
+    <tbody>${state.users.map((row) => `
+      <tr>
+        <td>${escapeHtml(row.username)}</td>
+        <td>${escapeHtml(row.display_name)}</td>
+        <td><span class="pill auto">${escapeHtml(row.role_label)}</span></td>
+        <td>${row.is_active ? "启用" : "停用"}</td>
+        <td>${escapeHtml(row.last_login_at || "-")}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="5">当前账号无权查看用户清单</td></tr>`}</tbody>
+  `;
 }
 
 function optionList(rows, valueKey, labelKeys) {
@@ -599,6 +698,91 @@ function renderCleaning() {
   `;
 }
 
+async function refreshOperations() {
+  const dashboard = await api("/api/management-dashboard");
+  state.managementDashboard = dashboard;
+  if (canManageSystem()) {
+    const [backups, users] = await Promise.all([
+      api("/api/backups"),
+      api("/api/users"),
+    ]);
+    state.backups = backups.rows;
+    state.users = users.rows;
+  } else {
+    state.backups = [];
+    state.users = [];
+  }
+  renderOperations();
+}
+
+async function login(event) {
+  event.preventDefault();
+  $("#loginMsg").textContent = "";
+  const result = await api("/api/login", {
+    method: "POST",
+    body: JSON.stringify({
+      username: $("#loginUsername").value.trim(),
+      password: $("#loginPassword").value,
+    }),
+  });
+  state.session = { authenticated: true, user: result.user };
+  updateUserBar();
+  hideLogin();
+  await refreshAll();
+  toast("登录成功");
+}
+
+async function logout() {
+  await api("/api/logout", { method: "POST", body: JSON.stringify({}) }).catch(() => null);
+  state.session = { authenticated: false, user: null };
+  updateUserBar();
+  showLogin();
+  toast("已退出登录");
+}
+
+function openPasswordDialog() {
+  $("#passwordForm").reset();
+  $("#passwordMsg").textContent = "";
+  $("#passwordDialog").showModal();
+}
+
+async function changePassword(event) {
+  event.preventDefault();
+  const newPassword = $("#newPassword").value;
+  if (newPassword !== $("#newPasswordConfirm").value) {
+    $("#passwordMsg").textContent = "两次新密码不一致";
+    return;
+  }
+  await api("/api/me/password", {
+    method: "POST",
+    body: JSON.stringify({
+      old_password: $("#oldPassword").value,
+      new_password: newPassword,
+    }),
+  });
+  $("#passwordDialog").close();
+  toast("密码已修改");
+}
+
+async function createBackup() {
+  const result = await api("/api/backups/create", { method: "POST", body: JSON.stringify({}) });
+  state.backups = result.rows;
+  renderOperations();
+  toast(`已创建备份：${result.backup.name}`);
+}
+
+async function restoreBackup(name) {
+  const ok = window.confirm(`确认恢复备份 ${name}？恢复后当前数据库会回到备份时点。`);
+  if (!ok) return;
+  await api("/api/backups/restore", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+  await refreshAll();
+  await refreshOperations();
+  toast("备份已恢复");
+}
+
 async function refreshAll() {
   const [summary, items, mappings, cleaning, products, boms, purchaseOrders, purchaseLines, inventory, workOrders, workMaterials, productionReports, salesOrders, shipments, qualityInspections, qualityDefects] = await Promise.all([
     api("/api/summary"),
@@ -989,8 +1173,23 @@ async function createQualityInspection() {
 }
 
 function bindEvents() {
+  $("#loginForm").addEventListener("submit", (event) => login(event).catch((error) => {
+    $("#loginMsg").textContent = error.message;
+  }));
+  $("#logoutBtn").addEventListener("click", logout);
+  $("#changePasswordBtn").addEventListener("click", openPasswordDialog);
+  $("#cancelPasswordBtn").addEventListener("click", () => $("#passwordDialog").close());
+  $("#passwordForm").addEventListener("submit", (event) => changePassword(event).catch((error) => {
+    $("#passwordMsg").textContent = error.message;
+  }));
   $$(".nav").forEach((btn) => btn.addEventListener("click", () => setTab(btn.dataset.tab)));
   $("#refreshBtn").addEventListener("click", refreshAll);
+  $("#refreshOpsBtn").addEventListener("click", () => refreshOperations().catch((error) => toast(error.message)));
+  $("#createBackupBtn").addEventListener("click", () => createBackup().catch((error) => toast(error.message)));
+  $("#backupTable").addEventListener("click", async (event) => {
+    const backupName = event.target.dataset.restoreBackup;
+    if (backupName) await restoreBackup(backupName);
+  });
   $("#loadSampleBtn").addEventListener("click", loadSample);
   $("#runImportBtn").addEventListener("click", runImport);
   $("#csvFile").addEventListener("change", async (event) => {
@@ -1048,5 +1247,12 @@ function bindEvents() {
   });
 }
 
-bindEvents();
-refreshAll().catch((error) => toast(error.message));
+async function initApp() {
+  bindEvents();
+  const session = await loadSession();
+  if (session.authenticated) {
+    await refreshAll();
+  }
+}
+
+initApp().catch((error) => toast(error.message));

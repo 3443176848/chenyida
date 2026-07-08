@@ -1,9 +1,12 @@
 import argparse
 import csv
+import hashlib
+import hmac
 import io
 import json
 import os
 import re
+import secrets
 import sqlite3
 import sys
 import tempfile
@@ -21,8 +24,43 @@ APP_DIR = Path(__file__).resolve().parent
 WORKSPACE = APP_DIR.parent
 STATIC_DIR = APP_DIR / "static"
 DATA_DIR = APP_DIR / "data"
+BACKUP_DIR = DATA_DIR / "backups"
 TEMPLATE_DIR = WORKSPACE / "物料主数据治理落地包" / "templates"
 DB_PATH = Path(os.environ.get("CYD_ERP_DB", DATA_DIR / "erp.sqlite3"))
+SESSION_COOKIE = "CYD_ERP_SESSION"
+SESSION_TTL_SECONDS = 12 * 60 * 60
+
+DEFAULT_USERS = [
+    {"username": "admin", "display_name": "系统管理员", "role": "admin", "password": "admin123"},
+    {"username": "manager", "display_name": "经营负责人", "role": "manager", "password": "manager123"},
+    {"username": "purchase", "display_name": "采购员", "role": "purchase", "password": "purchase123"},
+    {"username": "engineering", "display_name": "工程员", "role": "engineering", "password": "engineering123"},
+    {"username": "production", "display_name": "生产计划", "role": "production", "password": "production123"},
+    {"username": "quality", "display_name": "品质员", "role": "quality", "password": "quality123"},
+    {"username": "sales", "display_name": "销售员", "role": "sales", "password": "sales123"},
+]
+
+ROLE_LABELS = {
+    "admin": "系统管理员",
+    "manager": "经营负责人",
+    "purchase": "采购",
+    "engineering": "工程",
+    "production": "生产",
+    "quality": "品质",
+    "sales": "销售",
+}
+
+ROLE_PERMISSIONS = {
+    "admin": {"*"},
+    "manager": {"read", "dashboard", "material", "engineering", "purchase", "production", "sales", "quality"},
+    "purchase": {"read", "dashboard", "material", "purchase"},
+    "engineering": {"read", "dashboard", "material", "engineering"},
+    "production": {"read", "dashboard", "production"},
+    "quality": {"read", "dashboard", "quality"},
+    "sales": {"read", "dashboard", "sales"},
+}
+
+PUBLIC_API_PATHS = {"/api/health", "/api/session", "/api/login", "/api/logout"}
 
 
 ITEM_FIELDS = [
@@ -337,6 +375,143 @@ def db_connect():
     return conn
 
 
+def hash_password(password, salt=None):
+    salt = salt or secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 180000).hex()
+    return f"pbkdf2_sha256${salt}${digest}"
+
+
+def verify_password(password, stored_hash):
+    try:
+        algorithm, salt, expected = stored_hash.split("$", 2)
+    except ValueError:
+        return False
+    if algorithm != "pbkdf2_sha256":
+        return False
+    actual = hash_password(password, salt).split("$", 2)[2]
+    return hmac.compare_digest(actual, expected)
+
+
+def permission_for_request(method, path):
+    if path in {"/api/backups", "/api/backups/create", "/api/backups/restore", "/api/users"}:
+        return "system"
+    if path == "/api/management-dashboard":
+        return "dashboard"
+    if path == "/api/me/password":
+        return "read"
+    if method == "GET":
+        return "read"
+    if path in {"/api/import", "/api/cleaning/confirm", "/api/cleaning/create-item"}:
+        return "material"
+    if path in {"/api/products", "/api/boms", "/api/bom-lines"}:
+        return "engineering"
+    if path in {"/api/purchase-orders", "/api/purchase-orders/from-shortage", "/api/purchase-receive"}:
+        return "purchase"
+    if path in {"/api/work-orders/from-bom", "/api/work-orders/issue-materials", "/api/work-orders/complete"}:
+        return "production"
+    if path in {"/api/sales-orders", "/api/shipments/from-order"}:
+        return "sales"
+    if path == "/api/quality-inspections":
+        return "quality"
+    return "read"
+
+
+def user_can(user, permission):
+    permissions = ROLE_PERMISSIONS.get(user.get("role", ""), set())
+    return "*" in permissions or permission in permissions
+
+
+def public_user(row):
+    if not row:
+        return None
+    role = row["role"]
+    permissions = ROLE_PERMISSIONS.get(role, set())
+    return {
+        "username": row["username"],
+        "display_name": row["display_name"],
+        "role": role,
+        "role_label": ROLE_LABELS.get(role, role),
+        "is_active": bool(row["is_active"]),
+        "last_login_at": row["last_login_at"] or "",
+        "permissions": sorted(permissions),
+    }
+
+
+def parse_cookie(header_value):
+    cookies = {}
+    for chunk in (header_value or "").split(";"):
+        if "=" not in chunk:
+            continue
+        key, value = chunk.strip().split("=", 1)
+        cookies[key] = value
+    return cookies
+
+
+def current_user_from_token(conn, token):
+    if not token:
+        return None
+    conn.execute("DELETE FROM app_sessions WHERE expires_at <= ?", (int(time.time()),))
+    conn.commit()
+    row = conn.execute(
+        """
+        SELECT u.*
+        FROM app_sessions s
+        JOIN app_users u ON u.username = s.username
+        WHERE s.session_token = ? AND s.expires_at > ? AND u.is_active = 1
+        """,
+        (token, int(time.time())),
+    ).fetchone()
+    return public_user(row)
+
+
+def session_cookie(token, max_age=SESSION_TTL_SECONDS):
+    return f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={max_age}"
+
+
+def clear_session_cookie():
+    return f"{SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+
+
+def login_user(conn, username, password):
+    row = conn.execute("SELECT * FROM app_users WHERE username = ? AND is_active = 1", (username,)).fetchone()
+    if not row or not verify_password(password, row["password_hash"]):
+        return None
+    token = secrets.token_urlsafe(32)
+    timestamp = now_text()
+    expires_at = int(time.time()) + SESSION_TTL_SECONDS
+    conn.execute("DELETE FROM app_sessions WHERE username = ? OR expires_at <= ?", (username, int(time.time())))
+    conn.execute(
+        "INSERT INTO app_sessions (session_token, username, expires_at, created_at) VALUES (?, ?, ?, ?)",
+        (token, username, expires_at, timestamp),
+    )
+    conn.execute("UPDATE app_users SET last_login_at = ?, updated_at = ? WHERE username = ?", (timestamp, timestamp, username))
+    conn.execute("INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)", ("用户登录", username, timestamp))
+    conn.commit()
+    return {"token": token, "expires_at": expires_at, "user": public_user(row)}
+
+
+def logout_user(conn, token):
+    if token:
+        conn.execute("DELETE FROM app_sessions WHERE session_token = ?", (token,))
+        conn.commit()
+
+
+def change_user_password(conn, username, old_password, new_password):
+    if len(new_password or "") < 8:
+        raise ValueError("新密码至少 8 位")
+    row = conn.execute("SELECT * FROM app_users WHERE username = ? AND is_active = 1", (username,)).fetchone()
+    if not row or not verify_password(old_password or "", row["password_hash"]):
+        raise ValueError("原密码不正确")
+    timestamp = now_text()
+    conn.execute(
+        "UPDATE app_users SET password_hash = ?, updated_at = ? WHERE username = ?",
+        (hash_password(new_password), timestamp, username),
+    )
+    conn.execute("DELETE FROM app_sessions WHERE username = ? AND session_token NOT IN (SELECT session_token FROM app_sessions WHERE username = ? ORDER BY created_at DESC LIMIT 1)", (username, username))
+    conn.execute("INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)", ("修改密码", username, timestamp))
+    conn.commit()
+
+
 def create_schema(conn):
     conn.executescript(
         """
@@ -416,6 +591,24 @@ def create_schema(conn):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             action TEXT NOT NULL,
             detail TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS app_users (
+            username TEXT PRIMARY KEY,
+            display_name TEXT NOT NULL,
+            role TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_login_at TEXT DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS app_sessions (
+            session_token TEXT PRIMARY KEY,
+            username TEXT NOT NULL,
+            expires_at INTEGER NOT NULL,
             created_at TEXT NOT NULL
         );
 
@@ -913,10 +1106,34 @@ def seed_from_templates(conn):
     conn.commit()
 
 
+def seed_default_users(conn):
+    timestamp = now_text()
+    for user in DEFAULT_USERS:
+        exists = conn.execute("SELECT username FROM app_users WHERE username = ?", (user["username"],)).fetchone()
+        if exists:
+            continue
+        conn.execute(
+            """
+            INSERT INTO app_users (username, display_name, role, password_hash, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 1, ?, ?)
+            """,
+            (
+                user["username"],
+                user["display_name"],
+                user["role"],
+                hash_password(user["password"]),
+                timestamp,
+                timestamp,
+            ),
+        )
+    conn.commit()
+
+
 def init_db():
     with closing(db_connect()) as conn:
         create_schema(conn)
         seed_from_templates(conn)
+        seed_default_users(conn)
 
 
 def fetch_items(conn):
@@ -1803,6 +2020,115 @@ def rows_to_csv(rows, fields):
     return buffer.getvalue()
 
 
+def fetch_users(conn):
+    rows = conn.execute(
+        """
+        SELECT username, display_name, role, is_active, created_at, updated_at, last_login_at
+        FROM app_users
+        ORDER BY role, username
+        """
+    ).fetchall()
+    return [
+        {
+            **dict(row),
+            "role_label": ROLE_LABELS.get(row["role"], row["role"]),
+            "is_active": bool(row["is_active"]),
+        }
+        for row in rows
+    ]
+
+
+def backup_entry(path):
+    stat = path.stat()
+    return {
+        "name": path.name,
+        "size": stat.st_size,
+        "created_at": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def list_backups():
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    backups = [backup_entry(path) for path in BACKUP_DIR.glob("erp-backup-*.sqlite3") if path.is_file()]
+    return sorted(backups, key=lambda row: row["created_at"], reverse=True)
+
+
+def create_database_backup(conn, created_by):
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    target = BACKUP_DIR / f"erp-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.sqlite3"
+    with sqlite3.connect(target) as backup_conn:
+        conn.backup(backup_conn)
+    conn.execute("INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)", ("创建备份", f"{target.name} / {created_by}", now_text()))
+    conn.commit()
+    return backup_entry(target)
+
+
+def resolve_backup_path(name):
+    if not re.fullmatch(r"erp-backup-\d{8}-\d{6}\.sqlite3", name or ""):
+        raise ValueError("备份文件名不合法")
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    path = (BACKUP_DIR / name).resolve()
+    if not str(path).startswith(str(BACKUP_DIR.resolve())) or not path.exists():
+        raise ValueError("备份文件不存在")
+    return path
+
+
+def restore_database_backup(name):
+    source = resolve_backup_path(name)
+    with sqlite3.connect(source) as source_conn:
+        with sqlite3.connect(DB_PATH) as target_conn:
+            source_conn.backup(target_conn)
+    return backup_entry(source)
+
+
+def api_management_dashboard(conn):
+    summary = api_summary(conn)
+    total_po_amount = conn.execute(
+        "SELECT COALESCE(SUM(order_qty * unit_price), 0) FROM purchase_order_lines"
+    ).fetchone()[0]
+    inventory_qty = conn.execute("SELECT COALESCE(SUM(on_hand_qty), 0) FROM inventory_balances").fetchone()[0]
+    inspected_qty, passed_qty, failed_qty = conn.execute(
+        """
+        SELECT COALESCE(SUM(inspected_qty), 0), COALESCE(SUM(passed_qty), 0), COALESCE(SUM(failed_qty), 0)
+        FROM quality_inspections
+        """
+    ).fetchone()
+    pass_rate = round((passed_qty / inspected_qty) * 100, 2) if inspected_qty else 100
+    completed_qty = conn.execute("SELECT COALESCE(SUM(completed_qty), 0) FROM work_orders").fetchone()[0]
+    shipped_qty = conn.execute("SELECT COALESCE(SUM(ship_qty), 0) FROM shipments").fetchone()[0]
+    metrics = [
+        {"label": "未完成采购单", "value": summary["open_pos"], "hint": "需要采购继续跟进的订单"},
+        {"label": "生产中工单", "value": summary["active_work_orders"], "hint": "尚未完工入库的生产任务"},
+        {"label": "待交付订单", "value": summary["open_sales_orders"], "hint": "尚未完全出货的销售订单"},
+        {"label": "品质异常", "value": summary["open_quality_issues"], "hint": "有不良且未放行的检验记录"},
+        {"label": "库存总量", "value": round(inventory_qty, 2), "hint": "所有物料当前在库数量合计"},
+        {"label": "采购金额", "value": round(total_po_amount, 2), "hint": "采购明细金额合计"},
+        {"label": "质量合格率", "value": f"{pass_rate}%", "hint": f"已检 {round(inspected_qty, 2)}，不良 {round(failed_qty, 2)}"},
+        {"label": "累计完工", "value": round(completed_qty, 2), "hint": "生产报工良品入库数量"},
+        {"label": "累计出货", "value": round(shipped_qty, 2), "hint": "销售交付已出货数量"},
+    ]
+    risks = []
+    if summary["pending"]:
+        risks.append({"level": "warning", "text": f"{summary['pending']} 条供应商物料待清洗审核"})
+    if summary["open_pos"]:
+        risks.append({"level": "info", "text": f"{summary['open_pos']} 张采购单未完成收货"})
+    if summary["active_work_orders"]:
+        risks.append({"level": "info", "text": f"{summary['active_work_orders']} 张生产工单未完工"})
+    if summary["open_quality_issues"]:
+        risks.append({"level": "danger", "text": f"{summary['open_quality_issues']} 条品质异常需要处置"})
+    if not risks:
+        risks.append({"level": "ok", "text": "当前没有突出的待办风险"})
+    activity = conn.execute(
+        "SELECT action, detail, created_at FROM activity_log ORDER BY id DESC LIMIT 12"
+    ).fetchall()
+    return {
+        "metrics": metrics,
+        "risks": risks,
+        "recent_activity": [dict(row) for row in activity],
+        "summary": summary,
+    }
+
+
 def api_summary(conn):
     total_items = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
     total_mappings = conn.execute("SELECT COUNT(*) FROM supplier_mappings").fetchone()[0]
@@ -1856,14 +2182,35 @@ class AppHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(content)
 
-    def send_json(self, payload, status=HTTPStatus.OK):
+    def send_json(self, payload, status=HTTPStatus.OK, extra_headers=None):
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_bytes(data, "application/json; charset=utf-8", status)
+        self.send_bytes(data, "application/json; charset=utf-8", status, extra_headers)
 
     def read_json(self):
         length = int(self.headers.get("Content-Length", "0"))
         data = self.rfile.read(length).decode("utf-8") if length else "{}"
         return json.loads(data or "{}")
+
+    def session_token(self):
+        return parse_cookie(self.headers.get("Cookie", "")).get(SESSION_COOKIE, "")
+
+    def current_user(self, conn):
+        return current_user_from_token(conn, self.session_token())
+
+    def authorize(self, conn, path, method):
+        if not path.startswith("/api/") or path in PUBLIC_API_PATHS:
+            self.user = None
+            return True
+        user = self.current_user(conn)
+        if not user:
+            self.send_json({"error": "请先登录", "code": "UNAUTHENTICATED"}, HTTPStatus.UNAUTHORIZED)
+            return False
+        permission = permission_for_request(method, path)
+        if not user_can(user, permission):
+            self.send_json({"error": "当前账号没有此操作权限", "code": "FORBIDDEN"}, HTTPStatus.FORBIDDEN)
+            return False
+        self.user = user
+        return True
 
     def serve_static(self, path):
         if path == "/":
@@ -1891,8 +2238,21 @@ class AppHandler(BaseHTTPRequestHandler):
         try:
             init_db()
             with closing(db_connect()) as conn:
-                if path == "/api/summary":
+                if path == "/api/health":
+                    self.send_json({"ok": True, "time": now_text()})
+                elif path == "/api/session":
+                    user = self.current_user(conn)
+                    self.send_json({"authenticated": bool(user), "user": user})
+                elif not self.authorize(conn, path, "GET"):
+                    return
+                elif path == "/api/summary":
                     self.send_json(api_summary(conn))
+                elif path == "/api/management-dashboard":
+                    self.send_json(api_management_dashboard(conn))
+                elif path == "/api/users":
+                    self.send_json({"rows": fetch_users(conn)})
+                elif path == "/api/backups":
+                    self.send_json({"rows": list_backups()})
                 elif path == "/api/items":
                     self.send_json({"rows": fetch_items(conn)})
                 elif path == "/api/mappings":
@@ -1977,7 +2337,38 @@ class AppHandler(BaseHTTPRequestHandler):
             init_db()
             body = self.read_json()
             with closing(db_connect()) as conn:
-                if path == "/api/import":
+                if path == "/api/login":
+                    result = login_user(conn, body.get("username", "").strip(), body.get("password", ""))
+                    if not result:
+                        self.send_json({"error": "账号或密码不正确"}, HTTPStatus.UNAUTHORIZED)
+                        return
+                    self.send_json(
+                        {"ok": True, "user": result["user"], "expires_at": result["expires_at"]},
+                        extra_headers={"Set-Cookie": session_cookie(result["token"])},
+                    )
+                elif path == "/api/logout":
+                    logout_user(conn, self.session_token())
+                    self.send_json({"ok": True}, extra_headers={"Set-Cookie": clear_session_cookie()})
+                elif not self.authorize(conn, path, "POST"):
+                    return
+                elif path == "/api/me/password":
+                    change_user_password(conn, self.user["username"], body.get("old_password", ""), body.get("new_password", ""))
+                    self.send_json({"ok": True})
+                elif path == "/api/backups/create":
+                    backup = create_database_backup(conn, self.user["username"])
+                    self.send_json({"ok": True, "backup": backup, "rows": list_backups()})
+                elif path == "/api/backups/restore":
+                    backup_name = body.get("name", "")
+                    conn.close()
+                    backup = restore_database_backup(backup_name)
+                    with closing(db_connect()) as restored_conn:
+                        restored_conn.execute(
+                            "INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)",
+                            ("恢复备份", f"{backup_name} / {self.user['username']}", now_text()),
+                        )
+                        restored_conn.commit()
+                    self.send_json({"ok": True, "backup": backup})
+                elif path == "/api/import":
                     rows = body.get("rows")
                     if rows is None:
                         rows = parse_csv_text(body.get("csvText", ""))

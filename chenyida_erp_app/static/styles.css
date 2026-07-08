@@ -45,17 +45,37 @@ body {
 
 .topbar-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.ghost-link {
+.ghost-link,
+.ghost-button {
   color: #fff;
   border: 1px solid rgba(255,255,255,.5);
   border-radius: 6px;
   padding: 8px 10px;
   text-decoration: none;
   font-size: 14px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.user-badge {
+  display: grid;
+  gap: 2px;
+  color: #fff;
+  text-align: right;
+  padding: 4px 8px;
+}
+
+.user-badge b {
+  font-size: 14px;
+}
+
+.user-badge small {
+  color: #d7fffb;
 }
 
 .layout {
@@ -172,6 +192,13 @@ textarea {
   font-size: 13px;
 }
 
+.summary-card small {
+  display: block;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
 .work-panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -181,6 +208,36 @@ textarea {
 
 .work-panel h3 {
   margin-top: 0;
+}
+
+.risk-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.risk {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+
+.risk.warning {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.risk.danger {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.risk.ok {
+  border-color: #16a34a;
+  background: #f0fdf4;
 }
 
 .steps {
@@ -250,6 +307,14 @@ select {
   border-radius: 8px;
   overflow: auto;
   max-height: calc(100vh - 170px);
+}
+
+.table-wrap.mini {
+  max-height: 320px;
+}
+
+.table-wrap.mini table {
+  min-width: 620px;
 }
 
 table {
@@ -350,6 +415,40 @@ dialog h3 {
   box-shadow: 0 12px 35px rgba(15, 23, 42, .2);
 }
 
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, .48);
+  z-index: 20;
+  padding: 18px;
+}
+
+.login-overlay[hidden] {
+  display: none;
+}
+
+.login-card {
+  display: grid;
+  gap: 14px;
+  width: min(420px, 94vw);
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, .25);
+}
+
+.login-card h2,
+.login-card p {
+  margin: 0;
+}
+
+.login-card small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
@@ -365,6 +464,13 @@ dialog h3 {
   }
   .summary-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .user-badge {
+    text-align: left;
   }
   .form-grid {
     grid-template-columns: 1fr;
