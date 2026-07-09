@@ -36,6 +36,7 @@ DEFAULT_USERS = [
     {"username": "purchase", "display_name": "采购员", "role": "purchase", "password": "purchase123"},
     {"username": "engineering", "display_name": "工程员", "role": "engineering", "password": "engineering123"},
     {"username": "production", "display_name": "生产计划", "role": "production", "password": "production123"},
+    {"username": "warehouse", "display_name": "仓库员", "role": "warehouse", "password": "warehouse123"},
     {"username": "quality", "display_name": "品质员", "role": "quality", "password": "quality123"},
     {"username": "sales", "display_name": "销售员", "role": "sales", "password": "sales123"},
     {"username": "finance", "display_name": "财务员", "role": "finance", "password": "finance123"},
@@ -47,6 +48,7 @@ ROLE_LABELS = {
     "purchase": "采购",
     "engineering": "工程",
     "production": "生产",
+    "warehouse": "仓库",
     "quality": "品质",
     "sales": "销售",
     "finance": "财务",
@@ -54,10 +56,11 @@ ROLE_LABELS = {
 
 ROLE_PERMISSIONS = {
     "admin": {"*"},
-    "manager": {"read", "dashboard", "material", "engineering", "purchase", "production", "sales", "quality", "finance"},
-    "purchase": {"read", "dashboard", "material", "purchase"},
+    "manager": {"read", "dashboard", "material", "engineering", "purchase", "production", "inventory", "sales", "quality", "finance"},
+    "purchase": {"read", "dashboard", "material", "purchase", "inventory"},
     "engineering": {"read", "dashboard", "material", "engineering"},
     "production": {"read", "dashboard", "production"},
+    "warehouse": {"read", "dashboard", "inventory"},
     "quality": {"read", "dashboard", "quality"},
     "sales": {"read", "dashboard", "sales"},
     "finance": {"read", "dashboard", "finance"},
@@ -410,6 +413,8 @@ def permission_for_request(method, path):
         return "engineering"
     if path in {"/api/purchase-orders", "/api/purchase-orders/from-shortage", "/api/purchase-receive"}:
         return "purchase"
+    if path == "/api/inventory-adjustments":
+        return "inventory"
     if path in {"/api/work-orders/from-bom", "/api/work-orders/issue-materials", "/api/work-orders/complete"}:
         return "production"
     if path in {"/api/sales-orders", "/api/shipments/from-order"}:
@@ -710,6 +715,20 @@ def create_schema(conn):
             before_qty REAL NOT NULL DEFAULT 0,
             after_qty REAL NOT NULL DEFAULT 0,
             remark TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS inventory_adjustments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            adjustment_code TEXT NOT NULL UNIQUE,
+            internal_item_code TEXT NOT NULL,
+            counted_qty REAL NOT NULL DEFAULT 0,
+            before_qty REAL NOT NULL DEFAULT 0,
+            delta_qty REAL NOT NULL DEFAULT 0,
+            after_qty REAL NOT NULL DEFAULT 0,
+            reason TEXT DEFAULT '',
+            adjusted_by TEXT DEFAULT '',
+            adjusted_at TEXT NOT NULL,
             created_at TEXT NOT NULL
         );
 
@@ -1343,6 +1362,70 @@ def fetch_inventory(conn):
         """
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def generate_inventory_adjustment_code(conn):
+    prefix = f"IA-{datetime.now().strftime('%Y%m%d')}"
+    count = conn.execute("SELECT COUNT(*) FROM inventory_adjustments WHERE adjustment_code LIKE ?", (f"{prefix}%",)).fetchone()[0]
+    return f"{prefix}-{count + 1:03d}"
+
+
+def fetch_inventory_adjustments(conn, limit=200):
+    rows = conn.execute(
+        """
+        SELECT ia.*, i.standard_name, i.base_uom, i.item_category
+        FROM inventory_adjustments ia
+        LEFT JOIN items i ON i.internal_item_code = ia.internal_item_code
+        ORDER BY ia.created_at DESC, ia.id DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_inventory_adjustment(conn, row):
+    item_code = row.get("internal_item_code", "")
+    if not item_code:
+        raise ValueError("请选择物料")
+    item = conn.execute("SELECT internal_item_code FROM items WHERE internal_item_code = ?", (item_code,)).fetchone()
+    if not item:
+        raise ValueError("内部物料不存在")
+    counted_qty = float(row.get("counted_qty") or 0)
+    if counted_qty < 0:
+        raise ValueError("实盘数量不能小于 0")
+    balance = conn.execute("SELECT * FROM inventory_balances WHERE internal_item_code = ?", (item_code,)).fetchone()
+    before_qty = float(balance["on_hand_qty"]) if balance else 0.0
+    delta_qty = round(counted_qty - before_qty, 6)
+    adjustment_code = row.get("adjustment_code") or generate_inventory_adjustment_code(conn)
+    reason = row.get("reason", "")
+    adjusted_by = row.get("adjusted_by", "")
+    timestamp = now_text()
+    stock_result = change_inventory(conn, item_code, delta_qty, "库存盘点", "盘点单", adjustment_code, reason)
+    conn.execute(
+        """
+        INSERT INTO inventory_adjustments (
+            adjustment_code, internal_item_code, counted_qty, before_qty, delta_qty,
+            after_qty, reason, adjusted_by, adjusted_at, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            adjustment_code,
+            item_code,
+            counted_qty,
+            before_qty,
+            delta_qty,
+            stock_result["after_qty"],
+            reason,
+            adjusted_by,
+            timestamp,
+            timestamp,
+        ),
+    )
+    conn.execute("INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)", ("库存盘点", f"{adjustment_code};{item_code};差异={delta_qty}", timestamp))
+    conn.commit()
+    return {"ok": True, "adjustment_code": adjustment_code, "delta_qty": delta_qty, **stock_result}
 
 
 def fetch_purchase_orders(conn):
@@ -2565,6 +2648,8 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.send_json({"rows": fetch_purchase_order_lines(conn, po_id)})
                 elif path == "/api/inventory":
                     self.send_json({"rows": fetch_inventory(conn)})
+                elif path == "/api/inventory-adjustments":
+                    self.send_json({"rows": fetch_inventory_adjustments(conn)})
                 elif path == "/api/work-orders":
                     self.send_json({"rows": fetch_work_orders(conn)})
                 elif path == "/api/work-order-materials":
@@ -2831,6 +2916,9 @@ class AppHandler(BaseHTTPRequestHandler):
                         self.send_json({"error": "缺少采购明细 ID"}, HTTPStatus.BAD_REQUEST)
                         return
                     result = receive_purchase_line(conn, line_id, receive_qty)
+                    self.send_json(result)
+                elif path == "/api/inventory-adjustments":
+                    result = create_inventory_adjustment(conn, body)
                     self.send_json(result)
                 elif path == "/api/work-orders/from-bom":
                     bom_id = int(body.get("bom_id") or 0)

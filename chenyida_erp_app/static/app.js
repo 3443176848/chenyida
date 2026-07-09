@@ -11,6 +11,7 @@ const state = {
   purchaseLines: [],
   purchaseSuggestions: [],
   inventory: [],
+  inventoryAdjustments: [],
   workOrders: [],
   workMaterials: [],
   productionReports: [],
@@ -260,6 +261,7 @@ function renderBomSelectors() {
   $("#productionBom").innerHTML = bomOptions;
   $("#salesProduct").innerHTML = productOptions;
   $("#lineItem").innerHTML = itemOptions;
+  $("#adjustItem").innerHTML = itemOptions;
 }
 
 function renderBoms() {
@@ -422,6 +424,26 @@ function renderInventory() {
       <th>物料编码</th><th>物料名称</th><th>品类</th><th>现有库存</th><th>已预留</th><th>可用库存</th><th>单位</th><th>更新时间</th>
     </tr></thead>
     <tbody>${rows}</tbody>
+  `;
+  const adjustments = state.inventoryAdjustments.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.adjustment_code)}</td>
+      <td>${escapeHtml(row.internal_item_code)}</td>
+      <td>${escapeHtml(row.standard_name)}</td>
+      <td>${escapeHtml(row.before_qty)}</td>
+      <td>${escapeHtml(row.counted_qty)}</td>
+      <td>${escapeHtml(row.delta_qty)}</td>
+      <td>${escapeHtml(row.after_qty)}</td>
+      <td>${escapeHtml(row.reason)}</td>
+      <td>${escapeHtml(row.adjusted_by)}</td>
+      <td>${escapeHtml(row.created_at)}</td>
+    </tr>
+  `).join("");
+  $("#inventoryAdjustmentsTable").innerHTML = `
+    <thead><tr>
+      <th>盘点单</th><th>物料编码</th><th>物料名称</th><th>调整前</th><th>实盘数</th><th>差异</th><th>调整后</th><th>原因</th><th>经办人</th><th>时间</th>
+    </tr></thead>
+    <tbody>${adjustments}</tbody>
   `;
 }
 
@@ -862,7 +884,7 @@ async function restoreBackup(name) {
 }
 
 async function refreshAll() {
-  const [summary, items, mappings, cleaning, products, boms, purchaseOrders, purchaseLines, inventory, workOrders, workMaterials, productionReports, salesOrders, shipments, qualityInspections, qualityDefects, financeSummary, financialDocuments, financialPayments] = await Promise.all([
+  const [summary, items, mappings, cleaning, products, boms, purchaseOrders, purchaseLines, inventory, inventoryAdjustments, workOrders, workMaterials, productionReports, salesOrders, shipments, qualityInspections, qualityDefects, financeSummary, financialDocuments, financialPayments] = await Promise.all([
     api("/api/summary"),
     api("/api/items"),
     api("/api/mappings"),
@@ -872,6 +894,7 @@ async function refreshAll() {
     api("/api/purchase-orders"),
     api("/api/purchase-order-lines"),
     api("/api/inventory"),
+    api("/api/inventory-adjustments"),
     api("/api/work-orders"),
     api("/api/work-order-materials"),
     api("/api/production-reports"),
@@ -892,6 +915,7 @@ async function refreshAll() {
   state.purchaseOrders = purchaseOrders.rows;
   state.purchaseLines = purchaseLines.rows;
   state.inventory = inventory.rows;
+  state.inventoryAdjustments = inventoryAdjustments.rows;
   state.workOrders = workOrders.rows;
   state.workMaterials = workMaterials.rows;
   state.productionReports = productionReports.rows;
@@ -1110,6 +1134,27 @@ async function receivePurchase() {
   $("#receiveMsg").textContent = `库存从 ${result.before_qty} 增加到 ${result.after_qty}`;
   await refreshAll();
   toast("收货入库完成");
+}
+
+async function createInventoryAdjustment() {
+  const itemCode = $("#adjustItem").value;
+  const countedQty = $("#adjustCountedQty").value.trim();
+  if (!itemCode) {
+    toast("请选择要盘点的物料");
+    return;
+  }
+  const result = await api("/api/inventory-adjustments", {
+    method: "POST",
+    body: JSON.stringify({
+      internal_item_code: itemCode,
+      counted_qty: countedQty,
+      reason: $("#adjustReason").value.trim(),
+      adjusted_by: $("#adjustedBy").value.trim(),
+    }),
+  });
+  $("#adjustMsg").textContent = `${result.adjustment_code}，差异 ${result.delta_qty}，库存从 ${result.before_qty} 调整到 ${result.after_qty}`;
+  await refreshAll();
+  toast("库存盘点已保存");
 }
 
 async function createWorkOrder() {
@@ -1360,6 +1405,7 @@ function bindEvents() {
   $("#loadPurchaseSuggestionsBtn").addEventListener("click", loadPurchaseSuggestions);
   $("#createPoFromShortageBtn").addEventListener("click", createPoFromShortage);
   $("#receivePurchaseBtn").addEventListener("click", receivePurchase);
+  $("#createAdjustmentBtn").addEventListener("click", createInventoryAdjustment);
   $("#createWorkOrderBtn").addEventListener("click", createWorkOrder);
   $("#completeWorkOrderBtn").addEventListener("click", completeWorkOrder);
   $("#createSalesOrderBtn").addEventListener("click", createSalesOrder);

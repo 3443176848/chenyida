@@ -66,6 +66,10 @@ try {
   await page.getByText("缺料采购建议").waitFor();
   await page.getByRole("button", { name: "生成采购建议" }).click();
   await page.getByText("建议采购数量").waitFor();
+  await page.locator("#adjustCountedQty").fill("1234");
+  await page.locator("#adjustReason").fill("浏览器盘点测试");
+  await page.getByRole("button", { name: "保存盘点调整" }).click();
+  await page.locator("#adjustMsg").getByText(/IA-/).waitFor();
   await page.getByText("生产协同").first().click();
   await page.getByRole("button", { name: "生成生产工单" }).waitFor();
   await page.getByRole("button", { name: "生成生产工单" }).click();

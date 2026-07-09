@@ -155,6 +155,22 @@ def main():
             inventory_after = request("/api/inventory")["rows"]
             after_item = next(row for row in inventory_after if row["internal_item_code"] == first_line["internal_item_code"])
             assert float(after_item["on_hand_qty"]) == float(before_item["on_hand_qty"]) + 1, (before_item, after_item)
+            adjusted = request(
+                "/api/inventory-adjustments",
+                method="POST",
+                payload={
+                    "internal_item_code": first_line["internal_item_code"],
+                    "counted_qty": float(after_item["on_hand_qty"]) + 2,
+                    "reason": "Smoke盘点",
+                    "adjusted_by": "SmokeTest",
+                },
+            )
+            assert adjusted["adjustment_code"].startswith("IA-"), adjusted
+            inventory_adjusted = request("/api/inventory")["rows"]
+            adjusted_item = next(row for row in inventory_adjusted if row["internal_item_code"] == first_line["internal_item_code"])
+            assert float(adjusted_item["on_hand_qty"]) == float(after_item["on_hand_qty"]) + 2, adjusted_item
+            adjustments = request("/api/inventory-adjustments")["rows"]
+            assert adjustments and adjustments[0]["adjustment_code"] == adjusted["adjustment_code"], adjustments
 
             work_order = request(
                 "/api/work-orders/from-bom",
