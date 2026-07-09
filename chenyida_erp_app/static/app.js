@@ -17,6 +17,7 @@ const state = {
   workOrders: [],
   workMaterials: [],
   productionReports: [],
+  quotations: [],
   salesOrders: [],
   shipments: [],
   qualityInspections: [],
@@ -128,6 +129,8 @@ function renderSummary() {
     ["未完成采购", state.summary.open_pos],
     ["生产工单", state.summary.total_work_orders],
     ["进行中工单", state.summary.active_work_orders],
+    ["报价单", state.summary.total_quotations],
+    ["待转报价", state.summary.open_quotations],
     ["销售订单", state.summary.total_sales_orders],
     ["待交付订单", state.summary.open_sales_orders],
     ["品质检验", state.summary.total_quality_inspections],
@@ -305,6 +308,7 @@ function renderBomSelectors() {
   $("#readyBom").innerHTML = bomOptions;
   $("#purchaseBom").innerHTML = bomOptions;
   $("#productionBom").innerHTML = bomOptions;
+  $("#quoteProduct").innerHTML = productOptions;
   $("#salesProduct").innerHTML = productOptions;
   $("#lineItem").innerHTML = itemOptions;
   $("#adjustItem").innerHTML = itemOptions;
@@ -576,6 +580,37 @@ function renderWorkOrderSelector() {
     const label = `${order.work_order_code} - ${order.product_name || order.product_code} - 未完 ${remaining}`;
     return `<option value="${escapeHtml(order.id)}">${escapeHtml(label)}</option>`;
   }).join("");
+}
+
+function renderQuotations() {
+  const rows = state.quotations.map((quote) => {
+    const converted = Number(quote.sales_order_id || 0) > 0 || quote.quote_status === "已转订单";
+    return `
+      <tr>
+        <td>${escapeHtml(quote.quote_code)}</td>
+        <td>${escapeHtml(quote.customer_name)}</td>
+        <td>${escapeHtml(quote.product_code)}</td>
+        <td>${escapeHtml(quote.product_name)}</td>
+        <td>${escapeHtml(quote.quote_qty)}</td>
+        <td>${escapeHtml(quote.unit_price)}</td>
+        <td>${escapeHtml(quote.total_amount)}</td>
+        <td>${escapeHtml(quote.quote_status)}</td>
+        <td>${escapeHtml(quote.valid_until)}</td>
+        <td>${escapeHtml(quote.owner)}</td>
+        <td>
+          <div class="row-actions">
+            <button data-convert-quote="${quote.id}" ${converted ? "disabled" : ""}>转销售订单</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+  $("#quotationsTable").innerHTML = `
+    <thead><tr>
+      <th>报价单号</th><th>客户</th><th>产品编码</th><th>产品名称</th><th>数量</th><th>单价</th><th>总额</th><th>状态</th><th>有效期</th><th>负责人</th><th>操作</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  `;
 }
 
 function renderSalesOrders() {
@@ -930,7 +965,7 @@ async function restoreBackup(name) {
 }
 
 async function refreshAll() {
-  const [summary, items, mappings, cleaning, products, customers, suppliers, boms, purchaseOrders, purchaseLines, inventory, inventoryAdjustments, workOrders, workMaterials, productionReports, salesOrders, shipments, qualityInspections, qualityDefects, financeSummary, financialDocuments, financialPayments] = await Promise.all([
+  const [summary, items, mappings, cleaning, products, customers, suppliers, boms, purchaseOrders, purchaseLines, inventory, inventoryAdjustments, workOrders, workMaterials, productionReports, quotations, salesOrders, shipments, qualityInspections, qualityDefects, financeSummary, financialDocuments, financialPayments] = await Promise.all([
     api("/api/summary"),
     api("/api/items"),
     api("/api/mappings"),
@@ -946,6 +981,7 @@ async function refreshAll() {
     api("/api/work-orders"),
     api("/api/work-order-materials"),
     api("/api/production-reports"),
+    api("/api/quotations"),
     api("/api/sales-orders"),
     api("/api/shipments"),
     api("/api/quality-inspections"),
@@ -969,6 +1005,7 @@ async function refreshAll() {
   state.workOrders = workOrders.rows;
   state.workMaterials = workMaterials.rows;
   state.productionReports = productionReports.rows;
+  state.quotations = quotations.rows;
   state.salesOrders = salesOrders.rows;
   state.shipments = shipments.rows;
   state.qualityInspections = qualityInspections.rows;
@@ -991,6 +1028,7 @@ async function refreshAll() {
   renderWorkOrders();
   renderWorkMaterials();
   renderProductionReports();
+  renderQuotations();
   renderSalesOrders();
   renderShipments();
   renderFinance();
@@ -1317,6 +1355,43 @@ async function completeWorkOrder() {
   toast("完工入库完成");
 }
 
+async function createQuotation() {
+  const payload = {
+    customer_name: $("#quoteCustomer").value.trim(),
+    product_code: $("#quoteProduct").value,
+    quote_qty: $("#quoteQty").value.trim(),
+    unit_price: $("#quoteUnitPrice").value.trim(),
+    valid_until: $("#quoteValidUntil").value,
+    owner: $("#quoteOwner").value.trim(),
+    remark: $("#quoteRemark").value.trim(),
+  };
+  if (!payload.customer_name) {
+    toast("请填写客户名称");
+    return;
+  }
+  if (!payload.product_code) {
+    toast("请选择产品");
+    return;
+  }
+  const result = await api("/api/quotations", { method: "POST", body: JSON.stringify(payload) });
+  await refreshAll();
+  $("#quoteMsg").textContent = `已生成 ${result.quote_code}`;
+  toast("报价单已生成");
+}
+
+async function convertQuotation(quoteId) {
+  const result = await api("/api/quotations/to-sales-order", {
+    method: "POST",
+    body: JSON.stringify({
+      quote_id: quoteId,
+      owner: $("#quoteOwner").value.trim() || "业务员",
+    }),
+  });
+  await refreshAll();
+  $("#quoteMsg").textContent = `已转销售订单 ${result.sales_order_code}`;
+  toast("销售订单已创建");
+}
+
 async function createSalesOrder() {
   const payload = {
     customer_name: $("#salesCustomer").value.trim(),
@@ -1500,6 +1575,7 @@ function bindEvents() {
   $("#createAdjustmentBtn").addEventListener("click", createInventoryAdjustment);
   $("#createWorkOrderBtn").addEventListener("click", createWorkOrder);
   $("#completeWorkOrderBtn").addEventListener("click", completeWorkOrder);
+  $("#createQuoteBtn").addEventListener("click", createQuotation);
   $("#createSalesOrderBtn").addEventListener("click", createSalesOrder);
   $("#shipSalesOrderBtn").addEventListener("click", shipSalesOrder);
   $("#createReceivableBtn").addEventListener("click", createReceivable);
@@ -1531,6 +1607,10 @@ function bindEvents() {
     const issueId = event.target.dataset.issueWorkOrder;
     if (viewId) await loadWorkOrderMaterials(viewId);
     if (issueId) await issueWorkOrder(issueId);
+  });
+  $("#quotationsTable").addEventListener("click", async (event) => {
+    const quoteId = event.target.dataset.convertQuote;
+    if (quoteId) await convertQuotation(quoteId);
   });
   $("#salesOrdersTable").addEventListener("click", (event) => {
     const salesOrderId = event.target.dataset.selectSalesOrder;

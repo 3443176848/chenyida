@@ -83,6 +83,15 @@ try {
   await page.getByRole("button", { name: "生成生产工单" }).waitFor();
   await page.getByRole("button", { name: "生成生产工单" }).click();
   await page.getByText(/WO-/).waitFor();
+  await page.getByText("询价报价").first().click();
+  await page.getByRole("button", { name: "生成报价单" }).waitFor();
+  await page.locator("#quoteCustomer").fill("浏览器测试客户档案");
+  await page.locator("#quoteQty").fill("3");
+  await page.locator("#quoteUnitPrice").fill("66");
+  await page.getByRole("button", { name: "生成报价单" }).click();
+  await page.locator("#quoteMsg").getByText(/QT-/).waitFor();
+  await page.getByRole("button", { name: "转销售订单" }).first().click();
+  await page.locator("#quoteMsg").getByText(/SO-/).waitFor();
   await page.getByText("销售交付").first().click();
   await page.getByRole("button", { name: "创建销售订单" }).waitFor();
   await page.locator("#salesCustomer").fill("浏览器测试客户");

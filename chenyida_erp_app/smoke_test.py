@@ -99,6 +99,8 @@ def main():
             assert summary["total_suppliers"] >= 1, summary
             assert summary["total_products"] == 1, summary
             assert summary["total_boms"] == 1, summary
+            assert summary["total_quotations"] == 0, summary
+            assert summary["open_quotations"] == 0, summary
             dashboard = request("/api/management-dashboard")
             assert dashboard["metrics"], dashboard
             backup_result = request("/api/backups/create", method="POST", payload={})
@@ -145,6 +147,7 @@ def main():
             assert "BOM 管理" in html
             assert "采购与库存" in html
             assert "生产协同" in html
+            assert "询价报价" in html
             assert "销售交付" in html
 
             products = request("/api/products")["rows"]
@@ -228,14 +231,41 @@ def main():
             completed = request(
                 "/api/work-orders/complete",
                 method="POST",
-                payload={"work_order_id": work_order["work_order_id"], "good_qty": 10, "scrap_qty": 1, "operator": "SmokeTest"},
+                payload={"work_order_id": work_order["work_order_id"], "good_qty": 12, "scrap_qty": 1, "operator": "SmokeTest"},
             )
             assert completed["finished_item_code"] == "FG-CYD-FPC-DEMO-001", completed
             finished_inventory = request("/api/inventory")["rows"]
             finished_item = next(row for row in finished_inventory if row["internal_item_code"] == completed["finished_item_code"])
-            assert float(finished_item["on_hand_qty"]) == 10, finished_item
+            assert float(finished_item["on_hand_qty"]) == 12, finished_item
             reports = request(f"/api/production-reports?work_order_id={work_order['work_order_id']}")["rows"]
-            assert reports and float(reports[0]["good_qty"]) == 10, reports
+            assert reports and float(reports[0]["good_qty"]) == 12, reports
+
+            quotation = request(
+                "/api/quotations",
+                method="POST",
+                payload={
+                    "customer_name": "Smoke客户",
+                    "product_code": "CYD-FPC-DEMO-001",
+                    "quote_qty": 2,
+                    "unit_price": 88,
+                    "valid_until": "2026-12-31",
+                    "owner": "SmokeTest",
+                },
+            )
+            assert quotation["quote_code"].startswith("QT-"), quotation
+            quotations = request("/api/quotations")["rows"]
+            assert quotations and quotations[0]["quote_code"] == quotation["quote_code"], quotations
+            assert float(quotations[0]["total_amount"]) == 176, quotations
+            converted_order = request(
+                "/api/quotations/to-sales-order",
+                method="POST",
+                payload={"quote_id": quotation["quote_id"], "owner": "SmokeTest"},
+            )
+            assert converted_order["sales_order_code"].startswith("SO-"), converted_order
+            quotations_after = request("/api/quotations")["rows"]
+            converted_quote = next(row for row in quotations_after if row["id"] == quotation["quote_id"])
+            assert converted_quote["quote_status"] == "已转订单", converted_quote
+            assert int(converted_quote["sales_order_id"]) == converted_order["sales_order_id"], converted_quote
 
             sales_order = request(
                 "/api/sales-orders",
@@ -259,7 +289,7 @@ def main():
             assert shipped_first["sales_status"] == "部分出货", shipped_first
             inventory_mid = request("/api/inventory")["rows"]
             finished_mid = next(row for row in inventory_mid if row["internal_item_code"] == "FG-CYD-FPC-DEMO-001")
-            assert float(finished_mid["on_hand_qty"]) == 6, finished_mid
+            assert float(finished_mid["on_hand_qty"]) == 8, finished_mid
             shipped_second = request(
                 "/api/shipments/from-order",
                 method="POST",
@@ -268,9 +298,18 @@ def main():
             assert shipped_second["sales_status"] == "已出货", shipped_second
             inventory_done = request("/api/inventory")["rows"]
             finished_done = next(row for row in inventory_done if row["internal_item_code"] == "FG-CYD-FPC-DEMO-001")
-            assert float(finished_done["on_hand_qty"]) == 0, finished_done
+            assert float(finished_done["on_hand_qty"]) == 2, finished_done
             shipments = request(f"/api/shipments?sales_order_id={sales_order['sales_order_id']}")["rows"]
             assert len(shipments) == 2, shipments
+            shipped_quote = request(
+                "/api/shipments/from-order",
+                method="POST",
+                payload={"sales_order_id": converted_order["sales_order_id"], "ship_qty": 2, "receiver": "Smoke报价收货人"},
+            )
+            assert shipped_quote["sales_status"] == "已出货", shipped_quote
+            inventory_quote_done = request("/api/inventory")["rows"]
+            finished_quote_done = next(row for row in inventory_quote_done if row["internal_item_code"] == "FG-CYD-FPC-DEMO-001")
+            assert float(finished_quote_done["on_hand_qty"]) == 0, finished_quote_done
 
             receivable = request(
                 "/api/financial-documents/from-sales-order",
@@ -426,7 +465,9 @@ def main():
             assert final_summary["open_pos"] >= 1, final_summary
             assert final_summary["total_work_orders"] >= 1, final_summary
             assert final_summary["active_work_orders"] >= 1, final_summary
-            assert final_summary["total_sales_orders"] >= 1, final_summary
+            assert final_summary["total_quotations"] >= 1, final_summary
+            assert final_summary["open_quotations"] == 0, final_summary
+            assert final_summary["total_sales_orders"] >= 2, final_summary
             assert final_summary["open_sales_orders"] == 0, final_summary
             assert final_summary["total_quality_inspections"] == 3, final_summary
             assert final_summary["open_quality_issues"] == 1, final_summary

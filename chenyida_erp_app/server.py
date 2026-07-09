@@ -166,6 +166,20 @@ SUPPLIER_FIELDS = [
     "remark",
 ]
 
+QUOTATION_FIELDS = [
+    "quote_code",
+    "customer_name",
+    "product_code",
+    "quote_qty",
+    "unit_price",
+    "total_amount",
+    "quote_status",
+    "valid_until",
+    "owner",
+    "remark",
+    "sales_order_id",
+]
+
 BOM_FIELDS = [
     "bom_code",
     "product_code",
@@ -448,7 +462,7 @@ def permission_for_request(method, path):
         return "inventory"
     if path in {"/api/work-orders/from-bom", "/api/work-orders/issue-materials", "/api/work-orders/complete"}:
         return "production"
-    if path in {"/api/sales-orders", "/api/shipments/from-order"}:
+    if path in {"/api/quotations", "/api/quotations/to-sales-order", "/api/sales-orders", "/api/shipments/from-order"}:
         return "sales"
     if path == "/api/quality-inspections":
         return "quality"
@@ -699,6 +713,23 @@ def create_schema(conn):
             supplier_level TEXT DEFAULT '',
             owner TEXT DEFAULT '',
             remark TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS quotations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            quote_code TEXT NOT NULL UNIQUE,
+            customer_name TEXT NOT NULL,
+            product_code TEXT NOT NULL,
+            quote_qty REAL NOT NULL DEFAULT 0,
+            unit_price REAL NOT NULL DEFAULT 0,
+            total_amount REAL NOT NULL DEFAULT 0,
+            quote_status TEXT NOT NULL DEFAULT '草稿',
+            valid_until TEXT DEFAULT '',
+            owner TEXT DEFAULT '',
+            remark TEXT DEFAULT '',
+            sales_order_id INTEGER DEFAULT 0,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
@@ -1056,6 +1087,42 @@ def insert_supplier(conn, row):
     )
     saved = conn.execute("SELECT supplier_code FROM suppliers WHERE supplier_name = ?", (data["supplier_name"],)).fetchone()
     return saved["supplier_code"] if saved else data["supplier_code"]
+
+
+def generate_quote_code(conn):
+    prefix = f"QT-{datetime.now().strftime('%Y%m%d')}"
+    count = conn.execute("SELECT COUNT(*) FROM quotations WHERE quote_code LIKE ?", (f"{prefix}%",)).fetchone()[0]
+    return f"{prefix}-{count + 1:03d}"
+
+
+def insert_quotation(conn, row):
+    data = {field: row.get(field, "") for field in QUOTATION_FIELDS}
+    data["quote_code"] = data["quote_code"] or generate_quote_code(conn)
+    data["quote_qty"] = float(data["quote_qty"] or 0)
+    data["unit_price"] = float(data["unit_price"] or 0)
+    data["total_amount"] = round(data["quote_qty"] * data["unit_price"], 2)
+    data["quote_status"] = data["quote_status"] or "草稿"
+    data["sales_order_id"] = int(data["sales_order_id"] or 0)
+    if not data["customer_name"]:
+        raise ValueError("客户不能为空")
+    if not data["product_code"]:
+        raise ValueError("产品不能为空")
+    if data["quote_qty"] <= 0:
+        raise ValueError("报价数量必须大于 0")
+    if data["unit_price"] <= 0:
+        raise ValueError("报价单价必须大于 0")
+    product = conn.execute("SELECT product_code FROM products WHERE product_code = ?", (data["product_code"],)).fetchone()
+    if not product:
+        raise ValueError("产品不存在，请先建立产品工程卡")
+    timestamp = now_text()
+    cursor = conn.execute(
+        f"""
+        INSERT INTO quotations ({",".join(QUOTATION_FIELDS)}, created_at, updated_at)
+        VALUES ({",".join(["?"] * len(QUOTATION_FIELDS))}, ?, ?)
+        """,
+        [data[field] for field in QUOTATION_FIELDS] + [timestamp, timestamp],
+    )
+    return cursor.lastrowid, data["quote_code"]
 
 
 def insert_bom(conn, row):
@@ -1946,6 +2013,49 @@ def fetch_sales_orders(conn):
     return [dict(row) for row in rows]
 
 
+def fetch_quotations(conn):
+    rows = conn.execute(
+        """
+        SELECT q.*, p.product_name, p.product_type
+        FROM quotations q
+        LEFT JOIN products p ON p.product_code = q.product_code
+        ORDER BY q.created_at DESC, q.id DESC
+        """
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_quotation(conn, row):
+    quote_id, quote_code = insert_quotation(conn, row)
+    conn.execute("INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)", ("创建报价单", quote_code, now_text()))
+    conn.commit()
+    return {"ok": True, "quote_id": quote_id, "quote_code": quote_code}
+
+
+def convert_quotation_to_sales_order(conn, quote_id, due_date="", owner=""):
+    quote = conn.execute("SELECT * FROM quotations WHERE id = ?", (quote_id,)).fetchone()
+    if not quote:
+        raise ValueError("报价单不存在")
+    if int(quote["sales_order_id"] or 0):
+        raise ValueError("报价单已转销售订单，不能重复转单")
+    result = create_sales_order(conn, {
+        "customer_name": quote["customer_name"],
+        "product_code": quote["product_code"],
+        "order_qty": quote["quote_qty"],
+        "due_date": due_date or quote["valid_until"],
+        "owner": owner or quote["owner"],
+        "remark": f"由报价单 {quote['quote_code']} 转入；报价金额 {quote['total_amount']}",
+    })
+    timestamp = now_text()
+    conn.execute(
+        "UPDATE quotations SET quote_status = '已转订单', sales_order_id = ?, updated_at = ? WHERE id = ?",
+        (result["sales_order_id"], timestamp, quote_id),
+    )
+    conn.execute("INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)", ("报价转销售订单", f"{quote['quote_code']} -> {result['sales_order_code']}", timestamp))
+    conn.commit()
+    return {"quote_code": quote["quote_code"], **result}
+
+
 def fetch_shipments(conn, sales_order_id=None):
     where_sql = ""
     params = ()
@@ -2615,6 +2725,7 @@ def api_management_dashboard(conn):
     metrics = [
         {"label": "未完成采购单", "value": summary["open_pos"], "hint": "需要采购继续跟进的订单"},
         {"label": "生产中工单", "value": summary["active_work_orders"], "hint": "尚未完工入库的生产任务"},
+        {"label": "待转报价", "value": summary["open_quotations"], "hint": "尚未转销售订单的报价单"},
         {"label": "待交付订单", "value": summary["open_sales_orders"], "hint": "尚未完全出货的销售订单"},
         {"label": "品质异常", "value": summary["open_quality_issues"], "hint": "有不良且未放行的检验记录"},
         {"label": "库存总量", "value": round(inventory_qty, 2), "hint": "所有物料当前在库数量合计"},
@@ -2632,6 +2743,8 @@ def api_management_dashboard(conn):
         risks.append({"level": "info", "text": f"{summary['open_pos']} 张采购单未完成收货"})
     if summary["active_work_orders"]:
         risks.append({"level": "info", "text": f"{summary['active_work_orders']} 张生产工单未完工"})
+    if summary["open_quotations"]:
+        risks.append({"level": "info", "text": f"{summary['open_quotations']} 张报价单待转销售订单"})
     if summary["open_quality_issues"]:
         risks.append({"level": "danger", "text": f"{summary['open_quality_issues']} 条品质异常需要处置"})
     if summary["receivable_balance"] > 0:
@@ -2666,6 +2779,8 @@ def api_summary(conn):
     open_pos = conn.execute("SELECT COUNT(*) FROM purchase_orders WHERE po_status != '已收货'").fetchone()[0]
     total_work_orders = conn.execute("SELECT COUNT(*) FROM work_orders").fetchone()[0]
     active_work_orders = conn.execute("SELECT COUNT(*) FROM work_orders WHERE work_status != '已完工'").fetchone()[0]
+    total_quotations = conn.execute("SELECT COUNT(*) FROM quotations").fetchone()[0]
+    open_quotations = conn.execute("SELECT COUNT(*) FROM quotations WHERE quote_status NOT IN ('已转订单', '已关闭')").fetchone()[0]
     total_sales_orders = conn.execute("SELECT COUNT(*) FROM sales_orders").fetchone()[0]
     open_sales_orders = conn.execute("SELECT COUNT(*) FROM sales_orders WHERE sales_status != '已出货'").fetchone()[0]
     total_quality_inspections = conn.execute("SELECT COUNT(*) FROM quality_inspections").fetchone()[0]
@@ -2683,6 +2798,8 @@ def api_summary(conn):
         "open_pos": open_pos,
         "total_work_orders": total_work_orders,
         "active_work_orders": active_work_orders,
+        "total_quotations": total_quotations,
+        "open_quotations": open_quotations,
         "total_sales_orders": total_sales_orders,
         "open_sales_orders": open_sales_orders,
         "total_quality_inspections": total_quality_inspections,
@@ -2834,6 +2951,8 @@ class AppHandler(BaseHTTPRequestHandler):
                     work_order_id_text = query.get("work_order_id", [""])[0]
                     work_order_id = int(work_order_id_text) if work_order_id_text else None
                     self.send_json({"rows": fetch_production_reports(conn, work_order_id)})
+                elif path == "/api/quotations":
+                    self.send_json({"rows": fetch_quotations(conn)})
                 elif path == "/api/sales-orders":
                     self.send_json({"rows": fetch_sales_orders(conn)})
                 elif path == "/api/shipments":
@@ -3138,6 +3257,21 @@ class AppHandler(BaseHTTPRequestHandler):
                         body.get("scrap_qty", 0),
                         body.get("operator", ""),
                         body.get("process_stage", "完工入库"),
+                    )
+                    self.send_json(result)
+                elif path == "/api/quotations":
+                    result = create_quotation(conn, body)
+                    self.send_json(result)
+                elif path == "/api/quotations/to-sales-order":
+                    quote_id = int(body.get("quote_id") or 0)
+                    if not quote_id:
+                        self.send_json({"error": "缺少报价单 ID"}, HTTPStatus.BAD_REQUEST)
+                        return
+                    result = convert_quotation_to_sales_order(
+                        conn,
+                        quote_id,
+                        body.get("due_date", ""),
+                        body.get("owner", ""),
                     )
                     self.send_json(result)
                 elif path == "/api/sales-orders":

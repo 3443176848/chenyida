@@ -36,6 +36,7 @@
         <button class="nav" data-tab="bom">BOM 管理</button>
         <button class="nav" data-tab="purchase">采购与库存</button>
         <button class="nav" data-tab="production">生产协同</button>
+        <button class="nav" data-tab="quotations">询价报价</button>
         <button class="nav" data-tab="sales">销售交付</button>
         <button class="nav" data-tab="finance">财务结算</button>
         <button class="nav" data-tab="quality">品质管理</button>
@@ -369,6 +370,34 @@
           </div>
           <div class="table-wrap spaced">
             <table id="productionReportsTable"></table>
+          </div>
+        </section>
+
+        <section id="quotations" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>询价报价</h2>
+              <p>把客户询价先沉淀为报价单，确认后可一键转成销售订单，减少重复录入。</p>
+            </div>
+          </div>
+          <div class="work-panel">
+            <h3>新增报价单</h3>
+            <div class="form-grid three">
+              <label>客户名称<input id="quoteCustomer" list="customerOptions" placeholder="客户名称" /></label>
+              <label>产品<select id="quoteProduct"></select></label>
+              <label>报价数量<input id="quoteQty" value="100" /></label>
+              <label>单价<input id="quoteUnitPrice" value="1" /></label>
+              <label>有效期<input id="quoteValidUntil" type="date" /></label>
+              <label>负责人<input id="quoteOwner" value="业务员" /></label>
+            </div>
+            <label>备注<input id="quoteRemark" placeholder="客户要求、交付说明、价格口径" /></label>
+            <div class="button-row">
+              <button id="createQuoteBtn" class="primary">生成报价单</button>
+              <span id="quoteMsg" class="muted"></span>
+            </div>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="quotationsTable"></table>
           </div>
         </section>
 
