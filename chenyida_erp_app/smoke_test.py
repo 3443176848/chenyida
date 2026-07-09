@@ -95,6 +95,8 @@ def main():
             summary = request("/api/summary")
             assert summary["total_items"] == 4, summary
             assert summary["total_mappings"] == 2, summary
+            assert summary["total_customers"] >= 1, summary
+            assert summary["total_suppliers"] >= 1, summary
             assert summary["total_products"] == 1, summary
             assert summary["total_boms"] == 1, summary
             dashboard = request("/api/management-dashboard")
@@ -107,6 +109,35 @@ def main():
             assert backups, backups
             users = request("/api/users")["rows"]
             assert any(user["username"] == "admin" for user in users), users
+
+            customer = request(
+                "/api/customers",
+                method="POST",
+                payload={
+                    "customer_name": "Smoke新增客户",
+                    "contact_name": "Smoke联系人",
+                    "phone": "13800000000",
+                    "payment_terms": "月结45天",
+                    "owner": "SmokeTest",
+                },
+            )
+            assert customer["customer_code"].startswith("CUS-"), customer
+            supplier = request(
+                "/api/suppliers",
+                method="POST",
+                payload={
+                    "supplier_name": "Smoke新增供应商",
+                    "supplier_level": "合格供应商",
+                    "contact_name": "Smoke供应商联系人",
+                    "payment_terms": "月结30天",
+                    "owner": "SmokeTest",
+                },
+            )
+            assert supplier["supplier_code"].startswith("SUP-"), supplier
+            customers = request("/api/customers")["rows"]
+            suppliers = request("/api/suppliers")["rows"]
+            assert any(row["customer_name"] == "Smoke新增客户" for row in customers), customers
+            assert any(row["supplier_name"] == "Smoke新增供应商" for row in suppliers), suppliers
 
             html = request("/")
             assert "物料主数据治理工作台" in html
@@ -387,6 +418,8 @@ def main():
             final_summary = request("/api/summary")
             assert final_summary["total_items"] == 6, final_summary
             assert final_summary["total_mappings"] >= 4, final_summary
+            assert final_summary["total_customers"] >= 2, final_summary
+            assert final_summary["total_suppliers"] >= 2, final_summary
             assert final_summary["total_products"] == 2, final_summary
             assert final_summary["total_boms"] == 2, final_summary
             assert final_summary["total_pos"] >= 1, final_summary

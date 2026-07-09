@@ -4,6 +4,8 @@ const state = {
   mappings: [],
   cleaning: [],
   products: [],
+  customers: [],
+  suppliers: [],
   boms: [],
   bomLines: [],
   readiness: [],
@@ -118,6 +120,8 @@ function renderSummary() {
   const cards = [
     ["内部物料", state.summary.total_items],
     ["供应商映射", state.summary.total_mappings],
+    ["客户档案", state.summary.total_customers],
+    ["供应商档案", state.summary.total_suppliers],
     ["产品工程", state.summary.total_products],
     ["BOM", state.summary.total_boms],
     ["采购单", state.summary.total_pos],
@@ -247,6 +251,48 @@ function renderProducts() {
       <th>状态</th><th>层数</th><th>板厚</th><th>表面处理</th><th>SMT</th>
     </tr></thead>
     <tbody>${rows}</tbody>
+  `;
+}
+
+function renderPartners() {
+  $("#customerOptions").innerHTML = state.customers.map((row) => `<option value="${escapeHtml(row.customer_name)}"></option>`).join("");
+  $("#supplierOptions").innerHTML = state.suppliers.map((row) => `<option value="${escapeHtml(row.supplier_name)}"></option>`).join("");
+  const customerRows = state.customers.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.customer_code)}</td>
+      <td>${escapeHtml(row.customer_name)}</td>
+      <td>${escapeHtml(row.customer_status)}</td>
+      <td>${escapeHtml(row.contact_name)}</td>
+      <td>${escapeHtml(row.phone)}</td>
+      <td>${escapeHtml(row.payment_terms)}</td>
+      <td>${escapeHtml(row.owner)}</td>
+      <td>${escapeHtml(row.updated_at)}</td>
+    </tr>
+  `).join("");
+  $("#customersTable").innerHTML = `
+    <thead><tr>
+      <th>客户编码</th><th>客户名称</th><th>状态</th><th>联系人</th><th>电话</th><th>账期</th><th>负责人</th><th>更新时间</th>
+    </tr></thead>
+    <tbody>${customerRows}</tbody>
+  `;
+  const supplierRows = state.suppliers.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.supplier_code)}</td>
+      <td>${escapeHtml(row.supplier_name)}</td>
+      <td>${escapeHtml(row.supplier_status)}</td>
+      <td>${escapeHtml(row.supplier_level)}</td>
+      <td>${escapeHtml(row.contact_name)}</td>
+      <td>${escapeHtml(row.phone)}</td>
+      <td>${escapeHtml(row.payment_terms)}</td>
+      <td>${escapeHtml(row.owner)}</td>
+      <td>${escapeHtml(row.updated_at)}</td>
+    </tr>
+  `).join("");
+  $("#suppliersTable").innerHTML = `
+    <thead><tr>
+      <th>供应商编码</th><th>供应商名称</th><th>状态</th><th>等级</th><th>联系人</th><th>电话</th><th>账期</th><th>负责人</th><th>更新时间</th>
+    </tr></thead>
+    <tbody>${supplierRows}</tbody>
   `;
 }
 
@@ -884,12 +930,14 @@ async function restoreBackup(name) {
 }
 
 async function refreshAll() {
-  const [summary, items, mappings, cleaning, products, boms, purchaseOrders, purchaseLines, inventory, inventoryAdjustments, workOrders, workMaterials, productionReports, salesOrders, shipments, qualityInspections, qualityDefects, financeSummary, financialDocuments, financialPayments] = await Promise.all([
+  const [summary, items, mappings, cleaning, products, customers, suppliers, boms, purchaseOrders, purchaseLines, inventory, inventoryAdjustments, workOrders, workMaterials, productionReports, salesOrders, shipments, qualityInspections, qualityDefects, financeSummary, financialDocuments, financialPayments] = await Promise.all([
     api("/api/summary"),
     api("/api/items"),
     api("/api/mappings"),
     api("/api/cleaning"),
     api("/api/products"),
+    api("/api/customers"),
+    api("/api/suppliers"),
     api("/api/boms"),
     api("/api/purchase-orders"),
     api("/api/purchase-order-lines"),
@@ -911,6 +959,8 @@ async function refreshAll() {
   state.mappings = mappings.rows;
   state.cleaning = cleaning.rows;
   state.products = products.rows;
+  state.customers = customers.rows;
+  state.suppliers = suppliers.rows;
   state.boms = boms.rows;
   state.purchaseOrders = purchaseOrders.rows;
   state.purchaseLines = purchaseLines.rows;
@@ -930,6 +980,7 @@ async function refreshAll() {
   renderItems();
   renderMappings();
   renderCleaning();
+  renderPartners();
   renderProducts();
   renderBoms();
   renderBomSelectors();
@@ -1033,6 +1084,45 @@ async function createProduct() {
   $("#productMsg").textContent = "产品已保存";
   await refreshAll();
   toast("产品工程卡已保存");
+}
+
+async function createCustomer() {
+  const payload = {
+    customer_name: $("#customerName").value.trim(),
+    contact_name: $("#customerContact").value.trim(),
+    phone: $("#customerPhone").value.trim(),
+    payment_terms: $("#customerTerms").value.trim(),
+    owner: $("#customerOwner").value.trim(),
+    remark: $("#customerRemark").value.trim(),
+  };
+  if (!payload.customer_name) {
+    toast("请填写客户名称");
+    return;
+  }
+  const result = await api("/api/customers", { method: "POST", body: JSON.stringify(payload) });
+  $("#partnerMsg").textContent = `客户档案已保存：${result.customer_code}`;
+  await refreshAll();
+  toast("客户档案已保存");
+}
+
+async function createSupplier() {
+  const payload = {
+    supplier_name: $("#supplierName").value.trim(),
+    supplier_level: $("#supplierLevel").value.trim(),
+    contact_name: $("#supplierContact").value.trim(),
+    phone: $("#supplierPhone").value.trim(),
+    payment_terms: $("#supplierTerms").value.trim(),
+    owner: $("#supplierOwner").value.trim(),
+    remark: $("#supplierRemark").value.trim(),
+  };
+  if (!payload.supplier_name) {
+    toast("请填写供应商名称");
+    return;
+  }
+  const result = await api("/api/suppliers", { method: "POST", body: JSON.stringify(payload) });
+  $("#partnerMsg").textContent = `供应商档案已保存：${result.supplier_code}`;
+  await refreshAll();
+  toast("供应商档案已保存");
 }
 
 async function createBom() {
@@ -1398,6 +1488,8 @@ function bindEvents() {
     if (createId) openNewItemDialog(Number(createId));
   });
   $("#createItemBtn").addEventListener("click", createItem);
+  $("#createCustomerBtn").addEventListener("click", createCustomer);
+  $("#createSupplierBtn").addEventListener("click", createSupplier);
   $("#createProductBtn").addEventListener("click", createProduct);
   $("#createBomBtn").addEventListener("click", createBom);
   $("#addBomLineBtn").addEventListener("click", addBomLine);

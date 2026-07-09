@@ -139,6 +139,33 @@ PRODUCT_FIELDS = [
     "remark",
 ]
 
+CUSTOMER_FIELDS = [
+    "customer_code",
+    "customer_name",
+    "customer_status",
+    "contact_name",
+    "phone",
+    "email",
+    "address",
+    "payment_terms",
+    "owner",
+    "remark",
+]
+
+SUPPLIER_FIELDS = [
+    "supplier_code",
+    "supplier_name",
+    "supplier_status",
+    "contact_name",
+    "phone",
+    "email",
+    "address",
+    "payment_terms",
+    "supplier_level",
+    "owner",
+    "remark",
+]
+
 BOM_FIELDS = [
     "bom_code",
     "product_code",
@@ -409,6 +436,10 @@ def permission_for_request(method, path):
         return "read"
     if path in {"/api/import", "/api/cleaning/confirm", "/api/cleaning/create-item"}:
         return "material"
+    if path == "/api/customers":
+        return "sales"
+    if path == "/api/suppliers":
+        return "purchase"
     if path in {"/api/products", "/api/boms", "/api/bom-lines"}:
         return "engineering"
     if path in {"/api/purchase-orders", "/api/purchase-orders/from-shortage", "/api/purchase-receive"}:
@@ -636,6 +667,37 @@ def create_schema(conn):
             surface_finish TEXT DEFAULT '',
             smt_required TEXT DEFAULT 'N',
             engineering_owner TEXT DEFAULT '',
+            remark TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS customers (
+            customer_code TEXT PRIMARY KEY,
+            customer_name TEXT NOT NULL UNIQUE,
+            customer_status TEXT NOT NULL DEFAULT '启用',
+            contact_name TEXT DEFAULT '',
+            phone TEXT DEFAULT '',
+            email TEXT DEFAULT '',
+            address TEXT DEFAULT '',
+            payment_terms TEXT DEFAULT '',
+            owner TEXT DEFAULT '',
+            remark TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS suppliers (
+            supplier_code TEXT PRIMARY KEY,
+            supplier_name TEXT NOT NULL UNIQUE,
+            supplier_status TEXT NOT NULL DEFAULT '启用',
+            contact_name TEXT DEFAULT '',
+            phone TEXT DEFAULT '',
+            email TEXT DEFAULT '',
+            address TEXT DEFAULT '',
+            payment_terms TEXT DEFAULT '',
+            supplier_level TEXT DEFAULT '',
+            owner TEXT DEFAULT '',
             remark TEXT DEFAULT '',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -925,6 +987,77 @@ def insert_product(conn, row):
     )
 
 
+def generate_customer_code(conn):
+    prefix = "CUS"
+    count = conn.execute("SELECT COUNT(*) FROM customers WHERE customer_code LIKE ?", (f"{prefix}-%",)).fetchone()[0]
+    return f"{prefix}-{count + 1:04d}"
+
+
+def generate_supplier_code(conn):
+    prefix = "SUP"
+    count = conn.execute("SELECT COUNT(*) FROM suppliers WHERE supplier_code LIKE ?", (f"{prefix}-%",)).fetchone()[0]
+    return f"{prefix}-{count + 1:04d}"
+
+
+def insert_customer(conn, row):
+    data = {field: row.get(field, "") for field in CUSTOMER_FIELDS}
+    data["customer_code"] = data["customer_code"] or generate_customer_code(conn)
+    data["customer_status"] = data["customer_status"] or "启用"
+    if not data["customer_name"]:
+        raise ValueError("客户名称不能为空")
+    timestamp = now_text()
+    conn.execute(
+        f"""
+        INSERT INTO customers ({",".join(CUSTOMER_FIELDS)}, created_at, updated_at)
+        VALUES ({",".join(["?"] * len(CUSTOMER_FIELDS))}, ?, ?)
+        ON CONFLICT(customer_name) DO UPDATE SET
+            customer_code = customers.customer_code,
+            customer_status = excluded.customer_status,
+            contact_name = excluded.contact_name,
+            phone = excluded.phone,
+            email = excluded.email,
+            address = excluded.address,
+            payment_terms = excluded.payment_terms,
+            owner = excluded.owner,
+            remark = excluded.remark,
+            updated_at = excluded.updated_at
+        """,
+        [data[field] for field in CUSTOMER_FIELDS] + [timestamp, timestamp],
+    )
+    saved = conn.execute("SELECT customer_code FROM customers WHERE customer_name = ?", (data["customer_name"],)).fetchone()
+    return saved["customer_code"] if saved else data["customer_code"]
+
+
+def insert_supplier(conn, row):
+    data = {field: row.get(field, "") for field in SUPPLIER_FIELDS}
+    data["supplier_code"] = data["supplier_code"] or generate_supplier_code(conn)
+    data["supplier_status"] = data["supplier_status"] or "启用"
+    if not data["supplier_name"]:
+        raise ValueError("供应商名称不能为空")
+    timestamp = now_text()
+    conn.execute(
+        f"""
+        INSERT INTO suppliers ({",".join(SUPPLIER_FIELDS)}, created_at, updated_at)
+        VALUES ({",".join(["?"] * len(SUPPLIER_FIELDS))}, ?, ?)
+        ON CONFLICT(supplier_name) DO UPDATE SET
+            supplier_code = suppliers.supplier_code,
+            supplier_status = excluded.supplier_status,
+            contact_name = excluded.contact_name,
+            phone = excluded.phone,
+            email = excluded.email,
+            address = excluded.address,
+            payment_terms = excluded.payment_terms,
+            supplier_level = excluded.supplier_level,
+            owner = excluded.owner,
+            remark = excluded.remark,
+            updated_at = excluded.updated_at
+        """,
+        [data[field] for field in SUPPLIER_FIELDS] + [timestamp, timestamp],
+    )
+    saved = conn.execute("SELECT supplier_code FROM suppliers WHERE supplier_name = ?", (data["supplier_name"],)).fetchone()
+    return saved["supplier_code"] if saved else data["supplier_code"]
+
+
 def insert_bom(conn, row):
     data = {field: row.get(field, "") for field in BOM_FIELDS}
     data["bom_version"] = data["bom_version"] or "A0"
@@ -1159,6 +1292,27 @@ def seed_from_templates(conn):
                 "INSERT OR IGNORE INTO inventory_balances (internal_item_code, on_hand_qty, reserved_qty, updated_at) VALUES (?, ?, 0, ?)",
                 (code, qty, timestamp),
             )
+    customer_count = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
+    if customer_count == 0:
+        names = conn.execute("SELECT DISTINCT customer_name FROM products WHERE customer_name != '' ORDER BY customer_name").fetchall()
+        for row in names:
+            insert_customer(conn, {
+                "customer_name": row["customer_name"],
+                "payment_terms": "月结30天",
+                "owner": "业务员",
+                "remark": "由产品档案自动沉淀",
+            })
+    supplier_count = conn.execute("SELECT COUNT(*) FROM suppliers").fetchone()[0]
+    if supplier_count == 0:
+        names = conn.execute("SELECT DISTINCT supplier_name FROM supplier_mappings WHERE supplier_name != '' ORDER BY supplier_name").fetchall()
+        for row in names:
+            insert_supplier(conn, {
+                "supplier_name": row["supplier_name"],
+                "payment_terms": "月结30天",
+                "supplier_level": "合格供应商",
+                "owner": "采购员",
+                "remark": "由供应商物料映射自动沉淀",
+            })
     conn.commit()
 
 
@@ -1204,6 +1358,16 @@ def fetch_mappings(conn):
 
 def fetch_products(conn):
     rows = conn.execute("SELECT * FROM products ORDER BY updated_at DESC, product_code").fetchall()
+    return [dict(row) for row in rows]
+
+
+def fetch_customers(conn):
+    rows = conn.execute("SELECT * FROM customers ORDER BY updated_at DESC, customer_code").fetchall()
+    return [dict(row) for row in rows]
+
+
+def fetch_suppliers(conn):
+    rows = conn.execute("SELECT * FROM suppliers ORDER BY updated_at DESC, supplier_code").fetchall()
     return [dict(row) for row in rows]
 
 
@@ -2494,6 +2658,8 @@ def api_summary(conn):
     auto_count = conn.execute("SELECT COUNT(*) FROM cleaning_rows WHERE match_level = '自动匹配'").fetchone()[0]
     suspect_count = conn.execute("SELECT COUNT(*) FROM cleaning_rows WHERE match_level = '疑似匹配'").fetchone()[0]
     new_count = conn.execute("SELECT COUNT(*) FROM cleaning_rows WHERE match_level = '新物料'").fetchone()[0]
+    total_customers = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
+    total_suppliers = conn.execute("SELECT COUNT(*) FROM suppliers").fetchone()[0]
     total_products = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
     total_boms = conn.execute("SELECT COUNT(*) FROM product_boms").fetchone()[0]
     total_pos = conn.execute("SELECT COUNT(*) FROM purchase_orders").fetchone()[0]
@@ -2509,6 +2675,8 @@ def api_summary(conn):
     return {
         "total_items": total_items,
         "total_mappings": total_mappings,
+        "total_customers": total_customers,
+        "total_suppliers": total_suppliers,
         "total_products": total_products,
         "total_boms": total_boms,
         "total_pos": total_pos,
@@ -2623,6 +2791,10 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.send_json({"rows": cleaning_rows(conn)})
                 elif path == "/api/products":
                     self.send_json({"rows": fetch_products(conn)})
+                elif path == "/api/customers":
+                    self.send_json({"rows": fetch_customers(conn)})
+                elif path == "/api/suppliers":
+                    self.send_json({"rows": fetch_suppliers(conn)})
                 elif path == "/api/boms":
                     self.send_json({"rows": fetch_boms(conn)})
                 elif path == "/api/bom-lines":
@@ -2840,6 +3012,18 @@ class AppHandler(BaseHTTPRequestHandler):
                     conn.execute("INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)", ("创建产品工程卡", payload["product_code"], now_text()))
                     conn.commit()
                     self.send_json({"ok": True})
+                elif path == "/api/customers":
+                    payload = {field: body.get(field, "") for field in CUSTOMER_FIELDS}
+                    code = insert_customer(conn, payload)
+                    conn.execute("INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)", ("维护客户档案", code, now_text()))
+                    conn.commit()
+                    self.send_json({"ok": True, "customer_code": code})
+                elif path == "/api/suppliers":
+                    payload = {field: body.get(field, "") for field in SUPPLIER_FIELDS}
+                    code = insert_supplier(conn, payload)
+                    conn.execute("INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)", ("维护供应商档案", code, now_text()))
+                    conn.commit()
+                    self.send_json({"ok": True, "supplier_code": code})
                 elif path == "/api/boms":
                     payload = {field: body.get(field, "") for field in BOM_FIELDS}
                     if not payload.get("bom_code"):

@@ -60,6 +60,15 @@ try {
   await page.locator("#userName", { hasText: "系统管理员" }).waitFor();
   await page.getByText("产品工程").first().click();
   await page.getByText("新增产品工程卡").waitFor();
+  await page.getByText("客户供应商").first().click();
+  await page.locator("#customerName").fill("浏览器测试客户档案");
+  await page.locator("#customerContact").fill("浏览器联系人");
+  await page.getByRole("button", { name: "保存客户" }).click();
+  await page.locator("#partnerMsg").getByText(/CUS-/).waitFor();
+  await page.locator("#supplierName").fill("浏览器测试供应商");
+  await page.locator("#supplierContact").fill("浏览器供应商联系人");
+  await page.getByRole("button", { name: "保存供应商" }).click();
+  await page.locator("#partnerMsg").getByText(/SUP-/).waitFor();
   await page.getByText("BOM 管理").first().click();
   await page.getByText("齐套检查").waitFor();
   await page.getByText("采购与库存").first().click();

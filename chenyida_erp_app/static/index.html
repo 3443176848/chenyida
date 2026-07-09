@@ -31,6 +31,7 @@
         <button class="nav" data-tab="cleaning">清洗审核</button>
         <button class="nav" data-tab="items">内部物料库</button>
         <button class="nav" data-tab="mappings">供应商映射</button>
+        <button class="nav" data-tab="partners">客户供应商</button>
         <button class="nav" data-tab="products">产品工程</button>
         <button class="nav" data-tab="bom">BOM 管理</button>
         <button class="nav" data-tab="purchase">采购与库存</button>
@@ -124,6 +125,59 @@
           </div>
         </section>
 
+        <section id="partners" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>客户供应商</h2>
+              <p>统一维护客户、供应商、联系人、账期和负责人，避免订单和采购单里重复手工写名称。</p>
+            </div>
+          </div>
+          <datalist id="customerOptions"></datalist>
+          <datalist id="supplierOptions"></datalist>
+          <div class="two-panels">
+            <div class="work-panel">
+              <h3>新增客户</h3>
+              <label>客户名称<input id="customerName" list="customerOptions" placeholder="客户名称" /></label>
+              <div class="form-grid">
+                <label>联系人<input id="customerContact" /></label>
+                <label>电话<input id="customerPhone" /></label>
+              </div>
+              <div class="form-grid">
+                <label>账期<input id="customerTerms" value="月结30天" /></label>
+                <label>负责人<input id="customerOwner" value="业务员" /></label>
+              </div>
+              <label>备注<input id="customerRemark" /></label>
+              <div class="button-row">
+                <button id="createCustomerBtn" class="primary">保存客户</button>
+                <span id="partnerMsg" class="muted"></span>
+              </div>
+            </div>
+            <div class="work-panel">
+              <h3>新增供应商</h3>
+              <label>供应商名称<input id="supplierName" list="supplierOptions" placeholder="供应商名称" /></label>
+              <div class="form-grid">
+                <label>等级<input id="supplierLevel" value="合格供应商" /></label>
+                <label>联系人<input id="supplierContact" /></label>
+              </div>
+              <div class="form-grid">
+                <label>电话<input id="supplierPhone" /></label>
+                <label>账期<input id="supplierTerms" value="月结30天" /></label>
+              </div>
+              <label>负责人<input id="supplierOwner" value="采购员" /></label>
+              <label>备注<input id="supplierRemark" /></label>
+              <div class="button-row">
+                <button id="createSupplierBtn" class="primary">保存供应商</button>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="customersTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="suppliersTable"></table>
+          </div>
+        </section>
+
         <section id="products" class="tab">
           <div class="section-head">
             <div>
@@ -136,7 +190,7 @@
             <div class="form-grid three">
               <label>产品编码<input id="productCode" placeholder="CYD-FPC-客户-001" /></label>
               <label>产品名称<input id="productName" placeholder="侧键 FPCA" /></label>
-              <label>客户名称<input id="productCustomer" placeholder="客户名称" /></label>
+              <label>客户名称<input id="productCustomer" list="customerOptions" placeholder="客户名称" /></label>
               <label>产品类型<input id="productType" value="FPC+SMT" /></label>
               <label>版本<input id="productVersion" value="A0" /></label>
               <label>状态<input id="productStatus" value="样品" /></label>
@@ -328,7 +382,7 @@
           <div class="two-panels">
             <div class="work-panel">
               <h3>新增销售订单</h3>
-              <label>客户名称<input id="salesCustomer" placeholder="客户名称" /></label>
+              <label>客户名称<input id="salesCustomer" list="customerOptions" placeholder="客户名称" /></label>
               <label>产品<select id="salesProduct"></select></label>
               <div class="form-grid">
                 <label>订单数量<input id="salesOrderQty" value="10" /></label>
