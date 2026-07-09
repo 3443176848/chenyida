@@ -38,6 +38,7 @@ DEFAULT_USERS = [
     {"username": "production", "display_name": "生产计划", "role": "production", "password": "production123"},
     {"username": "quality", "display_name": "品质员", "role": "quality", "password": "quality123"},
     {"username": "sales", "display_name": "销售员", "role": "sales", "password": "sales123"},
+    {"username": "finance", "display_name": "财务员", "role": "finance", "password": "finance123"},
 ]
 
 ROLE_LABELS = {
@@ -48,16 +49,18 @@ ROLE_LABELS = {
     "production": "生产",
     "quality": "品质",
     "sales": "销售",
+    "finance": "财务",
 }
 
 ROLE_PERMISSIONS = {
     "admin": {"*"},
-    "manager": {"read", "dashboard", "material", "engineering", "purchase", "production", "sales", "quality"},
+    "manager": {"read", "dashboard", "material", "engineering", "purchase", "production", "sales", "quality", "finance"},
     "purchase": {"read", "dashboard", "material", "purchase"},
     "engineering": {"read", "dashboard", "material", "engineering"},
     "production": {"read", "dashboard", "production"},
     "quality": {"read", "dashboard", "quality"},
     "sales": {"read", "dashboard", "sales"},
+    "finance": {"read", "dashboard", "finance"},
 }
 
 PUBLIC_API_PATHS = {"/api/health", "/api/session", "/api/login", "/api/logout"}
@@ -413,6 +416,8 @@ def permission_for_request(method, path):
         return "sales"
     if path == "/api/quality-inspections":
         return "quality"
+    if path in {"/api/financial-documents/from-sales-order", "/api/financial-documents/from-purchase-order", "/api/financial-payments"}:
+        return "finance"
     return "read"
 
 
@@ -809,6 +814,38 @@ def create_schema(conn):
             severity TEXT DEFAULT '',
             defect_qty REAL NOT NULL DEFAULT 0,
             corrective_action TEXT DEFAULT '',
+            remark TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS financial_documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doc_code TEXT NOT NULL UNIQUE,
+            doc_type TEXT NOT NULL,
+            counterparty TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            source_id INTEGER NOT NULL,
+            source_code TEXT NOT NULL,
+            total_amount REAL NOT NULL DEFAULT 0,
+            paid_amount REAL NOT NULL DEFAULT 0,
+            doc_status TEXT NOT NULL DEFAULT '未结清',
+            due_date TEXT DEFAULT '',
+            created_by TEXT DEFAULT '',
+            remark TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(doc_type, source_type, source_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS financial_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            payment_code TEXT NOT NULL UNIQUE,
+            payment_type TEXT NOT NULL,
+            doc_id INTEGER NOT NULL,
+            amount REAL NOT NULL DEFAULT 0,
+            payment_date TEXT NOT NULL,
+            account_name TEXT DEFAULT '',
+            handled_by TEXT DEFAULT '',
             remark TEXT DEFAULT '',
             created_at TEXT NOT NULL
         );
@@ -2020,6 +2057,238 @@ def rows_to_csv(rows, fields):
     return buffer.getvalue()
 
 
+def generate_financial_doc_code(conn, doc_type):
+    prefix = "AR" if doc_type == "应收" else "AP"
+    day = datetime.now().strftime("%Y%m%d")
+    code_prefix = f"{prefix}-{day}"
+    count = conn.execute("SELECT COUNT(*) FROM financial_documents WHERE doc_code LIKE ?", (f"{code_prefix}%",)).fetchone()[0]
+    return f"{code_prefix}-{count + 1:03d}"
+
+
+def generate_payment_code(conn, payment_type):
+    prefix = "RCV" if payment_type == "收款" else "PAY"
+    day = datetime.now().strftime("%Y%m%d")
+    code_prefix = f"{prefix}-{day}"
+    count = conn.execute("SELECT COUNT(*) FROM financial_payments WHERE payment_code LIKE ?", (f"{code_prefix}%",)).fetchone()[0]
+    return f"{code_prefix}-{count + 1:03d}"
+
+
+def financial_doc_status(total_amount, paid_amount):
+    total_amount = float(total_amount or 0)
+    paid_amount = float(paid_amount or 0)
+    if paid_amount <= 0:
+        return "未结清"
+    if paid_amount >= total_amount - 1e-9:
+        return "已结清"
+    return "部分结清"
+
+
+def fetch_financial_documents(conn, doc_type=None):
+    where_sql = ""
+    params = ()
+    if doc_type:
+        where_sql = "WHERE doc_type = ?"
+        params = (doc_type,)
+    rows = conn.execute(
+        f"""
+        SELECT *,
+               ROUND(total_amount - paid_amount, 2) AS balance_amount
+        FROM financial_documents
+        {where_sql}
+        ORDER BY created_at DESC, id DESC
+        """,
+        params,
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def fetch_financial_payments(conn, doc_id=None):
+    where_sql = ""
+    params = ()
+    if doc_id:
+        where_sql = "WHERE fp.doc_id = ?"
+        params = (doc_id,)
+    rows = conn.execute(
+        f"""
+        SELECT fp.*, fd.doc_code, fd.doc_type, fd.counterparty, fd.source_code
+        FROM financial_payments fp
+        LEFT JOIN financial_documents fd ON fd.id = fp.doc_id
+        {where_sql}
+        ORDER BY fp.created_at DESC, fp.id DESC
+        """,
+        params,
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_financial_document(conn, payload):
+    doc_type = payload.get("doc_type", "")
+    if doc_type not in {"应收", "应付"}:
+        raise ValueError("财务单据类型必须是应收或应付")
+    total_amount = float(payload.get("total_amount") or 0)
+    if total_amount <= 0:
+        raise ValueError("金额必须大于 0")
+    source_type = payload.get("source_type", "")
+    source_id = int(payload.get("source_id") or 0)
+    if not source_type or not source_id:
+        raise ValueError("缺少来源单据")
+    timestamp = now_text()
+    doc_code = payload.get("doc_code") or generate_financial_doc_code(conn, doc_type)
+    cursor = conn.execute(
+        """
+        INSERT INTO financial_documents (
+            doc_code, doc_type, counterparty, source_type, source_id, source_code,
+            total_amount, paid_amount, doc_status, due_date, created_by, remark, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, '未结清', ?, ?, ?, ?, ?)
+        """,
+        (
+            doc_code,
+            doc_type,
+            payload.get("counterparty", ""),
+            source_type,
+            source_id,
+            payload.get("source_code", ""),
+            total_amount,
+            payload.get("due_date", ""),
+            payload.get("created_by", ""),
+            payload.get("remark", ""),
+            timestamp,
+            timestamp,
+        ),
+    )
+    conn.execute("INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)", ("创建财务单据", doc_code, timestamp))
+    conn.commit()
+    return {"ok": True, "doc_id": cursor.lastrowid, "doc_code": doc_code}
+
+
+def purchase_order_amount(conn, po_id):
+    amount = conn.execute(
+        "SELECT COALESCE(SUM(order_qty * unit_price), 0) FROM purchase_order_lines WHERE po_id = ?",
+        (po_id,),
+    ).fetchone()[0]
+    return float(amount or 0)
+
+
+def create_receivable_from_sales_order(conn, row):
+    sales_order_id = int(row.get("sales_order_id") or 0)
+    order = conn.execute("SELECT * FROM sales_orders WHERE id = ?", (sales_order_id,)).fetchone()
+    if not order:
+        raise ValueError("销售订单不存在")
+    return create_financial_document(conn, {
+        "doc_type": "应收",
+        "counterparty": order["customer_name"],
+        "source_type": "销售订单",
+        "source_id": sales_order_id,
+        "source_code": order["sales_order_code"],
+        "total_amount": row.get("total_amount"),
+        "due_date": row.get("due_date") or order["due_date"],
+        "created_by": row.get("created_by", ""),
+        "remark": row.get("remark", ""),
+    })
+
+
+def create_payable_from_purchase_order(conn, row):
+    po_id = int(row.get("po_id") or 0)
+    po = conn.execute("SELECT * FROM purchase_orders WHERE id = ?", (po_id,)).fetchone()
+    if not po:
+        raise ValueError("采购单不存在")
+    amount = row.get("total_amount")
+    if amount in (None, ""):
+        amount = purchase_order_amount(conn, po_id)
+    return create_financial_document(conn, {
+        "doc_type": "应付",
+        "counterparty": po["supplier_name"],
+        "source_type": "采购单",
+        "source_id": po_id,
+        "source_code": po["po_code"],
+        "total_amount": amount,
+        "due_date": row.get("due_date") or po["expected_date"],
+        "created_by": row.get("created_by", ""),
+        "remark": row.get("remark", ""),
+    })
+
+
+def create_financial_payment(conn, row):
+    doc_id = int(row.get("doc_id") or 0)
+    doc = conn.execute("SELECT * FROM financial_documents WHERE id = ?", (doc_id,)).fetchone()
+    if not doc:
+        raise ValueError("财务单据不存在")
+    payment_type = row.get("payment_type") or ("收款" if doc["doc_type"] == "应收" else "付款")
+    expected_type = "收款" if doc["doc_type"] == "应收" else "付款"
+    if payment_type != expected_type:
+        raise ValueError(f"{doc['doc_type']}单只能登记{expected_type}")
+    amount = float(row.get("amount") or 0)
+    if amount <= 0:
+        raise ValueError("收付款金额必须大于 0")
+    balance = float(doc["total_amount"]) - float(doc["paid_amount"])
+    if amount > balance + 1e-9:
+        raise ValueError("收付款金额不能超过未结余额")
+    timestamp = now_text()
+    payment_code = row.get("payment_code") or generate_payment_code(conn, payment_type)
+    payment_date = row.get("payment_date") or datetime.now().strftime("%Y-%m-%d")
+    conn.execute(
+        """
+        INSERT INTO financial_payments (payment_code, payment_type, doc_id, amount, payment_date, account_name, handled_by, remark, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            payment_code,
+            payment_type,
+            doc_id,
+            amount,
+            payment_date,
+            row.get("account_name", ""),
+            row.get("handled_by", ""),
+            row.get("remark", ""),
+            timestamp,
+        ),
+    )
+    new_paid = round(float(doc["paid_amount"]) + amount, 2)
+    status = financial_doc_status(doc["total_amount"], new_paid)
+    conn.execute(
+        "UPDATE financial_documents SET paid_amount = ?, doc_status = ?, updated_at = ? WHERE id = ?",
+        (new_paid, status, timestamp, doc_id),
+    )
+    conn.execute("INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)", (payment_type, f"{payment_code};{doc['doc_code']};{amount}", timestamp))
+    conn.commit()
+    return {"ok": True, "payment_code": payment_code, "paid_amount": new_paid, "doc_status": status, "balance_amount": round(float(doc["total_amount"]) - new_paid, 2)}
+
+
+def api_finance_summary(conn):
+    row = conn.execute(
+        """
+        SELECT
+            COALESCE(SUM(CASE WHEN doc_type = '应收' THEN total_amount ELSE 0 END), 0) AS receivable_total,
+            COALESCE(SUM(CASE WHEN doc_type = '应收' THEN paid_amount ELSE 0 END), 0) AS receivable_paid,
+            COALESCE(SUM(CASE WHEN doc_type = '应付' THEN total_amount ELSE 0 END), 0) AS payable_total,
+            COALESCE(SUM(CASE WHEN doc_type = '应付' THEN paid_amount ELSE 0 END), 0) AS payable_paid
+        FROM financial_documents
+        """
+    ).fetchone()
+    receivable_balance = float(row["receivable_total"]) - float(row["receivable_paid"])
+    payable_balance = float(row["payable_total"]) - float(row["payable_paid"])
+    recent = conn.execute(
+        """
+        SELECT fp.*, fd.doc_code, fd.counterparty
+        FROM financial_payments fp
+        LEFT JOIN financial_documents fd ON fd.id = fp.doc_id
+        ORDER BY fp.created_at DESC, fp.id DESC
+        LIMIT 8
+        """
+    ).fetchall()
+    return {
+        "receivable_total": round(float(row["receivable_total"]), 2),
+        "receivable_paid": round(float(row["receivable_paid"]), 2),
+        "receivable_balance": round(receivable_balance, 2),
+        "payable_total": round(float(row["payable_total"]), 2),
+        "payable_paid": round(float(row["payable_paid"]), 2),
+        "payable_balance": round(payable_balance, 2),
+        "cash_net": round(float(row["receivable_paid"]) - float(row["payable_paid"]), 2),
+        "recent_payments": [dict(item) for item in recent],
+    }
+
+
 def fetch_users(conn):
     rows = conn.execute(
         """
@@ -2106,6 +2375,8 @@ def api_management_dashboard(conn):
         {"label": "质量合格率", "value": f"{pass_rate}%", "hint": f"已检 {round(inspected_qty, 2)}，不良 {round(failed_qty, 2)}"},
         {"label": "累计完工", "value": round(completed_qty, 2), "hint": "生产报工良品入库数量"},
         {"label": "累计出货", "value": round(shipped_qty, 2), "hint": "销售交付已出货数量"},
+        {"label": "应收余额", "value": summary["receivable_balance"], "hint": "客户尚未回款金额"},
+        {"label": "应付余额", "value": summary["payable_balance"], "hint": "供应商尚未付款金额"},
     ]
     risks = []
     if summary["pending"]:
@@ -2116,6 +2387,10 @@ def api_management_dashboard(conn):
         risks.append({"level": "info", "text": f"{summary['active_work_orders']} 张生产工单未完工"})
     if summary["open_quality_issues"]:
         risks.append({"level": "danger", "text": f"{summary['open_quality_issues']} 条品质异常需要处置"})
+    if summary["receivable_balance"] > 0:
+        risks.append({"level": "warning", "text": f"还有 {summary['receivable_balance']} 元应收未回款"})
+    if summary["payable_balance"] > 0:
+        risks.append({"level": "info", "text": f"还有 {summary['payable_balance']} 元应付未付款"})
     if not risks:
         risks.append({"level": "ok", "text": "当前没有突出的待办风险"})
     activity = conn.execute(
@@ -2146,6 +2421,8 @@ def api_summary(conn):
     open_sales_orders = conn.execute("SELECT COUNT(*) FROM sales_orders WHERE sales_status != '已出货'").fetchone()[0]
     total_quality_inspections = conn.execute("SELECT COUNT(*) FROM quality_inspections").fetchone()[0]
     open_quality_issues = conn.execute("SELECT COUNT(*) FROM quality_inspections WHERE failed_qty > 0 AND inspection_status != '合格放行'").fetchone()[0]
+    receivable_balance = conn.execute("SELECT COALESCE(SUM(total_amount - paid_amount), 0) FROM financial_documents WHERE doc_type = '应收'").fetchone()[0]
+    payable_balance = conn.execute("SELECT COALESCE(SUM(total_amount - paid_amount), 0) FROM financial_documents WHERE doc_type = '应付'").fetchone()[0]
     return {
         "total_items": total_items,
         "total_mappings": total_mappings,
@@ -2159,6 +2436,8 @@ def api_summary(conn):
         "open_sales_orders": open_sales_orders,
         "total_quality_inspections": total_quality_inspections,
         "open_quality_issues": open_quality_issues,
+        "receivable_balance": round(float(receivable_balance or 0), 2),
+        "payable_balance": round(float(payable_balance or 0), 2),
         "pending": pending,
         "auto_count": auto_count,
         "suspect_count": suspect_count,
@@ -2312,6 +2591,17 @@ class AppHandler(BaseHTTPRequestHandler):
                     inspection_id_text = query.get("inspection_id", [""])[0]
                     inspection_id = int(inspection_id_text) if inspection_id_text else None
                     self.send_json({"rows": fetch_quality_defects(conn, inspection_id)})
+                elif path == "/api/finance-summary":
+                    self.send_json(api_finance_summary(conn))
+                elif path == "/api/financial-documents":
+                    query = parse_qs(parsed.query)
+                    doc_type = query.get("doc_type", [""])[0] or None
+                    self.send_json({"rows": fetch_financial_documents(conn, doc_type)})
+                elif path == "/api/financial-payments":
+                    query = parse_qs(parsed.query)
+                    doc_id_text = query.get("doc_id", [""])[0]
+                    doc_id = int(doc_id_text) if doc_id_text else None
+                    self.send_json({"rows": fetch_financial_payments(conn, doc_id)})
                 elif path == "/api/sample-import":
                     rows = read_csv_file(TEMPLATE_DIR / "供应商原始物料导入模板.csv")
                     self.send_json({"rows": rows, "csv": rows_to_csv(rows, IMPORT_FIELDS)})
@@ -2596,6 +2886,15 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.send_json(result)
                 elif path == "/api/quality-inspections":
                     result = create_quality_inspection(conn, body)
+                    self.send_json(result)
+                elif path == "/api/financial-documents/from-sales-order":
+                    result = create_receivable_from_sales_order(conn, body)
+                    self.send_json(result)
+                elif path == "/api/financial-documents/from-purchase-order":
+                    result = create_payable_from_purchase_order(conn, body)
+                    self.send_json(result)
+                elif path == "/api/financial-payments":
+                    result = create_financial_payment(conn, body)
                     self.send_json(result)
                 else:
                     self.send_json({"error": "接口不存在"}, HTTPStatus.NOT_FOUND)

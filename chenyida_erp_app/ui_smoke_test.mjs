@@ -75,6 +75,14 @@ try {
   await page.locator("#salesCustomer").fill("浏览器测试客户");
   await page.getByRole("button", { name: "创建销售订单" }).click();
   await page.locator("#salesMsg").getByText(/SO-/).waitFor();
+  await page.getByText("财务结算").first().click();
+  await page.locator("#arAmount").fill("888");
+  await page.getByRole("button", { name: "生成应收" }).click();
+  await page.locator("#financeMsg").getByText(/AR-/).waitFor();
+  await page.waitForFunction(() => document.querySelector("#paymentDoc")?.value);
+  await page.locator("#paymentAmount").fill("188");
+  await page.getByRole("button", { name: "登记收付款" }).click();
+  await page.locator("#financeMsg").getByText(/RCV-/).waitFor();
   await page.getByText("品质管理").first().click();
   await page.getByRole("button", { name: "保存检验记录" }).waitFor();
   await page.getByRole("button", { name: "保存检验记录" }).click();

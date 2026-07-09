@@ -18,6 +18,9 @@ const state = {
   shipments: [],
   qualityInspections: [],
   qualityDefects: [],
+  financeSummary: {},
+  financialDocuments: [],
+  financialPayments: [],
   session: { authenticated: false, user: null },
   managementDashboard: null,
   backups: [],
@@ -124,6 +127,8 @@ function renderSummary() {
     ["待交付订单", state.summary.open_sales_orders],
     ["品质检验", state.summary.total_quality_inspections],
     ["质量异常", state.summary.open_quality_issues],
+    ["应收余额", state.summary.receivable_balance],
+    ["应付余额", state.summary.payable_balance],
     ["待处理", state.summary.pending],
     ["自动匹配", state.summary.auto_count],
     ["疑似匹配", state.summary.suspect_count],
@@ -568,6 +573,79 @@ function renderSalesSelector() {
   }).join("");
 }
 
+function renderFinanceSelectors() {
+  $("#arSalesOrder").innerHTML = state.salesOrders.map((order) => `
+    <option value="${escapeHtml(order.id)}">${escapeHtml(order.sales_order_code)} - ${escapeHtml(order.customer_name)} - ${escapeHtml(order.product_name || order.product_code)}</option>
+  `).join("");
+  $("#apPurchaseOrder").innerHTML = state.purchaseOrders.map((po) => `
+    <option value="${escapeHtml(po.id)}">${escapeHtml(po.po_code)} - ${escapeHtml(po.supplier_name)} - ${escapeHtml(po.po_status)}</option>
+  `).join("");
+  const openDocs = state.financialDocuments.filter((doc) => Number(doc.balance_amount || 0) > 0);
+  $("#paymentDoc").innerHTML = openDocs.map((doc) => `
+    <option value="${escapeHtml(doc.id)}" data-type="${escapeHtml(doc.doc_type)}">${escapeHtml(doc.doc_code)} - ${escapeHtml(doc.counterparty)} - 未结 ${escapeHtml(doc.balance_amount)}</option>
+  `).join("");
+  const selectedDoc = openDocs[0];
+  if (selectedDoc) {
+    $("#paymentAmount").value = selectedDoc.balance_amount;
+    $("#paymentType").value = selectedDoc.doc_type === "应收" ? "收款" : "付款";
+  }
+}
+
+function renderFinance() {
+  const summary = state.financeSummary || {};
+  const cards = [
+    ["应收总额", summary.receivable_total],
+    ["已收款", summary.receivable_paid],
+    ["应收余额", summary.receivable_balance],
+    ["应付总额", summary.payable_total],
+    ["已付款", summary.payable_paid],
+    ["应付余额", summary.payable_balance],
+    ["现金净流入", summary.cash_net],
+  ];
+  $("#financeCards").innerHTML = cards.map(([label, value]) => `
+    <div class="summary-card">
+      <b>${escapeHtml(value ?? 0)}</b>
+      <span>${escapeHtml(label)}</span>
+    </div>
+  `).join("");
+  $("#financialDocumentsTable").innerHTML = `
+    <thead><tr>
+      <th>单号</th><th>类型</th><th>往来单位</th><th>来源</th><th>总金额</th><th>已结</th><th>未结</th><th>状态</th><th>到期日</th>
+    </tr></thead>
+    <tbody>${state.financialDocuments.map((doc) => `
+      <tr>
+        <td>${escapeHtml(doc.doc_code)}</td>
+        <td>${escapeHtml(doc.doc_type)}</td>
+        <td>${escapeHtml(doc.counterparty)}</td>
+        <td>${escapeHtml(doc.source_code)}</td>
+        <td>${escapeHtml(doc.total_amount)}</td>
+        <td>${escapeHtml(doc.paid_amount)}</td>
+        <td>${escapeHtml(doc.balance_amount)}</td>
+        <td>${escapeHtml(doc.doc_status)}</td>
+        <td>${escapeHtml(doc.due_date)}</td>
+      </tr>
+    `).join("")}</tbody>
+  `;
+  $("#financialPaymentsTable").innerHTML = `
+    <thead><tr>
+      <th>流水号</th><th>类型</th><th>财务单据</th><th>往来单位</th><th>金额</th><th>日期</th><th>账户</th><th>经办人</th>
+    </tr></thead>
+    <tbody>${state.financialPayments.map((row) => `
+      <tr>
+        <td>${escapeHtml(row.payment_code)}</td>
+        <td>${escapeHtml(row.payment_type)}</td>
+        <td>${escapeHtml(row.doc_code)}</td>
+        <td>${escapeHtml(row.counterparty)}</td>
+        <td>${escapeHtml(row.amount)}</td>
+        <td>${escapeHtml(row.payment_date)}</td>
+        <td>${escapeHtml(row.account_name)}</td>
+        <td>${escapeHtml(row.handled_by)}</td>
+      </tr>
+    `).join("")}</tbody>
+  `;
+  renderFinanceSelectors();
+}
+
 function renderQualityRefOptions() {
   const type = $("#qualityType")?.value || "IPQC";
   let options = [];
@@ -784,7 +862,7 @@ async function restoreBackup(name) {
 }
 
 async function refreshAll() {
-  const [summary, items, mappings, cleaning, products, boms, purchaseOrders, purchaseLines, inventory, workOrders, workMaterials, productionReports, salesOrders, shipments, qualityInspections, qualityDefects] = await Promise.all([
+  const [summary, items, mappings, cleaning, products, boms, purchaseOrders, purchaseLines, inventory, workOrders, workMaterials, productionReports, salesOrders, shipments, qualityInspections, qualityDefects, financeSummary, financialDocuments, financialPayments] = await Promise.all([
     api("/api/summary"),
     api("/api/items"),
     api("/api/mappings"),
@@ -801,6 +879,9 @@ async function refreshAll() {
     api("/api/shipments"),
     api("/api/quality-inspections"),
     api("/api/quality-defects"),
+    api("/api/finance-summary"),
+    api("/api/financial-documents"),
+    api("/api/financial-payments"),
   ]);
   state.summary = summary;
   state.items = items.rows;
@@ -818,6 +899,9 @@ async function refreshAll() {
   state.shipments = shipments.rows;
   state.qualityInspections = qualityInspections.rows;
   state.qualityDefects = qualityDefects.rows;
+  state.financeSummary = financeSummary;
+  state.financialDocuments = financialDocuments.rows;
+  state.financialPayments = financialPayments.rows;
   renderSummary();
   renderItems();
   renderMappings();
@@ -834,6 +918,7 @@ async function refreshAll() {
   renderProductionReports();
   renderSalesOrders();
   renderShipments();
+  renderFinance();
   renderQualityRefOptions();
   renderQualityInspections();
   renderQualityDefects();
@@ -1110,8 +1195,8 @@ async function createSalesOrder() {
     return;
   }
   const result = await api("/api/sales-orders", { method: "POST", body: JSON.stringify(payload) });
-  $("#salesMsg").textContent = `已创建 ${result.sales_order_code}`;
   await refreshAll();
+  $("#salesMsg").textContent = `已创建 ${result.sales_order_code}`;
   toast("销售订单已创建");
 }
 
@@ -1133,6 +1218,70 @@ async function shipSalesOrder() {
   $("#shipMsg").textContent = `${result.shipment_code}，库存从 ${result.before_qty} 变为 ${result.after_qty}`;
   await refreshAll();
   toast("出货完成");
+}
+
+async function createReceivable() {
+  const salesOrderId = $("#arSalesOrder").value;
+  const amount = $("#arAmount").value.trim();
+  if (!salesOrderId) {
+    toast("没有可生成应收的销售订单");
+    return;
+  }
+  const result = await api("/api/financial-documents/from-sales-order", {
+    method: "POST",
+    body: JSON.stringify({
+      sales_order_id: salesOrderId,
+      total_amount: amount,
+      due_date: $("#arDueDate").value,
+      created_by: "财务员",
+    }),
+  });
+  await refreshAll();
+  $("#financeMsg").textContent = `已生成应收 ${result.doc_code}`;
+  toast("应收单已生成");
+}
+
+async function createPayable() {
+  const poId = $("#apPurchaseOrder").value;
+  const amount = $("#apAmount").value.trim();
+  if (!poId) {
+    toast("没有可生成应付的采购单");
+    return;
+  }
+  const result = await api("/api/financial-documents/from-purchase-order", {
+    method: "POST",
+    body: JSON.stringify({
+      po_id: poId,
+      total_amount: amount,
+      due_date: $("#apDueDate").value,
+      created_by: "财务员",
+    }),
+  });
+  await refreshAll();
+  $("#financeMsg").textContent = `已生成应付 ${result.doc_code}`;
+  toast("应付单已生成");
+}
+
+async function createPayment() {
+  const docId = $("#paymentDoc").value;
+  if (!docId) {
+    toast("没有可结算的财务单据");
+    return;
+  }
+  const result = await api("/api/financial-payments", {
+    method: "POST",
+    body: JSON.stringify({
+      doc_id: docId,
+      payment_type: $("#paymentType").value,
+      amount: $("#paymentAmount").value.trim(),
+      payment_date: $("#paymentDate").value,
+      account_name: $("#paymentAccount").value.trim(),
+      handled_by: $("#paymentHandler").value.trim(),
+    }),
+  });
+  await refreshAll();
+  $("#financeMsg").textContent = `已登记 ${result.payment_code}，状态：${result.doc_status}`;
+  toast("收付款已登记");
 }
 
 async function createQualityInspection() {
@@ -1215,6 +1364,13 @@ function bindEvents() {
   $("#completeWorkOrderBtn").addEventListener("click", completeWorkOrder);
   $("#createSalesOrderBtn").addEventListener("click", createSalesOrder);
   $("#shipSalesOrderBtn").addEventListener("click", shipSalesOrder);
+  $("#createReceivableBtn").addEventListener("click", createReceivable);
+  $("#createPayableBtn").addEventListener("click", createPayable);
+  $("#createPaymentBtn").addEventListener("click", createPayment);
+  $("#paymentDoc").addEventListener("change", () => {
+    const option = $("#paymentDoc").selectedOptions[0];
+    if (option) $("#paymentType").value = option.dataset.type === "应收" ? "收款" : "付款";
+  });
   $("#qualityType").addEventListener("change", renderQualityRefOptions);
   $("#createInspectionBtn").addEventListener("click", createQualityInspection);
   $("#bomsTable").addEventListener("click", async (event) => {

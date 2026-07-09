@@ -225,6 +225,38 @@ def main():
             shipments = request(f"/api/shipments?sales_order_id={sales_order['sales_order_id']}")["rows"]
             assert len(shipments) == 2, shipments
 
+            receivable = request(
+                "/api/financial-documents/from-sales-order",
+                method="POST",
+                payload={"sales_order_id": sales_order["sales_order_id"], "total_amount": 1200, "created_by": "SmokeTest"},
+            )
+            assert receivable["doc_code"].startswith("AR-"), receivable
+            payable = request(
+                "/api/financial-documents/from-purchase-order",
+                method="POST",
+                payload={"po_id": purchase_orders[0]["id"], "total_amount": 300, "created_by": "SmokeTest"},
+            )
+            assert payable["doc_code"].startswith("AP-"), payable
+            payment_in = request(
+                "/api/financial-payments",
+                method="POST",
+                payload={"doc_id": receivable["doc_id"], "amount": 500, "handled_by": "SmokeTest"},
+            )
+            assert payment_in["doc_status"] == "部分结清", payment_in
+            payment_out = request(
+                "/api/financial-payments",
+                method="POST",
+                payload={"doc_id": payable["doc_id"], "amount": 100, "handled_by": "SmokeTest"},
+            )
+            assert payment_out["doc_status"] == "部分结清", payment_out
+            finance_summary = request("/api/finance-summary")
+            assert finance_summary["receivable_balance"] == 700, finance_summary
+            assert finance_summary["payable_balance"] == 200, finance_summary
+            financial_docs = request("/api/financial-documents")["rows"]
+            assert len(financial_docs) == 2, financial_docs
+            financial_payments = request("/api/financial-payments")["rows"]
+            assert len(financial_payments) == 2, financial_payments
+
             iqc = request(
                 "/api/quality-inspections",
                 method="POST",

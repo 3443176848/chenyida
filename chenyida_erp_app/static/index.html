@@ -36,6 +36,7 @@
         <button class="nav" data-tab="purchase">采购与库存</button>
         <button class="nav" data-tab="production">生产协同</button>
         <button class="nav" data-tab="sales">销售交付</button>
+        <button class="nav" data-tab="finance">财务结算</button>
         <button class="nav" data-tab="quality">品质管理</button>
         <button class="nav" data-tab="operations">系统运维</button>
       </aside>
@@ -342,6 +343,65 @@
           </div>
           <div class="table-wrap spaced">
             <table id="shipmentsTable"></table>
+          </div>
+        </section>
+
+        <section id="finance" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>财务结算</h2>
+              <p>从销售订单生成应收，从采购单生成应付，并登记收款、付款和未结余额。</p>
+            </div>
+          </div>
+          <div id="financeCards" class="summary-grid"></div>
+          <div class="two-panels">
+            <div class="work-panel">
+              <h3>生成应收 / 应付</h3>
+              <label>销售订单<select id="arSalesOrder"></select></label>
+              <div class="form-grid">
+                <label>应收金额<input id="arAmount" placeholder="例如 1200" /></label>
+                <label>到期日<input id="arDueDate" type="date" /></label>
+              </div>
+              <div class="button-row">
+                <button id="createReceivableBtn" class="primary">生成应收</button>
+              </div>
+              <label class="spaced">采购单<select id="apPurchaseOrder"></select></label>
+              <div class="form-grid">
+                <label>应付金额<input id="apAmount" placeholder="留空则按采购明细金额" /></label>
+                <label>到期日<input id="apDueDate" type="date" /></label>
+              </div>
+              <div class="button-row">
+                <button id="createPayableBtn" class="primary">生成应付</button>
+                <span id="financeMsg" class="muted"></span>
+              </div>
+            </div>
+            <div class="work-panel">
+              <h3>登记收付款</h3>
+              <label>财务单据<select id="paymentDoc"></select></label>
+              <div class="form-grid">
+                <label>类型
+                  <select id="paymentType">
+                    <option value="收款">收款</option>
+                    <option value="付款">付款</option>
+                  </select>
+                </label>
+                <label>金额<input id="paymentAmount" placeholder="本次结算金额" /></label>
+              </div>
+              <div class="form-grid">
+                <label>日期<input id="paymentDate" type="date" /></label>
+                <label>账户<input id="paymentAccount" value="基本户" /></label>
+              </div>
+              <label>经办人<input id="paymentHandler" value="财务员" /></label>
+              <div class="button-row">
+                <button id="createPaymentBtn" class="primary">登记收付款</button>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="financialDocumentsTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="financialPaymentsTable"></table>
           </div>
         </section>
 
