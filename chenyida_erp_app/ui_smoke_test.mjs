@@ -74,7 +74,7 @@ try {
   await page.getByRole("button", { name: "创建销售订单" }).waitFor();
   await page.locator("#salesCustomer").fill("浏览器测试客户");
   await page.getByRole("button", { name: "创建销售订单" }).click();
-  await page.getByText(/SO-/).waitFor();
+  await page.locator("#salesMsg").getByText(/SO-/).waitFor();
   await page.getByText("品质管理").first().click();
   await page.getByRole("button", { name: "保存检验记录" }).waitFor();
   await page.getByRole("button", { name: "保存检验记录" }).click();

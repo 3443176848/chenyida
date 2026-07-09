@@ -34,7 +34,7 @@ def stop_existing():
 
 
 def wait_until_ready():
-    url = f"http://127.0.0.1:{PORT}/api/summary"
+    url = f"http://127.0.0.1:{PORT}/api/health"
     last_error = None
     for _ in range(20):
         try:

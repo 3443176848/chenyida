@@ -107,6 +107,13 @@ D:\erp\物料主数据治理落地包\templates
 $py='C:\Users\tu661\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
 & $py D:\erp\chenyida_erp_app\server.py --self-test
 & $py D:\erp\chenyida_erp_app\smoke_test.py
+& $py D:\erp\chenyida_erp_app\go_live_check.py
+```
+
+如果后台服务已经启动，可以要求上线检查同时验证服务健康状态：
+
+```powershell
+& $py D:\erp\chenyida_erp_app\go_live_check.py --require-running
 ```
 
 如需做浏览器界面验证，并且本机已安装 Microsoft Edge：
