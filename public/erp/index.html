@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>晨亿达 ERP - 物料主数据治理</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260710-auth-flow" />
   </head>
   <body>
     <header class="topbar">
@@ -638,44 +638,68 @@
     </main>
 
     <div id="loginOverlay" class="login-overlay" hidden>
-      <form id="setupForm" class="login-card" hidden>
-        <h2>初始化晨亿达 ERP</h2>
-        <p>首次使用时创建唯一的系统管理员。</p>
-        <label>
-          一次性初始化凭证
-          <input id="setupToken" type="password" autocomplete="off" required />
-        </label>
-        <label>
-          管理员账号
-          <input id="setupUsername" autocomplete="username" value="admin" required />
-        </label>
-        <label>
-          管理员姓名
-          <input id="setupDisplayName" value="系统管理员" required />
-        </label>
-        <label>
-          管理员密码
-          <input id="setupPassword" type="password" minlength="12" autocomplete="new-password" required />
-        </label>
-        <button class="primary" type="submit">完成初始化</button>
-        <span id="setupMsg" class="muted"></span>
-        <small>初始化完成后，此入口会永久关闭。</small>
-      </form>
-      <form id="loginForm" class="login-card">
-        <h2>晨亿达 ERP 登录</h2>
-        <p>请使用分配的账号进入系统。</p>
-        <label>
-          账号
-          <input id="loginUsername" autocomplete="username" required />
-        </label>
-        <label>
-          密码
-          <input id="loginPassword" type="password" autocomplete="current-password" required />
-        </label>
-        <button class="primary" type="submit">登录</button>
-        <span id="loginMsg" class="muted"></span>
-        <small>账号由系统管理员统一创建和授权。</small>
-      </form>
+      <section class="auth-shell" aria-label="晨亿达 ERP 身份验证">
+        <aside class="auth-brand">
+          <div class="auth-mark" aria-hidden="true">CYD</div>
+          <div>
+            <span class="auth-kicker">CHENYIDA ERP</span>
+            <h1>晨亿达 ERP</h1>
+            <p>业务数据协同工作台</p>
+          </div>
+          <div class="auth-status">
+            <span class="auth-status-dot" aria-hidden="true"></span>
+            企业数据服务已连接
+          </div>
+        </aside>
+
+        <div class="auth-panel">
+          <form id="setupForm" class="login-card" hidden>
+            <header class="auth-form-head">
+              <span>首次配置</span>
+              <h2>创建系统管理员</h2>
+              <p>完成后将直接进入工作台。</p>
+            </header>
+            <label>
+              一次性初始化凭证
+              <input id="setupToken" type="password" autocomplete="off" required />
+            </label>
+            <div class="auth-field-row">
+              <label>
+                管理员账号
+                <input id="setupUsername" autocomplete="username" value="admin" required />
+              </label>
+              <label>
+                管理员姓名
+                <input id="setupDisplayName" value="系统管理员" required />
+              </label>
+            </div>
+            <label>
+              管理员密码
+              <input id="setupPassword" type="password" minlength="12" autocomplete="new-password" required />
+            </label>
+            <button class="primary auth-submit" type="submit">完成初始化并进入</button>
+            <span id="setupMsg" class="auth-message" role="status"></span>
+          </form>
+
+          <form id="loginForm" class="login-card">
+            <header class="auth-form-head">
+              <span>账号登录</span>
+              <h2>欢迎回来</h2>
+              <p>进入晨亿达 ERP 工作台</p>
+            </header>
+            <label>
+              账号
+              <input id="loginUsername" autocomplete="username" autofocus required />
+            </label>
+            <label>
+              密码
+              <input id="loginPassword" type="password" autocomplete="current-password" required />
+            </label>
+            <button class="primary auth-submit" type="submit">登录系统</button>
+            <span id="loginMsg" class="auth-message" role="status"></span>
+          </form>
+        </div>
+      </section>
     </div>
 
     <dialog id="newItemDialog">
@@ -729,6 +753,6 @@
     </dialog>
 
     <div id="toast" class="toast" hidden></div>
-    <script src="./app.js"></script>
+    <script src="./app.js?v=20260710-auth-flow"></script>
   </body>
 </html>

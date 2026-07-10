@@ -448,6 +448,38 @@ async function usersCount() {
   return Number(row?.count ?? 0);
 }
 
+async function authenticatedSessionResponse(
+  request: Request,
+  row: UserRow,
+  requestId: string,
+  status: number,
+  action: string,
+  detail: string,
+) {
+  const token = randomToken();
+  const tokenHash = await sha256(token);
+  const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+  const timestamp = nowText();
+  await database().batch([
+    database().prepare("DELETE FROM app_sessions WHERE username = ? OR expires_at <= ?").bind(row.username, Math.floor(Date.now() / 1000)),
+    database().prepare("INSERT INTO app_sessions (token_hash, username, expires_at, created_at) VALUES (?, ?, ?, ?)").bind(tokenHash, row.username, expiresAt, timestamp),
+    database().prepare("UPDATE app_users SET last_login_at = ?, updated_at = ? WHERE username = ?").bind(timestamp, timestamp, row.username),
+    database().prepare("INSERT INTO audit_log (username, action, detail, request_id, result, created_at) VALUES (?, ?, ?, ?, 'success', ?)").bind(row.username, action, detail, requestId, timestamp),
+  ]);
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  const cookie = `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}${secure}`;
+  return jsonResponse(
+    {
+      ok: true,
+      user: publicUser({ ...row, last_login_at: timestamp }),
+      expires_at: expiresAt,
+      setup_required: false,
+    },
+    status,
+    { "Set-Cookie": cookie },
+  );
+}
+
 async function handleSetup(request: Request, requestId: string) {
   if ((await usersCount()) > 0) return errorResponse("系统已经完成初始化", 409, "SETUP_COMPLETE", requestId);
   const body = await readJson(request);
@@ -474,8 +506,22 @@ async function handleSetup(request: Request, requestId: string) {
     .prepare("INSERT OR REPLACE INTO app_meta (key, value, updated_at) VALUES ('setup_completed', '1', ?)")
     .bind(timestamp)
     .run();
-  await audit(username, "初始化系统", "创建首位管理员", requestId);
-  return jsonResponse({ ok: true, username }, 201);
+  return authenticatedSessionResponse(
+    request,
+    {
+      username,
+      display_name: displayName,
+      role: "admin",
+      is_active: 1,
+      must_change_password: 0,
+      version: 1,
+      last_login_at: "",
+    },
+    requestId,
+    201,
+    "初始化系统",
+    "创建首位管理员并登录",
+  );
 }
 
 async function handleLogin(request: Request, requestId: string) {
@@ -496,19 +542,7 @@ async function handleLogin(request: Request, requestId: string) {
     await audit("", "登录失败", username, requestId, "failed");
     return errorResponse("账号或密码不正确", 401, "LOGIN_FAILED", requestId);
   }
-  const token = randomToken();
-  const tokenHash = await sha256(token);
-  const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-  const timestamp = nowText();
-  await database().batch([
-    database().prepare("DELETE FROM app_sessions WHERE username = ? OR expires_at <= ?").bind(username, Math.floor(Date.now() / 1000)),
-    database().prepare("INSERT INTO app_sessions (token_hash, username, expires_at, created_at) VALUES (?, ?, ?, ?)").bind(tokenHash, username, expiresAt, timestamp),
-    database().prepare("UPDATE app_users SET last_login_at = ?, updated_at = ? WHERE username = ?").bind(timestamp, timestamp, username),
-    database().prepare("INSERT INTO audit_log (username, action, detail, request_id, result, created_at) VALUES (?, '用户登录', ?, ?, 'success', ?)").bind(username, username, requestId, timestamp),
-  ]);
-  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  const cookie = `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}${secure}`;
-  return jsonResponse({ ok: true, user: publicUser(row), expires_at: expiresAt }, 200, { "Set-Cookie": cookie });
+  return authenticatedSessionResponse(request, row, requestId, 200, "用户登录", username);
 }
 
 async function handleLogout(request: Request) {

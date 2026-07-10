@@ -921,37 +921,60 @@ async function refreshOperations() {
 
 async function login(event) {
   event.preventDefault();
+  const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+  const originalLabel = submitButton.textContent;
+  submitButton.disabled = true;
+  submitButton.textContent = "正在登录...";
   $("#loginMsg").textContent = "";
-  const result = await api("/api/login", {
-    method: "POST",
-    body: JSON.stringify({
-      username: $("#loginUsername").value.trim(),
-      password: $("#loginPassword").value,
-    }),
-  });
-  state.session = { authenticated: true, user: result.user };
-  updateUserBar();
-  hideLogin();
-  await refreshAll();
-  if (result.user.must_change_password) openPasswordDialog();
-  toast("登录成功");
+  try {
+    const result = await api("/api/login", {
+      method: "POST",
+      body: JSON.stringify({
+        username: $("#loginUsername").value.trim(),
+        password: $("#loginPassword").value,
+      }),
+    });
+    state.session = { authenticated: true, user: result.user, setup_required: false };
+    updateUserBar();
+    hideLogin();
+    setTab("dashboard");
+    await refreshAll();
+    if (result.user.must_change_password) openPasswordDialog();
+    toast("登录成功");
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = originalLabel;
+  }
 }
 
 async function setupSystem(event) {
   event.preventDefault();
+  const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+  const originalLabel = submitButton.textContent;
+  submitButton.disabled = true;
+  submitButton.textContent = "正在创建...";
   $("#setupMsg").textContent = "";
-  await api("/api/setup", {
-    method: "POST",
-    body: JSON.stringify({
-      setup_token: $("#setupToken").value,
-      username: $("#setupUsername").value.trim(),
-      display_name: $("#setupDisplayName").value.trim(),
-      password: $("#setupPassword").value,
-    }),
-  });
-  $("#setupForm").reset();
-  showLogin();
-  $("#loginMsg").textContent = "初始化完成，请使用管理员账号登录。";
+  try {
+    const result = await api("/api/setup", {
+      method: "POST",
+      body: JSON.stringify({
+        setup_token: $("#setupToken").value,
+        username: $("#setupUsername").value.trim(),
+        display_name: $("#setupDisplayName").value.trim(),
+        password: $("#setupPassword").value,
+      }),
+    });
+    state.session = { authenticated: true, user: result.user, setup_required: false };
+    updateUserBar();
+    hideLogin();
+    setTab("dashboard");
+    await refreshAll();
+    $("#setupForm").reset();
+    toast("初始化完成，已进入系统");
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = originalLabel;
+  }
 }
 
 async function logout() {
