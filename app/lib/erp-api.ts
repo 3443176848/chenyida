@@ -250,7 +250,11 @@ async function sha256(value: string) {
   return bytesToHex(new Uint8Array(digest));
 }
 
-async function hashPassword(password: string, salt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)))) {
+async function hashPassword(
+  password: string,
+  salt = bytesToHex(crypto.getRandomValues(new Uint8Array(16))),
+  iterations = 100000,
+) {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -259,11 +263,11 @@ async function hashPassword(password: string, salt = bytesToHex(crypto.getRandom
     ["deriveBits"],
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations: 180000 },
+    { name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations },
     key,
     256,
   );
-  return `pbkdf2_sha256$${salt}$${bytesToHex(new Uint8Array(bits))}`;
+  return `pbkdf2_sha256$${iterations}$${salt}$${bytesToHex(new Uint8Array(bits))}`;
 }
 
 function constantTimeEqual(left: string, right: string) {
@@ -276,9 +280,18 @@ function constantTimeEqual(left: string, right: string) {
 }
 
 async function verifyPassword(password: string, stored: string) {
-  const [algorithm, salt] = stored.split("$", 3);
-  if (algorithm !== "pbkdf2_sha256" || !salt) return false;
-  return constantTimeEqual(await hashPassword(password, salt), stored);
+  const parts = stored.split("$");
+  if (parts[0] !== "pbkdf2_sha256") return false;
+  if (parts.length === 3) {
+    const [, legacySalt] = parts;
+    const legacyDigest = (await hashPassword(password, legacySalt, 180000)).split("$")[3];
+    return constantTimeEqual(`pbkdf2_sha256$${legacySalt}$${legacyDigest}`, stored);
+  }
+  if (parts.length !== 4) return false;
+  const iterations = Number(parts[1]);
+  const salt = parts[2];
+  if (!Number.isInteger(iterations) || iterations < 50000 || !salt) return false;
+  return constantTimeEqual(await hashPassword(password, salt, iterations), stored);
 }
 
 function publicUser(row: UserRow) {
