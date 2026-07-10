@@ -33,6 +33,9 @@ test("ships the complete ERP interface without starter metadata", async () => {
   assert.match(erpHtml, /物料主数据治理工作台/);
   assert.match(erpHtml, /初始化晨亿达 ERP/);
   assert.match(erpHtml, /账号与角色/);
+  assert.match(erpHtml, /href="\.\/styles\.css"/);
+  assert.match(erpHtml, /src="\.\/app\.js"/);
+  assert.doesNotMatch(erpHtml, /(?:href|src)="\/(?:styles\.css|app\.js)"/);
   assert.doesNotMatch(erpHtml, /admin123|默认管理员/);
   assert.match(erpScript, /Idempotency-Key/);
   assert.match(erpScript, /setup_required/);
