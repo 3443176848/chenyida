@@ -1,6 +1,4 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
+# Dependencies and caches
 /node_modules
 /.pnp
 .pnp.*
@@ -9,35 +7,44 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+**/__pycache__/
+*.py[cod]
 
-# testing
+# Builds and test output
 /coverage
-
-# next.js
 /.next/
 /.vinext/
 /out/
+/dist/
+/outputs/
+/work/
 
-# misc
+# Local runtime data
+/.wrangler/
+chenyida_erp_app/data/
+*.sqlite3
+*.db
+*.log
+*.pid
+
+# Environment and local workspace metadata
+.env*
+!.env.example
+.agents/
+.codex/
+.git.invalid-empty-backup/
+.vercel/
+
+# OS and editor noise
 .DS_Store
+Thumbs.db
+*.tmp
 *.pem
-
-# debug
+next-env.d.ts
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-!.env.example
-
-# vercel
-.vercel
-
-# typescript
-next-env.d.ts
-/dist/
-/.wrangler/
-/outputs/
-/work/
+# Source reference decks remain local unless explicitly shared
+*.pptx

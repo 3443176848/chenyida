@@ -1,0 +1,5 @@
+﻿import_batch_no,supplier_name,raw_item_name,raw_item_code,raw_spec,parsed_category,parsed_package,parsed_value,parsed_voltage,candidate_internal_code,candidate_standard_name,match_level,confidence,owner_role,process_status
+IMP-20260708-001,A供应商,0402 10UF 16V,A-104-16V,0402 10UF 16V X5R,CAP,0402,10UF,16V,CYD-CAP-000001,贴片电容 10uF 16V X5R 0402,自动匹配,1.0,采购,待处理
+IMP-20260708-001,A供应商,0603 10K 1%,A-R-10K-0603,0603 10K 1%,RES,0603,10K,,CYD-RES-000001,贴片电阻 10K 1% 0603,自动匹配,0.91,采购,待处理
+IMP-20260708-001,A供应商,FPC CONN 0.5P 24PIN,A-CON-0524,0.5Pitch 24Pin,CON,,0.5PITCH24PIN,,CYD-CON-000001,FPC连接器 0.5Pitch 24Pin,疑似匹配,0.58,工程,待处理
+IMP-20260708-001,A供应商,TVS SOD-523 5V,A-TVS-5V,SOD-523 5V,DIO,SOD-523,,5V,,,新物料,0.02,工程,待处理
