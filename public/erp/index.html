@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>晨亿达 ERP - 物料主数据治理</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>晨亿达 ERP</h1>
+        <p>物料主数据治理工作台</p>
+      </div>
+      <div class="topbar-actions">
+        <span id="userBadge" class="user-badge" hidden>
+          <b id="userName"></b>
+          <small id="userRole"></small>
+        </span>
+        <button id="changePasswordBtn" class="ghost-button" hidden>修改密码</button>
+        <button id="logoutBtn" class="ghost-button" hidden>退出</button>
+        <a class="ghost-link" href="/api/export/items.csv">导出物料库</a>
+        <a class="ghost-link" href="/api/export/cleaning.csv">导出清洗结果</a>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <button class="nav active" data-tab="dashboard">总览</button>
+        <button class="nav" data-tab="import">供应商导入</button>
+        <button class="nav" data-tab="cleaning">清洗审核</button>
+        <button class="nav" data-tab="items">内部物料库</button>
+        <button class="nav" data-tab="mappings">供应商映射</button>
+        <button class="nav" data-tab="partners">客户供应商</button>
+        <button class="nav" data-tab="products">产品工程</button>
+        <button class="nav" data-tab="bom">BOM 管理</button>
+        <button class="nav" data-tab="purchase">采购与库存</button>
+        <button class="nav" data-tab="production">生产协同</button>
+        <button class="nav" data-tab="quotations">询价报价</button>
+        <button class="nav" data-tab="sales">销售交付</button>
+        <button class="nav" data-tab="finance">财务结算</button>
+        <button class="nav" data-tab="quality">品质管理</button>
+        <button class="nav" data-tab="operations">系统运维</button>
+      </aside>
+
+      <section class="content">
+        <section id="dashboard" class="tab active">
+          <div class="section-head">
+            <div>
+              <h2>今日状态</h2>
+              <p>先把物料入口管住，再接 BOM、采购、库存和生产。</p>
+            </div>
+            <button id="refreshBtn" class="primary">刷新</button>
+          </div>
+          <div id="summaryCards" class="summary-grid"></div>
+          <div class="work-panel">
+            <h3>现场执行顺序</h3>
+            <ol class="steps">
+              <li>采购把供应商表贴到“供应商导入”。</li>
+              <li>系统自动匹配内部物料并分流。</li>
+              <li>自动匹配由采购确认，疑似匹配由工程确认。</li>
+              <li>新物料走建档，生成晨亿达内部物料编码。</li>
+              <li>BOM、采购、库存、生产只使用内部物料编码。</li>
+            </ol>
+          </div>
+        </section>
+
+        <section id="import" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>供应商导入</h2>
+              <p>支持 CSV 表头：import_batch_no, supplier_name, raw_item_name, raw_item_code, raw_spec...</p>
+            </div>
+            <button id="loadSampleBtn" class="secondary">载入示例</button>
+          </div>
+          <div class="form-grid">
+            <label>
+              导入批次号
+              <input id="batchNo" placeholder="留空自动生成" />
+            </label>
+            <label>
+              CSV 文件
+              <input id="csvFile" type="file" accept=".csv" />
+            </label>
+          </div>
+          <textarea id="csvText" class="csv-box" spellcheck="false" placeholder="把供应商 CSV 内容粘贴到这里，或选择 CSV 文件。"></textarea>
+          <div class="button-row">
+            <button id="runImportBtn" class="primary">运行导入与匹配</button>
+            <span id="importMsg" class="muted"></span>
+          </div>
+        </section>
+
+        <section id="cleaning" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>清洗审核</h2>
+              <p>处理自动匹配、疑似匹配和新物料。人工只审核异常，不再逐条录入。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="cleaningTable"></table>
+          </div>
+        </section>
+
+        <section id="items" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>内部物料库</h2>
+              <p>晨亿达自己的标准物料编码，后续 BOM、库存、采购、生产都以它为准。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="itemsTable"></table>
+          </div>
+        </section>
+
+        <section id="mappings" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>供应商映射</h2>
+              <p>供应商原始名称和料号可以多样，但必须映射到内部标准物料。</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="mappingsTable"></table>
+          </div>
+        </section>
+
+        <section id="partners" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>客户供应商</h2>
+              <p>统一维护客户、供应商、联系人、账期和负责人，避免订单和采购单里重复手工写名称。</p>
+            </div>
+          </div>
+          <datalist id="customerOptions"></datalist>
+          <datalist id="supplierOptions"></datalist>
+          <div class="two-panels">
+            <div class="work-panel">
+              <h3>新增客户</h3>
+              <label>客户名称<input id="customerName" list="customerOptions" placeholder="客户名称" /></label>
+              <div class="form-grid">
+                <label>联系人<input id="customerContact" /></label>
+                <label>电话<input id="customerPhone" /></label>
+              </div>
+              <div class="form-grid">
+                <label>账期<input id="customerTerms" value="月结30天" /></label>
+                <label>负责人<input id="customerOwner" value="业务员" /></label>
+              </div>
+              <label>备注<input id="customerRemark" /></label>
+              <div class="button-row">
+                <button id="createCustomerBtn" class="primary">保存客户</button>
+                <span id="partnerMsg" class="muted"></span>
+              </div>
+            </div>
+            <div class="work-panel">
+              <h3>新增供应商</h3>
+              <label>供应商名称<input id="supplierName" list="supplierOptions" placeholder="供应商名称" /></label>
+              <div class="form-grid">
+                <label>等级<input id="supplierLevel" value="合格供应商" /></label>
+                <label>联系人<input id="supplierContact" /></label>
+              </div>
+              <div class="form-grid">
+                <label>电话<input id="supplierPhone" /></label>
+                <label>账期<input id="supplierTerms" value="月结30天" /></label>
+              </div>
+              <label>负责人<input id="supplierOwner" value="采购员" /></label>
+              <label>备注<input id="supplierRemark" /></label>
+              <div class="button-row">
+                <button id="createSupplierBtn" class="primary">保存供应商</button>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="customersTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="suppliersTable"></table>
+          </div>
+        </section>
+
+        <section id="products" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>产品工程</h2>
+              <p>维护产品编码、客户、版本和 PCB/FPC/SMT 工程参数。</p>
+            </div>
+          </div>
+          <div class="work-panel">
+            <h3>新增产品工程卡</h3>
+            <div class="form-grid three">
+              <label>产品编码<input id="productCode" placeholder="CYD-FPC-客户-001" /></label>
+              <label>产品名称<input id="productName" placeholder="侧键 FPCA" /></label>
+              <label>客户名称<input id="productCustomer" list="customerOptions" placeholder="客户名称" /></label>
+              <label>产品类型<input id="productType" value="FPC+SMT" /></label>
+              <label>版本<input id="productVersion" value="A0" /></label>
+              <label>状态<input id="productStatus" value="样品" /></label>
+              <label>层数<input id="productLayers" placeholder="2" /></label>
+              <label>板厚<input id="productThickness" placeholder="0.13mm" /></label>
+              <label>最小线宽<input id="productLineWidth" placeholder="0.10mm" /></label>
+              <label>最小孔径<input id="productHole" placeholder="0.15mm" /></label>
+              <label>表面处理<input id="productFinish" placeholder="化学镍金" /></label>
+              <label>是否 SMT<input id="productSmt" value="Y" /></label>
+            </div>
+            <div class="button-row">
+              <button id="createProductBtn" class="primary">保存产品</button>
+              <span id="productMsg" class="muted"></span>
+            </div>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="productsTable"></table>
+          </div>
+        </section>
+
+        <section id="bom" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>BOM 管理</h2>
+              <p>把内部标准物料挂到产品版本，后续采购齐套、生产工单都从这里展开。</p>
+            </div>
+          </div>
+          <div class="two-panels">
+            <div class="work-panel">
+              <h3>新增 BOM</h3>
+              <label>BOM 编码<input id="bomCode" placeholder="BOM-CYD-FPC-001-A0" /></label>
+              <label>产品<select id="bomProduct"></select></label>
+              <label>BOM 版本<input id="bomVersion" value="A0" /></label>
+              <label>状态<input id="bomStatus" value="草稿" /></label>
+              <div class="button-row">
+                <button id="createBomBtn" class="primary">创建 BOM</button>
+              </div>
+            </div>
+            <div class="work-panel">
+              <h3>新增 BOM 明细</h3>
+              <label>BOM<select id="lineBom"></select></label>
+              <label>物料<select id="lineItem"></select></label>
+              <div class="form-grid">
+                <label>行号<input id="lineNo" value="10" /></label>
+                <label>单件用量<input id="lineQty" value="1" /></label>
+                <label>单位<input id="lineUom" value="PCS" /></label>
+                <label>损耗率<input id="lineLoss" value="0.03" /></label>
+              </div>
+              <label>工序阶段<input id="lineStage" placeholder="SMT / FPC / PCB" /></label>
+              <div class="button-row">
+                <button id="addBomLineBtn" class="primary">加入明细</button>
+              </div>
+            </div>
+          </div>
+          <div class="work-panel spaced">
+            <h3>齐套检查</h3>
+            <div class="form-grid">
+              <label>检查 BOM<select id="readyBom"></select></label>
+              <label>订单数量<input id="readyQty" value="100" /></label>
+            </div>
+            <div class="button-row">
+              <button id="checkReadyBtn" class="secondary">检查齐套</button>
+              <span id="readyMsg" class="muted"></span>
+            </div>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="bomsTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="bomLinesTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="readinessTable"></table>
+          </div>
+        </section>
+
+        <section id="purchase" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>采购与库存</h2>
+              <p>从 BOM 缺料生成采购建议，按供应商形成采购单，收货后自动增加库存。</p>
+            </div>
+          </div>
+          <div class="two-panels">
+            <div class="work-panel">
+              <h3>缺料采购建议</h3>
+              <label>来源 BOM<select id="purchaseBom"></select></label>
+              <label>订单数量<input id="purchaseQty" value="100000" /></label>
+              <div class="button-row">
+                <button id="loadPurchaseSuggestionsBtn" class="secondary">生成采购建议</button>
+                <button id="createPoFromShortageBtn" class="primary">由缺料生成采购单</button>
+              </div>
+              <span id="purchaseMsg" class="muted"></span>
+            </div>
+            <div class="work-panel">
+              <h3>采购收货入库</h3>
+              <label>采购明细<select id="receiveLine"></select></label>
+              <label>本次收货数量<input id="receiveQty" value="1" /></label>
+              <div class="button-row">
+                <button id="receivePurchaseBtn" class="primary">收货入库</button>
+                <span id="receiveMsg" class="muted"></span>
+              </div>
+            </div>
+          </div>
+          <div class="work-panel spaced">
+            <h3>库存盘点调整</h3>
+            <div class="form-grid three">
+              <label>物料<select id="adjustItem"></select></label>
+              <label>实盘数量<input id="adjustCountedQty" value="0" /></label>
+              <label>经办人<input id="adjustedBy" value="仓库员" /></label>
+            </div>
+            <label>调整原因<input id="adjustReason" placeholder="盘点差异 / 损耗 / 录入修正" /></label>
+            <div class="button-row">
+              <button id="createAdjustmentBtn" class="primary">保存盘点调整</button>
+              <span id="adjustMsg" class="muted"></span>
+            </div>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="purchaseSuggestionsTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="purchaseOrdersTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="purchaseLinesTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="inventoryTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="inventoryAdjustmentsTable"></table>
+          </div>
+        </section>
+
+        <section id="production" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>生产协同</h2>
+              <p>从 BOM 生成生产工单，按工单领料，生产报工后自动形成成品库存。</p>
+            </div>
+          </div>
+          <div class="two-panels">
+            <div class="work-panel">
+              <h3>生成生产工单</h3>
+              <label>来源 BOM<select id="productionBom"></select></label>
+              <label>生产数量<input id="workOrderQty" value="100" /></label>
+              <label>负责人<input id="workOrderOwner" value="计划员" /></label>
+              <div class="form-grid">
+                <label>计划开始<input id="plannedStart" type="date" /></label>
+                <label>计划完成<input id="plannedFinish" type="date" /></label>
+              </div>
+              <div class="button-row">
+                <button id="createWorkOrderBtn" class="primary">生成生产工单</button>
+                <span id="workOrderMsg" class="muted"></span>
+              </div>
+            </div>
+            <div class="work-panel">
+              <h3>生产报工入库</h3>
+              <label>生产工单<select id="completeWorkOrder"></select></label>
+              <div class="form-grid">
+                <label>良品数量<input id="goodQty" value="10" /></label>
+                <label>报废数量<input id="scrapQty" value="0" /></label>
+              </div>
+              <label>操作员<input id="productionOperator" value="生产班组" /></label>
+              <div class="button-row">
+                <button id="completeWorkOrderBtn" class="primary">完工入库</button>
+                <span id="completeMsg" class="muted"></span>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="workOrdersTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="workMaterialsTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="productionReportsTable"></table>
+          </div>
+        </section>
+
+        <section id="quotations" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>询价报价</h2>
+              <p>把客户询价先沉淀为报价单，确认后可一键转成销售订单，减少重复录入。</p>
+            </div>
+          </div>
+          <div class="work-panel">
+            <h3>新增报价单</h3>
+            <div class="form-grid three">
+              <label>客户名称<input id="quoteCustomer" list="customerOptions" placeholder="客户名称" /></label>
+              <label>产品<select id="quoteProduct"></select></label>
+              <label>报价数量<input id="quoteQty" value="100" /></label>
+              <label>单价<input id="quoteUnitPrice" value="1" /></label>
+              <label>有效期<input id="quoteValidUntil" type="date" /></label>
+              <label>负责人<input id="quoteOwner" value="业务员" /></label>
+            </div>
+            <label>备注<input id="quoteRemark" placeholder="客户要求、交付说明、价格口径" /></label>
+            <div class="button-row">
+              <button id="createQuoteBtn" class="primary">生成报价单</button>
+              <span id="quoteMsg" class="muted"></span>
+            </div>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="quotationsTable"></table>
+          </div>
+        </section>
+
+        <section id="sales" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>销售交付</h2>
+              <p>维护客户订单，按成品库存出货，出货后自动扣减库存并更新订单状态。</p>
+            </div>
+          </div>
+          <div class="two-panels">
+            <div class="work-panel">
+              <h3>新增销售订单</h3>
+              <label>客户名称<input id="salesCustomer" list="customerOptions" placeholder="客户名称" /></label>
+              <label>产品<select id="salesProduct"></select></label>
+              <div class="form-grid">
+                <label>订单数量<input id="salesOrderQty" value="10" /></label>
+                <label>交付日期<input id="salesDueDate" type="date" /></label>
+              </div>
+              <label>负责人<input id="salesOwner" value="业务员" /></label>
+              <div class="button-row">
+                <button id="createSalesOrderBtn" class="primary">创建销售订单</button>
+                <span id="salesMsg" class="muted"></span>
+              </div>
+            </div>
+            <div class="work-panel">
+              <h3>成品出货</h3>
+              <label>销售订单<select id="shipSalesOrder"></select></label>
+              <div class="form-grid">
+                <label>出货数量<input id="shipQty" value="1" /></label>
+                <label>出货日期<input id="shipDate" type="date" /></label>
+              </div>
+              <label>收货人/地址<input id="shipReceiver" placeholder="客户收货信息" /></label>
+              <div class="button-row">
+                <button id="shipSalesOrderBtn" class="primary">确认出货</button>
+                <span id="shipMsg" class="muted"></span>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="salesOrdersTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="shipmentsTable"></table>
+          </div>
+        </section>
+
+        <section id="finance" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>财务结算</h2>
+              <p>从销售订单生成应收，从采购单生成应付，并登记收款、付款和未结余额。</p>
+            </div>
+          </div>
+          <div id="financeCards" class="summary-grid"></div>
+          <div class="two-panels">
+            <div class="work-panel">
+              <h3>生成应收 / 应付</h3>
+              <label>销售订单<select id="arSalesOrder"></select></label>
+              <div class="form-grid">
+                <label>应收金额<input id="arAmount" placeholder="例如 1200" /></label>
+                <label>到期日<input id="arDueDate" type="date" /></label>
+              </div>
+              <div class="button-row">
+                <button id="createReceivableBtn" class="primary">生成应收</button>
+              </div>
+              <label class="spaced">采购单<select id="apPurchaseOrder"></select></label>
+              <div class="form-grid">
+                <label>应付金额<input id="apAmount" placeholder="留空则按采购明细金额" /></label>
+                <label>到期日<input id="apDueDate" type="date" /></label>
+              </div>
+              <div class="button-row">
+                <button id="createPayableBtn" class="primary">生成应付</button>
+                <span id="financeMsg" class="muted"></span>
+              </div>
+            </div>
+            <div class="work-panel">
+              <h3>登记收付款</h3>
+              <label>财务单据<select id="paymentDoc"></select></label>
+              <div class="form-grid">
+                <label>类型
+                  <select id="paymentType">
+                    <option value="收款">收款</option>
+                    <option value="付款">付款</option>
+                  </select>
+                </label>
+                <label>金额<input id="paymentAmount" placeholder="本次结算金额" /></label>
+              </div>
+              <div class="form-grid">
+                <label>日期<input id="paymentDate" type="date" /></label>
+                <label>账户<input id="paymentAccount" value="基本户" /></label>
+              </div>
+              <label>经办人<input id="paymentHandler" value="财务员" /></label>
+              <div class="button-row">
+                <button id="createPaymentBtn" class="primary">登记收付款</button>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="financialDocumentsTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="financialPaymentsTable"></table>
+          </div>
+        </section>
+
+        <section id="quality" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>品质管理</h2>
+              <p>记录 IQC 来料、IPQC 过程和 FQC 成品检验，形成质量异常与处置记录。</p>
+            </div>
+          </div>
+          <div class="two-panels">
+            <div class="work-panel">
+              <h3>新增检验记录</h3>
+              <label>检验类型
+                <select id="qualityType">
+                  <option value="IPQC">IPQC 过程检验</option>
+                  <option value="IQC">IQC 来料检验</option>
+                  <option value="FQC">FQC 成品检验</option>
+                </select>
+              </label>
+              <label>来源单据<select id="qualityRef"></select></label>
+              <div class="form-grid">
+                <label>检验数量<input id="inspectionQty" value="10" /></label>
+                <label>合格数量<input id="passedQty" value="10" /></label>
+              </div>
+              <div class="form-grid">
+                <label>不良类型<input id="defectType" placeholder="开路 / 偏位 / 外观不良" /></label>
+                <label>处置方式
+                  <select id="disposition">
+                    <option value="">无异常</option>
+                    <option value="返工">返工</option>
+                    <option value="让步放行">让步放行</option>
+                    <option value="退供">退供</option>
+                    <option value="报废">报废</option>
+                  </select>
+                </label>
+              </div>
+              <div class="form-grid">
+                <label>检验员<input id="inspector" value="品质员" /></label>
+                <label>责任环节<input id="responsibleStage" placeholder="供应商 / SMT / FPC / 包装" /></label>
+              </div>
+              <label>备注<input id="qualityRemark" placeholder="检验说明或临时处置" /></label>
+              <div class="button-row">
+                <button id="createInspectionBtn" class="primary">保存检验记录</button>
+                <span id="qualityMsg" class="muted"></span>
+              </div>
+            </div>
+            <div class="work-panel">
+              <h3>品质处理原则</h3>
+              <ol class="steps">
+                <li>IQC 负责来料检验和退供判断。</li>
+                <li>IPQC 记录过程异常、责任工序和返工处置。</li>
+                <li>FQC 确认成品出货前质量状态。</li>
+                <li>不良数量大于 0 时必须填写不良类型和处置方式。</li>
+              </ol>
+            </div>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="qualityInspectionsTable"></table>
+          </div>
+          <div class="table-wrap spaced">
+            <table id="qualityDefectsTable"></table>
+          </div>
+        </section>
+
+        <section id="operations" class="tab">
+          <div class="section-head">
+            <div>
+              <h2>系统运维</h2>
+              <p>查看经营状态、账号权限、数据库备份和最近操作记录。</p>
+            </div>
+            <button id="refreshOpsBtn" class="primary">刷新运维数据</button>
+          </div>
+          <div id="opsMetrics" class="summary-grid ops-grid"></div>
+          <div class="two-panels">
+            <div class="work-panel">
+              <h3>风险提醒</h3>
+              <ul id="opsRisks" class="risk-list"></ul>
+            </div>
+            <div class="work-panel">
+              <h3>数据库备份</h3>
+              <p id="backupAdminHint" class="muted">只有系统管理员可以创建或恢复备份。</p>
+              <div class="button-row">
+                <button id="createBackupBtn" class="primary">创建备份</button>
+              </div>
+              <div class="table-wrap mini spaced">
+                <table id="backupTable"></table>
+              </div>
+            </div>
+          </div>
+          <div class="two-panels spaced">
+            <div class="work-panel">
+              <h3>账号与角色</h3>
+              <p id="userAdminHint" class="muted">只有系统管理员可以创建账号。</p>
+              <form id="createUserForm" class="compact-form">
+                <div class="form-grid">
+                  <label>账号<input id="newUsername" autocomplete="off" placeholder="例如 purchase01" required /></label>
+                  <label>姓名<input id="newUserDisplayName" autocomplete="off" placeholder="员工姓名" required /></label>
+                </div>
+                <div class="form-grid">
+                  <label>角色
+                    <select id="newUserRole">
+                      <option value="purchase">采购</option>
+                      <option value="engineering">工程</option>
+                      <option value="production">生产</option>
+                      <option value="warehouse">仓库</option>
+                      <option value="quality">品质</option>
+                      <option value="sales">销售</option>
+                      <option value="finance">财务</option>
+                      <option value="manager">经营负责人</option>
+                      <option value="operations">运营</option>
+                      <option value="admin">系统管理员</option>
+                    </select>
+                  </label>
+                  <label>初始密码<input id="newUserPassword" type="password" minlength="12" autocomplete="new-password" required /></label>
+                </div>
+                <div class="button-row">
+                  <button id="createUserBtn" class="primary" type="submit">创建账号</button>
+                  <span id="createUserMsg" class="muted"></span>
+                </div>
+              </form>
+              <div class="table-wrap mini">
+                <table id="usersTable"></table>
+              </div>
+            </div>
+            <div class="work-panel">
+              <h3>最近操作</h3>
+              <div class="table-wrap mini">
+                <table id="opsActivityTable"></table>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div id="loginOverlay" class="login-overlay" hidden>
+      <form id="setupForm" class="login-card" hidden>
+        <h2>初始化晨亿达 ERP</h2>
+        <p>首次使用时创建唯一的系统管理员。</p>
+        <label>
+          一次性初始化凭证
+          <input id="setupToken" type="password" autocomplete="off" required />
+        </label>
+        <label>
+          管理员账号
+          <input id="setupUsername" autocomplete="username" value="admin" required />
+        </label>
+        <label>
+          管理员姓名
+          <input id="setupDisplayName" value="系统管理员" required />
+        </label>
+        <label>
+          管理员密码
+          <input id="setupPassword" type="password" minlength="12" autocomplete="new-password" required />
+        </label>
+        <button class="primary" type="submit">完成初始化</button>
+        <span id="setupMsg" class="muted"></span>
+        <small>初始化完成后，此入口会永久关闭。</small>
+      </form>
+      <form id="loginForm" class="login-card">
+        <h2>晨亿达 ERP 登录</h2>
+        <p>请使用分配的账号进入系统。</p>
+        <label>
+          账号
+          <input id="loginUsername" autocomplete="username" required />
+        </label>
+        <label>
+          密码
+          <input id="loginPassword" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="primary" type="submit">登录</button>
+        <span id="loginMsg" class="muted"></span>
+        <small>账号由系统管理员统一创建和授权。</small>
+      </form>
+    </div>
+
+    <dialog id="newItemDialog">
+      <form method="dialog" id="newItemForm">
+        <h3>新物料建档</h3>
+        <input type="hidden" id="newItemCleaningId" />
+        <label>
+          品类编码
+          <input id="newItemCategory" required />
+        </label>
+        <label>
+          标准名称
+          <input id="newItemName" required />
+        </label>
+        <label>
+          环保等级
+          <input id="newItemEnv" value="待确认" />
+        </label>
+        <label>
+          检验规则
+          <input id="newItemInspection" value="需品质确认" />
+        </label>
+        <div class="dialog-actions">
+          <button value="cancel" class="secondary">取消</button>
+          <button id="createItemBtn" value="default" class="primary">生成内部物料</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="passwordDialog">
+      <form method="dialog" id="passwordForm">
+        <h3>修改密码</h3>
+        <label>
+          原密码
+          <input id="oldPassword" type="password" autocomplete="current-password" required />
+        </label>
+        <label>
+          新密码
+          <input id="newPassword" type="password" autocomplete="new-password" minlength="12" required />
+        </label>
+        <label>
+          再输入一次
+          <input id="newPasswordConfirm" type="password" autocomplete="new-password" minlength="12" required />
+        </label>
+        <span id="passwordMsg" class="muted"></span>
+        <div class="dialog-actions">
+          <button id="cancelPasswordBtn" type="button" class="secondary">取消</button>
+          <button class="primary" type="submit">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" hidden></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
