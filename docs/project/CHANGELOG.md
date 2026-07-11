@@ -4,6 +4,17 @@
 
 ## 2026-07-12
 
+### PHASE1-TASK03 - `feat: add material category and attribute templates`
+
+- Git Commit：本任务功能独立提交，实际哈希以根仓库 `git log -1` 为准；前置设计提交为 `ebef667`。
+- 新增功能：新增 `material-category-v1` TypeScript 声明数据和 test/local 专用 seed 执行器，输出分类、属性、绑定的插入/更新统计。
+- 修改功能：无现有业务功能变化；不接入 AI、Excel、真实物料、BOM、采购、库存或生产。
+- Bug 修复：无。
+- 数据库变化：无 schema 或 migration 变化；seed 可向已迁移的隔离 D1 幂等写入 101 个分类、34 个属性定义和 228 条四级叶子显式绑定，使用本地 D1 原子 batch。
+- API 变化：无。
+- 文档变化：新增分类标准 V1 与设计规格；D-009 明确模板复制而非父子继承；同步更新项目状态文档。
+- 验证：seed 声明、父子层级、关键必填模板、幂等、环境拒绝和原 migration 测试通过；未连接生产 D1。
+
 ### PHASE1-TASK02 - `feat: implement material master v2 schema`
 
 - Git Commit：本任务独立提交，实际哈希以根仓库 `git log -1` 为准。

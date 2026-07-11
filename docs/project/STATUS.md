@@ -14,7 +14,7 @@
 | 数据表 | 46（开发 schema） | 本地 SQLite 26；在线既有 D1 8；新增 V2 12；未执行生产迁移，不能理解为生产现状 |
 | 在线 API 路径 | 54 | `app/lib/erp-api.ts` 中具体 `/api/...` 路径去重，排除仅用于前缀判断的 `/api/financial-` |
 | 页面入口 | 3 | 本地 `static/index.html`、在线 `app/page.tsx`、在线 `public/erp/index.html` |
-| 测试与安全检查文件 | 11 | 原基线 10 个，新增 1 个 Material Master 隔离迁移测试 |
+| 测试与安全检查文件 | 12 | 原基线 10 个，新增 Material Master 隔离迁移与分类 seed 测试各 1 个 |
 
 ## 当前版本与环境
 
@@ -64,6 +64,19 @@ git -C chenyida_erp_site status --short
 - 数据库迁移或表数量变化
 - API、页面、测试或主要目录变化
 - 统计口径变化
+
+## PHASE1-TASK03 分类与属性模板状态
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 分类数据 | PASS | 101 个节点、5 个一级分类、39 个四级叶子；父子级别连续 |
+| 属性定义 | PASS | 34 个复用定义；覆盖 TEXT、INTEGER（NUMBER 语义）、DECIMAL、BOOLEAN、ENUM 与要求单位 |
+| 属性绑定 | PASS | 228 条绑定全部指向四级叶子；叶子 39/39 均有完整模板，不存在父级继承 |
+| Seed 幂等 | PASS | 首次写入后第二次 inserted 为 0，记录总数不变并输出 updated 统计 |
+| 环境保护 | PASS | 仅接受 test/local；production 和 `--remote` 在数据库访问前拒绝 |
+| 数据库影响 | NONE | `0001` migration、schema 和快照未修改；未连接生产 D1 |
+| Site 基线 | PASS | lint 0 错误/1 个既有警告；build 成功；Node 12/12（包含 migration）通过 |
+| TypeScript 全量检查 | EXISTING FAILURE | 本任务新增文件无类型错误；`db/schema.ts` 第 129、243 行存在 PHASE1-TASK02 已有的 Drizzle 自引用类型错误 |
 
 ## PHASE1-TASK02 Schema 实施状态
 
