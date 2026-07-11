@@ -1,0 +1,3 @@
+import_batch_no,supplier_name,raw_item_name,raw_item_code,raw_spec,parsed_category,parsed_package,parsed_value,parsed_voltage,candidate_internal_code,match_level,confidence,owner_role,process_status
+IMP-20260708-001,A供应商,0402 10UF 16V,A-104-16V,0402 10UF 16V X5R,CAP,0402,10uF,16V,CYD-CAP-000001,自动匹配,0.95,采购,待处理
+

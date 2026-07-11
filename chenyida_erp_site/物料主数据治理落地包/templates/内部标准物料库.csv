@@ -1,0 +1,5 @@
+internal_item_code,item_category,standard_name,item_status,base_uom,brand,mpn,package,value_spec,voltage,tolerance,material,thickness,copper_weight,environmental_level,is_customer_specific,default_inspection_rule,remark
+CYD-CAP-000001,CAP,贴片电容 10uF 16V X5R 0402,启用,PCS,,,"0402","10uF","16V","±20%","X5R",,,RoHS,N,IQC-电子料常规检验,高频通用料
+CYD-RES-000001,RES,贴片电阻 10K 1% 0603,启用,PCS,,,"0603","10K",,"1%",,,,RoHS,N,IQC-电子料常规检验,高频通用料
+CYD-PI-000001,PI,PI基材 25um ED铜 1/2OZ,启用,M2,,,"","",,,PI,25um,1/2OZ,RoHS,N,IQC-FPC材料检验,核心材料
+CYD-CON-000001,CON,FPC连接器 0.5Pitch 24Pin,启用,PCS,,,"","0.5Pitch 24Pin",,,,,,RoHS,N,IQC-连接器检验,连接器示例

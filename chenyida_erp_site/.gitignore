@@ -1,0 +1,50 @@
+# Dependencies and caches
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+**/__pycache__/
+*.py[cod]
+
+# Builds and test output
+/coverage
+/.next/
+/.vinext/
+/out/
+/dist/
+/outputs/
+/work/
+
+# Local runtime data
+/.wrangler/
+chenyida_erp_app/data/
+*.sqlite3
+*.db
+*.log
+*.pid
+
+# Environment and local workspace metadata
+.env*
+!.env.example
+.agents/
+.codex/
+.git.invalid-empty-backup/
+.vercel/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+*.tmp
+*.pem
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Source reference decks remain local unless explicitly shared
+*.pptx

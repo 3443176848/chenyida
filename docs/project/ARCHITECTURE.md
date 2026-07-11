@@ -28,14 +28,14 @@ flowchart LR
 ```text
 D:/erp
 ├── chenyida_erp_app/       本地 Python ERP，普通根仓库目录
-├── chenyida_erp_site/      嵌套 Git 仓库；根仓库中为 gitlink
+├── chenyida_erp_site/      在线 Site，普通根仓库目录
 ├── 物料主数据治理落地包/   模板、规则、SOP、工具和生成物
 ├── docs/                   审计、V2 计划、项目管理文档
 ├── README.md
 └── AGENTS.md
 ```
 
-根仓库 gitlink 指向 `9f2c2dc`，但没有 `.gitmodules`。当前生产 Site `v3` 对应提交 `2b4f178`。因此本图描述的是本机完整工作区，不代表 GitHub 新克隆可恢复同样的目录内容。
+`PHASE0-TASK01-B` 已把原来指向 `9f2c2dc`、且没有 `.gitmodules` 的 gitlink 转换为 77 个普通跟踪文件。当前生产 Site `v3` 对应提交 `2b4f178`，纳管前开发 Site 为 `9f2c2dc`；两者的运行时代码一致。根仓库新克隆现在可以直接恢复两个应用，无需初始化子模块。
 
 ## 在线 Site 请求路径
 
@@ -139,7 +139,8 @@ erDiagram
 
 ```mermaid
 flowchart LR
-    SRC["Site源码提交 2b4f178"] --> SITES["OpenAI Sites v3"]
+    ROOT["根仓库普通目录 chenyida_erp_site"] --> DEV["开发基线 9f2c2dc"]
+    PROD["生产源码提交 2b4f178"] --> SITES["OpenAI Sites v3"]
     SITES --> WORKER["Cloudflare Worker/Vinext"]
     WORKER --> D1P["生产D1绑定 DB"]
     WORKER --> URL["chenyida-erp-online.sjin74376.chatgpt.site"]
@@ -147,13 +148,13 @@ flowchart LR
 
 - `.openai/hosting.json` 绑定现有 Sites 项目和逻辑 D1 名称 `DB`。
 - Site 当前为公开访问、状态 active、版本 v3。
+- `2b4f178` 是 `9f2c2dc` 的祖先；源码纳管提交保留这条历史关系，但没有创建新生产版本。
 - 本任务没有保存新版本、修改访问策略或部署生产。
 
 ## 已知架构债务
 
-1. 根仓库无法恢复 Site 完整源码。
-2. 两套运行面存在重复业务逻辑和不同数据库模型。
-3. 在线单文件 API 处理器职责过多。
-4. 在线业务主体为 JSON，缺少 V2 所需关系约束。
-5. schema、迁移和运行时建表同时存在，需建立单一迁移权威。
-6. 本地数据库缺少迁移历史和外键。
+1. 两套运行面存在重复业务逻辑和不同数据库模型。
+2. 在线单文件 API 处理器职责过多。
+3. 在线业务主体为 JSON，缺少 V2 所需关系约束。
+4. schema、迁移和运行时建表同时存在，需建立单一迁移权威。
+5. 本地数据库缺少迁移历史和外键。

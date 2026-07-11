@@ -1,0 +1,190 @@
+import assert from "node:assert/strict";
+
+const baseUrl = process.env.ERP_TEST_URL || "http://localhost:3000";
+const adminUsername = process.env.ERP_TEST_USERNAME || "admin";
+const adminPassword = process.env.ERP_TEST_PASSWORD;
+
+if (!adminPassword) {
+  throw new Error("ERP_TEST_PASSWORD is required");
+}
+
+let cookie = "";
+
+async function request(path, { method = "GET", body, idempotencyKey } = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Request-Id": crypto.randomUUID(),
+  };
+  if (cookie) headers.Cookie = cookie;
+  if (method === "POST") headers["Idempotency-Key"] = idempotencyKey || crypto.randomUUID();
+  const response = await fetch(`${baseUrl}${path}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    redirect: "manual",
+  });
+  const setCookie = response.headers.get("set-cookie");
+  if (setCookie) cookie = setCookie.split(";", 1)[0];
+  const contentType = response.headers.get("content-type") || "";
+  const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+  if (!response.ok) throw new Error(`${method} ${path} -> ${response.status}: ${JSON.stringify(payload)}`);
+  return { payload, response };
+}
+
+const session = (await request("/api/session")).payload;
+if (session.setup_required) {
+  await request("/api/setup", {
+    method: "POST",
+    body: {
+      setup_token: process.env.ERP_TEST_SETUP_TOKEN,
+      username: adminUsername,
+      display_name: "测试管理员",
+      password: adminPassword,
+    },
+  });
+}
+
+const login = (await request("/api/login", {
+  method: "POST",
+  body: { username: adminUsername, password: adminPassword },
+})).payload;
+assert.equal(login.user.role, "admin");
+
+const suffix = Date.now().toString(36).toUpperCase();
+
+const createdUser = (await request("/api/users", {
+  method: "POST",
+  body: {
+    username: `sales${Date.now().toString().slice(-7)}`,
+    display_name: "烟测销售员",
+    role: "sales",
+    password: `Sales-${suffix}-Pass!`,
+  },
+})).payload.user;
+assert.equal(createdUser.role, "sales");
+assert.equal(createdUser.must_change_password, true);
+await request("/api/users/status", {
+  method: "POST",
+  body: { username: createdUser.username, is_active: false, version: 1 },
+});
+const disabledUser = (await request("/api/users")).payload.rows.find((row) => row.username === createdUser.username);
+assert.equal(disabledUser.is_active, false);
+await request("/api/users/status", {
+  method: "POST",
+  body: { username: createdUser.username, is_active: true, version: disabledUser.version },
+});
+await request("/api/users/reset-password", {
+  method: "POST",
+  body: { username: createdUser.username, password: `Reset-${suffix}-Pass!` },
+});
+
+const customerKey = crypto.randomUUID();
+const customerBody = {
+  customer_name: `烟测客户-${suffix}`,
+  contact_name: "测试联系人",
+  payment_terms: "月结30天",
+  owner: "烟测",
+};
+const firstCustomer = (await request("/api/customers", { method: "POST", body: customerBody, idempotencyKey: customerKey })).payload;
+const replayedCustomer = await request("/api/customers", { method: "POST", body: customerBody, idempotencyKey: customerKey });
+assert.equal(replayedCustomer.response.headers.get("idempotency-replayed"), "true");
+assert.equal(replayedCustomer.payload.customer_code, firstCustomer.customer_code);
+
+const supplier = (await request("/api/suppliers", {
+  method: "POST",
+  body: { supplier_name: `烟测供应商-${suffix}`, supplier_level: "合格供应商", owner: "烟测" },
+})).payload;
+assert.match(supplier.supplier_code, /^SUP-/);
+
+const productCode = `CYD-SMOKE-${suffix}`;
+await request("/api/products", {
+  method: "POST",
+  body: { product_code: productCode, product_name: "烟测在线产品", product_type: "FPC+SMT", product_version: "A0" },
+});
+
+await request("/api/import", {
+  method: "POST",
+  body: {
+    batchNo: `IMP-${suffix}`,
+    rows: [{ supplier_name: supplier.supplier_name, raw_item_name: "贴片电阻 10K 0603 1%", raw_item_code: `R-${suffix}`, purchase_uom: "PCS" }],
+  },
+});
+const cleaningRows = (await request("/api/cleaning")).payload.rows;
+const cleaning = cleaningRows.find((row) => row.import_batch_no === `IMP-${suffix}`);
+assert.ok(cleaning);
+const item = (await request("/api/cleaning/create-item", {
+  method: "POST",
+  body: { id: cleaning.id, item_category: "RES", standard_name: "贴片电阻 10K 0603", environmental_level: "RoHS", default_inspection_rule: "抽检" },
+})).payload;
+assert.match(item.internal_item_code, /^MAT-RES-/);
+
+const bom = (await request("/api/boms", {
+  method: "POST",
+  body: { bom_code: `BOM-${productCode}-A0`, product_code: productCode, bom_version: "A0", bom_status: "已审核" },
+})).payload;
+await request("/api/bom-lines", {
+  method: "POST",
+  body: { bom_id: bom.bom_id, line_no: 10, internal_item_code: item.internal_item_code, qty_per: 2, uom: "PCS", process_stage: "SMT", loss_rate: 0 },
+});
+
+await request("/api/inventory-adjustments", {
+  method: "POST",
+  body: { internal_item_code: item.internal_item_code, counted_qty: 100, reason: "在线烟测", adjusted_by: "烟测" },
+});
+const readiness = (await request(`/api/bom-readiness?bom_id=${bom.bom_id}&order_qty=10`)).payload;
+assert.equal(readiness.all_ready, true);
+
+const workOrder = (await request("/api/work-orders/from-bom", {
+  method: "POST",
+  body: { bom_id: bom.bom_id, order_qty: 10, owner: "烟测" },
+})).payload;
+const issued = (await request("/api/work-orders/issue-materials", {
+  method: "POST",
+  body: { work_order_id: workOrder.work_order_id },
+})).payload;
+assert.equal(issued.issued.length, 1);
+const completed = (await request("/api/work-orders/complete", {
+  method: "POST",
+  body: { work_order_id: workOrder.work_order_id, good_qty: 5, scrap_qty: 0, operator: "烟测" },
+})).payload;
+assert.equal(completed.after_qty, 5);
+
+const quotation = (await request("/api/quotations", {
+  method: "POST",
+  body: { customer_name: customerBody.customer_name, product_code: productCode, quote_qty: 2, unit_price: 88, owner: "烟测" },
+})).payload;
+const salesOrder = (await request("/api/quotations/to-sales-order", {
+  method: "POST",
+  body: { quote_id: quotation.quote_id, owner: "烟测" },
+})).payload;
+const shipment = (await request("/api/shipments/from-order", {
+  method: "POST",
+  body: { sales_order_id: salesOrder.sales_order_id, ship_qty: 1, receiver: "烟测收货人" },
+})).payload;
+assert.equal(shipment.after_qty, 4);
+
+const receivable = (await request("/api/financial-documents/from-sales-order", {
+  method: "POST",
+  body: { sales_order_id: salesOrder.sales_order_id, total_amount: 176, created_by: "烟测" },
+})).payload;
+const payment = (await request("/api/financial-payments", {
+  method: "POST",
+  body: { doc_id: receivable.doc_id, amount: 50, payment_type: "收款", handled_by: "烟测" },
+})).payload;
+assert.equal(payment.doc_status, "部分结清");
+
+const inspection = (await request("/api/quality-inspections", {
+  method: "POST",
+  body: { inspection_type: "FQC", ref_type: "销售订单", ref_id: salesOrder.sales_order_id, product_code: productCode, inspected_qty: 1, passed_qty: 1, inspector: "烟测" },
+})).payload;
+assert.equal(inspection.inspection_status, "合格放行");
+
+const summary = (await request("/api/summary")).payload;
+assert.ok(summary.total_items >= 2);
+assert.ok(summary.total_customers >= 1);
+assert.ok(summary.total_suppliers >= 1);
+assert.ok(summary.total_work_orders >= 1);
+assert.ok(summary.total_sales_orders >= 1);
+assert.equal(summary.receivable_balance >= 126, true);
+
+console.log(JSON.stringify({ ok: true, productCode, workOrder: workOrder.work_order_code, salesOrder: salesOrder.sales_order_code }));

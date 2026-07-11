@@ -4,6 +4,17 @@
 
 ## 2026-07-11
 
+### PHASE0-TASK01-B - `fix: convert site gitlink to tracked source`
+
+- Git Commit：本任务独立合并提交；第一父提交为任务开始时根仓库 `a1a8d6a`，第二父提交为 Site 开发基线 `9f2c2dc`；完成后实际哈希以根仓库 `git log -1` 为准。
+- 新增功能：无。
+- 修改功能：无。
+- Bug 修复：移除无 `.gitmodules`、无可用远端的 Site gitlink；把原 Site tree 的 77 个文件按普通文件纳入根仓库，使新克隆可恢复完整源码。
+- 数据库变化：无；未修改 schema、迁移或生产 D1。
+- API 变化：无。
+- 文档变化：更新根 README、项目总控、状态、任务、架构、上下文和决策记录；新增 `docs/audits/phase0-task01-source-management-report.md`。
+- 版本关系：生产 Site `2b4f178`；纳管前开发 Site `9f2c2dc`；两者运行时代码一致，且 `2b4f178` 是 `9f2c2dc` 的祖先。
+
 ### PM-000 - `docs: establish project operating system`
 
 - Git Commit：本任务独立提交，完成后以根仓库 `git log -1` 为准。

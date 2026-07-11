@@ -70,6 +70,16 @@
 - 原因：避免两套系统继续产生冲突主数据。
 - 影响：确认前不得实施 V2 数据迁移或切断本地写路径。
 
+## D-007 Site 源码由根仓库直接管理
+
+- 日期：2026-07-11
+- 状态：ACCEPTED
+- 确认人：项目负责人（通过 `PHASE0-TASK01-B` 指令确认）
+- 背景：`chenyida_erp_site/` 原为无 `.gitmodules`、无可用远端的 mode `160000` gitlink，新克隆无法恢复 Site 源码。
+- 决定：保留 `chenyida_erp_app/` 和 `chenyida_erp_site/` 目录名；解除 gitlink，把 Site 的 77 个跟踪文件作为普通文件纳入根仓库。最终任务提交连接根仓库历史与 Site 开发提交 `9f2c2dc`，生产提交 `2b4f178` 继续可追溯。
+- 原因：让一次根仓库克隆即可恢复两个应用，同时避免目录重命名引发启动、构建、托管或部署路径变化。
+- 影响：后续 Site 开发直接在根仓库提交，不再在 `chenyida_erp_site/` 内创建独立仓库或执行 submodule 操作；生产发布仍须单独授权。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`，其中 `B01-B06` 阻断 Phase 1 开发。任何确认结果都必须回写本文件，包含确认人、日期和适用范围。

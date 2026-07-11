@@ -1,0 +1,4 @@
+internal_item_code,supplier_name,supplier_item_name,supplier_item_code,supplier_brand,supplier_mpn,purchase_uom,uom_conversion,min_order_qty,lead_time_days,last_price,match_status,approved_by,approved_date
+CYD-CAP-000001,A供应商,0402 10UF 16V,A-104-16V,,,PCS,1,10000,7,0.012,已确认,采购主管,2026-07-08
+CYD-CAP-000001,B供应商,C0402X5R106M160,B-CAP-9912,,,PCS,1,10000,10,0.011,已确认,采购主管,2026-07-08
+
