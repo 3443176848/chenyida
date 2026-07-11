@@ -16,8 +16,10 @@
 | PM-000 | 建立AI项目管理体系 | DONE | Codex（执行）、项目负责人（确认） | 2026-07-11 | 2026-07-11 | 无 | 建立 `docs/project/` 九份权威文档并更新 `AGENTS.md`；未修改业务代码、数据库、页面或生产环境 |
 | PHASE0-TASK01-B | 解除Site gitlink并纳入根仓库管理 | DONE | Codex（执行）、项目负责人（目录决策确认） | 2026-07-11 | 2026-07-11 | PM-000 | 保留 `chenyida_erp_app/` 与 `chenyida_erp_site/` 路径；将 1 个 gitlink 转为 77 个普通跟踪文件，并保留 `2b4f178`、`9f2c2dc` 的版本和历史关系；未修改业务代码或生产环境 |
 | PHASE0-TASK02 | 建立隔离测试与安全基线 | DONE | Codex（执行）、项目负责人（本机一次性 D1 方案确认） | 2026-07-11 | 2026-07-11 | PHASE0-TASK01 | 建立三环境清单、production/公开 URL 拒绝、本机一次性 Miniflare D1、自动销毁、去敏日志、凭证检查和临时 SQLite 备份恢复验证；未访问生产 D1 |
+| PHASE1-TASK01 | 设计 Material Master V2 数据模型 | DONE | Codex（设计）、项目负责人（审批） | 2026-07-11 | 2026-07-12 | PHASE0-TASK01、PHASE0-TASK02 | 设计已批准；正式编码仅审核通过后生成，增加生命周期、变更日志和五要素时效供应商映射唯一性 |
+| PHASE1-TASK02 | 实现V2数据契约与迁移测试基线 | DONE | Codex（执行）、项目负责人（设计审批） | 2026-07-12 | 2026-07-12 | PHASE1-TASK01 | 新增 12 张 D1 V2 表、Drizzle schema、Up/Down、快照和隔离迁移测试；未接业务、未迁移数据、未访问生产 |
 
-当前唯一 `DOING` 任务为 `PHASE1-TASK01`，仅进行 Material Master V2 数据模型设计评审；迁移实现、业务接入和生产操作尚未开始。`PHASE0-TASK03` 仍在台账中等待后续安排。
+当前无 `DOING` 任务。PHASE1-TASK02 已完成 schema 与迁移测试基线，业务接入和生产操作尚未开始；`PHASE0-TASK03` 仍在台账中等待后续安排。
 
 ## Phase 0 待办
 
@@ -31,8 +33,6 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PHASE1-TASK01 | 设计 Material Master V2 数据模型 | DOING | Codex（设计）、项目负责人（审批） | 2026-07-11 | - | PHASE0-TASK01、PHASE0-TASK02 | 已形成 `database-model-v2.md` 评审稿：在线 D1 为唯一目标，本地 SQLite 仅作 legacy 来源；当前等待人工审批，尚未创建迁移或修改业务 |
-| PHASE1-TASK02 | 实现V2数据契约与迁移测试基线 | TODO | 待指派 | - | - | PHASE1-TASK01 设计批准 | 只建立关系化 schema、增量 Up/Down 迁移和隔离迁移测试，不接入现有 UI，不迁移生产数据 |
 | PHASE2-TASK01 | 建立导入批次与行级状态机 | TODO | 待指派 | - | - | Phase 1 完成 | 关系化记录批次、原始行、解析结果、错误和重试 |
 | PHASE3-TASK01 | 建立AI治理评估与审批边界 | TODO | 待指派 | - | - | Phase 2 完成 | 定义评估集、证据、模型版本、人工确认和禁止自动生效规则 |
 

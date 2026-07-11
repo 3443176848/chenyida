@@ -2,6 +2,19 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-12
+
+### PHASE1-TASK02 - `feat: implement material master v2 schema`
+
+- Git Commit：本任务独立提交，实际哈希以根仓库 `git log -1` 为准。
+- 新增功能：无业务功能；新增 Material Master V2 数据契约与可回滚迁移框架。
+- 修改功能：无；现有 API、页面、BOM、采购、库存和 legacy SQLite 不变。
+- Bug 修复：无。
+- 数据库变化：新增 12 张在线 D1 V2 表的 Drizzle schema、`0001` Up、Down、快照、约束与索引；正式编码仅允许审核后生命周期，供应商映射唯一身份包含 supplier/code/manufacturer/mpn/revision 与有效期。
+- API 变化：无。
+- 文档变化：更新设计基线和项目状态，新增 `docs/audits/phase1-task02-schema-report.md`。
+- 验证：本机一次性 D1 完成空库 Up、防重、结构/约束、Down 和重建；完整基线结果见审计报告。未连接生产 D1。
+
 ## 2026-07-11
 
 ### PHASE1-TASK01 设计评审 - `docs: design material master v2 data model`

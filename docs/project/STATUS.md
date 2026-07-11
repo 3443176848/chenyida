@@ -1,6 +1,6 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-11（Asia/Shanghai）
+最后更新时间：2026-07-12（Asia/Shanghai）
 
 ## 自动统计摘要
 
@@ -8,13 +8,13 @@
 | --- | ---: | --- |
 | 总代码量 | 13,459 行 | 统计本地 ERP 与在线 Site 的源码；排除 `node_modules`、数据库、构建缓存、生成物、文档及 Site 内重复导入的本地 ERP 树 |
 | 源码文件 | 44 | 同上口径；本地 14，在线 30 |
-| 根仓库跟踪项 | 150 | 本次新增 1 份 Material Master V2 数据模型评审稿；仓库仍无 mode `160000` |
+| 根仓库跟踪项 | 提交前动态值 | 本次新增迁移、快照、测试和审计报告；仓库仍无 mode `160000` |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
-| 数据表 | 34 | 本地 SQLite 26；在线 D1 8；两套模型不等价，不能直接相加理解为统一 schema |
+| 数据表 | 46（开发 schema） | 本地 SQLite 26；在线既有 D1 8；新增 V2 12；未执行生产迁移，不能理解为生产现状 |
 | 在线 API 路径 | 54 | `app/lib/erp-api.ts` 中具体 `/api/...` 路径去重，排除仅用于前缀判断的 `/api/financial-` |
 | 页面入口 | 3 | 本地 `static/index.html`、在线 `app/page.tsx`、在线 `public/erp/index.html` |
-| 测试与安全检查文件 | 10 | 本地 5 个测试/检查文件，在线 3 个测试文件、1 个烟测运行器和 1 个凭证检查器；`server.py --self-test` 为内置入口，未另计文件 |
+| 测试与安全检查文件 | 11 | 原基线 10 个，新增 1 个 Material Master 隔离迁移测试 |
 
 ## 当前版本与环境
 
@@ -65,19 +65,17 @@ git -C chenyida_erp_site status --short
 - API、页面、测试或主要目录变化
 - 统计口径变化
 
-## PHASE1-TASK01 设计评审状态
+## PHASE1-TASK02 Schema 实施状态
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 目标运行面 | CONFIRMED | 在线 Site/D1 是 Material Master V2 唯一目标；本地 SQLite 不修改，仅作 legacy 来源 |
-| 设计范围 | DRAFT FOR REVIEW | 11 张关系表、ER 图、完整字段字典、迁移/回滚设计、测试矩阵和风险已写入评审稿 |
-| 数据库变化 | NONE | 在线仍为 8 张现有表；未生成或执行 `0001`，未修改 Drizzle schema |
-| 业务变化 | NONE | 未修改 BOM、采购、库存、生产、导入或 AI 逻辑 |
+| 目标运行面 | CONFIRMED | 仅在线 Site/D1 schema；本地 SQLite 未修改 |
+| 设计审批 | PASS | 已吸收正式编码审核后生成、生命周期、变更日志、供应商五要素时效唯一性和应用层校验调整 |
+| 数据库变化 | IMPLEMENTED | 新增 12 张 V2 表的 Drizzle schema、`0001` Up/Down、snapshot 和 journal |
+| 业务变化 | NONE | 未修改 BOM、采购、库存、生产、导入、AI、API 或页面 |
 | 数据操作 | NONE | 未连接生产 D1，未迁移真实数据，未创建生产表 |
-| 文档自审 | PASS | 无 TBD/TODO 占位；11 张表均有 `created_at`；`git diff --check` 通过 |
-| Site 基线 | PASS | lint 0 错误/1 个既有警告；构建成功；Node 测试 8/8；凭证检查扫描 150 个仓库文件通过 |
-| 本地基线 | PASS | `server.py --self-test`、`smoke_test.py`、`go_live_check.py --no-backup` 在一次性临时 SQLite 中通过且已清理；现有 legacy 数据库大小和时间戳未变化 |
-| 人工审批 | PENDING | 批准前不得进入迁移实现 |
+| 隔离迁移 | PASS | 空库 Up、防重、结构/约束、Down、重建通过；临时 D1 已清理 |
+| 完整基线 | PASS | lint 0 错误/1 个既有警告；build 成功；Node 9/9；隔离 API 烟测、本地三项临时基线、凭证扫描和 `git diff --check` 通过 |
 
 ## PHASE0-TASK02 验证结果
 

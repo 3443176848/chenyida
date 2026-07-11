@@ -1,6 +1,6 @@
 # Material Master V2 数据库模型设计
 
-状态：`DRAFT_FOR_REVIEW`
+状态：`APPROVED_AND_IMPLEMENTED`
 
 任务：`PHASE1-TASK01`
 
@@ -39,6 +39,7 @@
 - `supplier_mappings`
 - `supplier_mapping_price_history`
 - `material_versions`
+- `material_change_logs`
 - `material_aliases`
 - `material_code_rules`
 - `legacy_material_mapping`
@@ -77,6 +78,7 @@ erDiagram
     MATERIAL_MASTER ||--o{ SUPPLIER_MAPPINGS : supplied_as
     SUPPLIER_MAPPINGS ||--o{ SUPPLIER_MAPPING_PRICE_HISTORY : priced_by
     MATERIAL_MASTER ||--o{ MATERIAL_VERSIONS : versioned_as
+    MATERIAL_MASTER ||--o{ MATERIAL_CHANGE_LOGS : changed_as
     MATERIAL_MASTER ||--o{ MATERIAL_ALIASES : known_as
     MATERIAL_CATEGORIES ||--o{ MATERIAL_CODE_RULES : coded_by
     MATERIAL_MASTER ||--o{ LEGACY_MATERIAL_MAPPING : maps_from
@@ -249,7 +251,7 @@ erDiagram
 | `manufacturer` | TEXT NOT NULL DEFAULT `''` | 制造商 |
 | `manufacturer_part_number` | TEXT NOT NULL DEFAULT `''` | 制造商型号/MPN |
 | `base_uom` | TEXT NOT NULL | 基础库存单位代码 |
-| `status` | TEXT NOT NULL | `DRAFT`,`PENDING_APPROVAL`,`ACTIVE`,`FROZEN`,`INACTIVE` |
+| `material_status` | TEXT NOT NULL | 生命周期：`DRAFT`,`PENDING_APPROVAL`,`ACTIVE`,`FROZEN`,`INACTIVE` |
 | `procurement_type` | TEXT NOT NULL | `PURCHASE`,`OUTSOURCE`,`SELF_MADE`,`NON_PURCHASABLE` |
 | `inventory_type` | TEXT NOT NULL | `STOCKED`,`NON_STOCKED`,`CONSIGNMENT` |
 | `lot_control_required` | INTEGER NOT NULL DEFAULT 0 | 是否批次管理 |
@@ -272,7 +274,7 @@ erDiagram
 - 部分唯一索引：`internal_material_code IS NOT NULL` 时唯一。
 - 候选去重索引：`(category_id, manufacturer, manufacturer_part_number)`；不设全局唯一，避免错误合并不同规格或客户范围物料。
 - 队列索引：`(status, updated_at)`；查询索引：`(category_id, status)`、`standard_name`。
-- `ACTIVE`、`FROZEN`、`INACTIVE` 状态必须已有正式编码；`ACTIVE` 还必须已有批准信息、必填分类属性和值。编码存在性可由 `CHECK` 约束，跨表完整性由未来服务事务保证，不用触发器隐藏业务逻辑。
+- `DRAFT`、`PENDING_APPROVAL` 不得生成正式编码；审核通过进入 `ACTIVE` 时生成编码。`ACTIVE`、`FROZEN`、`INACTIVE` 必须已有正式编码和批准信息。编码与生命周期的一致性由 `CHECK` 约束，跨表完整性由未来服务事务保证，不用触发器隐藏业务逻辑。
 
 ### 6.3 `material_attribute_definitions`
 
@@ -362,8 +364,9 @@ erDiagram
 | `supplier_item_code` | TEXT NOT NULL | 供应商料号 |
 | `supplier_item_name` | TEXT NOT NULL DEFAULT `''` | 供应商叫法 |
 | `supplier_specification` | TEXT NOT NULL DEFAULT `''` | 供应商规格描述 |
-| `supplier_brand` | TEXT NOT NULL DEFAULT `''` | 供应商品牌声明 |
-| `supplier_mpn` | TEXT NOT NULL DEFAULT `''` | 供应商 MPN 声明 |
+| `manufacturer` | TEXT NOT NULL DEFAULT `''` | 制造商规范值 |
+| `mpn` | TEXT NOT NULL DEFAULT `''` | 制造商料号规范值 |
+| `revision` | TEXT NOT NULL DEFAULT `''` | 版本/修订号规范值 |
 | `purchase_uom` | TEXT NOT NULL | 采购单位 |
 | `uom_conversion_numerator` | INTEGER NOT NULL DEFAULT 1 CHECK > 0 | 转为基础单位的分子 |
 | `uom_conversion_denominator` | INTEGER NOT NULL DEFAULT 1 CHECK > 0 | 转为基础单位的分母 |
@@ -384,7 +387,7 @@ erDiagram
 | `approved_at` | TEXT NULL | 批准时间 |
 | `request_id` | TEXT NOT NULL | 请求编号 |
 
-映射关键字段在批准后不可原地改写；变更时停用旧行并插入带 `supersedes_mapping_id` 的新行，从而由 `supplier_mappings` 自身保留映射历史。部分唯一索引保证同一 `(supplier_key, supplier_item_code)` 最多只有一个 `valid_to IS NULL` 的当前行。多个不同供应商料号可映射到同一 `material_id`。索引：`material_id`、`supersedes_mapping_id`、`(supplier_mpn, supplier_brand)`、`(status, updated_at)`。
+映射关键字段在批准后不可原地改写；变更时停用旧行并插入带 `supersedes_mapping_id` 的新行。唯一性身份为 `(supplier_key, supplier_item_code, manufacturer, mpn, revision)`：部分唯一索引保证每个身份最多一条 `valid_to IS NULL` 当前行，历史唯一索引再包含 `valid_from`；任意两段历史有效期不可重叠由应用层事务校验。索引：`material_id`、`supersedes_mapping_id`、`(mpn, manufacturer)`、`(status, updated_at)`。
 
 ### 6.7 `supplier_mapping_price_history`
 
@@ -430,7 +433,11 @@ erDiagram
 
 唯一约束：`(material_id, version_no)`。索引：`(material_id, created_at DESC)`、`(event_type, created_at)`。`snapshot_json` 只用于历史审计和恢复比对，不作为当前查询、约束或匹配来源。
 
-### 6.9 `material_aliases`
+### 6.9 `material_change_logs`
+
+物料逐字段变更审计日志，记录 `material_id`、`change_type`、`field_name`、变更前后 JSON 值、原因、操作者、时间和 `request_id`。它与 `material_versions` 分工：版本表保存完整快照，变更日志提供可检索的字段级差异。索引为 `(material_id, created_at)` 和 `request_id`。
+
+### 6.10 `material_aliases`
 
 保存中文名、英文名、供应商叫法、历史旧名称、内部简称和旧编码。
 
@@ -454,7 +461,7 @@ erDiagram
 
 唯一约束：`(material_id, alias_type, normalized_alias)`。不设置 `normalized_alias` 全局唯一，因为相同简称可能对应多个物料；匹配服务必须显式处理歧义。
 
-### 6.10 `material_code_rules`
+### 6.11 `material_code_rules`
 
 独立保存编码格式和原子序列状态。规则绑定最具体分类；大类段和小类段在规则启用后不可原地修改，只能停用旧规则并新增规则。
 
@@ -484,7 +491,7 @@ erDiagram
 
 生成规则：`prefix + separator + major_segment + separator + minor_segment + separator + zeroPad(sequence, width)`。例如 `CYD-EL-RES-000001`。未来编码服务必须在一个数据库事务中原子领取并递增序号、插入物料和版本/审计记录；领取后序号不复用。当前任务不实现该服务，也不决定正式编码生成时点。
 
-### 6.11 `legacy_material_mapping`
+### 6.12 `legacy_material_mapping`
 
 保存 legacy 身份到 V2 物料的经批准交叉映射。它不是导入暂存表；未决冲突留在未来迁移批次/冲突表，不得写入本表。
 
@@ -530,7 +537,7 @@ erDiagram
 
 | 阶段 | 内容 | 本任务状态 |
 | --- | --- | --- |
-| 扩展 | 新增 11 张 V2 表、约束和索引；同步 Drizzle schema | 仅设计，下一任务实现 |
+| 扩展 | 新增 12 张 V2 表、约束和索引；同步 Drizzle schema | 已由 PHASE1-TASK02 实现并在隔离 D1 验证 |
 | 回填 | 只读导出 legacy，规范化、冲突审查、写入 V2 和交叉映射 | 不执行 |
 | 切换 | 分别切换只读查询，再按 BOM/采购/库存/生产切换写引用 | 不执行 |
 | 收缩 | 停止旧写路径；稳定期后另案评估旧结构 | 不执行，禁止删除旧表 |
@@ -557,17 +564,18 @@ chenyida_erp_site/drizzle/meta/0001_snapshot.json
 6. `supplier_mappings`
 7. `supplier_mapping_price_history`
 8. `material_versions`
-9. `material_aliases`
-10. `material_code_rules`
-11. `legacy_material_mapping`
-12. 创建唯一索引和查询索引
-13. 执行结构与约束核对
+9. `material_change_logs`
+10. `material_aliases`
+11. `material_code_rules`
+12. `legacy_material_mapping`
+13. 创建唯一索引和查询索引
+14. 执行结构与约束核对
 
 首个 Up 迁移不包含 `INSERT ... SELECT`、不扫描生产业务数据、不创建默认编码规则、不更改运行时 API 建表语句。
 
 ### 8.4 回滚与恢复
 
-- **开发/隔离测试回滚**：仅当 V2 尚无保留数据时，使用对应 Down 文件按依赖逆序删除 11 张新增表；V1 表和数据不受影响。
+- **开发/隔离测试回滚**：仅当 V2 尚无保留数据时，使用对应 Down 文件按依赖逆序删除 12 张新增表；V1 表和数据不受影响。
 - **迁移执行失败**：隔离测试中整个迁移事务回滚；不得留下部分表或部分索引。
 - **生产尚未切换时**：若已产生 V2 数据，优先停用新写路径并执行前向修复；不得直接 Down 丢弃数据。
 - **生产切换后**：回退必须依赖迁移前 D1 可恢复快照、交叉映射和逐表核对报告，Down SQL 不再作为数据恢复手段。
@@ -581,7 +589,7 @@ chenyida_erp_site/drizzle/meta/0001_snapshot.json
 
 - 上述 V1 数量和汇总完全不变。
 - V1 items、mappings、BOM、采购和库存 API 查询结果不变。
-- 11 张 V2 表为空。
+- 12 张 V2 表为空。
 - schema、Drizzle snapshot、迁移 SQL 的表名、列、约束和索引一致。
 
 ## 9. 隔离迁移测试设计
@@ -590,11 +598,11 @@ chenyida_erp_site/drizzle/meta/0001_snapshot.json
 
 | 测试 | 准备 | 验证 |
 | --- | --- | --- |
-| 空库升级 | 执行 `0000` 后执行 `0001` | 11 张表、外键、检查约束和索引存在 |
+| 空库升级 | 执行 `0000` 后执行 `0001` | 12 张表、基础外键、检查约束和索引存在 |
 | 已有数据升级 | 在 V1 写入合成 items、mappings、BOM、采购明细、库存 | 执行 `0001` 后旧记录和汇总逐项相同 |
 | 迁移防重 | 通过迁移 journal 再次调用迁移器 | `0001` 不重复执行，schema 不变 |
 | 失败回滚 | 在事务中的测试副本注入中途失败 | 不存在部分 V2 表，V1 数据不变 |
-| Down 回滚 | 空 V2 库执行 Down | 仅 11 张 V2 表消失；V1 仍可读 |
+| Down 回滚 | 空 V2 库执行 Down | 仅 12 张 V2 表消失；V1 仍可读 |
 | 回滚后重升 | Down 后重新执行 Up | 结构与首次升级完全一致 |
 | 约束测试 | 写入非法状态、重复编码、非法父键、错类型属性 | 数据库或服务校验明确拒绝 |
 | 来源必填 | 写入缺少 `source_type/source_ref` 的物料 | 数据库拒绝 |
@@ -631,11 +639,11 @@ AI 不直接写 `material_master`、`material_attribute_values`、`supplier_mapp
 | D1 外键配置未启用 | 引用约束可能未执行 | 迁移测试显式检查 `foreign_keys` 和孤儿写入 | 实施时确认 Wrangler/D1 行为 |
 | 现有运行时建表与迁移并存 | schema 漂移 | 本次不改运行时行为 | 后续迁移基线任务统一权威来源 |
 
-## 12. 设计审批门禁
+## 12. 设计审批结果
 
-只有以下内容经人工明确批准后，才能进入迁移实现：
+以下内容已于 PHASE1-TASK02 开始前获人工明确批准并吸收调整：
 
-1. 11 张表的边界、命名和关系。
+1. 12 张表的边界、命名和关系，包括新增 `material_change_logs`。
 2. `material_master` 状态、采购、库存、检验和环保值集。
 3. 属性数据类型、缩放整数和枚举定义方式。
 4. 供应商映射唯一键和价格历史拆表方案。
