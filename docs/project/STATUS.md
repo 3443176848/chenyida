@@ -8,7 +8,7 @@
 | --- | ---: | --- |
 | 总代码量 | 13,459 行 | 统计本地 ERP 与在线 Site 的源码；排除 `node_modules`、数据库、构建缓存、生成物、文档及 Site 内重复导入的本地 ERP 树 |
 | 源码文件 | 44 | 同上口径；本地 14，在线 30 |
-| 根仓库跟踪项 | 149 | `PHASE0-TASK02` 新增 12 个环境、测试和文档文件；仓库仍无 mode `160000` |
+| 根仓库跟踪项 | 150 | 本次新增 1 份 Material Master V2 数据模型评审稿；仓库仍无 mode `160000` |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 34 | 本地 SQLite 26；在线 D1 8；两套模型不等价，不能直接相加理解为统一 schema |
@@ -64,6 +64,20 @@ git -C chenyida_erp_site status --short
 - 数据库迁移或表数量变化
 - API、页面、测试或主要目录变化
 - 统计口径变化
+
+## PHASE1-TASK01 设计评审状态
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 目标运行面 | CONFIRMED | 在线 Site/D1 是 Material Master V2 唯一目标；本地 SQLite 不修改，仅作 legacy 来源 |
+| 设计范围 | DRAFT FOR REVIEW | 11 张关系表、ER 图、完整字段字典、迁移/回滚设计、测试矩阵和风险已写入评审稿 |
+| 数据库变化 | NONE | 在线仍为 8 张现有表；未生成或执行 `0001`，未修改 Drizzle schema |
+| 业务变化 | NONE | 未修改 BOM、采购、库存、生产、导入或 AI 逻辑 |
+| 数据操作 | NONE | 未连接生产 D1，未迁移真实数据，未创建生产表 |
+| 文档自审 | PASS | 无 TBD/TODO 占位；11 张表均有 `created_at`；`git diff --check` 通过 |
+| Site 基线 | PASS | lint 0 错误/1 个既有警告；构建成功；Node 测试 8/8；凭证检查扫描 150 个仓库文件通过 |
+| 本地基线 | PASS | `server.py --self-test`、`smoke_test.py`、`go_live_check.py --no-backup` 在一次性临时 SQLite 中通过且已清理；现有 legacy 数据库大小和时间戳未变化 |
+| 人工审批 | PENDING | 批准前不得进入迁移实现 |
 
 ## PHASE0-TASK02 验证结果
 

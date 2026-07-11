@@ -4,6 +4,17 @@
 
 ## 2026-07-11
 
+### PHASE1-TASK01 设计评审 - `docs: design material master v2 data model`
+
+- Git Commit：设计评审独立提交，完成后实际哈希以根仓库 `git log -1` 为准。
+- 新增功能：无；当前只完成设计。
+- 修改功能：无。
+- Bug 修复：无。
+- 数据库变化：无；仅设计 11 张在线 D1 V2 关系表、约束、索引和 Up/Down 迁移顺序，未创建数据库对象。
+- API 变化：无。
+- 文档变化：新增 `docs/material-master/database-model-v2.md`，包含 ER 图、字段说明、`legacy_material_mapping`、来源追踪、迁移/回滚方案、测试矩阵、AI 接入边界和风险；记录在线 D1 唯一目标及动态属性决策。
+- 验证：文档占位符、内部一致性、11/11 表级 `created_at` 覆盖和 `git diff --check` 通过；Site lint 0 错误/1 个既有警告、构建与 Node 测试 8/8、凭证检查通过；本地 ERP 自测、烟测和上线检查在一次性临时 SQLite 中通过且目录已清理。等待人工设计审批。
+
 ### PHASE0-TASK02 - `security: establish environment isolation baseline`
 
 - Git Commit：本任务独立提交，完成后实际哈希以根仓库 `git log -1` 为准。
