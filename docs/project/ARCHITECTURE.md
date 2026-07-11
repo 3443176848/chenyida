@@ -1,0 +1,159 @@
+# 晨亿达ERP当前架构
+
+本文只描述 2026-07-11 从当前代码、Git 和 Sites 状态核验到的事实；V2 目标架构参见 `docs/material-master/phased-implementation-plan.md`。
+
+## 系统架构图
+
+```mermaid
+flowchart LR
+    U1["本地用户浏览器"] --> LUI["chenyida_erp_app/static"]
+    LUI --> PY["Python server.py"]
+    PY --> SQL["本地 SQLite 26表"]
+
+    U2["在线用户浏览器"] --> SITE["OpenAI Sites 公网站点"]
+    SITE --> PAGE["Vinext app/page.tsx"]
+    PAGE --> IFRAME["public/erp/index.html"]
+    IFRAME --> API["/api/[...path]"]
+    API --> HANDLER["app/lib/erp-api.ts"]
+    HANDLER --> D1["Cloudflare D1 8表"]
+
+    GOV["物料治理模板与SOP"] -. 人工导入/参照 .-> PY
+    GOV -. 人工导入/参照 .-> HANDLER
+```
+
+本地 ERP 与在线 Site 当前没有代码级共享服务或数据库同步层。两者各自实现接口和业务规则。
+
+## 仓库与源码结构
+
+```text
+D:/erp
+├── chenyida_erp_app/       本地 Python ERP，普通根仓库目录
+├── chenyida_erp_site/      嵌套 Git 仓库；根仓库中为 gitlink
+├── 物料主数据治理落地包/   模板、规则、SOP、工具和生成物
+├── docs/                   审计、V2 计划、项目管理文档
+├── README.md
+└── AGENTS.md
+```
+
+根仓库 gitlink 指向 `9f2c2dc`，但没有 `.gitmodules`。当前生产 Site `v3` 对应提交 `2b4f178`。因此本图描述的是本机完整工作区，不代表 GitHub 新克隆可恢复同样的目录内容。
+
+## 在线 Site 请求路径
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant P as Vinext Page
+    participant S as Static ERP UI
+    participant R as Catch-all Route
+    participant H as ERP API Handler
+    participant D as D1
+    B->>P: GET /
+    P-->>B: iframe shell
+    B->>S: GET /erp/index.html
+    S->>R: /api/* request
+    R->>H: handleErpApi(request)
+    H->>D: SQL / transaction
+    D-->>H: rows
+    H-->>S: JSON + request id
+```
+
+- `app/page.tsx` 只有一个页面入口，加载静态 ERP 操作界面。
+- `app/api/[...path]/route.ts` 是统一 API 路由入口。
+- `app/lib/erp-api.ts` 集中处理认证、权限、业务动作、幂等、审计和数据访问。
+- 代码中识别到 54 个具体 `/api/...` 路径；多种 CRUD 由同一路径按 HTTP 方法区分。
+
+## 模块关系
+
+```mermaid
+flowchart TB
+    AUTH["用户/会话/角色"] --> ALL["全部受保护API"]
+    MATERIAL["物料/映射/清洗"] --> BOM["产品/BOM"]
+    MATERIAL --> PUR["采购/收货"]
+    MATERIAL --> INV["库存/调整"]
+    BOM --> PROD["工单/领料/完工"]
+    PUR --> INV
+    PROD --> INV
+    CUSTOMER["客户/供应商"] --> PUR
+    CUSTOMER --> SALES["报价/订单/发货"]
+    SALES --> FIN["财务单据/收付款"]
+    PUR --> FIN
+    PUR --> QUALITY["品质检验/缺陷"]
+    PROD --> QUALITY
+    ALL --> AUDIT["审计日志"]
+```
+
+上述关系由 API 处理逻辑和业务字段实现，当前在线模型并非全部通过数据库外键强制。
+
+## 数据库关系
+
+### 在线 D1
+
+```mermaid
+erDiagram
+    APP_USERS ||--o{ APP_SESSIONS : username
+    APP_USERS ||--o{ ERP_RECORDS : created_by
+    APP_USERS ||--o{ AUDIT_LOG : username
+    ERP_RECORDS {
+      integer id PK
+      text kind
+      text code
+      text data_json
+      integer version
+    }
+    INVENTORY_BALANCES ||--o{ INVENTORY_TRANSACTIONS : item_code
+    APP_USERS ||--o{ IDEMPOTENCY_KEYS : username
+    APP_META {
+      text key PK
+      text value
+    }
+```
+
+图中的连线表达代码层引用；当前 Drizzle schema 没有声明外键。`erp_records(kind, code)` 有唯一索引，库存余额以 `item_code` 为主键。
+
+### 本地 SQLite
+
+本地 26 张表按领域分为：
+
+- 身份与审计：`app_users`、`app_sessions`、`activity_log`
+- 物料治理：`items`、`supplier_mappings`、`cleaning_rows`
+- 主数据与工程：`customers`、`suppliers`、`products`、`product_boms`、`bom_lines`
+- 采购与库存：`purchase_orders`、`purchase_order_lines`、`inventory_balances`、`inventory_transactions`、`inventory_adjustments`
+- 生产：`work_orders`、`work_order_materials`、`production_reports`
+- 销售：`quotations`、`sales_orders`、`shipments`
+- 品质与财务：`quality_inspections`、`quality_defects`、`financial_documents`、`financial_payments`
+
+表间关系主要由服务端代码和文本/整数引用维护，当前建表语句未声明外键。
+
+## Backend 与 Frontend
+
+当前命名与目标目录尚未统一：
+
+- Backend（本地运行面）：`chenyida_erp_app/server.py` 同时承担 HTTP、API、业务规则、建表和数据库访问。
+- Frontend（本地运行面）：`chenyida_erp_app/static/` 原生页面直接调用本地 API。
+- Backend（在线运行面）：`chenyida_erp_site/app/lib/erp-api.ts` 与 Worker/D1。
+- Frontend（在线运行面）：`chenyida_erp_site/app/page.tsx` + `public/erp/`。
+
+在线与本地前端文件存在复制关系，不是共享构建产物。后续源码结构任务只能搬迁和修复路径，不得借机改业务行为。
+
+## 部署结构
+
+```mermaid
+flowchart LR
+    SRC["Site源码提交 2b4f178"] --> SITES["OpenAI Sites v3"]
+    SITES --> WORKER["Cloudflare Worker/Vinext"]
+    WORKER --> D1P["生产D1绑定 DB"]
+    WORKER --> URL["chenyida-erp-online.sjin74376.chatgpt.site"]
+```
+
+- `.openai/hosting.json` 绑定现有 Sites 项目和逻辑 D1 名称 `DB`。
+- Site 当前为公开访问、状态 active、版本 v3。
+- 本任务没有保存新版本、修改访问策略或部署生产。
+
+## 已知架构债务
+
+1. 根仓库无法恢复 Site 完整源码。
+2. 两套运行面存在重复业务逻辑和不同数据库模型。
+3. 在线单文件 API 处理器职责过多。
+4. 在线业务主体为 JSON，缺少 V2 所需关系约束。
+5. schema、迁移和运行时建表同时存在，需建立单一迁移权威。
+6. 本地数据库缺少迁移历史和外键。

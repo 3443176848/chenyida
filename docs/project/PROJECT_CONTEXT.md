@@ -1,0 +1,98 @@
+# 晨亿达ERP项目上下文
+
+> 新的 Codex 对话必须先阅读 `MASTER.md`，然后阅读本文件、`TASKS.md` 和当前任务文档。
+
+## 项目介绍
+
+晨亿达ERP面向 PCB、FPC、SMT 行业，目标是用统一内部编码贯通物料、产品、BOM、采购、库存、生产、销售、品质和财务。当前系统已经存在本地版和在线版；未来主线是 AI 物料主数据中心，但 AI 必须受审核、审计和数据权限约束。
+
+## 系统组成
+
+### 本地 ERP
+
+- 路径：`chenyida_erp_app/`
+- 技术：Python 3、标准库 HTTP Server、SQLite、原生 HTML/CSS/JavaScript。
+- 入口：`server.py`；静态页面位于 `static/`。
+- 用途：现场本地运行、旧行为参照和未来迁移来源。
+- 数据：`chenyida_erp_app/data/erp.sqlite3`，运行数据被 Git 忽略。
+
+### 在线 Site
+
+- 路径：`chenyida_erp_site/`
+- 技术：Vinext、React、TypeScript、Cloudflare Worker、D1、Drizzle、OpenAI Sites。
+- 页面：`app/page.tsx` 通过 iframe 加载 `public/erp/index.html`。
+- API：`app/api/[...path]/route.ts` 转交给 `app/lib/erp-api.ts` 的集中式处理器。
+- 生产：Sites `v3`，公开地址 `https://chenyida-erp-online.sjin74376.chatgpt.site`。
+- 源码风险：根仓库只记录 gitlink；无 `.gitmodules`，新克隆不能恢复完整源码。
+
+### 治理资料
+
+- `物料主数据治理落地包/`：编码、字段、导入、审核 SOP、模板和清洗辅助工具。
+- `docs/audits/current-system-audit.md`：当前系统技术审计。
+- `docs/material-master/`：物料主数据中心 V2 计划和待确认决策。
+- `docs/project/`：本项目长期运行的权威上下文和任务台账。
+
+## 数据库
+
+### 本地 SQLite
+
+- 26 张业务表，由 `server.py` 中运行时 `CREATE TABLE IF NOT EXISTS` 建立。
+- 覆盖用户、会话、物料、映射、清洗、客户、供应商、产品、BOM、采购、库存、生产、销售、品质、财务和活动日志。
+- 当前未发现正式迁移版本表或外键约束。
+
+### 在线 D1
+
+- `db/schema.ts` 和 `drizzle/0000_far_nightmare.sql` 定义 8 张表：`app_meta`、`app_users`、`app_sessions`、`erp_records`、`inventory_balances`、`inventory_transactions`、`audit_log`、`idempotency_keys`。
+- 大多数业务对象按 `kind` 存入 `erp_records.data_json`。
+- API 运行时还包含建表语句；schema、迁移和运行时定义必须在后续任务中校准。
+
+## 主要模块
+
+- 身份与权限：初始化、登录、会话、角色、用户状态、密码重置、审计。
+- 物料治理：物料、供应商映射、CSV 导入、清洗确认、新物料建档。
+- 工程：产品、BOM、BOM 行、齐套分析。
+- 供应链：供应商、采购建议、采购订单、收货、库存调整和库存流水。
+- 制造：工单、BOM 转工单、领料、完工和报工。
+- 销售：客户、询价/报价、销售订单和发货。
+- 品质与财务：检验、缺陷、应收应付单据、收付款和汇总。
+- 运维：健康检查、管理看板、备份、恢复和导出。
+
+## 当前架构结论
+
+1. 两个运行面包含大量相似业务能力，但数据库结构不同，尚未明确唯一生产权威源。
+2. 在线版是当前公开生产方向；服务端 API/D1 是权限和数据规则的权威边界。
+3. 在线 API 主要集中在单个 `erp-api.ts`，业务边界尚未模块化。
+4. Material Master V2 应先建立关系化数据底座和迁移测试，再接入页面或 AI。
+5. 任何源码整理必须保持当前生产 `v3` / `2b4f178` 内容不变，除非单独批准业务修改与部署。
+
+## 当前风险
+
+- Site 裸 gitlink 导致源码不可恢复。
+- 本地和在线数据模型、编码和治理行为分叉。
+- 在线 JSON 模型缺少关键关系约束；本地 SQLite 缺少外键和迁移历史。
+- 在线导入没有真正匹配现有物料或映射。
+- 默认凭证、会话安全、CSRF、限速和测试隔离仍需专项验证。
+- 在线同库备份和本地零字节历史备份不能视为可靠灾备。
+- 业务决策 `B01-B24` 尚未全部确认。
+
+## 开发规范
+
+- 每次只执行 `TASKS.md` 中一个任务编号。
+- 不扩大范围，不修改无关代码，不直接操作生产数据或生产环境。
+- 数据库变化必须使用版本化迁移并提供隔离迁移测试。
+- 新功能必须有测试；关键写操作必须有权限、事务、幂等、并发和审计。
+- AI 不得直接覆盖正式数据，物料合并不得绕过人工审核。
+- 完成任务必须更新 `MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md` 并创建独立提交。
+
+## 当前路线
+
+当前处于 Phase 0。先修复 Site 源码可恢复性，再建立隔离测试、安全、版本和发布基线；之后确认 Material Master 业务决策，进入关系化主数据、导入中心、AI 治理、ERP 融合和行业物料库。
+
+## 恢复上下文检查清单
+
+1. 阅读 `AGENTS.md` 和 `docs/project/MASTER.md`。
+2. 阅读 `TASKS.md`，确认唯一当前任务和依赖。
+3. 阅读本文件及 `DECISIONS.md`，区分已确认与待确认事项。
+4. 阅读当前任务文档，检查禁止事项和验收标准。
+5. 运行 `git status`，不得覆盖用户未提交变更。
+6. 只读核验可能变化的 Git、Site 和数据库状态后再开发。
