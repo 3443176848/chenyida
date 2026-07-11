@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { assertSafeTestTarget } from "../scripts/environment.mjs";
 
-const baseUrl = process.env.ERP_TEST_URL || "http://localhost:3000";
+const { target } = assertSafeTestTarget(process.env);
+const baseUrl = target.origin;
 const adminUsername = process.env.ERP_TEST_USERNAME || "admin";
 const adminPassword = process.env.ERP_TEST_PASSWORD;
 
@@ -10,7 +12,7 @@ if (!adminPassword) {
 
 let cookie = "";
 
-async function request(path, { method = "GET", body, idempotencyKey } = {}) {
+async function request(path, { method = "GET", body, idempotencyKey, expectedStatus } = {}) {
   const headers = {
     "Content-Type": "application/json",
     "X-Request-Id": crypto.randomUUID(),
@@ -27,7 +29,11 @@ async function request(path, { method = "GET", body, idempotencyKey } = {}) {
   if (setCookie) cookie = setCookie.split(";", 1)[0];
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
-  if (!response.ok) throw new Error(`${method} ${path} -> ${response.status}: ${JSON.stringify(payload)}`);
+  if (expectedStatus !== undefined) {
+    assert.equal(response.status, expectedStatus, `${method} ${path} returned an unexpected status`);
+  } else if (!response.ok) {
+    throw new Error(`${method} ${path} -> ${response.status}: ${JSON.stringify(payload)}`);
+  }
   return { payload, response };
 }
 
@@ -50,12 +56,26 @@ const login = (await request("/api/login", {
 })).payload;
 assert.equal(login.user.role, "admin");
 
-const suffix = Date.now().toString(36).toUpperCase();
+const suffix = `TEST-${Date.now().toString(36).toUpperCase()}`;
+
+const backup = (await request("/api/backups/create", { method: "POST", body: {} })).payload.backup;
+assert.match(backup.name, /^erp-backup-/);
+const restoredBackup = (await request("/api/backups/restore", {
+  method: "POST",
+  body: { name: backup.name },
+})).payload.backup;
+assert.equal(restoredBackup.name, backup.name);
+const missingBackup = await request("/api/backups/restore", {
+  method: "POST",
+  body: { name: `TEST-MISSING-BACKUP-${suffix}` },
+  expectedStatus: 404,
+});
+assert.equal(missingBackup.payload.code, "NOT_FOUND");
 
 const createdUser = (await request("/api/users", {
   method: "POST",
   body: {
-    username: `sales${Date.now().toString().slice(-7)}`,
+    username: `testsales${Date.now().toString().slice(-7)}`,
     display_name: "烟测销售员",
     role: "sales",
     password: `Sales-${suffix}-Pass!`,
@@ -80,7 +100,7 @@ await request("/api/users/reset-password", {
 
 const customerKey = crypto.randomUUID();
 const customerBody = {
-  customer_name: `烟测客户-${suffix}`,
+  customer_name: `TEST-烟测客户-${suffix}`,
   contact_name: "测试联系人",
   payment_terms: "月结30天",
   owner: "烟测",
@@ -92,11 +112,11 @@ assert.equal(replayedCustomer.payload.customer_code, firstCustomer.customer_code
 
 const supplier = (await request("/api/suppliers", {
   method: "POST",
-  body: { supplier_name: `烟测供应商-${suffix}`, supplier_level: "合格供应商", owner: "烟测" },
+  body: { supplier_name: `TEST-烟测供应商-${suffix}`, supplier_level: "合格供应商", owner: "烟测" },
 })).payload;
 assert.match(supplier.supplier_code, /^SUP-/);
 
-const productCode = `CYD-SMOKE-${suffix}`;
+const productCode = `TEST-PRODUCT-${suffix}`;
 await request("/api/products", {
   method: "POST",
   body: { product_code: productCode, product_name: "烟测在线产品", product_type: "FPC+SMT", product_version: "A0" },
@@ -105,12 +125,12 @@ await request("/api/products", {
 await request("/api/import", {
   method: "POST",
   body: {
-    batchNo: `IMP-${suffix}`,
-    rows: [{ supplier_name: supplier.supplier_name, raw_item_name: "贴片电阻 10K 0603 1%", raw_item_code: `R-${suffix}`, purchase_uom: "PCS" }],
+    batchNo: `TEST-IMPORT-${suffix}`,
+    rows: [{ supplier_name: supplier.supplier_name, raw_item_name: "TEST-MATERIAL-001 贴片电阻 10K 0603 1%", raw_item_code: `TEST-R-${suffix}`, purchase_uom: "PCS" }],
   },
 });
 const cleaningRows = (await request("/api/cleaning")).payload.rows;
-const cleaning = cleaningRows.find((row) => row.import_batch_no === `IMP-${suffix}`);
+const cleaning = cleaningRows.find((row) => row.import_batch_no === `TEST-IMPORT-${suffix}`);
 assert.ok(cleaning);
 const item = (await request("/api/cleaning/create-item", {
   method: "POST",

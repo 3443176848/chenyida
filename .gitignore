@@ -5,6 +5,10 @@ chenyida_erp_app/data/
 *.log
 *.pid
 
+# Local environment files (only the documented template is tracked)
+.env*
+!.env.example
+
 # Dependency and cache folders
 node_modules/
 **/__pycache__/

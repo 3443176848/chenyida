@@ -8,6 +8,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from environment_guard import prepare_test_environment
+
 
 APP_DIR = Path(__file__).resolve().parent
 PORT = 8766
@@ -62,9 +64,9 @@ def wait_ready(proc):
 
 
 def main():
-    with tempfile.TemporaryDirectory() as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="chenyida-erp-test-") as temp_dir:
         env = os.environ.copy()
-        env["CYD_ERP_DB"] = str(Path(temp_dir) / "smoke.sqlite3")
+        prepare_test_environment(temp_dir, "smoke.sqlite3", env)
         proc = subprocess.Popen(
             [
                 sys.executable,
@@ -394,7 +396,7 @@ def main():
                 "/api/products",
                 method="POST",
                 payload={
-                    "product_code": "CYD-SMOKE-PROD-001",
+                    "product_code": "TEST-PRODUCT-001",
                     "product_name": "烟测产品",
                     "customer_name": "烟测客户",
                     "product_type": "FPC+SMT",
@@ -407,8 +409,8 @@ def main():
                 "/api/boms",
                 method="POST",
                 payload={
-                    "bom_code": "BOM-CYD-SMOKE-PROD-001-A0",
-                    "product_code": "CYD-SMOKE-PROD-001",
+                    "bom_code": "TEST-BOM-PRODUCT-001-A0",
+                    "product_code": "TEST-PRODUCT-001",
                     "bom_version": "A0",
                     "bom_status": "草稿",
                 },
@@ -428,7 +430,7 @@ def main():
             )
 
             sample = request("/api/sample-import")
-            result = request("/api/import", method="POST", payload={"csvText": sample["csv"], "batchNo": "IMP-SMOKE"})
+            result = request("/api/import", method="POST", payload={"csvText": sample["csv"], "batchNo": "TEST-IMPORT-SMOKE"})
             assert result["count"] == 4, result
 
             summary = request("/api/summary")

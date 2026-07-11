@@ -33,6 +33,21 @@ npm ci
 npm test
 ```
 
+## 环境配置与安全测试
+
+仓库使用 `config/environments.json` 统一记录 `development`、`test`、`production` 的数据库、API、Site、日志级别和调试模式。复制根目录或 Site 目录的 `.env.example` 作为本机配置；真实 `.env`、令牌、密码、数据库和日志均被 Git 忽略。
+
+Site 的写入型 API 烟测只允许 `ERP_ENV=test` 和本机回环地址。测试命令会创建一次性 Miniflare D1，结束后删除全部数据库文件；不会读取项目 `.env`，也不会使用远程绑定：
+
+```powershell
+cd chenyida_erp_site
+npm run test:environment
+npm run test:api
+npm run security:credentials
+```
+
+完整说明见 `docs/testing/test-environment.md`。生产环境地址和凭证只允许由受控运行环境注入，不得写入源码或 `.env.example`。
+
 ## 快速启动
 
 ```powershell

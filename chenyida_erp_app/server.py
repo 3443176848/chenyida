@@ -23,7 +23,7 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 APP_DIR = Path(__file__).resolve().parent
 WORKSPACE = APP_DIR.parent
 STATIC_DIR = APP_DIR / "static"
-DATA_DIR = APP_DIR / "data"
+DATA_DIR = Path(os.environ.get("CYD_ERP_DATA_DIR", APP_DIR / "data"))
 BACKUP_DIR = DATA_DIR / "backups"
 TEMPLATE_DIR = WORKSPACE / "物料主数据治理落地包" / "templates"
 DB_PATH = Path(os.environ.get("CYD_ERP_DB", DATA_DIR / "erp.sqlite3"))
@@ -3317,14 +3317,18 @@ def run_server(host, port):
 
 
 def self_test():
-    with tempfile.TemporaryDirectory() as temp_dir:
-        os.environ["CYD_ERP_DB"] = str(Path(temp_dir) / "test.sqlite3")
-        global DB_PATH
+    from environment_guard import prepare_test_environment
+
+    with tempfile.TemporaryDirectory(prefix="chenyida-erp-test-") as temp_dir:
+        prepare_test_environment(temp_dir)
+        global DATA_DIR, BACKUP_DIR, DB_PATH
+        DATA_DIR = Path(os.environ["CYD_ERP_DATA_DIR"])
+        BACKUP_DIR = DATA_DIR / "backups"
         DB_PATH = Path(os.environ["CYD_ERP_DB"])
         init_db()
         with closing(db_connect()) as conn:
             sample_rows = read_csv_file(TEMPLATE_DIR / "供应商原始物料导入模板.csv")
-            result = import_supplier_rows(conn, sample_rows, "IMP-SELFTEST")
+            result = import_supplier_rows(conn, sample_rows, "TEST-IMPORT-SELFTEST")
             summary = api_summary(conn)
             assert summary["total_items"] >= 4, summary
             assert result["count"] == 4, result

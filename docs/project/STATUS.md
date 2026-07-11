@@ -6,15 +6,15 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 13,575 行 | 只统计本地 ERP 与在线 Site 的源码；排除 `node_modules`、数据库、构建缓存、生成物、文档及嵌套仓库中的重复导入树 |
-| 源码文件 | 40 | 同上口径；本地 11，在线 29 |
-| 根仓库跟踪项 | 137 | 原 60 项中移除 1 个 gitlink，加入 Site 的 77 个普通文件，并新增 1 份任务审计报告；根仓库已无 mode `160000` |
+| 总代码量 | 13,459 行 | 统计本地 ERP 与在线 Site 的源码；排除 `node_modules`、数据库、构建缓存、生成物、文档及 Site 内重复导入的本地 ERP 树 |
+| 源码文件 | 44 | 同上口径；本地 14，在线 30 |
+| 根仓库跟踪项 | 149 | `PHASE0-TASK02` 新增 12 个环境、测试和文档文件；仓库仍无 mode `160000` |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 34 | 本地 SQLite 26；在线 D1 8；两套模型不等价，不能直接相加理解为统一 schema |
 | 在线 API 路径 | 54 | `app/lib/erp-api.ts` 中具体 `/api/...` 路径去重，排除仅用于前缀判断的 `/api/financial-` |
 | 页面入口 | 3 | 本地 `static/index.html`、在线 `app/page.tsx`、在线 `public/erp/index.html` |
-| 测试文件 | 5 | 本地 3 个测试/检查文件，在线 2 个测试文件；`server.py --self-test` 为内置入口，未另计文件 |
+| 测试与安全检查文件 | 10 | 本地 5 个测试/检查文件，在线 3 个测试文件、1 个烟测运行器和 1 个凭证检查器；`server.py --self-test` 为内置入口，未另计文件 |
 
 ## 当前版本与环境
 
@@ -31,14 +31,16 @@
 | npm | 11.16.0 |
 | 项目绑定 Python | 3.12.13 |
 | 系统 `python` 命令 | 2.7.18，不适用于当前 ERP；启动脚本使用项目绑定 Python 3.12.13 |
+| 环境配置 | `development` / `test` / `production`；生产地址运行时注入，不在代码硬编码 |
+| 默认测试数据库 | 本机一次性 Miniflare D1；远程绑定关闭，结束后销毁 |
 
 ## Git 状态
 
-`PHASE0-TASK01-B` 开始时，根仓库 `main` 位于 `a1a8d6a`，工作区干净并比 `origin/main` 超前 1 个提交；Site 嵌套仓库 `main` 位于 `9f2c2dc`，工作区干净且没有远端配置。
+`PHASE0-TASK02` 开始时，根仓库 `main` 位于 `ec6ce6d`，工作区干净并比 `origin/main` 超前 7 个提交。任务只在根仓库普通目录中修改；`chenyida_erp_site/` 不再是嵌套仓库。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-任务提交采用两个父节点：第一父节点连接根仓库 `a1a8d6a`，第二父节点连接 Site 开发基线 `9f2c2dc`。生产提交 `2b4f178` 是 `9f2c2dc` 的祖先，因此生产和开发来源均可从根仓库提交图追溯。
+`PHASE0-TASK02` 任务提交消息为 `security: establish environment isolation baseline`，不创建生产版本、不推送、不部署。实际任务提交哈希以 `git log -1` 为准。
 
 实时状态必须使用：
 
@@ -62,6 +64,26 @@ git -C chenyida_erp_site status --short
 - 数据库迁移或表数量变化
 - API、页面、测试或主要目录变化
 - 统计口径变化
+
+## PHASE0-TASK02 验证结果
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Site 环境守卫 | PASS | Node 6/6；production、公开 URL、非临时 D1 路径和非法环境名均拒绝 |
+| 本地环境守卫 | PASS | Python 4/4；production/development 在数据库创建前拒绝 |
+| 一次性 D1 API 烟测 | PASS | 完成合成写入、备份、恢复与错误提示验证；测试后数据库目录和进程均清理 |
+| production 入口拒绝 | PASS | 退出码 1，未创建新临时目录 |
+| 凭证检查 | PASS | `.env` 未跟踪；仓库文件、常见令牌格式和 hosting 键检查通过 |
+| `server.py --self-test` | PASS | 输出 `SELF_TEST_OK`，使用临时 SQLite |
+| `smoke_test.py` | PASS | 输出 `SMOKE_TEST_OK`，数据库和备份均位于临时目录 |
+| `backup_restore_test.py` | PASS | 创建、恢复、非法名称提示和最终数据清理通过 |
+| `go_live_check.py --no-backup` | PASS | 使用临时 SQLite；未写正式数据或备份 |
+| `npm run lint` | PASS with warning | 0 错误、1 个既有未使用变量警告 |
+| `npm test` | PASS | 构建成功，Node 测试 8/8 通过；沙箱缓存写入限制下获准在沙箱外重跑 |
+| `npm run build` | PASS | 最终独立构建通过，未连接数据库或网络 |
+| 最终仓库检查 | PASS | 149 个仓库文件凭证扫描通过；`git diff --check` 无空白错误；代码中无生产地址硬编码 |
+
+任务没有创建云端 D1、连接生产 D1、修改生产数据、保存 Site 版本或执行部署。
 
 ## PHASE0-TASK01-B 验证结果
 

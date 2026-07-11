@@ -135,6 +135,27 @@ erDiagram
 
 在线与本地前端文件存在复制关系，不是共享构建产物。后续源码结构任务只能搬迁和修复路径，不得借机改业务行为。
 
+## 环境与测试隔离
+
+```mermaid
+flowchart LR
+    CFG["config/environments.json"] --> DEV["development"]
+    CFG --> TEST["test"]
+    CFG --> PROD["production"]
+    DEV --> D1L["项目内 Miniflare D1"]
+    TEST --> GUARD["环境/URL/路径守卫"]
+    GUARD --> D1T["系统临时目录的一次性 D1"]
+    D1T --> DESTROY["停止进程并销毁目录"]
+    PROD --> D1P["Sites 管理的 D1 绑定 DB"]
+    GUARD -. "拒绝 production、公开 URL、远程绑定" .-> PROD
+```
+
+- `development`、`test`、`production` 的数据库、API、Site、日志级别和调试模式由统一非敏感清单描述。
+- 测试运行器在网络请求前要求 `ERP_ENV=test`、HTTP 回环目标和系统临时 D1 路径；Vite 本地 Cloudflare 插件设置 `remoteBindings: false`。
+- 测试成功或失败都销毁 D1；失败日志去敏且不保存请求/响应正文或数据库文件。
+- 本地 Python 测试通过临时 `CYD_ERP_DATA_DIR` 和 `CYD_ERP_DB` 隔离 SQLite 与备份。
+- 远程 Test D1 尚未创建，未来必须使用独立资源、权限、凭证、保留期和明确测试主机允许列表。
+
 ## 部署结构
 
 ```mermaid
@@ -149,7 +170,7 @@ flowchart LR
 - `.openai/hosting.json` 绑定现有 Sites 项目和逻辑 D1 名称 `DB`。
 - Site 当前为公开访问、状态 active、版本 v3。
 - `2b4f178` 是 `9f2c2dc` 的祖先；源码纳管提交保留这条历史关系，但没有创建新生产版本。
-- 本任务没有保存新版本、修改访问策略或部署生产。
+- `PHASE0-TASK01-B` 和 `PHASE0-TASK02` 均没有保存新生产版本、修改访问策略或部署生产。
 
 ## 已知架构债务
 

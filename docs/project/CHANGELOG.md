@@ -4,6 +4,17 @@
 
 ## 2026-07-11
 
+### PHASE0-TASK02 - `security: establish environment isolation baseline`
+
+- Git Commit：本任务独立提交，完成后实际哈希以根仓库 `git log -1` 为准。
+- 新增功能：统一 development/test/production 环境清单；本机一次性 Miniflare D1 烟测运行器；生产/公开 URL/非临时路径拒绝；凭证扫描；本地 SQLite 环境与备份恢复测试。
+- 修改功能：仅修改开发与测试配置；Site 本地 Cloudflare 绑定关闭远程资源，烟测数据采用 `TEST-` 标识并自动销毁；本地数据目录支持环境覆盖以隔离测试。
+- Bug 修复：本地烟测备份不再写入正式数据目录；在线写入型烟测不能再直接指向任意远程 URL。
+- 数据库变化：无 schema 或迁移变化；未创建云端 D1，未连接或修改生产 D1。
+- API 变化：无业务 API 新增、删除或行为修改；备份/恢复只在一次性测试数据库验证。
+- 文档变化：新增测试环境说明、安全隔离审计和设计规格；更新 README、MASTER、TASKS、PROJECT_CONTEXT、ARCHITECTURE、DECISIONS、STATUS。
+- 验证：Site lint、build、Node 测试、一次性 D1 API 烟测、凭证扫描及本地 ERP 自测/烟测/上线检查/备份恢复均通过。
+
 ### PHASE0-TASK01-B - `fix: convert site gitlink to tracked source`
 
 - Git Commit：本任务独立合并提交；第一父提交为任务开始时根仓库 `a1a8d6a`，第二父提交为 Site 开发基线 `9f2c2dc`；完成后实际哈希以根仓库 `git log -1` 为准。

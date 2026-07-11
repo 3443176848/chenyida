@@ -1,0 +1,23 @@
+{
+  "development": {
+    "database": "local Miniflare D1 in chenyida_erp_site/.wrangler/state",
+    "apiUrl": "http://127.0.0.1:3000/api",
+    "siteUrl": "http://127.0.0.1:3000",
+    "logLevel": "debug",
+    "debug": true
+  },
+  "test": {
+    "database": "ephemeral Miniflare D1 under the operating-system temporary directory",
+    "apiUrl": "http://127.0.0.1:<allocated-port>/api",
+    "siteUrl": "http://127.0.0.1:<allocated-port>",
+    "logLevel": "info",
+    "debug": false
+  },
+  "production": {
+    "database": "Sites-managed D1 binding DB; no database id is committed",
+    "apiUrl": "required runtime value ERP_API_URL",
+    "siteUrl": "required runtime value ERP_SITE_URL",
+    "logLevel": "warn",
+    "debug": false
+  }
+}
