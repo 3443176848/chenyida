@@ -1,6 +1,6 @@
 # Material Master V2 物料校验服务 V1
 
-状态：`APPROVED_FOR_IMPLEMENTATION`
+状态：`IMPLEMENTED_AND_VERIFIED`
 
 任务：`PHASE1-TASK04`
 
@@ -424,3 +424,18 @@ Memory Repository 接收测试内构造的分类和属性 metadata，覆盖：
 - 未连接生产 D1、未创建真实物料、未修改 API、页面、迁移或下游业务
 
 任何生产 metadata 修改、部署或 API 接入都需要独立任务和用户明确授权；本文件不构成生产操作授权。
+
+## 15. 实施结果
+
+`PHASE1-TASK04` 已按本规格实现并完成隔离验证：
+
+- 新增 `app/lib/material-validation/`，包含 Types、D1/Memory Repository、Rules、Service 和统一导出。
+- D1 Repository 每次调用读取 `material_categories`、`material_category_attributes` 和 `material_attribute_definitions`，不导入 seed、不缓存 metadata。
+- 实现本文件列出的 25 个稳定结构化 code，其中 24 个 `ERROR`、1 个 `WARNING`。
+- 新增 22 个顶层测试及 6 个子测试，共 28 个校验测试；完整 Node 测试为 40/40 通过。
+- 隔离 D1 测试确认标准单位、枚举、必填、属性定义状态、绑定状态和分类状态变化在下一次调用生效。
+- `npm run lint`、`npm test`、隔离 API 烟测、凭证检查和 `git diff --check` 通过；lint 保留 1 个与本任务无关的既有警告。
+- TypeScript 全量检查仍只报告 `db/schema.ts` 第 129、243 行的既有 Drizzle 自引用类型错误；新增模块没有类型错误。
+- 未接入 API、页面或生产环境，未创建真实物料，未修改 schema、migration、BOM、采购或库存。
+
+当前已知限制：没有品牌主数据字典；`mm`/`um` 只做单位兼容判断、不换算数值；`DATE` 暂不支持；不检测跨物料重复或候选冲突；`source`、`confidence` 暂不参与决策。

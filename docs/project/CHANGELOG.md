@@ -4,6 +4,17 @@
 
 ## 2026-07-12
 
+### PHASE1-TASK04 - `feat: add material validation service`
+
+- Git Commit：本任务功能独立提交，实际哈希以根仓库 `git log -1` 为准；前置设计提交为 `e239c35`。
+- 新增功能：新增 Repository + Rules + Service 三层 `material-validation` 模块，提供创建前和审核前校验、D1/Memory Repository、25 个结构化 code 及稳定错误顺序。
+- 修改功能：测试入口显式启用 Node TypeScript stripping，以兼容项目声明的 Node 22.13 最低版本；未修改现有业务行为。
+- Bug 修复：无现有业务 Bug；实现期间补足绑定属性优先、未绑定属性随后输出的稳定排序。
+- 数据库变化：无 schema、migration 或生产数据变化；D1 Repository 只读现有分类、绑定和属性定义 metadata，不缓存、不读取 seed。
+- API 变化：无；未接入路由或现有 `erp-api.ts`。
+- 文档变化：完成物料校验服务 V1 规格与实施结果；D-010 记录 D1 metadata 唯一运行时规则来源；同步更新项目状态。
+- 验证：新增 28 个校验测试，完整 Node 40/40；lint、build、隔离 API 烟测、凭证检查和差异检查通过；未连接生产 D1。
+
 ### PHASE1-TASK03 - `feat: add material category and attribute templates`
 
 - Git Commit：本任务功能独立提交，实际哈希以根仓库 `git log -1` 为准；前置设计提交为 `ebef667`。

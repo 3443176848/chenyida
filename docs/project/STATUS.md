@@ -6,15 +6,15 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 13,459 行 | 统计本地 ERP 与在线 Site 的源码；排除 `node_modules`、数据库、构建缓存、生成物、文档及 Site 内重复导入的本地 ERP 树 |
-| 源码文件 | 44 | 同上口径；本地 14，在线 30 |
+| 总代码量 | 14,259 行 | 统计本地 ERP 与在线 Site 的运行时源码；排除测试、seed、`node_modules`、数据库、构建缓存、生成物、文档及 Site 内重复导入的本地 ERP 树；本任务新增 800 行运行时 TypeScript |
+| 源码文件 | 49 | 同上口径；本地 14，在线 35；测试文件另计 |
 | 根仓库跟踪项 | 提交前动态值 | 本次新增迁移、快照、测试和审计报告；仓库仍无 mode `160000` |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 46（开发 schema） | 本地 SQLite 26；在线既有 D1 8；新增 V2 12；未执行生产迁移，不能理解为生产现状 |
 | 在线 API 路径 | 54 | `app/lib/erp-api.ts` 中具体 `/api/...` 路径去重，排除仅用于前缀判断的 `/api/financial-` |
 | 页面入口 | 3 | 本地 `static/index.html`、在线 `app/page.tsx`、在线 `public/erp/index.html` |
-| 测试与安全检查文件 | 12 | 原基线 10 个，新增 Material Master 隔离迁移与分类 seed 测试各 1 个 |
+| 测试与安全检查文件 | 14 | 原基线 12 个，新增物料校验 Memory/规则测试和隔离 D1 metadata 变化测试各 1 个 |
 
 ## 当前版本与环境
 
@@ -65,16 +65,21 @@ git -C chenyida_erp_site status --short
 - API、页面、测试或主要目录变化
 - 统计口径变化
 
-## PHASE1-TASK04 设计状态
+## PHASE1-TASK04 物料校验服务状态
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DOING | 2026-07-12 启动；当前等待书面规格复核，尚未开始代码实现 |
+| 任务状态 | DONE | 2026-07-12 完成实现、验证、文档和独立功能提交 |
 | 设计审批 | PASS | 采用 Repository + Rules + Service；D1 metadata 是运行时分类和属性规则唯一来源 |
 | 接口边界 | PASS | attributes 按稳定大写 attribute code 索引；禁止 attribute_id；保留 source/confidence 扩展字段 |
-| 规格文档 | WRITTEN | `docs/material-master/validation-service-v1.md` 已写入，待项目负责人复核 |
-| 业务变化 | NONE | 尚未修改 API、页面、迁移、真实物料或 BOM/采购/库存 |
+| 服务实现 | PASS | Types、D1/Memory Repository、Rules、Service 和统一导出已完成；25 个结构化 code 中 24 ERROR、1 WARNING |
+| Metadata 变化 | PASS | 隔离 D1 中标准单位、枚举、必填、属性定义/绑定/分类状态变化均在下一次校验生效 |
+| 校验测试 | PASS | 新增 22 个顶层测试和 6 个子测试，共 28/28；Memory Repository 与指定 FR4/电阻/锡膏矩阵通过 |
+| Site 基线 | PASS | build 成功；Node 40/40；lint 0 错误/1 个既有警告；隔离 API 烟测和凭证检查通过 |
+| TypeScript 全量检查 | EXISTING FAILURE | 新增模块无类型错误；`db/schema.ts` 第 129、243 行仍有 PHASE1-TASK02 已记录的 Drizzle 自引用类型错误 |
+| 业务变化 | NONE | 未修改 API、页面、迁移、真实物料或 BOM/采购/库存 |
 | 生产影响 | NONE | 未连接生产 D1，未部署或修改生产 metadata |
+| 已知限制 | RECORDED | 无品牌字典、不做单位数值换算、不支持 DATE、不检测跨物料冲突，source/confidence 暂不参与决策 |
 
 ## PHASE1-TASK03 分类与属性模板状态
 

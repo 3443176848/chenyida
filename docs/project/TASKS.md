@@ -19,14 +19,9 @@
 | PHASE1-TASK01 | 设计 Material Master V2 数据模型 | DONE | Codex（设计）、项目负责人（审批） | 2026-07-11 | 2026-07-12 | PHASE0-TASK01、PHASE0-TASK02 | 设计已批准；正式编码仅审核通过后生成，增加生命周期、变更日志和五要素时效供应商映射唯一性 |
 | PHASE1-TASK02 | 实现V2数据契约与迁移测试基线 | DONE | Codex（执行）、项目负责人（设计审批） | 2026-07-12 | 2026-07-12 | PHASE1-TASK01 | 新增 12 张 D1 V2 表、Drizzle schema、Up/Down、快照和隔离迁移测试；未接业务、未迁移数据、未访问生产 |
 | PHASE1-TASK03 | 建立PCB/FPC/SMT行业物料分类体系和属性模板 | DONE | Codex（执行）、项目负责人（设计与叶子绑定决策确认） | 2026-07-12 | 2026-07-12 | PHASE1-TASK02 | 版本化 TypeScript seed 包含 101 个分类、34 个属性和 228 条叶子显式绑定；本地事务批次、幂等统计、环境拒绝和 migration 回归通过；未访问生产 |
+| PHASE1-TASK04 | 建立 Material Master V2 物料校验服务 | DONE | Codex（执行）、项目负责人（设计与书面规格确认） | 2026-07-12 | 2026-07-12 | PHASE1-TASK03 | Repository + Rules + Service 三层实现按 D1 metadata 返回 25 个结构化 code；Memory 与隔离 D1 metadata 变化测试共 28 个，全量 Node 40/40；未接 API、未创建真实物料、未访问生产 |
 
-## 当前任务
-
-| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| PHASE1-TASK04 | 建立 Material Master V2 物料校验服务 | DOING | Codex（执行）、项目负责人（设计与书面规格确认） | 2026-07-12 | - | PHASE1-TASK03 | Repository + Rules + Service 三层设计已批准；D1 metadata 为运行时规则唯一来源，属性使用稳定 code；当前等待书面规格复核，尚未实现代码或连接生产 D1 |
-
-当前唯一 `DOING` 任务为 `PHASE1-TASK04`。范围仅限 validation service、规则层、Memory Repository、隔离 metadata 变化测试和规定文档；禁止 API、页面、导入、AI、真实迁移及 BOM/采购/库存修改。`PHASE0-TASK03` 仍在台账中等待后续安排。
+当前无 `DOING` 任务。PHASE1-TASK04 已完成独立 validation service，但创建/审核写事务、API 和生产操作尚未开始；`PHASE0-TASK03` 仍在台账中等待后续安排。
 
 ## Phase 0 待办
 
