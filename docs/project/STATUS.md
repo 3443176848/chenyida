@@ -65,6 +65,17 @@ git -C chenyida_erp_site status --short
 - API、页面、测试或主要目录变化
 - 统计口径变化
 
+## PHASE1-TASK04 设计状态
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DOING | 2026-07-12 启动；当前等待书面规格复核，尚未开始代码实现 |
+| 设计审批 | PASS | 采用 Repository + Rules + Service；D1 metadata 是运行时分类和属性规则唯一来源 |
+| 接口边界 | PASS | attributes 按稳定大写 attribute code 索引；禁止 attribute_id；保留 source/confidence 扩展字段 |
+| 规格文档 | WRITTEN | `docs/material-master/validation-service-v1.md` 已写入，待项目负责人复核 |
+| 业务变化 | NONE | 尚未修改 API、页面、迁移、真实物料或 BOM/采购/库存 |
+| 生产影响 | NONE | 未连接生产 D1，未部署或修改生产 metadata |
+
 ## PHASE1-TASK03 分类与属性模板状态
 
 | 验证项 | 结果 | 说明 |
