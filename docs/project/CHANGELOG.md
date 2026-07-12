@@ -2,6 +2,19 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-13
+
+### PHASE1-TASK05 - `feat: add material draft and review service`
+
+- Git Commit：规格、实现、测试和项目文档在本任务独立提交完成，实际哈希以根仓库 `git log -1` 为准。
+- 新增功能：新增 `material-master` 六模块，提供 `createDraft()`、`approveDraft()`、`rejectDraft()`、类型化属性持久化、正式编码格式和统一导出。
+- 状态流转：创建固定写 `DRAFT` 且无正式编码；批准重新校验后以单一 D1 batch 原子写 `ACTIVE`、编码、批准信息、版本和审计；拒绝保持 `DRAFT`、递增版本并记录拒绝历史。
+- 并发与安全：物料使用 `expected_version` 乐观锁，编码规则使用 version/sequence CAS 和唯一索引；创建/批准事务比较 metadata/属性守卫，校验后规则变化会冲突回滚；服务错误不返回 SQL 或底层 D1 异常。
+- 数据库变化：无 schema 或 migration 变化；只使用现有 V2 表和约束，未写生产数据。审计业务动作映射为 `CREATE_DRAFT -> CREATE`、`APPROVE -> APPROVAL`、`REJECT -> REJECTION`、`CODE_GENERATE -> CODE_ASSIGNMENT`。
+- API 变化：无；未修改路由、`erp-api.ts` 或页面。
+- 文档变化：新增草稿/审核服务 V1 规格与实施结果；D-011 确认所有未来来源统一经过该服务及最终审核启用时生成正式编码；同步更新总控、任务和状态。
+- 验证：新增 12 个隔离 D1 服务测试，覆盖校验阻断、提交前复核、并发审核、重复编码、防 TOCTOU 和故障回滚；完整 Node 52/52、build、lint（0 error/1 个既有 warning）、隔离 API smoke、176 文件凭证检查和差异检查通过；未连接生产 D1。
+
 ## 2026-07-12
 
 ### PHASE1-TASK04 - `feat: add material validation service`

@@ -1,20 +1,20 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-12（Asia/Shanghai）
+最后更新时间：2026-07-13（Asia/Shanghai）
 
 ## 自动统计摘要
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 14,259 行 | 统计本地 ERP 与在线 Site 的运行时源码；排除测试、seed、`node_modules`、数据库、构建缓存、生成物、文档及 Site 内重复导入的本地 ERP 树；本任务新增 800 行运行时 TypeScript |
-| 源码文件 | 49 | 同上口径；本地 14，在线 35；测试文件另计 |
-| 根仓库跟踪项 | 提交前动态值 | 本次新增迁移、快照、测试和审计报告；仓库仍无 mode `160000` |
+| 总代码量 | 16,336 行 | 统计本地 ERP 与在线 Site 的运行时源码；排除测试、seed、`node_modules`、数据库、构建缓存、生成物、文档及 Site 内重复导入的本地 ERP 树；本任务新增 2,077 行运行时 TypeScript |
+| 源码文件 | 55 | 同上口径；本地 14，在线 41；测试文件另计 |
+| 根仓库跟踪项 | 提交前动态值 | 本次新增 6 个服务文件、1 个测试文件和 1 份服务规格；仓库仍无 mode `160000` |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 46（开发 schema） | 本地 SQLite 26；在线既有 D1 8；新增 V2 12；未执行生产迁移，不能理解为生产现状 |
 | 在线 API 路径 | 54 | `app/lib/erp-api.ts` 中具体 `/api/...` 路径去重，排除仅用于前缀判断的 `/api/financial-` |
 | 页面入口 | 3 | 本地 `static/index.html`、在线 `app/page.tsx`、在线 `public/erp/index.html` |
-| 测试与安全检查文件 | 14 | 原基线 12 个，新增物料校验 Memory/规则测试和隔离 D1 metadata 变化测试各 1 个 |
+| 测试与安全检查文件 | 15 | 原基线 14 个，本任务新增 1 个 Material Master 草稿/审核隔离 D1 服务测试文件 |
 
 ## 当前版本与环境
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE0-TASK02` 开始时，根仓库 `main` 位于 `ec6ce6d`，工作区干净并比 `origin/main` 超前 7 个提交。任务只在根仓库普通目录中修改；`chenyida_erp_site/` 不再是嵌套仓库。
+`PHASE1-TASK05` 开始时，根仓库 `main` 位于 `fe2ba45`，工作区干净并比 `origin/main` 超前 14 个提交。任务只在根仓库普通目录中修改；`chenyida_erp_site/` 不是嵌套仓库。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE0-TASK02` 任务提交消息为 `security: establish environment isolation baseline`，不创建生产版本、不推送、不部署。实际任务提交哈希以 `git log -1` 为准。
+`PHASE1-TASK05` 任务提交消息为 `feat: add material draft and review service`，不创建生产版本、不推送、不部署。实际任务提交哈希以 `git log -1` 为准。
 
 实时状态必须使用：
 
@@ -64,6 +64,26 @@ git -C chenyida_erp_site status --short
 - 数据库迁移或表数量变化
 - API、页面、测试或主要目录变化
 - 统计口径变化
+
+## PHASE1-TASK05 草稿创建与审核写服务状态
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 2026-07-13 完成实现、验证、文档和独立功能提交 |
+| 模块边界 | PASS | 新增 Types、D1 Repository、Draft Service、Review Service、Code Service 和统一导出；未接 API |
+| 创建草稿 | PASS | Validation 无 ERROR 后原子写 `DRAFT`、类型化属性、`CREATE` 版本和 `CREATE_DRAFT` 审计；正式编码为空 |
+| 批准启用 | PASS | 从 D1 重载并重新校验；单一 batch 原子领取序号、转 `ACTIVE`、写编码/批准信息、`APPROVE` 版本及两条审计 |
+| 拒绝 | PASS | 保持 `DRAFT`、version + 1、追加 `REJECT` 版本和审计；不读取或消耗编码规则 |
+| 属性存储 | PASS | 按 definition 类型列保存 TEXT/ENUM/INTEGER/DECIMAL/BOOLEAN，DECIMAL 精确缩放；保留 unit、source_type、source_ref、created_by/created_at |
+| 并发与编码 | PASS | 同草稿双审核一成功一版本冲突；同规则双草稿读取同一旧序列后 CAS 重试并生成不同编码；唯一索引竞争路径跳过占用序号 |
+| 规则漂移保护 | PASS | 创建和批准均比较 metadata/属性守卫；校验后品类/属性规则变化时事务冲突回滚 |
+| 事务回滚 | PASS | 故障注入使最后一条编码审计失败，规则、物料状态、版本和审计全部保持事务前值 |
+| 服务测试 | PASS | 新增 12/12 隔离 D1 场景；完整 Node 52/52 |
+| Site 基线 | PASS | build 成功；lint 0 error/1 个既有 warning；隔离 API smoke、176 文件凭证检查和 `git diff --check` 通过 |
+| TypeScript 全量检查 | EXISTING FAILURE | 新增模块无类型错误；`db/schema.ts` 第 129、243 行仍为既有 Drizzle 自引用类型错误 |
+| 数据库/API 变化 | NONE | 未修改 schema、migration、API、页面、导入、BOM、采购、库存或生产 |
+| 生产影响 | NONE | 未连接生产 D1，未迁移真实数据，未部署或修改生产 metadata |
+| 已知限制 | RECORDED | 无多角色节点、草稿编辑/重新提交、API 权限/幂等；拒绝状态复用 `DRAFT`；编码规则仍需后续受控初始化 |
 
 ## PHASE1-TASK04 物料校验服务状态
 

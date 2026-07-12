@@ -20,8 +20,9 @@
 | PHASE1-TASK02 | 实现V2数据契约与迁移测试基线 | DONE | Codex（执行）、项目负责人（设计审批） | 2026-07-12 | 2026-07-12 | PHASE1-TASK01 | 新增 12 张 D1 V2 表、Drizzle schema、Up/Down、快照和隔离迁移测试；未接业务、未迁移数据、未访问生产 |
 | PHASE1-TASK03 | 建立PCB/FPC/SMT行业物料分类体系和属性模板 | DONE | Codex（执行）、项目负责人（设计与叶子绑定决策确认） | 2026-07-12 | 2026-07-12 | PHASE1-TASK02 | 版本化 TypeScript seed 包含 101 个分类、34 个属性和 228 条叶子显式绑定；本地事务批次、幂等统计、环境拒绝和 migration 回归通过；未访问生产 |
 | PHASE1-TASK04 | 建立 Material Master V2 物料校验服务 | DONE | Codex（执行）、项目负责人（设计与书面规格确认） | 2026-07-12 | 2026-07-12 | PHASE1-TASK03 | Repository + Rules + Service 三层实现按 D1 metadata 返回 25 个结构化 code；Memory 与隔离 D1 metadata 变化测试共 28 个，全量 Node 40/40；未接 API、未创建真实物料、未访问生产 |
+| PHASE1-TASK05 | 建立 Material Master Draft 创建与审核写服务 | DONE | Codex（执行）、项目负责人（任务规格与编码时点确认） | 2026-07-12 | 2026-07-13 | PHASE1-TASK04 | 新增 Draft/Review/Code 六模块，以 D1 batch 原子写草稿、属性、版本、审计和审核编码；乐观锁、规则 CAS、metadata/属性守卫及 12 个隔离 D1 用例通过，全量 Node 52/52；未接 API、未改 migration、未访问生产 |
 
-当前无 `DOING` 任务。PHASE1-TASK04 已完成独立 validation service，但创建/审核写事务、API 和生产操作尚未开始；`PHASE0-TASK03` 仍在台账中等待后续安排。
+当前无 `DOING` 任务。PHASE1-TASK05 已完成草稿/审核写服务，但认证授权 API、页面、导入适配和生产操作尚未开始；`PHASE0-TASK03` 仍在台账中等待后续安排。
 
 ## Phase 0 待办
 
