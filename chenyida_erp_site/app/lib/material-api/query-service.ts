@@ -4,7 +4,13 @@ import {
   type MaterialMasterRepository,
   type MaterialRecord,
 } from "../material-master/index.ts";
-import type { MaterialValidationService } from "../material-validation/index.ts";
+import {
+  createMaterialValidationService,
+  MemoryMaterialValidationRepository,
+  type MaterialAttributeRule,
+  type MaterialCategoryRules,
+  type MaterialValidationService,
+} from "../material-validation/index.ts";
 
 export type MaterialDraftListQuery = Readonly<{
   page: number;
@@ -25,10 +31,23 @@ export type MaterialDraftHistoryQuery = Readonly<{
   changeLogPageSize: number;
 }>;
 
+export type MaterialReviewQueueQuery = Readonly<{
+  page: number;
+  pageSize: number;
+  categoryId?: number;
+  sourceType?: string;
+  creator?: string;
+  submittedFrom?: string;
+  submittedToExclusive?: string;
+  keyword?: string;
+  sort: "submitted_at_desc" | "submitted_at_asc" | "standard_name_asc" | "standard_name_desc";
+}>;
+
 export interface MaterialMasterQueryService {
   listDrafts(query: MaterialDraftListQuery): Promise<Record<string, unknown>>;
   getDraftDetail(materialId: number, query: MaterialDraftHistoryQuery): Promise<Record<string, unknown> | null>;
-  getDraftCreatedBy(materialId: number): Promise<string | null>;
+  getReviewResponsibility(materialId: number): Promise<{ createdBy: string; lastModifiedBy: string } | null>;
+  listReviewQueue(query: MaterialReviewQueueQuery): Promise<Record<string, unknown>>;
 }
 
 type CountRow = { total: number };
@@ -72,7 +91,7 @@ function materialView(material: MaterialRecord) {
     environmental_requirement: material.fields.environmentalRequirement,
     source_type: material.fields.sourceType,
     source_ref: material.fields.sourceRef,
-    material_status: material.materialStatus,
+    material_status: material.materialStatus === "PENDING_APPROVAL" ? "PENDING_REVIEW" : material.materialStatus,
     version: material.version,
     created_by: material.createdBy,
     created_at: material.createdAt,
@@ -80,6 +99,9 @@ function materialView(material: MaterialRecord) {
     updated_at: material.updatedAt,
     approved_by: material.approvedBy,
     approved_at: material.approvedAt,
+    last_modified_by: material.lastModifiedBy,
+    submitted_by: material.submittedBy,
+    submitted_at: material.submittedAt,
   };
 }
 
@@ -102,8 +124,10 @@ class D1MaterialMasterQueryService implements MaterialMasterQueryService {
   }
 
   async listDrafts(query: MaterialDraftListQuery): Promise<Record<string, unknown>> {
-    const clauses = ["m.material_status = ?"];
-    const values: unknown[] = [query.materialStatus];
+    const clauses = [query.materialStatus === "PENDING_REVIEW"
+      ? "m.material_status IN ('PENDING_REVIEW', 'PENDING_APPROVAL')"
+      : "m.material_status = ?"];
+    const values: unknown[] = query.materialStatus === "PENDING_REVIEW" ? [] : [query.materialStatus];
     if (query.categoryId !== undefined) {
       clauses.push("m.category_id = ?");
       values.push(query.categoryId);
@@ -150,7 +174,7 @@ class D1MaterialMasterQueryService implements MaterialMasterQueryService {
         standard_name: row.standard_name,
         category_id: row.category_id,
         category_name: row.category_name_cn,
-        material_status: row.material_status,
+        material_status: row.material_status === "PENDING_APPROVAL" ? "PENDING_REVIEW" : row.material_status,
         source_type: row.source_type,
         version: row.version,
         created_by: row.created_by,
@@ -244,10 +268,126 @@ class D1MaterialMasterQueryService implements MaterialMasterQueryService {
     };
   }
 
-  async getDraftCreatedBy(materialId: number): Promise<string | null> {
-    const row = await this.database.prepare("SELECT created_by FROM material_master WHERE id = ? LIMIT 1")
-      .bind(materialId).first<{ created_by: string }>();
-    return row?.created_by ?? null;
+  async getReviewResponsibility(materialId: number): Promise<{ createdBy: string; lastModifiedBy: string } | null> {
+    const row = await this.database.prepare("SELECT created_by, last_modified_by FROM material_master WHERE id = ? LIMIT 1")
+      .bind(materialId).first<{ created_by: string; last_modified_by: string }>();
+    return row ? { createdBy: row.created_by, lastModifiedBy: row.last_modified_by } : null;
+  }
+
+  async listReviewQueue(query: MaterialReviewQueueQuery): Promise<Record<string, unknown>> {
+    const clauses = ["m.material_status = 'PENDING_REVIEW'"];
+    const values: unknown[] = [];
+    if (query.categoryId !== undefined) { clauses.push("m.category_id = ?"); values.push(query.categoryId); }
+    if (query.sourceType !== undefined) { clauses.push("m.source_type = ?"); values.push(query.sourceType); }
+    if (query.creator !== undefined) { clauses.push("m.created_by = ?"); values.push(query.creator); }
+    if (query.submittedFrom !== undefined) { clauses.push("m.submitted_at >= ?"); values.push(query.submittedFrom); }
+    if (query.submittedToExclusive !== undefined) { clauses.push("m.submitted_at < ?"); values.push(query.submittedToExclusive); }
+    if (query.keyword !== undefined) {
+      const escaped = `%${query.keyword.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
+      clauses.push("(m.standard_name LIKE ? ESCAPE '\\' OR m.manufacturer LIKE ? ESCAPE '\\' OR m.manufacturer_part_number LIKE ? ESCAPE '\\')");
+      values.push(escaped, escaped, escaped);
+    }
+    const where = clauses.join(" AND ");
+    const orderBy = {
+      submitted_at_desc: "m.submitted_at DESC, m.id DESC",
+      submitted_at_asc: "m.submitted_at ASC, m.id ASC",
+      standard_name_asc: "m.standard_name ASC, m.id ASC",
+      standard_name_desc: "m.standard_name DESC, m.id DESC",
+    }[query.sort];
+    const [count, pageResult] = await Promise.all([
+      this.database.prepare(`SELECT COUNT(*) AS total FROM material_master m WHERE ${where}`).bind(...values).first<CountRow>(),
+      this.database.prepare(`
+        SELECT m.id, m.category_id, m.standard_name, m.base_uom, m.source_type,
+               m.created_by, m.last_modified_by, m.submitted_by, m.submitted_at, m.version
+        FROM material_master m WHERE ${where}
+        ORDER BY ${orderBy} LIMIT ? OFFSET ?
+      `).bind(...values, query.pageSize, (query.page - 1) * query.pageSize).all<Record<string, unknown>>(),
+    ]);
+    const masters = rows(pageResult);
+    if (masters.length === 0) {
+      return { data: [], pagination: page(Number(count?.total ?? 0), query.page, query.pageSize) };
+    }
+    const ids = masters.map((row) => Number(row.id));
+    const categoryIds = [...new Set(masters.map((row) => Number(row.category_id)))];
+    const idSlots = ids.map(() => "?").join(",");
+    const categorySlots = categoryIds.map(() => "?").join(",");
+    const [attributeResult, categoryResult, ruleResult, allCategoryResult] = await Promise.all([
+      this.database.prepare(`
+        SELECT v.material_id, d.attribute_code, d.data_type, d.decimal_scale,
+               v.value_text, v.value_integer, v.value_decimal_scaled, v.value_boolean,
+               v.value_date, v.unit_code, v.source_type
+        FROM material_attribute_values v
+        INNER JOIN material_attribute_definitions d ON d.id = v.attribute_definition_id
+        WHERE v.material_id IN (${idSlots}) ORDER BY v.material_id, d.attribute_code
+      `).bind(...ids).all<Record<string, unknown>>(),
+      this.database.prepare(`SELECT id, category_code, category_level, status FROM material_categories WHERE id IN (${categorySlots})`).bind(...categoryIds).all<Record<string, unknown>>(),
+      this.database.prepare(`
+        SELECT b.category_id, a.attribute_code, a.attribute_name_cn, a.data_type,
+               a.decimal_scale, a.canonical_unit, a.allowed_values_json,
+               b.is_required, b.sort_order
+        FROM material_category_attributes b
+        INNER JOIN material_attribute_definitions a ON a.id = b.attribute_definition_id
+        WHERE b.category_id IN (${categorySlots}) AND b.status = 'ACTIVE' AND a.status = 'ACTIVE'
+        ORDER BY b.category_id, b.sort_order, a.attribute_code
+      `).bind(...categoryIds).all<Record<string, unknown>>(),
+      this.database.prepare("SELECT id, parent_id, category_name_cn, category_level FROM material_categories").all<Record<string, unknown>>(),
+    ]);
+    const ruleRows = rows(ruleResult);
+    const rules: MaterialCategoryRules[] = rows(categoryResult).map((category) => ({
+      id: Number(category.id),
+      code: String(category.category_code),
+      level: Number(category.category_level),
+      status: String(category.status),
+      attributes: ruleRows.filter((row) => Number(row.category_id) === Number(category.id)).map((row): MaterialAttributeRule => ({
+        code: String(row.attribute_code), name: String(row.attribute_name_cn), dataType: String(row.data_type),
+        decimalScale: Number(row.decimal_scale), canonicalUnit: String(row.canonical_unit),
+        allowedValuesJson: String(row.allowed_values_json), isRequired: Number(row.is_required) === 1,
+        sortOrder: Number(row.sort_order),
+      })),
+    }));
+    const batchValidation = createMaterialValidationService(new MemoryMaterialValidationRepository(rules));
+    const attributeRows = rows(attributeResult);
+    const categoryMap = new Map(rows(allCategoryResult).map((row) => [Number(row.id), row]));
+    const pathFor = (categoryId: number): string => {
+      const names: string[] = [];
+      let current = categoryMap.get(categoryId);
+      for (let depth = 0; current && depth < 4; depth += 1) {
+        names.unshift(String(current.category_name_cn));
+        current = current.parent_id == null ? undefined : categoryMap.get(Number(current.parent_id));
+      }
+      return names.join(" / ");
+    };
+    const data = await Promise.all(masters.map(async (master) => {
+      const attributes = Object.fromEntries(attributeRows.filter((row) => Number(row.material_id) === Number(master.id)).map((row) => {
+        let value: unknown = row.value_text;
+        if (row.data_type === "INTEGER") value = row.value_integer;
+        else if (row.data_type === "DECIMAL") value = Number(row.value_decimal_scaled) / 10 ** Number(row.decimal_scale);
+        else if (row.data_type === "BOOLEAN") value = Number(row.value_boolean) === 1;
+        else if (row.data_type === "DATE") value = row.value_date;
+        return [String(row.attribute_code), { value, unit: String(row.unit_code ?? ""), source: String(row.source_type) }];
+      }));
+      const validation = await batchValidation.validateForReview({
+        category_id: Number(master.category_id),
+        basic_fields: { standard_name: master.standard_name, unit: master.base_uom, source_type: master.source_type },
+        attributes,
+      });
+      const issues = [...validation.errors, ...validation.warnings].slice(0, 5).map((issue) => ({
+        code: issue.code, severity: issue.severity, field: issue.field,
+        ...(issue.attribute_code ? { attribute_code: issue.attribute_code } : {}), message: issue.message,
+      }));
+      return {
+        material_id: master.id, standard_name: master.standard_name,
+        category_path: pathFor(Number(master.category_id)), creator: master.created_by,
+        last_modified_by: master.last_modified_by, submitted_by: master.submitted_by,
+        submitted_at: master.submitted_at, current_version: master.version,
+        source_type: master.source_type,
+        validation_summary: {
+          basis: "CURRENT_METADATA", valid: validation.valid, error_count: validation.errors.length,
+          warning_count: validation.warnings.length, top_issues: issues,
+        },
+      };
+    }));
+    return { data, pagination: page(Number(count?.total ?? 0), query.page, query.pageSize) };
   }
 }
 

@@ -8,10 +8,10 @@ export const MATERIAL_IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60;
 export const MATERIAL_AUDIT_RETENTION_SECONDS = 1095 * 24 * 60 * 60;
 export const DEFAULT_MATERIAL_RATE_LIMITS = Object.freeze({ attemptsPerMinute: 60, newKeysPerMinute: 20 });
 export const MATERIAL_ROLE_PERMISSIONS: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  admin: ["material.read", "material.draft.create", "material.review.approve", "material.review.reject", "material.audit.read"],
-  manager: ["material.read", "material.draft.create", "material.review.approve", "material.review.reject", "material.audit.read"],
-  purchase: ["material.read", "material.draft.create"],
-  engineering: ["material.read", "material.draft.create"],
+  admin: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject", "material.audit.read"],
+  manager: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject", "material.audit.read"],
+  purchase: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit"],
+  engineering: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit"],
   production: ["material.read"],
   warehouse: ["material.read"],
   quality: ["material.read"],
@@ -30,6 +30,9 @@ export type MaterialApiRouteCode =
   | "MATERIAL_DRAFT_CREATE"
   | "MATERIAL_DRAFT_LIST"
   | "MATERIAL_DRAFT_DETAIL"
+  | "MATERIAL_DRAFT_EDIT"
+  | "MATERIAL_DRAFT_SUBMIT"
+  | "MATERIAL_REVIEW_QUEUE"
   | "MATERIAL_DRAFT_APPROVE"
   | "MATERIAL_DRAFT_REJECT";
 
@@ -302,9 +305,11 @@ async function rejectRateLimit(
   throw new MaterialApiFailure("RATE_LIMITED", "写请求过于频繁，请稍后重试", 429);
 }
 
-function routeCodeFromScope(scope: string): "MATERIAL_DRAFT_CREATE" | "MATERIAL_DRAFT_APPROVE" | "MATERIAL_DRAFT_REJECT" {
+function routeCodeFromScope(scope: string, method: string): MaterialApiTransactionCompanion["routeCode"] {
   if (scope.endsWith("/approve")) return "MATERIAL_DRAFT_APPROVE";
   if (scope.endsWith("/reject")) return "MATERIAL_DRAFT_REJECT";
+  if (scope.endsWith("/submit")) return "MATERIAL_DRAFT_SUBMIT";
+  if (method === "PATCH") return "MATERIAL_DRAFT_EDIT";
   return "MATERIAL_DRAFT_CREATE";
 }
 
@@ -315,7 +320,7 @@ async function terminateAbandonedIdempotency(
 ): Promise<void> {
   const staleBefore = new Date((nowSeconds - MATERIAL_IDEMPOTENCY_TTL_SECONDS) * 1000).toISOString();
   const result = await database.prepare(`
-    SELECT id, username, route_scope, key_digest, request_digest, operation_id,
+    SELECT id, username, method, route_scope, key_digest, request_digest, operation_id,
            lease_token_digest
     FROM material_api_idempotency
     WHERE state = 'PENDING' AND lease_expires_at <= ? AND updated_at <= ?
@@ -323,6 +328,7 @@ async function terminateAbandonedIdempotency(
   `).bind(nowSeconds, staleBefore).all<{
     id: number;
     username: string;
+    method: string;
     route_scope: string;
     key_digest: string;
     request_digest: string;
@@ -349,7 +355,7 @@ async function terminateAbandonedIdempotency(
     await completeIdempotentFailure(database, {
       idempotencyRecordId: row.id,
       username: row.username,
-      routeCode: routeCodeFromScope(row.route_scope),
+      routeCode: routeCodeFromScope(row.route_scope, row.method),
       physicalRequestId,
       operationId: row.operation_id,
       keyDigest: row.key_digest,
@@ -366,8 +372,8 @@ export async function reserveIdempotency(
   database: MaterialMasterD1Database,
   input: Readonly<{
     username: string;
-    routeCode: "MATERIAL_DRAFT_CREATE" | "MATERIAL_DRAFT_APPROVE" | "MATERIAL_DRAFT_REJECT";
-    method: "POST";
+    routeCode: MaterialApiTransactionCompanion["routeCode"];
+    method: "POST" | "PATCH";
     routeScope: string;
     rawKey: string;
     canonicalJson: string;
@@ -537,7 +543,7 @@ export async function completeIdempotentFailure(
   companion: MaterialApiTransactionCompanion,
   failure: MaterialApiFailure,
   nowSeconds: number,
-  auditAction = companion.routeCode,
+  auditAction: string = companion.routeCode,
 ): Promise<void> {
   const responseJson = JSON.stringify({
     error: {

@@ -33,6 +33,10 @@ import {
 type MaterialPermission =
   | "material.read"
   | "material.draft.create"
+  | "material.draft.edit_own"
+  | "material.draft.edit_any"
+  | "material.draft.submit"
+  | "material.review.queue"
   | "material.review.approve"
   | "material.review.reject";
 
@@ -52,11 +56,12 @@ export type MaterialApiDependencies = Readonly<{
 }>;
 
 const FORBIDDEN_IDENTITY_FIELDS = new Set([
-  "actor", "context", "request_id", "created_by", "updated_by", "approved_by",
+  "actor", "context", "request_id", "created_by", "updated_by", "last_modified_by",
+  "submitted_by", "submitted_at", "approved_by", "approved_at", "created_at", "updated_at",
   "reviewed_by", "internal_material_code", "material_status", "version", "attribute_id",
 ]);
 const SOURCE_TYPES = new Set(["MANUAL", "LEGACY_D1", "LEGACY_SQLITE", "GOVERNANCE_TEMPLATE", "API", "SUPPLIER_IMPORT", "AI", "SYSTEM"]);
-const STATUSES = new Set(["DRAFT", "PENDING_APPROVAL", "ACTIVE", "FROZEN", "INACTIVE"]);
+const STATUSES = new Set(["DRAFT", "PENDING_REVIEW", "ACTIVE", "FROZEN", "INACTIVE"]);
 const PUBLIC_SOURCE_TYPES = new Set(["MANUAL"]);
 
 function routeFor(path: string): MaterialRoute | null {
@@ -70,7 +75,16 @@ function routeFor(path: string): MaterialRoute | null {
   if (detail) {
     const id = Number(detail[1]);
     if (!Number.isSafeInteger(id)) return null;
-    return { code: "MATERIAL_DRAFT_DETAIL", materialId: id, supportedMethods: ["GET"], permission: () => "material.read" };
+    return {
+      code: "MATERIAL_DRAFT_DETAIL", materialId: id, supportedMethods: ["GET", "PATCH"],
+      permission: (method) => method === "PATCH" ? "material.draft.edit_own" : "material.read",
+    };
+  }
+  const submit = path.match(/^\/api\/material-master\/drafts\/([1-9][0-9]*)\/submit$/);
+  if (submit) {
+    const id = Number(submit[1]);
+    if (!Number.isSafeInteger(id)) return null;
+    return { code: "MATERIAL_DRAFT_SUBMIT", materialId: id, supportedMethods: ["POST"], permission: () => "material.draft.submit" };
   }
   const review = path.match(/^\/api\/material-master\/drafts\/([1-9][0-9]*)\/(approve|reject)$/);
   if (review) {
@@ -83,6 +97,9 @@ function routeFor(path: string): MaterialRoute | null {
       supportedMethods: ["POST"],
       permission: () => approve ? "material.review.approve" : "material.review.reject",
     };
+  }
+  if (path === "/api/material-master/review-queue") {
+    return { code: "MATERIAL_REVIEW_QUEUE", materialId: null, supportedMethods: ["GET"], permission: () => "material.review.queue" };
   }
   return null;
 }
@@ -202,6 +219,63 @@ function createCommand(
   };
 }
 
+function editCommand(
+  body: Record<string, unknown>,
+  user: MaterialApiUser,
+  companion: MaterialApiTransactionCompanion,
+  materialId: number,
+) {
+  assertKeys(body, ["expected_version", "basic_fields", "category_id", "attributes"], "请求正文");
+  assertNoIdentityFields(body);
+  const basic = objectValue(body.basic_fields, "basic_fields");
+  assertKeys(basic, [
+    "standard_name", "unit", "brand", "manufacturer", "manufacturer_part_number",
+    "procurement_type", "inventory_type", "lot_control_required", "shelf_life_days",
+    "inspection_type", "environmental_requirement",
+  ], "basic_fields");
+  const parsed = createCommand({
+    category_id: body.category_id,
+    basic_fields: { ...basic, source_type: "MANUAL", source_ref: `immutable:${materialId}` },
+    attributes: body.attributes,
+  }, user, companion);
+  return {
+    material_id: materialId,
+    expected_version: positiveInteger(body.expected_version, "expected_version"),
+    category_id: parsed.basic_fields.category_id,
+    basic_fields: {
+      standard_name: parsed.basic_fields.standard_name,
+      unit: parsed.basic_fields.unit,
+      brand: parsed.basic_fields.brand,
+      manufacturer: parsed.basic_fields.manufacturer,
+      manufacturer_part_number: parsed.basic_fields.manufacturer_part_number,
+      procurement_type: parsed.basic_fields.procurement_type,
+      inventory_type: parsed.basic_fields.inventory_type,
+      lot_control_required: parsed.basic_fields.lot_control_required,
+      shelf_life_days: parsed.basic_fields.shelf_life_days,
+      inspection_type: parsed.basic_fields.inspection_type,
+      environmental_requirement: parsed.basic_fields.environmental_requirement,
+    },
+    attributes: parsed.attributes,
+    context: parsed.context,
+  };
+}
+
+function submitCommand(
+  body: Record<string, unknown>,
+  user: MaterialApiUser,
+  companion: MaterialApiTransactionCompanion,
+  materialId: number,
+) {
+  assertNoIdentityFields(body);
+  assertKeys(body, ["expected_version", "submit_comment"], "请求正文");
+  return {
+    material_id: materialId,
+    expected_version: positiveInteger(body.expected_version, "expected_version"),
+    submit_comment: optionalString(body.submit_comment, "submit_comment", 1000),
+    context: { actor: user.username, request_id: companion.operationId, transaction_companion: companion },
+  };
+}
+
 function reviewCommand(
   body: Record<string, unknown>,
   user: MaterialApiUser,
@@ -215,8 +289,11 @@ function reviewCommand(
     approve ? body.review_comment : body.reason,
     approve ? "review_comment" : "reason",
     1000,
-    !approve,
+    false,
   );
+  if (!approve && !reason) {
+    throw new MaterialApiFailure("REVIEW_REASON_REQUIRED", "驳回原因必填", 400, [], materialId);
+  }
   return {
     material_id: materialId,
     expected_version: positiveInteger(body.expected_version, "expected_version"),
@@ -262,7 +339,10 @@ function mapServiceError(error: MaterialMasterServiceError, materialId: number |
     MATERIAL_ATTRIBUTE_STORAGE_METADATA_INVALID: ["INTERNAL_ERROR", "物料属性规则暂时不可用", 500],
     MATERIAL_ATTRIBUTE_STORAGE_INVALID: ["INTERNAL_ERROR", "物料属性规则暂时不可用", 500],
     MATERIAL_DRAFT_NOT_FOUND: ["MATERIAL_NOT_FOUND", "物料草稿不存在", 404],
-    MATERIAL_DRAFT_NOT_REVIEWABLE: ["INVALID_MATERIAL_STATE", "当前物料状态不允许审核", 409],
+    MATERIAL_DRAFT_NOT_REVIEWABLE: ["MATERIAL_NOT_REVIEWABLE", "当前物料状态不允许审核", 409],
+    MATERIAL_DRAFT_NOT_EDITABLE: ["DRAFT_NOT_EDITABLE", "当前物料状态不允许编辑", 409],
+    MATERIAL_DRAFT_NOT_CHANGED: ["DRAFT_NOT_CHANGED", "草稿没有实质变化", 409],
+    MATERIAL_DRAFT_NOT_SUBMITTABLE: ["MATERIAL_NOT_SUBMITTABLE", "当前物料状态不允许提交审核", 409],
     MATERIAL_VERSION_CONFLICT: ["VERSION_CONFLICT", "物料已被其他用户修改，请刷新后重试", 409],
     MATERIAL_CODE_RULE_NOT_FOUND: ["CODE_GENERATION_CONFLICT", "物料编码规则不可用", 409],
     MATERIAL_CODE_RULE_AMBIGUOUS: ["CODE_GENERATION_CONFLICT", "物料编码规则不可用", 409],
@@ -294,7 +374,9 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
   const route = routeFor(url.pathname);
   const routeCode = route?.code === "MATERIAL_DRAFT_LIST" && request.method === "POST"
     ? "MATERIAL_DRAFT_CREATE"
-    : route?.code;
+    : route?.code === "MATERIAL_DRAFT_DETAIL" && request.method === "PATCH"
+      ? "MATERIAL_DRAFT_EDIT"
+      : route?.code;
   const now = dependencies.clock?.() ?? new Date();
   const nowSeconds = Math.floor(now.getTime() / 1000);
   const auditRoute = routeCode ?? "MATERIAL_DRAFT_LIST";
@@ -317,8 +399,11 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
       return methodNotAllowedResponse(request, requestId);
     }
     const permission = route.permission(request.method);
-    if (!dependencies.userCan(user, permission)) throw new MaterialApiFailure("FORBIDDEN", "当前账号没有此操作权限", 403, [], route.materialId);
-    if (request.method === "POST" && user.must_change_password) {
+    const allowed = routeCode === "MATERIAL_DRAFT_EDIT"
+      ? dependencies.userCan(user, "material.draft.edit_own") || dependencies.userCan(user, "material.draft.edit_any")
+      : dependencies.userCan(user, permission);
+    if (!allowed) throw new MaterialApiFailure("FORBIDDEN", "当前账号没有此操作权限", 403, [], route.materialId);
+    if (request.method !== "GET" && user.must_change_password) {
       throw new MaterialApiFailure("PASSWORD_CHANGE_REQUIRED", "请先修改临时密码", 403, [], route.materialId);
     }
 
@@ -374,6 +459,37 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
       return materialJsonResponse({ data: detail, request_id: requestId }, 200, requestId);
     }
 
+    if (request.method === "GET" && routeCode === "MATERIAL_REVIEW_QUEUE") {
+      const allowedQuery = new Set(["page", "page_size", "category_id", "source_type", "creator", "submitted_from", "submitted_to", "keyword", "sort"]);
+      const unknown = [...url.searchParams.keys()].find((key) => !allowedQuery.has(key));
+      if (unknown) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", `未知查询参数：${unknown}`, 400);
+      const sourceType = url.searchParams.get("source_type") ?? undefined;
+      if (sourceType && !SOURCE_TYPES.has(sourceType)) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "source_type 无效", 400);
+      const sort = url.searchParams.get("sort") ?? "submitted_at_desc";
+      const sorts = new Set(["submitted_at_desc", "submitted_at_asc", "standard_name_asc", "standard_name_desc"]);
+      if (!sorts.has(sort)) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "sort 无效", 400);
+      const fromRaw = url.searchParams.get("submitted_from");
+      const toRaw = url.searchParams.get("submitted_to");
+      const submittedFrom = fromRaw ? dateBoundary(fromRaw, "submitted_from") : undefined;
+      const submittedToExclusive = toRaw ? dateBoundary(toRaw, "submitted_to", true) : undefined;
+      if (submittedFrom && submittedToExclusive && submittedFrom >= submittedToExclusive) {
+        throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "submitted_from 不能晚于 submitted_to", 400);
+      }
+      const result = await queryService.listReviewQueue({
+        page: queryInteger(url, "page", 1, 1_000_000),
+        pageSize: queryInteger(url, "page_size", 20, 100),
+        categoryId: url.searchParams.has("category_id") ? positiveInteger(Number(url.searchParams.get("category_id")), "category_id") : undefined,
+        sourceType,
+        creator: url.searchParams.has("creator") ? optionalString(url.searchParams.get("creator"), "creator", 64, true) : undefined,
+        submittedFrom,
+        submittedToExclusive,
+        keyword: url.searchParams.has("keyword") ? optionalString(url.searchParams.get("keyword"), "keyword", 100, true) : undefined,
+        sort: sort as "submitted_at_desc" | "submitted_at_asc" | "standard_name_asc" | "standard_name_desc",
+      });
+      await writeMaterialAudit(dependencies.database, { username: user.username, routeCode, requestId, result: "success", nowSeconds });
+      return materialJsonResponse({ ...result, request_id: requestId }, 200, requestId);
+    }
+
     assertMaterialCsrf(request);
     const { body, canonicalJson } = await readBoundedJson(request);
     const rawKey = request.headers.get("Idempotency-Key") ?? "";
@@ -383,8 +499,8 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
     }
     const reservation = await reserveIdempotency(dependencies.database, {
       username: user.username,
-      routeCode: routeCode as "MATERIAL_DRAFT_CREATE" | "MATERIAL_DRAFT_APPROVE" | "MATERIAL_DRAFT_REJECT",
-      method: "POST",
+      routeCode: routeCode as MaterialApiTransactionCompanion["routeCode"],
+      method: request.method as "POST" | "PATCH",
       routeScope: url.pathname,
       rawKey,
       canonicalJson,
@@ -396,11 +512,20 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
     if (reservation.kind === "replay") return renderStoredResponse(reservation, requestId);
     companion = reservation.companion;
 
-    if ((routeCode === "MATERIAL_DRAFT_APPROVE" || routeCode === "MATERIAL_DRAFT_REJECT") && route.materialId) {
-      const creator = await queryService.getDraftCreatedBy(route.materialId);
-      if (!creator) throw new MaterialApiFailure("MATERIAL_NOT_FOUND", "物料草稿不存在", 404);
-      if (creator === user.username) {
+    if ((routeCode === "MATERIAL_DRAFT_EDIT" || routeCode === "MATERIAL_DRAFT_SUBMIT" || routeCode === "MATERIAL_DRAFT_APPROVE" || routeCode === "MATERIAL_DRAFT_REJECT") && route.materialId) {
+      const responsibility = await queryService.getReviewResponsibility(route.materialId);
+      if (!responsibility) throw new MaterialApiFailure("MATERIAL_NOT_FOUND", "物料草稿不存在", 404);
+      if (routeCode === "MATERIAL_DRAFT_EDIT" || routeCode === "MATERIAL_DRAFT_SUBMIT") {
+        const owns = responsibility.createdBy === user.username;
+        if (!owns && !dependencies.userCan(user, "material.draft.edit_any")) {
+          throw new MaterialApiFailure("FORBIDDEN", "只能编辑或提交自己创建的草稿", 403, [], route.materialId);
+        }
+      }
+      if ((routeCode === "MATERIAL_DRAFT_APPROVE" || routeCode === "MATERIAL_DRAFT_REJECT") && responsibility.createdBy === user.username) {
         throw new MaterialApiFailure("SELF_REVIEW_FORBIDDEN", "禁止审核自己创建的物料草稿", 403, [], route.materialId);
+      }
+      if ((routeCode === "MATERIAL_DRAFT_APPROVE" || routeCode === "MATERIAL_DRAFT_REJECT") && responsibility.lastModifiedBy === user.username) {
+        throw new MaterialApiFailure("LAST_EDITOR_REVIEW_FORBIDDEN", "禁止审核自己最后修改的物料草稿", 403, [], route.materialId);
       }
     }
 
@@ -408,6 +533,10 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
     const reviewService = createMaterialReviewService({ repository, validationService, clock });
     if (routeCode === "MATERIAL_DRAFT_CREATE") {
       await draftService.createDraft(createCommand(body, user, companion));
+    } else if (routeCode === "MATERIAL_DRAFT_EDIT" && route.materialId) {
+      await draftService.editDraft(editCommand(body, user, companion, route.materialId));
+    } else if (routeCode === "MATERIAL_DRAFT_SUBMIT" && route.materialId) {
+      await draftService.submitDraft(submitCommand(body, user, companion, route.materialId));
     } else if (routeCode === "MATERIAL_DRAFT_APPROVE" && route.materialId) {
       await reviewService.approveDraft(reviewCommand(body, user, companion, route.materialId, true));
     } else if (routeCode === "MATERIAL_DRAFT_REJECT" && route.materialId) {

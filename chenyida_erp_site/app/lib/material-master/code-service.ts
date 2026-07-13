@@ -105,7 +105,7 @@ class DefaultMaterialCodeService implements MaterialCodeService {
     reviewedAt: string,
   ): Promise<MaterialRecord> {
     if (
-      draft.materialStatus !== "DRAFT" ||
+      draft.materialStatus !== "PENDING_REVIEW" ||
       draft.internalMaterialCode !== null ||
       draft.version !== command.expected_version
     ) {

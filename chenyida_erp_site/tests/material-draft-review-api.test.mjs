@@ -34,8 +34,16 @@ async function seed(DB) {
       VALUES (9101, 'THICKNESS', '厚度', 'DECIMAL', 3, 'mm', '[]', 'DECIMAL_SCALE', 'ACTIVE', 'test', ?, 'test', ?, 'seed')
     `).bind(timestamp, timestamp),
     DB.prepare(`
+      INSERT INTO material_attribute_definitions(id, attribute_code, attribute_name_cn, data_type, decimal_scale, canonical_unit, allowed_values_json, normalization_rule, status, created_by, created_at, updated_by, updated_at, request_id)
+      VALUES (9102, 'COLOR', '颜色', 'TEXT', 0, '', '[]', 'TRIM_UPPER', 'ACTIVE', 'test', ?, 'test', ?, 'seed')
+    `).bind(timestamp, timestamp),
+    DB.prepare(`
       INSERT INTO material_category_attributes(id, category_id, attribute_definition_id, is_required, is_unique_key_component, is_searchable, sort_order, status, created_by, created_at, updated_by, updated_at, request_id)
       VALUES (9201, 9001, 9101, 1, 1, 1, 10, 'ACTIVE', 'test', ?, 'test', ?, 'seed')
+    `).bind(timestamp, timestamp),
+    DB.prepare(`
+      INSERT INTO material_category_attributes(id, category_id, attribute_definition_id, is_required, is_unique_key_component, is_searchable, sort_order, status, created_by, created_at, updated_by, updated_at, request_id)
+      VALUES (9202, 9001, 9102, 0, 0, 1, 20, 'ACTIVE', 'test', ?, 'test', ?, 'seed')
     `).bind(timestamp, timestamp),
     DB.prepare(`
       INSERT INTO material_code_rules(id, rule_code, rule_name, category_id, prefix, major_segment, minor_segment, separator, sequence_width, next_sequence, status, effective_from, version, approved_by, approved_at, created_by, created_at, updated_by, updated_at, request_id)
@@ -56,6 +64,7 @@ async function fixture(rateLimits) {
   await applyMigration(DB, "0000_far_nightmare.sql");
   await applyMigration(DB, "0001_material_master_v2.sql");
   await applyMigration(DB, "0002_material_draft_review_api.sql");
+  await applyMigration(DB, "0003_material_draft_lifecycle.sql");
   await seed(DB);
   const users = new Map([
     ["admin1", { username: "admin1", role: "admin", must_change_password: false }],
@@ -67,8 +76,8 @@ async function fixture(rateLimits) {
   ]);
   const permissions = {
     admin: new Set(["*"]),
-    manager: new Set(["material.read", "material.draft.create", "material.review.approve", "material.review.reject"]),
-    purchase: new Set(["material.read", "material.draft.create"]),
+    manager: new Set(["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject"]),
+    purchase: new Set(["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit"]),
     warehouse: new Set(["material.read"]),
   };
   return {
@@ -88,11 +97,15 @@ const csrf = "csrf-test-token";
 
 test("Material role permissions match the approved matrix", () => {
   for (const role of ["admin", "manager"]) {
+    assert.ok(MATERIAL_ROLE_PERMISSIONS[role].includes("material.draft.edit_any"));
+    assert.ok(MATERIAL_ROLE_PERMISSIONS[role].includes("material.review.queue"));
     assert.ok(MATERIAL_ROLE_PERMISSIONS[role].includes("material.review.approve"));
     assert.ok(MATERIAL_ROLE_PERMISSIONS[role].includes("material.review.reject"));
   }
   for (const role of ["purchase", "engineering"]) {
     assert.ok(MATERIAL_ROLE_PERMISSIONS[role].includes("material.draft.create"));
+    assert.ok(MATERIAL_ROLE_PERMISSIONS[role].includes("material.draft.edit_own"));
+    assert.ok(MATERIAL_ROLE_PERMISSIONS[role].includes("material.draft.submit"));
     assert.ok(!MATERIAL_ROLE_PERMISSIONS[role].includes("material.review.approve"));
   }
   for (const role of ["production", "warehouse", "quality", "sales", "finance", "operations"]) {
@@ -125,10 +138,23 @@ function draftBody(overrides = {}) {
   };
 }
 
+function editBody(expectedVersion, overrides = {}) {
+  const created = draftBody(overrides);
+  const basicFields = { ...created.basic_fields };
+  delete basicFields.source_type;
+  delete basicFields.source_ref;
+  return {
+    expected_version: expectedVersion,
+    basic_fields: basicFields,
+    category_id: created.category_id,
+    attributes: created.attributes,
+  };
+}
+
 async function api(context, path, { method = "GET", user, body, key = crypto.randomUUID(), includeCsrf = true } = {}) {
   const headers = new Headers();
   if (user) headers.set("X-Test-User", user);
-  if (method === "POST") {
+  if (method === "POST" || method === "PATCH") {
     headers.set("Content-Type", "application/json");
     headers.set("Idempotency-Key", key);
     headers.set("Origin", "http://local.test");
@@ -185,37 +211,148 @@ test("Material review forbids self-review and preserves optimistic locking and u
   const context = await fixture();
   try {
     const selfDraft = await api(context, "/api/material-master/drafts", { method: "POST", user: "admin1", body: draftBody(), key: "admin-self-draft-01" });
-    const selfReview = await api(context, `/api/material-master/drafts/${selfDraft.payload.data.material_id}/approve`, { method: "POST", user: "admin1", body: { expected_version: 1 }, key: "admin-self-review-1" });
+    await api(context, `/api/material-master/drafts/${selfDraft.payload.data.material_id}/submit`, { method: "POST", user: "admin1", body: { expected_version: 1 }, key: "admin-self-submit-1" });
+    const selfReview = await api(context, `/api/material-master/drafts/${selfDraft.payload.data.material_id}/approve`, { method: "POST", user: "admin1", body: { expected_version: 2 }, key: "admin-self-review-1" });
     assert.equal(selfReview.response.status, 403);
     assert.equal(selfReview.payload.error.code, "SELF_REVIEW_FORBIDDEN");
 
     const draft = await api(context, "/api/material-master/drafts", { method: "POST", user: "purchase1", body: draftBody(), key: "review-draft-00001" });
     const id = draft.payload.data.material_id;
+    const submitted = await api(context, `/api/material-master/drafts/${id}/submit`, { method: "POST", user: "purchase1", body: { expected_version: 1, submit_comment: "提交" }, key: "review-submit-0001" });
+    assert.equal(submitted.payload.data.material_status, "PENDING_REVIEW");
     const [left, right] = await Promise.all([
-      api(context, `/api/material-master/drafts/${id}/approve`, { method: "POST", user: "manager1", body: { expected_version: 1, review_comment: "通过" }, key: "approve-left-0001" }),
-      api(context, `/api/material-master/drafts/${id}/approve`, { method: "POST", user: "admin2", body: { expected_version: 1, review_comment: "通过" }, key: "approve-right-001" }),
+      api(context, `/api/material-master/drafts/${id}/approve`, { method: "POST", user: "manager1", body: { expected_version: 2, review_comment: "通过" }, key: "approve-left-0001" }),
+      api(context, `/api/material-master/drafts/${id}/approve`, { method: "POST", user: "admin2", body: { expected_version: 2, review_comment: "通过" }, key: "approve-right-001" }),
     ]);
     const statuses = [left.response.status, right.response.status].sort((a, b) => a - b);
     assert.deepEqual(statuses, [200, 409]);
     const success = left.response.status === 200 ? left : right;
     const failed = left.response.status === 409 ? left : right;
     assert.match(success.payload.data.internal_material_code, /^CYD-PCB-FR4-\d{6}$/);
-    assert.ok(["VERSION_CONFLICT", "INVALID_MATERIAL_STATE"].includes(failed.payload.error.code));
+    assert.ok(["VERSION_CONFLICT", "MATERIAL_NOT_REVIEWABLE"].includes(failed.payload.error.code));
     const codes = await context.DB.prepare("SELECT internal_material_code FROM material_master WHERE id = ?").bind(id).all();
     assert.equal(codes.results.length, 1);
     assert.equal(codes.results[0].internal_material_code, success.payload.data.internal_material_code);
 
     const rejectedDraft = await api(context, "/api/material-master/drafts", { method: "POST", user: "purchase1", body: draftBody(), key: "reject-draft-00001" });
     const rejectId = rejectedDraft.payload.data.material_id;
-    const missingReason = await api(context, `/api/material-master/drafts/${rejectId}/reject`, { method: "POST", user: "manager1", body: { expected_version: 1 }, key: "reject-no-reason-01" });
+    await api(context, `/api/material-master/drafts/${rejectId}/submit`, { method: "POST", user: "purchase1", body: { expected_version: 1 }, key: "reject-submit-0001" });
+    const missingReason = await api(context, `/api/material-master/drafts/${rejectId}/reject`, { method: "POST", user: "manager1", body: { expected_version: 2 }, key: "reject-no-reason-01" });
     assert.equal(missingReason.response.status, 400);
-    const rejected = await api(context, `/api/material-master/drafts/${rejectId}/reject`, { method: "POST", user: "manager1", body: { expected_version: 1, reason: "缺少证明" }, key: "reject-valid-00001" });
+    assert.equal(missingReason.payload.error.code, "REVIEW_REASON_REQUIRED");
+    const rejected = await api(context, `/api/material-master/drafts/${rejectId}/reject`, { method: "POST", user: "manager1", body: { expected_version: 2, reason: "缺少证明" }, key: "reject-valid-00001" });
     assert.equal(rejected.response.status, 200);
     assert.equal(rejected.payload.data.material_status, "DRAFT");
-    assert.equal(rejected.payload.data.version, 2);
+    assert.equal(rejected.payload.data.version, 3);
     const stale = await api(context, `/api/material-master/drafts/${rejectId}/reject`, { method: "POST", user: "manager1", body: { expected_version: 1, reason: "再次驳回" }, key: "reject-stale-00001" });
     assert.equal(stale.response.status, 409);
     assert.equal(stale.payload.error.code, "VERSION_CONFLICT");
+  } finally {
+    await context.mf.dispose();
+  }
+});
+
+test("Material draft lifecycle supports full replacement, queue, separation and resubmission", { timeout: 120_000 }, async () => {
+  const context = await fixture();
+  try {
+    const created = await api(context, "/api/material-master/drafts", {
+      method: "POST", user: "purchase1",
+      body: draftBody({ attributes: {
+        THICKNESS: { value: 1.6, unit: "mm", source: "MANUAL" },
+        COLOR: { value: "GREEN", source: "MANUAL" },
+      } }),
+      key: "lifecycle-create-001",
+    });
+    const id = created.payload.data.material_id;
+    const directReview = await api(context, `/api/material-master/drafts/${id}/approve`, {
+      method: "POST", user: "admin2", body: { expected_version: 1 }, key: "direct-draft-review-1",
+    });
+    assert.equal(directReview.payload.error.code, "MATERIAL_NOT_REVIEWABLE");
+    const editKey = "lifecycle-edit-0001";
+    const edited = await api(context, `/api/material-master/drafts/${id}`, {
+      method: "PATCH", user: "manager1",
+      body: editBody(1, { basic_fields: { standard_name: "普通 FR4 覆铜板 V2" } }), key: editKey,
+    });
+    assert.equal(edited.response.status, 200);
+    assert.equal(edited.payload.data.version, 2);
+    assert.equal(edited.payload.data.last_modified_by, "manager1");
+    assert.equal(edited.payload.data.validation_summary.valid, true);
+    const editReplay = await api(context, `/api/material-master/drafts/${id}`, {
+      method: "PATCH", user: "manager1",
+      body: editBody(1, { basic_fields: { standard_name: "普通 FR4 覆铜板 V2" } }), key: editKey,
+    });
+    assert.equal(editReplay.response.headers.get("idempotency-replayed"), "true");
+    const unchanged = await api(context, `/api/material-master/drafts/${id}`, {
+      method: "PATCH", user: "manager1",
+      body: editBody(2, { basic_fields: { standard_name: "普通 FR4 覆铜板 V2" } }), key: "lifecycle-unchanged-1",
+    });
+    assert.equal(unchanged.payload.error.code, "DRAFT_NOT_CHANGED");
+    const attributes = await context.DB.prepare(`
+      SELECT d.attribute_code FROM material_attribute_values v
+      INNER JOIN material_attribute_definitions d ON d.id = v.attribute_definition_id
+      WHERE v.material_id = ? ORDER BY d.attribute_code
+    `).bind(id).all();
+    assert.deepEqual(attributes.results, [{ attribute_code: "THICKNESS" }]);
+
+    const submitted = await api(context, `/api/material-master/drafts/${id}/submit`, {
+      method: "POST", user: "purchase1", body: { expected_version: 2, submit_comment: "  已补充资料  " }, key: "lifecycle-submit-01",
+    });
+    assert.equal(submitted.payload.data.material_status, "PENDING_REVIEW");
+    assert.equal(submitted.payload.data.version, 3);
+    assert.equal(submitted.payload.data.submitted_by, "purchase1");
+    assert.equal(submitted.payload.data.submitted_at, fixedNow.toISOString());
+    const hiddenQueue = await api(context, "/api/material-master/review-queue", { user: "purchase1" });
+    assert.equal(hiddenQueue.response.status, 403);
+    const queue = await api(context, "/api/material-master/review-queue?page=1&page_size=20&sort=submitted_at_desc", { user: "manager2" });
+    assert.equal(queue.response.status, 200);
+    assert.equal(queue.payload.data[0].material_id, id);
+    assert.equal(queue.payload.data[0].validation_summary.basis, "CURRENT_METADATA");
+    assert.ok(queue.payload.data[0].validation_summary.top_issues.length <= 5);
+    const lastEditorReview = await api(context, `/api/material-master/drafts/${id}/approve`, {
+      method: "POST", user: "manager1", body: { expected_version: 3 }, key: "last-editor-review-1",
+    });
+    assert.equal(lastEditorReview.payload.error.code, "LAST_EDITOR_REVIEW_FORBIDDEN");
+    const rejected = await api(context, `/api/material-master/drafts/${id}/reject`, {
+      method: "POST", user: "admin2", body: { expected_version: 3, reason: "需要调整名称" }, key: "lifecycle-reject-01",
+    });
+    assert.equal(rejected.payload.data.material_status, "DRAFT");
+    assert.equal(rejected.payload.data.version, 4);
+    const reedited = await api(context, `/api/material-master/drafts/${id}`, {
+      method: "PATCH", user: "purchase1",
+      body: editBody(4, { basic_fields: { standard_name: "普通 FR4 覆铜板 V3" } }), key: "lifecycle-reedit-01",
+    });
+    assert.equal(reedited.payload.data.version, 5);
+    const resubmitted = await api(context, `/api/material-master/drafts/${id}/submit`, {
+      method: "POST", user: "purchase1", body: { expected_version: 5, submit_comment: "重新提交" }, key: "lifecycle-resubmit-1",
+    });
+    assert.equal(resubmitted.payload.data.version, 6);
+    const submitHistory = await context.DB.prepare("SELECT change_reason FROM material_versions WHERE material_id = ? AND event_type = 'SUBMIT' ORDER BY version_no").bind(id).all();
+    assert.deepEqual(submitHistory.results, [{ change_reason: "已补充资料" }, { change_reason: "重新提交" }]);
+    const formerEditorApproval = await api(context, `/api/material-master/drafts/${id}/approve`, {
+      method: "POST", user: "manager1", body: { expected_version: 6, review_comment: "后续版本通过" }, key: "former-editor-approve",
+    });
+    assert.equal(formerEditorApproval.response.status, 200);
+
+    const direct = await api(context, "/api/material-master/drafts", { method: "POST", user: "purchase1", body: draftBody(), key: "submitter-only-create" });
+    const directId = direct.payload.data.material_id;
+    await api(context, `/api/material-master/drafts/${directId}/submit`, { method: "POST", user: "manager2", body: { expected_version: 1 }, key: "submitter-only-submit" });
+    const submitterApproval = await api(context, `/api/material-master/drafts/${directId}/approve`, { method: "POST", user: "manager2", body: { expected_version: 2 }, key: "submitter-only-approve" });
+    assert.equal(submitterApproval.response.status, 200);
+
+    const concurrent = await api(context, "/api/material-master/drafts", { method: "POST", user: "purchase1", body: draftBody(), key: "concurrent-edit-create" });
+    const concurrentId = concurrent.payload.data.material_id;
+    const editOutcomes = await Promise.all([
+      api(context, `/api/material-master/drafts/${concurrentId}`, { method: "PATCH", user: "manager1", body: editBody(1, { basic_fields: { standard_name: "并发编辑 A" } }), key: "concurrent-edit-a" }),
+      api(context, `/api/material-master/drafts/${concurrentId}`, { method: "PATCH", user: "manager2", body: editBody(1, { basic_fields: { standard_name: "并发编辑 B" } }), key: "concurrent-edit-b" }),
+    ]);
+    assert.deepEqual(editOutcomes.map((result) => result.response.status).sort((a, b) => a - b), [200, 409]);
+    const submitOutcomes = await Promise.all([
+      api(context, `/api/material-master/drafts/${concurrentId}/submit`, { method: "POST", user: "purchase1", body: { expected_version: 2 }, key: "concurrent-submit-a" }),
+      api(context, `/api/material-master/drafts/${concurrentId}/submit`, { method: "POST", user: "manager2", body: { expected_version: 2 }, key: "concurrent-submit-b" }),
+    ]);
+    assert.deepEqual(submitOutcomes.map((result) => result.response.status).sort((a, b) => a - b), [200, 409]);
+    const concurrentHistory = await context.DB.prepare("SELECT event_type,COUNT(*) AS total FROM material_versions WHERE material_id=? AND event_type IN ('UPDATE','SUBMIT') GROUP BY event_type ORDER BY event_type").bind(concurrentId).all();
+    assert.deepEqual(concurrentHistory.results, [{ event_type: "SUBMIT", total: 1 }, { event_type: "UPDATE", total: 1 }]);
   } finally {
     await context.mf.dispose();
   }

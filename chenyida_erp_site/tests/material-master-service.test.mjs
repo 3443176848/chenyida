@@ -85,6 +85,8 @@ async function fixture() {
     ({ DB } = await mf.getBindings());
     await applyMigration(DB, "0000_far_nightmare.sql");
     await applyMigration(DB, "0001_material_master_v2.sql");
+    await applyMigration(DB, "0002_material_draft_review_api.sql");
+    await applyMigration(DB, "0003_material_draft_lifecycle.sql");
     await seedFr4(DB);
   } catch (error) {
     await mf.dispose();
@@ -149,6 +151,15 @@ function reviewCommand(materialId, version, suffix, reason = "审核确认") {
       request_id: `review-${suffix}`,
     },
   };
+}
+
+async function submitForReview(context, draft, suffix = "submit") {
+  return (await context.draftService.submitDraft({
+    material_id: draft.id,
+    expected_version: draft.version,
+    submit_comment: "提交审核",
+    context: { actor: "creator", request_id: `submit-${suffix}` },
+  })).material;
 }
 
 async function counts(DB) {
@@ -234,13 +245,13 @@ async function insertActiveMaterial(DB, code) {
     INSERT INTO material_master(
       id, internal_material_code, standard_name, category_id, base_uom,
       material_status, procurement_type, inventory_type, inspection_type,
-      environmental_requirement, source_type, source_ref, version,
+      environmental_requirement, source_type, source_ref, version, last_modified_by,
       approved_by, approved_at, created_by, created_at, updated_by,
       updated_at, request_id
     ) VALUES (
       8000, ?, '既有正式物料', 9001, 'PCS',
       'ACTIVE', 'PURCHASE', 'STOCKED', 'NORMAL', 'ROHS', 'MANUAL',
-      'request:existing', 1, 'approver', ?, 'creator', ?, 'creator', ?, 'existing'
+      'request:existing', 1, 'creator', 'approver', ?, 'creator', ?, 'creator', ?, 'existing'
     )
   `).bind(code, now, now, now).run();
 }
@@ -384,7 +395,8 @@ test("rolls back draft creation when metadata changes after create validation", 
 test("revalidates persisted attributes before approval", { timeout: 15_000 }, async () => {
     const context = await fixture();
     try {
-      const draft = (await context.draftService.createDraft(draftCommand())).material;
+      const created = (await context.draftService.createDraft(draftCommand())).material;
+      const draft = await submitForReview(context, created, "revalidate");
       await context.DB.prepare(`
         UPDATE material_attribute_definitions
         SET canonical_unit = 'kg'
@@ -392,15 +404,15 @@ test("revalidates persisted attributes before approval", { timeout: 15_000 }, as
       `).run();
 
       await assert.rejects(
-        () => context.reviewService.approveDraft(reviewCommand(draft.id, 1, "revalidate")),
+        () => context.reviewService.approveDraft(reviewCommand(draft.id, 2, "revalidate")),
         errorCode(
           "MATERIAL_REVIEW_VALIDATION_FAILED",
           "MATERIAL_ATTRIBUTE_UNIT_INCOMPATIBLE",
         ),
       );
       const stored = await context.repository.getMaterialForReview(draft.id);
-      assert.equal(stored.materialStatus, "DRAFT");
-      assert.equal(stored.version, 1);
+      assert.equal(stored.materialStatus, "PENDING_REVIEW");
+      assert.equal(stored.version, 2);
       const rule = await context.DB.prepare(
         "SELECT next_sequence FROM material_code_rules WHERE id = 9301",
       ).first();
@@ -413,7 +425,8 @@ test("revalidates persisted attributes before approval", { timeout: 15_000 }, as
 test("blocks metadata changes that race after review validation", { timeout: 15_000 }, async () => {
     const context = await fixture();
     try {
-      const draft = (await context.draftService.createDraft(draftCommand())).material;
+      const created = (await context.draftService.createDraft(draftCommand())).material;
+      const draft = await submitForReview(context, created, "metadata-race");
       const racingValidation = {
         validateForCreate: (input) => context.validationService.validateForCreate(input),
         async validateForReview(input) {
@@ -434,12 +447,12 @@ test("blocks metadata changes that race after review validation", { timeout: 15_
       });
 
       await assert.rejects(
-        () => racingReview.approveDraft(reviewCommand(draft.id, 1, "metadata-race")),
+        () => racingReview.approveDraft(reviewCommand(draft.id, 2, "metadata-race")),
         errorCode("MATERIAL_VERSION_CONFLICT"),
       );
       const stored = await context.repository.getMaterialForReview(draft.id);
-      assert.equal(stored.materialStatus, "DRAFT");
-      assert.equal(stored.version, 1);
+      assert.equal(stored.materialStatus, "PENDING_REVIEW");
+      assert.equal(stored.version, 2);
       const rule = await context.DB.prepare(
         "SELECT next_sequence, version FROM material_code_rules WHERE id = 9301",
       ).first();
@@ -452,13 +465,14 @@ test("blocks metadata changes that race after review validation", { timeout: 15_
 test("approves a draft and atomically generates the formal code", { timeout: 15_000 }, async () => {
     const context = await fixture();
     try {
-      const draft = (await context.draftService.createDraft(draftCommand())).material;
+      const created = (await context.draftService.createDraft(draftCommand())).material;
+      const draft = await submitForReview(context, created, "approve");
       const approved = await context.reviewService.approveDraft(
         reviewCommand(draft.id, draft.version, "approve"),
       );
       assert.equal(approved.material.materialStatus, "ACTIVE");
       assert.equal(approved.material.internalMaterialCode, "CYD-PCB-FR4-000001");
-      assert.equal(approved.material.version, 2);
+      assert.equal(approved.material.version, 3);
       assert.equal(approved.material.approvedBy, "reviewer-approve");
 
       const rule = await context.DB.prepare(
@@ -472,7 +486,8 @@ test("approves a draft and atomically generates the formal code", { timeout: 15_
       `).bind(draft.id).all();
       assert.deepEqual(versions.results, [
         { event_type: "CREATE", version_no: 1 },
-        { event_type: "APPROVE", version_no: 2 },
+        { event_type: "SUBMIT", version_no: 2 },
+        { event_type: "APPROVE", version_no: 3 },
       ]);
 
       const actions = await context.DB.prepare(`
@@ -481,6 +496,7 @@ test("approves a draft and atomically generates the formal code", { timeout: 15_
       `).bind(draft.id).all();
       assert.deepEqual(actions.results, [
         { change_type: "CREATE", field_name: "CREATE_DRAFT" },
+        { change_type: "STATUS_CHANGE", field_name: "material_status" },
         { change_type: "APPROVAL", field_name: "APPROVE" },
         { change_type: "CODE_ASSIGNMENT", field_name: "CODE_GENERATE" },
       ]);
@@ -492,7 +508,8 @@ test("approves a draft and atomically generates the formal code", { timeout: 15_
 test("rolls back the whole approval batch when a later audit write fails", { timeout: 15_000 }, async () => {
     const context = await fixture();
     try {
-      const draft = (await context.draftService.createDraft(draftCommand())).material;
+      const created = (await context.draftService.createDraft(draftCommand())).material;
+      const draft = await submitForReview(context, created, "rollback");
       await context.DB.prepare(`
         CREATE TRIGGER fail_code_generate_audit
         BEFORE INSERT ON material_change_logs
@@ -503,13 +520,13 @@ test("rolls back the whole approval batch when a later audit write fails", { tim
       `).run();
 
       await assert.rejects(
-        () => context.reviewService.approveDraft(reviewCommand(draft.id, 1, "rollback")),
+        () => context.reviewService.approveDraft(reviewCommand(draft.id, 2, "rollback")),
         errorCode("MATERIAL_WRITE_FAILED"),
       );
       const stored = await context.repository.getMaterialForReview(draft.id);
-      assert.equal(stored.materialStatus, "DRAFT");
+      assert.equal(stored.materialStatus, "PENDING_REVIEW");
       assert.equal(stored.internalMaterialCode, null);
-      assert.equal(stored.version, 1);
+      assert.equal(stored.version, 2);
       const rule = await context.DB.prepare(
         "SELECT next_sequence, version FROM material_code_rules WHERE id = 9301",
       ).first();
@@ -518,12 +535,18 @@ test("rolls back the whole approval batch when a later audit write fails", { tim
         SELECT event_type, version_no FROM material_versions
         WHERE material_id = ? ORDER BY version_no
       `).bind(draft.id).all();
-      assert.deepEqual(versions.results, [{ event_type: "CREATE", version_no: 1 }]);
+      assert.deepEqual(versions.results, [
+        { event_type: "CREATE", version_no: 1 },
+        { event_type: "SUBMIT", version_no: 2 },
+      ]);
       const logs = await context.DB.prepare(`
         SELECT change_type, field_name FROM material_change_logs
         WHERE material_id = ? ORDER BY id
       `).bind(draft.id).all();
-      assert.deepEqual(logs.results, [{ change_type: "CREATE", field_name: "CREATE_DRAFT" }]);
+      assert.deepEqual(logs.results, [
+        { change_type: "CREATE", field_name: "CREATE_DRAFT" },
+        { change_type: "STATUS_CHANGE", field_name: "material_status" },
+      ]);
     } finally {
       await context.mf.dispose();
     }
@@ -532,13 +555,14 @@ test("rolls back the whole approval batch when a later audit write fails", { tim
 test("rejects a draft without consuming a code", { timeout: 15_000 }, async () => {
     const context = await fixture();
     try {
-      const draft = (await context.draftService.createDraft(draftCommand())).material;
+      const created = (await context.draftService.createDraft(draftCommand())).material;
+      const draft = await submitForReview(context, created, "reject");
       const rejected = await context.reviewService.rejectDraft(
         reviewCommand(draft.id, draft.version, "reject", "厚度证明不足"),
       );
       assert.equal(rejected.materialStatus, "DRAFT");
       assert.equal(rejected.internalMaterialCode, null);
-      assert.equal(rejected.version, 2);
+      assert.equal(rejected.version, 3);
 
       const rule = await context.DB.prepare(
         "SELECT next_sequence FROM material_code_rules WHERE id = 9301",
@@ -550,7 +574,8 @@ test("rejects a draft without consuming a code", { timeout: 15_000 }, async () =
       `).bind(draft.id).all();
       assert.deepEqual(versions.results, [
         { event_type: "CREATE", version_no: 1 },
-        { event_type: "REJECT", version_no: 2 },
+        { event_type: "SUBMIT", version_no: 2 },
+        { event_type: "REJECT", version_no: 3 },
       ]);
       const logs = await context.DB.prepare(`
         SELECT change_type, field_name, change_reason FROM material_change_logs
@@ -558,6 +583,7 @@ test("rejects a draft without consuming a code", { timeout: 15_000 }, async () =
       `).bind(draft.id).all();
       assert.deepEqual(logs.results, [
         { change_type: "CREATE", field_name: "CREATE_DRAFT", change_reason: "" },
+        { change_type: "STATUS_CHANGE", field_name: "material_status", change_reason: "提交审核" },
         { change_type: "REJECTION", field_name: "REJECT", change_reason: "厚度证明不足" },
       ]);
     } finally {
@@ -568,7 +594,8 @@ test("rejects a draft without consuming a code", { timeout: 15_000 }, async () =
 test("allows only one of two concurrent approvals for the same draft", { timeout: 15_000 }, async () => {
     const context = await fixture();
     try {
-      const draft = (await context.draftService.createDraft(draftCommand())).material;
+      const created = (await context.draftService.createDraft(draftCommand())).material;
+      const draft = await submitForReview(context, created, "concurrent");
       const codeService = barrierCodeService(createMaterialCodeService(context.repository));
       const reviewA = createMaterialReviewService({
         repository: context.repository,
@@ -584,8 +611,8 @@ test("allows only one of two concurrent approvals for the same draft", { timeout
       });
 
       const outcomes = await Promise.allSettled([
-        reviewA.approveDraft(reviewCommand(draft.id, 1, "concurrent-a")),
-        reviewB.approveDraft(reviewCommand(draft.id, 1, "concurrent-b")),
+        reviewA.approveDraft(reviewCommand(draft.id, 2, "concurrent-a")),
+        reviewB.approveDraft(reviewCommand(draft.id, 2, "concurrent-b")),
       ]);
       assert.equal(outcomes.filter((outcome) => outcome.status === "fulfilled").length, 1);
       const rejected = outcomes.find((outcome) => outcome.status === "rejected");
@@ -607,8 +634,10 @@ test("allows only one of two concurrent approvals for the same draft", { timeout
 test("allocates different codes to concurrent drafts using one rule", { timeout: 15_000 }, async () => {
     const context = await fixture();
     try {
-      const first = (await context.draftService.createDraft(draftCommand())).material;
-      const second = (await context.draftService.createDraft(draftCommand())).material;
+      const firstCreated = (await context.draftService.createDraft(draftCommand())).material;
+      const secondCreated = (await context.draftService.createDraft(draftCommand())).material;
+      const first = await submitForReview(context, firstCreated, "rule-a");
+      const second = await submitForReview(context, secondCreated, "rule-b");
       const barrierRepository = codeRuleBarrierRepository(context.repository);
       const codeService = createMaterialCodeService(barrierRepository.repository);
       const reviewA = createMaterialReviewService({
@@ -624,8 +653,8 @@ test("allocates different codes to concurrent drafts using one rule", { timeout:
         clock: context.clock,
       });
       const results = await Promise.all([
-        reviewA.approveDraft(reviewCommand(first.id, 1, "rule-a")),
-        reviewB.approveDraft(reviewCommand(second.id, 1, "rule-b")),
+        reviewA.approveDraft(reviewCommand(first.id, 2, "rule-a")),
+        reviewB.approveDraft(reviewCommand(second.id, 2, "rule-b")),
       ]);
       const codes = results.map((result) => result.material.internalMaterialCode).sort();
       assert.deepEqual(codes, ["CYD-PCB-FR4-000001", "CYD-PCB-FR4-000002"]);
@@ -643,7 +672,8 @@ test("allocates different codes to concurrent drafts using one rule", { timeout:
 test("skips an already occupied code instead of generating a duplicate", { timeout: 15_000 }, async () => {
     const context = await fixture();
     try {
-      const draft = (await context.draftService.createDraft(draftCommand())).material;
+      const created = (await context.draftService.createDraft(draftCommand())).material;
+      const draft = await submitForReview(context, created, "occupied");
       let injected = false;
       const racingRepository = {
         getApplicableCodeRules: (...args) => context.repository.getApplicableCodeRules(...args),
@@ -666,7 +696,7 @@ test("skips an already occupied code instead of generating a duplicate", { timeo
       });
 
       const approved = await racingReview.approveDraft(
-        reviewCommand(draft.id, 1, "occupied"),
+        reviewCommand(draft.id, 2, "occupied"),
       );
       assert.equal(injected, true);
       assert.equal(approved.material.internalMaterialCode, "CYD-PCB-FR4-000002");

@@ -3,6 +3,7 @@ import {
   MaterialMasterRepositoryError,
   type ApproveDraftWrite,
   type CreateDraftWrite,
+  type EditDraftWrite,
   type MaterialAttributeRecord,
   type MaterialAttributeStorageSnapshot,
   type MaterialApiTransactionCompanion,
@@ -13,6 +14,7 @@ import {
   type MaterialSourceType,
   type MaterialStatus,
   type RejectDraftWrite,
+  type SubmitDraftWrite,
 } from "./types.ts";
 
 export interface MaterialMasterD1Result<T = Record<string, unknown>> {
@@ -57,6 +59,9 @@ type MaterialRow = {
   source_type: MaterialSourceType;
   source_ref: string;
   version: number;
+  last_modified_by: string;
+  submitted_by: string;
+  submitted_at: string | null;
   approved_by: string;
   approved_at: string | null;
   created_by: string;
@@ -119,7 +124,8 @@ const SELECT_MATERIAL_SQL = `
     id, internal_material_code, standard_name, category_id, brand, manufacturer,
     manufacturer_part_number, base_uom, material_status, procurement_type,
     inventory_type, lot_control_required, shelf_life_days, inspection_type,
-    environmental_requirement, source_type, source_ref, version, approved_by,
+    environmental_requirement, source_type, source_ref, version, last_modified_by,
+    submitted_by, submitted_at, approved_by,
     approved_at, created_by, created_at, updated_by, updated_at, request_id
   FROM material_master
   WHERE id = ?
@@ -315,6 +321,9 @@ function rowToMaterial(
     },
     materialStatus: row.material_status,
     version: row.version,
+    lastModifiedBy: row.last_modified_by,
+    submittedBy: row.submitted_by,
+    submittedAt: row.submitted_at,
     approvedBy: row.approved_by,
     approvedAt: row.approved_at,
     createdBy: row.created_by,
@@ -332,11 +341,15 @@ function materialApiSuccessStatements(
   companion: MaterialApiTransactionCompanion | undefined,
   result: Readonly<{
     materialId: number;
-    materialStatus: "DRAFT" | "ACTIVE";
+    materialStatus: "DRAFT" | "PENDING_REVIEW" | "ACTIVE";
     version: number;
     internalMaterialCode: string | null;
     oldVersion: number | null;
     completedAt: string;
+    lastModifiedBy?: string;
+    submittedBy?: string;
+    submittedAt?: string | null;
+    validationSummary?: Readonly<{ valid: true; errorCount: 0; warningCount: number }>;
   }>,
 ): MaterialMasterD1Statement[] {
   if (!companion) return [];
@@ -346,6 +359,15 @@ function materialApiSuccessStatements(
       material_status: result.materialStatus,
       version: result.version,
       internal_material_code: result.internalMaterialCode,
+      ...(result.lastModifiedBy ? { last_modified_by: result.lastModifiedBy } : {}),
+      ...(result.submittedBy ? { submitted_by: result.submittedBy, submitted_at: result.submittedAt ?? null } : {}),
+      ...(result.validationSummary ? {
+        validation_summary: {
+          valid: result.validationSummary.valid,
+          error_count: result.validationSummary.errorCount,
+          warning_count: result.validationSummary.warningCount,
+        },
+      } : {}),
     },
     operation_id: companion.operationId,
   });
@@ -492,7 +514,8 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
                 manufacturer, manufacturer_part_number, base_uom, material_status,
                 procurement_type, inventory_type, lot_control_required, shelf_life_days,
                 inspection_type, environmental_requirement, source_type, source_ref,
-                version, approved_by, approved_at, created_by, created_at, updated_by,
+                version, last_modified_by, submitted_by, submitted_at,
+                approved_by, approved_at, created_by, created_at, updated_by,
                 updated_at, request_id
               ) VALUES (
                 ?, NULL,
@@ -505,7 +528,7 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
                   WHERE c.id = ?
                 ),
                 ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?,
-                1, '', NULL, ?, ?, ?, ?, ?
+                1, ?, '', NULL, '', NULL, ?, ?, ?, ?, ?
               )
             `)
             .bind(
@@ -526,6 +549,7 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
               input.fields.environmentalRequirement,
               input.fields.sourceType,
               input.fields.sourceRef,
+              input.createdBy,
               input.createdBy,
               input.createdAt,
               input.createdBy,
@@ -611,6 +635,243 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
       }
     }
     throw new MaterialMasterRepositoryError("MATERIAL_ID_CONFLICT");
+  }
+
+  async editDraft(input: EditDraftWrite): Promise<MaterialRecord> {
+    const nextVersion = input.expectedVersion + 1;
+    try {
+      await this.database.batch([
+        this.database.prepare(`
+          UPDATE material_master
+          SET standard_name = (
+                SELECT CASE WHEN ${metadataGuardExpression("c.id")} = ? THEN ? ELSE NULL END
+                FROM material_categories c WHERE c.id = ?
+              ),
+              category_id = ?, brand = ?, manufacturer = ?,
+              manufacturer_part_number = ?, base_uom = ?, procurement_type = ?,
+              inventory_type = ?, lot_control_required = ?, shelf_life_days = ?,
+              inspection_type = ?, environmental_requirement = ?,
+              version = version + 1, last_modified_by = ?, updated_by = ?,
+              updated_at = ?, request_id = ?
+          WHERE id = ? AND version = ? AND material_status = 'DRAFT'
+            AND internal_material_code IS NULL
+        `).bind(
+          input.metadataGuard,
+          input.fields.standardName,
+          input.fields.categoryId,
+          input.fields.categoryId,
+          input.fields.brand,
+          input.fields.manufacturer,
+          input.fields.manufacturerPartNumber,
+          input.fields.baseUom,
+          input.fields.procurementType,
+          input.fields.inventoryType,
+          input.fields.lotControlRequired,
+          input.fields.shelfLifeDays,
+          input.fields.inspectionType,
+          input.fields.environmentalRequirement,
+          input.changedBy,
+          input.changedBy,
+          input.changedAt,
+          input.requestId,
+          input.materialId,
+          input.expectedVersion,
+        ),
+        this.database.prepare(`
+          DELETE FROM material_attribute_values
+          WHERE material_id = ? AND EXISTS (
+            SELECT 1 FROM material_master m
+            WHERE m.id = ? AND m.version = ? AND m.material_status = 'DRAFT'
+              AND m.last_modified_by = ? AND m.updated_at = ? AND m.request_id = ?
+          )
+        `).bind(
+          input.materialId,
+          input.materialId,
+          nextVersion,
+          input.changedBy,
+          input.changedAt,
+          input.requestId,
+        ),
+        ...input.attributes.map((attribute) => this.database.prepare(`
+          INSERT INTO material_attribute_values(
+            material_id, attribute_definition_id, value_text, value_integer,
+            value_decimal_scaled, value_boolean, value_date, normalized_value,
+            unit_code, source_type, source_ref, created_by, created_at, updated_by,
+            updated_at, request_id
+          ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          WHERE EXISTS (
+            SELECT 1 FROM material_master m
+            WHERE m.id = ? AND m.version = ? AND m.material_status = 'DRAFT'
+              AND m.last_modified_by = ? AND m.updated_at = ? AND m.request_id = ?
+          )
+        `).bind(
+          input.materialId,
+          attribute.attributeDefinitionId,
+          attribute.valueText,
+          attribute.valueInteger,
+          attribute.valueDecimalScaled,
+          attribute.valueBoolean,
+          attribute.valueDate,
+          attribute.normalizedValue,
+          attribute.unitCode,
+          attribute.sourceType,
+          attribute.sourceRef,
+          input.changedBy,
+          input.changedAt,
+          input.changedBy,
+          input.changedAt,
+          input.requestId,
+          input.materialId,
+          nextVersion,
+          input.changedBy,
+          input.changedAt,
+          input.requestId,
+        )),
+        this.database.prepare(`
+          INSERT INTO material_versions(
+            material_id, version_no, event_type, change_reason, changed_fields_json,
+            snapshot_json, changed_by, reviewed_by, reviewed_at, created_at, request_id
+          ) VALUES (
+            (SELECT id FROM material_master
+             WHERE id = ? AND version = ? AND material_status = 'DRAFT'
+               AND last_modified_by = ? AND updated_at = ? AND request_id = ?),
+            ?, 'UPDATE', '', ?, ?, ?, '', NULL, ?, ?
+          )
+        `).bind(
+          input.materialId,
+          nextVersion,
+          input.changedBy,
+          input.changedAt,
+          input.requestId,
+          nextVersion,
+          JSON.stringify(input.changedFields),
+          input.snapshotJson,
+          input.changedBy,
+          input.changedAt,
+          input.requestId,
+        ),
+        ...input.changedFields.map((field) => this.database.prepare(`
+          INSERT INTO material_change_logs(
+            material_id, change_type, field_name, old_value_json, new_value_json,
+            change_reason, changed_by, created_at, request_id
+          ) SELECT id, ?, ?, ?, ?, '', ?, ?, ? FROM material_master
+            WHERE id = ? AND version = ? AND material_status = 'DRAFT'
+              AND last_modified_by = ? AND updated_at = ? AND request_id = ?
+        `).bind(
+          MATERIAL_ACTION_CHANGE_TYPES.EDIT_DRAFT,
+          field,
+          input.oldSnapshotJson,
+          input.snapshotJson,
+          input.changedBy,
+          input.changedAt,
+          input.requestId,
+          input.materialId,
+          nextVersion,
+          input.changedBy,
+          input.changedAt,
+          input.requestId,
+        )),
+        ...materialApiSuccessStatements(this.database, input.transactionCompanion, {
+          materialId: input.materialId,
+          materialStatus: "DRAFT",
+          version: nextVersion,
+          internalMaterialCode: null,
+          oldVersion: input.expectedVersion,
+          completedAt: input.changedAt,
+          lastModifiedBy: input.changedBy,
+          validationSummary: input.validationSummary,
+        }),
+      ]);
+    } catch {
+      await this.throwDraftMutationConflict(input.materialId, input.expectedVersion, "DRAFT");
+    }
+    const material = await this.getMaterialForReview(input.materialId);
+    if (!material) throw new MaterialMasterRepositoryError("WRITE_FAILED");
+    return material;
+  }
+
+  async submitDraft(input: SubmitDraftWrite): Promise<MaterialRecord> {
+    const nextVersion = input.expectedVersion + 1;
+    try {
+      await this.database.batch([
+        this.database.prepare(`
+          UPDATE material_master
+          SET material_status = 'PENDING_REVIEW', version = version + 1,
+              submitted_by = ?, submitted_at = ?, updated_by = ?, updated_at = ?, request_id = ?
+          WHERE id = ? AND version = ? AND material_status = 'DRAFT'
+            AND internal_material_code IS NULL AND ${reviewGuardExpression("material_master")} = ?
+        `).bind(
+          input.submittedBy,
+          input.submittedAt,
+          input.submittedBy,
+          input.submittedAt,
+          input.requestId,
+          input.materialId,
+          input.expectedVersion,
+          input.reviewGuard,
+        ),
+        this.database.prepare(`
+          INSERT INTO material_versions(
+            material_id, version_no, event_type, change_reason, changed_fields_json,
+            snapshot_json, changed_by, reviewed_by, reviewed_at, created_at, request_id
+          ) VALUES (
+            (SELECT id FROM material_master
+             WHERE id = ? AND version = ? AND material_status = 'PENDING_REVIEW'
+               AND submitted_by = ? AND submitted_at = ? AND request_id = ?),
+            ?, 'SUBMIT', ?, ?, ?, ?, '', NULL, ?, ?
+          )
+        `).bind(
+          input.materialId,
+          nextVersion,
+          input.submittedBy,
+          input.submittedAt,
+          input.requestId,
+          nextVersion,
+          input.comment,
+          JSON.stringify(["material_status", "submitted_by", "submitted_at"]),
+          input.snapshotJson,
+          input.submittedBy,
+          input.submittedAt,
+          input.requestId,
+        ),
+        this.database.prepare(`
+          INSERT INTO material_change_logs(
+            material_id, change_type, field_name, old_value_json, new_value_json,
+            change_reason, changed_by, created_at, request_id
+          ) SELECT id, ?, 'material_status', ?, ?, ?, ?, ?, ? FROM material_master
+            WHERE id = ? AND version = ? AND material_status = 'PENDING_REVIEW'
+              AND submitted_by = ? AND submitted_at = ? AND request_id = ?
+        `).bind(
+          MATERIAL_ACTION_CHANGE_TYPES.SUBMIT_DRAFT,
+          JSON.stringify("DRAFT"),
+          JSON.stringify("PENDING_REVIEW"),
+          input.comment,
+          input.submittedBy,
+          input.submittedAt,
+          input.requestId,
+          input.materialId,
+          nextVersion,
+          input.submittedBy,
+          input.submittedAt,
+          input.requestId,
+        ),
+        ...materialApiSuccessStatements(this.database, input.transactionCompanion, {
+          materialId: input.materialId,
+          materialStatus: "PENDING_REVIEW",
+          version: nextVersion,
+          internalMaterialCode: null,
+          oldVersion: input.expectedVersion,
+          completedAt: input.submittedAt,
+          submittedBy: input.submittedBy,
+          submittedAt: input.submittedAt,
+        }),
+      ]);
+    } catch {
+      await this.throwDraftMutationConflict(input.materialId, input.expectedVersion, "DRAFT");
+    }
+    const material = await this.getMaterialForReview(input.materialId);
+    if (!material) throw new MaterialMasterRepositoryError("WRITE_FAILED");
+    return material;
   }
 
   async getMaterialForReview(materialId: number): Promise<MaterialRecord | null> {
@@ -745,7 +1006,7 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
                 request_id = ?
             WHERE id = ?
               AND version = ?
-              AND material_status = 'DRAFT'
+              AND material_status = 'PENDING_REVIEW'
               AND internal_material_code IS NULL
           `)
           .bind(
@@ -818,7 +1079,7 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
           .bind(
             input.materialId,
             MATERIAL_ACTION_CHANGE_TYPES.APPROVE,
-            JSON.stringify("DRAFT"),
+            JSON.stringify("PENDING_REVIEW"),
             JSON.stringify("ACTIVE"),
             input.reason,
             input.reviewedBy,
@@ -866,13 +1127,14 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
         this.database
           .prepare(`
             UPDATE material_master
-            SET version = version + 1,
+            SET material_status = 'DRAFT',
+                version = version + 1,
                 updated_by = ?,
                 updated_at = ?,
                 request_id = ?
             WHERE id = ?
               AND version = ?
-              AND material_status = 'DRAFT'
+              AND material_status = 'PENDING_REVIEW'
               AND internal_material_code IS NULL
           `)
           .bind(
@@ -929,7 +1191,7 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
           .bind(
             input.materialId,
             MATERIAL_ACTION_CHANGE_TYPES.REJECT,
-            JSON.stringify({ result: "REJECT", material_status: "DRAFT" }),
+            JSON.stringify({ result: "REJECT", material_status: "DRAFT", previous_status: "PENDING_REVIEW" }),
             input.reason,
             input.reviewedBy,
             input.reviewedAt,
@@ -949,7 +1211,7 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
       if (
         !material ||
         material.version !== input.expectedVersion ||
-        material.materialStatus !== "DRAFT" ||
+        material.materialStatus !== "PENDING_REVIEW" ||
         material.reviewGuard !== input.reviewGuard
       ) {
         throw new MaterialMasterRepositoryError("MATERIAL_VERSION_CONFLICT");
@@ -982,13 +1244,25 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
     }
   }
 
+  private async throwDraftMutationConflict(
+    materialId: number,
+    expectedVersion: number,
+    expectedStatus: MaterialStatus,
+  ): Promise<never> {
+    const material = await this.getMaterialForReview(materialId);
+    if (!material || material.version !== expectedVersion || material.materialStatus !== expectedStatus) {
+      throw new MaterialMasterRepositoryError("MATERIAL_VERSION_CONFLICT");
+    }
+    throw new MaterialMasterRepositoryError("WRITE_FAILED");
+  }
+
   private async throwApprovalConflict(input: ApproveDraftWrite): Promise<never> {
     try {
       const material = await this.getMaterialForReview(input.materialId);
       if (
         !material ||
         material.version !== input.expectedVersion ||
-        material.materialStatus !== "DRAFT" ||
+        material.materialStatus !== "PENDING_REVIEW" ||
         material.internalMaterialCode !== null ||
         material.reviewGuard !== input.reviewGuard
       ) {

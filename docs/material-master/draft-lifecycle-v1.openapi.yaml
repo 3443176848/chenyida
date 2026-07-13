@@ -1,0 +1,194 @@
+openapi: 3.1.0
+info:
+  title: 晨亿达 ERP 物料草稿生命周期 API
+  version: 1.0.0
+  description: >-
+    PHASE1-TASK07 的服务端契约。所有写接口均要求 ERP 会话、严格同源 CSRF、
+    Idempotency-Key 和 expected_version；操作者及职责字段只由服务端取得。
+paths:
+  /api/material-master/drafts/{materialId}:
+    patch:
+      summary: 完整替换草稿的可编辑聚合
+      description: >-
+        本 PATCH 不是 JSON Merge Patch。basic_fields、category_id 和 attributes
+        均为必填；attributes 是替换后的完整集合，省略旧属性即删除。
+      operationId: replaceMaterialDraftEditableAggregate
+      parameters:
+        - $ref: '#/components/parameters/MaterialId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceDraftRequest'
+      responses:
+        '200':
+          description: 草稿已替换，或返回相同幂等请求的原始结果
+        '409':
+          description: VERSION_CONFLICT、DRAFT_NOT_EDITABLE 或 DRAFT_NOT_CHANGED
+        '422':
+          description: MATERIAL_VALIDATION_FAILED
+  /api/material-master/drafts/{materialId}/submit:
+    post:
+      summary: 提交草稿审核
+      operationId: submitMaterialDraft
+      parameters:
+        - $ref: '#/components/parameters/MaterialId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version]
+              properties:
+                expected_version:
+                  type: integer
+                  minimum: 1
+                submit_comment:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: 状态已变为 PENDING_REVIEW
+        '409':
+          description: VERSION_CONFLICT 或 MATERIAL_NOT_SUBMITTABLE
+        '422':
+          description: MATERIAL_VALIDATION_FAILED
+  /api/material-master/review-queue:
+    get:
+      summary: 查询当前待审核队列
+      operationId: listMaterialReviewQueue
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: category_id, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: source_type, in: query, schema: { type: string } }
+        - { name: creator, in: query, schema: { type: string, maxLength: 64 } }
+        - { name: submitted_from, in: query, schema: { type: string, format: date } }
+        - { name: submitted_to, in: query, schema: { type: string, format: date } }
+        - { name: keyword, in: query, schema: { type: string, minLength: 1, maxLength: 100 } }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: submitted_at_desc
+            enum: [submitted_at_desc, submitted_at_asc, standard_name_asc, standard_name_desc]
+      responses:
+        '200':
+          description: >-
+            仅返回 PENDING_REVIEW。validation_summary 基于 CURRENT_METADATA，
+            每项最多五条脱敏 issue。
+  /api/material-master/drafts/{materialId}/approve:
+    post:
+      summary: 批准 PENDING_REVIEW 物料
+      description: 创建人及当前提交版本最后修改人不得审核；无管理员例外。
+      operationId: approveMaterialDraft
+      parameters:
+        - $ref: '#/components/parameters/MaterialId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version]
+              properties:
+                expected_version: { type: integer, minimum: 1 }
+                review_comment: { type: string, maxLength: 1000 }
+      responses:
+        '200': { description: 已批准并生成唯一正式编码 }
+        '403': { description: SELF_REVIEW_FORBIDDEN 或 LAST_EDITOR_REVIEW_FORBIDDEN }
+        '409': { description: VERSION_CONFLICT 或 MATERIAL_NOT_REVIEWABLE }
+  /api/material-master/drafts/{materialId}/reject:
+    post:
+      summary: 驳回 PENDING_REVIEW 物料
+      description: reason 去除首尾空白后必须为 1 至 1000 字符。
+      operationId: rejectMaterialDraft
+      parameters:
+        - $ref: '#/components/parameters/MaterialId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version, reason]
+              properties:
+                expected_version: { type: integer, minimum: 1 }
+                reason: { type: string, minLength: 1, maxLength: 1000 }
+      responses:
+        '200': { description: 已驳回为 DRAFT，保留最近提交职责字段 }
+        '400': { description: REVIEW_REASON_REQUIRED }
+        '403': { description: SELF_REVIEW_FORBIDDEN 或 LAST_EDITOR_REVIEW_FORBIDDEN }
+        '409': { description: VERSION_CONFLICT 或 MATERIAL_NOT_REVIEWABLE }
+components:
+  parameters:
+    MaterialId:
+      name: materialId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: { type: string }
+  schemas:
+    ReplaceDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, basic_fields, category_id, attributes]
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        category_id: { type: integer, minimum: 1 }
+        basic_fields:
+          type: object
+          additionalProperties: false
+          required:
+            - standard_name
+            - unit
+            - procurement_type
+            - inventory_type
+            - inspection_type
+            - environmental_requirement
+          properties:
+            standard_name: { type: string, minLength: 1, maxLength: 200 }
+            unit: { type: string, minLength: 1, maxLength: 32 }
+            brand: { type: string, maxLength: 200 }
+            manufacturer: { type: string, maxLength: 200 }
+            manufacturer_part_number: { type: string, maxLength: 200 }
+            procurement_type: { type: string }
+            inventory_type: { type: string }
+            lot_control_required: { type: boolean }
+            shelf_life_days: { type: [integer, 'null'], minimum: 0 }
+            inspection_type: { type: string }
+            environmental_requirement: { type: string }
+        attributes:
+          type: object
+          maxProperties: 128
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            required: [value]
+            properties:
+              value: {}
+              unit: { type: string, maxLength: 32 }
+              source: { type: string }
+              confidence: { type: number, minimum: 0, maximum: 1 }

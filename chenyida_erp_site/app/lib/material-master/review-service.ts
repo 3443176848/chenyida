@@ -193,7 +193,7 @@ class DefaultMaterialReviewService implements MaterialReviewService {
         "物料草稿版本已变化，请刷新后重试",
       );
     }
-    if (material.materialStatus !== "DRAFT" || material.internalMaterialCode !== null) {
+    if (material.materialStatus !== "PENDING_REVIEW" || material.internalMaterialCode !== null) {
       throw new MaterialMasterServiceError(
         "MATERIAL_DRAFT_NOT_REVIEWABLE",
         "当前物料状态不允许执行草稿审核",

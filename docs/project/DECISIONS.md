@@ -138,14 +138,14 @@
 ## D-013 草稿生命周期、当前职责字段与审核队列
 
 - 日期：2026-07-14
-- 状态：PROPOSED
-- 确认人：待项目负责人回复“规格确认”并确认 `draft-lifecycle-v1.md` 第 17 节九项选择
+- 状态：ACCEPTED
+- 确认人：项目负责人（2026-07-14 回复“规格确认”并逐项确认九项方案 A）
 - 背景：现有服务直接审核 `DRAFT`，数据库使用 `PENDING_APPROVAL`，没有编辑、提交、重新提交或独立审核队列；`updated_by` 会被审核动作覆盖，不能证明最后实质修改人。
-- 建议：采用 `DRAFT -> PENDING_REVIEW -> ACTIVE`，驳回回到 `DRAFT`；在聚合根增加 `last_modified_by`、`submitted_by`、`submitted_at`，历史继续追加到现有版本与变更日志；PATCH 使用完整可编辑聚合替换；审核者不得是创建人或最后实质修改人；审核队列只分页返回待审记录并按当前 metadata 提供有界校验摘要。
+- 决定：采用 `DRAFT -> PENDING_REVIEW -> ACTIVE`，驳回回到 `DRAFT`；在聚合根增加 `last_modified_by`、`submitted_by`、`submitted_at`，历史继续追加到现有版本、变更日志和 API 审计；PATCH 使用完整可编辑聚合替换；审核者不得是创建人或当前提交版本的最后实质修改人，`submitted_by` 不单独禁审；审核队列只分页返回待审记录并按当前 metadata 提供有界校验摘要。
 - 原因：在不引入多节点审核申请表的前提下形成可查询、可重提、可审计的单步生命周期，并保持正式编码只在最终批准事务生成。
-- 影响：确认后需要前向 migration 扩展状态和职责字段、允许 PATCH 幂等 method、增加待审队列索引，并调整 Draft/Review Service 与 Material API。扩展、回填、切换和收缩必须分步；生产 migration 和部署仍需单独授权。
+- 影响：非生产实现已新增 `0003`，扩展状态和职责字段、PATCH 幂等 method 与待审队列索引，并调整 Draft/Review Service 与 Material API。过渡期双读 `PENDING_APPROVAL`/`PENDING_REVIEW`，只写和只返回新状态；历史快照不改写；破坏性收缩另立任务。生产 migration 和部署仍需单独授权。
 
-在项目负责人确认前，本条不得作为实施或生产业务规则；完整方案和待确认选择见 `docs/material-master/draft-lifecycle-v1.md`。
+完整确认方案见 `docs/material-master/draft-lifecycle-v1.md`；本决策只授权非生产实现，不授权生产 migration、回填或部署。
 
 ## 待确认业务决策
 

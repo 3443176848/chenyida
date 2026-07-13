@@ -6,15 +6,15 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 17,969 行 | 沿用既有运行时源码口径；PHASE1-TASK06 净新增 1,633 行运行时/API/schema 源码，排除测试、migration、seed、依赖、构建缓存、生成物和文档 |
+| 总代码量 | 18,882 行 | 沿用既有运行时源码口径；PHASE1-TASK07 净新增 913 行运行时/API/schema 源码，排除测试、migration、seed、依赖、构建缓存、生成物和文档 |
 | 源码文件 | 61 | 既有 55 个基础上新增 Material API 五模块和共享 Validation 输入映射；测试文件另计 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK07 第一阶段只新增 1 份生命周期规格并更新项目文档；仓库仍无 mode `160000` |
+| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK07 已新增 `0003`、OpenAPI、迁移/并发测试并修改生命周期服务；仓库仍无 mode `160000` |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 48（开发 schema） | 本地 SQLite 26；在线既有 D1 8；V2 12；Material API 安全表 2；未执行生产迁移，不能理解为生产现状 |
-| 在线 API 路径 | 59 | 既有 54 个具体路径加本任务已实现的 5 个 Material 路由；生产公开站点尚未部署本提交 |
+| 在线 API 路径 | 61 | 既有 54 个具体路径加 7 个 Material 路径（草稿详情同时支持 GET/PATCH）；生产公开站点尚未部署本提交 |
 | 页面入口 | 3 | 本地 `static/index.html`、在线 `app/page.tsx`、在线 `public/erp/index.html` |
-| 测试与安全检查文件 | 17 | 新增 Material API migration 与 API 集成测试各 1 份；既有 smoke/安全脚本同步扩展 |
+| 测试与安全检查文件 | 18 | 新增 `0003` migration 测试，并扩展 Material API、服务并发和隔离 smoke |
 
 ## 当前版本与环境
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE1-TASK07` 开始时，根仓库 `main` 位于 `a736e60`，工作区干净；`chenyida_erp_site/` 不是嵌套仓库。当前阶段只修改生命周期规格和项目文档。
+`PHASE1-TASK07` 开始时，根仓库 `main` 位于 `a736e60`，工作区干净；前置设计提交为 `3dbf2b0`，`chenyida_erp_site/` 不是嵌套仓库。当前实施差异仅覆盖 TASK07 服务端生命周期、`0003`、隔离测试和项目文档。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE1-TASK07` 第一阶段提交消息为 `docs: design material draft lifecycle`；不修改 API、schema、migration 或业务代码，不创建生产版本、不推送、不部署。
+`PHASE1-TASK07` 第一阶段提交消息为 `docs: design material draft lifecycle`；本阶段提交消息为 `feat: add material draft lifecycle`。未创建生产版本、未推送、未连接或部署生产 D1。
 
 实时状态必须使用：
 
@@ -65,19 +65,20 @@ git -C chenyida_erp_site status --short
 - API、页面、测试或主要目录变化
 - 统计口径变化
 
-## PHASE1-TASK07 草稿生命周期设计状态
+## PHASE1-TASK07 草稿生命周期实施状态
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DOING | 第一阶段书面规格完成，等待项目负责人回复“规格确认”及确认九项设计选择；尚未开始实施 |
-| 规格文档 | WRITTEN | `docs/material-master/draft-lifecycle-v1.md` 覆盖状态机、编辑/提交/重新提交、审核队列、权限、职责分离、幂等并发、版本审计、migration 和测试 |
-| 状态命名 | PROPOSED | 推荐把存储状态由 `PENDING_APPROVAL` 分阶段统一为 `PENDING_REVIEW`；确认前不修改已执行 migration 或代码 |
-| 职责字段 | PROPOSED | 推荐新增 `last_modified_by`、`submitted_by`、`submitted_at`；`created_by` 与最后实质修改人均不得审核 |
-| API | DESIGNED | 拟议 PATCH 草稿、POST 提交、GET 审核队列，并把现有 approve/reject 收紧到只处理 `PENDING_REVIEW` |
-| 权限 | PROPOSED | 新增 edit-own/edit-any/submit/review-queue，admin/manager 可编辑任意草稿和审核，purchase/engineering 只编辑及提交自己的草稿 |
-| Migration | DESIGNED | 必须新增前向 migration；状态 CHECK 和 PATCH 幂等 method 按扩展、回填、切换、后续收缩分步处理 |
-| 代码/API/schema 变化 | NONE | 第一阶段未修改 `chenyida_erp_site/`、migration、页面、测试或业务行为 |
-| 非生产基线 | PASS | Site build、Node 58/58、lint 0 error/1 个既有 warning、一次性 D1 API smoke、189 文件凭证扫描及本地临时 SQLite 完整基线通过 |
+| 任务状态 | DONE | 九项方案 A 已确认、实现、验证并记录；等待人工验收 |
+| 规格文档 | APPROVED/IMPLEMENTED | 生命周期规格和 OpenAPI 明确 PATCH 非 Merge Patch、提交、队列、审核状态及稳定错误 |
+| 状态命名 | PASS | 新代码只写/只返回 `PENDING_REVIEW`；通用查询双读旧/新值；历史快照旧文字不改写 |
+| 职责字段 | PASS | 新增 `last_modified_by`、`submitted_by`、`submitted_at`；创建人永久禁审，当前版本最后修改人禁审，提交人本身不禁审 |
+| API | IMPLEMENTED | PATCH 完整替换、POST 提交、GET 审核队列已实现；approve/reject 只处理 `PENDING_REVIEW` |
+| 权限 | PASS | edit-own/edit-any/submit/review-queue 在服务端独立校验；admin/manager 无职责分离例外，purchase/engineering 仅自己的草稿 |
+| Migration | PASS | `0003`、Down、snapshot/journal、旧状态可恢复回填、失败预检、子表保全、约束、索引、空库 Down/重升通过 |
+| 代码/API/schema 变化 | IMPLEMENTED | 仅修改在线服务端生命周期、Schema、Migration、测试和文档；未开发页面或下游业务 |
+| 非生产基线 | PASS | Site build、Node 62/62、lint 0 error/1 个既有 warning、一次性 D1 API smoke、194 文件凭证扫描及本地临时 SQLite 完整基线通过 |
+| TypeScript 全量检查 | EXISTING FAILURE | TASK07 新增代码无类型错误；`db/schema.ts` 两组既有 Drizzle 自引用类型诊断仍保留，按范围要求未修复 |
 | 生产影响 | NONE | 未连接生产 D1、未迁移真实数据、未部署或修改生产配置 |
 
 ## PHASE1-TASK06 Draft/Review API 实施状态

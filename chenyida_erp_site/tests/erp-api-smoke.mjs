@@ -136,19 +136,23 @@ const materialReplay = await request("/api/material-master/drafts", {
 });
 assert.equal(materialReplay.response.headers.get("idempotency-replayed"), "true");
 assert.equal(materialReplay.payload.operation_id, materialDraft.operation_id);
+const submittedMaterial = (await request(`/api/material-master/drafts/${materialDraft.data.material_id}/submit`, {
+  method: "POST", body: { expected_version: 1, submit_comment: "烟测提交" },
+})).payload;
+assert.equal(submittedMaterial.data.material_status, "PENDING_REVIEW");
 const selfReview = await request(`/api/material-master/drafts/${materialDraft.data.material_id}/approve`, {
-  method: "POST", body: { expected_version: 1 }, expectedStatus: 403,
+  method: "POST", body: { expected_version: 2 }, expectedStatus: 403,
 });
 assert.equal(selfReview.payload.error.code, "SELF_REVIEW_FORBIDDEN");
 const approvedMaterial = (await request(`/api/material-master/drafts/${materialDraft.data.material_id}/approve`, {
   method: "POST",
-  body: { expected_version: 1, review_comment: "烟测审核通过" },
+  body: { expected_version: 2, review_comment: "烟测审核通过" },
   jar: managerJar,
 })).payload;
 assert.equal(approvedMaterial.data.material_status, "ACTIVE");
 assert.match(approvedMaterial.data.internal_material_code, /^CYD-PCB-FR4-\d{6}$/);
 const materialDetail = (await request(`/api/material-master/drafts/${materialDraft.data.material_id}`, { jar: managerJar })).payload;
-assert.equal(materialDetail.data.material.version, 2);
+assert.equal(materialDetail.data.material.version, 3);
 
 const backup = (await request("/api/backups/create", { method: "POST", body: {} })).payload.backup;
 assert.match(backup.name, /^erp-backup-/);

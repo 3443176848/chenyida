@@ -4,6 +4,18 @@
 
 ## 2026-07-14
 
+### PHASE1-TASK07 实施 - `feat: add material draft lifecycle`
+
+- Git Commit：实现、迁移、测试和项目文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，前置设计提交为 `3dbf2b0`。
+- 状态机：实现 `DRAFT -> PENDING_REVIEW -> ACTIVE` 和 `PENDING_REVIEW -> DRAFT`；驳回后允许完整替换编辑并重新提交，批准/驳回不再接受 `DRAFT`。
+- API：新增 PATCH 草稿完整可编辑聚合替换、POST 提交和 GET 审核队列；补充 OpenAPI 非 Merge Patch 契约、稳定状态错误、默认分页/排序、allowlist 筛选和当前 metadata 校验摘要。
+- 权限与职责：新增 edit-own/edit-any/submit/review-queue；提交同时校验 own/edit-any；创建人永久禁审、当前提交版本最后修改人禁审，无 admin 例外，`submitted_by` 本身不构成禁审。
+- 数据库：新增 `0003_material_draft_lifecycle.sql`、受保护 Down 和 Drizzle snapshot/journal；增加三个职责字段、双状态过渡约束、PATCH 幂等 method 和四个审核队列索引；可验证旧待审数据回填，无法恢复职责时预检失败，历史快照不改写。
+- 并发与安全：PATCH、submit、approve、reject 继续使用严格 Origin/CSRF、24 小时幂等、60/20 限流和乐观锁；业务、属性、版本、变更日志、幂等完成与 API 成功审计在单一 D1 batch 提交。并发 PATCH/提交/审核均验证仅一个成功。
+- 测试：build 和 Node 62/62 通过；lint 0 error/1 个既有 warning；`0003` 升级、失败预检、约束、索引、空库 Down/重升、完整生命周期、职责分离、N+1 边界及一次性 D1 smoke 通过；194 文件凭证扫描和本地临时 SQLite 基线通过。
+- 已知限制：过渡 schema 仍接受 `PENDING_APPROVAL`，破坏性收缩必须另建任务；无页面、多级审核、break-glass、导入、AI、真实物料迁移或下游业务修改；既有 Drizzle 自引用 TypeScript 诊断未在本任务修复。
+- 生产影响：无；未连接生产 D1、未迁移真实物料、未部署或修改生产配置。
+
 ### PHASE1-TASK07 设计评审 - `docs: design material draft lifecycle`
 
 - Git Commit：第一阶段书面规格和项目文档在独立提交完成，实际哈希以根仓库 `git log -1` 为准；规格确认前停止实施。

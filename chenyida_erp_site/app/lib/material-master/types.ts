@@ -34,13 +34,15 @@ export type MaterialProcurementType = (typeof MATERIAL_PROCUREMENT_TYPES)[number
 export type MaterialInventoryType = (typeof MATERIAL_INVENTORY_TYPES)[number];
 export type MaterialInspectionType = (typeof MATERIAL_INSPECTION_TYPES)[number];
 export type MaterialEnvironmentalRequirement = (typeof MATERIAL_ENVIRONMENTAL_REQUIREMENTS)[number];
-export type MaterialStatus = "DRAFT" | "PENDING_APPROVAL" | "ACTIVE" | "FROZEN" | "INACTIVE";
+export type MaterialStatus = "DRAFT" | "PENDING_APPROVAL" | "PENDING_REVIEW" | "ACTIVE" | "FROZEN" | "INACTIVE";
 
-export type MaterialMasterAction = "CREATE_DRAFT" | "APPROVE" | "REJECT" | "CODE_GENERATE";
-export type MaterialChangeType = "CREATE" | "APPROVAL" | "REJECTION" | "CODE_ASSIGNMENT";
+export type MaterialMasterAction = "CREATE_DRAFT" | "EDIT_DRAFT" | "SUBMIT_DRAFT" | "APPROVE" | "REJECT" | "CODE_GENERATE";
+export type MaterialChangeType = "CREATE" | "UPDATE" | "STATUS_CHANGE" | "APPROVAL" | "REJECTION" | "CODE_ASSIGNMENT";
 
 export const MATERIAL_ACTION_CHANGE_TYPES: Readonly<Record<MaterialMasterAction, MaterialChangeType>> = {
   CREATE_DRAFT: "CREATE",
+  EDIT_DRAFT: "UPDATE",
+  SUBMIT_DRAFT: "STATUS_CHANGE",
   APPROVE: "APPROVAL",
   REJECT: "REJECTION",
   CODE_GENERATE: "CODE_ASSIGNMENT",
@@ -55,7 +57,7 @@ export type MaterialOperationContext = Readonly<{
 export type MaterialApiTransactionCompanion = Readonly<{
   idempotencyRecordId: number;
   username: string;
-  routeCode: "MATERIAL_DRAFT_CREATE" | "MATERIAL_DRAFT_APPROVE" | "MATERIAL_DRAFT_REJECT";
+  routeCode: "MATERIAL_DRAFT_CREATE" | "MATERIAL_DRAFT_EDIT" | "MATERIAL_DRAFT_SUBMIT" | "MATERIAL_DRAFT_APPROVE" | "MATERIAL_DRAFT_REJECT";
   physicalRequestId: string;
   operationId: string;
   keyDigest: string;
@@ -91,6 +93,34 @@ export type ReviewMaterialDraftCommand = Readonly<{
   material_id: number;
   expected_version: number;
   reason?: string;
+  context: MaterialOperationContext;
+}>;
+
+export type EditMaterialDraftCommand = Readonly<{
+  material_id: number;
+  expected_version: number;
+  category_id: number;
+  basic_fields: Readonly<{
+    standard_name: unknown;
+    unit: unknown;
+    brand?: unknown;
+    manufacturer?: unknown;
+    manufacturer_part_number?: unknown;
+    procurement_type: unknown;
+    inventory_type: unknown;
+    lot_control_required?: unknown;
+    shelf_life_days?: unknown;
+    inspection_type: unknown;
+    environmental_requirement: unknown;
+  }>;
+  attributes: Readonly<Record<string, MaterialAttributeInput>>;
+  context: MaterialOperationContext;
+}>;
+
+export type SubmitMaterialDraftCommand = Readonly<{
+  material_id: number;
+  expected_version: number;
+  submit_comment?: string;
   context: MaterialOperationContext;
 }>;
 
@@ -161,6 +191,9 @@ export type MaterialRecord = Readonly<{
   fields: MaterialDraftFields;
   materialStatus: MaterialStatus;
   version: number;
+  lastModifiedBy: string;
+  submittedBy: string;
+  submittedAt: string | null;
   approvedBy: string;
   approvedAt: string | null;
   createdBy: string;
@@ -191,6 +224,34 @@ export type CreateDraftWrite = Readonly<{
   createdAt: string;
   requestId: string;
   metadataGuard: string;
+  snapshotJson: string;
+  transactionCompanion?: MaterialApiTransactionCompanion;
+}>;
+
+export type EditDraftWrite = Readonly<{
+  materialId: number;
+  expectedVersion: number;
+  fields: MaterialDraftFields;
+  attributes: readonly MaterialAttributeValueWrite[];
+  changedFields: readonly string[];
+  changedBy: string;
+  changedAt: string;
+  requestId: string;
+  metadataGuard: string;
+  snapshotJson: string;
+  oldSnapshotJson: string;
+  validationSummary: Readonly<{ valid: true; errorCount: 0; warningCount: number }>;
+  transactionCompanion?: MaterialApiTransactionCompanion;
+}>;
+
+export type SubmitDraftWrite = Readonly<{
+  materialId: number;
+  expectedVersion: number;
+  submittedBy: string;
+  submittedAt: string;
+  requestId: string;
+  comment: string;
+  reviewGuard: string;
   snapshotJson: string;
   transactionCompanion?: MaterialApiTransactionCompanion;
 }>;
@@ -245,6 +306,9 @@ export type MaterialMasterServiceErrorCode =
   | "MATERIAL_ATTRIBUTE_STORAGE_METADATA_CONFLICT"
   | "MATERIAL_DRAFT_NOT_FOUND"
   | "MATERIAL_DRAFT_NOT_REVIEWABLE"
+  | "MATERIAL_DRAFT_NOT_EDITABLE"
+  | "MATERIAL_DRAFT_NOT_CHANGED"
+  | "MATERIAL_DRAFT_NOT_SUBMITTABLE"
   | "MATERIAL_VERSION_CONFLICT"
   | "MATERIAL_CODE_RULE_NOT_FOUND"
   | "MATERIAL_CODE_RULE_AMBIGUOUS"
@@ -294,6 +358,8 @@ export class MaterialMasterRepositoryError extends Error {
 export interface MaterialMasterRepository {
   getAttributeStorageDefinitions(categoryId: number): Promise<MaterialAttributeStorageSnapshot>;
   createDraft(input: CreateDraftWrite): Promise<MaterialRecord>;
+  editDraft(input: EditDraftWrite): Promise<MaterialRecord>;
+  submitDraft(input: SubmitDraftWrite): Promise<MaterialRecord>;
   getMaterialForReview(materialId: number): Promise<MaterialRecord | null>;
   getApplicableCodeRules(categoryId: number, effectiveDate: string): Promise<readonly MaterialCodeRule[]>;
   materialCodeExists(code: string): Promise<boolean>;
@@ -309,6 +375,8 @@ export interface MaterialMasterRepository {
 
 export interface MaterialDraftService {
   createDraft(command: CreateMaterialDraftCommand): Promise<MaterialDraftResult>;
+  editDraft(command: EditMaterialDraftCommand): Promise<MaterialDraftResult>;
+  submitDraft(command: SubmitMaterialDraftCommand): Promise<MaterialDraftResult>;
 }
 
 export interface MaterialCodeService {

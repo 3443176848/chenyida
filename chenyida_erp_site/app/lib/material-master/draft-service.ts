@@ -1,4 +1,5 @@
 import type { MaterialValidationInput } from "../material-validation/index.ts";
+import { materialRecordToValidationInput } from "./validation-input.ts";
 import {
   MATERIAL_ENVIRONMENTAL_REQUIREMENTS,
   MATERIAL_INSPECTION_TYPES,
@@ -8,6 +9,7 @@ import {
   MaterialMasterRepositoryError,
   MaterialMasterServiceError,
   type CreateMaterialDraftCommand,
+  type EditMaterialDraftCommand,
   type MaterialAttributeStorageDefinition,
   type MaterialAttributeStorageSnapshot,
   type MaterialAttributeValueWrite,
@@ -16,6 +18,8 @@ import {
   type MaterialDraftService,
   type MaterialMasterServiceDependencies,
   type MaterialSourceType,
+  type MaterialRecord,
+  type SubmitMaterialDraftCommand,
 } from "./types.ts";
 
 const SOURCE_TYPES = new Set<string>(MATERIAL_SOURCE_TYPES);
@@ -243,6 +247,13 @@ function serializeAttribute(
 function buildSnapshot(
   fields: MaterialDraftFields,
   attributes: readonly MaterialAttributeValueWrite[],
+  options: Readonly<{
+    version?: number;
+    status?: "DRAFT" | "PENDING_REVIEW";
+    lastModifiedBy?: string;
+    submittedBy?: string;
+    submittedAt?: string | null;
+  }> = {},
 ): string {
   const attributeSnapshot = Object.fromEntries(
     attributes.map((attribute) => [
@@ -272,9 +283,126 @@ function buildSnapshot(
     environmental_requirement: fields.environmentalRequirement,
     source_type: fields.sourceType,
     source_ref: fields.sourceRef,
-    material_status: "DRAFT",
-    version: 1,
+    material_status: options.status ?? "DRAFT",
+    version: options.version ?? 1,
+    last_modified_by: options.lastModifiedBy,
+    submitted_by: options.submittedBy ?? "",
+    submitted_at: options.submittedAt ?? null,
     attributes: attributeSnapshot,
+  });
+}
+
+function recordSnapshot(material: MaterialRecord): string {
+  return JSON.stringify({
+    id: material.id,
+    internal_material_code: material.internalMaterialCode,
+    category_id: material.fields.categoryId,
+    standard_name: material.fields.standardName,
+    base_uom: material.fields.baseUom,
+    brand: material.fields.brand,
+    manufacturer: material.fields.manufacturer,
+    manufacturer_part_number: material.fields.manufacturerPartNumber,
+    procurement_type: material.fields.procurementType,
+    inventory_type: material.fields.inventoryType,
+    lot_control_required: material.fields.lotControlRequired === 1,
+    shelf_life_days: material.fields.shelfLifeDays,
+    inspection_type: material.fields.inspectionType,
+    environmental_requirement: material.fields.environmentalRequirement,
+    source_type: material.fields.sourceType,
+    source_ref: material.fields.sourceRef,
+    material_status: material.materialStatus,
+    version: material.version,
+    last_modified_by: material.lastModifiedBy,
+    submitted_by: material.submittedBy,
+    submitted_at: material.submittedAt,
+    attributes: Object.fromEntries(material.attributes.map((attribute) => [
+      attribute.attributeCode,
+      { value: attribute.value, unit: attribute.unit, source_type: attribute.sourceType },
+    ])),
+  });
+}
+
+function editableSignature(
+  fields: MaterialDraftFields,
+  attributes: readonly MaterialAttributeValueWrite[],
+): string {
+  return JSON.stringify({
+    fields,
+    attributes: [...attributes].sort((a, b) => a.attributeCode.localeCompare(b.attributeCode)).map((a) => ({
+      code: a.attributeCode,
+      value: a.rawValue,
+      unit: a.unitCode,
+      source: a.sourceType,
+    })),
+  });
+}
+
+function currentEditableSignature(material: MaterialRecord): string {
+  return JSON.stringify({
+    fields: material.fields,
+    attributes: [...material.attributes].sort((a, b) => a.attributeCode.localeCompare(b.attributeCode)).map((a) => ({
+      code: a.attributeCode,
+      value: a.value,
+      unit: a.unit,
+      source: a.sourceType,
+    })),
+  });
+}
+
+function assertMaterialIdAndVersion(materialId: number, expectedVersion: number): void {
+  if (!Number.isSafeInteger(materialId) || materialId <= 0) {
+    inputError("material_id", "物料 ID 必须是正整数");
+  }
+  if (!Number.isSafeInteger(expectedVersion) || expectedVersion <= 0) {
+    inputError("expected_version", "预期版本必须是正整数");
+  }
+}
+
+function normalizeComment(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (typeof value !== "string") inputError("submit_comment", "提交说明必须是字符串");
+  const comment = (value as string).trim();
+  if (comment.length > 1000 || /[\u0000-\u001F\u007F]/u.test(comment)) {
+    inputError("submit_comment", "提交说明包含非法字符或超过 1000 字符");
+  }
+  return comment;
+}
+
+function serializeAttributes(
+  input: Readonly<Record<string, CreateMaterialDraftCommand["attributes"][string]>>,
+  fields: MaterialDraftFields,
+  storageSnapshot: MaterialAttributeStorageSnapshot,
+): readonly MaterialAttributeValueWrite[] {
+  if (storageSnapshot.categoryLevel !== 4 || storageSnapshot.categoryStatus !== "ACTIVE") {
+    throw new MaterialMasterServiceError(
+      "MATERIAL_ATTRIBUTE_STORAGE_METADATA_CONFLICT",
+      "物料分类 metadata 在校验后发生变化",
+      { details: { category_id: fields.categoryId } },
+    );
+  }
+  const missingRequired = storageSnapshot.definitions.find(
+    (definition) => definition.isRequired && !(definition.code in input),
+  );
+  if (missingRequired) {
+    throw new MaterialMasterServiceError(
+      "MATERIAL_ATTRIBUTE_STORAGE_METADATA_CONFLICT",
+      "必填属性 metadata 在校验后发生变化",
+      { details: { attribute_code: missingRequired.code } },
+    );
+  }
+  const definitionsByCode = new Map(
+    storageSnapshot.definitions.map((definition) => [definition.code, definition]),
+  );
+  return Object.entries(input).map(([code, entry]) => {
+    const definition = definitionsByCode.get(code);
+    if (!definition) {
+      throw new MaterialMasterServiceError(
+        "MATERIAL_ATTRIBUTE_STORAGE_METADATA_CONFLICT",
+        "属性 metadata 在校验后发生变化",
+        { details: { attribute_code: code } },
+      );
+    }
+    return serializeAttribute(definition, entry, fields);
   });
 }
 
@@ -382,6 +510,165 @@ class DefaultMaterialDraftService implements MaterialDraftService {
         );
       }
       throw new MaterialMasterServiceError("MATERIAL_WRITE_FAILED", "物料草稿创建失败");
+    }
+  }
+
+  async editDraft(command: EditMaterialDraftCommand): Promise<MaterialDraftResult> {
+    assertMaterialIdAndVersion(command.material_id, command.expected_version);
+    const actor = requiredString(command.context.actor, "context.actor");
+    const requestId = requiredString(command.context.request_id, "context.request_id");
+    let current: MaterialRecord | null;
+    try {
+      current = await this.dependencies.repository.getMaterialForReview(command.material_id);
+    } catch {
+      throw new MaterialMasterServiceError("MATERIAL_WRITE_FAILED", "物料草稿读取失败");
+    }
+    if (!current) throw new MaterialMasterServiceError("MATERIAL_DRAFT_NOT_FOUND", "物料草稿不存在");
+    if (current.version !== command.expected_version) {
+      throw new MaterialMasterServiceError("MATERIAL_VERSION_CONFLICT", "物料草稿版本已变化");
+    }
+    if (current.materialStatus !== "DRAFT" || current.internalMaterialCode !== null) {
+      throw new MaterialMasterServiceError("MATERIAL_DRAFT_NOT_EDITABLE", "当前物料状态不允许编辑");
+    }
+
+    const createShape: CreateMaterialDraftCommand = {
+      basic_fields: {
+        ...command.basic_fields,
+        category_id: command.category_id,
+        source_ref: current.fields.sourceRef,
+      },
+      attributes: command.attributes,
+      source_type: current.fields.sourceType,
+      context: command.context,
+    };
+    const validationInput: MaterialValidationInput = {
+      category_id: command.category_id,
+      basic_fields: {
+        standard_name: command.basic_fields.standard_name,
+        unit: command.basic_fields.unit,
+        source_type: current.fields.sourceType,
+      },
+      attributes: command.attributes,
+    };
+    let validation;
+    try {
+      validation = await this.dependencies.validationService.validateForCreate(validationInput);
+    } catch {
+      throw new MaterialMasterServiceError("MATERIAL_CREATE_VALIDATION_FAILED", "当前 metadata 不可用，草稿未保存");
+    }
+    if (!validation.valid) {
+      throw new MaterialMasterServiceError("MATERIAL_CREATE_VALIDATION_FAILED", "物料草稿未通过编辑校验", { validation });
+    }
+    const fields = normalizeFields(createShape);
+    let storageSnapshot: MaterialAttributeStorageSnapshot;
+    try {
+      storageSnapshot = await this.dependencies.repository.getAttributeStorageDefinitions(fields.categoryId);
+    } catch {
+      throw new MaterialMasterServiceError("MATERIAL_WRITE_FAILED", "物料属性 metadata 暂时不可用");
+    }
+    try {
+      validation = await this.dependencies.validationService.validateForCreate(validationInput);
+    } catch {
+      throw new MaterialMasterServiceError("MATERIAL_CREATE_VALIDATION_FAILED", "当前 metadata 不可用，草稿未保存");
+    }
+    if (!validation.valid) {
+      throw new MaterialMasterServiceError("MATERIAL_CREATE_VALIDATION_FAILED", "物料草稿未通过编辑复核", { validation });
+    }
+    const attributes = serializeAttributes(command.attributes, fields, storageSnapshot);
+    if (editableSignature(fields, attributes) === currentEditableSignature(current)) {
+      throw new MaterialMasterServiceError("MATERIAL_DRAFT_NOT_CHANGED", "草稿没有实质变化");
+    }
+    const changedFields = [
+      ...(fields.categoryId !== current.fields.categoryId ? ["category_id"] : []),
+      ...(JSON.stringify({ ...fields, categoryId: undefined, sourceType: undefined, sourceRef: undefined }) !==
+      JSON.stringify({ ...current.fields, categoryId: undefined, sourceType: undefined, sourceRef: undefined }) ? ["basic_fields"] : []),
+      ...(JSON.stringify([...attributes].map((a) => [a.attributeCode, a.rawValue, a.unitCode, a.sourceType]).sort()) !==
+      JSON.stringify([...current.attributes].map((a) => [a.attributeCode, a.value, a.unit, a.sourceType]).sort()) ? ["attributes"] : []),
+    ];
+    const changedAt = timestamp(this.dependencies.clock);
+    try {
+      const material = await this.dependencies.repository.editDraft({
+        materialId: current.id,
+        expectedVersion: command.expected_version,
+        fields,
+        attributes,
+        changedFields,
+        changedBy: actor,
+        changedAt,
+        requestId,
+        metadataGuard: storageSnapshot.metadataGuard,
+        oldSnapshotJson: recordSnapshot(current),
+        validationSummary: { valid: true, errorCount: 0, warningCount: validation.warnings.length },
+        snapshotJson: buildSnapshot(fields, attributes, {
+          version: command.expected_version + 1,
+          lastModifiedBy: actor,
+          submittedBy: current.submittedBy,
+          submittedAt: current.submittedAt,
+        }),
+        transactionCompanion: command.context.transaction_companion,
+      });
+      return { material, validation };
+    } catch (error) {
+      if (error instanceof MaterialMasterRepositoryError && error.kind === "MATERIAL_VERSION_CONFLICT") {
+        throw new MaterialMasterServiceError("MATERIAL_VERSION_CONFLICT", "物料草稿版本或状态已变化");
+      }
+      throw new MaterialMasterServiceError("MATERIAL_WRITE_FAILED", "物料草稿编辑事务失败");
+    }
+  }
+
+  async submitDraft(command: SubmitMaterialDraftCommand): Promise<MaterialDraftResult> {
+    assertMaterialIdAndVersion(command.material_id, command.expected_version);
+    const actor = requiredString(command.context.actor, "context.actor");
+    const requestId = requiredString(command.context.request_id, "context.request_id");
+    const comment = normalizeComment(command.submit_comment);
+    let current: MaterialRecord | null;
+    try {
+      current = await this.dependencies.repository.getMaterialForReview(command.material_id);
+    } catch {
+      throw new MaterialMasterServiceError("MATERIAL_WRITE_FAILED", "物料草稿读取失败");
+    }
+    if (!current) throw new MaterialMasterServiceError("MATERIAL_DRAFT_NOT_FOUND", "物料草稿不存在");
+    if (current.version !== command.expected_version) {
+      throw new MaterialMasterServiceError("MATERIAL_VERSION_CONFLICT", "物料草稿版本已变化");
+    }
+    if (current.materialStatus !== "DRAFT" || current.internalMaterialCode !== null) {
+      throw new MaterialMasterServiceError("MATERIAL_DRAFT_NOT_SUBMITTABLE", "当前物料状态不允许提交审核");
+    }
+    let validation;
+    try {
+      validation = await this.dependencies.validationService.validateForReview(
+        materialRecordToValidationInput(current),
+      );
+    } catch {
+      throw new MaterialMasterServiceError("MATERIAL_REVIEW_VALIDATION_FAILED", "当前 metadata 不可用，提交已阻断");
+    }
+    if (!validation.valid) {
+      throw new MaterialMasterServiceError("MATERIAL_REVIEW_VALIDATION_FAILED", "物料草稿未通过提交审核校验", { validation });
+    }
+    const submittedAt = timestamp(this.dependencies.clock);
+    const snapshot = JSON.parse(recordSnapshot(current)) as Record<string, unknown>;
+    snapshot.material_status = "PENDING_REVIEW";
+    snapshot.version = command.expected_version + 1;
+    snapshot.submitted_by = actor;
+    snapshot.submitted_at = submittedAt;
+    try {
+      const material = await this.dependencies.repository.submitDraft({
+        materialId: current.id,
+        expectedVersion: command.expected_version,
+        submittedBy: actor,
+        submittedAt,
+        requestId,
+        comment,
+        reviewGuard: current.reviewGuard,
+        snapshotJson: JSON.stringify(snapshot),
+        transactionCompanion: command.context.transaction_companion,
+      });
+      return { material, validation };
+    } catch (error) {
+      if (error instanceof MaterialMasterRepositoryError && error.kind === "MATERIAL_VERSION_CONFLICT") {
+        throw new MaterialMasterServiceError("MATERIAL_VERSION_CONFLICT", "物料草稿版本或状态已变化");
+      }
+      throw new MaterialMasterServiceError("MATERIAL_WRITE_FAILED", "物料草稿提交事务失败");
     }
   }
 }
