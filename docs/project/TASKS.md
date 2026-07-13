@@ -22,7 +22,13 @@
 | PHASE1-TASK04 | 建立 Material Master V2 物料校验服务 | DONE | Codex（执行）、项目负责人（设计与书面规格确认） | 2026-07-12 | 2026-07-12 | PHASE1-TASK03 | Repository + Rules + Service 三层实现按 D1 metadata 返回 25 个结构化 code；Memory 与隔离 D1 metadata 变化测试共 28 个，全量 Node 40/40；未接 API、未创建真实物料、未访问生产 |
 | PHASE1-TASK05 | 建立 Material Master Draft 创建与审核写服务 | DONE | Codex（执行）、项目负责人（任务规格与编码时点确认） | 2026-07-12 | 2026-07-13 | PHASE1-TASK04 | 新增 Draft/Review/Code 六模块，以 D1 batch 原子写草稿、属性、版本、审计和审核编码；乐观锁、规则 CAS、metadata/属性守卫及 12 个隔离 D1 用例通过，全量 Node 52/52；未接 API、未改 migration、未访问生产 |
 
-当前无 `DOING` 任务。PHASE1-TASK05 已完成草稿/审核写服务，但认证授权 API、页面、导入适配和生产操作尚未开始；`PHASE0-TASK03` 仍在台账中等待后续安排。
+## 当前任务
+
+| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| PHASE1-TASK06 | 设计并实现受认证授权的 Material Master Draft/Review API | DOING | Codex（设计）、项目负责人（规格与业务决策确认） | 2026-07-13 | - | PHASE1-TASK05 | 第一阶段书面规格已写入 `draft-review-api-v1.md`；当前等待“规格确认”和审核角色、自审、多节点、保留期等选择，未经确认不得修改 API、schema、migration 或业务代码 |
+
+当前唯一 `DOING` 任务为 `PHASE1-TASK06`，且只完成第一阶段设计。范围冻结为五个 Draft/Review 路由、现有会话认证、细粒度权限、CSRF、持久幂等、乐观锁适配、只读 Query Service、错误/审计和隔离测试；禁止页面、导入、AI、下游业务、legacy SQLite、生产 D1 和部署。`PHASE0-TASK03` 仍在台账中等待后续安排。
 
 ## Phase 0 待办
 

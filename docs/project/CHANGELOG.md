@@ -4,6 +4,17 @@
 
 ## 2026-07-13
 
+### PHASE1-TASK06 设计评审 - `docs: design material draft and review api`
+
+- Git Commit：第一阶段书面规格和项目文档在独立提交完成，实际哈希以根仓库 `git log -1` 为准；规格确认前停止实施。
+- 新增功能：无；当前只完成受认证授权 Draft/Review API V1 书面设计。
+- 修改功能：无；未修改现有 Draft/Review/Validation Service、API、页面或 legacy 运行面。
+- 数据库变化：无；只提出后续新增 `0002`、专用 `material_api_idempotency`、有界速率桶、关系化通用审计字段、列表/审计索引和隔离迁移测试，未创建 migration 或连接 D1。
+- API 变化：无已实现路由；规格拟议创建、列表、详情、批准、驳回 5 个路由，明确现有会话认证、细粒度权限、Origin/CSRF、持久幂等、乐观锁和稳定错误映射。
+- 文档变化：新增 `docs/material-master/draft-review-api-v1.md`；D-012 记录为 `PROPOSED`；同步登记唯一 DOING 任务、风险、下一步和验证状态。
+- 待确认：审核角色、创建人自审、多节点审核边界、批准/驳回角色是否相同、幂等与审计保留期、写速率阈值及人工 API 来源范围。
+- 验证：Site build、Node 52/52、lint（0 error/1 个既有 warning）、一次性 D1 API smoke、177 文件凭证检查通过；本地环境守卫 4/4、self-test、smoke、backup/restore、临时 SQLite go-live 检查通过；`git diff --check` 通过。未连接生产 D1。
+
 ### PHASE1-TASK05 - `feat: add material draft and review service`
 
 - Git Commit：规格、实现、测试和项目文档在本任务独立提交完成，实际哈希以根仓库 `git log -1` 为准。
