@@ -4,6 +4,18 @@
 
 ## 2026-07-14
 
+### PHASE1-TASK07 设计评审 - `docs: design material draft lifecycle`
+
+- Git Commit：第一阶段书面规格和项目文档在独立提交完成，实际哈希以根仓库 `git log -1` 为准；规格确认前停止实施。
+- 新增功能：无；当前只完成草稿生命周期、重新提交和审核队列 V1 书面设计。
+- 修改功能：无；未修改现有 Validation、Draft/Review Service、Material API、页面或 legacy 运行面。
+- 数据库变化：无；规格提出后续前向 migration 增加 `last_modified_by`、`submitted_by`、`submitted_at`，分步统一 `PENDING_REVIEW`，扩展 PATCH 幂等 method 并增加审核队列索引，当前未创建或执行 migration。
+- API 变化：无已实现路由；规格拟议 PATCH 草稿、POST 提交和 GET 审核队列，并收紧批准/驳回只能操作 `PENDING_REVIEW`。
+- 权限与职责：拟议 edit-own/edit-any/submit/review-queue 权限；所有角色继续禁止创建人自审，并新增最后实质修改人不得审核当前版本。
+- 文档变化：新增 `docs/material-master/draft-lifecycle-v1.md`；D-013 记录为 `PROPOSED`；同步登记唯一 DOING 任务、风险和下一步。
+- 待确认：当前职责字段方案、物理状态更名、PATCH 完整替换、编辑 Validation 阻断、提交人审核、队列校验口径、提交说明、权限矩阵和 migration 分步方案。
+- 验证：Site build 和 Node 58/58 通过；lint 0 error/1 个既有 warning；一次性 Miniflare API smoke、189 文件凭证扫描通过；本地临时 SQLite 环境守卫 4/4、self-test、smoke、backup/restore 和 `go_live_check --no-backup` 通过；`git diff --check` 通过。未连接生产 D1。
+
 ### PHASE1-TASK06 实施 - `feat: add material draft and review api`
 
 - Git Commit：实现、迁移、测试和项目文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，前置设计提交为 `e55318c`。

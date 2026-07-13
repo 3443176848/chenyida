@@ -135,6 +135,18 @@
 - 原因：不复制登录或物料业务规则，同时消除未知 POST 回退 `read`、同 Key 异载荷、并发双执行和业务提交后无幂等记录的窗口。
 - 影响：已新增 `0002` Up/Down、schema/snapshot/journal、精确权限、CSRF、持久幂等、有界限流、审计扩展、只读 Query Service 和隔离 API 测试；未修改 `0000`/`0001`，未连接或部署生产。多节点会签、break-glass、自动生产审计归档/清理调度仍为后续独立任务。
 
+## D-013 草稿生命周期、当前职责字段与审核队列
+
+- 日期：2026-07-14
+- 状态：PROPOSED
+- 确认人：待项目负责人回复“规格确认”并确认 `draft-lifecycle-v1.md` 第 17 节九项选择
+- 背景：现有服务直接审核 `DRAFT`，数据库使用 `PENDING_APPROVAL`，没有编辑、提交、重新提交或独立审核队列；`updated_by` 会被审核动作覆盖，不能证明最后实质修改人。
+- 建议：采用 `DRAFT -> PENDING_REVIEW -> ACTIVE`，驳回回到 `DRAFT`；在聚合根增加 `last_modified_by`、`submitted_by`、`submitted_at`，历史继续追加到现有版本与变更日志；PATCH 使用完整可编辑聚合替换；审核者不得是创建人或最后实质修改人；审核队列只分页返回待审记录并按当前 metadata 提供有界校验摘要。
+- 原因：在不引入多节点审核申请表的前提下形成可查询、可重提、可审计的单步生命周期，并保持正式编码只在最终批准事务生成。
+- 影响：确认后需要前向 migration 扩展状态和职责字段、允许 PATCH 幂等 method、增加待审队列索引，并调整 Draft/Review Service 与 Material API。扩展、回填、切换和收缩必须分步；生产 migration 和部署仍需单独授权。
+
+在项目负责人确认前，本条不得作为实施或生产业务规则；完整方案和待确认选择见 `docs/material-master/draft-lifecycle-v1.md`。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
