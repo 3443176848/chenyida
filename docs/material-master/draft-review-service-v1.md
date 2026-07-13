@@ -231,6 +231,9 @@ prefix + separator + major_segment + separator + minor_segment
 - `MATERIAL_REVIEW_VALIDATION_FAILED`
 - `MATERIAL_DRAFT_INPUT_INVALID`
 - `MATERIAL_ATTRIBUTE_STORAGE_INVALID`
+- `MATERIAL_ATTRIBUTE_VALUE_INVALID`
+- `MATERIAL_ATTRIBUTE_STORAGE_METADATA_INVALID`
+- `MATERIAL_ATTRIBUTE_STORAGE_METADATA_CONFLICT`
 - `MATERIAL_DRAFT_NOT_FOUND`
 - `MATERIAL_DRAFT_NOT_REVIEWABLE`
 - `MATERIAL_VERSION_CONFLICT`
@@ -290,3 +293,5 @@ prefix + separator + major_segment + separator + minor_segment
 - `npm run lint` 为 0 error，保留 1 个任务外既有 warning；隔离 API smoke、凭证检查和 `git diff --check` 通过。
 - TypeScript 全量检查仍只报告 `db/schema.ts` 第 129、243 行既有 Drizzle 自引用错误；新增模块没有类型错误。
 - 未接入 API、页面、导入、AI 或下游业务，未修改 schema/migration，未访问生产 D1 或部署。
+
+`PHASE1-TASK06` 接入 API 时仅收窄了属性存储错误分类：客户端小数精度问题使用 `MATERIAL_ATTRIBUTE_VALUE_INVALID`，无效存储 metadata 使用 `MATERIAL_ATTRIBUTE_STORAGE_METADATA_INVALID`，校验后 metadata 竞态使用 `MATERIAL_ATTRIBUTE_STORAGE_METADATA_CONFLICT`；旧 `MATERIAL_ATTRIBUTE_STORAGE_INVALID` 继续作为兼容性 fail-closed code。未改变校验、属性存储、状态或编码业务语义。

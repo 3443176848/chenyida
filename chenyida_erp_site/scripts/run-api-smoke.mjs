@@ -2,13 +2,14 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { assertSafeTestTarget, redactSensitiveText } from "./environment.mjs";
 
 const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
 const vinextCli = join(siteRoot, "node_modules", "vinext", "dist", "cli.js");
 const smokeScript = join(siteRoot, "tests", "erp-api-smoke.mjs");
+const wranglerCli = join(siteRoot, "node_modules", "wrangler", "bin", "wrangler.js");
 
 function randomId() {
   return `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
@@ -109,6 +110,37 @@ async function main() {
   const serverOutput = [];
   try {
     await mkdir(join(tempRoot, "logs"), { recursive: true });
+    const d1Config = join(tempRoot, "wrangler.jsonc");
+    await writeFile(d1Config, JSON.stringify({
+      name: "chenyida-erp-api-smoke",
+      compatibility_date: "2026-07-14",
+      d1_databases: [{
+        binding: "DB",
+        database_name: "site-creator-d1",
+        database_id: "00000000-0000-4000-8000-000000000000",
+        migrations_dir: join(siteRoot, "drizzle"),
+      }],
+    }), "utf8");
+    const migrate = spawnSync(process.execPath, [
+      wranglerCli, "d1", "migrations", "apply", "DB", "--config", d1Config,
+      "--local", "--persist-to", d1Path,
+    ], { cwd: siteRoot, env, windowsHide: true, encoding: "utf8" });
+    if (migrate.status !== 0) throw new Error(`isolated D1 migration failed with code ${migrate.status}`);
+    const seedSql = `
+      INSERT INTO material_categories(id,category_code,category_name_cn,category_level,status,created_by,updated_by,request_id)
+      VALUES(9901,'FR4_SMOKE','FR4烟测',4,'ACTIVE','test','test','smoke-seed');
+      INSERT INTO material_attribute_definitions(id,attribute_code,attribute_name_cn,data_type,decimal_scale,canonical_unit,allowed_values_json,normalization_rule,status,created_by,updated_by,request_id)
+      VALUES(9911,'THICKNESS','厚度','DECIMAL',3,'mm','[]','DECIMAL_SCALE','ACTIVE','test','test','smoke-seed');
+      INSERT INTO material_category_attributes(id,category_id,attribute_definition_id,is_required,is_unique_key_component,is_searchable,sort_order,status,created_by,updated_by,request_id)
+      VALUES(9921,9901,9911,1,1,1,10,'ACTIVE','test','test','smoke-seed');
+      INSERT INTO material_code_rules(id,rule_code,rule_name,category_id,prefix,major_segment,minor_segment,separator,sequence_width,next_sequence,status,effective_from,version,approved_by,approved_at,created_by,updated_by,request_id)
+      VALUES(9931,'FR4-SMOKE-CODE','FR4烟测编码',9901,'CYD','PCB','FR4','-',6,1,'ACTIVE','2026-01-01',1,'test',CURRENT_TIMESTAMP,'test','test','smoke-seed');
+    `;
+    const seed = spawnSync(process.execPath, [
+      wranglerCli, "d1", "execute", "DB", "--config", d1Config, "--local",
+      "--persist-to", d1Path, "--command", seedSql,
+    ], { cwd: siteRoot, env, windowsHide: true, encoding: "utf8" });
+    if (seed.status !== 0) throw new Error(`isolated D1 metadata seed failed with code ${seed.status}`);
     server = spawn(process.execPath, [vinextCli, "dev", "--host", "127.0.0.1", "--port", String(port)], {
       cwd: siteRoot,
       env,

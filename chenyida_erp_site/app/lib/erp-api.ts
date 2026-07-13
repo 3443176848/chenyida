@@ -1,8 +1,12 @@
 import { env } from "cloudflare:workers";
+import { handleMaterialMasterApi, type MaterialApiDependencies } from "./material-api/index.ts";
+import { MATERIAL_CSRF_COOKIE, MATERIAL_ROLE_PERMISSIONS } from "./material-api/security.ts";
 
 type RuntimeEnv = {
   DB: D1Database;
   ERP_SETUP_TOKEN?: string;
+  ERP_MATERIAL_WRITE_RATE_LIMIT?: string;
+  ERP_MATERIAL_NEW_KEY_RATE_LIMIT?: string;
 };
 
 type UserRow = {
@@ -54,17 +58,21 @@ const ROLE_LABELS: Record<string, string> = {
   operations: "运营",
 };
 
+function rolePermissions(role: string, legacy: readonly string[]) {
+  return new Set([...legacy, ...(MATERIAL_ROLE_PERMISSIONS[role] ?? [])]);
+}
+
 const ROLE_PERMISSIONS: Record<string, Set<string>> = {
-  admin: new Set(["*"]),
-  manager: new Set(["read", "dashboard", "material", "engineering", "purchase", "production", "inventory", "sales", "quality", "finance"]),
-  purchase: new Set(["read", "dashboard", "material", "purchase", "inventory"]),
-  engineering: new Set(["read", "dashboard", "material", "engineering"]),
-  production: new Set(["read", "dashboard", "production"]),
-  warehouse: new Set(["read", "dashboard", "inventory"]),
-  quality: new Set(["read", "dashboard", "quality"]),
-  sales: new Set(["read", "dashboard", "sales"]),
-  finance: new Set(["read", "dashboard", "finance"]),
-  operations: new Set(["read", "dashboard"]),
+  admin: rolePermissions("admin", ["*"]),
+  manager: rolePermissions("manager", ["read", "dashboard", "material", "engineering", "purchase", "production", "inventory", "sales", "quality", "finance"]),
+  purchase: rolePermissions("purchase", ["read", "dashboard", "material", "purchase", "inventory"]),
+  engineering: rolePermissions("engineering", ["read", "dashboard", "material", "engineering"]),
+  production: rolePermissions("production", ["read", "dashboard", "production"]),
+  warehouse: rolePermissions("warehouse", ["read", "dashboard", "inventory"]),
+  quality: rolePermissions("quality", ["read", "dashboard", "quality"]),
+  sales: rolePermissions("sales", ["read", "dashboard", "sales"]),
+  finance: rolePermissions("finance", ["read", "dashboard", "finance"]),
+  operations: rolePermissions("operations", ["read", "dashboard"]),
 };
 
 const LIST_KINDS: Record<string, string> = {
@@ -243,6 +251,19 @@ function randomToken(byteLength = 32) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function csrfCookie(request: Request, token: string, maxAge: number) {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return `${MATERIAL_CSRF_COOKIE}=${token}; Path=/; SameSite=Strict; Max-Age=${maxAge}${secure}`;
+}
+
+function clearAuthCookies(request: Request): Headers {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  const headers = new Headers();
+  headers.append("Set-Cookie", `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
+  headers.append("Set-Cookie", `${MATERIAL_CSRF_COOKIE}=; Path=/; SameSite=Strict; Max-Age=0${secure}`);
+  return headers;
 }
 
 async function sha256(value: string) {
@@ -468,15 +489,20 @@ async function authenticatedSessionResponse(
   ]);
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
   const cookie = `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}${secure}`;
+  const csrfToken = randomToken();
+  const headers = new Headers();
+  headers.append("Set-Cookie", cookie);
+  headers.append("Set-Cookie", csrfCookie(request, csrfToken, SESSION_TTL_SECONDS));
   return jsonResponse(
     {
       ok: true,
       user: publicUser({ ...row, last_login_at: timestamp }),
       expires_at: expiresAt,
       setup_required: false,
+      csrf_token: csrfToken,
     },
     status,
-    { "Set-Cookie": cookie },
+    headers,
   );
 }
 
@@ -548,14 +574,17 @@ async function handleLogin(request: Request, requestId: string) {
 async function handleLogout(request: Request) {
   const token = parseCookies(request.headers.get("Cookie"))[SESSION_COOKIE];
   if (token) await database().prepare("DELETE FROM app_sessions WHERE token_hash = ?").bind(await sha256(token)).run();
-  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return jsonResponse({ ok: true }, 200, { "Set-Cookie": `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}` });
+  return jsonResponse({ ok: true }, 200, clearAuthCookies(request));
 }
 
 async function handleSession(request: Request) {
   const setupRequired = (await usersCount()) === 0;
   const user = setupRequired ? null : await currentUser(request);
-  return jsonResponse({ authenticated: Boolean(user), user, setup_required: setupRequired });
+  if (!user) return jsonResponse({ authenticated: false, user: null, setup_required: setupRequired });
+  const existing = parseCookies(request.headers.get("Cookie"))[MATERIAL_CSRF_COOKIE];
+  const csrfToken = existing || randomToken();
+  const headers = existing ? undefined : { "Set-Cookie": csrfCookie(request, csrfToken, SESSION_TTL_SECONDS) };
+  return jsonResponse({ authenticated: true, user, setup_required: false, csrf_token: csrfToken }, 200, headers);
 }
 
 async function inventoryRows() {
@@ -626,10 +655,15 @@ async function summaryData() {
   };
 }
 
-async function managementDashboard() {
+async function managementDashboard(role: string) {
   const summary = await summaryData();
+  const canViewMaterialAudit = role === "admin" || role === "manager";
   const activity = await database()
-    .prepare("SELECT created_at, action, detail, username, result FROM audit_log ORDER BY id DESC LIMIT 20")
+    .prepare(`SELECT created_at, action, detail, username, result
+              FROM audit_log
+              WHERE ? = 1 OR route_code = ''
+              ORDER BY id DESC LIMIT 20`)
+    .bind(canViewMaterialAudit ? 1 : 0)
     .all<Record<string, unknown>>();
   const risks: Array<{ level: string; text: string }> = [];
   if (summary.open_pos > 0) risks.push({ level: "medium", text: `有 ${summary.open_pos} 张采购单尚未完成` });
@@ -724,7 +758,7 @@ function rowsToCsv(rows: Array<Record<string, unknown>>) {
 
 async function handleGet(path: string, url: URL, user: ReturnType<typeof publicUser>) {
   if (path === "/api/summary") return jsonResponse(await summaryData());
-  if (path === "/api/management-dashboard") return jsonResponse(await managementDashboard());
+  if (path === "/api/management-dashboard") return jsonResponse(await managementDashboard(user.role));
   if (path === "/api/inventory") return jsonResponse({ rows: await inventoryRows() });
   if (path === "/api/bom-readiness") return jsonResponse(await bomReadiness(url));
   if (path === "/api/purchase-suggestions") return jsonResponse(await purchaseSuggestions(url));
@@ -851,7 +885,11 @@ async function handlePost(
   requestId: string,
 ) {
   const body = await readJson(request);
-  if (path === "/api/me/password") return jsonResponse(await changePassword(new Request(request.url, { method: "POST", body: JSON.stringify(body) }), user.username, requestId));
+  if (path === "/api/me/password") return jsonResponse(
+    await changePassword(new Request(request.url, { method: "POST", body: JSON.stringify(body) }), user.username, requestId),
+    200,
+    clearAuthCookies(request),
+  );
   if (path === "/api/users/status") {
     const username = stringValue(body.username).toLowerCase();
     const active = Boolean(body.is_active);
@@ -1380,6 +1418,19 @@ export async function handleErpApi(request: Request) {
   const requestId = request.headers.get("X-Request-Id") || crypto.randomUUID();
   try {
     await ensureSchema();
+    if (path === "/api/material-master" || path.startsWith("/api/material-master/")) {
+      const attempts = Number(runtime.ERP_MATERIAL_WRITE_RATE_LIMIT ?? 60);
+      const newKeys = Number(runtime.ERP_MATERIAL_NEW_KEY_RATE_LIMIT ?? 20);
+      return handleMaterialMasterApi(request, {
+        database: database() as unknown as MaterialApiDependencies["database"],
+        currentUser: async (materialRequest) => currentUser(materialRequest),
+        userCan: (materialUser, permission) => {
+          const permissions = ROLE_PERMISSIONS[materialUser.role] ?? new Set<string>();
+          return permissions.has("*") || permissions.has(permission);
+        },
+        rateLimits: { attemptsPerMinute: attempts, newKeysPerMinute: newKeys },
+      });
+    }
     if (path === "/api/health") return jsonResponse({ ok: true, time: nowText() });
     if (path === "/api/session") return handleSession(request);
     if (path === "/api/setup" && request.method === "POST") return handleSetup(request, requestId);

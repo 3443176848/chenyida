@@ -1,8 +1,6 @@
-import type {
-  MaterialValidationInput,
-  MaterialValidationService,
-} from "../material-validation/index.ts";
+import type { MaterialValidationService } from "../material-validation/index.ts";
 import { createMaterialCodeService } from "./code-service.ts";
+import { materialRecordToValidationInput } from "./validation-input.ts";
 import {
   MaterialMasterRepositoryError,
   MaterialMasterServiceError,
@@ -38,27 +36,6 @@ function reviewTimestamp(clock: () => Date): string {
     throw new MaterialMasterServiceError("MATERIAL_WRITE_FAILED", "服务端时间不可用");
   }
   return value.toISOString();
-}
-
-function validationInput(material: MaterialRecord): MaterialValidationInput {
-  return {
-    category_id: material.fields.categoryId,
-    basic_fields: {
-      standard_name: material.fields.standardName,
-      unit: material.fields.baseUom,
-      source_type: material.fields.sourceType,
-    },
-    attributes: Object.fromEntries(
-      material.attributes.map((attribute) => [
-        attribute.attributeCode,
-        {
-          value: attribute.value,
-          ...(attribute.unit === "" ? {} : { unit: attribute.unit }),
-          source: attribute.sourceType,
-        },
-      ]),
-    ),
-  };
 }
 
 function rejectionSnapshot(
@@ -124,9 +101,12 @@ class DefaultMaterialReviewService implements MaterialReviewService {
       context: {
         actor: command.context.actor.trim(),
         request_id: command.context.request_id.trim(),
+        transaction_companion: command.context.transaction_companion,
       },
     };
-    const validation = await this.validationService.validateForReview(validationInput(draft));
+    const validation = await this.validationService.validateForReview(
+      materialRecordToValidationInput(draft),
+    );
     if (!validation.valid) {
       throw new MaterialMasterServiceError(
         "MATERIAL_REVIEW_VALIDATION_FAILED",
@@ -149,6 +129,7 @@ class DefaultMaterialReviewService implements MaterialReviewService {
       context: {
         actor: command.context.actor.trim(),
         request_id: command.context.request_id.trim(),
+        transaction_companion: command.context.transaction_companion,
       },
     };
     const reviewedAt = reviewTimestamp(this.clock);
@@ -163,6 +144,7 @@ class DefaultMaterialReviewService implements MaterialReviewService {
         reason,
         reviewGuard: draft.reviewGuard,
         snapshotJson: rejectionSnapshot(draft, normalizedCommand, reviewedAt, reason),
+        transactionCompanion: normalizedCommand.context.transaction_companion,
       });
     } catch (error) {
       if (

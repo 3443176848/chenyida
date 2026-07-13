@@ -43,7 +43,9 @@ test("ships the complete ERP interface without starter metadata", async () => {
   assert.match(erpScript, /初始化完成，已进入系统/);
   assert.match(erpScript, /authenticated: true, user: result\.user, setup_required: false/);
   assert.match(erpApi, /authenticatedSessionResponse/);
-  assert.match(erpApi, /"Set-Cookie": cookie/);
+  assert.match(erpApi, /headers\.append\("Set-Cookie", cookie\)/);
+  assert.match(erpApi, /MATERIAL_CSRF_COOKIE/);
+  assert.match(erpApi, /SameSite=Strict/);
   assert.match(erpApi, /创建首位管理员并登录/);
   assert.match(erpStyles, /@media \(max-width: 900px\)/);
   assert.match(erpStyles, /\.login-card\[hidden\]/);

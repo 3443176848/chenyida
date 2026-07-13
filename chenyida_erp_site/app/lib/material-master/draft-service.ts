@@ -148,7 +148,7 @@ function normalizedValue(
       break;
   }
   throw new MaterialMasterServiceError(
-    "MATERIAL_ATTRIBUTE_STORAGE_INVALID",
+    "MATERIAL_ATTRIBUTE_STORAGE_METADATA_INVALID",
     "属性规范化 metadata 无法安全应用",
     { details: { attribute_code: definition.code } },
   );
@@ -183,7 +183,7 @@ function serializeAttribute(
       const tolerance = Number.EPSILON * Math.max(1, Math.abs(scaled)) * 8;
       if (!Number.isSafeInteger(rounded) || Math.abs(scaled - rounded) > tolerance) {
         throw new MaterialMasterServiceError(
-          "MATERIAL_ATTRIBUTE_STORAGE_INVALID",
+          "MATERIAL_ATTRIBUTE_VALUE_INVALID",
           "属性值超过允许的小数精度",
           {
             details: {
@@ -212,7 +212,7 @@ function serializeAttribute(
     valueDate === null
   ) {
     throw new MaterialMasterServiceError(
-      "MATERIAL_ATTRIBUTE_STORAGE_INVALID",
+      "MATERIAL_ATTRIBUTE_STORAGE_METADATA_INVALID",
       "属性值无法写入已定义的类型列",
       { details: { attribute_code: definition.code } },
     );
@@ -321,7 +321,7 @@ class DefaultMaterialDraftService implements MaterialDraftService {
 
     if (storageSnapshot.categoryLevel !== 4 || storageSnapshot.categoryStatus !== "ACTIVE") {
       throw new MaterialMasterServiceError(
-        "MATERIAL_ATTRIBUTE_STORAGE_INVALID",
+        "MATERIAL_ATTRIBUTE_STORAGE_METADATA_CONFLICT",
         "物料分类 metadata 在校验后发生变化",
         { details: { category_id: fields.categoryId } },
       );
@@ -341,7 +341,7 @@ class DefaultMaterialDraftService implements MaterialDraftService {
     );
     if (missingRequired) {
       throw new MaterialMasterServiceError(
-        "MATERIAL_ATTRIBUTE_STORAGE_INVALID",
+        "MATERIAL_ATTRIBUTE_STORAGE_METADATA_CONFLICT",
         "必填属性 metadata 在校验后发生变化",
         { details: { attribute_code: missingRequired.code } },
       );
@@ -354,7 +354,7 @@ class DefaultMaterialDraftService implements MaterialDraftService {
       const definition = definitionsByCode.get(code);
       if (!definition) {
         throw new MaterialMasterServiceError(
-          "MATERIAL_ATTRIBUTE_STORAGE_INVALID",
+          "MATERIAL_ATTRIBUTE_STORAGE_METADATA_CONFLICT",
           "属性 metadata 在校验后发生变化",
           { details: { attribute_code: code } },
         );
@@ -371,6 +371,7 @@ class DefaultMaterialDraftService implements MaterialDraftService {
         requestId,
         metadataGuard: storageSnapshot.metadataGuard,
         snapshotJson: buildSnapshot(fields, attributes),
+        transactionCompanion: command.context.transaction_companion,
       });
       return { material, validation };
     } catch (error) {

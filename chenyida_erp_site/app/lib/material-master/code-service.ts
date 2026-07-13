@@ -173,6 +173,7 @@ class DefaultMaterialCodeService implements MaterialCodeService {
           reason: command.reason?.trim() ?? "",
           reviewGuard: draft.reviewGuard,
           snapshotJson: approvalSnapshot(draft, code, command, reviewedAt),
+          transactionCompanion: command.context.transaction_companion,
         });
       } catch (error) {
         if (error instanceof MaterialMasterRepositoryError) {

@@ -42,9 +42,9 @@
 
 ### 在线 D1
 
-- `db/schema.ts` 和 `drizzle/0000_far_nightmare.sql` 定义 8 张表：`app_meta`、`app_users`、`app_sessions`、`erp_records`、`inventory_balances`、`inventory_transactions`、`audit_log`、`idempotency_keys`。
+- `drizzle/0000_far_nightmare.sql` 定义 8 张既有表；`0001_material_master_v2.sql` 新增 12 张 V2 关系表；`0002_material_draft_review_api.sql` 新增 2 张 Material API 安全表并扩展通用审计。三份 migration 只在开发/隔离 D1 验证，尚未执行生产 migration。
 - 大多数业务对象按 `kind` 存入 `erp_records.data_json`。
-- API 运行时还包含建表语句；schema、迁移和运行时定义必须在后续任务中校准。
+- API 运行时仍只为 legacy 8 表包含兼容建表语句；V2 与 Material API 对象必须显式应用版本化 migration，不在生产启动时自动创建。
 
 ## 主要模块
 
@@ -61,7 +61,7 @@
 
 1. 两个运行面包含大量相似业务能力，但数据库结构不同，尚未明确唯一生产权威源。
 2. 在线版是当前公开生产方向；服务端 API/D1 是权限和数据规则的权威边界。
-3. 在线 API 主要集中在单个 `erp-api.ts`，业务边界尚未模块化。
+3. legacy 在线 API 主要集中在 `erp-api.ts`；Material namespace 已由 catch-all 精确分发到独立 Material API、安全、查询和审计导出模块，并调用现有 Validation/Draft/Review Service。
 4. Material Master V2 应先建立关系化数据底座和迁移测试，再接入页面或 AI。
 5. 当前生产 `v3` / `2b4f178` 与纳管开发基线 `9f2c2dc` 的运行时代码一致；任何后续业务修改与部署仍须单独批准。
 6. 测试默认使用本机一次性 Miniflare D1；只接受 `ERP_ENV=test` 和 HTTP 回环地址，远程绑定关闭，测试后销毁数据库。
@@ -71,8 +71,8 @@
 - Site 源码已可从根仓库恢复；生产提交与开发提交仍需在后续发布基线中持续追踪。
 - 本地和在线数据模型、编码和治理行为分叉。
 - 在线 JSON 模型缺少关键关系约束；本地 SQLite 缺少外键和迁移历史。
-- 在线导入没有真正匹配现有物料或映射。
-- 本地旧版默认凭证、会话安全、CSRF 和限速仍需专项治理；测试环境隔离已建立本机基线，但尚无远程 Test D1。
+- 在线导入没有真正匹配现有物料或映射；新 Material Draft/Review API 不包含导入适配。
+- Material Draft/Review POST 已具备同源/CSRF、持久幂等和限速；其他 legacy POST 的 CSRF 与限速仍需专项治理。测试环境已有本机一次性 D1，尚无远程 Test D1。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
 - 业务决策 `B01-B24` 尚未全部确认。
 
@@ -87,7 +87,7 @@
 
 ## 当前路线
 
-当前处于 Phase 0。Site 源码可恢复性和本机隔离测试/安全基线已完成；下一步建立版本、迁移和发布追踪基线，之后确认 Material Master 业务决策，再进入关系化主数据、导入中心、AI 治理、ERP 融合和行业物料库。
+当前已完成 Phase 1 的 Material V2 schema、分类属性、Validation、Draft/Review Service 和受认证授权 API 的非生产实现。生产仍为旧版本，未执行 `0001`/`0002` 或部署。下一步需由项目负责人选择发布迁移追踪基线，或独立设计草稿修订/重新提交与审核队列职责。
 
 ## 恢复上下文检查清单
 

@@ -15,6 +15,13 @@
       "when": 1783801558209,
       "tag": "0001_material_master_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783976840587,
+      "tag": "0002_material_draft_review_api",
+      "breakpoints": true
     }
   ]
 }

@@ -1,20 +1,20 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-13（Asia/Shanghai）
+最后更新时间：2026-07-14（Asia/Shanghai）
 
 ## 自动统计摘要
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 16,336 行 | 统计本地 ERP 与在线 Site 的运行时源码；排除测试、seed、`node_modules`、数据库、构建缓存、生成物、文档及 Site 内重复导入的本地 ERP 树；PHASE1-TASK06 设计阶段未修改运行时代码 |
-| 源码文件 | 55 | 同上口径；本地 14，在线 41；测试文件另计 |
-| 根仓库跟踪项 | 提交前动态值 | 本设计阶段只新增 1 份 API 规格并更新项目文档；未新增业务/API/schema 文件，仓库仍无 mode `160000` |
+| 总代码量 | 17,969 行 | 沿用既有运行时源码口径；PHASE1-TASK06 净新增 1,633 行运行时/API/schema 源码，排除测试、migration、seed、依赖、构建缓存、生成物和文档 |
+| 源码文件 | 61 | 既有 55 个基础上新增 Material API 五模块和共享 Validation 输入映射；测试文件另计 |
+| 根仓库跟踪项 | 提交前动态值 | 本任务新增 API 模块、`0002`、快照、回滚和两份测试；仓库仍无 mode `160000` |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
-| 数据表 | 46（开发 schema） | 本地 SQLite 26；在线既有 D1 8；新增 V2 12；未执行生产迁移，不能理解为生产现状 |
-| 在线 API 路径 | 54 | `app/lib/erp-api.ts` 中当前已实现的具体 `/api/...` 路径去重；本规格拟议 5 个 Material 路由但尚未实现，不计入现状 |
+| 数据表 | 48（开发 schema） | 本地 SQLite 26；在线既有 D1 8；V2 12；Material API 安全表 2；未执行生产迁移，不能理解为生产现状 |
+| 在线 API 路径 | 59 | 既有 54 个具体路径加本任务已实现的 5 个 Material 路由；生产公开站点尚未部署本提交 |
 | 页面入口 | 3 | 本地 `static/index.html`、在线 `app/page.tsx`、在线 `public/erp/index.html` |
-| 测试与安全检查文件 | 15 | PHASE1-TASK05 后基线；PHASE1-TASK06 设计阶段未新增或修改测试文件 |
+| 测试与安全检查文件 | 17 | 新增 Material API migration 与 API 集成测试各 1 份；既有 smoke/安全脚本同步扩展 |
 
 ## 当前版本与环境
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE1-TASK06` 开始时，根仓库 `main` 位于 `b9d255a`，工作区干净并比 `origin/main` 超前 15 个提交。当前阶段只修改规格和项目文档；`chenyida_erp_site/` 不是嵌套仓库。
+`PHASE1-TASK06` 实施开始时，根仓库 `main` 位于设计提交 `e55318c`，工作区干净；`chenyida_erp_site/` 不是嵌套仓库。实现提交消息为 `feat: add material draft and review api`，实际哈希以 `git log -1` 为准。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE1-TASK06` 第一阶段提交消息为 `docs: design material draft and review api`，不修改 API、schema 或业务代码，不创建生产版本、不推送、不部署。实际提交哈希以 `git log -1` 为准。
+`PHASE1-TASK06` 第一阶段设计提交为 `e55318c docs: design material draft and review api`；第二阶段实现不创建生产版本、不推送、不部署。
 
 实时状态必须使用：
 
@@ -65,21 +65,22 @@ git -C chenyida_erp_site status --short
 - API、页面、测试或主要目录变化
 - 统计口径变化
 
-## PHASE1-TASK06 Draft/Review API 设计状态
+## PHASE1-TASK06 Draft/Review API 实施状态
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DOING | 第一阶段书面设计完成，等待项目负责人回复“规格确认”及选择未决业务项；尚未开始实施 |
-| 规格文档 | WRITTEN | `docs/material-master/draft-review-api-v1.md` 覆盖 5 个路由、请求/响应、认证权限、CSRF、持久幂等、乐观锁、错误、审计、分页、migration 和测试 |
+| 任务状态 | DONE | 项目负责人已确认八项业务/安全选择；实现、测试和项目文档完成，等待功能提交后人工验收 |
+| 规格文档 | APPROVED/IMPLEMENTED | `docs/material-master/draft-review-api-v1.md` 已记录确认选择和实施结果 |
 | 认证边界 | VERIFIED | 复用 `app_users`/`app_sessions` 和服务端会话 actor；未使用未接入 ERP 的 ChatGPT Header 身份；禁止客户端伪造操作者 |
-| 授权边界 | PROPOSED | read/create 可按现有角色能力映射；approve/reject、创建人自审和多节点审核仍待人工确认，规格确认前不得实现 |
-| CSRF | DESIGNED | 拟议严格 Origin + host-only 双提交 Token；现有代码没有 CSRF，当前阶段未修改会话或路由 |
-| 幂等 | NEW TABLE REQUIRED | 现有 `idempotency_keys` 无请求摘要/状态且存在并发窗口；规格提出 `material_api_idempotency` 和与业务 batch 协调的完成标记，尚未创建 `0002` |
-| Query | DESIGNED | 列表默认 20/最大 100，详情版本/日志分页；使用独立只读 Query Service，不把 SQL 加入现有写服务 |
-| 代码/API/schema 变化 | NONE | 未修改 `chenyida_erp_site/` 代码、路由、schema、migration、页面、测试或业务行为 |
-| Site 基线 | PASS | build 成功；Node 52/52；lint 0 error/1 个既有 warning；一次性 D1 API smoke 和 177 文件凭证检查通过 |
+| 授权边界 | PASS | admin/manager 审核，purchase/engineering 创建，其他角色只读；所有角色包括 admin 禁止自审 |
+| CSRF | PASS | 登录轮换 host-only 双提交 Token；Material POST 严格验证同源 Origin、Cookie/Header，Session Cookie 继续 HttpOnly |
+| 幂等与限流 | PASS | 专用持久表保存 canonical 请求摘要、租约和 24 小时结果；完成/成功审计与业务 batch 原子提交；60 次写/20 个新 Key，测试可降低阈值 |
+| Query | PASS | 列表默认 20/最大 100；详情当前 metadata 校验、分类路径、版本和变更日志均有界分页 |
+| Migration | PASS | `0002` Up/Down、schema、snapshot/journal、已有数据升级、约束、防重、空状态回滚和重升通过 |
+| 代码/API/schema 变化 | IMPLEMENTED | 新增 5 路由、Material API 五模块、共享 Validation 映射、2 张安全表和审计扩展；未开发页面或下游业务 |
+| Site 基线 | PASS | build 成功；Node 58/58；lint 0 error/1 个既有 warning；一次性 D1 登录/CSRF/API smoke 和凭证检查通过 |
 | 本地基线 | PASS | 项目 Python 3.12 的环境守卫 4/4、self-test、smoke、backup/restore 和临时 SQLite `go_live_check --no-backup` 通过 |
-| 差异检查 | PASS | 规格自检无未决占位符或内部矛盾；`git diff --check` 通过 |
+| 差异检查 | PASS | `git diff --check` 通过；敏感正文、原始 Key、Session/CSRF Token 不进入 Material 审计或错误响应 |
 | 生产影响 | NONE | 未连接生产 D1、未迁移真实数据、未部署或修改生产配置 |
 
 ## PHASE1-TASK05 草稿创建与审核写服务状态
@@ -87,7 +88,7 @@ git -C chenyida_erp_site status --short
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
 | 任务状态 | DONE | 2026-07-13 完成实现、验证、文档和独立功能提交 |
-| 模块边界 | PASS | 新增 Types、D1 Repository、Draft Service、Review Service、Code Service 和统一导出；未接 API |
+| 模块边界 | PASS | Types、D1 Repository、Draft Service、Review Service、Code Service 和统一导出保持独立；PHASE1-TASK06 通过受信适配调用，未复制业务规则 |
 | 创建草稿 | PASS | Validation 无 ERROR 后原子写 `DRAFT`、类型化属性、`CREATE` 版本和 `CREATE_DRAFT` 审计；正式编码为空 |
 | 批准启用 | PASS | 从 D1 重载并重新校验；单一 batch 原子领取序号、转 `ACTIVE`、写编码/批准信息、`APPROVE` 版本及两条审计 |
 | 拒绝 | PASS | 保持 `DRAFT`、version + 1、追加 `REJECT` 版本和审计；不读取或消耗编码规则 |

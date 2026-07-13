@@ -40,6 +40,8 @@ const localBindingConfig = {
     ERP_LOG_LEVEL: process.env.ERP_LOG_LEVEL || environmentProfile.logLevel,
     ERP_DEBUG: process.env.ERP_DEBUG || String(environmentProfile.debug),
     ERP_SETUP_TOKEN: process.env.ERP_SETUP_TOKEN || "",
+    ERP_MATERIAL_WRITE_RATE_LIMIT: process.env.ERP_MATERIAL_WRITE_RATE_LIMIT || "60",
+    ERP_MATERIAL_NEW_KEY_RATE_LIMIT: process.env.ERP_MATERIAL_NEW_KEY_RATE_LIMIT || "20",
   },
   d1_databases: d1
     ? [

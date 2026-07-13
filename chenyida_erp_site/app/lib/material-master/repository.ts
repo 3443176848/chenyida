@@ -5,6 +5,7 @@ import {
   type CreateDraftWrite,
   type MaterialAttributeRecord,
   type MaterialAttributeStorageSnapshot,
+  type MaterialApiTransactionCompanion,
   type MaterialCodeRule,
   type MaterialDraftFields,
   type MaterialMasterRepository,
@@ -326,6 +327,89 @@ function rowToMaterial(
   };
 }
 
+function materialApiSuccessStatements(
+  database: MaterialMasterD1Database,
+  companion: MaterialApiTransactionCompanion | undefined,
+  result: Readonly<{
+    materialId: number;
+    materialStatus: "DRAFT" | "ACTIVE";
+    version: number;
+    internalMaterialCode: string | null;
+    oldVersion: number | null;
+    completedAt: string;
+  }>,
+): MaterialMasterD1Statement[] {
+  if (!companion) return [];
+  const responseJson = JSON.stringify({
+    data: {
+      material_id: result.materialId,
+      material_status: result.materialStatus,
+      version: result.version,
+      internal_material_code: result.internalMaterialCode,
+    },
+    operation_id: companion.operationId,
+  });
+  return [
+    database.prepare(`
+      UPDATE material_api_idempotency
+      SET state = 'COMPLETED', lease_expires_at = NULL, status_code = ?,
+          response_json = ?, material_id = ?, old_version = ?, new_version = ?,
+          updated_at = ?, expires_at = ?
+      WHERE id = ? AND username = ? AND state = 'PENDING'
+        AND operation_id = ? AND key_digest = ? AND request_digest = ?
+        AND lease_token_digest = ?
+    `).bind(
+      companion.statusCode,
+      responseJson,
+      result.materialId,
+      result.oldVersion,
+      result.version,
+      result.completedAt,
+      companion.expiresAt,
+      companion.idempotencyRecordId,
+      companion.username,
+      companion.operationId,
+      companion.keyDigest,
+      companion.requestDigest,
+      companion.leaseTokenDigest,
+    ),
+    database.prepare(`
+      INSERT INTO audit_log(
+        username, action, detail, request_id, result, route_code, material_id,
+        operation_id, idempotency_key_digest, old_version, new_version,
+        error_code, retention_until, created_at
+      ) VALUES (
+        (
+          SELECT username FROM material_api_idempotency
+          WHERE id = ? AND username = ? AND state = 'COMPLETED'
+            AND operation_id = ? AND request_digest = ? AND lease_token_digest = ?
+            AND response_json = ? AND material_id = ? AND new_version = ?
+        ),
+        ?, '{"replayed":false}', ?, 'success', ?, ?, ?, ?, ?, ?, '', ?, ?
+      )
+    `).bind(
+      companion.idempotencyRecordId,
+      companion.username,
+      companion.operationId,
+      companion.requestDigest,
+      companion.leaseTokenDigest,
+      responseJson,
+      result.materialId,
+      result.version,
+      companion.routeCode,
+      companion.physicalRequestId,
+      companion.routeCode,
+      result.materialId,
+      companion.operationId,
+      companion.keyDigest,
+      result.oldVersion,
+      result.version,
+      companion.retentionUntil,
+      result.completedAt,
+    ),
+  ];
+}
+
 function isMaterialIdConflict(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /(?:UNIQUE|PRIMARY KEY).*material_master(?:\.id)?/i.test(message);
@@ -507,6 +591,14 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
                 input.requestId,
               ),
           ),
+          ...materialApiSuccessStatements(this.database, input.transactionCompanion, {
+            materialId: candidate,
+            materialStatus: "DRAFT",
+            version: 1,
+            internalMaterialCode: null,
+            oldVersion: null,
+            completedAt: input.createdAt,
+          }),
         ]);
 
         const material = await this.getMaterialForReview(candidate);
@@ -749,6 +841,14 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
             input.reviewedAt,
             input.requestId,
           ),
+        ...materialApiSuccessStatements(this.database, input.transactionCompanion, {
+          materialId: input.materialId,
+          materialStatus: "ACTIVE",
+          version: nextMaterialVersion,
+          internalMaterialCode: input.code,
+          oldVersion: input.expectedVersion,
+          completedAt: input.reviewedAt,
+        }),
       ]);
     } catch {
       await this.throwApprovalConflict(input);
@@ -835,6 +935,14 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
             input.reviewedAt,
             input.requestId,
           ),
+        ...materialApiSuccessStatements(this.database, input.transactionCompanion, {
+          materialId: input.materialId,
+          materialStatus: "DRAFT",
+          version: nextVersion,
+          internalMaterialCode: null,
+          oldVersion: input.expectedVersion,
+          completedAt: input.reviewedAt,
+        }),
       ]);
     } catch {
       const material = await this.getMaterialForReview(input.materialId);

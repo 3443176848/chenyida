@@ -49,6 +49,21 @@ export const MATERIAL_ACTION_CHANGE_TYPES: Readonly<Record<MaterialMasterAction,
 export type MaterialOperationContext = Readonly<{
   actor: string;
   request_id: string;
+  transaction_companion?: MaterialApiTransactionCompanion;
+}>;
+
+export type MaterialApiTransactionCompanion = Readonly<{
+  idempotencyRecordId: number;
+  username: string;
+  routeCode: "MATERIAL_DRAFT_CREATE" | "MATERIAL_DRAFT_APPROVE" | "MATERIAL_DRAFT_REJECT";
+  physicalRequestId: string;
+  operationId: string;
+  keyDigest: string;
+  requestDigest: string;
+  leaseTokenDigest: string;
+  statusCode: 200 | 201;
+  expiresAt: number;
+  retentionUntil: number;
 }>;
 
 export type CreateMaterialDraftCommand = Readonly<{
@@ -177,6 +192,7 @@ export type CreateDraftWrite = Readonly<{
   requestId: string;
   metadataGuard: string;
   snapshotJson: string;
+  transactionCompanion?: MaterialApiTransactionCompanion;
 }>;
 
 export type ApproveDraftWrite = Readonly<{
@@ -190,6 +206,7 @@ export type ApproveDraftWrite = Readonly<{
   reason: string;
   reviewGuard: string;
   snapshotJson: string;
+  transactionCompanion?: MaterialApiTransactionCompanion;
 }>;
 
 export type RejectDraftWrite = Readonly<{
@@ -201,6 +218,7 @@ export type RejectDraftWrite = Readonly<{
   reason: string;
   reviewGuard: string;
   snapshotJson: string;
+  transactionCompanion?: MaterialApiTransactionCompanion;
 }>;
 
 export type MaterialDraftResult = Readonly<{
@@ -222,6 +240,9 @@ export type MaterialMasterServiceErrorCode =
   | "MATERIAL_REVIEW_VALIDATION_FAILED"
   | "MATERIAL_DRAFT_INPUT_INVALID"
   | "MATERIAL_ATTRIBUTE_STORAGE_INVALID"
+  | "MATERIAL_ATTRIBUTE_VALUE_INVALID"
+  | "MATERIAL_ATTRIBUTE_STORAGE_METADATA_INVALID"
+  | "MATERIAL_ATTRIBUTE_STORAGE_METADATA_CONFLICT"
   | "MATERIAL_DRAFT_NOT_FOUND"
   | "MATERIAL_DRAFT_NOT_REVIEWABLE"
   | "MATERIAL_VERSION_CONFLICT"

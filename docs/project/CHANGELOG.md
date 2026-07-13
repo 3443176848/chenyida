@@ -2,6 +2,19 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-14
+
+### PHASE1-TASK06 实施 - `feat: add material draft and review api`
+
+- Git Commit：实现、迁移、测试和项目文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，前置设计提交为 `e55318c`。
+- 新增功能：实现创建、列表、详情、批准、驳回 5 个 Material 路由；复用现有会话并增加细粒度权限、全员禁止自审、严格 Origin/双提交 CSRF、稳定错误和只读 Query Service。
+- 数据库变化：新增 `0002_material_draft_review_api.sql`、空隔离库 Down、Drizzle snapshot/journal；增加 `material_api_idempotency`、`material_api_rate_limit_buckets`，扩展关系化 API 审计列及 Material 列表/审计索引；未修改 `0000`/`0001`，未执行生产 migration。
+- 并发与安全：幂等作用域为用户、方法、具体路径和 Key 摘要；保存 canonical 请求摘要、120 秒租约和 24 小时结果，成功完成/审计与 Material 业务 batch 原子提交；每用户每分钟 60 次写尝试/20 个新 Key，admin 不豁免，测试可降低阈值。
+- 审计：Material API 审计关系化记录物理请求、稳定操作、Key 摘要、对象和版本，在线保留目标为 1095 天；admin 完整查看、manager 只读查看，提供受控分页导出，`material_change_logs` 不随 API 或幂等清理删除。
+- 业务边界：公共创建只允许 `MANUAL`，非 MANUAL 返回 `SOURCE_TYPE_NOT_ALLOWED`；V1 只提供单步最终审核，不实现页面、草稿编辑、多级会签、break-glass、导入、AI 或下游业务变更。
+- 验证：build 和 Node 58/58 通过；lint 0 error/1 个既有 warning；版本化迁移已有数据升级、约束、Down/重升通过；一次性 Miniflare 登录/CSRF/API smoke、凭证扫描、`git diff --check` 和本地临时 SQLite 基线通过。TypeScript 全量检查仍只有 `db/schema.ts` 两处既有自引用类型错误。
+- 生产影响：无；未连接生产 D1、未迁移真实物料、未部署、未修改生产配置。
+
 ## 2026-07-13
 
 ### PHASE1-TASK06 设计评审 - `docs: design material draft and review api`

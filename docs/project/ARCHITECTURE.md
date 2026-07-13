@@ -59,7 +59,7 @@ sequenceDiagram
 
 - `app/page.tsx` 只有一个页面入口，加载静态 ERP 操作界面。
 - `app/api/[...path]/route.ts` 是统一 API 路由入口。
-- `app/lib/erp-api.ts` 集中处理认证、权限、业务动作、幂等、审计和数据访问。
+- `app/lib/erp-api.ts` 继续处理 legacy 认证和业务；`/api/material-master/*` 在默认权限回退前进入独立 `app/lib/material-api/`，复用同一会话并调用现有 Material Validation/Draft/Review 服务。
 - 代码中识别到 54 个具体 `/api/...` 路径；多种 CRUD 由同一路径按 HTTP 方法区分。
 
 ## 模块关系
@@ -175,7 +175,7 @@ flowchart LR
 ## 已知架构债务
 
 1. 两套运行面存在重复业务逻辑和不同数据库模型。
-2. 在线单文件 API 处理器职责过多。
+2. legacy 在线单文件 API 处理器职责仍然过多；Material namespace 已建立独立边界，但其他领域尚未拆分。
 3. 在线业务主体为 JSON，缺少 V2 所需关系约束。
 4. schema、迁移和运行时建表同时存在，需建立单一迁移权威。
 5. 本地数据库缺少迁移历史和外键。

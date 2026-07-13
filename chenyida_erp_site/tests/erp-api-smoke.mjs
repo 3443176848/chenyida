@@ -10,25 +10,46 @@ if (!adminPassword) {
   throw new Error("ERP_TEST_PASSWORD is required");
 }
 
-let cookie = "";
+const adminJar = { cookies: new Map(), csrfToken: "" };
 
-async function request(path, { method = "GET", body, idempotencyKey, expectedStatus } = {}) {
+function updateCookies(jar, response) {
+  const setCookies = typeof response.headers.getSetCookie === "function"
+    ? response.headers.getSetCookie()
+    : [response.headers.get("set-cookie")].filter(Boolean);
+  for (const value of setCookies) {
+    const pair = value.split(";", 1)[0];
+    const separator = pair.indexOf("=");
+    if (separator < 0) continue;
+    const name = pair.slice(0, separator);
+    const cookieValue = pair.slice(separator + 1);
+    if (cookieValue === "" || /Max-Age=0/i.test(value)) jar.cookies.delete(name);
+    else jar.cookies.set(name, cookieValue);
+  }
+}
+
+async function request(path, { method = "GET", body, idempotencyKey, expectedStatus, jar = adminJar } = {}) {
   const headers = {
     "Content-Type": "application/json",
     "X-Request-Id": crypto.randomUUID(),
   };
-  if (cookie) headers.Cookie = cookie;
-  if (method === "POST") headers["Idempotency-Key"] = idempotencyKey || crypto.randomUUID();
+  if (jar.cookies.size) headers.Cookie = [...jar.cookies].map(([name, value]) => `${name}=${value}`).join("; ");
+  if (method === "POST") {
+    headers["Idempotency-Key"] = idempotencyKey || crypto.randomUUID();
+    headers.Origin = baseUrl;
+    if (jar.csrfToken) headers["X-CSRF-Token"] = jar.csrfToken;
+  }
   const response = await fetch(`${baseUrl}${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
     redirect: "manual",
   });
-  const setCookie = response.headers.get("set-cookie");
-  if (setCookie) cookie = setCookie.split(";", 1)[0];
+  updateCookies(jar, response);
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+  if (payload && typeof payload === "object" && typeof payload.csrf_token === "string") {
+    jar.csrfToken = payload.csrf_token;
+  }
   if (expectedStatus !== undefined) {
     assert.equal(response.status, expectedStatus, `${method} ${path} returned an unexpected status`);
   } else if (!response.ok) {
@@ -57,6 +78,77 @@ const login = (await request("/api/login", {
 assert.equal(login.user.role, "admin");
 
 const suffix = `TEST-${Date.now().toString(36).toUpperCase()}`;
+
+const managerInitialPassword = `Manager-${suffix}-Initial!`;
+const managerPassword = `Manager-${suffix}-Final!`;
+const managerUser = (await request("/api/users", {
+  method: "POST",
+  body: {
+    username: `testmanager${Date.now().toString().slice(-6)}`,
+    display_name: "烟测审核经理",
+    role: "manager",
+    password: managerInitialPassword,
+  },
+})).payload.user;
+const managerJar = { cookies: new Map(), csrfToken: "" };
+await request("/api/login", {
+  method: "POST",
+  body: { username: managerUser.username, password: managerInitialPassword },
+  jar: managerJar,
+});
+await request("/api/me/password", {
+  method: "POST",
+  body: { old_password: managerInitialPassword, new_password: managerPassword },
+  jar: managerJar,
+});
+await request("/api/login", {
+  method: "POST",
+  body: { username: managerUser.username, password: managerPassword },
+  jar: managerJar,
+});
+
+const materialBody = {
+  basic_fields: {
+    standard_name: "烟测 FR4 覆铜板",
+    unit: "PCS",
+    source_type: "MANUAL",
+    source_ref: "",
+    brand: "TEST",
+    manufacturer: "TEST",
+    manufacturer_part_number: `FR4-${suffix}`,
+    procurement_type: "PURCHASE",
+    inventory_type: "STOCKED",
+    lot_control_required: true,
+    shelf_life_days: 365,
+    inspection_type: "NORMAL",
+    environmental_requirement: "ROHS",
+  },
+  category_id: 9901,
+  attributes: { THICKNESS: { value: 1.6, unit: "mm", source: "MANUAL", confidence: 1 } },
+};
+const materialKey = `material-create-${Date.now()}`;
+const materialDraft = (await request("/api/material-master/drafts", {
+  method: "POST", body: materialBody, idempotencyKey: materialKey,
+})).payload;
+assert.equal(materialDraft.data.material_status, "DRAFT");
+const materialReplay = await request("/api/material-master/drafts", {
+  method: "POST", body: materialBody, idempotencyKey: materialKey,
+});
+assert.equal(materialReplay.response.headers.get("idempotency-replayed"), "true");
+assert.equal(materialReplay.payload.operation_id, materialDraft.operation_id);
+const selfReview = await request(`/api/material-master/drafts/${materialDraft.data.material_id}/approve`, {
+  method: "POST", body: { expected_version: 1 }, expectedStatus: 403,
+});
+assert.equal(selfReview.payload.error.code, "SELF_REVIEW_FORBIDDEN");
+const approvedMaterial = (await request(`/api/material-master/drafts/${materialDraft.data.material_id}/approve`, {
+  method: "POST",
+  body: { expected_version: 1, review_comment: "烟测审核通过" },
+  jar: managerJar,
+})).payload;
+assert.equal(approvedMaterial.data.material_status, "ACTIVE");
+assert.match(approvedMaterial.data.internal_material_code, /^CYD-PCB-FR4-\d{6}$/);
+const materialDetail = (await request(`/api/material-master/drafts/${materialDraft.data.material_id}`, { jar: managerJar })).payload;
+assert.equal(materialDetail.data.material.version, 2);
 
 const backup = (await request("/api/backups/create", { method: "POST", body: {} })).payload.backup;
 assert.match(backup.name, /^erp-backup-/);
