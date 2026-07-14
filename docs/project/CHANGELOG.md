@@ -4,6 +4,19 @@
 
 ## 2026-07-14
 
+### PHASE1-TASK08 设计评审 - `docs: design material reference and query api`
+
+- Git Commit：书面规格、OpenAPI 和项目治理文档在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `0edede0`。
+- 新增功能：无；本阶段只完成 Material Master Reference & Query API V1 书面设计。
+- API 设计：新增统一 `/materials` 列表/详情、分类树、叶子 Schema、版本分页和变更日志分页契约；`/drafts` 保留为复用统一 Query Service 的兼容层，`/review-queue` 保持独立。
+- 权限与隐藏：正式状态对全部 material.read 可见；DRAFT/PENDING_REVIEW 按创建人、edit-any、review-queue 取交集；列表在 SQL/count 中过滤，不可见详情返回 `404 MATERIAL_NOT_FOUND`。
+- 缓存与性能：分类 tree/flat 和叶子 Schema 使用规范化内容摘要 ETag 与私有可验证缓存；物料、历史和工作流响应统一 private/no-store；列表不逐项 Validation，详情只执行单物料当前校验，历史有界分页。
+- 数据库变化：无；未创建 migration 或索引。只列出候选组合索引，要求后续先完成 1k/10k/100k 合成数据的 `EXPLAIN QUERY PLAN` 和延迟证据，并再次审批。
+- 文档变化：新增 `reference-query-api-v1.md` 和 OpenAPI；D-014 记录已确认架构与读取范围；同步更新 MASTER、TASKS、STATUS。
+- 待确认：规格最终字段、分页、缓存 Header，以及现有 metadata 无 description/枚举显示名时采用空 description 和 `label = code` 的 V1 表达。
+- 验证：OpenAPI YAML、9 个路由/35 个 schema 引用和占位符检查通过；Site build、Node 62/62、lint 0 error/1 个既有 warning、一次性 Miniflare API smoke、196 文件凭证扫描通过；本地临时 SQLite 环境守卫 4/4、自测、烟测、备份恢复和 go-live 检查通过；临时数据已清理，`git diff --check` 通过。
+- 生产影响：无；未修改 Schema、migration、API 代码、业务服务或前端，未连接生产 D1、迁移真实数据或部署。
+
 ### PHASE1-TASK07 实施 - `feat: add material draft lifecycle`
 
 - Git Commit：实现、迁移、测试和项目文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，前置设计提交为 `3dbf2b0`。

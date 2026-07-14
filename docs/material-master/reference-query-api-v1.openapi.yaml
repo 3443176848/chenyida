@@ -1,0 +1,909 @@
+openapi: 3.1.0
+info:
+  title: 晨亿达 ERP Material Master Reference & Query API
+  version: 1.0.0
+  description: >-
+    PHASE1-TASK08 书面契约。统一 materials 查询、分类 Reference、分类属性 Schema、
+    独立历史分页，并把 drafts 定义为受行级可见性约束的兼容接口。本文件不代表代码、
+    migration、索引或生产部署已获授权。
+security:
+  - erpSession: []
+tags:
+  - name: Material Reference
+  - name: Material Query
+  - name: Material Workflow Compatibility
+paths:
+  /api/material-master/categories:
+    get:
+      tags: [Material Reference]
+      summary: 查询完整启用分类树或扁平表
+      operationId: listMaterialCategories
+      parameters:
+        - $ref: '#/components/parameters/CategoryView'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: 当前启用分类 metadata
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/RequestId' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/ReferenceCacheControl' }
+            Vary: { $ref: '#/components/headers/ReferenceVary' }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryListResponse'
+        '304':
+          description: 当前已认证用户的缓存副本仍有效；响应无正文
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/RequestId' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/ReferenceCacheControl' }
+            Vary: { $ref: '#/components/headers/ReferenceVary' }
+        '400': { $ref: '#/components/responses/RequestValidationFailed' }
+        '401': { $ref: '#/components/responses/AuthRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/material-master/categories/{categoryId}/schema:
+    get:
+      tags: [Material Reference]
+      summary: 查询启用四级叶子的当前属性输入 Schema
+      operationId: getMaterialCategorySchema
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Schema 来自当前 D1 metadata 和 Validation 共用单位策略
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/RequestId' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/ReferenceCacheControl' }
+            Vary: { $ref: '#/components/headers/ReferenceVary' }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategorySchemaResponse'
+        '304':
+          description: 当前已认证用户的缓存副本仍有效；响应无正文
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/RequestId' }
+            ETag: { $ref: '#/components/headers/ETag' }
+            Cache-Control: { $ref: '#/components/headers/ReferenceCacheControl' }
+            Vary: { $ref: '#/components/headers/ReferenceVary' }
+        '400': { $ref: '#/components/responses/RequestValidationFailed' }
+        '401': { $ref: '#/components/responses/AuthRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: CATEGORY_NOT_FOUND
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '409':
+          description: CATEGORY_DISABLED 或 CATEGORY_NOT_LEAF
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '500':
+          description: CATEGORY_SCHEMA_INVALID 或 INTERNAL_ERROR
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /api/material-master/materials:
+    get:
+      tags: [Material Query]
+      summary: 按当前用户可见范围统一查询全部生命周期物料
+      description: >-
+        查询条件与服务端授权范围取交集。普通 material.read 只看到正式状态；创建人额外看到
+        自己的 DRAFT/PENDING_REVIEW；edit-any 看到全部工作流状态；review-queue 额外看到全部
+        PENDING_REVIEW。隐藏记录不出现在 data 或 pagination.total 中。
+      operationId: listMaterials
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/MaterialPageSize'
+        - $ref: '#/components/parameters/Keyword'
+        - $ref: '#/components/parameters/MaterialStatus'
+        - $ref: '#/components/parameters/CategoryIdQuery'
+        - $ref: '#/components/parameters/CategoryPathQuery'
+        - $ref: '#/components/parameters/SourceType'
+        - $ref: '#/components/parameters/CreatedBy'
+        - $ref: '#/components/parameters/CreatedFrom'
+        - $ref: '#/components/parameters/CreatedTo'
+        - $ref: '#/components/parameters/UpdatedFrom'
+        - $ref: '#/components/parameters/UpdatedTo'
+        - $ref: '#/components/parameters/MaterialSort'
+      responses:
+        '200':
+          description: 可见物料的确定性分页结果
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/RequestId' }
+            Cache-Control: { $ref: '#/components/headers/PrivateNoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MaterialPageResponse' }
+        '400': { $ref: '#/components/responses/RequestValidationFailed' }
+        '401': { $ref: '#/components/responses/AuthRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/material-master/materials/{materialId}:
+    get:
+      tags: [Material Query]
+      summary: 查询统一物料详情和有界历史摘要
+      description: 存在但当前用户不可见的 DRAFT/PENDING_REVIEW 与不存在对象相同，返回 MATERIAL_NOT_FOUND。
+      operationId: getMaterialDetail
+      parameters:
+        - $ref: '#/components/parameters/MaterialId'
+      responses:
+        '200':
+          description: 当前物料详情；历史摘要每类最多五条
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/RequestId' }
+            Cache-Control: { $ref: '#/components/headers/PrivateNoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MaterialDetailResponse' }
+        '400': { $ref: '#/components/responses/RequestValidationFailed' }
+        '401': { $ref: '#/components/responses/AuthRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/MaterialNotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/material-master/materials/{materialId}/versions:
+    get:
+      tags: [Material Query]
+      summary: 分页查询完整版本历史
+      operationId: listMaterialVersions
+      parameters:
+        - $ref: '#/components/parameters/MaterialId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/HistoryPageSize'
+      responses:
+        '200':
+          description: 按 version_no DESC, id DESC 排序的版本页
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/RequestId' }
+            Cache-Control: { $ref: '#/components/headers/PrivateNoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MaterialVersionPageResponse' }
+        '400': { $ref: '#/components/responses/RequestValidationFailed' }
+        '401': { $ref: '#/components/responses/AuthRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/MaterialNotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/material-master/materials/{materialId}/change-logs:
+    get:
+      tags: [Material Query]
+      summary: 分页查询完整变更日志
+      operationId: listMaterialChangeLogs
+      parameters:
+        - $ref: '#/components/parameters/MaterialId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/HistoryPageSize'
+      responses:
+        '200':
+          description: 按 created_at DESC, id DESC 排序的变更日志页
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/RequestId' }
+            Cache-Control: { $ref: '#/components/headers/PrivateNoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MaterialChangeLogPageResponse' }
+        '400': { $ref: '#/components/responses/RequestValidationFailed' }
+        '401': { $ref: '#/components/responses/AuthRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/MaterialNotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/material-master/drafts:
+    get:
+      tags: [Material Workflow Compatibility]
+      summary: 兼容查询当前用户可见的草稿和待审物料
+      description: >-
+        兼容接口，仅允许 DRAFT/PENDING_REVIEW。响应主体核心字段保持现有契约；新前端应使用 /materials。
+      operationId: listVisibleMaterialDrafts
+      deprecated: true
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/MaterialPageSize'
+        - name: material_status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, PENDING_REVIEW]
+            default: DRAFT
+        - $ref: '#/components/parameters/CategoryIdQuery'
+        - $ref: '#/components/parameters/SourceType'
+        - $ref: '#/components/parameters/Keyword'
+        - $ref: '#/components/parameters/CreatedBy'
+        - $ref: '#/components/parameters/CreatedFrom'
+        - $ref: '#/components/parameters/CreatedTo'
+      responses:
+        '200':
+          description: 兼容分页结果
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/RequestId' }
+            Cache-Control: { $ref: '#/components/headers/PrivateNoStore' }
+            Deprecation: { $ref: '#/components/headers/Deprecation' }
+            Link: { $ref: '#/components/headers/MaterialsSuccessor' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DraftPageCompatibilityResponse' }
+        '400': { $ref: '#/components/responses/RequestValidationFailed' }
+        '401': { $ref: '#/components/responses/AuthRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/material-master/drafts/{materialId}:
+    get:
+      tags: [Material Workflow Compatibility]
+      summary: 兼容查询可见草稿或待审详情
+      operationId: getVisibleMaterialDraftDetail
+      deprecated: true
+      parameters:
+        - $ref: '#/components/parameters/MaterialId'
+        - name: version_page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: version_page_size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: change_log_page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: change_log_page_size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        '200':
+          description: 保持既有核心详情、Validation 和双历史分页外壳
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/RequestId' }
+            Cache-Control: { $ref: '#/components/headers/PrivateNoStore' }
+            Deprecation: { $ref: '#/components/headers/Deprecation' }
+            Link: { $ref: '#/components/headers/MaterialsSuccessor' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DraftDetailCompatibilityResponse' }
+        '400': { $ref: '#/components/responses/RequestValidationFailed' }
+        '401': { $ref: '#/components/responses/AuthRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/MaterialNotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/material-master/review-queue:
+    get:
+      tags: [Material Workflow Compatibility]
+      summary: 查询独立待审核队列
+      description: 必须具有 material.review.queue；material.read 本身不足以访问。
+      operationId: listMaterialReviewQueue
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/MaterialPageSize'
+        - $ref: '#/components/parameters/CategoryIdQuery'
+        - $ref: '#/components/parameters/SourceType'
+        - name: creator
+          in: query
+          schema: { type: string, minLength: 1, maxLength: 64 }
+        - name: submitted_from
+          in: query
+          schema: { type: string, format: date }
+        - name: submitted_to
+          in: query
+          schema: { type: string, format: date }
+        - $ref: '#/components/parameters/Keyword'
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: submitted_at_desc
+            enum: [submitted_at_desc, submitted_at_asc, standard_name_asc, standard_name_desc]
+      responses:
+        '200':
+          description: 仅 PENDING_REVIEW 的审核队列
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/RequestId' }
+            Cache-Control: { $ref: '#/components/headers/PrivateNoStore' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewQueueResponse' }
+        '400': { $ref: '#/components/responses/RequestValidationFailed' }
+        '401': { $ref: '#/components/responses/AuthRequired' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+components:
+  securitySchemes:
+    erpSession:
+      type: apiKey
+      in: cookie
+      name: CYD_ERP_SESSION
+
+  headers:
+    RequestId:
+      description: 本次物理 HTTP 尝试的服务端 UUID
+      schema: { type: string, format: uuid }
+    ETag:
+      description: 当前规范化 Reference 响应内容的强 SHA-256 摘要
+      schema: { type: string, pattern: '^"sha256-[A-Za-z0-9_-]+"$' }
+    ReferenceCacheControl:
+      schema: { type: string, const: 'private, max-age=300, must-revalidate' }
+    ReferenceVary:
+      schema: { type: string, const: 'Cookie, Accept-Encoding' }
+    PrivateNoStore:
+      schema: { type: string, const: 'private, no-store' }
+    Deprecation:
+      schema: { type: string, const: 'true' }
+    MaterialsSuccessor:
+      schema: { type: string, const: '</api/material-master/materials>; rel="successor-version"' }
+
+  parameters:
+    CategoryView:
+      name: view
+      in: query
+      schema: { type: string, enum: [tree, flat], default: tree }
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      schema: { type: string }
+    CategoryId:
+      name: categoryId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    MaterialId:
+      name: materialId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    MaterialPageSize:
+      name: page_size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    HistoryPageSize:
+      name: page_size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+    Keyword:
+      name: keyword
+      in: query
+      schema: { type: string, minLength: 1, maxLength: 100 }
+    MaterialStatus:
+      name: material_status
+      in: query
+      schema:
+        $ref: '#/components/schemas/MaterialStatus'
+    CategoryIdQuery:
+      name: category_id
+      in: query
+      schema: { type: integer, minimum: 1 }
+    CategoryPathQuery:
+      name: category_path
+      in: query
+      description: 从根开始以 / 分隔的 category code 路径，匹配末节点及启用后代
+      schema: { type: string, minLength: 1, maxLength: 300 }
+    SourceType:
+      name: source_type
+      in: query
+      schema: { $ref: '#/components/schemas/SourceType' }
+    CreatedBy:
+      name: created_by
+      in: query
+      schema: { type: string, minLength: 1, maxLength: 64 }
+    CreatedFrom:
+      name: created_from
+      in: query
+      schema: { type: string, format: date }
+    CreatedTo:
+      name: created_to
+      in: query
+      schema: { type: string, format: date }
+    UpdatedFrom:
+      name: updated_from
+      in: query
+      schema: { type: string, format: date }
+    UpdatedTo:
+      name: updated_to
+      in: query
+      schema: { type: string, format: date }
+    MaterialSort:
+      name: sort
+      in: query
+      schema:
+        type: string
+        default: updated_at_desc
+        enum:
+          - updated_at_desc
+          - updated_at_asc
+          - created_at_desc
+          - created_at_asc
+          - standard_name_asc
+          - standard_name_desc
+          - material_code_asc
+          - material_code_desc
+
+  responses:
+    RequestValidationFailed:
+      description: REQUEST_VALIDATION_FAILED
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    AuthRequired:
+      description: AUTH_REQUIRED
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden:
+      description: FORBIDDEN；在对象查询前缺少路由基础权限
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    MaterialNotFound:
+      description: MATERIAL_NOT_FOUND；对象不存在或当前用户无行级可见权限
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InternalError:
+      description: INTERNAL_ERROR 或该路由定义的脱敏 metadata 错误
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+    RequestId:
+      type: string
+      format: uuid
+    MaterialStatus:
+      type: string
+      enum: [DRAFT, PENDING_REVIEW, ACTIVE, FROZEN, INACTIVE]
+    SourceType:
+      type: string
+      enum: [MANUAL, LEGACY_D1, LEGACY_SQLITE, GOVERNANCE_TEMPLATE, API]
+    Pagination:
+      type: object
+      additionalProperties: false
+      required: [page, page_size, total, total_pages]
+      properties:
+        page: { type: integer, minimum: 1 }
+        page_size: { type: integer, minimum: 1 }
+        total: { type: integer, minimum: 0 }
+        total_pages: { type: integer, minimum: 0 }
+
+    CategoryNode:
+      type: object
+      additionalProperties: false
+      required: [category_id, code, name, level, parent_id, full_path, enabled, is_leaf, display_order, children]
+      properties:
+        category_id: { type: integer, minimum: 1 }
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,63}$' }
+        name: { type: string, minLength: 1 }
+        level: { type: integer, minimum: 1, maximum: 4 }
+        parent_id: { type: [integer, 'null'], minimum: 1 }
+        full_path: { type: string, minLength: 1 }
+        enabled: { type: boolean, const: true }
+        is_leaf: { type: boolean }
+        display_order: { type: integer }
+        children:
+          type: array
+          items: { $ref: '#/components/schemas/CategoryNode' }
+    CategoryListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/CategoryNode' }
+        request_id: { $ref: '#/components/schemas/RequestId' }
+
+    EnumOption:
+      type: object
+      additionalProperties: false
+      required: [code, label]
+      properties:
+        code: { type: string, minLength: 1 }
+        label:
+          type: string
+          minLength: 1
+          description: V1 因现有 metadata 无独立显示名而等于 code
+    AttributeInputContract:
+      type: object
+      additionalProperties: false
+      required: [json_type, control, unit_mode, decimal_scale]
+      properties:
+        json_type: { type: string, enum: [string, integer, number, boolean] }
+        control: { type: string, enum: [text, integer, decimal, checkbox, select] }
+        unit_mode: { type: string, enum: [REQUIRED, FORBIDDEN] }
+        decimal_scale: { type: [integer, 'null'], minimum: 0, maximum: 9 }
+    CategoryAttributeSchema:
+      type: object
+      additionalProperties: false
+      required:
+        - attribute_code
+        - name
+        - description
+        - data_type
+        - required
+        - standard_unit
+        - compatible_units
+        - enum_options
+        - display_order
+        - enabled
+        - input_contract
+      properties:
+        attribute_code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,63}$' }
+        name: { type: string, minLength: 1 }
+        description:
+          type: string
+          description: V1 因现有 metadata 无 description 列而为空字符串
+        data_type: { type: string, enum: [TEXT, INTEGER, DECIMAL, BOOLEAN, ENUM] }
+        required: { type: boolean }
+        standard_unit: { type: string }
+        compatible_units:
+          type: array
+          uniqueItems: true
+          items: { type: string, minLength: 1 }
+        enum_options:
+          type: array
+          items: { $ref: '#/components/schemas/EnumOption' }
+        display_order: { type: integer }
+        enabled: { type: boolean, const: true }
+        input_contract: { $ref: '#/components/schemas/AttributeInputContract' }
+    CategorySchema:
+      type: object
+      additionalProperties: false
+      required: [category_id, category_code, category_name, category_path, schema_version, attributes]
+      properties:
+        category_id: { type: integer, minimum: 1 }
+        category_code: { type: string }
+        category_name: { type: string }
+        category_path: { type: string }
+        schema_version: { type: string, pattern: '^sha256:[a-f0-9]{64}$' }
+        attributes:
+          type: array
+          items: { $ref: '#/components/schemas/CategoryAttributeSchema' }
+    CategorySchemaResponse:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/CategorySchema' }
+        request_id: { $ref: '#/components/schemas/RequestId' }
+
+    MaterialListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - material_id
+        - material_code
+        - standard_name
+        - material_status
+        - category_id
+        - category_path
+        - unit
+        - source_type
+        - current_version
+        - created_by
+        - last_modified_by
+        - submitted_by
+        - submitted_at
+        - created_at
+        - updated_at
+      properties:
+        material_id: { type: integer, minimum: 1 }
+        material_code: { type: [string, 'null'] }
+        standard_name: { type: string }
+        material_status: { $ref: '#/components/schemas/MaterialStatus' }
+        category_id: { type: integer, minimum: 1 }
+        category_path: { type: string }
+        unit: { type: string }
+        source_type: { $ref: '#/components/schemas/SourceType' }
+        current_version: { type: integer, minimum: 1 }
+        created_by: { type: string }
+        last_modified_by: { type: string }
+        submitted_by: { type: string }
+        submitted_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    MaterialPageResponse:
+      type: object
+      additionalProperties: false
+      required: [data, pagination, request_id]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/MaterialListItem' }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+        request_id: { $ref: '#/components/schemas/RequestId' }
+
+    CategoryPathNode:
+      type: object
+      additionalProperties: false
+      required: [category_id, category_code, category_name, level]
+      properties:
+        category_id: { type: integer, minimum: 1 }
+        category_code: { type: string }
+        category_name: { type: string }
+        level: { type: integer, minimum: 1, maximum: 4 }
+    MaterialCore:
+      type: object
+      additionalProperties: true
+      required:
+        - material_id
+        - material_code
+        - standard_name
+        - material_status
+        - category_id
+        - unit
+        - current_version
+        - created_by
+        - last_modified_by
+        - submitted_by
+        - submitted_at
+        - created_at
+        - updated_at
+      properties:
+        material_id: { type: integer, minimum: 1 }
+        material_code: { type: [string, 'null'] }
+        standard_name: { type: string }
+        material_status: { $ref: '#/components/schemas/MaterialStatus' }
+        category_id: { type: integer, minimum: 1 }
+        unit: { type: string }
+        current_version: { type: integer, minimum: 1 }
+        created_by: { type: string }
+        last_modified_by: { type: string }
+        submitted_by: { type: string }
+        submitted_at: { type: [string, 'null'], format: date-time }
+        approved_by: { type: string }
+        approved_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    MaterialAttributeView:
+      type: object
+      additionalProperties: false
+      required: [attribute_code, name, data_type, value, unit, source_type]
+      properties:
+        attribute_code: { type: string }
+        name: { type: string }
+        data_type: { type: string, enum: [TEXT, INTEGER, DECIMAL, BOOLEAN, ENUM] }
+        value: {}
+        unit: { type: string }
+        source_type: { $ref: '#/components/schemas/SourceType' }
+    ValidationIssue:
+      type: object
+      additionalProperties: false
+      required: [code, severity, field, message]
+      properties:
+        code: { type: string }
+        severity: { type: string, enum: [ERROR, WARNING] }
+        field: { type: string }
+        message: { type: string }
+        attribute_code: { type: string }
+        metadata: { type: object, additionalProperties: true }
+    ValidationResult:
+      type: object
+      additionalProperties: false
+      required: [basis, validated_at, valid, errors, warnings]
+      properties:
+        basis: { type: string, const: CURRENT_METADATA }
+        validated_at: { type: string, format: date-time }
+        valid: { type: boolean }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/ValidationIssue' }
+        warnings:
+          type: array
+          items: { $ref: '#/components/schemas/ValidationIssue' }
+
+    MaterialVersionSummary:
+      type: object
+      additionalProperties: false
+      required: [version, event_type, change_reason, changed_fields, changed_by, reviewed_by, reviewed_at, created_at]
+      properties:
+        version: { type: integer, minimum: 1 }
+        event_type: { type: string }
+        change_reason: { type: string }
+        changed_fields: { type: array, items: { type: string } }
+        changed_by: { type: string }
+        reviewed_by: { type: string }
+        reviewed_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+    MaterialChangeLogSummary:
+      type: object
+      additionalProperties: false
+      required: [change_type, field_name, change_reason, changed_by, created_at]
+      properties:
+        change_type: { type: string }
+        field_name: { type: string }
+        change_reason: { type: string }
+        changed_by: { type: string }
+        created_at: { type: string, format: date-time }
+    HistorySummary:
+      type: object
+      additionalProperties: false
+      required: [versions, change_logs]
+      properties:
+        versions:
+          type: object
+          additionalProperties: false
+          required: [items, total, has_more]
+          properties:
+            items:
+              type: array
+              maxItems: 5
+              items: { $ref: '#/components/schemas/MaterialVersionSummary' }
+            total: { type: integer, minimum: 0 }
+            has_more: { type: boolean }
+        change_logs:
+          type: object
+          additionalProperties: false
+          required: [items, total, has_more]
+          properties:
+            items:
+              type: array
+              maxItems: 5
+              items: { $ref: '#/components/schemas/MaterialChangeLogSummary' }
+            total: { type: integer, minimum: 0 }
+            has_more: { type: boolean }
+    MaterialDetail:
+      type: object
+      additionalProperties: false
+      required: [material, category_path, attributes, validation, history_summary]
+      properties:
+        material: { $ref: '#/components/schemas/MaterialCore' }
+        category_path:
+          type: array
+          maxItems: 4
+          items: { $ref: '#/components/schemas/CategoryPathNode' }
+        attributes:
+          type: array
+          items: { $ref: '#/components/schemas/MaterialAttributeView' }
+        validation: { $ref: '#/components/schemas/ValidationResult' }
+        history_summary: { $ref: '#/components/schemas/HistorySummary' }
+    MaterialDetailResponse:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/MaterialDetail' }
+        request_id: { $ref: '#/components/schemas/RequestId' }
+
+    MaterialVersion:
+      allOf:
+        - $ref: '#/components/schemas/MaterialVersionSummary'
+        - type: object
+          required: [snapshot, operation_id]
+          properties:
+            snapshot: { type: object, additionalProperties: true }
+            operation_id: { type: string, format: uuid }
+    MaterialVersionPageResponse:
+      type: object
+      additionalProperties: false
+      required: [data, pagination, request_id]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/MaterialVersion' } }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+        request_id: { $ref: '#/components/schemas/RequestId' }
+    MaterialChangeLog:
+      allOf:
+        - $ref: '#/components/schemas/MaterialChangeLogSummary'
+        - type: object
+          required: [old_value, new_value, operation_id]
+          properties:
+            old_value: {}
+            new_value: {}
+            operation_id: { type: string, format: uuid }
+    MaterialChangeLogPageResponse:
+      type: object
+      additionalProperties: false
+      required: [data, pagination, request_id]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/MaterialChangeLog' } }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+        request_id: { $ref: '#/components/schemas/RequestId' }
+
+    DraftListItemCompatibility:
+      type: object
+      additionalProperties: true
+      required: [material_id, internal_material_code, standard_name, category_id, material_status, source_type, version, created_by, created_at, updated_at]
+      properties:
+        material_id: { type: integer }
+        internal_material_code: { type: [string, 'null'] }
+        standard_name: { type: string }
+        category_id: { type: integer }
+        category_name: { type: string }
+        material_status: { type: string, enum: [DRAFT, PENDING_REVIEW] }
+        source_type: { $ref: '#/components/schemas/SourceType' }
+        version: { type: integer }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    DraftPageCompatibilityResponse:
+      type: object
+      additionalProperties: false
+      required: [data, pagination, request_id]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/DraftListItemCompatibility' } }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+        request_id: { $ref: '#/components/schemas/RequestId' }
+    DraftDetailCompatibilityResponse:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+          required: [material, attributes, category_path, validation, versions, change_logs]
+          properties:
+            material: { type: object, additionalProperties: true }
+            attributes: { type: array, items: { type: object, additionalProperties: true } }
+            category_path: { type: array, items: { $ref: '#/components/schemas/CategoryPathNode' } }
+            validation: { $ref: '#/components/schemas/ValidationResult' }
+            versions: { type: object, additionalProperties: true }
+            change_logs: { type: object, additionalProperties: true }
+        request_id: { $ref: '#/components/schemas/RequestId' }
+
+    ReviewQueueItem:
+      type: object
+      additionalProperties: true
+      required: [material_id, standard_name, category_path, creator, last_modified_by, submitted_by, submitted_at, current_version, source_type, validation_summary]
+      properties:
+        material_id: { type: integer }
+        standard_name: { type: string }
+        category_path: { type: string }
+        creator: { type: string }
+        last_modified_by: { type: string }
+        submitted_by: { type: string }
+        submitted_at: { type: string, format: date-time }
+        current_version: { type: integer }
+        source_type: { $ref: '#/components/schemas/SourceType' }
+        validation_summary: { type: object, additionalProperties: true }
+    ReviewQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [data, pagination, request_id]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/ReviewQueueItem' } }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+        request_id: { $ref: '#/components/schemas/RequestId' }
+
+    ErrorDetail:
+      type: object
+      additionalProperties: true
+    ErrorBody:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id, details]
+      properties:
+        code:
+          type: string
+          enum:
+            - REQUEST_VALIDATION_FAILED
+            - AUTH_REQUIRED
+            - FORBIDDEN
+            - CATEGORY_NOT_FOUND
+            - CATEGORY_DISABLED
+            - CATEGORY_NOT_LEAF
+            - CATEGORY_TREE_INVALID
+            - CATEGORY_SCHEMA_INVALID
+            - MATERIAL_NOT_FOUND
+            - INTERNAL_ERROR
+        message: { type: string }
+        request_id: { $ref: '#/components/schemas/RequestId' }
+        details: { type: array, items: { $ref: '#/components/schemas/ErrorDetail' } }
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: { $ref: '#/components/schemas/ErrorBody' }

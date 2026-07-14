@@ -22,14 +22,15 @@
 | PHASE1-TASK04 | 建立 Material Master V2 物料校验服务 | DONE | Codex（执行）、项目负责人（设计与书面规格确认） | 2026-07-12 | 2026-07-12 | PHASE1-TASK03 | Repository + Rules + Service 三层实现按 D1 metadata 返回 25 个结构化 code；Memory 与隔离 D1 metadata 变化测试共 28 个，全量 Node 40/40；未接 API、未创建真实物料、未访问生产 |
 | PHASE1-TASK05 | 建立 Material Master Draft 创建与审核写服务 | DONE | Codex（执行）、项目负责人（任务规格与编码时点确认） | 2026-07-12 | 2026-07-13 | PHASE1-TASK04 | 新增 Draft/Review/Code 六模块，以 D1 batch 原子写草稿、属性、版本、审计和审核编码；乐观锁、规则 CAS、metadata/属性守卫及 12 个隔离 D1 用例通过，全量 Node 52/52；未接 API、未改 migration、未访问生产 |
 | PHASE1-TASK06 | 设计并实现受认证授权的 Material Master Draft/Review API | DONE | Codex（执行）、项目负责人（规格与八项业务选择确认） | 2026-07-13 | 2026-07-14 | PHASE1-TASK05 | 五个 API、现有会话认证、细粒度权限、禁止自审、Origin/CSRF、24 小时持久幂等、60/20 限流、乐观锁、1095 天审计、只读 Query Service 和 `0002` 已完成；Node 58/58、隔离 API smoke 及安全检查通过，未连接或部署生产 |
+| PHASE1-TASK07 | 完善物料草稿生命周期、重新提交和审核队列 | DONE | Codex（实施）、项目负责人（九项方案 A 确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK06 | 已实现完整替换编辑、提交/驳回/再编辑/重新提交、`PENDING_REVIEW`、审核队列、职责分离、`0003` 和隔离并发/迁移测试；未连接或部署生产 D1 |
 
 ## 当前任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PHASE1-TASK07 | 完善物料草稿生命周期、重新提交和审核队列 | DONE | Codex（实施）、项目负责人（九项方案 A 确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK06 | 已实现完整替换编辑、提交/驳回/再编辑/重新提交、`PENDING_REVIEW`、审核队列、职责分离、`0003` 和隔离并发/迁移测试；未连接或部署生产 D1 |
+| PHASE1-TASK08 | 设计 Material Master Reference & Query API | DONE | Codex（设计）、项目负责人（方案 A 与读取范围确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK07 | 完成分类树、分类 Schema、统一 materials、历史分页和 drafts 兼容的书面规格/OpenAPI；确认行级可见性、内容摘要 ETag、no-store 和索引证据门；未修改代码、schema、migration 或生产环境，等待“规格确认” |
 
-`PHASE1-TASK07` 已完成非生产实现与验证，当前没有自动开始的新任务。范围保持为草稿编辑、提交/重新提交、`PENDING_REVIEW` 单步审核、创建人与最后实质修改人职责分离、审核队列、现有安全/幂等复用和版本化 migration；未增加页面、导入、AI、批量审核、下游业务、legacy SQLite、生产 D1 或部署。`PHASE0-TASK03` 仍在台账中等待后续安排。
+`PHASE1-TASK08` 已完成第一阶段书面设计，当前等待项目负责人回复“规格确认”。确认前不得实施 Reference/Query API、收紧 `/drafts`、修改 schema/migration、增加候选索引或开发页面；任何后续实现仍不得连接或部署生产 D1。`PHASE0-TASK03` 仍在台账中等待后续安排。
 
 ## Phase 0 待办
 
