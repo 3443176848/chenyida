@@ -127,8 +127,12 @@ async function main() {
     ], { cwd: siteRoot, env, windowsHide: true, encoding: "utf8" });
     if (migrate.status !== 0) throw new Error(`isolated D1 migration failed with code ${migrate.status}`);
     const seedSql = `
-      INSERT INTO material_categories(id,category_code,category_name_cn,category_level,status,created_by,updated_by,request_id)
-      VALUES(9901,'FR4_SMOKE','FR4烟测',4,'ACTIVE','test','test','smoke-seed');
+      INSERT INTO material_categories(id,category_code,category_name_cn,parent_id,category_level,status,sort_order,created_by,updated_by,request_id)
+      VALUES
+        (9900,'SMOKE_ROOT','物料',NULL,1,'ACTIVE',1,'test','test','smoke-seed'),
+        (9902,'SMOKE_GROUP','板材',9900,2,'ACTIVE',1,'test','test','smoke-seed'),
+        (9903,'SMOKE_FAMILY','FR4',9902,3,'ACTIVE',1,'test','test','smoke-seed'),
+        (9901,'FR4_SMOKE','FR4烟测',9903,4,'ACTIVE',1,'test','test','smoke-seed');
       INSERT INTO material_attribute_definitions(id,attribute_code,attribute_name_cn,data_type,decimal_scale,canonical_unit,allowed_values_json,normalization_rule,status,created_by,updated_by,request_id)
       VALUES(9911,'THICKNESS','厚度','DECIMAL',3,'mm','[]','DECIMAL_SCALE','ACTIVE','test','test','smoke-seed');
       INSERT INTO material_category_attributes(id,category_id,attribute_definition_id,is_required,is_unique_key_component,is_searchable,sort_order,status,created_by,updated_by,request_id)

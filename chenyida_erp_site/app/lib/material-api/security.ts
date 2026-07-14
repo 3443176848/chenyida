@@ -27,6 +27,12 @@ export type MaterialApiUser = Readonly<{
 }>;
 
 export type MaterialApiRouteCode =
+  | "MATERIAL_CATEGORY_LIST"
+  | "MATERIAL_CATEGORY_SCHEMA"
+  | "MATERIAL_LIST"
+  | "MATERIAL_DETAIL"
+  | "MATERIAL_VERSIONS"
+  | "MATERIAL_CHANGE_LOGS"
   | "MATERIAL_DRAFT_CREATE"
   | "MATERIAL_DRAFT_LIST"
   | "MATERIAL_DRAFT_DETAIL"
@@ -174,11 +180,29 @@ export async function readBoundedJson(request: Request): Promise<{ body: Record<
 export function materialJsonResponse(payload: unknown, status: number, requestId: string, replayed = false): Response {
   const headers = new Headers({
     "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store",
+    "Cache-Control": "private, no-store",
+    "Pragma": "no-cache",
     "X-Request-Id": requestId,
   });
   if (replayed) headers.set("Idempotency-Replayed", "true");
   return new Response(JSON.stringify(payload), { status, headers });
+}
+
+export function materialReferenceResponse(
+  payload: unknown,
+  requestId: string,
+  etag: string,
+  notModified: boolean,
+): Response {
+  const headers = new Headers({
+    "Cache-Control": "private, max-age=300, must-revalidate",
+    "ETag": etag,
+    "Vary": "Cookie, Accept-Encoding",
+    "X-Request-Id": requestId,
+  });
+  if (notModified) return new Response(null, { status: 304, headers });
+  headers.set("Content-Type", "application/json; charset=utf-8");
+  return new Response(JSON.stringify(payload), { status: 200, headers });
 }
 
 export function materialErrorResponse(

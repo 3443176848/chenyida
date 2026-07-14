@@ -151,8 +151,8 @@ const approvedMaterial = (await request(`/api/material-master/drafts/${materialD
 })).payload;
 assert.equal(approvedMaterial.data.material_status, "ACTIVE");
 assert.match(approvedMaterial.data.internal_material_code, /^CYD-PCB-FR4-\d{6}$/);
-const materialDetail = (await request(`/api/material-master/drafts/${materialDraft.data.material_id}`, { jar: managerJar })).payload;
-assert.equal(materialDetail.data.material.version, 3);
+const materialDetail = (await request(`/api/material-master/materials/${materialDraft.data.material_id}`, { jar: managerJar })).payload;
+assert.equal(materialDetail.data.material.current_version, 3);
 
 const backup = (await request("/api/backups/create", { method: "POST", body: {} })).payload.backup;
 assert.match(backup.name, /^erp-backup-/);

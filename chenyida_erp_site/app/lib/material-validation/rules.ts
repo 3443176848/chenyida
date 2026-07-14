@@ -8,6 +8,7 @@ import {
   type ValidationIssueMetadataValue,
   type ValidationSeverity,
 } from "./types.ts";
+import { compatibleMaterialUnits } from "./unit-policy.ts";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -28,7 +29,6 @@ const SOURCE_TYPES = new Set([
 const SUPPORTED_ATTRIBUTE_TYPES = new Set(["TEXT", "INTEGER", "DECIMAL", "BOOLEAN", "ENUM"]);
 const NUMERIC_ATTRIBUTE_TYPES = new Set(["INTEGER", "DECIMAL"]);
 const UNKNOWN_BRAND_VALUES = new Set(["UNKNOWN", "UNSPECIFIED", "N/A", "NA", "未知"]);
-const UNIT_FAMILIES: readonly (readonly string[])[] = [["mm", "um"]];
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -64,11 +64,6 @@ function actualType(value: unknown): string {
   if (value === null) return "null";
   if (Array.isArray(value)) return "array";
   return typeof value;
-}
-
-function allowedUnits(canonicalUnit: string): readonly string[] {
-  const family = UNIT_FAMILIES.find((units) => units.includes(canonicalUnit));
-  return family ?? [canonicalUnit];
 }
 
 function parseEnumValues(rule: MaterialAttributeRule): readonly string[] | null {
@@ -347,7 +342,7 @@ function validateAttributeUnit(rule: MaterialAttributeRule, entry: UnknownRecord
     )];
   }
 
-  const compatibleUnits = allowedUnits(rule.canonicalUnit);
+  const compatibleUnits = compatibleMaterialUnits(rule.canonicalUnit);
   if (compatibleUnits.includes(unit)) return [];
 
   return [issue(

@@ -3,9 +3,9 @@ info:
   title: 晨亿达 ERP Material Master Reference & Query API
   version: 1.0.0
   description: >-
-    PHASE1-TASK08 书面契约。统一 materials 查询、分类 Reference、分类属性 Schema、
-    独立历史分页，并把 drafts 定义为受行级可见性约束的兼容接口。本文件不代表代码、
-    migration、索引或生产部署已获授权。
+    PHASE1-TASK08 已确认并实施的非生产契约。统一 materials 查询、分类 Reference、
+    分类属性 Schema、独立历史分页，并把 drafts 定义为受行级可见性约束的兼容接口。
+    实施不包含 migration、索引或生产部署授权。
 security:
   - erpSession: []
 tags:

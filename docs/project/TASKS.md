@@ -28,9 +28,9 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PHASE1-TASK08 | 设计 Material Master Reference & Query API | DONE | Codex（设计）、项目负责人（方案 A 与读取范围确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK07 | 完成分类树、分类 Schema、统一 materials、历史分页和 drafts 兼容的书面规格/OpenAPI；确认行级可见性、内容摘要 ETag、no-store 和索引证据门；未修改代码、schema、migration 或生产环境，等待“规格确认” |
+| PHASE1-TASK08 | 实施 Material Master Reference & Query API | DONE | Codex（实施）、项目负责人（规格与 metadata 兼容规则确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK07 | 统一 Query/Reference Service、6 个新增查询路由、drafts 兼容层、行级可见性、ETag/no-store、历史分页及批量 metadata 已实现；Node 66/66、隔离 smoke、1k/10k/100k 计划证据和全量本地基线通过；未改 schema/index migration，未连接或部署生产 |
 
-`PHASE1-TASK08` 已完成第一阶段书面设计，当前等待项目负责人回复“规格确认”。确认前不得实施 Reference/Query API、收紧 `/drafts`、修改 schema/migration、增加候选索引或开发页面；任何后续实现仍不得连接或部署生产 D1。`PHASE0-TASK03` 仍在台账中等待后续安排。
+`PHASE1-TASK08` 已完成非生产实现和验证，当前无 `DOING` 任务。缺失 description、`label = code`、不读取 seed、行级最小披露和缓存契约均有回归测试；候选索引只记录在查询计划报告中，未经再次审批不得创建 migration。等待项目负责人验收并指派下一任务；`PHASE0-TASK03` 仍在台账中等待后续安排。
 
 ## Phase 0 待办
 

@@ -4,7 +4,12 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 import { Miniflare } from "miniflare";
 
-import { exportMaterialApiAudit, handleMaterialMasterApi, MATERIAL_ROLE_PERMISSIONS } from "../app/lib/material-api/index.ts";
+import {
+  exportMaterialApiAudit,
+  handleMaterialMasterApi,
+  MATERIAL_ROLE_PERMISSIONS,
+  projectCategoryAttributeSchema,
+} from "../app/lib/material-api/index.ts";
 
 const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
 const fixedNow = new Date("2026-07-14T08:00:00.000Z");
@@ -20,15 +25,21 @@ async function seed(DB) {
   await DB.batch([
     ...[
       ["admin1", "admin"], ["admin2", "admin"], ["manager1", "manager"],
-      ["manager2", "manager"], ["purchase1", "purchase"], ["warehouse1", "warehouse"],
+      ["manager2", "manager"], ["purchase1", "purchase"], ["purchase2", "purchase"],
+      ["warehouse1", "warehouse"], ["reviewer1", "reviewer"],
     ].map(([username, role]) => DB.prepare(`
       INSERT INTO app_users(username, display_name, role, password_hash, is_active, must_change_password, version, created_at, updated_at)
       VALUES (?, ?, ?, 'test-only', 1, 0, 1, ?, ?)
     `).bind(username, username, role, timestamp, timestamp)),
-    DB.prepare(`
-      INSERT INTO material_categories(id, category_code, category_name_cn, category_level, status, created_by, created_at, updated_by, updated_at, request_id)
-      VALUES (9001, 'FR4_API', 'FR4 API测试', 4, 'ACTIVE', 'test', ?, 'test', ?, 'seed')
-    `).bind(timestamp, timestamp),
+    ...[
+      [9000, "ROOT_API", "物料", null, 1],
+      [9002, "GROUP_API", "板材", 9000, 2],
+      [9003, "FAMILY_API", "FR4", 9002, 3],
+      [9001, "FR4_API", "FR4 API测试", 9003, 4],
+    ].map(([id, code, name, parentId, level], index) => DB.prepare(`
+      INSERT INTO material_categories(id, category_code, category_name_cn, parent_id, category_level, status, sort_order, created_by, created_at, updated_by, updated_at, request_id)
+      VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, 'test', ?, 'test', ?, 'seed')
+    `).bind(id, code, name, parentId, level, index + 1, timestamp, timestamp)),
     DB.prepare(`
       INSERT INTO material_attribute_definitions(id, attribute_code, attribute_name_cn, data_type, decimal_scale, canonical_unit, allowed_values_json, normalization_rule, status, created_by, created_at, updated_by, updated_at, request_id)
       VALUES (9101, 'THICKNESS', '厚度', 'DECIMAL', 3, 'mm', '[]', 'DECIMAL_SCALE', 'ACTIVE', 'test', ?, 'test', ?, 'seed')
@@ -38,12 +49,20 @@ async function seed(DB) {
       VALUES (9102, 'COLOR', '颜色', 'TEXT', 0, '', '[]', 'TRIM_UPPER', 'ACTIVE', 'test', ?, 'test', ?, 'seed')
     `).bind(timestamp, timestamp),
     DB.prepare(`
+      INSERT INTO material_attribute_definitions(id, attribute_code, attribute_name_cn, data_type, decimal_scale, canonical_unit, allowed_values_json, normalization_rule, status, created_by, created_at, updated_by, updated_at, request_id)
+      VALUES (9103, 'SURFACE', '表面处理', 'ENUM', 0, '', '["HASL","ENIG"]', 'ENUM_CODE', 'ACTIVE', 'test', ?, 'test', ?, 'seed')
+    `).bind(timestamp, timestamp),
+    DB.prepare(`
       INSERT INTO material_category_attributes(id, category_id, attribute_definition_id, is_required, is_unique_key_component, is_searchable, sort_order, status, created_by, created_at, updated_by, updated_at, request_id)
       VALUES (9201, 9001, 9101, 1, 1, 1, 10, 'ACTIVE', 'test', ?, 'test', ?, 'seed')
     `).bind(timestamp, timestamp),
     DB.prepare(`
       INSERT INTO material_category_attributes(id, category_id, attribute_definition_id, is_required, is_unique_key_component, is_searchable, sort_order, status, created_by, created_at, updated_by, updated_at, request_id)
       VALUES (9202, 9001, 9102, 0, 0, 1, 20, 'ACTIVE', 'test', ?, 'test', ?, 'seed')
+    `).bind(timestamp, timestamp),
+    DB.prepare(`
+      INSERT INTO material_category_attributes(id, category_id, attribute_definition_id, is_required, is_unique_key_component, is_searchable, sort_order, status, created_by, created_at, updated_by, updated_at, request_id)
+      VALUES (9203, 9001, 9103, 0, 0, 1, 30, 'ACTIVE', 'test', ?, 'test', ?, 'seed')
     `).bind(timestamp, timestamp),
     DB.prepare(`
       INSERT INTO material_code_rules(id, rule_code, rule_name, category_id, prefix, major_segment, minor_segment, separator, sequence_width, next_sequence, status, effective_from, version, approved_by, approved_at, created_by, created_at, updated_by, updated_at, request_id)
@@ -72,13 +91,16 @@ async function fixture(rateLimits) {
     ["manager1", { username: "manager1", role: "manager", must_change_password: false }],
     ["manager2", { username: "manager2", role: "manager", must_change_password: false }],
     ["purchase1", { username: "purchase1", role: "purchase", must_change_password: false }],
+    ["purchase2", { username: "purchase2", role: "purchase", must_change_password: false }],
     ["warehouse1", { username: "warehouse1", role: "warehouse", must_change_password: false }],
+    ["reviewer1", { username: "reviewer1", role: "reviewer", must_change_password: false }],
   ]);
   const permissions = {
     admin: new Set(["*"]),
     manager: new Set(["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject"]),
     purchase: new Set(["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit"]),
     warehouse: new Set(["material.read"]),
+    reviewer: new Set(["material.read", "material.review.queue"]),
   };
   return {
     DB,
@@ -151,8 +173,9 @@ function editBody(expectedVersion, overrides = {}) {
   };
 }
 
-async function api(context, path, { method = "GET", user, body, key = crypto.randomUUID(), includeCsrf = true } = {}) {
+async function api(context, path, { method = "GET", user, body, key = crypto.randomUUID(), includeCsrf = true, requestHeaders = {} } = {}) {
   const headers = new Headers();
+  for (const [name, value] of Object.entries(requestHeaders)) headers.set(name, value);
   if (user) headers.set("X-Test-User", user);
   if (method === "POST" || method === "PATCH") {
     headers.set("Content-Type", "application/json");
@@ -166,7 +189,8 @@ async function api(context, path, { method = "GET", user, body, key = crypto.ran
   const response = await handleMaterialMasterApi(new Request(`http://local.test${path}`, {
     method, headers, body: body === undefined ? undefined : JSON.stringify(body),
   }), context.dependencies);
-  return { response, payload: await response.json() };
+  const text = await response.text();
+  return { response, payload: text ? JSON.parse(text) : null };
 }
 
 test("Material Draft/Review API enforces auth, permission, CSRF, idempotency and source boundary", { timeout: 120_000 }, async () => {
@@ -367,7 +391,10 @@ test("Material queries are bounded and audit output is sanitized", { timeout: 12
     assert.equal(list.payload.pagination.page_size, 20);
     const unbounded = await api(context, "/api/material-master/drafts?page_size=101", { user: "warehouse1" });
     assert.equal(unbounded.payload.error.code, "REQUEST_VALIDATION_FAILED");
-    const detail = await api(context, `/api/material-master/drafts/${created.payload.data.material_id}`, { user: "warehouse1" });
+    const hidden = await api(context, `/api/material-master/drafts/${created.payload.data.material_id}`, { user: "warehouse1" });
+    assert.equal(hidden.response.status, 404);
+    assert.equal(hidden.payload.error.code, "MATERIAL_NOT_FOUND");
+    const detail = await api(context, `/api/material-master/drafts/${created.payload.data.material_id}`, { user: "purchase1" });
     assert.equal(detail.response.status, 200);
     assert.equal(detail.payload.data.validation.basis, "CURRENT_METADATA");
     assert.equal("reviewGuard" in detail.payload.data.material, false);
@@ -417,6 +444,234 @@ test("Material write rate limits are test-configurable and bounded", { timeout: 
     const bucket = await context.DB.prepare("SELECT attempt_count, new_key_count, rejected_count FROM material_api_rate_limit_buckets WHERE username = 'manager2'").first();
     assert.equal(bucket.new_key_count, 1);
     assert.equal(bucket.rejected_count, 1);
+  } finally {
+    await context.mf.dispose();
+  }
+});
+
+test("Material reference APIs return complete metadata, stable fallbacks and content ETags", { timeout: 120_000 }, async () => {
+  const context = await fixture();
+  try {
+    const tree = await api(context, "/api/material-master/categories?view=tree", { user: "warehouse1" });
+    assert.equal(tree.response.status, 200);
+    assert.equal(tree.response.headers.get("cache-control"), "private, max-age=300, must-revalidate");
+    assert.match(tree.response.headers.get("etag"), /^"sha256-[A-Za-z0-9_-]{43}"$/);
+    assert.equal(tree.payload.data[0].children[0].children[0].children[0].category_id, 9001);
+    const firstEtag = tree.response.headers.get("etag");
+    const notModified = await api(context, "/api/material-master/categories?view=tree", {
+      user: "warehouse1", requestHeaders: { "If-None-Match": firstEtag },
+    });
+    assert.equal(notModified.response.status, 304);
+    assert.equal(notModified.payload, null);
+    assert.equal(notModified.response.headers.get("etag"), firstEtag);
+    assert.ok(notModified.response.headers.get("x-request-id"));
+    const unauthenticated304 = await api(context, "/api/material-master/categories?view=tree", {
+      requestHeaders: { "If-None-Match": firstEtag },
+    });
+    assert.equal(unauthenticated304.response.status, 401);
+
+    const flat = await api(context, "/api/material-master/categories?view=flat", { user: "warehouse1" });
+    assert.deepEqual(flat.payload.data.map((node) => node.category_id), [9000, 9002, 9003, 9001]);
+    assert.ok(flat.payload.data.every((node) => node.children.length === 0));
+
+    const schema = await api(context, "/api/material-master/categories/9001/schema", { user: "warehouse1" });
+    assert.equal(schema.response.status, 200);
+    assert.match(schema.payload.data.schema_version, /^sha256:[a-f0-9]{64}$/);
+    const thickness = schema.payload.data.attributes.find((attribute) => attribute.attribute_code === "THICKNESS");
+    const surface = schema.payload.data.attributes.find((attribute) => attribute.attribute_code === "SURFACE");
+    assert.equal(thickness.description, "");
+    assert.deepEqual(thickness.compatible_units, ["mm", "um"]);
+    assert.deepEqual(surface.enum_options, [{ code: "HASL", label: "HASL" }, { code: "ENIG", label: "ENIG" }]);
+    const schema304 = await api(context, "/api/material-master/categories/9001/schema", {
+      user: "warehouse1", requestHeaders: { "If-None-Match": schema.response.headers.get("etag") },
+    });
+    assert.equal(schema304.response.status, 304);
+    const missingSchema = await api(context, "/api/material-master/categories/999999/schema", { user: "warehouse1" });
+    assert.equal(missingSchema.response.status, 404);
+    assert.equal(missingSchema.payload.error.code, "CATEGORY_NOT_FOUND");
+    const nonLeafSchema = await api(context, "/api/material-master/categories/9000/schema", { user: "warehouse1" });
+    assert.equal(nonLeafSchema.response.status, 409);
+    assert.equal(nonLeafSchema.payload.error.code, "CATEGORY_NOT_LEAF");
+
+    await context.DB.prepare("UPDATE material_categories SET category_name_cn = 'FR4 API已更新', updated_at = ? WHERE id = 9001")
+      .bind("2026-07-14T09:00:00.000Z").run();
+    const changed = await api(context, "/api/material-master/categories?view=tree", {
+      user: "warehouse1", requestHeaders: { "If-None-Match": firstEtag },
+    });
+    assert.equal(changed.response.status, 200);
+    assert.notEqual(changed.response.headers.get("etag"), firstEtag);
+
+    const fallbackProjection = projectCategoryAttributeSchema({
+      attributeCode: "FINISH", name: "表面", dataType: "ENUM", required: false,
+      canonicalUnit: "", decimalScale: 0, allowedValuesJson: '["A"]', displayOrder: 1,
+    });
+    const realMetadataProjection = projectCategoryAttributeSchema({
+      attributeCode: "FINISH", name: "表面", description: "真实描述", dataType: "ENUM", required: false,
+      canonicalUnit: "", decimalScale: 0, allowedValuesJson: '["A"]', enumLabels: { A: "显示名" }, displayOrder: 1,
+    });
+    assert.deepEqual(Object.keys(realMetadataProjection), Object.keys(fallbackProjection));
+    assert.equal(fallbackProjection.description, "");
+    assert.deepEqual(fallbackProjection.enum_options, [{ code: "A", label: "A" }]);
+    assert.equal(realMetadataProjection.description, "真实描述");
+    assert.deepEqual(realMetadataProjection.enum_options, [{ code: "A", label: "显示名" }]);
+
+    const source = await readFile(join(siteRoot, "app", "lib", "material-api", "reference-query-service.ts"), "utf8");
+    assert.doesNotMatch(source, /from\s+["'][^"']*seed|material-categories-v1|material-category-seed/i);
+
+    await context.DB.prepare("UPDATE material_attribute_definitions SET data_type = 'DATE' WHERE id = 9102").run();
+    const invalidSchema = await api(context, "/api/material-master/categories/9001/schema", { user: "warehouse1" });
+    assert.equal(invalidSchema.response.status, 500);
+    assert.equal(invalidSchema.payload.error.code, "CATEGORY_SCHEMA_INVALID");
+  } finally {
+    await context.mf.dispose();
+  }
+});
+
+test("Unified material queries enforce row visibility before filters, totals and details", { timeout: 120_000 }, async () => {
+  const context = await fixture();
+  try {
+    const create = async (user, suffix) => api(context, "/api/material-master/drafts", {
+      method: "POST", user, body: draftBody({ basic_fields: { standard_name: `物料 ${suffix}` } }), key: `visibility-create-${suffix}`,
+    });
+    const ownDraft = await create("purchase1", "p1-draft");
+    const otherDraft = await create("purchase2", "p2-draft");
+    const ownPending = await create("purchase1", "p1-pending");
+    await api(context, `/api/material-master/drafts/${ownPending.payload.data.material_id}/submit`, {
+      method: "POST", user: "purchase1", body: { expected_version: 1 }, key: "visibility-submit-p1",
+    });
+    const otherPending = await create("purchase2", "p2-pending");
+    await api(context, `/api/material-master/drafts/${otherPending.payload.data.material_id}/submit`, {
+      method: "POST", user: "purchase2", body: { expected_version: 1 }, key: "visibility-submit-p2",
+    });
+    const formal = await create("purchase1", "formal");
+    await api(context, `/api/material-master/drafts/${formal.payload.data.material_id}/submit`, {
+      method: "POST", user: "purchase1", body: { expected_version: 1 }, key: "visibility-submit-formal",
+    });
+    await api(context, `/api/material-master/drafts/${formal.payload.data.material_id}/approve`, {
+      method: "POST", user: "manager1", body: { expected_version: 2, review_comment: "通过" }, key: "visibility-approve-formal",
+    });
+
+    const warehouse = await api(context, "/api/material-master/materials", { user: "warehouse1" });
+    assert.equal(warehouse.response.status, 200);
+    assert.equal(warehouse.payload.pagination.total, 1);
+    assert.deepEqual(warehouse.payload.data.map((item) => item.material_status), ["ACTIVE"]);
+    assert.equal(warehouse.response.headers.get("cache-control"), "private, no-store");
+    assert.equal(warehouse.response.headers.get("pragma"), "no-cache");
+    const bypass = await api(context, "/api/material-master/materials?material_status=DRAFT", { user: "warehouse1" });
+    assert.equal(bypass.payload.pagination.total, 0);
+    const hidden = await api(context, `/api/material-master/materials/${otherDraft.payload.data.material_id}`, { user: "warehouse1" });
+    assert.equal(hidden.response.status, 404);
+    assert.equal(hidden.payload.error.code, "MATERIAL_NOT_FOUND");
+
+    const purchase = await api(context, "/api/material-master/materials?page_size=100", { user: "purchase1" });
+    assert.equal(purchase.payload.pagination.total, 3);
+    assert.deepEqual(new Set(purchase.payload.data.map((item) => item.material_id)), new Set([
+      ownDraft.payload.data.material_id, ownPending.payload.data.material_id, formal.payload.data.material_id,
+    ]));
+    const manager = await api(context, "/api/material-master/materials?page_size=100", { user: "manager1" });
+    assert.equal(manager.payload.pagination.total, 5);
+    const reviewer = await api(context, "/api/material-master/materials?page_size=100", { user: "reviewer1" });
+    assert.equal(reviewer.payload.pagination.total, 3);
+    assert.ok(reviewer.payload.data.every((item) => item.material_status !== "DRAFT"));
+    const reviewerDrafts = await api(context, "/api/material-master/drafts?material_status=DRAFT", { user: "reviewer1" });
+    assert.equal(reviewerDrafts.payload.pagination.total, 0);
+    const reviewerPending = await api(context, "/api/material-master/drafts?material_status=PENDING_REVIEW", { user: "reviewer1" });
+    assert.equal(reviewerPending.payload.pagination.total, 2);
+    const incompatibleStatus = await api(context, "/api/material-master/drafts?material_status=ACTIVE", { user: "manager1" });
+    assert.equal(incompatibleStatus.response.status, 400);
+    assert.equal(incompatibleStatus.payload.error.code, "REQUEST_VALIDATION_FAILED");
+    const queueDenied = await api(context, "/api/material-master/review-queue", { user: "warehouse1" });
+    assert.equal(queueDenied.response.status, 403);
+  } finally {
+    await context.mf.dispose();
+  }
+});
+
+test("Material detail history is bounded and full histories use deterministic pagination", { timeout: 120_000 }, async () => {
+  const context = await fixture();
+  try {
+    const created = await api(context, "/api/material-master/drafts", {
+      method: "POST", user: "purchase1", body: draftBody(), key: "history-create",
+    });
+    const id = created.payload.data.material_id;
+    for (let version = 1; version <= 5; version += 1) {
+      const edited = await api(context, `/api/material-master/drafts/${id}`, {
+        method: "PATCH", user: "purchase1",
+        body: editBody(version, { basic_fields: { standard_name: `历史物料 ${version}` } }),
+        key: `history-edit-${version}`,
+      });
+      assert.equal(edited.response.status, 200);
+    }
+    await api(context, `/api/material-master/drafts/${id}/submit`, {
+      method: "POST", user: "purchase1", body: { expected_version: 6 }, key: "history-submit",
+    });
+    const rejected = await api(context, `/api/material-master/drafts/${id}/reject`, {
+      method: "POST", user: "manager1", body: { expected_version: 7, reason: "补充资料" }, key: "history-reject",
+    });
+    assert.equal(rejected.response.status, 200);
+
+    const detail = await api(context, `/api/material-master/materials/${id}`, { user: "purchase1" });
+    assert.equal(detail.response.status, 200);
+    assert.equal(detail.payload.data.history_summary.versions.items.length, 5);
+    assert.equal(detail.payload.data.history_summary.versions.total, 8);
+    assert.equal(detail.payload.data.history_summary.versions.has_more, true);
+    assert.ok(detail.payload.data.history_summary.versions.items.every((item) => !("snapshot" in item)));
+    assert.ok(detail.payload.data.history_summary.change_logs.items.every((item) => !("old_value" in item) && !("new_value" in item)));
+
+    const versions1 = await api(context, `/api/material-master/materials/${id}/versions?page=1&page_size=2`, { user: "purchase1" });
+    const versions2 = await api(context, `/api/material-master/materials/${id}/versions?page=2&page_size=2`, { user: "purchase1" });
+    assert.equal(versions1.payload.pagination.total, 8);
+    assert.equal(versions1.payload.data.length, 2);
+    assert.ok(versions1.payload.data.every((item) => typeof item.snapshot === "object" && !Array.isArray(item.snapshot)));
+    assert.deepEqual(versions1.payload.data.map((item) => item.version), [8, 7]);
+    assert.deepEqual(versions2.payload.data.map((item) => item.version), [6, 5]);
+    const logs = await api(context, `/api/material-master/materials/${id}/change-logs?page=1&page_size=2`, { user: "purchase1" });
+    assert.equal(logs.payload.data.length, 2);
+    assert.ok("old_value" in logs.payload.data[0] && "new_value" in logs.payload.data[0]);
+    const tooLarge = await api(context, `/api/material-master/materials/${id}/versions?page_size=51`, { user: "purchase1" });
+    assert.equal(tooLarge.response.status, 400);
+    const invisible = await api(context, `/api/material-master/materials/${id}/versions`, { user: "purchase2" });
+    assert.equal(invisible.response.status, 404);
+    assert.equal(invisible.payload.error.code, "MATERIAL_NOT_FOUND");
+    await context.DB.prepare("UPDATE material_versions SET snapshot_json = '{broken' WHERE material_id = ? AND version_no = 8").bind(id).run();
+    const corrupted = await api(context, `/api/material-master/materials/${id}/versions`, { user: "purchase1" });
+    assert.equal(corrupted.response.status, 500);
+    assert.equal(corrupted.payload.error.code, "INTERNAL_ERROR");
+    assert.doesNotMatch(JSON.stringify(corrupted.payload), /broken|snapshot_json/);
+  } finally {
+    await context.mf.dispose();
+  }
+});
+
+test("Material list metadata loading has a bounded query count instead of N+1", { timeout: 120_000 }, async () => {
+  const context = await fixture();
+  try {
+    const timestamp = fixedNow.toISOString();
+    const inserts = Array.from({ length: 50 }, (_, index) => context.DB.prepare(`
+      INSERT INTO material_master(
+        standard_name, category_id, base_uom, material_status, procurement_type, inventory_type,
+        lot_control_required, inspection_type, environmental_requirement, source_type, source_ref,
+        version, last_modified_by, created_by, created_at, updated_by, updated_at, request_id
+      ) VALUES (?, 9001, 'PCS', 'DRAFT', 'PURCHASE', 'STOCKED', 0, 'NORMAL', 'ROHS',
+                'MANUAL', ?, 1, 'manager1', 'manager1', ?, 'manager1', ?, ?)
+    `).bind(`批量物料 ${index}`, `batch:${index}`, timestamp, timestamp, `batch-${index}`));
+    await context.DB.batch(inserts);
+
+    let prepares = 0;
+    const countedDatabase = {
+      prepare(sql) { prepares += 1; return context.DB.prepare(sql); },
+      batch(statements) { return context.DB.batch(statements); },
+    };
+    const countedContext = { ...context, dependencies: { ...context.dependencies, database: countedDatabase } };
+    const first = await api(countedContext, "/api/material-master/materials?page=1&page_size=1", { user: "manager1" });
+    assert.equal(first.response.status, 200);
+    const oneItemPrepareCount = prepares;
+    prepares = 0;
+    const fifty = await api(countedContext, "/api/material-master/materials?page=1&page_size=50", { user: "manager1" });
+    assert.equal(fifty.response.status, 200);
+    assert.equal(fifty.payload.data.length, 50);
+    assert.equal(prepares, oneItemPrepareCount);
+    assert.ok(prepares <= 5, `列表查询 prepare 次数应有界，实际 ${prepares}`);
   } finally {
     await context.mf.dispose();
   }

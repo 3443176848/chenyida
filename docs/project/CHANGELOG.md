@@ -4,6 +4,18 @@
 
 ## 2026-07-14
 
+### PHASE1-TASK08 实施 - `feat: add material reference and query api`
+
+- Git Commit：实现、测试、查询计划证据和项目文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，前置规格提交为 `928e08f`。
+- Query Service：统一 materials/drafts 的列表、可见性、详情聚合、类型化属性、当前 metadata 校验和历史读取；drafts 只保留工作流兼容字段与分页外壳，审核队列保持独立。
+- API：新增分类 tree/flat、四级叶子 Schema、`/materials` 列表/详情、版本分页和变更日志分页 6 个路由；详情历史摘要各最多 5 条，完整历史默认 20、最大 50。
+- 权限与隐藏：正式状态对全部 material.read 可见；DRAFT/PENDING_REVIEW 按创建人、edit-any、review-queue 扩展；授权谓词与筛选在 SQL/count 取交集，隐藏记录不返回、不计 total，不可见详情/历史返回 404。
+- Metadata 与缓存：Schema 只读当前 D1，不读 seed；description 缺失为空字符串，enum label 缺失等于 code；共享 Validation 单位策略；Reference 使用强内容摘要 ETag/304，物料及历史使用 `private, no-store`。
+- 性能：列表分类路径与审核 metadata 批量加载，新增查询次数防 N+1 回归；1k/10k/100k 查询计划和采样已记录，发现候选优化方向但未创建索引或 migration。
+- 测试：Site build、Node 66/66、隔离 API smoke、lint 0 error/1 个任务外既有 warning、201 文件凭证扫描、查询计划脚本和临时 SQLite 完整基线通过；全量 tsc 仍只有 `db/schema.ts` 两处既有 Drizzle TS2740，按范围未修改。
+- 已知限制：继续双读 `PENDING_APPROVAL`；leading-wildcard keyword 没有专用全文索引；候选索引需再次审批；无前端、写接口、导入、AI、候选匹配、真实迁移或下游业务变化。
+- 生产影响：无；未连接生产 D1、未迁移真实物料、未部署或修改生产配置。
+
 ### PHASE1-TASK08 设计评审 - `docs: design material reference and query api`
 
 - Git Commit：书面规格、OpenAPI 和项目治理文档在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `0edede0`。

@@ -13,7 +13,8 @@ import {
   type MaterialValidationD1Database,
   type ValidationIssue,
 } from "../material-validation/index.ts";
-import { createMaterialMasterQueryService } from "./query-service.ts";
+import { createMaterialMasterQueryService, MaterialQueryError } from "./query-service.ts";
+import { createMaterialReferenceQueryService, MaterialReferenceQueryError } from "./reference-query-service.ts";
 import {
   assertMaterialCsrf,
   completeIdempotentFailure,
@@ -21,6 +22,7 @@ import {
   MaterialApiFailure,
   materialErrorResponse,
   materialJsonResponse,
+  materialReferenceResponse,
   readBoundedJson,
   readCompletedIdempotency,
   renderStoredResponse,
@@ -65,6 +67,30 @@ const STATUSES = new Set(["DRAFT", "PENDING_REVIEW", "ACTIVE", "FROZEN", "INACTI
 const PUBLIC_SOURCE_TYPES = new Set(["MANUAL"]);
 
 function routeFor(path: string): MaterialRoute | null {
+  if (path === "/api/material-master/categories") {
+    return { code: "MATERIAL_CATEGORY_LIST", materialId: null, supportedMethods: ["GET"], permission: () => "material.read" };
+  }
+  const categorySchema = path.match(/^\/api\/material-master\/categories\/([1-9][0-9]*)\/schema$/);
+  if (categorySchema) {
+    const id = Number(categorySchema[1]);
+    if (!Number.isSafeInteger(id)) return null;
+    return { code: "MATERIAL_CATEGORY_SCHEMA", materialId: id, supportedMethods: ["GET"], permission: () => "material.read" };
+  }
+  if (path === "/api/material-master/materials") {
+    return { code: "MATERIAL_LIST", materialId: null, supportedMethods: ["GET"], permission: () => "material.read" };
+  }
+  const materialHistory = path.match(/^\/api\/material-master\/materials\/([1-9][0-9]*)\/(versions|change-logs)$/);
+  if (materialHistory) {
+    const id = Number(materialHistory[1]);
+    if (!Number.isSafeInteger(id)) return null;
+    return { code: materialHistory[2] === "versions" ? "MATERIAL_VERSIONS" : "MATERIAL_CHANGE_LOGS", materialId: id, supportedMethods: ["GET"], permission: () => "material.read" };
+  }
+  const materialDetail = path.match(/^\/api\/material-master\/materials\/([1-9][0-9]*)$/);
+  if (materialDetail) {
+    const id = Number(materialDetail[1]);
+    if (!Number.isSafeInteger(id)) return null;
+    return { code: "MATERIAL_DETAIL", materialId: id, supportedMethods: ["GET"], permission: () => "material.read" };
+  }
   if (path === "/api/material-master/drafts") {
     return {
       code: "MATERIAL_DRAFT_LIST", materialId: null, supportedMethods: ["GET", "POST"],
@@ -363,7 +389,7 @@ function mapServiceError(error: MaterialMasterServiceError, materialId: number |
 
 function methodNotAllowedResponse(request: Request, requestId: string): Response {
   if (request.method === "HEAD") {
-    return new Response(null, { status: 405, headers: { "Cache-Control": "no-store", "X-Request-Id": requestId, "X-Error-Code": "METHOD_NOT_ALLOWED" } });
+    return new Response(null, { status: 405, headers: { "Cache-Control": "private, no-store", "Pragma": "no-cache", "X-Request-Id": requestId, "X-Error-Code": "METHOD_NOT_ALLOWED" } });
   }
   return materialErrorResponse(new MaterialApiFailure("METHOD_NOT_ALLOWED", "请求方法不支持", 405), requestId);
 }
@@ -380,6 +406,7 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
   const now = dependencies.clock?.() ?? new Date();
   const nowSeconds = Math.floor(now.getTime() / 1000);
   const auditRoute = routeCode ?? "MATERIAL_DRAFT_LIST";
+  const auditMaterialId = routeCode === "MATERIAL_CATEGORY_SCHEMA" ? null : route?.materialId ?? null;
   let user: MaterialApiUser | null = null;
   let companion: MaterialApiTransactionCompanion | undefined;
   try {
@@ -393,7 +420,7 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
         requestId,
         result: "failed",
         errorCode: "METHOD_NOT_ALLOWED",
-        materialId: route.materialId,
+        materialId: auditMaterialId,
         nowSeconds,
       });
       return methodNotAllowedResponse(request, requestId);
@@ -402,7 +429,7 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
     const allowed = routeCode === "MATERIAL_DRAFT_EDIT"
       ? dependencies.userCan(user, "material.draft.edit_own") || dependencies.userCan(user, "material.draft.edit_any")
       : dependencies.userCan(user, permission);
-    if (!allowed) throw new MaterialApiFailure("FORBIDDEN", "当前账号没有此操作权限", 403, [], route.materialId);
+    if (!allowed) throw new MaterialApiFailure("FORBIDDEN", "当前账号没有此操作权限", 403, [], auditMaterialId);
     if (request.method !== "GET" && user.must_change_password) {
       throw new MaterialApiFailure("PASSWORD_CHANGE_REQUIRED", "请先修改临时密码", 403, [], route.materialId);
     }
@@ -414,14 +441,92 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
       ),
     );
     const clock = dependencies.clock ?? (() => new Date());
-    const queryService = createMaterialMasterQueryService(dependencies.database, repository, validationService, clock);
+    const queryService = createMaterialMasterQueryService(dependencies.database, repository, validationService, {
+      username: user.username,
+      canEditAny: dependencies.userCan(user, "material.draft.edit_any"),
+      canReviewQueue: dependencies.userCan(user, "material.review.queue"),
+    }, clock);
+    const referenceService = createMaterialReferenceQueryService(dependencies.database);
+
+    if (request.method === "GET" && routeCode === "MATERIAL_CATEGORY_LIST") {
+      const allowed = new Set(["view"]);
+      const unknown = [...url.searchParams.keys()].find((key) => !allowed.has(key));
+      if (unknown) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", `未知查询参数：${unknown}`, 400);
+      const view = url.searchParams.get("view") ?? "tree";
+      if (view !== "tree" && view !== "flat") throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "view 无效", 400);
+      const result = await referenceService.listCategories(view);
+      await writeMaterialAudit(dependencies.database, { username: user.username, routeCode, requestId, result: "success", nowSeconds });
+      return materialReferenceResponse({ data: result.data, request_id: requestId }, requestId, result.etag, request.headers.get("If-None-Match") === result.etag);
+    }
+
+    if (request.method === "GET" && routeCode === "MATERIAL_CATEGORY_SCHEMA" && route.materialId) {
+      if ([...url.searchParams.keys()].length > 0) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "Schema 接口不接受查询参数", 400);
+      const result = await referenceService.getCategorySchema(route.materialId);
+      await writeMaterialAudit(dependencies.database, { username: user.username, routeCode, requestId, result: "success", materialId: null, nowSeconds });
+      return materialReferenceResponse({ data: result.data, request_id: requestId }, requestId, result.etag, request.headers.get("If-None-Match") === result.etag);
+    }
+
+    if (request.method === "GET" && routeCode === "MATERIAL_LIST") {
+      const allowed = new Set(["page", "page_size", "keyword", "material_status", "category_id", "category_path", "source_type", "created_by", "created_from", "created_to", "updated_from", "updated_to", "sort"]);
+      const unknown = [...url.searchParams.keys()].find((key) => !allowed.has(key));
+      if (unknown) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", `未知查询参数：${unknown}`, 400);
+      const status = url.searchParams.get("material_status") ?? undefined;
+      if (status && !STATUSES.has(status)) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "material_status 无效", 400);
+      const sourceType = url.searchParams.get("source_type") ?? undefined;
+      if (sourceType && !SOURCE_TYPES.has(sourceType)) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "source_type 无效", 400);
+      const sort = url.searchParams.get("sort") ?? "updated_at_desc";
+      const sorts = new Set(["updated_at_desc", "updated_at_asc", "created_at_desc", "created_at_asc", "standard_name_asc", "standard_name_desc", "material_code_asc", "material_code_desc"]);
+      if (!sorts.has(sort)) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "sort 无效", 400);
+      const boundary = (key: string, nextDay = false) => {
+        const raw = url.searchParams.get(key);
+        return raw ? dateBoundary(raw, key, nextDay) : undefined;
+      };
+      const createdFrom = boundary("created_from");
+      const createdToExclusive = boundary("created_to", true);
+      const updatedFrom = boundary("updated_from");
+      const updatedToExclusive = boundary("updated_to", true);
+      if ((createdFrom && createdToExclusive && createdFrom >= createdToExclusive) || (updatedFrom && updatedToExclusive && updatedFrom >= updatedToExclusive)) {
+        throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "日期范围起点不能晚于终点", 400);
+      }
+      const result = await queryService.listMaterials({
+        page: queryInteger(url, "page", 1, 1_000_000), pageSize: queryInteger(url, "page_size", 20, 100),
+        materialStatus: status, categoryId: url.searchParams.has("category_id") ? positiveInteger(Number(url.searchParams.get("category_id")), "category_id") : undefined,
+        categoryPath: url.searchParams.has("category_path") ? optionalString(url.searchParams.get("category_path"), "category_path", 260, true) : undefined,
+        sourceType, keyword: url.searchParams.has("keyword") ? optionalString(url.searchParams.get("keyword"), "keyword", 100, true) : undefined,
+        createdBy: url.searchParams.has("created_by") ? optionalString(url.searchParams.get("created_by"), "created_by", 64, true) : undefined,
+        createdFrom, createdToExclusive, updatedFrom, updatedToExclusive,
+        sort: sort as Parameters<typeof queryService.listMaterials>[0]["sort"],
+      });
+      await writeMaterialAudit(dependencies.database, { username: user.username, routeCode, requestId, result: "success", nowSeconds });
+      return materialJsonResponse({ ...result, request_id: requestId }, 200, requestId);
+    }
+
+    if (request.method === "GET" && routeCode === "MATERIAL_DETAIL" && route.materialId) {
+      if ([...url.searchParams.keys()].length > 0) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "详情接口不接受查询参数", 400);
+      const detail = await queryService.getMaterialDetail(route.materialId);
+      if (!detail) throw new MaterialApiFailure("MATERIAL_NOT_FOUND", "物料不存在", 404);
+      await writeMaterialAudit(dependencies.database, { username: user.username, routeCode, requestId, result: "success", materialId: route.materialId, nowSeconds });
+      return materialJsonResponse({ data: detail, request_id: requestId }, 200, requestId);
+    }
+
+    if (request.method === "GET" && (routeCode === "MATERIAL_VERSIONS" || routeCode === "MATERIAL_CHANGE_LOGS") && route.materialId) {
+      const unknown = [...url.searchParams.keys()].find((key) => key !== "page" && key !== "page_size");
+      if (unknown) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", `未知查询参数：${unknown}`, 400);
+      const historyQuery = { page: queryInteger(url, "page", 1, 1_000_000), pageSize: queryInteger(url, "page_size", 20, 50) };
+      const result = routeCode === "MATERIAL_VERSIONS"
+        ? await queryService.listMaterialVersions(route.materialId, historyQuery)
+        : await queryService.listMaterialChangeLogs(route.materialId, historyQuery);
+      if (!result) throw new MaterialApiFailure("MATERIAL_NOT_FOUND", "物料不存在", 404);
+      await writeMaterialAudit(dependencies.database, { username: user.username, routeCode, requestId, result: "success", materialId: route.materialId, nowSeconds });
+      return materialJsonResponse({ ...result, request_id: requestId }, 200, requestId);
+    }
 
     if (request.method === "GET" && routeCode === "MATERIAL_DRAFT_LIST") {
       const allowed = new Set(["page", "page_size", "material_status", "category_id", "source_type", "keyword", "created_by", "created_from", "created_to"]);
       const unknown = [...url.searchParams.keys()].find((key) => !allowed.has(key));
       if (unknown) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", `未知查询参数：${unknown}`, 400);
       const status = url.searchParams.get("material_status") ?? "DRAFT";
-      if (!STATUSES.has(status)) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "material_status 无效", 400);
+      if (status !== "DRAFT" && status !== "PENDING_REVIEW") throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "material_status 只允许 DRAFT 或 PENDING_REVIEW", 400);
       const sourceType = url.searchParams.get("source_type") ?? undefined;
       if (sourceType && !SOURCE_TYPES.has(sourceType)) throw new MaterialApiFailure("REQUEST_VALIDATION_FAILED", "source_type 无效", 400);
       const fromRaw = url.searchParams.get("created_from");
@@ -432,7 +537,7 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
       const result = await queryService.listDrafts({
         page: queryInteger(url, "page", 1, 1_000_000),
         pageSize: queryInteger(url, "page_size", 20, 100),
-        materialStatus: status,
+        materialStatus: status as "DRAFT" | "PENDING_REVIEW",
         categoryId: url.searchParams.has("category_id") ? positiveInteger(Number(url.searchParams.get("category_id")), "category_id") : undefined,
         sourceType,
         keyword: url.searchParams.has("keyword") ? optionalString(url.searchParams.get("keyword"), "keyword", 100, true) : undefined,
@@ -441,7 +546,10 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
         createdToExclusive,
       });
       await writeMaterialAudit(dependencies.database, { username: user.username, routeCode, requestId, result: "success", nowSeconds });
-      return materialJsonResponse({ ...result, request_id: requestId }, 200, requestId);
+      const response = materialJsonResponse({ ...result, request_id: requestId }, 200, requestId);
+      response.headers.set("Deprecation", "true");
+      response.headers.set("Link", "</api/material-master/materials>; rel=\"successor-version\"");
+      return response;
     }
 
     if (request.method === "GET" && routeCode === "MATERIAL_DRAFT_DETAIL" && route.materialId) {
@@ -456,7 +564,10 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
       });
       if (!detail) throw new MaterialApiFailure("MATERIAL_NOT_FOUND", "物料草稿不存在", 404, [], route.materialId);
       await writeMaterialAudit(dependencies.database, { username: user.username, routeCode, requestId, result: "success", materialId: route.materialId, nowSeconds });
-      return materialJsonResponse({ data: detail, request_id: requestId }, 200, requestId);
+      const response = materialJsonResponse({ data: detail, request_id: requestId }, 200, requestId);
+      response.headers.set("Deprecation", "true");
+      response.headers.set("Link", "</api/material-master/materials>; rel=\"successor-version\"");
+      return response;
     }
 
     if (request.method === "GET" && routeCode === "MATERIAL_REVIEW_QUEUE") {
@@ -552,16 +663,25 @@ export async function handleMaterialMasterApi(request: Request, dependencies: Ma
   } catch (error) {
     let failure = error instanceof MaterialApiFailure
       ? error
-      : error instanceof MaterialMasterServiceError
-        ? mapServiceError(error, route?.materialId ?? null)
-        : new MaterialApiFailure("INTERNAL_ERROR", "系统处理失败，请联系管理员", 500, [], route?.materialId ?? null);
+        : error instanceof MaterialReferenceQueryError
+          ? new MaterialApiFailure(error.code, error.message, error.status, [], auditMaterialId)
+        : error instanceof MaterialQueryError
+          ? new MaterialApiFailure(
+            error.code === "CATEGORY_PATH_INVALID" ? "REQUEST_VALIDATION_FAILED" : "INTERNAL_ERROR",
+            error.code === "CATEGORY_PATH_INVALID" ? "category_path 无效" : "系统处理失败，请联系管理员",
+            error.code === "CATEGORY_PATH_INVALID" ? 400 : 500,
+            [], auditMaterialId,
+          )
+        : error instanceof MaterialMasterServiceError
+        ? mapServiceError(error, auditMaterialId)
+        : new MaterialApiFailure("INTERNAL_ERROR", "系统处理失败，请联系管理员", 500, [], auditMaterialId);
     if (companion) {
       const completed = await readCompletedIdempotency(dependencies.database, companion.idempotencyRecordId).catch(() => null);
       if (completed) return renderStoredResponse(completed, requestId);
       try {
         await completeIdempotentFailure(dependencies.database, companion, failure, nowSeconds);
       } catch {
-        failure = new MaterialApiFailure("INTERNAL_ERROR", "系统处理失败，请联系管理员", 500, [], route?.materialId ?? null);
+        failure = new MaterialApiFailure("INTERNAL_ERROR", "系统处理失败，请联系管理员", 500, [], auditMaterialId);
       }
       return materialErrorResponse(failure, requestId, companion.operationId);
     }

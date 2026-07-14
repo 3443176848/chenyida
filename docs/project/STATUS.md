@@ -7,12 +7,12 @@
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
 | 总代码量 | 18,882 行 | 沿用既有运行时源码口径；PHASE1-TASK07 净新增 913 行运行时/API/schema 源码，排除测试、migration、seed、依赖、构建缓存、生成物和文档 |
-| 源码文件 | 61 | 既有 55 个基础上新增 Material API 五模块和共享 Validation 输入映射；测试文件另计 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK08 仅新增两份规格并更新项目治理文档；业务代码、schema、migration、测试代码和部署配置未修改，仓库仍无 mode `160000` |
+| 源码文件 | 64 | TASK08 新增 Reference Query、行级可见性和共享单位策略三个服务端模块；测试与查询计划脚本另计 |
+| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK08 修改在线服务端查询代码、测试、查询计划脚本和文档；schema、migration、前端及部署配置未修改，仓库仍无 mode `160000` |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 48（开发 schema） | 本地 SQLite 26；在线既有 D1 8；V2 12；Material API 安全表 2；未执行生产迁移，不能理解为生产现状 |
-| 在线 API 路径 | 61 | 既有 54 个具体路径加 7 个 Material 路径（草稿详情同时支持 GET/PATCH）；生产公开站点尚未部署本提交 |
+| 在线 API 路径 | 67 | 既有 61 个路径加 6 个 Reference/统一查询/历史路径；生产公开站点尚未部署本提交 |
 | 页面入口 | 3 | 本地 `static/index.html`、在线 `app/page.tsx`、在线 `public/erp/index.html` |
 | 测试与安全检查文件 | 18 | 新增 `0003` migration 测试，并扩展 Material API、服务并发和隔离 smoke |
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE1-TASK08` 开始时，根仓库 `main` 位于 `0edede0`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异仅覆盖 Reference/Query API 规格、OpenAPI 和项目治理文档；未修改运行时代码、schema、migration、测试代码或生产配置。
+`PHASE1-TASK08` 实施开始时，根仓库 `main` 位于规格提交 `928e08f`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异覆盖在线服务端 Query/Reference、共享单位策略、隔离测试、查询计划脚本和文档；未修改 schema、migration、前端或生产配置。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE1-TASK08` 提交消息为 `docs: design material reference and query api`。未创建生产版本、未推送、未连接或部署生产 D1。
+`PHASE1-TASK08` 实施提交消息为 `feat: add material reference and query api`。未创建生产版本、未推送、未连接或部署生产 D1。
 
 实时状态必须使用：
 
@@ -65,20 +65,21 @@ git -C chenyida_erp_site status --short
 - API、页面、测试或主要目录变化
 - 统计口径变化
 
-## PHASE1-TASK08 Reference & Query API 设计状态
+## PHASE1-TASK08 Reference & Query API 实施状态
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DONE / AWAITING SPEC CONFIRMATION | 方案 A 和读取范围已确认，两份书面契约完成；等待项目负责人回复“规格确认” |
-| 运行时代码 | UNCHANGED | 未修改 `chenyida_erp_site/app/`、Material Service、Query Service、前端或 legacy SQLite |
+| 任务状态 | DONE / AWAITING ACCEPTANCE | 规格与 metadata 兼容规则已确认，非生产实现和验证完成 |
+| 运行时代码 | IMPLEMENTED | 统一 Material Query Service、Reference Service、共享可见性和单位策略已接入；未修改前端或 legacy SQLite |
 | 数据库 | UNCHANGED | 未修改 `db/schema.ts`、`drizzle/` 或任何 migration，未增加索引 |
-| 统一查询 | DESIGNED | `/materials` 覆盖全部生命周期；`/drafts` 为共享 Query Service 的兼容层；`/review-queue` 独立 |
-| 行级可见性 | ACCEPTED / NOT IMPLEMENTED | 正式状态全 read；DRAFT/PENDING_REVIEW 按创建人、edit-any、review-queue；隐藏详情 404，列表及 total 完全过滤 |
-| Reference | DESIGNED | 完整启用分类 tree/flat、无 parent 懒加载；叶子 Schema 来自当前 D1 metadata，并使用内容摘要 ETag |
-| 历史 | DESIGNED | 详情每类最多 5 条摘要；版本和变更日志使用独立分页子资源，默认 20、最大 50 |
-| 缓存 | DESIGNED | Reference 私有可验证缓存；materials、drafts、review-queue 和历史统一 private/no-store |
-| 索引 | EVIDENCE GATE | 当前只记录候选；实施前必须用 1k/10k/100k 合成数据、查询计划和延迟证据，再次审批 migration |
-| 非生产基线 | PASS | OpenAPI 9 path/35 schema 引用通过；Site build、Node 62/62、lint 0 error/1 个既有 warning、一次性 D1 smoke、196 文件凭证扫描及本地临时 SQLite 完整基线通过 |
+| 统一查询 | PASS | `/materials` 覆盖全部生命周期；`/drafts` 复用统一可见性与详情组装；`/review-queue` 保持独立权限 |
+| 行级可见性 | PASS | 正式状态全 read；DRAFT/PENDING_REVIEW 按创建人、edit-any、review-queue；隐藏详情/历史 404，列表及 total 完全过滤 |
+| Reference | PASS | 完整启用分类 tree/flat、无 parent 懒加载；叶子 Schema 只读 D1 metadata；description/label fallback 和强 ETag/304 已验证 |
+| 历史 | PASS | 详情每类最多 5 条摘要；版本和变更日志独立分页默认 20、最大 50；损坏 JSON fail-closed |
+| 缓存与批量 | PASS | Reference 私有可验证缓存；物料及历史 private/no-store；列表 metadata 查询次数不随页大小增长 |
+| 索引证据 | COMPLETE / NO MIGRATION | 1k/10k/100k 计划与采样完成；发现创建人 OR 可见范围等候选方向，只形成报告，未创建 migration |
+| 非生产基线 | PASS | Site build、Node 66/66、lint 0 error/1 个既有 warning、一次性 D1 smoke、201 文件凭证扫描及临时 SQLite 完整基线通过 |
+| TypeScript 全量检查 | EXISTING FAILURE | 仅 `db/schema.ts:147`、`:332` 的既有 Drizzle 自引用 TS2740；TASK08 文件未出现类型错误，按授权未修改任务外问题 |
 | 生产影响 | NONE | 未连接生产 D1、未迁移真实数据、未部署或修改生产配置 |
 
 ## PHASE1-TASK07 草稿生命周期实施状态

@@ -1,6 +1,6 @@
 # Material Master Reference & Query API V1
 
-状态：`PROPOSED_AWAITING_SPEC_CONFIRMATION`
+状态：`APPROVED_IMPLEMENTED_AND_VERIFIED`
 
 任务：`PHASE1-TASK08`
 
@@ -673,9 +673,33 @@ Pragma: no-cache
 6. 分类树和 Schema 使用内容摘要 ETag；物料和历史统一 private/no-store。
 7. 本阶段不创建 migration；候选索引必须有 EXPLAIN QUERY PLAN 和数据规模证据，并再次审批。
 
-规格确认前仍待人工确认：
+项目负责人已于 2026-07-14 回复“规格确认”并批准按本文与
+`reference-query-api-v1.openapi.yaml` 实施。兼容规则冻结如下：
 
-- 本文件和 `reference-query-api-v1.openapi.yaml` 的最终字段、状态码、分页上限和缓存 Header 是否作为实施冻结契约。
-- V1 枚举因现有 metadata 无独立显示名而采用 `label = code`，属性 description 返回空字符串的兼容表达是否接受。
+- 缺少属性 description 时返回空字符串，不从属性名、seed 或代码注释生成描述。
+- 枚举没有独立显示名时 `label = code`，不翻译、格式化或猜测显示名。
+- `attribute_code` 与 enum `code` 是稳定业务标识；description 与 label 仅用于展示。
 
-收到“规格确认”后才可建立后续实施计划。规格确认不自动授权任何 migration、索引、生产连接、生产迁移或部署。
+实施授权不包含 migration、索引、生产连接、生产迁移或部署；候选索引仅可形成证据报告，仍需再次审批。
+
+## 21. 实施与验证结果
+
+2026-07-14 已按本规格完成非生产服务端实现：统一 Material Query Service、独立
+Reference Query Service、`/materials` 列表/详情、两个历史分页子资源、tree/flat 分类、
+四级叶子 Schema，以及复用统一可见性和详情组装逻辑的 `/drafts` 兼容适配层。
+
+验证结果：
+
+- 行级可见性、隐藏记录不计入 total、不可见详情/历史 404 已通过隔离 D1 测试。
+- 缺失 description 返回空字符串、缺失枚举显示名时 `label = code`、运行时不读取 seed、
+  未来展示 metadata 投影不改变响应字段结构已通过测试。
+- 强内容摘要 ETag、认证后的 304、Reference 私有可验证缓存，以及物料/历史
+  `private, no-store` 已通过测试。
+- 详情历史摘要固定最多 5 条，完整版本与变更日志默认 20、最大 50 的确定性分页已通过测试。
+- 物料列表 metadata 查询次数不随页内记录数增加；审核队列继续批量加载 metadata。
+- 1k/10k/100k 合成数据的计划和采样见
+  `docs/audits/phase1-task08-query-plan-report.md`。发现候选优化方向，但没有创建索引或 migration。
+- Site build、Node 66/66、隔离 API smoke、lint（0 error、1 个任务外既有 warning）、
+  201 文件凭证扫描和临时 SQLite 基线通过。
+
+本任务未开发前端或写接口，未修改 schema/migration，未连接生产 D1、迁移真实数据或部署。
