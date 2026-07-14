@@ -7,7 +7,8 @@ import {
   actionLabel, attributeDisplay, boundedPreview, compactTrackingId, displayValue, formatShanghaiDate,
   parseHistoryQuery, sourceLabel, statusLabel,
 } from "../_lib/material-ui";
-import { redirectToExistingLogin } from "./material-shell";
+import { canEditDraft } from "../_lib/material-draft";
+import { redirectToExistingLogin, useMaterialSession } from "./material-shell";
 import { MaterialErrorState, MaterialPagination, MaterialStatusBadge, type PaginationValue } from "./material-primitives";
 
 type View = "detail" | "versions" | "change-logs";
@@ -41,6 +42,7 @@ function summaryText(item: ChangeItem): string {
 }
 
 export function MaterialDetailWorkspace({ materialId, view }: { materialId: number; view: View }) {
+  const session = useMaterialSession();
   const [detail, setDetail] = useState<MaterialDetail | null>(null);
   const [detailError, setDetailError] = useState<UiError | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
@@ -135,7 +137,7 @@ export function MaterialDetailWorkspace({ materialId, view }: { materialId: numb
       <nav className="mm-breadcrumb" aria-label="面包屑"><Link href="/materials">物料主数据</Link><span>/</span><span>{detail.material.material_code || detail.material.standard_name}</span></nav>
       <header className="mm-detail-head">
         <div><Link className="mm-back-link" href={returnTo}>← 返回列表</Link><div className="mm-detail-title"><h2>{detail.material.standard_name}</h2><MaterialStatusBadge value={detail.material.material_status} /></div></div>
-        <span className="mm-material-code">{detail.material.material_code || "尚无正式编码"}</span>
+        <div className="mm-page-actions">{detail.material.material_status === "DRAFT" && canEditDraft(session.user?.permissions || [], session.user?.username || "", detail.material.created_by) ? <Link className="mm-primary-link" href={`/materials/${materialId}/edit?return_to=${encodeURIComponent(returnTo)}`}>编辑草稿</Link> : null}<span className="mm-material-code">{detail.material.material_code || "尚无正式编码"}</span></div>
       </header>
       <nav className="mm-history-tabs" aria-label="物料详情工作区">
         <Link href={`${routeFor("detail", materialId)}?${returnParam}`} aria-current={view === "detail" ? "page" : undefined}>详情</Link>

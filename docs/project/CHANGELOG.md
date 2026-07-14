@@ -4,6 +4,19 @@
 
 ## 2026-07-15
 
+### PHASE1-TASK12 实施 - `feat: add material draft ui`
+
+- Git Commit：前端实现、UI 测试、规格和项目治理文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `7e6844d`。
+- 页面与入口：新增 `/materials/new` 和 `/materials/:materialId/edit`；列表创建入口与 DRAFT 详情编辑入口仅依据 `/api/session -> user.permissions` 和 own/any 能力显示，不硬编码角色。
+- 表单：实现布局 C、分类树和当前叶子 Schema、TEXT/INTEGER/DECIMAL/BOOLEAN/ENUM/compatible unit、严格数值、完整 attributes、0/false、未知旧属性显式删除和分类切换确认。
+- 写链路：实现创建 POST、编辑 PATCH 完整替换、GET 回读、Validation ERROR/WARNING、WARNING 版本绑定确认和 submit；保存成功后同步、部分成功、结果未知和提交成功返回只读详情均有独立状态。
+- 安全与并发：共享 Client 对受保护 Material 写请求强制显式 Idempotency-Key 与 CSRF；同一操作仅允许原 Key、原 method、原 endpoint、原 payload 重试；覆盖 VERSION_CONFLICT、Retry-After、重复点击、dirty/beforeunload、Schema 漂移和状态/权限变化。
+- 驳回与错误：编辑页只读展示 `last_rejection`；401/403/404/409/422/429/5xx 使用安全中文提示和 request_id，不向浏览器暴露 SQL、堆栈或敏感正文。
+- 验收：Draft UI 54/54、全量 Node 158/158；build、lint 0 error/1 个既有 warning、隔离 API smoke、224 文件凭证扫描和临时 SQLite 五项基线通过。
+- 浏览器：一次性本地 D1 实机完成创建、编辑、PATCH/GET/submit 至 `PENDING_REVIEW`；1366/1280/1024/768 无横向溢出，三列按断点降级，离开保护和程序内成功跳转通过。
+- 数据库与生产：未修改 API、Schema、migration、索引、Material 业务服务、Legacy SQLite 或部署配置；未连接生产 URL/D1，未迁移真实数据或部署。
+- 已知限制：统一详情没有历史 `schema_version`；V1 使用当前 Schema、未知 code 保护和服务端 422 重载 fail-closed，不自动迁移旧属性。
+
 ### PHASE1-TASK11 实施 - `feat: add last rejection material projection`
 
 - Git Commit：实现、隔离测试、OpenAPI 和项目治理文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `402ef9b`。

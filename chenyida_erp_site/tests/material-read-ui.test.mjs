@@ -80,9 +80,9 @@ test("11 page_size 只允许 20 50 100", () => {
   assert.equal(parseListQuery("page_size=101").page_size, 20);
 });
 
-test("12 空数据库显示只读空状态且没有创建入口", () => {
+test("12 空数据库显示空状态且创建入口由会话权限控制", () => {
   assert.match(listSource, /尚无可查看的物料/);
-  assert.doesNotMatch(listSource, />新建物料<|>创建物料</);
+  assert.match(listSource, /canCreateDraft\(session\.user\?\.permissions/);
 });
 
 test("13 筛选无结果提供清除筛选", () => {
@@ -173,10 +173,11 @@ test("32 未知状态安全显示且不崩溃", () => {
   assert.equal(statusLabel("FUTURE_STATE"), "未知状态");
 });
 
-test("33 Material 页面不渲染创建编辑提交审核导入或 AI 操作", () => {
+test("33 Material 只读工作区不渲染批准驳回导入或 AI 操作", () => {
   const ui = `${listSource}\n${detailSource}\n${shellSource}`;
-  assert.doesNotMatch(ui, />\s*(?:新建|创建|编辑|提交审核|批准|驳回|Excel导入|CSV导入|AI功能)\s*</);
+  assert.doesNotMatch(ui, />\s*(?:批准|驳回|Excel导入|CSV导入|AI功能)\s*</);
   assert.doesNotMatch(ui, /createDraft|approveDraft|rejectDraft|runImport/);
+  assert.match(ui, /canCreateDraft|canEditDraft/);
 });
 
 test("34 所有列表与历史请求显式携带有界分页", () => {

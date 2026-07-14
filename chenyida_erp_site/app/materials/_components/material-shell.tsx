@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { api, ErpApiError, safeMaterialReturnTo } from "../../../public/erp/api-client.js";
 
-type SessionUser = { username?: string; display_name?: string; role?: string; role_label?: string };
-type Session = { authenticated: boolean; setup_required?: boolean; user?: SessionUser | null };
+export type SessionUser = { username?: string; display_name?: string; role?: string; role_label?: string; permissions?: string[] };
+export type MaterialSession = { authenticated: boolean; setup_required?: boolean; user?: SessionUser | null; csrf_token?: string };
+
+const MaterialSessionContext = createContext<MaterialSession | null>(null);
+
+export function useMaterialSession(): MaterialSession {
+  const value = useContext(MaterialSessionContext);
+  if (!value) throw new Error("Material 页面必须位于 MaterialShell 内");
+  return value;
+}
 
 export function currentMaterialLocation(): string {
   return safeMaterialReturnTo(`${window.location.pathname}${window.location.search}`);
@@ -17,12 +25,12 @@ export function redirectToExistingLogin(): void {
 }
 
 export function MaterialShell({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<MaterialSession | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
-    api<Session>("/api/session")
+    api<MaterialSession>("/api/session")
       .then((result) => {
         if (!active) return;
         if (!result.authenticated || result.setup_required) {
@@ -43,7 +51,7 @@ export function MaterialShell({ children }: { children: ReactNode }) {
   return (
     <div className="mm-app-shell">
       <header className="mm-topbar">
-        <div><h1>晨亿达 ERP</h1><p>物料主数据只读工作区</p></div>
+        <div><h1>晨亿达 ERP</h1><p>物料主数据工作区</p></div>
         <div className="mm-topbar-actions">
           {user ? <span className="mm-user"><b>{user.display_name || user.username || "当前用户"}</b><small>{user.role_label || user.role || "已登录"}</small></span> : null}
           <Link href="/" className="mm-ghost-link">返回 ERP</Link>
@@ -63,7 +71,7 @@ export function MaterialShell({ children }: { children: ReactNode }) {
         <main className="mm-content">
           {error ? <div className="mm-error-state" role="alert"><h2>登录状态验证失败</h2><p>{error}</p><button onClick={() => window.location.reload()}>重试</button></div> : null}
           {!session && !error ? <div className="mm-shell-loading" role="status">正在验证登录状态…</div> : null}
-          {session ? children : null}
+          {session ? <MaterialSessionContext.Provider value={session}>{children}</MaterialSessionContext.Provider> : null}
         </main>
       </div>
     </div>

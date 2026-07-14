@@ -7,7 +7,8 @@ import {
   DEFAULT_LIST_QUERY, flattenCategories, formatShanghaiDate, hasActiveFilters, materialApiQuery,
   parseListQuery, serializeListQuery, sourceLabel, type CategoryOption, type MaterialListQuery,
 } from "../_lib/material-ui";
-import { redirectToExistingLogin } from "./material-shell";
+import { canCreateDraft } from "../_lib/material-draft";
+import { redirectToExistingLogin, useMaterialSession } from "./material-shell";
 import { LoadingRows, MaterialErrorState, MaterialPagination, MaterialStatusBadge, type PaginationValue } from "./material-primitives";
 
 type MaterialRow = {
@@ -26,6 +27,7 @@ function sortAria(query: MaterialListQuery, field: string): "ascending" | "desce
 }
 
 export function MaterialListPage() {
+  const session = useMaterialSession();
   const [ready, setReady] = useState(false);
   const [query, setQuery] = useState<MaterialListQuery>(DEFAULT_LIST_QUERY);
   const [draft, setDraft] = useState<MaterialListQuery>(DEFAULT_LIST_QUERY);
@@ -130,7 +132,7 @@ export function MaterialListPage() {
   return (
     <section className="mm-page" aria-labelledby="material-list-title">
       <nav className="mm-breadcrumb" aria-label="面包屑"><Link href="/">首页</Link><span>/</span><span>物料主数据</span></nav>
-      <header className="mm-page-head"><div><h2 id="material-list-title">物料主数据</h2><p>按服务端授权范围查询，当前页面仅供查看。</p></div><span className="mm-readonly">只读</span></header>
+      <header className="mm-page-head"><div><h2 id="material-list-title">物料主数据</h2><p>按服务端授权范围查询；写操作仍由服务端最终授权。</p></div><div className="mm-page-actions">{canCreateDraft(session.user?.permissions || []) ? <Link className="mm-primary-link" href={`/materials/new?return_to=${encodeURIComponent(returnTo)}`}>新建物料草稿</Link> : null}<span className="mm-readonly">受控操作</span></div></header>
 
       <form className="mm-filter-bar" onSubmit={applyDraft} aria-label="物料筛选">
         <label>关键词<input value={draft.keyword} onChange={(event) => setDraft({ ...draft, keyword: event.target.value })} placeholder="编码 / 名称 / 制造商 / MPN" /></label>

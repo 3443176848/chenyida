@@ -6,6 +6,7 @@ export class ErpApiError extends Error {
     this.code = options.code || "NETWORK_ERROR";
     this.requestId = options.requestId || "";
     this.details = Array.isArray(options.details) ? options.details : [];
+    this.retryAfter = options.retryAfter || "";
   }
 }
 
@@ -27,15 +28,23 @@ function errorBody(data) {
 }
 
 export async function api(path, options = {}) {
+  const { protectedWrite, ...requestOptions } = options;
   const method = String(options.method || "GET").toUpperCase();
   const headers = { Accept: "application/json", ...(options.headers || {}) };
   if (options.body != null && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
   headers["X-Request-Id"] ||= crypto.randomUUID();
-  if (method === "POST") headers["Idempotency-Key"] ||= crypto.randomUUID();
+  const materialWrite = path.startsWith("/api/material-master/") && ["POST", "PATCH"].includes(method);
+  if (materialWrite) {
+    if (!protectedWrite?.idempotencyKey || !protectedWrite?.csrfToken) {
+      throw new ErpApiError("受保护写请求缺少幂等键或 CSRF Token", { code: "PROTECTED_WRITE_CONTEXT_REQUIRED" });
+    }
+    headers["Idempotency-Key"] = protectedWrite.idempotencyKey;
+    headers["X-CSRF-Token"] = protectedWrite.csrfToken;
+  } else if (method === "POST") headers["Idempotency-Key"] ||= crypto.randomUUID();
 
   let response;
   try {
-    response = await fetch(path, { ...options, method, credentials: "same-origin", headers });
+    response = await fetch(path, { ...requestOptions, method, credentials: "same-origin", headers });
   } catch (error) {
     if (error?.name === "AbortError") throw error;
     throw new ErpApiError("网络连接失败，请检查网络后重试", { code: "NETWORK_ERROR" });
@@ -48,7 +57,7 @@ export async function api(path, options = {}) {
     if (response.status === 401 && !["/api/session", "/api/login"].includes(path)) {
       window.dispatchEvent(new CustomEvent("cyd-erp-auth-required", { detail: { path } }));
     }
-    throw new ErpApiError(parsed.message, { status: response.status, ...parsed });
+    throw new ErpApiError(parsed.message, { status: response.status, retryAfter: response.headers.get("Retry-After") || "", ...parsed });
   }
   return data;
 }
