@@ -20,7 +20,7 @@
 
 - 路径：`chenyida_erp_site/`
 - 技术：Vinext、React、TypeScript、Cloudflare Worker、D1、Drizzle、OpenAI Sites。
-- 页面：`app/page.tsx` 通过 iframe 加载 `public/erp/index.html`。
+- 页面：根 `app/page.tsx` 继续通过 iframe 加载 legacy `public/erp/index.html`；Material Master 使用 `app/materials/` 的四条原生 Vinext 页面路由。
 - API：`app/api/[...path]/route.ts` 转交给 `app/lib/erp-api.ts` 的集中式处理器。
 - 生产：Sites `v3`，公开地址 `https://chenyida-erp-online.sjin74376.chatgpt.site`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
@@ -87,7 +87,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 的 Material V2 schema、分类属性、Validation、Draft/Review Service 和受认证授权 API 的非生产实现。生产仍为旧版本，未执行 `0001`/`0002` 或部署。下一步需由项目负责人选择发布迁移追踪基线，或独立设计草稿修订/重新提交与审核队列职责。
+当前已完成 Phase 1 的 Material V2 schema、分类属性、Validation、Draft/Review Service、受认证授权 API、统一只读 Query API 和只读管理界面的非生产实现。生产仍为旧版本，未执行 V2 migrations 或部署。下一任务必须由项目负责人独立指定。
 
 ## 恢复上下文检查清单
 

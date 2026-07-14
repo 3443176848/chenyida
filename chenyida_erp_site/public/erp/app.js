@@ -1,3 +1,5 @@
+import { api, safeMaterialReturnTo } from "./api-client.js";
+
 const state = {
   summary: {},
   items: [],
@@ -43,28 +45,6 @@ function toast(message) {
   }, 2600);
 }
 
-async function api(path, options = {}) {
-  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
-  const method = (options.method || "GET").toUpperCase();
-  headers["X-Request-Id"] ||= crypto.randomUUID();
-  if (method === "POST") headers["Idempotency-Key"] ||= crypto.randomUUID();
-  const response = await fetch(path, {
-    ...options,
-    method,
-    credentials: "same-origin",
-    headers,
-  });
-  const contentType = response.headers.get("Content-Type") || "";
-  const data = contentType.includes("application/json") ? await response.json() : await response.text();
-  if (!response.ok) {
-    if (response.status === 401 && !["/api/session", "/api/login"].includes(path)) {
-      showLogin();
-    }
-    throw new Error(data.error || "请求失败");
-  }
-  return data;
-}
-
 function setTab(name) {
   $$(".nav").forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === name));
   $$(".tab").forEach((tab) => tab.classList.toggle("active", tab.id === name));
@@ -95,6 +75,26 @@ function showLogin() {
   $("#setupForm").hidden = true;
   $("#loginForm").hidden = false;
   $("#loginUsername")?.focus();
+}
+
+window.addEventListener("cyd-erp-auth-required", showLogin);
+
+function requestedMaterialReturnTo() {
+  try {
+    const raw = new URL(window.top.location.href).searchParams.get("return_to");
+    return raw ? safeMaterialReturnTo(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function continueAfterAuthentication() {
+  const returnTo = requestedMaterialReturnTo();
+  if (returnTo) {
+    window.top.location.replace(returnTo);
+    return true;
+  }
+  return false;
 }
 
 function showSetup() {
@@ -937,6 +937,7 @@ async function login(event) {
     state.session = { authenticated: true, user: result.user, setup_required: false };
     updateUserBar();
     hideLogin();
+    if (continueAfterAuthentication()) return;
     setTab("dashboard");
     await refreshAll();
     if (result.user.must_change_password) openPasswordDialog();
@@ -967,6 +968,7 @@ async function setupSystem(event) {
     state.session = { authenticated: true, user: result.user, setup_required: false };
     updateUserBar();
     hideLogin();
+    if (continueAfterAuthentication()) return;
     setTab("dashboard");
     await refreshAll();
     $("#setupForm").reset();
@@ -1741,6 +1743,7 @@ async function initApp() {
   bindEvents();
   const session = await loadSession();
   if (session.authenticated) {
+    if (continueAfterAuthentication()) return;
     await refreshAll();
   }
 }

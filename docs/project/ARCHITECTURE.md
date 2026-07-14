@@ -47,9 +47,9 @@ sequenceDiagram
     participant R as Catch-all Route
     participant H as ERP API Handler
     participant D as D1
-    B->>P: GET /
-    P-->>B: iframe shell
-    B->>S: GET /erp/index.html
+    B->>P: GET / 或 /materials/...
+    P-->>B: 根 iframe shell 或原生 Material 页面
+    B->>S: 根页面 GET /erp/index.html
     S->>R: /api/* request
     R->>H: handleErpApi(request)
     H->>D: SQL / transaction
@@ -57,7 +57,7 @@ sequenceDiagram
     H-->>S: JSON + request id
 ```
 
-- `app/page.tsx` 只有一个页面入口，加载静态 ERP 操作界面。
+- `app/page.tsx` 保留根页面 iframe；`app/materials/` 新增列表、详情、版本和变更日志四条原生只读路由。
 - `app/api/[...path]/route.ts` 是统一 API 路由入口。
 - `app/lib/erp-api.ts` 继续处理 legacy 认证和业务；`/api/material-master/*` 在默认权限回退前进入独立 `app/lib/material-api/`，复用同一会话并调用现有 Material Validation/Draft/Review 服务。
 - 代码中识别到 54 个具体 `/api/...` 路径；多种 CRUD 由同一路径按 HTTP 方法区分。
@@ -131,7 +131,7 @@ erDiagram
 - Backend（本地运行面）：`chenyida_erp_app/server.py` 同时承担 HTTP、API、业务规则、建表和数据库访问。
 - Frontend（本地运行面）：`chenyida_erp_app/static/` 原生页面直接调用本地 API。
 - Backend（在线运行面）：`chenyida_erp_site/app/lib/erp-api.ts` 与 Worker/D1。
-- Frontend（在线运行面）：`chenyida_erp_site/app/page.tsx` + `public/erp/`。
+- Frontend（在线运行面）：根 legacy 使用 `app/page.tsx` + `public/erp/`；Material 只读页面使用 `app/materials/`，两者共同委托 `public/erp/api-client.js`。
 
 在线与本地前端文件存在复制关系，不是共享构建产物。后续源码结构任务只能搬迁和修复路径，不得借机改业务行为。
 

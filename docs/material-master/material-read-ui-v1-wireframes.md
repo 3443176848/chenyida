@@ -1,12 +1,12 @@
 # Material Master 只读管理界面 V1 文字线框稿
 
-状态：`PROPOSED_AWAITING_SPEC_APPROVAL`
+状态：`APPROVED_IMPLEMENTED_REFERENCE`
 
 任务：`PHASE1-TASK09`
 
 日期：2026-07-14
 
-说明：本文是低保真布局说明，不定义颜色品牌体系，不代表已实施页面。所有尺寸均为 1366×768、浏览器 100% 缩放下的设计目标。
+说明：本文是已批准并实施的低保真布局参照，不定义颜色品牌体系。实际实现位于 `chenyida_erp_site/app/materials/`，所有尺寸仍以 1366×768、浏览器 100% 缩放为验收目标。
 
 ## 1. 全局页面壳
 

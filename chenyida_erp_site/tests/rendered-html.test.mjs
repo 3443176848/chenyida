@@ -9,7 +9,7 @@ test("production build contains the ERP application shell", async () => {
     readFile(new URL("../dist/server/index.js", import.meta.url), "utf8"),
     readFile(new URL("../dist/client/erp/index.html", import.meta.url), "utf8"),
   ]);
-  assert.match(worker, /src:\s*"\/erp\/index\.html\?v=20260710-auth-flow"/i);
+  assert.match(worker, /src:\s*"\/erp\/index\.html\?v=20260714-material-read-ui"/i);
   assert.match(worker, /title:\s*"晨亿达 ERP"/i);
   assert.match(worker, /handleErpApi/);
   assert.match(erpHtml, /物料主数据治理工作台/);
@@ -17,12 +17,13 @@ test("production build contains the ERP application shell", async () => {
 });
 
 test("ships the complete ERP interface without starter metadata", async () => {
-  const [page, layout, packageJson, erpHtml, erpScript, erpStyles, erpApi] = await Promise.all([
+  const [page, layout, packageJson, erpHtml, erpScript, browserApiClient, erpStyles, erpApi] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../public/erp/index.html", import.meta.url), "utf8"),
     readFile(new URL("../public/erp/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/erp/api-client.js", import.meta.url), "utf8"),
     readFile(new URL("../public/erp/styles.css", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/erp-api.ts", import.meta.url), "utf8"),
   ]);
@@ -35,10 +36,12 @@ test("ships the complete ERP interface without starter metadata", async () => {
   assert.match(erpHtml, /创建系统管理员/);
   assert.match(erpHtml, /账号与角色/);
   assert.match(erpHtml, /href="\.\/styles\.css\?v=20260710-auth-flow"/);
-  assert.match(erpHtml, /src="\.\/app\.js\?v=20260710-auth-flow"/);
+  assert.match(erpHtml, /type="module" src="\.\/app\.js\?v=20260714-material-read-ui"/);
   assert.doesNotMatch(erpHtml, /(?:href|src)="\/(?:styles\.css|app\.js)"/);
   assert.doesNotMatch(erpHtml, /admin123|默认管理员/);
-  assert.match(erpScript, /Idempotency-Key/);
+  assert.match(erpScript, /import \{ api, safeMaterialReturnTo \} from "\.\/api-client\.js"/);
+  assert.match(browserApiClient, /Idempotency-Key/);
+  assert.match(browserApiClient, /credentials: "same-origin"/);
   assert.match(erpScript, /setup_required/);
   assert.match(erpScript, /初始化完成，已进入系统/);
   assert.match(erpScript, /authenticated: true, user: result\.user, setup_required: false/);

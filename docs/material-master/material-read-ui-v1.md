@@ -1,6 +1,6 @@
 # Material Master 只读管理界面 V1
 
-状态：`PROPOSED_AWAITING_SPEC_APPROVAL`
+状态：`APPROVED_IMPLEMENTED_AND_VERIFIED`
 
 任务：`PHASE1-TASK09`
 
@@ -600,7 +600,7 @@ Material route shell
 
 ## 18. 生产与实施保护
 
-本规格不构成前端实施授权。项目负责人回复“规格确认”后，仍需建立独立实施任务和计划，才可修改前端代码。
+项目负责人已于 2026-07-14 回复“规格确认”，并批准在 `PHASE1-TASK09` 范围内实施本文只读页面。该授权不包含 API、Schema、Migration、索引、生产连接、生产迁移或部署。
 
 未经单独明确授权，不得：
 
@@ -622,3 +622,17 @@ Material route shell
 - 项目 Python 3.12 临时 SQLite：环境守卫 4/4、`server.py --self-test`、`smoke_test.py`、`backup_restore_test.py` 和 `go_live_check.py --no-backup` 通过；临时目录已清理。
 - 最终范围只包含两份 Material UI 规格和项目治理文档；未修改运行时代码、前端、API、Schema、Migration、测试代码或部署配置。
 - 未连接生产 D1、未迁移真实数据、未部署生产 Site。
+
+## 20. 实施与验证结果
+
+2026-07-14 已按批准的组合布局完成非生产前端实现：
+
+- 新增原生 Vinext `/materials`、`/materials/:materialId`、`/versions` 和 `/change-logs` 四条页面路由，刷新和深链接不依赖 hash 或 iframe 内 tab。
+- 列表使用紧凑两行筛选、高密度横向滚动表格、固定编码/名称列、服务端分页/排序、300ms keyword debounce、分类树和 URL 权威状态。
+- 详情使用基本信息、职责信息、类型化属性、当前校验和两类最近历史摘要分区；完整历史使用独立 URL、服务端分页和有界行下展开。
+- legacy 页面和 Material 路由共同委托 `public/erp/api-client.js`，复用同源 Cookie、相对 API、401 事件和 Material/legacy 错误解析；未建立第二套 HTTP Client。
+- Material 路由未建立登录表单。未认证时携带安全 `return_to` 返回现有根页面登录遮罩，登录成功后回到原 Material URL；恶意、协议相对、外部或 scheme URL 回退 `/materials`。
+- 状态兼容覆盖 `INACTIVE=停用`、`OBSOLETE=废止`、`REPLACED=已替代` 和未知状态；筛选仍只发送 Query API allowlist。
+- 新增 37 个 UI 单元/契约测试，覆盖任务要求的 36 类场景；Site 全量 Node 测试、隔离 API smoke、lint、build、凭证扫描和临时 SQLite 基线通过。
+- 本地 Vinext 开发运行面四条页面路由均返回 200；普通 Node production start 因当前构建的 `cloudflare:` 模块加载限制不能作为本地 HTTP 验证入口，最终路由验证使用项目既有开发运行面和正式 build。
+- 未修改 API、Schema、Migration、索引、Material 服务、legacy SQLite 或部署配置；未连接生产 D1、迁移真实数据或部署生产 Site。

@@ -4,6 +4,19 @@
 
 ## 2026-07-14
 
+### PHASE1-TASK09 实施 - `feat: add material master read ui`
+
+- Git Commit：前端实现、测试和项目文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，前置设计提交为 `7b0527c`。
+- 页面路由：新增 `/materials`、`/materials/:materialId`、`/versions` 和 `/change-logs` 四条原生 Vinext 路由；刷新、深链接和浏览器历史不依赖 hash 或 iframe 内 tab。
+- 列表：实现紧凑筛选、高密度横向滚动表格、固定编码/名称列、服务端分页/排序、20/50/100 page_size、300ms keyword debounce、分类树和 URL 权威状态；分类失败不阻断基础列表。
+- 详情与历史：实现基本、职责、类型化属性、Validation、最近 5 条版本/变更摘要分区；完整历史独立分页、comment 折叠、快照/diff 有界行下展开和 operation_id 安全显示，不提供恢复或写操作。
+- 认证与请求：抽取唯一 `public/erp/api-client.js`，legacy 与 Material 页面共同使用相对 URL、同源 Cookie、Material/legacy 错误解析和 401 事件；Material 未认证访问使用现有根页面登录遮罩并通过安全 `return_to` 返回。
+- 状态与错误：INACTIVE 独立显示“停用”，OBSOLETE/REPLACED 仅作防御性展示，未知状态安全降级；400/401/403/404/500、网络失败、request_id、加载、空数据库和筛选无结果均有页面状态。
+- 测试：UI 单元/契约 37/37；全量 Node 103/103；四条本地 Vinext 开发路由均返回 200；lint 0 error/1 个任务外既有 warning；build、隔离 API smoke、217 文件凭证扫描和临时 SQLite 完整基线通过。
+- 数据库/API：未修改 API、Schema、Migration、索引、Material 业务服务或 legacy SQLite；前端不执行行级权限过滤并以服务端 total 为唯一总数。
+- 已知限制：当前普通 Node production start 不能加载 Vinext 构建中的 `cloudflare:` 模块，本地深链接验证使用既有开发运行面和正式 build；生产 Site 仍为旧版本。
+- 生产影响：无；未连接生产 D1、未迁移真实数据、未部署或修改生产配置。
+
 ### PHASE1-TASK09 设计评审 - `docs: design material master read ui`
 
 - Git Commit：书面规格、文字线框稿和项目治理文档在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `4d2f54b`。

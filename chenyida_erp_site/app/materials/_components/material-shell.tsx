@@ -1,0 +1,71 @@
+"use client";
+
+import { useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { api, ErpApiError, safeMaterialReturnTo } from "../../../public/erp/api-client.js";
+
+type SessionUser = { username?: string; display_name?: string; role?: string; role_label?: string };
+type Session = { authenticated: boolean; setup_required?: boolean; user?: SessionUser | null };
+
+export function currentMaterialLocation(): string {
+  return safeMaterialReturnTo(`${window.location.pathname}${window.location.search}`);
+}
+
+export function redirectToExistingLogin(): void {
+  const returnTo = encodeURIComponent(currentMaterialLocation());
+  window.location.replace(`/?return_to=${returnTo}`);
+}
+
+export function MaterialShell({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    api<Session>("/api/session")
+      .then((result) => {
+        if (!active) return;
+        if (!result.authenticated || result.setup_required) {
+          redirectToExistingLogin();
+          return;
+        }
+        setSession(result);
+      })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        if (reason instanceof ErpApiError && reason.status === 401) redirectToExistingLogin();
+        else setError("系统暂时无法验证登录状态，请稍后重试");
+      });
+    return () => { active = false; };
+  }, []);
+
+  const user = session?.user;
+  return (
+    <div className="mm-app-shell">
+      <header className="mm-topbar">
+        <div><h1>晨亿达 ERP</h1><p>物料主数据只读工作区</p></div>
+        <div className="mm-topbar-actions">
+          {user ? <span className="mm-user"><b>{user.display_name || user.username || "当前用户"}</b><small>{user.role_label || user.role || "已登录"}</small></span> : null}
+          <Link href="/" className="mm-ghost-link">返回 ERP</Link>
+        </div>
+      </header>
+      <div className="mm-layout">
+        <nav className="mm-sidebar" aria-label="主导航">
+          <Link href="/" className="mm-nav">ERP 总览</Link>
+          <Link href="/materials" className="mm-nav active" aria-current="page">物料主数据</Link>
+          <span className="mm-nav-section">业务模块</span>
+          <Link href="/" className="mm-nav">客户与供应商</Link>
+          <Link href="/" className="mm-nav">产品与 BOM</Link>
+          <Link href="/" className="mm-nav">采购与库存</Link>
+          <Link href="/" className="mm-nav">生产协同</Link>
+          <Link href="/" className="mm-nav">品质管理</Link>
+        </nav>
+        <main className="mm-content">
+          {error ? <div className="mm-error-state" role="alert"><h2>登录状态验证失败</h2><p>{error}</p><button onClick={() => window.location.reload()}>重试</button></div> : null}
+          {!session && !error ? <div className="mm-shell-loading" role="status">正在验证登录状态…</div> : null}
+          {session ? children : null}
+        </main>
+      </div>
+    </div>
+  );
+}

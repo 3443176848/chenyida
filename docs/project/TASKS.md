@@ -29,9 +29,9 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PHASE1-TASK09 | 设计 Material Master 只读管理界面 V1 | DONE | Codex（设计）、项目负责人（布局确认、规格待确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK08 | 完成高密度列表、分区详情、独立 URL 历史页签、URL 状态、权限/错误、组件边界、测试计划及低保真文字线框稿；Node 66/66、隔离 smoke、凭证扫描和临时 SQLite 基线通过；未修改前端、API、schema、migration、业务服务或生产环境 |
+| PHASE1-TASK09 | 设计并实施 Material Master 只读管理界面 V1 | DONE | Codex（设计与实施）、项目负责人（布局及规格确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK08 | 实现四条原生 Vinext 路由、高密度列表、分区详情、独立历史页签、URL 状态、安全 return_to、共享 HTTP Client 和现有登录回跳；UI 37/37、全量 Node 103/103、隔离 API smoke、路由冒烟、凭证扫描及临时 SQLite 基线通过；未修改 API/schema/migration/索引/业务服务，未连接或部署生产 |
 
-`PHASE1-TASK09` 已完成书面规格和文字线框稿，当前无 `DOING` 任务。布局方向已确认，完整规格等待项目负责人回复“规格确认”；未经确认不得实施前端。候选索引、`PENDING_APPROVAL` 收缩、生产迁移/部署和 `PHASE0-TASK03` 仍需独立任务与授权。
+`PHASE1-TASK09` 已完成规格确认、非生产前端实现和验证，当前无 `DOING` 任务。候选索引、`PENDING_APPROVAL` 收缩、生产迁移/部署和 `PHASE0-TASK03` 仍需独立任务与授权。
 
 ## Phase 0 待办
 
