@@ -397,6 +397,7 @@ test("Material queries are bounded and audit output is sanitized", { timeout: 12
     const detail = await api(context, `/api/material-master/drafts/${created.payload.data.material_id}`, { user: "purchase1" });
     assert.equal(detail.response.status, 200);
     assert.equal(detail.payload.data.validation.basis, "CURRENT_METADATA");
+    assert.equal(detail.payload.data.last_rejection, null);
     assert.equal("reviewGuard" in detail.payload.data.material, false);
     const audit = await context.DB.prepare("SELECT detail, idempotency_key_digest, retention_until FROM audit_log WHERE route_code <> ''").all();
     assert.ok(audit.results.length >= 3);
@@ -638,6 +639,136 @@ test("Material detail history is bounded and full histories use deterministic pa
     assert.equal(corrupted.response.status, 500);
     assert.equal(corrupted.payload.error.code, "INTERNAL_ERROR");
     assert.doesNotMatch(JSON.stringify(corrupted.payload), /broken|snapshot_json/);
+  } finally {
+    await context.mf.dispose();
+  }
+});
+
+test("Material detail projects the latest complete rejection from immutable version history", { timeout: 120_000 }, async () => {
+  const context = await fixture();
+  try {
+    const created = await api(context, "/api/material-master/drafts", {
+      method: "POST", user: "purchase1", body: draftBody(), key: "last-rejection-create",
+    });
+    const id = created.payload.data.material_id;
+    const neverRejectedMaterial = await api(context, `/api/material-master/materials/${id}`, { user: "purchase1" });
+    const neverRejectedDraft = await api(context, `/api/material-master/drafts/${id}`, { user: "purchase1" });
+    assert.equal(neverRejectedMaterial.payload.data.last_rejection, null);
+    assert.equal(neverRejectedDraft.payload.data.last_rejection, null);
+
+    await api(context, `/api/material-master/drafts/${id}/submit`, {
+      method: "POST", user: "purchase1", body: { expected_version: 1 }, key: "last-rejection-submit-1",
+    });
+    const firstReason = "<b>第一次驳回</b> & 原样保留";
+    await api(context, `/api/material-master/drafts/${id}/reject`, {
+      method: "POST", user: "manager1", body: { expected_version: 2, reason: firstReason }, key: "last-rejection-reject-1",
+    });
+    const firstMaterial = await api(context, `/api/material-master/materials/${id}`, { user: "purchase1" });
+    const firstDraft = await api(context, `/api/material-master/drafts/${id}`, { user: "purchase1" });
+    assert.deepEqual(firstMaterial.payload.data.last_rejection, {
+      version: 3,
+      reason: firstReason,
+      reviewed_by: "manager1",
+      reviewed_at: fixedNow.toISOString(),
+    });
+    assert.deepEqual(firstDraft.payload.data.last_rejection, firstMaterial.payload.data.last_rejection);
+
+    for (const path of [
+      `/api/material-master/materials/${id}`,
+      `/api/material-master/drafts/${id}`,
+    ]) {
+      const hidden = await api(context, path, { user: "purchase2" });
+      assert.equal(hidden.response.status, 404);
+      assert.equal(hidden.payload.error.code, "MATERIAL_NOT_FOUND");
+      assert.doesNotMatch(JSON.stringify(hidden.payload), /第一次驳回|manager1/);
+    }
+
+    await api(context, `/api/material-master/drafts/${id}`, {
+      method: "PATCH", user: "purchase1",
+      body: editBody(3, { basic_fields: { standard_name: "二次提交物料" } }), key: "last-rejection-edit-2",
+    });
+    await api(context, `/api/material-master/drafts/${id}/submit`, {
+      method: "POST", user: "purchase1", body: { expected_version: 4 }, key: "last-rejection-submit-2",
+    });
+    const latestReason = "第二次驳回：补充证明";
+    await api(context, `/api/material-master/drafts/${id}/reject`, {
+      method: "POST", user: "admin2", body: { expected_version: 5, reason: latestReason }, key: "last-rejection-reject-2",
+    });
+    const secondMaterial = await api(context, `/api/material-master/materials/${id}`, { user: "purchase1" });
+    const secondDraft = await api(context, `/api/material-master/drafts/${id}`, { user: "purchase1" });
+    assert.deepEqual(secondMaterial.payload.data.last_rejection, {
+      version: 6,
+      reason: latestReason,
+      reviewed_by: "admin2",
+      reviewed_at: fixedNow.toISOString(),
+    });
+    assert.deepEqual(secondDraft.payload.data.last_rejection, secondMaterial.payload.data.last_rejection);
+
+    let version = 6;
+    for (let index = 1; index <= 6; index += 1) {
+      const edited = await api(context, `/api/material-master/drafts/${id}`, {
+        method: "PATCH", user: "purchase1",
+        body: editBody(version, { basic_fields: { standard_name: `驳回后编辑 ${index}` } }),
+        key: `last-rejection-post-edit-${index}`,
+      });
+      assert.equal(edited.response.status, 200);
+      version += 1;
+    }
+    await api(context, `/api/material-master/drafts/${id}/submit`, {
+      method: "POST", user: "purchase1", body: { expected_version: version }, key: "last-rejection-final-submit",
+    });
+    version += 1;
+    const approved = await api(context, `/api/material-master/drafts/${id}/approve`, {
+      method: "POST", user: "manager1", body: { expected_version: version, review_comment: "通过" }, key: "last-rejection-final-approve",
+    });
+    assert.equal(approved.payload.data.material_status, "ACTIVE");
+
+    const capturedSql = [];
+    const capturingDatabase = {
+      prepare(sql) { capturedSql.push(sql.replaceAll(/\s+/g, " ").trim()); return context.DB.prepare(sql); },
+      batch(statements) { return context.DB.batch(statements); },
+    };
+    const capturedContext = { ...context, dependencies: { ...context.dependencies, database: capturingDatabase } };
+    const activeDetail = await api(capturedContext, `/api/material-master/materials/${id}`, { user: "warehouse1" });
+    assert.equal(activeDetail.response.status, 200);
+    assert.deepEqual(activeDetail.payload.data.last_rejection, secondMaterial.payload.data.last_rejection);
+    assert.equal(activeDetail.payload.data.history_summary.versions.items.length, 5);
+    assert.ok(activeDetail.payload.data.history_summary.versions.items.every((item) => item.event_type !== "REJECT"));
+    const projectionSql = capturedSql.find((sql) => sql.includes("event_type = 'REJECT'"));
+    assert.ok(projectionSql);
+    assert.match(projectionSql, /ORDER BY version_no DESC, reviewed_at DESC, id DESC LIMIT 1$/);
+    const projectionPlan = await context.DB.prepare(`EXPLAIN QUERY PLAN
+      SELECT version_no, change_reason, reviewed_by, reviewed_at
+      FROM material_versions
+      WHERE material_id = ? AND event_type = 'REJECT'
+      ORDER BY version_no DESC, reviewed_at DESC, id DESC
+      LIMIT 1
+    `).bind(id).all();
+    const projectionPlanDetails = projectionPlan.results.map((row) => String(row.detail)).join(" | ");
+    assert.match(projectionPlanDetails, /SEARCH material_versions USING INDEX material_versions_material_version_uq \(material_id=\?\)/);
+    assert.doesNotMatch(projectionPlanDetails, /SCAN material_versions/);
+
+    const versions = await api(context, `/api/material-master/materials/${id}/versions?page=1&page_size=2`, { user: "warehouse1" });
+    assert.equal(versions.payload.pagination.total, 14);
+    assert.deepEqual(versions.payload.data.map((item) => item.version), [14, 13]);
+    const incompatibleDraft = await api(context, `/api/material-master/drafts/${id}`, { user: "manager1" });
+    assert.equal(incompatibleDraft.response.status, 404);
+    assert.equal(incompatibleDraft.payload.error.code, "MATERIAL_NOT_FOUND");
+
+    await context.DB.prepare("UPDATE material_versions SET reviewed_at = NULL WHERE material_id = ? AND event_type = 'REJECT' AND version_no = 6").bind(id).run();
+    const corrupted = await api(context, `/api/material-master/materials/${id}`, { user: "warehouse1" });
+    assert.equal(corrupted.response.status, 500);
+    assert.equal(corrupted.payload.error.code, "INTERNAL_ERROR");
+    assert.equal(typeof corrupted.payload.error.request_id, "string");
+    assert.doesNotMatch(JSON.stringify(corrupted.payload), /第二次驳回|admin2|material_versions|reviewed_at/);
+    const failureAudit = await context.DB.prepare(`
+      SELECT error_code, request_id FROM audit_log
+      WHERE request_id = ? ORDER BY id DESC LIMIT 1
+    `).bind(corrupted.payload.error.request_id).first();
+    assert.deepEqual(failureAudit, {
+      error_code: "INTERNAL_ERROR",
+      request_id: corrupted.payload.error.request_id,
+    });
   } finally {
     await context.mf.dispose();
   }

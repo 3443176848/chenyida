@@ -25,14 +25,15 @@
 | PHASE1-TASK07 | 完善物料草稿生命周期、重新提交和审核队列 | DONE | Codex（实施）、项目负责人（九项方案 A 确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK06 | 已实现完整替换编辑、提交/驳回/再编辑/重新提交、`PENDING_REVIEW`、审核队列、职责分离、`0003` 和隔离并发/迁移测试；未连接或部署生产 D1 |
 | PHASE1-TASK08 | 实施 Material Master Reference & Query API | DONE | Codex（实施）、项目负责人（规格与 metadata 兼容规则确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK07 | 统一 Query/Reference Service、6 个新增查询路由、drafts 兼容层、行级可见性、ETag/no-store、历史分页及批量 metadata 已实现；Node 66/66、隔离 smoke、1k/10k/100k 计划证据和全量本地基线通过；未改 schema/index migration，未连接或部署生产 |
 | PHASE1-TASK09 | 设计并实施 Material Master 只读管理界面 V1 | DONE | Codex（设计与实施）、项目负责人（布局及规格确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK08 | 实现四条原生 Vinext 路由、高密度列表、分区详情、独立历史页签、URL 状态、安全 return_to、共享 HTTP Client 和现有登录回跳；UI 37/37、全量 Node 103/103、隔离 API smoke、路由冒烟、凭证扫描及临时 SQLite 基线通过；未修改 API/schema/migration/索引/业务服务，未连接或部署生产 |
+| PHASE1-TASK10 | 设计 Material Draft 创建、编辑与提交审核界面 V1 | DONE | Codex（设计）、项目负责人（五节设计与补充约束确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK09 | 完成正式书面规格和低保真线框稿；批准布局 C、Schema 驱动完整替换、PATCH/GET/submit、权限、Validation、Schema 漂移、幂等、并发、dirty、SAVED_UNSYNCED/RESULT_UNKNOWN 和 54 项 E2E 计划；未实施前端或 API |
 
 ## 当前任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PHASE1-TASK10 | 设计 Material Draft 创建、编辑与提交审核界面 V1 | DONE | Codex（设计）、项目负责人（五节设计与补充约束确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK09 | 完成正式书面规格和低保真线框稿；批准布局 C、Schema 驱动完整替换、PATCH/GET/submit、权限、Validation、Schema 漂移、幂等、并发、dirty、SAVED_UNSYNCED/RESULT_UNKNOWN 和 54 项 E2E 计划；未实施前端或 API，`last_rejection` 是前端实施前置 |
+| PHASE1-TASK11 | 实现 Material Detail last_rejection 只读历史投影 | DONE | Codex（实施）、项目负责人（任务范围确认） | 2026-07-15 | 2026-07-15 | PHASE1-TASK10 | materials/drafts 统一详情从完整 `material_versions` REJECT 历史按版本、审核时间、事件 ID 确定性 `LIMIT 1` 投影；null、两次驳回、摘要外历史、重提后 ACTIVE、权限 404、损坏历史和查询计划已覆盖；未改 schema/migration/索引/写服务，未连接或部署生产 D1 |
 
-`PHASE1-TASK10` 已完成规格确认、书面设计和非生产基线验证，当前无 `DOING` 任务。下一任务未自动开始；必须先独立批准并实现 `last_rejection` 最小只读兼容项，之后才能另行授权 Draft 前端编码。候选索引、`PENDING_APPROVAL` 收缩、生产迁移/部署和 `PHASE0-TASK03` 仍需独立任务与授权。
+`PHASE1-TASK11` 已完成非生产实现、隔离验证、文档和独立提交，当前无 `DOING` 任务。下一任务未自动开始，不开始 `PHASE1-TASK12`；Draft 前端编码、候选索引、`PENDING_APPROVAL` 收缩、生产迁移/部署和 `PHASE0-TASK03` 仍需独立任务与授权。
 
 ## Phase 0 待办
 

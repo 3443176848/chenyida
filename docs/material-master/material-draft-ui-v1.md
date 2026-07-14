@@ -28,7 +28,7 @@
 - 冲突不自动合并、不强制覆盖、不重发旧版本。
 - 未保存内容不写入 `localStorage` 或 `sessionStorage`。
 - `/api/session` 现有 `user.permissions` 是能力来源，不硬编码角色名，不调整 Session API。
-- `last_rejection` 是正式前端实施前置的最小只读 API 兼容项；本任务只定义契约，不实施 API。
+- `last_rejection` 是正式前端实施前置的最小只读 API 兼容项；PHASE1-TASK11 已按本规格实现，前端仍须由后续独立任务实施。
 
 ## 2. 范围与禁止事项
 
@@ -103,7 +103,7 @@ type ProtectedWriteContext = {
 
 ### 3.4 API 前置缺口
 
-统一详情只内嵌最近 5 条历史，版本分页没有 `event_type=REJECT` 过滤，因此不能可靠投影最近一次驳回。正式前端实施前必须通过独立任务增加第 17 节定义的 `last_rejection` 只读字段。本任务不修改 API。
+统一详情的最近 5 条历史不能可靠投影最近一次驳回。PHASE1-TASK11 已通过独立任务从完整不可变 `material_versions` REJECT 历史增加第 17 节定义的 `last_rejection`；不扫描最近摘要，也未修改写服务、Schema 或 migration。
 
 ## 4. 路由、返回协议与页面入口
 
@@ -611,7 +611,7 @@ type LastRejection = {
 - 无记录返回 null。
 - 不新增 Schema/Migration，不修改写服务。
 
-该字段未实现前可以在线框稿展示，但不得宣称能够可靠显示最近驳回，不得扫描详情最近 5 条后冒充完整历史。`last_rejection` 完成是正式前端实施验收的阻断前置条件。
+PHASE1-TASK11 的实现使用统一 Query Service，两个详情接口均按 `version_no DESC, reviewed_at DESC, id DESC LIMIT 1` 查询完整 REJECT 版本历史；无记录返回 `null`，损坏历史 fail-closed 为脱敏 `INTERNAL_ERROR`。该前置条件已完成，但不构成 Draft 前端编码或生产部署授权。
 
 ## 18. 未保存保护
 
@@ -810,7 +810,7 @@ type LastRejection = {
 51. WARNING 确认绑定当前版本和当前 Validation。
 52. SAVED_UNSYNCED 不显示为保存失败。
 53. RESULT_UNKNOWN 阻止同一物料启动第二个写操作。
-54. last_rejection 未完成时阻断正式前端实施验收。
+54. 正式前端必须消费已实现的 last_rejection，并覆盖 null、驳回后编辑/重提和最终 ACTIVE 的显示验收。
 
 ### 22.5 人工视觉验收
 
@@ -856,13 +856,13 @@ type LastRejection = {
 
 本规格已获项目负责人确认，但不构成前端实施或生产授权。后续顺序固定为：
 
-1. 独立批准并实施 `last_rejection` 最小只读 API 兼容项。
-2. 更新并确认对应 Query API/OpenAPI 文档和测试。
-3. 项目负责人另行指定前端实施任务。
+1. `last_rejection` 最小只读 API 兼容项已由 PHASE1-TASK11 独立实施。
+2. Query API/OpenAPI 文档和隔离测试已同步更新。
+3. 项目负责人另行指定前端实施任务；本任务不自动开始前端编码。
 4. 前端实施按本规格执行全部隔离测试和人工验收。
 5. 任何生产 migration 或部署仍需单独明确授权。
 
-在上述门禁完成前，不得开始 PHASE1-TASK10 的前端编码，也不得把本任务标记为生产可用。
+PHASE1-TASK11 只解除 `last_rejection` 这一 API 前置缺口；在项目负责人另行指定前端实施任务前，不得开始 PHASE1-TASK10 的前端编码，也不得把本任务标记为生产可用。
 
 ## 25. 文档阶段实际验证结果
 
@@ -875,4 +875,4 @@ type LastRejection = {
 - 一次性临时 SQLite：PASS；环境守卫 4/4、`SELF_TEST_OK`、`SMOKE_TEST_OK`、`BACKUP_RESTORE_TEST_OK`、`GO_LIVE_CHECK_OK`，临时目录已清理。
 - `git diff --check`、最终文件范围和敏感信息检查：提交前复核并记录在项目状态；差异仅允许本规格、线框稿和项目治理文档。
 
-以上是文档阶段回归结果，不表示页面、`last_rejection` API 或任何生产功能已经实施。
+以上是 PHASE1-TASK10 文档阶段回归结果。`last_rejection` API 后续已由 PHASE1-TASK11 在非生产开发代码中实施；页面和任何生产功能仍未实施或部署。

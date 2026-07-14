@@ -495,6 +495,37 @@ class D1MaterialMasterQueryService implements MaterialMasterQueryService {
     };
   }
 
+  private async lastRejection(materialId: number): Promise<Record<string, unknown> | null> {
+    const row = await this.database.prepare(`
+      SELECT version_no, change_reason, reviewed_by, reviewed_at
+      FROM material_versions
+      WHERE material_id = ? AND event_type = 'REJECT'
+      ORDER BY version_no DESC, reviewed_at DESC, id DESC
+      LIMIT 1
+    `).bind(materialId).first<Row>();
+    if (!row) return null;
+
+    const version = Number(row.version_no);
+    const reason = row.change_reason;
+    const reviewedBy = row.reviewed_by;
+    const reviewedAt = row.reviewed_at;
+    const reviewedTimestamp = typeof reviewedAt === "string" ? new Date(reviewedAt) : null;
+    if (
+      !Number.isSafeInteger(version) || version < 1
+      || typeof reason !== "string" || reason.trim().length < 1 || reason.length > 1000
+      || typeof reviewedBy !== "string" || reviewedBy.trim().length < 1
+      || !reviewedTimestamp || Number.isNaN(reviewedTimestamp.getTime())
+    ) {
+      throw new MaterialQueryError("HISTORY_DATA_INVALID");
+    }
+    return {
+      version,
+      reason,
+      reviewed_by: reviewedBy,
+      reviewed_at: reviewedTimestamp.toISOString(),
+    };
+  }
+
   async getMaterialDetail(materialId: number): Promise<Record<string, unknown> | null> {
     const base = await this.loadBaseDetail(materialId);
     if (!base) return null;
@@ -502,7 +533,11 @@ class D1MaterialMasterQueryService implements MaterialMasterQueryService {
     publicBase.attributes = (base.attributes as Row[]).map((attribute) => Object.fromEntries(
       Object.entries(attribute).filter(([key]) => key !== "source_ref"),
     ));
-    return { ...publicBase, history_summary: await this.historySummary(materialId) };
+    const [historySummary, lastRejection] = await Promise.all([
+      this.historySummary(materialId),
+      this.lastRejection(materialId),
+    ]);
+    return { ...publicBase, history_summary: historySummary, last_rejection: lastRejection };
   }
 
   async listMaterialVersions(materialId: number, query: MaterialHistoryQuery): Promise<Record<string, unknown> | null> {
@@ -519,15 +554,17 @@ class D1MaterialMasterQueryService implements MaterialMasterQueryService {
     const base = await this.loadBaseDetail(materialId, true);
     if (!base) return null;
     const material = base.material_record as MaterialRecord;
-    const [versions, changeLogs] = await Promise.all([
+    const [versions, changeLogs, lastRejection] = await Promise.all([
       this.versions(materialId, { page: query.versionPage, pageSize: query.versionPageSize }),
       this.changeLogs(materialId, { page: query.changeLogPage, pageSize: query.changeLogPageSize }),
+      this.lastRejection(materialId),
     ]);
     return {
       material: compatibilityMaterialView(material),
       attributes: base.attributes,
       category_path: base.category_path,
       validation: base.validation,
+      last_rejection: lastRejection,
       versions: { items: versions.data, pagination: versions.pagination },
       change_logs: { items: changeLogs.data, pagination: changeLogs.pagination },
     };

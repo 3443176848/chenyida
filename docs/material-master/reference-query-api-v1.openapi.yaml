@@ -131,14 +131,17 @@ paths:
   /api/material-master/materials/{materialId}:
     get:
       tags: [Material Query]
-      summary: 查询统一物料详情和有界历史摘要
-      description: 存在但当前用户不可见的 DRAFT/PENDING_REVIEW 与不存在对象相同，返回 MATERIAL_NOT_FOUND。
+      summary: 查询统一物料详情、有界历史摘要和最近驳回投影
+      description: >-
+        last_rejection 从完整不可变 material_versions REJECT 历史按
+        version_no DESC, reviewed_at DESC, id DESC 和 LIMIT 1 确定性投影，不依赖最近五条摘要。
+        存在但当前用户不可见的 DRAFT/PENDING_REVIEW 与不存在对象相同，返回 MATERIAL_NOT_FOUND。
       operationId: getMaterialDetail
       parameters:
         - $ref: '#/components/parameters/MaterialId'
       responses:
         '200':
-          description: 当前物料详情；历史摘要每类最多五条
+          description: 当前物料详情；历史摘要每类最多五条；last_rejection 无历史时为 null
           headers:
             X-Request-Id: { $ref: '#/components/headers/RequestId' }
             Cache-Control: { $ref: '#/components/headers/PrivateNoStore' }
@@ -242,6 +245,9 @@ paths:
     get:
       tags: [Material Workflow Compatibility]
       summary: 兼容查询可见草稿或待审详情
+      description: >-
+        复用统一 Query Service 和 last_rejection 投影；继续只允许可见的 DRAFT/PENDING_REVIEW，
+        不可见或状态不兼容均返回 MATERIAL_NOT_FOUND。
       operationId: getVisibleMaterialDraftDetail
       deprecated: true
       parameters:
@@ -260,7 +266,7 @@ paths:
           schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
       responses:
         '200':
-          description: 保持既有核心详情、Validation 和双历史分页外壳
+          description: 保持既有核心详情、Validation 和双历史分页外壳，并返回相同 last_rejection
           headers:
             X-Request-Id: { $ref: '#/components/headers/RequestId' }
             Cache-Control: { $ref: '#/components/headers/PrivateNoStore' }
@@ -754,10 +760,21 @@ components:
               items: { $ref: '#/components/schemas/MaterialChangeLogSummary' }
             total: { type: integer, minimum: 0 }
             has_more: { type: boolean }
+    LastRejection:
+      type: [object, 'null']
+      additionalProperties: false
+      required: [version, reason, reviewed_by, reviewed_at]
+      description: >-
+        最近一次完整 REJECT 业务历史；从未驳回时为 null。reason 是纯文本，客户端不得解释为 HTML。
+      properties:
+        version: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        reviewed_by: { type: string, minLength: 1 }
+        reviewed_at: { type: string, format: date-time }
     MaterialDetail:
       type: object
       additionalProperties: false
-      required: [material, category_path, attributes, validation, history_summary]
+      required: [material, category_path, attributes, validation, history_summary, last_rejection]
       properties:
         material: { $ref: '#/components/schemas/MaterialCore' }
         category_path:
@@ -769,6 +786,7 @@ components:
           items: { $ref: '#/components/schemas/MaterialAttributeView' }
         validation: { $ref: '#/components/schemas/ValidationResult' }
         history_summary: { $ref: '#/components/schemas/HistorySummary' }
+        last_rejection: { $ref: '#/components/schemas/LastRejection' }
     MaterialDetailResponse:
       type: object
       additionalProperties: false
@@ -843,12 +861,13 @@ components:
         data:
           type: object
           additionalProperties: true
-          required: [material, attributes, category_path, validation, versions, change_logs]
+          required: [material, attributes, category_path, validation, last_rejection, versions, change_logs]
           properties:
             material: { type: object, additionalProperties: true }
             attributes: { type: array, items: { type: object, additionalProperties: true } }
             category_path: { type: array, items: { $ref: '#/components/schemas/CategoryPathNode' } }
             validation: { $ref: '#/components/schemas/ValidationResult' }
+            last_rejection: { $ref: '#/components/schemas/LastRejection' }
             versions: { type: object, additionalProperties: true }
             change_logs: { type: object, additionalProperties: true }
         request_id: { $ref: '#/components/schemas/RequestId' }

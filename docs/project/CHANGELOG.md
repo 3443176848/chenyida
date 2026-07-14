@@ -2,6 +2,20 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-15
+
+### PHASE1-TASK11 实施 - `feat: add last rejection material projection`
+
+- Git Commit：实现、隔离测试、OpenAPI 和项目治理文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `402ef9b`。
+- 历史来源：单一使用不可变 `material_versions` 的 `event_type='REJECT'` 行；现有原子写事务已完整保存版本、驳回原因、审核人和审核时间，不关联 change logs，不修改历史。
+- Query Service：新增统一 `lastRejection()` 有界投影；`/materials/:materialId` 与 `/drafts/:materialId` 在既有行级可见性之后复用同一查询，列表不执行且无 N+1。
+- 确定性与安全：固定 `version_no DESC, reviewed_at DESC, id DESC LIMIT 1`；无记录返回 null，reason 原样作为纯文本，缺少任一必需历史字段时 fail-closed 为带 request_id 的脱敏 `INTERNAL_ERROR`。
+- 查询计划：隔离 D1 返回 `SEARCH material_versions USING INDEX material_versions_material_version_uq (material_id=?)`，未出现全表扫描；本任务未新增索引或 migration。
+- 测试：新增 1 个顶层隔离 D1 场景，覆盖 null、单次/多次驳回、摘要窗口外驳回、重编/重提/最终 ACTIVE、两详情一致、drafts 状态限制、隐藏 404、纯文本、损坏历史、确定性 SQL、查询计划和分页/摘要回归；Node 104/104 通过。
+- 全量验证：build、lint 0 error/1 个既有 warning、OpenAPI YAML、一次性 D1 API smoke、219 文件凭证扫描、临时 SQLite 环境守卫 4/4、自测、烟测、备份恢复、go-live 检查和 `git diff --check` 全部通过。
+- 数据库与生产：未修改 schema、migration、索引、审核写服务、前端或历史记录；未连接生产 URL/D1，未迁移或部署。
+- 已知限制：现有索引按 material_id/version_no 搜索，没有专用 REJECT 索引；当前单详情计划满足有界要求，若单物料版本规模显著增长需独立复测和审批。
+
 ## 2026-07-14
 
 ### PHASE1-TASK10 设计评审 - `docs: design material draft ui`
