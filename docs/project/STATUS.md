@@ -8,13 +8,13 @@
 | --- | ---: | --- |
 | 总代码量 | 约 19,850 行 | 沿用既有运行时源码口径；TASK09 新增约 994 行 Material 路由、组件、样式与共享 Client 源码，排除测试、依赖、构建缓存、生成物和文档 |
 | 源码文件 | 77 | TASK09 新增四条页面路由、四个职责组件、查询/格式化模块、样式和共享浏览器 Client；测试另计 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK09 实施差异覆盖 Material 前端、共享浏览器 Client、UI 测试和项目文档；API、schema、migration、索引、业务服务和部署配置未修改 |
+| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK10 差异只覆盖两份 Material Draft UI 设计文档和项目治理文档；运行时代码、API、schema、migration、测试代码和部署配置未修改 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 48（开发 schema） | 本地 SQLite 26；在线既有 D1 8；V2 12；Material API 安全表 2；未执行生产迁移，不能理解为生产现状 |
 | 在线 API 路径 | 67 | 既有 61 个路径加 6 个 Reference/统一查询/历史路径；生产公开站点尚未部署本提交 |
-| 页面入口 | 7 | 既有本地/在线根入口 3 个，加 `/materials`、详情、版本和变更日志 4 条原生 Vinext 路由；生产尚未部署 |
-| 测试与安全检查文件 | 19 | TASK09 新增 37 个 UI 单元/契约用例，覆盖要求的 36 类前端场景 |
+| 页面入口 | 7 | 当前仍为既有本地/在线根入口 3 个，加 `/materials`、详情、版本和变更日志 4 条原生 Vinext 路由；TASK10 只设计 `/materials/new` 和编辑路由，尚未实施 |
+| 测试与安全检查文件 | 19 | TASK10 未修改测试代码；书面规格定义后续 54 项 Draft UI 端到端验收 |
 
 ## 当前版本与环境
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE1-TASK09` 实施开始时，根仓库 `main` 位于书面设计提交 `7b0527c`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异覆盖 Material 前端、共享浏览器 Client、UI 测试和项目治理文档；未修改 API、schema、migration、索引、业务服务或生产配置。
+`PHASE1-TASK10` 开始时，根仓库 `main` 位于 `9bb1756`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖 Material Draft UI 书面规格、低保真线框稿和项目治理文档；未修改前端运行时代码、API、schema、migration、索引、业务服务、测试代码或生产配置。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE1-TASK09` 实施提交消息为 `feat: add material master read ui`，前置设计提交为 `7b0527c`。未创建生产版本、未推送、未连接或部署生产 D1。
+`PHASE1-TASK10` 提交消息为 `docs: design material draft ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1。
 
 实时状态必须使用：
 
@@ -64,6 +64,22 @@ git -C chenyida_erp_site status --short
 - 数据库迁移或表数量变化
 - API、页面、测试或主要目录变化
 - 统计口径变化
+
+## PHASE1-TASK10 Material Draft UI 书面设计状态
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / AWAITING ACCEPTANCE | 五节设计及全部补充约束已确认；只完成规格和线框稿 |
+| 页面路由 | DESIGNED / NOT IMPLEMENTED | `/materials/new`、`/materials/:materialId/edit`；未新增页面文件 |
+| 布局 | APPROVED | 布局 C；分类/基础信息首屏并列、动态属性全宽、约 200px 快速定位与 Validation、sticky 操作区和窄宽降级 |
+| 表单与 Schema | APPROVED | 当前 D1 Schema、完整 PATCH、严格数值、0/false、未知属性保护、分类切换确认和 Schema 漂移 fail-closed |
+| 写状态 | APPROVED | POST 后 GET、PATCH/GET/submit、WARNING 确认、Idempotency 状态机、RESULT_UNKNOWN、SAVED_UNSYNCED、dirty 和版本冲突对照 |
+| 权限 | APPROVED | `/api/session -> user.permissions`；不硬编码角色；服务端继续最终校验权限、所有权、状态和 expected_version |
+| API 兼容 | BLOCKING PREREQUISITE | Session/创建响应/validate-only 无需调整；统一详情必须先独立实现可靠 `last_rejection` 只读投影 |
+| 测试设计 | COMPLETE | 单元、组件、集成、原 47 项加 7 项扩展 E2E，以及 1366×768 人工视觉/键盘验收 |
+| 文档阶段基线 | PASS | lint 0 error/1 个既有 warning；Node 103/103；隔离 API、凭证扫描、临时 SQLite 五项基线和 `git diff --check` 通过 |
+| 代码/API/schema 变化 | NONE | 未修改运行时代码、API、Schema、Migration、索引、业务服务或测试代码 |
+| 生产影响 | NONE | 未连接生产 D1、未迁移真实物料、未部署或修改生产配置 |
 
 ## PHASE1-TASK09 Material 只读管理界面实施状态
 

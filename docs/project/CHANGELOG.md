@@ -4,6 +4,19 @@
 
 ## 2026-07-14
 
+### PHASE1-TASK10 设计评审 - `docs: design material draft ui`
+
+- Git Commit：书面规格、低保真线框稿和项目治理文档在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `9bb1756`。
+- 新增功能：无；本任务只完成 Material Draft 创建、编辑与提交审核界面 V1 书面设计。
+- 路由与布局：定义 `/materials/new`、`/materials/:materialId/edit`，采用顶部分类/基础信息、全宽动态属性和约 200px 右侧快速定位/Validation 的布局 C；窄宽下辅助栏移动到顶部。
+- 表单与 Schema：只读取当前分类 Reference Schema，按 display_order 和中性分段渲染 TEXT/INTEGER/DECIMAL/BOOLEAN/ENUM/单位；PATCH 使用完整可编辑聚合，未知旧属性和分类切换不得静默删除。
+- 写状态：定义 POST 创建后 GET 重载、PATCH/GET/submit、WARNING 确认、页面内存 IdempotencyKeyController、RESULT_UNKNOWN 安全重试、SAVED_UNSYNCED、规范化 dirty 和 VERSION_CONFLICT 只读对照。
+- 权限与安全：动作只读取 `/api/session -> user.permissions`；复用现有会话、CSRF、安全 return_to 和共享 Client；source_ref 只读，POST 省略、PATCH 不发送；不硬编码角色或复制服务端 Validation。
+- API 前置：记录统一详情 `last_rejection` 最小只读投影为正式前端实施阻断前置；本任务未修改 API、Schema、Migration 或写服务。
+- 测试设计：定义单元、组件、集成、原 47 项加 7 项扩展 E2E，以及 1366×768 人工视觉/键盘验收；文档阶段运行完整隔离基线。
+- 验证结果：lint 0 error/1 个既有 warning；构建和 Node 103/103、一次性本地 D1 API 烟测、219 文件凭证扫描、临时 SQLite 环境守卫/自测/烟测/备份恢复/go-live 检查及 `git diff --check` 全部通过。
+- 生产影响：无；未连接生产 D1、未迁移真实物料、未部署或修改生产配置。
+
 ### PHASE1-TASK09 实施 - `feat: add material master read ui`
 
 - Git Commit：前端实现、测试和项目文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，前置设计提交为 `7b0527c`。

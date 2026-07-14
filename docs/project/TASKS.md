@@ -24,14 +24,15 @@
 | PHASE1-TASK06 | 设计并实现受认证授权的 Material Master Draft/Review API | DONE | Codex（执行）、项目负责人（规格与八项业务选择确认） | 2026-07-13 | 2026-07-14 | PHASE1-TASK05 | 五个 API、现有会话认证、细粒度权限、禁止自审、Origin/CSRF、24 小时持久幂等、60/20 限流、乐观锁、1095 天审计、只读 Query Service 和 `0002` 已完成；Node 58/58、隔离 API smoke 及安全检查通过，未连接或部署生产 |
 | PHASE1-TASK07 | 完善物料草稿生命周期、重新提交和审核队列 | DONE | Codex（实施）、项目负责人（九项方案 A 确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK06 | 已实现完整替换编辑、提交/驳回/再编辑/重新提交、`PENDING_REVIEW`、审核队列、职责分离、`0003` 和隔离并发/迁移测试；未连接或部署生产 D1 |
 | PHASE1-TASK08 | 实施 Material Master Reference & Query API | DONE | Codex（实施）、项目负责人（规格与 metadata 兼容规则确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK07 | 统一 Query/Reference Service、6 个新增查询路由、drafts 兼容层、行级可见性、ETag/no-store、历史分页及批量 metadata 已实现；Node 66/66、隔离 smoke、1k/10k/100k 计划证据和全量本地基线通过；未改 schema/index migration，未连接或部署生产 |
+| PHASE1-TASK09 | 设计并实施 Material Master 只读管理界面 V1 | DONE | Codex（设计与实施）、项目负责人（布局及规格确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK08 | 实现四条原生 Vinext 路由、高密度列表、分区详情、独立历史页签、URL 状态、安全 return_to、共享 HTTP Client 和现有登录回跳；UI 37/37、全量 Node 103/103、隔离 API smoke、路由冒烟、凭证扫描及临时 SQLite 基线通过；未修改 API/schema/migration/索引/业务服务，未连接或部署生产 |
 
 ## 当前任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PHASE1-TASK09 | 设计并实施 Material Master 只读管理界面 V1 | DONE | Codex（设计与实施）、项目负责人（布局及规格确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK08 | 实现四条原生 Vinext 路由、高密度列表、分区详情、独立历史页签、URL 状态、安全 return_to、共享 HTTP Client 和现有登录回跳；UI 37/37、全量 Node 103/103、隔离 API smoke、路由冒烟、凭证扫描及临时 SQLite 基线通过；未修改 API/schema/migration/索引/业务服务，未连接或部署生产 |
+| PHASE1-TASK10 | 设计 Material Draft 创建、编辑与提交审核界面 V1 | DONE | Codex（设计）、项目负责人（五节设计与补充约束确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK09 | 完成正式书面规格和低保真线框稿；批准布局 C、Schema 驱动完整替换、PATCH/GET/submit、权限、Validation、Schema 漂移、幂等、并发、dirty、SAVED_UNSYNCED/RESULT_UNKNOWN 和 54 项 E2E 计划；未实施前端或 API，`last_rejection` 是前端实施前置 |
 
-`PHASE1-TASK09` 已完成规格确认、非生产前端实现和验证，当前无 `DOING` 任务。候选索引、`PENDING_APPROVAL` 收缩、生产迁移/部署和 `PHASE0-TASK03` 仍需独立任务与授权。
+`PHASE1-TASK10` 已完成规格确认、书面设计和非生产基线验证，当前无 `DOING` 任务。下一任务未自动开始；必须先独立批准并实现 `last_rejection` 最小只读兼容项，之后才能另行授权 Draft 前端编码。候选索引、`PENDING_APPROVAL` 收缩、生产迁移/部署和 `PHASE0-TASK03` 仍需独立任务与授权。
 
 ## Phase 0 待办
 

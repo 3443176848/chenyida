@@ -73,6 +73,7 @@
 - 在线 JSON 模型缺少关键关系约束；本地 SQLite 缺少外键和迁移历史。
 - 在线导入没有真正匹配现有物料或映射；新 Material Draft/Review API 不包含导入适配。
 - Material Draft/Review POST 已具备同源/CSRF、持久幂等和限速；其他 legacy POST 的 CSRF 与限速仍需专项治理。测试环境已有本机一次性 D1，尚无远程 Test D1。
+- Material Draft UI 已完成书面规格但尚未编码；统一详情只能返回最近 5 条历史摘要，正式实现前必须先独立增加从完整不可变历史投影的 `last_rejection` 只读字段。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
 - 业务决策 `B01-B24` 尚未全部确认。
 
@@ -87,7 +88,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 的 Material V2 schema、分类属性、Validation、Draft/Review Service、受认证授权 API、统一只读 Query API 和只读管理界面的非生产实现。生产仍为旧版本，未执行 V2 migrations 或部署。下一任务必须由项目负责人独立指定。
+当前已完成 Phase 1 的 Material V2 schema、分类属性、Validation、Draft/Review Service、受认证授权 API、统一只读 Query API 和只读管理界面的非生产实现，并完成 Material Draft 创建、编辑与提交审核界面的书面规格和低保真线框设计。Draft 前端尚未编码；生产仍为旧版本，未执行 V2 migrations 或部署。下一任务必须由项目负责人独立指定，且前端实施前需先完成已批准范围内的 `last_rejection` 最小只读兼容项。
 
 ## 恢复上下文检查清单
 
