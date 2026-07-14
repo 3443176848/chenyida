@@ -4,6 +4,19 @@
 
 ## 2026-07-14
 
+### PHASE1-TASK09 设计评审 - `docs: design material master read ui`
+
+- Git Commit：书面规格、文字线框稿和项目治理文档在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `4d2f54b`。
+- 新增功能：无；本阶段只完成 Material Master 只读管理界面 V1 书面设计。
+- 页面设计：列表采用高密度紧凑筛选和企业表格，详情采用高密度分区卡片；版本历史与变更日志保留独立 URL 并作为详情工作区页签。
+- URL 与交互：定义列表查询规范化、keyword debounce、前进后退、深链接、安全 `return_to`、分类 ID/path 语义、服务端分页/排序和固定关键列。
+- 权限与错误：前端不复制行级权限；隐藏对象统一 404；定义 401/403/400/500、网络失败、request_id、Material 嵌套错误和 private/no-store 边界。
+- 历史与属性：定义 TEXT/INTEGER/DECIMAL/BOOLEAN/ENUM/单位/空值展示、Validation ERROR/WARNING、最近 5 条摘要、有界版本快照和变更详情。
+- 架构：记录现有 iframe/tab、无通用组件和 legacy 错误包装差异；建议使用真正 Vinext 路由、唯一共享浏览器请求边界，不新增大型状态或请求依赖。
+- 验证：规格占位符/路由/范围自检通过；Site build、Node 66/66、lint 0 error/1 个既有 warning、一次性 D1 smoke、203 文件凭证扫描和临时 SQLite 完整基线通过；临时数据已清理。
+- 数据库/API/代码：无变化；未修改前端、API、Schema、Migration、索引、业务服务或 legacy SQLite。
+- 生产影响：无；未连接生产 D1、未迁移真实数据、未部署或修改生产配置。
+
 ### PHASE1-TASK08 实施 - `feat: add material reference and query api`
 
 - Git Commit：实现、测试、查询计划证据和项目文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，前置规格提交为 `928e08f`。

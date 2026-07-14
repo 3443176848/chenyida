@@ -8,12 +8,12 @@
 | --- | ---: | --- |
 | 总代码量 | 18,882 行 | 沿用既有运行时源码口径；PHASE1-TASK07 净新增 913 行运行时/API/schema 源码，排除测试、migration、seed、依赖、构建缓存、生成物和文档 |
 | 源码文件 | 64 | TASK08 新增 Reference Query、行级可见性和共享单位策略三个服务端模块；测试与查询计划脚本另计 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK08 修改在线服务端查询代码、测试、查询计划脚本和文档；schema、migration、前端及部署配置未修改，仓库仍无 mode `160000` |
+| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK09 只新增 Material UI 规格、文字线框稿并更新项目治理文档；运行时代码、schema、migration、API、前端和部署配置未修改 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 48（开发 schema） | 本地 SQLite 26；在线既有 D1 8；V2 12；Material API 安全表 2；未执行生产迁移，不能理解为生产现状 |
 | 在线 API 路径 | 67 | 既有 61 个路径加 6 个 Reference/统一查询/历史路径；生产公开站点尚未部署本提交 |
-| 页面入口 | 3 | 本地 `static/index.html`、在线 `app/page.tsx`、在线 `public/erp/index.html` |
+| 页面入口 | 3 | 本地 `static/index.html`、在线 `app/page.tsx`、在线 `public/erp/index.html`；`/materials/...` 仅为待确认书面设计，尚未实施 |
 | 测试与安全检查文件 | 18 | 新增 `0003` migration 测试，并扩展 Material API、服务并发和隔离 smoke |
 
 ## 当前版本与环境
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE1-TASK08` 实施开始时，根仓库 `main` 位于规格提交 `928e08f`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异覆盖在线服务端 Query/Reference、共享单位策略、隔离测试、查询计划脚本和文档；未修改 schema、migration、前端或生产配置。
+`PHASE1-TASK09` 开始时，根仓库 `main` 位于 `4d2f54b`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖两份 Material UI 规格和项目治理文档；未修改运行时代码、schema、migration、API、测试代码、前端或生产配置。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE1-TASK08` 实施提交消息为 `feat: add material reference and query api`。未创建生产版本、未推送、未连接或部署生产 D1。
+`PHASE1-TASK09` 设计提交消息为 `docs: design material master read ui`。未创建生产版本、未推送、未连接或部署生产 D1。
 
 实时状态必须使用：
 
@@ -64,6 +64,20 @@ git -C chenyida_erp_site status --short
 - 数据库迁移或表数量变化
 - API、页面、测试或主要目录变化
 - 统计口径变化
+
+## PHASE1-TASK09 Material 只读管理界面设计状态
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / AWAITING SPEC APPROVAL | 布局方向已确认，完整书面规格等待项目负责人回复“规格确认” |
+| 规格文件 | COMPLETE | `material-read-ui-v1.md` 覆盖路由、URL 状态、页面结构、组件、权限/错误、历史和测试 |
+| 文字线框稿 | COMPLETE | 覆盖列表、详情、版本、日志及加载、空、401/403/404/400/500 状态 |
+| 布局 | ACCEPTED | 高密度企业表格列表；高密度分区卡片详情；独立 URL 历史页签 |
+| 前端/API/schema | UNCHANGED | 未修改运行时代码、前端、API、Schema、Migration、索引、测试代码或部署配置 |
+| Site 基线 | PASS | build、Node 66/66、lint 0 error/1 个任务外既有 warning、一次性 D1 smoke 通过 |
+| 本地基线 | PASS | 临时 SQLite 环境守卫 4/4、自测、烟测、备份恢复和 go-live 检查通过；临时目录已清理 |
+| 安全检查 | PASS | 203 个仓库文件凭证扫描通过；Material 错误和隐藏对象策略已写入规格 |
+| 生产影响 | NONE | 未连接生产 D1、未迁移真实物料、未部署或修改生产配置 |
 
 ## PHASE1-TASK08 Reference & Query API 实施状态
 

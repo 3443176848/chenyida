@@ -23,14 +23,15 @@
 | PHASE1-TASK05 | 建立 Material Master Draft 创建与审核写服务 | DONE | Codex（执行）、项目负责人（任务规格与编码时点确认） | 2026-07-12 | 2026-07-13 | PHASE1-TASK04 | 新增 Draft/Review/Code 六模块，以 D1 batch 原子写草稿、属性、版本、审计和审核编码；乐观锁、规则 CAS、metadata/属性守卫及 12 个隔离 D1 用例通过，全量 Node 52/52；未接 API、未改 migration、未访问生产 |
 | PHASE1-TASK06 | 设计并实现受认证授权的 Material Master Draft/Review API | DONE | Codex（执行）、项目负责人（规格与八项业务选择确认） | 2026-07-13 | 2026-07-14 | PHASE1-TASK05 | 五个 API、现有会话认证、细粒度权限、禁止自审、Origin/CSRF、24 小时持久幂等、60/20 限流、乐观锁、1095 天审计、只读 Query Service 和 `0002` 已完成；Node 58/58、隔离 API smoke 及安全检查通过，未连接或部署生产 |
 | PHASE1-TASK07 | 完善物料草稿生命周期、重新提交和审核队列 | DONE | Codex（实施）、项目负责人（九项方案 A 确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK06 | 已实现完整替换编辑、提交/驳回/再编辑/重新提交、`PENDING_REVIEW`、审核队列、职责分离、`0003` 和隔离并发/迁移测试；未连接或部署生产 D1 |
+| PHASE1-TASK08 | 实施 Material Master Reference & Query API | DONE | Codex（实施）、项目负责人（规格与 metadata 兼容规则确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK07 | 统一 Query/Reference Service、6 个新增查询路由、drafts 兼容层、行级可见性、ETag/no-store、历史分页及批量 metadata 已实现；Node 66/66、隔离 smoke、1k/10k/100k 计划证据和全量本地基线通过；未改 schema/index migration，未连接或部署生产 |
 
 ## 当前任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PHASE1-TASK08 | 实施 Material Master Reference & Query API | DONE | Codex（实施）、项目负责人（规格与 metadata 兼容规则确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK07 | 统一 Query/Reference Service、6 个新增查询路由、drafts 兼容层、行级可见性、ETag/no-store、历史分页及批量 metadata 已实现；Node 66/66、隔离 smoke、1k/10k/100k 计划证据和全量本地基线通过；未改 schema/index migration，未连接或部署生产 |
+| PHASE1-TASK09 | 设计 Material Master 只读管理界面 V1 | DONE | Codex（设计）、项目负责人（布局确认、规格待确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK08 | 完成高密度列表、分区详情、独立 URL 历史页签、URL 状态、权限/错误、组件边界、测试计划及低保真文字线框稿；Node 66/66、隔离 smoke、凭证扫描和临时 SQLite 基线通过；未修改前端、API、schema、migration、业务服务或生产环境 |
 
-`PHASE1-TASK08` 已完成非生产实现和验证，当前无 `DOING` 任务。缺失 description、`label = code`、不读取 seed、行级最小披露和缓存契约均有回归测试；候选索引只记录在查询计划报告中，未经再次审批不得创建 migration。等待项目负责人验收并指派下一任务；`PHASE0-TASK03` 仍在台账中等待后续安排。
+`PHASE1-TASK09` 已完成书面规格和文字线框稿，当前无 `DOING` 任务。布局方向已确认，完整规格等待项目负责人回复“规格确认”；未经确认不得实施前端。候选索引、`PENDING_APPROVAL` 收缩、生产迁移/部署和 `PHASE0-TASK03` 仍需独立任务与授权。
 
 ## Phase 0 待办
 
