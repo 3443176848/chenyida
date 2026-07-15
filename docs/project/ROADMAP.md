@@ -57,8 +57,8 @@
 
 - `PHASE2-TASK01`：设计 Material Import Batch Foundation V1（DONE）。
 - `PHASE2-TASK02`：实现 Import Batch Foundation（DONE，非生产；无 R2 资源、生产迁移或部署）。
-- `PHASE2-TASK03`：设计 Excel/CSV Parser 与字段 Mapping V1（DONE，等待正式规格确认；仅文档）。
-- `PHASE2-TASK04`：实施 Parser、`0005`、Outbox 和 Mapping API（PLANNED；只有规格确认和独立授权后才可开始，不含生产资源或部署）。
+- `PHASE2-TASK03`：设计 Excel/CSV Parser 与字段 Mapping V1（DONE；16 项决定已确认）。
+- `PHASE2-TASK04`：实施 Parser、`0005`、Outbox 和 Mapping API（DONE；54 项专项与全量 Node 278/278 通过，仅非生产，不含生产资源、迁移或部署）。
 
 ## Phase 3 AI治理
 

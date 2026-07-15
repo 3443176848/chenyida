@@ -19,10 +19,13 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@zip.js/zip.js": "2.8.26",
+    "csv-parse": "7.0.1",
     "drizzle-orm": "0.45.2",
     "next": "16.2.6",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "sax-wasm": "3.1.4"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",

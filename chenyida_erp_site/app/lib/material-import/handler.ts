@@ -7,6 +7,16 @@ import {
 } from "../material-api/security.ts";
 import type { MaterialImportObjectStore } from "./object-store.ts";
 import {
+  confirmMaterialImportMapping,
+  getMaterialImportMapping,
+  listMaterialImportRows,
+  listMaterialImportSheets,
+  previewMaterialImportMapping,
+  replaceMaterialImportMapping,
+  type MaterialImportMappingDraftInput,
+} from "./mapping-service.ts";
+import { MaterialImportParserServiceError, queueMaterialImportParse } from "./parser-service.ts";
+import {
   cancelMaterialImportBatch,
   createMaterialImportBatch,
   getMaterialImportBatch,
@@ -21,6 +31,8 @@ type ImportPermission =
   | "material.import.create"
   | "material.import.read"
   | "material.import.cancel"
+  | "material.import.parse"
+  | "material.import.map"
   | "material.import.read_any";
 
 export type MaterialImportApiDependencies = Readonly<{
@@ -129,14 +141,24 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
     const fileMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/file$/);
     const eventsMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/events$/);
     const cancelMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/cancel$/);
-    if (!root && !detailMatch && !fileMatch && !eventsMatch && !cancelMatch) throw new MaterialImportServiceError("IMPORT_BATCH_NOT_FOUND", "导入接口不存在", 404);
+    const parseMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/parse$/);
+    const sheetsMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/sheets$/);
+    const rowsMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/rows$/);
+    const mappingMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/mapping$/);
+    const previewMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/mapping\/preview$/);
+    const confirmMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/mapping\/confirm$/);
+    if (!root && !detailMatch && !fileMatch && !eventsMatch && !cancelMatch && !parseMatch && !sheetsMatch && !rowsMatch && !mappingMatch && !previewMatch && !confirmMatch) throw new MaterialImportServiceError("IMPORT_BATCH_NOT_FOUND", "导入接口不存在", 404);
     const permission: ImportPermission = root && request.method === "POST"
       ? "material.import.create"
       : fileMatch
         ? "material.import.create"
         : cancelMatch
           ? "material.import.cancel"
-          : "material.import.read";
+          : parseMatch
+            ? "material.import.parse"
+            : (mappingMatch && request.method !== "GET") || previewMatch || confirmMatch
+              ? "material.import.map"
+              : "material.import.read";
     if (!dependencies.userCan(user, permission)) throw new MaterialImportServiceError("PERMISSION_DENIED", "没有执行此操作的权限", 403);
     const canReadAny = dependencies.userCan(user, "material.import.read_any");
     const serviceDependencies = {
@@ -161,7 +183,7 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
     } else if (root && request.method === "GET") {
       assertQueryKeys(url, ["status", "source_kind", "created_by_me", "cursor", "limit", "sort"]);
       const status = url.searchParams.get("status") ?? undefined;
-      if (status && !new Set(["CREATED", "UPLOAD_PENDING", "FILE_READY", "RECONCILIATION_REQUIRED", "FAILED", "CANCELLED"]).has(status)) throw new MaterialImportServiceError("INVALID_REQUEST", "status 无效", 400);
+      if (status && !new Set(["CREATED", "UPLOAD_PENDING", "FILE_READY", "QUEUED_FOR_PARSING", "PARSING", "PARSED", "AWAITING_MAPPING", "MAPPING_CONFIRMED", "RECONCILIATION_REQUIRED", "FAILED", "CANCELLED"]).has(status)) throw new MaterialImportServiceError("INVALID_REQUEST", "status 无效", 400);
       const sourceKind = url.searchParams.get("source_kind") ?? undefined;
       if (sourceKind && sourceKind !== "XLSX" && sourceKind !== "CSV") throw new MaterialImportServiceError("INVALID_REQUEST", "source_kind 无效", 400);
       const createdByMe = url.searchParams.get("created_by_me");
@@ -192,6 +214,38 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
       const { body } = await readBoundedJson(request);
       assertObjectKeys(body, ["expected_version", "reason_code"]);
       result = await cancelMaterialImportBatch(serviceDependencies, { batchId: integerPath(cancelMatch[1]), user, canReadAny, rawKey: request.headers.get("Idempotency-Key") ?? "", requestId, expectedVersion: body.expected_version, reasonCode: body.reason_code });
+    } else if (parseMatch && request.method === "POST") {
+      assertMaterialCsrf(request);
+      const { body } = await readBoundedJson(request);
+      assertObjectKeys(body, ["expected_version", "parser_version"]);
+      result = await queueMaterialImportParse(dependencies.database, { batchId: integerPath(parseMatch[1]), username: user.username, canReadAny, expectedVersion: Number(body.expected_version), parserVersion: String(body.parser_version ?? ""), idempotencyKey: request.headers.get("Idempotency-Key") ?? "", requestId }, dependencies.clock);
+    } else if (sheetsMatch && request.method === "GET") {
+      assertQueryKeys(url, []);
+      result = await listMaterialImportSheets(dependencies.database, integerPath(sheetsMatch[1]), { username: user.username, canReadAny });
+    } else if (rowsMatch && request.method === "GET") {
+      assertQueryKeys(url, ["sheet_index", "page", "page_size", "start_row", "end_row"]);
+      const rangeMode = url.searchParams.has("start_row") || url.searchParams.has("end_row");
+      if (rangeMode && (url.searchParams.has("page") || url.searchParams.has("page_size"))) throw new MaterialImportServiceError("INVALID_REQUEST", "分页模式与行范围模式不能混用", 400);
+      result = await listMaterialImportRows(dependencies.database, integerPath(rowsMatch[1]), { username: user.username, canReadAny, sheetIndex: Number(url.searchParams.get("sheet_index")), page: Number(url.searchParams.get("page") ?? 1), pageSize: Number(url.searchParams.get("page_size") ?? 50), ...(rangeMode ? { startRow: Number(url.searchParams.get("start_row")), endRow: Number(url.searchParams.get("end_row")) } : {}) });
+    } else if (mappingMatch && request.method === "GET") {
+      assertQueryKeys(url, []);
+      result = await getMaterialImportMapping(dependencies.database, integerPath(mappingMatch[1]), { username: user.username, canReadAny });
+    } else if (mappingMatch && request.method === "PUT") {
+      assertMaterialCsrf(request);
+      const { body } = await readBoundedJson(request);
+      assertObjectKeys(body, ["expected_version", "parse_run_id", "expected_mapping_version", "selected_sheet_index", "header_mode", "header_row_number", "items"]);
+      const draft = { selected_sheet_index: Number(body.selected_sheet_index), header_mode: body.header_mode, header_row_number: body.header_row_number, items: body.items } as MaterialImportMappingDraftInput;
+      result = await replaceMaterialImportMapping(dependencies.database, integerPath(mappingMatch[1]), { username: user.username, canReadAny, idempotencyKey: request.headers.get("Idempotency-Key") ?? "", requestId, expectedVersion: Number(body.expected_version), parseRunId: Number(body.parse_run_id), expectedMappingVersion: Number(body.expected_mapping_version), draft }, dependencies.clock);
+    } else if (previewMatch && request.method === "POST") {
+      assertMaterialCsrf(request);
+      const { body } = await readBoundedJson(request);
+      assertObjectKeys(body, ["expected_version", "parse_run_id", "mapping", "start_row", "row_limit"]);
+      result = await previewMaterialImportMapping(dependencies.database, integerPath(previewMatch[1]), { username: user.username, canReadAny, idempotencyKey: request.headers.get("Idempotency-Key") ?? "", requestId, expectedVersion: Number(body.expected_version), parseRunId: Number(body.parse_run_id), draft: body.mapping as MaterialImportMappingDraftInput, startRow: Number(body.start_row), rowLimit: Number(body.row_limit) }, dependencies.clock);
+    } else if (confirmMatch && request.method === "POST") {
+      assertMaterialCsrf(request);
+      const { body } = await readBoundedJson(request);
+      assertObjectKeys(body, ["expected_version", "parse_run_id", "mapping_id", "expected_mapping_version", "metadata_digest"]);
+      result = await confirmMaterialImportMapping(dependencies.database, integerPath(confirmMatch[1]), { username: user.username, canReadAny, idempotencyKey: request.headers.get("Idempotency-Key") ?? "", requestId, expectedVersion: Number(body.expected_version), parseRunId: Number(body.parse_run_id), mappingId: Number(body.mapping_id), expectedMappingVersion: Number(body.expected_mapping_version), metadataDigest: String(body.metadata_digest ?? "") }, dependencies.clock);
     } else {
       throw new MaterialImportServiceError("METHOD_NOT_ALLOWED", "请求方法不支持", 405);
     }
@@ -199,6 +253,7 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
   } catch (error) {
     let failure: MaterialImportServiceError;
     if (error instanceof MaterialImportServiceError) failure = error;
+    else if (error instanceof MaterialImportParserServiceError) failure = new MaterialImportServiceError(error.code, error.message, error.status, error.expectedVersion);
     else if (error instanceof MaterialApiFailure) {
       failure = new MaterialImportServiceError(
         error.code === "CSRF_INVALID" ? "CSRF_VALIDATION_FAILED" : error.code,

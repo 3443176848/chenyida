@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
   title: Chenyida ERP Material Import Parser and Mapping V1
-  version: 0.1.0-proposed
+  version: 1.0.0
   description: |
-    PHASE2-TASK03 proposed contract. This document does not mean the parser,
-    migration, Queue, schema, API, or production infrastructure exists.
-    All business decisions and resource limits remain Status: PROPOSED.
+    PHASE2-TASK04 approved non-production contract. Parser, versioned 0005
+    migration, Outbox/scheduler abstraction, schema and seven APIs are implemented
+    and covered by isolated tests. Production Queue/R2 bindings, production
+    migration, deployment, cleansing, matching and Material Draft creation are not included.
 servers:
   - url: /
 security:

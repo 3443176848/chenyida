@@ -4,6 +4,18 @@
 
 ## 2026-07-16
 
+### PHASE2-TASK04 实施 - `feat: add material import parser and mapping`
+
+- Git Commit：Parser 与字段 Mapping V1 非生产实现、测试和治理文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `a16b2f3`。
+- 数据库：新增不可修改的 `0005_material_import_parser_mapping.sql`、Drizzle schema/快照/journal 和数据保护 Down；扩展批次状态与 current run，新增 parse run、Sheet、Shared Strings 分块、Outbox、header suggestion、Mapping 主从表，并按 legacy run 保留既有原始行。
+- Parser：固定 `@zip.js/zip.js@2.8.26`、`sax-wasm@3.1.4`、`csv-parse@7.0.1`；实现 Web Streams 有界 XLSX/CSV、UTF-8/BOM/GB18030、三种分隔符、OOXML/XML 安全、日期/公式/隐藏 Sheet、组合资源限制和稳定 raw row hash。
+- 调度与恢复：实现 D1 Outbox dispatcher、可注入 scheduler、Cloudflare Queue adapter、至少一次去重、run 租约/接管/心跳、Sheet 恢复、分阶段失败、原始行原子发布和 Mapping 准备独立重试；没有创建 Queue binding 或部署配置。
+- Mapping/API：实现 Sheet/行读取、header candidates、关系化 Mapping 完整替换、静态与动态 target allowlist、100 行预览、metadata 摘要确认、乐观锁、事务幂等/审计及七个精确 API；明确不创建 Material Draft 或正式物料。
+- 权限：新增 `material.import.parse` 与 `material.import.map` capability；admin/manager/purchase/engineering 获显式授权，`read_any` 不隐含 parse/map；继续执行 owner/read_any 最小披露、Origin/CSRF 和隐藏 404。
+- 验证：专项 Parser 36、集成 11、migration 4、兼容 3，共 54/54；全量 Node 278/278、build、隔离 Parser TypeScript 夹具、隔离 API smoke、OpenAPI YAML、Drizzle 无漂移、265 文件凭证扫描及本地临时 SQLite 基线通过，lint 0 error/1 个任务外既有 warning。全仓 `tsc --noEmit` 的 10 个既有任务外错误未在本任务修复。
+- 依赖审计：`npm audit --omit=dev` 仍报告 Next 内置 PostCSS 的 2 个 moderate，建议修复会触发破坏性版本变化；本任务不执行 force fix。新增 Parser 依赖的固定版本、许可证、构建和运行时兼容测试通过。
+- 生产影响：无。未连接生产 D1/R2/Queue，未创建 bucket/binding/Cron，未执行生产 migration、修改 hosting 或部署；未实施前端、清洗、分类、匹配、AI、Material Draft 或正式物料写入。
+
 ### PHASE2-TASK03 设计 - `docs: design material import parser and mapping`
 
 - Git Commit：Parser 与字段 Mapping V1 文档在独立提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `63e0483`。

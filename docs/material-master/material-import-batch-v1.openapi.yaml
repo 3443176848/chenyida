@@ -427,11 +427,16 @@ components:
       enum: [XLSX, CSV]
     BatchStatus:
       type: string
-      description: V1 database CHECK values only; future parsing states are intentionally absent.
+      description: Foundation values plus the approved PHASE2-TASK04 parser and mapping states added by 0005.
       enum:
         - CREATED
         - UPLOAD_PENDING
         - FILE_READY
+        - QUEUED_FOR_PARSING
+        - PARSING
+        - PARSED
+        - AWAITING_MAPPING
+        - MAPPING_CONFIRMED
         - RECONCILIATION_REQUIRED
         - FAILED
         - CANCELLED

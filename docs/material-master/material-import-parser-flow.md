@@ -1,10 +1,10 @@
 # Material Import Parser 与 Mapping V1 流程图
 
-状态：`DESIGN COMPLETE / AWAITING SPECIFICATION CONFIRMATION`
+状态：`APPROVED / PHASE2-TASK04 IMPLEMENTED IN NON-PRODUCTION`
 
-业务与资源决定：`Status: PROPOSED`
+业务与资源决定：`Status: APPROVED`
 
-本图只说明 `PHASE2-TASK03` 的后续实现契约，不表示 Parser、`0005`、Queue、Schema 或 API 已实现。
+本图是 `PHASE2-TASK04` 非生产实施契约；生产 Queue、binding、migration 和部署仍未授权。
 
 ## 1. 业务状态
 
@@ -217,4 +217,4 @@ flowchart LR
     T --> P["Separate production Queue/R2/D1/deployment approval"]
 ```
 
-本次提交在第一节点停止，不自动进入任何实现或生产步骤。
+`PHASE2-TASK04` 已完成到隔离 Parser/Mapping 测试节点；生产 Queue/R2/D1 migration 和部署审批节点未开始。

@@ -36,6 +36,13 @@
       "when": 1784128413043,
       "tag": "0004_material_import_batch_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1784141598492,
+      "tag": "0005_material_import_parser_mapping",
+      "breakpoints": true
     }
   ]
 }

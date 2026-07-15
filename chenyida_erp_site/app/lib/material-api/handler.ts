@@ -49,6 +49,8 @@ type MaterialPermission =
   | "material.import.create"
   | "material.import.read"
   | "material.import.cancel"
+  | "material.import.parse"
+  | "material.import.map"
   | "material.import.read_any";
 
 type MaterialRoute = Readonly<{

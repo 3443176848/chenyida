@@ -5,7 +5,7 @@
 - 适用运行面：`chenyida_erp_site/`（在线 Sites / Vinext / TypeScript / D1）
 - 文档日期：2026-07-15
 - 审阅结果：项目负责人已通过 `PHASE2-TASK02` 指令批准本规格的 12 项决定。
-- 实施状态：已完成 Schema、`0004` Migration、对象存储抽象、六个 API、上传/安全检查、Saga、取消与手工清理的非生产实现；未创建生产 R2、binding、Cron，未连接或迁移生产 D1/R2，未部署。
+- 实施状态：已完成 Schema、`0004` Migration、对象存储抽象、六个 API、上传/安全检查、Saga、取消与手工清理的非生产实现；`PHASE2-TASK04` 通过后续 `0005` 扩展 Parser/Mapping 状态，未改写 `0004`。未创建生产 R2/Queue、binding、Cron，未连接或迁移生产 D1/R2，未部署。
 
 ## 1. 目的与边界
 
@@ -256,9 +256,7 @@ V1 Migration 的 CHECK 只应接受以下实际状态：
 | `FAILED` | 已确定、不可原地恢复的终态失败 | 无；重试创建新批次 |
 | `CANCELLED` | 业务终态取消；不表示对象已经删除 | 无 |
 
-`FAILED` 与 `CANCELLED` 是 V1 终态，进入时设置 `terminal_at`。未来 `COMPLETED` 也属于终态，但不应提前加入 V1 CHECK。
-
-以下状态只记录为路线图，必须由后续 Migration 扩展 CHECK 后才能使用：`QUEUED_FOR_PARSING`、`PARSING`、`PARSED`、`AWAITING_MAPPING`、`VALIDATING`、`AWAITING_REVIEW`、`COMPLETED`。
+`FAILED` 与 `CANCELLED` 是 V1 终态，进入时设置 `terminal_at`。`PHASE2-TASK04` 的后续 `0005` 已扩展 CHECK，加入 `QUEUED_FOR_PARSING`、`PARSING`、`PARSED`、`AWAITING_MAPPING`、`MAPPING_CONFIRMED`；其权威语义见 `material-import-parser-v1.md`。`VALIDATING`、`AWAITING_REVIEW`、`COMPLETED` 仍只是后续路线图状态，不得提前写入。
 
 ### 5.2 文件存储状态
 

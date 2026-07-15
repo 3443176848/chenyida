@@ -32,15 +32,15 @@
 | PHASE1-TASK14 | 实现 Material Review Queue 与审核工作台 V1 | DONE | Codex（实施）、项目负责人（任务范围确认） | 2026-07-15 | 2026-07-15 | PHASE1-TASK13 | 实现审核队列、方案 A 单条工作台、共享只读详情、批准/驳回、Validation 新鲜度确认、职责分离、页面内存幂等/并发/离开保护和完整错误状态；Review UI 51/51、全量 Node 209/209、1366×768 浏览器验收、隔离 API smoke、凭证扫描和本地基线通过；未改 API/schema/migration/业务服务，未连接或部署生产 |
 | PHASE2-TASK01 | 设计 Material Import Batch Foundation V1 | DONE | Codex（设计）、项目负责人（两节方向确认，待完整规格确认） | 2026-07-15 | 2026-07-15 | PHASE1-TASK14 | 完成正式规格、OpenAPI 草案、数据流图和 12 项 `PROPOSED` 决策表；设计私有 R2、D1 元数据、单文件代理上传、可恢复 Saga、状态机、原始行契约、权限、幂等、清理与 Migration 边界；仅文档，未创建 Schema、Migration、R2、Binding、API、前端或部署配置，停止等待“规格确认” |
 | PHASE2-TASK02 | 实现 Material Import Batch Foundation V1 | DONE | Codex（实施）、项目负责人（12 项决定与任务范围批准） | 2026-07-15 | 2026-07-15 | PHASE2-TASK01 | 新增 `0004` 五表契约及 Down/快照、可注入对象存储与 R2/内存适配器、10 MiB 流式单文件 multipart、XLSX/CSV 基础安全检查、六个 API、专用幂等、Saga/协调、权限/行级可见性、重复策略、取消与手工清理服务；Node 224/224、迁移 3/3、导入专项 12/12 通过；无生产 R2 binding、Cron、迁移或部署 |
-| PHASE2-TASK03 | 设计 Excel/CSV Parser 与字段 Mapping V1 | DONE | Codex（设计）、项目负责人（整体方向及补充约束确认，待正式规格确认） | 2026-07-16 | 2026-07-16 | PHASE2-TASK02 | 完成 Parser 主规格、OpenAPI 草案、Mapping 规格和流程图；定义 `PARSED` 原子发布、parse run 隔离、Outbox、Sheet 级恢复、Shared Strings/总字节预算、Mapping 准备恢复、`0005` 设计与 16 项 `PROPOSED` 决策；仅文档，未实施 Parser、Schema、Migration、Queue、API 或部署 |
+| PHASE2-TASK03 | 设计 Excel/CSV Parser 与字段 Mapping V1 | DONE | Codex（设计）、项目负责人（16 项正式规格确认） | 2026-07-16 | 2026-07-16 | PHASE2-TASK02 | 完成 Parser 主规格、OpenAPI 草案、Mapping 规格和流程图；定义 `PARSED` 原子发布、parse run 隔离、Outbox、Sheet 级恢复、Shared Strings/总字节预算、Mapping 准备恢复、`0005` 设计；16 项决定已由 `PHASE2-TASK04` 指令批准 |
 
 ## 当前任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| - | 暂无已授权执行任务 | - | - | - | - | - | `PHASE2-TASK03` 文档基线已完成，停止等待“规格确认”；任何实现、生产迁移、资源或部署仍需单独明确授权 |
+| PHASE2-TASK04 | 实现 Excel/CSV Parser 与字段 Mapping V1 | DONE | Codex（实施）、项目负责人（规格与非生产范围批准） | 2026-07-16 | 2026-07-16 | PHASE2-TASK03 | 完成 `0005` Up/受保护 Down、parse run、Outbox、可注入调度与租约恢复、XLSX/CSV 有界解析、Shared Strings 分块、原始行原子发布、Mapping 准备及七个 API；54 项专项和全量 Node 278/278 通过；未创建生产 Queue/binding、执行生产迁移或部署，未创建 Material Draft/正式物料 |
 
-当前没有 `DOING` 任务。`PHASE2-TASK03` 只完成书面设计，全部 Parser/Mapping 决定与资源上限仍为 `PROPOSED`。正式规格确认、非生产实现、生产 R2/Queue、生产 D1 migration、Cron、部署、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 均需独立授权。
+当前没有 `DOING` 任务。`PHASE2-TASK04` 已完成并停止；生产 R2/Queue、生产 D1 migration、Cron、部署、清洗/匹配/Material Draft、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
 
 ## Phase 0 待办
 

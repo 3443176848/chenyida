@@ -1,10 +1,10 @@
 # Material Import Field Mapping V1 规格
 
-状态：`DESIGN COMPLETE / AWAITING SPECIFICATION CONFIRMATION`
+状态：`APPROVED / PHASE2-TASK04 IMPLEMENTED IN NON-PRODUCTION`
 
-业务决定：`Status: PROPOSED`
+业务决定：`Status: APPROVED`
 
-任务：`PHASE2-TASK03`
+任务：`PHASE2-TASK03`（设计）/ `PHASE2-TASK04`（实施）
 
 ## 1. 目的和边界
 
@@ -211,7 +211,7 @@ PUT 是完整替换当前 DRAFT 聚合，不是部分 patch。事务校验版本
 
 `POST .../{batchId}/mapping/preview`：
 
-- 只处理显式 `start_row` 和有上限 `row_limit` 的样本，推荐最大 100 行，`PROPOSED`；
+- 只处理显式 `start_row` 和有上限 `row_limit` 的样本，最大 100 行；
 - 可预览尚未保存的完整 Mapping payload，但同样执行 allowlist 和版本绑定校验；
 - 返回每行的源 cell 摘要、目标对应、候选转换值、warning/error code；
 - 不执行完整清洗、分类、匹配或 Draft 创建；
@@ -244,7 +244,7 @@ PUT 是完整替换当前 DRAFT 聚合，不是部分 patch。事务校验版本
 
 ## 9. 权限与信息披露
 
-权限仍为 `PROPOSED`：
+权限已批准用于非生产实施：
 
 - `material.import.read`：读取本人有权批次的状态、Sheet、行和 Mapping；
 - `material.import.read_any`：读取任意有权域内批次，但不自动允许 parse/map；
@@ -292,6 +292,6 @@ API 不硬编码角色名。owner/read_any 行级条件必须进入 SQL 和 tota
 - PUT 完整替换、预览 100 行上限、确认不创建 Draft；
 - 并发编辑、确认与 metadata、新 run 与确认、幂等相同/异载荷、CSRF、限流和稳定错误。
 
-## 12. 停止条件
+## 12. 完成边界
 
-本规格只形成后续实现边界。提交后停止并等待“规格确认”，不得创建 Mapping 表、修改 Drizzle、实施 API/UI、执行 migration、连接生产或开始清洗/匹配/Material Draft 任务。
+`PHASE2-TASK04` 已完成 Mapping 关系表、Drizzle、服务端 API 和隔离测试，但不含 UI。任务完成后停止；不得执行生产 migration、连接生产、部署，或开始清洗、匹配、Material Draft 和正式物料任务。

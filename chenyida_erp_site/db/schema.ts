@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  foreignKey,
   index,
   integer,
   real,
@@ -287,6 +288,7 @@ export const materialImportBatches = sqliteTable(
     ),
     createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
     currentVersion: integer("current_version").notNull().default(1),
+    currentParseRunId: integer("current_parse_run_id"),
     fileCount: integer("file_count").notNull().default(0),
     totalRows: integer("total_rows").notNull().default(0),
     acceptedRows: integer("accepted_rows").notNull().default(0),
@@ -308,14 +310,16 @@ export const materialImportBatches = sqliteTable(
     index("material_import_batches_status_created_idx").on(table.status, table.createdAt, table.id),
     index("material_import_batches_retry_idx").on(table.retryOfBatchId),
     index("material_import_batches_raw_retention_idx").on(table.rawDataRetentionUntil, table.id),
+    index("material_import_batches_current_run_idx").on(table.currentParseRunId),
     check("material_import_batches_source_ck", sql`${table.sourceKind} IN ('XLSX','CSV')`),
-    check("material_import_batches_status_ck", sql`${table.status} IN ('CREATED','UPLOAD_PENDING','FILE_READY','RECONCILIATION_REQUIRED','FAILED','CANCELLED')`),
+    check("material_import_batches_status_ck", sql`${table.status} IN ('CREATED','UPLOAD_PENDING','FILE_READY','QUEUED_FOR_PARSING','PARSING','PARSED','AWAITING_MAPPING','MAPPING_CONFIRMED','RECONCILIATION_REQUIRED','FAILED','CANCELLED')`),
     check("material_import_batches_version_ck", sql`${table.currentVersion} > 0`),
     check("material_import_batches_counts_ck", sql`${table.fileCount} BETWEEN 0 AND 1 AND ${table.totalRows} >= 0 AND ${table.acceptedRows} >= 0 AND ${table.rejectedRows} >= 0 AND ${table.acceptedRows} + ${table.rejectedRows} <= ${table.totalRows}`),
     check("material_import_batches_retry_ck", sql`${table.retryOfBatchId} IS NULL OR ${table.retryOfBatchId} <> ${table.id}`),
     check("material_import_batches_failure_ck", sql`(${table.status} = 'FAILED' AND length(trim(${table.failureStage})) > 0 AND length(trim(${table.failureCode})) > 0) OR (${table.status} <> 'FAILED' AND ${table.failureStage} IS NULL AND ${table.failureCode} IS NULL AND ${table.failureMessage} IS NULL)`),
     check("material_import_batches_cancel_ck", sql`(${table.status} = 'CANCELLED' AND ${table.cancelledBy} IS NOT NULL AND ${table.cancelledAt} IS NOT NULL) OR (${table.status} <> 'CANCELLED' AND ${table.cancelledBy} IS NULL AND ${table.cancelledAt} IS NULL)`),
     check("material_import_batches_terminal_ck", sql`(${table.status} IN ('FAILED','CANCELLED') AND ${table.terminalAt} IS NOT NULL AND ${table.rawDataRetentionUntil} IS NOT NULL AND ${table.recordRetentionUntil} IS NOT NULL) OR (${table.status} NOT IN ('FAILED','CANCELLED') AND ${table.terminalAt} IS NULL AND ${table.rawDataRetentionUntil} IS NULL AND ${table.recordRetentionUntil} IS NULL)`),
+    check("material_import_batches_current_run_ck", sql`(${table.status} IN ('PARSED','AWAITING_MAPPING','MAPPING_CONFIRMED') AND ${table.currentParseRunId} IS NOT NULL) OR (${table.status} NOT IN ('PARSED','AWAITING_MAPPING','MAPPING_CONFIRMED'))`),
   ],
 );
 
@@ -362,25 +366,90 @@ export const materialImportFiles = sqliteTable(
   ],
 );
 
+export const materialImportParseRuns = sqliteTable(
+  "material_import_parse_runs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }), batchId: integer("batch_id").notNull(), parserVersion: text("parser_version").notNull(),
+    runStatus: text("run_status").notNull(), attemptNo: integer("attempt_no").notNull().default(1), sourceFileSha256: text("source_file_sha256"),
+    leaseTokenDigest: text("lease_token_digest"), leaseExpiresAt: integer("lease_expires_at"), heartbeatAt: text("heartbeat_at"), workerRequestId: text("worker_request_id"),
+    currentStage: text("current_stage").notNull(), startedAt: text("started_at"), completedAt: text("completed_at"), rowsWritten: integer("rows_written").notNull().default(0),
+    parsedSheetCount: integer("parsed_sheet_count").notNull().default(0), normalizedJsonBytes: integer("normalized_json_bytes").notNull().default(0), decodedTextBytes: integer("decoded_text_bytes").notNull().default(0),
+    warningCount: integer("warning_count").notNull().default(0), errorCount: integer("error_count").notNull().default(0), failureCode: text("failure_code"), safeFailureMessage: text("safe_failure_message"),
+    mappingPreparationStatus: text("mapping_preparation_status").notNull().default("NOT_STARTED"), mappingPreparationAttemptCount: integer("mapping_preparation_attempt_count").notNull().default(0),
+    mappingPreparationFailureCode: text("mapping_preparation_failure_code"), mappingPreparationSafeMessage: text("mapping_preparation_safe_message"), mappingPreparationUpdatedAt: text("mapping_preparation_updated_at"),
+    createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("material_import_parse_runs_batch_status_idx").on(table.batchId, table.runStatus, table.id), index("material_import_parse_runs_lease_idx").on(table.runStatus, table.leaseExpiresAt, table.id),
+    uniqueIndex("material_import_parse_runs_active_uq").on(table.batchId).where(sql`${table.runStatus} IN ('QUEUED','RUNNING','STAGED','PUBLISHING')`),
+    check("material_import_parse_runs_status_ck", sql`${table.runStatus} IN ('QUEUED','RUNNING','STAGED','PUBLISHING','SUCCEEDED','FAILED','CANCELLED','SUPERSEDED')`),
+    check("material_import_parse_runs_stage_ck", sql`${table.currentStage} IN ('INSPECT_WORKBOOK','PREPARE_SHARED_RESOURCES','PARSE_SHEET','VERIFY_PARSE_RUN','PUBLISH_PARSE_RUN','PREPARE_MAPPING','PUBLISH_MAPPING_PREPARATION','COMPLETE')`),
+    check("material_import_parse_runs_counts_ck", sql`${table.attemptNo}>0 AND ${table.rowsWritten}>=0 AND ${table.parsedSheetCount}>=0 AND ${table.normalizedJsonBytes}>=0 AND ${table.decodedTextBytes}>=0 AND ${table.warningCount}>=0 AND ${table.errorCount}>=0`),
+    check("material_import_parse_runs_mapping_status_ck", sql`${table.mappingPreparationStatus} IN ('NOT_STARTED','QUEUED','RUNNING','READY','FAILED')`),
+    check("material_import_parse_runs_sha_ck", sql`${table.sourceFileSha256} IS NULL OR (length(${table.sourceFileSha256})=64 AND ${table.sourceFileSha256} NOT GLOB '*[^0-9a-f]*')`),
+    check("material_import_parse_runs_lease_ck", sql`(${table.leaseTokenDigest} IS NULL AND ${table.leaseExpiresAt} IS NULL) OR (length(${table.leaseTokenDigest})=64 AND ${table.leaseExpiresAt}>0)`),
+    check("material_import_parse_runs_failure_ck", sql`(${table.runStatus}='FAILED' AND length(trim(${table.failureCode}))>0) OR (${table.runStatus}<>'FAILED' AND ${table.failureCode} IS NULL AND ${table.safeFailureMessage} IS NULL)`),
+    check("material_import_parse_runs_mapping_failure_ck", sql`(${table.mappingPreparationStatus}='FAILED' AND length(trim(${table.mappingPreparationFailureCode}))>0) OR (${table.mappingPreparationStatus}<>'FAILED' AND ${table.mappingPreparationFailureCode} IS NULL AND ${table.mappingPreparationSafeMessage} IS NULL)`),
+  ],
+);
+
+export const materialImportParseSheets = sqliteTable("material_import_parse_sheets", {
+  id: integer("id").primaryKey({ autoIncrement: true }), parseRunId: integer("parse_run_id").notNull().references(() => materialImportParseRuns.id, { onDelete: "restrict" }),
+  sheetIndex: integer("sheet_index").notNull(), sheetName: text("sheet_name").notNull(), visibility: text("visibility").notNull(), parseStatus: text("parse_status").notNull(),
+  rowCount: integer("row_count").notNull().default(0), sourceColumnMax: integer("source_column_max").notNull().default(0), mergedRangesJson: text("merged_ranges_json"),
+  warningCount: integer("warning_count").notNull().default(0), safeWarningsJson: text("safe_warnings_json"), startedAt: text("started_at"), completedAt: text("completed_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (table) => [uniqueIndex("material_import_parse_sheets_position_uq").on(table.parseRunId, table.sheetIndex), index("material_import_parse_sheets_run_status_idx").on(table.parseRunId, table.parseStatus, table.sheetIndex), check("material_import_parse_sheets_visibility_ck", sql`${table.visibility} IN ('VISIBLE','HIDDEN','VERY_HIDDEN')`), check("material_import_parse_sheets_status_ck", sql`${table.parseStatus} IN ('PENDING','RUNNING','COMPLETED','SKIPPED_HIDDEN','SKIPPED_VERY_HIDDEN','FAILED')`), check("material_import_parse_sheets_counts_ck", sql`${table.sheetIndex}>=0 AND ${table.rowCount}>=0 AND ${table.sourceColumnMax}>=0 AND ${table.warningCount}>=0`), check("material_import_parse_sheets_json_ck", sql`(${table.mergedRangesJson} IS NULL OR json_valid(${table.mergedRangesJson})) AND (${table.safeWarningsJson} IS NULL OR json_valid(${table.safeWarningsJson}))`)]);
+
+export const materialImportSharedStringChunks = sqliteTable("material_import_shared_string_chunks", {
+  id: integer("id").primaryKey({ autoIncrement: true }), parseRunId: integer("parse_run_id").notNull().references(() => materialImportParseRuns.id, { onDelete: "restrict" }),
+  chunkIndex: integer("chunk_index").notNull(), startStringIndex: integer("start_string_index").notNull(), itemCount: integer("item_count").notNull(), decodedBytes: integer("decoded_bytes").notNull(), valuesJson: text("values_json").notNull(), createdAt: text("created_at").notNull(),
+}, (table) => [uniqueIndex("material_import_shared_string_chunks_position_uq").on(table.parseRunId, table.chunkIndex), index("material_import_shared_string_chunks_lookup_idx").on(table.parseRunId, table.startStringIndex), check("material_import_shared_string_chunks_counts_ck", sql`${table.chunkIndex}>=0 AND ${table.startStringIndex}>=0 AND ${table.itemCount}>0 AND ${table.decodedBytes}>=0`), check("material_import_shared_string_chunks_json_ck", sql`json_valid(${table.valuesJson}) AND json_type(${table.valuesJson})='array'`)]);
+
 export const materialImportRows = sqliteTable(
   "material_import_rows",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     batchId: integer("batch_id").notNull().references(() => materialImportBatches.id, { onDelete: "restrict" }),
+    parseRunId: integer("parse_run_id").notNull().references(() => materialImportParseRuns.id, { onDelete: "restrict" }),
     sheetIndex: integer("sheet_index").notNull(),
     sheetName: text("sheet_name").notNull(),
     rowNumber: integer("row_number").notNull(),
     rawValuesJson: text("raw_values_json").notNull(),
-    rawRowSha256: text("raw_row_sha256").notNull(),
+    rawRowHash: text("raw_row_hash").notNull(),
     createdAt: text("created_at").notNull(),
   },
   (table) => [
-    uniqueIndex("material_import_rows_position_uq").on(table.batchId, table.sheetIndex, table.rowNumber),
+    uniqueIndex("material_import_rows_position_uq").on(table.parseRunId, table.sheetIndex, table.rowNumber),
+    index("material_import_rows_batch_run_idx").on(table.batchId, table.parseRunId, table.sheetIndex, table.rowNumber),
     check("material_import_rows_position_ck", sql`${table.sheetIndex} >= 0 AND ${table.rowNumber} > 0 AND length(${table.sheetName}) > 0`),
     check("material_import_rows_values_ck", sql`json_valid(${table.rawValuesJson}) AND json_type(${table.rawValuesJson}) = 'object'`),
-    check("material_import_rows_sha_ck", sql`length(${table.rawRowSha256}) = 64 AND ${table.rawRowSha256} NOT GLOB '*[^0-9a-f]*'`),
+    check("material_import_rows_sha_ck", sql`length(${table.rawRowHash}) = 64 AND ${table.rawRowHash} NOT GLOB '*[^0-9a-f]*'`),
   ],
 );
+
+export const materialImportHeaderSuggestions = sqliteTable("material_import_header_suggestions", {
+  id: integer("id").primaryKey({ autoIncrement: true }), parseRunId: integer("parse_run_id").notNull().references(() => materialImportParseRuns.id, { onDelete: "restrict" }), sheetIndex: integer("sheet_index").notNull(),
+  rowNumber: integer("row_number").notNull(), rank: integer("rank").notNull(), score: real("score").notNull(), reasonCodesJson: text("reason_codes_json").notNull(), algorithmVersion: text("algorithm_version").notNull(), metadataDigest: text("metadata_digest").notNull(), createdAt: text("created_at").notNull(),
+}, (table) => [uniqueIndex("material_import_header_suggestions_position_uq").on(table.parseRunId, table.sheetIndex, table.rowNumber, table.algorithmVersion), index("material_import_header_suggestions_rank_idx").on(table.parseRunId, table.sheetIndex, table.rank, table.id), check("material_import_header_suggestions_values_ck", sql`${table.sheetIndex}>=0 AND ${table.rowNumber}>0 AND ${table.rank}>0 AND ${table.score} BETWEEN 0 AND 1`), check("material_import_header_suggestions_json_ck", sql`json_valid(${table.reasonCodesJson}) AND json_type(${table.reasonCodesJson})='array'`), check("material_import_header_suggestions_digest_ck", sql`length(${table.metadataDigest})=64 AND ${table.metadataDigest} NOT GLOB '*[^0-9a-f]*'`)]);
+
+export const materialImportJobOutbox = sqliteTable("material_import_job_outbox", {
+  id: text("id").primaryKey(), batchId: integer("batch_id").notNull().references(() => materialImportBatches.id, { onDelete: "restrict" }), parseRunId: integer("parse_run_id").notNull().references(() => materialImportParseRuns.id, { onDelete: "restrict" }),
+  jobType: text("job_type").notNull(), payloadVersion: integer("payload_version").notNull().default(1), payloadJson: text("payload_json").notNull(), dispatchStatus: text("dispatch_status").notNull().default("PENDING"),
+  dispatchVersion: integer("dispatch_version").notNull().default(1), attemptCount: integer("attempt_count").notNull().default(0), availableAt: integer("available_at").notNull(), lastAttemptAt: integer("last_attempt_at"), safeFailureCode: text("safe_failure_code"), createdAt: text("created_at").notNull(), dispatchedAt: text("dispatched_at"),
+}, (table) => [index("material_import_job_outbox_pending_idx").on(table.dispatchStatus, table.availableAt, table.id), uniqueIndex("material_import_job_outbox_stage_uq").on(table.parseRunId, table.jobType, sql`json_extract(${table.payloadJson},'$.sheet_index')`).where(sql`${table.dispatchStatus}<>'DEAD'`), check("material_import_job_outbox_type_ck", sql`${table.jobType} IN ('INSPECT_WORKBOOK','PREPARE_SHARED_RESOURCES','PARSE_SHEET','VERIFY_PARSE_RUN','PUBLISH_PARSE_RUN','PREPARE_MAPPING','PUBLISH_MAPPING_PREPARATION')`), check("material_import_job_outbox_status_ck", sql`${table.dispatchStatus} IN ('PENDING','DISPATCHING','DISPATCHED','RETRY_WAIT','DEAD')`), check("material_import_job_outbox_counts_ck", sql`${table.payloadVersion}>0 AND ${table.dispatchVersion}>0 AND ${table.attemptCount}>=0 AND ${table.availableAt}>0`), check("material_import_job_outbox_json_ck", sql`json_valid(${table.payloadJson}) AND json_type(${table.payloadJson})='object'`)]);
+
+export const materialImportMappings = sqliteTable("material_import_mappings", {
+  id: integer("id").primaryKey({ autoIncrement: true }), batchId: integer("batch_id").notNull().references(() => materialImportBatches.id, { onDelete: "restrict" }), parseRunId: integer("parse_run_id").notNull().references(() => materialImportParseRuns.id, { onDelete: "restrict" }),
+  selectedSheetIndex: integer("selected_sheet_index").notNull(), headerMode: text("header_mode").notNull(), headerRowNumber: integer("header_row_number"), mappingStatus: text("mapping_status").notNull().default("DRAFT"), mappingVersion: integer("mapping_version").notNull().default(1), metadataDigest: text("metadata_digest").notNull(),
+  suggestionAlgorithmVersion: text("suggestion_algorithm_version"), supersedesMappingId: integer("supersedes_mapping_id"),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), updatedBy: text("updated_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), confirmedBy: text("confirmed_by").references(() => appUsers.username, { onDelete: "restrict" }),
+  createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(), confirmedAt: text("confirmed_at"),
+}, (table) => [foreignKey({ columns: [table.supersedesMappingId], foreignColumns: [table.id] }).onDelete("restrict"), index("material_import_mappings_batch_run_idx").on(table.batchId, table.parseRunId, table.id), uniqueIndex("material_import_mappings_current_uq").on(table.parseRunId).where(sql`${table.mappingStatus}<>'SUPERSEDED'`), check("material_import_mappings_header_ck", sql`(${table.headerMode}='SINGLE_ROW' AND ${table.headerRowNumber}>0) OR (${table.headerMode}='NO_HEADER' AND ${table.headerRowNumber} IS NULL)`), check("material_import_mappings_status_ck", sql`${table.mappingStatus} IN ('DRAFT','CONFIRMED','STALE','SUPERSEDED')`), check("material_import_mappings_values_ck", sql`${table.selectedSheetIndex}>=0 AND ${table.mappingVersion}>0`), check("material_import_mappings_digest_ck", sql`length(${table.metadataDigest})=64 AND ${table.metadataDigest} NOT GLOB '*[^0-9a-f]*'`), check("material_import_mappings_confirm_ck", sql`(${table.mappingStatus}='CONFIRMED' AND ${table.confirmedBy} IS NOT NULL AND ${table.confirmedAt} IS NOT NULL) OR (${table.mappingStatus}<>'CONFIRMED')`)]);
+
+export const materialImportMappingItems = sqliteTable("material_import_mapping_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }), mappingId: integer("mapping_id").notNull().references(() => materialImportMappings.id, { onDelete: "restrict" }), sourceColumnIndex: integer("source_column_index"), sourceHeader: text("source_header"),
+  targetNamespace: text("target_namespace").notNull(), targetCode: text("target_code").notNull(), mappingMode: text("mapping_mode").notNull(), defaultValueJson: text("default_value_json"), required: integer("required").notNull().default(0), displayOrder: integer("display_order").notNull(),
+}, (table) => [uniqueIndex("material_import_mapping_items_source_uq").on(table.mappingId, table.sourceColumnIndex).where(sql`${table.sourceColumnIndex} IS NOT NULL`), uniqueIndex("material_import_mapping_items_target_uq").on(table.mappingId, table.targetNamespace, table.targetCode).where(sql`${table.targetNamespace}<>'ignore'`), check("material_import_mapping_items_namespace_ck", sql`${table.targetNamespace} IN ('basic','attribute','category_hint','supplier_reference','ignore')`), check("material_import_mapping_items_mode_ck", sql`${table.mappingMode} IN ('SOURCE','SOURCE_WITH_DEFAULT','DEFAULT','IGNORE')`), check("material_import_mapping_items_source_ck", sql`(${table.mappingMode}='DEFAULT' AND ${table.sourceColumnIndex} IS NULL) OR (${table.mappingMode}<>'DEFAULT' AND ${table.sourceColumnIndex}>=0)`), check("material_import_mapping_items_default_ck", sql`${table.defaultValueJson} IS NULL OR json_valid(${table.defaultValueJson})`), check("material_import_mapping_items_values_ck", sql`${table.required} IN (0,1) AND ${table.displayOrder}>=0`)]);
 
 export const materialImportEvents = sqliteTable(
   "material_import_events",
@@ -398,9 +467,9 @@ export const materialImportEvents = sqliteTable(
   },
   (table) => [
     index("material_import_events_batch_created_idx").on(table.batchId, table.createdAt, table.id),
-    check("material_import_events_type_ck", sql`${table.eventType} IN ('BATCH_CREATED','FILE_UPLOAD_STARTED','FILE_STORED','FILE_UPLOAD_COMPLETED','FILE_UPLOAD_FAILED','FILE_SECURITY_CHECK_PASSED','FILE_SECURITY_CHECK_FAILED','RECONCILIATION_REQUIRED','BATCH_CANCELLED','FILE_DELETE_REQUESTED','FILE_DELETED','FILE_DELETE_FAILED')`),
+    check("material_import_events_type_ck", sql`${table.eventType} IN ('BATCH_CREATED','FILE_UPLOAD_STARTED','FILE_STORED','FILE_UPLOAD_COMPLETED','FILE_UPLOAD_FAILED','FILE_SECURITY_CHECK_PASSED','FILE_SECURITY_CHECK_FAILED','RECONCILIATION_REQUIRED','BATCH_CANCELLED','FILE_DELETE_REQUESTED','FILE_DELETED','FILE_DELETE_FAILED','PARSE_QUEUED','PARSE_STARTED','PARSE_PUBLISHED','PARSE_FAILED','MAPPING_PREPARATION_READY','MAPPING_PREPARATION_FAILED','MAPPING_SAVED','MAPPING_CONFIRMED')`),
     check("material_import_events_actor_ck", sql`${table.actorType} IN ('USER','SYSTEM')`),
-    check("material_import_events_status_ck", sql`(${table.previousStatus} IS NULL OR ${table.previousStatus} IN ('CREATED','UPLOAD_PENDING','FILE_READY','RECONCILIATION_REQUIRED','FAILED','CANCELLED')) AND (${table.newStatus} IS NULL OR ${table.newStatus} IN ('CREATED','UPLOAD_PENDING','FILE_READY','RECONCILIATION_REQUIRED','FAILED','CANCELLED'))`),
+    check("material_import_events_status_ck", sql`(${table.previousStatus} IS NULL OR ${table.previousStatus} IN ('CREATED','UPLOAD_PENDING','FILE_READY','QUEUED_FOR_PARSING','PARSING','PARSED','AWAITING_MAPPING','MAPPING_CONFIRMED','RECONCILIATION_REQUIRED','FAILED','CANCELLED')) AND (${table.newStatus} IS NULL OR ${table.newStatus} IN ('CREATED','UPLOAD_PENDING','FILE_READY','QUEUED_FOR_PARSING','PARSING','PARSED','AWAITING_MAPPING','MAPPING_CONFIRMED','RECONCILIATION_REQUIRED','FAILED','CANCELLED'))`),
     check("material_import_events_details_ck", sql`${table.safeDetailsJson} IS NULL OR json_valid(${table.safeDetailsJson})`),
   ],
 );
@@ -431,7 +500,7 @@ export const materialImportIdempotency = sqliteTable(
     uniqueIndex("material_import_idempotency_scope_uq").on(table.username, table.method, table.routeScope, table.keyDigest),
     uniqueIndex("material_import_idempotency_operation_uq").on(table.operationId),
     index("material_import_idempotency_recovery_idx").on(table.state, table.recoveryUntil, table.id),
-    check("material_import_idempotency_method_ck", sql`${table.method} = 'POST'`),
+    check("material_import_idempotency_method_ck", sql`${table.method} IN ('POST','PUT')`),
     check("material_import_idempotency_route_ck", sql`length(${table.routeScope}) BETWEEN 1 AND 255`),
     check("material_import_idempotency_digest_ck", sql`length(${table.keyDigest}) = 64 AND length(${table.requestDigest}) = 64 AND length(${table.leaseTokenDigest}) = 64`),
     check("material_import_idempotency_operation_ck", sql`length(${table.operationId}) = 36`),

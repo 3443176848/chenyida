@@ -44,7 +44,7 @@ type BatchRow = {
   id: number;
   batch_no: string;
   source_kind: "XLSX" | "CSV";
-  status: "CREATED" | "UPLOAD_PENDING" | "FILE_READY" | "RECONCILIATION_REQUIRED" | "FAILED" | "CANCELLED";
+  status: "CREATED" | "UPLOAD_PENDING" | "FILE_READY" | "QUEUED_FOR_PARSING" | "PARSING" | "PARSED" | "AWAITING_MAPPING" | "MAPPING_CONFIRMED" | "RECONCILIATION_REQUIRED" | "FAILED" | "CANCELLED";
   retry_of_batch_id: number | null;
   created_by: string;
   current_version: number;
@@ -859,7 +859,7 @@ export async function cancelMaterialImportBatch(
   const batch = await batchById(dependencies.database, input.batchId);
   if (!batch || (!input.canReadAny && batch.created_by !== input.user.username)) throw new MaterialImportServiceError("IMPORT_BATCH_NOT_FOUND", "导入批次不存在", 404);
   if (batch.current_version !== expectedVersion) throw new MaterialImportServiceError("IMPORT_BATCH_VERSION_CONFLICT", "批次版本已变化", 409, batch.current_version);
-  if (!new Set(["CREATED", "UPLOAD_PENDING", "FILE_READY"]).has(batch.status)) throw new MaterialImportServiceError("IMPORT_BATCH_STATE_INVALID", "当前批次状态不允许取消", 409);
+  if (!new Set(["CREATED", "UPLOAD_PENDING", "FILE_READY", "QUEUED_FOR_PARSING", "PARSING"]).has(batch.status)) throw new MaterialImportServiceError("IMPORT_BATCH_STATE_INVALID", "当前批次状态不允许取消", 409);
   const file = await fileByBatch(dependencies.database, input.batchId);
   const operationId = idem?.operation_id ?? crypto.randomUUID();
   const timestamp = nowText(clock);
@@ -873,8 +873,12 @@ export async function cancelMaterialImportBatch(
   if (!idem) {
     statements.push(dependencies.database.prepare(`INSERT INTO material_import_idempotency(username,method,route_scope,key_digest,request_digest,operation_id,state,batch_id,file_id,lease_token_digest,lease_expires_at,created_at,updated_at,recovery_until) VALUES(?,'POST',?,?,?,?,'PENDING',?,?,?,?,?,?,?)`).bind(input.user.username, routeScope, keyDigest, requestDigest, operationId, input.batchId, file?.id ?? null, leaseDigest, nowSeconds(clock) + IDEMPOTENCY_LEASE_SECONDS, timestamp, timestamp, nowSeconds(clock) + IDEMPOTENCY_RECOVERY_SECONDS));
   }
+  const parserSchemaAvailable = await dependencies.database.prepare("SELECT 1 AS available FROM sqlite_master WHERE type='table' AND name='material_import_parse_runs'").first<{ available: number }>();
+  if (parserSchemaAvailable) statements.push(
+    dependencies.database.prepare(`UPDATE material_import_parse_runs SET run_status='CANCELLED',completed_at=?,lease_token_digest=NULL,lease_expires_at=NULL,heartbeat_at=NULL,updated_at=? WHERE batch_id=? AND run_status IN ('QUEUED','RUNNING','STAGED','PUBLISHING')`).bind(timestamp, timestamp, input.batchId),
+  );
   statements.push(
-    dependencies.database.prepare(`UPDATE material_import_batches SET status='CANCELLED',current_version=current_version+1,cancelled_by=?,cancelled_at=?,terminal_at=?,raw_data_retention_until=?,record_retention_until=?,updated_at=? WHERE id=? AND current_version=? AND status IN ('CREATED','UPLOAD_PENDING','FILE_READY')`).bind(input.user.username, timestamp, timestamp, rawUntil, recordUntil, timestamp, input.batchId, expectedVersion),
+    dependencies.database.prepare(`UPDATE material_import_batches SET status='CANCELLED',current_version=current_version+1,cancelled_by=?,cancelled_at=?,terminal_at=?,raw_data_retention_until=?,record_retention_until=?,updated_at=? WHERE id=? AND current_version=? AND status IN ('CREATED','UPLOAD_PENDING','FILE_READY','QUEUED_FOR_PARSING','PARSING')`).bind(input.user.username, timestamp, timestamp, rawUntil, recordUntil, timestamp, input.batchId, expectedVersion),
   );
   if (file) statements.push(dependencies.database.prepare(`UPDATE material_import_files SET storage_status=CASE WHEN storage_status='STORED' THEN 'DELETE_PENDING' ELSE storage_status END,retention_until=?,updated_at=? WHERE id=?`).bind(rawUntil, timestamp, file.id));
   statements.push(

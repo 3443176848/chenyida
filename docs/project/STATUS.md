@@ -6,15 +6,15 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 约 24,000 行 | 既有运行时源码口径加 TASK02 导入模块、迁移和测试；不含依赖、构建产物和文档 |
-| 源码文件 | 93 | 新增 `app/lib/material-import/` 六个边界明确的模块；既有 Material handler 和 ERP 入口仅做路由与依赖集成 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK03 只新增/更新 Parser、Mapping、OpenAPI、流程和治理文档；未修改运行时代码、Schema、Migration、测试代码或部署配置 |
+| 总代码量 | 约 29,000 行 | 本地 ERP 与 Site 运行时、迁移、脚本和测试源码；不含依赖、构建产物和文档 |
+| 源码文件 | 105 | Site 的 `app/db/drizzle/tests/scripts` 口径；TASK04 新增六个 Parser/Mapping 模块、迁移和四组测试 |
+| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK04 只修改获批的在线 Material Import、`0005`、依赖、专项测试和项目文档；未修改 hosting、前端或本地旧版业务逻辑 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
-| 数据表 | 53（开发 schema） | 既有开发 schema 48 表加 Material Import 五表；未执行生产迁移，不能理解为生产现状 |
-| 在线 API 路径 | 73 | 既有 67 个路径加 Material Import 创建/列表/详情/上传/事件/取消 6 个路径；生产公开站点尚未部署本提交 |
+| 数据表 | 60（本地+开发 schema） | 本地 SQLite 26 张，Site 开发 schema 34 张；`0005` 仅在隔离 D1 测试，未执行生产迁移 |
+| 在线 API 路径 | 80 | 既有 73 个路径加 Parser/Mapping 7 个路径；生产公开站点尚未部署本提交 |
 | 页面入口 | 11 | 既有 9 个入口加 `/materials/review` 与 `/materials/:materialId/review` |
-| 测试与安全检查文件 | 23 | 新增迁移和 API/Saga/安全两组测试；全量 Node 224/224 |
+| 测试与安全检查文件 | 27 | TASK04 新增 Parser、兼容、迁移、集成四组；专项 54/54，全量 Node 278/278 |
 
 ## 当前版本与环境
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE2-TASK03` 开始时，根仓库 `main` 位于 `63e0483`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖获批范围内的 Material Import Parser/Mapping 书面规格、OpenAPI、流程图和项目治理文档；未修改运行时代码、Schema、Migration、依赖、测试代码、生产 binding、资源或部署配置。
+`PHASE2-TASK04` 开始时，根仓库 `main` 位于 `a16b2f3`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖获批范围内的 Material Import Parser/Mapping 运行时、`0005`、Drizzle、依赖、测试、规格和治理文档；未修改 production binding、hosting、前端或本地旧版业务逻辑。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE2-TASK03` 计划提交消息为 `docs: design material import parser and mapping`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2。
+`PHASE2-TASK04` 计划提交消息为 `feat: add material import parser and mapping`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
 
 实时状态必须使用：
 
@@ -49,11 +49,29 @@ git status --short
 git -C chenyida_erp_site status --short
 ```
 
+## PHASE2-TASK04 Excel/CSV Parser 与字段 Mapping V1 实施基线
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 16 项决定和非生产范围已批准；实现、测试和文档完成后停止 |
+| Parser | PASS | 有界 XLSX/CSV 流式解析；UTF-8/BOM/GB18030、三种分隔符、类型化 cell、公式不执行、1900/1904、隐藏 Sheet、XML/ZIP 安全与组合资源上限 |
+| 调度与恢复 | PASS / INJECTABLE | D1 Outbox、可注入 scheduler、Queue adapter、至少一次去重、租约领取/接管/心跳、Sheet 恢复、原子发布和 Mapping 准备独立重试；未创建生产 Queue/binding |
+| Shared Strings/行 | PASS | run 级 D1 分块、有界 LRU、稳定 raw row hash、100 行逻辑批次与幂等冲突检测；发布前行不成为 current |
+| Mapping/API | PASS | 关系化 Mapping、静态/动态 target allowlist、metadata 摘要、完整替换、100 行预览、确认 CAS、七个精确路由、权限/owner/read_any/CSRF/幂等/审计；不创建 Material Draft |
+| `0005` | PASS / NOT APPLIED TO PRODUCTION | Up、Drizzle snapshot/journal、受保护 Down、legacy 行保留回填、批次/current-run 等价引用触发器、失败回滚和重升 4/4 |
+| 兼容门禁 | PASS LOCALLY | 固定 `@zip.js/zip.js@2.8.26`、`sax-wasm@3.1.4`、`csv-parse@7.0.1`；Miniflare/WASM/Web Streams/R2 Range 替身/Bundle/64 MiB heap 门禁 3/3 |
+| 依赖审计 | KNOWN BASELINE | `npm audit --omit=dev` 报告 Next 内置 PostCSS 的 2 个 moderate；建议的 force fix 会产生破坏性版本变化，未在本任务自动修改。三项新增 Parser 依赖的固定版本与许可证门禁通过 |
+| 专项测试 | PASS | Parser 36、集成 11、migration 4、兼容 3，共 54/54 |
+| Site 基线 | PASS | `npm test` 构建成功、Node 278/278；独立 build、Parser 类型夹具、隔离 API smoke、OpenAPI YAML、Drizzle 无漂移和 265 文件凭证扫描通过；lint 0 error/1 个任务外既有 warning |
+| 全仓 TypeScript | KNOWN BASELINE | `tsc --noEmit` 仍有 10 个任务外既有错误，位于 multipart/service、Material list 与既有 schema 自引用；本任务未降低检查或扩大范围修复 |
+| 本地基线 | PASS | 项目 Python 3.12 的环境守卫 4/4、self-test、smoke、backup/restore 和临时 SQLite go-live 检查通过；临时数据已清理 |
+| 生产影响 | NONE | 未连接 production、公共 URL、远程 D1/R2/Queue，未创建 binding/Cron、执行生产 migration、修改 hosting 或部署 |
+
 ## PHASE2-TASK03 Excel/CSV Parser 与字段 Mapping V1 书面设计基线
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DONE / AWAITING SPECIFICATION CONFIRMATION | 整体方向和补充约束已确认；正式文档完成后停止等待“规格确认” |
+| 任务状态 | DONE / CONFIRMED BY TASK04 | 16 项决定已由项目负责人批准并在 PHASE2-TASK04 非生产实现 |
 | 正式交付 | COMPLETE | Parser 主规格、OpenAPI 草案、Mapping 规格、Mermaid 流程图和 16 项 `PROPOSED` 决策表 |
 | `PARSED` 语义 | DESIGNED | 当前策略允许的可见 Sheet 原始行、元数据和汇总完整核验后，run 状态、旧 run、current pointer、批次版本、事件、审计和幂等在单事务发布 |
 | 调度 | PROPOSED | D1 同事务写 Outbox，提交后至少一次发送；Queue `max_batch_size=1` 与低并发仍需压测和基础设施审批，不宣称 D1/Queue 原子 |
