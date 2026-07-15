@@ -53,6 +53,12 @@
 
 **预计任务数**：5。**当前状态**：PLANNED。
 
+**任务顺序**：
+
+- `PHASE2-TASK01`：设计 Material Import Batch Foundation V1（DONE）。
+- `PHASE2-TASK02`：实现 Import Batch Foundation（DONE，非生产；无 R2 资源、生产迁移或部署）。
+- `PHASE2-TASK03`：实现 Excel/CSV 行解析并写入冻结的 `material_import_rows` 契约（PLANNED，需另行授权）。
+
 ## Phase 3 AI治理
 
 **目标**：在确定性规则和人工审核之上增加受控 AI 辅助能力。

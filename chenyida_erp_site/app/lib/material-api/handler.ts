@@ -16,6 +16,11 @@ import {
 import { createMaterialMasterQueryService, MaterialQueryError } from "./query-service.ts";
 import { createMaterialReferenceQueryService, MaterialReferenceQueryError } from "./reference-query-service.ts";
 import {
+  handleMaterialImportApi,
+  isMaterialImportPath,
+  type MaterialImportObjectStore,
+} from "../material-import/index.ts";
+import {
   assertMaterialCsrf,
   completeIdempotentFailure,
   DEFAULT_MATERIAL_RATE_LIMITS,
@@ -40,7 +45,11 @@ type MaterialPermission =
   | "material.draft.submit"
   | "material.review.queue"
   | "material.review.approve"
-  | "material.review.reject";
+  | "material.review.reject"
+  | "material.import.create"
+  | "material.import.read"
+  | "material.import.cancel"
+  | "material.import.read_any";
 
 type MaterialRoute = Readonly<{
   code: MaterialApiRouteCode;
@@ -53,6 +62,8 @@ export type MaterialApiDependencies = Readonly<{
   database: MaterialMasterD1Database;
   currentUser(request: Request): Promise<MaterialApiUser | null>;
   userCan(user: MaterialApiUser, permission: MaterialPermission): boolean;
+  objectStore?: MaterialImportObjectStore;
+  objectPrefix?: string;
   clock?: () => Date;
   rateLimits?: Readonly<{ attemptsPerMinute: number; newKeysPerMinute: number }>;
 }>;
@@ -397,6 +408,9 @@ function methodNotAllowedResponse(request: Request, requestId: string): Response
 export async function handleMaterialMasterApi(request: Request, dependencies: MaterialApiDependencies): Promise<Response> {
   const requestId = crypto.randomUUID();
   const url = new URL(request.url);
+  if (isMaterialImportPath(url.pathname)) {
+    return handleMaterialImportApi(request, dependencies);
+  }
   const route = routeFor(url.pathname);
   const routeCode = route?.code === "MATERIAL_DRAFT_LIST" && request.method === "POST"
     ? "MATERIAL_DRAFT_CREATE"

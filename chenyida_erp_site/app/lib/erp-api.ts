@@ -1,12 +1,15 @@
 import { env } from "cloudflare:workers";
 import { handleMaterialMasterApi, type MaterialApiDependencies } from "./material-api/index.ts";
 import { MATERIAL_CSRF_COOKIE, MATERIAL_ROLE_PERMISSIONS } from "./material-api/security.ts";
+import { R2MaterialImportObjectStore, type R2BucketLike } from "./material-import/index.ts";
 
 type RuntimeEnv = {
   DB: D1Database;
   ERP_SETUP_TOKEN?: string;
   ERP_MATERIAL_WRITE_RATE_LIMIT?: string;
   ERP_MATERIAL_NEW_KEY_RATE_LIMIT?: string;
+  ERP_ENV?: string;
+  MATERIAL_IMPORT_OBJECTS?: R2BucketLike;
 };
 
 type UserRow = {
@@ -1429,6 +1432,10 @@ export async function handleErpApi(request: Request) {
           return permissions.has("*") || permissions.has(permission);
         },
         rateLimits: { attemptsPerMinute: attempts, newKeysPerMinute: newKeys },
+        objectStore: runtime.MATERIAL_IMPORT_OBJECTS
+          ? new R2MaterialImportObjectStore(runtime.MATERIAL_IMPORT_OBJECTS)
+          : undefined,
+        objectPrefix: runtime.ERP_ENV ?? "development",
       });
     }
     if (path === "/api/health") return jsonResponse({ ok: true, time: nowText() });

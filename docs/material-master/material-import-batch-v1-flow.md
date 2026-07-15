@@ -1,10 +1,10 @@
 # Material Import Batch Foundation V1 数据流与状态图
 
-- 任务编号：`PHASE2-TASK01`
-- Status: `PROPOSED`
-- 实施状态：未实施
+- 任务编号：`PHASE2-TASK01`（设计）/ `PHASE2-TASK02`（实现）
+- Status: `APPROVED`
+- 实施状态：非生产实现已完成；生产资源、迁移与部署未执行
 
-本文件是 `material-import-batch-v1.md` 的图形化补充。图中所有组件、状态与迁移均为待审阅设计，不表示仓库已经具备 R2 或上传能力。
+本文件是 `material-import-batch-v1.md` 的图形化补充。实线 Worker/D1 流程已在仓库实现，对象存储通过可注入适配器接入；图中的生产 R2、定时清理和后续解析器仍未创建或部署。
 
 ## 1. 组件与信任边界
 
@@ -14,8 +14,8 @@ flowchart LR
     W["Worker API\n鉴权 / CSRF / 限流 / CAS / 流式接收"]
     D[("D1\n批次 / 文件元数据 / 幂等 / 事件 / 原始行契约")]
     R[("私有 R2\n原始文件对象")]
-    P["PHASE2-TASK02\n后续解析器（不属于本任务）"]
-    C["受控协调与清理任务\n后续实现"]
+    P["PHASE2-TASK03\n后续解析器（不属于本任务）"]
+    C["受控协调与清理服务\n已实现手工入口；未配置 Cron"]
 
     U -->|"JSON 创建 / multipart 单文件 / 查询 / 取消"| W
     W -->|"事务、CAS、行级权限"| D
@@ -36,7 +36,7 @@ flowchart LR
 约束：
 
 - 浏览器永远不获取 R2 凭证、公开 URL 或可直接访问的 object key。
-- D1 与 R2 没有分布式事务；虚线任务代表未来受控后台能力，不在本任务创建。
+- D1 与 R2 没有分布式事务；协调与清理服务已有可测试手工入口，生产调度不在本任务创建。
 - 测试以可注入的内存/隔离对象存储替身代替 R2，不连接生产 binding。
 
 ## 2. 正常上传数据流
@@ -77,7 +77,7 @@ sequenceDiagram
         W->>D: 记录 IMPORT_FILE_HASH_MISMATCH<br/>DELETE_PENDING 或 RECONCILIATION_REQUIRED
         W-->>U: 422，绝不 FILE_READY
     else 哈希一致
-        W->>D: 原子记录 STORED + 实际 SHA/大小/类型<br/>security=PENDING / batch=SECURITY_CHECK_PENDING<br/>FILE_STORED / version+1
+        W->>D: 原子记录 STORED + 实际 SHA/大小/类型<br/>security=PENDING / batch 保持 UPLOAD_PENDING<br/>FILE_STORED / version+1
         W->>R: 对已存对象做文件级基础检查
         alt 基础检查通过
             W->>D: 原子 security=BASIC_CHECK_PASSED<br/>batch=FILE_READY<br/>两个完成事件 / version+1 / 幂等完成
@@ -99,15 +99,11 @@ stateDiagram-v2
     CREATED --> UPLOAD_PENDING: 登记上传意图
     CREATED --> CANCELLED: 取消 CAS 成功
 
-    UPLOAD_PENDING --> SECURITY_CHECK_PENDING: R2 成功且 D1 记录 STORED
+    UPLOAD_PENDING --> FILE_READY: D1 STORED 且基础安全检查通过
     UPLOAD_PENDING --> FAILED: 确定的存储失败
+    UPLOAD_PENDING --> FAILED: 基础安全检查拒绝
     UPLOAD_PENDING --> CANCELLED: 取消 CAS 先赢
     UPLOAD_PENDING --> RECONCILIATION_REQUIRED: 结果不确定或对象不一致
-
-    SECURITY_CHECK_PENDING --> FILE_READY: 基础安全检查通过
-    SECURITY_CHECK_PENDING --> FAILED: 基础安全检查拒绝
-    SECURITY_CHECK_PENDING --> CANCELLED: 取消 CAS 先赢
-    SECURITY_CHECK_PENDING --> RECONCILIATION_REQUIRED: D1/R2 或竞争结果不确定
 
     FILE_READY --> CANCELLED: V1 获批范围内取消
     FILE_READY --> RECONCILIATION_REQUIRED: 后续发现证据不一致
@@ -206,7 +202,7 @@ sequenceDiagram
 
     par 并发竞争
         C->>D: expected_version=v, status in allowed -> CANCELLED
-        U->>D: expected_version=v, UPLOAD_PENDING -> SECURITY_CHECK_PENDING/FILE_READY
+        U->>D: expected_version=v, UPLOAD_PENDING -> FILE_READY/FAILED/RECONCILIATION_REQUIRED
     end
 
     alt 取消 CAS 先成功
@@ -228,8 +224,8 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     T["进入 FAILED / CANCELLED / 未来 COMPLETED"] --> S["同一 D1 事务设置 terminal_at"]
-    S --> R1["raw_data_retention_until\n建议 terminal_at + 30 天"]
-    S --> R2["record_retention_until\n建议 terminal_at + 1095 天"]
+    S --> R1["raw_data_retention_until\nterminal_at + 30 天"]
+    S --> R2["record_retention_until\nterminal_at + 1095 天"]
     R1 --> Q["到期扫描 + CAS -> DELETE_PENDING"]
     Q --> DR["删除私有 R2 对象"]
     DR -->|成功| DD["D1 -> DELETED\nFILE_DELETED"]
@@ -240,12 +236,12 @@ flowchart LR
     R2 -.-> AR["独立、受控的长期归档/删除流程\n不得由原始对象清理顺带执行"]
 ```
 
-两个保留期限均为 `PROPOSED`；图示不代表已经配置生命周期规则或清理任务。
+两个保留期限均已批准并由终态字段实现；图示不代表已经配置生产生命周期规则或 Cron。
 
-## 8. 实施前验证门槛
+## 8. 实施结果与后续门槛
 
-- 12 项决定逐项由用户选择，并收到统一回复“规格确认”。
-- 另行审阅版本化 Migration、R2 环境隔离、binding 和生产创建计划。
+- 12 项决定已批准，版本化 `0004`、对象存储抽象、API、Saga 和隔离测试已完成。
+- 生产 R2 环境隔离、binding、生命周期、Cron 和迁移执行计划必须另行审阅与授权。
 - 使用脱敏 PCB/FPC/SMT 历史文件样本验证 10 MiB 上限、编码、ZIP 展开边界和解析成本。
-- 使用隔离 D1 与对象存储替身覆盖全部 Saga、取消、孤立对象和清理故障。
+- 隔离 D1 与内存对象存储已覆盖 Saga、取消、竞争、对象不一致和清理故障；生产前仍需受控环境验收。
 - 任何生产 bucket、binding、密钥、迁移或部署都需要新的显式授权。

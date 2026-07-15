@@ -29,6 +29,13 @@
       "when": 1783982880150,
       "tag": "0003_material_draft_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1784128413043,
+      "tag": "0004_material_import_batch_foundation",
+      "breakpoints": true
     }
   ]
 }

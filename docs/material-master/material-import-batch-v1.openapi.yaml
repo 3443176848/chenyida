@@ -1,10 +1,10 @@
 openapi: 3.1.0
 info:
   title: Chenyida ERP Material Import Batch Foundation V1
-  version: 0.1.0-proposed
+  version: 1.0.0
   description: |
-    PHASE2-TASK01 documentation-only OpenAPI draft.
-    Status: PROPOSED. It does not describe an implemented or approved API.
+    PHASE2-TASK01 approved contract implemented by PHASE2-TASK02 in non-production code.
+    Production R2 resources, migration, and deployment remain outside this contract's authorization.
     Original objects remain private and no download or public-object endpoint is defined.
 servers:
   - url: /
@@ -61,6 +61,7 @@ paths:
         - $ref: '#/components/parameters/StatusFilter'
         - $ref: '#/components/parameters/SourceKindFilter'
         - $ref: '#/components/parameters/CreatedByMe'
+        - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
       responses:
@@ -111,7 +112,7 @@ paths:
       operationId: uploadMaterialImportFile
       summary: Stream one file through the Worker into private object storage
       description: |
-        PROPOSED V1 accepts exactly one file part named file. The Worker counts actual bytes,
+        V1 accepts exactly one file part named file. The Worker counts actual bytes,
         computes SHA-256, detects type, stores without overwriting an existing mismatched
         object, records STORED in D1, then performs a file-level basic security check.
         A batch is FILE_READY only after storage and security invariants both pass.
@@ -140,7 +141,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: Exactly one .xlsx or .csv file; proposed application limit is 10 MiB.
+                  description: Exactly one .xlsx or .csv file; approved application limit is 10 MiB.
             encoding:
               file:
                 contentType: >-
@@ -225,8 +226,8 @@ paths:
       operationId: cancelMaterialImportBatch
       summary: Cancel one visible batch with optimistic concurrency
       description: |
-        Requires material.import.cancel and owner/read_any visibility. PROPOSED public cancellation
-        states are CREATED, UPLOAD_PENDING, SECURITY_CHECK_PENDING, and FILE_READY.
+        Requires material.import.cancel and owner/read_any visibility. Public cancellation
+        states are CREATED, UPLOAD_PENDING, and FILE_READY.
         RECONCILIATION_REQUIRED can only become CANCELLED through controlled reconciliation.
         CANCELLED does not mean that the private object has already been deleted.
       parameters:
@@ -345,6 +346,14 @@ components:
       schema:
         type: boolean
         default: true
+    Sort:
+      name: sort
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [created_at_desc, created_at_asc]
+        default: created_at_desc
     Cursor:
       name: cursor
       in: query
@@ -395,7 +404,7 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
     PayloadTooLarge:
-      description: JSON envelope or streamed file exceeds the applicable proposed application limit.
+      description: JSON envelope or streamed file exceeds the applicable application limit.
       content:
         application/json:
           schema:
@@ -422,7 +431,6 @@ components:
       enum:
         - CREATED
         - UPLOAD_PENDING
-        - SECURITY_CHECK_PENDING
         - FILE_READY
         - RECONCILIATION_REQUIRED
         - FAILED
@@ -712,7 +720,7 @@ components:
     BatchListEnvelope:
       type: object
       additionalProperties: false
-      required: [request_id, data, page]
+      required: [request_id, data, total, page]
       properties:
         request_id:
           type: string
@@ -720,6 +728,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Batch'
+        total:
+          type: integer
+          minimum: 0
+          description: Count after server-side owner/read_any visibility filtering.
         page:
           $ref: '#/components/schemas/PageInfo'
     EventListEnvelope:

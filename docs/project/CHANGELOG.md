@@ -4,6 +4,18 @@
 
 ## 2026-07-15
 
+### PHASE2-TASK02 实施 - `feat: add material import batch foundation`
+
+- Git Commit：Material Import Batch Foundation V1 的非生产实现、测试和治理文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `050d134`。
+- 数据库：新增 `0004_material_import_batch_foundation.sql`、Drizzle schema/快照及带数据保护的 Down 文件；创建批次、文件、冻结原始行契约、不可变事件和专用幂等五表，包含 V1 状态、外键、唯一性、终态与完整性约束。
+- 对象存储：新增可注入接口、R2 适配器和内存测试替身；确定性环境前缀 key 使用条件写入且不覆盖，支持 HEAD、范围读取和受控删除；没有创建生产 bucket、binding 或密钥。
+- 上传与安全：实现恰好一个 `file` part 的有界流式 multipart、10 MiB 实际计数、增量 SHA-256、声明哈希核对与文件类型探测；XLSX 检查 OOXML/ZIP 结构、加密/宏/条目/展开/压缩比/路径边界，CSV 检查 UTF-8/GB18030、NUL、二进制和完整 HTML 伪装，不解析工作表或业务行。
+- API、权限与 Saga：实现创建、列表、详情、上传、事件、取消六个精确路由；复用 Session/Origin/CSRF，以 capability + owner/`read_any` 执行行级可见性和隐藏 404，并实现专用幂等、限流、乐观并发、重复 SHA 策略、D1/R2 故障协调、取消竞争及手工清理服务。
+- 验证：新增迁移 3/3、导入 API/Saga/安全 12/12；全量 Node 224/224、build、隔离 API smoke 和 247 文件凭证扫描通过，lint 0 error/1 个任务外既有 warning。
+- 本地基线：项目 Python 3.12 在临时 SQLite 中运行 `server.py --self-test`、`smoke_test.py` 和 `go_live_check.py --no-backup` 全部通过，临时数据已清理。
+- 文档：12 项决定转为 `APPROVED`；同步正式规格、OpenAPI、数据流/状态图、MASTER、TASKS、ROADMAP、DECISIONS、STATUS 和 CHANGELOG；Excel/CSV 行解析顺延为 `PHASE2-TASK03`。
+- 数据库与生产：未连接生产 URL/D1/R2，未执行生产迁移，未创建生产 R2 资源、生命周期或 Cron，未部署；没有解析 Excel/CSV 行、写入 `material_import_rows` 或创建 Material Draft。
+
 ### PHASE2-TASK01 设计评审 - `docs: design material import batch foundation`
 
 - Git Commit：正式规格、OpenAPI 草案、数据流图和项目治理文档在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `353c6d9`。
