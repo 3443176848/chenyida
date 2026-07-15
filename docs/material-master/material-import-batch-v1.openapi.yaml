@@ -1,0 +1,803 @@
+openapi: 3.1.0
+info:
+  title: Chenyida ERP Material Import Batch Foundation V1
+  version: 0.1.0-proposed
+  description: |
+    PHASE2-TASK01 documentation-only OpenAPI draft.
+    Status: PROPOSED. It does not describe an implemented or approved API.
+    Original objects remain private and no download or public-object endpoint is defined.
+servers:
+  - url: /
+    description: Same-origin Worker API; environment host is not embedded in the contract.
+tags:
+  - name: Material Import Batches
+security:
+  - sessionCookie: []
+paths:
+  /api/material-master/import-batches:
+    post:
+      tags: [Material Import Batches]
+      operationId: createMaterialImportBatch
+      summary: Create one empty material import batch
+      description: |
+        Requires material.import.create, same-origin Origin validation, and CSRF validation.
+        retry_of_batch_id creates an independent batch and never mutates the source batch.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBatchRequest'
+      responses:
+        '201':
+          description: Batch created, or an identical completed idempotent result replayed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    get:
+      tags: [Material Import Batches]
+      operationId: listMaterialImportBatches
+      summary: List visible import batches
+      description: |
+        Requires material.import.read. Without material.import.read_any, the server filters
+        to created_by = current user in the database query.
+      parameters:
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/SourceKindFilter'
+        - $ref: '#/components/parameters/CreatedByMe'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Visible batches ordered by created_at DESC, id DESC.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchListEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/material-master/import-batches/{batchId}:
+    get:
+      tags: [Material Import Batches]
+      operationId: getMaterialImportBatch
+      summary: Get one visible batch and safe file metadata
+      description: |
+        Requires material.import.read. Missing and non-visible batches both return 404.
+        The response never includes bucket, object_key, ETag, credentials, or a download URL.
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+      responses:
+        '200':
+          description: Visible batch detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchDetailEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/material-master/import-batches/{batchId}/file:
+    post:
+      tags: [Material Import Batches]
+      operationId: uploadMaterialImportFile
+      summary: Stream one file through the Worker into private object storage
+      description: |
+        PROPOSED V1 accepts exactly one file part named file. The Worker counts actual bytes,
+        computes SHA-256, detects type, stores without overwriting an existing mismatched
+        object, records STORED in D1, then performs a file-level basic security check.
+        A batch is FILE_READY only after storage and security invariants both pass.
+
+        The idempotency request digest is computed from method, concrete path, batch_id,
+        expected_version, declared_sha256, sanitized filename, normalized declared MIME,
+        optional declared size, and duplicate action. It excludes multipart boundary,
+        raw multipart bytes, and Content-Length.
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+        - $ref: '#/components/parameters/ExpectedVersionHeader'
+        - $ref: '#/components/parameters/FileSha256'
+        - $ref: '#/components/parameters/FileSize'
+        - $ref: '#/components/parameters/DuplicateAction'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Exactly one .xlsx or .csv file; proposed application limit is 10 MiB.
+            encoding:
+              file:
+                contentType: >-
+                  application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,
+                  text/csv,
+                  application/csv
+      responses:
+        '200':
+          description: File stored, actual metadata recorded, basic check passed, batch FILE_READY.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchDetailEnvelope'
+        '202':
+          description: Result requires controlled reconciliation; this is not upload success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconciliationEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          description: Unsupported multipart or detected file type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Hash mismatch, empty file, security rejection, or other semantic rejection.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: Confirmed storage failure or temporarily unavailable object storage.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/material-master/import-batches/{batchId}/events:
+    get:
+      tags: [Material Import Batches]
+      operationId: listMaterialImportBatchEvents
+      summary: List immutable safe events for one visible batch
+      description: Requires material.import.read and the same owner/read_any visibility rule.
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Events ordered by created_at ASC, id ASC.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/material-master/import-batches/{batchId}/cancel:
+    post:
+      tags: [Material Import Batches]
+      operationId: cancelMaterialImportBatch
+      summary: Cancel one visible batch with optimistic concurrency
+      description: |
+        Requires material.import.cancel and owner/read_any visibility. PROPOSED public cancellation
+        states are CREATED, UPLOAD_PENDING, SECURITY_CHECK_PENDING, and FILE_READY.
+        RECONCILIATION_REQUIRED can only become CANCELLED through controlled reconciliation.
+        CANCELLED does not mean that the private object has already been deleted.
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelBatchRequest'
+      responses:
+        '200':
+          description: Batch cancelled, or identical completed idempotent response replayed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchDetailEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: CYD_ERP_SESSION
+      description: Existing HttpOnly same-origin ERP session cookie.
+
+  parameters:
+    BatchId:
+      name: batchId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Opaque client-generated key; reuse is valid only for the identical normalized request.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 200
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: Must match the same-origin CSRF cookie according to the existing server policy.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 512
+    ExpectedVersionHeader:
+      name: X-Expected-Version
+      in: header
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    FileSha256:
+      name: X-File-SHA256
+      in: header
+      required: true
+      description: Client-declared lower-case SHA-256; the server-computed value is authoritative.
+      schema:
+        type: string
+        pattern: '^[0-9a-f]{64}$'
+    FileSize:
+      name: X-File-Size
+      in: header
+      required: false
+      description: Optional client declaration; actual streaming byte count is authoritative.
+      schema:
+        type: integer
+        format: int64
+        minimum: 0
+    DuplicateAction:
+      name: X-Duplicate-Action
+      in: header
+      required: false
+      description: Defaults to REJECT. ALLOW_DUPLICATE explicitly permits a new independent import.
+      schema:
+        $ref: '#/components/schemas/DuplicateAction'
+    StatusFilter:
+      name: status
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/BatchStatus'
+    SourceKindFilter:
+      name: source_kind
+      in: query
+      required: false
+      schema:
+        $ref: '#/components/schemas/SourceKind'
+    CreatedByMe:
+      name: created_by_me
+      in: query
+      required: false
+      description: Non-read_any users are owner-filtered regardless of this value.
+      schema:
+        type: boolean
+        default: true
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 512
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+
+  responses:
+    BadRequest:
+      description: Invalid request shape, header, filter, cursor, or multipart structure.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unauthorized:
+      description: Authentication required or session invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Forbidden:
+      description: Capability, Origin, or CSRF validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: Batch does not exist or is not visible to the current user.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Conflict:
+      description: State/version/idempotency/duplicate conflict.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    PayloadTooLarge:
+      description: JSON envelope or streamed file exceeds the applicable proposed application limit.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    RateLimited:
+      description: User, idempotency-key, upload-byte, or concurrent-upload rate limit exceeded.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+  schemas:
+    SourceKind:
+      type: string
+      enum: [XLSX, CSV]
+    BatchStatus:
+      type: string
+      description: V1 database CHECK values only; future parsing states are intentionally absent.
+      enum:
+        - CREATED
+        - UPLOAD_PENDING
+        - SECURITY_CHECK_PENDING
+        - FILE_READY
+        - RECONCILIATION_REQUIRED
+        - FAILED
+        - CANCELLED
+    StorageStatus:
+      type: string
+      enum:
+        - UPLOAD_PENDING
+        - STORED
+        - RECONCILIATION_REQUIRED
+        - STORAGE_FAILED
+        - DELETE_PENDING
+        - DELETED
+    SecurityCheckStatus:
+      type: string
+      enum:
+        - NOT_STARTED
+        - PENDING
+        - BASIC_CHECK_PASSED
+        - REJECTED
+    DuplicateAction:
+      type: string
+      enum: [REJECT, ALLOW_DUPLICATE]
+      default: REJECT
+    CreateBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [source_kind]
+      properties:
+        source_kind:
+          $ref: '#/components/schemas/SourceKind'
+        retry_of_batch_id:
+          oneOf:
+            - type: integer
+              format: int64
+              minimum: 1
+            - type: 'null'
+          description: Must reference a visible terminal failed batch and must not create a cycle.
+    CancelBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+        reason_code:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: '^[A-Z][A-Z0-9_]*$'
+          description: Optional safe business reason code; no free-form sensitive detail.
+    Batch:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - batch_no
+        - source_kind
+        - status
+        - created_by
+        - current_version
+        - file_count
+        - total_rows
+        - accepted_rows
+        - rejected_rows
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        batch_no:
+          type: string
+        source_kind:
+          $ref: '#/components/schemas/SourceKind'
+        status:
+          $ref: '#/components/schemas/BatchStatus'
+        retry_of_batch_id:
+          oneOf:
+            - type: integer
+              format: int64
+              minimum: 1
+            - type: 'null'
+        created_by:
+          type: string
+          description: Safe user display identifier; exposure follows existing account policy.
+        current_version:
+          type: integer
+          minimum: 1
+        file_count:
+          type: integer
+          minimum: 0
+          maximum: 1
+        total_rows:
+          type: integer
+          minimum: 0
+        accepted_rows:
+          type: integer
+          minimum: 0
+        rejected_rows:
+          type: integer
+          minimum: 0
+        failure_stage:
+          type: [string, 'null']
+        failure_code:
+          type: [string, 'null']
+        failure_message:
+          type: [string, 'null']
+          description: Sanitized Chinese user message only.
+        cancelled_at:
+          type: [string, 'null']
+          format: date-time
+        terminal_at:
+          type: [string, 'null']
+          format: date-time
+        raw_data_retention_until:
+          type: [string, 'null']
+          format: date-time
+        record_retention_until:
+          type: [string, 'null']
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    SafeFileMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - original_filename
+        - declared_sha256
+        - storage_status
+        - security_check_status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        original_filename:
+          type: string
+          description: Sanitized display filename, never used as an object key.
+        filename_extension:
+          type: [string, 'null']
+        declared_mime_type:
+          type: [string, 'null']
+        declared_sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        declared_size_bytes:
+          oneOf:
+            - type: integer
+              format: int64
+              minimum: 0
+            - type: 'null'
+        detected_file_type:
+          oneOf:
+            - $ref: '#/components/schemas/SourceKind'
+            - type: 'null'
+        actual_sha256:
+          type: [string, 'null']
+          pattern: '^[0-9a-f]{64}$'
+        actual_size_bytes:
+          oneOf:
+            - type: integer
+              format: int64
+              minimum: 1
+            - type: 'null'
+        storage_status:
+          $ref: '#/components/schemas/StorageStatus'
+        security_check_status:
+          $ref: '#/components/schemas/SecurityCheckStatus'
+        security_failure_code:
+          type: [string, 'null']
+        security_failure_message:
+          type: [string, 'null']
+        uploaded_at:
+          type: [string, 'null']
+          format: date-time
+        retention_until:
+          type: [string, 'null']
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    BatchDetail:
+      type: object
+      additionalProperties: false
+      required: [batch, file]
+      properties:
+        batch:
+          $ref: '#/components/schemas/Batch'
+        file:
+          oneOf:
+            - $ref: '#/components/schemas/SafeFileMetadata'
+            - type: 'null'
+    ImportEventType:
+      type: string
+      enum:
+        - BATCH_CREATED
+        - FILE_UPLOAD_STARTED
+        - FILE_STORED
+        - FILE_UPLOAD_COMPLETED
+        - FILE_UPLOAD_FAILED
+        - FILE_SECURITY_CHECK_PASSED
+        - FILE_SECURITY_CHECK_FAILED
+        - RECONCILIATION_REQUIRED
+        - BATCH_CANCELLED
+        - FILE_DELETE_REQUESTED
+        - FILE_DELETED
+        - FILE_DELETE_FAILED
+    ImportEvent:
+      type: object
+      additionalProperties: false
+      required: [id, batch_id, event_type, actor_type, request_id, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        batch_id:
+          type: integer
+          format: int64
+          minimum: 1
+        event_type:
+          $ref: '#/components/schemas/ImportEventType'
+        actor_type:
+          type: string
+          enum: [USER, SYSTEM]
+        actor_identifier:
+          type: [string, 'null']
+        previous_status:
+          oneOf:
+            - $ref: '#/components/schemas/BatchStatus'
+            - type: 'null'
+        new_status:
+          oneOf:
+            - $ref: '#/components/schemas/BatchStatus'
+            - type: 'null'
+        request_id:
+          type: string
+        safe_details:
+          oneOf:
+            - type: object
+              additionalProperties: true
+              description: Safe codes and counters only; no file content or internal exception.
+            - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+    PageInfo:
+      type: object
+      additionalProperties: false
+      required: [has_more]
+      properties:
+        next_cursor:
+          type: [string, 'null']
+        has_more:
+          type: boolean
+    BatchEnvelope:
+      type: object
+      additionalProperties: false
+      required: [request_id, data]
+      properties:
+        request_id:
+          type: string
+        data:
+          $ref: '#/components/schemas/Batch'
+    BatchDetailEnvelope:
+      type: object
+      additionalProperties: false
+      required: [request_id, data]
+      properties:
+        request_id:
+          type: string
+        data:
+          $ref: '#/components/schemas/BatchDetail'
+    BatchListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [request_id, data, page]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Batch'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    EventListEnvelope:
+      type: object
+      additionalProperties: false
+      required: [request_id, data, page]
+      properties:
+        request_id:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportEvent'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+    ReconciliationEnvelope:
+      type: object
+      additionalProperties: false
+      required: [request_id, code, message, data]
+      properties:
+        request_id:
+          type: string
+        code:
+          type: string
+          const: IMPORT_BATCH_RECONCILIATION_REQUIRED
+        message:
+          type: string
+          description: Sanitized Chinese status message; not a success message.
+        data:
+          $ref: '#/components/schemas/BatchDetail'
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [request_id, error]
+      properties:
+        request_id:
+          type: string
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - IMPORT_BATCH_NOT_FOUND
+            - IMPORT_BATCH_STATE_INVALID
+            - IMPORT_BATCH_VERSION_CONFLICT
+            - IMPORT_BATCH_RECONCILIATION_REQUIRED
+            - IMPORT_FILE_ALREADY_ATTACHED
+            - IMPORT_FILE_REQUIRED
+            - IMPORT_FILE_MULTIPLE_NOT_ALLOWED
+            - IMPORT_FILE_TYPE_UNSUPPORTED
+            - IMPORT_FILE_TOO_LARGE
+            - IMPORT_FILE_EMPTY
+            - IMPORT_FILE_HASH_MISMATCH
+            - IMPORT_FILE_DUPLICATE
+            - IMPORT_FILE_SECURITY_CHECK_FAILED
+            - IMPORT_FILE_STORAGE_FAILED
+            - IDEMPOTENCY_KEY_REQUIRED
+            - IDEMPOTENCY_KEY_REUSED
+            - IDEMPOTENCY_REQUEST_IN_PROGRESS
+            - INVALID_REQUEST
+            - AUTHENTICATION_REQUIRED
+            - PERMISSION_DENIED
+            - CSRF_VALIDATION_FAILED
+            - RATE_LIMITED
+            - INTERNAL_ERROR
+        message:
+          type: string
+          description: Stable sanitized Chinese message; never SQL, stack, credentials, or R2 details.
+        field:
+          type: [string, 'null']
+        expected_version:
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: 'null'
+          description: Present only when safe and relevant to a version conflict.

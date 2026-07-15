@@ -4,6 +4,22 @@
 
 ## 2026-07-15
 
+### PHASE2-TASK01 设计评审 - `docs: design material import batch foundation`
+
+- Git Commit：正式规格、OpenAPI 草案、数据流图和项目治理文档在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `353c6d9`。
+- 新增功能：无；本任务只完成 Material Import Batch Foundation V1 书面设计，12 项决定全部保持 `PROPOSED`。
+- 存储架构：推荐私有 Cloudflare R2 保存原始文件、D1 保存批次/文件元数据/原始行契约/幂等/不可变事件；记录当前 `.openai/hosting.json` 的 `r2` 为 `null` 且仓库没有可用 binding，不把待新增基础设施表述为现有能力。
+- 上传与恢复：定义创建批次后单文件 multipart Worker 代理上传；以确定性、不可覆盖 object key 和实际 SHA/字节数构成可恢复 Saga，不宣称跨 D1/R2 分布式事务或 exactly-once。
+- 状态与安全：分离文件 `storage_status` 与 `security_check_status`；只有 STORED、基础检查通过、实际摘要/大小和有效检测类型同时满足才进入 `FILE_READY`；增加批次级 `RECONCILIATION_REQUIRED`、取消竞态和清理事件。
+- 数据契约：定义批次、文件、0-based 工作表原始行、不可变事件和专用导入幂等技术表；冻结 `EMPTY/TEXT/NUMBER/BOOLEAN/DATE/FORMULA/ERROR` 类型化单元格契约，CSV 固定 `sheet_index=0`、`sheet_name=__CSV__`。
+- API、安全与并发：OpenAPI 草案包含创建/列表/详情/上传/事件/取消 6 个操作；服务端 capability 与 owner/`read_any` 行级可见性、CSRF、限流、CAS、规范化 multipart 摘要、重复 SHA 显式动作和安全错误码均有定义，不提供下载或对象地址。
+- 保留与 Migration：建议以 `terminal_at` 计算原始数据和批次记录保留期，采用两阶段可恢复清理；只描述未来 `0004` 的五表、V1 CHECK、候选索引查询依据和扩展式迁移，不创建任何迁移文件。
+- 平台依据：Worker 内存/请求体、D1 行/BLOB、R2 私有访问、上传与价格事实均引用 2026-07-15 当前 Cloudflare 官方文档；10 MiB 业务上限仍为保守建议，仓库没有历史样本容量证据。
+- 验证：OpenAPI YAML 与 93 个本地引用解析通过，6 个操作；12 项决定结构检查通过。build 通过；全量 Node 串行 209/209、隔离 API smoke、环境守卫 6/6、凭证扫描 236 个文件、lint 0 error/1 个既有 warning通过。首次并行全量中一个迁移用例因 120 秒资源竞争取消，单独 1/1 与串行全量均通过。
+- 本地基线：项目 Python 3.12 临时 SQLite 环境守卫 4/4、`server.py --self-test`、`smoke_test.py`、备份恢复和 `go_live_check.py --no-backup` 全部通过；临时数据已清理。
+- 数据库与生产：未修改运行时代码、Schema、Migration、索引、对象存储、Binding、API、前端或部署配置；未连接生产 URL/D1/R2，未创建 bucket、密钥、生产版本或部署。
+- 停止条件：提交后停止，等待项目负责人逐项选择并统一回复“规格确认”；此前任何推荐方案都不得转为 `APPROVED` 或进入实施。
+
 ### PHASE1-TASK14 实施 - `feat: add material review ui`
 
 - Git Commit：前端实现、UI 测试、规格和项目治理文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `c6ddf3b`。

@@ -191,6 +191,17 @@
 - 原因：保持服务端权限、状态、Validation 和版本为权威边界，同时让审核人员在桌面端获得可读、可恢复、可键盘操作且不会因网络不确定执行相反动作的单条审核流程。
 - 影响：本任务只形成 `material-review-ui-v1.md`、低保真线框和 51 项实施测试计划；不修改前端运行时代码、API、Schema、Migration、索引、部署配置或生产环境。任何实施、API 候选项、生产迁移或部署均需另立任务并取得授权。
 
+## D-018 Material Import Batch Foundation V1 存储、状态与安全边界
+
+- 日期：2026-07-15
+- 状态：PROPOSED
+- 确认人：待项目负责人审阅完整规格并统一回复“规格确认”
+- 背景：Phase 2 需要为 PCB/FPC/SMT 历史 `.xlsx`/`.csv` 文件建立批次、原始证据、后续解析边界和可恢复上传，但当前 `.openai/hosting.json` 的 `r2` 为 `null`，仓库没有 R2 binding 或 multipart 上传能力；D1 与 R2 也不存在分布式事务。
+- 推荐：使用私有 R2 保存一个批次的单个原始文件，D1 保存批次、文件元数据、类型化原始行契约、专用幂等记录和不可变事件；Worker 代理流式上传，按 D1 意图、R2 不可覆盖写入、D1 `STORED`、基础安全检查、`FILE_READY` 执行可恢复 Saga，并以批次级 `RECONCILIATION_REQUIRED` 处理不确定结果。
+- 安全与并发：对象 key 仅由服务端确定性生成且不得公开；实际 SHA、大小和检测类型为权威；存储完成与安全检查通过分离；owner/`read_any` 行级可见性、CSRF、限流、规范化 multipart 幂等摘要、版本 CAS、终态不可恢复和两阶段清理均由服务端执行。
+- 待确认：正式规格末尾 12 项决定，包括存储、单文件、10 MiB 上限、两类保留期、重复 SHA、跨用户读取、取消状态、失败重试、下载、安全扫描和 R2 基础设施。全部仍为 `PROPOSED`，推荐不构成批准。
+- 影响：本任务只新增 `docs/material-master/material-import-batch-v1.md`、OpenAPI 草案、数据流图和治理文档，不授权 Schema、Migration、bucket、binding、密钥、API、前端、生产迁移或部署。只有收到“规格确认”后，用户选中的方案才可在后续独立任务中转为 `APPROVED`。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

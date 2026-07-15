@@ -8,13 +8,13 @@
 | --- | ---: | --- |
 | 总代码量 | 约 21,500 行 | 沿用既有运行时源码口径并计入 TASK14 新增 Review UI 与共享只读组件；不含依赖、构建产物和文档 |
 | 源码文件 | 87 | TASK14 新增 2 条路由、3 个组件和 1 个 Review 辅助模块；既有详情工作区改为复用共享只读组件 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK14 差异只覆盖 Review 前端、共享只读组件、UI 测试及项目文档；无 API、schema、migration、索引、业务服务或部署配置变化 |
+| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK01 差异只覆盖 3 份 Material Import Batch 规格和项目治理文档；无运行时代码、API、schema、migration、索引、对象存储、binding 或部署配置变化 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 48（开发 schema） | 本地 SQLite 26；在线既有 D1 8；V2 12；Material API 安全表 2；未执行生产迁移，不能理解为生产现状 |
 | 在线 API 路径 | 67 | 既有 61 个路径加 6 个 Reference/统一查询/历史路径；生产公开站点尚未部署本提交 |
 | 页面入口 | 11 | 既有 9 个入口加 `/materials/review` 与 `/materials/:materialId/review` |
-| 测试与安全检查文件 | 21 | 新增 Review UI 51 项；全量 Node 基线为 209/209 |
+| 测试与安全检查文件 | 21 | PHASE2-TASK01 未新增测试代码；全量 Node 基线保持 209/209 |
 
 ## 当前版本与环境
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE1-TASK14` 开始时，根仓库 `main` 位于 `c6ddf3b`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异覆盖 Review 队列/工作台前端、共享只读详情、UI 测试和项目治理文档；未修改 API、schema、migration、索引、审核写服务或生产配置。
+`PHASE2-TASK01` 开始时，根仓库 `main` 位于 `353c6d9`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖 Material Import Batch 正式规格、OpenAPI 草案、数据流图和项目治理文档；未修改运行时代码、API、schema、migration、索引、对象存储、binding、审核写服务或生产配置。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE1-TASK14` 计划提交消息为 `feat: add material review ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1。
+`PHASE2-TASK01` 计划提交消息为 `docs: design material import batch foundation`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2。
 
 实时状态必须使用：
 
@@ -48,6 +48,27 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE2-TASK01 Material Import Batch Foundation V1 书面设计基线
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / AWAITING SPECIFICATION CONFIRMATION | 两节方向已确认并形成完整规格；12 项决定全部保持 `PROPOSED`，停止等待“规格确认” |
+| 正式交付 | COMPLETE | `material-import-batch-v1.md`、OpenAPI 草案和 Mermaid 数据流/状态/恢复/清理图完成 |
+| 基础设施现状 | VERIFIED | `.openai/hosting.json` 的 `r2` 为 `null`，Worker 无 R2 binding；R2 是待新增能力，文档阶段未创建任何资源 |
+| 存储与上传 | PROPOSED | 私有 R2 原始对象 + D1 元数据；创建批次后单文件 multipart Worker 代理上传；无公开 URL、直传、S3 凭证或多文件 |
+| Saga 与状态 | PROPOSED | D1 意图、R2 不可覆盖写入、D1 STORED、安全检查、FILE_READY 分层；批次/文件均有 `RECONCILIATION_REQUIRED` 恢复边界 |
+| 数据模型 | PROPOSED | 四张业务表加专用导入幂等技术表；0-based `sheet_index`、CSV `__CSV__`、7 类不可变原始单元格契约 |
+| API/权限 | PROPOSED | 6 个操作；capability + owner/`read_any`、隐藏 404、CSRF、限流、请求编号、CAS、稳定错误码；无下载端点 |
+| 幂等/并发 | PROPOSED | multipart 规范化摘要排除 boundary/原始字节/Content-Length；确定性 key 不覆盖；取消/完成以 D1 CAS 裁决 |
+| 保留/清理 | PROPOSED | `terminal_at` 为统一基准；原始数据 30 天、批次/事件 1095 天为推荐值；两阶段清理不顺带删除事件 |
+| Migration | DESIGNED ONLY | 只描述未来 `0004`、V1 CHECK、外键/唯一约束、候选普通索引和迁移测试；没有创建 SQL、schema 或快照 |
+| 官方事实核验 | PASS | Workers、D1 与 R2 当前限制/隐私/上传/价格均引用 Cloudflare 官方文档；10 MiB 不冒充平台或已验证业务上限 |
+| 规格校验 | PASS | OpenAPI YAML、93 个本地引用和 6 个操作通过解析；12 项决定恰好各含要求的 8 个字段，全部为 `PROPOSED` |
+| Site 基线 | PASS | build、串行 Node 209/209、隔离 API smoke、环境守卫 6/6、凭证扫描 236 文件、lint 0 error/1 个既有 warning；并行首次迁移超时已由单测 1/1 和串行全量排除 |
+| 本地基线 | PASS | 项目 Python 3.12 临时 SQLite 环境守卫 4/4、自测、烟测、备份恢复和 `go_live_check --no-backup` 通过；临时数据已清理 |
+| 运行时范围 | UNCHANGED | 无运行时代码、Schema、Migration、对象存储、Binding、API、前端、测试业务代码或部署配置变化 |
+| 生产影响 | NONE | 未连接 production、公共 URL、远程 D1/R2 binding，未迁移真实数据、创建 bucket/密钥或部署 |
 
 ## PHASE1-TASK14 Material Review UI 实施状态
 
