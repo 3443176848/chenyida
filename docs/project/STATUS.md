@@ -6,15 +6,15 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 约 20,700 行 | 沿用 TASK12 运行时源码口径；TASK13 仅新增文档，不改变代码统计 |
-| 源码文件 | 81 | 沿用 TASK12 运行时源码口径；TASK13 未新增或修改源码文件 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK13 差异只覆盖两份 Review UI 规格及项目治理文档；无运行时代码、API、schema、migration、索引、测试业务代码或部署配置变化 |
+| 总代码量 | 约 21,500 行 | 沿用既有运行时源码口径并计入 TASK14 新增 Review UI 与共享只读组件；不含依赖、构建产物和文档 |
+| 源码文件 | 87 | TASK14 新增 2 条路由、3 个组件和 1 个 Review 辅助模块；既有详情工作区改为复用共享只读组件 |
+| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK14 差异只覆盖 Review 前端、共享只读组件、UI 测试及项目文档；无 API、schema、migration、索引、业务服务或部署配置变化 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 48（开发 schema） | 本地 SQLite 26；在线既有 D1 8；V2 12；Material API 安全表 2；未执行生产迁移，不能理解为生产现状 |
 | 在线 API 路径 | 67 | 既有 61 个路径加 6 个 Reference/统一查询/历史路径；生产公开站点尚未部署本提交 |
-| 页面入口 | 9 | 既有本地/在线根入口 3 个，加 Material 列表、详情、版本、变更日志、创建和编辑 6 条原生 Vinext 路由 |
-| 测试与安全检查文件 | 20 | TASK13 未修改测试文件；全量 Node 基线仍为 158，规格另定义 51 项后续实施测试 |
+| 页面入口 | 11 | 既有 9 个入口加 `/materials/review` 与 `/materials/:materialId/review` |
+| 测试与安全检查文件 | 21 | 新增 Review UI 51 项；全量 Node 基线为 209/209 |
 
 ## 当前版本与环境
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE1-TASK13` 开始时，根仓库 `main` 位于 `9278bea`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖 Review UI 两份规格和项目治理文档；未修改前端运行时代码、API、schema、migration、索引、测试业务代码、审核写服务或生产配置。
+`PHASE1-TASK14` 开始时，根仓库 `main` 位于 `c6ddf3b`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异覆盖 Review 队列/工作台前端、共享只读详情、UI 测试和项目治理文档；未修改 API、schema、migration、索引、审核写服务或生产配置。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE1-TASK13` 提交消息为 `docs: design material review ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1。
+`PHASE1-TASK14` 计划提交消息为 `feat: add material review ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1。
 
 实时状态必须使用：
 
@@ -48,6 +48,26 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE1-TASK14 Material Review UI 实施状态
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / AWAITING ACCEPTANCE | 非生产前端实现、自动测试、浏览器验收、文档和独立功能提交完成；未自动开始后续任务 |
+| 页面路由 | IMPLEMENTED | 新增 `/materials/review`、`/materials/:materialId/review`；入口只由 `material.review.queue` 控制 |
+| 队列 | PASS | URL 权威筛选、300ms keyword、四种 allowlist 排序、20/50/100 服务端分页、叶子分类、创建人和提交日期；展示但不筛选 `submitted_by`，服务端 `total` 为权威 |
+| 工作台 | PASS | 方案 A；左侧完整只读详情，右侧实测 310px sticky Validation/职责分离/审核操作；基本信息、职责、属性、Validation 和历史展示复用共享组件 |
+| 批准与驳回 | PASS | 最终动作前重读统一详情；ERROR 禁止批准，WARNING 明示确认；批准返回正式编码与 ACTIVE，驳回返回 DRAFT 并复读 `last_rejection` |
+| 权限与职责 | PASS | queue/approve/reject 独立能力；创建人或最后修改人禁审、提交人本身不禁审；前端无角色名推断，服务端继续最终裁决 |
+| 安全与并发 | PASS | 复用 Session/共享 Client/CSRF；approve/reject 独立页面内存 Key 和不可变载荷；RESULT_UNKNOWN 仅原请求安全重试，覆盖版本冲突、状态变化、429、dirty 和离开保护 |
+| 状态与可访问性 | PASS | 400/401/403/404/422/429/5xx、request_id、加载/空/无结果、焦点定位、对话框初始焦点/Tab/Escape/恢复和 live region 均有实现或测试 |
+| UI 测试 | PASS | Review UI 51/51；只读 UI 回归 37/37；全量 Node 209/209 |
+| 浏览器验收 | PASS | 本地 Vinext + Playwright 1366×768；队列 2 行、sticky 右栏 310px、WARNING 复选确认、批准写入模拟与成功返回原队列完整往返通过 |
+| Site 基线 | PASS | build、lint 0 error/1 个既有 warning、一次性隔离 D1 API smoke、233 文件凭证扫描通过 |
+| 本地基线 | PASS | 临时 SQLite 环境守卫 4/4、自测、烟测、备份恢复和 `go_live_check --no-backup` 通过；临时数据已清理 |
+| 数据库/API 范围 | UNCHANGED | 未修改 API、Schema、migration、索引、Material 业务服务、Legacy SQLite 或部署配置 |
+| 生产影响 | NONE | 未连接生产 URL/D1，未迁移真实数据、部署或修改生产配置 |
+| 已知限制 | RECORDED | 队列 API 不支持 `submitted_by` 筛选；公开 Site 仍为旧版本；生产迁移/部署、候选索引及 `PENDING_APPROVAL` 收缩需独立任务 |
 
 ## PHASE1-TASK13 Material Review UI 书面设计基线
 

@@ -28,14 +28,16 @@
 | PHASE1-TASK10 | 设计 Material Draft 创建、编辑与提交审核界面 V1 | DONE | Codex（设计）、项目负责人（五节设计与补充约束确认） | 2026-07-14 | 2026-07-14 | PHASE1-TASK09 | 完成正式书面规格和低保真线框稿；批准布局 C、Schema 驱动完整替换、PATCH/GET/submit、权限、Validation、Schema 漂移、幂等、并发、dirty、SAVED_UNSYNCED/RESULT_UNKNOWN 和 54 项 E2E 计划；未实施前端或 API |
 | PHASE1-TASK11 | 实现 Material Detail last_rejection 只读历史投影 | DONE | Codex（实施）、项目负责人（任务范围确认） | 2026-07-15 | 2026-07-15 | PHASE1-TASK10 | materials/drafts 统一详情从完整 REJECT 版本历史确定性投影最近一次驳回；隔离测试和查询计划通过，未改 schema/migration/索引/写服务，未连接或部署生产 D1 |
 | PHASE1-TASK12 | 实现 Material Draft 创建、编辑与提交审核界面 V1 | DONE | Codex（实施）、项目负责人（任务范围确认） | 2026-07-15 | 2026-07-15 | PHASE1-TASK11 | 新增创建/编辑路由、布局 C、Schema 驱动五类属性、权限入口、完整 PATCH、PATCH/GET/submit、Validation/WARNING、幂等安全重试、冲突、dirty、未知属性与驳回信息保护；Draft UI 54/54、全量 Node 158/158、隔离浏览器/API 和本地基线通过；未改 API/schema/migration/业务服务，未连接或部署生产 |
+| PHASE1-TASK13 | 设计 Material Review Queue 与审核工作台 V1 | DONE | Codex（设计）、项目负责人（五段设计及补充约束确认） | 2026-07-15 | 2026-07-15 | PHASE1-TASK12 | 完成正式规格和低保真线框；批准布局 A、队列返回恢复、权限与职责分离、批准/驳回、Validation 确认绑定、错误/幂等/可访问性和 51 项实施测试计划；仅文档，未修改运行时代码、API、Schema、Migration、索引或部署配置 |
+| PHASE1-TASK14 | 实现 Material Review Queue 与审核工作台 V1 | DONE | Codex（实施）、项目负责人（任务范围确认） | 2026-07-15 | 2026-07-15 | PHASE1-TASK13 | 实现审核队列、方案 A 单条工作台、共享只读详情、批准/驳回、Validation 新鲜度确认、职责分离、页面内存幂等/并发/离开保护和完整错误状态；Review UI 51/51、全量 Node 209/209、1366×768 浏览器验收、隔离 API smoke、凭证扫描和本地基线通过；未改 API/schema/migration/业务服务，未连接或部署生产 |
 
 ## 当前任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PHASE1-TASK13 | 设计 Material Review Queue 与审核工作台 V1 | DONE | Codex（设计）、项目负责人（五段设计及补充约束确认） | 2026-07-15 | 2026-07-15 | PHASE1-TASK12 | 完成正式规格和低保真线框；批准布局 A、队列返回恢复、权限与职责分离、批准/驳回、Validation 确认绑定、错误/幂等/可访问性和 51 项实施测试计划；仅文档，未修改运行时代码、API、Schema、Migration、索引或部署配置 |
+| - | 暂无已授权执行任务 | - | - | - | - | - | 等待项目负责人指定下一任务；生产迁移或部署仍需单独明确授权 |
 
-`PHASE1-TASK13` 已完成书面设计和文档阶段验证，当前无 `DOING` 任务。停止并等待项目负责人回复“规格确认”；审核操作界面实施、`submitted_by` 只读筛选 API 候选项、候选索引、`PENDING_APPROVAL` 收缩、生产迁移/部署和 `PHASE0-TASK03` 仍需独立任务与授权。
+当前没有 `DOING` 任务。`submitted_by` 只读筛选 API 候选项、候选索引、`PENDING_APPROVAL` 收缩、生产迁移/部署和 `PHASE0-TASK03` 仍需独立任务与授权。
 
 ## Phase 0 待办
 

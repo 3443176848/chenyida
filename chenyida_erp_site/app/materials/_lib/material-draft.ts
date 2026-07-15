@@ -239,7 +239,7 @@ export type WriteOperation = {
   endpoint: string;
   payloadDigest: string;
   payload: Readonly<Record<string, unknown>>;
-  type: "CREATE" | "SAVE" | "SUBMIT";
+  type: "CREATE" | "SAVE" | "SUBMIT" | "APPROVE" | "REJECT";
   state: "PENDING" | "RESULT_UNKNOWN" | "SUCCEEDED" | "FAILED";
 };
 

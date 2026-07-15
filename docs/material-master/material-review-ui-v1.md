@@ -1,8 +1,8 @@
 # Material Review Queue 与审核工作台 V1
 
-状态：`AWAITING_SPECIFICATION_CONFIRMATION`
+状态：`IMPLEMENTED_NON_PRODUCTION / AWAITING_ACCEPTANCE`
 
-任务：`PHASE1-TASK13`
+任务：`PHASE1-TASK13`（设计）、`PHASE1-TASK14`（实施）
 
 日期：2026-07-15
 
@@ -10,9 +10,21 @@
 
 低保真线框稿见 [material-review-ui-v1-wireframes.md](./material-review-ui-v1-wireframes.md)。
 
+## 0. PHASE1-TASK14 实施结果
+
+- 已实现 `/materials/review` 与 `/materials/:materialId/review` 两条原生 Vinext 路由，并在 `MaterialShell` 中按 `material.review.queue` 显示审核队列入口。
+- 队列使用既有 `GET /api/material-master/review-queue`，由 URL 保存有界分页、筛选和 allowlist 排序；显示 `submitted_by`，但不伪造服务端尚未支持的提交人筛选。
+- 工作台按批准的方案 A 实现：左侧完整只读详情，右侧约 310px sticky Validation、职责分离和审核操作；只读详情展示已提取为共享组件，既有详情页行为保持不变。
+- 批准和驳回复用既有共享 Client、Session、CSRF 与 API；最终动作前重读统一详情。ERROR 禁止批准但不自动驳回；WARNING 需要绑定当前物料、版本和规范化 Validation 的明确确认。
+- 前端按 `user.permissions` 独立控制 queue/approve/reject；创建人和最后修改人禁审，`submitted_by` 本身不禁审，服务端仍是权限、状态、职责分离和 Validation 的最终裁决者。
+- approve/reject 各自维护页面内存幂等状态、不可变载荷和原 Key 安全重试；覆盖 `RESULT_UNKNOWN`、`IDEMPOTENCY_IN_PROGRESS`、冲突、限流、401/403/404/422/5xx、dirty/beforeunload 与对话框焦点保护。
+- 新增并通过 Review UI 51/51；全量 Node 209/209、构建、lint 0 error/1 个既有 warning、隔离 D1 API smoke、233 文件凭证扫描、本地 SQLite 基线全部通过。
+- 1366×768 本地浏览器验收通过：队列、310px sticky 右栏、WARNING 确认和批准后返回原队列完成完整往返。
+- 未修改 API、Schema、Migration、索引、Material 业务服务、Legacy SQLite 或部署配置；未连接生产 D1、迁移真实数据或部署公开 Site。
+
 ## 1. 目标与设计结论
 
-为 Material Master V2 设计中文、桌面优先、只读复核优先的待审核队列和单条审核工作台。V1 只消费已经实现的 Session、统一详情、审核队列、批准和驳回 API；本任务只形成书面规格与低保真线框，不修改运行时代码、API、Schema、Migration、索引或部署配置。
+为 Material Master V2 设计并实现中文、桌面优先、只读复核优先的待审核队列和单条审核工作台。V1 只消费已经实现的 Session、统一详情、审核队列、批准和驳回 API；`PHASE1-TASK13` 形成书面规格与低保真线框，`PHASE1-TASK14` 在不修改 API、Schema、Migration、索引或部署配置的前提下完成前端实施。
 
 已确认的核心结论：
 
@@ -47,16 +59,14 @@
 
 ### 2.3 当前组件现实
 
-现有只读详情中的基础字段网格、类型化属性展示和 Validation 面板仍是 `material-detail-workspace.tsx` 内的私有展示单元，并不存在附件名称对应的全部独立导出组件。
-
-后续实施任务获批后允许做最小提取，以复用：
+`PHASE1-TASK14` 已把既有只读详情中的基础字段网格、职责、类型化属性、Validation、最近版本和最近变更最小提取到 `material-detail-sections.tsx`，供原详情页和审核工作台共同复用：
 
 - 基础字段展示。
 - 类型化属性展示。
 - Validation 面板。
 - 状态及错误展示规则。
 
-最小提取不得改变现有只读页面行为或 API 契约，不得复制两套展示逻辑，不得引入大型依赖。本次文档任务不修改任何运行时代码。
+该提取未改变现有只读页面 API 契约或用户行为，未复制两套展示逻辑，也未引入大型依赖；Material 只读 UI 回归 37/37 通过。
 
 ## 3. 范围与禁止事项
 
@@ -69,11 +79,10 @@
 - 登录失效、权限不足、隐藏对象、参数错误、Validation 失败、限流、网络和服务端错误状态。
 - 未发送审核意见和 `RESULT_UNKNOWN` 的离开保护。
 - 键盘、对话框、焦点、live region 和 1366×768 人工验收。
-- 后续实施阶段的 51 项测试计划。
+- 已实施的 51 项 Review UI 测试与 1366×768 浏览器验收。
 
 ### 3.2 不包含
 
-- 前端运行时代码或测试代码实施。
 - 新增或修改 API、Schema、Migration、索引、业务服务或部署配置。
 - 批量审核、多级审核、审核认领、审核转交或强制审核。
 - 审核人员创建、编辑草稿或“审核并编辑”。
@@ -502,26 +511,21 @@ PENDING -> RESULT_UNKNOWN -> PENDING（原请求安全重试）
 
 ## 19. 前端组件边界
 
-建议后续实施模块：
+实际实施模块：
 
 | 单元 | 单一职责 |
 | --- | --- |
-| `MaterialReviewQueuePage` | 队列路由、Session 能力和 URL 状态编排 |
-| `MaterialReviewFilterBar` | 现有 API 支持筛选、重置和字段错误 |
-| `MaterialReviewTable` | 高密度表格、Validation 摘要和工作台链接 |
-| `MaterialReviewWorkspace` | 最新详情、推荐布局 A 和只读复核流程 |
-| `MaterialReviewResponsibilities` | 职责字段、预提示和服务端 code 映射 |
-| `MaterialReviewActions` | approve/reject 能力组合和操作状态 |
-| `MaterialApproveDialog` | 最终确认、可选评论和 WARNING 勾选 |
-| `MaterialRejectDialog` | 必填原因、状态说明和最终确认 |
-| `MaterialReviewConflictState` | 版本、状态、职责和幂等冲突 |
-| `MaterialReviewUnsavedGuard` | 两类意见和 RESULT_UNKNOWN 离开保护 |
+| `MaterialReviewQueuePage` | 队列路由、Session 能力、URL 状态、筛选、表格和服务端分页编排 |
+| `MaterialReviewWorkspace` | 最新详情、推荐布局 A、职责分离、approve/reject、冲突、结果未知和离开保护 |
+| `DialogShell` | 工作台内部共享的最终确认与离开确认焦点边界 |
+| `material-detail-sections.tsx` | 原详情页与审核工作台共享的只读基础、职责、属性、Validation 和历史展示 |
+| `material-review.ts` | URL codec、安全返回、权限、职责、Validation 指纹与意见规范化纯函数 |
 
 共享边界：
 
 - 复用 `MaterialShell` 和唯一共享 API Client。
 - 复用安全 return_to、状态、分页和错误展示。
-- 后续实施时最小提取现有只读基础字段、属性和 Validation 展示，不复制两套逻辑。
+- 已最小提取现有只读基础字段、属性和 Validation 展示，没有复制两套逻辑。
 - 复用 Draft UI 的幂等状态机原则，但 approve/reject 操作记录必须独立。
 - 不引入 Redux、Zustand、TanStack Query、表单库、Data Grid 或新 UI 组件库。
 
@@ -548,9 +552,9 @@ V1：
 
 详情没有独立 metadata version。V1 使用 `material_id + current_version + 当前 Validation 规范化摘要 + 本次加载标识` 绑定前端确认；该摘要不是 metadata 安全保证，approve 服务端最终重校验仍是唯一安全边界。本任务不新增 metadata version API。
 
-## 21. 后续实施测试计划
+## 21. 实施测试与验收
 
-全部写测试使用 `ERP_ENV=test` 和一次性本地隔离 D1，显式拒绝 production、公共 URL 和远程 D1 binding；测试结束销毁数据。以下 51 项必须分组完整覆盖。
+以下 51 项 Review UI 测试已全部实施并通过；UI 纯函数与组件边界测试不写数据库，既有 API smoke 使用 `ERP_ENV=test` 和一次性本地隔离 D1，显式拒绝 production、公共 URL 和远程 D1 binding并在结束后销毁数据。
 
 ### 21.1 权限与队列（1–12）
 

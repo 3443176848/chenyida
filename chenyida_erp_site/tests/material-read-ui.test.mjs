@@ -9,9 +9,10 @@ import {
 import { safeMaterialReturnTo } from "../public/erp/api-client.js";
 
 const root = new URL("../", import.meta.url);
-const [listSource, detailSource, shellSource, sharedClient, listRoute, detailRoute, versionsRoute, logsRoute, styles] = await Promise.all([
+const [listSource, detailSource, detailSectionsSource, shellSource, sharedClient, listRoute, detailRoute, versionsRoute, logsRoute, styles] = await Promise.all([
   readFile(new URL("../app/materials/_components/material-list-page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/materials/_components/material-detail-workspace.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../app/materials/_components/material-detail-sections.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/materials/_components/material-shell.tsx", import.meta.url), "utf8"),
   readFile(new URL("../public/erp/api-client.js", import.meta.url), "utf8"),
   readFile(new URL("../app/materials/page.tsx", import.meta.url), "utf8"),
@@ -20,6 +21,7 @@ const [listSource, detailSource, shellSource, sharedClient, listRoute, detailRou
   readFile(new URL("../app/materials/[materialId]/change-logs/page.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/materials/materials.css", import.meta.url), "utf8"),
 ]);
+const detailUiSource = `${detailSource}\n${detailSectionsSource}`;
 
 test("01 未登录访问回到现有登录流程并携带当前 Material URL", () => {
   assert.match(shellSource, /\/\?return_to=/);
@@ -113,7 +115,7 @@ test("18 500 显示通用错误和服务端 request_id", () => {
 });
 
 test("19 详情包含基本信息和职责字段", () => {
-  for (const label of ["基本信息", "职责信息", "正式物料编码", "标准名称", "创建人", "最后修改人", "批准人"]) assert.match(detailSource, new RegExp(label));
+  for (const label of ["基本信息", "职责信息", "正式物料编码", "标准名称", "创建人", "最后修改人", "批准人"]) assert.match(detailUiSource, new RegExp(label));
 });
 
 test("20 TEXT 属性按纯文本显示", () => {
@@ -142,8 +144,8 @@ test("25 属性单位紧邻数值", () => {
 });
 
 test("26 Validation 同时用文字展示 ERROR 和 WARNING", () => {
-  assert.match(detailSource, /错误 ERROR/); assert.match(detailSource, /警告 WARNING/);
-  assert.doesNotMatch(detailSource, /validateForReview|重新计算/);
+  assert.match(detailUiSource, /错误 ERROR/); assert.match(detailUiSource, /警告 WARNING/);
+  assert.doesNotMatch(detailUiSource, /validateForReview|重新计算/);
 });
 
 test("27 版本历史分页默认 20 且最大界面选项 50", () => {

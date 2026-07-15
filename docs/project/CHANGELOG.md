@@ -4,6 +4,22 @@
 
 ## 2026-07-15
 
+### PHASE1-TASK14 实施 - `feat: add material review ui`
+
+- Git Commit：前端实现、UI 测试、规格和项目治理文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `c6ddf3b`。
+- 页面与入口：新增 `/materials/review` 与 `/materials/:materialId/review`；`MaterialShell` 只按 `material.review.queue` 显示审核队列入口，不按角色名推断权限。
+- 审核队列：实现 URL 权威筛选、300ms 关键词、叶子分类、来源、创建人、提交日期、四种 allowlist 排序及 20/50/100 服务端分页；展示 `submitted_by` 但不伪造服务端不支持的筛选，服务端 `total` 为唯一权威。
+- 工作台与复用：按方案 A 实现左侧完整只读详情、右侧约 310px sticky Validation/职责分离/审核操作；提取共享只读详情组件供既有详情与审核工作台复用，既有只读 UI 37/37 回归通过。
+- 批准与驳回：最终动作前重读统一详情；ERROR 禁止批准但不自动驳回，WARNING 在单一最终对话框列出并明确确认；批准复读 ACTIVE/正式编码，驳回复读 DRAFT/`last_rejection` 后返回原队列状态。
+- 权限与职责：queue/approve/reject 独立能力驱动；创建人或最后修改人禁审，提交人本身不禁审；前端提示与关闭动作，既有服务端权限、职责、状态和 Validation 校验保持最终权威。
+- 幂等与并发：approve/reject 使用独立的页面内存 Key、不可变 endpoint/payload 快照和共享 Client 受保护写；覆盖重复点击、`RESULT_UNKNOWN` 原请求安全重试、`IDEMPOTENCY_IN_PROGRESS`、冲突、状态变化、422、429、401/403/404/5xx 和 request_id。
+- 安全与可访问性：实现安全 `return_to`、dirty/beforeunload、离开确认、纯文本渲染、焦点定位、对话框初始焦点/Tab 循环/Escape/焦点恢复及 live region；不写 localStorage/sessionStorage，不引入第二套认证或 HTTP Client。
+- 测试：新增 Review UI 51/51；全量 Node 209/209；build 通过；lint 0 error/1 个任务外既有 warning；一次性隔离 D1 API smoke 与 233 文件凭证扫描通过。
+- 浏览器验收：本地 Vinext + Playwright 在 1366×768 完成队列、310px sticky 审核栏、WARNING 确认和批准后返回原队列的完整往返；验收网络夹具及截图未提交。
+- 本地基线：临时 SQLite `server.py --self-test`、`smoke_test.py`、备份恢复、环境保护 4/4 和 `go_live_check.py --no-backup` 全部通过；临时数据已清理。
+- 数据库与生产：未修改 API、Schema、Migration、索引、Material 业务服务、Legacy SQLite 或部署配置；未连接生产 URL/D1，未迁移真实数据、创建生产版本或部署。
+- 已知限制：队列 API 仍不支持 `submitted_by` 筛选；远程 Test D1、候选索引、`PENDING_APPROVAL` 收缩及生产迁移/部署均需独立任务与授权。
+
 ### PHASE1-TASK13 设计评审 - `docs: design material review ui`
 
 - Git Commit：正式规格、低保真线框和项目治理文档在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `9278bea`。
