@@ -6,15 +6,15 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 约 20,700 行 | 沿用既有运行时源码口径；TASK12 新增 Draft 表单控制器、领域序列化和两条页面路由，排除测试、依赖、构建缓存、生成物和文档 |
-| 源码文件 | 81 | 在既有 Site 源码口径上新增两条 Draft 路由、一个页面控制器和一个表单领域模块；测试另计 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK12 差异覆盖 Draft 前端、共享浏览器 Client、UI 测试、规格和项目治理文档；无 API、schema、migration、索引、写服务或部署配置变化 |
+| 总代码量 | 约 20,700 行 | 沿用 TASK12 运行时源码口径；TASK13 仅新增文档，不改变代码统计 |
+| 源码文件 | 81 | 沿用 TASK12 运行时源码口径；TASK13 未新增或修改源码文件 |
+| 根仓库跟踪项 | 提交前动态值 | PHASE1-TASK13 差异只覆盖两份 Review UI 规格及项目治理文档；无运行时代码、API、schema、migration、索引、测试业务代码或部署配置变化 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 48（开发 schema） | 本地 SQLite 26；在线既有 D1 8；V2 12；Material API 安全表 2；未执行生产迁移，不能理解为生产现状 |
 | 在线 API 路径 | 67 | 既有 61 个路径加 6 个 Reference/统一查询/历史路径；生产公开站点尚未部署本提交 |
 | 页面入口 | 9 | 既有本地/在线根入口 3 个，加 Material 列表、详情、版本、变更日志、创建和编辑 6 条原生 Vinext 路由 |
-| 测试与安全检查文件 | 20 | TASK12 新增 Draft UI 54 项验收；全量 Node 从 104 增至 158，既有安全和隔离测试继续通过 |
+| 测试与安全检查文件 | 20 | TASK13 未修改测试文件；全量 Node 基线仍为 158，规格另定义 51 项后续实施测试 |
 
 ## 当前版本与环境
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE1-TASK12` 开始时，根仓库 `main` 位于 `7e6844d`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖 Draft 前端、共享浏览器 Client、UI 测试、规格和项目治理文档；未修改 API、schema、migration、索引、审核写服务或生产配置。
+`PHASE1-TASK13` 开始时，根仓库 `main` 位于 `9278bea`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖 Review UI 两份规格和项目治理文档；未修改前端运行时代码、API、schema、migration、索引、测试业务代码、审核写服务或生产配置。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE1-TASK12` 提交消息为 `feat: add material draft ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1。
+`PHASE1-TASK13` 提交消息为 `docs: design material review ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1。
 
 实时状态必须使用：
 
@@ -48,6 +48,24 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE1-TASK13 Material Review UI 书面设计基线
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / AWAITING SPECIFICATION CONFIRMATION | 五段设计和补充约束已确认；正式规格与低保真线框完成，停止并等待“规格确认” |
+| 页面路由 | DESIGNED | `/materials/review`、`/materials/:materialId/review`；队列 URL 保存筛选、排序和分页，`return_to` 仅接受审核队列路径 |
+| 推荐布局 | APPROVED | 方案 A：左侧完整只读详情，右侧 sticky Validation、职责分离和审核操作；方案 B 仅作线框比较 |
+| 权限与职责 | APPROVED | 能力权限驱动；创建人或最后实质修改人禁审，提交人本身不禁审；前端提示，服务端 403 code 最终裁决 |
+| 批准与驳回 | APPROVED | 批准前重读详情并单一最终确认；WARNING 明示确认；驳回原因 1–1000 字；成功返回原队列状态 |
+| Validation | APPROVED | 确认绑定 material_id、current_version 和当前规范化摘要；摘要仅用于前端新鲜度，服务端重新校验是唯一安全边界 |
+| API 兼容 | RECORDED | 队列无 `submitted_by` 筛选；职责分离使用既有 HTTP 403；不新增 metadata version API，三项均不阻断前端实施 |
+| 组件边界 | DESIGNED | 后续实施仅最小提取现有只读详情展示，不复制逻辑、不改变契约、不引入大型依赖；本任务未改代码 |
+| 测试设计 | COMPLETE | 分组保留全部 51 项，覆盖 A/B、队列/工作台、两类确认、职责分离、冲突/结果未知、HTTP 错误和 1366×768 |
+| 文档阶段验证 | PASS | lint 0 error/1 个既有 warning；构建与 Node 158/158、隔离 API smoke、226 文件凭证扫描通过 |
+| 本地基线 | PASS | 临时 SQLite 环境守卫 4/4、自测、烟测、备份恢复和 `go_live_check --no-backup` 通过；临时数据已清理 |
+| 运行时范围 | UNCHANGED | 无前端运行时代码、API、Schema、Migration、索引、业务服务、测试业务代码或部署配置变化 |
+| 生产影响 | NONE | 未连接 production、公共 URL、远程 D1 binding，未迁移真实数据或部署 |
 
 ## PHASE1-TASK12 Material Draft UI 实施状态
 

@@ -4,6 +4,19 @@
 
 ## 2026-07-15
 
+### PHASE1-TASK13 设计评审 - `docs: design material review ui`
+
+- Git Commit：正式规格、低保真线框和项目治理文档在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `9278bea`。
+- 新增功能：无；本任务只完成 Material Review Queue 与审核工作台 V1 书面设计，不修改任何运行时代码。
+- 路由与布局：定义 `/materials/review` 和 `/materials/:materialId/review`；推荐方案 A，即左侧完整只读详情、右侧 sticky Validation/职责分离/审核操作，方案 B 仅作比较。
+- 队列与返回：筛选、排序和分页由 URL 管理；批准或驳回成功后安全返回原队列状态，当前页清空时回到最后有效页；展示 `submitted_by`，但不提供服务端尚不支持的提交人筛选。
+- 权限与职责：按 `user.permissions` 展示入口和动作，不硬编码角色；`created_by` 或 `last_modified_by` 命中当前用户时先提示并关闭审核动作，服务端 `403 SELF_REVIEW_FORBIDDEN` / `LAST_EDITOR_REVIEW_FORBIDDEN` 继续作为最终判断。
+- 批准与驳回：批准前重新 GET 最新详情并使用单一最终确认；WARNING 确认绑定物料、版本和规范化 Validation 摘要，但摘要仅是前端新鲜度标记。驳回要求 1–1000 字原因；approve/reject 使用相互独立的页面内存幂等状态。
+- 错误与可访问性：结构化 `error.code` 优先；覆盖 VERSION_CONFLICT、RESULT_UNKNOWN、401/403/404/422/429/500、文字状态、键盘对话框、焦点恢复、问题定位和纯文本渲染。
+- 测试设计：保留并分组定义全部 51 项实施测试，附方案 A/B、主要状态、确认对话框和 1366×768 线框；写测试只能使用一次性本地隔离 D1，并拒绝 production、公共 URL 和远程 binding。
+- 验证结果：lint 0 error/1 个既有 warning；构建与 Node 158/158、一次性本地 D1 API smoke、226 文件凭证扫描、临时 SQLite 环境守卫 4/4、自测、烟测、备份恢复和 go-live 检查全部通过；临时数据已清理。
+- 数据库与生产：未修改前端运行时代码、API、Schema、Migration、索引、业务服务或部署配置；未连接生产 URL/D1，未迁移真实数据或部署。
+
 ### PHASE1-TASK12 实施 - `feat: add material draft ui`
 
 - Git Commit：前端实现、UI 测试、规格和项目治理文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `7e6844d`。
