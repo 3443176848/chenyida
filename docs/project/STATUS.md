@@ -1,6 +1,6 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-15（Asia/Shanghai）
+最后更新时间：2026-07-16（Asia/Shanghai）
 
 ## 自动统计摘要
 
@@ -8,7 +8,7 @@
 | --- | ---: | --- |
 | 总代码量 | 约 24,000 行 | 既有运行时源码口径加 TASK02 导入模块、迁移和测试；不含依赖、构建产物和文档 |
 | 源码文件 | 93 | 新增 `app/lib/material-import/` 六个边界明确的模块；既有 Material handler 和 ERP 入口仅做路由与依赖集成 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK02 差异覆盖 schema/`0004`、导入运行时、测试、正式契约与项目治理文档；未修改生产资源或部署配置 |
+| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK03 只新增/更新 Parser、Mapping、OpenAPI、流程和治理文档；未修改运行时代码、Schema、Migration、测试代码或部署配置 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 53（开发 schema） | 既有开发 schema 48 表加 Material Import 五表；未执行生产迁移，不能理解为生产现状 |
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE2-TASK02` 开始时，根仓库 `main` 位于 `050d134`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖获批范围内的 Material Import schema/`0004`、对象存储抽象、六个 API、上传/安全/Saga 服务、隔离测试和治理文档；未修改生产 binding、资源或部署配置。
+`PHASE2-TASK03` 开始时，根仓库 `main` 位于 `63e0483`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖获批范围内的 Material Import Parser/Mapping 书面规格、OpenAPI、流程图和项目治理文档；未修改运行时代码、Schema、Migration、依赖、测试代码、生产 binding、资源或部署配置。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE2-TASK02` 计划提交消息为 `feat: add material import batch foundation`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2。
+`PHASE2-TASK03` 计划提交消息为 `docs: design material import parser and mapping`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2。
 
 实时状态必须使用：
 
@@ -48,6 +48,25 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE2-TASK03 Excel/CSV Parser 与字段 Mapping V1 书面设计基线
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / AWAITING SPECIFICATION CONFIRMATION | 整体方向和补充约束已确认；正式文档完成后停止等待“规格确认” |
+| 正式交付 | COMPLETE | Parser 主规格、OpenAPI 草案、Mapping 规格、Mermaid 流程图和 16 项 `PROPOSED` 决策表 |
+| `PARSED` 语义 | DESIGNED | 当前策略允许的可见 Sheet 原始行、元数据和汇总完整核验后，run 状态、旧 run、current pointer、批次版本、事件、审计和幂等在单事务发布 |
+| 调度 | PROPOSED | D1 同事务写 Outbox，提交后至少一次发送；Queue `max_batch_size=1` 与低并发仍需压测和基础设施审批，不宣称 D1/Queue 原子 |
+| 恢复 | DESIGNED | 七个持久阶段；Sheet 是 V1 真正恢复边界，500 行/约 10 秒检查点只用于观测、预算、心跳和幂等写入 |
+| 解析候选 | UNVERIFIED / PROPOSED | `zip.js + sax-wasm + 受限 OOXML`、`csv-parse` browser ESM；尚未通过 Vinext、Miniflare、Workers、WASM、R2 Range、Bundle 或内存矩阵 |
+| 原始契约 | DESIGNED | sparse cells + `source_column_count`，区分缺失与 EMPTY；日期保留 source/raw/format/system/解释状态；公式不执行 |
+| Shared Strings | PROPOSED | run 级 D1 分块和有界预取为推荐候选，R2 分块索引为备选；禁止逐 cell 查询或默认全量常驻内存 |
+| 资源限制 | PROPOSED | 32 Sheet、50k 行、256 列、2m 非空 cell、256 MiB 规范化总量等组合限制；最终值需脱敏样本与容量/并发压测 |
+| Mapping | DESIGNED / PROPOSED | Sheet/header suggestion、关系化主从、target allowlist、`category_hint`、版本 CAS、旧 Mapping STALE/SUPERSEDED 和有界预览 |
+| API | CONTRACT ONLY | 七个拟议路由，包含权限、owner/read_any、CSRF、幂等、批次/Mapping 版本、metadata 摘要和稳定错误；未实施 |
+| `0005` | DESIGN ONLY | 设计新表、状态 CHECK、rows 重建、外键/索引、Up/Down/重升/失败回滚；未创建 SQL、schema 或 snapshot |
+| 文档验证 | PASS | OpenAPI YAML 与 115 个本地引用通过；规格约束/16 项决策检查通过；lint 0 error/1 个既有 warning、build 与 Node 224/224、隔离 API smoke、251 文件凭证扫描通过；临时 SQLite 环境守卫 4/4、self-test、smoke、backup/restore、go-live 通过并清理；`git diff --check` 和文档-only 范围核对通过 |
+| 生产影响 | NONE | 未连接 production、D1、R2 或 Queue，未迁移、创建资源、修改部署配置或发布 |
 
 ## PHASE2-TASK02 Material Import Batch Foundation V1 实施基线
 

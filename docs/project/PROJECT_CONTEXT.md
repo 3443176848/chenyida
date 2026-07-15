@@ -88,7 +88,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 的 Material V2 schema、分类属性、Validation、Draft/Review Service、受认证授权 API、统一只读 Query API 和只读管理界面的非生产实现，并完成 Material Draft 创建、编辑与提交审核界面的书面规格和低保真线框设计。Draft 前端尚未编码；生产仍为旧版本，未执行 V2 migrations 或部署。下一任务必须由项目负责人独立指定，且前端实施前需先完成已批准范围内的 `last_rejection` 最小只读兼容项。
+当前已完成 Phase 1 的 Material V2 非生产数据、服务、API 与前端基线，以及 Phase 2 Material Import Batch Foundation 非生产实现。`PHASE2-TASK03` 已完成 Excel/CSV Parser、原始行隔离发布、Outbox、字段 Mapping、OpenAPI、流程和 `0005` 的书面设计，全部决定与资源上限仍为 `PROPOSED`；没有实施 Parser、Schema、Migration、Queue、API 或部署。下一步必须先由项目负责人回复“规格确认”，再另行授权任何非生产实现；生产仍为旧版本。
 
 ## 恢复上下文检查清单
 

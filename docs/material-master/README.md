@@ -10,6 +10,11 @@
 - [分阶段实施计划](./phased-implementation-plan.md)
 - [需要人工确认的业务决策](./business-decisions.md)
 - [当前系统技术审计](../audits/current-system-audit.md)
+- [Material Import Batch Foundation V1](./material-import-batch-v1.md)
+- [Material Import Parser V1](./material-import-parser-v1.md)
+- [Material Import Parser/Mapping OpenAPI](./material-import-parser-v1.openapi.yaml)
+- [Material Import Mapping V1](./material-import-mapping-v1.md)
+- [Material Import Parser 流程图](./material-import-parser-flow.md)
 
 ## V2 目标
 

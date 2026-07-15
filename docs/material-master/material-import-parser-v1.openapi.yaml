@@ -1,0 +1,700 @@
+openapi: 3.1.0
+info:
+  title: Chenyida ERP Material Import Parser and Mapping V1
+  version: 0.1.0-proposed
+  description: |
+    PHASE2-TASK03 proposed contract. This document does not mean the parser,
+    migration, Queue, schema, API, or production infrastructure exists.
+    All business decisions and resource limits remain Status: PROPOSED.
+servers:
+  - url: /
+security:
+  - sessionCookie: []
+tags:
+  - name: MaterialImportParser
+  - name: MaterialImportMapping
+paths:
+  /api/material-master/import-batches/{batchId}/parse:
+    post:
+      tags: [MaterialImportParser]
+      summary: Queue an eligible FILE_READY batch for parsing
+      operationId: queueMaterialImportParse
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParseRequest'
+      responses:
+        '202':
+          description: Parse run and pending outbox job persisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParseAcceptedResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/material-master/import-batches/{batchId}/sheets:
+    get:
+      tags: [MaterialImportParser]
+      summary: Read sheet metadata and preparation suggestions for the current parse run
+      operationId: listMaterialImportSheets
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+      responses:
+        '200':
+          description: Current parse run sheets; hidden sheets contain metadata only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SheetsResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/material-master/import-batches/{batchId}/rows:
+    get:
+      tags: [MaterialImportParser]
+      summary: Read a bounded page or range of raw rows from the current parse run
+      operationId: listMaterialImportRows
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - name: sheet_index
+          in: query
+          required: true
+          schema: { type: integer, minimum: 0, maximum: 31 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: start_row
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: end_row
+          in: query
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Bounded raw rows. Page mode and row-range mode are mutually exclusive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RowsResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/material-master/import-batches/{batchId}/mapping:
+    get:
+      tags: [MaterialImportMapping]
+      summary: Read the current mapping bound to the current parse run
+      operationId: getMaterialImportMapping
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+      responses:
+        '200':
+          description: Current mapping aggregate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MappingResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    put:
+      tags: [MaterialImportMapping]
+      summary: Completely replace the current DRAFT mapping aggregate
+      operationId: replaceMaterialImportMapping
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceMappingRequest'
+      responses:
+        '200':
+          description: Mapping draft replaced and version incremented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MappingResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/material-master/import-batches/{batchId}/mapping/preview:
+    post:
+      tags: [MaterialImportMapping]
+      summary: Preview a bounded sample without cleaning, classification, or draft creation
+      operationId: previewMaterialImportMapping
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MappingPreviewRequest'
+      responses:
+        '200':
+          description: Bounded mapping preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MappingPreviewResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /api/material-master/import-batches/{batchId}/mapping/confirm:
+    post:
+      tags: [MaterialImportMapping]
+      summary: Confirm a mapping and move the batch to MAPPING_CONFIRMED
+      operationId: confirmMaterialImportMapping
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmMappingRequest'
+      responses:
+        '200':
+          description: Mapping confirmed; no Material Draft or master record is created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmMappingResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: erp_session
+  parameters:
+    BatchId:
+      name: batchId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 256 }
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden:
+      description: Capability or CSRF check failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Resource is absent or hidden by row-level authorization
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict:
+      description: State, version, idempotency, parse run, or mapping conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PayloadTooLarge:
+      description: Request or bounded preview exceeds an application limit
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unprocessable:
+      description: Mapping or target metadata validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InternalError:
+      description: Safe internal error; no stack, SQL, XML path, or sensitive content
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    BatchStatus:
+      type: string
+      enum:
+        - CREATED
+        - UPLOAD_PENDING
+        - FILE_READY
+        - QUEUED_FOR_PARSING
+        - PARSING
+        - PARSED
+        - AWAITING_MAPPING
+        - MAPPING_CONFIRMED
+        - RECONCILIATION_REQUIRED
+        - FAILED
+        - CANCELLED
+    ParseRunStatus:
+      type: string
+      enum: [QUEUED, RUNNING, STAGED, PUBLISHING, SUCCEEDED, FAILED, CANCELLED, SUPERSEDED]
+    MappingPreparationStatus:
+      type: string
+      enum: [NOT_STARTED, QUEUED, RUNNING, READY, FAILED]
+    MappingStatus:
+      type: string
+      enum: [DRAFT, CONFIRMED, STALE, SUPERSEDED]
+    ParseRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, parser_version]
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        parser_version: { type: string, minLength: 1, maxLength: 64 }
+    ParseAcceptedResponse:
+      type: object
+      additionalProperties: false
+      required: [batch_id, batch_status, current_version, parse_run_id, parse_run_status, request_id]
+      properties:
+        batch_id: { type: string }
+        batch_status: { const: QUEUED_FOR_PARSING }
+        current_version: { type: integer, minimum: 1 }
+        parse_run_id: { type: string }
+        parse_run_status: { const: QUEUED }
+        request_id: { type: string }
+    SheetVisibility:
+      type: string
+      enum: [VISIBLE, HIDDEN, VERY_HIDDEN]
+    HeaderSuggestion:
+      type: object
+      additionalProperties: false
+      required: [row_number, rank, score, reason_codes, algorithm_version]
+      properties:
+        row_number: { type: integer, minimum: 1 }
+        rank: { type: integer, minimum: 1 }
+        score: { type: number, minimum: 0, maximum: 1 }
+        reason_codes:
+          type: array
+          maxItems: 16
+          items: { type: string, maxLength: 64 }
+        algorithm_version: { type: string, maxLength: 64 }
+    SheetSummary:
+      type: object
+      additionalProperties: false
+      required: [sheet_index, sheet_name, visibility, parse_disposition, parsed_row_count, source_column_max]
+      properties:
+        sheet_index: { type: integer, minimum: 0, maximum: 31 }
+        sheet_name: { type: string, minLength: 1, maxLength: 255 }
+        visibility: { $ref: '#/components/schemas/SheetVisibility' }
+        parse_disposition:
+          type: string
+          enum: [PARSED, SKIPPED_HIDDEN, SKIPPED_VERY_HIDDEN]
+        parsed_row_count: { type: integer, minimum: 0, maximum: 50000 }
+        source_column_max: { type: integer, minimum: 0, maximum: 256 }
+        is_default_suggestion: { type: boolean, default: false }
+        header_suggestions:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/HeaderSuggestion' }
+        warnings:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/SafeIssue' }
+    WorkbookSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - workbook_sheet_count
+        - visible_sheet_count
+        - hidden_sheet_count
+        - very_hidden_sheet_count
+        - parsed_sheet_count
+        - skipped_sheet_count
+        - parsed_row_count
+      properties:
+        workbook_sheet_count: { type: integer, minimum: 0, maximum: 32 }
+        visible_sheet_count: { type: integer, minimum: 0, maximum: 32 }
+        hidden_sheet_count: { type: integer, minimum: 0, maximum: 32 }
+        very_hidden_sheet_count: { type: integer, minimum: 0, maximum: 32 }
+        parsed_sheet_count: { type: integer, minimum: 0, maximum: 32 }
+        skipped_sheet_count: { type: integer, minimum: 0, maximum: 32 }
+        parsed_row_count: { type: integer, minimum: 0, maximum: 50000 }
+        skipped_sheet_warnings:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/SafeIssue' }
+    SheetsResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - batch_id
+        - batch_status
+        - current_version
+        - parse_run_id
+        - parser_version
+        - mapping_preparation_status
+        - workbook_summary
+        - sheets
+        - request_id
+      properties:
+        batch_id: { type: string }
+        batch_status: { $ref: '#/components/schemas/BatchStatus' }
+        current_version: { type: integer, minimum: 1 }
+        parse_run_id: { type: string }
+        parser_version: { type: string }
+        mapping_preparation_status: { $ref: '#/components/schemas/MappingPreparationStatus' }
+        workbook_summary: { $ref: '#/components/schemas/WorkbookSummary' }
+        sheets:
+          type: array
+          maxItems: 32
+          items: { $ref: '#/components/schemas/SheetSummary' }
+        request_id: { type: string }
+    CellType:
+      type: string
+      enum: [EMPTY, TEXT, NUMBER, BOOLEAN, DATE, FORMULA, ERROR]
+    RawCell:
+      type: object
+      additionalProperties: false
+      required: [column_index, column_ref, type, source_type, raw_value, display]
+      properties:
+        column_index: { type: integer, minimum: 0, maximum: 255 }
+        column_ref: { type: string, pattern: '^[A-Z]+$' }
+        type: { $ref: '#/components/schemas/CellType' }
+        source_type: { type: string, enum: [EMPTY, TEXT, NUMBER, BOOLEAN, ERROR] }
+        raw_value: {}
+        display: { type: [string, 'null'], maxLength: 32767 }
+        format_code: { type: [string, 'null'], maxLength: 512 }
+        formula: { type: [string, 'null'], maxLength: 8192 }
+        cached_value: {}
+        date_system: { type: [string, 'null'], enum: ['1900', '1904', null] }
+        interpreted_iso_value: { type: [string, 'null'], maxLength: 64 }
+        interpretation_status:
+          type: [string, 'null']
+          enum: [NOT_APPLICABLE, INTERPRETED, FAILED, null]
+        formula_injection_risk: { type: boolean, default: false }
+    RawRow:
+      type: object
+      additionalProperties: false
+      required: [sheet_index, row_number, schema_version, source_column_count, cells, raw_row_hash]
+      properties:
+        sheet_index: { type: integer, minimum: 0, maximum: 31 }
+        row_number: { type: integer, minimum: 1, maximum: 50000 }
+        schema_version: { const: 1 }
+        source_column_count: { type: integer, minimum: 0, maximum: 256 }
+        cells:
+          type: array
+          maxItems: 256
+          description: Sparse cells in strictly increasing column_index order.
+          items: { $ref: '#/components/schemas/RawCell' }
+        raw_row_hash: { type: string, pattern: '^[a-f0-9]{64}$' }
+    RowsResponse:
+      type: object
+      additionalProperties: false
+      required: [batch_id, parse_run_id, sheet_index, rows, page, page_size, total_rows, request_id]
+      properties:
+        batch_id: { type: string }
+        parse_run_id: { type: string }
+        sheet_index: { type: integer, minimum: 0, maximum: 31 }
+        rows:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/RawRow' }
+        page: { type: integer, minimum: 1 }
+        page_size: { type: integer, minimum: 1, maximum: 100 }
+        total_rows: { type: integer, minimum: 0, maximum: 50000 }
+        request_id: { type: string }
+    HeaderMode:
+      type: string
+      enum: [SINGLE_ROW, NO_HEADER]
+    TargetNamespace:
+      type: string
+      enum: [basic, attribute, category_hint, supplier_reference, ignore]
+    MappingMode:
+      type: string
+      enum: [SOURCE, SOURCE_WITH_DEFAULT, DEFAULT, IGNORE]
+    MappingItemInput:
+      type: object
+      additionalProperties: false
+      required: [target_namespace, target_code, mapping_mode, required, display_order]
+      properties:
+        source_column_index: { type: [integer, 'null'], minimum: 0, maximum: 255 }
+        source_header: { type: [string, 'null'], maxLength: 32767 }
+        target_namespace: { $ref: '#/components/schemas/TargetNamespace' }
+        target_code: { type: string, minLength: 1, maxLength: 128 }
+        mapping_mode: { $ref: '#/components/schemas/MappingMode' }
+        default_value_json: {}
+        required: { type: boolean }
+        display_order: { type: integer, minimum: 0, maximum: 255 }
+    MappingItem:
+      allOf:
+        - $ref: '#/components/schemas/MappingItemInput'
+        - type: object
+          required: [id]
+          properties:
+            id: { type: string }
+    MappingDraftInput:
+      type: object
+      additionalProperties: false
+      required:
+        - selected_sheet_index
+        - header_mode
+        - items
+      properties:
+        selected_sheet_index: { type: integer, minimum: 0, maximum: 31 }
+        header_mode: { $ref: '#/components/schemas/HeaderMode' }
+        header_row_number: { type: [integer, 'null'], minimum: 1, maximum: 50000 }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 256
+          items: { $ref: '#/components/schemas/MappingItemInput' }
+    ReplaceMappingRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_version
+        - parse_run_id
+        - expected_mapping_version
+        - selected_sheet_index
+        - header_mode
+        - items
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        parse_run_id: { type: string }
+        expected_mapping_version: { type: integer, minimum: 1 }
+        selected_sheet_index: { type: integer, minimum: 0, maximum: 31 }
+        header_mode: { $ref: '#/components/schemas/HeaderMode' }
+        header_row_number: { type: [integer, 'null'], minimum: 1, maximum: 50000 }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 256
+          items: { $ref: '#/components/schemas/MappingItemInput' }
+    MappingAggregate:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - batch_id
+        - parse_run_id
+        - selected_sheet_index
+        - header_mode
+        - mapping_status
+        - mapping_version
+        - metadata_digest
+        - items
+      properties:
+        id: { type: string }
+        batch_id: { type: string }
+        parse_run_id: { type: string }
+        selected_sheet_index: { type: integer, minimum: 0, maximum: 31 }
+        header_mode: { $ref: '#/components/schemas/HeaderMode' }
+        header_row_number: { type: [integer, 'null'], minimum: 1, maximum: 50000 }
+        mapping_status: { $ref: '#/components/schemas/MappingStatus' }
+        mapping_version: { type: integer, minimum: 1 }
+        metadata_digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+        items:
+          type: array
+          maxItems: 256
+          items: { $ref: '#/components/schemas/MappingItem' }
+    MappingResponse:
+      type: object
+      additionalProperties: false
+      required: [batch_id, batch_status, current_version, mapping, request_id]
+      properties:
+        batch_id: { type: string }
+        batch_status: { $ref: '#/components/schemas/BatchStatus' }
+        current_version: { type: integer, minimum: 1 }
+        mapping: { $ref: '#/components/schemas/MappingAggregate' }
+        request_id: { type: string }
+    MappingPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, parse_run_id, mapping, start_row, row_limit]
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        parse_run_id: { type: string }
+        mapping: { $ref: '#/components/schemas/MappingDraftInput' }
+        start_row: { type: integer, minimum: 1, maximum: 50000 }
+        row_limit: { type: integer, minimum: 1, maximum: 100 }
+    PreviewValue:
+      type: object
+      additionalProperties: false
+      required: [target_namespace, target_code, source_column_index, status, raw_value]
+      properties:
+        target_namespace: { $ref: '#/components/schemas/TargetNamespace' }
+        target_code: { type: string }
+        source_column_index: { type: [integer, 'null'] }
+        status: { type: string, enum: [OK, WARNING, ERROR] }
+        raw_value: {}
+        candidate_value: {}
+        issues:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/SafeIssue' }
+    PreviewRow:
+      type: object
+      additionalProperties: false
+      required: [row_number, values]
+      properties:
+        row_number: { type: integer, minimum: 1 }
+        values:
+          type: array
+          maxItems: 256
+          items: { $ref: '#/components/schemas/PreviewValue' }
+    MappingPreviewResponse:
+      type: object
+      additionalProperties: false
+      required: [batch_id, parse_run_id, sampled_row_count, rows, request_id]
+      properties:
+        batch_id: { type: string }
+        parse_run_id: { type: string }
+        sampled_row_count: { type: integer, minimum: 0, maximum: 100 }
+        rows:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/PreviewRow' }
+        request_id: { type: string }
+    ConfirmMappingRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_version
+        - parse_run_id
+        - mapping_id
+        - expected_mapping_version
+        - metadata_digest
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        parse_run_id: { type: string }
+        mapping_id: { type: string }
+        expected_mapping_version: { type: integer, minimum: 1 }
+        metadata_digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+    ConfirmMappingResponse:
+      type: object
+      additionalProperties: false
+      required: [batch_id, batch_status, current_version, parse_run_id, mapping_id, mapping_status, mapping_version, request_id]
+      properties:
+        batch_id: { type: string }
+        batch_status: { const: MAPPING_CONFIRMED }
+        current_version: { type: integer, minimum: 1 }
+        parse_run_id: { type: string }
+        mapping_id: { type: string }
+        mapping_status: { const: CONFIRMED }
+        mapping_version: { type: integer, minimum: 1 }
+        request_id: { type: string }
+    SafeIssue:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 128 }
+        message: { type: string, minLength: 1, maxLength: 500 }
+        field: { type: [string, 'null'], maxLength: 128 }
+    ErrorDetail:
+      type: object
+      additionalProperties: true
+      maxProperties: 20
+    ErrorBody:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - IMPORT_PARSE_NOT_ALLOWED
+            - IMPORT_PARSE_ALREADY_RUNNING
+            - IMPORT_PARSE_FAILED
+            - IMPORT_PARSE_LIMIT_EXCEEDED
+            - IMPORT_PARSE_UNSUPPORTED_ENCODING
+            - IMPORT_PARSE_INVALID_XLSX
+            - IMPORT_PARSE_INVALID_CSV
+            - IMPORT_PARSE_FORMULA_UNSAFE
+            - IMPORT_PARSE_CANCELLED
+            - IMPORT_PARSE_VERSION_CONFLICT
+            - IMPORT_MAPPING_PREPARATION_FAILED
+            - IMPORT_SHEET_NOT_FOUND
+            - IMPORT_HEADER_NOT_CONFIRMED
+            - IMPORT_MAPPING_NOT_FOUND
+            - IMPORT_MAPPING_INVALID
+            - IMPORT_MAPPING_TARGET_INVALID
+            - IMPORT_MAPPING_DUPLICATE_TARGET
+            - IMPORT_MAPPING_VERSION_CONFLICT
+            - IMPORT_MAPPING_PREVIEW_FAILED
+            - IMPORT_BATCH_NOT_FOUND
+            - AUTH_REQUIRED
+            - FORBIDDEN
+            - CSRF_INVALID
+            - IDEMPOTENCY_CONFLICT
+            - RATE_LIMITED
+            - INTERNAL_ERROR
+        message: { type: string, minLength: 1, maxLength: 500 }
+        details: { $ref: '#/components/schemas/ErrorDetail' }
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error, request_id]
+      properties:
+        error: { $ref: '#/components/schemas/ErrorBody' }
+        request_id: { type: string, minLength: 1, maxLength: 128 }

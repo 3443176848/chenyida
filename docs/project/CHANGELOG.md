@@ -2,6 +2,20 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-16
+
+### PHASE2-TASK03 设计 - `docs: design material import parser and mapping`
+
+- Git Commit：Parser 与字段 Mapping V1 文档在独立提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `63e0483`。
+- 规格：新增 Parser 主规格、OpenAPI 草案、Mapping 规格和 Mermaid 流程图，覆盖 `FILE_READY -> MAPPING_CONFIRMED`、`PARSED` 原子发布恢复点、用户可见性和失败分类。
+- 调度与恢复：明确 D1/Queue 无分布式事务，推荐持久 Outbox；Queue 至少一次、`max_batch_size=1`、低并发和租约保持 `PROPOSED`。V1 以 Sheet 为真正恢复边界，500 行检查点只用于观测、预算、心跳和幂等写入。
+- 数据模型：设计 `parse_runs`、Sheet/header、Outbox、Shared Strings、Mapping 主从表、`current_parse_run_id` 及 `material_import_rows` 唯一约束重建；只提出 `0005` Up/Down/回滚方案，未创建 migration 或修改 Drizzle。
+- 解析与安全：方案 A `zip.js + sax-wasm + 受限 OOXML`、CSV `csv-parse` 均为待兼容验证候选；定义 XML/OOXML、公式、外链、隐藏 Sheet、编码、稀疏 cell、行宽、日期解释、Shared Strings 和组合资源预算。
+- Mapping/API：定义 Sheet/header suggestion、稳定 target catalog、`category_hint`、一源一目标、受限默认值、预览、确认、旧 Mapping 失效、七个 API、权限、CSRF、幂等、CAS 和稳定错误。
+- 决策：集中记录 16 项 `Status: PROPOSED` 决策；设计方向确认不等于正式规格确认、实施批准或生产批准。
+- 验证：文档完成后运行 Site lint、全量 Node、隔离 API smoke、凭证扫描、临时 SQLite 基线、OpenAPI YAML 解析、`git diff --check` 和范围核对；实际结果记录在 `STATUS.md`。
+- 生产影响：无。未实施 Parser、Schema、`0005`、Queue、R2/Cron、API、前端、生产迁移或部署，未连接生产 D1/R2。
+
 ## 2026-07-15
 
 ### PHASE2-TASK02 实施 - `feat: add material import batch foundation`
