@@ -4,6 +4,16 @@
 
 ## 2026-07-17
 
+### PHASE3-TASK01 设计 - `docs: design material import normalization`
+
+- 新增功能：无；本任务只完成 Material Import Normalization & Staging V1 书面规格、未来数据模型和 API 契约。
+- 架构与状态：推荐独立 normalization run、复用 Outbox/租约/CAS/原子发布，批次增加排队/运行/发布状态；执行失败与行级 ERROR 分离，不新增批次 `NORMALIZATION_FAILED`。
+- 数据契约：推荐每行版本化 JSON 快照、独立 issue 表和 current pointer；冻结完整 lineage、空值/默认值、基础字段、动态属性、类型、公式禁用、Deferred Validation 和行状态语义。
+- API/安全：设计异步启动、汇总、行列表/详情和 issue 五个路由；新增独立 `material.import.normalize` 能力，保持 owner/read_any 行级可见性、404/403、CSRF、强幂等、限流、稳定错误和纯文本安全边界。
+- Migration/测试：只设计未来 `0006` 三表、batches/events/outbox 重建、索引、受保护 Down/重升和 54 项最低测试；16 项选择全部为 `PROPOSED`。
+- 验证：OpenAPI 3.1 的 5 个操作/98 个本地引用、16 项决定逐项 11 字段、54 项测试/docs-only 检查通过；lint 0 error/1 个既有 warning；build 与 Node 440/440、隔离 API smoke、Drizzle 34 表无漂移、296 文件凭证扫描、临时 SQLite 环境守卫 4/4、自测、烟测、备份恢复和 go-live 均通过并清理。
+- 范围：未修改运行时代码、Schema、Migration、API、前端、依赖、R2/Queue/hosting 或本地旧版；未连接、迁移或部署生产环境。实际提交哈希以 `git log -1` 为准。
+
 ### PHASE2-TASK08 实现 - `feat: add material import workspace ui`
 
 - 路由与工作区：新增 `/materials/imports`、`/materials/imports/new`、`/materials/imports/:batchId`，实现权限驱动入口、opaque cursor 列表、状态 Stepper、非法 URL 规范化、错误/终态处置和服务端状态权威恢复。

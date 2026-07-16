@@ -8,13 +8,13 @@
 | --- | ---: | --- |
 | 总代码量 | 约 43,000 行 | Site 的 `app/db/drizzle/tests/scripts` 运行时、迁移、脚本和测试源码；不含依赖、构建产物和文档 |
 | 源码文件 | 124 | Site 的 `app/db/drizzle/tests/scripts` 口径；TASK08 新增 Import Workspace 组件、Worker/轮询模块和专项测试 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK08 仅实施 Import Workspace 前端、共享浏览器 Client、依赖锁、专项测试和治理文档；未修改 Schema、Migration、Metadata、hosting 或本地旧版业务逻辑 |
+| 根仓库跟踪项 | 提交前动态值 | PHASE3-TASK01 仅新增 Normalization 规格/OpenAPI/流程图并同步治理文档；未修改运行时代码、Schema、Migration、API、前端、依赖或生产配置 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 60（本地+开发 schema） | 本地 SQLite 26 张，Site 开发 schema 34 张；`0005` 仅在隔离 D1 测试，未执行生产迁移 |
 | 在线 API 路径 | 81 | 新增批次作用域 Mapping Target Catalog；生产公开站点尚未部署开发基线 |
 | 页面入口 | 14 | 既有 11 个入口加 3 条 Material Import 路由 |
-| 测试文件 | 24 | TASK08 新增 100 项 Import UI 专项；全量 Node 440/440 |
+| 测试文件 | 24 | PHASE3-TASK01 未改测试；任务开始基线为全量 Node 440/440 |
 
 ## 当前版本与环境
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE2-TASK08` 开始时，根仓库 `main` 位于 `eff8ca9`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异覆盖 Import Workspace 前端、共享浏览器 Client、固定 SHA 依赖、100 项专项测试与项目治理文档；未修改 production binding、hosting、后端 API route/service、Schema、Migration、Metadata 数据或本地旧版业务逻辑。
+`PHASE3-TASK01` 开始时，根仓库 `main` 位于 `7cc89b8`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只允许覆盖三份 Normalization 设计交付物和项目治理文档；不得修改 production binding、hosting、依赖、运行时 API/服务、Schema、Migration、Metadata、前端或本地旧版业务逻辑。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE2-TASK08` 计划提交消息为 `feat: add material import workspace ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
+`PHASE3-TASK01` 计划提交消息为 `docs: design material import normalization`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
 
 实时状态必须使用：
 
@@ -48,6 +48,21 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE3-TASK01 Material Import Normalization & Staging V1 书面设计
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / WAITING FOR SPEC CONFIRMATION | 正式规格、OpenAPI 草案、数据流/状态图完成；16 项决定全部 `PROPOSED` |
+| 状态与运行 | DESIGNED | 批次排队/运行/发布；独立 run、租约、Outbox、CAS、失败恢复与 SUPERSEDED 历史 |
+| 数据契约 | DESIGNED | 每行版本化 JSON payload + 常用关系列 + 独立 issue；完整 lineage，不覆盖原始行 |
+| 类型/空值 | DESIGNED | MISSING/EMPTY/BLANK_TEXT/NULL_VALUE/PRESENT、受控默认、基础字段/动态属性、公式禁用 |
+| Validation | DESIGNED | 只运行 Normalization 规则；完整 Material Validation 延迟到真实 category_id，Draft 写服务不调用 |
+| API/权限 | DESIGNED | 5 个路由、opaque cursor、`material.import.normalize`、owner/read_any、404/403、CSRF/幂等/限流 |
+| `0006` | DESIGN ONLY | 三个新表、batch current pointer、events/outbox/batches 重建、索引/Down/重升；未创建 Migration 或改 Drizzle |
+| 测试计划 | COMPLETE | 54 项最低未来测试及完整 docs-only 基线 |
+| 验证 | PASS | OpenAPI 3.1 为 5 个操作/98 个本地引用；16 项决定逐项 11 字段、54 项测试/docs-only 检查通过；lint 0 error/1 个既有 warning；build 与 Node 440/440；隔离 API smoke；Drizzle 34 表无漂移；296 文件凭证扫描；临时 SQLite 环境守卫 4/4、self-test、smoke、backup/restore、go-live 均通过并清理 |
+| 生产影响 | NONE | 未连接 production/公共 URL/远程 D1/R2/Queue，未迁移、部署或创建 binding/Cron |
 
 ## PHASE2-TASK08 Material Import Workspace UI V1 非生产实现
 

@@ -1,0 +1,640 @@
+openapi: 3.1.0
+info:
+  title: Chenyida ERP Material Import Normalization V1
+  version: 0.1.0-proposed
+  description: >-
+    PHASE3-TASK01 书面契约草案。全部设计决定为 PROPOSED；当前运行时尚未实现这些路由、Schema 或 Migration。
+servers:
+  - url: /
+    description: Same-origin Site API only; production use requires separate approval.
+tags:
+  - name: MaterialImportNormalization
+security:
+  - sessionCookie: []
+paths:
+  /api/material-master/import-batches/{batchId}/normalize:
+    post:
+      tags: [MaterialImportNormalization]
+      operationId: startMaterialImportNormalization
+      summary: 异步启动或以新 processor version 重新运行规范化
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/CsrfToken'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartNormalizationRequest'
+      responses:
+        '202':
+          description: 启动事务已提交；处理异步执行
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartNormalizationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/material-master/import-batches/{batchId}/normalization:
+    get:
+      tags: [MaterialImportNormalization]
+      operationId: getMaterialImportNormalization
+      summary: 读取 current published run 与活跃或最近 attempt 汇总
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+      responses:
+        '200':
+          description: 规范化汇总；尚未发布时 current_run 可为 null
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NormalizationSummaryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/material-master/import-batches/{batchId}/normalized-rows:
+    get:
+      tags: [MaterialImportNormalization]
+      operationId: listMaterialImportNormalizedRows
+      summary: 分页读取 current published run 的行摘要
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: row_status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/RowStatus'
+      responses:
+        '200':
+          description: 有界行摘要，不含完整 normalized payload
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NormalizedRowsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/material-master/import-batches/{batchId}/normalized-rows/{rowId}:
+    get:
+      tags: [MaterialImportNormalization]
+      operationId: getMaterialImportNormalizedRow
+      summary: 读取 current published run 的单行版本化 payload
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - name: rowId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: 单行详情
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NormalizedRowDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NormalizedRowNotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/material-master/import-batches/{batchId}/normalization-issues:
+    get:
+      tags: [MaterialImportNormalization]
+      operationId: listMaterialImportNormalizationIssues
+      summary: 分页筛选 current published run 的问题
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: issue_level
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/IssueLevel'
+        - name: issue_code
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: '^[A-Z][A-Z0-9_]{2,99}$'
+        - name: target_code
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 160
+        - name: source_row_number
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: 有界 issue 列表
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NormalizationIssuesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: erp_session
+  headers:
+    NoStore:
+      schema:
+        type: string
+        const: private, no-store
+    RequestId:
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+  parameters:
+    BatchId:
+      name: batchId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 512
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: 摘要保护的不透明单向 cursor；客户端不得解析
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 2048
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+  schemas:
+    StartNormalizationRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, processor_version]
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+        processor_version:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$'
+        rerun_reason:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 500
+          description: NORMALIZED 上新 processor version 重跑时必填；首次运行必须省略或为 null
+    StartNormalizationResponse:
+      type: object
+      additionalProperties: false
+      required: [operation_id, batch_id, normalization_run_id, batch_status, run_status, processor_version, current_version, request_id]
+      properties:
+        operation_id:
+          type: string
+          minLength: 8
+          maxLength: 128
+        batch_id:
+          type: integer
+          minimum: 1
+        normalization_run_id:
+          type: integer
+          minimum: 1
+        batch_status:
+          type: string
+          const: QUEUED_FOR_NORMALIZATION
+        run_status:
+          type: string
+          const: QUEUED
+        processor_version:
+          type: string
+        current_version:
+          type: integer
+          minimum: 1
+        request_id:
+          type: string
+    BatchStatus:
+      type: string
+      enum: [MAPPING_CONFIRMED, QUEUED_FOR_NORMALIZATION, NORMALIZING, NORMALIZED, CANCELLED]
+    RunStatus:
+      type: string
+      enum: [QUEUED, RUNNING, STAGED, PUBLISHING, SUCCEEDED, FAILED, CANCELLED, SUPERSEDED]
+    RunStage:
+      type: string
+      enum: [LOAD_MAPPING, READ_SOURCE_ROWS, NORMALIZE_ROWS, VERIFY_RESULT, PUBLISH_RESULT, COMPLETE]
+    RowStatus:
+      type: string
+      enum: [VALID, WARNING, ERROR]
+    IssueLevel:
+      type: string
+      enum: [ERROR, WARNING]
+    ValueState:
+      type: string
+      enum: [MISSING, EMPTY, BLANK_TEXT, NULL_VALUE, PRESENT]
+    NormalizationRunSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - parse_run_id
+        - mapping_id
+        - mapping_version
+        - processor_version
+        - metadata_digest
+        - run_status
+        - current_stage
+        - total_rows
+        - processed_rows
+        - valid_rows
+        - warning_rows
+        - error_rows
+        - issue_count
+        - created_at
+        - updated_at
+      properties:
+        id: { type: integer, minimum: 1 }
+        parse_run_id: { type: integer, minimum: 1 }
+        mapping_id: { type: integer, minimum: 1 }
+        mapping_version: { type: integer, minimum: 1 }
+        processor_version: { type: string }
+        metadata_digest: { type: string, pattern: '^[0-9a-f]{64}$' }
+        run_status: { $ref: '#/components/schemas/RunStatus' }
+        current_stage: { $ref: '#/components/schemas/RunStage' }
+        total_rows: { type: integer, minimum: 0 }
+        processed_rows: { type: integer, minimum: 0 }
+        valid_rows: { type: integer, minimum: 0 }
+        warning_rows: { type: integer, minimum: 0 }
+        error_rows: { type: integer, minimum: 0 }
+        issue_count: { type: integer, minimum: 0 }
+        normalized_json_bytes: { type: integer, minimum: 0 }
+        result_digest: { type: [string, 'null'], pattern: '^[0-9a-f]{64}$' }
+        failure_code: { type: [string, 'null'] }
+        safe_failure_message: { type: [string, 'null'], maxLength: 500 }
+        started_at: { type: [string, 'null'], format: date-time }
+        completed_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    NormalizationSummaryResponse:
+      type: object
+      additionalProperties: false
+      required: [batch_id, batch_status, current_version, current_run, latest_attempt, request_id]
+      properties:
+        batch_id: { type: integer, minimum: 1 }
+        batch_status: { $ref: '#/components/schemas/BatchStatus' }
+        current_version: { type: integer, minimum: 1 }
+        current_run:
+          oneOf:
+            - $ref: '#/components/schemas/NormalizationRunSummary'
+            - type: 'null'
+        latest_attempt:
+          oneOf:
+            - $ref: '#/components/schemas/NormalizationRunSummary'
+            - type: 'null'
+        request_id: { type: string }
+    NormalizedRowSummary:
+      type: object
+      additionalProperties: false
+      required: [id, source_sheet_index, source_row_number, source_raw_row_hash, normalized_payload_hash, row_status, error_count, warning_count, created_at]
+      properties:
+        id: { type: integer, minimum: 1 }
+        source_sheet_index: { type: integer, minimum: 0 }
+        source_row_number: { type: integer, minimum: 1 }
+        source_raw_row_hash: { type: string, pattern: '^[0-9a-f]{64}$' }
+        normalized_payload_hash: { type: string, pattern: '^[0-9a-f]{64}$' }
+        row_status: { $ref: '#/components/schemas/RowStatus' }
+        error_count: { type: integer, minimum: 0 }
+        warning_count: { type: integer, minimum: 0 }
+        created_at: { type: string, format: date-time }
+    NormalizedRowsResponse:
+      type: object
+      additionalProperties: false
+      required: [batch_id, normalization_run_id, items, next_cursor, request_id]
+      properties:
+        batch_id: { type: integer, minimum: 1 }
+        normalization_run_id: { type: integer, minimum: 1 }
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NormalizedRowSummary' }
+        next_cursor: { type: [string, 'null'] }
+        request_id: { type: string }
+    SourceLineage:
+      type: object
+      additionalProperties: false
+      required: [kind, column_index, cell_type, value_state, raw_value]
+      properties:
+        kind:
+          type: string
+          enum: [SOURCE_COLUMN, DEFAULT_VALUE]
+        column_index:
+          type: [integer, 'null']
+          minimum: 0
+        cell_type:
+          type: [string, 'null']
+          enum: [EMPTY, TEXT, NUMBER, BOOLEAN, DATE, FORMULA, ERROR, null]
+        value_state: { $ref: '#/components/schemas/ValueState' }
+        blank_kind:
+          type: [string, 'null']
+          enum: [EMPTY_STRING, WHITESPACE_ONLY, null]
+        raw_value: {}
+    FieldCandidate:
+      type: object
+      additionalProperties: false
+      required: [target_code, source, candidate, status]
+      properties:
+        target_code: { type: string, minLength: 3, maxLength: 160 }
+        source: { $ref: '#/components/schemas/SourceLineage' }
+        candidate: {}
+        status: { $ref: '#/components/schemas/RowStatus' }
+    NormalizedPayload:
+      type: object
+      additionalProperties: false
+      required: [schema_version, lineage, basic, attributes, deferred_validation]
+      properties:
+        schema_version: { type: integer, const: 1 }
+        lineage:
+          type: object
+          additionalProperties: false
+          required: [batch_id, parse_run_id, mapping_id, mapping_version, metadata_digest, processor_version, sheet_index, row_number, raw_row_hash]
+          properties:
+            batch_id: { type: integer, minimum: 1 }
+            parse_run_id: { type: integer, minimum: 1 }
+            mapping_id: { type: integer, minimum: 1 }
+            mapping_version: { type: integer, minimum: 1 }
+            metadata_digest: { type: string, pattern: '^[0-9a-f]{64}$' }
+            processor_version: { type: string }
+            sheet_index: { type: integer, minimum: 0 }
+            row_number: { type: integer, minimum: 1 }
+            raw_row_hash: { type: string, pattern: '^[0-9a-f]{64}$' }
+        basic:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/FieldCandidate' }
+        attributes:
+          type: object
+          propertyNames: { pattern: '^[A-Z][A-Z0-9_]{1,127}$' }
+          additionalProperties: { $ref: '#/components/schemas/FieldCandidate' }
+        category_hint:
+          oneOf:
+            - $ref: '#/components/schemas/FieldCandidate'
+            - type: 'null'
+        supplier_reference:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/FieldCandidate' }
+        deferred_validation:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [CATEGORY_ASSIGNMENT_REQUIRED, CATEGORY_BOUND_ATTRIBUTE_VALIDATION_REQUIRED, MATERIAL_VALIDATION_NOT_RUN]
+    NormalizedRowDetailResponse:
+      type: object
+      additionalProperties: false
+      required: [batch_id, normalization_run_id, row, normalized_payload, request_id]
+      properties:
+        batch_id: { type: integer, minimum: 1 }
+        normalization_run_id: { type: integer, minimum: 1 }
+        row: { $ref: '#/components/schemas/NormalizedRowSummary' }
+        normalized_payload: { $ref: '#/components/schemas/NormalizedPayload' }
+        request_id: { type: string }
+    NormalizationIssue:
+      type: object
+      additionalProperties: false
+      required: [id, normalized_row_id, issue_level, issue_code, target_code, source_sheet_index, source_row_number, source_column_index, safe_message, safe_details, created_at]
+      properties:
+        id: { type: integer, minimum: 1 }
+        normalized_row_id: { type: integer, minimum: 1 }
+        issue_level: { $ref: '#/components/schemas/IssueLevel' }
+        issue_code: { type: string, pattern: '^[A-Z][A-Z0-9_]{2,99}$' }
+        target_code: { type: string, minLength: 3, maxLength: 160 }
+        source_sheet_index: { type: integer, minimum: 0 }
+        source_row_number: { type: integer, minimum: 1 }
+        source_column_index: { type: [integer, 'null'], minimum: 0 }
+        safe_message: { type: string, minLength: 1, maxLength: 500 }
+        safe_details:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: string
+              - type: number
+              - type: boolean
+              - type: array
+                maxItems: 200
+                items: { type: string }
+        created_at: { type: string, format: date-time }
+    NormalizationIssuesResponse:
+      type: object
+      additionalProperties: false
+      required: [batch_id, normalization_run_id, items, next_cursor, request_id]
+      properties:
+        batch_id: { type: integer, minimum: 1 }
+        normalization_run_id: { type: integer, minimum: 1 }
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/NormalizationIssue' }
+        next_cursor: { type: [string, 'null'] }
+        request_id: { type: string }
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, request_id, details]
+          properties:
+            code:
+              type: string
+              enum:
+                - IMPORT_NORMALIZATION_NOT_ALLOWED
+                - IMPORT_NORMALIZATION_ALREADY_RUNNING
+                - IMPORT_NORMALIZATION_FAILED
+                - IMPORT_NORMALIZATION_LIMIT_EXCEEDED
+                - IMPORT_NORMALIZATION_MAPPING_STALE
+                - IMPORT_NORMALIZATION_METADATA_CHANGED
+                - IMPORT_NORMALIZATION_VERSION_CONFLICT
+                - IMPORT_NORMALIZATION_CANCELLED
+                - IMPORT_NORMALIZED_ROW_NOT_FOUND
+                - IMPORT_NORMALIZATION_QUERY_INVALID
+                - IMPORT_BATCH_NOT_FOUND
+                - AUTH_REQUIRED
+                - FORBIDDEN
+                - CSRF_INVALID
+                - IDEMPOTENCY_KEY_REQUIRED
+                - IDEMPOTENCY_CONFLICT
+                - RATE_LIMITED
+                - INTERNAL_ERROR
+            message: { type: string, minLength: 1, maxLength: 500 }
+            request_id: { type: string, minLength: 8, maxLength: 128 }
+            details:
+              type: array
+              maxItems: 50
+              items:
+                type: object
+                additionalProperties: true
+  responses:
+    BadRequest:
+      description: 请求、查询、CSRF 或幂等 key 不合法
+      headers:
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        X-Request-Id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Unauthorized:
+      description: 未认证
+      headers:
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        X-Request-Id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Forbidden:
+      description: 可见批次但缺少 material.import.normalize
+      headers:
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        X-Request-Id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    NotFound:
+      description: 批次不存在或对当前用户隐藏
+      headers:
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        X-Request-Id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    NormalizedRowNotFound:
+      description: 批次隐藏，或 row 不属于 current published run
+      headers:
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        X-Request-Id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Conflict:
+      description: 版本、状态、Mapping、Metadata、活跃 run 或幂等冲突
+      headers:
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        X-Request-Id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    RateLimited:
+      description: 超过写或读限流
+      headers:
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        X-Request-Id: { $ref: '#/components/headers/RequestId' }
+        Retry-After:
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    InternalError:
+      description: 脱敏内部错误；不返回 SQL、堆栈或原始数据
+      headers:
+        Cache-Control: { $ref: '#/components/headers/NoStore' }
+        X-Request-Id: { $ref: '#/components/headers/RequestId' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
