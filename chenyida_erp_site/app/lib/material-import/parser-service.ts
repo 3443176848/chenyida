@@ -162,6 +162,7 @@ export class MaterialImportParserTaskHandler implements MaterialImportTaskHandle
   constructor(dependencies: MaterialImportParserTaskDependencies) { this.#database = dependencies.database; this.#objectStore = dependencies.objectStore; this.#saxWasm = dependencies.saxWasm; this.#clock = dependencies.clock ?? (() => new Date()); }
 
   async handle(task: MaterialImportTask): Promise<MaterialImportTaskDisposition> {
+    if (!task.parseRunId) return "ACK";
     if (task.jobType === "PREPARE_MAPPING") return this.#prepareMapping(task);
     if (task.jobType !== "INSPECT_WORKBOOK") return "ACK";
     const leaseToken = crypto.randomUUID();

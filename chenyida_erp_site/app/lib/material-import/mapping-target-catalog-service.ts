@@ -19,18 +19,18 @@ export type MaterialImportMappingTargetCatalogQuery = Readonly<{
 }>;
 
 export interface MaterialImportReadRateLimiter {
-  consume(input: Readonly<{ username: string; limit: number; now: Date }>): Promise<void>;
+  consume(input: Readonly<{ username: string; limit: number; now: Date; routeCode?: string }>): Promise<void>;
 }
 
 export class D1MaterialImportReadRateLimiter implements MaterialImportReadRateLimiter {
   readonly #database: MaterialMasterD1Database;
   constructor(database: MaterialMasterD1Database) { this.#database = database; }
-  async consume(input: Readonly<{ username: string; limit: number; now: Date }>): Promise<void> {
+  async consume(input: Readonly<{ username: string; limit: number; now: Date; routeCode?: string }>): Promise<void> {
     const bucket = new Date(input.now);
     bucket.setUTCSeconds(0, 0);
     let row: { count: number } | null;
     try {
-      row = await this.#database.prepare("SELECT COUNT(*) AS count FROM audit_log WHERE username=? AND route_code='MATERIAL_IMPORT_MAPPING_TARGET_CATALOG' AND created_at>=?").bind(input.username, bucket.toISOString()).first<{ count: number }>();
+      row = await this.#database.prepare("SELECT COUNT(*) AS count FROM audit_log WHERE username=? AND route_code=? AND created_at>=?").bind(input.username, input.routeCode ?? "MATERIAL_IMPORT_MAPPING_TARGET_CATALOG", bucket.toISOString()).first<{ count: number }>();
     } catch {
       throw new MaterialImportParserServiceError("IMPORT_MAPPING_TARGET_CATALOG_NOT_AVAILABLE", "读取限流暂不可用", 503);
     }

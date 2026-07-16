@@ -7,6 +7,7 @@ import {
 } from "../material-api/security.ts";
 import type { MaterialImportObjectStore } from "./object-store.ts";
 import {
+  D1MaterialImportReadRateLimiter,
   MaterialImportMappingTargetCatalogService,
   type MaterialImportReadRateLimiter,
 } from "./mapping-target-catalog-service.ts";
@@ -20,6 +21,14 @@ import {
   type MaterialImportMappingDraftInput,
 } from "./mapping-service.ts";
 import { MaterialImportParserServiceError, queueMaterialImportParse } from "./parser-service.ts";
+import {
+  getMaterialImportNormalization,
+  getMaterialImportNormalizedRow,
+  listMaterialImportNormalizationIssues,
+  listMaterialImportNormalizedRows,
+  MaterialImportNormalizationServiceError,
+  startMaterialImportNormalization,
+} from "./normalization-service.ts";
 import {
   cancelMaterialImportBatch,
   createMaterialImportBatch,
@@ -37,6 +46,7 @@ type ImportPermission =
   | "material.import.cancel"
   | "material.import.parse"
   | "material.import.map"
+  | "material.import.normalize"
   | "material.import.read_any";
 
 export type MaterialImportApiDependencies = Readonly<{
@@ -44,6 +54,7 @@ export type MaterialImportApiDependencies = Readonly<{
   objectStore?: MaterialImportObjectStore;
   objectPrefix?: string;
   importReadRateLimit?: number;
+  importNormalizationWriteRateLimit?: number;
   importReadRateLimiter?: MaterialImportReadRateLimiter;
   currentUser(request: Request): Promise<MaterialApiUser | null>;
   userCan(user: MaterialApiUser, permission: ImportPermission): boolean;
@@ -128,6 +139,22 @@ function catalogQuery(url: URL): Readonly<{ namespace?: "BASIC" | "ATTRIBUTE" | 
   return { namespace: namespace as "BASIC" | "ATTRIBUTE" | "SPECIAL" | undefined, q, limit, cursor };
 }
 
+function normalizationLimit(url: URL): number {
+  const raw = url.searchParams.get("limit");
+  if (raw === null) return 50;
+  if (!/^[1-9][0-9]*$/.test(raw)) throw new MaterialImportServiceError("IMPORT_NORMALIZATION_QUERY_INVALID", "limit 必须是正整数", 400);
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value > 100) throw new MaterialImportServiceError("IMPORT_NORMALIZATION_QUERY_INVALID", "limit 必须在 1 到 100 之间", 400);
+  return value;
+}
+
+function assertNormalizationQuery(url: URL, allowed: readonly string[]): void {
+  const accepted = new Set(allowed);
+  for (const key of url.searchParams.keys()) {
+    if (!accepted.has(key) || url.searchParams.getAll(key).length > 1) throw new MaterialImportServiceError("IMPORT_NORMALIZATION_QUERY_INVALID", `查询参数 ${key} 无效`, 400);
+  }
+}
+
 function assertObjectKeys(value: Record<string, unknown>, allowed: readonly string[]): void {
   const set = new Set(allowed);
   const unknown = Object.keys(value).find((key) => !set.has(key));
@@ -144,13 +171,25 @@ async function writeFailureAudit(
   if (!user) return;
   const timestamp = (dependencies.clock ?? (() => new Date()))().toISOString();
   const catalog = /^\/api\/material-master\/import-batches\/[1-9][0-9]*\/mapping-targets$/.test(path);
-  const routeCode = catalog ? "MATERIAL_IMPORT_MAPPING_TARGET_CATALOG" : "MATERIAL_IMPORT_BATCH";
+  const normalization = /^\/api\/material-master\/import-batches\/[1-9][0-9]*\/(?:normalize|normalization|normalized-rows(?:\/[1-9][0-9]*)?|normalization-issues)$/.test(path);
+  const routeCode = catalog ? "MATERIAL_IMPORT_MAPPING_TARGET_CATALOG" : normalization ? "MATERIAL_IMPORT_NORMALIZATION" : "MATERIAL_IMPORT_BATCH";
   try {
     await dependencies.database.prepare(`
       INSERT INTO audit_log(username,action,detail,request_id,result,route_code,error_code,retention_until,created_at)
       VALUES(?,'MATERIAL_IMPORT_API_REJECTED',?,?,'failed',?,?,?,?)
     `).bind(user.username, path.slice(0, 255), requestId, routeCode, error.code, Math.floor(new Date(timestamp).getTime() / 1000) + 1095 * 86400, timestamp).run();
   } catch { /* Security audit failures must not expose internal storage errors. */ }
+}
+
+async function writeNormalizationReadAudit(
+  dependencies: MaterialImportApiDependencies,
+  username: string,
+  requestId: string,
+  path: string,
+): Promise<void> {
+  const now = (dependencies.clock ?? (() => new Date()))();
+  await dependencies.database.prepare("INSERT INTO audit_log(username,action,detail,request_id,result,route_code,retention_until,created_at) VALUES(?,'MATERIAL_IMPORT_NORMALIZATION_READ',?,?,'success','MATERIAL_IMPORT_NORMALIZATION_READ',?,?)")
+    .bind(username, path.slice(0, 255), requestId, Math.floor(now.getTime() / 1000) + 1_095 * 86_400, now.toISOString()).run();
 }
 
 export function isMaterialImportPath(path: string): boolean {
@@ -161,11 +200,12 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
   const requestId = crypto.randomUUID();
   const url = new URL(request.url);
   const isMappingTargetsRequest = /^\/api\/material-master\/import-batches\/[1-9][0-9]*\/mapping-targets$/.test(url.pathname);
+  const isNormalizationRequest = /^\/api\/material-master\/import-batches\/[1-9][0-9]*\/(?:normalize|normalization|normalized-rows(?:\/[1-9][0-9]*)?|normalization-issues)$/.test(url.pathname);
   let user: MaterialApiUser | null = null;
   try {
     user = await dependencies.currentUser(request);
-    if (!user) throw new MaterialImportServiceError(isMappingTargetsRequest ? "AUTH_REQUIRED" : "AUTHENTICATION_REQUIRED", "请先登录", 401);
-    if (user.must_change_password) throw new MaterialImportServiceError(isMappingTargetsRequest ? "FORBIDDEN" : "PERMISSION_DENIED", "请先修改临时密码", 403);
+    if (!user) throw new MaterialImportServiceError(isMappingTargetsRequest || isNormalizationRequest ? "AUTH_REQUIRED" : "AUTHENTICATION_REQUIRED", "请先登录", 401);
+    if (user.must_change_password) throw new MaterialImportServiceError(isMappingTargetsRequest || isNormalizationRequest ? "FORBIDDEN" : "PERMISSION_DENIED", "请先修改临时密码", 403);
     const root = url.pathname === "/api/material-master/import-batches";
     const detailMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)$/);
     const fileMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/file$/);
@@ -178,7 +218,12 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
     const mappingTargetsMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/mapping-targets$/);
     const previewMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/mapping\/preview$/);
     const confirmMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/mapping\/confirm$/);
-    if (!root && !detailMatch && !fileMatch && !eventsMatch && !cancelMatch && !parseMatch && !sheetsMatch && !rowsMatch && !mappingMatch && !mappingTargetsMatch && !previewMatch && !confirmMatch) throw new MaterialImportServiceError("IMPORT_BATCH_NOT_FOUND", "导入接口不存在", 404);
+    const normalizeMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/normalize$/);
+    const normalizationMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/normalization$/);
+    const normalizedRowsMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/normalized-rows$/);
+    const normalizedRowMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/normalized-rows\/([1-9][0-9]*)$/);
+    const normalizationIssuesMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/normalization-issues$/);
+    if (!root && !detailMatch && !fileMatch && !eventsMatch && !cancelMatch && !parseMatch && !sheetsMatch && !rowsMatch && !mappingMatch && !mappingTargetsMatch && !previewMatch && !confirmMatch && !normalizeMatch && !normalizationMatch && !normalizedRowsMatch && !normalizedRowMatch && !normalizationIssuesMatch) throw new MaterialImportServiceError("IMPORT_BATCH_NOT_FOUND", "导入接口不存在", 404);
     const permission: ImportPermission = root && request.method === "POST"
       ? "material.import.create"
       : fileMatch
@@ -190,8 +235,10 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
             : (mappingMatch && request.method !== "GET") || previewMatch || confirmMatch
               ? "material.import.map"
               : "material.import.read";
-    if (!dependencies.userCan(user, permission)) throw new MaterialImportServiceError(mappingTargetsMatch ? "FORBIDDEN" : "PERMISSION_DENIED", "没有执行此操作的权限", 403);
+    if (!normalizeMatch && !dependencies.userCan(user, permission)) throw new MaterialImportServiceError(mappingTargetsMatch || isNormalizationRequest ? "FORBIDDEN" : "PERMISSION_DENIED", "没有执行此操作的权限", 403);
     const canReadAny = dependencies.userCan(user, "material.import.read_any");
+    const normalizationRateLimiter = dependencies.importReadRateLimiter ?? new D1MaterialImportReadRateLimiter(dependencies.database);
+    const consumeNormalizationRateLimit = (routeCode: string, limit: number) => () => normalizationRateLimiter.consume({ username: user.username, limit, now: (dependencies.clock ?? (() => new Date()))(), routeCode });
     const serviceDependencies = {
       database: dependencies.database,
       objectStore: dependencies.objectStore ?? unavailableStore,
@@ -279,17 +326,37 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
       const { body } = await readBoundedJson(request);
       assertObjectKeys(body, ["expected_version", "parse_run_id", "mapping_id", "expected_mapping_version", "metadata_digest"]);
       result = await confirmMaterialImportMapping(dependencies.database, integerPath(confirmMatch[1]), { username: user.username, canReadAny, idempotencyKey: request.headers.get("Idempotency-Key") ?? "", requestId, expectedVersion: Number(body.expected_version), parseRunId: Number(body.parse_run_id), mappingId: Number(body.mapping_id), expectedMappingVersion: Number(body.expected_mapping_version), metadataDigest: String(body.metadata_digest ?? "") }, dependencies.clock);
+    } else if (normalizeMatch && request.method === "POST") {
+      assertMaterialCsrf(request);
+      const { body } = await readBoundedJson(request);
+      assertObjectKeys(body, ["expected_version", "processor_version", "rerun_reason"]);
+      result = await startMaterialImportNormalization(dependencies.database, { batchId: integerPath(normalizeMatch[1]), username: user.username, canReadAny, canNormalize: dependencies.userCan(user, "material.import.normalize"), expectedVersion: Number(body.expected_version), processorVersion: String(body.processor_version ?? ""), rerunReason: body.rerun_reason === undefined || body.rerun_reason === null ? null : String(body.rerun_reason), idempotencyKey: request.headers.get("Idempotency-Key") ?? "", requestId, consumeRateLimit: consumeNormalizationRateLimit("MATERIAL_IMPORT_NORMALIZATION_START", dependencies.importNormalizationWriteRateLimit ?? 20) }, dependencies.clock);
+    } else if (normalizationMatch && request.method === "GET") {
+      assertNormalizationQuery(url, []);
+      result = await getMaterialImportNormalization(dependencies.database, integerPath(normalizationMatch[1]), { username: user.username, canReadAny, consumeRateLimit: consumeNormalizationRateLimit("MATERIAL_IMPORT_NORMALIZATION_READ", dependencies.importReadRateLimit ?? 120) });
+    } else if (normalizedRowsMatch && request.method === "GET") {
+      assertNormalizationQuery(url, ["cursor", "limit", "row_status"]);
+      result = await listMaterialImportNormalizedRows(dependencies.database, integerPath(normalizedRowsMatch[1]), { username: user.username, canReadAny, rowStatus: url.searchParams.get("row_status") ?? undefined, limit: normalizationLimit(url), cursor: url.searchParams.get("cursor") ?? undefined, consumeRateLimit: consumeNormalizationRateLimit("MATERIAL_IMPORT_NORMALIZATION_READ", dependencies.importReadRateLimit ?? 120) });
+    } else if (normalizedRowMatch && request.method === "GET") {
+      assertNormalizationQuery(url, []);
+      result = await getMaterialImportNormalizedRow(dependencies.database, integerPath(normalizedRowMatch[1]), integerPath(normalizedRowMatch[2]), { username: user.username, canReadAny, consumeRateLimit: consumeNormalizationRateLimit("MATERIAL_IMPORT_NORMALIZATION_READ", dependencies.importReadRateLimit ?? 120) });
+    } else if (normalizationIssuesMatch && request.method === "GET") {
+      assertNormalizationQuery(url, ["cursor", "limit", "issue_level", "issue_code", "target_code", "source_row_number"]);
+      const sourceRow = url.searchParams.get("source_row_number");
+      result = await listMaterialImportNormalizationIssues(dependencies.database, integerPath(normalizationIssuesMatch[1]), { username: user.username, canReadAny, issueLevel: url.searchParams.get("issue_level") ?? undefined, issueCode: url.searchParams.get("issue_code") ?? undefined, targetCode: url.searchParams.get("target_code") ?? undefined, sourceRowNumber: sourceRow === null ? undefined : Number(sourceRow), limit: normalizationLimit(url), cursor: url.searchParams.get("cursor") ?? undefined, consumeRateLimit: consumeNormalizationRateLimit("MATERIAL_IMPORT_NORMALIZATION_READ", dependencies.importReadRateLimit ?? 120) });
     } else {
       throw new MaterialImportServiceError("METHOD_NOT_ALLOWED", "请求方法不支持", 405);
     }
+    if (isNormalizationRequest && request.method === "GET") await writeNormalizationReadAudit(dependencies, user.username, requestId, url.pathname);
     return response(result, requestId);
   } catch (error) {
     let failure: MaterialImportServiceError;
     if (error instanceof MaterialImportServiceError) failure = error;
     else if (error instanceof MaterialImportParserServiceError) failure = new MaterialImportServiceError(error.code, error.message, error.status, error.expectedVersion);
+    else if (error instanceof MaterialImportNormalizationServiceError) failure = new MaterialImportServiceError(error.code, error.message, error.status, error.expectedVersion);
     else if (error instanceof MaterialApiFailure) {
       failure = new MaterialImportServiceError(
-        error.code === "CSRF_INVALID" ? "CSRF_VALIDATION_FAILED" : error.code,
+        error.code === "CSRF_INVALID" && !isNormalizationRequest ? "CSRF_VALIDATION_FAILED" : error.code,
         error.code === "CSRF_INVALID" ? "CSRF 校验失败" : error.message,
         error.status,
       );

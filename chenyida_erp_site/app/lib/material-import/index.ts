@@ -11,3 +11,5 @@ export * from "./parser-service.ts";
 export * from "./mapping-service.ts";
 export * from "./mapping-target-registry.ts";
 export * from "./mapping-target-catalog-service.ts";
+export * from "./normalization-model.ts";
+export * from "./normalization-service.ts";

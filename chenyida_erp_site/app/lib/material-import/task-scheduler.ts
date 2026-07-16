@@ -1,14 +1,18 @@
 import type { MaterialMasterD1Database } from "../material-master/index.ts";
 
-export type MaterialImportJobType = "INSPECT_WORKBOOK" | "PREPARE_SHARED_RESOURCES" | "PARSE_SHEET" | "VERIFY_PARSE_RUN" | "PUBLISH_PARSE_RUN" | "PREPARE_MAPPING" | "PUBLISH_MAPPING_PREPARATION";
+export type MaterialImportParserJobType = "INSPECT_WORKBOOK" | "PREPARE_SHARED_RESOURCES" | "PARSE_SHEET" | "VERIFY_PARSE_RUN" | "PUBLISH_PARSE_RUN" | "PREPARE_MAPPING" | "PUBLISH_MAPPING_PREPARATION";
+export type MaterialImportNormalizationJobType = "START_NORMALIZATION" | "NORMALIZE_ROW_CHUNK" | "VERIFY_NORMALIZATION" | "PUBLISH_NORMALIZATION";
+export type MaterialImportJobType = MaterialImportParserJobType | MaterialImportNormalizationJobType;
 
 export type MaterialImportTask = Readonly<{
   jobId: string;
   batchId: number;
-  parseRunId: number;
+  parseRunId?: number;
+  normalizationRunId?: number;
   jobType: MaterialImportJobType;
   payloadVersion: 1;
   sheetIndex?: number;
+  afterRowNumber?: number;
 }>;
 
 export type MaterialImportTaskDisposition = "ACK" | "RETRY" | "DEAD";
@@ -60,7 +64,8 @@ export class CloudflareQueueMaterialImportTaskScheduler implements MaterialImpor
 type OutboxRow = {
   id: string;
   batch_id: number;
-  parse_run_id: number;
+  parse_run_id: number | null;
+  normalization_run_id?: number | null;
   job_type: MaterialImportJobType;
   payload_version: 1;
   payload_json: string;
@@ -73,10 +78,12 @@ function outboxTask(row: OutboxRow): MaterialImportTask {
   return {
     jobId: row.id,
     batchId: row.batch_id,
-    parseRunId: row.parse_run_id,
+    ...(row.parse_run_id === null ? {} : { parseRunId: row.parse_run_id }),
+    ...(row.normalization_run_id == null ? {} : { normalizationRunId: row.normalization_run_id }),
     jobType: row.job_type,
     payloadVersion: row.payload_version,
     ...(Number.isInteger(payload.sheet_index) ? { sheetIndex: Number(payload.sheet_index) } : {}),
+    ...(Number.isInteger(payload.after_row_number) ? { afterRowNumber: Number(payload.after_row_number) } : {}),
   };
 }
 
@@ -93,7 +100,7 @@ export class MaterialImportOutboxDispatcher {
     const bounded = Math.max(1, Math.min(100, Math.floor(limit)));
     const now = Math.floor(this.#clock().getTime() / 1000);
     const rows = (await this.#database.prepare(`
-      SELECT id,batch_id,parse_run_id,job_type,payload_version,payload_json,dispatch_version
+      SELECT *
       FROM material_import_job_outbox
       WHERE dispatch_status IN ('PENDING','RETRY_WAIT') AND available_at<=?
       ORDER BY available_at,id LIMIT ?

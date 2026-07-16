@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
   title: Chenyida ERP Material Import Normalization V1
-  version: 0.1.0-proposed
+  version: 1.0.0
   description: >-
-    PHASE3-TASK01 书面契约草案。全部设计决定为 PROPOSED；当前运行时尚未实现这些路由、Schema 或 Migration。
+    PHASE3-TASK02 已批准并在非生产运行时实现；生产迁移与部署仍需独立授权。
 servers:
   - url: /
     description: Same-origin Site API only; production use requires separate approval.
@@ -337,7 +337,9 @@ components:
         - parse_run_id
         - mapping_id
         - mapping_version
+        - mapping_digest
         - processor_version
+        - payload_schema_version
         - metadata_digest
         - run_status
         - current_stage
@@ -347,6 +349,8 @@ components:
         - warning_rows
         - error_rows
         - issue_count
+        - warning_count
+        - error_count
         - created_at
         - updated_at
       properties:
@@ -354,7 +358,9 @@ components:
         parse_run_id: { type: integer, minimum: 1 }
         mapping_id: { type: integer, minimum: 1 }
         mapping_version: { type: integer, minimum: 1 }
+        mapping_digest: { type: string, pattern: '^[0-9a-f]{64}$' }
         processor_version: { type: string }
+        payload_schema_version: { type: integer, const: 1 }
         metadata_digest: { type: string, pattern: '^[0-9a-f]{64}$' }
         run_status: { $ref: '#/components/schemas/RunStatus' }
         current_stage: { $ref: '#/components/schemas/RunStage' }
@@ -364,6 +370,8 @@ components:
         warning_rows: { type: integer, minimum: 0 }
         error_rows: { type: integer, minimum: 0 }
         issue_count: { type: integer, minimum: 0 }
+        warning_count: { type: integer, minimum: 0 }
+        error_count: { type: integer, minimum: 0 }
         normalized_json_bytes: { type: integer, minimum: 0 }
         result_digest: { type: [string, 'null'], pattern: '^[0-9a-f]{64}$' }
         failure_code: { type: [string, 'null'] }
@@ -447,22 +455,25 @@ components:
     NormalizedPayload:
       type: object
       additionalProperties: false
-      required: [schema_version, lineage, basic, attributes, deferred_validation]
+      required: [schema_version, lineage, basic, attributes, category_hint, supplier_reference, deferred_validation, row_status, issue_summary]
       properties:
         schema_version: { type: integer, const: 1 }
         lineage:
           type: object
           additionalProperties: false
-          required: [batch_id, parse_run_id, mapping_id, mapping_version, metadata_digest, processor_version, sheet_index, row_number, raw_row_hash]
+          required: [batch_id, parse_run_id, normalization_run_id, mapping_id, mapping_version, mapping_digest, metadata_digest, processor_version, sheet_index, row_number, source_row_number, raw_row_hash]
           properties:
             batch_id: { type: integer, minimum: 1 }
             parse_run_id: { type: integer, minimum: 1 }
+            normalization_run_id: { type: integer, minimum: 1 }
             mapping_id: { type: integer, minimum: 1 }
             mapping_version: { type: integer, minimum: 1 }
+            mapping_digest: { type: string, pattern: '^[0-9a-f]{64}$' }
             metadata_digest: { type: string, pattern: '^[0-9a-f]{64}$' }
             processor_version: { type: string }
             sheet_index: { type: integer, minimum: 0 }
             row_number: { type: integer, minimum: 1 }
+            source_row_number: { type: integer, minimum: 1 }
             raw_row_hash: { type: string, pattern: '^[0-9a-f]{64}$' }
         basic:
           type: object
@@ -484,6 +495,15 @@ components:
           items:
             type: string
             enum: [CATEGORY_ASSIGNMENT_REQUIRED, CATEGORY_BOUND_ATTRIBUTE_VALIDATION_REQUIRED, MATERIAL_VALIDATION_NOT_RUN]
+        row_status: { $ref: '#/components/schemas/RowStatus' }
+        issue_summary:
+          type: object
+          additionalProperties: false
+          required: [issue_count, error_count, warning_count]
+          properties:
+            issue_count: { type: integer, minimum: 0, maximum: 20 }
+            error_count: { type: integer, minimum: 0, maximum: 20 }
+            warning_count: { type: integer, minimum: 0, maximum: 20 }
     NormalizedRowDetailResponse:
       type: object
       additionalProperties: false

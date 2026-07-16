@@ -1,7 +1,7 @@
 # Material Import Normalization V1 数据流与状态图
 
-> 任务：`PHASE3-TASK01`
-> 状态：`PROPOSED`；本文件只描述未来实现，不代表运行时已存在。
+> 任务：`PHASE3-TASK02`
+> 状态：`APPROVED / IMPLEMENTED (NON-PRODUCTION)`；对应运行时、`0006` 与隔离测试，不代表生产已迁移或部署。
 
 ## 1. 端到端数据流
 

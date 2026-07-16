@@ -4,6 +4,15 @@
 
 ## 2026-07-17
 
+### PHASE3-TASK02 实现 - `feat: add material import normalization`
+
+- 决策与边界：批准 D-022 和正式规格的 16 项推荐决定；Normalization 只生成可追溯候选与 Deferred Validation，不调用 Draft/正式物料写服务，不执行分类、匹配或去重。
+- 数据库：新增 `0006_material_import_normalization.sql`、三张关系表、批次 current pointer 与状态、events/outbox 扩展、约束/索引/绑定 trigger、Drizzle snapshot/journal，以及只在无 Normalization 业务状态时允许的受保护 Down。
+- 运行与恢复：实现独立 normalization run、Mapping/Metadata 快照绑定、行级 JSON/Issue 暂存、Outbox、租约/心跳、幂等分块、资源上限、完整性摘要和单 D1 batch 原子发布；失败/取消清理未发布行，重跑在成功发布前保留旧 pointer。
+- API/安全：实现异步启动、汇总、行列表、行详情和 Issue 列表五个 API；新增 `material.import.normalize`，保持 owner/read_any 可见性先于能力判断，支持 CSRF、强幂等、版本 CAS、读写限流、opaque cursor、稳定错误和安全审计。
+- 测试：正式矩阵 54/54，Normalization/Migration 专项 18/18；覆盖 Up/受保护 Down/重升/失败回滚、约束/trigger、稳定发布、ERROR 行共存、幂等/块重放、分页、不同 processor 重跑、取消清理、Mapping/Metadata/parse 冻结、50,001 行与 payload 资源边界、发布竞争、五 API、权限/404、CSRF、429 和安全 500；全量 Node 458/458、build、隔离 API smoke、OpenAPI、Drizzle 无漂移、凭证扫描和临时 SQLite 基线通过，lint 0 error/1 个任务外既有 warning。
+- 范围：未修改 hosting 或生产 binding，未连接、迁移或部署生产 D1/R2/Queue，未创建 Material Draft 或正式物料；根目录既有未跟踪 `.obsidian/` 保持不变。
+
 ### PHASE3-TASK01 设计 - `docs: design material import normalization`
 
 - 新增功能：无；本任务只完成 Material Import Normalization & Staging V1 书面规格、未来数据模型和 API 契约。

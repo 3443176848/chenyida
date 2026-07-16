@@ -6,15 +6,15 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 约 43,000 行 | Site 的 `app/db/drizzle/tests/scripts` 运行时、迁移、脚本和测试源码；不含依赖、构建产物和文档 |
-| 源码文件 | 124 | Site 的 `app/db/drizzle/tests/scripts` 口径；TASK08 新增 Import Workspace 组件、Worker/轮询模块和专项测试 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE3-TASK01 仅新增 Normalization 规格/OpenAPI/流程图并同步治理文档；未修改运行时代码、Schema、Migration、API、前端、依赖或生产配置 |
+| 总代码量 | 49,964 行 | Site 的 `app/db/drizzle/tests/scripts` 运行时、迁移、脚本和测试源码；不含依赖、构建产物和文档 |
+| 源码文件 | 131 | TypeScript/TSX 78、MJS 30、SQL 13，其余为 schema/fixture 等任务源码 |
+| 根仓库跟踪项 | 本任务 27 个文件 | PHASE3-TASK02 修改 Normalization 运行时、Schema/Migration/API/测试和治理文档；未跟踪 `.obsidian/`、`bub.md` 均未修改或暂存 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
-| 数据表 | 60（本地+开发 schema） | 本地 SQLite 26 张，Site 开发 schema 34 张；`0005` 仅在隔离 D1 测试，未执行生产迁移 |
-| 在线 API 路径 | 81 | 新增批次作用域 Mapping Target Catalog；生产公开站点尚未部署开发基线 |
+| 数据表 | 63（本地+开发 schema） | 本地 SQLite 26 张，Site 开发 schema 新增 3 张 Normalization 表；`0006` 仅在隔离 D1 测试，未执行生产迁移 |
+| 在线 API 路径 | 86 | 开发代码新增 5 个 Normalization API；生产公开站点尚未部署开发基线 |
 | 页面入口 | 14 | 既有 11 个入口加 3 条 Material Import 路由 |
-| 测试文件 | 24 | PHASE3-TASK01 未改测试；任务开始基线为全量 Node 440/440 |
+| 测试文件 | 26 | 新增 Normalization migration 与服务/API 集成测试；任务开始基线为全量 Node 440/440 |
 
 ## 当前版本与环境
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE3-TASK01` 开始时，根仓库 `main` 位于 `7cc89b8`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只允许覆盖三份 Normalization 设计交付物和项目治理文档；不得修改 production binding、hosting、依赖、运行时 API/服务、Schema、Migration、Metadata、前端或本地旧版业务逻辑。
+`PHASE3-TASK02` 开始时，根仓库 `main` 位于 `826280e`，仅有用户既有未跟踪 `.obsidian/`。本任务差异覆盖 Normalization 运行时、Schema/Migration、API、测试和治理文档；未修改 production binding、hosting、依赖、前端或本地旧版业务逻辑。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE3-TASK01` 计划提交消息为 `docs: design material import normalization`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
+`PHASE3-TASK02` 计划提交消息为 `feat: add material import normalization`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
 
 实时状态必须使用：
 
@@ -48,6 +48,24 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE3-TASK02 Material Import Normalization & Staging V1 非生产实现
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 16 项正式决定全部 `APPROVED`，运行时与隔离实现完成 |
+| 状态与运行 | PASS | 批次排队/运行/发布；独立 run、Outbox、租约/心跳、CAS、失败恢复与 SUPERSEDED 历史 |
+| 数据契约 | PASS | 每行版本化 JSON payload、完整 lineage、payload hash、独立 issue、关系约束与绑定 trigger |
+| 类型/空值 | PASS | MISSING/EMPTY/BLANK_TEXT/NULL_VALUE/PRESENT、受控默认、类型/属性/公式禁用与稳定 issue code |
+| Validation | PASS | 只运行 Normalization 规则并输出 Deferred Validation；不调用 Material Validation 或 Draft 写服务 |
+| API/权限 | PASS | 5 个路由、opaque cursor、`material.import.normalize`、owner/read_any、404/403、CSRF/幂等/读写限流 |
+| `0006` | PASS | Up、三表、batch pointer、events/outbox/batches 重建、索引/trigger、受保护 Down、重升与失败整批回滚 |
+| 专项测试 | PASS | 稳定发布、ERROR 行共存、幂等、分页、重跑、取消清理、五 API、安全与 429；一次性 Miniflare D1 |
+| Site 全量 | PASS | 正式矩阵 54/54；Normalization/Migration 专项 18/18；`npm test` 458/458；`npm run build` 成功；`npm run lint` 0 error、1 个任务外既有 unused warning |
+| API/OpenAPI | PASS | 隔离 `npm run test:api` 通过；6 份 OpenAPI、33 个 operation、533 个本地引用均有效 |
+| Drizzle | PASS | 37 tables；生成漂移检查返回 `No schema changes, nothing to migrate` |
+| 凭证/本地基线 | PASS | 304 个仓库文件凭证扫描通过；临时 SQLite 环境守卫 4/4、self-test、smoke、backup/restore、go-live 全通过并清理 |
+| 生产影响 | NONE | 未连接 production/公共 URL/远程 D1/R2/Queue，未迁移、部署、创建 binding/Cron、Draft 或正式物料 |
 
 ## PHASE3-TASK01 Material Import Normalization & Staging V1 书面设计
 

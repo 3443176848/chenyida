@@ -46,7 +46,7 @@
 | PHASE2-TASK08 | 实现 Material Import Workspace UI V1 | DONE | Codex（实施）、项目负责人（16 项决定与非生产 UI 范围批准） | 2026-07-17 | 2026-07-17 | PHASE2-TASK07 | 完成三条导入路由、Worker SHA、共享 XHR、列表/上传/解析/轮询、Sheet/Rows/Header、Catalog/Mapping 保存预览确认；UI-001—UI-100、50×256 Playwright 门禁、Node 440/440、lint/API/OpenAPI/Drizzle/凭证/临时 SQLite 通过；未修改 API/Schema/Migration、生产资源、迁移或部署 |
 | PHASE3-TASK01 | 设计 Material Import Normalization & Staging V1 | DONE | Codex（设计）、项目负责人（待规格确认） | 2026-07-17 | 2026-07-17 | PHASE2-TASK08 | 完成正式规格、OpenAPI 草案和数据流/状态图；定义独立 run、JSON 行快照、独立 issue、类型/空值/属性规则、Outbox/租约、原子发布、五个 API、`0006` 设计、54 项测试和 16 项 `PROPOSED` 决定；仅文档，未修改运行时代码、Schema、Migration、API、前端或生产环境 |
 
-当前没有 `DOING` 任务。`PHASE3-TASK01` 已完成书面设计并停止等待“规格确认”。Normalization 实施、`0006`、生产 R2/Queue、生产 D1 migration、Cron、部署、分类/匹配/Material Draft、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
+当前没有 `DOING` 任务。`PHASE3-TASK02` 已完成非生产 Normalization 运行时、`0006`、五个 API 与隔离测试。生产 R2/Queue、生产 D1 migration、Cron、部署、分类/匹配/Material Draft、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
 
 ## Phase 0 待办
 
@@ -60,7 +60,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PHASE3-TASK02 | 实现 Material Import Normalization & Staging V1 | TODO | 待指派 | - | - | PHASE3-TASK01 规格确认 | 仅在 16 项决定批准后实施运行时、`0006`、API 和隔离测试；不含生产迁移/部署、分类、匹配或 Draft |
+| PHASE3-TASK02 | 实现 Material Import Normalization & Staging V1 | DONE | Codex（实施）、项目负责人（批准 16 项决定） | 2026-07-17 | 2026-07-17 | PHASE3-TASK01 | 已实现独立 run、行 JSON 快照、Issue、Outbox/租约/心跳、原子 pointer 发布、不同 processor 版本重跑、取消清理、五个 API、`material.import.normalize`、读写限流、`0006` Up/受保护 Down/快照及隔离测试；未创建 Draft/正式物料，未迁移或部署生产 |
 | PHASE4-TASK01 | 建立AI治理评估与审批边界 | TODO | 待指派 | - | - | Material Import 治理链路完成 | 定义评估集、证据、模型版本、人工确认和禁止自动生效规则；原占位编号 `PHASE3-TASK01` 因本次明确任务编号顺延 |
 
 ## 更新模板

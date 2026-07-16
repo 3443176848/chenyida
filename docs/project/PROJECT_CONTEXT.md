@@ -88,7 +88,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 的 Material V2 非生产数据、服务、API 与前端基线，以及 Phase 2 Material Import Batch Foundation 非生产实现。`PHASE2-TASK03` 已完成 Excel/CSV Parser、原始行隔离发布、Outbox、字段 Mapping、OpenAPI、流程和 `0005` 的书面设计，全部决定与资源上限仍为 `PROPOSED`；没有实施 Parser、Schema、Migration、Queue、API 或部署。下一步必须先由项目负责人回复“规格确认”，再另行授权任何非生产实现；生产仍为旧版本。
+当前已完成 Phase 1 的 Material V2 非生产数据、服务、API 与前端基线、Phase 2 Material Import Batch/Parser/Mapping/Catalog/Workspace，以及 Phase 3 Normalization & Staging V1 非生产实现。`PHASE3-TASK02` 已批准 16 项决定并实现独立 run、行快照、Issue、Outbox/租约、原子发布、五个 API 和 `0006` 隔离迁移；没有创建 Material Draft 或正式物料，也没有迁移或部署生产。生产仍为旧版本，分类、匹配、Draft 与任何生产动作必须另行授权。
 
 ## 恢复上下文检查清单
 

@@ -44,10 +44,12 @@ type BatchRow = {
   id: number;
   batch_no: string;
   source_kind: "XLSX" | "CSV";
-  status: "CREATED" | "UPLOAD_PENDING" | "FILE_READY" | "QUEUED_FOR_PARSING" | "PARSING" | "PARSED" | "AWAITING_MAPPING" | "MAPPING_CONFIRMED" | "RECONCILIATION_REQUIRED" | "FAILED" | "CANCELLED";
+  status: "CREATED" | "UPLOAD_PENDING" | "FILE_READY" | "QUEUED_FOR_PARSING" | "PARSING" | "PARSED" | "AWAITING_MAPPING" | "MAPPING_CONFIRMED" | "QUEUED_FOR_NORMALIZATION" | "NORMALIZING" | "NORMALIZED" | "RECONCILIATION_REQUIRED" | "FAILED" | "CANCELLED";
   retry_of_batch_id: number | null;
   created_by: string;
   current_version: number;
+  current_parse_run_id?: number | null;
+  current_normalization_run_id?: number | null;
   file_count: number;
   total_rows: number;
   accepted_rows: number;
@@ -859,14 +861,19 @@ export async function cancelMaterialImportBatch(
   const batch = await batchById(dependencies.database, input.batchId);
   if (!batch || (!input.canReadAny && batch.created_by !== input.user.username)) throw new MaterialImportServiceError("IMPORT_BATCH_NOT_FOUND", "导入批次不存在", 404);
   if (batch.current_version !== expectedVersion) throw new MaterialImportServiceError("IMPORT_BATCH_VERSION_CONFLICT", "批次版本已变化", 409, batch.current_version);
-  if (!new Set(["CREATED", "UPLOAD_PENDING", "FILE_READY", "QUEUED_FOR_PARSING", "PARSING"]).has(batch.status)) throw new MaterialImportServiceError("IMPORT_BATCH_STATE_INVALID", "当前批次状态不允许取消", 409);
+  if (!new Set(["CREATED", "UPLOAD_PENDING", "FILE_READY", "QUEUED_FOR_PARSING", "PARSING", "QUEUED_FOR_NORMALIZATION", "NORMALIZING"]).has(batch.status)) throw new MaterialImportServiceError("IMPORT_BATCH_STATE_INVALID", "当前批次状态不允许取消", 409);
+  const normalizationCancel = batch.status === "QUEUED_FOR_NORMALIZATION" || batch.status === "NORMALIZING";
+  const restorePublishedNormalization = normalizationCancel && batch.current_normalization_run_id !== null && batch.current_normalization_run_id !== undefined;
+  const cancellationStatus = restorePublishedNormalization ? "NORMALIZED" as const : "CANCELLED" as const;
   const file = await fileByBatch(dependencies.database, input.batchId);
   const operationId = idem?.operation_id ?? crypto.randomUUID();
   const timestamp = nowText(clock);
   const rawUntil = retentionFrom(timestamp, RAW_RETENTION_DAYS);
   const recordUntil = retentionFrom(timestamp, RECORD_RETENTION_DAYS);
-  const cancelled = { ...batch, status: "CANCELLED" as const, current_version: expectedVersion + 1, cancelled_at: timestamp, terminal_at: timestamp, raw_data_retention_until: rawUntil, record_retention_until: recordUntil, updated_at: timestamp };
-  const cancelledFile = file ? { ...file, storage_status: file.storage_status === "STORED" ? "DELETE_PENDING" as const : file.storage_status, retention_until: rawUntil, updated_at: timestamp } : null;
+  const cancelled = restorePublishedNormalization
+    ? { ...batch, status: cancellationStatus, current_version: expectedVersion + 1, updated_at: timestamp }
+    : { ...batch, status: cancellationStatus, current_version: expectedVersion + 1, cancelled_at: timestamp, terminal_at: timestamp, raw_data_retention_until: rawUntil, record_retention_until: recordUntil, updated_at: timestamp };
+  const cancelledFile = !normalizationCancel && file ? { ...file, storage_status: file.storage_status === "STORED" ? "DELETE_PENDING" as const : file.storage_status, retention_until: rawUntil, updated_at: timestamp } : file;
   const payload = { data: { batch: batchProjection(cancelled), file: fileProjection(cancelledFile) } };
   const leaseDigest = await sha256(`${operationId}:lease`);
   const statements = [];
@@ -877,20 +884,30 @@ export async function cancelMaterialImportBatch(
   if (parserSchemaAvailable) statements.push(
     dependencies.database.prepare(`UPDATE material_import_parse_runs SET run_status='CANCELLED',completed_at=?,lease_token_digest=NULL,lease_expires_at=NULL,heartbeat_at=NULL,updated_at=? WHERE batch_id=? AND run_status IN ('QUEUED','RUNNING','STAGED','PUBLISHING')`).bind(timestamp, timestamp, input.batchId),
   );
-  statements.push(
-    dependencies.database.prepare(`UPDATE material_import_batches SET status='CANCELLED',current_version=current_version+1,cancelled_by=?,cancelled_at=?,terminal_at=?,raw_data_retention_until=?,record_retention_until=?,updated_at=? WHERE id=? AND current_version=? AND status IN ('CREATED','UPLOAD_PENDING','FILE_READY','QUEUED_FOR_PARSING','PARSING')`).bind(input.user.username, timestamp, timestamp, rawUntil, recordUntil, timestamp, input.batchId, expectedVersion),
-  );
-  if (file) statements.push(dependencies.database.prepare(`UPDATE material_import_files SET storage_status=CASE WHEN storage_status='STORED' THEN 'DELETE_PENDING' ELSE storage_status END,retention_until=?,updated_at=? WHERE id=?`).bind(rawUntil, timestamp, file.id));
-  statements.push(
-    dependencies.database.prepare(`INSERT INTO material_import_events(batch_id,event_type,actor_type,actor_identifier,previous_status,new_status,request_id,safe_details_json,created_at) VALUES((SELECT CASE WHEN status='CANCELLED' AND current_version=? THEN id ELSE NULL END FROM material_import_batches WHERE id=?),'BATCH_CANCELLED','USER',?,?, 'CANCELLED',?,json_object('reason_code',?),?)`).bind(expectedVersion + 1, input.batchId, input.user.username, batch.status, input.requestId, reasonCode, timestamp),
-  );
-  if (file?.storage_status === "STORED") statements.push(dependencies.database.prepare(`INSERT INTO material_import_events(batch_id,event_type,actor_type,request_id,safe_details_json,created_at) VALUES(?,'FILE_DELETE_REQUESTED','SYSTEM',?,json_object('file_id',?),?)`).bind(input.batchId, input.requestId, file.id, timestamp));
+  if (normalizationCancel) {
+    statements.push(
+      dependencies.database.prepare("DELETE FROM material_import_normalization_issues WHERE normalization_run_id IN (SELECT id FROM material_import_normalization_runs WHERE batch_id=? AND run_status IN ('QUEUED','RUNNING','STAGED','PUBLISHING'))").bind(input.batchId),
+      dependencies.database.prepare("DELETE FROM material_import_normalized_rows WHERE normalization_run_id IN (SELECT id FROM material_import_normalization_runs WHERE batch_id=? AND run_status IN ('QUEUED','RUNNING','STAGED','PUBLISHING'))").bind(input.batchId),
+      dependencies.database.prepare("UPDATE material_import_normalization_runs SET run_status='CANCELLED',completed_at=?,lease_token_digest=NULL,lease_expires_at=NULL,heartbeat_at=NULL,updated_at=? WHERE batch_id=? AND run_status IN ('QUEUED','RUNNING','STAGED','PUBLISHING')").bind(timestamp, timestamp, input.batchId),
+      dependencies.database.prepare("UPDATE material_import_batches SET status=?,current_version=current_version+1,cancelled_by=CASE WHEN ?='CANCELLED' THEN ? ELSE NULL END,cancelled_at=CASE WHEN ?='CANCELLED' THEN ? ELSE NULL END,terminal_at=CASE WHEN ?='CANCELLED' THEN ? ELSE NULL END,raw_data_retention_until=CASE WHEN ?='CANCELLED' THEN ? ELSE NULL END,record_retention_until=CASE WHEN ?='CANCELLED' THEN ? ELSE NULL END,updated_at=? WHERE id=? AND current_version=? AND status IN ('QUEUED_FOR_NORMALIZATION','NORMALIZING')").bind(cancellationStatus, cancellationStatus, input.user.username, cancellationStatus, timestamp, cancellationStatus, timestamp, cancellationStatus, rawUntil, cancellationStatus, recordUntil, timestamp, input.batchId, expectedVersion),
+      dependencies.database.prepare("INSERT INTO material_import_events(batch_id,event_type,actor_type,actor_identifier,previous_status,new_status,request_id,safe_details_json,created_at) VALUES((SELECT CASE WHEN status=? AND current_version=? THEN id ELSE NULL END FROM material_import_batches WHERE id=?),'NORMALIZATION_CANCELLED','USER',?,?,?,?,json_object('reason_code',?),?)").bind(cancellationStatus, expectedVersion + 1, input.batchId, input.user.username, batch.status, cancellationStatus, input.requestId, reasonCode, timestamp),
+    );
+  } else {
+    statements.push(
+      dependencies.database.prepare(`UPDATE material_import_batches SET status='CANCELLED',current_version=current_version+1,cancelled_by=?,cancelled_at=?,terminal_at=?,raw_data_retention_until=?,record_retention_until=?,updated_at=? WHERE id=? AND current_version=? AND status IN ('CREATED','UPLOAD_PENDING','FILE_READY','QUEUED_FOR_PARSING','PARSING')`).bind(input.user.username, timestamp, timestamp, rawUntil, recordUntil, timestamp, input.batchId, expectedVersion),
+    );
+    if (file) statements.push(dependencies.database.prepare(`UPDATE material_import_files SET storage_status=CASE WHEN storage_status='STORED' THEN 'DELETE_PENDING' ELSE storage_status END,retention_until=?,updated_at=? WHERE id=?`).bind(rawUntil, timestamp, file.id));
+    statements.push(
+      dependencies.database.prepare(`INSERT INTO material_import_events(batch_id,event_type,actor_type,actor_identifier,previous_status,new_status,request_id,safe_details_json,created_at) VALUES((SELECT CASE WHEN status='CANCELLED' AND current_version=? THEN id ELSE NULL END FROM material_import_batches WHERE id=?),'BATCH_CANCELLED','USER',?,?, 'CANCELLED',?,json_object('reason_code',?),?)`).bind(expectedVersion + 1, input.batchId, input.user.username, batch.status, input.requestId, reasonCode, timestamp),
+    );
+    if (file?.storage_status === "STORED") statements.push(dependencies.database.prepare(`INSERT INTO material_import_events(batch_id,event_type,actor_type,request_id,safe_details_json,created_at) VALUES(?,'FILE_DELETE_REQUESTED','SYSTEM',?,json_object('file_id',?),?)`).bind(input.batchId, input.requestId, file.id, timestamp));
+  }
   statements.push(
     dependencies.database.prepare(`UPDATE material_import_idempotency SET state='COMPLETED',lease_expires_at=NULL,status_code=200,response_json=?,updated_at=?,expires_at=? WHERE username=? AND route_scope=? AND key_digest=? AND state='PENDING'`).bind(JSON.stringify(payload), timestamp, nowSeconds(clock) + IDEMPOTENCY_TTL_SECONDS, input.user.username, routeScope, keyDigest),
     auditStatement(dependencies.database, { username: input.user.username, action: "CANCEL_IMPORT_BATCH", detail: `batch:${input.batchId}`, requestId: input.requestId, operationId, keyDigest, result: "success", timestamp }),
   );
   await dependencies.database.batch(statements);
-  if (file?.storage_status === "STORED") await bestEffortDelete(dependencies, input.batchId, file.id, file.object_key, input.requestId);
+  if (!normalizationCancel && file?.storage_status === "STORED") await bestEffortDelete(dependencies, input.batchId, file.id, file.object_key, input.requestId);
   return { status: 200, payload };
 }
 
