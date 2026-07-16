@@ -4,12 +4,14 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 import { Miniflare } from "miniflare";
 
+import { splitD1MigrationStatements } from "../scripts/d1-migration-statements.mjs";
+
 const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
 let databaseSequence = 0;
 
 async function runSqlFile(DB, relativePath) {
   const sql = await readFile(join(siteRoot, relativePath), "utf8");
-  const statements = sql.split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean);
+  const statements = splitD1MigrationStatements(sql);
   await DB.batch(statements.map((statement) => DB.prepare(statement)));
 }
 
@@ -126,7 +128,7 @@ test("Material draft lifecycle 0003 preflight fails without recoverable submissi
   }
 });
 
-test("Material draft lifecycle 0003 supports guarded empty down and re-up", { timeout: 30_000 }, async () => {
+test("0003 Down remains green with guarded empty down and re-up", { timeout: 30_000 }, async () => {
   const context = await fixture();
   try {
     await runSqlFile(context.DB, "drizzle/0003_material_draft_lifecycle.sql");

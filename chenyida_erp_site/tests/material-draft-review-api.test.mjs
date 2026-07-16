@@ -10,6 +10,7 @@ import {
   MATERIAL_ROLE_PERMISSIONS,
   projectCategoryAttributeSchema,
 } from "../app/lib/material-api/index.ts";
+import { splitD1MigrationStatements } from "../scripts/d1-migration-statements.mjs";
 
 const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
 const fixedNow = new Date("2026-07-14T08:00:00.000Z");
@@ -17,7 +18,7 @@ let databaseSequence = 0;
 
 async function applyMigration(DB, name) {
   const sql = await readFile(join(siteRoot, "drizzle", name), "utf8");
-  await DB.batch(sql.split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean).map((part) => DB.prepare(part)));
+  await DB.batch(splitD1MigrationStatements(sql).map((part) => DB.prepare(part)));
 }
 
 async function seed(DB) {

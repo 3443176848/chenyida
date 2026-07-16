@@ -10,6 +10,7 @@ import { MemoryMaterialImportObjectStore } from "../app/lib/material-import/obje
 import { MATERIAL_IMPORT_PARSER_VERSION } from "../app/lib/material-import/parser-model.ts";
 import { MaterialImportParserTaskHandler, queueMaterialImportParse } from "../app/lib/material-import/parser-service.ts";
 import { CloudflareQueueMaterialImportTaskScheduler, InMemoryMaterialImportTaskScheduler, MaterialImportOutboxDispatcher, consumeMaterialImportQueueMessage } from "../app/lib/material-import/task-scheduler.ts";
+import { splitD1MigrationStatements } from "../scripts/d1-migration-statements.mjs";
 
 const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
 const fixedNow = new Date("2026-07-16T02:00:00.000Z");
@@ -17,7 +18,7 @@ let sequence = 0;
 
 async function apply(DB, migration) {
   const sql = await readFile(join(siteRoot, "drizzle", migration), "utf8");
-  await DB.batch(sql.split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean).map((statement) => DB.prepare(statement)));
+  await DB.batch(splitD1MigrationStatements(sql).map((statement) => DB.prepare(statement)));
 }
 
 async function fixture() {

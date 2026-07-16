@@ -4,6 +4,16 @@
 
 ## 2026-07-16
 
+### PHASE2-MAINT-01 修复 - `fix: ignore comment-only rollback statements`
+
+- Git Commit：共享 breakpoint-aware Migration statement 过滤、隔离回归测试和治理文档在独立维护提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `f965ddb`。
+- 根因：Migration 测试 helper 按既有 breakpoint 分割后仅执行 `trim().filter(Boolean)`；0005 protected Down 尾部 `-- End of protected 0005 rollback.` 非空，因此被作为没有可执行 SQL 的 D1 statement 提交。
+- 修复：在共享测试/开发辅助层识别空白、`--`、`/* ... */`、单/双引号和成对引号转义，只过滤没有可执行内容的片段；提交 D1 的仍是未修改原片段。未闭合字符串或块注释 fail-closed 保留给 D1 报错；不支持 SQLite 本身不支持的嵌套块注释。
+- 复用：0003、0004、0005 Down 测试和仓库内确认使用相同 breakpoint 语义的 Migration 夹具统一调用共享辅助器；未按分号切分，也未针对 0005 特判。
+- 回归：新增 10 个隔离 D1 用例覆盖尾部行注释、块注释、空白、SQL 前后注释、字符串内注释标记/分号、混合注释和异常片段 fail-closed；0003、0004、0005 Down 专项均通过。
+- 验证：Migration 专项 20/20；build 与全量 Node 288/288；lint 0 error/1 个既有 warning；隔离 API smoke、4 份 OpenAPI、Drizzle 34 表无漂移、凭证扫描、临时 SQLite 完整基线和范围检查通过。
+- 边界：0003/0004/0005 Up/Down、Schema、Drizzle snapshot/journal、API 和生产配置均未修改；0005 尾部保护说明保留，Migration 业务语义不变；未连接、迁移或部署生产环境。
+
 ### PHASE2-TASK05 设计 - `docs: design material import workspace ui`
 
 - Git Commit：Material Import Workspace UI V1 的三份正式设计文档与项目治理更新在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `73435a3`。

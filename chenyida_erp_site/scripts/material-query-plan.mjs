@@ -3,6 +3,8 @@ import { join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { Miniflare } from "miniflare";
 
+import { splitD1MigrationStatements } from "./d1-migration-statements.mjs";
+
 const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
 const requestedEnvironment = String(process.env.ERP_ENV || "test").toLowerCase();
 if (requestedEnvironment !== "test") {
@@ -11,7 +13,7 @@ if (requestedEnvironment !== "test") {
 
 async function applyMigration(DB, name) {
   const sql = await readFile(join(siteRoot, "drizzle", name), "utf8");
-  await DB.batch(sql.split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean).map((part) => DB.prepare(part)));
+  await DB.batch(splitD1MigrationStatements(sql).map((part) => DB.prepare(part)));
 }
 
 async function seedSynthetic(DB, scale) {

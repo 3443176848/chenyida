@@ -14,6 +14,7 @@ import {
   cleanupExpiredMaterialImportObjects,
   MemoryMaterialImportObjectStore,
 } from "../app/lib/material-import/index.ts";
+import { splitD1MigrationStatements } from "../scripts/d1-migration-statements.mjs";
 
 const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
 const fixedNow = new Date("2026-07-15T08:00:00.000Z");
@@ -87,7 +88,7 @@ function xlsxBytes(extraEntries = []) {
 
 async function applyMigration(DB, name) {
   const sql = await readFile(join(siteRoot, "drizzle", name), "utf8");
-  const statements = sql.split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean);
+  const statements = splitD1MigrationStatements(sql);
   await DB.batch(statements.map((statement) => DB.prepare(statement)));
 }
 

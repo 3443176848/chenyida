@@ -4,12 +4,14 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 import { Miniflare } from "miniflare";
 
+import { splitD1MigrationStatements } from "../scripts/d1-migration-statements.mjs";
+
 const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
 let sequence = 0;
 
 async function runSqlFile(DB, relativePath) {
   const sql = await readFile(join(siteRoot, relativePath), "utf8");
-  const statements = sql.split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean);
+  const statements = splitD1MigrationStatements(sql);
   await DB.batch(statements.map((statement) => DB.prepare(statement)));
 }
 
@@ -60,7 +62,7 @@ test("0005 application rolls back when a later statement fails", { timeout: 30_0
   const context = await fixture();
   try {
     const sql = await readFile(join(siteRoot, "drizzle/0005_material_import_parser_mapping.sql"), "utf8");
-    const statements = sql.split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean);
+    const statements = splitD1MigrationStatements(sql);
     statements.splice(20, 0, "CREATE TABLE material_import_parse_runs(id INTEGER)");
     await assert.rejects(context.DB.batch(statements.map((statement) => context.DB.prepare(statement))));
     assert.ok(await context.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='material_import_rows'").first());
@@ -70,7 +72,7 @@ test("0005 application rolls back when a later statement fails", { timeout: 30_0
   }
 });
 
-test("0005 protected Down preserves legacy rows and permits re-upgrade", { timeout: 30_000 }, async () => {
+test("protected 0005 Down succeeds and preserves legacy rows for re-upgrade", { timeout: 30_000 }, async () => {
   const context = await fixture();
   try {
     await insertReadyBatch(context.DB);

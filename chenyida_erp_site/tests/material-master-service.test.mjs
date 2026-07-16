@@ -14,6 +14,7 @@ import {
   createD1MaterialValidationRepository,
   createMaterialValidationService,
 } from "../app/lib/material-validation/index.ts";
+import { splitD1MigrationStatements } from "../scripts/d1-migration-statements.mjs";
 
 const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
 const now = "2026-07-12T08:00:00.000Z";
@@ -21,11 +22,7 @@ let databaseSequence = 0;
 
 async function applyMigration(DB, name) {
   const sql = await readFile(join(siteRoot, "drizzle", name), "utf8");
-  const statements = sql
-    .split("--> statement-breakpoint")
-    .map((statement) => statement.trim())
-    .filter(Boolean)
-    .map((statement) => DB.prepare(statement));
+  const statements = splitD1MigrationStatements(sql).map((statement) => DB.prepare(statement));
   await DB.batch(statements);
 }
 

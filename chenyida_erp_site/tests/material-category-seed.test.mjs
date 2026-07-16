@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { Miniflare } from "miniflare";
 import { MATERIAL_ATTRIBUTES, MATERIAL_CATEGORIES, MATERIAL_CATEGORY_BINDINGS, MATERIAL_CATEGORY_CODE_PATTERN, validateMaterialCategorySeed } from "../seeds/material-category-v1.ts";
+import { splitD1MigrationStatements } from "../scripts/d1-migration-statements.mjs";
 
 const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
 const runner = join(siteRoot, "scripts", "seed-material-categories.ts");
@@ -36,7 +37,7 @@ test("category seed is local-only, transactional and idempotent", { timeout: 120
   const root = await mkdtemp(join(tmpdir(), "chenyida-category-seed-test-")); const persistTo = join(root, "d1");
   try {
     const config = join(root, "wrangler.jsonc"); await writeFile(config, JSON.stringify({ name: "category-seed-test", compatibility_date: "2026-05-22", d1_databases: [{ binding: "DB", database_name: "category-seed-test", database_id: "local-test-only" }] }), "utf8");
-    await withDb(persistTo, async (DB) => { for (const name of ["0000_far_nightmare.sql", "0001_material_master_v2.sql"]) { const statements = (await readFile(join(siteRoot, "drizzle", name), "utf8")).split("--> statement-breakpoint").map((sql) => sql.trim()).filter(Boolean); await DB.batch(statements.map((sql) => DB.prepare(sql))); } });
+    await withDb(persistTo, async (DB) => { for (const name of ["0000_far_nightmare.sql", "0001_material_master_v2.sql"]) { const statements = splitD1MigrationStatements(await readFile(join(siteRoot, "drizzle", name), "utf8")); await DB.batch(statements.map((sql) => DB.prepare(sql))); } });
     const first = run(["--config", config, "--persist-to", persistTo]); assert.match(first, /material-category-v1/); assert.match(first, /inserted/);
     const counts1 = await withDb(persistTo, (DB) => DB.prepare("SELECT (SELECT count(*) FROM material_categories) categories,(SELECT count(*) FROM material_attribute_definitions) attributes,(SELECT count(*) FROM material_category_attributes) bindings").first());
     assert.deepEqual(counts1, { categories: MATERIAL_CATEGORIES.length, attributes: MATERIAL_ATTRIBUTES.length, bindings: MATERIAL_CATEGORY_BINDINGS.reduce((sum, item) => sum + item.attributeCodes.length, 0) });

@@ -4,12 +4,14 @@ import { join, resolve } from "node:path";
 import test from "node:test";
 import { Miniflare } from "miniflare";
 
+import { splitD1MigrationStatements } from "../scripts/d1-migration-statements.mjs";
+
 const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
 let sequence = 0;
 
 async function runSqlFile(DB, relativePath) {
   const sql = await readFile(join(siteRoot, relativePath), "utf8");
-  const statements = sql.split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean);
+  const statements = splitD1MigrationStatements(sql);
   await DB.batch(statements.map((statement) => DB.prepare(statement)));
 }
 
@@ -52,7 +54,7 @@ test("Material import 0004 upgrades an existing database and enforces relational
   }
 });
 
-test("Material import 0004 supports guarded empty down and re-up", { timeout: 30_000 }, async () => {
+test("0004 Down remains green with guarded empty down and re-up", { timeout: 30_000 }, async () => {
   const context = await fixture();
   try {
     await runSqlFile(context.DB, "drizzle/0004_material_import_batch_foundation.sql");
@@ -71,7 +73,7 @@ test("Material import 0004 batch application rolls back on a later statement fai
   const context = await fixture();
   try {
     const sql = await readFile(join(siteRoot, "drizzle/0004_material_import_batch_foundation.sql"), "utf8");
-    const statements = sql.split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean);
+    const statements = splitD1MigrationStatements(sql);
     statements.splice(2, 0, "CREATE TABLE material_import_batches(id INTEGER)");
     await assert.rejects(context.DB.batch(statements.map((statement) => context.DB.prepare(statement))));
     assert.equal(await context.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='material_import_batches'").first(), null);
