@@ -1,20 +1,20 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-16（Asia/Shanghai）
+最后更新时间：2026-07-17（Asia/Shanghai）
 
 ## 自动统计摘要
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 约 40,000 行 | Site 的 `app/db/drizzle/tests/scripts` 运行时、迁移、脚本和测试源码；不含依赖、构建产物和文档 |
-| 源码文件 | 110 | Site 的 `app/db/drizzle/tests/scripts` 口径；TASK07 新增 Registry、Catalog Service 与专项测试 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK07 修改 Catalog/Mapping 服务与治理文档；未修改 Schema、Migration、Metadata 数据、前端、hosting 或本地旧版业务逻辑 |
+| 总代码量 | 约 43,000 行 | Site 的 `app/db/drizzle/tests/scripts` 运行时、迁移、脚本和测试源码；不含依赖、构建产物和文档 |
+| 源码文件 | 124 | Site 的 `app/db/drizzle/tests/scripts` 口径；TASK08 新增 Import Workspace 组件、Worker/轮询模块和专项测试 |
+| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK08 仅实施 Import Workspace 前端、共享浏览器 Client、依赖锁、专项测试和治理文档；未修改 Schema、Migration、Metadata、hosting 或本地旧版业务逻辑 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 60（本地+开发 schema） | 本地 SQLite 26 张，Site 开发 schema 34 张；`0005` 仅在隔离 D1 测试，未执行生产迁移 |
 | 在线 API 路径 | 81 | 新增批次作用域 Mapping Target Catalog；生产公开站点尚未部署开发基线 |
-| 页面入口 | 11 | 既有 9 个入口加 `/materials/review` 与 `/materials/:materialId/review` |
-| 测试与安全检查文件 | 29 | TASK07 新增 51 项 Catalog 契约/隔离 D1 测试；全量 Node 339/339 |
+| 页面入口 | 14 | 既有 11 个入口加 3 条 Material Import 路由 |
+| 测试文件 | 24 | TASK08 新增 100 项 Import UI 专项；全量 Node 440/440 |
 
 ## 当前版本与环境
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE2-TASK07` 开始时，根仓库 `main` 位于 `434f107`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异覆盖 Catalog/Mapping 服务、专项测试、OpenAPI 与项目治理文档；未修改 production binding、hosting、前端、Schema、Migration、Metadata 数据或本地旧版业务逻辑。
+`PHASE2-TASK08` 开始时，根仓库 `main` 位于 `eff8ca9`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异覆盖 Import Workspace 前端、共享浏览器 Client、固定 SHA 依赖、100 项专项测试与项目治理文档；未修改 production binding、hosting、后端 API route/service、Schema、Migration、Metadata 数据或本地旧版业务逻辑。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE2-TASK07` 计划提交消息为 `feat: add import mapping target catalog`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
+`PHASE2-TASK08` 计划提交消息为 `feat: add material import workspace ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
 
 实时状态必须使用：
 
@@ -48,6 +48,25 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE2-TASK08 Material Import Workspace UI V1 非生产实现
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 16 项正式决定已批准并实施；Catalog 与性能/可访问性门禁均通过 |
+| 页面路由 | PASS | `/materials/imports`、`/materials/imports/new`、`/materials/imports/:batchId`；权限入口与单状态工作区 |
+| 文件/SHA/XHR | PASS | 10 MiB 单文件预检；`@noble/hashes@2.2.0` MIT、1 MiB 分块 Worker；单 file part XHR、浏览器 boundary、真实进度 |
+| 状态/恢复 | PASS | 服务端状态权威、URL allowlist、独立 Key/不可变载荷、RESULT_UNKNOWN、重复新批次、2/5/10 轮询、Retry-After、取消竞争 |
+| Rows/Mapping | PASS | 完整 256 列、20/50 服务端分页、Sheet/Header、动态 Catalog、保存/preview/confirm 新鲜度、confirmed 只读 |
+| UI 专项 | PASS | UI-001—UI-100 全部通过；含 10 MiB SHA 分块边界、权限、URL、错误、键盘与焦点 |
+| Playwright 门禁 | PASS | Chromium 1366×768：50×256 + 256 Mapping，初渲染 1751 ms、翻页 1083 ms、横滚 197 ms、30,285 DOM、123,423,127 bytes JS heap；末列 IV、sticky、语义、键盘、700 窄屏和 0 console error/warning通过 |
+| Site 全量 | PASS | build 成功，Node 440/440；首次并行高负载触发历史迁移 120 秒超时，串行全量通过 |
+| lint | PASS | 0 error；1 个任务外既有 `build_material_workbook.mjs` unused warning |
+| API/OpenAPI | PASS | 隔离 API smoke；仓库 5 份 OpenAPI 3.1、434 个本地引用、Batch 6 个操作通过 |
+| Drizzle | PASS | 34 tables，`No schema changes, nothing to migrate`；未创建 0006 |
+| 凭证/本地基线 | PASS | 289 文件凭证扫描；临时 SQLite self-test、smoke、go-live 通过并清理 |
+| 生产影响 | NONE | 未连接 production/公共 URL/远程 D1/R2/Queue，未创建 binding/Cron、迁移、修改 hosting 或部署 |
+| 已知限制 | RECORDED | page_size=100 未开放；File、unknown 操作与 preview 只在页面内存；远程生产容量/冷启动未验收 |
 
 ## PHASE2-TASK07 Mapping Target Catalog V1 非生产实现
 
@@ -65,7 +84,7 @@ git -C chenyida_erp_site status --short
 | Drizzle | PASS | `db/schema.ts`、`drizzle/`、snapshot/journal 无差异；未创建 0006 |
 | 本地基线 | PASS | 临时 SQLite 环境守卫 4/4、self-test、smoke、backup/restore、go-live 通过并清理 |
 | 生产影响 | NONE | 未连接 production/公共 URL/远程 D1/R2/Queue，未创建 binding/Cron、迁移、修改 hosting 或部署 |
-| UI 状态 | NOT IMPLEMENTED | Catalog 门禁已解除，但 Import Workspace UI 仍受 50×256 性能与可访问性门禁，本任务未开始前端 |
+| UI 状态 | IMPLEMENTED BY PHASE2-TASK08 | Catalog 门禁已被真实 Workspace 使用；50×256 性能与可访问性门禁通过 |
 
 ## PHASE2-TASK06 Mapping Target Catalog V1 书面设计基线
 
@@ -107,9 +126,9 @@ git -C chenyida_erp_site status --short
 | 创建/上传 | DESIGNED | 客户端有限预检、Worker 增量 SHA、确认后创建、共享 Client 内 XHR、真实字节进度、独立幂等/RESULT_UNKNOWN、重复文件新批次恢复 |
 | 解析/取消 | DESIGNED | parse 前重读与独立 Key、2/5/10 秒轮询、网络/429 退避、粗粒度真实状态、五状态协作式取消与 CAS 竞争 |
 | Sheet/Rows/Header | DESIGNED | Sheet 可见性、真实 Rows 分页、稀疏 cell/DATE/FORMULA/ERROR、原始行与 Mapping 样本分离、Sheet/Header 随 Mapping 保存 |
-| Mapping | DESIGNED / UI NOT IMPLEMENTED | 三列编辑、显式保存、已保存版本 preview、当前页面最新 preview 门禁、服务端 confirm 最终裁决、confirmed 只读；Catalog 依赖已解除，UI 仍受性能与可访问性门禁限制 |
+| Mapping | IMPLEMENTED BY PHASE2-TASK08 | 三列编辑、显式保存、已保存版本 preview、当前页面最新 preview 门禁、服务端 confirm 最终裁决、confirmed 只读已实现 |
 | Catalog 门禁 | RESOLVED BY PHASE2-TASK07 | 已实现批次作用域动态 Catalog 与共享 Registry/Snapshot/digest；仍禁止 seed、前端硬编码或历史 Mapping 绕过 |
-| 表格门禁 | PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED | 50×256 的渲染、翻页、横滚、sticky、键盘、DOM、内存、读屏、1366/窄屏尚未实施验收，不虚构通过 |
+| 表格门禁 | PASSED BY PHASE2-TASK08 | 50×256 的渲染、翻页、横滚、sticky、键盘、DOM、内存、语义、1366/窄屏均有 Playwright 记录 |
 | 线框/矩阵/测试设计 | COMPLETE | 覆盖 22 个指定状态、集中主状态/URL/preparation/unknown/dirty/权限/门禁矩阵，100 个唯一未来实施测试编号 |
 | 文档检查 | PASS | 100 项编号、16 项决定、22 状态结构、无 TBD/TODO 占位、`git diff --check` 与 docs-only 范围在提交前复核 |
 | Site 静态/安全 | PASS | lint 0 error/1 个既有 warning；环境守卫 6/6；4 份 OpenAPI YAML 解析；268 文件凭证扫描；隔离 API smoke 通过 |

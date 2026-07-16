@@ -43,8 +43,9 @@
 | PHASE2-MAINT-01 | 修复 0005 Protected Down 注释语句测试失败 | DONE | Codex（实施）、项目负责人（共享 breakpoint-aware 过滤方案确认） | 2026-07-16 | 2026-07-16 | PHASE2-TASK05 | 在 Migration 测试共享层按既有 breakpoint 分割后忽略空白及纯注释片段，原样保留可执行 SQL；覆盖字符串/注释边界和 fail-closed 异常片段，统一复用到 0003/0004/0005 等同语义夹具；全量 Node 288/288，未修改 Migration、Schema、API 或生产配置 |
 | PHASE2-TASK06 | 设计 Material Import Mapping Target Catalog V1 | DONE | Codex（设计）、项目负责人（由 TASK07 指令确认） | 2026-07-16 | 2026-07-16 | PHASE2-TASK05、PHASE2-MAINT-01 | 完成只读批次作用域 Catalog 正式规格、OpenAPI 与 43 项未来实施测试；审计确认现有 digest 缺少单位/default/特殊目标等语义，提出共享 Target Registry + Metadata Snapshot 前置重构；12 项决定由 TASK07 批准 |
 | PHASE2-TASK07 | 实现 Material Import Mapping Target Catalog V1 | DONE | Codex（实施）、项目负责人（12 项决定与非生产范围批准） | 2026-07-16 | 2026-07-16 | PHASE2-TASK06 | 实现批次作用域只读 Catalog、共享 Registry/Snapshot/digest、运行时 D1 ACTIVE 属性、有界搜索/cursor、read+map/行级可见性、读取限流和安全审计；Mapping 准备/保存/preview/confirm 统一；专项 51/51、全量 Node 339/339、lint/API/OpenAPI/凭证/临时 SQLite 通过；未改 Schema/Migration/前端或生产环境 |
+| PHASE2-TASK08 | 实现 Material Import Workspace UI V1 | DONE | Codex（实施）、项目负责人（16 项决定与非生产 UI 范围批准） | 2026-07-17 | 2026-07-17 | PHASE2-TASK07 | 完成三条导入路由、Worker SHA、共享 XHR、列表/上传/解析/轮询、Sheet/Rows/Header、Catalog/Mapping 保存预览确认；UI-001—UI-100、50×256 Playwright 门禁、Node 440/440、lint/API/OpenAPI/Drizzle/凭证/临时 SQLite 通过；未修改 API/Schema/Migration、生产资源、迁移或部署 |
 
-当前没有 `DOING` 任务。`PHASE2-TASK07` 已完成 Catalog 非生产实现并解除 `BLOCKED_BY_MAPPING_TARGET_CATALOG`；Import Workspace UI 尚未实施，仍受 50×256 性能/可访问性门禁限制。生产 R2/Queue、生产 D1 migration、Cron、部署、清洗/匹配/Material Draft、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
+当前没有 `DOING` 任务。`PHASE2-TASK08` 已完成非生产 Import Workspace UI 和 50×256 性能/可访问性门禁。生产 R2/Queue、生产 D1 migration、Cron、部署、清洗/匹配/Material Draft、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
 
 ## Phase 0 待办
 

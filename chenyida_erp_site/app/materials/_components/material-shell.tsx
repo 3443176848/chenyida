@@ -62,6 +62,7 @@ export function MaterialShell({ children }: { children: ReactNode }) {
           <Link href="/" className="mm-nav">ERP 总览</Link>
           <Link href="/materials" className="mm-nav active" aria-current="page">物料主数据</Link>
           <Link href="/materials" className="mm-nav mm-nav-child">物料列表</Link>
+          {session?.user?.permissions?.includes("material.import.read") ? <Link href="/materials/imports" className="mm-nav mm-nav-child">物料导入</Link> : null}
           {session?.user?.permissions?.includes("material.review.queue") ? <Link href="/materials/review" className="mm-nav mm-nav-child">审核队列</Link> : null}
           <span className="mm-nav-section">业务模块</span>
           <Link href="/" className="mm-nav">客户与供应商</Link>

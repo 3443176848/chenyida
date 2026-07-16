@@ -1,7 +1,7 @@
 # Material Import Workspace UI V1 — 状态矩阵
 
-> Status: PROPOSED
-> 任务：PHASE2-TASK05
+> Status: APPROVED / IMPLEMENTED（非生产）
+> 规格任务：PHASE2-TASK05；实施任务：PHASE2-TASK08
 > 服务端批次状态、Mapping preparation、版本、权限与幂等结果是权威；`view` 只决定合法状态内的优先展示。
 
 ## 1. 主状态矩阵
@@ -105,8 +105,8 @@
 
 | Gate | 当前状态 | 阻断内容 | 通过证据 | 失败处置 |
 | --- | --- | --- | --- | --- |
-| BLOCKED_BY_MAPPING_TARGET_CATALOG | RESOLVED | 无；PHASE2-TASK07 已解除 Catalog 阻断，但 UI 尚未实施 | 独立只读 API、共享 Registry/Snapshot/digest、权限/行级隔离、cursor、OpenAPI、51 项专项和 Node 339/339 通过 | 未来 UI 仍不得 seed/硬编码/测试数据/历史 Mapping 绕过 |
-| PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED | REQUIRED，未验证 | 50×256 Rows 的实施验收；UI 是否开放 page_size=100 | 初渲染、翻页、横滚、sticky、展开、键盘、DOM、内存、读屏、1366、窄屏记录通过 | 停止验收，另立窗口化/轻量虚拟化任务；不截列、不引大型 Grid |
+| BLOCKED_BY_MAPPING_TARGET_CATALOG | RESOLVED / CONSUMED BY TASK08 | 无；PHASE2-TASK07 已解除 Catalog 阻断，TASK08 已接入真实批次 Catalog | 独立只读 API、共享 Registry/Snapshot/digest、权限/行级隔离、cursor、OpenAPI、51 项 Catalog 专项与 100 项 UI 专项通过 | 后续仍不得 seed/硬编码/测试数据/历史 Mapping 绕过 |
+| PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED | PASSED BY PHASE2-TASK08 | 无；page_size=100 仍未开放 | Playwright Chromium 1366×768：50×256 + 256 Mapping，初渲染 1751 ms、翻页 1083 ms、横滚 197 ms、30,285 DOM、123,423,127 bytes JS heap；sticky/键盘/语义/700 窄屏通过 | 后续若真实数据或低端设备退化，另立窗口化/轻量虚拟化任务；仍不截列、不引大型 Grid |
 
 ## 9. 稳定错误处置摘要
 

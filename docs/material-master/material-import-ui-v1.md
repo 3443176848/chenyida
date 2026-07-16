@@ -1,9 +1,9 @@
 # Material Import Workspace UI V1
 
-> 任务：PHASE2-TASK05
-> 文档状态：PROPOSED
-> 日期：2026-07-16
-> 适用范围：在线 `chenyida_erp_site` 的前端交互规格；本任务不修改运行时代码、API、数据库、迁移、R2、Queue、hosting 或生产环境。
+> 规格任务：PHASE2-TASK05；实施任务：PHASE2-TASK08
+> 文档状态：APPROVED / IMPLEMENTED（非生产）
+> 日期：2026-07-17
+> 适用范围：在线 `chenyida_erp_site` 的前端交互规格与非生产实现；实施未修改后端 API、数据库、迁移、Metadata、R2、Queue、hosting 或生产环境。
 
 ## 1. 目标与非目标
 
@@ -271,26 +271,26 @@ Stepper、状态、dirty、ERROR/WARNING 不只靠颜色。文件选择和目标
 
 ## 24. 16 项设计决定
 
-以下推荐均已形成完整设计，但在用户审阅全部交付物并明确回复“规格确认”前，状态一律保持 `PROPOSED`。
+以下 16 项推荐已由项目负责人通过 `PHASE2-TASK08` 指令批准，作为本次非生产 UI 实施约束。
 
 | # / 决定 | 可选方案 | 推荐方案与理由 | API 影响 | 前端状态影响 | 安全影响 | 可访问性影响 | 性能影响 | 实施复杂度 | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 路由与工作区 IA | 多子路由 / 单工作区 | 三条顶层路由 + 状态驱动单工作区；刷新恢复明确 | 无新增 API | view 非权威、统一恢复 | 防 URL 绕状态/权限 | 单一 Stepper 语义连续 | 少重复加载 | 中 | PROPOSED |
-| 2 创建前是否选文件 | 先建空批次 / 先选文件 | 先选、预检、SHA、确认，再建批次；减少空批次 | 调用顺序变化，契约不变 | File 身份先于创建操作 | 降低误建与重复建 | 确认点清楚 | 多一次本地哈希 | 中 | PROPOSED |
-| 3 SHA-256 | 整文件 subtle / Worker 增量 / 主线程库 | Worker + 经审计增量实现；响应且可取消 | 无 | Worker 生命周期绑定 File | 哈希非凭证，服务端复核 | 真实进度 live region | 分块、低主线程阻塞 | 中高 | PROPOSED |
-| 4 multipart transport | fetch / 共享 Client 内 XHR | 受控 XHR adapter；获得真实 upload 事件且不分裂 Client | 真实头和 multipart 不变 | 独立上传操作记录 | 复用 auth/CSRF/错误/幂等 | 可播报阶段与取消结果 | 真实事件，无伪进度 | 中 | PROPOSED |
-| 5 上传进度 | 阶段 / 精确百分比 | lengthComputable 时百分比，否则阶段文案 | 无 | send 100% 后仍等待服务端 | 不误称安全检查完成 | 文本同步表达 | 事件开销低 | 低 | PROPOSED |
-| 6 轮询节奏 | 固定 / 指数 / 分段有界 | 2s→5s→10s；网络 5/10/30s，429 Retry-After | 无 | 单 controller、active/stable | 防请求风暴 | 克制 live region | 有界请求 | 中 | PROPOSED |
-| 7 Stepper 或 Tabs | Tabs / Stepper | Stepper；能表达完成、当前、锁定、只读和失败 | 无 | 状态驱动合法步骤 | 不作为授权边界 | 状态文字不只颜色 | 可忽略 | 中 | PROPOSED |
-| 8 Rows 默认 page_size | 20 / 50 / 100 | 默认 50，UI 20/50；兼顾核对与 DOM | 使用真实分页 | 页码/size URL 化 | 不扩大数据访问 | 表格语义仍完整 | 50×256 需硬验收 | 中高 | PROPOSED |
-| 9 Mapping 布局 | 三列 / 卡片 / 矩阵 | 1366 三列，窄屏单映射单元；便于同一行核对 | 无 | dirty 以 source 为单元 | 明确错误归属 | label/description 关联 | 有界样本 | 中 | PROPOSED |
-| 10 样本数量 | 0 / 3 / 更多 | 每来源最多 3 个真实样本；足够核对且有界 | 不新增 sample API | 来自当前 Rows/preview | 纯文本、最小披露 | 类型有文字 | 不全表扫描 | 低中 | PROPOSED |
+| 1 路由与工作区 IA | 多子路由 / 单工作区 | 三条顶层路由 + 状态驱动单工作区；刷新恢复明确 | 无新增 API | view 非权威、统一恢复 | 防 URL 绕状态/权限 | 单一 Stepper 语义连续 | 少重复加载 | 中 | APPROVED |
+| 2 创建前是否选文件 | 先建空批次 / 先选文件 | 先选、预检、SHA、确认，再建批次；减少空批次 | 调用顺序变化，契约不变 | File 身份先于创建操作 | 降低误建与重复建 | 确认点清楚 | 多一次本地哈希 | 中 | APPROVED |
+| 3 SHA-256 | 整文件 subtle / Worker 增量 / 主线程库 | Worker + 经审计增量实现；响应且可取消 | 无 | Worker 生命周期绑定 File | 哈希非凭证，服务端复核 | 真实进度 live region | 分块、低主线程阻塞 | 中高 | APPROVED |
+| 4 multipart transport | fetch / 共享 Client 内 XHR | 受控 XHR adapter；获得真实 upload 事件且不分裂 Client | 真实头和 multipart 不变 | 独立上传操作记录 | 复用 auth/CSRF/错误/幂等 | 可播报阶段与取消结果 | 真实事件，无伪进度 | 中 | APPROVED |
+| 5 上传进度 | 阶段 / 精确百分比 | lengthComputable 时百分比，否则阶段文案 | 无 | send 100% 后仍等待服务端 | 不误称安全检查完成 | 文本同步表达 | 事件开销低 | 低 | APPROVED |
+| 6 轮询节奏 | 固定 / 指数 / 分段有界 | 2s→5s→10s；网络 5/10/30s，429 Retry-After | 无 | 单 controller、active/stable | 防请求风暴 | 克制 live region | 有界请求 | 中 | APPROVED |
+| 7 Stepper 或 Tabs | Tabs / Stepper | Stepper；能表达完成、当前、锁定、只读和失败 | 无 | 状态驱动合法步骤 | 不作为授权边界 | 状态文字不只颜色 | 可忽略 | 中 | APPROVED |
+| 8 Rows 默认 page_size | 20 / 50 / 100 | 默认 50，UI 20/50；兼顾核对与 DOM | 使用真实分页 | 页码/size URL 化 | 不扩大数据访问 | 表格语义仍完整 | 50×256 需硬验收 | 中高 | APPROVED |
+| 9 Mapping 布局 | 三列 / 卡片 / 矩阵 | 1366 三列，窄屏单映射单元；便于同一行核对 | 无 | dirty 以 source 为单元 | 明确错误归属 | label/description 关联 | 有界样本 | 中 | APPROVED |
+| 10 样本数量 | 0 / 3 / 更多 | 每来源最多 3 个真实样本；足够核对且有界 | 不新增 sample API | 来自当前 Rows/preview | 纯文本、最小披露 | 类型有文字 | 不全表扫描 | 低中 | APPROVED |
 | 11 动态目标选择 | 硬编码 / 平铺 / 可搜索分组 catalog | **Recommended: 可搜索分组 Catalog**；动态、稳定、可核对。**Implementation Gate: RESOLVED BY PHASE2-TASK07** | 已新增批次作用域只读 Catalog 并更新 OpenAPI | catalog digest 绑定编辑/preview | 认证授权、不泄露内部 ID | 可见 label、键盘搜索/分组 | 有界分组 | 高 | APPROVED |
-| 12 自动或显式保存 | 自动 / 显式 | 显式保存；清楚建立服务端基线和 preview 依赖 | 使用现有 PUT | dirty、saved、unknown 分开 | 避免隐式写和竞态 | 状态文字明确 | 减少写请求 | 中 | PROPOSED |
-| 13 确认前最新预览 | 可选 / 强制 | 当前页面会话强制最新 preview；帮助核对但不冒充服务端证明 | 无 token 新增 | 绑定版本/digest，刷新失效 | confirm 服务端仍最终校验 | 问题摘要可导航 | 一次有界请求 | 中 | PROPOSED |
-| 14 confirmed 默认落点 | 保留编辑 / 只读摘要 | `confirmed` 只读；不显示正式导入入口 | 只读现有响应 | 清 dirty/preview/写操作 | 防伪造后续业务 | 状态清晰 | 低 | 低 | PROPOSED |
-| 15 列表默认筛选排序 | 仅我的 / 全部可见；多种排序 | 无 status/source 筛选、`created_by_me=true`、`created_at_desc`、`limit=50`；均沿用真实 API 默认，服务端仍执行行级可见性 | 仅真实 query | URL 规范化，cursor 清除 | 不用 read_any 推断可见数据 | 控件有 label | 单批 50 条 | 低中 | PROPOSED |
-| 16 窄屏降级 | 卡片 / 隐藏列 / 横向表格 | Rows 横向完整表格；Mapping 单列映射单元 | 无 | Sheet selector 上移 | 不因布局扩大/隐藏数据 | 保持阅读/焦点顺序 | 横向滚动、有界 DOM | 中 | PROPOSED |
+| 12 自动或显式保存 | 自动 / 显式 | 显式保存；清楚建立服务端基线和 preview 依赖 | 使用现有 PUT | dirty、saved、unknown 分开 | 避免隐式写和竞态 | 状态文字明确 | 减少写请求 | 中 | APPROVED |
+| 13 确认前最新预览 | 可选 / 强制 | 当前页面会话强制最新 preview；帮助核对但不冒充服务端证明 | 无 token 新增 | 绑定版本/digest，刷新失效 | confirm 服务端仍最终校验 | 问题摘要可导航 | 一次有界请求 | 中 | APPROVED |
+| 14 confirmed 默认落点 | 保留编辑 / 只读摘要 | `confirmed` 只读；不显示正式导入入口 | 只读现有响应 | 清 dirty/preview/写操作 | 防伪造后续业务 | 状态清晰 | 低 | 低 | APPROVED |
+| 15 列表默认筛选排序 | 仅我的 / 全部可见；多种排序 | 无 status/source 筛选、`created_by_me=true`、`created_at_desc`、`limit=50`；均沿用真实 API 默认，服务端仍执行行级可见性 | 仅真实 query | URL 规范化，cursor 清除 | 不用 read_any 推断可见数据 | 控件有 label | 单批 50 条 | 低中 | APPROVED |
+| 16 窄屏降级 | 卡片 / 隐藏列 / 横向表格 | Rows 横向完整表格；Mapping 单列映射单元 | 无 | Sheet selector 上移 | 不因布局扩大/隐藏数据 | 保持阅读/焦点顺序 | 横向滚动、有界 DOM | 中 | APPROVED |
 
 ## 25. 未来实施测试计划（100 项）
 
@@ -421,4 +421,39 @@ Stepper、状态、dirty、ERROR/WARNING 不只靠颜色。文件选择和目标
 | UI-099 | 50×256 数据 | 渲染/滚动/翻页/键盘/读屏 | 记录全部性能与可访问性指标，不截列 | 验收门禁 | 否 |
 | UI-100 | 1366×768 与窄屏 | 检查布局/焦点 | 三列核对；窄屏表格横滚与 Mapping 单列顺序正确 | Playwright | 否 |
 
-回归时同时保留当前 278 项 Node 测试基线；文档阶段不声称上述未来 UI 用例已经实现或通过。
+回归时同时保留既有 Node 测试基线。`PHASE2-TASK08` 已将 UI-001—UI-100 落地到 `tests/material-import-ui.test.mjs`，并与全量 440 项 Node 测试一起通过。
+
+## 26. PHASE2-TASK08 实施结果
+
+### 26.1 路由与组件
+
+实际路由为 `/materials/imports`、`/materials/imports/new`、`/materials/imports/:batchId`。运行时组件按列表、创建/上传、状态工作区、Rows、Mapping、共享原语拆分；状态、URL、写操作、轮询、SHA 与 XHR 边界分别位于可独立测试模块。MaterialShell 只在具备 `material.import.read` 时显示导入入口。
+
+共享 Client 已增加受保护 PUT、顶层/嵌套 `request_id` 与 details 归一化、写后网络不确定的 `RESULT_UNKNOWN`，以及单文件 multipart XHR transport。浏览器不手设 boundary；上传进度只在 `lengthComputable` 时显示百分比。创建、上传、parse、cancel、save、preview、confirm 使用独立页面内存操作记录与不可变载荷摘要。
+
+### 26.2 SHA Worker 与依赖
+
+Worker 使用固定依赖 `@noble/hashes@2.2.0` 的增量 `sha256.create/update/digest`，许可证为 MIT、零运行时依赖。按 1 MiB 分块读取最多 10 MiB File，按字节上报进度，支持重选/卸载取消，不把 File、摘要上下文或 Key 写入持久存储。标准 `abc` 向量与 10 MiB 分块/整块一致性测试通过。
+
+### 26.3 Catalog 与 Mapping
+
+编辑器只读批次作用域 `/mapping-targets` Catalog，按 BASIC/ATTRIBUTE/SPECIAL 分组并使用服务端 q/cursor；无前端硬编码业务目标 fallback。完整 Mapping 保存后采用服务端版本，preview 绑定当前页面的 batch/run/version/mapping/payload/metadata，confirm 前重读详情、Mapping、Sheets 与 Catalog；metadata、run、版本或本地内容变化会失效 preview。`MAPPING_CONFIRMED` 只读且不显示 API 未提供的确认人/时间或正式导入入口。
+
+### 26.4 50×256 性能与可访问性门禁
+
+2026-07-17 使用 Playwright Chromium、本地 Vinext 与浏览器级隔离 API fixture，在 1366×768 下同时渲染 50 行×256 列 Rows 和 256 条 Mapping：初渲染 1751 ms、翻页 1083 ms、横向滚动到底 197 ms；DOM 30,285 节点、HTML 908,994 bytes、JS heap 123,423,127 bytes。表格实际有 257 个 header（含行号），末列为 IV，滚动宽 33,854 px、可视宽 889 px，未截列。
+
+sticky 标题、sticky 行号、sticky Mapping 操作栏、可聚焦横滚 region、table caption、`aria-rowcount=101`、`aria-colcount=257`、键盘打开长内容、对话框初始焦点、Escape 与焦点恢复全部通过。1366 宽屏 Mapping 为三列；700×768 为单列，Rows 仍可横滚，sticky 操作栏不失效；浏览器控制台 0 error / 0 warning。门禁结论为 `PASS`，但未开放 page_size=100。
+
+验收记录和未提交截图位于：
+
+- `chenyida_erp_site/output/playwright/material-import-qa-result.json`
+- `chenyida_erp_site/output/playwright/material-import-50x256-1366.png`
+- `chenyida_erp_site/output/playwright/material-import-mapping-1366.png`
+- `chenyida_erp_site/output/playwright/material-import-mapping-700.png`
+
+### 26.5 验证、差异与限制
+
+UI-001—UI-100 全部通过；全量 Node 440/440、build、lint 0 error（1 个任务外既有 warning）、隔离 API smoke、5 份 OpenAPI 3.1/434 个本地引用与 Batch 6 操作、Drizzle 34 表无漂移、289 文件凭证扫描及临时 SQLite self-test/smoke/go-live 全部通过。
+
+实现没有扩大为后端或数据任务：未修改 API route/service、Schema、Migration、Metadata、hosting 或本地旧版业务逻辑，未连接生产。与规格的已知限制是继续只开放 Rows page_size 20/50；浏览器 File、RESULT_UNKNOWN 操作记录与 preview 只在当前页面内存中，刷新后必须按权威服务端状态恢复或重新选择文件；真实远程 R2/Queue、生产配额、冷启动和部署仍未验收。

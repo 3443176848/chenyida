@@ -19,6 +19,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@noble/hashes": "2.2.0",
     "@zip.js/zip.js": "2.8.26",
     "csv-parse": "7.0.1",
     "drizzle-orm": "0.45.2",

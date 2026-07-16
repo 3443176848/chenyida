@@ -1,8 +1,8 @@
 # Material Import Workspace UI V1 — 低保真线框
 
-> Status: PROPOSED
-> 任务：PHASE2-TASK05
-> 线框只定义信息层级与交互语义，不代表运行时已实现；Mapping 目标区域受 `BLOCKED_BY_MAPPING_TARGET_CATALOG` 门禁约束。
+> Status: APPROVED / IMPLEMENTED（非生产）
+> 规格任务：PHASE2-TASK05；实施任务：PHASE2-TASK08
+> 线框定义信息层级与交互语义；`PHASE2-TASK08` 已按此实现，Catalog 与性能/可访问性门禁均已通过。
 
 ## 1. 共用框架与标记
 
@@ -352,7 +352,7 @@ request_id：……（若已有）
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-验收必须记录初渲染、翻页、横滚、sticky、展开、键盘、DOM 节点、内存、屏幕阅读器、1366 与窄屏。此门禁当前状态为 `PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED`，不得在线框阶段标为通过。
+验收必须记录初渲染、翻页、横滚、sticky、展开、键盘、DOM 节点、内存、屏幕阅读器、1366 与窄屏。该门禁已由 `PHASE2-TASK08` 在真实浏览器结构数据上验证通过，测量值见第 26 节。
 
 ## 25. 对话框与焦点清单
 
@@ -367,3 +367,19 @@ request_id：……（若已有）
 | 长单元格详情 | 关闭按钮/标题 | 可关闭 | 不涉及写 | 展开按钮 |
 
 所有 modal 使用焦点圈定，背景不可交互，错误/长 warning 采用有界纯文本并允许滚动，不扩张到遮住主要动作。
+
+## 26. 实际浏览器验收记录
+
+| 项目 | 1366×768 | 700×768 |
+| --- | --- | --- |
+| Rows | 50 行、256 数据列、末列 IV；完整横滚 | 仍保留完整横滚 |
+| Mapping | 256 行、三列 `来源/目标/问题` | 单列 `来源→目标→问题` |
+| 初渲染 | 1751 ms | 宽屏渲染后 resize 验收 |
+| 翻页 | 1083 ms，页 1→2，真实行号到 100 | 不适用 |
+| 横向滚动 | 197 ms 到 32,965 px；scrollWidth 33,854 px | 横向滚动条仍可用 |
+| sticky | 标题、行号、Mapping 操作栏均为 sticky | 操作栏仍为 sticky，bottom -10 px |
+| 结构/内存 | DOM 30,285；HTML 908,994 bytes；used JS heap 123,423,127 bytes | 无静默减列或卡片化 |
+| 语义/键盘 | region 可聚焦；caption；aria rows/cols；键盘展开；modal 初焦点、Escape、焦点恢复 | Mapping 顺序保持；Rows 可键盘聚焦 |
+| 控制台 | 0 error / 0 warning | 0 error / 0 warning |
+
+Playwright Chromium 验收结果为 `PASS`。截图路径为 `chenyida_erp_site/output/playwright/material-import-50x256-1366.png`、`material-import-mapping-1366.png` 和 `material-import-mapping-700.png`；这些是本地验收产物，不进入 Git 提交。

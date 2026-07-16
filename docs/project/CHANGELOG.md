@@ -2,6 +2,17 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-17
+
+### PHASE2-TASK08 实现 - `feat: add material import workspace ui`
+
+- 路由与工作区：新增 `/materials/imports`、`/materials/imports/new`、`/materials/imports/:batchId`，实现权限驱动入口、opaque cursor 列表、状态 Stepper、非法 URL 规范化、错误/终态处置和服务端状态权威恢复。
+- 文件与写安全：新增 10 MiB 单文件预检、`@noble/hashes@2.2.0`（MIT）增量 SHA Worker、确认后创建、受控单文件 multipart XHR、真实网络进度、独立幂等操作记录、重复文件新批次恢复及 RESULT_UNKNOWN 原 Key/原载荷恢复边界。
+- 解析与 Mapping：实现 2/5/10 秒轮询、5/10/30 秒网络退避、Retry-After、可见性暂停、协作式取消、Sheets/Rows/Header、完整 256 列横滚、动态 Catalog、Mapping 保存/preview/confirm 新鲜度和 confirmed 只读；不创建 Draft 或正式物料。
+- 测试与门禁：UI-001—UI-100 全部通过；Playwright Chromium 1366×768 的 50×256 + 256 Mapping 门禁通过，初渲染 1751 ms、翻页 1083 ms、横滚 197 ms、30,285 DOM、123,423,127 bytes JS heap，sticky/键盘/语义/700 窄屏及控制台 0 error/0 warning通过。
+- 全量验证：build 与 Node 440/440、lint 0 error/1 个任务外既有 warning、隔离 API smoke、5 份 OpenAPI 3.1/434 本地引用与 Batch 6 操作、Drizzle 34 表无漂移、289 文件凭证扫描和临时 SQLite self-test/smoke/go-live 通过；首次并行全量触发历史迁移用例 120 秒超时，串行复跑 440/440。
+- 范围：仅修改 Site 前端、共享浏览器 Client、依赖锁、专项测试和治理文档；未修改后端 route/service、Schema、Migration、Metadata、hosting、本地旧版业务逻辑或生产环境，未部署。
+
 ## 2026-07-16
 
 ### PHASE2-TASK07 实现 - `feat: add import mapping target catalog`
