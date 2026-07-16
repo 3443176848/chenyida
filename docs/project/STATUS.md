@@ -6,15 +6,15 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 约 29,000 行 | 本地 ERP 与 Site 运行时、迁移、脚本和测试源码；不含依赖、构建产物和文档 |
-| 源码文件 | 107 | Site 的 `app/db/drizzle/tests/scripts` 口径；MAINT-01 新增共享 Migration statement 辅助器及其隔离 D1 回归测试 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK06 只新增 Catalog 规格/OpenAPI 并更新四份项目台账；未修改运行时代码、Migration、API、Schema、Metadata、hosting 或本地旧版业务逻辑 |
+| 总代码量 | 约 40,000 行 | Site 的 `app/db/drizzle/tests/scripts` 运行时、迁移、脚本和测试源码；不含依赖、构建产物和文档 |
+| 源码文件 | 110 | Site 的 `app/db/drizzle/tests/scripts` 口径；TASK07 新增 Registry、Catalog Service 与专项测试 |
+| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK07 修改 Catalog/Mapping 服务与治理文档；未修改 Schema、Migration、Metadata 数据、前端、hosting 或本地旧版业务逻辑 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 60（本地+开发 schema） | 本地 SQLite 26 张，Site 开发 schema 34 张；`0005` 仅在隔离 D1 测试，未执行生产迁移 |
-| 在线 API 路径 | 80 | Catalog 路由仅为 `PROPOSED` OpenAPI，未实现；生产公开站点尚未部署开发基线 |
+| 在线 API 路径 | 81 | 新增批次作用域 Mapping Target Catalog；生产公开站点尚未部署开发基线 |
 | 页面入口 | 11 | 既有 9 个入口加 `/materials/review` 与 `/materials/:materialId/review` |
-| 测试与安全检查文件 | 28 | MAINT-01 新增共享辅助器隔离 D1 回归测试；全量 Node 288/288 |
+| 测试与安全检查文件 | 29 | TASK07 新增 51 项 Catalog 契约/隔离 D1 测试；全量 Node 339/339 |
 
 ## 当前版本与环境
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE2-TASK06` 开始时，根仓库 `main` 位于 `d1c6763`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖两份 Catalog 文档与 `MASTER/TASKS/CHANGELOG/STATUS`；未修改 production binding、hosting、前端/服务端运行时代码、API 实现、Schema、Migration、Metadata 或本地旧版业务逻辑。
+`PHASE2-TASK07` 开始时，根仓库 `main` 位于 `434f107`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异覆盖 Catalog/Mapping 服务、专项测试、OpenAPI 与项目治理文档；未修改 production binding、hosting、前端、Schema、Migration、Metadata 数据或本地旧版业务逻辑。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE2-TASK06` 计划提交消息为 `docs: design import mapping target catalog`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
+`PHASE2-TASK07` 计划提交消息为 `feat: add import mapping target catalog`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
 
 实时状态必须使用：
 
@@ -49,16 +49,34 @@ git status --short
 git -C chenyida_erp_site status --short
 ```
 
+## PHASE2-TASK07 Mapping Target Catalog V1 非生产实现
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 12 项正式决定已批准并实施；Catalog 门禁已 `RESOLVED` |
+| API | PASS | `GET /api/material-master/import-batches/:batchId/mapping-targets`；仅支持 namespace/q/limit/cursor，DTO/OpenAPI 一致 |
+| Registry/Snapshot | PASS | BASIC/SPECIAL 单一 Registry + 运行时 D1 ACTIVE ATTRIBUTE；Catalog、准备、保存、preview、confirm 共享 `material-import-mapping-metadata-v1` |
+| digest/cursor | PASS | 业务语义进入 Mapping SHA-256；展示文案不进入 Mapping digest但进入 cursor 搜索摘要；稳定排序、条件绑定和旧 cursor 409 通过 |
+| 权限/安全 | PASS | AUTH/read/map/owner/read_any、隐藏 404、可见无 map 403、读取限流、request_id、no-store 和安全审计通过；无 attribute_id/数据库内部信息 |
+| Catalog 专项 | PASS | 51/51，覆盖正式 43 项最低契约和共享规则/历史失效/空结果/Repository 失败/日志去敏回归 |
+| Site 全量 | PASS | build 成功，Node 339/339；原 288 基线全部保留 |
+| lint/凭证 | PASS | lint 0 error/1 个既有 warning；凭证扫描通过 |
+| API/OpenAPI | PASS | 一次性隔离 D1 API smoke 通过；OpenAPI 3.1 YAML、路由、参数、DTO、错误和 no-store 契约检查通过 |
+| Drizzle | PASS | `db/schema.ts`、`drizzle/`、snapshot/journal 无差异；未创建 0006 |
+| 本地基线 | PASS | 临时 SQLite 环境守卫 4/4、self-test、smoke、backup/restore、go-live 通过并清理 |
+| 生产影响 | NONE | 未连接 production/公共 URL/远程 D1/R2/Queue，未创建 binding/Cron、迁移、修改 hosting 或部署 |
+| UI 状态 | NOT IMPLEMENTED | Catalog 门禁已解除，但 Import Workspace UI 仍受 50×256 性能与可访问性门禁，本任务未开始前端 |
+
 ## PHASE2-TASK06 Mapping Target Catalog V1 书面设计基线
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DONE / AWAITING SPECIFICATION CONFIRMATION | 规格、OpenAPI 和 12 项决定已形成；全部决定仍为 `PROPOSED` |
-| 推荐路由 | PROPOSED | 批次作用域 `GET .../:batchId/mapping-targets`；全局路由与混入 Mapping 仅保留比较 |
+| 任务状态 | DONE / CONFIRMED BY TASK07 | 规格、OpenAPI 和 12 项决定已形成；全部决定由 PHASE2-TASK07 批准 |
+| 推荐路由 | APPROVED / IMPLEMENTED | 批次作用域 `GET .../:batchId/mapping-targets`；全局路由与混入 Mapping 仅保留比较 |
 | 权限/可见性 | DESIGNED | read + map + owner/read_any；隐藏批次 404，`read_any` 不隐含 map |
 | Catalog 来源 | DESIGNED | BASIC/SPECIAL 来自共享 Registry；ATTRIBUTE 来自运行时 D1 ACTIVE metadata；禁止 seed/fixture/历史 Mapping |
 | target DTO | DESIGNED | 保留现有小写 namespace 与大写 code，返回分组、类型、必填、mapping modes、default/unit/value constraints、enabled/selectable；不返回内部 ID/列名 |
-| digest 审计 | GAP RECORDED | 当前 digest 缺特殊目标、单位/default/必填等语义且有两处投影；实施前必须抽共享 Registry + Snapshot，禁止 Catalog 第二套算法 |
+| digest 审计 | RESOLVED BY TASK07 | 已抽共享 Registry + Snapshot，Catalog、准备、保存、preview、confirm 使用同一算法 |
 | 搜索/cursor | DESIGNED | 三组统一有界分页；q 最大 64、limit 默认 50/最大 100、稳定排序、cursor 绑定业务与展示搜索快照，旧 cursor 409 |
 | 缓存/历史目标 | DESIGNED | `private, no-store`；历史 Mapping code 保留，Catalog miss 由 UI 标失效，不新增 resolver、不自动替换 |
 | 测试计划 | COMPLETE | 43 项未来实施测试，含权限、D1 metadata、digest、cursor、限流、审计、OpenAPI、隔离 D1 和 288 项回归 |
@@ -83,14 +101,14 @@ git -C chenyida_erp_site status --short
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DONE / SPECIFICATION CONFIRMED | 完整规格与 16 项决定已由项目负责人确认；运行时实施仍受 catalog 与 50×256 门禁限制 |
+| 任务状态 | DONE / SPECIFICATION CONFIRMED | 完整规格与 16 项决定已由项目负责人确认；Catalog 门禁已由 PHASE2-TASK07 解除，运行时 UI 实施仍受 50×256 性能与可访问性门禁限制 |
 | 正式交付 | COMPLETE | `material-import-ui-v1.md`、wireframes、state matrix 三份独立文档 |
 | 路由/恢复 | DESIGNED | 三条路由、单状态工作区 Stepper、view 非权威、allowlist/replaceState、单向 opaque cursor 单批结果导航 |
 | 创建/上传 | DESIGNED | 客户端有限预检、Worker 增量 SHA、确认后创建、共享 Client 内 XHR、真实字节进度、独立幂等/RESULT_UNKNOWN、重复文件新批次恢复 |
 | 解析/取消 | DESIGNED | parse 前重读与独立 Key、2/5/10 秒轮询、网络/429 退避、粗粒度真实状态、五状态协作式取消与 CAS 竞争 |
 | Sheet/Rows/Header | DESIGNED | Sheet 可见性、真实 Rows 分页、稀疏 cell/DATE/FORMULA/ERROR、原始行与 Mapping 样本分离、Sheet/Header 随 Mapping 保存 |
-| Mapping | DESIGNED / BLOCKED | 三列编辑、显式保存、已保存版本 preview、当前页面最新 preview 门禁、服务端 confirm 最终裁决、confirmed 只读 |
-| Catalog 门禁 | BLOCKED_BY_MAPPING_TARGET_CATALOG | 当前无完整动态目标 catalog/权威 metadata 读接口；必须另立兼容 API 任务，禁止 seed/硬编码绕过 |
+| Mapping | DESIGNED / UI NOT IMPLEMENTED | 三列编辑、显式保存、已保存版本 preview、当前页面最新 preview 门禁、服务端 confirm 最终裁决、confirmed 只读；Catalog 依赖已解除，UI 仍受性能与可访问性门禁限制 |
+| Catalog 门禁 | RESOLVED BY PHASE2-TASK07 | 已实现批次作用域动态 Catalog 与共享 Registry/Snapshot/digest；仍禁止 seed、前端硬编码或历史 Mapping 绕过 |
 | 表格门禁 | PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED | 50×256 的渲染、翻页、横滚、sticky、键盘、DOM、内存、读屏、1366/窄屏尚未实施验收，不虚构通过 |
 | 线框/矩阵/测试设计 | COMPLETE | 覆盖 22 个指定状态、集中主状态/URL/preparation/unknown/dirty/权限/门禁矩阵，100 个唯一未来实施测试编号 |
 | 文档检查 | PASS | 100 项编号、16 项决定、22 状态结构、无 TBD/TODO 占位、`git diff --check` 与 docs-only 范围在提交前复核 |

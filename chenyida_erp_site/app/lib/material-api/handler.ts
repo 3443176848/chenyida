@@ -68,6 +68,7 @@ export type MaterialApiDependencies = Readonly<{
   objectPrefix?: string;
   clock?: () => Date;
   rateLimits?: Readonly<{ attemptsPerMinute: number; newKeysPerMinute: number }>;
+  importReadRateLimit?: number;
 }>;
 
 const FORBIDDEN_IDENTITY_FIELDS = new Set([

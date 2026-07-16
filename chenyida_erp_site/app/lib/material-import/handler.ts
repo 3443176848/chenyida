@@ -7,6 +7,10 @@ import {
 } from "../material-api/security.ts";
 import type { MaterialImportObjectStore } from "./object-store.ts";
 import {
+  MaterialImportMappingTargetCatalogService,
+  type MaterialImportReadRateLimiter,
+} from "./mapping-target-catalog-service.ts";
+import {
   confirmMaterialImportMapping,
   getMaterialImportMapping,
   listMaterialImportRows,
@@ -39,6 +43,8 @@ export type MaterialImportApiDependencies = Readonly<{
   database: MaterialMasterD1Database;
   objectStore?: MaterialImportObjectStore;
   objectPrefix?: string;
+  importReadRateLimit?: number;
+  importReadRateLimiter?: MaterialImportReadRateLimiter;
   currentUser(request: Request): Promise<MaterialApiUser | null>;
   userCan(user: MaterialApiUser, permission: ImportPermission): boolean;
   clock?: () => Date;
@@ -67,7 +73,8 @@ function response(result: MaterialImportServiceResult, requestId: string): Respo
 }
 
 function errorResponse(error: MaterialImportServiceError, requestId: string): Response {
-  const body: Record<string, unknown> = { code: error.code, message: error.message };
+  const details = error.code === "IMPORT_MAPPING_TARGET_CATALOG_CHANGED" ? [{ restart_from_first_page: true }] : [];
+  const body: Record<string, unknown> = { code: error.code, message: error.message, request_id: requestId, details };
   if (error.expectedVersion !== undefined) body.expected_version = error.expectedVersion;
   return new Response(JSON.stringify({ request_id: requestId, error: body }), {
     status: error.status,
@@ -103,6 +110,24 @@ function assertQueryKeys(url: URL, allowed: readonly string[]): void {
   if (unknown) throw new MaterialImportServiceError("INVALID_REQUEST", `未知查询参数：${unknown}`, 400);
 }
 
+function catalogQuery(url: URL): Readonly<{ namespace?: "BASIC" | "ATTRIBUTE" | "SPECIAL"; q?: string; limit: number; cursor?: string }> {
+  const allowed = new Set(["namespace", "q", "limit", "cursor"]);
+  const unknown = [...url.searchParams.keys()].find((key) => !allowed.has(key));
+  if (unknown) throw new MaterialImportServiceError("IMPORT_MAPPING_TARGET_QUERY_INVALID", `未知查询参数：${unknown}`, 400);
+  for (const key of ["namespace", "q", "limit", "cursor"]) if (url.searchParams.getAll(key).length > 1) throw new MaterialImportServiceError("IMPORT_MAPPING_TARGET_QUERY_INVALID", `查询参数 ${key} 不得重复`, 400);
+  const namespace = url.searchParams.get("namespace") ?? undefined;
+  if (namespace && !new Set(["BASIC", "ATTRIBUTE", "SPECIAL"]).has(namespace)) throw new MaterialImportServiceError("IMPORT_MAPPING_TARGET_QUERY_INVALID", "namespace 无效", 400);
+  const rawLimit = url.searchParams.get("limit");
+  if (rawLimit !== null && !/^[1-9][0-9]*$/.test(rawLimit)) throw new MaterialImportServiceError("IMPORT_MAPPING_TARGET_QUERY_INVALID", "limit 必须是正整数", 400);
+  const limit = rawLimit === null ? 50 : Number(rawLimit);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new MaterialImportServiceError("IMPORT_MAPPING_TARGET_QUERY_INVALID", "limit 必须在 1 到 100 之间", 400);
+  const q = url.searchParams.get("q") ?? undefined;
+  if (q !== undefined && q.length > 256) throw new MaterialImportServiceError("IMPORT_MAPPING_TARGET_QUERY_INVALID", "q 无效", 400);
+  const cursor = url.searchParams.get("cursor") ?? undefined;
+  if (cursor !== undefined && (cursor.length < 1 || cursor.length > 1024)) throw new MaterialImportServiceError("IMPORT_MAPPING_TARGET_QUERY_INVALID", "cursor 无效", 400);
+  return { namespace: namespace as "BASIC" | "ATTRIBUTE" | "SPECIAL" | undefined, q, limit, cursor };
+}
+
 function assertObjectKeys(value: Record<string, unknown>, allowed: readonly string[]): void {
   const set = new Set(allowed);
   const unknown = Object.keys(value).find((key) => !set.has(key));
@@ -118,10 +143,14 @@ async function writeFailureAudit(
 ): Promise<void> {
   if (!user) return;
   const timestamp = (dependencies.clock ?? (() => new Date()))().toISOString();
-  await dependencies.database.prepare(`
-    INSERT INTO audit_log(username,action,detail,request_id,result,route_code,error_code,retention_until,created_at)
-    VALUES(?,'MATERIAL_IMPORT_API_REJECTED',?,?,'failed','MATERIAL_IMPORT_BATCH',?,?,?)
-  `).bind(user.username, path.slice(0, 255), requestId, error.code, Math.floor(new Date(timestamp).getTime() / 1000) + 1095 * 86400, timestamp).run().catch(() => undefined);
+  const catalog = /^\/api\/material-master\/import-batches\/[1-9][0-9]*\/mapping-targets$/.test(path);
+  const routeCode = catalog ? "MATERIAL_IMPORT_MAPPING_TARGET_CATALOG" : "MATERIAL_IMPORT_BATCH";
+  try {
+    await dependencies.database.prepare(`
+      INSERT INTO audit_log(username,action,detail,request_id,result,route_code,error_code,retention_until,created_at)
+      VALUES(?,'MATERIAL_IMPORT_API_REJECTED',?,?,'failed',?,?,?,?)
+    `).bind(user.username, path.slice(0, 255), requestId, routeCode, error.code, Math.floor(new Date(timestamp).getTime() / 1000) + 1095 * 86400, timestamp).run();
+  } catch { /* Security audit failures must not expose internal storage errors. */ }
 }
 
 export function isMaterialImportPath(path: string): boolean {
@@ -131,11 +160,12 @@ export function isMaterialImportPath(path: string): boolean {
 export async function handleMaterialImportApi(request: Request, dependencies: MaterialImportApiDependencies): Promise<Response> {
   const requestId = crypto.randomUUID();
   const url = new URL(request.url);
+  const isMappingTargetsRequest = /^\/api\/material-master\/import-batches\/[1-9][0-9]*\/mapping-targets$/.test(url.pathname);
   let user: MaterialApiUser | null = null;
   try {
     user = await dependencies.currentUser(request);
-    if (!user) throw new MaterialImportServiceError("AUTHENTICATION_REQUIRED", "请先登录", 401);
-    if (user.must_change_password) throw new MaterialImportServiceError("PERMISSION_DENIED", "请先修改临时密码", 403);
+    if (!user) throw new MaterialImportServiceError(isMappingTargetsRequest ? "AUTH_REQUIRED" : "AUTHENTICATION_REQUIRED", "请先登录", 401);
+    if (user.must_change_password) throw new MaterialImportServiceError(isMappingTargetsRequest ? "FORBIDDEN" : "PERMISSION_DENIED", "请先修改临时密码", 403);
     const root = url.pathname === "/api/material-master/import-batches";
     const detailMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)$/);
     const fileMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/file$/);
@@ -145,9 +175,10 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
     const sheetsMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/sheets$/);
     const rowsMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/rows$/);
     const mappingMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/mapping$/);
+    const mappingTargetsMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/mapping-targets$/);
     const previewMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/mapping\/preview$/);
     const confirmMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/mapping\/confirm$/);
-    if (!root && !detailMatch && !fileMatch && !eventsMatch && !cancelMatch && !parseMatch && !sheetsMatch && !rowsMatch && !mappingMatch && !previewMatch && !confirmMatch) throw new MaterialImportServiceError("IMPORT_BATCH_NOT_FOUND", "导入接口不存在", 404);
+    if (!root && !detailMatch && !fileMatch && !eventsMatch && !cancelMatch && !parseMatch && !sheetsMatch && !rowsMatch && !mappingMatch && !mappingTargetsMatch && !previewMatch && !confirmMatch) throw new MaterialImportServiceError("IMPORT_BATCH_NOT_FOUND", "导入接口不存在", 404);
     const permission: ImportPermission = root && request.method === "POST"
       ? "material.import.create"
       : fileMatch
@@ -159,7 +190,7 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
             : (mappingMatch && request.method !== "GET") || previewMatch || confirmMatch
               ? "material.import.map"
               : "material.import.read";
-    if (!dependencies.userCan(user, permission)) throw new MaterialImportServiceError("PERMISSION_DENIED", "没有执行此操作的权限", 403);
+    if (!dependencies.userCan(user, permission)) throw new MaterialImportServiceError(mappingTargetsMatch ? "FORBIDDEN" : "PERMISSION_DENIED", "没有执行此操作的权限", 403);
     const canReadAny = dependencies.userCan(user, "material.import.read_any");
     const serviceDependencies = {
       database: dependencies.database,
@@ -230,6 +261,8 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
     } else if (mappingMatch && request.method === "GET") {
       assertQueryKeys(url, []);
       result = await getMaterialImportMapping(dependencies.database, integerPath(mappingMatch[1]), { username: user.username, canReadAny });
+    } else if (mappingTargetsMatch && request.method === "GET") {
+      result = await new MaterialImportMappingTargetCatalogService(dependencies.database, { rateLimiter: dependencies.importReadRateLimiter, readLimit: dependencies.importReadRateLimit, clock: dependencies.clock }).list(integerPath(mappingTargetsMatch[1]), { username: user.username, canReadAny, canMap: dependencies.userCan(user, "material.import.map"), requestId, query: catalogQuery(url) });
     } else if (mappingMatch && request.method === "PUT") {
       assertMaterialCsrf(request);
       const { body } = await readBoundedJson(request);

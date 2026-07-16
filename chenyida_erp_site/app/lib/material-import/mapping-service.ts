@@ -1,5 +1,11 @@
 import type { MaterialMasterD1Database, MaterialMasterD1Statement } from "../material-master/index.ts";
-import { BASIC_TARGETS, MaterialImportParserServiceError, SUPPLIER_TARGETS, type MaterialImportParserServiceResult } from "./parser-service.ts";
+import { MaterialImportParserServiceError, type MaterialImportParserServiceResult } from "./parser-service.ts";
+import {
+  MaterialImportMappingMetadataSnapshotService,
+  requiredMappingTargets,
+  type MaterialImportMappingMetadataSnapshot,
+  type MaterialImportMappingTargetNamespace,
+} from "./mapping-target-registry.ts";
 
 type MappingBatch = { id: number; status: string; created_by: string; current_version: number; current_parse_run_id: number | null };
 type MappingRow = { id: number; batch_id: number; parse_run_id: number; selected_sheet_index: number; header_mode: "SINGLE_ROW" | "NO_HEADER"; header_row_number: number | null; mapping_status: string; mapping_version: number; metadata_digest: string; created_at: string; updated_at: string; confirmed_at: string | null };
@@ -39,14 +45,6 @@ async function batchVisible(database: MaterialMasterD1Database, batchId: number,
   const batch = await database.prepare("SELECT id,status,created_by,current_version,current_parse_run_id FROM material_import_batches WHERE id=?").bind(batchId).first<MappingBatch>();
   if (!batch || (!visibility.canReadAny && batch.created_by !== visibility.username)) throw new MaterialImportParserServiceError("IMPORT_BATCH_NOT_FOUND", "导入批次不存在", 404);
   return batch;
-}
-
-async function currentMetadata(database: MaterialMasterD1Database): Promise<Readonly<{ digest: string; attributes: ReadonlyMap<string, { type: string; active: boolean }> }>> {
-  const rows = (await database.prepare("SELECT attribute_code,data_type,status FROM material_attribute_definitions ORDER BY attribute_code").all<{ attribute_code: string; data_type: string; status: string }>()).results ?? [];
-  return {
-    digest: await digest(JSON.stringify({ basic: BASIC_TARGETS, supplier: SUPPLIER_TARGETS, attributes: rows })),
-    attributes: new Map(rows.map((row) => [row.attribute_code, { type: row.data_type, active: row.status === "ACTIVE" }])),
-  };
 }
 
 async function currentMapping(database: MaterialMasterD1Database, runId: number): Promise<MappingRow | null> {
@@ -126,13 +124,14 @@ export async function getMaterialImportMapping(database: MaterialMasterD1Databas
   return { status: 200, payload: await mappingPayload(database, batch, mapping) };
 }
 
-async function validateDraft(database: MaterialMasterD1Database, runId: number, draft: MaterialImportMappingDraftInput): Promise<Readonly<{ metadataDigest: string; items: MaterialImportMappingItemInput[] }>> {
+async function validateDraft(database: MaterialMasterD1Database, runId: number, draft: MaterialImportMappingDraftInput, metadata?: MaterialImportMappingMetadataSnapshot): Promise<Readonly<{ metadataDigest: string; items: MaterialImportMappingItemInput[] }>> {
   if (!Number.isInteger(draft.selected_sheet_index) || draft.selected_sheet_index < 0 || draft.selected_sheet_index > 31 || !Array.isArray(draft.items) || draft.items.length < 1 || draft.items.length > 256) throw new MaterialImportParserServiceError("IMPORT_MAPPING_INVALID", "Mapping 结构无效", 422);
   const sheet = await database.prepare("SELECT row_count,source_column_max FROM material_import_parse_sheets WHERE parse_run_id=? AND sheet_index=? AND visibility='VISIBLE' AND parse_status='COMPLETED'").bind(runId, draft.selected_sheet_index).first<{ row_count: number; source_column_max: number }>();
   if (!sheet) throw new MaterialImportParserServiceError("IMPORT_SHEET_NOT_FOUND", "Sheet 不存在", 404);
   if ((draft.header_mode === "SINGLE_ROW" && (!Number.isInteger(draft.header_row_number) || Number(draft.header_row_number) < 1 || Number(draft.header_row_number) > sheet.row_count)) || (draft.header_mode === "NO_HEADER" && draft.header_row_number != null)) throw new MaterialImportParserServiceError("IMPORT_HEADER_NOT_CONFIRMED", "表头模式或行号无效", 422);
   if (draft.header_mode !== "SINGLE_ROW" && draft.header_mode !== "NO_HEADER") throw new MaterialImportParserServiceError("IMPORT_HEADER_NOT_CONFIRMED", "表头模式无效", 422);
-  const metadata = await currentMetadata(database);
+  const snapshot = metadata ?? await new MaterialImportMappingMetadataSnapshotService(database).current();
+  const snapshots = new MaterialImportMappingMetadataSnapshotService(database);
   const sources = new Set<number>();
   const targets = new Set<string>();
   const items = [...draft.items];
@@ -143,13 +142,9 @@ async function validateDraft(database: MaterialMasterD1Database, runId: number, 
     if (requiresSource && sources.has(Number(item.source_column_index))) throw new MaterialImportParserServiceError("IMPORT_MAPPING_INVALID", "一个源列只能映射一次", 422);
     if (requiresSource) sources.add(Number(item.source_column_index));
     if (item.mapping_mode === "IGNORE" && item.target_namespace !== "ignore") throw new MaterialImportParserServiceError("IMPORT_MAPPING_INVALID", "Ignore Mapping 无效", 422);
-    let validTarget = false;
-    if (item.target_namespace === "basic") validTarget = BASIC_TARGETS.includes(item.target_code);
-    else if (item.target_namespace === "supplier_reference") validTarget = SUPPLIER_TARGETS.includes(item.target_code);
-    else if (item.target_namespace === "attribute") validTarget = metadata.attributes.get(item.target_code)?.active === true;
-    else if (item.target_namespace === "category_hint") validTarget = item.target_code === "CATEGORY_HINT";
-    else if (item.target_namespace === "ignore") validTarget = item.target_code === "IGNORE" && item.mapping_mode === "IGNORE";
-    if (!validTarget || /(?:sql|script|formula|jsonpath|regex)/i.test(item.target_code)) throw new MaterialImportParserServiceError("IMPORT_MAPPING_TARGET_INVALID", "Mapping 目标无效或已禁用", 422);
+    const targetDefinition = snapshots.lookup(snapshot, item.target_namespace as MaterialImportMappingTargetNamespace, item.target_code);
+    if (!targetDefinition || !targetDefinition.mapping_modes.includes(item.mapping_mode)) throw new MaterialImportParserServiceError("IMPORT_MAPPING_TARGET_INVALID", "Mapping 目标无效或已禁用", 422);
+    if (item.required !== targetDefinition.required_for_confirm) throw new MaterialImportParserServiceError("IMPORT_MAPPING_INVALID", "Mapping 必填规则与当前目标元数据不一致", 422);
     const target = `${item.target_namespace}.${item.target_code}`;
     if (item.target_namespace !== "ignore" && targets.has(target)) throw new MaterialImportParserServiceError("IMPORT_MAPPING_DUPLICATE_TARGET", "一个目标字段只能映射一次", 422);
     targets.add(target);
@@ -160,7 +155,7 @@ async function validateDraft(database: MaterialMasterD1Database, runId: number, 
       if (typeof value === "number" && (!Number.isFinite(value) || !Number.isSafeInteger(value))) throw new MaterialImportParserServiceError("IMPORT_MAPPING_INVALID", "数值默认值无效", 422);
     } else if (item.default_value_json !== undefined && item.default_value_json !== null) throw new MaterialImportParserServiceError("IMPORT_MAPPING_INVALID", "当前 Mapping 模式不允许默认值", 422);
   }
-  return { metadataDigest: metadata.digest, items };
+  return { metadataDigest: snapshot.metadataDigest, items };
 }
 
 type IdempotencyClaim = Readonly<{ keyDigest: string; requestDigest: string; route: string; replay?: MaterialImportParserServiceResult }>;
@@ -265,12 +260,12 @@ export async function confirmMaterialImportMapping(database: MaterialMasterD1Dat
   const mapping = await database.prepare("SELECT * FROM material_import_mappings WHERE id=? AND batch_id=? AND parse_run_id=?").bind(context.mappingId, batchId, context.parseRunId).first<MappingRow>();
   if (!mapping) throw new MaterialImportParserServiceError("IMPORT_MAPPING_NOT_FOUND", "Mapping 不存在", 404);
   if (mapping.mapping_status !== "DRAFT" || mapping.mapping_version !== context.expectedMappingVersion) throw new MaterialImportParserServiceError("IMPORT_MAPPING_VERSION_CONFLICT", "Mapping 版本已变化或不可确认", 409, mapping.mapping_version);
-  const metadata = await currentMetadata(database);
-  if (metadata.digest !== context.metadataDigest || mapping.metadata_digest !== context.metadataDigest) throw new MaterialImportParserServiceError("IMPORT_MAPPING_TARGET_INVALID", "目标元数据已变化，请重新保存 Mapping", 422);
+  const metadata = await new MaterialImportMappingMetadataSnapshotService(database).current();
+  if (metadata.metadataDigest !== context.metadataDigest || mapping.metadata_digest !== context.metadataDigest) throw new MaterialImportParserServiceError("IMPORT_MAPPING_TARGET_INVALID", "目标元数据已变化，请重新保存 Mapping", 422);
   const items = await mappingItems(database, mapping.id);
-  const required = new Set(items.filter((item) => item.target_namespace === "basic").map((item) => item.target_code));
-  if (!required.has("STANDARD_NAME") || !required.has("UNIT")) throw new MaterialImportParserServiceError("IMPORT_MAPPING_INVALID", "确认前必须映射标准名称和单位", 422);
-  await validateDraft(database, context.parseRunId, { selected_sheet_index: mapping.selected_sheet_index, header_mode: mapping.header_mode, header_row_number: mapping.header_row_number, items: items.map((item) => ({ source_column_index: item.source_column_index, source_header: item.source_header, target_namespace: item.target_namespace as MaterialImportMappingItemInput["target_namespace"], target_code: item.target_code, mapping_mode: item.mapping_mode as MaterialImportMappingItemInput["mapping_mode"], default_value_json: item.default_value_json === null ? undefined : JSON.parse(item.default_value_json), required: item.required === 1, display_order: item.display_order })) });
+  const mapped = new Set(items.map((item) => `${item.target_namespace}\u0000${item.target_code}`));
+  if (requiredMappingTargets(metadata).some((target) => !mapped.has(`${target.target_namespace}\u0000${target.target_code}`))) throw new MaterialImportParserServiceError("IMPORT_MAPPING_INVALID", "确认前必须映射标准名称和单位", 422);
+  await validateDraft(database, context.parseRunId, { selected_sheet_index: mapping.selected_sheet_index, header_mode: mapping.header_mode, header_row_number: mapping.header_row_number, items: items.map((item) => ({ source_column_index: item.source_column_index, source_header: item.source_header, target_namespace: item.target_namespace as MaterialImportMappingItemInput["target_namespace"], target_code: item.target_code, mapping_mode: item.mapping_mode as MaterialImportMappingItemInput["mapping_mode"], default_value_json: item.default_value_json === null ? undefined : JSON.parse(item.default_value_json), required: item.required === 1, display_order: item.display_order })) }, metadata);
   const timestamp = clock().toISOString();
   const result: MaterialImportParserServiceResult = { status: 200, payload: { batch_id: batchId, batch_status: "MAPPING_CONFIRMED", current_version: batch.current_version + 1, parse_run_id: context.parseRunId, mapping_id: mapping.id, mapping_status: "CONFIRMED", mapping_version: mapping.mapping_version } };
   await database.batch([

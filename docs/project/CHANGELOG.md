@@ -4,6 +4,15 @@
 
 ## 2026-07-16
 
+### PHASE2-TASK07 实现 - `feat: add import mapping target catalog`
+
+- API：实现批次作用域 `GET /api/material-master/import-batches/:batchId/mapping-targets`，支持 BASIC/ATTRIBUTE/SPECIAL、`namespace/q/limit/cursor`、稳定排序、规范化搜索、摘要保护的不透明 cursor、Metadata/展示变化 409 和 `private, no-store`。
+- 共享规则：新增 `MaterialImportMappingTargetRegistry`、运行时 D1 ACTIVE Metadata Repository 与 `MaterialImportMappingMetadataSnapshotService`；`material-import-mapping-metadata-v1` 规范 JSON SHA-256 覆盖 namespace/code、enabled/selectable、type、required、modes、default、unit、value constraints 等业务语义，展示文案只进入 cursor 搜索投影摘要。
+- Mapping 统一：Parser Mapping 准备、PUT 保存、preview、confirm 和 Catalog 全部调用同一 Snapshot；保留现有请求、状态机、必填、唯一性、category_hint、supplier_reference、ignore 和历史失效 target 语义。
+- 权限与安全：要求认证、read + map、owner/read_any 行级可见性；隐藏批次 404、可见但无 map 403。GET 无 CSRF/幂等要求，执行独立读取限流、request_id、安全错误和不记录 q/cursor/metadata 正文的 API 审计；不返回 attribute_id、表/列/SQL 或 Repository 内部信息。
+- 测试：Catalog 专项 51/51；build 与全量 Node 339/339；lint 0 error/1 个既有 warning；隔离 API smoke、OpenAPI 解析/契约检查、Drizzle 无漂移、凭证扫描和临时 SQLite 环境守卫/self-test/smoke/backup-restore/go-live 通过。
+- 门禁与范围：`BLOCKED_BY_MAPPING_TARGET_CATALOG` 已标记 `RESOLVED`；Import Workspace UI 尚未实施，仍受 50×256 性能与可访问性门禁。本任务未修改 Schema、Migration、Metadata 数据、前端、R2/Queue/hosting，未连接、迁移或部署生产环境。
+
 ### PHASE2-TASK06 设计 - `docs: design import mapping target catalog`
 
 - Git Commit：Material Import Mapping Target Catalog V1 正式规格、OpenAPI 和治理文档在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `d1c6763`。

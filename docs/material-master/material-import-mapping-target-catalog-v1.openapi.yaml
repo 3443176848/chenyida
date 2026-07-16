@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
   title: Chenyida ERP Material Import Mapping Target Catalog V1
-  version: 1.0.0-proposed
+  version: 1.0.0
   description: |
-    PHASE2-TASK06 proposed read-only compatibility contract. This document does
-    not authorize runtime implementation, schema or metadata changes, production
-    access, migration, or deployment.
+    PHASE2-TASK07 approved read-only compatibility contract, implemented in the
+    non-production source tree. This document does not authorize schema or
+    metadata changes, production access, migration, or deployment.
+x-implementation-status: NON_PRODUCTION_IMPLEMENTED
 servers:
   - url: /
 security:

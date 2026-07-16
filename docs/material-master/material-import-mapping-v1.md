@@ -295,3 +295,9 @@ API 不硬编码角色名。owner/read_any 行级条件必须进入 SQL 和 tota
 ## 12. 完成边界
 
 `PHASE2-TASK04` 已完成 Mapping 关系表、Drizzle、服务端 API 和隔离测试，但不含 UI。任务完成后停止；不得执行生产 migration、连接生产、部署，或开始清洗、匹配、Material Draft 和正式物料任务。
+
+## 13. PHASE2-TASK07 共享 Catalog 兼容更新
+
+Mapping 准备、PUT 保存、preview 和 confirm 现已统一调用 `MaterialImportMappingTargetRegistry` 与 `MaterialImportMappingMetadataSnapshotService`。共享 Snapshot 从运行时 D1 ACTIVE 属性与静态 BASIC/SPECIAL Registry 构造，使用 `material-import-mapping-metadata-v1` 规范 JSON SHA-256；展示文案不进入 Mapping digest，搜索 cursor 另绑展示投影摘要。现有请求载荷、target namespace/code、Mapping 状态机、确认必填、唯一性、category_hint 和 ignore 语义未改变；旧失效 target 仍由 GET Mapping 原样保留，新的保存/confirm fail closed。
+
+新增只读路由为 `GET /api/material-master/import-batches/:batchId/mapping-targets`。该更新未修改 Schema、Migration、前端或生产环境。

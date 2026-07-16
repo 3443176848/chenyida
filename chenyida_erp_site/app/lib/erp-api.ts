@@ -8,6 +8,7 @@ type RuntimeEnv = {
   ERP_SETUP_TOKEN?: string;
   ERP_MATERIAL_WRITE_RATE_LIMIT?: string;
   ERP_MATERIAL_NEW_KEY_RATE_LIMIT?: string;
+  ERP_MATERIAL_IMPORT_READ_RATE_LIMIT?: string;
   ERP_ENV?: string;
   MATERIAL_IMPORT_OBJECTS?: R2BucketLike;
 };
@@ -1424,6 +1425,7 @@ export async function handleErpApi(request: Request) {
     if (path === "/api/material-master" || path.startsWith("/api/material-master/")) {
       const attempts = Number(runtime.ERP_MATERIAL_WRITE_RATE_LIMIT ?? 60);
       const newKeys = Number(runtime.ERP_MATERIAL_NEW_KEY_RATE_LIMIT ?? 20);
+      const importReads = Number(runtime.ERP_MATERIAL_IMPORT_READ_RATE_LIMIT ?? 120);
       return handleMaterialMasterApi(request, {
         database: database() as unknown as MaterialApiDependencies["database"],
         currentUser: async (materialRequest) => currentUser(materialRequest),
@@ -1432,6 +1434,7 @@ export async function handleErpApi(request: Request) {
           return permissions.has("*") || permissions.has(permission);
         },
         rateLimits: { attemptsPerMinute: attempts, newKeysPerMinute: newKeys },
+        importReadRateLimit: Number.isSafeInteger(importReads) && importReads > 0 ? importReads : 120,
         objectStore: runtime.MATERIAL_IMPORT_OBJECTS
           ? new R2MaterialImportObjectStore(runtime.MATERIAL_IMPORT_OBJECTS)
           : undefined,

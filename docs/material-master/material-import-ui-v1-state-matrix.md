@@ -20,7 +20,7 @@
 | PARSED | RUNNING | sheet | D,S,R | 无 Mapping 写 | read | 活跃：2/5/10s | 同上 | 字段映射准备中 | 同上 | 同上 | 刷新 | 50×256 验收 |
 | PARSED | FAILED | sheet/处置 | D,S,R | 无；不重新 parse | read | 稳定 | 解析完成；Sheet 只读；失败标记在 Mapping 准备 | 解析结果已发布，但字段映射准备失败 | 写均锁定 | 不允许新 dirty | 刷新、联系管理员；无伪重试 | 50×256 验收 |
 | PARSED | READY | sheet | D,S,R | 无；客户端不解锁 | read | 立即 GET 一次，再有界轮询 | 解析完成；Sheet 只读；Mapping 仍锁 | 正在确认字段映射准备状态 | 写均锁定 | 不允许新 dirty | 等待服务端进入 AWAITING_MAPPING | 50×256 验收 |
-| AWAITING_MAPPING | READY/契约实际值 | sheet 或 mapping | D,S,R,M | PUT 保存；preview；confirm | Map（读仍按 read） | 稳定 | 文件/解析完成；Sheet/Mapping 当前；确认锁/待就绪 | 请选择 Sheet、Header 并配置字段映射 | save unknown 禁 preview/confirm；preview unknown 禁 confirm；confirm unknown 禁编辑/写 | sheet/header/离页需 guard；保存成功才清对应 dirty | 冲突重读；metadata 错保留映射并失效 preview | **BLOCKED_BY_MAPPING_TARGET_CATALOG**；50×256验收 |
+| AWAITING_MAPPING | READY/契约实际值 | sheet 或 mapping | D,S,R,M | PUT 保存；preview；confirm | Map（读仍按 read） | 稳定 | 文件/解析完成；Sheet/Mapping 当前；确认锁/待就绪 | 请选择 Sheet、Header 并配置字段映射 | save unknown 禁 preview/confirm；preview unknown 禁 confirm；confirm unknown 禁编辑/写 | sheet/header/离页需 guard；保存成功才清对应 dirty | 冲突重读；metadata 错保留映射并失效 preview | Catalog 门禁已 RESOLVED；仍需 50×256 验收 |
 | MAPPING_CONFIRMED | READY/契约实际值 | confirmed；sheet 只读 | D,S,R,M | 无 | read | 稳定 | 全部完成但 Sheet/Header/Mapping 只读 | 字段映射已确认；不代表物料已创建 | 不应有新写；遗留 confirm unknown 先权威恢复 | 无编辑 dirty | 只显示真实字段；无确认人/时间推断 | 50×256验收（Rows） |
 | FAILED | — | 状态处置 | D | 仅明确重复失败的新批次流程；原批次不写 | C（新批次）/read | 稳定 | 对应阶段失败；后续锁定 | 按安全 stage/code 分类 | 明确业务失败不算 unknown；若原写仍 unknown 不得直接重试批次 | 不适用 | 刷新；安全 request_id；重复需同 SHA 新批次 | 无 |
 | CANCELLED | — | 状态处置 | D | 无 | read | 稳定 | 取消标记；后续锁定 | 批次已取消 | 清除已权威解析的 unknown；禁止新写 | 不适用 | 刷新/返回列表 | 无 |
@@ -105,7 +105,7 @@
 
 | Gate | 当前状态 | 阻断内容 | 通过证据 | 失败处置 |
 | --- | --- | --- | --- | --- |
-| BLOCKED_BY_MAPPING_TARGET_CATALOG | BLOCKED | 完整 TargetSelector、动态属性 Mapping、metadata 恢复、完整确认流 | 独立只读 API 规格获批；实现/权限/安全/测试通过；OpenAPI 更新 | 不得 seed/硬编码/测试数据/历史 Mapping 绕过 |
+| BLOCKED_BY_MAPPING_TARGET_CATALOG | RESOLVED | 无；PHASE2-TASK07 已解除 Catalog 阻断，但 UI 尚未实施 | 独立只读 API、共享 Registry/Snapshot/digest、权限/行级隔离、cursor、OpenAPI、51 项专项和 Node 339/339 通过 | 未来 UI 仍不得 seed/硬编码/测试数据/历史 Mapping 绕过 |
 | PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED | REQUIRED，未验证 | 50×256 Rows 的实施验收；UI 是否开放 page_size=100 | 初渲染、翻页、横滚、sticky、展开、键盘、DOM、内存、读屏、1366、窄屏记录通过 | 停止验收，另立窗口化/轻量虚拟化任务；不截列、不引大型 Grid |
 
 ## 9. 稳定错误处置摘要

@@ -8,6 +8,7 @@ import {
 } from "./parser-model.ts";
 import type { MaterialImportTask, MaterialImportTaskDisposition, MaterialImportTaskHandler } from "./task-scheduler.ts";
 import { parseMaterialImportXlsx, type MaterialImportSharedStringStore, type MaterialImportXlsxSheet } from "./xlsx-parser.ts";
+import { MaterialImportMappingMetadataSnapshotService } from "./mapping-target-registry.ts";
 
 const LEASE_SECONDS = 120;
 const IDEMPOTENCY_TTL_SECONDS = 86_400;
@@ -266,8 +267,7 @@ export class MaterialImportParserTaskHandler implements MaterialImportTaskHandle
         const score = cells.length ? Math.min(1, (nonEmpty / cells.length) * 0.7 + (unique / Math.max(1, nonEmpty)) * 0.3) : 0;
         return { rowNumber: row.row_number, score };
       }).filter((candidate) => candidate.score > 0).sort((left, right) => right.score - left.score).slice(0, 3);
-      const attributes = (await this.#database.prepare("SELECT attribute_code,data_type,status FROM material_attribute_definitions ORDER BY attribute_code").all<{ attribute_code: string; data_type: string; status: string }>()).results ?? [];
-      const metadataDigest = await sha256Text(JSON.stringify({ basic: BASIC_TARGETS, supplier: SUPPLIER_TARGETS, attributes }));
+      const metadataDigest = (await new MaterialImportMappingMetadataSnapshotService(this.#database).current()).metadataDigest;
       const header = candidates[0]?.rowNumber ?? null;
       const statements: MaterialMasterD1Statement[] = [this.#database.prepare("DELETE FROM material_import_header_suggestions WHERE parse_run_id=?").bind(task.parseRunId)];
       candidates.forEach((candidate, index) => statements.push(this.#database.prepare("INSERT INTO material_import_header_suggestions(parse_run_id,sheet_index,row_number,rank,score,reason_codes_json,algorithm_version,metadata_digest,created_at) VALUES(?,?,?,?,?,'[\"NON_EMPTY_UNIQUE_ROW\"]','header-v1',?,?)").bind(task.parseRunId, sheet.sheet_index, candidate.rowNumber, index + 1, candidate.score, metadataDigest, timestamp)));
@@ -306,5 +306,4 @@ export class MaterialImportParserTaskHandler implements MaterialImportTaskHandle
   }
 }
 
-export const BASIC_TARGETS = Object.freeze(["STANDARD_NAME", "UNIT", "BRAND", "MANUFACTURER", "MANUFACTURER_PART_NUMBER", "PURCHASE_TYPE", "INVENTORY_TYPE", "LOT_CONTROL", "SHELF_LIFE_DAYS", "INSPECTION_TYPE", "ENVIRONMENTAL_REQUIREMENT"]);
-export const SUPPLIER_TARGETS = Object.freeze(["SUPPLIER_NAME", "SUPPLIER_ITEM_CODE", "SUPPLIER_ITEM_NAME", "SUPPLIER_SPECIFICATION", "PURCHASE_UOM"]);
+export { BASIC_TARGETS, SUPPLIER_TARGETS } from "./mapping-target-registry.ts";

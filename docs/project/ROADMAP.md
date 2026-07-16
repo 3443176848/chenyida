@@ -8,7 +8,7 @@
 | --- | --- | ---: | --- |
 | Phase 0 | 基础架构 | 4 | DOING |
 | Phase 1 | 物料主数据 | 6 | PLANNED |
-| Phase 2 | 导入中心 | 5 | PLANNED |
+| Phase 2 | 导入中心 | 7 | PLANNED |
 | Phase 3 | AI治理 | 5 | PLANNED |
 | Phase 4 | ERP融合 | 6 | PLANNED |
 | Phase 5 | 行业物料库 | 4 | PLANNED |
@@ -51,7 +51,7 @@
 - 重复上传与重试幂等，失败不留下半批数据。
 - 冲突和新物料不能绕过审核进入正式业务。
 
-**预计任务数**：5。**当前状态**：PLANNED。
+**当前任务数**：7。**当前状态**：PLANNED。
 
 **任务顺序**：
 
@@ -59,6 +59,11 @@
 - `PHASE2-TASK02`：实现 Import Batch Foundation（DONE，非生产；无 R2 资源、生产迁移或部署）。
 - `PHASE2-TASK03`：设计 Excel/CSV Parser 与字段 Mapping V1（DONE；16 项决定已确认）。
 - `PHASE2-TASK04`：实施 Parser、`0005`、Outbox 和 Mapping API（DONE；54 项专项与全量 Node 278/278 通过，仅非生产，不含生产资源、迁移或部署）。
+- `PHASE2-TASK05`：设计 Material Import Workspace UI V1（DONE；仅文档，完整 UI 未实施）。
+- `PHASE2-TASK06`：设计 Material Import Mapping Target Catalog V1（DONE；12 项决定已由 TASK07 批准）。
+- `PHASE2-TASK07`：实现批次作用域 Catalog 与共享 Registry/Snapshot/digest（DONE；51 项专项、Node 339/339；Catalog 门禁已解除，未改 Schema/Migration/前端或生产环境）。
+
+后续 Import Workspace UI 必须另立任务，并先完成 50×256 性能与可访问性验收；Catalog 门禁解除不代表 UI 已实施。
 
 ## Phase 3 AI治理
 

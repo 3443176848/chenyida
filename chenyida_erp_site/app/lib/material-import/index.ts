@@ -9,3 +9,5 @@ export * from "./xlsx-parser.ts";
 export * from "./task-scheduler.ts";
 export * from "./parser-service.ts";
 export * from "./mapping-service.ts";
+export * from "./mapping-target-registry.ts";
+export * from "./mapping-target-catalog-service.ts";
