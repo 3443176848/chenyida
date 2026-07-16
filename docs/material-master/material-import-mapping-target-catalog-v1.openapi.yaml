@@ -1,0 +1,308 @@
+openapi: 3.1.0
+info:
+  title: Chenyida ERP Material Import Mapping Target Catalog V1
+  version: 1.0.0-proposed
+  description: |
+    PHASE2-TASK06 proposed read-only compatibility contract. This document does
+    not authorize runtime implementation, schema or metadata changes, production
+    access, migration, or deployment.
+servers:
+  - url: /
+security:
+  - sessionCookie: []
+tags:
+  - name: MaterialImportMappingTargetCatalog
+paths:
+  /api/material-master/import-batches/{batchId}/mapping-targets:
+    get:
+      tags: [MaterialImportMappingTargetCatalog]
+      summary: Read a bounded page of current selectable Mapping targets
+      operationId: listMaterialImportMappingTargets
+      parameters:
+        - $ref: '#/components/parameters/BatchId'
+        - name: namespace
+          in: query
+          required: false
+          description: Catalog display group, not the persisted Mapping target_namespace.
+          schema:
+            $ref: '#/components/schemas/TargetGroupCode'
+        - name: q
+          in: query
+          required: false
+          description: Bounded plain-text search over target code, display name, and description.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque server-issued cursor bound to query and catalog snapshots.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 1024
+      responses:
+        '200':
+          description: Current bounded target catalog page
+          headers:
+            Cache-Control:
+              schema: { type: string, const: 'private, no-store' }
+            Pragma:
+              schema: { type: string, const: 'no-cache' }
+            X-Request-Id:
+              schema: { type: string, minLength: 1, maxLength: 128 }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetCatalogResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/CatalogConflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/CatalogUnavailable' }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: erp_session
+  parameters:
+    BatchId:
+      name: batchId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[1-9][0-9]*$'
+        maxLength: 20
+  responses:
+    BadRequest:
+      description: Query parameter or cursor is invalid
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden:
+      description: material.import.read or material.import.map is missing
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Batch is absent or hidden by row-level authorization
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    CatalogConflict:
+      description: Cursor is stale or the batch has no current parse run in a catalog-readable state
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Read rate limit exceeded
+      headers:
+        Retry-After:
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InternalError:
+      description: Safe internal error without SQL, stack, IDs, paths, or sensitive metadata
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    CatalogUnavailable:
+      description: Authoritative registry or runtime metadata is unavailable, malformed, or over a safe bound
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    TargetGroupCode:
+      type: string
+      enum: [BASIC, ATTRIBUTE, SPECIAL]
+    PersistedTargetNamespace:
+      type: string
+      description: Exact existing namespace persisted by Mapping PUT and read by preview/confirm.
+      enum: [basic, attribute, category_hint, supplier_reference, ignore]
+    TargetValueType:
+      type: string
+      enum: [TEXT, INTEGER, DECIMAL, BOOLEAN, DATE, ENUM, NONE]
+    MappingMode:
+      type: string
+      enum: [SOURCE, SOURCE_WITH_DEFAULT, DEFAULT, IGNORE]
+    AllowedDefaultJsonType:
+      type: string
+      enum: [STRING, SAFE_INTEGER, BOOLEAN, 'NULL']
+    DefaultValuePolicy:
+      type: object
+      additionalProperties: false
+      required: [allowed, allowed_json_types]
+      properties:
+        allowed: { type: boolean }
+        allowed_json_types:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          items: { $ref: '#/components/schemas/AllowedDefaultJsonType' }
+    UnitPolicy:
+      type: object
+      additionalProperties: false
+      required: [mode, canonical_unit, allowed_units]
+      properties:
+        mode:
+          type: string
+          enum: [NOT_APPLICABLE, FORBIDDEN, CANONICAL]
+        canonical_unit:
+          type: [string, 'null']
+          maxLength: 64
+        allowed_units:
+          type: array
+          uniqueItems: true
+          maxItems: 32
+          items: { type: string, minLength: 1, maxLength: 64 }
+    ValueConstraints:
+      type: object
+      additionalProperties: false
+      required: [decimal_scale, enum_values, normalization_rule]
+      properties:
+        decimal_scale:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 9
+        enum_values:
+          type: array
+          uniqueItems: true
+          maxItems: 200
+          items: { type: string, minLength: 1, maxLength: 128 }
+        normalization_rule:
+          type: string
+          enum: [NONE, TRIM_UPPER, DECIMAL_SCALE, ENUM_CODE, DATE_ISO]
+    ConstraintSummary:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 64, pattern: '^[A-Z][A-Z0-9_]*$' }
+        message: { type: string, minLength: 1, maxLength: 200 }
+    MappingTarget:
+      type: object
+      additionalProperties: false
+      required:
+        - group_code
+        - target_namespace
+        - target_code
+        - display_name
+        - description
+        - value_type
+        - required_for_confirm
+        - mapping_modes
+        - default_value_policy
+        - unit_policy
+        - value_constraints
+        - enabled
+        - selectable
+        - constraints
+      properties:
+        group_code: { $ref: '#/components/schemas/TargetGroupCode' }
+        target_namespace: { $ref: '#/components/schemas/PersistedTargetNamespace' }
+        target_code:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: '^[A-Z][A-Z0-9_]*$'
+        display_name: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, maxLength: 500 }
+        value_type: { $ref: '#/components/schemas/TargetValueType' }
+        required_for_confirm: { type: boolean }
+        mapping_modes:
+          type: array
+          minItems: 1
+          maxItems: 3
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/MappingMode' }
+        default_value_policy: { $ref: '#/components/schemas/DefaultValuePolicy' }
+        unit_policy: { $ref: '#/components/schemas/UnitPolicy' }
+        value_constraints: { $ref: '#/components/schemas/ValueConstraints' }
+        enabled: { type: boolean, const: true }
+        selectable: { type: boolean, const: true }
+        constraints:
+          type: array
+          maxItems: 8
+          items: { $ref: '#/components/schemas/ConstraintSummary' }
+    TargetCatalogResponse:
+      type: object
+      additionalProperties: false
+      required: [batch_id, parse_run_id, metadata_digest, items, next_cursor, request_id]
+      properties:
+        batch_id:
+          type: integer
+          minimum: 1
+        parse_run_id:
+          type: integer
+          minimum: 1
+        metadata_digest:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        items:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/MappingTarget' }
+        next_cursor:
+          type: [string, 'null']
+          maxLength: 1024
+        request_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+    ErrorCode:
+      type: string
+      enum:
+        - IMPORT_MAPPING_TARGET_CATALOG_NOT_AVAILABLE
+        - IMPORT_MAPPING_TARGET_CATALOG_CHANGED
+        - IMPORT_MAPPING_TARGET_QUERY_INVALID
+        - IMPORT_BATCH_NOT_FOUND
+        - AUTH_REQUIRED
+        - FORBIDDEN
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      properties:
+        field: { type: string, maxLength: 64 }
+        code: { type: string, maxLength: 64 }
+        restart_from_first_page: { type: boolean }
+    ErrorBody:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id, details]
+      properties:
+        code: { $ref: '#/components/schemas/ErrorCode' }
+        message: { type: string, minLength: 1, maxLength: 500 }
+        request_id: { type: string, minLength: 1, maxLength: 128 }
+        details:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/ErrorDetail' }
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [request_id, error]
+      properties:
+        request_id: { type: string, minLength: 1, maxLength: 128 }
+        error: { $ref: '#/components/schemas/ErrorBody' }

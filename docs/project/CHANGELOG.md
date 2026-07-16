@@ -4,6 +4,16 @@
 
 ## 2026-07-16
 
+### PHASE2-TASK06 设计 - `docs: design import mapping target catalog`
+
+- Git Commit：Material Import Mapping Target Catalog V1 正式规格、OpenAPI 和治理文档在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `d1c6763`。
+- 路由与权限：比较批次作用域、全局作用域和混入现有 Mapping 三种方案，推荐 `GET /api/material-master/import-batches/:batchId/mapping-targets`；要求 `material.import.read` + `material.import.map`、owner/`read_any` 行级可见性和隐藏 404，`read_any` 不自动等于 map。
+- 数据来源：基础和特殊目标来自后续共享 Target Registry；动态属性只读运行时 D1 ACTIVE metadata，不读 seed、fixture 或历史 Mapping，不暴露 attribute id、表名、列名或 SQL。
+- digest 审计：确认当前实现只摘要基础/供应商 code 与属性 code/type/status，且 Parser 准备与 Mapping Service 各自投影；规格要求实施前抽取共享 Registry + `MappingMetadataSnapshotV1`，由 Catalog、准备、保存、preview 和 confirm 共同使用，禁止第二套 digest。
+- 契约：定义 BASIC/ATTRIBUTE/SPECIAL 三组、保留现有小写 namespace 与大写 target code、完整 target DTO、统一有界搜索/cursor、Metadata/展示双摘要、`private, no-store`、历史失效目标和稳定安全错误。
+- 测试与决定：记录 43 项未来实施测试和 12 项 `PROPOSED` 决定；Catalog 不可用时整体阻断 TargetSelector，不允许降级到基础字段或前端硬编码。
+- 验证与范围：5 份 OpenAPI YAML/本地引用、规格 43 项编号/12 项决定、lint 0 error/1 个既有 warning、build 与全量 Node 288/288、隔离 API smoke、Drizzle 34 表无漂移、272 文件凭证扫描和临时 SQLite 完整基线通过；最终 `git diff --check` 与 docs-only 范围在提交前复核。未修改运行时代码、Mapping 语义、Schema、Migration、Metadata、前端、R2/Queue/hosting 或生产环境。
+
 ### PHASE2-MAINT-01 修复 - `fix: ignore comment-only rollback statements`
 
 - Git Commit：共享 breakpoint-aware Migration statement 过滤、隔离回归测试和治理文档在独立维护提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `f965ddb`。

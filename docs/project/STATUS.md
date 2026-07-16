@@ -8,11 +8,11 @@
 | --- | ---: | --- |
 | 总代码量 | 约 29,000 行 | 本地 ERP 与 Site 运行时、迁移、脚本和测试源码；不含依赖、构建产物和文档 |
 | 源码文件 | 107 | Site 的 `app/db/drizzle/tests/scripts` 口径；MAINT-01 新增共享 Migration statement 辅助器及其隔离 D1 回归测试 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE2-MAINT-01 只修改 Migration 测试/开发辅助层、对应隔离测试和四份项目台账；未修改 Migration、API、Schema、hosting 或本地旧版业务逻辑 |
+| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK06 只新增 Catalog 规格/OpenAPI 并更新四份项目台账；未修改运行时代码、Migration、API、Schema、Metadata、hosting 或本地旧版业务逻辑 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 60（本地+开发 schema） | 本地 SQLite 26 张，Site 开发 schema 34 张；`0005` 仅在隔离 D1 测试，未执行生产迁移 |
-| 在线 API 路径 | 80 | 既有 73 个路径加 Parser/Mapping 7 个路径；生产公开站点尚未部署本提交 |
+| 在线 API 路径 | 80 | Catalog 路由仅为 `PROPOSED` OpenAPI，未实现；生产公开站点尚未部署开发基线 |
 | 页面入口 | 11 | 既有 9 个入口加 `/materials/review` 与 `/materials/:materialId/review` |
 | 测试与安全检查文件 | 28 | MAINT-01 新增共享辅助器隔离 D1 回归测试；全量 Node 288/288 |
 
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE2-MAINT-01` 开始时，根仓库 `main` 位于 `f965ddb`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖共享 Migration 测试/开发辅助层、同语义调用点、隔离 D1 回归测试和 `MASTER/TASKS/CHANGELOG/STATUS`；未修改 production binding、hosting、前端运行时代码、API、Schema、Migration 或本地旧版业务逻辑。
+`PHASE2-TASK06` 开始时，根仓库 `main` 位于 `d1c6763`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖两份 Catalog 文档与 `MASTER/TASKS/CHANGELOG/STATUS`；未修改 production binding、hosting、前端/服务端运行时代码、API 实现、Schema、Migration、Metadata 或本地旧版业务逻辑。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE2-MAINT-01` 计划提交消息为 `fix: ignore comment-only rollback statements`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
+`PHASE2-TASK06` 计划提交消息为 `docs: design import mapping target catalog`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
 
 实时状态必须使用：
 
@@ -48,6 +48,23 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE2-TASK06 Mapping Target Catalog V1 书面设计基线
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / AWAITING SPECIFICATION CONFIRMATION | 规格、OpenAPI 和 12 项决定已形成；全部决定仍为 `PROPOSED` |
+| 推荐路由 | PROPOSED | 批次作用域 `GET .../:batchId/mapping-targets`；全局路由与混入 Mapping 仅保留比较 |
+| 权限/可见性 | DESIGNED | read + map + owner/read_any；隐藏批次 404，`read_any` 不隐含 map |
+| Catalog 来源 | DESIGNED | BASIC/SPECIAL 来自共享 Registry；ATTRIBUTE 来自运行时 D1 ACTIVE metadata；禁止 seed/fixture/历史 Mapping |
+| target DTO | DESIGNED | 保留现有小写 namespace 与大写 code，返回分组、类型、必填、mapping modes、default/unit/value constraints、enabled/selectable；不返回内部 ID/列名 |
+| digest 审计 | GAP RECORDED | 当前 digest 缺特殊目标、单位/default/必填等语义且有两处投影；实施前必须抽共享 Registry + Snapshot，禁止 Catalog 第二套算法 |
+| 搜索/cursor | DESIGNED | 三组统一有界分页；q 最大 64、limit 默认 50/最大 100、稳定排序、cursor 绑定业务与展示搜索快照，旧 cursor 409 |
+| 缓存/历史目标 | DESIGNED | `private, no-store`；历史 Mapping code 保留，Catalog miss 由 UI 标失效，不新增 resolver、不自动替换 |
+| 测试计划 | COMPLETE | 43 项未来实施测试，含权限、D1 metadata、digest、cursor、限流、审计、OpenAPI、隔离 D1 和 288 项回归 |
+| 文档阶段验证 | PASS | 5 份 OpenAPI YAML/本地引用、规格 43 项编号/12 项决定、lint 0 error/1 个既有 warning、build 与 Node 288/288、隔离 API smoke、Drizzle 34 表无漂移、272 文件凭证扫描通过；首次 `npm test` 因 183 秒工具时限被终止并产生 reporter EPIPE，干净重跑 288/288 |
+| 本地基线 | PASS | Python 3.12 临时 SQLite 环境守卫 4/4、self-test、smoke、backup/restore、go-live 通过并清理 |
+| 生产影响 | NONE | 未连接 production/公共 URL/远程 D1/R2/Queue，未迁移、修改 Metadata、部署或修改 hosting |
 
 ## PHASE2-MAINT-01 Protected Down 注释语句测试修复基线
 
