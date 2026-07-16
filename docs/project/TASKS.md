@@ -39,8 +39,9 @@
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | PHASE2-TASK04 | 实现 Excel/CSV Parser 与字段 Mapping V1 | DONE | Codex（实施）、项目负责人（规格与非生产范围批准） | 2026-07-16 | 2026-07-16 | PHASE2-TASK03 | 完成 `0005` Up/受保护 Down、parse run、Outbox、可注入调度与租约恢复、XLSX/CSV 有界解析、Shared Strings 分块、原始行原子发布、Mapping 准备及七个 API；54 项专项和全量 Node 278/278 通过；未创建生产 Queue/binding、执行生产迁移或部署，未创建 Material Draft/正式物料 |
+| PHASE2-TASK05 | 设计 Material Import Workspace UI V1 | DONE | Codex（设计）、项目负责人（六段设计与整体方向确认，待完整规格确认） | 2026-07-16 | 2026-07-16 | PHASE2-TASK04 | 完成正式 UI 规格、22 状态低保真线框、集中状态矩阵、100 项未来实施测试和 16 项 `PROPOSED` 决定；记录 `BLOCKED_BY_MAPPING_TARGET_CATALOG` 与 `PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED`；仅文档，未修改运行时代码、API、Schema、Migration、R2/Queue、hosting 或生产环境 |
 
-当前没有 `DOING` 任务。`PHASE2-TASK04` 已完成并停止；生产 R2/Queue、生产 D1 migration、Cron、部署、清洗/匹配/Material Draft、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
+当前没有 `DOING` 任务。`PHASE2-TASK05` 已完成并停止等待“规格确认”；16 项 UI 决定不得提前转为 `APPROVED`。Mapping Target Catalog 只读兼容 API 必须先独立设计、实现、测试并更新 OpenAPI，之后才能开始完整 Import Workspace UI；生产 R2/Queue、生产 D1 migration、Cron、部署、清洗/匹配/Material Draft、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
 
 ## Phase 0 待办
 

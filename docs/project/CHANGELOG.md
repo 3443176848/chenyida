@@ -4,6 +4,18 @@
 
 ## 2026-07-16
 
+### PHASE2-TASK05 设计 - `docs: design material import workspace ui`
+
+- Git Commit：Material Import Workspace UI V1 的三份正式设计文档与项目治理更新在独立文档提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `73435a3`。
+- 路由与状态：定义 `/materials/imports`、`/materials/imports/new`、`/materials/imports/:batchId`，采用服务端状态驱动的单工作区 Stepper；`view` 仅为展示意图，非法参数 replaceState 规范化；列表使用不透明单向 cursor 的单批结果导航。
+- 文件与上传：确定先预检/SHA/确认再创建批次；推荐专用 Worker 的真实增量 SHA-256；共享 API Client 内受控 multipart XHR transport；精确区分网络上传进度、服务端存储/安全检查、取消和 RESULT_UNKNOWN；重复 REJECT 后按新批次 ALLOW_DUPLICATE 流程恢复。
+- 解析与查看：定义 parse 前重读、独立幂等、2/5/10 秒受控轮询、网络与 Retry-After 退避、协作式取消和粗粒度真实状态；Sheet/Rows 使用真实分页并保留稀疏 cell、日期、公式、错误、列宽与尾随空列语义。
+- Mapping：采用三列编辑器、显式保存、已保存版本预览和当前页面最新 preview 门禁；confirmed 只读且不虚构确认人/时间、不显示正式导入；100 项未来实施测试逐条记录。
+- 门禁：记录 `BLOCKED_BY_MAPPING_TARGET_CATALOG`，禁止从 seed、测试数据或前端硬编码绕过动态目标；记录 `PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED`，50×256 未验收前不开放完整实施或 page_size=100。
+- 决策：16 项均保持 `Status: PROPOSED`，只有完整文档审阅后收到“规格确认”才能转为 `APPROVED`。
+- 验证：lint 0 error/1 个既有 warning、环境守卫 6/6、隔离 API smoke、4 份 OpenAPI 解析、268 文件凭证扫描、100 项测试编号/16 项决定/22 状态线框结构检查和临时 SQLite 基线通过。`npm test` 构建成功但基线未全绿：并发运行 275/278 通过，两个超时迁移串行复跑通过；`0005 protected Down` 单独复跑仍因 rollback SQL 尾部纯注释被测试 helper 当作 D1 statement 而失败。本任务按 docs-only 边界不修改既有迁移或测试运行时代码。
+- 范围与生产：仅新增/更新文档；未修改前端运行时代码、API、Schema、Migration、R2/Queue、hosting 或生产配置，未连接、迁移或部署生产环境。
+
 ### PHASE2-TASK04 实施 - `feat: add material import parser and mapping`
 
 - Git Commit：Parser 与字段 Mapping V1 非生产实现、测试和治理文档在独立功能提交完成；实际哈希以根仓库 `git log -1` 为准，提交前基线为 `a16b2f3`。

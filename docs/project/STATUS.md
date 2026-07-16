@@ -8,7 +8,7 @@
 | --- | ---: | --- |
 | 总代码量 | 约 29,000 行 | 本地 ERP 与 Site 运行时、迁移、脚本和测试源码；不含依赖、构建产物和文档 |
 | 源码文件 | 105 | Site 的 `app/db/drizzle/tests/scripts` 口径；TASK04 新增六个 Parser/Mapping 模块、迁移和四组测试 |
-| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK04 只修改获批的在线 Material Import、`0005`、依赖、专项测试和项目文档；未修改 hosting、前端或本地旧版业务逻辑 |
+| 根仓库跟踪项 | 提交前动态值 | PHASE2-TASK05 只新增三份 Material Import UI 设计文档并更新四份项目台账；未修改运行时代码、API、Schema、Migration、hosting 或本地旧版业务逻辑 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 60（本地+开发 schema） | 本地 SQLite 26 张，Site 开发 schema 34 张；`0005` 仅在隔离 D1 测试，未执行生产迁移 |
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE2-TASK04` 开始时，根仓库 `main` 位于 `a16b2f3`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖获批范围内的 Material Import Parser/Mapping 运行时、`0005`、Drizzle、依赖、测试、规格和治理文档；未修改 production binding、hosting、前端或本地旧版业务逻辑。
+`PHASE2-TASK05` 开始时，根仓库 `main` 位于 `73435a3`，工作区干净，`chenyida_erp_site/` 不是嵌套仓库。当前差异只覆盖三份 Material Import Workspace UI 设计文档和 `MASTER/TASKS/CHANGELOG/STATUS`；未修改 production binding、hosting、前端运行时代码、API、Schema、Migration 或本地旧版业务逻辑。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE2-TASK04` 计划提交消息为 `feat: add material import parser and mapping`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
+`PHASE2-TASK05` 计划提交消息为 `docs: design material import workspace ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
 
 实时状态必须使用：
 
@@ -48,6 +48,26 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE2-TASK05 Material Import Workspace UI V1 书面设计基线
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / AWAITING SPECIFICATION CONFIRMATION | 六段设计和整体方向已确认；完整文档交付后停止等待“规格确认”，16 项决定仍为 `PROPOSED` |
+| 正式交付 | COMPLETE | `material-import-ui-v1.md`、wireframes、state matrix 三份独立文档 |
+| 路由/恢复 | DESIGNED | 三条路由、单状态工作区 Stepper、view 非权威、allowlist/replaceState、单向 opaque cursor 单批结果导航 |
+| 创建/上传 | DESIGNED | 客户端有限预检、Worker 增量 SHA、确认后创建、共享 Client 内 XHR、真实字节进度、独立幂等/RESULT_UNKNOWN、重复文件新批次恢复 |
+| 解析/取消 | DESIGNED | parse 前重读与独立 Key、2/5/10 秒轮询、网络/429 退避、粗粒度真实状态、五状态协作式取消与 CAS 竞争 |
+| Sheet/Rows/Header | DESIGNED | Sheet 可见性、真实 Rows 分页、稀疏 cell/DATE/FORMULA/ERROR、原始行与 Mapping 样本分离、Sheet/Header 随 Mapping 保存 |
+| Mapping | DESIGNED / BLOCKED | 三列编辑、显式保存、已保存版本 preview、当前页面最新 preview 门禁、服务端 confirm 最终裁决、confirmed 只读 |
+| Catalog 门禁 | BLOCKED_BY_MAPPING_TARGET_CATALOG | 当前无完整动态目标 catalog/权威 metadata 读接口；必须另立兼容 API 任务，禁止 seed/硬编码绕过 |
+| 表格门禁 | PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED | 50×256 的渲染、翻页、横滚、sticky、键盘、DOM、内存、读屏、1366/窄屏尚未实施验收，不虚构通过 |
+| 线框/矩阵/测试设计 | COMPLETE | 覆盖 22 个指定状态、集中主状态/URL/preparation/unknown/dirty/权限/门禁矩阵，100 个唯一未来实施测试编号 |
+| 文档检查 | PASS | 100 项编号、16 项决定、22 状态结构、无 TBD/TODO 占位、`git diff --check` 与 docs-only 范围在提交前复核 |
+| Site 静态/安全 | PASS | lint 0 error/1 个既有 warning；环境守卫 6/6；4 份 OpenAPI YAML 解析；268 文件凭证扫描；隔离 API smoke 通过 |
+| Site 全量基线 | KNOWN FAILURE OUTSIDE TASK | build 成功；并发 `npm test` 275/278 通过、2 个迁移超时在串行复跑通过；`0005 protected Down` 单独复跑仍因 rollback SQL 末段纯注释被 helper 当作 D1 statement 而失败。本 docs-only 任务未修改迁移/测试代码 |
+| 本地基线 | PASS | Python 3.12 临时 SQLite 环境守卫 4/4、self-test、smoke、backup/restore、go-live 通过并清理 |
+| 生产影响 | NONE | 未连接 production/公共 URL/远程 D1/R2/Queue，未创建 binding/Cron、迁移、修改 hosting 或部署 |
 
 ## PHASE2-TASK04 Excel/CSV Parser 与字段 Mapping V1 实施基线
 
