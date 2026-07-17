@@ -4,6 +4,13 @@
 
 ## 2026-07-17
 
+### PHASE3-TASK03 规格确认 - `docs: approve import normalization review ui`
+
+- 项目负责人在正式设计提交 `c694045` 后明确回复“规格确认”；主规格中的 14 项 UI 决定从 `PROPOSED` 转为 `APPROVED`，并新增 D-023 决策记录。
+- 确认范围仅为统一工作区、七步 Stepper、Current/Latest 双轨、启动/重跑/取消、Rows/Issues、Row Drawer、可访问性与性能门禁等书面规格；不自动创建或授权实施任务。
+- Row Drawer 完整 Issue 查询局部门禁、`PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED` 和 7 项非阻塞限制继续有效，不因规格确认而视为已解决。
+- 本次仍为 docs-only；未修改前端、API、Schema、Migration、业务逻辑、依赖或生产环境。
+
 ### PHASE3-TASK03 设计 - `docs: design import normalization review ui`
 
 - 新增功能：无；本任务只形成 Material Import Normalization Review UI V1 正式规格、37 状态低保真线框、状态矩阵和 104 项未来实施测试计划。

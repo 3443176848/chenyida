@@ -45,9 +45,9 @@
 | PHASE2-TASK07 | 实现 Material Import Mapping Target Catalog V1 | DONE | Codex（实施）、项目负责人（12 项决定与非生产范围批准） | 2026-07-16 | 2026-07-16 | PHASE2-TASK06 | 实现批次作用域只读 Catalog、共享 Registry/Snapshot/digest、运行时 D1 ACTIVE 属性、有界搜索/cursor、read+map/行级可见性、读取限流和安全审计；Mapping 准备/保存/preview/confirm 统一；专项 51/51、全量 Node 339/339、lint/API/OpenAPI/凭证/临时 SQLite 通过；未改 Schema/Migration/前端或生产环境 |
 | PHASE2-TASK08 | 实现 Material Import Workspace UI V1 | DONE | Codex（实施）、项目负责人（16 项决定与非生产 UI 范围批准） | 2026-07-17 | 2026-07-17 | PHASE2-TASK07 | 完成三条导入路由、Worker SHA、共享 XHR、列表/上传/解析/轮询、Sheet/Rows/Header、Catalog/Mapping 保存预览确认；UI-001—UI-100、50×256 Playwright 门禁、Node 440/440、lint/API/OpenAPI/Drizzle/凭证/临时 SQLite 通过；未修改 API/Schema/Migration、生产资源、迁移或部署 |
 | PHASE3-TASK01 | 设计 Material Import Normalization & Staging V1 | DONE | Codex（设计）、项目负责人（待规格确认） | 2026-07-17 | 2026-07-17 | PHASE2-TASK08 | 完成正式规格、OpenAPI 草案和数据流/状态图；定义独立 run、JSON 行快照、独立 issue、类型/空值/属性规则、Outbox/租约、原子发布、五个 API、`0006` 设计、54 项测试和 16 项 `PROPOSED` 决定；仅文档，未修改运行时代码、Schema、Migration、API、前端或生产环境 |
-| PHASE3-TASK03 | 设计 Material Import Normalization Review UI V1 | DONE / WAITING FOR SPEC CONFIRMATION | Codex（设计）、项目负责人（四段设计确认，待正式规格确认） | 2026-07-17 | 2026-07-17 | PHASE3-TASK02 | 完成正式 UI 规格、37 状态低保真线框、集中状态矩阵和 104 项未来实施测试；采用统一工作区、七步 Stepper、Current/Latest 双轨、Rows/Issues cursor 与 Row Drawer；记录行完整 Issue 查询局部门禁、性能门禁和 7 项非阻塞限制；14 项决定仍为 `PROPOSED`；仅文档，未修改前端、API、Schema、Migration、业务逻辑或生产环境 |
+| PHASE3-TASK03 | 设计 Material Import Normalization Review UI V1 | DONE | Codex（设计）、项目负责人（2026-07-17 正式规格确认） | 2026-07-17 | 2026-07-17 | PHASE3-TASK02 | 完成正式 UI 规格、37 状态低保真线框、集中状态矩阵和 104 项未来实施测试；统一工作区、七步 Stepper、Current/Latest 双轨、Rows/Issues cursor 与 Row Drawer等 14 项决定均已 `APPROVED`；局部 Issue 查询门禁、性能门禁和 7 项非阻塞限制继续有效；仅文档，未修改前端、API、Schema、Migration、业务逻辑或生产环境 |
 
-当前没有 `DOING` 任务。`PHASE3-TASK03` 已形成正式规格并停止等待“规格确认”；确认前不得实施 Review UI。生产 R2/Queue、生产 D1 migration、Cron、部署、分类/匹配/Material Draft、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
+当前没有 `DOING` 任务。`PHASE3-TASK03` 正式规格已确认，但这不自动创建或授权 Review UI 实施任务。生产 R2/Queue、生产 D1 migration、Cron、部署、分类/匹配/Material Draft、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
 
 ## Phase 0 待办
 

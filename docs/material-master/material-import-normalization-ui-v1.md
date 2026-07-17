@@ -6,10 +6,10 @@
 | --- | --- |
 | 任务 | `PHASE3-TASK03` |
 | 类型 | UI 规格，docs-only |
-| 状态 | `DONE / WAITING FOR SPEC CONFIRMATION` |
+| 状态 | `DONE / SPECIFICATION CONFIRMED` |
 | 日期 | 2026-07-17 |
 | 实施授权 | 无；本文件不授权修改前端、API、Schema、Migration、业务逻辑或生产环境 |
-| 决策状态 | 第 34 节 14 项决定全部为 `PROPOSED` |
+| 决策状态 | 项目负责人于 2026-07-17 回复“规格确认”；第 34 节 14 项决定全部为 `APPROVED` |
 
 本规格设计从已确认 Mapping 启动数据归一化、查看异步进度、取消活动任务、审阅当前已发布结果、分页查看规范化行与 Issues，以及在批次作用域 Drawer 中核对单行候选和 Lineage。它不实施 UI，也不改变任何运行时契约。
 
@@ -442,26 +442,26 @@ PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED
 
 空状态不得称全部校验通过、已分类、可创建物料或正式导入。只读错误处置只允许刷新、查看来源/Mapping/安全问题、按现有流程新建导入批次，或在 API 允许时重试/重跑。
 
-## 34. 14 项待确认决定
+## 34. 14 项已确认决定
 
-以下均为 `Status: PROPOSED`；本轮确认只授权形成正式规格，不是实施批准。
+项目负责人于 2026-07-17 在正式规格提交后明确回复“规格确认”，以下均转为 `Status: APPROVED`。该确认批准 UI 规格，不授权开始编码、修改后端契约或操作生产环境；实施仍需独立任务。
 
 | # | 决定 | 可选方案 | 推荐方案与理由 | API 影响 | 前端状态影响 | 权限影响 | 安全影响 | 可访问性影响 | 性能影响 | 复杂度 | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | IA | 独立路由 / 统一工作区 | 统一 `/materials/imports/:batchId`；上下文连续 | 无 | View 状态扩展 | 无 | URL 不越权 | 单一语义流 | 少重复加载 | 中 | PROPOSED |
-| 2 | Stepper | 六步 / 七步 | 七步；分开 Mapping 确认与结果审阅 | 无 | 增第 6/7 步 | 无 | 不作授权 | 状态更清晰 | 可忽略 | 低 | PROPOSED |
-| 3 | Mapping Confirmed 落点 | Confirmed / Normalize | Normalize；下一合法动作明确 | 无 | 默认 View | Normalize 控钮独立鉴权 | 不自动发送 | 焦点明确 | 少一次导航 | 低 | PROPOSED |
-| 4 | Normalized 落点 | Progress / Results | Results；优先审阅已发布结果 | 无 | 默认 View | 只读权限 | 不暴露 Attempt 暂存 | 主标题明确 | 少一次请求 | 低 | PROPOSED |
-| 5 | Row 详情 | Drawer / Dialog / 路由 | Drawer；保留列表与 URL 恢复 | 无 | `row` + Marker | 仍由 API 鉴权 | 批次作用域核验 | 焦点约束/恢复 | 一次 Detail | 中 | PROPOSED |
-| 6 | 轮询 | 固定 / 指数 / 分段 | 2/5/10；网络 5/10/30，复用现有模式 | 无 | 单 Generation | 401/403 停止 | 防请求风暴 | 克制播报 | 有界请求 | 中 | PROPOSED |
-| 7 | 百分比 | 总进度 / 行进度 / 无百分比 | 仅合法 `processed/total` 行进度 | 无 | 校验后显示 | 无 | 不伪造 | 标签清楚 | 常量计算 | 低 | PROPOSED |
-| 8 | Rows 默认数量 | 20 / 50 / 100 | 50；契约默认与核对密度平衡 | 无 | `row_limit` | 无 | 有界 | 表格可读 | 最多 50 初始 DOM | 低 | PROPOSED |
-| 9 | Rows 字段 | 候选摘要 / 真实 DTO | 仅真实摘要；避免 N+1 和误导 | 无 | 列表/Drawer 分层 | 无 | 最小披露 | 短表头 | 无 N+1 | 低 | PROPOSED |
-| 10 | Issue 导航 | Client 全量 / Cursor + Drawer | 真实筛选、Opaque Cursor、Issue→Drawer | 无 | 独立参数/Marker | Read | 不扫描全量 | 表格与焦点关联 | 当前页请求 | 中 | PROPOSED |
-| 11 | Lineage 展开 | 全开 / 全折叠 / 分层 | 普通来源展开，技术信息折叠 | 无 | Drawer 分区 | Read | Hash 缩略 | 标题层级 | 少初始节点 | 低 | PROPOSED |
-| 12 | 重跑 | 直接 / Dialog / 独立页 | Dialog + 必填理由 + 新版本 | 无 | 独立 Operation | Normalize | 冻结 Body | 焦点与说明 | 常量开销 | 中 | PROPOSED |
-| 13 | 窄屏 | 新页面 / 全宽 Drawer | 700px 全宽覆盖，逻辑一致 | 无 | 响应式布局 | 无 | 同一核验 | 关闭按钮固定 | 不重复加载 | 中 | PROPOSED |
-| 14 | 实施门禁 | 文档通过即实施 / 硬验证 | 先通过性能与可访问性门禁 | 无 | Gate 状态 | 无 | 防无界展示 | 必须实测 | 必须实测 | 中高 | PROPOSED |
+| 1 | IA | 独立路由 / 统一工作区 | 统一 `/materials/imports/:batchId`；上下文连续 | 无 | View 状态扩展 | 无 | URL 不越权 | 单一语义流 | 少重复加载 | 中 | APPROVED |
+| 2 | Stepper | 六步 / 七步 | 七步；分开 Mapping 确认与结果审阅 | 无 | 增第 6/7 步 | 无 | 不作授权 | 状态更清晰 | 可忽略 | 低 | APPROVED |
+| 3 | Mapping Confirmed 落点 | Confirmed / Normalize | Normalize；下一合法动作明确 | 无 | 默认 View | Normalize 控钮独立鉴权 | 不自动发送 | 焦点明确 | 少一次导航 | 低 | APPROVED |
+| 4 | Normalized 落点 | Progress / Results | Results；优先审阅已发布结果 | 无 | 默认 View | 只读权限 | 不暴露 Attempt 暂存 | 主标题明确 | 少一次请求 | 低 | APPROVED |
+| 5 | Row 详情 | Drawer / Dialog / 路由 | Drawer；保留列表与 URL 恢复 | 无 | `row` + Marker | 仍由 API 鉴权 | 批次作用域核验 | 焦点约束/恢复 | 一次 Detail | 中 | APPROVED |
+| 6 | 轮询 | 固定 / 指数 / 分段 | 2/5/10；网络 5/10/30，复用现有模式 | 无 | 单 Generation | 401/403 停止 | 防请求风暴 | 克制播报 | 有界请求 | 中 | APPROVED |
+| 7 | 百分比 | 总进度 / 行进度 / 无百分比 | 仅合法 `processed/total` 行进度 | 无 | 校验后显示 | 无 | 不伪造 | 标签清楚 | 常量计算 | 低 | APPROVED |
+| 8 | Rows 默认数量 | 20 / 50 / 100 | 50；契约默认与核对密度平衡 | 无 | `row_limit` | 无 | 有界 | 表格可读 | 最多 50 初始 DOM | 低 | APPROVED |
+| 9 | Rows 字段 | 候选摘要 / 真实 DTO | 仅真实摘要；避免 N+1 和误导 | 无 | 列表/Drawer 分层 | 无 | 最小披露 | 短表头 | 无 N+1 | 低 | APPROVED |
+| 10 | Issue 导航 | Client 全量 / Cursor + Drawer | 真实筛选、Opaque Cursor、Issue→Drawer | 无 | 独立参数/Marker | Read | 不扫描全量 | 表格与焦点关联 | 当前页请求 | 中 | APPROVED |
+| 11 | Lineage 展开 | 全开 / 全折叠 / 分层 | 普通来源展开，技术信息折叠 | 无 | Drawer 分区 | Read | Hash 缩略 | 标题层级 | 少初始节点 | 低 | APPROVED |
+| 12 | 重跑 | 直接 / Dialog / 独立页 | Dialog + 必填理由 + 新版本 | 无 | 独立 Operation | Normalize | 冻结 Body | 焦点与说明 | 常量开销 | 中 | APPROVED |
+| 13 | 窄屏 | 新页面 / 全宽 Drawer | 700px 全宽覆盖，逻辑一致 | 无 | 响应式布局 | 无 | 同一核验 | 关闭按钮固定 | 不重复加载 | 中 | APPROVED |
+| 14 | 实施门禁 | 文档通过即实施 / 硬验证 | 先通过性能与可访问性门禁 | 无 | Gate 状态 | 无 | 防无界展示 | 必须实测 | 必须实测 | 中高 | APPROVED |
 
 ## 35. 门禁与非阻塞限制汇总
 
@@ -496,12 +496,12 @@ SELECTED_ISSUE_CONTEXT_NOT_RESTORABLE_AFTER_RELOAD
 
 本任务仅创建规格、线框、矩阵和测试计划。未来实施必须：
 
-1. 用户先明确回复“规格确认”。
-2. 单独形成实施计划并核验当前契约。
+1. 规格确认已于 2026-07-17 完成。
+2. 另立实施任务，形成实施计划并重新核验当前契约。
 3. 不修改 API 以绕过局部门禁，除非另立后端任务获批。
 4. 完成 104 项计划测试、现有 Node 回归和性能/可访问性门禁。
 5. 未经独立授权，不连接、迁移或部署生产资源。
 
 ## 37. 本任务验证策略
 
-上一提交的已验证结果作为可信基线，本任务采用增量文档验证，未重复运行无关全量检查。验证仅包括文档结构、内部链接/引用、104 项测试编号与分组、37 个线框、状态矩阵、14 项 `PROPOSED`、门禁/限制、`git diff --check`、docs-only 范围，以及 `.obsidian/` 和 `bub.md` 保护检查。
+设计提交沿用前一运行时提交的可信基线，并通过文档结构、内部链接/引用、104 项测试编号与分组、37 个线框、状态矩阵、14 项决定、门禁/限制、`git diff --check`、docs-only 范围及用户文件保护检查。规格确认提交只更新决策状态与治理记录，不重复运行无关全量检查。
