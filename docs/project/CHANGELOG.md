@@ -4,6 +4,15 @@
 
 ## 2026-07-17
 
+### PHASE3-TASK03 设计 - `docs: design import normalization review ui`
+
+- 新增功能：无；本任务只形成 Material Import Normalization Review UI V1 正式规格、37 状态低保真线框、状态矩阵和 104 项未来实施测试计划。
+- UI 契约：推荐继续 `/materials/imports/:batchId` 统一工作区、七步 Stepper、`normalize/normalized/issues` View、`batch/current_run/latest_attempt` 三层状态、固定 Processor Version、页面内存幂等、`RESULT_UNKNOWN`、2/5/10 轮询、真实行进度和协作式取消。
+- 结果审阅：Rows 与 Issues 使用独立 URL 参数和 opaque cursor；Row Detail 使用批次作用域 Drawer，展示 Basic、动态属性、非正式分类提示、供应商引用、Deferred Validation 与 Lineage；结果全部只读，不实施分类、匹配、Draft 或正式导入。
+- 门禁：记录 Row Drawer 完整 Issue 查询局部门禁、`PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED` 和完整历史、Batch Pointer、部分筛选、列表候选摘要、选中 Issue 刷新恢复等 7 项非阻塞限制；14 项决定全部保持 `PROPOSED`，等待提交后的“规格确认”。
+- 验证：复用上一提交的可信运行时基线，只执行文档结构/链接、104 项编号与分组、37 线框、状态矩阵、14 项决定、门禁/限制、`git diff --check`、docs-only 范围和用户未跟踪文件保护检查；未重复运行无关 Node/build/API/Drizzle/Migration/SQLite/Playwright/全仓凭证扫描。
+- 范围：未修改前端、API、Schema、Migration、Normalization/Mapping 业务逻辑、依赖、hosting 或 Legacy SQLite；未连接、迁移或部署生产 D1/R2/Queue；未创建 Draft 或正式物料。
+
 ### PHASE3-TASK02 实现 - `feat: add material import normalization`
 
 - 决策与边界：批准 D-022 和正式规格的 16 项推荐决定；Normalization 只生成可追溯候选与 Deferred Validation，不调用 Draft/正式物料写服务，不执行分类、匹配或去重。

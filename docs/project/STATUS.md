@@ -8,7 +8,7 @@
 | --- | ---: | --- |
 | 总代码量 | 49,964 行 | Site 的 `app/db/drizzle/tests/scripts` 运行时、迁移、脚本和测试源码；不含依赖、构建产物和文档 |
 | 源码文件 | 131 | TypeScript/TSX 78、MJS 30、SQL 13，其余为 schema/fixture 等任务源码 |
-| 根仓库跟踪项 | 本任务 27 个文件 | PHASE3-TASK02 修改 Normalization 运行时、Schema/Migration/API/测试和治理文档；未跟踪 `.obsidian/`、`bub.md` 均未修改或暂存 |
+| 根仓库跟踪项 | 本任务 9 个文档文件 | PHASE3-TASK03 新增 4 份 Review UI 规格并更新 5 份治理文档；未修改运行时代码、API、Schema、Migration、依赖或部署配置；用户既有 `.obsidian/` 未跟踪且未修改，`bub.md` 不存在且未创建 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 63（本地+开发 schema） | 本地 SQLite 26 张，Site 开发 schema 新增 3 张 Normalization 表；`0006` 仅在隔离 D1 测试，未执行生产迁移 |
@@ -36,11 +36,11 @@
 
 ## Git 状态
 
-`PHASE3-TASK02` 开始时，根仓库 `main` 位于 `826280e`，仅有用户既有未跟踪 `.obsidian/`。本任务差异覆盖 Normalization 运行时、Schema/Migration、API、测试和治理文档；未修改 production binding、hosting、依赖、前端或本地旧版业务逻辑。
+`PHASE3-TASK03` 开始时，根仓库 `main` 位于 `186c80a`，仅有用户既有未跟踪 `.obsidian/`。本任务差异只覆盖 9 个 `docs/` 文件；`bub.md` 不存在且未创建。未修改 production binding、hosting、依赖、前端、API、Schema/Migration 或本地旧版业务逻辑。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE3-TASK02` 计划提交消息为 `feat: add material import normalization`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
+`PHASE3-TASK03` 计划提交消息为 `docs: design import normalization review ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
 
 实时状态必须使用：
 
@@ -48,6 +48,21 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE3-TASK03 Material Import Normalization Review UI V1 书面设计
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / WAITING FOR SPEC CONFIRMATION | 四段设计方向已确认形成正式规格；14 项决定仍为 `PROPOSED`，等待提交后的“规格确认” |
+| 正式交付 | COMPLETE | 主规格、37 状态线框、状态矩阵、104 项测试计划共 4 份新文档 |
+| 路由/状态 | DESIGNED | 统一 Batch 工作区、七步 Stepper、`batch/current_run/latest_attempt`、合法 View 与 History Marker |
+| 写与进度 | DESIGNED | 固定 Processor Version、启动/业务重试/重跑、冻结幂等 Body、`RESULT_UNKNOWN`、2/5/10 轮询、真实行进度、取消竞争 |
+| 结果审阅 | DESIGNED | Current Run 汇总、Rows/Issues opaque cursor、Row Drawer、Candidate/Lineage、有界 Safe Details、权限与错误矩阵 |
+| 局部门禁 | RECORDED | Drawer 内“该行全部 Issues”缺少精确有界查询；不阻断其他 Review UI 流程，本任务不改 API |
+| 全局门禁 | REQUIRED | `PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED`；未来实施后实测，文档阶段未声称通过 |
+| 非阻塞限制 | RECORDED | 完整历史、Batch Pointer、Issue Row Status/Sheet 筛选、Rows 候选摘要、Batch List 状态筛选和选中 Issue 刷新恢复 |
+| 增量验证 | PASS | 复用上一提交可信基线；9 个文档存在且无尾随空白/表格结构错误，内部链接 0 断链，104/104 测试编号唯一且分组正确，37/37 线框、14/14 `PROPOSED`、错误矩阵、门禁/限制和 docs-only 范围检查通过 |
+| 生产影响 | NONE | 未修改或运行前端/API/Schema/Migration/业务服务，未连接生产资源、迁移或部署 |
 
 ## PHASE3-TASK02 Material Import Normalization & Staging V1 非生产实现
 
