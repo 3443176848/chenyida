@@ -1,8 +1,8 @@
-# Material Import Normalization Review UI V1：未来实施测试计划
+# Material Import Normalization Review UI V1：实施测试计划与结果
 
 ## 0. 规则
 
-本计划共 104 项唯一测试。`写` 表示会发送受保护写请求；`D1` 表示未来实施时需要隔离 Miniflare D1；`PW` 表示需要 Playwright。任何测试不得连接生产 URL、远程 Binding 或真实业务数据。当前 Node 基线必须在未来实施前重新核验；本 docs-only 任务不运行这些未来测试。
+本计划共 104 项唯一测试。`写` 表示会发送受保护写请求；`D1` 表示使用隔离数据或 API Mock；`PW` 表示需要 Playwright。任何测试不得连接生产 URL、远程 Binding 或真实业务数据。`PHASE3-TASK04` 已按这些 ID 实施测试。
 
 ## A. 路由、恢复及 Stepper（12）
 
@@ -167,3 +167,11 @@
 | H 权限、安全及可访问性 | 16 |
 | I 性能门禁 | 8 |
 | **总计** | **104** |
+
+## 11. `PHASE3-TASK04` 结果
+
+- `tests/material-import-normalization-ui.test.mjs` 保持 `NUI-RS-001`—`NUI-PF-008` 共 104 个唯一计划 ID，并另有 1 个矩阵完整性检查；104/104 通过。
+- 直接相关 Import Workspace 回归 `UI-001`—`UI-100` 为 100/100；两文件联合为 206/206（含两项矩阵元检查）。
+- Playwright CLI 使用本地 Vinext 与隔离 API Mock；未连接远程 Binding 或生产 URL。实测 50 Rows、100 Issues、204 个 Drawer Candidate（含 200 动态属性）、最大有界值、最大五键 `safe_details`、Current Run 切换、1366×768 和 700px。
+- 测量值：Rows 可用 801 ms；Drawer 可用 398 ms；700px Drawer 宽度 700px；浏览器过程 0 console warning/error；Storage 0；History 正文键 0；打开三次 Drawer 仅有三次详情请求，列表无 N+1。
+- `PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED` 已在本地隔离范围通过。远程生产网络、D1/R2/Queue 配额、并发和低端设备容量不在本任务结论内。

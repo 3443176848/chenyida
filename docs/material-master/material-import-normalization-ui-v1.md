@@ -4,11 +4,11 @@
 
 | 项目 | 值 |
 | --- | --- |
-| 任务 | `PHASE3-TASK03` |
-| 类型 | UI 规格，docs-only |
-| 状态 | `DONE / SPECIFICATION CONFIRMED` |
+| 任务 | `PHASE3-TASK03`（规格）/ `PHASE3-TASK04`（实施） |
+| 类型 | UI 规格及非生产前端实施记录 |
+| 状态 | `IMPLEMENTED / VALIDATED LOCALLY` |
 | 日期 | 2026-07-17 |
-| 实施授权 | 无；本文件不授权修改前端、API、Schema、Migration、业务逻辑或生产环境 |
+| 实施授权 | `PHASE3-TASK04` 已授权非生产前端及直接相关测试；未授权 API、Schema、Migration、业务逻辑、生产迁移或部署 |
 | 决策状态 | 项目负责人于 2026-07-17 回复“规格确认”；第 34 节 14 项决定全部为 `APPROVED` |
 
 本规格设计从已确认 Mapping 启动数据归一化、查看异步进度、取消活动任务、审阅当前已发布结果、分页查看规范化行与 Issues，以及在批次作用域 Drawer 中核对单行候选和 Lineage。它不实施 UI，也不改变任何运行时契约。
@@ -505,3 +505,16 @@ SELECTED_ISSUE_CONTEXT_NOT_RESTORABLE_AFTER_RELOAD
 ## 37. 本任务验证策略
 
 设计提交沿用前一运行时提交的可信基线，并通过文档结构、内部链接/引用、104 项测试编号与分组、37 个线框、状态矩阵、14 项决定、门禁/限制、`git diff --check`、docs-only 范围及用户文件保护检查。规格确认提交只更新决策状态与治理记录，不重复运行无关全量检查。
+
+## 38. `PHASE3-TASK04` 实施结果
+
+2026-07-17 已在现有 `/materials/imports/:batchId` 工作区完成非生产前端实现：
+
+- `material-import-normalization.ts` 集中定义 Processor Version、DTO、URL Allowlist、Rows/Issues API 参数、安全整数、归属/计数核验、Issue 标签、`safe_details` Allowlist 与有界类型化值模型。
+- `material-import-normalization-review.tsx` 实现 `batch/current_run/latest_attempt` 双轨状态、2/5/10 复合轮询、启动/业务重试/版本重跑/取消、独立页面内存冻结操作、`RESULT_UNKNOWN` 原请求重放、Current Run 汇总、Rows/Issues opaque cursor、Row Drawer 和权限失效清理。
+- 七步 Stepper 与既有 Import Workspace 共用同一路由；`view=normalize|normalized|issues|confirmed`，Rows 使用 `row_status/row_limit/row_cursor/row`，Issues 使用 `issue_level/issue_code/issue_target/issue_row/issue_limit/issue_cursor`。
+- Drawer 采用单次详情读取、Batch/Run/Row/Lineage 归属核验、背景隔离、Escape/Tab 约束和三级焦点恢复；700px 下为同一业务逻辑的全宽覆盖层。
+- `ROW_DETAIL_COMPLETE_ISSUE_LOOKUP_NOT_AVAILABLE` 保持为局部门禁：只展示 Row `issue_summary`、当前页面内存选中的单条 Issue 和按来源行筛选入口，不伪造“该行全部 Issues”。七项非阻塞限制均保持。
+- 未修改 Normalization 后端 API、Schema、Migration、业务服务、依赖或 hosting；未连接、迁移或部署生产资源。
+
+实施后的性能与可访问性门禁已在本地隔离 Mock 中通过：50 Rows 首屏 801 ms、200 动态属性 Drawer 398 ms、100 Issues、最大有界值与五键 `safe_details`、Current Run 切换清理、1366×768、700px、键盘焦点、表格语义、无列表详情 N+1、无控制台警告/错误、无 Storage/大 History State。截图保存在 `chenyida_erp_site/output/playwright/`，不进入 Git。

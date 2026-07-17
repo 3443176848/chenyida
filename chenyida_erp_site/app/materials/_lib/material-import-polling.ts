@@ -1,6 +1,6 @@
 import { importStatusNeedsPolling, pollingDelay, retryAfterMilliseconds, type MaterialImportBatch, type MaterialImportBatchStatus } from "./material-import";
 
-type PollResult = { batch: MaterialImportBatch; preparation?: string };
+type PollResult = { batch: MaterialImportBatch; preparation?: string; continuePolling?: boolean };
 type PollCallbacks = { onData: (result: PollResult) => void; onError: (error: unknown) => void };
 
 export class MaterialImportPollingController {
@@ -27,7 +27,7 @@ export class MaterialImportPollingController {
       const result = await this.#load(batchId, this.#abort.signal);
       if (sequence !== this.#sequence || batchId !== this.#batchId) return;
       this.#networkFailures = 0; this.#callbacks.onData(result);
-      if (importStatusNeedsPolling(result.batch.status, result.preparation)) this.#schedule(pollingDelay(Date.now() - this.#startedAt));
+      if (result.continuePolling ?? importStatusNeedsPolling(result.batch.status, result.preparation)) this.#schedule(pollingDelay(Date.now() - this.#startedAt));
     } catch (error) {
       if (sequence !== this.#sequence || (error as { name?: string })?.name === "AbortError") return;
       this.#callbacks.onError(error);

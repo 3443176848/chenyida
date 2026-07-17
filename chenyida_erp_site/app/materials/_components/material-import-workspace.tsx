@@ -13,6 +13,7 @@ import { MaterialImportPollingController } from "../_lib/material-import-polling
 import { redirectToExistingLogin, useMaterialSession } from "./material-shell";
 import { MaterialImportUploadFlow } from "./material-import-create-page";
 import { MaterialImportMappingEditor, MaterialImportMappingPreview } from "./material-import-mapping-editor";
+import { MaterialImportNormalizationReview } from "./material-import-normalization-review";
 import { MaterialImportRowPreview, MaterialImportSheetSelector, type MaterialImportRow, type MaterialImportSheet } from "./material-import-row-preview";
 import { MaterialImportDialog, MaterialImportErrorState, MaterialImportStatusBadge, MaterialImportStepper, useMaterialImportUnsavedGuard } from "./material-import-primitives";
 
@@ -29,7 +30,7 @@ const CANCEL_STATES = new Set(["CREATED", "UPLOAD_PENDING", "FILE_READY", "QUEUE
 
 export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
   const session = useMaterialSession(); const permissions = session.user?.permissions || [];
-  const canRead = permissions.includes("material.import.read"); const canMap = permissions.includes("material.import.map"); const canParse = permissions.includes("material.import.parse"); const canCancel = permissions.includes("material.import.cancel");
+  const canRead = permissions.includes("material.import.read") || permissions.includes("material.import.read_any"); const canMap = permissions.includes("material.import.map"); const canParse = permissions.includes("material.import.parse"); const canCancel = permissions.includes("material.import.cancel");
   const [batch, setBatch] = useState<MaterialImportBatch | null>(null); const [file, setFile] = useState<MaterialImportFileSummary | null>(null);
   const [query, setQuery] = useState<ImportWorkspaceQuery>({ view: "file", sheet: null, row_page: 1, row_page_size: 50 });
   const [sheetsData, setSheetsData] = useState<SheetsResponse | null>(null); const [rowsData, setRowsData] = useState<RowsResponse | null>(null); const [mapping, setMapping] = useState<MappingAggregate | null>(null);
@@ -64,8 +65,9 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
       const visible = sheets.sheets.filter((item) => item.visibility === "VISIBLE" && item.parse_disposition === "PARSED");
       if (parsed.sheet === null || !visible.some((item) => item.sheet_index === parsed.sheet)) parsed.sheet = visible[0]?.sheet_index ?? null;
     }
+    const normalizationView = ["normalize", "normalized", "issues"].includes(parsed.view);
     const canonical = `/materials/imports/${batchId}?${serializeImportWorkspaceQuery(parsed)}`;
-    if (`${window.location.pathname}${window.location.search}` !== canonical) window.history.replaceState({}, "", canonical);
+    if (!normalizationView && `${window.location.pathname}${window.location.search}` !== canonical) window.history.replaceState({}, "", canonical);
     setQuery(parsed);
   }, [batchId]);
 
@@ -73,7 +75,8 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
     if (!canRead) return; const sequence = ++loadSequence.current; setLoading(true);
     try {
       const detail = await readDetail(); let sheets: SheetsResponse | null = null;
-      if (["PARSED", "AWAITING_MAPPING", "MAPPING_CONFIRMED"].includes(detail.batch.status)) sheets = await readSheets();
+      const requestedView = new URLSearchParams(window.location.search).get("view");
+      if (["PARSED", "AWAITING_MAPPING"].includes(detail.batch.status) || (detail.batch.status === "MAPPING_CONFIRMED" && ["sheet", "mapping", "confirmed"].includes(requestedView || "")) || (["QUEUED_FOR_NORMALIZATION", "NORMALIZING", "NORMALIZED"].includes(detail.batch.status) && requestedView === "confirmed")) sheets = await readSheets();
       if (sequence === loadSequence.current) applyBatch(detail, sheets);
     } catch (reason) { if (sequence === loadSequence.current) handleError(reason, true); }
     finally { if (sequence === loadSequence.current) setLoading(false); }
@@ -109,14 +112,14 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
   }, [batch, batchId, handleError, query.row_page, query.row_page_size, query.sheet, sheetsData]);
 
   const loadMapping = useCallback(async () => {
-    if (!batch || !["AWAITING_MAPPING", "MAPPING_CONFIRMED"].includes(batch.status)) return;
+    if (!batch || !["AWAITING_MAPPING", "MAPPING_CONFIRMED", "QUEUED_FOR_NORMALIZATION", "NORMALIZING", "NORMALIZED"].includes(batch.status) || (batch.status === "MAPPING_CONFIRMED" && query.view === "normalize") || (!["AWAITING_MAPPING", "MAPPING_CONFIRMED"].includes(batch.status) && query.view !== "confirmed")) return;
     try {
       const response = await api<MappingResponse>(`/api/material-master/import-batches/${batchId}/mapping`, { cache: "no-store" }); const value = response.mapping;
       setMapping(value); setItems(value.items); setFormalSheet(value.selected_sheet_index); setHeaderMode(value.header_mode); setHeaderRow(value.header_row_number);
       setMappingBaseline(stableImportStringify({ selected_sheet_index: value.selected_sheet_index, header_mode: value.header_mode, header_row_number: value.header_row_number, items: value.items })); setPreview(null);
       if (query.sheet === null) navigate({ sheet: value.selected_sheet_index, row_page: 1 }, "replace");
     } catch (reason) { handleError(reason, true); }
-  }, [batch, batchId, handleError, navigate, query.sheet]);
+  }, [batch, batchId, handleError, navigate, query.sheet, query.view]);
   useEffect(() => { const timer = window.setTimeout(() => void loadMapping(), 0); return () => window.clearTimeout(timer); }, [loadMapping]);
 
   const loadCatalog = useCallback(async (append = false) => {
@@ -191,7 +194,7 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
   if (loading && !batch) return <div className="mm-shell-loading" role="status">正在加载导入工作区…</div>;
   if (error && !batch) return <MaterialImportErrorState message={error.status === 404 ? "导入批次不存在或无权查看" : error.status === 403 ? "当前账号无权继续查看该导入批次" : "暂时无法加载导入工作区"} requestId={error.requestId} clearProtected={[403,404].includes(error.status)} onRetry={() => void initialLoad()} />;
   if (!batch) return null;
-  const selectedSheet = sheetsData?.sheets.find((item) => item.sheet_index === query.sheet) || null; const mappingReadOnly = batch.status === "MAPPING_CONFIRMED" || !canMap;
+  const selectedSheet = sheetsData?.sheets.find((item) => item.sheet_index === query.sheet) || null; const mappingReadOnly = batch.status !== "AWAITING_MAPPING" || !canMap;
   const previewValid = Boolean(preview && mapping && preview.batchVersion === batch.current_version && preview.mappingVersion === mapping.mapping_version && preview.payloadDigest === stableImportStringify(draftPayload()) && preview.metadataDigest === (catalogDigest || mapping.metadata_digest));
   const statusPage = ["FAILED", "CANCELLED", "RECONCILIATION_REQUIRED"].includes(batch.status);
   return <section className="mi-workspace"><div className="mm-breadcrumb"><Link href="/materials">物料主数据</Link><span>/</span><Link href="/materials/imports">导入批次</Link><span>/</span><span>{batch.batch_no}</span></div>
@@ -201,16 +204,17 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
     {statusPage ? <section className="mi-disposition"><h3>{batch.status === "FAILED" ? "导入批次失败" : batch.status === "CANCELLED" ? "批次已取消" : "当前批次需要后台协调"}</h3><p>{batch.failure_message || (batch.status === "RECONCILIATION_REQUIRED" ? "普通用户暂时不能继续上传或解析，请刷新或联系管理员。" : "该批次不能继续执行后续写操作。")}</p>{batch.failure_code ? <p>安全错误代码：{batch.failure_code}</p> : null}</section> : null}
     {!statusPage && ["CREATED", "UPLOAD_PENDING"].includes(batch.status) ? <section><h3>文件</h3>{batch.status === "CREATED" ? <><p>重新打开的 CREATED 批次不会恢复浏览器 File；请重新选择、预检并计算 SHA。</p><MaterialImportUploadFlow existingBatch={batch} /></> : <p>文件上传或服务端处理正在进行。若此前上传结果未知，只能在原页面使用原操作标识恢复。</p>}</section> : null}
     {!statusPage && ["FILE_READY", "QUEUED_FOR_PARSING", "PARSING"].includes(batch.status) ? <section className="mi-parse-panel"><h3>解析</h3><p>{batch.status === "FILE_READY" ? "文件已通过服务端基础安全检查，可启动解析。" : batch.status === "QUEUED_FOR_PARSING" ? "解析请求排队中；不提供 Queue 位置或预计完成时间。" : "服务端正在解析；当前 API 不公开百分比、阶段、行数或 ETA。"}</p><p>最近更新时间：{formatShanghaiDate(batch.updated_at, true)}</p>{batch.status === "FILE_READY" && canParse ? <button className="mi-primary" disabled={busy || file?.security_check_status !== "BASIC_CHECK_PASSED" || resultUnknown} onClick={() => void startParse()}>启动解析</button> : null}</section> : null}
-    {!statusPage && ["PARSED", "AWAITING_MAPPING", "MAPPING_CONFIRMED"].includes(batch.status) && sheetsData ? <>
+    {!statusPage && (["PARSED", "AWAITING_MAPPING", "MAPPING_CONFIRMED"].includes(batch.status) || (["QUEUED_FOR_NORMALIZATION", "NORMALIZING", "NORMALIZED"].includes(batch.status) && query.view === "confirmed")) && sheetsData ? <>
       {batch.status === "PARSED" ? <div className={`mi-preparation mi-preparation-${sheetsData.mapping_preparation_status.toLowerCase()}`}>{sheetsData.mapping_preparation_status === "FAILED" ? "解析结果已发布，但字段映射准备失败" : `解析结果已发布，字段映射准备状态：${sheetsData.mapping_preparation_status}`}</div> : null}
       <section className="mi-sheet-workspace"><MaterialImportSheetSelector sheets={sheetsData.sheets} selected={query.sheet} onSelect={(sheet) => navigate({ sheet: sheet.sheet_index, row_page: 1, view: "sheet" })} />
         {selectedSheet && rowsData ? <MaterialImportRowPreview rows={rowsData.rows} columnCount={selectedSheet.source_column_max} page={query.row_page} pageSize={query.row_page_size} totalRows={rowsData.total_rows} loading={rowsLoading} onPage={(row_page) => navigate({ row_page })} onPageSize={(row_page_size) => navigate({ row_page_size, row_page: 1 })} /> : null}
       </section>
       {batch.status === "AWAITING_MAPPING" && mapping ? <section className="mi-header-panel"><h3>正式 Sheet 与表头</h3><label>来源 Sheet<select value={formalSheet ?? ""} disabled={!canMap || busy} onChange={(e) => { if (dirty && !window.confirm("切换 Sheet 会清除当前未保存 Mapping，是否继续？")) return; setFormalSheet(Number(e.target.value)); setItems([]); setPreview(null); navigate({ sheet: Number(e.target.value), row_page: 1 }); }}><option value="" disabled>请选择</option>{sheetsData.sheets.filter((item) => item.visibility === "VISIBLE" && item.parse_disposition === "PARSED").map((item) => <option value={item.sheet_index} key={item.sheet_index}>{item.sheet_index} · {item.sheet_name}</option>)}</select></label><fieldset disabled={!canMap || busy}><legend>表头模式</legend><label><input type="radio" checked={headerMode === "SINGLE_ROW"} onChange={() => { if (dirty && !window.confirm("切换表头会使当前 Mapping 编辑失效，是否继续？")) return; setHeaderMode("SINGLE_ROW"); setHeaderRow(selectedSheet?.header_suggestions[0]?.row_number || 1); setItems([]); setPreview(null); }} /> SINGLE_ROW</label><label><input type="radio" checked={headerMode === "NO_HEADER"} onChange={() => { if (dirty && !window.confirm("切换表头会使当前 Mapping 编辑失效，是否继续？")) return; setHeaderMode("NO_HEADER"); setHeaderRow(null); setItems([]); setPreview(null); }} /> NO_HEADER</label>{headerMode === "SINGLE_ROW" ? <label>表头行<input type="number" min="1" max={selectedSheet?.parsed_row_count || 1} value={headerRow || 1} onChange={(e) => { setHeaderRow(Number(e.target.value)); setPreview(null); }} /></label> : <p>将使用 COLUMN_A…COLUMN_IV 稳定展示标签；不会冒充数据库字段名。</p>}</fieldset></section> : null}
-      {mapping && formalSheet !== null && (query.view === "mapping" || batch.status === "MAPPING_CONFIRMED") ? <MaterialImportMappingEditor columnCount={sheetsData.sheets.find((item) => item.sheet_index === formalSheet)?.source_column_max || 0} rows={rowsData?.sheet_index === formalSheet ? rowsData.rows : []} headerMode={headerMode} headerRow={headerRow} targets={targets} catalogQuery={catalogQuery} catalogHasMore={Boolean(catalogCursor)} items={items} dirty={dirty} readOnly={mappingReadOnly} busy={busy || resultUnknown} previewValid={previewValid} onCatalogQuery={(value) => { setCatalogQuery(value); setCatalogCursor(null); }} onCatalogMore={() => void loadCatalog(true)} onItems={(value) => { setItems(value); setPreview(null); }} onReset={() => { setItems(mapping.items); setFormalSheet(mapping.selected_sheet_index); setHeaderMode(mapping.header_mode); setHeaderRow(mapping.header_row_number); setPreview(null); }} onSave={() => void saveMapping()} onPreview={() => void previewMapping()} onConfirm={() => void prepareConfirm()} /> : null}
+      {mapping && formalSheet !== null && (query.view === "mapping" || query.view === "confirmed") ? <MaterialImportMappingEditor columnCount={sheetsData.sheets.find((item) => item.sheet_index === formalSheet)?.source_column_max || 0} rows={rowsData?.sheet_index === formalSheet ? rowsData.rows : []} headerMode={headerMode} headerRow={headerRow} targets={targets} catalogQuery={catalogQuery} catalogHasMore={Boolean(catalogCursor)} items={items} dirty={dirty} readOnly={mappingReadOnly} busy={busy || resultUnknown} previewValid={previewValid} onCatalogQuery={(value) => { setCatalogQuery(value); setCatalogCursor(null); }} onCatalogMore={() => void loadCatalog(true)} onItems={(value) => { setItems(value); setPreview(null); }} onReset={() => { setItems(mapping.items); setFormalSheet(mapping.selected_sheet_index); setHeaderMode(mapping.header_mode); setHeaderRow(mapping.header_row_number); setPreview(null); }} onSave={() => void saveMapping()} onPreview={() => void previewMapping()} onConfirm={() => void prepareConfirm()} /> : null}
       {preview?.response && query.view === "mapping" ? <MaterialImportMappingPreview rows={preview.response.rows} /> : null}
-      {batch.status === "MAPPING_CONFIRMED" ? <section className="mi-confirmed"><h3>字段映射已确认</h3><p>这里只表示字段对应关系已确认，不代表物料已创建。页面不显示 API 未提供的确认人或确认时间，也不提供“开始正式导入”。</p></section> : null}
+      {batch.status === "MAPPING_CONFIRMED" && query.view === "confirmed" ? <section className="mi-confirmed"><h3>字段映射已确认</h3><p>这里只表示字段对应关系已确认，不代表物料已创建。页面不显示 API 未提供的确认人或确认时间，也不提供“开始正式导入”。</p></section> : null}
     </> : null}
+    {["MAPPING_CONFIRMED", "QUEUED_FOR_NORMALIZATION", "NORMALIZING", "NORMALIZED"].includes(batch.status) && ["normalize", "normalized", "issues"].includes(query.view) ? <MaterialImportNormalizationReview batchId={batchId} batch={batch} permissions={permissions} csrfToken={session.csrf_token || ""} onBatch={setBatch} /> : null}
     {dialog === "PARSE" ? <MaterialImportDialog title="启动文件解析" busy={busy} primaryLabel="确认启动解析" onClose={() => setDialog(null)} onPrimary={() => void confirmParse()}><ul><li>公式不会执行。</li><li>隐藏 Sheet 不用于业务行或 Mapping。</li><li>不会创建 Material Draft 或正式编码。</li><li>解析可能需要一定时间，页面只显示服务端真实粗粒度状态。</li></ul></MaterialImportDialog> : null}
     {dialog === "CANCEL" ? <MaterialImportDialog title="取消导入批次" danger busy={busy} primaryLabel="确认取消" onClose={() => setDialog(null)} onPrimary={() => void cancelBatch()}><p>{batch.status === "PARSING" ? "这是协作式取消，后台可短暂继续计算，但成功后旧任务不得发布。" : batch.status === "QUEUED_FOR_PARSING" ? "取消不承诺物理删除 Queue 消息，只阻止尚未完成的结果发布。" : batch.status === "UPLOAD_PENDING" ? "取消不表示对象立即删除，服务端会按协调和清理策略处理。" : "服务端将使用最新版本决定是否仍可取消。"}</p></MaterialImportDialog> : null}
     {dialog === "CONFIRM" ? <MaterialImportDialog title="最终确认字段 Mapping" busy={busy} primaryLabel="确认 Mapping" onClose={() => setDialog(null)} onPrimary={() => void confirmMapping()}><p>本操作只确认字段对应关系，不创建 Material Draft、正式物料或编码，不执行清洗、分类、匹配、去重或 AI。服务端仍会重新核对状态、版本、parse run 与 metadata。</p></MaterialImportDialog> : null}

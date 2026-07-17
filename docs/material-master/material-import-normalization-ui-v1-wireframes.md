@@ -407,3 +407,16 @@ Sheet、Header、Target 和默认值均不可在此修改。
 ## 38. 线框覆盖结论
 
 本文件逐一覆盖任务要求的 37 个状态。Row Drawer Issue 状态明确采用局部门禁降级；所有写状态、权限、轮询、Unknown、旧 Current Run 和关键安全文案均已标注。
+
+## 39. 实施后的视觉验收
+
+`PHASE3-TASK04` 已按本线框实现统一工作区。隔离 Chromium 实测结果：
+
+| 截图 | 视口 | 结论 |
+| --- | --- | --- |
+| `normalization-results-1366.png` | 1366×768 | 七步 Stepper、Current 汇总、50 Rows、筛选和文字状态可读 |
+| `normalization-row-drawer-1366.png` | 1366×768 | Drawer 保留列表上下文，Basic/Attributes/Lineage 分区与关闭按钮可达 |
+| `normalization-issues-1366.png` | 1366×768 | 100 Issues 当前页、五类真实筛选、文字 Level、Issue→Row 入口可达 |
+| `normalization-row-drawer-700.png` | 700×768 | Drawer 实测宽度 700px，使用同一业务逻辑与焦点约束 |
+
+截图位于 `chenyida_erp_site/output/playwright/` 且按仓库规则不提交。目视检查未发现 Sticky 遮挡、背景可交互、仅颜色状态或窄屏逻辑分叉。

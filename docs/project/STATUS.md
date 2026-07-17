@@ -6,15 +6,15 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 49,964 行 | Site 的 `app/db/drizzle/tests/scripts` 运行时、迁移、脚本和测试源码；不含依赖、构建产物和文档 |
-| 源码文件 | 131 | TypeScript/TSX 78、MJS 30、SQL 13，其余为 schema/fixture 等任务源码 |
-| 根仓库跟踪项 | 规格确认更新 7 个文档文件 | 主规格决策状态及 6 份治理文档同步确认结果；未修改运行时代码、API、Schema、Migration、依赖或部署配置；用户既有 `.obsidian/` 未跟踪且未修改，`bub.md` 不存在且未创建 |
+| 总代码量 | 50,718 行 | 以上一状态快照 49,964 行加本任务运行时、QA 脚本与测试净增 754 行；不含依赖、构建产物、截图和文档 |
+| 源码文件 | 135 | 本任务新增 Normalization UI 协议、组件、Playwright QA 脚本和 104 项测试文件共 4 个 |
+| 根仓库跟踪项 | Normalization Review UI 前端、测试和 9 份文档 | 未修改后端 API、Schema、Migration、依赖或部署配置；用户既有 `.obsidian/` 未跟踪且未修改 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 63（本地+开发 schema） | 本地 SQLite 26 张，Site 开发 schema 新增 3 张 Normalization 表；`0006` 仅在隔离 D1 测试，未执行生产迁移 |
 | 在线 API 路径 | 86 | 开发代码新增 5 个 Normalization API；生产公开站点尚未部署开发基线 |
 | 页面入口 | 14 | 既有 11 个入口加 3 条 Material Import 路由 |
-| 测试文件 | 26 | 新增 Normalization migration 与服务/API 集成测试；任务开始基线为全量 Node 440/440 |
+| 测试文件 | 27 | 新增 `material-import-normalization-ui.test.mjs`，包含 104 个计划 ID 及 1 个矩阵元检查 |
 
 ## 当前版本与环境
 
@@ -36,13 +36,13 @@
 
 ## Git 状态
 
-`PHASE3-TASK03` 开始时，根仓库 `main` 位于 `186c80a`，仅有用户既有未跟踪 `.obsidian/`。本任务差异只覆盖 9 个 `docs/` 文件；`bub.md` 不存在且未创建。未修改 production binding、hosting、依赖、前端、API、Schema/Migration 或本地旧版业务逻辑。
+`PHASE3-TASK04` 开始时，根仓库 `main` 位于 `0b01c13`，仅有用户既有未跟踪 `.obsidian/`。本任务差异覆盖 Material Import 前端、Normalization 协议/审阅组件、专项测试、Playwright QA 脚本和 9 份文档；未修改 production binding、hosting、依赖、后端 API、Schema/Migration 或本地旧版业务逻辑。
 
 正式规格确认更新开始时，根仓库位于 `c694045`；用户明确回复“规格确认”。本次只更新主规格的 14 项决策状态和项目治理记录，不实施 Review UI。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE3-TASK03` 计划提交消息为 `docs: design import normalization review ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
+`PHASE3-TASK04` 计划提交消息为 `feat: add import normalization review ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
 
 实时状态必须使用：
 
@@ -50,6 +50,22 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE3-TASK04 Material Import Normalization Review UI V1 非生产实现
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 14 项既定 UI 决策按规格实现，未重新设计业务语义 |
+| 页面/状态 | PASS | 统一 `/materials/imports/:batchId`、七步 Stepper、`normalize/normalized/issues/confirmed`、Batch/Current/Latest 双轨 |
+| 写与轮询 | PASS | 固定 Processor、启动/重试/重跑/取消、独立冻结 Operation、`RESULT_UNKNOWN`、2/5/10 复合轮询、Retry-After、真实行进度 |
+| 结果审阅 | PASS | Current 汇总、Rows/Issues 50/100 opaque cursor、Row Drawer、200 Attributes、有界值与 Safe Details、Current Run 失效清理 |
+| 局部门禁 | PRESERVED | 无精确完整 Row Issues API；只显示计数、当前单条 Issue 和按来源行筛选，不扫描或伪造完整集合 |
+| 计划测试 | PASS | `NUI-RS-001`—`NUI-PF-008` 104/104；矩阵唯一性元检查通过 |
+| 直接回归 | PASS | Import Workspace `UI-001`—`UI-100` 100/100；联合 206/206（含两项矩阵元检查） |
+| Playwright | PASS | 隔离本地 Mock；50 Rows 801 ms、Drawer 398 ms、100 Issues、204 Candidate、700px Drawer 实宽 700px、0 console warning/error |
+| 安全/存储 | PASS | 无详情 N+1、无 Catalog 冒充历史标签、Storage 0、History 正文键 0、权限失效清理与安全归属核验覆盖 |
+| Build/Lint | PASS | Vinext build 成功；lint 0 error，仅保留任务外既有 workbook unused warning |
+| 范围 | PASS | 无后端 API、Schema、Migration、业务服务、依赖、hosting 或生产环境改动；`.obsidian/` 保持未跟踪且未修改 |
 
 ## PHASE3-TASK03 Material Import Normalization Review UI V1 书面设计
 

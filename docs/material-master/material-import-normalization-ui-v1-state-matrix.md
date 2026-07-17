@@ -233,4 +233,14 @@ Basic 按稳定业务顺序后 Code；Attributes 按 Code；Category Hint 与 Su
 | 完整 Run 历史 | NON_BLOCKING_LIMITATION | 只显示 Current/Latest |
 | Safe Details | RESOLVED WITH ALLOWLIST | 五键有界展示 |
 | Permission DTO | RESOLVED | 使用 `user.permissions` Capability |
-| 性能与可访问性 | REQUIRED GATE | 实施后实测，文档期不宣称通过 |
+| 性能与可访问性 | PASS (LOCAL ISOLATED MOCK) | 50 Rows、100 Issues、200 Attributes、1366/700px、键盘与语义实测通过；不代表生产容量 |
+
+## 17. 实施状态
+
+`PHASE3-TASK04` 已把本矩阵落实为前端协议与组件状态，并通过 104 项唯一测试 ID。实际实现保持：
+
+- Batch Detail 与 Summary 同一 Generation 复合提交；Current Run 变化同时清 Rows、Issues、Drawer、Cursor 和旧正文。
+- Normalize 与 Cancel 各自维护内存冻结 Body/Key；只有客户端未取得权威响应时进入 `RESULT_UNKNOWN`。
+- Rows 与 Issues 使用独立 Marker、独立 Cursor 和归属核验；直接 Cursor URL 不伪造上一页或总页数。
+- 401/403/404 停止轮询、Abort 并清受保护状态；`read_any` 不授予 Normalize 或 Cancel。
+- 性能与可访问性 Gate 从 `REQUIRED` 转为 `PASS (LOCAL ISOLATED MOCK)`；生产容量、远程网络和部署仍未验收。

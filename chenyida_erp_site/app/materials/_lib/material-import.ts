@@ -3,10 +3,11 @@ export const MATERIAL_IMPORT_PARSER_VERSION = "material-import-parser-v1";
 
 export const IMPORT_BATCH_STATUSES = [
   "CREATED", "UPLOAD_PENDING", "FILE_READY", "QUEUED_FOR_PARSING", "PARSING", "PARSED",
-  "AWAITING_MAPPING", "MAPPING_CONFIRMED", "RECONCILIATION_REQUIRED", "FAILED", "CANCELLED",
+  "AWAITING_MAPPING", "MAPPING_CONFIRMED", "QUEUED_FOR_NORMALIZATION", "NORMALIZING", "NORMALIZED",
+  "RECONCILIATION_REQUIRED", "FAILED", "CANCELLED",
 ] as const;
 export type MaterialImportBatchStatus = typeof IMPORT_BATCH_STATUSES[number];
-export type MaterialImportView = "file" | "parse" | "sheet" | "mapping" | "confirmed";
+export type MaterialImportView = "file" | "parse" | "sheet" | "mapping" | "confirmed" | "normalize" | "normalized" | "issues";
 
 export type MaterialImportFileSummary = {
   id: number; original_filename: string; filename_extension: string | null; declared_mime_type: string | null;
@@ -33,7 +34,7 @@ export const DEFAULT_IMPORT_LIST_QUERY: ImportListQuery = {
 };
 
 const STATUS_SET = new Set<string>(IMPORT_BATCH_STATUSES);
-const VIEW_SET = new Set<MaterialImportView>(["file", "parse", "sheet", "mapping", "confirmed"]);
+const VIEW_SET = new Set<MaterialImportView>(["file", "parse", "sheet", "mapping", "confirmed", "normalize", "normalized", "issues"]);
 
 function positiveInteger(value: string | null, fallback: number): number {
   if (!value || !/^[1-9][0-9]*$/.test(value)) return fallback;
@@ -85,7 +86,8 @@ export function defaultViewForStatus(status: MaterialImportBatchStatus): Materia
   if (["CREATED", "UPLOAD_PENDING"].includes(status)) return "file";
   if (["FILE_READY", "QUEUED_FOR_PARSING", "PARSING"].includes(status)) return "parse";
   if (status === "AWAITING_MAPPING") return "sheet";
-  if (status === "MAPPING_CONFIRMED") return "confirmed";
+  if (["MAPPING_CONFIRMED", "QUEUED_FOR_NORMALIZATION", "NORMALIZING"].includes(status)) return "normalize";
+  if (status === "NORMALIZED") return "normalized";
   return "sheet";
 }
 
@@ -96,7 +98,9 @@ export function legalImportView(status: MaterialImportBatchStatus, requested: st
   if (["FILE_READY", "QUEUED_FOR_PARSING", "PARSING"].includes(status)) return view === "parse" ? view : "parse";
   if (status === "PARSED") return "sheet";
   if (status === "AWAITING_MAPPING") return view === "mapping" ? "mapping" : "sheet";
-  if (status === "MAPPING_CONFIRMED") return view === "sheet" ? "sheet" : "confirmed";
+  if (status === "MAPPING_CONFIRMED") return ["sheet", "confirmed", "normalize"].includes(view) ? view : "normalize";
+  if (["QUEUED_FOR_NORMALIZATION", "NORMALIZING"].includes(status)) return ["normalize", "normalized", "issues", "confirmed"].includes(view) ? view : "normalize";
+  if (status === "NORMALIZED") return ["normalize", "normalized", "issues", "confirmed"].includes(view) ? view : "normalized";
   return defaultViewForStatus(status);
 }
 
@@ -125,6 +129,7 @@ export function importStatusLabel(value: unknown): string {
   const labels: Record<string, string> = {
     CREATED: "待上传", UPLOAD_PENDING: "上传处理中", FILE_READY: "文件已就绪", QUEUED_FOR_PARSING: "解析排队中",
     PARSING: "解析中", PARSED: "解析结果已发布", AWAITING_MAPPING: "等待字段映射", MAPPING_CONFIRMED: "字段映射已确认",
+    QUEUED_FOR_NORMALIZATION: "数据归一化排队中", NORMALIZING: "数据归一化中", NORMALIZED: "规范化结果已发布",
     RECONCILIATION_REQUIRED: "需要后台协调", FAILED: "失败", CANCELLED: "已取消",
   };
   return labels[String(value)] || "未知状态";
@@ -177,7 +182,7 @@ function deepFreeze<T>(value: T): T {
 
 export type ImportOperationState = "READY" | "PENDING" | "COMPLETED" | "FAILED" | "RESULT_UNKNOWN";
 export type ImportWriteOperation<T = unknown> = Readonly<{
-  type: "CREATE" | "UPLOAD" | "PARSE" | "CANCEL" | "SAVE" | "PREVIEW" | "CONFIRM";
+  type: "CREATE" | "UPLOAD" | "PARSE" | "NORMALIZE" | "CANCEL" | "SAVE" | "PREVIEW" | "CONFIRM";
   key: string; method: "POST" | "PUT"; endpoint: string; payload: T; payloadDigest: string; state: ImportOperationState;
 }>;
 

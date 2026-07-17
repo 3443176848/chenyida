@@ -4,6 +4,14 @@
 
 ## 2026-07-17
 
+### PHASE3-TASK04 实现 - `feat: add import normalization review ui`
+
+- 前端：在 `/materials/imports/:batchId` 统一工作区增加七步 Stepper、`normalize/normalized/issues`、Current/Latest 双轨、启动/重试/版本重跑/取消、冻结幂等与 `RESULT_UNKNOWN`、2/5/10 复合轮询和真实行进度。
+- 审阅：增加 Current Run 汇总、50/100 Rows 与 Issues opaque cursor、批次作用域 Row Drawer、Basic/200 动态属性/分类提示/供应商引用/Deferred Validation/Lineage、有界类型化值和五键 `safe_details`。
+- 安全与可访问性：Capability 独立判断、401/403/404 清理、Batch/Run/Row/Lineage 归属核验、纯文本与安全 ID、Drawer 背景隔离/焦点约束/三级恢复、700px 全宽和状态文字语义。
+- 测试：104/104 计划 ID、100/100 既有 Import UI 回归；本地 Playwright 50 Rows 801 ms、Drawer 398 ms、100 Issues、200 Attributes、1366/700px、无 N+1/Storage/History 正文及 0 console warning/error。
+- 数据库/API/生产：未修改 Schema、Migration、后端 API、Normalization 业务逻辑、依赖或 hosting；未连接、迁移或部署生产资源。完整 Row Issues 局部门禁与七项非阻塞限制继续保留。
+
 ### PHASE3-TASK03 规格确认 - `docs: approve import normalization review ui`
 
 - 项目负责人在正式设计提交 `c694045` 后明确回复“规格确认”；主规格中的 14 项 UI 决定从 `PROPOSED` 转为 `APPROVED`，并新增 D-023 决策记录。

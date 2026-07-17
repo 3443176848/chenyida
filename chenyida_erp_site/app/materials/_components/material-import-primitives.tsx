@@ -9,9 +9,10 @@ export function MaterialImportStatusBadge({ value }: { value: MaterialImportBatc
   return <span className={`mi-status mi-status-${code.toLowerCase().replaceAll("_", "-")}`} aria-label={`导入批次状态：${importStatusLabel(code)}`}>{importStatusLabel(code)}</span>;
 }
 
-const STEPS: { view: MaterialImportView; label: string }[] = [
-  { view: "file", label: "文件" }, { view: "parse", label: "解析" }, { view: "sheet", label: "Sheet 与表头" },
-  { view: "mapping", label: "字段 Mapping" }, { view: "confirmed", label: "Mapping 确认" },
+const STEPS: { view: MaterialImportView; views: MaterialImportView[]; label: string }[] = [
+  { view: "file", views: ["file"], label: "文件" }, { view: "parse", views: ["parse"], label: "解析" }, { view: "sheet", views: ["sheet"], label: "表头" },
+  { view: "mapping", views: ["mapping"], label: "字段映射" }, { view: "confirmed", views: ["confirmed"], label: "映射确认" },
+  { view: "normalize", views: ["normalize"], label: "数据归一化" }, { view: "normalized", views: ["normalized", "issues"], label: "结果审阅" },
 ];
 
 function currentStep(status: MaterialImportBatchStatus): number {
@@ -19,7 +20,9 @@ function currentStep(status: MaterialImportBatchStatus): number {
   if (["FILE_READY", "QUEUED_FOR_PARSING", "PARSING"].includes(status)) return 1;
   if (status === "PARSED") return 2;
   if (status === "AWAITING_MAPPING") return 3;
-  if (status === "MAPPING_CONFIRMED") return 4;
+  if (status === "MAPPING_CONFIRMED") return 5;
+  if (["QUEUED_FOR_NORMALIZATION", "NORMALIZING"].includes(status)) return 5;
+  if (status === "NORMALIZED") return 6;
   return Math.max(0, ["FILE_STORAGE", "FILE_SECURITY", "PARSER"].indexOf(status));
 }
 
@@ -30,9 +33,9 @@ export function MaterialImportStepper({ status, view, canMap, onView }: {
   const terminalFailure = ["FAILED", "CANCELLED", "RECONCILIATION_REQUIRED"].includes(status);
   return <ol className="mi-stepper" aria-label="导入进度">
     {STEPS.map((step, index) => {
-      const complete = !terminalFailure && index < current; const selected = step.view === view;
-      const readable = index <= current || (status === "MAPPING_CONFIRMED" && ["sheet", "mapping", "confirmed"].includes(step.view));
-      const locked = !readable || (step.view === "mapping" && !canMap && status !== "MAPPING_CONFIRMED");
+      const complete = !terminalFailure && index < current; const selected = step.views.includes(view);
+      const readable = index <= current || (["MAPPING_CONFIRMED", "QUEUED_FOR_NORMALIZATION", "NORMALIZING", "NORMALIZED"].includes(status) && ["sheet", "mapping", "confirmed"].includes(step.view)) || (status === "NORMALIZED" && step.view === "normalize");
+      const locked = !readable || (step.view === "mapping" && !canMap && status === "AWAITING_MAPPING");
       return <li key={step.view} className={`${complete ? "complete" : ""} ${selected ? "current" : ""} ${locked ? "locked" : ""} ${terminalFailure && index === current ? "failed" : ""}`} aria-current={selected ? "step" : undefined}>
         <button type="button" disabled={locked} onClick={() => onView(step.view)} aria-label={`${step.label}：${complete ? "已完成" : selected ? "当前步骤" : locked ? "尚未开放" : "只读可查看"}`}>
           <span aria-hidden="true">{complete ? "✓" : terminalFailure && index === current ? "!" : index + 1}</span>{step.label}
