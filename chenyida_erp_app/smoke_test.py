@@ -1,4 +1,5 @@
 import json
+import io
 import os
 import subprocess
 import sys
@@ -9,6 +10,7 @@ import urllib.request
 from pathlib import Path
 
 from environment_guard import prepare_test_environment
+from openpyxl import Workbook
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -48,6 +50,36 @@ def request(path, method="GET", payload=None, expected_status=200):
     if isinstance(data, dict):
         data["_status"] = status
     return data
+
+
+def request_binary(path, content, expected_status=200):
+    global SESSION_COOKIE
+    headers = {"Content-Type": "application/octet-stream"}
+    if SESSION_COOKIE:
+        headers["Cookie"] = SESSION_COOKIE
+    req = urllib.request.Request(BASE_URL + path, data=content, method="POST", headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            body = response.read()
+            status = response.status
+    except urllib.error.HTTPError as exc:
+        body = exc.read()
+        status = exc.code
+    if status != expected_status:
+        raise AssertionError(f"{path} returned {status}, expected {expected_status}: {body!r}")
+    return json.loads(body.decode("utf-8"))
+
+
+def sample_xlsx_bytes():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "物料明细"
+    sheet.append(["供应商料号", "物料名称", "规格型号", "品牌", "单位"])
+    sheet.append(["SMOKE-XLSX-001", "Smoke Excel 电阻", "10K 0603", "TEST", "PCS"])
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    workbook.close()
+    return buffer.getvalue()
 
 
 def wait_ready(proc):
@@ -433,8 +465,16 @@ def main():
             result = request("/api/import", method="POST", payload={"csvText": sample["csv"], "batchNo": "TEST-IMPORT-SMOKE"})
             assert result["count"] == 4, result
 
+            xlsx_result = request_binary(
+                "/api/import-file?filename=smoke.xlsx&batch_no=TEST-XLSX-SMOKE",
+                sample_xlsx_bytes(),
+            )
+            assert xlsx_result["source_type"] == "XLSX", xlsx_result
+            assert xlsx_result["selected_sheet"] == "物料明细", xlsx_result
+            assert xlsx_result["count"] == 1, xlsx_result
+
             summary = request("/api/summary")
-            assert summary["pending"] == 4, summary
+            assert summary["pending"] == 5, summary
             assert summary["auto_count"] >= 2, summary
             assert summary["suspect_count"] >= 1, summary
             assert summary["new_count"] >= 1, summary
@@ -473,6 +513,35 @@ def main():
             assert final_summary["open_sales_orders"] == 0, final_summary
             assert final_summary["total_quality_inspections"] == 3, final_summary
             assert final_summary["open_quality_issues"] == 1, final_summary
+
+            request(
+                "/api/import",
+                method="POST",
+                payload={
+                    "batchNo": "TEST-IMPORT-REVIEW-GUARDS",
+                    "rows": [
+                        {"raw_item_name": "Smoke缺规格", "purchase_uom": "PCS"},
+                        {"raw_item_name": "Smoke缺单位", "raw_spec": "2.54mm"},
+                    ],
+                },
+            )
+            guard_rows = request("/api/cleaning")["rows"]
+            missing_spec = next(row for row in guard_rows if row["raw_item_name"] == "Smoke缺规格")
+            spec_block = request(
+                "/api/cleaning/create-item",
+                method="POST",
+                payload={"id": missing_spec["id"], "item_category": "OTH", "standard_name": "Smoke缺规格"},
+                expected_status=400,
+            )
+            assert spec_block["code"] == "SPECIFICATION_REVIEW_REQUIRED", spec_block
+            missing_unit = next(row for row in guard_rows if row["raw_item_name"] == "Smoke缺单位")
+            unit_block = request(
+                "/api/cleaning/create-item",
+                method="POST",
+                payload={"id": missing_unit["id"], "item_category": "OTH", "standard_name": "Smoke缺单位"},
+                expected_status=400,
+            )
+            assert unit_block["code"] == "MATERIAL_UNIT_REQUIRED", unit_block
 
             print("SMOKE_TEST_OK")
         finally:

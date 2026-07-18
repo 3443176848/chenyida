@@ -9,7 +9,7 @@ User=root
 Group=root
 WorkingDirectory=/opt/erp
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 /opt/erp/chenyida_erp_app/server.py --host 0.0.0.0 --port 18888 --log-file /opt/erp/chenyida_erp_app/data/server.log
+ExecStart=/opt/erp/.venv/bin/python /opt/erp/chenyida_erp_app/server.py --host 0.0.0.0 --port 18888 --log-file /opt/erp/chenyida_erp_app/data/server.log
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=20

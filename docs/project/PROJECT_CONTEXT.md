@@ -11,7 +11,7 @@
 ### 本地 ERP
 
 - 路径：`chenyida_erp_app/`
-- 技术：Python 3、标准库 HTTP Server、SQLite、原生 HTML/CSS/JavaScript。
+- 技术：Python 3.11、标准库 HTTP Server、SQLite、原生 HTML/CSS/JavaScript；项目虚拟环境固定 `openpyxl`/`xlrd` 解析 XLSX/XLS。
 - 入口：`server.py`；静态页面位于 `static/`。
 - 用途：服务器本地运行和后续默认交付目标；根据 D-029 公网验证期间监听 `0.0.0.0:18888`。
 - 数据：`chenyida_erp_app/data/erp.sqlite3`，运行数据被 Git 忽略。
@@ -39,9 +39,9 @@
 
 ### 本地 SQLite
 
-- 26 张业务表，由 `server.py` 中运行时 `CREATE TABLE IF NOT EXISTS` 建立。
+- 29 张业务/迁移表；历史 26 张表仍由 `server.py` 建立，Excel 导入新增表从 `0001_material_import_source_lineage.sql` 起使用版本化迁移。
 - 覆盖用户、会话、物料、映射、清洗、客户、供应商、产品、BOM、采购、库存、生产、销售、品质、财务和活动日志。
-- 当前未发现正式迁移版本表或外键约束。
+- 已增加 `local_schema_migrations`、`material_import_batches`、`material_import_raw_rows` 及来源外键/索引；历史表的迁移基线与外键治理仍待逐步补齐。
 
 ### 在线 D1
 
@@ -52,7 +52,7 @@
 ## 主要模块
 
 - 身份与权限：初始化、登录、会话、角色、用户状态、密码重置、审计。
-- 物料治理：物料、供应商映射、CSV 导入、清洗确认、新物料建档。
+- 物料治理：物料、供应商映射、CSV/XLSX/XLS 自适应导入、不可变原始行、清洗确认、新物料建档。
 - 工程：产品、BOM、BOM 行、齐套分析。
 - 供应链：供应商、采购建议、采购订单、收货、库存调整和库存流水。
 - 制造：工单、BOM 转工单、领料、完工和报工。
@@ -91,7 +91,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import Batch/Parser/Mapping/Catalog/Workspace，以及 Phase 3 Normalization、Review UI、`PHASE3-MATERIAL-LIBRARY-01`、多供应商自适应导入 V1 和 A118/V700 真实 BOM 只读验证。`PHASE3-MATERIAL-LIBRARY-02` 因 A118 XFD 异常块和 V700 缺少必填 Mapping 语义保持 `BLOCKED`；真实 dry-run、首批 DRAFT、生产迁移和部署均未执行。
+当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import Batch/Parser/Mapping/Catalog/Workspace，以及 Phase 3 Normalization、Review UI、内部物料库、多供应商自适应导入、A118/V700 只读验证和服务器本地 CSV/XLSX/XLS 接入。开发服务已部署到 `43.135.157.211:18888`；A118 XFD 异常和 V700 名称/单位语义仍保持 fail closed。
 
 ## 恢复上下文检查清单
 

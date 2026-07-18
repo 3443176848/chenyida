@@ -11,6 +11,7 @@ chenyida_erp_app/data/
 
 # Dependency and cache folders
 node_modules/
+.venv/
 **/__pycache__/
 *.py[cod]
 

@@ -4,6 +4,17 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-EXCEL-COMPAT - `feat: enable local spreadsheet imports`
+
+- 运行面：修复实际常驻的 `chenyida_erp_app`，网页文件选择器和后端现已接受 `.csv/.xlsx/.xls`，不再把 Excel 当 CSV 文本读取。
+- 解析：按强签名识别 CSV/OOXML/OLE，固定 `defusedxml==0.7.1`、`openpyxl==3.1.5`、`xlrd==2.0.2`；限制 10 MiB、50 Sheet、50,000 行/Sheet、256 列，并拒绝 XLSX 宏、加密、外链、路径和压缩资源异常。
+- 自适应：评分全部 Sheet、前 50 行、1～3 行和合并表头；集中字段别名、样本特征、多列规格组合及非数据行分类。缺少明确名称、规格证据不足或 Mapping 冲突时 fail closed/进入复核，不由 AI 补造。
+- 建档门禁：清洗行创建内部物料前，页面和服务端均要求人工确认标准名称、规格和基本单位；空规格或空单位禁止建档，不再自动补 `PCS`。
+- 数据库：新增本地版本化迁移 `0001_material_import_source_lineage`，保存文件 SHA、Sheet/表头/Mapping 快照、不可变原始行，以及清洗行来源、mapped values、Mapping/规格置信度和 Review 状态。
+- 测试：Spreadsheet 6/6、Migration 3/3、联合单元 13/13、self-test、含 XLSX 二进制 API 的 smoke、go-live、快照副本试迁移和完整性检查均通过。
+- 部署：迁移前备份 `erp-backup-20260718-172714.sqlite3`；systemd 改用 `/opt/erp/.venv/bin/python` 后重启为 `enabled/active`，本机和公网 HTML 已验证新文件类型。
+- 真实样本：V700 仍因缺少明确物料名称阻断，A118 仍因 XFD 超宽阻断；没有截断、补造或写入这两份真实附件。
+
 ### PHASE3-MATERIAL-LIBRARY-PUBLIC-VERIFY - `chore: enable port 18888 public verification`
 
 - 运行：服务器应用改为绑定 `0.0.0.0:18888`，公网验证地址为 `http://43.135.157.211:18888`。

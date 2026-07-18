@@ -19,6 +19,8 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
+from spreadsheet_import import MAX_FILE_BYTES, SpreadsheetImportError, parse_spreadsheet_import
+
 
 APP_DIR = Path(__file__).resolve().parent
 WORKSPACE = APP_DIR.parent
@@ -26,6 +28,7 @@ STATIC_DIR = APP_DIR / "static"
 DATA_DIR = Path(os.environ.get("CYD_ERP_DATA_DIR", APP_DIR / "data"))
 BACKUP_DIR = DATA_DIR / "backups"
 TEMPLATE_DIR = WORKSPACE / "物料主数据治理落地包" / "templates"
+MIGRATIONS_DIR = APP_DIR / "migrations"
 DB_PATH = Path(os.environ.get("CYD_ERP_DB", DATA_DIR / "erp.sqlite3"))
 SESSION_COOKIE = "CYD_ERP_SESSION"
 SESSION_TTL_SECONDS = 12 * 60 * 60
@@ -448,7 +451,7 @@ def permission_for_request(method, path):
         return "read"
     if method == "GET":
         return "read"
-    if path in {"/api/import", "/api/cleaning/confirm", "/api/cleaning/create-item"}:
+    if path in {"/api/import", "/api/import-file", "/api/cleaning/confirm", "/api/cleaning/create-item"}:
         return "material"
     if path == "/api/customers":
         return "sales"
@@ -966,6 +969,41 @@ def create_schema(conn):
     conn.commit()
 
 
+def apply_migrations(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS local_schema_migrations (
+            version TEXT PRIMARY KEY,
+            applied_at TEXT NOT NULL
+        )
+        """
+    )
+    applied = {
+        row["version"]
+        for row in conn.execute("SELECT version FROM local_schema_migrations").fetchall()
+    }
+    for migration_path in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        version = migration_path.stem
+        if version in applied:
+            continue
+        if not re.fullmatch(r"[a-zA-Z0-9_-]+", version):
+            raise RuntimeError("迁移文件名不合法")
+        sql = migration_path.read_text(encoding="utf-8")
+        escaped_version = version.replace("'", "''")
+        escaped_time = now_text().replace("'", "''")
+        try:
+            conn.executescript(
+                "BEGIN IMMEDIATE;\n"
+                f"{sql}\n"
+                "INSERT INTO local_schema_migrations (version, applied_at) "
+                f"VALUES ('{escaped_version}', '{escaped_time}');\n"
+                "COMMIT;"
+            )
+        except Exception:
+            conn.rollback()
+            raise
+
+
 def read_csv_file(path):
     if not path.exists():
         return []
@@ -1409,6 +1447,7 @@ def seed_default_users(conn):
 def init_db():
     with closing(db_connect()) as conn:
         create_schema(conn)
+        apply_migrations(conn)
         seed_from_templates(conn)
         seed_default_users(conn)
 
@@ -2312,11 +2351,10 @@ def best_match(conn, raw):
 def normalize_import_row(row, batch_no):
     data = {field: row.get(field, "") for field in IMPORT_FIELDS}
     data["import_batch_no"] = data["import_batch_no"] or batch_no
-    data["purchase_uom"] = data["purchase_uom"] or "PCS"
     return data
 
 
-def import_supplier_rows(conn, rows, batch_no=None):
+def import_supplier_rows(conn, rows, batch_no=None, commit=True):
     if not batch_no:
         batch_no = f"IMP-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     imported = []
@@ -2344,8 +2382,10 @@ def import_supplier_rows(conn, rows, batch_no=None):
                 raw_brand, raw_mpn, purchase_uom, min_order_qty, lead_time_days, last_price, remark,
                 parsed_category, parsed_package, parsed_value, parsed_voltage,
                 candidate_internal_code, candidate_standard_name, match_level, confidence,
-                owner_role, process_status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                owner_role, process_status, created_at, updated_at,
+                source_batch_id, source_sheet_name, source_row_number, mapped_values_json,
+                mapping_confidence, specification_confidence, mapping_status, review_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 payload.get("import_batch_no", ""),
@@ -2372,12 +2412,106 @@ def import_supplier_rows(conn, rows, batch_no=None):
                 payload.get("process_status", "待处理"),
                 timestamp,
                 timestamp,
+                row.get("_source_batch_id"),
+                row.get("_source_sheet_name", ""),
+                row.get("_source_row_number"),
+                json.dumps(row.get("_mapped_values", {}), ensure_ascii=False),
+                row.get("_mapping_confidence", 0),
+                row.get("_specification_confidence", 0),
+                row.get("_mapping_status", ""),
+                row.get("_review_status", ""),
             ],
         )
         imported.append(payload)
     conn.execute("INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)", ("导入供应商物料", f"{batch_no}: {len(imported)} 行", timestamp))
-    conn.commit()
+    if commit:
+        conn.commit()
     return {"batch_no": batch_no, "count": len(imported), "rows": imported}
+
+
+def import_supplier_file(conn, content, filename, batch_no=None, created_by=""):
+    parsed = parse_spreadsheet_import(content, filename)
+    batch_no = (batch_no or "").strip() or f"IMP-{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}"
+    if len(batch_no) > 80:
+        raise SpreadsheetImportError("导入批次号不能超过 80 个字符", "IMPORT_BATCH_NO_INVALID")
+    if conn.execute("SELECT 1 FROM material_import_batches WHERE batch_no = ?", (batch_no,)).fetchone():
+        raise SpreadsheetImportError("导入批次号已经存在，请更换后重试", "IMPORT_BATCH_NO_CONFLICT")
+    timestamp = now_text()
+    cursor = conn.execute(
+        """
+        INSERT INTO material_import_batches (
+            batch_no, original_filename, source_sha256, source_type, selected_sheet_name,
+            header_start_row, header_end_row, data_start_row, structure_confidence,
+            mapping_json, total_source_rows, data_row_count, imported_row_count,
+            batch_status, created_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'PARSING', ?, ?, ?)
+        """,
+        (
+            batch_no,
+            Path(filename).name,
+            hashlib.sha256(content).hexdigest(),
+            parsed["source_type"],
+            parsed["selected_sheet"],
+            parsed["header_start_row"],
+            parsed["header_end_row"],
+            parsed["data_start_row"],
+            parsed["structure_confidence"],
+            json.dumps(parsed["mappings"], ensure_ascii=False),
+            len(parsed["raw_rows"]),
+            len(parsed["rows"]),
+            created_by or "system",
+            timestamp,
+            timestamp,
+        ),
+    )
+    batch_id = cursor.lastrowid
+    conn.executemany(
+        """
+        INSERT INTO material_import_raw_rows (
+            batch_id, source_sheet_name, source_row_number, raw_values_json,
+            row_disposition, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                batch_id,
+                row["sheet_name"],
+                row["row_number"],
+                json.dumps(row["values"], ensure_ascii=False),
+                row["disposition"],
+                timestamp,
+            )
+            for row in parsed["raw_rows"]
+        ],
+    )
+    rows = []
+    for row in parsed["rows"]:
+        rows.append({**row, "_source_batch_id": batch_id})
+    result = import_supplier_rows(conn, rows, batch_no, commit=False)
+    conn.execute(
+        """
+        UPDATE material_import_batches
+        SET imported_row_count = ?, batch_status = 'IMPORTED', updated_at = ?
+        WHERE id = ?
+        """,
+        (result["count"], now_text(), batch_id),
+    )
+    conn.commit()
+    return {
+        "batch_id": batch_id,
+        "batch_no": batch_no,
+        "count": result["count"],
+        "source_type": parsed["source_type"],
+        "selected_sheet": parsed["selected_sheet"],
+        "header_start_row": parsed["header_start_row"],
+        "header_end_row": parsed["header_end_row"],
+        "data_start_row": parsed["data_start_row"],
+        "structure_confidence": parsed["structure_confidence"],
+        "columns": parsed["columns"],
+        "mappings": parsed["mappings"],
+        "sheet_summaries": parsed["sheet_summaries"],
+        "extension_warning": parsed["extension_warning"],
+    }
 
 
 def generate_item_code(conn, category):
@@ -2838,6 +2972,20 @@ class AppHandler(BaseHTTPRequestHandler):
         data = self.rfile.read(length).decode("utf-8") if length else "{}"
         return json.loads(data or "{}")
 
+    def read_import_file(self):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError as exc:
+            raise SpreadsheetImportError("上传大小无效", "IMPORT_FILE_INVALID") from exc
+        if length <= 0:
+            raise SpreadsheetImportError("导入文件不能为空", "IMPORT_FILE_EMPTY")
+        if length > MAX_FILE_BYTES:
+            raise SpreadsheetImportError("导入文件不能超过 10 MiB", "IMPORT_FILE_TOO_LARGE")
+        content = self.rfile.read(length)
+        if len(content) != length:
+            raise SpreadsheetImportError("文件上传不完整，请重试", "IMPORT_FILE_UPLOAD_INCOMPLETE")
+        return content
+
     def session_token(self):
         return parse_cookie(self.headers.get("Cookie", "")).get(SESSION_COOKIE, "")
 
@@ -2999,6 +3147,34 @@ class AppHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        if path == "/api/import-file":
+            try:
+                init_db()
+                with closing(db_connect()) as conn:
+                    if not self.authorize(conn, path, "POST"):
+                        return
+                    query = parse_qs(parsed.query)
+                    filename = Path(query.get("filename", [""])[0]).name
+                    if not filename:
+                        raise SpreadsheetImportError("缺少原始文件名", "IMPORT_FILE_NAME_REQUIRED")
+                    content = self.read_import_file()
+                    result = import_supplier_file(
+                        conn,
+                        content,
+                        filename,
+                        query.get("batch_no", [""])[0],
+                        self.user["username"],
+                    )
+                    self.send_json(result)
+            except SpreadsheetImportError as exc:
+                status = HTTPStatus.REQUEST_ENTITY_TOO_LARGE if exc.code == "IMPORT_FILE_TOO_LARGE" else HTTPStatus.BAD_REQUEST
+                self.send_json({"error": str(exc), "code": exc.code}, status)
+            except Exception:
+                self.send_json(
+                    {"error": "Excel 导入处理失败，请检查文件后重试", "code": "IMPORT_FILE_PROCESSING_FAILED"},
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
         try:
             init_db()
             body = self.read_json()
@@ -3076,17 +3252,28 @@ class AppHandler(BaseHTTPRequestHandler):
                         return
                     category = body.get("item_category") or row["parsed_category"] or "OTH"
                     code = generate_item_code(conn, category)
-                    standard_name = body.get("standard_name") or row["raw_item_name"]
+                    standard_name = (body.get("standard_name") or row["raw_item_name"] or "").strip()
+                    specification = (body.get("specification") or row["raw_spec"] or "").strip()
+                    base_uom = (body.get("base_uom") or row["purchase_uom"] or "").strip()
+                    if not standard_name:
+                        self.send_json({"error": "标准名称不能为空", "code": "MATERIAL_NAME_REQUIRED"}, HTTPStatus.BAD_REQUEST)
+                        return
+                    if not specification:
+                        self.send_json({"error": "规格必须人工确认，不能以空规格建档", "code": "SPECIFICATION_REVIEW_REQUIRED"}, HTTPStatus.BAD_REQUEST)
+                        return
+                    if not base_uom:
+                        self.send_json({"error": "基本单位必须人工确认", "code": "MATERIAL_UNIT_REQUIRED"}, HTTPStatus.BAD_REQUEST)
+                        return
                     insert_item(conn, {
                         "internal_item_code": code,
                         "item_category": category,
                         "standard_name": standard_name,
                         "item_status": "启用",
-                        "base_uom": row["purchase_uom"] or "PCS",
+                        "base_uom": base_uom,
                         "brand": row["raw_brand"],
                         "mpn": row["raw_mpn"],
                         "package": row["parsed_package"],
-                        "value_spec": row["parsed_value"],
+                        "value_spec": specification,
                         "voltage": row["parsed_voltage"],
                         "environmental_level": body.get("environmental_level", "待确认"),
                         "is_customer_specific": body.get("is_customer_specific", "N"),
@@ -3100,7 +3287,7 @@ class AppHandler(BaseHTTPRequestHandler):
                         "supplier_item_code": row["raw_item_code"],
                         "supplier_brand": row["raw_brand"],
                         "supplier_mpn": row["raw_mpn"],
-                        "purchase_uom": row["purchase_uom"],
+                        "purchase_uom": base_uom,
                         "min_order_qty": row["min_order_qty"],
                         "lead_time_days": row["lead_time_days"],
                         "last_price": row["last_price"],
@@ -3111,7 +3298,8 @@ class AppHandler(BaseHTTPRequestHandler):
                     conn.execute(
                         """
                         UPDATE cleaning_rows
-                        SET candidate_internal_code = ?, candidate_standard_name = ?, process_status = '已建档', updated_at = ?
+                        SET candidate_internal_code = ?, candidate_standard_name = ?,
+                            process_status = '已建档', review_status = 'CONFIRMED', updated_at = ?
                         WHERE id = ?
                         """,
                         (code, standard_name, now_text(), row_id),

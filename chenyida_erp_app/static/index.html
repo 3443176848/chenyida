@@ -69,7 +69,7 @@
           <div class="section-head">
             <div>
               <h2>供应商导入</h2>
-              <p>支持 CSV 表头：import_batch_no, supplier_name, raw_item_name, raw_item_code, raw_spec...</p>
+              <p>支持 CSV、XLSX、XLS；系统自动识别工作表、1～3 行表头并映射物料名称、规格、型号、单位等字段。</p>
             </div>
             <button id="loadSampleBtn" class="secondary">载入示例</button>
           </div>
@@ -79,11 +79,11 @@
               <input id="batchNo" placeholder="留空自动生成" />
             </label>
             <label>
-              CSV 文件
-              <input id="csvFile" type="file" accept=".csv" />
+              供应商文件
+              <input id="csvFile" type="file" accept=".csv,.xlsx,.xls" />
             </label>
           </div>
-          <textarea id="csvText" class="csv-box" spellcheck="false" placeholder="把供应商 CSV 内容粘贴到这里，或选择 CSV 文件。"></textarea>
+          <textarea id="csvText" class="csv-box" spellcheck="false" placeholder="也可以直接粘贴 CSV 内容；选择 Excel 文件后由服务器安全解析。"></textarea>
           <div class="button-row">
             <button id="runImportBtn" class="primary">运行导入与匹配</button>
             <span id="importMsg" class="muted"></span>
@@ -638,6 +638,14 @@
         <label>
           标准名称
           <input id="newItemName" required />
+        </label>
+        <label>
+          规格（必须人工确认）
+          <input id="newItemSpec" required />
+        </label>
+        <label>
+          基本单位（必须人工确认）
+          <input id="newItemUom" required />
         </label>
         <label>
           环保等级

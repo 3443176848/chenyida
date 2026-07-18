@@ -6,15 +6,15 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 约 55,100 行 | 在上一快照上新增真实样本驱动的安全兼容、Inspect 摘要和回归测试；不含 Drizzle snapshot、依赖、构建产物、截图和文档 |
-| 源码文件 | 145 | 新增自适应识别模块和 3 份专项测试；扩展 Parser、Mapping、Normalization、Review UI 和 Draft 门禁 |
-| 根仓库跟踪项 | 自适应 Import 运行时、`0008`、测试和文档 | 未修改本地旧版业务代码、hosting 或部署配置 |
+| 总代码量 | 约 56,000 行 | 新增服务器本地 spreadsheet parser、迁移、API/UI 和专项测试；不含依赖、运行数据库、备份和截图 |
+| 源码文件 | 150+ | 新增本地 parser、2 份专项测试、版本化 migration、依赖清单和完成报告 |
+| 根仓库跟踪项 | Site 自适应 Import + 服务器本地 CSV/XLSX/XLS | 本轮修改本地 Python 运行面和 systemd 源码配置，未修改 Site |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
-| 数据表 | 71（本地+开发 schema） | 本地 SQLite 26 张，Site D1/Drizzle 45 张；最新 `0008` 仅在隔离 D1 测试，未执行生产迁移 |
+| 数据表 | 74（本地+开发 schema） | 本地 SQLite 29 张业务/迁移表，Site D1/Drizzle 45 张；本地 `0001` 已执行，Site `0008` 未执行生产迁移 |
 | 在线 API 路径 | 89 | 开发代码新增 Draft Generation 查询、Normalization Approval 和 Draft Commit；生产公开站点尚未部署 |
 | 页面入口 | 14 | 既有 11 个入口加 3 条 Material Import 路由 |
-| 测试文件 | 33 | 新增自适应识别、Migration 和运行时闭环 3 份专项测试 |
+| 测试文件 | 35 | 本轮新增本地 Spreadsheet 和 Migration 两份专项测试 |
 
 ## 当前版本与环境
 
@@ -80,6 +80,21 @@ git -C chenyida_erp_site status --short
 | `.csv` | 保持 | 既有编码、分隔符和 CSV 安全检查不变 |
 | 兼容策略 | 已记录 | 批次 `source_kind`/文件 `detected_file_type` V1 分类保持 `XLSX`，`.xls` 通过 `filename_extension` 选择独立 BIFF 路径并写入 `XLS_LEGACY_BINARY` 警告 |
 | 生产影响 | NONE | 未连接生产资源、未迁移、未上传、未创建 Draft、未部署 |
+
+## 服务器本地 CSV/XLSX/XLS 自适应导入
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 实际运行面 | DEPLOYED / DEVELOPMENT | `chenyida_erp_app` 和 systemd 常驻服务已更新，不再只有 Site 代码支持 Excel |
+| 文件类型 | PASS | CSV、OOXML XLSX、OLE/BIFF XLS；按内容签名识别，10 MiB 上限 |
+| Sheet/表头 | PASS | 全部 Sheet、前 50 行、1～3 行、合并父级表头、数据起始行 |
+| Mapping/规格 | PASS | 集中别名、样本评分、EXACT/HIGH_CONFIDENCE/SUGGESTED/UNMAPPED/CONFLICT、多列规格组合 |
+| 原始数据 | PASS | `material_import_batches` + 不可变 `material_import_raw_rows`；清洗行保存来源和置信度 |
+| Migration | PASS 3/3 | 空库、已有数据、重复执行、失败回滚和约束；迁移前快照和副本试迁移完整性 `ok` |
+| Parser/API | PASS 6/6 | 包含多行 XLSX、真实 BIFF XLS、CSV、错后缀、缺名称阻断和 A118/V700 回归 |
+| 本地基线 | PASS | 联合单元 13/13、self-test、含二进制 XLSX 上传的 smoke、go-live |
+| 服务 | PASS | `/opt/erp/.venv/bin/python`、systemd `enabled/active`、`0.0.0.0:18888` |
+| 真实样本 | EXPECTED BLOCK | V700 缺名称；A118 XFD 超宽；业务/安全门禁未降低 |
 
 ## 服务器本地交付运行面
 

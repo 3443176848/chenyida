@@ -6,7 +6,7 @@
 
 - 内部标准物料库
 - 供应商物料映射
-- 供应商 CSV 批量导入
+- 供应商 CSV、XLSX、XLS 自适应批量导入
 - 自动匹配、疑似匹配、新物料分流
 - 清洗审核：确认映射、新建物料
 - 客户与供应商档案：维护联系人、电话、账期、负责人和状态
@@ -29,6 +29,13 @@
 - CSV 导出
 
 ## 启动方式
+
+首次部署或依赖更新：
+
+```bash
+python3 -m venv /opt/erp/.venv
+/opt/erp/.venv/bin/python -m pip install -r /opt/erp/chenyida_erp_app/requirements.txt
+```
 
 服务器开发环境使用仓库内的 `deployment/chenyida-erp.service`，当前监听 `0.0.0.0:18888`，支持开机自启和异常自动重启：
 

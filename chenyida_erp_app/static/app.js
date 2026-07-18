@@ -1044,17 +1044,46 @@ async function refreshAll() {
 
 async function loadSample() {
   const sample = await api("/api/sample-import");
+  $("#csvFile").value = "";
   $("#csvText").value = sample.csv;
   toast("已载入示例供应商物料");
 }
 
 async function runImport() {
-  const csvText = $("#csvText").value.trim();
-  if (!csvText) {
-    toast("请先粘贴或选择 CSV");
+  const file = $("#csvFile").files[0];
+  const batchNo = $("#batchNo").value.trim();
+  if (file) {
+    if (file.size > 10 * 1024 * 1024) {
+      toast("导入文件不能超过 10 MiB");
+      return;
+    }
+    const suffix = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] || "";
+    if (![".csv", ".xlsx", ".xls"].includes(suffix)) {
+      toast("仅支持 CSV、XLSX、XLS 文件");
+      return;
+    }
+    $("#importMsg").textContent = "正在上传并识别工作表与表头…";
+    const query = new URLSearchParams({ filename: file.name });
+    if (batchNo) query.set("batch_no", batchNo);
+    const result = await api(`/api/import-file?${query}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: file,
+    });
+    const headerLabel = result.header_start_row === result.header_end_row
+      ? `第 ${result.header_start_row} 行`
+      : `第 ${result.header_start_row}～${result.header_end_row} 行`;
+    $("#importMsg").textContent = `已从 ${result.selected_sheet} 导入 ${result.count} 行，表头 ${headerLabel}，批次 ${result.batch_no}`;
+    await refreshAll();
+    setTab("cleaning");
+    toast(`${result.source_type} 导入与匹配完成`);
     return;
   }
-  const batchNo = $("#batchNo").value.trim();
+  const csvText = $("#csvText").value.trim();
+  if (!csvText) {
+    toast("请先选择 CSV、XLSX、XLS 文件，或粘贴 CSV");
+    return;
+  }
   const result = await api("/api/import", {
     method: "POST",
     body: JSON.stringify({ csvText, batchNo }),
@@ -1080,6 +1109,8 @@ function openNewItemDialog(id) {
   $("#newItemCleaningId").value = row.id;
   $("#newItemCategory").value = row.parsed_category || "OTH";
   $("#newItemName").value = row.raw_item_name;
+  $("#newItemSpec").value = row.raw_spec || "";
+  $("#newItemUom").value = row.purchase_uom || "";
   $("#newItemDialog").showModal();
 }
 
@@ -1092,6 +1123,8 @@ async function createItem(event) {
       id,
       item_category: $("#newItemCategory").value.trim(),
       standard_name: $("#newItemName").value.trim(),
+      specification: $("#newItemSpec").value.trim(),
+      base_uom: $("#newItemUom").value.trim(),
       environmental_level: $("#newItemEnv").value.trim(),
       default_inspection_rule: $("#newItemInspection").value.trim(),
       approvedBy: "系统用户",
@@ -1549,12 +1582,16 @@ function bindEvents() {
     const backupName = event.target.dataset.restoreBackup;
     if (backupName) await restoreBackup(backupName);
   });
-  $("#loadSampleBtn").addEventListener("click", loadSample);
-  $("#runImportBtn").addEventListener("click", runImport);
+  $("#loadSampleBtn").addEventListener("click", () => loadSample().catch((error) => toast(error.message)));
+  $("#runImportBtn").addEventListener("click", () => runImport().catch((error) => {
+    $("#importMsg").textContent = error.message;
+    toast(error.message);
+  }));
   $("#csvFile").addEventListener("change", async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    $("#csvText").value = await file.text();
+    $("#csvText").value = "";
+    $("#importMsg").textContent = `已选择 ${file.name}（${Math.ceil(file.size / 1024)} KiB）`;
   });
   $("#cleaningTable").addEventListener("click", async (event) => {
     const confirmId = event.target.dataset.confirm;
