@@ -19,13 +19,22 @@ class MaterialImportMigrationTest(unittest.TestCase):
             server.apply_migrations(connection)
             server.apply_migrations(connection)
             versions = connection.execute("SELECT version FROM local_schema_migrations").fetchall()
-            self.assertEqual([row["version"] for row in versions], ["0001_material_import_source_lineage"])
+            self.assertEqual(
+                [row["version"] for row in versions],
+                ["0001_material_import_source_lineage", "0002_material_import_file_archive"],
+            )
             columns = {
                 row["name"]
                 for row in connection.execute("PRAGMA table_info(cleaning_rows)").fetchall()
             }
             self.assertIn("source_batch_id", columns)
             self.assertIn("specification_confidence", columns)
+            batch_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(material_import_batches)").fetchall()
+            }
+            self.assertIn("archived_file_key", batch_columns)
+            self.assertIn("parse_warnings_json", batch_columns)
         finally:
             connection.close()
 

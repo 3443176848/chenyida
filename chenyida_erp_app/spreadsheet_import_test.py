@@ -78,7 +78,7 @@ class SpreadsheetImportTest(unittest.TestCase):
         self.assertEqual(result["source_type"], "XLSX")
         self.assertTrue(result["extension_warning"])
 
-    def test_missing_material_name_fails_closed(self):
+    def test_specification_can_be_a_review_required_name_candidate(self):
         workbook = Workbook()
         sheet = workbook.active
         sheet.title = "BOM"
@@ -87,21 +87,39 @@ class SpreadsheetImportTest(unittest.TestCase):
         buffer = io.BytesIO()
         workbook.save(buffer)
         workbook.close()
+        result = parse_spreadsheet_import(buffer.getvalue(), "missing-name.xlsx")
+        self.assertEqual(result["rows"][0]["raw_item_name"], "10K 0603")
+        self.assertEqual(result["rows"][0]["_mapping_status"], "SUGGESTED")
+        self.assertEqual(result["rows"][0]["_review_status"], "NEEDS_REVIEW")
+        self.assertIn("MATERIAL_NAME_FROM_SPECIFICATION_REVIEW_REQUIRED", result["warnings"])
+
+    def test_file_without_name_or_specification_semantics_fails_closed(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "数据"
+        sheet.append(["序号", "数量", "备注"])
+        sheet.append([1, 2, "待识别"])
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        workbook.close()
         with self.assertRaisesRegex(SpreadsheetImportError, "物料名称列") as caught:
-            parse_spreadsheet_import(buffer.getvalue(), "missing-name.xlsx")
+            parse_spreadsheet_import(buffer.getvalue(), "unmapped.xlsx")
         self.assertEqual(caught.exception.code, "IMPORT_MAPPING_REVIEW_REQUIRED")
 
-    def test_real_samples_keep_documented_safe_outcomes(self):
+    def test_real_samples_enter_review_without_lowering_material_guards(self):
         if not ATTACHMENT_DIR.exists():
             self.skipTest("真实附件不在当前服务器")
         v700 = ATTACHMENT_DIR / "V700量产BOM.csv"
         a118 = ATTACHMENT_DIR / "A118量产BOM.csv"
-        with self.assertRaises(SpreadsheetImportError) as v700_error:
-            parse_spreadsheet_import(v700.read_bytes(), v700.name)
-        self.assertEqual(v700_error.exception.code, "IMPORT_MAPPING_REVIEW_REQUIRED")
-        with self.assertRaises(SpreadsheetImportError) as a118_error:
-            parse_spreadsheet_import(a118.read_bytes(), a118.name)
-        self.assertEqual(a118_error.exception.code, "IMPORT_PARSE_LIMIT_EXCEEDED")
+        v700_result = parse_spreadsheet_import(v700.read_bytes(), v700.name)
+        self.assertEqual(v700_result["selected_sheet"], "BOM")
+        self.assertEqual(len(v700_result["rows"]), 229)
+        self.assertTrue(all(row["_review_status"] == "NEEDS_REVIEW" for row in v700_result["rows"]))
+        a118_result = parse_spreadsheet_import(a118.read_bytes(), a118.name)
+        self.assertEqual(a118_result["selected_sheet"], "SHEET1")
+        self.assertEqual((a118_result["header_start_row"], a118_result["header_end_row"]), (44, 44))
+        self.assertEqual(len(a118_result["rows"]), 314)
+        self.assertIn("SOURCE_COLUMNS_EXCEED_ANALYSIS_LIMIT_ORIGINAL_FILE_ARCHIVE_REQUIRED", a118_result["warnings"])
 
 
 if __name__ == "__main__":

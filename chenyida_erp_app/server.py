@@ -27,6 +27,7 @@ WORKSPACE = APP_DIR.parent
 STATIC_DIR = APP_DIR / "static"
 DATA_DIR = Path(os.environ.get("CYD_ERP_DATA_DIR", APP_DIR / "data"))
 BACKUP_DIR = DATA_DIR / "backups"
+IMPORT_FILE_DIR = DATA_DIR / "import_files"
 TEMPLATE_DIR = WORKSPACE / "物料主数据治理落地包" / "templates"
 MIGRATIONS_DIR = APP_DIR / "migrations"
 DB_PATH = Path(os.environ.get("CYD_ERP_DB", DATA_DIR / "erp.sqlite3"))
@@ -2429,6 +2430,29 @@ def import_supplier_rows(conn, rows, batch_no=None, commit=True):
     return {"batch_no": batch_no, "count": len(imported), "rows": imported}
 
 
+def archive_import_file(content, source_sha256, source_type):
+    IMPORT_FILE_DIR.mkdir(parents=True, exist_ok=True)
+    suffix = {"CSV": ".csv", "XLSX": ".xlsx", "XLS": ".xls"}[source_type]
+    filename = f"{source_sha256}{suffix}"
+    target = IMPORT_FILE_DIR / filename
+    if target.exists():
+        archived_sha256 = hashlib.sha256(target.read_bytes()).hexdigest()
+        if target.stat().st_size != len(content) or archived_sha256 != source_sha256:
+            raise SpreadsheetImportError("原文件归档校验失败", "IMPORT_FILE_ARCHIVE_CONFLICT")
+        return f"import_files/{filename}", False
+    temporary = IMPORT_FILE_DIR / f".{filename}.{secrets.token_hex(8)}.tmp"
+    try:
+        with temporary.open("xb") as file:
+            file.write(content)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temporary, target)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+    return f"import_files/{filename}", True
+
+
 def import_supplier_file(conn, content, filename, batch_no=None, created_by=""):
     parsed = parse_spreadsheet_import(content, filename)
     batch_no = (batch_no or "").strip() or f"IMP-{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}"
@@ -2437,66 +2461,78 @@ def import_supplier_file(conn, content, filename, batch_no=None, created_by=""):
     if conn.execute("SELECT 1 FROM material_import_batches WHERE batch_no = ?", (batch_no,)).fetchone():
         raise SpreadsheetImportError("导入批次号已经存在，请更换后重试", "IMPORT_BATCH_NO_CONFLICT")
     timestamp = now_text()
-    cursor = conn.execute(
-        """
-        INSERT INTO material_import_batches (
-            batch_no, original_filename, source_sha256, source_type, selected_sheet_name,
-            header_start_row, header_end_row, data_start_row, structure_confidence,
-            mapping_json, total_source_rows, data_row_count, imported_row_count,
-            batch_status, created_by, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'PARSING', ?, ?, ?)
-        """,
-        (
-            batch_no,
-            Path(filename).name,
-            hashlib.sha256(content).hexdigest(),
-            parsed["source_type"],
-            parsed["selected_sheet"],
-            parsed["header_start_row"],
-            parsed["header_end_row"],
-            parsed["data_start_row"],
-            parsed["structure_confidence"],
-            json.dumps(parsed["mappings"], ensure_ascii=False),
-            len(parsed["raw_rows"]),
-            len(parsed["rows"]),
-            created_by or "system",
-            timestamp,
-            timestamp,
-        ),
-    )
-    batch_id = cursor.lastrowid
-    conn.executemany(
-        """
-        INSERT INTO material_import_raw_rows (
-            batch_id, source_sheet_name, source_row_number, raw_values_json,
-            row_disposition, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        [
+    source_sha256 = hashlib.sha256(content).hexdigest()
+    archive_key, archive_created = archive_import_file(content, source_sha256, parsed["source_type"])
+    try:
+        cursor = conn.execute(
+            """
+            INSERT INTO material_import_batches (
+                batch_no, original_filename, source_sha256, source_type, selected_sheet_name,
+                header_start_row, header_end_row, data_start_row, structure_confidence,
+                mapping_json, total_source_rows, data_row_count, imported_row_count,
+                batch_status, created_by, created_at, updated_at,
+                archived_file_key, file_size_bytes, parse_warnings_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'PARSING', ?, ?, ?, ?, ?, ?)
+            """,
             (
-                batch_id,
-                row["sheet_name"],
-                row["row_number"],
-                json.dumps(row["values"], ensure_ascii=False),
-                row["disposition"],
+                batch_no,
+                Path(filename).name,
+                source_sha256,
+                parsed["source_type"],
+                parsed["selected_sheet"],
+                parsed["header_start_row"],
+                parsed["header_end_row"],
+                parsed["data_start_row"],
+                parsed["structure_confidence"],
+                json.dumps(parsed["mappings"], ensure_ascii=False),
+                len(parsed["raw_rows"]),
+                len(parsed["rows"]),
+                created_by or "system",
                 timestamp,
-            )
-            for row in parsed["raw_rows"]
-        ],
-    )
-    rows = []
-    for row in parsed["rows"]:
-        rows.append({**row, "_source_batch_id": batch_id})
-    result = import_supplier_rows(conn, rows, batch_no, commit=False)
-    conn.execute(
-        """
-        UPDATE material_import_batches
-        SET imported_row_count = ?, batch_status = 'IMPORTED', updated_at = ?
-        WHERE id = ?
-        """,
-        (result["count"], now_text(), batch_id),
-    )
-    conn.commit()
+                timestamp,
+                archive_key,
+                len(content),
+                json.dumps(parsed["warnings"], ensure_ascii=False),
+            ),
+        )
+        batch_id = cursor.lastrowid
+        conn.executemany(
+            """
+            INSERT INTO material_import_raw_rows (
+                batch_id, source_sheet_name, source_row_number, raw_values_json,
+                row_disposition, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    batch_id,
+                    row["sheet_name"],
+                    row["row_number"],
+                    json.dumps(row["values"], ensure_ascii=False),
+                    row["disposition"],
+                    timestamp,
+                )
+                for row in parsed["raw_rows"]
+            ],
+        )
+        rows = [{**row, "_source_batch_id": batch_id} for row in parsed["rows"]]
+        result = import_supplier_rows(conn, rows, batch_no, commit=False)
+        conn.execute(
+            """
+            UPDATE material_import_batches
+            SET imported_row_count = ?, batch_status = 'IMPORTED', updated_at = ?
+            WHERE id = ?
+            """,
+            (result["count"], now_text(), batch_id),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        if archive_created:
+            archive_path = DATA_DIR / archive_key
+            if archive_path.exists():
+                archive_path.unlink()
+        raise
     return {
         "batch_id": batch_id,
         "batch_no": batch_no,
@@ -2511,6 +2547,7 @@ def import_supplier_file(conn, content, filename, batch_no=None, created_by=""):
         "mappings": parsed["mappings"],
         "sheet_summaries": parsed["sheet_summaries"],
         "extension_warning": parsed["extension_warning"],
+        "warnings": parsed["warnings"],
     }
 
 

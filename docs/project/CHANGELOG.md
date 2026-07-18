@@ -4,6 +4,15 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-REAL-SAMPLE-IMPORT-02 - `feat: stage real BOM imports for review`
+
+- 用户确认：项目负责人明确 A118/V700 是正确且需要入库的正式表格，不应因缺独立名称/单位或 XFD 异常声明宽度拒绝整份文件。
+- A118：完整原文件按 SHA 归档；从第 44 行可信表头和 256 列安全分析窗口生成 314 条待审核行，不把异常 XFD 列映射到 Canonical 字段。
+- V700：正确选择 BOM 第 1～2 行；规格描述同时生成 `SUGGESTED` 名称候选，生成 229 条待审核行，不自动确认名称。
+- 数据：新增 `0002_material_import_file_archive`；实际写入 2 Batch、766 Raw Rows、543 Cleaning Rows，543 条全部 `NEEDS_REVIEW`，22 条空规格、543 条空单位，内部物料保持 4 条。
+- 恢复：写入前备份 `erp-backup-20260718-174855.sqlite3`；迁移副本和写入后 `PRAGMA integrity_check` 均为 `ok`。
+- 验证：环境/Spreadsheet/Migration/真实样本联合单元 15/15、self-test、含二进制 Excel 的 smoke 和公网开发服务检查通过。
+
 ### PHASE3-MATERIAL-LIBRARY-EXCEL-COMPAT - `feat: enable local spreadsheet imports`
 
 - 运行面：修复实际常驻的 `chenyida_erp_app`，网页文件选择器和后端现已接受 `.csv/.xlsx/.xls`，不再把 Excel 当 CSV 文本读取。

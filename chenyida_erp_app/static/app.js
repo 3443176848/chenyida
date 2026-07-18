@@ -74,6 +74,16 @@ function pill(level) {
   return `<span class="pill ${cls}">${level || ""}</span>`;
 }
 
+function importWarningText(code) {
+  const messages = {
+    FILE_EXTENSION_DIFFERS_FROM_CONTENT_SIGNATURE: "文件后缀与实际类型不同，已按实际 Excel 类型处理",
+    SOURCE_COLUMNS_EXCEED_ANALYSIS_LIMIT_ORIGINAL_FILE_ARCHIVE_REQUIRED: "原文件已完整归档，仅从可信表头范围生成待审核行",
+    MATERIAL_NAME_FROM_SPECIFICATION_REVIEW_REQUIRED: "物料名称使用规格描述候选，必须人工确认",
+    MATERIAL_UNIT_REVIEW_REQUIRED: "原表缺少单位，建档前必须人工填写",
+  };
+  return messages[code] || code;
+}
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -854,6 +864,11 @@ function renderCleaning() {
         <td>${escapeHtml(row.raw_item_name)}</td>
         <td>${escapeHtml(row.raw_item_code)}</td>
         <td>${escapeHtml(row.raw_spec)}</td>
+        <td>${escapeHtml(row.purchase_uom)}</td>
+        <td>${escapeHtml(row.source_sheet_name ? `${row.source_sheet_name} #${row.source_row_number || ""}` : "")}</td>
+        <td>${escapeHtml(row.mapping_status)}</td>
+        <td>${escapeHtml(row.specification_confidence)}</td>
+        <td>${escapeHtml(row.review_status)}</td>
         <td>${escapeHtml(row.parsed_category)}</td>
         <td>${escapeHtml(row.candidate_internal_code)}</td>
         <td>${escapeHtml(row.candidate_standard_name)}</td>
@@ -873,6 +888,7 @@ function renderCleaning() {
   $("#cleaningTable").innerHTML = `
     <thead><tr>
       <th>ID</th><th>批次</th><th>供应商</th><th>原始名称</th><th>供应商料号</th><th>原始规格</th>
+      <th>单位</th><th>来源行</th><th>映射状态</th><th>规格置信度</th><th>审核状态</th>
       <th>解析品类</th><th>候选编码</th><th>候选名称</th><th>匹配</th><th>置信度</th><th>责任</th><th>状态</th><th>操作</th>
     </tr></thead>
     <tbody>${rows}</tbody>
@@ -1073,10 +1089,11 @@ async function runImport() {
     const headerLabel = result.header_start_row === result.header_end_row
       ? `第 ${result.header_start_row} 行`
       : `第 ${result.header_start_row}～${result.header_end_row} 行`;
-    $("#importMsg").textContent = `已从 ${result.selected_sheet} 导入 ${result.count} 行，表头 ${headerLabel}，批次 ${result.batch_no}`;
+    const warningText = (result.warnings || []).map(importWarningText).join("；");
+    $("#importMsg").textContent = `已从 ${result.selected_sheet} 生成 ${result.count} 条待审核行，表头 ${headerLabel}，批次 ${result.batch_no}${warningText ? `；${warningText}` : ""}`;
     await refreshAll();
     setTab("cleaning");
-    toast(`${result.source_type} 导入与匹配完成`);
+    toast(`${result.source_type} 已进入清洗审核`);
     return;
   }
   const csvText = $("#csvText").value.trim();

@@ -94,7 +94,22 @@ git -C chenyida_erp_site status --short
 | Parser/API | PASS 6/6 | 包含多行 XLSX、真实 BIFF XLS、CSV、错后缀、缺名称阻断和 A118/V700 回归 |
 | 本地基线 | PASS | 联合单元 13/13、self-test、含二进制 XLSX 上传的 smoke、go-live |
 | 服务 | PASS | `/opt/erp/.venv/bin/python`、systemd `enabled/active`、`0.0.0.0:18888` |
-| 真实样本 | EXPECTED BLOCK | V700 缺名称；A118 XFD 超宽；业务/安全门禁未降低 |
+| 真实样本 | SUPERSEDED | 此处记录初始严格拒绝结果；用户确认业务语义后，已由下节的待审核入库方案替代 |
+
+## A118 / V700 正式 BOM 待审核入库
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 用户确认 | ACCEPTED | 两份是正确且需要导入库内的正式表格 |
+| A118 | STAGED | `REAL-A118-20260718`，第 44 行表头，314 Cleaning Rows |
+| V700 | STAGED | `REAL-V700-20260718`，BOM 第 1～2 行，229 Cleaning Rows |
+| 原文件 | PASS | 两份按 SHA 完整归档；A118 XFD 原始内容不丢失 |
+| Raw Rows | 766 | A118 457；V700 293+16 |
+| Review | 543/543 | 两批次全部 NEEDS_REVIEW |
+| 必填门禁 | PASS | 22 空规格、543 空单位；建档接口继续拒绝空值 |
+| Material | 4→4 | 没有自动建档、编码或正式物料写入 |
+| Migration | PASS | 本地 `0002`、迁移前快照、副本试迁移和完整性检查 |
+| 自动测试 | PASS | 联合单元 15/15、self-test、smoke |
 
 ## 服务器本地交付运行面
 

@@ -167,21 +167,30 @@ def _read_xlsx(content):
         total_rows = 0
         for worksheet in worksheets:
             row_count = worksheet.max_row or 0
-            column_count = worksheet.max_column or 0
-            if row_count > MAX_ROWS_PER_SHEET or column_count > MAX_COLUMNS:
+            source_column_count = worksheet.max_column or 0
+            if row_count > MAX_ROWS_PER_SHEET:
                 raise SpreadsheetImportError(
-                    f"工作表“{worksheet.title}”的行数或列数超过安全上限",
+                    f"工作表“{worksheet.title}”的行数超过安全上限",
                     "IMPORT_PARSE_LIMIT_EXCEEDED",
                 )
             total_rows += row_count
             if total_rows > MAX_TOTAL_ROWS:
                 raise SpreadsheetImportError("工作簿总行数超过安全上限", "IMPORT_PARSE_LIMIT_EXCEEDED")
             rows = []
-            for row in worksheet.iter_rows(min_row=1, max_row=row_count, max_col=column_count):
-                rows.append([_text(cell.value) for cell in row])
+            read_column_count = min(source_column_count, MAX_COLUMNS)
+            for row in worksheet.iter_rows(min_row=1, max_row=row_count, max_col=read_column_count):
+                values = [_text(cell.value) for cell in row]
+                while values and not values[-1]:
+                    values.pop()
+                rows.append(values)
+            header_scan = rows[:HEADER_SCAN_ROWS]
+            column_count = max((len(row) for row in header_scan), default=0)
+            if not column_count:
+                column_count = min(max((len(row) for row in rows), default=0), MAX_COLUMNS)
             merged = [
-                (cell_range.min_row, cell_range.min_col, cell_range.max_row, cell_range.max_col)
+                (cell_range.min_row, cell_range.min_col, cell_range.max_row, min(cell_range.max_col, MAX_COLUMNS))
                 for cell_range in worksheet.merged_cells.ranges
+                if cell_range.min_col <= MAX_COLUMNS
             ]
             sheets.append({
                 "name": worksheet.title,
@@ -189,6 +198,8 @@ def _read_xlsx(content):
                 "merged": merged,
                 "row_count": row_count,
                 "column_count": column_count,
+                "source_column_count": source_column_count,
+                "analysis_column_limit_applied": source_column_count > MAX_COLUMNS,
             })
         return sheets
     finally:
@@ -229,6 +240,8 @@ def _read_xls(content):
                 "merged": merged,
                 "row_count": worksheet.nrows,
                 "column_count": worksheet.ncols,
+                "source_column_count": worksheet.ncols,
+                "analysis_column_limit_applied": False,
             })
         return sheets
     finally:
@@ -310,6 +323,11 @@ def _header_candidate(sheet, start, span):
     if widths:
         stability = 0.5 if len(widths) == 1 else 1 - (max(widths) - min(widths)) / max(1, max(widths))
     substantive = sum(width >= max(2, (sheet["column_count"] + 1) // 2) for width in widths)
+    empty_header_rows = sum(
+        not any(sheet["rows"][row_number - 1])
+        for row_number in range(start, end + 1)
+        if row_number <= len(sheet["rows"])
+    )
     unmerged_single_cell_preambles = 0
     for row_number in range(start, end):
         row = sheet["rows"][row_number - 1] if row_number <= len(sheet["rows"]) else []
@@ -332,6 +350,7 @@ def _header_candidate(sheet, start, span):
     )
     if not substantive:
         score -= 0.20
+    score -= empty_header_rows * 0.30
     score -= unmerged_single_cell_preambles * 0.35
     return {
         "start": start,
@@ -427,11 +446,7 @@ def _suggest_mappings(header):
                 item
                 for item in scored
                 if item[2]
-                and re.fullmatch(
-                    r"规格|规格型号|型号规格|产品规格|规格参数|技术规格|规格描述|specification|spec|model/spec",
-                    item[3].split("/")[-1],
-                    re.I,
-                )
+                and re.search(r"规格|specification|model/spec", item[3].split("/")[-1], re.I)
             ]
             contributors = []
             for column in header["columns"]:
@@ -471,12 +486,12 @@ def _classify_row(row, header, row_number):
         return "FOOTER"
     if header["start"] <= row_number <= header["end"]:
         return "TITLE_OR_NOTE"
+    if row_number < header["start"]:
+        return "TITLE_OR_NOTE"
     header_leaves = {_normalized_header(column["header"].split("/")[-1]) for column in header["columns"] if column["header"]}
     matches = sum(_normalized_header(value) in header_leaves for value in values)
     if row_number > header["end"] and matches >= min(2, max(1, len(header_leaves))):
         return "REPEATED_HEADER"
-    if row_number < header["start"] and (len(values) == 1 or NOTE_WORDS.search(joined)):
-        return "TITLE_OR_NOTE"
     if len(values) <= 2 and (NOTE_WORDS.search(joined) or EMBEDDED_TITLE.search(joined)):
         return "TITLE_OR_NOTE"
     return "DATA"
@@ -517,6 +532,11 @@ def parse_spreadsheet_import(content, filename):
         sheets = _read_xls(content)
     if not sheets:
         raise SpreadsheetImportError("文件中没有可读取的工作表", "IMPORT_NO_WORKSHEET")
+    warnings = []
+    if extension_warning:
+        warnings.append("FILE_EXTENSION_DIFFERS_FROM_CONTENT_SIGNATURE")
+    if any(sheet.get("analysis_column_limit_applied") for sheet in sheets):
+        warnings.append("SOURCE_COLUMNS_EXCEED_ANALYSIS_LIMIT_ORIGINAL_FILE_ARCHIVE_REQUIRED")
     analyses = [_analyze_sheet(sheet, index) for index, sheet in enumerate(sheets)]
     analyses.sort(key=lambda item: (-item["score"], item["index"]))
     selected_analysis = analyses[0]
@@ -525,8 +545,16 @@ def parse_spreadsheet_import(content, filename):
         raise SpreadsheetImportError("无法识别物料表头，请人工整理或另存后重试", "IMPORT_HEADER_REVIEW_REQUIRED")
     selected_sheet = sheets[selected_analysis["index"]]
     mappings = _suggest_mappings(header)
-    if mappings["material_name"]["status"] in {"UNMAPPED", "CONFLICT"}:
+    material_name_from_specification = (
+        mappings["material_name"]["status"] in {"UNMAPPED", "CONFLICT"}
+        and mappings["specification"]["status"] not in {"UNMAPPED", "CONFLICT"}
+    )
+    if mappings["material_name"]["status"] in {"UNMAPPED", "CONFLICT"} and not material_name_from_specification:
         raise SpreadsheetImportError("未识别到明确的物料名称列，已停止导入以避免错误建档", "IMPORT_MAPPING_REVIEW_REQUIRED")
+    if material_name_from_specification:
+        warnings.append("MATERIAL_NAME_FROM_SPECIFICATION_REVIEW_REQUIRED")
+    if mappings["unit"]["status"] in {"UNMAPPED", "CONFLICT"}:
+        warnings.append("MATERIAL_UNIT_REVIEW_REQUIRED")
     import_rows = []
     raw_rows = []
     for sheet in sheets:
@@ -548,10 +576,20 @@ def parse_spreadsheet_import(content, filename):
             mapped["material_name"],
             mapped["description"],
         )
+        if not specification and mapped["model"]:
+            specification = mapped["model"]
+            specification_confidence = max(specification_confidence, 0.74)
+            specification_status = "SUGGESTED"
+            spec_evidence = ["MODEL_AS_SPECIFICATION_CANDIDATE", "MANUAL_CONFIRMATION_REQUIRED"]
         mapped["specification"] = specification
-        key_statuses = [mappings["material_name"]["status"], specification_status]
+        material_name_status = mappings["material_name"]["status"]
+        if not mapped["material_name"] and material_name_from_specification and specification:
+            mapped["material_name"] = specification
+            material_name_status = "SUGGESTED"
+        key_statuses = [material_name_status, specification_status]
         mapping_status = "CONFLICT" if "CONFLICT" in key_statuses else "UNMAPPED" if "UNMAPPED" in key_statuses else "SUGGESTED" if "SUGGESTED" in key_statuses else "HIGH_CONFIDENCE" if "HIGH_CONFIDENCE" in key_statuses else "EXACT"
-        mapping_confidence = round((mappings["material_name"]["confidence"] + specification_confidence) / 2, 4)
+        material_name_confidence = 0.55 if material_name_from_specification else mappings["material_name"]["confidence"]
+        mapping_confidence = round((material_name_confidence + specification_confidence) / 2, 4)
         import_rows.append({
             "raw_item_name": mapped["material_name"],
             "raw_item_code": mapped["supplier_part_no"] or mapped["material_code"],
@@ -567,7 +605,15 @@ def parse_spreadsheet_import(content, filename):
             "_mapping_confidence": mapping_confidence,
             "_specification_confidence": round(specification_confidence, 4),
             "_mapping_status": mapping_status,
-            "_review_status": "AUTO_ACCEPTABLE" if mapping_status == "EXACT" and specification_status == "EXACT" else "NEEDS_REVIEW",
+            "_review_status": (
+                "AUTO_ACCEPTABLE"
+                if mapping_status == "EXACT"
+                and specification_status == "EXACT"
+                and bool(mapped["material_name"])
+                and bool(specification)
+                and bool(mapped["unit"])
+                else "NEEDS_REVIEW"
+            ),
             "_specification_evidence": spec_evidence,
         })
     if not import_rows:
@@ -584,6 +630,7 @@ def parse_spreadsheet_import(content, filename):
     return {
         "source_type": source_type,
         "extension_warning": extension_warning,
+        "warnings": warnings,
         "selected_sheet": selected_sheet["name"],
         "header_start_row": header["start"],
         "header_end_row": header["end"],
@@ -598,6 +645,8 @@ def parse_spreadsheet_import(content, filename):
                 "name": sheet["name"],
                 "row_count": sheet["row_count"],
                 "column_count": sheet["column_count"],
+                "source_column_count": sheet.get("source_column_count", sheet["column_count"]),
+                "analysis_column_limit_applied": bool(sheet.get("analysis_column_limit_applied")),
             }
             for sheet in sheets
         ],

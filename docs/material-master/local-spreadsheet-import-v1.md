@@ -19,7 +19,7 @@
 
 ## 3. Mapping 与规格
 
-集中别名覆盖物料编码、名称、规格、型号、品牌、单位、分类、描述、制造商/供应商料号、图号、数量和价格。规格优先使用独立规格列；无独立列时确定性组合型号、尺寸等来源；名称/描述提取只能形成待复核候选。没有明确物料名称的文件返回 `IMPORT_MAPPING_REVIEW_REQUIRED`，不静默把规格当名称。
+集中别名覆盖物料编码、名称、规格、型号、品牌、单位、分类、描述、制造商/供应商料号、图号、数量和价格。规格优先使用独立规格列；无独立列时确定性组合型号、尺寸等来源；名称/描述提取只能形成待复核候选。缺少独立名称但存在明确规格列时，规格可以生成 `SUGGESTED` 名称候选并进入清洗审核；名称和规格语义都缺失时仍返回 `IMPORT_MAPPING_REVIEW_REQUIRED`。
 
 清洗队列创建内部物料前必须由用户在对话框明确确认标准名称、规格和基本单位；服务端再次拒绝空规格和空单位，避免识别失败后沿用空值或默认值。
 
@@ -31,6 +31,8 @@
 - `material_import_raw_rows`：不可变 Sheet、行号、完整原始值和行分类。
 - `cleaning_rows` 来源、mapped values、Mapping/规格置信度和 Review 状态列。
 
+`0002_material_import_file_archive.sql` 为批次增加完整原文件归档 key、文件大小和解析 warning。超出 256 列分析窗口的工作簿不再直接丢弃：完整文件按 SHA 保存，Raw Rows 明确只保存安全分析窗口投影，Canonical Mapping 只读取可信表头命中的列。
+
 文件导入在同一事务保存批次、原始行、映射结果、清洗队列和活动审计。旧文本 CSV 入口保持兼容。迁移前已创建 SQLite 可恢复快照，并在快照副本完成只读试迁移和 `PRAGMA integrity_check`。
 
 ## 5. 验证结果
@@ -41,8 +43,8 @@
 - `server.py --self-test`：PASS。
 - `smoke_test.py`：PASS，包含经认证的 XLSX 二进制上传。
 - `go_live_check.py --require-running --no-backup`：PASS。
-- 真实 V700：识别为 XLSX，但因缺少明确物料名称继续安全阻断。
-- 真实 A118：识别为 XLSX，但因 XFD 超宽异常继续安全阻断。
+- 真实 V700：识别为 XLSX，规格描述作为待审核名称候选，229 行进入清洗审核。
+- 真实 A118：识别为 XLSX，完整文件归档后从第 44 行可信表头生成 314 行清洗审核数据。
 - 公网 HTML 已返回 `.csv,.xlsx,.xls` 文件选择器；systemd 使用项目虚拟环境并保持 `enabled/active`。
 
 ## 6. 当前边界

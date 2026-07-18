@@ -41,7 +41,7 @@
 
 - 29 张业务/迁移表；历史 26 张表仍由 `server.py` 建立，Excel 导入新增表从 `0001_material_import_source_lineage.sql` 起使用版本化迁移。
 - 覆盖用户、会话、物料、映射、清洗、客户、供应商、产品、BOM、采购、库存、生产、销售、品质、财务和活动日志。
-- 已增加 `local_schema_migrations`、`material_import_batches`、`material_import_raw_rows` 及来源外键/索引；历史表的迁移基线与外键治理仍待逐步补齐。
+- 已增加 `local_schema_migrations`、`material_import_batches`、`material_import_raw_rows` 及来源外键/索引；`0002` 为批次增加完整原文件归档 key、大小和 warning。历史表的迁移基线与外键治理仍待逐步补齐。
 
 ### 在线 D1
 
@@ -74,7 +74,7 @@
 - Site 源码已可从根仓库恢复；生产提交与开发提交仍需在后续发布基线中持续追踪。
 - 本地和在线数据模型、编码和治理行为分叉。
 - 在线 JSON 模型缺少关键关系约束；本地 SQLite 缺少外键和迁移历史。
-- 在线导入已在非生产代码中接通 Normalization Approval→Material Draft，并保存来源行和重复候选；本地 inspect 和治理 dry-run 汇总已增强，EXACT/HIGH_CONFIDENCE fail-closed。`0008` 已增加全部可见 Sheet、前 50 行、1～3 行合并表头、集中别名、Supplier Profile、多来源规格和 Canonical Row；A118/V700 两份真实 BOM 已做只读验证，但 A118 超宽异常块、V700 必填名称/单位、更多模板召回率、逐行人工修订和生产容量尚未解决。
+- A118/V700 已在服务器本地形成 2 Batch、766 Raw Rows 和 543 Cleaning Rows，完整原文件按 SHA 归档；全部行仍为 NEEDS_REVIEW，22 行缺规格、543 行缺单位，内部物料没有自动增加。
 - Material Draft/Review POST 已具备同源/CSRF、持久幂等和限速；其他 legacy POST 的 CSRF 与限速仍需专项治理。测试环境已有本机一次性 D1，尚无远程 Test D1。
 - Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现，但生产 Site 仍为旧版本。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
@@ -91,7 +91,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import Batch/Parser/Mapping/Catalog/Workspace，以及 Phase 3 Normalization、Review UI、内部物料库、多供应商自适应导入、A118/V700 只读验证和服务器本地 CSV/XLSX/XLS 接入。开发服务已部署到 `43.135.157.211:18888`；A118 XFD 异常和 V700 名称/单位语义仍保持 fail closed。
+当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import，以及 Phase 3 Normalization、内部物料库、多供应商识别和服务器本地 Excel 接入。A118/V700 已进入开发服务器清洗审核队列；下一步是批次级单位/Mapping 确认和 22 条空规格处置，而不是重新索取模板。
 
 ## 恢复上下文检查清单
 

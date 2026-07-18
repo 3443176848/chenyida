@@ -15,6 +15,8 @@
 - [Material Import Parser/Mapping OpenAPI](./material-import-parser-v1.openapi.yaml)
 - [Material Import Mapping V1](./material-import-mapping-v1.md)
 - [Material Import Parser 流程图](./material-import-parser-flow.md)
+- [本地 CSV/XLSX/XLS 自适应导入](./local-spreadsheet-import-v1.md)
+- [A118/V700 真实 BOM 入库暂存报告](./real-sample-staging-a118-v700.md)
 
 ## V2 目标
 
