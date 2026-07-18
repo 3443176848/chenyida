@@ -20,7 +20,7 @@
 
 - 路径：`chenyida_erp_site/`
 - 技术：Vinext、React、TypeScript、Cloudflare Worker、D1、Drizzle、OpenAI Sites。
-- 页面：根 `app/page.tsx` 继续通过 iframe 加载 legacy `public/erp/index.html`；Material Master 使用 `app/materials/` 的四条原生 Vinext 页面路由。
+- 页面：根 `app/page.tsx` 继续通过 iframe 加载 legacy `public/erp/index.html`；Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给 `app/lib/erp-api.ts` 的集中式处理器。
 - 生产：Sites `v3`，公开地址 `https://chenyida-erp-online.sjin74376.chatgpt.site`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
@@ -42,7 +42,7 @@
 
 ### 在线 D1
 
-- `drizzle/0000_far_nightmare.sql` 定义 8 张既有表；`0001_material_master_v2.sql` 新增 12 张 V2 关系表；`0002_material_draft_review_api.sql` 新增 2 张 Material API 安全表并扩展通用审计。三份 migration 只在开发/隔离 D1 验证，尚未执行生产 migration。
+- `drizzle/0000`—`0007` 形成 44 张表的开发 schema；Material V2、Draft/Review、Import Batch、Parser/Mapping、Normalization 和 Material Library 全部使用版本化 Up、snapshot/journal、受保护 Down 与隔离迁移测试，尚未执行生产 migration。
 - 大多数业务对象按 `kind` 存入 `erp_records.data_json`。
 - API 运行时仍只为 legacy 8 表包含兼容建表语句；V2 与 Material API 对象必须显式应用版本化 migration，不在生产启动时自动创建。
 
@@ -71,9 +71,9 @@
 - Site 源码已可从根仓库恢复；生产提交与开发提交仍需在后续发布基线中持续追踪。
 - 本地和在线数据模型、编码和治理行为分叉。
 - 在线 JSON 模型缺少关键关系约束；本地 SQLite 缺少外键和迁移历史。
-- 在线导入没有真正匹配现有物料或映射；新 Material Draft/Review API 不包含导入适配。
+- 在线导入已在非生产代码中接通 Normalization Approval→Material Draft，并保存来源行和重复候选；真实文件、候选召回率、冲突人工处置和生产容量尚未验收。
 - Material Draft/Review POST 已具备同源/CSRF、持久幂等和限速；其他 legacy POST 的 CSRF 与限速仍需专项治理。测试环境已有本机一次性 D1，尚无远程 Test D1。
-- Material Draft UI 已完成书面规格但尚未编码；统一详情只能返回最近 5 条历史摘要，正式实现前必须先独立增加从完整不可变历史投影的 `last_rejection` 只读字段。
+- Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现，但生产 Site 仍为旧版本。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
 - 业务决策 `B01-B24` 尚未全部确认。
 
@@ -88,7 +88,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 的 Material V2 非生产数据、服务、API 与前端基线、Phase 2 Material Import Batch/Parser/Mapping/Catalog/Workspace，以及 Phase 3 Normalization & Staging V1 非生产实现。`PHASE3-TASK02` 已批准 16 项决定并实现独立 run、行快照、Issue、Outbox/租约、原子发布、五个 API 和 `0006` 隔离迁移；没有创建 Material Draft 或正式物料，也没有迁移或部署生产。生产仍为旧版本，分类、匹配、Draft 与任何生产动作必须另行授权。
+当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import Batch/Parser/Mapping/Catalog/Workspace，以及 Phase 3 Normalization、Review UI 和 `PHASE3-MATERIAL-LIBRARY-01`。最新 `0007` 增加标准单位、品牌、Normalization Approval、Import Row→Draft 关联和重复候选；Approved Normalization 可复用既有 Validation/Draft Service 创建无正式编码的 `DRAFT`，后续仍需既有人工审核才能 `ACTIVE`。仓库内仅发现治理模板/样例，未执行真实文件 dry-run、生产迁移或部署。
 
 ## 恢复上下文检查清单
 

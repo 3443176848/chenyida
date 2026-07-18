@@ -1,20 +1,20 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-17（Asia/Shanghai）
+最后更新时间：2026-07-18（Asia/Shanghai）
 
 ## 自动统计摘要
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 50,718 行 | 以上一状态快照 49,964 行加本任务运行时、QA 脚本与测试净增 754 行；不含依赖、构建产物、截图和文档 |
-| 源码文件 | 135 | 本任务新增 Normalization UI 协议、组件、Playwright QA 脚本和 104 项测试文件共 4 个 |
-| 根仓库跟踪项 | Normalization Review UI 前端、测试和 9 份文档 | 未修改后端 API、Schema、Migration、依赖或部署配置；用户既有 `.obsidian/` 未跟踪且未修改 |
+| 总代码量 | 52,695 行 | 上一快照加功能提交净增 1,977 行；不含 Drizzle snapshot、依赖、构建产物、截图和文档 |
+| 源码文件 | 139 | 本任务新增 Draft Generation Service、导入命令和 2 个专项测试文件 |
+| 根仓库跟踪项 | Material Library 运行时、0007、测试和治理文档 | 未修改本地旧版业务代码、hosting 或部署配置 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
-| 数据表 | 63（本地+开发 schema） | 本地 SQLite 26 张，Site 开发 schema 新增 3 张 Normalization 表；`0006` 仅在隔离 D1 测试，未执行生产迁移 |
-| 在线 API 路径 | 86 | 开发代码新增 5 个 Normalization API；生产公开站点尚未部署开发基线 |
+| 数据表 | 70（本地+开发 schema） | 本地 SQLite 26 张，Site D1/Drizzle 44 张；最新 `0007` 仅在隔离 D1 测试，未执行生产迁移 |
+| 在线 API 路径 | 89 | 开发代码新增 Draft Generation 查询、Normalization Approval 和 Draft Commit；生产公开站点尚未部署 |
 | 页面入口 | 14 | 既有 11 个入口加 3 条 Material Import 路由 |
-| 测试文件 | 27 | 新增 `material-import-normalization-ui.test.mjs`，包含 104 个计划 ID 及 1 个矩阵元检查 |
+| 测试文件 | 29 | 新增 Material Library Migration 与 Import→Draft 两个专项测试文件 |
 
 ## 当前版本与环境
 
@@ -36,13 +36,13 @@
 
 ## Git 状态
 
-`PHASE3-TASK04` 开始时，根仓库 `main` 位于 `0b01c13`，仅有用户既有未跟踪 `.obsidian/`。本任务差异覆盖 Material Import 前端、Normalization 协议/审阅组件、专项测试、Playwright QA 脚本和 9 份文档；未修改 production binding、hosting、依赖、后端 API、Schema/Migration 或本地旧版业务逻辑。
+`PHASE3-MATERIAL-LIBRARY-01` 开始时，根仓库 `main` 位于 `badbf93` 且工作区干净。功能提交 `2ff8d9c` 覆盖在线 D1/Drizzle 增量模型、Import→Draft 服务/API、安全命令和专项测试；未修改 hosting、本地旧版业务代码或生产资源。
 
 正式规格确认更新开始时，根仓库位于 `c694045`；用户明确回复“规格确认”。本次只更新主规格的 14 项决策状态和项目治理记录，不实施 Review UI。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
 
-`PHASE3-TASK04` 计划提交消息为 `feat: add import normalization review ui`，实际哈希以 `git log -1` 为准。未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
+本任务未创建生产版本、未推送、未连接或部署生产 D1/R2/Queue。
 
 实时状态必须使用：
 
@@ -50,6 +50,24 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE3-MATERIAL-LIBRARY-01 Internal Material Library 非生产实现
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 审计、实现、测试、功能提交 `2ff8d9c` 和治理文档完成 |
+| 数据库技术 | CONFIRMED | Cloudflare D1 / SQLite 语义，Drizzle schema + SQL migration + snapshot/journal |
+| 模型复用 | PASS | 复用 `material_master`、分类、动态属性、别名、供应商映射、版本/审计和既有 Draft/Review；没有第二套 `materials` |
+| `0007` | PASS | 新增单位/别名、品牌/别名、Approval、Draft Link、Duplicate Candidate；Material 增加品牌、单位和批次/文件/行外键；受保护 Down/re-up |
+| Import 闭环 | PASS | Current Normalization digest 审批后调用既有 Validation/Draft Service；单行原子写来源/候选；结果仅 `DRAFT`、无正式编码 |
+| 权限/安全 | PASS | admin/manager `material.import.commit`，owner/read_any、CSRF、版本/摘要、WARNING 明确确认、强幂等、安全错误和审计 |
+| 重复检测 | PASS | material/legacy/supplier code、名称、品牌、型号、规格、制造商料号；EXACT/HIGH_CONFIDENCE/POSSIBLE，仅候选不合并 |
+| 命令 | PASS | inspect/dry-run/commit/report 复用 API；只允许回环 URL，commit 只允许 test/local/development |
+| 迁移/闭环专项 | PASS | Migration 3/3；Import→Draft、权限、CSRF、追溯、请求/行幂等 3/3；既有生命周期 14/14 |
+| Site 全量 | PASS | Vinext build；Node 569/569；lint 0 error、1 个任务外既有 warning；Drizzle 44 表无漂移 |
+| 隔离基线 | PASS | 一次性 D1 API smoke、314 文件凭证扫描、远程 URL 拒绝、本地临时 SQLite 五项基线通过 |
+| 文件/dry-run | NOT RUN | `/opt/erp` 只发现两套相同治理模板/样例，`/home` 无候选；未发现真实首批物料文件，因此未上传或 dry-run |
+| 生产影响 | NONE | 未连接生产 D1/R2/Queue，未执行迁移、真实导入、Sites 保存或部署 |
 
 ## PHASE3-TASK04 Material Import Normalization Review UI V1 非生产实现
 

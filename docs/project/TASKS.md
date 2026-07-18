@@ -38,6 +38,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| PHASE3-MATERIAL-LIBRARY-01 | 内部物料库数据库建立与正式 Material Master 落地 | DONE | Codex（审计与非生产实施）、项目负责人（任务范围确认） | 2026-07-18 14:01 CST | 2026-07-18 14:38 CST | PHASE3-TASK04、PHASE1-TASK07 | 复用既有 `material_master` 和 Import/Normalization/Review；新增 `0007` 单位/品牌、Approval、来源行关联和重复候选，接通 Approved Normalization→DRAFT，提供 inspect/dry-run/commit/report；全量 Node 569/569、build、隔离 API smoke、迁移/权限/幂等/凭证/临时 SQLite 通过；功能提交 `2ff8d9c`，未执行真实文件 dry-run、生产迁移或部署 |
 | PHASE3-TASK04 | 实现 Material Import Normalization Review UI V1 | DONE | Codex（实施）、项目负责人（14 项规格与非生产前端范围批准） | 2026-07-17 | 2026-07-17 | PHASE3-TASK03 | 完成统一工作区七步 Stepper、current_run/latest_attempt、启动/重试/重跑/取消、Rows/Issues cursor、Row Drawer、安全有界渲染与权限清理；104/104 计划测试、100/100 Import UI 回归和本地 Playwright 门禁通过，未修改 API、Schema、Migration、Normalization 业务逻辑或生产环境 |
 | PHASE2-TASK04 | 实现 Excel/CSV Parser 与字段 Mapping V1 | DONE | Codex（实施）、项目负责人（规格与非生产范围批准） | 2026-07-16 | 2026-07-16 | PHASE2-TASK03 | 完成 `0005` Up/受保护 Down、parse run、Outbox、可注入调度与租约恢复、XLSX/CSV 有界解析、Shared Strings 分块、原始行原子发布、Mapping 准备及七个 API；54 项专项和全量 Node 278/278 通过；未创建生产 Queue/binding、执行生产迁移或部署，未创建 Material Draft/正式物料 |
 | PHASE2-TASK05 | 设计 Material Import Workspace UI V1 | DONE | Codex（设计）、项目负责人（完整规格与 16 项决定确认） | 2026-07-16 | 2026-07-16 | PHASE2-TASK04 | 完成并确认正式 UI 规格、22 状态低保真线框、集中状态矩阵、100 项未来实施测试和 16 项决定；保留 `BLOCKED_BY_MAPPING_TARGET_CATALOG` 与 `PERFORMANCE_AND_ACCESSIBILITY_VALIDATION_REQUIRED`；仅文档，未修改运行时代码、API、Schema、Migration、R2/Queue、hosting 或生产环境 |
@@ -48,7 +49,7 @@
 | PHASE3-TASK01 | 设计 Material Import Normalization & Staging V1 | DONE | Codex（设计）、项目负责人（待规格确认） | 2026-07-17 | 2026-07-17 | PHASE2-TASK08 | 完成正式规格、OpenAPI 草案和数据流/状态图；定义独立 run、JSON 行快照、独立 issue、类型/空值/属性规则、Outbox/租约、原子发布、五个 API、`0006` 设计、54 项测试和 16 项 `PROPOSED` 决定；仅文档，未修改运行时代码、Schema、Migration、API、前端或生产环境 |
 | PHASE3-TASK03 | 设计 Material Import Normalization Review UI V1 | DONE | Codex（设计）、项目负责人（2026-07-17 正式规格确认） | 2026-07-17 | 2026-07-17 | PHASE3-TASK02 | 完成正式 UI 规格、37 状态低保真线框、集中状态矩阵和 104 项未来实施测试；统一工作区、七步 Stepper、Current/Latest 双轨、Rows/Issues cursor 与 Row Drawer等 14 项决定均已 `APPROVED`；局部 Issue 查询门禁、性能门禁和 7 项非阻塞限制继续有效；仅文档，未修改前端、API、Schema、Migration、业务逻辑或生产环境 |
 
-当前没有 `DOING` 任务。`PHASE3-TASK04` 已完成非生产前端实施；生产 R2/Queue、生产 D1 migration、Cron、部署、分类/匹配/Material Draft、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
+当前无 `DOING` 任务。生产 R2/Queue、生产 D1 migration、Cron、部署、真实数据导入、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
 
 ## Phase 0 待办
 

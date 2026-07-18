@@ -2,6 +2,20 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-18
+
+### PHASE3-MATERIAL-LIBRARY-01 - `feat: add material master database schema`
+
+- Git Commit：`2ff8d9c`。
+- 审计：确认在线目标为 Cloudflare D1/SQLite 语义、Drizzle ORM/SQL Migration；既有 `material_master`、分类、动态属性、别名、供应商映射、Import Batch/File/Row/Event、Normalization 和 Draft/Review 服务可直接复用，因此未创建第二套物料主表或重写 Import。
+- 数据库：新增 `0007`、受保护 Down、snapshot/journal；增加 units/unit aliases、brands/brand aliases、Normalization approvals、Import Draft links、duplicate candidates，并为 Material 增加品牌、单位和批次/文件/行来源外键；全部为增量表/可空列/约束/索引，无删除或破坏性重建。
+- 业务/API：新增 inspect/dry-run/report、Normalization Approval 和 Draft commit；admin/manager 独立 `material.import.commit`，CSRF、版本/摘要、ERROR/WARNING 门禁、请求/行幂等、Validation、EXACT/HIGH_CONFIDENCE/POSSIBLE 候选和原子来源关联；创建结果只能是无正式编码的 `DRAFT`，后续继续复用人工提交/审核。
+- 命令：新增只允许回环 URL 和 test/local/development commit 的 `material-library:import`，复用 API 提供 inspect/dry-run/commit/report，不直接连接 D1。
+- 文件检查：只扫描 `/opt/erp`、`/home`；仅发现两套内容相同的治理模板/样例（XLSX 10 表和 9 个 CSV），未发现真实首批物料文件，未上传或执行真实 dry-run。
+- 验证：迁移 3/3、闭环/权限/CSRF/幂等 3/3、既有 Material 生命周期 14/14、全量 Node 569/569、Vinext build、Drizzle 44 表无漂移、隔离 API smoke、314 文件凭证扫描、远程 URL 拒绝和临时 SQLite 基线通过；lint 0 error/1 个任务外既有 warning。
+- 生产：未连接生产 D1/R2/Queue，未执行生产迁移、真实数据导入、Sites 保存或部署。
+- 文档：新增 Material Library 落地说明和审计报告，记录模型复用、文件清单、风险、测试及下一步。
+
 ## 2026-07-17
 
 ### PHASE3-TASK04 实现 - `feat: add import normalization review ui`
