@@ -371,6 +371,31 @@ tr:nth-child(even) td {
   background: #f9fbfd;
 }
 
+.spec-parts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(115px, 1fr));
+  gap: 4px 12px;
+  min-width: 280px;
+  white-space: normal;
+}
+
+.spec-part {
+  display: flex;
+  gap: 5px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.spec-part b {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.spec-part.empty {
+  color: var(--muted);
+}
+
 .pill {
   display: inline-block;
   border-radius: 999px;

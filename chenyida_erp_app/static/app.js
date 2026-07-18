@@ -93,6 +93,48 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function renderSpecParts(parts) {
+  return `
+    <div class="spec-parts">
+      ${parts.map(([label, value]) => `
+        <span class="spec-part ${value ? "" : "empty"}">
+          <b>${escapeHtml(label)}</b>${escapeHtml(value || "未维护")}
+        </span>
+      `).join("")}
+    </div>
+  `;
+}
+
+function sourceSpecParts(row) {
+  return [
+    ["品类", row.parsed_category],
+    ["封装", row.parsed_package],
+    ["容量/阻值", row.parsed_value],
+    ["耐压", row.parsed_voltage],
+    ["误差", row.parsed_tolerance],
+    ["介质/材质", row.parsed_material],
+    ["型号/MPN", row.raw_model || row.raw_mpn],
+    ["品牌", row.raw_brand],
+  ];
+}
+
+function candidateSpecParts(row) {
+  const item = state.items.find(
+    (entry) => String(entry.internal_item_code) === String(row.candidate_internal_code),
+  );
+  if (!item) return [];
+  return [
+    ["品类", item.item_category],
+    ["封装", item.package],
+    ["容量/阻值", item.value_spec],
+    ["耐压", item.voltage],
+    ["误差", item.tolerance],
+    ["介质/材质", item.material],
+    ["型号/MPN", item.mpn],
+    ["品牌", item.brand],
+  ];
+}
+
 function canManageSystem() {
   return state.session.user?.role === "admin";
 }
@@ -859,6 +901,7 @@ function renderCleaning() {
   const rows = state.cleaning.map((row) => {
     const canConfirm = row.process_status === "待处理" && row.candidate_internal_code;
     const canCreate = row.process_status === "待处理" && row.match_level === "新物料";
+    const candidateParts = candidateSpecParts(row);
     return `
       <tr>
         <td>${escapeHtml(row.id)}</td>
@@ -866,7 +909,8 @@ function renderCleaning() {
         <td>${escapeHtml(row.supplier_name)}</td>
         <td>${escapeHtml(row.raw_item_name)}</td>
         <td>${escapeHtml(row.raw_item_code)}</td>
-        <td>${escapeHtml(row.raw_spec)}</td>
+        <td>${escapeHtml(row.raw_model || row.raw_spec)}</td>
+        <td>${renderSpecParts(sourceSpecParts(row))}</td>
         <td>${escapeHtml(row.purchase_uom)}</td>
         <td>${escapeHtml(row.source_sheet_name ? `${row.source_sheet_name} #${row.source_row_number || ""}` : "")}</td>
         <td>${escapeHtml(row.mapping_status)}</td>
@@ -875,6 +919,7 @@ function renderCleaning() {
         <td>${escapeHtml(row.parsed_category)}</td>
         <td>${escapeHtml(row.candidate_internal_code)}</td>
         <td>${escapeHtml(row.candidate_standard_name)}</td>
+        <td>${candidateParts.length ? renderSpecParts(candidateParts) : '<span class="muted">无候选内部规格</span>'}</td>
         <td>${pill(row.match_level)}</td>
         <td>${escapeHtml(row.confidence)}</td>
         <td>${escapeHtml(row.owner_role)}</td>
@@ -890,9 +935,9 @@ function renderCleaning() {
   }).join("");
   $("#cleaningTable").innerHTML = `
     <thead><tr>
-      <th>ID</th><th>批次</th><th>供应商</th><th>原始名称</th><th>供应商料号</th><th>原始规格</th>
+      <th>ID</th><th>批次</th><th>供应商</th><th>原始名称</th><th>供应商料号</th><th>原始型号/规格</th><th>来源分项规格</th>
       <th>单位</th><th>来源行</th><th>映射状态</th><th>规格置信度</th><th>审核状态</th>
-      <th>解析品类</th><th>候选编码</th><th>候选名称</th><th>匹配</th><th>置信度</th><th>责任</th><th>状态</th><th>操作</th>
+      <th>解析品类</th><th>候选编码</th><th>候选名称</th><th>候选内部规格</th><th>匹配</th><th>置信度</th><th>责任</th><th>状态</th><th>操作</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   `;

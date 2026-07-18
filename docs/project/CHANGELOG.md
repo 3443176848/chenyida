@@ -4,6 +4,15 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-REVIEW-SPEC-DISPLAY-01 - `feat: show structured specification comparison`
+
+- 审核 UI：新增“来源分项规格”和“候选内部规格”，按品类、封装、容量/阻值、耐压、误差、介质/材质、型号/MPN、品牌逐项展示；内部缺项显示“未维护”。
+- 字段语义：原列改为“原始型号/规格”；富结构化物料描述作为 raw spec 来源，物料型号独立保存为 raw model，不再让厂商型号冒充规格。
+- 权威边界：候选内部规格从已加载的 `/api/items` 只读数据展示；匹配、候选编号、权限和确认仍由服务端决定。
+- 置信度：来源介质存在但内部候选未维护时仍为疑似，并将置信度上限改为 0.95，避免显示 1.0。
+- 数据：无 Schema/Migration，无旧行回填，无物料或 Cleaning 写入。
+- 验证与部署：联合单元 38/38、self-test、smoke、go-live 通过；systemd active/enabled，本机和公网 HTTP 200，线上静态资源已核验两组规格字段，当前 9 条物料和 25 条 Cleaning 未改变。
+
 ### PHASE3-MATERIAL-LIBRARY-STRUCTURED-SPEC-MATCH-01 - `feat: match structured specification components`
 
 - 机制：取消把型号/描述压成整体文字进行匹配；分别提取并比较品类、封装、容量/阻值、耐压、误差、介质和 MPN，关键属性任一冲突立即排除。

@@ -503,6 +503,8 @@ def specification_match(raw, master):
             return 0.0, False
         score = 1.0
         mpn_exact = True
+    if uncovered_optional:
+        score = min(score, 0.95)
     required_fields = [
         field
         for field in ("package", "value_spec", "voltage", "tolerance", "material")

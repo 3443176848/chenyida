@@ -211,6 +211,7 @@ class SpecificationMatchTest(unittest.TestCase):
 
         self.assertEqual(result["candidate_internal_code"], "8")
         self.assertEqual(result["match_level"], "疑似匹配")
+        self.assertEqual(result["confidence"], 0.95)
 
 
 if __name__ == "__main__":

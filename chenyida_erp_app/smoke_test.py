@@ -183,6 +183,14 @@ def main():
             assert "生产协同" in html
             assert "询价报价" in html
             assert "销售交付" in html
+            assert "structured-spec-review" in html
+            app_js = request("/app.js")
+            styles = request("/styles.css")
+            assert "来源分项规格" in app_js
+            assert "候选内部规格" in app_js
+            assert "parsed_tolerance" in app_js
+            assert "parsed_material" in app_js
+            assert ".spec-parts" in styles
 
             products = request("/api/products")["rows"]
             assert products and products[0]["product_code"] == "CYD-FPC-DEMO-001", products

@@ -51,6 +51,14 @@ TECH_TOKEN = re.compile(
     r"(?:kΩ|mΩ|Ω|ohm|pf|nf|uf|μf|v|kv|a|ma|w|kw|hz|mhz|ghz|℃|°c))\b",
     re.I,
 )
+STRUCTURED_SPEC_PATTERNS = [
+    re.compile(r"(?<![A-Z0-9])(?:0201|0402|0603|0805|1206)(?![A-Z0-9])", re.I),
+    re.compile(r"(?<![A-Z0-9.])\d+(?:\.\d+)?\s*(?:UF|NF|PF|[UNP])(?![A-Z0-9])", re.I),
+    re.compile(r"(?<![A-Z0-9.])\d+(?:\.\d+)?\s*V(?![A-Z0-9])", re.I),
+    re.compile(r"(?<![A-Z0-9.])\d+(?:\.\d+)?\s*%", re.I),
+    re.compile(r"(?<![A-Z0-9])(?:C0G|COG|NP0|NPO|X7R|X5R|Y5V|Z5U)(?![A-Z0-9])", re.I),
+    DIMENSION_TOKEN,
+]
 
 
 class SpreadsheetImportError(ValueError):
@@ -518,6 +526,11 @@ def _resolve(row, mapping):
 def _extract_specification(row, mappings, material_name, description):
     mapping = mappings["specification"]
     explicit = _resolve(row, mapping)
+    description_evidence = sum(bool(pattern.search(description or "")) for pattern in STRUCTURED_SPEC_PATTERNS)
+    explicit_evidence = sum(bool(pattern.search(explicit or "")) for pattern in STRUCTURED_SPEC_PATTERNS)
+    if description and description_evidence >= 2 and description_evidence > explicit_evidence:
+        confidence = min(0.92, 0.68 + description_evidence * 0.04)
+        return description, confidence, "HIGH_CONFIDENCE", ["DESCRIPTION_STRUCTURED_SPECIFICATION_SOURCE"]
     if explicit:
         return explicit, mapping["confidence"], mapping["status"], ["EXPLICIT_OR_COMPONENT_SPECIFICATION"]
     fallback = " ".join(value for value in (material_name, description) if value)

@@ -145,6 +145,29 @@ class SpreadsheetImportTest(unittest.TestCase):
         self.assertEqual(result["mappings"]["description"]["source_headers"], ["描述"])
         self.assertEqual(result["rows"][0]["raw_spec"], "10nF 50V 0201")
 
+    def test_model_is_kept_separate_from_rich_description_specification(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "BOM"
+        sheet.append(["物料名称", "物料型号", "物料描述", "生产厂家"])
+        sheet.append([
+            "贴片电容",
+            "TEST-CAP-PART-001",
+            "CAP 0201 ±5% NPO 50V 10PF TEST-CAP-PART-001",
+            "测试品牌",
+        ])
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        workbook.close()
+
+        result = parse_spreadsheet_import(buffer.getvalue(), "model-and-description.xlsx")
+        row = result["rows"][0]
+
+        self.assertEqual(row["raw_model"], "TEST-CAP-PART-001")
+        self.assertNotEqual(row["raw_spec"], row["raw_model"])
+        self.assertIn("10PF", row["raw_spec"])
+        self.assertEqual(row["_specification_evidence"], ["DESCRIPTION_STRUCTURED_SPECIFICATION_SOURCE"])
+
     def test_real_samples_enter_review_without_lowering_material_guards(self):
         if not ATTACHMENT_DIR.exists():
             self.skipTest("真实附件不在当前服务器")
@@ -179,6 +202,7 @@ class SpreadsheetImportTest(unittest.TestCase):
                 if filename == "1928C量产BOM.xlsx":
                     capacitor = next(row for row in result["rows"] if row["_source_row_number"] == 9)
                     self.assertTrue(capacitor["raw_model"])
+                    self.assertNotEqual(capacitor["raw_spec"], capacitor["raw_model"])
                     self.assertTrue(capacitor["raw_brand"])
                     self.assertTrue(capacitor["remark"])
 

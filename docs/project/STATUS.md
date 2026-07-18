@@ -179,6 +179,18 @@ git -C chenyida_erp_site status --short
 | 回归 | PASS | 联合单元 37/37、self-test、smoke、go-live |
 | 部署 | PASS | 迁移前快照完整；`0003` 已应用，systemd active/enabled，公网 HTTP 200 |
 
+## 清洗审核分项规格对照
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 来源规格 | PASS | 八项分开展示，型号/MPN 不冒充电气规格 |
+| 候选规格 | PASS | 从内部物料只读展示同组字段，空值明确“未维护” |
+| 人工证据 | PASS | 候选编码、候选名称、来源规格、候选规格同一行核对 |
+| 服务端边界 | PASS | 浏览器不计算匹配、不改编号、不自动确认 |
+| 置信度 | PASS | 来源介质未覆盖时疑似上限 0.95 |
+| 数据影响 | NONE | 无 Schema/Migration、无旧行回填、无业务数据写入 |
+| 回归/部署 | PASS | 联合单元 38/38、self-test、smoke、go-live；systemd active/enabled，公网 HTTP 200 |
+
 ## 服务器本地交付运行面
 
 | 验证项 | 结果 | 说明 |

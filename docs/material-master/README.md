@@ -22,6 +22,7 @@
 - [清洗审核安全清空 V1](./cleaning-clear-v1.md)
 - [1928C/G20/J587 规格提取与编号匹配](./supplier-specification-match-1928-g20-j587.md)
 - [1928C 分项规格匹配](./structured-specification-match-1928.md)
+- [清洗审核分项规格对照](./cleaning-review-structured-spec-display.md)
 
 ## V2 目标
 
