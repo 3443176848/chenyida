@@ -85,10 +85,10 @@ git -C chenyida_erp_site status --short
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 默认应用 | 已切换 | `chenyida_erp_app/server.py` 及启动脚本默认使用 `127.0.0.1:18888` |
+| 默认应用 | 已切换 | `chenyida_erp_app/server.py` 及启动脚本在公网验证期间使用 `0.0.0.0:18888` |
 | 本地基线 | PASS | `server.py --self-test`、`smoke_test.py`、`go_live_check.py --no-backup` 通过 |
 | Site 关系 | 已记录 | Site 保留为历史/参考代码，后续新功能不再默认整合到 Site |
-| 外部暴露 | 未执行 | 未绑定 `0.0.0.0`、未改防火墙、未创建公网入口、未启动服务 |
+| 外部暴露 | 已验证后停止 | `43.135.157.211:18888` 健康接口和登录页均返回 200；发现默认密码预填后已停止公网进程，长期运行需密码轮换、HTTPS、反向代理和访问控制 |
 
 ## PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT 非生产实现
 

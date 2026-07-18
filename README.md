@@ -57,7 +57,7 @@ powershell -ExecutionPolicy Bypass -File D:\erp\chenyida_erp_app\start_server.ps
 打开：
 
 ```text
-http://127.0.0.1:18888
+http://43.135.157.211:18888
 ```
 
 本地开发默认管理员：

@@ -7,6 +7,7 @@ $DataDir = Join-Path $AppDir "data"
 $PidFile = Join-Path $DataDir "server.pid"
 $LogFile = Join-Path $DataDir "server.log"
 $Port = 18888
+$HostAddress = "0.0.0.0"
 $HealthUrl = "http://127.0.0.1:$Port/api/health"
 
 New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
@@ -29,7 +30,7 @@ if ($Connection) {
 
 $Arguments = @(
   "$AppDir\server.py",
-  "--host", "127.0.0.1",
+  "--host", $HostAddress,
   "--port", "$Port",
   "--log-file", "$LogFile"
 )

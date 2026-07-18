@@ -128,7 +128,7 @@ erDiagram
 
 当前命名与目标目录尚未统一：
 
-- Backend（服务器默认交付面）：`chenyida_erp_app/server.py` 同时承担 HTTP、API、业务规则、建表和数据库访问，默认监听 `127.0.0.1:18888`。
+- Backend（服务器默认交付面）：`chenyida_erp_app/server.py` 同时承担 HTTP、API、业务规则、建表和数据库访问；公网验证期间监听 `0.0.0.0:18888`。
 - Frontend（本地运行面）：`chenyida_erp_app/static/` 原生页面直接调用本地 API。
 - Backend（历史在线参考面）：`chenyida_erp_site/app/lib/erp-api.ts` 与 Worker/D1；后续新功能不以该运行面作为默认交付目标。
 - Frontend（在线运行面）：根 legacy 使用 `app/page.tsx` + `public/erp/`；Material 只读页面使用 `app/materials/`，两者共同委托 `public/erp/api-client.js`。

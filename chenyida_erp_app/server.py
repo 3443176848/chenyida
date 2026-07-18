@@ -3339,7 +3339,7 @@ def self_test():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=18888)
     parser.add_argument("--init-db", action="store_true")
     parser.add_argument("--self-test", action="store_true")

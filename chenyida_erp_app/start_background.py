@@ -9,6 +9,7 @@ from pathlib import Path
 APP_DIR = Path(__file__).resolve().parent
 WORKSPACE = APP_DIR.parent
 PYTHON = Path(sys.executable)
+HOST = "0.0.0.0"
 PORT = 18888
 DATA_DIR = APP_DIR / "data"
 PID_FILE = DATA_DIR / "server.pid"
@@ -60,7 +61,7 @@ def main():
             str(PYTHON),
             str(APP_DIR / "server.py"),
             "--host",
-            "127.0.0.1",
+            HOST,
             "--port",
             str(PORT),
             "--log-file",
@@ -70,6 +71,7 @@ def main():
         stdout=log,
         stderr=subprocess.STDOUT,
         stdin=subprocess.DEVNULL,
+        start_new_session=True,
         creationflags=creationflags,
     )
     PID_FILE.write_text(str(proc.pid), encoding="utf-8")
