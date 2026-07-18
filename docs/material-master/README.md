@@ -20,6 +20,7 @@
 - [电容匹配测试物料 1～5](./matching-test-seed-1-5.md)
 - [清洗审核匹配置信度排序 V1](./cleaning-confidence-sort-v1.md)
 - [清洗审核安全清空 V1](./cleaning-clear-v1.md)
+- [1928C/G20/J587 规格提取与编号匹配](./supplier-specification-match-1928-g20-j587.md)
 
 ## V2 目标
 

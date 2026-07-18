@@ -13,7 +13,7 @@ import tempfile
 import time
 from contextlib import closing
 from datetime import datetime
-from difflib import SequenceMatcher
+from decimal import Decimal, InvalidOperation
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
@@ -379,36 +379,84 @@ def parse_tolerance(text):
     return f"{match.group(1)}%" if match else ""
 
 
-def similarity(left, right):
-    return SequenceMatcher(None, normalize(left), normalize(right)).ratio()
+def normalized_spec_component(field, value):
+    text = spec_text(value).replace(" ", "")
+    if not text:
+        return ""
+    if field == "value_spec":
+        capacitance = re.fullmatch(r"(\d+(?:\.\d+)?)(UF|NF|PF)", text)
+        if capacitance:
+            factors = {"UF": Decimal("1000000"), "NF": Decimal("1000"), "PF": Decimal("1")}
+            return ("CAP_PF", Decimal(capacitance.group(1)) * factors[capacitance.group(2)])
+        resistance = re.fullmatch(r"(\d+(?:\.\d+)?)(M|K|R)", text)
+        if resistance:
+            factors = {"M": Decimal("1000000"), "K": Decimal("1000"), "R": Decimal("1")}
+            return ("RES_OHM", Decimal(resistance.group(1)) * factors[resistance.group(2)])
+    if field in {"voltage", "tolerance"}:
+        suffix = "V" if field == "voltage" else "%"
+        numeric = text.removesuffix(suffix).lstrip("+-±")
+        try:
+            return (field.upper(), Decimal(numeric))
+        except InvalidOperation:
+            pass
+    return normalize(text)
+
+
+def specification_match(raw, master):
+    raw_spec = " ".join([raw.get("raw_spec", ""), raw.get("raw_mpn", "")]).strip()
+    master_spec = master.get("value_spec", "")
+    source = {
+        "package": parse_package(raw_spec),
+        "value_spec": parse_value(raw_spec),
+        "voltage": parse_voltage(raw_spec),
+        "tolerance": parse_tolerance(raw_spec),
+    }
+    target = {
+        "package": master.get("package", "") or parse_package(master_spec),
+        "value_spec": parse_value(master_spec) or master_spec,
+        "voltage": master.get("voltage", "") or parse_voltage(master_spec),
+        "tolerance": master.get("tolerance", "") or parse_tolerance(master_spec),
+    }
+    weights = {
+        "package": 0.25,
+        "value_spec": 0.30,
+        "voltage": 0.20,
+        "tolerance": 0.15,
+    }
+    score = 0.0
+    for field, weight in weights.items():
+        source_value = normalized_spec_component(field, source[field])
+        if not source_value:
+            continue
+        target_value = normalized_spec_component(field, target[field])
+        if not target_value or source_value != target_value:
+            return 0.0, False
+        score += weight
+    source_category = parse_category(raw_spec) or parse_category(raw.get("raw_item_name", ""))
+    if source_category:
+        if source_category != master.get("item_category", ""):
+            return 0.0, False
+        score += 0.10
+    source_mpn = normalize(raw.get("raw_mpn", ""))
+    target_mpn = normalize(master.get("mpn", ""))
+    if source_mpn and target_mpn:
+        if source_mpn != target_mpn:
+            return 0.0, False
+        return 1.0, True
+    required_fields = [field for field, value in target.items() if normalize(value)]
+    full_signature = (
+        len(required_fields) >= 2
+        and all(
+            normalized_spec_component(field, source[field])
+            == normalized_spec_component(field, target[field])
+            for field in required_fields
+        )
+    )
+    return (1.0 if full_signature else round(min(score, 1.0), 2)), full_signature
 
 
 def score_candidate(raw, master):
-    score = 0.0
-    raw_text = " ".join([
-        raw.get("raw_item_name", ""),
-        raw.get("raw_spec", ""),
-        raw.get("raw_mpn", ""),
-    ])
-    master_text = " ".join([
-        master.get("standard_name", ""),
-        master.get("package", ""),
-        master.get("value_spec", ""),
-        master.get("voltage", ""),
-        master.get("mpn", ""),
-    ])
-    if parse_category(raw_text) and parse_category(raw_text) == master.get("item_category", ""):
-        score += 0.25
-    if parse_package(raw_text) and parse_package(raw_text) == master.get("package", ""):
-        score += 0.25
-    if parse_value(raw_text) and normalize(parse_value(raw_text)) == normalize(master.get("value_spec", "")):
-        score += 0.25
-    if parse_voltage(raw_text) and normalize(parse_voltage(raw_text)) == normalize(master.get("voltage", "")):
-        score += 0.15
-    if parse_tolerance(raw_text) and normalize(parse_tolerance(raw_text)) == normalize(master.get("tolerance", "")):
-        score += 0.10
-    score += min(0.10, similarity(raw_text, master_text) * 0.10)
-    return round(min(score, 1.0), 2)
+    return specification_match(raw, master)[0]
 
 
 def classify(score):
@@ -2337,9 +2385,28 @@ def best_match(conn, raw):
             "confidence": 0,
             "owner_role": "工程",
         }
-    ranked = sorted(((score_candidate(raw, item), item) for item in items), key=lambda pair: pair[0], reverse=True)
-    score, item = ranked[0]
-    level = classify(score)
+    ranked = sorted(
+        ((specification_match(raw, item), item) for item in items),
+        key=lambda pair: (-int(pair[0][1]), -pair[0][0], pair[1]["internal_item_code"]),
+    )
+    (score, full_signature), item = ranked[0]
+    equally_ranked = [
+        candidate
+        for (candidate_score, candidate_full), candidate in ranked
+        if candidate_full == full_signature and abs(candidate_score - score) < 1e-9
+    ]
+    if len(equally_ranked) > 1 and score >= 0.55:
+        return {
+            "candidate_internal_code": "",
+            "candidate_standard_name": "",
+            "match_level": "疑似匹配",
+            "confidence": score,
+            "owner_role": "工程",
+        }
+    if full_signature:
+        level = "自动匹配"
+    else:
+        level = classify(score)
     return {
         "candidate_internal_code": item["internal_item_code"] if level != "新物料" else "",
         "candidate_standard_name": item["standard_name"] if level != "新物料" else "",

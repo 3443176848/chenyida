@@ -4,6 +4,15 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-SPEC-MATCH-01 - `feat: match supplier rows by specification`
+
+- 样本：审计 1928C、G20-G15G、J587 三份 XLSX；G20 的 Description-only 表头原先被名称门禁拒绝，J587 描述/备注冲突会导致规格为空。
+- Parser：增加 HC_CODE、VendorCode；Description-only 作为 SUGGESTED 规格/名称候选；正式描述优先备注；全部 Canonical 字段为空的行标记 `UNMAPPED_NON_DATA`，Raw 保留。
+- 规格：三文件隔离得到 221 Cleaning Rows，其中 216 条有规格；G20 5 条原始 Description 为空，不用料号冒充规格。
+- Matcher：删除名称相似度评分；来源规格硬冲突立即排除，完整唯一规格才自动确认编号，部分唯一候选保持疑似，多候选同分不随机给号；支持 0.1uF=100nF、5.0V=5V、+5%=5%。
+- 当前库：三文件没有完整唯一匹配编号 1～5 的行；J587 5 条缺误差，不能在 1/2/3 中唯一选码。未创建新内部物料。
+- 验证：规格编号 7/7、Parser/真实样本 12/12、隔离文件导入 3 Batch/316 Raw/221 Cleaning/0 Material，联合基线 33/33、smoke/self-test/go-live 通过；systemd 已部署且未重写现有数据。
+
 ### PHASE3-MATERIAL-LIBRARY-CLEANING-CLEAR-01 - `feat: safely clear cleaning rows`
 
 - 权限：清空接口要求 `system`，仅管理员页面显示按钮，普通角色服务端拒绝。

@@ -9,6 +9,7 @@ from spreadsheet_import import SpreadsheetImportError, parse_spreadsheet_import
 
 
 ATTACHMENT_DIR = Path("/root/.codex/attachments/11acb435-f2b7-4453-9522-c553f1a97300")
+SPEC_ATTACHMENT_DIR = Path("/root/.codex/attachments/06a0e45b-d5f3-4bef-aa0c-2dc9521194f1")
 
 
 class SpreadsheetImportTest(unittest.TestCase):
@@ -106,6 +107,44 @@ class SpreadsheetImportTest(unittest.TestCase):
             parse_spreadsheet_import(buffer.getvalue(), "unmapped.xlsx")
         self.assertEqual(caught.exception.code, "IMPORT_MAPPING_REVIEW_REQUIRED")
 
+    def test_description_only_bom_produces_review_required_specification_and_name(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "BOM"
+        sheet.append(["HC_CODE", "Description", "VendorCode", "Quantity", "Remark"])
+        sheet.append(["HC-001", "100nF +5% 6.3V 0201", "VENDOR-001", 1, "辅助备注"])
+        sheet.append(["", "", "", "", "分段标题"])
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        workbook.close()
+
+        result = parse_spreadsheet_import(buffer.getvalue(), "description-only.xlsx")
+
+        self.assertEqual(len(result["rows"]), 1)
+        self.assertEqual(result["rows"][0]["raw_item_code"], "VENDOR-001")
+        self.assertEqual(result["rows"][0]["raw_item_name"], "100nF +5% 6.3V 0201")
+        self.assertEqual(result["rows"][0]["raw_spec"], "100nF +5% 6.3V 0201")
+        self.assertEqual(result["rows"][0]["_mapping_status"], "SUGGESTED")
+        self.assertEqual(result["rows"][0]["_review_status"], "NEEDS_REVIEW")
+        self.assertIn("MATERIAL_NAME_FROM_SPECIFICATION_REVIEW_REQUIRED", result["warnings"])
+        self.assertEqual(result["raw_rows"][2]["disposition"], "UNMAPPED_NON_DATA")
+
+    def test_description_column_wins_over_remark_for_specification_source(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "物料"
+        sheet.append(["物料编码", "物料名称", "描述", "备注"])
+        sheet.append(["M-001", "电容", "10nF 50V 0201", "仅供内部备注"])
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        workbook.close()
+
+        result = parse_spreadsheet_import(buffer.getvalue(), "description-and-remark.xlsx")
+
+        self.assertEqual(result["mappings"]["description"]["status"], "EXACT")
+        self.assertEqual(result["mappings"]["description"]["source_headers"], ["描述"])
+        self.assertEqual(result["rows"][0]["raw_spec"], "10nF 50V 0201")
+
     def test_real_samples_enter_review_without_lowering_material_guards(self):
         if not ATTACHMENT_DIR.exists():
             self.skipTest("真实附件不在当前服务器")
@@ -113,13 +152,30 @@ class SpreadsheetImportTest(unittest.TestCase):
         a118 = ATTACHMENT_DIR / "A118量产BOM.csv"
         v700_result = parse_spreadsheet_import(v700.read_bytes(), v700.name)
         self.assertEqual(v700_result["selected_sheet"], "BOM")
-        self.assertEqual(len(v700_result["rows"]), 229)
+        self.assertEqual(len(v700_result["rows"]), 222)
         self.assertTrue(all(row["_review_status"] == "NEEDS_REVIEW" for row in v700_result["rows"]))
         a118_result = parse_spreadsheet_import(a118.read_bytes(), a118.name)
         self.assertEqual(a118_result["selected_sheet"], "SHEET1")
         self.assertEqual((a118_result["header_start_row"], a118_result["header_end_row"]), (44, 44))
-        self.assertEqual(len(a118_result["rows"]), 314)
+        self.assertEqual(len(a118_result["rows"]), 305)
         self.assertIn("SOURCE_COLUMNS_EXCEED_ANALYSIS_LIMIT_ORIGINAL_FILE_ARCHIVE_REQUIRED", a118_result["warnings"])
+
+    def test_new_real_samples_preserve_available_specifications(self):
+        if not SPEC_ATTACHMENT_DIR.exists():
+            self.skipTest("规格真实附件不在当前服务器")
+        expected = {
+            "1928C量产BOM.xlsx": (25, 25, "M105H-DG-M23U-charge-V1_BOM"),
+            "G20-G15G项目量产BOM.xlsx": (74, 69, "G9_5G_ANT_SCH_V2R0"),
+            "J587_SUBA2_V01-20260703.xlsx": (122, 122, "TYPE-C耳机小板"),
+        }
+        for filename, (row_count, specification_count, sheet_name) in expected.items():
+            with self.subTest(filename=filename):
+                path = SPEC_ATTACHMENT_DIR / filename
+                result = parse_spreadsheet_import(path.read_bytes(), path.name)
+                self.assertEqual(result["selected_sheet"], sheet_name)
+                self.assertEqual(len(result["rows"]), row_count)
+                self.assertEqual(sum(bool(row["raw_spec"]) for row in result["rows"]), specification_count)
+                self.assertTrue(all(row["_review_status"] == "NEEDS_REVIEW" for row in result["rows"]))
 
 
 if __name__ == "__main__":

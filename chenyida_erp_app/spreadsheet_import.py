@@ -17,7 +17,7 @@ MAX_ARCHIVE_UNCOMPRESSED_BYTES = 80 * 1024 * 1024
 HEADER_SCAN_ROWS = 50
 
 FIELD_ALIASES = {
-    "material_code": ["物料编码", "物料代码", "物料编号", "产品编码", "产品编号", "料号", "货号", "item code", "material code", "part no"],
+    "material_code": ["物料编码", "物料代码", "物料编号", "产品编码", "产品编号", "料号", "货号", "item code", "material code", "part no", "hc code", "hccode"],
     "material_name": ["物料名称", "物料名", "产品名称", "产品名", "品名", "名称", "货品名称", "品名及规格", "品名规格", "name", "item name", "material name"],
     "specification": ["规格", "规格型号", "型号规格", "产品规格", "规格参数", "技术规格", "规格描述", "尺寸", "参数", "品名及规格", "品名规格", "料号描述", "物料描述", "产品描述", "description", "specification", "spec", "model/spec", "size"],
     "model": ["型号", "产品型号", "物料型号", "model", "model no"],
@@ -26,7 +26,7 @@ FIELD_ALIASES = {
     "category": ["分类", "物料分类", "产品分类", "类别", "品类", "category"],
     "description": ["描述", "物料描述", "产品描述", "料号描述", "说明", "备注", "description", "remark"],
     "manufacturer_part_no": ["制造商料号", "厂家料号", "厂商料号", "厂商物料编码", "厂家物料编码", "原厂料号", "mpn", "manufacturer part no"],
-    "supplier_part_no": ["供应商料号", "供方料号", "供应商编码", "vendor part no", "supplier part no"],
+    "supplier_part_no": ["供应商料号", "供方料号", "供应商编码", "vendor part no", "vendor code", "vendorcode", "supplier part no"],
     "drawing_no": ["图号", "图纸编号", "drawing no", "drawing number"],
     "quantity": ["数量", "用量", "需求数量", "采购数量", "qty", "quantity"],
     "price": ["单价", "价格", "含税单价", "未税单价", "price", "unit price"],
@@ -400,6 +400,7 @@ def _analyze_sheet(sheet, index):
 
 def _mapping_score(field, column):
     normalized = _normalized_header(column["header"])
+    leaf = _normalized_header(column["header"].split("/")[-1])
     best = 0
     exact = False
     for alias in FIELD_ALIASES[field]:
@@ -414,6 +415,9 @@ def _mapping_score(field, column):
             best = max(best, 0.82)
     if field == "material_code" and re.search(r"厂商|厂家|制造商|供应商|供方|原厂", normalized):
         return 0, False
+    if field == "description" and leaf in {"备注", "remark", "说明"}:
+        best = min(best, 0.72)
+        exact = False
     samples = column["samples"]
     sample_score = 0
     if samples:
@@ -454,7 +458,13 @@ def _suggest_mappings(header):
                     score, exact = _mapping_score(field, column)
                     contributors.append((max(score, 0.72), column["index"], exact, column["header"]))
             contributors.sort(key=lambda item: (-item[0], item[1]))
-            selected = dedicated[:1] if dedicated else contributors[:5]
+            descriptive_candidates = [
+                (min(item[0], 0.68), item[1], False, item[3])
+                for item in scored
+                if _normalized_header(item[3].split("/")[-1])
+                in {"description", "描述", "物料描述", "产品描述", "料号描述"}
+            ]
+            selected = dedicated[:1] if dedicated else contributors[:5] if contributors else descriptive_candidates[:1]
             selected.sort(key=lambda item: item[1])
             strategy = "JOIN_NON_EMPTY" if len(selected) > 1 else "SPECIFICATION_EXTRACT"
         if not selected:
@@ -570,6 +580,9 @@ def parse_spreadsheet_import(content, filename):
             continue
         row = raw["values"]
         mapped = {field: _resolve(row, mapping) for field, mapping in mappings.items()}
+        if not any(mapped.values()):
+            raw["disposition"] = "UNMAPPED_NON_DATA"
+            continue
         specification, specification_confidence, specification_status, spec_evidence = _extract_specification(
             row,
             mappings,

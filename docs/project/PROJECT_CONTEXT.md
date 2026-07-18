@@ -78,6 +78,7 @@
 - 开发库新增内部编码 1～5 的五条电容，内部物料共 9 条；这些是临时测试编号，五条本地匹配均为对应编码、自动匹配 1.00。
 - 清洗审核列表支持服务端匹配置信度 `newest/desc/asc` 排序；页面可选高到低或低到高，同分按 ID 降序。项目负责人已在网页重导入 V700，当前有 229 条 Cleaning Rows、21 个置信度层级。
 - 管理员可通过双重确认的清空接口删除全部 Cleaning Rows；系统先自动备份并在事务中写审计，Batch/Raw Rows/归档/物料/映射不删除。部署没有自动清空当前 229 条。
+- 1928C/G20/J587 已完成规格兼容：三文件隔离产生 221 条 Cleaning、216 条有规格；名称不参与编号评分，结构化规格完整且唯一才自动确认内部编号，部分唯一候选保持疑似，歧义不随机给号。
 - Material Draft/Review POST 已具备同源/CSRF、持久幂等和限速；其他 legacy POST 的 CSRF 与限速仍需专项治理。测试环境已有本机一次性 D1，尚无远程 Test D1。
 - Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现，但生产 Site 仍为旧版本。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
@@ -94,7 +95,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import，以及 Phase 3 Normalization、内部物料库、多供应商识别和服务器本地 Excel 接入。编号 1～5 的五条电容已作为匹配基线，清洗匹配置信度排序和管理员安全清空已部署；V700 当前 229 条等待页面验证或人工清空。
+当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import，以及 Phase 3 Normalization、内部物料库、多供应商识别和服务器本地 Excel 接入。清洗排序、安全清空和规格唯一编号匹配已部署；下一步从网页重导入 1928C/G20/J587，对未覆盖的新规格人工建档生成编号。
 
 ## 恢复上下文检查清单
 
