@@ -500,6 +500,7 @@ class DefaultMaterialDraftService implements MaterialDraftService {
         metadataGuard: storageSnapshot.metadataGuard,
         snapshotJson: buildSnapshot(fields, attributes),
         transactionCompanion: command.context.transaction_companion,
+        importTrace: command.context.import_trace,
       });
       return { material, validation };
     } catch (error) {
@@ -509,7 +510,7 @@ class DefaultMaterialDraftService implements MaterialDraftService {
           "物料草稿编号分配冲突，请重试",
         );
       }
-      throw new MaterialMasterServiceError("MATERIAL_WRITE_FAILED", "物料草稿创建失败");
+      throw new MaterialMasterServiceError("MATERIAL_WRITE_FAILED", "物料草稿创建失败", { cause: error });
     }
   }
 

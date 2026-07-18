@@ -526,18 +526,82 @@ class D1MaterialMasterQueryService implements MaterialMasterQueryService {
     };
   }
 
+  private async importTrace(materialId: number): Promise<Record<string, unknown> | null> {
+    const row = await this.database.prepare(`
+      SELECT
+        m.brand_id,m.base_unit_id,m.source_import_batch_id,m.source_import_file_id,
+        m.source_import_row_id,l.normalized_row_id,l.normalization_approval_id,
+        n.normalization_run_id,n.source_sheet_index,n.source_row_number,n.normalized_payload_hash,
+        f.original_filename,f.actual_sha256,a.approved_by,a.approved_at
+      FROM material_master m
+      LEFT JOIN material_import_draft_links l ON l.material_id=m.id
+      LEFT JOIN material_import_normalized_rows n ON n.id=l.normalized_row_id
+      LEFT JOIN material_import_files f ON f.id=m.source_import_file_id
+      LEFT JOIN material_import_normalization_approvals a ON a.id=l.normalization_approval_id
+      WHERE m.id=?
+      LIMIT 1
+    `).bind(materialId).first<Row>();
+    if (!row || row.source_import_batch_id == null) return null;
+    if (
+      row.source_import_file_id == null || row.source_import_row_id == null
+      || row.normalized_row_id == null || row.normalization_run_id == null
+    ) throw new MaterialQueryError("IMPORT_TRACE_INVALID");
+    return {
+      batch_id: row.source_import_batch_id,
+      file_id: row.source_import_file_id,
+      source_row_id: row.source_import_row_id,
+      normalized_row_id: row.normalized_row_id,
+      normalization_run_id: row.normalization_run_id,
+      normalization_approval_id: row.normalization_approval_id,
+      source_sheet_index: row.source_sheet_index,
+      source_row_number: row.source_row_number,
+      normalized_payload_hash: row.normalized_payload_hash,
+      original_filename: row.original_filename,
+      file_sha256: row.actual_sha256,
+      approved_by: row.approved_by,
+      approved_at: row.approved_at,
+      brand_id: row.brand_id,
+      base_unit_id: row.base_unit_id,
+    };
+  }
+
+  private async duplicateCandidates(materialId: number): Promise<Row[]> {
+    return rows(await this.database.prepare(`
+      SELECT
+        d.candidate_material_id,m.internal_material_code,m.standard_name,m.material_status,
+        d.match_level,d.confidence_basis_points,d.matched_fields_json
+      FROM material_duplicate_candidates d
+      INNER JOIN material_master m ON m.id=d.candidate_material_id
+      WHERE d.draft_material_id=?
+      ORDER BY d.confidence_basis_points DESC,d.candidate_material_id
+      LIMIT 20
+    `).bind(materialId).all<Row>()).map((row) => ({
+      candidate_material_id: row.candidate_material_id,
+      material_code: row.internal_material_code,
+      standard_name: row.standard_name,
+      material_status: publicStatus(row.material_status),
+      match_level: row.match_level,
+      confidence: Number(row.confidence_basis_points) / 10_000,
+      matched_fields: parseJsonStrict(row.matched_fields_json, "array"),
+    }));
+  }
+
   async getMaterialDetail(materialId: number): Promise<Record<string, unknown> | null> {
     const base = await this.loadBaseDetail(materialId);
     if (!base) return null;
+    const material = base.material_record as MaterialRecord;
+    const hasImportTrace = material.sourceType === "MATERIAL_IMPORT";
     const publicBase = Object.fromEntries(Object.entries(base).filter(([key]) => key !== "material_record"));
     publicBase.attributes = (base.attributes as Row[]).map((attribute) => Object.fromEntries(
       Object.entries(attribute).filter(([key]) => key !== "source_ref"),
     ));
-    const [historySummary, lastRejection] = await Promise.all([
+    const [historySummary, lastRejection, importTrace, duplicateCandidates] = await Promise.all([
       this.historySummary(materialId),
       this.lastRejection(materialId),
+      hasImportTrace ? this.importTrace(materialId) : Promise.resolve(null),
+      hasImportTrace ? this.duplicateCandidates(materialId) : Promise.resolve([]),
     ]);
-    return { ...publicBase, history_summary: historySummary, last_rejection: lastRejection };
+    return { ...publicBase, source_import: importTrace, duplicate_candidates: duplicateCandidates, history_summary: historySummary, last_rejection: lastRejection };
   }
 
   async listMaterialVersions(materialId: number, query: MaterialHistoryQuery): Promise<Record<string, unknown> | null> {
@@ -554,16 +618,21 @@ class D1MaterialMasterQueryService implements MaterialMasterQueryService {
     const base = await this.loadBaseDetail(materialId, true);
     if (!base) return null;
     const material = base.material_record as MaterialRecord;
-    const [versions, changeLogs, lastRejection] = await Promise.all([
+    const hasImportTrace = material.sourceType === "MATERIAL_IMPORT";
+    const [versions, changeLogs, lastRejection, importTrace, duplicateCandidates] = await Promise.all([
       this.versions(materialId, { page: query.versionPage, pageSize: query.versionPageSize }),
       this.changeLogs(materialId, { page: query.changeLogPage, pageSize: query.changeLogPageSize }),
       this.lastRejection(materialId),
+      hasImportTrace ? this.importTrace(materialId) : Promise.resolve(null),
+      hasImportTrace ? this.duplicateCandidates(materialId) : Promise.resolve([]),
     ]);
     return {
       material: compatibilityMaterialView(material),
       attributes: base.attributes,
       category_path: base.category_path,
       validation: base.validation,
+      source_import: importTrace,
+      duplicate_candidates: duplicateCandidates,
       last_rejection: lastRejection,
       versions: { items: versions.data, pagination: versions.pagination },
       change_logs: { items: changeLogs.data, pagination: changeLogs.pagination },

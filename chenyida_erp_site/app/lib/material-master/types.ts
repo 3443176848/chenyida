@@ -10,6 +10,7 @@ export const MATERIAL_SOURCE_TYPES = [
   "LEGACY_SQLITE",
   "GOVERNANCE_TEMPLATE",
   "API",
+  "MATERIAL_IMPORT",
 ] as const;
 
 export const MATERIAL_PROCUREMENT_TYPES = [
@@ -52,6 +53,25 @@ export type MaterialOperationContext = Readonly<{
   actor: string;
   request_id: string;
   transaction_companion?: MaterialApiTransactionCompanion;
+  import_trace?: MaterialImportDraftTrace;
+}>;
+
+export type MaterialDuplicateCandidateWrite = Readonly<{
+  candidateMaterialId: number;
+  matchLevel: "EXACT" | "HIGH_CONFIDENCE" | "POSSIBLE";
+  confidenceBasisPoints: number;
+  matchedFields: readonly string[];
+}>;
+
+export type MaterialImportDraftTrace = Readonly<{
+  batchId: number;
+  fileId: number;
+  sourceRowId: number;
+  normalizedRowId: number;
+  normalizationApprovalId: number;
+  baseUnitId: number;
+  brandId: number | null;
+  duplicateCandidates: readonly MaterialDuplicateCandidateWrite[];
 }>;
 
 export type MaterialApiTransactionCompanion = Readonly<{
@@ -226,6 +246,7 @@ export type CreateDraftWrite = Readonly<{
   metadataGuard: string;
   snapshotJson: string;
   transactionCompanion?: MaterialApiTransactionCompanion;
+  importTrace?: MaterialImportDraftTrace;
 }>;
 
 export type EditDraftWrite = Readonly<{
@@ -328,9 +349,10 @@ export class MaterialMasterServiceError extends Error {
     options: Readonly<{
       details?: MaterialServiceErrorDetails;
       validation?: MaterialValidationResult;
+      cause?: unknown;
     }> = {},
   ) {
-    super(message);
+    super(message, options.cause === undefined ? undefined : { cause: options.cause });
     this.name = "MaterialMasterServiceError";
     this.code = code;
     this.details = options.details;
@@ -348,8 +370,8 @@ export type MaterialMasterRepositoryErrorKind =
 export class MaterialMasterRepositoryError extends Error {
   readonly kind: MaterialMasterRepositoryErrorKind;
 
-  constructor(kind: MaterialMasterRepositoryErrorKind) {
-    super(kind);
+  constructor(kind: MaterialMasterRepositoryErrorKind, cause?: unknown) {
+    super(kind, cause === undefined ? undefined : { cause });
     this.name = "MaterialMasterRepositoryError";
     this.kind = kind;
   }

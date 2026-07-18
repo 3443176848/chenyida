@@ -162,6 +162,82 @@ export const materialCategories = sqliteTable(
   ],
 );
 
+export const units = sqliteTable(
+  "units",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    symbol: text("symbol").notNull(),
+    unitType: text("unit_type").notNull(),
+    enabled: integer("enabled").notNull().default(1),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("units_code_uq").on(table.code),
+    index("units_type_enabled_idx").on(table.unitType, table.enabled, table.code),
+    check("units_code_ck", sql`length(trim(${table.code})) BETWEEN 1 AND 32 AND ${table.code} = upper(trim(${table.code}))`),
+    check("units_name_ck", sql`length(trim(${table.name})) BETWEEN 1 AND 100`),
+    check("units_symbol_ck", sql`length(trim(${table.symbol})) BETWEEN 1 AND 32`),
+    check("units_type_ck", sql`${table.unitType} IN ('COUNT','MASS','LENGTH','AREA','VOLUME','TIME','OTHER')`),
+    check("units_enabled_ck", sql`${table.enabled} IN (0,1)`),
+  ],
+);
+
+export const unitAliases = sqliteTable(
+  "unit_aliases",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    unitId: integer("unit_id").notNull().references(() => units.id, { onDelete: "restrict" }),
+    alias: text("alias").notNull(),
+    normalizedAlias: text("normalized_alias").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("unit_aliases_normalized_uq").on(table.normalizedAlias),
+    index("unit_aliases_unit_idx").on(table.unitId),
+    check("unit_aliases_alias_ck", sql`length(trim(${table.alias})) BETWEEN 1 AND 100 AND length(trim(${table.normalizedAlias})) BETWEEN 1 AND 100`),
+  ],
+);
+
+export const brands = sqliteTable(
+  "brands",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    code: text("code").notNull(),
+    standardName: text("standard_name").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    enabled: integer("enabled").notNull().default(1),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("brands_code_uq").on(table.code),
+    uniqueIndex("brands_normalized_name_uq").on(table.normalizedName),
+    index("brands_enabled_name_idx").on(table.enabled, table.standardName),
+    check("brands_code_ck", sql`length(trim(${table.code})) BETWEEN 1 AND 64 AND ${table.code} = upper(trim(${table.code}))`),
+    check("brands_name_ck", sql`length(trim(${table.standardName})) BETWEEN 1 AND 200 AND length(trim(${table.normalizedName})) BETWEEN 1 AND 200`),
+    check("brands_enabled_ck", sql`${table.enabled} IN (0,1)`),
+  ],
+);
+
+export const brandAliases = sqliteTable(
+  "brand_aliases",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    brandId: integer("brand_id").notNull().references(() => brands.id, { onDelete: "restrict" }),
+    alias: text("alias").notNull(),
+    normalizedAlias: text("normalized_alias").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("brand_aliases_normalized_uq").on(table.normalizedAlias),
+    index("brand_aliases_brand_idx").on(table.brandId),
+    check("brand_aliases_alias_ck", sql`length(trim(${table.alias})) BETWEEN 1 AND 200 AND length(trim(${table.normalizedAlias})) BETWEEN 1 AND 200`),
+  ],
+);
+
 export const materialMaster = sqliteTable(
   "material_master",
   {
@@ -170,9 +246,11 @@ export const materialMaster = sqliteTable(
     standardName: text("standard_name").notNull(),
     categoryId: integer("category_id").notNull().references(() => materialCategories.id),
     brand: text("brand").notNull().default(""),
+    brandId: integer("brand_id").references(() => brands.id, { onDelete: "restrict" }),
     manufacturer: text("manufacturer").notNull().default(""),
     manufacturerPartNumber: text("manufacturer_part_number").notNull().default(""),
     baseUom: text("base_uom").notNull(),
+    baseUnitId: integer("base_unit_id").references(() => units.id, { onDelete: "restrict" }),
     materialStatus: text("material_status").notNull(),
     procurementType: text("procurement_type").notNull(),
     inventoryType: text("inventory_type").notNull(),
@@ -182,6 +260,18 @@ export const materialMaster = sqliteTable(
     environmentalRequirement: text("environmental_requirement").notNull(),
     sourceType: text("source_type").notNull(),
     sourceRef: text("source_ref").notNull(),
+    sourceImportBatchId: integer("source_import_batch_id").references(
+      (): ReturnType<typeof integer> => materialImportBatches.id,
+      { onDelete: "restrict" },
+    ),
+    sourceImportFileId: integer("source_import_file_id").references(
+      (): ReturnType<typeof integer> => materialImportFiles.id,
+      { onDelete: "restrict" },
+    ),
+    sourceImportRowId: integer("source_import_row_id").references(
+      (): ReturnType<typeof integer> => materialImportRows.id,
+      { onDelete: "restrict" },
+    ),
     version: integer("version").notNull().default(1),
     lastModifiedBy: text("last_modified_by").notNull(),
     submittedBy: text("submitted_by").notNull().default(""),
@@ -193,6 +283,9 @@ export const materialMaster = sqliteTable(
   (table) => [
     uniqueIndex("material_master_internal_code_uq").on(table.internalMaterialCode).where(sql`${table.internalMaterialCode} IS NOT NULL`),
     index("material_master_candidate_idx").on(table.categoryId, table.manufacturer, table.manufacturerPartNumber),
+    index("material_master_brand_idx").on(table.brandId, table.materialStatus, table.id),
+    index("material_master_base_unit_idx").on(table.baseUnitId, table.materialStatus, table.id),
+    index("material_master_import_source_idx").on(table.sourceImportBatchId, table.sourceImportRowId, table.id),
     index("material_master_status_updated_idx").on(table.materialStatus, table.updatedAt),
     index("material_master_category_status_idx").on(table.categoryId, table.materialStatus),
     index("material_master_review_queue_idx").on(table.materialStatus, table.submittedAt, table.id),
@@ -497,6 +590,70 @@ export const materialImportNormalizationIssues = sqliteTable("material_import_no
   uniqueIndex("material_import_normalization_issues_idempotent_uq").on(table.normalizationRunId, table.sourceSheetIndex, table.sourceRowNumber, table.targetCode, table.issueCode, sql`COALESCE(${table.sourceColumnIndex},-1)`),
   check("material_import_normalization_issues_level_ck", sql`${table.issueLevel} IN ('ERROR','WARNING')`), check("material_import_normalization_issues_position_ck", sql`${table.sourceSheetIndex}>=0 AND ${table.sourceRowNumber}>0 AND (${table.sourceColumnIndex} IS NULL OR ${table.sourceColumnIndex}>=0)`), check("material_import_normalization_issues_code_ck", sql`length(${table.issueCode}) BETWEEN 3 AND 100 AND length(${table.targetCode}) BETWEEN 3 AND 160 AND length(${table.safeMessage}) BETWEEN 1 AND 500`), check("material_import_normalization_issues_details_ck", sql`json_valid(${table.safeDetailsJson}) AND json_type(${table.safeDetailsJson})='object'`),
 ]);
+
+export const materialImportNormalizationApprovals = sqliteTable(
+  "material_import_normalization_approvals",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    batchId: integer("batch_id").notNull().references(() => materialImportBatches.id, { onDelete: "restrict" }),
+    normalizationRunId: integer("normalization_run_id").notNull().references(() => materialImportNormalizationRuns.id, { onDelete: "restrict" }),
+    resultDigest: text("result_digest").notNull(),
+    approvedBy: text("approved_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
+    approvedAt: text("approved_at").notNull(),
+    requestId: text("request_id").notNull(),
+  },
+  (table) => [
+    uniqueIndex("material_import_normalization_approvals_run_uq").on(table.normalizationRunId),
+    index("material_import_normalization_approvals_batch_idx").on(table.batchId, table.approvedAt, table.id),
+    check("material_import_normalization_approvals_digest_ck", sql`length(${table.resultDigest})=64 AND ${table.resultDigest} NOT GLOB '*[^0-9a-f]*'`),
+  ],
+);
+
+export const materialImportDraftLinks = sqliteTable(
+  "material_import_draft_links",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    batchId: integer("batch_id").notNull().references(() => materialImportBatches.id, { onDelete: "restrict" }),
+    fileId: integer("file_id").notNull().references(() => materialImportFiles.id, { onDelete: "restrict" }),
+    sourceRowId: integer("source_row_id").notNull().references(() => materialImportRows.id, { onDelete: "restrict" }),
+    normalizedRowId: integer("normalized_row_id").notNull().references(() => materialImportNormalizedRows.id, { onDelete: "restrict" }),
+    normalizationApprovalId: integer("normalization_approval_id").notNull().references(() => materialImportNormalizationApprovals.id, { onDelete: "restrict" }),
+    materialId: integer("material_id").notNull().references(() => materialMaster.id, { onDelete: "restrict" }),
+    createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
+    createdAt: text("created_at").notNull(),
+    requestId: text("request_id").notNull(),
+  },
+  (table) => [
+    uniqueIndex("material_import_draft_links_normalized_row_uq").on(table.normalizedRowId),
+    uniqueIndex("material_import_draft_links_material_uq").on(table.materialId),
+    index("material_import_draft_links_batch_idx").on(table.batchId, table.id),
+    index("material_import_draft_links_source_row_idx").on(table.sourceRowId),
+  ],
+);
+
+export const materialDuplicateCandidates = sqliteTable(
+  "material_duplicate_candidates",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    normalizedRowId: integer("normalized_row_id").notNull().references(() => materialImportNormalizedRows.id, { onDelete: "restrict" }),
+    draftMaterialId: integer("draft_material_id").notNull().references(() => materialMaster.id, { onDelete: "restrict" }),
+    candidateMaterialId: integer("candidate_material_id").notNull().references(() => materialMaster.id, { onDelete: "restrict" }),
+    matchLevel: text("match_level").notNull(),
+    confidenceBasisPoints: integer("confidence_basis_points").notNull(),
+    matchedFieldsJson: text("matched_fields_json").notNull(),
+    createdAt: text("created_at").notNull(),
+    requestId: text("request_id").notNull(),
+  },
+  (table) => [
+    uniqueIndex("material_duplicate_candidates_pair_uq").on(table.normalizedRowId, table.candidateMaterialId),
+    index("material_duplicate_candidates_draft_level_idx").on(table.draftMaterialId, table.matchLevel, table.confidenceBasisPoints, table.id),
+    index("material_duplicate_candidates_candidate_idx").on(table.candidateMaterialId, table.id),
+    check("material_duplicate_candidates_level_ck", sql`${table.matchLevel} IN ('EXACT','HIGH_CONFIDENCE','POSSIBLE')`),
+    check("material_duplicate_candidates_confidence_ck", sql`${table.confidenceBasisPoints} BETWEEN 1 AND 10000`),
+    check("material_duplicate_candidates_fields_ck", sql`json_valid(${table.matchedFieldsJson}) AND json_type(${table.matchedFieldsJson})='array'`),
+    check("material_duplicate_candidates_not_self_ck", sql`${table.draftMaterialId} <> ${table.candidateMaterialId}`),
+  ],
+);
 
 export const materialImportEvents = sqliteTable(
   "material_import_events",

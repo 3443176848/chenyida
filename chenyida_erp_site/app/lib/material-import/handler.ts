@@ -30,6 +30,13 @@ import {
   startMaterialImportNormalization,
 } from "./normalization-service.ts";
 import {
+  approveMaterialImportNormalization,
+  commitMaterialImportDraftGeneration,
+  dryRunMaterialImportDraftGeneration,
+  inspectMaterialImportDraftGeneration,
+  reportMaterialImportDraftGeneration,
+} from "./draft-generation-service.ts";
+import {
   cancelMaterialImportBatch,
   createMaterialImportBatch,
   getMaterialImportBatch,
@@ -47,6 +54,7 @@ type ImportPermission =
   | "material.import.parse"
   | "material.import.map"
   | "material.import.normalize"
+  | "material.import.commit"
   | "material.import.read_any";
 
 export type MaterialImportApiDependencies = Readonly<{
@@ -171,8 +179,9 @@ async function writeFailureAudit(
   if (!user) return;
   const timestamp = (dependencies.clock ?? (() => new Date()))().toISOString();
   const catalog = /^\/api\/material-master\/import-batches\/[1-9][0-9]*\/mapping-targets$/.test(path);
-  const normalization = /^\/api\/material-master\/import-batches\/[1-9][0-9]*\/(?:normalize|normalization|normalized-rows(?:\/[1-9][0-9]*)?|normalization-issues)$/.test(path);
-  const routeCode = catalog ? "MATERIAL_IMPORT_MAPPING_TARGET_CATALOG" : normalization ? "MATERIAL_IMPORT_NORMALIZATION" : "MATERIAL_IMPORT_BATCH";
+  const normalization = /^\/api\/material-master\/import-batches\/[1-9][0-9]*\/(?:normalize|normalization(?:\/approve)?|normalized-rows(?:\/[1-9][0-9]*)?|normalization-issues|draft-generation|drafts)$/.test(path);
+  const draftGeneration = /\/(?:normalization\/approve|draft-generation|drafts)$/.test(path);
+  const routeCode = catalog ? "MATERIAL_IMPORT_MAPPING_TARGET_CATALOG" : draftGeneration ? "MATERIAL_IMPORT_DRAFT_GENERATION" : normalization ? "MATERIAL_IMPORT_NORMALIZATION" : "MATERIAL_IMPORT_BATCH";
   try {
     await dependencies.database.prepare(`
       INSERT INTO audit_log(username,action,detail,request_id,result,route_code,error_code,retention_until,created_at)
@@ -200,7 +209,7 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
   const requestId = crypto.randomUUID();
   const url = new URL(request.url);
   const isMappingTargetsRequest = /^\/api\/material-master\/import-batches\/[1-9][0-9]*\/mapping-targets$/.test(url.pathname);
-  const isNormalizationRequest = /^\/api\/material-master\/import-batches\/[1-9][0-9]*\/(?:normalize|normalization|normalized-rows(?:\/[1-9][0-9]*)?|normalization-issues)$/.test(url.pathname);
+  const isNormalizationRequest = /^\/api\/material-master\/import-batches\/[1-9][0-9]*\/(?:normalize|normalization(?:\/approve)?|normalized-rows(?:\/[1-9][0-9]*)?|normalization-issues|draft-generation|drafts)$/.test(url.pathname);
   let user: MaterialApiUser | null = null;
   try {
     user = await dependencies.currentUser(request);
@@ -223,18 +232,23 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
     const normalizedRowsMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/normalized-rows$/);
     const normalizedRowMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/normalized-rows\/([1-9][0-9]*)$/);
     const normalizationIssuesMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/normalization-issues$/);
-    if (!root && !detailMatch && !fileMatch && !eventsMatch && !cancelMatch && !parseMatch && !sheetsMatch && !rowsMatch && !mappingMatch && !mappingTargetsMatch && !previewMatch && !confirmMatch && !normalizeMatch && !normalizationMatch && !normalizedRowsMatch && !normalizedRowMatch && !normalizationIssuesMatch) throw new MaterialImportServiceError("IMPORT_BATCH_NOT_FOUND", "导入接口不存在", 404);
+    const normalizationApproveMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/normalization\/approve$/);
+    const draftGenerationMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/draft-generation$/);
+    const draftsMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/drafts$/);
+    if (!root && !detailMatch && !fileMatch && !eventsMatch && !cancelMatch && !parseMatch && !sheetsMatch && !rowsMatch && !mappingMatch && !mappingTargetsMatch && !previewMatch && !confirmMatch && !normalizeMatch && !normalizationMatch && !normalizedRowsMatch && !normalizedRowMatch && !normalizationIssuesMatch && !normalizationApproveMatch && !draftGenerationMatch && !draftsMatch) throw new MaterialImportServiceError("IMPORT_BATCH_NOT_FOUND", "导入接口不存在", 404);
     const permission: ImportPermission = root && request.method === "POST"
       ? "material.import.create"
       : fileMatch
         ? "material.import.create"
         : cancelMatch
           ? "material.import.cancel"
-          : parseMatch
-            ? "material.import.parse"
-            : (mappingMatch && request.method !== "GET") || previewMatch || confirmMatch
-              ? "material.import.map"
-              : "material.import.read";
+          : normalizationApproveMatch || draftsMatch
+            ? "material.import.commit"
+            : parseMatch
+              ? "material.import.parse"
+              : (mappingMatch && request.method !== "GET") || previewMatch || confirmMatch
+                ? "material.import.map"
+                : "material.import.read";
     if (!normalizeMatch && !dependencies.userCan(user, permission)) throw new MaterialImportServiceError(mappingTargetsMatch || isNormalizationRequest ? "FORBIDDEN" : "PERMISSION_DENIED", "没有执行此操作的权限", 403);
     const canReadAny = dependencies.userCan(user, "material.import.read_any");
     const normalizationRateLimiter = dependencies.importReadRateLimiter ?? new D1MaterialImportReadRateLimiter(dependencies.database);
@@ -344,6 +358,63 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
       assertNormalizationQuery(url, ["cursor", "limit", "issue_level", "issue_code", "target_code", "source_row_number"]);
       const sourceRow = url.searchParams.get("source_row_number");
       result = await listMaterialImportNormalizationIssues(dependencies.database, integerPath(normalizationIssuesMatch[1]), { username: user.username, canReadAny, issueLevel: url.searchParams.get("issue_level") ?? undefined, issueCode: url.searchParams.get("issue_code") ?? undefined, targetCode: url.searchParams.get("target_code") ?? undefined, sourceRowNumber: sourceRow === null ? undefined : Number(sourceRow), limit: normalizationLimit(url), cursor: url.searchParams.get("cursor") ?? undefined, consumeRateLimit: consumeNormalizationRateLimit("MATERIAL_IMPORT_NORMALIZATION_READ", dependencies.importReadRateLimit ?? 120) });
+    } else if (draftGenerationMatch && request.method === "GET") {
+      assertNormalizationQuery(url, ["mode", "after_row_id", "after_link_id", "limit"]);
+      const mode = url.searchParams.get("mode") ?? "inspect";
+      const common = { batchId: integerPath(draftGenerationMatch[1]), username: user.username, canReadAny };
+      if (mode === "inspect") {
+        if (url.searchParams.has("after_row_id") || url.searchParams.has("after_link_id") || url.searchParams.has("limit")) throw new MaterialImportServiceError("IMPORT_DRAFT_REQUEST_INVALID", "inspect 不接受分页参数", 400);
+        result = await inspectMaterialImportDraftGeneration(dependencies.database, common);
+      } else if (mode === "dry-run") {
+        if (url.searchParams.has("after_link_id")) throw new MaterialImportServiceError("IMPORT_DRAFT_REQUEST_INVALID", "dry-run 不接受 after_link_id", 400);
+        result = await dryRunMaterialImportDraftGeneration(dependencies.database, {
+          ...common,
+          requestId,
+          afterRowId: Number(url.searchParams.get("after_row_id") ?? 0),
+          limit: Number(url.searchParams.get("limit") ?? 20),
+        });
+      } else if (mode === "report") {
+        if (url.searchParams.has("after_row_id")) throw new MaterialImportServiceError("IMPORT_DRAFT_REQUEST_INVALID", "report 不接受 after_row_id", 400);
+        result = await reportMaterialImportDraftGeneration(dependencies.database, {
+          ...common,
+          afterLinkId: Number(url.searchParams.get("after_link_id") ?? 0),
+          limit: Number(url.searchParams.get("limit") ?? 20),
+        });
+      } else {
+        throw new MaterialImportServiceError("IMPORT_DRAFT_REQUEST_INVALID", "mode 只允许 inspect、dry-run 或 report", 400);
+      }
+    } else if (normalizationApproveMatch && request.method === "POST") {
+      assertMaterialCsrf(request);
+      const { body } = await readBoundedJson(request);
+      assertObjectKeys(body, ["expected_version", "result_digest", "accept_warnings"]);
+      result = await approveMaterialImportNormalization(dependencies.database, {
+        batchId: integerPath(normalizationApproveMatch[1]),
+        username: user.username,
+        canReadAny,
+        canCommit: dependencies.userCan(user, "material.import.commit"),
+        expectedVersion: Number(body.expected_version),
+        resultDigest: String(body.result_digest ?? ""),
+        acceptWarnings: body.accept_warnings === true,
+        rawKey: request.headers.get("Idempotency-Key") ?? "",
+        requestId,
+        clock: dependencies.clock,
+      });
+    } else if (draftsMatch && request.method === "POST") {
+      assertMaterialCsrf(request);
+      const { body } = await readBoundedJson(request);
+      assertObjectKeys(body, ["expected_version", "after_row_id", "limit"]);
+      result = await commitMaterialImportDraftGeneration(dependencies.database, {
+        batchId: integerPath(draftsMatch[1]),
+        username: user.username,
+        canReadAny,
+        canCommit: dependencies.userCan(user, "material.import.commit"),
+        expectedVersion: Number(body.expected_version),
+        afterRowId: Number(body.after_row_id ?? 0),
+        limit: Number(body.limit ?? 20),
+        rawKey: request.headers.get("Idempotency-Key") ?? "",
+        requestId,
+        clock: dependencies.clock,
+      });
     } else {
       throw new MaterialImportServiceError("METHOD_NOT_ALLOWED", "请求方法不支持", 405);
     }

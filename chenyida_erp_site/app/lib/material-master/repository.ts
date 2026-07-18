@@ -506,9 +506,62 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const candidate = await this.nextMaterialId();
       try {
-        await this.database.batch([
-          this.database
-            .prepare(`
+        const materialInsert = input.importTrace
+          ? this.database.prepare(`
+              INSERT INTO material_master(
+                id, internal_material_code, standard_name, category_id, brand,
+                brand_id, manufacturer, manufacturer_part_number, base_uom,
+                base_unit_id, material_status,
+                procurement_type, inventory_type, lot_control_required, shelf_life_days,
+                inspection_type, environmental_requirement, source_type, source_ref,
+                source_import_batch_id, source_import_file_id, source_import_row_id,
+                version, last_modified_by, submitted_by, submitted_at,
+                approved_by, approved_at, created_by, created_at, updated_by,
+                updated_at, request_id
+              ) VALUES (
+                ?, NULL,
+                (
+                  SELECT CASE
+                    WHEN ${metadataGuardExpression("c.id")} = ? THEN ?
+                    ELSE NULL
+                  END
+                  FROM material_categories c
+                  WHERE c.id = ?
+                ),
+                ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                1, ?, '', NULL, '', NULL, ?, ?, ?, ?, ?
+              )
+            `).bind(
+              candidate,
+              input.metadataGuard,
+              input.fields.standardName,
+              input.fields.categoryId,
+              input.fields.categoryId,
+              input.fields.brand,
+              input.importTrace.brandId,
+              input.fields.manufacturer,
+              input.fields.manufacturerPartNumber,
+              input.fields.baseUom,
+              input.importTrace.baseUnitId,
+              input.fields.procurementType,
+              input.fields.inventoryType,
+              input.fields.lotControlRequired,
+              input.fields.shelfLifeDays,
+              input.fields.inspectionType,
+              input.fields.environmentalRequirement,
+              input.fields.sourceType,
+              input.fields.sourceRef,
+              input.importTrace.batchId,
+              input.importTrace.fileId,
+              input.importTrace.sourceRowId,
+              input.createdBy,
+              input.createdBy,
+              input.createdAt,
+              input.createdBy,
+              input.createdAt,
+              input.requestId,
+            )
+          : this.database.prepare(`
               INSERT INTO material_master(
                 id, internal_material_code, standard_name, category_id, brand,
                 manufacturer, manufacturer_part_number, base_uom, material_status,
@@ -530,8 +583,7 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
                 ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?,
                 1, ?, '', NULL, '', NULL, ?, ?, ?, ?, ?
               )
-            `)
-            .bind(
+            `).bind(
               candidate,
               input.metadataGuard,
               input.fields.standardName,
@@ -555,7 +607,9 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
               input.createdBy,
               input.createdAt,
               input.requestId,
-            ),
+            );
+        await this.database.batch([
+          materialInsert,
           this.database
             .prepare(`
               INSERT INTO material_versions(
@@ -615,6 +669,54 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
                 input.requestId,
               ),
           ),
+          ...(input.importTrace ? [
+            this.database.prepare(`
+              INSERT INTO material_import_draft_links(
+                batch_id,file_id,source_row_id,normalized_row_id,
+                normalization_approval_id,material_id,created_by,created_at,request_id
+              )
+              SELECT ?,?,?,?,?,id,?,?,?
+              FROM material_master
+              WHERE id=? AND material_status='DRAFT' AND source_type='MATERIAL_IMPORT'
+                AND source_import_batch_id=? AND source_import_file_id=?
+                AND source_import_row_id=? AND request_id=?
+            `).bind(
+              input.importTrace.batchId,
+              input.importTrace.fileId,
+              input.importTrace.sourceRowId,
+              input.importTrace.normalizedRowId,
+              input.importTrace.normalizationApprovalId,
+              input.createdBy,
+              input.createdAt,
+              input.requestId,
+              candidate,
+              input.importTrace.batchId,
+              input.importTrace.fileId,
+              input.importTrace.sourceRowId,
+              input.requestId,
+            ),
+            ...input.importTrace.duplicateCandidates.map((duplicate) =>
+              this.database.prepare(`
+                INSERT INTO material_duplicate_candidates(
+                  normalized_row_id,draft_material_id,candidate_material_id,match_level,
+                  confidence_basis_points,matched_fields_json,created_at,request_id
+                )
+                SELECT ?,id,?,?,?,?,?,?
+                FROM material_master
+                WHERE id=? AND material_status='DRAFT' AND request_id=?
+              `).bind(
+                input.importTrace!.normalizedRowId,
+                duplicate.candidateMaterialId,
+                duplicate.matchLevel,
+                duplicate.confidenceBasisPoints,
+                JSON.stringify(duplicate.matchedFields),
+                input.createdAt,
+                input.requestId,
+                candidate,
+                input.requestId,
+              ),
+            ),
+          ] : []),
           ...materialApiSuccessStatements(this.database, input.transactionCompanion, {
             materialId: candidate,
             materialStatus: "DRAFT",
@@ -631,7 +733,7 @@ class D1MaterialMasterRepository implements MaterialMasterRepository {
       } catch (error) {
         if (isMaterialIdConflict(error)) continue;
         if (error instanceof MaterialMasterRepositoryError) throw error;
-        throw new MaterialMasterRepositoryError("WRITE_FAILED");
+        throw new MaterialMasterRepositoryError("WRITE_FAILED", error);
       }
     }
     throw new MaterialMasterRepositoryError("MATERIAL_ID_CONFLICT");
