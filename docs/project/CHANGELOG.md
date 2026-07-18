@@ -4,6 +4,18 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT - `feat: adapt supplier material imports`
+
+- Git Commit：`41e293f`。
+- 审计：复用既有 Batch、Parser、Raw Rows、Mapping、Normalization、Review、Validation、Event/Audit 和 Draft；确认旧实现默认首个可见 Sheet、前 10 行单表头、单来源映射和只跳过精确表头行，是多供应商兼容失败的主要原因。
+- 结构识别：对全部可见 Sheet 的前 50 行评分，支持 1～3 行和合并父级表头、稳定父子列路径、数据起始行，以及说明/空行/重复表头/小计/合计/页脚的可解释分类。
+- Mapping/规格：集中版本化别名，结合样本类型、唯一率、长度、尺寸/型号/单位特征和受控 Supplier Profile；支持 `EXACT/HIGH_CONFIDENCE/SUGGESTED/UNMAPPED/CONFLICT`、多来源列与确定性规格组合。名称/描述只给候选，不调用 AI；空规格产生 ERROR 并阻断 Draft。
+- Canonical Row：在现有 Normalization 保存文件、Sheet、行、Supplier/Profile、raw/mapped 投影、置信度和 Review 状态；完整原始值继续只存在不可变 Raw Row。非数据行保留 lineage 并标记 `SKIPPED/REJECTED`。
+- 数据库/UI：新增 `0008`、Supplier Profile 及 Mapping/Normalization 扩展，旧 `0005` 兼容；工作区展示结构范围、置信度、多来源 Mapping 和规格确认提示。Down 是受保护的兼容回退，完整结构恢复依赖迁移前快照。
+- 样本：仅检查 `/opt/erp` 内受控目录，未发现真实供应商样本；治理模板未冒充真实验证，未输出完整业务数据、价格或联系方式。
+- 验证：全量 Node 589/589，自适应 9/9、Migration 3/3、运行时闭环 2/2，build、lint 0 error/1 个既有 warning、隔离 API smoke、1k/10k/100k 查询计划、最终文档范围 328 文件凭证扫描、Python self-test/smoke/go-live 和 `git diff --check` 通过。
+- 生产：未连接生产 D1/R2/Queue，未执行生产迁移、真实上传、Draft 创建、Sites 保存或部署。
+
 ### PHASE3-MATERIAL-LIBRARY-02 NO_REAL_DATA_MODE - `feat: harden material import governance`
 
 - Git Commit：`b3d26c3`。

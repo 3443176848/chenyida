@@ -6,15 +6,15 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 约 53,330 行 | 上一快照加 `b3d26c3` 净增 635 行；不含 Drizzle snapshot、依赖、构建产物、截图和文档 |
-| 源码文件 | 141 | 新增本地文件 Inspector 和专项测试；扩展 Draft Generation 与导入命令 |
-| 根仓库跟踪项 | Material Library 治理运行时、测试和文档 | 未修改 Schema/Migration、本地旧版业务代码、hosting 或部署配置 |
+| 总代码量 | 约 54,900 行 | 在上一快照上新增自适应识别、Mapping/Normalization 扩展和专项测试；不含 Drizzle snapshot、依赖、构建产物、截图和文档 |
+| 源码文件 | 145 | 新增自适应识别模块和 3 份专项测试；扩展 Parser、Mapping、Normalization、Review UI 和 Draft 门禁 |
+| 根仓库跟踪项 | 自适应 Import 运行时、`0008`、测试和文档 | 未修改本地旧版业务代码、hosting 或部署配置 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
-| 数据表 | 70（本地+开发 schema） | 本地 SQLite 26 张，Site D1/Drizzle 44 张；最新 `0007` 仅在隔离 D1 测试，未执行生产迁移 |
+| 数据表 | 71（本地+开发 schema） | 本地 SQLite 26 张，Site D1/Drizzle 45 张；最新 `0008` 仅在隔离 D1 测试，未执行生产迁移 |
 | 在线 API 路径 | 89 | 开发代码新增 Draft Generation 查询、Normalization Approval 和 Draft Commit；生产公开站点尚未部署 |
 | 页面入口 | 14 | 既有 11 个入口加 3 条 Material Import 路由 |
-| 测试文件 | 30 | 新增本地文件 inspect 专项测试并扩展 Import→Draft 治理测试 |
+| 测试文件 | 33 | 新增自适应识别、Migration 和运行时闭环 3 份专项测试 |
 
 ## 当前版本与环境
 
@@ -38,6 +38,8 @@
 
 `PHASE3-MATERIAL-LIBRARY-02` 开始时，根仓库 `main` 位于 `c660cc3` 且工作区干净。功能提交 `b3d26c3` 覆盖本地只读 inspect、治理状态、安全汇总、重复阻断和专项测试；未修改 Schema/Migration、hosting、本地旧版业务代码或生产资源。
 
+`PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT` 功能提交为 `41e293f`，覆盖自适应结构识别、Supplier Profile、多来源 Mapping/规格、Canonical Row、Review/Draft 门禁、`0008` 和专项测试；没有真实供应商样本，没有生产迁移或部署。
+
 正式规格确认更新开始时，根仓库位于 `c694045`；用户明确回复“规格确认”。本次只更新主规格的 14 项决策状态和项目治理记录，不实施 Review UI。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
@@ -50,6 +52,23 @@
 git status --short
 git -C chenyida_erp_site status --short
 ```
+
+## PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT 非生产实现
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 功能提交 `41e293f`、测试和治理文档完成 |
+| 现有链路复用 | PASS | 继续使用 Batch/Parser/Raw Rows/Mapping/Normalization/Review/Validation/Event/Audit/Draft，没有第二套导入系统 |
+| Sheet/表头 | PASS (SYNTHETIC) | 全部可见 Sheet、前 50 行、1～3 行与合并父级表头评分；保存范围、置信度和证据 |
+| 行分类 | PASS (SYNTHETIC) | DATA/BLANK/说明/重复表头/小计/合计/页脚；原始行保留，非数据行在 Normalization 标记 SKIPPED/REJECTED |
+| Mapping | PASS (SYNTHETIC) | 集中别名、样本统计、相邻信息和 Supplier Profile；五级状态及低置信度人工确认 |
+| 规格 | PASS (SYNTHETIC) | 独立规格、多来源确定性组合、名称/描述候选；不调用 AI，空规格 ERROR 阻断 Draft |
+| Canonical Row | PASS | 进入既有 Normalization payload/队列列，完整原始值仍只存不可变 Raw Row |
+| `0008` | PASS | 45 表 Drizzle 基线；空库/已有数据/约束/失败原子性和受保护兼容回退通过，完整结构恢复依赖迁移前快照 |
+| 真实样本 | NO_REAL_SAMPLE_FILES | 仅检查 `/opt/erp` 受控目录；发现内容均为治理模板/镜像，未冒充真实验收 |
+| 专项/全量 | PASS | 自适应 9/9、Migration 3/3、运行时闭环 2/2；Vinext build + Node 589/589 |
+| 其他隔离基线 | PASS | lint 0 error/1 个既有 warning、API smoke、1k/10k/100k 查询计划、最终文档范围 328 文件凭证扫描、Python self-test/smoke/go-live、`git diff --check` |
+| 生产影响 | NONE | 未连接生产 D1/R2/Queue，未迁移、上传真实文件、创建 Draft、Sites 保存或部署 |
 
 ## PHASE3-MATERIAL-LIBRARY-02 真实数据导入治理（NO_REAL_DATA_MODE）
 
