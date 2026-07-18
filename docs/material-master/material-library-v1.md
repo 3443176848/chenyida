@@ -91,7 +91,7 @@ npm run material-library:import -- commit --api-base http://127.0.0.1:3000 --bat
 npm run material-library:import -- report --api-base http://127.0.0.1:3000 --batch-id 1
 ```
 
-本地 `inspect --file` 不需要 API 或 Cookie，只读处理不超过 10 MiB 的 `.xlsx/.csv`，输出文件类型、大小、SHA-256、Sheet/CSV 行列、编码/分隔符、表头候选和可能标准字段，不输出业务数据行、不修改源文件。
+本地 `inspect --file` 不需要 API 或 Cookie，只读处理不超过 10 MiB 的 `.xlsx/.xls/.csv`；`.xlsx` 使用 OOXML、`.xls` 使用 OLE/BIFF，输出文件类型、大小、SHA-256、Sheet/CSV 行列、编码/分隔符、表头候选和可能标准字段，不输出业务数据行、不修改源文件。
 
 批次命令只接受回环地址；`commit` 还要求 `ERP_ENV=test/local/development`、现有登录 Cookie、CSRF、Origin。命令复用 API，不直接连接 D1。dry-run/report 分页读取后只输出总数、成功/错误/警告/重复/待审，以及分类、单位、品牌和重复等级的安全计数汇总，不逐行打印物料正文。实际批次必须先 inspect/dry-run，再由有权限操作者批准和 commit。
 

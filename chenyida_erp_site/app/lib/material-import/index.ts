@@ -6,6 +6,7 @@ export * from "./service.ts";
 export * from "./parser-model.ts";
 export * from "./csv-parser.ts";
 export * from "./xlsx-parser.ts";
+export * from "./xls-parser.ts";
 export * from "./task-scheduler.ts";
 export * from "./parser-service.ts";
 export * from "./mapping-service.ts";

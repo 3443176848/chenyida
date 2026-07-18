@@ -5,7 +5,7 @@ const COMMANDS = new Set(["inspect", "dry-run", "commit", "report"]);
 function usage(message, exitCode = 2) {
   if (message) process.stderr.write(`${message}\n`);
   process.stderr.write("用法:\n");
-  process.stderr.write("  npm run material-library:import -- inspect --file <本地.xlsx|.csv>\n");
+  process.stderr.write("  npm run material-library:import -- inspect --file <本地.xlsx|.xls|.csv>\n");
   process.stderr.write("  npm run material-library:import -- <inspect|dry-run|commit|report> --api-base http://127.0.0.1:3000 --batch-id <id> [--accept-warnings]\n");
   process.exitCode = exitCode;
 }

@@ -95,8 +95,8 @@ export function MaterialImportUploadFlow({ existingBatch }: { existingBatch?: Ma
 
   const percentage = hash.totalBytes ? Math.floor(hash.processedBytes / hash.totalBytes * 100) : 0;
   return <section className="mi-upload-flow">
-    <div className="mi-upload-card"><label htmlFor="material-import-file">选择单个文件</label><input id="material-import-file" type="file" accept=".xlsx,.csv" disabled={busy} onChange={(event) => choose(event.currentTarget.files?.length === 1 ? event.currentTarget.files[0] : null)} />
-      <p>支持 .xlsx 或 .csv，文件非空且不超过 10 MiB。客户端预检不代表文件安全或服务端必然接受。</p>
+    <div className="mi-upload-card"><label htmlFor="material-import-file">选择单个文件</label><input id="material-import-file" type="file" accept=".xlsx,.xls,.csv" disabled={busy} onChange={(event) => choose(event.currentTarget.files?.length === 1 ? event.currentTarget.files[0] : null)} />
+      <p>支持 .xlsx、.xls 或 .csv，文件非空且不超过 10 MiB。客户端预检不代表文件安全或服务端必然接受。</p>
       {file ? <dl className="mi-file-facts"><div><dt>文件名</dt><dd>{preflight.filename}</dd></div><div><dt>大小</dt><dd>{file.size.toLocaleString()} 字节</dd></div><div><dt>MIME</dt><dd>{file.type || "浏览器未报告"}</dd></div></dl> : null}
       {preflight.errors.length ? <ul className="mi-issues" role="alert">{preflight.errors.map((item) => <li key={item}>{item}</li>)}</ul> : null}
       {hash.state === "HASHING" ? <div className="mi-progress" role="status" aria-live="polite"><progress max={hash.totalBytes} value={hash.processedBytes} /><span>SHA-256：{hash.processedBytes.toLocaleString()} / {hash.totalBytes.toLocaleString()} 字节（{percentage}%）</span></div> : null}

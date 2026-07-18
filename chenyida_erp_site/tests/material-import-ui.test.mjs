@@ -52,6 +52,11 @@ test("UI-023 空文件被拒绝", () => assert.ok(preflightImportFile(file({ siz
 test("UI-024 超过 10 MiB 被拒绝", () => assert.equal(preflightImportFile(file({ size: 10 * 1024 * 1024 + 1 })).ok, false));
 test("UI-025 非 xlsx csv 被拒绝", () => assert.equal(preflightImportFile(file({ name: "a.pdf", type: "application/pdf" })).sourceKind, null));
 test("UI-026 MIME 明显冲突不称安全", () => { const result = preflightImportFile(file({ type: "application/pdf" })); assert.equal(result.ok, false); assert.doesNotMatch(result.errors.join(""), /安全|病毒/); });
+test("UI-026A 旧式 XLS 文件进入 Excel 来源分类", () => {
+  const result = preflightImportFile(file({ name: "parts.xls", type: "application/vnd.ms-excel" }));
+  assert.equal(result.ok, true);
+  assert.equal(result.sourceKind, "XLSX");
+});
 test("UI-027 控制字符文件名被清理", () => assert.equal(safeImportFilename("../a\u0000<b>.csv"), "a_b_.csv"));
 test("UI-028 成功文案仅为客户端预检通过", () => { assert.match(createSource, /客户端预检通过/); assert.doesNotMatch(createSource, /病毒扫描通过|文件已经安全|内容已经合法/); });
 test("UI-029 Worker 按字节报告真实进度", () => assert.match(workerSource, /processedBytes: end, totalBytes: file\.size/));

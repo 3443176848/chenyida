@@ -141,7 +141,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: Exactly one .xlsx or .csv file; approved application limit is 10 MiB.
+                  description: Exactly one .xlsx, .xls, or .csv file; approved application limit is 10 MiB.
             encoding:
               file:
                 contentType: >-

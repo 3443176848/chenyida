@@ -16,6 +16,7 @@ import {
   MemoryMaterialImportSharedStringStore,
   parseMaterialImportXlsx,
 } from "../app/lib/material-import/xlsx-parser.ts";
+import { parseMaterialImportXls } from "../app/lib/material-import/xls-parser.ts";
 
 const HEADER_SAMPLE_ROWS = MATERIAL_IMPORT_HEADER_SCAN_ROWS;
 const HEADER_CANDIDATE_LIMIT = 3;
@@ -205,6 +206,7 @@ function fileStream(path) {
 
 function extensionWarnings(path, type) {
   const extension = extname(path).toLowerCase();
+  if (extension === ".xls") return ["XLS_LEGACY_BINARY"];
   if (type === "XLSX" && extension === ".csv") return ["XLSX_CONTENT_WITH_CSV_EXTENSION"];
   if ((type === "XLSX" && extension !== ".xlsx") || (type === "CSV" && extension !== ".csv")) {
     const error = new Error("文件扩展名与检测类型不一致");
@@ -263,6 +265,30 @@ export async function inspectMaterialFile(rawPath, options = {}) {
           mergedRanges: [],
           rows,
         }]),
+      },
+    };
+  }
+  if (extname(path).toLowerCase() === ".xls") {
+    const result = await parseMaterialImportXls(fileStream(path), collect);
+    return {
+      file,
+      excel: {
+        format: "XLS",
+        sheet_count: result.workbookSheetCount,
+        visible_sheet_count: result.visibleSheetCount,
+        hidden_sheet_count: result.hiddenSheetCount + result.veryHiddenSheetCount,
+        sheets: result.sheets.map((sheet) => ({
+          sheet_index: sheet.sheetIndex,
+          sheet_name: sheet.sheetName,
+          visibility: sheet.visibility,
+          row_count: sheet.rowCount,
+          column_count: sheet.sourceColumnMax,
+          header_candidates: sheet.visibility === "VISIBLE" ? candidatesFor(sampledRows.get(sheet.sheetIndex) ?? []) : [],
+          warning_codes: [...new Set(sheet.warnings.map((warning) => warning.code))],
+        })),
+        adaptive_structure: adaptiveSummary(result.sheets
+          .filter((sheet) => sheet.visibility === "VISIBLE")
+          .map((sheet) => ({ sheetIndex: sheet.sheetIndex, sheetName: sheet.sheetName, rowCount: sheet.rowCount, sourceColumnMax: sheet.sourceColumnMax, mergedRanges: sheet.mergedRanges, rows: sampledRows.get(sheet.sheetIndex) ?? [] }))),
       },
     };
   }

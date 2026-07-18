@@ -71,6 +71,16 @@ git -C chenyida_erp_site status --short
 | 其他基线 | PASS | build、lint 0 error/1 个既有 warning、隔离 API smoke、凭证扫描、Python self-test/smoke/go-live、`git diff --check` |
 | 生产影响 | NONE | 未提交附件、连接生产、上传、dry-run、创建 Draft、迁移或部署 |
 
+## Excel 文件格式兼容增强
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| `.xlsx` | 保持 | 继续使用既有有界 OOXML/ZIP 安全检查和解析器 |
+| `.xls` | 已接入 | 前端预检、服务端 OLE 安全边界、BIFF Sheet/单元格读取和现有 Raw Row/Mapping 链路 |
+| `.csv` | 保持 | 既有编码、分隔符和 CSV 安全检查不变 |
+| 兼容策略 | 已记录 | 批次 `source_kind`/文件 `detected_file_type` V1 分类保持 `XLSX`，`.xls` 通过 `filename_extension` 选择独立 BIFF 路径并写入 `XLS_LEGACY_BINARY` 警告 |
+| 生产影响 | NONE | 未连接生产资源、未迁移、未上传、未创建 Draft、未部署 |
+
 ## PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT 非生产实现
 
 | 验证项 | 结果 | 说明 |

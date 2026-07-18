@@ -4,6 +4,14 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-EXCEL-COMPAT - `feat: support legacy xls imports`
+
+- 文件格式：网页预检和上传安全检查新增 `.xls`；旧式 OLE/BIFF 工作簿进入独立解析路径，现有 `.xlsx` 继续使用 OOXML 解析器，`.csv` 行为不变。
+- 解析：新增有界 OLE Compound File/BIFF 读取器，支持可见/隐藏 Sheet、共享字符串、文本、数字、RK、布尔/错误、公式缓存、合并单元格和原始行哈希；加密/损坏/超限文件 fail-closed。
+- 链路：继续复用现有 Import Batch、File、Raw Rows、Mapping、Normalization、Review、Event/Audit 和 Draft 门禁；不新增第二套导入系统或数据库表。
+- UI/Inspect：文件选择器与本地 inspect 同时接受 `.xlsx/.xls/.csv`，`.xls` 保留 `XLS_LEGACY_BINARY` 安全证据；批次原有 `XLSX` 来源分类不变以保持迁移兼容。
+- 生产：仅修改本地代码，未连接生产 D1/R2/Queue，未上传、迁移、创建 Draft 或部署。
+
 ### PHASE3-MATERIAL-LIBRARY-REAL-SAMPLE-01 - `fix: adapt imports to real supplier BOMs`
 
 - Git Commit：`cea940a`。

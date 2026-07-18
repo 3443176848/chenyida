@@ -1,4 +1,5 @@
 import type { MaterialImportObjectStore } from "./object-store.ts";
+import { validateMaterialImportXlsContainer } from "./xls-parser.ts";
 
 const ZIP_MAX_ENTRIES = 2_048;
 const ZIP_MAX_CENTRAL_DIRECTORY_BYTES = 1024 * 1024;
@@ -24,7 +25,9 @@ function startsWith(bytes: Uint8Array, signature: readonly number[]): boolean {
 export function detectMaterialImportFileType(prefix: Uint8Array): MaterialImportDetectedType {
   if (startsWith(prefix, [0x50, 0x4b, 0x03, 0x04])) return "XLSX";
   if (startsWith(prefix, [0xd0, 0xcf, 0x11, 0xe0])) {
-    throw new MaterialImportFileSecurityError("IMPORT_FILE_TYPE_UNSUPPORTED", "不支持 XLS 或加密工作簿");
+    // Keep the existing workbook category in the V1 schema; the .xls extension
+    // selects the BIFF/OLE parser after the upload security check.
+    return "XLSX";
   }
   const forbidden: Array<readonly number[]> = [
     [0x4d, 0x5a], [0x7f, 0x45, 0x4c, 0x46], [0x25, 0x50, 0x44, 0x46],
@@ -83,8 +86,13 @@ function validateDeclaredMetadata(
   declaredMimeType: string,
 ): readonly string[] {
   const extension = filenameExtension.toLowerCase();
-  if (extension === ".xls" || extension === ".xlsm") {
-    throw new MaterialImportFileSecurityError("IMPORT_FILE_TYPE_UNSUPPORTED", "只允许 XLSX 或 CSV 文件");
+  if (extension === ".xlsm") {
+    throw new MaterialImportFileSecurityError("IMPORT_FILE_TYPE_UNSUPPORTED", "不支持 XLSM 宏工作簿");
+  }
+  if (extension === ".xls") {
+    const allowedLegacyMimes = new Set(["", "application/octet-stream", "application/vnd.ms-excel"]);
+    if (!allowedLegacyMimes.has(declaredMimeType)) throw new MaterialImportFileSecurityError("IMPORT_FILE_TYPE_UNSUPPORTED", "客户端 MIME 与 XLS 类型不一致");
+    return ["XLS_LEGACY_BINARY"];
   }
   const neutral = new Set(["", "application/octet-stream"]);
   if (type === "XLSX" && extension === ".csv") {
@@ -190,6 +198,15 @@ async function validateXlsx(store: MaterialImportObjectStore, key: string, size:
   }
 }
 
+async function validateXls(store: MaterialImportObjectStore, key: string, size: number): Promise<void> {
+  const bytes = await readBounded(store, key, { offset: 0, length: size }, Math.min(size, 10 * 1024 * 1024));
+  try { validateMaterialImportXlsContainer(bytes); }
+  catch (error) {
+    if (error instanceof MaterialImportFileSecurityError) throw error;
+    throw new MaterialImportFileSecurityError("IMPORT_FILE_SECURITY_CHECK_FAILED", error instanceof Error ? error.message : "XLS OLE 结构无效");
+  }
+}
+
 async function validateCsvEncoding(
   store: MaterialImportObjectStore,
   key: string,
@@ -265,7 +282,8 @@ export async function runMaterialImportBasicSecurityCheck(input: Readonly<{
   declaredMimeType: string;
 }>): Promise<Readonly<{ warningCodes: readonly string[] }>> {
   const warningCodes = validateDeclaredMetadata(input.detectedType, input.filenameExtension, input.declaredMimeType);
-  if (input.detectedType === "XLSX") await validateXlsx(input.store, input.objectKey, input.actualSizeBytes);
+  if (input.filenameExtension.toLowerCase() === ".xls") await validateXls(input.store, input.objectKey, input.actualSizeBytes);
+  else if (input.detectedType === "XLSX") await validateXlsx(input.store, input.objectKey, input.actualSizeBytes);
   else await validateCsv(input.store, input.objectKey);
   return { warningCodes };
 }

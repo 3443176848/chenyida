@@ -145,19 +145,21 @@ export type ImportFileLike = { name: string; size: number; type: string; lastMod
 export type ImportPreflight = { ok: boolean; filename: string; sourceKind: "XLSX" | "CSV" | null; errors: string[] };
 
 export function preflightImportFile(file: ImportFileLike | null): ImportPreflight {
-  if (!file) return { ok: false, filename: "", sourceKind: null, errors: ["请选择一个 .xlsx 或 .csv 文件"] };
+  if (!file) return { ok: false, filename: "", sourceKind: null, errors: ["请选择一个 .xlsx、.xls 或 .csv 文件"] };
   const filename = safeImportFilename(file.name);
-  const extension = filename.toLowerCase().endsWith(".xlsx") ? ".xlsx" : filename.toLowerCase().endsWith(".csv") ? ".csv" : "";
+  const extension = filename.toLowerCase().endsWith(".xlsx") ? ".xlsx" : filename.toLowerCase().endsWith(".xls") ? ".xls" : filename.toLowerCase().endsWith(".csv") ? ".csv" : "";
   const errors: string[] = [];
-  if (!extension) errors.push("仅支持 .xlsx 或 .csv 文件");
+  if (!extension) errors.push("仅支持 .xlsx、.xls 或 .csv 文件");
   if (!Number.isSafeInteger(file.size) || file.size <= 0) errors.push("文件不能为空");
   if (file.size > MATERIAL_IMPORT_MAX_BYTES) errors.push("文件不能超过 10 MiB");
   const mime = String(file.type || "").toLowerCase();
   const xlsxMimes = new Set(["", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream"]);
+  const xlsMimes = new Set(["", "application/vnd.ms-excel", "application/octet-stream"]);
   const csvMimes = new Set(["", "text/csv", "application/csv", "text/plain", "application/vnd.ms-excel", "application/octet-stream"]);
   if (extension === ".xlsx" && !xlsxMimes.has(mime)) errors.push("文件扩展名与浏览器报告的 MIME 类型明显不一致");
+  if (extension === ".xls" && !xlsMimes.has(mime)) errors.push("文件扩展名与浏览器报告的 MIME 类型明显不一致");
   if (extension === ".csv" && !csvMimes.has(mime)) errors.push("文件扩展名与浏览器报告的 MIME 类型明显不一致");
-  return { ok: errors.length === 0, filename, sourceKind: extension === ".xlsx" ? "XLSX" : extension === ".csv" ? "CSV" : null, errors };
+  return { ok: errors.length === 0, filename, sourceKind: extension === ".csv" ? "CSV" : extension ? "XLSX" : null, errors };
 }
 
 export function importFileIdentity(file: ImportFileLike): string {

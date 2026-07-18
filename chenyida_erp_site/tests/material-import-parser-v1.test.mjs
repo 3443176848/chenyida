@@ -6,6 +6,7 @@ import test from "node:test";
 import { TextReader, Uint8ArrayWriter, ZipWriter } from "@zip.js/zip.js";
 
 import { detectCsvDelimiter, parseMaterialImportCsv } from "../app/lib/material-import/csv-parser.ts";
+import { detectMaterialImportFileType } from "../app/lib/material-import/file-security.ts";
 import { MATERIAL_IMPORT_PARSER_LIMITS, MaterialImportParserError, columnIndex, columnReference, normalizeRawRow } from "../app/lib/material-import/parser-model.ts";
 import { MemoryMaterialImportSharedStringStore, parseMaterialImportXlsx } from "../app/lib/material-import/xlsx-parser.ts";
 
@@ -23,6 +24,10 @@ async function csv(text, chunkSize = 3) {
   const result = await parseMaterialImportCsv(chunks(text, chunkSize), async (row) => { rows.push(row); });
   return { result, rows };
 }
+
+test("legacy XLS OLE signature is recognized as an Excel workbook category", () => {
+  assert.equal(detectMaterialImportFileType(new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])), "XLSX");
+});
 
 async function workbook({ sheets, sharedStrings, styles, date1904 = false, externalRelationship = false, doctype = false }) {
   const output = new Uint8ArrayWriter();

@@ -19,6 +19,7 @@ import {
 } from "./parser-model.ts";
 import type { MaterialImportTask, MaterialImportTaskDisposition, MaterialImportTaskHandler } from "./task-scheduler.ts";
 import { parseMaterialImportXlsx, type MaterialImportSharedStringStore, type MaterialImportXlsxSheet } from "./xlsx-parser.ts";
+import { parseMaterialImportXls, type MaterialImportXlsSheet } from "./xls-parser.ts";
 import { MaterialImportMappingMetadataSnapshotService } from "./mapping-target-registry.ts";
 
 const LEASE_SECONDS = 120;
@@ -29,7 +30,7 @@ const RECORD_RETENTION_DAYS = 1_095;
 
 type ParserBatchRow = { id: number; status: string; source_kind: "CSV" | "XLSX"; created_by: string; current_version: number; current_parse_run_id: number | null };
 type ParserRunRow = { id: number; batch_id: number; run_status: string; attempt_no: number; lease_token_digest: string | null; lease_expires_at: number | null; mapping_preparation_status: string; parser_version: string };
-type ParserFileRow = { object_key: string; detected_file_type: "CSV" | "XLSX"; actual_sha256: string };
+type ParserFileRow = { object_key: string; filename_extension: string | null; detected_file_type: "CSV" | "XLSX"; actual_sha256: string };
 type SupplierProfileRow = { id: number; supplier_key: string; template_fingerprint: string; field_aliases_json: string; mapping_rules_json: string };
 
 export type QueueMaterialImportParseInput = Readonly<{
@@ -214,7 +215,7 @@ export class MaterialImportParserTaskHandler implements MaterialImportTaskHandle
       ]);
     }
     try {
-      const file = await this.#database.prepare("SELECT object_key,detected_file_type,actual_sha256 FROM material_import_files WHERE batch_id=? AND storage_status='STORED' AND security_check_status='BASIC_CHECK_PASSED'").bind(task.batchId).first<ParserFileRow>();
+      const file = await this.#database.prepare("SELECT object_key,filename_extension,detected_file_type,actual_sha256 FROM material_import_files WHERE batch_id=? AND storage_status='STORED' AND security_check_status='BASIC_CHECK_PASSED'").bind(task.batchId).first<ParserFileRow>();
       if (!file) throw new MaterialImportParserError("IMPORT_PARSE_FAILED", "解析源文件不可用", true);
       const source = await this.#objectStore.open(file.object_key);
       if (!source) throw new MaterialImportParserError("IMPORT_PARSE_FAILED", "解析源文件不可用", true);
@@ -224,7 +225,7 @@ export class MaterialImportParserTaskHandler implements MaterialImportTaskHandle
         const result = await this.#database.prepare("UPDATE material_import_parse_runs SET rows_written=?,heartbeat_at=?,lease_expires_at=?,updated_at=? WHERE id=? AND run_status='RUNNING' AND lease_token_digest=?").bind(rows, this.#clock().toISOString(), current + LEASE_SECONDS, this.#clock().toISOString(), task.parseRunId, leaseDigest).run();
         if ((result.meta?.changes ?? 0) !== 1) throw new MaterialImportParserError("IMPORT_PARSE_CANCELLED", "解析租约已失效");
       };
-      let sheets: readonly MaterialImportXlsxSheet[];
+      let sheets: readonly (MaterialImportXlsxSheet | MaterialImportXlsSheet)[];
       let parsedSheetCount: number;
       let normalizedJsonBytes: number;
       let decodedTextBytes: number;
@@ -233,6 +234,13 @@ export class MaterialImportParserTaskHandler implements MaterialImportTaskHandle
         const result = await parseMaterialImportCsv(source, (row) => writer.add(row), { onProgress: heartbeat });
         sheets = [{ sheetIndex: 0, sheetName: "__CSV__", visibility: "VISIBLE", status: "COMPLETED", rowCount: result.rowCount, sourceColumnMax: result.sourceColumnMax, mergedRanges: [], warnings: result.warnings }];
         parsedSheetCount = 1;
+        normalizedJsonBytes = result.normalizedJsonBytes;
+        decodedTextBytes = result.decodedTextBytes;
+        warningCount = result.warnings.length;
+      } else if (file.filename_extension?.toLowerCase() === ".xls") {
+        const result = await parseMaterialImportXls(source, (row) => writer.add(row), { onProgress: heartbeat });
+        sheets = result.sheets;
+        parsedSheetCount = result.parsedSheetCount;
         normalizedJsonBytes = result.normalizedJsonBytes;
         decodedTextBytes = result.decodedTextBytes;
         warningCount = result.warnings.length;
