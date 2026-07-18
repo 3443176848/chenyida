@@ -75,6 +75,13 @@ type PreparedDraft = {
   preview: Readonly<Record<string, unknown>>;
 };
 
+type GovernanceMatch<T> = Readonly<{
+  status: "EXACT" | "MATCHED" | "NEEDS_REVIEW" | "NOT_PROVIDED";
+  reason: "CODE" | "NAME" | "ALIAS" | "UNMATCHED" | "CONFLICT" | "NOT_PROVIDED";
+  value: T | null;
+  candidates: readonly T[];
+}>;
+
 type IdempotencyReservation =
   | { kind: "replay"; result: MaterialImportServiceResult }
   | {
@@ -180,44 +187,146 @@ async function listRows(
   return result.results ?? [];
 }
 
-async function resolveCategory(database: MaterialMasterD1Database, hint: string): Promise<number | null> {
-  if (!hint) return null;
+async function resolveCategory(
+  database: MaterialMasterD1Database,
+  hint: string,
+): Promise<GovernanceMatch<{ id: number; code: string; name: string }>> {
+  if (!hint) return { status: "NEEDS_REVIEW", reason: "UNMATCHED", value: null, candidates: [] };
   const result = await database.prepare(`
-    SELECT id
+    SELECT id,category_code code,category_name_cn name,
+      CASE
+        WHEN upper(category_code)=upper(?) THEN 'CODE'
+        WHEN category_name_cn=? OR lower(category_name_en)=lower(?) THEN 'NAME'
+        ELSE 'UNMATCHED'
+      END match_reason
     FROM material_categories
     WHERE status='ACTIVE' AND category_level=4
       AND (upper(category_code)=upper(?) OR category_name_cn=? OR category_name_en=?)
     ORDER BY CASE WHEN upper(category_code)=upper(?) THEN 0 ELSE 1 END,id
-    LIMIT 2
-  `).bind(hint, hint, hint, hint).all<{ id: number }>();
+    LIMIT 5
+  `).bind(hint, hint, hint, hint, hint, hint, hint).all<{
+    id: number; code: string; name: string; match_reason: "CODE" | "NAME" | "UNMATCHED";
+  }>();
   const rows = result.results ?? [];
-  return rows.length === 1 ? rows[0].id : null;
+  const exact = rows.filter((row) => row.match_reason === "CODE");
+  if (exact.length === 1) {
+    const value = { id: exact[0].id, code: exact[0].code, name: exact[0].name };
+    return { status: "EXACT", reason: "CODE", value, candidates: [value] };
+  }
+  if (rows.length === 1) {
+    const value = { id: rows[0].id, code: rows[0].code, name: rows[0].name };
+    return { status: "MATCHED", reason: "NAME", value, candidates: [value] };
+  }
+  if (rows.length > 1) {
+    return {
+      status: "NEEDS_REVIEW",
+      reason: "CONFLICT",
+      value: null,
+      candidates: rows.map((row) => ({ id: row.id, code: row.code, name: row.name })),
+    };
+  }
+  const suspected = await database.prepare(`
+    SELECT id,category_code code,category_name_cn name
+    FROM material_categories
+    WHERE status='ACTIVE' AND category_level=4
+      AND (
+        instr(category_name_cn,?)>0 OR instr(?,category_name_cn)>0
+        OR instr(lower(category_name_en),lower(?))>0
+        OR instr(lower(?),lower(category_name_en))>0
+      )
+    ORDER BY id
+    LIMIT 5
+  `).bind(hint, hint, hint, hint).all<{ id: number; code: string; name: string }>();
+  return {
+    status: "NEEDS_REVIEW",
+    reason: "UNMATCHED",
+    value: null,
+    candidates: suspected.results ?? [],
+  };
 }
 
-async function resolveUnit(database: MaterialMasterD1Database, value: string): Promise<{ id: number; code: string } | null> {
-  if (!value) return null;
-  return database.prepare(`
-    SELECT u.id,u.code
+async function resolveUnit(
+  database: MaterialMasterD1Database,
+  value: string,
+): Promise<GovernanceMatch<{ id: number; code: string }>> {
+  if (!value) return { status: "NEEDS_REVIEW", reason: "UNMATCHED", value: null, candidates: [] };
+  const rows = (await database.prepare(`
+    SELECT DISTINCT u.id,u.code,
+      CASE WHEN upper(u.code)=upper(?) THEN 'CODE' ELSE 'ALIAS' END match_reason
     FROM units u
     LEFT JOIN unit_aliases a ON a.unit_id=u.id
     WHERE u.enabled=1 AND (upper(u.code)=upper(?) OR a.normalized_alias=?)
     ORDER BY CASE WHEN upper(u.code)=upper(?) THEN 0 ELSE 1 END,u.id
-    LIMIT 1
-  `).bind(value, value.normalize("NFKC").trim().toLowerCase(), value).first<{ id: number; code: string }>();
+    LIMIT 5
+  `).bind(value, value, value.normalize("NFKC").trim().toLowerCase(), value).all<{
+    id: number; code: string; match_reason: "CODE" | "ALIAS";
+  }>()).results ?? [];
+  const unique = [...new Map(rows.map((row) => [row.id, row])).values()];
+  if (unique.length === 1) {
+    const reason = unique[0].match_reason;
+    const matched = { id: unique[0].id, code: unique[0].code };
+    return {
+      status: reason === "CODE" ? "EXACT" : "MATCHED",
+      reason,
+      value: matched,
+      candidates: [matched],
+    };
+  }
+  return {
+    status: "NEEDS_REVIEW",
+    reason: unique.length ? "CONFLICT" : "UNMATCHED",
+    value: null,
+    candidates: unique.map((row) => ({ id: row.id, code: row.code })),
+  };
 }
 
-async function resolveBrand(database: MaterialMasterD1Database, value: string): Promise<{ id: number; standard_name: string } | null> {
-  if (!value) return null;
+async function resolveBrand(
+  database: MaterialMasterD1Database,
+  value: string,
+): Promise<GovernanceMatch<{ id: number; code: string; standard_name: string }>> {
+  if (!value) return { status: "NOT_PROVIDED", reason: "NOT_PROVIDED", value: null, candidates: [] };
   const normalized = normalizedKey(value);
-  return database.prepare(`
-    SELECT b.id,b.standard_name
+  const rows = (await database.prepare(`
+    SELECT DISTINCT b.id,b.code,b.standard_name,
+      CASE
+        WHEN upper(b.code)=? THEN 'CODE'
+        WHEN b.normalized_name=? THEN 'NAME'
+        ELSE 'ALIAS'
+      END match_reason
     FROM brands b
     LEFT JOIN brand_aliases a ON a.brand_id=b.id
     WHERE b.enabled=1
       AND (upper(b.code)=? OR b.normalized_name=? OR a.normalized_alias=?)
     ORDER BY CASE WHEN upper(b.code)=? THEN 0 WHEN b.normalized_name=? THEN 1 ELSE 2 END,b.id
-    LIMIT 1
-  `).bind(normalized, normalized, normalized, normalized, normalized).first<{ id: number; standard_name: string }>();
+    LIMIT 5
+  `).bind(normalized, normalized, normalized, normalized, normalized, normalized, normalized).all<{
+    id: number; code: string; standard_name: string; match_reason: "CODE" | "NAME" | "ALIAS";
+  }>()).results ?? [];
+  const unique = [...new Map(rows.map((row) => [row.id, row])).values()];
+  if (unique.length === 1) {
+    const reason = unique[0].match_reason;
+    const matched = {
+      id: unique[0].id,
+      code: unique[0].code,
+      standard_name: unique[0].standard_name,
+    };
+    return {
+      status: reason === "CODE" ? "EXACT" : "MATCHED",
+      reason,
+      value: matched,
+      candidates: [matched],
+    };
+  }
+  return {
+    status: "NEEDS_REVIEW",
+    reason: unique.length ? "CONFLICT" : "UNMATCHED",
+    value: null,
+    candidates: unique.map((row) => ({
+      id: row.id,
+      code: row.code,
+      standard_name: row.standard_name,
+    })),
+  };
 }
 
 function attributeInput(payload: Record<string, unknown>): Record<string, MaterialAttributeInput> {
@@ -383,13 +492,14 @@ async function prepareDraft(
   const rawUnit = stringCandidate(basic, "unit");
   const rawBrand = stringCandidate(basic, "brand");
   const categoryHint = stringCandidate(payload.category_hint);
-  const categoryId = await resolveCategory(database, categoryHint);
+  const categoryMatch = await resolveCategory(database, categoryHint);
   const unit = await resolveUnit(database, rawUnit);
   const brand = await resolveBrand(database, rawBrand);
+  const categoryId = categoryMatch.value?.id ?? null;
   if (!standardName) issues.push(issue("MATERIAL_STANDARD_NAME_REQUIRED", "basic.STANDARD_NAME", "标准名称不能为空"));
   if (!categoryId) issues.push(issue("IMPORT_CATEGORY_LEAF_REQUIRED", "category_hint.CATEGORY_HINT", "分类提示必须唯一命中启用的四级分类"));
-  if (!unit) issues.push(issue("IMPORT_UNIT_NOT_STANDARDIZED", "basic.UNIT", "基础单位必须命中启用的标准单位或别名"));
-  if (rawBrand && !brand) issues.push(issue("IMPORT_BRAND_NOT_STANDARDIZED", "basic.BRAND", "非空品牌必须命中启用的品牌或别名"));
+  if (!unit.value) issues.push(issue("IMPORT_UNIT_NOT_STANDARDIZED", "basic.UNIT", "基础单位必须命中启用的标准单位或别名"));
+  if (rawBrand && !brand.value) issues.push(issue("IMPORT_BRAND_NOT_STANDARDIZED", "basic.BRAND", "非空品牌必须命中启用的品牌或别名"));
 
   const requiredEnums = [
     ["purchase_type", "PURCHASE_TYPE"],
@@ -406,7 +516,7 @@ async function prepareDraft(
       createD1MaterialValidationRepository(database),
     ).validateForCreate({
       category_id: categoryId,
-      basic_fields: { standard_name: standardName, unit: unit?.code ?? rawUnit, source_type: "MATERIAL_IMPORT" },
+      basic_fields: { standard_name: standardName, unit: unit.value?.code ?? rawUnit, source_type: "MATERIAL_IMPORT" },
       attributes,
     });
     issues.push(...validation.errors.map((item: ValidationIssue) => issue(item.code, item.field, item.message)));
@@ -421,33 +531,48 @@ async function prepareDraft(
   const candidates = categoryId ? await scanDuplicateCandidates(database, {
     categoryId,
     name: standardName,
-    brand: brand?.standard_name ?? rawBrand,
+    brand: brand.value?.standard_name ?? rawBrand,
     manufacturer,
     manufacturerPartNumber,
     model,
     specification,
     supplierPartNumber,
   }) : [];
+  const blockingDuplicate = candidates.find((candidate) =>
+    candidate.matchLevel === "EXACT" || candidate.matchLevel === "HIGH_CONFIDENCE",
+  );
+  if (blockingDuplicate) {
+    issues.push(issue(
+      blockingDuplicate.matchLevel === "EXACT"
+        ? "IMPORT_DUPLICATE_EXACT_BLOCKED"
+        : "IMPORT_DUPLICATE_CONFIRMATION_REQUIRED",
+      "duplicate_candidates",
+      blockingDuplicate.matchLevel === "EXACT"
+        ? "发现完全重复候选，禁止创建草稿"
+        : "发现高置信重复候选，必须先完成人工确认",
+    ));
+  }
   const preview = {
     normalized_row_id: row.id,
     source_sheet_index: row.source_sheet_index,
     source_row_number: row.source_row_number,
-    category_hint: categoryHint,
+    source_row_status: row.row_status,
+    category: categoryMatch,
     category_id: categoryId,
     standard_name: standardName,
-    base_unit: unit ? { id: unit.id, code: unit.code } : null,
-    brand: brand ? { id: brand.id, standard_name: brand.standard_name } : rawBrand || null,
+    base_unit: unit,
+    brand,
     duplicate_candidates: candidates,
   };
-  if (issues.length || !categoryId || !unit) return { command: null, issues, candidates, preview };
+  if (issues.length || !categoryId || !unit.value) return { command: null, issues, candidates, preview };
   const sourceRef = `material-import:${context.batch_id}:${context.file_id}:${row.source_sheet_index}:${row.source_row_number}:normalization:${context.normalization_run_id}`;
   return {
     command: {
       basic_fields: {
         category_id: categoryId,
         standard_name: standardName,
-        unit: unit.code,
-        brand: brand?.standard_name ?? "",
+        unit: unit.value.code,
+        brand: brand.value?.standard_name ?? "",
         manufacturer,
         manufacturer_part_number: manufacturerPartNumber,
         procurement_type: stringCandidate(basic, "purchase_type"),
@@ -469,8 +594,8 @@ async function prepareDraft(
           sourceRowId: row.source_row_id,
           normalizedRowId: row.id,
           normalizationApprovalId: context.approval_id!,
-          baseUnitId: unit.id,
-          brandId: brand?.id ?? null,
+          baseUnitId: unit.value.id,
+          brandId: brand.value?.id ?? null,
           duplicateCandidates: candidates,
         },
       },

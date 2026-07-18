@@ -13,7 +13,7 @@
     "test:environment": "node --test tests/environment-guard.test.mjs",
     "test:api": "node scripts/run-api-smoke.mjs",
     "test:material-query-plan": "node scripts/material-query-plan.mjs",
-    "material-library:import": "node scripts/material-library-import.mjs",
+    "material-library:import": "node --experimental-strip-types scripts/material-library-import.mjs",
     "seed:material-categories": "node --experimental-strip-types scripts/seed-material-categories.ts",
     "security:credentials": "node scripts/check-credentials.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",

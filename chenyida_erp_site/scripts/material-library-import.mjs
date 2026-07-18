@@ -1,8 +1,12 @@
+import { inspectMaterialFile } from "./material-file-inspector.mjs";
+
 const COMMANDS = new Set(["inspect", "dry-run", "commit", "report"]);
 
 function usage(message, exitCode = 2) {
   if (message) process.stderr.write(`${message}\n`);
-  process.stderr.write("用法: npm run material-library:import -- <inspect|dry-run|commit|report> --api-base http://127.0.0.1:3000 --batch-id <id> [--accept-warnings]\n");
+  process.stderr.write("用法:\n");
+  process.stderr.write("  npm run material-library:import -- inspect --file <本地.xlsx|.csv>\n");
+  process.stderr.write("  npm run material-library:import -- <inspect|dry-run|commit|report> --api-base http://127.0.0.1:3000 --batch-id <id> [--accept-warnings]\n");
   process.exitCode = exitCode;
 }
 
@@ -75,15 +79,57 @@ function print(value) {
 
 async function pagedRead(base, batchId, mode, cursorName) {
   let cursor = 0;
+  const summary = mode === "dry-run"
+    ? {
+        total_rows: 0,
+        success_rows: 0,
+        error_rows: 0,
+        warning_rows: 0,
+        duplicate_rows: 0,
+        needs_review_rows: 0,
+        category: { exact: 0, matched: 0, needs_review: 0 },
+        unit: { exact: 0, matched: 0, needs_review: 0, conflicts: 0, unmatched: 0 },
+        brand: { exact: 0, matched: 0, needs_review: 0, conflicts: 0, new_candidates: 0, not_provided: 0 },
+        duplicates: { exact: 0, high_confidence: 0, possible: 0 },
+      }
+    : { draft_count: 0, duplicate_rows: 0 };
   do {
     const url = new URL(`${base}/api/material-master/import-batches/${batchId}/draft-generation`);
     url.searchParams.set("mode", mode);
     url.searchParams.set("limit", "50");
     if (cursor) url.searchParams.set(cursorName, String(cursor));
     const payload = await request(url, { headers: headers() });
-    print(payload);
+    for (const item of payload.items ?? []) {
+      if (mode === "dry-run") {
+        summary.total_rows += 1;
+        if (item.ready) summary.success_rows += 1;
+        else summary.needs_review_rows += 1;
+        if ((item.issues ?? []).length) summary.error_rows += 1;
+        if (item.source_row_status === "WARNING") summary.warning_rows += 1;
+        if ((item.duplicate_candidates ?? []).length) summary.duplicate_rows += 1;
+        const categoryStatus = String(item.category?.status ?? "").toLowerCase();
+        if (categoryStatus in summary.category) summary.category[categoryStatus] += 1;
+        const unitStatus = String(item.base_unit?.status ?? "").toLowerCase();
+        if (unitStatus in summary.unit) summary.unit[unitStatus] += 1;
+        if (item.base_unit?.reason === "CONFLICT") summary.unit.conflicts += 1;
+        if (item.base_unit?.reason === "UNMATCHED") summary.unit.unmatched += 1;
+        const brandStatus = String(item.brand?.status ?? "").toLowerCase();
+        if (brandStatus in summary.brand) summary.brand[brandStatus] += 1;
+        if (item.brand?.reason === "CONFLICT") summary.brand.conflicts += 1;
+        if (item.brand?.reason === "UNMATCHED") summary.brand.new_candidates += 1;
+        for (const duplicate of item.duplicate_candidates ?? []) {
+          if (duplicate.matchLevel === "EXACT") summary.duplicates.exact += 1;
+          else if (duplicate.matchLevel === "HIGH_CONFIDENCE") summary.duplicates.high_confidence += 1;
+          else if (duplicate.matchLevel === "POSSIBLE") summary.duplicates.possible += 1;
+        }
+      } else {
+        summary.draft_count += 1;
+        if (Number(item.duplicate_candidate_count ?? 0) > 0) summary.duplicate_rows += 1;
+      }
+    }
     cursor = Number(payload[mode === "dry-run" ? "next_after_row_id" : "next_after_link_id"] ?? 0);
   } while (cursor);
+  print({ batch_id: batchId, mode: mode === "dry-run" ? "DRY_RUN_SUMMARY" : "DRAFT_REPORT_SUMMARY", summary });
 }
 
 async function main() {
@@ -91,6 +137,11 @@ async function main() {
   if (argv.length === 1 && ["--help", "-h"].includes(argv[0])) return usage("", 0);
   const options = argumentsFrom(argv);
   if (!options) return usage("参数无效");
+  if (options.command === "inspect" && options.file) {
+    if (options["api-base"] || options["batch-id"]) throw new Error("--file 不能与 --api-base/--batch-id 混用");
+    print(await inspectMaterialFile(options.file));
+    return;
+  }
   const base = localApiBase(options["api-base"]);
   const batchId = positiveInteger(options["batch-id"], "--batch-id");
   if (options.command === "inspect") {

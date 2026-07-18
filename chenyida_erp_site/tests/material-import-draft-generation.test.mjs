@@ -126,6 +126,17 @@ async function fixture() {
   return { mf, DB };
 }
 
+async function updateCurrentNormalizedPayload(DB, mutate) {
+  const row = await DB.prepare(
+    "SELECT id,normalized_payload_json FROM material_import_normalized_rows WHERE normalization_run_id=(SELECT current_normalization_run_id FROM material_import_batches WHERE id=1)",
+  ).first();
+  const payload = JSON.parse(row.normalized_payload_json);
+  mutate(payload);
+  await DB.prepare(
+    "UPDATE material_import_normalized_rows SET normalized_payload_json=? WHERE id=?",
+  ).bind(JSON.stringify(payload), row.id).run();
+}
+
 test("approved normalization creates a traceable DRAFT and persists duplicate candidates", { timeout: 30_000 }, async () => {
   const context = await fixture();
   try {
@@ -133,6 +144,9 @@ test("approved normalization creates a traceable DRAFT and persists duplicate ca
     assert.equal(inspect.payload.approval, null);
     const dryRun = await dryRunMaterialImportDraftGeneration(context.DB, { batchId: 1, username: "owner", canReadAny: false, requestId: "dry-run" });
     assert.equal(dryRun.payload.items[0].ready, true, JSON.stringify(dryRun.payload.items[0]));
+    assert.equal(dryRun.payload.items[0].category.status, "EXACT");
+    assert.equal(dryRun.payload.items[0].base_unit.status, "EXACT");
+    assert.equal(dryRun.payload.items[0].brand.status, "NOT_PROVIDED");
     assert.equal(dryRun.payload.items[0].duplicate_candidates[0].matchLevel, "POSSIBLE");
 
     await assert.rejects(
@@ -181,6 +195,149 @@ test("approved normalization creates a traceable DRAFT and persists duplicate ca
     const report = await reportMaterialImportDraftGeneration(context.DB, { batchId: 1, username: "owner", canReadAny: false });
     assert.equal(report.payload.items[0].material_status, "DRAFT");
     assert.equal(report.payload.items[0].source_import_row_id, 1);
+  } finally {
+    await context.mf.dispose();
+  }
+});
+
+test("EXACT duplicate candidates block dry-run and cannot create a DRAFT", { timeout: 30_000 }, async () => {
+  const context = await fixture();
+  try {
+    await updateCurrentNormalizedPayload(context.DB, (payload) => {
+      payload.basic.manufacturer = {
+        target_code: "basic.MANUFACTURER",
+        source: { kind: "DEFAULT_VALUE", value_state: "PRESENT", raw_value: "ACME" },
+        candidate: "ACME",
+        status: "VALID",
+      };
+      payload.basic.manufacturer_part_number = {
+        target_code: "basic.MANUFACTURER_PART_NUMBER",
+        source: { kind: "DEFAULT_VALUE", value_state: "PRESENT", raw_value: "MPN-1" },
+        candidate: "MPN-1",
+        status: "VALID",
+      };
+    });
+    await context.DB.prepare(
+      "UPDATE material_master SET manufacturer='ACME',manufacturer_part_number='MPN-1' WHERE id=10",
+    ).run();
+
+    const inspected = await inspectMaterialImportDraftGeneration(context.DB, {
+      batchId: 1,
+      username: "owner",
+      canReadAny: false,
+    });
+    const dryRun = await dryRunMaterialImportDraftGeneration(context.DB, {
+      batchId: 1,
+      username: "owner",
+      canReadAny: false,
+      requestId: "dry-run-exact",
+    });
+    assert.equal(dryRun.payload.items[0].ready, false);
+    assert.equal(dryRun.payload.items[0].duplicate_candidates[0].matchLevel, "EXACT");
+    assert.equal(
+      dryRun.payload.items[0].issues.some((issue) => issue.code === "IMPORT_DUPLICATE_EXACT_BLOCKED"),
+      true,
+    );
+
+    await approveMaterialImportNormalization(context.DB, {
+      batchId: 1,
+      username: "owner",
+      canReadAny: false,
+      canCommit: true,
+      expectedVersion: inspected.payload.current_version,
+      resultDigest: inspected.payload.result_digest,
+      acceptWarnings: false,
+      rawKey: "owner-approval-exact-duplicate",
+      requestId: "approve-exact",
+      clock: () => new Date(fixedNow),
+    });
+    const committed = await commitMaterialImportDraftGeneration(context.DB, {
+      batchId: 1,
+      username: "owner",
+      canReadAny: false,
+      canCommit: true,
+      expectedVersion: inspected.payload.current_version,
+      rawKey: "owner-commit-exact-duplicate",
+      requestId: "commit-exact",
+      clock: () => new Date(fixedNow),
+    });
+    assert.equal(committed.payload.items[0].status, "BLOCKED");
+    assert.equal(
+      (await context.DB.prepare("SELECT COUNT(*) count FROM material_import_draft_links").first()).count,
+      0,
+    );
+  } finally {
+    await context.mf.dispose();
+  }
+});
+
+test("HIGH_CONFIDENCE duplicate candidates require review and block DRAFT creation", { timeout: 30_000 }, async () => {
+  const context = await fixture();
+  try {
+    await updateCurrentNormalizedPayload(context.DB, (payload) => {
+      payload.basic.manufacturer = {
+        target_code: "basic.MANUFACTURER",
+        source: { kind: "DEFAULT_VALUE", value_state: "PRESENT", raw_value: "OTHER" },
+        candidate: "OTHER",
+        status: "VALID",
+      };
+      payload.basic.manufacturer_part_number = {
+        target_code: "basic.MANUFACTURER_PART_NUMBER",
+        source: { kind: "DEFAULT_VALUE", value_state: "PRESENT", raw_value: "MPN-2" },
+        candidate: "MPN-2",
+        status: "VALID",
+      };
+    });
+    await context.DB.prepare(
+      "UPDATE material_master SET manufacturer='ACME',manufacturer_part_number='MPN-2' WHERE id=10",
+    ).run();
+    const dryRun = await dryRunMaterialImportDraftGeneration(context.DB, {
+      batchId: 1,
+      username: "owner",
+      canReadAny: false,
+      requestId: "dry-run-high",
+    });
+    assert.equal(dryRun.payload.items[0].ready, false);
+    assert.equal(dryRun.payload.items[0].duplicate_candidates[0].matchLevel, "HIGH_CONFIDENCE");
+    assert.equal(
+      dryRun.payload.items[0].issues.some((issue) => issue.code === "IMPORT_DUPLICATE_CONFIRMATION_REQUIRED"),
+      true,
+    );
+  } finally {
+    await context.mf.dispose();
+  }
+});
+
+test("category names, unit aliases and brand aliases are governed without creating metadata", { timeout: 30_000 }, async () => {
+  const context = await fixture();
+  try {
+    await context.DB.batch([
+      context.DB.prepare("INSERT INTO brands(id,code,standard_name,normalized_name,enabled) VALUES(1,'SCHNEIDER','施耐德','施耐德',1)"),
+      context.DB.prepare("INSERT INTO brand_aliases(brand_id,alias,normalized_alias) VALUES(1,'Schneider Electric','SCHNEIDER ELECTRIC')"),
+    ]);
+    await updateCurrentNormalizedPayload(context.DB, (payload) => {
+      payload.category_hint.candidate = "普通电阻";
+      payload.basic.unit.candidate = "个";
+      payload.basic.brand = {
+        target_code: "basic.BRAND",
+        source: { kind: "DEFAULT_VALUE", value_state: "PRESENT", raw_value: "Schneider Electric" },
+        candidate: "Schneider Electric",
+        status: "VALID",
+      };
+    });
+    const dryRun = await dryRunMaterialImportDraftGeneration(context.DB, {
+      batchId: 1,
+      username: "owner",
+      canReadAny: false,
+      requestId: "dry-run-governance",
+    });
+    assert.equal(dryRun.payload.items[0].category.status, "MATCHED");
+    assert.equal(dryRun.payload.items[0].base_unit.status, "MATCHED");
+    assert.equal(dryRun.payload.items[0].brand.status, "MATCHED");
+    assert.equal(dryRun.payload.items[0].brand.reason, "ALIAS");
+    assert.equal(dryRun.payload.items[0].ready, true, JSON.stringify(dryRun.payload.items[0]));
+    assert.equal((await context.DB.prepare("SELECT COUNT(*) count FROM brands").first()).count, 1);
+    assert.equal((await context.DB.prepare("SELECT COUNT(*) count FROM units").first()).count, 5);
   } finally {
     await context.mf.dispose();
   }
