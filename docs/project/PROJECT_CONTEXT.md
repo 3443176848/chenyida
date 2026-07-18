@@ -25,6 +25,7 @@
 - 历史在线生产：Sites `v3`，公开地址 `https://chenyida-erp-online.sjin74376.chatgpt.site`；不作为后续新功能默认交付目标。
 
 - 公网验证地址：`http://43.135.157.211:18888`；仅用于本次验证，长期公网运行仍需 HTTPS 和访问控制。
+- 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
 
 ### 治理资料

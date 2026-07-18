@@ -30,6 +30,14 @@
 
 ## 启动方式
 
+服务器开发环境使用仓库内的 `deployment/chenyida-erp.service`，当前监听 `0.0.0.0:18888`，支持开机自启和异常自动重启：
+
+```bash
+systemctl status chenyida-erp.service
+systemctl restart chenyida-erp.service
+journalctl -u chenyida-erp.service -n 100 --no-pager
+```
+
 推荐使用前台启动脚本：
 
 ```powershell

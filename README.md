@@ -50,6 +50,22 @@ npm run security:credentials
 
 ## 快速启动
 
+当前开发服务器使用 systemd 常驻，公网地址：
+
+```text
+http://43.135.157.211:18888
+```
+
+服务管理：
+
+```bash
+systemctl status chenyida-erp.service
+systemctl restart chenyida-erp.service
+journalctl -u chenyida-erp.service -n 100 --no-pager
+```
+
+Windows 本地运行仍可使用：
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File D:\erp\chenyida_erp_app\start_server.ps1
 ```

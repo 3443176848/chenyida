@@ -10,6 +10,7 @@
 - 范围：只验证健康接口和网页可达性；不配置域名、TLS、反向代理或其他端口，不输出凭证。
 - 前置：项目负责人提供公网 IP 及 TCP 18888 IPv4/IPv6 入站允许规则截图。
 - 结果：本机与 `43.135.157.211:18888/api/health` 均返回 HTTP 200，登录页返回 HTTP 200；发现登录页预填默认密码，验证后立即停止公网进程并移除页面预填凭证。
+- 常驻：项目负责人随后确认开发阶段保持常开；新增并安装 `chenyida-erp.service`，systemd `enabled/active`，开机自启且异常自动重启。
 
 ### PHASE3-MATERIAL-LIBRARY-SERVER-RUNTIME - `chore: switch local server delivery runtime`
 

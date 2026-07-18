@@ -1,0 +1,25 @@
+[Unit]
+Description=ChenYida ERP development server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/erp
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/erp/chenyida_erp_app/server.py --host 0.0.0.0 --port 18888 --log-file /opt/erp/chenyida_erp_app/data/server.log
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/erp/chenyida_erp_app/data
+
+[Install]
+WantedBy=multi-user.target
