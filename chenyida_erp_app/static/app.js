@@ -105,7 +105,31 @@ function renderSpecParts(parts) {
   `;
 }
 
+function parseJsonArray(value) {
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function renderRawModelAndSpecification(row) {
+  return `
+    <div class="raw-specification">
+      <span><b>型号</b>${escapeHtml(row.raw_model || "未提供")}</span>
+      <span><b>MPN</b>${escapeHtml(row.raw_mpn || "未提供")}</span>
+      <span><b>原始详细规格</b>${escapeHtml(row.raw_spec || "未识别")}</span>
+    </div>
+  `;
+}
+
 function sourceSpecParts(row) {
+  const tokens = parseJsonArray(row.source_spec_tokens_json);
+  if (tokens.length) {
+    return tokens.map((token) => [token.label || token.kind, token.value || token.normalized]);
+  }
   return [
     ["品类", row.parsed_category],
     ["封装", row.parsed_package],
@@ -119,6 +143,10 @@ function sourceSpecParts(row) {
 }
 
 function candidateSpecParts(row) {
+  const tokens = parseJsonArray(row.candidate_spec_tokens_json);
+  if (tokens.length) {
+    return tokens.map((token) => [token.label || token.kind, token.value || token.normalized]);
+  }
   const item = state.items.find(
     (entry) => String(entry.internal_item_code) === String(row.candidate_internal_code),
   );
@@ -909,8 +937,11 @@ function renderCleaning() {
         <td>${escapeHtml(row.supplier_name)}</td>
         <td>${escapeHtml(row.raw_item_name)}</td>
         <td>${escapeHtml(row.raw_item_code)}</td>
-        <td>${escapeHtml(row.raw_model || row.raw_spec)}</td>
-        <td>${renderSpecParts(sourceSpecParts(row))}</td>
+        <td>${renderRawModelAndSpecification(row)}</td>
+        <td>
+          ${row.specification_source ? `<div class="spec-source">规格来源：${escapeHtml(row.specification_source)}</div>` : ""}
+          ${renderSpecParts(sourceSpecParts(row))}
+        </td>
         <td>${escapeHtml(row.purchase_uom)}</td>
         <td>${escapeHtml(row.source_sheet_name ? `${row.source_sheet_name} #${row.source_row_number || ""}` : "")}</td>
         <td>${escapeHtml(row.mapping_status)}</td>
@@ -935,7 +966,7 @@ function renderCleaning() {
   }).join("");
   $("#cleaningTable").innerHTML = `
     <thead><tr>
-      <th>ID</th><th>批次</th><th>供应商</th><th>原始名称</th><th>供应商料号</th><th>原始型号/规格</th><th>来源分项规格</th>
+      <th>ID</th><th>批次</th><th>供应商</th><th>原始名称</th><th>供应商料号</th><th>型号与原始详细规格</th><th>来源详细规格</th>
       <th>单位</th><th>来源行</th><th>映射状态</th><th>规格置信度</th><th>审核状态</th>
       <th>解析品类</th><th>候选编码</th><th>候选名称</th><th>候选内部规格</th><th>匹配</th><th>置信度</th><th>责任</th><th>状态</th><th>操作</th>
     </tr></thead>

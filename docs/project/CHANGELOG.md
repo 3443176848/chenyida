@@ -4,6 +4,16 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-GENERAL-SPEC-MATCH-01 - `feat: match generalized specification tokens`
+
+- 来源识别：在明确规格、多列组合、描述和物料名称中按确定性参数丰富度选择详细规格，保存完整 raw spec、来源列、置信度和证据；型号/MPN 继续独立保存。
+- Matcher：新增通用类型化 token，覆盖品类、封装、容量、阻值、电感值、电流、电压、功率、频率、百分比/绝对误差、介质/材质和尺寸；量纲归一后按集合比较，参数顺序不影响相似度。
+- 边界：同类型冲突排除，缺项降低置信度；MPN/品牌只作为独立标识证据，不进入通用规格分数，也不能代替详细规格。名称仍不参与编号评分，AI 不补造参数。
+- 数据库：新增本地 `0004_cleaning_general_spec_tokens`，只扩展既有 Cleaning 的来源、来源/候选 token 和匹配证据 JSON；旧行不回填、不重算。
+- 审核 UI：同时显示型号/MPN、完整原始详细规格、规格来源、来源逐项参数和候选内部参数，不再用型号覆盖原始规格。
+- 建档：人工确认的新内部物料在 `value_spec` 保留完整详细规格，结构化列作为附加投影，不丢弃尚无独立列的电流或绝对误差参数。
+- 验证与部署：联合单元 48/48、self-test、smoke、go-live 通过；备份和迁移后完整性 `ok`，9 条物料、444 条 Cleaning、16 个 Batch 和 3037 条 Raw Rows 未改变；systemd active/enabled，公网 HTTP 200。
+
 ### PHASE3-MATERIAL-LIBRARY-REVIEW-SPEC-DISPLAY-01 - `feat: show structured specification comparison`
 
 - 审核 UI：新增“来源分项规格”和“候选内部规格”，按品类、封装、容量/阻值、耐压、误差、介质/材质、型号/MPN、品牌逐项展示；内部缺项显示“未维护”。

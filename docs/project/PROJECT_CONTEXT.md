@@ -39,7 +39,7 @@
 
 ### 本地 SQLite
 
-- 29 张业务/迁移表；历史 26 张表仍由 `server.py` 建立，Excel 导入新增表从 `0001_material_import_source_lineage.sql` 起使用版本化迁移，当前已应用到 `0003_cleaning_structured_specification.sql`。
+- 29 张业务/迁移表；历史 26 张表仍由 `server.py` 建立，Excel 导入新增表从 `0001_material_import_source_lineage.sql` 起使用版本化迁移，当前已应用到 `0004_cleaning_general_spec_tokens.sql`。
 - 覆盖用户、会话、物料、映射、清洗、客户、供应商、产品、BOM、采购、库存、生产、销售、品质、财务和活动日志。
 - 已增加 `local_schema_migrations`、`material_import_batches`、`material_import_raw_rows` 及来源外键/索引；`0002` 为批次增加完整原文件归档 key、大小和 warning。历史表的迁移基线与外键治理仍待逐步补齐。
 
@@ -81,6 +81,8 @@
 - 1928C/G20/J587 已完成规格兼容：三文件隔离产生 221 条 Cleaning、216 条有规格；名称不参与编号评分，结构化规格完整且唯一才自动确认内部编号，部分唯一候选保持疑似，歧义不随机给号。
 - 1928C 进一步改为逐属性规格匹配：型号、描述、MPN 分开作为证据，提取品类/封装/值/耐压/误差/介质后逐项比较；当前 25 条旧 Cleaning 不回填，重导后生效。
 - 清洗审核现同时展示来源与候选内部物料的八项规格，空字段标为未维护；富规格描述进入 raw spec、厂商型号进入 raw model，介质未覆盖的疑似候选置信度不再为 1.0。
+- 通用规格匹配已部署：Parser 从明确规格、多列组合、描述或名称中选择参数更完整的来源并保存列名；Matcher 把品类、封装、容量/阻值/电感值、电流、电压、功率、频率、误差、材质和尺寸归一为无序参数集合。MPN/品牌独立展示，不进入通用规格分数。
+- 当前 444 条既有 Cleaning 保留且不回填通用 token；项目负责人清空并重导后，新行才显示 `specification_source`、来源/候选 token 和逐项匹配证据。
 - Material Draft/Review POST 已具备同源/CSRF、持久幂等和限速；其他 legacy POST 的 CSRF 与限速仍需专项治理。测试环境已有本机一次性 D1，尚无远程 Test D1。
 - Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现，但生产 Site 仍为旧版本。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
@@ -97,7 +99,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import，以及 Phase 3 Normalization、内部物料库、多供应商识别和服务器本地 Excel 接入。清洗排序、安全清空、规格唯一编号匹配、1928C 分项规格匹配和审核对照已部署；下一步按来源/候选分项规格审核，对缺项和新规格人工处置。
+当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import，以及 Phase 3 Normalization、内部物料库、多供应商识别和服务器本地 Excel 接入。清洗排序、安全清空、规格唯一编号匹配、通用规格来源识别、无序参数匹配和审核对照已部署；下一步由项目负责人清空旧 Cleaning、重新导入样本并验收来源列及匹配结果。
 
 ## 恢复上下文检查清单
 

@@ -66,6 +66,17 @@ class SpecificationMatchTest(unittest.TestCase):
             """
             INSERT INTO items (
                 internal_item_code, item_category, standard_name, package,
+                value_spec, mpn
+            ) VALUES (
+                '9', 'IND', '贴片功率电感', '0201',
+                '2.2nH ±0.1nH 600mA', 'TEST-INDUCTOR-001'
+            )
+            """
+        )
+        self.conn.execute(
+            """
+            INSERT INTO items (
+                internal_item_code, item_category, standard_name, package,
                 value_spec, voltage, tolerance, material, mpn
             ) VALUES (
                 '7', 'CAP', '内部名称与供应商不同', '0201',
@@ -118,7 +129,8 @@ class SpecificationMatchTest(unittest.TestCase):
 
         self.assertEqual(result["candidate_internal_code"], "")
         self.assertEqual(result["match_level"], "疑似匹配")
-        self.assertEqual(result["confidence"], 0.85)
+        self.assertGreaterEqual(result["confidence"], 0.55)
+        self.assertLess(result["confidence"], 1)
 
     def test_similar_name_cannot_override_conflicting_specification(self):
         result = self.match("任意名称 A", "10nF,10%,50V,0201")
@@ -211,7 +223,25 @@ class SpecificationMatchTest(unittest.TestCase):
 
         self.assertEqual(result["candidate_internal_code"], "8")
         self.assertEqual(result["match_level"], "疑似匹配")
-        self.assertEqual(result["confidence"], 0.95)
+        self.assertGreaterEqual(result["confidence"], 0.55)
+        self.assertLess(result["confidence"], 1)
+
+    def test_inductor_specification_matches_when_parameter_order_changes(self):
+        result = best_match(
+            self.conn,
+            {
+                "supplier_name": "",
+                "raw_item_code": "",
+                "raw_item_name": "供应商自定义名称",
+                "raw_spec": "600mA,0201,2.2nH,±0.1nH,电感",
+                "raw_model": "TEST-INDUCTOR-001",
+            },
+        )
+
+        self.assertEqual(result["candidate_internal_code"], "9")
+        self.assertEqual(result["match_level"], "自动匹配")
+        self.assertEqual(result["confidence"], 1.0)
+        self.assertTrue(result["specification_match_evidence"]["full_signature"])
 
 
 if __name__ == "__main__":

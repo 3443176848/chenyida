@@ -142,7 +142,9 @@ class RealSampleImportTest(unittest.TestCase):
                     capacitor = connection.execute(
                         """
                         SELECT raw_model, raw_brand, parsed_category, parsed_package,
-                               parsed_value, parsed_voltage, parsed_tolerance, parsed_material
+                               parsed_value, parsed_voltage, parsed_tolerance, parsed_material,
+                               specification_source, source_spec_tokens_json,
+                               candidate_spec_tokens_json, specification_match_evidence_json
                         FROM cleaning_rows
                         WHERE import_batch_no = 'TEST-SPEC-1' AND source_row_number = 9
                         """
@@ -158,6 +160,20 @@ class RealSampleImportTest(unittest.TestCase):
                         "parsed_material",
                     ):
                         self.assertTrue(capacitor[field], field)
+                    self.assertTrue(capacitor["specification_source"])
+                    token_kinds = {
+                        token["kind"]
+                        for token in json.loads(capacitor["source_spec_tokens_json"])
+                    }
+                    self.assertTrue(
+                        {"CATEGORY", "PACKAGE", "CAPACITANCE", "VOLTAGE", "TOLERANCE_PERCENT"}
+                        <= token_kinds
+                    )
+                    self.assertEqual(json.loads(capacitor["candidate_spec_tokens_json"]), [])
+                    self.assertIn(
+                        "full_signature",
+                        json.loads(capacitor["specification_match_evidence_json"]),
+                    )
                     self.assertEqual(connection.execute("SELECT COUNT(*) FROM items").fetchone()[0], 0)
         finally:
             server.DATA_DIR = original_data_dir

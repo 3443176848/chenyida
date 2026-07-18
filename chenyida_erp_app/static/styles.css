@@ -379,6 +379,31 @@ tr:nth-child(even) td {
   white-space: normal;
 }
 
+.spec-source {
+  margin-bottom: 6px;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: normal;
+}
+
+.raw-specification {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+  white-space: normal;
+}
+
+.raw-specification span {
+  display: grid;
+  gap: 2px;
+}
+
+.raw-specification b {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .spec-part {
   display: flex;
   gap: 5px;

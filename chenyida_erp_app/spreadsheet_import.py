@@ -6,6 +6,8 @@ import zipfile
 from datetime import date, datetime
 from pathlib import Path
 
+from specification_tokens import specification_richness
+
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_SHEETS = 50
@@ -51,16 +53,6 @@ TECH_TOKEN = re.compile(
     r"(?:kΩ|mΩ|Ω|ohm|pf|nf|uf|μf|v|kv|a|ma|w|kw|hz|mhz|ghz|℃|°c))\b",
     re.I,
 )
-STRUCTURED_SPEC_PATTERNS = [
-    re.compile(r"(?<![A-Z0-9])(?:0201|0402|0603|0805|1206)(?![A-Z0-9])", re.I),
-    re.compile(r"(?<![A-Z0-9.])\d+(?:\.\d+)?\s*(?:UF|NF|PF|[UNP])(?![A-Z0-9])", re.I),
-    re.compile(r"(?<![A-Z0-9.])\d+(?:\.\d+)?\s*V(?![A-Z0-9])", re.I),
-    re.compile(r"(?<![A-Z0-9.])\d+(?:\.\d+)?\s*%", re.I),
-    re.compile(r"(?<![A-Z0-9])(?:C0G|COG|NP0|NPO|X7R|X5R|Y5V|Z5U)(?![A-Z0-9])", re.I),
-    DIMENSION_TOKEN,
-]
-
-
 class SpreadsheetImportError(ValueError):
     def __init__(self, message, code="IMPORT_FILE_INVALID"):
         super().__init__(message)
@@ -526,18 +518,62 @@ def _resolve(row, mapping):
 def _extract_specification(row, mappings, material_name, description):
     mapping = mappings["specification"]
     explicit = _resolve(row, mapping)
-    description_evidence = sum(bool(pattern.search(description or "")) for pattern in STRUCTURED_SPEC_PATTERNS)
-    explicit_evidence = sum(bool(pattern.search(explicit or "")) for pattern in STRUCTURED_SPEC_PATTERNS)
-    if description and description_evidence >= 2 and description_evidence > explicit_evidence:
-        confidence = min(0.92, 0.68 + description_evidence * 0.04)
-        return description, confidence, "HIGH_CONFIDENCE", ["DESCRIPTION_STRUCTURED_SPECIFICATION_SOURCE"]
+    candidates = [
+        {
+            "value": explicit,
+            "source": "/".join(mapping["headers"]) or "mapped_specification",
+            "evidence": specification_richness(explicit or ""),
+            "priority": 3,
+            "reason": "EXPLICIT_OR_COMPONENT_SPECIFICATION",
+        },
+        {
+            "value": description,
+            "source": "/".join(mappings["description"]["headers"]) or "description",
+            "evidence": specification_richness(description or ""),
+            "priority": 2,
+            "reason": "DESCRIPTION_STRUCTURED_SPECIFICATION_SOURCE",
+        },
+        {
+            "value": material_name,
+            "source": "/".join(mappings["material_name"]["headers"]) or "material_name",
+            "evidence": specification_richness(material_name or ""),
+            "priority": 1,
+            "reason": "MATERIAL_NAME_STRUCTURED_SPECIFICATION_SOURCE",
+        },
+    ]
+    rich = [candidate for candidate in candidates if candidate["value"] and candidate["evidence"][0] >= 2]
+    if rich:
+        selected = max(
+            rich,
+            key=lambda candidate: (
+                candidate["evidence"][0],
+                candidate["evidence"][1],
+                candidate["priority"],
+            ),
+        )
+        confidence = min(0.94, 0.68 + selected["evidence"][0] * 0.04)
+        status = mapping["status"] if selected["priority"] == 3 else "HIGH_CONFIDENCE"
+        return (
+            selected["value"],
+            max(confidence, mapping["confidence"] if selected["priority"] == 3 else 0),
+            status,
+            [selected["reason"]],
+            selected["source"],
+        )
     if explicit:
-        return explicit, mapping["confidence"], mapping["status"], ["EXPLICIT_OR_COMPONENT_SPECIFICATION"]
+        source = "/".join(mapping["headers"]) or "mapped_specification"
+        return explicit, mapping["confidence"], mapping["status"], ["EXPLICIT_OR_COMPONENT_SPECIFICATION"], source
     fallback = " ".join(value for value in (material_name, description) if value)
     tokens = list(dict.fromkeys(DIMENSION_TOKEN.findall(fallback) + TECH_TOKEN.findall(fallback)))
     if not tokens:
-        return "", 0, "UNMAPPED", ["NO_SPECIFICATION_EVIDENCE"]
-    return " ".join(tokens), min(0.68, 0.48 + len(tokens) * 0.05), "SUGGESTED", ["DETERMINISTIC_NAME_OR_DESCRIPTION_EXTRACTION", "MANUAL_CONFIRMATION_REQUIRED"]
+        return "", 0, "UNMAPPED", ["NO_SPECIFICATION_EVIDENCE"], ""
+    return (
+        " ".join(tokens),
+        min(0.68, 0.48 + len(tokens) * 0.05),
+        "SUGGESTED",
+        ["DETERMINISTIC_NAME_OR_DESCRIPTION_EXTRACTION", "MANUAL_CONFIRMATION_REQUIRED"],
+        "material_name+description",
+    )
 
 
 def parse_spreadsheet_import(content, filename):
@@ -596,7 +632,7 @@ def parse_spreadsheet_import(content, filename):
         if not any(mapped.values()):
             raw["disposition"] = "UNMAPPED_NON_DATA"
             continue
-        specification, specification_confidence, specification_status, spec_evidence = _extract_specification(
+        specification, specification_confidence, specification_status, spec_evidence, specification_source = _extract_specification(
             row,
             mappings,
             mapped["material_name"],
@@ -607,6 +643,7 @@ def parse_spreadsheet_import(content, filename):
             specification_confidence = max(specification_confidence, 0.74)
             specification_status = "SUGGESTED"
             spec_evidence = ["MODEL_AS_SPECIFICATION_CANDIDATE", "MANUAL_CONFIRMATION_REQUIRED"]
+            specification_source = "/".join(mappings["model"]["headers"]) or "model"
         mapped["specification"] = specification
         material_name_status = mappings["material_name"]["status"]
         if not mapped["material_name"] and material_name_from_specification and specification:
@@ -643,6 +680,7 @@ def parse_spreadsheet_import(content, filename):
                 else "NEEDS_REVIEW"
             ),
             "_specification_evidence": spec_evidence,
+            "_specification_source": specification_source,
         })
     if not import_rows:
         raise SpreadsheetImportError("未识别到可导入的物料数据行", "IMPORT_NO_DATA_ROWS")

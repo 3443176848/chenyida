@@ -167,6 +167,33 @@ class SpreadsheetImportTest(unittest.TestCase):
         self.assertNotEqual(row["raw_spec"], row["raw_model"])
         self.assertIn("10PF", row["raw_spec"])
         self.assertEqual(row["_specification_evidence"], ["DESCRIPTION_STRUCTURED_SPECIFICATION_SOURCE"])
+        self.assertEqual(row["_specification_source"], "物料描述")
+
+    def test_rich_material_name_wins_over_model_only_spec_candidate(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "BOM"
+        sheet.append(["料号", "物料名称", "型号", "单位"])
+        sheet.append([
+            "SOURCE-001",
+            "电感,2.2nH,±0.1nH,600mA,0201",
+            "TEST-INDUCTOR-001",
+            "PCS",
+        ])
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        workbook.close()
+
+        result = parse_spreadsheet_import(buffer.getvalue(), "rich-name.xlsx")
+        row = result["rows"][0]
+
+        self.assertEqual(row["raw_spec"], "电感,2.2nH,±0.1nH,600mA,0201")
+        self.assertEqual(row["raw_model"], "TEST-INDUCTOR-001")
+        self.assertEqual(row["_specification_source"], "物料名称")
+        self.assertEqual(
+            row["_specification_evidence"],
+            ["MATERIAL_NAME_STRUCTURED_SPECIFICATION_SOURCE"],
+        )
 
     def test_real_samples_enter_review_without_lowering_material_guards(self):
         if not ATTACHMENT_DIR.exists():

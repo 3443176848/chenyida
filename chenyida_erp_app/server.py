@@ -13,12 +13,12 @@ import tempfile
 import time
 from contextlib import closing
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
+from specification_tokens import compare_tokens, extract_tokens
 from spreadsheet_import import MAX_FILE_BYTES, SpreadsheetImportError, parse_spreadsheet_import
 
 
@@ -398,128 +398,114 @@ def parse_material(text):
     return ""
 
 
-def first_parsed(parser, values):
-    for value in values:
-        parsed = parser(value)
-        if parsed:
-            return parsed
-    return ""
+def deduplicate_spec_tokens(tokens):
+    result = []
+    seen = set()
+    for token in tokens:
+        key = (token["kind"], token["normalized"])
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(token)
+    return result
+
+
+def source_spec_tokens(raw):
+    category = raw.get("parsed_category", "") or raw.get("raw_category", "")
+    identifiers = list(
+        dict.fromkeys(
+            value
+            for value in (raw.get("raw_mpn", ""), raw.get("raw_model", ""))
+            if value
+        )
+    )
+    brand = raw.get("raw_brand", "")
+    tokens = []
+    for index, text in enumerate([raw.get("raw_spec", ""), raw.get("remark", "")]):
+        tokens.extend(
+            extract_tokens(
+                text,
+                category=category if index == 0 else "",
+                model=identifiers[0] if index == 0 and identifiers else "",
+                brand=brand if index == 0 else "",
+            )
+        )
+    for identifier in identifiers[1:]:
+        tokens.extend(extract_tokens("", model=identifier))
+    if not any(token["kind"] == "CATEGORY" for token in tokens):
+        tokens.extend(
+            token
+            for token in extract_tokens(raw.get("raw_item_name", ""))
+            if token["kind"] == "CATEGORY"
+        )
+    return deduplicate_spec_tokens(tokens)
+
+
+def target_spec_tokens(master):
+    tokens = []
+    for index, text in enumerate([
+        master.get("value_spec", ""),
+        master.get("package", ""),
+        master.get("voltage", ""),
+        master.get("tolerance", ""),
+        master.get("material", ""),
+    ]):
+        tokens.extend(
+            extract_tokens(
+                text,
+                category=master.get("item_category", "") if index == 0 else "",
+                model=master.get("mpn", "") if index == 0 else "",
+                brand=master.get("brand", "") if index == 0 else "",
+            )
+        )
+    return deduplicate_spec_tokens(tokens)
 
 
 def extract_specification_components(raw):
-    sources = [
-        raw.get("raw_spec", ""),
-        raw.get("raw_model", ""),
-        raw.get("remark", ""),
-        raw.get("raw_mpn", ""),
-    ]
+    tokens = source_spec_tokens(raw)
+    by_kind = {}
+    for token in tokens:
+        by_kind.setdefault(token["kind"], token)
+    primary = next(
+        (
+            by_kind[kind]
+            for kind in ("CAPACITANCE", "RESISTANCE", "INDUCTANCE", "FREQUENCY")
+            if kind in by_kind
+        ),
+        None,
+    )
+    tolerance = by_kind.get("TOLERANCE_PERCENT") or next(
+        (token for kind, token in by_kind.items() if kind.endswith("_TOLERANCE")),
+        None,
+    )
+    tolerance_value = tolerance["value"] if tolerance else ""
+    if tolerance and tolerance["kind"] == "TOLERANCE_PERCENT":
+        tolerance_value = tolerance["normalized"].replace(" ", "")
     return {
-        "category": raw.get("parsed_category", "")
-        or raw.get("raw_category", "")
-        or first_parsed(parse_category, [*sources, raw.get("raw_item_name", "")]),
-        "package": raw.get("parsed_package", "") or first_parsed(parse_package, sources),
-        "value_spec": raw.get("parsed_value", "") or first_parsed(parse_value, sources),
-        "voltage": raw.get("parsed_voltage", "") or first_parsed(parse_voltage, sources),
-        "tolerance": raw.get("parsed_tolerance", "") or first_parsed(parse_tolerance, sources),
-        "material": raw.get("parsed_material", "") or first_parsed(parse_material, sources),
-        "mpn": raw.get("raw_mpn", "") or raw.get("raw_model", ""),
+        "category": by_kind.get("CATEGORY", {}).get("normalized", ""),
+        "package": by_kind.get("PACKAGE", {}).get("value", ""),
+        "value_spec": primary["value"] if primary else "",
+        "voltage": by_kind.get("VOLTAGE", {}).get("value", ""),
+        "tolerance": tolerance_value,
+        "material": by_kind.get("MATERIAL", {}).get("normalized", ""),
+        "mpn": by_kind.get("MPN", {}).get("value", ""),
     }
 
 
-def normalized_spec_component(field, value):
-    text = spec_text(value).replace(" ", "")
-    if not text:
-        return ""
-    if field == "material":
-        return parse_material(value) or normalize(text)
-    if field == "value_spec":
-        capacitance = re.fullmatch(r"(\d+(?:\.\d+)?)(UF|NF|PF)", text)
-        if capacitance:
-            factors = {"UF": Decimal("1000000"), "NF": Decimal("1000"), "PF": Decimal("1")}
-            return ("CAP_PF", Decimal(capacitance.group(1)) * factors[capacitance.group(2)])
-        resistance = re.fullmatch(r"(\d+(?:\.\d+)?)(M|K|R)", text)
-        if resistance:
-            factors = {"M": Decimal("1000000"), "K": Decimal("1000"), "R": Decimal("1")}
-            return ("RES_OHM", Decimal(resistance.group(1)) * factors[resistance.group(2)])
-    if field in {"voltage", "tolerance"}:
-        suffix = "V" if field == "voltage" else "%"
-        numeric = text.removesuffix(suffix).lstrip("+-±")
-        try:
-            return (field.upper(), Decimal(numeric))
-        except InvalidOperation:
-            pass
-    return normalize(text)
+def specification_comparison(raw, master):
+    source_tokens = source_spec_tokens(raw)
+    candidate_tokens = target_spec_tokens(master)
+    result = compare_tokens(source_tokens, candidate_tokens)
+    return {
+        **result,
+        "source_tokens": source_tokens,
+        "candidate_tokens": candidate_tokens,
+    }
 
 
 def specification_match(raw, master):
-    source = extract_specification_components(raw)
-    master_spec = master.get("value_spec", "")
-    target = {
-        "category": master.get("item_category", ""),
-        "package": master.get("package", "") or parse_package(master_spec),
-        "value_spec": parse_value(master_spec) or master_spec,
-        "voltage": master.get("voltage", "") or parse_voltage(master_spec),
-        "tolerance": master.get("tolerance", "") or parse_tolerance(master_spec),
-        "material": master.get("material", "") or parse_material(master_spec),
-        "mpn": master.get("mpn", ""),
-    }
-    weights = {
-        "package": 0.25,
-        "value_spec": 0.30,
-        "voltage": 0.20,
-        "tolerance": 0.15,
-        "material": 0.05,
-    }
-    score = 0.0
-    for field in ("package", "value_spec", "voltage", "tolerance"):
-        weight = weights[field]
-        source_value = normalized_spec_component(field, source[field])
-        if not source_value:
-            continue
-        target_value = normalized_spec_component(field, target[field])
-        if not target_value or source_value != target_value:
-            return 0.0, False
-        score += weight
-    uncovered_optional = False
-    source_material = normalized_spec_component("material", source["material"])
-    target_material = normalized_spec_component("material", target["material"])
-    if source_material:
-        if target_material and source_material != target_material:
-            return 0.0, False
-        if target_material:
-            score += weights["material"]
-        else:
-            uncovered_optional = True
-    source_category = source["category"]
-    if source_category:
-        if source_category != target["category"]:
-            return 0.0, False
-        score += 0.10
-    source_mpn = normalize(source["mpn"])
-    target_mpn = normalize(target["mpn"])
-    mpn_exact = False
-    if source_mpn and target_mpn:
-        if source_mpn != target_mpn:
-            return 0.0, False
-        score = 1.0
-        mpn_exact = True
-    if uncovered_optional:
-        score = min(score, 0.95)
-    required_fields = [
-        field
-        for field in ("package", "value_spec", "voltage", "tolerance", "material")
-        if normalize(target[field])
-    ]
-    full_signature = (
-        (mpn_exact or len(required_fields) >= 2)
-        and not uncovered_optional
-        and all(
-            normalized_spec_component(field, source[field])
-            == normalized_spec_component(field, target[field])
-            for field in required_fields
-        )
-    )
-    return (1.0 if full_signature else round(min(score, 1.0), 2)), full_signature
+    comparison = specification_comparison(raw, master)
+    return comparison["score"], comparison["full_signature"]
 
 
 def score_candidate(raw, master):
@@ -2411,6 +2397,13 @@ def create_quality_inspection(conn, row):
 
 
 def best_match(conn, raw):
+    def evidence_only(comparison, **extra):
+        return {
+            key: value
+            for key, value in comparison.items()
+            if key not in {"source_tokens", "candidate_tokens"}
+        } | extra
+
     supplier_name = raw.get("supplier_name", "")
     raw_item_code = raw.get("raw_item_code", "")
     if raw_item_code:
@@ -2427,32 +2420,73 @@ def best_match(conn, raw):
             (normalize(supplier_name), normalize(raw_item_code)),
         ).fetchone()
         if exact:
+            item = conn.execute(
+                "SELECT * FROM items WHERE internal_item_code = ?",
+                (exact["internal_item_code"],),
+            ).fetchone()
+            comparison = specification_comparison(raw, dict(item)) if item else {
+                "source_tokens": source_spec_tokens(raw),
+                "candidate_tokens": [],
+                "score": 1.0,
+                "full_signature": False,
+                "matched": [],
+                "missing_in_target": [],
+                "missing_in_source": [],
+                "conflicts": [],
+                "identifier_evidence": [],
+            }
             return {
                 "candidate_internal_code": exact["internal_item_code"],
                 "candidate_standard_name": exact["standard_name"] or "",
                 "match_level": "自动匹配",
                 "confidence": 1.0,
                 "owner_role": "采购",
+                "source_spec_tokens": comparison["source_tokens"],
+                "candidate_spec_tokens": comparison["candidate_tokens"],
+                "specification_match_evidence": evidence_only(
+                    comparison,
+                    confirmed_supplier_mapping=True,
+                ),
             }
 
     items = fetch_items(conn)
     if not items:
+        source_tokens = source_spec_tokens(raw)
         return {
             "candidate_internal_code": "",
             "candidate_standard_name": "",
             "match_level": "新物料",
             "confidence": 0,
             "owner_role": "工程",
+            "source_spec_tokens": source_tokens,
+            "candidate_spec_tokens": [],
+            "specification_match_evidence": {
+                "score": 0,
+                "full_signature": False,
+                "matched": [],
+                "missing_in_target": [],
+                "missing_in_source": [],
+                "conflicts": [],
+                "identifier_evidence": [],
+                "reason": "NO_INTERNAL_ITEMS",
+            },
         }
     ranked = sorted(
-        ((specification_match(raw, item), item) for item in items),
-        key=lambda pair: (-int(pair[0][1]), -pair[0][0], pair[1]["internal_item_code"]),
+        ((specification_comparison(raw, item), item) for item in items),
+        key=lambda pair: (
+            -int(pair[0]["full_signature"]),
+            -pair[0]["score"],
+            pair[1]["internal_item_code"],
+        ),
     )
-    (score, full_signature), item = ranked[0]
+    comparison, item = ranked[0]
+    score = comparison["score"]
+    full_signature = comparison["full_signature"]
     equally_ranked = [
         candidate
-        for (candidate_score, candidate_full), candidate in ranked
-        if candidate_full == full_signature and abs(candidate_score - score) < 1e-9
+        for candidate_comparison, candidate in ranked
+        if candidate_comparison["full_signature"] == full_signature
+        and abs(candidate_comparison["score"] - score) < 1e-9
     ]
     if len(equally_ranked) > 1 and score >= 0.55:
         return {
@@ -2461,6 +2495,13 @@ def best_match(conn, raw):
             "match_level": "疑似匹配",
             "confidence": score,
             "owner_role": "工程",
+            "source_spec_tokens": comparison["source_tokens"],
+            "candidate_spec_tokens": [],
+            "specification_match_evidence": evidence_only(
+                comparison,
+                ambiguous=True,
+                ambiguous_candidate_count=len(equally_ranked),
+            ),
         }
     if full_signature:
         level = "自动匹配"
@@ -2472,6 +2513,9 @@ def best_match(conn, raw):
         "match_level": level,
         "confidence": score,
         "owner_role": "采购" if level == "自动匹配" else "工程",
+        "source_spec_tokens": comparison["source_tokens"],
+        "candidate_spec_tokens": comparison["candidate_tokens"] if level != "新物料" else [],
+        "specification_match_evidence": evidence_only(comparison),
     }
 
 
@@ -2515,8 +2559,10 @@ def import_supplier_rows(conn, rows, batch_no=None, commit=True):
                 candidate_internal_code, candidate_standard_name, match_level, confidence,
                 owner_role, process_status, created_at, updated_at,
                 source_batch_id, source_sheet_name, source_row_number, mapped_values_json,
-                mapping_confidence, specification_confidence, mapping_status, review_status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                mapping_confidence, specification_confidence, mapping_status, review_status,
+                specification_source, source_spec_tokens_json, candidate_spec_tokens_json,
+                specification_match_evidence_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 payload.get("import_batch_no", ""),
@@ -2555,6 +2601,10 @@ def import_supplier_rows(conn, rows, batch_no=None, commit=True):
                 row.get("_specification_confidence", 0),
                 row.get("_mapping_status", ""),
                 row.get("_review_status", ""),
+                row.get("_specification_source", ""),
+                json.dumps(payload.get("source_spec_tokens", []), ensure_ascii=False),
+                json.dumps(payload.get("candidate_spec_tokens", []), ensure_ascii=False),
+                json.dumps(payload.get("specification_match_evidence", {}), ensure_ascii=False),
             ],
         )
         imported.append(payload)
@@ -3484,7 +3534,6 @@ class AppHandler(BaseHTTPRequestHandler):
                         self.send_json({"error": "基本单位必须人工确认", "code": "MATERIAL_UNIT_REQUIRED"}, HTTPStatus.BAD_REQUEST)
                         return
                     confirmed_package = parse_package(specification) or row["parsed_package"]
-                    confirmed_value = parse_value(specification) or row["parsed_value"]
                     confirmed_voltage = parse_voltage(specification) or row["parsed_voltage"]
                     confirmed_tolerance = parse_tolerance(specification) or row["parsed_tolerance"]
                     confirmed_material = parse_material(specification) or row["parsed_material"]
@@ -3497,7 +3546,7 @@ class AppHandler(BaseHTTPRequestHandler):
                         "brand": row["raw_brand"],
                         "mpn": row["raw_mpn"] or row["raw_model"],
                         "package": confirmed_package,
-                        "value_spec": confirmed_value or specification,
+                        "value_spec": specification,
                         "voltage": confirmed_voltage,
                         "tolerance": confirmed_tolerance,
                         "material": confirmed_material,

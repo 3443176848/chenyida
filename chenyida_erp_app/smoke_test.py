@@ -183,13 +183,14 @@ def main():
             assert "生产协同" in html
             assert "询价报价" in html
             assert "销售交付" in html
-            assert "structured-spec-review" in html
+            assert "general-spec-v2" in html
             app_js = request("/app.js")
             styles = request("/styles.css")
-            assert "来源分项规格" in app_js
+            assert "来源详细规格" in app_js
             assert "候选内部规格" in app_js
-            assert "parsed_tolerance" in app_js
-            assert "parsed_material" in app_js
+            assert "原始详细规格" in app_js
+            assert "source_spec_tokens_json" in app_js
+            assert "candidate_spec_tokens_json" in app_js
             assert ".spec-parts" in styles
 
             products = request("/api/products")["rows"]
@@ -516,6 +517,12 @@ def main():
                 },
             )
             assert created["internal_item_code"].startswith("CYD-"), created
+            created_item = next(
+                row
+                for row in request("/api/items")["rows"]
+                if row["internal_item_code"] == created["internal_item_code"]
+            )
+            assert created_item["value_spec"] == new_row["raw_spec"], created_item
 
             final_summary = request("/api/summary")
             assert final_summary["total_items"] == 6, final_summary

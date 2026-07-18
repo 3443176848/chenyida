@@ -11,7 +11,7 @@
 | 根仓库跟踪项 | Site 自适应 Import + 服务器本地 CSV/XLSX/XLS | 本轮修改本地 Python 运行面和 systemd 源码配置，未修改 Site |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
-| 数据表 | 74（本地+开发 schema） | 本地 SQLite 29 张业务/迁移表，Site D1/Drizzle 45 张；本地 `0001` 已执行，Site `0008` 未执行生产迁移 |
+| 数据表 | 74（本地+开发 schema） | 本地 SQLite 29 张业务/迁移表，Site D1/Drizzle 45 张；本地 `0001`～`0004` 已执行，Site `0008` 未执行生产迁移 |
 | 在线 API 路径 | 89 | 开发代码新增 Draft Generation 查询、Normalization Approval 和 Draft Commit；生产公开站点尚未部署 |
 | 页面入口 | 14 | 既有 11 个入口加 3 条 Material Import 路由 |
 | 测试文件 | 35 | 本轮新增本地 Spreadsheet 和 Migration 两份专项测试 |
@@ -190,6 +190,21 @@ git -C chenyida_erp_site status --short
 | 置信度 | PASS | 来源介质未覆盖时疑似上限 0.95 |
 | 数据影响 | NONE | 无 Schema/Migration、无旧行回填、无业务数据写入 |
 | 回归/部署 | PASS | 联合单元 38/38、self-test、smoke、go-live；systemd active/enabled，公网 HTTP 200 |
+
+## 通用规格来源识别与无序参数匹配
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 规格来源 | PASS | 明确规格、多列组合、描述和物料名称按确定性参数丰富度选择，保存完整 raw spec 和来源列 |
+| 通用参数 | PASS | 品类、封装、容量、阻值、电感值、电流、电压、功率、频率、百分比/绝对误差、材质和尺寸 |
+| 无序匹配 | PASS | 参数以类型和归一值集合比较，前后顺序不影响相似度；同类型冲突排除，缺项降级 |
+| 型号边界 | PASS | MPN/品牌独立保存和展示，不进入通用规格相似度；MPN 相同不能替代规格 |
+| 审核页面 | PASS | 型号/MPN、完整原始详细规格、规格来源、来源参数和候选内部参数同时可见 |
+| 数据模型 | PASS | `0004` 只扩展既有 Cleaning 四个证据列，不新建第二套导入系统 |
+| 旧数据 | PRESERVED | 9 Material、444 Cleaning、16 Batch、3037 Raw 均未变化；旧 Cleaning 不重算 |
+| 恢复 | PASS | 部署前备份 `erp-backup-20260718-203624.sqlite3`，SHA-256 `04286e386f9a799400c4ec0dc675110419d5f77fdf7dc54e3366cb2287651262`，完整性 `ok` |
+| 自动测试 | PASS | 联合单元 48/48、self-test、smoke、go-live |
+| 部署 | PASS | systemd active/enabled，本机和公网首页 HTTP 200，`0004` 已应用 |
 
 ## 服务器本地交付运行面
 

@@ -25,6 +25,7 @@ class MaterialImportMigrationTest(unittest.TestCase):
                     "0001_material_import_source_lineage",
                     "0002_material_import_file_archive",
                     "0003_cleaning_structured_specification",
+                    "0004_cleaning_general_spec_tokens",
                 ],
             )
             columns = {
@@ -37,6 +38,10 @@ class MaterialImportMigrationTest(unittest.TestCase):
             self.assertIn("raw_category", columns)
             self.assertIn("parsed_tolerance", columns)
             self.assertIn("parsed_material", columns)
+            self.assertIn("specification_source", columns)
+            self.assertIn("source_spec_tokens_json", columns)
+            self.assertIn("candidate_spec_tokens_json", columns)
+            self.assertIn("specification_match_evidence_json", columns)
             batch_columns = {
                 row["name"]
                 for row in connection.execute("PRAGMA table_info(material_import_batches)").fetchall()
