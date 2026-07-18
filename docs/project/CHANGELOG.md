@@ -4,6 +4,14 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-CLEANING-CLEAR-01 - `feat: safely clear cleaning rows`
+
+- 权限：清空接口要求 `system`，仅管理员页面显示按钮，普通角色服务端拒绝。
+- 确认：浏览器确认之外，`POST /api/cleaning/clear` 还要求固定 `CLEAR_CLEANING_ROWS`；缺失返回稳定错误且不删除。
+- 恢复：成功操作先自动创建 SQLite 备份，再清空 Cleaning Rows；响应返回删除数量和备份信息。
+- 事务/审计：删除与操作日志在 `BEGIN IMMEDIATE` 事务内完成，记录操作者与行数；保留 Batch、Raw Rows、原文件归档、物料和供应商映射。
+- 测试：清空专项 3/3、与排序联合 7/7、smoke 通过；systemd 公网开发服务已部署。部署过程未调用真实清空，229 条 V700 记录不变。
+
 ### PHASE3-MATERIAL-LIBRARY-CONFIDENCE-SORT-01 - `feat: sort cleaning rows by confidence`
 
 - API：`GET /api/cleaning` 增加 `confidence_sort=newest|desc|asc`，未知值回退 newest；SQL 排序只使用固定白名单。

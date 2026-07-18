@@ -111,6 +111,7 @@ function updateUserBar() {
   $("#userBadge").hidden = !user;
   $("#logoutBtn").hidden = !user;
   $("#changePasswordBtn").hidden = !user;
+  $("#clearCleaningBtn").hidden = !canManageSystem();
   if (!user) return;
   $("#userName").textContent = user.display_name || user.username;
   $("#userRole").textContent = user.role_label || user.role;
@@ -854,6 +855,7 @@ function renderMappings() {
 }
 
 function renderCleaning() {
+  $("#clearCleaningBtn").disabled = state.cleaning.length === 0;
   const rows = state.cleaning.map((row) => {
     const canConfirm = row.process_status === "待处理" && row.candidate_internal_code;
     const canCreate = row.process_status === "待处理" && row.match_level === "新物料";
@@ -1065,6 +1067,23 @@ async function refreshCleaning() {
   const result = await api(`/api/cleaning?confidence_sort=${sort}`);
   state.cleaning = result.rows;
   renderCleaning();
+}
+
+async function clearCleaning() {
+  if (!state.cleaning.length) {
+    toast("当前没有可清空的清洗记录");
+    return;
+  }
+  const confirmed = window.confirm(
+    "确认清空全部清洗审核记录？系统会先创建数据库备份；导入批次、原始行和原文件不会删除。"
+  );
+  if (!confirmed) return;
+  const result = await api("/api/cleaning/clear", {
+    method: "POST",
+    body: JSON.stringify({ confirmation: "CLEAR_CLEANING_ROWS" }),
+  });
+  await refreshAll();
+  toast(`已清空 ${result.deleted_count} 条清洗记录，备份：${result.backup.name}`);
 }
 
 async function loadSample() {
@@ -1628,6 +1647,9 @@ function bindEvents() {
   $("#cleaningConfidenceSort").addEventListener("change", (event) => {
     state.cleaningConfidenceSort = event.target.value;
     refreshCleaning().catch((error) => toast(error.message));
+  });
+  $("#clearCleaningBtn").addEventListener("click", () => {
+    clearCleaning().catch((error) => toast(error.message));
   });
   $("#createItemBtn").addEventListener("click", createItem);
   $("#createCustomerBtn").addEventListener("click", createCustomer);

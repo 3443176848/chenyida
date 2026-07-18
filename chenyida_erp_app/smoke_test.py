@@ -556,6 +556,23 @@ def main():
             )
             assert unit_block["code"] == "MATERIAL_UNIT_REQUIRED", unit_block
 
+            clear_without_confirmation = request(
+                "/api/cleaning/clear",
+                method="POST",
+                payload={},
+                expected_status=400,
+            )
+            assert clear_without_confirmation["code"] == "CLEANING_CLEAR_CONFIRMATION_REQUIRED", clear_without_confirmation
+            assert request("/api/cleaning")["rows"], "confirmation failure must preserve cleaning rows"
+            cleared = request(
+                "/api/cleaning/clear",
+                method="POST",
+                payload={"confirmation": "CLEAR_CLEANING_ROWS"},
+            )
+            assert cleared["deleted_count"] > 0, cleared
+            assert cleared["backup"]["name"].startswith("erp-backup-"), cleared
+            assert request("/api/cleaning")["rows"] == [], cleared
+
             print("SMOKE_TEST_OK")
         finally:
             proc.terminate()

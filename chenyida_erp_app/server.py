@@ -444,7 +444,7 @@ def verify_password(password, stored_hash):
 
 
 def permission_for_request(method, path):
-    if path in {"/api/backups", "/api/backups/create", "/api/backups/restore", "/api/users"}:
+    if path in {"/api/backups", "/api/backups/create", "/api/backups/restore", "/api/users", "/api/cleaning/clear"}:
         return "system"
     if path == "/api/management-dashboard":
         return "dashboard"
@@ -2578,6 +2578,22 @@ def cleaning_rows(conn, limit=500, confidence_sort="newest"):
     return [dict(row) for row in rows]
 
 
+def clear_cleaning_rows(conn, cleared_by):
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        deleted_count = conn.execute("SELECT COUNT(*) FROM cleaning_rows").fetchone()[0]
+        conn.execute("DELETE FROM cleaning_rows")
+        conn.execute(
+            "INSERT INTO activity_log (action, detail, created_at) VALUES (?, ?, ?)",
+            ("清空清洗审核", f"{deleted_count} 行 / {cleared_by}", now_text()),
+        )
+        conn.commit()
+        return deleted_count
+    except Exception:
+        conn.rollback()
+        raise
+
+
 def parse_csv_text(text):
     with io.StringIO(text) as buffer:
         reader = csv.DictReader(buffer)
@@ -3268,6 +3284,23 @@ class AppHandler(BaseHTTPRequestHandler):
                         rows = parse_csv_text(body.get("csvText", ""))
                     result = import_supplier_rows(conn, rows, body.get("batchNo"))
                     self.send_json(result)
+                elif path == "/api/cleaning/clear":
+                    if body.get("confirmation") != "CLEAR_CLEANING_ROWS":
+                        self.send_json(
+                            {
+                                "error": "必须明确确认后才能清空清洗记录",
+                                "code": "CLEANING_CLEAR_CONFIRMATION_REQUIRED",
+                            },
+                            HTTPStatus.BAD_REQUEST,
+                        )
+                        return
+                    backup = create_database_backup(conn, self.user["username"])
+                    deleted_count = clear_cleaning_rows(conn, self.user["username"])
+                    self.send_json({
+                        "ok": True,
+                        "deleted_count": deleted_count,
+                        "backup": backup,
+                    })
                 elif path == "/api/cleaning/confirm":
                     row_id = int(body.get("id"))
                     row = conn.execute("SELECT * FROM cleaning_rows WHERE id = ?", (row_id,)).fetchone()

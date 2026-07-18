@@ -19,6 +19,7 @@
 - [A118/V700 真实 BOM 入库暂存报告](./real-sample-staging-a118-v700.md)
 - [电容匹配测试物料 1～5](./matching-test-seed-1-5.md)
 - [清洗审核匹配置信度排序 V1](./cleaning-confidence-sort-v1.md)
+- [清洗审核安全清空 V1](./cleaning-clear-v1.md)
 
 ## V2 目标
 
