@@ -39,7 +39,7 @@
 
 ### 本地 SQLite
 
-- 29 张业务/迁移表；历史 26 张表仍由 `server.py` 建立，Excel 导入新增表从 `0001_material_import_source_lineage.sql` 起使用版本化迁移。
+- 29 张业务/迁移表；历史 26 张表仍由 `server.py` 建立，Excel 导入新增表从 `0001_material_import_source_lineage.sql` 起使用版本化迁移，当前已应用到 `0003_cleaning_structured_specification.sql`。
 - 覆盖用户、会话、物料、映射、清洗、客户、供应商、产品、BOM、采购、库存、生产、销售、品质、财务和活动日志。
 - 已增加 `local_schema_migrations`、`material_import_batches`、`material_import_raw_rows` 及来源外键/索引；`0002` 为批次增加完整原文件归档 key、大小和 warning。历史表的迁移基线与外键治理仍待逐步补齐。
 
@@ -79,6 +79,7 @@
 - 清洗审核列表支持服务端匹配置信度 `newest/desc/asc` 排序；页面可选高到低或低到高，同分按 ID 降序。项目负责人已在网页重导入 V700，当前有 229 条 Cleaning Rows、21 个置信度层级。
 - 管理员可通过双重确认的清空接口删除全部 Cleaning Rows；系统先自动备份并在事务中写审计，Batch/Raw Rows/归档/物料/映射不删除。部署没有自动清空当前 229 条。
 - 1928C/G20/J587 已完成规格兼容：三文件隔离产生 221 条 Cleaning、216 条有规格；名称不参与编号评分，结构化规格完整且唯一才自动确认内部编号，部分唯一候选保持疑似，歧义不随机给号。
+- 1928C 进一步改为逐属性规格匹配：型号、描述、MPN 分开作为证据，提取品类/封装/值/耐压/误差/介质后逐项比较；当前 25 条旧 Cleaning 不回填，重导后生效。
 - Material Draft/Review POST 已具备同源/CSRF、持久幂等和限速；其他 legacy POST 的 CSRF 与限速仍需专项治理。测试环境已有本机一次性 D1，尚无远程 Test D1。
 - Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现，但生产 Site 仍为旧版本。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
@@ -95,7 +96,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import，以及 Phase 3 Normalization、内部物料库、多供应商识别和服务器本地 Excel 接入。清洗排序、安全清空和规格唯一编号匹配已部署；下一步从网页重导入 1928C/G20/J587，对未覆盖的新规格人工建档生成编号。
+当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import，以及 Phase 3 Normalization、内部物料库、多供应商识别和服务器本地 Excel 接入。清洗排序、安全清空、规格唯一编号匹配和 1928C 分项规格匹配已部署；下一步从网页清空后重导 1928C，对未覆盖的新规格人工建档生成编号。
 
 ## 恢复上下文检查清单
 

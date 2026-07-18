@@ -176,6 +176,11 @@ class SpreadsheetImportTest(unittest.TestCase):
                 self.assertEqual(len(result["rows"]), row_count)
                 self.assertEqual(sum(bool(row["raw_spec"]) for row in result["rows"]), specification_count)
                 self.assertTrue(all(row["_review_status"] == "NEEDS_REVIEW" for row in result["rows"]))
+                if filename == "1928C量产BOM.xlsx":
+                    capacitor = next(row for row in result["rows"] if row["_source_row_number"] == 9)
+                    self.assertTrue(capacitor["raw_model"])
+                    self.assertTrue(capacitor["raw_brand"])
+                    self.assertTrue(capacitor["remark"])
 
 
 if __name__ == "__main__":

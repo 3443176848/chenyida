@@ -21,7 +21,11 @@ class MaterialImportMigrationTest(unittest.TestCase):
             versions = connection.execute("SELECT version FROM local_schema_migrations").fetchall()
             self.assertEqual(
                 [row["version"] for row in versions],
-                ["0001_material_import_source_lineage", "0002_material_import_file_archive"],
+                [
+                    "0001_material_import_source_lineage",
+                    "0002_material_import_file_archive",
+                    "0003_cleaning_structured_specification",
+                ],
             )
             columns = {
                 row["name"]
@@ -29,6 +33,10 @@ class MaterialImportMigrationTest(unittest.TestCase):
             }
             self.assertIn("source_batch_id", columns)
             self.assertIn("specification_confidence", columns)
+            self.assertIn("raw_model", columns)
+            self.assertIn("raw_category", columns)
+            self.assertIn("parsed_tolerance", columns)
+            self.assertIn("parsed_material", columns)
             batch_columns = {
                 row["name"]
                 for row in connection.execute("PRAGMA table_info(material_import_batches)").fetchall()

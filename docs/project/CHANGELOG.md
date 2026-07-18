@@ -4,6 +4,15 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-STRUCTURED-SPEC-MATCH-01 - `feat: match structured specification components`
+
+- 机制：取消把型号/描述压成整体文字进行匹配；分别提取并比较品类、封装、容量/阻值、耐压、误差、介质和 MPN，关键属性任一冲突立即排除。
+- Parser：1928C 的物料型号、物料描述和生产厂家分别保留；增加生产厂家品牌别名，支持 `NPO/NP0/COG/C0G` 与 `100P=100PF` 等确定性表达。
+- 数据库：新增本地 `0003_cleaning_structured_specification`，扩展现有 Cleaning 的 raw model/category 和 parsed tolerance/material；不建第二套导入系统，不回填旧清洗。
+- 建档：电子规格分别写入 value/package/voltage/tolerance/material/MPN，不再把可解析的完整长描述只塞进 `value_spec`。
+- 真实回归：1928C 截图行得到 CAP/0201/5%/C0G-NP0/50V/10PF/MPN；当前内部库无该 10PF 规格，按预期保持新物料。
+- 验证与部署：联合单元 37/37、self-test、smoke、go-live 通过；迁移前快照完整性通过，`0003` 已应用，9 条物料、25 条 Cleaning、12 个 Batch 保持不变，公网 HTTP 200。
+
 ### PHASE3-MATERIAL-LIBRARY-SPEC-MATCH-01 - `feat: match supplier rows by specification`
 
 - 样本：审计 1928C、G20-G15G、J587 三份 XLSX；G20 的 Description-only 表头原先被名称门禁拒绝，J587 描述/备注冲突会导致规格为空。

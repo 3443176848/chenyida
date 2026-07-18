@@ -117,6 +117,8 @@ IMPORT_FIELDS = [
     "raw_item_name",
     "raw_item_code",
     "raw_spec",
+    "raw_model",
+    "raw_category",
     "raw_brand",
     "raw_mpn",
     "purchase_uom",
@@ -333,9 +335,9 @@ def remove_package_tokens(value):
 
 def parse_category(text):
     value = normalize(text)
-    if "UF" in value or "NF" in value or "PF" in value:
+    if "电容" in value or re.search(r"(^|[^A-Z])CAP(?:ACITOR)?([^A-Z]|$)", value) or "UF" in value or "NF" in value or "PF" in value:
         return "CAP"
-    if re.search(r"(^|[^A-Z])\d+(\.\d+)?K([^A-Z]|$)", value) or re.search(r"(^|[^A-Z])\d+R([^A-Z]|$)", value):
+    if "电阻" in value or re.search(r"(^|[^A-Z])RES(?:ISTOR)?([^A-Z]|$)", value) or re.search(r"(^|[^A-Z])\d+(\.\d+)?K([^A-Z]|$)", value) or re.search(r"(^|[^A-Z])\d+R([^A-Z]|$)", value):
         return "RES"
     if "CONN" in value or "CONNECTOR" in value or "PITCH" in value:
         return "CON"
@@ -365,6 +367,9 @@ def parse_value(text):
     match = re.search(r"(?<![A-Z0-9.])(\d+(?:\.\d+)?)\s*(UF|NF|PF)\b", value)
     if match:
         return f"{match.group(1)}{match.group(2)}"
+    match = re.search(r"(?<![A-Z0-9.])(\d+(?:\.\d+)?)\s*([UNP])\b", value)
+    if match:
+        return f"{match.group(1)}{match.group(2)}F"
     match = re.search(r"(?<![A-Z0-9.])(\d+(?:\.\d+)?)\s*(K|R|M)\b", value)
     if match:
         return f"{match.group(1)}{match.group(2)}"
@@ -379,10 +384,54 @@ def parse_tolerance(text):
     return f"{match.group(1)}%" if match else ""
 
 
+def parse_material(text):
+    value = spec_text(text)
+    for pattern, canonical in [
+        (r"(^|[^A-Z0-9])(?:C0G|COG|NP0|NPO)([^A-Z0-9]|$)", "C0G/NP0"),
+        (r"(^|[^A-Z0-9])X7R([^A-Z0-9]|$)", "X7R"),
+        (r"(^|[^A-Z0-9])X5R([^A-Z0-9]|$)", "X5R"),
+        (r"(^|[^A-Z0-9])Y5V([^A-Z0-9]|$)", "Y5V"),
+        (r"(^|[^A-Z0-9])Z5U([^A-Z0-9]|$)", "Z5U"),
+    ]:
+        if re.search(pattern, value):
+            return canonical
+    return ""
+
+
+def first_parsed(parser, values):
+    for value in values:
+        parsed = parser(value)
+        if parsed:
+            return parsed
+    return ""
+
+
+def extract_specification_components(raw):
+    sources = [
+        raw.get("raw_spec", ""),
+        raw.get("raw_model", ""),
+        raw.get("remark", ""),
+        raw.get("raw_mpn", ""),
+    ]
+    return {
+        "category": raw.get("parsed_category", "")
+        or raw.get("raw_category", "")
+        or first_parsed(parse_category, [*sources, raw.get("raw_item_name", "")]),
+        "package": raw.get("parsed_package", "") or first_parsed(parse_package, sources),
+        "value_spec": raw.get("parsed_value", "") or first_parsed(parse_value, sources),
+        "voltage": raw.get("parsed_voltage", "") or first_parsed(parse_voltage, sources),
+        "tolerance": raw.get("parsed_tolerance", "") or first_parsed(parse_tolerance, sources),
+        "material": raw.get("parsed_material", "") or first_parsed(parse_material, sources),
+        "mpn": raw.get("raw_mpn", "") or raw.get("raw_model", ""),
+    }
+
+
 def normalized_spec_component(field, value):
     text = spec_text(value).replace(" ", "")
     if not text:
         return ""
+    if field == "material":
+        return parse_material(value) or normalize(text)
     if field == "value_spec":
         capacitance = re.fullmatch(r"(\d+(?:\.\d+)?)(UF|NF|PF)", text)
         if capacitance:
@@ -403,28 +452,27 @@ def normalized_spec_component(field, value):
 
 
 def specification_match(raw, master):
-    raw_spec = " ".join([raw.get("raw_spec", ""), raw.get("raw_mpn", "")]).strip()
+    source = extract_specification_components(raw)
     master_spec = master.get("value_spec", "")
-    source = {
-        "package": parse_package(raw_spec),
-        "value_spec": parse_value(raw_spec),
-        "voltage": parse_voltage(raw_spec),
-        "tolerance": parse_tolerance(raw_spec),
-    }
     target = {
+        "category": master.get("item_category", ""),
         "package": master.get("package", "") or parse_package(master_spec),
         "value_spec": parse_value(master_spec) or master_spec,
         "voltage": master.get("voltage", "") or parse_voltage(master_spec),
         "tolerance": master.get("tolerance", "") or parse_tolerance(master_spec),
+        "material": master.get("material", "") or parse_material(master_spec),
+        "mpn": master.get("mpn", ""),
     }
     weights = {
         "package": 0.25,
         "value_spec": 0.30,
         "voltage": 0.20,
         "tolerance": 0.15,
+        "material": 0.05,
     }
     score = 0.0
-    for field, weight in weights.items():
+    for field in ("package", "value_spec", "voltage", "tolerance"):
+        weight = weights[field]
         source_value = normalized_spec_component(field, source[field])
         if not source_value:
             continue
@@ -432,20 +480,37 @@ def specification_match(raw, master):
         if not target_value or source_value != target_value:
             return 0.0, False
         score += weight
-    source_category = parse_category(raw_spec) or parse_category(raw.get("raw_item_name", ""))
+    uncovered_optional = False
+    source_material = normalized_spec_component("material", source["material"])
+    target_material = normalized_spec_component("material", target["material"])
+    if source_material:
+        if target_material and source_material != target_material:
+            return 0.0, False
+        if target_material:
+            score += weights["material"]
+        else:
+            uncovered_optional = True
+    source_category = source["category"]
     if source_category:
-        if source_category != master.get("item_category", ""):
+        if source_category != target["category"]:
             return 0.0, False
         score += 0.10
-    source_mpn = normalize(raw.get("raw_mpn", ""))
-    target_mpn = normalize(master.get("mpn", ""))
+    source_mpn = normalize(source["mpn"])
+    target_mpn = normalize(target["mpn"])
+    mpn_exact = False
     if source_mpn and target_mpn:
         if source_mpn != target_mpn:
             return 0.0, False
-        return 1.0, True
-    required_fields = [field for field, value in target.items() if normalize(value)]
+        score = 1.0
+        mpn_exact = True
+    required_fields = [
+        field
+        for field in ("package", "value_spec", "voltage", "tolerance", "material")
+        if normalize(target[field])
+    ]
     full_signature = (
-        len(required_fields) >= 2
+        (mpn_exact or len(required_fields) >= 2)
+        and not uncovered_optional
         and all(
             normalized_spec_component(field, source[field])
             == normalized_spec_component(field, target[field])
@@ -457,14 +522,6 @@ def specification_match(raw, master):
 
 def score_candidate(raw, master):
     return specification_match(raw, master)[0]
-
-
-def classify(score):
-    if score >= 0.85:
-        return "自动匹配"
-    if score >= 0.55:
-        return "疑似匹配"
-    return "新物料"
 
 
 def db_connect():
@@ -2406,7 +2463,7 @@ def best_match(conn, raw):
     if full_signature:
         level = "自动匹配"
     else:
-        level = classify(score)
+        level = "疑似匹配" if score >= 0.55 else "新物料"
     return {
         "candidate_internal_code": item["internal_item_code"] if level != "新物料" else "",
         "candidate_standard_name": item["standard_name"] if level != "新物料" else "",
@@ -2429,14 +2486,16 @@ def import_supplier_rows(conn, rows, batch_no=None, commit=True):
     timestamp = now_text()
     for row in rows:
         raw = normalize_import_row(row, batch_no)
-        raw_text = " ".join([raw.get("raw_item_name", ""), raw.get("raw_spec", "")])
+        components = extract_specification_components(raw)
         parsed = {
-            "parsed_category": parse_category(raw_text),
-            "parsed_package": parse_package(raw_text),
-            "parsed_value": parse_value(raw_text),
-            "parsed_voltage": parse_voltage(raw_text),
+            "parsed_category": components["category"],
+            "parsed_package": components["package"],
+            "parsed_value": components["value_spec"],
+            "parsed_voltage": components["voltage"],
+            "parsed_tolerance": components["tolerance"],
+            "parsed_material": components["material"],
         }
-        match = best_match(conn, raw)
+        match = best_match(conn, {**raw, **parsed})
         payload = {
             **raw,
             **parsed,
@@ -2447,13 +2506,15 @@ def import_supplier_rows(conn, rows, batch_no=None, commit=True):
             """
             INSERT INTO cleaning_rows (
                 import_batch_no, supplier_name, raw_item_name, raw_item_code, raw_spec,
-                raw_brand, raw_mpn, purchase_uom, min_order_qty, lead_time_days, last_price, remark,
+                raw_model, raw_category, raw_brand, raw_mpn, purchase_uom, min_order_qty,
+                lead_time_days, last_price, remark,
                 parsed_category, parsed_package, parsed_value, parsed_voltage,
+                parsed_tolerance, parsed_material,
                 candidate_internal_code, candidate_standard_name, match_level, confidence,
                 owner_role, process_status, created_at, updated_at,
                 source_batch_id, source_sheet_name, source_row_number, mapped_values_json,
                 mapping_confidence, specification_confidence, mapping_status, review_status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 payload.get("import_batch_no", ""),
@@ -2461,6 +2522,8 @@ def import_supplier_rows(conn, rows, batch_no=None, commit=True):
                 payload.get("raw_item_name", ""),
                 payload.get("raw_item_code", ""),
                 payload.get("raw_spec", ""),
+                payload.get("raw_model", ""),
+                payload.get("raw_category", ""),
                 payload.get("raw_brand", ""),
                 payload.get("raw_mpn", ""),
                 payload.get("purchase_uom", ""),
@@ -2472,6 +2535,8 @@ def import_supplier_rows(conn, rows, batch_no=None, commit=True):
                 payload.get("parsed_package", ""),
                 payload.get("parsed_value", ""),
                 payload.get("parsed_voltage", ""),
+                payload.get("parsed_tolerance", ""),
+                payload.get("parsed_material", ""),
                 payload.get("candidate_internal_code", ""),
                 payload.get("candidate_standard_name", ""),
                 payload.get("match_level", ""),
@@ -3416,6 +3481,11 @@ class AppHandler(BaseHTTPRequestHandler):
                     if not base_uom:
                         self.send_json({"error": "基本单位必须人工确认", "code": "MATERIAL_UNIT_REQUIRED"}, HTTPStatus.BAD_REQUEST)
                         return
+                    confirmed_package = parse_package(specification) or row["parsed_package"]
+                    confirmed_value = parse_value(specification) or row["parsed_value"]
+                    confirmed_voltage = parse_voltage(specification) or row["parsed_voltage"]
+                    confirmed_tolerance = parse_tolerance(specification) or row["parsed_tolerance"]
+                    confirmed_material = parse_material(specification) or row["parsed_material"]
                     insert_item(conn, {
                         "internal_item_code": code,
                         "item_category": category,
@@ -3423,10 +3493,12 @@ class AppHandler(BaseHTTPRequestHandler):
                         "item_status": "启用",
                         "base_uom": base_uom,
                         "brand": row["raw_brand"],
-                        "mpn": row["raw_mpn"],
-                        "package": row["parsed_package"],
-                        "value_spec": specification,
-                        "voltage": row["parsed_voltage"],
+                        "mpn": row["raw_mpn"] or row["raw_model"],
+                        "package": confirmed_package,
+                        "value_spec": confirmed_value or specification,
+                        "voltage": confirmed_voltage,
+                        "tolerance": confirmed_tolerance,
+                        "material": confirmed_material,
                         "environmental_level": body.get("environmental_level", "待确认"),
                         "is_customer_specific": body.get("is_customer_specific", "N"),
                         "default_inspection_rule": body.get("default_inspection_rule", "需品质确认"),

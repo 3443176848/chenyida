@@ -165,6 +165,20 @@ git -C chenyida_erp_site status --short
 | 自动建档 | NONE | 0 个内部物料自动创建 |
 | 部署 | PASS | systemd `enabled/active`，公网 HTTP 200 |
 
+## 1928C 分项规格匹配
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 匹配输入 | PASS | raw spec/model/description/MPN 分开取证，不比较整体文字相似度 |
+| 截图行 | PASS | CAP、0201、5%、C0G/NP0、50V、10PF、MPN 分项提取 |
+| 单项冲突 | PASS | 任一来源关键属性与候选冲突即淘汰 |
+| 供应商简写 | PASS | NPO/NP0/COG/C0G、100P/100PF 确定性归一 |
+| 数据模型 | PASS | 本地 `0003` 扩展现有 Cleaning，不新建重复导入表 |
+| 旧数据 | PRESERVED | 当前 25 条 1928C Cleaning 不回填、不重算 |
+| 当前编号 | EXPECTED NEW | 截图 10PF 规格未存在于当前内部测试库，不能伪造编号 |
+| 回归 | PASS | 联合单元 37/37、self-test、smoke、go-live |
+| 部署 | PASS | 迁移前快照完整；`0003` 已应用，systemd active/enabled，公网 HTTP 200 |
+
 ## 服务器本地交付运行面
 
 | 验证项 | 结果 | 说明 |

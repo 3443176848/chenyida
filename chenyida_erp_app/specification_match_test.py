@@ -1,7 +1,7 @@
 import sqlite3
 import unittest
 
-from server import best_match
+from server import best_match, extract_specification_components
 
 
 class SpecificationMatchTest(unittest.TestCase):
@@ -18,6 +18,7 @@ class SpecificationMatchTest(unittest.TestCase):
                 value_spec TEXT DEFAULT '',
                 voltage TEXT DEFAULT '',
                 tolerance TEXT DEFAULT '',
+                material TEXT DEFAULT '',
                 mpn TEXT DEFAULT ''
             );
             CREATE TABLE supplier_mappings (
@@ -48,6 +49,28 @@ class SpecificationMatchTest(unittest.TestCase):
             INSERT INTO items (
                 internal_item_code, item_category, standard_name, value_spec
             ) VALUES ('6', 'CAP', '历史名称', '22nF,10%,25V,0402')
+            """
+        )
+        self.conn.execute(
+            """
+            INSERT INTO items (
+                internal_item_code, item_category, standard_name, package,
+                value_spec, voltage, tolerance, material, mpn
+            ) VALUES (
+                '8', 'CAP', '内部介质待补', '0402',
+                '47PF', '25V', '5%', '', 'EXACT-MPN'
+            )
+            """
+        )
+        self.conn.execute(
+            """
+            INSERT INTO items (
+                internal_item_code, item_category, standard_name, package,
+                value_spec, voltage, tolerance, material, mpn
+            ) VALUES (
+                '7', 'CAP', '内部名称与供应商不同', '0201',
+                '10PF', '50V', '5%', 'NP0', 'TEST-CAP-PART-001'
+            )
             """
         )
 
@@ -114,6 +137,80 @@ class SpecificationMatchTest(unittest.TestCase):
 
         self.assertEqual(result["candidate_internal_code"], "6")
         self.assertEqual(result["match_level"], "自动匹配")
+
+    def test_1928_description_is_compared_as_individual_components(self):
+        raw = {
+            "supplier_name": "",
+            "raw_item_code": "",
+            "raw_item_name": "贴片电容",
+            "raw_spec": "TEST-CAP-PART-001",
+            "raw_model": "TEST-CAP-PART-001",
+            "raw_mpn": "",
+            "remark": "CAP 0201 ±5% NPO 50V 10PF TEST-CAP-PART-001 测试品牌",
+        }
+
+        components = extract_specification_components(raw)
+        result = best_match(self.conn, raw)
+
+        self.assertEqual(
+            components,
+            {
+                "category": "CAP",
+                "package": "0201",
+                "value_spec": "10PF",
+                "voltage": "50V",
+                "tolerance": "5%",
+                "material": "C0G/NP0",
+                "mpn": "TEST-CAP-PART-001",
+            },
+        )
+        self.assertEqual(result["candidate_internal_code"], "7")
+        self.assertEqual(result["match_level"], "自动匹配")
+
+    def test_one_conflicting_component_rejects_the_candidate(self):
+        result = best_match(
+            self.conn,
+            {
+                "supplier_name": "",
+                "raw_item_code": "",
+                "raw_item_name": "贴片电容",
+                "raw_model": "TEST-CAP-PART-001",
+                "remark": "CAP 0201 ±5% NPO 25V 10PF",
+            },
+        )
+
+        self.assertNotEqual(result["candidate_internal_code"], "7")
+
+    def test_capacitance_shorthand_is_not_dropped_before_matching(self):
+        raw = {
+            "supplier_name": "",
+            "raw_item_code": "",
+            "raw_item_name": "贴片电容",
+            "raw_model": "TEST-CAP-PART-002",
+            "remark": "CAP 0201 +/-5% COG 50V 100P，TEST-CAP-PART-002，测试品牌",
+        }
+
+        components = extract_specification_components(raw)
+        result = best_match(self.conn, raw)
+
+        self.assertEqual(components["value_spec"], "100PF")
+        self.assertEqual(components["material"], "C0G/NP0")
+        self.assertNotEqual(result["candidate_internal_code"], "5")
+
+    def test_exact_mpn_stays_suspected_when_internal_material_is_missing(self):
+        result = best_match(
+            self.conn,
+            {
+                "supplier_name": "",
+                "raw_item_code": "",
+                "raw_item_name": "不同名称",
+                "raw_model": "EXACT-MPN",
+                "remark": "CAP 0402 5% C0G 25V 47PF",
+            },
+        )
+
+        self.assertEqual(result["candidate_internal_code"], "8")
+        self.assertEqual(result["match_level"], "疑似匹配")
 
 
 if __name__ == "__main__":

@@ -139,6 +139,25 @@ class RealSampleImportTest(unittest.TestCase):
                         ).fetchone()[0],
                         221,
                     )
+                    capacitor = connection.execute(
+                        """
+                        SELECT raw_model, raw_brand, parsed_category, parsed_package,
+                               parsed_value, parsed_voltage, parsed_tolerance, parsed_material
+                        FROM cleaning_rows
+                        WHERE import_batch_no = 'TEST-SPEC-1' AND source_row_number = 9
+                        """
+                    ).fetchone()
+                    self.assertTrue(capacitor["raw_model"])
+                    self.assertTrue(capacitor["raw_brand"])
+                    for field in (
+                        "parsed_category",
+                        "parsed_package",
+                        "parsed_value",
+                        "parsed_voltage",
+                        "parsed_tolerance",
+                        "parsed_material",
+                    ):
+                        self.assertTrue(capacitor[field], field)
                     self.assertEqual(connection.execute("SELECT COUNT(*) FROM items").fetchone()[0], 0)
         finally:
             server.DATA_DIR = original_data_dir
