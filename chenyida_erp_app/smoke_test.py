@@ -480,6 +480,19 @@ def main():
             assert summary["new_count"] >= 1, summary
 
             cleaning = request("/api/cleaning")["rows"]
+            confidence_desc = request("/api/cleaning?confidence_sort=desc")
+            confidence_asc = request("/api/cleaning?confidence_sort=asc")
+            confidence_fallback = request("/api/cleaning?confidence_sort=not-valid")
+            assert confidence_desc["confidence_sort"] == "desc", confidence_desc
+            assert confidence_asc["confidence_sort"] == "asc", confidence_asc
+            assert confidence_fallback["confidence_sort"] == "newest", confidence_fallback
+            assert [row["confidence"] for row in confidence_desc["rows"]] == sorted(
+                [row["confidence"] for row in confidence_desc["rows"]],
+                reverse=True,
+            ), confidence_desc
+            assert [row["confidence"] for row in confidence_asc["rows"]] == sorted(
+                [row["confidence"] for row in confidence_asc["rows"]],
+            ), confidence_asc
             auto_row = next(row for row in cleaning if row["match_level"] == "自动匹配")
             request("/api/cleaning/confirm", method="POST", payload={"id": auto_row["id"], "approvedBy": "SmokeTest"})
 

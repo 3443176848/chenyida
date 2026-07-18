@@ -124,6 +124,19 @@ git -C chenyida_erp_site status --short
 | 数据库 | PASS | `PRAGMA integrity_check=ok` |
 | 服务 | PASS | systemd `enabled/active`，公网首页 HTTP 200 |
 
+## 清洗审核匹配置信度排序
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| API 参数 | PASS | `newest/desc/asc` 固定白名单，未知值回退 newest |
+| 全局顺序 | PASS | 服务端排序后再应用 500 条上限 |
+| 稳定顺序 | PASS | 同分按 ID 降序 |
+| 页面 | PASS | 最新记录、由高到低、由低到高 |
+| 单元测试 | PASS 4/4 | 升序、降序、回退、排序后 limit |
+| 集成基线 | PASS | smoke、self-test、go-live |
+| 真实 V700 | PASS | 229 条、21 个置信度层级；升序 0.00→1.00，降序 1.00→0.00 |
+| 开发部署 | PASS | systemd `enabled/active`，公网 HTML/JS 已更新 |
+
 ## 服务器本地交付运行面
 
 | 验证项 | 结果 | 说明 |

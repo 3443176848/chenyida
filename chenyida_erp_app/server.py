@@ -2565,8 +2565,16 @@ def generate_item_code(conn, category):
     return f"CYD-{category}-{next_number:06d}"
 
 
-def cleaning_rows(conn, limit=500):
-    rows = conn.execute("SELECT * FROM cleaning_rows ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+def cleaning_rows(conn, limit=500, confidence_sort="newest"):
+    order_by = {
+        "newest": "id DESC",
+        "desc": "confidence DESC, id DESC",
+        "asc": "confidence ASC, id DESC",
+    }.get(confidence_sort, "id DESC")
+    rows = conn.execute(
+        f"SELECT * FROM cleaning_rows ORDER BY {order_by} LIMIT ?",
+        (limit,),
+    ).fetchall()
     return [dict(row) for row in rows]
 
 
@@ -3090,7 +3098,14 @@ class AppHandler(BaseHTTPRequestHandler):
                 elif path == "/api/mappings":
                     self.send_json({"rows": fetch_mappings(conn)})
                 elif path == "/api/cleaning":
-                    self.send_json({"rows": cleaning_rows(conn)})
+                    query = parse_qs(parsed.query)
+                    confidence_sort = query.get("confidence_sort", ["newest"])[0]
+                    if confidence_sort not in {"newest", "desc", "asc"}:
+                        confidence_sort = "newest"
+                    self.send_json({
+                        "rows": cleaning_rows(conn, confidence_sort=confidence_sort),
+                        "confidence_sort": confidence_sort,
+                    })
                 elif path == "/api/products":
                     self.send_json({"rows": fetch_products(conn)})
                 elif path == "/api/customers":

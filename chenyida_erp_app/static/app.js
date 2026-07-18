@@ -29,6 +29,7 @@ const state = {
   managementDashboard: null,
   backups: [],
   users: [],
+  cleaningConfidenceSort: "newest",
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -981,11 +982,12 @@ async function restoreBackup(name) {
 }
 
 async function refreshAll() {
+  const cleaningQuery = encodeURIComponent(state.cleaningConfidenceSort);
   const [summary, items, mappings, cleaning, products, customers, suppliers, boms, purchaseOrders, purchaseLines, inventory, inventoryAdjustments, workOrders, workMaterials, productionReports, quotations, salesOrders, shipments, qualityInspections, qualityDefects, financeSummary, financialDocuments, financialPayments] = await Promise.all([
     api("/api/summary"),
     api("/api/items"),
     api("/api/mappings"),
-    api("/api/cleaning"),
+    api(`/api/cleaning?confidence_sort=${cleaningQuery}`),
     api("/api/products"),
     api("/api/customers"),
     api("/api/suppliers"),
@@ -1056,6 +1058,13 @@ async function refreshAll() {
   } else {
     renderBomLines();
   }
+}
+
+async function refreshCleaning() {
+  const sort = encodeURIComponent(state.cleaningConfidenceSort);
+  const result = await api(`/api/cleaning?confidence_sort=${sort}`);
+  state.cleaning = result.rows;
+  renderCleaning();
 }
 
 async function loadSample() {
@@ -1615,6 +1624,10 @@ function bindEvents() {
     const createId = event.target.dataset.create;
     if (confirmId) await confirmMapping(Number(confirmId));
     if (createId) openNewItemDialog(Number(createId));
+  });
+  $("#cleaningConfidenceSort").addEventListener("change", (event) => {
+    state.cleaningConfidenceSort = event.target.value;
+    refreshCleaning().catch((error) => toast(error.message));
   });
   $("#createItemBtn").addEventListener("click", createItem);
   $("#createCustomerBtn").addEventListener("click", createCustomer);

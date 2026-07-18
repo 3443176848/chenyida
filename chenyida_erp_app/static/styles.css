@@ -139,9 +139,15 @@ body {
   color: var(--muted);
 }
 
+.compact-control {
+  min-width: 150px;
+  font-size: 14px;
+}
+
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 

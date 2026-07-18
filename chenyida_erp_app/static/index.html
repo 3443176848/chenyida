@@ -96,6 +96,14 @@
               <h2>清洗审核</h2>
               <p>处理自动匹配、疑似匹配和新物料。人工只审核异常，不再逐条录入。</p>
             </div>
+            <label class="compact-control">
+              匹配置信度排序
+              <select id="cleaningConfidenceSort">
+                <option value="newest">最新记录</option>
+                <option value="desc">由高到低</option>
+                <option value="asc">由低到高</option>
+              </select>
+            </label>
           </div>
           <div class="table-wrap">
             <table id="cleaningTable"></table>

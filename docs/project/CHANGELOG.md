@@ -4,6 +4,15 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-CONFIDENCE-SORT-01 - `feat: sort cleaning rows by confidence`
+
+- API：`GET /api/cleaning` 增加 `confidence_sort=newest|desc|asc`，未知值回退 newest；SQL 排序只使用固定白名单。
+- 顺序：服务端对完整 Cleaning 查询按匹配置信度排序后再应用 500 条上限；同分按 ID 降序，默认保持最新记录。
+- UI：“清洗审核”增加“匹配置信度排序”，可选最新、由高到低、由低到高；切换只刷新清洗列表。
+- 测试：排序单元 4/4，smoke 覆盖升降序和未知值回退，self-test/go-live 通过。
+- 部署：systemd 开发服务已重启为 `enabled/active`，公网 HTML/JS 已核验新控件。
+- 真实队列：部署期间用户已网页重导入 V700；229 条、21 个置信度层级（0.00～1.00）的升降序检查均通过。
+
 ### PHASE3-MATERIAL-LIBRARY-MATCH-SEED-01 - `docs: record capacitor matching test seed`
 
 - 用户数据：只采用项目负责人更正后的五条电容规格，按临时内部编码 1～5 建入开发服务器物料库；首次重复版本未执行。
