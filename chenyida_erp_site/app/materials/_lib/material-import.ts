@@ -245,9 +245,11 @@ export type ImportMappingTarget = {
 };
 
 export type ImportMappingItem = {
-  source_column_index: number | null; source_header?: string | null; target_namespace: ImportMappingTarget["target_namespace"];
+  source_column_index: number | null; source_column_indexes?: number[]; source_header?: string | null; source_headers?: string[]; target_namespace: ImportMappingTarget["target_namespace"];
   target_code: string; mapping_mode: "SOURCE" | "SOURCE_WITH_DEFAULT" | "DEFAULT" | "IGNORE";
   default_value_json?: string | number | boolean | null; required: boolean; display_order: number;
+  combination_strategy?: "FIRST_NON_EMPTY" | "JOIN_NON_EMPTY" | "SPECIFICATION_EXTRACT"; combination_separator?: string;
+  mapping_confidence?: number; adaptive_mapping_status?: "EXACT" | "HIGH_CONFIDENCE" | "SUGGESTED" | "UNMAPPED" | "CONFLICT" | "CONFIRMED"; mapping_evidence?: string[];
 };
 
 export function duplicateMappingSources(items: readonly ImportMappingItem[]): number[] {

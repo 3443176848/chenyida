@@ -3,6 +3,8 @@ import type {
   MaterialImportMappingTarget,
   MaterialImportMappingTargetNamespace,
 } from "./mapping-target-registry.ts";
+import { extractSpecificationCandidate } from "./adaptive-import.ts";
+import type { AdaptiveDataRowClassification } from "./adaptive-import.ts";
 import { canonicalJson } from "./mapping-target-registry.ts";
 import type { MaterialImportRawCell, MaterialImportRawRow } from "./parser-model.ts";
 
@@ -34,12 +36,19 @@ export type MaterialImportNormalizationIssue = Readonly<{
 
 export type MaterialImportNormalizationMappingItem = Readonly<{
   source_column_index: number | null;
+  source_column_indexes?: readonly number[];
+  source_headers?: readonly string[];
   target_namespace: MaterialImportMappingTargetNamespace;
   target_code: string;
   mapping_mode: "SOURCE" | "SOURCE_WITH_DEFAULT" | "DEFAULT" | "IGNORE";
   default_value: unknown;
   required: boolean;
   display_order: number;
+  combination_strategy?: "FIRST_NON_EMPTY" | "JOIN_NON_EMPTY" | "SPECIFICATION_EXTRACT";
+  combination_separator?: string;
+  mapping_confidence?: number;
+  adaptive_mapping_status?: "EXACT" | "HIGH_CONFIDENCE" | "SUGGESTED" | "UNMAPPED" | "CONFLICT" | "CONFIRMED";
+  mapping_evidence?: readonly string[];
 }>;
 
 export type MaterialImportNormalizationLineage = Readonly<{
@@ -257,7 +266,46 @@ export class MaterialImportRowNormalizer {
     rawRow: MaterialImportRawRow;
     mappingItems: readonly MaterialImportNormalizationMappingItem[];
     metadataSnapshot: MaterialImportMappingMetadataSnapshot;
+    rowClassification?: AdaptiveDataRowClassification;
+    canonicalContext?: Readonly<{
+      source_file_id: number;
+      source_sheet_name: string;
+      supplier_id: string | null;
+      supplier_profile_id: number | null;
+      created_at: string;
+    }>;
   }>): Promise<MaterialImportNormalizedRowResult> {
+    if (input.rowClassification && input.rowClassification.kind !== "DATA") {
+      const payload: Record<string, unknown> = {
+        schema_version: 1,
+        lineage: input.lineage,
+        row_disposition: "SKIPPED",
+        row_classification: {
+          kind: input.rowClassification.kind,
+          confidence: input.rowClassification.confidence,
+          reason_codes: input.rowClassification.reasonCodes,
+        },
+        basic: {},
+        attributes: {},
+        category_hint: null,
+        supplier_reference: {},
+        adaptive_mapping: {},
+        deferred_validation: [],
+        row_status: "VALID",
+        issue_summary: { issue_count: 0, error_count: 0, warning_count: 0 },
+      };
+      const payloadJson = canonicalJson(payload);
+      return {
+        normalized_payload: payload,
+        normalized_payload_json: payloadJson,
+        normalized_payload_hash: await hashBytes(payloadJson),
+        normalized_payload_bytes: new TextEncoder().encode(payloadJson).byteLength,
+        row_status: "VALID",
+        error_count: 0,
+        warning_count: 0,
+        issues: [],
+      };
+    }
     const cells = new Map(input.rawRow.cells.map((cell) => [cell.column_index, cell]));
     const allIssues: MaterialImportNormalizationIssue[] = [];
     const basic: Record<string, unknown> = {};
@@ -265,6 +313,8 @@ export class MaterialImportRowNormalizer {
     const supplierReference: Record<string, unknown> = {};
     let categoryHint: unknown = null;
     let issueLimitReached = false;
+    const adaptiveMappings: Record<string, unknown> = {};
+    const adaptiveRow = input.mappingItems.some((item) => item.adaptive_mapping_status !== undefined || item.combination_strategy !== undefined || item.source_column_indexes !== undefined);
 
     const pushIssues = (items: readonly MaterialImportNormalizationIssue[]) => {
       for (const item of items) {
@@ -284,23 +334,78 @@ export class MaterialImportRowNormalizer {
         pushIssues([issue("ERROR", "NORMALIZATION_ATTRIBUTE_DISABLED", key, item.source_column_index, "Mapping 目标已失效")]);
         continue;
       }
-      const cell = item.source_column_index === null ? undefined : cells.get(item.source_column_index);
-      let source = sourceFromCell(cell, item.source_column_index);
+      const sourceIndexes = item.source_column_indexes?.length ? item.source_column_indexes : item.source_column_index === null ? [] : [item.source_column_index];
+      const sourceCells = sourceIndexes.map((index) => cells.get(index)).filter((cell): cell is MaterialImportRawCell => Boolean(cell));
+      let cell = sourceCells.find((candidate) => candidate.type !== "EMPTY") ?? sourceCells[0];
+      let source = sourceFromCell(cell, sourceIndexes[0] ?? null);
+      const combination = item.combination_strategy ?? "FIRST_NON_EMPTY";
+      const combinedValues = sourceCells.filter((candidate) => !["EMPTY", "FORMULA", "ERROR"].includes(candidate.type)).map((candidate) => String(candidate.raw_value ?? "").normalize("NFC").trim()).filter(Boolean);
+      let extractionReviewRequired = false;
+      if (combination === "JOIN_NON_EMPTY" && combinedValues.length) {
+        const joined = [...new Set(combinedValues)].join(item.combination_separator ?? " ");
+        cell = { column_index: sourceIndexes[0] ?? 0, column_ref: cell?.column_ref ?? "A", type: "TEXT", source_type: "COMBINED_COLUMNS", raw_value: joined, display: joined, format_code: null };
+        source = { ...sourceFromCell(cell, sourceIndexes[0] ?? null), source_column_indexes: sourceIndexes, raw_values: combinedValues } as SourceLineage;
+      } else if (combination === "SPECIFICATION_EXTRACT") {
+        const extracted = extractSpecificationCandidate({ componentValues: combinedValues });
+        extractionReviewRequired = extracted.reviewStatus === "NEEDS_REVIEW";
+        if (extracted.value) {
+          cell = { column_index: sourceIndexes[0] ?? 0, column_ref: cell?.column_ref ?? "A", type: "TEXT", source_type: "SPECIFICATION_EXTRACT", raw_value: extracted.value, display: extracted.value, format_code: null };
+          source = { ...sourceFromCell(cell, sourceIndexes[0] ?? null), source_column_indexes: sourceIndexes, raw_values: combinedValues, extraction_evidence: extracted.evidence } as SourceLineage;
+        } else source = sourceFromCell(undefined, sourceIndexes[0] ?? null);
+      }
       const useDefault = item.mapping_mode === "DEFAULT"
         || (item.mapping_mode === "SOURCE_WITH_DEFAULT" && (source.value_state === "MISSING" || source.value_state === "EMPTY"));
       if (useDefault) source = defaultSource(item.default_value);
       const converted = convertCandidate(definition, source, item.required || definition.required_for_confirm);
       pushIssues(converted.issues);
-      const value = { target_code: key, source, candidate: converted.candidate, status: fieldStatus(converted.issues) };
+      const specificationIssues: MaterialImportNormalizationIssue[] = [];
+      if (adaptiveRow && key === "supplier_reference.SUPPLIER_SPECIFICATION" && (converted.candidate === null || converted.candidate === "")) {
+        specificationIssues.push(issue("ERROR", "NORMALIZATION_SPECIFICATION_REVIEW_REQUIRED", key, sourceIndexes[0] ?? null, "规格未识别，禁止以空规格进入物料草稿"));
+        pushIssues([issue("ERROR", "NORMALIZATION_SPECIFICATION_REVIEW_REQUIRED", key, sourceIndexes[0] ?? null, "规格未识别，禁止以空规格进入物料草稿")]);
+      } else if (adaptiveRow && key === "supplier_reference.SUPPLIER_SPECIFICATION" && extractionReviewRequired) {
+        specificationIssues.push(issue("WARNING", "NORMALIZATION_SPECIFICATION_REVIEW_REQUIRED", key, sourceIndexes[0] ?? null, "规格为确定性组合候选，必须在审核界面确认", { source_columns: sourceIndexes }));
+        pushIssues([issue("WARNING", "NORMALIZATION_SPECIFICATION_REVIEW_REQUIRED", key, sourceIndexes[0] ?? null, "规格为确定性组合候选，必须在审核界面确认", { source_columns: sourceIndexes })]);
+      }
+      const value = { target_code: key, source, candidate: converted.candidate, status: fieldStatus([...converted.issues, ...specificationIssues]) };
       if (item.target_namespace === "basic") basic[item.target_code.toLowerCase()] = value;
       else if (item.target_namespace === "attribute") attributes[item.target_code] = value;
       else if (item.target_namespace === "category_hint") categoryHint = value;
       else supplierReference[item.target_code] = value;
+      adaptiveMappings[key] = {
+        source_column_indexes: sourceIndexes,
+        combination_strategy: combination,
+        confidence: item.mapping_confidence ?? 0,
+        mapping_status: item.adaptive_mapping_status ?? "UNMAPPED",
+        evidence: item.mapping_evidence ?? [],
+      };
+    }
+
+    if (adaptiveRow && !supplierReference.SUPPLIER_SPECIFICATION) {
+      pushIssues([issue("ERROR", "NORMALIZATION_SPECIFICATION_REVIEW_REQUIRED", "supplier_reference.SUPPLIER_SPECIFICATION", null, "未建立规格 Mapping，禁止以空规格进入物料草稿")]);
     }
 
     if (issueLimitReached) {
       allIssues.push(issue("ERROR", "NORMALIZATION_ISSUE_LIMIT_EXCEEDED", "row.__ROW__", null, "单行问题数量超过限制"));
     }
+    const candidateValue = (value: unknown): unknown => value && typeof value === "object" && "candidate" in value
+      ? (value as { candidate?: unknown }).candidate ?? null
+      : null;
+    const adaptiveStatuses = input.mappingItems.map((item) => item.adaptive_mapping_status ?? "UNMAPPED");
+    const mappingStatus = adaptiveStatuses.includes("CONFLICT") ? "CONFLICT"
+      : adaptiveStatuses.includes("UNMAPPED") ? "UNMAPPED"
+        : adaptiveStatuses.includes("SUGGESTED") ? "SUGGESTED"
+          : adaptiveStatuses.includes("HIGH_CONFIDENCE") ? "HIGH_CONFIDENCE" : "EXACT";
+    const mappingConfidence = input.mappingItems.length
+      ? input.mappingItems.reduce((sum, item) => sum + Number(item.mapping_confidence ?? 0), 0) / input.mappingItems.length
+      : 0;
+    const specificationItem = input.mappingItems.find((item) => item.target_namespace === "supplier_reference" && item.target_code === "SUPPLIER_SPECIFICATION");
+    const specification = candidateValue(supplierReference.SUPPLIER_SPECIFICATION);
+    const specificationSourceIndexes = specificationItem?.source_column_indexes
+      ?? (specificationItem?.source_column_index === null || specificationItem?.source_column_index === undefined ? [] : [specificationItem.source_column_index]);
+    const specificationSourceHeaders = specificationItem?.source_headers ?? [];
+    const rawModelIndex = specificationSourceHeaders.findIndex((header) => /型号|model/i.test(header.split("/").at(-1) ?? header));
+    const rawModelColumn = rawModelIndex >= 0 ? specificationSourceIndexes[rawModelIndex] : undefined;
+    const rawModel = rawModelColumn === undefined ? null : cellTextForCanonical(cells.get(rawModelColumn));
     const payload: Record<string, unknown> = {
       schema_version: 1,
       lineage: input.lineage,
@@ -308,10 +413,44 @@ export class MaterialImportRowNormalizer {
       attributes,
       category_hint: categoryHint,
       supplier_reference: supplierReference,
+      adaptive_mapping: adaptiveMappings,
       deferred_validation: ["CATEGORY_ASSIGNMENT_REQUIRED", "CATEGORY_BOUND_ATTRIBUTE_VALIDATION_REQUIRED", "MATERIAL_VALIDATION_NOT_RUN"],
     };
     let errors = allIssues.filter((item) => item.issue_level === "ERROR").length;
     let warnings = allIssues.length - errors;
+    if (adaptiveRow && input.canonicalContext) {
+      payload.canonical_import = {
+        schema_version: 1,
+        source_file_id: input.canonicalContext.source_file_id,
+        source_sheet_name: input.canonicalContext.source_sheet_name,
+        source_row_number: input.lineage.source_row_number,
+        supplier_id: input.canonicalContext.supplier_id,
+        supplier_profile_id: input.canonicalContext.supplier_profile_id,
+        raw_values_reference: {
+          parse_run_id: input.lineage.parse_run_id,
+          sheet_index: input.lineage.sheet_index,
+          row_number: input.lineage.source_row_number,
+          raw_row_hash: input.lineage.raw_row_hash,
+        },
+        raw_material_code: candidateValue(supplierReference.SUPPLIER_ITEM_CODE),
+        raw_material_name: candidateValue(basic.standard_name),
+        raw_specification: specification,
+        raw_model: rawModel,
+        raw_brand: candidateValue(basic.brand),
+        raw_unit: candidateValue(basic.unit),
+        raw_category: candidateValue(categoryHint),
+        raw_description: candidateValue(supplierReference.SUPPLIER_ITEM_NAME),
+        raw_manufacturer_part_no: candidateValue(basic.manufacturer_part_number),
+        raw_supplier_part_no: candidateValue(supplierReference.SUPPLIER_ITEM_CODE),
+        mapped_values_json: { basic, attributes, category_hint: categoryHint, supplier_reference: supplierReference },
+        mapping_confidence: Math.max(0, Math.min(1, mappingConfidence)),
+        specification_confidence: specification ? Math.max(0, Math.min(1, Number(specificationItem?.mapping_confidence ?? 0))) : 0,
+        mapping_status: mappingStatus,
+        review_status: !errors && specification && ["EXACT", "CONFIRMED"].includes(specificationItem?.adaptive_mapping_status ?? "") ? "AUTO_ACCEPTABLE" : "NEEDS_REVIEW",
+        created_at: input.canonicalContext.created_at,
+        updated_at: input.canonicalContext.created_at,
+      };
+    }
     payload.row_status = errors ? "ERROR" : warnings ? "WARNING" : "VALID";
     payload.issue_summary = { issue_count: allIssues.length, error_count: errors, warning_count: warnings };
     let payloadJson = canonicalJson(payload);
@@ -340,4 +479,10 @@ export class MaterialImportRowNormalizer {
       issues: allIssues,
     };
   }
+}
+
+function cellTextForCanonical(cell: MaterialImportRawCell | undefined): string | null {
+  if (!cell || ["EMPTY", "ERROR", "FORMULA"].includes(cell.type)) return null;
+  const value = String(cell.raw_value ?? "").normalize("NFC").trim();
+  return value || null;
 }

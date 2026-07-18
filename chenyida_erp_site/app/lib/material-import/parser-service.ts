@@ -1,4 +1,15 @@
 import type { MaterialMasterD1Database, MaterialMasterD1Statement } from "../material-master/index.ts";
+import {
+  MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION,
+  MATERIAL_IMPORT_FIELD_ALIASES,
+  adaptiveTemplateSignature,
+  analyzeAdaptiveImportStructure,
+  suggestAdaptiveFieldMappings,
+  type AdaptiveFieldMapping,
+  type AdaptiveImportSheet,
+  type CanonicalField,
+  type SupplierImportProfile,
+} from "./adaptive-import.ts";
 import { parseMaterialImportCsv } from "./csv-parser.ts";
 import type { MaterialImportObjectStore } from "./object-store.ts";
 import {
@@ -19,6 +30,7 @@ const RECORD_RETENTION_DAYS = 1_095;
 type ParserBatchRow = { id: number; status: string; source_kind: "CSV" | "XLSX"; created_by: string; current_version: number; current_parse_run_id: number | null };
 type ParserRunRow = { id: number; batch_id: number; run_status: string; attempt_no: number; lease_token_digest: string | null; lease_expires_at: number | null; mapping_preparation_status: string; parser_version: string };
 type ParserFileRow = { object_key: string; detected_file_type: "CSV" | "XLSX"; actual_sha256: string };
+type SupplierProfileRow = { id: number; supplier_key: string; template_fingerprint: string; field_aliases_json: string; mapping_rules_json: string };
 
 export type QueueMaterialImportParseInput = Readonly<{
   batchId: number;
@@ -46,6 +58,25 @@ async function sha256Text(value: string): Promise<string> {
 
 function assertIdempotencyKey(value: string): void {
   if (value.length < 8 || value.length > 200 || /[\u0000-\u001f\u007f]/.test(value)) throw new MaterialImportParserServiceError("IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key 必须为 8 到 200 个安全字符", 400);
+}
+
+function controlledProfileMap(value: string, nestedKey?: string): Partial<Record<CanonicalField, readonly string[]>> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return {};
+  }
+  if (nestedKey && parsed && typeof parsed === "object" && !Array.isArray(parsed)) parsed = (parsed as Record<string, unknown>)[nestedKey] ?? parsed;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  const result: Partial<Record<CanonicalField, readonly string[]>> = {};
+  for (const field of Object.keys(MATERIAL_IMPORT_FIELD_ALIASES) as CanonicalField[]) {
+    const aliases = (parsed as Record<string, unknown>)[field];
+    if (!Array.isArray(aliases)) continue;
+    const safe = aliases.filter((item): item is string => typeof item === "string" && item.trim().length > 0 && item.length <= 500 && !/[\u0000-\u001f\u007f]/.test(item)).slice(0, 50);
+    if (safe.length) result[field] = safe;
+  }
+  return result;
 }
 
 function visibleBatch(row: ParserBatchRow | null, username: string, canReadAny: boolean): ParserBatchRow {
@@ -257,26 +288,106 @@ export class MaterialImportParserTaskHandler implements MaterialImportTaskHandle
     const claim = await this.#database.prepare("UPDATE material_import_parse_runs SET mapping_preparation_status='RUNNING',mapping_preparation_attempt_count=mapping_preparation_attempt_count+1,mapping_preparation_failure_code=NULL,mapping_preparation_safe_message=NULL,mapping_preparation_updated_at=?,current_stage='PREPARE_MAPPING',updated_at=? WHERE id=? AND mapping_preparation_status IN ('NOT_STARTED','QUEUED','FAILED')").bind(timestamp, timestamp, task.parseRunId).run();
     if ((claim.meta?.changes ?? 0) !== 1) return "RETRY";
     try {
-      const sheet = await this.#database.prepare("SELECT sheet_index,row_count,source_column_max FROM material_import_parse_sheets WHERE parse_run_id=? AND visibility='VISIBLE' AND parse_status='COMPLETED' ORDER BY CASE WHEN row_count>0 THEN 0 ELSE 1 END,sheet_index LIMIT 1").bind(task.parseRunId).first<{ sheet_index: number; row_count: number; source_column_max: number }>();
-      if (!sheet) throw new MaterialImportParserError("IMPORT_MAPPING_PREPARATION_FAILED", "没有可用于 Mapping 的可见 Sheet");
-      const sample = (await this.#database.prepare("SELECT row_number,raw_values_json FROM material_import_rows WHERE parse_run_id=? AND sheet_index=? ORDER BY row_number LIMIT 10").bind(task.parseRunId, sheet.sheet_index).all<{ row_number: number; raw_values_json: string }>()).results ?? [];
-      const candidates = sample.map((row) => {
-        const raw = JSON.parse(row.raw_values_json) as { cells?: Array<{ type?: string; raw_value?: unknown }> };
-        const cells = raw.cells ?? [];
-        const nonEmpty = cells.filter((cell) => cell.type !== "EMPTY" && String(cell.raw_value ?? "").trim()).length;
-        const unique = new Set(cells.map((cell) => String(cell.raw_value ?? "").trim()).filter(Boolean)).size;
-        const score = cells.length ? Math.min(1, (nonEmpty / cells.length) * 0.7 + (unique / Math.max(1, nonEmpty)) * 0.3) : 0;
-        return { rowNumber: row.row_number, score };
-      }).filter((candidate) => candidate.score > 0).sort((left, right) => right.score - left.score).slice(0, 3);
+      const sheetRows = (await this.#database.prepare("SELECT sheet_index,sheet_name,row_count,source_column_max,merged_ranges_json FROM material_import_parse_sheets WHERE parse_run_id=? AND visibility='VISIBLE' AND parse_status='COMPLETED' ORDER BY sheet_index").bind(task.parseRunId).all<{ sheet_index: number; sheet_name: string; row_count: number; source_column_max: number; merged_ranges_json: string | null }>()).results ?? [];
+      if (!sheetRows.length) throw new MaterialImportParserError("IMPORT_MAPPING_PREPARATION_FAILED", "没有可用于 Mapping 的可见 Sheet");
+      const sheets: AdaptiveImportSheet[] = [];
+      for (const sheet of sheetRows) {
+        const rows = (await this.#database.prepare("SELECT row_number,raw_values_json FROM material_import_rows WHERE parse_run_id=? AND sheet_index=? AND row_number<=50 ORDER BY row_number").bind(task.parseRunId, sheet.sheet_index).all<{ row_number: number; raw_values_json: string }>()).results ?? [];
+        sheets.push({
+          sheetIndex: sheet.sheet_index,
+          sheetName: sheet.sheet_name,
+          rowCount: sheet.row_count,
+          sourceColumnMax: sheet.source_column_max,
+          mergedRanges: sheet.merged_ranges_json ? JSON.parse(sheet.merged_ranges_json) as string[] : [],
+          rows: rows.map((row) => ({ rowNumber: row.row_number, raw: JSON.parse(row.raw_values_json) })),
+        });
+      }
+      const adaptiveSchema = Boolean(await this.#database.prepare("SELECT 1 AS present FROM pragma_table_info('material_import_mappings') WHERE name='structure_confidence'").first<{ present: number }>());
+      let structure = analyzeAdaptiveImportStructure(sheets);
+      let selectedAnalysis = structure.sheets.find((sheet) => sheet.sheetIndex === structure.selectedSheetIndex);
+      let selectedHeader = selectedAnalysis?.selectedHeader;
+      if (!selectedAnalysis || !selectedHeader) throw new MaterialImportParserError("IMPORT_MAPPING_PREPARATION_FAILED", "未找到可信的物料工作表和表头候选");
+      const templateFingerprint = await sha256Text(adaptiveTemplateSignature(selectedHeader));
+      const profileRow = adaptiveSchema
+        ? await this.#database.prepare("SELECT id,supplier_key,template_fingerprint,field_aliases_json,mapping_rules_json FROM material_import_supplier_profiles WHERE template_fingerprint=? AND status='ACTIVE' ORDER BY profile_version DESC,id DESC LIMIT 1").bind(templateFingerprint).first<SupplierProfileRow>()
+        : null;
+      const profile: SupplierImportProfile | undefined = profileRow ? {
+        id: profileRow.id,
+        supplierKey: profileRow.supplier_key,
+        templateFingerprint: profileRow.template_fingerprint,
+        headerAliases: controlledProfileMap(profileRow.field_aliases_json),
+        preferredMappings: controlledProfileMap(profileRow.mapping_rules_json, "preferred_mappings"),
+      } : undefined;
+      if (profile) {
+        structure = analyzeAdaptiveImportStructure(sheets, profile);
+        selectedAnalysis = structure.sheets.find((sheet) => sheet.sheetIndex === structure.selectedSheetIndex);
+        selectedHeader = selectedAnalysis?.selectedHeader;
+        if (!selectedAnalysis || !selectedHeader) throw new MaterialImportParserError("IMPORT_MAPPING_PREPARATION_FAILED", "供应商 Profile 未能识别可信物料表头");
+      }
+      const suggestedMappings = suggestAdaptiveFieldMappings(selectedHeader, profile);
       const metadataDigest = (await new MaterialImportMappingMetadataSnapshotService(this.#database).current()).metadataDigest;
-      const header = candidates[0]?.rowNumber ?? null;
       const statements: MaterialMasterD1Statement[] = [this.#database.prepare("DELETE FROM material_import_header_suggestions WHERE parse_run_id=?").bind(task.parseRunId)];
-      candidates.forEach((candidate, index) => statements.push(this.#database.prepare("INSERT INTO material_import_header_suggestions(parse_run_id,sheet_index,row_number,rank,score,reason_codes_json,algorithm_version,metadata_digest,created_at) VALUES(?,?,?,?,?,'[\"NON_EMPTY_UNIQUE_ROW\"]','header-v1',?,?)").bind(task.parseRunId, sheet.sheet_index, candidate.rowNumber, index + 1, candidate.score, metadataDigest, timestamp)));
+      let rank = 0;
+      for (const analysis of structure.sheets) {
+        const seenHeaderRows = new Set<number>();
+        for (const header of analysis.headerCandidates) {
+          if (seenHeaderRows.has(header.headerStartRow) || seenHeaderRows.size >= 3) continue;
+          seenHeaderRows.add(header.headerStartRow);
+          rank += 1;
+          statements.push(this.#database.prepare("INSERT INTO material_import_header_suggestions(parse_run_id,sheet_index,row_number,rank,score,reason_codes_json,algorithm_version,metadata_digest,created_at) VALUES(?,?,?,?,?,?,?,?,?)").bind(
+            task.parseRunId,
+            analysis.sheetIndex,
+            header.headerStartRow,
+            rank,
+            header.score,
+            JSON.stringify([...header.reasonCodes, `HEADER_END_ROW_${header.headerEndRow}`, `DATA_START_ROW_${header.dataStartRow}`]),
+            MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION,
+            metadataDigest,
+            timestamp,
+          ));
+        }
+      }
+      statements.push(adaptiveSchema
+        ? this.#database.prepare(`INSERT INTO material_import_mappings(batch_id,parse_run_id,selected_sheet_index,header_mode,header_row_number,mapping_status,mapping_version,metadata_digest,suggestion_algorithm_version,header_start_row_number,data_start_row_number,structure_confidence,structure_status,structure_evidence_json,created_by,updated_by,created_at,updated_at)
+          SELECT ?,?,?, 'SINGLE_ROW',?,'DRAFT',1,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM material_import_mappings WHERE parse_run_id=? AND mapping_status<>'SUPERSEDED')`).bind(task.batchId, task.parseRunId, selectedAnalysis.sheetIndex, selectedHeader.headerEndRow, metadataDigest, MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION, selectedHeader.headerStartRow, selectedHeader.dataStartRow, structure.confidence, structure.status, JSON.stringify({ algorithm_version: structure.algorithmVersion, template_fingerprint: templateFingerprint, supplier_profile_id: profile?.id ?? null, sheet_reason_codes: selectedAnalysis.reasonCodes, header_reason_codes: selectedHeader.reasonCodes }), batch.created_by, batch.created_by, timestamp, timestamp, task.parseRunId)
+        : this.#database.prepare(`INSERT INTO material_import_mappings(batch_id,parse_run_id,selected_sheet_index,header_mode,header_row_number,mapping_status,mapping_version,metadata_digest,suggestion_algorithm_version,created_by,updated_by,created_at,updated_at) SELECT ?,?,?, 'SINGLE_ROW',?,'DRAFT',1,?,?, ?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM material_import_mappings WHERE parse_run_id=? AND mapping_status<>'SUPERSEDED')`).bind(task.batchId, task.parseRunId, selectedAnalysis.sheetIndex, selectedHeader.headerEndRow, metadataDigest, MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION, batch.created_by, batch.created_by, timestamp, timestamp, task.parseRunId),
+      );
+      if (adaptiveSchema && profile?.id) statements.push(
+        this.#database.prepare("UPDATE material_import_mappings SET supplier_profile_id=? WHERE parse_run_id=? AND mapping_status='DRAFT'").bind(profile.id, task.parseRunId),
+      );
+      const targetForField: Readonly<Partial<Record<CanonicalField, readonly [string, string]>>> = {
+        material_name: ["basic", "STANDARD_NAME"],
+        unit: ["basic", "UNIT"],
+        brand: ["basic", "BRAND"],
+        manufacturer_part_no: ["basic", "MANUFACTURER_PART_NUMBER"],
+        category: ["category_hint", "CATEGORY_HINT"],
+        supplier_part_no: ["supplier_reference", "SUPPLIER_ITEM_CODE"],
+        material_code: ["supplier_reference", "SUPPLIER_ITEM_CODE"],
+        specification: ["supplier_reference", "SUPPLIER_SPECIFICATION"],
+      };
+      const usedTargets = new Set<string>();
+      const automatic: AdaptiveFieldMapping[] = [];
+      for (const mapping of suggestedMappings) {
+        const target = targetForField[mapping.field];
+        if (!target || ["CONFLICT", "UNMAPPED"].includes(mapping.status) || (!adaptiveSchema && (!["EXACT", "HIGH_CONFIDENCE"].includes(mapping.status) || mapping.sourceColumnIndexes.length !== 1))) continue;
+        const targetKey = `${target[0]}.${target[1]}`;
+        if (usedTargets.has(targetKey)) continue;
+        usedTargets.add(targetKey);
+        automatic.push(mapping);
+      }
+      automatic.forEach((mapping, index) => {
+        const target = targetForField[mapping.field]!;
+        const source = mapping.sourceColumnIndexes[0] ?? null;
+        statements.push(adaptiveSchema
+          ? this.#database.prepare(`INSERT INTO material_import_mapping_items(mapping_id,source_column_index,source_header,target_namespace,target_code,mapping_mode,default_value_json,required,display_order,source_column_indexes_json,source_headers_json,combination_strategy,combination_separator,mapping_confidence,adaptive_mapping_status,mapping_evidence_json)
+            SELECT id,?,?,?,?, 'SOURCE',NULL,?,?,?,?,?,?,?,?,? FROM material_import_mappings WHERE parse_run_id=? AND mapping_status='DRAFT'`).bind(source, mapping.sourceHeaders.join("/").slice(0, 32_767) || null, target[0], target[1], target[0] === "basic" && ["STANDARD_NAME", "UNIT"].includes(target[1]) ? 1 : 0, index, JSON.stringify(mapping.sourceColumnIndexes), JSON.stringify(mapping.sourceHeaders), mapping.combinationStrategy, mapping.separator, mapping.confidence, mapping.status, JSON.stringify(mapping.evidence), task.parseRunId)
+          : this.#database.prepare(`INSERT INTO material_import_mapping_items(mapping_id,source_column_index,source_header,target_namespace,target_code,mapping_mode,default_value_json,required,display_order)
+            SELECT id,?,?,?,?, 'SOURCE',NULL,?,? FROM material_import_mappings WHERE parse_run_id=? AND mapping_status='DRAFT'`).bind(source, mapping.sourceHeaders[0]?.slice(0, 32_767) ?? null, target[0], target[1], target[0] === "basic" && ["STANDARD_NAME", "UNIT"].includes(target[1]) ? 1 : 0, index, task.parseRunId));
+      });
       statements.push(
-        this.#database.prepare(`INSERT INTO material_import_mappings(batch_id,parse_run_id,selected_sheet_index,header_mode,header_row_number,mapping_status,mapping_version,metadata_digest,suggestion_algorithm_version,created_by,updated_by,created_at,updated_at) SELECT ?,?,?,?,?,'DRAFT',1,?,'header-v1',?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM material_import_mappings WHERE parse_run_id=? AND mapping_status<>'SUPERSEDED')`).bind(task.batchId, task.parseRunId, sheet.sheet_index, header ? "SINGLE_ROW" : "NO_HEADER", header, metadataDigest, batch.created_by, batch.created_by, timestamp, timestamp, task.parseRunId),
         this.#database.prepare("UPDATE material_import_parse_runs SET mapping_preparation_status='READY',mapping_preparation_updated_at=?,current_stage='COMPLETE',updated_at=? WHERE id=? AND mapping_preparation_status='RUNNING'").bind(timestamp, timestamp, task.parseRunId),
         this.#database.prepare("UPDATE material_import_batches SET status='AWAITING_MAPPING',current_version=current_version+1,updated_at=? WHERE id=? AND status='PARSED' AND current_parse_run_id=? AND current_version=?").bind(timestamp, task.batchId, task.parseRunId, batch.current_version),
-        this.#database.prepare("INSERT INTO material_import_events(batch_id,event_type,actor_type,previous_status,new_status,request_id,safe_details_json,created_at) VALUES(?,'MAPPING_PREPARATION_READY','SYSTEM','PARSED','AWAITING_MAPPING',?,json_object('parse_run_id',?,'sheet_index',?),?)").bind(task.batchId, task.jobId, task.parseRunId, sheet.sheet_index, timestamp),
+        this.#database.prepare("INSERT INTO material_import_events(batch_id,event_type,actor_type,previous_status,new_status,request_id,safe_details_json,created_at) VALUES(?,'MAPPING_PREPARATION_READY','SYSTEM','PARSED','AWAITING_MAPPING',?,json_object('parse_run_id',?,'sheet_index',?,'header_start_row',?,'header_end_row',?,'structure_status',?,'structure_confidence',?,'automatic_mapping_count',?),?)").bind(task.batchId, task.jobId, task.parseRunId, selectedAnalysis.sheetIndex, selectedHeader.headerStartRow, selectedHeader.headerEndRow, structure.status, structure.confidence, automatic.length, timestamp),
       );
       await this.#database.batch(statements);
       return "ACK";

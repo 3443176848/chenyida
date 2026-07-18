@@ -57,6 +57,13 @@
       "when": 1784355015660,
       "tag": "0007_material_library",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1784360087956,
+      "tag": "0008_supplier_adaptive_import",
+      "breakpoints": true
     }
   ]
 }

@@ -10,6 +10,7 @@ import {
   type MaterialImportNormalizationMappingItem,
 } from "./normalization-model.ts";
 import type { MaterialImportRawRow } from "./parser-model.ts";
+import { classifyAdaptiveDataRow } from "./adaptive-import.ts";
 import type { MaterialImportTask, MaterialImportTaskDisposition, MaterialImportTaskHandler } from "./task-scheduler.ts";
 
 const LEASE_SECONDS = 120;
@@ -35,6 +36,7 @@ type MappingRow = {
   mapping_status: string;
   mapping_version: number;
   metadata_digest: string;
+  supplier_profile_id?: number | null;
 };
 
 type RunRow = {
@@ -79,6 +81,13 @@ type MappingItemRow = {
   default_value_json: string | null;
   required: number;
   display_order: number;
+  source_column_indexes_json?: string | null;
+  source_headers_json?: string | null;
+  combination_strategy?: MaterialImportNormalizationMappingItem["combination_strategy"];
+  combination_separator?: string;
+  mapping_confidence?: number;
+  adaptive_mapping_status?: MaterialImportNormalizationMappingItem["adaptive_mapping_status"];
+  mapping_evidence_json?: string;
 };
 
 export type MaterialImportNormalizationServiceResult = Readonly<{ status: number; payload: Record<string, unknown>; replayed?: boolean }>;
@@ -208,7 +217,7 @@ export async function startMaterialImportNormalization(
     if (current.processor_version === input.processorVersion) throw new MaterialImportNormalizationServiceError("IMPORT_NORMALIZATION_NOT_ALLOWED", "相同 processor_version 不创建重复运行", 409);
   }
   const headerRow = mapping.header_mode === "SINGLE_ROW" ? mapping.header_row_number : null;
-  const count = await database.prepare("SELECT COUNT(*) AS total FROM material_import_rows WHERE parse_run_id=? AND sheet_index=? AND (? IS NULL OR row_number<>?)").bind(mapping.parse_run_id, mapping.selected_sheet_index, headerRow, headerRow).first<{ total: number }>();
+  const count = await database.prepare("SELECT COUNT(*) AS total FROM material_import_rows WHERE parse_run_id=? AND sheet_index=? AND (? IS NULL OR row_number>?)").bind(mapping.parse_run_id, mapping.selected_sheet_index, headerRow, headerRow).first<{ total: number }>();
   const totalRows = Number(count?.total ?? 0);
   if (totalRows > MATERIAL_IMPORT_NORMALIZATION_LIMITS.maxRows) throw new MaterialImportNormalizationServiceError("IMPORT_NORMALIZATION_LIMIT_EXCEEDED", "规范化源行数超过限制", 409);
 
@@ -369,21 +378,75 @@ async function claimLease(database: MaterialMasterD1Database, run: RunRow, clock
 }
 
 async function normalizationMappingItems(database: MaterialMasterD1Database, mappingId: number): Promise<readonly MaterialImportNormalizationMappingItem[]> {
-  const rows = (await database.prepare("SELECT source_column_index,target_namespace,target_code,mapping_mode,default_value_json,required,display_order FROM material_import_mapping_items WHERE mapping_id=? ORDER BY display_order,id").bind(mappingId).all<MappingItemRow>()).results ?? [];
-  return rows.map((row) => ({
+  const rows = (await database.prepare("SELECT * FROM material_import_mapping_items WHERE mapping_id=? ORDER BY display_order,id").bind(mappingId).all<MappingItemRow>()).results ?? [];
+  return rows.map((row) => {
+    const adaptive = row.source_column_indexes_json !== undefined && (row.source_column_indexes_json !== null || row.adaptive_mapping_status !== "UNMAPPED");
+    return {
     source_column_index: row.source_column_index,
+    ...(adaptive ? { source_column_indexes: row.source_column_indexes_json ? JSON.parse(row.source_column_indexes_json) : row.source_column_index === null ? [] : [row.source_column_index] } : {}),
+    ...(adaptive ? { source_headers: row.source_headers_json ? JSON.parse(row.source_headers_json) : [] } : {}),
     target_namespace: row.target_namespace,
     target_code: row.target_code,
     mapping_mode: row.mapping_mode,
     default_value: row.default_value_json === null ? null : JSON.parse(row.default_value_json),
     required: row.required === 1,
     display_order: row.display_order,
-  }));
+    ...(adaptive ? {
+      combination_strategy: row.combination_strategy ?? "FIRST_NON_EMPTY",
+      combination_separator: row.combination_separator ?? " ",
+      mapping_confidence: row.mapping_confidence ?? 0,
+      adaptive_mapping_status: row.adaptive_mapping_status ?? "UNMAPPED",
+      mapping_evidence: row.mapping_evidence_json ? JSON.parse(row.mapping_evidence_json) : [],
+    } : {}),
+  };
+  });
+}
+
+async function adaptiveNormalizationSchemaAvailable(database: MaterialMasterD1Database): Promise<boolean> {
+  const row = await database.prepare("SELECT 1 AS present FROM pragma_table_info('material_import_normalized_rows') WHERE name='mapped_values_json'").first<{ present: number }>();
+  return row?.present === 1;
+}
+
+function adaptiveRowProjection(result: Awaited<ReturnType<MaterialImportRowNormalizer["normalize"]>>): Readonly<{
+  mappedValuesJson: string;
+  mappingConfidence: number;
+  specificationConfidence: number;
+  mappingStatus: "EXACT" | "HIGH_CONFIDENCE" | "SUGGESTED" | "UNMAPPED" | "CONFLICT";
+  reviewStatus: "AUTO_ACCEPTABLE" | "NEEDS_REVIEW" | "REJECTED";
+}> {
+  const payload = result.normalized_payload as { row_disposition?: string; basic?: unknown; attributes?: unknown; category_hint?: unknown; supplier_reference?: Record<string, { candidate?: unknown; status?: string }>; adaptive_mapping?: Record<string, { confidence?: number; mapping_status?: string }> };
+  if (payload.row_disposition === "SKIPPED") {
+    return {
+      mappedValuesJson: canonicalJson({}),
+      mappingConfidence: 0,
+      specificationConfidence: 0,
+      mappingStatus: "UNMAPPED",
+      reviewStatus: "REJECTED",
+    };
+  }
+  const mappings = Object.values(payload.adaptive_mapping ?? {});
+  const statuses = mappings.map((item) => String(item.mapping_status ?? "UNMAPPED"));
+  const mappingStatus = statuses.includes("CONFLICT") ? "CONFLICT"
+    : statuses.includes("UNMAPPED") || !statuses.length ? "UNMAPPED"
+      : statuses.includes("SUGGESTED") ? "SUGGESTED"
+        : statuses.includes("HIGH_CONFIDENCE") ? "HIGH_CONFIDENCE" : "EXACT";
+  const confidence = mappings.length ? mappings.reduce((sum, item) => sum + Number(item.confidence ?? 0), 0) / mappings.length : 0;
+  const specification = payload.supplier_reference?.SUPPLIER_SPECIFICATION;
+  const specificationMapping = payload.adaptive_mapping?.["supplier_reference.SUPPLIER_SPECIFICATION"];
+  const specificationConfidence = specification?.candidate ? Number(specificationMapping?.confidence ?? 0) : 0;
+  const needsReview = result.row_status === "ERROR" || !specification?.candidate || !["EXACT", "CONFIRMED"].includes(String(specificationMapping?.mapping_status ?? ""));
+  return {
+    mappedValuesJson: canonicalJson({ basic: payload.basic ?? {}, attributes: payload.attributes ?? {}, category_hint: payload.category_hint ?? null, supplier_reference: payload.supplier_reference ?? {} }),
+    mappingConfidence: Math.max(0, Math.min(1, confidence)),
+    specificationConfidence: Math.max(0, Math.min(1, specificationConfidence)),
+    mappingStatus,
+    reviewStatus: needsReview ? "NEEDS_REVIEW" : "AUTO_ACCEPTABLE",
+  };
 }
 
 async function boundFacts(database: MaterialMasterD1Database, run: RunRow): Promise<Readonly<{ batch: BatchRow; mapping: MappingRow }>> {
   const batch = await database.prepare("SELECT id,status,created_by,current_version,current_parse_run_id,current_normalization_run_id FROM material_import_batches WHERE id=?").bind(run.batch_id).first<BatchRow>();
-  const mapping = await database.prepare("SELECT id,batch_id,parse_run_id,selected_sheet_index,header_mode,header_row_number,mapping_status,mapping_version,metadata_digest FROM material_import_mappings WHERE id=? AND batch_id=?").bind(run.mapping_id, run.batch_id).first<MappingRow>();
+  const mapping = await database.prepare("SELECT * FROM material_import_mappings WHERE id=? AND batch_id=?").bind(run.mapping_id, run.batch_id).first<MappingRow>();
   if (!batch || !mapping || batch.current_parse_run_id !== run.parse_run_id || mapping.parse_run_id !== run.parse_run_id || mapping.mapping_status !== "CONFIRMED" || mapping.mapping_version !== run.mapping_version || mapping.metadata_digest !== run.metadata_digest) {
     throw new MaterialImportNormalizationServiceError("IMPORT_NORMALIZATION_MAPPING_STALE", "规范化绑定事实已变化", 409);
   }
@@ -479,13 +542,29 @@ export class MaterialImportNormalizationTaskHandler implements MaterialImportTas
     if (!["READ_SOURCE_ROWS", "NORMALIZE_ROWS"].includes(run.current_stage)) return;
     const snapshot = await new MaterialImportMappingMetadataSnapshotService(this.#database).current();
     const items = await normalizationMappingItems(this.#database, mapping.id);
-    const rows = (await this.#database.prepare(`SELECT row_number,raw_values_json,raw_row_hash FROM material_import_rows
-      WHERE parse_run_id=? AND sheet_index=? AND row_number>? AND (? IS NULL OR row_number<>?) ORDER BY row_number LIMIT ?`)
+    const adaptive = await adaptiveNormalizationSchemaAvailable(this.#database);
+    const adaptiveItems = items.some((item) => item.adaptive_mapping_status !== undefined || item.combination_strategy !== undefined || item.source_column_indexes !== undefined);
+    const canonicalContext = adaptive && adaptiveItems
+      ? await this.#database.prepare(`SELECT
+          (SELECT id FROM material_import_files WHERE batch_id=? ORDER BY id LIMIT 1) source_file_id,
+          (SELECT sheet_name FROM material_import_parse_sheets WHERE parse_run_id=? AND sheet_index=?) source_sheet_name,
+          (SELECT supplier_key FROM material_import_supplier_profiles WHERE id=?) supplier_id`)
+        .bind(run.batch_id, run.parse_run_id, mapping.selected_sheet_index, mapping.supplier_profile_id ?? null)
+        .first<{ source_file_id: number | null; source_sheet_name: string | null; supplier_id: string | null }>()
+      : null;
+    const rows = (await this.#database.prepare(`SELECT row_number,raw_values_json,raw_row_hash,created_at FROM material_import_rows
+      WHERE parse_run_id=? AND sheet_index=? AND row_number>? AND (? IS NULL OR row_number>?) ORDER BY row_number LIMIT ?`)
       .bind(run.parse_run_id, mapping.selected_sheet_index, afterRowNumber, mapping.header_row_number, mapping.header_row_number, MATERIAL_IMPORT_NORMALIZATION_LIMITS.logicalRowsPerChunk)
-      .all<{ row_number: number; raw_values_json: string; raw_row_hash: string }>()).results ?? [];
+      .all<{ row_number: number; raw_values_json: string; raw_row_hash: string; created_at: string }>()).results ?? [];
     let chunkBytes = 0;
     for (const row of rows) {
       const raw = JSON.parse(row.raw_values_json) as MaterialImportRawRow;
+      const classification = adaptive && adaptiveItems
+        ? classifyAdaptiveDataRow(raw, items.map((item) => ({
+          sourceColumnIndexes: item.source_column_indexes ?? (item.source_column_index === null ? [] : [item.source_column_index]),
+          sourceHeaders: item.source_headers ?? [],
+        })))
+        : undefined;
       const result = await this.#normalizer.normalize({
         lineage: {
           batch_id: run.batch_id,
@@ -504,6 +583,14 @@ export class MaterialImportNormalizationTaskHandler implements MaterialImportTas
         rawRow: raw,
         mappingItems: items,
         metadataSnapshot: snapshot,
+        rowClassification: classification,
+        canonicalContext: adaptive && adaptiveItems && canonicalContext?.source_file_id && canonicalContext.source_sheet_name ? {
+          source_file_id: canonicalContext.source_file_id,
+          source_sheet_name: canonicalContext.source_sheet_name,
+          supplier_id: canonicalContext.supplier_id,
+          supplier_profile_id: mapping.supplier_profile_id ?? null,
+          created_at: row.created_at,
+        } : undefined,
       });
       chunkBytes += result.normalized_payload_bytes;
       if (chunkBytes > MATERIAL_IMPORT_NORMALIZATION_LIMITS.maxChunkBytes) throw new MaterialImportNormalizationServiceError("IMPORT_NORMALIZATION_LIMIT_EXCEEDED", "规范化逻辑分块超过字节预算", 409);
@@ -511,11 +598,15 @@ export class MaterialImportNormalizationTaskHandler implements MaterialImportTas
       if (existing && existing.normalized_payload_hash !== result.normalized_payload_hash) throw new MaterialImportNormalizationServiceError("IMPORT_NORMALIZATION_VERSION_CONFLICT", "重复行规范化结果不一致", 409);
       if (existing) continue;
       const now = this.#clock().toISOString();
-      const statements: MaterialMasterD1Statement[] = [
-        this.#database.prepare(`INSERT INTO material_import_normalized_rows(batch_id,normalization_run_id,parse_run_id,source_sheet_index,source_row_number,source_raw_row_hash,normalized_payload_json,normalized_payload_hash,row_status,error_count,warning_count,created_at,updated_at)
+      const adaptiveProjection = adaptiveRowProjection(result);
+      const rowInsert = adaptive
+        ? this.#database.prepare(`INSERT INTO material_import_normalized_rows(batch_id,normalization_run_id,parse_run_id,source_sheet_index,source_row_number,source_raw_row_hash,normalized_payload_json,normalized_payload_hash,row_status,error_count,warning_count,created_at,updated_at,mapped_values_json,mapping_confidence,specification_confidence,adaptive_mapping_status,review_status)
+          SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM material_import_normalization_runs WHERE id=? AND lease_token_digest=? AND run_status='RUNNING')`)
+          .bind(run.batch_id, run.id, run.parse_run_id, mapping.selected_sheet_index, row.row_number, row.raw_row_hash, result.normalized_payload_json, result.normalized_payload_hash, result.row_status, result.error_count, result.warning_count, now, now, adaptiveProjection.mappedValuesJson, adaptiveProjection.mappingConfidence, adaptiveProjection.specificationConfidence, adaptiveProjection.mappingStatus, adaptiveProjection.reviewStatus, run.id, leaseDigest)
+        : this.#database.prepare(`INSERT INTO material_import_normalized_rows(batch_id,normalization_run_id,parse_run_id,source_sheet_index,source_row_number,source_raw_row_hash,normalized_payload_json,normalized_payload_hash,row_status,error_count,warning_count,created_at,updated_at)
           SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM material_import_normalization_runs WHERE id=? AND lease_token_digest=? AND run_status='RUNNING')`)
-          .bind(run.batch_id, run.id, run.parse_run_id, mapping.selected_sheet_index, row.row_number, row.raw_row_hash, result.normalized_payload_json, result.normalized_payload_hash, result.row_status, result.error_count, result.warning_count, now, now, run.id, leaseDigest),
-      ];
+          .bind(run.batch_id, run.id, run.parse_run_id, mapping.selected_sheet_index, row.row_number, row.raw_row_hash, result.normalized_payload_json, result.normalized_payload_hash, result.row_status, result.error_count, result.warning_count, now, now, run.id, leaseDigest);
+      const statements: MaterialMasterD1Statement[] = [rowInsert];
       for (const entry of result.issues) statements.push(this.#issueStatement(run, mapping.selected_sheet_index, row.row_number, entry, now, leaseDigest));
       statements.push(this.#database.prepare("UPDATE material_import_normalization_runs SET heartbeat_at=?,lease_expires_at=?,updated_at=? WHERE id=? AND lease_token_digest=? AND run_status='RUNNING'").bind(now, seconds(this.#clock()) + LEASE_SECONDS, now, run.id, leaseDigest));
       if (statements.length > MATERIAL_IMPORT_NORMALIZATION_LIMITS.maxStatementsPerBatch) throw new MaterialImportNormalizationServiceError("IMPORT_NORMALIZATION_LIMIT_EXCEEDED", "规范化单行写入超过 D1 batch 预算", 409);

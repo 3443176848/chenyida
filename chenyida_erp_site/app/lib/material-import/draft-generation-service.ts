@@ -171,6 +171,9 @@ async function listRows(
   afterRowId: number,
   limit: number,
 ): Promise<NormalizedRow[]> {
+  const adaptive = Boolean(await database.prepare(
+    "SELECT 1 AS present FROM pragma_table_info('material_import_normalized_rows') WHERE name='review_status'",
+  ).first<{ present: number }>());
   const result = await database.prepare(`
     SELECT
       n.id,n.batch_id,n.normalization_run_id,n.parse_run_id,n.source_sheet_index,
@@ -180,7 +183,7 @@ async function listRows(
     INNER JOIN material_import_rows raw
       ON raw.batch_id=n.batch_id AND raw.parse_run_id=n.parse_run_id
       AND raw.sheet_index=n.source_sheet_index AND raw.row_number=n.source_row_number
-    WHERE n.normalization_run_id=? AND n.id>?
+    WHERE n.normalization_run_id=? AND n.id>? ${adaptive ? "AND n.review_status<>'REJECTED'" : ""}
     ORDER BY n.id
     LIMIT ?
   `).bind(context.normalization_run_id, afterRowId, limit).all<NormalizedRow>();
