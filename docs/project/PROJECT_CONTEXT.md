@@ -71,7 +71,7 @@
 - Site 源码已可从根仓库恢复；生产提交与开发提交仍需在后续发布基线中持续追踪。
 - 本地和在线数据模型、编码和治理行为分叉。
 - 在线 JSON 模型缺少关键关系约束；本地 SQLite 缺少外键和迁移历史。
-- 在线导入已在非生产代码中接通 Normalization Approval→Material Draft，并保存来源行和重复候选；本地 inspect 和治理 dry-run 汇总已增强，EXACT/HIGH_CONFIDENCE fail-closed。`0008` 已增加全部可见 Sheet、前 50 行、1～3 行合并表头、集中别名、Supplier Profile、多来源规格和 Canonical Row，但真实文件、结构/规格召回率、逐行人工修订、冲突处置和生产容量尚未验收。
+- 在线导入已在非生产代码中接通 Normalization Approval→Material Draft，并保存来源行和重复候选；本地 inspect 和治理 dry-run 汇总已增强，EXACT/HIGH_CONFIDENCE fail-closed。`0008` 已增加全部可见 Sheet、前 50 行、1～3 行合并表头、集中别名、Supplier Profile、多来源规格和 Canonical Row；A118/V700 两份真实 BOM 已做只读验证，但 A118 超宽异常块、V700 必填名称/单位、更多模板召回率、逐行人工修订和生产容量尚未解决。
 - Material Draft/Review POST 已具备同源/CSRF、持久幂等和限速；其他 legacy POST 的 CSRF 与限速仍需专项治理。测试环境已有本机一次性 D1，尚无远程 Test D1。
 - Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现，但生产 Site 仍为旧版本。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
@@ -88,7 +88,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import Batch/Parser/Mapping/Catalog/Workspace，以及 Phase 3 Normalization、Review UI、`PHASE3-MATERIAL-LIBRARY-01` 和多供应商自适应导入 V1。`PHASE3-MATERIAL-LIBRARY-02` 已在 `NO_REAL_DATA_MODE` 完成本地只读 inspect、安全汇总、分类/单位/品牌状态和重复阻断增强，但受控目录无真实企业物料文件而保持 `BLOCKED`；真实结构报告、dry-run、首批 DRAFT、生产迁移和部署均未执行。
+当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import Batch/Parser/Mapping/Catalog/Workspace，以及 Phase 3 Normalization、Review UI、`PHASE3-MATERIAL-LIBRARY-01`、多供应商自适应导入 V1 和 A118/V700 真实 BOM 只读验证。`PHASE3-MATERIAL-LIBRARY-02` 因 A118 XFD 异常块和 V700 缺少必填 Mapping 语义保持 `BLOCKED`；真实 dry-run、首批 DRAFT、生产迁移和部署均未执行。
 
 ## 恢复上下文检查清单
 

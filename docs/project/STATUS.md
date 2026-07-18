@@ -6,7 +6,7 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 约 54,900 行 | 在上一快照上新增自适应识别、Mapping/Normalization 扩展和专项测试；不含 Drizzle snapshot、依赖、构建产物、截图和文档 |
+| 总代码量 | 约 55,100 行 | 在上一快照上新增真实样本驱动的安全兼容、Inspect 摘要和回归测试；不含 Drizzle snapshot、依赖、构建产物、截图和文档 |
 | 源码文件 | 145 | 新增自适应识别模块和 3 份专项测试；扩展 Parser、Mapping、Normalization、Review UI 和 Draft 门禁 |
 | 根仓库跟踪项 | 自适应 Import 运行时、`0008`、测试和文档 | 未修改本地旧版业务代码、hosting 或部署配置 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
@@ -40,6 +40,8 @@
 
 `PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT` 功能提交为 `41e293f`，覆盖自适应结构识别、Supplier Profile、多来源 Mapping/规格、Canonical Row、Review/Draft 门禁、`0008` 和专项测试；没有真实供应商样本，没有生产迁移或部署。
 
+`PHASE3-MATERIAL-LIBRARY-REAL-SAMPLE-01` 功能提交为 `cea940a`；只读验证 A118/V700，未跟踪附件或业务行，未连接生产、上传、dry-run、创建 Draft 或部署。
+
 正式规格确认更新开始时，根仓库位于 `c694045`；用户明确回复“规格确认”。本次只更新主规格的 14 项决策状态和项目治理记录，不实施 Review UI。
 
 转换前，`git ls-files --stage -- chenyida_erp_site` 只显示一个 mode `160000` gitlink。转换后，根仓库直接跟踪 Site 的 77 个 mode `100644` 文件，仓库中不再存在 mode `160000`。暂存 Site 子树 hash `541decf5a685a0efc238868ef958d3ae500174e5` 与原 `9f2c2dc` tree 完全一致。
@@ -53,6 +55,22 @@ git status --short
 git -C chenyida_erp_site status --short
 ```
 
+## PHASE3-MATERIAL-LIBRARY-REAL-SAMPLE-01 真实 BOM 只读验证
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 功能提交 `cea940a`；脱敏报告、测试与项目记录完成 |
+| 文件类型 | PASS WITH WARNING | A118/V700 均为 XLSX 内容、`.csv` 后缀；以内容签名解析并记录 `XLSX_CONTENT_WITH_CSV_EXTENSION` |
+| V700 Sheet | PASS | 正确选择 `BOM`，不再误选 `变更记录`；表头 1～2，数据从 3 开始 |
+| V700 Mapping | PARTIAL | 规格、型号、数量 EXACT；标准名称、单位未确认，继续 fail closed |
+| V700 行估计 | READ-ONLY | 229 DATA；219 有规格、10 空规格、222 有型号 |
+| A118 表头/Mapping | PASS (STRUCTURE ONLY) | 第 44 行；名称、规格、厂商料号、用量 EXACT |
+| A118 解析 | EXPECTED BLOCK | 第 197～203 行扩展到 XFD；不截断，稳定返回 `IMPORT_PARSE_LIMIT_EXCEEDED` |
+| A118 行估计 | DIAGNOSTIC ONLY | 前 9 列只读估计 310 DATA、266 有规格、44 空规格；不是成功 Parse |
+| 专项/全量 | PASS | 自适应 11/11、Parser 37/37、Inspector 4/4、Batch API 12/12、Node 593/593 |
+| 其他基线 | PASS | build、lint 0 error/1 个既有 warning、隔离 API smoke、凭证扫描、Python self-test/smoke/go-live、`git diff --check` |
+| 生产影响 | NONE | 未提交附件、连接生产、上传、dry-run、创建 Draft、迁移或部署 |
+
 ## PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT 非生产实现
 
 | 验证项 | 结果 | 说明 |
@@ -65,17 +83,17 @@ git -C chenyida_erp_site status --short
 | 规格 | PASS (SYNTHETIC) | 独立规格、多来源确定性组合、名称/描述候选；不调用 AI，空规格 ERROR 阻断 Draft |
 | Canonical Row | PASS | 进入既有 Normalization payload/队列列，完整原始值仍只存不可变 Raw Row |
 | `0008` | PASS | 45 表 Drizzle 基线；空库/已有数据/约束/失败原子性和受保护兼容回退通过，完整结构恢复依赖迁移前快照 |
-| 真实样本 | NO_REAL_SAMPLE_FILES | 仅检查 `/opt/erp` 受控目录；发现内容均为治理模板/镜像，未冒充真实验收 |
+| 初始真实样本 | INITIAL_BASELINE | 功能首次完成时受控目录无样本；后续 A118/V700 结果见上方真实 BOM 验证 |
 | 专项/全量 | PASS | 自适应 9/9、Migration 3/3、运行时闭环 2/2；Vinext build + Node 589/589 |
 | 其他隔离基线 | PASS | lint 0 error/1 个既有 warning、API smoke、1k/10k/100k 查询计划、最终文档范围 328 文件凭证扫描、Python self-test/smoke/go-live、`git diff --check` |
 | 生产影响 | NONE | 未连接生产 D1/R2/Queue，未迁移、上传真实文件、创建 Draft、Sites 保存或部署 |
 
-## PHASE3-MATERIAL-LIBRARY-02 真实数据导入治理（NO_REAL_DATA_MODE）
+## PHASE3-MATERIAL-LIBRARY-02 初始治理（历史 NO_REAL_DATA_MODE）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | BLOCKED / NO_REAL_DATA_MODE | 缺少真实企业物料文件；解除条件为用户提供真实 `.xlsx/.csv` 与隔离上传目录 |
-| 文件扫描 | COMPLETE | 仅扫描 `/opt/erp`、`/home`；20 路径去重为 1 个 10-Sheet XLSX + 9 CSV，全部是已跟踪模板/样例镜像 |
+| 当时任务状态 | HISTORICAL / SAMPLE DELIVERED | 此节记录 `b3d26c3` 当时无真实文件的事实；后续 A118/V700 结果见上方真实 BOM 验证 |
+| 当时文件扫描 | COMPLETE | 当时仅扫描 `/opt/erp`、`/home`；20 路径去重为 1 个 10-Sheet XLSX + 9 CSV，全部是已跟踪模板/样例镜像 |
 | 本地 inspect | PASS | 只读类型/大小/SHA、Sheet/CSV、行列、编码/分隔符、表头候选和可能字段；不回显业务行、不改源文件 |
 | Mapping | VERIFIED / UNCHANGED | 既有关系化 Mapping 可保存、版本 CAS、metadata digest、确认、事件和审计；未硬编码实际映射、未改 Schema |
 | 分类治理 | PASS (SYNTHETIC) | code=`EXACT`、唯一名称=`MATCHED`、未命中/冲突=`NEEDS_REVIEW` 并给有界疑似候选；不自动建分类 |

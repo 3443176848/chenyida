@@ -4,6 +4,18 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-REAL-SAMPLE-01 - `fix: adapt imports to real supplier BOMs`
+
+- Git Commit：`cea940a`。
+- 样本：只读检查用户提供的 A118/V700 两份附件；两者均为 XLSX 内容但使用 `.csv` 后缀。只记录文件哈希、大小、Sheet、表头、列名、行数估计和安全原因，未提交附件或业务行。
+- V700：修正前误选“变更记录”；修正后以 `HIGH_CONFIDENCE` 选择 `BOM` 第 1～2 行组合表头，正确识别规格、型号和数量。标准名称、单位仍未确认，故不进入 Mapping Confirm/Normalization/Draft。
+- A118：识别 `SHEET1` 第 44 行表头，正确映射名称、规格、厂商料号和用量；第 197～203 行周期性扩展到 XFD，继续以 256 列安全上限阻断，不静默截断。只读前 9 列估计不视为成功导入。
+- 兼容：只允许 `.csv` 后缀但强签名为 XLSX 的单向兼容，完整 OOXML 安全检查不变，并把原后缀、检测类型和 warning code 写入既有安全事件。
+- 识别：Inspect 复用自适应前 50 行摘要；增加 BOM 正向、变更/历史负向 Sheet 证据，限定“厂商物料编码”为制造商料号，增加“用量”数量别名和嵌入式 BOM 标题分类。
+- 安全错误：XLSX 超宽 Promise 立即挂接拒绝处理，CLI 返回稳定中文错误，不再产生未处理拒绝堆栈。
+- 验证：自适应 11/11、Parser 37/37、Inspector 4/4、Batch API 12/12；Vinext build + 全量 Node 593/593、lint 0 error/1 个既有 warning、隔离 API smoke、凭证扫描及 Python self-test/smoke/go-live 通过。
+- 生产：未连接生产 D1/R2/Queue，未上传真实附件、执行 dry-run、创建 Draft、迁移、Sites 保存或部署。
+
 ### PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT - `feat: adapt supplier material imports`
 
 - Git Commit：`41e293f`。

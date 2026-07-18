@@ -13,6 +13,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| PHASE3-MATERIAL-LIBRARY-REAL-SAMPLE-01 | A118/V700 真实 BOM 自适应导入验证 | DONE | Codex（只读样本审计与非生产修正）、项目负责人（提供两份样本） | 2026-07-18 16:30 CST | 2026-07-18 16:35 CST | PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT | 功能提交 `cea940a`；只读验证两份真实附件，V700 已正确选择 BOM 并识别规格/型号/数量，A118 已识别第 44 行表头和正确字段但因 7 行扩展到 16,384 列而保持安全阻断；修正错后缀 XLSX 告警兼容、Change Log 降权、厂商料号限定、“用量”和安全错误，Node 593/593。未提交样本、上传生产或创建 Draft |
 | PM-000 | 建立AI项目管理体系 | DONE | Codex（执行）、项目负责人（确认） | 2026-07-11 | 2026-07-11 | 无 | 建立 `docs/project/` 九份权威文档并更新 `AGENTS.md`；未修改业务代码、数据库、页面或生产环境 |
 | PHASE0-TASK01-B | 解除Site gitlink并纳入根仓库管理 | DONE | Codex（执行）、项目负责人（目录决策确认） | 2026-07-11 | 2026-07-11 | PM-000 | 保留 `chenyida_erp_app/` 与 `chenyida_erp_site/` 路径；将 1 个 gitlink 转为 77 个普通跟踪文件，并保留 `2b4f178`、`9f2c2dc` 的版本和历史关系；未修改业务代码或生产环境 |
 | PHASE0-TASK02 | 建立隔离测试与安全基线 | DONE | Codex（执行）、项目负责人（本机一次性 D1 方案确认） | 2026-07-11 | 2026-07-11 | PHASE0-TASK01 | 建立三环境清单、production/公开 URL 拒绝、本机一次性 Miniflare D1、自动销毁、去敏日志、凭证检查和临时 SQLite 备份恢复验证；未访问生产 D1 |
@@ -39,7 +40,7 @@
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT | 多供应商自适应表格识别、字段映射与规格提取 | DONE | Codex（审计与非生产实施）、项目负责人（任务范围确认） | 2026-07-18 | 2026-07-18 16:10 CST | PHASE3-MATERIAL-LIBRARY-02、PHASE3-TASK04 | 复用既有 Batch/Parser/Raw Rows/Mapping/Normalization/Review/Validation/Audit/Draft；功能提交 `41e293f` 实现全部可见 Sheet、前 50 行、1～3 行合并表头、集中别名与样本/Profile 加权、可解释行分类、多列规格、Canonical Row、人工确认和空规格 Draft 阻断；Node 589/589 及完整隔离基线通过。受控目录无真实供应商样本；未执行生产迁移、真实数据写入或部署 |
-| PHASE3-MATERIAL-LIBRARY-02 | 真实物料数据导入治理与首批内部物料库建立 | BLOCKED | Codex（NO_REAL_DATA_MODE 治理增强）、项目负责人（待提供真实文件与人工确认） | 2026-07-18 14:41 CST | - | PHASE3-MATERIAL-LIBRARY-01 | 限定扫描 `/opt/erp`、`/home` 仅发现两套相同且已跟踪的治理模板/样例，无真实企业物料文件；已提交 `b3d26c3`，增加本地只读 inspect、安全 dry-run 汇总、分类/单位/品牌状态及 EXACT/HIGH_CONFIDENCE 阻断，Node 575/575 与完整隔离基线通过。未上传、dry-run 或导入模板，DRAFT=0；解除条件是用户提供真实 `.xlsx/.csv` 与隔离上传目录，HIGH_CONFIDENCE 逐行确认解除流程仍需本任务后续完成 |
+| PHASE3-MATERIAL-LIBRARY-02 | 真实物料数据导入治理与首批内部物料库建立 | BLOCKED | Codex（真实样本只读治理）、项目负责人（待补充模板语义/重新导出） | 2026-07-18 14:41 CST | - | PHASE3-MATERIAL-LIBRARY-01 | 已完成 `b3d26c3` 治理增强和 `cea940a` 两份真实 BOM 验证。V700 缺少可确认的标准名称、单位等 Draft 必填映射；A118 存在 XFD 超宽重复块，系统不静默截断。未上传、dry-run 或创建 DRAFT；解除条件是确认 V700 标准名称/单位来源，并重新导出或人工清理 A118 异常块后提供新 SHA 文件 |
 | PHASE3-MATERIAL-LIBRARY-01 | 内部物料库数据库建立与正式 Material Master 落地 | DONE | Codex（审计与非生产实施）、项目负责人（任务范围确认） | 2026-07-18 14:01 CST | 2026-07-18 14:38 CST | PHASE3-TASK04、PHASE1-TASK07 | 复用既有 `material_master` 和 Import/Normalization/Review；新增 `0007` 单位/品牌、Approval、来源行关联和重复候选，接通 Approved Normalization→DRAFT，提供 inspect/dry-run/commit/report；全量 Node 569/569、build、隔离 API smoke、迁移/权限/幂等/凭证/临时 SQLite 通过；功能提交 `2ff8d9c`，未执行真实文件 dry-run、生产迁移或部署 |
 | PHASE3-TASK04 | 实现 Material Import Normalization Review UI V1 | DONE | Codex（实施）、项目负责人（14 项规格与非生产前端范围批准） | 2026-07-17 | 2026-07-17 | PHASE3-TASK03 | 完成统一工作区七步 Stepper、current_run/latest_attempt、启动/重试/重跑/取消、Rows/Issues cursor、Row Drawer、安全有界渲染与权限清理；104/104 计划测试、100/100 Import UI 回归和本地 Playwright 门禁通过，未修改 API、Schema、Migration、Normalization 业务逻辑或生产环境 |
 | PHASE2-TASK04 | 实现 Excel/CSV Parser 与字段 Mapping V1 | DONE | Codex（实施）、项目负责人（规格与非生产范围批准） | 2026-07-16 | 2026-07-16 | PHASE2-TASK03 | 完成 `0005` Up/受保护 Down、parse run、Outbox、可注入调度与租约恢复、XLSX/CSV 有界解析、Shared Strings 分块、原始行原子发布、Mapping 准备及七个 API；54 项专项和全量 Node 278/278 通过；未创建生产 Queue/binding、执行生产迁移或部署，未创建 Material Draft/正式物料 |
@@ -51,7 +52,7 @@
 | PHASE3-TASK01 | 设计 Material Import Normalization & Staging V1 | DONE | Codex（设计）、项目负责人（待规格确认） | 2026-07-17 | 2026-07-17 | PHASE2-TASK08 | 完成正式规格、OpenAPI 草案和数据流/状态图；定义独立 run、JSON 行快照、独立 issue、类型/空值/属性规则、Outbox/租约、原子发布、五个 API、`0006` 设计、54 项测试和 16 项 `PROPOSED` 决定；仅文档，未修改运行时代码、Schema、Migration、API、前端或生产环境 |
 | PHASE3-TASK03 | 设计 Material Import Normalization Review UI V1 | DONE | Codex（设计）、项目负责人（2026-07-17 正式规格确认） | 2026-07-17 | 2026-07-17 | PHASE3-TASK02 | 完成正式 UI 规格、37 状态低保真线框、集中状态矩阵和 104 项未来实施测试；统一工作区、七步 Stepper、Current/Latest 双轨、Rows/Issues cursor 与 Row Drawer等 14 项决定均已 `APPROVED`；局部 Issue 查询门禁、性能门禁和 7 项非阻塞限制继续有效；仅文档，未修改前端、API、Schema、Migration、业务逻辑或生产环境 |
 
-当前没有 `DOING` 任务；`PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT` 已完成非生产实现，`PHASE3-MATERIAL-LIBRARY-02` 的真实数据导入仍因缺少真实数据文件处于 `BLOCKED`。生产 R2/Queue、生产 D1 migration、Cron、部署、真实数据导入、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
+当前没有 `DOING` 任务；两份真实 BOM 的只读验证已完成，`PHASE3-MATERIAL-LIBRARY-02` 仍因 A118 超宽异常块和 V700 缺少必填 Mapping 语义处于 `BLOCKED`。生产 R2/Queue、生产 D1 migration、Cron、部署、真实数据导入、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
 
 ## Phase 0 待办
 

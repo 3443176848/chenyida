@@ -21,7 +21,7 @@
 
 ## 2. 真实样本检查
 
-结果：`NO_REAL_SAMPLE_FILES`。
+本任务完成当时结果：`NO_REAL_SAMPLE_FILES`。2026-07-18 后续用户提供 A118/V700 两份真实 BOM，验证结果见 `material-import-real-sample-a118-v700.md`；本段保留为当时审计事实。
 
 检查范围仅包括 `/opt/erp` 及其中受控的 `data`、`imports`、`uploads`、`samples`、项目配置上传目录和测试 fixture；没有扫描整个服务器。发现的 XLSX/CSV 均为仓库已跟踪的物料治理模板、输出模板或其镜像，不属于用户真实供应商文件，因此没有把它们列为真实兼容性样本，也没有输出业务行、价格或联系方式。
 
