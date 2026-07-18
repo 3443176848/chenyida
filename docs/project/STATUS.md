@@ -111,6 +111,19 @@ git -C chenyida_erp_site status --short
 | Migration | PASS | 本地 `0002`、迁移前快照、副本试迁移和完整性检查 |
 | 自动测试 | PASS | 联合单元 15/15、self-test、smoke |
 
+## 电容匹配测试基线 1～5
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 用户最终输入 | ACCEPTED | 采用更正后的 5%、10%、20%、10%、5% 五条规格 |
+| 备份 | PASS | `erp-backup-20260718-182230.sqlite3`，副本事务试跑通过 |
+| 内部物料 | 4→9 | 新增临时编码 1～5，均启用、CAP、PCS |
+| Cleaning Rows | 543→0 | 按用户指令清空，事务失败时整体回滚 |
+| 原始追溯 | PRESERVED | 2 Batch、766 Raw Rows、两份原文件归档均保留 |
+| 匹配 | PASS 5/5 | 输入 1～5 分别自动匹配编码 1～5，置信度均 1.00 |
+| 数据库 | PASS | `PRAGMA integrity_check=ok` |
+| 服务 | PASS | systemd `enabled/active`，公网首页 HTTP 200 |
+
 ## 服务器本地交付运行面
 
 | 验证项 | 结果 | 说明 |

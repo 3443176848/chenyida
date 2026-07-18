@@ -74,7 +74,8 @@
 - Site 源码已可从根仓库恢复；生产提交与开发提交仍需在后续发布基线中持续追踪。
 - 本地和在线数据模型、编码和治理行为分叉。
 - 在线 JSON 模型缺少关键关系约束；本地 SQLite 缺少外键和迁移历史。
-- A118/V700 已在服务器本地形成 2 Batch、766 Raw Rows 和 543 Cleaning Rows，完整原文件按 SHA 归档；全部行仍为 NEEDS_REVIEW，22 行缺规格、543 行缺单位，内部物料没有自动增加。
+- A118/V700 的 2 Batch、766 Raw Rows 和完整 SHA 原文件归档仍保留；项目负责人已授权清空原 543 条 Cleaning Rows，用五条电容作为重新导入匹配基线。
+- 开发库新增内部编码 1～5 的五条电容，内部物料共 9 条；这些是临时测试编号，五条本地匹配均为对应编码、自动匹配 1.00。
 - Material Draft/Review POST 已具备同源/CSRF、持久幂等和限速；其他 legacy POST 的 CSRF 与限速仍需专项治理。测试环境已有本机一次性 D1，尚无远程 Test D1。
 - Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现，但生产 Site 仍为旧版本。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
@@ -91,7 +92,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import，以及 Phase 3 Normalization、内部物料库、多供应商识别和服务器本地 Excel 接入。A118/V700 已进入开发服务器清洗审核队列；下一步是批次级单位/Mapping 确认和 22 条空规格处置，而不是重新索取模板。
+当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import，以及 Phase 3 Normalization、内部物料库、多供应商识别和服务器本地 Excel 接入。当前清洗队列为空，编号 1～5 的五条电容已作为匹配基线；下一步由项目负责人从网页重新导入真实表并核对匹配结果。
 
 ## 恢复上下文检查清单
 

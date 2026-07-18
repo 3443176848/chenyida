@@ -17,6 +17,7 @@
 - [Material Import Parser 流程图](./material-import-parser-flow.md)
 - [本地 CSV/XLSX/XLS 自适应导入](./local-spreadsheet-import-v1.md)
 - [A118/V700 真实 BOM 入库暂存报告](./real-sample-staging-a118-v700.md)
+- [电容匹配测试物料 1～5](./matching-test-seed-1-5.md)
 
 ## V2 目标
 

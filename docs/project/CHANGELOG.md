@@ -4,6 +4,14 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-MATCH-SEED-01 - `docs: record capacitor matching test seed`
+
+- 用户数据：只采用项目负责人更正后的五条电容规格，按临时内部编码 1～5 建入开发服务器物料库；首次重复版本未执行。
+- 结构化字段：CAP、容量、规范化误差、电压、0201 封装、PCS；名称保留用户输入的正号，未创建供应商映射。
+- 清理：单一事务删除 543 条旧 Cleaning Rows；保留 2 个 Import Batch、766 条不可变 Raw Rows 和完整 SHA 原文件归档。
+- 恢复：写入前备份 `erp-backup-20260718-182230.sqlite3`，SHA-256 为 `f97337052aa9fcc0258355a9a0d7655e6d51f865c28189e6f901ec673f597613`；先在备份副本执行同一事务。
+- 验证：内部物料 4→9；五条输入分别自动匹配编码 1～5，置信度均为 1.00；SQLite integrity `ok`，systemd `enabled/active`，公网 HTTP 200。
+
 ### PHASE3-MATERIAL-LIBRARY-REAL-SAMPLE-IMPORT-02 - `feat: stage real BOM imports for review`
 
 - 用户确认：项目负责人明确 A118/V700 是正确且需要入库的正式表格，不应因缺独立名称/单位或 XFD 异常声明宽度拒绝整份文件。
