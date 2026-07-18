@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -45,6 +45,21 @@ test("local XLSX inspect uses the bounded production parser without modifying th
   assert.equal(inspected.excel.sheet_count, 10);
   assert.equal(inspected.excel.sheets.length, 10);
   assert.equal(inspected.excel.sheets.every((sheet) => Number.isInteger(sheet.row_count)), true);
+});
+
+test("local inspect recognizes XLSX content mislabeled with a CSV extension and records a warning", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "material-inspect-mislabeled-"));
+  const source = resolve(siteRoot, "../物料主数据治理落地包/output/物料主数据治理模板.xlsx");
+  const path = join(directory, "supplier-export.csv");
+  try {
+    await copyFile(source, path);
+    const inspected = await inspectMaterialFile(path);
+    assert.equal(inspected.file.type, "XLSX");
+    assert.deepEqual(inspected.file.warning_codes, ["XLSX_CONTENT_WITH_CSV_EXTENSION"]);
+    assert.equal(inspected.excel.sheet_count, 10);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("local inspect rejects extension/type mismatch before parsing", async () => {

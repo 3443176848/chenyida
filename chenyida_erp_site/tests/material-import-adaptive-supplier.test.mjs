@@ -51,6 +51,23 @@ test("structure analysis scores material sheet above cover and detects a two-row
   assert.equal(selected.reasonCodes.includes("MULTI_ROW_HEADER_2"), true);
 });
 
+test("structure analysis prefers a BOM sheet over a smaller change-log sheet with similar field aliases", () => {
+  const bom = sheet(0, "BOM", [
+    row(1, ["V700 BOM", null, null, null]),
+    row(2, ["序号", "物料规格描述", "物料型号", "数量"]),
+    ...Array.from({ length: 20 }, (_, index) => row(index + 3, [String(index + 1), `规格-${index + 1}`, `MODEL-${index + 1}`, "1"])),
+  ], ["A1:D1"]);
+  const changeLog = sheet(1, "变更记录", [
+    row(1, ["V700 变更记录", null, null, null]),
+    row(2, ["序号", "修改记录描述", "物料规格描述", "数量"]),
+    row(3, ["1", "修改内容", "规格-1", "1"]),
+    row(4, ["2", "修改内容", "规格-2", "1"]),
+  ], ["A1:D1"]);
+  const result = analyzeAdaptiveImportStructure([bom, changeLog]);
+  assert.equal(result.selectedSheetIndex, 0);
+  assert.equal(result.sheets.find((item) => item.sheetIndex === 1).reasonCodes.includes("CHANGE_OR_HISTORY_SHEET_PENALTY"), true);
+});
+
 test("structure analysis supports three-row headers and scans after title, note, and blank rows", () => {
   const target = sheet(0, "Data", [
     row(1, ["报价物料清单", null, null]),
@@ -100,7 +117,8 @@ test("runtime row classification explains repeated headers, totals, footers, not
   assert.equal(classifyAdaptiveDataRow(row(3, ["合计", "2"]).raw, headers).kind, "TOTAL");
   assert.equal(classifyAdaptiveDataRow(row(4, ["审核："]).raw, headers).kind, "FOOTER");
   assert.equal(classifyAdaptiveDataRow(row(5, ["说明：以下价格已脱敏"]).raw, headers).kind, "TITLE_OR_NOTE");
-  assert.equal(classifyAdaptiveDataRow(row(6, ["A-1", "连接器", "MX-10", "20mm"]).raw, headers).kind, "DATA");
+  assert.equal(classifyAdaptiveDataRow(row(6, ["V700 PCB BOM"]).raw, headers).kind, "TITLE_OR_NOTE");
+  assert.equal(classifyAdaptiveDataRow(row(7, ["A-1", "连接器", "MX-10", "20mm"]).raw, headers).kind, "DATA");
 });
 
 test("mapping combines header aliases, value features, and supplier profile history", () => {
@@ -124,6 +142,21 @@ test("mapping combines header aliases, value features, and supplier profile hist
   assert.deepEqual(specification.sourceHeaders, ["型号", "尺寸"]);
   assert.equal(specification.combinationStrategy, "JOIN_NON_EMPTY");
   assert.equal(["HIGH_CONFIDENCE", "SUGGESTED"].includes(specification.status), true);
+});
+
+test("qualified manufacturer code is not generalized into material code and BOM usage maps to quantity", () => {
+  const target = sheet(0, "BOM", [
+    row(44, ["序号", "名称", "物料规格描述", "厂商物料编码", "生产厂商", "用量", "位号", "备注"]),
+    row(45, ["1", "连接器", "10×20mm", "MFG-001", "厂商甲", "2", "J1", ""]),
+    row(46, ["2", "电容", "0402 10uF", "MFG-002", "厂商乙", "4", "C1", ""]),
+  ]);
+  const header = analyzeAdaptiveImportStructure([target]).sheets[0].selectedHeader;
+  const mappings = suggestAdaptiveFieldMappings(header);
+  assert.equal(mappings.find((item) => item.field === "material_code").status, "UNMAPPED");
+  assert.deepEqual(mappings.find((item) => item.field === "manufacturer_part_no").sourceHeaders, ["厂商物料编码"]);
+  assert.equal(mappings.find((item) => item.field === "manufacturer_part_no").status, "EXACT");
+  assert.deepEqual(mappings.find((item) => item.field === "quantity").sourceHeaders, ["用量"]);
+  assert.equal(mappings.find((item) => item.field === "quantity").status, "EXACT");
 });
 
 test("specification extraction separates explicit, component, inferred, and missing evidence", () => {

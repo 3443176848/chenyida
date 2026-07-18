@@ -332,6 +332,22 @@ test("Material import XLSX checks reject disguises and macro parts without parsi
     const valid = await upload(context, { batchId: validBatch.payload.data.id, version: 1, user: "purchase1", bytes: xlsxBytes(), filename: "materials.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key: "upload-xlsx-ok01" });
     assert.equal(valid.response.status, 200, JSON.stringify(valid.payload));
 
+    const mislabeledBatch = await createBatch(context, "purchase1", "CSV", "create-xlsx-csv01");
+    const mislabeled = await upload(context, {
+      batchId: mislabeledBatch.payload.data.id,
+      version: 1,
+      user: "purchase1",
+      bytes: xlsxBytes([["docProps/custom.xml", "mislabeled-export"]]),
+      filename: "supplier-export.csv",
+      type: "text/csv",
+      key: "upload-xlsx-csv01",
+    });
+    assert.equal(mislabeled.response.status, 200, JSON.stringify(mislabeled.payload));
+    assert.equal(mislabeled.payload.data.file.filename_extension, ".csv");
+    assert.equal(mislabeled.payload.data.file.detected_file_type, "XLSX");
+    const typeEvidence = await context.DB.prepare("SELECT safe_details_json FROM material_import_events WHERE batch_id=? AND event_type='FILE_SECURITY_CHECK_PASSED'").bind(mislabeledBatch.payload.data.id).first();
+    assert.deepEqual(JSON.parse(typeEvidence.safe_details_json).warning_codes, ["XLSX_CONTENT_WITH_CSV_EXTENSION"]);
+
     const fakeBatch = await createBatch(context, "purchase1", "XLSX", "create-xlsx-fake1");
     const fake = await upload(context, { batchId: fakeBatch.payload.data.id, version: 1, user: "purchase1", bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3]), filename: "fake.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key: "upload-xlsx-fake1" });
     assert.equal(fake.response.status, 422);

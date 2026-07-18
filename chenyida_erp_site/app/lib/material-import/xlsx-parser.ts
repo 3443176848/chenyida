@@ -319,7 +319,9 @@ export async function parseMaterialImportXlsx(
           else if (name === "c" && currentCell) {
             const state = currentCell;
             currentCell = null;
-            pendingCells.push(finishCell(state, currentCells));
+            const write = finishCell(state, currentCells);
+            void write.catch(() => undefined);
+            pendingCells.push(write);
           }
           else if (name === "row") {
             const cells = currentCells;

@@ -714,8 +714,10 @@ export async function uploadMaterialImportFile(
   } catch {
     return updateReconciliation(dependencies, { batchId: input.batchId, fileId: file.id, idempotencyId: idem.id, user: input.user.username, requestId: input.requestId, operationId, keyDigest, reason: "D1_STORED_COMPLETION_FAILED" });
   }
+  let securityWarnings: readonly string[] = [];
   try {
-    await runMaterialImportBasicSecurityCheck({ store: dependencies.objectStore, objectKey: file.object_key, actualSizeBytes: facts.actualSizeBytes, detectedType, filenameExtension: extension, declaredMimeType: part.declaredMimeType });
+    const security = await runMaterialImportBasicSecurityCheck({ store: dependencies.objectStore, objectKey: file.object_key, actualSizeBytes: facts.actualSizeBytes, detectedType, filenameExtension: extension, declaredMimeType: part.declaredMimeType });
+    securityWarnings = security.warningCodes;
   } catch (error) {
     const security = error instanceof MaterialImportFileSecurityError
       ? error
@@ -747,7 +749,7 @@ export async function uploadMaterialImportFile(
     await dependencies.database.batch([
       dependencies.database.prepare(`UPDATE material_import_batches SET status='FILE_READY',current_version=current_version+1,updated_at=? WHERE id=? AND status='UPLOAD_PENDING' AND current_version=?`).bind(timestamp, input.batchId, latest.current_version),
       dependencies.database.prepare(`UPDATE material_import_files SET security_check_status='BASIC_CHECK_PASSED',updated_at=? WHERE id=? AND storage_status='STORED' AND security_check_status='PENDING'`).bind(timestamp, file.id),
-      dependencies.database.prepare(`INSERT INTO material_import_events(batch_id,event_type,actor_type,request_id,safe_details_json,created_at) VALUES((SELECT CASE WHEN status='FILE_READY' AND current_version=? THEN id ELSE NULL END FROM material_import_batches WHERE id=?),'FILE_SECURITY_CHECK_PASSED','SYSTEM',?,json_object('file_id',?),?)`).bind(latest.current_version + 1, input.batchId, input.requestId, file.id, timestamp),
+      dependencies.database.prepare(`INSERT INTO material_import_events(batch_id,event_type,actor_type,request_id,safe_details_json,created_at) VALUES((SELECT CASE WHEN status='FILE_READY' AND current_version=? THEN id ELSE NULL END FROM material_import_batches WHERE id=?),'FILE_SECURITY_CHECK_PASSED','SYSTEM',?,json_object('file_id',?,'original_extension',?,'detected_file_type',?,'warning_codes',json(?)),?)`).bind(latest.current_version + 1, input.batchId, input.requestId, file.id, extension, detectedType, JSON.stringify(securityWarnings), timestamp),
       dependencies.database.prepare(`INSERT INTO material_import_events(batch_id,event_type,actor_type,request_id,safe_details_json,created_at) VALUES(?,'FILE_UPLOAD_COMPLETED','SYSTEM',?,json_object('file_id',?),?)`).bind(input.batchId, input.requestId, file.id, timestamp),
       dependencies.database.prepare(`UPDATE material_import_idempotency SET state='COMPLETED',lease_expires_at=NULL,status_code=200,response_json=?,updated_at=?,expires_at=? WHERE id=? AND state='PENDING'`).bind(JSON.stringify(payload), timestamp, nowSeconds(clock) + IDEMPOTENCY_TTL_SECONDS, idem.id),
       auditStatement(dependencies.database, { username: input.user.username, action: "UPLOAD_IMPORT_FILE", detail: `batch:${input.batchId}`, requestId: input.requestId, operationId, keyDigest, result: "success", timestamp }),

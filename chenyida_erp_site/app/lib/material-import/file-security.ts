@@ -81,21 +81,34 @@ function validateDeclaredMetadata(
   type: MaterialImportDetectedType,
   filenameExtension: string,
   declaredMimeType: string,
-): void {
+): readonly string[] {
   const extension = filenameExtension.toLowerCase();
   if (extension === ".xls" || extension === ".xlsm") {
     throw new MaterialImportFileSecurityError("IMPORT_FILE_TYPE_UNSUPPORTED", "只允许 XLSX 或 CSV 文件");
   }
+  const neutral = new Set(["", "application/octet-stream"]);
+  if (type === "XLSX" && extension === ".csv") {
+    const mislabeledAllowed = new Set([
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "text/csv",
+      "application/csv",
+      "text/plain",
+    ]);
+    if (!neutral.has(declaredMimeType) && !mislabeledAllowed.has(declaredMimeType)) {
+      throw new MaterialImportFileSecurityError("IMPORT_FILE_TYPE_UNSUPPORTED", "客户端 MIME 与检测类型不一致");
+    }
+    return ["XLSX_CONTENT_WITH_CSV_EXTENSION"];
+  }
   if ((type === "XLSX" && extension !== ".xlsx") || (type === "CSV" && extension !== ".csv")) {
     throw new MaterialImportFileSecurityError("IMPORT_FILE_TYPE_UNSUPPORTED", "文件扩展名与检测类型不一致");
   }
-  const neutral = new Set(["", "application/octet-stream"]);
   const allowed = type === "XLSX"
     ? new Set(["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"])
     : new Set(["text/csv", "application/csv", "text/plain"]);
   if (!neutral.has(declaredMimeType) && !allowed.has(declaredMimeType)) {
     throw new MaterialImportFileSecurityError("IMPORT_FILE_TYPE_UNSUPPORTED", "客户端 MIME 与检测类型不一致");
   }
+  return [];
 }
 
 async function validateXlsx(store: MaterialImportObjectStore, key: string, size: number): Promise<void> {
@@ -250,8 +263,9 @@ export async function runMaterialImportBasicSecurityCheck(input: Readonly<{
   detectedType: MaterialImportDetectedType;
   filenameExtension: string;
   declaredMimeType: string;
-}>): Promise<void> {
-  validateDeclaredMetadata(input.detectedType, input.filenameExtension, input.declaredMimeType);
+}>): Promise<Readonly<{ warningCodes: readonly string[] }>> {
+  const warningCodes = validateDeclaredMetadata(input.detectedType, input.filenameExtension, input.declaredMimeType);
   if (input.detectedType === "XLSX") await validateXlsx(input.store, input.objectKey, input.actualSizeBytes);
   else await validateCsv(input.store, input.objectKey);
+  return { warningCodes };
 }

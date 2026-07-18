@@ -174,6 +174,15 @@ test("XLSX records merged ranges", async () => {
   assert.deepEqual(result.sheets[0].mergedRanges, ["A1:B2"]);
 });
 
+test("XLSX rejects an over-limit column with a stable parser error", async () => {
+  const firstOverLimitReference = `${columnReference(MATERIAL_IMPORT_PARSER_LIMITS.maxColumns)}1`;
+  const bytes = await workbook({ sheets: [{ name: "Data", xml: `<worksheet><sheetData><row r="1"><c r="${firstOverLimitReference}"><v>1</v></c></row></sheetData></worksheet>` }] });
+  await assert.rejects(
+    parseMaterialImportXlsx(chunks(bytes, 17), saxWasm, new MemoryMaterialImportSharedStringStore(), async () => {}),
+    (error) => error.code === "IMPORT_PARSE_LIMIT_EXCEEDED" && error.message === "XLSX 列数超过限制",
+  );
+});
+
 test("XLSX supports empty sheets", async () => {
   const bytes = await workbook({ sheets: [{ name: "Empty", xml: "<worksheet><sheetData/></worksheet>" }] });
   const result = await parseMaterialImportXlsx(chunks(bytes, 11), saxWasm, new MemoryMaterialImportSharedStringStore(), async () => {});

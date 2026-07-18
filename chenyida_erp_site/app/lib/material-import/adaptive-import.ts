@@ -139,15 +139,18 @@ export const MATERIAL_IMPORT_FIELD_ALIASES: Readonly<Record<CanonicalField, read
   unit: Object.freeze(["单位", "计量单位", "基本单位", "采购单位", "uom", "unit"]),
   category: Object.freeze(["分类", "物料分类", "产品分类", "类别", "品类", "category"]),
   description: Object.freeze(["描述", "物料描述", "产品描述", "料号描述", "说明", "备注", "description", "remark"]),
-  manufacturer_part_no: Object.freeze(["制造商料号", "厂家料号", "原厂料号", "mpn", "manufacturer part no"]),
+  manufacturer_part_no: Object.freeze(["制造商料号", "厂家料号", "厂商料号", "厂商物料编码", "厂家物料编码", "原厂料号", "mpn", "manufacturer part no"]),
   supplier_part_no: Object.freeze(["供应商料号", "供方料号", "供应商编码", "vendor part no", "supplier part no"]),
   drawing_no: Object.freeze(["图号", "图纸编号", "drawing no", "drawing number"]),
-  quantity: Object.freeze(["数量", "需求数量", "采购数量", "qty", "quantity"]),
+  quantity: Object.freeze(["数量", "用量", "需求数量", "采购数量", "qty", "quantity"]),
   price: Object.freeze(["单价", "价格", "含税单价", "未税单价", "price", "unit price"]),
 });
 
 const KEY_FIELDS = new Set<CanonicalField>(["material_code", "material_name", "specification", "unit"]);
-const NOTE_WORDS = /说明|须知|注意|报价单|报价表|价格表|清单|目录|封面|统计|汇总|制表|联系人|电话|地址/i;
+const NOTE_WORDS = /说明|须知|注意|报价单|报价表|价格表|清单|目录|封面|统计|汇总|变更记录|修改记录|制表|联系人|电话|地址/i;
+const EMBEDDED_TITLE_WORDS = /(?:^|[^a-z])bom(?:[^a-z]|$)|物料清单|材料清单/i;
+const MATERIAL_SHEET_WORDS = /(?:^|[^a-z])bom(?:[^a-z]|$)|物料|材料|明细|清单/i;
+const NON_MATERIAL_SHEET_WORDS = /变更|修改记录|修订|版本记录|change\s*log|revision|history/i;
 const TOTAL_WORDS = /^(总计|合计|累计|grand\s*total|total)$/i;
 const SUBTOTAL_WORDS = /^(小计|subtotal)$/i;
 const FOOTER_WORDS = /^(审核|批准|签字|制表|备注|页码|第\s*\d+\s*页)/i;
@@ -367,7 +370,7 @@ export function classifyAdaptiveDataRow(
     return { kind: "REPEATED_HEADER", confidence: Math.min(1, 0.8 + repeatedMatches * 0.04), reasonCodes: ["MAPPED_HEADER_SIGNATURE_REPEATED"] };
   }
   const joined = populated.map((cell) => cell.value).join(" ");
-  if (populated.length <= 2 && NOTE_WORDS.test(joined)) return { kind: "TITLE_OR_NOTE", confidence: 0.9, reasonCodes: ["NOTE_MARKER_AFTER_HEADER"] };
+  if (populated.length <= 2 && (NOTE_WORDS.test(joined) || EMBEDDED_TITLE_WORDS.test(joined))) return { kind: "TITLE_OR_NOTE", confidence: 0.9, reasonCodes: [NOTE_WORDS.test(joined) ? "NOTE_MARKER_AFTER_HEADER" : "EMBEDDED_TITLE_MARKER"] };
   return { kind: "DATA", confidence: 0.82, reasonCodes: ["NO_NON_DATA_MARKER", "MAPPED_HEADER_SIGNATURE_NOT_REPEATED"] };
 }
 
@@ -383,12 +386,16 @@ export function analyzeAdaptiveImportStructure(sheets: readonly AdaptiveImportSh
     const nonEmptyColumns = new Set(sheet.rows.flatMap((row) => row.raw.cells.filter((cell) => cellText(cell)).map((cell) => cell.column_index))).size;
     const continuity = nonEmptyRows / Math.max(1, sheet.rowCount);
     const coverPenalty = NOTE_WORDS.test(sheet.sheetName) && (selected?.aliasHitCount ?? 0) < 2 ? 0.25 : 0;
-    const score = Math.max(0, Math.min(1, (selected?.score ?? 0) * 0.65 + Math.min(1, nonEmptyRows / 10) * 0.15 + Math.min(1, nonEmptyColumns / 4) * 0.1 + continuity * 0.1 - coverPenalty));
+    const materialSheetBonus = MATERIAL_SHEET_WORDS.test(sheet.sheetName) ? 0.12 : 0;
+    const nonMaterialSheetPenalty = NON_MATERIAL_SHEET_WORDS.test(sheet.sheetName) ? 0.28 : 0;
+    const score = Math.max(0, Math.min(1, (selected?.score ?? 0) * 0.65 + Math.min(1, nonEmptyRows / 10) * 0.15 + Math.min(1, nonEmptyColumns / 4) * 0.1 + continuity * 0.1 + materialSheetBonus - coverPenalty - nonMaterialSheetPenalty));
     const reasons = [
       nonEmptyRows ? "NON_EMPTY_ROWS" : "EMPTY_SHEET",
       nonEmptyColumns >= 2 ? "MULTI_COLUMN_STRUCTURE" : "LOW_COLUMN_COUNT",
       selected?.aliasHitCount ? "MATERIAL_HEADER_ALIASES" : "NO_MATERIAL_HEADER_ALIAS",
       coverPenalty ? "COVER_OR_INSTRUCTION_PENALTY" : "NO_COVER_PENALTY",
+      materialSheetBonus ? "MATERIAL_SHEET_NAME_BONUS" : "NO_MATERIAL_SHEET_NAME_BONUS",
+      nonMaterialSheetPenalty ? "CHANGE_OR_HISTORY_SHEET_PENALTY" : "NO_CHANGE_OR_HISTORY_SHEET_PENALTY",
     ];
     return { sheetIndex: sheet.sheetIndex, sheetName: sheet.sheetName, score, confidence: selected?.score ?? 0, nonEmptyRows, nonEmptyColumns, selectedHeader: selected, headerCandidates: candidates.slice(0, 5), rowClassifications: classifyRows(sheet, selected), reasonCodes: reasons };
   }).sort((left, right) => right.score - left.score || left.sheetIndex - right.sheetIndex);
@@ -405,10 +412,11 @@ export function analyzeAdaptiveImportStructure(sheets: readonly AdaptiveImportSh
   };
 }
 
-function headerScore(header: string, alias: string): number {
+function headerScore(field: CanonicalField, header: string, alias: string): number {
   const normalized = normalizedHeader(header);
   const target = normalizedHeader(alias);
   if (!normalized || !target) return 0;
+  if (field === "material_code" && /厂商|厂家|制造商|供应商|供方|原厂/.test(normalized)) return 0;
   if (normalized === target || normalized.endsWith(target)) return 1;
   if (target.length >= 3 && normalized.includes(target)) return 0.82;
   return 0;
@@ -430,7 +438,7 @@ export function suggestAdaptiveFieldMappings(header: AdaptiveHeaderCandidate, pr
     const aliases = [...MATERIAL_IMPORT_FIELD_ALIASES[field], ...(profile?.headerAliases?.[field] ?? [])];
     const preferred = new Set((profile?.preferredMappings?.[field] ?? []).map(normalizedHeader));
     const scored = header.columns.map((column) => {
-      const alias = Math.max(0, ...aliases.map((candidate) => headerScore(column.headerPath, candidate)));
+      const alias = Math.max(0, ...aliases.map((candidate) => headerScore(field, column.headerPath, candidate)));
       const history = preferred.has(normalizedHeader(column.headerPath)) ? 0.12 : 0;
       const samples = sampleScore(field, column);
       return { column, score: Math.min(1, alias * 0.75 + samples * 0.2 + history), exact: alias === 1, history: history > 0 };

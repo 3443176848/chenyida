@@ -5,6 +5,11 @@ import { basename, extname, resolve } from "node:path";
 import { Readable } from "node:stream";
 
 import { parseMaterialImportCsv } from "../app/lib/material-import/csv-parser.ts";
+import {
+  MATERIAL_IMPORT_HEADER_SCAN_ROWS,
+  analyzeAdaptiveImportStructure,
+  suggestAdaptiveFieldMappings,
+} from "../app/lib/material-import/adaptive-import.ts";
 import { detectMaterialImportFileType } from "../app/lib/material-import/file-security.ts";
 import { MATERIAL_IMPORT_PARSER_LIMITS } from "../app/lib/material-import/parser-model.ts";
 import {
@@ -12,7 +17,7 @@ import {
   parseMaterialImportXlsx,
 } from "../app/lib/material-import/xlsx-parser.ts";
 
-const HEADER_SAMPLE_ROWS = 10;
+const HEADER_SAMPLE_ROWS = MATERIAL_IMPORT_HEADER_SCAN_ROWS;
 const HEADER_CANDIDATE_LIMIT = 3;
 
 const FIELD_ALIASES = Object.freeze({
@@ -138,6 +143,45 @@ function candidatesFor(rows) {
     .map((candidate, index) => ({ ...candidate, rank: index + 1 }));
 }
 
+function adaptiveSummary(sheets) {
+  const structure = analyzeAdaptiveImportStructure(sheets);
+  const selected = structure.sheets.find((sheet) => sheet.sheetIndex === structure.selectedSheetIndex);
+  const header = selected?.selectedHeader;
+  return {
+    algorithm_version: structure.algorithmVersion,
+    status: structure.status,
+    confidence: structure.confidence,
+    selected_sheet_index: structure.selectedSheetIndex,
+    selected_sheet_name: selected?.sheetName ?? null,
+    header_start_row: header?.headerStartRow ?? null,
+    header_end_row: header?.headerEndRow ?? null,
+    data_start_row: header?.dataStartRow ?? null,
+    columns: header?.columns.map((column) => ({
+      source_column_index: column.columnIndex,
+      column_name: column.headerPath,
+    })) ?? [],
+    field_mappings: header
+      ? suggestAdaptiveFieldMappings(header).map((mapping) => ({
+          standard_field: mapping.field,
+          status: mapping.status,
+          confidence: mapping.confidence,
+          source_column_indexes: mapping.sourceColumnIndexes,
+          source_headers: mapping.sourceHeaders,
+          combination_strategy: mapping.combinationStrategy,
+          evidence: mapping.evidence,
+        }))
+      : [],
+    sheet_candidates: structure.sheets.map((sheet) => ({
+      sheet_index: sheet.sheetIndex,
+      sheet_name: sheet.sheetName,
+      score: sheet.score,
+      header_start_row: sheet.selectedHeader?.headerStartRow ?? null,
+      header_end_row: sheet.selectedHeader?.headerEndRow ?? null,
+      reason_codes: sheet.reasonCodes,
+    })),
+  };
+}
+
 async function sha256File(path) {
   const hash = createHash("sha256");
   for await (const chunk of createReadStream(path)) hash.update(chunk);
@@ -159,13 +203,15 @@ function fileStream(path) {
   return Readable.toWeb(createReadStream(path));
 }
 
-function assertSupportedExtension(path, type) {
+function extensionWarnings(path, type) {
   const extension = extname(path).toLowerCase();
+  if (type === "XLSX" && extension === ".csv") return ["XLSX_CONTENT_WITH_CSV_EXTENSION"];
   if ((type === "XLSX" && extension !== ".xlsx") || (type === "CSV" && extension !== ".csv")) {
     const error = new Error("文件扩展名与检测类型不一致");
     error.code = "IMPORT_FILE_TYPE_UNSUPPORTED";
     throw error;
   }
+  return [];
 }
 
 export async function inspectMaterialFile(rawPath, options = {}) {
@@ -182,12 +228,13 @@ export async function inspectMaterialFile(rawPath, options = {}) {
     throw error;
   }
   const detectedType = detectMaterialImportFileType(await prefix(path));
-  assertSupportedExtension(path, detectedType);
+  const warningCodes = extensionWarnings(path, detectedType);
   const file = {
     name: basename(path),
     type: detectedType,
     size_bytes: metadata.size,
     sha256: await sha256File(path),
+    warning_codes: warningCodes,
   };
   const sampledRows = new Map();
   const collect = async (row) => {
@@ -197,6 +244,7 @@ export async function inspectMaterialFile(rawPath, options = {}) {
   };
   if (detectedType === "CSV") {
     const result = await parseMaterialImportCsv(fileStream(path), collect);
+    const rows = sampledRows.get(0) ?? [];
     return {
       file,
       csv: {
@@ -205,8 +253,16 @@ export async function inspectMaterialFile(rawPath, options = {}) {
         delimiter: result.delimiter === "\t" ? "TAB" : result.delimiter,
         row_count: result.rowCount,
         column_count: result.sourceColumnMax,
-        header_candidates: candidatesFor(sampledRows.get(0) ?? []),
+        header_candidates: candidatesFor(rows),
         warning_codes: [...new Set(result.warnings.map((warning) => warning.code))],
+        adaptive_structure: adaptiveSummary([{
+          sheetIndex: 0,
+          sheetName: "CSV",
+          rowCount: result.rowCount,
+          sourceColumnMax: result.sourceColumnMax,
+          mergedRanges: [],
+          rows,
+        }]),
       },
     };
   }
@@ -235,6 +291,16 @@ export async function inspectMaterialFile(rawPath, options = {}) {
           : [],
         warning_codes: [...new Set(sheet.warnings.map((warning) => warning.code))],
       })),
+      adaptive_structure: adaptiveSummary(result.sheets
+        .filter((sheet) => sheet.visibility === "VISIBLE")
+        .map((sheet) => ({
+          sheetIndex: sheet.sheetIndex,
+          sheetName: sheet.sheetName,
+          rowCount: sheet.rowCount,
+          sourceColumnMax: sheet.sourceColumnMax,
+          mergedRanges: sheet.mergedRanges,
+          rows: sampledRows.get(sheet.sheetIndex) ?? [],
+        }))),
     },
   };
 }
