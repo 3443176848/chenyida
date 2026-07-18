@@ -73,23 +73,33 @@ Excel/CSV -> Import Batch -> Mapping -> Normalization Review
 - manufacturer + manufacturer part number
 - supplier part number
 
-等级为 `EXACT`、`HIGH_CONFIDENCE`、`POSSIBLE`，最多返回并保存 20 个候选。任何等级都只提示，不自动合并、不删除、不覆盖。
+等级为 `EXACT`、`HIGH_CONFIDENCE`、`POSSIBLE`，最多返回并保存 20 个候选：
+
+- `EXACT`：阻断 Draft。
+- `HIGH_CONFIDENCE`：阻断 Draft 并等待人工确认；当前尚无已审计的逐行解除流程。
+- `POSSIBLE`：只提示。
+
+任何等级都不自动合并、不删除、不覆盖。
 
 ## 命令
 
 ```bash
+npm run material-library:import -- inspect --file /path/to/materials.xlsx
 npm run material-library:import -- inspect --api-base http://127.0.0.1:3000 --batch-id 1
 npm run material-library:import -- dry-run --api-base http://127.0.0.1:3000 --batch-id 1
 npm run material-library:import -- commit --api-base http://127.0.0.1:3000 --batch-id 1
 npm run material-library:import -- report --api-base http://127.0.0.1:3000 --batch-id 1
 ```
 
-命令只接受回环地址；`commit` 还要求 `ERP_ENV=test/local/development`、现有登录 Cookie、CSRF、Origin。命令复用 API，不直接连接 D1。实际批次必须先 inspect/dry-run，再由有权限操作者批准和 commit。
+本地 `inspect --file` 不需要 API 或 Cookie，只读处理不超过 10 MiB 的 `.xlsx/.csv`，输出文件类型、大小、SHA-256、Sheet/CSV 行列、编码/分隔符、表头候选和可能标准字段，不输出业务数据行、不修改源文件。
+
+批次命令只接受回环地址；`commit` 还要求 `ERP_ENV=test/local/development`、现有登录 Cookie、CSRF、Origin。命令复用 API，不直接连接 D1。dry-run/report 分页读取后只输出总数、成功/错误/警告/重复/待审，以及分类、单位、品牌和重复等级的安全计数汇总，不逐行打印物料正文。实际批次必须先 inspect/dry-run，再由有权限操作者批准和 commit。
 
 ## 已知限制
 
 - 本次不向既有 Mapping Target 增加“旧编码”或“内部编码”目标，以避免重写 Import；旧编码命中依赖现有供应商料号/别名证据。
-- 分类和品牌不自动创建；无法唯一命中时该行保持 BLOCKED。
+- 分类、单位和品牌不自动创建；无法唯一命中时该行保持 `NEEDS_REVIEW`，不能创建 Draft。
+- `HIGH_CONFIDENCE` 当前采用 fail-closed 阻断；逐行人工确认、审计和解除流程仍待后续实现。
 - 本次只准备 Draft 生成能力，未在既有 Review UI 增加新写按钮。
 - 尚未对真实企业物料文件做 dry-run；仓库内只发现治理模板和示例数据。
 - 生产迁移、真实导入、外部备份、容量验收和部署必须另行授权。

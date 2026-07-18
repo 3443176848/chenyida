@@ -4,6 +4,17 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-02 NO_REAL_DATA_MODE - `feat: harden material import governance`
+
+- Git Commit：`b3d26c3`。
+- 文件检查：只扫描 `/opt/erp`、`/home`；发现 20 个路径，按 SHA 去重为 1 个 10-Sheet XLSX 和 9 个 CSV，均为已跟踪治理模板/样例及其 Site 镜像；`/home` 无候选，未发现、上传或导入真实企业物料文件。
+- Inspect：扩展 `material-library:import inspect --file`，复用既有有界 XLSX/CSV Parser，只读输出类型、大小、SHA-256、Sheet/CSV 行列、编码、分隔符、表头候选和可能标准字段；不输出业务数据行、不修改源文件。
+- 治理：dry-run 显式返回分类、单位和品牌的 `EXACT/MATCHED/NEEDS_REVIEW` 及冲突/候选原因；不自动创建分类、单位或品牌。CLI 分页读取后只输出分类/单位/品牌、错误/警告/待审和重复等级安全汇总，不逐行打印物料正文。
+- 重复：EXACT 候选直接阻断 Draft；HIGH_CONFIDENCE 候选保持人工确认门禁并阻断；POSSIBLE 只提示。所有等级继续禁止自动合并、删除或覆盖。
+- 测试：新增本地 CSV/XLSX inspect 与类型错配测试，扩展分类名称、单位别名、品牌别名、EXACT/HIGH_CONFIDENCE、Draft/权限/幂等回归；专项 9/9、全量 Node 575/575、build、lint 0 error/1 个既有 warning、隔离 API smoke、319 文件凭证扫描和本地临时 SQLite 基线通过。
+- 数据库/结果：未修改 Schema、Migration、Drizzle 或生产配置；真实 dry-run 未执行，Material DRAFT 数量为 0。任务保持 `BLOCKED / NO_REAL_DATA_MODE`，等待真实文件和隔离上传目录。
+- 生产：未连接生产 D1/R2/Queue，未迁移、部署或创建生产资源。
+
 ### PHASE3-MATERIAL-LIBRARY-01 - `feat: add material master database schema`
 
 - Git Commit：`2ff8d9c`。

@@ -6,15 +6,15 @@
 
 | 指标 | 当前值 | 统计口径 |
 | --- | ---: | --- |
-| 总代码量 | 52,695 行 | 上一快照加功能提交净增 1,977 行；不含 Drizzle snapshot、依赖、构建产物、截图和文档 |
-| 源码文件 | 139 | 本任务新增 Draft Generation Service、导入命令和 2 个专项测试文件 |
-| 根仓库跟踪项 | Material Library 运行时、0007、测试和治理文档 | 未修改本地旧版业务代码、hosting 或部署配置 |
+| 总代码量 | 约 53,330 行 | 上一快照加 `b3d26c3` 净增 635 行；不含 Drizzle snapshot、依赖、构建产物、截图和文档 |
+| 源码文件 | 141 | 新增本地文件 Inspector 和专项测试；扩展 Draft Generation 与导入命令 |
+| 根仓库跟踪项 | Material Library 治理运行时、测试和文档 | 未修改 Schema/Migration、本地旧版业务代码、hosting 或部署配置 |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
 | 数据表 | 70（本地+开发 schema） | 本地 SQLite 26 张，Site D1/Drizzle 44 张；最新 `0007` 仅在隔离 D1 测试，未执行生产迁移 |
 | 在线 API 路径 | 89 | 开发代码新增 Draft Generation 查询、Normalization Approval 和 Draft Commit；生产公开站点尚未部署 |
 | 页面入口 | 14 | 既有 11 个入口加 3 条 Material Import 路由 |
-| 测试文件 | 29 | 新增 Material Library Migration 与 Import→Draft 两个专项测试文件 |
+| 测试文件 | 30 | 新增本地文件 inspect 专项测试并扩展 Import→Draft 治理测试 |
 
 ## 当前版本与环境
 
@@ -36,7 +36,7 @@
 
 ## Git 状态
 
-`PHASE3-MATERIAL-LIBRARY-01` 开始时，根仓库 `main` 位于 `badbf93` 且工作区干净。功能提交 `2ff8d9c` 覆盖在线 D1/Drizzle 增量模型、Import→Draft 服务/API、安全命令和专项测试；未修改 hosting、本地旧版业务代码或生产资源。
+`PHASE3-MATERIAL-LIBRARY-02` 开始时，根仓库 `main` 位于 `c660cc3` 且工作区干净。功能提交 `b3d26c3` 覆盖本地只读 inspect、治理状态、安全汇总、重复阻断和专项测试；未修改 Schema/Migration、hosting、本地旧版业务代码或生产资源。
 
 正式规格确认更新开始时，根仓库位于 `c694045`；用户明确回复“规格确认”。本次只更新主规格的 14 项决策状态和项目治理记录，不实施 Review UI。
 
@@ -51,6 +51,24 @@ git status --short
 git -C chenyida_erp_site status --short
 ```
 
+## PHASE3-MATERIAL-LIBRARY-02 真实数据导入治理（NO_REAL_DATA_MODE）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | BLOCKED / NO_REAL_DATA_MODE | 缺少真实企业物料文件；解除条件为用户提供真实 `.xlsx/.csv` 与隔离上传目录 |
+| 文件扫描 | COMPLETE | 仅扫描 `/opt/erp`、`/home`；20 路径去重为 1 个 10-Sheet XLSX + 9 CSV，全部是已跟踪模板/样例镜像 |
+| 本地 inspect | PASS | 只读类型/大小/SHA、Sheet/CSV、行列、编码/分隔符、表头候选和可能字段；不回显业务行、不改源文件 |
+| Mapping | VERIFIED / UNCHANGED | 既有关系化 Mapping 可保存、版本 CAS、metadata digest、确认、事件和审计；未硬编码实际映射、未改 Schema |
+| 分类治理 | PASS (SYNTHETIC) | code=`EXACT`、唯一名称=`MATCHED`、未命中/冲突=`NEEDS_REVIEW` 并给有界疑似候选；不自动建分类 |
+| 单位治理 | PASS (SYNTHETIC) | 标准 code=`EXACT`、alias=`MATCHED`、未命中/冲突=`NEEDS_REVIEW`；不自动建单位 |
+| 品牌治理 | PASS (SYNTHETIC) | code/name/alias 分级匹配，空品牌独立标识，未命中作为新候选待审；不自动建品牌 |
+| 重复治理 | PASS (SYNTHETIC) | EXACT 阻断；HIGH_CONFIDENCE 阻断并要求人工确认；POSSIBLE 提示；不自动合并 |
+| dry-run 汇总 | PASS (SYNTHETIC) | CLI 只输出总数、成功/错误/警告/重复/待审及分类/单位/品牌/重复等级计数，不打印完整物料正文 |
+| 真实 dry-run / DRAFT | NOT RUN / 0 | 未把模板冒充真实数据，未上传、批准、commit 或创建 Material DRAFT |
+| 专项/全量 | PASS | 治理专项 9/9；Node 575/575；Vinext build；lint 0 error/1 个任务外既有 warning |
+| 隔离基线 | PASS | 本机一次性 D1 API smoke、319 文件凭证扫描；临时 SQLite 环境守卫 4/4、self-test、smoke、backup/restore、go-live |
+| Schema/生产影响 | NONE | D1/Drizzle 仍为 44 表、最新 `0007`；未连接生产、迁移、部署或创建资源 |
+
 ## PHASE3-MATERIAL-LIBRARY-01 Internal Material Library 非生产实现
 
 | 验证项 | 结果 | 说明 |
@@ -61,7 +79,7 @@ git -C chenyida_erp_site status --short
 | `0007` | PASS | 新增单位/别名、品牌/别名、Approval、Draft Link、Duplicate Candidate；Material 增加品牌、单位和批次/文件/行外键；受保护 Down/re-up |
 | Import 闭环 | PASS | Current Normalization digest 审批后调用既有 Validation/Draft Service；单行原子写来源/候选；结果仅 `DRAFT`、无正式编码 |
 | 权限/安全 | PASS | admin/manager `material.import.commit`，owner/read_any、CSRF、版本/摘要、WARNING 明确确认、强幂等、安全错误和审计 |
-| 重复检测 | PASS | material/legacy/supplier code、名称、品牌、型号、规格、制造商料号；EXACT/HIGH_CONFIDENCE/POSSIBLE，仅候选不合并 |
+| 重复检测 | PASS | material/legacy/supplier code、名称、品牌、型号、规格、制造商料号；EXACT/HIGH_CONFIDENCE 阻断、POSSIBLE 提示，均不自动合并 |
 | 命令 | PASS | inspect/dry-run/commit/report 复用 API；只允许回环 URL，commit 只允许 test/local/development |
 | 迁移/闭环专项 | PASS | Migration 3/3；Import→Draft、权限、CSRF、追溯、请求/行幂等 3/3；既有生命周期 14/14 |
 | Site 全量 | PASS | Vinext build；Node 569/569；lint 0 error、1 个任务外既有 warning；Drizzle 44 表无漂移 |
