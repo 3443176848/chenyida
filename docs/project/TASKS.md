@@ -15,6 +15,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | PHASE3-MATERIAL-LIBRARY-REAL-SAMPLE-01 | A118/V700 真实 BOM 自适应导入验证 | DONE | Codex（只读样本审计与非生产修正）、项目负责人（提供两份样本） | 2026-07-18 16:30 CST | 2026-07-18 16:35 CST | PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT | 功能提交 `cea940a`；只读验证两份真实附件，V700 已正确选择 BOM 并识别规格/型号/数量，A118 已识别第 44 行表头和正确字段但因 7 行扩展到 16,384 列而保持安全阻断；修正错后缀 XLSX 告警兼容、Change Log 降权、厂商料号限定、“用量”和安全错误，Node 593/593。未提交样本、上传生产或创建 Draft |
 | PHASE3-MATERIAL-LIBRARY-EXCEL-COMPAT | `.xlsx/.xls` 网页识别与导入兼容 | DOING | Codex（非生产实现） | 2026-07-18 | - | PHASE3-MATERIAL-LIBRARY-REAL-SAMPLE-01 | 新增 `.xls` OLE/BIFF 有界读取路径，复用现有 Batch/File/Raw Row/Mapping/Normalization/UI；待完成 TypeScript/build/Node 基线后再标记 DONE。 |
+| PHASE3-MATERIAL-LIBRARY-SERVER-RUNTIME | 服务器本地运行面与 18888 端口切换 | DOING | Codex（非生产配置与文档） | 2026-07-18 | - | PHASE3-MATERIAL-LIBRARY-EXCEL-COMPAT | 根据 D-028 将本地 Python 应用作为后续默认交付目标，统一 server/start/stop/background/go-live 默认端口为 `18888`；尚未迁移 Site 的 `.xls` 代码、启动生产服务或开放外部监听。 |
 | PM-000 | 建立AI项目管理体系 | DONE | Codex（执行）、项目负责人（确认） | 2026-07-11 | 2026-07-11 | 无 | 建立 `docs/project/` 九份权威文档并更新 `AGENTS.md`；未修改业务代码、数据库、页面或生产环境 |
 | PHASE0-TASK01-B | 解除Site gitlink并纳入根仓库管理 | DONE | Codex（执行）、项目负责人（目录决策确认） | 2026-07-11 | 2026-07-11 | PM-000 | 保留 `chenyida_erp_app/` 与 `chenyida_erp_site/` 路径；将 1 个 gitlink 转为 77 个普通跟踪文件，并保留 `2b4f178`、`9f2c2dc` 的版本和历史关系；未修改业务代码或生产环境 |
 | PHASE0-TASK02 | 建立隔离测试与安全基线 | DONE | Codex（执行）、项目负责人（本机一次性 D1 方案确认） | 2026-07-11 | 2026-07-11 | PHASE0-TASK01 | 建立三环境清单、production/公开 URL 拒绝、本机一次性 Miniflare D1、自动销毁、去敏日志、凭证检查和临时 SQLite 备份恢复验证；未访问生产 D1 |

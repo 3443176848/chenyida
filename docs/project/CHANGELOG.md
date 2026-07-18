@@ -4,6 +4,13 @@
 
 ## 2026-07-18
 
+### PHASE3-MATERIAL-LIBRARY-SERVER-RUNTIME - `chore: switch local server delivery runtime`
+
+- 运行面：根据项目负责人新要求，后续默认交付目标改为服务器本地 `chenyida_erp_app`，不再默认把新功能整合到 `chenyida_erp_site`。
+- 端口：`server.py`、前台/后台启动、停止脚本和上线健康检查默认统一为 `127.0.0.1:18888`；测试脚本继续使用隔离端口，不与默认服务冲突。
+- 安全：未绑定 `0.0.0.0`，未修改防火墙、反向代理、TLS、公网入口或生产数据库；本次没有启动服务器。
+- 验证：`server.py --self-test`、`smoke_test.py`、`go_live_check.py --no-backup` 通过；Site 中已完成的 `.xls` 代码未自动回写本地应用，服务器端 `.xlsx/.xls` 迁移另立任务。
+
 ### PHASE3-MATERIAL-LIBRARY-EXCEL-COMPAT - `feat: support legacy xls imports`
 
 - 文件格式：网页预检和上传安全检查新增 `.xls`；旧式 OLE/BIFF 工作簿进入独立解析路径，现有 `.xlsx` 继续使用 OOXML 解析器，`.csv` 行为不变。

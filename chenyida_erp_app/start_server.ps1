@@ -6,7 +6,7 @@ $Python = "C:\Users\tu661\.cache\codex-runtimes\codex-primary-runtime\dependenci
 $DataDir = Join-Path $AppDir "data"
 $PidFile = Join-Path $DataDir "server.pid"
 $LogFile = Join-Path $DataDir "server.log"
-$Port = 8765
+$Port = 18888
 $HealthUrl = "http://127.0.0.1:$Port/api/health"
 
 New-Item -ItemType Directory -Force -Path $DataDir | Out-Null

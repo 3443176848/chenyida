@@ -9,7 +9,7 @@ from pathlib import Path
 APP_DIR = Path(__file__).resolve().parent
 WORKSPACE = APP_DIR.parent
 PYTHON = Path(sys.executable)
-PORT = 8765
+PORT = 18888
 DATA_DIR = APP_DIR / "data"
 PID_FILE = DATA_DIR / "server.pid"
 LOG_FILE = DATA_DIR / "server.log"

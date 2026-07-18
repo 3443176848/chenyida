@@ -13,7 +13,7 @@
 - 路径：`chenyida_erp_app/`
 - 技术：Python 3、标准库 HTTP Server、SQLite、原生 HTML/CSS/JavaScript。
 - 入口：`server.py`；静态页面位于 `static/`。
-- 用途：现场本地运行、旧行为参照和未来迁移来源。
+- 用途：服务器本地运行和后续默认交付目标；根据 D-028 默认监听 `127.0.0.1:18888`。
 - 数据：`chenyida_erp_app/data/erp.sqlite3`，运行数据被 Git 忽略。
 
 ### 在线 Site
@@ -22,7 +22,7 @@
 - 技术：Vinext、React、TypeScript、Cloudflare Worker、D1、Drizzle、OpenAI Sites。
 - 页面：根 `app/page.tsx` 继续通过 iframe 加载 legacy `public/erp/index.html`；Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给 `app/lib/erp-api.ts` 的集中式处理器。
-- 生产：Sites `v3`，公开地址 `https://chenyida-erp-online.sjin74376.chatgpt.site`。
+- 历史在线生产：Sites `v3`，公开地址 `https://chenyida-erp-online.sjin74376.chatgpt.site`；不作为后续新功能默认交付目标。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
 
 ### 治理资料

@@ -81,6 +81,15 @@ git -C chenyida_erp_site status --short
 | 兼容策略 | 已记录 | 批次 `source_kind`/文件 `detected_file_type` V1 分类保持 `XLSX`，`.xls` 通过 `filename_extension` 选择独立 BIFF 路径并写入 `XLS_LEGACY_BINARY` 警告 |
 | 生产影响 | NONE | 未连接生产资源、未迁移、未上传、未创建 Draft、未部署 |
 
+## 服务器本地交付运行面
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 默认应用 | 已切换 | `chenyida_erp_app/server.py` 及启动脚本默认使用 `127.0.0.1:18888` |
+| 本地基线 | PASS | `server.py --self-test`、`smoke_test.py`、`go_live_check.py --no-backup` 通过 |
+| Site 关系 | 已记录 | Site 保留为历史/参考代码，后续新功能不再默认整合到 Site |
+| 外部暴露 | 未执行 | 未绑定 `0.0.0.0`、未改防火墙、未创建公网入口、未启动服务 |
+
 ## PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT 非生产实现
 
 | 验证项 | 结果 | 说明 |

@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $AppDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PidFile = Join-Path $AppDir "data\server.pid"
-$Port = 8765
+$Port = 18888
 
 if (-not (Test-Path -LiteralPath $PidFile)) {
   $Connection = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1

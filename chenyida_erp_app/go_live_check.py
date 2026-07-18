@@ -20,7 +20,7 @@ def check_http_health(host, port):
 def main():
     parser = argparse.ArgumentParser(description="晨亿达 ERP 上线检查")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--port", type=int, default=18888)
     parser.add_argument("--require-running", action="store_true", help="要求本地服务已启动")
     parser.add_argument("--no-backup", action="store_true", help="只检查数据库，不创建备份")
     args = parser.parse_args()
@@ -69,7 +69,7 @@ def main():
     print("GO_LIVE_CHECK_OK")
     for check in checks:
         print(f"- {check}")
-    print("- 登录地址: http://127.0.0.1:8765")
+    print("- 登录地址: http://127.0.0.1:18888")
     print("- 首次投用请用 admin / admin123 登录后立即修改密码")
     return 0
 

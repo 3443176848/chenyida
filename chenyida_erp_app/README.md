@@ -39,7 +39,7 @@ powershell -ExecutionPolicy Bypass -File D:\erp\chenyida_erp_app\run_server.ps1
 看到启动提示后，保持这个窗口打开，然后访问：
 
 ```text
-http://127.0.0.1:8765
+http://127.0.0.1:18888
 ```
 
 ## 默认账号
@@ -82,7 +82,7 @@ $py='C:\Users\tu661\.cache\codex-runtimes\codex-primary-runtime\dependencies\pyt
 启动后打开：
 
 ```text
-http://127.0.0.1:8765
+http://127.0.0.1:18888
 ```
 
 ## 数据位置
