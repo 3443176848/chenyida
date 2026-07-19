@@ -131,7 +131,7 @@ class RealSampleImportTest(unittest.TestCase):
                     )
                     self.assertEqual(
                         connection.execute("SELECT COUNT(*) FROM cleaning_rows WHERE raw_spec != ''").fetchone()[0],
-                        216,
+                        215,
                     )
                     self.assertEqual(
                         connection.execute(
@@ -175,6 +175,91 @@ class RealSampleImportTest(unittest.TestCase):
                         json.loads(capacitor["specification_match_evidence_json"]),
                     )
                     self.assertEqual(connection.execute("SELECT COUNT(*) FROM items").fetchone()[0], 0)
+        finally:
+            server.DATA_DIR = original_data_dir
+            server.IMPORT_FILE_DIR = original_import_dir
+            server.DB_PATH = original_db_path
+
+    def test_j587_precision_regressions_do_not_create_false_connector_candidates(self):
+        if not SPEC_ATTACHMENT_DIR.exists():
+            self.skipTest("规格真实附件不在当前服务器")
+        original_data_dir = server.DATA_DIR
+        original_import_dir = server.IMPORT_FILE_DIR
+        original_db_path = server.DB_PATH
+        try:
+            with tempfile.TemporaryDirectory(prefix="erp-precision-import-") as temp_dir:
+                data_dir = Path(temp_dir)
+                server.DATA_DIR = data_dir
+                server.IMPORT_FILE_DIR = data_dir / "import_files"
+                server.DB_PATH = data_dir / "precision-sample.sqlite3"
+                with closing(server.db_connect()) as connection:
+                    server.create_schema(connection)
+                    server.apply_migrations(connection)
+                    connection.execute(
+                        """
+                        INSERT INTO items (
+                            internal_item_code, item_category, standard_name,
+                            item_status, base_uom, value_spec, created_at, updated_at
+                        ) VALUES (
+                            'TEST-CON-001', 'CON', '测试连接器',
+                            '启用', 'PCS', 'FPC 0.5Pitch 24Pin',
+                            '2026-07-19', '2026-07-19'
+                        )
+                        """
+                    )
+                    path = SPEC_ATTACHMENT_DIR / "J587_SUBA2_V01-20260703.xlsx"
+                    result = server.import_supplier_file(
+                        connection,
+                        path.read_bytes(),
+                        path.name,
+                        "TEST-PRECISION-J587",
+                        "real-sample-test",
+                    )
+                    self.assertEqual(result["count"], 122)
+                    false_connector_candidates = connection.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM cleaning_rows
+                        WHERE import_batch_no = 'TEST-PRECISION-J587'
+                          AND source_row_number IN (118, 119, 120, 121, 127)
+                          AND candidate_internal_code = 'TEST-CON-001'
+                        """
+                    ).fetchone()[0]
+                    self.assertEqual(false_connector_candidates, 0)
+                    resistor_tokens = json.loads(
+                        connection.execute(
+                            """
+                            SELECT source_spec_tokens_json
+                            FROM cleaning_rows
+                            WHERE import_batch_no = 'TEST-PRECISION-J587'
+                              AND source_row_number = 3
+                            """
+                        ).fetchone()[0]
+                    )
+                    powers = {
+                        token["normalized"]
+                        for token in resistor_tokens
+                        if token["kind"] == "POWER"
+                    }
+                    self.assertEqual(powers, {"0.05 W"})
+                    connector_tokens = json.loads(
+                        connection.execute(
+                            """
+                            SELECT source_spec_tokens_json
+                            FROM cleaning_rows
+                            WHERE import_batch_no = 'TEST-PRECISION-J587'
+                              AND source_row_number = 118
+                            """
+                        ).fetchone()[0]
+                    )
+                    connector_values = {
+                        (token["kind"], token["normalized"])
+                        for token in connector_tokens
+                    }
+                    self.assertIn(("PIN_COUNT", "16"), connector_values)
+                    self.assertFalse(
+                        any(token["kind"] == "CAPACITANCE" for token in connector_tokens)
+                    )
         finally:
             server.DATA_DIR = original_data_dir
             server.IMPORT_FILE_DIR = original_import_dir

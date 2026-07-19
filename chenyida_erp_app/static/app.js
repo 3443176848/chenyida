@@ -71,7 +71,13 @@ function setTab(name) {
 }
 
 function pill(level) {
-  const cls = level === "自动匹配" ? "auto" : level === "疑似匹配" ? "suspect" : "new";
+  const cls = level === "自动匹配"
+    ? "auto"
+    : level === "疑似匹配"
+      ? "suspect"
+      : level === "规格不足"
+        ? "insufficient"
+        : "new";
   return `<span class="pill ${cls}">${level || ""}</span>`;
 }
 
@@ -113,6 +119,37 @@ function parseJsonArray(value) {
   } catch {
     return [];
   }
+}
+
+function parseJsonObject(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function renderMatchEvidenceNotice(row) {
+  const evidence = parseJsonObject(row.specification_match_evidence_json);
+  if (evidence.reason === "INSUFFICIENT_SPECIFICATION_EVIDENCE") {
+    const count = Number(evidence.discriminative_kind_count || 0);
+    return `<div class="spec-warning">规格证据不足：只识别到 ${count} 类鉴别参数，未提供内部物料候选</div>`;
+  }
+  const tokenLabels = Object.fromEntries(
+    parseJsonArray(row.source_spec_tokens_json).map((token) => [token.kind, token.label || token.kind]),
+  );
+  const missing = Array.isArray(evidence.missing_in_target)
+    ? evidence.missing_in_target.map((item) => tokenLabels[item.kind] || item.kind)
+    : [];
+  if (missing.length) {
+    return `<div class="spec-caution">候选内部规格缺少：${escapeHtml(missing.join("、"))}，不能自动确认</div>`;
+  }
+  if (evidence.ambiguous) {
+    return `<div class="spec-caution">存在 ${Number(evidence.ambiguous_candidate_count || 0)} 个同分候选，未随机给号</div>`;
+  }
+  return "";
 }
 
 function renderRawModelAndSpecification(row) {
@@ -222,6 +259,7 @@ function renderSummary() {
     ["待处理", state.summary.pending],
     ["自动匹配", state.summary.auto_count],
     ["疑似匹配", state.summary.suspect_count],
+    ["规格不足", state.summary.insufficient_count],
     ["新物料", state.summary.new_count],
   ];
   $("#summaryCards").innerHTML = cards.map(([label, value]) => `
@@ -940,6 +978,7 @@ function renderCleaning() {
         <td>${renderRawModelAndSpecification(row)}</td>
         <td>
           ${row.specification_source ? `<div class="spec-source">规格来源：${escapeHtml(row.specification_source)}</div>` : ""}
+          ${renderMatchEvidenceNotice(row)}
           ${renderSpecParts(sourceSpecParts(row))}
         </td>
         <td>${escapeHtml(row.purchase_uom)}</td>

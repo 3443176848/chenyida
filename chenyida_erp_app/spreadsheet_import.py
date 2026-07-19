@@ -42,7 +42,7 @@ EMBEDDED_TITLE = re.compile(r"(?:^|[^a-z])bom(?:[^a-z]|$)|物料清单|材料清
 TOTAL_WORDS = re.compile(r"^(总计|合计|累计|grand\s*total|total)$", re.I)
 SUBTOTAL_WORDS = re.compile(r"^(小计|subtotal)$", re.I)
 FOOTER_WORDS = re.compile(r"^(审核|批准|签字|制表|备注|页码|第\s*\d+\s*页)", re.I)
-SPEC_CONTRIBUTOR = re.compile(r"型号|尺寸|材质|材料|颜色|参数|封装|等级|厚度|宽度|长度|model|size|parameter", re.I)
+SPEC_CONTRIBUTOR = re.compile(r"尺寸|材质|材料|颜色|参数|封装|等级|厚度|宽度|长度|size|parameter", re.I)
 DIMENSION_TOKEN = re.compile(
     r"\b\d+(?:\.\d+)?\s*(?:mm|cm|m|mil|inch|英寸)?\s*[x×*]\s*"
     r"\d+(?:\.\d+)?(?:\s*[x×*]\s*\d+(?:\.\d+)?)?\s*(?:mm|cm|m|mil|inch|英寸)?\b",
@@ -453,18 +453,40 @@ def _suggest_mappings(header):
                 and re.search(r"规格|specification|model/spec", item[3].split("/")[-1], re.I)
             ]
             contributors = []
+            content_candidates = []
             for column in header["columns"]:
                 if SPEC_CONTRIBUTOR.search(column["header"]):
                     score, exact = _mapping_score(field, column)
                     contributors.append((max(score, 0.72), column["index"], exact, column["header"]))
+                evidences = [specification_richness(value) for value in column["samples"] if value]
+                rich_ratio = (
+                    sum(evidence[0] >= 2 for evidence in evidences) / len(evidences)
+                    if evidences
+                    else 0
+                )
+                max_kind_count = max((evidence[0] for evidence in evidences), default=0)
+                if rich_ratio >= 0.3 or max_kind_count >= 3:
+                    content_score = min(0.90, 0.64 + rich_ratio * 0.18 + max_kind_count * 0.02)
+                    content_candidates.append(
+                        (content_score, column["index"], False, column["header"])
+                    )
             contributors.sort(key=lambda item: (-item[0], item[1]))
+            content_candidates.sort(key=lambda item: (-item[0], item[1]))
             descriptive_candidates = [
                 (min(item[0], 0.68), item[1], False, item[3])
                 for item in scored
                 if _normalized_header(item[3].split("/")[-1])
                 in {"description", "描述", "物料描述", "产品描述", "料号描述"}
             ]
-            selected = dedicated[:1] if dedicated else contributors[:5] if contributors else descriptive_candidates[:1]
+            selected = (
+                dedicated[:1]
+                if dedicated
+                else content_candidates[:1]
+                if content_candidates
+                else contributors[:5]
+                if contributors
+                else descriptive_candidates[:1]
+            )
             selected.sort(key=lambda item: item[1])
             strategy = "JOIN_NON_EMPTY" if len(selected) > 1 else "SPECIFICATION_EXTRACT"
         if not selected:
@@ -518,13 +540,21 @@ def _resolve(row, mapping):
 def _extract_specification(row, mappings, material_name, description):
     mapping = mappings["specification"]
     explicit = _resolve(row, mapping)
+    explicit_reason = "EXPLICIT_OR_COMPONENT_SPECIFICATION"
+    explicit_priority = 3
+    if mapping["indexes"] == mappings["description"]["indexes"] and explicit == description:
+        explicit_reason = "DESCRIPTION_STRUCTURED_SPECIFICATION_SOURCE"
+        explicit_priority = 2
+    elif mapping["indexes"] == mappings["material_name"]["indexes"] and explicit == material_name:
+        explicit_reason = "MATERIAL_NAME_STRUCTURED_SPECIFICATION_SOURCE"
+        explicit_priority = 1
     candidates = [
         {
             "value": explicit,
             "source": "/".join(mapping["headers"]) or "mapped_specification",
             "evidence": specification_richness(explicit or ""),
-            "priority": 3,
-            "reason": "EXPLICIT_OR_COMPONENT_SPECIFICATION",
+            "priority": explicit_priority,
+            "reason": explicit_reason,
         },
         {
             "value": description,
@@ -562,14 +592,23 @@ def _extract_specification(row, mappings, material_name, description):
         )
     if explicit:
         source = "/".join(mapping["headers"]) or "mapped_specification"
+        explicit_evidence = specification_richness(explicit)
+        if explicit_evidence[0] < 2:
+            return (
+                explicit,
+                min(mapping["confidence"], 0.68),
+                "SUGGESTED",
+                ["EXPLICIT_SPECIFICATION_EVIDENCE_INSUFFICIENT", "MANUAL_CONFIRMATION_REQUIRED"],
+                source,
+            )
         return explicit, mapping["confidence"], mapping["status"], ["EXPLICIT_OR_COMPONENT_SPECIFICATION"], source
     fallback = " ".join(value for value in (material_name, description) if value)
-    tokens = list(dict.fromkeys(DIMENSION_TOKEN.findall(fallback) + TECH_TOKEN.findall(fallback)))
-    if not tokens:
+    fallback_evidence = specification_richness(fallback)
+    if not fallback or fallback_evidence[0] == 0:
         return "", 0, "UNMAPPED", ["NO_SPECIFICATION_EVIDENCE"], ""
     return (
-        " ".join(tokens),
-        min(0.68, 0.48 + len(tokens) * 0.05),
+        fallback,
+        min(0.72, 0.48 + fallback_evidence[0] * 0.06),
         "SUGGESTED",
         ["DETERMINISTIC_NAME_OR_DESCRIPTION_EXTRACTION", "MANUAL_CONFIRMATION_REQUIRED"],
         "material_name+description",
@@ -638,12 +677,6 @@ def parse_spreadsheet_import(content, filename):
             mapped["material_name"],
             mapped["description"],
         )
-        if not specification and mapped["model"]:
-            specification = mapped["model"]
-            specification_confidence = max(specification_confidence, 0.74)
-            specification_status = "SUGGESTED"
-            spec_evidence = ["MODEL_AS_SPECIFICATION_CANDIDATE", "MANUAL_CONFIRMATION_REQUIRED"]
-            specification_source = "/".join(mappings["model"]["headers"]) or "model"
         mapped["specification"] = specification
         material_name_status = mappings["material_name"]["status"]
         if not mapped["material_name"] and material_name_from_specification and specification:

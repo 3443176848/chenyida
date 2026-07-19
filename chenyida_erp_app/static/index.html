@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>晨亿达 ERP - 物料主数据治理</title>
-    <link rel="stylesheet" href="/styles.css?v=20260718-general-spec-v2" />
+    <link rel="stylesheet" href="/styles.css?v=20260719-spec-precision-v3" />
   </head>
   <body>
     <header class="topbar">
@@ -57,7 +57,7 @@
             <h3>现场执行顺序</h3>
             <ol class="steps">
               <li>采购把供应商表贴到“供应商导入”。</li>
-              <li>系统自动匹配内部物料并分流。</li>
+              <li>系统只在规格证据充足时匹配内部物料，证据不足明确拦截。</li>
               <li>自动匹配由采购确认，疑似匹配由工程确认。</li>
               <li>新物料走建档，生成晨亿达内部物料编码。</li>
               <li>BOM、采购、库存、生产只使用内部物料编码。</li>
@@ -697,6 +697,6 @@
     </dialog>
 
     <div id="toast" class="toast" hidden></div>
-    <script src="/app.js?v=20260718-general-spec-v2"></script>
+    <script src="/app.js?v=20260719-spec-precision-v3"></script>
   </body>
 </html>

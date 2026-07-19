@@ -18,7 +18,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-from specification_tokens import compare_tokens, extract_tokens
+from specification_tokens import assess_specification_evidence, compare_tokens, extract_tokens
 from spreadsheet_import import MAX_FILE_BYTES, SpreadsheetImportError, parse_spreadsheet_import
 
 
@@ -420,24 +420,25 @@ def source_spec_tokens(raw):
         )
     )
     brand = raw.get("raw_brand", "")
-    tokens = []
-    for index, text in enumerate([raw.get("raw_spec", ""), raw.get("remark", "")]):
-        tokens.extend(
-            extract_tokens(
-                text,
-                category=category if index == 0 else "",
-                model=identifiers[0] if index == 0 and identifiers else "",
-                brand=brand if index == 0 else "",
+    specification_context = " ".join(
+        dict.fromkeys(
+            value
+            for value in (
+                raw.get("raw_item_name", ""),
+                raw.get("raw_spec", ""),
+                raw.get("remark", ""),
             )
+            if value
         )
+    )
+    tokens = extract_tokens(
+        specification_context,
+        category=category,
+        model=identifiers[0] if identifiers else "",
+        brand=brand,
+    )
     for identifier in identifiers[1:]:
         tokens.extend(extract_tokens("", model=identifier))
-    if not any(token["kind"] == "CATEGORY" for token in tokens):
-        tokens.extend(
-            token
-            for token in extract_tokens(raw.get("raw_item_name", ""))
-            if token["kind"] == "CATEGORY"
-        )
     return deduplicate_spec_tokens(tokens)
 
 
@@ -2434,6 +2435,7 @@ def best_match(conn, raw):
                 "missing_in_source": [],
                 "conflicts": [],
                 "identifier_evidence": [],
+                **assess_specification_evidence(source_spec_tokens(raw)),
             }
             return {
                 "candidate_internal_code": exact["internal_item_code"],
@@ -2449,9 +2451,33 @@ def best_match(conn, raw):
                 ),
             }
 
+    source_tokens = source_spec_tokens(raw)
+    source_evidence = assess_specification_evidence(source_tokens)
+    if not source_evidence["evidence_sufficient"]:
+        return {
+            "candidate_internal_code": "",
+            "candidate_standard_name": "",
+            "match_level": "规格不足",
+            "confidence": 0,
+            "owner_role": "工程",
+            "source_spec_tokens": source_tokens,
+            "candidate_spec_tokens": [],
+            "specification_match_evidence": {
+                "score": 0,
+                "raw_similarity": 0,
+                "full_signature": False,
+                **source_evidence,
+                "matched": [],
+                "missing_in_target": [],
+                "missing_in_source": [],
+                "conflicts": [],
+                "identifier_evidence": [],
+                "reason": "INSUFFICIENT_SPECIFICATION_EVIDENCE",
+            },
+        }
+
     items = fetch_items(conn)
     if not items:
-        source_tokens = source_spec_tokens(raw)
         return {
             "candidate_internal_code": "",
             "candidate_standard_name": "",
@@ -2468,6 +2494,7 @@ def best_match(conn, raw):
                 "missing_in_source": [],
                 "conflicts": [],
                 "identifier_evidence": [],
+                **source_evidence,
                 "reason": "NO_INTERNAL_ITEMS",
             },
         }
@@ -3150,6 +3177,7 @@ def api_summary(conn):
     auto_count = conn.execute("SELECT COUNT(*) FROM cleaning_rows WHERE match_level = '自动匹配'").fetchone()[0]
     suspect_count = conn.execute("SELECT COUNT(*) FROM cleaning_rows WHERE match_level = '疑似匹配'").fetchone()[0]
     new_count = conn.execute("SELECT COUNT(*) FROM cleaning_rows WHERE match_level = '新物料'").fetchone()[0]
+    insufficient_count = conn.execute("SELECT COUNT(*) FROM cleaning_rows WHERE match_level = '规格不足'").fetchone()[0]
     total_customers = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
     total_suppliers = conn.execute("SELECT COUNT(*) FROM suppliers").fetchone()[0]
     total_products = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
@@ -3189,6 +3217,7 @@ def api_summary(conn):
         "auto_count": auto_count,
         "suspect_count": suspect_count,
         "new_count": new_count,
+        "insufficient_count": insufficient_count,
     }
 
 

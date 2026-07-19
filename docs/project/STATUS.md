@@ -1,6 +1,6 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-18（Asia/Shanghai）
+最后更新时间：2026-07-19（Asia/Shanghai）
 
 ## 自动统计摘要
 
@@ -205,6 +205,22 @@ git -C chenyida_erp_site status --short
 | 恢复 | PASS | 部署前备份 `erp-backup-20260718-203624.sqlite3`，SHA-256 `04286e386f9a799400c4ec0dc675110419d5f77fdf7dc54e3366cb2287651262`，完整性 `ok` |
 | 自动测试 | PASS | 联合单元 48/48、self-test、smoke、go-live |
 | 部署 | PASS | systemd active/enabled，本机和公网首页 HTTP 200，`0004` 已应用 |
+
+## 规格匹配精度门禁
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 大类误匹配 | PASS | CATEGORY 不计入鉴别参数；只识别大类的来源返回“规格不足”、无候选、置信度 0 |
+| 自动匹配门禁 | PASS | 双方至少三类鉴别参数、包含锚点、集合完整一致、无冲突且候选唯一 |
+| 参数扩展 | PASS | 分数功率、范围、频率/阻抗、带宽、dB、嵌入电阻码、长度、针数、间距、铜厚和接口 |
+| 上下文消歧 | PASS | Type-C `16P` 识别为针数且不生成电容；电容短写 P 只在电容上下文启用 |
+| 来源 Mapping | PASS | 样本值丰富度可定位未知标题规格列；型号不直接冒充规格 |
+| 审核页面 | PASS | 显示规格不足、鉴别参数类数、候选内部缺项和歧义候选数 |
+| 真实 J587 回归 | PASS | 隔离复算 105 新/5 疑似/12 规格不足；4 条连接器大类错误候选归零 |
+| 数据影响 | PRESERVED | 9 Material、122 Cleaning、17 Batch、3176 Raw；旧 Cleaning 不回填、不重算 |
+| 恢复 | PASS | `erp-backup-20260719-133841.sqlite3`，SHA-256 `898b3dab3da5b3e4239773789afebca73f1c91428646c2c2c3f476e2d8efc536`，integrity `ok` |
+| 自动测试 | PASS | 联合单元 58/58、self-test、smoke、go-live 和 Python 编译检查 |
+| 部署 | PASS | systemd active/enabled，`0.0.0.0:18888`，本机与公网健康检查和新版静态资源通过 |
 
 ## 服务器本地交付运行面
 

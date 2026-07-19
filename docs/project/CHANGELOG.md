@@ -2,6 +2,18 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-19
+
+### PHASE3-MATERIAL-LIBRARY-SPEC-PRECISION-GATE-01 - `feat: enforce specification precision gates`
+
+- 精度门禁：CATEGORY 不再作为足以区分内部编号的证据；少于两类鉴别参数返回“规格不足”、置信度 0 且不提供候选。自动匹配要求来源与候选至少三类参数、包含锚点、集合完整一致且候选唯一。
+- 参数扩展：确定性支持分数功率、工程量范围、频率/阻抗组合、带宽、dB、嵌入电阻码、长度、针数、间距、铜厚和常用接口；Type-C `16P` 不再误识别为电容。
+- 来源选择：未知表头可按样本规格丰富度选中；普通型号列不再拼入规格，只有型号或低信息规格保持人工审核。
+- 审核 UI：摘要增加“规格不足”，清洗行明确显示证据类数、候选内部缺项和歧义，不由浏览器重新计算匹配。
+- 真实回归：J587 隔离复算为 105 新物料、5 疑似、12 规格不足；旧逻辑中 4 条只凭连接器大类产生的错误候选归零。三份附件和业务正文不提交。
+- 数据：无 Schema/Migration；9 Material、122 Cleaning、17 Batch 和 3176 Raw 保持不变，旧 Cleaning 不静默重算。
+- 验证与部署：联合单元 58/58、self-test、smoke、go-live、编译和 diff 检查通过；部署前备份 SHA-256 为 `898b3dab3da5b3e4239773789afebca73f1c91428646c2c2c3f476e2d8efc536`，systemd active/enabled，本机和公网 HTTP 200。
+
 ## 2026-07-18
 
 ### PHASE3-MATERIAL-LIBRARY-GENERAL-SPEC-MATCH-01 - `feat: match generalized specification tokens`

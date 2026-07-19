@@ -56,7 +56,8 @@ class SpreadsheetImportTest(unittest.TestCase):
         self.assertEqual((result["header_start_row"], result["header_end_row"]), (1, 2))
         self.assertEqual(len(result["rows"]), 2)
         self.assertEqual(result["rows"][0]["raw_item_name"], "贴片电阻")
-        self.assertEqual(result["rows"][0]["raw_spec"], "RC0603 1.6x0.8mm")
+        self.assertEqual(result["rows"][0]["raw_spec"], "1.6x0.8mm")
+        self.assertEqual(result["rows"][0]["raw_model"], "RC0603")
         self.assertEqual(result["rows"][0]["_review_status"], "NEEDS_REVIEW")
         self.assertEqual(len(result["raw_rows"]), 6)
 
@@ -214,7 +215,7 @@ class SpreadsheetImportTest(unittest.TestCase):
         if not SPEC_ATTACHMENT_DIR.exists():
             self.skipTest("规格真实附件不在当前服务器")
         expected = {
-            "1928C量产BOM.xlsx": (25, 25, "M105H-DG-M23U-charge-V1_BOM"),
+            "1928C量产BOM.xlsx": (25, 24, "M105H-DG-M23U-charge-V1_BOM"),
             "G20-G15G项目量产BOM.xlsx": (74, 69, "G9_5G_ANT_SCH_V2R0"),
             "J587_SUBA2_V01-20260703.xlsx": (122, 122, "TYPE-C耳机小板"),
         }

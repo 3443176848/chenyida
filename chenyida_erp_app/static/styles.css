@@ -387,6 +387,20 @@ tr:nth-child(even) td {
   white-space: normal;
 }
 
+.spec-warning {
+  margin-bottom: 6px;
+  color: #b91c1c;
+  font-size: 12px;
+  white-space: normal;
+}
+
+.spec-caution {
+  margin-bottom: 6px;
+  color: #92400e;
+  font-size: 12px;
+  white-space: normal;
+}
+
 .raw-specification {
   display: grid;
   gap: 6px;
@@ -442,6 +456,11 @@ tr:nth-child(even) td {
 .pill.new {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.pill.insufficient {
+  background: #f3e8ff;
+  color: #7e22ce;
 }
 
 .row-actions {

@@ -65,6 +65,15 @@ class SpecificationMatchTest(unittest.TestCase):
         self.conn.execute(
             """
             INSERT INTO items (
+                internal_item_code, item_category, standard_name, value_spec
+            ) VALUES (
+                '10', 'CON', 'FPC连接器', 'FPC 0.5Pitch 24Pin'
+            )
+            """
+        )
+        self.conn.execute(
+            """
+            INSERT INTO items (
                 internal_item_code, item_category, standard_name, package,
                 value_spec, mpn
             ) VALUES (
@@ -142,7 +151,11 @@ class SpecificationMatchTest(unittest.TestCase):
         result = self.match("任意名称 A", "")
 
         self.assertEqual(result["candidate_internal_code"], "")
-        self.assertEqual(result["match_level"], "新物料")
+        self.assertEqual(result["match_level"], "规格不足")
+        self.assertEqual(
+            result["specification_match_evidence"]["reason"],
+            "INSUFFICIENT_SPECIFICATION_EVIDENCE",
+        )
 
     def test_full_specification_stored_in_value_spec_is_supported(self):
         result = self.match("不同的供应商名称", "22nF,+10%,25V,0402")
@@ -242,6 +255,26 @@ class SpecificationMatchTest(unittest.TestCase):
         self.assertEqual(result["match_level"], "自动匹配")
         self.assertEqual(result["confidence"], 1.0)
         self.assertTrue(result["specification_match_evidence"]["full_signature"])
+
+    def test_category_only_does_not_produce_connector_candidate(self):
+        result = self.match("连接器", "Connector")
+
+        self.assertEqual(result["candidate_internal_code"], "")
+        self.assertEqual(result["match_level"], "规格不足")
+        self.assertEqual(result["confidence"], 0)
+
+    def test_connector_pin_and_interface_conflicts_reject_candidate(self):
+        result = self.match("60pin连接器", "60Pin MB-TO-SUB connector")
+
+        self.assertEqual(result["candidate_internal_code"], "")
+        self.assertEqual(result["match_level"], "新物料")
+
+    def test_connector_parameters_match_independent_of_order(self):
+        result = self.match("供应商名称", "24Pin Connector FPC 0.5Pitch")
+
+        self.assertEqual(result["candidate_internal_code"], "10")
+        self.assertEqual(result["match_level"], "自动匹配")
+        self.assertEqual(result["confidence"], 1.0)
 
 
 if __name__ == "__main__":

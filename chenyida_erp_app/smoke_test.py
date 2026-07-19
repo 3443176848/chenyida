@@ -183,7 +183,7 @@ def main():
             assert "生产协同" in html
             assert "询价报价" in html
             assert "销售交付" in html
-            assert "general-spec-v2" in html
+            assert "spec-precision-v3" in html
             app_js = request("/app.js")
             styles = request("/styles.css")
             assert "来源详细规格" in app_js
@@ -191,7 +191,9 @@ def main():
             assert "原始详细规格" in app_js
             assert "source_spec_tokens_json" in app_js
             assert "candidate_spec_tokens_json" in app_js
+            assert "INSUFFICIENT_SPECIFICATION_EVIDENCE" in app_js
             assert ".spec-parts" in styles
+            assert ".pill.insufficient" in styles
 
             products = request("/api/products")["rows"]
             assert products and products[0]["product_code"] == "CYD-FPC-DEMO-001", products
@@ -473,6 +475,24 @@ def main():
             sample = request("/api/sample-import")
             result = request("/api/import", method="POST", payload={"csvText": sample["csv"], "batchNo": "TEST-IMPORT-SMOKE"})
             assert result["count"] == 4, result
+            partial_match = request(
+                "/api/import",
+                method="POST",
+                payload={
+                    "batchNo": "TEST-SPEC-PARTIAL-MATCH",
+                    "rows": [
+                        {
+                            "supplier_name": "Smoke规格证据供应商",
+                            "raw_item_name": "贴片电容",
+                            "raw_item_code": "SMOKE-PARTIAL-CAP-001",
+                            "raw_spec": "CAP 10uF 16V 0402",
+                            "purchase_uom": "PCS",
+                        }
+                    ],
+                },
+            )
+            assert partial_match["count"] == 1, partial_match
+            assert partial_match["rows"][0]["match_level"] == "疑似匹配", partial_match
 
             xlsx_result = request_binary(
                 "/api/import-file?filename=smoke.xlsx&batch_no=TEST-XLSX-SMOKE",
@@ -483,7 +503,7 @@ def main():
             assert xlsx_result["count"] == 1, xlsx_result
 
             summary = request("/api/summary")
-            assert summary["pending"] == 5, summary
+            assert summary["pending"] == 6, summary
             assert summary["auto_count"] >= 2, summary
             assert summary["suspect_count"] >= 1, summary
             assert summary["new_count"] >= 1, summary

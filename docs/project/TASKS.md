@@ -13,6 +13,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| PHASE3-MATERIAL-LIBRARY-SPEC-PRECISION-GATE-01 | 规格证据强度门禁与扩展参数精准匹配 | DONE | Codex（真实结果审计、参数扩展、证据门禁、审核提示、测试与开发部署）、项目负责人（要求覆盖已提供情况并消除不精准匹配） | 2026-07-19 13:13 CST | 2026-07-19 13:39 CST | PHASE3-MATERIAL-LIBRARY-GENERAL-SPEC-MATCH-01 | CATEGORY 不再作为编号鉴别证据；少于两类参数返回“规格不足”且无候选，自动匹配要求双方至少三类参数、锚点、完整一致和候选唯一。增加分数功率、范围、频率/阻抗、针数/间距/接口等解析；J587 隔离复算 105 新/5 疑似/12 规格不足，原 4 条连接器大类误候选归零。联合单元 58/58、self-test/smoke/go-live 通过并部署，旧 122 条不重算。 |
 | PHASE3-MATERIAL-LIBRARY-GENERAL-SPEC-MATCH-01 | 通用规格来源识别与无序参数匹配 | DONE | Codex（通用参数模型、来源选择、Matcher、Migration、审核 UI、测试与开发部署）、项目负责人（明确只需准确定位详细规格并忽略参数排列顺序） | 2026-07-18 20:06 CST | 2026-07-18 20:38 CST | PHASE3-MATERIAL-LIBRARY-REVIEW-SPEC-DISPLAY-01 | 从明确规格、多列组合、描述和名称中按可解释参数丰富度选择完整 raw spec 并保存来源；通用 token 支持品类/封装/容量/阻值/电感/电流/电压/功率/频率/误差/材质/尺寸，量纲归一后按集合无序匹配。MPN/品牌独立取证、不混入规格分数；`0004` 扩展既有 Cleaning 证据列。联合单元 48/48、self-test/smoke/go-live 通过并部署，旧 444 条不重算。 |
 | PHASE3-MATERIAL-LIBRARY-REVIEW-SPEC-DISPLAY-01 | 清洗审核来源/候选分项规格对照 | DONE | Codex（字段语义、审核 UI、置信度修正、测试与开发部署）、项目负责人（明确人工确认必须看到规格，指出型号与规格不同） | 2026-07-18 19:58 CST | 2026-07-18 20:05 CST | PHASE3-MATERIAL-LIBRARY-STRUCTURED-SPEC-MATCH-01 | 清洗表同时展示来源和候选内部物料的品类/封装/容量或阻值/耐压/误差/介质/型号/品牌，空字段明确未维护；原列改为原始型号/规格。型号与规格分开保存，富描述优先作为 raw spec 来源；来源介质未被内部候选覆盖时置信度上限 0.95。页面只展示，匹配与确认仍由服务端控制。 |
 | PHASE3-MATERIAL-LIBRARY-STRUCTURED-SPEC-MATCH-01 | 1928C 分项规格提取与逐属性匹配 | DONE | Codex（结构化提取、Matcher、Migration、真实样本测试与开发部署）、项目负责人（指出 1928C 截图行及逐项匹配语义） | 2026-07-18 19:36 CST | 2026-07-18 19:49 CST | PHASE3-MATERIAL-LIBRARY-SPEC-MATCH-01 | 匹配不比较压缩后的整段规格；从原始规格、型号、描述和 MPN 分别提取品类/封装/容量或阻值/耐压/误差/介质/MPN 后逐项比较。`0003` 扩展现有 Cleaning 结构化字段；1928C 截图行确定性得到 CAP/0201/5%/C0G-NP0/50V/10PF/MPN，100P 简写不会再因漏提取形成错误候选。既有 Cleaning 不重算。 |
@@ -63,7 +64,7 @@
 | PHASE3-TASK01 | 设计 Material Import Normalization & Staging V1 | DONE | Codex（设计）、项目负责人（待规格确认） | 2026-07-17 | 2026-07-17 | PHASE2-TASK08 | 完成正式规格、OpenAPI 草案和数据流/状态图；定义独立 run、JSON 行快照、独立 issue、类型/空值/属性规则、Outbox/租约、原子发布、五个 API、`0006` 设计、54 项测试和 16 项 `PROPOSED` 决定；仅文档，未修改运行时代码、Schema、Migration、API、前端或生产环境 |
 | PHASE3-TASK03 | 设计 Material Import Normalization Review UI V1 | DONE | Codex（设计）、项目负责人（2026-07-17 正式规格确认） | 2026-07-17 | 2026-07-17 | PHASE3-TASK02 | 完成正式 UI 规格、37 状态低保真线框、集中状态矩阵和 104 项未来实施测试；统一工作区、七步 Stepper、Current/Latest 双轨、Rows/Issues cursor 与 Row Drawer等 14 项决定均已 `APPROVED`；局部 Issue 查询门禁、性能门禁和 7 项非阻塞限制继续有效；仅文档，未修改前端、API、Schema、Migration、业务逻辑或生产环境 |
 
-当前没有 `DOING` 任务；两份真实 BOM 的只读验证已完成，`PHASE3-MATERIAL-LIBRARY-02` 仍因 A118 超宽异常块和 V700 缺少必填 Mapping 语义处于 `BLOCKED`。生产 R2/Queue、生产 D1 migration、Cron、部署、真实数据导入、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
+当前没有 `DOING` 任务；规格精度门禁已部署，等待项目负责人清空旧 Cleaning 并重新导入验收。`PHASE3-MATERIAL-LIBRARY-02` 仍因 A118 超宽异常块和 V700 缺少必填 Mapping 语义处于 `BLOCKED`。生产 R2/Queue、生产 D1 migration、Cron、正式部署、真实数据导入、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
 
 ## Phase 0 待办
 
