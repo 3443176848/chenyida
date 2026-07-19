@@ -82,4 +82,3 @@ Matcher 同时保存原始集合相似度、来源证据强度、校准后置信
 - 部署前后保持 9 条内部物料、122 条 Cleaning、17 个 Batch 和 3176 条 Raw
   Rows；旧 Cleaning 不静默重算。systemd 为 active/enabled，本机和公网健康
   检查通过。
-
