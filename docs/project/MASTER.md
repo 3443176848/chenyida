@@ -47,14 +47,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 自托管 PostgreSQL 17 开发基线为 `0001` 46表 + `0002` Material工作流 + `0003` Import Mapping/版本/复用 + `0004` 行级 Normalization + `0005` 人工复核/finalization；SQLite 29张仍支撑当前 Python 开发运行面并作为迁移来源，D1/Drizzle 45张为历史迁移来源；均未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | Python/SQLite 开发服务由 systemd 常驻，`enabled/active` 且监听 `0.0.0.0:18888`；Node/PostgreSQL 仅为隔离开发基线，无运行中的 Compose 项目，未生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Material、Import Mapping、Normalization 与人工复核/ACTIVE绑定/Material Draft 非生产闭环；完整 ERP API 尚未迁移 |
-| 当前阶段 | `PHASE0-TASK03` 已建立统一发布、migration、验收与回退追踪基线 |
-| 当前任务 | 无 `DOING`；`PHASE0-TASK03` 完成后工作区状态以 `git status --short` 为准 |
-| 下一任务 | 建议另立 `SELFHOST-PHASE2-TASK01`，先盘点并分阶段迁移采购、库存、生产、销售、品质、财务等旧 Python API；真实数据试迁移、生产备份恢复、部署和切换继续独立授权 |
+| 当前阶段 | `SELFHOST-PHASE2-TASK01` 已完成完整 ERP API 盘点和分阶段迁移计划；没有实施任何新业务 API |
+| 当前任务 | 无 `DOING`；`SELFHOST-PHASE2-TASK01` 的提交以 `git log -1 -- docs/audits/SELFHOST-PHASE2-TASK01-api-inventory.md` 为准 |
+| 下一任务 | 建议仅授权 `SELFHOST-PHASE2-TASK02`，补齐身份、用户管理、密码、会话撤销和系统审计；候选 TASK02—TASK10 均未自动获批，真实数据试迁移、生产备份恢复、部署和切换继续独立授权 |
 
 ## 当前完成模块
 
-以下模块已有可运行代码，但“已实现”不代表已达到 V2、审计或生产成熟度标准：
+以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
+- SELFHOST-PHASE2-TASK01 完成 docs-only 盘点：Python 共 64 个 HTTP 操作（GET 34、POST 30），自托管等价覆盖 4、部分覆盖 9、未覆盖 51；根 legacy iframe 登录后并发的 23 个业务 GET 在 Node/PostgreSQL 均返回 404。已提出 TASK02—TASK10 依赖顺序，全部仍待逐项授权；没有业务域因此完成迁移
 - 多用户登录、会话、角色权限、密码修改、账号管理和操作审计
 - 物料、供应商映射、CSV 导入、清洗队列和新物料建档基础流程
 - 客户、供应商、产品、BOM 和 BOM 齐套分析
@@ -151,9 +152,11 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 30. 任意未来供应商可能使用当前词法尚未定义的规格语法，不能承诺未知输入 100% 自动识别；系统通过证据门禁保证不确定时不返回候选编号，新增真实反例必须进入回归夹具后再扩展确定性解析。
 31. 自托管 Material Draft/Review/Active 已通过一次性 PostgreSQL 17 和 Compose 隔离验证，但尚未迁移真实 D1/SQLite 数据、执行生产容量测试或生产恢复演练；旧 D1/Miniflare 代码只作历史参照，不能重新接入运行依赖。
 32. 完整 ERP 业务尚未迁移到 Node/PostgreSQL 自托管 API；采购、库存、生产、销售、品质和财务仍依赖当前 Python/SQLite 开发运行面，不能仅因 PostgreSQL 已有表结构就声称业务已切换。
+33. 根自托管页面仍加载 legacy iframe；登录后 `refreshAll()` 并发请求的 23 个 legacy 业务 GET 均不在 `selfhost-api.ts` 路由中，整批失败。当前自托管系统不能描述为“完整 ERP”，`erp_records` 和库存占位表也不能作为业务 API 已迁移的证据。
 
 ## 当前任务与下一任务
 
+- 已完成：`SELFHOST-PHASE2-TASK01`，只读盘点 Python 64 个 HTTP 操作、页面调用、权限、表、事务、审计、过账风险与自托管覆盖，确认 legacy iframe 登录后 23 个业务 GET 全部 404，并提出 TASK02—TASK10 建议顺序；仅文档，未实施 API、Schema、migration、依赖、部署或生产动作。
 - 已完成：`PHASE0-TASK03`，建立 `RELEASES.md`、三套 migration SHA-256、`0.1.0-alpha.1` 非生产版本、发布验收和回退模板；修正 Git、运行面、部署和业务迁移状态，未访问或修改生产。
 - 已完成：`SELFHOST-PHASE1-TASK04`，把独立人工覆盖、Issue 处置、ACTIVE 精确绑定、Material Service 建 DRAFT 和可恢复 finalization 移植到 PostgreSQL；专项、回归、migration 与 Compose 验收通过，后续已随 `39946f6` 提交，未连接生产、迁移真实数据或部署。
 - 已完成：`SELFHOST-PHASE1-TASK01`，把 Material Draft/Review/Active 完整移植到 PostgreSQL Repository、自托管 API 和现有页面；编码并发、职责分离、幂等/乐观锁/CSRF、版本/变更/审计及 Compose 重启持久性通过，后续已随 `39946f6` 提交，未连接生产或部署。
@@ -205,7 +208,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - 已完成：`PHASE3-TASK02` 批准全部 16 项决定并完成非生产 Normalization 服务、`0006`、五个 API、权限/限流/取消、隔离迁移与集成测试；未创建 Draft/正式物料，未迁移或部署生产。
 - 已完成：`PHASE3-TASK03` Material Import Normalization Review UI V1 docs-only 设计与正式规格确认；四份正式文档覆盖统一路由、七步 Stepper、启动/轮询/取消、Current/Latest、Rows/Drawer/Issues、37 个线框、104 项测试、局部门禁和性能门禁，14 项决定均为 `APPROVED`；未实施运行时代码或改变生产环境。
 - 已完成：`PHASE3-TASK04` Material Import Normalization Review UI V1 非生产实施；统一工作区、七步 Stepper、Current/Latest、冻结幂等与 `RESULT_UNKNOWN`、2/5/10 轮询、取消、汇总、Rows/Issues cursor、Row Drawer、安全有界渲染和权限清理均已落地；104/104 计划测试、100/100 Import UI 回归及本地 Playwright 性能/可访问性门禁通过，未改 API/Schema/Migration/业务服务或生产环境。
-- 下一：当前无活动任务；Review UI 实施、分类、匹配、Material Draft、生产 Queue/binding、生产迁移/部署、`submitted_by` 候选项、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 均需独立任务与授权。
+- 下一：当前无活动任务；建议最小任务为 `SELFHOST-PHASE2-TASK02` 身份/用户/密码/系统审计。TASK03—TASK10、真实数据试迁移、生产备份恢复、部署/切换、`submitted_by` 候选项和 `PENDING_APPROVAL` 收缩均需独立任务与授权。
 
 ## 更新规则
 

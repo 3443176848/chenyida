@@ -2,6 +2,28 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-24 自托管完整 ERP 盘点覆盖层
+
+`SELFHOST-PHASE2-TASK01` 从源码确认 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30）。当前 Node/PostgreSQL 对其中等价覆盖 4、部分覆盖 9、未覆盖 51；已完成的能力集中在身份基础和新的 Material/Import/Normalization/Review namespace。customer、supplier 主体、product、BOM、PO、receipt、WO、report、quote、SO、shipment、quality 和 finance 尚无关系化自托管业务服务。
+
+```mermaid
+flowchart LR
+    ROOT["自托管根页面"] --> IFRAME["/erp/index.html legacy iframe"]
+    IFRAME --> AUTH["health/session/login/logout: 可用"]
+    IFRAME --> BATCH["登录后 23 个 legacy 业务 GET"]
+    BATCH --> NF["selfhost-api.ts: 全部 404"]
+
+    NATIVE["/materials 原生页面"] --> MM["Material/Import/Normalization/Review API"]
+    MM --> PG["PostgreSQL 0001—0005"]
+
+    PYUI["Python static app"] --> PYAPI["Python 64 个 HTTP 操作"]
+    PYAPI --> SQLITE["SQLite 29 表开发运行面"]
+```
+
+根 iframe 的 `refreshAll()` 用一个 `Promise.all` 请求 summary、material/cleaning、主数据、采购/库存、生产、销售、品质和财务共 23 个 GET；当前自托管 catch-all 均返回 404，因此“认证成功”和“完整 ERP 页面可用”是两件不同的事。Operations 还会额外请求 management-dashboard、backups 和 users，同样未迁移。
+
+PostgreSQL 的 `erp_records(kind,code,data JSONB)` 只是历史兼容占位，不是未来各域关系模型；`inventory_balances` 与 `inventory_transactions` 也只有文本 item_code 和基础字段，没有 receipt/adjustment/reservation/reversal 服务。存在结构不能作为 API、权限、事务、审计、测试或数据迁移完成的证据。完整逐项清单见 `docs/audits/SELFHOST-PHASE2-TASK01-api-inventory.md`，建议依赖顺序见 `docs/self-hosting/full-erp-api-migration-plan.md`。
+
 ## 系统架构图
 
 ```mermaid
@@ -179,3 +201,6 @@ flowchart LR
 3. 在线业务主体为 JSON，缺少 V2 所需关系约束。
 4. schema、迁移和运行时建表同时存在，需建立单一迁移权威。
 5. 本地数据库缺少迁移历史和外键。
+6. 自托管根页仍依赖 legacy iframe，登录后 23 个业务 GET 全部 404；在 TASK02—TASK09 逐域迁移并由最终 UI 任务退出 iframe 前，系统不能描述为完整 ERP。
+7. Python 关键写操作缺少通用 request ID、CSRF、幂等、乐观锁、失败审计和不可变冲销；迁移必须重新建立服务端边界，不能机械翻译旧 handler。
+8. Quote 转 Sales Order 的旧 Python 路径跨两个 commit；收货、领料、完工、发货和收付款虽在 SQLite 单事务内联动，但都缺并发锁/幂等/版本和反向记录，是后续迁移的最高风险区。

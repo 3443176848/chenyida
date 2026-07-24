@@ -4,6 +4,16 @@
 
 ## 2026-07-24
 
+### SELFHOST-PHASE2-TASK01 - `docs: plan full erp api migration`
+
+- API 盘点：只读核验 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30）；按身份系统11、基础主数据/工程/物料22、采购库存9、生产6、销售7、品质3、财务6 分类，逐项记录页面、权限、输入、读写表、事务、联动、审计、过账、自托管覆盖、PG结构、缺口、风险和依赖。
+- 覆盖结论：以等价服务能力统计，自托管已覆盖4、部分覆盖9、未覆盖51；Material/Import 的新工作流不能因语义相近就冒充 legacy 路径兼容，`erp_records` 或库存占位表也不能作为业务迁移证据。
+- 首页断链：根页面仍加载 `/erp/index.html`；登录后 `refreshAll()` 并发的23个 legacy业务GET在 `selfhost-api.ts` 均返回404，Operations额外的Dashboard/backups/users也缺失，因此当前自托管不能描述为完整ERP。
+- 数据与事务：记录稳定内部ID、BOM版本、库存不可变流水/余额投影、采购收货、领料/完工、发货、品质处置、应收应付/收付款不变量；确认旧 quote→SO 存在双commit窗口，所有过账更正必须使用调整/冲销/反向记录。
+- 迁移建议：提出待逐项授权的 TASK02—TASK10；先身份与审计、再主数据，独立建立库存账本后并行承接采购/生产/销售，再品质/财务，最后 Dashboard、备份恢复治理和 iframe 退出。候选任务均未批准实施。
+- 验证：`git diff --check`；Node lint 0 error/1既有warning、`npm test` 3/3、review typecheck、Vinext build 5/5、凭证扫描458文件；项目虚拟环境 Python self-test、smoke、临时SQLite go-live 均通过。
+- 边界：只修改文档；未修改 Python/TypeScript/React/Schema/migration/依赖/Compose/部署配置，未读取真实业务数据，未访问公开Site或生产数据库，未重启服务、启动Compose、部署、push或创建PR。
+
 ### PHASE0-TASK03 - `docs: establish self-hosted release tracking baseline`
 
 - 发布追踪：新增 `docs/project/RELEASES.md`，区分历史 Sites、当前 Python/SQLite 开发常驻、自托管 Node/PostgreSQL 开发基线和不存在的自托管生产版本；统一记录 Git、version、migration、测试、部署、真实数据迁移、回退和批准状态。

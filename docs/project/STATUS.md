@@ -2,6 +2,21 @@
 
 最后更新时间：2026-07-24（Asia/Shanghai）
 
+## SELFHOST-PHASE2-TASK01 完整 ERP API 盘点与迁移计划
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 起始基线 | PASS | 根仓库 `main`、HEAD `12d3ea30d21cce6918de0c525d81f19af289f5ac`、工作区 clean；本地 `main` 领先 `origin/main` 1 个提交 |
+| 运行面结论 | CONFIRMED | Python/SQLite 仍支撑完整 ERP；Node/PostgreSQL 只完成 Material、Import Mapping、Normalization、Review，不得由已存在表推断业务 API 已迁移 |
+| Python API | PASS | 共 64 个 HTTP 操作：身份与系统 11、基础主数据/工程/物料治理 22、采购与库存 9、生产 6、销售 7、品质 3、财务 6 |
+| 自托管覆盖 | RECORDED | 等价覆盖 4、部分覆盖 9、未覆盖 51；“部分覆盖”不代表 legacy method/path 可用 |
+| legacy iframe | BROKEN | 根页面仍加载 `/erp/index.html`；登录后 `refreshAll()` 的 23 个并发业务 GET 均不在 `selfhost-api.ts` 路由中并返回 404，整批刷新失败 |
+| 数据与事务 | RECORDED | 稳定 ID、BOM 引用、库存/订单/应收应付联动、不可原地修改的过账记录，以及单事务、幂等、CAS、request id、审计要求均已列明 |
+| 迁移顺序 | PROPOSED | 建议 `TASK02`—`TASK10` 依次覆盖身份、主数据、库存、采购、生产、销售、品质、财务、看板/备份/退出 iframe；均待项目负责人逐项授权 |
+| 变更边界 | PASS | 仅新增/更新项目文档；未修改业务代码、Schema、migration、依赖或部署配置 |
+| 验证 | PASS WITH EXISTING WARNING | lint 0 error/1 个既有 warning；npm test 3/3；review typecheck、Vinext build、凭证扫描、Python self-test/smoke/临时 SQLite go-live 与 diff check 通过 |
+| 生产影响 | NONE | 未访问公开生产 Site、生产 D1 或生产数据库；未读取真实业务数据、部署、执行 migration、重启服务、push 或创建 PR |
+
 ## PHASE0-TASK03 统一发布、迁移与回退追踪基线
 
 | 验证项 | 结果 | 说明 |
@@ -132,7 +147,7 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 根仓库 Branch | `main` |
-| 任务开始 HEAD | `39946f6b854a985b5c19106eaa6c938bddaf9c7c`，与远端 `origin/main` 同步 |
+| 任务开始 HEAD | `12d3ea30d21cce6918de0c525d81f19af289f5ac`；开始时本地 `main` 领先 `origin/main` 1 个提交 |
 | 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.1`；非生产、尚未发布 |
 | 当前实际常驻服务 | Python 3.11.6 / SQLite，systemd `enabled/active`，`0.0.0.0:18888` |
 | 自托管部署状态 | Node/PostgreSQL 未生产部署；当前无运行中 Compose 项目 |
@@ -149,6 +164,8 @@
 Node 验收因宿主机无 Node/npm，在一次性 `node:22-bookworm` 容器执行。`npm ci` 报告 12 个既有依赖审计项（1 low、4 moderate、7 high），依照本任务禁止事项未升级依赖。Python 首轮误用系统解释器时 smoke 在导入 `openpyxl` 前停止；改用 systemd 实际使用的项目虚拟环境后，self-test、smoke 和临时 SQLite go-live 全部通过。
 
 ## Git 状态
+
+SELFHOST-PHASE2-TASK01 开始时，根仓库 `main` 位于 `12d3ea30d21cce6918de0c525d81f19af289f5ac`，工作区 clean，本地分支领先 `origin/main` 1 个提交。本任务只修改 `docs/`；完成提交和最终 clean 状态以任务完成报告及该提交的 `git show` 为准。
 
 PHASE0-TASK03 开始时，根仓库 `main` 位于 `39946f6`，工作区 clean；`origin/main` 的本地跟踪引用和远端只读查询均为同一提交。当前任务只修改项目发布文档以及 `package.json`/`package-lock.json` 的名称和版本；最终提交与工作区状态以本任务完成报告为准。
 

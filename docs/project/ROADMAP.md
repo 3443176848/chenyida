@@ -11,7 +11,7 @@
 | Phase 2 | 导入采集与 Mapping | 8 | DONE（非生产） |
 | Phase 3 | 导入规范化、暂存与审阅 | 4 | DONE（非生产实现完成） |
 | Phase 4 | AI治理 | 5 | PLANNED |
-| Phase 5 | ERP融合 | 6 | PLANNED |
+| Phase 5 | ERP融合 | 9 个建议任务（待逐项授权） | PLANNED |
 | Phase 6 | 行业物料库 | 4 | PLANNED |
 
 ## Phase 0 基础架构
@@ -39,7 +39,23 @@
 - 正式物料只能经审核启用，AI 或导入结果不能直接写正式数据。
 - 物料、属性、别名、映射和历史变更可审计。
 
-**预计任务数**：6。**当前状态**：PLANNED。
+**建议任务数**：9（由 `SELFHOST-PHASE2-TASK01` 源码盘点提出，尚未逐项批准）。**当前状态**：PLANNED。
+
+**已完成的前置诊断**：`SELFHOST-PHASE2-TASK01` 已盘点 Python 64 个 HTTP 操作（GET 34、POST 30），确认自托管等价覆盖 4、部分覆盖 9、未覆盖 51；根 legacy iframe 登录后 23 个业务 GET 全部 404。该任务只完成诊断和设计，没有迁移业务域。
+
+**建议顺序（全部待独立提示授权）**：
+
+- `SELFHOST-PHASE2-TASK02`：身份、用户管理、密码、会话撤销与系统审计。
+- `SELFHOST-PHASE2-TASK03`：客户、供应商、产品、BOM 与供应商物料映射。
+- `SELFHOST-PHASE2-TASK04`：库存不可变账本、余额投影与受控调整。
+- `SELFHOST-PHASE2-TASK05`：采购、缺料建议、收货与库存联动。
+- `SELFHOST-PHASE2-TASK06`：工单、领料、报工、完工与库存联动。
+- `SELFHOST-PHASE2-TASK07`：询报价、销售订单、发货与库存联动。
+- `SELFHOST-PHASE2-TASK08`：IQC/IPQC/FQC、缺陷、处置与关闭。
+- `SELFHOST-PHASE2-TASK09`：应收应付、收付款、余额与冲销。
+- `SELFHOST-PHASE2-TASK10`：经营看板、备份恢复治理与 legacy iframe 退出。
+
+库存从采购中拆成独立 TASK04，因为收货、领料、完工和发货都必须复用同一不可变账本、余额投影、锁顺序、幂等和冲销规则。真实数据试迁移、生产备份恢复演练、部署和切换不属于上述九项，仍需另建任务。
 
 ## Phase 2 导入中心
 

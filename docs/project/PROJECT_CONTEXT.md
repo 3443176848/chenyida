@@ -23,6 +23,7 @@
 - 技术：Vinext、React、TypeScript、标准 Node.js、PostgreSQL/Drizzle、本地持久化文件和 PostgreSQL 后台任务 Worker。
 - 页面：根 `app/page.tsx` 继续通过 iframe 加载 legacy `public/erp/index.html`；Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给不依赖平台 binding 的 `app/lib/selfhost-api.ts`；旧 `erp-api.ts` 仅作迁移参考。
+- 根 iframe 断链：legacy 页面登录后 `refreshAll()` 并发请求 23 个旧业务 GET；当前 `selfhost-api.ts` 均无对应路由并返回 404。只有 health/setup/login/logout/session 与新的 Material/Import namespace 可用，故根页面不能代表完整 ERP。
 - 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL；Caddy production profile 可提供 HTTPS。当前没有运行中的 Compose 项目，Node/PostgreSQL 尚未生产部署。历史 Sites `v3` 不作为后续交付目标。
 
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
@@ -86,6 +87,7 @@
 9. D-043 已确认自托管 Normalization 使用 run 隔离暂存、关系化候选/lineage 和 Job/业务结果同事务原子发布；重试复用同 run，重跑创建新版本，取消结果不得成为 current。
 10. D-044 已确认自托管人工复核采用独立覆盖层、版本历史和行级可恢复 finalization；ACTIVE 只允许人工精确绑定，Material Draft 必须经 TASK01 Service 创建且保持未编码 DRAFT。
 11. 完整 ERP 业务还没有迁入自托管 API。PostgreSQL 中存在表结构不等于业务已切换；采购、库存、生产、销售、品质、财务仍依赖 Python/SQLite 开发运行面。
+12. SELFHOST-PHASE2-TASK01 已从源码确认 Python 共有 64 个 HTTP 操作（GET 34、POST 30）；以等价服务能力统计，自托管已覆盖 4、部分覆盖 9、未覆盖 51。候选 TASK02—TASK10 只是建议，未获实施或生产授权。
 
 ## 当前风险
 
@@ -109,6 +111,8 @@
 - Node/PostgreSQL 没有生产部署、真实数据 migration 或发布批准；隔离测试通过不能写成已上线。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
 - 业务决策 `B01-B24` 尚未全部确认。
+- 根自托管页面仍加载 legacy iframe，登录后 23 个业务 GET 全部 404；Operations 额外请求的 Dashboard、backup、users 也 404。当前自托管只能描述为 Material/Import 非生产闭环，不能描述为完整 ERP。
+- PostgreSQL `erp_records` JSON 占位和 `inventory_balances/inventory_transactions` 基线表没有对应客户、采购、生产、销售、品质、财务服务；表存在不等于 API、权限、事务、幂等、审计或迁移已完成。
 
 ## 开发规范
 
@@ -121,7 +125,7 @@
 
 ## 当前路线
 
-当前已完成 Material/Import/Normalization/Review 的 Node/PostgreSQL 非生产链路和统一发布追踪基线；完整 ERP 业务 API 尚未迁移。下一任务建议先盘点并分阶段迁移采购、库存、生产、销售、品质和财务，同时把真实数据试迁移、生产备份恢复与部署保持为独立授权任务。
+当前已完成 Material/Import/Normalization/Review 的 Node/PostgreSQL 非生产链路、统一发布追踪基线，以及完整 ERP 的 64 项 Python API 盘点、数据不变量、首页断链核验和 TASK02—TASK10 建议计划。盘点完成不表示任何新业务域已迁移。下一任务建议只授权 `SELFHOST-PHASE2-TASK02` 身份/用户/密码/系统审计；真实数据试迁移、生产备份恢复、部署和切换继续独立授权。
 
 ## 恢复上下文检查清单
 
