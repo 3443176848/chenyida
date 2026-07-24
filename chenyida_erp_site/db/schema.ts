@@ -185,6 +185,91 @@ export const idempotencyKeys = pgTable("idempotency_keys", {
   statusCode: integer("status_code").notNull(), response: jsonb("response").notNull(), expiresAt: timestamptz("expires_at").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [index("idempotency_keys_expiry_idx").on(t.expiresAt), index("idempotency_keys_identity_scope_idx").on(t.username, t.method, t.path, t.createdAt)]);
 
+export const businessCodeSequences = pgTable("business_code_sequences", {
+  sequenceCode: text("sequence_code").primaryKey(), currentValue: bigint("current_value", { mode: "number" }).notNull().default(0),
+  version: integer("version").notNull().default(1), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [check("business_code_sequences_value_ck", sql`${t.currentValue} >= 0`), check("business_code_sequences_version_ck", sql`${t.version} > 0`)]);
+
+export const customers = pgTable("customers", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), customerCode: text("customer_code").notNull(), customerName: text("customer_name").notNull(),
+  normalizedName: text("normalized_name").notNull(), status: text("status").notNull().default("ACTIVE"), contactName: text("contact_name").notNull().default(""),
+  phone: text("phone").notNull().default(""), email: text("email").notNull().default(""), address: text("address").notNull().default(""),
+  paymentTerms: text("payment_terms").notNull().default(""), owner: text("owner").notNull().default(""), remark: text("remark").notNull().default(""),
+  version: integer("version").notNull().default(1), ...auditColumns,
+}, (t) => [
+  uniqueIndex("customers_code_uq").on(t.customerCode), uniqueIndex("customers_normalized_name_uq").on(t.normalizedName),
+  index("customers_status_updated_idx").on(t.status, t.updatedAt, t.id), check("customers_status_ck", sql`${t.status} in ('ACTIVE','INACTIVE')`),
+  check("customers_version_ck", sql`${t.version} > 0`), check("customers_name_ck", sql`char_length(btrim(${t.customerName})) between 1 and 200`),
+]);
+
+export const suppliers = pgTable("suppliers", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), supplierCode: text("supplier_code").notNull(), supplierName: text("supplier_name").notNull(),
+  normalizedName: text("normalized_name").notNull(), status: text("status").notNull().default("ACTIVE"), contactName: text("contact_name").notNull().default(""),
+  phone: text("phone").notNull().default(""), email: text("email").notNull().default(""), address: text("address").notNull().default(""),
+  paymentTerms: text("payment_terms").notNull().default(""), supplierLevel: text("supplier_level").notNull().default(""), owner: text("owner").notNull().default(""),
+  remark: text("remark").notNull().default(""), version: integer("version").notNull().default(1), ...auditColumns,
+}, (t) => [
+  uniqueIndex("suppliers_code_uq").on(t.supplierCode), uniqueIndex("suppliers_normalized_name_uq").on(t.normalizedName),
+  index("suppliers_status_updated_idx").on(t.status, t.updatedAt, t.id), check("suppliers_status_ck", sql`${t.status} in ('ACTIVE','INACTIVE')`),
+  check("suppliers_version_ck", sql`${t.version} > 0`), check("suppliers_name_ck", sql`char_length(btrim(${t.supplierName})) between 1 and 200`),
+]);
+
+export const products = pgTable("products", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), productCode: text("product_code").notNull(), productName: text("product_name").notNull(),
+  customerId: bigint("customer_id", { mode: "number" }).references(() => customers.id, { onDelete: "restrict" }),
+  status: text("status").notNull().default("ACTIVE"), currentVersionNo: integer("current_version_no").notNull().default(1), version: integer("version").notNull().default(1), ...auditColumns,
+}, (t) => [
+  uniqueIndex("products_code_uq").on(t.productCode), index("products_customer_status_idx").on(t.customerId, t.status),
+  index("products_status_updated_idx").on(t.status, t.updatedAt, t.id), check("products_status_ck", sql`${t.status} in ('ACTIVE','INACTIVE')`),
+  check("products_version_ck", sql`${t.version} > 0 and ${t.currentVersionNo} > 0`), check("products_name_ck", sql`char_length(btrim(${t.productName})) between 1 and 200`),
+]);
+
+export const productVersions = pgTable("product_versions", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), productId: bigint("product_id", { mode: "number" }).notNull().references(() => products.id, { onDelete: "restrict" }),
+  versionNo: integer("version_no").notNull(), versionCode: text("version_code").notNull(), status: text("status").notNull().default("DRAFT"),
+  productType: text("product_type").notNull(), lifecycleStatus: text("lifecycle_status").notNull(), layerCount: integer("layer_count"),
+  boardThickness: numeric("board_thickness", { precision: 18, scale: 6 }), minLineWidth: numeric("min_line_width", { precision: 18, scale: 6 }),
+  minHole: numeric("min_hole", { precision: 18, scale: 6 }), surfaceFinish: text("surface_finish").notNull().default(""),
+  smtRequired: boolean("smt_required").notNull().default(false), engineeringOwner: text("engineering_owner").notNull().default(""), remark: text("remark").notNull().default(""),
+  releasedBy: text("released_by").notNull().default(""), releasedAt: timestamptz("released_at"), ...auditColumns,
+}, (t) => [
+  uniqueIndex("product_versions_product_no_uq").on(t.productId, t.versionNo), uniqueIndex("product_versions_product_code_uq").on(t.productId, t.versionCode),
+  index("product_versions_product_status_idx").on(t.productId, t.status, t.versionNo), check("product_versions_no_ck", sql`${t.versionNo} > 0`),
+  check("product_versions_status_ck", sql`${t.status} in ('DRAFT','RELEASED','OBSOLETE')`), check("product_versions_layer_ck", sql`${t.layerCount} is null or ${t.layerCount} > 0`),
+  check("product_versions_dimension_ck", sql`(${t.boardThickness} is null or ${t.boardThickness} > 0) and (${t.minLineWidth} is null or ${t.minLineWidth} > 0) and (${t.minHole} is null or ${t.minHole} > 0)`),
+]);
+
+export const bomHeaders = pgTable("bom_headers", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), bomCode: text("bom_code").notNull(), productId: bigint("product_id", { mode: "number" }).notNull().references(() => products.id, { onDelete: "restrict" }),
+  status: text("status").notNull().default("ACTIVE"), currentVersionNo: integer("current_version_no").notNull().default(1), version: integer("version").notNull().default(1), ...auditColumns,
+}, (t) => [
+  uniqueIndex("bom_headers_code_uq").on(t.bomCode), index("bom_headers_product_status_idx").on(t.productId, t.status),
+  check("bom_headers_status_ck", sql`${t.status} in ('ACTIVE','INACTIVE')`), check("bom_headers_version_ck", sql`${t.version} > 0 and ${t.currentVersionNo} > 0`),
+]);
+
+export const bomVersions = pgTable("bom_versions", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), bomHeaderId: bigint("bom_header_id", { mode: "number" }).notNull().references(() => bomHeaders.id, { onDelete: "restrict" }),
+  productVersionId: bigint("product_version_id", { mode: "number" }).notNull().references(() => productVersions.id, { onDelete: "restrict" }),
+  versionNo: integer("version_no").notNull(), versionCode: text("version_code").notNull(), status: text("status").notNull().default("DRAFT"),
+  remark: text("remark").notNull().default(""), releasedBy: text("released_by").notNull().default(""), releasedAt: timestamptz("released_at"), ...auditColumns,
+}, (t) => [
+  uniqueIndex("bom_versions_header_no_uq").on(t.bomHeaderId, t.versionNo), uniqueIndex("bom_versions_header_code_uq").on(t.bomHeaderId, t.versionCode),
+  index("bom_versions_header_status_idx").on(t.bomHeaderId, t.status, t.versionNo), check("bom_versions_no_ck", sql`${t.versionNo} > 0`),
+  check("bom_versions_status_ck", sql`${t.status} in ('DRAFT','RELEASED','OBSOLETE')`),
+]);
+
+export const bomLines = pgTable("bom_lines", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), bomVersionId: bigint("bom_version_id", { mode: "number" }).notNull().references(() => bomVersions.id, { onDelete: "restrict" }),
+  lineNo: integer("line_no").notNull(), materialId: bigint("material_id", { mode: "number" }).notNull().references(() => materialMaster.id, { onDelete: "restrict" }),
+  quantityPer: numeric("quantity_per", { precision: 24, scale: 6 }).notNull(), unitId: bigint("unit_id", { mode: "number" }).notNull().references(() => units.id, { onDelete: "restrict" }),
+  lossRate: numeric("loss_rate", { precision: 12, scale: 8 }).notNull().default("0"), processStage: text("process_stage").notNull().default(""),
+  remark: text("remark").notNull().default(""), ...auditColumns,
+}, (t) => [
+  uniqueIndex("bom_lines_version_line_uq").on(t.bomVersionId, t.lineNo), uniqueIndex("bom_lines_version_material_stage_uq").on(t.bomVersionId, t.materialId, t.processStage),
+  index("bom_lines_material_idx").on(t.materialId, t.bomVersionId), check("bom_lines_line_ck", sql`${t.lineNo} > 0`),
+  check("bom_lines_quantity_ck", sql`${t.quantityPer} > 0`), check("bom_lines_loss_ck", sql`${t.lossRate} >= 0 and ${t.lossRate} < 1`),
+]);
+
 export const inventoryBalances = pgTable("inventory_balances", {
   itemCode: text("item_code").primaryKey(), onHandQty: numeric("on_hand_qty", { precision: 24, scale: 6 }).notNull().default("0"), reservedQty: numeric("reserved_qty", { precision: 24, scale: 6 }).notNull().default("0"), version: integer("version").notNull().default(1), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 });
@@ -425,12 +510,23 @@ export const materialImportIdempotency = pgTable("material_import_idempotency", 
 }, (t) => [uniqueIndex("material_import_idempotency_scope_uq").on(t.username, t.method, t.routeScope, t.keyDigest), uniqueIndex("material_import_idempotency_operation_uq").on(t.operationId)]);
 
 export const supplierMappings = pgTable("supplier_mappings", {
-  id: bigserial("id", { mode: "number" }).primaryKey(), materialId: bigint("material_id", { mode: "number" }).notNull().references(() => materialMaster.id, { onDelete: "restrict" }), supplierName: text("supplier_name").notNull(), supplierKey: text("supplier_key").notNull(), supplierItemCode: text("supplier_item_code").notNull(), supplierItemName: text("supplier_item_name").notNull().default(""), supplierSpecification: text("supplier_specification").notNull().default(""), manufacturer: text("manufacturer").notNull().default(""), mpn: text("mpn").notNull().default(""), revision: text("revision").notNull().default(""), purchaseUom: text("purchase_uom").notNull(), conversionNumerator: bigint("conversion_numerator", { mode: "number" }).notNull().default(1), conversionDenominator: bigint("conversion_denominator", { mode: "number" }).notNull().default(1), status: text("status").notNull(), validFrom: timestamptz("valid_from").notNull(), validTo: timestamptz("valid_to"), version: integer("version").notNull().default(1), ...auditColumns,
-}, (t) => [uniqueIndex("supplier_mappings_identity_period_uq").on(t.supplierKey, t.supplierItemCode, t.manufacturer, t.mpn, t.revision, t.validFrom), index("supplier_mappings_material_idx").on(t.materialId)]);
+  id: bigserial("id", { mode: "number" }).primaryKey(), materialId: bigint("material_id", { mode: "number" }).notNull().references(() => materialMaster.id, { onDelete: "restrict" }),
+  supplierId: bigint("supplier_id", { mode: "number" }).references(() => suppliers.id, { onDelete: "restrict" }), supplierName: text("supplier_name").notNull(), supplierKey: text("supplier_key").notNull(),
+  supplierItemCode: text("supplier_item_code").notNull(), supplierItemName: text("supplier_item_name").notNull().default(""), supplierSpecification: text("supplier_specification").notNull().default(""),
+  manufacturer: text("manufacturer").notNull().default(""), mpn: text("mpn").notNull().default(""), revision: text("revision").notNull().default(""), purchaseUom: text("purchase_uom").notNull(),
+  purchaseUnitId: bigint("purchase_unit_id", { mode: "number" }).references(() => units.id, { onDelete: "restrict" }), conversionNumerator: bigint("conversion_numerator", { mode: "number" }).notNull().default(1),
+  conversionDenominator: bigint("conversion_denominator", { mode: "number" }).notNull().default(1), status: text("status").notNull(), validFrom: timestamptz("valid_from").notNull(), validTo: timestamptz("valid_to"),
+  version: integer("version").notNull().default(1), ...auditColumns,
+}, (t) => [
+  uniqueIndex("supplier_mappings_identity_period_uq").on(t.supplierKey, t.supplierItemCode, t.manufacturer, t.mpn, t.revision, t.validFrom),
+  index("supplier_mappings_material_idx").on(t.materialId), index("supplier_mappings_supplier_status_idx").on(t.supplierId, t.status, t.validFrom),
+  check("supplier_mappings_status_ck", sql`${t.status} in ('ACTIVE','INACTIVE')`), check("supplier_mappings_version_ck", sql`${t.version} > 0`),
+  check("supplier_mappings_conversion_ck", sql`${t.conversionNumerator} > 0 and ${t.conversionDenominator} > 0`), check("supplier_mappings_period_ck", sql`${t.validTo} is null or ${t.validTo} > ${t.validFrom}`),
+]);
 
 export const supplierMappingPriceHistory = pgTable("supplier_mapping_price_history", {
   id: bigserial("id", { mode: "number" }).primaryKey(), supplierMappingId: bigint("supplier_mapping_id", { mode: "number" }).notNull().references(() => supplierMappings.id, { onDelete: "restrict" }), price: numeric("price", { precision: 24, scale: 6 }).notNull(), currencyCode: text("currency_code").notNull(), priceUom: text("price_uom").notNull(), minimumOrderQty: numeric("minimum_order_qty", { precision: 24, scale: 6 }), effectiveFrom: timestamptz("effective_from").notNull(), effectiveTo: timestamptz("effective_to"), sourceDocumentRef: text("source_document_ref").notNull().default(""), createdBy: text("created_by").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(), requestId: uuid("request_id").notNull(),
-}, (t) => [index("supplier_mapping_price_history_from_idx").on(t.supplierMappingId, t.effectiveFrom)]);
+}, (t) => [index("supplier_mapping_price_history_from_idx").on(t.supplierMappingId, t.effectiveFrom), check("supplier_mapping_price_positive_ck", sql`${t.price} > 0`), check("supplier_mapping_price_moq_ck", sql`${t.minimumOrderQty} is null or ${t.minimumOrderQty} >= 0`), check("supplier_mapping_price_period_ck", sql`${t.effectiveTo} is null or ${t.effectiveTo} > ${t.effectiveFrom}`)]);
 
 export const materialChangeLogs = pgTable("material_change_logs", {
   id: bigserial("id", { mode: "number" }).primaryKey(), materialId: bigint("material_id", { mode: "number" }).notNull().references(() => materialMaster.id, { onDelete: "restrict" }), changeType: text("change_type").notNull(), fieldName: text("field_name").notNull(), oldValue: jsonb("old_value"), newValue: jsonb("new_value"), changeReason: text("change_reason").notNull().default(""), changedBy: text("changed_by").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(), requestId: uuid("request_id").notNull(),

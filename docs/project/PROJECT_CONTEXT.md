@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.2`，明确为非生产且尚未发布；详见 `RELEASES.md`。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.3`，明确为非生产且尚未发布；详见 `RELEASES.md`。
 
 ### 治理资料
 
@@ -88,7 +88,8 @@
 10. D-044 已确认自托管人工复核采用独立覆盖层、版本历史和行级可恢复 finalization；ACTIVE 只允许人工精确绑定，Material Draft 必须经 TASK01 Service 创建且保持未编码 DRAFT。
 11. 完整 ERP 业务还没有迁入自托管 API。PostgreSQL 中存在表结构不等于业务已切换；采购、库存、生产、销售、品质、财务仍依赖 Python/SQLite 开发运行面。
 12. SELFHOST-PHASE2-TASK01 已从源码确认 Python 共有 64 个 HTTP 操作（GET 34、POST 30）；以当时基线统计，自托管已覆盖 4、部分覆盖 9、未覆盖 51。
-13. SELFHOST-PHASE2-TASK02 已补齐自托管身份公共边界：PostgreSQL `0006`、独立 Identity Repository/Service/Handler、用户管理、密码策略、会话撤销、must-change 全局门禁、限流、持久幂等、CAS 和系统审计；不包含其他业务域或生产动作。TASK03—TASK10 仍只是建议，未获实施或生产授权。
+13. SELFHOST-PHASE2-TASK02 已补齐自托管身份公共边界：PostgreSQL `0006`、独立 Identity Repository/Service/Handler、用户管理、密码策略、会话撤销、must-change 全局门禁、限流、持久幂等、CAS 和系统审计；不包含其他业务域或生产动作。
+14. SELFHOST-PHASE2-TASK03 已新增 PostgreSQL `0007` 和独立 Master Data/BOM 服务，关系化 Customer、Supplier、Product/Version、BOM Header/Version/Line、Supplier Mapping/价格历史；发布后不可变，readiness 只检查结构且不读取库存。版本为 `0.1.0-alpha.3`，未迁真实数据或部署。
 
 ## 当前风险
 
@@ -112,8 +113,8 @@
 - Node/PostgreSQL 没有生产部署、真实数据 migration 或发布批准；隔离测试通过不能写成已上线。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
 - 业务决策 `B01-B24` 尚未全部确认。
-- 根自托管页面仍加载 legacy iframe，登录后 23 个业务 GET 全部 404；Operations 额外请求的 Dashboard、backup、users 也 404。当前自托管只能描述为 Material/Import 非生产闭环，不能描述为完整 ERP。
-- PostgreSQL `erp_records` JSON 占位和 `inventory_balances/inventory_transactions` 基线表没有对应客户、采购、生产、销售、品质、财务服务；表存在不等于 API、权限、事务、幂等、审计或迁移已完成。
+- 根自托管页面仍加载 legacy iframe；TASK03 已接通其中主数据/BOM 子集，但库存及后续业务 GET 仍 404，`Promise.all` 仍会整批失败。Operations 的 Dashboard/backup 仍缺失；当前不能描述为完整 ERP。
+- PostgreSQL Customer/Supplier/Product/BOM 已有关系服务；`erp_records` JSON 占位和 `inventory_balances/inventory_transactions` 基线表仍没有对应采购、库存账本、生产、销售、品质、财务服务。表存在不等于 API、权限、事务、幂等、审计或迁移已完成。
 
 ## 开发规范
 
@@ -126,7 +127,7 @@
 
 ## 当前路线
 
-当前已完成 Identity、Material/Import/Normalization/Review 的 Node/PostgreSQL 非生产链路、统一发布追踪基线，以及完整 ERP 的 64 项 Python API 盘点、数据不变量和首页断链核验。TASK02 已补齐共同身份安全边界，但不表示其他业务域已迁移。下一任务建议只在明确授权后执行 `SELFHOST-PHASE2-TASK03`；真实数据试迁移、生产备份恢复、部署和切换继续独立授权。
+当前已完成 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping 的 Node/PostgreSQL 非生产链路、统一发布追踪基线，以及完整 ERP 的 64 项 Python API 盘点、数据不变量和首页断链核验。TASK03 完成不表示库存及后续业务域已迁移。下一任务按连续任务指令执行 `SELFHOST-PHASE2-TASK04`；真实数据试迁移、生产备份恢复、部署和切换继续独立授权。
 
 ## 恢复上下文检查清单
 

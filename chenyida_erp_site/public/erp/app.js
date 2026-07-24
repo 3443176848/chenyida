@@ -32,6 +32,7 @@ const state = {
   backups: [],
   users: [],
   identityOperations: new Map(),
+  masterDataOperations: new Map(),
   operationsAvailability: { dashboard: false, backups: false },
 };
 
@@ -100,6 +101,22 @@ async function identityWrite(operationName, path, payload) {
     return result;
   } catch (error) {
     if (!error.resultUnknown) state.identityOperations.delete(operationName);
+    throw error;
+  }
+}
+
+async function masterDataWrite(operationName, path, payload, method = "POST") {
+  const frozenBody = JSON.stringify(payload);
+  const existing = state.masterDataOperations.get(operationName);
+  if (existing && existing.frozenBody !== frozenBody) throw new Error("上一次主数据操作结果尚未确认，只能使用原请求安全重试");
+  const operation = existing || { key: crypto.randomUUID(), frozenBody };
+  state.masterDataOperations.set(operationName, operation);
+  try {
+    const result = await api(path, { method, body: operation.frozenBody, protectedWrite: { idempotencyKey: operation.key, csrfToken: state.session.csrf_token || "" } });
+    state.masterDataOperations.delete(operationName);
+    return result;
+  } catch (error) {
+    if (!error.resultUnknown) state.masterDataOperations.delete(operationName);
     throw error;
   }
 }
@@ -1240,10 +1257,16 @@ async function createItem(event) {
 }
 
 async function createProduct() {
+  const customerName = $("#productCustomer").value.trim();
+  const customer = customerName ? state.customers.find((row) => row.customer_name === customerName) : null;
+  if (customerName && !customer) {
+    toast("请选择已存在的客户档案");
+    return;
+  }
   const payload = {
     product_code: $("#productCode").value.trim(),
     product_name: $("#productName").value.trim(),
-    customer_name: $("#productCustomer").value.trim(),
+    customer_id: customer?.id || null,
     product_type: $("#productType").value.trim(),
     product_version: $("#productVersion").value.trim(),
     lifecycle_status: $("#productStatus").value.trim(),
@@ -1255,7 +1278,7 @@ async function createProduct() {
     smt_required: $("#productSmt").value.trim(),
     engineering_owner: "工程部",
   };
-  await api("/api/products", { method: "POST", body: JSON.stringify(payload) });
+  await masterDataWrite("create-product", "/api/products", payload);
   $("#productMsg").textContent = "产品已保存";
   await refreshAll();
   toast("产品工程卡已保存");
@@ -1274,7 +1297,7 @@ async function createCustomer() {
     toast("请填写客户名称");
     return;
   }
-  const result = await api("/api/customers", { method: "POST", body: JSON.stringify(payload) });
+  const result = await masterDataWrite("create-customer", "/api/customers", payload);
   $("#partnerMsg").textContent = `客户档案已保存：${result.customer_code}`;
   await refreshAll();
   toast("客户档案已保存");
@@ -1294,7 +1317,7 @@ async function createSupplier() {
     toast("请填写供应商名称");
     return;
   }
-  const result = await api("/api/suppliers", { method: "POST", body: JSON.stringify(payload) });
+  const result = await masterDataWrite("create-supplier", "/api/suppliers", payload);
   $("#partnerMsg").textContent = `供应商档案已保存：${result.supplier_code}`;
   await refreshAll();
   toast("供应商档案已保存");
@@ -1308,7 +1331,7 @@ async function createBom() {
     bom_status: $("#bomStatus").value.trim(),
     approved_by: "",
   };
-  const result = await api("/api/boms", { method: "POST", body: JSON.stringify(payload) });
+  const result = await masterDataWrite("create-bom", "/api/boms", payload);
   await refreshAll();
   if (result.bom_id) await loadBomLines(result.bom_id);
   toast("BOM 已创建");
@@ -1324,7 +1347,7 @@ async function addBomLine() {
     process_stage: $("#lineStage").value.trim(),
     loss_rate: $("#lineLoss").value.trim(),
   };
-  await api("/api/bom-lines", { method: "POST", body: JSON.stringify(payload) });
+  await masterDataWrite(`create-bom-line:${payload.bom_id}:${payload.line_no}`, "/api/bom-lines", payload);
   await loadBomLines(payload.bom_id);
   toast("BOM 明细已加入");
 }

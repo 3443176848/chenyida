@@ -37,8 +37,10 @@ export async function api(path, options = {}) {
   headers["X-Request-Id"] ||= crypto.randomUUID();
   const materialWrite = path.startsWith("/api/material-master/") && (["POST", "PATCH"].includes(method) || method === "PUT");
   const identityWrite = ["/api/me/password", "/api/users", "/api/users/status", "/api/users/reset-password"].includes(path) && method === "POST";
+  const masterDataWrite = (["/api/customers", "/api/suppliers", "/api/products", "/api/mappings", "/api/boms", "/api/bom-lines"].includes(path)
+    || /^\/api\/(customers|suppliers|products|mappings|boms)\/[1-9]\d*\//.test(path)) && ["POST", "PATCH"].includes(method);
   const logoutWrite = path === "/api/logout" && method === "POST";
-  if (materialWrite || identityWrite) {
+  if (materialWrite || identityWrite || masterDataWrite) {
     if (!protectedWrite?.idempotencyKey || !protectedWrite?.csrfToken) {
       throw new ErpApiError("受保护写请求缺少幂等键或 CSRF Token", { code: "PROTECTED_WRITE_CONTEXT_REQUIRED" });
     }
@@ -53,7 +55,7 @@ export async function api(path, options = {}) {
   try {
     response = await fetch(path, { ...requestOptions, method, credentials: "same-origin", headers });
   } catch (error) {
-    if (materialWrite || identityWrite) {
+    if (materialWrite || identityWrite || masterDataWrite) {
       throw new ErpApiError("操作结果尚未确认，请使用原操作标识安全恢复", { code: "RESULT_UNKNOWN", resultUnknown: true });
     }
     if (error?.name === "AbortError") throw error;

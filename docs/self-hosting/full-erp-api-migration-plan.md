@@ -40,7 +40,7 @@ TASK02—TASK09
 - 写路径分为 API（Session、CSRF、解析）、Service（权限、状态机、不变量）、Repository（事务、锁、持久化）。
 - 写接口要求 request ID、稳定 code、中文安全消息、CSRF、正文上限、速率限制、`Idempotency-Key + canonical body digest`、`expected_version`/CAS；成功业务、审计和幂等结果同事务。
 - 使用 bigint/UUID 内部 ID 和 numeric 数量/金额；业务编码通过并发安全序列表或唯一键生成，不用 `COUNT/MAX + 1`。
-- 关系表声明 FK、唯一约束、状态 CHECK、常用队列/列表索引；migration 只追加，不修改任何已执行 migration（当前 PostgreSQL 为 `0001`—`0006`）。
+- 关系表声明 FK、唯一约束、状态 CHECK、常用队列/列表索引；migration 只追加，不修改任何已执行 migration（当前 PostgreSQL 为 `0001`—`0007`）。
 - migration 测试覆盖空库、已有数据升级、重复 runner、失败回滚、约束、索引和汇总核对。
 - 每域至少有 unit、isolated PostgreSQL integration、API contract、安全/并发/回滚、UI contract 和 Compose E2E；测试拒绝 production URL。
 - 旧路径是否临时兼容必须由该任务的书面 API 规格决定；兼容层只能调用新 Service，不能复制规则。
@@ -50,8 +50,8 @@ TASK02—TASK09
 | 候选任务 | 名称 | 依赖 | 主要风险 | 状态 |
 | --- | --- | --- | --- | --- |
 | SELFHOST-PHASE2-TASK02 | 身份、用户管理、密码和系统审计补齐 | TASK01 | 权限提升、会话撤销、凭证 | DONE（非生产；未发布/部署/迁移真实用户） |
-| SELFHOST-PHASE2-TASK03 | 客户、供应商、产品、BOM 与供应商物料映射 | TASK02、现有 Material ACTIVE | 稳定 ID、BOM 版本、重复主数据 | 建议，待授权 |
-| SELFHOST-PHASE2-TASK04 | 库存不可变账本、余额投影与受控调整 | TASK02、TASK03 | 负库存、并发、已过账更正 | 建议，待授权 |
+| SELFHOST-PHASE2-TASK03 | 客户、供应商、产品、BOM 与供应商物料映射 | TASK02、现有 Material ACTIVE | 稳定 ID、BOM 版本、重复主数据 | DONE；非生产 `0.1.0-alpha.3`，未迁真实数据或部署 |
+| SELFHOST-PHASE2-TASK04 | 库存不可变账本、余额投影与受控调整 | TASK02、TASK03 | 负库存、并发、已过账更正 | 已获连续任务指令授权；待 TASK03 独立提交后开始 |
 | SELFHOST-PHASE2-TASK05 | 采购、缺料建议、收货与库存联动 | TASK03、TASK04 | 超收、重复收货、库存过账 | 建议，待授权 |
 | SELFHOST-PHASE2-TASK06 | 工单、领料、完工、报工与库存联动 | TASK03、TASK04 | 多料锁、成品入库、冲销 | 建议，待授权 |
 | SELFHOST-PHASE2-TASK07 | 询报价、销售订单、发货与库存联动 | TASK03、TASK04、TASK06 | 转单原子性、超发、FQC | 建议，待授权 |
@@ -98,7 +98,7 @@ TASK02—TASK09
 - 禁止默认密码、批量导入账号、外部 IdP、break-glass、生产用户迁移、部署或真实权限修改。
 - 只用隔离用户；生产/真实数据授权：**否，另立任务**。
 
-## 6. SELFHOST-PHASE2-TASK03（建议）：客户、供应商、产品、BOM 与供应商物料映射
+## 6. SELFHOST-PHASE2-TASK03（DONE，非生产）：客户、供应商、产品、BOM 与供应商物料映射
 
 ### 依赖与代码范围
 
@@ -135,6 +135,7 @@ TASK02—TASK09
 ### 禁止与生产边界
 
 - 不导入真实主数据、不自动激活 Material、不实现替代料推断、不写库存/PO/WO。
+- 实施结果：PostgreSQL `0007`、独立 `master-data-selfhost/`/`bom-selfhost/`、legacy path 兼容投影、发布不可变、映射有效期/价格历史和结构 readiness 已通过专项、migration、Compose 重启与回归。
 - 生产/真实数据授权：**否**。
 
 ## 7. SELFHOST-PHASE2-TASK04（建议）：库存不可变账本、余额投影与调整
@@ -358,4 +359,4 @@ TASK02—TASK09
 
 ## 14. 下一条最小实施任务建议
 
-TASK02 已完成上述用户生命周期、密码、session revoke、能力与审计公共边界。下一任务如获授权应为 `SELFHOST-PHASE2-TASK03`；Dashboard、备份 API、其他业务域、真实用户迁移和部署继续保持独立任务。
+TASK02 已完成用户生命周期、密码、session revoke、能力与审计公共边界；TASK03 已完成非生产主数据/BOM。下一任务按连续任务指令为 `SELFHOST-PHASE2-TASK04`；Dashboard、备份 API、其他业务域、真实数据迁移和部署继续保持独立任务与生产授权。

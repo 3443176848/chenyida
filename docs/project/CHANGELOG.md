@@ -2,6 +2,19 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-25
+
+### SELFHOST-PHASE2-TASK03 - `feat: add self-hosted master data and bom`
+
+- 模块：新增独立 `master-data-selfhost` 与 `bom-selfhost` Repository/Service/Handler，统一入口只做身份门禁和精确分派；新写不进入 `erp_records`。
+- 数据：关系化 Customer、Supplier、Product/Product Version、BOM Header/Version/Line 与原子业务编码序列；Supplier Mapping 增加稳定 Supplier/Material/Unit FK、状态/版本/有效期，价格历史只追加。
+- 版本/不可变：Product/BOM 使用 DRAFT→RELEASED；数据库 trigger 禁止发布 Product Version、BOM Version 和 Lines 被 UPDATE/DELETE，修正只能新建版本。BOM 发布重查 Product、Material ACTIVE、Unit enabled 和行完整性。
+- API/安全：接通 legacy `/api/items|mappings|products|customers|suppliers|boms|bom-lines|bom-readiness` 及版本/状态/价格路由；固定服务端权限、CSRF、256 KiB、每分钟 60/20 限流、24小时幂等、CAS/锁、请求编号、同事务业务/审计/幂等结果。
+- readiness：TASK04 前只做结构与 required quantity，明确 `inventory_evaluated=false`、`all_ready=false`，不查询 `inventory_balances`/`inventory_transactions` 或伪造齐套。
+- Migration：新增 PostgreSQL `0007_master_data_bom.sql`、schema/snapshot/journal；SHA-256 `0e9cf9327b37673eb09483035117d15789047862f348cd5eb7098476d62fd3a6`，`0001`—`0006` checksum 不变。
+- 验证：TASK03 unit 2/2、UI 2/2、PostgreSQL/API 3/3、migration 3/3；Compose 空库 E2E 与 Web/PostgreSQL 重启通过；Identity/Material/Mapping/Normalization/Review、Phase0、lint/build/typecheck/凭证和 Python 三项回归通过，测试资源已清理。
+- 版本与边界：`0.1.0-alpha.2 -> 0.1.0-alpha.3`，未升级依赖；未实现库存/采购/生产，未访问生产、迁移真实数据、部署、重启 systemd、push 或创建 PR。
+
 ## 2026-07-24
 
 ### SELFHOST-PHASE2-TASK02 - `feat: add self-hosted identity security`

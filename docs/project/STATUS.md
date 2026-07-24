@@ -1,6 +1,24 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-24（Asia/Shanghai）
+最后更新时间：2026-07-25（Asia/Shanghai）
+
+## SELFHOST-PHASE2-TASK03 自托管主数据与 BOM
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 起点 | PASS | `main`、HEAD `2784a9a064838ebbb76f2bce8c97ebeb1eb8befb`、clean、本地相对 `origin/main +3/-0`；无 submodule/gitlink/嵌套仓库 |
+| 模块边界 | PASS | 独立 `master-data-selfhost`、`bom-selfhost`；Node/PostgreSQL 权威，不写 Python/SQLite、D1 或 `erp_records` |
+| 数据模型 | PASS | Customer/Supplier/Product/Product Version/BOM Header/Version/Line 与 business code sequence 关系化；Supplier Mapping 扩展稳定 FK、状态/版本/有效期，价格历史只追加 |
+| 发布不可变 | PASS | Product/BOM DRAFT→RELEASED；数据库 trigger 拒绝发布版本及 BOM Lines UPDATE/DELETE，修订创建新版本 |
+| API 与 legacy 契约 | PASS | items/mappings/products/customers/suppliers/boms/bom-lines/bom-readiness 兼容路径和版本/状态/价格路径通过；ACTIVE Material 投影，readiness 不查库存 |
+| 权限与安全 | PASS | sales/purchase/engineering 固定服务端能力；Session/must-change、CSRF、正文上限、60/20 限流、24h 幂等、CAS/锁、请求编号和安全错误通过 |
+| 事务与审计 | PASS | 业务、审计、幂等结果同事务；失败回滚不留业务/idempotency，失败审计最小披露；并发 code 唯一、mapping 有效期不重叠 |
+| PostgreSQL migration | PASS | `0007` 空库、0006升级、重复、失败回滚、约束/索引、旧用户/session/mapping 保留通过；SHA-256 `0e9cf9327b37673eb09483035117d15789047862f348cd5eb7098476d62fd3a6`，0001—0006不变 |
+| 专项测试 | PASS | unit 2/2、UI 2/2、PostgreSQL/API 3/3、migration 3/3；typecheck 与 Schema consistency 通过 |
+| Compose | PASS | 空库迁移与 Customer→Product→BOM→Supplier Mapping/Price E2E；PostgreSQL/Web 重启后数据和审计持久，容器/网络/卷已清理 |
+| 回归 | PASS | Node 基础、Identity、Material、Mapping、Normalization、Review、Phase0 PostgreSQL/Worker、旧升级、build/lint/typecheck/凭证及 Python 三项通过 |
+| 版本 | PASS / NOT RELEASED | `chenyida-erp-selfhosted@0.1.0-alpha.3`；非生产、尚未发布、部署或批准 |
+| 资源/生产影响 | NONE | 隔离测试资源清理；未访问生产、迁移真实数据、部署、重启 Python systemd、push 或 PR |
 
 ## SELFHOST-PHASE2-TASK02 自托管身份安全边界
 

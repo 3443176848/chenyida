@@ -6,6 +6,8 @@
 
 数据边界：只读源码、Schema 与 migration；未查询或输出任何业务数据库正文。
 
+> 2026-07-25 TASK03 更新：下表 M01、M02、M04—M09、M18—M22 已按 `0.1.0-alpha.3` 实际实现修正；本节 4/9/51 数字保留 TASK01 原始盘点基线，不冒充当前重新汇总。M08/M09 因库存尚未迁移仍为部分覆盖。
+
 ## 1. 口径与结论
 
 `chenyida_erp_app/server.py` 的 `AppHandler` 共暴露 **64 个 HTTP 操作**：GET 34、POST 30。按迁移业务域统计如下：
@@ -55,15 +57,15 @@ Python 当前**没有**用户创建、启停、重置密码 API。legacy iframe 
 
 | # | Method / path；页面调用 | Python 权限；输入与校验 | SQLite / 文件读写 | 事务、联动、审计与过账 | 自托管、PG 结构、缺口、风险与依赖 |
 | --- | --- | --- | --- | --- | --- |
-| M01 | `GET /api/items`；P:init，L:init | `read` | 读 `items` | 只读；无审计 | `P`；PG 有关系化 `material_master` 与新 `/material-master/materials`，旧 DTO/path 不兼容；M；需兼容/退出策略 |
-| M02 | `GET /api/mappings`；P:init，L:init | `read` | 读 `supplier_mappings` | 只读；无审计 | `N`；PG 有关系化 supplier mapping/price history，但无自托管服务/API；H；依赖物料 ACTIVE、供应商主数据 |
+| M01 | `GET /api/items`；P:init，L:init | `read` | 读 `items` | 只读；无审计 | `C`；TASK03 提供 legacy path 投影且只返回 PG ACTIVE Material；不复制 SQLite item 主键/状态行为 |
+| M02 | `GET /api/mappings`；P:init，L:init | `read` | 读 `supplier_mappings` | 只读；无审计 | `C`；TASK03 由关系化 Supplier/Material/Unit 映射与价格历史服务提供；旧无 supplier FK 行只保留作迁移来源 |
 | M03 | `GET /api/cleaning`；P:init/P:1182，L:init | `read`；`confidence_sort` 白名单 newest/desc/asc，最多 500 | 读 `cleaning_rows` | 只读；无审计 | `P`；Import Normalization/Review 有更强分页/证据模型，但路径、状态和 DTO 不等价；M |
-| M04 | `GET /api/products`；P:init，L:init | `read` | 读 `products` | 只读；无审计 | `N`；只有 `erp_records` JSON 占位，无服务/关系表；M；依赖客户内部 ID |
-| M05 | `GET /api/customers`；P:init，L:init | `read` | 读 `customers` | 只读；无审计 | `N`；仅 `erp_records` 占位；M；需关系化表/API |
-| M06 | `GET /api/suppliers`；P:init，L:init | `read` | 读 `suppliers` | 只读；无审计 | `N`；仅 `erp_records`；supplier mapping 表不能代替供应商主体；M |
-| M07 | `GET /api/boms`；P:init，L:init | `read` | 读 `product_boms`，按 product_code 连接 `products` | 只读；无审计 | `N`；仅 `erp_records`；无 BOM/BOM line 关系服务；H；依赖 product/material ID |
-| M08 | `GET /api/bom-lines`；P:1390，L:1303 | `read`；`bom_id` 转 int，默认 0 | 读 `bom_lines/items/inventory_balances` | 只读但混入库存可用量；无审计 | `N`；PG 无 BOM line；H；依赖 BOM、Material、Inventory |
-| M09 | `GET /api/bom-readiness`；P:1400，L:1313 | `read`；bom_id int、order_qty float，默认 1；未拒绝负数 | 读 M08 表 | 计算 required/available/shortage；无写/审计 | `N`；无服务；H；依赖 BOM + 库存快照/单位规则 |
+| M04 | `GET /api/products`；P:init，L:init | `read` | 读 `products` | 只读；无审计 | `C`；TASK03 Product Header/Version、Customer ID 和服务端权限已接通 |
+| M05 | `GET /api/customers`；P:init，L:init | `read` | 读 `customers` | 只读；无审计 | `C`；TASK03 关系表、稳定 ID、分页和能力权限已接通 |
+| M06 | `GET /api/suppliers`；P:init，L:init | `read` | 读 `suppliers` | 只读；无审计 | `C`；TASK03 Supplier 主体与稳定 ID 已接通，不以 mapping 文本代替主体 |
+| M07 | `GET /api/boms`；P:init，L:init | `read` | 读 `product_boms`，按 product_code 连接 `products` | 只读；无审计 | `C`；TASK03 BOM Header/Version、Product ID 与发布状态已接通 |
+| M08 | `GET /api/bom-lines`；P:1390，L:1303 | `read`；`bom_id` 转 int，默认 0 | 读 `bom_lines/items/inventory_balances` | 只读但混入库存可用量；无审计 | `P`；TASK03 关系化 BOM Line/Material/Unit 已接通，但刻意不返回库存可用量；等待 TASK04 |
+| M09 | `GET /api/bom-readiness`；P:1400，L:1313 | `read`；bom_id int、order_qty float，默认 1；未拒绝负数 | 读 M08 表 | 计算 required/available/shortage；无写/审计 | `P`；TASK03 只计算结构与 required quantity，明确 `inventory_evaluated=false/all_ready=false`；库存齐套依赖 TASK04 |
 | M10 | `GET /api/sample-import`；P:1205，L:1152 | `read`；无输入 | 读仓库模板 CSV 文件 | 只读；无审计 | `N`；新 Import UI 不提供该 legacy 样例 API；L；是否保留待产品决定 |
 | M11 | `GET /api/export/items.csv`；H:22 | `read` | 读 `items`，生成 CSV | 数据导出；无导出审计 | `N`；Material API 无 CSV 导出；M（数据披露）；依赖导出权限/审计 |
 | M12 | `GET /api/export/cleaning.csv`；H:23 | `read` | 读最多 10000 `cleaning_rows` | 数据导出；无审计 | `N`；Review 无等价导出；M；依赖最小披露与审计 |
@@ -72,11 +74,11 @@ Python 当前**没有**用户创建、启停、重置密码 API。legacy iframe 
 | M15 | `POST /api/cleaning/clear`；P:1196；L 无调用 | `system`；固定 confirmation | 先创建 DB 备份；事务删除全部 `cleaning_rows` 并写 activity | 备份提交与删除事务分开；破坏性但不删 raw/batch/material | `N`；Review 不提供全清；**H**；不应迁移为常规业务 API，需数据保留策略 |
 | M16 | `POST /api/cleaning/confirm`；P:1258，L:1175 | `material`；id int、记录存在、必须有 candidate code | 读 cleaning；写 supplier_mappings、cleaning 状态、activity | 单事务；确认供应商映射；未重验 item 状态/并发；无幂等 | `P`；Review 可人工精确绑定 ACTIVE，但没有等价 supplier mapping 落地语义；H；依赖供应商 mapping 服务 |
 | M17 | `POST /api/cleaning/create-item`；P:1280，L:1195 | `material`；id；名称/规格/单位必填；类别/环境/客户专用等弱校验 | 写 `items/supplier_mappings/cleaning_rows/activity_log` | 单事务；用“最后编码+1”生成 ACTIVE 物料并直接建映射；无审核/幂等/锁 | `P`；Review 只能调用 Material Service 建未编码 DRAFT，故更安全但非旧语义；**H**；禁止兼容“直接 ACTIVE” |
-| M18 | `POST /api/products`；P:1314，L:1227 | `engineering`；PRODUCT_FIELDS；product_code/name 必填 | 写 `products/activity_log` | 单事务；`INSERT OR IGNORE` 可能静默忽略重复；无版本/幂等 | `N`；无 PG 关系表/服务/API；M；依赖客户 ID |
-| M19 | `POST /api/customers`；P:1333，L:1246 | `sales`；CUSTOMER_FIELDS；name 必填 | upsert `customers` by name；activity | 单事务；编码用 COUNT+1，名称作为更新键；无版本/幂等 | `N`；无关系表/服务；H（稳定 ID/重复/并发）；依赖 TASK02 安全基线 |
-| M20 | `POST /api/suppliers`；P:1353，L:1266 | `purchase`；SUPPLIER_FIELDS；name 必填 | upsert `suppliers` by name；activity | 单事务；编码 COUNT+1、名称更新键；无版本/幂等 | `N`；无供应商主体表/服务；H；依赖稳定 supplier ID |
-| M21 | `POST /api/boms`；P:1367，L:1280 | `engineering`；bom_code/product_code 必填；未验证产品存在 | 写 `product_boms/activity_log` | 单事务；重复 code 可能静默复用；无版本/审批状态机 | `N`；无 PG 关系表/API；H；依赖 Product/Material |
-| M22 | `POST /api/bom-lines`；P:1383，L:1296 | `engineering`；bom_id/item_code 必填，物料存在；qty/loss 转数值 | 写/替换 `bom_lines`；读 items；activity | 单事务；`INSERT OR REPLACE` 可原地覆盖，未验证 BOM/ACTIVE/单位/客户限制 | `N`；无 PG 表/API；**H**；依赖稳定 BOM/material ID、乐观锁、版本历史 |
+| M18 | `POST /api/products`；P:1314，L:1227 | `engineering`；PRODUCT_FIELDS；product_code/name 必填 | 写 `products/activity_log` | 单事务；`INSERT OR IGNORE` 可能静默忽略重复；无版本/幂等 | `C`；TASK03 Product Header/Version、稳定 Customer ID、幂等/审计/并发编码与发布不可变已接通 |
+| M19 | `POST /api/customers`；P:1333，L:1246 | `sales`；CUSTOMER_FIELDS；name 必填 | upsert `customers` by name；activity | 单事务；编码用 COUNT+1，名称作为更新键；无版本/幂等 | `C`；TASK03 使用稳定 ID、原子 code、CAS 状态、幂等和事务审计；不再按名称 upsert |
+| M20 | `POST /api/suppliers`；P:1353，L:1266 | `purchase`；SUPPLIER_FIELDS；name 必填 | upsert `suppliers` by name；activity | 单事务；编码 COUNT+1、名称更新键；无版本/幂等 | `C`；TASK03 使用稳定 ID、原子 code、CAS 状态、幂等和事务审计；不再按名称 upsert |
+| M21 | `POST /api/boms`；P:1367，L:1280 | `engineering`；bom_code/product_code 必填；未验证产品存在 | 写 `product_boms/activity_log` | 单事务；重复 code 可能静默复用；无版本/审批状态机 | `C`；TASK03 验证 ACTIVE Product/RELEASED Product Version，创建 Header+DRAFT Version 并支持发布/修订 |
+| M22 | `POST /api/bom-lines`；P:1383，L:1296 | `engineering`；bom_id/item_code 必填，物料存在；qty/loss 转数值 | 写/替换 `bom_lines`；读 items；activity | 单事务；`INSERT OR REPLACE` 可原地覆盖，未验证 BOM/ACTIVE/单位/客户限制 | `C`；TASK03 只允许 DRAFT 加行并验证 ACTIVE Material/enabled Unit；RELEASED Version/Line 由数据库禁止修改或删除 |
 
 ## 4. 采购与库存（9）
 

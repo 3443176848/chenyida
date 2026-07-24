@@ -43,6 +43,13 @@
       "when": 1784907513742,
       "tag": "0006_identity_security",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784910176682,
+      "tag": "0007_master_data_bom",
+      "breakpoints": true
     }
   ]
 }

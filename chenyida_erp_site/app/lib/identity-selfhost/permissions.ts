@@ -8,18 +8,20 @@ const reviewEditorPermissions = [
 ];
 const reviewManagerPermissions = [...reviewEditorPermissions, "material.import.review.bulk", "material.import.review.finalize", "material.import.review.retry"];
 const readOnly = ["material.read"];
+const masterRead = ["master.customer.read", "master.supplier.read", "master.product.read", "master.bom.read", "master.supplier_mapping.read"];
+const masterManage = [...masterRead, "master.customer.manage", "master.supplier.manage", "master.product.manage", "master.bom.manage", "master.supplier_mapping.manage"];
 
 const ROLE_PERMISSIONS: Record<IdentityRole, string[]> = {
-  admin: ["*", "system.user.read", "system.user.create", "system.user.status", "system.user.reset", "system.audit.read", "material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject", "material.audit.read", "material.import.create", "material.import.read", "material.import.read_any", "material.import.cancel", "material.import.parse", "material.import.map", "material.import.normalize", "material.import.commit", ...reviewManagerPermissions],
-  manager: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject", "material.audit.read", "material.import.create", "material.import.read", "material.import.read_any", "material.import.cancel", "material.import.parse", "material.import.map", "material.import.normalize", "material.import.commit", ...reviewManagerPermissions],
-  purchase: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit", "material.import.create", "material.import.read", "material.import.cancel", "material.import.parse", "material.import.map", ...reviewEditorPermissions],
-  engineering: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit", "material.import.create", "material.import.read", "material.import.cancel", "material.import.parse", "material.import.map", ...reviewEditorPermissions],
-  production: readOnly,
-  warehouse: readOnly,
-  quality: readOnly,
-  sales: readOnly,
-  finance: readOnly,
-  operations: readOnly,
+  admin: ["*", "system.user.read", "system.user.create", "system.user.status", "system.user.reset", "system.audit.read", "material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject", "material.audit.read", "material.import.create", "material.import.read", "material.import.read_any", "material.import.cancel", "material.import.parse", "material.import.map", "material.import.normalize", "material.import.commit", ...reviewManagerPermissions, ...masterManage],
+  manager: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject", "material.audit.read", "material.import.create", "material.import.read", "material.import.read_any", "material.import.cancel", "material.import.parse", "material.import.map", "material.import.normalize", "material.import.commit", ...reviewManagerPermissions, ...masterManage],
+  purchase: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit", "material.import.create", "material.import.read", "material.import.cancel", "material.import.parse", "material.import.map", ...reviewEditorPermissions, ...masterRead, "master.supplier.manage", "master.supplier_mapping.manage"],
+  engineering: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit", "material.import.create", "material.import.read", "material.import.cancel", "material.import.parse", "material.import.map", ...reviewEditorPermissions, ...masterRead, "master.product.manage", "master.bom.manage"],
+  production: [...readOnly, ...masterRead],
+  warehouse: [...readOnly, ...masterRead],
+  quality: [...readOnly, ...masterRead],
+  sales: [...readOnly, ...masterRead, "master.customer.manage"],
+  finance: [...readOnly, ...masterRead],
+  operations: [...readOnly, ...masterRead],
 };
 
 export function validateRole(value: unknown): IdentityRole {

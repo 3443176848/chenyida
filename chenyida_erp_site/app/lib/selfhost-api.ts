@@ -9,6 +9,8 @@ import { handleSelfhostMaterialApi } from "./material-selfhost/handler.ts";
 import { handleSelfhostMaterialImportMappingApi } from "./material-import-selfhost/handler.ts";
 import { handleSelfhostMaterialImportNormalizationApi } from "./material-import-normalization-selfhost/handler.ts";
 import { handleSelfhostMaterialImportReviewApi } from "./material-import-review-selfhost/handler.ts";
+import { handleMasterDataApi } from "./master-data-selfhost/handler.ts";
+import { handleBomApi } from "./bom-selfhost/handler.ts";
 import {
   assertProtectedIdentityGate,
   CSRF_COOKIE,
@@ -74,6 +76,10 @@ export async function handleSelfhostApi(request: Request): Promise<Response> {
     let user: IdentityActor;
     try { user = assertProtectedIdentityGate(identityContext); } catch (error) { return identityFailureResponse(error, requestId); }
     requirePermission(user, "material.read");
+    const masterDataResponse = await handleMasterDataApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
+    if (masterDataResponse) return masterDataResponse;
+    const bomResponse = await handleBomApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
+    if (bomResponse) return bomResponse;
     const materialResponse = await handleSelfhostMaterialApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (materialResponse) return materialResponse;
     const mappingResponse = await handleSelfhostMaterialImportMappingApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });

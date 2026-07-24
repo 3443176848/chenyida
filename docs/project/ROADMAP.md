@@ -39,14 +39,14 @@
 - 正式物料只能经审核启用，AI 或导入结果不能直接写正式数据。
 - 物料、属性、别名、映射和历史变更可审计。
 
-**建议任务数**：9（由 `SELFHOST-PHASE2-TASK01` 源码盘点提出，逐项批准）。**当前状态**：IN PROGRESS；TASK02 已完成，TASK03—TASK10 未授权。
+**建议任务数**：9（由 `SELFHOST-PHASE2-TASK01` 源码盘点提出，逐项独立验收）。**当前状态**：IN PROGRESS；TASK02—TASK03 已完成，TASK04 已获连续任务指令授权但尚未开始。
 
-**已完成的前置诊断**：`SELFHOST-PHASE2-TASK01` 已盘点 Python 64 个 HTTP 操作（GET 34、POST 30），确认自托管等价覆盖 4、部分覆盖 9、未覆盖 51；根 legacy iframe 登录后 23 个业务 GET 全部 404。该任务只完成诊断和设计，没有迁移业务域。
+**已完成的前置诊断**：`SELFHOST-PHASE2-TASK01` 已盘点 Python 64 个 HTTP 操作（GET 34、POST 30），并在当时确认自托管等价覆盖 4、部分覆盖 9、未覆盖 51、根 legacy iframe 登录后 23 个业务 GET 全部 404。TASK02/TASK03 后覆盖已增加，但完整 iframe 仍未恢复。
 
-**建议顺序（除已完成 TASK02 外，均待独立提示授权）**：
+**执行顺序（TASK02/TASK03 已完成；TASK04 已授权；其余仍需按连续指令与依赖逐项独立验收）**：
 
 - `SELFHOST-PHASE2-TASK02`：身份、用户管理、密码、会话撤销与系统审计（DONE，非生产 `0.1.0-alpha.2`；未部署或迁移真实用户）。
-- `SELFHOST-PHASE2-TASK03`：客户、供应商、产品、BOM 与供应商物料映射。
+- `SELFHOST-PHASE2-TASK03`：客户、供应商、产品、BOM 与供应商物料映射（DONE，非生产 `0.1.0-alpha.3`；PostgreSQL `0007`，未迁真实数据或部署）。
 - `SELFHOST-PHASE2-TASK04`：库存不可变账本、余额投影与受控调整。
 - `SELFHOST-PHASE2-TASK05`：采购、缺料建议、收货与库存联动。
 - `SELFHOST-PHASE2-TASK06`：工单、领料、报工、完工与库存联动。
