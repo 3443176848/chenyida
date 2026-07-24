@@ -2,6 +2,25 @@
 
 最后更新时间：2026-07-24（Asia/Shanghai）
 
+## SELFHOST-PHASE2-TASK02 自托管身份安全边界
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 模块边界 | PASS | 独立 `identity-selfhost` Types/Errors/Password/Permissions/Repository/Service/Handler；`selfhost-api.ts` 只委托并注入可信 actor/全局门禁 |
+| API | PASS | setup/login/logout/session 安全重构；本人改密、用户列表/创建/启停/重置及系统审计查询均通过隔离 API 测试 |
+| 权限与 must-change | PASS | 十角色只由服务端映射；admin-only 管理/审计；must-change 只允许 session/logout/本人改密，Material 与其他受保护 API 统一 403 |
+| 密码与 Cookie | PASS | 12—128、四类至少三类、弱口令/用户名/相同密码拒绝；PBKDF2-SHA256 310k；development HTTP 不强制 Secure，production 内部 HTTP 仍强制 Secure |
+| 会话撤销 | PASS | token 只存 SHA-256；停用/重置撤销全部，本人改密保留当前并撤销其他；旧会话立即 `SESSION_REVOKED` |
+| 限流/幂等/CAS | PASS | 登录 5/15min；身份写 60 attempts/20 new keys/min；完成重放不计新 Key；四接口持久幂等、异正文冲突、expected version 和失败回滚通过 |
+| 并发保护 | PASS | 用户名并发唯一；事务 advisory lock + CAS 使并发停用管理员后仍至少保留一个 active admin；禁止自停用、自重置 |
+| 系统审计 | PASS | admin-only、有界分页/筛选、最小 DTO；actor/target/action/result/request/operation/version/error/time 可查，无密码、Token、Cookie、hash 或正文 |
+| PostgreSQL migration | PASS | `0006` 空库、0005升级、重复、失败回滚、约束/索引、旧合成用户/session 保留通过；SHA-256 `6e185d01a69c4bd132c577793ae72baceaa075e5beecc738bcdf4310430d7079`，0001—0005不变 |
+| 专项测试 | PASS | unit 8/8、UI 4/4、PostgreSQL/API 8/8、migration 4/4 |
+| Compose | PASS | setup→admin login→purchase创建/临时登录/must-change/改密/Material读取→停用/撤销→启用/重置/再次must-change→审计；Web/PostgreSQL 重启后 user version、审计与撤销持久 |
+| 回归 | PASS | npm基础、Material、Mapping、Normalization、Review、Phase0 PostgreSQL/Worker、旧升级、typecheck、build、lint、凭证及 Python 三项通过 |
+| 版本 | PASS / NOT RELEASED | `chenyida-erp-selfhosted@0.1.0-alpha.2`；非生产、尚未发布、部署或批准 |
+| 资源/生产影响 | NONE | 一次性 Compose 与 PostgreSQL 资源清理；未访问生产、迁移真实用户、部署、重启 Python systemd、push 或 PR |
+
 ## SELFHOST-PHASE2-TASK01 完整 ERP API 盘点与迁移计划
 
 | 验证项 | 结果 | 说明 |
@@ -137,7 +156,7 @@
 | 根仓库跟踪项 | Site 自适应 Import + 服务器本地 CSV/XLSX/XLS | 本轮修改本地 Python 运行面和 systemd 源码配置，未修改 Site |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
 | 数据库实现 | 3 | 当前开发 SQLite、历史 Cloudflare D1、自托管开发 PostgreSQL |
-| 数据表 | 分运行面追踪 | SQLite 29 张；D1/Drizzle 45 张；PostgreSQL `0001` 基线 46 张并有 `0002`—`0005` 增量；不能跨运行面相加冒充同一数据库 |
+| 数据表 | 分运行面追踪 | SQLite 29 张；D1/Drizzle 45 张；PostgreSQL `0001` 基线 46 张并有 `0002`—`0006` 增量；不能跨运行面相加冒充同一数据库 |
 | 在线 API 路径 | 89 | 开发代码新增 Draft Generation 查询、Normalization Approval 和 Draft Commit；生产公开站点尚未部署 |
 | 页面入口 | 14 | 既有 11 个入口加 3 条 Material Import 路由 |
 | 测试文件 | 35 | 本轮新增本地 Spreadsheet 和 Migration 两份专项测试 |
@@ -147,11 +166,11 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 根仓库 Branch | `main` |
-| 任务开始 HEAD | `12d3ea30d21cce6918de0c525d81f19af289f5ac`；开始时本地 `main` 领先 `origin/main` 1 个提交 |
-| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.1`；非生产、尚未发布 |
+| 任务开始 HEAD | `e8cb7ebc0fa9d45575aeaffc0732183d2533f577`；开始时本地 `main` 领先 `origin/main` 2 个提交 |
+| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.2`；非生产、尚未发布 |
 | 当前实际常驻服务 | Python 3.11.6 / SQLite，systemd `enabled/active`，`0.0.0.0:18888` |
 | 自托管部署状态 | Node/PostgreSQL 未生产部署；当前无运行中 Compose 项目 |
-| PostgreSQL migration | `0001`—`0005`；未迁移真实数据 |
+| PostgreSQL migration | `0001`—`0006`；未迁移真实数据或真实用户 |
 | SQLite migration | `0001`—`0004` 已记录；数据库不保存 migration checksum |
 | 历史 D1 migration | 仓库 `0000`—`0008`；生产实际应用版本未访问、未核验 |
 | PM-000 前根提交 | `bbefb2e388323213b51531fec117d67d5a28fe70` |
@@ -164,6 +183,8 @@
 Node 验收因宿主机无 Node/npm，在一次性 `node:22-bookworm` 容器执行。`npm ci` 报告 12 个既有依赖审计项（1 low、4 moderate、7 high），依照本任务禁止事项未升级依赖。Python 首轮误用系统解释器时 smoke 在导入 `openpyxl` 前停止；改用 systemd 实际使用的项目虚拟环境后，self-test、smoke 和临时 SQLite go-live 全部通过。
 
 ## Git 状态
+
+SELFHOST-PHASE2-TASK02 开始时，根仓库 `main` 位于 `e8cb7ebc0fa9d45575aeaffc0732183d2533f577`，工作区 clean，本地分支领先 `origin/main` 2 个提交。TASK02 独立提交和最终 clean 状态以完成报告及 `git show` 为准；未 push 或创建 PR。
 
 SELFHOST-PHASE2-TASK01 开始时，根仓库 `main` 位于 `12d3ea30d21cce6918de0c525d81f19af289f5ac`，工作区 clean，本地分支领先 `origin/main` 1 个提交。本任务只修改 `docs/`；完成提交和最终 clean 状态以任务完成报告及该提交的 `git show` 为准。
 

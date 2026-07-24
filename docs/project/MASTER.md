@@ -37,25 +37,26 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 自托管开发基线 `0.1.0-alpha.1`（包名 `chenyida-erp-selfhosted`），明确为非生产、尚未发布；统一追踪见 `RELEASES.md` |
+| 当前版本 | 自托管开发基线 `0.1.0-alpha.2`（包名 `chenyida-erp-selfhosted`），明确为非生产、尚未发布；统一追踪见 `RELEASES.md` |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；PHASE0-TASK03 提交以 `git log -1 -- docs/project/RELEASES.md` 为准 |
+| 当前根仓库功能基线提交 | TASK02 起始 `e8cb7ebc0fa9d45575aeaffc0732183d2533f577`；TASK02 功能提交以 `git log -1 -- docs/tasks/SELFHOST-PHASE2-TASK02-completion.md` 为准 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 自托管 PostgreSQL 17 开发基线为 `0001` 46表 + `0002` Material工作流 + `0003` Import Mapping/版本/复用 + `0004` 行级 Normalization + `0005` 人工复核/finalization；SQLite 29张仍支撑当前 Python 开发运行面并作为迁移来源，D1/Drizzle 45张为历史迁移来源；均未向 PostgreSQL 迁移真实数据 |
+| 当前数据库 | 自托管 PostgreSQL 17 开发基线为 `0001`—`0006`；`0006` 只扩展身份限流、会话撤销、审计 target/索引和身份约束。SQLite 29张仍支撑当前 Python 开发运行面并作为迁移来源，D1/Drizzle 45张为历史迁移来源；均未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | Python/SQLite 开发服务由 systemd 常驻，`enabled/active` 且监听 `0.0.0.0:18888`；Node/PostgreSQL 仅为隔离开发基线，无运行中的 Compose 项目，未生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Material、Import Mapping、Normalization 与人工复核/ACTIVE绑定/Material Draft 非生产闭环；完整 ERP API 尚未迁移 |
-| 当前阶段 | `SELFHOST-PHASE2-TASK01` 已完成完整 ERP API 盘点和分阶段迁移计划；没有实施任何新业务 API |
-| 当前任务 | 无 `DOING`；`SELFHOST-PHASE2-TASK01` 的提交以 `git log -1 -- docs/audits/SELFHOST-PHASE2-TASK01-api-inventory.md` 为准 |
-| 下一任务 | 建议仅授权 `SELFHOST-PHASE2-TASK02`，补齐身份、用户管理、密码、会话撤销和系统审计；候选 TASK02—TASK10 均未自动获批，真实数据试迁移、生产备份恢复、部署和切换继续独立授权 |
+| 当前阶段 | `SELFHOST-PHASE2-TASK02` 已完成非生产身份安全边界；其他完整 ERP 业务域仍未迁移 |
+| 当前任务 | 无 `DOING`；TASK02 提交以 `git log -1 -- docs/tasks/SELFHOST-PHASE2-TASK02-completion.md` 为准 |
+| 下一任务 | 建议仅在明确授权后执行 `SELFHOST-PHASE2-TASK03`（客户、供应商、产品、BOM 与供应商物料映射）；真实数据试迁移、生产备份恢复、部署和切换继续独立授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
 - SELFHOST-PHASE2-TASK01 完成 docs-only 盘点：Python 共 64 个 HTTP 操作（GET 34、POST 30），自托管等价覆盖 4、部分覆盖 9、未覆盖 51；根 legacy iframe 登录后并发的 23 个业务 GET 在 Node/PostgreSQL 均返回 404。已提出 TASK02—TASK10 依赖顺序，全部仍待逐项授权；没有业务域因此完成迁移
+- SELFHOST-PHASE2-TASK02 完成自托管身份安全边界：独立 Identity Repository/Service/Handler，用户创建/列表/启停/重置、本人改密、会话撤销、must-change 全局门禁、登录与身份写限流、持久幂等、CAS/最后管理员保护、有界系统审计和生产强制 Secure Cookie；`0006`、隔离 PostgreSQL 17、Compose 生命周期/重启与指定回归通过，未发布或部署
 - 多用户登录、会话、角色权限、密码修改、账号管理和操作审计
 - 物料、供应商映射、CSV 导入、清洗队列和新物料建档基础流程
 - 客户、供应商、产品、BOM 和 BOM 齐套分析
@@ -156,6 +157,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
+- 已完成：`SELFHOST-PHASE2-TASK02`，补齐自托管身份、用户、密码、会话撤销、限流、持久幂等和系统审计；版本更新为非生产 `0.1.0-alpha.2`，未迁移真实用户、未部署或访问生产。
 - 已完成：`SELFHOST-PHASE2-TASK01`，只读盘点 Python 64 个 HTTP 操作、页面调用、权限、表、事务、审计、过账风险与自托管覆盖，确认 legacy iframe 登录后 23 个业务 GET 全部 404，并提出 TASK02—TASK10 建议顺序；仅文档，未实施 API、Schema、migration、依赖、部署或生产动作。
 - 已完成：`PHASE0-TASK03`，建立 `RELEASES.md`、三套 migration SHA-256、`0.1.0-alpha.1` 非生产版本、发布验收和回退模板；修正 Git、运行面、部署和业务迁移状态，未访问或修改生产。
 - 已完成：`SELFHOST-PHASE1-TASK04`，把独立人工覆盖、Issue 处置、ACTIVE 精确绑定、Material Service 建 DRAFT 和可恢复 finalization 移植到 PostgreSQL；专项、回归、migration 与 Compose 验收通过，后续已随 `39946f6` 提交，未连接生产、迁移真实数据或部署。

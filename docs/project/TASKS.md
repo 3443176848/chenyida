@@ -71,7 +71,7 @@
 | PHASE3-TASK01 | 设计 Material Import Normalization & Staging V1 | DONE | Codex（设计）、项目负责人（待规格确认） | 2026-07-17 | 2026-07-17 | PHASE2-TASK08 | 完成正式规格、OpenAPI 草案和数据流/状态图；定义独立 run、JSON 行快照、独立 issue、类型/空值/属性规则、Outbox/租约、原子发布、五个 API、`0006` 设计、54 项测试和 16 项 `PROPOSED` 决定；仅文档，未修改运行时代码、Schema、Migration、API、前端或生产环境 |
 | PHASE3-TASK03 | 设计 Material Import Normalization Review UI V1 | DONE | Codex（设计）、项目负责人（2026-07-17 正式规格确认） | 2026-07-17 | 2026-07-17 | PHASE3-TASK02 | 完成正式 UI 规格、37 状态低保真线框、集中状态矩阵和 104 项未来实施测试；统一工作区、七步 Stepper、Current/Latest 双轨、Rows/Issues cursor 与 Row Drawer等 14 项决定均已 `APPROVED`；局部 Issue 查询门禁、性能门禁和 7 项非阻塞限制继续有效；仅文档，未修改前端、API、Schema、Migration、业务逻辑或生产环境 |
 
-当前无 `DOING` 任务。`SELFHOST-PHASE2-TASK01` 已完成盘点与规划，但完整 ERP 业务仍未迁入自托管 API，采购、库存、生产、销售、品质和财务仍依赖 Python/SQLite。下一任务只建议 `SELFHOST-PHASE2-TASK02`；所有候选均需新的逐项授权，真实样本容量、旧数据试迁移、生产部署和切换继续独立授权。
+当前无 `DOING` 任务。`SELFHOST-PHASE2-TASK02` 已完成非生产身份安全边界；后续候选仍需逐项明确授权，真实数据迁移、生产部署和切换继续单独授权。
 
 ## Phase 0 待办
 
@@ -86,7 +86,7 @@
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | SELFHOST-PHASE2-TASK01 | 盘点并分阶段迁移完整 ERP 业务 API | DONE | Codex（诊断与设计）、项目负责人（范围确认） | 2026-07-24 | 2026-07-24 | PHASE0-TASK03、SELFHOST-PHASE1-TASK04 | API 清单、数据不变量、首页断链和 TASK02—TASK10 建议计划完成；未实施任何业务 API |
-| SELFHOST-PHASE2-TASK02 | 补齐身份、用户管理、密码、会话撤销与系统审计 | TODO | 待指派 | - | - | SELFHOST-PHASE2-TASK01 | **建议、未授权**；只补共同身份安全边界，不含 Dashboard、备份、业务域、真实用户迁移或部署 |
+| SELFHOST-PHASE2-TASK02 | 补齐身份、用户管理、密码、会话撤销与系统审计 | DONE | Codex（诊断、非生产实施、隔离测试、文档与本地提交）、项目负责人（固定业务/安全决策与范围确认） | 2026-07-24 | 2026-07-24 | SELFHOST-PHASE2-TASK01 | 独立 Identity Repository/Service/Handler、`0006`、六个补齐接口、全局 must-change、PBKDF2、撤销、限流、幂等、CAS、最后管理员保护和有界审计查询通过隔离 PostgreSQL/Compose/回归；版本 `0.1.0-alpha.2`，未发布、未部署、未迁移真实用户。 |
 | SELFHOST-PHASE2-TASK03 | 迁移客户、供应商、产品、BOM 与供应商物料映射 | TODO | 待指派 | - | - | SELFHOST-PHASE2-TASK02、现有 Material ACTIVE | **建议、未授权**；关系化主数据与 BOM 版本，不含库存/采购/生产 |
 | SELFHOST-PHASE2-TASK04 | 建立库存不可变账本、余额投影与受控调整 | TODO | 待指派 | - | - | SELFHOST-PHASE2-TASK02、SELFHOST-PHASE2-TASK03 | **建议、未授权**；先于所有库存联动域独立验收，不回填真实库存 |
 | SELFHOST-PHASE2-TASK05 | 迁移采购、缺料建议、收货与库存联动 | TODO | 待指派 | - | - | SELFHOST-PHASE2-TASK03、SELFHOST-PHASE2-TASK04 | **建议、未授权**；不自动生成应付，不迁真实 PO/在途 |

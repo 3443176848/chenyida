@@ -4,6 +4,17 @@
 
 ## 2026-07-24
 
+### SELFHOST-PHASE2-TASK02 - `feat: add self-hosted identity security`
+
+- 模块：将自托管身份从 `selfhost-api.ts` 拆为 `identity-selfhost` 的 Types/Errors/Password/Permissions/Repository/Service/Handler；入口只保留精确委托、可信 actor 注入和所有后续业务模块前的统一 active/must-change 门禁。
+- API：安全保留 setup/login/logout/session，补齐本人改密、用户列表/创建/启停/重置和系统审计查询；admin-only 管理、固定十角色、用户名不可变、禁止自停用/自重置和最后 active admin 并发保护。
+- 密码/会话：12—128 位且四类至少三类，拒绝用户名/默认/弱口令/新旧相同；PBKDF2-SHA256 310,000 次、常量时间比较、token 只存 SHA-256。停用/重置撤销全部会话，本人改密保留当前并撤销其他会话；生产内部 HTTP 仍强制 Secure Cookie。
+- 安全：登录 15 分钟 5 次失败限流，身份写每分钟 60 次/20 个新 Key；四个 POST 使用 CSRF、canonical body、持久 Idempotency、CAS、事务审计和稳定错误；系统审计默认 20/最大 100 并最小披露。
+- Migration：新增 expand-only PostgreSQL `0006_identity_security.sql`、schema/snapshot/journal；SHA-256 `6e185d01a69c4bd132c577793ae72baceaa075e5beecc738bcdf4310430d7079`，`0001`—`0005` checksum 不变，未迁移真实用户或静默删除旧 session。
+- 前端：现有 legacy 身份交互改用 temporary_password/expected_version/CSRF/页面内存幂等上下文；处理 must-change、版本/幂等冲突、限流和撤销。Dashboard/备份仍缺失时明确降级，不在本任务补业务 API。
+- 验证：Identity 单元 8/8、UI 4/4、PostgreSQL/API 8/8、migration 4/4；隔离 Compose 完整生命周期及 Web/PostgreSQL 重启持久性通过；指定 Material/Mapping/Normalization/Review、Phase0、build/lint/typecheck/凭证与 Python 回归通过。
+- 版本与边界：`0.1.0-alpha.1 -> 0.1.0-alpha.2`，仅非生产开发记录；未访问生产、迁移真实数据、部署、重启 systemd、升级依赖、push 或创建 PR。
+
 ### SELFHOST-PHASE2-TASK01 - `docs: plan full erp api migration`
 
 - API 盘点：只读核验 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30）；按身份系统11、基础主数据/工程/物料22、采购库存9、生产6、销售7、品质3、财务6 分类，逐项记录页面、权限、输入、读写表、事务、联动、审计、过账、自托管覆盖、PG结构、缺口、风险和依赖。

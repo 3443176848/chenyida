@@ -4,23 +4,27 @@
 
 ## 2026-07-24 自托管完整 ERP 盘点覆盖层
 
-`SELFHOST-PHASE2-TASK01` 从源码确认 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30）。当前 Node/PostgreSQL 对其中等价覆盖 4、部分覆盖 9、未覆盖 51；已完成的能力集中在身份基础和新的 Material/Import/Normalization/Review namespace。customer、supplier 主体、product、BOM、PO、receipt、WO、report、quote、SO、shipment、quality 和 finance 尚无关系化自托管业务服务。
+`SELFHOST-PHASE2-TASK01` 从源码确认 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30），并在当时基线记录等价覆盖 4、部分覆盖 9、未覆盖 51。TASK02 现已补齐身份、用户、密码、会话撤销和系统审计公共边界；customer、supplier 主体、product、BOM、PO、receipt、WO、report、quote、SO、shipment、quality 和 finance 仍无关系化自托管业务服务。
 
 ```mermaid
 flowchart LR
     ROOT["自托管根页面"] --> IFRAME["/erp/index.html legacy iframe"]
-    IFRAME --> AUTH["health/session/login/logout: 可用"]
+    IFRAME --> AUTH["身份/用户/系统审计: 可用"]
     IFRAME --> BATCH["登录后 23 个 legacy 业务 GET"]
     BATCH --> NF["selfhost-api.ts: 全部 404"]
 
     NATIVE["/materials 原生页面"] --> MM["Material/Import/Normalization/Review API"]
-    MM --> PG["PostgreSQL 0001—0005"]
+    AUTH --> ID["identity-selfhost Repository/Service/Handler"]
+    ID --> PG["PostgreSQL 0001—0006"]
+    MM --> PG
 
     PYUI["Python static app"] --> PYAPI["Python 64 个 HTTP 操作"]
     PYAPI --> SQLITE["SQLite 29 表开发运行面"]
 ```
 
-根 iframe 的 `refreshAll()` 用一个 `Promise.all` 请求 summary、material/cleaning、主数据、采购/库存、生产、销售、品质和财务共 23 个 GET；当前自托管 catch-all 均返回 404，因此“认证成功”和“完整 ERP 页面可用”是两件不同的事。Operations 还会额外请求 management-dashboard、backups 和 users，同样未迁移。
+根 iframe 的 `refreshAll()` 用一个 `Promise.all` 请求 summary、material/cleaning、主数据、采购/库存、生产、销售、品质和财务共 23 个 GET；当前自托管 catch-all 仍全部返回 404，因此“身份可用”和“完整 ERP 页面可用”是两件不同的事。Operations 的 users 已接通新 Identity API；management-dashboard 与 backups 仍明确降级为不可用。
+
+身份请求先进入 `identity-selfhost/handler.ts`，再由 Service 执行业务规则、Repository 执行 PostgreSQL 事务。非身份受保护请求在进入 Material/Import 模块前统一解析服务端 session actor 并执行 active/must-change 门禁；浏览器不能提交 permissions。会话只保存 token SHA-256 摘要，身份审计、限流和幂等均持久化到 PostgreSQL。
 
 PostgreSQL 的 `erp_records(kind,code,data JSONB)` 只是历史兼容占位，不是未来各域关系模型；`inventory_balances` 与 `inventory_transactions` 也只有文本 item_code 和基础字段，没有 receipt/adjustment/reservation/reversal 服务。存在结构不能作为 API、权限、事务、审计、测试或数据迁移完成的证据。完整逐项清单见 `docs/audits/SELFHOST-PHASE2-TASK01-api-inventory.md`，建议依赖顺序见 `docs/self-hosting/full-erp-api-migration-plan.md`。
 

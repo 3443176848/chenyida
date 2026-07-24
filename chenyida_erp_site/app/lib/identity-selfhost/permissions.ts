@@ -1,0 +1,41 @@
+import { IdentityError } from "./errors.ts";
+import { IDENTITY_ROLES, type IdentityActor, type IdentityRole } from "./types.ts";
+
+const reviewEditorPermissions = [
+  "material.import.review.create", "material.import.review.history", "material.import.review.edit",
+  "material.import.review.decide", "material.import.review.issue", "material.import.review.search_material",
+  "material.import.review.bind", "material.import.review.create_draft",
+];
+const reviewManagerPermissions = [...reviewEditorPermissions, "material.import.review.bulk", "material.import.review.finalize", "material.import.review.retry"];
+const readOnly = ["material.read"];
+
+const ROLE_PERMISSIONS: Record<IdentityRole, string[]> = {
+  admin: ["*", "system.user.read", "system.user.create", "system.user.status", "system.user.reset", "system.audit.read", "material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject", "material.audit.read", "material.import.create", "material.import.read", "material.import.read_any", "material.import.cancel", "material.import.parse", "material.import.map", "material.import.normalize", "material.import.commit", ...reviewManagerPermissions],
+  manager: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject", "material.audit.read", "material.import.create", "material.import.read", "material.import.read_any", "material.import.cancel", "material.import.parse", "material.import.map", "material.import.normalize", "material.import.commit", ...reviewManagerPermissions],
+  purchase: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit", "material.import.create", "material.import.read", "material.import.cancel", "material.import.parse", "material.import.map", ...reviewEditorPermissions],
+  engineering: ["material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit", "material.import.create", "material.import.read", "material.import.cancel", "material.import.parse", "material.import.map", ...reviewEditorPermissions],
+  production: readOnly,
+  warehouse: readOnly,
+  quality: readOnly,
+  sales: readOnly,
+  finance: readOnly,
+  operations: readOnly,
+};
+
+export function validateRole(value: unknown): IdentityRole {
+  const role = String(value ?? "") as IdentityRole;
+  if (!IDENTITY_ROLES.includes(role)) throw new IdentityError("ROLE_INVALID", "角色代码无效");
+  return role;
+}
+
+export function permissionsForRole(role: IdentityRole): string[] {
+  return [...ROLE_PERMISSIONS[role]].sort();
+}
+
+export function hasPermission(actor: Pick<IdentityActor, "permissions">, permission: string): boolean {
+  return actor.permissions.includes("*") || actor.permissions.includes(permission);
+}
+
+export function requirePermission(actor: IdentityActor, permission: string): void {
+  if (!hasPermission(actor, permission)) throw new IdentityError("PERMISSION_DENIED", "没有权限执行此操作", 403);
+}

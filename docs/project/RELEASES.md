@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
 最后核验：2026-07-24（Asia/Shanghai）
-适用任务：`PHASE0-TASK03`
+适用任务：`SELFHOST-PHASE2-TASK02`
 
 ## 1. 使用规则
 
@@ -19,10 +19,10 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 历史 OpenAI Sites / Cloudflare D1 | 历史记录 `v3` | `2b4f1787ddbc7e0941ab2d5f5cadea6e817e8f12`；后续纳管来源 `9f2c2dca9ccde237cb2db6c01d2e3792b284e6e9` | 仓库 D1/Drizzle `0000`—`0008`；生产实际已应用版本本任务未访问、未核验 | 仅保留历史验收记录；本任务未访问公开 Site | `HISTORICAL`；文档曾记录为公开 `v3`，本任务不重新确认在线状态；不是未来生产权威方向 | 未向 PostgreSQL 迁移 | 历史提交 `2b4f178` 和 D1 migration/快照仅作迁移与行为证据；不是已验证的当前回退方案 | 历史状态；无新的部署批准 |
 | 当前 Python / SQLite 开发运行面 | `legacy-development`，尚无统一 SemVer | 当前仓库包含源代码的功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；常驻进程未记录启动 commit，不能反推为该提交 | 本地 SQLite 历史 26 表 + migration `0001`—`0004`；开发库只读核验已记录四个版本 | 本任务按发布基线重新执行 Python self-test、smoke 和临时库 go-live；结果见第 6 节 | `DEVELOPMENT`；systemd `enabled/active`，源码与已安装 unit 一致，Python 监听 `0.0.0.0:18888`；不是正式生产投用 | 不适用；该 SQLite 是旧数据来源和当前开发运行数据 | Git 源码 + 执行前 SQLite 可恢复快照；正式回退点尚未建立 | 仅开发常驻；未获生产批准 |
-| Node.js / PostgreSQL 自托管开发基线 | `0.1.0-alpha.1`；包名 `chenyida-erp-selfhosted` | 功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；发布记录提交用上述 `git log` 命令解析 | PostgreSQL 17 migration `0001`—`0005` | SELFHOST TASK01—04 隔离 PostgreSQL/Compose 验收已通过；本任务重新执行 lint、基础单元、review typecheck、build 和凭证扫描 | `NOT_RELEASED`；没有运行中的 Compose 项目，未生产部署 | SQLite/D1 真实数据均未迁入 PostgreSQL | 未部署版本无线上回退动作；未来部署前必须以现运行面、Git commit、数据库快照和文件快照建立恢复点 | 非生产开发版本，未获发布批准 |
+| Node.js / PostgreSQL 自托管开发基线 | `0.1.0-alpha.2`；包名 `chenyida-erp-selfhosted` | TASK02 起始基线 `e8cb7ebc0fa9d45575aeaffc0732183d2533f577`；功能提交通过 `git log -1 -- docs/tasks/SELFHOST-PHASE2-TASK02-completion.md` 解析 | PostgreSQL 17 migration `0001`—`0006` | Identity 单元/UI/PostgreSQL/migration/Compose 与 Material/Mapping/Normalization/Review/Phase0/Python 回归通过 | `NOT_RELEASED`；没有运行中的 Compose 项目，未生产部署 | SQLite/D1 真实数据及真实用户均未迁入 PostgreSQL | 未部署版本无线上回退动作；未来部署前必须以现运行面、Git commit、数据库快照和文件快照建立恢复点 | 非生产开发版本，未获发布批准 |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.1` 只表示自托管开发基线，不表示生产候选、生产上线、真实数据迁移完成或业务迁移完成。当前自托管 API 已覆盖 Material Draft/Review/Active、Import Mapping、Normalization 和人工复核；完整 ERP 尚未迁移。采购、库存、生产、销售、品质、财务以及相关旧业务流程仍依赖 Python/SQLite 运行面。
+`0.1.0-alpha.2` 只表示加入身份安全边界的自托管开发基线，不表示生产候选、生产上线、真实数据迁移完成或业务迁移完成。当前自托管 API 已覆盖身份/用户/系统审计、Material Draft/Review/Active、Import Mapping、Normalization 和人工复核；完整 ERP 尚未迁移。采购、库存、生产、销售、品质、财务以及相关旧业务流程仍依赖 Python/SQLite 运行面。
 
 ## 3. Migration 文件与 SHA-256 基线
 
@@ -35,8 +35,9 @@
 | `0003` | `0003_material_import_mapping.sql` | `8ce859551198a8a5a334665f68eee503590fa5472f3a6396f44670d2110dddbf` |
 | `0004` | `0004_material_import_normalization.sql` | `1bb0eb9b7b3ddbe6c6058a75a04a4bbc69a088e201856f258a4c75728f64aa39` |
 | `0005` | `0005_material_import_review.sql` | `e4f2dc62afb8908c7d5a1a0202639809c9dd3f3be3fc09f0ad469224e46ecdcc` |
+| `0006` | `0006_identity_security.sql` | `6e185d01a69c4bd132c577793ae72baceaa075e5beecc738bcdf4310430d7079` |
 
-当前 PostgreSQL 基线是空库 `0001 -> 0005`。它只在隔离 PostgreSQL 17/Compose 中执行过；没有生产 PostgreSQL 部署，也没有真实数据迁移。
+当前 PostgreSQL 基线是空库 `0001 -> 0006`。它只在隔离 PostgreSQL 17/Compose 中执行过；没有生产 PostgreSQL 部署，也没有真实数据迁移。
 
 ### 历史 Cloudflare D1 / Drizzle
 
@@ -168,3 +169,19 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 | 部署/生产访问 | 未部署、未重启服务、未迁移真实数据、未访问公开生产 Site 或生产数据库 |
 
 补充说明：宿主机没有 Node/npm，Node 命令在一次性 `node:22-bookworm` 容器中执行。Python 首轮误用系统解释器时 self-test 通过、smoke 在导入 `openpyxl` 前因环境缺依赖停止；改用常驻服务实际使用的 `/opt/erp/.venv/bin/python` 后三项全部通过，没有降低断言。`npm ci` 报告 12 个既有依赖审计项（1 low、4 moderate、7 high），本任务按范围不升级依赖，留待独立安全任务。
+
+## 7. `0.1.0-alpha.2` 非生产开发记录
+
+| 项目 | 记录 |
+| --- | --- |
+| 任务 | `SELFHOST-PHASE2-TASK02` |
+| 包版本 | `chenyida-erp-selfhosted@0.1.0-alpha.2` |
+| 状态 | `NOT_RELEASED` / `NOT_DEPLOYED` / `NOT_MIGRATED` / `NOT_APPROVED_FOR_PRODUCTION` |
+| 起始 Git | `e8cb7ebc0fa9d45575aeaffc0732183d2533f577`；`main`，工作区 clean，本地领先 `origin/main` 2 个提交 |
+| PostgreSQL | 新增 expand-only `0006_identity_security.sql`；SHA-256 `6e185d01a69c4bd132c577793ae72baceaa075e5beecc738bcdf4310430d7079`；`0001`—`0005` checksum 保持不变 |
+| 功能 | 独立 Identity Repository/Service/Handler；setup/login/logout/session 安全重构；本人改密、用户列表/创建/启停/重置、会话撤销、must-change、限流、持久幂等、CAS 和系统审计 |
+| 验收 | Identity 单元 8/8、UI 4/4、PostgreSQL/API 8/8、migration 4/4；Compose 初始生命周期与 Web/PostgreSQL 重启阶段通过；指定 Material/Mapping/Normalization/Review、Phase0、build/lint/typecheck/凭证和 Python 回归通过 |
+| 排除 | 客户、供应商、产品、BOM、库存、采购、生产、销售、品质、财务、Dashboard、备份、真实身份迁移、生产 migration、部署和切换 |
+| 生产访问 | 未访问公开生产 Site、生产 D1、生产 PostgreSQL 或其他生产数据库；未修改或重启 Python systemd |
+
+这是一条开发版本记录，不是发布公告。未来任何部署、真实用户迁移或生产批准必须新增不可改写的独立记录。

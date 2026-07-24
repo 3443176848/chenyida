@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.1`，明确为非生产且尚未发布；详见 `RELEASES.md`。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.2`，明确为非生产且尚未发布；详见 `RELEASES.md`。
 
 ### 治理资料
 
@@ -87,7 +87,8 @@
 9. D-043 已确认自托管 Normalization 使用 run 隔离暂存、关系化候选/lineage 和 Job/业务结果同事务原子发布；重试复用同 run，重跑创建新版本，取消结果不得成为 current。
 10. D-044 已确认自托管人工复核采用独立覆盖层、版本历史和行级可恢复 finalization；ACTIVE 只允许人工精确绑定，Material Draft 必须经 TASK01 Service 创建且保持未编码 DRAFT。
 11. 完整 ERP 业务还没有迁入自托管 API。PostgreSQL 中存在表结构不等于业务已切换；采购、库存、生产、销售、品质、财务仍依赖 Python/SQLite 开发运行面。
-12. SELFHOST-PHASE2-TASK01 已从源码确认 Python 共有 64 个 HTTP 操作（GET 34、POST 30）；以等价服务能力统计，自托管已覆盖 4、部分覆盖 9、未覆盖 51。候选 TASK02—TASK10 只是建议，未获实施或生产授权。
+12. SELFHOST-PHASE2-TASK01 已从源码确认 Python 共有 64 个 HTTP 操作（GET 34、POST 30）；以当时基线统计，自托管已覆盖 4、部分覆盖 9、未覆盖 51。
+13. SELFHOST-PHASE2-TASK02 已补齐自托管身份公共边界：PostgreSQL `0006`、独立 Identity Repository/Service/Handler、用户管理、密码策略、会话撤销、must-change 全局门禁、限流、持久幂等、CAS 和系统审计；不包含其他业务域或生产动作。TASK03—TASK10 仍只是建议，未获实施或生产授权。
 
 ## 当前风险
 
@@ -125,7 +126,7 @@
 
 ## 当前路线
 
-当前已完成 Material/Import/Normalization/Review 的 Node/PostgreSQL 非生产链路、统一发布追踪基线，以及完整 ERP 的 64 项 Python API 盘点、数据不变量、首页断链核验和 TASK02—TASK10 建议计划。盘点完成不表示任何新业务域已迁移。下一任务建议只授权 `SELFHOST-PHASE2-TASK02` 身份/用户/密码/系统审计；真实数据试迁移、生产备份恢复、部署和切换继续独立授权。
+当前已完成 Identity、Material/Import/Normalization/Review 的 Node/PostgreSQL 非生产链路、统一发布追踪基线，以及完整 ERP 的 64 项 Python API 盘点、数据不变量和首页断链核验。TASK02 已补齐共同身份安全边界，但不表示其他业务域已迁移。下一任务建议只在明确授权后执行 `SELFHOST-PHASE2-TASK03`；真实数据试迁移、生产备份恢复、部署和切换继续独立授权。
 
 ## 恢复上下文检查清单
 

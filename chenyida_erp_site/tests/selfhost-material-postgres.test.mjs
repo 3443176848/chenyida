@@ -78,6 +78,7 @@ test("migration exposes workflow tables and constraints", async () => {
     "0003_material_import_mapping.sql",
     "0004_material_import_normalization.sql",
     "0005_material_import_review.sql",
+    "0006_identity_security.sql",
   ]);
   await assert.rejects(pool.query("insert into material_code_sequences(category_id,category_code,next_value) values(9004,'bad',1)"), /material_code_sequences_category_code_ck/);
 });

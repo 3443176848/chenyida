@@ -34,20 +34,56 @@ export const appUsers = pgTable("app_users", {
   passwordHash: text("password_hash").notNull(), isActive: boolean("is_active").notNull().default(true),
   mustChangePassword: boolean("must_change_password").notNull().default(false), version: integer("version").notNull().default(1),
   createdAt: timestamptz("created_at").notNull().defaultNow(), updatedAt: timestamptz("updated_at").notNull().defaultNow(), lastLoginAt: timestamptz("last_login_at"),
-}, (t) => [check("app_users_version_ck", sql`${t.version} > 0`)]);
+}, (t) => [
+  check("app_users_version_ck", sql`${t.version} > 0`),
+  check("app_users_username_format_ck", sql`${t.username} ~ '^[a-z][a-z0-9._-]{2,31}$'`),
+  check("app_users_display_name_ck", sql`char_length(btrim(${t.displayName})) between 1 and 128`),
+  check("app_users_role_ck", sql`${t.role} in ('admin','manager','purchase','engineering','production','warehouse','quality','sales','finance','operations')`),
+]);
 
 export const appSessions = pgTable("app_sessions", {
   tokenHash: text("token_hash").primaryKey(), username: text("username").notNull().references(() => appUsers.username, { onDelete: "cascade" }),
-  expiresAt: timestamptz("expires_at").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
-}, (t) => [index("app_sessions_username_idx").on(t.username), index("app_sessions_expiry_idx").on(t.expiresAt)]);
+  expiresAt: timestamptz("expires_at").notNull(), revokedAt: timestamptz("revoked_at"), revokedReason: text("revoked_reason"), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("app_sessions_username_idx").on(t.username),
+  index("app_sessions_expiry_idx").on(t.expiresAt),
+  index("app_sessions_active_user_idx").on(t.username, t.expiresAt).where(sql`${t.revokedAt} is null`),
+  check("app_sessions_revocation_ck", sql`(${t.revokedAt} is null and ${t.revokedReason} is null) or (${t.revokedAt} is not null and ${t.revokedReason} in ('LOGOUT','USER_INACTIVE','USER_DEACTIVATED','PASSWORD_RESET','PASSWORD_CHANGED'))`),
+]);
 
 export const auditLog = pgTable("audit_log", {
   id: bigserial("id", { mode: "number" }).primaryKey(), username: text("username").notNull().default(""), action: text("action").notNull(),
   detail: jsonb("detail").notNull().default({}), requestId: uuid("request_id").notNull(), result: text("result").notNull().default("success"),
   routeCode: text("route_code").notNull().default(""), materialId: bigint("material_id", { mode: "number" }), operationId: uuid("operation_id"),
   idempotencyKeyDigest: text("idempotency_key_digest"), oldVersion: integer("old_version"), newVersion: integer("new_version"), errorCode: text("error_code"),
-  retentionUntil: timestamptz("retention_until"), createdAt: timestamptz("created_at").notNull().defaultNow(),
-}, (t) => [index("audit_log_created_at_idx").on(t.createdAt), index("audit_log_request_id_idx").on(t.requestId), index("audit_log_material_created_idx").on(t.materialId, t.createdAt)]);
+  targetUsername: text("target_username"), retentionUntil: timestamptz("retention_until"), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("audit_log_created_at_idx").on(t.createdAt), index("audit_log_request_id_idx").on(t.requestId), index("audit_log_material_created_idx").on(t.materialId, t.createdAt),
+  index("audit_log_identity_created_idx").on(t.routeCode, t.createdAt, t.id),
+  index("audit_log_identity_actor_created_idx").on(t.username, t.createdAt).where(sql`${t.routeCode} = 'IDENTITY'`),
+  index("audit_log_identity_target_created_idx").on(t.targetUsername, t.createdAt).where(sql`${t.routeCode} = 'IDENTITY'`),
+  index("audit_log_identity_action_result_created_idx").on(t.action, t.result, t.createdAt).where(sql`${t.routeCode} = 'IDENTITY'`),
+]);
+
+export const identityLoginFailures = pgTable("identity_login_failures", {
+  usernameDigest: text("username_digest").notNull(), windowStart: timestamptz("window_start").notNull(), failureCount: integer("failure_count").notNull().default(0),
+  createdAt: timestamptz("created_at").notNull().defaultNow(), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("identity_login_failures_pk").on(t.usernameDigest, t.windowStart),
+  index("identity_login_failures_window_idx").on(t.windowStart),
+  check("identity_login_failures_digest_ck", sql`${t.usernameDigest} ~ '^[0-9a-f]{64}$'`),
+  check("identity_login_failures_count_ck", sql`${t.failureCount} >= 0`),
+]);
+
+export const identityWriteRateLimitBuckets = pgTable("identity_write_rate_limit_buckets", {
+  username: text("username").notNull().references(() => appUsers.username, { onDelete: "cascade" }), bucketStart: timestamptz("bucket_start").notNull(),
+  attemptCount: integer("attempt_count").notNull().default(0), newKeyCount: integer("new_key_count").notNull().default(0), rejectedCount: integer("rejected_count").notNull().default(0),
+  createdAt: timestamptz("created_at").notNull().defaultNow(), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("identity_write_rate_limit_buckets_pk").on(t.username, t.bucketStart),
+  index("identity_write_rate_limit_bucket_idx").on(t.bucketStart),
+  check("identity_write_rate_limit_counts_ck", sql`${t.attemptCount} >= 0 and ${t.newKeyCount} >= 0 and ${t.rejectedCount} >= 0 and ${t.newKeyCount} <= ${t.attemptCount}`),
+]);
 
 export const materialCategories = pgTable("material_categories", {
   id: bigserial("id", { mode: "number" }).primaryKey(), categoryCode: text("category_code").notNull(), categoryNameCn: text("category_name_cn").notNull(),
@@ -147,7 +183,7 @@ export const materialImportEvents = pgTable("material_import_events", {
 export const idempotencyKeys = pgTable("idempotency_keys", {
   keyDigest: text("key_digest").primaryKey(), username: text("username").notNull(), method: text("method").notNull(), path: text("path").notNull(), requestDigest: text("request_digest").notNull(),
   statusCode: integer("status_code").notNull(), response: jsonb("response").notNull(), expiresAt: timestamptz("expires_at").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
-}, (t) => [index("idempotency_keys_expiry_idx").on(t.expiresAt)]);
+}, (t) => [index("idempotency_keys_expiry_idx").on(t.expiresAt), index("idempotency_keys_identity_scope_idx").on(t.username, t.method, t.path, t.createdAt)]);
 
 export const inventoryBalances = pgTable("inventory_balances", {
   itemCode: text("item_code").primaryKey(), onHandQty: numeric("on_hand_qty", { precision: 24, scale: 6 }).notNull().default("0"), reservedQty: numeric("reserved_qty", { precision: 24, scale: 6 }).notNull().default("0"), version: integer("version").notNull().default(1), updatedAt: timestamptz("updated_at").notNull().defaultNow(),

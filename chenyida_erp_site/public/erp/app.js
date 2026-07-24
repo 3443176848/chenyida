@@ -31,6 +31,8 @@ const state = {
   managementDashboard: null,
   backups: [],
   users: [],
+  identityOperations: new Map(),
+  operationsAvailability: { dashboard: false, backups: false },
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -78,6 +80,29 @@ function showLogin() {
 }
 
 window.addEventListener("cyd-erp-auth-required", showLogin);
+window.addEventListener("cyd-erp-password-change-required", openPasswordDialog);
+
+async function identityWrite(operationName, path, payload) {
+  const frozenBody = JSON.stringify(payload);
+  const existing = state.identityOperations.get(operationName);
+  if (existing && existing.frozenBody !== frozenBody) {
+    throw new Error("上一次操作结果尚未确认，只能使用原请求安全重试");
+  }
+  const operation = existing || { key: crypto.randomUUID(), frozenBody };
+  state.identityOperations.set(operationName, operation);
+  try {
+    const result = await api(path, {
+      method: "POST",
+      body: operation.frozenBody,
+      protectedWrite: { idempotencyKey: operation.key, csrfToken: state.session.csrf_token || "" },
+    });
+    state.identityOperations.delete(operationName);
+    return result;
+  } catch (error) {
+    if (!error.resultUnknown) state.identityOperations.delete(operationName);
+    throw error;
+  }
+}
 
 function requestedMaterialReturnTo() {
   try {
@@ -189,8 +214,9 @@ function renderOperations() {
   `;
 
   const canManage = canManageSystem();
-  $("#backupAdminHint").hidden = canManage;
-  $("#createBackupBtn").disabled = !canManage;
+  $("#backupAdminHint").hidden = canManage && state.operationsAvailability.backups;
+  $("#backupAdminHint").textContent = state.operationsAvailability.backups ? "只有系统管理员可以创建或恢复备份。" : "自托管备份 API 尚未迁移，本任务不开放创建或恢复。";
+  $("#createBackupBtn").disabled = !canManage || !state.operationsAvailability.backups;
   $("#userAdminHint").hidden = canManage;
   $("#createUserForm").hidden = !canManage;
   $("#backupTable").innerHTML = `
@@ -210,7 +236,7 @@ function renderOperations() {
       <tr>
         <td>${escapeHtml(row.username)}</td>
         <td>${escapeHtml(row.display_name)}</td>
-        <td><span class="pill auto">${escapeHtml(row.role_label)}</span></td>
+        <td><span class="pill auto">${escapeHtml(row.role_label || row.role)}</span></td>
         <td>${row.is_active ? "启用" : "停用"}</td>
         <td>${escapeHtml(row.last_login_at || "-")}</td>
         <td>
@@ -903,15 +929,23 @@ function renderCleaning() {
 }
 
 async function refreshOperations() {
-  const dashboard = await api("/api/management-dashboard");
-  state.managementDashboard = dashboard;
+  state.managementDashboard = await api("/api/management-dashboard").then((dashboard) => {
+    state.operationsAvailability.dashboard = true;
+    return dashboard;
+  }).catch((error) => {
+    if (error.status !== 404) throw error;
+    state.operationsAvailability.dashboard = false;
+    return { metrics: [], risks: [{ level: "medium", text: "自托管经营看板尚未迁移，本页仅开放身份管理。" }], recent_activity: [] };
+  });
   if (canManageSystem()) {
-    const [backups, users] = await Promise.all([
-      api("/api/backups"),
-      api("/api/users"),
-    ]);
-    state.backups = backups.rows;
+    const users = await api("/api/users");
     state.users = users.rows;
+    const backups = await api("/api/backups").catch((error) => {
+      if (error.status !== 404) throw error;
+      return null;
+    });
+    state.operationsAvailability.backups = Boolean(backups);
+    state.backups = backups?.rows || [];
   } else {
     state.backups = [];
     state.users = [];
@@ -934,13 +968,16 @@ async function login(event) {
         password: $("#loginPassword").value,
       }),
     });
-    state.session = { authenticated: true, user: result.user, setup_required: false };
+    state.session = { authenticated: true, user: result.user, setup_required: false, csrf_token: result.csrf_token };
     updateUserBar();
     hideLogin();
     if (continueAfterAuthentication()) return;
-    setTab("dashboard");
-    await refreshAll();
-    if (result.user.must_change_password) openPasswordDialog();
+    if (result.user.must_change_password) {
+      openPasswordDialog();
+    } else {
+      setTab("dashboard");
+      await refreshAll();
+    }
     toast("登录成功");
   } finally {
     submitButton.disabled = false;
@@ -965,7 +1002,7 @@ async function setupSystem(event) {
         password: $("#setupPassword").value,
       }),
     });
-    state.session = { authenticated: true, user: result.user, setup_required: false };
+    state.session = { authenticated: true, user: result.user, setup_required: false, csrf_token: result.csrf_token };
     updateUserBar();
     hideLogin();
     if (continueAfterAuthentication()) return;
@@ -980,7 +1017,7 @@ async function setupSystem(event) {
 }
 
 async function logout() {
-  await api("/api/logout", { method: "POST", body: JSON.stringify({}) }).catch(() => null);
+  await api("/api/logout", { method: "POST", body: JSON.stringify({}), protectedWrite: { csrfToken: state.session.csrf_token || "" } }).catch(() => null);
   state.session = { authenticated: false, user: null };
   updateUserBar();
   showLogin();
@@ -1000,30 +1037,25 @@ async function changePassword(event) {
     $("#passwordMsg").textContent = "两次新密码不一致";
     return;
   }
-  await api("/api/me/password", {
-    method: "POST",
-    body: JSON.stringify({
-      old_password: $("#oldPassword").value,
-      new_password: newPassword,
-    }),
+  const result = await identityWrite("change-own-password", "/api/me/password", {
+    old_password: $("#oldPassword").value,
+    new_password: newPassword,
+    expected_version: state.session.user.version,
   });
   $("#passwordDialog").close();
-  state.session = { authenticated: false, user: null, setup_required: false };
+  state.session.user = { ...state.session.user, ...result.user };
   updateUserBar();
-  showLogin();
-  toast("密码已修改，请重新登录");
+  toast("密码已修改，其他会话已撤销");
 }
 
 async function createUser(event) {
   event.preventDefault();
-  const result = await api("/api/users", {
-    method: "POST",
-    body: JSON.stringify({
-      username: $("#newUsername").value.trim(),
-      display_name: $("#newUserDisplayName").value.trim(),
-      role: $("#newUserRole").value,
-      password: $("#newUserPassword").value,
-    }),
+  const username = $("#newUsername").value.trim();
+  const result = await identityWrite(`create-user:${username}`, "/api/users", {
+    username,
+    display_name: $("#newUserDisplayName").value.trim(),
+    role: $("#newUserRole").value,
+    temporary_password: $("#newUserPassword").value,
   });
   $("#createUserForm").reset();
   $("#createUserMsg").textContent = `已创建 ${result.user.username}，首次登录必须修改密码。`;
@@ -1032,9 +1064,8 @@ async function createUser(event) {
 }
 
 async function toggleUser(username, isActive, version) {
-  await api("/api/users/status", {
-    method: "POST",
-    body: JSON.stringify({ username, is_active: !isActive, version }),
+  await identityWrite(`user-status:${username}`, "/api/users/status", {
+    username, is_active: !isActive, expected_version: version,
   });
   await refreshOperations();
   toast(isActive ? "账号已停用" : "账号已启用");
@@ -1043,9 +1074,9 @@ async function toggleUser(username, isActive, version) {
 async function resetUserPassword(username) {
   const password = window.prompt(`请输入 ${username} 的新临时密码（至少 12 位）`);
   if (!password) return;
-  await api("/api/users/reset-password", {
-    method: "POST",
-    body: JSON.stringify({ username, password }),
+  const user = state.users.find((item) => item.username === username);
+  await identityWrite(`reset-password:${username}`, "/api/users/reset-password", {
+    username, temporary_password: password, expected_version: user?.version,
   });
   await refreshOperations();
   toast("密码已重置，用户下次登录必须修改密码");
@@ -1744,7 +1775,8 @@ async function initApp() {
   const session = await loadSession();
   if (session.authenticated) {
     if (continueAfterAuthentication()) return;
-    await refreshAll();
+    if (session.user.must_change_password) openPasswordDialog();
+    else await refreshAll();
   }
 }
 
