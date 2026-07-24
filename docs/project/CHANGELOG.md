@@ -4,6 +4,21 @@
 
 ## 2026-07-24
 
+### PHASE0-TASK03 - `docs: establish self-hosted release tracking baseline`
+
+- 发布追踪：新增 `docs/project/RELEASES.md`，区分历史 Sites、当前 Python/SQLite 开发常驻、自托管 Node/PostgreSQL 开发基线和不存在的自托管生产版本；统一记录 Git、version、migration、测试、部署、真实数据迁移、回退和批准状态。
+- 版本：将包名从 starter 标识改为 `chenyida-erp-selfhosted`，版本改为 `0.1.0-alpha.1` 并同步 lockfile；不升级或改变任何依赖，该版本明确为非生产、尚未发布。
+- Migration：建立 PostgreSQL `0001`—`0005`、历史 D1 `0000`—`0008` 和 SQLite `0001`—`0004` 的 SHA-256 基线；本地开发 SQLite 只读确认四个版本，未访问生产 D1/PostgreSQL。
+- 运行面：只读确认 systemd Python/SQLite 开发服务 `enabled/active`、监听 `0.0.0.0:18888`，Node/PostgreSQL 无运行中 Compose 项目且未生产部署；明确采购、库存、生产、销售、品质和财务仍依赖旧 Python API。
+- 模板：新增发布身份、快照/恢复点、空库/升级/重复/失败回滚、真实数据核对、lint/build/单元/集成/Compose/人工验收、安全/HTTPS/备份恢复/容量、批准执行与回退条件模板。
+- 验证：lint 0 error/1既有warning、`npm test` 3/3、review typecheck、Vinext build 5/5、455文件凭证扫描、项目虚拟环境 Python self-test/smoke/临时SQLite go-live、`git diff --check` 均通过；宿主机无Node/npm，Node命令在一次性Node 22容器执行。
+- 已知风险：`npm ci` 报告12个既有依赖审计项（1 low、4 moderate、7 high）；按本任务范围不升级依赖，留待独立安全任务。Python首轮误用系统解释器时smoke在导入依赖前停止，改用常驻服务实际项目虚拟环境后完整通过。
+- 边界：未修改业务逻辑、API、Schema、migration、Compose、systemd 或生产配置；未访问公开生产 Site、生产数据库/D1，未重启服务、部署、迁移真实数据、push 或创建 PR。
+
+### SELFHOST Phase 0 / Phase 1 后续 Git 结果说明
+
+- 下列 SELFHOST-PHASE0-TASK01 与 SELFHOST-PHASE1-TASK01—04 条目中的“未提交”准确记录各原任务结束时状态；后续已由 `39946f6`（`feat: complete SELFHOST PHASE1 TASK04 material review workflow`）汇总提交。PHASE0-TASK03 开始时该提交已与 `origin/main` 同步且工作区 clean，不改写原任务历史。
+
 ### SELFHOST-PHASE1-TASK04 - 未提交（用户明确禁止提交）
 
 - 数据库：新增 PostgreSQL `0005_material_import_review.sql`、Drizzle schema/snapshot/journal；增加11张Review/覆盖/Issue/finalization/binding/draft link/history表、42个索引、restrict外键、互斥/大小/唯一/CAS约束和终态不可变trigger，未修改`0001`～`0004`。

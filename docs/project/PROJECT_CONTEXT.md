@@ -13,8 +13,9 @@
 - 路径：`chenyida_erp_app/`
 - 技术：Python 3.11、标准库 HTTP Server、SQLite、原生 HTML/CSS/JavaScript；项目虚拟环境固定 `openpyxl`/`xlrd` 解析 XLSX/XLS。
 - 入口：`server.py`；静态页面位于 `static/`。
-- 用途：历史业务行为参考和旧数据迁移来源；不再作为未来生产底座。
+- 用途：当前实际常驻的开发运行面、历史业务行为参考和旧数据迁移来源；不再作为未来生产底座。
 - 数据：`chenyida_erp_app/data/erp.sqlite3`，运行数据被 Git 忽略。
+- 实际状态：2026-07-24 只读核验 systemd `chenyida-erp.service` 为 `enabled/active`，源码与已安装 unit 一致，Python 监听 `0.0.0.0:18888`。这仍是开发服务，不代表正式生产投用。
 
 ### 自托管 Node 应用
 
@@ -22,11 +23,12 @@
 - 技术：Vinext、React、TypeScript、标准 Node.js、PostgreSQL/Drizzle、本地持久化文件和 PostgreSQL 后台任务 Worker。
 - 页面：根 `app/page.tsx` 继续通过 iframe 加载 legacy `public/erp/index.html`；Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给不依赖平台 binding 的 `app/lib/selfhost-api.ts`；旧 `erp-api.ts` 仅作迁移参考。
-- 部署：`compose.yml` 启动 Web、Worker、PostgreSQL；Caddy production profile 提供 HTTPS。历史 Sites `v3` 不作为后续交付目标。
+- 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL；Caddy production profile 可提供 HTTPS。当前没有运行中的 Compose 项目，Node/PostgreSQL 尚未生产部署。历史 Sites `v3` 不作为后续交付目标。
 
-- 公网验证地址：`http://43.135.157.211:18888`；仅用于本次验证，长期公网运行仍需 HTTPS 和访问控制。
+- 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.1`，明确为非生产且尚未发布；详见 `RELEASES.md`。
 
 ### 治理资料
 
@@ -58,6 +60,7 @@
 - `drizzle/0000`—`0008` 形成 45 张表的开发 schema；Material V2、Draft/Review、Import Batch、Parser/Mapping、Normalization、Material Library 和 Supplier Profile 全部使用版本化 Up、snapshot/journal、受保护恢复边界与隔离迁移测试，尚未执行生产 migration。
 - 大多数业务对象按 `kind` 存入 `erp_records.data_json`。
 - API 运行时仍只为 legacy 8 表包含兼容建表语句；V2 与 Material API 对象必须显式应用版本化 migration，不在生产启动时自动创建。
+- PHASE0-TASK03 只核验仓库内 `0000`—`0008` 文件与 SHA-256，没有访问生产 D1，也没有确认生产实际 migration 版本。
 
 ## 主要模块
 
@@ -82,6 +85,7 @@
 8. D-042 已确认自托管 Mapping 使用不可变确认快照、显式新版本和结构相容复用；复用只复制到 DRAFT 并必须重新确认，Mapping 确认不自动启动 Normalizer。
 9. D-043 已确认自托管 Normalization 使用 run 隔离暂存、关系化候选/lineage 和 Job/业务结果同事务原子发布；重试复用同 run，重跑创建新版本，取消结果不得成为 current。
 10. D-044 已确认自托管人工复核采用独立覆盖层、版本历史和行级可恢复 finalization；ACTIVE 只允许人工精确绑定，Material Draft 必须经 TASK01 Service 创建且保持未编码 DRAFT。
+11. 完整 ERP 业务还没有迁入自托管 API。PostgreSQL 中存在表结构不等于业务已切换；采购、库存、生产、销售、品质、财务仍依赖 Python/SQLite 开发运行面。
 
 ## 当前风险
 
@@ -101,7 +105,8 @@
 - 规格精度门禁已部署：CATEGORY 不作为足够的编号证据，少于两类鉴别参数返回“规格不足”且不提供候选；自动匹配要求双方至少三类参数、锚点、完整一致和候选唯一。J587 隔离复算中的 4 条连接器大类误候选已消除。
 - 当前 122 条既有 Cleaning 保留且不回填、不重算；项目负责人清空并重导后，新行才使用证据强度校准并显示“规格不足”或内部候选缺项。
 - Material Draft/Review POST 已具备同源/CSRF、持久幂等和限速；其他 legacy POST 的 CSRF 与限速仍需专项治理。测试环境已有本机一次性 D1，尚无远程 Test D1。
-- Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现，但生产 Site 仍为旧版本。
+- Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现；历史 Site 未部署这些代码，本任务也未访问公网重新确认其状态。
+- Node/PostgreSQL 没有生产部署、真实数据 migration 或发布批准；隔离测试通过不能写成已上线。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
 - 业务决策 `B01-B24` 尚未全部确认。
 
@@ -116,7 +121,7 @@
 
 ## 当前路线
 
-当前已完成 Phase 1 Material V2 非生产数据、服务、API 与前端，Phase 2 Import，以及 Phase 3 Normalization、内部物料库、多供应商识别和服务器本地 Excel 接入。清洗排序、安全清空、规格唯一编号匹配、通用规格来源识别、无序参数匹配、证据强度门禁和审核对照已部署；下一步由项目负责人清空旧 Cleaning、重新导入样本并验收“规格不足”、内部缺项和唯一编号结果。
+当前已完成 Material/Import/Normalization/Review 的 Node/PostgreSQL 非生产链路和统一发布追踪基线；完整 ERP 业务 API 尚未迁移。下一任务建议先盘点并分阶段迁移采购、库存、生产、销售、品质和财务，同时把真实数据试迁移、生产备份恢复与部署保持为独立授权任务。
 
 ## 恢复上下文检查清单
 

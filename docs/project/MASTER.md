@@ -37,18 +37,19 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 尚未建立统一 ERP 发布版本；在线 Site `package.json` 为 `0.1.0` |
+| 当前版本 | 自托管开发基线 `0.1.0-alpha.1`（包名 `chenyida-erp-selfhosted`），明确为非生产、尚未发布；统一追踪见 `RELEASES.md` |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `PHASE3-MATERIAL-LIBRARY-SPEC-PRECISION-GATE-01`，实际提交以 `git log -1` 为准 |
+| 当前根仓库功能基线提交 | `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；PHASE0-TASK03 提交以 `git log -1 -- docs/project/RELEASES.md` 为准 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
-| 当前生产版本 | Sites 项目状态 `active`、公开访问，线上版本 `v3` |
-| 当前 Site 源码版本 | 生产对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
-| 当前生产网址 | `https://chenyida-erp-online.sjin74376.chatgpt.site` |
-| 当前数据库 | 自托管 PostgreSQL 17 开发基线为 `0001` 46表 + `0002` Material工作流 + `0003` Import Mapping/版本/复用 + `0004` 行级 Normalization + `0005` 人工复核/finalization 增量；服务器本地 SQLite 29张和在线 D1/Drizzle 45张仅作迁移来源，均未向 PostgreSQL 迁移真实数据 |
-| 当前开发环境 | 自托管 Node.js/PostgreSQL/本地文件/后台 Worker 基线，以及 Material、Import Mapping、Normalization 与人工复核/ACTIVE绑定/Material Draft 闭环已在隔离环境实现；现有 Python/SQLite 与 Cloudflare/D1 不是新生产底座 |
-| 当前阶段 | `SELFHOST-PHASE1-TASK04` 人工复核与 Material 安全衔接已完成非生产实现和隔离验收 |
-| 当前任务 | 无 `DOING`；Phase 0、Phase 1 Task 01/02/03/04 均按用户明确要求保留未提交工作区 |
-| 下一任务 | 建议先对脱敏真实供应商样本执行只读容量、冲突处置和复核验收；旧数据试迁移、生产迁移与切换继续另立任务 |
+| 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
+| 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
+| 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
+| 当前数据库 | 自托管 PostgreSQL 17 开发基线为 `0001` 46表 + `0002` Material工作流 + `0003` Import Mapping/版本/复用 + `0004` 行级 Normalization + `0005` 人工复核/finalization；SQLite 29张仍支撑当前 Python 开发运行面并作为迁移来源，D1/Drizzle 45张为历史迁移来源；均未向 PostgreSQL 迁移真实数据 |
+| 当前运行状态 | Python/SQLite 开发服务由 systemd 常驻，`enabled/active` 且监听 `0.0.0.0:18888`；Node/PostgreSQL 仅为隔离开发基线，无运行中的 Compose 项目，未生产部署 |
+| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Material、Import Mapping、Normalization 与人工复核/ACTIVE绑定/Material Draft 非生产闭环；完整 ERP API 尚未迁移 |
+| 当前阶段 | `PHASE0-TASK03` 已建立统一发布、migration、验收与回退追踪基线 |
+| 当前任务 | 无 `DOING`；`PHASE0-TASK03` 完成后工作区状态以 `git status --short` 为准 |
+| 下一任务 | 建议另立 `SELFHOST-PHASE2-TASK01`，先盘点并分阶段迁移采购、库存、生产、销售、品质、财务等旧 Python API；真实数据试迁移、生产备份恢复、部署和切换继续独立授权 |
 
 ## 当前完成模块
 
@@ -74,10 +75,10 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - Material Master 只读管理界面 V1：四条原生 Vinext 路由实现高密度列表、分区详情、独立历史页签、URL 状态、安全返回、状态/属性/Validation 展示和完整加载/空/错误状态；legacy 与新页面共用浏览器请求边界和现有登录流程；未接生产
 - Material Draft 创建、编辑与提交审核界面 V1：实现 `/materials/new`、`/materials/:materialId/edit`、布局 C、Schema 驱动五类属性与完整 PATCH、PATCH/GET/submit、权限入口、页面内存幂等安全重试、VERSION_CONFLICT 对照、Schema 漂移/未知属性/dirty/驳回信息保护；54 项 UI 验收与隔离浏览器链路通过，未改 API、Schema、Migration 或业务服务，未接生产
 - Material Review Queue 与审核工作台 V1：实现 `/materials/review`、`/materials/:materialId/review`、服务端分页 URL 队列、方案 A 完整只读工作台、共享详情展示、批准/驳回、Validation 新鲜度确认、职责分离、页面内存幂等/结果未知/并发/离开保护及 51 项 UI 验收；未改 API、Schema、Migration、索引或业务服务，未接生产
-- 自托管 Material Draft/Review/Active PostgreSQL 全链路：新增 `0002` 编码序列、状态/编码约束和历史/队列索引，独立 Repository/Service/API，固定审批状态机、类型化属性、职责分离、CSRF、24小时持久幂等、乐观锁、原子编码、版本/变更/审计及真实页面审计入口；隔离单元 6/6、UI契约 2/2、PostgreSQL/API 7/7、既有Material UI 142/142、Compose双用户审批和重启持久性通过，未接生产且按要求未提交
-- 自托管 Import Mapping/版本/复用 PostgreSQL 全链路：新增 `0003`、parse run绑定、动态Catalog、源结构/metadata/mapping摘要、不可变确认快照、同批次版本/SUPERSEDED、跨批次复用/STALE、事务幂等与Event/Audit；Worker原子发布初始DRAFT，现有工作区显示版本历史和显式复用。专项规则3/3、UI2/2、PG/API6/6、旧数据升级1/1、Compose解析→v2确认与重启持久性通过，未接Normalizer或生产且按要求未提交
-- 自托管行级 Normalizer 与 Normalization Review PostgreSQL 全链路：新增 `0004`，关系化保存核心字段候选、动态属性候选、lineage 和稳定 issue；独立 Repository/Service/API/Worker 支持 run history、同 run 重试、新版本重跑、取消、100 行分块暂存和 Job/业务结果同事务原子发布，现有 Review UI 支持历史切换和证据查看。专项 12/12、既有回归 41/41、空库/升级迁移、Compose v1→v2→取消及整栈重启持久性通过；未创建 Draft、迁移真实数据、接生产或提交
-- 自托管 Material Import 人工复核 PostgreSQL 闭环：新增 `0005` 十一张关系表，分离 raw/candidate/manual effective，支持 Session/version、字段和动态属性 SET/CLEAR/REVERT 历史、Issue resolution、保留/排除、ACTIVE 精确绑定、Material Draft 人工选择、sealed finalization、100/50 行 Worker 分块、CAS/幂等/租约和失败恢复；调用 TASK01 Material Service 创建未编码 DRAFT，ACTIVE 不被修改。专项 13/13、101 行跨 chunk、既有回归、Compose 端到端及整栈重启持久性通过；未迁移真实数据、接生产、部署或提交
+- 自托管 Material Draft/Review/Active PostgreSQL 全链路：新增 `0002` 编码序列、状态/编码约束和历史/队列索引，独立 Repository/Service/API，固定审批状态机、类型化属性、职责分离、CSRF、24小时持久幂等、乐观锁、原子编码、版本/变更/审计及真实页面审计入口；隔离单元 6/6、UI契约 2/2、PostgreSQL/API 7/7、既有Material UI 142/142、Compose双用户审批和重启持久性通过；已随 `39946f6` 提交，未接生产
+- 自托管 Import Mapping/版本/复用 PostgreSQL 全链路：新增 `0003`、parse run绑定、动态Catalog、源结构/metadata/mapping摘要、不可变确认快照、同批次版本/SUPERSEDED、跨批次复用/STALE、事务幂等与Event/Audit；Worker原子发布初始DRAFT，现有工作区显示版本历史和显式复用。专项规则3/3、UI2/2、PG/API6/6、旧数据升级1/1、Compose解析→v2确认与重启持久性通过；已随 `39946f6` 提交，未接生产
+- 自托管行级 Normalizer 与 Normalization Review PostgreSQL 全链路：新增 `0004`，关系化保存核心字段候选、动态属性候选、lineage 和稳定 issue；独立 Repository/Service/API/Worker 支持 run history、同 run 重试、新版本重跑、取消、100 行分块暂存和 Job/业务结果同事务原子发布，现有 Review UI 支持历史切换和证据查看。专项 12/12、既有回归 41/41、空库/升级迁移、Compose v1→v2→取消及整栈重启持久性通过；已随 `39946f6` 提交，未创建 Draft、迁移真实数据或接生产
+- 自托管 Material Import 人工复核 PostgreSQL 闭环：新增 `0005` 十一张关系表，分离 raw/candidate/manual effective，支持 Session/version、字段和动态属性 SET/CLEAR/REVERT 历史、Issue resolution、保留/排除、ACTIVE 精确绑定、Material Draft 人工选择、sealed finalization、100/50 行 Worker 分块、CAS/幂等/租约和失败恢复；调用 TASK01 Material Service 创建未编码 DRAFT，ACTIVE 不被修改。专项 13/13、101 行跨 chunk、既有回归、Compose 端到端及整栈重启持久性通过；已随 `39946f6` 提交，未迁移真实数据、接生产或部署
 - Material Import Batch Foundation V1：12 项决定已批准；新增 `0004` 五表数据契约、Drizzle schema/快照/Down、可注入对象存储与 R2/内存适配器、10 MiB 流式 multipart、XLSX/CSV 文件级安全检查、六个 API、专用幂等、可恢复 Saga、权限/行级可见性、重复策略、取消和手工清理服务；未创建生产资源、Cron、迁移或部署
 - Material Import Parser 与 Mapping V1：16 项决定已批准并完成非生产实现；新增 `0005` Up/受保护 Down、parse run/Sheet/Shared Strings/Outbox/Mapping 关系模型、有界 XLSX/CSV Parser、可注入调度与租约恢复、原子发布、Mapping 准备及七个 API；54 项专项与全量 Node 278/278 通过，未创建生产资源、执行生产迁移或部署
 - Material Import Workspace UI V1：完成三条路由、状态驱动 Stepper、opaque cursor、文件预检、增量 SHA Worker、受控 multipart XHR、解析轮询/取消、Sheet/Rows/Header、三列 Mapping 保存/预览/确认和 confirmed 只读；UI-001—UI-100、50×256 Playwright 门禁与 Node 440/440 通过，未接生产
@@ -118,30 +119,30 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前风险
 
-1. 生产 Site 仍为 `v3` / `2b4f178`，而根仓库开发基线来自 `9f2c2dc`；虽运行时代码一致，后续发布仍需建立统一版本与回退记录。
+1. 历史 Site 记录为 `v3` / `2b4f178`，但本任务未访问公开 Site，不能据旧文档声称当前在线状态；该运行面只保留为迁移与行为证据。
 2. 本地 SQLite 与在线 D1 存在两套数据模型和两套物料编号行为，尚未确认唯一权威源。
 3. 在线业务数据大量保存在 `erp_records.data_json`，关系约束、查询能力和迁移能力有限。
 4. 本地数据库已从 Excel 导入任务开始建立版本化迁移历史，但既有 26 张表仍是历史运行时建表基线；默认账号、弱口令和公网 HTTP 仍是开发服务器高风险项。
-5. 在线导入当前把导入行直接归为新物料，没有执行供应商映射或候选匹配。
-6. 在线备份仍位于同一 D1 故障域，不能替代外部灾备。
-7. 当前测试基线只覆盖本机一次性 D1；尚未建立远程 Test D1，也未覆盖真实远程权限、配额和网络行为。
-8. V2 草稿/审核写服务已接入开发版认证授权 API、持久幂等和隔离测试，但尚未接入生产；供应商历史有效期重叠和其他生命周期仍需后续应用层服务保证，不得据本地测试直接迁移生产。
+5. 历史在线导入实现把导入行直接归为新物料，没有执行供应商映射或候选匹配；该行为只作迁移风险证据。
+6. 历史在线备份位于同一 D1 故障域，不能替代外部灾备。
+7. 历史 D1 测试基线只覆盖本机一次性 D1；没有远程 Test D1 权限、配额和网络验收，自托管测试已转向隔离 PostgreSQL。
+8. 历史 D1 V2 草稿/审核写服务具备认证授权、持久幂等和隔离测试，但从未据此取得生产迁移或部署结论；供应商历史有效期重叠和其他生命周期仍需应用层保证。
 9. V1 分类模板已覆盖首批行业范围，但尚未经过真实物料样本试配；扩展必须新增 seed 版本，不得直接改写已发布版本或引入隐式继承。
-10. Material API 已在开发代码中使用专用强幂等、CSRF、细粒度权限、职责分离和审计边界，但生产仍停留在旧版本且没有执行 `0002`/`0003`；未经生产迁移与部署授权，公开网址不具备本任务新增 API。V1 仍无多节点会签、break-glass 或自动审计归档调度。
+10. 历史 D1 Material API 开发代码使用专用强幂等、CSRF、细粒度权限、职责分离和审计边界，但历史 Site 未部署对应 `0002`/`0003`；本任务未访问公开网址确认状态。V1 仍无多节点会签、break-glass 或自动审计归档调度。
 11. `0003` 过渡约束仍接受 `PENDING_APPROVAL`，应用只写/只返回 `PENDING_REVIEW`，通用查询双读旧/新值；移除旧值必须另建收缩 migration，不能修改 `0003`。
-12. TASK08 行级最小披露已在开发代码和隔离测试实现，但生产仍为旧版本；在另行批准迁移和部署前，公开站点不能视为具备新查询 API 或收紧后的 `/drafts`。
-13. 开发代码已增加真正的 `/materials/...` 页面路由，但生产 Site 仍为旧版本；在另行批准部署前，公开网址不能视为具备这些页面。
+12. TASK08 行级最小披露已在历史 D1 开发代码和隔离测试实现，但未部署到历史 Site；公开站点不能视为具备新查询 API 或收紧后的 `/drafts`。
+13. 开发代码已增加真正的 `/materials/...` 页面路由，但未部署到历史 Site；公开网址不能视为具备这些页面。
 14. legacy 与 Material 页面已共用 `public/erp/api-client.js`，但根页面仍为 iframe + 静态 tab，其他领域尚未迁移为原生路由；不得据此扩大本任务范围。
-15. `last_rejection` 与 Draft UI 已在非生产开发代码中完成，但生产仍为旧版本；不得把隔离实现与本地验收表述为公开站点已具备创建、编辑、提交或驳回信息展示能力，部署仍需独立授权。
+15. `last_rejection` 与 Draft UI 已在非生产开发代码中完成，但未部署到历史 Site；不得把隔离实现与本地验收表述为公开站点能力。
 16. 当前查询计划使用 `(material_id, version_no)` 唯一索引搜索单物料历史，没有专用 `event_type=REJECT` 索引；现阶段有界详情查询无需 migration，若单物料版本规模显著增长，需另建任务复测并审批索引。
 17. 当前审核队列 API 可展示 `submitted_by`，但只支持 `creator` 筛选，不支持 `submitted_by` 筛选；V1 不提供该控件、不在前端全量筛选，后续可另立只读 API 候选任务。
-18. Review UI 已在非生产开发代码完成并通过本机浏览器与隔离 D1 API 验证，但生产 Site 仍为旧版本；公开网址不能视为具备审核页面，迁移和部署仍需独立授权。
-19. Material Import Batch Foundation 已在本地/隔离环境实现，但 `.openai/hosting.json` 的 `r2` 仍为 `null`，没有生产 R2 binding、bucket、生命周期或 Cron；公开站点也未执行 `0004` 或部署本代码。10 MiB 是获批应用上限，不是平台上限或历史样本容量结论。
+18. Review UI 已在非生产开发代码完成并通过本机浏览器与隔离 D1 API 验证，但未部署到历史 Site；公开网址不能视为具备审核页面。
+19. Material Import Batch Foundation 已在本地/隔离环境实现，但历史 `.openai/hosting.json` 的 `r2` 为 `null`，没有生产 R2 binding、bucket、生命周期或 Cron；历史 Site 未执行 `0004` 或部署本代码。10 MiB 是获批应用上限，不是容量结论。
 20. Parser 栈 `@zip.js/zip.js@2.8.26 + sax-wasm@3.1.4 + 受限 OOXML` 与 `csv-parse@7.0.1` 已通过本机 Vinext、Miniflare、WASM、Web Streams、R2 Range 替身、Bundle 和内存门禁；这些是隔离验证，不等于真实生产 Queue/R2、远程配额、并发容量或冷启动已经验收。
-21. 独立只读 Catalog 与 Import Workspace 已在非生产代码实现；50×256 本地 Chromium 门禁已通过，但这不是远程生产 R2/Queue、网络、并发、低端设备或冷启动容量结论。生产 Site 仍为旧版本且未部署。
-22. Normalization 的 50,000 行、256 KiB/行、256 MiB/批、20 issue/行和 200,000 issue/批已批准为 V1 应用保护上限，但不是生产容量结论；真实生产 Queue/D1 并发、1k/10k/50k 容量与冷启动仍需独立压测和授权。
+21. 独立只读 Catalog 与 Import Workspace 已在非生产代码实现；50×256 本地 Chromium 门禁已通过，但这不是远程网络、并发、低端设备或冷启动容量结论，历史 Site 未部署。
+22. Normalization 的 50,000 行、256 KiB/行、256 MiB/批、20 issue/行和 200,000 issue/批是 V1 应用保护上限，不是生产容量结论；自托管 PostgreSQL 的真实容量仍需独立压测和授权。
 23. Normalization Review UI 已完成非生产前端与本地门禁，但 Issue API 仍无 `normalized_row_id`/Sheet 精确筛选，Drawer 内完整行 Issue 集合继续属于局部门禁；完整 Run 历史、Batch Current Pointer、部分筛选和列表候选摘要也未暴露。前端已明确降级且未推断；本地 1366×768、700px、50 Rows、100 Issues、200 Attributes 与有界 Payload 结果不等于远程生产容量结论。
-24. `0007` 和 Import→Draft 只在一次性 Miniflare D1 验证；品牌正式数据尚未初始化，仓库内只发现治理模板/样例，没有真实首批物料文件。候选扫描上限 500、输出 20；EXACT/HIGH_CONFIDENCE 已 fail-closed 阻断，但 HIGH_CONFIDENCE 逐行人工确认解除、真实召回率和规模容量尚未验收。
+24. 历史 D1 `0007` 和 Import→Draft 只在一次性 Miniflare 验证；品牌正式数据尚未初始化，仓库内只发现治理模板/样例。候选扫描上限 500、输出 20；HIGH_CONFIDENCE 逐行人工确认解除、真实召回率和规模容量尚未验收。
 25. A118/V700 的 543 条旧 Cleaning Rows 已按项目负责人指令清空；2 个 Batch、766 条 Raw Rows 和完整原文件仍保留。重新导入会建立新清洗结果，且缺单位/空规格门禁仍然有效。
 26. 内部编码 1～5 是开发匹配测试编号，不是正式编码规则；正式投用前必须迁移到批准的 `CYD-*` 编码或记录保留决定。
 27. 三份新 BOM 共 221 条清洗候选，216 条有规格；当前 1～5 内部库未覆盖这些完整规格。J587 有 5 条缺误差，只能定位到编号 1/2/3 候选集合，不能唯一给号。
@@ -149,12 +150,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 29. 当前 25 条 1928C Cleaning 的分项字段可直接展示，但旧行保存的 raw spec/匹配置信度不会静默重算；重新导入后才使用“型号与规格分离”和缺失介质时最高 0.95 的新结果。
 30. 任意未来供应商可能使用当前词法尚未定义的规格语法，不能承诺未知输入 100% 自动识别；系统通过证据门禁保证不确定时不返回候选编号，新增真实反例必须进入回归夹具后再扩展确定性解析。
 31. 自托管 Material Draft/Review/Active 已通过一次性 PostgreSQL 17 和 Compose 隔离验证，但尚未迁移真实 D1/SQLite 数据、执行生产容量测试或生产恢复演练；旧 D1/Miniflare 代码只作历史参照，不能重新接入运行依赖。
+32. 完整 ERP 业务尚未迁移到 Node/PostgreSQL 自托管 API；采购、库存、生产、销售、品质和财务仍依赖当前 Python/SQLite 开发运行面，不能仅因 PostgreSQL 已有表结构就声称业务已切换。
 
 ## 当前任务与下一任务
 
-- 已完成：`SELFHOST-PHASE1-TASK01`，把 Material Draft/Review/Active 完整移植到 PostgreSQL Repository、自托管 API 和现有页面；编码并发、职责分离、幂等/乐观锁/CSRF、版本/变更/审计及 Compose 重启持久性通过，未连接生产、部署或提交。
-- 已完成：`SELFHOST-PHASE1-TASK02`，把 Import Mapping、动态目标目录、确认快照、版本/SUPERSEDED、跨批次复用/STALE、Worker准备和现有页面移植到 PostgreSQL 自托管链路；专项、回归、迁移和 Compose 重启持久性通过，未连接 Normalizer、生产、部署或提交。
-- 已完成：`SELFHOST-PHASE1-TASK03`，把行级 Normalizer、核心/动态属性候选、lineage、稳定 issues、重试/重跑/取消、原子发布和 Review UI 移植到 PostgreSQL 自托管链路；专项 12/12、回归 41/41、迁移和 Compose 重启持久性通过，未创建 Draft、迁移真实数据、连接生产、部署或提交。
+- 已完成：`PHASE0-TASK03`，建立 `RELEASES.md`、三套 migration SHA-256、`0.1.0-alpha.1` 非生产版本、发布验收和回退模板；修正 Git、运行面、部署和业务迁移状态，未访问或修改生产。
+- 已完成：`SELFHOST-PHASE1-TASK04`，把独立人工覆盖、Issue 处置、ACTIVE 精确绑定、Material Service 建 DRAFT 和可恢复 finalization 移植到 PostgreSQL；专项、回归、migration 与 Compose 验收通过，后续已随 `39946f6` 提交，未连接生产、迁移真实数据或部署。
+- 已完成：`SELFHOST-PHASE1-TASK01`，把 Material Draft/Review/Active 完整移植到 PostgreSQL Repository、自托管 API 和现有页面；编码并发、职责分离、幂等/乐观锁/CSRF、版本/变更/审计及 Compose 重启持久性通过，后续已随 `39946f6` 提交，未连接生产或部署。
+- 已完成：`SELFHOST-PHASE1-TASK02`，把 Import Mapping、动态目标目录、确认快照、版本/SUPERSEDED、跨批次复用/STALE、Worker准备和现有页面移植到 PostgreSQL 自托管链路；专项、回归、迁移和 Compose 重启持久性通过，后续已随 `39946f6` 提交，未连接生产或部署。
+- 已完成：`SELFHOST-PHASE1-TASK03`，把行级 Normalizer、核心/动态属性候选、lineage、稳定 issues、重试/重跑/取消、原子发布和 Review UI 移植到 PostgreSQL 自托管链路；专项 12/12、回归 41/41、迁移和 Compose 重启持久性通过，后续已随 `39946f6` 提交，未创建 Draft、迁移真实数据、连接生产或部署。
 - 已完成：`PHASE0-TASK01-B`，把 Site gitlink 转为根仓库直接跟踪的普通目录，保留生产版本、开发基线和提交历史关系；未修改业务代码或生产环境。
 - 已完成：`PHASE0-TASK02`，以本机一次性 Miniflare D1 建立生产地址拒绝、测试数据销毁、去敏失败日志、凭证扫描和临时 SQLite 备份恢复验证；未创建云端资源、未连接或修改生产 D1。
 - 已完成：`PHASE1-TASK01`，数据模型及正式编码、生命周期、变更日志、供应商映射时效唯一性调整已获批准。

@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-24（Asia/Shanghai）
 
+## PHASE0-TASK03 统一发布、迁移与回退追踪基线
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 基线 | PASS | 任务开始时根仓库 `main`、HEAD `39946f6b854a985b5c19106eaa6c938bddaf9c7c`、工作区 clean；缓存和 `git ls-remote` 均确认 `origin/main` 同一提交；只有根 `.git` |
+| TASK04 后续提交 | PASS | SELFHOST Phase 0 与 Phase 1 Task01—04 已由 `39946f6` 汇总提交；TASK04 完成报告保留原任务结束时 dirty/未提交事实并追加后续结果 |
+| 发布版本 | PASS | 新自托管包名 `chenyida-erp-selfhosted`，版本 `0.1.0-alpha.1`；明确为非生产、尚未发布、未批准 |
+| 运行面 | PASS | Python/SQLite systemd 开发服务 `enabled/active`，监听 `0.0.0.0:18888`；unit 源码与安装文件一致；Node/PostgreSQL 无运行中 Compose 项目 |
+| PostgreSQL migration | PASS | `0001`—`0005` 文件及 SHA-256 已建立基线；只在既有隔离 PostgreSQL 17/Compose 验收，未生产执行 |
+| D1 migration | PASS | 历史 `0000`—`0008` 文件及 SHA-256 已建立基线；未访问生产 D1，生产实际版本未核验 |
+| SQLite migration | PASS | 文件 `0001`—`0004` 及 SHA-256 已建立基线；开发库只读记录四个版本，数据库表本身不保存 checksum |
+| 业务迁移范围 | RECORDED | 自托管 API 仅完成 Material/Import/Normalization/Review 关键链路；完整 ERP 尚未迁移，采购、库存、生产、销售、品质、财务仍依赖 Python/SQLite |
+| 发布/回退模板 | PASS | `RELEASES.md` 覆盖 Git/version、migration 前后、快照恢复点、四类 migration 验证、测试、安全、HTTPS、备份恢复、容量、批准执行和回退条件 |
+| 本任务验证 | PASS WITH RECORDED WARNING | lint 0 error/1既有warning；npm test 3/3；review typecheck；Vinext build 5/5；凭证扫描455文件；项目虚拟环境 Python self-test/smoke/临时库go-live；diff check通过 |
+| 生产影响 | NONE | 未访问公开生产 Site、生产 D1 或生产数据库；未部署、迁移真实数据、重启 systemd、创建云资源、push 或 PR |
+
 ## SELFHOST-PHASE1-TASK04 人工复核与 Material 安全衔接
 
 | 验证项 | 结果 | 说明 |
@@ -105,8 +121,8 @@
 | 源码文件 | 150+ | 新增本地 parser、2 份专项测试、版本化 migration、依赖清单和完成报告 |
 | 根仓库跟踪项 | Site 自适应 Import + 服务器本地 CSV/XLSX/XLS | 本轮修改本地 Python 运行面和 systemd 源码配置，未修改 Site |
 | 主要目录 | 4 类 | `chenyida_erp_app/`、`chenyida_erp_site/`、`物料主数据治理落地包/`、`docs/` |
-| 数据库实现 | 2 | 本地 SQLite、在线 Cloudflare D1 |
-| 数据表 | 74（本地+开发 schema） | 本地 SQLite 29 张业务/迁移表，Site D1/Drizzle 45 张；本地 `0001`～`0004` 已执行，Site `0008` 未执行生产迁移 |
+| 数据库实现 | 3 | 当前开发 SQLite、历史 Cloudflare D1、自托管开发 PostgreSQL |
+| 数据表 | 分运行面追踪 | SQLite 29 张；D1/Drizzle 45 张；PostgreSQL `0001` 基线 46 张并有 `0002`—`0005` 增量；不能跨运行面相加冒充同一数据库 |
 | 在线 API 路径 | 89 | 开发代码新增 Draft Generation 查询、Normalization Approval 和 Draft Commit；生产公开站点尚未部署 |
 | 页面入口 | 14 | 既有 11 个入口加 3 条 Material Import 路由 |
 | 测试文件 | 35 | 本轮新增本地 Spreadsheet 和 Migration 两份专项测试 |
@@ -116,20 +132,25 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 根仓库 Branch | `main` |
+| 任务开始 HEAD | `39946f6b854a985b5c19106eaa6c938bddaf9c7c`，与远端 `origin/main` 同步 |
+| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.1`；非生产、尚未发布 |
+| 当前实际常驻服务 | Python 3.11.6 / SQLite，systemd `enabled/active`，`0.0.0.0:18888` |
+| 自托管部署状态 | Node/PostgreSQL 未生产部署；当前无运行中 Compose 项目 |
+| PostgreSQL migration | `0001`—`0005`；未迁移真实数据 |
+| SQLite migration | `0001`—`0004` 已记录；数据库不保存 migration checksum |
+| 历史 D1 migration | 仓库 `0000`—`0008`；生产实际应用版本未访问、未核验 |
 | PM-000 前根提交 | `bbefb2e388323213b51531fec117d67d5a28fe70` |
 | Site 开发基线 | `9f2c2dca9ccde237cb2db6c01d2e3792b284e6e9`；已作为普通目录纳入根仓库 |
-| 生产 Site | active / public / v3 |
-| 生产源码提交 | `2b4f1787ddbc7e0941ab2d5f5cadea6e817e8f12` |
-| PowerShell | 5.1.26100.8655 |
-| Git | 2.52.0.windows.1 |
-| Node.js | 26.3.0 |
-| npm | 11.16.0 |
-| 项目绑定 Python | 3.12.13 |
-| 系统 `python` 命令 | 2.7.18，不适用于当前 ERP；启动脚本使用项目绑定 Python 3.12.13 |
-| 环境配置 | `development` / `test` / `production`；生产地址运行时注入，不在代码硬编码 |
-| 默认测试数据库 | 本机一次性 Miniflare D1；远程绑定关闭，结束后销毁 |
+| 历史 Site | 历史记录 `v3`，源码提交 `2b4f1787ddbc7e0941ab2d5f5cadea6e817e8f12`；本任务未访问公网重新确认 |
+| 当前主机工具 | Git 2.43.7、Docker 29.5.2、Compose v5.1.4、Python 3.11.6；宿主机无 Node/npm，Node 验收使用 `node:22-bookworm` 一次性容器 |
+| 环境配置 | `development` / `test` / `production`；生产地址运行时注入，不在发布记录硬编码 |
+| 测试数据库 | Node 基线使用隔离/一次性环境；Python go-live 使用临时 SQLite；不连接生产 |
+
+Node 验收因宿主机无 Node/npm，在一次性 `node:22-bookworm` 容器执行。`npm ci` 报告 12 个既有依赖审计项（1 low、4 moderate、7 high），依照本任务禁止事项未升级依赖。Python 首轮误用系统解释器时 smoke 在导入 `openpyxl` 前停止；改用 systemd 实际使用的项目虚拟环境后，self-test、smoke 和临时 SQLite go-live 全部通过。
 
 ## Git 状态
+
+PHASE0-TASK03 开始时，根仓库 `main` 位于 `39946f6`，工作区 clean；`origin/main` 的本地跟踪引用和远端只读查询均为同一提交。当前任务只修改项目发布文档以及 `package.json`/`package-lock.json` 的名称和版本；最终提交与工作区状态以本任务完成报告为准。
 
 `PHASE3-MATERIAL-LIBRARY-02` 开始时，根仓库 `main` 位于 `c660cc3` 且工作区干净。功能提交 `b3d26c3` 覆盖本地只读 inspect、治理状态、安全汇总、重复阻断和专项测试；未修改 Schema/Migration、hosting、本地旧版业务代码或生产资源。
 

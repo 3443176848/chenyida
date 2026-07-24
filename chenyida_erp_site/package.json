@@ -1,6 +1,6 @@
 {
-  "name": "site-creator-vinext-starter",
-  "version": "0.1.0",
+  "name": "chenyida-erp-selfhosted",
+  "version": "0.1.0-alpha.1",
   "private": true,
   "engines": {
     "node": ">=22.13.0"

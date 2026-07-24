@@ -249,3 +249,12 @@ TASK01 Material 15/15、TASK02 Mapping 12/12 + upgrade 1/1、TASK03 Normalizatio
 - PR：未创建
 - 一次性 Compose 项目容器、网络、PostgreSQL/uploads/attachments volumes：已删除
 - 一次性 PostgreSQL 集成测试容器：完成最终检查后删除
+
+## 31. 后续 Git 提交结果（PHASE0-TASK03 追加）
+
+本节记录原任务结束后的事实，不改写第 29、30 节所述原任务结束状态：
+
+- 2026-07-24 17:42:15 CST，原未提交工作区由提交 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`（`feat: complete SELFHOST PHASE1 TASK04 material review workflow`）汇总提交。
+- `39946f6` 同时包含此前按各任务要求保留的 SELFHOST Phase 0、Phase 1 Task01—Task04 变更；因此不能把它描述成 TASK04 单独文件范围提交。
+- PHASE0-TASK03 开始时，根仓库分支为 `main`，HEAD、本地 `origin/main` 和 `git ls-remote` 查询到的远端 `main` 均为 `39946f6`，工作区 clean。
+- 原报告中的“未提交、Worktree dirty”仍是 TASK04 当时的准确历史状态，不应删除或伪造为原任务结束时已经提交。

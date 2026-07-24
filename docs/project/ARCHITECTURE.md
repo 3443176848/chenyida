@@ -1,6 +1,6 @@
 # 晨亿达ERP当前架构
 
-本文只描述 2026-07-11 从当前代码、Git 和 Sites 状态核验到的事实；V2 目标架构参见 `docs/material-master/phased-implementation-plan.md`。
+本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
 ## 系统架构图
 
