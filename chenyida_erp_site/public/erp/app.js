@@ -369,6 +369,7 @@ function renderBomSelectors() {
   const productOptions = optionList(state.products, "product_code", ["product_code", "product_name"]);
   const bomOptions = optionList(state.boms, "id", ["bom_code", "product_name"]);
   const itemOptions = optionList(state.items, "internal_item_code", ["internal_item_code", "standard_name"]);
+  const inventoryOptions = optionList(state.inventory, "material_id", ["internal_material_code", "standard_name"]);
   $("#bomProduct").innerHTML = productOptions;
   $("#lineBom").innerHTML = bomOptions;
   $("#readyBom").innerHTML = bomOptions;
@@ -377,7 +378,7 @@ function renderBomSelectors() {
   $("#quoteProduct").innerHTML = productOptions;
   $("#salesProduct").innerHTML = productOptions;
   $("#lineItem").innerHTML = itemOptions;
-  $("#adjustItem").innerHTML = itemOptions;
+  $("#adjustItem").innerHTML = inventoryOptions;
 }
 
 function renderBoms() {
@@ -530,6 +531,7 @@ function renderInventory() {
       <td>${escapeHtml(item.item_category)}</td>
       <td>${escapeHtml(item.on_hand_qty)}</td>
       <td>${escapeHtml(item.reserved_qty)}</td>
+      <td>${escapeHtml(item.frozen_qty)}</td>
       <td>${escapeHtml(item.available_qty)}</td>
       <td>${escapeHtml(item.base_uom)}</td>
       <td>${escapeHtml(item.updated_at)}</td>
@@ -537,27 +539,25 @@ function renderInventory() {
   `).join("");
   $("#inventoryTable").innerHTML = `
     <thead><tr>
-      <th>物料编码</th><th>物料名称</th><th>品类</th><th>现有库存</th><th>已预留</th><th>可用库存</th><th>单位</th><th>更新时间</th>
+      <th>物料编码</th><th>物料名称</th><th>品类</th><th>现有库存</th><th>已预留</th><th>已冻结</th><th>可用库存</th><th>单位</th><th>更新时间</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   `;
   const adjustments = state.inventoryAdjustments.map((row) => `
     <tr>
       <td>${escapeHtml(row.adjustment_code)}</td>
-      <td>${escapeHtml(row.internal_item_code)}</td>
-      <td>${escapeHtml(row.standard_name)}</td>
-      <td>${escapeHtml(row.before_qty)}</td>
-      <td>${escapeHtml(row.counted_qty)}</td>
-      <td>${escapeHtml(row.delta_qty)}</td>
-      <td>${escapeHtml(row.after_qty)}</td>
+      <td>${escapeHtml(row.operation_type)}</td>
+      <td>${escapeHtml(row.line_count)}</td>
+      <td>${escapeHtml(row.status)}</td>
       <td>${escapeHtml(row.reason)}</td>
-      <td>${escapeHtml(row.adjusted_by)}</td>
+      <td>${escapeHtml(row.created_by)}</td>
+      <td>${escapeHtml(row.reversal_adjustment_code || "")}</td>
       <td>${escapeHtml(row.created_at)}</td>
     </tr>
   `).join("");
   $("#inventoryAdjustmentsTable").innerHTML = `
     <thead><tr>
-      <th>盘点单</th><th>物料编码</th><th>物料名称</th><th>调整前</th><th>实盘数</th><th>差异</th><th>调整后</th><th>原因</th><th>经办人</th><th>时间</th>
+      <th>调整单</th><th>类型</th><th>行数</th><th>状态</th><th>原因</th><th>经办人</th><th>冲销单</th><th>时间</th>
     </tr></thead>
     <tbody>${adjustments}</tbody>
   `;
@@ -1425,22 +1425,28 @@ async function receivePurchase() {
 }
 
 async function createInventoryAdjustment() {
-  const itemCode = $("#adjustItem").value;
+  const materialId = Number($("#adjustItem").value);
   const countedQty = $("#adjustCountedQty").value.trim();
-  if (!itemCode) {
+  const inventory = state.inventory.find((item) => Number(item.material_id) === materialId);
+  if (!inventory) {
     toast("请选择要盘点的物料");
     return;
   }
   const result = await api("/api/inventory-adjustments", {
     method: "POST",
     body: JSON.stringify({
-      internal_item_code: itemCode,
-      counted_qty: countedQty,
+      operation_type: "ADJUSTMENT",
       reason: $("#adjustReason").value.trim(),
-      adjusted_by: $("#adjustedBy").value.trim(),
+      lines: [{
+        material_id: inventory.material_id,
+        unit_id: inventory.unit_id,
+        counted_qty: countedQty,
+        expected_balance_version: inventory.balance_version,
+      }],
     }),
   });
-  $("#adjustMsg").textContent = `${result.adjustment_code}，差异 ${result.delta_qty}，库存从 ${result.before_qty} 调整到 ${result.after_qty}`;
+  const line = result.data.lines[0];
+  $("#adjustMsg").textContent = `${result.adjustment_code}，差异 ${line.on_hand_delta}，库存从 ${line.before_on_hand_qty} 调整到 ${line.after_on_hand_qty}`;
   await refreshAll();
   toast("库存盘点已保存");
 }

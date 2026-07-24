@@ -87,12 +87,12 @@ Python 当前**没有**用户创建、启停、重置密码 API。legacy iframe 
 | P01 | `GET /api/purchase-suggestions`；P:1413，L:1326 | `read`；bom_id int、order_qty float，未统一正数门禁 | 读 BOM/lines/items/inventory/supplier_mappings | 计算缺料并按最低可解析价格选供应商；无审计 | `N`；PG 无采购服务；H；依赖 BOM、库存、单位换算、有效 supplier mapping |
 | P02 | `GET /api/purchase-orders`；P:init，L:init | `read` | 读 PO/lines | 只读汇总；无审计 | `N`；仅 `erp_records`；H |
 | P03 | `GET /api/purchase-order-lines`；P:init/P:1439，L:init/L:1352 | `read`；可选 po_id int | 读 PO/lines/items | 只读；无审计 | `N`；无关系表/API；H |
-| P04 | `GET /api/inventory`；P:init，L:init | `read` | 读 items + inventory_balances | 只读余额；无流水查询 API、无审计 | `N`；PG 有 balance/transaction 占位表但无 API，且 item_code 无 Material FK；**H** |
-| P05 | `GET /api/inventory-adjustments`；P:init，L:init | `read` | 读 adjustments/items，最多 200 | 只读；无审计 | `N`；PG 无 adjustment 表/API；H |
+| P04 | `GET /api/inventory`；P:init，L:init | `read` | 读 items + inventory_balances | 只读余额；无流水查询 API、无审计 | `C`；TASK04 使用稳定 Material/Unit ID 的新余额投影，并增加 ledger/reconciliation 查询；旧文本表不返回 |
+| P05 | `GET /api/inventory-adjustments`；P:init，L:init | `read` | 读 adjustments/items，最多 200 | 只读；无审计 | `C`；TASK04 提供关系化 adjustment list/detail、不可变 lines/ledger 与有界分页 |
 | P06 | `POST /api/purchase-orders/from-shortage`；P:1426，L:1339 | `purchase`；bom_id、order_qty>0 | 读缺料/映射；写多张 PO/lines/activity | 所有供应商分组在单事务；编码 COUNT+1；不预留库存、不幂等 | `N`；无服务/API；**H**；依赖 TASK03 BOM/supplier + TASK04 inventory |
 | P07 | `POST /api/purchase-orders`；当前页面无手工调用 | `purchase`；supplier 必填；lines 中 item 必须存在，数量/价格仅数值转换 | 写 PO/lines/activity；读 items | 末尾单提交；无 expected_version/幂等/供应商 ID；已创建 header 后遇坏 line 依赖连接关闭回滚 | `N`；无 PG 关系表/API；H；依赖主数据/权限 |
 | P08 | `POST /api/purchase-receive`；P:1451，L:1364 | `purchase`；line_id；receive_qty>0且≤未收 | 锁语义缺失；写 inventory balance/transaction、PO line/header、activity | 单 SQLite 事务完成收货、库存、流水和状态；属于库存过账；无幂等/并发版本 | `N`；PG balance/transaction 表存在但无收货服务/PO 表；**H**；依赖库存账本与 PO |
-| P09 | `POST /api/inventory-adjustments`；P:1467，L:1380 | `inventory`；item 存在、counted_qty≥0 | 写 balance/transaction/adjustment/activity | 单事务；直接把余额改到实盘数，属于库存过账；无复核/幂等/版本 | `N`；PG 仅 balance/transaction，无 adjustment；**H**；应先实现不可变调整/冲销模型 |
+| P09 | `POST /api/inventory-adjustments`；P:1467，L:1380 | `inventory`；item 存在、counted_qty≥0 | 写 balance/transaction/adjustment/activity | 单事务；直接把余额改到实盘数，属于库存过账；无复核/幂等/版本 | `C`；TASK04 使用稳定 ID、CSRF/幂等/expected balance version、行锁、不可变 Ledger、事务余额投影和全额冲销；无采购/生产/销售来源语义 |
 
 ## 5. 生产（6）
 
@@ -154,9 +154,9 @@ Python 没有收款/付款冲销、应收应付调整、关账或原单反向记
 
 `/api/summary`、`/api/items`、`/api/mappings`、`/api/cleaning`、`/api/products`、`/api/customers`、`/api/suppliers`、`/api/boms`、`/api/purchase-orders`、`/api/purchase-order-lines`、`/api/inventory`、`/api/inventory-adjustments`、`/api/work-orders`、`/api/work-order-materials`、`/api/production-reports`、`/api/quotations`、`/api/sales-orders`、`/api/shipments`、`/api/quality-inspections`、`/api/quality-defects`、`/api/finance-summary`、`/api/financial-documents`、`/api/financial-payments`。
 
-当前 `selfhost-api.ts` 对以上 23 个路径均无路由，全部最终返回 `404 NOT_FOUND`。任一失败会使整个 `Promise.all` reject，因此登录成功不等于 legacy dashboard 可用。
+TASK02—TASK04 后，以上 23 个路径中的 users 相关独立入口、主数据/BOM 子集以及 `/api/inventory`、`/api/inventory-adjustments` 已接通；summary、cleaning、采购、生产、销售、品质和财务等路径仍有 404。任一未迁移路径都会使整个 `Promise.all` reject，因此登录成功仍不等于 legacy dashboard 可用。
 
-Operations 页面还请求 `/api/management-dashboard`，管理员再请求 `/api/backups` 和 `/api/users`，同样 404。legacy 页面调用的全部非认证业务操作（主数据、采购、库存、生产、销售、品质、财务、用户、密码和备份）均不被自托管 catch-all 兼容；只有 `/api/health`、`/api/session`、`/api/login`、`/api/logout` 以及 Python 没有的 `/api/setup` 可用。
+Operations 页面还请求 `/api/management-dashboard` 和 `/api/backups`，两者仍为 404；`/api/users` 已由 TASK02 接通。当前覆盖是逐域兼容子集，采购及后续业务和 Dashboard/backup 仍未迁移。
 
 ### 9.3 `selfhost-api.ts` 实际能力
 
@@ -167,8 +167,10 @@ Operations 页面还请求 `/api/management-dashboard`，管理员再请求 `/ap
 - Import：batch/file/parse/job、Sheet/Rows、Mapping/Catalog/版本/复用；
 - Normalization：run、retry/rerun/cancel、rows/issues/lineage；
 - Review：session/row/override/issue/decision/ACTIVE search/finalize/retry/Draft link。
+- Master Data/BOM：items、customers、suppliers、products、BOM/version/line/readiness、supplier mapping/price history；
+- Inventory：balance、ledger、reconciliation、adjustment list/detail/post/full reversal。
 
-这些新路径没有被根 iframe 的 legacy `refreshAll()` 使用。结论：当前自托管系统**不能描述为“完整 ERP”**；它是 Material/Import 非生产闭环加基础身份/任务基础设施，根首页存在确定性的全域断链。
+其中一部分新路径已被根 iframe 使用，但剩余 404 仍会使整批刷新失败。结论：当前自托管系统**不能描述为“完整 ERP”**；它是 Material/Import、身份、主数据/BOM 与通用库存的非生产闭环，根首页仍存在确定性的跨域断链。
 
 ## 10. 数据关系与业务不变量
 

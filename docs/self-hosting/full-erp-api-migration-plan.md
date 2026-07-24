@@ -51,8 +51,8 @@ TASK02—TASK09
 | --- | --- | --- | --- | --- |
 | SELFHOST-PHASE2-TASK02 | 身份、用户管理、密码和系统审计补齐 | TASK01 | 权限提升、会话撤销、凭证 | DONE（非生产；未发布/部署/迁移真实用户） |
 | SELFHOST-PHASE2-TASK03 | 客户、供应商、产品、BOM 与供应商物料映射 | TASK02、现有 Material ACTIVE | 稳定 ID、BOM 版本、重复主数据 | DONE；非生产 `0.1.0-alpha.3`，未迁真实数据或部署 |
-| SELFHOST-PHASE2-TASK04 | 库存不可变账本、余额投影与受控调整 | TASK02、TASK03 | 负库存、并发、已过账更正 | 已获连续任务指令授权；待 TASK03 独立提交后开始 |
-| SELFHOST-PHASE2-TASK05 | 采购、缺料建议、收货与库存联动 | TASK03、TASK04 | 超收、重复收货、库存过账 | 建议，待授权 |
+| SELFHOST-PHASE2-TASK04 | 库存不可变账本、余额投影与受控调整 | TASK02、TASK03 | 负库存、并发、已过账更正 | DONE；非生产 `0.1.0-alpha.4`，未回填真实库存或部署 |
+| SELFHOST-PHASE2-TASK05 | 采购、缺料建议、收货与库存联动 | TASK03、TASK04 | 超收、重复收货、库存过账 | 已获连续任务指令授权；待 TASK04 独立提交并 clean 后开始 |
 | SELFHOST-PHASE2-TASK06 | 工单、领料、完工、报工与库存联动 | TASK03、TASK04 | 多料锁、成品入库、冲销 | 建议，待授权 |
 | SELFHOST-PHASE2-TASK07 | 询报价、销售订单、发货与库存联动 | TASK03、TASK04、TASK06 | 转单原子性、超发、FQC | 建议，待授权 |
 | SELFHOST-PHASE2-TASK08 | IQC/IPQC/FQC、缺陷、处置与关闭 | TASK05、TASK06、TASK07 | 跨域 hold/release、不可变历史 | 建议，待授权 |
@@ -138,18 +138,18 @@ TASK02—TASK09
 - 实施结果：PostgreSQL `0007`、独立 `master-data-selfhost/`/`bom-selfhost/`、legacy path 兼容投影、发布不可变、映射有效期/价格历史和结构 readiness 已通过专项、migration、Compose 重启与回归。
 - 生产/真实数据授权：**否**。
 
-## 7. SELFHOST-PHASE2-TASK04（建议）：库存不可变账本、余额投影与调整
+## 7. SELFHOST-PHASE2-TASK04（DONE，非生产）：库存不可变账本、余额投影与调整
 
 ### 依赖与代码范围
 
 - 依赖 TASK02、TASK03；新建 `inventory-selfhost/`。
-- 只实现 inventory query、ledger、reservation 基线（如规格批准）和 adjustment/reversal；不实现收货、领料、完工或发货业务服务。
+- 只实现 inventory query、ledger、adjustment/reversal 和余额核对；不实现 reservation 写入、收货、领料、完工或发货业务服务。
 
 ### Schema / migration
 
-- 扩展现有 balance/transaction：新增 material_id、业务 location/lot 边界（首期是否启用需规格确认）、ledger operation/reversal link、request/actor/source ID、balance version。
-- 新增 inventory_adjustments 和 adjustment lines/approval（是否双人复核待确认）；采用 expand→backfill→switch，不删除 item_code 兼容列。
-- ledger append-only；balance 可由 ledger 核对重建；numeric 精度和单位换算固定。
+- expand-only 新增 stable-ID `inventory_stock_balances`、`inventory_ledger_entries`、`inventory_adjustments` 和 lines；旧 item_code balance/transaction 原样保留且不回填。
+- V1 固定 `MAIN` 逻辑库位、空 lot、Material 基础单位；不启用批次、序列、多库位或单位换算。
+- ledger append-only；balance 由服务事务维护并可按 ledger 汇总核对；numeric 固定六位小数。
 
 ### API、权限与事务
 
@@ -169,6 +169,12 @@ TASK02—TASK09
 
 - 不回填真实库存、不在启动时对账、不直接改 balance、不实现下游业务过账。
 - 生产/真实数据授权：**否**。
+
+### 实施结果
+
+- PostgreSQL `0008` 新增稳定 Material/Unit ID 的不可变 Ledger、余额投影、调整 Header/Line 与全额冲销；旧文本库存表保持不变且不回填。
+- 独立 `inventory-selfhost/` 实现权限、CSRF、幂等、expected balance version、稳定行锁、负库存门禁、审计和 reconciliation；legacy 库存页面提交稳定 ID。
+- 通用入/出/盘点、冻结/解冻与冲销通过 unit、UI、PostgreSQL/API、migration、Compose restart 和适用回归；没有实现采购收货、领退料、完工或发货业务服务。
 
 ## 8. SELFHOST-PHASE2-TASK05（建议）：采购、缺料建议、收货与库存联动
 
@@ -359,4 +365,4 @@ TASK02—TASK09
 
 ## 14. 下一条最小实施任务建议
 
-TASK02 已完成用户生命周期、密码、session revoke、能力与审计公共边界；TASK03 已完成非生产主数据/BOM。下一任务按连续任务指令为 `SELFHOST-PHASE2-TASK04`；Dashboard、备份 API、其他业务域、真实数据迁移和部署继续保持独立任务与生产授权。
+TASK02 已完成身份公共边界，TASK03 已完成非生产主数据/BOM，TASK04 已完成非生产通用库存账本。下一任务按连续任务指令为 `SELFHOST-PHASE2-TASK05`；Dashboard、备份 API、其他业务域、真实数据迁移和部署继续保持独立任务与生产授权。

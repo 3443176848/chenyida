@@ -4,6 +4,16 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE2-TASK04 - `feat: add immutable inventory ledger`
+
+- 模块：新增独立 `inventory-selfhost` Repository/Service/Handler；稳定 Material/Unit ID、不可变 Ledger、事务余额投影、调整 Header/Line 和核对查询，不写 legacy `erp_records` 或文本编码库存表。
+- 业务：支持通用入库、出库、盘点调整、冻结、解冻和一次全额冲销；单一 MAIN 库位、基础单位、禁止负库存/负可用量，已过账 Header/Line/Ledger 由数据库 trigger 禁止修改或删除。
+- API/安全：接通 inventory、ledger、reconciliation、adjustment list/detail/post/reverse；服务端权限、CSRF、256 KiB、24h 幂等、限流、expected balance version、稳定加锁、请求编号和同事务审计。
+- BOM/UI：readiness 只读新余额投影并返回 required/available/shortage；legacy 调整页提交 material_id/unit_id/version，不再以物料编码作为写引用。
+- Migration：新增 PostgreSQL `0008_inventory_ledger.sql`、schema/snapshot/journal；SHA-256 `49334afa405d03b61568559edcdffa68c232c899251181e3a27ff271aa1da80b`，`0001`—`0007` checksum 不变。
+- 验证：专项 unit 3/3、UI 2/2、PostgreSQL/API 3/3、migration 3/3、Compose 空库/重启通过；适用 Identity/Material/Mapping/Normalization/Review/Phase0/build/lint/typecheck/凭证/Python 回归通过。未改动旧导入 UI 文件上的 6 条既有源码正则断言仍失败，已记录为非 TASK04 回归债务；parser/file-inspector/adaptive-supplier 49/49 通过。
+- 版本/生产：`0.1.0-alpha.4`，非生产、未发布；未回填真实库存、实现 PO/WO/SO 业务过账、访问生产、部署、push 或创建 PR。
+
 ### SELFHOST-PHASE2-TASK03 - `feat: add self-hosted master data and bom`
 
 - 模块：新增独立 `master-data-selfhost` 与 `bom-selfhost` Repository/Service/Handler，统一入口只做身份门禁和精确分派；新写不进入 `erp_records`。

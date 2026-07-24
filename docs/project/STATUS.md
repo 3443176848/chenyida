@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE2-TASK04 自托管不可变库存账本
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 起点 | PASS | `main`、HEAD `3565d56f24ca904dd0b8d0c55960c702a8895406`、clean、本地相对 `origin/main +4/-0`；无 submodule/gitlink/嵌套仓库 |
+| 模块/数据边界 | PASS | 独立 `inventory-selfhost`；稳定 Material/Unit ID，旧文本库存表仅作迁移来源，不回填/双写/返回，不实现 PO/WO/SO 单据 |
+| 不可变与余额 | PASS | Ledger 为权威、Balance 为同事务可核对投影；数据库拒绝直接余额写及已过账 Header/Line/Ledger UPDATE/DELETE |
+| 业务与并发 | PASS | RECEIPT/ISSUE/ADJUSTMENT/FREEZE/UNFREEZE/REVERSAL；禁止负库存/负可用量，expected version、稳定多行锁、一次全额冲销和失败回滚通过 |
+| API/UI/BOM | PASS | inventory/ledger/reconciliation/adjustment/detail/post/reverse；legacy 写引用稳定 ID；BOM readiness 读取新投影并返回真实 shortage |
+| 权限与安全 | PASS | read/adjust/reverse 分离；Session/must-change、CSRF、正文上限、限流、24h 幂等、请求编号、安全错误及成功/失败审计通过 |
+| PostgreSQL migration | PASS | `0008` 空库、0007存量、重复、强制失败回滚、约束/索引、旧用户/session/legacy库存保留通过；SHA-256 `49334afa405d03b61568559edcdffa68c232c899251181e3a27ff271aa1da80b`，0001—0007不变 |
+| 专项/Compose | PASS | unit 3/3、UI 2/2、PostgreSQL/API 3/3、migration 3/3；Compose 初始与 PostgreSQL/Web/Worker 重启持久性通过，容器/网络/卷清理 |
+| 适用回归 | PASS WITH BASELINE DEBT | Identity/Material/Mapping/Normalization/Review/Phase0、build/lint/typecheck/凭证、Python三项通过；旧导入 UI 未改文件的 6 条源码正则断言为起点既有失败，未跨域修补，parser/file-inspector/adaptive 49/49通过 |
+| 版本 | PASS / NOT RELEASED | `chenyida-erp-selfhosted@0.1.0-alpha.4`；非生产、尚未发布、部署或批准 |
+| 资源/生产影响 | NONE | 隔离资源清理；未访问生产、迁移真实库存、部署、重启 Python systemd、push 或 PR |
+
 ## SELFHOST-PHASE2-TASK03 自托管主数据与 BOM
 
 | 验证项 | 结果 | 说明 |

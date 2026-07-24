@@ -36,7 +36,7 @@ test.beforeEach(async () => {
 });
 test.after(async () => pool.end());
 
-test("customer supplier product BOM mapping and structural readiness complete without inventory", async () => {
+test("customer supplier product BOM mapping and inventory-backed readiness complete", async () => {
   const customer = await api(handleMasterDataApi, "/api/customers", { method: "POST", role: "sales", key: "customer-create-0001", body: { customer_name: "晨亿达客户" } });
   assert.equal(customer.response.status, 201); assert.match(customer.payload.customer_code, /^CUS-\d{6}$/);
   const replay = await api(handleMasterDataApi, "/api/customers", { method: "POST", role: "sales", key: "customer-create-0001", body: { customer_name: "晨亿达客户" } });
@@ -57,7 +57,7 @@ test("customer supplier product BOM mapping and structural readiness complete wi
   const line = await api(handleBomApi, "/api/bom-lines", { method: "POST", role: "engineering", body: { bom_id: bomId, line_no: 1, material_id: material.rows[0].id, quantity_per: "2.500000", unit_id: unit.rows[0].id, loss_rate: "0.05" } });
   assert.equal(line.response.status, 201);
   const readiness = await api(handleBomApi, `/api/bom-readiness?bom_id=${bomId}&order_qty=10`, { role: "warehouse" });
-  assert.equal(readiness.response.status, 200); assert.equal(readiness.payload.inventory_evaluated, false); assert.equal(readiness.payload.structure_ready, true); assert.equal(readiness.payload.rows[0].required_qty, "26.250000");
+  assert.equal(readiness.response.status, 200); assert.equal(readiness.payload.inventory_evaluated, true); assert.equal(readiness.payload.structure_ready, true); assert.equal(readiness.payload.all_ready, false); assert.equal(readiness.payload.rows[0].required_qty, "26.250000"); assert.equal(readiness.payload.rows[0].readiness_status, "SHORTAGE");
   const releasedBom = await api(handleBomApi, `/api/boms/${bomId}/versions/${bomVersionId}/release`, { method: "POST", role: "engineering", body: { expected_version: 1 } });
   assert.equal(releasedBom.response.status, 200);
   await assert.rejects(pool.query("update bom_lines set quantity_per=3 where id=$1", [line.payload.data.id]), /released bom lines are immutable/);

@@ -18,8 +18,9 @@ test("legacy master-data and BOM paths delegate to self-hosted handlers", () => 
   assert.match(legacy, /customer_id: customer\?\.id \|\| null/); assert.match(legacy, /请选择已存在的客户档案/);
 });
 
-test("BOM readiness explicitly refuses to invent inventory readiness", () => {
-  assert.match(bom, /inventory_evaluated: false/);
-  assert.match(bom, /库存账本尚未迁移/);
+test("BOM readiness uses only the TASK04 authoritative inventory projection", () => {
+  assert.match(bom, /inventory_evaluated: true/);
+  assert.match(bom, /inventory_stock_balances/);
+  assert.match(bom, /reserved_qty.*frozen_qty/s);
   assert.doesNotMatch(bom, /inventory_balances|inventory_transactions/);
 });

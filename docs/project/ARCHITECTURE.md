@@ -4,32 +4,34 @@
 
 ## 2026-07-25 自托管完整 ERP 迁移覆盖层
 
-`SELFHOST-PHASE2-TASK01` 从源码确认 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30），并在当时基线记录等价覆盖 4、部分覆盖 9、未覆盖 51。TASK02 补齐身份、用户、密码、会话撤销和系统审计公共边界；TASK03 已关系化 customer、supplier、product/version、BOM/version/line 与 supplier mapping/price history。PO、receipt、inventory ledger、WO、report、quote、SO、shipment、quality 和 finance 仍无完整自托管业务服务。
+`SELFHOST-PHASE2-TASK01` 从源码确认 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30），并在当时基线记录等价覆盖 4、部分覆盖 9、未覆盖 51。TASK02 补齐身份公共边界；TASK03 已关系化主数据/BOM；TASK04 已建立通用不可变 inventory ledger、余额投影、调整和冲销。PO、业务 receipt、WO、report、quote、SO、shipment、quality 和 finance 仍无完整自托管业务服务。
 
 ```mermaid
 flowchart LR
     ROOT["自托管根页面"] --> IFRAME["/erp/index.html legacy iframe"]
     IFRAME --> AUTH["身份/用户/系统审计: 可用"]
     IFRAME --> BATCH["登录后 23 个 legacy 业务 GET"]
-    BATCH --> M3["TASK03 主数据/BOM 子集: 已接通"]
-    BATCH --> NF["库存及后续业务域: 仍 404"]
+    BATCH --> M4["TASK03 主数据/BOM + TASK04 库存子集: 已接通"]
+    BATCH --> NF["采购及后续业务域: 仍 404"]
 
     NATIVE["/materials 原生页面"] --> MM["Material/Import/Normalization/Review API"]
     AUTH --> ID["identity-selfhost Repository/Service/Handler"]
-    ID --> PG["PostgreSQL 0001—0007"]
+    ID --> PG["PostgreSQL 0001—0008"]
     MM --> PG
-    M3 --> MDB["master-data-selfhost / bom-selfhost"]
+    M4 --> MDB["master-data-selfhost / bom-selfhost"]
     MDB --> PG
+    M4 --> INV["inventory-selfhost / immutable ledger"]
+    INV --> PG
 
     PYUI["Python static app"] --> PYAPI["Python 64 个 HTTP 操作"]
     PYAPI --> SQLITE["SQLite 29 表开发运行面"]
 ```
 
-根 iframe 的 `refreshAll()` 用一个 `Promise.all` 请求 summary、material/cleaning、主数据、采购/库存、生产、销售、品质和财务共 23 个 GET。TASK03 已接通 `/api/items`、`/api/mappings`、`/api/products`、`/api/customers`、`/api/suppliers`、`/api/boms`、`/api/bom-lines`，但 `Promise.all` 仍会因库存及后续业务域 404 整批失败，因此当前仍不能描述为完整 ERP。Operations 的 users 已接通新 Identity API；management-dashboard 与 backups 仍明确降级为不可用。
+根 iframe 的 `refreshAll()` 用一个 `Promise.all` 请求 summary、material/cleaning、主数据、采购/库存、生产、销售、品质和财务共 23 个 GET。TASK03 接通主数据/BOM 子集，TASK04 接通 `/api/inventory` 与 `/api/inventory-adjustments`；但 `Promise.all` 仍会因采购及后续业务域 404 整批失败，因此当前仍不能描述为完整 ERP。Operations 的 users 已接通新 Identity API；management-dashboard 与 backups 仍明确降级为不可用。
 
 身份请求先进入 `identity-selfhost/handler.ts`，再由 Service 执行业务规则、Repository 执行 PostgreSQL 事务。非身份受保护请求在进入 Material/Import 模块前统一解析服务端 session actor 并执行 active/must-change 门禁；浏览器不能提交 permissions。会话只保存 token SHA-256 摘要，身份审计、限流和幂等均持久化到 PostgreSQL。
 
-PostgreSQL 的 `erp_records(kind,code,data JSONB)` 只是历史兼容占位，不是未来各域关系模型；`inventory_balances` 与 `inventory_transactions` 也只有文本 item_code 和基础字段，没有 receipt/adjustment/reservation/reversal 服务。存在结构不能作为 API、权限、事务、审计、测试或数据迁移完成的证据。完整逐项清单见 `docs/audits/SELFHOST-PHASE2-TASK01-api-inventory.md`，建议依赖顺序见 `docs/self-hosting/full-erp-api-migration-plan.md`。
+PostgreSQL 的 `erp_records(kind,code,data JSONB)` 只是历史兼容占位，不是未来各域关系模型；`0001` 的 `inventory_balances` 与 `inventory_transactions` 也只是文本 item_code 迁移证据。TASK04 的新 `inventory_ledger_entries` 才是库存数量权威，`inventory_stock_balances` 是受服务事务保护的可核对投影；下游业务单据仍未实现。完整逐项清单见 `docs/audits/SELFHOST-PHASE2-TASK01-api-inventory.md`，依赖顺序见 `docs/self-hosting/full-erp-api-migration-plan.md`。
 
 ## 系统架构图
 
@@ -208,6 +210,6 @@ flowchart LR
 3. 在线业务主体为 JSON，缺少 V2 所需关系约束。
 4. schema、迁移和运行时建表同时存在，需建立单一迁移权威。
 5. 本地数据库缺少迁移历史和外键。
-6. 自托管根页仍依赖 legacy iframe；TASK03 只接通其中主数据/BOM 子集，库存及后续业务 GET 仍返回 404，`Promise.all` 仍会整批失败。在 TASK04—TASK09 逐域迁移并由最终 UI 任务退出 iframe 前，系统不能描述为完整 ERP。
+6. 自托管根页仍依赖 legacy iframe；TASK03/TASK04 只接通主数据、BOM 和通用库存子集，采购及后续业务 GET 仍返回 404，`Promise.all` 仍会整批失败。在 TASK05—TASK09 逐域迁移并由最终 UI 任务退出 iframe 前，系统不能描述为完整 ERP。
 7. Python 关键写操作缺少通用 request ID、CSRF、幂等、乐观锁、失败审计和不可变冲销；迁移必须重新建立服务端边界，不能机械翻译旧 handler。
 8. Quote 转 Sales Order 的旧 Python 路径跨两个 commit；收货、领料、完工、发货和收付款虽在 SQLite 单事务内联动，但都缺并发锁/幂等/版本和反向记录，是后续迁移的最高风险区。

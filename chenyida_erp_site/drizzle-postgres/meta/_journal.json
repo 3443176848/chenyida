@@ -50,6 +50,13 @@
       "when": 1784910176682,
       "tag": "0007_master_data_bom",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784914084338,
+      "tag": "0008_inventory_ledger",
+      "breakpoints": true
     }
   ]
 }

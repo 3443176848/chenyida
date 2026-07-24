@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.3`，明确为非生产且尚未发布；详见 `RELEASES.md`。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.4`，明确为非生产且尚未发布；详见 `RELEASES.md`。
 
 ### 治理资料
 
@@ -53,6 +53,7 @@
 - `drizzle-postgres/0003_material_import_mapping.sql` 增加 parse run 行绑定、动态 Mapping 目标、源结构/metadata/mapping摘要、不可变确认快照、版本/SUPERSEDED、复用来源和STALE语义；Worker、API和现有Import Workspace已完成非生产自托管闭环。
 - `drizzle-postgres/0004_material_import_normalization.sql` 增加版本化 Normalization run、关系化核心/动态属性候选、lineage、稳定 issue、重试/重跑/取消、发布一致性约束和已发布数据不可变 trigger；Worker、API和现有 Review UI 已完成非生产闭环。
 - `drizzle-postgres/0005_material_import_review.sql` 增加 Review Session/Row、核心和动态属性覆盖历史、Issue resolution、Review validation issue、sealed finalization、行级 operation、ACTIVE binding、Draft link 和审计历史；TASK01 Material Service、API、Worker 与七步 Import Workspace 已完成非生产闭环。
+- `drizzle-postgres/0006_identity_security.sql` 和 `0007_master_data_bom.sql` 分别补齐身份安全与关系化主数据/BOM；`0008_inventory_ledger.sql` 新增稳定 Material/Unit ID 的库存余额投影、不可变账本、调整 Line 和全额冲销关系，旧文本编码库存表仅保留为迁移来源。
 - 本地文件卷保存二进制，数据库只保存受控相对路径和摘要元数据。
 - Worker 使用 PostgreSQL Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、重试和 CAS；Web/Worker 是独立入口。
 
@@ -90,6 +91,7 @@
 12. SELFHOST-PHASE2-TASK01 已从源码确认 Python 共有 64 个 HTTP 操作（GET 34、POST 30）；以当时基线统计，自托管已覆盖 4、部分覆盖 9、未覆盖 51。
 13. SELFHOST-PHASE2-TASK02 已补齐自托管身份公共边界：PostgreSQL `0006`、独立 Identity Repository/Service/Handler、用户管理、密码策略、会话撤销、must-change 全局门禁、限流、持久幂等、CAS 和系统审计；不包含其他业务域或生产动作。
 14. SELFHOST-PHASE2-TASK03 已新增 PostgreSQL `0007` 和独立 Master Data/BOM 服务，关系化 Customer、Supplier、Product/Version、BOM Header/Version/Line、Supplier Mapping/价格历史；发布后不可变，readiness 只检查结构且不读取库存。版本为 `0.1.0-alpha.3`，未迁真实数据或部署。
+15. SELFHOST-PHASE2-TASK04 已新增 PostgreSQL `0008` 和独立 Inventory 服务；Ledger 是唯一数量权威，余额是同事务可核对投影，支持通用入/出/盘点、冻结/解冻及全额冲销。readiness 只读该新投影；未回填旧库存或实现采购/生产/销售过账。版本为 `0.1.0-alpha.4`，未迁真实数据或部署。
 
 ## 当前风险
 
@@ -127,7 +129,7 @@
 
 ## 当前路线
 
-当前已完成 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping 的 Node/PostgreSQL 非生产链路、统一发布追踪基线，以及完整 ERP 的 64 项 Python API 盘点、数据不变量和首页断链核验。TASK03 完成不表示库存及后续业务域已迁移。下一任务按连续任务指令执行 `SELFHOST-PHASE2-TASK04`；真实数据试迁移、生产备份恢复、部署和切换继续独立授权。
+当前已完成 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping 和通用库存账本的 Node/PostgreSQL 非生产链路、统一发布追踪基线，以及完整 ERP 的 64 项 Python API 盘点、数据不变量和首页断链核验。TASK04 完成不表示采购及后续业务域已迁移。下一任务按连续任务指令执行 `SELFHOST-PHASE2-TASK05`；真实数据试迁移、生产备份恢复、部署和切换继续独立授权。
 
 ## 恢复上下文检查清单
 
