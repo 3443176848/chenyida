@@ -1,0 +1,114 @@
+name: chenyida-erp
+
+x-app-environment: &app-environment
+  ERP_ENV: ${ERP_ENV:-development}
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+  ERP_SETUP_TOKEN: ${ERP_SETUP_TOKEN:?ERP_SETUP_TOKEN is required}
+  ERP_UPLOAD_ROOT: /data/chenyida-erp/uploads
+  ERP_ATTACHMENT_ROOT: /data/chenyida-erp/attachments
+  ERP_MAX_UPLOAD_BYTES: ${ERP_MAX_UPLOAD_BYTES:-10485760}
+  ERP_WORKER_POLL_MS: ${ERP_WORKER_POLL_MS:-1000}
+  ERP_WORKER_LEASE_SECONDS: ${ERP_WORKER_LEASE_SECONDS:-60}
+  DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+
+x-app-volumes: &app-volumes
+  - erp_uploads:/data/chenyida-erp/uploads
+  - erp_attachments:/data/chenyida-erp/attachments
+
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - erp_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    logging:
+      options: { max-size: "10m", max-file: "5" }
+
+  migrate:
+    build: { context: ., target: worker }
+    command: ["node", "--experimental-strip-types", "scripts/migrate-postgres.ts"]
+    environment: *app-environment
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  web:
+    build: { context: ., target: web }
+    environment:
+      <<: *app-environment
+      ERP_PROCESS_NAME: chenyida-erp-web
+      PORT: 3000
+    volumes: *app-volumes
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    ports:
+      - "${ERP_HTTP_BIND:-127.0.0.1}:${ERP_HTTP_PORT:-3000}:3000"
+    restart: unless-stopped
+    init: true
+    logging:
+      options: { max-size: "10m", max-file: "5" }
+
+  worker:
+    build: { context: ., target: worker }
+    environment:
+      <<: *app-environment
+      ERP_PROCESS_NAME: chenyida-erp-worker
+    volumes: *app-volumes
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    logging:
+      options: { max-size: "10m", max-file: "5" }
+
+  admin:
+    build: { context: ., target: worker }
+    command: ["node", "--experimental-strip-types", "scripts/init-admin.ts"]
+    environment:
+      <<: *app-environment
+      ERP_ADMIN_USERNAME: ${ERP_ADMIN_USERNAME:-}
+      ERP_ADMIN_DISPLAY_NAME: ${ERP_ADMIN_DISPLAY_NAME:-}
+      ERP_ADMIN_PASSWORD: ${ERP_ADMIN_PASSWORD:-}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    profiles: ["tools"]
+    restart: "no"
+
+  caddy:
+    image: caddy:2.10-alpine
+    environment:
+      ERP_DOMAIN: ${ERP_DOMAIN:-erp.invalid}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports: ["80:80", "443:443", "443:443/udp"]
+    depends_on:
+      web: { condition: service_healthy }
+    profiles: ["production"]
+    restart: unless-stopped
+    logging:
+      options: { max-size: "10m", max-file: "5" }
+
+volumes:
+  erp_postgres:
+  erp_uploads:
+  erp_attachments:
+  caddy_data:
+  caddy_config:

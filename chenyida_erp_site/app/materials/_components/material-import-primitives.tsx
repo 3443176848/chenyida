@@ -12,7 +12,7 @@ export function MaterialImportStatusBadge({ value }: { value: MaterialImportBatc
 const STEPS: { view: MaterialImportView; views: MaterialImportView[]; label: string }[] = [
   { view: "file", views: ["file"], label: "文件" }, { view: "parse", views: ["parse"], label: "解析" }, { view: "sheet", views: ["sheet"], label: "表头" },
   { view: "mapping", views: ["mapping"], label: "字段映射" }, { view: "confirmed", views: ["confirmed"], label: "映射确认" },
-  { view: "normalize", views: ["normalize"], label: "数据归一化" }, { view: "normalized", views: ["normalized", "issues"], label: "结果审阅" },
+  { view: "normalize", views: ["normalize"], label: "数据归一化" }, { view: "normalized", views: ["normalized", "issues", "review"], label: "结果审阅" },
 ];
 
 function currentStep(status: MaterialImportBatchStatus): number {

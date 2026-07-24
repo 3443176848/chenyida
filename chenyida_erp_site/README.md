@@ -1,62 +1,51 @@
-# 晨亿达 ERP
+# 晨亿达 ERP 自托管应用
 
-晨亿达多用户在线 ERP，覆盖物料主数据、供应商映射、BOM、采购、库存、生产、销售、财务、品质和系统运维。
+当前生产方向是标准 Node.js Web、PostgreSQL、服务器本地持久化文件和独立后台 Worker。运行时不需要 OpenAI Site、Cloudflare Worker、D1、R2 或 Queue。历史 Cloudflare 代码和 `drizzle/` migration 暂留作后续数据迁移依据，不是启动依赖。
 
-线上地址：[chenyida-erp-online.sjin74376.chatgpt.site](https://chenyida-erp-online.sjin74376.chatgpt.site)
+## 快速启动
 
-## 技术栈
-
-- Vinext / React / TypeScript
-- Cloudflare Workers
-- Cloudflare D1
-- OpenAI Sites
-
-## 本地运行
-
-需要 Node.js `>=22.13.0`。
+需要 Docker Engine 和 Docker Compose。复制 `.env.example` 为 `.env`，替换全部 `CHANGE_ME`，然后执行：
 
 ```bash
-npm install
+docker compose -f compose.yml up -d --build postgres migrate web worker
+docker compose -f compose.yml ps
+curl --fail http://127.0.0.1:3000/api/health
+```
+
+首次管理员必须显式从命令环境传入，仓库不提供默认密码：
+
+```bash
+ERP_ADMIN_USERNAME=admin \
+ERP_ADMIN_DISPLAY_NAME='系统管理员' \
+ERP_ADMIN_PASSWORD='在此输入至少12位的随机密码' \
+docker compose -f compose.yml --profile tools run --rm admin
+```
+
+开发入口默认只绑定 `127.0.0.1:3000`。生产 HTTPS 使用 Caddy profile，并要求 DNS 已指向服务器：
+
+```bash
+ERP_DOMAIN=erp.example.com docker compose -f compose.yml --profile production up -d
+```
+
+## 常用命令
+
+```bash
+npm ci
 npm run dev
-```
-
-默认开发地址为 `http://localhost:3000`。
-
-## 配置
-
-复制 `.env.example` 中的变量到本地环境。`ERP_ENV` 只能是 `development`、`test` 或 `production`；生产 API/Site 地址必须由托管环境注入，不得写入源码。开发环境还需设置一次性初始化凭证：
-
-```text
-ERP_SETUP_TOKEN=replace-with-a-strong-random-token
-```
-
-首次打开系统时使用该凭证创建管理员。初始化成功后会自动登录，初始化入口随即关闭。
-
-`vite.config.ts` 的本地 Cloudflare 绑定显式禁用远程资源。普通开发使用项目内 `.wrangler/state`；API 烟测使用操作系统临时目录中的一次性 Miniflare D1。
-
-## 验证
-
-```bash
 npm run lint
 npm test
-npm run test:environment
-npm run test:api
-npm run security:credentials
+npm run db:generate
+docker compose -f compose.yml run --rm migrate
+docker compose -f compose.yml logs -f web worker postgres
 ```
 
-`test:api` 只接受 `ERP_ENV=test`、HTTP 回环地址和带测试标识的临时 D1 路径。无论测试成功或失败，D1 业务数据都会删除；失败时仅在被 Git 忽略的 `work/test-logs/` 保存去敏诊断。
+PostgreSQL 集成测试必须显式提供独立 `TEST_DATABASE_URL`；Compose 冒烟测试需要已经初始化的隔离实例和测试管理员变量。任何测试数据库名称都应包含 `test`，不得指向生产。
 
-## 目录
+完整说明：
 
-- `app/`：在线 API、认证和页面入口
-- `public/erp/`：ERP 操作界面
-- `drizzle/`：数据库迁移
-- `tests/`：构建和接口测试
-- `chenyida_erp_app/`：早期本地 Python 版本
-- `物料主数据治理落地包/`：物料治理模板、SOP 和辅助工具
-
-## 安全说明
-
-- 不要提交 `.env`、初始化凭证、账号密码或数据库文件。
-- 生产环境变量通过托管平台配置。
-- 系统采用服务端会话、角色权限和操作审计。
+- `docs/self-hosting/architecture.md`
+- `docs/self-hosting/deployment.md`
+- `docs/self-hosting/postgresql-migration.md`
+- `docs/self-hosting/backup-restore.md`
+- `docs/self-hosting/cloudflare-deprecation.md`
+- `docs/tasks/SELFHOST-PHASE0-TASK01-completion.md`

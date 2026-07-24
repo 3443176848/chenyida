@@ -5,15 +5,16 @@ export const NORMALIZATION_ROW_PAGE_MARKER = "normalization-row-page";
 export const NORMALIZATION_ISSUE_PAGE_MARKER = "normalization-issue-page";
 export const NORMALIZATION_ROW_DRAWER_MARKER = "normalization-row-drawer";
 
-export const NORMALIZATION_RUN_STATUSES = ["QUEUED", "RUNNING", "STAGED", "PUBLISHING", "SUCCEEDED", "FAILED", "CANCELLED", "SUPERSEDED"] as const;
+export const NORMALIZATION_RUN_STATUSES = ["QUEUED", "RUNNING", "PUBLISHING", "SUCCEEDED", "FAILED", "CANCEL_REQUESTED", "CANCELLED", "SUPERSEDED"] as const;
 export type NormalizationRunStatus = typeof NORMALIZATION_RUN_STATUSES[number];
-export type NormalizationRowStatus = "VALID" | "WARNING" | "ERROR";
+export type NormalizationRowStatus = "VALID" | "WARNING" | "ERROR" | "SKIPPED";
 export type NormalizationIssueLevel = "WARNING" | "ERROR";
 
 export type NormalizationRun = {
   id: number; parse_run_id: number; mapping_id: number; mapping_version: number; mapping_digest: string;
   processor_version: string; payload_schema_version: number; metadata_digest: string; run_status: NormalizationRunStatus;
   current_stage: string; total_rows: number; processed_rows: number; valid_rows: number; warning_rows: number; error_rows: number;
+  skipped_rows?: number; run_version?: number; expected_version?: number; retry_count?: number; published_at?: string | null;
   normalized_json_bytes?: number; issue_count: number; warning_count: number; error_count: number; result_digest?: string | null;
   failure_code?: string | null; safe_failure_message?: string | null; started_at?: string | null; completed_at?: string | null;
   created_at: string; updated_at: string;
@@ -21,7 +22,7 @@ export type NormalizationRun = {
 
 export type NormalizationSummary = {
   batch_id: number; batch_status: MaterialImportBatch["status"]; current_version: number;
-  current_run: NormalizationRun | null; latest_attempt: NormalizationRun | null; request_id: string;
+  current_run: NormalizationRun | null; latest_attempt: NormalizationRun | null; selected_run?: NormalizationRun | null; request_id: string;
 };
 
 export type NormalizedRow = {
@@ -40,7 +41,11 @@ export type NormalizedPayload = {
   supplier_reference: Record<string, FieldCandidate>; deferred_validation: string[]; row_status: NormalizationRowStatus;
   issue_summary: { issue_count: number; error_count: number; warning_count: number };
 };
-export type NormalizedRowDetail = { batch_id: number; normalization_run_id: number; row: NormalizedRow; normalized_payload: NormalizedPayload; request_id: string };
+export type NormalizedRowDetail = {
+  batch_id: number; normalization_run_id: number; row: NormalizedRow; raw_row?: unknown; normalized_payload: NormalizedPayload;
+  field_candidates?: Record<string, unknown>[]; attribute_candidates?: Record<string, unknown>[];
+  lineage?: Record<string, unknown>[]; issues?: NormalizationIssue[]; request_id: string;
+};
 export type NormalizationIssue = {
   id: number; normalized_row_id: number; issue_level: NormalizationIssueLevel; issue_code: string; target_code: string;
   source_sheet_index: number; source_row_number: number; source_column_index: number | null; safe_message: string;
@@ -51,13 +56,14 @@ export type NormalizationIssuesResponse = { batch_id: number; normalization_run_
 
 export type NormalizationQuery = {
   view: Extract<MaterialImportView, "normalize" | "normalized" | "issues" | "confirmed">;
+  run_id: number | null;
   row_status: "" | NormalizationRowStatus; row_limit: 50 | 100; row_cursor: string; row: number | null;
   issue_level: "" | NormalizationIssueLevel; issue_code: string; issue_target: string; issue_row: number | null; issue_limit: 50 | 100; issue_cursor: string;
 };
 
 const ISSUE_CODE = /^[A-Z][A-Z0-9_]{2,99}$/;
 const POSITIVE_INTEGER = /^[1-9][0-9]*$/;
-const ROW_STATUSES = new Set(["VALID", "WARNING", "ERROR"]);
+const ROW_STATUSES = new Set(["VALID", "WARNING", "ERROR", "SKIPPED"]);
 const ISSUE_LEVELS = new Set(["WARNING", "ERROR"]);
 
 export function strictPositiveInteger(value: string | null): number | null {
@@ -82,6 +88,7 @@ export function parseNormalizationQuery(input: string | URLSearchParams, batch: 
   const issueTarget = String(params.get("issue_target") || "");
   return {
     view: resultView,
+    run_id: strictPositiveInteger(params.get("run_id")),
     row_status: ROW_STATUSES.has(rowStatus) ? rowStatus as NormalizationRowStatus : "",
     row_limit: params.get("row_limit") === "100" ? 100 : 50,
     row_cursor: String(params.get("row_cursor") || "").slice(0, 2048),
@@ -97,6 +104,7 @@ export function parseNormalizationQuery(input: string | URLSearchParams, batch: 
 
 export function serializeNormalizationQuery(query: NormalizationQuery): string {
   const params = new URLSearchParams({ view: query.view });
+  if (query.run_id !== null) params.set("run_id", String(query.run_id));
   if (query.row_status) params.set("row_status", query.row_status);
   params.set("row_limit", String(query.row_limit));
   if (query.row_cursor) params.set("row_cursor", query.row_cursor);
@@ -112,6 +120,7 @@ export function serializeNormalizationQuery(query: NormalizationQuery): string {
 
 export function normalizedRowsEndpoint(batchId: number, query: NormalizationQuery): string {
   const params = new URLSearchParams({ limit: String(query.row_limit) });
+  if (query.run_id !== null) params.set("run_id", String(query.run_id));
   if (query.row_status) params.set("row_status", query.row_status);
   if (query.row_cursor) params.set("cursor", query.row_cursor);
   return `/api/material-master/import-batches/${batchId}/normalized-rows?${params}`;
@@ -119,6 +128,7 @@ export function normalizedRowsEndpoint(batchId: number, query: NormalizationQuer
 
 export function normalizationIssuesEndpoint(batchId: number, query: NormalizationQuery): string {
   const params = new URLSearchParams({ limit: String(query.issue_limit) });
+  if (query.run_id !== null) params.set("run_id", String(query.run_id));
   if (query.issue_level) params.set("issue_level", query.issue_level);
   if (ISSUE_CODE.test(query.issue_code)) params.set("issue_code", query.issue_code);
   if (query.issue_target.length >= 3 && query.issue_target.length <= 160) params.set("target_code", query.issue_target);
@@ -128,14 +138,14 @@ export function normalizationIssuesEndpoint(batchId: number, query: Normalizatio
 }
 
 export function activeNormalizationRun(run: NormalizationRun | null): boolean {
-  return Boolean(run && ["QUEUED", "RUNNING", "STAGED", "PUBLISHING"].includes(run.run_status));
+  return Boolean(run && ["QUEUED", "RUNNING", "PUBLISHING", "CANCEL_REQUESTED"].includes(run.run_status));
 }
 
 export function validRunCounts(run: NormalizationRun): boolean {
   const values = [run.total_rows, run.processed_rows, run.valid_rows, run.warning_rows, run.error_rows, run.issue_count, run.warning_count, run.error_count];
   return values.every((value) => Number.isSafeInteger(value) && value >= 0)
     && run.processed_rows <= run.total_rows
-    && (!run.result_digest || run.valid_rows + run.warning_rows + run.error_rows === run.total_rows)
+    && (!run.result_digest || run.valid_rows + run.warning_rows + run.error_rows + (run.skipped_rows ?? 0) === run.total_rows)
     && run.warning_count + run.error_count <= run.issue_count;
 }
 
@@ -148,7 +158,7 @@ export function normalizationStageLabel(stage: unknown): string {
 }
 
 export function rowProgress(run: NormalizationRun): { percent: number; label: string } | null {
-  if (!validRunCounts(run) || run.total_rows <= 0 || !["RUNNING", "STAGED", "PUBLISHING"].includes(run.run_status)) return null;
+  if (!validRunCounts(run) || run.total_rows <= 0 || !["RUNNING", "PUBLISHING", "CANCEL_REQUESTED"].includes(run.run_status)) return null;
   const percent = Math.floor(run.processed_rows / run.total_rows * 100);
   const label = percent === 100 && run.current_stage === "VERIFY_RESULT" ? "行处理已完成，正在核对" : percent === 100 && run.current_stage === "PUBLISH_RESULT" ? "行处理已完成，正在发布" : "行处理进度";
   return { percent, label };

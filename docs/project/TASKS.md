@@ -51,6 +51,11 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-PHASE1-TASK04 | 完成 Normalization 人工复核与 Material Draft Commit 的 PostgreSQL 自托管移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围、验收标准与禁止事项确认） | 2026-07-24 | 2026-07-24 | SELFHOST-PHASE1-TASK03、SELFHOST-PHASE1-TASK01 | 新增 PostgreSQL `0005`、Session/Row/覆盖/Issue/finalization/binding/draft link/history，接通 ACTIVE 精确绑定和 TASK01 Material Service DRAFT 创建；专项13/13、101行跨chunk、回归、Compose端到端与整栈重启通过。未连接生产、迁移真实数据、部署、提交、推送或创建PR。 |
+| SELFHOST-PHASE1-TASK03 | 完成行级 Normalizer 与 Normalization Review 的 PostgreSQL 自托管移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围、验收标准与禁止事项确认） | 2026-07-23 | 2026-07-23 | SELFHOST-PHASE1-TASK02 | 新增 PostgreSQL `0004`、关系化核心/动态属性候选、lineage、稳定issues、独立Repository/Service/API/Worker、同run重试、新版本重跑、取消和原子发布，接通现有Review UI；专项12/12、回归41/41、空库/升级迁移及Compose整栈重启通过。未创建Draft、迁移真实数据、连接生产、部署或提交。 |
+| SELFHOST-PHASE1-TASK02 | 完成 Import Mapping、Mapping版本及复用规则的 PostgreSQL 持久化和自托管 API 移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围与禁止事项确认） | 2026-07-23 | 2026-07-23 | SELFHOST-PHASE1-TASK01 | 新增 PostgreSQL `0003`、动态Catalog、源结构/Mapping摘要、不可变确认快照、版本/SUPERSEDED、跨批次复用/STALE、事务幂等/审计、Worker原子Mapping准备及现有UI版本/复用面板；专项3/3+2/2+6/6+1/1、回归与Compose重启通过。未实现Normalizer、迁移真实数据、部署或提交。 |
+| SELFHOST-PHASE1-TASK01 | 完成 Material Draft / Review / Active 物料主数据 PostgreSQL 全链路移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（状态机、范围和禁止事项确认） | 2026-07-23 | 2026-07-23 | SELFHOST-PHASE0-TASK01、现有 Material Draft/Review UI 与 D1行为基线 | 新增 PostgreSQL `0002` 编码序列/约束/索引、独立 Repository/Service/API，接通现有草稿/审核/ACTIVE/版本/变更/审计页面；单元6/6、UI契约2/2、PG/API 7/7、既有Material UI 142/142、Compose双用户审批与重启持久性通过。未连接生产、迁移真实数据、部署或提交；按本任务明确要求保留未提交工作区。Import Mapping/Normalizer 留给TASK02。 |
+| SELFHOST-PHASE0-TASK01 | 建立 Node.js + PostgreSQL + 本地文件存储 + 后台 Worker 的自托管运行基线 | DONE | Codex（诊断、设计、非生产实施与验证）、项目负责人（架构方向和任务范围确认） | 2026-07-22 | 2026-07-22 | PM-000、PHASE0-TASK02、现有 Material Master/Import 非生产基线 | 完成 46 表 PostgreSQL `0001`、Node Web、本地原子 FileStorage、PostgreSQL Outbox/租约 Worker、Compose/Caddy、admin/migration/备份恢复和文档；隔离单元 3/3、PostgreSQL 5/5、Compose 登录/分类/草稿/上传/解析/重启持久性通过。未连接生产、部署、迁移真实数据或提交；按用户明确要求保留未提交工作区。完整旧 API/行级 Normalizer PostgreSQL 移植另列后续风险。 |
 | PHASE3-MATERIAL-LIBRARY-SUPPLIER-ADAPTIVE-IMPORT | 多供应商自适应表格识别、字段映射与规格提取 | DONE | Codex（审计与非生产实施）、项目负责人（任务范围确认） | 2026-07-18 | 2026-07-18 16:10 CST | PHASE3-MATERIAL-LIBRARY-02、PHASE3-TASK04 | 复用既有 Batch/Parser/Raw Rows/Mapping/Normalization/Review/Validation/Audit/Draft；功能提交 `41e293f` 实现全部可见 Sheet、前 50 行、1～3 行合并表头、集中别名与样本/Profile 加权、可解释行分类、多列规格、Canonical Row、人工确认和空规格 Draft 阻断；Node 589/589 及完整隔离基线通过。受控目录无真实供应商样本；未执行生产迁移、真实数据写入或部署 |
 | PHASE3-MATERIAL-LIBRARY-02 | 真实物料数据导入治理与首批内部物料库建立 | BLOCKED | Codex（真实样本只读治理）、项目负责人（待补充模板语义/重新导出） | 2026-07-18 14:41 CST | - | PHASE3-MATERIAL-LIBRARY-01 | 已完成 `b3d26c3` 治理增强和 `cea940a` 两份真实 BOM 验证。V700 缺少可确认的标准名称、单位等 Draft 必填映射；A118 存在 XFD 超宽重复块，系统不静默截断。未上传、dry-run 或创建 DRAFT；解除条件是确认 V700 标准名称/单位来源，并重新导出或人工清理 A118 异常块后提供新 SHA 文件 |
 | PHASE3-MATERIAL-LIBRARY-01 | 内部物料库数据库建立与正式 Material Master 落地 | DONE | Codex（审计与非生产实施）、项目负责人（任务范围确认） | 2026-07-18 14:01 CST | 2026-07-18 14:38 CST | PHASE3-TASK04、PHASE1-TASK07 | 复用既有 `material_master` 和 Import/Normalization/Review；新增 `0007` 单位/品牌、Approval、来源行关联和重复候选，接通 Approved Normalization→DRAFT，提供 inspect/dry-run/commit/report；全量 Node 569/569、build、隔离 API smoke、迁移/权限/幂等/凭证/临时 SQLite 通过；功能提交 `2ff8d9c`，未执行真实文件 dry-run、生产迁移或部署 |
@@ -64,7 +69,7 @@
 | PHASE3-TASK01 | 设计 Material Import Normalization & Staging V1 | DONE | Codex（设计）、项目负责人（待规格确认） | 2026-07-17 | 2026-07-17 | PHASE2-TASK08 | 完成正式规格、OpenAPI 草案和数据流/状态图；定义独立 run、JSON 行快照、独立 issue、类型/空值/属性规则、Outbox/租约、原子发布、五个 API、`0006` 设计、54 项测试和 16 项 `PROPOSED` 决定；仅文档，未修改运行时代码、Schema、Migration、API、前端或生产环境 |
 | PHASE3-TASK03 | 设计 Material Import Normalization Review UI V1 | DONE | Codex（设计）、项目负责人（2026-07-17 正式规格确认） | 2026-07-17 | 2026-07-17 | PHASE3-TASK02 | 完成正式 UI 规格、37 状态低保真线框、集中状态矩阵和 104 项未来实施测试；统一工作区、七步 Stepper、Current/Latest 双轨、Rows/Issues cursor 与 Row Drawer等 14 项决定均已 `APPROVED`；局部 Issue 查询门禁、性能门禁和 7 项非阻塞限制继续有效；仅文档，未修改前端、API、Schema、Migration、业务逻辑或生产环境 |
 
-当前没有 `DOING` 任务；规格精度门禁已部署，等待项目负责人清空旧 Cleaning 并重新导入验收。`PHASE3-MATERIAL-LIBRARY-02` 仍因 A118 超宽异常块和 V700 缺少必填 Mapping 语义处于 `BLOCKED`。生产 R2/Queue、生产 D1 migration、Cron、正式部署、真实数据导入、`submitted_by` 只读筛选、`PENDING_APPROVAL` 收缩和 `PHASE0-TASK03` 仍需独立授权。
+当前无 `DOING` 任务。`SELFHOST-PHASE1-TASK04` 已完成非生产实现和隔离验收；脱敏真实样本容量/冲突演练、旧数据试迁移、生产部署和公网切换仍需独立任务与授权。
 
 ## Phase 0 待办
 
@@ -78,6 +83,9 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-PHASE1-TASK02 | 完成 Import Mapping、Mapping版本及复用规则的 PostgreSQL 持久化和自托管 API 移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围与禁止事项确认） | 2026-07-23 | 2026-07-23 | SELFHOST-PHASE1-TASK01 | 已移植 Mapping 目录、版本、复用、Worker准备和现有页面；行级 Normalizer、真实数据迁移及生产部署继续另立任务 |
+| SELFHOST-PHASE1-TASK03 | 完成行级 Normalizer 与 Normalization Review 的 PostgreSQL 自托管移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围、验收标准与禁止事项确认） | 2026-07-23 | 2026-07-23 | SELFHOST-PHASE1-TASK02 | 已移植 run/rows/issues、关系化候选/lineage、Worker原子发布、重试/重跑/取消和Review UI；真实数据迁移及生产部署继续另立任务 |
+| SELFHOST-PHASE1-TASK04 | 完成 Normalization 人工复核与 Material Draft Commit 的 PostgreSQL 自托管移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围、验收标准与禁止事项确认） | 2026-07-24 | 2026-07-24 | SELFHOST-PHASE1-TASK03、SELFHOST-PHASE1-TASK01 | 已实现独立人工覆盖、Issue处理、ACTIVE精确绑定、Material Service建DRAFT和可恢复finalization；真实样本容量验收、真实数据迁移和生产部署继续另立任务 |
 | PHASE3-TASK02 | 实现 Material Import Normalization & Staging V1 | DONE | Codex（实施）、项目负责人（批准 16 项决定） | 2026-07-17 | 2026-07-17 | PHASE3-TASK01 | 已实现独立 run、行 JSON 快照、Issue、Outbox/租约/心跳、原子 pointer 发布、不同 processor 版本重跑、取消清理、五个 API、`material.import.normalize`、读写限流、`0006` Up/受保护 Down/快照及隔离测试；未创建 Draft/正式物料，未迁移或部署生产 |
 | PHASE4-TASK01 | 建立AI治理评估与审批边界 | TODO | 待指派 | - | - | Material Import 治理链路完成 | 定义评估集、证据、模型版本、人工确认和禁止自动生效规则；原占位编号 `PHASE3-TASK01` 因本次明确任务编号顺延 |
 

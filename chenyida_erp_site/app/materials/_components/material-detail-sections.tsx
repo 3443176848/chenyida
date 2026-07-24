@@ -38,6 +38,7 @@ export type MaterialDetail = {
   history_summary: {
     versions: { items: MaterialVersionSummary[]; total: number; has_more: boolean };
     change_logs: { items: MaterialChangeSummary[]; total: number; has_more: boolean };
+    audit_logs?: { total: number; has_more: boolean };
   };
   last_rejection?: { version: number; reason: string; reviewed_by: string; reviewed_at: string } | null;
 };

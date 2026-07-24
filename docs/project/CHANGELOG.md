@@ -2,6 +2,62 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-24
+
+### SELFHOST-PHASE1-TASK04 - 未提交（用户明确禁止提交）
+
+- 数据库：新增 PostgreSQL `0005_material_import_review.sql`、Drizzle schema/snapshot/journal；增加11张Review/覆盖/Issue/finalization/binding/draft link/history表、42个索引、restrict外键、互斥/大小/唯一/CAS约束和终态不可变trigger，未修改`0001`～`0004`。
+- 服务端：新增独立 Material Import Review Repository/Service/API/Worker，覆盖已发布run固定引用、Session版本、三层值、SET/CLEAR/REVERT、行决定、Issue处理、ACTIVE分页精确绑定、finalization进度/失败/retry和历史。
+- Material接入：通过TASK01 `MaterialWorkflowService.createDraftWithClient` 在同一行级事务创建未编码DRAFT并保存稳定link；不直接写物料表，不提交、批准、生成正式编码或修改ACTIVE。
+- Worker与安全：Outbox/background_jobs、100行快照、50行处理、lease/heartbeat/CAS、行级operation key、部分失败和旧Worker租约拒绝；Session/Row expected_version、CSRF、细粒度权限、强幂等和安全审计通过。
+- 前端：复用`/materials/imports/:batchId`七步工作区、现有view/row深链接和Drawer，增加Review版本/历史、三层值、覆盖、Issue确认、决定、ACTIVE选择、Draft选择、批量、进度和失败恢复；没有自动匹配/建稿/审批/编码入口。
+- 验证：专项unit7/7、UI3/3、PG3/3；39个unit/UI/environment、25个PostgreSQL及2个旧migration upgrade共66个Node test通过；101行跨Worker chunk、空库/重复/0004升级、build、strict定向类型、lint 0 error/1既有warning、454文件凭证扫描和`git diff --check`通过。
+- Compose：CSV→Parser→Mapping→Normalization→Review→排除/绑定/Draft→finalize通过；整栈stop/up后Normalization、Review历史、binding和DRAFT保持，一次性容器/网络/卷已清理。
+- 边界：未连接生产、迁移真实数据、部署、提交、推送或创建PR；旧D1代码保留但不进入自托管依赖图。
+
+## 2026-07-23
+
+### SELFHOST-PHASE1-TASK03 - 未提交（用户明确禁止提交）
+
+- 数据库：新增 PostgreSQL `0004_material_import_normalization.sql`、Drizzle snapshot/journal；扩展 run/row/issue，关系化新增核心字段候选、动态属性候选和 lineage，并增加唯一索引、外键、状态/统计/发布约束及已发布数据不可变 trigger。
+- 服务端：新增独立 Normalization Repository/Service/Normalizer/API/Worker，复用旧确定性规则，覆盖 create/summary/history/detail/rows/issues、同 run 重试、新版本重跑、取消、100 行分块暂存和 500 行摘要读取。
+- 原子性与安全：Session/权限/行级可见性、CSRF、Idempotency-Key+正文摘要、expected version、Job lease/heartbeat/CAS、Event/Audit 和稳定错误通过；发布 pointer 与 Job success 同一 PostgreSQL 事务，失败、丢失 lease 或取消不得暴露暂存。
+- 前端：现有 Normalization Review 增加运行历史选择、run-specific Rows/Issues、VALID/WARNING/ERROR/SKIPPED、raw row、核心/动态候选、关系化 lineage、重试/重跑/取消。
+- 验证：专项 unit4/4、UI3/3、PG/API4/4、升级1/1；既有回归41/41，strict定向类型检查、build、lint 0 error/1既有warning、空库/重复/升级迁移、Compose v1→v2→取消及整栈重启持久性通过。
+- 边界：未实现人工最终复核、ACTIVE绑定或Draft Commit；未连接生产、迁移真实数据、部署、提交、推送或创建PR。
+
+### SELFHOST-PHASE1-TASK02 - 未提交（用户明确禁止提交）
+
+- 数据库：新增 PostgreSQL `0003_material_import_mapping.sql`、Drizzle snapshot/journal；原始行绑定 parse run，Mapping 增加源结构摘要、动态目标 metadata、确认快照、版本关系、复用来源、STALE 原因和不可变 trigger；旧不可证明确认版本升级为 `LEGACY_SNAPSHOT_INCOMPLETE`。
+- 服务端：新增独立 Import Mapping Catalog/Rules/Service/API，覆盖 Sheets、Rows、动态 Targets、Mapping 保存/预览/确认、版本列表/新版本、有效性、复用候选和显式应用；D1/Miniflare/Cloudflare 不进入自托管运行依赖。
+- 一致性与安全：权限、创建人行级可见性、CSRF、请求大小、稳定错误、请求编号、批次/Mapping 乐观锁、事务内强幂等、Import Event/Audit、并发锁顺序和失败整体回滚通过。
+- 版本与复用：确认版本和 Items 数据库不可变；相同 digest 禁止重复确认；新版本确认后旧版本 SUPERSEDED；跨批次来源不变，复用只复制到 DRAFT，metadata 变化需重确认，已用目标类型变化为 STALE 并拒绝应用。
+- Worker/UI：解析完成事务内原子发布 parse run、Sheet、Rows、Header 建议和初始 Mapping DRAFT；现有工作区增加当前版本/状态、版本历史、新草稿和复用候选/应用提示。
+- 验证：Mapping 单元3/3、UI2/2、PG/API6/6、旧数据升级1/1；Material单元6/6、UI2/2、PG/API7/7、FileStorage3/3、PG/Worker5/5、环境6/6回归；strict定向类型检查、build、lint 0 error/1既有warning、空库/升级/重复迁移、Compose解析→Mapping v2→确认和Web/Worker重启持久性通过。
+- 边界：未实现或连接行级Normalizer，未连接生产、迁移真实数据、部署、提交、推送或创建PR。
+
+### SELFHOST-PHASE1-TASK01 - 未提交（用户明确禁止提交）
+
+- 数据库：新增 PostgreSQL `0002_material_master_workflow.sql`、Drizzle snapshot/journal、分类编码序列表、审核队列/版本事件索引及草稿/ACTIVE编码一致性约束；未改 `0001`。
+- 服务端：新增独立 Material Repository/Service/状态机/Validation/API，覆盖分类、草稿创建编辑、提交、审核通过/驳回、ACTIVE查询、版本、变更和审计；Session、权限、职责分离、CSRF、24小时强幂等、请求摘要、乐观锁和安全错误均由服务端执行。
+- 编码与事务：批准时锁定草稿，以 PostgreSQL原子 upsert 领取分类流水并生成 `CYD-{CATEGORY_CODE}-{NNNNNN}`；主记录、属性、版本、变更、审计、幂等和编码同事务提交或回滚，并发测试无重复编码。
+- 前端：复用现有Material创建/编辑/详情/审核页面契约，新增真实审计历史路由和 `material.audit.read` 能力页签，不展示敏感审计正文。
+- 验证：单元6/6、UI契约2/2、PostgreSQL/API 7/7、既有Material UI 142/142、Phase0文件3/3和PG/Worker 5/5回归、build、lint 0 error/1既有warning及Compose双用户审批/整体重启持久性通过。
+- 既有问题清理：只把 `xls-parser.ts` 的 `let flags` 改为 `const`，无行为变化；workbook unused warning和依赖审计风险继续记录，未强制升级。
+- 边界：未移植Import Mapping/Normalizer，未连接生产、迁移真实数据、部署、提交、推送或创建PR；旧D1/Miniflare仅保留为参照，不进入新运行依赖。
+
+## 2026-07-22
+
+### SELFHOST-PHASE0-TASK01 - 未提交（用户明确禁止提交）
+
+- 架构：标准 Node.js/Vinext Web、PostgreSQL、服务器本地 FileStorage、PostgreSQL Outbox/租约 Worker、Docker Compose 与 Caddy production profile 取代 OpenAI Site/Cloudflare 运行依赖。
+- 数据库：新增 Drizzle PostgreSQL schema 和新的 `0001` 空库 baseline，46 表覆盖既有 45 张业务/治理结构及 `background_jobs`；migration advisory lock、checksum、transaction 和生产显式门禁。
+- 文件：随机存储名、路径穿越保护、SHA-256/大小/MIME/原名元数据、同目录临时文件、fsync、原子 rename、受控读删和持久卷。
+- Worker：Outbox、`FOR UPDATE SKIP LOCKED`、lease owner/token、heartbeat、CAS、重试、超时恢复、幂等、业务结果与任务状态原子发布、安全停机；CSV 解析和规范化基线 handler 已接入。
+- 运维：Web/Worker/PostgreSQL/Caddy Compose、非 root 用户、健康检查、日志轮转、admin/migrate CLI、无覆盖备份恢复脚本与 Linux 文档。
+- 验证：单元 3/3、PostgreSQL 5/5、Vinext build、定向 lint、凭证/差异检查、Compose 登录/分类/草稿/上传/Worker/重启持久性和隔离备份→新空库恢复通过；全量 lint 有 1 个本任务前既有 `prefer-const` error。
+- 边界：未连接或修改生产、未迁移真实数据、未部署公网、未提交/推送/PR；完整旧 API、审批写 Repository 和行级 Normalizer PostgreSQL 移植留待后续任务。
+
 ## 2026-07-19
 
 ### PHASE3-MATERIAL-LIBRARY-SPEC-PRECISION-GATE-01 - `feat: enforce specification precision gates`

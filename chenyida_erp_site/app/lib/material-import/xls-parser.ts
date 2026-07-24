@@ -167,7 +167,7 @@ class SegmentReader {
 }
 
 function readBiffString(reader: SegmentReader): string {
-  const count = reader.readU16(); let flags = reader.readByte(); const rich = (flags & 0x08) !== 0 ? reader.readU16() : 0; const extended = (flags & 0x04) !== 0 ? (() => { const a = reader.readByte(); const b = reader.readByte(); const c = reader.readByte(); const d = reader.readByte(); return (a | b << 8 | c << 16 | d << 24) >>> 0; })() : 0;
+  const count = reader.readU16(); const flags = reader.readByte(); const rich = (flags & 0x08) !== 0 ? reader.readU16() : 0; const extended = (flags & 0x04) !== 0 ? (() => { const a = reader.readByte(); const b = reader.readByte(); const c = reader.readByte(); const d = reader.readByte(); return (a | b << 8 | c << 16 | d << 24) >>> 0; })() : 0;
   if (count > MATERIAL_IMPORT_PARSER_LIMITS.maxCellCharacters) fail("XLS 单元格文本超过限制");
   const compressed = (flags & 1) === 0;
   const value = reader.readStringCharacters(count, compressed);

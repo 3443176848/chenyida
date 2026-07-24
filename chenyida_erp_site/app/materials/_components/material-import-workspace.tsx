@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { api, ErpApiError } from "../../../public/erp/api-client.js";
+import { api } from "../../../public/erp/api-client.js";
 import { formatShanghaiDate } from "../_lib/material-ui";
 import {
   createImportWriteOperation, normalizeImportUiError, parseImportWorkspaceQuery,
@@ -14,6 +14,7 @@ import { redirectToExistingLogin, useMaterialSession } from "./material-shell";
 import { MaterialImportUploadFlow } from "./material-import-create-page";
 import { MaterialImportMappingEditor, MaterialImportMappingPreview } from "./material-import-mapping-editor";
 import { MaterialImportNormalizationReview } from "./material-import-normalization-review";
+import { MaterialImportReviewWorkspace } from "./material-import-review-workspace";
 import { MaterialImportRowPreview, MaterialImportSheetSelector, type MaterialImportRow, type MaterialImportSheet } from "./material-import-row-preview";
 import { MaterialImportDialog, MaterialImportErrorState, MaterialImportStatusBadge, MaterialImportStepper, useMaterialImportUnsavedGuard } from "./material-import-primitives";
 
@@ -25,6 +26,9 @@ type MappingResponse = { request_id?: string; batch_id: number; batch_status: st
 type CatalogResponse = { request_id?: string; batch_id: number; parse_run_id: number; metadata_digest: string; items: ImportMappingTarget[]; next_cursor: string | null };
 type PreviewResponse = { request_id?: string; batch_id: number; parse_run_id: number; sampled_row_count: number; rows: { row_number: number; values: { target_namespace: string; target_code: string; source_column_index: number | null; status: string; raw_value: unknown; candidate_value: unknown; issues: { code: string; message: string }[] }[] }[] };
 type PreviewBinding = { batchId: number; parseRunId: number; batchVersion: number; mappingId: number; mappingVersion: number; payloadDigest: string; metadataDigest: string; response: PreviewResponse };
+type MappingVersionsResponse = { request_id?: string; batch_id: number; items: (MappingAggregate & { confirmed_by?: string | null; confirmed_at?: string | null; reuse_source_mapping_id?: number | null; stale_reason?: string | null })[] };
+type MappingReuseCandidate = { mapping_id: number; mapping_version: number; batch_id: number; batch_no: string; confirmed_by: string | null; confirmed_at: string | null; decision: "AUTO_RECOMMEND" | "RECONFIRM_REQUIRED" | "INCOMPATIBLE" | "STALE"; reason_code: string };
+type MappingReuseResponse = MappingResponse & { reuse_decision: string; confirmation_required: boolean };
 
 const CANCEL_STATES = new Set(["CREATED", "UPLOAD_PENDING", "FILE_READY", "QUEUED_FOR_PARSING", "PARSING"]);
 
@@ -40,6 +44,8 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
   const [error, setError] = useState<ImportUiError | null>(null); const [notice, setNotice] = useState(""); const [dialog, setDialog] = useState<"PARSE" | "CANCEL" | "CONFIRM" | null>(null);
   const [polling] = useState(() => new MaterialImportPollingController()); const [operations, setOperations] = useState<Record<string, ImportWriteOperation>>({});
   const [mappingBaseline, setMappingBaseline] = useState(""); const loadSequence = useRef(0);
+  const [mappingVersions, setMappingVersions] = useState<MappingVersionsResponse["items"]>([]);
+  const [reuseCandidates, setReuseCandidates] = useState<MappingReuseCandidate[]>([]);
   const dirty = mapping ? stableImportStringify({ selected_sheet_index: formalSheet, header_mode: headerMode, header_row_number: headerRow, items }) !== mappingBaseline : false;
   const resultUnknown = Object.values(operations).some((operation) => operation.state === "RESULT_UNKNOWN");
   useMaterialImportUnsavedGuard(dirty || resultUnknown || Boolean(file && batch?.status === "CREATED"));
@@ -65,7 +71,7 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
       const visible = sheets.sheets.filter((item) => item.visibility === "VISIBLE" && item.parse_disposition === "PARSED");
       if (parsed.sheet === null || !visible.some((item) => item.sheet_index === parsed.sheet)) parsed.sheet = visible[0]?.sheet_index ?? null;
     }
-    const normalizationView = ["normalize", "normalized", "issues"].includes(parsed.view);
+    const normalizationView = ["normalize", "normalized", "issues", "review"].includes(parsed.view);
     const canonical = `/materials/imports/${batchId}?${serializeImportWorkspaceQuery(parsed)}`;
     if (!normalizationView && `${window.location.pathname}${window.location.search}` !== canonical) window.history.replaceState({}, "", canonical);
     setQuery(parsed);
@@ -121,6 +127,19 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
     } catch (reason) { handleError(reason, true); }
   }, [batch, batchId, handleError, navigate, query.sheet, query.view]);
   useEffect(() => { const timer = window.setTimeout(() => void loadMapping(), 0); return () => window.clearTimeout(timer); }, [loadMapping]);
+
+  const loadMappingVersions = useCallback(async () => {
+    if (!batch || !["AWAITING_MAPPING", "MAPPING_CONFIRMED"].includes(batch.status)) { setMappingVersions([]); setReuseCandidates([]); return; }
+    try {
+      const versions = await api<MappingVersionsResponse>(`/api/material-master/import-batches/${batchId}/mapping/versions`, { cache: "no-store" });
+      setMappingVersions(versions.items);
+      if (batch.status === "AWAITING_MAPPING" && canMap) {
+        const candidates = await api<{ items: MappingReuseCandidate[] }>(`/api/material-master/import-batches/${batchId}/mapping/reuse-candidates`, { cache: "no-store" });
+        setReuseCandidates(candidates.items);
+      } else setReuseCandidates([]);
+    } catch (reason) { handleError(reason, true); }
+  }, [batch, batchId, canMap, handleError]);
+  useEffect(() => { const timer = window.setTimeout(() => void loadMappingVersions(), 0); return () => window.clearTimeout(timer); }, [loadMappingVersions]);
 
   const loadCatalog = useCallback(async (append = false) => {
     if (!batch || batch.status !== "AWAITING_MAPPING" || !canMap) return;
@@ -180,7 +199,7 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
       const [latest, latestMapping, latestSheets] = await Promise.all([readDetail(), api<MappingResponse>(`/api/material-master/import-batches/${batchId}/mapping`, { cache: "no-store" }), readSheets()]);
       const catalog = await api<CatalogResponse>(`/api/material-master/import-batches/${batchId}/mapping-targets?limit=50`, { cache: "no-store" });
       const valid = latest.batch.status === "AWAITING_MAPPING" && latest.batch.current_version === preview.batchVersion && latestMapping.mapping.mapping_version === preview.mappingVersion && latestMapping.mapping.parse_run_id === preview.parseRunId && latestSheets.parse_run_id === preview.parseRunId && catalog.metadata_digest === preview.metadataDigest && preview.payloadDigest === stableImportStringify(draftPayload());
-      if (!valid) { setPreview(null); throw new ErpApiError("服务端版本、parse run 或 Catalog 已变化，请重新保存和预览", { status: 409, code: "IMPORT_MAPPING_VERSION_CONFLICT" }); }
+      if (!valid) { setPreview(null); throw Object.assign(new Error("服务端版本、parse run 或 Catalog 已变化，请重新保存和预览"), { status: 409, code: "IMPORT_MAPPING_VERSION_CONFLICT" }); }
       setDialog("CONFIRM");
     } catch (reason) { handleError(reason); } finally { setBusy(false); }
   };
@@ -188,6 +207,31 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
     if (!batch || !mapping || !preview) return; setBusy(true);
     try { await write("CONFIRM", `/api/material-master/import-batches/${batchId}/mapping/confirm`, "POST", { expected_version: batch.current_version, parse_run_id: mapping.parse_run_id, mapping_id: mapping.id, expected_mapping_version: mapping.mapping_version, metadata_digest: preview.metadataDigest }); setDialog(null); setPreview(null); await initialLoad(); }
     catch (reason) { handleError(reason); } finally { setBusy(false); }
+  };
+  const applyReuse = async (candidate: MappingReuseCandidate) => {
+    if (!batch || !mapping || batch.status !== "AWAITING_MAPPING" || busy || resultUnknown) return;
+    setBusy(true);
+    try {
+      const result = await write<MappingReuseResponse>("REUSE", `/api/material-master/import-batches/${batchId}/mapping/reuse`, "POST", {
+        expected_version: batch.current_version,
+        expected_mapping_version: mapping.mapping_version,
+        source_mapping_id: candidate.mapping_id,
+      });
+      const value = result.mapping;
+      setMapping(value); setItems(value.items); setFormalSheet(value.selected_sheet_index); setHeaderMode(value.header_mode); setHeaderRow(value.header_row_number);
+      setMappingBaseline(stableImportStringify({ selected_sheet_index: value.selected_sheet_index, header_mode: value.header_mode, header_row_number: value.header_row_number, items: value.items }));
+      setPreview(null); setNotice(`已应用 ${candidate.batch_no} 的 Mapping v${candidate.mapping_version}；服务端未自动确认，请重新预览并人工确认。`);
+      await loadMappingVersions();
+    } catch (reason) { handleError(reason); } finally { setBusy(false); }
+  };
+  const createMappingVersion = async () => {
+    if (!batch || batch.status !== "MAPPING_CONFIRMED" || busy || resultUnknown) return;
+    setBusy(true);
+    try {
+      await write<MappingResponse>("NEW_VERSION", `/api/material-master/import-batches/${batchId}/mapping/versions`, "POST", { expected_version: batch.current_version });
+      setNotice("已从当前确认快照创建新的 Mapping 草稿；原确认版本保持不可变。");
+      await initialLoad();
+    } catch (reason) { handleError(reason); } finally { setBusy(false); }
   };
 
   if (!canRead) return <MaterialImportErrorState title="没有导入读取权限" message="当前账号没有 material.import.read，页面不会请求批次正文。" />;
@@ -209,12 +253,20 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
       <section className="mi-sheet-workspace"><MaterialImportSheetSelector sheets={sheetsData.sheets} selected={query.sheet} onSelect={(sheet) => navigate({ sheet: sheet.sheet_index, row_page: 1, view: "sheet" })} />
         {selectedSheet && rowsData ? <MaterialImportRowPreview rows={rowsData.rows} columnCount={selectedSheet.source_column_max} page={query.row_page} pageSize={query.row_page_size} totalRows={rowsData.total_rows} loading={rowsLoading} onPage={(row_page) => navigate({ row_page })} onPageSize={(row_page_size) => navigate({ row_page_size, row_page: 1 })} /> : null}
       </section>
+      {mapping ? <section className="mi-mapping-history" aria-label="Mapping 版本与复用">
+        <h3>Mapping 版本与复用</h3>
+        <p>当前 v{mapping.mapping_version} · {mapping.mapping_status}。已确认版本为不可变快照；复用只会复制到草稿，始终需要重新预览和确认。</p>
+        {mappingVersions.length ? <ul>{mappingVersions.map((version) => <li key={version.id}>v{version.mapping_version} · {version.mapping_status}{version.confirmed_by ? ` · ${version.confirmed_by}` : ""}{version.confirmed_at ? ` · ${formatShanghaiDate(version.confirmed_at, true)}` : ""}{version.stale_reason ? ` · ${version.stale_reason}` : ""}</li>)}</ul> : <p>暂无版本历史。</p>}
+        {batch.status === "MAPPING_CONFIRMED" && canMap ? <button disabled={busy || resultUnknown} onClick={() => void createMappingVersion()}>创建新 Mapping 草稿版本</button> : null}
+        {batch.status === "AWAITING_MAPPING" && reuseCandidates.length ? <div><h4>可复用候选</h4>{reuseCandidates.map((candidate) => <article key={candidate.mapping_id}><p>{candidate.batch_no} · v{candidate.mapping_version} · {candidate.decision} · {candidate.reason_code}</p>{["AUTO_RECOMMEND", "RECONFIRM_REQUIRED"].includes(candidate.decision) ? <button disabled={busy || resultUnknown || dirty} onClick={() => void applyReuse(candidate)}>应用到当前草稿</button> : <span>不可应用</span>}</article>)}</div> : null}
+      </section> : null}
       {batch.status === "AWAITING_MAPPING" && mapping ? <section className="mi-header-panel"><h3>正式 Sheet 与表头</h3>{mapping.structure_status ? <p role="status">结构识别：{mapping.structure_status} · 置信度 {Math.round((mapping.structure_confidence || 0) * 100)}% · 表头 {mapping.header_start_row_number ?? mapping.header_row_number}—{mapping.header_row_number ?? "—"} 行 · 数据从第 {mapping.data_start_row_number ?? ((mapping.header_row_number || 0) + 1)} 行开始。低置信度必须人工确认。</p> : null}<label>来源 Sheet<select value={formalSheet ?? ""} disabled={!canMap || busy} onChange={(e) => { if (dirty && !window.confirm("切换 Sheet 会清除当前未保存 Mapping，是否继续？")) return; setFormalSheet(Number(e.target.value)); setItems([]); setPreview(null); navigate({ sheet: Number(e.target.value), row_page: 1 }); }}><option value="" disabled>请选择</option>{sheetsData.sheets.filter((item) => item.visibility === "VISIBLE" && item.parse_disposition === "PARSED").map((item) => <option value={item.sheet_index} key={item.sheet_index}>{item.sheet_index} · {item.sheet_name}</option>)}</select></label><fieldset disabled={!canMap || busy}><legend>表头模式</legend><label><input type="radio" checked={headerMode === "SINGLE_ROW"} onChange={() => { if (dirty && !window.confirm("切换表头会使当前 Mapping 编辑失效，是否继续？")) return; setHeaderMode("SINGLE_ROW"); setHeaderRow(selectedSheet?.header_suggestions[0]?.row_number || 1); setItems([]); setPreview(null); }} /> 有表头（表头结束行）</label><label><input type="radio" checked={headerMode === "NO_HEADER"} onChange={() => { if (dirty && !window.confirm("切换表头会使当前 Mapping 编辑失效，是否继续？")) return; setHeaderMode("NO_HEADER"); setHeaderRow(null); setItems([]); setPreview(null); }} /> NO_HEADER</label>{headerMode === "SINGLE_ROW" ? <label>表头结束行<input type="number" min="1" max={selectedSheet?.parsed_row_count || 1} value={headerRow || 1} onChange={(e) => { setHeaderRow(Number(e.target.value)); setPreview(null); }} /></label> : <p>将使用 COLUMN_A…COLUMN_IV 稳定展示标签；不会冒充数据库字段名。</p>}</fieldset></section> : null}
       {mapping && formalSheet !== null && (query.view === "mapping" || query.view === "confirmed") ? <MaterialImportMappingEditor columnCount={sheetsData.sheets.find((item) => item.sheet_index === formalSheet)?.source_column_max || 0} rows={rowsData?.sheet_index === formalSheet ? rowsData.rows : []} headerMode={headerMode} headerRow={headerRow} targets={targets} catalogQuery={catalogQuery} catalogHasMore={Boolean(catalogCursor)} items={items} dirty={dirty} readOnly={mappingReadOnly} busy={busy || resultUnknown} previewValid={previewValid} onCatalogQuery={(value) => { setCatalogQuery(value); setCatalogCursor(null); }} onCatalogMore={() => void loadCatalog(true)} onItems={(value) => { setItems(value); setPreview(null); }} onReset={() => { setItems(mapping.items); setFormalSheet(mapping.selected_sheet_index); setHeaderMode(mapping.header_mode); setHeaderRow(mapping.header_row_number); setPreview(null); }} onSave={() => void saveMapping()} onPreview={() => void previewMapping()} onConfirm={() => void prepareConfirm()} /> : null}
       {preview?.response && query.view === "mapping" ? <MaterialImportMappingPreview rows={preview.response.rows} /> : null}
       {batch.status === "MAPPING_CONFIRMED" && query.view === "confirmed" ? <section className="mi-confirmed"><h3>字段映射已确认</h3><p>这里只表示字段对应关系已确认，不代表物料已创建。页面不显示 API 未提供的确认人或确认时间，也不提供“开始正式导入”。</p></section> : null}
     </> : null}
     {["MAPPING_CONFIRMED", "QUEUED_FOR_NORMALIZATION", "NORMALIZING", "NORMALIZED"].includes(batch.status) && ["normalize", "normalized", "issues"].includes(query.view) ? <MaterialImportNormalizationReview batchId={batchId} batch={batch} permissions={permissions} csrfToken={session.csrf_token || ""} onBatch={setBatch} /> : null}
+    {batch.status === "NORMALIZED" && query.view === "review" ? <MaterialImportReviewWorkspace batchId={batchId} batch={batch} permissions={permissions} csrfToken={session.csrf_token || ""} /> : null}
     {dialog === "PARSE" ? <MaterialImportDialog title="启动文件解析" busy={busy} primaryLabel="确认启动解析" onClose={() => setDialog(null)} onPrimary={() => void confirmParse()}><ul><li>公式不会执行。</li><li>隐藏 Sheet 不用于业务行或 Mapping。</li><li>不会创建 Material Draft 或正式编码。</li><li>解析可能需要一定时间，页面只显示服务端真实粗粒度状态。</li></ul></MaterialImportDialog> : null}
     {dialog === "CANCEL" ? <MaterialImportDialog title="取消导入批次" danger busy={busy} primaryLabel="确认取消" onClose={() => setDialog(null)} onPrimary={() => void cancelBatch()}><p>{batch.status === "PARSING" ? "这是协作式取消，后台可短暂继续计算，但成功后旧任务不得发布。" : batch.status === "QUEUED_FOR_PARSING" ? "取消不承诺物理删除 Queue 消息，只阻止尚未完成的结果发布。" : batch.status === "UPLOAD_PENDING" ? "取消不表示对象立即删除，服务端会按协调和清理策略处理。" : "服务端将使用最新版本决定是否仍可取消。"}</p></MaterialImportDialog> : null}
     {dialog === "CONFIRM" ? <MaterialImportDialog title="最终确认字段 Mapping" busy={busy} primaryLabel="确认 Mapping" onClose={() => setDialog(null)} onPrimary={() => void confirmMapping()}><p>本操作只确认字段对应关系，不创建 Material Draft、正式物料或编码，不执行清洗、分类、匹配、去重或 AI。服务端仍会重新核对状态、版本、parse run 与 metadata。</p></MaterialImportDialog> : null}

@@ -4,7 +4,7 @@
 
 ## 项目介绍
 
-晨亿达ERP面向 PCB、FPC、SMT 行业，目标是用统一内部编码贯通物料、产品、BOM、采购、库存、生产、销售、品质和财务。当前系统已经存在本地版和在线版；未来主线是 AI 物料主数据中心，但 AI 必须受审核、审计和数据权限约束。
+晨亿达ERP面向 PCB、FPC、SMT 行业，目标是用统一内部编码贯通物料、产品、BOM、采购、库存、生产、销售、品质和财务。未来唯一生产方向是用户自有 Linux 服务器上的 Node.js/PostgreSQL/本地持久化文件/独立 Worker；AI 必须受审核、审计和数据权限约束。
 
 ## 系统组成
 
@@ -13,16 +13,16 @@
 - 路径：`chenyida_erp_app/`
 - 技术：Python 3.11、标准库 HTTP Server、SQLite、原生 HTML/CSS/JavaScript；项目虚拟环境固定 `openpyxl`/`xlrd` 解析 XLSX/XLS。
 - 入口：`server.py`；静态页面位于 `static/`。
-- 用途：服务器本地运行和后续默认交付目标；根据 D-029 公网验证期间监听 `0.0.0.0:18888`。
+- 用途：历史业务行为参考和旧数据迁移来源；不再作为未来生产底座。
 - 数据：`chenyida_erp_app/data/erp.sqlite3`，运行数据被 Git 忽略。
 
-### 在线 Site
+### 自托管 Node 应用
 
 - 路径：`chenyida_erp_site/`
-- 技术：Vinext、React、TypeScript、Cloudflare Worker、D1、Drizzle、OpenAI Sites。
+- 技术：Vinext、React、TypeScript、标准 Node.js、PostgreSQL/Drizzle、本地持久化文件和 PostgreSQL 后台任务 Worker。
 - 页面：根 `app/page.tsx` 继续通过 iframe 加载 legacy `public/erp/index.html`；Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
-- API：`app/api/[...path]/route.ts` 转交给 `app/lib/erp-api.ts` 的集中式处理器。
-- 历史在线生产：Sites `v3`，公开地址 `https://chenyida-erp-online.sjin74376.chatgpt.site`；不作为后续新功能默认交付目标。
+- API：`app/api/[...path]/route.ts` 转交给不依赖平台 binding 的 `app/lib/selfhost-api.ts`；旧 `erp-api.ts` 仅作迁移参考。
+- 部署：`compose.yml` 启动 Web、Worker、PostgreSQL；Caddy production profile 提供 HTTPS。历史 Sites `v3` 不作为后续交付目标。
 
 - 公网验证地址：`http://43.135.157.211:18888`；仅用于本次验证，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
@@ -43,7 +43,17 @@
 - 覆盖用户、会话、物料、映射、清洗、客户、供应商、产品、BOM、采购、库存、生产、销售、品质、财务和活动日志。
 - 已增加 `local_schema_migrations`、`material_import_batches`、`material_import_raw_rows` 及来源外键/索引；`0002` 为批次增加完整原文件归档 key、大小和 warning。历史表的迁移基线与外键治理仍待逐步补齐。
 
-### 在线 D1
+### PostgreSQL 自托管基线
+
+- `drizzle-postgres/0001_selfhost_baseline.sql` 新建 46 表：现有 45 张业务/治理结构和 `background_jobs`；使用 bigint/UUID/timestamptz/boolean/JSONB/numeric、外键、唯一约束和索引。
+- `drizzle-postgres/0002_material_master_workflow.sql` 增加按分类编码序列、审核队列/事件历史索引及草稿/ACTIVE编码一致性约束；Material Draft/Review/Active 已通过独立 Repository/Service/API 使用 PostgreSQL，Schema/snapshot/journal 对齐。
+- `drizzle-postgres/0003_material_import_mapping.sql` 增加 parse run 行绑定、动态 Mapping 目标、源结构/metadata/mapping摘要、不可变确认快照、版本/SUPERSEDED、复用来源和STALE语义；Worker、API和现有Import Workspace已完成非生产自托管闭环。
+- `drizzle-postgres/0004_material_import_normalization.sql` 增加版本化 Normalization run、关系化核心/动态属性候选、lineage、稳定 issue、重试/重跑/取消、发布一致性约束和已发布数据不可变 trigger；Worker、API和现有 Review UI 已完成非生产闭环。
+- `drizzle-postgres/0005_material_import_review.sql` 增加 Review Session/Row、核心和动态属性覆盖历史、Issue resolution、Review validation issue、sealed finalization、行级 operation、ACTIVE binding、Draft link 和审计历史；TASK01 Material Service、API、Worker 与七步 Import Workspace 已完成非生产闭环。
+- 本地文件卷保存二进制，数据库只保存受控相对路径和摘要元数据。
+- Worker 使用 PostgreSQL Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、重试和 CAS；Web/Worker 是独立入口。
+
+### 历史在线 D1
 
 - `drizzle/0000`—`0008` 形成 45 张表的开发 schema；Material V2、Draft/Review、Import Batch、Parser/Mapping、Normalization、Material Library 和 Supplier Profile 全部使用版本化 Up、snapshot/journal、受保护恢复边界与隔离迁移测试，尚未执行生产 migration。
 - 大多数业务对象按 `kind` 存入 `erp_records.data_json`。
@@ -62,15 +72,21 @@
 
 ## 当前架构结论
 
-1. 两个运行面包含大量相似业务能力，但数据库结构不同，尚未明确唯一生产权威源。
-2. 在线版是当前公开生产方向；服务端 API/D1 是权限和数据规则的权威边界。
+1. D-040 已确认自托管 PostgreSQL 是未来唯一生产权威方向；Python/SQLite 和 Cloudflare/D1 都只作迁移来源。
+2. 服务端 Node API/PostgreSQL 是权限、数据规则和任务状态的权威边界。
 3. legacy 在线 API 主要集中在 `erp-api.ts`；Material namespace 已由 catch-all 精确分发到独立 Material API、安全、查询和审计导出模块，并调用现有 Validation/Draft/Review Service。
 4. Material Master V2 应先建立关系化数据底座和迁移测试，再接入页面或 AI。
 5. 当前生产 `v3` / `2b4f178` 与纳管开发基线 `9f2c2dc` 的运行时代码一致；任何后续业务修改与部署仍须单独批准。
-6. 测试默认使用本机一次性 Miniflare D1；只接受 `ERP_ENV=test` 和 HTTP 回环地址，远程绑定关闭，测试后销毁数据库。
+6. 自托管测试使用明确的隔离 PostgreSQL 数据库和临时/测试文件卷；Miniflare 只保留为历史实现回归。
+7. D-041 已确认自托管 Material 使用固定 `DRAFT -> PENDING_REVIEW -> ACTIVE` 单步状态机；驳回回到 `DRAFT`，创建人和最后修改人不得审核，正式编码仅在批准事务中原子生成。
+8. D-042 已确认自托管 Mapping 使用不可变确认快照、显式新版本和结构相容复用；复用只复制到 DRAFT 并必须重新确认，Mapping 确认不自动启动 Normalizer。
+9. D-043 已确认自托管 Normalization 使用 run 隔离暂存、关系化候选/lineage 和 Job/业务结果同事务原子发布；重试复用同 run，重跑创建新版本，取消结果不得成为 current。
+10. D-044 已确认自托管人工复核采用独立覆盖层、版本历史和行级可恢复 finalization；ACTIVE 只允许人工精确绑定，Material Draft 必须经 TASK01 Service 创建且保持未编码 DRAFT。
 
 ## 当前风险
 
+- Material Draft/Review/Active、Import Mapping/版本/复用、行级 Normalizer 及人工复核/ACTIVE绑定/Draft Commit 已完成 PostgreSQL 非生产移植；后续真实数据演练和迁移不得重新接入 D1 运行依赖。
+- `0002`/`0003`/`0004`/`0005`、双用户审批、Mapping确认、Normalization原子发布/取消、人工复核 finalization 和重启持久性只在一次性 PostgreSQL 17/Compose 测试环境验证；未迁移真实数据、执行生产容量测试、生产恢复演练或部署。
 - Site 源码已可从根仓库恢复；生产提交与开发提交仍需在后续发布基线中持续追踪。
 - 本地和在线数据模型、编码和治理行为分叉。
 - 在线 JSON 模型缺少关键关系约束；本地 SQLite 缺少外键和迁移历史。

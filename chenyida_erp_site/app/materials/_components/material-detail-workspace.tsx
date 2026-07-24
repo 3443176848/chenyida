@@ -12,14 +12,16 @@ import { redirectToExistingLogin, useMaterialSession } from "./material-shell";
 import { MaterialErrorState, MaterialPagination, MaterialStatusBadge, type PaginationValue } from "./material-primitives";
 import { MaterialDetailSections, type MaterialDetail } from "./material-detail-sections";
 
-type View = "detail" | "versions" | "change-logs";
+type View = "detail" | "versions" | "change-logs" | "audit-logs";
 type VersionItem = { version: number; event_type: string; change_reason?: string; changed_fields?: string[]; snapshot?: Record<string, unknown>; changed_by?: string; reviewed_by?: string; created_at?: string; operation_id?: string };
 type ChangeItem = { change_type: string; field_name?: string; change_reason?: string; old_value?: unknown; new_value?: unknown; changed_by?: string; created_at?: string; operation_id?: string };
+type AuditItem = { id: number; username?: string; action?: string; result?: string; route_code?: string; request_id?: string; operation_id?: string; old_version?: number | null; new_version?: number | null; error_code?: string | null; created_at?: string };
 type HistoryResponse<T> = { data: T[]; pagination: PaginationValue; request_id?: string };
 type UiError = { status?: number; code?: string; requestId?: string };
 
 function asError(reason: unknown): UiError { return reason instanceof ErpApiError ? reason : {}; }
 function routeFor(view: View, id: number): string { return view === "detail" ? `/materials/${id}` : `/materials/${id}/${view}`; }
+function viewTitle(view: View): string { return view === "detail" ? "物料详情" : view === "versions" ? "版本历史" : view === "change-logs" ? "变更日志" : "审计历史"; }
 function actor(value: unknown): string { return displayValue(value); }
 function valueVersion(value: unknown): string { return Number.isInteger(value) && Number(value) > 0 ? `V${value}` : "—"; }
 function summaryText(item: ChangeItem): string {
@@ -66,7 +68,7 @@ export function MaterialDetailWorkspace({ materialId, view }: { materialId: numb
     try {
       const response = await api(`/api/material-master/materials/${materialId}`, { signal }) as { data: MaterialDetail };
       setDetail(response.data);
-      document.title = `${response.data.material.standard_name} - ${view === "detail" ? "物料详情" : view === "versions" ? "版本历史" : "变更日志"} - 晨亿达 ERP`;
+      document.title = `${response.data.material.standard_name} - ${viewTitle(view)} - 晨亿达 ERP`;
     } catch (reason) {
       if ((reason as { name?: string })?.name === "AbortError") return;
       if (reason instanceof ErpApiError && reason.status === 401) { redirectToExistingLogin(); return; }
@@ -115,6 +117,8 @@ export function MaterialDetailWorkspace({ materialId, view }: { materialId: numb
   const returnParam = `return_to=${encodeURIComponent(returnTo)}`;
   const versionsTotal = detail?.history_summary.versions.total ?? 0;
   const logsTotal = detail?.history_summary.change_logs.total ?? 0;
+  const auditsTotal = detail?.history_summary.audit_logs?.total ?? 0;
+  const canReadAudit = Boolean(session.user?.permissions?.includes("*") || session.user?.permissions?.includes("material.audit.read"));
 
   if (loadingDetail && !detail) return <section className="mm-detail-loading" role="status"><div className="mm-skeleton-title" /><div className="mm-card-skeletons">正在加载物料详情…</div></section>;
   if (detailError || !detail) return <MaterialErrorState error={detailError} onRetry={detailError?.status === 404 ? undefined : () => loadDetail()} />;
@@ -130,12 +134,14 @@ export function MaterialDetailWorkspace({ materialId, view }: { materialId: numb
         <Link href={`${routeFor("detail", materialId)}?${returnParam}`} aria-current={view === "detail" ? "page" : undefined}>详情</Link>
         <Link href={`${routeFor("versions", materialId)}?page=1&page_size=20&${returnParam}`} aria-current={view === "versions" ? "page" : undefined}>版本历史（{versionsTotal}）</Link>
         <Link href={`${routeFor("change-logs", materialId)}?page=1&page_size=20&${returnParam}`} aria-current={view === "change-logs" ? "page" : undefined}>变更日志（{logsTotal}）</Link>
+        {canReadAudit ? <Link href={`${routeFor("audit-logs", materialId)}?page=1&page_size=20&${returnParam}`} aria-current={view === "audit-logs" ? "page" : undefined}>审计历史（{auditsTotal}）</Link> : null}
       </nav>
 
       {view === "detail" ? <MaterialDetailSections detail={detail} materialId={materialId} returnParam={returnParam} /> : null}
       {view !== "detail" && historyError ? <MaterialErrorState error={historyError} onRetry={() => loadHistory()} /> : null}
       {view === "versions" && !historyError ? <VersionHistory data={(history?.data || []) as VersionItem[]} loading={loadingHistory} expanded={expanded} onExpand={setExpanded} /> : null}
       {view === "change-logs" && !historyError ? <ChangeHistory data={(history?.data || []) as ChangeItem[]} loading={loadingHistory} expanded={expanded} onExpand={setExpanded} copied={copied} onCopy={(id) => { navigator.clipboard?.writeText(id); setCopied(id); }} /> : null}
+      {view === "audit-logs" && !historyError ? <AuditHistory data={(history?.data || []) as AuditItem[]} loading={loadingHistory} copied={copied} onCopy={(id) => { navigator.clipboard?.writeText(id); setCopied(id); }} /> : null}
       {view !== "detail" && history && !historyError ? <MaterialPagination value={history.pagination} pageSizes={[20, 50]} disabled={loadingHistory} onChange={navigateHistory} /> : null}
     </section>
   );
@@ -159,4 +165,9 @@ function VersionHistory({ data, loading, expanded, onExpand }: { data: VersionIt
 function ChangeHistory({ data, loading, expanded, onExpand, copied, onCopy }: { data: ChangeItem[]; loading: boolean; expanded: number | null; onExpand: (value: number | null) => void; copied: string; onCopy: (id: string) => void }) {
   if (!loading && data.length === 0) return <div className="mm-empty-state"><p>暂无变更日志</p></div>;
   return <div className="mm-table-wrap mm-history-table-wrap" aria-busy={loading}>{loading ? <div className="mm-updating" role="status">正在加载变更日志…</div> : null}<table className="mm-history-table mm-change-table"><caption>物料变更日志</caption><thead><tr><th>动作</th><th>操作者</th><th>发生时间</th><th>原版本</th><th>新版本</th><th>安全变更摘要</th><th>追踪信息</th><th>详情</th></tr></thead><tbody>{data.map((item, index) => <tr className="mm-history-row" key={`${item.created_at}-${index}`}><td>{actionLabel(item.change_type)}<small>{item.change_type}</small></td><td>{actor(item.changed_by)}</td><td>{formatShanghaiDate(item.created_at, true)}</td><td>{item.field_name === "version" ? valueVersion(item.old_value) : "—"}</td><td>{item.field_name === "version" ? valueVersion(item.new_value) : "—"}</td><td><span className="mm-change-summary">{summaryText(item).slice(0, 180)}</span></td><td><span className="mm-tracking">{compactTrackingId(item.operation_id)}</span>{item.operation_id ? <button className="mm-copy" onClick={() => onCopy(item.operation_id || "")}>{copied === item.operation_id ? "已复制" : "复制"}</button> : null}</td><td><button onClick={() => onExpand(expanded === index ? null : index)} aria-expanded={expanded === index}>{expanded === index ? "收起" : "查看"}</button></td></tr>)}</tbody></table>{expanded !== null && data[expanded] ? <section className="mm-inline-detail"><h3>变更详情（只读）</h3><div className="mm-diff"><div><h4>变更前</h4><pre>{boundedPreview(data[expanded].old_value)}</pre></div><div><h4>变更后</h4><pre>{boundedPreview(data[expanded].new_value)}</pre></div></div><p>内容最多展示 4 层、4KB，数组最多 100 项。</p></section> : null}</div>;
+}
+
+function AuditHistory({ data, loading, copied, onCopy }: { data: AuditItem[]; loading: boolean; copied: string; onCopy: (id: string) => void }) {
+  if (!loading && data.length === 0) return <div className="mm-empty-state"><p>暂无审计历史</p></div>;
+  return <div className="mm-table-wrap mm-history-table-wrap" aria-busy={loading}>{loading ? <div className="mm-updating" role="status">正在加载审计历史…</div> : null}<table className="mm-history-table mm-audit-table"><caption>物料操作审计历史</caption><thead><tr><th>时间</th><th>操作者</th><th>动作</th><th>结果</th><th>原版本</th><th>新版本</th><th>错误代码</th><th>请求编号</th><th>操作编号</th></tr></thead><tbody>{data.map((item) => <tr className="mm-history-row" key={item.id}><td>{formatShanghaiDate(item.created_at, true)}</td><td>{actor(item.username)}</td><td>{displayValue(item.action)}<small>{displayValue(item.route_code)}</small></td><td>{displayValue(item.result)}</td><td>{valueVersion(item.old_version)}</td><td>{valueVersion(item.new_version)}</td><td>{displayValue(item.error_code)}</td><td><span className="mm-tracking">{compactTrackingId(item.request_id)}</span>{item.request_id ? <button className="mm-copy" onClick={() => onCopy(item.request_id || "")}>{copied === item.request_id ? "已复制" : "复制"}</button> : null}</td><td><span className="mm-tracking">{compactTrackingId(item.operation_id)}</span>{item.operation_id ? <button className="mm-copy" onClick={() => onCopy(item.operation_id || "")}>{copied === item.operation_id ? "已复制" : "复制"}</button> : null}</td></tr>)}</tbody></table><p className="mm-muted">审计页只展示安全元数据，不显示请求正文、凭证或内部错误堆栈。</p></div>;
 }

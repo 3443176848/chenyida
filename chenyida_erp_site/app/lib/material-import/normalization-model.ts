@@ -31,7 +31,7 @@ export type MaterialImportNormalizationIssue = Readonly<{
   target_code: string;
   source_column_index: number | null;
   safe_message: string;
-  safe_details: Readonly<Record<string, string | number | boolean | readonly string[]>>;
+  safe_details: Readonly<Record<string, string | number | boolean | readonly (string | number | boolean)[]>>;
 }>;
 
 export type MaterialImportNormalizationMappingItem = Readonly<{
@@ -158,7 +158,7 @@ function issue(
   target: string,
   column: number | null,
   message: string,
-  details: Record<string, string | number | boolean | readonly string[]> = {},
+  details: Record<string, string | number | boolean | readonly (string | number | boolean)[]> = {},
 ): MaterialImportNormalizationIssue {
   return { issue_level: level, issue_code: code, target_code: target, source_column_index: column, safe_message: message, safe_details: details };
 }

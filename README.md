@@ -4,8 +4,8 @@
 
 ## 项目结构
 
-- `chenyida_erp_app/`：本地 ERP 应用，使用 Python、SQLite 和原生网页。
-- `chenyida_erp_site/`：在线 Site 应用，使用 Vinext、TypeScript、Cloudflare Worker 和 D1。
+- `chenyida_erp_app/`：历史 Python/SQLite 业务参考和迁移来源，不再作为未来生产底座。
+- `chenyida_erp_site/`：当前自托管应用，使用 Vinext/React/TypeScript、标准 Node.js、PostgreSQL、本地持久化文件和独立 Worker。
 - `docs/`：项目管理、架构、审计和物料主数据规划文档。
 - `物料主数据治理落地包/`：物料编码、字段、导入、审核和清洗资料。
 
@@ -25,7 +25,7 @@ git clone https://github.com/3443176848/chenyida.git
 cd chenyida
 ```
 
-本地 ERP 和在线 Site 可分别进入各自目录开发和验证。在线 Site 保留现有 `package-lock.json`、构建脚本和 `.openai/hosting.json`：
+新开发只在 `chenyida_erp_site` 的自托管运行面进行。旧 D1/Cloudflare 和 Python/SQLite 实现仅用于行为核对与后续数据迁移：
 
 ```powershell
 cd chenyida_erp_site
@@ -35,59 +35,26 @@ npm test
 
 ## 环境配置与安全测试
 
-仓库使用 `config/environments.json` 统一记录 `development`、`test`、`production` 的数据库、API、Site、日志级别和调试模式。复制根目录或 Site 目录的 `.env.example` 作为本机配置；真实 `.env`、令牌、密码、数据库和日志均被 Git 忽略。
-
-Site 的写入型 API 烟测只允许 `ERP_ENV=test` 和本机回环地址。测试命令会创建一次性 Miniflare D1，结束后删除全部数据库文件；不会读取项目 `.env`，也不会使用远程绑定：
+复制 Site 的 `.env.example` 作为本机配置；真实 `.env`、令牌、密码、数据库和日志均被 Git 忽略。测试必须使用名称带 `test` 的独立 PostgreSQL 数据库和临时文件目录：
 
 ```powershell
 cd chenyida_erp_site
-npm run test:environment
-npm run test:api
+npm test
+npm run test:postgres
 npm run security:credentials
 ```
 
-完整说明见 `docs/testing/test-environment.md`。生产环境地址和凭证只允许由受控运行环境注入，不得写入源码或 `.env.example`。
+旧 Miniflare/D1 测试仅作为 Cloudflare 历史回归保留，不是自托管验收入口。生产环境地址和凭证只允许由受控运行环境注入，不得写入源码或 `.env.example`。
 
 ## 快速启动
 
-当前开发服务器使用 systemd 常驻，公网地址：
-
-```text
-http://43.135.157.211:18888
-```
-
-服务管理：
-
-```bash
-systemctl status chenyida-erp.service
-systemctl restart chenyida-erp.service
-journalctl -u chenyida-erp.service -n 100 --no-pager
-```
-
-Windows 本地运行仍可使用：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File D:\erp\chenyida_erp_app\start_server.ps1
-```
-
-打开：
-
-```text
-http://43.135.157.211:18888
-```
-
-本地开发默认管理员：
-
-```text
-admin / admin123
-```
-
-首次本地投用后请立即修改管理员密码；该默认凭证不得用于生产环境。
+进入 `chenyida_erp_site`，复制并安全填写 `.env.example`，再运行 `docker compose -f compose.yml up -d --build postgres migrate web worker`。仓库不提供默认管理员密码；初始化必须使用一次性命令显式传入。详细步骤见 `docs/self-hosting/deployment.md`。
 
 ## 主要文档
 
 - `chenyida_erp_app/README.md`：应用说明、默认账号、验证命令。
-- `chenyida_erp_site/README.md`：在线 Site 的开发、构建和部署说明。
+- `chenyida_erp_site/README.md`：自托管开发、构建和部署入口。
+- `docs/self-hosting/`：架构、PostgreSQL migration、Linux 部署、备份恢复和旧 Cloudflare 处置。
 - `docs/audits/phase0-task01-source-management-report.md`：Site gitlink 转普通目录的审计报告。
 - `晨亿达ERP系统设计方案.md`：完整系统设计方案。
 - `晨亿达ERP投用运行手册.md`：现场启动、检查、备份、恢复和故障处理。

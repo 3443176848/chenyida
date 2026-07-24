@@ -1,14 +1,47 @@
-import { env } from "cloudflare:workers";
-import { drizzle } from "drizzle-orm/d1";
-import * as schema from "./schema";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool, type PoolClient, type PoolConfig } from "pg";
+import * as schema from "./schema.ts";
+
+let sharedPool: Pool | undefined;
+
+function connectionConfig(): PoolConfig {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("DATABASE_URL is required");
+  return {
+    connectionString,
+    max: Number(process.env.DATABASE_POOL_MAX || 10),
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+    application_name: process.env.ERP_PROCESS_NAME || "chenyida-erp-web",
+  };
+}
+
+export function getPool(): Pool {
+  sharedPool ??= new Pool(connectionConfig());
+  return sharedPool;
+}
 
 export function getDb() {
-  const runtime = env as unknown as { DB?: D1Database };
-  if (!runtime.DB) {
-    throw new Error(
-      "Cloudflare D1 binding `DB` is unavailable. Set the `d1` field in .openai/hosting.json to `DB` or let your control plane inject the real binding values before using the database."
-    );
-  }
+  return drizzle(getPool(), { schema });
+}
 
-  return drizzle(runtime.DB, { schema });
+export async function withTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const result = await work(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function closeDb(): Promise<void> {
+  const pool = sharedPool;
+  sharedPool = undefined;
+  if (pool) await pool.end();
 }

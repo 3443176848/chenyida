@@ -7,7 +7,7 @@ export const IMPORT_BATCH_STATUSES = [
   "RECONCILIATION_REQUIRED", "FAILED", "CANCELLED",
 ] as const;
 export type MaterialImportBatchStatus = typeof IMPORT_BATCH_STATUSES[number];
-export type MaterialImportView = "file" | "parse" | "sheet" | "mapping" | "confirmed" | "normalize" | "normalized" | "issues";
+export type MaterialImportView = "file" | "parse" | "sheet" | "mapping" | "confirmed" | "normalize" | "normalized" | "issues" | "review";
 
 export type MaterialImportFileSummary = {
   id: number; original_filename: string; filename_extension: string | null; declared_mime_type: string | null;
@@ -34,7 +34,7 @@ export const DEFAULT_IMPORT_LIST_QUERY: ImportListQuery = {
 };
 
 const STATUS_SET = new Set<string>(IMPORT_BATCH_STATUSES);
-const VIEW_SET = new Set<MaterialImportView>(["file", "parse", "sheet", "mapping", "confirmed", "normalize", "normalized", "issues"]);
+const VIEW_SET = new Set<MaterialImportView>(["file", "parse", "sheet", "mapping", "confirmed", "normalize", "normalized", "issues", "review"]);
 
 function positiveInteger(value: string | null, fallback: number): number {
   if (!value || !/^[1-9][0-9]*$/.test(value)) return fallback;
@@ -100,7 +100,7 @@ export function legalImportView(status: MaterialImportBatchStatus, requested: st
   if (status === "AWAITING_MAPPING") return view === "mapping" ? "mapping" : "sheet";
   if (status === "MAPPING_CONFIRMED") return ["sheet", "confirmed", "normalize"].includes(view) ? view : "normalize";
   if (["QUEUED_FOR_NORMALIZATION", "NORMALIZING"].includes(status)) return ["normalize", "normalized", "issues", "confirmed"].includes(view) ? view : "normalize";
-  if (status === "NORMALIZED") return ["normalize", "normalized", "issues", "confirmed"].includes(view) ? view : "normalized";
+  if (status === "NORMALIZED") return ["normalize", "normalized", "issues", "review", "confirmed"].includes(view) ? view : "normalized";
   return defaultViewForStatus(status);
 }
 
@@ -184,7 +184,7 @@ function deepFreeze<T>(value: T): T {
 
 export type ImportOperationState = "READY" | "PENDING" | "COMPLETED" | "FAILED" | "RESULT_UNKNOWN";
 export type ImportWriteOperation<T = unknown> = Readonly<{
-  type: "CREATE" | "UPLOAD" | "PARSE" | "NORMALIZE" | "CANCEL" | "SAVE" | "PREVIEW" | "CONFIRM";
+  type: "CREATE" | "UPLOAD" | "PARSE" | "NORMALIZE" | "CANCEL" | "SAVE" | "PREVIEW" | "CONFIRM" | "REUSE" | "NEW_VERSION";
   key: string; method: "POST" | "PUT"; endpoint: string; payload: T; payloadDigest: string; state: ImportOperationState;
 }>;
 

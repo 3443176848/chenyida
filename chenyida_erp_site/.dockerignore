@@ -1,0 +1,14 @@
+node_modules
+dist
+.vinext
+.next
+.git
+.env
+.env.*
+!.env.example
+.wrangler
+coverage
+chenyida_erp_app/data
+*.db
+*.sqlite3
+*.log

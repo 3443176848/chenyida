@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "incremental": false,
+    "plugins": []
+  },
+  "include": [
+    "app/lib/infrastructure/background-jobs.ts",
+    "app/lib/material-import-normalization-selfhost/**/*.ts",
+    "app/lib/material-import/normalization-model.ts",
+    "app/lib/selfhost-worker.ts",
+    "app/materials/_components/material-import-normalization-review.tsx",
+    "app/materials/_lib/material-import-normalization.ts",
+    "db/**/*.ts",
+    "worker/selfhost.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "examples",
+    "app/api/erp-api.ts",
+    "scripts/seed-material-categories.ts"
+  ]
+}

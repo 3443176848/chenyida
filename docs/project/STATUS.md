@@ -1,6 +1,101 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-19（Asia/Shanghai）
+最后更新时间：2026-07-24（Asia/Shanghai）
+
+## SELFHOST-PHASE1-TASK04 人工复核与 Material 安全衔接
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 数据分层 | PASS | Parser raw、Mapping snapshot、Normalization candidates/attributes/lineage/issues保持不可变；人工覆盖独立保存 |
+| PostgreSQL migration | PASS | `0005`十一表、42个索引、FK/唯一/大小/互斥/终态trigger；空库、重复runner、0004升级通过，0001～0004未改 |
+| Session/版本/CAS | PASS | 固定published run/mapping digest，Review历史和supersedes可读；Session/Row expected_version冲突409 |
+| 覆盖和值模型 | PASS | 核心/动态属性SET/CLEAR/REVERT revision历史；effective只按override→candidate，不回退raw |
+| Issue | PASS | 原Issue不改；WARNING确认、ERROR排除/对应SET覆盖解决；Worker validation issue稳定key去重 |
+| ACTIVE绑定 | PASS | 服务端分页精确选择，Worker最终重查ACTIVE，唯一binding和安全快照；不修改ACTIVE |
+| Material Draft | PASS | 调用TASK01 Material Service；结果DRAFT、无code、未submit/approve；稳定link/operation防重 |
+| Finalization | PASS | Outbox、100行prepare/50行process、行级事务、lease/heartbeat、部分失败和retry；全部完成才FINALIZED |
+| 权限与API | PASS | Session、细粒度权限、CSRF、Idempotency-Key+正文摘要、分页/筛选、稳定400/401/403/404/409/422/500 |
+| UI | PASS | 保留七步、view/row/Drawer；增加三层值、覆盖、决定、Issue、ACTIVE、Draft、批量、历史、进度和冲突提示 |
+| 专项测试 | PASS | unit7/7、UI3/3、PG3/3，共13/13 |
+| 回归 | PASS | 39个unit/UI/environment、25个PG和2个旧migration upgrade，共66个Node test；101行跨chunk和lease接管通过 |
+| Build/Lint/安全 | PASS WITH EXISTING WARNING | strict定向TS、Vinext build、454文件凭证扫描、diff check通过；lint 0 error/1任务前warning |
+| Compose | PASS | 3行VALID/WARNING/ERROR完成覆盖/排除/绑定/Draft/finalize；整栈重启后2版本、binding和DRAFT保持 |
+| 资源清理 | PASS | TASK04 Compose容器、网络和卷已删除；独立PG测试容器在最终检查后删除 |
+| 生产影响 | NONE | 未连接生产、迁移真实数据、部署、提交、push或PR |
+| 已知限制 | RECORDED | Compose批次仅3行，101行与lease失效接管由PG集成验证；无真实样本容量验收和多租户schema |
+
+## SELFHOST-PHASE1-TASK03 行级 Normalization PostgreSQL 全链路
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 唯一运行数据库 | PASS | 自托管 Normalizer、Review API 与 Worker 只访问 PostgreSQL；D1/Miniflare/Cloudflare 仅保留为迁移参照 |
+| PostgreSQL migration | PASS | `0004`、schema、journal、snapshot 对齐；空库0001→0004、重复runner、0003存量升级、约束和不可变trigger通过 |
+| 候选与证据 | PASS | 核心字段、动态属性、lineage和稳定ERROR/WARNING issue关系化保存；动态属性使用稳定attribute_code |
+| 状态与恢复 | PASS | QUEUED→RUNNING→PUBLISHING→SUCCEEDED/SUPERSEDED，FAILED同run重试、新run重跑和CANCEL_REQUESTED/CANCELLED通过 |
+| 原子发布 | PASS | run隔离暂存不可见；lease/CAS、pointer、统计、Event/Audit和Job success同事务；失败/丢lease/取消不发布 |
+| API与安全 | PASS | Session、权限、行级可见性、CSRF、强幂等、expected version、分页/筛选边界、稳定错误和请求编号通过 |
+| Review UI | PASS | 运行历史、run-specific Rows/Issues、状态/问题筛选、raw/candidates/attributes/lineage及重试/重跑/取消通过 |
+| 专项测试 | PASS | unit4/4、UI3/3、PG/API4/4、旧数据升级1/1，共12/12 |
+| 回归 | PASS | FileStorage、Phase0 Worker、Material、Mapping和环境保护共41/41；strict定向类型检查和build通过 |
+| Lint | PASS WITH WARNING | 0 error；保留任务前 workbook 脚本1个unused warning |
+| Compose | PASS | CSV解析→Mapping确认→Normalization v1发布→v2重跑→v3取消；整栈stop/up后3行、2 issues、3次run历史和lineage保持 |
+| 资源清理 | PASS | 一次性Compose容器/网络/卷、独立PG测试容器和临时migration目录已删除，核对列表为空 |
+| 生产影响 | NONE | 未连接生产、迁移真实数据、部署、提交、push或PR |
+| 后续范围 | RECORDED | 人工最终复核、保留/排除、ACTIVE绑定、Draft Commit、真实迁移和生产切换必须独立任务与授权 |
+
+## SELFHOST-PHASE1-TASK02 Import Mapping PostgreSQL 全链路
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 唯一运行数据库 | PASS | 自托管 Mapping、版本、复用和动态 Catalog 只访问 PostgreSQL；不导入 D1/Miniflare/Cloudflare 运行时 |
+| PostgreSQL migration | PASS | `0003`、schema、journal、snapshot 对齐；空库、旧数据升级、runner 重复执行、约束和不可变 trigger 通过 |
+| Parse 原子发布 | PASS | Worker 同事务发布 parse run、Sheet、Header 建议、不可变 Rows、初始 DRAFT、pointer 和事件；Compose 实际 CSV 3 行 |
+| Mapping/Catalog | PASS | ACTIVE 动态属性稳定 code、BASIC/SPECIAL 目标、源结构/metadata/mapping digest、保存/预览/确认通过 |
+| 版本不可变 | PASS | CONFIRMED/STALE/SUPERSEDED 内容和 Items 受 DB trigger 保护；重复 digest 拒绝，新确认版本使旧确认版本 SUPERSEDED |
+| 复用与失效 | PASS | exact 为 AUTO_RECOMMEND；metadata 漂移需重确认；已用目标类型变化为 STALE；应用复用只生成/更新 DRAFT 且来源不变 |
+| 安全与事务 | PASS | Session、权限、行级可见性、CSRF、Idempotency-Key+正文摘要、乐观锁、并发、稳定错误、Event/Audit同事务 |
+| 专项测试 | PASS | 规则3/3、UI2/2、PG/API6/6、旧数据升级1/1 |
+| 回归 | PASS | Material 6/6+2/2+7/7、FileStorage3/3、PG/Worker5/5、环境6/6、strict定向类型检查、build通过 |
+| Lint | PASS WITH WARNING | 0 error；保留任务前 workbook 脚本 1 个 unused warning |
+| Compose | PASS | 空卷迁移、登录、上传、Worker解析、DRAFT保存、2行预览、v2确认、版本查询；Web/Worker重启后状态仍为确认 |
+| 生产影响 | NONE | 未连接生产、迁移真实数据、部署、提交、push 或 PR |
+| 后续范围 | RECORDED | 行级 Normalizer/Review/Draft Commit、真实迁移和生产切换必须独立任务与授权 |
+
+## SELFHOST-PHASE1-TASK01 Material PostgreSQL 全链路
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 唯一运行数据库 | PASS | 自托管 Material Draft/Review/Active 只经 `material-selfhost` Repository访问 PostgreSQL；不导入D1/Miniflare/Cloudflare运行时 |
+| PostgreSQL migration | PASS | `0002` 新增编码序列、2个索引和2个状态/编码约束；空库应用、重复执行和Schema/snapshot/journal一致性通过 |
+| 草稿与属性 | PASS | 实际页面契约覆盖创建、完整替换编辑、详情、列表/筛选、四级分类和TEXT/INTEGER/DECIMAL/BOOLEAN/ENUM类型化属性 |
+| 固定审批 | PASS | DRAFT→PENDING_REVIEW→ACTIVE、驳回→DRAFT；创建人/最后修改人自审403，无审核权限403，第二名授权用户通过 |
+| 编码并发 | PASS | PostgreSQL原子分类序列，不使用MAX+1；不同连接并发批准生成不同 `CYD-*` 编码，失败事务无半记录 |
+| 安全与一致性 | PASS | Session、细粒度权限、CSRF、Idempotency-Key+正文摘要、重放/冲突、expected_version、行锁、统一安全错误与请求编号通过 |
+| 版本/变更/审计 | PASS | 创建、编辑、提交、通过/驳回的主记录、属性、版本、变更、审计和幂等结果均为单事务；新增受权审计历史页面 |
+| 单元/UI/PG/API | PASS | 6/6、2/2、7/7；既有Material UI 142/142回归通过 |
+| Phase 0回归 | PASS | FileStorage 3/3、PostgreSQL/Worker 5/5、Vinext build通过 |
+| Lint | PASS WITH WARNING | 0 error；最小修复既有prefer-const阻断，保留workbook脚本1个任务前unused warning |
+| 凭证/差异/依赖扫描 | PASS | 402个文件凭证扫描、`git diff --check`通过；新Material模块无Cloudflare/D1/R2/Queue/Miniflare运行引用 |
+| Compose冒烟 | PASS | 真实Web登录、创建/编辑/提交、两类拒绝、第二用户批准、ACTIVE/4版本/8变更/6审计查询；重启PG/Web/Worker后持久 |
+| 生产影响 | NONE | 未连接生产、迁移真实数据、部署、提交、推送或创建PR |
+| 后续范围 | RECORDED | TASK02移植Import Mapping/版本/复用；行级Normalizer、真实数据迁移与生产切换继续独立授权 |
+
+## SELFHOST-PHASE0-TASK01 自托管基线
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 运行架构 | PASS | Vinext standalone Node Web + PostgreSQL 17 + 本地持久卷 + 独立 Node Worker；运行入口不依赖 OpenAI Site/Cloudflare |
+| PostgreSQL baseline | PASS | 新 `0001` 共 46 表：现有 45 张业务/治理结构加 `background_jobs`；Drizzle PostgreSQL schema/snapshot 对齐，空库和重复执行通过 |
+| 管理员与分类 | PASS | 无默认密码；一次性 CLI 初始化 1 个 admin、101 分类、34 属性；登录和会话 cookie/CSRF 通过 |
+| Material | PASS (CORE) | 分类 tree/schema、草稿创建/查询、权限与审计链路通过；完整旧 Draft/Review/Query Repository 仍待逐域移植 |
+| 文件 | PASS | 随机路径、路径穿越拒绝、SHA-256/大小/MIME/原名、临时文件+fsync+原子 rename、持久卷和非 root 读取通过 |
+| Worker | PASS | Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、CAS、重试、超时恢复、幂等、原子结果发布和安全停机；CSV 实际解析 3 行，CSV/XLS/XLSX 共用既有有界 Parser，纯 Parser 38/38 |
+| 单元测试 | PASS 3/3 | 路径安全、原子写、失败清理 |
+| PostgreSQL 集成 | PASS 5/5 | migration/约束、transaction rollback、Outbox 幂等、4 Worker 并发唯一领取、heartbeat/retry/expired recovery |
+| Compose 冒烟 | PASS | build、health、admin、login、101 分类、草稿、上传、任务完成；PostgreSQL/Web/Worker 整体重启后 2 Material、2 File、2 SUCCEEDED Job 和 SHA 文件保持 |
+| 备份恢复 | PASS | 隔离实例生成 PostgreSQL custom dump、uploads/attachments tar 和 SHA256SUMS；恢复到显式新空库/空目录后 1 User、2 Material、2 SUCCEEDED Job 一致 |
+| 生产影响 | NONE | 未连接生产数据库、迁移真实数据、部署公网、修改真实服务器、提交、推送或创建 PR |
+| 已知阻断 | RECORDED | 全量 lint 被既有 `xls-parser.ts:170 prefer-const` 阻断；新增自托管文件定向 lint 和 Vinext build 通过；旧 API/完整行级 Normalizer 仍待移植 |
 
 ## 自动统计摘要
 
