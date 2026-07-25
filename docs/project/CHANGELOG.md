@@ -4,6 +4,14 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE3-TASK01 - `feat: add synthetic migration readiness tooling`
+
+- 迁移框架：新增只能显式执行的离线 CLI，包含 SQLite/D1 export source、PostgreSQL staging target、manifest、mapping registry、稳定 ID map、digest checkpoint、dry-run、合成 commit、reconcile 与安全报告。
+- 安全：所有 source read/target connect 前拒绝 production、真实/仓库路径、公开或远程目标、非 `_migration_test` 库和非空目标；不输出业务正文、个人信息、凭证、连接串或绝对业务路径。
+- 合成验收：五类虚构 fixture 覆盖跨域合法/复核/阻断/恢复/重复；中断恢复、重复执行、输入变化、库存和稳定来源 AR/AP 核对、backup→新空 restore 与 PostgreSQL/Web/Worker 重启通过。
+- 回归：迁移 tool 8/8、PG E2E 1/1、非数据库 87/87、PG/API 67/67、upgrade 27/27、typecheck 8/8、build/lint/652 文件凭据、Compose 与 Python 三项通过。
+- 版本/边界：`0.1.0-alpha.11`；业务 migration 保持 `0001`—`0013`，未创建 `0014`。未读取真实数据库/备份/附件，未迁真实数据、重启 Python、访问生产、部署、push 或创建 PR；生产保持 NO-GO。
+
 ### SELFHOST-PHASE2-TASK10 - `feat: add self-hosted operations workbench`
 
 - Dashboard：新增独立 Repository/Service/Handler，在 `REPEATABLE READ READ ONLY` 快照中实时聚合 TASK02—TASK09 权威关系表；固定 DTO 按服务端权限裁剪，numeric 以文本返回，库存按单位分组而不跨单位相加。

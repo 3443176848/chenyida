@@ -2,6 +2,21 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE3-TASK01 生产前数据迁移框架与合成试迁移
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 恢复点 | PASS | `main`、起点 `14bc68791a34ece9086b889f23d473e84a761cf0`；独立提交消息 `feat: add synthetic migration readiness tooling` |
+| 迁移框架 | PASS | 显式 CLI、SQLite/D1 export、manifest、mapping/ID map、digest checkpoint、dry-run、synthetic commit、reconcile、去敏报告 |
+| 安全守卫 | PASS | source read/target connect 前拒绝 production、真实路径、非回环/非测试/非空目标、备份/上传/附件/归档和敏感 manifest 字段 |
+| 合成 E2E | PASS | 28 records、45 relations、28 ID maps、0 orphan；库存 `112.000000`、AR/AP `19.000000`；中断恢复和重复执行后 `RECONCILED` |
+| Backup/Compose | PASS | 新空目标 restore 后 13 migrations 与合成 staging 一致；PostgreSQL/Web/Worker 重启后健康和数据保持 |
+| 专项/回归 | PASS | tool 8/8、PG E2E 1/1、非数据库 87/87、PG/API 67/67、upgrade 27/27、typecheck 8/8、build/lint/credentials 与 Python 三项 |
+| PostgreSQL migration | PASS / NO CHANGE | 0001—0013 checksum 不变，head `0013_finance.sql`，未创建 `0014`，业务 schema 未修改 |
+| 版本 | PASS / NOT RELEASED | `chenyida-erp-selfhosted@0.1.0-alpha.11`；非生产、尚未发布、部署、迁真实数据或批准 |
+| 生产准入 | NO-GO | staging 未物化真实业务表；真实 source、Dashboard、Finance opening、文件、容量和生产恢复未验证 |
+| 资源/生产影响 | NONE | 最终清理隔离 PostgreSQL/Compose/临时目录；未打开真实数据库、重启 Python、访问生产、部署、push 或创建 PR |
+
 ## SELFHOST-PHASE2-TASK10 自托管经营与运维工作台
 
 | 验证项 | 结果 | 说明 |
@@ -295,11 +310,11 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 根仓库 Branch | `main` |
-| 任务开始 HEAD | TASK10 起点 `06a4413403869f4f41872c7a5cb98c434a44f095` |
-| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.10`；非生产、尚未发布 |
+| 任务开始 HEAD | TASK01 起点 `14bc68791a34ece9086b889f23d473e84a761cf0` |
+| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.11`；非生产、尚未发布 |
 | 当前实际常驻服务 | Python 3.11.6 / SQLite，systemd `enabled/active`，`0.0.0.0:18888` |
 | 自托管部署状态 | Node/PostgreSQL 未生产部署；当前无运行中 Compose 项目 |
-| PostgreSQL migration | `0001`—`0013`；TASK10 未新增 migration，未迁移任何真实数据 |
+| PostgreSQL migration | `0001`—`0013`；TASK01 未新增 migration，未迁移任何真实数据 |
 | SQLite migration | `0001`—`0004` 已记录；数据库不保存 migration checksum |
 | 历史 D1 migration | 仓库 `0000`—`0008`；生产实际应用版本未访问、未核验 |
 | PM-000 前根提交 | `bbefb2e388323213b51531fec117d67d5a28fe70` |

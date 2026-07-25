@@ -51,6 +51,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-PHASE3-TASK01 | 生产前数据迁移框架与合成试迁移基线 | DONE | Codex（源码诊断、合成迁移工具、隔离测试、文档与本地提交）、项目负责人（任务范围、安全边界与验收授权） | 2026-07-25 | 2026-07-25 | SELFHOST-PHASE2-TASK10 | 完成显式 CLI、双 source adapter、目标 staging、守卫、manifest/ID map/checkpoint、dry-run/commit/reconcile 和跨域合成验收；版本 `0.1.0-alpha.11`，migration 保持 `0001`—`0013`。DONE 只表示合成迁移框架和生产前准入证据完成；真实数据和生产仍 NO-GO。 |
 | SELFHOST-PHASE2-TASK01 | 盘点完整 ERP 业务 API 并制定分阶段自托管迁移计划 | DONE | Codex（只读源码审计、数据/事务不变量、断链核验、分阶段计划、文档、测试与提交）、项目负责人（诊断设计范围和禁止事项确认） | 2026-07-24 | 2026-07-24 | PHASE0-TASK03、SELFHOST-PHASE1-TASK04 | 盘点 Python 64 个 HTTP 操作（GET34/POST30），自托管等价覆盖4/部分9/未覆盖51；确认根 iframe 登录后 23 个业务 GET 全部404；提出 TASK02—TASK10 建议顺序。DONE 仅表示盘点规划完成，不表示任何业务域已迁移；仅文档，未访问生产或修改运行代码/Schema/migration/依赖/部署。 |
 | PHASE0-TASK03 | 建立统一发布、迁移与回退追踪基线 | DONE | Codex（只读核验、版本/migration基线、模板、文档修正、测试与提交）、项目负责人（任务范围、验收与禁止事项确认） | 2026-07-24 | 2026-07-24 21:22 CST | PHASE0-TASK01、PHASE0-TASK02 | 新增 `RELEASES.md`，定义自托管 `0.1.0-alpha.1` 非生产版本、三套migration SHA-256、发布验收与回退模板；修正Git/运行面/部署/业务迁移漂移。lint 0 error/1既有warning、npm test 3/3、typecheck、build、455文件凭证、Python三项与diff check通过；未访问生产、部署、迁移真实数据、重启服务、push或PR。 |
 | SELFHOST-PHASE1-TASK04 | 完成 Normalization 人工复核与 Material Draft Commit 的 PostgreSQL 自托管移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围、验收标准与禁止事项确认） | 2026-07-24 | 2026-07-24 | SELFHOST-PHASE1-TASK03、SELFHOST-PHASE1-TASK01 | 新增 PostgreSQL `0005`、Session/Row/覆盖/Issue/finalization/binding/draft link/history，接通 ACTIVE 精确绑定和 TASK01 Material Service DRAFT 创建；专项13/13、101行跨chunk、回归、Compose端到端与整栈重启通过。原任务结束时未连接生产、迁移真实数据、部署或提交；后续随 `39946f6` 汇总提交，仍未部署。 |
@@ -71,7 +72,7 @@
 | PHASE3-TASK01 | 设计 Material Import Normalization & Staging V1 | DONE | Codex（设计）、项目负责人（待规格确认） | 2026-07-17 | 2026-07-17 | PHASE2-TASK08 | 完成正式规格、OpenAPI 草案和数据流/状态图；定义独立 run、JSON 行快照、独立 issue、类型/空值/属性规则、Outbox/租约、原子发布、五个 API、`0006` 设计、54 项测试和 16 项 `PROPOSED` 决定；仅文档，未修改运行时代码、Schema、Migration、API、前端或生产环境 |
 | PHASE3-TASK03 | 设计 Material Import Normalization Review UI V1 | DONE | Codex（设计）、项目负责人（2026-07-17 正式规格确认） | 2026-07-17 | 2026-07-17 | PHASE3-TASK02 | 完成正式 UI 规格、37 状态低保真线框、集中状态矩阵和 104 项未来实施测试；统一工作区、七步 Stepper、Current/Latest 双轨、Rows/Issues cursor 与 Row Drawer等 14 项决定均已 `APPROVED`；局部 Issue 查询门禁、性能门禁和 7 项非阻塞限制继续有效；仅文档，未修改前端、API、Schema、Migration、业务逻辑或生产环境 |
 
-`SELFHOST-PHASE2-TASK10` 已完成非生产实施与隔离验收，独立提交消息为 `feat: add self-hosted operations workbench`。当前没有自动开始的下一开发任务；真实数据迁移、生产备份恢复、部署和切换继续单独授权。
+`SELFHOST-PHASE3-TASK01` 已完成合成迁移框架与隔离验收，独立提交消息为 `feat: add synthetic migration readiness tooling`。当前没有自动开始的下一开发任务；真实数据试迁移、业务表物化、生产备份恢复、部署和切换继续单独授权。
 
 ## Phase 0 待办
 

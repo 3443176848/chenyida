@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.10`，明确为非生产且尚未发布；详见 `RELEASES.md`。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.11`，明确为非生产且尚未发布；详见 `RELEASES.md`。
 
 ### 治理资料
 
@@ -98,11 +98,13 @@
 19. SELFHOST-PHASE2-TASK08 已新增 PostgreSQL `0012` 和独立 Quality 服务；IQC/Receipt Line、IPQC/Report、FQC/Completion Line+SO Line 使用稳定关系，Result/Defect/Event 不可变，异人处置/关闭/管理者重开受控。Shipment 在原事务消费 CLOSED/RELEASED FQC 额度；不伪造无批次 IQC 库存隔离，不迁真实检验数据。版本为 `0.1.0-alpha.8`，未发布或部署。
 20. SELFHOST-PHASE2-TASK09 已新增 PostgreSQL `0013` 和独立 Finance 服务；AR/AP 只消费未冲销正向 Shipment/Receipt 金额来源，Settlement/Reversal/Event 不可变，Document 余额/状态/version 是受控投影。财务过账后上游来源冲销 fail closed；不接银行/税务/发票/汇率/总账，不迁真实金额。版本为 `0.1.0-alpha.9`，未发布或部署。
 21. SELFHOST-PHASE2-TASK10 已新增独立 Dashboard Query Service、原生根工作台和离线 backup/verify/新空目标 restore；权限裁剪、numeric 文本、不同单位不合计、64 操作/23 legacy GET 覆盖、隔离恢复与 Compose 重启通过。版本为 `0.1.0-alpha.10`，未新增 `0014`、未迁真实数据、发布或部署。
+22. SELFHOST-PHASE3-TASK01 已新增显式离线迁移 CLI、SQLite/D1 export adapter、PostgreSQL `migration_tool` staging、manifest、稳定 ID map、checkpoint、合成 commit/reconcile 和生产拒绝守卫；版本为 `0.1.0-alpha.11`，0001—0013 保持不变。它只证明合成准备度，不读取或物化真实业务数据。
 
 ## 当前风险
 
 - Material Draft/Review/Active、Import Mapping/版本/复用、行级 Normalizer 及人工复核/ACTIVE绑定/Draft Commit 已完成 PostgreSQL 非生产移植；后续真实数据演练和迁移不得重新接入 D1 运行依赖。
 - `0002`/`0003`/`0004`/`0005`、双用户审批、Mapping确认、Normalization原子发布/取消、人工复核 finalization 和重启持久性只在一次性 PostgreSQL 17/Compose 测试环境验证；未迁移真实数据、执行生产容量测试、生产恢复演练或部署。
+- TASK01 迁移工具只把合成记录提交到隔离 `migration_tool` schema；真实 source fingerprint、业务表物化、Dashboard 明细核对、无业务来源 Finance opening 和文件迁移仍是生产 NO-GO 项。
 - Site 源码已可从根仓库恢复；生产提交与开发提交仍需在后续发布基线中持续追踪。
 - 本地和在线数据模型、编码和治理行为分叉。
 - 在线 JSON 模型缺少关键关系约束；本地 SQLite 缺少外键和迁移历史。
@@ -135,7 +137,7 @@
 
 ## 当前路线
 
-当前已完成 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard、原生根工作台和离线 backup/restore 治理的 Node/PostgreSQL 链路，可描述为“自托管完整 ERP API 非生产候选”。TASK10 功能提交为 `96fbaaedf1b11da42de53e48afe714f1ee640f44`；当前不自动开始下一任务。真实数据试迁移、生产备份恢复演练、部署和切换继续独立授权。
+当前已完成 Node/PostgreSQL 全域 API、Dashboard、原生根、离线 backup/restore 治理，以及合成迁移准备工具，可描述为“自托管完整 ERP API 非生产候选 + 合成迁移准备度”。TASK01 起点为 `14bc68791a34ece9086b889f23d473e84a761cf0`；当前不自动开始下一任务。真实数据盘点/试迁移、业务表物化、生产恢复、部署和切换继续独立授权。
 
 ## 恢复上下文检查清单
 

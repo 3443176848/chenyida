@@ -54,8 +54,9 @@
 - `SELFHOST-PHASE2-TASK08`：IQC/IPQC/FQC、缺陷、处置与关闭（DONE，非生产 `0.1.0-alpha.8`；PostgreSQL `0012`，FQC 门禁已接入发货，未迁真实检验或伪造 IQC 库存隔离）。
 - `SELFHOST-PHASE2-TASK09`：应收应付、收付款、余额与冲销（DONE，非生产 `0.1.0-alpha.9`；PostgreSQL `0013`，稳定 Shipment/Receipt 金额来源、不可变 Settlement/Reversal/Event 与上游冲销门禁通过，未迁真实金额或接入外部财务系统）。
 - `SELFHOST-PHASE2-TASK10`：经营看板、备份恢复治理与 legacy iframe 退出（DONE，非生产 `0.1.0-alpha.10`；实时权限裁剪 Dashboard、原生根、离线 backup/verify/新空目标 restore 与 Compose 重启通过，未新增 `0014`、未迁真实数据或部署）。
+- `SELFHOST-PHASE3-TASK01`：生产前数据迁移框架与合成试迁移基线（DONE，非生产 `0.1.0-alpha.11`；显式 CLI、双 source adapter、staging、checkpoint、合成 backup/restore 与全回归通过，真实数据和生产 NO-GO）。
 
-库存从采购中拆成独立 TASK04，因为收货、领料、完工和发货都必须复用同一不可变账本、余额投影、锁顺序、幂等和冲销规则。真实数据试迁移、生产备份恢复演练、部署和切换不属于 TASK02—TASK10，仍需另建任务并明确授权。
+库存从采购中拆成独立 TASK04，因为收货、领料、完工和发货都必须复用同一不可变账本、余额投影、锁顺序、幂等和冲销规则。TASK01 只补充合成迁移准备度；真实数据盘点/试迁移、业务表物化、生产恢复、部署和切换仍需另建任务并明确授权。
 
 ## Phase 2 导入中心
 

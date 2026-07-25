@@ -2,6 +2,24 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-25 生产前合成迁移准备层
+
+`SELFHOST-PHASE3-TASK01` 在 Web/API 启动路径之外新增显式 CLI。环境守卫先于任何 source read 或 target connect，SQLite/D1 export adapter 只接受临时目录与合成 marker；计划经 mapping registry、稳定 ID、checkpoint 和 manifest 进入回环 `_migration_test` PostgreSQL 的独立 `migration_tool` schema。dry-run 不写目标，synthetic commit 只写 staging，最终必须 Reconcile 才能成为 `RECONCILED`。
+
+```mermaid
+flowchart LR
+    CLI["显式离线 CLI"] --> GUARD["环境与真实路径拒绝"]
+    GUARD --> SRC["临时合成 SQLite / D1 export"]
+    SRC --> PLAN["Inspect / Normalize / Validate / Plan"]
+    PLAN --> CP["digest-bound checkpoint"]
+    PLAN --> DRY["Dry-run：目标零写入"]
+    DRY --> STAGE["migration_tool 临时 staging"]
+    STAGE --> REC["库存 / AR-AP / 关系核对"]
+    REC --> REPORT["去敏报告 + Go/No-Go"]
+```
+
+该层不接 Web API、不在启动时运行、不修改 `public` 业务 schema，也不迁移真实文件或账号。后续真实业务表物化必须按领域调用权威 Service/事务或新增经审批的迁移适配，不得把 staging 表变成第二套业务权威。
+
 ## 2026-07-25 自托管完整 ERP 迁移覆盖层
 
 `SELFHOST-PHASE2-TASK01` 从源码确认 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30），并在当时基线记录等价覆盖 4、部分覆盖 9、未覆盖 51。TASK02—TASK09 依次补齐身份、主数据/BOM、不可变库存、采购、生产、销售、品质和财务；TASK10 增加实时权限裁剪 Dashboard、离线备份恢复治理和原生根工作台。64 个操作和登录后 23 个 legacy GET 现在均有自托管实现或明确退役合同，但真实数据和生产切换尚未执行。

@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.10",
+  "version": "0.1.0-alpha.11",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -94,7 +94,11 @@
     "seed:material-categories": "node --experimental-strip-types scripts/seed-material-categories.ts",
     "security:credentials": "node scripts/check-credentials.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate --name selfhost_baseline"
+    "db:generate": "drizzle-kit generate --name selfhost_baseline",
+    "migration:fixture": "node scripts/selfhost-migration-fixture.mjs",
+    "migration:run": "node tools/selfhost-migration/cli.mjs",
+    "test:migration-tool": "node --experimental-strip-types --test tests/selfhost-migration-tool.test.mjs",
+    "test:migration-tool:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-migration-postgres.test.mjs"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",
