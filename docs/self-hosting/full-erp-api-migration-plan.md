@@ -54,7 +54,7 @@ TASK02—TASK09
 | SELFHOST-PHASE2-TASK04 | 库存不可变账本、余额投影与受控调整 | TASK02、TASK03 | 负库存、并发、已过账更正 | DONE；非生产 `0.1.0-alpha.4`，未回填真实库存或部署 |
 | SELFHOST-PHASE2-TASK05 | 采购、缺料建议、收货与库存联动 | TASK03、TASK04 | 超收、重复收货、库存过账 | DONE；非生产 `0.1.0-alpha.5`，未迁真实 PO/在途或创建 AP |
 | SELFHOST-PHASE2-TASK06 | 工单、领料、完工、报工与库存联动 | TASK03、TASK04 | 多料锁、成品入库、冲销 | 建议，待授权 |
-| SELFHOST-PHASE2-TASK07 | 询报价、销售订单、发货与库存联动 | TASK03、TASK04、TASK06 | 转单原子性、超发、FQC | 建议，待授权 |
+| SELFHOST-PHASE2-TASK07 | 询报价、销售订单、发货与库存联动 | TASK03、TASK04、TASK06 | 转单原子性、超发、FQC | DONE；非生产 `0.1.0-alpha.7` / PostgreSQL `0011`；FQC gate 留待 TASK08 |
 | SELFHOST-PHASE2-TASK08 | IQC/IPQC/FQC、缺陷、处置与关闭 | TASK05、TASK06、TASK07 | 跨域 hold/release、不可变历史 | 建议，待授权 |
 | SELFHOST-PHASE2-TASK09 | 应收应付、收付款、余额与冲销 | TASK05、TASK07 | 金额精度、重复过账、期间规则 | 建议，待授权 |
 | SELFHOST-PHASE2-TASK10 | 经营看板、备份恢复治理与 legacy iframe 退出 | TASK02—TASK09 | 跨域披露、恢复破坏性、切换 | 建议，待授权 |
@@ -245,7 +245,9 @@ TASK02—TASK09
 - 不做 MRP/排程 AI、不迁真实 WO/在制、不自动批准成品、不部署。
 - 生产/真实数据授权：**否**。
 
-## 10. SELFHOST-PHASE2-TASK07（建议）：报价、销售订单与发货
+## 10. SELFHOST-PHASE2-TASK07（DONE，非生产）：报价、销售订单与发货
+
+实施结果：`0011_sales.sql`、独立 Sales Repository/Service/Handler、Quote Version/状态事件、ACCEPTED 原子转单、SO、Shipment/一次全额冲销、TASK04 库存原子联动和稳定销售金额来源已完成；专项、迁移、Compose 重启和全量回归通过。未迁真实数据、未创建 FQC、应收、收款或总账，未部署。
 
 ### 依赖与代码范围
 

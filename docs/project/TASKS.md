@@ -71,7 +71,7 @@
 | PHASE3-TASK01 | 设计 Material Import Normalization & Staging V1 | DONE | Codex（设计）、项目负责人（待规格确认） | 2026-07-17 | 2026-07-17 | PHASE2-TASK08 | 完成正式规格、OpenAPI 草案和数据流/状态图；定义独立 run、JSON 行快照、独立 issue、类型/空值/属性规则、Outbox/租约、原子发布、五个 API、`0006` 设计、54 项测试和 16 项 `PROPOSED` 决定；仅文档，未修改运行时代码、Schema、Migration、API、前端或生产环境 |
 | PHASE3-TASK03 | 设计 Material Import Normalization Review UI V1 | DONE | Codex（设计）、项目负责人（2026-07-17 正式规格确认） | 2026-07-17 | 2026-07-17 | PHASE3-TASK02 | 完成正式 UI 规格、37 状态低保真线框、集中状态矩阵和 104 项未来实施测试；统一工作区、七步 Stepper、Current/Latest 双轨、Rows/Issues cursor 与 Row Drawer等 14 项决定均已 `APPROVED`；局部 Issue 查询门禁、性能门禁和 7 项非阻塞限制继续有效；仅文档，未修改前端、API、Schema、Migration、业务逻辑或生产环境 |
 
-`SELFHOST-PHASE2-TASK06` 已完成独立验收，当前没有 `DOING` 任务。只有 TASK06 独立提交完成且工作区 clean 后，才按连续任务指令把 `SELFHOST-PHASE2-TASK07` 设为 `DOING`；真实数据迁移、生产部署和切换继续单独授权。
+`SELFHOST-PHASE2-TASK07` 已完成并等待独立提交；提交并确认 clean 后按连续任务指令把 `SELFHOST-PHASE2-TASK08` 设为唯一 `DOING`。真实数据迁移、生产部署和切换继续单独授权。
 
 ## Phase 0 待办
 
@@ -91,7 +91,7 @@
 | SELFHOST-PHASE2-TASK04 | 建立库存不可变账本、余额投影与受控调整 | DONE | Codex（诊断、非生产实施、隔离测试、文档与本地提交）、项目负责人（连续任务指令批准范围） | 2026-07-25 | 2026-07-25 | SELFHOST-PHASE2-TASK02、SELFHOST-PHASE2-TASK03 | 起点 `3565d56f`；PostgreSQL `0008`、稳定 Material ID、单一 MAIN 库位、禁止负库存、不可变账本、冻结/解冻、全额冲销、余额核对及权限/CSRF/幂等/CAS/锁/审计通过；版本 `0.1.0-alpha.4`，未回填真实库存、实现下游单据、部署、push 或 PR。 |
 | SELFHOST-PHASE2-TASK05 | 迁移采购、缺料建议、收货与库存联动 | DONE | Codex（诊断、非生产实施、隔离测试、文档与本地提交） | 2026-07-25 | 2026-07-25 | SELFHOST-PHASE2-TASK03、SELFHOST-PHASE2-TASK04 | 起点 `41b451de`；PostgreSQL `0009`、PO/Receipt/状态事件/财务来源、缺料建议、收货/全额冲销及 TASK04 库存同事务联动通过；版本 `0.1.0-alpha.5`，未自动生成应付、迁真实 PO/在途、部署、push 或 PR。 |
 | SELFHOST-PHASE2-TASK06 | 迁移工单、领料、报工、完工与库存联动 | DONE | Codex（诊断、非生产实施、隔离测试、文档与本地提交） | 2026-07-25 | 2026-07-25 | SELFHOST-PHASE2-TASK03、SELFHOST-PHASE2-TASK04 | 起点 `b4a7d5cde06df0b8982e7f120afd9f72c13af8d2`；PostgreSQL `0010`、关系化 WO/BOM 快照/需求/领退料/报工/完工及 TASK04 库存同事务联动通过；版本 `0.1.0-alpha.6`，未迁真实生产数据、部署、push 或 PR。 |
-| SELFHOST-PHASE2-TASK07 | 迁移询报价、销售订单、发货与库存联动 | TODO | 待指派 | - | - | SELFHOST-PHASE2-TASK03、SELFHOST-PHASE2-TASK04、SELFHOST-PHASE2-TASK06 | **建议、未授权**；修复 quote 转单原子性，不自动生成应收 |
+| SELFHOST-PHASE2-TASK07 | 迁移询报价、销售订单、发货与库存联动 | DONE | Codex（诊断、非生产实施、隔离测试、文档与本地提交） | 2026-07-25 | 2026-07-25 | SELFHOST-PHASE2-TASK03、SELFHOST-PHASE2-TASK04、SELFHOST-PHASE2-TASK06 | 起点 `97d541ecfb7fe6fff551c750c69f5cf30e3ff5bc`；PostgreSQL `0011`、Quote Version/Line/状态事件、ACCEPTED 原子转 SO、Shipment/全额冲销、TASK04 库存和稳定销售金额来源同事务联动通过；版本 `0.1.0-alpha.7`，未自动生成应收、迁真实数据、部署、push 或 PR。 |
 | SELFHOST-PHASE2-TASK08 | 迁移 IQC/IPQC/FQC、缺陷、处置与关闭 | TODO | 待指派 | - | - | SELFHOST-PHASE2-TASK05、SELFHOST-PHASE2-TASK06、SELFHOST-PHASE2-TASK07 | **建议、未授权**；跨域 hold/release 规则需先获业务确认 |
 | SELFHOST-PHASE2-TASK09 | 迁移应收应付、收付款、余额与冲销 | TODO | 待指派 | - | - | SELFHOST-PHASE2-TASK05、SELFHOST-PHASE2-TASK07 | **建议、未授权**；金额 numeric、不可变过账与冲销，不迁真实金额 |
 | SELFHOST-PHASE2-TASK10 | 经营看板、备份恢复治理与 legacy iframe 退出 | TODO | 待指派 | - | - | SELFHOST-PHASE2-TASK02—TASK09 | **建议、未授权**；根页切换与恢复必须最后验收，不含生产切流/原地覆盖恢复 |

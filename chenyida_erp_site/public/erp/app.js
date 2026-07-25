@@ -35,6 +35,7 @@ const state = {
   masterDataOperations: new Map(),
   procurementOperations: new Map(),
   productionOperations: new Map(),
+  salesOperations: new Map(),
   operationsAvailability: { dashboard: false, backups: false },
 };
 
@@ -137,6 +138,14 @@ async function productionWrite(operationName, path, payload, method = "POST") {
   const operation = existing || { key: crypto.randomUUID(), frozenBody }; state.productionOperations.set(operationName, operation);
   try { const result = await api(path, { method, body: operation.frozenBody, protectedWrite: { idempotencyKey: operation.key, csrfToken: state.session.csrf_token || "" } }); state.productionOperations.delete(operationName); return result; }
   catch (error) { if (!error.resultUnknown) state.productionOperations.delete(operationName); throw error; }
+}
+
+async function salesWrite(operationName, path, payload, method = "POST") {
+  const frozenBody = JSON.stringify(payload); const existing = state.salesOperations.get(operationName);
+  if (existing && existing.frozenBody !== frozenBody) throw new Error("上一次销售操作结果尚未确认，只能使用原请求安全重试");
+  const operation = existing || { key: crypto.randomUUID(), frozenBody }; state.salesOperations.set(operationName, operation);
+  try { const result = await api(path, { method, body: operation.frozenBody, protectedWrite: { idempotencyKey: operation.key, csrfToken: state.session.csrf_token || "" } }); state.salesOperations.delete(operationName); return result; }
+  catch (error) { if (!error.resultUnknown) state.salesOperations.delete(operationName); throw error; }
 }
 
 function requestedMaterialReturnTo() {
@@ -344,6 +353,9 @@ function renderProducts() {
 function renderPartners() {
   $("#customerOptions").innerHTML = state.customers.map((row) => `<option value="${escapeHtml(row.customer_name)}"></option>`).join("");
   $("#supplierOptions").innerHTML = state.suppliers.map((row) => `<option value="${escapeHtml(row.supplier_name)}"></option>`).join("");
+  const salesCustomerOptions = optionList(state.customers.filter((row) => (row.status || row.customer_status) === "ACTIVE"), "id", ["customer_code", "customer_name"]);
+  $("#quoteCustomer").innerHTML = salesCustomerOptions;
+  $("#salesCustomer").innerHTML = salesCustomerOptions;
   const customerRows = state.customers.map((row) => `
     <tr>
       <td>${escapeHtml(row.customer_code)}</td>
@@ -394,8 +406,12 @@ function renderBomSelectors() {
   $("#purchaseBom").innerHTML = bomOptions;
   $("#productionBom").innerHTML = bomOptions;
   $("#productionFinishedMaterial").innerHTML = optionList(state.items, "id", ["internal_material_code", "standard_name"]);
-  $("#quoteProduct").innerHTML = productOptions;
-  $("#salesProduct").innerHTML = productOptions;
+  const salesProducts = optionList(state.products.filter((row) => (row.status || row.product_status) === "ACTIVE" && row.product_version_status === "RELEASED"), "id", ["product_code", "product_name", "product_version"]);
+  const finishedMaterials = optionList(state.inventory, "material_id", ["internal_material_code", "standard_name", "base_uom"]);
+  $("#quoteProduct").innerHTML = salesProducts;
+  $("#salesProduct").innerHTML = salesProducts;
+  $("#quoteFinishedMaterial").innerHTML = finishedMaterials;
+  $("#salesFinishedMaterial").innerHTML = finishedMaterials;
   $("#lineItem").innerHTML = itemOptions;
   $("#adjustItem").innerHTML = inventoryOptions;
 }
@@ -669,7 +685,8 @@ function renderWorkOrderSelector() {
 
 function renderQuotations() {
   const rows = state.quotations.map((quote) => {
-    const converted = Number(quote.sales_order_id || 0) > 0 || quote.quote_status === "已转订单";
+    const status = quote.quote_status || quote.status;
+    const converted = Number(quote.sales_order_id || 0) > 0 || status === "CONVERTED";
     return `
       <tr>
         <td>${escapeHtml(quote.quote_code)}</td>
@@ -684,7 +701,9 @@ function renderQuotations() {
         <td>${escapeHtml(quote.owner)}</td>
         <td>
           <div class="row-actions">
-            <button data-convert-quote="${quote.id}" ${converted ? "disabled" : ""}>转销售订单</button>
+            <button data-convert-quote="${quote.id}" ${!converted && status === "ACCEPTED" ? "" : "disabled"}>转销售订单</button>
+            <button data-publish-quote="${quote.id}" data-quote-version="${quote.version}" ${status === "DRAFT" ? "" : "disabled"}>发布</button>
+            <button data-accept-quote="${quote.id}" data-quote-version="${quote.version}" ${status === "PUBLISHED" ? "" : "disabled"}>接受</button>
           </div>
         </td>
       </tr>
@@ -715,7 +734,7 @@ function renderSalesOrders() {
         <td>${escapeHtml(order.finished_available_qty)}</td>
         <td>
           <div class="row-actions">
-            <button data-select-sales-order="${order.id}" ${remaining <= 0 ? "disabled" : ""}>出货</button>
+            <button data-select-sales-order="${order.id}" ${remaining <= 0 || Number(order.line_count) !== 1 ? "disabled" : ""}>出货</button>
           </div>
         </td>
       </tr>
@@ -1527,36 +1546,48 @@ async function completeWorkOrder() {
 }
 
 async function createQuotation() {
+  const product = state.products.find((row) => String(row.id) === String($("#quoteProduct").value));
+  const material = state.inventory.find((row) => String(row.material_id) === String($("#quoteFinishedMaterial").value));
   const payload = {
-    customer_name: $("#quoteCustomer").value.trim(),
-    product_code: $("#quoteProduct").value,
-    quote_qty: $("#quoteQty").value.trim(),
-    unit_price: $("#quoteUnitPrice").value.trim(),
+    customer_id: Number($("#quoteCustomer").value),
+    currency_code: "CNY",
+    lines: product && material ? [{ product_id: Number(product.id), product_version_id: Number(product.product_version_id), finished_material_id: Number(material.material_id), unit_id: Number(material.unit_id), quantity: $("#quoteQty").value.trim(), unit_price: $("#quoteUnitPrice").value.trim(), remark: "" }] : [],
     valid_until: $("#quoteValidUntil").value,
     owner: $("#quoteOwner").value.trim(),
     remark: $("#quoteRemark").value.trim(),
   };
-  if (!payload.customer_name) {
-    toast("请填写客户名称");
+  if (!payload.customer_id) {
+    toast("请选择客户");
     return;
   }
-  if (!payload.product_code) {
-    toast("请选择产品");
+  if (!product || !material) {
+    toast("请选择已发布产品和成品物料");
     return;
   }
-  const result = await api("/api/quotations", { method: "POST", body: JSON.stringify(payload) });
+  const result = await salesWrite("create-quotation", "/api/quotations", payload);
   await refreshAll();
   $("#quoteMsg").textContent = `已生成 ${result.quote_code}`;
   toast("报价单已生成");
 }
 
+async function publishQuotation(quoteId, expectedVersion) {
+  await salesWrite(`publish-quotation:${quoteId}`, `/api/quotations/${quoteId}/publish`, { expected_version: Number(expectedVersion), reason: "" });
+  await refreshAll();
+  toast("报价已发布");
+}
+
+async function acceptQuotation(quoteId, expectedVersion) {
+  await salesWrite(`accept-quotation:${quoteId}`, `/api/quotations/${quoteId}/accept`, { expected_version: Number(expectedVersion), reason: "" });
+  await refreshAll();
+  toast("报价已接受");
+}
+
 async function convertQuotation(quoteId) {
-  const result = await api("/api/quotations/to-sales-order", {
-    method: "POST",
-    body: JSON.stringify({
+  const quote = state.quotations.find((row) => String(row.id) === String(quoteId));
+  const result = await salesWrite(`convert-quotation:${quoteId}`, "/api/quotations/to-sales-order", {
       quote_id: quoteId,
+      expected_version: Number(quote?.version),
       owner: $("#quoteOwner").value.trim() || "业务员",
-    }),
   });
   await refreshAll();
   $("#quoteMsg").textContent = `已转销售订单 ${result.sales_order_code}`;
@@ -1564,18 +1595,20 @@ async function convertQuotation(quoteId) {
 }
 
 async function createSalesOrder() {
+  const product = state.products.find((row) => String(row.id) === String($("#salesProduct").value));
+  const material = state.inventory.find((row) => String(row.material_id) === String($("#salesFinishedMaterial").value));
   const payload = {
-    customer_name: $("#salesCustomer").value.trim(),
-    product_code: $("#salesProduct").value,
-    order_qty: $("#salesOrderQty").value.trim(),
+    customer_id: Number($("#salesCustomer").value),
+    currency_code: "CNY",
+    lines: product && material ? [{ product_id: Number(product.id), product_version_id: Number(product.product_version_id), finished_material_id: Number(material.material_id), unit_id: Number(material.unit_id), quantity: $("#salesOrderQty").value.trim(), unit_price: $("#salesUnitPrice").value.trim(), remark: "" }] : [],
     due_date: $("#salesDueDate").value,
     owner: $("#salesOwner").value.trim(),
   };
-  if (!payload.customer_name) {
-    toast("请填写客户名称");
+  if (!payload.customer_id || !product || !material) {
+    toast("请选择客户、已发布产品和成品物料");
     return;
   }
-  const result = await api("/api/sales-orders", { method: "POST", body: JSON.stringify(payload) });
+  const result = await salesWrite("create-sales-order", "/api/sales-orders", payload);
   await refreshAll();
   $("#salesMsg").textContent = `已创建 ${result.sales_order_code}`;
   toast("销售订单已创建");
@@ -1587,16 +1620,21 @@ async function shipSalesOrder() {
     toast("没有可出货的销售订单");
     return;
   }
-  const result = await api("/api/shipments/from-order", {
-    method: "POST",
-    body: JSON.stringify({
+  const order = state.salesOrders.find((row) => String(row.id) === String(salesOrderId));
+  if (!order || Number(order.line_count) !== 1) {
+    toast("兼容页面只支持单行订单出货，请使用稳定多行接口");
+    return;
+  }
+  const result = await salesWrite(`ship-sales-order:${salesOrderId}`, "/api/shipments", {
       sales_order_id: salesOrderId,
-      ship_qty: $("#shipQty").value.trim(),
+      expected_order_version: Number(order.version),
+      lines: [{ sales_order_line_id: Number(order.sales_order_line_id), quantity: $("#shipQty").value.trim(), expected_line_version: Number(order.expected_line_version), expected_balance_version: Number(order.expected_balance_version) }],
       ship_date: $("#shipDate").value,
       receiver: $("#shipReceiver").value.trim(),
-    }),
+      reason: "销售出货",
   });
-  $("#shipMsg").textContent = `${result.shipment_code}，库存从 ${result.before_qty} 变为 ${result.after_qty}`;
+  const inventoryLine = result.data?.inventory?.lines?.[0] || {};
+  $("#shipMsg").textContent = `${result.shipment_code}，库存从 ${inventoryLine.before_on_hand_qty ?? "-"} 变为 ${inventoryLine.after_on_hand_qty ?? "-"}`;
   await refreshAll();
   toast("出货完成");
 }
@@ -1793,7 +1831,11 @@ function bindEvents() {
   });
   $("#quotationsTable").addEventListener("click", async (event) => {
     const quoteId = event.target.dataset.convertQuote;
-    if (quoteId) await convertQuotation(quoteId);
+    const publishId = event.target.dataset.publishQuote;
+    const acceptId = event.target.dataset.acceptQuote;
+    if (publishId) await publishQuotation(publishId, event.target.dataset.quoteVersion);
+    else if (acceptId) await acceptQuotation(acceptId, event.target.dataset.quoteVersion);
+    else if (quoteId) await convertQuotation(quoteId);
   });
   $("#salesOrdersTable").addEventListener("click", (event) => {
     const salesOrderId = event.target.dataset.selectSalesOrder;

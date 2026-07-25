@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE2-TASK07 自托管销售与库存联动
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 恢复点 | PASS | `main`、起点 `97d541ecfb7fe6fff551c750c69f5cf30e3ff5bc`；合法 TASK07 dirty 全部保留并原地续作，0001—0010 无变化 |
+| 模块/数据边界 | PASS | 独立 `sales-selfhost`；稳定 Customer/Product Version/Material/Unit/Inventory/User ID，不写 Python、D1 或 `erp_records` |
+| 报价/转单 | PASS | DRAFT Version/Line、显式状态事件、只有 ACCEPTED 可原子转换一次；SO/Link/投影/audit/idem 同事务 |
+| 发货/冲销原子性 | PASS | Shipment/全额 reversal、SO 投影、TASK04 Ledger/Balance、状态、金额来源、audit、idem 同事务；故障注入和审计失败整体回滚 |
+| 金额/约束/并发 | PASS | CNY numeric(24,6) 服务端计算；ACTIVE/STOCKED/基础单位/客户限制、超发/负库存、并发编码/转换/发货和 expected version 均 fail closed |
+| 权限与兼容 | PASS | quote/order/ship/reverse/finance source 服务端分离；legacy API/UI 只转换稳定 ID 并委托同一 Service，CSRF/限流/请求编号/中文错误通过 |
+| PostgreSQL migration | PASS | `0011` 空库、0010 存量、重复、失败回滚、约束/索引/不可变 guard、旧数据保留通过；SHA-256 `6d97c854ecd2fd47f4540c0403de097332f406c7d9f5155c2355dd44d5a57e3b`，0001—0010 不变 |
+| 专项/Compose | PASS | unit/UI 5/5、PostgreSQL/API 3/3、migration 3/3、Schema consistency；Compose 初始及 PostgreSQL/Web/Worker 重启持久性通过 |
+| 全量回归 | PASS | shared unit/UI 65/65、PG 54/54、升级 21/21、Import 53/53、FileStorage/environment、lint/build/typecheck/credentials、Python 三项通过 |
+| 版本 | PASS / NOT RELEASED | `chenyida-erp-selfhosted@0.1.0-alpha.7`；非生产、尚未发布、部署或批准 |
+| 资源/生产影响 | NONE | 隔离 PostgreSQL、Compose、临时 SQLite/文件已清理；未访问生产、迁真实销售数据、部署、push 或 PR |
+
 ## SELFHOST-PHASE2-TASK06 自托管生产与库存联动
 
 | 验证项 | 结果 | 说明 |

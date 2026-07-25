@@ -384,8 +384,9 @@
           <div class="work-panel">
             <h3>新增报价单</h3>
             <div class="form-grid three">
-              <label>客户名称<input id="quoteCustomer" list="customerOptions" placeholder="客户名称" /></label>
+              <label>客户<select id="quoteCustomer"></select></label>
               <label>产品<select id="quoteProduct"></select></label>
+              <label>成品物料<select id="quoteFinishedMaterial"></select></label>
               <label>报价数量<input id="quoteQty" value="100" /></label>
               <label>单价<input id="quoteUnitPrice" value="1" /></label>
               <label>有效期<input id="quoteValidUntil" type="date" /></label>
@@ -412,10 +413,12 @@
           <div class="two-panels">
             <div class="work-panel">
               <h3>新增销售订单</h3>
-              <label>客户名称<input id="salesCustomer" list="customerOptions" placeholder="客户名称" /></label>
+              <label>客户<select id="salesCustomer"></select></label>
               <label>产品<select id="salesProduct"></select></label>
+              <label>成品物料<select id="salesFinishedMaterial"></select></label>
               <div class="form-grid">
                 <label>订单数量<input id="salesOrderQty" value="10" /></label>
+                <label>未税单价（CNY）<input id="salesUnitPrice" value="1" /></label>
                 <label>交付日期<input id="salesDueDate" type="date" /></label>
               </div>
               <label>负责人<input id="salesOwner" value="业务员" /></label>

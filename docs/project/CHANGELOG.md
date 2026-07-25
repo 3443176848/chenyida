@@ -4,6 +4,16 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE2-TASK07 - `feat: add self-hosted sales`
+
+- 数据库：新增 PostgreSQL `0011`，关系化 Quote Header/Version/Line/Status Event、SO Header/Version/Line/Status Event、唯一 Quote→SO Link、Shipment/全额冲销和 append-only Sales Financial Source；已过账事实与非草稿版本不可修改/删除。
+- 服务端：新增独立 Sales Repository/Service/Handler，稳定与 legacy 报价/销售订单/发货路由统一委托；固定权限、CSRF、256 KiB、24h 幂等、限流、expected version、稳定错误、请求编号和事务审计由服务端执行。
+- 业务：报价 DRAFT 版本、发布/接受/拒绝/过期/取消/转换；只有 ACCEPTED 可原子转单一次；直接 SO 为 OPEN；部分/全部发货与一次全额冲销；CNY 六位金额由 PostgreSQL numeric 计算。
+- 原子联动：Shipment/冲销复用 TASK04 Inventory Service 事务入口，销售事实、SO 投影、Ledger/Balance、状态、金额来源、审计和幂等共同提交或整体回滚。
+- Legacy UI：客户、Product Version、成品 Material 和 Unit 使用稳定 ID；受保护报价/转单/订单/单行发货不计算客户端权威总额或提交操作者字段。
+- 验收：专项 unit/UI 5/5、PG/API 3/3、migration 3/3、Schema consistency、Compose 初始/整栈重启；shared unit/UI 65/65、PG 54/54、升级 21/21、Import 53/53、FileStorage/environment、lint/build/typecheck/credentials、Python 三项均通过。
+- 版本/边界：`0.1.0-alpha.7`，非生产且未发布；未迁真实销售/库存/金额数据，未实现税/折扣/汇率、销售审批、退换货/部分冲销、FQC、应收/收款/总账，未访问生产、部署、push 或创建 PR。
+
 ### SELFHOST-PHASE2-TASK06 - `feat: add self-hosted production`
 
 - 数据库：新增 PostgreSQL `0010`，关系化 WO、状态事件、不可变 BOM 快照/需求、领退料、报工、完工和客户专用料限制；已过账事实与快照有数据库不可变 guard，旧 `erp_records` 不回填、不双写。

@@ -174,6 +174,7 @@ test("migration applies the mapping model and immutable guards", async () => {
     "0008_inventory_ledger.sql",
     "0009_procurement.sql",
     "0010_production.sql",
+    "0011_sales.sql",
   ]);
   const columns = await pool.query(`
     select column_name from information_schema.columns

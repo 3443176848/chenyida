@@ -4,39 +4,42 @@
 
 ## 2026-07-25 自托管完整 ERP 迁移覆盖层
 
-`SELFHOST-PHASE2-TASK01` 从源码确认 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30），并在当时基线记录等价覆盖 4、部分覆盖 9、未覆盖 51。TASK02 补齐身份公共边界；TASK03 已关系化主数据/BOM；TASK04 已建立通用不可变 inventory ledger；TASK05 已关系化采购；TASK06 已关系化 WO/BOM 快照/领退料/报工/完工，并与库存同事务联动。Quote、SO、shipment、quality 和完整 finance 仍无自托管业务服务。
+`SELFHOST-PHASE2-TASK01` 从源码确认 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30），并在当时基线记录等价覆盖 4、部分覆盖 9、未覆盖 51。TASK02 补齐身份公共边界；TASK03 已关系化主数据/BOM；TASK04 已建立通用不可变 inventory ledger；TASK05 已关系化采购；TASK06 已关系化生产；TASK07 已关系化 Quote/SO/Shipment/Financial Source，并与库存同事务联动。Quality 和完整 finance 仍无自托管业务服务。
 
 ```mermaid
 flowchart LR
     ROOT["自托管根页面"] --> IFRAME["/erp/index.html legacy iframe"]
     IFRAME --> AUTH["身份/用户/系统审计: 可用"]
     IFRAME --> BATCH["登录后 23 个 legacy 业务 GET"]
-    BATCH --> M6["TASK03—TASK06 主数据/BOM/库存/采购/生产: 已接通"]
-    BATCH --> NF["销售及后续业务域: 仍 404"]
+    BATCH --> M7["TASK03—TASK07 主数据/BOM/库存/采购/生产/销售: 已接通"]
+    BATCH --> NF["品质及后续业务域: 仍有缺口"]
 
     NATIVE["/materials 原生页面"] --> MM["Material/Import/Normalization/Review API"]
     AUTH --> ID["identity-selfhost Repository/Service/Handler"]
-    ID --> PG["PostgreSQL 0001—0010"]
+    ID --> PG["PostgreSQL 0001—0011"]
     MM --> PG
-    M6 --> MDB["master-data-selfhost / bom-selfhost"]
+    M7 --> MDB["master-data-selfhost / bom-selfhost"]
     MDB --> PG
-    M6 --> INV["inventory-selfhost / immutable ledger"]
+    M7 --> INV["inventory-selfhost / immutable ledger"]
     INV --> PG
-    M6 --> PROC["procurement-selfhost / PO + Receipt"]
+    M7 --> PROC["procurement-selfhost / PO + Receipt"]
     PROC --> PG
-    M6 --> PROD["production-selfhost / WO + Snapshot + Material/Completion"]
+    M7 --> PROD["production-selfhost / WO + Snapshot + Material/Completion"]
     PROD --> INV
     PROD --> PG
+    M7 --> SALES["sales-selfhost / Quote + SO + Shipment"]
+    SALES --> INV
+    SALES --> PG
 
     PYUI["Python static app"] --> PYAPI["Python 64 个 HTTP 操作"]
     PYAPI --> SQLITE["SQLite 29 表开发运行面"]
 ```
 
-根 iframe 的 `refreshAll()` 用一个 `Promise.all` 请求 summary、material/cleaning、主数据、采购/库存、生产、销售、品质和财务共 23 个 GET。TASK03—TASK06 已接通主数据/BOM、库存、采购与生产子集；但 `Promise.all` 仍会因销售及后续业务域 404 整批失败，因此当前仍不能描述为完整 ERP。Operations 的 users 已接通新 Identity API；management-dashboard 与 backups 仍明确降级为不可用。
+根 iframe 的 `refreshAll()` 用一个 `Promise.all` 请求 summary、material/cleaning、主数据、采购/库存、生产、销售、品质和财务共 23 个 GET。TASK03—TASK07 已接通主数据/BOM、库存、采购、生产与销售子集；但品质和完整财务仍有缺口，因此当前仍不能描述为完整 ERP。Operations 的 users 已接通新 Identity API；management-dashboard 与 backups 仍明确降级为不可用。
 
 身份请求先进入 `identity-selfhost/handler.ts`，再由 Service 执行业务规则、Repository 执行 PostgreSQL 事务。非身份受保护请求在进入 Material/Import 模块前统一解析服务端 session actor 并执行 active/must-change 门禁；浏览器不能提交 permissions。会话只保存 token SHA-256 摘要，身份审计、限流和幂等均持久化到 PostgreSQL。
 
-PostgreSQL 的 `erp_records(kind,code,data JSONB)` 只是历史兼容占位，不是未来各域关系模型；`0001` 的文本库存表也只作迁移证据。TASK04 Ledger/Balance 是库存数量权威；TASK05 PO/Receipt/Financial Source 与 TASK06 WO/Snapshot/Material/Report/Completion 均通过稳定外键和同事务服务调用联动，不回写 legacy 表。销售及后续业务单据仍未实现。完整逐项清单见 `docs/audits/SELFHOST-PHASE2-TASK01-api-inventory.md`，依赖顺序见 `docs/self-hosting/full-erp-api-migration-plan.md`。
+PostgreSQL 的 `erp_records(kind,code,data JSONB)` 只是历史兼容占位，不是未来各域关系模型；`0001` 的文本库存表也只作迁移证据。TASK04 Ledger/Balance 是库存数量权威；TASK05 PO/Receipt/Financial Source、TASK06 WO/Snapshot/Material/Report/Completion 与 TASK07 Quote/SO/Shipment/Financial Source 均通过稳定外键和同事务服务调用联动，不回写 legacy 表。品质及完整财务业务单据仍未实现。完整逐项清单见 `docs/audits/SELFHOST-PHASE2-TASK01-api-inventory.md`，依赖顺序见 `docs/self-hosting/full-erp-api-migration-plan.md`。
 
 ## 系统架构图
 
