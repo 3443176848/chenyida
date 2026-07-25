@@ -20,8 +20,8 @@ test("planning page has pending and accepted queues with read-only decision deta
   assert.doesNotMatch(workspace, /localStorage|sessionStorage|relative_path|absolute_path|storage_name|file_body/);
 });
 
-test("dashboard exposes only the TASK02 queue and no downstream recommendation", () => {
-  assert.match(dashboard, /计划部门/); assert.match(dashboard, /\/planning\/handoffs/); assert.match(dashboard, /pending_planning_handoffs/); assert.match(dashboard, /不含物料需求或采购建议/);
+test("dashboard preserves the TASK02 queue while its package workspace stays upstream-only", () => {
+  assert.match(dashboard, /计划部门/); assert.match(dashboard, /\/planning\/handoffs/); assert.match(dashboard, /pending_planning_handoffs/);
   assert.match(legacyOperations, /option value="planning">计划/);
   assert.doesNotMatch(workspace, /创建采购申请|创建采购订单|净需求计算|供应商推荐/);
 });

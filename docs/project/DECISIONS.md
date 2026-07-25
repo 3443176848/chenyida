@@ -654,6 +654,19 @@
 - 生产边界：仅授权回环并行验收环境；不批准真实数据迁移、生产上线、HTTPS、公网、切流或 TASK03。
 - 验收结果：`0.1.0-alpha.16`/`0016` 已完成真实会话退回→新包 v2→重提→接收、Compose 重启和恢复点清理；最终只保留 Schema/唯一管理员，结论 `PROJECT TO PLANNING HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。
 
+## D-060 计划物料需求使用提交时重算与独立 Planning Allocation
+
+- 日期：2026-07-26
+- 状态：`ACCEPTED / IMPLEMENTED / PENDING PARALLEL ACCEPTANCE`
+- 确认人：项目负责人（通过 `SELFHOST-PHASE4-TASK03` 指令确认角色、数量公式、锁与重算、不可变计划、采购申请和任务排除边界）
+- 来源：只能使用项目最新 `ACCEPTED` Planning Package；`Material + Unit` 与 gross quantity 只读取固化快照并聚合，不重读或展开当前 BOM。需求日期是计划版本稳定字段。
+- 数量：gross、库存可用、有效在途、库存/在途分配和净采购统一由 PostgreSQL `numeric(24,6)` 计算与约束，Node/浏览器只传递 decimal 字符串，不以 JavaScript 浮点数决定结果。
+- 并发：DRAFT 只保存预览且不占用来源；SUBMIT 在单一事务中锁定计划、Package、物料分配键、Inventory 同源键及采购在途表，重新核算并比较 Package/余额/PO/Allocation 摘要。任何变化均以稳定冲突要求重新生成，不静默改写预览。
+- 分配：Planning Allocation 与 Inventory `reserved_qty` 分离；只有 `SUBMITTED/ACCEPTED` 计划的分配参与其他计划扣减。采购退回把计划投影置为 `RETURNED`，历史分配保持不可变但不再有效，计划部只能创建新版本重算。
+- 申请：净采购大于零的计划行一对一进入不可变 `PRQ-########` 采购申请；净采购全为零时保存已提交需求计划但不创建空申请。采购只接收或填写原因退回，接收不自动创建 RFQ、报价、供应商选择、比价、PO 或收货。
+- 角色：planning 生成/重新生成/提交；purchase 接收/退回；manager/admin 全能力。服务端权限、CSRF、持久幂等、版本冲突、数据库 trigger、事件与审计共同 fail closed。
+- 生产边界：只授权回环并行验收环境；不迁移真实数据，不执行生产 migration/部署/切流，不进入生产、品质、财务或真实采购执行。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

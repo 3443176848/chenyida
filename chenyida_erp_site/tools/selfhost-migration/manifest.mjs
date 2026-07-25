@@ -5,7 +5,7 @@ import { fail } from "./errors.mjs";
 import { registryDigest, MAPPING_REGISTRY } from "./mapping-registry.mjs";
 
 export const MANIFEST_SCHEMA_VERSION = 1;
-export const TOOL_VERSION = "0.1.0-alpha.16";
+export const TOOL_VERSION = "0.1.0-alpha.17";
 export const EXPECTED_MIGRATION_SHA256 = Object.freeze({
   "0001_selfhost_baseline.sql": "c1cd71803b0f504594a41234a82eb13ce8e6713f5d346f3e49247b4921ff1702",
   "0002_material_master_workflow.sql": "2d8d4facf54c950fa19d1346705aa0f549669544da1a87c2fc584c1fe8b7eb80",
@@ -23,16 +23,17 @@ export const EXPECTED_MIGRATION_SHA256 = Object.freeze({
   "0014_migration_openings.sql": "61f65ef3d588bfbf178f3dd9ba196886fa18fb3ecca119a151f6a3bc0bc5a99b",
   "0015_market_project_handoff.sql": "419a80cb1ec3daad614f23b89895c9e8e3679bee40f506b0d0a811aba98a546f",
   "0016_project_planning_handoff.sql": "26d6e4cc609a53403b377d8550fcf5d8fd88f677178681f4cca1692544bb2076",
+  "0017_planning_material_requirements.sql": "33cb162e5e32aeaca015a9d6e25a33f048166c7c895ebbc242819f6bbe2b6b28",
 });
 
 export async function migrationChecksums(directory) {
   const files = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();
-  if (files.length !== 16 || files[0] !== "0001_selfhost_baseline.sql" || files.at(-1) !== "0016_project_planning_handoff.sql") {
-    fail("MIGRATION_TARGET_BASELINE_INVALID", "目标 migration 必须严格为 0001—0016");
+  if (files.length !== 17 || files[0] !== "0001_selfhost_baseline.sql" || files.at(-1) !== "0017_planning_material_requirements.sql") {
+    fail("MIGRATION_TARGET_BASELINE_INVALID", "目标 migration 必须严格为 0001—0017");
   }
   const migrations = await Promise.all(files.map(async (name) => ({ name, sha256: sha256(await readFile(resolve(directory, name))) })));
   if (migrations.some(({ name, sha256: digest }) => EXPECTED_MIGRATION_SHA256[name] !== digest)) {
-    fail("MIGRATION_TARGET_BASELINE_INVALID", "目标 migration checksum 与 0001—0016 固定基线不一致");
+    fail("MIGRATION_TARGET_BASELINE_INVALID", "目标 migration checksum 与 0001—0017 固定基线不一致");
   }
   return migrations;
 }

@@ -21,7 +21,7 @@ from urllib.parse import quote
 
 MODE = "REAL_READONLY_INVENTORY"
 CONFIRMATION = "REAL_LOCAL_SQLITE_READONLY_INVENTORY"
-TOOL_VERSION = "0.1.0-alpha.16"
+TOOL_VERSION = "0.1.0-alpha.17"
 SNAPSHOT_NAME = "task04-source.snapshot.sqlite3"
 REPORT_NAMES = (
     "source-schema-fingerprint.json",

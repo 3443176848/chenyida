@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.16",
+  "version": "0.1.0-alpha.17",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -93,6 +93,11 @@
     "test:planning:ui": "node --experimental-strip-types --test tests/selfhost-planning-handoff-ui-contract.test.mjs",
     "test:planning:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-planning-handoff-postgres.test.mjs",
     "test:planning:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-planning-handoff-migration-upgrade.test.mjs",
+    "typecheck:material-requirement": "tsc -p tsconfig.phase4-task03.json --pretty false",
+    "test:material-requirement:unit": "node --experimental-strip-types --test tests/selfhost-material-requirement-unit.test.mjs",
+    "test:material-requirement:ui": "node --experimental-strip-types --test tests/selfhost-material-requirement-ui-contract.test.mjs",
+    "test:material-requirement:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-material-requirement-postgres.test.mjs",
+    "test:material-requirement:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-material-requirement-migration-upgrade.test.mjs",
     "test:full-erp:compose": "node scripts/selfhost-full-erp-compose-smoke.mjs",
     "test:compose": "node scripts/selfhost-compose-smoke.mjs",
     "test:normalization:compose-restart": "node scripts/selfhost-normalization-restart-smoke.mjs",

@@ -113,6 +113,13 @@
       "when": 1784990232976,
       "tag": "0016_project_planning_handoff",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1784997473274,
+      "tag": "0017_planning_material_requirements",
+      "breakpoints": true
     }
   ]
 }
