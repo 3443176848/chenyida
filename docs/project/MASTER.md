@@ -39,7 +39,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 自托管开发基线 `0.1.0-alpha.10`（包名 `chenyida-erp-selfhosted`），明确为非生产、尚未发布；统一追踪见 `RELEASES.md` |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK10 起点为 TASK09 `06a4413403869f4f41872c7a5cb98c434a44f095`；TASK10 独立提交消息为 `feat: add self-hosted operations workbench`，实际哈希以 `git log` 为准 |
+| 当前根仓库功能基线提交 | TASK10 起点 `06a4413403869f4f41872c7a5cb98c434a44f095`；功能提交 `96fbaaedf1b11da42de53e48afe714f1ee640f44`；提交后验收修正的最终 HEAD 以 `git log -1` 为准 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
@@ -47,7 +47,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 自托管 PostgreSQL 开发基线为 `0001`—`0013`；`0013` 新增稳定 Shipment/Receipt 来源的 AR/AP、不可变收付款/冲销和余额投影。SQLite 29张仍支撑当前 Python 开发运行面并作为迁移来源，D1/Drizzle 45张为历史迁移来源；均未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | Python/SQLite 开发服务由 systemd 常驻，`enabled/active` 且监听 `0.0.0.0:18888`；Node/PostgreSQL 仅为已清理的隔离开发验收基线，未生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard 与离线备份恢复治理的非生产链路 |
-| 当前阶段 | `SELFHOST-PHASE2-TASK02`—`TASK10` 已完成非生产关系化业务链路与根工作台验收；不等于已迁真实数据或可生产切换 |
+| 当前阶段 | `SELFHOST-PHASE2-TASK02`—`TASK10` 已形成“自托管完整 ERP API 非生产候选”；不等于已迁真实数据、可投产版本或已批准生产切换 |
 | 当前任务 | `SELFHOST-PHASE2-TASK10`：`DONE`；起点 `06a4413403869f4f41872c7a5cb98c434a44f095` |
 | 下一任务 | 不自动开始新任务；真实数据试迁移、生产备份恢复演练、部署和切换必须另立任务并单独授权 |
 

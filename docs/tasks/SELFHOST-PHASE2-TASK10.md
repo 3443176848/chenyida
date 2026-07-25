@@ -44,4 +44,4 @@
 - 不删除 legacy 静态源码、Python/SQLite 或历史 Sites/D1 证据；不双写，不补做 TASK02—TASK09 业务规则。
 - 不在浏览器暴露数据库 URL、文件绝对路径、备份制品内容、凭证或原地恢复能力。
 
-完成结果与完整验收证据见 `SELFHOST-PHASE2-TASK10-completion.md`；任务独立提交消息为 `feat: add self-hosted operations workbench`，实际哈希以 `git log` 为准。
+完成结果与完整验收证据见 `SELFHOST-PHASE2-TASK10-completion.md`、`../audits/SELFHOST-PHASE2-TASK10-api-coverage.md` 和 `../audits/SELFHOST-PHASE2-TASK10-restore-drill.md`。功能提交为 `96fbaaedf1b11da42de53e48afe714f1ee640f44`（`feat: add self-hosted operations workbench`）；提交后的指标语义、恢复证据和文档修正按不可 amend 规则使用聚焦后续提交。

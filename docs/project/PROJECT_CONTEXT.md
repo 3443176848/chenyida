@@ -135,7 +135,7 @@
 
 ## 当前路线
 
-当前已完成 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard、原生根工作台和离线 backup/restore 治理的 Node/PostgreSQL 非生产链路。TASK10 独立提交消息为 `feat: add self-hosted operations workbench`；当前不自动开始下一任务。真实数据试迁移、生产备份恢复演练、部署和切换继续独立授权。
+当前已完成 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard、原生根工作台和离线 backup/restore 治理的 Node/PostgreSQL 链路，可描述为“自托管完整 ERP API 非生产候选”。TASK10 功能提交为 `96fbaaedf1b11da42de53e48afe714f1ee640f44`；当前不自动开始下一任务。真实数据试迁移、生产备份恢复演练、部署和切换继续独立授权。
 
 ## 恢复上下文检查清单
 

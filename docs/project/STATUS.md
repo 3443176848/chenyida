@@ -9,13 +9,13 @@
 | Git 恢复点 | PASS | `main`、起点 `06a4413403869f4f41872c7a5cb98c434a44f095`；任务独立提交消息 `feat: add self-hosted operations workbench` |
 | Dashboard | PASS | 独立实时只读 Query Service；TASK02—TASK09 权威关系表、权限裁剪、numeric 文本、库存不跨单位聚合、系统审计最小披露 |
 | 根工作台/legacy | PASS | 根 `/` 无 iframe；setup/login/must-change/logout 与卡片独立状态通过；`/erp/index.html` 仅显式白名单 tab 深链 |
-| API 覆盖 | PASS | Python 盘点 64 操作和 legacy 23 个刷新 GET 均有实现或明确退役行为；浏览器备份 create/restore 返回稳定离线操作错误 |
+| API 覆盖 | PASS | Python 64 项最终为 COVERED 52、REPLACED 2、RETIRED 10、未知/404 0；legacy 23 个刷新 GET 在源全域库和恢复目标均逐项运行 200；浏览器备份 create/restore 返回稳定离线操作错误 |
 | Backup/restore | PASS | custom dump、文件 tar、manifest、migration/SHA/size 校验；隔离 PostgreSQL 新空目标恢复 13 个 migration 与合成文件逐字节一致；危险/损坏/非空目标拒绝 |
-| Compose | PASS | 空卷依次贯穿 TASK02→TASK10；角色裁剪、23 legacy GET、合成失败任务和 backup `UNVERIFIED` 通过，Web/Worker 重启后 `0013` 与跨域事实持久 |
-| 专项/回归 | PASS | Dashboard unit/UI/coverage 9/9、PG/API 2/2、跨域 unit/UI 23/23、Task05—09 typecheck、build、lint、environment 6/6、FileStorage 3/3、凭证与 Python 三项通过 |
+| Compose | PASS | 空卷依次贯穿 TASK02→TASK10；恢复到第二个新空 Compose 后 PostgreSQL/Web/Worker 整体重启，角色裁剪、23 GET、`0013`、跨域事实、Session、文件 SHA 和 backup `VERIFIED` 持久 |
+| 专项/回归 | PASS | Dashboard unit/UI/coverage 10/10；全量非数据库 selfhost 87/87、PostgreSQL/API 67/67、migration upgrade 27/27、environment 6/6、TASK03—TASK10 typecheck、build、lint 0 error/1 条既有 warning、623 文件凭证与 Python 三项通过 |
 | PostgreSQL migration | PASS / NO CHANGE | 保持 `0001`—`0013`；实时查询不需要 projection/outbox，未创建 `0014` |
 | 版本 | PASS / NOT RELEASED | `chenyida-erp-selfhosted@0.1.0-alpha.10`；非生产、尚未发布、部署或批准 |
-| 资源/生产影响 | NONE | TASK10 隔离 PostgreSQL/Compose/临时文件与 Python 测试备份已清理；未访问生产、迁真实数据、执行生产备份恢复、部署、push 或 PR |
+| 资源/生产影响 | NONE | TASK10 隔离 PostgreSQL/Compose/临时文件在最终核对后清理；未访问生产、迁真实数据、执行生产备份恢复、部署、push 或 PR |
 
 ## SELFHOST-PHASE2-TASK09 自托管应收应付与不可变收付款
 

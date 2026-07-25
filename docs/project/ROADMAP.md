@@ -39,9 +39,9 @@
 - 正式物料只能经审核启用，AI 或导入结果不能直接写正式数据。
 - 物料、属性、别名、映射和历史变更可审计。
 
-**建议任务数**：9（由 `SELFHOST-PHASE2-TASK01` 源码盘点提出，逐项独立验收）。**当前状态**：IN PROGRESS；TASK02—TASK09 已完成，TASK10 在 TASK09 独立提交和 clean 后按连续指令开始。
+**建议任务数**：9（由 `SELFHOST-PHASE2-TASK01` 源码盘点提出，逐项独立验收）。**当前状态**：DONE（仅非生产实施）；TASK02—TASK10 已完成，真实数据与生产门禁不在本阶段授权内。
 
-**已完成的前置诊断**：`SELFHOST-PHASE2-TASK01` 已盘点 Python 64 个 HTTP 操作（GET 34、POST 30），并在当时确认自托管等价覆盖 4、部分覆盖 9、未覆盖 51、根 legacy iframe 登录后 23 个业务 GET 全部 404。TASK02/TASK03 后覆盖已增加，但完整 iframe 仍未恢复。
+**覆盖演进**：`SELFHOST-PHASE2-TASK01` 起点为等价覆盖 4、部分 9、未覆盖 51，且 23 个业务 GET 全部 404；TASK10 最终为 COVERED 52、REPLACED 2、RETIRED 10、未知/404 0，根页已退出 iframe。
 
 **执行顺序（TASK02—TASK10 已完成非生产实施与独立验收）**：
 

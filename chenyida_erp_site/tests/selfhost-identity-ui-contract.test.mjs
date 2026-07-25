@@ -20,13 +20,14 @@ test("unknown identity results retain only page-memory operation context", () =>
   assert.doesNotMatch(app, /localStorage|sessionStorage/);
 });
 
-test("new stable errors and must-change flow are handled without loading missing dashboard APIs", () => {
+test("stable identity errors and must-change flow coexist with read-only operations APIs", () => {
   assert.match(client, /PASSWORD_CHANGE_REQUIRED/);
   assert.match(client, /Retry-After/);
   assert.match(app, /result\.user\.must_change_password/);
   assert.match(app, /session\.user\.must_change_password/);
-  assert.match(app, /自托管经营看板尚未迁移/);
-  assert.match(app, /自托管备份 API 尚未迁移/);
+  assert.match(app, /api\("\/api\/management-dashboard"\)/);
+  assert.match(app, /备份创建和新空目标恢复只允许受控离线 CLI；浏览器不提供写操作/);
+  assert.doesNotMatch(app, /function (?:createBackup|restoreBackup)/);
 });
 
 test("passwords and tokens are not written to URLs, logs or browser storage", () => {

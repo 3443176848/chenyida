@@ -8,6 +8,8 @@
 
 > 2026-07-25 TASK05 更新：下表主数据、库存与采购相关项已按 `0.1.0-alpha.5` 实际实现修正；本节 4/9/51 数字保留 TASK01 原始盘点基线，不冒充当前重新汇总。
 
+> 2026-07-25 TASK10 最终复核：本文件逐项描述保留当时诊断证据，不能再作为当前覆盖统计。`0.1.0-alpha.10` 的最终结果为 COVERED 52、REPLACED 2、RETIRED 10、未知/404 0；登录后 23 个 legacy GET 已在全域合成库和恢复后的新空 Compose 目标中逐项运行为 200。逐项 method/path、等价入口、权限、权威源、降级/禁止原因和证据见 `SELFHOST-PHASE2-TASK10-api-coverage.md`。
+
 ## 1. 口径与结论
 
 `chenyida_erp_app/server.py` 的 `AppHandler` 共暴露 **64 个 HTTP 操作**：GET 34、POST 30。按迁移业务域统计如下：

@@ -226,6 +226,6 @@ flowchart LR
 3. 在线业务主体为 JSON，缺少 V2 所需关系约束。
 4. schema、迁移和运行时建表同时存在，需建立单一迁移权威。
 5. 本地数据库缺少迁移历史和外键。
-6. 自托管根页仍依赖 legacy iframe；TASK03—TASK09 已接通主数据、BOM、通用库存、采购、生产、销售、品质和财务结算子集，但 Dashboard/backup 等 Operations GET 仍明确降级。在 TASK10 完成根页与恢复治理验收前，系统不能描述为完整 ERP。
+6. TASK10 已使自托管根页退出 legacy iframe，并接入实时 Dashboard 与只读备份治理；`/erp/index.html` 仍作为显式兼容业务台。当前债务是业务页面尚未全部原生化，且真实数据试迁移、生产恢复演练、容量/安全门禁和切换均未执行。
 7. Python 关键写操作缺少通用 request ID、CSRF、幂等、乐观锁、失败审计和不可变冲销；迁移必须重新建立服务端边界，不能机械翻译旧 handler。
 8. Quote 转 Sales Order 的旧 Python 路径跨两个 commit；收货、领料、完工、发货和收付款虽在 SQLite 单事务内联动，但都缺并发锁/幂等/版本和反向记录，是后续迁移的最高风险区。

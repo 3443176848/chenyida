@@ -10,7 +10,8 @@
 - 根工作台：`/` 改为原生 Vinext 会话与经营工作台，覆盖 setup/login/must-change/logout、指标、风险、模块入口和独立错误/重试，不再加载 iframe。
 - legacy/API：`/erp/index.html` 仅作显式白名单 tab 深链和回滚证据；64 个盘点操作与 23 个 legacy 刷新 GET 有实现或稳定退役合同，浏览器 backup create/restore 返回 `OFFLINE_OPERATION_REQUIRED`。
 - 备份治理：离线 backup/verify/restore 生成并核对 app/Git/tool/migration/size/SHA manifest，拒绝危险 tar/link、已有输出、生产目标和非空恢复目标；Web 只读去敏状态，不返回路径、URL、凭证或制品正文。
-- 验收：Dashboard unit/UI/coverage 9/9、PG/API 2/2、跨域 unit/UI 23/23、Task05—09 typecheck、build、lint、environment、FileStorage、凭证和 Python 三项通过；隔离 PostgreSQL backup→新空目标 restore，以及 TASK02→TASK10 同库 Compose 全旅程/重启通过。
+- 验收：Dashboard unit/UI/coverage 10/10；全量非数据库 selfhost 87/87、PostgreSQL/API 67/67、migration upgrade 27/27、environment 6/6、TASK03—TASK10 typecheck、build、lint、凭证和 Python 三项通过；隔离 PostgreSQL backup→新空目标 restore，以及 TASK02→TASK10 同库 Compose 全旅程/重启通过。
+- 验收补充：64 项逐条复核为 COVERED 52/REPLACED 2/RETIRED 10；全域备份恢复到第二个新空 Compose 后，115 张表、13 个 migration、跨域计数、0 个 Material orphan、两个文件 SHA、backup `VERIFIED` 与 23 GET 在整体重启后再次通过。
 - 版本/边界：`0.1.0-alpha.10`；无需新 projection，migration 保持 `0001`—`0013`。未迁真实数据、执行生产备份恢复、访问生产、部署、切流、push 或创建 PR。
 
 ### SELFHOST-PHASE2-TASK09 - `feat: add self-hosted finance management`
