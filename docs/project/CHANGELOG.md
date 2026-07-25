@@ -4,6 +4,14 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE4-TASK01 - `ops: accept market project workflow in parallel environment`
+
+- 部署：从功能提交重建 `chenyida-erp-parallel` migrate/Web/Worker，只应用 `0015`；管理员保留，Web/PostgreSQL healthy、Worker running。
+- 实际旅程：两个独立 sales/engineering 账号完成直接接收，以及退回原因→不可变需求 v2→重新提交→最终接收；两个项目最终 ACCEPTED，四类事件和 Project Audit/request_id 完整。
+- 持久与清理：Compose 重启后事实保持；随后恢复 0015 已应用的空验收点，临时账号、客户、项目和事件清零，Schema/唯一管理员保留，临时 root-only 恢复点删除。
+- 保护：Python PID `277640`、18888 与 SQLite inode/size/mtime/mode 不变；未读/迁真实数据、未启 HTTPS、未切流、未 push，不启动 TASK02。
+- 结论：`MARKET TO PROJECT HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。
+
 ### SELFHOST-PHASE4-TASK01 - `feat: add market project handoff workflow`
 
 - 数据库：新增 expand-only PostgreSQL `0015` 六表关系模型、稳定项目编号、需求版本/行、受控文件引用、交接投影和不可变事件；同步 Drizzle journal/snapshot/schema 与固定 checksum，不修改 0001—0014。

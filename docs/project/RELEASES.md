@@ -19,10 +19,10 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 历史 OpenAI Sites / Cloudflare D1 | 历史记录 `v3` | `2b4f1787ddbc7e0941ab2d5f5cadea6e817e8f12`；后续纳管来源 `9f2c2dca9ccde237cb2db6c01d2e3792b284e6e9` | 仓库 D1/Drizzle `0000`—`0008`；生产实际已应用版本本任务未访问、未核验 | 仅保留历史验收记录；本任务未访问公开 Site | `HISTORICAL`；文档曾记录为公开 `v3`，本任务不重新确认在线状态；不是未来生产权威方向 | 未向 PostgreSQL 迁移 | 历史提交 `2b4f178` 和 D1 migration/快照仅作迁移与行为证据；不是已验证的当前回退方案 | 历史状态；无新的部署批准 |
 | 当前 Python / SQLite 开发运行面 | `legacy-development`，尚无统一 SemVer | 当前仓库包含源代码的功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；常驻进程未记录启动 commit，不能反推为该提交 | 本地 SQLite 历史 26 表 + migration `0001`—`0004`；开发库只读核验已记录四个版本 | 本任务按发布基线重新执行 Python self-test、smoke 和临时库 go-live；结果见第 6 节 | `DEVELOPMENT`；systemd `enabled/active`，源码与已安装 unit 一致，Python 监听 `0.0.0.0:18888`；不是正式生产投用 | 不适用；该 SQLite 是旧数据来源和当前开发运行数据 | Git 源码 + 执行前 SQLite 可恢复快照；正式回退点尚未建立 | 仅开发常驻；未获生产批准 |
-| Node.js / PostgreSQL 自托管开发基线 | 源码 `0.1.0-alpha.15`；并行运行面部署前仍为 alpha.14 | TASK01 父提交 `0f15f271cc458343116cb6639f0d118eea37521b`；功能提交消息 `feat: add market project handoff workflow` | 源码 migration `0001`—`0015`；并行空环境在 ops 验收前仍为 14 个版本 | TASK01 专项/migration/共享回归通过；并行双账号与重启验收待功能提交后执行 | 既有 `PARALLEL HTTP ACCEPTANCE ONLY` 运行；TASK01 尚未部署，Web 仅 `127.0.0.1:3000` | `NOT_MIGRATED`；真实 SQLite、D1、文件和业务数据未读、未复制、未双写 | TASK01 部署前 root-only 恢复点 + 既有四个 Volume；Python/SQLite 不切流 | `IMPLEMENTED / PARALLEL ACCEPTANCE PENDING`；HTTPS、真实迁移和生产未批准 |
+| Node.js / PostgreSQL 自托管开发基线 | `0.1.0-alpha.15` | 功能提交 `6bbec3f490033dcfef0dd00d3c8af179f5674b60`；验收提交消息 `ops: accept market project workflow in parallel environment` | PostgreSQL 17，`0001`—`0015`；测试业务清理后为空 | TASK01 专项/migration/共享回归、并行双账号、Compose 重启与清理恢复通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；Web 仅 `127.0.0.1:3000` | `NOT_MIGRATED`；真实 SQLite、D1、文件和业务数据未读、未复制、未双写 | 既有四个 Volume；部署/验收 root-only 临时恢复点成功后删除；Python/SQLite 不切流 | `MARKET TO PROJECT HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`；HTTPS、真实迁移和生产未批准 |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.15` 源码新增市场→项目交接，但尚未完成并行 ops 验收；现运行的回环环境仍以 alpha.14/0014 为已部署基线。两者都不表示真实数据已迁移、HTTPS/生产恢复通过或已批准上线。
+`0.1.0-alpha.15` 已在回环并行环境完成市场→项目闭环验收。该部署仍不表示真实数据已迁移、六部门主线完成、HTTPS/生产恢复通过或已批准上线。
 
 ## 3. Migration 文件与 SHA-256 基线
 
@@ -189,8 +189,10 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 | 数据库 | expand-only `0015_market_project_handoff.sql`；SHA-256 `419a80cb1ec3daad614f23b89895c9e8e3679bee40f506b0d0a811aba98a546f`；旧 migrations 不修改 |
 | 功能 | sales 市场草稿/不可变修订/提交，engineering 队列/退回/接收，稳定 Project、受控文件引用、不可变 Handoff Event 和两条原生页面 |
 | 验收 | unit/UI、隔离 PG/API、空库与 0014 upgrade、重复/回滚、并发/幂等/CAS/故障、共享 Identity/Master/Sales、typecheck/lint/build/credentials/Python 临时基线通过 |
-| 发布 | `NOT_RELEASED`；功能提交前并行环境仍为 alpha.14/0014，双账号/重启/清理待 ops 验收 |
+| 发布 | `DEPLOYED` 仅限 `PARALLEL HTTP ACCEPTANCE ONLY`；未正式 release/push；双账号、重启和清理已验收 |
 | 排除 | 真实数据、Product/BOM/计划/采购/生产自动创建、HTTPS、公网、切流、TASK02、push/PR |
+
+并行实际结果：两个独立 sales/engineering 账号完成直接接收及退回→需求 v2→重提→最终接收；重启后事实与 Audit 持久。随后恢复 0015 空数据点，最终唯一管理员保留且 Project/Event/Customer/临时账号为 0。结论为 `MARKET TO PROJECT HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。
 
 ## 6.1 SELFHOST-PHASE3-TASK05 并行 HTTP 验收部署记录
 

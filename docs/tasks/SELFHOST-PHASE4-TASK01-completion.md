@@ -1,6 +1,6 @@
 # SELFHOST-PHASE4-TASK01 完成报告
 
-状态：`IMPLEMENTED / PARALLEL ACCEPTANCE PENDING`
+状态：`DONE / ACCEPTED IN PARALLEL ENVIRONMENT`
 
 可信起点：`main@0f15f271cc458343116cb6639f0d118eea37521b`，功能提交父提交必须保持该值。
 
@@ -21,10 +21,17 @@
 - TASK01 typecheck、全仓 lint、Vinext 5/5 build、凭证扫描和 `git diff --check` 通过。
 - Python 临时 SQLite self-test、smoke、go-live 通过；常驻 PID `277640` 与 18888 保持，真实 SQLite 只核验 metadata、未读取或修改。
 
-## 待功能提交后执行
+## 并行环境验收
 
-- 创建 root-only 恢复点，重建 `chenyida-erp-parallel` migrate/Web/Worker并只应用 0015。
-- 双账号完成直接接收与退回→修订→重提→最终接收，验证 Compose 重启持久性。
-- 恢复验收前空数据点以清理业务测试记录，保留 Schema/管理员；记录功能与 ops 提交、最终 Compose/Git/Python/SQLite 证据。
+- 功能提交：`6bbec3f490033dcfef0dd00d3c8af179f5674b60`，父提交精确为 `0f15f271cc458343116cb6639f0d118eea37521b`。
+- 部署前创建 root-only 0600 PostgreSQL 恢复点；随后只新增 `0015`，migrate exited 0，Web/PostgreSQL healthy、Worker running，管理员保持唯一且启用。
+- 两个独立账号完成两个项目：直接提交→接收；提交→填写原因退回→需求 v2 修订→重新提交→最终接收。最终项目均 ACCEPTED，事件顺序为 SUBMITTED/RETURNED/RESUBMITTED/ACCEPTED。
+- Compose 重启后 15 migrations、2 个 ACCEPTED 项目、3 个需求版本、四类事件和 9 条成功 Project Audit 持久；两个原生 UI 路由返回 200。
+- 使用“0015 已应用、验收数据未创建”的恢复点完成清理；最终 app_users=1、启用管理员=1、临时账号=0、Project/Event/Customer=0，Schema 与管理员保留。临时恢复点在成功后删除。
+- 最终 Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口、Worker running；Python PID `277640`/18888 与 SQLite metadata `53827608:1544192:1784963637:600` 不变。
 
-在上述并行验收完成前，不使用最终结论，不将 TASK01 标记 DONE。
+## 完成边界
+
+`MARKET TO PROJECT HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`
+
+该结论不表示六部门主线完成、真实数据迁移、生产上线、HTTPS/公网开放，或计划/采购询比价/财务成本完成。未 push、未切流，不启动 TASK02。

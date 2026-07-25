@@ -1,6 +1,6 @@
 # SELFHOST-PHASE4-TASK01：建立市场部门 → 项目部门需求交接闭环
 
-状态：`DOING`
+状态：`DONE`
 
 开始日期：2026-07-25（Asia/Shanghai）
 
@@ -38,3 +38,5 @@
 唯一允许结论：`MARKET TO PROJECT HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。
 
 完成报告计划：`docs/tasks/SELFHOST-PHASE4-TASK01-completion.md`。
+
+完成日期：2026-07-25。功能提交 `6bbec3f490033dcfef0dd00d3c8af179f5674b60`；并行验收提交消息 `ops: accept market project workflow in parallel environment`。TASK01 完成后停止，不启动 TASK02。

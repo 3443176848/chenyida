@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前源码版本 `0.1.0-alpha.15`，明确为非生产且尚未发布；并行环境在 TASK01 部署验收前仍为 alpha.14。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前源码及并行验收版本 `0.1.0-alpha.15`，明确为非生产且尚未发布。
 
 ### 治理资料
 
@@ -106,7 +106,7 @@
 24. SELFHOST-PHASE3-TASK03 已新增仅 CLI 可达的受控 public materializer；18 个 cutover snapshot 来源指向 actual public ID/digest，12 个历史活动为 archive-only，正常全域 Service/API、Dashboard、文件、backup→新空目标 restore、同 manifest 重跑和整栈重启通过。版本为 `0.1.0-alpha.13`，migration 保持 0001—0014；只证明完全合成业务表物化，真实数据与生产仍 NO-GO。
 25. SELFHOST-PHASE3-TASK04 已在明确授权下对本机唯一 SQLite 源执行 online backup，仅在临时快照上完成 29 表/3,619 条的 Schema fingerprint、脱敏聚合质量盘点与无目标 Dry-run。快照已删除，源 inode/权限与 Python PID 不变，未读文件正文或连接 PostgreSQL。版本 `0.1.0-alpha.14`，migration 保持 0001—0014；真实迁移与生产仍 NO-GO。
 26. SELFHOST-PHASE3-TASK05 已在同机启动 `chenyida-erp-parallel`：PostgreSQL 17、14 migrations、Web/Worker、唯一管理员和四个持久卷。Web 仅 `127.0.0.1:3000` 并通过 SSH 隧道访问；管理员流程、空 Dashboard、23 GET、数据库/服务重启和资源门禁通过。Worker 对 PostgreSQL 短暂断连增加去敏 Pool error handler 与轮询重试。版本仍为 `0.1.0-alpha.14`，真实数据、HTTPS、切流和生产批准均未发生。
-27. SELFHOST-PHASE4-TASK01 采用 D-058：sales=市场、engineering=项目；稳定 `PRJ-########` 与六表关系模型保存当前投影和不可变需求/事件，写操作由 Project Service 统一执行 CSRF、持久幂等、CAS、事务 Audit 和职责分离。源码为 `0.1.0-alpha.15`/`0015`，不创建 Product/BOM/订单/计划/采购/工单，当前等待并行环境实际验收。
+27. SELFHOST-PHASE4-TASK01 采用 D-058：sales=市场、engineering=项目；稳定 `PRJ-########` 与六表关系模型保存当前投影和不可变需求/事件，写操作由 Project Service 统一执行 CSRF、持久幂等、CAS、事务 Audit 和职责分离。`0.1.0-alpha.15`/`0015` 已通过并行双账号闭环、重启和清理验收，不创建 Product/BOM/订单/计划/采购/工单。
 
 ## 当前风险
 
@@ -146,7 +146,7 @@
 
 ## 当前路线
 
-当前唯一任务是 `SELFHOST-PHASE4-TASK01`。源码已形成 `0.1.0-alpha.15` / PostgreSQL `0015` 的市场→项目交接实现和隔离证据；并行环境仍保持 TASK05 alpha.14/0014，须在功能提交后建立恢复点、部署、双账号验收、重启和清理，才可标记 DONE。TASK02 及真实迁移、HTTPS、生产恢复和切换均不自动开始。
+`SELFHOST-PHASE4-TASK01` 已完成：并行环境运行 `0.1.0-alpha.15` / PostgreSQL `0015`，市场→项目双账号闭环、重启持久和测试数据清理通过，结论仅为 `MARKET TO PROJECT HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。当前停止；TASK02 及真实迁移、HTTPS、生产恢复和切换均不自动开始。
 
 ## 恢复上下文检查清单
 
