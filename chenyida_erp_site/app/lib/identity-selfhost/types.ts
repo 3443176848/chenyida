@@ -5,6 +5,7 @@ export const IDENTITY_ROLES = [
   "manager",
   "purchase",
   "engineering",
+  "planning",
   "production",
   "warehouse",
   "quality",

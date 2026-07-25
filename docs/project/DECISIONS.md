@@ -640,6 +640,19 @@
 - 下游边界：接收只形成稳定项目记录，不自动创建 Product、BOM、销售订单、计划、采购、工单、生产、品质、完工、发货或财务记录。
 - 生产边界：TASK01 只在回环并行验收环境交付，不批准真实数据迁移、生产上线、HTTPS、公网或切流。
 
+## D-059 项目到计划采用显式解析与不可变版本交接包
+
+- 日期：2026-07-25
+- 状态：`ACCEPTED / IMPLEMENTED; PARALLEL ACCEPTANCE PENDING`
+- 确认人：项目负责人（通过 `SELFHOST-PHASE4-TASK02` 指令确认十二项固定业务决定）
+- 角色：新增正式 `planning`；engineering 负责准备/提交，planning 只读/接收/退回，production 不代替 planning，manager/admin 具备全能力。
+- 前置与引用：只有 TASK01 已接收且操作者为项目负责人的 Project 可准备；每条 Requirement Item 必须显式关联稳定、客户一致的 RELEASED Product Version 及其 RELEASED BOM Version，不按名称猜测。
+- BOM 门禁：BOM 必须属于 Product Version，全部行引用 ACTIVE Material 和 enabled Unit；客户关系或专用料范围无法证明时 fail closed。
+- 包与版本：DRAFT 生成时用 PostgreSQL numeric 固化需求、BOM、Material 安全规格和受控文件元数据 digest；提交后内容不可变，退回后创建新包版本，不覆盖旧包。
+- 状态与职责：planning 只能接收或填写原因退回，不能改 BOM、创建物料需求/采购/生产单据；并发接收仅一次成功，接收不自动启动 TASK03。
+- TASK01 保护：`project_handoffs`、`project_handoff_events` 及既有 Requirement Version 事实不扩写、不覆盖；Project→Planning 使用独立六表模型。
+- 生产边界：仅授权回环并行验收环境；不批准真实数据迁移、生产上线、HTTPS、公网、切流或 TASK03。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

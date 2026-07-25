@@ -4,6 +4,14 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE4-TASK02 - `feat: add project planning handoff workflow`
+
+- Identity/权限：新增正式 planning 角色及 read/accept 能力；engineering 获 read/prepare/submit，manager/admin 全能力，production 不代替计划员。
+- 数据库：新增 expand-only `0016` 六表独立 Project→Planning 模型、稳定 Resolution、不可变版本包/BOM/文件快照和只追加事件；同步 schema/journal/snapshot/checksum，不修改 0001—0015 或 TASK01 事实。
+- API/UI：新增独立 planning-handoff 服务边界、8 条 API、项目解析/版本工作台、计划待办/接收/退回工作台和 Dashboard 待接收指标。
+- 规则：只接受 ACCEPTED 项目负责人、客户一致 RELEASED Product/BOM、ACTIVE Material/enabled Unit；PostgreSQL numeric 固化毛数量，不读库存、不创建需求/采购/生产单据。
+- 验证：TASK02 unit/UI 6/6、PG/API 3/3、migration 3/3、Schema consistency、typecheck、lint、build 通过；功能提交后再进入并行 Compose 验收，不启动 TASK03。
+
 ### SELFHOST-PHASE4-TASK01 - `ops: accept market project workflow in parallel environment`
 
 - 部署：从功能提交重建 `chenyida-erp-parallel` migrate/Web/Worker，只应用 `0015`；管理员保留，Web/PostgreSQL healthy、Worker running。

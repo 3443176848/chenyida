@@ -1,12 +1,20 @@
 # 第一阶段部门业务主线
 
-状态：已确认；适用起点 `SELFHOST-PHASE4-TASK01`。
+状态：已确认；TASK01 已完成，`SELFHOST-PHASE4-TASK02` 正在执行。
 
 第一阶段按下列责任链逐段建设，不允许前一段提交自动生成后一段业务单据：
 
 `客户 → 市场部门 → 项目部门 → 计划部门 → 采购部门 → 仓库部门 → 财务部门`
 
-本阶段后期再接生产、品质、完工和发货。当前 TASK01 只交付客户需求由市场整理后交给项目部门、项目部门接收或退回、市场修订重提并最终接收的闭环。
+本阶段后期再接生产、品质、完工和发货。TASK01 已交付市场→项目闭环；当前 TASK02 只交付已接收项目的 Product/BOM/零件规格包给计划部门接收或退回修订。
+
+## TASK02 责任边界
+
+- engineering 项目负责人逐条解析 Requirement Item，只能选项目客户一致的 RELEASED Product Version 及所属 RELEASED BOM Version。
+- BOM 全行必须引用 ACTIVE Material 和 enabled Unit；服务端用 PostgreSQL numeric 生成不可变数量/规格快照与完整 digest。
+- 正式 planning 角色只读取、接收或填写原因退回；退回后项目部创建新包版本并重提，旧版本和事件不覆盖。
+- 受控资料只复用 TASK01 Document Link 和安全元数据，不复制正文/路径；TASK01 Project/Handoff/Event 历史保持原样。
+- 接收不计算净需求、不创建物料需求、采购申请、采购订单或生产事实，也不自动启动 TASK03。
 
 ## TASK01 责任边界
 
@@ -22,7 +30,6 @@ TASK01 不自动创建或启动 Product、Product Version、BOM、销售订单�
 
 ## 后续路线（仅记录，不启动）
 
-- TASK02：项目部 → 计划部，产品/BOM/规格交接。
 - TASK03：计划物料需求与采购申请。
 - TASK04：供应商询价、报价和比价。
 - TASK05：采购 → 仓库 → 财务交接。

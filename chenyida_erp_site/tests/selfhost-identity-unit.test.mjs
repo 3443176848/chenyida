@@ -16,7 +16,7 @@ test("username and display name validation are bounded", () => {
 });
 
 test("role allowlist and server-side permission matrix are fixed", () => {
-  assert.deepEqual(IDENTITY_ROLES, ["admin", "manager", "purchase", "engineering", "production", "warehouse", "quality", "sales", "finance", "operations"]);
+  assert.deepEqual(IDENTITY_ROLES, ["admin", "manager", "purchase", "engineering", "planning", "production", "warehouse", "quality", "sales", "finance", "operations"]);
   for (const role of IDENTITY_ROLES) assert.equal(validateRole(role), role);
   assert.throws(() => validateRole("custom"), (error) => error.code === "ROLE_INVALID");
   assert.ok(permissionsForRole("admin").includes("system.audit.read"));

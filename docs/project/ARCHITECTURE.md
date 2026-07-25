@@ -2,6 +2,23 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-25 项目到计划交接边界
+
+`SELFHOST-PHASE4-TASK02` 新增独立 `planning-handoff-selfhost` 边界和正式 `planning` 角色。Project→Planning 不复用或改写 TASK01 MARKET→PROJECT 投影；Requirement Item 必须显式关联稳定 Product/Product Version/BOM Header/BOM Version，服务端验证客户关系、RELEASED 状态和 BOM 全行 Material/Unit 有效性。
+
+```mermaid
+flowchart LR
+    P[ACCEPTED Project + current Requirement] --> R[Explicit Requirement Resolution]
+    R --> D[DRAFT immutable package snapshot]
+    D -->|SUBMITTED| Q[Planning queue]
+    Q -->|RETURNED + reason| V[New package version]
+    V -->|RESUBMITTED| Q
+    Q -->|ACCEPTED| A[Accepted handoff fact]
+    A -. no automatic trigger .-> X[Material requirement / Purchase / Production]
+```
+
+`0016` 六表分别保存 Resolution、Package、Package Item、BOM Line Snapshot、受控 Document Link 和 immutable Event。Package Service 在单事务内执行行锁、CAS、numeric 毛数量、digest、Audit 与 Idempotency；数据库 trigger 阻止绕过服务修改包快照和事件。浏览器只负责交互，不读取库存、不推荐供应商、不创建下游单据。
+
 ## 2026-07-25 市场到项目交接边界
 
 `SELFHOST-PHASE4-TASK01` 在现有 Node/PostgreSQL 权威边界中新增独立 `project-selfhost` 模块。Customer 和受控文件继续复用既有关系，Project Service 是状态转换唯一应用入口；浏览器页面只提交稳定 ID、业务输入、`expected_version`、CSRF 和 Idempotency-Key。
@@ -24,12 +41,12 @@ flowchart LR
 
 `SELFHOST-PHASE3-TASK05` 首次把 Node/PostgreSQL 基线作为持久的非生产空环境与 Python/SQLite 同机并行运行。Compose 项目固定为 `chenyida-erp-parallel`，只启动 PostgreSQL 17、migrate、Web 和 Worker；Caddy/production profile 不启动。Web 宿主绑定为 `127.0.0.1:3000`，PostgreSQL 只在 Compose 网络暴露 5432，用户经 SSH 隧道访问。
 
-`SELFHOST-PHASE4-TASK01` 已把该并行环境升级到 alpha.15/`0015`，在恢复点保护下完成双账号市场→项目闭环与重启验收，并恢复为保留 Schema/唯一管理员的空业务状态；网络与 production profile 边界不变。
+`SELFHOST-PHASE4-TASK01` 已把该并行环境升级到 alpha.15/`0015`，在恢复点保护下完成双账号市场→项目闭环与重启验收，并恢复为保留 Schema/唯一管理员的空业务状态。TASK02 源码 alpha.16/`0016` 已实现但尚待功能提交后部署；网络与 production profile 边界不变。
 
 ```mermaid
 flowchart LR
     SSH["用户 SSH 隧道"] --> WEB["127.0.0.1:3000 Node Web"]
-    WEB --> PG["Compose PostgreSQL 17 / 0001—0015"]
+    WEB --> PG["Compose PostgreSQL 17 / 当前 0001—0015，待 TASK02 升级 0016"]
     WORKER["独立 Worker"] --> PG
     WEB --> FILES["uploads / attachments Volumes"]
     PY["现有 Python :18888"] --> SQLITE["真实 SQLite，保持不变"]

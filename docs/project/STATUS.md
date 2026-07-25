@@ -2,6 +2,23 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE4-TASK02 项目 → 计划交接
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DOING | 源码和隔离验收完成；功能提交、并行部署/旅程/清理和 ops 提交待执行 |
+| 版本/Migration | PASS / NOT YET PARALLEL DEPLOYED | 源码 `0.1.0-alpha.16`；`0016` SHA-256 `26d6e4cc609a53403b377d8550fcf5d8fd88f677178681f4cca1692544bb2076`；0001—0015 未修改 |
+| 角色/权限 | PASS | planning 正式角色；engineering prepare/submit，planning accept，manager/admin 全部；production 无接收/提交能力 |
+| 状态/快照 | PASS | DRAFT→SUBMITTED→RETURNED；新 v2→RESUBMITTED→ACCEPTED；Product/BOM/Material/文件安全快照不可变 |
+| API/安全 | PASS | 8 API、CSRF、正文上限、持久幂等、CAS、并发唯一接收、职责分离、单事务 Audit/request_id |
+| UI | PASS | engineering 解析/预览/历史/重提，planning 待办/详情/退回/接收/历史，Dashboard 计划部门入口 |
+| 专项 | PASS | unit/UI 6/6、PostgreSQL/API 3/3、migration upgrade 3/3；故障注入零半记录、文件路径/正文不披露 |
+| 共享回归 | PASS | Identity/Master/Material/Project unit/UI 31/31、PG/API 21/21、migration 10/10；Dashboard 10/10、manifest 8/8、FileStorage 3/3、environment 6/6 |
+| 静态与构建 | PASS | Schema consistency、TASK02 typecheck、全仓 lint、Vinext 5/5 build、761 文件凭证扫描、`git diff --check` |
+| Python/SQLite | PASS / PROTECTED | 临时 SQLite self-test/smoke/go-live；PID 277640/18888 与真实 SQLite metadata `53827608:1544192:1784963637:600` 不变，未读业务内容 |
+| 并行环境 | PENDING | 功能提交后只应用 0016，执行真实退回修订重提、重启和恢复点清理 |
+| 下游边界 | PASS | 未计算净需求，未创建物料需求、采购申请、采购订单或生产事实；不自动启动 TASK03 |
+
 ## SELFHOST-PHASE4-TASK01 市场 → 项目交接
 
 | 验证项 | 结果 | 说明 |

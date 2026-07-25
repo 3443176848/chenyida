@@ -40,7 +40,7 @@ export const appUsers = pgTable("app_users", {
   check("app_users_version_ck", sql`${t.version} > 0`),
   check("app_users_username_format_ck", sql`${t.username} ~ '^[a-z][a-z0-9._-]{2,31}$'`),
   check("app_users_display_name_ck", sql`char_length(btrim(${t.displayName})) between 1 and 128`),
-  check("app_users_role_ck", sql`${t.role} in ('admin','manager','purchase','engineering','production','warehouse','quality','sales','finance','operations')`),
+  check("app_users_role_ck", sql`${t.role} in ('admin','manager','purchase','engineering','planning','production','warehouse','quality','sales','finance','operations')`),
 ]);
 
 export const migrationOpeningSources = pgTable("migration_opening_sources", {
@@ -388,6 +388,96 @@ export const projectHandoffEvents = pgTable("project_handoff_events", {
   index("project_handoff_events_request_idx").on(t.requestId, t.id),
   check("project_handoff_events_type_ck", sql`${t.eventType} in ('SUBMITTED','ACCEPTED','RETURNED','RESUBMITTED')`),
   check("project_handoff_events_reason_ck", sql`(${t.eventType}='RETURNED' and char_length(btrim(${t.reason})) between 1 and 1000) or (${t.eventType}<>'RETURNED' and char_length(${t.reason})<=1000)`),
+]);
+
+export const projectRequirementResolutions = pgTable("project_requirement_resolutions", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }),
+  requirementVersionId: bigint("requirement_version_id", { mode: "number" }).notNull().references(() => projectRequirementVersions.id, { onDelete: "restrict" }),
+  requirementItemId: bigint("requirement_item_id", { mode: "number" }).notNull().references(() => projectRequirementItems.id, { onDelete: "restrict" }),
+  productId: bigint("product_id", { mode: "number" }).notNull().references(() => products.id, { onDelete: "restrict" }),
+  productVersionId: bigint("product_version_id", { mode: "number" }).notNull().references(() => productVersions.id, { onDelete: "restrict" }),
+  bomHeaderId: bigint("bom_header_id", { mode: "number" }).notNull().references(() => bomHeaders.id, { onDelete: "restrict" }),
+  bomVersionId: bigint("bom_version_id", { mode: "number" }).notNull().references(() => bomVersions.id, { onDelete: "restrict" }),
+  resolvedBy: text("resolved_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
+  resolvedAt: timestamptz("resolved_at").notNull().defaultNow(), requestId: uuid("request_id").notNull(),
+}, (t) => [
+  uniqueIndex("project_requirement_resolutions_item_uq").on(t.requirementItemId),
+  uniqueIndex("project_requirement_resolutions_project_version_item_uq").on(t.projectId, t.requirementVersionId, t.requirementItemId),
+  index("project_requirement_resolutions_project_idx").on(t.projectId, t.requirementVersionId, t.requirementItemId),
+  index("project_requirement_resolutions_product_bom_idx").on(t.productVersionId, t.bomVersionId, t.id),
+]);
+
+export const projectPlanningPackages = pgTable("project_planning_packages", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }),
+  packageVersionNo: integer("package_version_no").notNull(),
+  requirementVersionId: bigint("requirement_version_id", { mode: "number" }).notNull().references(() => projectRequirementVersions.id, { onDelete: "restrict" }),
+  status: text("status").notNull().default("DRAFT"), targetDeliveryDate: date("target_delivery_date", { mode: "string" }), packageDigest: text("package_digest").notNull(),
+  preparedBy: text("prepared_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), preparedAt: timestamptz("prepared_at").notNull().defaultNow(),
+  submittedBy: text("submitted_by").references(() => appUsers.username, { onDelete: "restrict" }), submittedAt: timestamptz("submitted_at"),
+  acceptedBy: text("accepted_by").references(() => appUsers.username, { onDelete: "restrict" }), acceptedAt: timestamptz("accepted_at"),
+  returnedBy: text("returned_by").references(() => appUsers.username, { onDelete: "restrict" }), returnedAt: timestamptz("returned_at"),
+  returnReason: text("return_reason").notNull().default(""), version: integer("version").notNull().default(1), requestId: uuid("request_id").notNull(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("project_planning_packages_project_version_uq").on(t.projectId, t.packageVersionNo),
+  uniqueIndex("project_planning_packages_project_digest_uq").on(t.projectId, t.packageDigest),
+  index("project_planning_packages_queue_idx").on(t.status, t.submittedAt, t.id),
+  index("project_planning_packages_project_idx").on(t.projectId, t.packageVersionNo, t.id),
+  index("project_planning_packages_preparer_idx").on(t.preparedBy, t.status, t.updatedAt, t.id),
+  check("project_planning_packages_status_ck", sql`${t.status} in ('DRAFT','SUBMITTED','RETURNED','ACCEPTED')`),
+  check("project_planning_packages_version_ck", sql`${t.version}>0 and ${t.packageVersionNo}>0`),
+  check("project_planning_packages_digest_ck", sql`${t.packageDigest} ~ '^[0-9a-f]{64}$'`),
+  check("project_planning_packages_submit_ck", sql`(${t.status}='DRAFT' and ${t.submittedBy} is null and ${t.submittedAt} is null) or (${t.status}<>'DRAFT' and ${t.submittedBy} is not null and ${t.submittedAt} is not null)`),
+  check("project_planning_packages_accept_ck", sql`(${t.status}='ACCEPTED' and ${t.acceptedBy} is not null and ${t.acceptedAt} is not null and ${t.returnedBy} is null and ${t.returnedAt} is null and ${t.returnReason}='') or ${t.status}<>'ACCEPTED'`),
+  check("project_planning_packages_return_ck", sql`(${t.status}='RETURNED' and ${t.returnedBy} is not null and ${t.returnedAt} is not null and char_length(btrim(${t.returnReason})) between 1 and 1000 and ${t.acceptedBy} is null and ${t.acceptedAt} is null) or ${t.status}<>'RETURNED'`),
+]);
+
+export const projectPlanningPackageItems = pgTable("project_planning_package_items", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), packageId: bigint("package_id", { mode: "number" }).notNull().references(() => projectPlanningPackages.id, { onDelete: "restrict" }),
+  requirementItemId: bigint("requirement_item_id", { mode: "number" }).notNull().references(() => projectRequirementItems.id, { onDelete: "restrict" }),
+  productVersionId: bigint("product_version_id", { mode: "number" }).notNull().references(() => productVersions.id, { onDelete: "restrict" }),
+  bomVersionId: bigint("bom_version_id", { mode: "number" }).notNull().references(() => bomVersions.id, { onDelete: "restrict" }),
+  requiredQuantity: numeric("required_quantity", { precision: 24, scale: 6 }).notNull(), unitId: bigint("unit_id", { mode: "number" }).notNull().references(() => units.id, { onDelete: "restrict" }),
+  lineNo: integer("line_no").notNull(), sourceDigest: text("source_digest").notNull(),
+}, (t) => [
+  uniqueIndex("project_planning_package_items_package_line_uq").on(t.packageId, t.lineNo),
+  uniqueIndex("project_planning_package_items_package_requirement_uq").on(t.packageId, t.requirementItemId),
+  index("project_planning_package_items_product_bom_idx").on(t.productVersionId, t.bomVersionId, t.id),
+  check("project_planning_package_items_quantity_ck", sql`${t.requiredQuantity}>0 and ${t.lineNo}>0`),
+  check("project_planning_package_items_digest_ck", sql`${t.sourceDigest} ~ '^[0-9a-f]{64}$'`),
+]);
+
+export const projectPlanningPackageBomLines = pgTable("project_planning_package_bom_lines", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), packageItemId: bigint("package_item_id", { mode: "number" }).notNull().references(() => projectPlanningPackageItems.id, { onDelete: "restrict" }),
+  sourceBomLineId: bigint("source_bom_line_id", { mode: "number" }).notNull().references(() => bomLines.id, { onDelete: "restrict" }),
+  materialId: bigint("material_id", { mode: "number" }).notNull().references(() => materialMaster.id, { onDelete: "restrict" }), unitId: bigint("unit_id", { mode: "number" }).notNull().references(() => units.id, { onDelete: "restrict" }),
+  quantityPer: numeric("quantity_per", { precision: 24, scale: 6 }).notNull(), lossRate: numeric("loss_rate", { precision: 12, scale: 8 }).notNull(),
+  calculatedGrossQuantity: numeric("calculated_gross_quantity", { precision: 24, scale: 6 }).notNull(), specificationSnapshot: jsonb("specification_snapshot").notNull(), materialDigest: text("material_digest").notNull(), lineNo: integer("line_no").notNull(),
+}, (t) => [
+  uniqueIndex("project_planning_package_bom_lines_item_line_uq").on(t.packageItemId, t.lineNo),
+  uniqueIndex("project_planning_package_bom_lines_item_source_uq").on(t.packageItemId, t.sourceBomLineId),
+  index("project_planning_package_bom_lines_material_idx").on(t.materialId, t.id),
+  check("project_planning_package_bom_lines_values_ck", sql`${t.lineNo}>0 and ${t.quantityPer}>0 and ${t.lossRate}>=0 and ${t.lossRate}<1 and ${t.calculatedGrossQuantity}>0`),
+  check("project_planning_package_bom_lines_digest_ck", sql`${t.materialDigest} ~ '^[0-9a-f]{64}$'`),
+  check("project_planning_package_bom_lines_snapshot_ck", sql`jsonb_typeof(${t.specificationSnapshot})='object' and pg_column_size(${t.specificationSnapshot})<=65536`),
+]);
+
+export const projectPlanningDocumentLinks = pgTable("project_planning_document_links", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), packageId: bigint("package_id", { mode: "number" }).notNull().references(() => projectPlanningPackages.id, { onDelete: "restrict" }),
+  projectDocumentLinkId: bigint("project_document_link_id", { mode: "number" }).notNull().references(() => projectDocumentLinks.id, { onDelete: "restrict" }),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [uniqueIndex("project_planning_document_links_package_document_uq").on(t.packageId, t.projectDocumentLinkId), index("project_planning_document_links_package_idx").on(t.packageId, t.id)]);
+
+export const projectPlanningHandoffEvents = pgTable("project_planning_handoff_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), packageId: bigint("package_id", { mode: "number" }).notNull().references(() => projectPlanningPackages.id, { onDelete: "restrict" }),
+  projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }), eventType: text("event_type").notNull(),
+  actor: text("actor").notNull().references(() => appUsers.username, { onDelete: "restrict" }), reason: text("reason").notNull().default(""), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("project_planning_handoff_events_project_idx").on(t.projectId, t.id), index("project_planning_handoff_events_package_idx").on(t.packageId, t.id), index("project_planning_handoff_events_request_idx").on(t.requestId, t.id),
+  check("project_planning_handoff_events_type_ck", sql`${t.eventType} in ('SUBMITTED','ACCEPTED','RETURNED','RESUBMITTED')`),
+  check("project_planning_handoff_events_reason_ck", sql`(${t.eventType}='RETURNED' and char_length(btrim(${t.reason})) between 1 and 1000) or (${t.eventType}<>'RETURNED' and char_length(${t.reason})<=1000)`),
 ]);
 
 // Compatibility tables retained from the D1 implementation. PostgreSQL uses

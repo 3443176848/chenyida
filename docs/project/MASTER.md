@@ -37,19 +37,19 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 自托管并行验收基线 `0.1.0-alpha.15`（包名 `chenyida-erp-selfhosted`），明确为非生产、尚未发布 |
+| 当前版本 | 源码 `0.1.0-alpha.16`；并行环境暂为 `0.1.0-alpha.15`，TASK02 功能已实现但尚待功能提交后部署验收；明确为非生产、尚未发布 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | 功能提交 `6bbec3f490033dcfef0dd00d3c8af179f5674b60`；验收提交消息 `ops: accept market project workflow in parallel environment` |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 自托管源码与并行环境均为 `0001`—`0015`；`0015` expand-only 新增市场→项目交接六表、不可变需求版本/事件和队列索引。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
+| 当前数据库 | 自托管源码为 `0001`—`0016`，并行环境暂为 `0001`—`0015`；`0016` expand-only 新增 Project→Planning Resolution、版本包、BOM/文件快照与事件六表及 planning 角色约束。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | Python/SQLite 开发服务继续由 systemd 常驻并监听 `0.0.0.0:18888`；非生产 Compose 项目 `chenyida-erp-parallel` 以 PostgreSQL 17/Web/Worker 同机并行运行，Web 仅绑定 `127.0.0.1:3000`，PostgreSQL 无宿主端口；不是生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard 与离线备份恢复治理的非生产链路 |
-| 当前阶段 | 第一阶段部门主线 TASK01 已交付客户需求→市场部门→项目部门，后续部门尚未开始 |
-| 当前任务 | `SELFHOST-PHASE4-TASK01`：`DONE`；结论 `MARKET TO PROJECT HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT` |
-| 下一任务 | 停止；TASK02 项目→计划仅记录、不自动启动。真实迁移、HTTPS、生产恢复和切换仍须独立授权 |
+| 当前阶段 | 第一阶段部门主线 TASK01 已交付；TASK02 项目→计划产品/BOM/规格交接正在执行并行验收前收口 |
+| 当前任务 | `SELFHOST-PHASE4-TASK02`：`DOING`；源码实现与隔离测试完成，并行环境尚未升级/验收 |
+| 下一任务 | 停止；TASK03 计划物料需求与采购申请仅记录、不自动启动。真实迁移、HTTPS、生产恢复和切换仍须独立授权 |
 
 ## 当前完成模块
 
@@ -71,6 +71,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - SELFHOST-PHASE3-TASK04 完成获准本机 SQLite online backup、integrity/Schema fingerprint、29 表 3,619 条脱敏聚合、无 PostgreSQL 目标 planner 和人工处置模板；源与 Python PID 不变，临时快照已删除，版本 `0.1.0-alpha.14`，migration 保持 `0001`—`0014`，结论仅为 `REAL LOCAL SQLITE READONLY INVENTORY COMPLETE`
 - SELFHOST-PHASE3-TASK05 以 `chenyida-erp-parallel` 在同机启动 PostgreSQL 17/Web/Worker，Web 仅 `127.0.0.1:3000`、数据库无宿主端口；14 个 migration、管理员、空 Dashboard、23 GET、重启持久性和资源门禁通过，并修复 Worker 在 PostgreSQL 重启时的空闲连接未捕获错误。Python PID/18888/SQLite 元数据不变；仅为 `PARALLEL HTTP ACCEPTANCE ENVIRONMENT RUNNING`
 - SELFHOST-PHASE4-TASK01 已在 `chenyida-erp-parallel` 交付 `0015`、独立 Project Service/API、市场/项目原生页面、不可变需求修订与交接事件；双账号直接接收和退回修订重提、重启持久、清理恢复及全回归通过。测试业务已清空，Schema/唯一管理员保留；不启动 TASK02
+- SELFHOST-PHASE4-TASK02 已完成源码 `0016`、正式 planning 角色、显式 Requirement Resolution、不可变版本交接包/BOM/文件快照、独立 API 和 engineering/planning 原生页面；隔离 unit/UI/PostgreSQL/migration、Schema、typecheck/lint/build 通过，当前仍待功能提交和并行环境实际旅程，不启动 TASK03
 - 多用户登录、会话、角色权限、密码修改、账号管理和操作审计
 - 物料、供应商映射、CSV 导入、清洗队列和新物料建档基础流程
 - 客户、供应商、产品、BOM 和 BOM 齐套分析
@@ -173,6 +174,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
+- 正在执行：`SELFHOST-PHASE4-TASK02`，源码 `0.1.0-alpha.16`/`0016`、planning 角色、显式 Requirement Resolution、不可变计划交接包和双原生页面已完成隔离验证；当前等待功能提交后升级 `chenyida-erp-parallel`、实际退回修订重提旅程和清理恢复。完成后停止，不自动启动 TASK03。
+- 已完成：`SELFHOST-PHASE4-TASK01`，并行环境 `0.1.0-alpha.15`/`0015` 的市场→项目闭环、重启持久和清理恢复通过；结论 `MARKET TO PROJECT HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`，既有事实不由 TASK02 改写。
 - 已完成：`SELFHOST-PHASE3-TASK05`，在保留 Python/SQLite 的同时以 `chenyida-erp-parallel` 运行 PostgreSQL 17、Web 和 Worker；`127.0.0.1:3000`、14 migrations、空环境管理员、23 GET、重启与资源验收通过。版本保持 `0.1.0-alpha.14`，未创建 `0015`；结论仅为 `PARALLEL HTTP ACCEPTANCE ENVIRONMENT RUNNING`，不自动开始真实数据迁移、HTTPS 或切流。
 - 已完成：`SELFHOST-PHASE3-TASK04`，对唯一获准的本机 SQLite 执行一次一致性只读快照、脱敏聚合盘点和无目标 Dry-run；快照已删除，源与 Python PID 不变，未读文件正文或写 PostgreSQL。版本 `0.1.0-alpha.14`，migration 保持 `0001`—`0014`；不自动开始真实试迁移或生产任务。
 - 已完成：`SELFHOST-PHASE3-TASK02`，新增 PostgreSQL `0014` 与受控 Inventory/Finance Opening，合成物化、冲销、幂等、并发、Dashboard、Compose 重启和备份恢复通过。MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`，版本 `0.1.0-alpha.12`；不自动开始下一任务，真实数据与生产仍为 `NO-GO FOR REAL DATA / PRODUCTION`。
