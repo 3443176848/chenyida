@@ -12,6 +12,7 @@ import { PostgresTargetAdapter } from "./target-postgres.mjs";
 import { buildSafeReport, writeSafeJson } from "./report.mjs";
 import { newRunId } from "./digest.mjs";
 import { safeError, fail } from "./errors.mjs";
+import { assertRealReadonlyArguments, REAL_READONLY_MODE } from "./readonly-environment-guard.mjs";
 
 function argumentsMap(values) {
   const output = {};
@@ -25,6 +26,26 @@ function argumentsMap(values) {
 
 async function main() {
   const args = argumentsMap(process.argv.slice(2));
+  if (args.mode === REAL_READONLY_MODE) {
+    const gitCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: resolve(process.cwd(), ".."), encoding: "utf8" }).trim();
+    const guarded = assertRealReadonlyArguments(args, { currentGitCommit: gitCommit });
+    const script = resolve(import.meta.dirname, "readonly-inventory.py");
+    const output = execFileSync("python3", [
+      script,
+      "--mode", REAL_READONLY_MODE,
+      "--confirm", args.confirm,
+      "--source", guarded.source,
+      "--snapshot-manifest", guarded.manifestPath,
+      "--source-sha256", args["source-sha256"],
+      "--git-commit", gitCommit,
+      "--tool-version", args["tool-version"],
+      "--output", guarded.workspace,
+      "--legacy-app-dir", resolve(process.cwd(), "../chenyida_erp_app"),
+      "--no-materialize", "--no-files",
+    ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+    process.stdout.write(output);
+    return;
+  }
   assertMigrationEnvironment(process.env);
   if (args.confirm !== "SYNTHETIC_MIGRATION_ONLY") fail("MIGRATION_CONFIRMATION_REQUIRED", "需要 --confirm SYNTHETIC_MIGRATION_ONLY");
   if (!new Set(["sqlite", "d1-export"]).has(args["source-kind"])) fail("MIGRATION_ARGUMENT_INVALID", "source-kind 必须为 sqlite 或 d1-export");

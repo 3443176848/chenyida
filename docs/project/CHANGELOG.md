@@ -4,6 +4,16 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE3-TASK04 - `feat: add authorized readonly migration inventory`
+
+- 快照：新增精确本机源守卫、SQLite `mode=ro`/`query_only` online backup、manifest/SHA/Schema fingerprint 绑定、成功/失败临时资源清理和源/PID 不变核验。
+- 工具：迁移 CLI 新增 `REAL_READONLY_INVENTORY`，强制显式确认、snapshot manifest/SHA、Git/tool version、`--no-materialize`、`--no-files`、任务临时输出和无 target；不创建 PostgreSQL adapter、staging/public/Opening。
+- 脱敏：对获准快照执行 Schema、计数、固定枚举、质量错误和数量/金额聚合；自由文本不 DISTINCT，行级处置仅使用 task-local HMAC opaque reference。
+- 真实执行：29 表、3,619 条；planned 49、archive-only 3,566、needs-review 4、blocked/model-gap/orphan 0；Inventory Opening 只读计划 4 条，Finance 0；target NONE、物化 0、文件正文读取 0，快照已删除。
+- 验收：TASK04 3/3、tool 8/8、unit/UI 98/98、npm 3/3、PG/API 73、upgrade 30、backup/restore、全 HTTP journey、8 组 typecheck、lint/build/environment/credentials 和 Python 三项通过。
+- 版本/数据库：`0.1.0-alpha.14`；PostgreSQL migration 保持 `0001`—`0014`，未创建 `0015`，checksum 与 `db/schema.ts` 不变。
+- 边界：结论仅为 `REAL LOCAL SQLITE READONLY INVENTORY COMPLETE`；未执行真实 PostgreSQL 试迁移、D1/附件盘点、生产恢复、部署、push 或 PR。
+
 ### SELFHOST-PHASE3-TASK03 - `feat: materialize synthetic migration into business tables`
 
 - 功能：新增仅 CLI 可达的受控 public materializer、actual public ID/provenance/target digest、聚合事务 checkpoint、合成文件原子写和 snapshot/archive-only 分类；post-cutover 采购、生产、销售、品质和财务只通过正常领域 Service/API 创建。

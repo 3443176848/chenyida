@@ -2,6 +2,14 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-25 本机 SQLite 只读盘点边界
+
+`SELFHOST-PHASE3-TASK04` 为迁移 CLI 新增与 synthetic/production 模式分离的 `REAL_READONLY_INVENTORY`。入口在任何业务行读取前同时校验显式 flag、确认文字、snapshot manifest/SHA、Git commit、tool version、`--no-materialize`、`--no-files`、临时目录权限和无 target URL。它仅能读 SQLite official online backup 产生的获准临时快照，不创建 target adapter、staging、public 记录、Opening 或文件副本。
+
+源以 URI `mode=ro` + `query_only` 打开，快照以 SHA-256、Schema fingerprint 和 source path digest 绑定。快照内的聚合 planner 只执行 allowlist 计数、数量/金额汇总和已确认枚举分组；自由文本不做 `DISTINCT`。问题行只用不持久化 key 的 task-local HMAC opaque reference。临时快照、完整 JSON 报告和 key 在抽取允许聚合后删除。
+
+该层没有修改 PostgreSQL `0001`—`0014`、`db/schema.ts`、Python 运行行为或业务 Service 状态机。它只提供本机源的脱敏证据，不是真实目标试迁移架构。
+
 ## 2026-07-25 合成 public 业务表物化与核对层
 
 `SELFHOST-PHASE3-TASK03` 在 staging/Opening 之后增加仅 CLI 可达的 `materializer/`。它把通过验证的 cutover snapshot 按 Identity→Reference→Material→Party→Product/Mapping/BOM→Opening→File/Audit 顺序写入 public 权威关系表，同时在 `migration_tool.public_id_map` 保存 actual target ID、source/target digest、request/operation 和 checkpoint。来源历史活动只记录 `ARCHIVE_ONLY`，不与期初余额重复过账。

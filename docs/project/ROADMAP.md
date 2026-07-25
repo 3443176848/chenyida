@@ -57,8 +57,9 @@
 - `SELFHOST-PHASE3-TASK01`：生产前数据迁移框架与合成试迁移基线（DONE，非生产 `0.1.0-alpha.11`；显式 CLI、双 source adapter、staging、checkpoint、合成 backup/restore 与全回归通过，真实数据和生产 NO-GO）。
 - `SELFHOST-PHASE3-TASK02`：库存与财务期初来源及迁移物化安全边界（DONE，非生产 `0.1.0-alpha.12`；PostgreSQL `0014`、受控 Inventory/Finance Opening、冲销、Compose/恢复与全回归通过；MG-001/MG-002 仅在合成模型解决，真实数据和生产 NO-GO）。
 - `SELFHOST-PHASE3-TASK03`：合成全域业务表物化与 Dashboard 核对（DONE，非生产 `0.1.0-alpha.13`；18 个 actual public targets、12 个 archive-only、正常全域 API/Dashboard、backup→新空目标 restore、同 manifest replay 与整栈重启通过；migration 保持 0001—0014，真实数据和生产 NO-GO）。
+- `SELFHOST-PHASE3-TASK04`：本机真实 SQLite 只读盘点与脱敏 Dry-run（DONE，非生产 `0.1.0-alpha.14`；29 表/3,619 条聚合，planned 49、archive-only 3,566、review 4、blocked/model-gap 0；快照已删除，源/PID 不变，无 target/materialization/file body read；migration 保持 0001—0014，真实 PostgreSQL 与生产 NO-GO）。
 
-库存从采购中拆成独立 TASK04，因为收货、领料、完工和发货都必须复用同一不可变账本、余额投影、锁顺序、幂等和冲销规则。TASK01 补充合成迁移准备度，TASK02 补充 MG-001/MG-002 合成期初，TASK03 完成完全合成 public materialization 与 Dashboard/恢复核对；真实数据盘点/试迁移、逐行人工处置、生产恢复、部署和切换仍需另建任务并明确授权。
+库存从采购中拆成独立 TASK04，因为收货、领料、完工和发货都必须复用同一不可变账本、余额投影、锁顺序、幂等和冲销规则。迁移阶段 TASK01 补充合成准备度，TASK02 补充 MG-001/MG-002 合成期初，TASK03 完成合成 public materialization，TASK04 完成一次本机 SQLite 只读脱敏盘点。真实 PostgreSQL 试迁移、逐行人工处置、D1/附件盘点、生产恢复、部署和切换仍需另建任务并明确授权。
 
 ## Phase 2 导入中心
 

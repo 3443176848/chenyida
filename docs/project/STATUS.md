@@ -2,6 +2,21 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE3-TASK04 本机真实 SQLite 只读盘点与脱敏 Dry-run
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 恢复点 | PASS | `main`、可信起点 `a541360eefe12869c090b2408bbcf07485fc77cb`；独立提交消息 `feat: add authorized readonly migration inventory` |
+| 只读快照 | PASS | SQLite online backup；`integrity_check=ok`；29 表、3,619 条、Schema fingerprint 已完成；源 inode/mode/权限不变 |
+| 运行面保护 | PASS | Python PID 前后 `277640`；未停止/重启；快照与临时目录已删除、不可恢复 |
+| 脱敏 Dry-run | PASS | planned 49、archive-only 3,566、needs-review 4、blocked/model-gap/orphan 0；target `NONE`，materialization/files `DISABLED` |
+| Opening 计划 | PASS / NOT MATERIALIZED | Inventory 4 条、on-hand 20,010、frozen 0；Finance 0；创建数均为 0 |
+| 报告安全 | PASS | 只保留聚合和 opaque reference 模板；绝对源路径、source ID、PII/业务正文、凭证和逐单金额未入报告 |
+| 专项/回归 | PASS | TASK04 3/3、tool 8/8、unit/UI 98/98、npm 3/3、PG/API 73、upgrade 30、backup/restore、全 HTTP journey、8 组 typecheck、lint/build/environment/credentials 与 Python 三项通过 |
+| Migration/版本 | PASS / NOT RELEASED | `0.1.0-alpha.14`；保持 0001—0014、未创建 0015，checksum 与 `db/schema.ts` 不变；未发布或部署 |
+| 完成结论 | PASS | `REAL LOCAL SQLITE READONLY INVENTORY COMPLETE` |
+| 生产准入 | NO-GO | 未执行真实 PostgreSQL 试迁移、D1/文件盘点、附件核对、生产恢复、部署或切换 |
+
 ## SELFHOST-PHASE3-TASK03 合成全域业务表物化与 Dashboard 核对
 
 | 验证项 | 结果 | 说明 |
@@ -343,8 +358,8 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 根仓库 Branch | `main` |
-| 任务开始 HEAD | TASK02 起点 `2c808f7a2ba2c293ff22e5dcc3ca3647a479a91c` |
-| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.13`；非生产、尚未发布 |
+| 任务开始 HEAD | TASK04 起点 `a541360eefe12869c090b2408bbcf07485fc77cb` |
+| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.14`；非生产、尚未发布 |
 | 当前实际常驻服务 | Python 3.11.6 / SQLite，systemd `enabled/active`，`0.0.0.0:18888` |
 | 自托管部署状态 | Node/PostgreSQL 未生产部署；当前无运行中 Compose 项目 |
 | PostgreSQL migration | `0001`—`0014`；TASK02 新增合成受控期初模型，未迁移任何真实数据 |

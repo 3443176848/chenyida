@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.13",
+  "version": "0.1.0-alpha.14",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -98,6 +98,7 @@
     "migration:fixture": "node scripts/selfhost-migration-fixture.mjs",
     "migration:run": "node --experimental-strip-types tools/selfhost-migration/cli.mjs",
     "test:migration-tool": "node --experimental-strip-types --test tests/selfhost-migration-tool.test.mjs",
+    "test:migration-readonly": "node --experimental-strip-types --test tests/selfhost-readonly-inventory.test.mjs",
     "test:migration-tool:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-migration-postgres.test.mjs",
     "test:migration-openings:unit": "node --experimental-strip-types --test tests/selfhost-migration-openings-unit.test.mjs",
     "test:migration-openings:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-migration-openings-postgres.test.mjs",

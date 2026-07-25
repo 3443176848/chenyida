@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
 最后核验：2026-07-25（Asia/Shanghai）
-适用任务：`SELFHOST-PHASE3-TASK03`
+适用任务：`SELFHOST-PHASE3-TASK04`
 
 ## 1. 使用规则
 
@@ -19,10 +19,10 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 历史 OpenAI Sites / Cloudflare D1 | 历史记录 `v3` | `2b4f1787ddbc7e0941ab2d5f5cadea6e817e8f12`；后续纳管来源 `9f2c2dca9ccde237cb2db6c01d2e3792b284e6e9` | 仓库 D1/Drizzle `0000`—`0008`；生产实际已应用版本本任务未访问、未核验 | 仅保留历史验收记录；本任务未访问公开 Site | `HISTORICAL`；文档曾记录为公开 `v3`，本任务不重新确认在线状态；不是未来生产权威方向 | 未向 PostgreSQL 迁移 | 历史提交 `2b4f178` 和 D1 migration/快照仅作迁移与行为证据；不是已验证的当前回退方案 | 历史状态；无新的部署批准 |
 | 当前 Python / SQLite 开发运行面 | `legacy-development`，尚无统一 SemVer | 当前仓库包含源代码的功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；常驻进程未记录启动 commit，不能反推为该提交 | 本地 SQLite 历史 26 表 + migration `0001`—`0004`；开发库只读核验已记录四个版本 | 本任务按发布基线重新执行 Python self-test、smoke 和临时库 go-live；结果见第 6 节 | `DEVELOPMENT`；systemd `enabled/active`，源码与已安装 unit 一致，Python 监听 `0.0.0.0:18888`；不是正式生产投用 | 不适用；该 SQLite 是旧数据来源和当前开发运行数据 | Git 源码 + 执行前 SQLite 可恢复快照；正式回退点尚未建立 | 仅开发常驻；未获生产批准 |
-| Node.js / PostgreSQL 自托管开发基线 | `0.1.0-alpha.13`；包名 `chenyida-erp-selfhosted` | TASK03 起始 `8f30798464476b53f435d53022c45ed731804e95`；本任务提交以 `git log -1` 为准 | PostgreSQL migration 保持 `0001`—`0014`；新增临时 `migration_tool` public ID/provenance，不改变业务 schema | 合成 public materialization、全域 API/Dashboard、backup→restore、同 manifest replay 与 Compose restart 通过 | `NOT_RELEASED`；隔离资源清理后未生产部署 | SQLite/D1 真实数据、真实用户及全部业务数据均未迁入 PostgreSQL | 未部署版本无线上回退动作；未来部署前必须以现运行面、Git commit、数据库快照和文件快照建立恢复点 | `PASS FOR SYNTHETIC PUBLIC-TABLE MATERIALIZATION`；真实数据/生产仍 NO-GO |
+| Node.js / PostgreSQL 自托管开发基线 | `0.1.0-alpha.14`；包名 `chenyida-erp-selfhosted` | TASK04 起始 `a541360eefe12869c090b2408bbcf07485fc77cb`；本任务提交以 `git log -1` 为准 | PostgreSQL migration 保持 `0001`—`0014`；仅新增只读快照/脱敏盘点工具，不改变业务 schema | 本机 SQLite online backup、Schema fingerprint、聚合盘点、无目标 Dry-run 和全回归通过 | `NOT_RELEASED`；临时快照与隔离资源已清理，未生产部署 | 真实数据仅做本机脱敏聚合，未迁入 PostgreSQL；D1/文件正文未读 | 未部署版本无线上回退动作；未来任何真实目标试迁移必须新任务和独立恢复点 | `REAL LOCAL SQLITE READONLY INVENTORY COMPLETE`；真实迁移/生产仍 NO-GO |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.13` 是“自托管完整 ERP API 非生产候选 + 完全合成 public 业务表物化准备度”，只表示合成 snapshot、post-cutover 全域旅程、Dashboard 和恢复验收完成；不表示真实数据已迁移、生产恢复通过或已批准上线。真实数据仍在 Python/SQLite 开发运行面。
+`0.1.0-alpha.14` 是“自托管完整 ERP API 非生产候选 + 合成 public 物化准备度 + 本机 SQLite 只读脱敏盘点证据”。它只表示一次获准的本机快照聚合与无目标 Dry-run 完成；不表示真实数据已迁移、生产恢复通过或已批准上线。真实数据仍在 Python/SQLite 开发运行面。
 
 ## 3. Migration 文件与 SHA-256 基线
 
@@ -178,7 +178,19 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 
 补充说明：宿主机没有 Node/npm，Node 命令在一次性 `node:22-bookworm` 容器中执行。Python 首轮误用系统解释器时 self-test 通过、smoke 在导入 `openpyxl` 前因环境缺依赖停止；改用常驻服务实际使用的 `/opt/erp/.venv/bin/python` 后三项全部通过，没有降低断言。TASK09 Compose build 的 `npm ci` 报告 13 个既有依赖审计项（1 low、4 moderate、8 high），本任务按范围不升级依赖，留待独立安全任务。
 
-## 7. `0.1.0-alpha.13` 非生产开发记录
+## 7. `0.1.0-alpha.14` 非生产开发记录
+
+| 项目 | 值 |
+| --- | --- |
+| 任务 | `SELFHOST-PHASE3-TASK04` |
+| 包版本 | `chenyida-erp-selfhosted@0.1.0-alpha.14` |
+| 起点 | `a541360eefe12869c090b2408bbcf07485fc77cb` |
+| 数据库 | PostgreSQL `0001`—`0014` checksum 不变，未创建 `0015`；真实 SQLite 仅做一致性只读快照与脱敏聚合 |
+| 验收 | 29 表/3,619 条聚合、target NONE、源/PID 不变、快照删除；专项、PG/API、upgrade、backup/restore、build/lint/typecheck 和 Python 基线通过 |
+| 发布 | `NOT_RELEASED`；未 push、PR、部署或切流 |
+| 结论 | `REAL LOCAL SQLITE READONLY INVENTORY COMPLETE`；真实 PostgreSQL 试迁移、D1/附件盘点与生产仍 NO-GO |
+
+## 8. `0.1.0-alpha.13` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -194,7 +206,7 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 
 结论仅为 `PASS FOR SYNTHETIC PUBLIC-TABLE MATERIALIZATION`；真实数据和生产为 `NO-GO FOR REAL DATA / PRODUCTION`。
 
-## 8. `0.1.0-alpha.12` 非生产开发记录
+## 9. `0.1.0-alpha.12` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -210,7 +222,7 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 
 MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`。这不是发布公告；真实数据和生产结论为 `NO-GO FOR REAL DATA / PRODUCTION`。
 
-## 9. `0.1.0-alpha.11` 非生产开发记录
+## 10. `0.1.0-alpha.11` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -226,7 +238,7 @@ MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`。这不是发布
 
 这是一条合成迁移准备度记录，不是发布公告。真实数据和生产结论保持 NO-GO。
 
-## 10. `0.1.0-alpha.10` 非生产开发记录
+## 11. `0.1.0-alpha.10` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -242,7 +254,7 @@ MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`。这不是发布
 
 这是一条开发版本记录，不是发布公告。后续任何真实数据或生产任务必须重新取得明确授权。
 
-## 11. `0.1.0-alpha.9` 非生产开发记录
+## 12. `0.1.0-alpha.9` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -258,7 +270,7 @@ MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`。这不是发布
 
 这是一条开发版本记录，不是发布公告。TASK10 必须从本任务独立提交和 clean 工作区开始。
 
-## 12. `0.1.0-alpha.8` 非生产开发记录
+## 13. `0.1.0-alpha.8` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -274,7 +286,7 @@ MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`。这不是发布
 
 这是一条开发版本记录，不是发布公告。TASK09 必须从本任务独立提交和 clean 工作区开始。
 
-## 13. `0.1.0-alpha.7` 非生产开发记录
+## 14. `0.1.0-alpha.7` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -290,7 +302,7 @@ MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`。这不是发布
 
 这是一条开发版本记录，不是发布公告。TASK08 必须从本任务独立提交和 clean 工作区开始。
 
-## 14. `0.1.0-alpha.6` 非生产开发记录
+## 15. `0.1.0-alpha.6` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -306,7 +318,7 @@ MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`。这不是发布
 
 这是一条开发版本记录，不是发布公告。TASK07 必须从本任务独立提交和 clean 工作区开始。
 
-## 15. `0.1.0-alpha.5` 非生产开发记录
+## 16. `0.1.0-alpha.5` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -322,7 +334,7 @@ MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`。这不是发布
 
 这是一条开发版本记录，不是发布公告。TASK06 必须从本任务独立提交和 clean 工作区开始。
 
-## 16. `0.1.0-alpha.4` 非生产开发记录
+## 17. `0.1.0-alpha.4` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -338,7 +350,7 @@ MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`。这不是发布
 
 这是一条开发版本记录，不是发布公告。TASK05 必须从本任务独立提交和 clean 工作区开始。
 
-## 17. `0.1.0-alpha.3` 非生产开发记录
+## 18. `0.1.0-alpha.3` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -354,7 +366,7 @@ MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`。这不是发布
 
 这是一条开发版本记录，不是发布公告。TASK04 必须从本任务独立提交和 clean 工作区开始。
 
-## 18. `0.1.0-alpha.2` 非生产开发记录
+## 19. `0.1.0-alpha.2` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |

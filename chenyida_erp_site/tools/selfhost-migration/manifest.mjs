@@ -5,7 +5,7 @@ import { fail } from "./errors.mjs";
 import { registryDigest, MAPPING_REGISTRY } from "./mapping-registry.mjs";
 
 export const MANIFEST_SCHEMA_VERSION = 1;
-export const TOOL_VERSION = "0.1.0-alpha.13";
+export const TOOL_VERSION = "0.1.0-alpha.14";
 export const EXPECTED_MIGRATION_SHA256 = Object.freeze({
   "0001_selfhost_baseline.sql": "c1cd71803b0f504594a41234a82eb13ce8e6713f5d346f3e49247b4921ff1702",
   "0002_material_master_workflow.sql": "2d8d4facf54c950fa19d1346705aa0f549669544da1a87c2fc584c1fe8b7eb80",
