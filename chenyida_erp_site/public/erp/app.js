@@ -34,6 +34,7 @@ const state = {
   identityOperations: new Map(),
   masterDataOperations: new Map(),
   procurementOperations: new Map(),
+  productionOperations: new Map(),
   operationsAvailability: { dashboard: false, backups: false },
 };
 
@@ -128,6 +129,14 @@ async function procurementWrite(operationName, path, payload, method = "POST") {
   const operation = existing || { key: crypto.randomUUID(), frozenBody }; state.procurementOperations.set(operationName, operation);
   try { const result = await api(path, { method, body: operation.frozenBody, protectedWrite: { idempotencyKey: operation.key, csrfToken: state.session.csrf_token || "" } }); state.procurementOperations.delete(operationName); return result; }
   catch (error) { if (!error.resultUnknown) state.procurementOperations.delete(operationName); throw error; }
+}
+
+async function productionWrite(operationName, path, payload, method = "POST") {
+  const frozenBody = JSON.stringify(payload); const existing = state.productionOperations.get(operationName);
+  if (existing && existing.frozenBody !== frozenBody) throw new Error("上一次生产操作结果尚未确认，只能使用原请求安全重试");
+  const operation = existing || { key: crypto.randomUUID(), frozenBody }; state.productionOperations.set(operationName, operation);
+  try { const result = await api(path, { method, body: operation.frozenBody, protectedWrite: { idempotencyKey: operation.key, csrfToken: state.session.csrf_token || "" } }); state.productionOperations.delete(operationName); return result; }
+  catch (error) { if (!error.resultUnknown) state.productionOperations.delete(operationName); throw error; }
 }
 
 function requestedMaterialReturnTo() {
@@ -384,6 +393,7 @@ function renderBomSelectors() {
   $("#readyBom").innerHTML = bomOptions;
   $("#purchaseBom").innerHTML = bomOptions;
   $("#productionBom").innerHTML = bomOptions;
+  $("#productionFinishedMaterial").innerHTML = optionList(state.items, "id", ["internal_material_code", "standard_name"]);
   $("#quoteProduct").innerHTML = productOptions;
   $("#salesProduct").innerHTML = productOptions;
   $("#lineItem").innerHTML = itemOptions;
@@ -1461,15 +1471,13 @@ async function createWorkOrder() {
     toast("请先选择 BOM");
     return;
   }
-  const result = await api("/api/work-orders/from-bom", {
-    method: "POST",
-    body: JSON.stringify({
+  const result = await productionWrite(`work-order-from-bom:${bomId}`, "/api/work-orders/from-bom", {
       bom_id: bomId,
+      finished_material_id: $("#productionFinishedMaterial").value,
       order_qty: qty,
       owner: $("#workOrderOwner").value.trim(),
       planned_start: $("#plannedStart").value,
       planned_finish: $("#plannedFinish").value,
-    }),
   });
   $("#workOrderMsg").textContent = `已生成 ${result.work_order_code}`;
   await refreshAll();
@@ -1493,10 +1501,7 @@ async function loadWorkOrderMaterials(workOrderId = "") {
 }
 
 async function issueWorkOrder(workOrderId) {
-  const result = await api("/api/work-orders/issue-materials", {
-    method: "POST",
-    body: JSON.stringify({ work_order_id: workOrderId }),
-  });
+  const result = await productionWrite(`work-order-issue:${workOrderId}`, "/api/work-orders/issue-materials", { work_order_id: workOrderId });
   await refreshAll();
   await loadWorkOrderMaterials(workOrderId);
   toast(`已领料 ${result.issued.length} 项`);
@@ -1508,15 +1513,12 @@ async function completeWorkOrder() {
     toast("没有可报工的生产工单");
     return;
   }
-  const result = await api("/api/work-orders/complete", {
-    method: "POST",
-    body: JSON.stringify({
+  const result = await productionWrite(`work-order-complete:${workOrderId}`, "/api/work-orders/complete", {
       work_order_id: workOrderId,
       good_qty: $("#goodQty").value.trim(),
       scrap_qty: $("#scrapQty").value.trim(),
       operator: $("#productionOperator").value.trim(),
       process_stage: "完工入库",
-    }),
   });
   $("#completeMsg").textContent = `${result.finished_item_code} 库存从 ${result.before_qty} 增加到 ${result.after_qty}`;
   await refreshAll();

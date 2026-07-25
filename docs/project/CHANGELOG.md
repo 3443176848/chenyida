@@ -4,6 +4,15 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE2-TASK06 - `feat: add self-hosted production`
+
+- 数据库：新增 PostgreSQL `0010`，关系化 WO、状态事件、不可变 BOM 快照/需求、领退料、报工、完工和客户专用料限制；已过账事实与快照有数据库不可变 guard，旧 `erp_records` 不回填、不双写。
+- 服务端：新增独立 Production Repository/Service/Handler；RELEASE 固化 RELEASED Product/BOM Version，PostgreSQL numeric 计算六位需求；状态、客户/物料/单位、超领/超退/报工/超产、expected version、幂等和并发均由服务端执行。
+- 原子联动：领料、退料和完工复用 TASK04 Inventory Service 事务入口；Production、Ledger/Balance、状态事件、audit 和 idem 共同提交或回滚，完工不重复扣已领原料。
+- API/legacy：接通工单 list/detail/create/update/release/cancel/close、快照/需求/进度、领退料、报工、完工及六条 legacy 生产路径；兼容层只转换稳定 ID DTO，不直接写库或调用 Python。
+- 验证：TASK06 unit/UI 4/4、PG/API 5/5、migration 3/3、Schema consistency、Compose 首次运行/整栈重启；shared unit/UI 60/60、PG 51/51、旧升级 18/18、Import 53/53、lint/build/typecheck/credentials/environment/Python 三项均通过。
+- 版本/边界：`0.1.0-alpha.6`，非生产且未发布；未迁真实生产数据，未实现 MRP/排程、设备/工时/成本、WIP/批次/单位换算、品质/财务过账或销售，未访问生产、部署、push 或创建 PR。
+
 ### SELFHOST-PHASE2-TASK05 - `feat: add self-hosted procurement`
 
 - 数据库：新增 PostgreSQL `0009`，关系化 PO Header/Line、来源、状态事件、Receipt/全额冲销和 append-only 财务来源；Receipt/Line/Status/Source/Financial 不可变并有跨对象完整性 guard，旧 `erp_records` 不回填、不双写。

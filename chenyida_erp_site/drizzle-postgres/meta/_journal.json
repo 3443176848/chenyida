@@ -64,6 +64,13 @@
       "when": 1784916114419,
       "tag": "0009_procurement",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784947857411,
+      "tag": "0010_production",
+      "breakpoints": true
     }
   ]
 }

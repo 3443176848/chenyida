@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE2-TASK06 自托管生产与库存联动
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 恢复点 | PASS | `main`、起点 `b4a7d5cde06df0b8982e7f120afd9f72c13af8d2`、clean、本地相对 `origin/main +6/-0`；无嵌套仓库或来源不明修改 |
+| 模块/数据边界 | PASS | 独立 `production-selfhost`；稳定 Product/BOM/Material/Unit/Inventory/User ID，不写 Python、D1 或 `erp_records` |
+| 工单/快照 | PASS | 固定状态机、并发安全编码、RELEASE 单事务复制不可变 BOM 快照并用 PostgreSQL numeric 计算需求；新 BOM 不影响旧 WO |
+| 领退料/完工原子性 | PASS | Production 事实、TASK04 Ledger/Balance、状态、audit、idem 同事务；故障注入与审计失败整体回滚 |
+| 约束/并发 | PASS | 客户专用料、ACTIVE/STOCKED/基础单位、超领/超退/错误报工/超产、expected version、并发完工和幂等冲突均 fail closed |
+| 权限与兼容 | PASS | plan/issue/report/complete/close 服务端分离；legacy API 只转换 DTO 并委托同一 Service，CSRF/限流/请求编号/中文错误通过 |
+| PostgreSQL migration | PASS | `0010` 空库、0009 存量、重复、失败回滚、约束/索引/不可变 guard、旧数据保留通过；SHA-256 `d60c4100f726d6572a9969c78cf06f64aa2f789d3a31d3be5fd58c22fa7dec35`，0001—0009 不变 |
+| 专项/Compose | PASS | unit/UI 4/4、PostgreSQL/API 5/5、migration 3/3、Schema consistency；Compose 初始及 PostgreSQL/Web/Worker 重启持久性通过 |
+| 全量回归 | PASS | shared unit/UI 60/60、PG 51/51、升级 18/18、Import 53/53、FileStorage/environment、lint/build/typecheck/credentials、Python 三项通过 |
+| 版本 | PASS / NOT RELEASED | `chenyida-erp-selfhosted@0.1.0-alpha.6`；非生产、尚未发布、部署或批准 |
+| 资源/生产影响 | NONE | 隔离 PostgreSQL、Compose、临时 SQLite/依赖/文件已清理；未访问生产、迁真实生产数据、部署、push 或 PR |
+
 ## SELFHOST-PHASE2-TASK05 自托管采购与收货
 
 | 验证项 | 结果 | 说明 |
@@ -216,11 +232,11 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 根仓库 Branch | `main` |
-| 任务开始 HEAD | `e8cb7ebc0fa9d45575aeaffc0732183d2533f577`；开始时本地 `main` 领先 `origin/main` 2 个提交 |
-| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.5`；非生产、尚未发布 |
+| 任务开始 HEAD | `b4a7d5cde06df0b8982e7f120afd9f72c13af8d2`；开始时本地 `main` 领先 `origin/main` 6 个提交 |
+| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.6`；非生产、尚未发布 |
 | 当前实际常驻服务 | Python 3.11.6 / SQLite，systemd `enabled/active`，`0.0.0.0:18888` |
 | 自托管部署状态 | Node/PostgreSQL 未生产部署；当前无运行中 Compose 项目 |
-| PostgreSQL migration | `0001`—`0009`；未迁移真实数据、真实用户、PO、在途或库存 |
+| PostgreSQL migration | `0001`—`0010`；未迁移真实数据、真实用户、采购、生产或库存 |
 | SQLite migration | `0001`—`0004` 已记录；数据库不保存 migration checksum |
 | 历史 D1 migration | 仓库 `0000`—`0008`；生产实际应用版本未访问、未核验 |
 | PM-000 前根提交 | `bbefb2e388323213b51531fec117d67d5a28fe70` |
