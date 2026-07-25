@@ -6,13 +6,13 @@
 
 当前 `0013_finance.sql` 规定 AR 只能绑定未冲销正向 Shipment source，AP 只能绑定未冲销正向 Purchase Receipt source。来源只有历史往来余额时，模型没有合法的 opening source 类型。
 
-结论：`MODEL_GAP / NO-GO`。本任务不创建 `0014`，不修改 `0013`，不伪造 Shipment/Receipt。后续必须独立决定：新增关系化 Finance Opening Source、期初单据状态/会计日期/币种/往来单位约束、不可变冲销、权限、审计和 migration；取得业务与财务负责人批准后另立 schema 任务。
+TASK02 更新：`RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`。`0014` 新增去正文的关系化 Finance Opening Source，`OPENING_AR`/`OPENING_AP` 与 Customer/Supplier 严格互斥，固定 CNY、正数六位金额、会计日、不可变 Event/审计和一次全额冲销；不伪造 Shipment/Receipt，也不修改 `0013`。真实来源字段、金额、主体和截止日尚未获授权核验，因此生产仍为 `NO-GO`。
 
 ## MG-002 余额型库存的业务 materialization
 
 当前 `0008_inventory_ledger.sql` 要求 Ledger、Adjustment 和 Balance 同事务且带不可变事实。旧来源只有当前余额时不能伪造成采购收货、生产完工或销售退货历史。
 
-结论：框架生成 `OPENING_PLAN` 并核对 Material/Unit/MAIN/空 lot/六位非负总量；本任务 synthetic commit 只写 `migration_tool` 证据，不写业务表。后续真实任务必须批准一种明确的库存期初 operation 类型或受控 opening 事务入口，并验证冻结、负数和单位/库位处置。
+TASK02 更新：`RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`。`0014` 与内部事务服务把合成 `OPENING_PLAN` 物化为 `MIGRATION_OPENING` Adjustment、不可变 Ledger 和同事务 Balance；只接受 ACTIVE/STOCKED Material、enabled Base Unit、MAIN/空 lot、六位正数 on-hand 与 `0 <= frozen <= on-hand`。更正追加一次全额反向事实，存在下游消耗时拒绝。真实余额、冻结、单位和库位仍未核验，因此生产仍为 `NO-GO`。
 
 ## MG-003 旧身份哈希可信度与管理员建立
 

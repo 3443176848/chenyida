@@ -51,6 +51,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-PHASE3-TASK02 | 库存与财务期初来源及迁移物化安全边界 | DONE | Codex（关系模型、内部服务、合成物化、测试与文档）、项目负责人（任务范围、安全边界与验收授权） | 2026-07-25 | 2026-07-25 | SELFHOST-PHASE3-TASK01 | 新增 `0014`、受控 Inventory/Finance Opening、全额冲销、Dashboard 汇总与合成物化；专项/全回归、Compose 重启、停服备份/新空库恢复通过。MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`；真实数据和生产仍 NO-GO，未部署、push 或建 PR。 |
 | SELFHOST-PHASE3-TASK01 | 生产前数据迁移框架与合成试迁移基线 | DONE | Codex（源码诊断、合成迁移工具、隔离测试、文档与本地提交）、项目负责人（任务范围、安全边界与验收授权） | 2026-07-25 | 2026-07-25 | SELFHOST-PHASE2-TASK10 | 完成显式 CLI、双 source adapter、目标 staging、守卫、manifest/ID map/checkpoint、dry-run/commit/reconcile 和跨域合成验收；版本 `0.1.0-alpha.11`，migration 保持 `0001`—`0013`。DONE 只表示合成迁移框架和生产前准入证据完成；真实数据和生产仍 NO-GO。 |
 | SELFHOST-PHASE2-TASK01 | 盘点完整 ERP 业务 API 并制定分阶段自托管迁移计划 | DONE | Codex（只读源码审计、数据/事务不变量、断链核验、分阶段计划、文档、测试与提交）、项目负责人（诊断设计范围和禁止事项确认） | 2026-07-24 | 2026-07-24 | PHASE0-TASK03、SELFHOST-PHASE1-TASK04 | 盘点 Python 64 个 HTTP 操作（GET34/POST30），自托管等价覆盖4/部分9/未覆盖51；确认根 iframe 登录后 23 个业务 GET 全部404；提出 TASK02—TASK10 建议顺序。DONE 仅表示盘点规划完成，不表示任何业务域已迁移；仅文档，未访问生产或修改运行代码/Schema/migration/依赖/部署。 |
 | PHASE0-TASK03 | 建立统一发布、迁移与回退追踪基线 | DONE | Codex（只读核验、版本/migration基线、模板、文档修正、测试与提交）、项目负责人（任务范围、验收与禁止事项确认） | 2026-07-24 | 2026-07-24 21:22 CST | PHASE0-TASK01、PHASE0-TASK02 | 新增 `RELEASES.md`，定义自托管 `0.1.0-alpha.1` 非生产版本、三套migration SHA-256、发布验收与回退模板；修正Git/运行面/部署/业务迁移漂移。lint 0 error/1既有warning、npm test 3/3、typecheck、build、455文件凭证、Python三项与diff check通过；未访问生产、部署、迁移真实数据、重启服务、push或PR。 |

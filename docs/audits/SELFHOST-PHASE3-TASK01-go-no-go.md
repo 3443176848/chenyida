@@ -8,8 +8,8 @@
 | SQLite/D1 source inventory | 已诊断源码 | 真实来源只读快照、schema fingerprint 和数据质量须另任务授权 |
 | 映射注册表 | SYNTHETIC PASS / REAL REVIEW | 合成映射确定且不按名称猜测；业务负责人仍须逐域确认真实字段/状态/单位/角色映射 |
 | 幂等/checkpoint/恢复 | PASS | 合成 E2E、中断恢复、重复执行和 digest 失效全部 PASS |
-| 库存期初 | SYNTHETIC PASS / REAL BLOCKED | 合成余额计划与汇总通过；真实余额、负库存、冻结、单位和库位须人工处置 |
-| Finance 期初 | `MODEL_GAP` 风险 | 决定无业务来源 AR/AP 的关系模型；另立 schema 任务，不伪造来源 |
+| 库存期初 | `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL` / REAL BLOCKED | `0014` 受控物化、Ledger/Balance、冲销、幂等和恢复通过；真实余额、负库存、冻结、单位和库位须人工处置 |
+| Finance 期初 | `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL` / REAL BLOCKED | `0014` 关系化 OPENING_AR/AP、核销/冲销、Dashboard、并发和恢复通过；真实主体、金额、币种和截止日须人工核验 |
 | 身份 | SYNTHETIC PASS / REAL BLOCKED | 合成固定十角色、disabled/首改与未知角色阻断通过；管理员初始化和通知流程须批准 |
 | 文件 | SYNTHETIC PASS / REAL BLOCKED | 合成 MATCHED/MISSING/MISMATCH 通过；真实附件清单、权限、恶意文件扫描和 SHA 处置未做 |
 | 容量/RPO/RTO | 未证明 | 使用脱敏规模模型或授权真实只读统计，完成压力与异故障域演练 |

@@ -45,13 +45,13 @@ test("SQLite and D1 export adapters fingerprint only generated synthetic sources
   const sqliteRoot = await tempRoot("sqlite"); const d1Root = await tempRoot("d1");
   const sqlite = await writeSyntheticSqlite(sqliteRoot, "valid"); const d1 = await writeSyntheticD1Export(d1Root, "valid");
   const left = await inspectSqliteSource(sqlite, env); const right = await inspectD1ExportSource(d1, env);
-  assert.equal(left.records.length, 28); assert.equal(right.records.length, 28);
+  assert.equal(left.records.length, 30); assert.equal(right.records.length, 30);
   assert.match(left.snapshotSha256, /^[0-9a-f]{64}$/); assert.match(right.schemaFingerprint, /^[0-9a-f]{64}$/);
   const badRoot = await tempRoot("badsource"); const bad = resolve(badRoot, "bad.json"); await writeFile(bad, JSON.stringify({ schema_version: 1, records: [] }));
   await assert.rejects(() => inspectD1ExportSource(bad, env), { code: "MIGRATION_SOURCE_NOT_SYNTHETIC" });
 });
 
-test("mapping planner accepts valid cross-domain data and blocks duplicates, orphans, precision, negative inventory, identity, files, and finance gap", async () => {
+test("mapping planner accepts typed openings and blocks duplicates, orphans, precision, inventory, identity, file, and finance constraints", async () => {
   const validRoot = await tempRoot("valid"); const blockedRoot = await tempRoot("blocked");
   const valid = await inspectD1ExportSource(await writeSyntheticD1Export(validRoot, "valid"), env);
   const blocked = await inspectD1ExportSource(await writeSyntheticD1Export(blockedRoot, "blocked"), env);
@@ -59,7 +59,7 @@ test("mapping planner accepts valid cross-domain data and blocks duplicates, orp
   assert.equal(validPlan.runnable, true); assert.equal(validPlan.issues.length, 0);
   assert.equal(blockedPlan.runnable, false);
   const codes = new Set(blockedPlan.issues.map((item) => item.code));
-  for (const code of ["UNKNOWN_ROLE", "UNMAPPED_KIND", "DUPLICATE_STABLE_KEY", "ORPHAN_REFERENCE", "NEGATIVE_INVENTORY", "MISSING_UNIT", "INVALID_STATUS", "INVALID_QUANTITY", "INVALID_AMOUNT", "CURRENCY_MISMATCH", "PRECISION_EXCEEDED", "MODEL_GAP", "FILE_MISSING", "FILE_CHECKSUM_MISMATCH"]) assert.ok(codes.has(code), code);
+  for (const code of ["UNKNOWN_ROLE", "UNMAPPED_KIND", "DUPLICATE_STABLE_KEY", "ORPHAN_REFERENCE", "NEGATIVE_INVENTORY", "FROZEN_EXCEEDS_ON_HAND", "MISSING_UNIT", "INVALID_STATUS", "INVALID_QUANTITY", "INVALID_AMOUNT", "CURRENCY_MISMATCH", "PRECISION_EXCEEDED", "FINANCE_OPENING_COUNTERPARTY_INVALID", "FILE_MISSING", "FILE_CHECKSUM_MISMATCH"]) assert.ok(codes.has(code), code);
 });
 
 test("ID map is stable, idempotent, and rejects changed source digest", () => {
@@ -70,11 +70,11 @@ test("ID map is stable, idempotent, and rejects changed source digest", () => {
   assert.throws(() => map.register({ ...input, sourceDigest: "c".repeat(64) }), { code: "MIGRATION_SOURCE_CHANGED" });
 });
 
-test("manifest is complete, safe, and binds exactly 0001-0013", async () => {
+test("manifest is complete, safe, and binds exactly 0001-0014", async () => {
   const root = await tempRoot("manifest"); const source = await inspectD1ExportSource(await writeSyntheticD1Export(root, "valid"), env);
   const migrations = await migrationChecksums(resolve(siteRoot, "drizzle-postgres"));
   const manifest = await createManifest({ runId: "22222222-2222-4222-8222-222222222222", source, targetGitCommit: "a".repeat(40), targetMigrations: migrations, executionMode: "DRY_RUN" });
-  assert.equal(manifest.target_migrations.length, 13); assert.equal(validateManifest(manifest), manifest);
+  assert.equal(manifest.target_migrations.length, 14); assert.equal(validateManifest(manifest), manifest);
   assert.throws(() => validateManifest({ ...manifest, source_files: [{ name: "/real/path", sha256: "a", bytes: 1 }] }), { code: "MIGRATION_MANIFEST_PATH_INVALID" });
   assert.throws(() => validateManifest({ ...manifest, leaked_password: "secret" }), { code: "MIGRATION_MANIFEST_SENSITIVE" });
 });

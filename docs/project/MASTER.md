@@ -37,18 +37,18 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 自托管开发基线 `0.1.0-alpha.11`（包名 `chenyida-erp-selfhosted`），明确为非生产、尚未发布；统一追踪见 `RELEASES.md` |
+| 当前版本 | 自托管开发基线 `0.1.0-alpha.12`（包名 `chenyida-erp-selfhosted`），明确为非生产、尚未发布；统一追踪见 `RELEASES.md` |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK01 起点 `14bc68791a34ece9086b889f23d473e84a761cf0`；本任务独立提交消息 `feat: add synthetic migration readiness tooling`，最终 HEAD 以 `git log -1` 为准 |
+| 当前根仓库功能基线提交 | TASK02 起点 `2c808f7a2ba2c293ff22e5dcc3ca3647a479a91c`；本任务独立提交消息 `feat: add controlled migration opening balances`，最终 HEAD 以 `git log -1` 为准 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 自托管 PostgreSQL 开发基线为 `0001`—`0013`；`0013` 新增稳定 Shipment/Receipt 来源的 AR/AP、不可变收付款/冲销和余额投影。SQLite 29张仍支撑当前 Python 开发运行面并作为迁移来源，D1/Drizzle 45张为历史迁移来源；均未向 PostgreSQL 迁移真实数据 |
+| 当前数据库 | 自托管 PostgreSQL 开发基线为 `0001`—`0014`；`0014` 新增受控 Migration Opening 来源、库存 Ledger/Balance 期初和无 Shipment/Receipt 的 AR/AP 期初。SQLite 29张仍支撑当前 Python 开发运行面并作为迁移来源，D1/Drizzle 45张为历史迁移来源；均未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | Python/SQLite 开发服务由 systemd 常驻，`enabled/active` 且监听 `0.0.0.0:18888`；Node/PostgreSQL 仅为已清理的隔离开发验收基线，未生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard 与离线备份恢复治理的非生产链路 |
-| 当前阶段 | `SELFHOST-PHASE3-TASK01` 已完成合成迁移准备度；自托管仍只是完整 ERP API 非生产候选，不等于已迁真实数据、可投产或获切换批准 |
-| 当前任务 | `SELFHOST-PHASE3-TASK01`：`DONE`；起点 `14bc68791a34ece9086b889f23d473e84a761cf0` |
+| 当前阶段 | `SELFHOST-PHASE3-TASK02` 已完成 MG-001/MG-002 合成期初物化安全边界；自托管仍只是完整 ERP API 非生产候选，不等于已迁真实数据、可投产或获切换批准 |
+| 当前任务 | `SELFHOST-PHASE3-TASK02`：`DONE`；起点 `2c808f7a2ba2c293ff22e5dcc3ca3647a479a91c` |
 | 下一任务 | 不自动开始新任务；真实数据盘点/试迁移、业务表物化、生产恢复、部署和切换必须另立任务并单独授权 |
 
 ## 当前完成模块
@@ -66,6 +66,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - SELFHOST-PHASE2-TASK09 完成自托管财务闭环：`0013`、稳定 Shipment/Receipt 金额来源 AR/AP、不可变 Receipt/Payment/Reversal/Event、余额/状态/version 投影及上游冲销门禁；隔离 migration、PostgreSQL/API、Compose 重启和适用回归通过，版本 `0.1.0-alpha.9`，未迁真实金额或实现银行/税务/发票/汇率/总账
 - SELFHOST-PHASE2-TASK10 完成自托管经营与运维工作台：实时只读 Dashboard 按权限聚合 TASK02—TASK09 权威关系表，原生根退出 iframe，legacy 工作区改为显式白名单深链；离线 backup/verify/新空目标 restore、去敏只读状态、隔离恢复与 Compose 重启通过，版本 `0.1.0-alpha.10`，未新增 `0014`、未执行生产动作
 - SELFHOST-PHASE3-TASK01 完成显式迁移 CLI、SQLite/D1 export adapter、PostgreSQL 隔离 staging、manifest、稳定 ID map、checkpoint、合成 dry-run/commit/reconcile、拒绝守卫和跨域恢复证据；版本 `0.1.0-alpha.11`，0001—0013 不变，真实数据与生产保持 NO-GO
+- SELFHOST-PHASE3-TASK02 完成 `0014` 关系化 Migration Opening Source、库存期初 Ledger/Balance、财务 `OPENING_AR/AP`、一次全额冲销、内部事务入口及 Dashboard 汇总；MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`，版本 `0.1.0-alpha.12`，真实数据与生产保持 NO-GO
 - 多用户登录、会话、角色权限、密码修改、账号管理和操作审计
 - 物料、供应商映射、CSV 导入、清洗队列和新物料建档基础流程
 - 客户、供应商、产品、BOM 和 BOM 齐套分析
@@ -163,10 +164,11 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 31. 自托管 Material Draft/Review/Active 已通过一次性 PostgreSQL 17 和 Compose 隔离验证，但尚未迁移真实 D1/SQLite 数据、执行生产容量测试或生产恢复演练；旧 D1/Miniflare 代码只作历史参照，不能重新接入运行依赖。
 32. TASK02—TASK10 已完成 Node/PostgreSQL 自托管非生产链路、实时 Dashboard 与离线备份恢复治理；真实数据仍在 Python/SQLite 开发运行面，尚未试迁移、容量验收或生产恢复演练，因此不能描述为业务已切换或已投产。
 33. 根自托管页面已退出 legacy iframe；`public/erp/` 仍保留为显式业务工作区和回滚证据。64 个盘点操作及 23 个 legacy 刷新 GET 已有自托管覆盖或明确退役合同，但这不等于全部 UI 已重写为原生 React。
-34. TASK01 迁移工具的 synthetic commit 只写隔离 `migration_tool` staging；尚未以授权真实快照验证字段映射、业务表物化、Dashboard 明细、无来源财务期初、附件和规模容量，不能据合成 PASS 宣布真实迁移或生产 Go-Live。
+34. TASK01 迁移工具 staging 与 TASK02 受控期初物化只在合成 `_migration_test` 验证；MG-001/MG-002 的模型缺口已解决，但尚未以授权真实快照验证字段映射、来源余额、其他业务域物化、附件和规模容量，不能据合成 PASS 宣布真实迁移或生产 Go-Live。
 
 ## 当前任务与下一任务
 
+- 已完成：`SELFHOST-PHASE3-TASK02`，新增 PostgreSQL `0014` 与受控 Inventory/Finance Opening，合成物化、冲销、幂等、并发、Dashboard、Compose 重启和备份恢复通过。MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`，版本 `0.1.0-alpha.12`；不自动开始下一任务，真实数据与生产仍为 `NO-GO FOR REAL DATA / PRODUCTION`。
 - 已完成：`SELFHOST-PHASE3-TASK01`，建立只允许临时合成源和回环 `_migration_test` PostgreSQL 的迁移准备工具；中断恢复、重复执行、摘要失效、backup/restore、整栈重启及全回归通过。版本为非生产 `0.1.0-alpha.11`，业务 migration 仍为 `0001`—`0013`。不自动开始真实数据或生产任务。
 - 已完成：`SELFHOST-PHASE2-TASK10`，新增实时权限裁剪 Dashboard、原生根工作台、显式 legacy 深链和离线 backup/verify/新空目标 restore；隔离 PostgreSQL 恢复、Compose 重启及适用全回归通过，版本为非生产 `0.1.0-alpha.10`，migration 仍为 `0001`—`0013`。不自动开始下一任务；真实数据与生产动作须另立任务授权。
 - 已完成：`SELFHOST-PHASE2-TASK09`，新增 PostgreSQL `0013`、稳定 Shipment/Receipt 来源 AR/AP、不可变 Settlement/Reversal/Event 和受控余额投影；财务过账后上游来源冲销 fail closed，版本为非生产 `0.1.0-alpha.9`，未迁真实金额、实现银行/税务/发票/汇率/总账、部署或访问生产。下一任务从 clean 工作区进入 TASK10。

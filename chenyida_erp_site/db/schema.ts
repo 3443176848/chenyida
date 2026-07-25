@@ -43,6 +43,23 @@ export const appUsers = pgTable("app_users", {
   check("app_users_role_ck", sql`${t.role} in ('admin','manager','purchase','engineering','production','warehouse','quality','sales','finance','operations')`),
 ]);
 
+export const migrationOpeningSources = pgTable("migration_opening_sources", {
+  id: uuid("id").primaryKey(), migrationRunId: uuid("migration_run_id").notNull(), manifestSha256: text("manifest_sha256").notNull(),
+  sourceSystem: text("source_system").notNull(), sourceEntityKind: text("source_entity_kind").notNull(), sourceStableReferenceDigest: text("source_stable_reference_digest").notNull(),
+  sourceRecordDigest: text("source_record_digest").notNull(), mappingDigest: text("mapping_digest").notNull(), targetDigest: text("target_digest").notNull(),
+  openingType: text("opening_type").notNull(), cutoffAt: timestamptz("cutoff_at").notNull(), status: text("status").notNull().default("POSTED"),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), operationId: uuid("operation_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("migration_opening_sources_stable_uq").on(t.sourceSystem, t.sourceEntityKind, t.sourceStableReferenceDigest, t.openingType),
+  uniqueIndex("migration_opening_sources_manifest_uq").on(t.manifestSha256, t.sourceEntityKind, t.sourceStableReferenceDigest, t.openingType),
+  uniqueIndex("migration_opening_sources_operation_uq").on(t.operationId), uniqueIndex("migration_opening_sources_request_uq").on(t.requestId),
+  index("migration_opening_sources_run_idx").on(t.migrationRunId, t.openingType, t.id),
+  check("migration_opening_sources_manifest_ck", sql`${t.manifestSha256} ~ '^[0-9a-f]{64}$'`),
+  check("migration_opening_sources_digest_ck", sql`${t.sourceStableReferenceDigest} ~ '^[0-9a-f]{64}$' and ${t.sourceRecordDigest} ~ '^[0-9a-f]{64}$' and ${t.mappingDigest} ~ '^[0-9a-f]{64}$' and ${t.targetDigest} ~ '^[0-9a-f]{64}$'`),
+  check("migration_opening_sources_text_ck", sql`char_length(btrim(${t.sourceSystem})) between 1 and 80 and char_length(btrim(${t.sourceEntityKind})) between 1 and 80`),
+  check("migration_opening_sources_type_ck", sql`${t.openingType} in ('INVENTORY','AR','AP')`), check("migration_opening_sources_status_ck", sql`${t.status} = 'POSTED'`),
+]);
+
 export const appSessions = pgTable("app_sessions", {
   tokenHash: text("token_hash").primaryKey(), username: text("username").notNull().references(() => appUsers.username, { onDelete: "cascade" }),
   expiresAt: timestamptz("expires_at").notNull(), revokedAt: timestamptz("revoked_at"), revokedReason: text("revoked_reason"), createdAt: timestamptz("created_at").notNull().defaultNow(),
@@ -308,7 +325,7 @@ export const inventoryAdjustments = pgTable("inventory_adjustments", {
   uniqueIndex("inventory_adjustments_reversal_uq").on(t.reversalOfAdjustmentId).where(sql`${t.reversalOfAdjustmentId} is not null`),
   index("inventory_adjustments_created_idx").on(t.createdAt, t.id),
   index("inventory_adjustments_type_created_idx").on(t.operationType, t.createdAt, t.id),
-  check("inventory_adjustments_type_ck", sql`${t.operationType} in ('RECEIPT','ISSUE','ADJUSTMENT','FREEZE','UNFREEZE','REVERSAL')`),
+  check("inventory_adjustments_type_ck", sql`${t.operationType} in ('RECEIPT','ISSUE','ADJUSTMENT','FREEZE','UNFREEZE','REVERSAL','MIGRATION_OPENING')`),
   check("inventory_adjustments_status_ck", sql`${t.status} = 'POSTED'`),
   check("inventory_adjustments_reason_ck", sql`char_length(btrim(${t.reason})) between 1 and 1000`),
   check("inventory_adjustments_reversal_ck", sql`(${t.operationType} = 'REVERSAL' and ${t.reversalOfAdjustmentId} is not null) or (${t.operationType} <> 'REVERSAL' and ${t.reversalOfAdjustmentId} is null)`),
@@ -367,13 +384,13 @@ export const inventoryLedgerEntries = pgTable("inventory_ledger_entries", {
   index("inventory_ledger_entries_balance_id_idx").on(t.balanceId, t.id),
   index("inventory_ledger_entries_source_idx").on(t.sourceType, t.sourceId),
   check("inventory_ledger_entries_line_ck", sql`${t.lineNo} > 0`),
-  check("inventory_ledger_entries_type_ck", sql`${t.entryType} in ('RECEIPT','ISSUE','ADJUSTMENT','FREEZE','UNFREEZE','REVERSAL')`),
+  check("inventory_ledger_entries_type_ck", sql`${t.entryType} in ('RECEIPT','ISSUE','ADJUSTMENT','FREEZE','UNFREEZE','REVERSAL','MIGRATION_OPENING')`),
   check("inventory_ledger_entries_location_ck", sql`${t.locationCode} = 'MAIN' and ${t.lotCode} = ''`),
   check("inventory_ledger_entries_delta_ck", sql`${t.onHandDelta} <> 0 or ${t.frozenDelta} <> 0`),
   check("inventory_ledger_entries_math_ck", sql`${t.afterOnHandQty} = ${t.beforeOnHandQty} + ${t.onHandDelta} and ${t.afterFrozenQty} = ${t.beforeFrozenQty} + ${t.frozenDelta}`),
   check("inventory_ledger_entries_quantity_ck", sql`${t.beforeOnHandQty} >= 0 and ${t.afterOnHandQty} >= 0 and ${t.beforeFrozenQty} >= 0 and ${t.afterFrozenQty} >= 0 and ${t.afterFrozenQty} <= ${t.afterOnHandQty}`),
   check("inventory_ledger_entries_version_ck", sql`${t.balanceVersionBefore} >= 0 and ${t.balanceVersionAfter} = ${t.balanceVersionBefore} + 1`),
-  check("inventory_ledger_entries_source_ck", sql`${t.sourceType} = 'INVENTORY_ADJUSTMENT' and ${t.sourceId} = ${t.adjustmentId}`),
+  check("inventory_ledger_entries_source_ck", sql`(${t.sourceType}='INVENTORY_ADJUSTMENT' and ${t.sourceId}=${t.adjustmentId}) or (${t.entryType}='MIGRATION_OPENING' and ${t.sourceType}='MIGRATION_OPENING') or (${t.entryType}='REVERSAL' and ${t.sourceType}='MIGRATION_OPENING_REVERSAL')`),
   check("inventory_ledger_entries_reversal_ck", sql`(${t.entryType} = 'REVERSAL' and ${t.reversalOfLedgerEntryId} is not null) or (${t.entryType} <> 'REVERSAL' and ${t.reversalOfLedgerEntryId} is null)`),
 ]);
 
@@ -408,6 +425,32 @@ export const inventoryAdjustmentLines = pgTable("inventory_adjustment_lines", {
   check("inventory_adjustment_lines_math_ck", sql`${t.afterOnHandQty} = ${t.beforeOnHandQty} + ${t.onHandDelta} and ${t.afterFrozenQty} = ${t.beforeFrozenQty} + ${t.frozenDelta}`),
   check("inventory_adjustment_lines_version_ck", sql`${t.balanceVersionBefore} >= 0 and ${t.balanceVersionAfter} = ${t.balanceVersionBefore} + 1`),
 ]);
+
+export const inventoryMigrationOpenings = pgTable("inventory_migration_openings", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), migrationOpeningSourceId: uuid("migration_opening_source_id").notNull().references(() => migrationOpeningSources.id, { onDelete: "restrict" }),
+  openingCode: text("opening_code").notNull(), inventoryAdjustmentId: bigint("inventory_adjustment_id", { mode: "number" }).notNull().references(() => inventoryAdjustments.id, { onDelete: "restrict" }),
+  effectiveAt: timestamptz("effective_at").notNull(), status: text("status").notNull().default("POSTED"), operationId: uuid("operation_id").notNull(),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [uniqueIndex("inventory_migration_openings_source_uq").on(t.migrationOpeningSourceId), uniqueIndex("inventory_migration_openings_code_uq").on(t.openingCode), uniqueIndex("inventory_migration_openings_adjustment_uq").on(t.inventoryAdjustmentId), uniqueIndex("inventory_migration_openings_operation_uq").on(t.operationId), check("inventory_migration_openings_status_ck", sql`${t.status}='POSTED'`)]);
+
+export const inventoryMigrationOpeningLines = pgTable("inventory_migration_opening_lines", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), inventoryOpeningId: bigint("inventory_opening_id", { mode: "number" }).notNull().references(() => inventoryMigrationOpenings.id, { onDelete: "restrict" }),
+  lineNo: integer("line_no").notNull(), materialId: bigint("material_id", { mode: "number" }).notNull().references(() => materialMaster.id, { onDelete: "restrict" }),
+  unitId: bigint("unit_id", { mode: "number" }).notNull().references(() => units.id, { onDelete: "restrict" }), locationCode: text("location_code").notNull().default("MAIN"), lotCode: text("lot_code").notNull().default(""),
+  onHandQuantity: numeric("on_hand_quantity", { precision: 24, scale: 6 }).notNull(), frozenQuantity: numeric("frozen_quantity", { precision: 24, scale: 6 }).notNull(),
+  inventoryLedgerEntryId: bigint("inventory_ledger_entry_id", { mode: "number" }).notNull().references(() => inventoryLedgerEntries.id, { onDelete: "restrict" }), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [uniqueIndex("inventory_migration_opening_lines_position_uq").on(t.inventoryOpeningId, t.materialId, t.unitId, t.locationCode, t.lotCode), uniqueIndex("inventory_migration_opening_lines_line_uq").on(t.inventoryOpeningId, t.lineNo), uniqueIndex("inventory_migration_opening_lines_ledger_uq").on(t.inventoryLedgerEntryId), check("inventory_migration_opening_lines_line_ck", sql`${t.lineNo}>0`), check("inventory_migration_opening_lines_location_ck", sql`${t.locationCode}='MAIN' and ${t.lotCode}=''`), check("inventory_migration_opening_lines_quantity_ck", sql`${t.onHandQuantity}>0 and ${t.frozenQuantity}>=0 and ${t.frozenQuantity}<=${t.onHandQuantity}`)]);
+
+export const inventoryMigrationOpeningReversals = pgTable("inventory_migration_opening_reversals", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), inventoryOpeningId: bigint("inventory_opening_id", { mode: "number" }).notNull().references(() => inventoryMigrationOpenings.id, { onDelete: "restrict" }),
+  inventoryAdjustmentId: bigint("inventory_adjustment_id", { mode: "number" }).notNull().references(() => inventoryAdjustments.id, { onDelete: "restrict" }), reason: text("reason").notNull(), operationId: uuid("operation_id").notNull(),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [uniqueIndex("inventory_migration_opening_reversals_opening_uq").on(t.inventoryOpeningId), uniqueIndex("inventory_migration_opening_reversals_adjustment_uq").on(t.inventoryAdjustmentId), uniqueIndex("inventory_migration_opening_reversals_operation_uq").on(t.operationId), check("inventory_migration_opening_reversals_reason_ck", sql`char_length(btrim(${t.reason})) between 1 and 1000`)]);
+
+export const inventoryMigrationOpeningReversalLines = pgTable("inventory_migration_opening_reversal_lines", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), inventoryOpeningReversalId: bigint("inventory_opening_reversal_id", { mode: "number" }).notNull().references(() => inventoryMigrationOpeningReversals.id, { onDelete: "restrict" }),
+  originalOpeningLineId: bigint("original_opening_line_id", { mode: "number" }).notNull().references(() => inventoryMigrationOpeningLines.id, { onDelete: "restrict" }), inventoryLedgerEntryId: bigint("inventory_ledger_entry_id", { mode: "number" }).notNull().references(() => inventoryLedgerEntries.id, { onDelete: "restrict" }), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [uniqueIndex("inventory_migration_opening_reversal_lines_original_uq").on(t.originalOpeningLineId), uniqueIndex("inventory_migration_opening_reversal_lines_ledger_uq").on(t.inventoryLedgerEntryId)]);
 
 export const purchaseOrders = pgTable("purchase_orders", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -1053,11 +1096,12 @@ export const financeDocuments = pgTable("finance_documents", {
   id: bigserial("id", { mode: "number" }).primaryKey(), docCode: text("doc_code").notNull(), docType: text("doc_type").notNull(),
   salesSourceEntryId: bigint("sales_source_entry_id", { mode: "number" }).references(() => salesFinancialSourceEntries.id, { onDelete: "restrict" }),
   purchaseSourceEntryId: bigint("purchase_source_entry_id", { mode: "number" }).references(() => purchaseFinancialSourceEntries.id, { onDelete: "restrict" }),
+  financeOpeningSourceId: bigint("finance_opening_source_id", { mode: "number" }).references((): AnyPgColumn => financeOpeningSources.id, { onDelete: "restrict" }),
   customerId: bigint("customer_id", { mode: "number" }).references(() => customers.id, { onDelete: "restrict" }), supplierId: bigint("supplier_id", { mode: "number" }).references(() => suppliers.id, { onDelete: "restrict" }),
   currencyCode: text("currency_code").notNull(), totalAmount: numeric("total_amount", { precision: 24, scale: 6 }).notNull(), settledAmount: numeric("settled_amount", { precision: 24, scale: 6 }).notNull().default("0"),
   status: text("status").notNull().default("OPEN"), accountingDate: date("accounting_date", { mode: "string" }).notNull(), dueDate: date("due_date", { mode: "string" }), version: integer("version").notNull().default(1),
   operationId: uuid("operation_id").notNull(), createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
-}, (t) => [uniqueIndex("finance_documents_code_uq").on(t.docCode), uniqueIndex("finance_documents_sales_source_uq").on(t.salesSourceEntryId), uniqueIndex("finance_documents_purchase_source_uq").on(t.purchaseSourceEntryId), index("finance_documents_status_idx").on(t.docType, t.status, t.dueDate, t.id), index("finance_documents_customer_idx").on(t.customerId, t.id), index("finance_documents_supplier_idx").on(t.supplierId, t.id), check("finance_documents_type_ck", sql`${t.docType} in ('AR','AP')`), check("finance_documents_source_ck", sql`(${t.docType}='AR' and ${t.salesSourceEntryId} is not null and ${t.purchaseSourceEntryId} is null and ${t.customerId} is not null and ${t.supplierId} is null) or (${t.docType}='AP' and ${t.purchaseSourceEntryId} is not null and ${t.salesSourceEntryId} is null and ${t.supplierId} is not null and ${t.customerId} is null)`), check("finance_documents_amount_ck", sql`${t.totalAmount}>0 and ${t.settledAmount}>=0 and ${t.settledAmount}<=${t.totalAmount}`), check("finance_documents_status_ck", sql`${t.status} in ('OPEN','PARTIALLY_SETTLED','SETTLED')`), check("finance_documents_projection_ck", sql`(${t.status}='OPEN' and ${t.settledAmount}=0) or (${t.status}='PARTIALLY_SETTLED' and ${t.settledAmount}>0 and ${t.settledAmount}<${t.totalAmount}) or (${t.status}='SETTLED' and ${t.settledAmount}=${t.totalAmount})`), check("finance_documents_currency_ck", sql`${t.currencyCode} ~ '^[A-Z]{3}$'`), check("finance_documents_version_ck", sql`${t.version}>0`)]);
+}, (t) => [uniqueIndex("finance_documents_code_uq").on(t.docCode), uniqueIndex("finance_documents_sales_source_uq").on(t.salesSourceEntryId), uniqueIndex("finance_documents_purchase_source_uq").on(t.purchaseSourceEntryId), uniqueIndex("finance_documents_opening_source_uq").on(t.financeOpeningSourceId).where(sql`${t.financeOpeningSourceId} is not null`), index("finance_documents_status_idx").on(t.docType, t.status, t.dueDate, t.id), index("finance_documents_customer_idx").on(t.customerId, t.id), index("finance_documents_supplier_idx").on(t.supplierId, t.id), check("finance_documents_type_ck", sql`${t.docType} in ('AR','AP','OPENING_AR','OPENING_AP')`), check("finance_documents_source_ck", sql`(${t.docType}='AR' and ${t.salesSourceEntryId} is not null and ${t.purchaseSourceEntryId} is null and ${t.financeOpeningSourceId} is null and ${t.customerId} is not null and ${t.supplierId} is null) or (${t.docType}='AP' and ${t.purchaseSourceEntryId} is not null and ${t.salesSourceEntryId} is null and ${t.financeOpeningSourceId} is null and ${t.supplierId} is not null and ${t.customerId} is null) or (${t.docType}='OPENING_AR' and ${t.financeOpeningSourceId} is not null and ${t.salesSourceEntryId} is null and ${t.purchaseSourceEntryId} is null and ${t.customerId} is not null and ${t.supplierId} is null) or (${t.docType}='OPENING_AP' and ${t.financeOpeningSourceId} is not null and ${t.salesSourceEntryId} is null and ${t.purchaseSourceEntryId} is null and ${t.supplierId} is not null and ${t.customerId} is null)`), check("finance_documents_amount_ck", sql`${t.totalAmount}>0 and ${t.settledAmount}>=0 and ${t.settledAmount}<=${t.totalAmount}`), check("finance_documents_status_ck", sql`${t.status} in ('OPEN','PARTIALLY_SETTLED','SETTLED','REVERSED')`), check("finance_documents_projection_ck", sql`(${t.status}='OPEN' and ${t.settledAmount}=0) or (${t.status}='PARTIALLY_SETTLED' and ${t.settledAmount}>0 and ${t.settledAmount}<${t.totalAmount}) or (${t.status}='SETTLED' and ${t.settledAmount}=${t.totalAmount}) or (${t.status}='REVERSED' and ${t.settledAmount}=0 and ${t.docType} in ('OPENING_AR','OPENING_AP'))`), check("finance_documents_currency_ck", sql`${t.currencyCode} ~ '^[A-Z]{3}$'`), check("finance_documents_version_ck", sql`${t.version}>0`)]);
 
 export const financeSettlements = pgTable("finance_settlements", {
   id: bigserial("id", { mode: "number" }).primaryKey(), settlementCode: text("settlement_code").notNull(), documentId: bigint("document_id", { mode: "number" }).notNull().references(() => financeDocuments.id, { onDelete: "restrict" }), settlementType: text("settlement_type").notNull(), amount: numeric("amount", { precision: 24, scale: 6 }).notNull(), originalSettlementId: bigint("original_settlement_id", { mode: "number" }), accountingDate: date("accounting_date", { mode: "string" }).notNull(), accountName: text("account_name").notNull(), reason: text("reason").notNull().default(""), operationId: uuid("operation_id").notNull(), createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
@@ -1065,4 +1109,17 @@ export const financeSettlements = pgTable("finance_settlements", {
 
 export const financeDocumentEvents = pgTable("finance_document_events", {
   id: bigserial("id", { mode: "number" }).primaryKey(), documentId: bigint("document_id", { mode: "number" }).notNull().references(() => financeDocuments.id, { onDelete: "restrict" }), eventType: text("event_type").notNull(), fromStatus: text("from_status"), toStatus: text("to_status").notNull(), amount: numeric("amount", { precision: 24, scale: 6 }), settlementId: bigint("settlement_id", { mode: "number" }).references(() => financeSettlements.id, { onDelete: "restrict" }), reason: text("reason").notNull().default(""), createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
-}, (t) => [index("finance_document_events_document_idx").on(t.documentId, t.id), check("finance_document_events_type_ck", sql`${t.eventType} in ('CREATED','SETTLED','SETTLEMENT_REVERSED')`), check("finance_document_events_status_ck", sql`${t.fromStatus} is null or ${t.fromStatus} in ('OPEN','PARTIALLY_SETTLED','SETTLED')`), check("finance_document_events_to_status_ck", sql`${t.toStatus} in ('OPEN','PARTIALLY_SETTLED','SETTLED')`)]);
+}, (t) => [index("finance_document_events_document_idx").on(t.documentId, t.id), check("finance_document_events_type_ck", sql`${t.eventType} in ('CREATED','SETTLED','SETTLEMENT_REVERSED','OPENING_REVERSED')`), check("finance_document_events_status_ck", sql`${t.fromStatus} is null or ${t.fromStatus} in ('OPEN','PARTIALLY_SETTLED','SETTLED','REVERSED')`), check("finance_document_events_to_status_ck", sql`${t.toStatus} in ('OPEN','PARTIALLY_SETTLED','SETTLED','REVERSED')`)]);
+
+export const financeOpeningSources = pgTable("finance_opening_sources", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), migrationOpeningSourceId: uuid("migration_opening_source_id").notNull().references(() => migrationOpeningSources.id, { onDelete: "restrict" }),
+  direction: text("direction").notNull(), customerId: bigint("customer_id", { mode: "number" }).references(() => customers.id, { onDelete: "restrict" }), supplierId: bigint("supplier_id", { mode: "number" }).references(() => suppliers.id, { onDelete: "restrict" }),
+  currencyCode: text("currency_code").notNull(), openingOutstandingAmount: numeric("opening_outstanding_amount", { precision: 24, scale: 6 }).notNull(), accountingDate: date("accounting_date", { mode: "string" }).notNull(), businessReferenceDigest: text("business_reference_digest").notNull(),
+  financeDocumentId: bigint("finance_document_id", { mode: "number" }).notNull().references(() => financeDocuments.id, { onDelete: "restrict" }), status: text("status").notNull().default("POSTED"), operationId: uuid("operation_id").notNull(),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [uniqueIndex("finance_opening_sources_migration_source_uq").on(t.migrationOpeningSourceId), uniqueIndex("finance_opening_sources_document_uq").on(t.financeDocumentId), uniqueIndex("finance_opening_sources_operation_uq").on(t.operationId), check("finance_opening_sources_direction_ck", sql`(${t.direction}='AR' and ${t.customerId} is not null and ${t.supplierId} is null) or (${t.direction}='AP' and ${t.supplierId} is not null and ${t.customerId} is null)`), check("finance_opening_sources_currency_ck", sql`${t.currencyCode}='CNY'`), check("finance_opening_sources_amount_ck", sql`${t.openingOutstandingAmount}>0`), check("finance_opening_sources_reference_ck", sql`${t.businessReferenceDigest} ~ '^[0-9a-f]{64}$'`), check("finance_opening_sources_status_ck", sql`${t.status}='POSTED'`)]);
+
+export const financeOpeningReversals = pgTable("finance_opening_reversals", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), financeOpeningSourceId: bigint("finance_opening_source_id", { mode: "number" }).notNull().references(() => financeOpeningSources.id, { onDelete: "restrict" }), financeDocumentId: bigint("finance_document_id", { mode: "number" }).notNull().references(() => financeDocuments.id, { onDelete: "restrict" }),
+  reason: text("reason").notNull(), operationId: uuid("operation_id").notNull(), createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [uniqueIndex("finance_opening_reversals_source_uq").on(t.financeOpeningSourceId), uniqueIndex("finance_opening_reversals_operation_uq").on(t.operationId), check("finance_opening_reversals_reason_ck", sql`char_length(btrim(${t.reason})) between 1 and 1000`)]);

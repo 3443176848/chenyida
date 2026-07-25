@@ -92,6 +92,13 @@
       "when": 1784956406651,
       "tag": "0013_finance",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1784968820167,
+      "tag": "0014_migration_openings",
+      "breakpoints": true
     }
   ]
 }

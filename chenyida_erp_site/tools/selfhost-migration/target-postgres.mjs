@@ -1,7 +1,9 @@
 import pg from "pg";
 import { parseSafePostgresUrl } from "./environment-guard.mjs";
 import { fail } from "./errors.mjs";
-import { sha256 } from "./digest.mjs";
+import { sha256, stableUuid } from "./digest.mjs";
+import { buildOpeningCommands } from "./opening-commands.mjs";
+import { MigrationOpeningService } from "./migration-opening-service.mjs";
 
 const { Pool } = pg;
 
@@ -22,7 +24,7 @@ export class PostgresTargetAdapter {
     try {
       const migrations = await client.query("select version, checksum from schema_migrations order by version");
       if (migrations.rows.length !== expectedMigrations.length || migrations.rows.some((row, index) => row.version !== expectedMigrations[index].name || row.checksum !== expectedMigrations[index].sha256)) {
-        fail("MIGRATION_TARGET_BASELINE_INVALID", "目标数据库 migration 与 0001—0013 不一致");
+        fail("MIGRATION_TARGET_BASELINE_INVALID", "目标数据库 migration 与 0001—0014 不一致");
       }
       const tables = await client.query("select tablename from pg_tables where schemaname='public' and tablename<>'schema_migrations' order by tablename");
       if (requireEmpty) for (const { tablename } of tables.rows) {
@@ -71,6 +73,30 @@ export class PostgresTargetAdapter {
       }
       await client.query("commit");
     } catch (error) { await client.query("rollback").catch(() => undefined); throw error; } finally { client.release(); }
+  }
+
+  async materializeOpenings({ source, plan, manifest, targetMigrations }) {
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      await client.query(`insert into app_users(username,display_name,role,password_hash,is_active,must_change_password) values('migration_opening_actor','Synthetic migration opening actor','operations','disabled-test-only',false,true) on conflict(username) do nothing`);
+      const categoryRow = plan.rows.find((row) => row.kind === "category");
+      if (categoryRow) await client.query(`insert into material_categories(category_code,category_name_cn,category_level,status,created_by,updated_by,request_id) values($1,'Synthetic migration category',4,'ACTIVE','migration_opening_actor','migration_opening_actor',$2) on conflict(category_code) do nothing`, [categoryRow.stable_key, stableUuid("migration-opening-bootstrap", `category:${categoryRow.stable_key}`)]);
+      for (const row of plan.rows.filter((item) => item.kind === "unit")) await client.query("insert into units(code,name,symbol,unit_type,enabled) values($1,$1,$1,'COUNT',true) on conflict(code) do nothing", [row.stable_key]);
+      for (const row of plan.rows.filter((item) => item.kind === "customer")) await client.query(`insert into customers(customer_code,customer_name,normalized_name,status,created_by,updated_by,request_id) values($1,$2,$1,'ACTIVE','migration_opening_actor','migration_opening_actor',$3) on conflict(customer_code) do nothing`, [row.stable_key, row.data.name, stableUuid("migration-opening-bootstrap", `customer:${row.stable_key}`)]);
+      for (const row of plan.rows.filter((item) => item.kind === "supplier")) await client.query(`insert into suppliers(supplier_code,supplier_name,normalized_name,status,created_by,updated_by,request_id) values($1,$2,$1,'ACTIVE','migration_opening_actor','migration_opening_actor',$3) on conflict(supplier_code) do nothing`, [row.stable_key, row.data.name, stableUuid("migration-opening-bootstrap", `supplier:${row.stable_key}`)]);
+      for (const row of plan.rows.filter((item) => item.kind === "material")) {
+        const unitKey = row.relations.find((item) => item.kind === "unit")?.key; const categoryKey = row.relations.find((item) => item.kind === "category")?.key;
+        await client.query(`insert into material_master(internal_material_code,standard_name,category_id,base_uom,base_unit_id,material_status,procurement_type,inventory_type,inspection_type,environmental_requirement,source_type,last_modified_by,created_by,updated_by,request_id)
+          select $1,$2,c.id,u.code,u.id,'ACTIVE','PURCHASE','STOCKED','IQC','ROHS','MIGRATION','migration_opening_actor','migration_opening_actor','migration_opening_actor',$5 from material_categories c join units u on u.code=$3 where c.category_code=$4 on conflict do nothing`, [row.stable_key, row.data.name, unitKey, categoryKey, stableUuid("migration-opening-bootstrap", `material:${row.stable_key}`)]);
+      }
+      await client.query("commit");
+    } catch (error) { await client.query("rollback").catch(() => undefined); throw error; } finally { client.release(); }
+    const bundle = buildOpeningCommands({ source, plan, manifest, targetMigrations });
+    const service = new MigrationOpeningService(this.pool, { environment: { ERP_ENV: "test" } });
+    const results = [];
+    for (const command of bundle.commands) results.push(command.command_type === "POST_INVENTORY_OPENING" ? await service.postInventory(command) : await service.postFinance(command));
+    return { bundle, results };
   }
 
   async setState(runId, state) { await this.pool.query("update migration_tool.runs set state=$2,updated_at=now() where run_id=$1", [runId, state]); }

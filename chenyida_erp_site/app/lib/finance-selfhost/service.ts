@@ -5,7 +5,7 @@ import { amount, date, documentType, id, text, version } from "./rules.ts";
 import { FinanceRepository } from "./repository.ts";
 import type { FinanceDocumentType, FinanceMeta, FinanceResult } from "./types.ts";
 
-type DocumentRow = Record<string, unknown> & { id: string; doc_type: FinanceDocumentType; total_amount: string; settled_amount: string; status: string; version: number; currency_code: string };
+type DocumentRow = Record<string, unknown> & { id: string; doc_type: string; total_amount: string; settled_amount: string; status: string; version: number; currency_code: string };
 
 export const FINANCE_BOUNDARY = Object.freeze({
   authority: "Node/PostgreSQL",
@@ -26,17 +26,20 @@ export function visibleFinanceTypes(actor: Pick<IdentityActor, "role">): Finance
 }
 
 function assertVisible(actor: Pick<IdentityActor, "role">, type: string): asserts type is FinanceDocumentType {
-  if (!visibleFinanceTypes(actor).includes(type as FinanceDocumentType)) throw new FinanceError("FINANCE_NOT_VISIBLE", "财务记录不存在", 404);
+  const family = type === "OPENING_AR" ? "AR" : type === "OPENING_AP" ? "AP" : type;
+  if (!visibleFinanceTypes(actor).includes(family as FinanceDocumentType)) throw new FinanceError("FINANCE_NOT_VISIBLE", "财务记录不存在", 404);
 }
 
+function databaseTypes(types: FinanceDocumentType[]) { return types.flatMap((type) => type === "AR" ? ["AR", "OPENING_AR"] : ["AP", "OPENING_AP"]); }
+
 function documentSelect() {
-  return `select d.*,case d.doc_type when 'AR' then '应收' else '应付' end legacy_doc_type,
-    case d.status when 'OPEN' then '未结清' when 'PARTIALLY_SETTLED' then '部分结清' else '已结清' end legacy_status,
+  return `select d.*,case when d.doc_type in ('AR','OPENING_AR') then '应收' else '应付' end legacy_doc_type,
+    case d.status when 'OPEN' then '未结清' when 'PARTIALLY_SETTLED' then '部分结清' when 'REVERSED' then '已冲销' else '已结清' end legacy_status,
     (d.total_amount-d.settled_amount)::text balance_amount,d.total_amount::text total_amount,d.settled_amount::text settled_amount,
     coalesce(c.customer_name,s.supplier_name) counterparty,coalesce(c.customer_code,s.supplier_code) counterparty_code,
     coalesce(sh.shipment_code,pr.receipt_code) source_code,
-    case d.doc_type when 'AR' then 'SHIPMENT' else 'RECEIPT' end source_type,
-    coalesce(d.sales_source_entry_id,d.purchase_source_entry_id) stable_source_entry_id
+    case when d.doc_type='AR' then 'SHIPMENT' when d.doc_type='AP' then 'RECEIPT' else 'FINANCE_OPENING' end source_type,
+    coalesce(d.sales_source_entry_id,d.purchase_source_entry_id,d.finance_opening_source_id) stable_source_entry_id
     from finance_documents d left join customers c on c.id=d.customer_id left join suppliers s on s.id=d.supplier_id
     left join sales_financial_source_entries sf on sf.id=d.sales_source_entry_id left join sales_shipments sh on sh.id=sf.shipment_id
     left join purchase_financial_source_entries pf on pf.id=d.purchase_source_entry_id left join purchase_receipts pr on pr.id=pf.purchase_receipt_id`;
@@ -51,9 +54,9 @@ export class FinanceService {
 
   async list(actor: IdentityActor, limit: number, offset: number, requestedType?: string, status?: string) {
     const types = visibleFinanceTypes(actor); if (!types.length) return [];
-    const values: unknown[] = [types]; const where = ["d.doc_type=any($1::text[])"];
-    if (requestedType) { const normalized = ["应收", "AR"].includes(requestedType) ? "AR" : ["应付", "AP"].includes(requestedType) ? "AP" : documentType(requestedType); assertVisible(actor, normalized); values.push(normalized); where.push(`d.doc_type=$${values.length}`); }
-    if (status) { const normalized = String(status).trim().toUpperCase(); if (!["OPEN", "PARTIALLY_SETTLED", "SETTLED"].includes(normalized)) throw new FinanceError("REQUEST_VALIDATION_FAILED", "status 无效"); values.push(normalized); where.push(`d.status=$${values.length}`); }
+    const values: unknown[] = [databaseTypes(types)]; const where = ["d.doc_type=any($1::text[])"];
+    if (requestedType) { const normalized = ["应收", "AR"].includes(requestedType) ? "AR" : ["应付", "AP"].includes(requestedType) ? "AP" : documentType(requestedType); assertVisible(actor, normalized); values.push(databaseTypes([normalized])); where.push(`d.doc_type=any($${values.length}::text[])`); }
+    if (status) { const normalized = String(status).trim().toUpperCase(); if (!["OPEN", "PARTIALLY_SETTLED", "SETTLED", "REVERSED"].includes(normalized)) throw new FinanceError("REQUEST_VALIDATION_FAILED", "status 无效"); values.push(normalized); where.push(`d.status=$${values.length}`); }
     values.push(limit, offset); const result = await this.repository.pool.query(`${documentSelect()} where ${where.join(" and ")} order by d.created_at desc,d.id desc limit $${values.length - 1} offset $${values.length}`, values); return result.rows.map(legacyDocument);
   }
 
@@ -64,16 +67,16 @@ export class FinanceService {
   }
 
   async listSettlements(actor: IdentityActor, limit: number, offset: number, documentId?: number) {
-    const types = visibleFinanceTypes(actor); if (!types.length) return []; const values: unknown[] = [types]; const where = ["d.doc_type=any($1::text[])"];
+    const types = visibleFinanceTypes(actor); if (!types.length) return []; const values: unknown[] = [databaseTypes(types)]; const where = ["d.doc_type=any($1::text[])"];
     if (documentId) { values.push(documentId); where.push(`fs.document_id=$${values.length}`); }
     values.push(limit, offset); const result = await this.repository.pool.query(`select fs.*,d.doc_code,d.doc_type,coalesce(c.customer_name,s.supplier_name) counterparty,exists(select 1 from finance_settlements r where r.original_settlement_id=fs.id) is_reversed from finance_settlements fs join finance_documents d on d.id=fs.document_id left join customers c on c.id=d.customer_id left join suppliers s on s.id=d.supplier_id where ${where.join(" and ")} order by fs.created_at desc,fs.id desc limit $${values.length - 1} offset $${values.length}`, values); return result.rows.map(legacySettlement);
   }
 
   async summary(actor: IdentityActor) {
     const types = visibleFinanceTypes(actor); if (!types.length) return { receivable_total: "0", receivable_paid: "0", receivable_balance: "0", payable_total: "0", payable_paid: "0", payable_balance: "0", cash_net: "0" }; const result = await this.repository.pool.query(`select
-      coalesce(sum(total_amount) filter(where doc_type='AR'),0)::text receivable_total,coalesce(sum(settled_amount) filter(where doc_type='AR'),0)::text receivable_paid,coalesce(sum(total_amount-settled_amount) filter(where doc_type='AR'),0)::text receivable_balance,
-      coalesce(sum(total_amount) filter(where doc_type='AP'),0)::text payable_total,coalesce(sum(settled_amount) filter(where doc_type='AP'),0)::text payable_paid,coalesce(sum(total_amount-settled_amount) filter(where doc_type='AP'),0)::text payable_balance
-      from finance_documents where doc_type=any($1::text[])`, [types]); const cash = await this.repository.pool.query(`select coalesce(sum(case when fs.settlement_type in ('RECEIPT','RECEIPT_REVERSAL') then fs.amount else -fs.amount end),0)::text cash_net from finance_settlements fs join finance_documents d on d.id=fs.document_id where d.doc_type=any($1::text[])`, [types]); return { ...result.rows[0], ...cash.rows[0] };
+      coalesce(sum(total_amount) filter(where doc_type in ('AR','OPENING_AR') and status<>'REVERSED'),0)::text receivable_total,coalesce(sum(settled_amount) filter(where doc_type in ('AR','OPENING_AR') and status<>'REVERSED'),0)::text receivable_paid,coalesce(sum(total_amount-settled_amount) filter(where doc_type in ('AR','OPENING_AR') and status<>'REVERSED'),0)::text receivable_balance,
+      coalesce(sum(total_amount) filter(where doc_type in ('AP','OPENING_AP') and status<>'REVERSED'),0)::text payable_total,coalesce(sum(settled_amount) filter(where doc_type in ('AP','OPENING_AP') and status<>'REVERSED'),0)::text payable_paid,coalesce(sum(total_amount-settled_amount) filter(where doc_type in ('AP','OPENING_AP') and status<>'REVERSED'),0)::text payable_balance
+      from finance_documents where doc_type=any($1::text[])`, [databaseTypes(types)]); const cash = await this.repository.pool.query(`select coalesce(sum(case when fs.settlement_type in ('RECEIPT','RECEIPT_REVERSAL') then fs.amount else -fs.amount end),0)::text cash_net from finance_settlements fs join finance_documents d on d.id=fs.document_id where d.doc_type=any($1::text[])`, [databaseTypes(types)]); return { ...result.rows[0], ...cash.rows[0] };
   }
 
   async sourceOptions(actor: IdentityActor, typeValue: string, limit: number) {
@@ -97,7 +100,7 @@ export class FinanceService {
 
   async settle(meta: FinanceMeta, input: Record<string, unknown>): Promise<FinanceResult> {
     const documentId = id(input.document_id ?? input.doc_id, "document_id"); const expected = version(input.expected_version); const value = amount(input.amount); const accountingDate = date(input.accounting_date ?? input.payment_date, "accounting_date")!; const accountName = text(input.account_name, "account_name", 200, true); const reason = text(input.reason ?? input.remark, "reason", 1000);
-    return this.repository.execute(meta, async (client) => { const document = await this.lockDocument(client, documentId); if (Number(document.version) !== expected) throw new FinanceError("FINANCE_VERSION_CONFLICT", "财务单据版本已变化", 409); const allowed = await client.query("select $1::numeric<=($2::numeric-$3::numeric) ok", [value, document.total_amount, document.settled_amount]); if (!allowed.rows[0].ok) throw new FinanceError("FINANCE_AMOUNT_EXCEEDS_BALANCE", "本次核销金额不能超过未结余额", 409); const settlementType = document.doc_type === "AR" ? "RECEIPT" : "PAYMENT"; const code = await this.repository.nextCode(client, document.doc_type === "AR" ? "FINANCE_RECEIPT" : "FINANCE_PAYMENT", document.doc_type === "AR" ? "RCV" : "PAY"); const created = await client.query("insert into finance_settlements(settlement_code,document_id,settlement_type,amount,accounting_date,account_name,reason,operation_id,created_by,request_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *", [code, documentId, settlementType, value, accountingDate, accountName, reason, meta.operationId, meta.actor.username, meta.requestId]); const updated = await client.query(`update finance_documents set settled_amount=settled_amount+$2::numeric,status=case when settled_amount+$2::numeric=total_amount then 'SETTLED' else 'PARTIALLY_SETTLED' end,version=version+1,updated_at=now() where id=$1 and version=$3 returning *`, [documentId, value, expected]); if (!updated.rows[0]) throw new FinanceError("FINANCE_VERSION_CONFLICT", "财务单据已被并发核销", 409); const settlementId = Number(created.rows[0].id); await client.query("insert into finance_document_events(document_id,event_type,from_status,to_status,amount,settlement_id,reason,created_by,request_id) values($1,'SETTLED',$2,$3,$4,$5,$6,$7,$8)", [documentId, document.status, updated.rows[0].status, value, settlementId, reason, meta.actor.username, meta.requestId]); await this.fault?.("after_finance_settlement"); return { status: 201, body: { ok: true, data: created.rows[0], settlement_id: settlementId, payment_code: code, doc_status: updated.rows[0].status, settled_amount: updated.rows[0].settled_amount, document_version: Number(updated.rows[0].version), request_id: meta.requestId }, objectId: settlementId };
+    return this.repository.execute(meta, async (client) => { const document = await this.lockDocument(client, documentId); if (Number(document.version) !== expected) throw new FinanceError("FINANCE_VERSION_CONFLICT", "财务单据版本已变化", 409); if (document.status === "REVERSED") throw new FinanceError("FINANCE_DOCUMENT_REVERSED", "已冲销期初不能核销", 409); const allowed = await client.query("select $1::numeric<=($2::numeric-$3::numeric) ok", [value, document.total_amount, document.settled_amount]); if (!allowed.rows[0].ok) throw new FinanceError("FINANCE_AMOUNT_EXCEEDS_BALANCE", "本次核销金额不能超过未结余额", 409); const receivable = ["AR", "OPENING_AR"].includes(document.doc_type); const settlementType = receivable ? "RECEIPT" : "PAYMENT"; const code = await this.repository.nextCode(client, receivable ? "FINANCE_RECEIPT" : "FINANCE_PAYMENT", receivable ? "RCV" : "PAY"); const created = await client.query("insert into finance_settlements(settlement_code,document_id,settlement_type,amount,accounting_date,account_name,reason,operation_id,created_by,request_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *", [code, documentId, settlementType, value, accountingDate, accountName, reason, meta.operationId, meta.actor.username, meta.requestId]); const updated = await client.query(`update finance_documents set settled_amount=settled_amount+$2::numeric,status=case when settled_amount+$2::numeric=total_amount then 'SETTLED' else 'PARTIALLY_SETTLED' end,version=version+1,updated_at=now() where id=$1 and version=$3 returning *`, [documentId, value, expected]); if (!updated.rows[0]) throw new FinanceError("FINANCE_VERSION_CONFLICT", "财务单据已被并发核销", 409); const settlementId = Number(created.rows[0].id); await client.query("insert into finance_document_events(document_id,event_type,from_status,to_status,amount,settlement_id,reason,created_by,request_id) values($1,'SETTLED',$2,$3,$4,$5,$6,$7,$8)", [documentId, document.status, updated.rows[0].status, value, settlementId, reason, meta.actor.username, meta.requestId]); await this.fault?.("after_finance_settlement"); return { status: 201, body: { ok: true, data: created.rows[0], settlement_id: settlementId, payment_code: code, doc_status: updated.rows[0].status, settled_amount: updated.rows[0].settled_amount, document_version: Number(updated.rows[0].version), request_id: meta.requestId }, objectId: settlementId };
     });
   }
 

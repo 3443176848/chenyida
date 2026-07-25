@@ -40,7 +40,7 @@ test("synthetic PostgreSQL commit resumes, repeats without duplicates, reconcile
   const manifest = await createManifest({ runId, source, targetGitCommit: "c".repeat(40), targetMigrations, executionMode: "SYNTHETIC_COMMIT" });
   const target = new PostgresTargetAdapter(databaseUrl, { ERP_ENV: "test" });
   try {
-    const baseline = await target.inspect(targetMigrations); assert.equal(baseline.migrations.length, 13); assert.ok(baseline.businessForeignKeyCount > 30);
+    const baseline = await target.inspect(targetMigrations); assert.equal(baseline.migrations.length, 14); assert.ok(baseline.businessForeignKeyCount > 40);
     const pool = new Pool({ connectionString: databaseUrl });
     assert.equal((await pool.query("select to_regnamespace('migration_tool') is null as missing")).rows[0].missing, true);
     const dryWorkspace = await temporaryRoot("chenyida_pgdry_migration_test_");
@@ -51,6 +51,8 @@ test("synthetic PostgreSQL commit resumes, repeats without duplicates, reconcile
     const resumed = await executeSyntheticCommit({ workspace, inputDigest, runId, source, plan, target, manifest });
     assert.equal(resumed.state, "RECONCILED"); assert.equal(resumed.reconciliation.grade, "PASS");
     const afterFirst = await target.aggregate(runId); assert.equal(afterFirst.record_count, plan.rows.length); assert.equal(afterFirst.orphan_count, 0); assert.equal(afterFirst.inventory_qty, "112.000000"); assert.equal(afterFirst.finance_amount, "19.000000");
+    const openings = await pool.query("select (select count(*)::int from inventory_migration_openings) inventory,(select count(*)::int from finance_opening_sources) finance,(select count(*)::int from inventory_ledger_entries where entry_type='MIGRATION_OPENING') ledgers,(select count(*)::int from finance_documents where doc_type in ('OPENING_AR','OPENING_AP')) documents");
+    assert.deepEqual(openings.rows[0], { inventory: 2, finance: 2, ledgers: 2, documents: 2 });
     const repeated = await executeSyntheticCommit({ workspace, inputDigest, runId, source, plan, target, manifest });
     assert.equal(repeated.state, "RECONCILED"); assert.equal((await target.aggregate(runId)).record_count, plan.rows.length);
     const changed = { ...plan.rows.find((row) => row.kind === "material"), source_digest: "d".repeat(64), data: { code: "SYN-MAT-001", name: "Changed Synthetic", status: "ACTIVE" } };

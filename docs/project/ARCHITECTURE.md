@@ -2,6 +2,25 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-25 迁移期初受控物化层
+
+`SELFHOST-PHASE3-TASK02` 在 TASK01 staging 之后增加显式、类型化的合成期初 command 和内部 `MigrationOpeningService`。服务只在 `ERP_ENV=test`、回环 `_migration_test`、已初始化迁移工具目标中运行；Web/API 不暴露期初写路由。`0014` 新增去正文的关系来源、库存/财务期初及冲销表，复用库存 Ledger/Balance 与财务 Document/Event/Settlement，不创建第二套余额。
+
+```mermaid
+flowchart LR
+    STAGE["migration_tool staging"] --> CMD["digest-bound opening command"]
+    CMD --> SVC["internal MigrationOpeningService"]
+    SVC --> SRC["immutable migration source"]
+    SVC --> INV["Adjustment + Ledger + Balance"]
+    SVC --> FIN["OPENING_AR/AP + Event"]
+    INV --> AUDIT["Audit + Idempotency"]
+    FIN --> AUDIT
+    REV["full reversal only"] --> INV
+    REV --> FIN
+```
+
+数据库 trigger 同时要求既有 Inventory/Finance Service GUC 与 migration-opening 内部 GUC；来源和过账事实 UPDATE/DELETE 永远拒绝。该层只在合成环境验证，真实数据与生产仍为 NO-GO。
+
 ## 2026-07-25 生产前合成迁移准备层
 
 `SELFHOST-PHASE3-TASK01` 在 Web/API 启动路径之外新增显式 CLI。环境守卫先于任何 source read 或 target connect，SQLite/D1 export adapter 只接受临时目录与合成 marker；计划经 mapping registry、稳定 ID、checkpoint 和 manifest 进入回环 `_migration_test` PostgreSQL 的独立 `migration_tool` schema。dry-run 不写目标，synthetic commit 只写 staging，最终必须 Reconcile 才能成为 `RECONCILED`。

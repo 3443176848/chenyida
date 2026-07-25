@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.11`，明确为非生产且尚未发布；详见 `RELEASES.md`。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.12`，明确为非生产且尚未发布；详见 `RELEASES.md`。
 
 ### 治理资料
 
@@ -54,6 +54,7 @@
 - `drizzle-postgres/0004_material_import_normalization.sql` 增加版本化 Normalization run、关系化核心/动态属性候选、lineage、稳定 issue、重试/重跑/取消、发布一致性约束和已发布数据不可变 trigger；Worker、API和现有 Review UI 已完成非生产闭环。
 - `drizzle-postgres/0005_material_import_review.sql` 增加 Review Session/Row、核心和动态属性覆盖历史、Issue resolution、Review validation issue、sealed finalization、行级 operation、ACTIVE binding、Draft link 和审计历史；TASK01 Material Service、API、Worker 与七步 Import Workspace 已完成非生产闭环。
 - `drizzle-postgres/0006_identity_security.sql` 和 `0007_master_data_bom.sql` 分别补齐身份安全与关系化主数据/BOM；`0008_inventory_ledger.sql` 新增稳定 Material/Unit ID 的库存余额投影与不可变账本；`0009_procurement.sql`、`0010_production.sql`、`0011_sales.sql`、`0012_quality.sql` 和 `0013_finance.sql` 分别关系化采购、生产、销售、品质与财务结算事实，旧文本编码/JSON 表仅保留为迁移来源。
+- `drizzle-postgres/0014_migration_openings.sql` 新增不可变 Migration Opening Source、库存期初/冲销和 Finance Opening/冲销；只通过测试迁移 CLI 的内部 Service 物化，复用 Ledger/Balance 与 Finance Document/Event/Settlement，不回填旧数据或暴露 HTTP 写路由。
 - 本地文件卷保存二进制，数据库只保存受控相对路径和摘要元数据。
 - Worker 使用 PostgreSQL Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、重试和 CAS；Web/Worker 是独立入口。
 
@@ -99,12 +100,13 @@
 20. SELFHOST-PHASE2-TASK09 已新增 PostgreSQL `0013` 和独立 Finance 服务；AR/AP 只消费未冲销正向 Shipment/Receipt 金额来源，Settlement/Reversal/Event 不可变，Document 余额/状态/version 是受控投影。财务过账后上游来源冲销 fail closed；不接银行/税务/发票/汇率/总账，不迁真实金额。版本为 `0.1.0-alpha.9`，未发布或部署。
 21. SELFHOST-PHASE2-TASK10 已新增独立 Dashboard Query Service、原生根工作台和离线 backup/verify/新空目标 restore；权限裁剪、numeric 文本、不同单位不合计、64 操作/23 legacy GET 覆盖、隔离恢复与 Compose 重启通过。版本为 `0.1.0-alpha.10`，未新增 `0014`、未迁真实数据、发布或部署。
 22. SELFHOST-PHASE3-TASK01 已新增显式离线迁移 CLI、SQLite/D1 export adapter、PostgreSQL `migration_tool` staging、manifest、稳定 ID map、checkpoint、合成 commit/reconcile 和生产拒绝守卫；版本为 `0.1.0-alpha.11`，0001—0013 保持不变。它只证明合成准备度，不读取或物化真实业务数据。
+23. SELFHOST-PHASE3-TASK02 已新增 PostgreSQL `0014`、digest-bound command 和内部 Migration Opening Service；合成库存期初进入不可变 Ledger/Balance，合成无来源应收应付进入 `OPENING_AR/AP`，全额冲销、并发、幂等、Dashboard 和恢复通过。MG-001/MG-002 只在合成非生产模型中解决，真实数据与生产仍 NO-GO。
 
 ## 当前风险
 
 - Material Draft/Review/Active、Import Mapping/版本/复用、行级 Normalizer 及人工复核/ACTIVE绑定/Draft Commit 已完成 PostgreSQL 非生产移植；后续真实数据演练和迁移不得重新接入 D1 运行依赖。
 - `0002`/`0003`/`0004`/`0005`、双用户审批、Mapping确认、Normalization原子发布/取消、人工复核 finalization 和重启持久性只在一次性 PostgreSQL 17/Compose 测试环境验证；未迁移真实数据、执行生产容量测试、生产恢复演练或部署。
-- TASK01 迁移工具只把合成记录提交到隔离 `migration_tool` schema；真实 source fingerprint、业务表物化、Dashboard 明细核对、无业务来源 Finance opening 和文件迁移仍是生产 NO-GO 项。
+- TASK01 staging 与 TASK02 期初物化只在隔离 `_migration_test` 验证；真实 source fingerprint、余额/主体/单位/冻结、其他业务域物化、文件迁移、容量和生产恢复仍是生产 NO-GO 项。
 - Site 源码已可从根仓库恢复；生产提交与开发提交仍需在后续发布基线中持续追踪。
 - 本地和在线数据模型、编码和治理行为分叉。
 - 在线 JSON 模型缺少关键关系约束；本地 SQLite 缺少外键和迁移历史。
@@ -137,7 +139,7 @@
 
 ## 当前路线
 
-当前已完成 Node/PostgreSQL 全域 API、Dashboard、原生根、离线 backup/restore 治理，以及合成迁移准备工具，可描述为“自托管完整 ERP API 非生产候选 + 合成迁移准备度”。TASK01 起点为 `14bc68791a34ece9086b889f23d473e84a761cf0`；当前不自动开始下一任务。真实数据盘点/试迁移、业务表物化、生产恢复、部署和切换继续独立授权。
+当前已完成 Node/PostgreSQL 全域 API、Dashboard、原生根、离线 backup/restore 治理、合成迁移准备工具，以及 MG-001/MG-002 的受控合成期初物化模型，可描述为“自托管完整 ERP API 非生产候选 + 合成迁移/期初准备度”。TASK02 可信起点为 `2c808f7a2ba2c293ff22e5dcc3ca3647a479a91c`，版本 `0.1.0-alpha.12`，PostgreSQL `0001`—`0014`；当前不自动开始下一任务。真实数据盘点/试迁移、其他业务域物化、生产恢复、部署和切换继续独立授权。
 
 ## 恢复上下文检查清单
 

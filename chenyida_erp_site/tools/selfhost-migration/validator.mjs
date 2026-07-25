@@ -47,7 +47,12 @@ export function validateAndPlan(source, mappingDigest) {
     if (record.kind === "identity" && (!FIXED_ROLES.has(record.data.role) || record.data.username !== record.stable_key)) issues.push(issue(record.data.role && !FIXED_ROLES.has(record.data.role) ? "UNKNOWN_ROLE" : "IDENTITY_KEY_INVALID", record));
     if (record.kind === "material" && !record.relations.some((relation) => relation.kind === "unit")) issues.push(issue("MISSING_UNIT", record));
     if (record.kind === "inventory_balance" && Number(record.data.on_hand_qty) < 0) issues.push(issue("NEGATIVE_INVENTORY", record));
-    if (record.kind === "finance_opening") issues.push(issue("MODEL_GAP", record));
+    if (record.kind === "inventory_balance" && Number(record.data.frozen_qty || 0) > Number(record.data.on_hand_qty)) issues.push(issue("FROZEN_EXCEEDS_ON_HAND", record));
+    if (record.kind === "finance_opening") {
+      const direction = String(record.data.document_type || record.data.direction || "").toUpperCase();
+      const hasCustomer = record.relations.some((relation) => relation.kind === "customer"); const hasSupplier = record.relations.some((relation) => relation.kind === "supplier");
+      if (!new Set(["AR", "AP"]).has(direction) || (direction === "AR" && (!hasCustomer || hasSupplier)) || (direction === "AP" && (!hasSupplier || hasCustomer))) issues.push(issue("FINANCE_OPENING_COUNTERPARTY_INVALID", record));
+    }
     if (record.data.currency_code && record.data.currency_code !== "CNY") issues.push(issue("CURRENCY_MISMATCH", record));
     if (record.kind === "file" && record.data.checksum_status !== "MATCHED") issues.push(issue(record.data.checksum_status === "MISSING" ? "FILE_MISSING" : "FILE_CHECKSUM_MISMATCH", record));
     const allowed = STATUS_ALLOWLIST[record.kind];

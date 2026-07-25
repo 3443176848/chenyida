@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE3-TASK02 库存与财务期初来源及迁移物化边界
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 恢复点 | PASS | `main`、可信起点 `2c808f7a2ba2c293ff22e5dcc3ca3647a479a91c`；独立提交消息 `feat: add controlled migration opening balances` |
+| MG-001 | RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL | 关系化 `OPENING_AR/AP`，不伪造 Shipment/Receipt；主体互斥、CNY、正数六位金额、核销/冲销和 Dashboard 通过 |
+| MG-002 | RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL | `MIGRATION_OPENING` Adjustment/Ledger/Balance 同事务；Base Unit、MAIN/空 lot、冻结边界、消费后冲销拒绝通过 |
+| Migration | PASS | expand-only `0014_migration_openings.sql`，SHA-256 `61f65ef3d588bfbf178f3dd9ba196886fa18fb3ecca119a151f6a3bc0bc5a99b`；空库/0013升级/重复/失败回滚/零回填通过，旧 checksum 不变 |
+| 安全/事务 | PASS | 无 HTTP 写路由；内部 GUC + DB trigger；digest conflict、幂等、并发和注入失败整体回滚通过 |
+| 合成核对 | PASS | 4 来源；库存 2 条、Ledger/Balance 均为 on-hand `112.000000` / frozen `4.000000`；AR `6.500000 CNY`、AP `7.250000 CNY` |
+| 专项/回归 | PASS | unit 3/3、PG 2/2、migration 3/3、tool 8/8；既有 PG/API 42/42、Material/Mapping/Normalization/Review 20/20、upgrade 30/30；typecheck/build/lint/environment/credentials/Python 三项通过 |
+| Compose/恢复 | PASS | PostgreSQL/Web/Worker 构建、健康和重启通过；停服 backup/verify 恢复到全新空库后 14 migrations、来源、Ledger/Balance、AR/AP 全部一致 |
+| 版本 | PASS / NOT RELEASED | `chenyida-erp-selfhosted@0.1.0-alpha.12`；未发布、部署、迁真实数据或批准生产 |
+| 生产准入 | NO-GO | 未读取真实源，未验证真实余额/主体/单位/冻结/规模/附件/异故障域；`NO-GO FOR REAL DATA / PRODUCTION` |
+| 资源/生产影响 | NONE | 隔离容器/网络/卷/数据库/备份/临时目录已清理；Python PID `277640` 未重启，未访问生产、部署、push 或 PR |
+
 ## SELFHOST-PHASE3-TASK01 生产前数据迁移框架与合成试迁移
 
 | 验证项 | 结果 | 说明 |
@@ -310,11 +326,11 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 根仓库 Branch | `main` |
-| 任务开始 HEAD | TASK01 起点 `14bc68791a34ece9086b889f23d473e84a761cf0` |
-| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.11`；非生产、尚未发布 |
+| 任务开始 HEAD | TASK02 起点 `2c808f7a2ba2c293ff22e5dcc3ca3647a479a91c` |
+| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.12`；非生产、尚未发布 |
 | 当前实际常驻服务 | Python 3.11.6 / SQLite，systemd `enabled/active`，`0.0.0.0:18888` |
 | 自托管部署状态 | Node/PostgreSQL 未生产部署；当前无运行中 Compose 项目 |
-| PostgreSQL migration | `0001`—`0013`；TASK01 未新增 migration，未迁移任何真实数据 |
+| PostgreSQL migration | `0001`—`0014`；TASK02 新增合成受控期初模型，未迁移任何真实数据 |
 | SQLite migration | `0001`—`0004` 已记录；数据库不保存 migration checksum |
 | 历史 D1 migration | 仓库 `0000`—`0008`；生产实际应用版本未访问、未核验 |
 | PM-000 前根提交 | `bbefb2e388323213b51531fec117d67d5a28fe70` |

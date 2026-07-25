@@ -4,6 +4,15 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE3-TASK02 - `feat: add controlled migration opening balances`
+
+- 数据库：新增 expand-only PostgreSQL `0014`，建立去正文的 migration source、Inventory Opening/Line/Reversal、Finance Opening/Reversal；扩展 Inventory/Finance 约束、索引、不可变 trigger 和内部 service-write guard，不修改 `0001`—`0013`、不自动回填。
+- 物化：类型化 command 绑定 manifest/source/mapping/target digest；内部 Service 在同一事务写库存 Adjustment/Ledger/Balance 或财务 `OPENING_AR/AP`/Event，并伴随 Audit、Idempotency；无 Web/legacy 写路由。
+- 更正：原期初事实不可更新/删除，只允许一次全额冲销；库存被下游消费或财务存在有效收付款时 fail closed；普通 Finance 核销/冲销与期初并发锁定通过。
+- 展示：Finance Service 与实时 Dashboard 读取/汇总期初应收应付，`REVERSED` 不计入余额；迁移 synthetic fixture 从 staging 正式物化 2 条库存与 2 条财务期初。
+- 验收：专项 unit 3/3、PG 2/2、migration 3/3；全量 PG/API、migration、unit/UI、typecheck、schema consistency、build/lint/environment/credentials 通过；隔离 Compose 重启和停服 backup→全新空库 restore 后 14 migrations、库存 `112/4` 与 AR/AP 余额一致；Python 三项通过。
+- 版本/边界：`0.1.0-alpha.12`，`0014` SHA-256 `61f65ef3d588bfbf178f3dd9ba196886fa18fb3ecca119a151f6a3bc0bc5a99b`。MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`；未读真实数据、未迁移/部署/重启 Python/push/建 PR，生产为 `NO-GO FOR REAL DATA / PRODUCTION`。
+
 ### SELFHOST-PHASE3-TASK01 - `feat: add synthetic migration readiness tooling`
 
 - 迁移框架：新增只能显式执行的离线 CLI，包含 SQLite/D1 export source、PostgreSQL staging target、manifest、mapping registry、稳定 ID map、digest checkpoint、dry-run、合成 commit、reconcile 与安全报告。

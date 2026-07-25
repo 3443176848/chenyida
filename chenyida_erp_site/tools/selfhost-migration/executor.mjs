@@ -36,6 +36,7 @@ export async function executeSyntheticCommit({ workspace, inputDigest, runId, so
       if (interruptAfterDomain === domain) fail("MIGRATION_TEST_INTERRUPT", "合成中断注入");
     }
   }
+  await target.materializeOpenings({ source, plan, manifest, targetMigrations: manifest.target_migrations });
   await target.setState(runId, "COMMITTED");
   checkpoint = await checkpoints.append("Commit", "COMMITTED", { migrated: plan.rows.length });
   const targetAggregate = await target.aggregate(runId);

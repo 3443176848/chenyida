@@ -55,8 +55,9 @@
 - `SELFHOST-PHASE2-TASK09`：应收应付、收付款、余额与冲销（DONE，非生产 `0.1.0-alpha.9`；PostgreSQL `0013`，稳定 Shipment/Receipt 金额来源、不可变 Settlement/Reversal/Event 与上游冲销门禁通过，未迁真实金额或接入外部财务系统）。
 - `SELFHOST-PHASE2-TASK10`：经营看板、备份恢复治理与 legacy iframe 退出（DONE，非生产 `0.1.0-alpha.10`；实时权限裁剪 Dashboard、原生根、离线 backup/verify/新空目标 restore 与 Compose 重启通过，未新增 `0014`、未迁真实数据或部署）。
 - `SELFHOST-PHASE3-TASK01`：生产前数据迁移框架与合成试迁移基线（DONE，非生产 `0.1.0-alpha.11`；显式 CLI、双 source adapter、staging、checkpoint、合成 backup/restore 与全回归通过，真实数据和生产 NO-GO）。
+- `SELFHOST-PHASE3-TASK02`：库存与财务期初来源及迁移物化安全边界（DONE，非生产 `0.1.0-alpha.12`；PostgreSQL `0014`、受控 Inventory/Finance Opening、冲销、Compose/恢复与全回归通过；MG-001/MG-002 仅在合成模型解决，真实数据和生产 NO-GO）。
 
-库存从采购中拆成独立 TASK04，因为收货、领料、完工和发货都必须复用同一不可变账本、余额投影、锁顺序、幂等和冲销规则。TASK01 只补充合成迁移准备度；真实数据盘点/试迁移、业务表物化、生产恢复、部署和切换仍需另建任务并明确授权。
+库存从采购中拆成独立 TASK04，因为收货、领料、完工和发货都必须复用同一不可变账本、余额投影、锁顺序、幂等和冲销规则。TASK01 补充合成迁移准备度，TASK02 只补充 MG-001/MG-002 合成期初物化；真实数据盘点/试迁移、其他业务域物化、生产恢复、部署和切换仍需另建任务并明确授权。
 
 ## Phase 2 导入中心
 
@@ -128,7 +129,7 @@ Import Workspace UI 已由 `PHASE2-TASK08` 独立实施；Catalog 与 50×256 �
 - 旧数据通过交叉映射分模块切换，历史单据不丢失。
 - 库存、在途采购、未完工工单和关键金额核对通过。
 
-**预计任务数**：6。**当前状态**：PLANNED。
+**预计任务数**：6。**当前状态**：IN PROGRESS。自托管全域 API、合成迁移框架及 MG-001/MG-002 的受控 Inventory/Finance Opening 已完成非生产验收；真实 source inventory、其他业务域物化、逐行人工处置、容量、生产恢复、部署和切换尚未开始。
 
 ## Phase 6 行业物料库
 

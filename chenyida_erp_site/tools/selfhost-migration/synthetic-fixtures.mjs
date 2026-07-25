@@ -33,6 +33,8 @@ export function validSyntheticRecords() {
     record("quality", "quality_inspection", "SYN-FQC-001", { inspection_type: "FQC", status: "CLOSED", result: "PASS", quantity: "3.000000" }, [rel("production_completion", "SYN-WO-001/C1"), rel("sales_order", "SYN-SO-001")]),
     record("finance", "finance_document", "SYN-AP-001", { document_type: "AP", status: "PARTIALLY_SETTLED", currency_code: "CNY", amount: "10.000000", settled_amount: "4.000000" }, [rel("purchase_receipt", "SYN-REC-001"), rel("supplier", "SYN-SUP-001")]),
     record("finance", "finance_document", "SYN-AR-001", { document_type: "AR", status: "PARTIALLY_SETTLED", currency_code: "CNY", amount: "9.000000", settled_amount: "3.000000" }, [rel("shipment", "SYN-SHIP-001"), rel("customer", "SYN-CUS-001")]),
+    record("finance", "finance_opening", "SYN-OPENING-AR-001", { document_type: "AR", currency_code: "CNY", amount: "6.500000", accounting_date: "2026-01-01" }, [rel("customer", "SYN-CUS-001")]),
+    record("finance", "finance_opening", "SYN-OPENING-AP-001", { document_type: "AP", currency_code: "CNY", amount: "7.250000", accounting_date: "2026-01-01" }, [rel("supplier", "SYN-SUP-001")]),
     record("file", "file", "synthetic-upload.bin", { bytes: 17, checksum_status: "MATCHED", sha256: "2b70b6667677d44492e57cf2091c1c0b35517daac860e5c15e8f8c3e1d9a7e10" }),
     record("audit", "audit", "SYN-AUDIT-001", { action: "SYNTHETIC_IMPORT", result: "SUCCESS" }, [rel("identity", "synthetic_admin")]),
   ];
@@ -52,7 +54,8 @@ export function fixtureRecords(kind = "valid") {
     record("procurement", "purchase_order", "SYN-PO-BAD", { status: "UNKNOWN", currency_code: "USD", order_qty: "1.0000001", received_qty: "0" }, [rel("supplier", "SYN-SUP-001")]),
     record("sales", "sales_order", "SYN-SO-BAD", { status: "PARTIALLY_SHIPPED", currency_code: "CNY", order_qty: "1.000000", shipped_qty: "2.000000", amount: "1.000000" }, [rel("customer", "SYN-CUS-001"), rel("product", "SYN-PROD-001")]),
     record("finance", "finance_document", "SYN-AR-BAD", { document_type: "AR", status: "OPEN", currency_code: "CNY", amount: "-1.000000", settled_amount: "0.000000" }, [rel("shipment", "SYN-SHIP-001"), rel("customer", "SYN-CUS-001")]),
-    record("finance", "finance_opening", "SYN-AR-OPENING", { document_type: "AR", amount: "2.000000", currency_code: "CNY" }, [rel("customer", "SYN-CUS-001")]),
+    record("finance", "finance_opening", "SYN-AR-OPENING-BAD", { document_type: "AR", amount: "2.000000", currency_code: "USD" }, [rel("customer", "SYN-CUS-001"), rel("supplier", "SYN-SUP-001")]),
+    record("inventory", "inventory_balance", "SYN-MAT-FROZEN/MAIN", { on_hand_qty: "1.000000", frozen_qty: "2.000000" }, [rel("material", "SYN-MAT-001"), rel("unit", "PCS")]),
     record("file", "file", "synthetic-missing.bin", { bytes: 0, checksum_status: "MISSING" }),
     record("file", "file", "synthetic-bad-sha.bin", { bytes: 5, checksum_status: "MISMATCH" }),
     record("audit", "unknown_event", "SYN-UNKNOWN-001", { status: "ACTIVE" }),
