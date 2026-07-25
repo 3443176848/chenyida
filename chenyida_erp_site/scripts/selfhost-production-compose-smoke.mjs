@@ -3,6 +3,7 @@ import { Pool } from "pg";
 
 const base = process.env.ERP_SMOKE_BASE_URL || "http://web:3000"; const databaseUrl = process.env.DATABASE_URL || ""; const phase = process.env.ERP_PRODUCTION_SMOKE_PHASE || "initial";
 const setupToken = process.env.ERP_SETUP_TOKEN || ""; const adminUsername = process.env.ERP_ADMIN_USERNAME || ""; const adminPassword = process.env.ERP_ADMIN_PASSWORD || "";
+const reuseIdentity = process.env.ERP_FULL_JOURNEY_REUSE_IDENTITY === "true";
 if (process.env.ERP_ENV !== "test" || !/(test|localhost|127\.0\.0\.1)/i.test(databaseUrl)) throw new Error("production compose smoke requires an isolated test database");
 if (!setupToken || !adminUsername || !adminPassword) throw new Error("production compose smoke credentials are required");
 
@@ -15,7 +16,7 @@ function apiClient() {
 const pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "production-compose-smoke" });
 try {
   if (phase === "initial") {
-    const api = apiClient(); await api.setup(); await api.login();
+    const api = apiClient(); if (!reuseIdentity) await api.setup(); await api.login();
     await pool.query("insert into material_categories(category_code,category_name_cn,category_level,status,created_by,updated_by,request_id) values('T06_LEAF','TASK06 测试叶子',4,'ACTIVE',$1,$1,$2)", [adminUsername, randomUUID()]); const category = await pool.query("select id from material_categories where category_code='T06_LEAF'");
     await pool.query("insert into units(code,name,symbol,unit_type,enabled) values('T06PCS','TASK06 件','T06PCS','COUNT',true)"); const unit = await pool.query("select id from units where code='T06PCS'");
     await pool.query(`insert into material_master(internal_material_code,standard_name,category_id,base_uom,base_unit_id,material_status,procurement_type,inventory_type,inspection_type,environmental_requirement,source_type,last_modified_by,created_by,updated_by,request_id) values

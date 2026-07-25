@@ -7,6 +7,7 @@ const phase = process.env.ERP_INVENTORY_SMOKE_PHASE || "initial";
 const setupToken = process.env.ERP_SETUP_TOKEN || "";
 const adminUsername = process.env.ERP_ADMIN_USERNAME || "";
 const adminPassword = process.env.ERP_ADMIN_PASSWORD || "";
+const reuseIdentity = process.env.ERP_FULL_JOURNEY_REUSE_IDENTITY === "true";
 if (process.env.ERP_ENV !== "test" || !/(test|localhost|127\.0\.0\.1)/i.test(databaseUrl)) throw new Error("inventory compose smoke requires an isolated test database");
 if (!setupToken || !adminUsername || !adminPassword) throw new Error("inventory compose smoke credentials are required");
 
@@ -29,7 +30,7 @@ function apiClient() {
 const pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "inventory-compose-smoke" });
 try {
   if (phase === "initial") {
-    const api = apiClient(); await api.setup(); await api.login();
+    const api = apiClient(); if (!reuseIdentity) await api.setup(); await api.login();
     await pool.query("insert into material_categories(category_code,category_name_cn,category_level,status,created_by,updated_by,request_id) values('T04_LEAF','TASK04 测试叶子',4,'ACTIVE',$1,$1,$2)", [adminUsername, randomUUID()]);
     const category = await pool.query("select id from material_categories where category_code='T04_LEAF'");
     await pool.query("insert into units(code,name,symbol,unit_type,enabled) values('T04PCS','TASK04 件','T04PCS','COUNT',true)"); const unit = await pool.query("select id from units where code='T04PCS'");

@@ -21,15 +21,15 @@
 
 - 路径：`chenyida_erp_site/`
 - 技术：Vinext、React、TypeScript、标准 Node.js、PostgreSQL/Drizzle、本地持久化文件和 PostgreSQL 后台任务 Worker。
-- 页面：根 `app/page.tsx` 继续通过 iframe 加载 legacy `public/erp/index.html`；Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
+- 页面：TASK10 已把根 `app/page.tsx` 改为原生经营工作台；legacy `public/erp/index.html` 保留为显式业务工作区和回滚入口，不再作为根 iframe 默认依赖。Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给不依赖平台 binding 的 `app/lib/selfhost-api.ts`；旧 `erp-api.ts` 仅作迁移参考。
-- 根 iframe 断链：legacy 页面登录后 `refreshAll()` 并发请求旧业务 GET；TASK03—TASK09 已接通主数据/BOM/库存/采购/生产/销售/品质和财务结算子集，Dashboard/backup 仍有缺口，故根页面仍不能代表完整 ERP。
+- 根页迁移：TASK03—TASK10 已接通主数据/BOM/库存/采购/生产/销售/品质/财务、实时 Dashboard 与离线 backup 治理，根页已退出 iframe。真实数据试迁移和生产恢复演练未做，仍不能描述为已投产。
 - 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL；Caddy production profile 可提供 HTTPS。当前没有运行中的 Compose 项目，Node/PostgreSQL 尚未生产部署。历史 Sites `v3` 不作为后续交付目标。
 
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.9`，明确为非生产且尚未发布；详见 `RELEASES.md`。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.10`，明确为非生产且尚未发布；详见 `RELEASES.md`。
 
 ### 治理资料
 
@@ -87,7 +87,7 @@
 8. D-042 已确认自托管 Mapping 使用不可变确认快照、显式新版本和结构相容复用；复用只复制到 DRAFT 并必须重新确认，Mapping 确认不自动启动 Normalizer。
 9. D-043 已确认自托管 Normalization 使用 run 隔离暂存、关系化候选/lineage 和 Job/业务结果同事务原子发布；重试复用同 run，重跑创建新版本，取消结果不得成为 current。
 10. D-044 已确认自托管人工复核采用独立覆盖层、版本历史和行级可恢复 finalization；ACTIVE 只允许人工精确绑定，Material Draft 必须经 TASK01 Service 创建且保持未编码 DRAFT。
-11. 完整 ERP 业务还没有全部迁入自托管 API。PostgreSQL 中存在表结构不等于业务已切换；采购、库存、生产、销售、品质和财务结算子集已完成非生产关系化链路，但 Dashboard/backup 及真实数据仍依赖 Python/SQLite 开发运行面。
+11. TASK02—TASK10 已完成自托管 API、实时 Dashboard、离线 backup/restore 治理和原生根工作台的非生产链路；PostgreSQL 中存在实现与隔离验收仍不等于真实数据已迁移或业务已切换。
 12. SELFHOST-PHASE2-TASK01 已从源码确认 Python 共有 64 个 HTTP 操作（GET 34、POST 30）；以当时基线统计，自托管已覆盖 4、部分覆盖 9、未覆盖 51。
 13. SELFHOST-PHASE2-TASK02 已补齐自托管身份公共边界：PostgreSQL `0006`、独立 Identity Repository/Service/Handler、用户管理、密码策略、会话撤销、must-change 全局门禁、限流、持久幂等、CAS 和系统审计；不包含其他业务域或生产动作。
 14. SELFHOST-PHASE2-TASK03 已新增 PostgreSQL `0007` 和独立 Master Data/BOM 服务，关系化 Customer、Supplier、Product/Version、BOM Header/Version/Line、Supplier Mapping/价格历史；发布后不可变，readiness 只检查结构且不读取库存。版本为 `0.1.0-alpha.3`，未迁真实数据或部署。
@@ -97,6 +97,7 @@
 18. SELFHOST-PHASE2-TASK07 已新增 PostgreSQL `0011` 和独立 Sales 服务；Quote Version/状态事件、ACCEPTED 原子转 SO、Shipment/全额冲销与 TASK04 Ledger/Balance、状态、销售金额来源、audit、idem 单事务提交。金额固定 CNY 六位 numeric，不创建应收/收款/品质过账，不迁真实销售数据。版本为 `0.1.0-alpha.7`，未发布或部署。
 19. SELFHOST-PHASE2-TASK08 已新增 PostgreSQL `0012` 和独立 Quality 服务；IQC/Receipt Line、IPQC/Report、FQC/Completion Line+SO Line 使用稳定关系，Result/Defect/Event 不可变，异人处置/关闭/管理者重开受控。Shipment 在原事务消费 CLOSED/RELEASED FQC 额度；不伪造无批次 IQC 库存隔离，不迁真实检验数据。版本为 `0.1.0-alpha.8`，未发布或部署。
 20. SELFHOST-PHASE2-TASK09 已新增 PostgreSQL `0013` 和独立 Finance 服务；AR/AP 只消费未冲销正向 Shipment/Receipt 金额来源，Settlement/Reversal/Event 不可变，Document 余额/状态/version 是受控投影。财务过账后上游来源冲销 fail closed；不接银行/税务/发票/汇率/总账，不迁真实金额。版本为 `0.1.0-alpha.9`，未发布或部署。
+21. SELFHOST-PHASE2-TASK10 已新增独立 Dashboard Query Service、原生根工作台和离线 backup/verify/新空目标 restore；权限裁剪、numeric 文本、不同单位不合计、64 操作/23 legacy GET 覆盖、隔离恢复与 Compose 重启通过。版本为 `0.1.0-alpha.10`，未新增 `0014`、未迁真实数据、发布或部署。
 
 ## 当前风险
 
@@ -120,7 +121,7 @@
 - Node/PostgreSQL 没有生产部署、真实数据 migration 或发布批准；隔离测试通过不能写成已上线。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
 - 业务决策 `B01-B24` 尚未全部确认。
-- 根自托管页面仍加载 legacy iframe；TASK03—TASK09 已接通主数据/BOM/库存/采购/生产/销售/品质和财务结算子集。Operations 的 Dashboard/backup 仍缺失；当前不能描述为完整 ERP。
+- 根自托管页面已退出 legacy iframe；显式 `/erp/index.html` 仍承载尚未重写的业务 UI。Dashboard/backup 治理已接通，但真实数据、生产备份恢复演练和切换仍未完成，不能描述为已投产。
 - PostgreSQL Customer/Supplier/Product/BOM、通用库存、采购、生产、销售、品质和 AR/AP/收付款已有关系服务；`erp_records` JSON 占位与旧库存表不属于这些权威链路。表存在不等于 API、权限、事务、幂等、审计或真实数据迁移已完成。
 
 ## 开发规范
@@ -134,7 +135,7 @@
 
 ## 当前路线
 
-当前已完成 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、通用库存账本、采购收货、生产、销售、品质和财务结算子集的 Node/PostgreSQL 非生产链路、统一发布追踪基线，以及完整 ERP 的 64 项 Python API 盘点、数据不变量和首页断链核验。TASK09 完成不表示 Dashboard、生产备份恢复治理或真实数据迁移已完成。TASK09 独立提交并恢复 clean 后按连续任务指令执行 `SELFHOST-PHASE2-TASK10`；真实数据试迁移、生产备份恢复、部署和切换继续独立授权。
+当前已完成 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard、原生根工作台和离线 backup/restore 治理的 Node/PostgreSQL 非生产链路。TASK10 独立提交消息为 `feat: add self-hosted operations workbench`；当前不自动开始下一任务。真实数据试迁移、生产备份恢复演练、部署和切换继续独立授权。
 
 ## 恢复上下文检查清单
 

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "target": "ES2022", "incremental": false, "plugins": [] },
+  "include": [
+    "app/_components/erp-workbench.tsx",
+    "app/page.tsx",
+    "app/lib/dashboard-selfhost/**/*.ts",
+    "app/lib/identity-selfhost/**/*.ts",
+    "app/lib/infrastructure/config.ts",
+    "app/lib/selfhost-api.ts",
+    "db/**/*.ts"
+  ],
+  "exclude": ["node_modules", "examples", "app/api/erp-api.ts", "scripts/seed-material-categories.ts"]
+}

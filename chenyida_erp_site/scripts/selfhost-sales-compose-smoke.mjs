@@ -7,6 +7,7 @@ const phase = process.env.ERP_SALES_SMOKE_PHASE || "initial";
 const setupToken = process.env.ERP_SETUP_TOKEN || "";
 const adminUsername = process.env.ERP_ADMIN_USERNAME || "";
 const adminPassword = process.env.ERP_ADMIN_PASSWORD || "";
+const reuseIdentity = process.env.ERP_FULL_JOURNEY_REUSE_IDENTITY === "true";
 if (process.env.ERP_ENV !== "test" || !/(test|localhost|127\.0\.0\.1)/i.test(databaseUrl)) throw new Error("sales compose smoke requires an isolated test database");
 if (!setupToken || !adminUsername || !adminPassword) throw new Error("sales compose smoke credentials are required");
 
@@ -29,7 +30,7 @@ function apiClient() {
 const pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "sales-compose-smoke" });
 try {
   if (phase === "initial") {
-    const api = apiClient(); await api.setup(); await api.login();
+    const api = apiClient(); if (!reuseIdentity) await api.setup(); await api.login();
     const category = await pool.query("insert into material_categories(category_code,category_name_cn,category_level,status,created_by,updated_by,request_id) values('T07_LEAF','TASK07 销售测试',4,'ACTIVE',$1,$1,$2) returning id", [adminUsername, randomUUID()]);
     const unit = await pool.query("insert into units(code,name,symbol,unit_type,enabled) values('T07PCS','TASK07 件','T07PCS','COUNT',true) returning id");
     const customer = await pool.query("insert into customers(customer_code,customer_name,normalized_name,status,created_by,updated_by,request_id) values('CUS-T07','TASK07 客户','TASK07 客户','ACTIVE',$1,$1,$2) returning id", [adminUsername, randomUUID()]);

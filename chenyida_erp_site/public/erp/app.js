@@ -46,6 +46,12 @@ const state = {
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+const LEGACY_TABS = new Set(["dashboard", "partners", "bom", "purchase", "production", "sales", "quality", "finance", "operations"]);
+
+function requestedLegacyTab() {
+  const requested = new URL(window.location.href).searchParams.get("tab") || "dashboard";
+  return LEGACY_TABS.has(requested) ? requested : "dashboard";
+}
 
 function toast(message) {
   const el = $("#toast");
@@ -279,21 +285,20 @@ function renderOperations() {
   `;
 
   const canManage = canManageSystem();
-  $("#backupAdminHint").hidden = canManage && state.operationsAvailability.backups;
-  $("#backupAdminHint").textContent = state.operationsAvailability.backups ? "只有系统管理员可以创建或恢复备份。" : "自托管备份 API 尚未迁移，本任务不开放创建或恢复。";
-  $("#createBackupBtn").disabled = !canManage || !state.operationsAvailability.backups;
+  $("#backupAdminHint").hidden = false;
+  $("#backupAdminHint").textContent = "备份创建和新空目标恢复只允许受控离线 CLI；浏览器不提供写操作。";
   $("#userAdminHint").hidden = canManage;
   $("#createUserForm").hidden = !canManage;
   $("#backupTable").innerHTML = `
-    <thead><tr><th>备份文件</th><th>大小</th><th>时间</th><th>操作</th></tr></thead>
+    <thead><tr><th>验证标识</th><th>状态</th><th>验证时间</th><th>恢复边界</th></tr></thead>
     <tbody>${state.backups.map((row) => `
       <tr>
         <td>${escapeHtml(row.name)}</td>
-        <td>${Math.round((Number(row.size) || 0) / 1024)} KB</td>
-        <td>${escapeHtml(row.created_at)}</td>
-        <td><button data-restore-backup="${escapeHtml(row.name)}" ${canManage ? "" : "disabled"}>恢复</button></td>
+        <td>${escapeHtml(row.status || "VERIFIED")}</td>
+        <td>${escapeHtml(row.verified_at || row.created_at)}</td>
+        <td>仅新建空目标</td>
       </tr>
-    `).join("") || `<tr><td colspan="4">还没有备份</td></tr>`}</tbody>
+    `).join("") || `<tr><td colspan="4">没有可信验证记录</td></tr>`}</tbody>
   `;
   $("#usersTable").innerHTML = `
     <thead><tr><th>账号</th><th>姓名</th><th>角色</th><th>状态</th><th>最近登录</th><th>操作</th></tr></thead>
@@ -1010,7 +1015,7 @@ async function refreshOperations() {
       return null;
     });
     state.operationsAvailability.backups = Boolean(backups);
-    state.backups = backups?.rows || [];
+    state.backups = backups?.latest_verification ? [{ name: backups.latest_verification.backup_id, status: backups.verification_status, verified_at: backups.latest_verification.verified_at }] : [];
   } else {
     state.backups = [];
     state.users = [];
@@ -1040,7 +1045,7 @@ async function login(event) {
     if (result.user.must_change_password) {
       openPasswordDialog();
     } else {
-      setTab("dashboard");
+      setTab(requestedLegacyTab());
       await refreshAll();
     }
     toast("登录成功");
@@ -1071,7 +1076,7 @@ async function setupSystem(event) {
     updateUserBar();
     hideLogin();
     if (continueAfterAuthentication()) return;
-    setTab("dashboard");
+    setTab(requestedLegacyTab());
     await refreshAll();
     $("#setupForm").reset();
     toast("初始化完成，已进入系统");
@@ -1145,25 +1150,6 @@ async function resetUserPassword(username) {
   });
   await refreshOperations();
   toast("密码已重置，用户下次登录必须修改密码");
-}
-
-async function createBackup() {
-  const result = await api("/api/backups/create", { method: "POST", body: JSON.stringify({}) });
-  state.backups = result.rows;
-  renderOperations();
-  toast(`已创建备份：${result.backup.name}`);
-}
-
-async function restoreBackup(name) {
-  const ok = window.confirm(`确认恢复备份 ${name}？恢复后当前数据库会回到备份时点。`);
-  if (!ok) return;
-  await api("/api/backups/restore", {
-    method: "POST",
-    body: JSON.stringify({ name }),
-  });
-  await refreshAll();
-  await refreshOperations();
-  toast("备份已恢复");
 }
 
 async function refreshAll() {
@@ -1755,7 +1741,6 @@ function bindEvents() {
   $$(".nav").forEach((btn) => btn.addEventListener("click", () => setTab(btn.dataset.tab)));
   $("#refreshBtn").addEventListener("click", refreshAll);
   $("#refreshOpsBtn").addEventListener("click", () => refreshOperations().catch((error) => toast(error.message)));
-  $("#createBackupBtn").addEventListener("click", () => createBackup().catch((error) => toast(error.message)));
   $("#createUserForm").addEventListener("submit", (event) => createUser(event).catch((error) => {
     $("#createUserMsg").textContent = error.message;
   }));
@@ -1764,10 +1749,6 @@ function bindEvents() {
     const resetUsername = event.target.dataset.resetUser;
     if (username) toggleUser(username, event.target.dataset.userActive === "1", Number(event.target.dataset.userVersion)).catch((error) => toast(error.message));
     if (resetUsername) resetUserPassword(resetUsername).catch((error) => toast(error.message));
-  });
-  $("#backupTable").addEventListener("click", async (event) => {
-    const backupName = event.target.dataset.restoreBackup;
-    if (backupName) await restoreBackup(backupName);
   });
   $("#loadSampleBtn").addEventListener("click", loadSample);
   $("#runImportBtn").addEventListener("click", runImport);
@@ -1856,7 +1837,10 @@ async function initApp() {
   if (session.authenticated) {
     if (continueAfterAuthentication()) return;
     if (session.user.must_change_password) openPasswordDialog();
-    else await refreshAll();
+    else {
+      setTab(requestedLegacyTab());
+      await refreshAll();
+    }
   }
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.9",
+  "version": "0.1.0-alpha.10",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -76,6 +76,13 @@
     "test:finance:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-finance-migration-upgrade.test.mjs",
     "test:finance:compose": "node scripts/selfhost-finance-compose-smoke.mjs",
     "typecheck:finance": "tsc -p tsconfig.task09.json --pretty false",
+    "typecheck:dashboard": "tsc -p tsconfig.task10.json --pretty false",
+    "test:dashboard:unit": "node --experimental-strip-types --test tests/selfhost-dashboard-unit.test.mjs",
+    "test:dashboard:ui": "node --experimental-strip-types --test tests/selfhost-dashboard-ui-contract.test.mjs",
+    "test:dashboard:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-dashboard-postgres.test.mjs",
+    "test:dashboard:coverage": "node --experimental-strip-types --test tests/selfhost-api-coverage.test.mjs",
+    "test:dashboard:compose": "node scripts/selfhost-dashboard-compose-smoke.mjs",
+    "test:full-erp:compose": "node scripts/selfhost-full-erp-compose-smoke.mjs",
     "test:compose": "node scripts/selfhost-compose-smoke.mjs",
     "test:normalization:compose-restart": "node scripts/selfhost-normalization-restart-smoke.mjs",
     "test:review:compose-restart": "node scripts/selfhost-review-restart-smoke.mjs",

@@ -43,7 +43,7 @@
 
 **已完成的前置诊断**：`SELFHOST-PHASE2-TASK01` 已盘点 Python 64 个 HTTP 操作（GET 34、POST 30），并在当时确认自托管等价覆盖 4、部分覆盖 9、未覆盖 51、根 legacy iframe 登录后 23 个业务 GET 全部 404。TASK02/TASK03 后覆盖已增加，但完整 iframe 仍未恢复。
 
-**执行顺序（TASK02—TASK09 已完成；后续按连续指令与依赖逐项独立验收）**：
+**执行顺序（TASK02—TASK10 已完成非生产实施与独立验收）**：
 
 - `SELFHOST-PHASE2-TASK02`：身份、用户管理、密码、会话撤销与系统审计（DONE，非生产 `0.1.0-alpha.2`；未部署或迁移真实用户）。
 - `SELFHOST-PHASE2-TASK03`：客户、供应商、产品、BOM 与供应商物料映射（DONE，非生产 `0.1.0-alpha.3`；PostgreSQL `0007`，未迁真实数据或部署）。
@@ -53,9 +53,9 @@
 - `SELFHOST-PHASE2-TASK07`：询报价、销售订单、发货与库存联动（DONE，非生产 `0.1.0-alpha.7`；PostgreSQL `0011`，未迁真实销售数据或创建 AR/收款/品质过账）。
 - `SELFHOST-PHASE2-TASK08`：IQC/IPQC/FQC、缺陷、处置与关闭（DONE，非生产 `0.1.0-alpha.8`；PostgreSQL `0012`，FQC 门禁已接入发货，未迁真实检验或伪造 IQC 库存隔离）。
 - `SELFHOST-PHASE2-TASK09`：应收应付、收付款、余额与冲销（DONE，非生产 `0.1.0-alpha.9`；PostgreSQL `0013`，稳定 Shipment/Receipt 金额来源、不可变 Settlement/Reversal/Event 与上游冲销门禁通过，未迁真实金额或接入外部财务系统）。
-- `SELFHOST-PHASE2-TASK10`：经营看板、备份恢复治理与 legacy iframe 退出。
+- `SELFHOST-PHASE2-TASK10`：经营看板、备份恢复治理与 legacy iframe 退出（DONE，非生产 `0.1.0-alpha.10`；实时权限裁剪 Dashboard、原生根、离线 backup/verify/新空目标 restore 与 Compose 重启通过，未新增 `0014`、未迁真实数据或部署）。
 
-库存从采购中拆成独立 TASK04，因为收货、领料、完工和发货都必须复用同一不可变账本、余额投影、锁顺序、幂等和冲销规则。真实数据试迁移、生产备份恢复演练、部署和切换不属于上述九项，仍需另建任务。
+库存从采购中拆成独立 TASK04，因为收货、领料、完工和发货都必须复用同一不可变账本、余额投影、锁顺序、幂等和冲销规则。真实数据试迁移、生产备份恢复演练、部署和切换不属于 TASK02—TASK10，仍需另建任务并明确授权。
 
 ## Phase 2 导入中心
 

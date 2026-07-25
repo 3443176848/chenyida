@@ -7,6 +7,7 @@ const phase = process.env.ERP_FINANCE_SMOKE_PHASE || "initial";
 const setupToken = process.env.ERP_SETUP_TOKEN || "";
 const adminUsername = process.env.ERP_ADMIN_USERNAME || "";
 const adminPassword = process.env.ERP_ADMIN_PASSWORD || "";
+const reuseIdentity = process.env.ERP_FULL_JOURNEY_REUSE_IDENTITY === "true";
 if (process.env.ERP_ENV !== "test" || !/(test|localhost|127\.0\.0\.1)/i.test(databaseUrl)) throw new Error("finance compose smoke requires an isolated test database");
 if (!setupToken || !adminUsername || !adminPassword) throw new Error("finance compose smoke credentials are required");
 
@@ -32,7 +33,7 @@ function client() {
 const pool = new Pool({ connectionString: databaseUrl, max: 3, application_name: "finance-compose-smoke" });
 try {
   if (phase === "initial") {
-    const setup = client(); await setup.setup(); const admin = client(); await admin.login();
+    const setup = client(); if (!reuseIdentity) await setup.setup(); const admin = client(); await admin.login();
     const customer = await pool.query("insert into customers(customer_code,customer_name,normalized_name,status,created_by,updated_by,request_id) values('CUS-T09','TASK09 客户','TASK09 客户','ACTIVE',$1,$1,$2) returning id", [adminUsername, randomUUID()]);
     const supplier = await pool.query("insert into suppliers(supplier_code,supplier_name,normalized_name,status,created_by,updated_by,request_id) values('SUP-T09','TASK09 供应商','TASK09 供应商','ACTIVE',$1,$1,$2) returning id", [adminUsername, randomUUID()]);
     const db = await pool.connect(); let refs;

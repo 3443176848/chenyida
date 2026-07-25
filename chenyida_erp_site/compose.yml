@@ -6,6 +6,7 @@ x-app-environment: &app-environment
   ERP_SETUP_TOKEN: ${ERP_SETUP_TOKEN:?ERP_SETUP_TOKEN is required}
   ERP_UPLOAD_ROOT: /data/chenyida-erp/uploads
   ERP_ATTACHMENT_ROOT: /data/chenyida-erp/attachments
+  ERP_BACKUP_STATUS_FILE: /data/chenyida-erp/backup-status/latest.json
   ERP_MAX_UPLOAD_BYTES: ${ERP_MAX_UPLOAD_BYTES:-10485760}
   ERP_WORKER_POLL_MS: ${ERP_WORKER_POLL_MS:-1000}
   ERP_WORKER_LEASE_SECONDS: ${ERP_WORKER_LEASE_SECONDS:-60}
@@ -47,7 +48,10 @@ services:
       <<: *app-environment
       ERP_PROCESS_NAME: chenyida-erp-web
       PORT: 3000
-    volumes: *app-volumes
+    volumes:
+      - erp_uploads:/data/chenyida-erp/uploads
+      - erp_attachments:/data/chenyida-erp/attachments
+      - erp_backup_status:/data/chenyida-erp/backup-status:ro
     depends_on:
       migrate: { condition: service_completed_successfully }
     healthcheck:
@@ -110,5 +114,6 @@ volumes:
   erp_postgres:
   erp_uploads:
   erp_attachments:
+  erp_backup_status:
   caddy_data:
   caddy_config:

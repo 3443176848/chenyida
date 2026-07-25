@@ -4,15 +4,16 @@
 
 ## 2026-07-25 自托管完整 ERP 迁移覆盖层
 
-`SELFHOST-PHASE2-TASK01` 从源码确认 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30），并在当时基线记录等价覆盖 4、部分覆盖 9、未覆盖 51。TASK02 补齐身份公共边界；TASK03 已关系化主数据/BOM；TASK04 已建立通用不可变 inventory ledger；TASK05 已关系化采购；TASK06 已关系化生产；TASK07 已关系化销售；TASK08 已关系化 IQC/IPQC/FQC、缺陷与生命周期，并把 FQC 放行门禁接入发货；TASK09 已用稳定 Shipment/Receipt 金额来源建立 AR/AP、不可变收付款/冲销和余额投影。Dashboard、备份恢复治理与 legacy iframe 退出仍未完成。
+`SELFHOST-PHASE2-TASK01` 从源码确认 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30），并在当时基线记录等价覆盖 4、部分覆盖 9、未覆盖 51。TASK02—TASK09 依次补齐身份、主数据/BOM、不可变库存、采购、生产、销售、品质和财务；TASK10 增加实时权限裁剪 Dashboard、离线备份恢复治理和原生根工作台。64 个操作和登录后 23 个 legacy GET 现在均有自托管实现或明确退役合同，但真实数据和生产切换尚未执行。
 
 ```mermaid
 flowchart LR
-    ROOT["自托管根页面"] --> IFRAME["/erp/index.html legacy iframe"]
-    IFRAME --> AUTH["身份/用户/系统审计: 可用"]
-    IFRAME --> BATCH["登录后 23 个 legacy 业务 GET"]
-    BATCH --> M9["TASK03—TASK09 主数据至财务结算子集: 已接通"]
-    BATCH --> NF["Dashboard/backup 等运维路径: 仍有缺口"]
+    ROOT["自托管原生根工作台"] --> AUTH["身份/用户/系统审计"]
+    ROOT --> DASH["实时 Dashboard / 去敏备份状态"]
+    ROOT --> LEGACY["显式 /erp/index.html 白名单深链"]
+    LEGACY --> BATCH["23 个 legacy 业务 GET"]
+    BATCH --> M9["TASK03—TASK09 主数据至财务结算子集"]
+    DASH --> PG
 
     NATIVE["/materials 原生页面"] --> MM["Material/Import/Normalization/Review API"]
     AUTH --> ID["identity-selfhost Repository/Service/Handler"]
@@ -42,7 +43,7 @@ flowchart LR
     PYAPI --> SQLITE["SQLite 29 表开发运行面"]
 ```
 
-根 iframe 的 `refreshAll()` 用一个 `Promise.all` 请求 summary、material/cleaning、主数据、采购/库存、生产、销售、品质和财务共 23 个 GET。TASK03—TASK09 已接通主数据/BOM、库存、采购、生产、销售、品质与稳定来源财务结算子集；当前仍不能描述为完整 ERP，因为 Operations 的 management-dashboard 与 backups 仍明确降级为不可用，真实数据也尚未迁移。
+根页面不再执行 legacy iframe 的 `refreshAll()`。显式 legacy 工作区仍可请求原有 23 个 GET；TASK03—TASK10 已提供实现或明确退役行为。`management-dashboard` 与备份治理状态已接通，但创建/恢复保持离线，真实数据仍未迁移，因此不能描述为已生产切换。
 
 身份请求先进入 `identity-selfhost/handler.ts`，再由 Service 执行业务规则、Repository 执行 PostgreSQL 事务。非身份受保护请求在进入 Material/Import 模块前统一解析服务端 session actor 并执行 active/must-change 门禁；浏览器不能提交 permissions。会话只保存 token SHA-256 摘要，身份审计、限流和幂等均持久化到 PostgreSQL。
 

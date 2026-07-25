@@ -7,6 +7,7 @@ const phase = process.env.ERP_MASTER_DATA_SMOKE_PHASE || "initial";
 const setupToken = process.env.ERP_SETUP_TOKEN || "";
 const adminUsername = process.env.ERP_ADMIN_USERNAME || "";
 const adminPassword = process.env.ERP_ADMIN_PASSWORD || "";
+const reuseIdentity = process.env.ERP_FULL_JOURNEY_REUSE_IDENTITY === "true";
 
 if (process.env.ERP_ENV !== "test" || !/(test|localhost|127\.0\.0\.1)/i.test(databaseUrl)) throw new Error("master-data compose smoke requires an isolated test database");
 if (!setupToken || !adminUsername || !adminPassword) throw new Error("master-data compose smoke credentials are required");
@@ -36,7 +37,7 @@ function apiClient() {
 const pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "master-data-compose-smoke" });
 try {
   if (phase === "initial") {
-    const api = apiClient(); await api.setup(); await api.login();
+    const api = apiClient(); if (!reuseIdentity) await api.setup(); await api.login();
     await pool.query(`insert into material_categories(category_code,category_name_cn,category_level,status,created_by,updated_by,request_id) values('T03_LEAF','TASK03 测试叶子',4,'ACTIVE',$1,$1,$2)`, [adminUsername, randomUUID()]);
     const category = await pool.query("select id from material_categories where category_code='T03_LEAF'");
     await pool.query("insert into units(code,name,symbol,unit_type,enabled) values('T03PCS','TASK03 件','T03PCS','COUNT',true)");
@@ -53,11 +54,11 @@ try {
     const bomId = Number(bom.payload.bom_id); const bomVersionId = Number(bom.payload.data.current_version.id);
     await api.write("/api/bom-lines", { bom_id: bomId, line_no: 1, material_id: material.rows[0].id, quantity_per: "2.000000", unit_id: unit.rows[0].id }, 201, "task03-compose-bom-line");
     const readiness = await api.get(`/api/bom-readiness?bom_id=${bomId}&order_qty=5`);
-    if (!readiness.payload.structure_ready || readiness.payload.inventory_evaluated !== false || readiness.payload.all_ready !== false) throw new Error("BOM readiness must remain structural before TASK04");
+    if (!readiness.payload.structure_ready || readiness.payload.inventory_evaluated !== true || readiness.payload.all_ready !== false) throw new Error("BOM readiness must use the current inventory projection and report the zero-stock shortage");
     await api.write(`/api/boms/${bomId}/versions/${bomVersionId}/release`, { expected_version: 1 }, 200, "task03-compose-bom-release");
     const mapping = await api.write("/api/mappings", { supplier_id: supplier.payload.data.id, material_id: material.rows[0].id, purchase_unit_id: unit.rows[0].id, supplier_item_code: "T03-SUP-001", valid_from: "2026-01-01T00:00:00.000Z" }, 201, "task03-compose-mapping");
     await api.write(`/api/mappings/${mapping.payload.data.id}/prices`, { price: "12.340000", currency_code: "CNY", price_uom: "T03PCS", effective_from: "2026-01-01T00:00:00.000Z" }, 201, "task03-compose-price");
-    console.info(JSON.stringify({ ok: true, phase, product_id: productId, bom_id: bomId, structure_ready: true, inventory_evaluated: false }));
+    console.info(JSON.stringify({ ok: true, phase, product_id: productId, bom_id: bomId, structure_ready: true, inventory_evaluated: true }));
   } else if (phase === "restart") {
     const api = apiClient(); await api.login();
     const [customers, suppliers, products, boms, mappings, items] = await Promise.all([api.get("/api/customers"), api.get("/api/suppliers"), api.get("/api/products"), api.get("/api/boms"), api.get("/api/mappings"), api.get("/api/items")]);

@@ -71,7 +71,7 @@
 | PHASE3-TASK01 | 设计 Material Import Normalization & Staging V1 | DONE | Codex（设计）、项目负责人（待规格确认） | 2026-07-17 | 2026-07-17 | PHASE2-TASK08 | 完成正式规格、OpenAPI 草案和数据流/状态图；定义独立 run、JSON 行快照、独立 issue、类型/空值/属性规则、Outbox/租约、原子发布、五个 API、`0006` 设计、54 项测试和 16 项 `PROPOSED` 决定；仅文档，未修改运行时代码、Schema、Migration、API、前端或生产环境 |
 | PHASE3-TASK03 | 设计 Material Import Normalization Review UI V1 | DONE | Codex（设计）、项目负责人（2026-07-17 正式规格确认） | 2026-07-17 | 2026-07-17 | PHASE3-TASK02 | 完成正式 UI 规格、37 状态低保真线框、集中状态矩阵和 104 项未来实施测试；统一工作区、七步 Stepper、Current/Latest 双轨、Rows/Issues cursor 与 Row Drawer等 14 项决定均已 `APPROVED`；局部 Issue 查询门禁、性能门禁和 7 项非阻塞限制继续有效；仅文档，未修改前端、API、Schema、Migration、业务逻辑或生产环境 |
 
-`SELFHOST-PHASE2-TASK09` 已完成非生产实现、隔离验收和文档；独立提交并确认 clean 后，按连续任务指令把 `SELFHOST-PHASE2-TASK10` 设为唯一 `DOING`。真实数据迁移、生产部署和切换继续单独授权。
+`SELFHOST-PHASE2-TASK10` 已完成非生产实施与隔离验收，独立提交消息为 `feat: add self-hosted operations workbench`。当前没有自动开始的下一开发任务；真实数据迁移、生产备份恢复、部署和切换继续单独授权。
 
 ## Phase 0 待办
 
@@ -94,7 +94,7 @@
 | SELFHOST-PHASE2-TASK07 | 迁移询报价、销售订单、发货与库存联动 | DONE | Codex（诊断、非生产实施、隔离测试、文档与本地提交） | 2026-07-25 | 2026-07-25 | SELFHOST-PHASE2-TASK03、SELFHOST-PHASE2-TASK04、SELFHOST-PHASE2-TASK06 | 起点 `97d541ecfb7fe6fff551c750c69f5cf30e3ff5bc`；PostgreSQL `0011`、Quote Version/Line/状态事件、ACCEPTED 原子转 SO、Shipment/全额冲销、TASK04 库存和稳定销售金额来源同事务联动通过；版本 `0.1.0-alpha.7`，未自动生成应收、迁真实数据、部署、push 或 PR。 |
 | SELFHOST-PHASE2-TASK08 | 迁移 IQC/IPQC/FQC、缺陷、处置与关闭 | DONE | Codex（诊断、非生产实施、隔离测试、文档与本地提交）、项目负责人（连续任务指令批准范围） | 2026-07-25 | 2026-07-25 | SELFHOST-PHASE2-TASK05、SELFHOST-PHASE2-TASK06、SELFHOST-PHASE2-TASK07 | 起点 `0ad0687a7b2f2502f68babbef1455df2a983421b`；PostgreSQL `0012`、稳定来源、不可变 Result/Defect/Event、异人处置/关闭/重开与 FQC 发货额度门禁通过；版本 `0.1.0-alpha.8`，未迁真实数据、伪造 IQC 库存隔离、部署、push 或 PR。 |
 | SELFHOST-PHASE2-TASK09 | 迁移应收应付、收付款、余额与冲销 | DONE | Codex（诊断、非生产实施、隔离测试、文档与本地提交）、项目负责人（连续任务指令批准范围） | 2026-07-25 | 2026-07-25 | SELFHOST-PHASE2-TASK05、SELFHOST-PHASE2-TASK07 | 起点 `ee3e6585d5f0366187f62ef3f6012c3abaf28150`；PostgreSQL `0013`、稳定 Shipment/Receipt 来源 AR/AP、不可变 Settlement/Reversal/Event、余额投影和上游冲销门禁通过；版本 `0.1.0-alpha.9`，未迁真实金额、部署、push 或 PR。 |
-| SELFHOST-PHASE2-TASK10 | 经营看板、备份恢复治理与 legacy iframe 退出 | TODO | 待指派 | - | - | SELFHOST-PHASE2-TASK02—TASK09 | **建议、未授权**；根页切换与恢复必须最后验收，不含生产切流/原地覆盖恢复 |
+| SELFHOST-PHASE2-TASK10 | 经营看板、备份恢复治理与 legacy iframe 退出 | DONE | Codex（诊断、非生产实施、隔离测试、文档与本地提交）、项目负责人（连续任务指令批准范围） | 2026-07-25 | 2026-07-25 | SELFHOST-PHASE2-TASK02—TASK09 | 起点 `06a4413403869f4f41872c7a5cb98c434a44f095`；完成实时只读跨域看板、64 操作/23 legacy GET 覆盖、离线 backup/verify/新空目标 restore 与原生根工作台；版本 `0.1.0-alpha.10`，migration 仍为 `0001`—`0013`。隔离 PG 恢复和 Compose 重启通过；未迁真实数据、执行生产备份恢复、部署、切流或删除 legacy 源码。独立提交消息 `feat: add self-hosted operations workbench`。 |
 | SELFHOST-PHASE1-TASK02 | 完成 Import Mapping、Mapping版本及复用规则的 PostgreSQL 持久化和自托管 API 移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围与禁止事项确认） | 2026-07-23 | 2026-07-23 | SELFHOST-PHASE1-TASK01 | 已移植 Mapping 目录、版本、复用、Worker准备和现有页面；行级 Normalizer、真实数据迁移及生产部署继续另立任务 |
 | SELFHOST-PHASE1-TASK03 | 完成行级 Normalizer 与 Normalization Review 的 PostgreSQL 自托管移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围、验收标准与禁止事项确认） | 2026-07-23 | 2026-07-23 | SELFHOST-PHASE1-TASK02 | 已移植 run/rows/issues、关系化候选/lineage、Worker原子发布、重试/重跑/取消和Review UI；真实数据迁移及生产部署继续另立任务 |
 | SELFHOST-PHASE1-TASK04 | 完成 Normalization 人工复核与 Material Draft Commit 的 PostgreSQL 自托管移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围、验收标准与禁止事项确认） | 2026-07-24 | 2026-07-24 | SELFHOST-PHASE1-TASK03、SELFHOST-PHASE1-TASK01 | 已实现独立人工覆盖、Issue处理、ACTIVE精确绑定、Material Service建DRAFT和可恢复finalization；真实样本容量验收、真实数据迁移和生产部署继续另立任务 |

@@ -6,6 +6,7 @@ export type RuntimeConfig = {
   setupToken: string;
   uploadRoot: string;
   attachmentRoot: string;
+  backupStatusFile: string;
   maxUploadBytes: number;
   workerPollMs: number;
   workerLeaseSeconds: number;
@@ -33,6 +34,7 @@ export function runtimeConfig(): RuntimeConfig {
     setupToken,
     uploadRoot: resolve(process.env.ERP_UPLOAD_ROOT || "/data/chenyida-erp/uploads"),
     attachmentRoot: resolve(process.env.ERP_ATTACHMENT_ROOT || "/data/chenyida-erp/attachments"),
+    backupStatusFile: resolve(process.env.ERP_BACKUP_STATUS_FILE || "/data/chenyida-erp/backup-status/latest.json"),
     maxUploadBytes: positiveInteger("ERP_MAX_UPLOAD_BYTES", 10 * 1024 * 1024),
     workerPollMs: positiveInteger("ERP_WORKER_POLL_MS", 1_000),
     workerLeaseSeconds: positiveInteger("ERP_WORKER_LEASE_SECONDS", 60),
