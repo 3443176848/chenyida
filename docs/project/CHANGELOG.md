@@ -4,6 +4,15 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE3-TASK03 - `feat: materialize synthetic migration into business tables`
+
+- 功能：新增仅 CLI 可达的受控 public materializer、actual public ID/provenance/target digest、聚合事务 checkpoint、合成文件原子写和 snapshot/archive-only 分类；post-cutover 采购、生产、销售、品质和财务只通过正常领域 Service/API 创建。
+- 核对：30 条合成来源形成 18 个 actual public targets、12 个 archive-only；Inventory Opening `112.000000/4.000000`、Finance Opening `6.500000/7.250000`。全域旅程后 Dashboard AR/AP `56.500001/27.250000`、4 个 Quality CLOSED、23/23 legacy GET，`erp_records=0`。
+- 恢复：停服 backup/verify 恢复到第二个新空目标；14 migrations、关键业务表、18 maps 和 17-byte 文件 SHA 一致。同 manifest replay 无重复，PostgreSQL/Web/Worker 整体重启后 Dashboard/API 再通过。
+- 验收：tool 8/8、materializer PG 3/3、TASK01/TASK02 专项、TASK02—TASK10 unit/UI、全部 PG/API 和 migration upgrade、8 组 typecheck、Schema consistency、npm test、lint/build/environment/credentials 与 Python 三项通过。
+- 版本/数据库：`0.1.0-alpha.13`；PostgreSQL migration 保持 `0001`—`0014`，未创建 `0015`，旧 checksum 与 `db/schema.ts` 不变。
+- 边界：未读取真实数据库、备份、上传、附件或归档；未访问生产、重启 Python、部署、push 或建 PR。结论仅为 `PASS FOR SYNTHETIC PUBLIC-TABLE MATERIALIZATION`，生产仍为 `NO-GO FOR REAL DATA / PRODUCTION`。
+
 ### SELFHOST-PHASE3-TASK02 - `feat: add controlled migration opening balances`
 
 - 数据库：新增 expand-only PostgreSQL `0014`，建立去正文的 migration source、Inventory Opening/Line/Reversal、Finance Opening/Reversal；扩展 Inventory/Finance 约束、索引、不可变 trigger 和内部 service-write guard，不修改 `0001`—`0013`、不自动回填。

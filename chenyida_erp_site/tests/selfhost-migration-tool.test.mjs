@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { assertMigrationEnvironment, assertSourcePath, assertWorkspace, parseSafePostgresUrl, assertEmptyFileTarget } from "../tools/selfhost-migration/environment-guard.mjs";
+import { assertMigrationEnvironment, assertSourcePath, assertWorkspace, parseSafePostgresUrl, assertEmptyFileTarget, assertMaterializationFileTarget, MATERIALIZATION_TARGET_MARKER } from "../tools/selfhost-migration/environment-guard.mjs";
 import { writeSyntheticD1Export, writeSyntheticSqlite } from "../tools/selfhost-migration/synthetic-fixtures.mjs";
 import { inspectSqliteSource } from "../tools/selfhost-migration/source-sqlite.mjs";
 import { inspectD1ExportSource } from "../tools/selfhost-migration/source-d1-export.mjs";
@@ -39,6 +39,12 @@ test("environment guard rejects production, remote targets, repository paths, an
   assert.throws(() => assertSourcePath(resolve(siteRoot, "../chenyida_erp_app/data/erp.sqlite3"), "sqlite"), { code: "MIGRATION_REAL_PATH_FORBIDDEN" });
   const root = await tempRoot("guard"); const files = resolve(root, "files"); await mkdir(files); await writeFile(resolve(files, "occupied"), "x");
   assert.throws(() => assertEmptyFileTarget(files), { code: "MIGRATION_FILE_TARGET_NOT_EMPTY" });
+  assert.throws(() => assertMaterializationFileTarget(files, "11111111-1111-4111-8111-111111111111"), { code: "MIGRATION_FILE_TARGET_NOT_EMPTY" });
+  await rm(resolve(files, "occupied"));
+  const runId = "11111111-1111-4111-8111-111111111111";
+  await writeFile(resolve(files, MATERIALIZATION_TARGET_MARKER), JSON.stringify({ schema_version: 1, migration_run_id: runId, synthetic_marker: "SYNTHETIC_MIGRATION_TEST_ONLY" }));
+  assert.equal(assertMaterializationFileTarget(files, runId), files);
+  assert.throws(() => assertMaterializationFileTarget(files, "22222222-2222-4222-8222-222222222222"), { code: "MIGRATION_FILE_TARGET_RUN_CONFLICT" });
 });
 
 test("SQLite and D1 export adapters fingerprint only generated synthetic sources", async () => {

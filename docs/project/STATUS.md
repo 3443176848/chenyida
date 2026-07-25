@@ -2,6 +2,23 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE3-TASK03 合成全域业务表物化与 Dashboard 核对
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 恢复点 | PASS | `main`、可信起点 `8f30798464476b53f435d53022c45ed731804e95`；独立提交消息 `feat: materialize synthetic migration into business tables` |
+| Public materializer | PASS | 仅显式 CLI；30 条合成来源形成 18 个 actual public targets、12 个 archive-only；actual ID/source/target digest、request/operation/checkpoint 齐全 |
+| Identity/主数据/BOM | PASS | 迁移账号 disabled+must-change 且无旧 hash；稳定 Unit/Category/Material/Party/Product/Version/Mapping/BOM ID；code/引用/有效期冲突 fail closed |
+| Opening/文件 | PASS | Inventory on-hand/frozen `112.000000/4.000000`；Opening AR/AP `6.500000/7.250000`；17-byte 文件原子写与 SHA `19ae05a8872e4000652f2efe7e9123cfc5e64aa2d69f9afb5511f80e21d66346` |
+| Post-cutover journey | PASS | 正常 Service/API 完成 Procurement、Production、Sales、IQC/IPQC/FQC 和 Finance；不重放来源历史活动 |
+| Dashboard/API | PASS | AR/AP `56.500001/27.250000`，Quality CLOSED 4，23/23 legacy GET；角色裁剪通过，`erp_records=0` |
+| 恢复/重放 | PASS | backup/verify→第二个新空目标；14 migrations、18 maps、关键业务表和文件 SHA 一致；同 manifest replay 无重复，PG/Web/Worker 整体重启后再核对通过 |
+| 专项/回归 | PASS | tool 8/8、materializer PG 3/3、Opening/TASK01 专项、TASK02—TASK10 unit/UI、全部 PG/API 与 migration upgrade、8 组 typecheck、Schema consistency、npm test、lint/build/environment/credentials、Python 三项 |
+| Migration/版本 | PASS / NOT RELEASED | `0.1.0-alpha.13`；保持 0001—0014、未创建 0015、旧 checksum 与 `db/schema.ts` 不变；未发布或部署 |
+| 合成结论 | PASS | `PASS FOR SYNTHETIC PUBLIC-TABLE MATERIALIZATION` |
+| 生产准入 | NO-GO | 未读取真实 source/账号/历史活动/文件，未验证真实容量、安全、生产恢复或切换；`NO-GO FOR REAL DATA / PRODUCTION` |
+| 资源/生产影响 | NONE | TASK03 临时 Compose/数据库/文件/备份最终清理；Python PID `277640` 未重启，未访问生产、部署、push 或 PR |
+
 ## SELFHOST-PHASE3-TASK02 库存与财务期初来源及迁移物化边界
 
 | 验证项 | 结果 | 说明 |
@@ -327,7 +344,7 @@
 | --- | --- |
 | 根仓库 Branch | `main` |
 | 任务开始 HEAD | TASK02 起点 `2c808f7a2ba2c293ff22e5dcc3ca3647a479a91c` |
-| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.12`；非生产、尚未发布 |
+| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.13`；非生产、尚未发布 |
 | 当前实际常驻服务 | Python 3.11.6 / SQLite，systemd `enabled/active`，`0.0.0.0:18888` |
 | 自托管部署状态 | Node/PostgreSQL 未生产部署；当前无运行中 Compose 项目 |
 | PostgreSQL migration | `0001`—`0014`；TASK02 新增合成受控期初模型，未迁移任何真实数据 |

@@ -4,6 +4,7 @@ import { fail } from "./errors.mjs";
 import { sha256, stableUuid } from "./digest.mjs";
 import { buildOpeningCommands } from "./opening-commands.mjs";
 import { MigrationOpeningService } from "./migration-opening-service.mjs";
+import { finalizePublicSnapshot, materializePublicSnapshot, recordOpeningTargets } from "./materializer/index.mjs";
 
 const { Pool } = pg;
 
@@ -16,10 +17,15 @@ export class PostgresTargetAdapter {
   constructor(databaseUrl, environment = process.env) {
     if (String(environment.ERP_ENV || "").toLowerCase() !== "test") fail("MIGRATION_ENVIRONMENT_FORBIDDEN", "迁移目标只允许 ERP_ENV=test");
     this.parsed = parseSafePostgresUrl(databaseUrl);
+    this.databaseUrl = databaseUrl;
     this.pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "chenyida_synthetic_migration" });
   }
 
-  async inspect(expectedMigrations, { requireEmpty = true } = {}) {
+  async materializeSnapshot(options) {
+    return materializePublicSnapshot({ pool: this.pool, databaseUrl: this.databaseUrl, ...options });
+  }
+
+  async inspect(expectedMigrations, { requireEmpty = true, resumeRunId = "", resumeInputDigest = "" } = {}) {
     const client = await this.pool.connect();
     try {
       const migrations = await client.query("select version, checksum from schema_migrations order by version");
@@ -27,12 +33,19 @@ export class PostgresTargetAdapter {
         fail("MIGRATION_TARGET_BASELINE_INVALID", "目标数据库 migration 与 0001—0014 不一致");
       }
       const tables = await client.query("select tablename from pg_tables where schemaname='public' and tablename<>'schema_migrations' order by tablename");
-      if (requireEmpty) for (const { tablename } of tables.rows) {
+      let existingRunManifest = null;
+      const migrationToolExists = (await client.query("select to_regnamespace('migration_tool') is not null present")).rows[0].present;
+      if (resumeRunId && migrationToolExists) {
+        const runs = await client.query("select run_id,input_digest,manifest from migration_tool.runs order by created_at");
+        const match = runs.rows.find((row) => row.run_id === resumeRunId && row.input_digest === resumeInputDigest);
+        if (runs.rowCount === 1 && match) existingRunManifest = match.manifest;
+      }
+      if (requireEmpty && !existingRunManifest) for (const { tablename } of tables.rows) {
         const present = await client.query(`select 1 from public.${quoteIdentifier(tablename)} limit 1`);
         if (present.rowCount) fail("MIGRATION_TARGET_NOT_EMPTY", "目标 PostgreSQL 含业务数据，拒绝写入");
       }
       const foreignKeys = await client.query("select count(*)::int as count from pg_constraint where contype='f' and connamespace='public'::regnamespace");
-      return { databaseName: this.parsed.databaseName, migrations: migrations.rows, publicTableCount: tables.rowCount, businessForeignKeyCount: foreignKeys.rows[0].count };
+      return { databaseName: this.parsed.databaseName, migrations: migrations.rows, publicTableCount: tables.rowCount, businessForeignKeyCount: foreignKeys.rows[0].count, existingRunManifest };
     } finally { client.release(); }
   }
 
@@ -98,6 +111,10 @@ export class PostgresTargetAdapter {
     for (const command of bundle.commands) results.push(command.command_type === "POST_INVENTORY_OPENING" ? await service.postInventory(command) : await service.postFinance(command));
     return { bundle, results };
   }
+
+  async recordOpeningTargets(snapshot, plan, openingResult) { return recordOpeningTargets(snapshot, plan, openingResult.bundle, openingResult.results); }
+
+  async finalizeSnapshot(snapshot) { return finalizePublicSnapshot(snapshot); }
 
   async setState(runId, state) { await this.pool.query("update migration_tool.runs set state=$2,updated_at=now() where run_id=$1", [runId, state]); }
 

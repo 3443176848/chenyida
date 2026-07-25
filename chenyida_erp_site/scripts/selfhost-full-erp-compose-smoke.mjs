@@ -32,7 +32,8 @@ async function requestAs(username, password, path, expectedStatus = 200) {
 }
 
 if (phase === "initial") {
-  await import("./selfhost-identity-compose-smoke.mjs?full-journey-initial");
+  const reusePreparedIdentity = process.env.ERP_FULL_JOURNEY_REUSE_IDENTITY === "true";
+  if (!reusePreparedIdentity) await import("./selfhost-identity-compose-smoke.mjs?full-journey-initial");
   process.env.ERP_FULL_JOURNEY_REUSE_IDENTITY = "true";
   await resetSyntheticRateWindow();
   await import("./selfhost-master-data-compose-smoke.mjs?full-journey-initial");

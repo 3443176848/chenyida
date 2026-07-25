@@ -20,7 +20,7 @@ export async function executeDryRun({ workspace, inputDigest, plan }) {
   return { state: "DRY_RUN_PASSED", checkpoint };
 }
 
-export async function executeSyntheticCommit({ workspace, inputDigest, runId, source, plan, target, manifest, interruptAfterDomain = "" }) {
+export async function executeSyntheticCommit({ workspace, inputDigest, runId, source, plan, target, manifest, fileTarget = "", setupAdmin, materializationFault, interruptAfterDomain = "" }) {
   const dry = await executeDryRun({ workspace, inputDigest, plan });
   if (dry.state !== "DRY_RUN_PASSED") return dry;
   const checkpoints = new CheckpointStore(workspace, inputDigest);
@@ -36,7 +36,13 @@ export async function executeSyntheticCommit({ workspace, inputDigest, runId, so
       if (interruptAfterDomain === domain) fail("MIGRATION_TEST_INTERRUPT", "合成中断注入");
     }
   }
-  await target.materializeOpenings({ source, plan, manifest, targetMigrations: manifest.target_migrations });
+  const snapshot = fileTarget ? await target.materializeSnapshot({ source, plan, manifest, workspace, fileTarget, setupAdmin, fault: materializationFault }) : null;
+  const openings = await target.materializeOpenings({ source, plan, manifest, targetMigrations: manifest.target_migrations });
+  let publicMaterialization = null;
+  if (snapshot) {
+    await target.recordOpeningTargets(snapshot, plan, openings);
+    publicMaterialization = await target.finalizeSnapshot(snapshot);
+  }
   await target.setState(runId, "COMMITTED");
   checkpoint = await checkpoints.append("Commit", "COMMITTED", { migrated: plan.rows.length });
   const targetAggregate = await target.aggregate(runId);
@@ -45,5 +51,5 @@ export async function executeSyntheticCommit({ workspace, inputDigest, runId, so
   await target.setState(runId, "RECONCILED");
   checkpoint = await checkpoints.append("Reconcile", "RECONCILED", { grade: reconciliation.grade });
   checkpoint = await checkpoints.append("Finalize", "RECONCILED", { report_ready: true });
-  return { state: "RECONCILED", checkpoint, reconciliation };
+  return { state: "RECONCILED", checkpoint, reconciliation, public_materialization: publicMaterialization };
 }

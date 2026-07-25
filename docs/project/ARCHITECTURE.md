@@ -2,6 +2,25 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-25 合成 public 业务表物化与核对层
+
+`SELFHOST-PHASE3-TASK03` 在 staging/Opening 之后增加仅 CLI 可达的 `materializer/`。它把通过验证的 cutover snapshot 按 Identity→Reference→Material→Party→Product/Mapping/BOM→Opening→File/Audit 顺序写入 public 权威关系表，同时在 `migration_tool.public_id_map` 保存 actual target ID、source/target digest、request/operation 和 checkpoint。来源历史活动只记录 `ARCHIVE_ONLY`，不与期初余额重复过账。
+
+```mermaid
+flowchart LR
+    PLAN["Validated synthetic plan"] --> MAT["Controlled public materializer"]
+    MAT --> PUBLIC["Public business tables"]
+    MAT --> MAP["Actual ID map + provenance"]
+    PUBLIC --> JOURNEY["Normal domain Service/API journey"]
+    JOURNEY --> DASH["Dashboard + 23 legacy GET"]
+    PUBLIC --> BACKUP["Offline backup / new-empty restore"]
+    MAP --> REC["Target digest reconcile"]
+    DASH --> REC
+    BACKUP --> REC
+```
+
+每个聚合事务独立，code/引用/单位/有效期/文件或 digest 冲突 fail closed；不同 manifest 不能复用非空目标，同 manifest/run 可从 public ID map 与 checkpoint 恢复。Post-cutover 采购、生产、销售、品质和财务事实只由正常领域 Service/API 创建。该层不新增 HTTP migration route、不写 `erp_records`、不改变 `0001`—`0014` public schema，只证明完全合成物化与恢复。
+
 ## 2026-07-25 迁移期初受控物化层
 
 `SELFHOST-PHASE3-TASK02` 在 TASK01 staging 之后增加显式、类型化的合成期初 command 和内部 `MigrationOpeningService`。服务只在 `ERP_ENV=test`、回环 `_migration_test`、已初始化迁移工具目标中运行；Web/API 不暴露期初写路由。`0014` 新增去正文的关系来源、库存/财务期初及冲销表，复用库存 Ledger/Balance 与财务 Document/Event/Settlement，不创建第二套余额。

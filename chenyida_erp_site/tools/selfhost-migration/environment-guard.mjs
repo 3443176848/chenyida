@@ -1,4 +1,4 @@
-import { lstatSync, readdirSync, realpathSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fail } from "./errors.mjs";
@@ -76,6 +76,19 @@ export function parseSafePostgresUrl(raw) {
 export function assertEmptyFileTarget(path) {
   const resolved = assertMigrationTempPath(path, { directory: true });
   if (readdirSync(resolved).length) fail("MIGRATION_FILE_TARGET_NOT_EMPTY", "目标文件目录必须为空");
+  return resolved;
+}
+
+export const MATERIALIZATION_TARGET_MARKER = ".cyd-synthetic-migration-run.json";
+
+export function assertMaterializationFileTarget(path, runId) {
+  const resolved = assertMigrationTempPath(path, { directory: true });
+  const entries = readdirSync(resolved);
+  if (!entries.length) return resolved;
+  if (!runId || !entries.includes(MATERIALIZATION_TARGET_MARKER)) fail("MIGRATION_FILE_TARGET_NOT_EMPTY", "目标文件目录非空且不属于受控 migration run");
+  let marker;
+  try { marker = JSON.parse(readFileSync(resolve(resolved, MATERIALIZATION_TARGET_MARKER), "utf8")); } catch { fail("MIGRATION_FILE_TARGET_MARKER_INVALID", "目标文件目录的 run marker 无效"); }
+  if (marker.schema_version !== 1 || marker.migration_run_id !== runId || marker.synthetic_marker !== "SYNTHETIC_MIGRATION_TEST_ONLY") fail("MIGRATION_FILE_TARGET_RUN_CONFLICT", "目标文件目录属于其他 migration run");
   return resolved;
 }
 

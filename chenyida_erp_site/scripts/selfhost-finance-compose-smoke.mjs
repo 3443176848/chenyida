@@ -8,6 +8,12 @@ const setupToken = process.env.ERP_SETUP_TOKEN || "";
 const adminUsername = process.env.ERP_ADMIN_USERNAME || "";
 const adminPassword = process.env.ERP_ADMIN_PASSWORD || "";
 const reuseIdentity = process.env.ERP_FULL_JOURNEY_REUSE_IDENTITY === "true";
+const openingAr = process.env.ERP_FINANCE_OPENING_AR || "0";
+const openingAp = process.env.ERP_FINANCE_OPENING_AP || "0";
+const add6 = (left, right) => {
+  const scaled = (value) => { const [whole, fraction = ""] = String(value).split("."); return BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, "0")); };
+  const value = scaled(left) + scaled(right); return `${value / 1_000_000n}.${String(value % 1_000_000n).padStart(6, "0")}`;
+};
 if (process.env.ERP_ENV !== "test" || !/(test|localhost|127\.0\.0\.1)/i.test(databaseUrl)) throw new Error("finance compose smoke requires an isolated test database");
 if (!setupToken || !adminUsername || !adminPassword) throw new Error("finance compose smoke credentials are required");
 
@@ -56,7 +62,7 @@ try {
     const paid = await admin.write("/api/finance/settlements", { document_id: Number(ap.payload.doc_id), expected_version: 1, amount: "20", accounting_date: "2026-07-25", account_name: "TASK09 测试户" }, 201, "task09-ap-settle");
     await admin.write(`/api/financial-payments/${paid.payload.settlement_id}/reversal`, { expected_version: 2, accounting_date: "2026-07-26", reason: "TASK09 烟测冲销" }, 201, "task09-ap-reverse");
     const summary = await admin.get("/api/finance-summary");
-    if (JSON.stringify([summary.payload.receivable_total, summary.payload.receivable_paid, summary.payload.payable_total, summary.payload.payable_paid, summary.payload.cash_net]) !== JSON.stringify(["50.000001", "10.000000", "20.000000", "0.000000", "10.000000"])) throw new Error(`finance initial summary mismatch: ${JSON.stringify(summary.payload)}`);
+    if (JSON.stringify([summary.payload.receivable_total, summary.payload.receivable_paid, summary.payload.payable_total, summary.payload.payable_paid, summary.payload.cash_net]) !== JSON.stringify([add6("50.000001", openingAr), "10.000000", add6("20.000000", openingAp), "0.000000", "10.000000"])) throw new Error(`finance initial summary mismatch: ${JSON.stringify(summary.payload)}`);
     console.info(JSON.stringify({ ok: true, phase, ar: ar.payload.doc_code, ap: ap.payload.doc_code }));
   } else if (phase === "restart") {
     const admin = client(); await admin.login(); const documents = await admin.get("/api/financial-documents"); const settlements = await admin.get("/api/financial-payments"); const summary = await admin.get("/api/finance-summary");

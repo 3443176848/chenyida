@@ -35,7 +35,7 @@ export function validSyntheticRecords() {
     record("finance", "finance_document", "SYN-AR-001", { document_type: "AR", status: "PARTIALLY_SETTLED", currency_code: "CNY", amount: "9.000000", settled_amount: "3.000000" }, [rel("shipment", "SYN-SHIP-001"), rel("customer", "SYN-CUS-001")]),
     record("finance", "finance_opening", "SYN-OPENING-AR-001", { document_type: "AR", currency_code: "CNY", amount: "6.500000", accounting_date: "2026-01-01" }, [rel("customer", "SYN-CUS-001")]),
     record("finance", "finance_opening", "SYN-OPENING-AP-001", { document_type: "AP", currency_code: "CNY", amount: "7.250000", accounting_date: "2026-01-01" }, [rel("supplier", "SYN-SUP-001")]),
-    record("file", "file", "synthetic-upload.bin", { bytes: 17, checksum_status: "MATCHED", sha256: "2b70b6667677d44492e57cf2091c1c0b35517daac860e5c15e8f8c3e1d9a7e10" }),
+    record("file", "file", "synthetic-upload.bin", { bytes: 17, checksum_status: "MATCHED", sha256: "19ae05a8872e4000652f2efe7e9123cfc5e64aa2d69f9afb5511f80e21d66346", mime_type: "application/octet-stream", content_marker: "SYNTHETIC_FILE_V1" }),
     record("audit", "audit", "SYN-AUDIT-001", { action: "SYNTHETIC_IMPORT", result: "SUCCESS" }, [rel("identity", "synthetic_admin")]),
   ];
 }

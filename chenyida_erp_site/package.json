@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.12",
+  "version": "0.1.0-alpha.13",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -96,12 +96,14 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate --name selfhost_baseline",
     "migration:fixture": "node scripts/selfhost-migration-fixture.mjs",
-    "migration:run": "node tools/selfhost-migration/cli.mjs",
+    "migration:run": "node --experimental-strip-types tools/selfhost-migration/cli.mjs",
     "test:migration-tool": "node --experimental-strip-types --test tests/selfhost-migration-tool.test.mjs",
     "test:migration-tool:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-migration-postgres.test.mjs",
     "test:migration-openings:unit": "node --experimental-strip-types --test tests/selfhost-migration-openings-unit.test.mjs",
     "test:migration-openings:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-migration-openings-postgres.test.mjs",
-    "test:migration-openings:upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-migration-openings-migration-upgrade.test.mjs"
+    "test:migration-openings:upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-migration-openings-migration-upgrade.test.mjs",
+    "test:migration-materializer:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-migration-materializer-postgres.test.mjs",
+    "test:migration-public:compose": "node --experimental-strip-types scripts/selfhost-migration-public-compose-smoke.mjs"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",
