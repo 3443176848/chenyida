@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
 最后核验：2026-07-25（Asia/Shanghai）
-适用任务：`SELFHOST-PHASE3-TASK04`
+适用任务：`SELFHOST-PHASE3-TASK05`
 
 ## 1. 使用规则
 
@@ -19,10 +19,10 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 历史 OpenAI Sites / Cloudflare D1 | 历史记录 `v3` | `2b4f1787ddbc7e0941ab2d5f5cadea6e817e8f12`；后续纳管来源 `9f2c2dca9ccde237cb2db6c01d2e3792b284e6e9` | 仓库 D1/Drizzle `0000`—`0008`；生产实际已应用版本本任务未访问、未核验 | 仅保留历史验收记录；本任务未访问公开 Site | `HISTORICAL`；文档曾记录为公开 `v3`，本任务不重新确认在线状态；不是未来生产权威方向 | 未向 PostgreSQL 迁移 | 历史提交 `2b4f178` 和 D1 migration/快照仅作迁移与行为证据；不是已验证的当前回退方案 | 历史状态；无新的部署批准 |
 | 当前 Python / SQLite 开发运行面 | `legacy-development`，尚无统一 SemVer | 当前仓库包含源代码的功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；常驻进程未记录启动 commit，不能反推为该提交 | 本地 SQLite 历史 26 表 + migration `0001`—`0004`；开发库只读核验已记录四个版本 | 本任务按发布基线重新执行 Python self-test、smoke 和临时库 go-live；结果见第 6 节 | `DEVELOPMENT`；systemd `enabled/active`，源码与已安装 unit 一致，Python 监听 `0.0.0.0:18888`；不是正式生产投用 | 不适用；该 SQLite 是旧数据来源和当前开发运行数据 | Git 源码 + 执行前 SQLite 可恢复快照；正式回退点尚未建立 | 仅开发常驻；未获生产批准 |
-| Node.js / PostgreSQL 自托管开发基线 | `0.1.0-alpha.14`；包名 `chenyida-erp-selfhosted` | TASK04 起始 `a541360eefe12869c090b2408bbcf07485fc77cb`；本任务提交以 `git log -1` 为准 | PostgreSQL migration 保持 `0001`—`0014`；仅新增只读快照/脱敏盘点工具，不改变业务 schema | 本机 SQLite online backup、Schema fingerprint、聚合盘点、无目标 Dry-run 和全回归通过 | `NOT_RELEASED`；临时快照与隔离资源已清理，未生产部署 | 真实数据仅做本机脱敏聚合，未迁入 PostgreSQL；D1/文件正文未读 | 未部署版本无线上回退动作；未来任何真实目标试迁移必须新任务和独立恢复点 | `REAL LOCAL SQLITE READONLY INVENTORY COMPLETE`；真实迁移/生产仍 NO-GO |
+| Node.js / PostgreSQL 自托管开发基线 | `0.1.0-alpha.14`；包名 `chenyida-erp-selfhosted` | TASK05 父提交 `7c39ff9b2c50786a225fe788ec5e3b6fb9f91dc2`；本任务提交以 `git log -1` 为准 | PostgreSQL 17，migration 保持 `0001`—`0014`；空环境 14 个版本已应用，未创建 `0015` | Compose 配置、健康、管理员、空 Dashboard、23 GET、重启持久性、Worker 断连恢复和资源门禁通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；Web 仅 `127.0.0.1:3000`，不是 production/release | `NOT_MIGRATED`；真实 SQLite、D1、文件和业务数据未读、未复制、未双写 | 停止 `chenyida-erp-parallel` 并保留四个 Volume；Python/SQLite 18888 始终保留且未切流 | `PARALLEL HTTP ACCEPTANCE ENVIRONMENT RUNNING`；HTTPS、真实迁移和生产仍未批准 |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.14` 是“自托管完整 ERP API 非生产候选 + 合成 public 物化准备度 + 本机 SQLite 只读脱敏盘点证据”。它只表示一次获准的本机快照聚合与无目标 Dry-run 完成；不表示真实数据已迁移、生产恢复通过或已批准上线。真实数据仍在 Python/SQLite 开发运行面。
+`0.1.0-alpha.14` 现同时具有“自托管完整 ERP API 非生产候选 + 合成 public 物化准备度 + 本机 SQLite 只读脱敏盘点证据 + 同机并行 HTTP 空环境”。该部署只用于回环/SSH 隧道验收；不表示真实数据已迁移、HTTPS/生产恢复通过或已批准上线。真实数据仍在 Python/SQLite 开发运行面。
 
 ## 3. Migration 文件与 SHA-256 基线
 
@@ -177,6 +177,24 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 | 部署/生产访问 | 未部署、未重启服务、未迁移真实数据、未访问公开生产 Site 或生产数据库 |
 
 补充说明：宿主机没有 Node/npm，Node 命令在一次性 `node:22-bookworm` 容器中执行。Python 首轮误用系统解释器时 self-test 通过、smoke 在导入 `openpyxl` 前因环境缺依赖停止；改用常驻服务实际使用的 `/opt/erp/.venv/bin/python` 后三项全部通过，没有降低断言。TASK09 Compose build 的 `npm ci` 报告 13 个既有依赖审计项（1 low、4 moderate、8 high），本任务按范围不升级依赖，留待独立安全任务。
+
+## 6.1 SELFHOST-PHASE3-TASK05 并行 HTTP 验收部署记录
+
+| 项目 | 值 |
+| --- | --- |
+| 任务 | `SELFHOST-PHASE3-TASK05` |
+| 包版本 | `chenyida-erp-selfhosted@0.1.0-alpha.14`，保持不变 |
+| 父提交 | `7c39ff9b2c50786a225fe788ec5e3b6fb9f91dc2`；独立提交消息 `ops: deploy parallel self-hosted acceptance environment` |
+| 环境 | `chenyida-erp-parallel`；`ERP_ENV=development`；`PARALLEL HTTP ACCEPTANCE ONLY` |
+| 网络 | Web 仅 `127.0.0.1:3000`；PostgreSQL 无宿主端口；Caddy、80/443、DNS、防火墙均未启用或修改 |
+| 数据库 | PostgreSQL 17.10；空环境 `0001`—`0014` 共 14 个 migration；未创建 `0015`、未迁真实数据 |
+| 身份 | 唯一管理员 `admin`；重复初始化为 `SETUP_COMPLETE`；setup token 已轮换；临时密码只在 root-only 凭据文件 |
+| 验收 | compose config、健康、login/session/logout、根工作台、空 Dashboard、23 GET、完整重启持久性、资源与 Python/SQLite 不变核对通过 |
+| 缺陷修复 | PostgreSQL 重启的 Worker 空闲 Pool `57P01` 改为去敏记录并轮询重试；专项 2/2、typecheck、lint、build 和只重启 PostgreSQL 的进程连续性通过 |
+| 部署状态 | `DEPLOYED` 仅指同机并行 HTTP 验收；不是 `RELEASED` 或 production |
+| 排除 | 未迁真实数据、未双写、未切流、未启 HTTPS、未访问 D1/远程数据库、未修改 Python systemd/SQLite、未 push/PR |
+
+结论严格为 `PARALLEL HTTP ACCEPTANCE ENVIRONMENT RUNNING`。
 
 ## 7. `0.1.0-alpha.14` 非生产开发记录
 

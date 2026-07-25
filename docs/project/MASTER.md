@@ -39,17 +39,17 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 自托管开发基线 `0.1.0-alpha.14`（包名 `chenyida-erp-selfhosted`），明确为非生产、尚未发布；统一追踪见 `RELEASES.md` |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK04 起点 `a541360eefe12869c090b2408bbcf07485fc77cb`；本任务独立提交消息 `feat: add authorized readonly migration inventory`，最终 HEAD 以 `git log -1` 为准 |
+| 当前根仓库功能基线提交 | TASK05 父提交 `7c39ff9b2c50786a225fe788ec5e3b6fb9f91dc2`；本任务独立提交消息 `ops: deploy parallel self-hosted acceptance environment`，最终 HEAD 以 `git log -1` 为准 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
 | 当前数据库 | 自托管 PostgreSQL 开发基线为 `0001`—`0014`；`0014` 新增受控 Migration Opening 来源、库存 Ledger/Balance 期初和无 Shipment/Receipt 的 AR/AP 期初。SQLite 29张仍支撑当前 Python 开发运行面并作为迁移来源，D1/Drizzle 45张为历史迁移来源；均未向 PostgreSQL 迁移真实数据 |
-| 当前运行状态 | Python/SQLite 开发服务由 systemd 常驻，`enabled/active` 且监听 `0.0.0.0:18888`；Node/PostgreSQL 仅为已清理的隔离开发验收基线，未生产部署 |
+| 当前运行状态 | Python/SQLite 开发服务继续由 systemd 常驻并监听 `0.0.0.0:18888`；非生产 Compose 项目 `chenyida-erp-parallel` 以 PostgreSQL 17/Web/Worker 同机并行运行，Web 仅绑定 `127.0.0.1:3000`，PostgreSQL 无宿主端口；不是生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard 与离线备份恢复治理的非生产链路 |
-| 当前阶段 | `SELFHOST-PHASE3-TASK04` 已完成获准本机 SQLite 一致性只读快照、脱敏聚合盘点与无目标 Dry-run；自托管仍只是非生产候选，不等于真实迁移通过或获切换批准 |
-| 当前任务 | `SELFHOST-PHASE3-TASK04`：`DONE`；起点 `a541360eefe12869c090b2408bbcf07485fc77cb` |
-| 下一任务 | 不自动开始新任务；真实 PostgreSQL 试迁移、逐行人工处置、D1/附件盘点、生产恢复、部署和切换必须另立任务并单独授权 |
+| 当前阶段 | `SELFHOST-PHASE3-TASK05` 已完成同机并行 HTTP 空环境部署与验收；结论仅为 `PARALLEL HTTP ACCEPTANCE ENVIRONMENT RUNNING`，不等于生产上线、真实迁移或切流 |
+| 当前任务 | `SELFHOST-PHASE3-TASK05`：`DONE`；父提交 `7c39ff9b2c50786a225fe788ec5e3b6fb9f91dc2` |
+| 下一任务 | 不自动开始新任务；真实 PostgreSQL 迁移、逐行人工处置、D1/附件盘点、HTTPS、生产恢复和切换必须另立任务并单独授权 |
 
 ## 当前完成模块
 
@@ -69,6 +69,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - SELFHOST-PHASE3-TASK02 完成 `0014` 关系化 Migration Opening Source、库存期初 Ledger/Balance、财务 `OPENING_AR/AP`、一次全额冲销、内部事务入口及 Dashboard 汇总；MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`，版本 `0.1.0-alpha.12`，真实数据与生产保持 NO-GO
 - SELFHOST-PHASE3-TASK03 完成受控 public materializer、actual target ID/provenance、合成文件、snapshot/archive 分类、正常全域 API/Dashboard、backup→新空目标 restore、同 manifest 重放与整栈重启；版本 `0.1.0-alpha.13`，migration 保持 `0001`—`0014`，结论仅为 `PASS FOR SYNTHETIC PUBLIC-TABLE MATERIALIZATION`，真实数据与生产保持 NO-GO
 - SELFHOST-PHASE3-TASK04 完成获准本机 SQLite online backup、integrity/Schema fingerprint、29 表 3,619 条脱敏聚合、无 PostgreSQL 目标 planner 和人工处置模板；源与 Python PID 不变，临时快照已删除，版本 `0.1.0-alpha.14`，migration 保持 `0001`—`0014`，结论仅为 `REAL LOCAL SQLITE READONLY INVENTORY COMPLETE`
+- SELFHOST-PHASE3-TASK05 以 `chenyida-erp-parallel` 在同机启动 PostgreSQL 17/Web/Worker，Web 仅 `127.0.0.1:3000`、数据库无宿主端口；14 个 migration、管理员、空 Dashboard、23 GET、重启持久性和资源门禁通过，并修复 Worker 在 PostgreSQL 重启时的空闲连接未捕获错误。Python PID/18888/SQLite 元数据不变；仅为 `PARALLEL HTTP ACCEPTANCE ENVIRONMENT RUNNING`
 - 多用户登录、会话、角色权限、密码修改、账号管理和操作审计
 - 物料、供应商映射、CSV 导入、清洗队列和新物料建档基础流程
 - 客户、供应商、产品、BOM 和 BOM 齐套分析
@@ -167,9 +168,11 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 32. TASK02—TASK10 已完成 Node/PostgreSQL 自托管非生产链路、实时 Dashboard 与离线备份恢复治理；真实数据仍在 Python/SQLite 开发运行面，尚未试迁移、容量验收或生产恢复演练，因此不能描述为业务已切换或已投产。
 33. 根自托管页面已退出 legacy iframe；`public/erp/` 仍保留为显式业务工作区和回滚证据。64 个盘点操作及 23 个 legacy 刷新 GET 已有自托管覆盖或明确退役合同，但这不等于全部 UI 已重写为原生 React。
 34. TASK01 staging、TASK02 Opening 与 TASK03 public materialization 仍只在合成 `_migration_test` 验证；TASK04 已完成获准真实快照的 Schema/聚合质量与无目标 planner，但没有连接目标、物化、逐行业务处置、附件核对或容量验收，不能据此宣布真实迁移或生产 Go-Live。
+35. TASK05 环境使用 development Cookie 和明文 HTTP，因此严格只绑定回环并通过 SSH 隧道验收；它没有 HTTPS、域名、真实数据、生产恢复或流量切换批准。管理员首次登录后必须改密并删除 root-only 临时凭据文件。
 
 ## 当前任务与下一任务
 
+- 已完成：`SELFHOST-PHASE3-TASK05`，在保留 Python/SQLite 的同时以 `chenyida-erp-parallel` 运行 PostgreSQL 17、Web 和 Worker；`127.0.0.1:3000`、14 migrations、空环境管理员、23 GET、重启与资源验收通过。版本保持 `0.1.0-alpha.14`，未创建 `0015`；结论仅为 `PARALLEL HTTP ACCEPTANCE ENVIRONMENT RUNNING`，不自动开始真实数据迁移、HTTPS 或切流。
 - 已完成：`SELFHOST-PHASE3-TASK04`，对唯一获准的本机 SQLite 执行一次一致性只读快照、脱敏聚合盘点和无目标 Dry-run；快照已删除，源与 Python PID 不变，未读文件正文或写 PostgreSQL。版本 `0.1.0-alpha.14`，migration 保持 `0001`—`0014`；不自动开始真实试迁移或生产任务。
 - 已完成：`SELFHOST-PHASE3-TASK02`，新增 PostgreSQL `0014` 与受控 Inventory/Finance Opening，合成物化、冲销、幂等、并发、Dashboard、Compose 重启和备份恢复通过。MG-001/MG-002 为 `RESOLVED IN SYNTHETIC NON-PRODUCTION MODEL`，版本 `0.1.0-alpha.12`；不自动开始下一任务，真实数据与生产仍为 `NO-GO FOR REAL DATA / PRODUCTION`。
 - 已完成：`SELFHOST-PHASE3-TASK01`，建立只允许临时合成源和回环 `_migration_test` PostgreSQL 的迁移准备工具；中断恢复、重复执行、摘要失效、backup/restore、整栈重启及全回归通过。版本为非生产 `0.1.0-alpha.11`，业务 migration 仍为 `0001`—`0013`。不自动开始真实数据或生产任务。

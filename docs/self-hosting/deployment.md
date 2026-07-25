@@ -1,5 +1,7 @@
 # Linux 自托管部署
 
+当前同机并行空环境不是本页的 production 部署：Compose 项目 `chenyida-erp-parallel` 只绑定 `127.0.0.1:3000`，使用 SSH 隧道验收且不启动 Caddy。其固定命令、安全边界和停止条件见 `parallel-http-acceptance.md`。
+
 ## 首次启动
 
 1. 安装 Docker Engine 与 Docker Compose，克隆仓库并进入 `chenyida_erp_site`。

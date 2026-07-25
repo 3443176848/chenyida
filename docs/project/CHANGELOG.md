@@ -4,6 +4,16 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE3-TASK05 - `ops: deploy parallel self-hosted acceptance environment`
+
+- 部署：创建并保持运行 Compose 项目 `chenyida-erp-parallel`，只启动 PostgreSQL 17、migrate、Web、Worker和四个持久 Volume；版本保持 `0.1.0-alpha.14`，migration 保持 `0001`—`0014`。
+- 安全：配置和一次性管理员凭据位于 `/etc/chenyida-erp/`，root-only 0600；管理员密码不进长期 env。setup token 初始化后已轮换；Web 只绑定 `127.0.0.1:3000`，PostgreSQL 无宿主端口，未启动 Caddy/80/443。
+- 管理员与验收：创建唯一 `admin`，重复初始化返回 `SETUP_COMPLETE`；health、根工作台、login/session/logout、Dashboard 空状态和 23/23 legacy GET 通过，完整重启后 14 migrations 与管理员持久。
+- Bug 修复：处理 PostgreSQL restart 时 `pg` Pool 空闲连接 `57P01`，只记录去敏 code；Worker 轮询对短暂基础设施错误重试。新增 2 个专项测试，并通过 typecheck、目标 lint、镜像 build 与只重启数据库的 Worker 进程连续性验收。
+- 资源保护：部署前后 Python PID 均为 `277640`、18888 返回 200，SQLite inode/mode/size/mtime 不变；稳态可用内存约 2.2GiB、磁盘 39GB，未触发停止条件。
+- 文档：新增任务/完成报告和 `parallel-http-acceptance.md`，同步 MASTER/TASKS/PROJECT_CONTEXT/ARCHITECTURE/RELEASES/STATUS。
+- 边界：结论仅为 `PARALLEL HTTP ACCEPTANCE ENVIRONMENT RUNNING`；未迁真实数据、未双写、未切流、未启 HTTPS、未修改 Python systemd/SQLite、未访问 D1/远程数据库、未 push/PR。
+
 ### SELFHOST-PHASE3-TASK04 - `feat: add authorized readonly migration inventory`
 
 - 快照：新增精确本机源守卫、SQLite `mode=ro`/`query_only` online backup、manifest/SHA/Schema fingerprint 绑定、成功/失败临时资源清理和源/PID 不变核验。

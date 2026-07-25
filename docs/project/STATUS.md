@@ -2,6 +2,21 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE3-TASK05 同机并行 HTTP 验收环境
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 恢复点 | PASS | `main`、父提交 `7c39ff9b2c50786a225fe788ec5e3b6fb9f91dc2`；独立提交消息 `ops: deploy parallel self-hosted acceptance environment` |
+| Compose | PASS / RUNNING | 项目 `chenyida-erp-parallel`；PostgreSQL healthy、migrate exited 0、Web healthy、Worker running，四个持久 Volume 保留 |
+| HTTP 安全边界 | PASS | `ERP_ENV=development`；Web 仅 `127.0.0.1:3000`，通过 SSH 隧道验收；PostgreSQL 无宿主端口，Caddy/80/443/DNS/防火墙未变 |
+| Migration/版本 | PASS | PostgreSQL 17.10；`0001`—`0014` 共 14 个；版本保持 `0.1.0-alpha.14`，未创建 `0015` |
+| 管理员 | PASS | 唯一 `admin`，重复初始化 `SETUP_COMPLETE`；setup token 已轮换；临时密码只存 root-only 0600 文件且未进长期 env/Git |
+| HTTP 验收 | PASS | health、根工作台、login/session/logout、空 Dashboard、23/23 legacy GET 均通过；0 个物料、无真实业务数据 |
+| Worker 重启韧性 | PASS | 修复 PostgreSQL restart 的 Pool `57P01` 未捕获错误；专项 2/2、typecheck/lint/build、Worker 容器连续性与最终 HTTP 回归通过 |
+| 资源 | PASS | 最终可用内存约 2.2GiB、swap 约 441MiB 已用且 20 秒复测未继续增长、磁盘可用 36GB、load `0.63/0.90/0.85`；三常驻容器约 145MiB，未触发停止条件 |
+| Python/SQLite | PASS / UNCHANGED | PID `277640`、18888 HTTP 200；SQLite inode `53827608`、mode 0600、size 1544192 bytes、mtime 不变；未读取/迁移/修改真实业务数据 |
+| 完成结论 | PASS | `PARALLEL HTTP ACCEPTANCE ENVIRONMENT RUNNING`；未切流、未启 HTTPS、未生产上线、未 push/PR |
+
 ## SELFHOST-PHASE3-TASK04 本机真实 SQLite 只读盘点与脱敏 Dry-run
 
 | 验证项 | 结果 | 说明 |

@@ -24,7 +24,7 @@
 - 页面：TASK10 已把根 `app/page.tsx` 改为原生经营工作台；legacy `public/erp/index.html` 保留为显式业务工作区和回滚入口，不再作为根 iframe 默认依赖。Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给不依赖平台 binding 的 `app/lib/selfhost-api.ts`；旧 `erp-api.ts` 仅作迁移参考。
 - 根页迁移：TASK03—TASK10 已接通主数据/BOM/库存/采购/生产/销售/品质/财务、实时 Dashboard 与离线 backup 治理，根页已退出 iframe。真实数据试迁移和生产恢复演练未做，仍不能描述为已投产。
-- 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL；Caddy production profile 可提供 HTTPS。当前没有运行中的 Compose 项目，Node/PostgreSQL 尚未生产部署。历史 Sites `v3` 不作为后续交付目标。
+- 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL；Caddy production profile 可提供 HTTPS。TASK05 已运行非生产 Compose 项目 `chenyida-erp-parallel`，Web 仅绑定 `127.0.0.1:3000`、PostgreSQL 无宿主端口，Caddy 未启动；它只用于同机 HTTP 空环境验收，不是生产部署。历史 Sites `v3` 不作为后续交付目标。
 
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
@@ -103,6 +103,7 @@
 23. SELFHOST-PHASE3-TASK02 已新增 PostgreSQL `0014`、digest-bound command 和内部 Migration Opening Service；合成库存期初进入不可变 Ledger/Balance，合成无来源应收应付进入 `OPENING_AR/AP`，全额冲销、并发、幂等、Dashboard 和恢复通过。MG-001/MG-002 只在合成非生产模型中解决，真实数据与生产仍 NO-GO。
 24. SELFHOST-PHASE3-TASK03 已新增仅 CLI 可达的受控 public materializer；18 个 cutover snapshot 来源指向 actual public ID/digest，12 个历史活动为 archive-only，正常全域 Service/API、Dashboard、文件、backup→新空目标 restore、同 manifest 重跑和整栈重启通过。版本为 `0.1.0-alpha.13`，migration 保持 0001—0014；只证明完全合成业务表物化，真实数据与生产仍 NO-GO。
 25. SELFHOST-PHASE3-TASK04 已在明确授权下对本机唯一 SQLite 源执行 online backup，仅在临时快照上完成 29 表/3,619 条的 Schema fingerprint、脱敏聚合质量盘点与无目标 Dry-run。快照已删除，源 inode/权限与 Python PID 不变，未读文件正文或连接 PostgreSQL。版本 `0.1.0-alpha.14`，migration 保持 0001—0014；真实迁移与生产仍 NO-GO。
+26. SELFHOST-PHASE3-TASK05 已在同机启动 `chenyida-erp-parallel`：PostgreSQL 17、14 migrations、Web/Worker、唯一管理员和四个持久卷。Web 仅 `127.0.0.1:3000` 并通过 SSH 隧道访问；管理员流程、空 Dashboard、23 GET、数据库/服务重启和资源门禁通过。Worker 对 PostgreSQL 短暂断连增加去敏 Pool error handler 与轮询重试。版本仍为 `0.1.0-alpha.14`，真实数据、HTTPS、切流和生产批准均未发生。
 
 ## 当前风险
 
@@ -125,6 +126,7 @@
 - Material Draft/Review POST 已具备同源/CSRF、持久幂等和限速；其他 legacy POST 的 CSRF 与限速仍需专项治理。测试环境已有本机一次性 D1，尚无远程 Test D1。
 - Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现；历史 Site 未部署这些代码，本任务也未访问公网重新确认其状态。
 - Node/PostgreSQL 没有生产部署、真实数据 migration 或发布批准；隔离测试通过不能写成已上线。
+- `chenyida-erp-parallel` 是正在运行的 HTTP 验收部署，但只绑定回环、使用 development 模式且数据库为空；它不能被描述为生产部署。访问必须经 SSH 隧道，首次登录后需改密并删除 `/etc/chenyida-erp/parallel-admin.txt`。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
 - 业务决策 `B01-B24` 尚未全部确认。
 - 根自托管页面已退出 legacy iframe；显式 `/erp/index.html` 仍承载尚未重写的业务 UI。Dashboard/backup 治理已接通，但真实数据、生产备份恢复演练和切换仍未完成，不能描述为已投产。
@@ -141,7 +143,7 @@
 
 ## 当前路线
 
-当前已完成 Node/PostgreSQL 全域 API、Dashboard、离线 backup/restore 治理、合成 public materialization，以及本机 SQLite 一次获准只读脱敏盘点，可描述为“自托管完整 ERP API 非生产候选 + 合成物化准备度 + 本机源聚合盘点证据”。TASK04 可信起点为 `a541360eefe12869c090b2408bbcf07485fc77cb`，版本 `0.1.0-alpha.14`，PostgreSQL `0001`—`0014`；当前不自动开始下一任务。真实 PostgreSQL 试迁移、逐行人工处置、D1/附件盘点、生产恢复、部署和切换继续独立授权。
+当前已完成 Node/PostgreSQL 全域 API、Dashboard、离线 backup/restore 治理、合成 public materialization、本机 SQLite 一次获准只读脱敏盘点，以及同机并行 HTTP 空环境部署。TASK05 父提交为 `7c39ff9b2c50786a225fe788ec5e3b6fb9f91dc2`，版本保持 `0.1.0-alpha.14`，PostgreSQL `0001`—`0014`；`chenyida-erp-parallel` 保持运行，结论仅为 `PARALLEL HTTP ACCEPTANCE ENVIRONMENT RUNNING`。当前不自动开始下一任务；真实迁移、HTTPS、生产恢复和切换继续独立授权。
 
 ## 恢复上下文检查清单
 

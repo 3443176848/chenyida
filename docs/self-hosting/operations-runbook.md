@@ -1,5 +1,7 @@
 # 自托管非生产运维基线
 
+当前 `chenyida-erp-parallel` 为运行中的 `PARALLEL HTTP ACCEPTANCE ONLY` 空环境；访问、状态、日志、重启和资源停止流程见 `parallel-http-acceptance.md`。它不是生产上线，不迁真实数据、不切流。
+
 ## Dashboard 与根工作台
 
 - 根 `/` 是原生 Vinext 工作台，负责 setup/login/session/must-change/logout、权限裁剪的经营指标、风险和模块入口；不得重新嵌入 legacy iframe。

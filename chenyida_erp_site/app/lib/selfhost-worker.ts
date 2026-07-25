@@ -19,6 +19,20 @@ import {
 
 type Publication = { result: Record<string, unknown>; publish?: (client: PoolClient) => Promise<void> };
 type Handler = (job: JobLease) => Promise<Publication>;
+type PollErrorLogger = (code: string) => void;
+
+export function workerInfrastructureErrorCode(error: unknown): string {
+  const candidate = error && typeof error === "object" && "code" in error
+    ? String(error.code || "")
+    : error instanceof Error
+      ? error.message
+      : "";
+  return /^[0-9A-Z_.-]{1,64}$/.test(candidate) ? candidate : "WORKER_INFRASTRUCTURE_ERROR";
+}
+
+const defaultPollErrorLogger: PollErrorLogger = (code) => {
+  console.error(JSON.stringify({ level: "error", event: "worker_poll_failed", code }));
+};
 
 async function parseImport(storage: FileStorage, job: JobLease): Promise<Publication> {
   const batchId = Number(job.payload.batch_id); const relativePath = String(job.payload.relative_path || "");
@@ -110,6 +124,7 @@ export class SelfHostedWorker {
   private workerId: string;
   private pollMs: number;
   private heartbeatMs: number;
+  private pollErrorLogger: PollErrorLogger;
   private normalization?: PostgresMaterialImportNormalizationWorker;
   private review?: PostgresMaterialImportReviewWorker;
   constructor(
@@ -120,9 +135,11 @@ export class SelfHostedWorker {
     normalization?: PostgresMaterialImportNormalizationWorker,
     review?: PostgresMaterialImportReviewWorker,
     heartbeatMs = 20_000,
+    pollErrorLogger: PollErrorLogger = defaultPollErrorLogger,
   ) {
     this.jobs = jobs; this.storage = storage; this.workerId = workerId; this.pollMs = pollMs;
     this.heartbeatMs = heartbeatMs;
+    this.pollErrorLogger = pollErrorLogger;
     this.normalization = normalization;
     this.review = review;
     this.handlers = {
@@ -161,5 +178,16 @@ export class SelfHostedWorker {
     }
     finally { clearInterval(heartbeat); }
   }
-  async run(): Promise<void> { while (!this.stopping) { const worked = await this.runOnce(); if (!worked) await new Promise((resolve) => setTimeout(resolve, this.pollMs)); } }
+  async run(): Promise<void> {
+    while (!this.stopping) {
+      try {
+        const worked = await this.runOnce();
+        if (!worked) await new Promise((resolve) => setTimeout(resolve, this.pollMs));
+      } catch (error) {
+        if (this.stopping) return;
+        this.pollErrorLogger(workerInfrastructureErrorCode(error));
+        await new Promise((resolve) => setTimeout(resolve, this.pollMs));
+      }
+    }
+  }
 }

@@ -15,6 +15,7 @@
     "test": "node --experimental-strip-types --test tests/selfhost-file-storage.test.mjs",
     "test:legacy": "npm run build && node --experimental-strip-types --test tests/*.test.mjs",
     "test:postgres": "node --experimental-strip-types --test tests/selfhost-postgres.test.mjs",
+    "test:worker:resilience": "node --experimental-strip-types --test tests/selfhost-worker-resilience.test.mjs",
     "test:material:unit": "node --experimental-strip-types --test tests/selfhost-material-unit.test.mjs",
     "test:material:ui": "node --experimental-strip-types --test tests/selfhost-material-ui-contract.test.mjs",
     "test:material:postgres": "node --experimental-strip-types --test tests/selfhost-material-postgres.test.mjs",

@@ -4,6 +4,24 @@ import * as schema from "./schema.ts";
 
 let sharedPool: Pool | undefined;
 
+type PoolErrorSource = {
+  on(event: "error", listener: (error: unknown) => void): unknown;
+};
+
+function safeDatabaseErrorCode(error: unknown): string {
+  const candidate = error && typeof error === "object" && "code" in error ? String(error.code || "") : "";
+  return /^[0-9A-Z_]{1,32}$/.test(candidate) ? candidate : "DATABASE_CONNECTION_ERROR";
+}
+
+export function attachPostgresPoolErrorHandler(
+  pool: PoolErrorSource,
+  logger: (line: string) => void = (line) => console.error(line),
+): void {
+  pool.on("error", (error) => {
+    logger(JSON.stringify({ level: "error", event: "postgres_idle_client_error", code: safeDatabaseErrorCode(error) }));
+  });
+}
+
 function connectionConfig(): PoolConfig {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL is required");
@@ -17,7 +35,10 @@ function connectionConfig(): PoolConfig {
 }
 
 export function getPool(): Pool {
-  sharedPool ??= new Pool(connectionConfig());
+  if (!sharedPool) {
+    sharedPool = new Pool(connectionConfig());
+    attachPostgresPoolErrorHandler(sharedPool);
+  }
   return sharedPool;
 }
 

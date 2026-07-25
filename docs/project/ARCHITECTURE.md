@@ -2,6 +2,24 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-25 同机并行 HTTP 验收运行面
+
+`SELFHOST-PHASE3-TASK05` 首次把 Node/PostgreSQL 基线作为持久的非生产空环境与 Python/SQLite 同机并行运行。Compose 项目固定为 `chenyida-erp-parallel`，只启动 PostgreSQL 17、migrate、Web 和 Worker；Caddy/production profile 不启动。Web 宿主绑定为 `127.0.0.1:3000`，PostgreSQL 只在 Compose 网络暴露 5432，用户经 SSH 隧道访问。
+
+```mermaid
+flowchart LR
+    SSH["用户 SSH 隧道"] --> WEB["127.0.0.1:3000 Node Web"]
+    WEB --> PG["Compose PostgreSQL 17 / 0001—0014"]
+    WORKER["独立 Worker"] --> PG
+    WEB --> FILES["uploads / attachments Volumes"]
+    PY["现有 Python :18888"] --> SQLITE["真实 SQLite，保持不变"]
+    WEB -. "不迁移 / 不双写 / 不切流" .- PY
+```
+
+环境使用 `ERP_ENV=development` 以支持本机明文 HTTP Cookie，但只允许回环访问并明确标记 `PARALLEL HTTP ACCEPTANCE ONLY`；production Secure Cookie 规则未修改。四个项目隔离 Volume 保存 PostgreSQL、uploads、attachments 和 backup-status。管理员临时凭据与长期 Compose 配置分离，setup token 在初始化后轮换。
+
+部署重启暴露 PostgreSQL 空闲连接 `57P01` 可触发 Worker 未捕获异常；TASK05 在共享 Pool 增加只记录安全 code 的 error handler，并使 Worker 外层轮询对短暂基础设施错误按现有 poll interval 重试。业务 Job 内部租约、幂等和失败状态机不变，PostgreSQL migration 和业务 schema 不变。
+
 ## 2026-07-25 本机 SQLite 只读盘点边界
 
 `SELFHOST-PHASE3-TASK04` 为迁移 CLI 新增与 synthetic/production 模式分离的 `REAL_READONLY_INVENTORY`。入口在任何业务行读取前同时校验显式 flag、确认文字、snapshot manifest/SHA、Git commit、tool version、`--no-materialize`、`--no-files`、临时目录权限和无 target URL。它仅能读 SQLite official online backup 产生的获准临时快照，不创建 target adapter、staging、public 记录、Opening 或文件副本。
