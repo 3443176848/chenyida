@@ -668,6 +668,19 @@
 - 生产边界：只授权回环并行验收环境；不迁移真实数据，不执行生产 migration/部署/切流，不进入生产、品质、财务或真实采购执行。
 - 验收结果：`0.1.0-alpha.17`/`0017` 已完成 `100.000000 - 55.000000 - 40.000000 = 5.000000` 的真实 HTTP 退回→修订重提→最终接收旅程、Compose 重启和恢复清理；正式 `reserved_qty` 不变，未新增 PO/收货/工单，最终只保留 Schema/唯一管理员。
 
+## D-061 采购询比价采用不可变报价版本、确定性比较与人工定标
+
+- 日期：2026-07-26
+- 状态：`ACCEPTED / IMPLEMENTED / PENDING PARALLEL ACCEPTANCE`
+- 确认人：项目负责人（通过 `SELFHOST-PHASE4-TASK04` 指令确认来源、角色、口径、比较、理由、不可变和下游排除边界）
+- 来源与供应商：只有最新 `ACCEPTED` 采购申请可建立 RFQ；候选必须 ACTIVE，且每家候选对每条物料都有当前有效 1:1 Supplier Mapping。发出后范围不可改，重新询价追加新 Round。
+- 报价：采购人员代录 Supplier 报价，固定 CNY 和当前 Unit，保存有效期、MOQ、单价、交期、税/运费及条款；当前报价唯一，改价使用新版本，旧版本保持 `SUPERSEDED`。
+- 比较：服务端 PostgreSQL 按 RFQ Line 和 Currency/Unit/Tax/Freight 口径分组，以 numeric 单价、交期、Supplier ID 确定性排序；过期报价不排名。比较只保存事实，不产生推荐审批，浏览器不得重算。
+- 定标：每行一个 Supplier，必须引用当前未过期报价和最新比较。单一有效报价使用 `SOLE_SOURCE`；非最低价、晚交期 `LATE_DELIVERY_ACCEPTED`、超申请数量分别留存显式理由。Award 不可修改/删除，只能撤销并新建 Round。
+- 权限与事务：purchase 负责 RFQ/报价/比较/定标，planning 仅进度只读，manager/admin 全部；写操作执行 CSRF、幂等、CAS、锁、数据库约束，并在同事务保存业务、不可变 Event、Audit 和 Idempotency。
+- 下游边界：Sourcing Award 不自动创建 PO、Receipt、Inventory、AP 或生产事实，不修改 TASK03 Planning Allocation 和 `reserved_qty`。后续 TASK05 必须独立授权。
+- 生产边界：当前只批准源码和隔离测试，待独立 ops 完成回环并行验收；不迁真实数据，不执行生产 migration/部署、HTTPS、公网或切流。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

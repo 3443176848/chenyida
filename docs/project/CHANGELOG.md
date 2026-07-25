@@ -4,6 +4,14 @@
 
 ## 2026-07-26
 
+### SELFHOST-PHASE4-TASK04 - `feat: add procurement sourcing workflow`
+
+- 数据库：新增 expand-only `0018` 十表 RFQ/报价版本/比较版本/Sourcing Award/Event 模型、`numeric(24,6)`、有效 Round/当前报价/每行唯一 Award 索引、稳定外键、服务写守卫与不可变/来源完整性 trigger；不修改 0001—0017。
+- 规则/API：新增独立 `procurement-sourcing-selfhost` 边界和 9 组路由；只接最新 ACCEPTED 采购申请与 ACTIVE/1:1 Mapping 供应商，固定 CNY/单位口径，服务端按税费/运费分组确定性排名，人工理由定标与保留历史撤销。
+- 权限/UI：purchase 全部询比价能力，planning 进度只读，manager/admin 全部；新增两条原生采购询价路由与 Dashboard 三项待办，不提供创建采购订单入口。
+- 安全/边界：Session/must-change、权限、CSRF、有界正文、持久幂等、CAS、并发锁、Event/Audit/Idempotency 单事务；Award 不创建 PO/Receipt/Inventory/AP，不修改 Planning Allocation 或 `reserved_qty`。
+- 验证：专项 unit/UI 6/6、PostgreSQL/API 2/2、migration 3/3、Schema consistency 与目标 typecheck 通过；Identity、Supplier Mapping/Master Data、Procurement、Project、Planning、Material Requirement、Dashboard、FileStorage 与环境守卫回归通过；ESLint 0 error、Vinext build 5/5、800 文件凭证扫描、diff check 和 Python 三项通过。并行环境验收在功能提交后独立记录。
+
 ### SELFHOST-PHASE4-TASK03 - `ops: accept planning material requirement workflow in parallel environment`
 
 - 部署：从功能提交 `5009b9118901a01af6a5faed194b8444d0c1e969` 重建并行 migrate/Web/Worker，只应用 `0017`；PostgreSQL/Web healthy、Worker running，Web 继续只绑定 `127.0.0.1:3000`。

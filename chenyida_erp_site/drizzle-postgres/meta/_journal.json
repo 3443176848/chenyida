@@ -120,6 +120,13 @@
       "when": 1784997473274,
       "tag": "0017_planning_material_requirements",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785001122146,
+      "tag": "0018_procurement_sourcing",
+      "breakpoints": true
     }
   ]
 }
