@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
-最后核验：2026-07-25（Asia/Shanghai）
-适用任务：`SELFHOST-PHASE4-TASK02`
+最后核验：2026-07-26（Asia/Shanghai）
+适用任务：`SELFHOST-PHASE4-TASK03`
 
 ## 1. 使用规则
 
@@ -19,11 +19,11 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 历史 OpenAI Sites / Cloudflare D1 | 历史记录 `v3` | `2b4f1787ddbc7e0941ab2d5f5cadea6e817e8f12`；后续纳管来源 `9f2c2dca9ccde237cb2db6c01d2e3792b284e6e9` | 仓库 D1/Drizzle `0000`—`0008`；生产实际已应用版本本任务未访问、未核验 | 仅保留历史验收记录；本任务未访问公开 Site | `HISTORICAL`；文档曾记录为公开 `v3`，本任务不重新确认在线状态；不是未来生产权威方向 | 未向 PostgreSQL 迁移 | 历史提交 `2b4f178` 和 D1 migration/快照仅作迁移与行为证据；不是已验证的当前回退方案 | 历史状态；无新的部署批准 |
 | 当前 Python / SQLite 开发运行面 | `legacy-development`，尚无统一 SemVer | 当前仓库包含源代码的功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；常驻进程未记录启动 commit，不能反推为该提交 | 本地 SQLite 历史 26 表 + migration `0001`—`0004`；开发库只读核验已记录四个版本 | 本任务按发布基线重新执行 Python self-test、smoke 和临时库 go-live；结果见第 6 节 | `DEVELOPMENT`；systemd `enabled/active`，源码与已安装 unit 一致，Python 监听 `0.0.0.0:18888`；不是正式生产投用 | 不适用；该 SQLite 是旧数据来源和当前开发运行数据 | Git 源码 + 执行前 SQLite 可恢复快照；正式回退点尚未建立 | 仅开发常驻；未获生产批准 |
-| Node.js / PostgreSQL TASK02 并行验收基线 | `0.1.0-alpha.16` | 功能提交 `9236884f6cd96385c9c7050b29f57e7268142208`；验收提交消息 `ops: accept project planning workflow in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0016`；测试业务清理后为空 | TASK02 专项/共享回归/Schema/typecheck/lint/build/credentials/Python、真实旅程、重启与清理通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | migration 前及干净 0016 root-only 恢复点已验证并在成功清理后删除；Python/SQLite 不影响 | `PROJECT TO PLANNING HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`；不授权 TASK03/生产 |
+| Node.js / PostgreSQL TASK03 并行验收基线 | `0.1.0-alpha.17` | 功能提交 `5009b9118901a01af6a5faed194b8444d0c1e969`；验收提交消息 `ops: accept planning material requirement workflow in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0017`；测试业务清理后为空 | TASK03 专项/共享回归/typecheck/lint/build/credentials/Python、真实旅程、重启与恢复清理通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | migration 前 0016 root-only 恢复点已验证、用于成功清理并删除；Python/SQLite 不影响 | `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`；不授权 TASK04/生产 |
 | Node.js / PostgreSQL 自托管开发基线 | `0.1.0-alpha.15` | 功能提交 `6bbec3f490033dcfef0dd00d3c8af179f5674b60`；验收提交消息 `ops: accept market project workflow in parallel environment` | PostgreSQL 17，`0001`—`0015`；测试业务清理后为空 | TASK01 专项/migration/共享回归、并行双账号、Compose 重启与清理恢复通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；Web 仅 `127.0.0.1:3000` | `NOT_MIGRATED`；真实 SQLite、D1、文件和业务数据未读、未复制、未双写 | 既有四个 Volume；部署/验收 root-only 临时恢复点成功后删除；Python/SQLite 不切流 | `MARKET TO PROJECT HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`；HTTPS、真实迁移和生产未批准 |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.16` 已完成源码、隔离验证和回环并行验收；`0.1.0-alpha.15` 的市场→项目验收事实保持有效且未被改写。二者均不表示真实数据已迁移、六部门主线完成、HTTPS/生产恢复通过或已批准上线。
+`0.1.0-alpha.17` 已完成源码、隔离验证和回环并行验收；`alpha.15/alpha.16` 的既有部门交接事实保持有效且未被改写。这不表示真实数据已迁移、询价/供应商/比价/PO/收货已完成、HTTPS/生产恢复通过或已批准上线。
 
 ## 3. Migration 文件与 SHA-256 基线
 
@@ -47,8 +47,9 @@
 | `0014` | `0014_migration_openings.sql` | `61f65ef3d588bfbf178f3dd9ba196886fa18fb3ecca119a151f6a3bc0bc5a99b` |
 | `0015` | `0015_market_project_handoff.sql` | `419a80cb1ec3daad614f23b89895c9e8e3679bee40f506b0d0a811aba98a546f` |
 | `0016` | `0016_project_planning_handoff.sql` | `26d6e4cc609a53403b377d8550fcf5d8fd88f677178681f4cca1692544bb2076` |
+| `0017` | `0017_planning_material_requirements.sql` | `33cb162e5e32aeaca015a9d6e25a33f048166c7c895ebbc242819f6bbe2b6b28` |
 
-当前源码与并行 PostgreSQL 基线都是 `0001 -> 0016`；0016 已通过隔离和并行 Compose 验收。没有生产 PostgreSQL 部署或真实数据迁移。
+当前源码与并行 PostgreSQL 基线都是 `0001 -> 0017`；0017 已通过隔离和并行 Compose 验收。没有生产 PostgreSQL 部署或真实数据迁移。
 
 ### 历史 Cloudflare D1 / Drizzle
 
@@ -180,6 +181,21 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 | 部署/生产访问 | 未部署、未重启服务、未迁移真实数据、未访问公开生产 Site 或生产数据库 |
 
 补充说明：宿主机没有 Node/npm，Node 命令在一次性 `node:22-bookworm` 容器中执行。Python 首轮误用系统解释器时 self-test 通过、smoke 在导入 `openpyxl` 前因环境缺依赖停止；改用常驻服务实际使用的 `/opt/erp/.venv/bin/python` 后三项全部通过，没有降低断言。TASK09 Compose build 的 `npm ci` 报告 13 个既有依赖审计项（1 low、4 moderate、8 high），本任务按范围不升级依赖，留待独立安全任务。
+
+## 6.2 `0.1.0-alpha.17` 计划物料需求到采购申请并行验收记录
+
+| 项目 | 当前记录 |
+| --- | --- |
+| 任务 | `SELFHOST-PHASE4-TASK03` |
+| 包版本 | `chenyida-erp-selfhosted@0.1.0-alpha.17` |
+| 功能提交 | `5009b9118901a01af6a5faed194b8444d0c1e969`；父提交 `5557d2eee98dd3e1b47c57e1643f21c5ae599175` |
+| 数据库 | expand-only `0017_planning_material_requirements.sql`；SHA-256 `33cb162e5e32aeaca015a9d6e25a33f048166c7c895ebbc242819f6bbe2b6b28`；旧 migrations 不修改 |
+| 功能 | 固化 Material+Unit 聚合、SUBMIT 锁定重算、独立库存/在途分配、不可变需求计划/PRQ、planning/purchase UI、Dashboard 待办 |
+| 隔离验证 | TASK03 unit/UI 6/6、PG/API 3/3、migration 3/3；TASK02、Dashboard、manifest、FileStorage、typecheck/lint/build/credentials/Python 基线通过 |
+| 部署 | `DEPLOYED` 仅限 `PARALLEL HTTP ACCEPTANCE ONLY`；只应用 0017，独立 ops 提交记录实际旅程、重启与恢复清理 |
+| 排除 | RFQ、供应商选择/报价/比价、PO、收货、生产、真实迁移、HTTPS、公网、切流、TASK04、push/PR |
+
+并行实际结果：临时 planning/purchase 账号完成 `100.000000 - 55.000000 - 40.000000 = 5.000000` 的 v1 提交/采购退回释放、v2 重算重提和最终接收；正式 `reserved_qty` 保持 `10.000000`，新增 PO/Receipt/WO 均为 0。Compose 重启后 v2 Plan/PR ACCEPTED，随后恢复干净 0016 点并重新应用 0017，最终 17 migrations、唯一管理员且业务为 0。结论为 `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`。
 
 ## 6.1 `0.1.0-alpha.16` 项目到计划交接并行验收记录
 

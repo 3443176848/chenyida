@@ -2,6 +2,25 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-26 计划物料需求到采购申请交接边界
+
+`SELFHOST-PHASE4-TASK03` 新增独立 `material-requirement-selfhost` 边界。计划只能消费项目最新 `ACCEPTED` Planning Package 的固化 Material/Unit/BOM gross 快照；浏览器和 Node 不用 JavaScript 浮点数作最终数量判断，PostgreSQL `numeric(24,6)` 在 SUBMIT 锁定事务内聚合并重算。
+
+```mermaid
+flowchart LR
+    P[Latest ACCEPTED Planning Package] --> D[DRAFT requirement preview]
+    D -->|SUBMIT + lock + recalculate| A[Immutable stock/inbound Planning Allocation]
+    A --> N[Net purchase requirement]
+    N -->|greater than zero| R[Immutable Purchase Request]
+    N -->|zero| Z[Submitted plan without fake request]
+    R -->|RETURNED + reason| V[New plan version and recalculate]
+    V --> R
+    R -->|ACCEPTED| H[Planning to Purchase handoff fact]
+    H -. no automatic trigger .-> X[RFQ / Vendor / PO / Receipt / Production]
+```
+
+`0017` 六表保存需求计划/行、库存或 PO Line 分配、采购申请/行和事件。有效分配只来自 `SUBMITTED/ACCEPTED` 计划，采购退回保留不可变历史但使旧分配不再参与扣减；正式 Inventory `reserved_qty` 不变。事务锁顺序复用 Inventory 物料键并锁住采购在途来源，其他计划不能重复占用同一库存或在途。
+
 ## 2026-07-25 项目到计划交接边界
 
 `SELFHOST-PHASE4-TASK02` 新增独立 `planning-handoff-selfhost` 边界和正式 `planning` 角色。Project→Planning 不复用或改写 TASK01 MARKET→PROJECT 投影；Requirement Item 必须显式关联稳定 Product/Product Version/BOM Header/BOM Version，服务端验证客户关系、RELEASED 状态和 BOM 全行 Material/Unit 有效性。
@@ -41,12 +60,12 @@ flowchart LR
 
 `SELFHOST-PHASE3-TASK05` 首次把 Node/PostgreSQL 基线作为持久的非生产空环境与 Python/SQLite 同机并行运行。Compose 项目固定为 `chenyida-erp-parallel`，只启动 PostgreSQL 17、migrate、Web 和 Worker；Caddy/production profile 不启动。Web 宿主绑定为 `127.0.0.1:3000`，PostgreSQL 只在 Compose 网络暴露 5432，用户经 SSH 隧道访问。
 
-`SELFHOST-PHASE4-TASK01` 已把该并行环境升级到 alpha.15/`0015` 并完成市场→项目验收。`SELFHOST-PHASE4-TASK02` 随后以功能提交 `9236884f6cd96385c9c7050b29f57e7268142208` 升级到 alpha.16/`0016`，在恢复点保护下完成项目接收、解析、v1 退回、修订 v2 重提、最终接收与重启验收，再恢复为保留 16 个 migration/唯一管理员的空业务状态；网络与 production profile 边界不变。
+`SELFHOST-PHASE4-TASK01` 已把该并行环境升级到 alpha.15/`0015` 并完成市场→项目验收。`SELFHOST-PHASE4-TASK02` 随后升级到 alpha.16/`0016` 并完成项目→计划验收。`SELFHOST-PHASE4-TASK03` 再以功能提交 `5009b9118901a01af6a5faed194b8444d0c1e969` 升级到 alpha.17/`0017`，在恢复点保护下完成需求聚合、v1 采购退回释放、v2 重算重提、最终接收与重启验收，再恢复为保留 17 个 migration/唯一管理员的空业务状态；网络与 production profile 边界不变。
 
 ```mermaid
 flowchart LR
     SSH["用户 SSH 隧道"] --> WEB["127.0.0.1:3000 Node Web"]
-    WEB --> PG["Compose PostgreSQL 17 / 当前 0001—0016"]
+    WEB --> PG["Compose PostgreSQL 17 / 当前 0001—0017"]
     WORKER["独立 Worker"] --> PG
     WEB --> FILES["uploads / attachments Volumes"]
     PY["现有 Python :18888"] --> SQLITE["真实 SQLite，保持不变"]

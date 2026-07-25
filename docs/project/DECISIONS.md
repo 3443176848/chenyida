@@ -657,7 +657,7 @@
 ## D-060 计划物料需求使用提交时重算与独立 Planning Allocation
 
 - 日期：2026-07-26
-- 状态：`ACCEPTED / IMPLEMENTED / PENDING PARALLEL ACCEPTANCE`
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
 - 确认人：项目负责人（通过 `SELFHOST-PHASE4-TASK03` 指令确认角色、数量公式、锁与重算、不可变计划、采购申请和任务排除边界）
 - 来源：只能使用项目最新 `ACCEPTED` Planning Package；`Material + Unit` 与 gross quantity 只读取固化快照并聚合，不重读或展开当前 BOM。需求日期是计划版本稳定字段。
 - 数量：gross、库存可用、有效在途、库存/在途分配和净采购统一由 PostgreSQL `numeric(24,6)` 计算与约束，Node/浏览器只传递 decimal 字符串，不以 JavaScript 浮点数决定结果。
@@ -666,6 +666,7 @@
 - 申请：净采购大于零的计划行一对一进入不可变 `PRQ-########` 采购申请；净采购全为零时保存已提交需求计划但不创建空申请。采购只接收或填写原因退回，接收不自动创建 RFQ、报价、供应商选择、比价、PO 或收货。
 - 角色：planning 生成/重新生成/提交；purchase 接收/退回；manager/admin 全能力。服务端权限、CSRF、持久幂等、版本冲突、数据库 trigger、事件与审计共同 fail closed。
 - 生产边界：只授权回环并行验收环境；不迁移真实数据，不执行生产 migration/部署/切流，不进入生产、品质、财务或真实采购执行。
+- 验收结果：`0.1.0-alpha.17`/`0017` 已完成 `100.000000 - 55.000000 - 40.000000 = 5.000000` 的真实 HTTP 退回→修订重提→最终接收旅程、Compose 重启和恢复清理；正式 `reserved_qty` 不变，未新增 PO/收货/工单，最终只保留 Schema/唯一管理员。
 
 ## 待确认业务决策
 

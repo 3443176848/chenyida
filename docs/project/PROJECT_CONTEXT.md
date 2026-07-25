@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前源码与并行环境均为 `0.1.0-alpha.16`；只属于回环并行验收，明确为非生产且尚未正式发布。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前源码与并行环境均为 `0.1.0-alpha.17`；只属于回环并行验收，明确为非生产且尚未正式发布。
 
 ### 治理资料
 
@@ -57,6 +57,7 @@
 - `drizzle-postgres/0014_migration_openings.sql` 新增不可变 Migration Opening Source、库存期初/冲销和 Finance Opening/冲销；只通过测试迁移 CLI 的内部 Service 物化，复用 Ledger/Balance 与 Finance Document/Event/Settlement，不回填旧数据或暴露 HTTP 写路由。
 - `drizzle-postgres/0015_market_project_handoff.sql` expand-only 新增稳定 Project、不可变 Requirement Version/Item、受控 Document Link、Handoff 投影和不可变 Event；服务端只允许 sales 市场与 engineering 项目角色按状态机操作，不回填旧数据或启动下游流程。
 - `drizzle-postgres/0016_project_planning_handoff.sql` expand-only 新增正式 planning 角色约束、Requirement Resolution、版本化 Planning Package、Item/BOM/Document 快照和不可变 Event；不修改 0015 事实，不读取库存或创建需求/采购/生产单据。
+- `drizzle-postgres/0017_planning_material_requirements.sql` expand-only 新增不可变物料需求计划/行、独立库存/在途 Planning Allocation、采购申请/行和事件；只消费固化 Package 快照，提交时锁定重算，不修改正式 `reserved_qty` 或创建 PO/收货/生产事实。
 - 本地文件卷保存二进制，数据库只保存受控相对路径和摘要元数据。
 - Worker 使用 PostgreSQL Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、重试和 CAS；Web/Worker 是独立入口。
 
@@ -75,7 +76,7 @@
 - 供应链：供应商、采购建议、采购订单、收货、库存调整和库存流水。
 - 制造：工单、BOM 转工单、领料、完工和报工。
 - 销售：客户、询价/报价、销售订单和发货。
-- 部门交接：市场项目草稿/修订/提交与项目接收/退回；项目负责人显式解析 Product/BOM、生成不可变规格包并提交，计划员只读接收或退回。
+- 部门交接：市场项目草稿/修订/提交与项目接收/退回；项目负责人显式解析 Product/BOM、生成不可变规格包并提交；计划员接收包后生成/修订/提交锁定重算的物料需求计划，采购只接收或退回净需求申请。
 - 品质与财务：检验、缺陷、应收应付单据、收付款和汇总。
 - 运维：健康检查、管理看板、备份、恢复和导出。
 
@@ -109,6 +110,7 @@
 26. SELFHOST-PHASE3-TASK05 已在同机启动 `chenyida-erp-parallel`：PostgreSQL 17、14 migrations、Web/Worker、唯一管理员和四个持久卷。Web 仅 `127.0.0.1:3000` 并通过 SSH 隧道访问；管理员流程、空 Dashboard、23 GET、数据库/服务重启和资源门禁通过。Worker 对 PostgreSQL 短暂断连增加去敏 Pool error handler 与轮询重试。版本仍为 `0.1.0-alpha.14`，真实数据、HTTPS、切流和生产批准均未发生。
 27. SELFHOST-PHASE4-TASK01 采用 D-058：sales=市场、engineering=项目；稳定 `PRJ-########` 与六表关系模型保存当前投影和不可变需求/事件，写操作由 Project Service 统一执行 CSRF、持久幂等、CAS、事务 Audit 和职责分离。`0.1.0-alpha.15`/`0015` 已通过并行双账号闭环、重启和清理验收，不创建 Product/BOM/订单/计划/采购/工单。
 28. SELFHOST-PHASE4-TASK02 采用 D-059：新增 planning 正式角色；engineering 项目负责人显式关联客户一致的 RELEASED Product/BOM，生成 numeric 计算的不可变规格快照包；planning 只能接收或退回，退回后创建新包版本，接收不触发 TASK03。`0.1.0-alpha.16`/`0016` 已通过并行真实旅程、重启与清理，验收业务最终为 0。
+29. SELFHOST-PHASE4-TASK03 采用 D-060：只聚合最新 ACCEPTED Package 固化 Material+Unit，PostgreSQL numeric 在提交锁内重算库存、需求日前在途及其他有效计划分配；独立 Planning Allocation 不改正式 `reserved_qty`，退回后旧分配失效且必须新版本重算。`0.1.0-alpha.17`/`0017` 已通过并行真实退回→v2 重提→接收、重启与恢复清理，最终业务为 0；未创建新 PO/收货/工单。
 
 ## 当前风险
 
@@ -148,7 +150,7 @@
 
 ## 当前路线
 
-`SELFHOST-PHASE4-TASK02` 已完成：源码与并行环境为 `0.1.0-alpha.16` / PostgreSQL `0016`，退回→v2→重提→接收、Compose 重启和恢复点清理通过，结论 `PROJECT TO PLANNING HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。现在停止；TASK03 及真实迁移、HTTPS、生产恢复和切换均未开始。
+`SELFHOST-PHASE4-TASK03` 已完成：源码与并行环境为 `0.1.0-alpha.17` / PostgreSQL `0017`，v1 退回释放→v2 重算重提→接收、Compose 重启和恢复清理通过，结论 `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`。现在停止；TASK04 询价/供应商/比价以及真实迁移、HTTPS、生产恢复和切换均未开始。
 
 ## 恢复上下文检查清单
 

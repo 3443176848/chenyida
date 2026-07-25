@@ -2,6 +2,23 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-26
+
+### SELFHOST-PHASE4-TASK03 - `ops: accept planning material requirement workflow in parallel environment`
+
+- 部署：从功能提交 `5009b9118901a01af6a5faed194b8444d0c1e969` 重建并行 migrate/Web/Worker，只应用 `0017`；PostgreSQL/Web healthy、Worker running，Web 继续只绑定 `127.0.0.1:3000`。
+- 实际旅程：临时 planning/purchase 身份完成 `100.000000 - 55.000000 - 40.000000 = 5.000000` 的 v1 提交、采购退回释放、v2 重算重提和最终接收；正式 `reserved_qty` 保持 `10.000000`。
+- 持久与清理：Compose 重启后 v2 Plan/PR ACCEPTED 与页面/API 保持；随后用已验证 `0016` 恢复点清理并重新应用 `0017`，最终 17 migrations、唯一管理员，全部 TASK03/Project/PO/Receipt/WO 业务为 0，临时恢复工件已删除。
+- 保护：没有新增 PO、收货或工单；Python PID `277640`/18888 保持，未读/迁真实数据、未启 HTTPS、未切流、未 push，不启动 TASK04。
+- 结论：`PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`。
+
+### SELFHOST-PHASE4-TASK03 - `feat: add planning material requirement handoff`
+
+- 数据库：新增 expand-only `0017` 六表、`numeric(24,6)` 数量、关系约束/索引、服务写守卫、不可变与延迟完整性 trigger；Planning Allocation 独立于 Inventory `reserved_qty`。
+- 规则/API：只聚合最新 ACCEPTED Package 固化 Material+Unit；SUBMIT 锁定来源并由 PostgreSQL 重算库存/有效在途/其他计划分配，来源变化稳定冲突；只为正净需求创建 PRQ，退回释放有效分配且必须新版本重算。
+- 权限/UI：planning prepare/submit，purchase decide，manager/admin 全部；新增 7 组 API、计划物料需求与采购申请工作台、Dashboard 待办，不创建 RFQ/供应商/比价/PO/收货/生产事实。
+- 验证：TASK03 unit/UI 6/6、PG/API 3/3、migration 3/3；TASK02、Dashboard、migration tool、FileStorage、typecheck、lint/build、780 文件凭证、diff check 与 Python 三项通过。功能提交 `5009b9118901a01af6a5faed194b8444d0c1e969`。
+
 ## 2026-07-25
 
 ### SELFHOST-PHASE4-TASK02 - `ops: accept project planning workflow in parallel environment`

@@ -20,6 +20,7 @@
 
 - `SELFHOST-PHASE4-TASK01`：市场部门 → 项目部门需求交接（DONE；`0.1.0-alpha.15` / PostgreSQL `0015` 已通过并行双账号、重启持久与清理验收）。
 - `SELFHOST-PHASE4-TASK02`：项目部 → 计划部，产品/BOM/规格交接（DONE；`0.1.0-alpha.16` / PostgreSQL `0016` 已通过并行退回→v2→重提→接收、重启持久与清理验收）。
+- `SELFHOST-PHASE4-TASK03`：计划部 → 采购部，固化需求聚合、独立库存/在途分配与采购申请交接（DONE；`0.1.0-alpha.17` / PostgreSQL `0017` 已通过并行 v1 退回释放→v2 重算重提→接收、重启与恢复清理；不自动启动询价/供应商/比价）。
 - TASK03：计划物料需求与采购申请（PLANNED，禁止自动启动）。
 - TASK04：供应商询价、报价和比价（PLANNED）。
 - TASK05：采购 → 仓库 → 财务交接（PLANNED）。

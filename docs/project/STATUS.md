@@ -1,6 +1,26 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-25（Asia/Shanghai）
+最后更新时间：2026-07-26（Asia/Shanghai）
+
+## SELFHOST-PHASE4-TASK03 计划物料需求 → 采购申请交接
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 功能提交 `5009b9118901a01af6a5faed194b8444d0c1e969`；独立 ops 验收提交 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.17`；并行 PostgreSQL `0001`—`0017`；`0017` SHA-256 `33cb162e5e32aeaca015a9d6e25a33f048166c7c895ebbc242819f6bbe2b6b28`；0001—0016 未修改 |
+| 来源/数量 | PASS | 只读取最新 ACCEPTED Package 固化快照，Material+Unit 聚合；全部数量由 PostgreSQL `numeric(24,6)` 计算与保存 |
+| 分配/并发 | PASS | 提交时锁定重算；其他有效计划库存/在途分配扣减，双计划不重复占用；Planning Allocation 不修改 Inventory `reserved_qty` |
+| 状态/不可变 | PASS | DRAFT→SUBMITTED→RETURNED；新 v2→SUBMITTED→ACCEPTED；计划行、分配、申请行、事件不可变，退回后旧分配不再有效 |
+| API/安全 | PASS | 7 组路由、planning/purchase 分权、manager/admin 全能力、CSRF、持久幂等、稳定冲突、request_id、Audit 和单事务 |
+| UI/Dashboard | PASS | 计划需求和采购接收两条原生路由；已接收包、版本、重算结果、分配、事件、待采购接收指标可见 |
+| 专项/共享回归 | PASS | TASK03 unit/UI 6/6、PG/API 3/3、migration 3/3；TASK02 12/12、Dashboard PG 2/2、migration tool 8/8、FileStorage 3/3、相关单元 34/34 |
+| 静态与构建 | PASS | TASK03 typecheck、全仓 ESLint、Vinext 5/5 build、780 文件凭证扫描、`git diff --check` |
+| 实际核算 | PASS | `100.000000 - 55.000000 - 40.000000 = 5.000000`；v1 退回释放，v2 重算重提并接收；`reserved_qty=10.000000` 不变 |
+| 下游边界 | PASS | 接收不新增 RFQ/供应商/比价/PO；新增 PO 0、Receipt 0、Work Order 0，不进入生产 |
+| 持久/恢复 | PASS | Compose 重启后 v2 Plan/PR ACCEPTED；恢复干净 `0016` 点后重新应用 `0017`，最终 17 migrations/唯一管理员/业务 0 |
+| Python/SQLite | PASS / PROTECTED | Python PID `277640` alive、18888 HTTP 200；Python 三项通过，未读取或修改真实 SQLite 业务内容 |
+| Compose/资源 | PASS | PostgreSQL/Web healthy、Worker running、仅回环 3000；三容器约 293.5 MiB，宿主可用内存约 1749 MiB、磁盘 29 GiB |
+| 完成结论 | PASS | `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`；TASK04 不自动启动 |
 
 ## SELFHOST-PHASE4-TASK02 项目 → 计划交接
 
