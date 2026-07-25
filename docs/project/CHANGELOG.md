@@ -4,6 +4,15 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE2-TASK09 - `feat: add self-hosted finance management`
+
+- 数据库：新增 PostgreSQL `0013`，关系化 AR/AP Document、Receipt/Payment/全额 Reversal 和 append-only Event；来源、往来单位、金额、币种和结算事实不可原地修改，Header 只保存受控余额/状态/version 投影。
+- 服务端：新增独立 Finance Repository/Service/Handler；仅从未冲销正向 Shipment/Receipt 金额来源过账，单来源唯一，收付款不超余额，正向 Settlement 最多一次全额冲销。
+- 安全/原子性：admin/manager/finance 写权限与 sales/purchase scoped read 分离；CSRF、256 KiB、24h 幂等、限流、expected version、请求编号、中文安全错误和事务审计通过；业务事实、投影、审计与幂等共同提交或回滚。
+- 跨域/legacy：财务过账后上游发货/收货冲销 fail closed；legacy 页面只选择稳定来源 ID，不提交总额、币种、往来单位或操作者权威字段，所有路由委托同一 Finance Service。
+- 验收：Finance unit/UI 4/4、PG/API 3/3、migration 3/3、Compose 首次/重启；Procurement 7/7、Sales 3/3、Quality 8/8、FileStorage/environment、lint/typecheck/build/credentials、Python 三项通过。
+- 版本/边界：`0.1.0-alpha.9`，`0013` SHA-256 `8c52efe69d836fadf4f2841caab6dad140c51d0b78e37612cbcbac46076c45a1`；非生产且未发布，未迁真实金额，未接银行/税务/发票/汇率/总账，未访问生产、部署、push 或创建 PR。
+
 ### SELFHOST-PHASE2-TASK08 - `feat: add self-hosted quality management`
 
 - 数据库：新增 PostgreSQL `0012`，关系化 IQC/IPQC/FQC Inspection、Result、Defect 与 append-only Event；稳定 FK 固定 Receipt Line、Production Report、Completion Line + SO Line 来源，事实不可变且数量/来源/跨对象一致性 fail closed。

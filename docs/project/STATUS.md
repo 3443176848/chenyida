@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE2-TASK09 自托管应收应付与不可变收付款
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 恢复点 | PASS | `main`、起点 `ee3e6585d5f0366187f62ef3f6012c3abaf28150`；0001—0012 checksum 保持不变 |
+| 模块/数据边界 | PASS | 独立 `finance-selfhost`；AR=Shipment 金额来源、AP=Receipt 金额来源，稳定 Customer/Supplier/User ID，不写 D1/`erp_records` |
+| 金额/状态/不可变 | PASS | PostgreSQL numeric(24,6)；OPEN/PARTIALLY_SETTLED/SETTLED，Document 事实与 Settlement/Event append-only，直接数据库越权写 fail closed |
+| 收付款/冲销 | PASS | 每笔核销单一 Document、不超余额、expected version；原 Receipt/Payment 最多一次全额负事实冲销，投影和 Event 同事务恢复 |
+| 上游门禁 | PASS | 已形成财务 Document 的 Shipment/Receipt 来源不能再由 Sales/Procurement 直接冲销；未财务过账的既有冲销流程回归通过 |
+| 权限与安全 | PASS | post/pay/reverse 与 scoped read 分离；must-change、CSRF、正文上限、持久幂等、限流、CAS、请求编号、中文安全错误和事务审计通过 |
+| PostgreSQL migration | PASS | `0013` 空库、0012 存量、重复、失败回滚、约束/索引/guard、legacy 保留通过；SHA-256 `8c52efe69d836fadf4f2841caab6dad140c51d0b78e37612cbcbac46076c45a1` |
+| 专项/Compose | PASS | Finance unit/UI 4/4、PG/API 3/3、migration 3/3；Compose 首次及 Web/Worker 重启持久性通过 |
+| 适用回归 | PASS | Procurement PG 7/7、Sales 3/3、Quality 8/8、FileStorage 3/3、environment 6/6、lint/typecheck/build/credentials、Python 三项通过 |
+| 版本 | PASS / NOT RELEASED | `chenyida-erp-selfhosted@0.1.0-alpha.9`；非生产、尚未发布、部署或批准 |
+| 资源/生产影响 | NONE | TASK09 Compose 容器/网络/卷、隔离 PostgreSQL 和临时 SQLite 均已清理；未访问生产、迁真实金额、部署、push 或 PR |
+
 ## SELFHOST-PHASE2-TASK08 自托管品质闭环与 FQC 发货门禁
 
 | 验证项 | 结果 | 说明 |

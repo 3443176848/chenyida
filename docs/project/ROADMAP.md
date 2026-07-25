@@ -39,11 +39,11 @@
 - 正式物料只能经审核启用，AI 或导入结果不能直接写正式数据。
 - 物料、属性、别名、映射和历史变更可审计。
 
-**建议任务数**：9（由 `SELFHOST-PHASE2-TASK01` 源码盘点提出，逐项独立验收）。**当前状态**：IN PROGRESS；TASK02—TASK08 已完成，TASK09 在 TASK08 独立提交和 clean 后按连续指令开始。
+**建议任务数**：9（由 `SELFHOST-PHASE2-TASK01` 源码盘点提出，逐项独立验收）。**当前状态**：IN PROGRESS；TASK02—TASK09 已完成，TASK10 在 TASK09 独立提交和 clean 后按连续指令开始。
 
 **已完成的前置诊断**：`SELFHOST-PHASE2-TASK01` 已盘点 Python 64 个 HTTP 操作（GET 34、POST 30），并在当时确认自托管等价覆盖 4、部分覆盖 9、未覆盖 51、根 legacy iframe 登录后 23 个业务 GET 全部 404。TASK02/TASK03 后覆盖已增加，但完整 iframe 仍未恢复。
 
-**执行顺序（TASK02—TASK08 已完成；后续按连续指令与依赖逐项独立验收）**：
+**执行顺序（TASK02—TASK09 已完成；后续按连续指令与依赖逐项独立验收）**：
 
 - `SELFHOST-PHASE2-TASK02`：身份、用户管理、密码、会话撤销与系统审计（DONE，非生产 `0.1.0-alpha.2`；未部署或迁移真实用户）。
 - `SELFHOST-PHASE2-TASK03`：客户、供应商、产品、BOM 与供应商物料映射（DONE，非生产 `0.1.0-alpha.3`；PostgreSQL `0007`，未迁真实数据或部署）。
@@ -52,7 +52,7 @@
 - `SELFHOST-PHASE2-TASK06`：工单、BOM 快照、领退料、报工、完工与库存联动（DONE，非生产 `0.1.0-alpha.6`；PostgreSQL `0010`，未迁真实生产数据或创建品质/财务过账）。
 - `SELFHOST-PHASE2-TASK07`：询报价、销售订单、发货与库存联动（DONE，非生产 `0.1.0-alpha.7`；PostgreSQL `0011`，未迁真实销售数据或创建 AR/收款/品质过账）。
 - `SELFHOST-PHASE2-TASK08`：IQC/IPQC/FQC、缺陷、处置与关闭（DONE，非生产 `0.1.0-alpha.8`；PostgreSQL `0012`，FQC 门禁已接入发货，未迁真实检验或伪造 IQC 库存隔离）。
-- `SELFHOST-PHASE2-TASK09`：应收应付、收付款、余额与冲销。
+- `SELFHOST-PHASE2-TASK09`：应收应付、收付款、余额与冲销（DONE，非生产 `0.1.0-alpha.9`；PostgreSQL `0013`，稳定 Shipment/Receipt 金额来源、不可变 Settlement/Reversal/Event 与上游冲销门禁通过，未迁真实金额或接入外部财务系统）。
 - `SELFHOST-PHASE2-TASK10`：经营看板、备份恢复治理与 legacy iframe 退出。
 
 库存从采购中拆成独立 TASK04，因为收货、领料、完工和发货都必须复用同一不可变账本、余额投影、锁顺序、幂等和冲销规则。真实数据试迁移、生产备份恢复演练、部署和切换不属于上述九项，仍需另建任务。

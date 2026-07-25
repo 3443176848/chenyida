@@ -37,19 +37,19 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 自托管开发基线 `0.1.0-alpha.8`（包名 `chenyida-erp-selfhosted`），明确为非生产、尚未发布；统一追踪见 `RELEASES.md` |
+| 当前版本 | 自托管开发基线 `0.1.0-alpha.9`（包名 `chenyida-erp-selfhosted`），明确为非生产、尚未发布；统一追踪见 `RELEASES.md` |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK08 起始 `0ad0687a7b2f2502f68babbef1455df2a983421b`；TASK08 功能提交通过 `git log -1 -- docs/tasks/SELFHOST-PHASE2-TASK08-completion.md` 解析 |
+| 当前根仓库功能基线提交 | TASK09 起始 `ee3e6585d5f0366187f62ef3f6012c3abaf28150`；TASK09 功能提交通过 `git log -1 -- docs/tasks/SELFHOST-PHASE2-TASK09-completion.md` 解析 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 自托管 PostgreSQL 开发基线为 `0001`—`0012`；`0012` 新增关系化 IQC/IPQC/FQC、结果、缺陷和生命周期事件，并以 FQC 放行额度约束发货。SQLite 29张仍支撑当前 Python 开发运行面并作为迁移来源，D1/Drizzle 45张为历史迁移来源；均未向 PostgreSQL 迁移真实数据 |
+| 当前数据库 | 自托管 PostgreSQL 开发基线为 `0001`—`0013`；`0013` 新增稳定 Shipment/Receipt 来源的 AR/AP、不可变收付款/冲销和余额投影。SQLite 29张仍支撑当前 Python 开发运行面并作为迁移来源，D1/Drizzle 45张为历史迁移来源；均未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | Python/SQLite 开发服务由 systemd 常驻，`enabled/active` 且监听 `0.0.0.0:18888`；Node/PostgreSQL 仅为隔离开发基线，无运行中的 Compose 项目，未生产部署 |
-| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、通用库存、采购、生产、销售及品质非生产链路；完整财务及后续业务域尚未迁移 |
-| 当前阶段 | `SELFHOST-PHASE2-TASK08` 已完成非生产 IQC/IPQC/FQC、缺陷、异人处置/关闭/重开及 FQC 发货门禁；完整财务和 Dashboard 仍未迁移 |
-| 当前任务 | `SELFHOST-PHASE2-TASK08`：`DONE`；独立提交后从 clean 工作区进入 TASK09 |
-| 下一任务 | 按连续任务指令进入 `SELFHOST-PHASE2-TASK09`，先诊断应收、应付、收付款、核销和冲销；真实数据试迁移、生产备份恢复、部署和切换继续独立授权 |
+| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、通用库存、采购、生产、销售、品质及 AR/AP/收付款非生产链路；Dashboard/备份恢复治理仍未迁移 |
+| 当前阶段 | `SELFHOST-PHASE2-TASK09` 已完成非生产稳定来源 AR/AP、不可变收付款/冲销、余额投影和上游冲销门禁；Dashboard、备份恢复治理及 legacy iframe 退出仍未完成 |
+| 当前任务 | `SELFHOST-PHASE2-TASK09`：`DONE`；独立提交后从 clean 工作区进入 TASK10 |
+| 下一任务 | 按连续任务指令进入 `SELFHOST-PHASE2-TASK10`，先诊断经营看板、备份恢复治理与 legacy iframe 退出；真实数据试迁移、生产备份恢复、部署和切换继续独立授权 |
 
 ## 当前完成模块
 
@@ -63,6 +63,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - SELFHOST-PHASE2-TASK06 完成自托管生产链路：`0010`、关系化 WO/BOM 快照/需求/领退料/报工/完工；领退料和完工原子复用 TASK04 Ledger/Balance，隔离 migration、PostgreSQL/API、Compose 重启和全回归通过，版本 `0.1.0-alpha.6`，未迁真实生产数据或创建品质/财务过账
 - SELFHOST-PHASE2-TASK07 完成自托管销售链路：`0011`、关系化 Quote Version/Line/状态事件、ACCEPTED 原子转 SO、Shipment/全额冲销和稳定金额来源；发货/冲销原子复用 TASK04 Ledger/Balance，隔离 migration、PostgreSQL/API、Compose 重启和全回归通过，版本 `0.1.0-alpha.7`，未迁真实销售数据或创建应收/收款/品质过账
 - SELFHOST-PHASE2-TASK08 完成自托管品质闭环：`0012`、关系化 IQC/IPQC/FQC、Result/Defect/Event、异人处置/关闭/重开及 FQC 发货门禁；隔离 migration、PostgreSQL/API、Compose 重启和适用回归通过，版本 `0.1.0-alpha.8`，未迁真实检验数据或伪造 IQC 库存隔离
+- SELFHOST-PHASE2-TASK09 完成自托管财务闭环：`0013`、稳定 Shipment/Receipt 金额来源 AR/AP、不可变 Receipt/Payment/Reversal/Event、余额/状态/version 投影及上游冲销门禁；隔离 migration、PostgreSQL/API、Compose 重启和适用回归通过，版本 `0.1.0-alpha.9`，未迁真实金额或实现银行/税务/发票/汇率/总账
 - 多用户登录、会话、角色权限、密码修改、账号管理和操作审计
 - 物料、供应商映射、CSV 导入、清洗队列和新物料建档基础流程
 - 客户、供应商、产品、BOM 和 BOM 齐套分析
@@ -158,12 +159,13 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 29. 当前 25 条 1928C Cleaning 的分项字段可直接展示，但旧行保存的 raw spec/匹配置信度不会静默重算；重新导入后才使用“型号与规格分离”和缺失介质时最高 0.95 的新结果。
 30. 任意未来供应商可能使用当前词法尚未定义的规格语法，不能承诺未知输入 100% 自动识别；系统通过证据门禁保证不确定时不返回候选编号，新增真实反例必须进入回归夹具后再扩展确定性解析。
 31. 自托管 Material Draft/Review/Active 已通过一次性 PostgreSQL 17 和 Compose 隔离验证，但尚未迁移真实 D1/SQLite 数据、执行生产容量测试或生产恢复演练；旧 D1/Miniflare 代码只作历史参照，不能重新接入运行依赖。
-32. 完整 ERP 业务尚未迁移到 Node/PostgreSQL 自托管 API；Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购和生产已完成非生产关系化迁移，但销售、品质和完整财务仍依赖当前 Python/SQLite 开发运行面，不能仅因 PostgreSQL 已有表结构就声称业务已切换。
-33. 根自托管页面仍加载 legacy iframe；TASK02—TASK06 已接通部分 legacy 路径，但登录后 `refreshAll()` 的 23 个业务 GET 仍会因未迁移域 404 而整批失败。当前自托管系统不能描述为“完整 ERP”，`erp_records` 和旧库存占位表也不能作为业务 API 已迁移的证据。
+32. 完整 ERP 业务尚未迁移到 Node/PostgreSQL 自托管 API；Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质和财务结算子集已完成非生产关系化迁移，但 Dashboard、生产备份恢复治理及真实数据仍依赖当前 Python/SQLite 开发运行面，不能仅因 PostgreSQL 已有表结构就声称业务已切换。
+33. 根自托管页面仍加载 legacy iframe；TASK02—TASK09 已接通主业务刷新子集，但 Operations Dashboard/backup 等路径仍未迁移，根页退出 iframe 和完整断链验收留待 TASK10。当前自托管系统不能描述为“完整 ERP”，`erp_records` 和旧库存占位表也不能作为业务 API 已迁移的证据。
 
 ## 当前任务与下一任务
 
-- 已完成：`SELFHOST-PHASE2-TASK08`，新增 PostgreSQL `0012`、关系化 IQC/IPQC/FQC、Result/Defect/Event；异人处置/关闭/重开与 FQC 发货额度门禁由服务端和数据库共同约束，版本为非生产 `0.1.0-alpha.8`，未迁真实检验数据、实现 IQC 库存批次隔离、部署或访问生产。下一任务从 clean 工作区进入 TASK09。
+- 已完成：`SELFHOST-PHASE2-TASK09`，新增 PostgreSQL `0013`、稳定 Shipment/Receipt 来源 AR/AP、不可变 Settlement/Reversal/Event 和受控余额投影；财务过账后上游来源冲销 fail closed，版本为非生产 `0.1.0-alpha.9`，未迁真实金额、实现银行/税务/发票/汇率/总账、部署或访问生产。下一任务从 clean 工作区进入 TASK10。
+- 已完成：`SELFHOST-PHASE2-TASK08`，新增 PostgreSQL `0012`、关系化 IQC/IPQC/FQC、Result/Defect/Event；异人处置/关闭/重开与 FQC 发货额度门禁由服务端和数据库共同约束，版本为非生产 `0.1.0-alpha.8`，未迁真实检验数据、实现 IQC 库存批次隔离、部署或访问生产。
 - 已完成：`SELFHOST-PHASE2-TASK07`，新增 PostgreSQL `0011`、关系化 Quote/SO/Shipment/Financial Source；ACCEPTED 转单及发货/冲销与 TASK04 Ledger/Balance、状态、审计、幂等同事务，版本为非生产 `0.1.0-alpha.7`，未迁真实销售数据、创建应收/收款/品质过账、部署或访问生产。
 - 已完成：`SELFHOST-PHASE2-TASK05`，新增 PostgreSQL `0009`、关系化 PO/Receipt/状态事件/财务来源、缺料建议、部分/全部收货和全额冲销；收货与 TASK04 Ledger/Balance、审计、幂等同事务，版本为非生产 `0.1.0-alpha.5`，未迁真实 PO/在途、创建 AP、部署或访问生产。
 - 已完成：`SELFHOST-PHASE2-TASK04`，新增 PostgreSQL `0008`、不可变库存 Ledger、事务余额投影、通用调整/冻结/冲销和真实 BOM shortage 投影；版本更新为非生产 `0.1.0-alpha.4`，专项、migration、Compose 重启和适用回归通过，未回填真实库存、部署或访问生产。

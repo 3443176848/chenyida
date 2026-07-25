@@ -27,6 +27,7 @@ const state = {
   financeSummary: {},
   financialDocuments: [],
   financialPayments: [],
+  financeSources: [],
   session: { authenticated: false, user: null, setup_required: false },
   managementDashboard: null,
   backups: [],
@@ -37,6 +38,7 @@ const state = {
   productionOperations: new Map(),
   salesOperations: new Map(),
   qualityOperations: new Map(),
+  financeOperations: new Map(),
   qualitySourceOptions: [],
   selectedInspection: null,
   operationsAvailability: { dashboard: false, backups: false },
@@ -157,6 +159,14 @@ async function qualityWrite(operationName, path, payload) {
   const operation = existing || { key: crypto.randomUUID(), frozenBody }; state.qualityOperations.set(operationName, operation);
   try { const result = await api(path, { method: "POST", body: operation.frozenBody, protectedWrite: { idempotencyKey: operation.key, csrfToken: state.session.csrf_token || "" } }); state.qualityOperations.delete(operationName); return result; }
   catch (error) { if (!error.resultUnknown) state.qualityOperations.delete(operationName); throw error; }
+}
+
+async function financeWrite(operationName, path, payload) {
+  const frozenBody = JSON.stringify(payload); const existing = state.financeOperations.get(operationName);
+  if (existing && existing.frozenBody !== frozenBody) throw new Error("上一次财务操作结果尚未确认，只能使用原请求安全重试");
+  const operation = existing || { key: crypto.randomUUID(), frozenBody }; state.financeOperations.set(operationName, operation);
+  try { const result = await api(path, { method: "POST", body: operation.frozenBody, protectedWrite: { idempotencyKey: operation.key, csrfToken: state.session.csrf_token || "" } }); state.financeOperations.delete(operationName); return result; }
+  catch (error) { if (!error.resultUnknown) state.financeOperations.delete(operationName); throw error; }
 }
 
 function requestedMaterialReturnTo() {
@@ -792,20 +802,20 @@ function renderSalesSelector() {
 }
 
 function renderFinanceSelectors() {
-  $("#arSalesOrder").innerHTML = state.salesOrders.map((order) => `
-    <option value="${escapeHtml(order.id)}">${escapeHtml(order.sales_order_code)} - ${escapeHtml(order.customer_name)} - ${escapeHtml(order.product_name || order.product_code)}</option>
+  $("#arSalesOrder").innerHTML = state.financeSources.filter((row) => row.document_type === "AR").map((row) => `
+    <option value="${escapeHtml(row.source_entry_id)}">${escapeHtml(row.source_code)} - ${escapeHtml(row.customer_name)} - ${escapeHtml(row.amount)} ${escapeHtml(row.currency_code)}</option>
   `).join("");
-  $("#apPurchaseOrder").innerHTML = state.purchaseOrders.map((po) => `
-    <option value="${escapeHtml(po.id)}">${escapeHtml(po.po_code)} - ${escapeHtml(po.supplier_name)} - ${escapeHtml(po.po_status)}</option>
+  $("#apPurchaseOrder").innerHTML = state.financeSources.filter((row) => row.document_type === "AP").map((row) => `
+    <option value="${escapeHtml(row.source_entry_id)}">${escapeHtml(row.source_code)} - ${escapeHtml(row.supplier_name)} - ${escapeHtml(row.amount)} ${escapeHtml(row.currency_code)}</option>
   `).join("");
   const openDocs = state.financialDocuments.filter((doc) => Number(doc.balance_amount || 0) > 0);
   $("#paymentDoc").innerHTML = openDocs.map((doc) => `
-    <option value="${escapeHtml(doc.id)}" data-type="${escapeHtml(doc.doc_type)}">${escapeHtml(doc.doc_code)} - ${escapeHtml(doc.counterparty)} - 未结 ${escapeHtml(doc.balance_amount)}</option>
+    <option value="${escapeHtml(doc.id)}" data-type="${escapeHtml(doc.doc_type)}" data-version="${escapeHtml(doc.version)}">${escapeHtml(doc.doc_code)} - ${escapeHtml(doc.counterparty)} - 未结 ${escapeHtml(doc.balance_amount)}</option>
   `).join("");
   const selectedDoc = openDocs[0];
   if (selectedDoc) {
     $("#paymentAmount").value = selectedDoc.balance_amount;
-    $("#paymentType").value = selectedDoc.doc_type === "应收" ? "收款" : "付款";
+    $("#paymentType").value = selectedDoc.doc_type === "AR" ? "收款" : "付款";
   }
 }
 
@@ -833,34 +843,36 @@ function renderFinance() {
     <tbody>${state.financialDocuments.map((doc) => `
       <tr>
         <td>${escapeHtml(doc.doc_code)}</td>
-        <td>${escapeHtml(doc.doc_type)}</td>
+        <td>${escapeHtml(doc.doc_type === "AR" ? "应收" : "应付")}</td>
         <td>${escapeHtml(doc.counterparty)}</td>
         <td>${escapeHtml(doc.source_code)}</td>
         <td>${escapeHtml(doc.total_amount)}</td>
         <td>${escapeHtml(doc.paid_amount)}</td>
         <td>${escapeHtml(doc.balance_amount)}</td>
-        <td>${escapeHtml(doc.doc_status)}</td>
+        <td>${escapeHtml(doc.doc_status || doc.status)}</td>
         <td>${escapeHtml(doc.due_date)}</td>
       </tr>
     `).join("")}</tbody>
   `;
   $("#financialPaymentsTable").innerHTML = `
     <thead><tr>
-      <th>流水号</th><th>类型</th><th>财务单据</th><th>往来单位</th><th>金额</th><th>日期</th><th>账户</th><th>经办人</th>
+      <th>流水号</th><th>类型</th><th>财务单据</th><th>往来单位</th><th>金额</th><th>日期</th><th>账户</th><th>经办人</th><th>动作</th>
     </tr></thead>
     <tbody>${state.financialPayments.map((row) => `
       <tr>
-        <td>${escapeHtml(row.payment_code)}</td>
+        <td>${escapeHtml(row.settlement_code || row.payment_code)}</td>
         <td>${escapeHtml(row.payment_type)}</td>
         <td>${escapeHtml(row.doc_code)}</td>
         <td>${escapeHtml(row.counterparty)}</td>
         <td>${escapeHtml(row.amount)}</td>
-        <td>${escapeHtml(row.payment_date)}</td>
+        <td>${escapeHtml(row.accounting_date || row.payment_date)}</td>
         <td>${escapeHtml(row.account_name)}</td>
-        <td>${escapeHtml(row.handled_by)}</td>
+        <td>${escapeHtml(row.created_by || row.handled_by)}</td>
+        <td>${row.original_settlement_id ? "冲销记录" : row.is_reversed ? "已冲销" : `<button type="button" data-finance-reverse="${escapeHtml(row.id)}" data-document-version="${escapeHtml(state.financialDocuments.find((doc) => Number(doc.id) === Number(row.document_id))?.version || 0)}">全额冲销</button>`}</td>
       </tr>
     `).join("")}</tbody>
   `;
+  $$('[data-finance-reverse]').forEach((button) => { button.onclick = () => reverseFinancialSettlement(Number(button.dataset.financeReverse), Number(button.dataset.documentVersion)).catch((error) => toast(error.message)); });
   renderFinanceSelectors();
 }
 
@@ -1203,6 +1215,10 @@ async function refreshAll() {
   state.financeSummary = financeSummary;
   state.financialDocuments = financialDocuments.rows;
   state.financialPayments = financialPayments.rows;
+  if (state.session.user?.permissions?.includes("*") || state.session.user?.permissions?.includes("finance.post")) {
+    const [arSources, apSources] = await Promise.all([api("/api/finance/source-options?document_type=AR&limit=100"), api("/api/finance/source-options?document_type=AP&limit=100")]);
+    state.financeSources = [...arSources.rows, ...apSources.rows];
+  } else state.financeSources = [];
   renderSummary();
   renderItems();
   renderMappings();
@@ -1638,42 +1654,24 @@ async function shipSalesOrder() {
 }
 
 async function createReceivable() {
-  const salesOrderId = $("#arSalesOrder").value;
-  const amount = $("#arAmount").value.trim();
-  if (!salesOrderId) {
-    toast("没有可生成应收的销售订单");
+  const sourceEntryId = $("#arSalesOrder").value;
+  if (!sourceEntryId) {
+    toast("没有可生成应收的已过账发货金额来源");
     return;
   }
-  const result = await api("/api/financial-documents/from-sales-order", {
-    method: "POST",
-    body: JSON.stringify({
-      sales_order_id: salesOrderId,
-      total_amount: amount,
-      due_date: $("#arDueDate").value,
-      created_by: "财务员",
-    }),
-  });
+  const result = await financeWrite(`finance-ar:${sourceEntryId}`, "/api/financial-documents/from-source", { document_type: "AR", source_entry_id: Number(sourceEntryId), due_date: $("#arDueDate").value });
   await refreshAll();
   $("#financeMsg").textContent = `已生成应收 ${result.doc_code}`;
   toast("应收单已生成");
 }
 
 async function createPayable() {
-  const poId = $("#apPurchaseOrder").value;
-  const amount = $("#apAmount").value.trim();
-  if (!poId) {
-    toast("没有可生成应付的采购单");
+  const sourceEntryId = $("#apPurchaseOrder").value;
+  if (!sourceEntryId) {
+    toast("没有可生成应付的已过账收货金额来源");
     return;
   }
-  const result = await api("/api/financial-documents/from-purchase-order", {
-    method: "POST",
-    body: JSON.stringify({
-      po_id: poId,
-      total_amount: amount,
-      due_date: $("#apDueDate").value,
-      created_by: "财务员",
-    }),
-  });
+  const result = await financeWrite(`finance-ap:${sourceEntryId}`, "/api/financial-documents/from-source", { document_type: "AP", source_entry_id: Number(sourceEntryId), due_date: $("#apDueDate").value });
   await refreshAll();
   $("#financeMsg").textContent = `已生成应付 ${result.doc_code}`;
   toast("应付单已生成");
@@ -1685,20 +1683,24 @@ async function createPayment() {
     toast("没有可结算的财务单据");
     return;
   }
-  const result = await api("/api/financial-payments", {
-    method: "POST",
-    body: JSON.stringify({
+  const selected = $("#paymentDoc").selectedOptions[0];
+  const result = await financeWrite(`finance-settle:${docId}:${selected?.dataset.version}`, "/api/financial-payments", {
       doc_id: docId,
-      payment_type: $("#paymentType").value,
+      expected_version: Number(selected?.dataset.version),
       amount: $("#paymentAmount").value.trim(),
-      payment_date: $("#paymentDate").value,
+      payment_date: $("#paymentDate").value || new Date().toISOString().slice(0, 10),
       account_name: $("#paymentAccount").value.trim(),
-      handled_by: $("#paymentHandler").value.trim(),
-    }),
+      reason: "财务登记收付款",
   });
   await refreshAll();
   $("#financeMsg").textContent = `已登记 ${result.payment_code}，状态：${result.doc_status}`;
   toast("收付款已登记");
+}
+
+async function reverseFinancialSettlement(settlementId, documentVersion) {
+  const reason = window.prompt("请输入冲销原因"); if (!reason) return;
+  await financeWrite(`finance-reverse:${settlementId}:${documentVersion}`, `/api/finance-settlements/${settlementId}/reversal`, { expected_version: documentVersion, accounting_date: new Date().toISOString().slice(0, 10), reason });
+  await refreshAll(); toast("收付款已全额冲销");
 }
 
 async function createQualityInspection() {

@@ -453,24 +453,22 @@
           <div class="section-head">
             <div>
               <h2>财务结算</h2>
-              <p>从销售订单生成应收，从采购单生成应付，并登记收款、付款和未结余额。</p>
+              <p>从已过账发货/收货的稳定金额来源生成应收应付，并以不可变收付款和冲销核对余额。</p>
             </div>
           </div>
           <div id="financeCards" class="summary-grid"></div>
           <div class="two-panels">
             <div class="work-panel">
               <h3>生成应收 / 应付</h3>
-              <label>销售订单<select id="arSalesOrder"></select></label>
+              <label>发货金额来源<select id="arSalesOrder"></select></label>
               <div class="form-grid">
-                <label>应收金额<input id="arAmount" placeholder="例如 1200" /></label>
                 <label>到期日<input id="arDueDate" type="date" /></label>
               </div>
               <div class="button-row">
                 <button id="createReceivableBtn" class="primary">生成应收</button>
               </div>
-              <label class="spaced">采购单<select id="apPurchaseOrder"></select></label>
+              <label class="spaced">收货金额来源<select id="apPurchaseOrder"></select></label>
               <div class="form-grid">
-                <label>应付金额<input id="apAmount" placeholder="留空则按采购明细金额" /></label>
                 <label>到期日<input id="apDueDate" type="date" /></label>
               </div>
               <div class="button-row">
@@ -483,7 +481,7 @@
               <label>财务单据<select id="paymentDoc"></select></label>
               <div class="form-grid">
                 <label>类型
-                  <select id="paymentType">
+                  <select id="paymentType" disabled aria-label="由财务单据类型自动确定">
                     <option value="收款">收款</option>
                     <option value="付款">付款</option>
                   </select>
@@ -494,7 +492,7 @@
                 <label>日期<input id="paymentDate" type="date" /></label>
                 <label>账户<input id="paymentAccount" value="基本户" /></label>
               </div>
-              <label>经办人<input id="paymentHandler" value="财务员" /></label>
+              <p class="muted">经办人以当前登录账号为准；原收付款不可修改，只能全额冲销。</p>
               <div class="button-row">
                 <button id="createPaymentBtn" class="primary">登记收付款</button>
               </div>

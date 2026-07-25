@@ -4,45 +4,49 @@
 
 ## 2026-07-25 自托管完整 ERP 迁移覆盖层
 
-`SELFHOST-PHASE2-TASK01` 从源码确认 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30），并在当时基线记录等价覆盖 4、部分覆盖 9、未覆盖 51。TASK02 补齐身份公共边界；TASK03 已关系化主数据/BOM；TASK04 已建立通用不可变 inventory ledger；TASK05 已关系化采购；TASK06 已关系化生产；TASK07 已关系化销售；TASK08 已关系化 IQC/IPQC/FQC、缺陷与生命周期，并把 FQC 放行门禁接入发货。完整 finance 仍无自托管业务服务。
+`SELFHOST-PHASE2-TASK01` 从源码确认 Python `AppHandler` 共 64 个 HTTP 操作（GET 34、POST 30），并在当时基线记录等价覆盖 4、部分覆盖 9、未覆盖 51。TASK02 补齐身份公共边界；TASK03 已关系化主数据/BOM；TASK04 已建立通用不可变 inventory ledger；TASK05 已关系化采购；TASK06 已关系化生产；TASK07 已关系化销售；TASK08 已关系化 IQC/IPQC/FQC、缺陷与生命周期，并把 FQC 放行门禁接入发货；TASK09 已用稳定 Shipment/Receipt 金额来源建立 AR/AP、不可变收付款/冲销和余额投影。Dashboard、备份恢复治理与 legacy iframe 退出仍未完成。
 
 ```mermaid
 flowchart LR
     ROOT["自托管根页面"] --> IFRAME["/erp/index.html legacy iframe"]
     IFRAME --> AUTH["身份/用户/系统审计: 可用"]
     IFRAME --> BATCH["登录后 23 个 legacy 业务 GET"]
-    BATCH --> M8["TASK03—TASK08 主数据/BOM/库存/采购/生产/销售/品质: 已接通"]
-    BATCH --> NF["完整财务及后续业务域: 仍有缺口"]
+    BATCH --> M9["TASK03—TASK09 主数据至财务结算子集: 已接通"]
+    BATCH --> NF["Dashboard/backup 等运维路径: 仍有缺口"]
 
     NATIVE["/materials 原生页面"] --> MM["Material/Import/Normalization/Review API"]
     AUTH --> ID["identity-selfhost Repository/Service/Handler"]
-    ID --> PG["PostgreSQL 0001—0012"]
+    ID --> PG["PostgreSQL 0001—0013"]
     MM --> PG
-    M8 --> MDB["master-data-selfhost / bom-selfhost"]
+    M9 --> MDB["master-data-selfhost / bom-selfhost"]
     MDB --> PG
-    M8 --> INV["inventory-selfhost / immutable ledger"]
+    M9 --> INV["inventory-selfhost / immutable ledger"]
     INV --> PG
-    M8 --> PROC["procurement-selfhost / PO + Receipt"]
+    M9 --> PROC["procurement-selfhost / PO + Receipt"]
     PROC --> PG
-    M8 --> PROD["production-selfhost / WO + Snapshot + Material/Completion"]
+    M9 --> PROD["production-selfhost / WO + Snapshot + Material/Completion"]
     PROD --> INV
     PROD --> PG
-    M8 --> SALES["sales-selfhost / Quote + SO + Shipment"]
+    M9 --> SALES["sales-selfhost / Quote + SO + Shipment"]
     SALES --> INV
     SALES --> PG
-    M8 --> QUALITY["quality-selfhost / IQC + IPQC + FQC"]
+    M9 --> QUALITY["quality-selfhost / IQC + IPQC + FQC"]
     QUALITY --> SALES
     QUALITY --> PG
+    M9 --> FINANCE["finance-selfhost / AR + AP + Settlement/Reversal"]
+    SALES --> FINANCE
+    PROC --> FINANCE
+    FINANCE --> PG
 
     PYUI["Python static app"] --> PYAPI["Python 64 个 HTTP 操作"]
     PYAPI --> SQLITE["SQLite 29 表开发运行面"]
 ```
 
-根 iframe 的 `refreshAll()` 用一个 `Promise.all` 请求 summary、material/cleaning、主数据、采购/库存、生产、销售、品质和财务共 23 个 GET。TASK03—TASK08 已接通主数据/BOM、库存、采购、生产、销售与品质子集；但完整财务仍有缺口，因此当前仍不能描述为完整 ERP。Operations 的 users 已接通新 Identity API；management-dashboard 与 backups 仍明确降级为不可用。
+根 iframe 的 `refreshAll()` 用一个 `Promise.all` 请求 summary、material/cleaning、主数据、采购/库存、生产、销售、品质和财务共 23 个 GET。TASK03—TASK09 已接通主数据/BOM、库存、采购、生产、销售、品质与稳定来源财务结算子集；当前仍不能描述为完整 ERP，因为 Operations 的 management-dashboard 与 backups 仍明确降级为不可用，真实数据也尚未迁移。
 
 身份请求先进入 `identity-selfhost/handler.ts`，再由 Service 执行业务规则、Repository 执行 PostgreSQL 事务。非身份受保护请求在进入 Material/Import 模块前统一解析服务端 session actor 并执行 active/must-change 门禁；浏览器不能提交 permissions。会话只保存 token SHA-256 摘要，身份审计、限流和幂等均持久化到 PostgreSQL。
 
-PostgreSQL 的 `erp_records(kind,code,data JSONB)` 只是历史兼容占位，不是未来各域关系模型；`0001` 的文本库存表也只作迁移证据。TASK04 Ledger/Balance 是库存数量权威；TASK05 PO/Receipt/Financial Source、TASK06 WO/Snapshot/Material/Report/Completion、TASK07 Quote/SO/Shipment/Financial Source 与 TASK08 Inspection/Result/Defect/Event 均通过稳定外键和受控事务联动，不回写 legacy 表。完整财务业务单据仍未实现。完整逐项清单见 `docs/audits/SELFHOST-PHASE2-TASK01-api-inventory.md`，依赖顺序见 `docs/self-hosting/full-erp-api-migration-plan.md`。
+PostgreSQL 的 `erp_records(kind,code,data JSONB)` 只是历史兼容占位，不是未来各域关系模型；`0001` 的文本库存表也只作迁移证据。TASK04 Ledger/Balance 是库存数量权威；TASK05 PO/Receipt/Financial Source、TASK06 WO/Snapshot/Material/Report/Completion、TASK07 Quote/SO/Shipment/Financial Source、TASK08 Inspection/Result/Defect/Event 与 TASK09 Finance Document/Settlement/Event 均通过稳定外键和受控事务联动，不回写 legacy 表。TASK09 只覆盖稳定来源 AR/AP、单据级核销和全额冲销，不包含发票、税务、汇率、总账或银行接入。完整逐项清单见 `docs/audits/SELFHOST-PHASE2-TASK01-api-inventory.md`，依赖顺序见 `docs/self-hosting/full-erp-api-migration-plan.md`。
 
 ## 系统架构图
 
@@ -221,6 +225,6 @@ flowchart LR
 3. 在线业务主体为 JSON，缺少 V2 所需关系约束。
 4. schema、迁移和运行时建表同时存在，需建立单一迁移权威。
 5. 本地数据库缺少迁移历史和外键。
-6. 自托管根页仍依赖 legacy iframe；TASK03—TASK08 已接通主数据、BOM、通用库存、采购、生产、销售和品质子集，但完整财务等 GET 仍有缺口，`Promise.all` 仍可能整批失败。在 TASK09 及最终 UI 任务完成前，系统不能描述为完整 ERP。
+6. 自托管根页仍依赖 legacy iframe；TASK03—TASK09 已接通主数据、BOM、通用库存、采购、生产、销售、品质和财务结算子集，但 Dashboard/backup 等 Operations GET 仍明确降级。在 TASK10 完成根页与恢复治理验收前，系统不能描述为完整 ERP。
 7. Python 关键写操作缺少通用 request ID、CSRF、幂等、乐观锁、失败审计和不可变冲销；迁移必须重新建立服务端边界，不能机械翻译旧 handler。
 8. Quote 转 Sales Order 的旧 Python 路径跨两个 commit；收货、领料、完工、发货和收付款虽在 SQLite 单事务内联动，但都缺并发锁/幂等/版本和反向记录，是后续迁移的最高风险区。
