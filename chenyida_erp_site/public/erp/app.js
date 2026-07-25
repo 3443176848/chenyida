@@ -36,6 +36,9 @@ const state = {
   procurementOperations: new Map(),
   productionOperations: new Map(),
   salesOperations: new Map(),
+  qualityOperations: new Map(),
+  qualitySourceOptions: [],
+  selectedInspection: null,
   operationsAvailability: { dashboard: false, backups: false },
 };
 
@@ -146,6 +149,14 @@ async function salesWrite(operationName, path, payload, method = "POST") {
   const operation = existing || { key: crypto.randomUUID(), frozenBody }; state.salesOperations.set(operationName, operation);
   try { const result = await api(path, { method, body: operation.frozenBody, protectedWrite: { idempotencyKey: operation.key, csrfToken: state.session.csrf_token || "" } }); state.salesOperations.delete(operationName); return result; }
   catch (error) { if (!error.resultUnknown) state.salesOperations.delete(operationName); throw error; }
+}
+
+async function qualityWrite(operationName, path, payload) {
+  const frozenBody = JSON.stringify(payload); const existing = state.qualityOperations.get(operationName);
+  if (existing && existing.frozenBody !== frozenBody) throw new Error("上一次品质操作结果尚未确认，只能使用原请求安全重试");
+  const operation = existing || { key: crypto.randomUUID(), frozenBody }; state.qualityOperations.set(operationName, operation);
+  try { const result = await api(path, { method: "POST", body: operation.frozenBody, protectedWrite: { idempotencyKey: operation.key, csrfToken: state.session.csrf_token || "" } }); state.qualityOperations.delete(operationName); return result; }
+  catch (error) { if (!error.resultUnknown) state.qualityOperations.delete(operationName); throw error; }
 }
 
 function requestedMaterialReturnTo() {
@@ -853,25 +864,13 @@ function renderFinance() {
   renderFinanceSelectors();
 }
 
-function renderQualityRefOptions() {
-  const type = $("#qualityType")?.value || "IPQC";
-  let options = [];
-  if (type === "IQC") {
-    options = state.purchaseLines.map((line) => ({
-      value: JSON.stringify({ ref_type: "采购明细", ref_id: line.id, item_code: line.internal_item_code, product_code: "" }),
-      label: `${line.po_code || "采购单"} - ${line.internal_item_code} - ${line.standard_name || ""}`,
-    }));
-  } else if (type === "IPQC") {
-    options = state.workOrders.map((order) => ({
-      value: JSON.stringify({ ref_type: "生产工单", ref_id: order.id, item_code: "", product_code: order.product_code }),
-      label: `${order.work_order_code} - ${order.product_name || order.product_code}`,
-    }));
-  } else {
-    options = state.salesOrders.map((order) => ({
-      value: JSON.stringify({ ref_type: "销售订单", ref_id: order.id, item_code: "", product_code: order.product_code }),
-      label: `${order.sales_order_code} - ${order.customer_name} - ${order.product_name || order.product_code}`,
-    }));
-  }
+async function renderQualityRefOptions() {
+  const visible = state.session.user?.role === "purchase" ? ["IQC"] : ["production", "engineering"].includes(state.session.user?.role) ? ["IPQC", "FQC"] : state.session.user?.role === "sales" ? ["FQC"] : ["warehouse", "finance"].includes(state.session.user?.role) ? ["IQC", "FQC"] : ["IQC", "IPQC", "FQC"];
+  if (!visible.includes($("#qualityType").value)) $("#qualityType").value = visible[0];
+  Array.from($("#qualityType").options).forEach((option) => { option.hidden = !visible.includes(option.value); });
+  const type = $("#qualityType").value;
+  const result = await api(`/api/quality/source-options?inspection_type=${encodeURIComponent(type)}`); state.qualitySourceOptions = result.rows || [];
+  const options = state.qualitySourceOptions.map((row) => ({ value: JSON.stringify(type === "IQC" ? { purchase_receipt_line_id: row.purchase_receipt_line_id } : type === "IPQC" ? { production_report_id: row.production_report_id } : { production_completion_line_id: row.production_completion_line_id, sales_order_line_id: row.sales_order_line_id }), label: `${row.source_code} - ${row.material_code} - ${row.material_name} (可检 ${row.remaining_qty} ${row.unit_code})` }));
   $("#qualityRef").innerHTML = options.map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join("");
 }
 
@@ -880,22 +879,22 @@ function renderQualityInspections() {
     <tr>
       <td>${escapeHtml(row.inspection_code)}</td>
       <td>${escapeHtml(row.inspection_type)}</td>
-      <td>${escapeHtml(row.ref_type)}</td>
-      <td>${escapeHtml(row.item_code || row.product_code)}</td>
-      <td>${escapeHtml(row.item_name || row.product_name)}</td>
+      <td>${escapeHtml(row.purchase_receipt_line_id || row.production_report_id || `${row.production_completion_line_id || ""}/${row.sales_order_line_id || ""}`)}</td>
+      <td>${escapeHtml(row.material_code)}</td>
+      <td>${escapeHtml(row.material_name)}</td>
       <td>${escapeHtml(row.inspected_qty)}</td>
       <td>${escapeHtml(row.passed_qty)}</td>
       <td>${escapeHtml(row.failed_qty)}</td>
-      <td>${escapeHtml(row.inspection_status)}</td>
-      <td>${escapeHtml(row.disposition)}</td>
-      <td>${escapeHtml(row.inspector)}</td>
+      <td>${escapeHtml(`${row.lifecycle_status}/${row.decision_status}`)}</td>
+      <td>${escapeHtml(row.released_qty)}</td>
+      <td>${escapeHtml(row.created_by)}</td>
       <td>${escapeHtml(row.responsible_stage)}</td>
-      <td>${escapeHtml(row.inspection_date)}</td>
+      <td>${escapeHtml(row.inspection_date)}</td><td><button data-quality-id="${row.id}" data-quality-version="${row.version}" data-quality-code="${escapeHtml(row.inspection_code)}">选择</button></td>
     </tr>
   `).join("");
   $("#qualityInspectionsTable").innerHTML = `
     <thead><tr>
-      <th>检验单号</th><th>类型</th><th>来源</th><th>对象编码</th><th>对象名称</th><th>检验</th><th>合格</th><th>不良</th><th>状态</th><th>处置</th><th>检验员</th><th>责任环节</th><th>日期</th>
+      <th>检验单号</th><th>类型</th><th>来源 ID</th><th>物料编码</th><th>物料名称</th><th>检验</th><th>合格</th><th>不良</th><th>状态</th><th>放行</th><th>创建人</th><th>责任环节</th><th>日期</th><th>操作</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   `;
@@ -905,18 +904,17 @@ function renderQualityDefects() {
   const rows = state.qualityDefects.map((row) => `
     <tr>
       <td>${escapeHtml(row.inspection_code)}</td>
-      <td>${escapeHtml(row.inspection_type)}</td>
       <td>${escapeHtml(row.defect_type)}</td>
       <td>${escapeHtml(row.severity)}</td>
-      <td>${escapeHtml(row.defect_qty)}</td>
-      <td>${escapeHtml(row.responsible_stage)}</td>
-      <td>${escapeHtml(row.corrective_action)}</td>
+      <td>${escapeHtml(row.quantity)}</td>
+      <td>${escapeHtml(row.description)}</td>
+      <td>${escapeHtml(row.created_by)}</td>
       <td>${escapeHtml(row.created_at)}</td>
     </tr>
   `).join("");
   $("#qualityDefectsTable").innerHTML = `
     <thead><tr>
-      <th>检验单号</th><th>类型</th><th>不良类型</th><th>严重度</th><th>数量</th><th>责任环节</th><th>改善措施</th><th>记录时间</th>
+      <th>检验单号</th><th>不良类型</th><th>严重度</th><th>数量</th><th>说明</th><th>创建人</th><th>记录时间</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   `;
@@ -1224,7 +1222,7 @@ async function refreshAll() {
   renderSalesOrders();
   renderShipments();
   renderFinance();
-  renderQualityRefOptions();
+  await renderQualityRefOptions();
   renderQualityInspections();
   renderQualityDefects();
   if (!state.bomLines.length && state.boms.length) {
@@ -1710,35 +1708,34 @@ async function createQualityInspection() {
     return;
   }
   const ref = JSON.parse(refValue);
-  const inspectedQty = Number($("#inspectionQty").value || 0);
-  const passedQty = Number($("#passedQty").value || 0);
-  const failedQty = Math.max(0, inspectedQty - passedQty);
+  const inspectedQty = $("#inspectionQty").value.trim();
+  const passedQty = $("#passedQty").value.trim();
+  const failedQty = $("#failedQty").value.trim();
+  const hasFailure = !/^0(?:\.0{1,6})?$/.test(failedQty);
   const payload = {
     inspection_type: $("#qualityType").value,
     ...ref,
     inspected_qty: inspectedQty,
     passed_qty: passedQty,
     failed_qty: failedQty,
-    defect_type: $("#defectType").value.trim(),
-    defect_qty: failedQty,
-    disposition: $("#disposition").value,
-    inspector: $("#inspector").value.trim(),
+    results: [{ characteristic: $("#qualityCharacteristic").value.trim(), result: $("#qualityResult").value }],
+    defects: hasFailure ? [{ result_line_no: 1, defect_type: $("#defectType").value.trim(), severity: $("#defectSeverity").value, quantity: failedQty, description: $("#qualityRemark").value.trim() }] : [],
     responsible_stage: $("#responsibleStage").value.trim(),
     remark: $("#qualityRemark").value.trim(),
   };
-  if (failedQty > 0 && !payload.defect_type) {
-    toast("有不良数量时请填写不良类型");
-    return;
-  }
-  if (failedQty > 0 && !payload.disposition) {
-    toast("有不良数量时请选择处置方式");
-    return;
-  }
-  const result = await api("/api/quality-inspections", { method: "POST", body: JSON.stringify(payload) });
-  $("#qualityMsg").textContent = `已保存 ${result.inspection_code}，状态：${result.inspection_status}`;
+  if (hasFailure !== (payload.results[0].result === "FAIL")) { toast("不良数量与 PASS/FAIL 结果不一致"); return; }
+  if (hasFailure && !payload.defects[0].defect_type) { toast("有不良数量时请填写不良类型"); return; }
+  const result = await qualityWrite(`quality-create:${crypto.randomUUID()}`, "/api/quality-inspections", payload);
+  $("#qualityMsg").textContent = `已保存 ${result.data.inspection_code}，状态：OPEN/PENDING`;
   await refreshAll();
   toast("品质检验记录已保存");
 }
+
+function selectedQuality() { if (!state.selectedInspection) throw new Error("请先从检验列表选择记录"); return state.selectedInspection; }
+async function addQualityDefect() { const selected = selectedQuality(); const result = await qualityWrite(`quality-defect:${selected.id}:${selected.version}`, `/api/quality-inspections/${selected.id}/defects`, { expected_version: selected.version, defect_type: $("#defectType").value.trim(), severity: $("#defectSeverity").value, quantity: $("#defectQty").value.trim(), description: $("#qualityActionReason").value.trim() }); selected.version = Number(result.inspection_version); $("#selectedInspection").value = `${$("#selectedInspection").value.split(" (v")[0]} (v${selected.version})`; await refreshAll(); toast("缺陷已追加"); }
+async function dispositionQuality() { const selected = selectedQuality(); const code = $("#disposition").value; await qualityWrite(`quality-disposition:${selected.id}:${selected.version}`, `/api/quality-inspections/${selected.id}/dispositions`, { expected_version: selected.version, disposition_code: code, release_qty: ["RELEASE", "CONCESSION"].includes(code) ? $("#releaseQty").value.trim() : undefined, reason: $("#qualityActionReason").value.trim() }); state.selectedInspection = null; $("#selectedInspection").value = ""; await refreshAll(); toast("品质处置已记录"); }
+async function closeQuality() { const selected = selectedQuality(); await qualityWrite(`quality-close:${selected.id}:${selected.version}`, `/api/quality-inspections/${selected.id}/close`, { expected_version: selected.version, reason: $("#qualityActionReason").value.trim() }); state.selectedInspection = null; $("#selectedInspection").value = ""; await refreshAll(); toast("检验已关闭"); }
+async function reopenQuality() { const selected = selectedQuality(); await qualityWrite(`quality-reopen:${selected.id}:${selected.version}`, `/api/quality-inspections/${selected.id}/reopen`, { expected_version: selected.version, reason: $("#qualityActionReason").value.trim() }); state.selectedInspection = null; $("#selectedInspection").value = ""; await refreshAll(); toast("检验已重开"); }
 
 function bindEvents() {
   $("#setupForm").addEventListener("submit", (event) => setupSystem(event).catch((error) => {
@@ -1806,8 +1803,13 @@ function bindEvents() {
     const option = $("#paymentDoc").selectedOptions[0];
     if (option) $("#paymentType").value = option.dataset.type === "应收" ? "收款" : "付款";
   });
-  $("#qualityType").addEventListener("change", renderQualityRefOptions);
+  $("#qualityType").addEventListener("change", () => renderQualityRefOptions().catch((error) => toast(error.message)));
   $("#createInspectionBtn").addEventListener("click", createQualityInspection);
+  $("#addDefectBtn").addEventListener("click", () => addQualityDefect().catch((error) => toast(error.message)));
+  $("#dispositionInspectionBtn").addEventListener("click", () => dispositionQuality().catch((error) => toast(error.message)));
+  $("#closeInspectionBtn").addEventListener("click", () => closeQuality().catch((error) => toast(error.message)));
+  $("#reopenInspectionBtn").addEventListener("click", () => reopenQuality().catch((error) => toast(error.message)));
+  $("#qualityInspectionsTable").addEventListener("click", (event) => { const button = event.target.closest("[data-quality-id]"); if (!button) return; state.selectedInspection = { id: Number(button.dataset.qualityId), version: Number(button.dataset.qualityVersion) }; $("#selectedInspection").value = `${button.dataset.qualityCode} (v${button.dataset.qualityVersion})`; });
   $("#bomsTable").addEventListener("click", async (event) => {
     const bomId = event.target.dataset.viewBom;
     if (bomId) await loadBomLines(bomId);

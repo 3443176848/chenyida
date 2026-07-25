@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE2-TASK08 自托管品质闭环与 FQC 发货门禁
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 恢复点 | PASS | `main`、起点 `0ad0687a7b2f2502f68babbef1455df2a983421b`；0001—0011 checksum 保持不变 |
+| 模块/数据边界 | PASS | 独立 `quality-selfhost`；IQC=Receipt Line、IPQC=Production Report、FQC=Completion Line+SO Line，稳定 Material/Unit/User ID，不写 D1/`erp_records` |
+| 状态与不可变 | PASS | OPEN/PENDING、异人处置、关闭、manager/admin 重开；Result/Defect/Event append-only，Header 仅受控投影，直接数据库越权写 fail closed |
+| FQC 联动 | PASS | Shipment 只消费 CLOSED/RELEASED 额度；不足阻断、冲销恢复额度、已消费时禁止重开；与 SO/Inventory 原事务及锁顺序整合 |
+| IQC/IPQC 边界 | PASS | 只建立 Receipt Line/Report 品质权威记录，不改已过账采购/生产事实；无批次/隔离库位时不伪造 pooled inventory freeze |
+| 权限与安全 | PASS | read/inspect/defect/disposition/close/reopen 分离；职责分离、must-change、CSRF、正文上限、持久幂等、限流、CAS、请求编号和事务审计通过 |
+| PostgreSQL migration | PASS | `0012` 空库、0011 存量、重复、失败回滚、约束/索引/guard、legacy 保留通过；SHA-256 `64f065783769c0913af482402199b10f9224a1a81e52c30a3b8a087978bcd5bf` |
+| 专项/Compose | PASS | unit/UI 5/5、Quality PG/API 8/8、migration 3/3、Sales PG 3/3；Compose 初始及 Web/Worker 重启持久性通过 |
+| 适用回归 | PASS | shared unit/UI 70/70、Identity/Master/Inventory/Procurement/Production PG、FileStorage 3/3、environment 6/6、lint/typecheck/build/credentials、Python 三项通过 |
+| 版本 | PASS / NOT RELEASED | `chenyida-erp-selfhosted@0.1.0-alpha.8`；非生产、尚未发布、部署或批准 |
+| 资源/生产影响 | NONE | TASK08 Compose 容器/网络/卷和隔离测试资源已清理；未访问生产、迁真实检验数据、部署、push 或 PR |
+
 ## SELFHOST-PHASE2-TASK07 自托管销售与库存联动
 
 | 验证项 | 结果 | 说明 |

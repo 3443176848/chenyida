@@ -4,6 +4,15 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE2-TASK08 - `feat: add self-hosted quality management`
+
+- 数据库：新增 PostgreSQL `0012`，关系化 IQC/IPQC/FQC Inspection、Result、Defect 与 append-only Event；稳定 FK 固定 Receipt Line、Production Report、Completion Line + SO Line 来源，事实不可变且数量/来源/跨对象一致性 fail closed。
+- 服务端：新增独立 Quality Repository/Service/Handler；创建、追加缺陷、异人处置、关闭、管理者重开执行权限、CSRF、256 KiB、24h 幂等、限流、expected version、请求编号和事务审计。
+- 联动：Sales Shipment 在原 SO/Inventory 锁事务内消费 `CLOSED/RELEASED` FQC 额度；冲销恢复额度，仍有有效发货时禁止重开；不改写 Receipt、Report、Completion、Shipment 或金额来源历史。
+- Legacy UI：使用稳定来源选项和稳定 ID；失败检验原子提交 result+defect，处置/关闭/重开为独立受保护动作，不由浏览器自动放行或计算权威数量。
+- 验收：unit/UI 5/5、Quality PG/API 8/8、migration 3/3、Sales PG 3/3、Compose 首次/重启；shared unit/UI 70/70、跨域 PG、FileStorage/environment、lint/build/typecheck/credentials、Python 三项均通过。
+- 版本/边界：`0.1.0-alpha.8`，`0012` SHA-256 `64f065783769c0913af482402199b10f9224a1a81e52c30a3b8a087978bcd5bf`；非生产且未发布，未迁真实检验数据、实现批次/AQL/SPC/IQC 库存隔离或财务联动，未访问生产、部署、push 或创建 PR。
+
 ### SELFHOST-PHASE2-TASK07 - `feat: add self-hosted sales`
 
 - 数据库：新增 PostgreSQL `0011`，关系化 Quote Header/Version/Line/Status Event、SO Header/Version/Line/Status Event、唯一 Quote→SO Link、Shipment/全额冲销和 append-only Sales Financial Source；已过账事实与非草稿版本不可修改/删除。

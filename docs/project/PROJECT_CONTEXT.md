@@ -23,13 +23,13 @@
 - 技术：Vinext、React、TypeScript、标准 Node.js、PostgreSQL/Drizzle、本地持久化文件和 PostgreSQL 后台任务 Worker。
 - 页面：根 `app/page.tsx` 继续通过 iframe 加载 legacy `public/erp/index.html`；Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给不依赖平台 binding 的 `app/lib/selfhost-api.ts`；旧 `erp-api.ts` 仅作迁移参考。
-- 根 iframe 断链：legacy 页面登录后 `refreshAll()` 并发请求旧业务 GET；TASK03—TASK07 已接通主数据/BOM/库存/采购/生产/销售子集，品质、完整财务、Dashboard/backup 仍有缺口，故根页面仍不能代表完整 ERP。
+- 根 iframe 断链：legacy 页面登录后 `refreshAll()` 并发请求旧业务 GET；TASK03—TASK08 已接通主数据/BOM/库存/采购/生产/销售/品质子集，完整财务、Dashboard/backup 仍有缺口，故根页面仍不能代表完整 ERP。
 - 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL；Caddy production profile 可提供 HTTPS。当前没有运行中的 Compose 项目，Node/PostgreSQL 尚未生产部署。历史 Sites `v3` 不作为后续交付目标。
 
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.7`，明确为非生产且尚未发布；详见 `RELEASES.md`。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.8`，明确为非生产且尚未发布；详见 `RELEASES.md`。
 
 ### 治理资料
 
@@ -53,7 +53,7 @@
 - `drizzle-postgres/0003_material_import_mapping.sql` 增加 parse run 行绑定、动态 Mapping 目标、源结构/metadata/mapping摘要、不可变确认快照、版本/SUPERSEDED、复用来源和STALE语义；Worker、API和现有Import Workspace已完成非生产自托管闭环。
 - `drizzle-postgres/0004_material_import_normalization.sql` 增加版本化 Normalization run、关系化核心/动态属性候选、lineage、稳定 issue、重试/重跑/取消、发布一致性约束和已发布数据不可变 trigger；Worker、API和现有 Review UI 已完成非生产闭环。
 - `drizzle-postgres/0005_material_import_review.sql` 增加 Review Session/Row、核心和动态属性覆盖历史、Issue resolution、Review validation issue、sealed finalization、行级 operation、ACTIVE binding、Draft link 和审计历史；TASK01 Material Service、API、Worker 与七步 Import Workspace 已完成非生产闭环。
-- `drizzle-postgres/0006_identity_security.sql` 和 `0007_master_data_bom.sql` 分别补齐身份安全与关系化主数据/BOM；`0008_inventory_ledger.sql` 新增稳定 Material/Unit ID 的库存余额投影与不可变账本；`0009_procurement.sql`、`0010_production.sql` 和 `0011_sales.sql` 分别关系化采购、生产和销售事实并复用该库存事务边界，旧文本编码/JSON 表仅保留为迁移来源。
+- `drizzle-postgres/0006_identity_security.sql` 和 `0007_master_data_bom.sql` 分别补齐身份安全与关系化主数据/BOM；`0008_inventory_ledger.sql` 新增稳定 Material/Unit ID 的库存余额投影与不可变账本；`0009_procurement.sql`、`0010_production.sql`、`0011_sales.sql` 和 `0012_quality.sql` 分别关系化采购、生产、销售和品质事实，旧文本编码/JSON 表仅保留为迁移来源。
 - 本地文件卷保存二进制，数据库只保存受控相对路径和摘要元数据。
 - Worker 使用 PostgreSQL Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、重试和 CAS；Web/Worker 是独立入口。
 
@@ -95,6 +95,7 @@
 16. SELFHOST-PHASE2-TASK05 已新增 PostgreSQL `0009` 和独立 Procurement 服务；关系化 PO/Receipt/状态事件/财务来源以稳定内部 ID 关联，收货/全额冲销与 TASK04 Ledger/Balance、audit、idem 在一个事务提交。缺料建议不自动建单，不创建 AP/付款，不迁真实 PO/在途。版本为 `0.1.0-alpha.5`，未发布或部署。
 17. SELFHOST-PHASE2-TASK06 已新增 PostgreSQL `0010` 和独立 Production 服务；WO RELEASE 固化不可变 BOM 快照与 numeric 需求，领退料/完工与 TASK04 Ledger/Balance、状态、audit、idem 单事务提交，报工只追加。成品必须显式引用 ACTIVE/STOCKED Material，不创建品质/财务过账，不迁真实生产数据。版本为 `0.1.0-alpha.6`，未发布或部署。
 18. SELFHOST-PHASE2-TASK07 已新增 PostgreSQL `0011` 和独立 Sales 服务；Quote Version/状态事件、ACCEPTED 原子转 SO、Shipment/全额冲销与 TASK04 Ledger/Balance、状态、销售金额来源、audit、idem 单事务提交。金额固定 CNY 六位 numeric，不创建应收/收款/品质过账，不迁真实销售数据。版本为 `0.1.0-alpha.7`，未发布或部署。
+19. SELFHOST-PHASE2-TASK08 已新增 PostgreSQL `0012` 和独立 Quality 服务；IQC/Receipt Line、IPQC/Report、FQC/Completion Line+SO Line 使用稳定关系，Result/Defect/Event 不可变，异人处置/关闭/管理者重开受控。Shipment 在原事务消费 CLOSED/RELEASED FQC 额度；不伪造无批次 IQC 库存隔离，不迁真实检验数据。版本为 `0.1.0-alpha.8`，未发布或部署。
 
 ## 当前风险
 
@@ -118,8 +119,8 @@
 - Node/PostgreSQL 没有生产部署、真实数据 migration 或发布批准；隔离测试通过不能写成已上线。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
 - 业务决策 `B01-B24` 尚未全部确认。
-- 根自托管页面仍加载 legacy iframe；TASK03—TASK07 已接通主数据/BOM/库存/采购/生产/销售子集，但品质及后续业务 GET 仍有缺口。Operations 的 Dashboard/backup 仍缺失；当前不能描述为完整 ERP。
-- PostgreSQL Customer/Supplier/Product/BOM、通用库存、采购、生产和销售已有关系服务；`erp_records` JSON 占位与旧库存表不属于这些权威链路，品质和完整财务仍未迁移。表存在不等于 API、权限、事务、幂等、审计或真实数据迁移已完成。
+- 根自托管页面仍加载 legacy iframe；TASK03—TASK08 已接通主数据/BOM/库存/采购/生产/销售/品质子集，但完整财务等业务 GET 仍有缺口。Operations 的 Dashboard/backup 仍缺失；当前不能描述为完整 ERP。
+- PostgreSQL Customer/Supplier/Product/BOM、通用库存、采购、生产、销售和品质已有关系服务；`erp_records` JSON 占位与旧库存表不属于这些权威链路，完整财务仍未迁移。表存在不等于 API、权限、事务、幂等、审计或真实数据迁移已完成。
 
 ## 开发规范
 
@@ -132,7 +133,7 @@
 
 ## 当前路线
 
-当前已完成 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、通用库存账本、采购收货、生产和销售的 Node/PostgreSQL 非生产链路、统一发布追踪基线，以及完整 ERP 的 64 项 Python API 盘点、数据不变量和首页断链核验。TASK07 完成不表示品质及后续业务域已迁移。TASK07 独立提交并恢复 clean 后按连续任务指令执行 `SELFHOST-PHASE2-TASK08`；真实数据试迁移、生产备份恢复、部署和切换继续独立授权。
+当前已完成 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、通用库存账本、采购收货、生产、销售和品质的 Node/PostgreSQL 非生产链路、统一发布追踪基线，以及完整 ERP 的 64 项 Python API 盘点、数据不变量和首页断链核验。TASK08 完成不表示完整财务及后续业务域已迁移。TASK08 独立提交并恢复 clean 后按连续任务指令执行 `SELFHOST-PHASE2-TASK09`；真实数据试迁移、生产备份恢复、部署和切换继续独立授权。
 
 ## 恢复上下文检查清单
 

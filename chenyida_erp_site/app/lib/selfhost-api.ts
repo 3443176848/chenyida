@@ -15,6 +15,7 @@ import { handleInventoryApi } from "./inventory-selfhost/handler.ts";
 import { handleProcurementApi } from "./procurement-selfhost/handler.ts";
 import { handleProductionApi } from "./production-selfhost/handler.ts";
 import { handleSalesApi } from "./sales-selfhost/handler.ts";
+import { handleQualityApi } from "./quality-selfhost/handler.ts";
 import {
   assertProtectedIdentityGate,
   CSRF_COOKIE,
@@ -80,6 +81,8 @@ export async function handleSelfhostApi(request: Request): Promise<Response> {
     let user: IdentityActor;
     try { user = assertProtectedIdentityGate(identityContext); } catch (error) { return identityFailureResponse(error, requestId); }
     requirePermission(user, "material.read");
+    const qualityResponse = await handleQualityApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
+    if (qualityResponse) return qualityResponse;
     const salesResponse = await handleSalesApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (salesResponse) return salesResponse;
     const productionResponse = await handleProductionApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });

@@ -525,25 +525,17 @@
                   <option value="FQC">FQC 成品检验</option>
                 </select>
               </label>
-              <label>来源单据<select id="qualityRef"></select></label>
+              <label>稳定来源<select id="qualityRef"></select></label>
               <div class="form-grid">
                 <label>检验数量<input id="inspectionQty" value="10" /></label>
                 <label>合格数量<input id="passedQty" value="10" /></label>
+                <label>不良数量<input id="failedQty" value="0" /></label>
               </div>
               <div class="form-grid">
-                <label>不良类型<input id="defectType" placeholder="开路 / 偏位 / 外观不良" /></label>
-                <label>处置方式
-                  <select id="disposition">
-                    <option value="">无异常</option>
-                    <option value="返工">返工</option>
-                    <option value="让步放行">让步放行</option>
-                    <option value="退供">退供</option>
-                    <option value="报废">报废</option>
-                  </select>
-                </label>
+                <label>结果特性<input id="qualityCharacteristic" value="综合判定" /></label>
+                <label>检验结果<select id="qualityResult"><option value="PASS">PASS</option><option value="FAIL">FAIL</option></select></label>
               </div>
               <div class="form-grid">
-                <label>检验员<input id="inspector" value="品质员" /></label>
                 <label>责任环节<input id="responsibleStage" placeholder="供应商 / SMT / FPC / 包装" /></label>
               </div>
               <label>备注<input id="qualityRemark" placeholder="检验说明或临时处置" /></label>
@@ -553,12 +545,25 @@
               </div>
             </div>
             <div class="work-panel">
-              <h3>品质处理原则</h3>
+              <h3>缺陷、处置与关闭</h3>
+              <label>当前检验<input id="selectedInspection" readonly placeholder="请从下表选择" /></label>
+              <div class="form-grid">
+                <label>不良类型<input id="defectType" placeholder="开路 / 偏位 / 外观不良" /></label>
+                <label>严重度<select id="defectSeverity"><option value="MINOR">MINOR</option><option value="MAJOR">MAJOR</option><option value="CRITICAL">CRITICAL</option></select></label>
+                <label>缺陷数量<input id="defectQty" value="1" /></label>
+                <button id="addDefectBtn">追加缺陷</button>
+              </div>
+              <div class="form-grid">
+                <label>处置<select id="disposition"><option value="RELEASE">正常放行</option><option value="CONCESSION">让步放行</option><option value="REWORK">返工</option><option value="RETURN_TO_SUPPLIER">退供</option><option value="SCRAP">报废</option></select></label>
+                <label>放行数量<input id="releaseQty" value="1" /></label>
+              </div>
+              <label>处置/关闭原因<input id="qualityActionReason" placeholder="必填" /></label>
+              <div class="button-row"><button id="dispositionInspectionBtn">执行处置</button><button id="closeInspectionBtn" class="primary">关闭</button><button id="reopenInspectionBtn">重开（经理）</button></div>
               <ol class="steps">
-                <li>IQC 负责来料检验和退供判断。</li>
-                <li>IPQC 记录过程异常、责任工序和返工处置。</li>
-                <li>FQC 确认成品出货前质量状态。</li>
-                <li>不良数量大于 0 时必须填写不良类型和处置方式。</li>
+                <li>新检验保持 OPEN/PENDING，不自动放行。</li>
+                <li>检验创建人与处置人必须不同。</li>
+                <li>存在不良数量时先追加缺陷，再执行处置。</li>
+                <li>只有 CLOSED/RELEASED 的 FQC 数量可供出货。</li>
               </ol>
             </div>
           </div>

@@ -117,17 +117,17 @@ Python 没有独立“生产报工 POST”；报工只能随 `work-orders/comple
 | A04 | `POST /api/quotations`；P:1569，L:1482 | `sales`；customer/product、qty>0、unit_price>0；product 存在 | 写 quotation/activity | 单事务；金额 float×float round；客户用名称、不验证 customer；无版本/幂等 | `C`；TASK07 使用稳定 Customer/Product Version/Material/Unit、DRAFT Version、CNY numeric、幂等/CAS/audit |
 | A05 | `POST /api/quotations/to-sales-order`；P:1576，L:1489 | `sales`；quote_id、未转单 | 写 SO/activity，然后更新 quote/activity | `create_sales_order()` 内先 commit，再更新 quote 第二次 commit，**不是原子转换**；重复/中断可产生孤立 SO | `C`；TASK07 仅 ACCEPTED 可单事务转换，唯一 Source Link、幂等和行锁防孤立/重复 SO |
 | A06 | `POST /api/sales-orders`；P:1600，L:1513 | `sales`；product/customer、qty>0；可选 BOM/WO 必须属于产品 | 写 SO/activity；读 product/BOM/WO | 单事务；名称引用客户；无幂等/版本 | `C`；TASK07 直接 OPEN、不可变 Version/Lines、稳定 ID、幂等/CAS/audit |
-| A07 | `POST /api/shipments/from-order`；P:1612，L:1525 | `sales`；SO 存在、ship_qty>0且≤未出；库存必须足 | 写 FG balance/transaction、shipment、SO shipped/status、activity | 单事务；出货与库存过账；无幂等/并发版本/品质放行门禁 | `C`；TASK07 委托稳定 Shipment Service，SO/Balance 行锁、幂等/CAS、TASK04 Ledger/Balance、金额来源与一次全额冲销；FQC gate 留待 TASK08 |
+| A07 | `POST /api/shipments/from-order`；P:1612，L:1525 | `sales`；SO 存在、ship_qty>0且≤未出；库存必须足 | 写 FG balance/transaction、shipment、SO shipped/status、activity | 单事务；出货与库存过账；无幂等/并发版本/品质放行门禁 | `C`；TASK07 委托稳定 Shipment Service，TASK08 在相同 SO/Balance 锁事务加入 CLOSED/RELEASED FQC 额度门禁；幂等/CAS、Ledger/Balance、金额来源和冲销均保留 |
 
 ## 7. 品质（3）
 
 | # | Method / path；页面调用 | Python 权限；输入与校验 | SQLite 读写 | 事务、联动、审计与过账 | 自托管、PG 结构、缺口、风险与依赖 |
 | --- | --- | --- | --- | --- | --- |
-| Q01 | `GET /api/quality-inspections`；P:init，L:init | `read` | 读 inspections/items/products | 只读；无审计 | `N`；仅 `erp_records`；H |
-| Q02 | `GET /api/quality-defects`；P:init，L:init | `read`；可选 inspection_id | 读 defects/inspections | 只读；无审计 | `N`；无关系表/API；H |
-| Q03 | `POST /api/quality-inspections`；P:1721，L:1634 | `quality`；type∈IQC/IPQC/FQC；数量非负且合计≤检验数；可关联 PO line/WO/SO | 写 inspection；可写 defect；读来源；activity | 单事务；设置合格放行或异常待处理；**不改变收货/工单/发货状态或库存**；无幂等 | `N`；无表/API；**H**；依赖采购/生产/销售对象与处置状态机 |
+| Q01 | `GET /api/quality-inspections`；P:init，L:init | `read` | 读 inspections/items/products | 只读；无审计 | `C`；TASK08 读取关系化 Inspection/Result/Event，按角色限制 IQC/IPQC/FQC 可见范围并提供稳定来源/eligibility |
+| Q02 | `GET /api/quality-defects`；P:init，L:init | `read`；可选 inspection_id | 读 defects/inspections | 只读；无审计 | `C`；TASK08 读取关系化 Defect/Result/Inspection；缺陷追加走独立受保护 API，事实不可 UPDATE/DELETE |
+| Q03 | `POST /api/quality-inspections`；P:1721，L:1634 | `quality`；type∈IQC/IPQC/FQC；数量非负且合计≤检验数；可关联 PO line/WO/SO | 写 inspection；可写 defect；读来源；activity | 单事务；设置合格放行或异常待处理；**不改变收货/工单/发货状态或库存**；无幂等 | `C`；TASK08 使用 Receipt Line/Production Report/Completion Line+SO Line 稳定 FK、numeric、事务幂等/CAS/audit；另有 defect/disposition/close/reopen，FQC 门禁接入发货 |
 
-Python 没有独立缺陷新增/修改、处置、关闭或重开 API；只有创建检验时可附带一条缺陷，`disposition` 只是字段，不能把“品质闭环”描述为完整状态机。
+Python 仍没有独立缺陷新增/修改、处置、关闭或重开 API；TASK08 自托管 Quality Service 已补齐该闭环，但未迁移旧检验，且无批次模型时不把 IQC 结果伪装为库存隔离。
 
 ## 8. 财务（6）
 
@@ -154,7 +154,7 @@ Python 没有收款/付款冲销、应收应付调整、关账或原单反向记
 
 `/api/summary`、`/api/items`、`/api/mappings`、`/api/cleaning`、`/api/products`、`/api/customers`、`/api/suppliers`、`/api/boms`、`/api/purchase-orders`、`/api/purchase-order-lines`、`/api/inventory`、`/api/inventory-adjustments`、`/api/work-orders`、`/api/work-order-materials`、`/api/production-reports`、`/api/quotations`、`/api/sales-orders`、`/api/shipments`、`/api/quality-inspections`、`/api/quality-defects`、`/api/finance-summary`、`/api/financial-documents`、`/api/financial-payments`。
 
-TASK02—TASK07 后，以上路径中的 users 相关独立入口、主数据/BOM、库存、采购、生产和销售子集已接通；summary、cleaning、品质和完整财务等路径仍有缺口。任一未迁移路径都会使整个 `Promise.all` reject，因此登录成功仍不等于 legacy dashboard 可用。
+TASK02—TASK08 后，以上路径中的 users 相关独立入口、主数据/BOM、库存、采购、生产、销售和品质子集已接通；summary、cleaning 和完整财务等路径仍有缺口。任一未迁移路径都会使整个 `Promise.all` reject，因此登录成功仍不等于 legacy dashboard 可用。
 
 Operations 页面还请求 `/api/management-dashboard` 和 `/api/backups`，两者仍为 404；`/api/users` 已由 TASK02 接通。当前覆盖是逐域兼容子集，生产及后续业务和 Dashboard/backup 仍未迁移。
 
@@ -231,5 +231,5 @@ Operations 页面还请求 `/api/management-dashboard` 和 `/api/backups`，两�
 - Material/Import/Mapping/Normalization/Review 已有关系表、service/API/test。
 - `supplier_mappings` 与 price history 有结构但无自托管业务 API。
 - `inventory_balances/inventory_transactions` 只是基线表：以文本 `item_code` 引用、无 Material FK，且没有 receipt/adjustment/reservation/lot/location/reversal 服务。
-- TASK03—TASK07 已补齐 customer、supplier、product、BOM、PO、receipt、WO、report、quote、SO、shipment 的专用关系表与服务；quality 和完整 financial 仍只有 legacy 运行面/历史占位，不能冒充已迁移。
+- TASK03—TASK08 已补齐 customer、supplier、product、BOM、PO、receipt、WO、report、quote、SO、shipment、quality inspection/result/defect/event 的专用关系表与服务；完整 financial 仍只有 legacy 运行面/历史占位，不能冒充已迁移。
 - 因此后续各域需要新的扩展 migration；不得把 `erp_records` 当作未来生产关系模型，也不得在启动时自动建表或迁移真实数据。
