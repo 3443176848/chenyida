@@ -2,6 +2,24 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-25 市场到项目交接边界
+
+`SELFHOST-PHASE4-TASK01` 在现有 Node/PostgreSQL 权威边界中新增独立 `project-selfhost` 模块。Customer 和受控文件继续复用既有关系，Project Service 是状态转换唯一应用入口；浏览器页面只提交稳定 ID、业务输入、`expected_version`、CSRF 和 Idempotency-Key。
+
+```mermaid
+flowchart LR
+    C[Customer stable ID] --> M[市场 sales：Draft / Revision]
+    M -->|SUBMITTED / RESUBMITTED| H[MARKET → PROJECT Handoff]
+    H -->|RETURNED + reason| M
+    H -->|ACCEPTED| P[稳定 Business Project]
+    R[Immutable Requirement Versions] --> H
+    F[Controlled File ID + safe metadata] --> R
+    H --> E[Immutable Events + Audit + request_id]
+    P -. 不自动创建 .-> X[Product / BOM / Plan / Purchase / Work Order]
+```
+
+六张 `0015` 表区分稳定 Project、不可变需求内容、关系化明细、受控文件链接、当前 Handoff 投影和不可变 Event。队列由 `(to_department,status,submitted_at,id)` 索引支撑；Project/Handoff 使用行锁与 CAS，并发接收只能提交一次。该层不复制 Identity、Customer、FileStorage、Idempotency 或 Audit 逻辑，也不改 Python/SQLite 和历史 D1。
+
 ## 2026-07-25 同机并行 HTTP 验收运行面
 
 `SELFHOST-PHASE3-TASK05` 首次把 Node/PostgreSQL 基线作为持久的非生产空环境与 Python/SQLite 同机并行运行。Compose 项目固定为 `chenyida-erp-parallel`，只启动 PostgreSQL 17、migrate、Web 和 Worker；Caddy/production profile 不启动。Web 宿主绑定为 `127.0.0.1:3000`，PostgreSQL 只在 Compose 网络暴露 5432，用户经 SSH 隧道访问。

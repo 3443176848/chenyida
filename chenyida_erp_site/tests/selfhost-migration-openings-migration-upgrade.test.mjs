@@ -9,7 +9,7 @@ const { Pool } = pg;
 const databaseUrl = process.env.TEST_MIGRATION_OPENINGS_UPGRADE_DATABASE_URL;
 if (databaseUrl && !/opening_upgrade_test/i.test(databaseUrl)) throw new Error("isolated opening_upgrade_test database is required");
 const pool = databaseUrl ? new Pool({ connectionString: databaseUrl, max: 3, application_name: "migration-opening-upgrade-test" }) : null;
-const names = Object.keys(EXPECTED_MIGRATION_SHA256).sort(); const sources = new Map();
+const names = Object.keys(EXPECTED_MIGRATION_SHA256).filter((name) => name <= "0014_migration_openings.sql").sort(); const sources = new Map();
 for (const name of names) sources.set(name, await readFile(new URL(`../drizzle-postgres/${name}`, import.meta.url), "utf8"));
 const checksum = (name) => createHash("sha256").update(sources.get(name)).digest("hex");
 

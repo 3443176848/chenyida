@@ -40,7 +40,7 @@ test("synthetic PostgreSQL commit resumes, repeats without duplicates, reconcile
   const manifest = await createManifest({ runId, source, targetGitCommit: "c".repeat(40), targetMigrations, executionMode: "SYNTHETIC_COMMIT" });
   const target = new PostgresTargetAdapter(databaseUrl, { ERP_ENV: "test" });
   try {
-    const baseline = await target.inspect(targetMigrations); assert.equal(baseline.migrations.length, 14); assert.ok(baseline.businessForeignKeyCount > 40);
+    const baseline = await target.inspect(targetMigrations); assert.equal(baseline.migrations.length, 15); assert.ok(baseline.businessForeignKeyCount > 40);
     const pool = new Pool({ connectionString: databaseUrl });
     assert.equal((await pool.query("select to_regnamespace('migration_tool') is null as missing")).rows[0].missing, true);
     const dryWorkspace = await temporaryRoot("chenyida_pgdry_migration_test_");

@@ -30,7 +30,7 @@ export class PostgresTargetAdapter {
     try {
       const migrations = await client.query("select version, checksum from schema_migrations order by version");
       if (migrations.rows.length !== expectedMigrations.length || migrations.rows.some((row, index) => row.version !== expectedMigrations[index].name || row.checksum !== expectedMigrations[index].sha256)) {
-        fail("MIGRATION_TARGET_BASELINE_INVALID", "目标数据库 migration 与 0001—0014 不一致");
+        fail("MIGRATION_TARGET_BASELINE_INVALID", "目标数据库 migration 与 0001—0015 不一致");
       }
       const tables = await client.query("select tablename from pg_tables where schemaname='public' and tablename<>'schema_migrations' order by tablename");
       let existingRunManifest = null;

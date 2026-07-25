@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
 最后核验：2026-07-25（Asia/Shanghai）
-适用任务：`SELFHOST-PHASE3-TASK05`
+适用任务：`SELFHOST-PHASE4-TASK01`
 
 ## 1. 使用规则
 
@@ -19,10 +19,10 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 历史 OpenAI Sites / Cloudflare D1 | 历史记录 `v3` | `2b4f1787ddbc7e0941ab2d5f5cadea6e817e8f12`；后续纳管来源 `9f2c2dca9ccde237cb2db6c01d2e3792b284e6e9` | 仓库 D1/Drizzle `0000`—`0008`；生产实际已应用版本本任务未访问、未核验 | 仅保留历史验收记录；本任务未访问公开 Site | `HISTORICAL`；文档曾记录为公开 `v3`，本任务不重新确认在线状态；不是未来生产权威方向 | 未向 PostgreSQL 迁移 | 历史提交 `2b4f178` 和 D1 migration/快照仅作迁移与行为证据；不是已验证的当前回退方案 | 历史状态；无新的部署批准 |
 | 当前 Python / SQLite 开发运行面 | `legacy-development`，尚无统一 SemVer | 当前仓库包含源代码的功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；常驻进程未记录启动 commit，不能反推为该提交 | 本地 SQLite 历史 26 表 + migration `0001`—`0004`；开发库只读核验已记录四个版本 | 本任务按发布基线重新执行 Python self-test、smoke 和临时库 go-live；结果见第 6 节 | `DEVELOPMENT`；systemd `enabled/active`，源码与已安装 unit 一致，Python 监听 `0.0.0.0:18888`；不是正式生产投用 | 不适用；该 SQLite 是旧数据来源和当前开发运行数据 | Git 源码 + 执行前 SQLite 可恢复快照；正式回退点尚未建立 | 仅开发常驻；未获生产批准 |
-| Node.js / PostgreSQL 自托管开发基线 | `0.1.0-alpha.14`；包名 `chenyida-erp-selfhosted` | TASK05 父提交 `7c39ff9b2c50786a225fe788ec5e3b6fb9f91dc2`；本任务提交以 `git log -1` 为准 | PostgreSQL 17，migration 保持 `0001`—`0014`；空环境 14 个版本已应用，未创建 `0015` | Compose 配置、健康、管理员、空 Dashboard、23 GET、重启持久性、Worker 断连恢复和资源门禁通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；Web 仅 `127.0.0.1:3000`，不是 production/release | `NOT_MIGRATED`；真实 SQLite、D1、文件和业务数据未读、未复制、未双写 | 停止 `chenyida-erp-parallel` 并保留四个 Volume；Python/SQLite 18888 始终保留且未切流 | `PARALLEL HTTP ACCEPTANCE ENVIRONMENT RUNNING`；HTTPS、真实迁移和生产仍未批准 |
+| Node.js / PostgreSQL 自托管开发基线 | 源码 `0.1.0-alpha.15`；并行运行面部署前仍为 alpha.14 | TASK01 父提交 `0f15f271cc458343116cb6639f0d118eea37521b`；功能提交消息 `feat: add market project handoff workflow` | 源码 migration `0001`—`0015`；并行空环境在 ops 验收前仍为 14 个版本 | TASK01 专项/migration/共享回归通过；并行双账号与重启验收待功能提交后执行 | 既有 `PARALLEL HTTP ACCEPTANCE ONLY` 运行；TASK01 尚未部署，Web 仅 `127.0.0.1:3000` | `NOT_MIGRATED`；真实 SQLite、D1、文件和业务数据未读、未复制、未双写 | TASK01 部署前 root-only 恢复点 + 既有四个 Volume；Python/SQLite 不切流 | `IMPLEMENTED / PARALLEL ACCEPTANCE PENDING`；HTTPS、真实迁移和生产未批准 |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.14` 现同时具有“自托管完整 ERP API 非生产候选 + 合成 public 物化准备度 + 本机 SQLite 只读脱敏盘点证据 + 同机并行 HTTP 空环境”。该部署只用于回环/SSH 隧道验收；不表示真实数据已迁移、HTTPS/生产恢复通过或已批准上线。真实数据仍在 Python/SQLite 开发运行面。
+`0.1.0-alpha.15` 源码新增市场→项目交接，但尚未完成并行 ops 验收；现运行的回环环境仍以 alpha.14/0014 为已部署基线。两者都不表示真实数据已迁移、HTTPS/生产恢复通过或已批准上线。
 
 ## 3. Migration 文件与 SHA-256 基线
 
@@ -44,8 +44,9 @@
 | `0012` | `0012_quality.sql` | `64f065783769c0913af482402199b10f9224a1a81e52c30a3b8a087978bcd5bf` |
 | `0013` | `0013_finance.sql` | `8c52efe69d836fadf4f2841caab6dad140c51d0b78e37612cbcbac46076c45a1` |
 | `0014` | `0014_migration_openings.sql` | `61f65ef3d588bfbf178f3dd9ba196886fa18fb3ecca119a151f6a3bc0bc5a99b` |
+| `0015` | `0015_market_project_handoff.sql` | `419a80cb1ec3daad614f23b89895c9e8e3679bee40f506b0d0a811aba98a546f` |
 
-当前 PostgreSQL 基线是空库 `0001 -> 0014`。它只在隔离 PostgreSQL/Compose 中执行过；没有生产 PostgreSQL 部署，也没有真实数据迁移。
+当前源码 PostgreSQL 基线是 `0001 -> 0015`；0015 已在隔离 PostgreSQL 执行，尚待并行 Compose 验收。没有生产 PostgreSQL 部署或真实数据迁移。
 
 ### 历史 Cloudflare D1 / Drizzle
 
@@ -177,6 +178,19 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 | 部署/生产访问 | 未部署、未重启服务、未迁移真实数据、未访问公开生产 Site 或生产数据库 |
 
 补充说明：宿主机没有 Node/npm，Node 命令在一次性 `node:22-bookworm` 容器中执行。Python 首轮误用系统解释器时 self-test 通过、smoke 在导入 `openpyxl` 前因环境缺依赖停止；改用常驻服务实际使用的 `/opt/erp/.venv/bin/python` 后三项全部通过，没有降低断言。TASK09 Compose build 的 `npm ci` 报告 13 个既有依赖审计项（1 low、4 moderate、8 high），本任务按范围不升级依赖，留待独立安全任务。
+
+## 6.0 `0.1.0-alpha.15` 市场到项目交接开发记录
+
+| 项目 | 值 |
+| --- | --- |
+| 任务 | `SELFHOST-PHASE4-TASK01` |
+| 包版本 | `chenyida-erp-selfhosted@0.1.0-alpha.15` |
+| 父提交 | `0f15f271cc458343116cb6639f0d118eea37521b`；功能提交消息 `feat: add market project handoff workflow` |
+| 数据库 | expand-only `0015_market_project_handoff.sql`；SHA-256 `419a80cb1ec3daad614f23b89895c9e8e3679bee40f506b0d0a811aba98a546f`；旧 migrations 不修改 |
+| 功能 | sales 市场草稿/不可变修订/提交，engineering 队列/退回/接收，稳定 Project、受控文件引用、不可变 Handoff Event 和两条原生页面 |
+| 验收 | unit/UI、隔离 PG/API、空库与 0014 upgrade、重复/回滚、并发/幂等/CAS/故障、共享 Identity/Master/Sales、typecheck/lint/build/credentials/Python 临时基线通过 |
+| 发布 | `NOT_RELEASED`；功能提交前并行环境仍为 alpha.14/0014，双账号/重启/清理待 ops 验收 |
+| 排除 | 真实数据、Product/BOM/计划/采购/生产自动创建、HTTPS、公网、切流、TASK02、push/PR |
 
 ## 6.1 SELFHOST-PHASE3-TASK05 并行 HTTP 验收部署记录
 

@@ -17,7 +17,7 @@ REPO = Path("/opt/erp")
 SITE = REPO / "chenyida_erp_site"
 SOURCE = REPO / "chenyida_erp_app/data/erp.sqlite3"
 SNAPSHOT_SCRIPT = SITE / "scripts/readonly-sqlite-snapshot.py"
-TOOL_VERSION = "0.1.0-alpha.14"
+TOOL_VERSION = "0.1.0-alpha.15"
 
 
 def command_output(arguments: list[str], cwd: Path | None = None) -> str:

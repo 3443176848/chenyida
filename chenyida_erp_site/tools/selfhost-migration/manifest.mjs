@@ -5,7 +5,7 @@ import { fail } from "./errors.mjs";
 import { registryDigest, MAPPING_REGISTRY } from "./mapping-registry.mjs";
 
 export const MANIFEST_SCHEMA_VERSION = 1;
-export const TOOL_VERSION = "0.1.0-alpha.14";
+export const TOOL_VERSION = "0.1.0-alpha.15";
 export const EXPECTED_MIGRATION_SHA256 = Object.freeze({
   "0001_selfhost_baseline.sql": "c1cd71803b0f504594a41234a82eb13ce8e6713f5d346f3e49247b4921ff1702",
   "0002_material_master_workflow.sql": "2d8d4facf54c950fa19d1346705aa0f549669544da1a87c2fc584c1fe8b7eb80",
@@ -21,16 +21,17 @@ export const EXPECTED_MIGRATION_SHA256 = Object.freeze({
   "0012_quality.sql": "64f065783769c0913af482402199b10f9224a1a81e52c30a3b8a087978bcd5bf",
   "0013_finance.sql": "8c52efe69d836fadf4f2841caab6dad140c51d0b78e37612cbcbac46076c45a1",
   "0014_migration_openings.sql": "61f65ef3d588bfbf178f3dd9ba196886fa18fb3ecca119a151f6a3bc0bc5a99b",
+  "0015_market_project_handoff.sql": "419a80cb1ec3daad614f23b89895c9e8e3679bee40f506b0d0a811aba98a546f",
 });
 
 export async function migrationChecksums(directory) {
   const files = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();
-  if (files.length !== 14 || files[0] !== "0001_selfhost_baseline.sql" || files.at(-1) !== "0014_migration_openings.sql") {
-    fail("MIGRATION_TARGET_BASELINE_INVALID", "目标 migration 必须严格为 0001—0014");
+  if (files.length !== 15 || files[0] !== "0001_selfhost_baseline.sql" || files.at(-1) !== "0015_market_project_handoff.sql") {
+    fail("MIGRATION_TARGET_BASELINE_INVALID", "目标 migration 必须严格为 0001—0015");
   }
   const migrations = await Promise.all(files.map(async (name) => ({ name, sha256: sha256(await readFile(resolve(directory, name))) })));
   if (migrations.some(({ name, sha256: digest }) => EXPECTED_MIGRATION_SHA256[name] !== digest)) {
-    fail("MIGRATION_TARGET_BASELINE_INVALID", "目标 migration checksum 与 0001—0014 固定基线不一致");
+    fail("MIGRATION_TARGET_BASELINE_INVALID", "目标 migration checksum 与 0001—0015 固定基线不一致");
   }
   return migrations;
 }

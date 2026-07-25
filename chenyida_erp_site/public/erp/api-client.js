@@ -47,8 +47,9 @@ export async function api(path, options = {}) {
   const qualityWrite = (path === "/api/quality-inspections" || /^\/api\/quality-inspections\/[1-9]\d*\/(?:defects|dispositions|close|reopen)$/.test(path)) && method === "POST";
   const financeWrite = (["/api/finance/documents", "/api/finance/settlements", "/api/financial-documents/from-source", "/api/financial-documents/from-sales-order", "/api/financial-documents/from-purchase-order", "/api/financial-payments"].includes(path)
     || /^\/api\/(?:financial-documents\/[1-9]\d*\/settlements|(?:financial-payments|finance-settlements)\/[1-9]\d*\/reversal)$/.test(path)) && method === "POST";
+  const projectWrite = (path === "/api/projects" || /^\/api\/projects\/[1-9]\d*(?:\/(?:submit|accept|return|documents)(?:\/[1-9]\d*)?)?$/.test(path)) && ["POST", "PATCH", "DELETE"].includes(method);
   const logoutWrite = path === "/api/logout" && method === "POST";
-  if ((materialWrite || identityWrite || masterDataWrite || procurementWrite || productionWrite || qualityWrite) || financeWrite) {
+  if ((materialWrite || identityWrite || masterDataWrite || procurementWrite || productionWrite || qualityWrite || projectWrite) || financeWrite) {
     if (!protectedWrite?.idempotencyKey || !protectedWrite?.csrfToken) {
       throw new ErpApiError("受保护写请求缺少幂等键或 CSRF Token", { code: "PROTECTED_WRITE_CONTEXT_REQUIRED" });
     }
@@ -63,7 +64,7 @@ export async function api(path, options = {}) {
   try {
     response = await fetch(path, { ...requestOptions, method, credentials: "same-origin", headers });
   } catch (error) {
-    if ((materialWrite || identityWrite || masterDataWrite || procurementWrite || productionWrite || qualityWrite) || financeWrite) {
+    if ((materialWrite || identityWrite || masterDataWrite || procurementWrite || productionWrite || qualityWrite || projectWrite) || financeWrite) {
       throw new ErpApiError("操作结果尚未确认，请使用原操作标识安全恢复", { code: "RESULT_UNKNOWN", resultUnknown: true });
     }
     if (error?.name === "AbortError") throw error;

@@ -76,11 +76,11 @@ test("ID map is stable, idempotent, and rejects changed source digest", () => {
   assert.throws(() => map.register({ ...input, sourceDigest: "c".repeat(64) }), { code: "MIGRATION_SOURCE_CHANGED" });
 });
 
-test("manifest is complete, safe, and binds exactly 0001-0014", async () => {
+test("manifest is complete, safe, and binds exactly 0001-0015", async () => {
   const root = await tempRoot("manifest"); const source = await inspectD1ExportSource(await writeSyntheticD1Export(root, "valid"), env);
   const migrations = await migrationChecksums(resolve(siteRoot, "drizzle-postgres"));
   const manifest = await createManifest({ runId: "22222222-2222-4222-8222-222222222222", source, targetGitCommit: "a".repeat(40), targetMigrations: migrations, executionMode: "DRY_RUN" });
-  assert.equal(manifest.target_migrations.length, 14); assert.equal(validateManifest(manifest), manifest);
+  assert.equal(manifest.target_migrations.length, 15); assert.equal(validateManifest(manifest), manifest);
   assert.throws(() => validateManifest({ ...manifest, source_files: [{ name: "/real/path", sha256: "a", bytes: 1 }] }), { code: "MIGRATION_MANIFEST_PATH_INVALID" });
   assert.throws(() => validateManifest({ ...manifest, leaked_password: "secret" }), { code: "MIGRATION_MANIFEST_SENSITIVE" });
 });

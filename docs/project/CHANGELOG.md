@@ -4,6 +4,14 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE4-TASK01 - `feat: add market project handoff workflow`
+
+- 数据库：新增 expand-only PostgreSQL `0015` 六表关系模型、稳定项目编号、需求版本/行、受控文件引用、交接投影和不可变事件；同步 Drizzle journal/snapshot/schema 与固定 checksum，不修改 0001—0014。
+- 服务端：新增独立 Project Repository/Service/Handler/Validation；sales 市场和 engineering 项目严格分权，执行 CSRF、24h 持久幂等、CAS、并发锁、职责分离、中文稳定错误、request_id 和单事务 Audit。
+- UI：新增 `/business/projects` 与 `/engineering/projects`，覆盖草稿/修订/提交、退回原因/重提、待接收/已接收和安全资料元数据；Dashboard 增加“市场部门”“项目部门”入口。
+- 验证：专项 unit/UI 7/7、PG/API 3/3、migration 3/3；Identity/Master/Sales unit/UI 21/21、PG/API 14/14；typecheck、lint、build、manifest、credentials、diff check 和 Python 临时 SQLite 三项通过。
+- 边界：功能提交后才部署并行验收环境；当前不标记 DONE，不启动 TASK02，不迁真实数据，不创建下游 Product/BOM/计划/采购/生产对象。
+
 ### SELFHOST-PHASE3-TASK05 - `ops: deploy parallel self-hosted acceptance environment`
 
 - 部署：创建并保持运行 Compose 项目 `chenyida-erp-parallel`，只启动 PostgreSQL 17、migrate、Web、Worker和四个持久 Volume；版本保持 `0.1.0-alpha.14`，migration 保持 `0001`—`0014`。

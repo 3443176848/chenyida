@@ -2,6 +2,21 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE4-TASK01 市场 → 项目交接（功能完成，部署待验收）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DOING | 源码、migration、UI、测试与文档已完成；等待功能提交及并行双账号/重启/清理验收 |
+| 版本/Migration | PASS / NOT DEPLOYED | `0.1.0-alpha.15`；`0015` SHA-256 `419a80cb1ec3daad614f23b89895c9e8e3679bee40f506b0d0a811aba98a546f`；0001—0014 未修改 |
+| 状态机 | PASS | DRAFT→SUBMITTED→ACCEPTED、SUBMITTED→RETURNED→修订→RESUBMITTED→ACCEPTED；需求/事件不可变 |
+| API/安全 | PASS | sales/engineering 分权、CSRF、持久幂等/CAS、并发一次接收、职责分离、事务 Audit/request_id、文件安全引用 |
+| UI | PASS | 市场/项目两条原生路由、加载/空/错误/权限/刷新恢复、退回原因和安全元数据合同通过 |
+| Migration | PASS | 空库 0001→0015、0014 管理员升级、重复执行、失败回滚、约束/索引/服务写守卫 3/3 |
+| 专项/共享回归 | PASS | Project unit/UI 7/7、PG/API 3/3；Identity/Master/Sales unit/UI 21/21、PG/API 14/14；manifest 8/8 |
+| 静态与构建 | PASS | TASK01 typecheck、全仓 lint、Vinext build 5/5、凭证扫描、`git diff --check` |
+| Python/SQLite | PASS / PROTECTED | 临时 SQLite self-test/smoke/go-live 通过；PID 277640/18888 保持；真实 SQLite 只做 metadata stat，未读取或修改 |
+| 完成结论 | PENDING | 并行实际闭环前禁止使用 `MARKET TO PROJECT HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT` |
+
 ## SELFHOST-PHASE3-TASK05 同机并行 HTTP 验收环境
 
 | 验证项 | 结果 | 说明 |

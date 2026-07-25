@@ -293,6 +293,103 @@ export const inventoryBalances = pgTable("inventory_balances", {
   itemCode: text("item_code").primaryKey(), onHandQty: numeric("on_hand_qty", { precision: 24, scale: 6 }).notNull().default("0"), reservedQty: numeric("reserved_qty", { precision: 24, scale: 6 }).notNull().default("0"), version: integer("version").notNull().default(1), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 });
 
+export const businessProjects = pgTable("business_projects", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), projectCode: text("project_code").notNull(),
+  customerId: bigint("customer_id", { mode: "number" }).notNull().references(() => customers.id, { onDelete: "restrict" }),
+  projectName: text("project_name").notNull(), projectGoal: text("project_goal").notNull(),
+  marketOwner: text("market_owner").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
+  projectOwner: text("project_owner").references(() => appUsers.username, { onDelete: "restrict" }),
+  status: text("status").notNull().default("DRAFT"), targetDeliveryDate: date("target_delivery_date", { mode: "string" }),
+  currentRequirementVersionNo: integer("current_requirement_version_no").notNull().default(1), version: integer("version").notNull().default(1),
+  requestId: uuid("request_id").notNull(), createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
+  createdAt: timestamptz("created_at").notNull().defaultNow(), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("business_projects_code_uq").on(t.projectCode),
+  index("business_projects_market_status_idx").on(t.marketOwner, t.status, t.updatedAt, t.id),
+  index("business_projects_project_status_idx").on(t.projectOwner, t.status, t.updatedAt, t.id),
+  index("business_projects_customer_idx").on(t.customerId, t.updatedAt, t.id),
+  check("business_projects_code_ck", sql`${t.projectCode} ~ '^PRJ-[0-9]{8}$'`),
+  check("business_projects_status_ck", sql`${t.status} in ('DRAFT','SUBMITTED','RETURNED','ACCEPTED')`),
+  check("business_projects_version_ck", sql`${t.version}>0 and ${t.currentRequirementVersionNo}>0`),
+  check("business_projects_text_ck", sql`char_length(btrim(${t.projectName})) between 1 and 200 and char_length(btrim(${t.projectGoal})) between 1 and 2000`),
+  check("business_projects_owner_ck", sql`(${t.status}='ACCEPTED' and ${t.projectOwner} is not null) or (${t.status}<>'ACCEPTED')`),
+]);
+
+export const projectRequirementVersions = pgTable("project_requirement_versions", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }),
+  versionNo: integer("version_no").notNull(), customerRequirementSummary: text("customer_requirement_summary").notNull(),
+  quantityRequirement: numeric("quantity_requirement", { precision: 24, scale: 6 }), quantityUnit: text("quantity_unit").notNull().default(""),
+  deliveryRequirement: text("delivery_requirement").notNull().default(""), commercialTerms: text("commercial_terms").notNull().default(""),
+  technicalRequirements: text("technical_requirements").notNull().default(""), contentDigest: text("content_digest").notNull(),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("project_requirement_versions_project_no_uq").on(t.projectId, t.versionNo),
+  uniqueIndex("project_requirement_versions_project_digest_uq").on(t.projectId, t.contentDigest),
+  index("project_requirement_versions_project_created_idx").on(t.projectId, t.createdAt, t.id),
+  check("project_requirement_versions_no_ck", sql`${t.versionNo}>0`),
+  check("project_requirement_versions_quantity_ck", sql`${t.quantityRequirement} is null or ${t.quantityRequirement}>0`),
+  check("project_requirement_versions_digest_ck", sql`${t.contentDigest} ~ '^[0-9a-f]{64}$'`),
+  check("project_requirement_versions_summary_ck", sql`char_length(btrim(${t.customerRequirementSummary})) between 1 and 4000`),
+]);
+
+export const projectRequirementItems = pgTable("project_requirement_items", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), requirementVersionId: bigint("requirement_version_id", { mode: "number" }).notNull().references(() => projectRequirementVersions.id, { onDelete: "restrict" }),
+  lineNo: integer("line_no").notNull(), provisionalName: text("provisional_name").notNull(), quantity: numeric("quantity", { precision: 24, scale: 6 }).notNull(),
+  unitId: bigint("unit_id", { mode: "number" }).references(() => units.id, { onDelete: "restrict" }), unitPending: boolean("unit_pending").notNull().default(false),
+  specificationRequirement: text("specification_requirement").notNull().default(""), productId: bigint("product_id", { mode: "number" }).references(() => products.id, { onDelete: "restrict" }),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("project_requirement_items_version_line_uq").on(t.requirementVersionId, t.lineNo),
+  index("project_requirement_items_product_idx").on(t.productId, t.id).where(sql`${t.productId} is not null`),
+  check("project_requirement_items_line_ck", sql`${t.lineNo}>0`), check("project_requirement_items_quantity_ck", sql`${t.quantity}>0`),
+  check("project_requirement_items_unit_ck", sql`(${t.unitPending}=true and ${t.unitId} is null) or (${t.unitPending}=false and ${t.unitId} is not null)`),
+  check("project_requirement_items_name_ck", sql`char_length(btrim(${t.provisionalName})) between 1 and 200`),
+]);
+
+export const projectDocumentLinks = pgTable("project_document_links", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }),
+  requirementVersionId: bigint("requirement_version_id", { mode: "number" }).notNull().references(() => projectRequirementVersions.id, { onDelete: "restrict" }),
+  fileId: bigint("file_id", { mode: "number" }).notNull().references(() => materialImportFiles.id, { onDelete: "restrict" }),
+  documentType: text("document_type").notNull(), displayName: text("display_name").notNull(),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("project_document_links_version_file_type_uq").on(t.requirementVersionId, t.fileId, t.documentType),
+  index("project_document_links_project_idx").on(t.projectId, t.requirementVersionId, t.id),
+  check("project_document_links_type_ck", sql`${t.documentType} in ('CUSTOMER_REQUIREMENT','DRAWING','SPECIFICATION','REFERENCE')`),
+  check("project_document_links_name_ck", sql`char_length(btrim(${t.displayName})) between 1 and 255`),
+]);
+
+export const projectHandoffs = pgTable("project_handoffs", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }),
+  requirementVersionId: bigint("requirement_version_id", { mode: "number" }).notNull().references(() => projectRequirementVersions.id, { onDelete: "restrict" }),
+  fromDepartment: text("from_department").notNull().default("MARKET"), toDepartment: text("to_department").notNull().default("PROJECT"), status: text("status").notNull(),
+  submittedBy: text("submitted_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), submittedAt: timestamptz("submitted_at").notNull(),
+  acceptedBy: text("accepted_by").references(() => appUsers.username, { onDelete: "restrict" }), acceptedAt: timestamptz("accepted_at"),
+  returnedBy: text("returned_by").references(() => appUsers.username, { onDelete: "restrict" }), returnedAt: timestamptz("returned_at"),
+  returnReason: text("return_reason").notNull().default(""), version: integer("version").notNull().default(1), requestId: uuid("request_id").notNull(), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("project_handoffs_project_uq").on(t.projectId),
+  index("project_handoffs_queue_idx").on(t.toDepartment, t.status, t.submittedAt, t.id),
+  index("project_handoffs_submitter_idx").on(t.submittedBy, t.status, t.updatedAt, t.id),
+  check("project_handoffs_department_ck", sql`${t.fromDepartment}='MARKET' and ${t.toDepartment}='PROJECT'`),
+  check("project_handoffs_status_ck", sql`${t.status} in ('SUBMITTED','RETURNED','ACCEPTED')`), check("project_handoffs_version_ck", sql`${t.version}>0`),
+  check("project_handoffs_accept_ck", sql`(${t.status}='ACCEPTED' and ${t.acceptedBy} is not null and ${t.acceptedAt} is not null) or ${t.status}<>'ACCEPTED'`),
+  check("project_handoffs_return_ck", sql`(${t.status}='RETURNED' and ${t.returnedBy} is not null and ${t.returnedAt} is not null and char_length(btrim(${t.returnReason})) between 1 and 1000) or ${t.status}<>'RETURNED'`),
+]);
+
+export const projectHandoffEvents = pgTable("project_handoff_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), handoffId: bigint("handoff_id", { mode: "number" }).notNull().references(() => projectHandoffs.id, { onDelete: "restrict" }),
+  projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }),
+  requirementVersionId: bigint("requirement_version_id", { mode: "number" }).notNull().references(() => projectRequirementVersions.id, { onDelete: "restrict" }),
+  eventType: text("event_type").notNull(), actor: text("actor").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
+  requestId: uuid("request_id").notNull(), reason: text("reason").notNull().default(""), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("project_handoff_events_project_idx").on(t.projectId, t.id), index("project_handoff_events_handoff_idx").on(t.handoffId, t.id),
+  index("project_handoff_events_request_idx").on(t.requestId, t.id),
+  check("project_handoff_events_type_ck", sql`${t.eventType} in ('SUBMITTED','ACCEPTED','RETURNED','RESUBMITTED')`),
+  check("project_handoff_events_reason_ck", sql`(${t.eventType}='RETURNED' and char_length(btrim(${t.reason})) between 1 and 1000) or (${t.eventType}<>'RETURNED' and char_length(${t.reason})<=1000)`),
+]);
+
 // Compatibility tables retained from the D1 implementation. PostgreSQL uses
 // native boolean/jsonb/timestamptz and explicit foreign keys rather than D1's
 // integer booleans, JSON text and millisecond epochs.
