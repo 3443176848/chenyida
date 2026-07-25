@@ -1,6 +1,6 @@
 # 采购询比价与人工定标关系模型（TASK04）
 
-状态：`IMPLEMENTED / PENDING PARALLEL ACCEPTANCE`
+状态：`IMPLEMENTED / PARALLEL ACCEPTED`
 
 ## 聚合与稳定引用
 

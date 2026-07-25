@@ -4,6 +4,15 @@
 
 ## 2026-07-26
 
+### SELFHOST-PHASE4-TASK04 - `ops: accept procurement sourcing workflow in parallel environment`
+
+- 部署：从功能提交 `4506db2579c07080afe27b33bb2e50623c3d1366` 重建并行 migrate/Web/Worker，只应用 `0018`；PostgreSQL/Web healthy、Worker running，Web 保持 `127.0.0.1:3000`。
+- 实际旅程：临时 planning/purchase 账号通过 must-change 和分权；A 报价 `12.000000`、准时、排名 2，B 报价 `10.000000`、晚交、排名 1；采购以 `DELIVERY_PRIORITY` 和“交期优先，避免项目延期”选择 A。
+- 下游证据：Award=1、Sourcing Event=5、成功采购审计=6，而 PO/Receipt/Inventory Ledger/Finance/Planning Allocation 均为 0，`reserved_qty` 为 `2.000000` 且未变。
+- 持久与清理：Compose 整体重启后 Award/理由/API/UI 持久；随后整体恢复干净 0018 点，最终 18 migrations、唯一管理员、全部验收业务 0；临时账号、脚本和 root-only 恢复工件已删除。
+- 保护：Python PID `277640`、18888 和 SQLite metadata `64769:53827608:1784999031:1544192` 不变；未迁真实数据、未启 HTTPS、未切流、未 push，不启动 TASK05。
+- 结论：`PROCUREMENT SOURCING AWARD ACCEPTED IN PARALLEL ENVIRONMENT`。
+
 ### SELFHOST-PHASE4-TASK04 - `feat: add procurement sourcing workflow`
 
 - 数据库：新增 expand-only `0018` 十表 RFQ/报价版本/比较版本/Sourcing Award/Event 模型、`numeric(24,6)`、有效 Round/当前报价/每行唯一 Award 索引、稳定外键、服务写守卫与不可变/来源完整性 trigger；不修改 0001—0017。

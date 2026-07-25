@@ -1,8 +1,10 @@
 # SELFHOST-PHASE4-TASK04：建立供应商询价、报价、比价与人工定标闭环
 
-状态：`DOING`
+状态：`DONE`
 
 开始日期：2026-07-26（Asia/Shanghai）
+
+完成日期：2026-07-26（Asia/Shanghai）
 
 负责人：Codex（关系模型、服务端询比价与人工定标、原生界面、隔离测试、并行环境验收、文档与独立提交）；项目负责人（固定业务决定与并行部署验收授权）
 
@@ -50,4 +52,6 @@
 
 唯一允许结论：`PROCUREMENT SOURCING AWARD ACCEPTED IN PARALLEL ENVIRONMENT`。
 
-完成报告目标：`docs/tasks/SELFHOST-PHASE4-TASK04-completion.md`。该结论不表示采购订单、收货、库存入账、应付、真实迁移、HTTPS、切流或生产上线完成；TASK04 完成后停止。
+完成报告：`docs/tasks/SELFHOST-PHASE4-TASK04-completion.md`。功能提交为 `4506db2579c07080afe27b33bb2e50623c3d1366`；并行两供应商实际旅程、重启持久、恢复清理和最终资源核验均已通过。
+
+完成结论：`PROCUREMENT SOURCING AWARD ACCEPTED IN PARALLEL ENVIRONMENT`。该结论不表示采购订单、收货、库存入账、应付、真实迁移、HTTPS、切流或生产上线完成；TASK04 完成后停止。

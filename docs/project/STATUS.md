@@ -6,8 +6,8 @@
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DOING | 功能、专项隔离测试、共享回归和功能文档已完成；功能提交与并行真实会话验收待完成 |
-| 版本/Migration | LOCAL PASS | `0.1.0-alpha.18`；expand-only `0018_procurement_sourcing.sql`；SHA-256 `64276e1292c0696ae097a322115662b958156ba6486b1cd16752cf84b6c987c9`；0001—0017 不修改 |
+| 任务状态 | DONE | 功能提交 `4506db2579c07080afe27b33bb2e50623c3d1366`；独立 ops 验收提交 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.18`；expand-only `0018_procurement_sourcing.sql`；SHA-256 `64276e1292c0696ae097a322115662b958156ba6486b1cd16752cf84b6c987c9`；0001—0017 不修改 |
 | 模型/比较 | PASS | 十表关系模型；CNY/Unit/Tax/Freight 分组，PostgreSQL numeric 按单价/交期/Supplier ID 排序；过期不排名，浏览器不重算 |
 | API/安全 | PASS | 9 组路由、purchase/planning 分权、CSRF、128 KiB、持久幂等、CAS、并发唯一、request_id、Audit/Event 同事务 |
 | UI/Dashboard | PASS | `/procurement/sourcing` 与详情页；报价历史、横向比较、MOQ/交期/税费/运费、人工理由/撤销；三项 Dashboard 待办 |
@@ -16,8 +16,11 @@
 | 静态与构建 | PASS | 全仓 ESLint 0 error（5 个既有 warning）、Vinext build 5/5、800 文件凭证扫描、`git diff --check` |
 | Python/SQLite | PASS / PROTECTED | Python self-test、smoke、临时 SQLite go-live 通过；PID `277640`/18888 保持，真实 SQLite metadata `64769:53827608:1784999031:1544192` 不变，未读业务内容 |
 | 下游保护 | PASS | 隔离验收 Award=1 时 PO/Receipt/Inventory Ledger/Finance/Planning Allocation 均为 0，`reserved_qty` 不变 |
-| 并行环境 | PENDING | 功能提交后才创建恢复点、重建并执行 0018、完成真实会话旅程、重启、恢复清理与独立 ops 提交 |
-| 完成结论 | NOT YET | 在并行验收及清理完成前不得使用最终完成结论，不启动 TASK05 |
+| 实际定标 | PASS | A `12.000000`/排名 2/准时，B `10.000000`/排名 1/晚交；以 `DELIVERY_PRIORITY` 和“交期优先，避免项目延期”人工选择 A；5 个 Sourcing Event、6 个成功采购审计 |
+| 并行环境 | PASS | 0017 与干净 0018 root-only 恢复点均校验；真实 HTTP、planning 只读/purchase 写入、UI 200、幂等重放、Compose 整体重启持久通过；随后整体恢复干净 0018 点并删除临时工件 |
+| 清理/最终状态 | PASS | 18 migrations/唯一启用管理员；临时账号及 Customer/Supplier/Material/Project/PR/RFQ/Quote/Comparison/Award 全为 0；PO/Receipt/Inventory/Finance/Planning Allocation 全为 0 |
+| Compose/资源 | PASS | PostgreSQL/Web healthy、Worker running；Web 仅 `127.0.0.1:3000`；三容器约 180.4 MiB，宿主可用内存约 1812 MiB、磁盘可用 27 GiB |
+| 完成结论 | PASS | `PROCUREMENT SOURCING AWARD ACCEPTED IN PARALLEL ENVIRONMENT`；TASK05 不启动 |
 
 ## SELFHOST-PHASE4-TASK03 计划物料需求 → 采购申请交接
 

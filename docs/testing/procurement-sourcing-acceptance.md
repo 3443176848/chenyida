@@ -1,6 +1,6 @@
 # SELFHOST-PHASE4-TASK04 API/UI 与业务验收清单
 
-状态：`AUTOMATED PASS / PARALLEL JOURNEY PENDING`
+状态：`AUTOMATED PASS / PARALLEL JOURNEY PASS`
 
 ## API 与权限
 
@@ -37,4 +37,4 @@
 - `/procurement/sourcing/:rfqId` 显示来源、邀请、行、报价版本、服务端横向比价、MOQ/交期/税费/运费风险、人工理由和撤销。
 - planning 只看到进度；purchase/manager/admin 才看到相应写控件；页面没有创建采购订单入口。
 
-并行真实会话旅程、Compose 重启、恢复清理与最终状态将在独立 ops 提交中补齐。
+并行实际结果：临时 planning/purchase 账号完成 must-change 门禁和分权；Supplier A `12.000000`、准时、价格排名 2，Supplier B `10.000000`、晚交、价格排名 1。采购以 `DELIVERY_PRIORITY` 和“交期优先，避免项目延期”选择 A，Award=1，PO/Receipt/Inventory Ledger/Finance/Planning Allocation 均为 0，`reserved_qty` 保持 `2.000000`。Compose 重启后事实持久；随后整体恢复干净 0018 点，最终 18 migrations、唯一管理员、业务 0。
