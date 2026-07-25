@@ -57,6 +57,13 @@
       "when": 1784914084338,
       "tag": "0008_inventory_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784916114419,
+      "tag": "0009_procurement",
+      "breakpoints": true
     }
   ]
 }

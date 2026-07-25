@@ -33,6 +33,7 @@ const state = {
   users: [],
   identityOperations: new Map(),
   masterDataOperations: new Map(),
+  procurementOperations: new Map(),
   operationsAvailability: { dashboard: false, backups: false },
 };
 
@@ -119,6 +120,14 @@ async function masterDataWrite(operationName, path, payload, method = "POST") {
     if (!error.resultUnknown) state.masterDataOperations.delete(operationName);
     throw error;
   }
+}
+
+async function procurementWrite(operationName, path, payload, method = "POST") {
+  const frozenBody = JSON.stringify(payload); const existing = state.procurementOperations.get(operationName);
+  if (existing && existing.frozenBody !== frozenBody) throw new Error("上一次采购操作结果尚未确认，只能使用原请求安全重试");
+  const operation = existing || { key: crypto.randomUUID(), frozenBody }; state.procurementOperations.set(operationName, operation);
+  try { const result = await api(path, { method, body: operation.frozenBody, protectedWrite: { idempotencyKey: operation.key, csrfToken: state.session.csrf_token || "" } }); state.procurementOperations.delete(operationName); return result; }
+  catch (error) { if (!error.resultUnknown) state.procurementOperations.delete(operationName); throw error; }
 }
 
 function requestedMaterialReturnTo() {
@@ -1390,10 +1399,7 @@ async function createPoFromShortage() {
     toast("请先选择 BOM");
     return;
   }
-  const result = await api("/api/purchase-orders/from-shortage", {
-    method: "POST",
-    body: JSON.stringify({ bom_id: bomId, order_qty: qty, createdBy: "系统用户" }),
-  });
+  const result = await procurementWrite(`purchase-from-shortage:${bomId}`, "/api/purchase-orders/from-shortage", { bom_id: bomId, order_qty: qty });
   state.purchaseSuggestions = result.suggestions;
   $("#purchaseMsg").textContent = `已生成 ${result.created.length} 张采购单`;
   await refreshAll();
@@ -1415,10 +1421,7 @@ async function receivePurchase() {
     toast("没有可收货的采购明细");
     return;
   }
-  const result = await api("/api/purchase-receive", {
-    method: "POST",
-    body: JSON.stringify({ line_id: lineId, receive_qty: receiveQty }),
-  });
+  const result = await procurementWrite(`purchase-receive:${lineId}`, "/api/purchase-receive", { line_id: lineId, receive_qty: receiveQty });
   $("#receiveMsg").textContent = `库存从 ${result.before_qty} 增加到 ${result.after_qty}`;
   await refreshAll();
   toast("收货入库完成");

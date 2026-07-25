@@ -52,7 +52,7 @@ TASK02—TASK09
 | SELFHOST-PHASE2-TASK02 | 身份、用户管理、密码和系统审计补齐 | TASK01 | 权限提升、会话撤销、凭证 | DONE（非生产；未发布/部署/迁移真实用户） |
 | SELFHOST-PHASE2-TASK03 | 客户、供应商、产品、BOM 与供应商物料映射 | TASK02、现有 Material ACTIVE | 稳定 ID、BOM 版本、重复主数据 | DONE；非生产 `0.1.0-alpha.3`，未迁真实数据或部署 |
 | SELFHOST-PHASE2-TASK04 | 库存不可变账本、余额投影与受控调整 | TASK02、TASK03 | 负库存、并发、已过账更正 | DONE；非生产 `0.1.0-alpha.4`，未回填真实库存或部署 |
-| SELFHOST-PHASE2-TASK05 | 采购、缺料建议、收货与库存联动 | TASK03、TASK04 | 超收、重复收货、库存过账 | 已获连续任务指令授权；待 TASK04 独立提交并 clean 后开始 |
+| SELFHOST-PHASE2-TASK05 | 采购、缺料建议、收货与库存联动 | TASK03、TASK04 | 超收、重复收货、库存过账 | DONE；非生产 `0.1.0-alpha.5`，未迁真实 PO/在途或创建 AP |
 | SELFHOST-PHASE2-TASK06 | 工单、领料、完工、报工与库存联动 | TASK03、TASK04 | 多料锁、成品入库、冲销 | 建议，待授权 |
 | SELFHOST-PHASE2-TASK07 | 询报价、销售订单、发货与库存联动 | TASK03、TASK04、TASK06 | 转单原子性、超发、FQC | 建议，待授权 |
 | SELFHOST-PHASE2-TASK08 | IQC/IPQC/FQC、缺陷、处置与关闭 | TASK05、TASK06、TASK07 | 跨域 hold/release、不可变历史 | 建议，待授权 |
@@ -176,7 +176,7 @@ TASK02—TASK09
 - 独立 `inventory-selfhost/` 实现权限、CSRF、幂等、expected balance version、稳定行锁、负库存门禁、审计和 reconciliation；legacy 库存页面提交稳定 ID。
 - 通用入/出/盘点、冻结/解冻与冲销通过 unit、UI、PostgreSQL/API、migration、Compose restart 和适用回归；没有实现采购收货、领退料、完工或发货业务服务。
 
-## 8. SELFHOST-PHASE2-TASK05（建议）：采购、缺料建议、收货与库存联动
+## 8. SELFHOST-PHASE2-TASK05（DONE，非生产）：采购、缺料建议、收货与库存联动
 
 ### 依赖与代码范围
 
@@ -205,6 +205,13 @@ TASK02—TASK09
 ### 禁止与生产边界
 
 - 不迁移真实 PO/在途/库存，不自动生成应付，不接供应商门户，不部署。
+
+### 8.5 实际完成记录
+
+- PostgreSQL `0009` 新增关系化 PO/Line、来源、状态事件、Receipt/Line/全额冲销和 append-only 财务来源；旧 `erp_records` 保持迁移来源，不回填或双写。
+- 独立 `procurement-selfhost/` 实现稳定 ID、并发编码、服务端状态机、权限、CSRF、持久幂等、expected version、限流、请求编号和审计；legacy 只作 DTO 兼容。
+- 收货/冲销通过 TASK04 Inventory Service 事务入口，在一个 PostgreSQL 事务提交 Receipt、PO 投影、Ledger/Balance、状态事件、财务来源、audit 和 idem；并发超收与故障注入整体回滚。
+- unit/UI、PostgreSQL/API、migration、Compose restart 和全量适用回归通过；不含 PO 审批/取消、部分冲销、超收、单位换算、完整 AP/付款/GL、真实数据或部署。
 - 生产/真实数据授权：**否**。
 
 ## 9. SELFHOST-PHASE2-TASK06（建议）：生产、领料、完工与报工
@@ -365,4 +372,4 @@ TASK02—TASK09
 
 ## 14. 下一条最小实施任务建议
 
-TASK02 已完成身份公共边界，TASK03 已完成非生产主数据/BOM，TASK04 已完成非生产通用库存账本。下一任务按连续任务指令为 `SELFHOST-PHASE2-TASK05`；Dashboard、备份 API、其他业务域、真实数据迁移和部署继续保持独立任务与生产授权。
+TASK02 已完成身份公共边界，TASK03 已完成非生产主数据/BOM，TASK04 已完成非生产通用库存账本，TASK05 已完成非生产采购/收货。下一任务按连续任务指令为 `SELFHOST-PHASE2-TASK06`；Dashboard、备份 API、其他业务域、真实数据迁移和部署继续保持独立任务与生产授权。

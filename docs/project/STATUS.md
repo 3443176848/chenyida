@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-25（Asia/Shanghai）
 
+## SELFHOST-PHASE2-TASK05 自托管采购与收货
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| Git 恢复点 | PASS | `main`、HEAD `41b451de04d4bc4b5e3f6fe765ff64fbc19a9121`；合法 TASK05 dirty 全部保留并原地续作，0001—0008 无变化 |
+| 模块/数据边界 | PASS | 独立 `procurement-selfhost`；PO/Receipt 使用稳定 Supplier/Material/Unit/Mapping ID，不写 Python、D1 或 `erp_records` |
+| 状态与不可变 | PASS | `OPEN -> PARTIALLY_RECEIVED -> RECEIVED -> CLOSED`；Receipt/Line/Status/Source/Financial append-only，全额冲销追加反向事实 |
+| 收货原子性 | PASS | Receipt、PO 投影、TASK04 Ledger/Balance、状态事件、财务来源、audit、idem 同一事务；故障注入/审计失败整体回滚 |
+| 建议与引用 | PASS | RELEASED 当前 BOM + 可用库存 + ACTIVE Material/Supplier/Unit/Mapping + 当前价格；阻断项不自动建 PO，不允许超收或单位换算 |
+| 权限与安全 | PASS | 管理/收货/只读/财务来源能力分离；must-change、CSRF、持久幂等、限流、expected version、请求编号和中文安全错误通过 |
+| PostgreSQL migration | PASS | `0009` 空库、0008 存量、重复、失败回滚、约束/索引、旧数据保留通过；SHA-256 `351b322f562e39bf0e17cf16cd6da20de6d801ff33f7692300a85c15403874d7`，0001—0008 不变 |
+| 专项/Compose | PASS | unit/UI 5/5、PostgreSQL/API 7/7、migration 3/3、Schema consistency；Compose 初始及 PostgreSQL/Web/Worker 重启持久性通过 |
+| 全量回归 | PASS | shared unit/UI 56/56、PG 46/46、升级 15/15、Import 53/53、FileStorage/environment、lint/build/typecheck/credentials、Python 三项通过 |
+| 版本 | PASS / NOT RELEASED | `chenyida-erp-selfhosted@0.1.0-alpha.5`；非生产、尚未发布、部署或批准 |
+| 资源/生产影响 | NONE | 隔离 PostgreSQL、Compose、临时 SQLite/依赖/文件已清理；未访问生产、部署、push 或 PR |
+
 ## SELFHOST-PHASE2-TASK04 自托管不可变库存账本
 
 | 验证项 | 结果 | 说明 |
@@ -201,10 +217,10 @@
 | --- | --- |
 | 根仓库 Branch | `main` |
 | 任务开始 HEAD | `e8cb7ebc0fa9d45575aeaffc0732183d2533f577`；开始时本地 `main` 领先 `origin/main` 2 个提交 |
-| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.2`；非生产、尚未发布 |
+| 自托管开发版本 | `chenyida-erp-selfhosted@0.1.0-alpha.5`；非生产、尚未发布 |
 | 当前实际常驻服务 | Python 3.11.6 / SQLite，systemd `enabled/active`，`0.0.0.0:18888` |
 | 自托管部署状态 | Node/PostgreSQL 未生产部署；当前无运行中 Compose 项目 |
-| PostgreSQL migration | `0001`—`0006`；未迁移真实数据或真实用户 |
+| PostgreSQL migration | `0001`—`0009`；未迁移真实数据、真实用户、PO、在途或库存 |
 | SQLite migration | `0001`—`0004` 已记录；数据库不保存 migration checksum |
 | 历史 D1 migration | 仓库 `0000`—`0008`；生产实际应用版本未访问、未核验 |
 | PM-000 前根提交 | `bbefb2e388323213b51531fec117d67d5a28fe70` |

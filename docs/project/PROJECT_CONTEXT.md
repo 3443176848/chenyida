@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.4`，明确为非生产且尚未发布；详见 `RELEASES.md`。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前开发版本 `0.1.0-alpha.5`，明确为非生产且尚未发布；详见 `RELEASES.md`。
 
 ### 治理资料
 
@@ -92,6 +92,7 @@
 13. SELFHOST-PHASE2-TASK02 已补齐自托管身份公共边界：PostgreSQL `0006`、独立 Identity Repository/Service/Handler、用户管理、密码策略、会话撤销、must-change 全局门禁、限流、持久幂等、CAS 和系统审计；不包含其他业务域或生产动作。
 14. SELFHOST-PHASE2-TASK03 已新增 PostgreSQL `0007` 和独立 Master Data/BOM 服务，关系化 Customer、Supplier、Product/Version、BOM Header/Version/Line、Supplier Mapping/价格历史；发布后不可变，readiness 只检查结构且不读取库存。版本为 `0.1.0-alpha.3`，未迁真实数据或部署。
 15. SELFHOST-PHASE2-TASK04 已新增 PostgreSQL `0008` 和独立 Inventory 服务；Ledger 是唯一数量权威，余额是同事务可核对投影，支持通用入/出/盘点、冻结/解冻及全额冲销。readiness 只读该新投影；未回填旧库存或实现采购/生产/销售过账。版本为 `0.1.0-alpha.4`，未迁真实数据或部署。
+16. SELFHOST-PHASE2-TASK05 已新增 PostgreSQL `0009` 和独立 Procurement 服务；关系化 PO/Receipt/状态事件/财务来源以稳定内部 ID 关联，收货/全额冲销与 TASK04 Ledger/Balance、audit、idem 在一个事务提交。缺料建议不自动建单，不创建 AP/付款，不迁真实 PO/在途。版本为 `0.1.0-alpha.5`，未发布或部署。
 
 ## 当前风险
 
@@ -129,7 +130,7 @@
 
 ## 当前路线
 
-当前已完成 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping 和通用库存账本的 Node/PostgreSQL 非生产链路、统一发布追踪基线，以及完整 ERP 的 64 项 Python API 盘点、数据不变量和首页断链核验。TASK04 完成不表示采购及后续业务域已迁移。下一任务按连续任务指令执行 `SELFHOST-PHASE2-TASK05`；真实数据试迁移、生产备份恢复、部署和切换继续独立授权。
+当前已完成 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、通用库存账本和采购收货的 Node/PostgreSQL 非生产链路、统一发布追踪基线，以及完整 ERP 的 64 项 Python API 盘点、数据不变量和首页断链核验。TASK05 完成不表示生产及后续业务域已迁移。下一任务按连续任务指令执行 `SELFHOST-PHASE2-TASK06`；真实数据试迁移、生产备份恢复、部署和切换继续独立授权。
 
 ## 恢复上下文检查清单
 

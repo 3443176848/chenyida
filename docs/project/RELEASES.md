@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
 最后核验：2026-07-25（Asia/Shanghai）
-适用任务：`SELFHOST-PHASE2-TASK04`
+适用任务：`SELFHOST-PHASE2-TASK05`
 
 ## 1. 使用规则
 
@@ -19,10 +19,10 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 历史 OpenAI Sites / Cloudflare D1 | 历史记录 `v3` | `2b4f1787ddbc7e0941ab2d5f5cadea6e817e8f12`；后续纳管来源 `9f2c2dca9ccde237cb2db6c01d2e3792b284e6e9` | 仓库 D1/Drizzle `0000`—`0008`；生产实际已应用版本本任务未访问、未核验 | 仅保留历史验收记录；本任务未访问公开 Site | `HISTORICAL`；文档曾记录为公开 `v3`，本任务不重新确认在线状态；不是未来生产权威方向 | 未向 PostgreSQL 迁移 | 历史提交 `2b4f178` 和 D1 migration/快照仅作迁移与行为证据；不是已验证的当前回退方案 | 历史状态；无新的部署批准 |
 | 当前 Python / SQLite 开发运行面 | `legacy-development`，尚无统一 SemVer | 当前仓库包含源代码的功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；常驻进程未记录启动 commit，不能反推为该提交 | 本地 SQLite 历史 26 表 + migration `0001`—`0004`；开发库只读核验已记录四个版本 | 本任务按发布基线重新执行 Python self-test、smoke 和临时库 go-live；结果见第 6 节 | `DEVELOPMENT`；systemd `enabled/active`，源码与已安装 unit 一致，Python 监听 `0.0.0.0:18888`；不是正式生产投用 | 不适用；该 SQLite 是旧数据来源和当前开发运行数据 | Git 源码 + 执行前 SQLite 可恢复快照；正式回退点尚未建立 | 仅开发常驻；未获生产批准 |
-| Node.js / PostgreSQL 自托管开发基线 | `0.1.0-alpha.4`；包名 `chenyida-erp-selfhosted` | TASK04 起始基线 `3565d56f24ca904dd0b8d0c55960c702a8895406`；功能提交通过 `git log -1 -- docs/tasks/SELFHOST-PHASE2-TASK04-completion.md` 解析 | PostgreSQL 17 migration `0001`—`0008` | TASK04 单元/UI/PostgreSQL/migration/Compose restart 与适用 Identity/Material/Mapping/Normalization/Review/Phase0/Python 回归通过；旧导入 UI 6 条起点既有正则断言失败单列记录 | `NOT_RELEASED`；没有运行中的 Compose 项目，未生产部署 | SQLite/D1 真实数据、真实用户、主数据与库存均未迁入 PostgreSQL | 未部署版本无线上回退动作；未来部署前必须以现运行面、Git commit、数据库快照和文件快照建立恢复点 | 非生产开发版本，未获发布批准 |
+| Node.js / PostgreSQL 自托管开发基线 | `0.1.0-alpha.5`；包名 `chenyida-erp-selfhosted` | TASK05 起始基线 `41b451de04d4bc4b5e3f6fe765ff64fbc19a9121`；功能提交通过 `git log -1 -- docs/tasks/SELFHOST-PHASE2-TASK05-completion.md` 解析 | PostgreSQL 17 migration `0001`—`0009` | TASK05 unit/UI/PostgreSQL/migration/Compose restart 与适用 Identity/Material/Mapping/Normalization/Review/Master Data/Inventory/Phase0/Python 回归通过 | `NOT_RELEASED`；没有运行中的 Compose 项目，未生产部署 | SQLite/D1 真实数据、真实用户、主数据、库存、PO 和在途均未迁入 PostgreSQL | 未部署版本无线上回退动作；未来部署前必须以现运行面、Git commit、数据库快照和文件快照建立恢复点 | 非生产开发版本，未获发布批准 |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.4` 只表示加入非生产不可变库存账本的自托管开发基线，不表示生产候选、生产上线、真实数据迁移完成或业务迁移完成。当前自托管 API 已覆盖身份/用户/系统审计、Material/Import、TASK03 主数据/BOM 和 TASK04 通用库存；采购、生产、销售、品质、财务以及相关旧业务流程仍依赖 Python/SQLite 运行面。
+`0.1.0-alpha.5` 只表示加入非生产采购/收货与库存原子联动的自托管开发基线，不表示生产候选、生产上线、真实数据迁移完成或完整业务迁移完成。当前自托管 API 已覆盖身份/用户/系统审计、Material/Import、主数据/BOM、通用库存和采购；生产、销售、品质、完整财务以及相关旧业务流程仍依赖 Python/SQLite 运行面。
 
 ## 3. Migration 文件与 SHA-256 基线
 
@@ -38,6 +38,7 @@
 | `0006` | `0006_identity_security.sql` | `6e185d01a69c4bd132c577793ae72baceaa075e5beecc738bcdf4310430d7079` |
 | `0007` | `0007_master_data_bom.sql` | `0e9cf9327b37673eb09483035117d15789047862f348cd5eb7098476d62fd3a6` |
 | `0008` | `0008_inventory_ledger.sql` | `49334afa405d03b61568559edcdffa68c232c899251181e3a27ff271aa1da80b` |
+| `0009` | `0009_procurement.sql` | `351b322f562e39bf0e17cf16cd6da20de6d801ff33f7692300a85c15403874d7` |
 
 当前 PostgreSQL 基线是空库 `0001 -> 0008`。它只在隔离 PostgreSQL 17/Compose 中执行过；没有生产 PostgreSQL 部署，也没有真实数据迁移。
 
@@ -172,7 +173,23 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 
 补充说明：宿主机没有 Node/npm，Node 命令在一次性 `node:22-bookworm` 容器中执行。Python 首轮误用系统解释器时 self-test 通过、smoke 在导入 `openpyxl` 前因环境缺依赖停止；改用常驻服务实际使用的 `/opt/erp/.venv/bin/python` 后三项全部通过，没有降低断言。`npm ci` 报告 12 个既有依赖审计项（1 low、4 moderate、7 high），本任务按范围不升级依赖，留待独立安全任务。
 
-## 7. `0.1.0-alpha.4` 非生产开发记录
+## 7. `0.1.0-alpha.5` 非生产开发记录
+
+| 项目 | 记录 |
+| --- | --- |
+| 任务 | `SELFHOST-PHASE2-TASK05` |
+| 包版本 | `chenyida-erp-selfhosted@0.1.0-alpha.5` |
+| 状态 | `NOT_RELEASED` / `NOT_DEPLOYED` / `NOT_MIGRATED` / `NOT_APPROVED_FOR_PRODUCTION` |
+| 起始 Git | `41b451de04d4bc4b5e3f6fe765ff64fbc19a9121`；`main`，恢复的 dirty 全部为合法 TASK05 成果 |
+| PostgreSQL | 新增 expand-only `0009_procurement.sql`；SHA-256 `351b322f562e39bf0e17cf16cd6da20de6d801ff33f7692300a85c15403874d7`；`0001`—`0008` checksum 保持不变 |
+| 功能 | 独立 Procurement Repository/Service/Handler；PO/Receipt/状态事件/财务来源、缺料建议、部分/全部收货、全额冲销及 TASK04 库存同事务复用 |
+| 验收 | unit/UI 5/5、PostgreSQL/API 7/7、migration 3/3、Schema consistency、Compose 初始/重启及全量适用回归通过 |
+| 排除 | 真实 PO/在途/库存、审批/取消、部分冲销、超收、单位换算、完整 AP/付款/GL、生产、销售、品质、Dashboard、生产 migration、部署和切换 |
+| 生产访问 | 未访问公开生产 Site、生产 D1、生产 PostgreSQL/SQLite 或真实业务数据；未修改或重启 Python systemd |
+
+这是一条开发版本记录，不是发布公告。TASK06 必须从本任务独立提交和 clean 工作区开始。
+
+## 8. `0.1.0-alpha.4` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -188,7 +205,7 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 
 这是一条开发版本记录，不是发布公告。TASK05 必须从本任务独立提交和 clean 工作区开始。
 
-## 8. `0.1.0-alpha.3` 非生产开发记录
+## 9. `0.1.0-alpha.3` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |
@@ -204,7 +221,7 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 
 这是一条开发版本记录，不是发布公告。TASK04 必须从本任务独立提交和 clean 工作区开始。
 
-## 9. `0.1.0-alpha.2` 非生产开发记录
+## 10. `0.1.0-alpha.2` 非生产开发记录
 
 | 项目 | 记录 |
 | --- | --- |

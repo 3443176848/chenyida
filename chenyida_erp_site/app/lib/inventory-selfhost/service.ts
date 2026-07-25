@@ -112,7 +112,14 @@ export class InventoryService {
 
   async post(meta: InventoryMutationMeta, rawInput: Record<string, unknown>): Promise<InventoryMutationResult> {
     const parsed = parseOperationInput(rawInput);
-    return this.repository.execute(meta, async (client) => {
+    return this.repository.execute(meta, (client) => this.postParsedInTransaction(client, meta, parsed));
+  }
+
+  async postInTransaction(client: PoolClient, meta: InventoryMutationMeta, rawInput: Record<string, unknown>): Promise<InventoryMutationResult> {
+    return this.postParsedInTransaction(client, meta, parseOperationInput(rawInput));
+  }
+
+  private async postParsedInTransaction(client: PoolClient, meta: InventoryMutationMeta, parsed: ReturnType<typeof parseOperationInput>): Promise<InventoryMutationResult> {
       await this.repository.lockPositions(client, parsed.lines.map((line) => line.materialId));
       await this.activeMaterials(client, parsed.lines);
       const balances = await this.balancesForUpdate(client, parsed.lines.map((line) => line.materialId));
@@ -124,7 +131,6 @@ export class InventoryService {
       for (let index = 0; index < calculated.length; index += 1) outputLines.push(await this.persistLine(client, meta, adjustmentId, index + 1, parsed.operationType, calculated[index]));
       const body = { ok: true, data: { ...header.rows[0], lines: outputLines }, adjustment_id: adjustmentId, adjustment_code: code, request_id: meta.requestId };
       return { status: 201, body, adjustmentId, materialIds: parsed.lines.map((line) => line.materialId) };
-    });
   }
 
   private async persistLine(client: PoolClient, meta: InventoryMutationMeta, adjustmentId: number, lineNo: number, entryType: string, line: CalculatedLine, reversalOfLedgerEntryId: number | null = null): Promise<Record<string, unknown>> {
@@ -151,7 +157,14 @@ export class InventoryService {
 
   async reverse(adjustmentId: number, meta: InventoryMutationMeta, rawInput: Record<string, unknown>): Promise<InventoryMutationResult> {
     const parsed = parseReversalVersions(rawInput);
-    return this.repository.execute(meta, async (client) => {
+    return this.repository.execute(meta, (client) => this.reverseParsedInTransaction(client, adjustmentId, meta, parsed));
+  }
+
+  async reverseInTransaction(client: PoolClient, adjustmentId: number, meta: InventoryMutationMeta, rawInput: Record<string, unknown>): Promise<InventoryMutationResult> {
+    return this.reverseParsedInTransaction(client, adjustmentId, meta, parseReversalVersions(rawInput));
+  }
+
+  private async reverseParsedInTransaction(client: PoolClient, adjustmentId: number, meta: InventoryMutationMeta, parsed: ReturnType<typeof parseReversalVersions>): Promise<InventoryMutationResult> {
       const original = await client.query("select * from inventory_adjustments where id=$1 for update", [adjustmentId]);
       if (!original.rows[0]) throw new InventoryError("INVENTORY_ADJUSTMENT_NOT_FOUND", "库存调整不存在", 404);
       if (original.rows[0].operation_type === "REVERSAL") throw new InventoryError("INVENTORY_REVERSAL_NOT_ALLOWED", "冲销记录不能再次冲销", 409);
@@ -179,6 +192,5 @@ export class InventoryService {
       for (let index = 0; index < calculated.length; index += 1) outputLines.push(await this.persistLine(client, meta, reversalId, index + 1, "REVERSAL", calculated[index], calculated[index].sourceLedgerId));
       const body = { ok: true, data: { ...header.rows[0], lines: outputLines }, adjustment_id: reversalId, adjustment_code: code, reversal_of_adjustment_id: adjustmentId, request_id: meta.requestId };
       return { status: 201, body, adjustmentId: reversalId, materialIds };
-    });
   }
 }

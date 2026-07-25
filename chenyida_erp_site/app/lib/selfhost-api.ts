@@ -12,6 +12,7 @@ import { handleSelfhostMaterialImportReviewApi } from "./material-import-review-
 import { handleMasterDataApi } from "./master-data-selfhost/handler.ts";
 import { handleBomApi } from "./bom-selfhost/handler.ts";
 import { handleInventoryApi } from "./inventory-selfhost/handler.ts";
+import { handleProcurementApi } from "./procurement-selfhost/handler.ts";
 import {
   assertProtectedIdentityGate,
   CSRF_COOKIE,
@@ -77,6 +78,8 @@ export async function handleSelfhostApi(request: Request): Promise<Response> {
     let user: IdentityActor;
     try { user = assertProtectedIdentityGate(identityContext); } catch (error) { return identityFailureResponse(error, requestId); }
     requirePermission(user, "material.read");
+    const procurementResponse = await handleProcurementApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
+    if (procurementResponse) return procurementResponse;
     const inventoryResponse = await handleInventoryApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (inventoryResponse) return inventoryResponse;
     const masterDataResponse = await handleMasterDataApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });

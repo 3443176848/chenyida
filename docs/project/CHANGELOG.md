@@ -4,6 +4,15 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE2-TASK05 - `feat: add self-hosted procurement`
+
+- 数据库：新增 PostgreSQL `0009`，关系化 PO Header/Line、来源、状态事件、Receipt/全额冲销和 append-only 财务来源；Receipt/Line/Status/Source/Financial 不可变并有跨对象完整性 guard，旧 `erp_records` 不回填、不双写。
+- 服务端：新增独立 Procurement Repository/Service/Handler，提供 PO list/detail/create/update/close、可收明细、BOM 缺料建议/显式建单、Receipt list/detail/create/reversal 和财务来源读取；并发编码、numeric 精度、状态机、权限、CSRF、幂等、限流、expected version、请求编号与审计均由服务端执行。
+- 原子联动：TASK04 Inventory Service 新增兼容的事务内入口；收货/冲销在同一 PostgreSQL 事务完成 Receipt、PO 投影、Ledger/Balance、状态事件、财务来源、审计和幂等。故障注入、审计失败和并发超收均整体回滚。
+- legacy：采购页面只转换稳定 Material/Supplier Mapping/Unit ID 和受保护 payload，再委托同一采购 Service；不直接写库、不写 `erp_records`、不调用 Python 创建采购记录。
+- 验证：TASK05 unit/UI 5/5、PG/API 7/7、migration 3/3、Schema consistency、Compose 首次运行/重启；共享 unit/UI 56/56、PG 46/46、旧升级 15/15、Import 53/53、lint/build/typecheck/credentials/environment/Python 三项均通过。
+- 版本/边界：`0.1.0-alpha.5`，非生产且未发布；未迁真实 PO/在途/库存，未实现 PO 审批/取消、部分冲销、超收、单位换算、完整应付/付款/总账，未访问生产、部署、push 或创建 PR。
+
 ### SELFHOST-PHASE2-TASK04 - `feat: add immutable inventory ledger`
 
 - 模块：新增独立 `inventory-selfhost` Repository/Service/Handler；稳定 Material/Unit ID、不可变 Ledger、事务余额投影、调整 Header/Line 和核对查询，不写 legacy `erp_records` 或文本编码库存表。
