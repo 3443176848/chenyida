@@ -1,8 +1,10 @@
 # SELFHOST-PHASE4-TASK02：建立项目部门 → 计划部门产品/BOM/规格交接闭环
 
-状态：`DOING`
+状态：`DONE`
 
 开始日期：2026-07-25（Asia/Shanghai）
+
+完成日期：2026-07-25（Asia/Shanghai）
 
 负责人：Codex（关系模型、服务端状态机、原生界面、隔离测试、并行环境验收、文档与独立提交）；项目负责人（固定业务决定、部署与验收边界授权）
 
@@ -39,3 +41,11 @@
 唯一允许结论：`PROJECT TO PLANNING HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。
 
 完成报告计划：`docs/tasks/SELFHOST-PHASE4-TASK02-completion.md`。
+
+## 完成结果
+
+- 功能提交：`9236884f6cd96385c9c7050b29f57e7268142208`，父提交严格为可信起点；独立 ops 验收提交使用 `ops: accept project planning workflow in parallel environment`。
+- 并行环境已升级至 `0.1.0-alpha.16` / `0016`，实际完成项目接收、需求解析、v1 提交、计划退回、项目修订生成 v2、重提和计划最终接收；重启后数据库、队列 API 与两条原生页面均保持。
+- 验收后整体恢复到干净 `0016` 点：保留 16 个 migration 和唯一启用管理员，合成 Customer/Product/Material/BOM/Project/Planning Package、临时账号及下游采购/生产事实均为 0。
+- Python PID `277640`、18888 和真实 SQLite metadata `53827608:1544192:1784963637:600` 保持不变；未读取真实 SQLite 业务内容。
+- 完成结论：`PROJECT TO PLANNING HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。TASK03 仅记录并停止，未自动启动。

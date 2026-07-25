@@ -643,7 +643,7 @@
 ## D-059 项目到计划采用显式解析与不可变版本交接包
 
 - 日期：2026-07-25
-- 状态：`ACCEPTED / IMPLEMENTED; PARALLEL ACCEPTANCE PENDING`
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
 - 确认人：项目负责人（通过 `SELFHOST-PHASE4-TASK02` 指令确认十二项固定业务决定）
 - 角色：新增正式 `planning`；engineering 负责准备/提交，planning 只读/接收/退回，production 不代替 planning，manager/admin 具备全能力。
 - 前置与引用：只有 TASK01 已接收且操作者为项目负责人的 Project 可准备；每条 Requirement Item 必须显式关联稳定、客户一致的 RELEASED Product Version 及其 RELEASED BOM Version，不按名称猜测。
@@ -652,6 +652,7 @@
 - 状态与职责：planning 只能接收或填写原因退回，不能改 BOM、创建物料需求/采购/生产单据；并发接收仅一次成功，接收不自动启动 TASK03。
 - TASK01 保护：`project_handoffs`、`project_handoff_events` 及既有 Requirement Version 事实不扩写、不覆盖；Project→Planning 使用独立六表模型。
 - 生产边界：仅授权回环并行验收环境；不批准真实数据迁移、生产上线、HTTPS、公网、切流或 TASK03。
+- 验收结果：`0.1.0-alpha.16`/`0016` 已完成真实会话退回→新包 v2→重提→接收、Compose 重启和恢复点清理；最终只保留 Schema/唯一管理员，结论 `PROJECT TO PLANNING HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。
 
 ## 待确认业务决策
 

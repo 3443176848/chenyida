@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前源码 `0.1.0-alpha.16`；并行环境暂为 `0.1.0-alpha.15`，明确为非生产且尚未发布。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前源码与并行环境均为 `0.1.0-alpha.16`；只属于回环并行验收，明确为非生产且尚未正式发布。
 
 ### 治理资料
 
@@ -75,7 +75,7 @@
 - 供应链：供应商、采购建议、采购订单、收货、库存调整和库存流水。
 - 制造：工单、BOM 转工单、领料、完工和报工。
 - 销售：客户、询价/报价、销售订单和发货。
-- 部门交接：市场项目草稿/修订/提交，项目部队列/接收/退回与安全资料元数据。
+- 部门交接：市场项目草稿/修订/提交与项目接收/退回；项目负责人显式解析 Product/BOM、生成不可变规格包并提交，计划员只读接收或退回。
 - 品质与财务：检验、缺陷、应收应付单据、收付款和汇总。
 - 运维：健康检查、管理看板、备份、恢复和导出。
 
@@ -108,7 +108,7 @@
 25. SELFHOST-PHASE3-TASK04 已在明确授权下对本机唯一 SQLite 源执行 online backup，仅在临时快照上完成 29 表/3,619 条的 Schema fingerprint、脱敏聚合质量盘点与无目标 Dry-run。快照已删除，源 inode/权限与 Python PID 不变，未读文件正文或连接 PostgreSQL。版本 `0.1.0-alpha.14`，migration 保持 0001—0014；真实迁移与生产仍 NO-GO。
 26. SELFHOST-PHASE3-TASK05 已在同机启动 `chenyida-erp-parallel`：PostgreSQL 17、14 migrations、Web/Worker、唯一管理员和四个持久卷。Web 仅 `127.0.0.1:3000` 并通过 SSH 隧道访问；管理员流程、空 Dashboard、23 GET、数据库/服务重启和资源门禁通过。Worker 对 PostgreSQL 短暂断连增加去敏 Pool error handler 与轮询重试。版本仍为 `0.1.0-alpha.14`，真实数据、HTTPS、切流和生产批准均未发生。
 27. SELFHOST-PHASE4-TASK01 采用 D-058：sales=市场、engineering=项目；稳定 `PRJ-########` 与六表关系模型保存当前投影和不可变需求/事件，写操作由 Project Service 统一执行 CSRF、持久幂等、CAS、事务 Audit 和职责分离。`0.1.0-alpha.15`/`0015` 已通过并行双账号闭环、重启和清理验收，不创建 Product/BOM/订单/计划/采购/工单。
-28. SELFHOST-PHASE4-TASK02 采用 D-059：新增 planning 正式角色；engineering 项目负责人显式关联客户一致的 RELEASED Product/BOM，生成 numeric 计算的不可变规格快照包；planning 只能接收或退回，退回后创建新包版本，接收不触发 TASK03。
+28. SELFHOST-PHASE4-TASK02 采用 D-059：新增 planning 正式角色；engineering 项目负责人显式关联客户一致的 RELEASED Product/BOM，生成 numeric 计算的不可变规格快照包；planning 只能接收或退回，退回后创建新包版本，接收不触发 TASK03。`0.1.0-alpha.16`/`0016` 已通过并行真实旅程、重启与清理，验收业务最终为 0。
 
 ## 当前风险
 
@@ -148,7 +148,7 @@
 
 ## 当前路线
 
-`SELFHOST-PHASE4-TASK02` 正在执行：源码为 `0.1.0-alpha.16` / PostgreSQL `0016`，隔离实现和测试已完成；并行环境仍待功能提交后升级并完成退回→v2→重提→接收旅程。TASK03 及真实迁移、HTTPS、生产恢复和切换均不自动开始。
+`SELFHOST-PHASE4-TASK02` 已完成：源码与并行环境为 `0.1.0-alpha.16` / PostgreSQL `0016`，退回→v2→重提→接收、Compose 重启和恢复点清理通过，结论 `PROJECT TO PLANNING HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。现在停止；TASK03 及真实迁移、HTTPS、生产恢复和切换均未开始。
 
 ## 恢复上下文检查清单
 

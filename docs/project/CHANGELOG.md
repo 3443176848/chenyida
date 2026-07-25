@@ -4,13 +4,21 @@
 
 ## 2026-07-25
 
+### SELFHOST-PHASE4-TASK02 - `ops: accept project planning workflow in parallel environment`
+
+- 部署：从功能提交 `9236884f6cd96385c9c7050b29f57e7268142208` 重建并行 migrate/Web/Worker，只应用 `0016`；PostgreSQL/Web healthy、Worker running，Web 继续只绑定回环。
+- 实际旅程：临时 sales/engineering/planning 身份完成项目接收、显式 Product/BOM Resolution、v1 不可变快照提交、计划退回、项目修订生成 v2、重提与最终接收；numeric 毛数量为 `34.375000`。
+- 持久与清理：Compose 重启后 Project、两个包、事件、队列 API 与原生页面保持；随后整体恢复干净 0016 点，最终 16 migrations、唯一管理员，所有合成主数据/项目/交接/采购/生产记录为 0。
+- 保护：Python PID `277640`、18888 和 SQLite metadata 不变；未读/迁真实数据、未启 HTTPS、未切流、未 push，不启动 TASK03。
+- 结论：`PROJECT TO PLANNING HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。
+
 ### SELFHOST-PHASE4-TASK02 - `feat: add project planning handoff workflow`
 
 - Identity/权限：新增正式 planning 角色及 read/accept 能力；engineering 获 read/prepare/submit，manager/admin 全能力，production 不代替计划员。
 - 数据库：新增 expand-only `0016` 六表独立 Project→Planning 模型、稳定 Resolution、不可变版本包/BOM/文件快照和只追加事件；同步 schema/journal/snapshot/checksum，不修改 0001—0015 或 TASK01 事实。
 - API/UI：新增独立 planning-handoff 服务边界、8 条 API、项目解析/版本工作台、计划待办/接收/退回工作台和 Dashboard 待接收指标。
 - 规则：只接受 ACCEPTED 项目负责人、客户一致 RELEASED Product/BOM、ACTIVE Material/enabled Unit；PostgreSQL numeric 固化毛数量，不读库存、不创建需求/采购/生产单据。
-- 验证：TASK02 unit/UI 6/6、PG/API 3/3、migration 3/3、Schema consistency、typecheck、lint、build 通过；功能提交后再进入并行 Compose 验收，不启动 TASK03。
+- 验证：TASK02 unit/UI 6/6、PG/API 3/3、migration 3/3、Schema consistency、typecheck、lint、build 通过；功能提交为 `9236884f6cd96385c9c7050b29f57e7268142208`，后续并行验收由独立 ops 记录。
 
 ### SELFHOST-PHASE4-TASK01 - `ops: accept market project workflow in parallel environment`
 

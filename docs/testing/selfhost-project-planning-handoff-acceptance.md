@@ -1,5 +1,7 @@
 # SELFHOST-PHASE4-TASK02 API/UI 验收清单
 
+状态：`PASS`（2026-07-25，`chenyida-erp-parallel`）
+
 ## 自动验证
 
 | 范围 | 必须结果 |
@@ -20,5 +22,7 @@
 3. 完成项目接收→明细 Resolution→包 v1→提交→planning 退回→项目部包 v2→重提→planning 最终接收。
 4. 重启 Compose，验证包版本、事件、Audit、角色和 migration 持久。
 5. 使用“0016 已应用、验收数据未创建”的 root-only 恢复点清理；最终只留管理员、Schema 和 16 migrations。
+
+实际结果：五步全部通过。v1 为 `RETURNED`、v2 为 `ACCEPTED`，毛数量 `34.375000`；重启后数据库、已接收队列 API 与 `/engineering/projects/1/planning`、`/planning/handoffs` 均持久。恢复清理后 16 migrations、唯一启用管理员，临时身份及 Customer/Product/Material/BOM/Project/Planning/采购/生产记录全部为 0。
 
 不得读取真实 SQLite 业务内容，不得创建物料需求、采购申请、采购订单或生产记录，不得启用 HTTPS/公网/切流。

@@ -41,12 +41,12 @@ flowchart LR
 
 `SELFHOST-PHASE3-TASK05` 首次把 Node/PostgreSQL 基线作为持久的非生产空环境与 Python/SQLite 同机并行运行。Compose 项目固定为 `chenyida-erp-parallel`，只启动 PostgreSQL 17、migrate、Web 和 Worker；Caddy/production profile 不启动。Web 宿主绑定为 `127.0.0.1:3000`，PostgreSQL 只在 Compose 网络暴露 5432，用户经 SSH 隧道访问。
 
-`SELFHOST-PHASE4-TASK01` 已把该并行环境升级到 alpha.15/`0015`，在恢复点保护下完成双账号市场→项目闭环与重启验收，并恢复为保留 Schema/唯一管理员的空业务状态。TASK02 源码 alpha.16/`0016` 已实现但尚待功能提交后部署；网络与 production profile 边界不变。
+`SELFHOST-PHASE4-TASK01` 已把该并行环境升级到 alpha.15/`0015` 并完成市场→项目验收。`SELFHOST-PHASE4-TASK02` 随后以功能提交 `9236884f6cd96385c9c7050b29f57e7268142208` 升级到 alpha.16/`0016`，在恢复点保护下完成项目接收、解析、v1 退回、修订 v2 重提、最终接收与重启验收，再恢复为保留 16 个 migration/唯一管理员的空业务状态；网络与 production profile 边界不变。
 
 ```mermaid
 flowchart LR
     SSH["用户 SSH 隧道"] --> WEB["127.0.0.1:3000 Node Web"]
-    WEB --> PG["Compose PostgreSQL 17 / 当前 0001—0015，待 TASK02 升级 0016"]
+    WEB --> PG["Compose PostgreSQL 17 / 当前 0001—0016"]
     WORKER["独立 Worker"] --> PG
     WEB --> FILES["uploads / attachments Volumes"]
     PY["现有 Python :18888"] --> SQLITE["真实 SQLite，保持不变"]
