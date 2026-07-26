@@ -48,9 +48,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0023`；最终唯一启用管理员、所有合成业务表 0、uploads/attachments 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | Python/SQLite 开发服务继续由 systemd 常驻并监听 `0.0.0.0:18888`；非生产 Compose 项目 `chenyida-erp-parallel` 以 PostgreSQL 17/Web/Worker 同机并行运行，Web 仅绑定 `127.0.0.1:3000`，PostgreSQL 无宿主端口；不是生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard 与离线备份恢复治理的非生产链路 |
-| 当前阶段 | 第一阶段 TASK01—TASK09 已完成并行验收；FQC 放行额度已通过分批 Shipment 交接成品出库、销售金额来源和显式 AR |
-| 当前任务 | `SELFHOST-PHASE4-TASK09` 已 `DONE`。`PHASE0-TASK03`、TASK05—TASK08 保持历史 `DONE`，不得重复 |
-| 下一任务 | 停止；客户收款、Settlement、银行、总账、税票、收入确认、真实迁移、HTTPS、生产恢复和切换均未授权 |
+| 当前阶段 | 第一阶段 TASK01—TASK09 已完成并行验收；TASK10 正在收束既有 AR/AP Settlement 与稳定项目来源追溯 |
+| 当前任务 | `SELFHOST-PHASE4-TASK10` 为唯一 `DOING`；TASK05、TASK09 及其余历史任务保持 `DONE`，不得重复 |
+| 下一任务 | TASK10 完成后停止；银行、总账、税票、成本会计、正式利润、真实迁移、HTTPS、生产恢复和切换均未授权 |
 
 ## 当前完成模块
 

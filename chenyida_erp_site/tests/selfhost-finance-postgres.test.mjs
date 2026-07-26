@@ -70,6 +70,11 @@ test("AR and AP inherit exact posted source facts, settle, reverse and summarize
   const exact = await pool.query("select doc_type,total_amount::text,currency_code,customer_id,supplier_id from finance_documents order by id");
   assert.deepEqual(exact.rows.map((row) => [row.doc_type, row.total_amount, row.currency_code, Boolean(row.customer_id), Boolean(row.supplier_id)]), [["AR", "123.456789", "CNY", true, false], ["AP", "98.765432", "CNY", false, true]]);
 
+  const wrongAr = await api("/api/finance/settlements", { method: "POST", body: { document_id: arId, expected_version: 1, settlement_type: "PAYMENT", amount: "1", accounting_date: "2026-07-25", account_name: "测试基本户" } });
+  assert.deepEqual([wrongAr.response.status, wrongAr.payload.code], [422, "FINANCE_SETTLEMENT_TYPE_MISMATCH"]);
+  const wrongAp = await api("/api/finance/settlements", { method: "POST", body: { document_id: apId, expected_version: 1, settlement_type: "RECEIPT", amount: "1", accounting_date: "2026-07-25", account_name: "测试基本户" } });
+  assert.deepEqual([wrongAp.response.status, wrongAp.payload.code], [422, "FINANCE_SETTLEMENT_TYPE_MISMATCH"]);
+
   const partial = await api("/api/financial-payments", { method: "POST", body: { doc_id: arId, expected_version: 1, amount: "23.456789", payment_date: "2026-07-25", account_name: "测试基本户", reason: "首笔收款" } });
   assert.equal(partial.response.status, 201, JSON.stringify(partial.payload));
   assert.deepEqual([partial.payload.settled_amount, partial.payload.doc_status, partial.payload.document_version], ["23.456789", "PARTIALLY_SETTLED", 2]);
@@ -90,6 +95,11 @@ test("AR and AP inherit exact posted source facts, settle, reverse and summarize
   const summary = await api("/api/finance-summary");
   assert.deepEqual({ receivable_total: summary.payload.receivable_total, receivable_paid: summary.payload.receivable_paid, payable_total: summary.payload.payable_total, payable_paid: summary.payload.payable_paid, cash_net: summary.payload.cash_net }, { receivable_total: "123.456789", receivable_paid: "23.456789", payable_total: "98.765432", payable_paid: "8.765432", cash_net: "14.691357" });
   assert.equal(Number((await pool.query("select count(*) count from finance_document_events")).rows[0].count), 6);
+  const salesSettlements = await api("/api/finance/settlements", { role: "sales" });
+  assert.equal(salesSettlements.payload.rows.length, 3); assert.ok(salesSettlements.payload.rows.every((row) => row.doc_type === "AR" && !("account_name" in row)));
+  const projectRows = await api("/api/finance/projects", { role: "finance" });
+  assert.equal(projectRows.payload.rows[0].project_code, "UNATTRIBUTED"); assert.equal(projectRows.payload.accounting_profit, false);
+  assert.equal((await api("/api/finance/projects", { role: "sales" })).response.status, 403);
 });
 
 test("role scope, trusted body, CSRF, versions and concurrent settlements fail closed", async () => {
@@ -113,6 +123,38 @@ test("role scope, trusted body, CSRF, versions and concurrent settlements fail c
   assert.equal(purchaseList.payload.rows.length, 0);
   const hidden = await api("/api/finance-summary", { role: "engineering" });
   assert.equal(hidden.payload.receivable_total, "0");
+});
+
+test("multi-project projection preserves source and partial-settlement rounding totals", async () => {
+  const refs = await seedSources();
+  const ar = await api("/api/finance/documents", { method: "POST", body: { doc_type: "AR", sales_source_entry_id: refs.salesSourceId } });
+  const ap = await api("/api/finance/documents", { method: "POST", body: { doc_type: "AP", purchase_source_entry_id: refs.purchaseSourceId } });
+  const customerId = (await pool.query("select id from customers where customer_code='CUS-FIN'")).rows[0].id;
+  const db = await pool.connect();
+  try {
+    await db.query("begin"); await db.query("set local session_replication_role=replica");
+    const projects = (await db.query(`insert into business_projects(project_code,customer_id,project_name,project_goal,market_owner,project_owner,status,request_id,created_by) values
+      ('PRJ-90000001',$1,'金额分配项目甲','TASK10 金额分配','sales01','engineering01','ACCEPTED',$2,'sales01'),
+      ('PRJ-90000002',$1,'金额分配项目乙','TASK10 金额分配','sales01','engineering01','ACCEPTED',$3,'sales01') returning id`, [customerId, randomUUID(), randomUUID()])).rows.sort((left, right) => Number(left.id) - Number(right.id));
+    const values = [
+      ["SALES_SHIPMENT", refs.salesSourceId, null, 900001, 900011, null, projects[0].id, "40.000000", "b".repeat(64)],
+      ["SALES_SHIPMENT", refs.salesSourceId, null, 900002, 900012, null, projects[1].id, "83.456789", "c".repeat(64)],
+      ["PURCHASE_RECEIPT", null, refs.purchaseSourceId, null, null, 900021, projects[0].id, "50.000000", "d".repeat(64)],
+      ["PURCHASE_RECEIPT", null, refs.purchaseSourceId, null, null, 900022, projects[1].id, "48.765432", "e".repeat(64)],
+    ];
+    for (const row of values) await db.query("insert into finance_project_source_allocations(source_type,sales_source_entry_id,purchase_source_entry_id,sales_shipment_line_id,sales_fqc_consumption_id,purchase_receipt_line_id,project_id,attribution_status,source_quantity,unit_price,amount,allocation_digest,created_by,request_id) values($1,$2,$3,$4,$5,$6,$7,'PROJECT',1,$8,$8,$9,'finance01',$10)", [...row, randomUUID()]);
+    await db.query("commit");
+  } catch (error) { await db.query("rollback"); throw error; } finally { db.release(); }
+  const receipt = await api("/api/finance/settlements", { method: "POST", body: { document_id: Number(ar.payload.doc_id), expected_version: 1, settlement_type: "RECEIPT", amount: "0.000001", accounting_date: "2026-07-25", account_name: "舍入测试户" } });
+  assert.equal(receipt.response.status, 201, JSON.stringify(receipt.payload));
+  const summary = await api("/api/finance/projects", { role: "finance" });
+  assert.deepEqual(summary.payload.rows.map((row) => [row.project_code, row.currency_code, row.sales_source_amount, row.purchase_source_amount]), [["PRJ-90000001", "CNY", "40.000000", "50.000000"], ["PRJ-90000002", "CNY", "83.456789", "48.765432"]]);
+  assert.equal(summary.payload.rows.reduce((sum, row) => sum + Number(row.customer_receipts), 0).toFixed(6), "0.000001");
+  assert.deepEqual(summary.payload.rows.map((row) => row.customer_receipts), ["0.000000", "0.000001"]);
+  const engineering = await api("/api/finance/projects", { role: "engineering" });
+  assert.equal(engineering.payload.rows.length, 2); assert.ok(engineering.payload.rows.every((row) => row.project_id));
+  assert.equal((await api("/api/finance/projects?currency=USD", { role: "finance" })).payload.rows.length, 0);
+  assert.equal(Number(ap.payload.doc_id) > 0, true);
 });
 
 test("posted facts are immutable, upstream reversal is blocked and transaction failures roll back", async () => {

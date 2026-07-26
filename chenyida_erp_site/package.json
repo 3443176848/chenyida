@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.23",
+  "version": "0.1.0-alpha.24",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -133,6 +133,12 @@
     "test:sales-delivery:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-sales-delivery-receivable-postgres.test.mjs",
     "test:sales-delivery:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-sales-delivery-receivable-migration-upgrade.test.mjs",
     "test:sales-delivery:compose": "node scripts/selfhost-sales-delivery-receivable-compose-smoke.mjs",
+    "typecheck:project-cashflow": "tsc -p tsconfig.phase4-task10.json --pretty false",
+    "test:project-cashflow:unit": "node --experimental-strip-types --test tests/selfhost-finance-unit.test.mjs tests/selfhost-dashboard-unit.test.mjs",
+    "test:project-cashflow:ui": "node --experimental-strip-types --test tests/selfhost-finance-ui-contract.test.mjs tests/selfhost-dashboard-ui-contract.test.mjs",
+    "test:project-cashflow:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-finance-postgres.test.mjs",
+    "test:project-cashflow:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-finance-project-migration-upgrade.test.mjs",
+    "test:project-cashflow:compose": "node scripts/selfhost-finance-project-settlement-compose-smoke.mjs",
     "test:full-erp:compose": "node scripts/selfhost-full-erp-compose-smoke.mjs",
     "test:compose": "node scripts/selfhost-compose-smoke.mjs",
     "test:normalization:compose-restart": "node scripts/selfhost-normalization-restart-smoke.mjs",

@@ -162,6 +162,13 @@
       "when": 1785050430150,
       "tag": "0023_sales_delivery_receivable",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1785070130796,
+      "tag": "0024_finance_project_settlements",
+      "breakpoints": true
     }
   ]
 }

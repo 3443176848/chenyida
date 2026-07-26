@@ -741,6 +741,18 @@
 - 应收：Shipment 只产生服务端按 quantity × SO unit price 计算的可信 Sales Source，不自动创建 AR。finance 显式消费每个正向来源且最多一次，Customer/Currency/Amount 只能继承来源；浏览器不得提交可信总额或客户。
 - 边界：本决定不授权 Finance Settlement、客户收款、银行、总账、税票、收入确认、真实数据迁移、HTTPS、切流或生产部署。
 
+## D-067 收付款沿稳定财务来源按项目和币种追溯，但不形成会计利润
+
+- 日期：2026-07-26
+- 状态：`ACCEPTED / IMPLEMENTING FOR PARALLEL ACCEPTANCE`
+- 确认人：项目负责人（明确授权 `SELFHOST-PHASE4-TASK10` 的合成客户收款、供应商付款与项目收支追溯）
+- Settlement：继续使用 `finance_documents`、`finance_settlements` 和追加式全额冲销。AR 只能登记 RECEIPT，AP 只能登记 PAYMENT；Document 行锁、CAS、幂等、金额上限、事件、审计和事务边界不变。`account_name` 只作内部记账标签，不证明银行连接或余额。
+- 项目归属：Finance 过账时从正向 Sales/Purchase Financial Source 的来源行沿稳定外键链确定 Business Project。金额由来源行数量和单价在服务端计算；缺链保存 `UNATTRIBUTED`，不按名称、订单文本或浏览器选择猜测，也不回写历史 Shipment、Receipt、AR 或 AP。
+- 不可变与守恒：来源分配保存 Project/UNATTRIBUTED、稳定来源行、数量、单价、金额和 SHA-256 digest；数据库外键、唯一约束、延迟总额核对和直接 SQL guard 防止绕过。部分 Settlement 按 Document 来源比例逐笔分配，六位小数尾差固定落到稳定排序首行，每笔和总额都守恒。
+- 查询：项目财务只按 Project 与 Currency 聚合来源、AR/AP、收付款和未结余额；跨币种禁止求和。`net_cash` 只等于客户收款减供应商付款；`transaction_contribution` 只等于销售来源减采购来源，不是毛利、净利润或会计利润，且不包含人工、制造/公司费用、税、折旧、汇率或库存成本。
+- 权限：finance 可查看/登记/冲销既有 AR/AP Settlement；manager/admin 可查看全部项目财务；engineering 只读本人负责项目的去敏汇总，不返回内部账户标签；sales/purchase 只读各自 AR/RECEIPT 与 AP/PAYMENT；其他越权写 403。
+- 生产边界：只批准隔离测试和回环 `chenyida-erp-parallel` 合成验收；不连接真实银行或支付接口，不迁真实数据，不执行生产 migration/部署、HTTPS、切流、push 或 PR。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

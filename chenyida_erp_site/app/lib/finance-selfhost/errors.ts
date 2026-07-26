@@ -15,6 +15,14 @@ const constraints: Record<string, [string, string]> = {
   finance_documents_amount_ck: ["FINANCE_AMOUNT_INVALID", "财务单据金额投影不合法"],
   finance_documents_projection_ck: ["FINANCE_PROJECTION_INVALID", "财务单据余额或状态投影不一致"],
   finance_settlements_amount_ck: ["FINANCE_AMOUNT_INVALID", "收付款或冲销金额不合法"],
+  finance_project_allocations_digest_uq: ["FINANCE_PROJECT_ALLOCATION_CONFLICT", "项目来源归属事实已经存在"],
+  finance_project_allocations_sales_fqc_uq: ["FINANCE_PROJECT_ALLOCATION_CONFLICT", "销售来源行已经完成项目归属"],
+  finance_project_allocations_sales_unattributed_line_uq: ["FINANCE_PROJECT_ALLOCATION_CONFLICT", "销售来源行已经记录未归属事实"],
+  finance_project_allocations_purchase_line_uq: ["FINANCE_PROJECT_ALLOCATION_CONFLICT", "采购来源行已经完成项目归属"],
+  finance_project_allocations_source_ck: ["FINANCE_PROJECT_ALLOCATION_INVALID", "项目归属来源类型不合法"],
+  finance_project_allocations_attribution_ck: ["FINANCE_PROJECT_ALLOCATION_INVALID", "项目归属状态不合法"],
+  finance_project_allocations_amount_ck: ["FINANCE_PROJECT_ALLOCATION_INVALID", "项目归属金额不合法"],
+  finance_project_allocations_digest_ck: ["FINANCE_PROJECT_ALLOCATION_INVALID", "项目归属摘要不合法"],
 };
 
 export function mapFinanceError(error: unknown): FinanceError {
@@ -27,6 +35,7 @@ export function mapFinanceError(error: unknown): FinanceError {
   if (["40001", "40P01"].includes(value?.code || "")) return new FinanceError("FINANCE_CONCURRENCY_CONFLICT", "财务数据已被并发更新，请刷新后重试", 409);
   if (/FinanceService|finance facts|finance documents/i.test(value?.message || "")) return new FinanceError("FINANCE_SERVICE_WRITE_REQUIRED", "财务记录只能通过受控服务写入", 403);
   if (/immutable/i.test(value?.message || "")) return new FinanceError("FINANCE_IMMUTABLE", "已过账财务事实不可修改或删除", 409);
+  if (/finance project.*(?:allocation|source|amount|attribution).*(?:mismatch|missing)/i.test(value?.message || "")) return new FinanceError("FINANCE_PROJECT_ALLOCATION_INVALID", "项目归属事实与稳定业务来源不一致", 409);
   if (/source mismatch/i.test(value?.message || "")) return new FinanceError("FINANCE_SOURCE_INVALID", "财务稳定来源与单据不一致", 422);
   if (/settlement.*mismatch/i.test(value?.message || "")) return new FinanceError("FINANCE_SETTLEMENT_INVALID", "收付款类型或冲销关系不一致", 422);
   if (/posted finance document blocks source reversal/i.test(value?.message || "")) return new FinanceError("FINANCE_SOURCE_ALREADY_POSTED", "来源已形成财务单据，不能从上游直接冲销", 409);
