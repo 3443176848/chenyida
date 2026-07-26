@@ -48,7 +48,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前运行状态 | Python/SQLite 开发服务继续由 systemd 常驻并监听 `0.0.0.0:18888`；非生产 Compose 项目 `chenyida-erp-parallel` 以 PostgreSQL 17/Web/Worker 同机并行运行，Web 仅绑定 `127.0.0.1:3000`，PostgreSQL 无宿主端口；不是生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard 与离线备份恢复治理的非生产链路 |
 | 当前阶段 | 第一阶段 TASK01—TASK04 已完成并行验收；在采购 Sourcing Award 后停止 |
-| 当前任务 | 无 `DOING`；`SELFHOST-PHASE4-TASK04` 已完成，不自动启动 TASK05 |
+| 当前任务 | `SELFHOST-PHASE4-TASK05`：定标到采购订单、仓库收货及财务应付交接（`DOING`） |
 | 下一任务 | 停止；TASK05 定标→采购订单→到货→收货→应付只记录，不自动启动。真实迁移、HTTPS、生产恢复和切换仍须独立授权 |
 
 ## 当前完成模块
@@ -176,7 +176,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 当前无 `DOING`；在 `SELFHOST-PHASE4-TASK04` 完成后停止。TASK05 定标→采购订单→到货计划→仓库收货→财务应付只记录，不自动启动；生产、品质、完工和发货同样不启动。
+- 当前 `DOING`：`SELFHOST-PHASE4-TASK05`，仅实现定标→采购订单→到货计划→仓库分批收货→库存→采购财务来源→财务显式应付；不启动生产、品质、完工、发货或 TASK06。
 - 已完成：`SELFHOST-PHASE4-TASK04`，并行环境 `0.1.0-alpha.18`/`0018` 完成两供应商 RFQ、报价、服务端比较和人工非最低价定标；A `12.000000`/准时/排名 2，B `10.000000`/晚交/排名 1，以 `DELIVERY_PRIORITY` 和“交期优先，避免项目延期”选择 A。Award=1 时全部下游写入为 0，重启持久和清理恢复通过；结论 `PROCUREMENT SOURCING AWARD ACCEPTED IN PARALLEL ENVIRONMENT`。
 - 已完成：`SELFHOST-PHASE4-TASK03`，并行环境 `0.1.0-alpha.17`/`0017` 的固化包聚合、库存/在途独立分配、不可变需求计划与采购申请、v1 退回释放→v2 重算重提→最终接收、重启持久和清理恢复通过；结论 `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`。现在停止，不自动启动 TASK04。
 - 已完成：`SELFHOST-PHASE4-TASK02`，并行环境 `0.1.0-alpha.16`/`0016` 的 planning 角色、显式 Requirement Resolution、不可变计划交接包、v1 退回→修订 v2→重提→接收、重启持久和清理恢复通过；结论 `PROJECT TO PLANNING HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。TASK03 后续已由独立授权和模型完成，不改写 TASK02 事实。
