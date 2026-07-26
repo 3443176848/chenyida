@@ -17,6 +17,9 @@ const constraintCodes: Record<string, [string, string]> = {
   production_routing_operations_code_uq: ["ROUTING_OPERATION_CODE_CONFLICT", "同一路线版本的工序编码不能重复"],
   production_routing_versions_current_product_uq: ["ROUTING_RELEASE_CONFLICT", "该产品版本已有当前发布路线"],
   production_work_order_routing_snapshots_wo_uq: ["WORK_ORDER_ROUTING_ALREADY_SNAPSHOTTED", "工单已经存在工艺快照"],
+  production_operation_runs_operation_uq: ["OPERATION_RUN_OPERATION_CONFLICT", "工序派工操作已经提交"],
+  production_operation_run_reversals_run_uq: ["OPERATION_RUN_ALREADY_REVERSED", "工序批次已经冲销"],
+  production_operation_run_input_allocations_source_uq: ["OPERATION_UPSTREAM_ALLOCATION_CONFLICT", "前序良品分配发生冲突"],
 };
 
 export function mapProductionError(error: unknown): ProductionError {

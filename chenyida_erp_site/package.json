@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.25",
+  "version": "0.1.0-alpha.26",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -13,7 +13,7 @@
     "db:migrate": "node --experimental-strip-types scripts/migrate-postgres.ts",
     "admin:init": "node --experimental-strip-types scripts/init-admin.ts",
     "test": "node --experimental-strip-types --test tests/selfhost-file-storage.test.mjs",
-    "test:legacy": "npm run build && node --experimental-strip-types --test tests/*.test.mjs",
+    "test:legacy": "npm run build && node --experimental-strip-types --test --test-concurrency=1 tests/*.test.mjs",
     "test:postgres": "node --experimental-strip-types --test tests/selfhost-postgres.test.mjs",
     "test:worker:resilience": "node --experimental-strip-types --test tests/selfhost-worker-resilience.test.mjs",
     "test:material:unit": "node --experimental-strip-types --test tests/selfhost-material-unit.test.mjs",
@@ -145,6 +145,12 @@
     "test:production-routing:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-routing-postgres.test.mjs",
     "test:production-routing:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-routing-migration-upgrade.test.mjs",
     "test:production-routing:compose": "node --experimental-strip-types scripts/selfhost-production-routing-compose-smoke.mjs",
+    "typecheck:production-operation": "tsc -p tsconfig.phase5-task02.json --pretty false",
+    "test:production-operation:unit": "node --experimental-strip-types --test tests/selfhost-production-operation-unit.test.mjs",
+    "test:production-operation:ui": "node --experimental-strip-types --test tests/selfhost-production-operation-ui-contract.test.mjs",
+    "test:production-operation:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-operation-postgres.test.mjs",
+    "test:production-operation:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-operation-migration-upgrade.test.mjs",
+    "test:production-operation:compose": "node --experimental-strip-types scripts/selfhost-production-operation-compose-smoke.mjs",
     "test:full-erp:compose": "node scripts/selfhost-full-erp-compose-smoke.mjs",
     "test:compose": "node scripts/selfhost-compose-smoke.mjs",
     "test:normalization:compose-restart": "node scripts/selfhost-normalization-restart-smoke.mjs",

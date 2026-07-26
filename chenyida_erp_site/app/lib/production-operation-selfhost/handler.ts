@@ -1,0 +1,31 @@
+import { createHash, randomUUID } from "node:crypto";
+import type { Pool } from "pg";
+import type { IdentityActor } from "../identity-selfhost/types.ts";
+import { ProductionError, mapProductionError } from "../production-selfhost/errors.ts";
+import { ProductionRepository } from "../production-selfhost/repository.ts";
+import { ProductionOperationService } from "./service.ts";
+
+type Dependencies = Readonly<{ pool: Pool; actor: IdentityActor; requestId: string; requireCsrf: () => void }>;
+const can = (actor: IdentityActor, permission: string) => actor.permissions.includes("*") || actor.permissions.includes(permission);
+const need = (actor: IdentityActor, permission: string) => { if (!can(actor, permission)) throw new ProductionError("PERMISSION_DENIED", "没有权限执行此操作", 403); };
+const response = (body: unknown, status: number, requestId: string, replay = false) => { const headers = new Headers({"Cache-Control":"no-store","X-Request-ID":requestId}); if (replay) headers.set("Idempotency-Replayed","true"); return Response.json(body,{status,headers}); };
+const stable = (value: unknown): unknown => Array.isArray(value) ? value.map(stable) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value as Record<string,unknown>).sort(([a],[b]) => a.localeCompare(b)).map(([key,item]) => [key,stable(item)])) : value;
+async function body(request: Request) { const raw = await request.text(); if (!raw || Buffer.byteLength(raw) > 64 * 1024) throw new ProductionError("REQUEST_VALIDATION_FAILED", "请求正文为空或超过 64 KiB"); let value: unknown; try { value=JSON.parse(raw); } catch { throw new ProductionError("REQUEST_VALIDATION_FAILED", "请求正文不是有效 JSON"); } if (!value || typeof value!=="object" || Array.isArray(value)) throw new ProductionError("REQUEST_VALIDATION_FAILED", "请求正文必须是对象"); const forbidden=["work_order_id","work_center_id","work_center_code","work_center_name","source_digest","operation_id","request_id","created_by","started_by","cancelled_by","reported_by","reversed_by","actor","status","processed_qty_total","good_qty_total","scrap_qty_total","version"].find((key)=>key in (value as Record<string,unknown>)); if(forbidden) throw new ProductionError("SERVER_MANAGED_FIELD_FORBIDDEN",`${forbidden} 由服务端维护`,422); return {value:value as Record<string,unknown>,digest:createHash("sha256").update(JSON.stringify(stable(value))).digest("hex")}; }
+function meta(request:Request,deps:Dependencies,action:string,digest:string){const key=request.headers.get("idempotency-key")||"";if(key.length<8||key.length>200)throw new ProductionError("IDEMPOTENCY_KEY_REQUIRED","写操作必须提供有效 Idempotency-Key");const route=new URL(request.url).pathname;return{actor:deps.actor,requestId:deps.requestId,operationId:randomUUID(),keyDigest:createHash("sha256").update(`${deps.actor.username}:${request.method}:${route}:${key}`).digest("hex"),requestDigest:digest,method:request.method,route,action};}
+
+export async function handleProductionOperationApi(request: Request, deps: Dependencies): Promise<Response|null> {
+  const url=new URL(request.url),path=url.pathname,start=path.match(/^\/api\/production\/operation-runs\/([1-9]\d*)\/start$/),report=path.match(/^\/api\/production\/operation-runs\/([1-9]\d*)\/reports$/),cancel=path.match(/^\/api\/production\/operation-runs\/([1-9]\d*)\/cancel$/),reverse=path.match(/^\/api\/production\/operation-runs\/([1-9]\d*)\/reverse$/);
+  if(!["/api/production/operation-execution/operators","/api/production/operation-execution/operations","/api/production/operation-execution/runs","/api/production/operation-execution/wip","/api/production/operation-execution/dispatch"].includes(path)&&!start&&!report&&!cancel&&!reverse)return null;
+  const repository=new ProductionRepository(deps.pool),service=new ProductionOperationService(repository);let action="PRODUCTION_OPERATION_REQUEST";
+  try {
+    if(request.method==="GET"){need(deps.actor,"production.read");const workOrderRaw=url.searchParams.get("work_order_id"),workOrderId=workOrderRaw?Number(workOrderRaw):undefined;if(workOrderRaw&&(!Number.isSafeInteger(workOrderId)||workOrderId!<=0))throw new ProductionError("REQUEST_VALIDATION_FAILED","work_order_id 必须为正整数");const result=path.endsWith("/operators")?await service.operators():path.endsWith("/operations")?await service.operations(workOrderId):path.endsWith("/runs")?await service.runs(workOrderId):path.endsWith("/wip")?await service.wip(workOrderId):null;if(!result)throw new ProductionError("METHOD_NOT_ALLOWED","接口不支持该请求方法",405);return response({rows:result.rows,data:result.rows,request_id:deps.requestId},200,deps.requestId);}
+    if(request.method!=="POST")throw new ProductionError("METHOD_NOT_ALLOWED","接口不支持该请求方法",405);deps.requireCsrf();const parsed=await body(request);let result;
+    if(path.endsWith("/dispatch")){action="PRODUCTION_OPERATION_DISPATCHED";need(deps.actor,"production.dispatch");result=await service.dispatch(meta(request,deps,action,parsed.digest),parsed.value);}
+    else if(start){action="PRODUCTION_OPERATION_STARTED";need(deps.actor,"production.execute");result=await service.start(Number(start[1]),meta(request,deps,action,parsed.digest),parsed.value);}
+    else if(report){action="PRODUCTION_OPERATION_REPORTED";need(deps.actor,"production.execute");result=await service.report(Number(report[1]),meta(request,deps,action,parsed.digest),parsed.value);}
+    else if(cancel){action="PRODUCTION_OPERATION_DISPATCH_CANCELLED";need(deps.actor,"production.dispatch");result=await service.cancel(Number(cancel[1]),meta(request,deps,action,parsed.digest),parsed.value);}
+    else if(reverse){action="PRODUCTION_OPERATION_REVERSED";need(deps.actor,"production.operation.reverse");result=await service.reverse(Number(reverse[1]),meta(request,deps,action,parsed.digest),parsed.value);}
+    else throw new ProductionError("NOT_FOUND","接口不存在",404);
+    return response(result.body,result.status,deps.requestId,result.replayed);
+  }catch(error){const mapped=mapProductionError(error);await repository.failureAudit(deps.actor.username,deps.requestId,action,mapped.code);return response({error:{code:mapped.code,message:mapped.message,details:mapped.details,request_id:deps.requestId},code:mapped.code,message:mapped.message,details:mapped.details,request_id:deps.requestId},mapped.status,deps.requestId);}
+}

@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "target": "ES2022", "incremental": false, "plugins": [] },
+  "include": [
+    "app/lib/production-operation-selfhost/**/*.ts",
+    "app/lib/production-routing-selfhost/**/*.ts",
+    "app/lib/production-selfhost/**/*.ts",
+    "app/lib/production-handoff-selfhost/**/*.ts",
+    "app/lib/inventory-selfhost/**/*.ts",
+    "app/lib/master-data-selfhost/**/*.ts",
+    "app/lib/bom-selfhost/**/*.ts",
+    "app/lib/identity-selfhost/**/*.ts",
+    "app/lib/dashboard-selfhost/**/*.ts",
+    "app/lib/selfhost-api.ts",
+    "app/production/**/*.tsx",
+    "db/**/*.ts"
+  ],
+  "exclude": ["node_modules", "examples", "app/api/erp-api.ts", "scripts/seed-material-categories.ts"]
+}
