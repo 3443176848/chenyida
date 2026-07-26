@@ -57,8 +57,10 @@ async function seed(admin, production) {
     const category = (await db.query("insert into material_categories(category_code,category_name_cn,category_level,status,created_by,updated_by,request_id) values('TASK10','TASK10 合成物料',4,'ACTIVE',$1,$1,$2) returning id", [admin, randomUUID()])).rows[0];
     const materials = (await db.query(`insert into material_master(internal_material_code,standard_name,category_id,base_uom,base_unit_id,material_status,procurement_type,inventory_type,inspection_type,environmental_requirement,source_type,last_modified_by,created_by,updated_by,request_id) values
       ('CYD-T10-RAW','TASK10 原材料',$1,'T10PCS',$2,'ACTIVE','PURCHASE','STOCKED','NONE','ROHS','MANUAL',$3,$3,$3,$4),
-      ('CYD-T10-FG','TASK10 成品',$1,'T10PCS',$2,'ACTIVE','MAKE','STOCKED','FQC','ROHS','MANUAL',$3,$3,$3,$5) returning id,internal_material_code`, [category.id, unit.id, admin, randomUUID(), randomUUID()])).rows;
+      ('CYD-T10-RAW2','TASK10 辅料',$1,'T10PCS',$2,'ACTIVE','PURCHASE','STOCKED','NONE','ROHS','MANUAL',$3,$3,$3,$5),
+      ('CYD-T10-FG','TASK10 成品',$1,'T10PCS',$2,'ACTIVE','MAKE','STOCKED','FQC','ROHS','MANUAL',$3,$3,$3,$6) returning id,internal_material_code`, [category.id, unit.id, admin, randomUUID(), randomUUID(), randomUUID()])).rows;
     const raw = materials.find((row) => row.internal_material_code === "CYD-T10-RAW");
+    const purchaseMaterial = materials.find((row) => row.internal_material_code === "CYD-T10-RAW2");
     const finished = materials.find((row) => row.internal_material_code === "CYD-T10-FG");
     const customer = (await db.query("insert into customers(customer_code,customer_name,normalized_name,status,created_by,updated_by,request_id) values('CUS-T10','TASK10 客户','TASK10 客户','ACTIVE',$1,$1,$2) returning id", [admin, randomUUID()])).rows[0];
     const product = (await db.query("insert into products(product_code,product_name,customer_id,status,created_by,updated_by,request_id) values('PRD-T10','TASK10 产品',$1,'ACTIVE',$2,$2,$3) returning id", [customer.id, admin, randomUUID()])).rows[0];
@@ -84,22 +86,46 @@ async function seed(admin, production) {
 
     const supplier = (await db.query("insert into suppliers(supplier_code,supplier_name,normalized_name,status,created_by,updated_by,request_id) values('SUP-T10','TASK10 供应商','TASK10 供应商','ACTIVE',$1,$1,$2) returning id", [admin, randomUUID()])).rows[0];
     const plan = (await db.query("insert into planning_material_requirement_plans(project_id,planning_package_id,plan_version_no,required_date,status,source_package_version,source_package_digest,calculation_digest,prepared_by,submitted_by,submitted_at,accepted_by,accepted_at,request_id) values($1,$2,1,current_date,'ACCEPTED',1,$3,$3,$4,$4,now(),$4,now(),$5) returning id", [project.id, planningPackage.id, digest, admin, randomUUID()])).rows[0];
+    const planLines = (await db.query(`insert into planning_material_requirement_lines(plan_id,line_no,material_id,unit_id,material_snapshot,material_digest,gross_requirement,stock_available,eligible_inbound,stock_allocated,inbound_allocated,net_purchase_requirement,source_digest) values
+      ($1,1,$2,$4,'{}',$5,4,0,0,0,0,4,$5),
+      ($1,2,$3,$4,'{}',$5,6,0,0,0,0,6,$5) returning id,material_id`, [plan.id, raw.id, purchaseMaterial.id, unit.id, digest])).rows;
     const purchaseRequest = (await db.query("insert into planning_purchase_requests(request_code,plan_id,status,submitted_by,submitted_at,accepted_by,accepted_at,request_id) values('PRQ-10000010',$1,'ACCEPTED',$2,now(),$2,now(),$3) returning id", [plan.id, admin, randomUUID()])).rows[0];
+    const requestLines = (await db.query(`insert into planning_purchase_request_lines(purchase_request_id,plan_line_id,line_no,material_id,unit_id,requested_quantity) values
+      ($1,$2,1,$4,$6,4),($1,$3,2,$5,$6,6) returning id,material_id`, [purchaseRequest.id, planLines[0].id, planLines[1].id, raw.id, purchaseMaterial.id, unit.id])).rows;
     const rfq = (await db.query("insert into procurement_rfqs(rfq_code,purchase_request_id,round_no,status,response_deadline,currency_code,source_purchase_request_version,source_digest,request_id,created_by,issued_by,issued_at) values('RFQ-10000010',$1,1,'ISSUED',current_date,'CNY',1,$2,$3,$4,$4,now()) returning id", [purchaseRequest.id, digest, randomUUID(), admin])).rows[0];
+    const rfqLines = (await db.query(`insert into procurement_rfq_lines(rfq_id,purchase_request_line_id,material_id,unit_id,requested_quantity,required_date,line_no,source_digest) values
+      ($1,$2,$4,$6,4,current_date,1,$7),($1,$3,$5,$6,6,current_date,2,$7) returning id,material_id`, [rfq.id, requestLines[0].id, requestLines[1].id, raw.id, purchaseMaterial.id, unit.id, digest])).rows;
+    await db.query("insert into procurement_rfq_suppliers(rfq_id,supplier_id,status,invited_by,responded_at,supplier_mapping_digest) values($1,$2,'RESPONDED',$3,now(),$4)", [rfq.id, supplier.id, admin, digest]);
+    const quote = (await db.query("insert into procurement_supplier_quotes(rfq_id,supplier_id,quote_version_no,supplier_quote_reference,status,currency_code,valid_until,tax_included,freight_included,payment_terms,quote_digest,recorded_by,request_id) values($1,$2,1,'TASK10-QUOTE','SUBMITTED','CNY',current_date+30,true,true,'TASK10 合成账期',$3,$4,$5) returning id", [rfq.id, supplier.id, digest, admin, randomUUID()])).rows[0];
+    const quoteLines = (await db.query(`insert into procurement_supplier_quote_lines(quote_id,rfq_line_id,material_id,unit_id,quoted_quantity,minimum_order_quantity,unit_price,lead_time_days,promised_delivery_date,line_digest) values
+      ($1,$2,$4,$6,4,1,12,0,current_date,$7),($1,$3,$5,$6,6,1,12,0,current_date,$7) returning id,rfq_line_id`, [quote.id, rfqLines[0].id, rfqLines[1].id, raw.id, purchaseMaterial.id, unit.id, digest])).rows;
+    const comparisons = [];
+    for (const [index, rfqLine] of rfqLines.entries()) {
+      const comparison = (await db.query("insert into procurement_quote_comparisons(rfq_id,rfq_line_id,comparison_version_no,basis_digest,generated_by,request_id) values($1,$2,1,$3,$4,$5) returning id", [rfq.id, rfqLine.id, digest, admin, randomUUID()])).rows[0];
+      await db.query("insert into procurement_quote_comparison_lines(comparison_id,quote_line_id,supplier_id,currency_code,unit_id,tax_included,freight_included,unit_price,minimum_order_quantity,promised_delivery_date,price_rank,lowest_price,moq_satisfied,delivery_status,quote_expired,comparable_status,reason_code,awardable) values($1,$2,$3,'CNY',$4,true,true,12,1,current_date,1,true,true,'ON_TIME',false,'COMPARABLE','OK',true)", [comparison.id, quoteLines[index].id, supplier.id, unit.id]);
+      comparisons.push(comparison);
+    }
     const award = (await db.query("insert into procurement_sourcing_awards(rfq_id,status,award_digest,selected_by,reason_code,reason,request_id) values($1,'AWARDED',$2,$3,'SYNTHETIC','TASK10 合成定标',$4) returning id", [rfq.id, digest, admin, randomUUID()])).rows[0];
     const awardLines = (await db.query(`insert into procurement_sourcing_award_lines(award_id,rfq_line_id,comparison_id,selected_quote_line_id,supplier_id,selected_quantity,selected_unit_price,required_date,promised_delivery_date,selection_reason) values
-      ($1,1001,2001,3001,$2,4,12,current_date,current_date,'TASK10 AP48'),
-      ($1,1002,2002,3002,$2,6,12,current_date,current_date,'TASK10 AP72') returning id`, [award.id, supplier.id])).rows;
+      ($1,$2,$4,$6,$8,4,12,current_date,current_date,'TASK10 AP48'),
+      ($1,$3,$5,$7,$8,6,12,current_date,current_date,'TASK10 AP72') returning id`, [award.id, rfqLines[0].id, rfqLines[1].id, comparisons[0].id, comparisons[1].id, quoteLines[0].id, quoteLines[1].id, supplier.id])).rows;
+    const mappings = [];
+    for (const [index, material] of [raw, purchaseMaterial].entries()) {
+      const mapping = (await db.query("insert into supplier_mappings(material_id,supplier_name,supplier_key,supplier_item_code,supplier_item_name,purchase_uom,status,valid_from,created_by,updated_by,request_id) values($1,'TASK10 供应商','TASK10 供应商',$2,$3,'T10PCS','ACTIVE',now(),$4,$4,$5) returning id", [material.id, `T10-SUP-${index + 1}`, `TASK10 物料 ${index + 1}`, admin, randomUUID()])).rows[0];
+      mappings.push(mapping);
+    }
     const purchaseSources = [];
     for (const [index, quantity] of [4, 6].entries()) {
-      const amount = quantity * 12; const material = index === 0 ? raw : finished;
+      const amount = quantity * 12; const material = index === 0 ? raw : purchaseMaterial;
       const po = (await db.query("insert into purchase_orders(po_code,supplier_id,status,currency_code,operation_id,created_by,request_id) values($1,$2,'RECEIVED','CNY',$3,$4,$5) returning id", [`PO-T10-${amount}`, supplier.id, randomUUID(), admin, randomUUID()])).rows[0];
-      const poLine = (await db.query("insert into purchase_order_lines(purchase_order_id,line_no,material_id,unit_id,supplier_mapping_id,order_qty,unit_price,received_qty,status) values($1,1,$2,$3,$4,$5,12,$5,'RECEIVED') returning id", [po.id, material.id, unit.id, 4001 + index, quantity])).rows[0];
+      const poLine = (await db.query("insert into purchase_order_lines(purchase_order_id,line_no,material_id,unit_id,supplier_mapping_id,order_qty,unit_price,received_qty,status) values($1,1,$2,$3,$4,$5,12,$5,'RECEIVED') returning id", [po.id, material.id, unit.id, mappings[index].id, quantity])).rows[0];
       await db.query("insert into procurement_award_po_line_links(award_id,award_line_id,purchase_order_id,purchase_order_line_id,source_digest,operation_id,created_by,request_id) values($1,$2,$3,$4,$5,$6,$7,$8)", [award.id, awardLines[index].id, po.id, poLine.id, digest, randomUUID(), admin, randomUUID()]);
       const delivery = (await db.query("insert into purchase_delivery_plans(purchase_order_id,purchase_order_line_id,supplier_id,material_id,unit_id,planned_quantity,received_quantity,promised_delivery_date,status,created_by,updated_by,request_id) values($1,$2,$3,$4,$5,$6,$6,current_date,'COMPLETED',$7,$7,$8) returning id", [po.id, poLine.id, supplier.id, material.id, unit.id, quantity, admin, randomUUID()])).rows[0];
       const adjustment = (await db.query("insert into inventory_adjustments(adjustment_code,operation_type,reason,operation_id,created_by,request_id) values($1,'RECEIPT','TASK10 合成采购收货',$2,$3,$4) returning id", [`ADJ-T10-${amount}`, randomUUID(), admin, randomUUID()])).rows[0];
+      const balance = (await db.query("insert into inventory_stock_balances(material_id,unit_id,on_hand_qty,reserved_qty,frozen_qty,version) values($1,$2,$3,0,0,1) returning id", [material.id, unit.id, quantity])).rows[0];
+      const ledger = (await db.query("insert into inventory_ledger_entries(operation_id,adjustment_id,line_no,balance_id,material_id,unit_id,entry_type,on_hand_delta,before_on_hand_qty,after_on_hand_qty,before_frozen_qty,after_frozen_qty,balance_version_before,balance_version_after,source_id,created_by,request_id) values($1,$2,1,$3,$4,$5,'RECEIPT',$6,0,$6,0,0,0,1,$2,$7,$8) returning id", [randomUUID(), adjustment.id, balance.id, material.id, unit.id, quantity, admin, randomUUID()])).rows[0];
       const receipt = (await db.query("insert into purchase_receipts(receipt_code,purchase_order_id,inventory_adjustment_id,reason,operation_id,created_by,request_id) values($1,$2,$3,'TASK10 合成采购收货',$4,$5,$6) returning id", [`RCPT-T10-${amount}`, po.id, adjustment.id, randomUUID(), admin, randomUUID()])).rows[0];
-      const receiptLine = (await db.query("insert into purchase_receipt_lines(purchase_receipt_id,line_no,purchase_order_line_id,material_id,unit_id,quantity,inventory_ledger_entry_id,line_amount) values($1,1,$2,$3,$4,$5,$6,$7) returning id", [receipt.id, poLine.id, material.id, unit.id, quantity, 5001 + index, amount])).rows[0];
+      const receiptLine = (await db.query("insert into purchase_receipt_lines(purchase_receipt_id,line_no,purchase_order_line_id,material_id,unit_id,quantity,inventory_ledger_entry_id,line_amount) values($1,1,$2,$3,$4,$5,$6,$7) returning id", [receipt.id, poLine.id, material.id, unit.id, quantity, ledger.id, amount])).rows[0];
       await db.query("insert into purchase_receipt_delivery_allocations(purchase_receipt_line_id,delivery_plan_id,quantity,created_by,request_id) values($1,$2,$3,$4,$5)", [receiptLine.id, delivery.id, quantity, admin, randomUUID()]);
       const source = (await db.query("insert into purchase_financial_source_entries(purchase_receipt_id,supplier_id,entry_type,amount,currency_code,source_id) values($1,$2,'RECEIPT',$3,'CNY',$4) returning id", [receipt.id, supplier.id, amount, randomUUID()])).rows[0];
       purchaseSources.push(Number(source.id));

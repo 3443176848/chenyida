@@ -27,7 +27,8 @@
 - `SELFHOST-PHASE4-TASK07`：已领料工单 → 分批 Report → good Allocation → warehouse 分批 Completion → 成品 Ledger/Balance → COMPLETED（DONE；`0.1.0-alpha.21`/`0021`、真实 4/6 HTTP、重启、双恢复与清理通过；品质、发货和财务排除）。
 - `SELFHOST-PHASE4-TASK08`：Report→IPQC、Completion→SO Allocation→FQC 处置关闭→订单级可消费放行额度（DONE；`0.1.0-alpha.22`/`0022`、真实 4/6 HTTP、重启、恢复与清理通过；不发货或创建 AR）。
 - `SELFHOST-PHASE4-TASK09`：FQC 放行→Sales Delivery Instruction→warehouse 分批 Shipment/FQC 消费→成品出库→Sales Source→finance 显式 AR（DONE；`0.1.0-alpha.23`/`0023`、Shipment/FQC `4/6`、库存 `10→6→0`、Source/AR `80/120`、Settlement 0，重启、恢复与清理通过）。
-- 后续阶段：客户收款、银行、总账、税票、收入确认、真实迁移和生产切换均为 PLANNED/待单独授权；TASK09 完成后停止。
+- `SELFHOST-PHASE4-TASK10`：既有 AR/AP→客户收款/供应商付款→稳定来源 Project/Currency 归属→来源、未结与净现金视图（DONE；`0.1.0-alpha.24`/`0024`、AR `80/120`、AP `48/72`、收款 `30/50/120`、付款 `48/30/42`、净现金 80、UNATTRIBUTED 0，重启、恢复与清理通过；不是会计利润）。
+- 后续阶段：真实银行、总账、税票、汇率、成本会计、公司费用、正式利润、真实迁移和生产切换均为 PLANNED/待单独授权；TASK10 完成后停止。
 
 ## Phase 0 基础架构
 

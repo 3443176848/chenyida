@@ -4,6 +4,10 @@
 
 ## 2026-07-26 FQC 放行到发货与应收交接边界
 
+`SELFHOST-PHASE4-TASK10` 继续复用唯一 Finance Document/Settlement/Reversal 权威，以 expand-only `0024` 保存 Sales/Purchase Financial Source 行到 Business Project 或 `UNATTRIBUTED` 的不可变归属。来源行数量、单价、金额、Project 与 digest 均由服务端沿稳定外键链计算，浏览器不能提交 Project 或分配金额；项目查询只按 Currency 分组，不做跨币种汇总。
+
+`net_cash` 只等于实际客户收款减供应商付款；`transaction_contribution` 只等于销售来源减采购来源。二者均不是会计利润，未包含人工、制造/公司费用、税、折旧、汇率或库存成本。`account_name` 只是内部记账标签，不表示银行连接或余额核验。
+
 `SELFHOST-PHASE4-TASK09` 在既有 Sales 权威内增加 Delivery Instruction 编排，以 expand-only `0023` 保存指令/行/事件、执行行和 Shipment Line→FQC Release Allocation；不复制 SO、Shipment、Inventory Ledger/Balance、Sales Financial Source 或 Finance Document。指令只占用订单未发量和 FQC 可发额度，不产生下游事实。
 
 ```mermaid

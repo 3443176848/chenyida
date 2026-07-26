@@ -2,7 +2,7 @@
 
 ## 状态与授权
 
-- 状态：`DOING`
+- 状态：`DONE / PARALLEL ACCEPTED`
 - 日期：2026-07-26（Asia/Shanghai）
 - 合法起点：`main` / `e63c726e0d274a8b7b654819794b4bd1044c6f82`，工作区 clean，`origin/main...HEAD` behind 0/ahead 36。
 - 依赖：`SELFHOST-PHASE4-TASK05`、`SELFHOST-PHASE4-TASK09`、既有 Finance/Procurement/Sales/Project/Dashboard 权威模块。
@@ -50,3 +50,10 @@ Shipment → Sales Financial Source → AR → RECEIPT
 ## 明确排除
 
 真实银行或支付接口、真实账户余额核验、总账、税票、外币/汇率、成本会计、人工/制造/公司费用、库存成本、收入确认、正式利润、真实数据迁移、HTTPS、80/443、切流、生产部署、push 和 PR 均不属于本任务。完成后停止。
+
+## 完成记录
+
+- 功能提交 `23fef6098a88466b94fcac104bba9317ba310d15`，严格 Parent `e63c726e0d274a8b7b654819794b4bd1044c6f82`；独立 ops 验收提交以 Git log 为准。
+- `0.1.0-alpha.24` / `0024`，Migration SHA-256 `cab6f7679e91589cfe2c7fdecf9750b222b9212acbbd3341301c7a67ec2e9624`。
+- 所有门禁、实际 HTTP、整体重启、停服备份、新空库恢复和最终清理通过；详细证据见 `SELFHOST-PHASE4-TASK10-COMPLETION.md`。
+- 结论：`PROJECT RECEIPT PAYMENT AND CASHFLOW ACCEPTED IN PARALLEL ENVIRONMENT`。

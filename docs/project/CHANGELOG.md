@@ -4,6 +4,25 @@
 
 ## 2026-07-26
 
+### SELFHOST-PHASE4-TASK10 - `ops: accept project cashflow workflow in parallel environment`
+
+- 提交：功能提交 `23fef6098a88466b94fcac104bba9317ba310d15`，Parent 严格为 `e63c726e0d274a8b7b654819794b4bd1044c6f82`；独立 ops 提交以功能提交为 Parent，不 amend/rebase，实际哈希以 Git log 为准。
+- 并行验收：只更新 `chenyida-erp-parallel` 至 `0.1.0-alpha.24`/24 migrations；`0024` SHA-256 `cab6f7679e91589cfe2c7fdecf9750b222b9212acbbd3341301c7a67ec2e9624`。Web 仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口。
+- 实际 HTTP：AR `80/120`、AP `48/72`；收款 `30/50/120`、付款 `48/30/42`；Sales/Purchase Source `200/120`，未结 `0/0`、交易贡献/净现金 `80/80 CNY`、UNATTRIBUTED 0、Settlement Reversal 0、银行写入 0。
+- 保护：类型错配、零/负/超额、并发、幂等/CAS、全额/重复/并发冲销、故障回滚、多 Project、UNATTRIBUTED、rounding、币种隔离、403 及 TASK05/TASK09 冲销门禁通过。
+- 持久与恢复：整体重启后事实保持；停服备份 `backup-20260726T133340Z-23fef6098a88` 校验并恢复到新空库，精确核对 24 migrations、AR/AP、6 Settlement、4 Allocation、200/120 来源、UNATTRIBUTED/冲销 0。
+- 清理与保护：最终 24 migrations、唯一启用管理员、业务/上传/附件 0，仅三容器四卷；临时恢复与备份工件删除。Python PID `277640` 与 SQLite metadata `64769:53827608:1784999031:1544192` 不变。
+- 结论：`PROJECT RECEIPT PAYMENT AND CASHFLOW ACCEPTED IN PARALLEL ENVIRONMENT`。未连接银行、迁真实数据、切流、生产部署、push 或 PR，也不宣称会计利润。
+
+### SELFHOST-PHASE4-TASK10 - `feat: add project settlement traceability`
+
+- Git：功能提交 `23fef6098a88466b94fcac104bba9317ba310d15` 严格以 `e63c726e0d274a8b7b654819794b4bd1044c6f82` 为 Parent；不 reset/stash/rebase/amend/force push。
+- 数据库：仅新增 expand-only `0024_finance_project_settlements.sql`，保存 Financial Source 行→Project/UNATTRIBUTED、数量/单价/金额/digest，补充外键、唯一/索引、延迟总额核对、不可变和稳定来源直接 SQL guard；同步 Drizzle Schema/journal/snapshot，不修改 0001—0023。
+- 服务/API：复用唯一 Finance Document/Settlement/Reversal；AR 只收款、AP 只付款，部分/多次核销和追加式全额冲销保持单事务、并发锁、CAS、幂等、Event/Audit；项目视图按 Project/Currency 汇总来源、收付款和未结。
+- 权限/UI：finance 管理收付款，manager/admin 查看项目汇总，sales/purchase 职责只读，engineering 查看本人项目去敏汇总；新增 `/finance/settlements`、`/finance/projects` 和六项 Dashboard 指标。
+- 验证：TASK10 专项、TASK01—TASK09 回归、正式 typecheck、Schema consistency、lint/build、凭证扫描、Python 隔离基线和 `git diff --check` 通过。
+- 边界：`net_cash` 不是会计利润；未实现银行、总账、税票、汇率、成本会计、公司费用、正式利润、真实迁移或生产部署。
+
 ### SELFHOST-PHASE4-TASK09 - `ops: accept sales delivery receivable workflow in parallel environment`
 
 - 提交：功能提交 `dfda1c5597cc576cd96f495e272e9fc59c851fa4`，Parent 严格为 `d9ebfb4644bb9e0d07bfbf81d168d7babcd4bdea`；独立 ops 提交以功能提交为 Parent，不 amend/rebase，实际哈希以 Git log 为准。

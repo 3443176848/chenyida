@@ -722,7 +722,7 @@
 ## D-065 成品订单归属采用稳定分配，品质放行只形成可消费额度
 
 - 日期：2026-07-26
-- 状态：`ACCEPTED / IMPLEMENTING FOR PARALLEL ACCEPTANCE`
+- 状态：`ACCEPTED / PARALLEL VERIFIED`
 - 确认人：项目负责人（明确授权 `SELFHOST-PHASE4-TASK08` 并固定分配、IPQC/FQC、权限与任务排除边界）
 - 分配：Completion Line 必须由 sales 显式分配到当前 `OPEN/PARTIALLY_SHIPPED` Sales Order Line；Customer、Product、Product Version、Finished Material 和 Unit 必须与来源 Work Order 一致。有效分配两侧不得超量，不修改 Inventory `reserved_qty`；已有 FQC 后不能取消，存在有效分配时 Completion 冲销 fail closed。
 - IPQC：只绑定未冲销 Production Report，累计检验不超过 reported quantity；数量守恒与 failed 的 FAIL Result/Defect 证据继续由既有 Quality Service 和数据库共同保证。IPQC 不修改生产或库存，不伪造工艺路线/WIP，也不自动决定 FQC。

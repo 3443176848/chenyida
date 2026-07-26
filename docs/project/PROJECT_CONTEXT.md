@@ -29,9 +29,9 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；TASK09 源码与并行环境均为 `0.1.0-alpha.23`/`0023`；只属于回环并行验收，明确为非生产且尚未正式发布。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；TASK10 源码与并行环境均为 `0.1.0-alpha.24`/`0024`；只属于回环并行验收，明确为非生产且尚未正式发布。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.19`。
-- Git 复核：2026-07-26 TASK09 起点为本地 `main`/HEAD `d9ebfb4644bb9e0d07bfbf81d168d7babcd4bdea`、工作区 clean；`origin/main...HEAD` 为 behind 0/ahead 34。TASK09 形成两个独立本地提交，仍未 push、未创建 PR，不得描述为已同步。
+- Git 复核：2026-07-26 TASK10 起点为本地 `main`/HEAD `e63c726e0d274a8b7b654819794b4bd1044c6f82`、工作区 clean；`origin/main...HEAD` 为 behind 0/ahead 36。TASK10 形成两个独立本地提交，仍未 push、未创建 PR，不得描述为已同步。
 
 ### 治理资料
 
@@ -61,7 +61,7 @@
 - `drizzle-postgres/0016_project_planning_handoff.sql` expand-only 新增正式 planning 角色约束、Requirement Resolution、版本化 Planning Package、Item/BOM/Document 快照和不可变 Event；不修改 0015 事实，不读取库存或创建需求/采购/生产单据。
 - `drizzle-postgres/0017_planning_material_requirements.sql` expand-only 新增不可变物料需求计划/行、独立库存/在途 Planning Allocation、采购申请/行和事件；只消费固化 Package 快照，提交时锁定重算，不修改正式 `reserved_qty` 或创建 PO/收货/生产事实。
 - `drizzle-postgres/0018_procurement_sourcing.sql` 保存 RFQ、报价版本、比较版本、人工 Award 和事件；`0019_sourcing_purchase_fulfillment.sql` 新增 Award/PO 来源、到货计划、待入库、Receipt 分配和不可变事件，并复用既有 Procurement/Inventory/Finance 事务权威。
-- `drizzle-postgres/0020_production_handoff_reservations.sql`—`0022_production_quality_release.sql` 依次增加计划→生产交接/预留、Report→Completion Allocation/安全冲销和 Completion→SO Allocation/FQC 放行额度；`0023_sales_delivery_receivable.sql` 增加发货指令及 Shipment Line→FQC 精确分配，复用既有 Shipment/Inventory/Sales Source/Finance AR 权威。
+- `drizzle-postgres/0020_production_handoff_reservations.sql`—`0023_sales_delivery_receivable.sql` 依次增加计划→生产、报工/完工、FQC 放行和精确发货/AR；`0024_finance_project_settlements.sql` 增加不可变 Financial Source→Project/UNATTRIBUTED 归属，继续复用唯一 Finance Document/Settlement/Reversal 权威。
 - 本地文件卷保存二进制，数据库只保存受控相对路径和摘要元数据。
 - Worker 使用 PostgreSQL Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、重试和 CAS；Web/Worker 是独立入口。
 

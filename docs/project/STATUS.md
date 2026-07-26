@@ -2,6 +2,24 @@
 
 最后更新时间：2026-07-26（Asia/Shanghai）
 
+## SELFHOST-PHASE4-TASK10 客户收款、供应商付款与项目收支追溯
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `23fef6098a88466b94fcac104bba9317ba310d15` 严格基于 `e63c726e0d274a8b7b654819794b4bd1044c6f82`；独立 ops 验收提交以 Git log 为准 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.24`；`0024` SHA-256/数据库 checksum `cab6f7679e91589cfe2c7fdecf9750b222b9212acbbd3341301c7a67ec2e9624`；0001—0023 未修改，Schema/journal/snapshot 一致 |
+| Settlement 权威 | PASS | 复用 Finance Document/Settlement/Reversal；AR→RECEIPT、AP→PAYMENT，部分/多次核销、不可变追加式冲销、单事务 Event/Audit/Idempotency 与余额/version 投影 |
+| 项目归属 | PASS | Sales/Purchase Source 行沿稳定外键归属 Project；缺链明确 UNATTRIBUTED；服务端数量×单价、digest、唯一/外键/守恒/直接 SQL guard，不回写历史来源 |
+| 实际金额 | PASS | AR `80/120`、AP `48/72`；收款 `30/50/120`、付款 `48/30/42`；来源 `200/120`，AR/AP 未结 `0/0`，交易贡献/净现金 `80/80 CNY`，UNATTRIBUTED 0、冲销 0、银行写入 0 |
+| 权限/UI/Dashboard | PASS | finance 写与冲销、manager/admin 项目汇总、sales/purchase 职责只读、engineering 本人项目去敏；越权 403；两条原生页面和六项按币种/权限指标通过 |
+| 并发/幂等/CAS/回滚 | PASS | 并发核销不超额、同 Key 重放/异正文冲突、expected version、全额/重复/并发冲销、故障零半记录及 TASK05/TASK09 上游门禁通过 |
+| 自动验证 | PASS | TASK10 unit/UI/PG/migration、TASK01—TASK09 PG/API 与 migration upgrade、相关模块回归、十组 Phase 4 typecheck、Schema consistency、build、884 文件凭证扫描和 Python 三项通过；lint 0 error/6 既有 warning |
+| 重启/恢复 | PASS | 整体重启后全部 Document/Settlement/Allocation/Event/Audit/项目汇总保持；停服备份 `backup-20260726T133340Z-23fef6098a88` 校验，新空恢复精确核对 24 migrations、200/120 收支和归属 |
+| 清理/资源 | PASS | 主库 24 migrations、唯一启用管理员、所有合成业务和 uploads/attachments 0；仅 PostgreSQL/Web/Worker 三容器和四卷；临时库/备份/恢复/检查资源删除 |
+| Python/SQLite | PASS / PROTECTED | Python PID `277640` 未重启；真实 SQLite metadata `64769:53827608:1784999031:1544192` 不变，未读取/修改业务正文 |
+| 排除事项 | ENFORCED | 未连接银行、未迁真实数据，未实现总账/税票/汇率/成本会计/正式利润，未切流、生产部署、push 或 PR |
+| 完成结论 | PASS | `PROJECT RECEIPT PAYMENT AND CASHFLOW ACCEPTED IN PARALLEL ENVIRONMENT` |
+
 ## SELFHOST-PHASE4-TASK09 销售发货、成品出库与应收交接
 
 | 验证项 | 结果 | 说明 |
