@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
 最后核验：2026-07-26（Asia/Shanghai）
-适用任务：`PHASE0-TASK03` 发布基线复核；最新功能验收为 `SELFHOST-PHASE4-TASK05`
+适用任务：`PHASE0-TASK03` 发布基线复核；最新功能验收为 `SELFHOST-PHASE4-TASK09`
 
 ## 1. 使用规则
 
@@ -22,12 +22,13 @@
 | Node.js / PostgreSQL TASK03 并行验收基线 | `0.1.0-alpha.17` | 功能提交 `5009b9118901a01af6a5faed194b8444d0c1e969`；验收提交消息 `ops: accept planning material requirement workflow in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0017`；测试业务清理后为空 | TASK03 专项/共享回归/typecheck/lint/build/credentials/Python、真实旅程、重启与恢复清理通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | migration 前 0016 root-only 恢复点已验证、用于成功清理并删除；Python/SQLite 不影响 | `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`；后续 TASK04 已独立验收 |
 | Node.js / PostgreSQL TASK04 并行验收基线 | `0.1.0-alpha.18` | 功能提交 `4506db2579c07080afe27b33bb2e50623c3d1366`；验收提交消息 `ops: accept procurement sourcing workflow in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0018`；测试业务清理后为空 | TASK04 专项、共享回归、Schema/typecheck/lint/build/credentials/Python、真实旅程、重启与恢复清理通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | 0017 与干净 0018 root-only 恢复点已校验；干净 0018 点用于成功清理后删除 | `PROCUREMENT SOURCING AWARD ACCEPTED IN PARALLEL ENVIRONMENT`；不授权 TASK05/生产 |
 | Node.js / PostgreSQL TASK05 并行验收基线 | `0.1.0-alpha.19` | 功能提交 `859454c97acddbff8c5199d91c41d636a6ca24e0`；验收提交 `3ae79f167a22bd8c5bb8120e2b5e8356f59d89b4` | 源码与并行 PostgreSQL 均为 `0001`—`0019`；测试业务清理后为空 | TASK05 专项、TASK01—TASK04/共享回归、Schema/typecheck/lint/build/credentials/Python、三角色 HTTP 旅程、重启与备份恢复通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | 0018 前置与干净 0019 root-only 恢复点已校验；第二新空库恢复通过，干净 0019 点用于最终清理后删除 | `SOURCING TO PAYABLE HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`；不授权 TASK06/生产 |
+| Node.js / PostgreSQL TASK09 并行验收基线 | `0.1.0-alpha.23` | 功能提交 `dfda1c5597cc576cd96f495e272e9fc59c851fa4`；验收提交消息 `ops: accept sales delivery receivable workflow in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0023`；唯一启用管理员，合成业务和文件已清空 | TASK09 专项、TASK01—TASK08/共享回归、17 typecheck、Schema/lint/build/credentials/Python、六角色 HTTP 4/6、重启与停服备份恢复通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | 接受态备份恢复到新空库通过，临时恢复点验收后删除；Python/SQLite 不影响 | `FQC RELEASE TO SHIPMENT AND RECEIVABLE ACCEPTED IN PARALLEL ENVIRONMENT`；不授权收款/生产 |
 | Node.js / PostgreSQL 原始自托管开发基线 | `0.1.0-alpha.1` | 功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；发布追踪提交 `12d3ea30d21cce6918de0c525d81f19af289f5ac` | PostgreSQL `0001`—`0005` | PHASE0-TASK03 的隔离 lint/test/typecheck/build/credentials、Python 三项与 diff check 通过 | `NOT_RELEASED` / `NOT_DEPLOYED`；历史开发基线，不代表当前包版本 | `NOT_MIGRATED` | Git `39946f6` + 当时 migration checksum；未建立生产恢复点 | `NOT_APPROVED_FOR_PRODUCTION`；该历史定义保留且不因后续 alpha 演进而改写 |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.1` 是 PHASE0-TASK03 建立的原始非生产发布基线，不是当前包版本。当前源码和回环并行验收环境已演进到 `0.1.0-alpha.19`；`alpha.15—alpha.18` 的既有部门交接事实保持有效且未被改写。这只证明合成 Award→PO→到货计划→分批收货→库存→采购财务来源→显式 AP 在并行环境成立，不表示真实数据已迁移、HTTPS/生产恢复通过或已批准上线。
+`0.1.0-alpha.1` 是 PHASE0-TASK03 建立的原始非生产发布基线，不是当前包版本。当前源码和回环并行验收环境已演进到 `0.1.0-alpha.23`；`alpha.15—alpha.22` 的既有部门交接事实保持有效且未被改写。这只证明合成 FQC→指令→分批发货/出库→销售来源→显式 AR 在并行环境成立，不表示真实数据已迁移、HTTPS/生产恢复通过或已批准上线。
 
-Git 同步状态以 2026-07-26 本次复核起点计：本地 `main`/HEAD 为 `3ae79f1`，本地远端跟踪引用 `origin/main` 与 `git ls-remote origin refs/heads/main` 均为 `39946f6`，因此本地领先远端 27 个提交而非“已同步”。本次发布基线提交将再增加一个未推送提交；最终状态以任务完成后的 `git status --short --branch` 为准。
+Git 同步状态以 2026-07-26 TASK09 起点计：本地 `main`/HEAD 为 `d9ebfb4644bb9e0d07bfbf81d168d7babcd4bdea`，`origin/main...HEAD` 为 behind 0/ahead 34。TASK09 增加两个独立未推送提交；最终状态以 `git status --short --branch` 为准。
 
 ## 3. Migration 文件与 SHA-256 基线
 
@@ -54,8 +55,12 @@ Git 同步状态以 2026-07-26 本次复核起点计：本地 `main`/HEAD 为 `3
 | `0017` | `0017_planning_material_requirements.sql` | `33cb162e5e32aeaca015a9d6e25a33f048166c7c895ebbc242819f6bbe2b6b28` |
 | `0018` | `0018_procurement_sourcing.sql` | `64276e1292c0696ae097a322115662b958156ba6486b1cd16752cf84b6c987c9` |
 | `0019` | `0019_sourcing_purchase_fulfillment.sql` | `6e517f6d2beffc74c94dcd5c5d60c9bcdc5baf9c93711a6add6cec4a08ed989a` |
+| `0020` | `0020_production_handoff_reservations.sql` | `1164536d51fbcf2f022c45aeab54b2b1ebc3d20cb2e4caabba9341d63fb4e182` |
+| `0021` | `0021_production_reporting_completions.sql` | `1cf953d98da2d3a7703f3866b852cbe10bdb37b33e1826cb78b24079fc5a11ec` |
+| `0022` | `0022_production_quality_release.sql` | `65b31aec91ad30ffd309796f58500a73c47a20bc12f855e010a4b4f17e808155` |
+| `0023` | `0023_sales_delivery_receivable.sql` | `5f07c7aebe9513e040fa0ab2f31f5cd5a51faf64fe78516794cd0fd46309221d` |
 
-当前源码与并行 PostgreSQL 均为 `0001 -> 0019`；0019 已通过隔离 migration/API 和回环并行验收，验收业务已清空。没有生产 PostgreSQL 部署或真实数据迁移。
+当前源码与并行 PostgreSQL 均为 `0001 -> 0023`；0023 已通过隔离 migration/API 和回环并行验收，验收业务已清空。没有生产 PostgreSQL 部署或真实数据迁移。
 
 ### 历史 Cloudflare D1 / Drizzle
 

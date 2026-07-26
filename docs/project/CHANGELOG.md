@@ -4,6 +4,25 @@
 
 ## 2026-07-26
 
+### SELFHOST-PHASE4-TASK09 - `ops: accept sales delivery receivable workflow in parallel environment`
+
+- 提交：功能提交 `dfda1c5597cc576cd96f495e272e9fc59c851fa4`，Parent 严格为 `d9ebfb4644bb9e0d07bfbf81d168d7babcd4bdea`；独立 ops 提交以功能提交为 Parent，不 amend/rebase，实际哈希以 Git log 为准。
+- 并行部署：只更新 `chenyida-erp-parallel` 至 `0.1.0-alpha.23`/23 migrations；`0023` checksum/SHA-256 为 `5f07c7aebe9513e040fa0ab2f31f5cd5a51faf64fe78516794cd0fd46309221d`。Web 仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口，未启 HTTPS/80/443。
+- 实际 HTTP：Instruction 10 分两批 Shipment/FQC `4/6`；成品库存 `10→6→0`，SO 最终 SHIPPED，Sales Source `80/120`，finance 显式 AR `80/120`，Settlement/客户收款 0；三个原生页面 HTTP 200。
+- 保护：实际验证指令零副作用、幂等重放、quality 越权 403、已有 AR 冲销门禁；隔离测试覆盖超订单/指令/库存/FQC、并发消费/执行/AR、CAS、异正文冲突、故障零半记录、无 AR 冲销恢复和 FQC Reopen 门禁。
+- 持久与恢复：整体重启后 4/6 数量、库存、来源、AR、事件和审计保持；停服备份 `backup-20260726T105516Z-dfda1c5597cc` 校验并恢复到新空库为 `23|7|1|2|10|-10|200|200|0`。
+- 清理与保护：最终 23 migrations、唯一启用管理员、业务/上传/附件 0，只保留三容器四卷；临时库和备份/恢复工件已删除。Python PID `277640` 与 SQLite metadata `64769:53827608:1784999031:1544192` 不变。
+- 结论：`FQC RELEASE TO SHIPMENT AND RECEIVABLE ACCEPTED IN PARALLEL ENVIRONMENT`。未收款、未迁真实数据、切流、生产部署、push 或 PR。
+
+### SELFHOST-PHASE4-TASK09 - `feat: add fqc controlled sales delivery workflow`
+
+- Git：功能提交 `dfda1c5597cc576cd96f495e272e9fc59c851fa4` 严格以 `d9ebfb4644bb9e0d07bfbf81d168d7babcd4bdea` 为 Parent；不 reset/stash/rebase/amend/force push。
+- 数据库：仅新增 expand-only `0023_sales_delivery_receivable.sql`，建立发货指令/行/事件、执行行和 Shipment Line→FQC Release Allocation，补充容量、来源、不可变、FQC reopen 与可信金额数据库 guard；同步 Drizzle Schema/journal/snapshot，不修改 0001—0022。
+- 服务/API：复用 Sales Order/Shipment/Reversal、TASK08 Allocation/FQC、Inventory Ledger/Balance、Sales Financial Source 和 Finance AR；Instruction 创建零副作用，warehouse 分批执行原子更新全部跨域事实，finance 仍显式创建 AR。
+- 权限/UI：sales、warehouse、quality、finance 和 manager/admin 最小分权；新增 `/sales/delivery`、`/warehouse/shipping`、`/finance/receivables` 与五项 Dashboard 指标。
+- 验证：TASK09 unit/UI/PG/migration、TASK01—TASK08 及 Sales/Quality/Inventory/Finance/Dashboard 回归、17 个正式 typecheck、Schema consistency、lint/build、凭证扫描、Python 三项和 `git diff --check` 通过。
+- 边界：未实现或执行客户收款、Settlement、银行、总账、税票、收入确认、真实数据迁移或生产部署。
+
 ### SELFHOST-PHASE4-TASK08 - `ops: accept production quality workflow in parallel environment`
 
 - 提交：功能提交 `4a638522b7ca295b41d2f35adbc464b23762b007`，Parent 严格为 `7d9c2dbaf62664e46c4f984822bb43903999f5fd`；独立 ops 提交以功能提交为 Parent，不 amend/rebase，实际哈希以 Git log 为准。

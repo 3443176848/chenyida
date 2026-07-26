@@ -2,7 +2,7 @@
 
 ## 状态与授权
 
-- 状态：`DOING`
+- 状态：`DONE / PARALLEL ACCEPTED`
 - 日期：2026-07-26（Asia/Shanghai）
 - 授权：项目负责人已明确授权继续完整业务链，本轮仅执行 TASK09。
 - 合法起点：`main` / `d9ebfb4644bb9e0d07bfbf81d168d7babcd4bdea`，工作区 clean，`origin/main...HEAD` behind 0/ahead 34。
@@ -49,17 +49,17 @@ CLOSED/RELEASED FQC
 
 ## 验收清单
 
-- [ ] TASK09 unit/UI、PostgreSQL/API、migration；空库、`0022→0023`、重复执行、失败回滚与约束
-- [ ] TASK08 业务链复现，发货指令创建零副作用
-- [ ] Shipment/FQC/库存/SO/Instruction/Source 两批 `4/6` 原子交接
-- [ ] finance 显式创建 AR `80/120`，Finance Settlement/客户收款为 0
-- [ ] 超订单、超指令、超库存、超 FQC、并发、幂等异正文、CAS、故障注入、403
-- [ ] 无 AR 冲销完整恢复；已有 AR 冲销阻止；FQC Reopen 消费门禁回归
-- [ ] TASK01—TASK08 与 Sales/Quality/Inventory/Finance/Dashboard 正式回归
-- [ ] 全部 typecheck、Schema consistency、lint/build、credentials scan、`git diff --check` 与 Python 临时库基线
-- [ ] `chenyida-erp-parallel` 实际多账号 HTTP、整体重启、停服备份/校验/新空库恢复
-- [ ] 最终 23 migrations、唯一启用管理员、业务/上传/附件为 0，仅保留既有三容器和四卷
-- [ ] 两个独立提交和最终报告
+- [x] TASK09 unit/UI、PostgreSQL/API、migration；空库、`0022→0023`、重复执行、失败回滚与约束
+- [x] TASK08 业务链复现，发货指令创建零副作用
+- [x] Shipment/FQC/库存/SO/Instruction/Source 两批 `4/6` 原子交接
+- [x] finance 显式创建 AR `80/120`，Finance Settlement/客户收款为 0
+- [x] 超订单、超指令、超库存、超 FQC、并发、幂等异正文、CAS、故障注入、403
+- [x] 无 AR 冲销完整恢复；已有 AR 冲销阻止；FQC Reopen 消费门禁回归
+- [x] TASK01—TASK08 与 Sales/Quality/Inventory/Finance/Dashboard 正式回归
+- [x] 全部 typecheck、Schema consistency、lint/build、credentials scan、`git diff --check` 与 Python 临时库基线
+- [x] `chenyida-erp-parallel` 实际多账号 HTTP、整体重启、停服备份/校验/新空库恢复
+- [x] 最终 23 migrations、唯一启用管理员、业务/上传/附件为 0，仅保留既有三容器和四卷
+- [x] 两个独立提交和最终报告
 
 ## 明确排除
 

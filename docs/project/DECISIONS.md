@@ -730,6 +730,17 @@
 - 额度：只有 CLOSED/RELEASED FQC 形成订单级额度，可用量为 closed released FQC 减有效 Shipment。Shipment 仍由既有 Sales/Inventory 权威事务执行；本任务只证明额度，不创建 Shipment、销售金额来源、AR 或收款。已被有效 Shipment 消费的放行不得重开、降低或撤销。
 - 生产边界：仅批准回环 `chenyida-erp-parallel` 验收；不迁真实数据，不执行生产部署、HTTPS、公网或切流，不扩展 IQC 池化隔离、批次/序列、AQL/SPC、返工工艺或报废库存过账。
 
+## D-066 销售发货采用关系化指令、精确 FQC 消费与显式应收交接
+
+- 日期：2026-07-26
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
+- 确认人：项目负责人（明确授权 `SELFHOST-PHASE4-TASK09` 的 Shipment 与显式 AR，并明确排除收款）
+- 指令：sales 只能从当前 `OPEN/PARTIALLY_SHIPPED` SO 创建稳定引用 SO Line 的发货指令。DRAFT/提交/接收/退回/取消均受权限、幂等、CAS、容量和事件控制；指令占用订单未发量与 FQC 可用量，但自身不写 Shipment、库存、FQC 消费、金额来源或 AR。
+- 发货：warehouse 只执行已接收指令，并在单一 PostgreSQL 事务锁定 Instruction、SO/Line、FQC Sources 与 Inventory Balance，原子提交 Shipment/Line、精确 Shipment→FQC Allocation、Ledger/Balance、SO/Instruction 投影、Sales Financial Source、Event/Audit/Idempotency。任何不完整来源或并发冲突 fail closed。
+- FQC：Shipment Line 可以消费一个或多个属于 TASK08 有效 Completion→SO Allocation 的 CLOSED/RELEASED FQC；同一 FQC 可被多次分批消费，但净累计不得超过 released quantity。Shipment 全额冲销按原分配恢复可用额度；已有 AR 时禁止冲销，已消费时禁止 FQC reopen。
+- 应收：Shipment 只产生服务端按 quantity × SO unit price 计算的可信 Sales Source，不自动创建 AR。finance 显式消费每个正向来源且最多一次，Customer/Currency/Amount 只能继承来源；浏览器不得提交可信总额或客户。
+- 边界：本决定不授权 Finance Settlement、客户收款、银行、总账、税票、收入确认、真实数据迁移、HTTPS、切流或生产部署。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

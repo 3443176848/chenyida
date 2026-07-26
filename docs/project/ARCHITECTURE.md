@@ -2,6 +2,24 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-26 FQC 放行到发货与应收交接边界
+
+`SELFHOST-PHASE4-TASK09` 在既有 Sales 权威内增加 Delivery Instruction 编排，以 expand-only `0023` 保存指令/行/事件、执行行和 Shipment Line→FQC Release Allocation；不复制 SO、Shipment、Inventory Ledger/Balance、Sales Financial Source 或 Finance Document。指令只占用订单未发量和 FQC 可发额度，不产生下游事实。
+
+```mermaid
+flowchart LR
+    F[CLOSED / RELEASED FQC] -->|sales instruction reserves| D[Delivery Instruction]
+    D -->|warehouse accepted + execute 4 / 6| S[Immutable Shipment]
+    S --> A[Exact Shipment Line to FQC Allocation]
+    S --> I[Finished Goods Ledger / Balance]
+    S --> O[Sales Order shipped projection]
+    S --> X[Sales Financial Source 80 / 120]
+    X -->|finance explicit| AR[AR 80 / 120]
+    AR -. blocks shipment reversal .-> S
+```
+
+warehouse 执行时以稳定锁顺序在同一 PostgreSQL 事务核对 Instruction、SO/Line、FQC 和库存，随后提交 Shipment/FQC/Inventory/SO/Instruction/Source/Event/Audit/Idempotency。FQC 净消费支持多来源拼批和单来源跨批，数据库 guard 防止超 released 或 reopen；无 AR 的全额 Shipment 冲销恢复原分配和全部投影，有 AR 时 fail closed。AR 由既有 Finance Service 显式创建，本层不执行 Settlement、收款、银行、总账、税票或收入确认。
+
 ## 2026-07-26 定标到收货与应付交接边界
 
 `procurement-fulfillment-selfhost` 只做跨既有服务的事务编排：采购显式把有效 Award 按 Supplier/Currency 确定性转为 PO，关系表固定 Award Line→PO Line；到货计划与待入库记录不增加库存或创建应付；仓库收货在同一 PostgreSQL 事务内调用既有 Procurement Receipt/Inventory Ledger/Balance/Financial Source；财务仍通过既有 Finance Service 显式消费来源生成 AP。

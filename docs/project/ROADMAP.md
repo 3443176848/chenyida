@@ -25,7 +25,9 @@
 - `SELFHOST-PHASE4-TASK05`：采购定标 → PO → 到货 → 仓库分批收货 → 库存 → 采购来源 → 财务显式 AP（DONE；`0.1.0-alpha.19` / PostgreSQL `0019`，重启与清理验收通过）。
 - `SELFHOST-PHASE4-TASK06`：最新已接收计划包 → 生产交接版本 → 唯一 DRAFT 工单 → 显式释放/BOM 快照/需求 → 齐套预留 → 仓库分批领料（DONE；`0.1.0-alpha.20`/`0020` 已通过并行 HTTP、重启、恢复与清理验收；报工、完工和品质排除）。
 - `SELFHOST-PHASE4-TASK07`：已领料工单 → 分批 Report → good Allocation → warehouse 分批 Completion → 成品 Ledger/Balance → COMPLETED（DONE；`0.1.0-alpha.21`/`0021`、真实 4/6 HTTP、重启、双恢复与清理通过；品质、发货和财务排除）。
-- 后续阶段：品质和发货接入（PLANNED，均未授权）。
+- `SELFHOST-PHASE4-TASK08`：Report→IPQC、Completion→SO Allocation→FQC 处置关闭→订单级可消费放行额度（DONE；`0.1.0-alpha.22`/`0022`、真实 4/6 HTTP、重启、恢复与清理通过；不发货或创建 AR）。
+- `SELFHOST-PHASE4-TASK09`：FQC 放行→Sales Delivery Instruction→warehouse 分批 Shipment/FQC 消费→成品出库→Sales Source→finance 显式 AR（DONE；`0.1.0-alpha.23`/`0023`、Shipment/FQC `4/6`、库存 `10→6→0`、Source/AR `80/120`、Settlement 0，重启、恢复与清理通过）。
+- 后续阶段：客户收款、银行、总账、税票、收入确认、真实迁移和生产切换均为 PLANNED/待单独授权；TASK09 完成后停止。
 
 ## Phase 0 基础架构
 

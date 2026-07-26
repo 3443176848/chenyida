@@ -2,6 +2,25 @@
 
 最后更新时间：2026-07-26（Asia/Shanghai）
 
+## SELFHOST-PHASE4-TASK09 销售发货、成品出库与应收交接
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `dfda1c5597cc576cd96f495e272e9fc59c851fa4` 严格基于 `d9ebfb4644bb9e0d07bfbf81d168d7babcd4bdea`；独立 ops 验收提交以 Git log 为准 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.23`；`0023` SHA-256/数据库 checksum `5f07c7aebe9513e040fa0ab2f31f5cd5a51faf64fe78516794cd0fd46309221d`；0001—0022 未修改，Schema/journal/snapshot 一致 |
+| 关系与事务 | PASS | 发货指令/行/事件、执行行和 Shipment Line→FQC Release Allocation 关系化；单事务复用 Shipment、Inventory Ledger/Balance、SO 投影、Sales Source、Event/Audit/Idempotency |
+| 权限 | PASS | sales 创建/提交/取消，warehouse 接收/退回/执行/受控冲销，finance 显式 AR，quality 只读消费；实际越权 403 通过 |
+| 数量与金额 | PASS | Instruction 10；Shipment/FQC `4/6`；库存 `10→6→0`；SO `OPEN→PARTIALLY_SHIPPED→SHIPPED`；Sales Source `80/120`；显式 AR `80/120`；Settlement 0 |
+| 并发/幂等/CAS | PASS | 指令/FQC/库存/订单容量、并发同指令与同 FQC、同 Source 并发 AR、同正文重放/异正文冲突、expected version 和稳定锁顺序均通过 |
+| 冲销与回滚 | PASS | 无 AR 全额冲销恢复库存/SO/Instruction/FQC 并追加负来源；已有 AR 阻止冲销；审计/库存故障注入均零半记录，TASK08 FQC Reopen 门禁回归通过 |
+| UI/Dashboard | PASS | `/sales/delivery`、`/warehouse/shipping`、`/finance/receivables` 实际 HTTP 200；五项权限裁剪指标完成 |
+| 自动验证 | PASS | TASK09 unit/UI/PG/migration、TASK01—TASK08 及 Inventory/Finance/Dashboard 回归、28 个相关 unit/UI、17 个正式 typecheck、Schema consistency、build、874 文件凭证扫描和 Python 三项通过；lint 0 error/6 warnings |
+| 重启/恢复 | PASS | Compose 整体重启后全事实保持；停服备份 `backup-20260726T105516Z-dfda1c5597cc` 校验，新空库恢复为 `23|7|1|2|10|-10|200|200|0` |
+| 清理/资源 | PASS | 主库 23 migrations、唯一启用管理员、所有合成业务及 uploads/attachments 0；仅 PostgreSQL/Web/Worker 三容器和四卷；临时库/备份/恢复目录已删除 |
+| Python/SQLite | PASS / PROTECTED | Python PID `277640` 未重启；真实 SQLite metadata `64769:53827608:1784999031:1544192` 不变，未读取/修改业务正文 |
+| 排除事项 | ENFORCED | 未收款、未创建 Settlement、未执行银行/总账/税票/收入确认、真实迁移、HTTPS/80/443、切流、生产部署、push 或 PR |
+| 完成结论 | PASS | `FQC RELEASE TO SHIPMENT AND RECEIVABLE ACCEPTED IN PARALLEL ENVIRONMENT` |
+
 ## SELFHOST-PHASE4-TASK08 生产过程检验、成品订单归属与 FQC 放行
 
 | 验证项 | 结果 | 说明 |
