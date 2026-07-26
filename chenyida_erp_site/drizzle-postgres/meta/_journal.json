@@ -169,6 +169,13 @@
       "when": 1785070130796,
       "tag": "0024_finance_project_settlements",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1785074750670,
+      "tag": "0025_production_routings",
+      "breakpoints": true
     }
   ]
 }

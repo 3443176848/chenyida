@@ -26,6 +26,12 @@ const productionManage = [...productionRead, "production.plan", "production.issu
 const productionHandoffRead = ["production.handoff.read"];
 const productionHandoffPlanning = [...productionHandoffRead, "production.handoff.prepare", "production.handoff.submit"];
 const productionHandoffProduction = [...productionHandoffRead, "production.handoff.decide", "production.handoff.work_order"];
+const productionRoutingRead = ["production.routing.read"];
+const productionRoutingEngineering = [...productionRoutingRead, "production.routing.manage"];
+const productionRoutingReview = [...productionRoutingRead, "production.routing.review"];
+const productionWorkCenterRead = ["production.work_center.read"];
+const productionWorkCenterManage = [...productionWorkCenterRead, "production.work_center.manage"];
+const productionRoutingSnapshotRead = ["production.routing.snapshot.read"];
 const salesRead = ["sales.read"];
 const salesDeliveryRead = ["sales.delivery.read"];
 const salesDeliverySales = [...salesDeliveryRead, "sales.delivery.create", "sales.delivery.submit", "sales.delivery.cancel"];
@@ -53,14 +59,14 @@ const ROLE_PERMISSIONS: Record<IdentityRole, string[]> = {
   admin: ["*", ...dashboardRead, "system.backup.read", "system.user.read", "system.user.create", "system.user.status", "system.user.reset", "system.audit.read", "material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject", "material.audit.read", "material.import.create", "material.import.read", "material.import.read_any", "material.import.cancel", "material.import.parse", "material.import.map", "material.import.normalize", "material.import.commit", ...reviewManagerPermissions, ...masterManage, ...inventoryManage, ...procurementManage, ...productionManage, ...salesManage, ...qualityManage, ...financeManage, ...projectAdmin],
   manager: [...dashboardRead, "material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject", "material.audit.read", "material.import.create", "material.import.read", "material.import.read_any", "material.import.cancel", "material.import.parse", "material.import.map", "material.import.normalize", "material.import.commit", ...reviewManagerPermissions, ...masterManage, ...inventoryManage, ...procurementManage, ...productionManage, ...salesManage, ...qualityManage, ...finishedGoodsAllocationManage, ...financeManage, ...financeProjectRead, ...projectAdmin],
   purchase: [...dashboardRead, "material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit", "material.import.create", "material.import.read", "material.import.cancel", "material.import.parse", "material.import.map", ...reviewEditorPermissions, ...masterRead, ...inventoryRead, ...procurementManage, ...procurementSourcingManage, ...procurementFulfillmentPurchase, ...productionRead, ...salesRead, ...qualityRead, ...financeRead, ...materialRequirementPurchase, "master.supplier.manage", "master.supplier_mapping.manage"],
-  engineering: [...dashboardRead, "material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit", "material.import.create", "material.import.read", "material.import.cancel", "material.import.parse", "material.import.map", ...reviewEditorPermissions, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...salesRead, ...qualityRead, ...financeRead, ...financeProjectRead, ...projectEngineering, "master.product.manage", "master.bom.manage"],
-  planning: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...procurementSourcingRead, ...productionRead, ...productionHandoffPlanning, ...salesRead, ...qualityRead, ...financeRead, ...projectRead, ...planningRead, ...materialRequirementPlanning, "planning.accept"],
-  production: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...productionHandoffProduction, ...salesRead, ...qualityRead, ...finishedGoodsAllocationRead, ...financeRead, "production.plan", "production.report", "production.report.reverse"],
+  engineering: [...dashboardRead, "material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit", "material.import.create", "material.import.read", "material.import.cancel", "material.import.parse", "material.import.map", ...reviewEditorPermissions, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...productionRoutingEngineering, ...productionWorkCenterRead, ...salesRead, ...qualityRead, ...financeRead, ...financeProjectRead, ...projectEngineering, "master.product.manage", "master.bom.manage"],
+  planning: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...procurementSourcingRead, ...productionRead, ...productionRoutingRead, ...productionHandoffPlanning, ...salesRead, ...qualityRead, ...financeRead, ...projectRead, ...planningRead, ...materialRequirementPlanning, "planning.accept"],
+  production: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...productionRoutingRead, ...productionRoutingSnapshotRead, ...productionHandoffProduction, ...salesRead, ...qualityRead, ...finishedGoodsAllocationRead, ...financeRead, "production.plan", "production.report", "production.report.reverse"],
   warehouse: [...readOnly, ...masterRead, ...inventoryManage, ...procurementRead, ...procurementFulfillmentWarehouse, ...productionRead, ...productionHandoffRead, ...salesRead, ...salesDeliveryWarehouse, ...qualityRead, ...finishedGoodsAllocationRead, ...financeRead, "procurement.receive", "procurement.reverse", "production.issue", "production.complete", "production.complete.reverse", "sales.ship", "sales.reverse"],
   quality: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...salesRead, ...salesDeliveryRead, ...qualityManage.filter((permission) => !["quality.disposition", "quality.reopen"].includes(permission)), ...finishedGoodsAllocationRead, ...financeRead],
   sales: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...salesRead, ...salesDeliverySales, ...qualityRead, ...finishedGoodsAllocationManage, ...financeRead, ...projectMarket, "sales.quote", "sales.order", "master.customer.manage"],
   finance: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...procurementFulfillmentRead, ...productionRead, ...salesRead, ...salesDeliveryRead, ...qualityRead, ...financeManage, ...financeProjectRead, "procurement.finance_source.read", "sales.finance_source.read"],
-  operations: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...salesRead, ...qualityRead, ...financeRead],
+  operations: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...productionWorkCenterManage, ...salesRead, ...qualityRead, ...financeRead],
 };
 
 export function validateRole(value: unknown): IdentityRole {
@@ -78,7 +84,8 @@ export function permissionsForRole(role: IdentityRole): string[] {
   const sourcing = ["admin", "manager"].includes(role) ? procurementSourcingManage : [];
   const fulfillment = ["admin", "manager"].includes(role) ? [...procurementFulfillmentPurchase, ...procurementFulfillmentWarehouse] : [];
   const productionHandoff = ["admin", "manager"].includes(role) ? [...productionHandoffPlanning, ...productionHandoffProduction] : [];
-  return [...new Set([...ROLE_PERMISSIONS[role], ...operations, ...planning, ...requirements, ...sourcing, ...fulfillment, ...productionHandoff])].sort();
+  const productionRouting = ["admin", "manager"].includes(role) ? [...productionRoutingReview, ...productionWorkCenterManage, ...productionRoutingSnapshotRead] : [];
+  return [...new Set([...ROLE_PERMISSIONS[role], ...operations, ...planning, ...requirements, ...sourcing, ...fulfillment, ...productionHandoff, ...productionRouting])].sort();
 }
 
 export function hasPermission(actor: Pick<IdentityActor, "permissions">, permission: string): boolean {

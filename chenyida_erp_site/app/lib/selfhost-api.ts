@@ -24,6 +24,7 @@ import { handleMaterialRequirementApi } from "./material-requirement-selfhost/ha
 import { handleProcurementSourcingApi } from "./procurement-sourcing-selfhost/handler.ts";
 import { handleProcurementFulfillmentApi } from "./procurement-fulfillment-selfhost/handler.ts";
 import { handleProductionHandoffApi } from "./production-handoff-selfhost/handler.ts";
+import { handleProductionRoutingApi } from "./production-routing-selfhost/handler.ts";
 import {
   assertProtectedIdentityGate,
   CSRF_COOKIE,
@@ -109,6 +110,8 @@ export async function handleSelfhostApi(request: Request): Promise<Response> {
     if (qualityResponse) return qualityResponse;
     const salesResponse = await handleSalesApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (salesResponse) return salesResponse;
+    const productionRoutingResponse = await handleProductionRoutingApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
+    if (productionRoutingResponse) return productionRoutingResponse;
     const productionResponse = await handleProductionApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (productionResponse) return productionResponse;
     const procurementResponse = await handleProcurementApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });

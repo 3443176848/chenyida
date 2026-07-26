@@ -10,6 +10,7 @@ import { ProductionError } from "../app/lib/production-selfhost/errors.ts";
 import { handleProductionApi } from "../app/lib/production-selfhost/handler.ts";
 import { ProductionRepository } from "../app/lib/production-selfhost/repository.ts";
 import { ProductionService } from "../app/lib/production-selfhost/service.ts";
+import { ensureReleasedRouting } from "./helpers/production-routing.mjs";
 
 const databaseUrl=process.env.TEST_PRODUCTION_HANDOFF_DATABASE_URL;
 if(!databaseUrl||!/production_handoff_test/i.test(databaseUrl))throw new Error("isolated TEST_PRODUCTION_HANDOFF_DATABASE_URL containing production_handoff_test is required");
@@ -49,7 +50,7 @@ async function seed(){
     await client.query("insert into project_planning_package_bom_lines(package_item_id,source_bom_line_id,material_id,unit_id,quantity_per,loss_rate,calculated_gross_quantity,specification_snapshot,material_digest,line_no) values($1,$2,$3,$4,1,0,10,'{}',$5,1)",[packageItem.id,bomLine.id,raw.id,unit.id,digest("material")]);
     await client.query("update project_planning_packages set status='SUBMITTED',submitted_by='engineering01',submitted_at=now(),version=2 where id=$1",[packageRow.id]);
     await client.query("update project_planning_packages set status='ACCEPTED',accepted_by='planning01',accepted_at=now(),version=3 where id=$1",[packageRow.id]);
-    await client.query("commit");return{unitId:Number(unit.id),rawId:Number(raw.id),finishedId:Number(finished.id),packageId:Number(packageRow.id),packageItemId:Number(packageItem.id),productId:Number(product.id),productVersionId:Number(productVersion.id),bomVersionId:Number(bomVersion.id)};
+    await client.query("commit");const refs={unitId:Number(unit.id),rawId:Number(raw.id),finishedId:Number(finished.id),packageId:Number(packageRow.id),packageItemId:Number(packageItem.id),productId:Number(product.id),productVersionId:Number(productVersion.id),bomVersionId:Number(bomVersion.id)};await ensureReleasedRouting(pool,refs,"T06");return refs;
   }catch(error){await client.query("rollback");throw error;}finally{client.release();}
 }
 

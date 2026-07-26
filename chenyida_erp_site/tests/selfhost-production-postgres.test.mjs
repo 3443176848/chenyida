@@ -9,6 +9,7 @@ import { ProductionError } from "../app/lib/production-selfhost/errors.ts";
 import { handleProductionApi } from "../app/lib/production-selfhost/handler.ts";
 import { ProductionRepository } from "../app/lib/production-selfhost/repository.ts";
 import { ProductionService } from "../app/lib/production-selfhost/service.ts";
+import { ensureReleasedRouting } from "./helpers/production-routing.mjs";
 
 const databaseUrl = process.env.TEST_PRODUCTION_DATABASE_URL;
 if (!databaseUrl || !/production_test/i.test(databaseUrl)) throw new Error("isolated TEST_PRODUCTION_DATABASE_URL containing production_test is required");
@@ -37,7 +38,7 @@ async function seed() {
   const bv = await pool.query("insert into bom_versions(bom_header_id,product_version_id,version_no,version_code,status,created_by,updated_by,request_id) values($1,$2,1,'A0','DRAFT','test','test',$3) returning id", [bh.rows[0].id, pv.rows[0].id, randomUUID()]);
   await pool.query("insert into bom_lines(bom_version_id,line_no,material_id,quantity_per,unit_id,loss_rate,process_stage,created_by,updated_by,request_id) values($1,1,$2,2,$4,0.1,'SMT','test','test',$5),($1,2,$3,1,$4,0,'组装','test','test',$6)", [bv.rows[0].id, materials.rows[0].id, materials.rows[1].id, pcs.id, randomUUID(), randomUUID()]);
   await pool.query("update bom_versions set status='RELEASED',released_by='test',released_at=now() where id=$1", [bv.rows[0].id]);
-  return { customerId: Number(customer.rows[0].id), productId: Number(product.rows[0].id), productVersionId: Number(pv.rows[0].id), bomHeaderId: Number(bh.rows[0].id), bomVersionId: Number(bv.rows[0].id), rawOne: materials.rows[0], rawTwo: materials.rows[1], finished: materials.rows[2], pcs };
+  const refs = { customerId: Number(customer.rows[0].id), productId: Number(product.rows[0].id), productVersionId: Number(pv.rows[0].id), bomHeaderId: Number(bh.rows[0].id), bomVersionId: Number(bv.rows[0].id), rawOne: materials.rows[0], rawTwo: materials.rows[1], finished: materials.rows[2], pcs }; await ensureReleasedRouting(pool, refs, "PROD"); return refs;
 }
 
 async function stock(materialId, unitId, qty) { const service = new InventoryService(new PostgresInventoryRepository(pool)); const unique = randomUUID(); return service.post({ actor: actor("admin"), requestId: randomUUID(), operationId: randomUUID(), keyDigest: unique.replaceAll("-", "").padEnd(64, "0"), requestDigest: randomUUID().replaceAll("-", "").padEnd(64, "0"), method: "POST", route: "/test/seed-stock", action: "TEST_STOCK_SEED" }, { operation_type: "RECEIPT", reason: "隔离测试初始库存", lines: [{ material_id: materialId, unit_id: unitId, quantity: qty, expected_balance_version: 0 }] }); }
