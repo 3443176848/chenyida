@@ -2,7 +2,7 @@
 
 ## 状态与授权
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 日期：2026-07-26（Asia/Shanghai）
 - 授权：项目负责人已明确授权继续生产线，且本轮仅执行 TASK07。
 - 合法起点：`main` / `26ccb95782478645720c8284c59b0afadca68649`，工作区 clean，`origin/main...HEAD` behind 0/ahead 30。
@@ -56,13 +56,13 @@ TASK06 已完整领料的 RELEASED/IN_PROGRESS Work Order
 
 - [x] 源码实现、Drizzle 元数据和版本升级
 - [x] TASK07 unit/UI/PostgreSQL/API/migration
-- [ ] 两批 Report `4/6` 与两批 Completion `4/6`，成品 Ledger/Balance 合计 `10`
+- [x] 两批 Report `4/6` 与两批 Completion `4/6`，成品 Ledger/Balance 合计 `10`
 - [x] 领料支持量、good/scrap、Report 消费、工单剩余、并发、幂等、CAS、故障注入、403 与 scrap 零库存
 - [x] Report/Completion 安全全额冲销及 IPQC/FQC/Shipment 下游门禁
 - [x] TASK01—TASK06、Production、Inventory、Quality、Sales、Dashboard 及正式全回归
-- [ ] 并行真实账号 HTTP、Compose 整体重启、停服备份/校验/新空恢复
-- [ ] 最终 21 migrations、唯一启用管理员、业务/上传/附件为 0，仅保留既有四卷
-- [ ] 两个独立提交和最终报告
+- [x] 并行真实账号 HTTP、Compose 整体重启、停服备份/校验/新空恢复
+- [x] 最终 21 migrations、唯一启用管理员、业务/上传/附件为 0，仅保留既有四卷
+- [x] 两个独立提交和最终报告
 
 ## 明确排除
 

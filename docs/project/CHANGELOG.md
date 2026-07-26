@@ -4,6 +4,16 @@
 
 ## 2026-07-26
 
+### SELFHOST-PHASE4-TASK07 - `ops: accept production completion workflow in parallel environment`
+
+- 提交：功能提交 `323e85d44a2a4202811944591d0a4f6b96ae6751`，Parent 严格为 `26ccb95782478645720c8284c59b0afadca68649`；独立 ops 提交以功能提交为 Parent，不 amend，实际哈希以 Git log 为准。
+- 并行部署：只更新 `chenyida-erp-parallel` 至 `0.1.0-alpha.21`/21 migrations；数据库 `0021` checksum 与源码 SHA-256 均为 `1cf953d98da2d3a7703f3866b852cbe10bdb37b33e1826cb78b24079fc5a11ec`。Web 仍仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口，未启用 HTTPS/80/443。
+- 实际 HTTP：复现 TASK06 完整领料 10；production 分批 Report `4/6`，warehouse 分批 Completion `4/6`，Allocation、Completion Line 和成品 Ledger 均为 `4/6`，Work Order reported/good/completed=10、scrap=0、状态 `COMPLETED` 且无 `CLOSED` 事件，成品 Balance=10。
+- 下游与保护：IQC/IPQC/FQC、Shipment、销售金额来源和 AR 均为 0；隔离自动测试覆盖领料支持量、good/scrap、Report/工单余量、并发消费、幂等异正文、CAS、故障零半记录、越权、scrap 零库存以及 Report/Completion 冲销与 IPQC/FQC/Shipment 门禁。
+- 持久与恢复：PostgreSQL/Web/Worker 整体重启后全部 Handoff/Reservation/Issue/Report/Allocation/Completion/Ledger/Event/Audit 持久；接受态备份 `backup-20260726T050445Z-323e85d44a2a` 恢复为 21 migrations、2 Report/Allocation/Completion、Balance 10、下游 0；干净态备份 `backup-20260726T050530Z-323e85d44a2a` 恢复为 21 migrations、唯一管理员、业务/文件 0。
+- 清理与保护：两份临时备份、恢复数据库/目录、隔离测试数据库、辅助容器/镜像均已删除且不可从本机临时工件恢复；最终仅三容器和四个并行持久卷。Python PID `277640` 与 SQLite metadata `64769:53827608:1784999031:1544192` 不变。
+- 结论：`PRODUCTION REPORTING AND FINISHED GOODS RECEIPT ACCEPTED IN PARALLEL ENVIRONMENT`。未创建品质/发货/财务事实，未迁真实数据、切流、生产部署、push 或 PR。
+
 ### SELFHOST-PHASE4-TASK07 - `feat: add production reporting and completion handoff`
 
 - Git：以 `26ccb95782478645720c8284c59b0afadca68649` 为严格 Parent；不 revert/reset/amend/rebase，不 push 或创建 PR。
