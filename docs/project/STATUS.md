@@ -2,6 +2,25 @@
 
 最后更新时间：2026-07-26（Asia/Shanghai）
 
+## SELFHOST-PHASE4-TASK08 生产过程检验、成品订单归属与 FQC 放行
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `4a638522b7ca295b41d2f35adbc464b23762b007` 严格基于 `7d9c2dbaf62664e46c4f984822bb43903999f5fd`；独立 ops 验收提交以 Git log 为准 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | 源码和并行环境均为 `0.1.0-alpha.22`；`0022` SHA-256/数据库 checksum `65b31aec91ad30ffd309796f58500a73c47a20bc12f855e010a4b4f17e808155`；0001—0021 未修改，Schema/journal/snapshot 一致 |
+| 关系与事务 | PASS | 复用唯一 `quality-selfhost`；Completion Line→Sales Order Line Allocation/Event 为关系化稳定来源，FQC 只接收 Allocation ID，Inspection/Result/Defect/Event、处置、关闭、审计和幂等保持同事务 |
+| 权限与职责 | PASS | sales 创建/取消分配，quality 创建/关闭检验，manager/admin 处置/重开，production/warehouse 受限读取；实际 403 和创建人不得最终处置通过 |
+| 规则与保护 | PASS | 客户/产品/版本/成品/单位一致、双侧容量、并发锁、CAS、超检、FAIL/Defect 守恒、RELEASE/CONCESSION 上限、REWORK/SCRAP HOLD、已消费放行门禁和故障零半记录通过 |
+| UI/Dashboard | PASS | `/sales/finished-goods-allocation`、`/quality/production` 真实 HTTP 200；loading/empty/403/CAS/幂等未知状态契约及五项权限裁剪指标通过 |
+| 实际 HTTP | PASS | Report `4/6`、Completion `4/6`、Allocation `4/6`、IPQC `4/6`、FQC `4/6`；FQC inspected/passed/released=`10/10/10`，订单行 available=10 |
+| 零副作用 | PASS | IPQC 前后 Work Order version、Completion 数量与库存不变；最终成品库存 10，Shipment、Sales Financial Source、AR 均为 0 |
+| 专项与回归 | PASS | TASK08 unit/UI 5/5、PG 12/12、migration 3/3；TASK01—TASK07、Production/Quality/Sales/Inventory/Dashboard 回归、16 组正式 typecheck、Schema consistency、lint 0 error/5 既有 warning、build、858 文件凭证扫描和 Python 三项通过 |
+| 重启/恢复 | PASS | Compose 整体重启后 Allocation/Inspection/Result/Event/放行额度/库存/审计持久；停服备份 `backup-20260726T062301Z-4a638522b7ca` 校验并恢复到新空库，精确核对 `22:2:4:4:12:10:10:0:0:0` |
+| 清理/资源 | PASS | 主库 22 migrations、唯一启用管理员、业务表与 uploads/attachments 0；仅 PostgreSQL/Web/Worker 三容器和四卷；临时数据库、备份、恢复目录、容器和镜像已删除 |
+| Python/SQLite | PASS / PROTECTED | Python systemd active、PID `277640`、监听 18888；真实 SQLite 只核验 metadata `64769:53827608:1784999031:1544192`，未读取/修改业务正文且未重启 |
+| 排除事项 | ENFORCED | 未执行 Shipment、库存扣减、销售金额来源、AR、收款、真实迁移、HTTPS/80/443、切流、生产部署、push 或 PR |
+| 完成结论 | PASS | `PRODUCTION QUALITY RELEASE ACCEPTED IN PARALLEL ENVIRONMENT` |
+
 ## SELFHOST-PHASE4-TASK07 生产报工 → 分批完工 → 成品入库
 
 | 验证项 | 结果 | 说明 |

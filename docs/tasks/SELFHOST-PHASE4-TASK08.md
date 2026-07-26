@@ -2,7 +2,7 @@
 
 ## 状态与授权
 
-- 状态：`DOING`
+- 状态：`DONE / PARALLEL ACCEPTED`
 - 日期：2026-07-26（Asia/Shanghai）
 - 授权：项目负责人已明确授权继续生产线，且本轮只执行 TASK08。
 - 合法起点：`main` / `7d9c2dbaf62664e46c4f984822bb43903999f5fd`，工作区 clean，`origin/main...HEAD` behind 0/ahead 32。
@@ -55,15 +55,15 @@ Production Completion Line
 
 ## 验收清单
 
-- [ ] 源码实现、Drizzle 元数据和版本升级
-- [ ] TASK08 unit/UI/PostgreSQL/API/migration
-- [ ] TASK07 真实 4/6 链、Allocation 4/6、IPQC 4/6、FQC 4/6、released 10
-- [ ] 成品库存保持 10；Shipment、Sales Financial Source、AR 均为 0
-- [ ] 来源一致性、超分配/超检、并发、职责分离、幂等、CAS、故障回滚、403 和下游门禁
-- [ ] TASK01—TASK07 与 Production/Quality/Sales/Inventory/Dashboard 正式回归
-- [ ] Compose 整体重启、停服备份/校验/新空恢复
-- [ ] 最终 22 migrations、唯一启用管理员、业务/上传/附件为 0，仅保留既有三容器和四卷
-- [ ] 两个独立提交和最终报告
+- [x] 源码实现、Drizzle 元数据和版本升级
+- [x] TASK08 unit/UI/PostgreSQL/API/migration
+- [x] TASK07 真实 4/6 链、Allocation 4/6、IPQC 4/6、FQC 4/6、released 10
+- [x] 成品库存保持 10；Shipment、Sales Financial Source、AR 均为 0
+- [x] 来源一致性、超分配/超检、并发、职责分离、幂等、CAS、故障回滚、403 和下游门禁
+- [x] TASK01—TASK07 与 Production/Quality/Sales/Inventory/Dashboard 正式回归
+- [x] Compose 整体重启、停服备份/校验/新空恢复
+- [x] 最终 22 migrations、唯一启用管理员、业务/上传/附件为 0，仅保留既有三容器和四卷
+- [x] 两个独立提交和最终报告
 
 ## 明确排除
 

@@ -4,6 +4,25 @@
 
 ## 2026-07-26
 
+### SELFHOST-PHASE4-TASK08 - `ops: accept production quality workflow in parallel environment`
+
+- 提交：功能提交 `4a638522b7ca295b41d2f35adbc464b23762b007`，Parent 严格为 `7d9c2dbaf62664e46c4f984822bb43903999f5fd`；独立 ops 提交以功能提交为 Parent，不 amend/rebase，实际哈希以 Git log 为准。
+- 并行部署：只更新 `chenyida-erp-parallel` 至 `0.1.0-alpha.22`/22 migrations；`0022` 数据库 checksum 与源码 SHA-256 均为 `65b31aec91ad30ffd309796f58500a73c47a20bc12f855e010a4b4f17e808155`。Web 仍仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口，未启用 HTTPS/80/443。
+- 实际 HTTP：production/warehouse/sales/quality/manager 真实隔离账号完成 Report、Completion、成品订单稳定 Allocation、IPQC 和 FQC 各 `4/6`；manager RELEASE、quality Close 后 FQC inspected/passed/released=`10/10/10`，订单行 available=10，成品库存保持 10。
+- 边界与保护：Shipment、Sales Financial Source、AR 均为 0；实际验证职责分离、越权 403、幂等重放和 CAS，隔离自动测试覆盖来源不一致、双侧超分配/并发、取消与 Completion 冲销门禁、超检、Defect 守恒、处置上限、HOLD、消费后重开门禁和故障零半记录。
+- 持久与恢复：整体重启后 2 Allocation/2 Allocation Event、4 Inspection/Result、12 Inspection Event、放行 10、库存 10 和 14 个关键成功审计保持；停服备份 `backup-20260726T062301Z-4a638522b7ca` 校验并恢复到新空库为 `22:2:4:4:12:10:10:0:0:0`。
+- 清理与保护：主库最终 22 migrations、唯一启用管理员、业务/上传/附件 0；临时数据库、备份/恢复目录、辅助容器/镜像已删除且不可从本机临时工件恢复，保留三容器和四卷。Python PID `277640` 与 SQLite metadata `64769:53827608:1784999031:1544192` 不变。
+- 结论：`PRODUCTION QUALITY RELEASE ACCEPTED IN PARALLEL ENVIRONMENT`。未迁真实数据、切流、生产部署、push 或 PR；未启动 Shipment、AR、收款或其他任务。
+
+### SELFHOST-PHASE4-TASK08 - `feat: add production quality release workflow`
+
+- Git：功能提交 `4a638522b7ca295b41d2f35adbc464b23762b007` 严格以 `7d9c2dbaf62664e46c4f984822bb43903999f5fd` 为 Parent；不 reset/stash/rebase/amend/force push。
+- 数据库：仅新增 expand-only `0022_production_quality_release.sql`，建立 Completion Line→Sales Order Line Allocation/Event、Quality Inspection 稳定 Allocation 引用、容量/来源/不可变/冲销数据库 guard；保留历史 Quality 兼容并同步 Drizzle Schema/journal/snapshot，不修改 0001—0021。
+- 服务/API：复用 `quality-selfhost` 的 Inspection/Result/Defect/Event、职责分离、Disposition、Close/Reopen 与 Shipment 门禁；新增分配候选/列表/创建/取消和订单行 eligibility，IPQC 只引用未冲销 Report，FQC 只引用有效 Allocation。
+- 权限/UI：sales 管理分配，quality 创建/关闭检验，manager/admin 处置/重开，production/warehouse 受限读取；新增两条原生页面和五项权限裁剪 Dashboard 指标。
+- 验证：TASK08 unit/UI/PostgreSQL/migration、TASK01—TASK07 与 Production/Quality/Sales/Inventory/Dashboard 回归、16 组 typecheck、Schema consistency、lint/build、凭证扫描、Python 三项和 `git diff --check` 通过。
+- 边界：功能不执行 Shipment、不扣减成品库存、不创建销售金额来源、AR 或收款，不扩展 IQC 隔离、批次/序列、返工/报废过账，不迁真实数据或生产部署。
+
 ### SELFHOST-PHASE4-TASK07 - `ops: accept production completion workflow in parallel environment`
 
 - 提交：功能提交 `323e85d44a2a4202811944591d0a4f6b96ae6751`，Parent 严格为 `26ccb95782478645720c8284c59b0afadca68649`；独立 ops 提交以功能提交为 Parent，不 amend，实际哈希以 Git log 为准。
