@@ -887,7 +887,7 @@ async function renderQualityRefOptions() {
   Array.from($("#qualityType").options).forEach((option) => { option.hidden = !visible.includes(option.value); });
   const type = $("#qualityType").value;
   const result = await api(`/api/quality/source-options?inspection_type=${encodeURIComponent(type)}`); state.qualitySourceOptions = result.rows || [];
-  const options = state.qualitySourceOptions.map((row) => ({ value: JSON.stringify(type === "IQC" ? { purchase_receipt_line_id: row.purchase_receipt_line_id } : type === "IPQC" ? { production_report_id: row.production_report_id } : { production_completion_line_id: row.production_completion_line_id, sales_order_line_id: row.sales_order_line_id }), label: `${row.source_code} - ${row.material_code} - ${row.material_name} (可检 ${row.remaining_qty} ${row.unit_code})` }));
+  const options = state.qualitySourceOptions.map((row) => ({ value: JSON.stringify(type === "IQC" ? { purchase_receipt_line_id: row.purchase_receipt_line_id } : type === "IPQC" ? { production_report_id: row.production_report_id } : { allocation_id: row.allocation_id }), label: `${row.source_code} - ${row.material_code} - ${row.material_name} (可检 ${row.remaining_qty} ${row.unit_code})` }));
   $("#qualityRef").innerHTML = options.map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join("");
 }
 
@@ -896,7 +896,7 @@ function renderQualityInspections() {
     <tr>
       <td>${escapeHtml(row.inspection_code)}</td>
       <td>${escapeHtml(row.inspection_type)}</td>
-      <td>${escapeHtml(row.purchase_receipt_line_id || row.production_report_id || `${row.production_completion_line_id || ""}/${row.sales_order_line_id || ""}`)}</td>
+      <td>${escapeHtml(row.purchase_receipt_line_id || row.production_report_id || row.fqc_allocation_id || "")}</td>
       <td>${escapeHtml(row.material_code)}</td>
       <td>${escapeHtml(row.material_name)}</td>
       <td>${escapeHtml(row.inspected_qty)}</td>

@@ -719,6 +719,17 @@
 - 边界：不实现工艺路线、WIP/OEE/工时成本、补料返工、品质检验创建、销售发货或财务过账；不迁真实数据、不部署生产、不启用 HTTPS、不切流。
 - 验收：并行真实 HTTP 以完整领料 10 的工单分两批 Report `4/6`、Completion `4/6`，形成 Allocation `4/6`、成品 Ledger `+4/+6`、Balance 10 和 Work Order `COMPLETED`；重启、接受态/干净态停服备份与两次新空库恢复、最终清理通过，IQC/IPQC/FQC、Shipment、销售金额来源和 AR 均为 0。
 
+## D-065 成品订单归属采用稳定分配，品质放行只形成可消费额度
+
+- 日期：2026-07-26
+- 状态：`ACCEPTED / IMPLEMENTING FOR PARALLEL ACCEPTANCE`
+- 确认人：项目负责人（明确授权 `SELFHOST-PHASE4-TASK08` 并固定分配、IPQC/FQC、权限与任务排除边界）
+- 分配：Completion Line 必须由 sales 显式分配到当前 `OPEN/PARTIALLY_SHIPPED` Sales Order Line；Customer、Product、Product Version、Finished Material 和 Unit 必须与来源 Work Order 一致。有效分配两侧不得超量，不修改 Inventory `reserved_qty`；已有 FQC 后不能取消，存在有效分配时 Completion 冲销 fail closed。
+- IPQC：只绑定未冲销 Production Report，累计检验不超过 reported quantity；数量守恒与 failed 的 FAIL Result/Defect 证据继续由既有 Quality Service 和数据库共同保证。IPQC 不修改生产或库存，不伪造工艺路线/WIP，也不自动决定 FQC。
+- FQC：只能引用稳定 Allocation ID，不能由浏览器组合 Completion/Sales Order 来源。RELEASE 最多 passed，CONCESSION 最多 inspected 且必须有原因，REWORK/SCRAP 保持 HOLD；创建人与最终处置人职责分离，处置后才能关闭。
+- 额度：只有 CLOSED/RELEASED FQC 形成订单级额度，可用量为 closed released FQC 减有效 Shipment。Shipment 仍由既有 Sales/Inventory 权威事务执行；本任务只证明额度，不创建 Shipment、销售金额来源、AR 或收款。已被有效 Shipment 消费的放行不得重开、降低或撤销。
+- 生产边界：仅批准回环 `chenyida-erp-parallel` 验收；不迁真实数据，不执行生产部署、HTTPS、公网或切流，不扩展 IQC 池化隔离、批次/序列、AQL/SPC、返工工艺或报废库存过账。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

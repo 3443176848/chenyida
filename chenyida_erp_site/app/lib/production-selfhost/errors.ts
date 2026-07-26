@@ -10,6 +10,7 @@ const constraintCodes: Record<string, [string, string]> = {
   production_report_reversals_report_uq: ["PRODUCTION_REPORT_ALREADY_REVERSED", "生产报工已经冲销"],
   production_completion_reversals_completion_uq: ["PRODUCTION_COMPLETION_ALREADY_REVERSED", "生产完工已经冲销"],
   production_completion_report_allocations_source_uq: ["PRODUCTION_REPORT_ALLOCATION_CONFLICT", "报工来源已被本次完工分配"],
+  production_completion_reversal_allocation_gate_ck: ["PRODUCTION_COMPLETION_DOWNSTREAM_EXISTS", "完工已有有效销售订单分配，不能冲销"],
 };
 
 export function mapProductionError(error: unknown): ProductionError {
@@ -17,6 +18,7 @@ export function mapProductionError(error: unknown): ProductionError {
   const value = error as { code?: string; constraint?: string; status?: number; message?: string };
   if (value?.code && /^[A-Z][A-Z0-9_]+$/.test(value.code) && Number.isInteger(value.status) && value.status! >= 400 && value.status! <= 599) return new ProductionError(value.code, value.message || "生产关联操作失败", value.status);
   if (value?.code === "23505" && value.constraint && constraintCodes[value.constraint]) { const [code, message] = constraintCodes[value.constraint]; return new ProductionError(code, message, 409); }
+  if (value?.code === "23514" && value.constraint && constraintCodes[value.constraint]) { const [code, message] = constraintCodes[value.constraint]; return new ProductionError(code, message, 409); }
   if (value?.code === "23503" || value?.code === "23514") return new ProductionError("PRODUCTION_REFERENCE_OR_CONSTRAINT_CONFLICT", "生产记录引用或数量约束已变化，请刷新后重试", 409);
   return new ProductionError("INTERNAL_ERROR", "服务器暂时无法处理生产请求", 500);
 }

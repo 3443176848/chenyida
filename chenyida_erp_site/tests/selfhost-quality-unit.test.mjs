@@ -3,10 +3,12 @@ import test from "node:test";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
 import { enumValue, id, quantity, resultLines, version } from "../app/lib/quality-selfhost/rules.ts";
 
-test("quality permissions separate read, execution and reopen", () => {
+test("quality permissions separate inspection, disposition and finished-goods allocation", () => {
   for (const role of ["purchase", "engineering", "production", "warehouse", "sales", "finance", "operations"]) { assert.ok(permissionsForRole(role).includes("quality.read")); assert.ok(!permissionsForRole(role).includes("quality.inspect")); }
-  for (const permission of ["quality.read", "quality.inspect", "quality.defect", "quality.disposition", "quality.close"]) assert.ok(permissionsForRole("quality").includes(permission));
-  assert.ok(!permissionsForRole("quality").includes("quality.reopen")); assert.ok(permissionsForRole("manager").includes("quality.reopen"));
+  for (const permission of ["quality.read", "quality.inspect", "quality.defect", "quality.close", "quality.finished_goods_allocation.read"]) assert.ok(permissionsForRole("quality").includes(permission));
+  for (const permission of ["quality.disposition", "quality.reopen", "quality.finished_goods_allocation.create"]) assert.ok(!permissionsForRole("quality").includes(permission));
+  for (const permission of ["quality.disposition", "quality.reopen"]) assert.ok(permissionsForRole("manager").includes(permission));
+  for (const permission of ["quality.finished_goods_allocation.read", "quality.finished_goods_allocation.create", "quality.finished_goods_allocation.cancel"]) assert.ok(permissionsForRole("sales").includes(permission));
 });
 
 test("quality validation fixes exact enums, ids, versions and numeric scale", () => {

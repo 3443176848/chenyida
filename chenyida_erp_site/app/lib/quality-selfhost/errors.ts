@@ -12,6 +12,14 @@ const constraints: Record<string, [string, string]> = {
   quality_inspections_source_match_ck: ["QUALITY_SOURCE_INVALID", "检验来源的物料或单位不一致"],
   quality_inspections_failed_evidence_ck: ["QUALITY_DEFECT_REQUIRED", "不良检验必须包含 FAIL 结果和有效缺陷"],
   quality_defects_total_ck: ["QUALITY_DEFECT_QUANTITY_EXCEEDED", "缺陷累计数量超过不良数量"],
+  finished_goods_sales_allocations_pair_uq: ["FINISHED_GOODS_ALLOCATION_DUPLICATE", "同一完工明细与销售明细不能重复分配"],
+  finished_goods_sales_allocations_operation_uq: ["FINISHED_GOODS_ALLOCATION_OPERATION_CONFLICT", "成品订单分配操作已经存在"],
+  finished_goods_sales_allocations_source_match_ck: ["FINISHED_GOODS_ALLOCATION_SOURCE_MISMATCH", "完工与销售明细来源不一致"],
+  finished_goods_sales_allocations_completion_capacity_ck: ["FINISHED_GOODS_ALLOCATION_EXCEEDED", "完工明细可分配数量不足"],
+  finished_goods_sales_allocations_order_capacity_ck: ["FINISHED_GOODS_ALLOCATION_EXCEEDED", "销售明细可分配数量不足"],
+  finished_goods_sales_allocations_fqc_gate_ck: ["FINISHED_GOODS_ALLOCATION_FQC_EXISTS", "分配已有 FQC，不能取消"],
+  quality_inspections_fqc_allocation_ck: ["QUALITY_SOURCE_INVALID", "FQC 必须绑定有效稳定分配"],
+  production_completion_reversal_allocation_gate_ck: ["PRODUCTION_COMPLETION_DOWNSTREAM_EXISTS", "完工已有有效销售分配，不能冲销"],
 };
 
 export function mapQualityError(error: unknown): QualityError {

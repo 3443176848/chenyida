@@ -45,7 +45,7 @@ export async function api(path, options = {}) {
     || ["/api/production/material-issues", "/api/production/material-returns", "/api/production/reports", "/api/production/completions"].includes(path)
     || /^\/api\/work-orders\/[1-9]\d*(?:\/(?:release|close|cancel))?$/.test(path)
     || /^\/api\/production\/(?:reports|completions)\/[1-9]\d*\/reverse$/.test(path)) && ["POST", "PATCH"].includes(method);
-  const qualityWrite = (path === "/api/quality-inspections" || /^\/api\/quality-inspections\/[1-9]\d*\/(?:defects|dispositions|close|reopen)$/.test(path)) && method === "POST";
+  const qualityWrite = (path === "/api/quality-inspections" || path === "/api/quality/finished-goods-allocations" || /^\/api\/quality-inspections\/[1-9]\d*\/(?:defects|dispositions|close|reopen)$/.test(path) || /^\/api\/quality\/finished-goods-allocations\/[1-9]\d*\/cancel$/.test(path)) && method === "POST";
   const financeWrite = (["/api/finance/documents", "/api/finance/settlements", "/api/financial-documents/from-source", "/api/financial-documents/from-sales-order", "/api/financial-documents/from-purchase-order", "/api/financial-payments"].includes(path)
     || /^\/api\/(?:financial-documents\/[1-9]\d*\/settlements|(?:financial-payments|finance-settlements)\/[1-9]\d*\/reversal)$/.test(path)) && method === "POST";
   const projectWrite = (path === "/api/projects" || /^\/api\/projects\/[1-9]\d*(?:\/(?:submit|accept|return|documents)(?:\/[1-9]\d*)?)?$/.test(path)) && ["POST", "PATCH", "DELETE"].includes(method);

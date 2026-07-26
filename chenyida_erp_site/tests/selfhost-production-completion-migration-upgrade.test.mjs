@@ -7,7 +7,7 @@ import { Pool } from "pg";
 const databaseUrl=process.env.TEST_PRODUCTION_COMPLETION_UPGRADE_DATABASE_URL;
 if(!databaseUrl||!/production_completion_upgrade_test/i.test(databaseUrl))throw new Error("isolated TEST_PRODUCTION_COMPLETION_UPGRADE_DATABASE_URL containing production_completion_upgrade_test is required");
 const pool=new Pool({connectionString:databaseUrl,max:3,application_name:"production-completion-upgrade-test"}),directory=new URL("../drizzle-postgres/",import.meta.url);
-const names=(await readdir(directory)).filter(name=>/^\d{4}_.+\.sql$/.test(name)).sort(),sources=new Map();for(const name of names)sources.set(name,await readFile(new URL(name,directory),"utf8"));
+const names=(await readdir(directory)).filter(name=>/^\d{4}_.+\.sql$/.test(name)&&name<="0021_production_reporting_completions.sql").sort(),sources=new Map();for(const name of names)sources.set(name,await readFile(new URL(name,directory),"utf8"));
 const checksum=name=>createHash("sha256").update(sources.get(name)).digest("hex");
 async function reset(){await pool.query("drop schema public cascade;create schema public;create table schema_migrations(version text primary key,checksum text not null)");}
 async function migrate(list){for(const name of list){const previous=await pool.query("select checksum from schema_migrations where version=$1",[name]);if(previous.rows[0]){assert.equal(previous.rows[0].checksum,checksum(name));continue;}const client=await pool.connect();try{await client.query("begin");await client.query(sources.get(name));await client.query("insert into schema_migrations values($1,$2)",[name,checksum(name)]);await client.query("commit");}catch(error){await client.query("rollback");throw error;}finally{client.release();}}}
