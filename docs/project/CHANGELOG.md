@@ -4,6 +4,15 @@
 
 ## 2026-07-26
 
+### SELFHOST-PHASE4-TASK07 - `feat: add production reporting and completion handoff`
+
+- Git：以 `26ccb95782478645720c8284c59b0afadca68649` 为严格 Parent；不 revert/reset/amend/rebase，不 push 或创建 PR。
+- 数据库：仅新增 expand-only `0021_production_reporting_completions.sql`，复用既有 Work Order/Report/Completion/Inventory 权威并增加 Report→Completion Allocation、Report/Completion reversal、不可变事件和 version/投影 guard；同步 Drizzle Schema/journal/snapshot，SHA-256 `1cf953d98da2d3a7703f3866b852cbe10bdb37b33e1826cb78b24079fc5a11ec`，不修改 `0001`—`0020`。
+- 服务/API：Report 只消费 BOM Snapshot 与净领料共同支持量；Completion 必须显式消费未占用 good quantity，并在同一事务原子写 Allocation、成品 Ledger/Balance、工单投影/状态、Event/Audit/Idempotency。Report/Completion 全额冲销均追加反向事实并执行 IPQC/FQC/Shipment/库存下游门禁。
+- 权限/UI：production 报工并按授权冲销，warehouse 分批完工入库/冲销，manager/admin 管理，其他角色无写权限；新增 `/production/reporting`、`/warehouse/production-completions`，扩展工单进度和四项权限裁剪 Dashboard 指标。
+- 验证：TASK07 unit/UI/PostgreSQL/migration，TASK01—TASK06、Production/Inventory/Quality/Sales/Dashboard 回归，全部正式 typecheck、Drizzle consistency、lint/build、凭证扫描、环境/API coverage、Python 三项和 `git diff --check` 已通过；并行真实 HTTP、整栈重启、备份恢复与最终清理将在独立 ops 验收提交完成。
+- 边界：未创建 IQC/IPQC/FQC、Shipment、销售金额来源或 AR/AP；未迁真实数据、启用 HTTPS/80/443、切流或生产部署。
+
 ### SELFHOST-PHASE4-TASK06 - `ops: accept production material issue workflow in parallel environment`
 
 - 提交：功能提交 `a8272b7c968e0fdcbce017aa0e41bad281702e50`，Parent 严格为保留的 `b45616e1115aab7d22d1b9a7e58f792005291524`；独立 ops 提交不 amend，实际哈希以 Git log 为准。

@@ -12,3 +12,14 @@ export function requirementLines(value: unknown): Array<{ requirementId: number;
   const seen = new Set<number>();
   return value.map((raw, index) => { if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new ProductionError("REQUEST_VALIDATION_FAILED", `第 ${index + 1} 行无效`); const row = raw as Record<string, unknown>; const requirementId = id(row.requirement_id, "requirement_id"); if (seen.has(requirementId)) throw new ProductionError("REQUEST_VALIDATION_FAILED", "同一请求不能重复物料需求"); seen.add(requirementId); return { requirementId, quantity: quantity(row.quantity, "quantity"), expectedRequirementVersion: version(row.expected_requirement_version, "expected_requirement_version"), expectedBalanceVersion: version(row.expected_balance_version, "expected_balance_version") }; }).sort((a, b) => a.requirementId - b.requirementId);
 }
+
+export function completionAllocations(value: unknown): Array<{ reportId: number; quantity: string; expectedReportVersion: number }> {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 100) throw new ProductionError("REQUEST_VALIDATION_FAILED", "allocations 必须包含 1 到 100 条报工来源");
+  const seen = new Set<number>();
+  return value.map((raw, index) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new ProductionError("REQUEST_VALIDATION_FAILED", `第 ${index + 1} 条报工分配无效`);
+    const row = raw as Record<string, unknown>; const reportId = id(row.report_id, "report_id");
+    if (seen.has(reportId)) throw new ProductionError("REQUEST_VALIDATION_FAILED", "同一完工请求不能重复报工来源"); seen.add(reportId);
+    return { reportId, quantity: quantity(row.quantity, "allocation.quantity"), expectedReportVersion: version(row.expected_report_version, "expected_report_version") };
+  }).sort((a, b) => a.reportId - b.reportId);
+}

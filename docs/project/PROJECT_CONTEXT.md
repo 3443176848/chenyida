@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；TASK06 源码与并行环境均为 `0.1.0-alpha.20`/`0020`；只属于回环并行验收，明确为非生产且尚未正式发布。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；TASK07 源码为 `0.1.0-alpha.21`/`0021`，并行环境在 ops 验收前仍为 TASK06 的 `0.1.0-alpha.20`/`0020`；只属于回环并行验收，明确为非生产且尚未正式发布。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.19`。
 - Git 复核：2026-07-26 本次任务起点为本地 `main`/HEAD `3ae79f1`、工作区 clean；本地 `origin/main` 与远端 `main` 均停留 `39946f6`，本地领先 27 个提交，不得描述为已同步。
 
@@ -114,6 +114,7 @@
 27. SELFHOST-PHASE4-TASK01 采用 D-058：sales=市场、engineering=项目；稳定 `PRJ-########` 与六表关系模型保存当前投影和不可变需求/事件，写操作由 Project Service 统一执行 CSRF、持久幂等、CAS、事务 Audit 和职责分离。`0.1.0-alpha.15`/`0015` 已通过并行双账号闭环、重启和清理验收，不创建 Product/BOM/订单/计划/采购/工单。
 28. SELFHOST-PHASE4-TASK02 采用 D-059：新增 planning 正式角色；engineering 项目负责人显式关联客户一致的 RELEASED Product/BOM，生成 numeric 计算的不可变规格快照包；planning 只能接收或退回，退回后创建新包版本，接收不触发 TASK03。`0.1.0-alpha.16`/`0016` 已通过并行真实旅程、重启与清理，验收业务最终为 0。
 29. SELFHOST-PHASE4-TASK03 采用 D-060：只聚合最新 ACCEPTED Package 固化 Material+Unit，PostgreSQL numeric 在提交锁内重算库存、需求日前在途及其他有效计划分配；独立 Planning Allocation 不改正式 `reserved_qty`，退回后旧分配失效且必须新版本重算。`0.1.0-alpha.17`/`0017` 已通过并行真实退回→v2 重提→接收、重启与恢复清理，最终业务为 0；未创建新 PO/收货/工单。
+30. SELFHOST-PHASE4-TASK07 采用 D-064：Report 受净领料支持量约束且不写库存；Completion 必须通过 Allocation 消费未占用 good，并与成品 Ledger/Balance、Work Order 投影、Event/Audit/Idempotency 同事务。Report/Completion 只能追加式全额冲销并执行 IPQC/FQC/Shipment/库存门禁。源码 `0.1.0-alpha.21`/`0021` 与隔离回归完成，并行验收待执行。
 
 ## 当前风险
 
@@ -155,7 +156,7 @@
 
 `SELFHOST-PHASE4-TASK05` 已完成：源码历史与并行环境基线为 `0.1.0-alpha.19` / PostgreSQL `0019`，`10×12` Award 经显式 PO/到货计划、两批 `4/6` 收货形成库存 `10`、来源和 AP `48/72`；Compose 重启、新空库恢复和清理通过。
 
-`SELFHOST-PHASE4-TASK06` 已 DONE。`0.1.0-alpha.20`/`0020` 已在并行环境接通最新 ACCEPTED Planning Package→生产交接版本→唯一 DRAFT 工单→显式释放/BOM 快照/Material Requirement→齐套 Reservation→仓库分批领退料；v1 退回/v2 接收、预留 10、领料 4/6、重启、恢复和清理通过。报工、完工、成品库存、品质、真实迁移、HTTPS 和生产切换仍未授权。合法 Git 起点 `b45616e1115aab7d22d1b9a7e58f792005291524` 已保留，功能提交为 `a8272b7c968e0fdcbce017aa0e41bad281702e50`。
+`SELFHOST-PHASE4-TASK06` 已 DONE。`SELFHOST-PHASE4-TASK07` 是唯一 DOING：源码 `0.1.0-alpha.21`/`0021` 已基于严格起点 `26ccb95782478645720c8284c59b0afadca68649` 完成 Report→Completion Allocation、净领料支持量、分批成品入库和追加式安全冲销，隔离专项与既有生产/库存/品质/销售/Dashboard 回归通过；并行真实 4/6 HTTP、整栈重启、停服恢复和最终清理仍待独立 ops 验收。品质检验创建、发货、财务、真实迁移、HTTPS 和生产切换不属于 TASK07。
 
 ## 恢复上下文检查清单
 

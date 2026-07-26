@@ -21,6 +21,19 @@ flowchart LR
 
 `SELFHOST-PHASE4-TASK06` 新增独立 `production-handoff-selfhost` 编排边界和 expand-only `0020`。交接表只固化当前 ACCEPTED Planning Package 来源、版本/事件及 Handoff Item→既有 Work Order 唯一链接；不复制 `production_work_orders`、BOM Snapshot、Material Requirement、Material Issue/Return、Inventory Ledger/Balance。释放工单在既有 Production 事务中锁定来源和库存，以 PostgreSQL `numeric(24,6)` 计算需求和 `on_hand-reserved-frozen`，写 Reservation/Event 来源事实后更新 Balance。仓库领退料继续调用既有 Inventory Service，并在同一事务消费或恢复预留。
 
+`SELFHOST-PHASE4-TASK07` 继续复用既有 Production/Inventory 权威，expand-only `0021` 只增加 Report→Completion Allocation、Report/Completion reversal、事件和投影/version guard。Report 的累计量受 BOM Snapshot 与净领料共同支持量约束且不写库存；warehouse Completion 必须消费 Report 未分配 good，并在同一事务写既有 Completion/Line、成品 Ledger/Balance、Work Order 状态、事件、审计和幂等。Report/Completion 更正均为追加式全额冲销，下游 IPQC/FQC/Shipment 或库存不足时 fail closed，不创建品质、销售或财务事实。
+
+```mermaid
+flowchart LR
+    W[Released / In-progress Work Order] -->|production report| R[Immutable Report]
+    R -->|unconsumed good qty| A[Report to Completion Allocation]
+    A -->|warehouse explicit receipt| C[Completion + Line]
+    C --> L[Finished Goods Ledger + Balance]
+    C --> P[Work Order completed projection]
+    P -->|completed equals planned| D[COMPLETED, not CLOSED]
+    R -. scrap excluded .-> X[No finished goods inventory]
+```
+
 ## 2026-07-26 计划物料需求到采购申请交接边界
 
 `SELFHOST-PHASE4-TASK03` 新增独立 `material-requirement-selfhost` 边界。计划只能消费项目最新 `ACCEPTED` Planning Package 的固化 Material/Unit/BOM gross 快照；浏览器和 Node 不用 JavaScript 浮点数作最终数量判断，PostgreSQL `numeric(24,6)` 在 SUBMIT 锁定事务内聚合并重算。

@@ -706,6 +706,18 @@
 - 权限：planning 准备/提交，production 接收/退回、建单/释放，warehouse 分批领退料，manager/admin 具备相应管理能力；其余角色服务端 403。
 - 边界：不实现生产报工、完工、成品库存、IQC/IPQC/FQC、发货、付款、银行、总账或税票；不迁真实数据、不部署生产、不启用 HTTPS、不切流。
 
+## D-064 生产报工与成品入库采用 Report 分配关系和追加式全额冲销
+
+- 日期：2026-07-26
+- 状态：`ACCEPTED / IMPLEMENTED / AWAITING PARALLEL ACCEPTANCE`
+- 确认人：项目负责人（明确授权继续生产线，并限定只完成报工、分批完工与成品入库交接）
+- 报工来源：只能对 TASK06 已释放且已领料的 `RELEASED/IN_PROGRESS` Work Order 追加 Report；服务端以 BOM Snapshot、Material Requirement 和净领料量在 PostgreSQL `numeric(24,6)` 中计算共同支持量。浏览器不提交累计投影，Report 不直接写库存，也不自动创建 IPQC/FQC。
+- 良品消费：既有 Completion 必须通过关系化 Allocation 显式消费一个或多个未冲销 Report 的未消费 `good_qty`；Report 投影保存 allocation/version，稳定加锁、CAS 与数据库 guard 共同防止重复或并发超量消费，scrap 永不成为 Completion。
+- 完工入库：warehouse 在单一事务复用既有 Production/Inventory 权威，原子写 Completion/Line、Allocation、成品 Ledger/Balance、Work Order 投影/状态、Event、Audit 和 Idempotency。累计完成等于计划数量才进入 `COMPLETED`，不自动 `CLOSED`。
+- 更正：Report/Completion/Allocation/Ledger 均不原地改写或删除。Report 仅在零 Allocation 且无 IPQC 等下游时可全额追加冲销；Completion 仅在无 FQC、Shipment 等消费且成品库存足够时可全额追加冲销，并通过 Inventory Service 创建反向 Ledger、恢复 Report 可用良品和 Work Order 投影。无法证明安全时 fail closed。
+- 权限：production 创建 Report，并仅按本人/管理授权冲销；warehouse 创建/冲销 Completion；manager/admin 管理；planning、purchase、finance、sales 等不得写，quality 只读合法来源。
+- 边界：不实现工艺路线、WIP/OEE/工时成本、补料返工、品质检验创建、销售发货或财务过账；不迁真实数据、不部署生产、不启用 HTTPS、不切流。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

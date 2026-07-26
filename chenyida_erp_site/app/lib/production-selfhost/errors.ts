@@ -7,6 +7,9 @@ const constraintCodes: Record<string, [string, string]> = {
   production_work_orders_code_uq: ["WORK_ORDER_CODE_CONFLICT", "工单编码冲突，请重试"],
   production_bom_snapshots_wo_uq: ["WORK_ORDER_ALREADY_RELEASED", "工单已经释放"],
   production_material_requirements_quantity_ck: ["PRODUCTION_QUANTITY_CONFLICT", "生产物料数量违反约束"],
+  production_report_reversals_report_uq: ["PRODUCTION_REPORT_ALREADY_REVERSED", "生产报工已经冲销"],
+  production_completion_reversals_completion_uq: ["PRODUCTION_COMPLETION_ALREADY_REVERSED", "生产完工已经冲销"],
+  production_completion_report_allocations_source_uq: ["PRODUCTION_REPORT_ALLOCATION_CONFLICT", "报工来源已被本次完工分配"],
 };
 
 export function mapProductionError(error: unknown): ProductionError {

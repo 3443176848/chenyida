@@ -2,6 +2,19 @@
 
 最后更新时间：2026-07-26（Asia/Shanghai）
 
+## SELFHOST-PHASE4-TASK07 生产报工 → 分批完工 → 成品入库
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DOING / FEATURE COMPLETE | 功能严格基于 `26ccb95782478645720c8284c59b0afadca68649` 开发；等待独立并行环境 ops 验收后才能标记 DONE |
+| 版本/Migration | PASS / SOURCE ONLY | 源码 `0.1.0-alpha.21`；仅新增 `0021_production_reporting_completions.sql`，SHA-256 `1cf953d98da2d3a7703f3866b852cbe10bdb37b33e1826cb78b24079fc5a11ec`；0001—0020 未修改，Schema/journal/snapshot 一致 |
+| 关系与事务 | PASS | 复用既有 Report/Completion/Inventory；Allocation 显式消费 good，Completion 与成品 Ledger/Balance、工单状态、事件、审计和幂等同事务 |
+| 规则与保护 | PASS | 领料支持量、good/scrap、Report/工单余量、CAS/并发/幂等/故障回滚、403、scrap 零库存以及 IPQC/FQC/Shipment 冲销门禁均通过隔离测试 |
+| UI/Dashboard | PASS | `/production/reporting`、`/warehouse/production-completions`、工单八项进度和四项权限裁剪指标完成；待品质仅为只读提示 |
+| 专项与回归 | PASS | TASK07 unit/UI/PG/migration，TASK01—TASK06、Production/Inventory/Quality/Sales/Dashboard、正式 typecheck、Schema consistency、lint/build、凭证扫描和 Python 隔离三项通过 |
+| 并行验收 | PENDING | 仅允许更新 `chenyida-erp-parallel`；真实 4/6 报工与 4/6 入库、重启、备份恢复和最终清理尚待执行 |
+| 排除事项 | ENFORCED | 未创建品质、发货或财务事实；未迁真实数据、启用 HTTPS/80/443、切流、生产部署、push 或 PR |
+
 ## SELFHOST-PHASE4-TASK06 计划 → 生产工单 → 齐套预留 → 仓库领料
 
 | 验证项 | 结果 | 说明 |

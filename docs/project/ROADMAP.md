@@ -24,7 +24,8 @@
 - `SELFHOST-PHASE4-TASK04`：采购询价、报价、服务端比较与人工定标（DONE；`0.1.0-alpha.18` / PostgreSQL `0018`，不自动创建 PO）。
 - `SELFHOST-PHASE4-TASK05`：采购定标 → PO → 到货 → 仓库分批收货 → 库存 → 采购来源 → 财务显式 AP（DONE；`0.1.0-alpha.19` / PostgreSQL `0019`，重启与清理验收通过）。
 - `SELFHOST-PHASE4-TASK06`：最新已接收计划包 → 生产交接版本 → 唯一 DRAFT 工单 → 显式释放/BOM 快照/需求 → 齐套预留 → 仓库分批领料（DONE；`0.1.0-alpha.20`/`0020` 已通过并行 HTTP、重启、恢复与清理验收；报工、完工和品质排除）。
-- 后续阶段：报工、完工、品质和发货接入（PLANNED，均未授权）。
+- `SELFHOST-PHASE4-TASK07`：已领料工单 → 分批 Report → good Allocation → warehouse 分批 Completion → 成品 Ledger/Balance → COMPLETED（DOING；`0.1.0-alpha.21`/`0021` 源码与隔离回归完成，并行 HTTP/重启/恢复/清理待验收；品质、发货和财务排除）。
+- 后续阶段：品质和发货接入（PLANNED，均未授权）。
 
 ## Phase 0 基础架构
 
@@ -144,6 +145,8 @@ Import Workspace UI 已由 `PHASE2-TASK08` 独立实施；Catalog 与 50×256 �
 - 库存、在途采购、未完工工单和关键金额核对通过。
 
 **预计任务数**：6。**当前状态**：IN PROGRESS。自托管全域 API、合成迁移框架、受控 Inventory/Finance Opening 及完全合成 public materialization/Dashboard/恢复已完成非生产验收；真实 source inventory、逐行人工处置、容量、安全、生产恢复、部署和切换尚未开始。
+
+生产线当前仅推进到 `SELFHOST-PHASE4-TASK07`：生产报工、Report 良品分配、分批完工入库和追加式全额冲销已完成源码与隔离验证，等待回环并行环境验收。IQC/IPQC/FQC 创建、销售发货和财务过账仍须后续独立任务。
 
 ## Phase 6 行业物料库
 

@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.20",
+  "version": "0.1.0-alpha.21",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -115,6 +115,12 @@
     "test:production-handoff:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-handoff-postgres.test.mjs",
     "test:production-handoff:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-handoff-migration-upgrade.test.mjs",
     "test:production-handoff:compose": "node scripts/selfhost-production-handoff-compose-smoke.mjs",
+    "typecheck:production-completion": "tsc -p tsconfig.phase4-task07.json --pretty false",
+    "test:production-completion:unit": "node --experimental-strip-types --test tests/selfhost-production-completion-unit.test.mjs",
+    "test:production-completion:ui": "node --experimental-strip-types --test tests/selfhost-production-completion-ui-contract.test.mjs",
+    "test:production-completion:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-completion-postgres.test.mjs",
+    "test:production-completion:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-completion-migration-upgrade.test.mjs",
+    "test:production-completion:compose": "node scripts/selfhost-production-completion-compose-smoke.mjs",
     "test:full-erp:compose": "node scripts/selfhost-full-erp-compose-smoke.mjs",
     "test:compose": "node scripts/selfhost-compose-smoke.mjs",
     "test:normalization:compose-restart": "node scripts/selfhost-normalization-restart-smoke.mjs",

@@ -37,20 +37,20 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.20`；PostgreSQL migration head 为 `0020_production_handoff_reservations.sql`；始终仅限回环非生产环境 |
+| 当前版本 | 源码为 `0.1.0-alpha.21`/`0021_production_reporting_completions.sql`，并行环境在 ops 验收前仍为 `0.1.0-alpha.20`/`0020`；始终仅限回环非生产环境 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK06 功能提交 `a8272b7c968e0fdcbce017aa0e41bad281702e50`，严格 Parent 为保留的仅文档提交 `b45616e1115aab7d22d1b9a7e58f792005291524`；独立 ops 验收提交以 Git log 为准 |
-| Git 同步与工作区 | 功能提交后 `origin/main...HEAD` 为 behind 0/ahead 29；ops 文档提交后仍不 push、不创建 PR、不改写历史 |
+| 当前根仓库功能基线提交 | TASK07 功能开发严格以 `26ccb95782478645720c8284c59b0afadca68649` 为 Parent；功能与 ops 提交实际哈希以 Git log 为准 |
+| Git 同步与工作区 | TASK07 起点 `origin/main...HEAD` 为 behind 0/ahead 30；功能提交后仍不 push、不创建 PR、不改写历史 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0020`；最终唯一启用管理员、所有合成业务表 0、uploads/attachments 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
+| 当前数据库 | 源码 migration 为 `0001`—`0021`，并行 PostgreSQL 在 ops 验收前为干净 `0001`—`0020`；SQLite/D1 未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | Python/SQLite 开发服务继续由 systemd 常驻并监听 `0.0.0.0:18888`；非生产 Compose 项目 `chenyida-erp-parallel` 以 PostgreSQL 17/Web/Worker 同机并行运行，Web 仅绑定 `127.0.0.1:3000`，PostgreSQL 无宿主端口；不是生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard 与离线备份恢复治理的非生产链路 |
-| 当前阶段 | 第一阶段 TASK01—TASK06 已完成并行验收；计划到生产物料领用交接后停止 |
-| 当前任务 | 无 `DOING`；`SELFHOST-PHASE4-TASK06` 已 DONE。`PHASE0-TASK03` 和 TASK05 保持历史 `DONE`，不得重复 |
-| 下一任务 | 停止；报工、完工、成品库存、品质、发货、真实迁移、HTTPS、生产恢复和切换均未授权 |
+| 当前阶段 | 第一阶段 TASK01—TASK06 已完成并行验收；TASK07 功能与隔离回归完成，等待并行 HTTP/重启/恢复/清理验收 |
+| 当前任务 | `SELFHOST-PHASE4-TASK07` 为唯一 `DOING`：生产报工、分批完工与成品入库交接。`PHASE0-TASK03`、TASK05 和 TASK06 保持历史 `DONE`，不得重复 |
+| 下一任务 | 停止；品质检验创建、发货、财务、真实迁移、HTTPS、生产恢复和切换均不属于 TASK07 |
 
 ## 当前完成模块
 
@@ -77,6 +77,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - SELFHOST-PHASE4-TASK04 已在 `chenyida-erp-parallel` 交付 `0.1.0-alpha.18`/`0018`、RFQ Round、不可变报价版本、服务端确定性比较、人工 Sourcing Award/撤销、独立 API/原生页面和 Dashboard 三项待办；A 高价准时、B 低价晚交的人工交期优先定标、重启持久和恢复清理通过，最终仅保留 18 migrations/唯一管理员，不创建 PO/收货/库存/应付，不启动 TASK05
 - SELFHOST-PHASE4-TASK05 已在同一并行环境交付 `0.1.0-alpha.19`/`0019`、Award Line→PO Line、到货计划/待入库、Receipt 分配关系、分批收货、库存与财务来源、显式 AP 和三条原生页面；实际 `10×12` 分两批 `4/6`，来源/AP 为 `48/72`，重启与新空库恢复通过，最终仅保留 19 migrations/唯一管理员，未启动生产或品质
 - SELFHOST-PHASE4-TASK06 已在同一并行环境交付 `0.1.0-alpha.20`/`0020`、版本化 Production Handoff、唯一工单链接和生产库存 Reservation/Event；实际 v1 退回→v2 接收、释放预留 10、分批领料 4/6、整栈重启、停服备份/新空库恢复和最终清理通过，报工/完工/成品/品质事实均为 0
+- SELFHOST-PHASE4-TASK07 源码已交付 `0.1.0-alpha.21`/`0021`、Report→Completion Allocation、基于净领料的报工支持量、分批成品入库和 Report/Completion 追加式全额冲销；隔离专项与 TASK01—TASK06/Production/Inventory/Quality/Sales/Dashboard 回归通过，并行实际 HTTP/重启/恢复/清理尚待独立 ops 验收
 - 多用户登录、会话、角色权限、密码修改、账号管理和操作审计
 - 物料、供应商映射、CSV 导入、清洗队列和新物料建档基础流程
 - 客户、供应商、产品、BOM 和 BOM 齐套分析
@@ -251,7 +252,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - 已完成：`PHASE3-TASK02` 批准全部 16 项决定并完成非生产 Normalization 服务、`0006`、五个 API、权限/限流/取消、隔离迁移与集成测试；未创建 Draft/正式物料，未迁移或部署生产。
 - 已完成：`PHASE3-TASK03` Material Import Normalization Review UI V1 docs-only 设计与正式规格确认；四份正式文档覆盖统一路由、七步 Stepper、启动/轮询/取消、Current/Latest、Rows/Drawer/Issues、37 个线框、104 项测试、局部门禁和性能门禁，14 项决定均为 `APPROVED`；未实施运行时代码或改变生产环境。
 - 已完成：`PHASE3-TASK04` Material Import Normalization Review UI V1 非生产实施；统一工作区、七步 Stepper、Current/Latest、冻结幂等与 `RESULT_UNKNOWN`、2/5/10 轮询、取消、汇总、Rows/Issues cursor、Row Drawer、安全有界渲染和权限清理均已落地；104/104 计划测试、100/100 Import UI 回归及本地 Playwright 性能/可访问性门禁通过，未改 API/Schema/Migration/业务服务或生产环境。
-- 下一：当前仅执行已获明确授权的 `SELFHOST-PHASE4-TASK06`；完成后停止。报工、完工、品质、真实数据迁移、生产备份恢复、部署/切换仍须另行明确授权。
+- 下一：当前仅执行已获明确授权的 `SELFHOST-PHASE4-TASK07`；完成并行验收后停止。品质创建、销售发货、财务、真实数据迁移、生产备份恢复、部署/切换不属于本任务。
 
 ## 更新规则
 
