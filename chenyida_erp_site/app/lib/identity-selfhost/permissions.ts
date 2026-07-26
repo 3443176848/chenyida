@@ -27,7 +27,10 @@ const productionHandoffRead = ["production.handoff.read"];
 const productionHandoffPlanning = [...productionHandoffRead, "production.handoff.prepare", "production.handoff.submit"];
 const productionHandoffProduction = [...productionHandoffRead, "production.handoff.decide", "production.handoff.work_order"];
 const salesRead = ["sales.read"];
-const salesManage = [...salesRead, "sales.quote", "sales.order", "sales.ship", "sales.reverse", "sales.finance_source.read"];
+const salesDeliveryRead = ["sales.delivery.read"];
+const salesDeliverySales = [...salesDeliveryRead, "sales.delivery.create", "sales.delivery.submit", "sales.delivery.cancel"];
+const salesDeliveryWarehouse = [...salesDeliveryRead, "sales.delivery.accept", "sales.delivery.return", "sales.delivery.execute", "sales.delivery.reverse"];
+const salesManage = [...salesRead, "sales.quote", "sales.order", "sales.ship", "sales.reverse", "sales.finance_source.read", ...salesDeliverySales, ...salesDeliveryWarehouse];
 const qualityRead = ["quality.read"];
 const qualityManage = [...qualityRead, "quality.inspect", "quality.defect", "quality.disposition", "quality.close", "quality.reopen"];
 const finishedGoodsAllocationRead = ["quality.finished_goods_allocation.read"];
@@ -52,10 +55,10 @@ const ROLE_PERMISSIONS: Record<IdentityRole, string[]> = {
   engineering: [...dashboardRead, "material.read", "material.draft.create", "material.draft.edit_own", "material.draft.submit", "material.import.create", "material.import.read", "material.import.cancel", "material.import.parse", "material.import.map", ...reviewEditorPermissions, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...salesRead, ...qualityRead, ...financeRead, ...projectEngineering, "master.product.manage", "master.bom.manage"],
   planning: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...procurementSourcingRead, ...productionRead, ...productionHandoffPlanning, ...salesRead, ...qualityRead, ...financeRead, ...projectRead, ...planningRead, ...materialRequirementPlanning, "planning.accept"],
   production: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...productionHandoffProduction, ...salesRead, ...qualityRead, ...finishedGoodsAllocationRead, ...financeRead, "production.plan", "production.report", "production.report.reverse"],
-  warehouse: [...readOnly, ...masterRead, ...inventoryManage, ...procurementRead, ...procurementFulfillmentWarehouse, ...productionRead, ...productionHandoffRead, ...salesRead, ...qualityRead, ...finishedGoodsAllocationRead, ...financeRead, "procurement.receive", "procurement.reverse", "production.issue", "production.complete", "production.complete.reverse", "sales.ship", "sales.reverse"],
-  quality: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...salesRead, ...qualityManage.filter((permission) => !["quality.disposition", "quality.reopen"].includes(permission)), ...finishedGoodsAllocationRead, ...financeRead],
-  sales: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...salesRead, ...qualityRead, ...finishedGoodsAllocationManage, ...financeRead, ...projectMarket, "sales.quote", "sales.order", "master.customer.manage"],
-  finance: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...procurementFulfillmentRead, ...productionRead, ...salesRead, ...qualityRead, ...financeManage, "procurement.finance_source.read", "sales.finance_source.read"],
+  warehouse: [...readOnly, ...masterRead, ...inventoryManage, ...procurementRead, ...procurementFulfillmentWarehouse, ...productionRead, ...productionHandoffRead, ...salesRead, ...salesDeliveryWarehouse, ...qualityRead, ...finishedGoodsAllocationRead, ...financeRead, "procurement.receive", "procurement.reverse", "production.issue", "production.complete", "production.complete.reverse", "sales.ship", "sales.reverse"],
+  quality: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...salesRead, ...salesDeliveryRead, ...qualityManage.filter((permission) => !["quality.disposition", "quality.reopen"].includes(permission)), ...finishedGoodsAllocationRead, ...financeRead],
+  sales: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...salesRead, ...salesDeliverySales, ...qualityRead, ...finishedGoodsAllocationManage, ...financeRead, ...projectMarket, "sales.quote", "sales.order", "master.customer.manage"],
+  finance: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...procurementFulfillmentRead, ...productionRead, ...salesRead, ...salesDeliveryRead, ...qualityRead, ...financeManage, "procurement.finance_source.read", "sales.finance_source.read"],
   operations: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...salesRead, ...qualityRead, ...financeRead],
 };
 

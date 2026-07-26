@@ -79,8 +79,8 @@ export class QualityService {
   async get(actor: IdentityActor, inspectionId: number) {
     const found = await this.repository.pool.query(`select qi.*,m.internal_material_code material_code,m.standard_name material_name,u.code unit_code from quality_inspections qi join material_master m on m.id=qi.material_id join units u on u.id=qi.unit_id where qi.id=$1`, [inspectionId]);
     if (!found.rows[0]) throw new QualityError("QUALITY_INSPECTION_NOT_FOUND", "检验记录不存在", 404); assertVisible(actor, String(found.rows[0].inspection_type)); await this.assertProductionScope(actor,inspectionId);
-    const [results, defectsFound, events] = await Promise.all([this.repository.pool.query("select * from quality_inspection_results where inspection_id=$1 order by line_no", [inspectionId]), this.repository.pool.query("select * from quality_defects where inspection_id=$1 order by id", [inspectionId]), this.repository.pool.query("select * from quality_inspection_events where inspection_id=$1 order by id", [inspectionId])]);
-    return { ...found.rows[0], results: results.rows, defects: defectsFound.rows, events: events.rows, boundary: QUALITY_BOUNDARY };
+    const [results, defectsFound, events,shipmentAllocations] = await Promise.all([this.repository.pool.query("select * from quality_inspection_results where inspection_id=$1 order by line_no", [inspectionId]), this.repository.pool.query("select * from quality_defects where inspection_id=$1 order by id", [inspectionId]), this.repository.pool.query("select * from quality_inspection_events where inspection_id=$1 order by id", [inspectionId]),this.repository.pool.query(`select a.*,sh.shipment_code,sh.shipment_type from sales_shipment_line_fqc_allocations a join sales_shipment_lines sl on sl.id=a.shipment_line_id join sales_shipments sh on sh.id=sl.shipment_id where a.quality_inspection_id=$1 order by a.id`,[inspectionId])]);
+    return { ...found.rows[0], results: results.rows, defects: defectsFound.rows, events: events.rows, shipment_allocations:shipmentAllocations.rows, boundary: QUALITY_BOUNDARY };
   }
 
   async resultLines(actor: IdentityActor, inspectionId: number) { await this.getVisibleInspection(actor, inspectionId); return this.repository.pool.query("select * from quality_inspection_results where inspection_id=$1 order by line_no", [inspectionId]); }
@@ -96,12 +96,13 @@ export class QualityService {
     values.push(limit, offset);
     return this.repository.pool.query(`select a.*,pc.completion_code,wo.work_order_code,so.sales_order_code,so.customer_id,sol.product_id,sol.product_version_id,
       m.internal_material_code material_code,m.standard_name material_name,u.code unit_code,coalesce(inspected.inspected_qty,0)::text inspected_qty,
-      coalesce(released.released_qty,0)::text released_qty
+      coalesce(released.released_qty,0)::text released_qty,coalesce(consumed.consumed_qty,0)::text consumed_qty,greatest(coalesce(released.released_qty,0)-coalesce(consumed.consumed_qty,0),0)::text available_qty
       from finished_goods_sales_allocations a join production_completion_lines pcl on pcl.id=a.completion_line_id join production_completions pc on pc.id=pcl.completion_id
       join production_work_orders wo on wo.id=pc.work_order_id join sales_order_lines sol on sol.id=a.sales_order_line_id join sales_order_versions sov on sov.id=sol.sales_order_version_id
       join sales_orders so on so.id=sov.sales_order_id join material_master m on m.id=pcl.material_id join units u on u.id=pcl.unit_id
       left join lateral(select coalesce(sum(qi.inspected_qty),0) inspected_qty from quality_inspections qi where qi.fqc_allocation_id=a.id) inspected on true
       left join lateral(select coalesce(sum(qi.released_qty),0) released_qty from quality_inspections qi where qi.fqc_allocation_id=a.id and qi.lifecycle_status='CLOSED' and qi.decision_status='RELEASED') released on true
+      left join lateral(select coalesce(sum(case when fa.entry_type='SHIPMENT' then fa.quantity else -fa.quantity end),0) consumed_qty from sales_shipment_line_fqc_allocations fa join quality_inspections qi on qi.id=fa.quality_inspection_id where qi.fqc_allocation_id=a.id) consumed on true
       ${where.length ? `where ${where.join(" and ")}` : ""} order by a.id desc limit $${values.length - 1} offset $${values.length}`, values);
   }
 
@@ -170,9 +171,9 @@ export class QualityService {
   async eligibility(actor: IdentityActor, salesOrderLineId: number) {
     if (!["admin", "manager", "quality", "production", "warehouse", "sales", "finance"].includes(actor.role)) throw new QualityError("QUALITY_NOT_VISIBLE", "销售明细品质额度不存在", 404);
     const result = await this.repository.pool.query(`with released as (
-        select coalesce(sum(released_qty),0)::numeric released_qty from quality_inspections where sales_order_line_id=$1 and inspection_type='FQC' and lifecycle_status='CLOSED' and decision_status='RELEASED'
+        select coalesce(sum(qi.released_qty),0)::numeric released_qty from quality_inspections qi join finished_goods_sales_allocations a on a.id=qi.fqc_allocation_id and a.status='ACTIVE' where qi.sales_order_line_id=$1 and qi.inspection_type='FQC' and qi.lifecycle_status='CLOSED' and qi.decision_status='RELEASED'
       ), consumed as (
-        select coalesce(sum(case when sh.shipment_type='SHIPMENT' then sl.quantity else -sl.quantity end),0)::numeric consumed_qty from sales_shipment_lines sl join sales_shipments sh on sh.id=sl.shipment_id where sl.sales_order_line_id=$1
+        select coalesce(sum(case when fa.entry_type='SHIPMENT' then fa.quantity else -fa.quantity end),0)::numeric consumed_qty from sales_shipment_line_fqc_allocations fa join quality_inspections qi on qi.id=fa.quality_inspection_id where qi.sales_order_line_id=$1
       )
       select sol.id sales_order_line_id,sol.ordered_qty::text,sol.shipped_qty::text,released.released_qty::text,consumed.consumed_qty::text consumed_qty,greatest(released.released_qty-consumed.consumed_qty,0)::text available_qty
       from sales_order_lines sol cross join released cross join consumed where sol.id=$1`, [salesOrderLineId]);
@@ -268,7 +269,7 @@ export class QualityService {
   async reopen(inspectionId: number, meta: QualityMeta, input: Record<string, unknown>): Promise<QualityResult> {
     const expected = version(input.expected_version); const reason = text(input.reason, "reason", 1000, true);
     return this.repository.execute(meta, async (client) => { const locked = await this.lockFqcInspection(client, inspectionId); const row = locked.row; if (Number(row.version) !== expected || row.lifecycle_status !== "CLOSED") throw new QualityError("QUALITY_REOPEN_STATE_CONFLICT", "只有已关闭且版本匹配的检验可以重开", 409);
-      if (row.inspection_type === "FQC" && row.decision_status === "RELEASED") { const consumption = await client.query(`with released as (select coalesce(sum(released_qty),0)::numeric qty from quality_inspections where sales_order_line_id=$1 and lifecycle_status='CLOSED' and decision_status='RELEASED' and id<>$2), consumed as (select coalesce(sum(case when sh.shipment_type='SHIPMENT' then sl.quantity else -sl.quantity end),0)::numeric qty from sales_shipment_lines sl join sales_shipments sh on sh.id=sl.shipment_id where sl.sales_order_line_id=$1) select released.qty>=consumed.qty ok from released,consumed`, [row.sales_order_line_id, inspectionId]); if (!consumption.rows[0].ok) throw new QualityError("QUALITY_RELEASE_ALREADY_CONSUMED", "该 FQC 放行额度已被有效发货消费，不能重开", 409); }
+      if (row.inspection_type === "FQC" && row.decision_status === "RELEASED") { const consumption = await client.query(`select coalesce(sum(case when entry_type='SHIPMENT' then quantity else -quantity end),0)=0 ok from sales_shipment_line_fqc_allocations where quality_inspection_id=$1`, [inspectionId]); if (!consumption.rows[0].ok) throw new QualityError("QUALITY_RELEASE_ALREADY_CONSUMED", "该 FQC 放行额度已被有效发货消费，不能重开", 409); }
       const updated = await client.query("update quality_inspections set lifecycle_status='OPEN',decision_status='PENDING',released_qty=0,version=version+1,updated_at=now() where id=$1 and version=$2 returning *", [inspectionId, expected]); if (!updated.rows[0]) throw new QualityError("QUALITY_REOPEN_STATE_CONFLICT", "检验已被并发更新", 409); await client.query("insert into quality_inspection_events(inspection_id,event_type,from_lifecycle_status,to_lifecycle_status,from_decision_status,to_decision_status,release_qty,reason,created_by,request_id) values($1,'REOPENED','CLOSED','OPEN',$2,'PENDING',0,$3,$4,$5)", [inspectionId, row.decision_status, reason, meta.actor.username, meta.requestId]); await this.fault?.("after_quality_reopen"); return { status: 200, body: { ok: true, data: updated.rows[0], request_id: meta.requestId }, objectId: inspectionId };
     });
   }

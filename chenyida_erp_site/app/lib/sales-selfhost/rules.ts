@@ -1,5 +1,5 @@
 import { SalesError } from "./errors.ts";
-import type { SalesLineInput, ShipmentLineInput } from "./types.ts";
+import type { DeliveryExecutionLineInput, DeliveryInstructionLineInput, SalesLineInput, ShipmentLineInput } from "./types.ts";
 
 export const id = (value: unknown, field: string) => { const result = Number(value); if (!Number.isSafeInteger(result) || result < 1) throw new SalesError("REQUEST_VALIDATION_FAILED", `${field} 必须是正整数`); return result; };
 export const version = (value: unknown, field = "expected_version") => { const result = Number(value); if (!Number.isSafeInteger(result) || result < 0) throw new SalesError("REQUEST_VALIDATION_FAILED", `${field} 必须是非负整数`); return result; };
@@ -28,6 +28,18 @@ export function shipmentLines(value: unknown): ShipmentLineInput[] {
     if (seen.has(salesOrderLineId)) throw new SalesError("REQUEST_VALIDATION_FAILED", "同一出货单不能重复销售明细"); seen.add(salesOrderLineId);
     return { salesOrderLineId, quantity: decimal(row.quantity ?? row.ship_qty, "quantity"), expectedLineVersion: version(row.expected_line_version, "expected_line_version"), expectedBalanceVersion: version(row.expected_balance_version, "expected_balance_version") };
   }).sort((left, right) => left.salesOrderLineId - right.salesOrderLineId);
+}
+
+export function deliveryInstructionLines(value: unknown): DeliveryInstructionLineInput[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 100) throw new SalesError("REQUEST_VALIDATION_FAILED", "lines 必须包含 1 到 100 行");
+  const seen = new Set<number>();
+  return value.map((raw, index) => { if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new SalesError("REQUEST_VALIDATION_FAILED", `第 ${index + 1} 行无效`); const row = raw as Record<string, unknown>; const salesOrderLineId = id(row.sales_order_line_id, "sales_order_line_id"); if (seen.has(salesOrderLineId)) throw new SalesError("REQUEST_VALIDATION_FAILED", "同一发货指令不能重复销售明细"); seen.add(salesOrderLineId); return { salesOrderLineId, quantity: decimal(row.quantity, "quantity"), expectedLineVersion: version(row.expected_line_version, "expected_line_version") }; }).sort((a, b) => a.salesOrderLineId - b.salesOrderLineId);
+}
+
+export function deliveryExecutionLines(value: unknown): DeliveryExecutionLineInput[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 100) throw new SalesError("REQUEST_VALIDATION_FAILED", "lines 必须包含 1 到 100 行");
+  const seen = new Set<number>();
+  return value.map((raw, index) => { if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new SalesError("REQUEST_VALIDATION_FAILED", `第 ${index + 1} 行无效`); const row = raw as Record<string, unknown>; const instructionLineId = id(row.instruction_line_id, "instruction_line_id"); if (seen.has(instructionLineId)) throw new SalesError("REQUEST_VALIDATION_FAILED", "同一批次不能重复发货指令明细"); seen.add(instructionLineId); return { instructionLineId, quantity: decimal(row.quantity, "quantity"), expectedLineVersion: version(row.expected_line_version, "expected_line_version"), expectedSalesOrderLineVersion: version(row.expected_sales_order_line_version, "expected_sales_order_line_version"), expectedBalanceVersion: version(row.expected_balance_version, "expected_balance_version") }; }).sort((a, b) => a.instructionLineId - b.instructionLineId);
 }
 
 export function expectedBalanceVersions(value: unknown) {

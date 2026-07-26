@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.22",
+  "version": "0.1.0-alpha.23",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -127,6 +127,12 @@
     "test:production-quality:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-quality-release-postgres.test.mjs",
     "test:production-quality:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-quality-release-migration-upgrade.test.mjs",
     "test:production-quality:compose": "node scripts/selfhost-production-quality-release-compose-smoke.mjs",
+    "typecheck:sales-delivery": "tsc -p tsconfig.phase4-task09.json --pretty false",
+    "test:sales-delivery:unit": "node --experimental-strip-types --test tests/selfhost-sales-delivery-receivable-unit.test.mjs",
+    "test:sales-delivery:ui": "node --experimental-strip-types --test tests/selfhost-sales-delivery-receivable-ui-contract.test.mjs",
+    "test:sales-delivery:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-sales-delivery-receivable-postgres.test.mjs",
+    "test:sales-delivery:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-sales-delivery-receivable-migration-upgrade.test.mjs",
+    "test:sales-delivery:compose": "node scripts/selfhost-sales-delivery-receivable-compose-smoke.mjs",
     "test:full-erp:compose": "node scripts/selfhost-full-erp-compose-smoke.mjs",
     "test:compose": "node scripts/selfhost-compose-smoke.mjs",
     "test:normalization:compose-restart": "node scripts/selfhost-normalization-restart-smoke.mjs",

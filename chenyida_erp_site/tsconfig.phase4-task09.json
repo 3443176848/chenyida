@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "target": "ES2022", "incremental": false, "plugins": [] },
+  "include": [
+    "app/lib/sales-selfhost/**/*.ts",
+    "app/lib/quality-selfhost/**/*.ts",
+    "app/lib/inventory-selfhost/**/*.ts",
+    "app/lib/finance-selfhost/**/*.ts",
+    "app/lib/identity-selfhost/**/*.ts",
+    "app/lib/dashboard-selfhost/**/*.ts",
+    "app/lib/selfhost-api.ts",
+    "app/sales/delivery/**/*.tsx",
+    "app/warehouse/shipping/**/*.tsx",
+    "app/finance/receivables/**/*.tsx",
+    "app/_components/erp-workbench.tsx",
+    "db/**/*.ts"
+  ],
+  "exclude": ["node_modules", "examples", "app/api/erp-api.ts", "scripts/seed-material-categories.ts"]
+}

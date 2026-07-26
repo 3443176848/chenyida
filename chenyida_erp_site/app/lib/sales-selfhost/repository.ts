@@ -20,7 +20,7 @@ export class SalesRepository {
     if (limited) throw new SalesError("RATE_LIMITED", "销售写操作过于频繁，请稍后重试", 429);
   }
 
-  async nextCode(client: PoolClient, sequence: "SALES_QUOTATION" | "SALES_ORDER" | "SALES_SHIPMENT", prefix: "QT" | "SO" | "DN") {
+  async nextCode(client: PoolClient, sequence: "SALES_QUOTATION" | "SALES_ORDER" | "SALES_SHIPMENT" | "SALES_DELIVERY", prefix: "QT" | "SO" | "DN" | "DI") {
     const row = await client.query<{ current_value: string }>(`insert into business_code_sequences(sequence_code,current_value,version,updated_at) values($1,1,1,now()) on conflict(sequence_code) do update set current_value=business_code_sequences.current_value+1,version=business_code_sequences.version+1,updated_at=now() returning current_value`, [sequence]);
     return `${prefix}-${String(row.rows[0].current_value).padStart(8, "0")}`;
   }
