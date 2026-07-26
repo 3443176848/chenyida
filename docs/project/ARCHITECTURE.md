@@ -2,6 +2,23 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-26 定标到收货与应付交接边界
+
+`procurement-fulfillment-selfhost` 只做跨既有服务的事务编排：采购显式把有效 Award 按 Supplier/Currency 确定性转为 PO，关系表固定 Award Line→PO Line；到货计划与待入库记录不增加库存或创建应付；仓库收货在同一 PostgreSQL 事务内调用既有 Procurement Receipt/Inventory Ledger/Balance/Financial Source；财务仍通过既有 Finance Service 显式消费来源生成 AP。
+
+```mermaid
+flowchart LR
+    A[AWARDED Award Line] -->|purchase explicit + idempotency/CAS| P[PO Line]
+    P --> D[Delivery Plan + Receiving Queue]
+    D -->|warehouse receipt 4 / 6| R[Receipt + Allocation]
+    R --> I[Immutable Ledger + Balance]
+    R --> S[Purchase Financial Source]
+    S -->|finance explicit| AP[AP]
+    AP -. blocks destructive receipt reversal .-> R
+```
+
+`0019` 只新增来源/计划/队列/分配/事件关系，不复制 PO、Receipt、Ledger、Balance、Financial Source 或 AP 权威表。服务端权限、持久幂等、行锁、CAS、数据库 guard、状态事件和 Audit 共同 fail closed；已过账事实只能使用既有冲销，已有 AP 时阻止破坏来源。当前并行运行面为 alpha.19/`0001—0019`，验收数据已恢复清空。
+
 ## 2026-07-26 计划物料需求到采购申请交接边界
 
 `SELFHOST-PHASE4-TASK03` 新增独立 `material-requirement-selfhost` 边界。计划只能消费项目最新 `ACCEPTED` Planning Package 的固化 Material/Unit/BOM gross 快照；浏览器和 Node 不用 JavaScript 浮点数作最终数量判断，PostgreSQL `numeric(24,6)` 在 SUBMIT 锁定事务内聚合并重算。
@@ -60,12 +77,12 @@ flowchart LR
 
 `SELFHOST-PHASE3-TASK05` 首次把 Node/PostgreSQL 基线作为持久的非生产空环境与 Python/SQLite 同机并行运行。Compose 项目固定为 `chenyida-erp-parallel`，只启动 PostgreSQL 17、migrate、Web 和 Worker；Caddy/production profile 不启动。Web 宿主绑定为 `127.0.0.1:3000`，PostgreSQL 只在 Compose 网络暴露 5432，用户经 SSH 隧道访问。
 
-`SELFHOST-PHASE4-TASK01` 已把该并行环境升级到 alpha.15/`0015` 并完成市场→项目验收。`SELFHOST-PHASE4-TASK02` 随后升级到 alpha.16/`0016` 并完成项目→计划验收。`SELFHOST-PHASE4-TASK03` 再以功能提交 `5009b9118901a01af6a5faed194b8444d0c1e969` 升级到 alpha.17/`0017`，在恢复点保护下完成需求聚合、v1 采购退回释放、v2 重算重提、最终接收与重启验收，再恢复为保留 17 个 migration/唯一管理员的空业务状态；网络与 production profile 边界不变。
+`SELFHOST-PHASE4-TASK01`—`TASK05` 已依次把该环境升级至 alpha.19/`0019`。TASK05 在恢复点保护下完成 Award→PO→到货→分批收货→库存→来源→AP、整体重启与新空库恢复，再恢复为保留 19 个 migration/唯一管理员的空业务状态；网络与 production profile 边界不变。
 
 ```mermaid
 flowchart LR
     SSH["用户 SSH 隧道"] --> WEB["127.0.0.1:3000 Node Web"]
-    WEB --> PG["Compose PostgreSQL 17 / 当前 0001—0017"]
+    WEB --> PG["Compose PostgreSQL 17 / 当前 0001—0019"]
     WORKER["独立 Worker"] --> PG
     WEB --> FILES["uploads / attachments Volumes"]
     PY["现有 Python :18888"] --> SQLITE["真实 SQLite，保持不变"]

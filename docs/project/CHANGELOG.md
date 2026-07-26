@@ -4,6 +4,23 @@
 
 ## 2026-07-26
 
+### SELFHOST-PHASE4-TASK05 - `ops: accept sourcing fulfillment workflow in parallel environment`
+
+- 部署：在既有 `chenyida-erp-parallel` 原地从 `0018` 升级到 `0019`，PostgreSQL/Web healthy、Worker running；Web 仍仅绑定 `127.0.0.1:3000`，PostgreSQL 不暴露宿主端口。
+- 实际旅程：purchase 显式把供应商 A 的 Award `10 × 12` 转为 PO 并建立到货计划；创建计划时 Receipt/Ledger/AP 均为 0。warehouse 分两批收货 `4/6`，库存为 `4/10`，采购财务来源为 `48/72`；finance 分别显式生成 AP `48/72`，AP 合计 `120`。
+- 安全与一致性：实际 HTTP 验证分权、同正文幂等重放、异正文冲突、CAS、超收拒绝、已有 PO 阻止 Award 撤销、已有 AP 阻止 Receipt 冲销；专项 PostgreSQL 测试覆盖并发唯一转单和故障注入零半记录。
+- 持久与恢复：Compose 整体重启后 Award→PO→Plan→Receipt→Ledger/Balance→Source→AP 数量、金额、事件和审计保持；停服备份通过校验并恢复到第二个新空数据库，随后用干净 `0019` 恢复点清理当前并行库。
+- 清理与保护：最终 19 migrations、唯一启用管理员、零临时账号和零合成业务；Python PID `277640`、18888 与 SQLite metadata `64769:53827608:1784999031:1544192` 不变；未 push、未切流、未迁真实数据、未部署生产，不启动 TASK06。
+- 结论：`SOURCING TO PAYABLE HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。
+
+### SELFHOST-PHASE4-TASK05 - `feat: connect sourcing awards to receiving and payables`
+
+- 数据库：新增且仅新增 expand-only `0019_sourcing_purchase_fulfillment.sql`，建立 Award Line→PO Line、到货计划、待入库队列、Receipt Line 分配和不可变计划事件；同步 Drizzle schema/journal/snapshot，SHA-256 为 `6e517f6d2beffc74c94dcd5c5d60c9bcdc5baf9c93711a6add6cec4a08ed989a`，不修改 `0001`—`0018`。
+- 服务/API：新增 `procurement-fulfillment-selfhost` 编排边界，显式转 PO、显式建计划、分批收货/冲销；单事务复用既有 Procurement Receipt、Inventory Ledger/Balance 和 purchase financial source，Finance 仍由财务人员显式消费来源生成 AP。
+- 规则：关系唯一约束、行锁、持久幂等、expected version/CAS 和数据库 guard 保证 Award Line 最多转一次、来源事实不静默变化、禁止超收和部分提交；已生成 PO 的 Award、已有 AP 的 Receipt 均 fail closed。
+- 权限/UI：purchase、warehouse、finance 与 manager/admin 最小分权；新增 `/procurement/fulfillment`、`/warehouse/receiving`、`/finance/payables` 三条原生可操作页面，Dashboard 区分待生成和已生成 AP。
+- 验证：TASK05 unit/UI、PostgreSQL/API、migration、TASK01—TASK04 及 Identity/Master Data/Supplier Mapping/Procurement/Inventory/Finance/Dashboard 回归、全部正式 typecheck、Schema consistency、lint/build/凭证/Python 基线通过；功能提交为 `859454c97acddbff8c5199d91c41d636a6ca24e0`。
+
 ### SELFHOST-PHASE4-TASK04 - `ops: accept procurement sourcing workflow in parallel environment`
 
 - 部署：从功能提交 `4506db2579c07080afe27b33bb2e50623c3d1366` 重建并行 migrate/Web/Worker，只应用 `0018`；PostgreSQL/Web healthy、Worker running，Web 保持 `127.0.0.1:3000`。

@@ -214,6 +214,15 @@ TASK02—TASK09
 - unit/UI、PostgreSQL/API、migration、Compose restart 和全量适用回归通过；不含 PO 审批/取消、部分冲销、超收、单位换算、完整 AP/付款/GL、真实数据或部署。
 - 生产/真实数据授权：**否**。
 
+### 8.6 Phase 4 TASK05 定标履约编排补充（DONE，并行验收）
+
+- `0019_sourcing_purchase_fulfillment.sql` 只扩展 Award Line→PO Line 来源、到货计划、待入库队列、Receipt Line 分配与计划事件，不另建 PO、Receipt、Inventory、purchase financial source 或 AP 权威。
+- `procurement-fulfillment-selfhost` 提供 purchase 显式 Award 转单和建计划、warehouse 从待入库队列分批收货/按规则冲销；在一个事务中复用既有 Procurement Receipt 与 Inventory Service，并让既有 purchase financial source 成为 Finance AP 的唯一采购来源。
+- Finance 继续通过既有 `/api/finance/documents` 显式消费每笔收货来源；收货不会自动生成 AP。来源已被 AP 消费时，上游 Receipt 冲销 fail closed。
+- 原生操作面为 `/procurement/fulfillment`、`/warehouse/receiving`、`/finance/payables`；Dashboard 分开统计待生成 AP 与已生成 AP。
+- 实际隔离 HTTP 验收为 `10 × 12`，分批 `4/6`，库存累计 `10`，来源和 AP 分别 `48/72`、合计 `120`；Compose 重启、备份恢复、权限、幂等、CAS、并发、超收和故障回滚通过。
+- 仍不迁真实 PO/收货/库存/财务数据，不实现付款、银行、税票、总账、工单或品质流程，不部署生产。
+
 ## 9. SELFHOST-PHASE2-TASK06（DONE，非生产）：生产、领料、完工与报工
 
 ### 依赖与代码范围

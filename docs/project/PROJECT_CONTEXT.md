@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前源码与并行环境均为 `0.1.0-alpha.17`；只属于回环并行验收，明确为非生产且尚未正式发布。
+- 发布标识：包名为 `chenyida-erp-selfhosted`，当前源码与并行环境均为 `0.1.0-alpha.19`；只属于回环并行验收，明确为非生产且尚未正式发布。
 
 ### 治理资料
 
@@ -58,6 +58,7 @@
 - `drizzle-postgres/0015_market_project_handoff.sql` expand-only 新增稳定 Project、不可变 Requirement Version/Item、受控 Document Link、Handoff 投影和不可变 Event；服务端只允许 sales 市场与 engineering 项目角色按状态机操作，不回填旧数据或启动下游流程。
 - `drizzle-postgres/0016_project_planning_handoff.sql` expand-only 新增正式 planning 角色约束、Requirement Resolution、版本化 Planning Package、Item/BOM/Document 快照和不可变 Event；不修改 0015 事实，不读取库存或创建需求/采购/生产单据。
 - `drizzle-postgres/0017_planning_material_requirements.sql` expand-only 新增不可变物料需求计划/行、独立库存/在途 Planning Allocation、采购申请/行和事件；只消费固化 Package 快照，提交时锁定重算，不修改正式 `reserved_qty` 或创建 PO/收货/生产事实。
+- `drizzle-postgres/0018_procurement_sourcing.sql` 保存 RFQ、报价版本、比较版本、人工 Award 和事件；`0019_sourcing_purchase_fulfillment.sql` 新增 Award/PO 来源、到货计划、待入库、Receipt 分配和不可变事件，并复用既有 Procurement/Inventory/Finance 事务权威。
 - 本地文件卷保存二进制，数据库只保存受控相对路径和摘要元数据。
 - Worker 使用 PostgreSQL Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、重试和 CAS；Web/Worker 是独立入口。
 
@@ -150,7 +151,7 @@
 
 ## 当前路线
 
-`SELFHOST-PHASE4-TASK03` 已完成：源码与并行环境为 `0.1.0-alpha.17` / PostgreSQL `0017`，v1 退回释放→v2 重算重提→接收、Compose 重启和恢复清理通过，结论 `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`。现在停止；TASK04 询价/供应商/比价以及真实迁移、HTTPS、生产恢复和切换均未开始。
+`SELFHOST-PHASE4-TASK05` 已完成：源码与并行环境为 `0.1.0-alpha.19` / PostgreSQL `0019`，`10×12` Award 经显式 PO/到货计划、两批 `4/6` 收货形成库存 `10`、来源和 AP `48/72`；Compose 重启、新空库恢复和清理通过。现在停止；TASK06、真实迁移、HTTPS、生产恢复和切换均未开始。
 
 ## 恢复上下文检查清单
 

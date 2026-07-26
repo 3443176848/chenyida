@@ -2,6 +2,26 @@
 
 最后更新时间：2026-07-26（Asia/Shanghai）
 
+## SELFHOST-PHASE4-TASK05 定标 → 采购订单 → 收货 → 应付交接
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 功能提交 `859454c97acddbff8c5199d91c41d636a6ca24e0`；独立 ops 验收提交 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.19`；仅新增 `0019_sourcing_purchase_fulfillment.sql`；SHA-256 `6e517f6d2beffc74c94dcd5c5d60c9bcdc5baf9c93711a6add6cec4a08ed989a`；0001—0018 不修改 |
+| 关系模型 | PASS | Award Line→PO Line 唯一来源、到货计划/待入库队列、Receipt Line 分配和不可变状态事件；外键、唯一约束、numeric 精度、索引和数据库 guard 完整 |
+| 事务复用 | PASS | 编排服务在同一事务调用既有 Procurement/Inventory 权威入口，原子提交 Receipt、PO/Plan、Ledger/Balance、purchase source、Event/Audit/Idempotency；Finance 仍显式创建 AP |
+| 权限/API | PASS | purchase 转单/计划、warehouse 收货/按规则冲销、finance 生成 AP，manager/admin 管理；无权限请求 403；CSRF、正文上限、持久幂等、CAS、行锁和稳定错误通过 |
+| UI/Dashboard | PASS | `/procurement/fulfillment`、`/warehouse/receiving`、`/finance/payables` 均实际 HTTP 200 且可操作；Dashboard 区分“已收货待生成应付”和“已生成应付” |
+| 实际数量金额 | PASS | Award/PO/Plan `10 × 12 CNY`；计划时 Receipt/Ledger/AP=0；首收 4→PARTIAL/库存4/来源48/AP48；次收6→COMPLETED/PO RECEIVED/库存10/来源72/AP72；AP 总额120 |
+| 保护/并发 | PASS | 同正文重放、异正文冲突、CAS、并发唯一转单、超收、故障注入零半记录通过；有 PO 阻止 Award 撤销，有 AP 阻止 Receipt 冲销 |
+| 专项/共享回归 | PASS | TASK05 unit/UI/PG/migration；TASK01—TASK04、Identity、Master Data、Supplier Mapping、Procurement、Inventory、Finance、Dashboard、FileStorage、环境与 Worker 回归通过 |
+| 静态与构建 | PASS | 全部正式 typecheck、Schema consistency、ESLint 0 error/5 既有 warning、Vinext build 5/5、凭证扫描、`git diff --check` |
+| 备份/重启/恢复 | PASS | 0018 前置恢复点和干净 0019 恢复点校验；Compose 整体重启后全链持久；停服备份恢复到第二个新空库为 19 migrations/唯一用户，随后恢复当前干净 0019 |
+| 清理/最终数据库 | PASS | 19 migrations、唯一启用管理员、0 临时账号；Customer/Product/Material/BOM/Project/Planning/PR/RFQ/Award/PO/Plan/Receipt/Ledger/Balance/Source/AP 均为 0，uploads/attachments 文件为 0 |
+| Python/SQLite | PASS / PROTECTED | Python 三项通过；PID `277640`、18888 HTTP 200；真实 SQLite metadata `64769:53827608:1784999031:1544192` 不变且未读业务正文 |
+| Compose/资源 | PASS | PostgreSQL/Web healthy、Worker running；Web 仅 `127.0.0.1:3000`，PG 无宿主端口；最终三容器约 233.1 MiB，宿主可用内存约 2.12 GiB、磁盘可用约 25 GiB |
+| 完成结论 | PASS | `SOURCING TO PAYABLE HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`；未启动 TASK06 |
+
 ## SELFHOST-PHASE4-TASK04 供应商询价、报价、比价与人工定标
 
 | 验证项 | 结果 | 说明 |

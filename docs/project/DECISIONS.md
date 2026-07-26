@@ -682,6 +682,17 @@
 - 验收结果：回环并行环境中 A 报价 `12.000000`、准时、排名 2，B 报价 `10.000000`、晚交、排名 1；采购以 `DELIVERY_PRIORITY` 和“交期优先，避免项目延期”人工选择 A。Award=1 时 PO/Receipt/Inventory Ledger/Finance/Planning Allocation 均为 0，`reserved_qty` 不变；重启持久和整体恢复清理通过。
 - 生产边界：只批准回环并行验收；不迁真实数据，不执行生产 migration/部署、HTTPS、公网或切流。TASK05 仅记录，不自动启动。
 
+## D-062 定标转单、到货计划、分批收货与应付采用显式分权交接
+
+- 日期：2026-07-26
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
+- 确认人：项目负责人（通过 `SELFHOST-PHASE4-TASK05` 指令确认）
+- 决定：Award 不自动建 PO；purchase 显式转单并按 Supplier/Currency 分组，Award Line 只允许转换一次。每个来源 PO Line 建唯一到货计划和待入库投影；warehouse 可分批收货但不得超收；每批 Receipt 原子形成 Ledger/Balance 与独立采购金额来源；finance 显式且仅一次消费来源生成 AP。
+- 完整性：Award/Quote/Material/Quantity/Unit/Currency/Price/Promise 必须一致；所有写操作要求服务端权限、CSRF、持久幂等、CAS、锁、事件和 Audit。已过账 Receipt 不原地改写，已有 AP 时拒绝破坏来源链的冲销。
+- 复用：PO/Receipt/Inventory/Financial Source/Finance Document 继续由既有服务和权威表负责，`0019` 只保存 Award→PO、Delivery Plan/Queue、Receipt Allocation 和事件关系。
+- 边界：不实现付款、银行、总账、税票、工单、领料、报工、完工或 IQC/IPQC/FQC；不迁真实数据、不部署生产、不切流，不自动启动 TASK06。
+- 验收：并行 HTTP 以 `10×12`、收货 `4/6`、来源/AP `48/72` 完成，重启持久、备份/新空恢复和最终清理通过。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

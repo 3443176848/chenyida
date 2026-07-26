@@ -37,19 +37,19 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.18`；仅部署到回环 `PARALLEL HTTP ACCEPTANCE ONLY`，明确为非生产、尚未正式发布 |
+| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.19`；仅部署到回环 `PARALLEL HTTP ACCEPTANCE ONLY`，明确为非生产、尚未正式发布 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK04 功能提交 `4506db2579c07080afe27b33bb2e50623c3d1366`；验收提交消息 `ops: accept procurement sourcing workflow in parallel environment` |
+| 当前根仓库功能基线提交 | TASK05 功能提交 `859454c97acddbff8c5199d91c41d636a6ca24e0`；验收提交消息 `ops: accept sourcing fulfillment workflow in parallel environment` |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 自托管源码与并行 PostgreSQL 均为 `0001`—`0018`；TASK04 验收业务已整体恢复清空，只保留 Schema 和唯一管理员。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
+| 当前数据库 | 自托管源码与并行 PostgreSQL 均为 `0001`—`0019`；TASK05 验收业务已整体恢复清空，只保留 Schema 和唯一管理员。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | Python/SQLite 开发服务继续由 systemd 常驻并监听 `0.0.0.0:18888`；非生产 Compose 项目 `chenyida-erp-parallel` 以 PostgreSQL 17/Web/Worker 同机并行运行，Web 仅绑定 `127.0.0.1:3000`，PostgreSQL 无宿主端口；不是生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard 与离线备份恢复治理的非生产链路 |
-| 当前阶段 | 第一阶段 TASK01—TASK04 已完成并行验收；在采购 Sourcing Award 后停止 |
-| 当前任务 | `SELFHOST-PHASE4-TASK05`：定标到采购订单、仓库收货及财务应付交接（`DOING`） |
-| 下一任务 | 停止；TASK05 定标→采购订单→到货→收货→应付只记录，不自动启动。真实迁移、HTTPS、生产恢复和切换仍须独立授权 |
+| 当前阶段 | 第一阶段 TASK01—TASK05 已完成并行验收；在采购收货与显式 AP 交接后停止 |
+| 当前任务 | 无 `DOING`；`SELFHOST-PHASE4-TASK05` 已完成 |
+| 下一任务 | 停止；TASK06 生产制造/品质流程不得自动启动。真实迁移、HTTPS、生产恢复和切换仍须独立授权 |
 
 ## 当前完成模块
 
@@ -74,6 +74,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - SELFHOST-PHASE4-TASK02 已在 `chenyida-erp-parallel` 交付 `0.1.0-alpha.16`/`0016`、正式 planning 角色、显式 Requirement Resolution、不可变版本交接包/BOM/文件快照、独立 API 和 engineering/planning 原生页面；实际 v1 退回→修订 v2→重提→接收、重启持久与恢复清理通过，最终仅保留 Schema/唯一管理员，不启动 TASK03
 - SELFHOST-PHASE4-TASK03 已在 `chenyida-erp-parallel` 交付 `0.1.0-alpha.17`/`0017`、固化包 Material+Unit 聚合、提交时 PostgreSQL numeric 锁定重算、独立库存/在途 Planning Allocation、不可变需求计划/采购申请、planning/purchase 原生页面与 Dashboard 待办；实际 v1 退回释放→v2 重算重提→采购接收、重启持久和恢复清理通过，正式 `reserved_qty` 不变且未创建新 PO/收货/工单，最终仅保留 Schema/唯一管理员
 - SELFHOST-PHASE4-TASK04 已在 `chenyida-erp-parallel` 交付 `0.1.0-alpha.18`/`0018`、RFQ Round、不可变报价版本、服务端确定性比较、人工 Sourcing Award/撤销、独立 API/原生页面和 Dashboard 三项待办；A 高价准时、B 低价晚交的人工交期优先定标、重启持久和恢复清理通过，最终仅保留 18 migrations/唯一管理员，不创建 PO/收货/库存/应付，不启动 TASK05
+- SELFHOST-PHASE4-TASK05 已在同一并行环境交付 `0.1.0-alpha.19`/`0019`、Award Line→PO Line、到货计划/待入库、Receipt 分配关系、分批收货、库存与财务来源、显式 AP 和三条原生页面；实际 `10×12` 分两批 `4/6`，来源/AP 为 `48/72`，重启与新空库恢复通过，最终仅保留 19 migrations/唯一管理员，未启动生产或品质
 - 多用户登录、会话、角色权限、密码修改、账号管理和操作审计
 - 物料、供应商映射、CSV 导入、清洗队列和新物料建档基础流程
 - 客户、供应商、产品、BOM 和 BOM 齐套分析
@@ -176,7 +177,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 当前 `DOING`：`SELFHOST-PHASE4-TASK05`，仅实现定标→采购订单→到货计划→仓库分批收货→库存→采购财务来源→财务显式应付；不启动生产、品质、完工、发货或 TASK06。
+- 当前无 `DOING`；`SELFHOST-PHASE4-TASK05` 已完成并停止，不启动生产、品质、完工、发货或 TASK06。
+- 已完成：`SELFHOST-PHASE4-TASK05`，并行环境 `0.1.0-alpha.19`/`0019` 完成 Award→PO→到货计划→两批 Receipt `4/6`→库存 `10`→采购来源 `48/72`→显式 AP `48/72`，权限、幂等、CAS、超收、冲销阻断、重启、备份恢复与清理通过；结论 `SOURCING TO PAYABLE HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。
 - 已完成：`SELFHOST-PHASE4-TASK04`，并行环境 `0.1.0-alpha.18`/`0018` 完成两供应商 RFQ、报价、服务端比较和人工非最低价定标；A `12.000000`/准时/排名 2，B `10.000000`/晚交/排名 1，以 `DELIVERY_PRIORITY` 和“交期优先，避免项目延期”选择 A。Award=1 时全部下游写入为 0，重启持久和清理恢复通过；结论 `PROCUREMENT SOURCING AWARD ACCEPTED IN PARALLEL ENVIRONMENT`。
 - 已完成：`SELFHOST-PHASE4-TASK03`，并行环境 `0.1.0-alpha.17`/`0017` 的固化包聚合、库存/在途独立分配、不可变需求计划与采购申请、v1 退回释放→v2 重算重提→最终接收、重启持久和清理恢复通过；结论 `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`。现在停止，不自动启动 TASK04。
 - 已完成：`SELFHOST-PHASE4-TASK02`，并行环境 `0.1.0-alpha.16`/`0016` 的 planning 角色、显式 Requirement Resolution、不可变计划交接包、v1 退回→修订 v2→重提→接收、重启持久和清理恢复通过；结论 `PROJECT TO PLANNING HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。TASK03 后续已由独立授权和模型完成，不改写 TASK02 事实。
@@ -245,7 +247,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - 已完成：`PHASE3-TASK02` 批准全部 16 项决定并完成非生产 Normalization 服务、`0006`、五个 API、权限/限流/取消、隔离迁移与集成测试；未创建 Draft/正式物料，未迁移或部署生产。
 - 已完成：`PHASE3-TASK03` Material Import Normalization Review UI V1 docs-only 设计与正式规格确认；四份正式文档覆盖统一路由、七步 Stepper、启动/轮询/取消、Current/Latest、Rows/Drawer/Issues、37 个线框、104 项测试、局部门禁和性能门禁，14 项决定均为 `APPROVED`；未实施运行时代码或改变生产环境。
 - 已完成：`PHASE3-TASK04` Material Import Normalization Review UI V1 非生产实施；统一工作区、七步 Stepper、Current/Latest、冻结幂等与 `RESULT_UNKNOWN`、2/5/10 轮询、取消、汇总、Rows/Issues cursor、Row Drawer、安全有界渲染和权限清理均已落地；104/104 计划测试、100/100 Import UI 回归及本地 Playwright 性能/可访问性门禁通过，未改 API/Schema/Migration/业务服务或生产环境。
-- 下一：TASK04 独立提交并恢复 clean 后，按连续任务指令开始 TASK05 采购、缺料建议与收货联动。TASK05—TASK10 仍须各自独立验收和提交；真实数据试迁移、生产备份恢复、部署/切换继续需要单独生产授权。
+- 下一：停止；TASK06 或任何生产、品质、真实数据迁移、生产备份恢复、部署/切换必须另行明确授权。
 
 ## 更新规则
 

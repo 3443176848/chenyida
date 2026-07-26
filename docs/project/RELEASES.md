@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
 最后核验：2026-07-26（Asia/Shanghai）
-适用任务：`SELFHOST-PHASE4-TASK04`
+适用任务：`SELFHOST-PHASE4-TASK05`
 
 ## 1. 使用规则
 
@@ -21,10 +21,11 @@
 | 当前 Python / SQLite 开发运行面 | `legacy-development`，尚无统一 SemVer | 当前仓库包含源代码的功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；常驻进程未记录启动 commit，不能反推为该提交 | 本地 SQLite 历史 26 表 + migration `0001`—`0004`；开发库只读核验已记录四个版本 | 本任务按发布基线重新执行 Python self-test、smoke 和临时库 go-live；结果见第 6 节 | `DEVELOPMENT`；systemd `enabled/active`，源码与已安装 unit 一致，Python 监听 `0.0.0.0:18888`；不是正式生产投用 | 不适用；该 SQLite 是旧数据来源和当前开发运行数据 | Git 源码 + 执行前 SQLite 可恢复快照；正式回退点尚未建立 | 仅开发常驻；未获生产批准 |
 | Node.js / PostgreSQL TASK03 并行验收基线 | `0.1.0-alpha.17` | 功能提交 `5009b9118901a01af6a5faed194b8444d0c1e969`；验收提交消息 `ops: accept planning material requirement workflow in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0017`；测试业务清理后为空 | TASK03 专项/共享回归/typecheck/lint/build/credentials/Python、真实旅程、重启与恢复清理通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | migration 前 0016 root-only 恢复点已验证、用于成功清理并删除；Python/SQLite 不影响 | `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`；后续 TASK04 已独立验收 |
 | Node.js / PostgreSQL TASK04 并行验收基线 | `0.1.0-alpha.18` | 功能提交 `4506db2579c07080afe27b33bb2e50623c3d1366`；验收提交消息 `ops: accept procurement sourcing workflow in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0018`；测试业务清理后为空 | TASK04 专项、共享回归、Schema/typecheck/lint/build/credentials/Python、真实旅程、重启与恢复清理通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | 0017 与干净 0018 root-only 恢复点已校验；干净 0018 点用于成功清理后删除 | `PROCUREMENT SOURCING AWARD ACCEPTED IN PARALLEL ENVIRONMENT`；不授权 TASK05/生产 |
+| Node.js / PostgreSQL TASK05 并行验收基线 | `0.1.0-alpha.19` | 功能提交 `859454c97acddbff8c5199d91c41d636a6ca24e0`；验收提交消息 `ops: accept sourcing fulfillment workflow in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0019`；测试业务清理后为空 | TASK05 专项、TASK01—TASK04/共享回归、Schema/typecheck/lint/build/credentials/Python、三角色 HTTP 旅程、重启与备份恢复通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | 0018 前置与干净 0019 root-only 恢复点已校验；第二新空库恢复通过，干净 0019 点用于最终清理后删除 | `SOURCING TO PAYABLE HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`；不授权 TASK06/生产 |
 | Node.js / PostgreSQL 自托管开发基线 | `0.1.0-alpha.15` | 功能提交 `6bbec3f490033dcfef0dd00d3c8af179f5674b60`；验收提交消息 `ops: accept market project workflow in parallel environment` | PostgreSQL 17，`0001`—`0015`；测试业务清理后为空 | TASK01 专项/migration/共享回归、并行双账号、Compose 重启与清理恢复通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；Web 仅 `127.0.0.1:3000` | `NOT_MIGRATED`；真实 SQLite、D1、文件和业务数据未读、未复制、未双写 | 既有四个 Volume；部署/验收 root-only 临时恢复点成功后删除；Python/SQLite 不切流 | `MARKET TO PROJECT HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`；HTTPS、真实迁移和生产未批准 |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.18` 已完成源码、隔离验证和回环并行验收；`alpha.15—alpha.17` 的既有部门交接事实保持有效且未被改写。这不表示真实数据已迁移、PO/收货/库存入账/应付已完成、HTTPS/生产恢复通过或已批准上线。
+`0.1.0-alpha.19` 已完成源码、隔离验证和回环并行验收；`alpha.15—alpha.18` 的既有部门交接事实保持有效且未被改写。这只证明合成 Award→PO→到货计划→分批收货→库存→采购财务来源→显式 AP 在并行环境成立，不表示真实数据已迁移、HTTPS/生产恢复通过或已批准上线。
 
 ## 3. Migration 文件与 SHA-256 基线
 
@@ -50,8 +51,9 @@
 | `0016` | `0016_project_planning_handoff.sql` | `26d6e4cc609a53403b377d8550fcf5d8fd88f677178681f4cca1692544bb2076` |
 | `0017` | `0017_planning_material_requirements.sql` | `33cb162e5e32aeaca015a9d6e25a33f048166c7c895ebbc242819f6bbe2b6b28` |
 | `0018` | `0018_procurement_sourcing.sql` | `64276e1292c0696ae097a322115662b958156ba6486b1cd16752cf84b6c987c9` |
+| `0019` | `0019_sourcing_purchase_fulfillment.sql` | `6e517f6d2beffc74c94dcd5c5d60c9bcdc5baf9c93711a6add6cec4a08ed989a` |
 
-当前源码与并行 PostgreSQL 均为 `0001 -> 0018`；0018 已通过隔离 migration/API 和回环并行验收，验收业务已清空。没有生产 PostgreSQL 部署或真实数据迁移。
+当前源码与并行 PostgreSQL 均为 `0001 -> 0019`；0019 已通过隔离 migration/API 和回环并行验收，验收业务已清空。没有生产 PostgreSQL 部署或真实数据迁移。
 
 ### 历史 Cloudflare D1 / Drizzle
 

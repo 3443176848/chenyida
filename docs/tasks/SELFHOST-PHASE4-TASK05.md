@@ -2,7 +2,7 @@
 
 ## 状态与边界
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 起始提交：`990279a5ff30a7ee4a23d2cb5b2c3142e1b81374`
 - 目标版本：`0.1.0-alpha.19`
 - 唯一新增迁移：`0019_sourcing_purchase_fulfillment.sql`
@@ -49,3 +49,5 @@
 ## 验收门禁
 
 专项测试覆盖迁移、空库与 `0018→0019`、约束、幂等异正文、CAS、并发唯一转单、超收、故障回滚、权限、页面和真实 HTTP 旅程。完成后还须运行 TASK01—TASK04、Identity、Master Data、Supplier Mapping、Procurement、Inventory、Finance、Dashboard、正式 typecheck、Schema consistency、lint/build、凭证扫描、Python 基线、Compose 重启、停服备份与新空库恢复。最终并行数据库只保留 19 个 migration、唯一启用管理员和零业务数据。
+
+以上门禁均于 2026-07-26 在隔离测试数据库和 `chenyida-erp-parallel` 通过。功能提交为 `859454c97acddbff8c5199d91c41d636a6ca24e0`；完整证据见 `SELFHOST-PHASE4-TASK05-completion.md`。任务在完成并行验收后停止，不授权 TASK06、真实数据迁移、生产部署或切流。
