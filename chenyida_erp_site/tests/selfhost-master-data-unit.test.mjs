@@ -12,7 +12,7 @@ test("master-data permissions are fixed by role on the server", () => {
   assert.ok(permissionsForRole("engineering").includes("master.bom.manage"));
   for (const role of ["production", "warehouse", "quality", "finance", "operations"]) {
     assert.ok(permissionsForRole(role).includes("master.bom.read"));
-    assert.ok(!permissionsForRole(role).some((permission) => permission.endsWith(".manage")));
+    assert.ok(!permissionsForRole(role).some((permission) => permission.startsWith("master.") && permission.endsWith(".manage")));
   }
 });
 

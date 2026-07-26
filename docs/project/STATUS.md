@@ -2,6 +2,25 @@
 
 最后更新时间：2026-07-26（Asia/Shanghai）
 
+## SELFHOST-PHASE5-TASK01 工艺路线、工作中心与工单工艺快照
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `8eedfa07573c37e46d93f208162a0842c8d90a48` 严格基于 `7485bb93dc4dad16fa5cfe54651bb8f82306a7d2`；独立 ops 验收提交以 Git log 为准 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.25`；`0025` SHA-256/数据库 checksum `39b1212df99d392739aa20b95859f3e2789fa287e23061006a34efc342c258f9`；0001—0024 未修改，Schema/journal/snapshot 一致 |
+| Work Center | PASS | 实际 HTTP 创建 ACTIVE `SMT-PRINT`、`SMT-MOUNT`、`REFLOW`、`AOI`；code 标准化、唯一、不可改，启停 CAS/幂等/审计，历史引用不受停用影响 |
+| Routing | PASS | v1 异人发布后含 10/20/30/40 四工序；v2 修改回流焊标准时间并发布，v1 保留 SUPERSEDED；服务端 digest、职责分离与并发唯一 current 通过 |
+| Work Order Snapshot | PASS | 首张 released 工单固化 v1/4 Operations，新工单固化 v2；已发布路线和工单快照不可修改/删除；历史工单不猜测回填并显示 `LEGACY_UNSTRUCTURED` |
+| 原子性 | PASS | Work Order RELEASE 同事务完成 BOM Snapshot、Requirement、Reservation=10、Routing Snapshot/Operations、Event/Audit/Idempotency；路线缺失及故障注入零半记录，Material Issue/Report/Completion 0 |
+| 权限/UI/Dashboard | PASS | operations、engineering、manager/admin、production、planning 最小分权与越权 403；三条原生页面和四项权限裁剪指标通过，无工序开工/完工/报工按钮 |
+| 并发/幂等/CAS/回滚 | PASS | 并发发布唯一 current、职责分离、同 Key 重放/异正文冲突、expected version、数据库 guard 与事务故障回滚通过 |
+| 自动验证 | PASS | TASK01 unit/UI/PG/migration、Phase 4 TASK01—TASK10 与关联模块回归、正式 typecheck、Schema consistency、build、902 文件凭证扫描和 Python 三项通过；lint 0 error/6 既有 warning |
+| 重启/恢复 | PASS | 整体重启后 4 Work Center、2 Routing、2 Snapshot、8 Snapshot Operations、7 Routing Event、11 Audit 保持；停服备份 `backup-20260726T144314Z-8eedfa07573c` 校验，新空恢复核对 `25|4|2|2|7|0|0|0` |
+| 清理/资源 | PASS | 主库 25 migrations、唯一启用管理员、所有合成业务/审计/幂等与 uploads/attachments 0；仅 PostgreSQL/Web/Worker 三容器和四卷；临时库/备份/恢复/迁移资源删除 |
+| Python/SQLite | PASS / PROTECTED | Python PID `277640` 未重启；真实 SQLite metadata `64769:53827608:1784999031:1544192` 不变，未读取/修改业务正文 |
+| 排除事项 | ENFORCED | 未执行派工、开工、完工、工序报工、WIP、返工、批次、设备、库存过账、真实数据迁移、切流、生产部署、push 或 PR |
+| 完成结论 | PASS | `PRODUCTION ROUTING AND WORK ORDER SNAPSHOT ACCEPTED IN PARALLEL ENVIRONMENT` |
+
 ## SELFHOST-PHASE4-TASK10 客户收款、供应商付款与项目收支追溯
 
 | 验证项 | 结果 | 说明 |

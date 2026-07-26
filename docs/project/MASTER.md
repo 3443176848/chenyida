@@ -37,20 +37,20 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.24`；PostgreSQL migration head 为 `0024_finance_project_settlements.sql`；始终仅限回环非生产环境 |
+| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.25`；PostgreSQL migration head 为 `0025_production_routings.sql`；始终仅限回环非生产环境 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK10 功能提交 `23fef6098a88466b94fcac104bba9317ba310d15`，严格 Parent 为 `e63c726e0d274a8b7b654819794b4bd1044c6f82`；独立 ops 验收提交以 Git log 为准 |
-| Git 同步与工作区 | TASK10 起点 `origin/main...HEAD` 为 behind 0/ahead 36；两次独立提交后为 behind 0/ahead 38，仍不 push、不创建 PR、不改写历史 |
+| 当前根仓库功能基线提交 | TASK01 功能提交 `8eedfa07573c37e46d93f208162a0842c8d90a48`，严格 Parent 为 `7485bb93dc4dad16fa5cfe54651bb8f82306a7d2`；独立 ops 验收提交以 Git log 为准 |
+| Git 同步与工作区 | TASK01 起点 `origin/main...HEAD` 为 behind 0/ahead 38；两次独立提交后为 behind 0/ahead 40，仍不 push、不创建 PR、不改写历史 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0024`；最终唯一启用管理员、所有合成业务表 0、uploads/attachments 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
+| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0025`；最终唯一启用管理员、所有合成业务表 0、uploads/attachments 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | Python/SQLite 开发服务继续由 systemd 常驻并监听 `0.0.0.0:18888`；非生产 Compose 项目 `chenyida-erp-parallel` 以 PostgreSQL 17/Web/Worker 同机并行运行，Web 仅绑定 `127.0.0.1:3000`，PostgreSQL 无宿主端口；不是生产部署 |
-| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard 与离线备份恢复治理的非生产链路 |
-| 当前阶段 | 第一阶段 TASK01—TASK10 已完成并行验收；既有 AR/AP Settlement 已沿稳定来源追溯到 Project/Currency |
-| 当前任务 | `SELFHOST-PHASE4-TASK10` 已 `DONE / PARALLEL ACCEPTED`；TASK05、TASK09 及其余历史任务保持 `DONE`，不得重复 |
-| 下一任务 | 停止；真实银行、总账、税票、汇率、成本会计、正式利润、真实迁移、HTTPS、生产恢复和切换均未授权 |
+| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard、工作中心、版本化工艺路线与工单不可变工艺快照的非生产链路 |
+| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01 已完成并行验收；工序执行仍未启动 |
+| 当前任务 | `SELFHOST-PHASE5-TASK01` 已 `DONE / PARALLEL ACCEPTED`；历史任务保持 `DONE`，不得重复 |
+| 下一任务 | 停止；工序开工/完工/报工、WIP、返工、批次、设备、真实迁移、HTTPS、生产恢复和切换均未授权 |
 
 ## 当前完成模块
 
@@ -81,6 +81,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - SELFHOST-PHASE4-TASK08 已在同一并行环境交付 `0.1.0-alpha.22`/`0022`，复用既有 Quality 权威建立 Completion Line→Sales Order Line 稳定 Allocation、IPQC/FQC 稳定来源、处置关闭和订单行放行额度；实际 Report/Completion/Allocation/IPQC/FQC 均为 `4/6`，FQC inspected/passed/released=10、available=10、成品库存保持 10，Shipment/销售金额来源/AR=0；整栈重启、停服备份/新空恢复和最终清理通过
 - SELFHOST-PHASE4-TASK09 已在同一并行环境交付 `0.1.0-alpha.23`/`0023`，复用 Sales/Quality/Inventory/Finance 权威建立发货指令、Shipment Line→FQC Release 精确分配和显式 AR 交接；实际 Shipment/FQC `4/6`、成品库存 `10→6→0`、Sales Source/AR `80/120`、Settlement 0，整栈重启、停服备份/新空恢复和最终清理通过
 - SELFHOST-PHASE4-TASK10 已在同一并行环境交付 `0.1.0-alpha.24`/`0024`，复用 Finance Settlement/Reversal 并沿稳定 Sales/Purchase Source 归属 Project/Currency；实际 AR `80/120`、AP `48/72`、收款 `30/50/120`、付款 `48/30/42`、来源 `200/120`、未结 0、净现金 80、UNATTRIBUTED 0，整栈重启、停服备份/新空恢复和最终清理通过，不宣称会计利润
+- SELFHOST-PHASE5-TASK01 已在同一并行环境交付 `0.1.0-alpha.25`/`0025`、稳定 Work Center、Product Version Routing 审核发布与 Work Order Release 不可变 Routing Snapshot；实际四工作中心、v1→v2、两张工单分别固化 v1/v2、BOM/Reservation/Route Snapshot 原子，整栈重启、停服备份/新空恢复与清理通过，未执行工序或库存过账
 - 多用户登录、会话、角色权限、密码修改、账号管理和操作审计
 - 物料、供应商映射、CSV 导入、清洗队列和新物料建档基础流程
 - 客户、供应商、产品、BOM 和 BOM 齐套分析
@@ -183,7 +184,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 当前无 `DOING`；`SELFHOST-PHASE4-TASK10` 已完成 AR/AP→RECEIPT/PAYMENT→稳定来源 Project/Currency→项目来源、未结与净现金的并行验收。
+- 当前无 `DOING`；`SELFHOST-PHASE5-TASK01` 已完成 Work Center→Routing v1/v2→Work Order Release 不可变 Routing Snapshot 的并行验收。
 - `PHASE0-TASK03`、`SELFHOST-PHASE4-TASK05`—`TASK09` 保持历史 `DONE`；TASK10 功能提交严格基于授权起点 `e63c726e`。
 - 本轮完成后停止。真实银行、总账、税票、汇率、成本会计、公司费用、正式利润、真实数据迁移和生产部署均未授权。
 - 已完成：`SELFHOST-PHASE4-TASK05`，并行环境 `0.1.0-alpha.19`/`0019` 完成 Award→PO→到货计划→两批 Receipt `4/6`→库存 `10`→采购来源 `48/72`→显式 AP `48/72`，权限、幂等、CAS、超收、冲销阻断、重启、备份恢复与清理通过；结论 `SOURCING TO PAYABLE HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。

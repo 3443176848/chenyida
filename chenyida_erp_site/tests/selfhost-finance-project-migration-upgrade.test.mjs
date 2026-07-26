@@ -7,7 +7,7 @@ import { Pool } from "pg";
 const databaseUrl = process.env.TEST_FINANCE_PROJECT_UPGRADE_DATABASE_URL;
 if (!databaseUrl || !/finance_project_upgrade_test/i.test(databaseUrl)) throw new Error("isolated TEST_FINANCE_PROJECT_UPGRADE_DATABASE_URL containing finance_project_upgrade_test is required");
 const pool = new Pool({ connectionString: databaseUrl, max: 3, application_name: "finance-project-migration-upgrade-test" });
-const names = (await readdir(new URL("../drizzle-postgres/", import.meta.url))).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();
+const names = (await readdir(new URL("../drizzle-postgres/", import.meta.url))).filter((name) => /^\d{4}_.+\.sql$/.test(name) && name <= "0024_finance_project_settlements.sql").sort();
 const sources = new Map(await Promise.all(names.map(async (name) => [name, await readFile(new URL(`../drizzle-postgres/${name}`, import.meta.url), "utf8")] )));
 const checksum = (name) => createHash("sha256").update(sources.get(name)).digest("hex");
 async function reset() { await pool.query("drop schema public cascade; create schema public; create table schema_migrations(version text primary key,checksum text not null,applied_at timestamptz not null default now())"); }

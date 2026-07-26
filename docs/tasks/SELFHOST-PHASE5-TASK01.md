@@ -2,7 +2,7 @@
 
 ## 状态与授权
 
-- 状态：`DOING`
+- 状态：`DONE / PARALLEL ACCEPTED`
 - 日期：2026-07-26（Asia/Shanghai）
 - 授权：项目负责人已明确选择继续细化生产，本轮仅执行本任务。
 - 合法起点：`main` / `7485bb93dc4dad16fa5cfe54651bb8f82306a7d2`；工作区 clean，`origin/main...HEAD` behind 0/ahead 38。
@@ -46,14 +46,23 @@ Routing 是未来结构化工序权威；既有 BOM Line 与 Production Report �
 
 ## 验收清单
 
-- [ ] 0025、Schema、journal、snapshot、SHA-256
-- [ ] Work Center 与 Routing Service/API、权限、职责分离、并发、幂等、CAS、回滚
-- [ ] Work Order 释放原子 Routing Snapshot 与历史兼容
-- [ ] 三条原生页面与 Dashboard 指标
-- [ ] unit/UI/PostgreSQL/migration、Phase 4 TASK01—TASK10 与关联全回归
-- [ ] 实际 HTTP v1/v2、v1 工单快照不变、新工单使用 v2
-- [ ] Compose 整体重启、停服备份/新空恢复、最终清理
-- [ ] 功能与验收两个独立提交
+- [x] 0025、Schema、journal、snapshot、SHA-256
+- [x] Work Center 与 Routing Service/API、权限、职责分离、并发、幂等、CAS、回滚
+- [x] Work Order 释放原子 Routing Snapshot 与历史兼容
+- [x] 三条原生页面与 Dashboard 指标
+- [x] unit/UI/PostgreSQL/migration、Phase 4 TASK01—TASK10 与关联全回归
+- [x] 实际 HTTP v1/v2、v1 工单快照不变、新工单使用 v2
+- [x] Compose 整体重启、停服备份/新空恢复、最终清理
+- [x] 功能与验收两个独立提交
+
+## 验收结果
+
+- 功能提交 `8eedfa07573c37e46d93f208162a0842c8d90a48`，严格 Parent `7485bb93dc4dad16fa5cfe54651bb8f82306a7d2`。
+- `0025_production_routings.sql` SHA-256：`39b1212df99d392739aa20b95859f3e2789fa287e23061006a34efc342c258f9`。
+- 实际 HTTP 创建 `SMT-PRINT`、`SMT-MOUNT`、`REFLOW`、`AOI`；v1 发布后工单固化 10/20/30/40，v2 修改回流焊标准时间且不改变 v1 工单快照，新工单固化 v2。
+- 工单释放在同一事务完成 BOM Snapshot、Requirement、Reservation=10、Routing Snapshot/4 Operations、Event、Audit 与 Idempotency；缺路线和故障注入均零半记录。
+- Compose 整体重启后 25 migrations、4 Work Center、2 Routing、2 Snapshot、7 Routing Event、11 Audit 保持；停服备份 `backup-20260726T144314Z-8eedfa07573c` 校验并恢复到新空库为 `25|4|2|2|7|0|0|0`。
+- 最终主库 25 migrations、唯一启用管理员、业务/审计/幂等与 uploads/attachments 0；仅三容器四卷。Python PID/SQLite metadata 不变。
 
 ## 明确排除
 

@@ -753,6 +753,17 @@
 - 权限：finance 可查看/登记/冲销既有 AR/AP Settlement；manager/admin 可查看全部项目财务；engineering 只读本人负责项目的去敏汇总，不返回内部账户标签；sales/purchase 只读各自 AR/RECEIPT 与 AP/PAYMENT；其他越权写 403。
 - 生产边界：只批准隔离测试和回环 `chenyida-erp-parallel` 合成验收；不连接真实银行或支付接口，不迁真实数据，不执行生产 migration/部署、HTTPS、切流、push 或 PR。
 
+## D-068 工艺路线以发布版本为权威，工单释放固化不可变工艺快照
+
+- 日期：2026-07-26
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
+- 确认人：项目负责人（明确授权 `SELFHOST-PHASE5-TASK01`，并明确排除工序执行、WIP 和库存过账）
+- 工作中心：Work Center 使用稳定内部 ID 和标准化唯一 code；code 创建后不可修改。启停受 CAS、持久幂等和审计控制；停用不改写历史，已进入 Released Routing 或 Work Order Snapshot 的记录不得删除。本阶段不存设备密码、网络地址或控制参数。
+- 路线：Routing Header 稳定绑定 Product，Routing Version 稳定绑定相同 Product 的 Product Version，Operation 稳定引用 ACTIVE Work Center。engineering 编辑/提交，manager/admin 异人发布或退回；发布时服务端重算 canonical digest，并通过事务锁与唯一约束保证一个 Product Version 只有一个 current RELEASED 版本。已发布版本及工序不可修改或删除，新发布版本保留旧版为 SUPERSEDED。
+- 工单：DRAFT Work Order 显式 RELEASE 时，在 TASK06 单一事务内复核当前 Released Routing 与 digest，并与 BOM Snapshot、Material Requirement、Inventory Reservation、状态事件、审计和幂等一起固化唯一 Routing Snapshot 及有序 Operations。任一校验或写入失败全部回滚；后续路线版本不得改变既有工单快照。
+- 历史边界：BOM Line/Production Report 的自由文本 `process_stage` 继续仅作历史兼容，不自动生成 Work Center/正式 Routing，也不批量改写。迁移前 RELEASED/COMPLETED 工单不猜测路线，只读显示 `LEGACY_UNSTRUCTURED`。
+- 生产边界：本决定只批准隔离测试和回环 `chenyida-erp-parallel` 合成验收；不授权工序派工、开工、完工、报工、WIP、返工、批次、设备、外协、库存过账、真实数据迁移、切流或生产部署。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

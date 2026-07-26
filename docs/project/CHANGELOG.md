@@ -4,6 +4,26 @@
 
 ## 2026-07-26
 
+### SELFHOST-PHASE5-TASK01 - `ops: accept production routing workflow in parallel environment`
+
+- 提交：功能提交 `8eedfa07573c37e46d93f208162a0842c8d90a48`，Parent 严格为 `7485bb93dc4dad16fa5cfe54651bb8f82306a7d2`；独立 ops 提交以功能提交为 Parent，不 amend/rebase，实际哈希以 Git log 为准。
+- 并行验收：只更新 `chenyida-erp-parallel` 至 `0.1.0-alpha.25`/25 migrations；`0025` SHA-256/数据库 checksum 为 `39b1212df99d392739aa20b95859f3e2789fa287e23061006a34efc342c258f9`。Web 仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口。
+- 实际 HTTP：operations 创建 `SMT-PRINT`、`SMT-MOUNT`、`REFLOW`、`AOI`；engineering 提交 v1，异人 manager 发布；planned quantity 10 的工单释放后获得 BOM Snapshot 1、Routing Snapshot 1、10/20/30/40 四工序与 Reservation 10。
+- 版本快照：v1 digest `d9756e1e1751c861953927dd299d89e57d90c5ddbcda2bde8d6600dcfa922f06`；v2 修改回流焊标准时间后发布，digest `2a3c5cda38ed6462f58b6d445a979fab58a3d6fccc255e1ee5be6bb934865962`。首张工单仍完整保持 v1，新工单使用 v2。
+- 原子性与保护：路线缺失、停用、digest/产品版本不匹配和故障注入均整体回滚；职责分离、403、并发唯一 current、幂等重放/异正文冲突、CAS、Released/Snapshot 数据库不可变 guard 通过。路线本身不改变 on-hand；Material Issue、Production Report、Completion 均为 0。
+- 持久与恢复：整体重启后 4 Work Center、2 Routing、2 Snapshot、8 Snapshot Operations、7 Routing Event 和 11 Audit 保持；停服备份 `backup-20260726T144314Z-8eedfa07573c` 校验并恢复到新空库，精确核对 `25|4|2|2|7|0|0|0`。
+- 清理与保护：最终 25 migrations、唯一启用管理员、所有合成业务/审计/幂等与 uploads/attachments 0，仅三容器四卷；临时数据库、备份/恢复目录和迁移容器删除。Python PID `277640` 与 SQLite metadata `64769:53827608:1784999031:1544192` 不变。
+- 结论：`PRODUCTION ROUTING AND WORK ORDER SNAPSHOT ACCEPTED IN PARALLEL ENVIRONMENT`。未执行工序开工/完工/报工、WIP、库存过账、真实数据迁移、切流、生产部署、push 或 PR。
+
+### SELFHOST-PHASE5-TASK01 - `feat: add production routing snapshots`
+
+- Git：功能提交 `8eedfa07573c37e46d93f208162a0842c8d90a48` 严格以 `7485bb93dc4dad16fa5cfe54651bb8f82306a7d2` 为 Parent；不 reset/stash/rebase/amend/force push。
+- 数据库：仅新增 expand-only `0025_production_routings.sql`，建立 Work Center、Routing Header/Version/Operation/Event 与 Work Order Routing Snapshot/Operation；补全外键、唯一、numeric、索引、不可变 guard 和服务 GUC，同步 Drizzle Schema/journal/snapshot，不修改 0001—0024。
+- 服务/API：Work Center code 标准化、不可改、CAS 启停；Routing `DRAFT -> SUBMITTED -> RELEASED` 与退回、异人发布、服务端 canonical digest、并发唯一 current；Work Order RELEASE 在 TASK06 单事务中追加路线复核与不可变快照，失败零半记录。
+- 权限/UI：operations 管理 Work Center，engineering 编辑/提交，manager/admin 发布/退回，production/planning 受限读取；新增 `/operations/work-centers`、`/engineering/routings`、`/production/dispatch` 及四项权限裁剪 Dashboard 指标，不提供虚假工序执行按钮。
+- 验证：TASK01 unit/UI/PostgreSQL/migration、Phase 4 TASK01—TASK10 与 Production/Planning/BOM/Inventory/Dashboard 回归、正式 typecheck、Schema consistency、lint/build、凭证扫描、Python 三项和 `git diff --check` 通过。
+- 边界：旧 `process_stage` 只保留历史兼容，不自动生成路线；历史工单显示 `LEGACY_UNSTRUCTURED`；未实现派工、开工、完工、工序报工、WIP、返工、批次、设备、外协或库存过账。
+
 ### SELFHOST-PHASE4-TASK10 - `ops: accept project cashflow workflow in parallel environment`
 
 - 提交：功能提交 `23fef6098a88466b94fcac104bba9317ba310d15`，Parent 严格为 `e63c726e0d274a8b7b654819794b4bd1044c6f82`；独立 ops 提交以功能提交为 Parent，不 amend/rebase，实际哈希以 Git log 为准。
