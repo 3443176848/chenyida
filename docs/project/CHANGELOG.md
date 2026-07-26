@@ -4,6 +4,16 @@
 
 ## 2026-07-26
 
+### SELFHOST-PHASE4-TASK06 - `ops: accept production material issue workflow in parallel environment`
+
+- 提交：功能提交 `a8272b7c968e0fdcbce017aa0e41bad281702e50`，Parent 严格为保留的 `b45616e1115aab7d22d1b9a7e58f792005291524`；独立 ops 提交不 amend，实际哈希以 Git log 为准。
+- 并行部署：只更新 `chenyida-erp-parallel` 至 `0.1.0-alpha.20`/20 migrations；`0020` 数据库 checksum 与源码 SHA-256 均为 `1164536d51fbcf2f022c45aeab54b2b1ebc3d20cb2e4caabba9341d63fb4e182`。Web 仍仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口，未启用 HTTPS/80/443。
+- 实际 HTTP：planning/production/warehouse 真实隔离账号完成 v1 提交→production 退回、planning 新建并提交 v2→production 接收→唯一 DRAFT 工单；DRAFT reserved/Issue/Ledger 为 0。释放后 requirement/on-hand/reserved/available=`10/10/10/0`；warehouse 分批领料 4/6 后余额依次 `6/6`、`0/0`，net issued 依次 4/10，两个出库 Ledger 合计 -10，工单为 IN_PROGRESS。
+- 下游与保护：Production Report、Completion、Finished Goods Ledger、IQC/IPQC/FQC 均为 0；隔离测试覆盖缺料零半记录、并发预留、重复工单、超领、持久幂等、CAS、故障注入、未领取消释放、已领取消阻止、退料恢复和越权 403。
+- 持久与恢复：整栈重启后 2 个 Handoff、1 个 WO、1 个 Reservation、2 个 Issue 和下游零事实保持；接受态 0020 停服备份恢复到新空库通过，最终干净 0020 再次备份并恢复到第二个新空库为 20 migrations/唯一管理员/业务 0。
+- 清理与保护：并行主库最终 20 migrations、唯一启用管理员，所有业务表、uploads、attachments 为 0；临时数据库、恢复目录、备份工件、临时容器/镜像已清理，四个并行持久卷保留。Python systemd 仍 `enabled/active`、PID `277640`、SQLite metadata `64769:53827608:1784999031:1544192` 不变。
+- 结论：`PLANNING TO PRODUCTION MATERIAL ISSUE ACCEPTED IN PARALLEL ENVIRONMENT`。未执行报工、完工、品质、真实数据迁移、HTTPS、切流、生产部署、push 或 PR。
+
 ### SELFHOST-PHASE4-TASK06 - `feat: add planning to production material handoff`
 
 - Git：以必须保留的仅文档提交 `b45616e1115aab7d22d1b9a7e58f792005291524` 为严格 Parent；不 revert/reset/amend/rebase，不 push 或创建 PR。

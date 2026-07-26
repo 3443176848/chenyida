@@ -6,15 +6,20 @@
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DOING / AUTHORIZED | 项目负责人已明确授权“继续生产线”；合法起点 `b45616e1115aab7d22d1b9a7e58f792005291524` 保留且不改写。PHASE0-TASK03/TASK05 保持历史 DONE |
-| 版本/Migration | IMPLEMENTED | 源码 `0.1.0-alpha.20`；仅新增 `0020_production_handoff_reservations.sql`，SHA-256 `1164536d51fbcf2f022c45aeab54b2b1ebc3d20cb2e4caabba9341d63fb4e182`；0001—0019 不修改，Schema/journal/snapshot 同步 |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `a8272b7c968e0fdcbce017aa0e41bad281702e50`，严格 Parent `b45616e1115aab7d22d1b9a7e58f792005291524`；独立 ops 提交消息为 `ops: accept production material issue workflow in parallel environment`。PHASE0-TASK03/TASK05 保持历史 DONE |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.20`；仅新增 `0020_production_handoff_reservations.sql`，SHA-256 `1164536d51fbcf2f022c45aeab54b2b1ebc3d20cb2e4caabba9341d63fb4e182`；0001—0019 不修改，Schema/journal/snapshot/并行数据库 checksum 一致 |
 | 关系模型 | PASS / ISOLATED | 版本化 Handoff/Item/Event、Handoff Item→Work Order 唯一链接、Reservation/Event；完整稳定外键、numeric/状态/digest 约束、来源 trigger、Service GUC 和不可变 guard |
 | 事务复用 | PASS / ISOLATED | 交接调用既有 Production Work Order 事务入口；RELEASE 原子创建既有 BOM Snapshot/Requirement 和新 Reservation 来源事实；Issue/Return 原子复用既有 Inventory Ledger/Balance |
-| 权限/API/UI | PASS / SOURCE | planning 准备/提交，production 退回/接收/建单/释放，warehouse 领退料，manager/admin 管理；三条原生页面和四项 Dashboard 待办已实现 |
-| 关键专项 | PASS | v1 退回→v2 接收、唯一 DRAFT、预留 10、分批领料 4/6；缺料零半记录、并发预留、超领、幂等/CAS、故障注入、取消释放/阻止、退料恢复和 403 通过 |
+| 权限/API/UI | PASS / HTTP | planning 准备/提交，production 退回/接收/建单/释放，warehouse 领退料，manager/admin 管理；三条原生页面实际 HTTP 200，四项 Dashboard 待办按权限裁剪 |
+| 实际主旅程 | PASS / HTTP | ACCEPTED Package 数量 10、BOM `1×10`、采购收货库存 10；v1 RETURNED→新 v2 ACCEPTED→唯一 DRAFT；DRAFT reserved/Issue/Ledger=0；RELEASE required/on-hand/reserved/available=`10/10/10/0`；领 4 后 `6/6/4`，再领 6 后 `0/0/10`、WO IN_PROGRESS、出库 Ledger 合计 -10 |
+| 下游零写入 | PASS | Production Report 0、Completion 0、Finished Goods Ledger 0、IQC/IPQC/FQC 0；未触发报工、完工、成品或品质链 |
+| 关键保护 | PASS | 缺料零半记录、并发预留、重复工单、超领、幂等重放/冲突、CAS、故障注入、未领取消释放、已领取消阻止、退料恢复和未授权 403 通过 |
 | Migration | PASS / ISOLATED | 空库、0019→0020、重复执行、失败回滚通过；Drizzle `check` 通过 |
 | 全量回归 | PASS / LOCAL+ISOLATED | TASK01—TASK05、Planning、Inventory、Production、Dashboard、14 组正式 typecheck、lint 0 error、Vinext build、凭证/环境/API coverage、Python 三项与 `git diff --check` 通过 |
-| 并行环境 | PENDING | 功能提交和全部正式回归完成后才允许更新 `chenyida-erp-parallel`；当前尚未声称 HTTP/重启/备份恢复/最终清理完成 |
+| Compose/恢复 | PASS | 0019 前置备份已校验；整栈重启后 Handoff/WO/Reservation/Issue/余额及下游零事实保持；接受态 0020 停服备份恢复到新空库为 `20/2/1/1/2`；最终干净 0020 备份再次恢复为 20 migrations/唯一管理员/业务 0 |
+| 清理/最终环境 | PASS | `chenyida-erp-parallel` 最终仅 PostgreSQL/Web/Worker 三容器和四个持久卷；20 migrations、唯一启用管理员、所有业务表 0、uploads/attachments 0；Web 仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口 |
+| Python/SQLite | PASS / PROTECTED | Python 三项使用隔离临时库通过；systemd `enabled/active`、PID `277640`、监听 18888；真实 SQLite metadata `64769:53827608:1784999031:1544192` 不变，Python 代码无差异且未重启 |
+| 完成结论 | PASS | `PLANNING TO PRODUCTION MATERIAL ISSUE ACCEPTED IN PARALLEL ENVIRONMENT` |
 | 排除事项 | ENFORCED | 报工、完工、成品库存、IQC/IPQC/FQC、发货、付款/银行/总账/税票、真实迁移、HTTPS、切流和生产部署未授权 |
 
 ## PHASE0-TASK03 统一发布、迁移与回退追踪基线复核
