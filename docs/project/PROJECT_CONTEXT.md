@@ -15,7 +15,7 @@
 - 入口：`server.py`；静态页面位于 `static/`。
 - 用途：当前实际常驻的开发运行面、历史业务行为参考和旧数据迁移来源；不再作为未来生产底座。
 - 数据：`chenyida_erp_app/data/erp.sqlite3`，运行数据被 Git 忽略。
-- 实际状态：2026-07-24 只读核验 systemd `chenyida-erp.service` 为 `enabled/active`，源码与已安装 unit 一致，Python 监听 `0.0.0.0:18888`。这仍是开发服务，不代表正式生产投用。
+- 实际状态：2026-07-26 只读复核 systemd `chenyida-erp.service` 为 `enabled/active`，源码与已安装 unit SHA-256 一致，PID `277640` 的命令行继续监听 `0.0.0.0:18888`。这仍是开发服务，不代表正式生产投用。
 
 ### 自托管 Node 应用
 
@@ -23,13 +23,15 @@
 - 技术：Vinext、React、TypeScript、标准 Node.js、PostgreSQL/Drizzle、本地持久化文件和 PostgreSQL 后台任务 Worker。
 - 页面：TASK10 已把根 `app/page.tsx` 改为原生经营工作台；legacy `public/erp/index.html` 保留为显式业务工作区和回滚入口，不再作为根 iframe 默认依赖。Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给不依赖平台 binding 的 `app/lib/selfhost-api.ts`；旧 `erp-api.ts` 仅作迁移参考。
-- 根页迁移：TASK03—TASK10 已接通主数据/BOM/库存/采购/生产/销售/品质/财务、实时 Dashboard 与离线 backup 治理，根页已退出 iframe。真实数据试迁移和生产恢复演练未做，仍不能描述为已投产。
+- 根页迁移：TASK03—TASK10 已接通主数据/BOM/库存/采购/生产/销售/品质/财务、实时 Dashboard 与离线 backup 治理，根页已退出 iframe。完整 ERP API 的非生产实现不等于实际业务迁移：真实数据、账号和文件未迁移，采购、库存、生产、销售、品质、财务的实际业务仍依赖 Python/SQLite；生产恢复演练未做，不能描述为已投产。
 - 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL；Caddy production profile 可提供 HTTPS。TASK05 已运行非生产 Compose 项目 `chenyida-erp-parallel`，Web 仅绑定 `127.0.0.1:3000`、PostgreSQL 无宿主端口，Caddy 未启动；它只用于同机 HTTP 空环境验收，不是生产部署。历史 Sites `v3` 不作为后续交付目标。
 
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
 - 发布标识：包名为 `chenyida-erp-selfhosted`，当前源码与并行环境均为 `0.1.0-alpha.19`；只属于回环并行验收，明确为非生产且尚未正式发布。
+- 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.19`。
+- Git 复核：2026-07-26 本次任务起点为本地 `main`/HEAD `3ae79f1`、工作区 clean；本地 `origin/main` 与远端 `main` 均停留 `39946f6`，本地领先 27 个提交，不得描述为已同步。
 
 ### 治理资料
 
@@ -87,7 +89,7 @@
 2. 服务端 Node API/PostgreSQL 是权限、数据规则和任务状态的权威边界。
 3. legacy 在线 API 主要集中在 `erp-api.ts`；Material namespace 已由 catch-all 精确分发到独立 Material API、安全、查询和审计导出模块，并调用现有 Validation/Draft/Review Service。
 4. Material Master V2 应先建立关系化数据底座和迁移测试，再接入页面或 AI。
-5. 当前生产 `v3` / `2b4f178` 与纳管开发基线 `9f2c2dc` 的运行时代码一致；任何后续业务修改与部署仍须单独批准。
+5. 历史文档记录的 Sites 生产 `v3` / `2b4f178` 与纳管开发基线 `9f2c2dc` 的运行时代码一致；本次未访问公开 Site 重新确认当前在线状态，任何后续业务修改与部署仍须单独批准。
 6. 自托管测试使用明确的隔离 PostgreSQL 数据库和临时/测试文件卷；Miniflare 只保留为历史实现回归。
 7. D-041 已确认自托管 Material 使用固定 `DRAFT -> PENDING_REVIEW -> ACTIVE` 单步状态机；驳回回到 `DRAFT`，创建人和最后修改人不得审核，正式编码仅在批准事务中原子生成。
 8. D-042 已确认自托管 Mapping 使用不可变确认快照、显式新版本和结构相容复用；复用只复制到 DRAFT 并必须重新确认，Mapping 确认不自动启动 Normalizer。

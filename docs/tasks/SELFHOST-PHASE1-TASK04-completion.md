@@ -258,3 +258,4 @@ TASK01 Material 15/15、TASK02 Mapping 12/12 + upgrade 1/1、TASK03 Normalizatio
 - `39946f6` 同时包含此前按各任务要求保留的 SELFHOST Phase 0、Phase 1 Task01—Task04 变更；因此不能把它描述成 TASK04 单独文件范围提交。
 - PHASE0-TASK03 开始时，根仓库分支为 `main`，HEAD、本地 `origin/main` 和 `git ls-remote` 查询到的远端 `main` 均为 `39946f6`，工作区 clean。
 - 原报告中的“未提交、Worktree dirty”仍是 TASK04 当时的准确历史状态，不应删除或伪造为原任务结束时已经提交。
+- `PHASE0-TASK03` 的原始发布追踪由提交 `12d3ea30d21cce6918de0c525d81f19af289f5ac`（`docs: establish self-hosted release tracking baseline`）完成；2026-07-26 再次复核时，仓库已演进到起点 HEAD `3ae79f167a22bd8c5bb8120e2b5e8356f59d89b4` / `0.1.0-alpha.19` / PostgreSQL `0019`。这不改变 TASK04 原任务结束时 dirty、未提交的历史事实。

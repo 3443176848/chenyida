@@ -4,6 +4,15 @@
 
 ## 2026-07-26
 
+### PHASE0-TASK03 - `docs: establish self-hosted release tracking baseline`
+
+- Git：以 clean 的 `main` / `3ae79f167a22bd8c5bb8120e2b5e8356f59d89b4` 为起点；只读远端核验 `origin/main=39946f6b854a985b5c19106eaa6c938bddaf9c7c`，本地任务开始时领先 27 个提交，不再沿用“已同步”的旧描述。
+- 发布：保留 2026-07-24 的 `0.1.0-alpha.1`/PostgreSQL `0001`—`0005` 原始非生产定义；当前源码与回环并行验收面记录为 `chenyida-erp-selfhosted@0.1.0-alpha.19`/`0001`—`0019`，没有降级 package 或升级依赖。
+- Migration：重新核对 PostgreSQL `0001`—`0019`、D1 `0000`—`0008`、SQLite `0001`—`0004` 的仓库文件与 SHA-256；并行 PostgreSQL 19 个已应用 checksum 和本机 SQLite 四个已应用版本均通过只读核验，未访问生产 D1/数据库。
+- 运行面：确认 Python/SQLite systemd 仍 `enabled/active`、PID `277640`、监听 `0.0.0.0:18888`；Node/PostgreSQL 仅为回环并行开发验收环境，未生产发布。真实账号、文件和业务数据未迁移，采购、库存、生产、销售、品质、财务仍依赖 Python/SQLite。
+- 文档：更新 `RELEASES.md` 的版本矩阵、验收/回退模板和后续复核记录，同步 `MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`STATUS.md`，并在 TASK04 完成报告中只追加后续提交事实而不改写原始 dirty 状态。
+- 验证：Node lint 0 error/5 个既有 warning、test 3/3、review typecheck、Vinext build 5/5、凭证扫描 819 文件；Python self-test、smoke、临时 SQLite go-live 与 `git diff --check` 通过。仅文档变更，未访问生产、部署、迁移真实数据、重启服务、push 或创建 PR。
+
 ### SELFHOST-PHASE4-TASK05 - `ops: accept sourcing fulfillment workflow in parallel environment`
 
 - 部署：在既有 `chenyida-erp-parallel` 原地从 `0018` 升级到 `0019`，PostgreSQL/Web healthy、Worker running；Web 仍仅绑定 `127.0.0.1:3000`，PostgreSQL 不暴露宿主端口。

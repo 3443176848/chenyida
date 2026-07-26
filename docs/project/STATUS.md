@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-26（Asia/Shanghai）
 
+## PHASE0-TASK03 统一发布、迁移与回退追踪基线复核
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 2026-07-24 原始发布基线保持不变；2026-07-26 按实际代码、Git、运行环境和只读数据库状态追加复核，独立提交消息为 `docs: establish self-hosted release tracking baseline` |
+| Git 起点 | PASS | `main` / `3ae79f167a22bd8c5bb8120e2b5e8356f59d89b4`，起始工作区 clean；`git ls-remote` 核验 `origin/main=39946f6b854a985b5c19106eaa6c938bddaf9c7c`，任务开始时本地领先 27 个提交 |
+| 发布版本 | PASS / NON-PRODUCTION | 原始自托管发布定义保留为 `0.1.0-alpha.1`/PG `0001`—`0005`；当前 package 与 lock 根包均为 `chenyida-erp-selfhosted@0.1.0-alpha.19`，没有修改 package 或依赖 |
+| Migration | PASS / READ-ONLY | PostgreSQL 仓库及并行库均为 `0001`—`0019` 且 19 个 checksum 一致；D1 仓库为 `0000`—`0008`；SQLite 仓库及本机只读记录均为 `0001`—`0004` |
+| 运行面 | PASS / READ-ONLY | Python systemd `enabled/active`，PID `277640`、`0.0.0.0:18888`，部署 unit 与仓库源码 SHA-256 一致；并行 Compose PostgreSQL/Web healthy、Worker running，Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口 |
+| 业务迁移 | NOT MIGRATED | Node/PostgreSQL 已有完整 ERP API 非生产实现及合成/并行验收，但真实业务数据、账号和文件未迁移；采购、库存、生产、销售、品质、财务的实际业务继续依赖 Python/SQLite |
+| Node 验证 | PASS | 一次性 Node 22 容器：lint 0 error/5 个既有 warning；`npm test` 3/3；`typecheck:review`；Vinext build 5/5；凭证扫描 819 个仓库文件。凭证扫描首次因只挂载子目录导致非 Git 工作区而未执行，改为只读挂载完整仓库后通过，未降低断言 |
+| Python 验证 | PASS | `/opt/erp/.venv/bin/python`：`server.py --self-test`、`smoke_test.py`、临时 `CYD_ERP_DB` 的 `go_live_check.py --no-backup` 全部通过；临时数据库已清理 |
+| 范围检查 | PASS | 仅修改项目/任务/自托管文档；未修改业务代码、Schema、migration、package、依赖或部署配置；`git diff --check` 与最终 diff 范围在提交前复核 |
+| 生产影响 | NONE | 未访问公开生产 Site、生产 D1 或生产数据库；未部署、未迁移真实数据、未创建云资源、未修改或重启 systemd、未 push 或创建 PR |
+| 下一任务 | STOP | 当前无 `DOING`；真实迁移、HTTPS、生产备份恢复、容量、安全整改和切流必须另立任务并获得明确批准 |
+
 ## SELFHOST-PHASE4-TASK05 定标 → 采购订单 → 收货 → 应付交接
 
 | 验证项 | 结果 | 说明 |

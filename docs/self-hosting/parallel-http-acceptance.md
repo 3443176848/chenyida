@@ -68,7 +68,7 @@ docker compose --project-name chenyida-erp-parallel \
   -f compose.yml restart postgres web worker
 ```
 
-PostgreSQL 短暂重启时 Worker 会记录去敏的 `postgres_idle_client_error` / `worker_poll_failed` 并重试；日志不得包含密码、token 或数据库 URL。TASK01 后重启必须重新确认 15 个 migration、唯一管理员、零验收项目、Web healthy 和 Worker running。
+PostgreSQL 短暂重启时 Worker 会记录去敏的 `postgres_idle_client_error` / `worker_poll_failed` 并重试；日志不得包含密码、token 或数据库 URL。当前 TASK05 基线重启后必须重新确认 19 个 migration、唯一管理员、零临时账号和零 Phase 4 验收业务、Web healthy 和 Worker running；历史 TASK01 的 15 migration 结论只保留在当时验收记录中。
 
 ## 资源停止条件
 

@@ -39,7 +39,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 源码与并行环境均为 `0.1.0-alpha.19`；仅部署到回环 `PARALLEL HTTP ACCEPTANCE ONLY`，明确为非生产、尚未正式发布 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK05 功能提交 `859454c97acddbff8c5199d91c41d636a6ca24e0`；验收提交消息 `ops: accept sourcing fulfillment workflow in parallel environment` |
+| 当前根仓库功能基线提交 | TASK05 功能提交 `859454c97acddbff8c5199d91c41d636a6ca24e0`；验收提交 `3ae79f167a22bd8c5bb8120e2b5e8356f59d89b4`；本次 PHASE0-TASK03 复核提交以 `git log -1 -- docs/project/RELEASES.md` 解析 |
+| Git 同步与工作区 | 本次复核起点工作区 clean；本地 `main`/HEAD `3ae79f1`，本地 `origin/main` 与远端 `main` 均为 `39946f6`，起点本地领先 27 个提交；本任务完成后新增一个未推送提交 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
@@ -48,7 +49,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前运行状态 | Python/SQLite 开发服务继续由 systemd 常驻并监听 `0.0.0.0:18888`；非生产 Compose 项目 `chenyida-erp-parallel` 以 PostgreSQL 17/Web/Worker 同机并行运行，Web 仅绑定 `127.0.0.1:3000`，PostgreSQL 无宿主端口；不是生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、Material/Import/Normalization/Review、Customer/Supplier/Product/BOM/Supplier Mapping、库存、采购、生产、销售、品质、财务、实时 Dashboard 与离线备份恢复治理的非生产链路 |
 | 当前阶段 | 第一阶段 TASK01—TASK05 已完成并行验收；在采购收货与显式 AP 交接后停止 |
-| 当前任务 | 无 `DOING`；`SELFHOST-PHASE4-TASK05` 已完成 |
+| 当前任务 | 无 `DOING`；`PHASE0-TASK03` 发布、迁移与回退基线复核已完成 |
 | 下一任务 | 停止；TASK06 生产制造/品质流程不得自动启动。真实迁移、HTTPS、生产恢复和切换仍须独立授权 |
 
 ## 当前完成模块
@@ -177,7 +178,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 当前无 `DOING`；`SELFHOST-PHASE4-TASK05` 已完成并停止，不启动生产、品质、完工、发货或 TASK06。
+- 当前无 `DOING`。`PHASE0-TASK03` 发布基线复核已完成；`SELFHOST-PHASE4-TASK05` 已完成并停止，不启动生产、品质、完工、发货或 TASK06。
 - 已完成：`SELFHOST-PHASE4-TASK05`，并行环境 `0.1.0-alpha.19`/`0019` 完成 Award→PO→到货计划→两批 Receipt `4/6`→库存 `10`→采购来源 `48/72`→显式 AP `48/72`，权限、幂等、CAS、超收、冲销阻断、重启、备份恢复与清理通过；结论 `SOURCING TO PAYABLE HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。
 - 已完成：`SELFHOST-PHASE4-TASK04`，并行环境 `0.1.0-alpha.18`/`0018` 完成两供应商 RFQ、报价、服务端比较和人工非最低价定标；A `12.000000`/准时/排名 2，B `10.000000`/晚交/排名 1，以 `DELIVERY_PRIORITY` 和“交期优先，避免项目延期”选择 A。Award=1 时全部下游写入为 0，重启持久和清理恢复通过；结论 `PROCUREMENT SOURCING AWARD ACCEPTED IN PARALLEL ENVIRONMENT`。
 - 已完成：`SELFHOST-PHASE4-TASK03`，并行环境 `0.1.0-alpha.17`/`0017` 的固化包聚合、库存/在途独立分配、不可变需求计划与采购申请、v1 退回释放→v2 重算重提→最终接收、重启持久和清理恢复通过；结论 `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`。现在停止，不自动启动 TASK04。
@@ -196,7 +197,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - 已完成：`SELFHOST-PHASE2-TASK03`，新增 PostgreSQL `0007`、关系化 Customer/Supplier/Product/BOM 与 Supplier Mapping/价格历史，发布版本不可变，readiness 在 TASK04 前只做结构检查；版本更新为非生产 `0.1.0-alpha.3`，专项、migration、Compose 重启和回归通过，未迁移真实数据、部署或访问生产。
 - 已完成：`SELFHOST-PHASE2-TASK02`，补齐自托管身份、用户、密码、会话撤销、限流、持久幂等和系统审计；版本更新为非生产 `0.1.0-alpha.2`，未迁移真实用户、未部署或访问生产。
 - 已完成：`SELFHOST-PHASE2-TASK01`，只读盘点 Python 64 个 HTTP 操作、页面调用、权限、表、事务、审计、过账风险与自托管覆盖，确认 legacy iframe 登录后 23 个业务 GET 全部 404，并提出 TASK02—TASK10 建议顺序；仅文档，未实施 API、Schema、migration、依赖、部署或生产动作。
-- 已完成：`PHASE0-TASK03`，建立 `RELEASES.md`、三套 migration SHA-256、`0.1.0-alpha.1` 非生产版本、发布验收和回退模板；修正 Git、运行面、部署和业务迁移状态，未访问或修改生产。
+- 已完成：`PHASE0-TASK03`，2026-07-24 建立 `RELEASES.md`、三套 migration SHA-256、`0.1.0-alpha.1` 原始非生产版本、发布验收和回退模板；2026-07-26 追加复核当前 `0.1.0-alpha.19`/PostgreSQL `0001`—`0019`、本地 Git 领先远端 27 个提交、双开发运行面和真实业务仍依赖 Python/SQLite，未访问或修改生产。
 - 已完成：`SELFHOST-PHASE1-TASK04`，把独立人工覆盖、Issue 处置、ACTIVE 精确绑定、Material Service 建 DRAFT 和可恢复 finalization 移植到 PostgreSQL；专项、回归、migration 与 Compose 验收通过，后续已随 `39946f6` 提交，未连接生产、迁移真实数据或部署。
 - 已完成：`SELFHOST-PHASE1-TASK01`，把 Material Draft/Review/Active 完整移植到 PostgreSQL Repository、自托管 API 和现有页面；编码并发、职责分离、幂等/乐观锁/CSRF、版本/变更/审计及 Compose 重启持久性通过，后续已随 `39946f6` 提交，未连接生产或部署。
 - 已完成：`SELFHOST-PHASE1-TASK02`，把 Import Mapping、动态目标目录、确认快照、版本/SUPERSEDED、跨批次复用/STALE、Worker准备和现有页面移植到 PostgreSQL 自托管链路；专项、回归、迁移和 Compose 重启持久性通过，后续已随 `39946f6` 提交，未连接生产或部署。
