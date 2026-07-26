@@ -4,6 +4,15 @@
 
 ## 2026-07-26
 
+### SELFHOST-PHASE4-TASK06 - `feat: add planning to production material handoff`
+
+- Git：以必须保留的仅文档提交 `b45616e1115aab7d22d1b9a7e58f792005291524` 为严格 Parent；不 revert/reset/amend/rebase，不 push 或创建 PR。
+- 数据库：仅新增 expand-only `0020_production_handoff_reservations.sql`，建立版本化 Handoff/Item/Event、交接行→既有 Work Order 唯一链接和 Production Inventory Reservation/Event；同步 Drizzle Schema/journal/snapshot，SHA-256 `1164536d51fbcf2f022c45aeab54b2b1ebc3d20cb2e4caabba9341d63fb4e182`，不修改 `0001`—`0019`。
+- 服务/API：新增 `production-handoff-selfhost` 编排边界；接收后调用既有 Production 事务入口创建唯一 DRAFT 工单。RELEASE 在同一事务复制既有 BOM Snapshot/Requirement、结构化核验缺料、写 Reservation 来源事实并更新 Balance；领退料继续复用既有 Production/Inventory 权威入口。
+- 权限/UI：planning 准备/提交，production 接收/退回/建单/释放，warehouse 分批领退料，manager/admin 管理；新增 `/planning/production-handoffs`、`/production/work-orders`、`/warehouse/production-issues` 和四项权限裁剪 Dashboard 指标。
+- 验证：TASK06 unit/UI/typecheck、隔离 PostgreSQL 主旅程与保护、TASK01—TASK05、Planning/Inventory/Production/Dashboard、空库/0019 升级/重复/失败回滚、全部正式 typecheck、Drizzle consistency、lint/build、凭证/环境/API coverage 和 Python 三项已通过；并行 HTTP/重启/恢复/清理将在独立 ops 验收提交完成。
+- 边界：未实现或执行报工、完工、成品库存、品质、发货、付款/银行/总账/税票、真实数据迁移、HTTPS、切流或生产部署。
+
 ### PHASE0-TASK03 - `docs: establish self-hosted release tracking baseline`
 
 - Git：以 clean 的 `main` / `3ae79f167a22bd8c5bb8120e2b5e8356f59d89b4` 为起点；只读远端核验 `origin/main=39946f6b854a985b5c19106eaa6c938bddaf9c7c`，本地任务开始时领先 27 个提交，不再沿用“已同步”的旧描述。

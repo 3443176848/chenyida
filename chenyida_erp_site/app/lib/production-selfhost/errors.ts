@@ -1,6 +1,6 @@
 export class ProductionError extends Error {
-  readonly code: string; readonly status: number;
-  constructor(code: string, message: string, status = 400) { super(message); this.code = code; this.status = status; }
+  readonly code: string; readonly status: number; readonly details?: unknown;
+  constructor(code: string, message: string, status = 400, details?: unknown) { super(message); this.code = code; this.status = status; this.details = details; }
 }
 
 const constraintCodes: Record<string, [string, string]> = {

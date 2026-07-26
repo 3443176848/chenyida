@@ -23,7 +23,8 @@
 - `SELFHOST-PHASE4-TASK03`：计划部 → 采购部，固化需求聚合、独立库存/在途分配与采购申请交接（DONE；`0.1.0-alpha.17` / PostgreSQL `0017` 已通过并行 v1 退回释放→v2 重算重提→接收、重启与恢复清理；不自动启动询价/供应商/比价）。
 - `SELFHOST-PHASE4-TASK04`：采购询价、报价、服务端比较与人工定标（DONE；`0.1.0-alpha.18` / PostgreSQL `0018`，不自动创建 PO）。
 - `SELFHOST-PHASE4-TASK05`：采购定标 → PO → 到货 → 仓库分批收货 → 库存 → 采购来源 → 财务显式 AP（DONE；`0.1.0-alpha.19` / PostgreSQL `0019`，重启与清理验收通过）。
-- 后续阶段：生产、品质、完工和发货接入（PLANNED）。
+- `SELFHOST-PHASE4-TASK06`：最新已接收计划包 → 生产交接版本 → 唯一 DRAFT 工单 → 显式释放/BOM 快照/需求 → 齐套预留 → 仓库分批领料（DOING；项目负责人已明确授权；报工、完工和品质排除）。
+- 后续阶段：报工、完工、品质和发货接入（PLANNED，均未授权）。
 
 ## Phase 0 基础架构
 

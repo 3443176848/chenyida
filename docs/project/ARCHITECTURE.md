@@ -17,7 +17,9 @@ flowchart LR
     AP -. blocks destructive receipt reversal .-> R
 ```
 
-`0019` 只新增来源/计划/队列/分配/事件关系，不复制 PO、Receipt、Ledger、Balance、Financial Source 或 AP 权威表。服务端权限、持久幂等、行锁、CAS、数据库 guard、状态事件和 Audit 共同 fail closed；已过账事实只能使用既有冲销，已有 AP 时阻止破坏来源。当前并行运行面为 alpha.19/`0001—0019`，验收数据已恢复清空。
+`0019` 只新增来源/计划/队列/分配/事件关系，不复制 PO、Receipt、Ledger、Balance、Financial Source 或 AP 权威表。服务端权限、持久幂等、行锁、CAS、数据库 guard、状态事件和 Audit 共同 fail closed；已过账事实只能使用既有冲销，已有 AP 时阻止破坏来源。TASK05 并行运行面基线为 alpha.19/`0001—0019`，验收数据已恢复清空。
+
+`SELFHOST-PHASE4-TASK06` 新增独立 `production-handoff-selfhost` 编排边界和 expand-only `0020`。交接表只固化当前 ACCEPTED Planning Package 来源、版本/事件及 Handoff Item→既有 Work Order 唯一链接；不复制 `production_work_orders`、BOM Snapshot、Material Requirement、Material Issue/Return、Inventory Ledger/Balance。释放工单在既有 Production 事务中锁定来源和库存，以 PostgreSQL `numeric(24,6)` 计算需求和 `on_hand-reserved-frozen`，写 Reservation/Event 来源事实后更新 Balance。仓库领退料继续调用既有 Inventory Service，并在同一事务消费或恢复预留。
 
 ## 2026-07-26 计划物料需求到采购申请交接边界
 

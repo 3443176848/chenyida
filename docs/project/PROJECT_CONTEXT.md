@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`，当前源码与并行环境均为 `0.1.0-alpha.19`；只属于回环并行验收，明确为非生产且尚未正式发布。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；TASK06 源码为 `0.1.0-alpha.20`，并行环境在功能提交前仍为 `0.1.0-alpha.19`，待专项回归后受控升级；只属于回环并行验收，明确为非生产且尚未正式发布。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.19`。
 - Git 复核：2026-07-26 本次任务起点为本地 `main`/HEAD `3ae79f1`、工作区 clean；本地 `origin/main` 与远端 `main` 均停留 `39946f6`，本地领先 27 个提交，不得描述为已同步。
 
@@ -153,7 +153,9 @@
 
 ## 当前路线
 
-`SELFHOST-PHASE4-TASK05` 已完成：源码与并行环境为 `0.1.0-alpha.19` / PostgreSQL `0019`，`10×12` Award 经显式 PO/到货计划、两批 `4/6` 收货形成库存 `10`、来源和 AP `48/72`；Compose 重启、新空库恢复和清理通过。现在停止；TASK06、真实迁移、HTTPS、生产恢复和切换均未开始。
+`SELFHOST-PHASE4-TASK05` 已完成：源码历史与并行环境基线为 `0.1.0-alpha.19` / PostgreSQL `0019`，`10×12` Award 经显式 PO/到货计划、两批 `4/6` 收货形成库存 `10`、来源和 AP `48/72`；Compose 重启、新空库恢复和清理通过。
+
+`SELFHOST-PHASE4-TASK06` 是当前唯一 `DOING`，项目负责人已明确授权。TASK06 源码升级为 `0.1.0-alpha.20`/`0020`，只接通最新 ACCEPTED Planning Package→生产交接版本→唯一 DRAFT 工单→显式释放/BOM 快照/Material Requirement→齐套 Reservation→仓库分批领退料；报工、完工、成品库存、品质、真实迁移、HTTPS 和生产切换仍未授权。合法 Git 起点是必须保留的仅文档提交 `b45616e1115aab7d22d1b9a7e58f792005291524`。
 
 ## 恢复上下文检查清单
 

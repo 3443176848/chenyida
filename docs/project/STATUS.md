@@ -2,6 +2,21 @@
 
 最后更新时间：2026-07-26（Asia/Shanghai）
 
+## SELFHOST-PHASE4-TASK06 计划 → 生产工单 → 齐套预留 → 仓库领料
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DOING / AUTHORIZED | 项目负责人已明确授权“继续生产线”；合法起点 `b45616e1115aab7d22d1b9a7e58f792005291524` 保留且不改写。PHASE0-TASK03/TASK05 保持历史 DONE |
+| 版本/Migration | IMPLEMENTED | 源码 `0.1.0-alpha.20`；仅新增 `0020_production_handoff_reservations.sql`，SHA-256 `1164536d51fbcf2f022c45aeab54b2b1ebc3d20cb2e4caabba9341d63fb4e182`；0001—0019 不修改，Schema/journal/snapshot 同步 |
+| 关系模型 | PASS / ISOLATED | 版本化 Handoff/Item/Event、Handoff Item→Work Order 唯一链接、Reservation/Event；完整稳定外键、numeric/状态/digest 约束、来源 trigger、Service GUC 和不可变 guard |
+| 事务复用 | PASS / ISOLATED | 交接调用既有 Production Work Order 事务入口；RELEASE 原子创建既有 BOM Snapshot/Requirement 和新 Reservation 来源事实；Issue/Return 原子复用既有 Inventory Ledger/Balance |
+| 权限/API/UI | PASS / SOURCE | planning 准备/提交，production 退回/接收/建单/释放，warehouse 领退料，manager/admin 管理；三条原生页面和四项 Dashboard 待办已实现 |
+| 关键专项 | PASS | v1 退回→v2 接收、唯一 DRAFT、预留 10、分批领料 4/6；缺料零半记录、并发预留、超领、幂等/CAS、故障注入、取消释放/阻止、退料恢复和 403 通过 |
+| Migration | PASS / ISOLATED | 空库、0019→0020、重复执行、失败回滚通过；Drizzle `check` 通过 |
+| 全量回归 | PASS / LOCAL+ISOLATED | TASK01—TASK05、Planning、Inventory、Production、Dashboard、14 组正式 typecheck、lint 0 error、Vinext build、凭证/环境/API coverage、Python 三项与 `git diff --check` 通过 |
+| 并行环境 | PENDING | 功能提交和全部正式回归完成后才允许更新 `chenyida-erp-parallel`；当前尚未声称 HTTP/重启/备份恢复/最终清理完成 |
+| 排除事项 | ENFORCED | 报工、完工、成品库存、IQC/IPQC/FQC、发货、付款/银行/总账/税票、真实迁移、HTTPS、切流和生产部署未授权 |
+
 ## PHASE0-TASK03 统一发布、迁移与回退追踪基线复核
 
 | 验证项 | 结果 | 说明 |
@@ -16,7 +31,7 @@
 | Python 验证 | PASS | `/opt/erp/.venv/bin/python`：`server.py --self-test`、`smoke_test.py`、临时 `CYD_ERP_DB` 的 `go_live_check.py --no-backup` 全部通过；临时数据库已清理 |
 | 范围检查 | PASS | 仅修改项目/任务/自托管文档；未修改业务代码、Schema、migration、package、依赖或部署配置；`git diff --check` 与最终 diff 范围在提交前复核 |
 | 生产影响 | NONE | 未访问公开生产 Site、生产 D1 或生产数据库；未部署、未迁移真实数据、未创建云资源、未修改或重启 systemd、未 push 或创建 PR |
-| 下一任务 | STOP | 当前无 `DOING`；真实迁移、HTTPS、生产备份恢复、容量、安全整改和切流必须另立任务并获得明确批准 |
+| 下一任务 | HISTORICAL STOP | PHASE0-TASK03 当时已停止；之后 TASK06 由项目负责人单独明确授权。真实迁移、HTTPS、生产备份恢复、容量、安全整改和切流仍须另立任务批准 |
 
 ## SELFHOST-PHASE4-TASK05 定标 → 采购订单 → 收货 → 应付交接
 

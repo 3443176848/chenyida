@@ -693,6 +693,19 @@
 - 边界：不实现付款、银行、总账、税票、工单、领料、报工、完工或 IQC/IPQC/FQC；不迁真实数据、不部署生产、不切流，不自动启动 TASK06。
 - 验收：并行 HTTP 以 `10×12`、收货 `4/6`、来源/AP `48/72` 完成，重启持久、备份/新空恢复和最终清理通过。
 
+## D-063 计划到生产采用版本化交接、释放时齐套预留与基于预留的领退料
+
+- 日期：2026-07-26
+- 状态：`ACCEPTED / IMPLEMENTED / AWAITING PARALLEL ACCEPTANCE`
+- 确认人：项目负责人（明确授权“继续生产线”，并限定只完成计划交接、工单、释放、预留和领退料）
+- 来源：只能消费项目当前最新、状态为 `ACCEPTED` 且 version/package digest 不变的 Planning Package。交接版本固化 Package Item、Product Version、BOM Version、成品 Material、Unit、数量与 SHA-256；浏览器不得覆盖 Package 来源字段。
+- 成品物料：既有 Planning Package 未保存成品 Material 关系，因此 planning 在 DRAFT 准备阶段显式选择稳定 Material ID；服务端验证 ACTIVE/STOCKED、基础单位和客户限制。该选择随交接版本固化，不反写 Planning Package。
+- 工单：Production 接收交接后才能调用既有 Production Service 事务入口创建 DRAFT Work Order；每个 Handoff Item 最多一张工单。Handoff 只保存来源和唯一链接，不复制工单、BOM、需求或领料权威表。
+- 释放与预留：RELEASE 在同一 PostgreSQL 事务复核当前 Package/Handoff，复制不可变 BOM Snapshot，用 `numeric(24,6)` 生成 Requirement，锁定 Inventory Position/Balance 并按 `on_hand-reserved-frozen` 校验。缺料整体回滚并返回结构化明细；齐套时写可追溯 Reservation/Event 后原子增加 `reserved_qty`。
+- 领退料与取消：warehouse 只能消费 RELEASED/IN_PROGRESS 工单的有效 Reservation；Issue/Return、Ledger、Balance、Requirement、工单 Event、Audit 和 Idempotency 同事务提交。Return 恢复库存和剩余需求预留。未领料 RELEASED 可取消并释放预留，已有领料事实不得直接取消。
+- 权限：planning 准备/提交，production 接收/退回、建单/释放，warehouse 分批领退料，manager/admin 具备相应管理能力；其余角色服务端 403。
+- 边界：不实现生产报工、完工、成品库存、IQC/IPQC/FQC、发货、付款、银行、总账或税票；不迁真实数据、不部署生产、不启用 HTTPS、不切流。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
