@@ -6,7 +6,7 @@ import { PostgresInventoryRepository } from "./repository.ts";
 import type { InventoryLineInput, InventoryMutationMeta, InventoryMutationResult, InventoryOperationType } from "./types.ts";
 
 type MaterialRow = { id: string; base_unit_id: string; internal_material_code: string; standard_name: string; unit_code: string };
-type BalanceRow = { id: string; material_id: string; unit_id: string; on_hand_qty: string; reserved_qty: string; frozen_qty: string; version: number };
+type BalanceRow = { id: string; material_id: string; unit_id: string; inventory_lot_id: string | null; lot_code: string; on_hand_qty: string; reserved_qty: string; frozen_qty: string; version: number };
 type CalculatedLine = {
   input: InventoryLineInput;
   balance: BalanceRow | null;
@@ -46,13 +46,13 @@ export class InventoryService {
   async listBalances(limit: number, offset: number) {
     return this.repository.pool.query(`
       select m.id material_id,m.internal_material_code,m.standard_name,m.inventory_type,c.category_code item_category,
-        u.id unit_id,u.code base_uom,coalesce(b.on_hand_qty,0)::text on_hand_qty,coalesce(b.reserved_qty,0)::text reserved_qty,
-        coalesce(b.frozen_qty,0)::text frozen_qty,(coalesce(b.on_hand_qty,0)-coalesce(b.reserved_qty,0)-coalesce(b.frozen_qty,0))::text available_qty,
-        coalesce(b.version,0) balance_version,b.updated_at
+        u.id unit_id,u.code base_uom,coalesce(sum(b.on_hand_qty),0)::text on_hand_qty,coalesce(sum(b.reserved_qty),0)::text reserved_qty,
+        coalesce(sum(b.frozen_qty),0)::text frozen_qty,(coalesce(sum(b.on_hand_qty),0)-coalesce(sum(b.reserved_qty),0)-coalesce(sum(b.frozen_qty),0))::text available_qty,
+        coalesce(max(b.version) filter(where b.inventory_lot_id is null),0) balance_version,max(b.updated_at) updated_at,count(b.inventory_lot_id)::int lot_count
       from material_master m join material_categories c on c.id=m.category_id join units u on u.id=m.base_unit_id and u.enabled=true
-      left join inventory_stock_balances b on b.material_id=m.id and b.location_code='MAIN' and b.lot_code=''
+      left join inventory_stock_balances b on b.material_id=m.id and b.unit_id=u.id and b.location_code='MAIN'
       where m.material_status='ACTIVE' and m.inventory_type='STOCKED'
-      order by m.internal_material_code,m.id limit $1 offset $2
+      group by m.id,c.category_code,u.id,u.code order by m.internal_material_code,m.id limit $1 offset $2
     `, [limit, offset]);
   }
 
@@ -105,9 +105,15 @@ export class InventoryService {
     return found;
   }
 
-  private async balancesForUpdate(client: PoolClient, materialIds: number[]): Promise<Map<number, BalanceRow>> {
-    const result = await client.query<BalanceRow>("select * from inventory_stock_balances where material_id=any($1::bigint[]) and location_code='MAIN' and lot_code='' order by material_id for update", [materialIds]);
-    return new Map(result.rows.map((row) => [Number(row.material_id), row]));
+  private positionKey(materialId: number, inventoryLotId: number | null) { return `${materialId}:${inventoryLotId ?? 0}`; }
+
+  private async balancesForUpdate(client: PoolClient, lines: InventoryLineInput[]): Promise<Map<string, BalanceRow>> {
+    const found = new Map<string, BalanceRow>();
+    for (const line of [...lines].sort((a,b)=>this.positionKey(a.materialId,a.inventoryLotId).localeCompare(this.positionKey(b.materialId,b.inventoryLotId)))) {
+      const result = await client.query<BalanceRow>("select * from inventory_stock_balances where material_id=$1 and location_code='MAIN' and inventory_lot_id is not distinct from $2::bigint for update", [line.materialId,line.inventoryLotId]);
+      if(result.rows[0])found.set(this.positionKey(line.materialId,line.inventoryLotId),result.rows[0]);
+    }
+    return found;
   }
 
   async post(meta: InventoryMutationMeta, rawInput: Record<string, unknown>): Promise<InventoryMutationResult> {
@@ -119,30 +125,39 @@ export class InventoryService {
     return this.postParsedInTransaction(client, meta, parseOperationInput(rawInput));
   }
 
+  async postLotInTransaction(client: PoolClient, meta: InventoryMutationMeta, input: { inventoryLotId: number; operationType: "RECEIPT"|"FREEZE"|"UNFREEZE"; quantity: string; expectedBalanceVersion: number; reason: string }): Promise<InventoryMutationResult> {
+    const lot = await client.query("select * from inventory_lots where id=$1 for update",[input.inventoryLotId]);
+    if(!lot.rows[0])throw new InventoryError("INVENTORY_LOT_NOT_FOUND","成品库存 Lot 不存在",404);
+    const parsed = parseOperationInput({operation_type:input.operationType,reason:input.reason,lines:[{material_id:Number(lot.rows[0].material_id),unit_id:Number(lot.rows[0].unit_id),quantity:input.quantity,expected_balance_version:input.expectedBalanceVersion}]});
+    const normalized={...parsed,lines:parsed.lines.map((line)=>({...line,inventoryLotId:input.inventoryLotId,lotCode:String(lot.rows[0].lot_code)}))};
+    return this.postParsedInTransaction(client,meta,normalized);
+  }
+
   private async postParsedInTransaction(client: PoolClient, meta: InventoryMutationMeta, parsed: ReturnType<typeof parseOperationInput>): Promise<InventoryMutationResult> {
-      await this.repository.lockPositions(client, parsed.lines.map((line) => line.materialId));
-      await this.activeMaterials(client, parsed.lines);
-      const balances = await this.balancesForUpdate(client, parsed.lines.map((line) => line.materialId));
-      const calculated = parsed.lines.map((line) => calculate(parsed.operationType, line, balances.get(line.materialId) ?? null));
+      const lines:InventoryLineInput[]=parsed.lines.map((line)=>({ ...line,inventoryLotId:(line as InventoryLineInput).inventoryLotId??null,lotCode:(line as InventoryLineInput).lotCode??"" }));
+      await this.repository.lockPositions(client, lines);
+      await this.activeMaterials(client, lines);
+      const balances = await this.balancesForUpdate(client, lines);
+      const calculated = lines.map((line) => calculate(parsed.operationType, line, balances.get(this.positionKey(line.materialId,line.inventoryLotId)) ?? null));
       const code = await this.repository.nextCode(client);
       const header = await client.query(`insert into inventory_adjustments(adjustment_code,operation_type,reason,operation_id,created_by,request_id)
         values($1,$2,$3,$4,$5,$6) returning *`, [code, parsed.operationType, parsed.reason, meta.operationId, meta.actor.username, meta.requestId]);
       const adjustmentId = Number(header.rows[0].id); const outputLines: Record<string, unknown>[] = [];
       for (let index = 0; index < calculated.length; index += 1) outputLines.push(await this.persistLine(client, meta, adjustmentId, index + 1, parsed.operationType, calculated[index]));
       const body = { ok: true, data: { ...header.rows[0], lines: outputLines }, adjustment_id: adjustmentId, adjustment_code: code, request_id: meta.requestId };
-      return { status: 201, body, adjustmentId, materialIds: parsed.lines.map((line) => line.materialId) };
+      return { status: 201, body, adjustmentId, materialIds: lines.map((line) => line.materialId), inventoryLotIds: lines.flatMap((line)=>line.inventoryLotId==null?[]:[line.inventoryLotId]) };
   }
 
   private async persistLine(client: PoolClient, meta: InventoryMutationMeta, adjustmentId: number, lineNo: number, entryType: string, line: CalculatedLine, reversalOfLedgerEntryId: number | null = null): Promise<Record<string, unknown>> {
     let balanceId: number;
     if (!line.balance) {
-      const inserted = await client.query(`insert into inventory_stock_balances(material_id,unit_id,on_hand_qty,reserved_qty,frozen_qty,version)
-        values($1,$2,$3,0,$4,1) returning id`, [line.input.materialId, line.input.unitId, formatQuantity(line.afterOnHand), formatQuantity(line.afterFrozen)]);
+      const inserted = await client.query(`insert into inventory_stock_balances(material_id,unit_id,inventory_lot_id,lot_code,on_hand_qty,reserved_qty,frozen_qty,version)
+        values($1,$2,$3,$4,$5,0,$6,1) returning id`, [line.input.materialId, line.input.unitId,line.input.inventoryLotId,line.input.lotCode, formatQuantity(line.afterOnHand), formatQuantity(line.afterFrozen)]);
       balanceId = Number(inserted.rows[0].id);
     } else balanceId = Number(line.balance.id);
     const ledgerOperationId = randomUUID();
-    const ledger = await client.query(`insert into inventory_ledger_entries(operation_id,adjustment_id,line_no,balance_id,material_id,unit_id,entry_type,on_hand_delta,frozen_delta,before_on_hand_qty,after_on_hand_qty,before_frozen_qty,after_frozen_qty,balance_version_before,balance_version_after,reversal_of_ledger_entry_id,source_id,created_by,request_id)
-      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$2,$17,$18) returning *`, [ledgerOperationId, adjustmentId, lineNo, balanceId, line.input.materialId, line.input.unitId, entryType, formatQuantity(line.onHandDelta), formatQuantity(line.frozenDelta), formatQuantity(line.beforeOnHand), formatQuantity(line.afterOnHand), formatQuantity(line.beforeFrozen), formatQuantity(line.afterFrozen), line.versionBefore, line.versionAfter, reversalOfLedgerEntryId, meta.actor.username, meta.requestId]);
+    const ledger = await client.query(`insert into inventory_ledger_entries(operation_id,adjustment_id,line_no,balance_id,material_id,unit_id,inventory_lot_id,lot_code,entry_type,on_hand_delta,frozen_delta,before_on_hand_qty,after_on_hand_qty,before_frozen_qty,after_frozen_qty,balance_version_before,balance_version_after,reversal_of_ledger_entry_id,source_id,created_by,request_id)
+      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$2,$19,$20) returning *`, [ledgerOperationId, adjustmentId, lineNo, balanceId, line.input.materialId, line.input.unitId,line.input.inventoryLotId,line.input.lotCode, entryType, formatQuantity(line.onHandDelta), formatQuantity(line.frozenDelta), formatQuantity(line.beforeOnHand), formatQuantity(line.afterOnHand), formatQuantity(line.beforeFrozen), formatQuantity(line.afterFrozen), line.versionBefore, line.versionAfter, reversalOfLedgerEntryId, meta.actor.username, meta.requestId]);
     const ledgerId = Number(ledger.rows[0].id);
     if (line.balance) {
       const updated = await client.query("update inventory_stock_balances set on_hand_qty=$2,frozen_qty=$3,version=$4,last_ledger_entry_id=$5,updated_at=now() where id=$1 and version=$6 returning id", [balanceId, formatQuantity(line.afterOnHand), formatQuantity(line.afterFrozen), line.versionAfter, ledgerId, line.versionBefore]);
@@ -150,8 +165,8 @@ export class InventoryService {
     } else await client.query("update inventory_stock_balances set last_ledger_entry_id=$2,updated_at=now() where id=$1", [balanceId, ledgerId]);
     const requested = line.input.quantityMicros === null ? null : formatQuantity(line.input.quantityMicros);
     const counted = line.input.countedMicros === null ? null : formatQuantity(line.input.countedMicros);
-    const saved = await client.query(`insert into inventory_adjustment_lines(adjustment_id,line_no,balance_id,ledger_entry_id,material_id,unit_id,requested_qty,counted_qty,on_hand_delta,frozen_delta,before_on_hand_qty,after_on_hand_qty,before_frozen_qty,after_frozen_qty,balance_version_before,balance_version_after)
-      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) returning *`, [adjustmentId, lineNo, balanceId, ledgerId, line.input.materialId, line.input.unitId, requested, counted, formatQuantity(line.onHandDelta), formatQuantity(line.frozenDelta), formatQuantity(line.beforeOnHand), formatQuantity(line.afterOnHand), formatQuantity(line.beforeFrozen), formatQuantity(line.afterFrozen), line.versionBefore, line.versionAfter]);
+    const saved = await client.query(`insert into inventory_adjustment_lines(adjustment_id,line_no,balance_id,ledger_entry_id,material_id,unit_id,inventory_lot_id,lot_code,requested_qty,counted_qty,on_hand_delta,frozen_delta,before_on_hand_qty,after_on_hand_qty,before_frozen_qty,after_frozen_qty,balance_version_before,balance_version_after)
+      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) returning *`, [adjustmentId, lineNo, balanceId, ledgerId, line.input.materialId, line.input.unitId,line.input.inventoryLotId,line.input.lotCode, requested, counted, formatQuantity(line.onHandDelta), formatQuantity(line.frozenDelta), formatQuantity(line.beforeOnHand), formatQuantity(line.afterOnHand), formatQuantity(line.beforeFrozen), formatQuantity(line.afterFrozen), line.versionBefore, line.versionAfter]);
     return { ...saved.rows[0], ledger_entry_id: ledgerId };
   }
 
@@ -172,17 +187,18 @@ export class InventoryService {
       const source = await client.query(`select l.*,al.unit_id from inventory_ledger_entries l join inventory_adjustment_lines al on al.ledger_entry_id=l.id where l.adjustment_id=$1 order by l.material_id,l.line_no`, [adjustmentId]);
       const materialIds = source.rows.map((row) => Number(row.material_id));
       if (parsed.versions.size !== materialIds.length || materialIds.some((id) => !parsed.versions.has(id))) throw new InventoryError("REQUEST_VALIDATION_FAILED", "expected_balance_versions 必须完整匹配原调整物料");
-      await this.repository.lockPositions(client, materialIds);
-      const balances = await this.balancesForUpdate(client, materialIds);
+      const sourceLines:InventoryLineInput[]=source.rows.map((row)=>({materialId:Number(row.material_id),unitId:Number(row.unit_id),inventoryLotId:row.inventory_lot_id==null?null:Number(row.inventory_lot_id),lotCode:String(row.lot_code),expectedBalanceVersion:Number(parsed.versions.get(Number(row.material_id))),quantityMicros:null,countedMicros:null}));
+      await this.repository.lockPositions(client, sourceLines);
+      const balances = await this.balancesForUpdate(client, sourceLines);
       const calculated = source.rows.map((row) => {
-        const materialId = Number(row.material_id); const balance = balances.get(materialId);
+        const materialId = Number(row.material_id),inventoryLotId=row.inventory_lot_id==null?null:Number(row.inventory_lot_id); const balance = balances.get(this.positionKey(materialId,inventoryLotId));
         if (!balance || Number(balance.version) !== parsed.versions.get(materialId)) throw new InventoryError("INVENTORY_VERSION_CONFLICT", "库存余额版本已变化，请刷新后重试", 409);
         const beforeOnHand = parseDatabaseQuantity(balance.on_hand_qty); const beforeFrozen = parseDatabaseQuantity(balance.frozen_qty); const reserved = parseDatabaseQuantity(balance.reserved_qty);
         const onHandDelta = -parseDatabaseQuantity(row.on_hand_delta); const frozenDelta = -parseDatabaseQuantity(row.frozen_delta);
         const afterOnHand = beforeOnHand + onHandDelta; const afterFrozen = beforeFrozen + frozenDelta;
         if (afterOnHand < 0n || afterFrozen < 0n || afterOnHand < reserved + afterFrozen) throw new InventoryError("INVENTORY_REVERSAL_WOULD_VIOLATE_BALANCE", "当前库存状态不允许冲销原调整", 409);
         const quantity = onHandDelta === 0n ? (frozenDelta < 0n ? -frozenDelta : frozenDelta) : (onHandDelta < 0n ? -onHandDelta : onHandDelta);
-        const input: InventoryLineInput = { materialId, unitId: Number(row.unit_id), expectedBalanceVersion: Number(balance.version), quantityMicros: quantity, countedMicros: null };
+        const input: InventoryLineInput = { materialId, unitId: Number(row.unit_id),inventoryLotId,lotCode:String(row.lot_code), expectedBalanceVersion: Number(balance.version), quantityMicros: quantity, countedMicros: null };
         return { input, balance, beforeOnHand, beforeFrozen, reserved, onHandDelta, frozenDelta, afterOnHand, afterFrozen, versionBefore: Number(balance.version), versionAfter: Number(balance.version) + 1, sourceLedgerId: Number(row.id) };
       });
       const code = await this.repository.nextCode(client);
@@ -191,6 +207,6 @@ export class InventoryService {
       const reversalId = Number(header.rows[0].id); const outputLines: Record<string, unknown>[] = [];
       for (let index = 0; index < calculated.length; index += 1) outputLines.push(await this.persistLine(client, meta, reversalId, index + 1, "REVERSAL", calculated[index], calculated[index].sourceLedgerId));
       const body = { ok: true, data: { ...header.rows[0], lines: outputLines }, adjustment_id: reversalId, adjustment_code: code, reversal_of_adjustment_id: adjustmentId, request_id: meta.requestId };
-      return { status: 201, body, adjustmentId: reversalId, materialIds };
+      return { status: 201, body, adjustmentId: reversalId, materialIds,inventoryLotIds:sourceLines.flatMap((line)=>line.inventoryLotId==null?[]:[line.inventoryLotId]) };
   }
 }

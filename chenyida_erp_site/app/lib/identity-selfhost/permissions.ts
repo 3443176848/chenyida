@@ -13,7 +13,8 @@ const readOnly = ["material.read", ...dashboardRead];
 const masterRead = ["master.customer.read", "master.supplier.read", "master.product.read", "master.bom.read", "master.supplier_mapping.read"];
 const masterManage = [...masterRead, "master.customer.manage", "master.supplier.manage", "master.product.manage", "master.bom.manage", "master.supplier_mapping.manage"];
 const inventoryRead = ["inventory.read"];
-const inventoryManage = [...inventoryRead, "inventory.adjust", "inventory.reverse"];
+const inventoryLotRead = ["inventory.lot.read"];
+const inventoryManage = [...inventoryRead, ...inventoryLotRead, "inventory.adjust", "inventory.reverse", "inventory.lot.freeze"];
 const procurementRead = ["procurement.read"];
 const procurementManage = [...procurementRead, "procurement.plan", "procurement.order", "procurement.receive", "procurement.reverse", "procurement.finance_source.read"];
 const procurementSourcingRead = ["procurement.rfq.read"];
@@ -94,7 +95,8 @@ export function permissionsForRole(role: IdentityRole): string[] {
   const productionRouting = ["admin", "manager"].includes(role) ? [...productionRoutingReview, ...productionWorkCenterManage, ...productionRoutingSnapshotRead] : [];
   const nonconformance = ["admin", "manager"].includes(role) ? nonconformanceManage : role === "quality" ? nonconformanceQuality : role === "production" ? nonconformanceProduction : role === "engineering" ? nonconformanceRead : [];
   const productionBatch = ["admin", "manager", "production"].includes(role) ? productionBatchManage : ["quality", "warehouse", "engineering"].includes(role) ? productionBatchRead : [];
-  return [...new Set([...ROLE_PERMISSIONS[role], ...operations, ...planning, ...requirements, ...sourcing, ...fulfillment, ...productionHandoff, ...productionRouting, ...nonconformance, ...productionBatch])].sort();
+  const inventoryLot = ["production","quality","warehouse","engineering"].includes(role) ? inventoryLotRead : [];
+  return [...new Set([...ROLE_PERMISSIONS[role], ...operations, ...planning, ...requirements, ...sourcing, ...fulfillment, ...productionHandoff, ...productionRouting, ...nonconformance, ...productionBatch,...inventoryLot])].sort();
 }
 
 export function hasPermission(actor: Pick<IdentityActor, "permissions">, permission: string): boolean {

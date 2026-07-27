@@ -62,7 +62,7 @@ export function parseOperationInput(input: Record<string, unknown>): { operation
     const isAdjustment = operationType === "ADJUSTMENT";
     const quantity = isAdjustment ? null : parseQuantityMicros(row.quantity, "quantity", false);
     const counted = isAdjustment ? parseQuantityMicros(row.counted_qty, "counted_qty", true) : null;
-    return { materialId, unitId: parseInventoryId(row.unit_id, "unit_id"), expectedBalanceVersion: parseExpectedVersion(row.expected_balance_version), quantityMicros: quantity, countedMicros: counted };
+    return { materialId, unitId: parseInventoryId(row.unit_id, "unit_id"), inventoryLotId: null, lotCode: "", expectedBalanceVersion: parseExpectedVersion(row.expected_balance_version), quantityMicros: quantity, countedMicros: counted };
   });
   return { operationType: operationType as InventoryOperationType, reason, lines: lines.sort((left, right) => left.materialId - right.materialId) };
 }

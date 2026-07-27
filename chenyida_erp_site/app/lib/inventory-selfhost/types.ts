@@ -7,6 +7,8 @@ export type InventoryOperationType = (typeof INVENTORY_OPERATION_TYPES)[number];
 export type InventoryLineInput = Readonly<{
   materialId: number;
   unitId: number;
+  inventoryLotId: number | null;
+  lotCode: string;
   expectedBalanceVersion: number;
   quantityMicros: bigint | null;
   countedMicros: bigint | null;
@@ -29,6 +31,7 @@ export type InventoryMutationResult = {
   replayed?: boolean;
   adjustmentId?: number;
   materialIds?: number[];
+  inventoryLotIds?: number[];
 };
 
 export type InventoryMutationWork = (client: PoolClient) => Promise<InventoryMutationResult>;

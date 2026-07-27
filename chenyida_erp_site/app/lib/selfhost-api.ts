@@ -12,6 +12,7 @@ import { handleSelfhostMaterialImportReviewApi } from "./material-import-review-
 import { handleMasterDataApi } from "./master-data-selfhost/handler.ts";
 import { handleBomApi } from "./bom-selfhost/handler.ts";
 import { handleInventoryApi } from "./inventory-selfhost/handler.ts";
+import { handleFinishedGoodsInventoryLotApi } from "./inventory-lot-selfhost/handler.ts";
 import { handleProcurementApi } from "./procurement-selfhost/handler.ts";
 import { handleProductionApi } from "./production-selfhost/handler.ts";
 import { handleSalesApi } from "./sales-selfhost/handler.ts";
@@ -125,6 +126,8 @@ export async function handleSelfhostApi(request: Request): Promise<Response> {
     if (productionResponse) return productionResponse;
     const procurementResponse = await handleProcurementApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (procurementResponse) return procurementResponse;
+    const inventoryLotResponse = await handleFinishedGoodsInventoryLotApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
+    if (inventoryLotResponse) return inventoryLotResponse;
     const inventoryResponse = await handleInventoryApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (inventoryResponse) return inventoryResponse;
     const masterDataResponse = await handleMasterDataApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });

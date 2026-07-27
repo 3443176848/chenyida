@@ -592,12 +592,20 @@ export const inventoryAdjustments = pgTable("inventory_adjustments", {
   check("inventory_adjustments_reversal_ck", sql`(${t.operationType} = 'REVERSAL' and ${t.reversalOfAdjustmentId} is not null) or (${t.operationType} <> 'REVERSAL' and ${t.reversalOfAdjustmentId} is null)`),
 ]);
 
+export const inventoryLots = pgTable("inventory_lots", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), lotCode: text("lot_code").notNull(), lotType: text("lot_type").notNull(),
+  materialId: bigint("material_id", { mode: "number" }).notNull().references(() => materialMaster.id, { onDelete: "restrict" }), unitId: bigint("unit_id", { mode: "number" }).notNull().references(() => units.id, { onDelete: "restrict" }),
+  sourceProductionBatchId: bigint("source_production_batch_id", { mode: "number" }).notNull().references((): AnyPgColumn => productionBatches.id, { onDelete: "restrict" }), workOrderId: bigint("work_order_id", { mode: "number" }).notNull().references(() => productionWorkOrders.id, { onDelete: "restrict" }), productVersionId: bigint("product_version_id", { mode: "number" }).notNull().references(() => productVersions.id, { onDelete: "restrict" }),
+  manufacturedAt: timestamptz("manufactured_at").notNull(), status: text("status").notNull().default("AVAILABLE"), version: integer("version").notNull().default(1), operationId: uuid("operation_id").notNull(), createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [uniqueIndex("inventory_lots_code_uq").on(t.lotCode), uniqueIndex("inventory_lots_batch_uq").on(t.sourceProductionBatchId), uniqueIndex("inventory_lots_operation_uq").on(t.operationId), uniqueIndex("inventory_lots_identity_uq").on(t.id,t.materialId,t.unitId,t.lotCode), index("inventory_lots_material_status_idx").on(t.materialId,t.status,t.createdAt,t.id), index("inventory_lots_work_order_idx").on(t.workOrderId,t.id), check("inventory_lots_code_ck",sql`${t.lotCode} ~ '^FGL-[0-9]{8}$' and ${t.lotCode}=upper(btrim(${t.lotCode}))`), check("inventory_lots_type_ck",sql`${t.lotType}='MANUFACTURING_FINISHED_GOODS'`), check("inventory_lots_status_ck",sql`${t.status} in ('AVAILABLE','FROZEN','DEPLETED','REVERSED')`), check("inventory_lots_version_ck",sql`${t.version}>0`)]);
+
 export const inventoryStockBalances = pgTable("inventory_stock_balances", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   materialId: bigint("material_id", { mode: "number" }).notNull().references(() => materialMaster.id, { onDelete: "restrict" }),
   unitId: bigint("unit_id", { mode: "number" }).notNull().references(() => units.id, { onDelete: "restrict" }),
   locationCode: text("location_code").notNull().default("MAIN"),
   lotCode: text("lot_code").notNull().default(""),
+  inventoryLotId: bigint("inventory_lot_id", { mode: "number" }),
   onHandQty: numeric("on_hand_qty", { precision: 24, scale: 6 }).notNull().default("0"),
   reservedQty: numeric("reserved_qty", { precision: 24, scale: 6 }).notNull().default("0"),
   frozenQty: numeric("frozen_qty", { precision: 24, scale: 6 }).notNull().default("0"),
@@ -605,9 +613,12 @@ export const inventoryStockBalances = pgTable("inventory_stock_balances", {
   lastLedgerEntryId: bigint("last_ledger_entry_id", { mode: "number" }),
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 }, (t) => [
-  uniqueIndex("inventory_stock_balances_position_uq").on(t.materialId, t.locationCode, t.lotCode),
+  uniqueIndex("inventory_stock_balances_empty_lot_uq").on(t.materialId, t.locationCode).where(sql`${t.inventoryLotId} is null`),
+  uniqueIndex("inventory_stock_balances_lot_uq").on(t.materialId, t.locationCode,t.inventoryLotId).where(sql`${t.inventoryLotId} is not null`),
   index("inventory_stock_balances_material_idx").on(t.materialId, t.updatedAt),
-  check("inventory_stock_balances_location_ck", sql`${t.locationCode} = 'MAIN' and ${t.lotCode} = ''`),
+  index("inventory_stock_balances_lot_idx").on(t.inventoryLotId,t.updatedAt),
+  foreignKey({name:"inventory_stock_balances_lot_fk",columns:[t.inventoryLotId,t.materialId,t.unitId,t.lotCode],foreignColumns:[inventoryLots.id,inventoryLots.materialId,inventoryLots.unitId,inventoryLots.lotCode]}).onDelete("restrict"),
+  check("inventory_stock_balances_location_ck", sql`${t.locationCode}='MAIN' and ((${t.inventoryLotId} is null and ${t.lotCode}='') or (${t.inventoryLotId} is not null and ${t.lotCode}<>''))`),
   check("inventory_stock_balances_quantity_ck", sql`${t.onHandQty} >= 0 and ${t.reservedQty} >= 0 and ${t.frozenQty} >= 0 and ${t.onHandQty} >= ${t.reservedQty} + ${t.frozenQty}`),
   check("inventory_stock_balances_version_ck", sql`${t.version} > 0`),
 ]);
@@ -622,6 +633,7 @@ export const inventoryLedgerEntries = pgTable("inventory_ledger_entries", {
   unitId: bigint("unit_id", { mode: "number" }).notNull().references(() => units.id, { onDelete: "restrict" }),
   locationCode: text("location_code").notNull().default("MAIN"),
   lotCode: text("lot_code").notNull().default(""),
+  inventoryLotId: bigint("inventory_lot_id", { mode: "number" }),
   entryType: text("entry_type").notNull(),
   onHandDelta: numeric("on_hand_delta", { precision: 24, scale: 6 }).notNull().default("0"),
   frozenDelta: numeric("frozen_delta", { precision: 24, scale: 6 }).notNull().default("0"),
@@ -644,9 +656,11 @@ export const inventoryLedgerEntries = pgTable("inventory_ledger_entries", {
   index("inventory_ledger_entries_material_created_idx").on(t.materialId, t.createdAt, t.id),
   index("inventory_ledger_entries_balance_id_idx").on(t.balanceId, t.id),
   index("inventory_ledger_entries_source_idx").on(t.sourceType, t.sourceId),
+  index("inventory_ledger_entries_lot_created_idx").on(t.inventoryLotId,t.createdAt,t.id).where(sql`${t.inventoryLotId} is not null`),
+  foreignKey({name:"inventory_ledger_entries_lot_fk",columns:[t.inventoryLotId,t.materialId,t.unitId,t.lotCode],foreignColumns:[inventoryLots.id,inventoryLots.materialId,inventoryLots.unitId,inventoryLots.lotCode]}).onDelete("restrict"),
   check("inventory_ledger_entries_line_ck", sql`${t.lineNo} > 0`),
   check("inventory_ledger_entries_type_ck", sql`${t.entryType} in ('RECEIPT','ISSUE','ADJUSTMENT','FREEZE','UNFREEZE','REVERSAL','MIGRATION_OPENING')`),
-  check("inventory_ledger_entries_location_ck", sql`${t.locationCode} = 'MAIN' and ${t.lotCode} = ''`),
+  check("inventory_ledger_entries_location_ck", sql`${t.locationCode}='MAIN' and ((${t.inventoryLotId} is null and ${t.lotCode}='') or (${t.inventoryLotId} is not null and ${t.lotCode}<>''))`),
   check("inventory_ledger_entries_delta_ck", sql`${t.onHandDelta} <> 0 or ${t.frozenDelta} <> 0`),
   check("inventory_ledger_entries_math_ck", sql`${t.afterOnHandQty} = ${t.beforeOnHandQty} + ${t.onHandDelta} and ${t.afterFrozenQty} = ${t.beforeFrozenQty} + ${t.frozenDelta}`),
   check("inventory_ledger_entries_quantity_ck", sql`${t.beforeOnHandQty} >= 0 and ${t.afterOnHandQty} >= 0 and ${t.beforeFrozenQty} >= 0 and ${t.afterFrozenQty} >= 0 and ${t.afterFrozenQty} <= ${t.afterOnHandQty}`),
@@ -665,6 +679,7 @@ export const inventoryAdjustmentLines = pgTable("inventory_adjustment_lines", {
   unitId: bigint("unit_id", { mode: "number" }).notNull().references(() => units.id, { onDelete: "restrict" }),
   locationCode: text("location_code").notNull().default("MAIN"),
   lotCode: text("lot_code").notNull().default(""),
+  inventoryLotId: bigint("inventory_lot_id", { mode: "number" }),
   requestedQty: numeric("requested_qty", { precision: 24, scale: 6 }),
   countedQty: numeric("counted_qty", { precision: 24, scale: 6 }),
   onHandDelta: numeric("on_hand_delta", { precision: 24, scale: 6 }).notNull().default("0"),
@@ -679,8 +694,9 @@ export const inventoryAdjustmentLines = pgTable("inventory_adjustment_lines", {
   uniqueIndex("inventory_adjustment_lines_adjustment_line_uq").on(t.adjustmentId, t.lineNo),
   uniqueIndex("inventory_adjustment_lines_ledger_uq").on(t.ledgerEntryId),
   index("inventory_adjustment_lines_material_idx").on(t.materialId, t.adjustmentId),
+  foreignKey({name:"inventory_adjustment_lines_lot_fk",columns:[t.inventoryLotId,t.materialId,t.unitId,t.lotCode],foreignColumns:[inventoryLots.id,inventoryLots.materialId,inventoryLots.unitId,inventoryLots.lotCode]}).onDelete("restrict"),
   check("inventory_adjustment_lines_line_ck", sql`${t.lineNo} > 0`),
-  check("inventory_adjustment_lines_location_ck", sql`${t.locationCode} = 'MAIN' and ${t.lotCode} = ''`),
+  check("inventory_adjustment_lines_location_ck", sql`${t.locationCode}='MAIN' and ((${t.inventoryLotId} is null and ${t.lotCode}='') or (${t.inventoryLotId} is not null and ${t.lotCode}<>''))`),
   check("inventory_adjustment_lines_input_ck", sql`(${t.requestedQty} is null) <> (${t.countedQty} is null) and coalesce(${t.requestedQty}, ${t.countedQty}) >= 0`),
   check("inventory_adjustment_lines_delta_ck", sql`${t.onHandDelta} <> 0 or ${t.frozenDelta} <> 0`),
   check("inventory_adjustment_lines_math_ck", sql`${t.afterOnHandQty} = ${t.beforeOnHandQty} + ${t.onHandDelta} and ${t.afterFrozenQty} = ${t.beforeFrozenQty} + ${t.frozenDelta}`),
@@ -900,6 +916,14 @@ export const productionReportBatches = pgTable("production_report_batches", {
 export const productionCompletionBatches = pgTable("production_completion_batches", {
   productionCompletionId: bigint("production_completion_id", { mode: "number" }).primaryKey().references(() => productionCompletions.id, { onDelete: "restrict" }), productionBatchId: bigint("production_batch_id", { mode: "number" }).notNull().references(() => productionBatches.id, { onDelete: "restrict" }), workOrderId: bigint("work_order_id", { mode: "number" }).notNull().references(() => productionWorkOrders.id, { onDelete: "restrict" }), createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [index("production_completion_batches_batch_idx").on(t.productionBatchId, t.productionCompletionId)]);
+
+export const productionCompletionInventoryLots = pgTable("production_completion_inventory_lots", {
+  productionCompletionId: bigint("production_completion_id", { mode: "number" }).primaryKey().references(() => productionCompletions.id, { onDelete: "restrict" }), inventoryLotId: bigint("inventory_lot_id", { mode: "number" }).notNull().references(() => inventoryLots.id, { onDelete: "restrict" }), productionBatchId: bigint("production_batch_id", { mode: "number" }).notNull().references(() => productionBatches.id, { onDelete: "restrict" }), inventoryAdjustmentId: bigint("inventory_adjustment_id", { mode: "number" }).notNull().references(() => inventoryAdjustments.id, { onDelete: "restrict" }), inventoryLedgerEntryId: bigint("inventory_ledger_entry_id", { mode: "number" }).notNull().references(() => inventoryLedgerEntries.id, { onDelete: "restrict" }), quantity: numeric("quantity", { precision: 24, scale: 6 }).notNull(), createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [uniqueIndex("production_completion_inventory_lots_ledger_uq").on(t.inventoryLedgerEntryId), index("production_completion_inventory_lots_lot_idx").on(t.inventoryLotId,t.productionCompletionId), check("production_completion_inventory_lots_quantity_ck",sql`${t.quantity}>0`)]);
+
+export const inventoryLotEvents = pgTable("inventory_lot_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), inventoryLotId: bigint("inventory_lot_id", { mode: "number" }).notNull().references(() => inventoryLots.id, { onDelete: "restrict" }), eventType: text("event_type").notNull(), inventoryAdjustmentId: bigint("inventory_adjustment_id", { mode: "number" }).references(() => inventoryAdjustments.id, { onDelete: "restrict" }), inventoryLedgerEntryId: bigint("inventory_ledger_entry_id", { mode: "number" }).references(() => inventoryLedgerEntries.id, { onDelete: "restrict" }), productionCompletionId: bigint("production_completion_id", { mode: "number" }).references(() => productionCompletions.id, { onDelete: "restrict" }), quantity: numeric("quantity", { precision: 24, scale: 6 }).notNull().default("0"), fromStatus: text("from_status"), toStatus: text("to_status").notNull(), reason: text("reason").notNull().default(""), actor: text("actor").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [index("inventory_lot_events_lot_idx").on(t.inventoryLotId,t.id),check("inventory_lot_events_type_ck",sql`${t.eventType} in ('CREATED','COMPLETION_RECEIVED','COMPLETION_REVERSED','FROZEN','UNFROZEN')`),check("inventory_lot_events_quantity_ck",sql`${t.quantity}>=0`),check("inventory_lot_events_status_ck",sql`(${t.fromStatus} is null or ${t.fromStatus} in ('AVAILABLE','FROZEN','DEPLETED','REVERSED')) and ${t.toStatus} in ('AVAILABLE','FROZEN','DEPLETED','REVERSED')`)]);
 
 export const productionWorkOrderOperationProjections = pgTable("production_work_order_operation_projections", {
   id: bigserial("id", { mode: "number" }).primaryKey(), workOrderId: bigint("work_order_id", { mode: "number" }).notNull().references(() => productionWorkOrders.id, { onDelete: "restrict" }), snapshotOperationId: bigint("snapshot_operation_id", { mode: "number" }).notNull().references(() => productionWorkOrderRoutingSnapshotOperations.id, { onDelete: "restrict" }), previousSnapshotOperationId: bigint("previous_snapshot_operation_id", { mode: "number" }).references((): AnyPgColumn => productionWorkOrderRoutingSnapshotOperations.id, { onDelete: "restrict" }), nextSnapshotOperationId: bigint("next_snapshot_operation_id", { mode: "number" }).references((): AnyPgColumn => productionWorkOrderRoutingSnapshotOperations.id, { onDelete: "restrict" }), status: text("status").notNull().default("WAITING"), targetQty: numeric("target_qty", { precision: 24, scale: 6 }).notNull(), version: integer("version").notNull().default(1), updatedAt: timestamptz("updated_at").notNull().defaultNow(),

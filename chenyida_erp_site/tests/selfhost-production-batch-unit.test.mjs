@@ -4,12 +4,13 @@ import test from "node:test";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
 import { PRODUCTION_BATCH_BOUNDARY } from "../app/lib/production-batch-selfhost/service.ts";
 
-test("Manufacturing Batch boundary never claims Inventory Lot support", () => {
+test("Manufacturing Batch boundary exposes finished-goods Lot without widening raw-material scope", () => {
   assert.deepEqual(PRODUCTION_BATCH_BOUNDARY, {
     manufacturing_batch_genealogy: true,
-    inventory_lot_enabled: false,
-    inventory_lot_code: "",
-    message: "生产批次谱系已建立，但仓库批次库存尚未启用。",
+    finished_goods_inventory_lot: true,
+    raw_material_inventory_lot: false,
+    supplier_inventory_lot: false,
+    message: "成品 Manufacturing Batch 已绑定 Inventory Lot；原材料和供应商批次仍未启用。",
   });
 });
 

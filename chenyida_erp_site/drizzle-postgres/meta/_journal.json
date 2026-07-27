@@ -218,6 +218,13 @@
       "when": 1785141676433,
       "tag": "0031_production_batch_genealogy",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1785150537032,
+      "tag": "0032_finished_goods_inventory_lots",
+      "breakpoints": true
     }
   ]
 }

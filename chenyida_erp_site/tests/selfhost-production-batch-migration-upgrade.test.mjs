@@ -8,7 +8,7 @@ const url = process.env.TEST_PRODUCTION_BATCH_DATABASE_URL;
 if (!url || !/production_batch_test/i.test(url)) throw new Error("isolated TEST_PRODUCTION_BATCH_DATABASE_URL containing production_batch_test is required");
 const pool = new Pool({ connectionString: url, max: 2, application_name: "production-batch-migration-test" });
 const dir = new URL("../drizzle-postgres/", import.meta.url);
-const names = (await readdir(dir)).filter((name) => /^\d{4}_.*\.sql$/.test(name)).sort();
+const names = (await readdir(dir)).filter((name) => /^\d{4}_.*\.sql$/.test(name) && name <= "0031_production_batch_genealogy.sql").sort();
 const sources = new Map(await Promise.all(names.map(async (name) => [name, await readFile(new URL(name, dir), "utf8")])));
 const checksum = (name) => createHash("sha256").update(sources.get(name)).digest("hex");
 

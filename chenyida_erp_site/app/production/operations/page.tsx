@@ -21,7 +21,7 @@ export default function OperationsPage() {
   async function report(event: FormEvent<HTMLFormElement>, run: Run) { event.preventDefault(); const form = new FormData(event.currentTarget); await post(run, "reports", { processed_qty: String(form.get("processed_qty")), good_qty: String(form.get("good_qty")), scrap_qty: String(form.get("scrap_qty")), remark: String(form.get("remark") || "") }); }
   const mayReverse = session?.user?.permissions?.some((permission) => permission === "*" || permission === "production.operation.reverse");
   return <main className="sourcing-shell">
-    <header className="sourcing-header"><div><Link href="/">← 经营工作台</Link><h1>工序执行事件与 Batch 质量状态</h1><p>NORMAL/REWORK Run 保持稳定 Manufacturing Batch；生产批次谱系已建立，但仓库批次库存尚未启用。</p><nav><Link href="/production/batches">Batch genealogy</Link> · <Link href="/production/dispatch">按 Batch 派工</Link> · <Link href="/production/wip">WIP 看板</Link> · <Link href="/quality/production">IPQC</Link></nav></div></header>
+    <header className="sourcing-header"><div><Link href="/">← 经营工作台</Link><h1>工序执行事件与 Batch 质量状态</h1><p>NORMAL/REWORK Run 保持稳定 Manufacturing Batch；成品 Manufacturing Batch 已绑定 Inventory Lot；原材料和供应商批次仍未启用。</p><nav><Link href="/production/batches">Batch genealogy</Link> · <Link href="/production/dispatch">按 Batch 派工</Link> · <Link href="/production/wip">WIP 看板</Link> · <Link href="/quality/production">IPQC</Link></nav></div></header>
     {error ? <div className="sourcing-state sourcing-error">{error}</div> : null}
     <section className="sourcing-panel">{rows.map((run) => <article className="sourcing-card" key={run.id}>
       <b>{run.run_kind} · {run.batch_code??"ORDER"} · {run.run_code} · {run.work_order_code} · {run.sequence_no} {run.operation_code} {run.operation_name}</b>

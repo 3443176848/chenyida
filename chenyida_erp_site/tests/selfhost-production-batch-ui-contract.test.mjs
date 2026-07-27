@@ -14,10 +14,10 @@ const pages = [
   "../app/production/rework-requests/page.tsx",
 ];
 
-test("all TASK07 workflow pages state the Inventory Lot boundary", async () => {
+test("all Manufacturing Batch workflow pages state the TASK08 Lot boundary", async () => {
   for (const page of pages) {
     const source = await readFile(new URL(page, import.meta.url), "utf8");
-    assert.match(source, /生产批次谱系已建立，但仓库批次库存尚未启用。/, page);
+    assert.match(source, /成品 Manufacturing Batch 已绑定 Inventory Lot；原材料和供应商批次仍未启用。/, page);
   }
 });
 test("Batch page and execution pages expose stable codes, genealogy, NORMAL and REWORK", async () => {
