@@ -52,12 +52,19 @@ export async function refreshOperationProjections(client: Queryable, workOrderId
       join production_operation_runs source on source.id=a.source_run_id
       join production_operation_runs target on target.id=a.run_id
       where source.snapshot_operation_id=$1 and source.status not in ('CANCELLED','REVERSED') and target.status not in ('CANCELLED','REVERSED')`, [Number(row.snapshot_operation_id)]);
+    const finalReported = row.next_snapshot_operation_id == null
+      ? await client.query(`select coalesce(sum(a.quantity),0)::text quantity
+          from production_report_operation_allocations a
+          join production_report_receipt_projections p on p.report_id=a.production_report_id
+          where a.snapshot_operation_id=$1 and not p.reversed`, [Number(row.snapshot_operation_id)])
+      : { rows: [{ quantity: "0" }] };
     const quantity = await client.query(`select
       ($1::numeric-$2::numeric)::text waiting,
       ($3::numeric-$4::numeric)::text available,
-      case when $5::bigint is null then ($3::numeric-$4::numeric)::text else '0' end final_output`,
-      [source.rows[0]?.quantity ?? "0", facts.rows[0].dispatched, facts.rows[0].good, transferred.rows[0].quantity, row.next_snapshot_operation_id]);
-    if (Number(quantity.rows[0].waiting) < 0 || Number(quantity.rows[0].available) < 0) throw new ProductionError("OPERATION_QUANTITY_CONFLICT", "工序投入或良品已被超量消费", 409);
+      case when $5::bigint is null then ($3::numeric-$4::numeric-$6::numeric)::text else '0' end final_output,
+      ($1::numeric-$2::numeric)>=0 and ($3::numeric-$4::numeric)>=0 and ($3::numeric-$4::numeric-$6::numeric)>=0 valid`,
+      [source.rows[0]?.quantity ?? "0", facts.rows[0].dispatched, facts.rows[0].good, transferred.rows[0].quantity, row.next_snapshot_operation_id, finalReported.rows[0].quantity]);
+    if (!quantity.rows[0].valid) throw new ProductionError("OPERATION_QUANTITY_CONFLICT", "工序投入、良品或末工序产出已被超量消费", 409);
     const status = row.work_order_status === "CANCELLED" ? "CANCELLED"
       : Number(facts.rows[0].processed) >= Number(row.target_qty) ? "COMPLETED"
         : facts.rows[0].has_active ? "IN_PROGRESS"

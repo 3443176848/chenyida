@@ -2,11 +2,11 @@
 FROM node:22-bookworm-slim AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN NODE_OPTIONS=--max-old-space-size=1024 npm ci --ignore-scripts
 
 FROM dependencies AS builder
 COPY . .
-RUN npm run build
+RUN NODE_OPTIONS=--max-old-space-size=1024 npm run build
 
 FROM node:22-bookworm-slim AS web
 ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
@@ -21,7 +21,7 @@ FROM node:22-bookworm-slim AS worker
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN NODE_OPTIONS=--max-old-space-size=1024 npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --chown=node:node app ./app
 COPY --chown=node:node db ./db
 COPY --chown=node:node drizzle-postgres ./drizzle-postgres

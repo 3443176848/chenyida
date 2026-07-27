@@ -23,3 +23,14 @@ export function completionAllocations(value: unknown): Array<{ reportId: number;
     return { reportId, quantity: quantity(row.quantity, "allocation.quantity"), expectedReportVersion: version(row.expected_report_version, "expected_report_version") };
   }).sort((a, b) => a.reportId - b.reportId);
 }
+
+export function finalOutputAllocations(value: unknown): Array<{ operationRunReportId: number; quantity: string }> {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 100) throw new ProductionError("REQUEST_VALIDATION_FAILED", "final_output_allocations 必须包含 1 到 100 条末工序来源");
+  const seen = new Set<number>();
+  return value.map((raw, index) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new ProductionError("REQUEST_VALIDATION_FAILED", `第 ${index + 1} 条末工序来源无效`);
+    const row = raw as Record<string, unknown>; const operationRunReportId = id(row.operation_run_report_id, "operation_run_report_id");
+    if (seen.has(operationRunReportId)) throw new ProductionError("REQUEST_VALIDATION_FAILED", "同一正式报工请求不能重复末工序 Run Report 来源"); seen.add(operationRunReportId);
+    return { operationRunReportId, quantity: quantity(row.quantity, "final_output_allocation.quantity") };
+  }).sort((a, b) => a.operationRunReportId - b.operationRunReportId);
+}

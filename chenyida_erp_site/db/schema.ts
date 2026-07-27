@@ -901,6 +901,21 @@ export const productionOperationRunReports = pgTable("production_operation_run_r
   id: bigserial("id", { mode: "number" }).primaryKey(), reportCode: text("report_code").notNull(), runId: bigint("run_id", { mode: "number" }).notNull().references(() => productionOperationRuns.id, { onDelete: "restrict" }), snapshotOperationId: bigint("snapshot_operation_id", { mode: "number" }).notNull().references(() => productionWorkOrderRoutingSnapshotOperations.id, { onDelete: "restrict" }), processedQty: numeric("processed_qty", { precision: 24, scale: 6 }).notNull(), goodQty: numeric("good_qty", { precision: 24, scale: 6 }).notNull(), scrapQty: numeric("scrap_qty", { precision: 24, scale: 6 }).notNull(), remark: text("remark").notNull().default(""), operationId: uuid("operation_id").notNull(), reportedBy: text("reported_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), reportedAt: timestamptz("reported_at").notNull().defaultNow(),
 }, (t) => [uniqueIndex("production_operation_run_reports_code_uq").on(t.reportCode), uniqueIndex("production_operation_run_reports_operation_uq").on(t.operationId), index("production_operation_run_reports_run_idx").on(t.runId, t.id), check("production_operation_run_reports_quantity_ck", sql`${t.processedQty}>0 and ${t.goodQty}>=0 and ${t.scrapQty}>=0 and ${t.processedQty}=${t.goodQty}+${t.scrapQty}`)]);
 
+export const productionReportOperationAllocations = pgTable("production_report_operation_allocations", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  productionReportId: bigint("production_report_id", { mode: "number" }).notNull().references(() => productionReports.id, { onDelete: "restrict" }),
+  operationRunReportId: bigint("operation_run_report_id", { mode: "number" }).notNull().references(() => productionOperationRunReports.id, { onDelete: "restrict" }),
+  snapshotOperationId: bigint("snapshot_operation_id", { mode: "number" }).notNull().references(() => productionWorkOrderRoutingSnapshotOperations.id, { onDelete: "restrict" }),
+  quantity: numeric("quantity", { precision: 24, scale: 6 }).notNull(), operationId: uuid("operation_id").notNull(),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("production_report_operation_allocations_source_uq").on(t.productionReportId, t.operationRunReportId),
+  uniqueIndex("production_report_operation_allocations_operation_uq").on(t.operationId),
+  index("production_report_operation_allocations_run_report_idx").on(t.operationRunReportId, t.id),
+  index("production_report_operation_allocations_snapshot_idx").on(t.snapshotOperationId, t.id),
+  check("production_report_operation_allocations_quantity_ck", sql`${t.quantity}>0`),
+]);
+
 export const productionOperationRunReversals = pgTable("production_operation_run_reversals", {
   id: bigserial("id", { mode: "number" }).primaryKey(), reversalCode: text("reversal_code").notNull(), runId: bigint("run_id", { mode: "number" }).notNull().references(() => productionOperationRuns.id, { onDelete: "restrict" }), processedQty: numeric("processed_qty", { precision: 24, scale: 6 }).notNull(), goodQty: numeric("good_qty", { precision: 24, scale: 6 }).notNull(), scrapQty: numeric("scrap_qty", { precision: 24, scale: 6 }).notNull(), reason: text("reason").notNull(), operationId: uuid("operation_id").notNull(), reversedBy: text("reversed_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), reversedAt: timestamptz("reversed_at").notNull().defaultNow(),
 }, (t) => [uniqueIndex("production_operation_run_reversals_code_uq").on(t.reversalCode), uniqueIndex("production_operation_run_reversals_run_uq").on(t.runId), uniqueIndex("production_operation_run_reversals_operation_uq").on(t.operationId), check("production_operation_run_reversals_quantity_ck", sql`${t.processedQty}>0 and ${t.goodQty}>=0 and ${t.scrapQty}>=0 and ${t.processedQty}=${t.goodQty}+${t.scrapQty} and char_length(btrim(${t.reason})) between 1 and 1000`)]);

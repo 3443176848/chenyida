@@ -20,12 +20,13 @@ export async function handleProductionApi(request: Request, dependencies: Depend
   const url = new URL(request.url); const path = url.pathname;
   const workOrder = path.match(/^\/api\/work-orders\/([1-9]\d*)$/); const release = path.match(/^\/api\/work-orders\/([1-9]\d*)\/release$/); const close = path.match(/^\/api\/work-orders\/([1-9]\d*)\/close$/); const cancel = path.match(/^\/api\/work-orders\/([1-9]\d*)\/cancel$/); const snapshot = path.match(/^\/api\/work-orders\/([1-9]\d*)\/bom-snapshot$/); const progress = path.match(/^\/api\/work-orders\/([1-9]\d*)\/progress$/);
   const issue = path.match(/^\/api\/production\/material-issues\/([1-9]\d*)$/); const returned = path.match(/^\/api\/production\/material-returns\/([1-9]\d*)$/); const report = path.match(/^\/api\/production\/reports\/([1-9]\d*)$/); const reportReversal=path.match(/^\/api\/production\/reports\/([1-9]\d*)\/reverse$/); const completion = path.match(/^\/api\/production\/completions\/([1-9]\d*)$/); const completionReversal=path.match(/^\/api\/production\/completions\/([1-9]\d*)\/reverse$/);
-  const fixed = ["/api/work-orders", "/api/work-orders/from-bom", "/api/work-order-materials", "/api/production-reports", "/api/work-orders/issue-materials", "/api/work-orders/complete", "/api/production/material-requirements", "/api/production/material-issues", "/api/production/material-returns", "/api/production/reports", "/api/production/completions"];
+  const fixed = ["/api/work-orders", "/api/work-orders/from-bom", "/api/work-order-materials", "/api/production-reports", "/api/work-orders/issue-materials", "/api/work-orders/complete", "/api/production/material-requirements", "/api/production/material-issues", "/api/production/material-returns", "/api/production/reports", "/api/production/final-output-sources", "/api/production/completions"];
   if (!fixed.includes(path) && !workOrder && !release && !close && !cancel && !snapshot && !progress && !issue && !returned && !report && !reportReversal && !completion && !completionReversal) return null;
   const repository = new ProductionRepository(dependencies.pool); const service = new ProductionService(repository); let action = "PRODUCTION_REQUEST";
   try {
     if (request.method === "GET") {
       requirePermission(dependencies.actor, "production.read");
+      if (path === "/api/production/final-output-sources" && !["production", "quality", "manager", "admin"].includes(dependencies.actor.role)) throw new ProductionError("PERMISSION_DENIED", "没有权限读取末工序正式报工来源", 403);
       if(reportReversal||completionReversal)throw new ProductionError("METHOD_NOT_ALLOWED","冲销接口只支持 POST",405);
       if (workOrder || progress) return response({ data: await service.getWorkOrder(Number((workOrder ?? progress)![1])), request_id: dependencies.requestId }, 200, dependencies.requestId);
       if (snapshot) return response({ data: await service.snapshot(Number(snapshot[1])), request_id: dependencies.requestId }, 200, dependencies.requestId);
@@ -37,6 +38,7 @@ export async function handleProductionApi(request: Request, dependencies: Depend
       if (path === "/api/work-orders") result = await service.listWorkOrders(size, offset);
       else if (["/api/work-order-materials", "/api/production/material-requirements"].includes(path)) result = await service.listRequirements(size, offset, workOrderId);
       else if (["/api/production-reports", "/api/production/reports"].includes(path)) result = await service.listReports(size, offset, workOrderId);
+      else if (path === "/api/production/final-output-sources") result = await service.listFinalOutputSources(size, offset, workOrderId);
       else if (path === "/api/production/material-issues") result = await service.listIssues(size, offset, workOrderId);
       else if (path === "/api/production/material-returns") result = await service.listReturns(size, offset, workOrderId);
       else result = await service.listCompletions(size, offset, workOrderId);

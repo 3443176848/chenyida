@@ -20,6 +20,12 @@ const constraintCodes: Record<string, [string, string]> = {
   production_operation_runs_operation_uq: ["OPERATION_RUN_OPERATION_CONFLICT", "工序派工操作已经提交"],
   production_operation_run_reversals_run_uq: ["OPERATION_RUN_ALREADY_REVERSED", "工序批次已经冲销"],
   production_operation_run_input_allocations_source_uq: ["OPERATION_UPSTREAM_ALLOCATION_CONFLICT", "前序良品分配发生冲突"],
+  production_report_operation_allocations_source_uq: ["FINAL_OUTPUT_ALLOCATION_CONFLICT", "同一报工不能重复消费末工序来源"],
+  production_report_operation_allocations_quantity_gate_ck: ["FINAL_OUTPUT_SOURCE_EXHAUSTED", "末工序 Run Report 良品已被消费或本次报工超量"],
+  production_report_operation_allocations_lineage_ck: ["FINAL_OUTPUT_SOURCE_INVALID", "末工序来源与结构化报工不一致"],
+  production_final_output_report_reconciliation_ck: ["FINAL_OUTPUT_RECONCILIATION_FAILED", "结构化报工与末工序来源分配无法核对"],
+  production_operation_projection_reconciliation_ck: ["FINAL_OUTPUT_PROJECTION_CONFLICT", "末工序可报工投影无法核对"],
+  production_report_operation_allocations_immutable_ck: ["FINAL_OUTPUT_ALLOCATION_IMMUTABLE", "末工序产出分配不可修改或删除"],
 };
 
 export function mapProductionError(error: unknown): ProductionError {

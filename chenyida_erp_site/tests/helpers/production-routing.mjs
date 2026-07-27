@@ -17,3 +17,18 @@ export async function ensureReleasedRouting(pool, refs, prefix = "TEST") {
     await client.query("commit"); return Number(version.id);
   } catch (error) { await client.query("rollback").catch(() => undefined); throw error; } finally { client.release(); }
 }
+
+// Test-only fixture conversion for Phase 4 compatibility suites. Production code and
+// migrations never delete immutable routing snapshots; migrated historical work orders
+// can legitimately have no snapshot and must retain their legacy report API.
+export async function convertReleasedWorkOrderToLegacyFixture(pool, workOrderId) {
+  const client=await pool.connect();
+  try {
+    await client.query("begin");await client.query("set local session_replication_role=replica");
+    await client.query("delete from production_operation_wip_projections where operation_projection_id in(select id from production_work_order_operation_projections where work_order_id=$1)",[workOrderId]);
+    await client.query("delete from production_work_order_operation_projections where work_order_id=$1",[workOrderId]);
+    await client.query("delete from production_work_order_routing_snapshot_operations where snapshot_id in(select id from production_work_order_routing_snapshots where work_order_id=$1)",[workOrderId]);
+    await client.query("delete from production_work_order_routing_snapshots where work_order_id=$1",[workOrderId]);
+    await client.query("commit");
+  } catch(error) { await client.query("rollback").catch(()=>undefined);throw error; } finally { client.release(); }
+}
