@@ -2,7 +2,7 @@
 
 ## 状态与授权
 
-- 状态：`DOING`
+- 状态：`DONE / PARALLEL ACCEPTED`
 - 日期：2026-07-27（Asia/Shanghai）
 - 授权：项目负责人明确授权仅执行 TASK05，包括代码、`0029`、隔离测试、回环并行 HTTP 验收、Compose 串行重启、停服备份恢复、最终清理、文档和独立 Git 提交。
 - 合法起点：`main` / `736f14b9510ca52ce39fea7154872dffe7818986`；工作区 clean，`origin/main...HEAD` behind 0/ahead 50。
@@ -52,21 +52,21 @@ Operation Run Report good
 
 ## 验收清单
 
-- [ ] `0029`、Schema、journal、snapshot、完整 SHA-256、版本升级
-- [ ] TASK05 unit、UI contract、PostgreSQL/API、Migration、Compose acceptance
-- [ ] failed=0、证据缺失、超量、重复返工/SCRAP、RETURN/CANCEL 释放、ACCEPT 不可变、目标工序和跨工单门禁
-- [ ] 权限、职责分离、幂等、CAS、并发唯一结果、故障零半记录和直接 SQL guard
-- [ ] TASK04 IPQC Gate、TASK02/TASK03 WIP/Final Output/冲销与 Phase 4 TASK07/TASK08 回归
-- [ ] 实际 HTTP inspected 10 / passed 8 / failed 2 / AOI available 8 / Quality Hold 2
-- [ ] Rework Request v1 退回、不可变 v2 重提并接收；accepted rework 2、unresolved 0
-- [ ] Rework Run、额外 Run Report、Production Report、Completion、Finished Goods、FQC/Shipment/AR/Settlement 全为 0
-- [ ] Inspection reopen、来源 Run 冲销、ACCEPTED Request 修改/取消均拒绝，越权角色 403
-- [ ] 正式 typecheck、Schema consistency、lint、build、credentials、`git diff --check` 和 Python 三项基线
-- [ ] 修改主库前 TASK05 专用停服备份及 SHA/`pg_restore --list`
-- [ ] Compose 整体串行重启、事实与 Audit 持久
-- [ ] 接受态停服备份、固定第二新空 PostgreSQL 恢复、29 migrations 与完整 NCR→v1/v2 链核对
-- [ ] 最终主库干净 0029、唯一启用管理员、业务/Audit/Idempotency/临时账号/文件 0，仅保留原三容器四卷
-- [ ] 功能提交、完成报告与独立 ops 验收提交
+- [x] `0029`、Schema、journal、snapshot、完整 SHA-256、版本升级
+- [x] TASK05 unit、UI contract、PostgreSQL/API、Migration、Compose acceptance
+- [x] failed=0、证据缺失、超量、重复返工/SCRAP、RETURN/CANCEL 释放、ACCEPT 不可变、目标工序和跨工单门禁
+- [x] 权限、职责分离、幂等、CAS、并发唯一结果、故障零半记录和直接 SQL guard
+- [x] TASK04 IPQC Gate、TASK02/TASK03 WIP/Final Output/冲销与 Phase 4 TASK07/TASK08 回归
+- [x] 实际 HTTP inspected 10 / passed 8 / failed 2 / AOI available 8 / Quality Hold 2
+- [x] Rework Request v1 退回、不可变 v2 重提并接收；accepted rework 2、unresolved 0
+- [x] Rework Run、额外 Run Report、Production Report、Completion、Finished Goods、FQC/Shipment/AR/Settlement 全为 0
+- [x] Inspection reopen、来源 Run 冲销、ACCEPTED Request 修改/取消均拒绝，越权角色 403
+- [x] 正式 typecheck、Schema consistency、lint、build、credentials、`git diff --check` 和 Python 三项基线
+- [x] 修改主库前 TASK05 专用停服备份及 SHA/`pg_restore --list`
+- [x] Compose 整体串行重启、事实与 Audit 持久
+- [x] 接受态停服备份、固定第二新空 PostgreSQL 恢复、29 migrations 与完整 NCR→v1/v2 链核对
+- [x] 最终主库干净 0029、唯一启用管理员、业务/Audit/Idempotency/临时账号/文件 0，仅保留原三容器四卷
+- [x] 功能提交、完成报告与独立 ops 验收提交
 
 ## 低资源与排除边界
 

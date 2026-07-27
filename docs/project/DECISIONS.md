@@ -796,6 +796,17 @@
 - 更正与并发：存在任何 IPQC 后阻止来源 Run 冲销；下游已消费后阻止 reopen、降低放行或改变处置。无消费时按既有职责分离安全 reopen，并把释放额度归零。Inspection/Result/Defect/Event/Allocation 不原地改写或删除；CAS、固定锁顺序、幂等、数据库 deferred guard 和单事务 Audit 保证并发与故障 fail closed。
 - 权限与边界：production 只执行工序和查看质量状态，quality 创建/记录/关闭，manager/admin 处置管理，最终处置与关闭保持异人职责分离，其他角色写入 403。Dashboard 只读且不自动创建 Inspection。本决定不授权 FQC、Shipment、财务、返工/返修、failed/scrap 库存、批次/序列、设备/OEE、产能、真实迁移、切流或生产部署。
 
+## D-072 IPQC failed 以唯一 NCR 守恒分配，返工接收不等于返工执行
+
+- 日期：2026-07-27
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
+- 确认人：项目负责人（明确授权 `SELFHOST-PHASE5-TASK05`，并固定 NCR、不可变返工申请交接、受控 SCRAP 与不执行返工工序边界）
+- 稳定来源：NCR 只能由同一 Work Order/Snapshot Operation 的结构化 Operation Run Report IPQC 创建，Inspection 必须 `failed_qty > 0` 且同时存在 FAIL Result 和有效 Defect。每个 Inspection 唯一 NCR；Material、Unit、Work Order、Run Report、Snapshot Operation 和 Work Center 均沿服务端稳定外键继承。
+- 数量守恒：`failed_qty = active rework allocation + final scrap allocation + unresolved_qty`。DRAFT 不占用；SUBMITTED/ACCEPTED 占用；RETURNED/CANCELLED 释放；SCRAP 为不可逆 FINAL。PostgreSQL numeric、唯一索引、固定锁顺序和 deferred guard 阻止超量、重复消费、跨工单目标和直接 SQL 伪造。
+- 返工交接：quality 创建/编辑 DRAFT，submit 重新锁定来源与数量并生成 canonical digest 和不可变提交版本；production 只能 ACCEPT/RETURN，创建人不得接收自己的申请，RETURN 必须留原因。RETURNED 只能新建修订请求，ACCEPTED 不可修改/取消/减少，也不会自动创建 Run、WIP、领料、报工、再检或库存事实。
+- 目标与更正：target 只能是同一 Work Order Routing Snapshot 中 sequence 不晚于来源的稳定 Snapshot Operation。已有 SUBMITTED/ACCEPTED 或 SCRAP 时禁止 Inspection reopen 和来源 Run 冲销；无有效处置和下游时仅允许保留历史的安全取消。无法证明安全一律 fail closed。
+- 权限与边界：quality 管理 NCR/返工准备，production 接收/退回，manager/admin 管理并执行不写 Inventory 的工序 SCRAP，engineering 只读，其余角色写入 403。Dashboard 只读显示待处置/未分配/待接收/已接收待执行/最终工序报废。本决定不授权 TASK06、实际返工执行、库存报废、补产/补料、批次/序列、FQC/Shipment/AR、真实迁移、切流或生产部署。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

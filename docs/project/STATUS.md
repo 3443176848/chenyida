@@ -2,6 +2,26 @@
 
 最后更新时间：2026-07-27（Asia/Shanghai）
 
+## SELFHOST-PHASE5-TASK05 IPQC 不合格处置与返工申请交接
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `1de057a6a248ca3346d7d2b0f201252a3965eced` 严格 Parent `736f14b9510ca52ce39fea7154872dffe7818986`；独立 ops 验收提交以 Git log 为准 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.29`；`0029` SHA-256/数据库 checksum `6814a728f4d04e4fbceb83c7a288fa214a9ec64317b547cc6cbaebfec456b40c`；0001—0028 未修改，Schema/journal/snapshot 一致 |
+| NCR 与数量守恒 | PASS | 只接受 failed>0、FAIL Result+Defect 的结构化 Run Report IPQC；服务端继承稳定来源；`failed = active rework + final scrap + unresolved`，RETURNED/CANCELLED 释放，ACCEPTED 占用，SCRAP 不可逆且不写库存 |
+| 实际 HTTP 数量 | PASS | planned/issued 10；REFLOW inspected 10/passed 8/failed 2；AOI available 8、Hold 2；v1 RETURNED、v2 ACCEPTED；active rework 2、final scrap 0、unresolved 0、NCR REWORK_ACCEPTED |
+| 请求版本/目标 | PASS | target 为同工单 REFLOW Snapshot Operation；v1/v2 各有不可变提交快照和 64 位 digest；后序/跨工单目标拒绝，SUBMITTED/ACCEPTED 内容不可改，ACCEPTED 不可取消 |
+| 权限/职责分离 | PASS | quality 创建/编辑/提交，production RETURN/ACCEPT 且不能接收自己创建的请求，manager/admin SCRAP，engineering 只读；warehouse/sales 等实际 403 |
+| 门禁/并发/回滚 | PASS | Idempotency 重放/异正文、CAS、固定锁顺序、并发 draft/submit/accept/SCRAP、直接 SQL、故障零半记录通过；已有处置阻止 Inspection reopen 与来源 Run 冲销 |
+| 下游零事实 | PASS | AOI available 保持 8；Rework Run、额外 Run Report、Production Report、Completion、Finished Goods Ledger/Balance、FQC/Shipment/AR/Settlement 均 0 |
+| 自动验证 | PASS | 166 项不重复 Node 自动测试：unit/UI 72、PG/API 47、migration 38、npm 3、environment 6；正式 typecheck、Schema consistency、lint、build、955 文件 credentials scan、`git diff --check` 和 Python 三项通过 |
+| 重启/恢复 | PASS | 整体重启后 NCR/v1/v2、2 提交快照、6 请求事件、digest、Audit 44、Idempotency 30 保持；接受态备份 SHA-256 `440fae8efd3427a341d7c8d2d24ebf516de9ef9dfd9acb50b5e841ebf069afbc` 恢复到固定第二新空库并核对完整链 |
+| 清理 | PASS | 主库 29 migrations、app_meta 1、唯一启用 admin，其他公共业务/Audit/Idempotency/临时账号 0；uploads/attachments 0；仅 PostgreSQL/Web/Worker 三容器和四卷；TASK05 库/备份/临时容器/辅助镜像删除，resource-guard 保留 |
+| Python/SQLite | PASS / PROTECTED | `server.py --self-test`、`smoke_test.py`、临时 SQLite `go_live_check.py --no-backup` 通过；常驻 Python PID `13737` 未重启，真实 SQLite metadata `53827608:1544192:1784999031:1784356951`、mode 600 未变，未读业务正文 |
+| 资源观测 | PASS | 起点 available 约 2.4 GiB、Swap 约 111 MiB、磁盘约 21 GiB；最终 available 2.4 GiB、Swap 150 MiB、磁盘 17 GiB、Load `0.18/0.31/0.82`；独立 60 秒 Swap 157,892,608→157,872,128 bytes（正增长 0），全程 RestartCount 0、OOMKilled false |
+| 排除事项 | ENFORCED | 未执行 Rework Run/派工/开工/报工/再检、SCRAP 库存过账、补产/补料、批次/设备/产能、FQC/Shipment/AR、真实迁移、Python 服务操作、HTTPS/防火墙、生产部署、push、PR 或 TASK06 |
+| 完成结论 | PASS | `IPQC NONCONFORMANCE TO REWORK REQUEST ACCEPTED IN PARALLEL ENVIRONMENT` |
+
 ## SELFHOST-PHASE5-TASK04 工序质量门禁、IPQC 稳定来源与受控放行
 
 | 验证项 | 结果 | 说明 |

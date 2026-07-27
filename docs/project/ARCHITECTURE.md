@@ -4,6 +4,23 @@
 
 ## 2026-07-27 工序 IPQC 质量门禁与受控 WIP 放行边界
 
+`SELFHOST-PHASE5-TASK05` 继续复用唯一 Quality Inspection/Result/Defect 与 Production Operation/WIP 权威。结构化 Operation Run Report IPQC 的 failed quantity 形成每 Inspection 唯一 NCR；服务端沿稳定外键继承 Work Order、Snapshot Operation、Work Center、Material、Unit 和来源数量。NCR 的关系化 Allocation 使 `failed = active rework + final scrap + unresolved` 在事务提交时由数据库核对。
+
+Rework Request 的 DRAFT 可 CAS 编辑但不占用数量；SUBMITTED 固化 canonical digest 与不可变版本并占用 failed，RETURNED/CANCELLED 释放，ACCEPTED 持续占用且只表示生产接收。SCRAP 是不写 Inventory Ledger/Balance 的不可逆工序事实。目标只能回到同一 Work Order Snapshot 中原工序或更早工序；TASK05 不创建 Rework Run、派工、报工、再检、补产或库存过账。
+
+```mermaid
+flowchart LR
+    I[Closed IPQC inspected 10] --> P[passed 8 released to AOI]
+    I --> N[failed 2 unique NCR]
+    N --> D[quality Rework Draft]
+    D --> S[Submitted immutable snapshot + digest]
+    S -->|production return| V1[v1 RETURNED, allocation released]
+    V1 --> V2[v2 revision SUBMITTED]
+    V2 -->|production accept| A[ACCEPTED allocation 2]
+    A -. TASK06 only .-> R[Future Rework Run]
+    N -->|manager/admin| X[Final operation SCRAP, no inventory posting]
+```
+
 `SELFHOST-PHASE5-TASK04` 不增加第二套 Quality 或 WIP。Routing Operation 的 `quality_gate_mode` 只允许 `NONE/IPQC`，进入发布 digest 并固化到 Work Order Snapshot Operation。IPQC 工序的 Run Report good 先全部进入 Quality Hold；既有 Quality Service 显式建立稳定 `production_operation_run_report_id` Inspection，经 Result、异人 Disposition 与 Close 后，`CLOSED/RELEASED` 数量才成为下游可消费额度。
 
 ```mermaid
@@ -150,12 +167,12 @@ flowchart LR
 
 `SELFHOST-PHASE3-TASK05` 首次把 Node/PostgreSQL 基线作为持久的非生产空环境与 Python/SQLite 同机并行运行。Compose 项目固定为 `chenyida-erp-parallel`，只启动 PostgreSQL 17、migrate、Web 和 Worker；Caddy/production profile 不启动。Web 宿主绑定为 `127.0.0.1:3000`，PostgreSQL 只在 Compose 网络暴露 5432，用户经 SSH 隧道访问。
 
-`SELFHOST-PHASE4-TASK01`—`TASK05` 已依次把该环境升级至 alpha.19/`0019`。TASK05 在恢复点保护下完成 Award→PO→到货→分批收货→库存→来源→AP、整体重启与新空库恢复，再恢复为保留 19 个 migration/唯一管理员的空业务状态；网络与 production profile 边界不变。
+`SELFHOST-PHASE4-TASK01`—`TASK10` 与 `SELFHOST-PHASE5-TASK01`—`TASK05` 已依次把该环境升级至 alpha.29/`0029`。最新 TASK05 在恢复点保护下完成 IPQC failed→NCR→Rework Request v1 退回/v2 接收、整体重启与固定第二新空库恢复，再恢复为保留 29 个 migration/唯一管理员的空业务状态；网络与 production profile 边界不变。
 
 ```mermaid
 flowchart LR
     SSH["用户 SSH 隧道"] --> WEB["127.0.0.1:3000 Node Web"]
-    WEB --> PG["Compose PostgreSQL 17 / 当前 0001—0019"]
+    WEB --> PG["Compose PostgreSQL 17 / 当前 0001—0029"]
     WORKER["独立 Worker"] --> PG
     WEB --> FILES["uploads / attachments Volumes"]
     PY["现有 Python :18888"] --> SQLITE["真实 SQLite，保持不变"]

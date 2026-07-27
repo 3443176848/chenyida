@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与并行环境均为 `0.1.0-alpha.28`/`0028`；只属于回环并行验收，明确为非生产且尚未正式发布。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与并行环境均为 `0.1.0-alpha.29`/`0029`；只属于回环并行验收，明确为非生产且尚未正式发布。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.19`。
 - Git 复核：TASK04 起点为本地 `main`/HEAD `f6e5ff2e8344e79a35f56311b02b514613484f59`、behind 0/ahead 47、工作区 clean；功能提交 `5379550d0381818ad970518ac4fb8261c4679989` 与聚焦修正 `56f63ca714ed6f359bc51f681b6a532259747f1b` 均为追加提交，最终另建 ops 验收提交，仍不 push、不创建 PR，不得描述为已同步。
 
@@ -124,6 +124,7 @@
 30. SELFHOST-PHASE4-TASK07 采用 D-064：Report 受净领料支持量约束且不写库存；Completion 必须通过 Allocation 消费未占用 good，并与成品 Ledger/Balance、Work Order 投影、Event/Audit/Idempotency 同事务。Report/Completion 只能追加式全额冲销并执行 IPQC/FQC/Shipment/库存门禁。`0.1.0-alpha.21`/`0021`、真实 4/6 链、重启、双恢复与清理已通过。
 31. SELFHOST-PHASE5-TASK03 采用 D-070：结构化 Production Report 只消费同一工单末 Snapshot Operation 的稳定 Run Report good，Allocation 与既有 Report 保持不可变；warehouse 继续显式消费既有 Report 创建 Completion 和成品库存。`0.1.0-alpha.27`/`0027`、实际 Report/Completion/Ledger `4/6`、Balance 10、COMPLETED、重启、恢复与清理已通过；品质、销售和财务事实保持 0。
 32. SELFHOST-PHASE5-TASK04 采用 D-071：Routing Operation 的 `NONE/IPQC` 随发布 digest 和 Work Order Snapshot 固化；工序 good 不自动创建 IPQC，quality 显式引用稳定 Run Report，经异人处置/关闭后才形成下游额度。`0.1.0-alpha.28`/`0028`、REFLOW Hold `10→6→0`、AOI available `0→4→10`、Report/Completion/Ledger `4/6`、Balance 10、重启、恢复与清理已通过。
+33. SELFHOST-PHASE5-TASK05 采用 D-072：只有结构化 Operation Run Report IPQC failed 才能建立唯一 NCR；failed 数量由 active rework、final scrap 与 unresolved 守恒。quality 的 DRAFT 在 submit 时生成不可变 digest/snapshot，production 只接收或退回，ACCEPTED 仅占用额度等待后续任务。`0.1.0-alpha.29`/`0029`、passed 8/failed 2、v1 退回/v2 接收、重启、第二新空库恢复与最终清理已通过；未执行返工工序或库存报废。
 
 ## 当前风险
 
@@ -163,9 +164,7 @@
 
 ## 当前路线
 
-`SELFHOST-PHASE4-TASK05` 已完成：源码历史与并行环境基线为 `0.1.0-alpha.19` / PostgreSQL `0019`，`10×12` Award 经显式 PO/到货计划、两批 `4/6` 收货形成库存 `10`、来源和 AP `48/72`；Compose 重启、新空库恢复和清理通过。
-
-`SELFHOST-PHASE4-TASK07` 已 DONE：功能提交 `323e85d44a2a4202811944591d0a4f6b96ae6751` 严格以 `26ccb95782478645720c8284c59b0afadca68649` 为 Parent；`0.1.0-alpha.21`/`0021` 的 Report→Completion Allocation、净领料支持量、分批成品入库和追加式安全冲销已通过隔离回归、并行真实 4/6 HTTP、整栈重启、双恢复和最终清理。品质检验创建、发货、财务、真实迁移、HTTPS 和生产切换仍未执行。
+`SELFHOST-PHASE5-TASK05` 已 DONE：功能提交 `1de057a6a248ca3346d7d2b0f201252a3965eced` 严格以 `736f14b9510ca52ce39fea7154872dffe7818986` 为 Parent；`0.1.0-alpha.29`/`0029` 的结构化 IPQC failed→唯一 NCR→不可变返工申请 v1 RETURNED/v2 ACCEPTED 已通过隔离回归、并行真实 passed 8/failed 2 HTTP、整体重启、固定第二新空库恢复和最终清理。当前无 `DOING`，不得自动启动 TASK06；实际返工、库存报废、真实迁移、HTTPS 和生产切换仍未执行。
 
 ## 恢复上下文检查清单
 

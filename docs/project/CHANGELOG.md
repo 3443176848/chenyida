@@ -4,6 +4,24 @@
 
 ## 2026-07-27
 
+### SELFHOST-PHASE5-TASK05 - `ops: accept production rework request workflow in parallel environment`
+
+- 提交：功能提交 `1de057a6a248ca3346d7d2b0f201252a3965eced` 严格 Parent `736f14b9510ca52ce39fea7154872dffe7818986`；独立 ops 提交实际哈希以 Git log 为准。
+- 并行验收：只更新 `chenyida-erp-parallel` 至 `0.1.0-alpha.29`/29 migrations；`0029` SHA-256/数据库 checksum 为 `6814a728f4d04e4fbceb83c7a288fa214a9ec64317b547cc6cbaebfec456b40c`。Web 仍仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口。
+- 实际 HTTP：四 Work Center 与 `NONE/NONE/IPQC/NONE` Routing，planned/issued 10；REFLOW IPQC inspected 10/passed 8/failed 2，AOI available 8、Quality Hold 2。唯一 NCR 由 OPEN 进入 REWORK_PENDING/REWORK_ACCEPTED；v1 RETURNED 释放占用，v2 以新不可变提交快照和 digest 重提后 ACCEPTED，最终 active rework 2、scrap 0、unresolved 0。
+- 保护：failed=0/缺 FAIL/Defect、超量、重复 Rework/SCRAP、后序/跨工单目标、职责分离、403、幂等重放/异正文、CAS、并发 submit/accept/SCRAP、故障零半记录、直接 SQL guard、ACCEPTED 修改/取消、Inspection reopen 和来源 Run 冲销均 fail closed；SCRAP 自动测试确认不可逆且不写 Inventory。
+- 下游为零：接收申请未增加 AOI available，未创建 Rework Run、额外 Run Report、Production Report、Completion、Finished Goods Ledger/Balance、FQC、Shipment、AR 或 Settlement。
+- 持久与恢复：Compose 整体串行重启后 NCR、v1/v2、2 个提交快照、6 个请求事件、digest、数量、Audit 44、Idempotency 30 保持；接受态备份 1,517,240 bytes、SHA-256 `440fae8efd3427a341d7c8d2d24ebf516de9ef9dfd9acb50b5e841ebf069afbc` 恢复到固定第二新空库并核对完整链。
+- 清理与边界：最终主库 29 migrations、唯一启用管理员、其余所有业务/Audit/Idempotency/验收账号/uploads/attachments 0，仅三容器四卷；恢复库、两份 TASK05 备份、临时目录/容器/辅助镜像删除，resource-guard 备份保留。未操作 Python 服务、读取真实 SQLite 正文、执行返工工序、迁真实数据、启 HTTPS、切流、生产部署、push、PR 或 TASK06。
+- 结论：`IPQC NONCONFORMANCE TO REWORK REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`。
+
+### SELFHOST-PHASE5-TASK05 - `feat: add production nonconformance handoff`
+
+- 数据库：只新增 expand-only `0029_production_nonconformance_rework_handoff.sql` 与 NCR/Event、Rework Request/Version/Event、Allocation、Scrap Disposition 关系表；numeric、稳定外键、唯一/状态/索引、不可变 guard、服务写入口与 deferred 守恒阻止超量、跨工单和伪造目标；同步 Drizzle Schema/journal/snapshot，不修改 0001—0028。
+- 服务/API：扩展既有 Quality/Production 边界，Inspection→唯一 NCR、DRAFT 编辑/提交、RETURN/ACCEPT、修订重提、SCRAP、队列/详情/数量/上下文全部执行 Session/must-change、CSRF、正文/速率限制、持久幂等、CAS、固定锁顺序、request_id、中文安全错误、Audit 与单事务回滚。
+- UI/Dashboard：新增 `/quality/nonconformances`、`/quality/rework-requests`、`/production/rework-requests`；Dashboard 增加待处置 NCR、未分配数量、待接收、已接收待执行和最终工序报废五项权限裁剪只读指标。
+- 验证：166 项不重复 Node 自动测试（unit/UI 72、PG/API 47、migration 38、npm 3、environment 6）通过；正式 TASK05 typecheck、Drizzle consistency、lint 0 error/8 个既有 warning、Vinext build、955 文件 credentials scan、`git diff --check` 和 Python 三项通过。
+
 ### SELFHOST-PHASE5-TASK04 - `ops: accept production quality gate workflow in parallel environment`
 
 - 提交：功能提交 `5379550d0381818ad970518ac4fb8261c4679989` 严格 Parent `f6e5ff2e8344e79a35f56311b02b514613484f59`；Dashboard 验收路径聚焦修正 `56f63ca714ed6f359bc51f681b6a532259747f1b`，Parent 为功能提交；独立 ops 提交实际哈希以 Git log 为准。
