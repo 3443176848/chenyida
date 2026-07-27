@@ -4,6 +4,17 @@
 
 ## 2026-07-27
 
+### SELFHOST-OPS-RESOURCE-GUARD-01 - `ops: add low-resource server safeguards`
+
+- Git：严格 Parent `120e1524eaebd9d921cab6a036b3203bf7d39226`；保留并审阅既有 `server.py`、`compose.yml`、systemd unit 三项修改，追加根规则、专项测试和文档；不改版本、migration 或历史。
+- Python：`ERPThreadingHTTPServer` 默认最多 16 个活跃请求线程，容量等待 1 秒后固定去敏 503；30 秒 socket timeout、daemon/non-blocking close 和正常/异常槽位释放通过轻量 2 项测试。通用 500 响应不再回显异常正文。
+- Compose/systemd：PostgreSQL/Web/Worker/Migrate/Admin/Caddy 均配置 CPU、Memory、Memory+Swap、PID 限额；Web/Worker Node heap 384 MiB。unit 源含 CPU 75%、MemoryHigh 512M、MemoryMax 768M、Tasks 256、NOFILE 4096 并通过 verify；只读核验确认起点 installed unit 已一致且实际属性生效，本任务未复制、reload 或重启 Python。
+- 运行应用：校验 PostgreSQL custom dump 后，固定 `COMPOSE_PARALLEL_LIMIT=1`、不 build，只逐个重建 Web/Worker；PostgreSQL 保持原容器。实际 inspect 与配置目标一致，26 migrations、唯一管理员、空业务基线、网络边界和四卷保持。
+- 资源观察：起止 available memory 均约 2.2 GiB、Swap 约 42 MiB、磁盘可用 26 GiB，Load `0.33/0.27/0.49` → `0.05/0.14/0.32`；60 秒 Swap 增长 0，restart 0、OOM false，PostgreSQL/Web healthy、Worker running。
+- 事故边界：2026-07-27 服务器重启/不可用根因 `UNKNOWN`，不得写成 OOM。Python 仍保留且只能由独立授权任务停用；结论不表示生产上线。
+- 验证：Python 专项/self-test/smoke/临时 SQLite go-live、Compose config、systemd verify、受限单容器 TypeScript check、环境守卫、credentials scan 与 Git 检查串行执行；临时资源清理完成，恢复备份按计划保留。
+- 结论：`LOW RESOURCE SERVER SAFEGUARDS ACTIVE`；未启动 PHASE5-TASK03，未 push、迁真实数据、切流或生产部署。
+
 ### SELFHOST-PHASE5-TASK02 - `ops: accept production wip workflow in parallel environment`
 
 - 提交：功能提交 `77ff520e8dbd4b04fdb96a4281934e2d7f2d8d9c`，Parent 严格为 `d6554fcaea77cfe16320d98afcf9aed9c794bc3f`；独立 ops 提交以功能提交为 Parent，不 amend/rebase，实际哈希以 Git log 为准。

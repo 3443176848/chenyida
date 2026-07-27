@@ -19,6 +19,10 @@ x-app-volumes: &app-volumes
 services:
   postgres:
     image: postgres:17-bookworm
+    cpus: "0.75"
+    mem_limit: 768m
+    memswap_limit: 1g
+    pids_limit: 128
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
@@ -36,6 +40,10 @@ services:
 
   migrate:
     build: { context: ., target: worker }
+    cpus: "0.75"
+    mem_limit: 768m
+    memswap_limit: 1g
+    pids_limit: 128
     command: ["node", "--experimental-strip-types", "scripts/migrate-postgres.ts"]
     environment: *app-environment
     depends_on:
@@ -44,9 +52,14 @@ services:
 
   web:
     build: { context: ., target: web }
+    cpus: "0.75"
+    mem_limit: 512m
+    memswap_limit: 768m
+    pids_limit: 128
     environment:
       <<: *app-environment
       ERP_PROCESS_NAME: chenyida-erp-web
+      NODE_OPTIONS: --max-old-space-size=384
       PORT: 3000
     volumes:
       - erp_uploads:/data/chenyida-erp/uploads
@@ -69,9 +82,14 @@ services:
 
   worker:
     build: { context: ., target: worker }
+    cpus: "0.50"
+    mem_limit: 512m
+    memswap_limit: 768m
+    pids_limit: 128
     environment:
       <<: *app-environment
       ERP_PROCESS_NAME: chenyida-erp-worker
+      NODE_OPTIONS: --max-old-space-size=384
     volumes: *app-volumes
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -83,6 +101,10 @@ services:
 
   admin:
     build: { context: ., target: worker }
+    cpus: "0.50"
+    mem_limit: 512m
+    memswap_limit: 768m
+    pids_limit: 128
     command: ["node", "--experimental-strip-types", "scripts/init-admin.ts"]
     environment:
       <<: *app-environment
@@ -96,6 +118,10 @@ services:
 
   caddy:
     image: caddy:2.10-alpine
+    cpus: "0.25"
+    mem_limit: 128m
+    memswap_limit: 192m
+    pids_limit: 64
     environment:
       ERP_DOMAIN: ${ERP_DOMAIN:-erp.invalid}
     volumes:

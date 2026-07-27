@@ -2,6 +2,24 @@
 
 最后更新时间：2026-07-27（Asia/Shanghai）
 
+## SELFHOST-OPS-RESOURCE-GUARD-01 低资源服务器保护
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 严格 Parent `120e1524eaebd9d921cab6a036b3203bf7d39226`；独立提交消息 `ops: add low-resource server safeguards`，实际哈希以 Git log 为准 |
+| 事故事实 | ROOT CAUSE UNKNOWN | 2026-07-27 曾发生服务器重启/不可用；没有证据证明 OOM，不做无证据归因 |
+| Python 源保护 | PASS | 默认 16 活跃请求线程、1 秒 admission、去敏 503、30 秒 socket timeout，正常/异常可靠释放；专项 2/2 通过 |
+| Python 运行保护 | CGROUP ACTIVE / THREAD CAP SOURCE ONLY | 起点 installed unit 已与源一致，实际 CPU 75%/MemoryHigh 512M/MemoryMax 768M/Tasks 256/NOFILE 4096；PID `13737`、restart 0、SQLite metadata 不变。本任务未复制、reload 或重启，16 线程源码须未来获准重启后生效 |
+| Compose 配置 | PASS | PostgreSQL 0.75/768M/1G/128；Web 0.75/512M/768M/128；Worker 0.50/512M/768M/128；Migrate 0.75/768M/1G/128；Admin 0.50/512M/768M/128；Caddy 0.25/128M/192M/64 |
+| Node/数据库边界 | PASS | Web/Worker heap 384 MiB；Worker 单 Job；每进程 pool max 10、PostgreSQL max 100；`/dev/shm` 64M 使用 9.1M，shared buffers 128MB，26 migrations 正常 |
+| 运行更新 | PASS | 已验证 custom dump；不 build，以 `COMPOSE_PARALLEL_LIMIT=1` 逐个重建 Web/Worker，PostgreSQL 原容器保持 |
+| Inspect/网络 | PASS | 三容器 NanoCPU/Memory/MemorySwap/PIDs 与目标一致；Web 仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口 |
+| 数据/卷 | PASS | 26 migrations、唯一启用管理员、Audit/Idempotency/Operation Run 0；四卷名称、driver/scope、创建时间前后一致 |
+| 60 秒观察 | PASS | available 约 2.2 GiB，Swap 43,180 KiB、增长 0，磁盘可用 26 GiB，Load 最终 0.05/0.14/0.32；restart 0、OOM false，PostgreSQL/Web healthy、Worker running |
+| 验证 | PASS | 专项、self-test、smoke、临时 SQLite go-live、Compose config、systemd verify、受限 TypeScript check、环境守卫、凭据与 Git 检查串行通过 |
+| 生产保护 | ENFORCED | 未启动 TASK03、未 push、未迁真实数据、未切流、未生产部署；资源保护不等于上线 |
+| 完成结论 | PASS | `LOW RESOURCE SERVER SAFEGUARDS ACTIVE` |
+
 ## SELFHOST-PHASE5-TASK02 工序派工、执行事件与线性 WIP 流转
 
 | 验证项 | 结果 | 说明 |

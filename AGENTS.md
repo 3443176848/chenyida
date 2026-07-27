@@ -84,6 +84,21 @@ MASTER.md
 7. 测试失败不得通过降低断言、跳过用例或写死结果绕过。确属环境问题时记录原因和未验证范围。
 8. 文档-only 变更也要运行不写生产数据的现有测试，并确认没有修改业务代码、迁移或部署配置。
 
+## 低资源服务器与 Docker 保护规则
+
+本节适用于仓库根目录及全部子目录，子目录 `AGENTS.md` 不得放宽：
+
+1. 本机固定按 2 核、约 4 GiB 内存、1 GiB Swap 的低资源服务器处理，不因瞬时空闲扩大并发。
+2. Docker build、全量测试、Migration、备份恢复和 Compose 重启必须串行执行；固定使用 `COMPOSE_PARALLEL_LIMIT=1`。
+3. 一次只允许一个临时测试或构建容器。Node 重任务优先使用 `NODE_OPTIONS=--max-old-space-size=1024`，容器内运行时应采用不超过其内存上限的更小 heap。
+4. 禁止同时运行 build、全量测试、多个 typecheck 或多个 PostgreSQL 测试库；不得在后台遗留重型任务后继续启动下一项。
+5. 每项重任务前后必须检查 `free -h`、`df -h /`、`uptime`、`docker stats --no-stream` 和 `docker compose ps`，并记录检查结果。
+6. 满足任一条件必须立即停止启动新重任务：available memory 小于 768 MiB；Swap 在 60 秒内增长超过 256 MiB；Swap 使用率超过 80%；根分区可用空间小于 10 GiB；1 分钟 Load 持续 3 分钟高于 4；出现 OOM、容器反复重启、SSH 卡顿或数据库失去健康。
+7. 只允许清理当前任务明确创建且已核对路径或名称的临时资源；不得扩大清理范围。
+8. 严禁执行 `docker system prune -a`、`docker volume prune`，严禁删除 `chenyida-erp-parallel_erp_postgres`、`chenyida-erp-parallel_erp_uploads`、`chenyida-erp-parallel_erp_attachments`、`chenyida-erp-parallel_erp_backup_status` 四个持久卷。
+9. 未经用户明确授权，不得修改 Swap、dockerd、内核、防火墙或 systemd 运行状态。
+10. 完成报告必须记录任务前后内存、Swap、磁盘、Load、OOM/restart 计数和临时资源清理结果。
+
 ## 安全规则
 
 1. 禁止提交真实密码、初始化凭证、会话令牌、Git Token、API Key、数据库文件、备份、日志或客户/供应商个人信息。

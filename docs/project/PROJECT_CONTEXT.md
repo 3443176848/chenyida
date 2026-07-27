@@ -15,7 +15,7 @@
 - 入口：`server.py`；静态页面位于 `static/`。
 - 用途：当前实际常驻的开发运行面、历史业务行为参考和旧数据迁移来源；不再作为未来生产底座。
 - 数据：`chenyida_erp_app/data/erp.sqlite3`，运行数据被 Git 忽略。
-- 实际状态：2026-07-26 只读复核 systemd `chenyida-erp.service` 为 `enabled/active`，源码与已安装 unit SHA-256 一致，PID `277640` 的命令行继续监听 `0.0.0.0:18888`。这仍是开发服务，不代表正式生产投用。
+- 实际状态：2026-07-27 systemd `chenyida-erp.service` 保持 active、PID `13737`、restart 0，继续监听 `0.0.0.0:18888`。起点已存在的 installed unit 与仓库源一致，当前 CPU/Memory/Task/NOFILE cgroup 限额实际生效；本任务未复制 unit、daemon-reload 或重启。仓库 Python 新源码默认限制 16 个活跃请求线程，但当前进程保持原运行代码，须未来获准重启后生效。这仍是开发服务，不代表正式生产投用，停用必须另立任务。
 
 ### 自托管 Node 应用
 
@@ -24,14 +24,20 @@
 - 页面：TASK10 已把根 `app/page.tsx` 改为原生经营工作台；legacy `public/erp/index.html` 保留为显式业务工作区和回滚入口，不再作为根 iframe 默认依赖。Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给不依赖平台 binding 的 `app/lib/selfhost-api.ts`；旧 `erp-api.ts` 仅作迁移参考。
 - 根页迁移：TASK03—TASK10 已接通主数据/BOM/库存/采购/生产/销售/品质/财务、实时 Dashboard 与离线 backup 治理，根页已退出 iframe。完整 ERP API 的非生产实现不等于实际业务迁移：真实数据、账号和文件未迁移，采购、库存、生产、销售、品质、财务的实际业务仍依赖 Python/SQLite；生产恢复演练未做，不能描述为已投产。
-- 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL；Caddy production profile 可提供 HTTPS。TASK05 已运行非生产 Compose 项目 `chenyida-erp-parallel`，Web 仅绑定 `127.0.0.1:3000`、PostgreSQL 无宿主端口，Caddy 未启动；它只用于同机 HTTP 空环境验收，不是生产部署。历史 Sites `v3` 不作为后续交付目标。
+- 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL；Caddy production profile 可提供 HTTPS。`chenyida-erp-parallel` 的 PostgreSQL/Web/Worker 已实际应用 CPU/Memory/Swap/PID 限额，Web/Worker Node heap 384 MiB；Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口，Caddy 未启动。它只用于同机 HTTP 空环境验收，不是生产部署。历史 Sites `v3` 不作为后续交付目标。
 
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；TASK10 源码与并行环境均为 `0.1.0-alpha.24`/`0024`；只属于回环并行验收，明确为非生产且尚未正式发布。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与并行环境均为 `0.1.0-alpha.26`/`0026`；只属于回环并行验收，明确为非生产且尚未正式发布。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.19`。
-- Git 复核：2026-07-26 TASK10 起点为本地 `main`/HEAD `e63c726e0d274a8b7b654819794b4bd1044c6f82`、工作区 clean；`origin/main...HEAD` 为 behind 0/ahead 36。TASK10 形成两个独立本地提交，仍未 push、未创建 PR，不得描述为已同步。
+- Git 复核：资源保护起点为本地 `main`/HEAD `120e1524eaebd9d921cab6a036b3203bf7d39226`、behind 0/ahead 42，只有三个获准资源保护修改；本任务形成一个严格 Parent 的独立本地提交，仍不 push、不创建 PR，不得描述为已同步。
+
+### 低资源主机事实
+
+- 本机永久按 2 核、约 4 GiB 内存、1 GiB Swap 管理。2026-07-27 曾发生服务器重启或不可用，证据不足，根因记录为 `UNKNOWN`，不得无证据归因 OOM。
+- 所有 build、全量测试、Migration、备份恢复和 Compose 重启必须串行，固定 `COMPOSE_PARALLEL_LIMIT=1`；停止阈值、禁用清理命令和验证记录见 `docs/self-hosting/low-resource-server.md`。
+- 资源保护任务结束时 available memory 约 2.2 GiB、Swap 42 MiB、根分区可用 26 GiB、Load 0.05/0.14/0.32；60 秒 Swap 增长 0，三个容器 restart 0/OOM false，四个持久卷未更换或删除。
 
 ### 治理资料
 

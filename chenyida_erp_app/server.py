@@ -10,6 +10,7 @@ import secrets
 import sqlite3
 import sys
 import tempfile
+import threading
 import time
 from contextlib import closing
 from datetime import datetime
@@ -3422,8 +3423,11 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.send_bytes(csv_text.encode("utf-8-sig"), "text/csv; charset=utf-8", extra_headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"})
                 else:
                     self.serve_static(path)
-        except Exception as exc:
-            self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+        except Exception:
+            self.send_json(
+                {"error": "服务器处理失败，请稍后重试", "code": "INTERNAL_ERROR"},
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
 
     def do_POST(self):
         parsed = urlparse(self.path)
@@ -3796,13 +3800,86 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.send_json(result)
                 else:
                     self.send_json({"error": "接口不存在"}, HTTPStatus.NOT_FOUND)
-        except Exception as exc:
-            self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+        except Exception:
+            self.send_json(
+                {"error": "服务器处理失败，请稍后重试", "code": "INTERNAL_ERROR"},
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+
+
+class ERPThreadingHTTPServer(ThreadingHTTPServer):
+    # The stdlib default backlog is only five connections. Public scanners and
+    # short request bursts can fill it before worker threads accept the sockets.
+    request_queue_size = 128
+    daemon_threads = True
+    block_on_close = False
+
+    def __init__(
+        self,
+        server_address,
+        request_handler_class,
+        bind_and_activate=True,
+        *,
+        max_request_threads=16,
+        admission_timeout_seconds=1.0,
+    ):
+        if max_request_threads < 1:
+            raise ValueError("max_request_threads must be positive")
+        if admission_timeout_seconds < 0:
+            raise ValueError("admission_timeout_seconds must not be negative")
+        self.max_request_threads = max_request_threads
+        self.admission_timeout_seconds = admission_timeout_seconds
+        self._request_slots = threading.BoundedSemaphore(max_request_threads)
+        super().__init__(server_address, request_handler_class, bind_and_activate)
+
+    def get_request(self):
+        request, client_address = super().get_request()
+        # Drop stalled/slowloris-style clients while keeping every request bounded.
+        request.settimeout(30)
+        return request, client_address
+
+    def process_request(self, request, client_address):
+        if not self._request_slots.acquire(timeout=self.admission_timeout_seconds):
+            self._reject_over_capacity(request)
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._request_slots.release()
+            self.shutdown_request(request)
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._request_slots.release()
+
+    @staticmethod
+    def _reject_over_capacity(request):
+        body = json.dumps(
+            {"error": "服务器繁忙，请稍后重试", "code": "SERVER_BUSY"},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        headers = (
+            b"HTTP/1.1 503 Service Unavailable\r\n"
+            + b"Content-Type: application/json; charset=utf-8\r\n"
+            + f"Content-Length: {len(body)}\r\n".encode("ascii")
+            + b"Connection: close\r\n"
+            + b"Retry-After: 1\r\n\r\n"
+        )
+        try:
+            request.settimeout(1)
+            request.sendall(headers + body)
+        except OSError:
+            pass
 
 
 def run_server(host, port):
     init_db()
-    httpd = ThreadingHTTPServer((host, port), AppHandler)
+    httpd = ERPThreadingHTTPServer((host, port), AppHandler)
     print(f"晨亿达 ERP 本地应用已启动: http://{host}:{port}")
     sys.stdout.flush()
     httpd.serve_forever()
