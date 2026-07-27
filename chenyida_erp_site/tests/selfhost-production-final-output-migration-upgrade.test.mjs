@@ -42,5 +42,5 @@ test("snapshot, schema and migration agree on allocation shape and checksum",asy
   const table=snapshot.tables["public.production_report_operation_allocations"];
   assert.ok(table);assert.deepEqual(Object.keys(table.columns),["id","production_report_id","operation_run_report_id","snapshot_operation_id","quantity","operation_id","created_by","request_id","created_at"]);
   assert.match(schema,/productionReportOperationAllocations/);assert.match(schema,/numeric\("quantity", \{ precision: 24, scale: 6 \}\)/);
-  assert.equal(journal.entries.at(-1).tag,"0027_production_final_output_reporting");assert.match(checksum(names.at(-1)),/^[0-9a-f]{64}$/);
+  assert.ok(journal.entries.some(entry=>entry.tag==="0027_production_final_output_reporting"));assert.match(checksum(names.at(-1)),/^[0-9a-f]{64}$/);
 });

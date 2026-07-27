@@ -7,7 +7,7 @@ import { ProductionError } from "./errors.ts";
 import { completionAllocations, finalOutputAllocations, id, nonNegativeQuantity, optionalDate, quantity, requirementLines, text, version } from "./rules.ts";
 import { ProductionRepository } from "./repository.ts";
 import type { CompletionAllocationInput, ProductionMeta, ProductionResult, RequirementLineInput } from "./types.ts";
-import { routingDigest, type RoutingDigestOperation } from "../production-routing-selfhost/digest.ts";
+import { legacyRoutingDigest, routingDigest, type RoutingDigestOperation } from "../production-routing-selfhost/digest.ts";
 import { initializeOperationProjections, refreshOperationProjections } from "../production-operation-selfhost/projections.ts";
 
 type WorkOrderRow = Record<string, unknown> & { id: string; status: string; version: number; planned_qty: string; completed_qty: string; finished_material_id: string; finished_unit_id: string };
@@ -27,11 +27,12 @@ export class ProductionService {
   async listFinalOutputSources(limit: number, offset: number, workOrderId?: number) {
     const values: unknown[] = []; const where = workOrderId ? (values.push(workOrderId), "and wo.id=$1") : ""; values.push(limit, offset);
     return this.repository.pool.query(`select wo.id work_order_id,wo.work_order_code,wo.status work_order_status,wo.version work_order_version,wo.planned_qty,wo.reported_qty,wo.good_qty,wo.completed_qty,
-      op.id snapshot_operation_id,op.sequence_no,op.operation_code,op.operation_name,op.work_center_code,op.work_center_name,
-      p.id operation_projection_id,p.version operation_projection_version,w.version final_output_version,w.completed_good_qty,w.final_output_available_qty,
+      op.id snapshot_operation_id,op.sequence_no,op.operation_code,op.operation_name,op.work_center_code,op.work_center_name,op.quality_gate_mode,
+      p.id operation_projection_id,p.version operation_projection_version,w.version final_output_version,w.completed_good_qty,w.quality_required_qty,w.quality_inspected_qty,w.quality_released_qty,w.quality_hold_qty,w.final_output_available_qty,
       run.id operation_run_id,run.run_code,run.status run_status,run.assigned_operator,
       rr.id operation_run_report_id,rr.report_code operation_run_report_code,rr.good_qty source_good_qty,rr.reported_by,rr.reported_at,
-      coalesce(consumed.quantity,0)::text reported_from_source_qty,(rr.good_qty-coalesce(consumed.quantity,0))::text source_available_qty
+      coalesce(released.quantity,0)::text source_quality_released_qty,coalesce(consumed.quantity,0)::text reported_from_source_qty,
+      (case when op.quality_gate_mode='IPQC' then coalesce(released.quantity,0) else rr.good_qty end-coalesce(consumed.quantity,0))::text source_available_qty
     from production_work_orders wo
     join production_work_order_routing_snapshots s on s.work_order_id=wo.id
     join production_work_order_routing_snapshot_operations op on op.snapshot_id=s.id
@@ -40,6 +41,7 @@ export class ProductionService {
     join production_operation_runs run on run.work_order_id=wo.id and run.snapshot_operation_id=op.id and run.status not in ('CANCELLED','REVERSED')
     join production_operation_run_reports rr on rr.run_id=run.id and rr.snapshot_operation_id=op.id and rr.good_qty>0
     left join lateral(select coalesce(sum(a.quantity),0) quantity from production_report_operation_allocations a join production_report_receipt_projections rp on rp.report_id=a.production_report_id where a.operation_run_report_id=rr.id and not rp.reversed) consumed on true
+    left join lateral(select coalesce(sum(q.released_qty),0) quantity from quality_inspections q where q.production_operation_run_report_id=rr.id and q.lifecycle_status='CLOSED' and q.decision_status='RELEASED') released on true
     where wo.status in ('RELEASED','IN_PROGRESS') ${where}
     order by wo.created_at desc,wo.id desc,op.sequence_no,rr.id limit $${values.length - 1} offset $${values.length}`, values);
   }
@@ -75,15 +77,16 @@ export class ProductionService {
     const route = source.rows[0];
     if (!route) throw new ProductionError("WORK_ORDER_ROUTING_MISSING", "产品版本缺少当前已发布工艺路线，工单不能释放", 422);
     if (Number(route.product_id) !== Number(wo.product_id)) throw new ProductionError("WORK_ORDER_ROUTING_PRODUCT_MISMATCH", "工艺路线与工单产品版本不一致", 422);
-    const operationsResult = await client.query(`select ro.id source_routing_operation_id,ro.sequence_no,ro.operation_code,ro.operation_name,ro.work_center_id,w.work_center_code,w.name_cn work_center_name,w.status work_center_status,ro.setup_minutes::text,ro.run_minutes_per_unit::text,ro.description from production_routing_operations ro join production_work_centers w on w.id=ro.work_center_id where ro.routing_version_id=$1 order by ro.sequence_no,ro.id for update of ro,w`, [Number(route.id)]);
+    const operationsResult = await client.query(`select ro.id source_routing_operation_id,ro.sequence_no,ro.operation_code,ro.operation_name,ro.work_center_id,w.work_center_code,w.name_cn work_center_name,w.status work_center_status,ro.setup_minutes::text,ro.run_minutes_per_unit::text,ro.description,ro.quality_gate_mode from production_routing_operations ro join production_work_centers w on w.id=ro.work_center_id where ro.routing_version_id=$1 order by ro.sequence_no,ro.id for update of ro,w`, [Number(route.id)]);
     if (!operationsResult.rows.length) throw new ProductionError("WORK_ORDER_ROUTING_EMPTY", "已发布工艺路线没有工序，工单不能释放", 422);
     if (operationsResult.rows.some((row) => row.work_center_status !== "ACTIVE")) throw new ProductionError("WORK_ORDER_ROUTING_INACTIVE", "工艺路线包含已停用工作中心，工单不能释放", 422);
-    const operations = operationsResult.rows.map((row) => ({ sequence_no: Number(row.sequence_no), operation_code: String(row.operation_code), operation_name: String(row.operation_name), work_center_id: Number(row.work_center_id), work_center_code: String(row.work_center_code), work_center_name: String(row.work_center_name), setup_minutes: String(row.setup_minutes), run_minutes_per_unit: String(row.run_minutes_per_unit), description: String(row.description) })) satisfies RoutingDigestOperation[];
+    const operations = operationsResult.rows.map((row) => ({ sequence_no: Number(row.sequence_no), operation_code: String(row.operation_code), operation_name: String(row.operation_name), work_center_id: Number(row.work_center_id), work_center_code: String(row.work_center_code), work_center_name: String(row.work_center_name), setup_minutes: String(row.setup_minutes), run_minutes_per_unit: String(row.run_minutes_per_unit), description: String(row.description), quality_gate_mode: String(row.quality_gate_mode) as "NONE" | "IPQC" })) satisfies RoutingDigestOperation[];
     const calculated = routingDigest({ routing_code: String(route.routing_code), product_id: Number(route.product_id), product_version_id: Number(route.product_version_id), version_no: Number(route.version_no), version_code: String(route.version_code), operations });
-    if (calculated !== route.canonical_digest) throw new ProductionError("WORK_ORDER_ROUTING_DIGEST_MISMATCH", "已发布工艺路线摘要不一致，工单不能释放", 409);
-    const saved = await client.query(`insert into production_work_order_routing_snapshots(work_order_id,routing_header_id,routing_version_id,product_version_id,routing_code,routing_version_no,routing_version_code,routing_digest,released_by,request_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`, [Number(wo.id), Number(route.routing_header_id), Number(route.id), Number(route.product_version_id), route.routing_code, Number(route.version_no), route.version_code, calculated, meta.actor.username, meta.requestId]);
+    const legacyCalculated = operations.every((row) => row.quality_gate_mode === "NONE") ? legacyRoutingDigest({ routing_code: String(route.routing_code), product_id: Number(route.product_id), product_version_id: Number(route.product_version_id), version_no: Number(route.version_no), version_code: String(route.version_code), operations }) : "";
+    if (calculated !== route.canonical_digest && legacyCalculated !== route.canonical_digest) throw new ProductionError("WORK_ORDER_ROUTING_DIGEST_MISMATCH", "已发布工艺路线摘要不一致，工单不能释放", 409);
+    const saved = await client.query(`insert into production_work_order_routing_snapshots(work_order_id,routing_header_id,routing_version_id,product_version_id,routing_code,routing_version_no,routing_version_code,routing_digest,released_by,request_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`, [Number(wo.id), Number(route.routing_header_id), Number(route.id), Number(route.product_version_id), route.routing_code, Number(route.version_no), route.version_code, route.canonical_digest, meta.actor.username, meta.requestId]);
     const snapshotOperations = [];
-    for (const row of operationsResult.rows) { const op = await client.query(`insert into production_work_order_routing_snapshot_operations(snapshot_id,source_routing_operation_id,sequence_no,operation_code,operation_name,work_center_id,work_center_code,work_center_name,setup_minutes,run_minutes_per_unit,description) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning *`, [Number(saved.rows[0].id), Number(row.source_routing_operation_id), Number(row.sequence_no), row.operation_code, row.operation_name, Number(row.work_center_id), row.work_center_code, row.work_center_name, row.setup_minutes, row.run_minutes_per_unit, row.description]); snapshotOperations.push(op.rows[0]); }
+    for (const row of operationsResult.rows) { const op = await client.query(`insert into production_work_order_routing_snapshot_operations(snapshot_id,source_routing_operation_id,sequence_no,operation_code,operation_name,work_center_id,work_center_code,work_center_name,setup_minutes,run_minutes_per_unit,description,quality_gate_mode) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`, [Number(saved.rows[0].id), Number(row.source_routing_operation_id), Number(row.sequence_no), row.operation_code, row.operation_name, Number(row.work_center_id), row.work_center_code, row.work_center_name, row.setup_minutes, row.run_minutes_per_unit, row.description, row.quality_gate_mode]); snapshotOperations.push(op.rows[0]); }
     await this.fault?.("after_routing_snapshot");
     return { ...saved.rows[0], operations: snapshotOperations };
   }
@@ -142,7 +145,7 @@ export class ProductionService {
     const allocations = finalOutputAllocations(input.final_output_allocations); const remark = text(input.remark, "remark", 1000);
     const wo = await this.lockWorkOrder(client, workOrderId, expectedWorkOrderVersion);
     if (!["RELEASED", "IN_PROGRESS"].includes(wo.status)) throw new ProductionError("WORK_ORDER_NOT_REPORTABLE", "工单当前状态不可报工", 409);
-    const final = await client.query(`select p.id operation_projection_id,p.snapshot_operation_id,p.version operation_projection_version,w.version final_output_version,w.final_output_available_qty,op.sequence_no,op.operation_code,op.operation_name,op.work_center_code
+    const final = await client.query(`select p.id operation_projection_id,p.snapshot_operation_id,p.version operation_projection_version,w.version final_output_version,w.final_output_available_qty,op.sequence_no,op.operation_code,op.operation_name,op.work_center_code,op.quality_gate_mode
       from production_work_order_operation_projections p
       join production_operation_wip_projections w on w.operation_projection_id=p.id
       join production_work_order_routing_snapshot_operations op on op.id=p.snapshot_operation_id
@@ -150,10 +153,11 @@ export class ProductionService {
     const finalRow = final.rows[0];
     if (!finalRow) throw new ProductionError("STRUCTURED_REPORT_SOURCE_REQUIRED", "结构化工单缺少末工序投影，不能报工", 409);
     if (Number(finalRow.final_output_version) !== expectedFinalOutputVersion) throw new ProductionError("FINAL_OUTPUT_VERSION_CONFLICT", "末工序可报工投影版本已变化，请刷新后重试", 409);
-    const sources = await client.query(`select rr.*,run.work_order_id,run.snapshot_operation_id run_snapshot_operation_id,run.status run_status,run.run_code,run.assigned_operator,
-        coalesce((select sum(a.quantity) from production_report_operation_allocations a join production_report_receipt_projections rp on rp.report_id=a.production_report_id where a.operation_run_report_id=rr.id and not rp.reversed),0)::text consumed_qty
-      from production_operation_run_reports rr join production_operation_runs run on run.id=rr.run_id
-      where rr.id=any($1::bigint[]) order by rr.id for update of run,rr`, [allocations.map((item) => item.operationRunReportId)]);
+    const sources = await client.query(`select rr.*,run.work_order_id,run.snapshot_operation_id run_snapshot_operation_id,run.status run_status,run.run_code,run.assigned_operator,op.quality_gate_mode,
+        coalesce((select sum(a.quantity) from production_report_operation_allocations a join production_report_receipt_projections rp on rp.report_id=a.production_report_id where a.operation_run_report_id=rr.id and not rp.reversed),0)::text consumed_qty,
+        coalesce((select sum(q.released_qty) from quality_inspections q where q.production_operation_run_report_id=rr.id and q.lifecycle_status='CLOSED' and q.decision_status='RELEASED'),0)::text quality_released_qty
+      from production_operation_run_reports rr join production_operation_runs run on run.id=rr.run_id join production_work_order_routing_snapshot_operations op on op.id=rr.snapshot_operation_id
+      where rr.id=any($1::bigint[]) order by rr.id for update of run,rr,op`, [allocations.map((item) => item.operationRunReportId)]);
     if (sources.rows.length !== allocations.length) throw new ProductionError("FINAL_OUTPUT_SOURCE_NOT_FOUND", "末工序 Run Report 来源不存在", 404);
     const byId = new Map(sources.rows.map((row) => [Number(row.id), row]));
     for (const allocation of allocations) {
@@ -161,7 +165,8 @@ export class ProductionService {
       if (Number(source.work_order_id) !== workOrderId) throw new ProductionError("FINAL_OUTPUT_WORK_ORDER_MISMATCH", "末工序来源不属于该工单", 409);
       if (Number(source.snapshot_operation_id) !== Number(finalRow.snapshot_operation_id) || Number(source.run_snapshot_operation_id) !== Number(finalRow.snapshot_operation_id)) throw new ProductionError("FINAL_OUTPUT_NOT_LAST_OPERATION", "只能消费该工单最后一道快照工序的 Run Report", 409);
       if (["CANCELLED", "REVERSED"].includes(String(source.run_status)) || !(await client.query("select $1::numeric>0 ok", [source.good_qty])).rows[0].ok) throw new ProductionError("FINAL_OUTPUT_SOURCE_INVALID", "末工序 Run Report 已取消、已冲销或没有有效良品", 409);
-      if (!(await client.query("select $1::numeric<=($2::numeric-$3::numeric) ok", [allocation.quantity, source.good_qty, source.consumed_qty])).rows[0].ok) throw new ProductionError("FINAL_OUTPUT_SOURCE_EXHAUSTED", "末工序 Run Report 良品已被消费或本次报工超量", 409);
+      const sourceCapacity = source.quality_gate_mode === "IPQC" ? source.quality_released_qty : source.good_qty;
+      if (!(await client.query("select $1::numeric<=($2::numeric-$3::numeric) ok", [allocation.quantity, sourceCapacity, source.consumed_qty])).rows[0].ok) throw new ProductionError("FINAL_OUTPUT_SOURCE_EXHAUSTED", source.quality_gate_mode === "IPQC" ? "末工序 Run Report 尚未获得足够 IPQC 关闭放行额度" : "末工序 Run Report 良品已被消费或本次报工超量", 409);
     }
     const total = await client.query("select sum(x.quantity)::text quantity from jsonb_to_recordset($1::jsonb) x(quantity numeric)", [JSON.stringify(allocations)]); const goodQty = String(total.rows[0].quantity);
     const allowed = await client.query("select $1::numeric>0 and $1::numeric<=$2::numeric and $1::numeric<=($3::numeric-$4::numeric) ok", [goodQty, finalRow.final_output_available_qty, wo.planned_qty, wo.reported_qty]);

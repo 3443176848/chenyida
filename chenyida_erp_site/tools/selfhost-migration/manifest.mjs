@@ -27,8 +27,11 @@ export const EXPECTED_MIGRATION_SHA256 = Object.freeze({
 });
 
 export async function migrationChecksums(directory) {
-  const files = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();
-  if (files.length !== 17 || files[0] !== "0001_selfhost_baseline.sql" || files.at(-1) !== "0017_planning_material_requirements.sql") {
+  const availableFiles = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();
+  const files = Object.keys(EXPECTED_MIGRATION_SHA256);
+  const available = new Set(availableFiles);
+  const unexpectedBaselineFile = availableFiles.some((name) => Number.parseInt(name.slice(0, 4), 10) <= 17 && !files.includes(name));
+  if (files.some((name) => !available.has(name)) || unexpectedBaselineFile) {
     fail("MIGRATION_TARGET_BASELINE_INVALID", "目标 migration 必须严格为 0001—0017");
   }
   const migrations = await Promise.all(files.map(async (name) => ({ name, sha256: sha256(await readFile(resolve(directory, name))) })));
