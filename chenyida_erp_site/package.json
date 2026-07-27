@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.28",
+  "version": "0.1.0-alpha.29",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -71,6 +71,12 @@
     "test:quality:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-quality-postgres.test.mjs",
     "test:quality:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-quality-migration-upgrade.test.mjs",
     "test:quality:compose": "node scripts/selfhost-quality-compose-smoke.mjs",
+    "typecheck:phase5-task05": "tsc -p tsconfig.phase5-task05.json --pretty false",
+    "test:production-nonconformance:unit": "node --experimental-strip-types --test tests/selfhost-production-nonconformance-unit.test.mjs",
+    "test:production-nonconformance:ui": "node --experimental-strip-types --test tests/selfhost-production-nonconformance-ui-contract.test.mjs",
+    "test:production-nonconformance:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-nonconformance-postgres.test.mjs",
+    "test:production-nonconformance:migration": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-nonconformance-migration-upgrade.test.mjs",
+    "test:production-nonconformance:compose": "node --experimental-strip-types scripts/selfhost-production-nonconformance-compose-smoke.mjs",
     "test:finance:unit": "node --experimental-strip-types --test tests/selfhost-finance-unit.test.mjs",
     "test:finance:ui": "node --experimental-strip-types --test tests/selfhost-finance-ui-contract.test.mjs",
     "test:finance:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-finance-postgres.test.mjs",

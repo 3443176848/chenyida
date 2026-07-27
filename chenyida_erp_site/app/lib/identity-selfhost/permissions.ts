@@ -42,6 +42,10 @@ const qualityRead = ["quality.read"];
 const qualityManage = [...qualityRead, "quality.inspect", "quality.defect", "quality.disposition", "quality.close", "quality.reopen"];
 const finishedGoodsAllocationRead = ["quality.finished_goods_allocation.read"];
 const finishedGoodsAllocationManage = [...finishedGoodsAllocationRead, "quality.finished_goods_allocation.create", "quality.finished_goods_allocation.cancel"];
+const nonconformanceRead = ["quality.nonconformance.read", "quality.rework_request.read"];
+const nonconformanceQuality = [...nonconformanceRead, "quality.nonconformance.create", "quality.rework_request.create", "quality.rework_request.submit"];
+const nonconformanceProduction = ["quality.nonconformance.read", "production.rework_request.read", "production.rework_request.decide"];
+const nonconformanceManage = [...nonconformanceQuality, ...nonconformanceProduction, "quality.nonconformance.scrap"];
 const financeRead = ["finance.read"];
 const financeManage = [...financeRead, "finance.post", "finance.pay", "finance.reverse"];
 const financeProjectRead = ["finance.project.read"];
@@ -86,7 +90,8 @@ export function permissionsForRole(role: IdentityRole): string[] {
   const fulfillment = ["admin", "manager"].includes(role) ? [...procurementFulfillmentPurchase, ...procurementFulfillmentWarehouse] : [];
   const productionHandoff = ["admin", "manager"].includes(role) ? [...productionHandoffPlanning, ...productionHandoffProduction] : [];
   const productionRouting = ["admin", "manager"].includes(role) ? [...productionRoutingReview, ...productionWorkCenterManage, ...productionRoutingSnapshotRead] : [];
-  return [...new Set([...ROLE_PERMISSIONS[role], ...operations, ...planning, ...requirements, ...sourcing, ...fulfillment, ...productionHandoff, ...productionRouting])].sort();
+  const nonconformance = ["admin", "manager"].includes(role) ? nonconformanceManage : role === "quality" ? nonconformanceQuality : role === "production" ? nonconformanceProduction : role === "engineering" ? nonconformanceRead : [];
+  return [...new Set([...ROLE_PERMISSIONS[role], ...operations, ...planning, ...requirements, ...sourcing, ...fulfillment, ...productionHandoff, ...productionRouting, ...nonconformance])].sort();
 }
 
 export function hasPermission(actor: Pick<IdentityActor, "permissions">, permission: string): boolean {

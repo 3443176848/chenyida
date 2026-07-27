@@ -14,7 +14,7 @@ const can = (session: Session | null, permission: string) => Boolean(session?.us
 export default function RoutingsPage() {
   const [session, setSession] = useState<Session | null>(null), [rows, setRows] = useState<Route[]>([]), [detail, setDetail] = useState<Detail | null>(null), [error, setError] = useState("");
   async function load() { const current = await api<Session>("/api/session"); setSession(current); if (current.authenticated) setRows((await api<{ rows: Route[] }>("/api/production/routings")).rows); }
-  useEffect(() => { void load().catch((cause) => setError(cause instanceof ErpApiError ? cause.message : "读取失败")); }, []);
+  useEffect(() => { void Promise.resolve().then(load).catch((cause) => setError(cause instanceof ErpApiError ? cause.message : "读取失败")); }, []);
   async function inspect(versionId: number) { try { setDetail((await api<{ data: Detail }>(`/api/production/routing-versions/${versionId}`)).data); } catch (cause) { setError(cause instanceof ErpApiError ? cause.message : "读取路线失败"); } }
   async function write(path: string, body: Record<string, unknown>, method = "POST") { if (!session?.csrf_token) return; setError(""); try { await api(path, { method, body: JSON.stringify(body), protectedWrite: { csrfToken: session.csrf_token, idempotencyKey: crypto.randomUUID() } }); setDetail(null); await load(); } catch (cause) { setError(cause instanceof ErpApiError ? `${cause.message} (${cause.code})` : "操作失败"); } }
   async function saveGates() { if (!detail) return; await write(`/api/production/routing-versions/${detail.header.id}/operations`, { expected_version: detail.header.version, operations: detail.operations }, "PATCH"); }

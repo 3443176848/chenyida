@@ -26,6 +26,7 @@ import { handleProcurementFulfillmentApi } from "./procurement-fulfillment-selfh
 import { handleProductionHandoffApi } from "./production-handoff-selfhost/handler.ts";
 import { handleProductionRoutingApi } from "./production-routing-selfhost/handler.ts";
 import { handleProductionOperationApi } from "./production-operation-selfhost/handler.ts";
+import { handleProductionNonconformanceApi } from "./production-nonconformance-selfhost/handler.ts";
 import {
   assertProtectedIdentityGate,
   CSRF_COOKIE,
@@ -107,6 +108,8 @@ export async function handleSelfhostApi(request: Request): Promise<Response> {
     if (productionHandoffResponse) return productionHandoffResponse;
     const financeResponse = await handleFinanceApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (financeResponse) return financeResponse;
+    const nonconformanceResponse = await handleProductionNonconformanceApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
+    if (nonconformanceResponse) return nonconformanceResponse;
     const qualityResponse = await handleQualityApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (qualityResponse) return qualityResponse;
     const salesResponse = await handleSalesApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });

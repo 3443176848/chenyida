@@ -46,5 +46,5 @@ test("schema, snapshot, journal and full SHA-256 describe the same 0028 model",a
   for(const table of ["public.production_routing_operations","public.production_work_order_routing_snapshot_operations","public.production_operation_wip_projections","public.quality_inspections"])assert.ok(snapshot.tables[table],table);
   assert.ok(snapshot.tables["public.quality_inspections"].columns.production_operation_run_report_id);assert.ok(snapshot.tables["public.production_operation_wip_projections"].columns.quality_hold_qty);
   for(const token of ["qualityGateMode","productionOperationRunReportId","qualityRequiredQty","qualityInspectedQty","qualityReleasedQty","qualityHoldQty"])assert.match(schema,new RegExp(token));
-  assert.equal(journal.entries.at(-1).tag,"0028_production_operation_quality_gates");assert.match(checksum(names.at(-1)),/^[0-9a-f]{64}$/);
+  const entry=journal.entries.find((item)=>item.tag==="0028_production_operation_quality_gates");assert.ok(entry);assert.equal(entry.idx,28);assert.match(checksum(names.at(-1)),/^[0-9a-f]{64}$/);
 });

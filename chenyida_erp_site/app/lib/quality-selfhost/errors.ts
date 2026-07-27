@@ -20,6 +20,21 @@ const constraints: Record<string, [string, string]> = {
   finished_goods_sales_allocations_fqc_gate_ck: ["FINISHED_GOODS_ALLOCATION_FQC_EXISTS", "分配已有 FQC，不能取消"],
   quality_inspections_fqc_allocation_ck: ["QUALITY_SOURCE_INVALID", "FQC 必须绑定有效稳定分配"],
   production_completion_reversal_allocation_gate_ck: ["PRODUCTION_COMPLETION_DOWNSTREAM_EXISTS", "完工已有有效销售分配，不能冲销"],
+  production_nonconformances_inspection_uq: ["NONCONFORMANCE_ALREADY_EXISTS", "该检验已有稳定不合格记录"],
+  production_nonconformances_operation_uq: ["NONCONFORMANCE_OPERATION_CONFLICT", "不合格建档操作已经存在"],
+  production_nonconformances_source_ck: ["NONCONFORMANCE_SOURCE_INVALID", "只有包含 FAIL 结果和有效缺陷的已关闭工序 IPQC 可建档"],
+  production_nonconformances_conservation_ck: ["NONCONFORMANCE_QUANTITY_CONFLICT", "不合格数量投影不守恒"],
+  production_nonconformances_status_projection_ck: ["NONCONFORMANCE_STATE_CONFLICT", "不合格状态投影不一致"],
+  production_rework_requests_operation_uq: ["REWORK_OPERATION_CONFLICT", "返工申请操作已经存在"],
+  production_rework_requests_revision_uq: ["REWORK_REVISION_CONFLICT", "返工申请修订号冲突"],
+  production_rework_requests_supersedes_uq: ["REWORK_REVISION_CONFLICT", "一个旧版本只能创建一个修订版本"],
+  production_rework_requests_target_ck: ["REWORK_TARGET_INVALID", "返工目标必须是同一工单的原工序或更早工序"],
+  production_rework_requests_revision_ck: ["REWORK_REVISION_INVALID", "返工申请修订链无效"],
+  production_rework_requests_transition_ck: ["REWORK_STATE_CONFLICT", "返工申请状态转换无效"],
+  production_nonconformance_allocations_source_match_ck: ["NONCONFORMANCE_ALLOCATION_INVALID", "不合格数量分配来源不一致"],
+  production_nonconformance_allocations_release_state_ck: ["NONCONFORMANCE_ALLOCATION_INVALID", "只有退回或取消的返工申请可以释放数量"],
+  production_nonconformance_allocations_capacity_ck: ["NONCONFORMANCE_QUANTITY_EXCEEDED", "返工与报废累计数量超过不合格数量"],
+  quality_inspection_ncr_reopen_ck: ["NONCONFORMANCE_DOWNSTREAM_EXISTS", "检验已有不合格处置，不能重新打开"],
 };
 
 export function mapQualityError(error: unknown): QualityError {

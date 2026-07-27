@@ -197,6 +197,13 @@
       "when": 1785123619220,
       "tag": "0028_production_operation_quality_gates",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1785153600000,
+      "tag": "0029_production_nonconformance_rework_handoff",
+      "breakpoints": true
     }
   ]
 }
