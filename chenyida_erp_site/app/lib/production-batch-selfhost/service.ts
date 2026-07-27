@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import { ProductionError } from "../production-selfhost/errors.ts";
 import { ProductionRepository } from "../production-selfhost/repository.ts";

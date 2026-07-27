@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api, ErpApiError } from "../../../public/erp/api-client.js";
 import "../../procurement/sourcing/sourcing.css";
 
@@ -15,8 +15,8 @@ const key=()=>crypto.randomUUID();
 
 export default function ProductionBatchesPage(){
  const[session,setSession]=useState<Session|null>(null),[orders,setOrders]=useState<WorkOrder[]>([]),[sets,setSets]=useState<BatchSet[]>([]),[batches,setBatches]=useState<ProjectedBatch[]>([]),[error,setError]=useState("");
- async function load(){const current=await api<Session>("/api/session");setSession(current);if(!current.authenticated)return;const[work,setRows,batchRows]=await Promise.all([api<{data:WorkOrder[]}>("/api/work-orders?page_size=100"),api<{rows:BatchSet[]}>("/api/production/batch-sets"),api<{rows:ProjectedBatch[]}>("/api/production/batches")]);setOrders(work.data);setSets(setRows.rows);setBatches(batchRows.rows);}
- useEffect(()=>{void load().catch(cause=>setError(cause instanceof ErpApiError?cause.message:"读取失败"));},[]);
+ const load=useCallback(async()=>{const current=await api<Session>("/api/session");setSession(current);if(!current.authenticated)return;const[work,setRows,batchRows]=await Promise.all([api<{data:WorkOrder[]}>("/api/work-orders?page_size=100"),api<{rows:BatchSet[]}>("/api/production/batch-sets"),api<{rows:ProjectedBatch[]}>("/api/production/batches")]);setOrders(work.data);setSets(setRows.rows);setBatches(batchRows.rows);},[]);
+ useEffect(()=>{const timer=window.setTimeout(()=>{void load().catch(cause=>setError(cause instanceof ErpApiError?cause.message:"读取失败"));},0);return()=>window.clearTimeout(timer);},[load]);
  async function write(path:string,method:"POST"|"PATCH",body:Record<string,unknown>){if(!session?.csrf_token)return;setError("");try{await api(path,{method,body:JSON.stringify(body),protectedWrite:{csrfToken:session.csrf_token,idempotencyKey:key()}});await load();}catch(cause){setError(cause instanceof ErpApiError?`${cause.message} (${cause.code})`:"操作失败");}}
  async function createSet(event:FormEvent<HTMLFormElement>){event.preventDefault();const form=new FormData(event.currentTarget),workOrderId=Number(form.get("work_order_id")),wo=orders.find(row=>row.id===workOrderId);if(wo)await write("/api/production/batch-sets","POST",{work_order_id:wo.id,expected_work_order_version:wo.version});}
  async function addBatch(event:FormEvent<HTMLFormElement>,set:BatchSet){event.preventDefault();const form=new FormData(event.currentTarget);await write(`/api/production/batch-sets/${set.id}/batches`,"POST",{planned_qty:String(form.get("planned_qty")),expected_batch_set_version:set.version});}
