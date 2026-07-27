@@ -2,6 +2,23 @@
 
 最后更新时间：2026-07-27（Asia/Shanghai）
 
+## SELFHOST-PHASE5-TASK03 末工序产出绑定、正式报工与成品入库
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `1dae9661d07f7af7e866a1654804742372b8bc76` 严格基于 `a6448ac42da737e31fee76085fb699e80f3c621b`；聚焦修正 `1a01172f14e9d4b3b51ec10430b188aa79efa96d`、`2eb5120bf98c9d45705cf96e2a25afb37cc154a3`；独立 ops 验收提交以 Git log 为准 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.27`；`0027` SHA-256/数据库 checksum `b226cc958215400c38f48c925e4b33c4e97723340aaf729d4da75322213b9c76`；0001—0026 未修改，Schema/journal/snapshot 一致 |
+| 结构化来源权威 | PASS | 只消费同 Work Order 最后 Snapshot Operation 的有效 Run Report good；稳定 Allocation、numeric、CAS/行锁/幂等和 deferred guard 防超量/跨工单/非末序/伪造/修改，legacy 无 Snapshot 兼容 |
+| 实际 HTTP 数量 | PASS | 四工序分批 `4/6`；final output `10→6→0`；有效 Report/Final Allocation/Completion/Completion Allocation 均 `4/6`；Ledger `+4/+6`、Balance 10，Work Order `10/10/10/0/10 COMPLETED` |
+| 冲销与下游 | PASS | 无下游 Report 冲销恢复 final output 后重新报工；已有 Completion 阻止 Report 冲销；有效 Report 消费阻止 Run 冲销；IPQC/FQC/Shipment/Sales Source/AR/Settlement 0 |
+| 权限/并发/回滚 | PASS | production/warehouse/manager/admin/quality 边界、sales 403、同 Key 重放/异正文冲突、Work Order/WIP/Report CAS、并发唯一消费、Completion 并发守恒、直接 SQL guard 和故障零半记录通过 |
+| 自动验证 | PASS | TASK03 专项 12、适用回归 82，共 94 项；正式 typecheck、Schema consistency、lint 0 error/8 个既有 warning、Vinext build、928 文件凭据扫描、`git diff --check` 和 Python 三项通过 |
+| 重启/恢复 | PASS | 整体串行停/启后完整事实与 Audit 51/Idempotency 41 保持；接受态停服备份 SHA-256 `16d63e5cbe1f85aa1a70f1414edb5a66d008faefe076b9739e92f9a71976f9f6` 恢复到第二新空库，核对 27 migrations 和完整 4/6 链 |
+| 清理/资源 | PASS | 主库 27 migrations、唯一启用管理员、业务/Audit/Idempotency/验收账号/uploads/attachments 0；仅 PostgreSQL/Web/Worker 三容器和四卷；任务测试/恢复库、备份/恢复目录和迁移容器删除，resource-guard 备份保留 |
+| Python/SQLite | PASS / PROTECTED | Python PID `13737`、NRestarts 0；真实 SQLite inode `53827608`、size `1544192`、mode `600`、mtime 不变，只核验 metadata，未读写正文或重启服务 |
+| 排除事项 | ENFORCED | 未自动创建品质、发货或财务事实；未执行返工/批次/设备/产能、真实迁移、HTTPS/80/443、防火墙、切流、生产部署、push、PR 或 TASK04 |
+| 完成结论 | PASS | `STRUCTURED FINAL OUTPUT TO FINISHED GOODS ACCEPTED IN PARALLEL ENVIRONMENT` |
+
 ## SELFHOST-OPS-RESOURCE-GUARD-01 低资源服务器保护
 
 | 验证项 | 结果 | 说明 |

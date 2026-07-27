@@ -4,6 +4,23 @@
 
 ## 2026-07-27
 
+### SELFHOST-PHASE5-TASK03 - `ops: accept structured final output workflow in parallel environment`
+
+- 提交：功能提交 `1dae9661d07f7af7e866a1654804742372b8bc76` 严格 Parent `a6448ac42da737e31fee76085fb699e80f3c621b`；验收脚本职责分离和固定恢复目标聚焦修正为 `1a01172f14e9d4b3b51ec10430b188aa79efa96d`、`2eb5120bf98c9d45705cf96e2a25afb37cc154a3`，独立 ops 提交实际哈希以 Git log 为准。
+- 并行验收：只更新 `chenyida-erp-parallel` 至 `0.1.0-alpha.27`/27 migrations；`0027` SHA-256/数据库 checksum 为 `b226cc958215400c38f48c925e4b33c4e97723340aaf729d4da75322213b9c76`。Web 仍仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口。
+- 实际 HTTP：四 Work Center、四 Snapshot Operations 均以 `4/6` 执行，AOI final output `10→6→0`；有效 Production Report、Final Output Allocation、Completion、Report→Completion Allocation 均为 `4/6`，Ledger `+4/+6`、Balance 10、Work Order `10/10/10/0/10 COMPLETED`。正式 Report 前 Completion/成品库存/品质为 0；最终 IPQC/FQC/Shipment/Sales Source/AR 仍为 0。
+- 保护：同正文幂等重放、异正文冲突、Work Order/final-output CAS、并发唯一消费、跨工单/非末序/冲销来源、直接 SQL guard、故障零半记录、403、无下游 Report 冲销恢复、Completion 下游阻止 Report 冲销及 Report 消费阻止 Run 冲销均通过专项或实际 HTTP。
+- 持久与恢复：整体串行停/启后 8 Run、8 Run Report、3 Report（1 冲销）、3 Final Allocation、2 Completion、2 Completion Allocation、2 Ledger、Balance 10、Audit 51、Idempotency 41 保持；接受态备份 SHA-256 `16d63e5cbe1f85aa1a70f1414edb5a66d008faefe076b9739e92f9a71976f9f6` 恢复到固定第二新空库并核对完整事实。
+- 清理与边界：最终主库 27 migrations、唯一启用管理员、业务/Audit/Idempotency/验收账号/uploads/attachments 0，仅三容器四卷；TASK03 测试库、恢复库、恢复目录和两份任务备份删除，既有 resource-guard 备份保留。未重启 Python、读取真实 SQLite 正文、迁真实数据、启 HTTPS、切流、部署、push 或创建 PR。
+- 结论：`STRUCTURED FINAL OUTPUT TO FINISHED GOODS ACCEPTED IN PARALLEL ENVIRONMENT`；不启动 PHASE5-TASK04。
+
+### SELFHOST-PHASE5-TASK03 - `feat: bind final operation output to production reporting`
+
+- 数据库：只新增 expand-only `0027_production_final_output_reporting.sql` 和稳定 `production_report_operation_allocations`；同步 Drizzle Schema/journal/snapshot，不修改 0001—0026。外键、numeric、唯一/索引、不可变和 deferred reconciliation 防止超量、跨工单、非末序、伪造来源与投影失配。
+- 服务/API：结构化 Report 只接受具体末工序 Run Report Allocation、Work Order/final-output CAS 和 Idempotency-Key；服务端生成数量、阶段与 operator，legacy 无 Snapshot 工单保持兼容，结构化 legacy report/complete 快捷路径 fail closed。详情、来源查询、冲销恢复、WIP/Work Order 和 Dashboard 已扩展。
+- UI：`/production/reporting` 结构化模式只展示稳定来源和可用量，历史表单明确标记兼容；`/production/wip` 明示 WIP 非 MAIN 库存，warehouse 页面继续消费既有 Report。
+- 验证：TASK03 专项 12 项，Phase 4 TASK06/TASK07、Phase 5 TASK01/TASK02、Production/Routing/Inventory/Dashboard/Identity 等回归 82 项，共 94 项自动测试通过；正式 typecheck、Schema consistency、lint 0 error、Vinext build、928 文件 credentials scan、`git diff --check` 与 Python 三项通过。
+
 ### SELFHOST-OPS-RESOURCE-GUARD-01 - `ops: add low-resource server safeguards`
 
 - Git：严格 Parent `120e1524eaebd9d921cab6a036b3203bf7d39226`；保留并审阅既有 `server.py`、`compose.yml`、systemd unit 三项修改，追加根规则、专项测试和文档；不改版本、migration 或历史。

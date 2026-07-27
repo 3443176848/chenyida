@@ -2,6 +2,24 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-27 末工序稳定产出到正式报工与成品入库边界
+
+`SELFHOST-PHASE5-TASK03` 在 TASK02 的 Snapshot Operation/Run/Run Report/WIP 与 TASK07 的 Production Report/Completion/Inventory 之间只增加稳定 `production_report_operation_allocations`。结构化 Work Order 的服务端以最后 Snapshot Operation 的具体 Run Report good 为唯一最终报工来源；Report 字段由服务端生成，浏览器不提交 final-output 投影或自由工序/操作员字段。无 Routing Snapshot 的历史工单继续走清晰标记的兼容路径。
+
+```mermaid
+flowchart LR
+    S[Last Snapshot Operation Run Report good] -->|stable allocation 4 / 6| R[Existing Production Report]
+    R --> P[Existing Receipt Projection]
+    P -->|warehouse explicit 4 / 6| C[Existing Completion]
+    C --> A[Existing Report to Completion Allocation]
+    C --> L[Finished Goods Ledger +4 / +6]
+    L --> B[Balance 10]
+    C --> W[Work Order COMPLETED, not CLOSED]
+    R -. no automatic creation .-> Q[IPQC / FQC / Shipment / AR]
+```
+
+`0027` 的外键、numeric、唯一索引、不可变 trigger 和 deferred reconciliation 同时核对同工单、末工序、有效来源、来源累计量、Report 数量与 WIP 投影；应用事务再叠加权限、CSRF、正文/速率限制、幂等、CAS 和稳定锁顺序。Report 无下游时追加冲销恢复 final output；已有 Completion 时禁止，Run 被有效 Report 消费后同样禁止冲销。最终报工本身不写 MAIN 库存，只有显式 warehouse Completion 复用 Inventory Service 入库。
+
 ## 2026-07-26 FQC 放行到发货与应收交接边界
 
 `SELFHOST-PHASE4-TASK10` 继续复用唯一 Finance Document/Settlement/Reversal 权威，以 expand-only `0024` 保存 Sales/Purchase Financial Source 行到 Business Project 或 `UNATTRIBUTED` 的不可变归属。来源行数量、单价、金额、Project 与 digest 均由服务端沿稳定外键链计算，浏览器不能提交 Project 或分配金额；项目查询只按 Currency 分组，不做跨币种汇总。

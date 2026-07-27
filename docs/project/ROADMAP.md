@@ -149,7 +149,7 @@ Import Workspace UI 已由 `PHASE2-TASK08` 独立实施；Catalog 与 50×256 �
 
 **预计任务数**：6。**当前状态**：IN PROGRESS。自托管全域 API、合成迁移框架、受控 Inventory/Finance Opening 及完全合成 public materialization/Dashboard/恢复已完成非生产验收；真实 source inventory、逐行人工处置、容量、安全、生产恢复、部署和切换尚未开始。
 
-生产线当前仅推进到 `SELFHOST-PHASE4-TASK07`：生产报工、Report 良品分配、分批完工入库和追加式全额冲销已完成回环并行环境验收。IQC/IPQC/FQC 创建、销售发货和财务过账仍须后续独立任务。
+生产线已推进到 `SELFHOST-PHASE5-TASK03`：Routing Snapshot 工序执行的末序 Run Report good 通过稳定 Final Output Allocation 分批进入既有 Production Report，再由 warehouse 显式 Completion `4/6` 写入成品 Ledger `+4/+6`、Balance 10 并使 Work Order `COMPLETED`。`0.1.0-alpha.27`/`0027`、重启、停服备份/新空恢复和清理已通过；TASK04、品质自动创建、返工、批次、设备、产能、真实迁移和生产切换未授权。
 
 ## Phase 6 行业物料库
 

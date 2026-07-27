@@ -775,6 +775,16 @@
 - 更正：未开工 Run 可取消；已报工 Run 只能追加式全额冲销。已有下一工序消费、末工序输出已被 Production Report 消费或存在品质等下游引用时禁止冲销；无下游时冲销恢复上游可派工量和当前投影。业务事实、投影、审计和幂等在单一事务提交或整体回滚。
 - 末工序边界：末工序 good 只形成待 Work Order 最终报工量，不自动创建 Phase 4 Production Report、Completion、Finished Goods Ledger/Balance、IPQC 或 FQC。本决定不授权最终报工绑定、成品入库、返工、批次、设备、外协、产能排程、真实数据迁移、切流或生产部署。
 
+## D-070 结构化最终报工消费末工序稳定 good，成品入库继续复用既有 Completion
+
+- 日期：2026-07-27
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
+- 确认人：项目负责人（明确授权 `SELFHOST-PHASE5-TASK03`，并固定末工序来源、显式 warehouse Completion 与品质/销售/财务排除边界）
+- 来源权威：有 Routing Snapshot 的 Work Order 只能消费同一工单最后 Snapshot Operation 的有效 Operation Run Report good；浏览器不得提交 `process_stage`、`operator` 或任意 reported/good/scrap 投影。`production_report_operation_allocations` 用稳定 ID 和 PostgreSQL numeric 保存具体来源，允许分批但累计不得超量。
+- 复用边界：Allocation 只绑定既有 Production Report，不复制 Report、Receipt Projection、Completion 或 Inventory 权威。服务端生成 `reported_qty=good_qty=allocation`、`scrap_qty=0`、末工序阶段和受控 operator；正式 Report 不写库存。warehouse 继续显式通过既有 Report→Completion Allocation 在同一事务写 Completion、Finished Goods Ledger/Balance、Work Order 投影、Event/Audit/Idempotency。
+- 守恒与更正：结构化写入要求 Work Order/final-output CAS、固定锁顺序、持久幂等和数据库 deferred guard。无下游 Report 全额冲销恢复末工序来源；已有 Completion/IPQC 等下游时 fail closed。Completion 安全冲销后才允许 Report 冲销；有效 Report 消费后阻止对应 Operation Run 冲销。Allocation 和原事实不可修改或删除。
+- 历史与下游：无 Routing Snapshot 的历史 Work Order 保留兼容 Report/Completion 路径；结构化工单拒绝 legacy 自由文本和自动 report+completion 快捷路径。本决定不自动创建 IPQC/FQC、Shipment、Sales Financial Source、AR 或 Settlement，也不授权返工、批次、设备、产能、真实数据迁移、切流或生产部署。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

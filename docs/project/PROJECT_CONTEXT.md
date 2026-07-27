@@ -29,9 +29,9 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与并行环境均为 `0.1.0-alpha.26`/`0026`；只属于回环并行验收，明确为非生产且尚未正式发布。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与并行环境均为 `0.1.0-alpha.27`/`0027`；只属于回环并行验收，明确为非生产且尚未正式发布。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.19`。
-- Git 复核：资源保护起点为本地 `main`/HEAD `120e1524eaebd9d921cab6a036b3203bf7d39226`、behind 0/ahead 42，只有三个获准资源保护修改；本任务形成一个严格 Parent 的独立本地提交，仍不 push、不创建 PR，不得描述为已同步。
+- Git 复核：TASK03 起点为本地 `main`/HEAD `a6448ac42da737e31fee76085fb699e80f3c621b`、behind 0/ahead 43、工作区 clean；功能提交和两项验收脚本聚焦修正均为追加提交，最终另建 ops 验收提交，仍不 push、不创建 PR，不得描述为已同步。
 
 ### 低资源主机事实
 
@@ -122,6 +122,7 @@
 28. SELFHOST-PHASE4-TASK02 采用 D-059：新增 planning 正式角色；engineering 项目负责人显式关联客户一致的 RELEASED Product/BOM，生成 numeric 计算的不可变规格快照包；planning 只能接收或退回，退回后创建新包版本，接收不触发 TASK03。`0.1.0-alpha.16`/`0016` 已通过并行真实旅程、重启与清理，验收业务最终为 0。
 29. SELFHOST-PHASE4-TASK03 采用 D-060：只聚合最新 ACCEPTED Package 固化 Material+Unit，PostgreSQL numeric 在提交锁内重算库存、需求日前在途及其他有效计划分配；独立 Planning Allocation 不改正式 `reserved_qty`，退回后旧分配失效且必须新版本重算。`0.1.0-alpha.17`/`0017` 已通过并行真实退回→v2 重提→接收、重启与恢复清理，最终业务为 0；未创建新 PO/收货/工单。
 30. SELFHOST-PHASE4-TASK07 采用 D-064：Report 受净领料支持量约束且不写库存；Completion 必须通过 Allocation 消费未占用 good，并与成品 Ledger/Balance、Work Order 投影、Event/Audit/Idempotency 同事务。Report/Completion 只能追加式全额冲销并执行 IPQC/FQC/Shipment/库存门禁。`0.1.0-alpha.21`/`0021`、真实 4/6 链、重启、双恢复与清理已通过。
+31. SELFHOST-PHASE5-TASK03 采用 D-070：结构化 Production Report 只消费同一工单末 Snapshot Operation 的稳定 Run Report good，Allocation 与既有 Report 保持不可变；warehouse 继续显式消费既有 Report 创建 Completion 和成品库存。`0.1.0-alpha.27`/`0027`、实际 Report/Completion/Ledger `4/6`、Balance 10、COMPLETED、重启、恢复与清理已通过；品质、销售和财务事实保持 0。
 
 ## 当前风险
 

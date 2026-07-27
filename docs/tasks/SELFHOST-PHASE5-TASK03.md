@@ -2,7 +2,7 @@
 
 ## 状态与授权
 
-- 状态：`DOING`
+- 状态：`DONE / PARALLEL ACCEPTED`
 - 日期：2026-07-27（Asia/Shanghai）
 - 授权：项目负责人明确授权仅执行 TASK03，包括代码、`0027`、隔离测试、回环并行 HTTP 验收、Compose 串行重启、停服备份恢复、清理、文档和独立 Git 提交。
 - 合法起点：`main` / `a6448ac42da737e31fee76085fb699e80f3c621b`，Parent `120e1524eaebd9d921cab6a036b3203bf7d39226`，工作区 clean，`origin/main...HEAD` behind 0/ahead 43。
@@ -53,19 +53,19 @@ Work Order Routing Snapshot
 
 ## 验收清单
 
-- [ ] `0027`、Schema、journal、snapshot、完整 SHA-256、版本升级
-- [ ] TASK03 unit/UI/PostgreSQL/API/migration/Compose acceptance 测试
-- [ ] 空库、0026→0027、重复执行、失败回滚、历史兼容、结构化 guard、checksum/schema consistency
-- [ ] 幂等同正文/异正文、CAS、并发超量、跨工单/非末工序/冲销来源拒绝、直接 SQL guard、故障零半记录、403
-- [ ] 实际四工序 4/6、Final Output Allocation 4/6、Report 4/6、Completion 4/6、Ledger +4/+6、Balance 10、Work Order COMPLETED
-- [ ] Report 冲销恢复 final output、Completion 下游门禁、Run 冲销门禁
-- [ ] Phase 4 TASK06/TASK07、Phase 5 TASK01/TASK02、Production/Routing/Inventory/Dashboard/Identity 回归
-- [ ] 正式 typecheck、Schema consistency、lint、build、credentials、`git diff --check` 和 Python 三项基线
-- [ ] 修改并行数据库前专用停服备份及 SHA/`pg_restore --list`
-- [ ] Compose 整体串行重启与事实持久性
-- [ ] 接受态停服备份、第二新空 PostgreSQL 恢复、27 migrations 与完整 4/6 链核对
-- [ ] 最终主库干净 0027、唯一启用管理员、业务/Audit/Idempotency/验收账号/文件 0，仅保留原三容器四卷
-- [ ] 功能提交、完成文档与独立验收提交
+- [x] `0027`、Schema、journal、snapshot、完整 SHA-256、版本升级
+- [x] TASK03 unit/UI/PostgreSQL/API/migration/Compose acceptance 测试
+- [x] 空库、0026→0027、重复执行、失败回滚、历史兼容、结构化 guard、checksum/schema consistency
+- [x] 幂等同正文/异正文、CAS、并发超量、跨工单/非末工序/冲销来源拒绝、直接 SQL guard、故障零半记录、403
+- [x] 实际四工序 4/6、Final Output Allocation 4/6、Report 4/6、Completion 4/6、Ledger +4/+6、Balance 10、Work Order COMPLETED
+- [x] Report 冲销恢复 final output、Completion 下游门禁、Run 冲销门禁
+- [x] Phase 4 TASK06/TASK07、Phase 5 TASK01/TASK02、Production/Routing/Inventory/Dashboard/Identity 回归
+- [x] 正式 typecheck、Schema consistency、lint、build、credentials、`git diff --check` 和 Python 三项基线
+- [x] 修改并行数据库前专用停服备份及 SHA/`pg_restore --list`
+- [x] Compose 整体串行重启与事实持久性
+- [x] 接受态停服备份、第二新空 PostgreSQL 恢复、27 migrations 与完整 4/6 链核对
+- [x] 最终主库干净 0027、唯一启用管理员、业务/Audit/Idempotency/验收账号/文件 0，仅保留原三容器四卷
+- [x] 功能提交、完成文档与独立验收提交
 
 ## 低资源与生产边界
 
