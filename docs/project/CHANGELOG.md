@@ -4,6 +4,31 @@
 
 ## 2026-07-27
 
+### SELFHOST-PHASE5-TASK07 - `ops: accept manufacturing batch workflow in parallel environment`
+
+- 提交：功能提交 `3162edf5559512dd82ec363cf859d39bae2d5a0d` 严格 Parent `93902d9c3f7be94044cf9903af6e6fbebc685cc3`；聚焦修正 `dfd1581bc2e3cb072cd7f238e6a1b0097f8912f4`、`cd9f016570cf94eb2990362b56e8f51ef5d43db1`；独立 ops 提交实际哈希以 Git log 为准。
+- 实际 HTTP：Work Order 10 建立 RELEASED Batch Set 和 digest；Batch A 4 完成四工序/IPQC，Batch B 6 的原检为 `6/4/2/4`、NCR v1 RETURNED/v2 ACCEPTED、同批 REWORK `2/2/0`、复检 `2/2/0/2`、AOI `4/2`。B REFLOW 加工次数 8、净量仍为 6。
+- Report/Completion/Inventory：Final Output、Production Report、Completion 和 Ledger 分别为 `4/6`；Report/Completion 混批与跨 Batch Input Allocation 实际拒绝。Ledger `lot_code=''`、MAIN Balance 10；FQC/Shipment/Sales Source/AR/Settlement 0。生产批次谱系已建立，但仓库批次库存尚未启用。
+- 保护与查询：发布数量不等、发布后修改、越权 403、CAS、幂等重放、同 Batch 返工继承、ORDER 模式、并发/故障/直接 SQL guard 和稳定 genealogy 查询通过。Batch 列表、详情、code 精确查询、WIP、Work Order 汇总和七项 Dashboard 指标按权限返回。
+- 验证：208 项不重复 Node 自动测试通过（unit/UI 82、PostgreSQL/API 67、migration 40、npm/environment/manifest/coverage 19）；9 组 typecheck、Schema consistency、lint、双镜像 build、credentials、`git diff --check` 和 Python 三项通过。
+- 重启与恢复：Compose 串行重启后 Batch/digest/Run/Inspection/NCR/Rework/Report/Completion/Ledger 全部保持；接受态 dump 1,638,643 bytes、SHA-256 `6a19e3a850dbb0014c00497f1916ba6f0c103f3035b631f348a4fe0e76f0f936` 恢复至固定第二新空库并核对完整 4/6 链。最终任务备份按清理计划删除，resource-guard 保留。
+- 清理与资源：主库 31 migrations、唯一启用 admin，其余公共业务/Audit/Idempotency/临时账号/uploads/attachments 0；仅三容器四卷。起点/最终 available 约 2.4 GiB，Swap 148→148 MiB，磁盘 15→14 GiB；最终 60 秒 Swap 155,295,744→155,295,744 bytes，RestartCount 0/OOM false。
+- 结论：`MANUFACTURING BATCH GENEALOGY ACCEPTED IN PARALLEL ENVIRONMENT`；未启动 TASK08。
+
+### SELFHOST-PHASE5-TASK07 - `test: preserve rework migration journal assertion`
+
+- 把 TASK06 的 0030 migration 回归从“journal 最后一项必须为 0030”改为精确查找并校验不可变 0030 项，使其可与新增 0031 共存；业务、回滚、Schema、snapshot 和完整 SHA-256 断言不变，重跑 5/5 通过。
+
+### SELFHOST-PHASE5-TASK07 - `fix: satisfy manufacturing batch lint contract`
+
+- 将 Batch 页面初始加载改为稳定 callback 与 effect 异步调度，避免同步 effect state update；移除 Batch Service 未使用 import。TASK07 unit/UI、typecheck、lint 0 error/9 warning、Vinext build 及 Web/Worker 串行镜像重建通过。
+
+### SELFHOST-PHASE5-TASK07 - `feat: add manufacturing batch genealogy`
+
+- 数据库：只新增 expand-only `0031_production_batch_genealogy.sql`；增加 Batch Set/Batch/Event、Operation Run nullable Batch ID、Report/Completion 单 Batch 关系、索引、服务写 guard、发布后不可变与 deferred 守恒；同步 Schema/journal/snapshot，不修改 0001—0030。
+- 服务/API：新增 Batch 管理、列表/详情/code/WIP/genealogy/Work Order 汇总；NORMAL Run 强制同批、REWORK 沿稳定来源继承，跨 Batch Allocation、Report/Completion 混批与结构化 legacy 绕过 fail closed。
+- UI/Dashboard：新增 `/production/batches`，扩展生产、品质、NCR、返工与完工页面显示 Batch code、NORMAL/REWORK、Hold、genealogy 和 Inventory Lot 边界；Dashboard 增加 DRAFT/待执行/WIP/Hold/Rework/Final Output/Completed Batch 指标。
+
 ### SELFHOST-PHASE5-TASK06 - `ops: accept production rework execution in parallel environment`
 
 - 提交：功能提交 `1f6a143adbf78d7fb70fbed1ea7d7dfea62cfd4b` 严格 Parent `11bc680a91c59258c94f8ddca3d56af71981811e`；独立 ops 提交实际哈希以 Git log 为准。

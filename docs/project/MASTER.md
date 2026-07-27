@@ -37,20 +37,20 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.30`；PostgreSQL migration head 为 `0030_production_rework_execution.sql`；始终仅限回环非生产环境 |
+| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.31`；PostgreSQL migration head 为 `0031_production_batch_genealogy.sql`；始终仅限回环非生产环境 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK06 功能提交 `1f6a143adbf78d7fb70fbed1ea7d7dfea62cfd4b` 严格以 `11bc680a91c59258c94f8ddca3d56af71981811e` 为 Parent |
-| Git 同步与工作区 | TASK06 起点 behind 0/ahead 52；功能与独立 ops 验收提交后预期 behind 0/ahead 54，仍不 push、不创建 PR、不改写历史 |
+| 当前根仓库功能基线提交 | TASK07 功能提交 `3162edf5559512dd82ec363cf859d39bae2d5a0d` 严格以 `93902d9c3f7be94044cf9903af6e6fbebc685cc3` 为 Parent；聚焦修正 `dfd1581bc2e3cb072cd7f238e6a1b0097f8912f4`、`cd9f016570cf94eb2990362b56e8f51ef5d43db1` |
+| Git 同步与工作区 | TASK07 起点 behind 0/ahead 54；功能、两项聚焦修正与独立 ops 验收提交后预期 behind 0/ahead 58，仍不 push、不创建 PR、不改写历史 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0030`；最终唯一启用管理员、所有合成业务/审计/幂等表 0、uploads/attachments 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
+| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0031`；最终唯一启用管理员、所有合成业务/审计/幂等表 0、uploads/attachments 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | 本机固定按 2 核/约 4 GiB/1 GiB Swap 保护；Python/SQLite 开发服务 PID `13737` 未重启，起点 systemd cgroup 限额已实际生效，仓库 16 请求线程新源码待未来获准重启；非生产 Compose 的 PostgreSQL/Web/Worker 已实际应用 CPU/Memory/Swap/PID 限额，Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口；不是生产部署 |
-| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard，以及 Routing Snapshot→工序执行/WIP→IPQC→NCR/Rework Request→显式 REWORK Run→复检放行→后续工序→成品入库的非生产链路 |
-| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK06 已完成并行验收；TASK06 已停止于干净 `0030` 点 |
-| 当前任务 | 当前无 `DOING`；`SELFHOST-PHASE5-TASK06` 已 `DONE`，2026-07-27 服务器重启/不可用根因仍为 `UNKNOWN` |
-| 下一任务 | 停止；不得自动启动 PHASE5-TASK07。返工补料、库存报废、自动补产、批次/序列、设备/OEE、产能排程、成本会计、真实迁移、HTTPS、生产恢复和切换均未授权 |
+| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard，以及 Work Order→Manufacturing Batch→NORMAL/REWORK→品质/NCR/复检→Report/Completion→既有 Ledger 的非生产谱系；仓库 Inventory Lot 尚未启用 |
+| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK07 已完成并行验收；TASK07 已停止于干净 `0031` 点 |
+| 当前任务 | 当前无 `DOING`；`SELFHOST-PHASE5-TASK07` 已 `DONE`，2026-07-27 服务器重启/不可用根因仍为 `UNKNOWN` |
+| 下一任务 | 停止；不得自动启动 PHASE5-TASK08。Inventory Lot Balance、原材料/供应商批次、批次冻结/Shipment 消费、序列号、设备/OEE、产能排程、成本会计、真实迁移、HTTPS、生产恢复和切换均未授权 |
 
 ## 当前完成模块
 
@@ -88,6 +88,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - SELFHOST-PHASE5-TASK04 已在同一并行环境交付 `0.1.0-alpha.28`/`0028`，Routing Operation 的 `NONE/IPQC` 随发布 digest 和 Work Order Snapshot 固化；显式稳定 Run Report 来源 IPQC 经 Result/Disposition/Close 后形成下游额度。实际 REFLOW good `4/6` 先 Hold 10、AOI available 0，再按 `4/6` 检验放行为 Hold `10→6→0`、AOI available `0→4→10`，最后复用 TASK03 Report/Completion/Ledger `4/6`、Balance 10、Work Order `COMPLETED`；重启、恢复和最终清理通过
 - SELFHOST-PHASE5-TASK05 已在同一并行环境交付 `0.1.0-alpha.29`/`0029`，稳定 IPQC failed 形成唯一 NCR，quality 以不可变提交快照准备返工申请，production 接收/退回，manager/admin 可追加不写库存的最终工序 SCRAP。实际 inspected 10/passed 8/failed 2、AOI available 8、Hold 2、v1 RETURNED、v2 ACCEPTED、accepted rework 2、unresolved 0；未创建返工 Run、额外报工、成品库存或下游销售/财务事实，重启、恢复和最终清理通过
 - SELFHOST-PHASE5-TASK06 已在同一并行环境交付 `0.1.0-alpha.30`/`0030`，复用既有 Operation Run/Report、Quality、WIP、Production Report、Completion 和 Inventory 权威执行显式返工。实际原检 `10/8/2/8`、REFLOW REWORK `2/2/0`、复检 `2/2/0/2`、AOI `8/2`、Ledger `+8/+2`、Balance 10，Execution COMPLETED、NCR RESOLVED；正常 REFLOW 加工次数 10+2 而净产品仍为 10，重启、固定第二库恢复和最终清理通过
+- SELFHOST-PHASE5-TASK07 已在同一并行环境交付 `0.1.0-alpha.31`/`0031`，建立 Manufacturing Batch Set/Batch 身份、发布 digest、按 Batch 的 NORMAL/REWORK、WIP/Quality/NCR/Rework/Report/Completion/Inventory 关联和稳定 genealogy。实际 Batch A 4、Batch B 6；B 原检 `6/4/2/4`、同批返工 `2/2/0`、复检 `2/2/0/2`，REFLOW 加工次数 8 而净 Batch 量 6；两笔 Ledger `+4/+6` 的 `lot_code` 仍为空、MAIN Balance 10。生产批次谱系已建立，但仓库批次库存尚未启用；重启、固定第二库恢复和最终清理通过
 - 多用户登录、会话、角色权限、密码修改、账号管理和操作审计
 - 物料、供应商映射、CSV 导入、清洗队列和新物料建档基础流程
 - 客户、供应商、产品、BOM 和 BOM 齐套分析

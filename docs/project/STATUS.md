@@ -2,6 +2,26 @@
 
 最后更新时间：2026-07-27（Asia/Shanghai）
 
+## SELFHOST-PHASE5-TASK07 生产批次身份与全过程谱系
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `3162edf5559512dd82ec363cf859d39bae2d5a0d` 严格 Parent `93902d9c3f7be94044cf9903af6e6fbebc685cc3`；聚焦修正 `dfd1581bc2e3cb072cd7f238e6a1b0097f8912f4`、`cd9f016570cf94eb2990362b56e8f51ef5d43db1`；独立 ops 验收提交以 Git log 为准 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.31`；`0031` SHA-256/数据库 checksum `ac0f6a63cfdb30d42edf50741afc7c8af632f74ff6fb08398d6b6e398a637fd4`；0001—0030 未修改，Schema/journal/snapshot 一致 |
+| Batch 身份 | PASS | 每 Work Order 至多一个 Batch Set；DRAFT CAS 编辑，RELEASE 合计严格等于 planned，服务端 Batch code 和稳定 canonical digest；发布后快照/Batch 不可变 |
+| 实际 HTTP | PASS | Batch A 4 完成四工序/IPQC；Batch B 原检 `6/4/2/4`、NCR v1 RETURNED/v2 ACCEPTED、同批 REWORK `2/2/0`、复检 `2/2/0/2`、AOI `4/2`；B REFLOW 加工次数 8、净量 6 |
+| Report/Completion/Inventory | PASS / NOT INVENTORY LOT | 两条 Final Output/Report/Completion/Ledger 为 `4/6`，Ledger `lot_code=''`、MAIN Balance 10；Batch A/B 均 COMPLETED，工单 `10/10/10/0/10 COMPLETED`。生产批次谱系已建立，但仓库批次库存尚未启用 |
+| 谱系/WIP | PASS | 列表、详情、code 精确查询、Batch WIP、genealogy、Work Order 汇总沿稳定 ID 返回 Batch Set/digest、快照、NORMAL/REWORK、品质/NCR/复检、Report/Completion 和 Inventory Adjustment/Ledger ID |
+| 门禁/权限 | PASS | 数量不等发布、发布后修改、跨 Batch 下游消费、Report/Completion 混批、结构化 legacy 绕过均拒绝；planning/warehouse 越权写实际 403，quality/warehouse/engineering 按职责只读；ORDER 模式实际兼容 |
+| 幂等/CAS/并发/回滚 | PASS | 持久 Idempotency 重放/异正文、Batch Set/Batch CAS、并发唯一发布/编码、固定锁序、故障零半记录、事实不可变和直接 SQL guard 通过 |
+| 自动验证 | PASS | 208 项不重复 Node 测试：unit/UI 82、PostgreSQL/API 67、migration 40、npm/environment/manifest/coverage 19；9 组 typecheck、Schema consistency、lint、双 build、credentials、diff 与 Python 三项通过 |
+| 重启/恢复 | PASS | 串行重启后 31 migrations、Batch `4/6`、NORMAL 9、REWORK 1、ORDER Run 1、Inspection 3、NCR 1、Report/Completion 2、Ledger `4/6`、Audit 85、Idempotency 71 保持；接受态备份恢复至固定第二空库复核完整链 |
+| 清理 | PASS | 主库 31 migrations、app_meta 1、唯一启用 admin，其他公共业务/Audit/Idempotency/临时账号 0；uploads/attachments 0；仅 PostgreSQL/Web/Worker 三容器和四卷；TASK07 数据库/备份/临时资源删除，resource-guard 保留 |
+| Python/SQLite | PASS / PROTECTED | Python PID `13737` 未停止或重启；真实 SQLite metadata `53827608:1544192:1784999031:1784356951`、mode 600 未变且未读正文；三项 Python 基线通过 |
+| 资源观测 | PASS | 起点 available 约 2.4 GiB、Swap 148 MiB、磁盘 15 GiB；最终 2.4 GiB/148 MiB/14 GiB、Load `0.81/0.91/0.71`；最终 60 秒 Swap 增长 0，三容器 RestartCount 0/OOMKilled false |
+| 排除事项 | ENFORCED | 未实现 Inventory Lot Balance、原材料/供应商/仓库批次、冻结/Shipment 消费、序列号/标签、自动 Batch、设备/OEE、外协、产能、成本会计、FQC/Shipment/AR/财务、历史迁移、Python 操作、HTTPS/防火墙、生产部署、push/PR 或 TASK08 |
+| 完成结论 | PASS | `MANUFACTURING BATCH GENEALOGY ACCEPTED IN PARALLEL ENVIRONMENT` |
+
 ## SELFHOST-PHASE5-TASK06 返工执行、复检与生产流恢复
 
 | 验证项 | 结果 | 说明 |

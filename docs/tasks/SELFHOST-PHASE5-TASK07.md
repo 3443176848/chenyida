@@ -2,7 +2,7 @@
 
 ## 状态与授权
 
-- 状态：`DOING`
+- 状态：`DONE / PARALLEL ACCEPTED`
 - 日期：2026-07-27（Asia/Shanghai）
 - 授权：项目负责人明确授权只执行 TASK07，包括代码、`0031`、隔离测试、现有 `chenyida-erp-parallel` 回环非生产环境实际 HTTP 验收、Compose 串行重启、停服备份恢复、限定清理、文档和独立 Git 提交；不得启动 TASK08。
 - 合法起点：`main` / `93902d9c3f7be94044cf9903af6e6fbebc685cc3`，Parent `1f6a143adbf78d7fb70fbed1ea7d7dfea62cfd4b`；工作区 clean，`origin/main...HEAD` behind 0/ahead 54。
@@ -42,9 +42,9 @@ Work Order -> DRAFT Batch Set -> Manufacturing Batch 4 / 6
 ## 验收清单
 
 - [x] `0031`、Schema、journal、snapshot、完整 SHA-256 `ac0f6a63cfdb30d42edf50741afc7c8af632f74ff6fb08398d6b6e398a637fd4`、版本升级
-- [ ] TASK07 unit、UI、PostgreSQL/API、Migration、Compose acceptance
-- [ ] 数量、不可变、CAS、幂等、并发、故障、SQL guard、权限 403、ORDER 兼容
-- [ ] 实际 HTTP Batch A 4 / Batch B 6 与完整 genealogy
-- [ ] typecheck、Schema consistency、lint、build、credentials、diff 与 Python 三项基线
-- [ ] 修改前备份、Compose 重启、接受态备份、恢复核对和最终清理
-- [ ] 功能提交、完成报告和独立 ops 验收提交
+- [x] TASK07 unit、UI、PostgreSQL/API、Migration、Compose acceptance
+- [x] 数量、不可变、CAS、幂等、并发、故障、SQL guard、权限 403、ORDER 兼容
+- [x] 实际 HTTP Batch A 4 / Batch B 6 与完整 genealogy
+- [x] typecheck、Schema consistency、lint、build、credentials、diff 与 Python 三项基线
+- [x] 修改前备份、Compose 重启、接受态备份、恢复核对和最终清理
+- [x] 功能提交、完成报告和独立 ops 验收提交

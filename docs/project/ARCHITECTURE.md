@@ -2,6 +2,27 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-27 Manufacturing Batch 身份与全过程谱系边界
+
+`SELFHOST-PHASE5-TASK07` 在 Work Order 下建立至多一个 Batch Set，并以服务端生成的 Batch code、发布时 canonical digest 和不可变快照固化 Manufacturing Batch 身份。Batch 模式下所有新 NORMAL Run 必须显式绑定同工单已发布 Batch；REWORK Run 只能沿 NCR→Inspection→源 Run Report 继承同一 Batch。Input Allocation、Final Output、Production Report 和 Completion 由数据库 guard 阻止跨 Batch 或混批。
+
+```mermaid
+flowchart LR
+    W[Work Order 10] --> S[Released Batch Set + digest]
+    S --> A[Batch A 4]
+    S --> B[Batch B 6]
+    A --> AN[NORMAL Runs / IPQC / Report / Completion 4]
+    B --> BN[NORMAL Runs 6 / original IPQC 4+2]
+    BN --> BR[Same-Batch REWORK 2 / Reinspection 2]
+    BR --> BC[Report / Completion 6]
+    AN --> L[Existing Inventory Ledger +4]
+    BC --> L2[Existing Inventory Ledger +6]
+```
+
+Batch genealogy 沿稳定外键返回 Batch Set/digest、Work Order/BOM/Routing Snapshot、NORMAL/REWORK Run/Report/Input Allocation、IPQC/Defect/NCR/Rework/复检、Final Output、Production Report、Completion 和 Inventory Adjustment/Ledger ID。Batch 状态是不可变事实的投影，不接受浏览器累计状态。没有 Batch Set 的历史工单继续 ORDER 模式，不猜测或自动生成 Batch。
+
+这是 Manufacturing Batch genealogy，不是仓库 Inventory Lot。Completion 继续复用既有 Inventory Service；Ledger/Balance 仍按 `MAIN` 和空 `lot_code` 聚合，`INVENTORY_LOT_NOT_SUPPORTED` 门禁保持。生产批次谱系已建立，但仓库批次库存尚未启用。
+
 ## 2026-07-27 返工执行、复检与生产流恢复边界
 
 `SELFHOST-PHASE5-TASK06` 复用唯一 Production Operation Run/Report、Quality Inspection 和 WIP/正式报工/完工/库存权威。只有有效 ACTIVE NCR Allocation 下 digest/固化提交版本一致且仍有余额的 ACCEPTED Rework Request，才可由 production 显式派工为既有 Run 的 `REWORK` 类型；稳定 Allocation 保存 Request、NCR、原 Inspection/Run Report、目标 Snapshot Operation、Work Order、Work Center、operator 和数量。

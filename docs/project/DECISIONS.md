@@ -818,6 +818,17 @@
 - 投影与更正：独立 Execution Projection 明确 ACCEPTED、IN_PROGRESS、WAITING_REINSPECTION、COMPLETED/COMPLETED_WITH_SCRAP；全部释放后 NCR 进入 RESOLVED。未开工 Run 可取消恢复余额；已报工只允许追加式全额冲销，无品质/下游时恢复投影，已有复检、下游 Allocation、正式 Report 或 Completion 时 fail closed。CAS、固定锁序、幂等、事务 Audit、故障回滚、不可变 trigger 和 deferred reconciliation 共同保证守恒。
 - 权限与边界：production 派工/执行/受控冲销，quality 创建复检/结果/缺陷，manager/admin 处置管理，engineering 只读，其余角色写入 403。Dashboard 只读。本决定不授权自动创建 Rework Run/复检、返工补料、SCRAP Inventory、自动补产、批次/设备/产能/FQC/Shipment/AR、真实迁移、切流、生产部署或 TASK07。
 
+## D-074 Manufacturing Batch 使用稳定发布身份贯穿生产谱系，但不等于 Inventory Lot
+
+- 日期：2026-07-27
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
+- 确认人：项目负责人（明确授权 `SELFHOST-PHASE5-TASK07`，并固定 Manufacturing Batch genealogy 与仓库 Inventory Lot 的边界）
+- Batch Set：每个 Work Order 至多一个 `DRAFT/RELEASED/CANCELLED` Batch Set。DRAFT Batch 通过 CAS 编辑；RELEASE 仅允许工单 `RELEASED/IN_PROGRESS` 且尚无 Run、各 Batch 数量大于 0、合计严格等于 planned quantity。服务端生成唯一 Batch code，并按稳定顺序固化 Work Order、Product Version、BOM/Routing Snapshot、Finished Material、Unit、planned quantity 和 canonical digest；发布后不可修改或删除。
+- 执行谱系：Batch 模式新 NORMAL Run 必须提交同工单已发布 Batch，首序累计不超 Batch planned quantity，后序 Input Allocation 只能消费同 Batch 上游 good。REWORK Batch 由 NCR/Inspection/源 Run Report 稳定继承，浏览器不得覆盖；原检、返工、复检保持同批，重复加工次数不得增加净产品数量。无 Batch Set 的历史工单保持 ORDER 模式，不猜测或自动补 Batch。
+- 报工与完工：每条结构化 Production Report 和 Completion 只能属于一个 Batch，Final Output 与 Report→Completion Allocation 不得混批。Completion 继续调用既有 Inventory Service；Batch genealogy 可返回 Inventory Adjustment/Ledger ID，但 Ledger `lot_code` 必须为空，Balance 继续按 MAIN 聚合。
+- 查询与权限：提供 Batch 列表/详情/code 精确查询/WIP/genealogy/Work Order 汇总；状态由事实投影。production 管理 Batch Set 和 Batch Run，quality/warehouse/engineering 按职责只读，manager/admin 管理，其余角色不得执行 Batch 写操作。全部写入继续受 Session/must-change、CSRF、正文/速率、持久幂等、CAS、固定锁序、request_id、安全中文错误和事务 Audit 保护。
+- 明确边界：这是 Manufacturing Batch genealogy，不是 Inventory Lot；`INVENTORY_LOT_NOT_SUPPORTED` 不解除。生产批次谱系已建立，但仓库批次库存尚未启用。本决定不授权原材料/供应商/仓库批次余额、冻结/解冻、Shipment 批次消费、序列号、标签/条码/二维码、自动 Batch、设备/OEE、外协、产能、成本会计、真实迁移、生产部署或 TASK08。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

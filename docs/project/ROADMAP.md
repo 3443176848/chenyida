@@ -149,7 +149,7 @@ Import Workspace UI 已由 `PHASE2-TASK08` 独立实施；Catalog 与 50×256 �
 
 **预计任务数**：6。**当前状态**：IN PROGRESS。自托管全域 API、合成迁移框架、受控 Inventory/Finance Opening 及完全合成 public materialization/Dashboard/恢复已完成非生产验收；真实 source inventory、逐行人工处置、容量、安全、生产恢复、部署和切换尚未开始。
 
-生产线已推进到 `SELFHOST-PHASE5-TASK06`：结构化 REFLOW 原检 inspected/passed/failed/released=`10/8/2/8`，v1 RETURNED/v2 ACCEPTED 后由 production 显式派工 REWORK 2，既有 Run/Report 完成 `2/2/0`，quality 显式复检并异人关闭放行 `2/2/0/2`，AOI available `8→10`。AOI、Final Output、Production Report、warehouse Completion 和 Finished Goods Ledger 均按 `8/2` 完成，Balance 10；REFLOW 加工次数 12 而工单净产品仍为 10，Execution COMPLETED、NCR RESOLVED、原 failed 2 保持。`0.1.0-alpha.30`/`0030`、重启、停服备份/固定第二库恢复和清理已通过；TASK07、自动返工/复检、返工补料、库存报废、补产、批次、设备、产能、真实迁移和生产切换未授权。
+生产线已推进到 `SELFHOST-PHASE5-TASK07`：Work Order 10 发布 Batch Set/digest，Manufacturing Batch A/B 为 `4/6`。A 四工序和 IPQC 4 全部放行；B 原 IPQC `6/4/2/4`，NCR v1 RETURNED/v2 ACCEPTED 后同批 REWORK `2/2/0`、复检 `2/2/0/2`，AOI `4/2`。两条 Final Output/Production Report/Completion/Ledger 为 `4/6`，空 `lot_code`、MAIN Balance 10；B REFLOW 加工次数 8、净 Batch 数量仍为 6。`0.1.0-alpha.31`/`0031`、重启、停服备份/固定第二库恢复和清理已通过。生产批次谱系已建立，但仓库批次库存尚未启用；TASK08、Inventory Lot Balance、原材料/供应商批次、Shipment 批次消费、自动 Batch、设备/OEE、产能、真实迁移和生产切换未授权。
 
 ## Phase 6 行业物料库
 
