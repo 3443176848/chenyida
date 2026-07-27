@@ -149,7 +149,7 @@ Import Workspace UI 已由 `PHASE2-TASK08` 独立实施；Catalog 与 50×256 �
 
 **预计任务数**：6。**当前状态**：IN PROGRESS。自托管全域 API、合成迁移框架、受控 Inventory/Finance Opening 及完全合成 public materialization/Dashboard/恢复已完成非生产验收；真实 source inventory、逐行人工处置、容量、安全、生产恢复、部署和切换尚未开始。
 
-生产线已推进到 `SELFHOST-PHASE5-TASK08`：在 TASK07 Manufacturing Batch genealogy 上增加唯一 Finished Goods Inventory Lot。实际全通过 IPQC 的 Batch A/B 为 `4/6`，Completion 创建 Lot A/B、Ledger `+4/+6`、Lot Balance `4/6`、Material Aggregate 10；Lot B freeze/unfreeze 2 守恒，Lot A Completion 冲销写原 Lot `-4` 并进入 REVERSED，重新 Completion `+4` 复用同一 Lot。ORDER 模式保持 null/空 Lot。`0.1.0-alpha.32`/`0032`、权限/并发/SQL guard、Compose 重启、停服备份/固定第二库恢复、Build Cache 归零和最终清理已通过。只实现制造成品 Lot；TASK09、原材料/供应商/采购 Receipt/生产领料/Shipment/FQC Lot、序列号、设备/OEE、产能、真实迁移和生产切换未授权。
+生产线已推进到 `SELFHOST-PHASE5-TASK09`：在 TASK08 Finished Goods Inventory Lot 上把 Completion Allocation、FQC、Shipment Line、FQC Consumption 与 Inventory ISSUE/REVERSAL 绑定同一稳定 Lot。实际 Lot A/B `4/6`，先发 A 4，冻结 B 2 后发 6 被拒且零半记录，解冻后发 B 6；再冲销 A 4 并从同一个 A 再发 4，最终有效 Shipment/FQC `4/6`、Material 0、Source 200、AR/Settlement 0。ORDER 模式保持 null Lot。`0.1.0-alpha.33`/`0033`、权限/幂等/CAS/并发/故障/SQL guard、Compose 重启、接受态固定第二库恢复、Build Cache 归零和最终 clean-0033 清理已通过。不得自动启动 TASK10；原材料/供应商/采购 Receipt/生产领料 Lot、序列号、设备/OEE、产能、真实迁移和生产切换未授权。
 
 ## Phase 6 行业物料库
 

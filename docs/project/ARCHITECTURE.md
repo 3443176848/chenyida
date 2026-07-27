@@ -2,6 +2,28 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-27 FQC Lot 放行与 Shipment 精确消费
+
+`SELFHOST-PHASE5-TASK09` 沿 TASK08 的唯一 Finished Goods Inventory Lot 扩展既有 Quality/Sales/Inventory 权威，不新建并行业务表。BATCH 的 Completion Line→Sales Allocation→FQC Inspection→Shipment Line→FQC Consumption Fact 必须保存同一个稳定 `inventory_lot_id`；ORDER 历史模式在整条链上继续 null Lot。
+
+```mermaid
+flowchart LR
+    B["Manufacturing Batch"] --> C["Completion Line"]
+    C --> L["Finished Goods Inventory Lot"]
+    C --> A["Sales Allocation with Lot"]
+    A --> Q["FQC Release with same Lot"]
+    Q --> S["Warehouse explicit Lot Shipment"]
+    L --> I["Inventory ISSUE on same Lot"]
+    S --> I
+    S --> F["FQC Consumption Fact with same Lot"]
+    S --> R["Sales Source"]
+    S --> V["Reversal restores original Lot/FQC"]
+```
+
+FQC Lot 由服务端从 Allocation 推导，浏览器不得指定或改变。Shipment 同时受 Delivery/SO 剩余、Lot `on_hand-reserved-frozen` 和同 Lot FQC available 限制，固定锁序与 CAS 防止并发超用。Inventory Ledger、Lot status/event、FQC consumption、Delivery/SO 投影、Sales Source、Audit 和 Idempotency 在同一 PostgreSQL 事务；冲销只沿原 Shipment Line 的原 Lot 追加反向事实，已有 AR 时 fail closed。0033 的外键、索引、服务写 guard、不可变事实 trigger 与 deferred reconciliation 阻止跨 Lot/Material/Unit/SO Line 和直接 SQL 绕过。
+
+该边界不包含自动选 Lot、FIFO/FEFO、原材料/供应商/Receipt/领料 Lot、序列号/标签、AR 自动创建或生产部署。
+
 ## 2026-07-27 Finished Goods Inventory Lot 与成品库存守恒
 
 `SELFHOST-PHASE5-TASK08` 在 TASK07 的稳定 Manufacturing Batch 与既有 Production Completion/Inventory Service 之间增加唯一 `MANUFACTURING_FINISHED_GOODS` Inventory Lot。首次 Batch Completion 在同一事务创建 Lot；后续同 Batch Completion、冲销和重新 Completion 均复用同一 Lot。Lot 沿稳定外键继承 Work Order、Product Version、finished Material/Unit 和 Batch，不从名称或 code 文本猜测。

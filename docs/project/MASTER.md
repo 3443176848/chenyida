@@ -37,28 +37,29 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.32`；PostgreSQL migration head 为 `0032_finished_goods_inventory_lots.sql`；始终仅限回环非生产环境 |
+| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.33`；PostgreSQL migration head 为 `0033_finished_goods_lot_fqc_shipment.sql`；始终仅限回环非生产环境 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK08 功能提交 `43808f85bc3a662825cc2421d97e9eb631e0c469` 严格以 `809efadd2cafd1a7b55a0824b87c67c70ad2814b` 为 Parent；其后仅追加九个聚焦修正提交，最终验收提交以 Git log 为准 |
+| 当前根仓库功能基线提交 | TASK09 功能提交 `02dfa0d3c18c16b0e8ee07af94f11de7a0ca77e7` 严格以 `279d284738b8ee01f6579a91333ad958a6c36dc8` 为 Parent；独立验收提交以 Git log 为准 |
 | 当前根仓库运维基线 | `SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03` 严格以 `0d24eddcc5176602370214bfc8f8003844ab2b80` 为 Parent；独立提交消息为 `ops: rotate parallel database credential safely`，实际提交 SHA 以 Git log 为准 |
-| Git 同步与工作区 | 凭据轮换起点 behind 0/ahead 70、工作区 clean；独立提交后预期 behind 0/ahead 71，仍不 push、不创建 PR、不改写历史 |
+| Git 同步与工作区 | TASK09 起点 behind 0/ahead 71、工作区 clean；功能提交后 behind 0/ahead 72，独立验收提交后预期 ahead 73；仍不 push、不创建 PR、不改写历史 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0032`；唯一启用管理员 1；唯一 `IDENTITY/LOGIN/success` 审计与唯一 ACTIVE session 是同一次合法管理员登录，必须保留；其余业务/幂等表、uploads/attachments 均为 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
-| 当前运行状态 | 本机固定按 2 核/约 4 GiB/1 GiB Swap 保护；并行 PostgreSQL 角色密码与 root-only env 已安全轮换，新密码连接成功、旧密码经 SCRAM 网络路径返回 `28P01`；PostgreSQL 未重启，Web/Worker 已串行重建。Python/SQLite PID `13737` 未重启；三容器 RestartCount 0、OOM false，Build Cache 0B，根分区可用 37 GiB；不是生产部署 |
-| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard，以及 Manufacturing Batch→Production Report→Completion→Finished Goods Inventory Lot→Lot Ledger/Balance/genealogy 的非生产链路 |
-| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK08 已完成并行验收；TASK08 已停止于干净 `0032` 点 |
-| 当前任务 | 当前无 `DOING`；`SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03` 已 `DONE`，凭据值和连接字符串未进入仓库或报告；2026-07-27 服务器重启/不可用根因仍为 `UNKNOWN` |
-| 下一任务 | 停止；不得自动启动 PHASE5-TASK09。原材料/供应商/采购 Receipt/生产领料/Shipment Lot、FQC Lot 放行、序列号、设备/OEE、产能排程、成本会计、真实迁移、HTTPS、生产恢复和切换均未授权 |
+| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0033`；唯一启用管理员 1；唯一 `IDENTITY/LOGIN/success` 审计与唯一 ACTIVE session 保持为任务前同一合法记录；其余业务/幂等表、uploads/attachments 均为 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
+| 当前运行状态 | 本机固定按 2 核/约 4 GiB/1 GiB Swap 保护；PostgreSQL/Web/Worker 已在 TASK09 实际验收后严格串行重启，最终 healthy/running、RestartCount 0、OOM false、Build Cache 0B、根分区可用 36 GiB。Python PID `13737`/NRestarts 0；不是生产部署 |
+| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard，以及 Manufacturing Batch→Completion→Finished Goods Lot→FQC Lot 放行→Delivery→Shipment 精确 Lot 消费/冲销/genealogy 的非生产链路 |
+| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK09 已完成并行验收；TASK09 已停止于干净 `0033` 点 |
+| 当前任务 | 当前无 `DOING`；`SELFHOST-PHASE5-TASK09` 已 `DONE / PARALLEL ACCEPTED`。2026-07-27 服务器重启/不可用历史根因仍为 `UNKNOWN` |
+| 下一任务 | 停止；不得自动启动 PHASE5-TASK10。原材料/供应商/采购 Receipt/生产领料 Lot、序列号、设备/OEE、产能排程、成本会计、真实迁移、HTTPS、生产恢复和切换均未授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
-- SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03 已在不重启 PostgreSQL、不修改 Schema/Migration/业务代码的前提下轮换并行非生产数据库角色密码与 `/etc/chenyida-erp/parallel.env`，串行恢复 Web/Worker；新密码 `SELECT 1` 成功、旧密码 SCRAM 认证 `28P01`，唯一合法 LOGIN 审计和 ACTIVE session 保持 1/1。TASK09 若获单独授权，必须采用 baseline-delta 并返回相同基线记录集/计数，不得删除不可变审计
-- SELFHOST-PHASE5-TASK08 已在同一并行环境交付 `0.1.0-alpha.32`/`0032`、唯一 Finished Goods Inventory Lot、稳定 Batch 一对一映射、Lot Ledger/Balance/Material Aggregate、freeze/unfreeze 和 Completion 原 Lot 冲销恢复；实际 Batch A 4 / Batch B 6、Material 10、ORDER 空 Lot 兼容、重启、停服备份/固定第二库恢复、Build Cache 回到 0B 和最终清理通过。原材料、供应商、采购 Receipt、生产领料、Shipment/FQC Lot 与序列号未实现，不启动 TASK09
+- SELFHOST-PHASE5-TASK09 已在同一并行环境交付 `0.1.0-alpha.33`/`0033`，把 BATCH Completion→Allocation→FQC→Shipment/FQC Consumption/Inventory Ledger 全部绑定同一稳定 Inventory Lot。实际 Lot A/B `4/6`、冻结 B 2 后拒发 6 零半记录、解冻后发 B 6、冲销 A 4 并从同一 A 再发 4，最终有效 Shipment/FQC `4/6`、Source 200、AR/Settlement 0；ORDER null Lot、整栈重启、接受态第二库恢复、最终 clean-0033 恢复和资源清理通过。未启动 TASK10
+- SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03 已在不重启 PostgreSQL、不修改 Schema/Migration/业务代码的前提下轮换并行非生产数据库角色密码与 `/etc/chenyida-erp/parallel.env`，串行恢复 Web/Worker；新密码 `SELECT 1` 成功、旧密码 SCRAM 认证 `28P01`，唯一合法 LOGIN 审计和 ACTIVE session 保持 1/1。该任务建立的 baseline-delta 规则已由后续 TASK09 遵守
+- SELFHOST-PHASE5-TASK08 已在同一并行环境交付 `0.1.0-alpha.32`/`0032`、唯一 Finished Goods Inventory Lot、稳定 Batch 一对一映射、Lot Ledger/Balance/Material Aggregate、freeze/unfreeze 和 Completion 原 Lot 冲销恢复；实际 Batch A 4 / Batch B 6、Material 10、ORDER 空 Lot 兼容、重启、停服备份/固定第二库恢复、Build Cache 回到 0B 和最终清理通过。Shipment/FQC Lot 是该任务结束时的明确排除，已由后续 TASK09 在不扩大原材料/供应商/Receipt/领料 Lot 范围下扩展
 - SELFHOST-OPS-DOCKER-CACHE-CLEANUP-02 在默认 `default*` builder 无构建任务时执行受控 `docker buildx prune --all --force`，清理 25.11 GB BuildKit cache，并逐个核验后删除唯一无引用 dangling image `sha256:ccce71ed69856b11e1980148ad4ed6aa5183012cab1a7a68dd121719413f6612`；镜像空间 27.45→6.511 GB、根分区可用 14→37 GiB。三 ERP 容器、四卷、Trae/MySQL、匿名卷、tagged image、备份、Python/SQLite 与数据库均保持，未启动 TASK08
 - SELFHOST-OPS-RESOURCE-GUARD-01 完成低资源永久规则、Python 16 活跃请求线程上限/有界 503、Compose 六服务 CPU/Memory/Swap/PID 限额、Web/Worker 384 MiB Node heap 和 systemd 源限额；PostgreSQL 备份校验、串行原镜像更新、60 秒 OOM/restart/Swap 观察和四卷保持通过。Python 当前 PID 未重启，资源保护不等于生产上线
 - SELFHOST-PHASE2-TASK01 完成 docs-only 盘点：Python 共 64 个 HTTP 操作（GET 34、POST 30），自托管等价覆盖 4、部分覆盖 9、未覆盖 51；根 legacy iframe 登录后并发的 23 个业务 GET 在 Node/PostgreSQL 均返回 404。已提出 TASK02—TASK10 依赖顺序，全部仍待逐项授权；没有业务域因此完成迁移
@@ -195,13 +196,13 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 当前无 `DOING`；`SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03` 已完成并行非生产 PostgreSQL 凭据安全轮换，版本保持 `0.1.0-alpha.32`、migration 保持 `0001`—`0032`。
+- 当前无 `DOING`；`SELFHOST-PHASE5-TASK09` 已完成并行非生产 Lot FQC 放行与 Shipment 精确消费，版本为 `0.1.0-alpha.33`、migration 为 `0001`—`0033`。
 - 当前审计/会话基线为同一次合法管理员登录：`IDENTITY/LOGIN/success` 1 条、ACTIVE session 1 条；不可变审计不得为追求“零记录”而删除。
-- 未来 TASK09 只有在单独授权后才能启动；必须在开始时保存基线主键或不可逆摘要（不得含 token、密码、请求正文或连接字符串），以 delta 验收，并在清理后返回完全相同的基线记录集与计数。
+- TASK09 已以保存的非敏感基线摘要执行 delta 验收，并在清理后返回完全相同的合法 Audit/Session 记录集与计数；未来任务仍须遵守相同规则。
 - 2026-07-27 服务器重启/不可用的根因保持 `UNKNOWN`，不得无证据归因 OOM；资源保护不等于生产上线。
 - `SELFHOST-PHASE5-TASK06` 已完成原检 10/8/2/8、返工 2、复检 2/2/0/2、AOI 8/2、正式报工/完工/成品 8/2；Execution COMPLETED、NCR RESOLVED，FQC/Shipment/AR/Settlement 保持 0。
 - `PHASE0-TASK03`、`SELFHOST-PHASE4-TASK05`—`TASK09` 保持历史 `DONE`；TASK10 功能提交严格基于授权起点 `e63c726e`。
-- 本轮完成后停止，不启动 PHASE5-TASK09。原材料/供应商/Receipt/领料/Shipment/FQC Lot、序列号、设备/OEE、外协、产能排程、工时/成本、真实数据迁移和生产部署均未授权。
+- 本轮完成后停止，不启动 PHASE5-TASK10。原材料/供应商/Receipt/领料 Lot、序列号、设备/OEE、外协、产能排程、工时/成本、真实数据迁移和生产部署均未授权。
 - 已完成：`SELFHOST-PHASE4-TASK05`，并行环境 `0.1.0-alpha.19`/`0019` 完成 Award→PO→到货计划→两批 Receipt `4/6`→库存 `10`→采购来源 `48/72`→显式 AP `48/72`，权限、幂等、CAS、超收、冲销阻断、重启、备份恢复与清理通过；结论 `SOURCING TO PAYABLE HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。
 - 已完成：`SELFHOST-PHASE4-TASK04`，并行环境 `0.1.0-alpha.18`/`0018` 完成两供应商 RFQ、报价、服务端比较和人工非最低价定标；A `12.000000`/准时/排名 2，B `10.000000`/晚交/排名 1，以 `DELIVERY_PRIORITY` 和“交期优先，避免项目延期”选择 A。Award=1 时全部下游写入为 0，重启持久和清理恢复通过；结论 `PROCUREMENT SOURCING AWARD ACCEPTED IN PARALLEL ENVIRONMENT`。
 - 已完成：`SELFHOST-PHASE4-TASK03`，并行环境 `0.1.0-alpha.17`/`0017` 的固化包聚合、库存/在途独立分配、不可变需求计划与采购申请、v1 退回释放→v2 重算重提→最终接收、重启持久和清理恢复通过；结论 `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`。现在停止，不自动启动 TASK04。

@@ -2,6 +2,23 @@
 
 最后更新时间：2026-07-27（Asia/Shanghai）
 
+## SELFHOST-PHASE5-TASK09 FQC Lot 放行与销售发货 Lot 精确消费
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `02dfa0d3c18c16b0e8ee07af94f11de7a0ca77e7` 严格 Parent `279d284738b8ee01f6579a91333ad958a6c36dc8`；独立 ops 验收提交以 Git log 为准 |
+| 版本/Migration | PASS | `0.1.0-alpha.33`；唯一 `0033` SHA/checksum `ca01cbc6a40ebfe9c17e9c3133f8704748d12b64c21d56155313ff73ce0c3d44`；0001—0032 未改，Schema/snapshot/journal 一致 |
+| Lot FQC/Shipment | PASS | BATCH Allocation/FQC/Shipment/FQC Fact/Ledger 全部保存同一 Lot；warehouse 显式选择，ORDER 全链 null Lot |
+| 实际 HTTP | PASS | Lot A/B `4/6`；A 发 4 后冻结 B 2，B 发 6 返回 409 且零半记录；解冻发 B 6；冲销 A 4 恢复原 Lot/FQC 后同一 A 再发 4。最终有效 Shipment/FQC `4/6`、Material 0、Source 200、AR/Settlement 0 |
+| 权限/幂等/CAS/并发 | PASS | quality/sales/warehouse/production/finance 权限分离；同 Key 重放/异正文冲突、Lot/FQC/Delivery/SO CAS 与并发额度、冻结/耗尽/跨 Lot/Material/Unit/SO Line、故障和 SQL guard 通过 |
+| 自动验证 | PASS | TASK09 unit/UI/PG/migration `2/2 + 2/2 + 2/2 + 3/3`；`npm test` 3/3、适用回归 75/75、11 typecheck、Drizzle consistency、lint 0 error/8 既有 warning、双 build、1003 文件 credentials、Python 临时库三项和 diff check 通过 |
+| 重启/恢复 | PASS | PostgreSQL→Web→Worker 串行重启后事实保持；接受态 SHA `feb1c4afbc37aabf1057105cb9904503f40340e8d0ce27b8ef72d96ac741e8fd` 恢复固定第二库并核对 `{4,6,4}`/`{A,B,A}`/A reversal/ORDER null Lot；主库由 clean-0033 SHA `52def540e06bb2eecfbf8a2a0d5e7a45a782e0861fb31b0120de6da9b259706f` 恢复 |
+| 最终基线 | PASS | migrations/admin/session/audit=`33/1/1/1`，原合法 Audit/Session 集合和时间完全不变；业务/幂等/uploads/attachments 0，任务库/备份/容器/SQLite 已清理 |
+| 资源 | PASS | 最终 available 2.38 GiB、Swap 146 MiB、根盘 36 GiB、Load `0.55/0.37/0.46`；64 秒 Swap 增长 -45056 bytes；restart 0/OOM false。最终 Build Cache `2.105 GB→0B`，四卷/tagged image/resource-guard 保持 |
+| Python/SQLite | PASS / PROTECTED | PID `13737`、NRestarts 0；SQLite 1544192 bytes、mode 600、mtime 不变，仅核验 metadata；三项测试使用临时 SQLite |
+| 排除事项 | ENFORCED | 未执行原材料/供应商/Receipt/领料 Lot、序列号/标签、自动选 Lot、AR/Settlement、真实迁移、生产部署、push/PR 或 TASK10 |
+| 完成结论 | PASS | `FINISHED GOODS LOT RELEASE AND SHIPMENT ACCEPTED IN PARALLEL ENVIRONMENT` |
+
 ## SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03 并行 PostgreSQL 凭据轮换
 
 | 验证项 | 结果 | 说明 |

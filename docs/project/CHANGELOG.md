@@ -4,6 +4,21 @@
 
 ## 2026-07-27
 
+### SELFHOST-PHASE5-TASK09 - `ops: accept finished goods lot shipment in parallel environment`
+
+- 实际验收：SO `10×20 CNY`、Lot A/B `4/6` 与各自 FQC；A 发 4 后 B 冻结 2、发 6 被拒且跨表零半记录，解冻后 B 发 6；冲销 A 4 恢复原 Lot/FQC 后再次从同一个 A 发 4。最终有效 Shipment/FQC `4/6`、Material 0、Source 200、AR/Settlement 0；ORDER 全链 null Lot。
+- 恢复：整栈串行重启后事实保持；接受态恢复固定第二空库核对正向 `{4,6,4}`、Lot `{A,B,A}`、A reversal、FQC `{4,6}` 与 ORDER null Lot。主库恢复为 33 migrations、原合法 admin/session/audit `1/1/1`，业务/幂等/files 0；临时库与任务备份删除。
+- 验证：TASK09 unit/UI/PG/migration、`npm test`、75 项适用回归、11 typecheck、Drizzle consistency、lint 0 error/8 既有 warning、Web/Worker 分开 build、1003 文件 credentials、Python 临时库三项和 diff check 通过。
+- 资源：最终 Build Cache `2.105 GB→0B`、磁盘 36 GiB、available 2.38 GiB、Swap 146 MiB；restart 0/OOM false，四卷/tagged image/resource-guard/Python/SQLite 保持。未 push/PR、未启动 TASK10。
+- 结论：`FINISHED GOODS LOT RELEASE AND SHIPMENT ACCEPTED IN PARALLEL ENVIRONMENT`。
+
+### SELFHOST-PHASE5-TASK09 - `feat: add finished goods lot shipment flow`
+
+- Git/版本：功能提交 `02dfa0d3c18c16b0e8ee07af94f11de7a0ca77e7` 严格 Parent `279d284738b8ee01f6579a91333ad958a6c36dc8`；版本 `0.1.0-alpha.33`。
+- 数据库：只新增 expand-only `0033_finished_goods_lot_fqc_shipment.sql`，SHA-256 `ca01cbc6a40ebfe9c17e9c3133f8704748d12b64c21d56155313ff73ce0c3d44`；Allocation、FQC、Shipment Line 和 FQC Fact 保存 nullable Lot 外键，BATCH 强制同 Lot、ORDER 兼容 null，并有索引、service guard、不可变事实和 deferred reconciliation。0001—0032 不变。
+- 服务/UI：Quality 服务端推导 FQC Lot；Sales/Inventory 同事务执行显式 Lot Shipment、FQC 消费、Lot Ledger/状态/事件、Delivery/SO/Source 与原 Lot 冲销恢复；原生 FQC、Allocation、Shipping、Lot/Batch genealogy 页面展示稳定 Lot 追溯。
+- 测试：新增 TASK09 unit/UI/PostgreSQL/migration/Compose HTTP 套件，并更新 TASK08/TASK09 历史契约以继续断言新的稳定 Lot 权威。
+
 ### SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03 - `ops: rotate parallel database credential safely`
 
 - 起点：`main`/`0d24eddcc5176602370214bfc8f8003844ab2b80`、behind 0/ahead 70、工作区 clean；版本 `0.1.0-alpha.32`，32 个 PostgreSQL migration 与 `0032` checksum 完全匹配。
