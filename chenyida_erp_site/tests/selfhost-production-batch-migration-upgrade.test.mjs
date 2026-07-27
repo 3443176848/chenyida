@@ -53,6 +53,6 @@ test("schema snapshot, journal and full SHA-256 describe 0031", async () => {
   for (const table of ["production_batch_sets", "production_batches", "production_batch_events", "production_report_batches", "production_completion_batches"]) assert.ok(snapshot.tables[`public.${table}`], table);
   for (const token of ["productionBatchSets", "productionBatches", "productionBatchEvents", "productionReportBatches", "productionCompletionBatches", "productionBatchId"]) assert.match(schema, new RegExp(token));
   assert.equal(snapshot.prevId, previous.id);
-  assert.equal(journal.entries.at(-1).tag, "0031_production_batch_genealogy");
+  assert.equal(journal.entries.find((entry) => entry.idx === 31)?.tag, "0031_production_batch_genealogy");
   assert.match(checksum(names.at(-1)), /^[0-9a-f]{64}$/);
 });
