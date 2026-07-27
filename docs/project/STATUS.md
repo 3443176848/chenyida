@@ -2,6 +2,23 @@
 
 最后更新时间：2026-07-27（Asia/Shanghai）
 
+## SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03 并行 PostgreSQL 凭据轮换
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 严格 Parent `0d24eddcc5176602370214bfc8f8003844ab2b80`；独立提交消息 `ops: rotate parallel database credential safely`，实际 SHA 以 Git log 为准 |
+| 版本/Migration | UNCHANGED | `0.1.0-alpha.32`；`0001`—`0032` 共 32 个 migration，`0032` SHA-256 `3a2fc22ff73706d226641119135b68d042d393124c89233a63d774f76aa2d4fa` |
+| 凭据轮换 | PASS / SECRET NOT RECORDED | 使用 256-bit 随机 URL-safe 密码，角色与 env 原子切换；`parallel.env` 保持 root:root 0600，临时回滚副本成功后安全删除；报告不含密码或连接字符串 |
+| 密码验证 | PASS | 新密码从 Worker 经 Compose 网络执行 `SELECT 1` 成功；旧密码经 `scram-sha-256` 路径返回 PostgreSQL `28P01`。PostgreSQL 容器 ID/StartedAt 未变且始终 healthy |
+| Web/Worker | PASS | Web、Worker 停止和重建严格串行；最终 Web healthy、Worker running，RestartCount 0、OOMKilled false |
+| 登录基线 | PASS / ACCEPTED | 唯一审计为 `IDENTITY/LOGIN/success`，唯一 session 为同时间创建的 ACTIVE session；属于同一次合法管理员登录，不删除不可变审计。未重复 POST 登录，避免制造第二条审计/会话；health 与 `/api/session` 均可用 |
+| 数据基线 | PASS | schema_migrations 32、app_meta 1、唯一启用 admin 1；其余 public 业务/幂等表 0，uploads/attachments 0 |
+| 自动验证 | PASS | Compose config、new-password `SELECT 1`、old-password `28P01`、HTTP health/session、`npm test` 3/3、lint 0 error/9 warning、credentials 994 files、diff/scope 检查通过 |
+| 资源/容器 | PASS | 起点 available 2.3 GiB、Swap 138 MiB 且 60 秒增长 0、根盘可用 37 GiB、Load `0.07/0.15/0.17`；最终 available 2.3 GiB、Swap 约 138 MiB/60 秒增长 -304 KiB、Load `0.17/0.22/0.19`。Build Cache 0B、三容器/四受保护卷保持 |
+| Python/SQLite | PASS / PROTECTED | Python PID `13737`、NRestarts 0；SQLite inode `53827608`、size `1544192`、mode 600、mtime `2026-07-26 01:03:51.761827070 +0800`，未读写正文或重启服务 |
+| TASK09 规则 | NOT STARTED | TASK09 未授权；未来必须保存基线主键或不可逆摘要（无敏感数据），按 baseline-delta 验收并返回完全相同记录集/计数，不得删除合法不可变审计 |
+| 完成结论 | PASS | `PARALLEL POSTGRESQL CREDENTIAL ROTATED AND LOGIN BASELINE ACCEPTED` |
+
 ## SELFHOST-PHASE5-TASK08 成品 Inventory Lot、批次余额与完工入库绑定
 
 | 验证项 | 结果 | 说明 |

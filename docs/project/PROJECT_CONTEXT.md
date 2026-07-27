@@ -129,6 +129,8 @@
 32. SELFHOST-PHASE5-TASK04 采用 D-071：Routing Operation 的 `NONE/IPQC` 随发布 digest 和 Work Order Snapshot 固化；工序 good 不自动创建 IPQC，quality 显式引用稳定 Run Report，经异人处置/关闭后才形成下游额度。`0.1.0-alpha.28`/`0028`、REFLOW Hold `10→6→0`、AOI available `0→4→10`、Report/Completion/Ledger `4/6`、Balance 10、重启、恢复与清理已通过。
 33. SELFHOST-PHASE5-TASK05 采用 D-072：只有结构化 Operation Run Report IPQC failed 才能建立唯一 NCR；failed 数量由 active rework、final scrap 与 unresolved 守恒。quality 的 DRAFT 在 submit 时生成不可变 digest/snapshot，production 只接收或退回，ACCEPTED 仅占用额度等待后续任务。`0.1.0-alpha.29`/`0029`、passed 8/failed 2、v1 退回/v2 接收、重启、第二新空库恢复与最终清理已通过；未执行返工工序或库存报废。
 34. SELFHOST-PHASE5-TASK06 采用 D-073：ACCEPTED Request 由 production 显式派工为既有 `production_operation_runs` 的 REWORK 类型；processed 只表示重复加工次数，返工 good 必须经新的稳定 Run Report IPQC 复检并 `CLOSED + RELEASED` 后才恢复后序额度。`0.1.0-alpha.30`/`0030`、原检 10/8/2/8、返工 2、复检 2/2/0/2、AOI 8/2、成品 8+2=10、重启、第二新空库恢复和清理已通过；原 failed 2 保持，Execution COMPLETED、NCR RESOLVED。
+35. SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03 已安全轮换并行非生产 PostgreSQL 角色密码与 root-only env；PostgreSQL 容器没有重启，Web/Worker 串行重建。新密码经 Compose 网络执行 `SELECT 1` 成功，旧密码经 SCRAM 返回 `28P01`；凭据值和连接字符串未写入仓库、日志或报告。
+36. 当前数据库合法基线不再是 Audit/Session 0：唯一 `IDENTITY/LOGIN/success` 审计与唯一 ACTIVE session 在同一时间创建，属于同一次合法管理员登录，必须保留。未来 TASK09 若另获授权，必须先记录该基线的主键或不可逆摘要（不含 token、密码、请求正文或连接字符串），所有验收使用 baseline-delta，清理后必须返回完全相同的基线记录集与计数；不得删除不可变审计。
 
 ## 当前风险
 
@@ -168,7 +170,7 @@
 
 ## 当前路线
 
-`SELFHOST-PHASE5-TASK08` 已 DONE：功能提交 `43808f85bc3a662825cc2421d97e9eb631e0c469` 严格以 `809efadd2cafd1a7b55a0824b87c67c70ad2814b` 为 Parent；`0.1.0-alpha.32`/`0032` 的 Manufacturing Batch→Completion→Finished Goods Inventory Lot→Lot Ledger/Balance/genealogy 已通过自动测试、实际 HTTP、Compose 重启、固定第二新空库恢复与最终清理。Batch A/B Lot 为 `4/6`、Material 10，freeze/unfreeze 和 Completion 冲销后同 Lot 恢复通过。当前无 `DOING`，不得自动启动 TASK09；原材料/供应商/Shipment Lot、真实迁移、HTTPS 和生产切换仍未执行。
+`SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03` 已 DONE：严格以 `0d24eddcc5176602370214bfc8f8003844ab2b80` 为 Parent；`0.1.0-alpha.32`/`0032` 不变，PostgreSQL 凭据已轮换且旧凭据失效，唯一合法登录审计/ACTIVE session 保持 1/1。当前无 `DOING`，不得自动启动 TASK09；原材料/供应商/Shipment Lot、真实迁移、HTTPS 和生产切换仍未执行。
 
 ## 恢复上下文检查清单
 

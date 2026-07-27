@@ -4,6 +4,16 @@
 
 ## 2026-07-27
 
+### SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03 - `ops: rotate parallel database credential safely`
+
+- 起点：`main`/`0d24eddcc5176602370214bfc8f8003844ab2b80`、behind 0/ahead 70、工作区 clean；版本 `0.1.0-alpha.32`，32 个 PostgreSQL migration 与 `0032` checksum 完全匹配。
+- 数据基线：唯一启用 admin；唯一 `IDENTITY/LOGIN/success` 审计和同时间创建的唯一 ACTIVE session 属于合法管理员登录并完整保留；其余业务/幂等表、uploads/attachments 0。
+- 轮换：生成 256-bit URL-safe 随机密码，只在进程内存与 root:root 0600 回滚副本中短暂存在；停 Web/Worker 后通过 PostgreSQL 容器本地 stdin 修改角色，只原子更新 env 的 `POSTGRES_PASSWORD` 与 `DATABASE_URL` 密码段，随后逐个重建 Web/Worker。PostgreSQL 未重启。
+- 验证：新密码经 Compose 网络 `SELECT 1` 成功，旧密码由 `scram-sha-256` 返回 `28P01`；Web healthy、Worker running、PG healthy，restart 0/OOM false。Compose config、HTTP health/session、`npm test` 3/3、lint 0 error/9 warning、credentials 994 files、diff/scope 均通过。
+- 回滚演练：前两次尝试分别发现 localhost `trust` 路径不能证明旧密码失效，以及 Bash `ERR` trap 将预期认证失败误分类；两次均恢复旧角色/env、串行恢复 Web/Worker并删除临时副本。最终改用 Worker→PostgreSQL SCRAM 路径和显式条件判断后通过；未降低断言。
+- 保护：凭据值、连接字符串、token/hash、CSRF、密码哈希、请求正文和 env 内容未输出或提交；临时容器/回滚副本全部清理，Build Cache 0B，四受保护卷与 Python/SQLite 不变。
+- TASK09：未启动且未授权。未来必须以基线主键或不可逆摘要建立 baseline-delta，完成后返回同一合法审计/会话记录集和计数；不得删除不可变审计。
+
 ### SELFHOST-PHASE5-TASK08 - `ops: accept finished goods lot workflow in parallel environment`
 
 - 提交：功能提交 `43808f85bc3a662825cc2421d97e9eb631e0c469` 严格 Parent `809efadd2cafd1a7b55a0824b87c67c70ad2814b`；其后仅追加九个聚焦修正，独立 ops 提交实际哈希以 Git log 为准。
