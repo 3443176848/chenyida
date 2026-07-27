@@ -55,11 +55,11 @@ export class ProductionNonconformanceService {
     if (status) { values.push(status.toUpperCase()); where.push(`n.status=$${values.length}`); }
     values.push(limit, offset);
     return this.pool.query(`select n.*,qi.inspection_code,wo.work_order_code,m.internal_material_code material_code,m.standard_name material_name,u.code unit_code,
-      op.sequence_no source_sequence_no,rr.report_code run_report_code
+      op.sequence_no source_sequence_no,rr.report_code run_report_code,run.production_batch_id,b.batch_code
       from production_nonconformances n join quality_inspections qi on qi.id=n.inspection_id
       join production_work_orders wo on wo.id=n.work_order_id join material_master m on m.id=n.material_id join units u on u.id=n.unit_id
       join production_work_order_routing_snapshot_operations op on op.id=n.snapshot_operation_id
-      join production_operation_run_reports rr on rr.id=n.production_operation_run_report_id
+      join production_operation_run_reports rr on rr.id=n.production_operation_run_report_id join production_operation_runs run on run.id=rr.run_id left join production_batches b on b.id=run.production_batch_id
       ${where.length ? `where ${where.join(" and ")}` : ""} order by n.created_at desc,n.id desc limit $${values.length - 1} offset $${values.length}`, values);
   }
 
@@ -67,16 +67,16 @@ export class ProductionNonconformanceService {
     const values: unknown[] = []; const where: string[] = [];
     if (status) { values.push(status.toUpperCase()); where.push(`r.status=$${values.length}`); }
     values.push(limit, offset);
-    return this.pool.query(`select r.*,n.ncr_code,wo.work_order_code,n.failed_qty,n.active_rework_qty,n.final_scrap_qty,n.unresolved_qty,n.status ncr_status,
+    return this.pool.query(`select r.*,n.ncr_code,wo.work_order_code,source_run.production_batch_id,b.batch_code,n.failed_qty,n.active_rework_qty,n.final_scrap_qty,n.unresolved_qty,n.status ncr_status,
       p.status execution_status,p.version execution_version,p.accepted_rework_qty::text,p.rework_waiting_dispatch_qty::text,p.rework_dispatched_qty::text,p.rework_in_progress_qty::text,p.rework_reported_good_qty::text,p.rework_reported_scrap_qty::text,p.rework_pending_reinspection_qty::text,p.rework_released_qty::text,p.rework_completed_qty::text,p.unresolved_rework_qty::text
-      from production_rework_requests r join production_nonconformances n on n.id=r.nonconformance_id join production_work_orders wo on wo.id=n.work_order_id left join production_rework_execution_projections p on p.rework_request_id=r.id
+      from production_rework_requests r join production_nonconformances n on n.id=r.nonconformance_id join production_operation_run_reports source_report on source_report.id=n.production_operation_run_report_id join production_operation_runs source_run on source_run.id=source_report.run_id left join production_batches b on b.id=source_run.production_batch_id join production_work_orders wo on wo.id=n.work_order_id left join production_rework_execution_projections p on p.rework_request_id=r.id
       ${where.length ? `where ${where.join(" and ")}` : ""} order by r.created_at desc,r.id desc limit $${values.length - 1} offset $${values.length}`, values);
   }
 
   async get(ncrId: number) {
-    const header = await this.pool.query(`select n.*,qi.inspection_code,qi.lifecycle_status inspection_lifecycle_status,wo.work_order_code,m.internal_material_code material_code,m.standard_name material_name,u.code unit_code,rr.report_code run_report_code,op.sequence_no source_sequence_no
+    const header = await this.pool.query(`select n.*,qi.inspection_code,qi.lifecycle_status inspection_lifecycle_status,wo.work_order_code,m.internal_material_code material_code,m.standard_name material_name,u.code unit_code,rr.report_code run_report_code,run.production_batch_id,b.batch_code,op.sequence_no source_sequence_no
       from production_nonconformances n join quality_inspections qi on qi.id=n.inspection_id join production_work_orders wo on wo.id=n.work_order_id
-      join material_master m on m.id=n.material_id join units u on u.id=n.unit_id join production_operation_run_reports rr on rr.id=n.production_operation_run_report_id
+      join material_master m on m.id=n.material_id join units u on u.id=n.unit_id join production_operation_run_reports rr on rr.id=n.production_operation_run_report_id join production_operation_runs run on run.id=rr.run_id left join production_batches b on b.id=run.production_batch_id
       join production_work_order_routing_snapshot_operations op on op.id=n.snapshot_operation_id where n.id=$1`, [ncrId]);
     if (!header.rows[0]) throw new QualityError("NONCONFORMANCE_NOT_FOUND", "不合格记录不存在", 404);
     const [events, requests, scraps, targets] = await Promise.all([

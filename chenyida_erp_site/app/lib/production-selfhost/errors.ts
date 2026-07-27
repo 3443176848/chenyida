@@ -26,6 +26,14 @@ const constraintCodes: Record<string, [string, string]> = {
   production_final_output_report_reconciliation_ck: ["FINAL_OUTPUT_RECONCILIATION_FAILED", "结构化报工与末工序来源分配无法核对"],
   production_operation_projection_reconciliation_ck: ["FINAL_OUTPUT_PROJECTION_CONFLICT", "末工序可报工投影无法核对"],
   production_report_operation_allocations_immutable_ck: ["FINAL_OUTPUT_ALLOCATION_IMMUTABLE", "末工序产出分配不可修改或删除"],
+  production_batch_sets_work_order_uq: ["PRODUCTION_BATCH_SET_EXISTS", "该工单已经存在生产批次集合"],
+  production_batches_code_uq: ["PRODUCTION_BATCH_CODE_CONFLICT", "生产批次编码冲突，请重试"],
+  production_batch_sets_release_reconciliation_ck: ["PRODUCTION_BATCH_TOTAL_MISMATCH", "生产批次数量合计、工单或快照不满足发布条件"],
+  production_operation_runs_batch_capacity_ck: ["PRODUCTION_BATCH_CAPACITY_EXCEEDED", "首工序累计投入超过生产批次计划数量"],
+  production_operation_run_input_allocations_batch_ck: ["PRODUCTION_BATCH_CROSS_ALLOCATION", "禁止跨生产批次分配工序投入"],
+  production_report_batches_lineage_ck: ["PRODUCTION_REPORT_BATCH_MIXED", "Production Report 只能消费同一生产批次"],
+  production_completion_batches_lineage_ck: ["PRODUCTION_COMPLETION_BATCH_MIXED", "Completion 只能消费同一生产批次"],
+  production_batch_mode_reconciliation_ck: ["PRODUCTION_BATCH_RECONCILIATION_FAILED", "生产批次事实与工单全过程谱系无法核对"],
 };
 
 export function mapProductionError(error: unknown): ProductionError {

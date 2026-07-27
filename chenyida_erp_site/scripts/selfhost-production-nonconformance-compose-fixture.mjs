@@ -10,8 +10,8 @@ import { ProductionRepository } from "../app/lib/production-selfhost/repository.
 import { ProductionService } from "../app/lib/production-selfhost/service.ts";
 
 export const base=process.env.ERP_SMOKE_BASE_URL||"http://web:3000",databaseUrl=process.env.DATABASE_URL||"",phase=process.env.ERP_TASK05_SMOKE_PHASE||"initial";
-const mainDatabase=/@postgres(?::5432)?\/chenyida_erp$/i.test(databaseUrl),restoreDatabase=phase==="restore"&&/@postgres(?::5432)?\/chenyida_erp_task05_restore$/i.test(databaseUrl);
-if(process.env.ERP_TASK05_ACCEPTANCE_CONFIRM!=="PARALLEL_SYNTHETIC_ONLY"||process.env.ERP_ENV==="production"||(!mainDatabase&&!restoreDatabase))throw new Error("TASK05 smoke requires the explicitly confirmed parallel synthetic or fixed restore database");
+const mainDatabase=/@postgres(?::5432)?\/chenyida_erp$/i.test(databaseUrl),restoreDatabase=phase==="restore"&&/@postgres(?::5432)?\/chenyida_erp_task05_restore$/i.test(databaseUrl),task07Preflight=process.env.ERP_TASK07_PREFLIGHT_CONFIRM==="PARALLEL_SYNTHETIC_ONLY"&&/@postgres(?::5432)?\/production_batch_acceptance_test_task07$/i.test(databaseUrl);
+if(process.env.ERP_TASK05_ACCEPTANCE_CONFIRM!=="PARALLEL_SYNTHETIC_ONLY"||process.env.ERP_ENV==="production"||(!mainDatabase&&!restoreDatabase&&!task07Preflight))throw new Error("TASK05 smoke requires the explicitly confirmed parallel synthetic or fixed restore database");
 export const pool=new Pool({connectionString:databaseUrl,max:8,application_name:"task05-nonconformance-smoke"});const sha=value=>createHash("sha256").update(String(value)).digest("hex");
 const actor=(role,username)=>({username,display_name:role,role,is_active:true,must_change_password:false,version:1,last_login_at:null,permissions:permissionsForRole(role)});
 const meta=(role,username,action)=>({actor:actor(role,username),requestId:randomUUID(),operationId:randomUUID(),keyDigest:sha(randomUUID()),requestDigest:sha(randomUUID()),method:"POST",route:`/task05/${action}`,action});
