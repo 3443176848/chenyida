@@ -2,6 +2,23 @@
 
 最后更新时间：2026-07-27（Asia/Shanghai）
 
+## SELFHOST-OPS-DOCKER-CACHE-CLEANUP-02 安全清理 Docker 构建缓存
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE | 严格 Parent `dfece35cda381ff31c376aad9ed78242861ada73`；独立提交消息 `ops: clean docker build cache safely`，实际 SHA 以 Git log 为准 |
+| BuildKit | PASS | 默认且唯一 `default*` docker builder、BuildKit v0.30.0；确认无构建/测试/migration 后，`docker buildx prune --all --force` 退出 0、`Total: 25.11GB`；Build Cache 25.11 GB→0B |
+| Image | PASS | Images 13/27.45 GB→12/6.511 GB；唯一无引用 dangling image `sha256:ccce71ed69856b11e1980148ad4ed6aa5183012cab1a7a68dd121719413f6612` 逐 ID 删除，最终 dangling 0；所有 tagged image 保留 |
+| 磁盘 | PASS | 根分区可用 14→37 GiB，超过 30 GiB 目标，无需第二阶段清理 |
+| 容器/网络 | PASS / UNINTERRUPTED | PostgreSQL/Web/Worker 容器 ID 与镜像不变；RestartCount 0、OOMKilled false；PostgreSQL/Web healthy、Worker running；Web 仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口 |
+| Volume/Trae | PASS / PROTECTED | 四个 ERP 卷名称、local driver、scope 与创建时间不变；`trae-app-1`、`trae-mysql-1`、`trae_mysql_data` 和六个匿名卷保留，未删除任何 Volume |
+| 数据/备份 | PASS / PROTECTED | 31 migrations、唯一启用 admin 1，其余 public 业务/Audit/Idempotency 表 0、uploads/attachments 0；resource-guard SHA-256 仍为 `ffd176e43192c575a0b5c7e3f2469f93f779605ca445bcfc6218ed8c810b6570` |
+| Python/SQLite | PASS / PROTECTED | Python PID `13737`、systemd restart 0；SQLite inode `53827608`、size `1544192`、mode 600、mtime `2026-07-26 01:03:51.761827070 +0800`，仅核验 metadata，未读正文 |
+| 60 秒观察 | PASS | available `2503064→2499940` KiB；Swap `151064→151064` KiB、增长 0；Load `0.79/0.60/0.44→0.37/0.52/0.42`；三容器 restart 0/OOM false，PostgreSQL/Web 全程 healthy |
+| 串行验证 | PASS | `git diff --check`、`npm test` 3/3、lint 0 error/9 warning、credentials 980 files；受限 `--rm` 容器逐个运行且已清理，无 Volume，Build Cache 保持 0B |
+| 版本/Migration | UNCHANGED | `0.1.0-alpha.31`；`0001`—`0031`，未修改业务代码、Schema、Migration、Compose 或版本 |
+| 完成结论 | PASS | `DOCKER BUILD CACHE SAFELY CLEANED`；未启动 TASK08 |
+
 ## SELFHOST-PHASE5-TASK07 生产批次身份与全过程谱系
 
 | 验证项 | 结果 | 说明 |

@@ -42,3 +42,16 @@ Python 源码使用 `ERPThreadingHTTPServer`：默认最多 16 个活跃请求�
 - 专项测试、self-test、smoke、临时 SQLite go-live、Compose config、systemd verify、受限单容器 TypeScript check、环境守卫、919 文件凭据扫描和 Git 检查按串行执行。临时 SQLite 目录和全部 `--rm` 检查容器均已清理。
 
 结论仅为 `LOW RESOURCE SERVER SAFEGUARDS ACTIVE`；未迁移真实数据、未切流、未生产部署。
+
+## 2026-07-27 Docker 构建缓存安全清理记录
+
+- `SELFHOST-OPS-DOCKER-CACHE-CLEANUP-02` 起点确认默认且唯一 builder 为 `default*`（docker driver、BuildKit v0.30.0），且无 `docker build`、`buildx build`、Compose build、测试容器或 Migration 运行。
+- 受控执行 `docker buildx prune --all --force`，退出码 0、输出合计 `Total: 25.11GB`；Build Cache 从 25.11 GB（24.3 GB private reclaimable）降为 0B。未执行任何 system/image/container/network/volume 通用 prune。
+- 唯一 dangling image `sha256:ccce71ed69856b11e1980148ad4ed6aa5183012cab1a7a68dd121719413f6612` 经 `docker ps -a --no-trunc` 和 `docker image inspect` 确认无 tag、digest 或容器引用后逐 ID 删除；Images 从 13/27.45 GB 降为 12/6.511 GB，所有 tagged image 保留。
+- 根分区可用从 14 GiB 恢复到 37 GiB。清理前后 available memory 约 2.4 GiB、Swap 约 147 MiB；独立 60 秒采样为 available `2503064→2499940` KiB、Swap `151064→151064` KiB、Load `0.79/0.60/0.44→0.37/0.52/0.42`。
+- PostgreSQL/Web/Worker 未停止、重建或删除，容器 ID/镜像保持，RestartCount 0、OOMKilled false；PostgreSQL/Web 全程 healthy、Worker running。Web 仍仅绑定 `127.0.0.1:3000`，PostgreSQL 无宿主端口。
+- 四个 ERP 持久卷、`trae_mysql_data`、六个匿名卷、Trae/MySQL 容器与 tagged image 全部保留。resource-guard 备份大小 1,383,645 bytes、mode 600、SHA-256 `ffd176e43192c575a0b5c7e3f2469f93f779605ca445bcfc6218ed8c810b6570` 不变。
+- 数据保持 31 migrations、唯一启用 admin 1、其余 public 业务/Audit/Idempotency 0、uploads/attachments 0。Python PID `13737`、systemd restart 0；SQLite 仅核验 metadata，inode `53827608`、size `1544192`、mode 600、mtime `2026-07-26 01:03:51.761827070 +0800`。
+- `git diff --check`、`npm test` 3/3、lint 0 error/9 warning、credentials 980 files 串行通过。宿主 PATH 无 npm，因此 Node 验证使用已有 tagged image 在一次一个、无网络、只读 bind、受限 `--rm` 容器中执行；四个临时容器均已自动清理，未创建 Volume，Build Cache 保持 0B。
+
+固定结论：`DOCKER BUILD CACHE SAFELY CLEANED`。未启动 `SELFHOST-PHASE5-TASK08`。

@@ -4,6 +4,16 @@
 
 ## 2026-07-27
 
+### SELFHOST-OPS-DOCKER-CACHE-CLEANUP-02 - `ops: clean docker build cache safely`
+
+- 起点：`main`/`dfece35cda381ff31c376aad9ed78242861ada73`、behind 0/ahead 58、工作区 clean；版本保持 `0.1.0-alpha.31`，PostgreSQL migration 保持 `0001`—`0031`。
+- BuildKit：确认默认且唯一 `default*` docker builder、BuildKit v0.30.0，无 build/buildx/Compose build、测试容器或 migration 运行后，执行 `docker buildx prune --all --force`；命令退出 0、输出 `Total: 25.11GB`，Build Cache 25.11 GB（24.3 GB private reclaimable）→0B。
+- Image：唯一 dangling image `sha256:ccce71ed69856b11e1980148ad4ed6aa5183012cab1a7a68dd121719413f6612` 无 tag/digest/容器引用，逐 ID 删除；Images 13/27.45 GB→12/6.511 GB，未执行 `image prune -a`，所有 tagged image 保留。
+- 保护：PostgreSQL/Web/Worker 容器 ID 与镜像不变，RestartCount 0、OOM false；Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口。四个 ERP 卷、Trae/MySQL、六个匿名卷、resource-guard 备份均保留。
+- 数据与资源：31 migrations、唯一启用 admin 1、其余 public 业务/Audit/Idempotency 0、uploads/attachments 0；Python PID `13737` 和 SQLite metadata 不变。根分区可用 14→37 GiB；60 秒 Swap 固定 151,064 KiB、Load1 0.79→0.37，PostgreSQL/Web 全程 healthy、Worker running。
+- 验证：`git diff --check`、`npm test` 3/3、lint 0 error/9 warning、credentials 980 files 全部通过；Node 命令在一次一个的受限 `--rm` 容器中串行执行，未创建 Volume，容器均已清理，Build Cache 保持 0B。
+- 结论：`DOCKER BUILD CACHE SAFELY CLEANED`；未停止或重建 Compose，未删除 Volume、匿名 Volume、tagged image 或业务数据，未启动 TASK08。
+
 ### SELFHOST-PHASE5-TASK07 - `ops: accept manufacturing batch workflow in parallel environment`
 
 - 提交：功能提交 `3162edf5559512dd82ec363cf859d39bae2d5a0d` 严格 Parent `93902d9c3f7be94044cf9903af6e6fbebc685cc3`；聚焦修正 `dfd1581bc2e3cb072cd7f238e6a1b0097f8912f4`、`cd9f016570cf94eb2990362b56e8f51ef5d43db1`；独立 ops 提交实际哈希以 Git log 为准。
