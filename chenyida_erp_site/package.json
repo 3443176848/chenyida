@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.33",
+  "version": "0.1.0-alpha.34",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -76,6 +76,12 @@
     "typecheck:phase5-task07": "tsc -p tsconfig.phase5-task07.json --pretty false",
     "typecheck:phase5-task08": "tsc -p tsconfig.phase5-task08.json --pretty false",
     "typecheck:phase5-task09": "tsc -p tsconfig.phase5-task09.json --pretty false",
+    "typecheck:phase5-task10": "tsc -p tsconfig.phase5-task10.json --pretty false",
+    "test:supplier-receipt-lot-iqc:unit": "node --experimental-strip-types --test tests/selfhost-supplier-receipt-lot-iqc-unit.test.mjs",
+    "test:supplier-receipt-lot-iqc:ui": "node --experimental-strip-types --test tests/selfhost-supplier-receipt-lot-iqc-ui-contract.test.mjs",
+    "test:supplier-receipt-lot-iqc:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-supplier-receipt-lot-iqc-postgres.test.mjs",
+    "test:supplier-receipt-lot-iqc:migration": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-supplier-receipt-lot-iqc-migration-upgrade.test.mjs",
+    "test:supplier-receipt-lot-iqc:compose": "node --experimental-strip-types scripts/selfhost-supplier-receipt-lot-iqc-compose-smoke.mjs",
     "test:finished-goods-lot-shipment:unit": "node --experimental-strip-types --test tests/selfhost-finished-goods-lot-shipment-unit.test.mjs",
     "test:finished-goods-lot-shipment:ui": "node --experimental-strip-types --test tests/selfhost-finished-goods-lot-shipment-ui-contract.test.mjs",
     "test:finished-goods-lot-shipment:compose": "node --experimental-strip-types scripts/selfhost-finished-goods-lot-shipment-compose-smoke.mjs",

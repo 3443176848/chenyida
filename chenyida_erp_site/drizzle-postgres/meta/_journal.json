@@ -232,6 +232,13 @@
       "when": 1785160080346,
       "tag": "0033_finished_goods_lot_fqc_shipment",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1785167544151,
+      "tag": "0034_supplier_receipt_lot_iqc",
+      "breakpoints": true
     }
   ]
 }

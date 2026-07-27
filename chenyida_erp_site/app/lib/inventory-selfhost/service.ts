@@ -29,6 +29,7 @@ function calculate(operationType: InventoryOperationType, input: InventoryLineIn
   if (actualVersion !== input.expectedBalanceVersion) throw new InventoryError("INVENTORY_VERSION_CONFLICT", "库存余额版本已变化，请刷新后重试", 409);
   let onHandDelta = 0n; let frozenDelta = 0n;
   if (operationType === "RECEIPT") onHandDelta = input.quantityMicros!;
+  if (operationType === "IQC_RECEIPT") { onHandDelta = input.quantityMicros!; frozenDelta = input.quantityMicros!; }
   if (operationType === "ISSUE") onHandDelta = -input.quantityMicros!;
   if (operationType === "ADJUSTMENT") onHandDelta = input.countedMicros! - beforeOnHand;
   if (operationType === "FREEZE") frozenDelta = input.quantityMicros!;
@@ -125,12 +126,24 @@ export class InventoryService {
     return this.postParsedInTransaction(client, meta, parseOperationInput(rawInput));
   }
 
-  async postLotInTransaction(client: PoolClient, meta: InventoryMutationMeta, input: { inventoryLotId: number; operationType: "RECEIPT"|"FREEZE"|"UNFREEZE"; quantity: string; expectedBalanceVersion: number; reason: string }): Promise<InventoryMutationResult> {
+  async postLotInTransaction(client: PoolClient, meta: InventoryMutationMeta, input: { inventoryLotId: number; operationType: "RECEIPT"|"IQC_RECEIPT"|"FREEZE"|"UNFREEZE"; quantity: string; expectedBalanceVersion: number; reason: string }): Promise<InventoryMutationResult> {
     const lot = await client.query("select * from inventory_lots where id=$1 for update",[input.inventoryLotId]);
-    if(!lot.rows[0])throw new InventoryError("INVENTORY_LOT_NOT_FOUND","成品库存 Lot 不存在",404);
+    if(!lot.rows[0])throw new InventoryError("INVENTORY_LOT_NOT_FOUND","库存 Lot 不存在",404);
     const parsed = parseOperationInput({operation_type:input.operationType,reason:input.reason,lines:[{material_id:Number(lot.rows[0].material_id),unit_id:Number(lot.rows[0].unit_id),quantity:input.quantity,expected_balance_version:input.expectedBalanceVersion}]});
     const normalized={...parsed,lines:parsed.lines.map((line)=>({...line,inventoryLotId:input.inventoryLotId,lotCode:String(lot.rows[0].lot_code)}))};
     return this.postParsedInTransaction(client,meta,normalized);
+  }
+
+  async postLotPositionsInTransaction(client: PoolClient, meta: InventoryMutationMeta, input: { operationType: "IQC_RECEIPT"; reason: string; lines: ReadonlyArray<{ inventoryLotId: number; quantity: string; expectedBalanceVersion: number }> }): Promise<InventoryMutationResult> {
+    if (!input.lines.length || input.lines.length > 100) throw new InventoryError("REQUEST_VALIDATION_FAILED", "库存 Lot 操作必须包含 1 到 100 行");
+    const normalized: InventoryLineInput[] = [];
+    for (const source of [...input.lines].sort((a, b) => a.inventoryLotId - b.inventoryLotId)) {
+      const lot = await client.query("select * from inventory_lots where id=$1 for update", [source.inventoryLotId]);
+      if (!lot.rows[0]) throw new InventoryError("INVENTORY_LOT_NOT_FOUND", "库存 Lot 不存在", 404);
+      const parsed = parseOperationInput({ operation_type: input.operationType, reason: input.reason, material_id: Number(lot.rows[0].material_id), unit_id: Number(lot.rows[0].unit_id), quantity: source.quantity, expected_balance_version: source.expectedBalanceVersion });
+      normalized.push({ ...parsed.lines[0], inventoryLotId: source.inventoryLotId, lotCode: String(lot.rows[0].lot_code) });
+    }
+    return this.postParsedInTransaction(client, meta, { operationType: input.operationType, reason: input.reason, lines: normalized });
   }
 
   async issuePositionsInTransaction(client: PoolClient, meta: InventoryMutationMeta, input: { reason: string; lines: ReadonlyArray<{ materialId: number; unitId: number; inventoryLotId: number | null; quantity: string; expectedBalanceVersion: number; expectedLotVersion: number | null }> }): Promise<InventoryMutationResult> {

@@ -6,7 +6,8 @@ import { enumValue, id, quantity, resultLines, version } from "../app/lib/qualit
 test("quality permissions separate inspection, disposition and finished-goods allocation", () => {
   for (const role of ["purchase", "engineering", "production", "warehouse", "sales", "finance", "operations"]) { assert.ok(permissionsForRole(role).includes("quality.read")); assert.ok(!permissionsForRole(role).includes("quality.inspect")); }
   for (const permission of ["quality.read", "quality.inspect", "quality.defect", "quality.close", "quality.finished_goods_allocation.read"]) assert.ok(permissionsForRole("quality").includes(permission));
-  for (const permission of ["quality.disposition", "quality.reopen", "quality.finished_goods_allocation.create"]) assert.ok(!permissionsForRole("quality").includes(permission));
+  assert.ok(permissionsForRole("quality").includes("quality.disposition"));
+  for (const permission of ["quality.reopen", "quality.finished_goods_allocation.create"]) assert.ok(!permissionsForRole("quality").includes(permission));
   for (const permission of ["quality.disposition", "quality.reopen"]) assert.ok(permissionsForRole("manager").includes(permission));
   for (const permission of ["quality.finished_goods_allocation.read", "quality.finished_goods_allocation.create", "quality.finished_goods_allocation.cancel"]) assert.ok(permissionsForRole("sales").includes(permission));
 });

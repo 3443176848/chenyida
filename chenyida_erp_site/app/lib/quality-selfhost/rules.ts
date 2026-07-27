@@ -3,7 +3,7 @@ import type { DefectInput, ResultLineInput } from "./types.ts";
 
 const DECIMAL = /^(0|[1-9]\d{0,17})(?:\.(\d{1,6}))?$/;
 export function id(value: unknown, field: string): number { const parsed = Number(value); if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new QualityError("REQUEST_VALIDATION_FAILED", `${field} 必须是正整数`); return parsed; }
-export function version(value: unknown): number { const parsed = Number(value); if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new QualityError("REQUEST_VALIDATION_FAILED", "expected_version 必须是正整数"); return parsed; }
+export function version(value: unknown, field = "expected_version"): number { const parsed = Number(value); if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new QualityError("REQUEST_VALIDATION_FAILED", `${field} 必须是正整数`); return parsed; }
 export function quantity(value: unknown, field: string, positive = true): string { const result = String(value ?? "").trim(); if (!DECIMAL.test(result) || (positive && /^0(?:\.0{1,6})?$/.test(result))) throw new QualityError("REQUEST_VALIDATION_FAILED", `${field} 必须是${positive ? "正" : "非负"}数且最多 6 位小数`); return result; }
 export function zeroQuantity(value: string): boolean { return /^0(?:\.0{1,6})?$/.test(value); }
 export function text(value: unknown, field: string, maximum: number, required = false): string { const result = String(value ?? "").trim(); if ((required && !result) || result.length > maximum) throw new QualityError("REQUEST_VALIDATION_FAILED", `${field}${required ? "不能为空且" : ""}不能超过 ${maximum} 个字符`); return result; }

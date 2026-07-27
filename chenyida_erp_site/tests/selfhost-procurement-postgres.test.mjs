@@ -26,9 +26,9 @@ async function seed() {
   await pool.query("insert into material_categories(category_code,category_name_cn,category_level,status,created_by,updated_by,request_id) values('PROC_LEAF','采购测试',4,'ACTIVE','test','test',$1)", [randomUUID()]); const category = await pool.query("select id from material_categories where category_code='PROC_LEAF'");
   await pool.query("insert into units(code,name,symbol,unit_type,enabled) values('PCS','件','PCS','COUNT',true),('BOX','箱','BOX','COUNT',true)"); const unit = await pool.query("select id,code from units order by code"); const pcs = unit.rows.find((row) => row.code === "PCS"); const box = unit.rows.find((row) => row.code === "BOX");
   await pool.query(`insert into material_master(internal_material_code,standard_name,category_id,base_uom,base_unit_id,material_status,procurement_type,inventory_type,inspection_type,environmental_requirement,source_type,last_modified_by,created_by,updated_by,request_id) values
-    ('CYD-PROC-000001','采购物料一',$1,'PCS',$2,'ACTIVE','PURCHASE','STOCKED','IQC','ROHS','MANUAL','test','test','test',$3),
-    ('CYD-PROC-000002','采购物料二',$1,'PCS',$2,'ACTIVE','PURCHASE','STOCKED','IQC','ROHS','MANUAL','test','test','test',$4),
-    (null,'未启用物料',$1,'PCS',$2,'DRAFT','PURCHASE','STOCKED','IQC','ROHS','MANUAL','test','test','test',$5)`, [category.rows[0].id, pcs.id, randomUUID(), randomUUID(), randomUUID()]);
+    ('CYD-PROC-000001','采购物料一',$1,'PCS',$2,'ACTIVE','PURCHASE','STOCKED','NONE','ROHS','MANUAL','test','test','test',$3),
+    ('CYD-PROC-000002','采购物料二',$1,'PCS',$2,'ACTIVE','PURCHASE','STOCKED','NONE','ROHS','MANUAL','test','test','test',$4),
+    (null,'未启用物料',$1,'PCS',$2,'DRAFT','PURCHASE','STOCKED','NONE','ROHS','MANUAL','test','test','test',$5)`, [category.rows[0].id, pcs.id, randomUUID(), randomUUID(), randomUUID()]);
   await pool.query(`insert into suppliers(supplier_code,supplier_name,normalized_name,status,created_by,updated_by,request_id) values
     ('SUP-000001','启用供应商','启用供应商','ACTIVE','test','test',$1),('SUP-000002','停用供应商','停用供应商','INACTIVE','test','test',$2)`, [randomUUID(), randomUUID()]);
   const supplier = await pool.query("select id,status from suppliers order by id"); const materials = await pool.query("select id,base_unit_id,material_status from material_master order by id");
@@ -66,7 +66,7 @@ test("PO idempotency update receipt reversal close and financial source stay con
   const balance = await pool.query("select on_hand_qty,version from inventory_stock_balances where material_id=$1", [refs.one.id]); assert.deepEqual(balance.rows[0], { on_hand_qty: "10.000000", version: 4 });
   const finance = await pool.query("select entry_type,amount::text from purchase_financial_source_entries order by id"); assert.deepEqual(finance.rows.map((row) => [row.entry_type, row.amount]), [["RECEIPT", "10.000000"], ["RECEIPT", "15.000000"], ["RECEIPT_REVERSAL", "-15.000000"], ["RECEIPT", "15.000000"]]);
   assert.equal(Number((await pool.query("select count(*) count from erp_records where kind in ('purchase_order','financial_document','financial_payment')")).rows[0].count), 0);
-  await assert.rejects(pool.query("update purchase_receipts set reason='tamper'"), /posted inventory records are immutable/); await assert.rejects(pool.query("update purchase_receipt_lines set quantity=1"), /posted inventory records are immutable/);
+  await assert.rejects(pool.query("update purchase_receipts set reason='tamper'"), /posted inventory records are immutable|posting requires service/); await assert.rejects(pool.query("update purchase_receipt_lines set quantity=1"), /posted inventory records are immutable|posting requires service/);
 });
 
 test("reference, permission, CSRF, over-receipt, concurrent receipt and atomic rollback fail closed", async () => {

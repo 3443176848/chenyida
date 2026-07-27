@@ -18,7 +18,7 @@ async function readBody(request: Request) {
   const raw = await request.text(); if (!raw || Buffer.byteLength(raw) > 256 * 1024) throw new ProcurementError("REQUEST_VALIDATION_FAILED", "请求正文为空或超过 256 KiB");
   let value: unknown; try { value = JSON.parse(raw); } catch { throw new ProcurementError("REQUEST_VALIDATION_FAILED", "请求正文不是有效 JSON"); }
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new ProcurementError("REQUEST_VALIDATION_FAILED", "请求正文必须是对象");
-  const forbidden = ["username", "role", "permissions", "created_by", "createdBy", "request_id", "received_qty", "po_status", "line_status", "financial_source_id"].find((key) => key in (value as Record<string, unknown>));
+  const forbidden = ["username", "role", "permissions", "created_by", "createdBy", "request_id", "received_qty", "po_status", "line_status", "financial_source_id", "lot_code", "inventory_lot_id"].find((key) => key in (value as Record<string, unknown>));
   if (forbidden) throw new ProcurementError("REQUEST_VALIDATION_FAILED", `请求正文不能指定服务端字段：${forbidden}`);
   return { value: value as Record<string, unknown>, digest: createHash("sha256").update(JSON.stringify(stable(value))).digest("hex") };
 }
@@ -48,7 +48,7 @@ export async function handleProcurementApi(request: Request, dependencies: Depen
       const po = url.searchParams.get("po_id") || url.searchParams.get("purchase_order_id"); const result = await service.listReceipts(size, offset, po ? id(po, "purchase_order_id") : undefined); return response({ rows: result.rows, data: result.rows, pagination: { page, page_size: size }, request_id: dependencies.requestId }, 200, dependencies.requestId);
     }
     if (!["POST", "PATCH"].includes(request.method)) throw new ProcurementError("METHOD_NOT_ALLOWED", "接口不支持该请求方法", 405);
-    dependencies.requireCsrf(); const parsed = await readBody(request); let result;
+    dependencies.requireCsrf(); const parsed = await readBody(request); if (["/api/purchase-receipts","/api/purchase-receive"].includes(path)) { const lines = Array.isArray(parsed.value.lines) ? parsed.value.lines : [parsed.value]; const forbidden = lines.flatMap((line) => line && typeof line === "object" && !Array.isArray(line) ? ["lot_code","inventory_lot_id","material_id","unit_id","supplier_id"].filter((key) => key in (line as Record<string, unknown>)) : ["line"])[0]; if (forbidden) throw new ProcurementError("REQUEST_VALIDATION_FAILED", `收货请求不能指定服务端字段：${forbidden}`); } let result;
     if (path === "/api/purchase-orders" && request.method === "POST") { action = "PURCHASE_ORDER_CREATED"; requirePermission(dependencies.actor, "procurement.order"); result = await service.createOrder(mutationMeta(request, dependencies, path, action, parsed.digest), parsed.value); }
     else if (path === "/api/purchase-orders/from-shortage" && request.method === "POST") { action = "PURCHASE_ORDERS_CREATED_FROM_SHORTAGE"; requirePermission(dependencies.actor, "procurement.order"); result = await service.createFromShortage(mutationMeta(request, dependencies, path, action, parsed.digest), parsed.value); }
     else if (orderDetail && request.method === "PATCH") { action = "PURCHASE_ORDER_UPDATED"; requirePermission(dependencies.actor, "procurement.order"); result = await service.updateOrder(Number(orderDetail[1]), mutationMeta(request, dependencies, path, action, parsed.digest), parsed.value); }

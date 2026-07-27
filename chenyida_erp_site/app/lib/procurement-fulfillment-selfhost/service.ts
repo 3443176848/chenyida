@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import { ProcurementError } from "../procurement-selfhost/errors.ts";
 import { ProcurementRepository } from "../procurement-selfhost/repository.ts";
-import { expectedBalanceVersions, id, quantity, text, version } from "../procurement-selfhost/rules.ts";
+import { expectedBalanceVersions, id, quantity, supplierLotCode, text, version } from "../procurement-selfhost/rules.ts";
 import { ProcurementService } from "../procurement-selfhost/service.ts";
 import type { ProcurementMeta, ProcurementResult, PurchaseOrderLineInput } from "../procurement-selfhost/types.ts";
 
@@ -39,16 +39,23 @@ export class ProcurementFulfillmentService {
   async listOrdersAndPlans(limit: number, offset: number) {
     return this.repository.pool.query(`select po.id purchase_order_id,po.po_code,po.status po_status,po.currency_code,po.version po_version,s.supplier_code,s.supplier_name,
       count(pol.id)::int line_count,count(dp.id)::int plan_count,coalesce(sum(pol.order_qty),0)::text ordered_quantity,
-      coalesce(sum(pol.received_qty),0)::text received_quantity
+      coalesce(sum(pol.received_qty),0)::text received_quantity,coalesce(receipt.receipt_count,0)::int receipt_count,
+      coalesce(receipt.receipt_codes,'') receipt_codes,coalesce(receipt.internal_lots,'') internal_lots,
+      coalesce(receipt.supplier_lots,'') supplier_lots,coalesce(receipt.iqc_status,'') iqc_status
       from purchase_orders po join suppliers s on s.id=po.supplier_id join purchase_order_lines pol on pol.purchase_order_id=po.id
       join procurement_award_po_line_links l on l.purchase_order_line_id=pol.id left join purchase_delivery_plans dp on dp.purchase_order_line_id=pol.id
-      group by po.id,s.id order by po.created_at desc,po.id desc limit $1 offset $2`, [limit, offset]);
+      left join lateral(select count(distinct pr.id) receipt_count,string_agg(distinct pr.receipt_code,', ' order by pr.receipt_code) receipt_codes,
+        string_agg(distinct il.lot_code,', ' order by il.lot_code) internal_lots,string_agg(distinct il.supplier_lot_code,', ' order by il.supplier_lot_code) supplier_lots,
+        string_agg(distinct qi.lifecycle_status||'/'||qi.decision_status||' released '||qi.released_qty::text,', ' order by qi.lifecycle_status||'/'||qi.decision_status||' released '||qi.released_qty::text) iqc_status
+        from purchase_receipts pr join purchase_receipt_lines prl on prl.purchase_receipt_id=pr.id left join inventory_lots il on il.source_purchase_receipt_line_id=prl.id left join quality_inspections qi on qi.inventory_lot_id=il.id
+        where pr.purchase_order_id=po.id and pr.receipt_type='RECEIPT') receipt on true
+      group by po.id,s.id,receipt.receipt_count,receipt.receipt_codes,receipt.internal_lots,receipt.supplier_lots,receipt.iqc_status order by po.created_at desc,po.id desc limit $1 offset $2`, [limit, offset]);
   }
 
   async receivingQueue(limit: number, offset: number) {
     return this.repository.pool.query(`select q.id queue_id,q.version queue_version,p.*,po.po_code,po.status po_status,pol.line_no,pol.version purchase_order_line_version,
       (p.planned_quantity-p.received_quantity)::text remaining_quantity,s.supplier_code,s.supplier_name,m.internal_material_code,m.standard_name,u.code unit_code,
-      coalesce(b.version,0) balance_version,coalesce(b.on_hand_qty,0)::text on_hand_quantity,
+      m.inventory_type,m.inspection_type,case when m.inventory_type='STOCKED' and m.inspection_type='IQC' then 0 else coalesce(b.version,0) end balance_version,coalesce(b.on_hand_qty,0)::text on_hand_quantity,
       (p.promised_delivery_date<current_date and p.status in ('PENDING','PARTIAL')) overdue
       from warehouse_receiving_queue_entries q join purchase_delivery_plans p on p.id=q.delivery_plan_id
       join purchase_orders po on po.id=p.purchase_order_id join purchase_order_lines pol on pol.id=p.purchase_order_line_id
@@ -145,7 +152,7 @@ export class ProcurementFulfillmentService {
   }
 
   async receive(deliveryPlanId: number, meta: ProcurementMeta, input: Record<string, unknown>): Promise<ProcurementResult> {
-    const receiveQuantity = quantity(input.quantity, "quantity"), expectedPlanVersion = version(input.expected_version, "expected_version"), expectedLineVersion = version(input.expected_line_version, "expected_line_version"), expectedBalanceVersion = Number(input.expected_balance_version);
+    const receiveQuantity = quantity(input.quantity, "quantity"), expectedPlanVersion = version(input.expected_version, "expected_version"), expectedLineVersion = version(input.expected_line_version, "expected_line_version"), expectedBalanceVersion = Number(input.expected_balance_version), normalizedSupplierLotCode = supplierLotCode(input.supplier_lot_code);
     if (!Number.isSafeInteger(expectedBalanceVersion) || expectedBalanceVersion < 0) throw new ProcurementError("REQUEST_VALIDATION_FAILED", "expected_balance_version 必须是非负整数");
     const reason = text(input.reason ?? "仓库按到货计划收货", "reason", 1000, true);
     return this.repository.execute(meta, async (client) => {
@@ -155,7 +162,7 @@ export class ProcurementFulfillmentService {
       if (!(await client.query("select 1 from warehouse_receiving_queue_entries where delivery_plan_id=$1 and closed_at is null for update", [deliveryPlanId])).rows[0]) throw new ProcurementError("RECEIVING_QUEUE_CLOSED", "待入库记录已关闭", 409);
       const allowed = await client.query("select $1::numeric<=($2::numeric-$3::numeric) ok", [receiveQuantity, plan.planned_quantity, plan.received_quantity]);
       if (!allowed.rows[0].ok) throw new ProcurementError("PURCHASE_RECEIPT_OVER_QUANTITY", "收货数量超过到货计划未收数量", 409);
-      const receipt = await this.procurement.createReceiptInTransaction(client, meta, Number(plan.purchase_order_id), [{ purchaseOrderLineId: Number(plan.purchase_order_line_id), quantity: receiveQuantity, expectedLineVersion, expectedBalanceVersion }], reason);
+      const receipt = await this.procurement.createReceiptInTransaction(client, meta, Number(plan.purchase_order_id), [{ purchaseOrderLineId: Number(plan.purchase_order_line_id), quantity: receiveQuantity, expectedLineVersion, expectedBalanceVersion, supplierLotCode: normalizedSupplierLotCode }], reason);
       const data = receipt.body.data as Record<string, unknown>, receiptLine = (data.lines as Record<string, unknown>[])[0];
       await client.query(`insert into purchase_receipt_delivery_allocations(purchase_receipt_line_id,delivery_plan_id,quantity,created_by,request_id) values($1,$2,$3,$4,$5)`, [Number(receiptLine.id), deliveryPlanId, receiveQuantity, meta.actor.username, meta.requestId]);
       const updated = await client.query(`update purchase_delivery_plans set received_quantity=received_quantity+$2::numeric,status=case when received_quantity+$2::numeric=planned_quantity then 'COMPLETED' else 'PARTIAL' end,
@@ -183,7 +190,7 @@ export class ProcurementFulfillmentService {
   }
 
   async reverseReceipt(receiptId: number, meta: ProcurementMeta, input: Record<string, unknown>): Promise<ProcurementResult> {
-    const reason = text(input.reason, "冲销原因", 1000, true), balances = expectedBalanceVersions(input.expected_balance_versions), expectedPlanVersion = version(input.expected_plan_version, "expected_plan_version");
+    const reason = text(input.reason, "冲销原因", 1000, true), balances = expectedBalanceVersions(input.expected_balance_versions), expectedPlanVersion = version(input.expected_plan_version, "expected_plan_version"), expectedLotVersion = input.expected_lot_version == null ? null : version(input.expected_lot_version, "expected_lot_version");
     const rawLineVersions = input.expected_line_versions;
     if (!Array.isArray(rawLineVersions) || rawLineVersions.length < 1 || rawLineVersions.length > 100) throw new ProcurementError("REQUEST_VALIDATION_FAILED", "expected_line_versions 必须包含 1 到 100 行");
     const lineVersions = new Map<number, number>();
@@ -198,7 +205,7 @@ export class ProcurementFulfillmentService {
       const allocation = allocationResult.rows[0];
       if (Number(allocation.plan_version) !== expectedPlanVersion) throw new ProcurementError("DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT", "到货计划版本已变化", 409);
       if (allocation.plan_status === "CLOSED") throw new ProcurementError("DELIVERY_PLAN_CLOSED", "已关闭到货计划的收货不能冲销", 409);
-      const result = await this.procurement.reverseReceiptInTransaction(client, receiptId, meta, reason, balances, lineVersions);
+      const result = await this.procurement.reverseReceiptInTransaction(client, receiptId, meta, reason, balances, lineVersions, expectedLotVersion);
       const data = result.body.data as Record<string, unknown>, reversalLine = (data.lines as Record<string, unknown>[])[0];
       await client.query(`insert into purchase_receipt_delivery_allocations(purchase_receipt_line_id,delivery_plan_id,quantity,reversal_of_allocation_id,created_by,request_id)
         values($1,$2,$3,$4,$5,$6)`, [Number(reversalLine.id), Number(allocation.delivery_plan_id), allocation.quantity, Number(allocation.id), meta.actor.username, meta.requestId]);

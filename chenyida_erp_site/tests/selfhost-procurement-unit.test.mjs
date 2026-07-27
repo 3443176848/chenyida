@@ -13,7 +13,7 @@ test("procurement decimal and stable-ID rules reject floats, duplicates and miss
 
 test("receipt inputs require every concurrency version and deterministic unique lines", () => {
   const parsed = receiptLines([{ purchase_order_line_id: 9, quantity: "1.250001", expected_line_version: 3, expected_balance_version: 4 }]);
-  assert.deepEqual(parsed[0], { purchaseOrderLineId: 9, quantity: "1.250001", expectedLineVersion: 3, expectedBalanceVersion: 4 });
+  assert.deepEqual(parsed[0], { purchaseOrderLineId: 9, quantity: "1.250001", expectedLineVersion: 3, expectedBalanceVersion: 4, supplierLotCode: null });
   assert.throws(() => receiptLines([{ purchase_order_line_id: 9, quantity: "1", expected_line_version: 1 }]), /expected_balance_version/);
   assert.throws(() => expectedBalanceVersions([{ material_id: 1, expected_balance_version: 2 }, { material_id: 1, expected_balance_version: 2 }]), /不能重复物料/);
 });

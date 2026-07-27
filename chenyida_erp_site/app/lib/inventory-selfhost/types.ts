@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import type { IdentityActor } from "../identity-selfhost/types.ts";
 
-export const INVENTORY_OPERATION_TYPES = ["RECEIPT", "ISSUE", "ADJUSTMENT", "FREEZE", "UNFREEZE"] as const;
+export const INVENTORY_OPERATION_TYPES = ["RECEIPT", "IQC_RECEIPT", "ISSUE", "ADJUSTMENT", "FREEZE", "UNFREEZE"] as const;
 export type InventoryOperationType = (typeof INVENTORY_OPERATION_TYPES)[number];
 
 export type InventoryLineInput = Readonly<{
