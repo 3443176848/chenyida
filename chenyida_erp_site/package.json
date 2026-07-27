@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.29",
+  "version": "0.1.0-alpha.30",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -72,6 +72,12 @@
     "test:quality:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-quality-migration-upgrade.test.mjs",
     "test:quality:compose": "node scripts/selfhost-quality-compose-smoke.mjs",
     "typecheck:phase5-task05": "tsc -p tsconfig.phase5-task05.json --pretty false",
+    "typecheck:phase5-task06": "tsc -p tsconfig.phase5-task06.json --pretty false",
+    "test:production-rework:unit": "node --experimental-strip-types --test tests/selfhost-production-rework-execution-unit.test.mjs",
+    "test:production-rework:ui": "node --experimental-strip-types --test tests/selfhost-production-rework-execution-ui-contract.test.mjs",
+    "test:production-rework:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-rework-execution-postgres.test.mjs",
+    "test:production-rework:migration": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-rework-execution-migration-upgrade.test.mjs",
+    "test:production-rework:compose": "node --experimental-strip-types scripts/selfhost-production-rework-execution-compose-smoke.mjs",
     "test:production-nonconformance:unit": "node --experimental-strip-types --test tests/selfhost-production-nonconformance-unit.test.mjs",
     "test:production-nonconformance:ui": "node --experimental-strip-types --test tests/selfhost-production-nonconformance-ui-contract.test.mjs",
     "test:production-nonconformance:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-production-nonconformance-postgres.test.mjs",

@@ -5,6 +5,7 @@ import { QualityError } from "../quality-selfhost/errors.ts";
 import { id, quantity, text, version } from "../quality-selfhost/rules.ts";
 import { QualityRepository } from "../quality-selfhost/repository.ts";
 import type { QualityMeta, QualityResult } from "../quality-selfhost/types.ts";
+import { initializeReworkExecution } from "../production-rework-execution-selfhost/projections.ts";
 
 type NcrRow = Record<string, unknown> & { id: string; status: string; version: number; failed_qty: string; work_order_id: string; snapshot_operation_id: string };
 type RequestRow = Record<string, unknown> & { id: string; nonconformance_id: string; status: string; version: number; quantity: string; created_by: string; revision_no: number };
@@ -66,8 +67,9 @@ export class ProductionNonconformanceService {
     const values: unknown[] = []; const where: string[] = [];
     if (status) { values.push(status.toUpperCase()); where.push(`r.status=$${values.length}`); }
     values.push(limit, offset);
-    return this.pool.query(`select r.*,n.ncr_code,wo.work_order_code,n.failed_qty,n.active_rework_qty,n.final_scrap_qty,n.unresolved_qty,n.status ncr_status
-      from production_rework_requests r join production_nonconformances n on n.id=r.nonconformance_id join production_work_orders wo on wo.id=n.work_order_id
+    return this.pool.query(`select r.*,n.ncr_code,wo.work_order_code,n.failed_qty,n.active_rework_qty,n.final_scrap_qty,n.unresolved_qty,n.status ncr_status,
+      p.status execution_status,p.version execution_version,p.accepted_rework_qty::text,p.rework_waiting_dispatch_qty::text,p.rework_dispatched_qty::text,p.rework_in_progress_qty::text,p.rework_reported_good_qty::text,p.rework_reported_scrap_qty::text,p.rework_pending_reinspection_qty::text,p.rework_released_qty::text,p.rework_completed_qty::text,p.unresolved_rework_qty::text
+      from production_rework_requests r join production_nonconformances n on n.id=r.nonconformance_id join production_work_orders wo on wo.id=n.work_order_id left join production_rework_execution_projections p on p.rework_request_id=r.id
       ${where.length ? `where ${where.join(" and ")}` : ""} order by r.created_at desc,r.id desc limit $${values.length - 1} offset $${values.length}`, values);
   }
 
@@ -79,9 +81,10 @@ export class ProductionNonconformanceService {
     if (!header.rows[0]) throw new QualityError("NONCONFORMANCE_NOT_FOUND", "不合格记录不存在", 404);
     const [events, requests, scraps, targets] = await Promise.all([
       this.pool.query("select * from production_nonconformance_events where nonconformance_id=$1 order by id", [ncrId]),
-      this.pool.query(`select r.*,v.canonical_digest submitted_digest,v.created_at snapshot_created_at,
-        coalesce((select jsonb_agg(e order by e.id) from production_rework_request_events e where e.rework_request_id=r.id),'[]'::jsonb) events
-        from production_rework_requests r left join production_rework_request_versions v on v.rework_request_id=r.id where r.nonconformance_id=$1 order by r.revision_no,r.id`, [ncrId]),
+      this.pool.query(`select r.*,v.canonical_digest submitted_digest,v.created_at snapshot_created_at,p.status execution_status,p.version execution_version,p.accepted_rework_qty::text,p.rework_waiting_dispatch_qty::text,p.rework_dispatched_qty::text,p.rework_in_progress_qty::text,p.rework_reported_good_qty::text,p.rework_reported_scrap_qty::text,p.rework_pending_reinspection_qty::text,p.rework_released_qty::text,p.rework_completed_qty::text,p.unresolved_rework_qty::text,
+        coalesce((select jsonb_agg(e order by e.id) from production_rework_request_events e where e.rework_request_id=r.id),'[]'::jsonb) events,
+        coalesce((select jsonb_agg(jsonb_build_object('id',run.id,'run_code',run.run_code,'run_kind',run.run_kind,'status',run.status,'dispatched_qty',run.dispatched_qty,'processed_qty',run.processed_qty,'good_qty',run.good_qty,'scrap_qty',run.scrap_qty,'assigned_operator',run.assigned_operator) order by run.id) from production_operation_runs run where run.rework_request_id=r.id),'[]'::jsonb) runs
+        from production_rework_requests r left join production_rework_request_versions v on v.rework_request_id=r.id left join production_rework_execution_projections p on p.rework_request_id=r.id where r.nonconformance_id=$1 order by r.revision_no,r.id`, [ncrId]),
       this.pool.query("select * from production_scrap_dispositions where nonconformance_id=$1 order by id", [ncrId]),
       this.targetOptions(ncrId),
     ]);
@@ -179,6 +182,7 @@ export class ProductionNonconformanceService {
       const next = decision === "ACCEPT" ? "ACCEPTED" : "RETURNED";
       const updated = await client.query(`update production_rework_requests set status=$2,decided_by=$3,decided_request_id=$4,decided_at=now(),return_reason=$5,version=version+1,updated_at=now() where id=$1 returning *`, [requestId, next, meta.actor.username, meta.requestId, returnReason]);
       if (next === "RETURNED") await client.query("update production_nonconformance_allocations set status='RELEASED',released_by=$2,released_request_id=$3,released_at=now(),updated_at=now() where rework_request_id=$1 and status='ACTIVE'", [requestId, meta.actor.username, meta.requestId]);
+      if (next === "ACCEPTED") await initializeReworkExecution(client, requestId, meta.actor.username, meta.requestId);
       const ncr = await this.refresh(client, ncrId);
       await client.query("insert into production_rework_request_events(rework_request_id,event_type,from_status,to_status,quantity,reason,actor,request_id) values($1,$2,'SUBMITTED',$3,$4,$5,$6,$7)", [requestId, next, next, row.quantity, returnReason, meta.actor.username, meta.requestId]);
       await client.query("insert into production_nonconformance_events(nonconformance_id,event_type,from_status,to_status,quantity,reason,actor,request_id) values($1,$2,$3,$4,$5,$6,$7,$8)", [ncrId, next === "ACCEPTED" ? "REWORK_ACCEPTED" : "REWORK_RETURNED", oldNcr.status, ncr.status, row.quantity, returnReason, meta.actor.username, meta.requestId]);

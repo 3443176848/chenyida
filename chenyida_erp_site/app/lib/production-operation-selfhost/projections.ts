@@ -48,6 +48,8 @@ export async function refreshOperationProjections(client: Queryable, workOrderId
         coalesce(sum(scrap_qty) filter(where status not in ('CANCELLED','REVERSED')),0)::text scrap,
         coalesce(sum(dispatched_qty-processed_qty) filter(where status='IN_PROGRESS'),0)::text in_progress,
         bool_or(status='READY') has_ready,bool_or(status='IN_PROGRESS') has_active
+      from production_operation_runs where snapshot_operation_id=$1 and run_kind='NORMAL'`, [Number(row.snapshot_operation_id)]);
+    const allGood = await client.query(`select coalesce(sum(good_qty) filter(where status not in ('CANCELLED','REVERSED')),0)::text good
       from production_operation_runs where snapshot_operation_id=$1`, [Number(row.snapshot_operation_id)]);
     const transferred = await client.query(`
       select coalesce(sum(a.quantity),0)::text quantity
@@ -66,9 +68,9 @@ export async function refreshOperationProjections(client: Queryable, workOrderId
           join production_report_receipt_projections p on p.report_id=a.production_report_id
           where a.snapshot_operation_id=$1 and not p.reversed`, [Number(row.snapshot_operation_id)])
       : { rows: [{ quantity: "0" }] };
-    const qualityRequired = row.quality_gate_mode === "IPQC" ? facts.rows[0].good : "0";
+    const qualityRequired = row.quality_gate_mode === "IPQC" ? allGood.rows[0].good : "0";
     const qualityReleased = quality.rows[0].released;
-    const outputCapacity = row.quality_gate_mode === "IPQC" ? qualityReleased : facts.rows[0].good;
+    const outputCapacity = row.quality_gate_mode === "IPQC" ? qualityReleased : allGood.rows[0].good;
     const quantity = await client.query(`select
       ($1::numeric-$2::numeric)::text waiting,
       ($3::numeric-$4::numeric)::text available,
