@@ -2,6 +2,26 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-27 返工执行、复检与生产流恢复边界
+
+`SELFHOST-PHASE5-TASK06` 复用唯一 Production Operation Run/Report、Quality Inspection 和 WIP/正式报工/完工/库存权威。只有有效 ACTIVE NCR Allocation 下 digest/固化提交版本一致且仍有余额的 ACCEPTED Rework Request，才可由 production 显式派工为既有 Run 的 `REWORK` 类型；稳定 Allocation 保存 Request、NCR、原 Inspection/Run Report、目标 Snapshot Operation、Work Order、Work Center、operator 和数量。
+
+```mermaid
+flowchart LR
+    A[ACCEPTED Rework Request qty 2] -->|production explicit dispatch| R[Existing Operation Run kind REWORK]
+    R --> P[Existing immutable Run Report good 2]
+    P --> H[New IPQC Quality Hold 2]
+    H -->|quality explicit reinspection| I[Inspection 2 passed 2]
+    I -->|different actor close + release| L[Released WIP 2]
+    L --> O[AOI allocation 8 + 2]
+    O --> F[Final Output / Production Report 8 + 2]
+    F --> C[Completion / FG Ledger 8 + 2 = 10]
+```
+
+NORMAL Run 的 good 继续进入净 WIP 投影；REWORK processed 只记录重复加工次数，不能把 REFLOW 正常 10+返工 2 解释为净产 12。返工 good 在目标为 IPQC 时必须进入新 Hold；原 Inspection 的 failed 2、原 release 8 与复检 release 2 分别核算，只有各自 `CLOSED + RELEASED` 的额度可被后序稳定 Input Allocation 消费。
+
+Execution Projection/Event 汇总 accepted、待派、在制、reported good/scrap、待复检、released、completed 和 unresolved；deferred reconciliation、不可变 trigger、稳定外键、CAS、固定锁序、幂等和事务 Audit 阻止跨工单/错误目标/超量、NORMAL 伪造 REWORK、直接 SQL 绕过复检及部分提交。未开工可取消；已报工只可追加式全额冲销，已有复检或下游引用即 fail closed。本边界不自动派工或复检，不补料、不写 SCRAP Inventory、不自动补产，也不触发 FQC、Shipment、AR 或财务动作。
+
 ## 2026-07-27 工序 IPQC 质量门禁与受控 WIP 放行边界
 
 `SELFHOST-PHASE5-TASK05` 继续复用唯一 Quality Inspection/Result/Defect 与 Production Operation/WIP 权威。结构化 Operation Run Report IPQC 的 failed quantity 形成每 Inspection 唯一 NCR；服务端沿稳定外键继承 Work Order、Snapshot Operation、Work Center、Material、Unit 和来源数量。NCR 的关系化 Allocation 使 `failed = active rework + final scrap + unresolved` 在事务提交时由数据库核对。

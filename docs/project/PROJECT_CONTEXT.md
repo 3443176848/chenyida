@@ -29,15 +29,15 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与并行环境均为 `0.1.0-alpha.29`/`0029`；只属于回环并行验收，明确为非生产且尚未正式发布。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与并行环境均为 `0.1.0-alpha.30`/`0030`；只属于回环并行验收，明确为非生产且尚未正式发布。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.19`。
-- Git 复核：TASK04 起点为本地 `main`/HEAD `f6e5ff2e8344e79a35f56311b02b514613484f59`、behind 0/ahead 47、工作区 clean；功能提交 `5379550d0381818ad970518ac4fb8261c4679989` 与聚焦修正 `56f63ca714ed6f359bc51f681b6a532259747f1b` 均为追加提交，最终另建 ops 验收提交，仍不 push、不创建 PR，不得描述为已同步。
+- Git 复核：TASK06 起点为本地 `main`/HEAD `11bc680a91c59258c94f8ddca3d56af71981811e`、behind 0/ahead 52、工作区 clean；功能提交 `1f6a143adbf78d7fb70fbed1ea7d7dfea62cfd4b` 严格以起点为 Parent，最终另建 ops 验收提交，仍不 push、不创建 PR，不得描述为已同步。
 
 ### 低资源主机事实
 
 - 本机永久按 2 核、约 4 GiB 内存、1 GiB Swap 管理。2026-07-27 曾发生服务器重启或不可用，证据不足，根因记录为 `UNKNOWN`，不得无证据归因 OOM。
 - 所有 build、全量测试、Migration、备份恢复和 Compose 重启必须串行，固定 `COMPOSE_PARALLEL_LIMIT=1`；停止阈值、禁用清理命令和验证记录见 `docs/self-hosting/low-resource-server.md`。
-- TASK04 最终 available memory 约 2.4 GiB、Swap 111 MiB、根分区可用 21 GiB、Load 0.49/0.44/0.51；独立 60 秒 Swap 从 113,688 KiB 降至 113,684 KiB、正增长 0，三个容器 restart 0/OOM false，四个持久卷未更换或删除。
+- TASK06 起点 available memory 约 2.4 GiB、Swap 141 MiB、根分区可用 18 GiB；最终约 2.4 GiB/153 MiB/15 GiB、Load 0.13/0.90/1.25。独立 60 秒 Swap 160,477,184→160,473,088 bytes、正增长 0，三个容器 restart 0/OOM false，四个持久卷未更换或删除。
 
 ### 治理资料
 
@@ -68,6 +68,7 @@
 - `drizzle-postgres/0017_planning_material_requirements.sql` expand-only 新增不可变物料需求计划/行、独立库存/在途 Planning Allocation、采购申请/行和事件；只消费固化 Package 快照，提交时锁定重算，不修改正式 `reserved_qty` 或创建 PO/收货/生产事实。
 - `drizzle-postgres/0018_procurement_sourcing.sql` 保存 RFQ、报价版本、比较版本、人工 Award 和事件；`0019_sourcing_purchase_fulfillment.sql` 新增 Award/PO 来源、到货计划、待入库、Receipt 分配和不可变事件，并复用既有 Procurement/Inventory/Finance 事务权威。
 - `drizzle-postgres/0020_production_handoff_reservations.sql`—`0023_sales_delivery_receivable.sql` 依次增加计划→生产、报工/完工、FQC 放行和精确发货/AR；`0024_finance_project_settlements.sql` 增加不可变 Financial Source→Project/UNATTRIBUTED 归属，继续复用唯一 Finance Document/Settlement/Reversal 权威。
+- `drizzle-postgres/0025_production_routing_snapshot.sql`—`0029_production_nonconformance_rework_handoff.sql` 依次增加路线快照、工序执行、末序正式报工绑定、工序 IPQC 门禁和 NCR→返工申请交接；`0030_production_rework_execution.sql` 复用既有 Operation Run/Report 与 Quality 权威，把 ACCEPTED 申请经显式 REWORK 派工、返工复检和放行重新接入后序生产流。
 - 本地文件卷保存二进制，数据库只保存受控相对路径和摘要元数据。
 - Worker 使用 PostgreSQL Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、重试和 CAS；Web/Worker 是独立入口。
 
@@ -125,6 +126,7 @@
 31. SELFHOST-PHASE5-TASK03 采用 D-070：结构化 Production Report 只消费同一工单末 Snapshot Operation 的稳定 Run Report good，Allocation 与既有 Report 保持不可变；warehouse 继续显式消费既有 Report 创建 Completion 和成品库存。`0.1.0-alpha.27`/`0027`、实际 Report/Completion/Ledger `4/6`、Balance 10、COMPLETED、重启、恢复与清理已通过；品质、销售和财务事实保持 0。
 32. SELFHOST-PHASE5-TASK04 采用 D-071：Routing Operation 的 `NONE/IPQC` 随发布 digest 和 Work Order Snapshot 固化；工序 good 不自动创建 IPQC，quality 显式引用稳定 Run Report，经异人处置/关闭后才形成下游额度。`0.1.0-alpha.28`/`0028`、REFLOW Hold `10→6→0`、AOI available `0→4→10`、Report/Completion/Ledger `4/6`、Balance 10、重启、恢复与清理已通过。
 33. SELFHOST-PHASE5-TASK05 采用 D-072：只有结构化 Operation Run Report IPQC failed 才能建立唯一 NCR；failed 数量由 active rework、final scrap 与 unresolved 守恒。quality 的 DRAFT 在 submit 时生成不可变 digest/snapshot，production 只接收或退回，ACCEPTED 仅占用额度等待后续任务。`0.1.0-alpha.29`/`0029`、passed 8/failed 2、v1 退回/v2 接收、重启、第二新空库恢复与最终清理已通过；未执行返工工序或库存报废。
+34. SELFHOST-PHASE5-TASK06 采用 D-073：ACCEPTED Request 由 production 显式派工为既有 `production_operation_runs` 的 REWORK 类型；processed 只表示重复加工次数，返工 good 必须经新的稳定 Run Report IPQC 复检并 `CLOSED + RELEASED` 后才恢复后序额度。`0.1.0-alpha.30`/`0030`、原检 10/8/2/8、返工 2、复检 2/2/0/2、AOI 8/2、成品 8+2=10、重启、第二新空库恢复和清理已通过；原 failed 2 保持，Execution COMPLETED、NCR RESOLVED。
 
 ## 当前风险
 
@@ -164,7 +166,7 @@
 
 ## 当前路线
 
-`SELFHOST-PHASE5-TASK05` 已 DONE：功能提交 `1de057a6a248ca3346d7d2b0f201252a3965eced` 严格以 `736f14b9510ca52ce39fea7154872dffe7818986` 为 Parent；`0.1.0-alpha.29`/`0029` 的结构化 IPQC failed→唯一 NCR→不可变返工申请 v1 RETURNED/v2 ACCEPTED 已通过隔离回归、并行真实 passed 8/failed 2 HTTP、整体重启、固定第二新空库恢复和最终清理。当前无 `DOING`，不得自动启动 TASK06；实际返工、库存报废、真实迁移、HTTPS 和生产切换仍未执行。
+`SELFHOST-PHASE5-TASK06` 已 DONE：功能提交 `1f6a143adbf78d7fb70fbed1ea7d7dfea62cfd4b` 严格以 `11bc680a91c59258c94f8ddca3d56af71981811e` 为 Parent；`0.1.0-alpha.30`/`0030` 的 ACCEPTED→REWORK Run/Report→显式复检→后序 AOI→正式报工/完工/成品 `8+2=10` 已通过 178 项自动测试、实际 HTTP、整体重启、固定第二新空库恢复和最终清理。当前无 `DOING`，不得自动启动 TASK07；返工补料、库存报废、真实迁移、HTTPS 和生产切换仍未执行。
 
 ## 恢复上下文检查清单
 

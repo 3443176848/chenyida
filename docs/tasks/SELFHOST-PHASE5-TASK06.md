@@ -2,7 +2,7 @@
 
 ## 状态与授权
 
-- 状态：`DOING`
+- 状态：`DONE / PARALLEL ACCEPTED`
 - 日期：2026-07-27（Asia/Shanghai）
 - 授权：项目负责人明确授权只执行 TASK06，包括代码、`0030`、隔离测试、现有回环并行环境实际 HTTP 验收、Compose 串行重启、停服备份恢复、清理、文档和独立 Git 提交。
 - 合法起点：`main` / `11bc680a91c59258c94f8ddca3d56af71981811e`，Parent `1de057a6a248ca3346d7d2b0f201252a3965eced`；工作区 clean，`origin/main...HEAD` behind 0/ahead 52。
@@ -49,18 +49,18 @@ ACCEPTED Rework Request
 
 ## 验收清单
 
-- [ ] `0030`、Schema、journal、snapshot、完整 SHA-256、版本升级
-- [ ] TASK06 unit、UI contract、PostgreSQL/API、Migration、Compose acceptance
-- [ ] 状态、来源、目标、active operator、数量、并发、幂等、CAS、职责、403、故障、取消/冲销和直接 SQL guard
-- [ ] Phase 4 TASK07/TASK08、Phase 5 TASK01—TASK05 与 Production/Routing/Quality/Nonconformance/Inventory/Dashboard/Identity 回归
-- [ ] 实际 HTTP 原检 10/8/2/8、返工 2/2/0、复检 2/2/0/2、AOI 8/2、成品 Ledger +8/+2、Balance 10、Work Order COMPLETED
-- [ ] 未复检不能派满 AOI，复检后才可派剩余 2；已有复检冲销拒绝、超量拒绝、越权 403
-- [ ] 正式 typecheck、Schema consistency、lint、build、credentials、`git diff --check` 与 Python 三项只读/临时基线
-- [ ] 修改主库前专用停服备份及 SHA/`pg_restore --list`
-- [ ] Compose 整体串行重启与完整事实持久
-- [ ] 接受态停服备份、固定第二新空 PostgreSQL 恢复和完整 8+2 闭环核对
-- [ ] 最终主库干净 0030、唯一启用管理员、业务/Audit/Idempotency/临时账号/文件 0，仅原三容器四卷
-- [ ] 功能提交、完成报告与独立 ops 验收提交
+- [x] `0030`、Schema、journal、snapshot、完整 SHA-256、版本升级
+- [x] TASK06 unit、UI contract、PostgreSQL/API、Migration、Compose acceptance
+- [x] 状态、来源、目标、active operator、数量、并发、幂等、CAS、职责、403、故障、取消/冲销和直接 SQL guard
+- [x] Phase 4 TASK07/TASK08、Phase 5 TASK01—TASK05 与 Production/Routing/Quality/Nonconformance/Inventory/Dashboard/Identity 回归
+- [x] 实际 HTTP 原检 10/8/2/8、返工 2/2/0、复检 2/2/0/2、AOI 8/2、成品 Ledger +8/+2、Balance 10、Work Order COMPLETED
+- [x] 未复检不能派满 AOI，复检后才可派剩余 2；已有复检冲销拒绝、超量拒绝、越权 403
+- [x] 正式 typecheck、Schema consistency、lint、build、credentials、`git diff --check` 与 Python 三项只读/临时基线
+- [x] 修改主库前专用停服备份及 SHA/`pg_restore --list`
+- [x] Compose 整体串行重启与完整事实持久
+- [x] 接受态停服备份、固定第二新空 PostgreSQL 恢复和完整 8+2 闭环核对
+- [x] 最终主库干净 0030、唯一启用管理员、业务/Audit/Idempotency/临时账号/文件 0，仅原三容器四卷
+- [x] 功能提交、完成报告与独立 ops 验收提交
 
 ## 低资源与排除边界
 

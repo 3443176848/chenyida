@@ -807,6 +807,17 @@
 - 目标与更正：target 只能是同一 Work Order Routing Snapshot 中 sequence 不晚于来源的稳定 Snapshot Operation。已有 SUBMITTED/ACCEPTED 或 SCRAP 时禁止 Inspection reopen 和来源 Run 冲销；无有效处置和下游时仅允许保留历史的安全取消。无法证明安全一律 fail closed。
 - 权限与边界：quality 管理 NCR/返工准备，production 接收/退回，manager/admin 管理并执行不写 Inventory 的工序 SCRAP，engineering 只读，其余角色写入 403。Dashboard 只读显示待处置/未分配/待接收/已接收待执行/最终工序报废。本决定不授权 TASK06、实际返工执行、库存报废、补产/补料、批次/序列、FQC/Shipment/AR、真实迁移、切流或生产部署。
 
+## D-073 返工执行复用既有 Operation/Quality 权威，复检放行后才恢复生产流
+
+- 日期：2026-07-27
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
+- 确认人：项目负责人（明确授权 `SELFHOST-PHASE5-TASK06`，并固定显式派工、既有 Run/Report、显式复检和净产品数量边界）
+- 执行来源：只有 digest 与固化提交快照一致、ACTIVE NCR Allocation 有效且尚有余额的 ACCEPTED Rework Request 可执行。production 显式派工，服务端沿稳定外键确定 Work Order、目标 Snapshot Operation、Work Center 和来源；不得再次领料、读取 Inventory Balance 或改写 Material Requirement/Reservation。
+- 权威复用：既有 `production_operation_runs` 以 `NORMAL/REWORK` 稳定区分；REWORK Run/Allocation 绑定 Request、NCR、原 Inspection/Run Report、目标工序和 operator，开工/报工复用 TASK02。processed 是重复加工次数，不增加工单净产品数量，也不建立第二套 Run、Report、Quality、WIP、Production Report、Completion 或 Inventory 权威。
+- 复检与后序：返工 good 在 IPQC 目标形成新的 Quality Hold，quality 必须显式对新 Run Report 建立复检；只有异人处置后的 `CLOSED + RELEASED` 才形成后序额度。原 Inspection failed 和两次 release 分别核算且历史不改写；更早目标必须按固化 Snapshot 顺序继续流转，禁止跳序或重复计算来源。
+- 投影与更正：独立 Execution Projection 明确 ACCEPTED、IN_PROGRESS、WAITING_REINSPECTION、COMPLETED/COMPLETED_WITH_SCRAP；全部释放后 NCR 进入 RESOLVED。未开工 Run 可取消恢复余额；已报工只允许追加式全额冲销，无品质/下游时恢复投影，已有复检、下游 Allocation、正式 Report 或 Completion 时 fail closed。CAS、固定锁序、幂等、事务 Audit、故障回滚、不可变 trigger 和 deferred reconciliation 共同保证守恒。
+- 权限与边界：production 派工/执行/受控冲销，quality 创建复检/结果/缺陷，manager/admin 处置管理，engineering 只读，其余角色写入 403。Dashboard 只读。本决定不授权自动创建 Rework Run/复检、返工补料、SCRAP Inventory、自动补产、批次/设备/产能/FQC/Shipment/AR、真实迁移、切流、生产部署或 TASK07。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

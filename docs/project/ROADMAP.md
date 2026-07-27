@@ -149,7 +149,7 @@ Import Workspace UI 已由 `PHASE2-TASK08` 独立实施；Catalog 与 50×256 �
 
 **预计任务数**：6。**当前状态**：IN PROGRESS。自托管全域 API、合成迁移框架、受控 Inventory/Finance Opening 及完全合成 public materialization/Dashboard/恢复已完成非生产验收；真实 source inventory、逐行人工处置、容量、安全、生产恢复、部署和切换尚未开始。
 
-生产线已推进到 `SELFHOST-PHASE5-TASK05`：结构化 REFLOW IPQC inspected 10/passed 8/failed 2，passed 8 按 TASK04 进入 AOI，failed 2 保持 Hold 并形成唯一 NCR；quality 的 v1 提交由 production 退回，随后以不可变 v2 重提并接收，最终 accepted rework 2、unresolved 0，AOI available 仍为 8。`0.1.0-alpha.29`/`0029`、重启、停服备份/固定第二库恢复和清理已通过；TASK06、实际返工 Run/派工/报工/再检、库存报废、补产、批次、设备、产能、真实迁移和生产切换未授权。
+生产线已推进到 `SELFHOST-PHASE5-TASK06`：结构化 REFLOW 原检 inspected/passed/failed/released=`10/8/2/8`，v1 RETURNED/v2 ACCEPTED 后由 production 显式派工 REWORK 2，既有 Run/Report 完成 `2/2/0`，quality 显式复检并异人关闭放行 `2/2/0/2`，AOI available `8→10`。AOI、Final Output、Production Report、warehouse Completion 和 Finished Goods Ledger 均按 `8/2` 完成，Balance 10；REFLOW 加工次数 12 而工单净产品仍为 10，Execution COMPLETED、NCR RESOLVED、原 failed 2 保持。`0.1.0-alpha.30`/`0030`、重启、停服备份/固定第二库恢复和清理已通过；TASK07、自动返工/复检、返工补料、库存报废、补产、批次、设备、产能、真实迁移和生产切换未授权。
 
 ## Phase 6 行业物料库
 

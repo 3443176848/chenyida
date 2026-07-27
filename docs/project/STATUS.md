@@ -2,6 +2,26 @@
 
 最后更新时间：2026-07-27（Asia/Shanghai）
 
+## SELFHOST-PHASE5-TASK06 返工执行、复检与生产流恢复
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `1f6a143adbf78d7fb70fbed1ea7d7dfea62cfd4b` 严格 Parent `11bc680a91c59258c94f8ddca3d56af71981811e`；独立 ops 验收提交以 Git log 为准 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.30`；`0030` SHA-256/数据库 checksum `37fd53b02f517023a3fc6aba22b0904a4881273b8752de2946f0c5432a2d050c`；0001—0029 未修改，Schema/journal/snapshot 一致 |
+| 权威与守恒 | PASS | REWORK 复用既有 Operation Run/Report、Quality、WIP、正式 Report/Completion/Inventory；稳定关联 Request/NCR/原检/来源 Report/目标快照/工单/operator，Execution 返回 accepted/待派/在制/good/scrap/待复检/released/completed/unresolved |
+| 实际 HTTP 数量 | PASS | 原检 `10/8/2/8`；v1 RETURNED/v2 ACCEPTED 2；REWORK report `2/2/0`；复检 `2/2/0/2`；AOI available `8→10`，后续 AOI/Final Output/Report/Completion/Ledger=`8/2`，Balance 10 |
+| 加工次数与净产品 | PASS | SMT-PRINT 10、SMT-MOUNT 10、REFLOW NORMAL 10、REFLOW REWORK 2、AOI 10；REFLOW 加工次数 12，但 Work Order planned/reported/good/scrap/completed=`10/10/10/0/10`，状态 COMPLETED 未自动 CLOSED |
+| 最终投影 | PASS | Rework Execution COMPLETED、NCR RESOLVED、accepted/reworked/released=`2/2/2`、unresolved 0；原 Inspection failed 2 保持；FQC/Shipment/Sales Source/AR/Settlement 0 |
+| 权限/职责/门禁 | PASS | production 显式派工/执行/受控冲销，quality 创建复检/结果/缺陷，manager 异人处置，engineering 只读；warehouse 等实际 403。未复检不得派满 AOI，复检放行后才恢复 2 |
+| 幂等/CAS/并发/回滚 | PASS | Idempotency 重放/异正文、CAS、固定锁序、并发派工/取消/开工/报工、超量、错误状态/目标、active operator、NORMAL/REWORK 伪造、故障零半记录和直接 SQL guard 通过；已有复检阻止冲销 |
+| 自动验证 | PASS | 178 项不重复 Node 自动测试：unit/UI 78、PG/API 46、migration 37、npm 3、environment 6、manifest 8；8 组 typecheck、Schema consistency、lint 0 error、build、965 文件 credentials scan、`git diff --check` 和 Python 三项通过 |
+| 重启/恢复 | PASS | Compose 整体重启后 30 migrations、NORMAL Run 5、REWORK 1、两次 Inspection/Report/Completion、Balance 10、Audit 56、Idempotency 46 保持；接受态备份 SHA `f5e8011c4ef55b0393cceedfbb2ebbbf8171e44fe8cccea92012452d77f8e379` 恢复到固定第二新空库并核对完整 `8+2` 链 |
+| 清理 | PASS | 主库 30 migrations、app_meta 1、唯一启用 admin，其他公共业务/Audit/Idempotency/临时账号 0；uploads/attachments 0；仅 PostgreSQL/Web/Worker 三容器和四卷；TASK06 库/备份/临时资源删除，resource-guard 保留 |
+| Python/SQLite | PASS / PROTECTED | 常驻 Python PID `13737` 未停止或重启；真实 SQLite 仅核验 metadata `53827608:1544192:1784999031:1784356951`、mode 600，未读业务正文；三项 Python 基线使用内部/临时库通过 |
+| 资源观测 | PASS | 起点 available 2.4 GiB、Swap 141 MiB、磁盘 18 GiB；最终 2.4 GiB/153 MiB/15 GiB、Load `0.13/0.90/1.25`；60 秒 Swap 160,477,184→160,473,088 bytes（正增长 0），RestartCount 0/OOMKilled false |
+| 排除事项 | ENFORCED | 未自动派工/复检、未返工补料、SCRAP Inventory、自动补产、批次/设备/产能/FQC/Shipment/AR/财务、真实迁移、Python 操作、HTTPS/防火墙、生产部署/切流、push、PR 或 TASK07 |
+| 完成结论 | PASS | `PRODUCTION REWORK EXECUTION AND REINSPECTION ACCEPTED IN PARALLEL ENVIRONMENT` |
+
 ## SELFHOST-PHASE5-TASK05 IPQC 不合格处置与返工申请交接
 
 | 验证项 | 结果 | 说明 |

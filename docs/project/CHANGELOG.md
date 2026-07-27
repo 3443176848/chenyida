@@ -4,6 +4,24 @@
 
 ## 2026-07-27
 
+### SELFHOST-PHASE5-TASK06 - `ops: accept production rework execution in parallel environment`
+
+- 提交：功能提交 `1f6a143adbf78d7fb70fbed1ea7d7dfea62cfd4b` 严格 Parent `11bc680a91c59258c94f8ddca3d56af71981811e`；独立 ops 提交实际哈希以 Git log 为准。
+- 并行验收：只更新 `chenyida-erp-parallel` 至 `0.1.0-alpha.30`/30 migrations；`0030` SHA-256/数据库 checksum 为 `37fd53b02f517023a3fc6aba22b0904a4881273b8752de2946f0c5432a2d050c`。Web 仍仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口。
+- 实际 HTTP：原 REFLOW IPQC inspected/passed/failed/released=`10/8/2/8`；v1 RETURNED/v2 ACCEPTED 后显式 REWORK 派工/开工/报工 `2/2/0`，未复检时 AOI available 保持 8；新 IPQC 异人关闭放行 `2/2/0/2` 后 available 变 10、Execution COMPLETED、NCR RESOLVED。AOI、Final Output、Production Report、Completion 和 Ledger 均为 `8/2`，Balance 10，工单 `10/10/10/0/10 COMPLETED`。
+- 数量边界：SMT-PRINT、SMT-MOUNT、REFLOW NORMAL、AOI processed 均为 10，REFLOW REWORK processed 2；返工是重复加工次数，REFLOW 总加工次数 12 不增加净产品，正式报工/完工/成品仍为 10，原 failed 2 保持不改写。
+- 保护：未复检派满 AOI、超 ACCEPTED quantity、已有复检冲销、错误状态/目标/跨工单、非 active operator、NORMAL/REWORK 伪造、权限 403、职责分离、幂等异正文、CAS、并发、故障半记录和直接 SQL 绕过均 fail closed。
+- 持久与恢复：整体串行重启后完整返工闭环、Audit 56、Idempotency 46 保持；接受态备份 1,569,512 bytes、SHA-256 `f5e8011c4ef55b0393cceedfbb2ebbbf8171e44fe8cccea92012452d77f8e379` 恢复到固定第二新空库并核对 30 migrations 与完整 `8+2` 链。
+- 清理与资源：最终主库 30 migrations、唯一启用管理员、其余业务/Audit/Idempotency/验收账号/uploads/attachments 0，仅三容器四卷；TASK06 测试/恢复库、两份任务备份、临时容器/辅助镜像/标签删除，resource-guard 备份保留。起点/最终 available 均约 2.4 GiB，Swap 141→153 MiB，磁盘 18→15 GiB，60 秒 Swap 正增长 0，RestartCount 0/OOM false。
+- 结论：`PRODUCTION REWORK EXECUTION AND REINSPECTION ACCEPTED IN PARALLEL ENVIRONMENT`；未启动 TASK07。
+
+### SELFHOST-PHASE5-TASK06 - `feat: add production rework execution`
+
+- 数据库：只新增 expand-only `0030_production_rework_execution.sql`；既有 Run 增加 `NORMAL/REWORK` 类型与稳定 lineage，新增 Rework Run Allocation、Execution Projection/Event、唯一/队列索引、不可变和 deferred reconciliation guard；同步 Drizzle Schema/journal/snapshot，不修改 0001—0029。
+- 服务/API：ACCEPTED Request 显式派工复用 TASK02 start/report/cancel/reverse；服务端派生工单、目标、来源和工作中心，返工 good 进入新 IPQC Hold，只有显式复检 `CLOSED + RELEASED` 才进入后序 WIP。取消/冲销只在无品质/下游时恢复请求余额和投影。
+- UI/Dashboard：返工请求、派工、工序、WIP、生产质量与 NCR 页面区分 NORMAL/REWORK，并展示原 failed、派工/处理/good/scrap、待复检/放行和 Execution 状态；Dashboard 增加待派、在制、待复检、复检未过和完成数量，保持权限裁剪只读。
+- 验证：178 项不重复自动测试通过（unit/UI 78、PostgreSQL/API 46、migration 37、npm 3、environment 6、manifest 8）；8 组 typecheck、Schema consistency、lint 0 error、build、965 文件凭证扫描、`git diff --check` 和 Python 三项通过。
+
 ### SELFHOST-PHASE5-TASK05 - `ops: accept production rework request workflow in parallel environment`
 
 - 提交：功能提交 `1de057a6a248ca3346d7d2b0f201252a3965eced` 严格 Parent `736f14b9510ca52ce39fea7154872dffe7818986`；独立 ops 提交实际哈希以 Git log 为准。
