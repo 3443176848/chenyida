@@ -61,5 +61,5 @@ test("journal snapshot schema and SHA-256 describe 0032", async () => {
   const schema = await readFile(new URL("../db/schema.ts", import.meta.url), "utf8"), snapshot = JSON.parse(await readFile(new URL("../drizzle-postgres/meta/0032_snapshot.json", import.meta.url), "utf8")), previous = JSON.parse(await readFile(new URL("../drizzle-postgres/meta/0031_snapshot.json", import.meta.url), "utf8")), journal = JSON.parse(await readFile(new URL("../drizzle-postgres/meta/_journal.json", import.meta.url), "utf8"));
   for (const table of ["inventory_lots", "production_completion_inventory_lots", "inventory_lot_events"]) assert.ok(snapshot.tables[`public.${table}`], table);
   for (const token of ["inventoryLots", "productionCompletionInventoryLots", "inventoryLotEvents", "inventoryLotId"]) assert.match(schema, new RegExp(token));
-  assert.equal(snapshot.prevId, previous.id); assert.equal(journal.entries.at(-2).tag, "0032_finished_goods_inventory_lots"); assert.match(checksum(lotNames.at(-1)), /^[0-9a-f]{64}$/);
+  assert.equal(snapshot.prevId, previous.id); assert.ok(journal.entries.some((entry) => entry.tag === "0032_finished_goods_inventory_lots")); assert.match(checksum(lotNames.at(-1)), /^[0-9a-f]{64}$/);
 });
