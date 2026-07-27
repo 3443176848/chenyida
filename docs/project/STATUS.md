@@ -1,6 +1,23 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-27（Asia/Shanghai）
+最后更新时间：2026-07-28（Asia/Shanghai）
+
+## SELFHOST-PHASE5-TASK10 供应商来料 Inventory Lot 与 IQC 隔离放行
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 严格 Parent `55f8fe9693ebc0f630920e92eca1f74584d852af`；Compose/回归修正 `b4f3f5f5de30259e44d5b00a5587dee29331539f`；独立 ops 验收提交以 Git log 为准 |
+| 版本/Migration | PASS | `0.1.0-alpha.34`；唯一 `0034` SHA/checksum `29b380050d7d7003df82df981aea061e7287845dde773f181caf918a49d47b2d`；0001—0033 未改，Schema/snapshot/journal 一致 |
+| Receipt Lot/IQC | PASS | IQC Receipt Line 唯一 RML Lot；收货同步 on-hand/frozen；IQC 沿稳定关系 RELEASE passed 范围，failed 保持冻结；无下游整单冲销只反向原 Lot |
+| 实际 HTTP | PASS | 两条 Project→Planning→Purchase Request→Award→PO→Plan 完整业务链；主链 Receipt 10、Source 120、初始 10/10/0，IQC 10/8/2、RELEASE 8/Close 后 10/2/8；AP/Production Issue 0。3 件支线同 Lot 冲销为 REVERSED；主链已有 IQC 的冲销 409；四页面 200 |
+| 权限/幂等/CAS/并发 | PASS | purchase/warehouse/quality/production/finance 职责边界与 403；同 Key 重放/异正文冲突、stale CAS、并发 Receipt/Release、过量放行、故障零半记录、SQL guard 和非 IQC null Lot 通过 |
+| 自动验证 | PASS | TASK10 unit/UI/PG/migration `2/2 + 2/2 + 3/3 + 3/3`；Procurement 7/7、Quality 12/12、TASK08 PG/migration 2/2+4/4、TASK09 PG/migration 2/2+3/3、共享 unit/UI 42/42；`npm test` 3/3、typecheck、Drizzle consistency、lint 0 error/8 既有 warning、双 build、credentials、Python 临时 SQLite 三项和 diff check 通过 |
+| 重启/恢复 | PASS | Web/Worker 串行重启后事实保持；最终完整 HTTP 接受态备份 1,706,164 bytes、SHA `e4548ed8b264b078a34c7856c1338d5fb6ce712158d0453dc018945b5e27b791` 恢复固定第二库并核对 Project/Planning/Purchase Request/Award/PO/Receipt/Lot=`2/2/2/2/2/2/2`、10/2/8、REVERSED、Source 120/0、AP/领料 0；临时库删除 |
+| 最终基线 | PASS | 主库由 clean-0034 SHA `44e064442eac5af0df56abf54989dd75a9fe6d39a030427439cf4996c9889c25` 恢复；migrations/admin/audit/session=`34/1/1/1`，原 Audit/Session 不变；205 个业务表、幂等/文件均 0 |
+| 资源 | PASS | 最终 available 2.3 GiB、Swap 139 MiB、60 秒 `142452→142372 KiB`（增长 -80 KiB）、根盘 36 GiB、Load `0.03/0.11/0.21`；Build Cache 峰值 2.569 GB，经一次授权 prune 回到 0B；任务依赖镜像删除，alpha.34 tagged images、三容器、四受保护卷保留；restart 0/OOM false |
+| Python/SQLite | PASS / PROTECTED | PID `13737`、NRestarts 0，未重启 Python；项目虚拟环境 self-test/smoke/临时 SQLite go-live 全部通过，系统 Python 缺 openpyxl 的首次 smoke 未进入测试后即改用项目虚拟环境 |
+| 排除事项 | ENFORCED | 未执行生产领料 Lot、FIFO/FEFO、效期、序列号/标签、MRB/退货/报废、AP/付款、真实迁移、生产部署、push/PR 或后续任务 |
+| 完成结论 | PASS | `SUPPLIER RECEIPT LOT AND IQC RELEASE ACCEPTED IN PARALLEL ENVIRONMENT` |
 
 ## SELFHOST-PHASE5-TASK09 FQC Lot 放行与销售发货 Lot 精确消费
 

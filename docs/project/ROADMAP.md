@@ -11,7 +11,7 @@
 | Phase 2 | 导入采集与 Mapping | 8 | DONE（非生产） |
 | Phase 3 | 导入规范化、暂存与审阅 | 4 | DONE（非生产实现完成） |
 | Phase 4 | AI治理 | 5 | PLANNED |
-| Phase 5 | ERP融合 | 9 个建议任务（待逐项授权） | PLANNED |
+| Phase 5 | ERP融合 | 10 个已授权任务 | DONE（非生产并行验收） |
 | Phase 6 | 行业物料库 | 4 | PLANNED |
 
 ## 部门业务主线（SELFHOST-PHASE4）
@@ -149,7 +149,7 @@ Import Workspace UI 已由 `PHASE2-TASK08` 独立实施；Catalog 与 50×256 �
 
 **预计任务数**：6。**当前状态**：IN PROGRESS。自托管全域 API、合成迁移框架、受控 Inventory/Finance Opening 及完全合成 public materialization/Dashboard/恢复已完成非生产验收；真实 source inventory、逐行人工处置、容量、安全、生产恢复、部署和切换尚未开始。
 
-生产线已推进到 `SELFHOST-PHASE5-TASK09`：在 TASK08 Finished Goods Inventory Lot 上把 Completion Allocation、FQC、Shipment Line、FQC Consumption 与 Inventory ISSUE/REVERSAL 绑定同一稳定 Lot。实际 Lot A/B `4/6`，先发 A 4，冻结 B 2 后发 6 被拒且零半记录，解冻后发 B 6；再冲销 A 4 并从同一个 A 再发 4，最终有效 Shipment/FQC `4/6`、Material 0、Source 200、AR/Settlement 0。ORDER 模式保持 null Lot。`0.1.0-alpha.33`/`0033`、权限/幂等/CAS/并发/故障/SQL guard、Compose 重启、接受态固定第二库恢复、Build Cache 归零和最终 clean-0033 清理已通过。不得自动启动 TASK10；原材料/供应商/采购 Receipt/生产领料 Lot、序列号、设备/OEE、产能、真实迁移和生产切换未授权。
+生产线已推进到 `SELFHOST-PHASE5-TASK10`：在既有采购履约、库存和品质权威上建立 Supplier Receipt Inventory Lot 与 IQC 隔离放行。真实主链 `10×12 CNY` 收货形成 RML Lot 和 Source 120，余额先为 `10/10/0`，IQC `10/8/2` 后 RELEASE 8/Close 为 `10/2/8`，AP/Production Issue 0；独立 3 件支线沿原 Lot 全额冲销为 REVERSED，主链已有 IQC 的冲销返回 409。`0.1.0-alpha.34`/`0034`、权限/幂等/CAS/并发/故障/SQL guard、Compose 重启、接受态固定第二库恢复、Build Cache 归零和最终 clean-0034 清理已通过。停止，不自动启动后续任务；生产领料 Lot、FIFO/FEFO、序列号、设备/OEE、产能、真实迁移和生产切换未授权。
 
 ## Phase 6 行业物料库
 

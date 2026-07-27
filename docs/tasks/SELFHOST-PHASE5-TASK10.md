@@ -2,7 +2,7 @@
 
 ## 状态与范围
 
-- 状态：`IMPLEMENTED / PENDING PARALLEL ACCEPTANCE`
+- 状态：`DONE / PARALLEL ACCEPTED`
 - 起点：`main` / `55f8fe9693ebc0f630920e92eca1f74584d852af`，版本 `0.1.0-alpha.33`，PostgreSQL migration `0001—0033`。
 - 目标：`0.1.0-alpha.34`；唯一新增 migration `0034_supplier_receipt_lot_iqc.sql`。
 - 只实现 Supplier Receipt Lot、收货即 IQC 冻结、合格量解冻、谱系和无下游整单冲销；不实现生产领料 Lot、FIFO/FEFO、效期、序列号、标签、MRB、退货或报废。
@@ -30,7 +30,11 @@
 - TASK10 PostgreSQL：3/3；已证明 Receipt 10 / Source 120 / AP 0、IQC 10/8/2、最终 10/2/8、同 Lot 冲销、409 阻断、幂等/CAS/并发/故障回滚/SQL guard。
 - TASK10 unit/UI：4/4；正式 typecheck、lint（0 error，8 个既有 warning）、`npm test` 3/3 和凭证扫描通过。
 
-## 待完成验收
+## 验收完成
 
-- Web/Worker 串行 build，前序 PostgreSQL 回归和 Python 临时 SQLite 基线。
-- 主库 0034、clean-0034 备份、真实 HTTP 主链/冲销支线、重启持久化、接受态备份、第二空库恢复和最终 clean-0034 恢复清理。
+- 功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 严格以起点 `55f8fe9693ebc0f630920e92eca1f74584d852af` 为 Parent；Compose HTTP 与历史 migration journal 修正提交 `b4f3f5f5de30259e44d5b00a5587dee29331539f`。
+- Web/Worker 串行 build、适用 PostgreSQL/migration/unit/UI 回归、typecheck、lint、`npm test`、凭证扫描和 Python 项目虚拟环境三项临时 SQLite 基线通过。
+- 真实 HTTP 完成两条 Award→PO→Delivery Plan：主链 `10×12 CNY` 形成 RML Lot、Source 120、IQC `10/8/2`、最终 on-hand/frozen/available `10/2/8`、AP/Production Issue 0；支线收货 3 后沿原 Lot 全额冲销为 REVERSED，主链已有 IQC 的冲销返回 409。
+- Web/Worker 串行重启后事实保持；接受态备份恢复到固定第二数据库复核通过并删除临时库。主库由 clean-0034 恢复为 34 migrations、唯一原管理员/审计/会话、205 个业务表与幂等/文件全 0。
+- Build Cache 从 2.569 GB 经一次授权 `docker buildx prune --all --force` 回到 0B；任务依赖镜像删除，alpha.34 Web/Worker 镜像、三容器、四个受保护卷和 Python PID 保留。
+- 固定结论：`SUPPLIER RECEIPT LOT AND IQC RELEASE ACCEPTED IN PARALLEL ENVIRONMENT`。不自动启动后续任务。

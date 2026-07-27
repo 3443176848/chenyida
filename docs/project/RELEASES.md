@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
-最后核验：2026-07-27（Asia/Shanghai）
-适用任务：`PHASE0-TASK03` 发布基线复核；最新功能验收为 `SELFHOST-PHASE5-TASK09`
+最后核验：2026-07-28（Asia/Shanghai）
+适用任务：`PHASE0-TASK03` 发布基线复核；最新功能验收为 `SELFHOST-PHASE5-TASK10`
 
 ## 1. 使用规则
 
@@ -19,6 +19,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 历史 OpenAI Sites / Cloudflare D1 | 历史记录 `v3` | `2b4f1787ddbc7e0941ab2d5f5cadea6e817e8f12`；后续纳管来源 `9f2c2dca9ccde237cb2db6c01d2e3792b284e6e9` | 仓库 D1/Drizzle `0000`—`0008`；生产实际已应用版本本任务未访问、未核验 | 仅保留历史验收记录；本任务未访问公开 Site | `HISTORICAL`；文档曾记录为公开 `v3`，本任务不重新确认在线状态；不是未来生产权威方向 | 未向 PostgreSQL 迁移 | 历史提交 `2b4f178` 和 D1 migration/快照仅作迁移与行为证据；不是已验证的当前回退方案 | 历史状态；无新的部署批准 |
 | 当前 Python / SQLite 开发运行面 | `legacy-development`，尚无统一 SemVer | 本次复核起点为根仓库 `3ae79f167a22bd8c5bb8120e2b5e8356f59d89b4`；Python/systemd 路径自 `39946f6` 后无差异，常驻进程未记录启动 commit，不能反推为当前 HEAD | 本地 SQLite 历史 26 表 + migration `0001`—`0004`；开发库只读核验为 29 张非系统表并记录四个版本 | 本次重新执行 Python self-test、smoke 和临时库 go-live；结果见本节后续复核记录 | `DEVELOPMENT`；systemd `enabled/active`，源码与已安装 unit SHA-256 一致，Python 监听 `0.0.0.0:18888`；不是正式生产投用 | 真实业务未迁出；采购、库存、生产、销售、品质和财务的实际业务继续依赖本运行面 | Git 源码 + 执行前 SQLite 可恢复快照；正式回退点尚未建立 | 仅开发常驻；未获生产批准 |
+| Node.js / PostgreSQL PHASE5-TASK10 并行验收基线 | `0.1.0-alpha.34` | 功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b`；Compose/回归修正 `b4f3f5f5de30259e44d5b00a5587dee29331539f`；验收提交消息 `ops: accept supplier receipt lot iqc in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0034`；唯一启用管理员与原合法 Audit/Session 保留，205 个业务表/幂等/files 全 0 | TASK10 专项、适用 Procurement/Quality/TASK08/TASK09 回归、typecheck/Schema/lint/build/credentials/Python、真实 HTTP 10/8/2→10/2/8、3 件同 Lot 冲销、重启和停服备份恢复通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | clean-0034 与接受态备份均校验；接受态第二库恢复通过，主库由 clean-0034 恢复；三份 TASK10 临时备份验收后删除，Python/SQLite 不影响 | `SUPPLIER RECEIPT LOT AND IQC RELEASE ACCEPTED IN PARALLEL ENVIRONMENT`；停止，不自动启动后续任务/生产 |
 | Node.js / PostgreSQL PHASE5-TASK09 并行验收基线 | `0.1.0-alpha.33` | 功能提交 `02dfa0d3c18c16b0e8ee07af94f11de7a0ca77e7`；验收提交消息 `ops: accept finished goods lot shipment in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0033`；唯一启用管理员与原合法 Audit/Session 保留，合成业务/幂等/files 已清空 | TASK09 unit/UI/PG/migration、适用回归/typecheck/Schema/lint/build/credentials/Python、真实 HTTP `{4,6,4}`/Lot `{A,B,A}`、重启和停服备份恢复通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | clean-0033 与接受态备份均校验；接受态第二库恢复通过，主库由 clean-0033 恢复，任务备份验收后删除；Python/SQLite 不影响 | `FINISHED GOODS LOT RELEASE AND SHIPMENT ACCEPTED IN PARALLEL ENVIRONMENT`；不得自动启动 TASK10/生产 |
 | Node.js / PostgreSQL TASK03 并行验收基线 | `0.1.0-alpha.17` | 功能提交 `5009b9118901a01af6a5faed194b8444d0c1e969`；验收提交消息 `ops: accept planning material requirement workflow in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0017`；测试业务清理后为空 | TASK03 专项/共享回归/typecheck/lint/build/credentials/Python、真实旅程、重启与恢复清理通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | migration 前 0016 root-only 恢复点已验证、用于成功清理并删除；Python/SQLite 不影响 | `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`；后续 TASK04 已独立验收 |
 | Node.js / PostgreSQL TASK04 并行验收基线 | `0.1.0-alpha.18` | 功能提交 `4506db2579c07080afe27b33bb2e50623c3d1366`；验收提交消息 `ops: accept procurement sourcing workflow in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0018`；测试业务清理后为空 | TASK04 专项、共享回归、Schema/typecheck/lint/build/credentials/Python、真实旅程、重启与恢复清理通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | 0017 与干净 0018 root-only 恢复点已校验；干净 0018 点用于成功清理后删除 | `PROCUREMENT SOURCING AWARD ACCEPTED IN PARALLEL ENVIRONMENT`；不授权 TASK05/生产 |
@@ -27,13 +28,13 @@
 | Node.js / PostgreSQL 原始自托管开发基线 | `0.1.0-alpha.1` | 功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；发布追踪提交 `12d3ea30d21cce6918de0c525d81f19af289f5ac` | PostgreSQL `0001`—`0005` | PHASE0-TASK03 的隔离 lint/test/typecheck/build/credentials、Python 三项与 diff check 通过 | `NOT_RELEASED` / `NOT_DEPLOYED`；历史开发基线，不代表当前包版本 | `NOT_MIGRATED` | Git `39946f6` + 当时 migration checksum；未建立生产恢复点 | `NOT_APPROVED_FOR_PRODUCTION`；该历史定义保留且不因后续 alpha 演进而改写 |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.1` 是 PHASE0-TASK03 建立的原始非生产发布基线，不是当前包版本。当前源码和回环并行验收环境已演进到 `0.1.0-alpha.33`/`0033`；既有部门交接、Manufacturing Batch 与 Finished Goods Lot 事实保持有效且未被改写。这只证明合成 BATCH Lot→FQC→显式 Lot Shipment/冲销在并行环境成立，不表示真实数据已迁移、HTTPS/生产恢复通过或已批准上线。
+`0.1.0-alpha.1` 是 PHASE0-TASK03 建立的原始非生产发布基线，不是当前包版本。当前源码和回环并行验收环境已演进到 `0.1.0-alpha.34`/`0034`；既有部门交接、Manufacturing Batch、Finished Goods Lot/FQC/Shipment 事实保持有效，并新增 Supplier Receipt Lot→IQC 隔离放行。这只证明合成非生产链路成立，不表示真实数据已迁移、HTTPS/生产恢复通过或已批准上线。
 
-Git 同步状态以 2026-07-27 PHASE5-TASK09 起点计：本地 `main`/HEAD 为 `279d284738b8ee01f6579a91333ad958a6c36dc8`，`origin/main...HEAD` 为 behind 0/ahead 71。TASK09 增加两个独立未推送提交；最终状态以 `git status --short --branch` 为准。
+Git 同步状态以 2026-07-27 PHASE5-TASK10 起点计：本地 `main`/HEAD 为 `55f8fe9693ebc0f630920e92eca1f74584d852af`，`origin/main...HEAD` 为 behind 0/ahead 73。TASK10 增加功能、Compose/回归修正和独立验收提交，均未推送；最终状态以 `git status --short --branch` 为准。
 
 ## 3. Migration 文件与 SHA-256 基线
 
-当前 Phase 5 head：`0033_finished_goods_lot_fqc_shipment.sql`，SHA-256 `ca01cbc6a40ebfe9c17e9c3133f8704748d12b64c21d56155313ff73ce0c3d44`。TASK09 已确认 `0001`—`0032` 相对严格起点无差异；完整运行库 checksum 与文件一致。下表保留 PHASE0 历史发布基线及后续已记录条目，不改写历史值。
+当前 Phase 5 head：`0034_supplier_receipt_lot_iqc.sql`，SHA-256 `29b380050d7d7003df82df981aea061e7287845dde773f181caf918a49d47b2d`。TASK10 已确认 `0001`—`0033` 相对严格起点无差异；完整运行库 checksum 与文件一致。下表保留 PHASE0 历史发布基线及后续已记录条目，不改写历史值。
 
 ### PostgreSQL 自托管
 
@@ -62,8 +63,19 @@ Git 同步状态以 2026-07-27 PHASE5-TASK09 起点计：本地 `main`/HEAD 为 
 | `0021` | `0021_production_reporting_completions.sql` | `1cf953d98da2d3a7703f3866b852cbe10bdb37b33e1826cb78b24079fc5a11ec` |
 | `0022` | `0022_production_quality_release.sql` | `65b31aec91ad30ffd309796f58500a73c47a20bc12f855e010a4b4f17e808155` |
 | `0023` | `0023_sales_delivery_receivable.sql` | `5f07c7aebe9513e040fa0ab2f31f5cd5a51faf64fe78516794cd0fd46309221d` |
+| `0024` | `0024_finance_project_settlements.sql` | `cab6f7679e91589cfe2c7fdecf9750b222b9212acbbd3341301c7a67ec2e9624` |
+| `0025` | `0025_production_routings.sql` | `39b1212df99d392739aa20b95859f3e2789fa287e23061006a34efc342c258f9` |
+| `0026` | `0026_production_operation_execution.sql` | `b00e49aa4d4f8279372c5aab291ccfcbd54afc09ab284a6390a50fea9e66aca0` |
+| `0027` | `0027_production_final_output_reporting.sql` | `b226cc958215400c38f48c925e4b33c4e97723340aaf729d4da75322213b9c76` |
+| `0028` | `0028_production_operation_quality_gates.sql` | `a7a55f7c6c81b1c5a80df59a1b3f639187cc2c2ce8658087ceb392b1f2ada912` |
+| `0029` | `0029_production_nonconformance_rework_handoff.sql` | `6814a728f4d04e4fbceb83c7a288fa214a9ec64317b547cc6cbaebfec456b40c` |
+| `0030` | `0030_production_rework_execution.sql` | `37fd53b02f517023a3fc6aba22b0904a4881273b8752de2946f0c5432a2d050c` |
+| `0031` | `0031_production_batch_genealogy.sql` | `ac0f6a63cfdb30d42edf50741afc7c8af632f74ff6fb08398d6b6e398a637fd4` |
+| `0032` | `0032_finished_goods_inventory_lots.sql` | `3a2fc22ff73706d226641119135b68d042d393124c89233a63d774f76aa2d4fa` |
+| `0033` | `0033_finished_goods_lot_fqc_shipment.sql` | `ca01cbc6a40ebfe9c17e9c3133f8704748d12b64c21d56155313ff73ce0c3d44` |
+| `0034` | `0034_supplier_receipt_lot_iqc.sql` | `29b380050d7d7003df82df981aea061e7287845dde773f181caf918a49d47b2d` |
 
-当前源码与并行 PostgreSQL 均为 `0001 -> 0023`；0023 已通过隔离 migration/API 和回环并行验收，验收业务已清空。没有生产 PostgreSQL 部署或真实数据迁移。
+当前源码与并行 PostgreSQL 均为 `0001 -> 0034`；0034 已通过隔离 migration/API 和回环并行验收，验收业务已清空。没有生产 PostgreSQL 部署或真实数据迁移。
 
 ### 历史 Cloudflare D1 / Drizzle
 
@@ -180,6 +192,20 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 | 用户通知、审计和事故记录 |  |
 
 数据库回退默认使用“恢复到新空目标并切换”，不得对已过账业务原地逆向改写。Migration Down 只有在明确证明无业务数据、约束允许且有批准时才可使用；否则使用快照恢复或新增前向修复 migration。
+
+## 5.1 `0.1.0-alpha.34` Supplier Receipt Lot/IQC 并行验收记录
+
+| 项目 | 记录 |
+| --- | --- |
+| 任务 | `SELFHOST-PHASE5-TASK10` |
+| 包版本 | `chenyida-erp-selfhosted@0.1.0-alpha.34` |
+| 状态 | `PARALLEL HTTP ACCEPTANCE ONLY` / `NOT_RELEASED` / `NOT_MIGRATED` / `NOT_APPROVED_FOR_PRODUCTION` |
+| Git | 起点 `55f8fe9693ebc0f630920e92eca1f74584d852af`；功能 `a10264020738d5ff281db9a6f7b6774df8cbb61b`；Compose/回归 `b4f3f5f5de30259e44d5b00a5587dee29331539f`；ops 提交以 Git log 为准；全部未 push |
+| PostgreSQL | 只新增 `0034_supplier_receipt_lot_iqc.sql`，SHA-256 `29b380050d7d7003df82df981aea061e7287845dde773f181caf918a49d47b2d`；最终主库 clean-0034 |
+| 功能 | Supplier Receipt RML Lot、收货即 frozen、IQC passed 范围 RELEASE、failed/HOLD 隔离、Lot genealogy、无下游整单原 Lot 冲销；生产领料 Lot 明确排除 |
+| 验收 | 真实 HTTP 从 Project/Planning/Purchase Request 贯通两条业务链；主链 10/8/2→10/2/8、Source 120、AP/领料 0；3 件支线 REVERSED；已有 IQC 冲销 409；重启、第二库恢复、专项与适用回归、双 build、Python 临时 SQLite 通过 |
+| 恢复 | clean-0034 SHA `44e064442eac5af0df56abf54989dd75a9fe6d39a030427439cf4996c9889c25`；最终完整 HTTP 接受态 SHA `e4548ed8b264b078a34c7856c1338d5fb6ce712158d0453dc018945b5e27b791` 在固定第二库验证后删除临时库；主库恢复原 Audit/Session 与空业务基线 |
+| 批准结论 | `SUPPLIER RECEIPT LOT AND IQC RELEASE ACCEPTED IN PARALLEL ENVIRONMENT`；不构成生产发布或后续任务授权 |
 
 ## 6. PHASE0-TASK03 验收记录
 

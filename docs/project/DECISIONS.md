@@ -856,13 +856,14 @@
 ## D-077 供应商来料收货创建独立 Inventory Lot，IQC 合格量才可解冻
 
 - 日期：2026-07-27
-- 状态：`ACCEPTED / IMPLEMENTED / PENDING PARALLEL ACCEPTANCE`
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
 - 确认人：项目负责人（明确授权 `SELFHOST-PHASE5-TASK10`，并固定来料隔离与生产领料排除边界）
 - Lot 身份：只有 ACTIVE/STOCKED/IQC 内部物料的正常 Receipt 创建 `SUPPLIER_RECEIPT` Lot；内部 `RML-########` 由服务端生成，一条 Receipt Line 唯一一个 Lot。supplier lot code 是不可变外部别名，相同文本不自动合并。
 - 隔离：收货数量在一个事务同时增加 on-hand 与 frozen，available 初始为 0。IQC 只能沿 Receipt Line→Lot 稳定关系创建；RELEASE 不超过 passed，并以追加式 UNFREEZE Ledger 原子减少 frozen，failed/HOLD 保持冻结。
 - 更正：没有 IQC、AP、领用、调整或其他下游且余额完整时，整单收货冲销沿原 Lot 追加反向 Ledger并置 REVERSED；不得部分冲销、重选或创建替代 Lot。已有 IQC 后禁止冲销，已形成 IQC 放行事实后禁止不安全 reopen。
 - 权限：warehouse 收货/安全冲销但不做 IQC；quality 创建检验、结果、缺陷、异人处置和关闭但不能收货/任意调库存；purchase 只读履约/Lot/IQC；production 只读已放行来料 Lot，本任务不授权领料。
 - 明确边界：不授权生产领料 Lot、FIFO/FEFO、效期/库龄、序列号/条码/标签、自动退货/报废、MRB/让步/返工、真实迁移、生产部署或后续任务。
+- 验收：`0.1.0-alpha.34`/`0034` 已用真实 Node/PostgreSQL HTTP 验证主链 Receipt 10→IQC 10/8/2→RELEASE 8/Close，最终 Lot `10/2/8`、Source 120、AP/Production Issue 0；独立 3 件支线沿原 Lot 全额冲销为 REVERSED，已有 IQC 的主链冲销 409。重启、接受态第二库恢复和最终 clean-0034 主库恢复均通过。本状态只代表回环并行非生产环境。
 
 ## 待确认业务决策
 

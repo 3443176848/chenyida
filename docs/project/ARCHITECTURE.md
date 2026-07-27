@@ -2,6 +2,26 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-28 Supplier Receipt Lot 与 IQC 隔离放行
+
+`SELFHOST-PHASE5-TASK10` 复用唯一 Procurement Fulfillment、Inventory 与 Quality 权威。只有 ACTIVE/STOCKED/IQC 内部物料的正常 Purchase Receipt Line 创建 `SUPPLIER_RECEIPT` Lot；内部 `RML-########` 由服务端生成，Supplier Lot 只是不可变外部别名。收货事务同时增加 on-hand 与 frozen，禁止先形成可用库存再异步冻结。
+
+```mermaid
+flowchart LR
+    A["Sourcing Award"] --> P["Purchase Order / Delivery Plan"]
+    P --> R["Warehouse Receipt Line"]
+    R --> L["Supplier Receipt Inventory Lot"]
+    L --> B["Lot Balance: on-hand 10 / frozen 10"]
+    R --> Q["IQC 10 / passed 8 / failed 2"]
+    Q --> U["RELEASE 8: append UNFREEZE Ledger"]
+    U --> F["Lot Balance: on-hand 10 / frozen 2 / available 8"]
+    L --> G["Supplier→PO→Receipt→Lot→IQC genealogy"]
+```
+
+IQC 只能沿 Receipt Line→Lot→Material/Unit/Supplier 稳定关系解析，调用者不能覆盖内部 Lot 或主数据身份。RELEASE 锁定 Inspection、Lot、Balance，以 CAS/幂等在同事务追加 Inventory Adjustment/Ledger、Lot/IQC Event 和 Audit；released 不超过 passed，failed/HOLD 保持冻结。无 IQC、AP、领用、其他调整且余额/账本完整时，整单 Receipt 冲销沿原 Lot 追加反向 Ledger并置 REVERSED；任何下游无法证明安全时 fail closed。0034 的 XOR、外键、唯一/CHECK、不可变/服务写 guard 与 deferred reconciliation 防止直接 SQL 绕过。
+
+该边界不包含生产领料 Lot、FIFO/FEFO、效期、序列号/标签、自动退货/报废、MRB/让步或生产部署。
+
 ## 2026-07-27 FQC Lot 放行与 Shipment 精确消费
 
 `SELFHOST-PHASE5-TASK09` 沿 TASK08 的唯一 Finished Goods Inventory Lot 扩展既有 Quality/Sales/Inventory 权威，不新建并行业务表。BATCH 的 Completion Line→Sales Allocation→FQC Inspection→Shipment Line→FQC Consumption Fact 必须保存同一个稳定 `inventory_lot_id`；ORDER 历史模式在整条链上继续 null Lot。

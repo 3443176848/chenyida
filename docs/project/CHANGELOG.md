@@ -2,6 +2,27 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-28
+
+### SELFHOST-PHASE5-TASK10 - `ops: accept supplier receipt lot iqc in parallel environment`
+
+- 实际验收：两条真实 HTTP Project→Planning→Purchase Request→Award→PO→Delivery Plan；SQL 只建稳定主数据 fixture。主链 `10×12 CNY` 收货形成 RML Lot、Source 120、余额 10/10/0，IQC 10/8/2 后异人 RELEASE 8/Close 为 10/2/8，AP/Production Issue 0；3 件支线沿原 Lot 全额冲销为 REVERSED，主链已有 IQC 冲销 409。
+- 恢复：Web/Worker 串行重启后事实保持；最终完整 HTTP 接受态备份恢复固定第二库，核对 Project/Planning/Purchase Request/Award/PO/Receipt/Lot=`2/2/2/2/2/2/2`、34 migrations、10/2/8、REVERSED 与 Source 120/0。主库由 clean-0034 恢复为原 admin/audit/session `1/1/1`、205 个业务表/幂等/files 0。
+- 验证：TASK10 专项、Procurement/Quality/TASK08/TASK09 和共享回归、typecheck、Schema、lint、双 build、credentials、Python 临时 SQLite 三项和 diff check 通过。首次系统 Python smoke 只因缺 `openpyxl` 在导入阶段停止，改用项目既有虚拟环境后通过。
+- 资源：Build Cache 2.569 GB→0B，任务依赖镜像删除；四受保护卷、alpha.34 tagged images、三服务和 Python 保留。未 push/PR、未启动后续任务。
+- 结论：`SUPPLIER RECEIPT LOT AND IQC RELEASE ACCEPTED IN PARALLEL ENVIRONMENT`。
+
+### SELFHOST-PHASE5-TASK10 - `test: accept supplier receipt lot iqc flow`
+
+- 新增真实 Compose HTTP 主链/冲销支线与重启持久性验收；把 TASK08/TASK09 历史 migration journal 断言改为精确查找不可变 tag，使其与新增 0034 共存而不降低 snapshot/checksum/回滚断言。
+
+### SELFHOST-PHASE5-TASK10 - `feat: add supplier receipt lot iqc flow`
+
+- Git/版本：功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 严格 Parent `55f8fe9693ebc0f630920e92eca1f74584d852af`；版本 `0.1.0-alpha.34`。
+- 数据库：只新增 expand-only `0034_supplier_receipt_lot_iqc.sql`，SHA-256 `29b380050d7d7003df82df981aea061e7287845dde773f181caf918a49d47b2d`；来源 XOR、Receipt Line 唯一 Lot、外键/CHECK、不可变/服务写 guard 和 deferred 守恒；0001—0033 不变。
+- 服务/UI：Procurement 收货原子创建 RML Lot 和 frozen Balance；Quality IQC RELEASE 追加 UNFREEZE Ledger；安全整单冲销复用原 Lot。新增/完善 receiving、incoming IQC、inventory lots、fulfillment 和 Dashboard。
+- 测试：新增 TASK10 unit/UI/PostgreSQL/migration/Compose 套件并保持 FGL/FQC/Shipment/ORDER/null Lot 回归。
+
 ## 2026-07-27
 
 ### SELFHOST-PHASE5-TASK09 - `ops: accept finished goods lot shipment in parallel environment`

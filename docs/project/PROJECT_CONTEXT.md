@@ -29,15 +29,15 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与并行环境均为 `0.1.0-alpha.33`/`0033`；只属于回环并行验收，明确为非生产且尚未正式发布。
-- 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.33`。
-- Git 复核：TASK09 起点为本地 `main`/HEAD `279d284738b8ee01f6579a91333ad958a6c36dc8`、behind 0/ahead 71、工作区 clean；功能提交 `02dfa0d3c18c16b0e8ee07af94f11de7a0ca77e7` 严格以起点为 Parent，最终另建 ops 验收提交；仍不 push、不创建 PR，不得描述为已同步。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与并行环境均为 `0.1.0-alpha.34`/`0034`；只属于回环并行验收，明确为非生产且尚未正式发布。
+- 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.34`。
+- Git 复核：TASK10 起点为本地 `main`/HEAD `55f8fe9693ebc0f630920e92eca1f74584d852af`、behind 0/ahead 73、工作区 clean；功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 严格以起点为 Parent，Compose/回归修正为 `b4f3f5f5de30259e44d5b00a5587dee29331539f`，最终另建 ops 验收提交；仍不 push、不创建 PR，不得描述为已同步。
 
 ### 低资源主机事实
 
 - 本机永久按 2 核、约 4 GiB 内存、1 GiB Swap 管理。2026-07-27 曾发生服务器重启或不可用，证据不足，根因记录为 `UNKNOWN`，不得无证据归因 OOM。
 - 所有 build、全量测试、Migration、备份恢复和 Compose 重启必须串行，固定 `COMPOSE_PARALLEL_LIMIT=1`；停止阈值、禁用清理命令和验证记录见 `docs/self-hosting/low-resource-server.md`。
-- TASK09 起点 available memory 约 2.3 GiB、Swap 137 MiB、根分区可用 37 GiB、Build Cache 0B；最终约 2.38 GiB/146 MiB/36 GiB、Load `0.55/0.37/0.46`，Build Cache 回到 0B。明确 64 秒窗口 Swap `145588224→145543168` bytes、正增长 0，三个容器 restart 0/OOM false，四个持久卷未更换或删除。
+- TASK10 起点 available memory 约 2.4 GiB、Swap 135 MiB、根分区可用 36 GiB、Build Cache 0B；构建峰值 2.569 GB 后一次授权 prune 回到 0B。最终 available 2.3 GiB、Swap 139 MiB、根分区可用 36 GiB、Load `0.03/0.11/0.21`；60 秒窗口 Swap `142452→142372 KiB`、增长 -80 KiB，三个容器 restart 0/OOM false，四个持久卷未更换或删除。
 
 ### 治理资料
 
@@ -72,6 +72,7 @@
 - `drizzle-postgres/0031_production_batch_genealogy.sql` expand-only 增加 Manufacturing Batch Set/Batch/Event、Run nullable Batch 稳定身份，以及 Report/Completion 单 Batch 关系和数据库 guard；发布后快照/digest 不可变，NORMAL/REWORK、Input Allocation、Quality/NCR/Rework、Final Output/Report/Completion 沿稳定 ID 保持同批。
 - `drizzle-postgres/0032_finished_goods_inventory_lots.sql` expand-only 增加唯一 Finished Goods Inventory Lot、Ledger/Balance nullable 稳定 Lot 外键、一致性/不可变/服务写/deferred 守恒 guard；Batch Completion 创建或复用同一 Lot，冲销回写原 Lot，ORDER 历史继续 null/空 Lot。Lot Balance 与 Material Aggregate、freeze/unfreeze、API/UI/genealogy 已在回环环境验证；原材料、供应商和 Shipment Lot 未实现。
 - `drizzle-postgres/0033_finished_goods_lot_fqc_shipment.sql` expand-only 为 Allocation、FQC、Shipment Line 与 FQC Consumption Fact 增加 nullable 稳定 Lot 外键；BATCH 必须同 Lot，ORDER 保持 null。warehouse 显式选择 Lot，Shipment 原子消费同 Lot Balance/FQC 并写 Ledger/Source/Event；冲销只恢复原 Lot。实际 `4/6`、冻结拒发、冲销同 Lot 再发、ORDER、恢复与清理已通过；原材料/供应商/Receipt/领料 Lot 仍未实现。
+- `drizzle-postgres/0034_supplier_receipt_lot_iqc.sql` expand-only 将 `inventory_lots` 扩展为制造成品/供应商来料严格 XOR 来源；ACTIVE/STOCKED/IQC Receipt 原子生成 RML Lot 并同时增加 on-hand/frozen。IQC 沿 Receipt Line→Lot 创建，RELEASE 通过追加式 UNFREEZE 只解冻 passed 范围，失败量继续冻结；无 IQC/AP/领用等下游时整单冲销沿原 Lot 反向过账。真实主链 10/8/2→10/2/8 与 3 件 REVERSED 支线、重启和恢复已通过；生产领料 Lot 未实现。
 - 本地文件卷保存二进制，数据库只保存受控相对路径和摘要元数据。
 - Worker 使用 PostgreSQL Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、重试和 CAS；Web/Worker 是独立入口。
 
@@ -171,7 +172,7 @@
 
 ## 当前路线
 
-`SELFHOST-PHASE5-TASK09` 已 `DONE / PARALLEL ACCEPTED`：功能提交 `02dfa0d3c18c16b0e8ee07af94f11de7a0ca77e7` 严格以 `279d284738b8ee01f6579a91333ad958a6c36dc8` 为 Parent；`0.1.0-alpha.33`/`0033`、BATCH Lot FQC/Shipment 精确消费与原 Lot 冲销恢复、ORDER null Lot、重启/第二库恢复和最终 clean 主库通过。当前无 `DOING`，不得自动启动 TASK10；原材料/供应商/Receipt/领料 Lot、真实迁移、HTTPS 和生产切换仍未执行。
+`SELFHOST-PHASE5-TASK10` 已 `DONE / PARALLEL ACCEPTED`：功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 严格以 `55f8fe9693ebc0f630920e92eca1f74584d852af` 为 Parent；`0.1.0-alpha.34`/`0034`、Supplier Receipt Lot 收货即冻结、IQC 10/8/2 放行 8、原 Lot 安全整单冲销、重启/第二库恢复和最终 clean 主库通过。当前无 `DOING`，不得自动启动后续任务；生产领料 Lot、真实迁移、HTTPS 和生产切换仍未执行。
 
 ## 恢复上下文检查清单
 
