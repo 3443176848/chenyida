@@ -764,6 +764,17 @@
 - 历史边界：BOM Line/Production Report 的自由文本 `process_stage` 继续仅作历史兼容，不自动生成 Work Center/正式 Routing，也不批量改写。迁移前 RELEASED/COMPLETED 工单不猜测路线，只读显示 `LEGACY_UNSTRUCTURED`。
 - 生产边界：本决定只批准隔离测试和回环 `chenyida-erp-parallel` 合成验收；不授权工序派工、开工、完工、报工、WIP、返工、批次、设备、外协、库存过账、真实数据迁移、切流或生产部署。
 
+## D-069 工序执行以工单快照工序和不可变事件为权威，WIP 不是库存
+
+- 日期：2026-07-27
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
+- 确认人：项目负责人（明确授权 `SELFHOST-PHASE5-TASK02`，并固定线性 WIP、追加式更正和最终报工排除边界）
+- 权威引用：Work Order 执行只引用其不可变 Routing Snapshot Operation、Snapshot Work Center 和前后 Snapshot Operation；不得引用之后可变化的 Routing Version Operation，也不得使用自由文本 `process_stage` 代替稳定工序 ID。迁移前 `LEGACY_UNSTRUCTURED` 工单保持兼容，但不猜测执行投影。
+- 数量来源：首工序可用投入由实际净领料共同支持量证明；后序由前序未冲销 good 提供，并通过 Run Input Allocation 精确消费具体上游 Run。跳序、重复消费、超前序 good 和并发超量均 fail closed；scrap 永不进入下一工序。
+- 事实与投影：Dispatch/Run、Run Report、Event、Input Allocation 和 Reversal 是不可变事实；Operation/WIP 是受控服务投影并由数据库延迟守恒核对。WIP 只表达 waiting/dispatched/in-progress/good/scrap/transferred/available/final-output 数量，不进入 MAIN Inventory Ledger/Balance。
+- 更正：未开工 Run 可取消；已报工 Run 只能追加式全额冲销。已有下一工序消费、末工序输出已被 Production Report 消费或存在品质等下游引用时禁止冲销；无下游时冲销恢复上游可派工量和当前投影。业务事实、投影、审计和幂等在单一事务提交或整体回滚。
+- 末工序边界：末工序 good 只形成待 Work Order 最终报工量，不自动创建 Phase 4 Production Report、Completion、Finished Goods Ledger/Balance、IPQC 或 FQC。本决定不授权最终报工绑定、成品入库、返工、批次、设备、外协、产能排程、真实数据迁移、切流或生产部署。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

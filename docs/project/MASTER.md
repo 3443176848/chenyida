@@ -33,24 +33,24 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-07-26（Asia/Shanghai）
+快照时间：2026-07-27（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.25`；PostgreSQL migration head 为 `0025_production_routings.sql`；始终仅限回环非生产环境 |
+| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.26`；PostgreSQL migration head 为 `0026_production_operation_execution.sql`；始终仅限回环非生产环境 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK01 功能提交 `8eedfa07573c37e46d93f208162a0842c8d90a48`，严格 Parent 为 `7485bb93dc4dad16fa5cfe54651bb8f82306a7d2`；独立 ops 验收提交以 Git log 为准 |
-| Git 同步与工作区 | TASK01 起点 `origin/main...HEAD` 为 behind 0/ahead 38；两次独立提交后为 behind 0/ahead 40，仍不 push、不创建 PR、不改写历史 |
+| 当前根仓库功能基线提交 | TASK02 功能提交 `77ff520e8dbd4b04fdb96a4281934e2d7f2d8d9c`，严格 Parent 为 `d6554fcaea77cfe16320d98afcf9aed9c794bc3f`；独立 ops 验收提交以 Git log 为准 |
+| Git 同步与工作区 | TASK02 起点 `origin/main...HEAD` 为 behind 0/ahead 40；两次独立提交后应为 behind 0/ahead 42，仍不 push、不创建 PR、不改写历史；三个并行出现的用户修改未纳入本任务提交 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0025`；最终唯一启用管理员、所有合成业务表 0、uploads/attachments 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
+| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0026`；最终唯一启用管理员、所有合成业务/审计/幂等表 0、uploads/attachments 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | Python/SQLite 开发服务继续由 systemd 常驻并监听 `0.0.0.0:18888`；非生产 Compose 项目 `chenyida-erp-parallel` 以 PostgreSQL 17/Web/Worker 同机并行运行，Web 仅绑定 `127.0.0.1:3000`，PostgreSQL 无宿主端口；不是生产部署 |
-| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard、工作中心、版本化工艺路线与工单不可变工艺快照的非生产链路 |
-| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01 已完成并行验收；工序执行仍未启动 |
-| 当前任务 | `SELFHOST-PHASE5-TASK01` 已 `DONE / PARALLEL ACCEPTED`；历史任务保持 `DONE`，不得重复 |
-| 下一任务 | 停止；工序开工/完工/报工、WIP、返工、批次、设备、真实迁移、HTTPS、生产恢复和切换均未授权 |
+| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard、工作中心、版本化工艺路线、工单不可变工艺快照，以及基于快照工序的派工/执行事件与线性 WIP 非生产链路 |
+| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK02 已完成并行验收；Work Order 最终报工绑定未启动 |
+| 当前任务 | `SELFHOST-PHASE5-TASK02` 已 `DONE / PARALLEL ACCEPTED`；历史任务保持 `DONE`，不得重复 |
+| 下一任务 | 停止；最终报工绑定、成品入库、返工、批次、设备、产能排程、真实迁移、HTTPS、生产恢复和切换均未授权 |
 
 ## 当前完成模块
 
@@ -82,6 +82,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - SELFHOST-PHASE4-TASK09 已在同一并行环境交付 `0.1.0-alpha.23`/`0023`，复用 Sales/Quality/Inventory/Finance 权威建立发货指令、Shipment Line→FQC Release 精确分配和显式 AR 交接；实际 Shipment/FQC `4/6`、成品库存 `10→6→0`、Sales Source/AR `80/120`、Settlement 0，整栈重启、停服备份/新空恢复和最终清理通过
 - SELFHOST-PHASE4-TASK10 已在同一并行环境交付 `0.1.0-alpha.24`/`0024`，复用 Finance Settlement/Reversal 并沿稳定 Sales/Purchase Source 归属 Project/Currency；实际 AR `80/120`、AP `48/72`、收款 `30/50/120`、付款 `48/30/42`、来源 `200/120`、未结 0、净现金 80、UNATTRIBUTED 0，整栈重启、停服备份/新空恢复和最终清理通过，不宣称会计利润
 - SELFHOST-PHASE5-TASK01 已在同一并行环境交付 `0.1.0-alpha.25`/`0025`、稳定 Work Center、Product Version Routing 审核发布与 Work Order Release 不可变 Routing Snapshot；实际四工作中心、v1→v2、两张工单分别固化 v1/v2、BOM/Reservation/Route Snapshot 原子，整栈重启、停服备份/新空恢复与清理通过，未执行工序或库存过账
+- SELFHOST-PHASE5-TASK02 已在同一并行环境交付 `0.1.0-alpha.26`/`0026`、Snapshot Operation 权威派工、Run/Event/Report/Reversal 不可变事实和线性 WIP 投影；实际四工序以 `4/6` 两批贯穿，每工序 processed/good/scrap=`10/10/0`，工序间剩余 WIP 0、末工序待最终报工 10，Work Order 仍 IN_PROGRESS，Production Report/Completion/成品库存/IPQC/FQC 均为 0；重启、停服备份/新空恢复和最终清理通过
 - 多用户登录、会话、角色权限、密码修改、账号管理和操作审计
 - 物料、供应商映射、CSV 导入、清洗队列和新物料建档基础流程
 - 客户、供应商、产品、BOM 和 BOM 齐套分析
@@ -184,9 +185,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 当前无 `DOING`；`SELFHOST-PHASE5-TASK01` 已完成 Work Center→Routing v1/v2→Work Order Release 不可变 Routing Snapshot 的并行验收。
+- 当前无 `DOING`；`SELFHOST-PHASE5-TASK02` 已完成 Routing Snapshot Operation→分批派工→开工→工序报工→good 线性流转→末工序待最终报工 WIP 的并行验收。
 - `PHASE0-TASK03`、`SELFHOST-PHASE4-TASK05`—`TASK09` 保持历史 `DONE`；TASK10 功能提交严格基于授权起点 `e63c726e`。
-- 本轮完成后停止。真实银行、总账、税票、汇率、成本会计、公司费用、正式利润、真实数据迁移和生产部署均未授权。
+- 本轮完成后停止。Work Order 最终报工绑定、成品入库、返工、批次、设备、产能排程、真实数据迁移和生产部署均未授权。
 - 已完成：`SELFHOST-PHASE4-TASK05`，并行环境 `0.1.0-alpha.19`/`0019` 完成 Award→PO→到货计划→两批 Receipt `4/6`→库存 `10`→采购来源 `48/72`→显式 AP `48/72`，权限、幂等、CAS、超收、冲销阻断、重启、备份恢复与清理通过；结论 `SOURCING TO PAYABLE HANDOFF ACCEPTED IN PARALLEL ENVIRONMENT`。
 - 已完成：`SELFHOST-PHASE4-TASK04`，并行环境 `0.1.0-alpha.18`/`0018` 完成两供应商 RFQ、报价、服务端比较和人工非最低价定标；A `12.000000`/准时/排名 2，B `10.000000`/晚交/排名 1，以 `DELIVERY_PRIORITY` 和“交期优先，避免项目延期”选择 A。Award=1 时全部下游写入为 0，重启持久和清理恢复通过；结论 `PROCUREMENT SOURCING AWARD ACCEPTED IN PARALLEL ENVIRONMENT`。
 - 已完成：`SELFHOST-PHASE4-TASK03`，并行环境 `0.1.0-alpha.17`/`0017` 的固化包聚合、库存/在途独立分配、不可变需求计划与采购申请、v1 退回释放→v2 重算重提→最终接收、重启持久和清理恢复通过；结论 `PLANNING MATERIAL REQUIREMENT TO PURCHASE REQUEST ACCEPTED IN PARALLEL ENVIRONMENT`。现在停止，不自动启动 TASK04。

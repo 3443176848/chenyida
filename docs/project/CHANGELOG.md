@@ -2,6 +2,28 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-27
+
+### SELFHOST-PHASE5-TASK02 - `ops: accept production wip workflow in parallel environment`
+
+- 提交：功能提交 `77ff520e8dbd4b04fdb96a4281934e2d7f2d8d9c`，Parent 严格为 `d6554fcaea77cfe16320d98afcf9aed9c794bc3f`；独立 ops 提交以功能提交为 Parent，不 amend/rebase，实际哈希以 Git log 为准。
+- 并行验收：只更新 `chenyida-erp-parallel` 至 `0.1.0-alpha.26`/26 migrations；`0026` SHA-256/数据库 checksum 为 `b00e49aa4d4f8279372c5aab291ccfcbd54afc09ab284a6390a50fea9e66aca0`。Web 仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口。
+- 实际 HTTP：production 账号对锡膏印刷、SMT贴片、回流焊、AOI 四个 Snapshot Operation 依次执行批次 `4/6` 的派工、开工和工序报工；每工序 processed/good/scrap=`10/10/0`，前三工序未转移 WIP 0，末工序 final output available 10。
+- 业务边界：Work Order 保持 `IN_PROGRESS`；Production Report、Completion、Finished Goods Ledger/Balance、IPQC/FQC 均为 0。工序 WIP 未写入库存，也未虚构库位、批次或成品数量。
+- 保护：权限 403、active operator、Work Center、前序来源、跳序、超量/并发派工、重复/并发开工、数量守恒、幂等重放/异正文冲突、CAS、scrap 隔离、取消、下游消费冲销阻断、无下游冲销恢复、故障零半记录和直接 SQL guard 通过。
+- 持久与恢复：整体重启后 8 Run、8 Report、24 Event、4 Operation Projection、4 WIP 和 24 相关 Audit 保持；停服备份 `backup-20260726T235722Z-77ff520e8dbd` 校验并恢复到新空库，核对 `26|2|1|4|8|8|24|4|10|0|0|0`。
+- 清理与保护：最终 26 migrations、唯一启用管理员、所有合成业务/审计/幂等与 uploads/attachments 0，仅三容器四卷；临时数据库、备份/恢复目录、测试 SQLite、依赖卷和迁移容器均删除。任务未重启 Python；开始时 PID `277640`，外部并行变更后最终 PID 为 `13737`，SQLite metadata 最终仍为 `64769:53827608:1784999031:1544192`。
+- 结论：`PRODUCTION OPERATION EXECUTION AND WIP ACCEPTED IN PARALLEL ENVIRONMENT`。未执行最终报工绑定、成品入库、返工、批次、设备、产能排程、真实数据迁移、切流、生产部署、push 或 PR。
+
+### SELFHOST-PHASE5-TASK02 - `feat: add production operation execution`
+
+- Git：功能提交 `77ff520e8dbd4b04fdb96a4281934e2d7f2d8d9c` 严格以 `d6554fcaea77cfe16320d98afcf9aed9c794bc3f` 为 Parent；不 reset/stash/rebase/amend/force push。
+- 数据库：仅新增 expand-only `0026_production_operation_execution.sql`，建立 Work Order Operation/WIP Projection、Run、Input Allocation、Run Report/Event/Reversal；完整外键、唯一、numeric、索引、不可变事实、服务写投影和延迟数量守恒 guard，同步 Drizzle Schema/journal/snapshot，不修改 0001—0025。
+- 服务/API：Snapshot Operation 为工单执行权威；首工序取净领料支持量，后序按前序 Run good 的稳定 Allocation 线性消费；派工/取消、开工、追加报工和受控全额冲销在单事务内提交事实、投影、Audit 和 Idempotency。
+- 权限/UI：新增 `production.dispatch`、`production.execute`、`production.operation.reverse`；production 获得 dispatch/execute，manager/admin 获管理能力，warehouse/quality 只读；新增 `/production/dispatch`、`/production/operations`、`/production/wip` 和五项 Dashboard 指标。
+- 验证：TASK02 unit/UI/PostgreSQL/migration、Phase 4 TASK01—TASK10、Phase 5 TASK01、Production/Routing/Inventory/Dashboard、全部正式 typecheck、Schema consistency、lint/build、凭证扫描、Python 临时库三项和 `git diff --check` 通过。
+- 边界：WIP 不是 Inventory Ledger；最后工序 good 只形成待最终报工量，不自动创建 Production Report、Completion、库存或品质事实。
+
 ## 2026-07-26
 
 ### SELFHOST-PHASE5-TASK01 - `ops: accept production routing workflow in parallel environment`

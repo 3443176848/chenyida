@@ -1,6 +1,25 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-26（Asia/Shanghai）
+最后更新时间：2026-07-27（Asia/Shanghai）
+
+## SELFHOST-PHASE5-TASK02 工序派工、执行事件与线性 WIP 流转
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `77ff520e8dbd4b04fdb96a4281934e2d7f2d8d9c` 严格基于 `d6554fcaea77cfe16320d98afcf9aed9c794bc3f`；独立 ops 验收提交以 Git log 为准 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.26`；`0026` SHA-256/数据库 checksum `b00e49aa4d4f8279372c5aab291ccfcbd54afc09ab284a6390a50fea9e66aca0`；0001—0025 未修改，Schema/journal/snapshot 一致 |
+| Snapshot Operation 权威 | PASS | 执行稳定引用 Work Order Routing Snapshot Operation/Work Center/前后工序/assigned operator；不引用可变 Routing Version Operation，不以 `process_stage` 作为权威 |
+| 实际 HTTP 数量 | PASS | 四工序锡膏印刷、SMT贴片、回流焊、AOI 分两批 `4/6` 贯穿；每工序 processed/good/scrap=`10/10/0`，前三工序未转移 WIP 0，末工序 final output available 10 |
+| 最终报工边界 | PASS | Work Order `IN_PROGRESS`；Production Report 0、Completion 0、Finished Goods Ledger 0、Balance 0、IPQC/FQC 0；WIP 不写库存 |
+| 权限/UI/Dashboard | PASS | production dispatch/execute，manager/admin 管理与 reverse，warehouse/quality 只读，其他写 403；三条原生页面和 READY/IN_PROGRESS/工序间 WIP/末序输出/WAITING 五项指标通过 |
+| 并发/幂等/CAS | PASS | 重复/并发派工不超量，重复/并发开工仅一成功；同 Key 重放原结果、异正文冲突、expected version 与稳定锁顺序通过 |
+| 守恒/冲销/回滚 | PASS | 前序 good 精确 Allocation，scrap 不流转，processed 不超派工；下游消费阻止冲销，无下游冲销恢复 WIP；事实不可变、直接 SQL guard 和故障零半记录通过 |
+| 自动验证 | PASS | TASK02 unit/UI/PG/migration、Phase 4 TASK01—TASK10 PG/API 与 migration upgrade、Phase 5 TASK01、Production/Routing/Inventory/Dashboard、20 组正式 typecheck、Schema consistency、lint/build、916 文件凭证扫描、Python 三项及 `git diff --check` 通过 |
+| 重启/恢复 | PASS | 整体重启后 `8|8|24|4|4|10|24` 的 Run/Report/Event/Operation Projection/WIP/final output/Audit 保持；停服备份 `backup-20260726T235722Z-77ff520e8dbd` 校验，新空恢复核对 `26|2|1|4|8|8|24|4|10|0|0|0` |
+| 清理/资源 | PASS | 主库 26 migrations、唯一启用管理员、所有合成业务/审计/幂等与 uploads/attachments 0；仅 PostgreSQL/Web/Worker 三容器和四卷；临时库/备份/恢复/测试 SQLite/依赖卷/迁移容器删除 |
+| Python/SQLite | PROTECTED / EXTERNAL PID CHANGE RECORDED | 可信起点 PID `277640` 与 SQLite metadata 均匹配；任务未执行 Python 重启或真实 SQLite 读写。并行等待期间外部变更使最终 Python PID 为 `13737`；最终 SQLite metadata 仍为 `64769:53827608:1784999031:1544192` |
+| Git/生产保护 | PASS | 起点 clean、behind 0/ahead 40；本任务不 push、不建 PR、不改写历史，三个外部用户修改未纳入提交；未迁真实数据、未切流、未启 HTTPS、未生产部署 |
+| 完成结论 | PASS | `PRODUCTION OPERATION EXECUTION AND WIP ACCEPTED IN PARALLEL ENVIRONMENT` |
 
 ## SELFHOST-PHASE5-TASK01 工艺路线、工作中心与工单工艺快照
 

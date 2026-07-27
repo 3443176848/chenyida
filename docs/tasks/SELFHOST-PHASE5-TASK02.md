@@ -2,7 +2,7 @@
 
 ## 状态与授权
 
-- 状态：`DOING`
+- 状态：`DONE / PARALLEL ACCEPTED`
 - 日期：2026-07-26（Asia/Shanghai）
 - 授权：项目负责人已明确授权继续细化生产，本轮自主执行且只执行本任务。
 - 合法起点：`main` / `d6554fcaea77cfe16320d98afcf9aed9c794bc3f`；工作区 clean，`origin/main...HEAD` behind 0/ahead 40。
@@ -49,15 +49,15 @@ Work Order Routing Snapshot
 
 ## 验收清单
 
-- [ ] 0026、Schema、journal、snapshot、SHA-256
-- [ ] 派工/取消、开工、工序报工、线性 good 流转、scrap、Run 冲销
-- [ ] 权限、职责、active operator、Work Center、幂等、CAS、并发、事务与直接 SQL guard
-- [ ] 三条原生页面与 Dashboard 五项指标
-- [ ] TASK02 unit/UI/PostgreSQL/API/migration 与 Phase 4/Phase 5/关联全回归
-- [ ] 实际 HTTP 四工序、两个批次 4/6；每工序 10/10/0，末工序 final output 10
-- [ ] Work Order 保持 IN_PROGRESS，Production Report/Completion/成品库存/IPQC/FQC 全为 0
-- [ ] Compose 整体重启、停服备份/新空恢复、最终干净 0026 清理
-- [ ] 功能与验收两个独立提交
+- [x] 0026、Schema、journal、snapshot、SHA-256
+- [x] 派工/取消、开工、工序报工、线性 good 流转、scrap、Run 冲销
+- [x] 权限、职责、active operator、Work Center、幂等、CAS、并发、事务与直接 SQL guard
+- [x] 三条原生页面与 Dashboard 五项指标
+- [x] TASK02 unit/UI/PostgreSQL/API/migration 与 Phase 4/Phase 5/关联全回归
+- [x] 实际 HTTP 四工序、两个批次 4/6；每工序 10/10/0，末工序 final output 10
+- [x] Work Order 保持 IN_PROGRESS，Production Report/Completion/成品库存/IPQC/FQC 全为 0
+- [x] Compose 整体重启、停服备份/新空恢复、最终干净 0026 清理
+- [x] 功能与验收两个独立提交
 
 ## 明确排除
 
