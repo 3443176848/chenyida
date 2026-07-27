@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.32",
+  "version": "0.1.0-alpha.33",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -75,6 +75,12 @@
     "typecheck:phase5-task06": "tsc -p tsconfig.phase5-task06.json --pretty false",
     "typecheck:phase5-task07": "tsc -p tsconfig.phase5-task07.json --pretty false",
     "typecheck:phase5-task08": "tsc -p tsconfig.phase5-task08.json --pretty false",
+    "typecheck:phase5-task09": "tsc -p tsconfig.phase5-task09.json --pretty false",
+    "test:finished-goods-lot-shipment:unit": "node --experimental-strip-types --test tests/selfhost-finished-goods-lot-shipment-unit.test.mjs",
+    "test:finished-goods-lot-shipment:ui": "node --experimental-strip-types --test tests/selfhost-finished-goods-lot-shipment-ui-contract.test.mjs",
+    "test:finished-goods-lot-shipment:compose": "node --experimental-strip-types scripts/selfhost-finished-goods-lot-shipment-compose-smoke.mjs",
+    "test:finished-goods-lot-shipment:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-finished-goods-lot-shipment-postgres.test.mjs",
+    "test:finished-goods-lot-shipment:migration": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-finished-goods-lot-shipment-migration-upgrade.test.mjs",
     "test:finished-goods-lot:unit": "node --experimental-strip-types --test tests/selfhost-finished-goods-inventory-lot-unit.test.mjs",
     "test:finished-goods-lot:ui": "node --experimental-strip-types --test tests/selfhost-finished-goods-inventory-lot-ui-contract.test.mjs",
     "test:finished-goods-lot:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-finished-goods-inventory-lot-postgres.test.mjs",

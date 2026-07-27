@@ -7,9 +7,10 @@ import type { ProductionMeta, ProductionResult } from "../production-selfhost/ty
 export const PRODUCTION_BATCH_BOUNDARY = Object.freeze({
   manufacturing_batch_genealogy: true,
   finished_goods_inventory_lot: true,
+  finished_goods_lot_fqc_shipment: true,
   raw_material_inventory_lot: false,
   supplier_inventory_lot: false,
-  message: "成品 Manufacturing Batch 已绑定 Inventory Lot；原材料和供应商批次仍未启用。",
+  message: "成品 Manufacturing Batch、FQC 放行与 Shipment 已形成 Inventory Lot 精确追溯；原材料和供应商批次仍未启用。",
 });
 
 const id = (value: unknown, field: string) => { const result = Number(value); if (!Number.isSafeInteger(result) || result <= 0) throw new ProductionError("REQUEST_VALIDATION_FAILED", `${field} 必须为正整数`); return result; };
@@ -89,8 +90,8 @@ export class ProductionBatchService {
       this.repository.pool.query(`select r.*,op.sequence_no,op.operation_code,op.operation_name from production_operation_runs r join production_work_order_routing_snapshot_operations op on op.id=r.snapshot_operation_id where r.production_batch_id=$1 order by r.id`, [batchId]),
       this.repository.pool.query(`select rr.* from production_operation_run_reports rr join production_operation_runs r on r.id=rr.run_id where r.production_batch_id=$1 order by rr.id`, [batchId]),
       this.repository.pool.query(`select a.* from production_operation_run_input_allocations a join production_operation_runs r on r.id=a.run_id where r.production_batch_id=$1 order by a.id`, [batchId]),
-      this.repository.pool.query(`select qi.* from quality_inspections qi join production_operation_run_reports rr on rr.id=qi.production_operation_run_report_id join production_operation_runs r on r.id=rr.run_id where r.production_batch_id=$1 order by qi.id`, [batchId]),
-      this.repository.pool.query(`select qd.* from quality_defects qd join quality_inspections qi on qi.id=qd.inspection_id join production_operation_run_reports rr on rr.id=qi.production_operation_run_report_id join production_operation_runs r on r.id=rr.run_id where r.production_batch_id=$1 order by qd.id`, [batchId]),
+      this.repository.pool.query(`select distinct qi.* from quality_inspections qi left join production_operation_run_reports rr on rr.id=qi.production_operation_run_report_id left join production_operation_runs r on r.id=rr.run_id left join inventory_lots lot on lot.id=qi.inventory_lot_id where r.production_batch_id=$1 or lot.source_production_batch_id=$1 order by qi.id`, [batchId]),
+      this.repository.pool.query(`select distinct qd.* from quality_defects qd join quality_inspections qi on qi.id=qd.inspection_id left join production_operation_run_reports rr on rr.id=qi.production_operation_run_report_id left join production_operation_runs r on r.id=rr.run_id left join inventory_lots lot on lot.id=qi.inventory_lot_id where r.production_batch_id=$1 or lot.source_production_batch_id=$1 order by qd.id`, [batchId]),
       this.repository.pool.query(`select n.* from production_nonconformances n join production_operation_run_reports rr on rr.id=n.production_operation_run_report_id join production_operation_runs r on r.id=rr.run_id where r.production_batch_id=$1 order by n.id`, [batchId]),
       this.repository.pool.query(`select rq.* from production_rework_requests rq join production_nonconformances n on n.id=rq.nonconformance_id join production_operation_run_reports rr on rr.id=n.production_operation_run_report_id join production_operation_runs r on r.id=rr.run_id where r.production_batch_id=$1 order by rq.id`, [batchId]),
       this.repository.pool.query(`select pr.*,rb.production_batch_id from production_report_batches rb join production_reports pr on pr.id=rb.production_report_id where rb.production_batch_id=$1 order by pr.id`, [batchId]),
@@ -99,8 +100,9 @@ export class ProductionBatchService {
       this.repository.pool.query(`select ia.id inventory_adjustment_id,il.id ledger_entry_id,il.inventory_lot_id,il.on_hand_delta::text,il.frozen_delta::text,il.location_code,il.lot_code from production_completion_batches cb join production_completions c on c.id=cb.production_completion_id join inventory_adjustments ia on ia.id=c.inventory_adjustment_id join inventory_ledger_entries il on il.adjustment_id=ia.id where cb.production_batch_id=$1 order by il.id`, [batchId]),
       this.repository.pool.query(`select e.event_type,e.actor,e.request_id,e.created_at from production_batch_events e where e.batch_set_id=$1 and (e.production_batch_id is null or e.production_batch_id=$2) order by e.id`, [Number(batch.batch_set_id), batchId]),
       this.repository.pool.query(`select l.*,s.on_hand_qty::text,s.reserved_qty::text,s.frozen_qty::text,(s.on_hand_qty-s.reserved_qty-s.frozen_qty)::text available_qty,s.version balance_version from inventory_lots l left join inventory_stock_balances s on s.inventory_lot_id=l.id and s.location_code='MAIN' where l.source_production_batch_id=$1`,[batchId]),
+      this.repository.pool.query(`select sl.*,sh.shipment_code,sh.shipment_type,sh.original_shipment_id,sh.ship_date,so.sales_order_code from inventory_lots lot join sales_shipment_lines sl on sl.inventory_lot_id=lot.id join sales_shipments sh on sh.id=sl.shipment_id join sales_orders so on so.id=sh.sales_order_id where lot.source_production_batch_id=$1 order by sl.id`,[batchId]),
     ]);
-    return { batch, normal_runs: queries[0].rows.filter((r) => r.run_kind === "NORMAL"), rework_runs: queries[0].rows.filter((r) => r.run_kind === "REWORK"), run_reports: queries[1].rows, input_allocations: queries[2].rows, inspections: queries[3].rows, defects: queries[4].rows, nonconformances: queries[5].rows, rework_requests: queries[6].rows, production_reports: queries[7].rows, final_output_allocations: queries[8].rows, completions: queries[9].rows, inventory_links: queries[10].rows, events: queries[11].rows, inventory_lot:queries[12].rows[0]??null, boundary: PRODUCTION_BATCH_BOUNDARY };
+    return { batch, normal_runs: queries[0].rows.filter((r) => r.run_kind === "NORMAL"), rework_runs: queries[0].rows.filter((r) => r.run_kind === "REWORK"), run_reports: queries[1].rows, input_allocations: queries[2].rows, inspections: queries[3].rows, defects: queries[4].rows, nonconformances: queries[5].rows, rework_requests: queries[6].rows, production_reports: queries[7].rows, final_output_allocations: queries[8].rows, completions: queries[9].rows, inventory_links: queries[10].rows, events: queries[11].rows, inventory_lot:queries[12].rows[0]??null, shipments:queries[13].rows, boundary: PRODUCTION_BATCH_BOUNDARY };
   }
 
   async createSet(meta: ProductionMeta, input: Record<string, unknown>): Promise<ProductionResult> {

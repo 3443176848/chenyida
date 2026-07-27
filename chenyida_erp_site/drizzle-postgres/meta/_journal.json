@@ -225,6 +225,13 @@
       "when": 1785150537032,
       "tag": "0032_finished_goods_inventory_lots",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1785160080346,
+      "tag": "0033_finished_goods_lot_fqc_shipment",
+      "breakpoints": true
     }
   ]
 }

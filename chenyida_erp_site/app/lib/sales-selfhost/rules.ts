@@ -26,7 +26,8 @@ export function shipmentLines(value: unknown): ShipmentLineInput[] {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new SalesError("REQUEST_VALIDATION_FAILED", `第 ${index + 1} 行无效`);
     const row = raw as Record<string, unknown>; const salesOrderLineId = id(row.sales_order_line_id, "sales_order_line_id");
     if (seen.has(salesOrderLineId)) throw new SalesError("REQUEST_VALIDATION_FAILED", "同一出货单不能重复销售明细"); seen.add(salesOrderLineId);
-    return { salesOrderLineId, quantity: decimal(row.quantity ?? row.ship_qty, "quantity"), expectedLineVersion: version(row.expected_line_version, "expected_line_version"), expectedBalanceVersion: version(row.expected_balance_version, "expected_balance_version") };
+    const inventoryLotId=row.inventory_lot_id === undefined || row.inventory_lot_id === null || row.inventory_lot_id === "" ? null : id(row.inventory_lot_id, "inventory_lot_id");
+    return { salesOrderLineId, inventoryLotId, quantity: decimal(row.quantity ?? row.ship_qty, "quantity"), expectedLineVersion: version(row.expected_line_version, "expected_line_version"), expectedBalanceVersion: version(row.expected_balance_version, "expected_balance_version"), expectedLotVersion: inventoryLotId===null?null:version(row.expected_lot_version,"expected_lot_version") };
   }).sort((left, right) => left.salesOrderLineId - right.salesOrderLineId);
 }
 
@@ -39,11 +40,17 @@ export function deliveryInstructionLines(value: unknown): DeliveryInstructionLin
 export function deliveryExecutionLines(value: unknown): DeliveryExecutionLineInput[] {
   if (!Array.isArray(value) || value.length < 1 || value.length > 100) throw new SalesError("REQUEST_VALIDATION_FAILED", "lines 必须包含 1 到 100 行");
   const seen = new Set<number>();
-  return value.map((raw, index) => { if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new SalesError("REQUEST_VALIDATION_FAILED", `第 ${index + 1} 行无效`); const row = raw as Record<string, unknown>; const instructionLineId = id(row.instruction_line_id, "instruction_line_id"); if (seen.has(instructionLineId)) throw new SalesError("REQUEST_VALIDATION_FAILED", "同一批次不能重复发货指令明细"); seen.add(instructionLineId); return { instructionLineId, quantity: decimal(row.quantity, "quantity"), expectedLineVersion: version(row.expected_line_version, "expected_line_version"), expectedSalesOrderLineVersion: version(row.expected_sales_order_line_version, "expected_sales_order_line_version"), expectedBalanceVersion: version(row.expected_balance_version, "expected_balance_version") }; }).sort((a, b) => a.instructionLineId - b.instructionLineId);
+  return value.map((raw, index) => { if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new SalesError("REQUEST_VALIDATION_FAILED", `第 ${index + 1} 行无效`); const row = raw as Record<string, unknown>; const instructionLineId = id(row.instruction_line_id, "instruction_line_id"); if (seen.has(instructionLineId)) throw new SalesError("REQUEST_VALIDATION_FAILED", "同一批次不能重复发货指令明细"); seen.add(instructionLineId); const inventoryLotId=row.inventory_lot_id === undefined || row.inventory_lot_id === null || row.inventory_lot_id === "" ? null : id(row.inventory_lot_id, "inventory_lot_id"); return { instructionLineId, inventoryLotId, quantity: decimal(row.quantity, "quantity"), expectedLineVersion: version(row.expected_line_version, "expected_line_version"), expectedSalesOrderLineVersion: version(row.expected_sales_order_line_version, "expected_sales_order_line_version"), expectedBalanceVersion: version(row.expected_balance_version, "expected_balance_version"), expectedLotVersion:inventoryLotId===null?null:version(row.expected_lot_version,"expected_lot_version") }; }).sort((a, b) => a.instructionLineId - b.instructionLineId);
 }
 
 export function expectedBalanceVersions(value: unknown) {
   if (!Array.isArray(value) || value.length < 1 || value.length > 100) throw new SalesError("REQUEST_VALIDATION_FAILED", "expected_balance_versions 必须包含 1 到 100 行");
   const seen = new Set<number>();
   return value.map((raw) => { if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new SalesError("REQUEST_VALIDATION_FAILED", "expected_balance_versions 行无效"); const row = raw as Record<string, unknown>; const materialId = id(row.material_id, "material_id"); if (seen.has(materialId)) throw new SalesError("REQUEST_VALIDATION_FAILED", "expected_balance_versions 不能重复物料"); seen.add(materialId); return { materialId, expectedBalanceVersion: version(row.expected_balance_version, "expected_balance_version") }; }).sort((a, b) => a.materialId - b.materialId);
+}
+
+export function expectedLotVersions(value: unknown) {
+  if (!Array.isArray(value) || value.length > 100) throw new SalesError("REQUEST_VALIDATION_FAILED", "expected_lot_versions 必须是最多 100 行的数组");
+  const seen = new Set<number>();
+  return value.map((raw) => { if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new SalesError("REQUEST_VALIDATION_FAILED", "expected_lot_versions 行无效"); const row = raw as Record<string, unknown>; const inventoryLotId = id(row.inventory_lot_id, "inventory_lot_id"); if (seen.has(inventoryLotId)) throw new SalesError("REQUEST_VALIDATION_FAILED", "expected_lot_versions 不能重复 Lot"); seen.add(inventoryLotId); return { inventoryLotId, expectedLotVersion: version(row.expected_lot_version, "expected_lot_version") }; }).sort((a, b) => a.inventoryLotId - b.inventoryLotId);
 }

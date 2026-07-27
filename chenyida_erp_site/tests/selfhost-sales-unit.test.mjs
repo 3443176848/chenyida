@@ -12,7 +12,7 @@ test("sales decimals, currency and stable-ID lines fail closed", () => {
 });
 
 test("shipment inputs require line and inventory concurrency versions", () => {
-  assert.deepEqual(shipmentLines([{ sales_order_line_id: 9, quantity: "1.000001", expected_line_version: 2, expected_balance_version: 3 }])[0], { salesOrderLineId: 9, quantity: "1.000001", expectedLineVersion: 2, expectedBalanceVersion: 3 });
+  assert.deepEqual(shipmentLines([{ sales_order_line_id: 9, quantity: "1.000001", expected_line_version: 2, expected_balance_version: 3 }])[0], { salesOrderLineId: 9, inventoryLotId: null, quantity: "1.000001", expectedLineVersion: 2, expectedBalanceVersion: 3, expectedLotVersion: null });
   assert.throws(() => shipmentLines([{ sales_order_line_id: 9, quantity: "1", expected_line_version: 2 }]), /expected_balance_version/);
   assert.throws(() => expectedBalanceVersions([{ material_id: 1, expected_balance_version: 2 }, { material_id: 1, expected_balance_version: 3 }]), /不能重复物料/);
 });

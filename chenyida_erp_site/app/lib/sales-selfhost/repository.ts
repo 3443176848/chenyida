@@ -32,7 +32,7 @@ export class SalesRepository {
       await client.query("delete from idempotency_keys where key_digest=$1 and expires_at<=now()", [meta.keyDigest]);
       const existing = await client.query("select request_digest,response,status_code from idempotency_keys where key_digest=$1", [meta.keyDigest]);
       if (existing.rows[0]) { if (existing.rows[0].request_digest !== meta.requestDigest) throw new SalesError("IDEMPOTENCY_CONFLICT", "同一 Idempotency-Key 不能用于不同请求", 409); await client.query("commit"); return { status: Number(existing.rows[0].status_code), body: existing.rows[0].response, replayed: true }; }
-      await client.query("select set_config('cyd.sales_service_write','allowed',true),set_config('cyd.inventory_service_write','allowed',true)");
+      await client.query("select set_config('cyd.sales_service_write','allowed',true),set_config('cyd.inventory_service_write','allowed',true),set_config('cyd.inventory_lot_service_write','allowed',true)");
       const result = await work(client);
       await client.query("insert into audit_log(username,action,detail,request_id,result,route_code,operation_id,idempotency_key_digest,retention_until) values($1,$2,$3,$4,'success','SALES',$5,$6,now()+interval '1095 days')", [meta.actor.username, meta.action, { object_id: result.objectId }, meta.requestId, meta.operationId, meta.keyDigest]);
       await client.query("insert into idempotency_keys(key_digest,username,method,path,request_digest,status_code,response,expires_at) values($1,$2,$3,$4,$5,$6,$7,now()+interval '24 hours')", [meta.keyDigest, meta.actor.username, meta.method, meta.route, meta.requestDigest, result.status, result.body]);

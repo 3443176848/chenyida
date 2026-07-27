@@ -841,6 +841,17 @@
 - 数据库守卫：唯一/外键/CHECK、不可变 trigger、服务写入口与 deferred reconciliation 阻止跨 Batch/Material/Unit、错误 lot_code、重复 Lot、Batch Completion 空 Lot，以及 Completion→Lot→Ledger→Balance 不守恒的直接 SQL。
 - 明确边界：本决定只授权 Completion 事务内受控创建的 Finished Goods Inventory Lot；不授权供应商来料、原材料、采购 Receipt、生产领料、Shipment Lot 消费、FQC Lot 放行、序列号、条码/标签、事务外自动 Lot、设备/OEE、外协、产能、成本会计、历史迁移、生产部署或 TASK09。
 
+## D-076 BATCH 成品 FQC 与 Shipment 必须沿稳定 Inventory Lot 精确放行和消费
+
+- 日期：2026-07-27
+- 状态：`ACCEPTED / IMPLEMENTING`
+- 确认人：项目负责人（明确授权 `SELFHOST-PHASE5-TASK09` 并固定 Lot 精确消费与 ORDER 兼容边界）
+- 稳定关系：BATCH 的 Completion→Sales Allocation、FQC Inspection、Shipment Line 和 FQC Consumption Fact 必须保存同一个 `inventory_lot_id`；Lot code 只显示和校验，不参与推断。ORDER 历史来源保持 null/空 Lot，不自动转为某个 Lot。
+- 放行与消费：FQC released/consumed/available 按 Lot、Allocation、Sales Order Line、Material 和 Unit 锁定核算。warehouse 必须显式选择 BATCH Lot；Shipment 同时受 Delivery/SO 剩余、Lot `on_hand-frozen-reserved` 和同 Lot FQC available 限制。禁止自动选 Lot、跨 Lot/Batch/Material/Unit/SO Line 消费和冻结 Lot 发货。
+- 事务与更正：Shipment 复用 Inventory Service 向同 Lot 写负 Ledger，并与 FQC 消费、Delivery/SO 投影、Sales Source、Event、Audit、Idempotency 同事务。无 AR 等不可逆下游时，冲销只能沿原 Shipment Line 的原 Lot 追加恢复 Ledger 和 FQC reversal；不得重选 Lot。
+- 数据库边界：0033 使用 nullable 外键兼容 ORDER，并以 CHECK、索引、服务写 guard、不可变事实与 deferred reconciliation 阻止直接 SQL 绕过和数量不守恒。已被 Shipment 净消费的 FQC 不能 reopen、改写或跨 Lot 转移。
+- 明确边界：不授权原材料/供应商/采购 Receipt/生产领料 Lot、序列号/标签、FIFO/FEFO、AR/Settlement/银行/税票/总账、成本/利润、Routing/WIP/返工规则变更、真实迁移、生产部署或 TASK10。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

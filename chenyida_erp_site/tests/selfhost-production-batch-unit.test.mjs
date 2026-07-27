@@ -8,9 +8,10 @@ test("Manufacturing Batch boundary exposes finished-goods Lot without widening r
   assert.deepEqual(PRODUCTION_BATCH_BOUNDARY, {
     manufacturing_batch_genealogy: true,
     finished_goods_inventory_lot: true,
+    finished_goods_lot_fqc_shipment: true,
     raw_material_inventory_lot: false,
     supplier_inventory_lot: false,
-    message: "成品 Manufacturing Batch 已绑定 Inventory Lot；原材料和供应商批次仍未启用。",
+    message: "成品 Manufacturing Batch、FQC 放行与 Shipment 已形成 Inventory Lot 精确追溯；原材料和供应商批次仍未启用。",
   });
 });
 

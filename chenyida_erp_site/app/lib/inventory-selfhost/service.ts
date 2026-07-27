@@ -133,6 +133,25 @@ export class InventoryService {
     return this.postParsedInTransaction(client,meta,normalized);
   }
 
+  async issuePositionsInTransaction(client: PoolClient, meta: InventoryMutationMeta, input: { reason: string; lines: ReadonlyArray<{ materialId: number; unitId: number; inventoryLotId: number | null; quantity: string; expectedBalanceVersion: number; expectedLotVersion: number | null }> }): Promise<InventoryMutationResult> {
+    if (!input.lines.length || input.lines.length > 100) throw new InventoryError("REQUEST_VALIDATION_FAILED", "库存操作必须包含 1 到 100 行");
+    const normalizedLines: InventoryLineInput[] = [];
+    let reason = "";
+    for (const source of [...input.lines].sort((a,b)=>this.positionKey(a.materialId,a.inventoryLotId).localeCompare(this.positionKey(b.materialId,b.inventoryLotId)))) {
+      const parsed = parseOperationInput({ operation_type:"ISSUE", reason:input.reason, material_id:source.materialId, unit_id:source.unitId, quantity:source.quantity, expected_balance_version:source.expectedBalanceVersion });
+      reason = parsed.reason;
+      if (source.inventoryLotId === null) { normalizedLines.push(parsed.lines[0]); continue; }
+      const lot = await client.query("select * from inventory_lots where id=$1 for update",[source.inventoryLotId]);
+      const row=lot.rows[0];
+      if(!row)throw new InventoryError("INVENTORY_LOT_NOT_FOUND","成品库存 Lot 不存在",404);
+      if(source.expectedLotVersion===null||Number(row.version)!==source.expectedLotVersion)throw new InventoryError("INVENTORY_LOT_VERSION_CONFLICT","成品库存 Lot 版本已变化，请刷新后重试",409);
+      if(row.status!=="AVAILABLE")throw new InventoryError("INVENTORY_LOT_NOT_AVAILABLE","冻结、耗尽或已冲销 Lot 不能发货",409);
+      if(Number(row.material_id)!==source.materialId||Number(row.unit_id)!==source.unitId)throw new InventoryError("INVENTORY_LOT_POSITION_MISMATCH","Lot 的物料或单位与发货明细不一致",422);
+      normalizedLines.push({...parsed.lines[0],inventoryLotId:source.inventoryLotId,lotCode:String(row.lot_code)});
+    }
+    return this.postParsedInTransaction(client,meta,{operationType:"ISSUE",reason,lines:normalizedLines});
+  }
+
   private async postParsedInTransaction(client: PoolClient, meta: InventoryMutationMeta, parsed: ReturnType<typeof parseOperationInput>): Promise<InventoryMutationResult> {
       const lines:InventoryLineInput[]=parsed.lines.map((line)=>({ ...line,inventoryLotId:(line as InventoryLineInput).inventoryLotId??null,lotCode:(line as InventoryLineInput).lotCode??"" }));
       await this.repository.lockPositions(client, lines);
