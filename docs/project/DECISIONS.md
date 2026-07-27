@@ -827,7 +827,19 @@
 - 执行谱系：Batch 模式新 NORMAL Run 必须提交同工单已发布 Batch，首序累计不超 Batch planned quantity，后序 Input Allocation 只能消费同 Batch 上游 good。REWORK Batch 由 NCR/Inspection/源 Run Report 稳定继承，浏览器不得覆盖；原检、返工、复检保持同批，重复加工次数不得增加净产品数量。无 Batch Set 的历史工单保持 ORDER 模式，不猜测或自动补 Batch。
 - 报工与完工：每条结构化 Production Report 和 Completion 只能属于一个 Batch，Final Output 与 Report→Completion Allocation 不得混批。Completion 继续调用既有 Inventory Service；Batch genealogy 可返回 Inventory Adjustment/Ledger ID，但 Ledger `lot_code` 必须为空，Balance 继续按 MAIN 聚合。
 - 查询与权限：提供 Batch 列表/详情/code 精确查询/WIP/genealogy/Work Order 汇总；状态由事实投影。production 管理 Batch Set 和 Batch Run，quality/warehouse/engineering 按职责只读，manager/admin 管理，其余角色不得执行 Batch 写操作。全部写入继续受 Session/must-change、CSRF、正文/速率、持久幂等、CAS、固定锁序、request_id、安全中文错误和事务 Audit 保护。
-- 明确边界：这是 Manufacturing Batch genealogy，不是 Inventory Lot；`INVENTORY_LOT_NOT_SUPPORTED` 不解除。生产批次谱系已建立，但仓库批次库存尚未启用。本决定不授权原材料/供应商/仓库批次余额、冻结/解冻、Shipment 批次消费、序列号、标签/条码/二维码、自动 Batch、设备/OEE、外协、产能、成本会计、真实迁移、生产部署或 TASK08。
+- 明确边界：这是 Manufacturing Batch genealogy，不是 Inventory Lot；该 TASK07 边界已由后续 D-075 对制造成品 Lot 部分扩展。D-074 仍不授权原材料/供应商批次、Shipment 批次消费、序列号、标签/条码/二维码、自动 Batch、设备/OEE、外协、产能、成本会计、真实迁移或生产部署。
+
+## D-075 制造成品 Completion 创建稳定 Inventory Lot，Lot 外键是库存批次权威
+
+- 日期：2026-07-27
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
+- 确认人：项目负责人（明确授权 `SELFHOST-PHASE5-TASK08`，并固定只实现 Finished Goods Inventory Lot）
+- Lot 身份：Batch 与 Inventory Lot 是不同对象。首次 Batch Completion 由服务端创建唯一 `MANUFACTURING_FINISHED_GOODS` Lot，稳定继承 Work Order、Product Version、finished Material/Unit 和 Manufacturing Batch；一个 Batch 只有一个 Lot，多次 Completion、冲销后重完工均复用。Lot code 服务端生成、标准化、创建后不可修改，浏览器不得提交最终身份。
+- 库存权威：Ledger/Balance 的 nullable `inventory_lot_id` 是批次权威，`lot_code` 只作兼容显示和一致性约束。成品 Lot Balance 唯一键为 Material + Location + Lot；Material aggregate 等于相同单位下所有 Lot Balance 与历史空 Lot Balance 之和，不跨单位求和。ORDER 历史路径继续 null/空 Lot，不猜测。
+- 事务与更正：Batch Completion 在一个事务锁定 Batch、Report、Completion、Lot 和 Balance，原子提交 Allocation、Ledger/Balance、Lot/Batch 投影、Event/Audit/Idempotency。Completion 冲销必须向原 Lot 追加反向 Ledger；冻结、FQC、Shipment 或无法证明安全的其他下游 fail closed。净余额为 0 且来源全冲销时投影为 REVERSED，再 Completion 复用原 Lot 恢复。
+- Lot 冻结：warehouse 可以对 Lot 执行正数 freeze/unfreeze，复用 Inventory Service 的追加式事实、CAS、幂等和事务审计；冻结不改 on-hand，`available=on_hand-reserved-frozen`，冻结/解冻均不得超量。production/quality/engineering 只按职责读取，其他角色不得执行 Lot 写操作。
+- 数据库守卫：唯一/外键/CHECK、不可变 trigger、服务写入口与 deferred reconciliation 阻止跨 Batch/Material/Unit、错误 lot_code、重复 Lot、Batch Completion 空 Lot，以及 Completion→Lot→Ledger→Balance 不守恒的直接 SQL。
+- 明确边界：本决定只授权 Completion 事务内受控创建的 Finished Goods Inventory Lot；不授权供应商来料、原材料、采购 Receipt、生产领料、Shipment Lot 消费、FQC Lot 放行、序列号、条码/标签、事务外自动 Lot、设备/OEE、外协、产能、成本会计、历史迁移、生产部署或 TASK09。
 
 ## 待确认业务决策
 

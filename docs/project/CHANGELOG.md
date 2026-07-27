@@ -4,6 +4,23 @@
 
 ## 2026-07-27
 
+### SELFHOST-PHASE5-TASK08 - `ops: accept finished goods lot workflow in parallel environment`
+
+- 提交：功能提交 `43808f85bc3a662825cc2421d97e9eb631e0c469` 严格 Parent `809efadd2cafd1a7b55a0824b87c67c70ad2814b`；其后仅追加九个聚焦修正，独立 ops 提交实际哈希以 Git log 为准。
+- 实际 HTTP：planned 10 工单发布 Batch A/B `4/6`，四工序及 IPQC 全部通过；Completion 形成唯一 Lot A/B、Ledger `+4/+6`、Lot Balance `4/6` 和 Material Aggregate 10。Lot B freeze/unfreeze 2；Lot A 冲销 `-4` 至 REVERSED 后重新 Completion `+4`，复用同一 Lot。
+- 保护：同批并发 Completion 不重复建 Lot，跨 Batch/Material、错误 code、重复 Lot、冻结冲销和直接 SQL 伪造拒绝；production freeze 实际 403；ORDER Completion 保持 null/空 Lot。FQC/Shipment/Sales Source/AR/Settlement 0。
+- 验证：212 项不重复 Node 测试、13 组适用 typecheck、Schema consistency、lint、Web/Worker 分开 build、992 文件 credentials scan、diff 和 Python 三项通过。
+- 重启与恢复：Compose 串行 restart 后 Lot/Ledger/Balance/冻结/genealogy 保持；接受态 dump 1,684,486 bytes、SHA-256 `416541cb78062657640458f6dd104c86a8cf3432332302cb2c58ab683a4b3949` 恢复至固定第二库并复核 32 migrations、Lot `4/6`、Material 10。主库最终恢复为干净 0032。
+- 清理：TASK08 库/角色/临时文件/三份任务备份已删除，resource-guard、三容器、四卷、Trae/MySQL、匿名卷和 tagged image 保留。Build Cache 起点 0B、峰值 2.627 GB、一次获授权 prune 后 0B；磁盘最终 37 GiB。
+- 结论：`FINISHED GOODS INVENTORY LOTS ACCEPTED IN PARALLEL ENVIRONMENT`；只实现制造成品 Lot，未启动 TASK09。
+
+### SELFHOST-PHASE5-TASK08 - `feat: add finished goods inventory lots`
+
+- 数据库：只新增 expand-only `0032_finished_goods_inventory_lots.sql`；增加唯一 Finished Goods Inventory Lot、Ledger/Balance nullable Lot 外键、关系索引、不可变/一致性/服务写/deferred 守恒 guard；同步 Schema/journal/snapshot/package/checksum，不修改 0001—0031。
+- 服务/API：Batch Completion 在同事务创建/复用稳定 Lot，冲销反向写原 Lot；Inventory Query 返回 Lot position 和同单位 Material aggregate；新增 Lot list/detail/ledger/freeze/unfreeze，并扩展 Completion、genealogy 和 Dashboard。
+- 页面：Inventory、production completion、Batch/genealogy 和 Dashboard 展示 Lot code、Batch、Material/Unit、on-hand/frozen/reserved/available、Completion、Ledger 与状态，并明确原材料和供应商批次仍未启用。
+- 安全：所有写接口复用 Session/must-change、CSRF、正文/限速、持久幂等、CAS、固定锁序、request_id、中文安全错误、Audit 和单事务回滚；warehouse 写，production/quality/engineering 只读职责受控。
+
 ### SELFHOST-OPS-DOCKER-CACHE-CLEANUP-02 - `ops: clean docker build cache safely`
 
 - 起点：`main`/`dfece35cda381ff31c376aad9ed78242861ada73`、behind 0/ahead 58、工作区 clean；版本保持 `0.1.0-alpha.31`，PostgreSQL migration 保持 `0001`—`0031`。

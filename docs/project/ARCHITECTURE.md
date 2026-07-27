@@ -2,6 +2,25 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-27 Finished Goods Inventory Lot 与成品库存守恒
+
+`SELFHOST-PHASE5-TASK08` 在 TASK07 的稳定 Manufacturing Batch 与既有 Production Completion/Inventory Service 之间增加唯一 `MANUFACTURING_FINISHED_GOODS` Inventory Lot。首次 Batch Completion 在同一事务创建 Lot；后续同 Batch Completion、冲销和重新 Completion 均复用同一 Lot。Lot 沿稳定外键继承 Work Order、Product Version、finished Material/Unit 和 Batch，不从名称或 code 文本猜测。
+
+```mermaid
+flowchart LR
+    B[Manufacturing Batch] --> R[Production Report]
+    R --> C[warehouse Completion]
+    C --> L[Stable Finished Goods Inventory Lot]
+    L --> E[Inventory Ledger with inventory_lot_id]
+    E --> P[Balance: Material + Location + Lot]
+    P --> A[Same-unit Material Aggregate]
+    L --> G[Batch Genealogy: Lot + Ledger + Balance]
+```
+
+Ledger/Balance 的 nullable `inventory_lot_id` 是稳定权威，`lot_code` 只作兼容显示和数据库一致性校验。历史 ORDER Completion 继续 null/空 Lot。Lot freeze/unfreeze 复用同一 Inventory Service 并追加 Ledger 事实；Completion 冲销把反向 Ledger 写回原 Lot，存在冻结、FQC、Shipment 或无法证明安全的下游时 fail closed。唯一/外键/CHECK、不可变 trigger、服务写 guard 和 deferred reconciliation 共同核对 Completion→Lot→Ledger→Balance 与 Material aggregate 守恒。
+
+该模型只覆盖制造成品。原材料、供应商来料、采购 Receipt、生产领料、Shipment/FQC Lot、序列号和标签仍不在当前架构内。
+
 ## 2026-07-27 Manufacturing Batch 身份与全过程谱系边界
 
 `SELFHOST-PHASE5-TASK07` 在 Work Order 下建立至多一个 Batch Set，并以服务端生成的 Batch code、发布时 canonical digest 和不可变快照固化 Manufacturing Batch 身份。Batch 模式下所有新 NORMAL Run 必须显式绑定同工单已发布 Batch；REWORK Run 只能沿 NCR→Inspection→源 Run Report 继承同一 Batch。Input Allocation、Final Output、Production Report 和 Completion 由数据库 guard 阻止跨 Batch 或混批。
@@ -21,7 +40,7 @@ flowchart LR
 
 Batch genealogy 沿稳定外键返回 Batch Set/digest、Work Order/BOM/Routing Snapshot、NORMAL/REWORK Run/Report/Input Allocation、IPQC/Defect/NCR/Rework/复检、Final Output、Production Report、Completion 和 Inventory Adjustment/Ledger ID。Batch 状态是不可变事实的投影，不接受浏览器累计状态。没有 Batch Set 的历史工单继续 ORDER 模式，不猜测或自动生成 Batch。
 
-这是 Manufacturing Batch genealogy，不是仓库 Inventory Lot。Completion 继续复用既有 Inventory Service；Ledger/Balance 仍按 `MAIN` 和空 `lot_code` 聚合，`INVENTORY_LOT_NOT_SUPPORTED` 门禁保持。生产批次谱系已建立，但仓库批次库存尚未启用。
+这是 TASK07 交付时的 Manufacturing Batch genealogy 边界；当时不是仓库 Inventory Lot。后续 TASK08 已按上节仅为制造成品扩展稳定 Lot，原材料、供应商和 Shipment Lot 边界仍保持。
 
 ## 2026-07-27 返工执行、复检与生产流恢复边界
 

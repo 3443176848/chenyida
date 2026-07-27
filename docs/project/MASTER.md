@@ -37,26 +37,27 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.31`；PostgreSQL migration head 为 `0031_production_batch_genealogy.sql`；始终仅限回环非生产环境 |
+| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.32`；PostgreSQL migration head 为 `0032_finished_goods_inventory_lots.sql`；始终仅限回环非生产环境 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK07 功能提交 `3162edf5559512dd82ec363cf859d39bae2d5a0d` 严格以 `93902d9c3f7be94044cf9903af6e6fbebc685cc3` 为 Parent；聚焦修正 `dfd1581bc2e3cb072cd7f238e6a1b0097f8912f4`、`cd9f016570cf94eb2990362b56e8f51ef5d43db1` |
+| 当前根仓库功能基线提交 | TASK08 功能提交 `43808f85bc3a662825cc2421d97e9eb631e0c469` 严格以 `809efadd2cafd1a7b55a0824b87c67c70ad2814b` 为 Parent；其后仅追加九个聚焦修正提交，最终验收提交以 Git log 为准 |
 | 当前根仓库运维基线 | `SELFHOST-OPS-DOCKER-CACHE-CLEANUP-02` 严格以 `dfece35cda381ff31c376aad9ed78242861ada73` 为 Parent；独立提交消息为 `ops: clean docker build cache safely`，实际提交 SHA 以 Git log 为准 |
-| Git 同步与工作区 | Docker cache cleanup 起点 behind 0/ahead 58、工作区 clean；独立提交后预期 behind 0/ahead 59，仍不 push、不创建 PR、不改写历史 |
+| Git 同步与工作区 | TASK08 起点 behind 0/ahead 59、工作区 clean；独立验收提交后预期 behind 0/ahead 70，仍不 push、不创建 PR、不改写历史 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0031`；最终唯一启用管理员、所有合成业务/审计/幂等表 0、uploads/attachments 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
-| 当前运行状态 | 本机固定按 2 核/约 4 GiB/1 GiB Swap 保护；Python/SQLite 开发服务 PID `13737` 未重启；非生产 Compose 的 PostgreSQL/Web/Worker 保持原容器与镜像，RestartCount 0、OOM false，Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口。默认 BuildKit cache 已从 25.11 GB 清为 0B，根分区可用从 14 GiB 恢复至 37 GiB；不是生产部署 |
-| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard，以及 Work Order→Manufacturing Batch→NORMAL/REWORK→品质/NCR/复检→Report/Completion→既有 Ledger 的非生产谱系；仓库 Inventory Lot 尚未启用 |
-| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK07 已完成并行验收；TASK07 已停止于干净 `0031` 点 |
-| 当前任务 | 当前无 `DOING`；`SELFHOST-OPS-DOCKER-CACHE-CLEANUP-02` 已 `DONE`，2026-07-27 服务器重启/不可用根因仍为 `UNKNOWN` |
-| 下一任务 | 停止；不得自动启动 PHASE5-TASK08。Inventory Lot Balance、原材料/供应商批次、批次冻结/Shipment 消费、序列号、设备/OEE、产能排程、成本会计、真实迁移、HTTPS、生产恢复和切换均未授权 |
+| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0032`；最终唯一启用管理员、所有合成业务/审计/幂等表 0、uploads/attachments 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
+| 当前运行状态 | 本机固定按 2 核/约 4 GiB/1 GiB Swap 保护；Python/SQLite 开发服务 PID `13737` 未重启；非生产 Compose 的 PostgreSQL/Web/Worker 运行，RestartCount 0、OOM false，Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口。TASK08 Build Cache 0B→峰值 2.627 GB→0B，根分区最终可用 37 GiB；不是生产部署 |
+| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard，以及 Manufacturing Batch→Production Report→Completion→Finished Goods Inventory Lot→Lot Ledger/Balance/genealogy 的非生产链路 |
+| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK08 已完成并行验收；TASK08 已停止于干净 `0032` 点 |
+| 当前任务 | 当前无 `DOING`；`SELFHOST-PHASE5-TASK08` 已 `DONE / PARALLEL ACCEPTED`，2026-07-27 服务器重启/不可用根因仍为 `UNKNOWN` |
+| 下一任务 | 停止；不得自动启动 PHASE5-TASK09。原材料/供应商/采购 Receipt/生产领料/Shipment Lot、FQC Lot 放行、序列号、设备/OEE、产能排程、成本会计、真实迁移、HTTPS、生产恢复和切换均未授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
+- SELFHOST-PHASE5-TASK08 已在同一并行环境交付 `0.1.0-alpha.32`/`0032`、唯一 Finished Goods Inventory Lot、稳定 Batch 一对一映射、Lot Ledger/Balance/Material Aggregate、freeze/unfreeze 和 Completion 原 Lot 冲销恢复；实际 Batch A 4 / Batch B 6、Material 10、ORDER 空 Lot 兼容、重启、停服备份/固定第二库恢复、Build Cache 回到 0B 和最终清理通过。原材料、供应商、采购 Receipt、生产领料、Shipment/FQC Lot 与序列号未实现，不启动 TASK09
 - SELFHOST-OPS-DOCKER-CACHE-CLEANUP-02 在默认 `default*` builder 无构建任务时执行受控 `docker buildx prune --all --force`，清理 25.11 GB BuildKit cache，并逐个核验后删除唯一无引用 dangling image `sha256:ccce71ed69856b11e1980148ad4ed6aa5183012cab1a7a68dd121719413f6612`；镜像空间 27.45→6.511 GB、根分区可用 14→37 GiB。三 ERP 容器、四卷、Trae/MySQL、匿名卷、tagged image、备份、Python/SQLite 与数据库均保持，未启动 TASK08
 - SELFHOST-OPS-RESOURCE-GUARD-01 完成低资源永久规则、Python 16 活跃请求线程上限/有界 503、Compose 六服务 CPU/Memory/Swap/PID 限额、Web/Worker 384 MiB Node heap 和 systemd 源限额；PostgreSQL 备份校验、串行原镜像更新、60 秒 OOM/restart/Swap 观察和四卷保持通过。Python 当前 PID 未重启，资源保护不等于生产上线
 - SELFHOST-PHASE2-TASK01 完成 docs-only 盘点：Python 共 64 个 HTTP 操作（GET 34、POST 30），自托管等价覆盖 4、部分覆盖 9、未覆盖 51；根 legacy iframe 登录后并发的 23 个业务 GET 在 Node/PostgreSQL 均返回 404。已提出 TASK02—TASK10 依赖顺序，全部仍待逐项授权；没有业务域因此完成迁移

@@ -2,12 +2,13 @@
 
 ## 状态与授权
 
-- 状态：`DOING`
+- 状态：`DONE / PARALLEL ACCEPTED`
 - 日期：2026-07-27（Asia/Shanghai）
 - 授权：项目负责人明确授权只执行 TASK08，包括代码、唯一 `0032` Migration、隔离测试、现有 `chenyida-erp-parallel` 回环非生产环境实际 HTTP 验收、Compose 串行重启、停服备份恢复、限定清理、文档和独立 Git 提交；不得启动 TASK09。
 - 合法起点：`main` / `809efadd2cafd1a7b55a0824b87c67c70ad2814b`，Parent `dfece35cda381ff31c376aad9ed78242861ada73`；工作区 clean，`origin/main...HEAD` behind 0/ahead 59。
 - 依赖：`SELFHOST-PHASE5-TASK01`—`SELFHOST-PHASE5-TASK07`，以及既有 Inventory、Production Completion、Manufacturing Batch、Quality、Sales、Identity、Dashboard 和备份恢复权威模块。
 - 完成门槛：代码、Migration、专项与适用回归、实际 HTTP 4+6、Completion 冲销与同 Lot 恢复、freeze/unfreeze、Compose 重启持久、接受态停服备份/固定第二新空库恢复、主库干净 0032、资源清理、文档和独立提交全部通过后才能改为 DONE。
+- 完成记录：上述门槛已全部通过，详见 `docs/tasks/SELFHOST-PHASE5-TASK08-COMPLETION.md`；固定结论为 `FINISHED GOODS INVENTORY LOTS ACCEPTED IN PARALLEL ENVIRONMENT`。TASK09 未启动。
 
 ## 唯一业务链与权威边界
 

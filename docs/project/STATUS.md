@@ -2,6 +2,24 @@
 
 最后更新时间：2026-07-27（Asia/Shanghai）
 
+## SELFHOST-PHASE5-TASK08 成品 Inventory Lot、批次余额与完工入库绑定
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `43808f85bc3a662825cc2421d97e9eb631e0c469` 严格 Parent `809efadd2cafd1a7b55a0824b87c67c70ad2814b`；其后仅追加聚焦修正；独立 ops 提交以 Git log 为准 |
+| 版本/Migration | PASS | `0.1.0-alpha.32`；唯一 `0032` SHA-256/checksum `3a2fc22ff73706d226641119135b68d042d393124c89233a63d774f76aa2d4fa`；0001—0031 未改，Schema/journal/snapshot/manifest 一致 |
+| Lot 身份与守恒 | PASS | 一个 Manufacturing Batch 唯一一个 Finished Goods Lot；同批多 Completion/冲销恢复复用。Ledger/Balance 稳定 Lot ID 一致，Lot Balance `4+6=10` = Material Aggregate = 有效 Completion 净量 |
+| 实际 HTTP | PASS | Batch A/B `4/6`、全 IPQC 通过、Lot A/B `4/6`；Lot B freeze/unfreeze 2；Lot A `-4` 冲销至 REVERSED 后同 Lot `+4` 恢复；ORDER null/空 Lot兼容 |
+| Ledger/Genealogy | PASS | on-hand delta `+4,+6,0,0,-4,+4`，零 delta 为冻结事件；genealogy 返回 Lot、Completion、Ledger、Balance；FQC/Shipment/Sales Source/AR/Settlement 0 |
+| 权限/并发/故障 | PASS | production freeze 实际 403；同 Idempotency-Key 并发 Completion 只一次有效；CAS、冻结冲销门禁、故障零半记录、跨 Batch/Material/错误 code/重复 Lot SQL guard 通过 |
+| 自动验证 | PASS | 212 项不重复 Node 测试、13 组适用 typecheck、Drizzle consistency、lint、双 build、992 文件 credentials scan、diff 和 Python 三项通过 |
+| 重启/恢复 | PASS | Compose 串行 restart 后接受事实保持；接受态 dump 1,684,486 bytes/SHA `416541cb78062657640458f6dd104c86a8cf3432332302cb2c58ab683a4b3949` 恢复固定第二库并核对 32 migrations、Lot `4/6`、Material 10 |
+| 清理 | PASS | 主库 32 migrations、app_meta 1、唯一启用 admin；其余公共业务/Audit/Idempotency/临时账号/uploads/attachments 0；任务库/角色/临时文件/备份删除，resource-guard 保留 |
+| Build Cache/资源 | PASS | Cache 起点 0B→峰值 2.627 GB→一次授权 prune 后 0B；磁盘 35→37 GiB。最终 available 约 2.4 GiB、Swap 150 MiB、Load `0.04/0.37/0.62`；60 秒 Swap 正增长 0，restart 0/OOM false |
+| Python/SQLite | PASS / PROTECTED | PID `13737` 未操作；SQLite metadata inode `53827608`、size `1544192`、mode 600、mtime `2026-07-26 01:03:51.761827070 +0800`，未读真实正文 |
+| 排除事项 | ENFORCED | 原材料、供应商/Receipt、领料、Shipment/FQC Lot、序列号/标签、事务外自动 Lot、设备/OEE、外协、产能、成本、历史迁移、Python 操作、HTTPS/防火墙、生产部署/切流、push/PR、TASK09 均未执行 |
+| 完成结论 | PASS | `FINISHED GOODS INVENTORY LOTS ACCEPTED IN PARALLEL ENVIRONMENT` |
+
 ## SELFHOST-OPS-DOCKER-CACHE-CLEANUP-02 安全清理 Docker 构建缓存
 
 | 验证项 | 结果 | 说明 |
