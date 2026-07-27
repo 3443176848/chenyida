@@ -37,20 +37,20 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.27`；PostgreSQL migration head 为 `0027_production_final_output_reporting.sql`；始终仅限回环非生产环境 |
+| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.28`；PostgreSQL migration head 为 `0028_production_operation_quality_gates.sql`；始终仅限回环非生产环境 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | TASK03 功能提交 `1dae9661d07f7af7e866a1654804742372b8bc76` 严格以 `a6448ac42da737e31fee76085fb699e80f3c621b` 为 Parent；验收脚本职责分离与固定恢复目标修正为 `1a01172f14e9d4b3b51ec10430b188aa79efa96d`、`2eb5120bf98c9d45705cf96e2a25afb37cc154a3` |
-| Git 同步与工作区 | TASK03 起点 behind 0/ahead 43；功能、两项聚焦修正与独立 ops 验收提交后预期 behind 0/ahead 47，仍不 push、不创建 PR、不改写历史 |
+| 当前根仓库功能基线提交 | TASK04 功能提交 `5379550d0381818ad970518ac4fb8261c4679989` 严格以 `f6e5ff2e8344e79a35f56311b02b514613484f59` 为 Parent；Dashboard 验收路径聚焦修正为 `56f63ca714ed6f359bc51f681b6a532259747f1b` |
+| Git 同步与工作区 | TASK04 起点 behind 0/ahead 47；功能、聚焦修正与独立 ops 验收提交后预期 behind 0/ahead 50，仍不 push、不创建 PR、不改写历史 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0027`；最终唯一启用管理员、所有合成业务/审计/幂等表 0、uploads/attachments 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
+| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0028`；最终唯一启用管理员、所有合成业务/审计/幂等表 0、uploads/attachments 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | 本机固定按 2 核/约 4 GiB/1 GiB Swap 保护；Python/SQLite 开发服务 PID `13737` 未重启，起点 systemd cgroup 限额已实际生效，仓库 16 请求线程新源码待未来获准重启；非生产 Compose 的 PostgreSQL/Web/Worker 已实际应用 CPU/Memory/Swap/PID 限额，Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口；不是生产部署 |
-| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard，以及 Routing Snapshot→工序执行/WIP→稳定末工序 Allocation→既有 Report→显式 Completion→成品库存的非生产链路 |
-| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK03 已完成并行验收；TASK03 已停止于干净 `0027` 点 |
-| 当前任务 | 当前无 `DOING`；`SELFHOST-PHASE5-TASK03` 已 `DONE`，2026-07-27 服务器重启/不可用根因仍为 `UNKNOWN` |
-| 下一任务 | 停止；不得自动启动 PHASE5-TASK04。品质自动创建、返工、批次、设备、产能排程、真实迁移、HTTPS、生产恢复和切换均未授权 |
+| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard，以及 Routing Snapshot→工序执行/WIP→显式 IPQC Hold/Release→下工序精确消费→既有 Report/Completion/成品库存的非生产链路 |
+| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK04 已完成并行验收；TASK04 已停止于干净 `0028` 点 |
+| 当前任务 | 当前无 `DOING`；`SELFHOST-PHASE5-TASK04` 已 `DONE`，2026-07-27 服务器重启/不可用根因仍为 `UNKNOWN` |
+| 下一任务 | 停止；不得自动启动 PHASE5-TASK05。自动创建品质、返工、批次、设备、产能排程、真实迁移、HTTPS、生产恢复和切换均未授权 |
 
 ## 当前完成模块
 
@@ -85,6 +85,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - SELFHOST-PHASE5-TASK01 已在同一并行环境交付 `0.1.0-alpha.25`/`0025`、稳定 Work Center、Product Version Routing 审核发布与 Work Order Release 不可变 Routing Snapshot；实际四工作中心、v1→v2、两张工单分别固化 v1/v2、BOM/Reservation/Route Snapshot 原子，整栈重启、停服备份/新空恢复与清理通过，未执行工序或库存过账
 - SELFHOST-PHASE5-TASK02 已在同一并行环境交付 `0.1.0-alpha.26`/`0026`、Snapshot Operation 权威派工、Run/Event/Report/Reversal 不可变事实和线性 WIP 投影；实际四工序以 `4/6` 两批贯穿，每工序 processed/good/scrap=`10/10/0`，工序间剩余 WIP 0、末工序待最终报工 10，Work Order 仍 IN_PROGRESS，Production Report/Completion/成品库存/IPQC/FQC 均为 0；重启、停服备份/新空恢复和最终清理通过
 - SELFHOST-PHASE5-TASK03 已在同一并行环境交付 `0.1.0-alpha.27`/`0027`，以稳定 `production_report_operation_allocations` 消费末工序 Run Report good，复用既有 Production Report、Report Receipt Projection、warehouse Completion、Report→Completion Allocation 和 Inventory Ledger/Balance；实际 `4/6` 正式报工与 `4/6` 成品入库使 Work Order 达到 `10/10/10/0/10 COMPLETED`，IPQC/FQC/Shipment/Sales Source/AR 均为 0，冲销/并发/幂等/CAS/权限/故障门禁、重启、停服备份/新空恢复与最终清理通过
+- SELFHOST-PHASE5-TASK04 已在同一并行环境交付 `0.1.0-alpha.28`/`0028`，Routing Operation 的 `NONE/IPQC` 随发布 digest 和 Work Order Snapshot 固化；显式稳定 Run Report 来源 IPQC 经 Result/Disposition/Close 后形成下游额度。实际 REFLOW good `4/6` 先 Hold 10、AOI available 0，再按 `4/6` 检验放行为 Hold `10→6→0`、AOI available `0→4→10`，最后复用 TASK03 Report/Completion/Ledger `4/6`、Balance 10、Work Order `COMPLETED`；重启、恢复和最终清理通过
 - 多用户登录、会话、角色权限、密码修改、账号管理和操作审计
 - 物料、供应商映射、CSV 导入、清洗队列和新物料建档基础流程
 - 客户、供应商、产品、BOM 和 BOM 齐套分析

@@ -2,7 +2,7 @@
 
 ## 状态与授权
 
-- 状态：`DOING`
+- 状态：`DONE / PARALLEL ACCEPTED`
 - 日期：2026-07-27（Asia/Shanghai）
 - 授权：项目负责人明确授权仅执行 TASK04，包括代码、`0028`、隔离测试、回环并行 HTTP 验收、Compose 串行重启、停服备份恢复、最终清理、文档和独立 Git 提交。
 - 合法起点：`main` / `f6e5ff2e8344e79a35f56311b02b514613484f59`，工作区 clean，`origin/main...HEAD` behind 0/ahead 47。
@@ -49,15 +49,15 @@ Released Routing Operation
 ## 验收清单
 
 - [x] 0028、Schema、journal、snapshot、完整 SHA-256、版本升级
-- [ ] TASK04 unit/UI/PostgreSQL/API/migration（已通过）/Compose acceptance（待实际环境）
-- [ ] NONE 直通与 IPQC Hold→显式检验→受控 Release→精确消费
-- [ ] 4/6 Run Report、IPQC、AOI、Final Output、Report、Completion、Ledger/Balance 实际 HTTP 链
-- [ ] 权限、职责分离、幂等、CAS、并发、超量、直接 SQL、故障回滚、reopen/冲销门禁
+- [x] TASK04 unit/UI/PostgreSQL/API/migration/Compose acceptance
+- [x] NONE 直通与 IPQC Hold→显式检验→受控 Release→精确消费
+- [x] 4/6 Run Report、IPQC、AOI、Final Output、Report、Completion、Ledger/Balance 实际 HTTP 链
+- [x] 权限、职责分离、幂等、CAS、并发、超量、直接 SQL、故障回滚、reopen/冲销门禁
 - [x] Phase 4 TASK07/TASK08、Phase 5 TASK01/TASK02/TASK03 与相关 Node/PostgreSQL 全回归
-- [ ] 正式 typecheck、Schema consistency、lint、build、credentials、`git diff --check`（已通过）、Python 三项基线（待执行）
-- [ ] 主库修改前停服备份、Compose 重启持久、接受态停服备份、第二新空库恢复
-- [ ] 最终主库干净 0028、唯一启用管理员、业务/Audit/Idempotency/临时账号/文件 0，仅保留原三容器四卷
-- [ ] 功能提交与独立 ops 验收提交
+- [x] 正式 typecheck、Schema consistency、lint、build、credentials、`git diff --check`、Python 三项基线
+- [x] 主库修改前停服备份、Compose 重启持久、接受态停服备份、第二新空库恢复
+- [x] 最终主库干净 0028、唯一启用管理员、业务/Audit/Idempotency/临时账号/文件 0，仅保留原三容器四卷
+- [x] 功能提交、聚焦修正与独立 ops 验收提交
 
 ## 低资源与排除边界
 

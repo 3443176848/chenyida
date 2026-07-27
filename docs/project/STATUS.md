@@ -2,6 +2,24 @@
 
 最后更新时间：2026-07-27（Asia/Shanghai）
 
+## SELFHOST-PHASE5-TASK04 工序质量门禁、IPQC 稳定来源与受控放行
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PARALLEL ACCEPTED | 功能提交 `5379550d0381818ad970518ac4fb8261c4679989` 严格 Parent `f6e5ff2e8344e79a35f56311b02b514613484f59`；聚焦修正 `56f63ca714ed6f359bc51f681b6a532259747f1b`；独立 ops 验收提交以 Git log 为准 |
+| 版本/Migration | PASS / PARALLEL DEPLOYED | `0.1.0-alpha.28`；`0028` SHA-256/数据库 checksum `a7a55f7c6c81b1c5a80df59a1b3f639187cc2c2ce8658087ceb392b1f2ada912`；0001—0027 未修改，Schema/journal/snapshot 一致 |
+| 门禁与稳定来源 | PASS | Routing `NONE/IPQC` 进入 digest 并固化 Snapshot；工序 IPQC 显式引用有效 Run Report，服务端确定同工单/快照/工序/工作中心/物料/单位/数量，与历史 Report IPQC 来源互斥且兼容 |
+| 实际 HTTP 数量 | PASS | REFLOW good `4/6` 后 Hold 10、released 0、AOI available 0；IPQC inspected/passed/released=`4/6` 后 Hold `10→6→0`、AOI available `0→4→10`；最终 AOI/Report/Completion/Ledger `4/6`、Balance 10，Work Order `10/10/10/0/10 COMPLETED` |
+| 权限/职责分离 | PASS | engineering 配置 DRAFT；production 执行和只读；quality 显式创建/记录/关闭，manager 异人处置；warehouse 实际越权 403。Dashboard 五项指标按权限返回且不创建 Inspection |
+| 守恒/并发/更正 | PASS | inspected/released 不超 good/passed；OPEN/HOLD/REWORK/SCRAP 不释放；幂等重放/异正文、CAS、并发 close/reopen/消费、直接 SQL 和故障零半记录通过；存在 IPQC 阻止来源 Run 冲销，下游消费阻止 reopen |
+| 自动验证 | PASS | TASK04 专项 15；完整 unit/UI 回归 56、PG/API 40、migration 回归 16、manifest 8、coverage 2、环境 6、npm 3 均通过；正式 typecheck、Schema consistency、lint、Vinext build、credentials scan、`git diff --check` 和 Python 三项通过 |
+| 重启/恢复 | PASS | Compose 整体重启后 8 Run/Report、2 Inspection/Result、6 Quality Event、2 Report/Final Allocation/Completion、2 Ledger、Balance 10 保持；接受态备份 SHA-256 `4da56e4303afae15ac0e5e7e8f550711ec66cbcae669dcac8b4b1f4c8e360a65` 恢复到固定第二新空库并核对 28 migrations 和完整 4/6 链 |
+| 清理/资源 | PASS | 主库 28 migrations、唯一启用管理员、业务/Audit/Idempotency/验收账号/uploads/attachments 0；仅 PostgreSQL/Web/Worker 三容器和四卷；任务库/备份/临时目录/测试镜像/build 产物删除，resource-guard 保留 |
+| Python/SQLite | PASS / PROTECTED | 三项基线使用内部/临时 SQLite 通过；常驻 Python PID `13737` 未重启，真实 SQLite metadata `53827608:1544192:1784999031:1784999031`、mode 600 不变，未读写业务正文 |
+| 资源观测 | PASS | 起点 available 约 2.4 GiB、Swap 约 86 MiB、磁盘约 21 GiB；最终 available 2.4 GiB、Swap 111 MiB、磁盘 21 GiB、Load `0.49/0.44/0.51`；独立 60 秒 Swap 正增长 0，RestartCount 0、OOMKilled false |
+| 排除事项 | ENFORCED | 未自动创建 IPQC/FQC，未执行 FQC/Shipment/AR/财务、返工/返修、failed/scrap 库存、批次/设备/产能、真实迁移、Python 服务操作、HTTPS/防火墙、生产部署、push、PR 或 TASK05 |
+| 完成结论 | PASS | `PRODUCTION OPERATION IPQC GATE ACCEPTED IN PARALLEL ENVIRONMENT` |
+
 ## SELFHOST-PHASE5-TASK03 末工序产出绑定、正式报工与成品入库
 
 | 验证项 | 结果 | 说明 |

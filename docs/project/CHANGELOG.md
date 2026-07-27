@@ -4,6 +4,23 @@
 
 ## 2026-07-27
 
+### SELFHOST-PHASE5-TASK04 - `ops: accept production quality gate workflow in parallel environment`
+
+- 提交：功能提交 `5379550d0381818ad970518ac4fb8261c4679989` 严格 Parent `f6e5ff2e8344e79a35f56311b02b514613484f59`；Dashboard 验收路径聚焦修正 `56f63ca714ed6f359bc51f681b6a532259747f1b`，Parent 为功能提交；独立 ops 提交实际哈希以 Git log 为准。
+- 并行验收：只更新 `chenyida-erp-parallel` 至 `0.1.0-alpha.28`/28 migrations；`0028` SHA-256/数据库 checksum 为 `a7a55f7c6c81b1c5a80df59a1b3f639187cc2c2ce8658087ceb392b1f2ada912`。Web 仍仅 `127.0.0.1:3000`，PostgreSQL 无宿主端口。
+- 实际 HTTP：REFLOW Run Report good `4/6` 先形成 Hold 10、released 0、AOI available 0；两条 quality 显式稳定来源 IPQC 经异人处置/关闭后 inspected/passed/released=`4/6`、Hold `10→6→0`、AOI available `0→4→10`。随后 AOI、Final Output Allocation、Production Report、Completion 均为 `4/6`，Ledger `+4/+6`、Balance 10、Work Order `10/10/10/0/10 COMPLETED`，FQC/Shipment/Sales Source/AR/Settlement 0。
+- 保护：未检派工拒绝、warehouse 越权 403、同正文幂等重放/异正文冲突、CAS、职责分离、超量、并发、直接 SQL、故障零半记录、有 IPQC 阻止 Run 冲销及下游消费阻止 reopen 均通过实际 HTTP 或专项 PostgreSQL 测试；NONE 直通和 TASK02/TASK03 冲销门禁回归通过。
+- 持久与恢复：Compose 整体重启后 8 Run/Report、2 Inspection/Result、6 Quality Event、2 Report/Final Allocation/Completion、2 Ledger、Balance 10 保持；接受态停服备份 1,438,390 bytes、SHA-256 `4da56e4303afae15ac0e5e7e8f550711ec66cbcae669dcac8b4b1f4c8e360a65` 恢复到固定第二新空库并核对完整 4/6 链。
+- 清理与边界：最终主库 28 migrations、唯一启用管理员、业务/Audit/Idempotency/验收账号/uploads/attachments 0，仅三容器四卷；恢复库、两份 TASK04 备份、临时目录/测试镜像/build 产物删除，resource-guard 备份保留。未操作 Python 服务、读取真实 SQLite 正文、迁真实数据、启 HTTPS、切流、生产部署、push、PR 或 TASK05。
+- 结论：`PRODUCTION OPERATION IPQC GATE ACCEPTED IN PARALLEL ENVIRONMENT`。
+
+### SELFHOST-PHASE5-TASK04 - `feat: add production operation quality gates`
+
+- 数据库：只新增 expand-only `0028_production_operation_quality_gates.sql`；Routing/Snapshot Operation 增加 `quality_gate_mode`，Quality Inspection 增加稳定 Run Report 互斥来源，WIP 增加 required/inspected/released/hold/available/final 投影；同步 Drizzle Schema/journal/snapshot，不修改 0001—0027。
+- 服务/API：Routing 发布 digest 与 Work Order Snapshot 固化门禁；既有 Quality Service 显式创建工序 IPQC并由服务端确定来源属性；下一工序和 TASK03 最终报工只消费 CLOSED/RELEASED 额度。历史 `production_report_id` IPQC 与 NONE 直通保持兼容。
+- UI/Dashboard：Routing、dispatch、operations、WIP 和现有 Quality 页面展示稳定来源及 Hold/Release；Dashboard 增加待 IPQC、检验中、Hold、已放行待下工序/最终报工五项权限裁剪指标，保持只读。
+- 验证：TASK04 专项 15 项，记录的 unit/UI、PostgreSQL/API、migration、manifest/coverage/environment 回归均通过；正式 typecheck、Schema consistency、lint、Vinext build、credentials scan、`git diff --check` 和 Python 三项通过。
+
 ### SELFHOST-PHASE5-TASK03 - `ops: accept structured final output workflow in parallel environment`
 
 - 提交：功能提交 `1dae9661d07f7af7e866a1654804742372b8bc76` 严格 Parent `a6448ac42da737e31fee76085fb699e80f3c621b`；验收脚本职责分离和固定恢复目标聚焦修正为 `1a01172f14e9d4b3b51ec10430b188aa79efa96d`、`2eb5120bf98c9d45705cf96e2a25afb37cc154a3`，独立 ops 提交实际哈希以 Git log 为准。

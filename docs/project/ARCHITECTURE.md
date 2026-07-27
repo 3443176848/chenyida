@@ -2,6 +2,24 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-27 工序 IPQC 质量门禁与受控 WIP 放行边界
+
+`SELFHOST-PHASE5-TASK04` 不增加第二套 Quality 或 WIP。Routing Operation 的 `quality_gate_mode` 只允许 `NONE/IPQC`，进入发布 digest 并固化到 Work Order Snapshot Operation。IPQC 工序的 Run Report good 先全部进入 Quality Hold；既有 Quality Service 显式建立稳定 `production_operation_run_report_id` Inspection，经 Result、异人 Disposition 与 Close 后，`CLOSED/RELEASED` 数量才成为下游可消费额度。
+
+```mermaid
+flowchart LR
+    R[Released Routing Operation IPQC] --> S[Work Order Snapshot Operation]
+    S --> G[Run Report good 4 / 6]
+    G --> H[Quality Hold 10]
+    H -->|quality explicit Inspection| I[Stable Run Report IPQC 4 / 6]
+    I -->|Result + Disposition + Close| L[Released 4 / 6]
+    L -->|exact Run Input Allocation| N[Next Snapshot Operation]
+    N --> F[TASK03 Final Output / Report / Completion]
+    F --> B[Finished Goods Balance 10]
+```
+
+`0028` 的互斥来源、同工单/同快照外键校验、numeric 上限、不可变 guard 与 deferred reconciliation 阻止非 IPQC 伪造、跨来源、inspected/released 超量和绕过投影放行。下游已消费后禁止 reopen 或减少放行；存在 IPQC 后禁止来源 Run 冲销。NONE 工序继续使用 TASK02/TASK03 原 good 直通规则，历史 `production_report_id` IPQC 不改写。
+
 ## 2026-07-27 末工序稳定产出到正式报工与成品入库边界
 
 `SELFHOST-PHASE5-TASK03` 在 TASK02 的 Snapshot Operation/Run/Run Report/WIP 与 TASK07 的 Production Report/Completion/Inventory 之间只增加稳定 `production_report_operation_allocations`。结构化 Work Order 的服务端以最后 Snapshot Operation 的具体 Run Report good 为唯一最终报工来源；Report 字段由服务端生成，浏览器不提交 final-output 投影或自由工序/操作员字段。无 Routing Snapshot 的历史工单继续走清晰标记的兼容路径。

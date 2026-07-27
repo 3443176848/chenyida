@@ -785,6 +785,17 @@
 - 守恒与更正：结构化写入要求 Work Order/final-output CAS、固定锁顺序、持久幂等和数据库 deferred guard。无下游 Report 全额冲销恢复末工序来源；已有 Completion/IPQC 等下游时 fail closed。Completion 安全冲销后才允许 Report 冲销；有效 Report 消费后阻止对应 Operation Run 冲销。Allocation 和原事实不可修改或删除。
 - 历史与下游：无 Routing Snapshot 的历史 Work Order 保留兼容 Report/Completion 路径；结构化工单拒绝 legacy 自由文本和自动 report+completion 快捷路径。本决定不自动创建 IPQC/FQC、Shipment、Sales Financial Source、AR 或 Settlement，也不授权返工、批次、设备、产能、真实数据迁移、切流或生产部署。
 
+## D-071 工序 IPQC 只从稳定 Run Report 显式创建，关闭放行后才形成 WIP 可消费额度
+
+- 日期：2026-07-27
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
+- 确认人：项目负责人（明确授权 `SELFHOST-PHASE5-TASK04`，并固定不自动创建品质、稳定来源、质量 Hold/Release 与下游门禁）
+- 门禁固化：engineering 只在 DRAFT Routing Operation 配置 `NONE/IPQC`；门禁进入 canonical digest，随 Released Routing 不可变，并在 Work Order RELEASE 时固化到 Snapshot Operation。历史路线默认 `NONE`，不猜测或批量改写。
+- 稳定来源：IPQC 工序完成 Run Report 后只形成待检来源和 Quality Hold；quality 必须显式创建引用 `production_operation_run_report_id` 的 Inspection。Work Order、Snapshot Operation、Work Center、Material、Unit 和来源 good 均由服务端沿稳定外键确定；该来源与既有 `production_report_id` IPQC 兼容来源互斥。
+- 数量与消费：同一 Run Report 的累计 inspected 不超 good，`passed + failed = inspected`；只有 `CLOSED + RELEASED` 的 released quantity 形成额度。下一 Snapshot Operation 的 Run Input Allocation 或末工序 Final Output Allocation 精确消费该额度；NONE 工序保持 TASK02/TASK03 原 good 直通语义。
+- 更正与并发：存在任何 IPQC 后阻止来源 Run 冲销；下游已消费后阻止 reopen、降低放行或改变处置。无消费时按既有职责分离安全 reopen，并把释放额度归零。Inspection/Result/Defect/Event/Allocation 不原地改写或删除；CAS、固定锁顺序、幂等、数据库 deferred guard 和单事务 Audit 保证并发与故障 fail closed。
+- 权限与边界：production 只执行工序和查看质量状态，quality 创建/记录/关闭，manager/admin 处置管理，最终处置与关闭保持异人职责分离，其他角色写入 403。Dashboard 只读且不自动创建 Inspection。本决定不授权 FQC、Shipment、财务、返工/返修、failed/scrap 库存、批次/序列、设备/OEE、产能、真实迁移、切流或生产部署。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
