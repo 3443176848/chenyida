@@ -6,17 +6,18 @@
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DONE / STAGING COMPLETE | `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED` |
+| 任务状态 | DONE / PARTIAL IMPORT | `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED` |
 | 输入门禁 | PASS | 8 个文件的数量、名称、SHA-256 全匹配；13 Sheet 离线只读解析，原件 inode/size/mode/mtime/SHA 不变 |
-| 脱敏分类 | REVIEW REQUIRED | 1,113 条：ELIGIBLE 0、NEEDS_REVIEW 950、ARCHIVE_ONLY 163、BLOCKED 0；950 条均缺明确单位，冲突/重复/异常原因另行 root-only 保存 |
-| A200 | FAIL CLOSED | 注意事项只归档；BOM 95 条候选与物料清单 73 条候选没有精确稳定身份交集，不自动合并或重复物化 |
-| pre-import 备份 | PASS | custom format、SHA、`pg_restore --list` 和新空库恢复通过；恢复后 migrations/admin/session/audit=`34/1/1/1`，业务 0 |
-| staging | PASS / ZERO MUTATION | 空库正式升级到 0034；双重放数据库摘要相同、新增 0，孤儿/重复编码/非法数量单位/非目标交易副作用均 0 |
-| 模型门禁 | BLOCKING MAIN WRITE | 主库 Unit/Category/ACTIVE Material 均 0；Product/BOM 表无文件摘要、Sheet、原始行或 Import Batch provenance 字段，不能满足来源追踪且不得绕过 Service |
-| 主库前后 | UNCHANGED | 身份/Session/Audit=`1/1/1`，Material/Product/BOM/Import/Inventory/PO/WO/Shipment/Finance 均 0；Migration 保持 34 |
-| post-import | NOT APPLICABLE | 主库未写入，不创建 post-import 备份或异库恢复 |
+| 脱敏分类 | REVIEW REQUIRED | 1,113 条：ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160、BLOCKED 0；物料级 806 条可映射、147 条隔离，BOM 级 488 条可映射、291 条隔离 |
+| A200 | FAIL CLOSED | 注意事项只归档；BOM 与物料清单没有严格稳定身份交集，不模糊合并、不重复物化 |
+| pre-import 备份 | PASS | `real-bom-preimport-20260728T143430Z.dump` custom format、SHA、list 和新空库恢复通过；恢复后 34 migrations、业务 0 |
+| staging | PASS / IDEMPOTENT | clean-0034 首次导入 532 Material/6 Product/6 BOM/316 Line；同批重放新增 0，孤儿/重复编码/非法数量单位/交易副作用 0 |
+| 模型门禁 | PASS / MIGRATION PROVENANCE | 复用既有 Material mapping 与受控 migration_tool 来源分类/target link；1,318 条来源链接，未新增业务 Migration，0034 不变 |
+| 主库前后 | CONTROLLED WRITE | 0→532 Material、0→6 Product/Version、0→6 DRAFT BOM/Version、0→316 Line；交易事实保持 0；同批重放新增 0 |
+| post-import | PASS / OFFHOST PENDING | `real-bom-postimport-20260728T143621Z.dump` list/第二空库恢复通过，主库/恢复库关键摘要一致；仍需用户异机复制 |
 | 保密/Git | PASS | 真实正文、逐行 CSV/JSON、dump 均未进入 Git；详细结果只在仓库外 root-only 目录 |
 | 清理 | PASS | staging/恢复库/容器内 dump/bytecode 已删除；pre-import 备份、alpha.34 灾备包、resource-guard 和四卷保留 |
+| 资源 | PASS | 最终 available 2.3 GiB、Swap 129 MiB、根盘 36 GiB；60 秒 Swap `132452→132452 KiB`；三容器 restart 0/OOM false，Python PID `13737`/NRestarts 0 |
 
 ## SELFHOST-LANDING-TASK01 alpha.34 灾备封存
 

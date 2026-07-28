@@ -4,6 +4,14 @@
 
 ## 2026-07-28
 
+### SELFHOST-LANDING-TASK02 - `feat: import classified real bom history`
+
+- 用户澄清：项目不具备逐行人工分类人力，因此在不猜测冲突数据的前提下，由离线确定性规则完成来源编码/MPN/严格规格组合、类别、位号与可数件单位判定；旧 `d63078b` 结论不改写，以连续独立提交取代当前状态。
+- 分类：8 文件/13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160；806 条物料级可映射来源经 274 条重复归并为 532 Material，488 条 BOM 来源形成 316 行。A200 注意事项归档，跨文件无严格同一身份时不合并。
+- 导入：新增通用离线分类器、受确认口令/目标库白名单/payload digest/0034/唯一管理员门禁的 PostgreSQL migration adapter 与单元测试；真实 payload、逐行映射和报告只在 root-only 目录。staging/主库首次执行和重放均通过，6 Product/Version、6 DRAFT BOM/Version、316 Line，第二次新增 0。
+- 约束：147 条物料级与 291 条 BOM 级待复核没有进入对应正式实体；孤儿、重复编码、非法数量/单位为 0。Inventory/PO/Receipt/WO/Shipment/Finance 保持 0；Migration 仍为 34、版本仍为 alpha.34。
+- 灾备：pre/post custom dump 的 list、新空库恢复及主库/恢复库关键摘要一致；临时库和容器副本清理，Web/PostgreSQL healthy、Worker running。结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`；post-import dump 仍待用户异机复制。
+
 ### SELFHOST-LANDING-TASK02 - `docs: record guarded real bom staging`
 
 - 输入/保密：指定 8 个文件的数量、名称和 SHA-256 全部通过；13 个 Sheet 离线只读盘点，原件 metadata 不变。详细逐行结果只保存于仓库外 root-only 目录，未联网、上传或提交真实正文。

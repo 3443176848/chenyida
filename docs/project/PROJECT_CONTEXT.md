@@ -33,7 +33,7 @@
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.34`。
 - Git 复核：TASK10 起点为本地 `main`/HEAD `55f8fe9693ebc0f630920e92eca1f74584d852af`、behind 0/ahead 73、工作区 clean；功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 严格以起点为 Parent，Compose/回归修正为 `b4f3f5f5de30259e44d5b00a5587dee29331539f`，最终另建 ops 验收提交；仍不 push、不创建 PR，不得描述为已同步。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
-- 真实 BOM staging：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验和离线盘点；13 Sheet/1,113 条分类记录中 ELIGIBLE 0、NEEDS_REVIEW 950、ARCHIVE_ONLY 163。pre-import dump/新空库恢复与 clean-0034 staging 双重放通过；单位/分类/稳定身份和 Product/BOM 行级 provenance 门禁阻止主库写入，主库业务保持 0，详细正文只存仓库外 root-only 目录。
+- 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
 
 ### 低资源主机事实
 
@@ -175,7 +175,7 @@
 
 ## 当前路线
 
-`SELFHOST-LANDING-TASK02` 已 `DONE / STAGING COMPLETE`，结论 `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED`。当前无 `DOING`；后续单位/分类/稳定身份/A200/版本确认和 Product/BOM provenance migration 必须另立任务，alpha.34 offhost copy 仍待用户完成。不得自动启动真实迁移、部署或切换。
+`SELFHOST-LANDING-TASK02` 已 `DONE / PARTIAL IMPORT`，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`。当前无 `DOING`；438 条来源保留在 root-only 清单，6 个不完整 BOM 保持 DRAFT。alpha.34 与本次 post-import dump 的 offhost copy 均待用户完成；不得自动启动下一任务、部署或切换。
 
 ## 恢复上下文检查清单
 
