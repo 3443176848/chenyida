@@ -2,6 +2,12 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-28 alpha.34 可移植灾备边界
+
+`SELFHOST-LANDING-TASK01` 不改变业务架构，而是在运行面之外建立 root-only 的可移植恢复边界：完整 main Git Bundle 恢复源码和历史；PostgreSQL custom dump 恢复关系库；uploads、attachments、backup-status 三个 tar 恢复文件状态；`parallel.env` 的实际值不进入包，必须在恢复目标重新安全配置。
+
+恢复顺序固定为 Git clone→新建 root-only env→新 PostgreSQL Volume/数据库→恢复 dump→恢复三个文件卷→核对 34 migrations→启动 Web/Worker→健康/回环端口验证→凭据轮换。PostgreSQL 原始 Volume 不作为逻辑备份；包不能直接用于公网部署。当前包只在本机 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z`，含敏感身份数据，`offhost_copy_completed=false`。
+
 ## 2026-07-28 Supplier Receipt Lot 与 IQC 隔离放行
 
 `SELFHOST-PHASE5-TASK10` 复用唯一 Procurement Fulfillment、Inventory 与 Quality 权威。只有 ACTIVE/STOCKED/IQC 内部物料的正常 Purchase Receipt Line 创建 `SUPPLIER_RECEIPT` Lot；内部 `RML-########` 由服务端生成，Supplier Lot 只是不可变外部别名。收货事务同时增加 on-hand 与 frozen，禁止先形成可用库存再异步冻结。

@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
 最后核验：2026-07-28（Asia/Shanghai）
-适用任务：`PHASE0-TASK03` 发布基线复核；最新功能验收为 `SELFHOST-PHASE5-TASK10`
+适用任务：`PHASE0-TASK03` 发布基线复核；最新功能验收为 `SELFHOST-PHASE5-TASK10`，最新恢复封存为 `SELFHOST-LANDING-TASK01`
 
 ## 1. 使用规则
 
@@ -17,6 +17,7 @@
 
 | 运行面 | 版本/标识 | Git 基线 | 数据库基线 | 测试状态 | 部署状态 | 真实数据迁移 | 回退基线 | 批准状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Node.js / PostgreSQL alpha.34 本机灾备封存 | `0.1.0-alpha.34` / `READY_FOR_OFFHOST_COPY` | 起点 `82e9f07ce1666ace2677853408c7fb4339808cfc`；docs-only 提交后创建完整 main Bundle，最终 SHA 只记录在包内 | clean-0034 custom dump；34 migrations/checksum；205 业务表 0；三个文件卷 tar | Bundle clone、固定新空库单事务恢复、三个 tar 恢复、npm test/lint/credentials、health、SHA256SUMS 通过 | 本机 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` root-only；不是生产部署 | `NOT_MIGRATED`；`offhost_copy_completed=false` | Bundle + dump + 三 tar + RESTORE/MANIFEST/SHA256SUMS；异机凭据必须重建并轮换 | `ALPHA.34 RECOVERY PACKAGE VERIFIED AND READY FOR OFFHOST COPY`；异机校验前不得称备份完成 |
 | 历史 OpenAI Sites / Cloudflare D1 | 历史记录 `v3` | `2b4f1787ddbc7e0941ab2d5f5cadea6e817e8f12`；后续纳管来源 `9f2c2dca9ccde237cb2db6c01d2e3792b284e6e9` | 仓库 D1/Drizzle `0000`—`0008`；生产实际已应用版本本任务未访问、未核验 | 仅保留历史验收记录；本任务未访问公开 Site | `HISTORICAL`；文档曾记录为公开 `v3`，本任务不重新确认在线状态；不是未来生产权威方向 | 未向 PostgreSQL 迁移 | 历史提交 `2b4f178` 和 D1 migration/快照仅作迁移与行为证据；不是已验证的当前回退方案 | 历史状态；无新的部署批准 |
 | 当前 Python / SQLite 开发运行面 | `legacy-development`，尚无统一 SemVer | 本次复核起点为根仓库 `3ae79f167a22bd8c5bb8120e2b5e8356f59d89b4`；Python/systemd 路径自 `39946f6` 后无差异，常驻进程未记录启动 commit，不能反推为当前 HEAD | 本地 SQLite 历史 26 表 + migration `0001`—`0004`；开发库只读核验为 29 张非系统表并记录四个版本 | 本次重新执行 Python self-test、smoke 和临时库 go-live；结果见本节后续复核记录 | `DEVELOPMENT`；systemd `enabled/active`，源码与已安装 unit SHA-256 一致，Python 监听 `0.0.0.0:18888`；不是正式生产投用 | 真实业务未迁出；采购、库存、生产、销售、品质和财务的实际业务继续依赖本运行面 | Git 源码 + 执行前 SQLite 可恢复快照；正式回退点尚未建立 | 仅开发常驻；未获生产批准 |
 | Node.js / PostgreSQL PHASE5-TASK10 并行验收基线 | `0.1.0-alpha.34` | 功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b`；Compose/回归修正 `b4f3f5f5de30259e44d5b00a5587dee29331539f`；验收提交消息 `ops: accept supplier receipt lot iqc in parallel environment` | 源码与并行 PostgreSQL 均为 `0001`—`0034`；唯一启用管理员与原合法 Audit/Session 保留，205 个业务表/幂等/files 全 0 | TASK10 专项、适用 Procurement/Quality/TASK08/TASK09 回归、typecheck/Schema/lint/build/credentials/Python、真实 HTTP 10/8/2→10/2/8、3 件同 Lot 冲销、重启和停服备份恢复通过 | `DEPLOYED` 到 `PARALLEL HTTP ACCEPTANCE ONLY`；`NOT_RELEASED` 到生产 | `NOT_MIGRATED` | clean-0034 与接受态备份均校验；接受态第二库恢复通过，主库由 clean-0034 恢复；三份 TASK10 临时备份验收后删除，Python/SQLite 不影响 | `SUPPLIER RECEIPT LOT AND IQC RELEASE ACCEPTED IN PARALLEL ENVIRONMENT`；停止，不自动启动后续任务/生产 |

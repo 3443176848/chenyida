@@ -4,6 +4,14 @@
 
 ## 2026-07-28
 
+### SELFHOST-LANDING-TASK01 - `ops: prepare alpha.34 disaster recovery package`
+
+- Git：严格起点 `82e9f07ce1666ace2677853408c7fb4339808cfc`、behind 0/ahead 76、clean；fsck、76 个可达本地提交、TASK01—TASK10 链、tracked archive、无 gitlink/嵌套仓库和 credentials 通过。提交只含项目文档，Bundle 在提交后生成并实际 clone。
+- 数据库：Web/Worker 严格停服时生成 clean-0034 custom dump，1,677,933 bytes、SHA `72e8cbc6c3c4666b0e95dbcacf395787c5b520eb05a2bf3a8837ed4cfc68d702`；固定新空库单事务恢复，34 migrations/checksum、210 表、admin/setup/audit/session 与 205 张零业务表通过后删除。
+- 文件：只读打包 uploads、attachments、backup-status；三个 tar 分别恢复验证路径、文件 SHA、uid/gid/mode/mtime，源不变且 root-only 临时目录清理。PostgreSQL 原始 Volume 未归档。
+- 灾备：`/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 为 root:root 0700，文件 0600；包含无秘密配置/恢复清单、MANIFEST 和 SHA256SUMS。PostgreSQL dump 按秘密材料处理，`offhost_copy_completed=false`。
+- 边界：未 push、上传、外传、build、访问生产、迁真实数据、改代码/Schema/Migration/Compose/package、重启 Python 或删除四卷/resource-guard；结论 `ALPHA.34 RECOVERY PACKAGE VERIFIED AND READY FOR OFFHOST COPY`。
+
 ### SELFHOST-PHASE5-TASK10 - `ops: accept supplier receipt lot iqc in parallel environment`
 
 - 实际验收：两条真实 HTTP Project→Planning→Purchase Request→Award→PO→Delivery Plan；SQL 只建稳定主数据 fixture。主链 `10×12 CNY` 收货形成 RML Lot、Source 120、余额 10/10/0，IQC 10/8/2 后异人 RELEASE 8/Close 为 10/2/8，AP/Production Issue 0；3 件支线沿原 Lot 全额冲销为 REVERSED，主链已有 IQC 冲销 409。

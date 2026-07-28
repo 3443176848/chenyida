@@ -14,6 +14,11 @@
 | Phase 5 | ERP融合 | 10 个已授权任务 | DONE（非生产并行验收） |
 | Phase 6 | 行业物料库 | 4 | PLANNED |
 
+## Landing 灾备封存
+
+- `SELFHOST-LANDING-TASK01`：DONE / READY_FOR_OFFHOST_COPY。alpha.34 完整 Git 历史、clean-0034 PostgreSQL、uploads/attachments/backup-status 已形成 root-only 包并通过 Git clone、固定新空库和文件恢复验证。
+- 当前只完成本机封存，`offhost_copy_completed=false`；下一步仅由项目负责人通过受控 scp/SFTP/VPN 下载，并在异机运行 `sha256sum -c SHA256SUMS`。校验返回前不删除服务器包，不启动真实迁移、生产部署或其他业务任务。
+
 ## 部门业务主线（SELFHOST-PHASE4）
 
 已确认第一阶段顺序为：客户 → 市场部门 → 项目部门 → 计划部门 → 采购部门 → 仓库部门 → 财务部门。生产、品质、完工和发货在后续阶段接入。每一段独立授权、独立状态机和独立验收，前段不得自动创建后段单据。

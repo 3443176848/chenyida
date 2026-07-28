@@ -41,7 +41,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | TASK10 功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 严格以 `55f8fe9693ebc0f630920e92eca1f74584d852af` 为 Parent；Compose/回归修正提交 `b4f3f5f5de30259e44d5b00a5587dee29331539f`；独立验收提交以 Git log 为准 |
 | 当前根仓库运维基线 | `SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03` 严格以 `0d24eddcc5176602370214bfc8f8003844ab2b80` 为 Parent；独立提交消息为 `ops: rotate parallel database credential safely`，实际提交 SHA 以 Git log 为准 |
-| Git 同步与工作区 | TASK10 起点 behind 0/ahead 73、工作区 clean；功能提交后 ahead 74，Compose/回归修正提交后 ahead 75，独立验收提交后预期 ahead 76；仍不 push、不创建 PR、不改写历史 |
+| Git 同步与工作区 | LANDING-TASK01 起点 `82e9f07ce1666ace2677853408c7fb4339808cfc`、behind 0/ahead 76、工作区 clean；唯一 docs-only 灾备提交后为 behind 0/ahead 77；仍不 push、不创建 PR、不改写历史 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
@@ -49,9 +49,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0034`；唯一启用管理员 1；唯一 `IDENTITY/LOGIN/success` 审计与唯一 ACTIVE session 保持为任务前同一合法记录；205 个业务表、幂等和文件元数据均为 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
 | 当前运行状态 | 本机固定按 2 核/约 4 GiB/1 GiB Swap 保护；PostgreSQL/Web/Worker 在 TASK10 验收后严格串行恢复为 healthy/healthy/running、RestartCount 0、OOM false；最终 available 2.3 GiB、Swap 139 MiB（60 秒增长 -80 KiB）、根盘 36 GiB、Build Cache 0B。Python PID `13737`/NRestarts 0；不是生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard，制造成品 Lot/FQC/Shipment 精确消费，以及 Supplier Receipt Lot→IQC 冻结/放行/安全整单冲销的非生产链路 |
-| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK10 已完成并行验收；TASK10 已停止于干净 `0034` 点 |
-| 当前任务 | 当前无 `DOING`；`SELFHOST-PHASE5-TASK10` 已 `DONE / PARALLEL ACCEPTED`。2026-07-27 服务器重启/不可用历史根因仍为 `UNKNOWN` |
-| 下一任务 | 停止；不得自动启动后续任务。生产领料 Lot、FIFO/FEFO、序列号、设备/OEE、产能排程、成本会计、真实迁移、HTTPS、生产恢复和切换均未授权 |
+| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK10 已完成并行验收；alpha.34 本机完整灾备包已验证，异机复制尚未完成 |
+| 当前任务 | `SELFHOST-LANDING-TASK01` 已 `DONE / READY_FOR_OFFHOST_COPY`；灾备目录 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 为 root-only，`offhost_copy_completed=false` |
+| 下一任务 | 仅等待用户通过受控 scp/SFTP/VPN 下载并在异机运行 `sha256sum -c SHA256SUMS`；校验返回前不得删除服务器灾备目录或宣称异机备份完成，不得自动启动业务任务 |
 
 ## 当前完成模块
 
@@ -278,3 +278,4 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 ## 更新规则
 
 每个任务完成前必须更新本文件中的当前提交、阶段、任务、下一任务、完成模块、未完成模块和风险。只写已从代码、Git、数据库只读检查或平台状态确认的事实；计划和建议必须明确标注为计划或待确认。
+- SELFHOST-LANDING-TASK01 已封存 `0.1.0-alpha.34` 完整 main 历史、clean-0034 PostgreSQL custom dump 和 uploads/attachments/backup-status 三个文件卷；Git Bundle clone、固定新空库恢复、文件卷 root-only 恢复与 SHA256SUMS 均实际验证。工件只位于 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z`，含敏感身份数据，尚未异机复制、未 push 或上传

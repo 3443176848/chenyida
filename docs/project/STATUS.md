@@ -2,6 +2,19 @@
 
 最后更新时间：2026-07-28（Asia/Shanghai）
 
+## SELFHOST-LANDING-TASK01 alpha.34 灾备封存
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / READY_FOR_OFFHOST_COPY | 本机 root-only 包已生成并验证；`offhost_copy_completed=false`，未执行外部传输 |
+| Git | PASS | 起点 `82e9f07ce1666ace2677853408c7fb4339808cfc`、behind 0/ahead 76、clean；fsck、76 本地提交、TASK01—TASK10、无 gitlink/嵌套仓库和凭据扫描通过；docs-only 提交后 Bundle clone 验证 |
+| 版本/Migration | PASS | `0.1.0-alpha.34`；0001—0034 共 34 个，仓库/数据库 checksum 全一致；0034 SHA `29b380050d7d7003df82df981aea061e7287845dde773f181caf918a49d47b2d` |
+| PostgreSQL | PASS / SECRET | custom dump 1,677,933 bytes、SHA `72e8cbc6c3c4666b0e95dbcacf395787c5b520eb05a2bf3a8837ed4cfc68d702`；固定新空库单事务恢复、210 表/205 零业务表、Audit/Session 安全字段通过后删除。dump 含身份哈希/Session，0600 |
+| 文件卷 | PASS | uploads/attachments/backup-status 三 tar 均通过路径、SHA、uid/gid/mode/mtime 和源不变核验；临时恢复目录清理，未创建 Docker Volume |
+| 运行保护 | PASS | Web/Worker 停服 dump 后按 Web healthy→Worker running 恢复；PostgreSQL 未停止/重启。restart 0/OOM false、Build Cache 0B、四卷/resource-guard/Python/SQLite 保持 |
+| 灾备目录 | ROOT ONLY | `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z`，root:root 0700；全部文件 root:root 0600，`SHA256SUMS` 全通过 |
+| 下一步 | USER ACTION REQUIRED | 经受控 scp/SFTP/VPN 下载整个目录，在异机运行 `sha256sum -c SHA256SUMS` 并返回结果；此前不得宣称 OFFHOST BACKUP COMPLETE |
+
 ## SELFHOST-PHASE5-TASK10 供应商来料 Inventory Lot 与 IQC 隔离放行
 
 | 验证项 | 结果 | 说明 |
