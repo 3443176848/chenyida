@@ -46,12 +46,12 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0034`；唯一启用管理员 1；唯一 `IDENTITY/LOGIN/success` 审计与唯一 ACTIVE session 保持为任务前同一合法记录；205 个业务表、幂等和文件元数据均为 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
-| 当前运行状态 | 本机固定按 2 核/约 4 GiB/1 GiB Swap 保护；PostgreSQL/Web/Worker 在 TASK10 验收后严格串行恢复为 healthy/healthy/running、RestartCount 0、OOM false；最终 available 2.3 GiB、Swap 139 MiB（60 秒增长 -80 KiB）、根盘 36 GiB、Build Cache 0B。Python PID `13737`/NRestarts 0；不是生产部署 |
+| 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0034`；唯一启用管理员 1；唯一 `IDENTITY/LOGIN/success` 审计与唯一 ACTIVE session 保持为任务前同一合法记录；SELFHOST-LANDING-TASK02 因单位/分类/身份与 Product/BOM provenance 门禁未写主库，Material/Product/BOM/Import 及交易业务仍为 0。SQLite/D1 未向 PostgreSQL 迁移真实数据 |
+| 当前运行状态 | 本机固定按 2 核/约 4 GiB/1 GiB Swap 保护；LANDING-TASK02 串行完成 pre-import dump/恢复和 staging，PostgreSQL/Web/Worker 最终 healthy/healthy/running、RestartCount 0、OOM false，四卷不变。Python PID `13737`/NRestarts 0；不是生产部署 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard，制造成品 Lot/FQC/Shipment 精确消费，以及 Supplier Receipt Lot→IQC 冻结/放行/安全整单冲销的非生产链路 |
-| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK10 已完成并行验收；alpha.34 本机完整灾备包已验证，异机复制尚未完成 |
-| 当前任务 | `SELFHOST-LANDING-TASK01` 已 `DONE / READY_FOR_OFFHOST_COPY`；灾备目录 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 为 root-only，`offhost_copy_completed=false` |
-| 下一任务 | 仅等待用户通过受控 scp/SFTP/VPN 下载并在异机运行 `sha256sum -c SHA256SUMS`；校验返回前不得删除服务器灾备目录或宣称异机备份完成，不得自动启动业务任务 |
+| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK10 已完成并行验收；LANDING-TASK02 已完成真实表格脱敏盘点和 0034 staging，但主库未修改；alpha.34 异机复制仍未完成 |
+| 当前任务 | `SELFHOST-LANDING-TASK02` 已 `DONE / STAGING COMPLETE`，结论 `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED`；8 文件/13 Sheet/1,113 条分类记录，ELIGIBLE 0、NEEDS_REVIEW 950、ARCHIVE_ONLY 163 |
+| 下一任务 | 停止。后续须由数据责任人确认单位、分类、稳定物料身份、A200 来源和版本，并另立 Product/BOM provenance Schema/Migration 任务；alpha.34 灾备包仍等待用户异机复制校验，不自动开始任何任务 |
 
 ## 当前完成模块
 
@@ -197,6 +197,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
+- `SELFHOST-LANDING-TASK02` 已完成 8 个真实表格的强校验、离线盘点、pre-import 恢复验证和 clean-0034 staging。全部 950 条结构化候选因单位等门禁进入 NEEDS_REVIEW；Product/BOM 缺少要求的逐行 provenance，未执行主库 Service mutation。结论 `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED`。
+- 后续必须先人工确认单位/分类/稳定身份/A200/版本，并另立 provenance migration 任务；本轮停止。LANDING-TASK01 的 offhost copy 仍是独立未完成用户动作。
+
 - 当前无 `DOING`；`SELFHOST-PHASE5-TASK10` 已完成并行非生产 Supplier Receipt Lot 与 IQC 隔离放行，版本为 `0.1.0-alpha.34`、migration 为 `0001`—`0034`。
 - 当前审计/会话基线为同一次合法管理员登录：`IDENTITY/LOGIN/success` 1 条、ACTIVE session 1 条；不可变审计不得为追求“零记录”而删除。
 - TASK09 已以保存的非敏感基线摘要执行 delta 验收，并在清理后返回完全相同的合法 Audit/Session 记录集与计数；未来任务仍须遵守相同规则。
@@ -279,3 +282,4 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 每个任务完成前必须更新本文件中的当前提交、阶段、任务、下一任务、完成模块、未完成模块和风险。只写已从代码、Git、数据库只读检查或平台状态确认的事实；计划和建议必须明确标注为计划或待确认。
 - SELFHOST-LANDING-TASK01 已封存 `0.1.0-alpha.34` 完整 main 历史、clean-0034 PostgreSQL custom dump 和 uploads/attachments/backup-status 三个文件卷；Git Bundle clone、固定新空库恢复、文件卷 root-only 恢复与 SHA256SUMS 均实际验证。工件只位于 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z`，含敏感身份数据，尚未异机复制、未 push 或上传
+- SELFHOST-LANDING-TASK02 已对指定 8 个真实表格完成离线强校验与脱敏分类，clean-0034 staging/重放/约束核对通过；因 ELIGIBLE 0 和 Product/BOM provenance 模型缺口，主库保持不变，详细逐行证据只存仓库外 root-only 目录

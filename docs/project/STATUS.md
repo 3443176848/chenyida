@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-28（Asia/Shanghai）
 
+## SELFHOST-LANDING-TASK02 真实 BOM/物料隔离试导入
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / STAGING COMPLETE | `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED` |
+| 输入门禁 | PASS | 8 个文件的数量、名称、SHA-256 全匹配；13 Sheet 离线只读解析，原件 inode/size/mode/mtime/SHA 不变 |
+| 脱敏分类 | REVIEW REQUIRED | 1,113 条：ELIGIBLE 0、NEEDS_REVIEW 950、ARCHIVE_ONLY 163、BLOCKED 0；950 条均缺明确单位，冲突/重复/异常原因另行 root-only 保存 |
+| A200 | FAIL CLOSED | 注意事项只归档；BOM 95 条候选与物料清单 73 条候选没有精确稳定身份交集，不自动合并或重复物化 |
+| pre-import 备份 | PASS | custom format、SHA、`pg_restore --list` 和新空库恢复通过；恢复后 migrations/admin/session/audit=`34/1/1/1`，业务 0 |
+| staging | PASS / ZERO MUTATION | 空库正式升级到 0034；双重放数据库摘要相同、新增 0，孤儿/重复编码/非法数量单位/非目标交易副作用均 0 |
+| 模型门禁 | BLOCKING MAIN WRITE | 主库 Unit/Category/ACTIVE Material 均 0；Product/BOM 表无文件摘要、Sheet、原始行或 Import Batch provenance 字段，不能满足来源追踪且不得绕过 Service |
+| 主库前后 | UNCHANGED | 身份/Session/Audit=`1/1/1`，Material/Product/BOM/Import/Inventory/PO/WO/Shipment/Finance 均 0；Migration 保持 34 |
+| post-import | NOT APPLICABLE | 主库未写入，不创建 post-import 备份或异库恢复 |
+| 保密/Git | PASS | 真实正文、逐行 CSV/JSON、dump 均未进入 Git；详细结果只在仓库外 root-only 目录 |
+| 清理 | PASS | staging/恢复库/容器内 dump/bytecode 已删除；pre-import 备份、alpha.34 灾备包、resource-guard 和四卷保留 |
+
 ## SELFHOST-LANDING-TASK01 alpha.34 灾备封存
 
 | 验证项 | 结果 | 说明 |

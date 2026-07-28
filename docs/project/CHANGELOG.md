@@ -4,6 +4,14 @@
 
 ## 2026-07-28
 
+### SELFHOST-LANDING-TASK02 - `docs: record guarded real bom staging`
+
+- 输入/保密：指定 8 个文件的数量、名称和 SHA-256 全部通过；13 个 Sheet 离线只读盘点，原件 metadata 不变。详细逐行结果只保存于仓库外 root-only 目录，未联网、上传或提交真实正文。
+- 分类：1,113 条记录中 ELIGIBLE 0、NEEDS_REVIEW 950、ARCHIVE_ONLY 163、BLOCKED 0；全部结构化候选缺明确单位，另有稳定身份冲突、重复来源、数量和身份缺失问题。A200 注意事项只归档，BOM/清单无精确稳定身份交集，不猜测合并。
+- staging：停服 pre-import custom dump 的 list/新空库恢复通过；唯一空 staging 使用正式 runner 升级到 0034，两次重放新增 0，孤儿/重复编码/非法数量单位/交易副作用均 0。
+- 主库：Unit/Category/ACTIVE Material 均为 0，Product/BOM 也缺任务要求的行级来源字段；正式 Service mutation 为 0，主库 Material/Product/BOM 和全部交易事实保持 0。需要独立 provenance Schema/Migration 任务后才能继续。
+- 结论：`STAGING COMPLETE — MAIN DATABASE NOT MODIFIED`；无 post-import 备份、build、代码/Schema/Migration/部署/push/PR 或 Python/SQLite 写入。
+
 ### SELFHOST-LANDING-TASK01 - `ops: prepare alpha.34 disaster recovery package`
 
 - Git：严格起点 `82e9f07ce1666ace2677853408c7fb4339808cfc`、behind 0/ahead 76、clean；fsck、76 个可达本地提交、TASK01—TASK10 链、tracked archive、无 gitlink/嵌套仓库和 credentials 通过。提交只含项目文档，Bundle 在提交后生成并实际 clone。
