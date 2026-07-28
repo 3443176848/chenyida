@@ -1,6 +1,6 @@
 # SELFHOST-LANDING-TASK04 — 兼容业务台供应商导入入口收敛
 
-状态：`DONE / SOURCE FIXED / DEPLOYMENT PENDING`
+状态：`DONE / DEPLOYED`
 
 ## 目标
 
@@ -10,7 +10,8 @@
 
 - 项目负责人于 2026-07-28 指出 PostgreSQL 兼容业务台仍只接受 CSV，允许在当前源码内修复该入口和对应回归测试。
 - 允许更新项目任务账本并创建独立 Git 提交。
-- 本任务不包含生产部署、容器重建、服务重启、数据库写入或真实文件导入；这些动作如需执行，必须另行取得明确授权。
+- 源码修复阶段不包含生产部署、容器重建、服务重启、数据库写入或真实文件导入。
+- 项目负责人于 2026-07-29 单独明确授权“部署 TASK04 到当前 18888 运行面并允许 build/restart”；该授权不包含 Migration、数据库写入或真实文件导入。
 
 ## 实施边界
 
@@ -38,7 +39,17 @@
 - `/api/sample-import`、`/api/import`、`/api/import-file` 继续稳定返回 `410 LEGACY_OPERATION_RETIRED`，没有恢复绕过批次审核的一步直写。
 - Dashboard UI/Unit/API coverage `12/12`、Material Import UI `102/102`、Parser `38/38`、Dashboard typecheck、浏览器脚本语法、定向 ESLint、`git diff --check` 和 1,023 个任务仓库文件 credentials scan 全部通过；全量 ESLint 为 0 error/8 个既有 warning。Parser 单测实际覆盖 CSV/XLSX 内容解析；XLS 本轮只核验 OLE 签名分类和 Worker 静态路由，未执行 XLS/XLSX→PostgreSQL 端到端导入。
 - 验证前后 available memory 均为 2.2 GiB、Swap 均为 114 MiB、根盘可用均为 36 GiB；PostgreSQL/Web/Worker/Caddy restart 0、OOM false。
-- 未修改 package 版本、API、Schema、Migration、Compose 或业务数据；未 build、重启、部署或导入真实文件。最终只读核验确认在线 `/erp/index.html` 仍含 `accept=".csv"` 且返回 `Cache-Control: public, max-age=3600`，说明当前源码尚未部署；必须取得单独明确授权后才能部署本提交。
+- 源码提交时未修改 package 版本、API、Schema、Migration、Compose 或业务数据；当时未 build、重启、部署或导入真实文件。该历史事实不改写，后续部署记录见下节。
+
+## 部署结果（2026-07-29）
+
+- 部署对象为功能提交 `cda8c7eebf93d1ba3b558a700b535dbf00fd92b2`；开始时工作区仅有已授权保留的未跟踪 `shujvbiao/`，本轮没有读取、修改或提交其中文件。
+- 以 `COMPOSE_PARALLEL_LIMIT=1` 串行构建 Web，新镜像为 `sha256:2db38e312586ef769f62f53b077fae2ebdaa88a926731642d6d89e223131ea05`；仅使用 `--no-deps --force-recreate --wait` 替换 Web。PostgreSQL、Worker 和 Caddy 容器 ID 保持，未运行 migrate、未重启 Python、未改 Schema/Compose/数据。
+- 公网与回环 `/api/health` 均为 200，匿名 `/api/materials` 为 401，`/materials/imports/new` 为 200。公网 `index.html` SHA-256 为 `5a81e310f80f5809d9f8e79b74fd4ab0b7ef1753e512529d2396cc4d58cbd087`，`app.js` 为 `a401e43648f0ea59dc89ee6b823e0b38c44bd365f4de8f460d4aa40bbcaa2939`，均与源码精确一致；旧 CSV 控件、`file.text()` 和退役 API 调用标记全部消失。
+- 在线响应已包含 `Cache-Control: private, no-store, max-age=0, must-revalidate` 和 `Pragma: no-cache`；Vinext 同时输出一条冗余 `Cache-Control: public, max-age=3600`。标准缓存须遵守更严格的 `no-store`，但为避免矛盾指令，精确消除该默认头已记为后续独立收缩任务。
+- 部署前后数据只读计数保持：34 migrations、head `0034_supplier_receipt_lot_iqc.sql`，Material/Product/Product Version/BOM/BOM Version/Line 为 `532/6/6/6/6/316`，Inventory Ledger/PO/Receipt/WO/Shipment/Finance Document/Settlement 为 0。
+- 起点 available memory 2.1 GiB、Swap 114 MiB、根盘可用 36 GiB；最终为 2.2 GiB、123 MiB、35 GiB。build 后 60 秒 Swap +100 KiB，部署后 60 秒 -24 KiB；PostgreSQL/Web/Worker/Caddy restart 0、OOM false，本轮内核 OOM 记录 0。
+- 所有临时验证容器已 `--rm`，无 TASK04 临时容器残留；四个 ERP 持久卷与 Caddy 证书卷未更换或删除。Build Cache 1.401 GB 和旧 Web 回滚标签 `chenyida-erp-parallel-web:task04-predeploy-20260729` 有意保留，未执行未授权的 prune。
 
 ## 相邻风险（不在本任务变更范围）
 

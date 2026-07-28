@@ -29,12 +29,12 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与并行环境均为 `0.1.0-alpha.34`/`0034`；只属于回环并行验收，明确为非生产且尚未正式发布。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与当前受控公网运行面均为 `0.1.0-alpha.34`/`0034`。TASK04 只更新 Web 兼容入口，不会因此将整体业务成熟度自动视为正式投产完成。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.34`。
 - Git 复核：TASK10 起点为本地 `main`/HEAD `55f8fe9693ebc0f630920e92eca1f74584d852af`、behind 0/ahead 73、工作区 clean；功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 严格以起点为 Parent，Compose/回归修正为 `b4f3f5f5de30259e44d5b00a5587dee29331539f`，最终另建 ops 验收提交；仍不 push、不创建 PR，不得描述为已同步。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
-- 兼容供应商导入：LANDING-TASK04 已在源码把 `public/erp/` 的 CSV-only/退役入口改为直达 `/materials/imports/new`，入口 URL 已版本化且兼容 HTML 为 `no-store`；CSV/XLS/XLSX 页面/Worker 路由合同及回归通过，但未做 Excel→PG E2E。尚未 build/restart/deploy，公网运行面仍是旧静态资源。
+- 兼容供应商导入：LANDING-TASK04 功能提交 `cda8c7e` 已在单独授权下部署到当前 18888 Web；`public/erp/` 的 CSV-only/退役入口已改为直达 `/materials/imports/new`，入口 URL 已版本化。公网 HTML/JS SHA 与源码一致，响应含 `private, no-store` 和 `Pragma: no-cache`；框架仍并列冗余 `public, max-age=3600` 头。未做 Excel→PG E2E。
 
 ### 低资源主机事实
 
@@ -42,6 +42,7 @@
 - 所有 build、全量测试、Migration、备份恢复和 Compose 重启必须串行，固定 `COMPOSE_PARALLEL_LIMIT=1`；停止阈值、禁用清理命令和验证记录见 `docs/self-hosting/low-resource-server.md`。
 - TASK10 起点 available memory 约 2.4 GiB、Swap 135 MiB、根分区可用 36 GiB、Build Cache 0B；构建峰值 2.569 GB 后一次授权 prune 回到 0B。最终 available 2.3 GiB、Swap 139 MiB、根分区可用 36 GiB、Load `0.03/0.11/0.21`；60 秒窗口 Swap `142452→142372 KiB`、增长 -80 KiB，三个容器 restart 0/OOM false，四个持久卷未更换或删除。
 - LANDING-TASK01 不执行 build；所有 Git、dump、恢复和测试串行。起点 65 秒 Swap `137476→137476 KiB`、增长 0，Build Cache 全程 0B；三容器 restart 0/OOM false，四卷、resource-guard、Python PID 和 SQLite metadata 保持。
+- LANDING-TASK04 部署严格串行 build/recreate Web；起点 available 2.1 GiB、Swap 114 MiB、根盘 36 GiB，最终 available 2.2 GiB、Swap 123 MiB、根盘 35 GiB。build 后 60 秒 Swap +100 KiB，部署后 60 秒 -24 KiB；容器 restart 0/OOM false、内核 OOM 记录 0。Build Cache 1.401 GB 保留，未执行未授权 prune。
 
 ### 治理资料
 
@@ -176,7 +177,7 @@
 
 ## 当前路线
 
-`SELFHOST-LANDING-TASK04` 已 `DONE / SOURCE FIXED / DEPLOYMENT PENDING`；兼容业务台源码入口已收敛到 CSV/XLS/XLSX 原生批次工作区，但公网尚未部署。当前无 `DOING`；438 条来源保留在 root-only 清单，6 个不完整 BOM 保持 DRAFT。post-import dump 的 offhost copy、公司自有域名替换及本次源码部署均待独立授权；不得自动启动下一任务。
+`SELFHOST-LANDING-TASK04` 已 `DONE / DEPLOYED`；兼容业务台入口已在当前 18888 运行面收敛到 CSV/XLS/XLSX 原生批次工作区。本轮没有启动其他任务；438 条来源保留在 root-only 清单，6 个不完整 BOM 保持 DRAFT。post-import dump 的 offhost copy、公司自有域名替换、Excel→PG E2E 与已记录的导入契约/响应头收缩均待独立任务；不得由本任务自动启动。
 
 ## 恢复上下文检查清单
 

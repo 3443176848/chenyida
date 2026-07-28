@@ -2,6 +2,16 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-29
+
+### SELFHOST-LANDING-TASK04 - `ops: record task04 web deployment`
+
+- 授权/范围：项目负责人明确授权把 `cda8c7e` 部署到当前 18888 运行面并允许 build/restart。实际严格串行构建 Web，并以 `--no-deps --force-recreate --wait` 只更换 Web；未运行 migrate，PostgreSQL/Worker/Caddy 容器未更换。
+- 验收：新镜像 `sha256:2db38e312586...` 为 healthy；公网/回环 health 200，匿名业务 API 401。公网 `index.html` 与 `app.js` SHA 精确匹配源码，新 `/materials/imports/new`、CSV/XLS/XLSX 和版本标识生效，旧 CSV 控件、`file.text()` 与退役 API 标记消失。
+- 缓存事实：响应已含 `private, no-store, max-age=0, must-revalidate` 和 `Pragma: no-cache`；Vinext 同时并列冗余 `public, max-age=3600`。`no-store` 为更严格指令，但精确消除矛盾响应头须另立收缩任务。
+- 数据/回滚：34 migrations 与 `0034` 不变，Material/Product/Product Version/BOM/BOM Version/Line 为 `532/6/6/6/6/316`，交易表仍为 0。旧 Web 镜像 `sha256:1c07cb1b5708...` 保留为 `task04-predeploy-20260729`；未改 Schema/Migration/Compose/数据，未做 Excel→PostgreSQL E2E。
+- 资源/清理：起点 available 2.1 GiB、Swap 114 MiB、根盘 36 GiB；最终 2.2 GiB、123 MiB、35 GiB。build 后与部署后 60 秒 Swap 分别 +100/-24 KiB，restart 0/OOM false、内核 OOM 0、临时验证容器无残留。Build Cache 1.401 GB 和回滚镜像有意保留，未执行未授权 prune。
+
 ## 2026-07-28
 
 ### SELFHOST-LANDING-TASK04 - `fix: route compatibility supplier import to native workflow`

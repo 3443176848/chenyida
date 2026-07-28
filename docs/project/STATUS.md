@@ -1,18 +1,19 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-28（Asia/Shanghai）
+最后更新时间：2026-07-29（Asia/Shanghai）
 
 ## SELFHOST-LANDING-TASK04 兼容业务台供应商导入入口收敛
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DONE / SOURCE FIXED / DEPLOYMENT PENDING | 问题来自 `public/erp/` 的 CSV-only 遗留页；源码已修复，在线运行面尚未部署 |
-| 入口/缓存 | PASS | “供应商导入”直达 `/materials/imports/new`；兼容页明确 CSV/XLS/XLSX。原生工作台入口统一带版本 query，`/erp/index.html` 配置 `private, no-store` 与 `Pragma: no-cache` |
+| 任务状态 | DONE / DEPLOYED | 功能提交 `cda8c7e` 已经 2026-07-29 单独授权部署到当前 18888 Web；公网兼容页已不再显示旧 CSV-only 表单 |
+| 入口/缓存 | PASS / FOLLOW-UP | “供应商导入”直达 `/materials/imports/new`；兼容页明确 CSV/XLS/XLSX。公网响应含 `private, no-store, max-age=0, must-revalidate` 与 `Pragma: no-cache`，但框架同时并列冗余 `public, max-age=3600`；精确消除矛盾头属后续收缩任务 |
 | 退役保护 | PASS | 删除 CSV 文本、`file.text()` 和旧 API 调用；`sample-import`/`import`/`import-file` 继续返回 410，不恢复一步直写 |
-| 自动验证 | PASS | Dashboard UI/Unit/API coverage 12/12、Material Import UI 102/102、Parser 38/38、Dashboard typecheck、脚本语法、定向 lint、diff 与 1,023 个任务仓库文件 credentials 通过；全量 lint 0 error/8 既有 warning。Parser 内容单测覆盖 CSV/XLSX，XLS 只覆盖 OLE 签名分类/Worker 静态路由，未做 Excel→PG E2E |
-| 数据/运行边界 | PASS | 版本仍 alpha.34、Migration 仍 0034；未改 API/Schema/Migration/Compose/数据，未 build、重启或部署。最终只读核验在线页仍含 `accept=".csv"` 且为 `Cache-Control: public, max-age=3600`，即本源码尚未生效 |
-| 资源 | PASS | 前后 available 2.2 GiB、Swap 114 MiB、根盘可用 36 GiB；四服务 restart 0/OOM false，无测试容器残留 |
-| 后续风险 | SEPARATE TASK REQUIRED | 列表实际 `{items,next_cursor}` 与页面期望 `{data,total,page}` 失配且 cursor 被忽略；解析失败终态、创建/上传幂等及版本/SHA/重复/安全契约也未验收 |
+| 自动/镜像/在线验证 | PASS | Dashboard UI/Unit/API coverage 12/12、Material Import UI 102/102、Parser 38/38（合计 152/152）、build 与新镜像静态合同通过。公网 `index.html`/`app.js` SHA 精确匹配源码，旧控件/API 标记消失；未做 Excel→PG E2E |
+| 数据/运行边界 | PASS | 版本仍 alpha.34、Migration 仍 0034；Material/Product/Product Version/BOM/BOM Version/Line 仍 `532/6/6/6/6/316`，Inventory/PO/Receipt/WO/Shipment/Finance 仍 0。仅以 `--no-deps` 重建 Web；PostgreSQL/Worker/Caddy 容器未更换，未运行 Migration 或写数据 |
+| 服务/回滚 | PASS / READY | 新 Web 镜像 `sha256:2db38e312586...` 且 healthy；旧镜像 `sha256:1c07cb1b5708...` 保留为 `task04-predeploy-20260729`。公网/回环 health 200，匿名 `/api/materials` 401，旧 Python 仍在 `127.0.0.1:18889` |
+| 资源/清理 | PASS | 起点 available 2.1 GiB/Swap 114 MiB/根盘 36 GiB，最终 2.2 GiB/123 MiB/35 GiB；build 后 60 秒 Swap +100 KiB，部署后 -24 KiB。四容器 restart 0/OOM false，内核 OOM 0；临时验证容器无残留，Build Cache 1.401 GB 与回滚镜像有意保留 |
+| 后续风险 | SEPARATE TASK REQUIRED | 列表实际 `{items,next_cursor}` 与页面期望 `{data,total,page}` 失配且 cursor 被忽略；解析失败终态、创建/上传幂等及版本/SHA/重复/安全契约、Excel→PG E2E 与冗余缓存头清理也未验收 |
 
 ## SELFHOST-LANDING-TASK03 18888 公网 HTTPS 入口
 
