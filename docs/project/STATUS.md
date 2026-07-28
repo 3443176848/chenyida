@@ -2,6 +2,20 @@
 
 最后更新时间：2026-07-28（Asia/Shanghai）
 
+## SELFHOST-LANDING-TASK03 18888 公网 HTTPS 入口
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / PUBLIC HTTPS ACTIVE | `https://43.135.157.211.nip.io:18888` 已可访问；用户明确授权公网入口并指定 `18888` |
+| TLS/跳转 | PASS | Let's Encrypt 可信证书主机名/链校验通过；80 返回 308 到 HTTPS 18888；HSTS、nosniff、DENY frame、Referrer/Permissions Policy 生效 |
+| 网络隔离 | PASS | 公网仅 80/18888 进入 Caddy；Web 继续 `127.0.0.1:3000`，PostgreSQL 无宿主端口；旧 Python active/enabled 且仅 `127.0.0.1:18889` |
+| 身份安全 | PASS | `ERP_ENV=production`，setup token 已轮换且未记录；唯一 admin 启用、must-change 0、切换前 active session 0；生产 Cookie 单元测试 8/8，匿名 `/api/materials` 返回 401 |
+| 数据不变 | PASS | 34 migrations；ACTIVE Material 532、Product/Version 6/6、DRAFT BOM/Version 6/6、BOM Line 316；Inventory/PO/Receipt/WO/Shipment/Finance 0 |
+| 服务/资源 | PASS | PostgreSQL/Web/Worker/Caddy 为 healthy/healthy/running/running；四服务 restart 0/OOM false，Python NRestarts 0；60 秒 Swap 增长 0，最终 available 2.2 GiB、Swap 114 MiB、磁盘可用 36 GiB |
+| 持久资源 | PASS | 原四个 ERP 卷不变；新增 Caddy data/config 两卷用于证书自动续期。post-import dump、alpha.34 灾备包和 root-only 导入报告均保留 |
+| 外部边界 | PASS / FOLLOW-UP | DNS 名称只提供解析、不代理 ERP 流量；未部署 Sites/D1、未上传真实数据、未修改云安全组。建议后续用公司自有域名替换临时解析域名，并完成 post-import 备份异机复制 |
+| 回退 | READY | 停止 Caddy 后可把 `/etc/systemd/system/chenyida-erp.service` 恢复到 `0.0.0.0:18888` 并重启；数据库和四个 ERP 卷无需变化 |
+
 ## SELFHOST-LANDING-TASK02 真实 BOM/物料隔离试导入
 
 | 验证项 | 结果 | 说明 |

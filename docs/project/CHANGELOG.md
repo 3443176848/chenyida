@@ -4,6 +4,14 @@
 
 ## 2026-07-28
 
+### SELFHOST-LANDING-TASK03 - `ops: expose parallel erp through https 18888`
+
+- 入口：用户明确指定公网 `18888`；Caddy 通过 `43.135.157.211.nip.io` 获取公开可信证书，`https://43.135.157.211.nip.io:18888` 指向新 Node/PostgreSQL ERP，80 只承担 ACME 和 308 HTTPS 跳转。DNS 服务只解析名称，ERP 流量不经过第三方代理。
+- 隔离：Web 保持 `127.0.0.1:3000`，PostgreSQL 不发布宿主端口；旧 Python 从公网 `18888` 移到 `127.0.0.1:18889` 并保持 active/enabled。新增 Caddy data/config 两卷，原四个 ERP 持久卷不变。
+- 安全：运行环境切为 `ERP_ENV=production`，轮换 setup token，认证 Cookie 的 `HttpOnly/Secure/SameSite=Lax` 单测 8/8；公网匿名业务 API 返回 401，TLS 主机名/链校验及 HSTS、nosniff、DENY frame、Referrer/Permissions Policy 通过。
+- 数据：未修改 Schema/Migration 或业务数据；仍为 34 migrations、532 ACTIVE Material、6 Product/Version、6 DRAFT BOM/Version、316 BOM Line，Inventory/PO/Receipt/WO/Shipment/Finance 为 0。post-import 备份与 root-only 报告保持。
+- 资源：PostgreSQL/Web/Worker/Caddy 为 healthy/healthy/running/running，restart 0、OOM false；60 秒 Swap 增长 0，最终 available 2.2 GiB、Swap 114 MiB、磁盘可用 36 GiB。未 push、创建 PR、部署 Sites/D1 或上传真实数据。
+
 ### SELFHOST-LANDING-TASK02 - `feat: import classified real bom history`
 
 - 用户澄清：项目不具备逐行人工分类人力，因此在不猜测冲突数据的前提下，由离线确定性规则完成来源编码/MPN/严格规格组合、类别、位号与可数件单位判定；旧 `d63078b` 结论不改写，以连续独立提交取代当前状态。

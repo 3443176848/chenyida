@@ -37,21 +37,21 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码与并行环境均为 `0.1.0-alpha.34`；PostgreSQL migration head 为 `0034_supplier_receipt_lot_iqc.sql`；始终仅限回环非生产环境 |
+| 当前版本 | 源码与运行环境均为 `0.1.0-alpha.34`；PostgreSQL migration head 为 `0034_supplier_receipt_lot_iqc.sql`；新 ERP 已有受控公网 HTTPS 入口，整体业务成熟度不因入口开放而自动视为正式投产完成 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | TASK10 功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 严格以 `55f8fe9693ebc0f630920e92eca1f74584d852af` 为 Parent；Compose/回归修正提交 `b4f3f5f5de30259e44d5b00a5587dee29331539f`；独立验收提交以 Git log 为准 |
 | 当前根仓库运维基线 | `SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03` 严格以 `0d24eddcc5176602370214bfc8f8003844ab2b80` 为 Parent；独立提交消息为 `ops: rotate parallel database credential safely`，实际提交 SHA 以 Git log 为准 |
-| Git 同步与工作区 | LANDING-TASK02 连续执行起点 `d63078bdda2d016306931a29ae98fc96f46de420`、behind 0/ahead 78；完成提交后实际 SHA 以 Git log 为准；仍不 push、不创建 PR、不改写历史，唯一授权未跟踪目录为 `shujvbiao/` |
+| Git 同步与工作区 | LANDING-TASK03 起点 `a91907c3c473017a92d20e638ad2c75deba5bb7a`、behind 0/ahead 79；完成提交后实际 SHA 以 Git log 为准；仍不 push、不创建 PR、不改写历史，唯一授权未跟踪目录为 `shujvbiao/` |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
 | 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0034`；SELFHOST-LANDING-TASK02 已在主库受控写入 532 Material、6 Product/Version、6 BOM/Version 与 316 BOM Line，来源分类 1,113、来源链接 1,318；6 个含隔离行的 BOM 均保持 DRAFT。Inventory/PO/Receipt/WO/Shipment/Finance 仍为 0；SQLite/D1 未读取或写入业务正文 |
-| 当前运行状态 | 本机固定按 2 核/约 4 GiB/1 GiB Swap 保护；LANDING-TASK02 串行完成 staging、主库导入、pre/post dump 与两个新空库恢复；PostgreSQL/Web/Worker 最终 healthy/healthy/running、RestartCount 0、OOM false，四卷不变。Python PID `13737`/NRestarts 0；不是生产部署 |
+| 当前运行状态 | `https://43.135.157.211.nip.io:18888` 经 Caddy 可信 TLS 到 Web；80 仅重定向/ACME，Web 仍为 `127.0.0.1:3000`、PostgreSQL 无宿主端口。PostgreSQL/Web/Worker/Caddy 为 healthy/healthy/running/running、restart 0/OOM false；旧 Python 保留在 `127.0.0.1:18889`，NRestarts 0 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard，制造成品 Lot/FQC/Shipment 精确消费，以及 Supplier Receipt Lot→IQC 冻结/放行/安全整单冲销的非生产链路 |
 | 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK10 已完成并行验收；LANDING-TASK02 已完成真实 BOM 自动分类、隔离导入、主库写入与灾备恢复；alpha.34 及本次 post-import 备份的异机复制仍未完成 |
-| 当前任务 | `SELFHOST-LANDING-TASK02` 已 `DONE / PARTIAL IMPORT`，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`；8 文件/13 Sheet/1,113 条，ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160、BLOCKED 0 |
-| 下一任务 | 停止，不自动开始新任务。用户可在 root-only 清单基础上补充 438 条隔离来源；post-import dump 必须由用户另行异机复制和校验 |
+| 当前任务 | `SELFHOST-LANDING-TASK03` 已 `DONE / PUBLIC HTTPS ACTIVE`；公网入口固定 `18888`，生产 Cookie/TLS/匿名门禁/数据不变/资源稳定性通过 |
+| 下一任务 | 停止，不自动开始新任务。建议用户用公司自有域名替换临时解析域名，并完成 post-import dump 异机复制；438 条隔离来源仍保留 root-only 清单 |
 
 ## 当前完成模块
 
@@ -197,6 +197,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
+- `SELFHOST-LANDING-TASK03` 根据用户明确授权把公网 `18888` 从旧 Python 切到新 PostgreSQL ERP：可信 TLS、80→HTTPS 跳转、生产 Cookie、匿名 401 和安全响应头通过；旧 Python 仅回环保留，数据库与真实 BOM 计数未变。入口为 `https://43.135.157.211.nip.io:18888`。
 - `SELFHOST-LANDING-TASK02` 经用户澄清“不依赖逐行人工分类”后连续执行：离线确定性规则按来源编码/MPN/严格规格组合、类别、位号和可数件单位完成 532 Material、6 Product、6 个 DRAFT BOM 与 316 行主库导入；438 条真正歧义来源隔离。migration_tool 来源链接承载逐行 provenance，0034 不变，同批次重放新增 0，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`。
 - 后续必须先人工确认单位/分类/稳定身份/A200/版本，并另立 provenance migration 任务；本轮停止。LANDING-TASK01 的 offhost copy 仍是独立未完成用户动作。
 
@@ -283,3 +284,4 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 每个任务完成前必须更新本文件中的当前提交、阶段、任务、下一任务、完成模块、未完成模块和风险。只写已从代码、Git、数据库只读检查或平台状态确认的事实；计划和建议必须明确标注为计划或待确认。
 - SELFHOST-LANDING-TASK01 已封存 `0.1.0-alpha.34` 完整 main 历史、clean-0034 PostgreSQL custom dump 和 uploads/attachments/backup-status 三个文件卷；Git Bundle clone、固定新空库恢复、文件卷 root-only 恢复与 SHA256SUMS 均实际验证。工件只位于 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z`，含敏感身份数据，尚未异机复制、未 push 或上传
 - SELFHOST-LANDING-TASK02 已对指定 8 个真实表格完成离线强校验、确定性分类、clean-0034 staging/重放、主库导入和 post-import 恢复；532 Material、6 Product、6 个 DRAFT BOM、316 行及 1,318 来源链接落库，438 条隔离，详细逐行证据只存仓库外 root-only 目录
+- SELFHOST-LANDING-TASK03 已将公网 18888 受控切换到新 PostgreSQL ERP：Caddy 可信 TLS、生产 Cookie、匿名认证门禁和 60 秒资源观察通过；旧 Python 在回环 18889 保留，未改业务数据、Schema/Migration 或四个 ERP 持久卷

@@ -1,10 +1,12 @@
-{$ERP_DOMAIN} {
-  encode zstd gzip
-  reverse_proxy web:3000
-  header {
-    Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    X-Content-Type-Options "nosniff"
-    Referrer-Policy "same-origin"
-    -Server
-  }
+{$ERP_DOMAIN}:{$ERP_HTTPS_PORT:443} {
+	encode zstd gzip
+	reverse_proxy web:3000
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		Permissions-Policy "camera=(), geolocation=(), microphone=()"
+		-Server
+	}
 }

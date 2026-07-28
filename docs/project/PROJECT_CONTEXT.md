@@ -157,8 +157,8 @@
 - 当前 122 条既有 Cleaning 保留且不回填、不重算；项目负责人清空并重导后，新行才使用证据强度校准并显示“规格不足”或内部候选缺项。
 - Material Draft/Review POST 已具备同源/CSRF、持久幂等和限速；其他 legacy POST 的 CSRF 与限速仍需专项治理。测试环境已有本机一次性 D1，尚无远程 Test D1。
 - Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现；历史 Site 未部署这些代码，本任务也未访问公网重新确认其状态。
-- Node/PostgreSQL 没有生产部署、真实数据 migration 或发布批准；隔离测试通过不能写成已上线。
-- `chenyida-erp-parallel` 是正在运行的 HTTP 验收部署，但只绑定回环、使用 development 模式且数据库为空；它不能被描述为生产部署。访问必须经 SSH 隧道，首次登录后需改密并删除 `/etc/chenyida-erp/parallel-admin.txt`。
+- Node/PostgreSQL 已完成真实 BOM 部分导入并在用户授权下开放受控公网 HTTPS 入口；这不代表 438 条隔离来源已解决，也不代表全部业务域完成正式投产验收。
+- `chenyida-erp-parallel` 使用 production 运行门禁；Caddy 公网监听 80/18888，Web 仅回环 3000、PostgreSQL 无宿主端口。入口临时依赖 DNS-only 名称，后续应替换为公司自有域名。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
 - 业务决策 `B01-B24` 尚未全部确认。
 - 根自托管页面已退出 legacy iframe；显式 `/erp/index.html` 仍承载尚未重写的业务 UI。Dashboard/backup 治理已接通，但真实数据、生产备份恢复演练和切换仍未完成，不能描述为已投产。
@@ -175,7 +175,7 @@
 
 ## 当前路线
 
-`SELFHOST-LANDING-TASK02` 已 `DONE / PARTIAL IMPORT`，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`。当前无 `DOING`；438 条来源保留在 root-only 清单，6 个不完整 BOM 保持 DRAFT。alpha.34 与本次 post-import dump 的 offhost copy 均待用户完成；不得自动启动下一任务、部署或切换。
+`SELFHOST-LANDING-TASK03` 已 `DONE / PUBLIC HTTPS ACTIVE`；入口为 `https://43.135.157.211.nip.io:18888`。当前无 `DOING`；438 条来源保留在 root-only 清单，6 个不完整 BOM 保持 DRAFT。post-import dump 的 offhost copy 和公司自有域名替换仍待用户完成；不得自动启动下一任务。
 
 ## 恢复上下文检查清单
 

@@ -865,6 +865,17 @@
 - 明确边界：不授权生产领料 Lot、FIFO/FEFO、效期/库龄、序列号/条码/标签、自动退货/报废、MRB/让步/返工、真实迁移、生产部署或后续任务。
 - 验收：`0.1.0-alpha.34`/`0034` 已用真实 Node/PostgreSQL HTTP 验证主链 Receipt 10→IQC 10/8/2→RELEASE 8/Close，最终 Lot `10/2/8`、Source 120、AP/Production Issue 0；独立 3 件支线沿原 Lot 全额冲销为 REVERSED，已有 IQC 的主链冲销 409。重启、接受态第二库恢复和最终 clean-0034 主库恢复均通过。本状态只代表回环并行非生产环境。
 
+## D-078 公网 18888 只通过可信 TLS 进入新 PostgreSQL ERP，旧 Python 回环保留
+
+- 日期：2026-07-28
+- 状态：`ACCEPTED / IMPLEMENTED`
+- 确认人：项目负责人（明确要求公网访问入口并指定端口 `18888`）
+- 入口：公网 `18888` 由 Caddy 终止 TLS 并反向代理到只绑定 `127.0.0.1:3000` 的 Web；PostgreSQL 不发布宿主端口。80 只用于 ACME 与 308 HTTPS 跳转，不承载明文登录。
+- 运行安全：Web/Worker 使用 `ERP_ENV=production`，Cookie 强制 `Secure`；setup token 在切换时轮换。匿名业务 API 必须保持 401，Caddy 添加 HSTS、nosniff、frame deny、Referrer 与 Permissions Policy。
+- 名称与数据路径：`43.135.157.211.nip.io` 只把名称解析到本机公网 IP，TLS 与 ERP 请求直接到本机 Caddy，不经过第三方反向代理或存储。该名称是临时入口，后续优先替换为公司自有域名。
+- 旧运行面：旧 Python 不删除、不读取或迁移 SQLite 正文，改为 `127.0.0.1:18889` 本机回退入口并保持 systemd active/enabled。
+- 数据边界：本决定不修改 Schema/Migration 或业务表，不解决 LANDING-TASK02 的 438 条隔离来源，不上传真实表格、备份、凭据或业务正文，不部署历史 Sites/D1。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
