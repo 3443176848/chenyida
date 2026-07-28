@@ -93,7 +93,7 @@ export class PostgresMaterialImportNormalizationWorker {
     let afterId = 0;
     while (true) {
       const sourceRows = await this.#repository.sourceRows(this.#pool, mapping, afterId, SELFHOST_NORMALIZATION_CHUNK_ROWS);
-      const bundles: { source: Readonly<{ id: number; rowNumber: number; rawRowHash: string; rawRow: MaterialImportRawRow }>; bundle: NormalizedRowBundle }[] = [];
+      const bundles: { source: Readonly<{ id: number; rowNumber: number; rawRowHash: string; rawRow: MaterialImportRawRow; createdAt: string }>; bundle: NormalizedRowBundle }[] = [];
       for (const source of sourceRows) {
         bundles.push({
           source,
@@ -102,6 +102,7 @@ export class PostgresMaterialImportNormalizationWorker {
             rowNumber: source.rowNumber,
             rawRowHash: source.rawRowHash,
             rawRow: source.rawRow,
+            sourceCreatedAt: source.createdAt,
             mapping,
           }),
         });

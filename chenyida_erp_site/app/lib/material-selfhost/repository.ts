@@ -27,6 +27,18 @@ type AuditInput = Readonly<{
   newVersion?: number | null;
   details?: Record<string, unknown>;
 }>;
+export type GovernanceDraftIdentityLink = Readonly<{
+  link_id: string | number;
+  group_id: string | number;
+  category: string;
+  readiness: string;
+  identity_digest: string | null;
+  rule_version: string;
+}>;
+export type GovernanceIdentityDraftReservation = Readonly<{
+  material_id: string | number;
+  material_status: string;
+}>;
 
 const numberValue = (value: unknown) => Number(value);
 const iso = (value: unknown) => value ? new Date(String(value)).toISOString() : null;
@@ -136,6 +148,36 @@ export class PostgresMaterialRepository {
       join material_attribute_definitions d on d.id=v.attribute_definition_id
       where v.material_id=$1 order by d.attribute_code
     `, [materialId]);
+    return result.rows;
+  }
+
+  async governanceDraftIdentityLinks(client: PoolClient, materialId: number): Promise<readonly GovernanceDraftIdentityLink[]> {
+    const result = await client.query<GovernanceDraftIdentityLink>(`
+      select link.id link_id,link.group_id,group_row.category,group_row.readiness,
+             group_row.identity_digest,run.rule_version
+      from material_governance_material_links link
+      join material_governance_groups group_row on group_row.id=link.group_id
+      join material_governance_runs run on run.id=group_row.governance_run_id
+      where link.material_id=$1 and link.link_type='CREATED_DRAFT'
+      order by link.id
+    `, [materialId]);
+    return result.rows;
+  }
+
+  async governanceIdentityDraftReservations(
+    client: PoolClient,
+    identityDigest: string,
+  ): Promise<readonly GovernanceIdentityDraftReservation[]> {
+    const result = await client.query<GovernanceIdentityDraftReservation>(`
+      select link.material_id,material.material_status
+      from material_governance_material_links link
+      join material_governance_groups group_row on group_row.id=link.group_id
+      join material_master material on material.id=link.material_id
+      where link.link_type='CREATED_DRAFT'
+        and group_row.identity_digest=$1
+        and material.material_status in ('DRAFT','PENDING_REVIEW')
+      order by link.material_id
+    `, [identityDigest]);
     return result.rows;
   }
 

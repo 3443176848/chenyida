@@ -1,4 +1,9 @@
 import type { PoolClient } from "pg";
+import { compatibilityProfileFor, compatibilityReviewEvidence } from "../material-governance-selfhost/compatibility.ts";
+import { MASTER_CATEGORY_GOVERNANCE_MAP } from "../material-governance-selfhost/config.ts";
+import { governMaterialSource } from "../material-governance-selfhost/engine.ts";
+import { FormalMaterialScanLimitError, scanFormalGovernanceMaterials } from "../material-governance-selfhost/formal-materials.ts";
+import { validatedDraftSource } from "../material-governance-selfhost/source-adapter.ts";
 import { MaterialWorkflowError, materialFailure } from "./errors.ts";
 import { PostgresMaterialRepository } from "./repository.ts";
 import { assertReviewSeparation, buildInternalMaterialCode, transitionMaterialState } from "./state-machine.ts";
@@ -108,6 +113,7 @@ export class MaterialWorkflowService {
       const metadata = Number.isSafeInteger(categoryId) ? await this.repository.categoryMetadata(client, categoryId) : null;
       if (!metadata) materialFailure("MATERIAL_CATEGORY_NOT_FOUND", "物料分类不存在或未启用", 404);
       const value = validateDraftPayload(payload, metadata, { sourceType: String(current.source_type), sourceRef: String(current.source_ref ?? "") });
+      await this.assertGovernanceDraftIdentity(client, materialId, value);
       const updated = await this.repository.updateDraft(client, materialId, expected, value, context.actor.username, context.requestId);
       if (!updated) materialFailure("VERSION_CONFLICT", "物料版本已变化，请刷新后重试", 409);
       const fields = ["standard_name", "category_id", "brand", "manufacturer", "manufacturer_part_number", "unit", "procurement_type", "inventory_type", "lot_control_required", "shelf_life_days", "inspection_type", "environmental_requirement", "attributes", "version"];
@@ -125,6 +131,7 @@ export class MaterialWorkflowService {
       transitionMaterialState(String(current.material_status), "SUBMIT");
       if (Number(current.version) !== expected) materialFailure("VERSION_CONFLICT", "物料版本已变化，请刷新后重试", 409);
       const value = await this.validateStored(client, current);
+      await this.assertGovernanceDraftIdentity(client, materialId, value);
       const updated = await this.repository.transition(client, materialId, expected, "DRAFT", "PENDING_REVIEW", context.actor.username, context.requestId);
       if (!updated) materialFailure("VERSION_CONFLICT", "物料版本已变化，请刷新后重试", 409);
       await this.repository.version(client, { materialId, version: Number(updated.version), eventType: "SUBMIT", reason, changedFields: ["material_status", "submitted_by", "submitted_at", "version"], snapshot: snapshot(value, updated), actor: context.actor.username, requestId: context.requestId });
@@ -152,7 +159,10 @@ export class MaterialWorkflowService {
       assertReviewSeparation(context.actor.username, String(current.created_by), String(current.last_modified_by));
       const value = await this.validateStored(client, current);
       let code: string | undefined;
-      if (approve) code = buildInternalMaterialCode(value.categoryCode, await this.repository.allocateCategorySequence(client, value.categoryId, value.categoryCode));
+      if (approve) {
+        await this.assertGovernedIdentityAvailableForApproval(client, materialId, value);
+        code = buildInternalMaterialCode(value.categoryCode, await this.repository.allocateCategorySequence(client, value.categoryId, value.categoryCode));
+      }
       const nextState = approve ? "ACTIVE" : "DRAFT";
       const updated = await this.repository.transition(client, materialId, expected, "PENDING_REVIEW", nextState, context.actor.username, context.requestId, { approvedCode: code, reason });
       if (!updated) materialFailure("VERSION_CONFLICT", "物料版本已变化，请刷新后重试", 409);
@@ -177,6 +187,105 @@ export class MaterialWorkflowService {
       return;
     }
     if (!hasPermission(actor, "material.draft.edit_any")) materialFailure("MATERIAL_NOT_FOUND", "物料不存在或无权查看", 404);
+  }
+
+  private async assertGovernanceDraftIdentity(client: PoolClient, materialId: number, value: ValidatedDraft): Promise<void> {
+    const links = await this.repository.governanceDraftIdentityLinks(client, materialId);
+    if (links.length === 0) return;
+    if (links.length !== 1) {
+      materialFailure("MATERIAL_GOVERNANCE_LINK_INTEGRITY_FAILED", "物料草稿存在冲突的治理来源，禁止继续处理", 409);
+    }
+    const link = links[0];
+    const source = validatedDraftSource(value, materialId);
+    let governed = null;
+    try {
+      governed = source ? governMaterialSource(source) : null;
+    } catch {
+      governed = null;
+    }
+    if (
+      link.readiness !== "READY"
+      || !link.identity_digest
+      || governed?.readiness !== "READY"
+      || governed.category !== link.category
+      || governed.ruleVersion !== link.rule_version
+      || governed.identityDigest !== link.identity_digest
+    ) {
+      materialFailure("MATERIAL_GOVERNANCE_IDENTITY_MISMATCH", "治理关联草稿的类别、关键规格或性能等级不得变更", 422);
+    }
+  }
+
+  private async assertGovernedIdentityAvailableForApproval(client: PoolClient, materialId: number, value: ValidatedDraft): Promise<void> {
+    if (!Object.hasOwn(MASTER_CATEGORY_GOVERNANCE_MAP, value.categoryCode)) return;
+    const source = validatedDraftSource(value, materialId);
+    if (!source) {
+      materialFailure("MATERIAL_GOVERNANCE_IDENTITY_INCOMPLETE", "物料分类与封装不符合该受治理类别的身份规则，禁止批准", 422);
+    }
+    let governed = null;
+    try {
+      governed = governMaterialSource(source);
+    } catch {
+      governed = null;
+    }
+    if (governed?.readiness !== "READY" || !governed.identityDigest) {
+      materialFailure("MATERIAL_GOVERNANCE_IDENTITY_INCOMPLETE", "该受治理类别的关键规格或性能等级不完整，禁止批准", 422);
+    }
+    const identityDigest = governed.identityDigest;
+    await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`material-governance-identity:${identityDigest}`]);
+    const reservations = await this.repository.governanceIdentityDraftReservations(client, identityDigest);
+    if (reservations.some((reservation) => Number(reservation.material_id) !== materialId)) {
+      materialFailure(
+        "MATERIAL_GOVERNANCE_IDENTITY_DRAFT_RESERVED",
+        "该规格已由 BOM 治理流程建立草稿或进入待审，当前普通草稿禁止抢占正式编码",
+        409,
+      );
+    }
+    let exactStatus: string | null = null;
+    let compatibilityConflict = false;
+    let unresolvedFormalIdentityConflict = false;
+    try {
+      await scanFormalGovernanceMaterials(client, ["ACTIVE", "FROZEN", "INACTIVE"], (material, resolved) => {
+        if (Number(material.id) === materialId) return;
+        const formalCategory = resolved?.category
+          ?? MASTER_CATEGORY_GOVERNANCE_MAP[String(material.category_code ?? "").trim().toUpperCase()];
+        if (formalCategory !== governed.category) return;
+        if (resolved?.readiness === "READY") {
+          if (resolved.identityDigest !== identityDigest) return;
+          exactStatus = String(material.material_status);
+          return false;
+        }
+        if (resolved && compatibilityReviewEvidence(resolved, governed)) {
+          compatibilityConflict = true;
+          return;
+        }
+        if (!resolved || !compatibilityProfileFor(resolved)) unresolvedFormalIdentityConflict = true;
+      });
+    } catch (error) {
+      if (error instanceof FormalMaterialScanLimitError) {
+        materialFailure("MATERIAL_GOVERNANCE_SCAN_LIMIT_EXCEEDED", "可比较的正式物料超过安全扫描上限，禁止批准", 413);
+      }
+      throw error;
+    }
+    if (exactStatus === "ACTIVE") {
+      materialFailure("MATERIAL_GOVERNANCE_DUPLICATE_ACTIVE", "该规格已有 ACTIVE 物料，禁止生成第二个正式编码", 409);
+    }
+    if (exactStatus) {
+      materialFailure("MATERIAL_GOVERNANCE_EXISTING_IDENTITY_CONFLICT", "该规格已有冻结或停用物料，需先人工处置", 409);
+    }
+    if (compatibilityConflict) {
+      materialFailure(
+        "MATERIAL_GOVERNANCE_COMPATIBILITY_REVIEW_REQUIRED",
+        "存在规格部分一致但身份元数据待处置的正式物料；当前版本不提供 ACTIVE 属性修订，禁止批准",
+        409,
+      );
+    }
+    if (unresolvedFormalIdentityConflict) {
+      materialFailure(
+        "MATERIAL_GOVERNANCE_UNRESOLVED_FORMAL_IDENTITY",
+        "同类正式物料存在无法可靠重构的身份冲突；当前版本不提供 ACTIVE 属性修订，禁止批准",
+        409,
+      );
+    }
   }
 
   private async validateStored(client: PoolClient, material: MaterialRow): Promise<ValidatedDraft> {

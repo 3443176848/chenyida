@@ -4,6 +4,7 @@ import type { JobLease } from "../infrastructure/background-jobs.ts";
 import { PostgresMaterialRepository } from "../material-selfhost/repository.ts";
 import { MaterialWorkflowService } from "../material-selfhost/service.ts";
 import { MaterialWorkflowError } from "../material-selfhost/errors.ts";
+import { MASTER_CATEGORY_GOVERNANCE_MAP } from "../material-governance-selfhost/config.ts";
 import { MaterialImportReviewError, reviewFailure } from "./errors.ts";
 import { PostgresMaterialImportReviewRepository } from "./repository.ts";
 import { buildEffectiveValues, reviewDigest } from "./values.ts";
@@ -208,11 +209,37 @@ export class PostgresMaterialImportReviewWorker {
 
   private async bindActive(client: PoolClient, row: Record<string, unknown>, sessionId: number, requestId: string): Promise<void> {
     const material = await client.query(`
-      select id,internal_material_code,standard_name,category_id,brand,manufacturer,manufacturer_part_number,
-             base_uom,material_status,version
-      from material_master where id=$1 for share
+      select material_master.id,material_master.internal_material_code,material_master.standard_name,
+             material_master.category_id,material_master.brand,material_master.manufacturer,
+             material_master.manufacturer_part_number,material_master.base_uom,
+             material_master.material_status,material_master.version,category.category_code
+      from material_master
+      join material_categories category on category.id=material_master.category_id
+      where material_master.id=$1 for share of material_master
     `, [row.existing_material_id]);
     if (!material.rows[0] || material.rows[0].material_status !== "ACTIVE") reviewFailure("IMPORT_REVIEW_MATERIAL_NOT_ACTIVE", "所选物料已不是 ACTIVE，请重新选择", 409);
+    const payload = row.final_payload && typeof row.final_payload === "object" && !Array.isArray(row.final_payload)
+      ? row.final_payload as Record<string, unknown>
+      : {};
+    const effective = payload.effective_values && typeof payload.effective_values === "object" && !Array.isArray(payload.effective_values)
+      ? payload.effective_values as Record<string, unknown>
+      : {};
+    const fields = effective.fields && typeof effective.fields === "object" && !Array.isArray(effective.fields)
+      ? effective.fields as Record<string, unknown>
+      : {};
+    const sourceCategory = await client.query("select category_code from material_categories where id=$1 and status='ACTIVE'", [fields.CATEGORY_ID]);
+    const targetCategoryCode = String(material.rows[0].category_code ?? "").trim().toUpperCase();
+    const sourceCategoryCode = String(sourceCategory.rows[0]?.category_code ?? "").trim().toUpperCase();
+    if (
+      Object.hasOwn(MASTER_CATEGORY_GOVERNANCE_MAP, targetCategoryCode)
+      || Object.hasOwn(MASTER_CATEGORY_GOVERNANCE_MAP, sourceCategoryCode)
+    ) {
+      reviewFailure(
+        "IMPORT_REVIEW_GOVERNANCE_REQUIRED",
+        "该物料类别必须通过 BOM 主数据治理组进行精确绑定，旧逐行复核入口禁止绑定",
+        409,
+      );
+    }
     const snapshot = { ...material.rows[0], id: number(material.rows[0].id), category_id: number(material.rows[0].category_id), version: Number(material.rows[0].version) };
     await client.query(`
       insert into material_import_review_material_bindings(
@@ -229,6 +256,15 @@ export class PostgresMaterialImportReviewWorker {
     const payload = row.final_payload as Record<string, unknown>;
     const effective = payload.effective_values as { fields: Record<string, unknown>; attributes: Record<string, { value: unknown; unit: string | null }> };
     const fields = effective.fields;
+    const category = await client.query("select category_code from material_categories where id=$1 and status='ACTIVE'", [fields.CATEGORY_ID]);
+    const categoryCode = String(category.rows[0]?.category_code ?? "").trim().toUpperCase();
+    if (categoryCode && Object.hasOwn(MASTER_CATEGORY_GOVERNANCE_MAP, categoryCode)) {
+      reviewFailure(
+        "IMPORT_REVIEW_GOVERNANCE_REQUIRED",
+        "该物料类别必须通过 BOM 主数据治理组建稿，旧逐行复核入口禁止创建重复草稿",
+        409,
+      );
+    }
     const attributes = Object.fromEntries(Object.entries(effective.attributes).filter(([, item]) => item.value != null).map(([code, item]) => [code, { value: item.value, unit: item.unit ?? "", source: "MANUAL", confidence: 1 }]));
     const draftBody = {
       category_id: fields.CATEGORY_ID,

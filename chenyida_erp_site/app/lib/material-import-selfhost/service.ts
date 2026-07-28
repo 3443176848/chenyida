@@ -1,5 +1,16 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
+import {
+  analyzeAdaptiveImportStructure,
+  MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION,
+  MATERIAL_IMPORT_HEADER_SCAN_ROWS,
+  suggestAdaptiveFieldMappings,
+  type AdaptiveFieldMapping,
+  type AdaptiveHeaderCandidate,
+  type AdaptiveImportSheet,
+  type CanonicalField,
+} from "../material-import/adaptive-import.ts";
+import type { MaterialImportRawRow } from "../material-import/parser-model.ts";
 import { mappingTargetSemanticProjection, PostgresMappingCatalog } from "./catalog.ts";
 import { mappingFailure } from "./errors.ts";
 import {
@@ -17,6 +28,13 @@ import type { MappingActor, MappingDraftInput, MappingItemInput, MappingTarget, 
 type Queryable = Pick<Pool | PoolClient, "query">;
 type BatchRow = Record<string, unknown>;
 type MappingRow = Record<string, unknown>;
+type InitialMappingSheet = Readonly<{
+  sheetIndex: number;
+  sheetName: string;
+  rowCount: number;
+  sourceColumnMax: number;
+  mergedRanges: readonly string[];
+}>;
 type MutationContext = Readonly<{
   actor: MappingActor;
   requestId: string;
@@ -74,11 +92,14 @@ const HEADER_TARGETS = new Map<string, readonly [MappingItemInput["target_namesp
   ["standard_name", ["basic", "STANDARD_NAME"]],
   ["标准名称", ["basic", "STANDARD_NAME"]],
   ["物料名称", ["basic", "STANDARD_NAME"]],
+  ["name", ["basic", "STANDARD_NAME"]],
+  ["item name", ["basic", "STANDARD_NAME"]],
   ["unit", ["basic", "UNIT"]],
   ["单位", ["basic", "UNIT"]],
-  ["规格", ["basic", "SPECIFICATION_MODEL"]],
-  ["型号", ["basic", "SPECIFICATION_MODEL"]],
-  ["specification", ["basic", "SPECIFICATION_MODEL"]],
+  ["规格", ["supplier_reference", "SUPPLIER_SPECIFICATION"]],
+  ["型号", ["supplier_reference", "SUPPLIER_SPECIFICATION"]],
+  ["specification", ["supplier_reference", "SUPPLIER_SPECIFICATION"]],
+  ["spec", ["supplier_reference", "SUPPLIER_SPECIFICATION"]],
   ["description", ["basic", "DESCRIPTION"]],
   ["描述", ["basic", "DESCRIPTION"]],
   ["备注", ["basic", "DESCRIPTION"]],
@@ -87,7 +108,84 @@ const HEADER_TARGETS = new Map<string, readonly [MappingItemInput["target_namesp
   ["供应商料号", ["supplier_reference", "SUPPLIER_ITEM_CODE"]],
   ["供应商名称", ["supplier_reference", "SUPPLIER_NAME"]],
   ["supplier_name", ["supplier_reference", "SUPPLIER_NAME"]],
+  ["物料编码", ["supplier_reference", "SUPPLIER_ITEM_CODE"]],
+  ["料号", ["supplier_reference", "SUPPLIER_ITEM_CODE"]],
+  ["item", ["supplier_reference", "SUPPLIER_ITEM_CODE"]],
+  ["item code", ["supplier_reference", "SUPPLIER_ITEM_CODE"]],
+  ["part no", ["supplier_reference", "SUPPLIER_ITEM_CODE"]],
+  ["brand", ["basic", "BRAND"]],
+  ["品牌", ["basic", "BRAND"]],
+  ["manufacturer", ["basic", "MANUFACTURER"]],
+  ["制造商", ["basic", "MANUFACTURER"]],
+  ["生产厂商", ["basic", "MANUFACTURER"]],
+  ["qty", ["supplier_reference", "SOURCE_QUANTITY"]],
+  ["quantity", ["supplier_reference", "SOURCE_QUANTITY"]],
+  ["数量", ["supplier_reference", "SOURCE_QUANTITY"]],
 ]);
+
+const ADAPTIVE_TARGETS: Readonly<Partial<Record<CanonicalField, readonly [MappingItemInput["target_namespace"], string]>>> = Object.freeze({
+  material_code: ["supplier_reference", "SUPPLIER_ITEM_CODE"] as const,
+  material_name: ["basic", "STANDARD_NAME"] as const,
+  specification: ["supplier_reference", "SUPPLIER_SPECIFICATION"] as const,
+  model: ["basic", "SPECIFICATION_MODEL"] as const,
+  brand: ["basic", "BRAND"] as const,
+  manufacturer: ["basic", "MANUFACTURER"] as const,
+  unit: ["basic", "UNIT"] as const,
+  category: ["category_hint", "CATEGORY_HINT"] as const,
+  description: ["basic", "DESCRIPTION"] as const,
+  manufacturer_part_no: ["basic", "MANUFACTURER_PART_NUMBER"] as const,
+  supplier_part_no: ["supplier_reference", "SUPPLIER_ITEM_CODE"] as const,
+  quantity: ["supplier_reference", "SOURCE_QUANTITY"] as const,
+});
+
+const ADAPTIVE_STATUS_RANK: Readonly<Record<AdaptiveFieldMapping["status"], number>> = Object.freeze({
+  EXACT: 5,
+  HIGH_CONFIDENCE: 4,
+  SUGGESTED: 3,
+  UNMAPPED: 1,
+  CONFLICT: 0,
+});
+
+export function adaptiveSuggestedItems(header: AdaptiveHeaderCandidate, targets: readonly MappingTarget[]): readonly MappingItemInput[] {
+  const targetByKey = new Map(targets.map((target) => [`${target.target_namespace}\u0000${target.target_code}`, target]));
+  const selected = new Map<string, Readonly<{ mapping: AdaptiveFieldMapping; field: CanonicalField }>>();
+  for (const mapping of suggestAdaptiveFieldMappings(header)) {
+    const targetReference = ADAPTIVE_TARGETS[mapping.field];
+    if (!targetReference || !mapping.sourceColumnIndexes.length || ["UNMAPPED", "CONFLICT"].includes(mapping.status)) continue;
+    const key = `${targetReference[0]}\u0000${targetReference[1]}`;
+    const previous = selected.get(key);
+    const priority = mapping.field === "supplier_part_no" ? 3 : mapping.field === "specification" ? 2 : mapping.field === "model" ? 1 : 0;
+    const previousPriority = previous?.field === "supplier_part_no" ? 3 : previous?.field === "specification" ? 2 : previous?.field === "model" ? 1 : 0;
+    if (
+      !previous
+      || ADAPTIVE_STATUS_RANK[mapping.status] > ADAPTIVE_STATUS_RANK[previous.mapping.status]
+      || (ADAPTIVE_STATUS_RANK[mapping.status] === ADAPTIVE_STATUS_RANK[previous.mapping.status] && (mapping.confidence > previous.mapping.confidence || (mapping.confidence === previous.mapping.confidence && priority > previousPriority)))
+    ) selected.set(key, Object.freeze({ mapping, field: mapping.field }));
+  }
+  const output: MappingItemInput[] = [];
+  for (const [key, candidate] of [...selected.entries()].sort(([left], [right]) => left.localeCompare(right, "en"))) {
+    const target = targetByKey.get(key);
+    if (!target) continue;
+    const mapping = candidate.mapping;
+    output.push(Object.freeze({
+      source_column_index: mapping.sourceColumnIndexes[0],
+      source_column_indexes: Object.freeze([...mapping.sourceColumnIndexes]),
+      source_header: mapping.sourceHeaders[0] ?? null,
+      source_headers: Object.freeze([...mapping.sourceHeaders]),
+      target_namespace: target.target_namespace,
+      target_code: target.target_code,
+      mapping_mode: "SOURCE",
+      required: target.required_for_confirm,
+      display_order: output.length,
+      combination_strategy: mapping.combinationStrategy,
+      combination_separator: mapping.separator,
+      mapping_confidence: mapping.confidence,
+      adaptive_mapping_status: mapping.status,
+      mapping_evidence: Object.freeze([...mapping.evidence, `ADAPTIVE_FIELD_${candidate.field.toUpperCase()}`]),
+    }));
+  }
+  return Object.freeze(output);
+}
 
 export function suggestedItems(fields: readonly SourceField[], targets: readonly MappingTarget[]): readonly MappingItemInput[] {
   const byKey = new Map(targets.map((target) => [`${target.target_namespace}\u0000${target.target_code}`, target]));
@@ -139,12 +237,14 @@ async function sourceContext(
 ): Promise<Readonly<{ sheetName: string; rowCount: number; columnCount: number; fields: readonly SourceField[]; digest: string }>> {
   if (numberValue(batch.current_parse_run_id) !== parseRunId) mappingFailure("IMPORT_MAPPING_PARSE_RUN_CONFLICT", "解析结果已经变化，请刷新后重试", 409);
   const sheetResult = await client.query(`
-    select sheet_name,row_count,source_column_max from material_import_parse_sheets
-    where parse_run_id=$1 and sheet_index=$2 and visibility='VISIBLE' and parse_status='COMPLETED'
+    select s.sheet_name,s.row_count,s.source_column_max,
+      coalesce((select max(r.row_number) from material_import_rows r where r.parse_run_id=s.parse_run_id and r.sheet_index=s.sheet_index),0) maximum_row_number
+    from material_import_parse_sheets s
+    where s.parse_run_id=$1 and s.sheet_index=$2 and s.visibility='VISIBLE' and s.parse_status='COMPLETED'
   `, [parseRunId, sheetIndex]);
   const sheet = sheetResult.rows[0] as Record<string, unknown> | undefined;
   if (!sheet) mappingFailure("IMPORT_MAPPING_SHEET_NOT_FOUND", "来源 Sheet 不存在或不可用于 Mapping", 404);
-  const rowCount = numberValue(sheet.row_count);
+  const rowCount = numberValue(sheet.maximum_row_number);
   const columnCount = numberValue(sheet.source_column_max);
   if (headerMode === "SINGLE_ROW" && (!headerRowNumber || headerRowNumber < 1 || headerRowNumber > rowCount)) mappingFailure("IMPORT_HEADER_NOT_CONFIRMED", "表头行无效", 422);
   const header = headerMode === "SINGLE_ROW"
@@ -221,10 +321,12 @@ async function mappingDto(client: Queryable, row: MappingRow): Promise<Record<st
     selected_sheet_name: row.selected_sheet_name,
     header_mode: row.header_mode,
     header_row_number: row.header_row_number == null ? null : numberValue(row.header_row_number),
-    header_start_row_number: row.header_row_number == null ? null : numberValue(row.header_row_number),
-    data_start_row_number: row.header_row_number == null ? 1 : numberValue(row.header_row_number) + 1,
-    structure_confidence: 1,
-    structure_status: "CONFIRMED",
+    header_start_row_number: row.header_start_row_number == null ? (row.header_row_number == null ? null : numberValue(row.header_row_number)) : numberValue(row.header_start_row_number),
+    header_end_row_number: row.header_end_row_number == null ? (row.header_row_number == null ? null : numberValue(row.header_row_number)) : numberValue(row.header_end_row_number),
+    data_start_row_number: row.data_start_row_number == null ? (row.header_row_number == null ? 1 : numberValue(row.header_row_number) + 1) : numberValue(row.data_start_row_number),
+    structure_confidence: row.structure_confidence == null ? (row.header_mode === "NO_HEADER" ? 0 : 1) : Number(row.structure_confidence),
+    structure_status: row.structure_status ?? (row.header_mode === "NO_HEADER" ? "NO_CANDIDATE" : "CONFIRMED"),
+    adaptive_algorithm_version: row.adaptive_algorithm_version ?? null,
     source_structure_digest: row.source_structure_digest,
     source_fields: row.source_fields,
     mapping_status: row.status,
@@ -297,32 +399,74 @@ function targetCompatibility(mappingSnapshot: unknown, currentTargets: readonly 
 
 export async function publishInitialMapping(
   client: PoolClient,
-  input: Readonly<{ batchId: number; parseRunId: number; requestId: string; actor: string; rows: readonly Readonly<{ sheetIndex: number; sheetName: string; rowNumber: number; raw: unknown }>[] }>,
+  input: Readonly<{
+    batchId: number;
+    parseRunId: number;
+    requestId: string;
+    actor: string;
+    rows: readonly Readonly<{ sheetIndex: number; sheetName: string; rowNumber: number; raw: unknown }>[];
+    sheets?: readonly InitialMappingSheet[];
+  }>,
 ): Promise<Readonly<{ mappingId: number; sourceStructureDigest: string }>> {
   const batchResult = await client.query("select * from material_import_batches where id=$1 for update", [input.batchId]);
   const batch = batchResult.rows[0] as BatchRow | undefined;
   if (!batch) mappingFailure("IMPORT_BATCH_NOT_FOUND", "导入批次不存在", 404);
   const catalog = await new PostgresMappingCatalog(client).snapshot();
-  const sheetIndexes = [...new Set(input.rows.map((row) => row.sheetIndex))].sort((a, b) => a - b);
-  const selectedSheetIndex = sheetIndexes[0] ?? 0;
+  const sourceSheets: readonly InitialMappingSheet[] = input.sheets?.length
+    ? input.sheets
+    : [...new Set(input.rows.map((row) => row.sheetIndex))].sort((a, b) => a - b).map((sheetIndex) => {
+      const rows = input.rows.filter((row) => row.sheetIndex === sheetIndex);
+      return Object.freeze({
+        sheetIndex,
+        sheetName: rows[0]?.sheetName ?? `Sheet${sheetIndex + 1}`,
+        rowCount: rows.length,
+        sourceColumnMax: Math.max(0, ...rows.map((row) => sourceColumnCount(row.raw))),
+        mergedRanges: Object.freeze([]),
+      });
+    });
+  const sheets: AdaptiveImportSheet[] = sourceSheets.map((sheet) => {
+    const rows = input.rows.filter((row) => row.sheetIndex === sheet.sheetIndex);
+    const analysisRows = rows.filter((row) => row.rowNumber <= MATERIAL_IMPORT_HEADER_SCAN_ROWS);
+    return Object.freeze({
+      sheetIndex: sheet.sheetIndex,
+      sheetName: sheet.sheetName,
+      rowCount: sheet.rowCount,
+      sourceColumnMax: sheet.sourceColumnMax,
+      mergedRanges: Object.freeze([...sheet.mergedRanges]),
+      rows: Object.freeze(analysisRows.map((row) => Object.freeze({ rowNumber: row.rowNumber, raw: row.raw as MaterialImportRawRow }))),
+    });
+  });
+  const structure = analyzeAdaptiveImportStructure(sheets);
+  const selectedSheetIndex = structure.selectedSheetIndex ?? structure.sheets[0]?.sheetIndex ?? sheets[0]?.sheetIndex ?? 0;
   const selectedRows = input.rows.filter((row) => row.sheetIndex === selectedSheetIndex);
-  const sheetName = selectedRows[0]?.sheetName ?? "__CSV__";
-  const columnCount = Math.max(0, ...selectedRows.map((row) => sourceColumnCount(row.raw)));
-  const headerRow = selectedRows.find((row) => row.rowNumber === 1)?.raw ?? null;
-  const fields = sourceFieldsFromRaw(headerRow, columnCount);
+  const selectedSheet = sheets.find((sheet) => sheet.sheetIndex === selectedSheetIndex);
+  const sheetName = selectedRows[0]?.sheetName ?? selectedSheet?.sheetName ?? "__CSV__";
+  const columnCount = selectedSheet?.sourceColumnMax ?? Math.max(0, ...selectedRows.map((row) => sourceColumnCount(row.raw)));
+  const selectedAnalysis = structure.sheets.find((sheet) => sheet.sheetIndex === selectedSheetIndex);
+  const selectedHeader = selectedAnalysis?.selectedHeader ?? null;
+  const fields: readonly SourceField[] = selectedHeader
+    ? Object.freeze(selectedHeader.columns.map((column) => Object.freeze({
+      column_index: column.columnIndex,
+      column_ref: columnReference(column.columnIndex),
+      source_header: column.headerPath,
+      normalized_header: normalizeSourceHeader(column.headerPath, column.columnIndex),
+    })))
+    : sourceFieldsFromRaw(null, columnCount);
+  const headerMode = selectedHeader ? "SINGLE_ROW" as const : "NO_HEADER" as const;
+  const headerRowNumber = selectedHeader?.headerEndRow ?? null;
   const structureDigest = sourceStructureDigest({
     sourceKind: String(batch.source_kind),
     sheetName,
     sheetIndex: selectedSheetIndex,
-    headerMode: selectedRows.length ? "SINGLE_ROW" : "NO_HEADER",
-    headerRowNumber: selectedRows.length ? 1 : null,
+    headerMode,
+    headerRowNumber,
     fields,
   });
-  const items = suggestedItems(fields, catalog.targets);
+  const items = selectedHeader ? adaptiveSuggestedItems(selectedHeader, catalog.targets) : Object.freeze([] as MappingItemInput[]);
   const mappingDigest = mappingContentDigest({
     selectedSheetIndex,
-    headerMode: selectedRows.length ? "SINGLE_ROW" : "NO_HEADER",
-    headerRowNumber: selectedRows.length ? 1 : null,
+    headerMode,
+    headerRowNumber,
     sourceStructureDigest: structureDigest,
     metadataDigest: catalog.metadataDigest,
     items,
@@ -331,17 +475,36 @@ export async function publishInitialMapping(
   const created = await client.query(`
     insert into material_import_mappings (
       mapping_key,batch_id,parse_run_id,mapping_version,source_kind,selected_sheet_index,selected_sheet_name,
-      header_mode,header_row_number,source_structure_digest,source_fields,metadata_digest,target_catalog_version,
+      header_mode,header_row_number,header_start_row_number,header_end_row_number,data_start_row_number,
+      structure_confidence,structure_status,adaptive_algorithm_version,
+      source_structure_digest,source_fields,metadata_digest,target_catalog_version,
       mapping_digest,status,created_by,updated_by,request_id
-    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'material-import-mapping-metadata-v1',$13,'DRAFT',$14,$14,$15)
+    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'material-import-mapping-metadata-v1',$19,'DRAFT',$20,$20,$21)
     returning id
   `, [
     randomUUID(), input.batchId, input.parseRunId, Number(previous.rows[0]?.version || 0) + 1,
-    String(batch.source_kind), selectedSheetIndex, sheetName, selectedRows.length ? "SINGLE_ROW" : "NO_HEADER",
-    selectedRows.length ? 1 : null, structureDigest, JSON.stringify(fields), catalog.metadataDigest, mappingDigest, input.actor, input.requestId,
+    String(batch.source_kind), selectedSheetIndex, sheetName, headerMode,
+    headerRowNumber, selectedHeader?.headerStartRow ?? headerRowNumber, selectedHeader?.headerEndRow ?? headerRowNumber,
+    selectedHeader?.dataStartRow ?? null, selectedHeader ? structure.confidence : null,
+    selectedHeader ? structure.status : null, selectedHeader ? MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION : null,
+    structureDigest, JSON.stringify(fields), catalog.metadataDigest, mappingDigest, input.actor, input.requestId,
   ]);
   const mappingId = numberValue(created.rows[0].id);
   await insertItems(client, mappingId, items);
+  for (const analysis of structure.sheets) {
+    const seenRows = new Set<number>();
+    for (const [index, candidate] of analysis.headerCandidates.entries()) {
+      if (seenRows.has(candidate.headerStartRow)) continue;
+      seenRows.add(candidate.headerStartRow);
+      await client.query(`
+        insert into material_import_header_suggestions(
+          parse_run_id,sheet_index,row_number,rank,score,reason_codes,algorithm_version,metadata_digest
+        ) values($1,$2,$3,$4,$5,$6,$7,$8)
+        on conflict(parse_run_id,sheet_index,row_number,algorithm_version) do nothing
+      `, [input.parseRunId, analysis.sheetIndex, candidate.headerStartRow, index + 1, candidate.score, JSON.stringify(candidate.reasonCodes), MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION, catalog.metadataDigest]);
+      if (seenRows.size >= 5) break;
+    }
+  }
   return { mappingId, sourceStructureDigest: structureDigest };
 }
 
@@ -529,10 +692,19 @@ export class MaterialImportMappingService {
       await client.query(`
         update material_import_mappings set
           parse_run_id=$2,mapping_version=$3,selected_sheet_index=$4,selected_sheet_name=$5,header_mode=$6,
-          header_row_number=$7,source_structure_digest=$8,source_fields=$9,metadata_digest=$10,mapping_digest=$11,
-          mapping_snapshot=null,reuse_source_mapping_id=null,updated_by=$12,request_id=$13,updated_at=now()
+          header_row_number=$7,header_start_row_number=$7,header_end_row_number=$7,
+          data_start_row_number=case when $7::integer is null then null else $7::integer+1 end,
+          structure_confidence=case when $7::integer is null then null else 1 end,
+          structure_status=case when $7::integer is null then null else 'CONFIRMED' end,
+          adaptive_algorithm_version=case when $7::integer is null then null else $8 end,
+          source_structure_digest=$9,source_fields=$10,metadata_digest=$11,mapping_digest=$12,
+          mapping_snapshot=null,reuse_source_mapping_id=null,updated_by=$13,request_id=$14,updated_at=now()
         where id=$1
-      `, [numberValue(row.id), parseRunId, nextVersion, draft.selected_sheet_index, source.sheetName, draft.header_mode, draft.header_row_number ?? null, source.digest, JSON.stringify(source.fields), catalog.metadataDigest, mappingDigest, context.actor.username, context.requestId]);
+      `, [numberValue(row.id), parseRunId, nextVersion, draft.selected_sheet_index, source.sheetName, draft.header_mode, draft.header_row_number ?? null, MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION, source.digest, JSON.stringify(source.fields), catalog.metadataDigest, mappingDigest, context.actor.username, context.requestId]);
+      await client.query(`
+        update material_import_parse_runs set source_structure_digest=$2,updated_at=now()
+        where id=$1 and batch_id=$3
+      `, [parseRunId, source.digest, batchId]);
       await client.query("delete from material_import_mapping_items where mapping_id=$1", [numberValue(row.id)]);
       await insertItems(client, numberValue(row.id), items);
       await audit(client, batch, context, "IMPORT_MAPPING_SAVED", String(batch.status), String(batch.status), { batch_id: batchId, mapping_id: numberValue(row.id), mapping_version: nextVersion });
@@ -611,6 +783,14 @@ export class MaterialImportMappingService {
         source_structure_digest: row.source_structure_digest,
         metadata_digest: catalog.metadataDigest,
         source_fields: row.source_fields,
+        adaptive_algorithm_version: row.adaptive_algorithm_version ?? null,
+        adaptive_structure: {
+          header_start_row_number: row.header_start_row_number == null ? row.header_row_number : row.header_start_row_number,
+          header_end_row_number: row.header_end_row_number == null ? row.header_row_number : row.header_end_row_number,
+          data_start_row_number: row.data_start_row_number == null ? (row.header_row_number == null ? 1 : numberValue(row.header_row_number) + 1) : numberValue(row.data_start_row_number),
+          confidence: row.structure_confidence == null ? 1 : Number(row.structure_confidence),
+          status: row.structure_status ?? "CONFIRMED",
+        },
         items,
         targets: targetSnapshot(catalog.targets, items),
       };
@@ -641,10 +821,14 @@ export class MaterialImportMappingService {
       const created = await client.query(`
         insert into material_import_mappings (
           mapping_key,batch_id,parse_run_id,mapping_version,source_kind,selected_sheet_index,selected_sheet_name,
-          header_mode,header_row_number,source_structure_digest,source_fields,metadata_digest,target_catalog_version,
+          header_mode,header_row_number,header_start_row_number,header_end_row_number,data_start_row_number,
+          structure_confidence,structure_status,adaptive_algorithm_version,
+          source_structure_digest,source_fields,metadata_digest,target_catalog_version,
           mapping_digest,status,reuse_source_mapping_id,created_by,updated_by,request_id
         ) select mapping_key,batch_id,parse_run_id,mapping_version+1,source_kind,selected_sheet_index,selected_sheet_name,
-          header_mode,header_row_number,source_structure_digest,source_fields,metadata_digest,target_catalog_version,
+          header_mode,header_row_number,header_start_row_number,header_end_row_number,data_start_row_number,
+          structure_confidence,structure_status,adaptive_algorithm_version,
+          source_structure_digest,source_fields,metadata_digest,target_catalog_version,
           mapping_digest,'DRAFT',id,$2,$2,$3 from material_import_mappings where id=$1 returning *
       `, [numberValue(confirmed.id), context.actor.username, context.requestId]);
       await insertItems(client, numberValue(created.rows[0].id), items);

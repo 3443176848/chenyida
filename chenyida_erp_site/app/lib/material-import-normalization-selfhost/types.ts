@@ -28,6 +28,7 @@ export type NormalizationMappingContext = Readonly<{
   sourceSheetIndex: number;
   sourceSheetName: string;
   headerRowNumber: number | null;
+  dataStartRowNumber: number | null;
   sourceFields: readonly Readonly<{
     column_index: number;
     column_ref: string;

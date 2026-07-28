@@ -4,6 +4,16 @@
 
 ## 2026-07-29
 
+### SELFHOST-PHASE6-TASK01 - `feat: add BOM material governance pipeline`
+
+- 范围/规则：在既有 CSV/XLS/XLSX Parser→Mapping→Normalization→Review 后增加可配置 `bom-material-governance-v1`；以品类+类型化关键规格+性能等级严格判同，使用精确十进制量纲，只对完整 READY 身份归组。`0201WMJ0000TCE` 与完整的 `0201,0R,±5%` 样例通过明示规则/默认归组；`1uF` 与 `100pF`、任一必需容量/耐压/介质/精度差异都不归并。型号敏感品类使用完整 MPN+封装，不做词干/模糊合并。
+- 数据库：新增唯一 expand-only `0035_bom_material_governance.sql`，九张 Governance Run/Group/Row/Spec、Material/Alternative Candidate、Decision/Link/Event 关系表；`material_import_mappings` 增加表头始/终行、数据起始行、结构置信/状态/算法版本 6 列，metadata v2 增加 4 属性、6 分类节点和更严精度/叶子必填绑定。Schema/snapshot/journal 一致，`0001—0034` 未修改，0035 未应用常驻库。
+- API/安全：增加批次 latest/list/create governance run，run/group/row 读取，`materials|bom-mapping|duplicates|exceptions|alternatives` 五类报告，以及 `BIND_EXISTING|CREATE_DRAFT|EXCLUDE` 决策端点。读取执行 owner/`read_any`；写入执行 capability、CSRF、`Idempotency-Key`/digest、CAS、限流、单事务审计；响应使用稳定错误码、中文提示、`X-Request-ID` 和 `no-store`。
+- 全局身份门禁：治理建稿、治理 Draft 批准与普通 Draft 批准共享 advisory identity lock；`CREATED_DRAFT` 持久预留防止竞争产生二码。绑定时 live revalidation 允许快照后新出现的精确 ACTIVE 收敛；INACTIVE/FROZEN、已有 Draft 和无法可靠重建身份的旧正式行 fail closed。旧 Import Review 不能对受治理类别旁路 CREATE/BIND。
+- 报告/追溯：不可变来源保存原始料号、描述、厂商、BOM/批次、数量/单位和解析证据，可沿 `material_id <- governance group <- source row <- normalization/import batch` 追溯。标准候选 key 不是正式 ERP 编码；替代项始终是待审候选，不自动写 Supplier Mapping 或正式替代关系。
+- 验证：治理 unit `61/61`、PostgreSQL `16/16`、migration contract/0034-upgrade `5/5 + 5/5`；Material/Normalization/Import Worker/Review PostgreSQL `7/7 + 5/5 + 1/1 + 4/4`；Material unit/UI `63/63`；`npm test` `3/3`、`typecheck:governance`、credentials 最终 1,050 文件扫描通过，lint `0 error / 8 既有 warning`。
+- 边界/限制：历史正式物料兼容问题只检测和阻断，无 ACTIVE 属性修订流程；`MECH/OTHER` 为 `UNSUPPORTED`；无治理 UI、真实回填、正式替代料审批或生产部署。`shujvbiao/` 未修改/暂存/提交；但断网只读凭据扫描器原默认 `--others` 曾对该未跟踪路径发起读取，未输出或传输内容，已记录为边界偏差。扫描器已在打开内容前排除该受保护未跟踪目录，最终复扫通过。未 build/restart 常驻服务；两个隔离测试库和临时容器已删除，四个受保护卷保留。
+
 ### SELFHOST-LANDING-TASK04 - `ops: record task04 web deployment`
 
 - 授权/范围：项目负责人明确授权把 `cda8c7e` 部署到当前 18888 运行面并允许 build/restart。实际严格串行构建 Web，并以 `--no-deps --force-recreate --wait` 只更换 Web；未运行 migrate，PostgreSQL/Worker/Caddy 容器未更换。

@@ -1,3 +1,5 @@
+import { normalizeExactDecimal } from "../../lib/exact-decimal.ts";
+
 export type DraftBasicFields = {
   standard_name: string;
   unit: string;
@@ -69,12 +71,9 @@ export function strictInteger(value: string): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
-export function strictDecimal(value: string, scale: number | null): number | null {
-  if (!DECIMAL_PATTERN.test(value)) return null;
-  const fraction = value.split(".")[1] || "";
-  if (scale !== null && fraction.length > scale) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+export function strictDecimal(value: string, scale: number | null): string | null {
+  if (!DECIMAL_PATTERN.test(value) || scale === null) return null;
+  return normalizeExactDecimal(value, scale);
 }
 
 function stableValue(value: unknown): unknown {

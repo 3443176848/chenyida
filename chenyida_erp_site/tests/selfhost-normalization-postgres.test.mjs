@@ -7,6 +7,7 @@ import { PostgresBackgroundJobQueue } from "../app/lib/infrastructure/background
 import { PostgresMappingCatalog, mappingTargetSemanticProjection } from "../app/lib/material-import-selfhost/catalog.ts";
 import { handleSelfhostMaterialImportNormalizationApi } from "../app/lib/material-import-normalization-selfhost/handler.ts";
 import { PostgresMaterialImportNormalizationWorker } from "../app/lib/material-import-normalization-selfhost/worker.ts";
+import { MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION } from "../app/lib/material-import/adaptive-import.ts";
 import { MATERIAL_IMPORT_NORMALIZATION_PROCESSOR_VERSION } from "../app/lib/material-import/normalization-model.ts";
 import { mappingContentDigest, sourceStructureDigest } from "../app/lib/material-import-selfhost/rules.ts";
 
@@ -58,7 +59,29 @@ async function reset() {
   `);
 }
 
-async function createMappedBatch() {
+async function createMappedBatch({ adaptiveMultiRowHeader = false } = {}) {
+  const headerRowNumber = adaptiveMultiRowHeader ? 3 : 1;
+  const headerStartRowNumber = adaptiveMultiRowHeader ? 2 : null;
+  const headerEndRowNumber = adaptiveMultiRowHeader ? 3 : null;
+  const dataStartRowNumber = adaptiveMultiRowHeader ? 4 : null;
+  const adaptiveAlgorithmVersion = adaptiveMultiRowHeader ? MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION : null;
+  const values = adaptiveMultiRowHeader
+    ? [
+        raw(["供应商 BOM 版本 V2", "", "", ""]),
+        raw(["物料信息", "物料信息", "供应信息", "电气参数"]),
+        raw(["名称", "单位", "品牌", "额定电压"]),
+        raw(["精密电阻", "PCS", "TDK", "12.50"]),
+        raw(["贴片电容", "PCS", "UNKNOWN", "3.30"]),
+        raw(["   ", "PCS", "Murata", "5.00"]),
+        raw(["测试器件", "PCS", "TDK", "not-a-number"]),
+      ]
+    : [
+        raw(["名称", "单位", "品牌", "额定电压"]),
+        raw(["精密电阻", "PCS", "TDK", "12.50"]),
+        raw(["贴片电容", "PCS", "UNKNOWN", "3.30"]),
+        raw(["   ", "PCS", "Murata", "5.00"]),
+        raw(["测试器件", "PCS", "TDK", "not-a-number"]),
+      ];
   const batch = await pool.query(`
     insert into material_import_batches(batch_no,source_kind,status,created_by,current_version)
     values($1,'CSV','MAPPING_CONFIRMED','normalizer1',5) returning *
@@ -72,21 +95,14 @@ async function createMappedBatch() {
     insert into material_import_parse_runs(
       batch_id,parser_version,run_status,attempt_no,source_file_sha256,current_stage,rows_written,
       parsed_sheet_count,mapping_preparation_status,started_at,completed_at
-    ) values($1,'material-import-parser-v1','SUCCEEDED',1,$2,'COMPLETE',5,1,'READY',now(),now()) returning id
-  `, [batchId, "a".repeat(64)]);
+    ) values($1,'material-import-parser-v1','SUCCEEDED',1,$2,'COMPLETE',$3,1,'READY',now(),now()) returning id
+  `, [batchId, "a".repeat(64), values.length]);
   const parseRunId = Number(parse.rows[0].id);
   const sheet = await pool.query(`
     insert into material_import_parse_sheets(
       parse_run_id,sheet_index,sheet_name,visibility,parse_status,row_count,source_column_max,warnings
-    ) values($1,0,'物料','VISIBLE','COMPLETED',5,4,'[]'::jsonb) returning id
-  `, [parseRunId]);
-  const values = [
-    raw(["名称", "单位", "品牌", "额定电压"]),
-    raw(["精密电阻", "PCS", "TDK", "12.50"]),
-    raw(["贴片电容", "PCS", "UNKNOWN", "3.30"]),
-    raw(["   ", "PCS", "Murata", "5.00"]),
-    raw(["测试器件", "PCS", "TDK", "not-a-number"]),
-  ];
+    ) values($1,0,'物料','VISIBLE','COMPLETED',$2,4,'[]'::jsonb) returning id
+  `, [parseRunId, values.length]);
   for (let index = 0; index < values.length; index += 1) {
     await pool.query(`
       insert into material_import_rows(batch_id,parse_run_id,job_id,sheet_index,sheet_name,row_number,raw_values,raw_row_hash)
@@ -99,7 +115,7 @@ async function createMappedBatch() {
     { column_index: 2, column_ref: "C", source_header: "品牌", normalized_header: "品牌" },
     { column_index: 3, column_ref: "D", source_header: "额定电压", normalized_header: "额定电压" },
   ];
-  const structureDigest = sourceStructureDigest({ sourceKind: "CSV", sheetName: "物料", sheetIndex: 0, headerMode: "SINGLE_ROW", headerRowNumber: 1, fields });
+  const structureDigest = sourceStructureDigest({ sourceKind: "CSV", sheetName: "物料", sheetIndex: 0, headerMode: "SINGLE_ROW", headerRowNumber, fields });
   await pool.query("update material_import_parse_runs set source_structure_digest=$2 where id=$1", [parseRunId, structureDigest]);
   await pool.query(`
     insert into material_attribute_definitions(
@@ -114,15 +130,22 @@ async function createMappedBatch() {
     { source_column_index: 2, source_column_indexes: [2], source_header: "品牌", source_headers: ["品牌"], target_namespace: "basic", target_code: "BRAND", mapping_mode: "SOURCE", default_value_json: null, required: false, display_order: 2, combination_strategy: "FIRST_NON_EMPTY", combination_separator: " ", mapping_confidence: 1, adaptive_mapping_status: "CONFIRMED", mapping_evidence: [] },
     { source_column_index: 3, source_column_indexes: [3], source_header: "额定电压", source_headers: ["额定电压"], target_namespace: "attribute", target_code: "RATED_VOLTAGE", mapping_mode: "SOURCE", default_value_json: null, required: false, display_order: 3, combination_strategy: "FIRST_NON_EMPTY", combination_separator: " ", mapping_confidence: 1, adaptive_mapping_status: "CONFIRMED", mapping_evidence: [] },
   ];
-  const mappingDigest = mappingContentDigest({ selectedSheetIndex: 0, headerMode: "SINGLE_ROW", headerRowNumber: 1, sourceStructureDigest: structureDigest, metadataDigest: catalog.metadataDigest, items });
+  const mappingDigest = mappingContentDigest({ selectedSheetIndex: 0, headerMode: "SINGLE_ROW", headerRowNumber, sourceStructureDigest: structureDigest, metadataDigest: catalog.metadataDigest, items });
   const mapping = await pool.query(`
     insert into material_import_mappings(
       mapping_key,batch_id,parse_run_id,mapping_version,source_kind,selected_sheet_index,selected_sheet_name,
-      header_mode,header_row_number,source_structure_digest,source_fields,metadata_digest,target_catalog_version,
+      header_mode,header_row_number,header_start_row_number,header_end_row_number,data_start_row_number,
+      structure_confidence,structure_status,adaptive_algorithm_version,
+      source_structure_digest,source_fields,metadata_digest,target_catalog_version,
       mapping_digest,status,created_by,updated_by,request_id
-    ) values($1,$2,$3,1,'CSV',0,'物料','SINGLE_ROW',1,$4,$5,$6,'material-import-mapping-metadata-v1',$7,'DRAFT','normalizer1','normalizer1',$8)
+    ) values($1,$2,$3,1,'CSV',0,'物料','SINGLE_ROW',$4,$5,$6,$7,$8,$9,$10,
+      $11,$12,$13,'material-import-mapping-metadata-v1',$14,'DRAFT','normalizer1','normalizer1',$15)
     returning id
-  `, [randomUUID(), batchId, parseRunId, structureDigest, JSON.stringify(fields), catalog.metadataDigest, mappingDigest, randomUUID()]);
+  `, [
+    randomUUID(), batchId, parseRunId, headerRowNumber, headerStartRowNumber, headerEndRowNumber, dataStartRowNumber,
+    adaptiveMultiRowHeader ? 1 : null, adaptiveMultiRowHeader ? "CONFIRMED" : null, adaptiveAlgorithmVersion,
+    structureDigest, JSON.stringify(fields), catalog.metadataDigest, mappingDigest, randomUUID(),
+  ]);
   const mappingId = Number(mapping.rows[0].id);
   for (const item of items) {
     await pool.query(`
@@ -151,7 +174,24 @@ async function createMappedBatch() {
     ]);
   }
   const usedTargets = items.map((item) => catalog.targetByKey.get(`${item.target_namespace}\u0000${item.target_code}`));
-  const snapshot = { schema_version: 1, mapping_id: mappingId, mapping_version: 1, source_structure_digest: structureDigest, metadata_digest: catalog.metadataDigest, source_fields: fields, items, targets: usedTargets.map(mappingTargetSemanticProjection) };
+  const snapshot = {
+    schema_version: 1,
+    mapping_id: mappingId,
+    mapping_version: 1,
+    source_structure_digest: structureDigest,
+    metadata_digest: catalog.metadataDigest,
+    adaptive_algorithm_version: adaptiveAlgorithmVersion,
+    adaptive_structure: adaptiveMultiRowHeader ? {
+      header_start_row_number: headerStartRowNumber,
+      header_end_row_number: headerRowNumber,
+      data_start_row_number: dataStartRowNumber,
+      confidence: 1,
+      status: "CONFIRMED",
+    } : null,
+    source_fields: fields,
+    items,
+    targets: usedTargets.map(mappingTargetSemanticProjection),
+  };
   await pool.query(`
     update material_import_mappings set status='CONFIRMED',mapping_snapshot=$2,confirmed_by='normalizer1',confirmed_at=now(),updated_at=now()
     where id=$1
@@ -292,6 +332,46 @@ test("PostgreSQL API and worker publish complete candidates, lineage, issues, hi
   assert.equal((await cancel.json()).run_status, "CANCELLED");
   const final = await (await api(actor, `/api/material-master/import-batches/${batchId}/normalization`)).json();
   assert.equal(final.current_run.id, rerunPayload.normalization_run_id);
+});
+
+test("create-run and worker honor the adaptive data boundary after a preamble and multi-row header", async () => {
+  const { batchId, mappingId } = await createMappedBatch({ adaptiveMultiRowHeader: true });
+  const created = await api(actor, `/api/material-master/import-batches/${batchId}/normalize`, {
+    method: "POST",
+    body: {
+      expected_version: 5,
+      processor_version: MATERIAL_IMPORT_NORMALIZATION_PROCESSOR_VERSION,
+      mapping_version_id: mappingId,
+    },
+  });
+  assert.equal(created.status, 202);
+  const runId = (await created.json()).normalization_run_id;
+  assert.equal(await pool.query(
+    "select total_rows from material_import_normalization_runs where id=$1",
+    [runId],
+  ).then((result) => Number(result.rows[0].total_rows)), 4);
+
+  const work = await processPendingRun();
+  assert.equal(work.publication.result.status, "SUCCEEDED");
+  assert.equal(await work.queue.complete(work.job, "normalization-test-worker", work.publication.result, work.publication.publish), true);
+
+  const published = await pool.query(
+    "select run_status,total_rows,processed_rows from material_import_normalization_runs where id=$1",
+    [runId],
+  );
+  assert.deepEqual(
+    {
+      run_status: published.rows[0].run_status,
+      total_rows: Number(published.rows[0].total_rows),
+      processed_rows: Number(published.rows[0].processed_rows),
+    },
+    { run_status: "SUCCEEDED", total_rows: 4, processed_rows: 4 },
+  );
+  const sourceRows = await pool.query(
+    "select source_row_number from material_import_normalized_rows where normalization_run_id=$1 order by source_row_number",
+    [runId],
+  );
+  assert.deepEqual(sourceRows.rows.map((row) => Number(row.source_row_number)), [4, 5, 6, 7]);
 });
 
 test("database constraints and immutable publication reject inconsistent or duplicate result writes", async () => {

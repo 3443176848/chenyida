@@ -9,6 +9,7 @@ import { handleSelfhostMaterialApi } from "./material-selfhost/handler.ts";
 import { handleSelfhostMaterialImportMappingApi } from "./material-import-selfhost/handler.ts";
 import { handleSelfhostMaterialImportNormalizationApi } from "./material-import-normalization-selfhost/handler.ts";
 import { handleSelfhostMaterialImportReviewApi } from "./material-import-review-selfhost/handler.ts";
+import { handleSelfhostMaterialGovernanceApi } from "./material-governance-selfhost/handler.ts";
 import { handleMasterDataApi } from "./master-data-selfhost/handler.ts";
 import { handleBomApi } from "./bom-selfhost/handler.ts";
 import { handleInventoryApi } from "./inventory-selfhost/handler.ts";
@@ -140,6 +141,8 @@ export async function handleSelfhostApi(request: Request): Promise<Response> {
     if (mappingResponse) return mappingResponse;
     const normalizationResponse = await handleSelfhostMaterialImportNormalizationApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (normalizationResponse) return normalizationResponse;
+    const governanceResponse = await handleSelfhostMaterialGovernanceApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
+    if (governanceResponse) return governanceResponse;
     const reviewQueue = new PostgresBackgroundJobQueue(pool, systemClock, uuidGenerator, runtimeConfig().workerLeaseSeconds);
     const reviewResponse = await handleSelfhostMaterialImportReviewApi(request, { pool, queue: reviewQueue, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (reviewResponse) return reviewResponse;

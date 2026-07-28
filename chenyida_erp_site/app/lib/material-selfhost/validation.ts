@@ -1,5 +1,6 @@
 import { MaterialWorkflowError, materialFailure, type MaterialIssue } from "./errors.ts";
 import type { AttributeInput, DraftBasicFields, NormalizedAttribute, ValidatedDraft } from "./types.ts";
+import { normalizeExactDecimal } from "../exact-decimal.ts";
 
 export type CategoryAttributeDefinition = Readonly<{
   definitionId: number;
@@ -109,13 +110,6 @@ function basicFields(raw: unknown, sourceFallback: Readonly<{ sourceType?: strin
   };
 }
 
-function decimalPlaces(value: number): number {
-  const text = String(value).toLowerCase();
-  if (!text.includes("e")) return (text.split(".")[1] || "").length;
-  const [coefficient, exponentText] = text.split("e");
-  return Math.max(0, (coefficient.split(".")[1] || "").length - Number(exponentText));
-}
-
 function attributeIssue(definition: CategoryAttributeDefinition, code: string, message: string): MaterialIssue {
   return { code, severity: "ERROR", field: `attributes.${definition.attributeCode}`, attribute_code: definition.attributeCode, message };
 }
@@ -143,10 +137,13 @@ function normalizeAttribute(definition: CategoryAttributeDefinition, raw: Attrib
       if (!Number.isSafeInteger(value)) return attributeIssue(definition, "MATERIAL_ATTRIBUTE_TYPE_INVALID", `${fieldName} 必须是安全整数`);
       normalizedValue = String(value);
       break;
-    case "DECIMAL":
-      if (typeof value !== "number" || !Number.isFinite(value) || decimalPlaces(value) > definition.decimalScale) return attributeIssue(definition, "MATERIAL_ATTRIBUTE_DECIMAL_INVALID", `${fieldName} 必须是最多 ${definition.decimalScale} 位小数`);
-      normalizedValue = value.toFixed(definition.decimalScale);
+    case "DECIMAL": {
+      const exact = normalizeExactDecimal(value, definition.decimalScale);
+      if (exact === null) return attributeIssue(definition, "MATERIAL_ATTRIBUTE_DECIMAL_INVALID", `${fieldName} 必须是最多 ${definition.decimalScale} 位小数的精确十进制值`);
+      value = exact;
+      normalizedValue = exact;
       break;
+    }
     case "BOOLEAN":
       if (typeof value !== "boolean") return attributeIssue(definition, "MATERIAL_ATTRIBUTE_TYPE_INVALID", `${fieldName} 必须是布尔值`);
       normalizedValue = value ? "true" : "false";

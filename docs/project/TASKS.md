@@ -13,6 +13,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-PHASE6-TASK01 | BOM 物料规格标准化与主数据治理 | DONE | Codex（规则配置、精确规格引擎、0035、全局身份门禁、服务端 API/报告、隔离测试、文档与独立提交）、项目负责人（提供完整任务目标与验收样例） | 2026-07-29 | 2026-07-29 | SELFHOST-PHASE1-TASK01—TASK04、SELFHOST-PHASE2-TASK03、SELFHOST-LANDING-TASK02 | `DONE / NON-PRODUCTION ACCEPTED`。`0.1.0-alpha.35`/`0035`；严格同规格归组、冲突/缺项 fail closed、来源透明度、异常/重复/BOM 映射/替代候选报告、受控绑定/建稿和并发身份锁已实现。治理 unit 61/61、PG 16/16、migration 5/5+5/5 及适用回归通过。替代项不自动生效；0035 未应用常驻库，未部署、未处理真实 BOM。提交 `feat: add BOM material governance pipeline`，SHA 以 Git log 为准。 |
 | SELFHOST-LANDING-TASK04 | 兼容业务台供应商导入入口收敛 | DONE | Codex（旧入口审计、原生导入工作区收敛、缓存保护、回归测试、Web 部署验收、文档与独立提交）、项目负责人（指出 CSV-only 问题并于 2026-07-29 单独授权部署当前 18888 运行面） | 2026-07-28 | 2026-07-29 | SELFHOST-LANDING-TASK03、PHASE2-TASK08、SELFHOST-PHASE2-TASK10 | `DONE / DEPLOYED`。功能提交 `cda8c7e` 已把“供应商导入”直达 `/materials/imports/new`，删除 CSV 文本/`file.text()`/已退役 API；Dashboard 12/12、Import UI 102/102、Parser 38/38 与 build/镜像/在线验收通过。仅重建 Web，未运行 Migration、未重启 PostgreSQL/Worker/Caddy、未写数据；Excel→PG E2E 及冗余 `public, max-age=3600` 响应头清理仍属后续独立任务。 |
 | SELFHOST-LANDING-TASK03 | 18888 公网 HTTPS 入口与受控切换 | DONE | Codex（TLS/Caddy、生产环境门禁、旧 Python 回环保留、运行验收与文档）、项目负责人（明确授权公网入口并指定 `18888`） | 2026-07-28 | 2026-07-28 | SELFHOST-LANDING-TASK02 | `https://43.135.157.211.nip.io:18888` 已由公开可信证书保护并指向 PostgreSQL ERP；80 仅重定向/ACME，Web 仍 `127.0.0.1:3000`、PostgreSQL 无宿主端口，旧 Python 保留在 `127.0.0.1:18889`。生产 Cookie 单测 8/8、匿名业务 API 401、34 migrations 与 532/6/6/316 核心计数不变；60 秒 Swap 增长 0、四服务 restart 0/OOM false。 |
 | SELFHOST-PHASE4-TASK06 | 计划到生产工单、齐套预留与仓库领料交接 | DONE | Codex（关系模型、最小事务编排、权限/API/原生页面、隔离测试、并行验收与文档）、项目负责人（明确授权继续生产线及限定边界） | 2026-07-26 | 2026-07-26 | SELFHOST-PHASE4-TASK03、SELFHOST-PHASE4-TASK05、SELFHOST-PHASE2-TASK04、SELFHOST-PHASE2-TASK06 | 功能提交 `a8272b7` 严格以不可改写的 `b45616e` 为 Parent；`0.1.0-alpha.20`/`0020`、v1 退回/v2 接收、预留 10、领料 4/6、权限/并发/幂等、重启、停服备份/新空库恢复与最终 20 migrations/唯一管理员/业务和文件 0 全部通过。结论 `PLANNING TO PRODUCTION MATERIAL ISSUE ACCEPTED IN PARALLEL ENVIRONMENT`；报工、完工、品质仍未授权。 |
@@ -51,7 +52,7 @@
 | PHASE2-TASK02 | 实现 Material Import Batch Foundation V1 | DONE | Codex（实施）、项目负责人（12 项决定与任务范围批准） | 2026-07-15 | 2026-07-15 | PHASE2-TASK01 | 新增 `0004` 五表契约及 Down/快照、可注入对象存储与 R2/内存适配器、10 MiB 流式单文件 multipart、XLSX/CSV 基础安全检查、六个 API、专用幂等、Saga/协调、权限/行级可见性、重复策略、取消与手工清理服务；Node 224/224、迁移 3/3、导入专项 12/12 通过；无生产 R2 binding、Cron、迁移或部署 |
 | PHASE2-TASK03 | 设计 Excel/CSV Parser 与字段 Mapping V1 | DONE | Codex（设计）、项目负责人（16 项正式规格确认） | 2026-07-16 | 2026-07-16 | PHASE2-TASK02 | 完成 Parser 主规格、OpenAPI 草案、Mapping 规格和流程图；定义 `PARSED` 原子发布、parse run 隔离、Outbox、Sheet 级恢复、Shared Strings/总字节预算、Mapping 准备恢复、`0005` 设计；16 项决定已由 `PHASE2-TASK04` 指令批准 |
 
-## 当前任务
+## 近期任务台账（当前无 DOING）
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |

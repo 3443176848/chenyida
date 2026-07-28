@@ -78,7 +78,7 @@ test("07 INTEGER 必须完整匹配且使用安全整数", () => {
 
 test("08 INTEGER 空字符串不会转为 0", () => assert.equal(strictInteger(""), null));
 test("09 DECIMAL 完整匹配且不接受 NaN Infinity", () => {
-  assert.equal(strictDecimal("1.25", 3), 1.25); assert.equal(strictDecimal("1.2x", 3), null);
+  assert.equal(strictDecimal("1.25", 3), "1.250"); assert.equal(strictDecimal("1.2x", 3), null);
   assert.equal(strictDecimal("NaN", 3), null); assert.equal(strictDecimal("Infinity", 3), null);
 });
 test("10 DECIMAL 超过 decimal_scale 时拒绝且不舍入", () => assert.equal(strictDecimal("1.2345", 3), null));
@@ -87,6 +87,7 @@ test("11 五种动态属性正确序列化", () => {
   const result = serializeDraft(validForm(), schema);
   assert.equal(result.issues.length, 0);
   assert.deepEqual(Object.keys(result.attributes), ["TEXT_A", "INT_A", "DEC_A", "BOOL_A", "ENUM_A"]);
+  assert.equal(result.attributes.DEC_A.value, "1.250");
 });
 
 test("12 完整 attributes 保留数值 0", () => assert.equal(serializeDraft(validForm(), schema).attributes.INT_A.value, 0));

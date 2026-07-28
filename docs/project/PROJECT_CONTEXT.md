@@ -24,17 +24,18 @@
 - 页面：TASK10 已把根 `app/page.tsx` 改为原生经营工作台；legacy `public/erp/index.html` 保留为显式业务工作区和回滚入口，不再作为根 iframe 默认依赖。Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给不依赖平台 binding 的 `app/lib/selfhost-api.ts`；旧 `erp-api.ts` 仅作迁移参考。
 - 根页迁移：TASK03—TASK10 已接通主数据/BOM/库存/采购/生产/销售/品质/财务、实时 Dashboard 与离线 backup 治理，根页已退出 iframe。完整 ERP API 的非生产实现不等于实际业务迁移：真实数据、账号和文件未迁移，采购、库存、生产、销售、品质、财务的实际业务仍依赖 Python/SQLite；生产恢复演练未做，不能描述为已投产。
-- 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL；Caddy production profile 可提供 HTTPS。`chenyida-erp-parallel` 的 PostgreSQL/Web/Worker 已实际应用 CPU/Memory/Swap/PID 限额，Web/Worker Node heap 384 MiB；Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口，Caddy 未启动。它只用于同机 HTTP 空环境验收，不是生产部署。历史 Sites `v3` 不作为后续交付目标。
+- 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL，Caddy production profile 提供 HTTPS。`chenyida-erp-parallel` 的 PostgreSQL/Web/Worker/Caddy 已实际应用 CPU/Memory/Swap/PID 限额；Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口，Caddy 在公网 18888 终止可信 TLS。当前运行面是受控非生产 alpha.34/0034，不代表 alpha.35 已部署或整体正式投产。历史 Sites `v3` 不作为后续交付目标。
 
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与当前受控公网运行面均为 `0.1.0-alpha.34`/`0034`。TASK04 只更新 Web 兼容入口，不会因此将整体业务成熟度自动视为正式投产完成。
-- 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前包已演进到 `alpha.34`。
-- Git 复核：TASK10 起点为本地 `main`/HEAD `55f8fe9693ebc0f630920e92eca1f74584d852af`、behind 0/ahead 73、工作区 clean；功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 严格以起点为 Parent，Compose/回归修正为 `b4f3f5f5de30259e44d5b00a5587dee29331539f`，最终另建 ops 验收提交；仍不 push、不创建 PR，不得描述为已同步。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；源码为 `0.1.0-alpha.35`/`0035`，当前受控公网运行面仍为 `0.1.0-alpha.34`/`0034`。0035 未应用，alpha.35 未 build/restart/deploy。
+- 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.35`。
+- Git 复核：TASK01 任务起点为本地 `main`/HEAD `cda8c7e`；执行期间独立 LANDING-TASK04 部署记录 `3025443` 已进入 `main`，TASK01 完成提交以 `3025443` 为 Parent，消息为 `feat: add BOM material governance pipeline`，实际 SHA 以 Git log 为准。未 push/PR/改写历史；`shujvbiao/` 未修改、暂存或提交。断网只读凭据扫描曾因 `--others` 对该路径发起读取，未输出/传输内容；偏差已记录，扫描器已在打开内容前排除该受保护未跟踪目录，最终复扫通过。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
 - 兼容供应商导入：LANDING-TASK04 功能提交 `cda8c7e` 已在单独授权下部署到当前 18888 Web；`public/erp/` 的 CSV-only/退役入口已改为直达 `/materials/imports/new`，入口 URL 已版本化。公网 HTML/JS SHA 与源码一致，响应含 `private, no-store` 和 `Pragma: no-cache`；框架仍并列冗余 `public, max-age=3600` 头。未做 Excel→PG E2E。
+- BOM 物料治理：PHASE6-TASK01 在既有 Import/Mapping/Normalization/Review 后新增确定性规格治理层，用品类+关键规格+性能等级的完整身份进行严格归组，保留原始行/BOM/料号透明度，替代项只是候选。受控决策可精确绑定 ACTIVE 或调用既有 Workflow 建 DRAFT；不自动编码、审批或建正式替代关系。
 
 ### 低资源主机事实
 
@@ -43,6 +44,7 @@
 - TASK10 起点 available memory 约 2.4 GiB、Swap 135 MiB、根分区可用 36 GiB、Build Cache 0B；构建峰值 2.569 GB 后一次授权 prune 回到 0B。最终 available 2.3 GiB、Swap 139 MiB、根分区可用 36 GiB、Load `0.03/0.11/0.21`；60 秒窗口 Swap `142452→142372 KiB`、增长 -80 KiB，三个容器 restart 0/OOM false，四个持久卷未更换或删除。
 - LANDING-TASK01 不执行 build；所有 Git、dump、恢复和测试串行。起点 65 秒 Swap `137476→137476 KiB`、增长 0，Build Cache 全程 0B；三容器 restart 0/OOM false，四卷、resource-guard、Python PID 和 SQLite metadata 保持。
 - LANDING-TASK04 部署严格串行 build/recreate Web；起点 available 2.1 GiB、Swap 114 MiB、根盘 36 GiB，最终 available 2.2 GiB、Swap 123 MiB、根盘 35 GiB。build 后 60 秒 Swap +100 KiB，部署后 60 秒 -24 KiB；容器 restart 0/OOM false、内核 OOM 记录 0。Build Cache 1.401 GB 保留，未执行未授权 prune。
+- PHASE6-TASK01 的 PostgreSQL 测试、迁移和 Node 重任务串行，任一时刻只有一个临时容器，Node heap 512 MiB/容器 768 MiB。起点 available 约 2.1 GiB、Swap 131—132 MiB、根盘 35 GiB；最终 available 2.2 GiB、Swap 135 MiB、根盘 35 GiB、Load `0.21/0.76/0.69`，四服务 restart 0/OOM false。两个任务测试库和临时容器已删除，四个受保护卷保留。
 
 ### 治理资料
 
@@ -78,6 +80,7 @@
 - `drizzle-postgres/0032_finished_goods_inventory_lots.sql` expand-only 增加唯一 Finished Goods Inventory Lot、Ledger/Balance nullable 稳定 Lot 外键、一致性/不可变/服务写/deferred 守恒 guard；Batch Completion 创建或复用同一 Lot，冲销回写原 Lot，ORDER 历史继续 null/空 Lot。Lot Balance 与 Material Aggregate、freeze/unfreeze、API/UI/genealogy 已在回环环境验证；原材料、供应商和 Shipment Lot 未实现。
 - `drizzle-postgres/0033_finished_goods_lot_fqc_shipment.sql` expand-only 为 Allocation、FQC、Shipment Line 与 FQC Consumption Fact 增加 nullable 稳定 Lot 外键；BATCH 必须同 Lot，ORDER 保持 null。warehouse 显式选择 Lot，Shipment 原子消费同 Lot Balance/FQC 并写 Ledger/Source/Event；冲销只恢复原 Lot。实际 `4/6`、冻结拒发、冲销同 Lot 再发、ORDER、恢复与清理已通过；原材料/供应商/Receipt/领料 Lot 仍未实现。
 - `drizzle-postgres/0034_supplier_receipt_lot_iqc.sql` expand-only 将 `inventory_lots` 扩展为制造成品/供应商来料严格 XOR 来源；ACTIVE/STOCKED/IQC Receipt 原子生成 RML Lot 并同时增加 on-hand/frozen。IQC 沿 Receipt Line→Lot 创建，RELEASE 通过追加式 UNFREEZE 只解冻 passed 范围，失败量继续冻结；无 IQC/AP/领用等下游时整单冲销沿原 Lot 反向过账。真实主链 10/8/2→10/2/8 与 3 件 REVERSED 支线、重启和恢复已通过；生产领料 Lot 未实现。
+- `drizzle-postgres/0035_bom_material_governance.sql` expand-only 新增 Governance Run/Group/Row/Spec、Material/Alternative Candidate、Decision/Link/Event 九张关系表，并扩展导入透明度和 v2 规格 metadata。严格身份、来源不可变、外键/CHECK/索引、服务事务入口和全局正式物料冲突门禁已在空库与 0034 升级隔离库验证；尚未应用常驻 PostgreSQL。
 - 本地文件卷保存二进制，数据库只保存受控相对路径和摘要元数据。
 - Worker 使用 PostgreSQL Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、重试和 CAS；Web/Worker 是独立入口。
 
@@ -91,7 +94,7 @@
 ## 主要模块
 
 - 身份与权限：初始化、登录、会话、角色、用户状态、密码重置、审计。
-- 物料治理：物料、供应商映射、CSV/XLSX/XLS 自适应导入、不可变原始行、清洗确认、新物料建档。
+- 物料治理：物料、供应商映射、CSV/XLSX/XLS 自适应导入、不可变原始行、Normalization/Review、品类+关键规格+性能等级的严格身份治理、候选报告和受控新物料建档。
 - 工程：产品、BOM、BOM 行、齐套分析。
 - 供应链：供应商、采购建议、采购订单、收货、库存调整和库存流水。
 - 制造：工单、BOM 转工单、领料、完工和报工。
@@ -138,6 +141,7 @@
 34. SELFHOST-PHASE5-TASK06 采用 D-073：ACCEPTED Request 由 production 显式派工为既有 `production_operation_runs` 的 REWORK 类型；processed 只表示重复加工次数，返工 good 必须经新的稳定 Run Report IPQC 复检并 `CLOSED + RELEASED` 后才恢复后序额度。`0.1.0-alpha.30`/`0030`、原检 10/8/2/8、返工 2、复检 2/2/0/2、AOI 8/2、成品 8+2=10、重启、第二新空库恢复和清理已通过；原 failed 2 保持，Execution COMPLETED、NCR RESOLVED。
 35. SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03 已安全轮换并行非生产 PostgreSQL 角色密码与 root-only env；PostgreSQL 容器没有重启，Web/Worker 串行重建。新密码经 Compose 网络执行 `SELECT 1` 成功，旧密码经 SCRAM 返回 `28P01`；凭据值和连接字符串未写入仓库、日志或报告。
 36. 当前数据库合法基线不再是 Audit/Session 0：唯一 `IDENTITY/LOGIN/success` 审计与唯一 ACTIVE session 在同一时间创建，属于同一次合法管理员登录，必须保留。未来 TASK09 若另获授权，必须先记录该基线的主键或不可逆摘要（不含 token、密码、请求正文或连接字符串），所有验收使用 baseline-delta，清理后必须返回完全相同的基线记录集与计数；不得删除不可变审计。
+37. SELFHOST-PHASE6-TASK01 采用 D-079：治理只消费已发布 Normalization，以版本化规则/配置快照和精确十进制形成“类别+关键规格+性能等级”身份。只有完整 READY 才精确归组，缺项/冲突 fail closed；标准候选 key 不是 ERP 编码。人工可精确绑定 ACTIVE 或经既有 Material Workflow 建 DRAFT，治理与普通审批共享 advisory identity lock 且绑定时 live revalidation；替代项只是候选。`0.1.0-alpha.35`/`0035` 只通过源码与隔离 PostgreSQL 验收，未进入常驻运行面。
 
 ## 当前风险
 
@@ -165,6 +169,7 @@
 - 业务决策 `B01-B24` 尚未全部确认。
 - 根自托管页面已退出 legacy iframe；显式 `/erp/index.html` 仍承载尚未重写的业务 UI。Dashboard/backup 治理已接通，但真实数据、生产备份恢复演练和切换仍未完成，不能描述为已投产。
 - PostgreSQL Customer/Supplier/Product/BOM、通用库存、采购、生产、销售、品质和 AR/AP/收付款已有关系服务；`erp_records` JSON 占位与旧库存表不属于这些权威链路。表存在不等于 API、权限、事务、幂等、审计或真实数据迁移已完成。
+- alpha.35 对旧 ACTIVE/FROZEN/INACTIVE 的不完整或冲突身份只能检测并阻断同类新建稿/批准，尚无 ACTIVE 属性修订流程；`MECH/OTHER` 仍为 `UNSUPPORTED`。治理 UI、真实样本试治理/试迁移、生产容量与部署、正式替代料审批都属独立风险与后续任务。
 
 ## 开发规范
 
@@ -177,7 +182,7 @@
 
 ## 当前路线
 
-`SELFHOST-LANDING-TASK04` 已 `DONE / DEPLOYED`；兼容业务台入口已在当前 18888 运行面收敛到 CSV/XLS/XLSX 原生批次工作区。本轮没有启动其他任务；438 条来源保留在 root-only 清单，6 个不完整 BOM 保持 DRAFT。post-import dump 的 offhost copy、公司自有域名替换、Excel→PG E2E 与已记录的导入契约/响应头收缩均待独立任务；不得由本任务自动启动。
+`SELFHOST-PHASE6-TASK01` 已 `DONE / NON-PRODUCTION SOURCE BASELINE`；源码为 alpha.35/0035，当前 18888 运行面仍为 alpha.34/0034。本轮停止，不自动应用 Migration 或部署。历史正式物料修订、治理 UI、真实样本试治理/试迁移、正式替代料审批、post-import dump 的 offhost copy、公司自有域名替换和导入契约/响应头收缩均待独立任务与明确授权。
 
 ## 恢复上下文检查清单
 

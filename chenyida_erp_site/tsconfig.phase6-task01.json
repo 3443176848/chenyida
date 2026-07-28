@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "incremental": false,
+    "plugins": []
+  },
+  "include": [
+    "app/lib/material-governance-selfhost/**/*.ts",
+    "app/lib/material-import/adaptive-import.ts",
+    "app/lib/material-import-selfhost/**/*.ts",
+    "app/lib/material-import-normalization-selfhost/**/*.ts",
+    "app/lib/material-selfhost/**/*.ts",
+    "app/lib/identity-selfhost/**/*.ts",
+    "app/lib/selfhost-api.ts",
+    "app/lib/selfhost-worker.ts",
+    "db/**/*.ts",
+    "seeds/material-category-v2.ts",
+    "scripts/init-admin.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "examples",
+    "app/api/erp-api.ts",
+    "scripts/seed-material-categories.ts"
+  ]
+}

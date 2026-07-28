@@ -239,6 +239,13 @@
       "when": 1785167544151,
       "tag": "0034_supplier_receipt_lot_iqc",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1785257054422,
+      "tag": "0035_bom_material_governance",
+      "breakpoints": true
     }
   ]
 }

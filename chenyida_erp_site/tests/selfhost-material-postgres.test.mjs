@@ -36,11 +36,19 @@ async function seed() {
   `, [requestId]);
   await pool.query(`
     insert into material_attribute_definitions(id,attribute_code,attribute_name_cn,data_type,decimal_scale,canonical_unit,allowed_values,normalization_rule,status,created_by,updated_by,request_id)
-    values(9010,'RESISTANCE','阻值','DECIMAL',3,'ohm','[]'::jsonb,'DECIMAL_SCALE','ACTIVE','seed','seed',$1)
+    values
+      (9010,'RESISTANCE','阻值','DECIMAL',3,'ohm','[]'::jsonb,'DECIMAL_SCALE','ACTIVE','seed','seed',$1),
+      (9011,'PACKAGE','封装','TEXT',0,'','[]'::jsonb,'TRIM_UPPER','ACTIVE','seed','seed',$1),
+      (9012,'TOLERANCE','精度','DECIMAL',2,'%','[]'::jsonb,'DECIMAL_SCALE','ACTIVE','seed','seed',$1),
+      (9013,'POWER','功率','DECIMAL',6,'W','[]'::jsonb,'DECIMAL_SCALE','ACTIVE','seed','seed',$1)
   `, [requestId]);
   await pool.query(`
     insert into material_category_attributes(id,category_id,attribute_definition_id,is_required,is_unique_key_component,is_searchable,sort_order,status,created_by,updated_by,request_id)
-    values(9020,9004,9010,true,true,true,10,'ACTIVE','seed','seed',$1)
+    values
+      (9020,9004,9010,true,true,true,10,'ACTIVE','seed','seed',$1),
+      (9021,9004,9011,true,true,true,20,'ACTIVE','seed','seed',$1),
+      (9022,9004,9012,true,true,true,30,'ACTIVE','seed','seed',$1),
+      (9023,9004,9013,true,true,true,40,'ACTIVE','seed','seed',$1)
   `, [requestId]);
 }
 
@@ -52,7 +60,12 @@ function draft(name = "10 欧姆贴片电阻", resistance = 10) {
       procurement_type: "PURCHASE", inventory_type: "STOCKED", lot_control_required: false, shelf_life_days: null,
       inspection_type: "NORMAL", environmental_requirement: "ROHS", source_type: "MANUAL",
     },
-    attributes: { RESISTANCE: { value: resistance, unit: "ohm", source: "MANUAL", confidence: 1 } },
+    attributes: {
+      RESISTANCE: { value: resistance, unit: "ohm", source: "MANUAL", confidence: 1 },
+      PACKAGE: { value: "0201", unit: "", source: "MANUAL", confidence: 1 },
+      TOLERANCE: { value: 5, unit: "%", source: "MANUAL", confidence: 1 },
+      POWER: { value: 0.05, unit: "W", source: "MANUAL", confidence: 1 },
+    },
   };
 }
 
@@ -90,6 +103,24 @@ test("migration exposes workflow tables and constraints", async () => {
     "0015_market_project_handoff.sql",
     "0016_project_planning_handoff.sql",
     "0017_planning_material_requirements.sql",
+    "0018_procurement_sourcing.sql",
+    "0019_sourcing_purchase_fulfillment.sql",
+    "0020_production_handoff_reservations.sql",
+    "0021_production_reporting_completions.sql",
+    "0022_production_quality_release.sql",
+    "0023_sales_delivery_receivable.sql",
+    "0024_finance_project_settlements.sql",
+    "0025_production_routings.sql",
+    "0026_production_operation_execution.sql",
+    "0027_production_final_output_reporting.sql",
+    "0028_production_operation_quality_gates.sql",
+    "0029_production_nonconformance_rework_handoff.sql",
+    "0030_production_rework_execution.sql",
+    "0031_production_batch_genealogy.sql",
+    "0032_finished_goods_inventory_lots.sql",
+    "0033_finished_goods_lot_fqc_shipment.sql",
+    "0034_supplier_receipt_lot_iqc.sql",
+    "0035_bom_material_governance.sql",
   ]);
   await assert.rejects(pool.query("insert into material_code_sequences(category_id,category_code,next_value) values(9004,'bad',1)"), /material_code_sequences_category_code_ck/);
 });
@@ -117,7 +148,8 @@ test("draft create, edit, submit, separation, approve and histories are atomic",
   assert.equal(approved.response.status, 200); assert.equal(approved.payload.data.material_status, "ACTIVE"); assert.equal(approved.payload.data.internal_material_code, "CYD-RES_CHIP-000001");
 
   const detail = await api(actors.reader, `/api/material-master/materials/${id}`);
-  assert.equal(detail.payload.data.material.material_code, "CYD-RES_CHIP-000001"); assert.equal(detail.payload.data.attributes[0].value, 12.5);
+  assert.equal(detail.payload.data.material.material_code, "CYD-RES_CHIP-000001");
+  assert.equal(detail.payload.data.attributes.find((attribute) => attribute.attribute_code === "RESISTANCE").value, "12.500");
   assert.equal(detail.payload.data.history_summary.versions.total, 4);
   for (const kind of ["versions", "change-logs"]) {
     const history = await api(actors.reader, `/api/material-master/materials/${id}/${kind}?page=1&page_size=20`);

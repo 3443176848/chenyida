@@ -4,7 +4,7 @@ export const MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION = "adaptive-supplier-v1"
 export const MATERIAL_IMPORT_HEADER_SCAN_ROWS = 50;
 
 export type CanonicalField =
-  | "material_code" | "material_name" | "specification" | "model" | "brand" | "unit"
+  | "material_code" | "material_name" | "specification" | "model" | "brand" | "manufacturer" | "unit"
   | "category" | "description" | "manufacturer_part_no" | "supplier_part_no"
   | "drawing_no" | "quantity" | "price";
 export type AdaptiveMappingStatus = "EXACT" | "HIGH_CONFIDENCE" | "SUGGESTED" | "UNMAPPED" | "CONFLICT";
@@ -115,6 +115,7 @@ export type CanonicalImportRow = Readonly<{
   raw_specification: string | null;
   raw_model: string | null;
   raw_brand: string | null;
+  raw_manufacturer: string | null;
   raw_unit: string | null;
   raw_category: string | null;
   raw_description: string | null;
@@ -131,11 +132,12 @@ export type CanonicalImportRow = Readonly<{
 }>;
 
 export const MATERIAL_IMPORT_FIELD_ALIASES: Readonly<Record<CanonicalField, readonly string[]>> = Object.freeze({
-  material_code: Object.freeze(["物料编码", "物料代码", "物料编号", "产品编码", "产品编号", "料号", "货号", "item code", "material code", "part no"]),
+  material_code: Object.freeze(["物料编码", "物料代码", "物料编号", "产品编码", "产品编号", "料号", "货号", "item", "item code", "material code", "part no"]),
   material_name: Object.freeze(["物料名称", "物料名", "产品名称", "产品名", "品名", "名称", "货品名称", "name", "item name", "material name"]),
   specification: Object.freeze(["规格", "规格型号", "型号规格", "产品规格", "规格参数", "技术规格", "规格描述", "尺寸", "参数", "品名及规格", "品名规格", "料号描述", "物料描述", "产品描述", "description", "specification", "spec", "model/spec", "size"]),
   model: Object.freeze(["型号", "产品型号", "物料型号", "model", "model no"]),
   brand: Object.freeze(["品牌", "牌子", "brand"]),
+  manufacturer: Object.freeze(["制造商", "生产厂商", "厂商", "厂家", "manufacturer", "mfr"]),
   unit: Object.freeze(["单位", "计量单位", "基本单位", "采购单位", "uom", "unit"]),
   category: Object.freeze(["分类", "物料分类", "产品分类", "类别", "品类", "category"]),
   description: Object.freeze(["描述", "物料描述", "产品描述", "料号描述", "说明", "备注", "description", "remark"]),
@@ -167,6 +169,12 @@ function text(value: unknown): string {
 function cellText(cell: MaterialImportRawCell | undefined): string {
   if (!cell || cell.type === "EMPTY" || cell.type === "ERROR" || cell.type === "FORMULA") return "";
   return text(cell.type === "DATE" && cell.interpretation_status === "INTERPRETED" ? cell.interpreted_iso_value : cell.raw_value);
+}
+
+function cellHasSourcePayload(cell: MaterialImportRawCell | undefined): boolean {
+  if (!cell || cell.type === "EMPTY") return false;
+  if (cell.type === "FORMULA" || cell.type === "ERROR") return true;
+  return Boolean(cellText(cell));
 }
 
 function values(row: AdaptiveImportRow): Map<number, string> {
@@ -327,11 +335,17 @@ function classifyRows(sheet: AdaptiveImportSheet, selected: AdaptiveHeaderCandid
   const headerSignatures = new Set((selected?.columns ?? []).map((column) => normalizedHeader(column.headerPath)).filter(Boolean));
   return sheet.rows.map((row) => {
     const rowValues = [...values(row).values()].filter(Boolean);
-    if (!rowValues.length) return { rowNumber: row.rowNumber, kind: "BLANK" as const, reasonCodes: ["NO_NON_EMPTY_CELL"] };
+    if (!rowValues.length) {
+      const hasUntrustedCell = row.raw.cells.some((cell) => cellHasSourcePayload(cell));
+      return hasUntrustedCell
+        ? { rowNumber: row.rowNumber, kind: "DATA" as const, reasonCodes: ["UNTRUSTED_CELL_REQUIRES_VALIDATION"] }
+        : { rowNumber: row.rowNumber, kind: "BLANK" as const, reasonCodes: ["NO_NON_EMPTY_CELL"] };
+    }
     const joined = rowValues.join(" ").trim();
-    if (TOTAL_WORDS.test(joined)) return { rowNumber: row.rowNumber, kind: "TOTAL" as const, reasonCodes: ["TOTAL_MARKER"] };
-    if (SUBTOTAL_WORDS.test(joined)) return { rowNumber: row.rowNumber, kind: "SUBTOTAL" as const, reasonCodes: ["SUBTOTAL_MARKER"] };
-    if (FOOTER_WORDS.test(joined)) return { rowNumber: row.rowNumber, kind: "FOOTER" as const, reasonCodes: ["FOOTER_MARKER"] };
+    const first = rowValues[0];
+    if (rowValues.length <= 2 && TOTAL_WORDS.test(first)) return { rowNumber: row.rowNumber, kind: "TOTAL" as const, reasonCodes: ["TOTAL_MARKER"] };
+    if (rowValues.length <= 2 && SUBTOTAL_WORDS.test(first)) return { rowNumber: row.rowNumber, kind: "SUBTOTAL" as const, reasonCodes: ["SUBTOTAL_MARKER"] };
+    if (rowValues.length <= 2 && FOOTER_WORDS.test(first)) return { rowNumber: row.rowNumber, kind: "FOOTER" as const, reasonCodes: ["FOOTER_MARKER"] };
     const matches = rowValues.filter((value) => headerSignatures.has(normalizedHeader(value))).length;
     if (selected && row.rowNumber > selected.headerEndRow && matches >= Math.min(2, Math.max(1, headerSignatures.size))) return { rowNumber: row.rowNumber, kind: "REPEATED_HEADER" as const, reasonCodes: ["HEADER_SIGNATURE_REPEATED"] };
     if ((!selected || row.rowNumber < selected.headerStartRow) && (rowValues.length === 1 || NOTE_WORDS.test(joined))) return { rowNumber: row.rowNumber, kind: "TITLE_OR_NOTE" as const, reasonCodes: [rowValues.length === 1 ? "SINGLE_CELL_PREAMBLE" : "NOTE_MARKER"] };
@@ -347,10 +361,15 @@ export function classifyAdaptiveDataRow(
   const populated = raw.cells
     .map((cell) => ({ columnIndex: cell.column_index, value: cellText(cell) }))
     .filter((cell) => cell.value);
-  if (!populated.length) return { kind: "BLANK", confidence: 1, reasonCodes: ["NO_NON_EMPTY_CELL"] };
-  if (populated.some((cell) => TOTAL_WORDS.test(cell.value))) return { kind: "TOTAL", confidence: 0.99, reasonCodes: ["TOTAL_MARKER"] };
-  if (populated.some((cell) => SUBTOTAL_WORDS.test(cell.value))) return { kind: "SUBTOTAL", confidence: 0.99, reasonCodes: ["SUBTOTAL_MARKER"] };
-  if (populated.some((cell) => FOOTER_WORDS.test(cell.value))) return { kind: "FOOTER", confidence: 0.96, reasonCodes: ["FOOTER_MARKER"] };
+  if (!populated.length) {
+    return raw.cells.some((cell) => cellHasSourcePayload(cell))
+      ? { kind: "DATA", confidence: 1, reasonCodes: ["UNTRUSTED_CELL_REQUIRES_VALIDATION"] }
+      : { kind: "BLANK", confidence: 1, reasonCodes: ["NO_NON_EMPTY_CELL"] };
+  }
+  const first = populated[0].value;
+  if (populated.length <= 2 && TOTAL_WORDS.test(first)) return { kind: "TOTAL", confidence: 0.99, reasonCodes: ["TOTAL_MARKER"] };
+  if (populated.length <= 2 && SUBTOTAL_WORDS.test(first)) return { kind: "SUBTOTAL", confidence: 0.99, reasonCodes: ["SUBTOTAL_MARKER"] };
+  if (populated.length <= 2 && FOOTER_WORDS.test(first)) return { kind: "FOOTER", confidence: 0.96, reasonCodes: ["FOOTER_MARKER"] };
 
   const expectedLeaves = new Map<number, Set<string>>();
   for (const mapping of headerMappings) {
@@ -369,8 +388,7 @@ export function classifyAdaptiveDataRow(
   if (expectedLeaves.size && repeatedMatches >= repeatedThreshold) {
     return { kind: "REPEATED_HEADER", confidence: Math.min(1, 0.8 + repeatedMatches * 0.04), reasonCodes: ["MAPPED_HEADER_SIGNATURE_REPEATED"] };
   }
-  const joined = populated.map((cell) => cell.value).join(" ");
-  if (populated.length <= 2 && (NOTE_WORDS.test(joined) || EMBEDDED_TITLE_WORDS.test(joined))) return { kind: "TITLE_OR_NOTE", confidence: 0.9, reasonCodes: [NOTE_WORDS.test(joined) ? "NOTE_MARKER_AFTER_HEADER" : "EMBEDDED_TITLE_MARKER"] };
+  if (populated.length <= 2 && (NOTE_WORDS.test(first) || EMBEDDED_TITLE_WORDS.test(first))) return { kind: "TITLE_OR_NOTE", confidence: 0.9, reasonCodes: [NOTE_WORDS.test(first) ? "NOTE_MARKER_AFTER_HEADER" : "EMBEDDED_TITLE_MARKER"] };
   return { kind: "DATA", confidence: 0.82, reasonCodes: ["NO_NON_DATA_MARKER", "MAPPED_HEADER_SIGNATURE_NOT_REPEATED"] };
 }
 
@@ -382,8 +400,8 @@ export function analyzeAdaptiveImportStructure(sheets: readonly AdaptiveImportSh
     for (const row of scan) for (let span = 1; span <= 3 && row.rowNumber + span - 1 <= MATERIAL_IMPORT_HEADER_SCAN_ROWS; span += 1) candidates.push(candidate(sheet, row.rowNumber, span, aliases));
     candidates.sort((left, right) => right.score - left.score || right.aliasHitCount - left.aliasHitCount || left.headerStartRow - right.headerStartRow || left.headerEndRow - right.headerEndRow);
     const selected = candidates[0] && candidates[0].score >= 0.35 ? candidates[0] : null;
-    const nonEmptyRows = sheet.rows.filter((row) => row.raw.cells.some((cell) => cellText(cell))).length;
-    const nonEmptyColumns = new Set(sheet.rows.flatMap((row) => row.raw.cells.filter((cell) => cellText(cell)).map((cell) => cell.column_index))).size;
+    const nonEmptyRows = sheet.rows.filter((row) => row.raw.cells.some((cell) => cellHasSourcePayload(cell))).length;
+    const nonEmptyColumns = new Set(sheet.rows.flatMap((row) => row.raw.cells.filter((cell) => cellHasSourcePayload(cell)).map((cell) => cell.column_index))).size;
     const continuity = nonEmptyRows / Math.max(1, sheet.rowCount);
     const coverPenalty = NOTE_WORDS.test(sheet.sheetName) && (selected?.aliasHitCount ?? 0) < 2 ? 0.25 : 0;
     const materialSheetBonus = MATERIAL_SHEET_WORDS.test(sheet.sheetName) ? 0.12 : 0;
@@ -447,7 +465,7 @@ export function suggestAdaptiveFieldMappings(header: AdaptiveHeaderCandidate, pr
     let strategy: AdaptiveFieldMapping["combinationStrategy"] = "FIRST_NON_EMPTY";
     if (field === "specification") {
       const contributors = header.columns.filter((column) => SPEC_CONTRIBUTOR.test(column.headerPath));
-      const dedicated = scored.filter((item) => item.exact && /规格|specification|model\/spec/i.test(item.column.headerPath));
+      const dedicated = scored.filter((item) => item.exact && /规格|specification|(?:^|\/)spec(?:$|\/)|model\/spec/i.test(item.column.headerPath));
       const contributorScores = contributors.map((column) => {
         const existing = scored.find((item) => item.column.columnIndex === column.columnIndex);
         return existing ?? { column, score: 0.72 + sampleScore(field, column) * 0.2, exact: false, history: false };
@@ -544,6 +562,7 @@ export function buildCanonicalImportRow(input: Readonly<{
     raw_specification: mapped.specification,
     raw_model: mapped.model,
     raw_brand: mapped.brand,
+    raw_manufacturer: mapped.manufacturer,
     raw_unit: mapped.unit,
     raw_category: mapped.category,
     raw_description: mapped.description,

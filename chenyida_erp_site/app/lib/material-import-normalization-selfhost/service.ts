@@ -99,8 +99,9 @@ export class MaterialImportNormalizationService {
       const count = await client.query(`
         select count(*)::integer total
         from material_import_rows
-        where parse_run_id=$1 and sheet_index=$2 and ($3::integer is null or row_number<>$3)
-      `, [mapping.parse_run_id, mapping.selected_sheet_index, mapping.header_row_number]);
+        where parse_run_id=$1 and sheet_index=$2
+          and row_number>=coalesce($3::integer,$4::integer+1,1)
+      `, [mapping.parse_run_id, mapping.selected_sheet_index, mapping.data_start_row_number, mapping.header_row_number]);
       const totalRows = Number(count.rows[0].total);
       if (totalRows > 50_000) normalizationFailure("IMPORT_NORMALIZATION_LIMIT_EXCEEDED", "规范化源行数超过 50000 行限制", 422);
       const version = await client.query("select coalesce(max(run_version),0)::integer+1 run_version from material_import_normalization_runs where batch_id=$1", [batchId]);

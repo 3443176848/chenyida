@@ -1164,6 +1164,8 @@ export const materialImportSupplierProfiles = pgTable("material_import_supplier_
 export const materialImportMappings = pgTable("material_import_mappings", {
   id: bigserial("id", { mode: "number" }).primaryKey(), mappingKey: uuid("mapping_key").notNull().defaultRandom(), batchId: bigint("batch_id", { mode: "number" }).notNull().references(() => materialImportBatches.id, { onDelete: "restrict" }), parseRunId: bigint("parse_run_id", { mode: "number" }).notNull().references(() => materialImportParseRuns.id, { onDelete: "restrict" }),
   mappingVersion: integer("mapping_version").notNull().default(1), sourceKind: text("source_kind").notNull(), selectedSheetIndex: integer("selected_sheet_index").notNull(), selectedSheetName: text("selected_sheet_name").notNull(), headerMode: text("header_mode").notNull(), headerRowNumber: integer("header_row_number"),
+  headerStartRowNumber: integer("header_start_row_number"), headerEndRowNumber: integer("header_end_row_number"), dataStartRowNumber: integer("data_start_row_number"),
+  structureConfidence: numeric("structure_confidence", { precision: 6, scale: 5 }), structureStatus: text("structure_status"), adaptiveAlgorithmVersion: text("adaptive_algorithm_version"),
   sourceStructureDigest: text("source_structure_digest").notNull(), sourceFields: jsonb("source_fields").notNull().default([]), metadataDigest: text("metadata_digest").notNull(), targetCatalogVersion: text("target_catalog_version").notNull().default("material-import-mapping-metadata-v1"), mappingDigest: text("mapping_digest").notNull(), mappingSnapshot: jsonb("mapping_snapshot"),
   status: text("status").notNull(), supersedesMappingId: bigint("supersedes_mapping_id", { mode: "number" }), supersededByMappingId: bigint("superseded_by_mapping_id", { mode: "number" }), reuseSourceMappingId: bigint("reuse_source_mapping_id", { mode: "number" }),
   staleReasonCode: text("stale_reason_code"), staleReason: text("stale_reason"), invalidatedAt: timestamptz("invalidated_at"),
@@ -1181,6 +1183,7 @@ export const materialImportMappings = pgTable("material_import_mappings", {
   foreignKey({ name: "material_import_mappings_reuse_source_fk", columns: [t.reuseSourceMappingId], foreignColumns: [t.id] }).onDelete("restrict"),
   check("material_import_mappings_status_ck", sql`${t.status} in ('DRAFT','CONFIRMED','STALE','SUPERSEDED')`),
   check("material_import_mappings_header_ck", sql`(${t.headerMode}='SINGLE_ROW' and ${t.headerRowNumber}>0) or (${t.headerMode}='NO_HEADER' and ${t.headerRowNumber} is null)`),
+  check("material_import_mappings_adaptive_structure_ck", sql`(${t.headerStartRowNumber} is null and ${t.headerEndRowNumber} is null and ${t.dataStartRowNumber} is null and ${t.structureConfidence} is null and ${t.structureStatus} is null and ${t.adaptiveAlgorithmVersion} is null) or (${t.headerStartRowNumber}>0 and ${t.headerEndRowNumber}>=${t.headerStartRowNumber} and ${t.headerRowNumber}=${t.headerEndRowNumber} and ${t.dataStartRowNumber}=${t.headerEndRowNumber}+1 and ${t.structureConfidence} between 0 and 1 and ${t.structureStatus} in ('HIGH_CONFIDENCE','NEEDS_REVIEW','NO_CANDIDATE','CONFIRMED') and char_length(btrim(${t.adaptiveAlgorithmVersion})) between 1 and 100)`),
   check("material_import_mappings_values_ck", sql`${t.mappingVersion}>0 and ${t.selectedSheetIndex}>=0`),
   check("material_import_mappings_digest_ck", sql`${t.sourceStructureDigest} ~ '^[0-9a-f]{64}$' and ${t.metadataDigest} ~ '^[0-9a-f]{64}$' and ${t.mappingDigest} ~ '^[0-9a-f]{64}$'`),
   check("material_import_mappings_source_fields_ck", sql`jsonb_typeof(${t.sourceFields})='array'`),
@@ -1575,6 +1578,108 @@ export const materialImportReviewHistory = pgTable("material_import_review_histo
 }, (t) => [
   index("material_import_review_history_session_idx").on(t.reviewSessionId, t.id),
   index("material_import_review_history_row_idx").on(t.reviewRowId, t.id).where(sql`${t.reviewRowId} is not null`),
+]);
+
+export const materialGovernanceRuns = pgTable("material_governance_runs", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  batchId: bigint("batch_id", { mode: "number" }).notNull().references(() => materialImportBatches.id, { onDelete: "restrict" }),
+  normalizationRunId: bigint("normalization_run_id", { mode: "number" }).notNull().references(() => materialImportNormalizationRuns.id, { onDelete: "restrict" }),
+  normalizationResultDigest: text("normalization_result_digest").notNull(), ruleVersion: text("rule_version").notNull(), configDigest: text("config_digest").notNull(),
+  ruleSnapshot: jsonb("rule_snapshot").notNull(), resultDigest: text("result_digest").notNull(), sourceCount: integer("source_count").notNull(), groupCount: integer("group_count").notNull(),
+  readyGroupCount: integer("ready_group_count").notNull(), exceptionRowCount: integer("exception_row_count").notNull(), alternativeCandidateCount: integer("alternative_candidate_count").notNull(),
+  operationId: uuid("operation_id").notNull(), requestedBy: text("requested_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(),
+  createdAt: timestamptz("created_at").notNull().defaultNow(), completedAt: timestamptz("completed_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("material_governance_runs_source_rule_uq").on(t.normalizationRunId, t.ruleVersion, t.configDigest),
+  uniqueIndex("material_governance_runs_operation_uq").on(t.operationId), index("material_governance_runs_batch_created_idx").on(t.batchId, t.completedAt, t.id),
+  check("material_governance_runs_digest_ck", sql`${t.normalizationResultDigest} ~ '^[0-9a-f]{64}$' and ${t.configDigest} ~ '^[0-9a-f]{64}$' and ${t.resultDigest} ~ '^[0-9a-f]{64}$'`),
+  check("material_governance_runs_rule_ck", sql`char_length(btrim(${t.ruleVersion})) between 1 and 100 and jsonb_typeof(${t.ruleSnapshot})='object' and pg_column_size(${t.ruleSnapshot})<=262144`),
+  check("material_governance_runs_counts_ck", sql`${t.sourceCount}>=0 and ${t.groupCount} between 0 and ${t.sourceCount} and ${t.readyGroupCount} between 0 and ${t.groupCount} and ${t.exceptionRowCount} between 0 and ${t.sourceCount} and ${t.alternativeCandidateCount}>=0`),
+]);
+
+export const materialGovernanceGroups = pgTable("material_governance_groups", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), governanceRunId: bigint("governance_run_id", { mode: "number" }).notNull().references(() => materialGovernanceRuns.id, { onDelete: "restrict" }),
+  groupKey: text("group_key").notNull(), category: text("category").notNull(), readiness: text("readiness").notNull(), canonicalKey: text("canonical_key"), canonicalSpecification: text("canonical_specification"),
+  standardName: text("standard_name").notNull(), identityDigest: text("identity_digest"), compatibilityDigest: text("compatibility_digest"), sourceCount: integer("source_count").notNull(), mergeEvidence: jsonb("merge_evidence").notNull().default([]),
+  decisionStatus: text("decision_status").notNull().default("PENDING"), version: integer("version").notNull().default(1),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), updatedBy: text("updated_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
+  createdAt: timestamptz("created_at").notNull().defaultNow(), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("material_governance_groups_run_key_uq").on(t.governanceRunId, t.groupKey), uniqueIndex("material_governance_groups_id_run_uq").on(t.id, t.governanceRunId),
+  uniqueIndex("material_governance_groups_run_identity_uq").on(t.governanceRunId, t.identityDigest).where(sql`${t.identityDigest} is not null`),
+  index("material_governance_groups_identity_idx").on(t.identityDigest, t.id).where(sql`${t.identityDigest} is not null`),
+  index("material_governance_groups_queue_idx").on(t.governanceRunId, t.decisionStatus, t.readiness, t.category, t.id),
+  index("material_governance_groups_compatibility_idx").on(t.governanceRunId, t.category, t.compatibilityDigest, t.id).where(sql`${t.compatibilityDigest} is not null`),
+  check("material_governance_groups_category_ck", sql`${t.category} in ('RES','CAP','IND','DIODE','TRANS','IC','OSC','CON','MECH','OTHER')`),
+  check("material_governance_groups_readiness_ck", sql`${t.readiness} in ('READY','REVIEW_REQUIRED','UNSUPPORTED')`),
+  check("material_governance_groups_digest_ck", sql`${t.groupKey} ~ '^[0-9a-f]{64}$' and (${t.identityDigest} is null or ${t.identityDigest} ~ '^[0-9a-f]{64}$') and (${t.compatibilityDigest} is null or ${t.compatibilityDigest} ~ '^[0-9a-f]{64}$') and (${t.identityDigest} is null or ${t.groupKey}=${t.identityDigest})`),
+  check("material_governance_groups_identity_ck", sql`(${t.readiness}='READY' and ${t.identityDigest} is not null and ${t.canonicalKey} is not null and ${t.canonicalSpecification} is not null) or (${t.readiness}<>'READY' and ${t.identityDigest} is null and ${t.canonicalKey} is null and ${t.canonicalSpecification} is null)`),
+  check("material_governance_groups_values_ck", sql`${t.sourceCount}>0 and jsonb_typeof(${t.mergeEvidence})='array' and pg_column_size(${t.mergeEvidence})<=16384 and ((${t.decisionStatus}='PENDING' and ${t.version}=1) or (${t.decisionStatus} in ('BOUND_ACTIVE','DRAFT_CREATED','EXCLUDED') and ${t.version}=2))`),
+]);
+
+export const materialGovernanceRows = pgTable("material_governance_rows", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), governanceRunId: bigint("governance_run_id", { mode: "number" }).notNull(), groupId: bigint("group_id", { mode: "number" }).notNull(),
+  normalizedRowId: bigint("normalized_row_id", { mode: "number" }).notNull().references(() => materialImportNormalizedRows.id, { onDelete: "restrict" }), sourceRowId: bigint("source_row_id", { mode: "number" }).notNull().references(() => materialImportRows.id, { onDelete: "restrict" }),
+  sourceKey: text("source_key").notNull(), originalPartNumber: text("original_part_number"), manufacturerPartNumber: text("manufacturer_part_number"), supplierPartNumber: text("supplier_part_number"), sourceModel: text("source_model"), originalMaterialName: text("original_material_name"), originalSpecification: text("original_specification"), originalDescription: text("original_description"),
+  originalBrand: text("original_brand"), originalManufacturer: text("original_manufacturer"), originalSupplier: text("original_supplier"), sourceQuantityRaw: text("source_quantity_raw"), sourceQuantity: numeric("source_quantity", { precision: 24, scale: 6 }), sourceUnit: text("source_unit"), sourceBom: text("source_bom"),
+  sourceSnapshotDigest: text("source_snapshot_digest").notNull(), parseEvidence: jsonb("parse_evidence").notNull().default([]), issues: jsonb("issues").notNull().default([]), issueCount: integer("issue_count").notNull().default(0), errorCount: integer("error_count").notNull().default(0), warningCount: integer("warning_count").notNull().default(0),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ name: "material_governance_rows_group_run_fk", columns: [t.groupId, t.governanceRunId], foreignColumns: [materialGovernanceGroups.id, materialGovernanceGroups.governanceRunId] }).onDelete("restrict"),
+  uniqueIndex("material_governance_rows_run_normalized_uq").on(t.governanceRunId, t.normalizedRowId), uniqueIndex("material_governance_rows_run_source_key_uq").on(t.governanceRunId, t.sourceKey),
+  index("material_governance_rows_run_idx").on(t.governanceRunId, t.id), index("material_governance_rows_group_idx").on(t.groupId, t.id), index("material_governance_rows_source_row_idx").on(t.sourceRowId, t.id), index("material_governance_rows_exception_idx").on(t.governanceRunId, t.errorCount, t.id).where(sql`${t.errorCount}>0`),
+  check("material_governance_rows_values_ck", sql`char_length(btrim(${t.sourceKey})) between 1 and 200 and ${t.sourceSnapshotDigest} ~ '^[0-9a-f]{64}$' and (${t.sourceQuantity} is null or ${t.sourceQuantity}>0) and ${t.issueCount}>=0 and ${t.errorCount}>=0 and ${t.warningCount}>=0 and ${t.issueCount}=${t.errorCount}+${t.warningCount}`),
+  check("material_governance_rows_json_ck", sql`jsonb_typeof(${t.parseEvidence})='array' and jsonb_typeof(${t.issues})='array' and pg_column_size(${t.parseEvidence})<=32768 and pg_column_size(${t.issues})<=65536`),
+]);
+
+export const materialGovernanceSpecs = pgTable("material_governance_specs", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), governanceRowId: bigint("governance_row_id", { mode: "number" }).notNull().references(() => materialGovernanceRows.id, { onDelete: "restrict" }),
+  componentCode: text("component_code").notNull(), componentRole: text("component_role").notNull(), normalizedValue: text("normalized_value").notNull(), displayValue: text("display_value").notNull(), canonicalUnit: text("canonical_unit"), evidence: jsonb("evidence").notNull().default([]), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("material_governance_specs_row_code_uq").on(t.governanceRowId, t.componentCode), index("material_governance_specs_lookup_idx").on(t.componentCode, t.normalizedValue, t.governanceRowId),
+  check("material_governance_specs_code_ck", sql`${t.componentCode} ~ '^[A-Z][A-Z0-9_]{0,63}$' and ${t.componentRole} in ('IDENTITY','PERFORMANCE','DESCRIPTIVE')`),
+  check("material_governance_specs_values_ck", sql`char_length(${t.normalizedValue}) between 1 and 500 and char_length(${t.displayValue}) between 1 and 500 and (${t.canonicalUnit} is null or char_length(${t.canonicalUnit}) between 1 and 32) and jsonb_typeof(${t.evidence})='array' and pg_column_size(${t.evidence})<=16384`),
+]);
+
+export const materialGovernanceMaterialCandidates = pgTable("material_governance_material_candidates", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), groupId: bigint("group_id", { mode: "number" }).notNull().references(() => materialGovernanceGroups.id, { onDelete: "restrict" }), materialId: bigint("material_id", { mode: "number" }).notNull().references(() => materialMaster.id, { onDelete: "restrict" }),
+  candidateKind: text("candidate_kind").notNull(), candidateRank: integer("candidate_rank").notNull(), materialVersionSnapshot: integer("material_version_snapshot").notNull(), materialStatusSnapshot: text("material_status_snapshot").notNull(), candidateSnapshot: jsonb("candidate_snapshot").notNull(), evidence: jsonb("evidence").notNull().default([]), candidateDigest: text("candidate_digest").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("material_governance_material_candidates_group_material_uq").on(t.groupId, t.materialId), uniqueIndex("material_governance_material_candidates_group_rank_uq").on(t.groupId, t.candidateRank), index("material_governance_material_candidates_material_idx").on(t.materialId, t.groupId),
+  check("material_governance_material_candidates_values_ck", sql`${t.candidateKind} in ('EXACT_IDENTITY','COMPATIBILITY_REVIEW') and ${t.candidateRank}>0 and ${t.materialVersionSnapshot}>0 and ${t.materialStatusSnapshot}='ACTIVE' and ${t.candidateDigest} ~ '^[0-9a-f]{64}$' and jsonb_typeof(${t.candidateSnapshot})='object' and jsonb_typeof(${t.evidence})='array' and pg_column_size(${t.candidateSnapshot})<=65536 and pg_column_size(${t.evidence})<=16384`),
+]);
+
+export const materialGovernanceAlternativeCandidates = pgTable("material_governance_alternative_candidates", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), governanceRunId: bigint("governance_run_id", { mode: "number" }).notNull(), mainGroupId: bigint("main_group_id", { mode: "number" }).notNull(), alternativeGroupId: bigint("alternative_group_id", { mode: "number" }).notNull(),
+  compatibilityDigest: text("compatibility_digest").notNull(), status: text("status").notNull().default("PENDING_REVIEW"), evidence: jsonb("evidence").notNull().default([]), candidateDigest: text("candidate_digest").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ name: "material_governance_alternatives_main_run_fk", columns: [t.mainGroupId, t.governanceRunId], foreignColumns: [materialGovernanceGroups.id, materialGovernanceGroups.governanceRunId] }).onDelete("restrict"),
+  foreignKey({ name: "material_governance_alternatives_alt_run_fk", columns: [t.alternativeGroupId, t.governanceRunId], foreignColumns: [materialGovernanceGroups.id, materialGovernanceGroups.governanceRunId] }).onDelete("restrict"),
+  uniqueIndex("material_governance_alternatives_pair_uq").on(t.governanceRunId, t.mainGroupId, t.alternativeGroupId), index("material_governance_alternatives_run_idx").on(t.governanceRunId, t.status, t.id), index("material_governance_alternatives_main_group_idx").on(t.mainGroupId, t.id), index("material_governance_alternatives_alt_group_idx").on(t.alternativeGroupId, t.id),
+  check("material_governance_alternatives_values_ck", sql`${t.mainGroupId}<${t.alternativeGroupId} and ${t.status}='PENDING_REVIEW' and ${t.compatibilityDigest} ~ '^[0-9a-f]{64}$' and ${t.candidateDigest} ~ '^[0-9a-f]{64}$' and jsonb_typeof(${t.evidence})='array' and pg_column_size(${t.evidence})<=16384`),
+]);
+
+export const materialGovernanceDecisions = pgTable("material_governance_decisions", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), groupId: bigint("group_id", { mode: "number" }).notNull().references(() => materialGovernanceGroups.id, { onDelete: "restrict" }), decisionType: text("decision_type").notNull(), expectedVersion: integer("expected_version").notNull(), resultingVersion: integer("resulting_version").notNull(), reasonCode: text("reason_code").notNull(), comment: text("comment").notNull().default(""), decisionPayload: jsonb("decision_payload").notNull().default({}), requestDigest: text("request_digest").notNull(), idempotencyKeyDigest: text("idempotency_key_digest").notNull(), operationId: uuid("operation_id").notNull(), decidedBy: text("decided_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), decidedAt: timestamptz("decided_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("material_governance_decisions_group_uq").on(t.groupId), uniqueIndex("material_governance_decisions_operation_uq").on(t.operationId), uniqueIndex("material_governance_decisions_id_group_uq").on(t.id, t.groupId),
+  check("material_governance_decisions_values_ck", sql`${t.decisionType} in ('BIND_EXISTING','CREATE_DRAFT','EXCLUDE') and ${t.expectedVersion}=1 and ${t.resultingVersion}=${t.expectedVersion}+1 and ${t.reasonCode} ~ '^[A-Z][A-Z0-9_]{2,99}$' and char_length(${t.comment})<=2000 and ${t.requestDigest} ~ '^[0-9a-f]{64}$' and ${t.idempotencyKeyDigest} ~ '^[0-9a-f]{64}$' and jsonb_typeof(${t.decisionPayload})='object' and pg_column_size(${t.decisionPayload})<=65536`),
+]);
+
+export const materialGovernanceMaterialLinks = pgTable("material_governance_material_links", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), groupId: bigint("group_id", { mode: "number" }).notNull(), decisionId: bigint("decision_id", { mode: "number" }).notNull(), materialId: bigint("material_id", { mode: "number" }).notNull().references(() => materialMaster.id, { onDelete: "restrict" }), linkType: text("link_type").notNull(), materialVersionSnapshot: integer("material_version_snapshot").notNull(), materialStatusSnapshot: text("material_status_snapshot").notNull(), materialDisplaySnapshot: jsonb("material_display_snapshot").notNull(), linkedBy: text("linked_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), linkedAt: timestamptz("linked_at").notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ name: "material_governance_material_links_decision_group_fk", columns: [t.decisionId, t.groupId], foreignColumns: [materialGovernanceDecisions.id, materialGovernanceDecisions.groupId] }).onDelete("restrict"),
+  uniqueIndex("material_governance_material_links_group_uq").on(t.groupId), uniqueIndex("material_governance_material_links_decision_uq").on(t.decisionId), uniqueIndex("material_governance_material_links_created_draft_material_uq").on(t.materialId).where(sql`${t.linkType}='CREATED_DRAFT'`), index("material_governance_material_links_material_idx").on(t.materialId, t.linkedAt, t.id),
+  check("material_governance_material_links_values_ck", sql`((${t.linkType}='BOUND_ACTIVE' and ${t.materialStatusSnapshot}='ACTIVE') or (${t.linkType}='CREATED_DRAFT' and ${t.materialStatusSnapshot}='DRAFT')) and ${t.materialVersionSnapshot}>0 and jsonb_typeof(${t.materialDisplaySnapshot})='object' and pg_column_size(${t.materialDisplaySnapshot})<=65536`),
+]);
+
+export const materialGovernanceEvents = pgTable("material_governance_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), groupId: bigint("group_id", { mode: "number" }).notNull(), decisionId: bigint("decision_id", { mode: "number" }).notNull(), eventType: text("event_type").notNull(), oldStatus: text("old_status").notNull(), newStatus: text("new_status").notNull(), oldVersion: integer("old_version").notNull(), newVersion: integer("new_version").notNull(), reasonCode: text("reason_code").notNull(), safeDetails: jsonb("safe_details").notNull().default({}), actor: text("actor").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  foreignKey({ name: "material_governance_events_decision_group_fk", columns: [t.decisionId, t.groupId], foreignColumns: [materialGovernanceDecisions.id, materialGovernanceDecisions.groupId] }).onDelete("restrict"),
+  uniqueIndex("material_governance_events_decision_uq").on(t.decisionId), index("material_governance_events_group_idx").on(t.groupId, t.id),
+  check("material_governance_events_values_ck", sql`${t.oldStatus}='PENDING' and ${t.oldVersion}=1 and ${t.newVersion}=2 and ((${t.eventType}='GROUP_BOUND_ACTIVE' and ${t.newStatus}='BOUND_ACTIVE') or (${t.eventType}='GROUP_DRAFT_CREATED' and ${t.newStatus}='DRAFT_CREATED') or (${t.eventType}='GROUP_EXCLUDED' and ${t.newStatus}='EXCLUDED')) and ${t.reasonCode} ~ '^[A-Z][A-Z0-9_]{2,99}$' and jsonb_typeof(${t.safeDetails})='object' and pg_column_size(${t.safeDetails})<=32768`),
 ]);
 
 export const financeDocuments = pgTable("finance_documents", {

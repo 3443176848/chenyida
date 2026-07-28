@@ -207,6 +207,9 @@ export class PostgresNormalizationRepository {
       sourceSheetIndex: Number(mapping.selected_sheet_index),
       sourceSheetName: String(mapping.source_sheet_name),
       headerRowNumber: mapping.header_row_number == null ? null : Number(mapping.header_row_number),
+      dataStartRowNumber: mapping.data_start_row_number == null
+        ? mapping.header_row_number == null ? null : Number(mapping.header_row_number) + 1
+        : Number(mapping.data_start_row_number),
       sourceFields: snapshot.source_fields as NormalizationMappingContext["sourceFields"],
       mappingSnapshot: snapshot,
       mappingItems: snapshot.items as MappingItemInput[],
@@ -405,14 +408,15 @@ export class PostgresNormalizationRepository {
     rowNumber: number;
     rawRowHash: string;
     rawRow: MaterialImportRawRow;
+    createdAt: string;
   }>[]> {
     const values: unknown[] = [mapping.parseRunId, mapping.sourceSheetIndex, afterId, limit];
-    const header = mapping.headerRowNumber === null ? "" : " and row_number<>$5";
-    if (mapping.headerRowNumber !== null) values.push(mapping.headerRowNumber);
+    const dataStart = mapping.dataStartRowNumber === null ? "" : " and row_number>=$5";
+    if (mapping.dataStartRowNumber !== null) values.push(mapping.dataStartRowNumber);
     const result = await database.query(`
-      select id,row_number,raw_row_hash,raw_values
+      select id,row_number,raw_row_hash,raw_values,created_at
       from material_import_rows
-      where parse_run_id=$1 and sheet_index=$2 and id>$3${header}
+      where parse_run_id=$1 and sheet_index=$2 and id>$3${dataStart}
       order by id limit $4
     `, values);
     return result.rows.map((row) => ({
@@ -420,6 +424,7 @@ export class PostgresNormalizationRepository {
       rowNumber: Number(row.row_number),
       rawRowHash: String(row.raw_row_hash),
       rawRow: row.raw_values as MaterialImportRawRow,
+      createdAt: new Date(String(row.created_at)).toISOString(),
     }));
   }
 

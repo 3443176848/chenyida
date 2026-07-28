@@ -1,8 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { getPool, closeDb } from "../db/index.ts";
 import { initializeAdmin } from "../app/lib/selfhost-api.ts";
-import { MATERIAL_ATTRIBUTES, MATERIAL_CATEGORIES, MATERIAL_CATEGORY_BINDINGS } from "../seeds/material-category-v1.ts";
+import {
+  MATERIAL_ATTRIBUTES,
+  MATERIAL_CATEGORIES,
+  MATERIAL_CATEGORY_BINDINGS,
+  MATERIAL_CATEGORY_SEED_VERSION,
+  validateMaterialCategorySeed,
+} from "../seeds/material-category-v2.ts";
 
+validateMaterialCategorySeed();
 const get = (name: string) => { const value = process.env[name] || ""; if (!value) throw new Error(`${name} is required`); return value; };
 const username = get("ERP_ADMIN_USERNAME"); const displayName = get("ERP_ADMIN_DISPLAY_NAME"); const password = get("ERP_ADMIN_PASSWORD");
 const pool = getPool(); const client = await pool.connect(); const requestId = randomUUID();
@@ -23,5 +30,5 @@ try {
     await client.query(`insert into material_category_attributes (category_id,attribute_definition_id,is_required,is_unique_key_component,is_searchable,sort_order,status,created_by,updated_by,request_id)
       values ($1,$2,$3,false,true,$4,'ACTIVE',$5,$5,$6)`, [categoryIds.get(binding.categoryCode), attributeIds.get(code), binding.requiredCodes.includes(code), sortOrder, username, requestId]);
   }
-  await client.query("COMMIT"); console.info(JSON.stringify({ ok: true, username, categories: categoryIds.size, attributes: attributeIds.size }));
+  await client.query("COMMIT"); console.info(JSON.stringify({ ok: true, username, seed_version: MATERIAL_CATEGORY_SEED_VERSION, categories: categoryIds.size, attributes: attributeIds.size }));
 } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); await closeDb(); }

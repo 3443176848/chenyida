@@ -19,11 +19,22 @@ const secretPatterns = [
   /\bart_v1_[A-Za-z0-9_-]{20,}\b/,
 ];
 const placeholderPattern = /^(?:replace|example|placeholder|changeme|local-|test-|<|\$\{|required)/i;
+// Real operator data is intentionally kept outside Git. Credential scanning must
+// still inspect every tracked file, but must not open this protected untracked tree.
+const protectedUntrackedPathPrefixes = ["shujvbiao/"];
 
-function repositoryFiles() {
-  const result = spawnSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: repoRoot, encoding: "utf8", windowsHide: true });
+function gitFiles(args) {
+  const result = spawnSync("git", ["ls-files", "-z", ...args], { cwd: repoRoot, encoding: "utf8", windowsHide: true });
   if (result.status !== 0) throw new Error(result.stderr || "git ls-files failed");
   return result.stdout.split("\0").filter(Boolean).map((path) => path.replaceAll("\\", "/"));
+}
+
+function repositoryFiles() {
+  const tracked = gitFiles(["--cached"]);
+  const untracked = gitFiles(["--others", "--exclude-standard"]).filter(
+    (path) => !protectedUntrackedPathPrefixes.some((prefix) => path.startsWith(prefix)),
+  );
+  return [...new Set([...tracked, ...untracked])];
 }
 
 async function main() {

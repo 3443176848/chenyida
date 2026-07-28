@@ -6,7 +6,7 @@ import type { FileStorage } from "./infrastructure/file-storage.ts";
 import { parseMaterialImportCsv } from "./material-import/csv-parser.ts";
 import { parseMaterialImportXls } from "./material-import/xls-parser.ts";
 import { MemoryMaterialImportSharedStringStore, parseMaterialImportXlsx } from "./material-import/xlsx-parser.ts";
-import type { MaterialImportParsedRow } from "./material-import/parser-model.ts";
+import type { MaterialImportParsedRow, MaterialImportParserWarning } from "./material-import/parser-model.ts";
 import { publishInitialMapping } from "./material-import-selfhost/service.ts";
 import {
   PostgresMaterialImportNormalizationWorker,
@@ -20,6 +20,16 @@ import {
 type Publication = { result: Record<string, unknown>; publish?: (client: PoolClient) => Promise<void> };
 type Handler = (job: JobLease) => Promise<Publication>;
 type PollErrorLogger = (code: string) => void;
+type ParsedSheetMetadata = Readonly<{
+  sheetIndex: number;
+  sheetName: string;
+  visibility: "VISIBLE" | "HIDDEN" | "VERY_HIDDEN";
+  status: "COMPLETED" | "SKIPPED_HIDDEN" | "SKIPPED_VERY_HIDDEN";
+  rowCount: number;
+  sourceColumnMax: number;
+  mergedRanges: readonly string[];
+  warnings: readonly MaterialImportParserWarning[];
+}>;
 
 export function workerInfrastructureErrorCode(error: unknown): string {
   const candidate = error && typeof error === "object" && "code" in error
@@ -39,15 +49,27 @@ async function parseImport(storage: FileStorage, job: JobLease): Promise<Publica
   if (!Number.isSafeInteger(batchId) || batchId <= 0 || !relativePath) throw new Error("JOB_PAYLOAD_INVALID");
   const stream = await storage.open(relativePath); const source = Readable.toWeb(stream) as ReadableStream<Uint8Array>;
   const rows: MaterialImportParsedRow[] = []; const onRow = async (row: MaterialImportParsedRow) => { rows.push(row); };
-  const extension = relativePath.toLowerCase().slice(relativePath.lastIndexOf(".")); let parser: string;
-  if (extension === ".csv") { await parseMaterialImportCsv(source, onRow); parser = "csv-parse"; }
-  else if (extension === ".xls") { await parseMaterialImportXls(source, onRow); parser = "biff-xls"; }
+  const extension = relativePath.toLowerCase().slice(relativePath.lastIndexOf(".")); let parser: string; let sheets: readonly ParsedSheetMetadata[];
+  if (extension === ".csv") {
+    const result = await parseMaterialImportCsv(source, onRow); parser = "csv-parse";
+    sheets = Object.freeze([Object.freeze({
+      sheetIndex: 0,
+      sheetName: "__CSV__",
+      visibility: "VISIBLE",
+      status: "COMPLETED",
+      rowCount: result.rowCount,
+      sourceColumnMax: result.sourceColumnMax,
+      mergedRanges: Object.freeze([]),
+      warnings: result.warnings,
+    })]);
+  }
+  else if (extension === ".xls") { const result = await parseMaterialImportXls(source, onRow); parser = "biff-xls"; sheets = result.sheets; }
   else if (extension === ".xlsx") {
     const wasm = await readFile(new URL("../../node_modules/sax-wasm/lib/sax-wasm.wasm", import.meta.url));
-    await parseMaterialImportXlsx(source, wasm, new MemoryMaterialImportSharedStringStore(), onRow); parser = "ooxml-xlsx";
+    const result = await parseMaterialImportXlsx(source, wasm, new MemoryMaterialImportSharedStringStore(), onRow); parser = "ooxml-xlsx"; sheets = result.sheets;
   } else throw new Error("IMPORT_FILE_TYPE_UNSUPPORTED");
   return {
-    result: { batch_id: batchId, rows: rows.length, parser },
+    result: { batch_id: batchId, rows: rows.length, sheets: sheets.length, parser },
     publish: async (client) => {
       const batchResult = await client.query(`
         select b.*,f.sha256 from material_import_batches b
@@ -63,7 +85,7 @@ async function parseImport(storage: FileStorage, job: JobLease): Promise<Publica
           rows_written,parsed_sheet_count,mapping_preparation_status,started_at,completed_at
         ) values($1,'material-import-parser-v1','SUCCEEDED',$2,$3,$4,'COMPLETE',$5,$6,'NOT_STARTED',now(),now())
         returning id
-      `, [batchId, Number(attempt.rows[0].attempt), batch.sha256, job.id, rows.length, new Set(rows.map((row) => row.sheetIndex)).size]);
+      `, [batchId, Number(attempt.rows[0].attempt), batch.sha256, job.id, rows.length, sheets.filter((sheet) => sheet.status === "COMPLETED").length]);
       const parseRunId = Number(parseRun.rows[0].id);
       for (const item of rows) {
         await client.query(`
@@ -71,22 +93,22 @@ async function parseImport(storage: FileStorage, job: JobLease): Promise<Publica
           values ($1,$2,$3,$4,$5,$6,$7,$8)
         `, [batchId, parseRunId, job.id, item.sheetIndex, item.sheetName, item.rowNumber, item.raw, item.rawRowHash]);
       }
-      const sheetIndexes = [...new Set(rows.map((row) => row.sheetIndex))].sort((left, right) => left - right);
-      for (const sheetIndex of sheetIndexes) {
-        const sheetRows = rows.filter((row) => row.sheetIndex === sheetIndex);
-        const columnMax = Math.max(0, ...sheetRows.map((row) => Number(row.raw.source_column_count || 0)));
+      for (const sheet of sheets) {
         await client.query(`
           insert into material_import_parse_sheets(
             parse_run_id,sheet_index,sheet_name,visibility,parse_status,row_count,source_column_max,merged_ranges,warnings
-          ) values($1,$2,$3,'VISIBLE','COMPLETED',$4,$5,null,'[]'::jsonb)
-        `, [parseRunId, sheetIndex, sheetRows[0]?.sheetName || `Sheet${sheetIndex + 1}`, sheetRows.length, columnMax]);
-        if (sheetRows.length) {
-          await client.query(`
-            insert into material_import_header_suggestions(
-              parse_run_id,sheet_index,row_number,rank,score,reason_codes,algorithm_version,metadata_digest
-            ) values($1,$2,1,1,1,'["FIRST_NON_EMPTY_ROW"]'::jsonb,'selfhost-header-v1',$3)
-          `, [parseRunId, sheetIndex, "0".repeat(64)]);
-        }
+          ) values($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        `, [
+          parseRunId,
+          sheet.sheetIndex,
+          sheet.sheetName,
+          sheet.visibility,
+          sheet.status,
+          sheet.rowCount,
+          sheet.sourceColumnMax,
+          JSON.stringify(sheet.mergedRanges),
+          JSON.stringify(sheet.warnings),
+        ]);
       }
       await client.query("delete from material_import_mappings where batch_id=$1 and status='DRAFT'", [batchId]);
       const mapping = await publishInitialMapping(client, {
@@ -95,6 +117,13 @@ async function parseImport(storage: FileStorage, job: JobLease): Promise<Publica
         requestId: job.id,
         actor: String(batch.created_by),
         rows,
+        sheets: sheets.filter((sheet) => sheet.status === "COMPLETED").map((sheet) => ({
+          sheetIndex: sheet.sheetIndex,
+          sheetName: sheet.sheetName,
+          rowCount: sheet.rowCount,
+          sourceColumnMax: sheet.sourceColumnMax,
+          mergedRanges: sheet.mergedRanges,
+        })),
       });
       await client.query(`
         update material_import_parse_runs

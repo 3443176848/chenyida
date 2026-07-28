@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import {
+  classifyAdaptiveDataRow,
+  MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION,
+} from "../material-import/adaptive-import.ts";
 import { MaterialImportRowNormalizer, MATERIAL_IMPORT_NORMALIZATION_PROCESSOR_VERSION } from "../material-import/normalization-model.ts";
 import type { MaterialImportRawRow } from "../material-import/parser-model.ts";
 import { canonicalJson } from "../material-import-selfhost/rules.ts";
@@ -56,6 +60,12 @@ function validationStatus(candidate: CandidateValue): "VALID" | "WARNING" | "ERR
   return candidate.candidate === null ? "EMPTY" : "VALID";
 }
 
+function candidateValue(value: unknown): unknown {
+  return value && typeof value === "object" && !Array.isArray(value) && "candidate" in value
+    ? (value as { candidate?: unknown }).candidate ?? null
+    : null;
+}
+
 function candidatesFromPayload(payload: Record<string, unknown>): readonly Readonly<{
   namespace: "basic" | "attribute" | "category_hint" | "supplier_reference";
   code: string;
@@ -88,23 +98,30 @@ export class SelfhostMaterialImportRowNormalizer {
     rowNumber: number;
     rawRowHash: string;
     rawRow: MaterialImportRawRow;
+    sourceCreatedAt: string;
     mapping: NormalizationMappingContext;
   }>): Promise<NormalizedRowBundle> {
     const legacyItems = input.mapping.mappingItems.map((item) => {
       const columns = sourceColumns(item);
       return {
         source_column_index: item.source_column_index,
-        ...(columns.length > 1 ? { source_column_indexes: columns, source_headers: item.source_headers } : {}),
+        source_column_indexes: columns,
+        source_headers: item.source_headers?.length
+          ? item.source_headers
+          : item.source_header && columns.length
+            ? [item.source_header]
+            : [],
         target_namespace: item.target_namespace,
         target_code: item.target_code,
         mapping_mode: item.mapping_mode,
         default_value: item.default_value_json ?? null,
         required: item.required,
         display_order: item.display_order,
-        ...(columns.length > 1 ? {
-          combination_strategy: item.combination_strategy,
-          combination_separator: item.combination_separator,
-        } : {}),
+        combination_strategy: item.combination_strategy ?? "FIRST_NON_EMPTY",
+        combination_separator: item.combination_separator ?? " ",
+        mapping_confidence: item.mapping_confidence ?? 0,
+        adaptive_mapping_status: item.adaptive_mapping_status ?? "CONFIRMED",
+        mapping_evidence: item.mapping_evidence ?? [],
       };
     });
     const legacy = await this.#delegate.normalize({
@@ -125,8 +142,35 @@ export class SelfhostMaterialImportRowNormalizer {
       rawRow: input.rawRow,
       mappingItems: legacyItems as never,
       metadataSnapshot: input.mapping.catalog as never,
+      rowClassification: input.mapping.dataStartRowNumber !== null && input.rowNumber < input.mapping.dataStartRowNumber
+        ? Object.freeze({ kind: "TITLE_OR_NOTE", confidence: 1, reasonCodes: Object.freeze(["AT_OR_BEFORE_SELECTED_HEADER_END"]) })
+        : classifyAdaptiveDataRow(input.rawRow, input.mapping.mappingItems.map((item) => Object.freeze({
+          sourceColumnIndexes: sourceColumns(item),
+          sourceHeaders: item.source_headers?.length ? item.source_headers : item.source_header ? [item.source_header] : [],
+        }))),
+      canonicalContext: {
+        source_file_id: input.mapping.sourceFileId,
+        source_sheet_name: input.mapping.sourceSheetName,
+        supplier_id: null,
+        supplier_profile_id: null,
+        created_at: input.sourceCreatedAt,
+      },
     });
     const payload = legacy.normalized_payload as Record<string, unknown>;
+    const basic = payload.basic && typeof payload.basic === "object" && !Array.isArray(payload.basic)
+      ? payload.basic as Record<string, unknown>
+      : {};
+    const canonical = payload.canonical_import && typeof payload.canonical_import === "object" && !Array.isArray(payload.canonical_import)
+      ? payload.canonical_import as Record<string, unknown>
+      : null;
+    if (canonical) {
+      payload.canonical_import = {
+        ...canonical,
+        raw_model: canonical.raw_model ?? candidateValue(basic.specification_model),
+        raw_manufacturer: candidateValue(basic.manufacturer),
+        raw_description: canonical.raw_description ?? candidateValue(basic.description),
+      };
+    }
     const extracted = candidatesFromPayload(payload);
     const itemByTarget = new Map(input.mapping.mappingItems.map((item) => [`${item.target_namespace}.${item.target_code}`, item]));
     const targetByKey = input.mapping.catalog.targetByKey;
@@ -193,7 +237,10 @@ export class SelfhostMaterialImportRowNormalizer {
         });
       }
     }
-    const retainedIssues = legacy.issues.filter((entry) => entry.issue_code !== "NORMALIZATION_SPECIFICATION_REVIEW_REQUIRED");
+    const adaptiveVersion = String(input.mapping.mappingSnapshot.adaptive_algorithm_version ?? "");
+    const retainedIssues = adaptiveVersion === MATERIAL_IMPORT_ADAPTIVE_ALGORITHM_VERSION
+      ? legacy.issues
+      : legacy.issues.filter((entry) => entry.issue_code !== "NORMALIZATION_SPECIFICATION_REVIEW_REQUIRED");
     const retainedErrors = retainedIssues.filter((entry) => entry.issue_level === "ERROR").length;
     const retainedWarnings = retainedIssues.length - retainedErrors;
     payload.row_status = retainedErrors ? "ERROR" : retainedWarnings ? "WARNING" : payload.row_disposition === "SKIPPED" ? "SKIPPED" : "VALID";

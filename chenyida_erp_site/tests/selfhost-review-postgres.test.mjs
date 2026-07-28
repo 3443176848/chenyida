@@ -466,3 +466,49 @@ test("finalization stores a deduplicated review validation issue when an ACTIVE 
   assert.equal(issues.rows[0].is_active, true);
   assert.equal(await pool.query("select count(*)::integer count from material_import_review_material_bindings").then((value) => value.rows[0].count), 0);
 });
+
+test("legacy row-by-row review cannot create drafts for governance-managed categories", async () => {
+  const seeded = await seed();
+  await pool.query(`
+    insert into material_categories(
+      id,category_code,category_name_cn,parent_id,category_level,status,sort_order,
+      created_by,updated_by,request_id
+    ) values(9105,'RES_CHIP','治理贴片电阻',9103,4,'ACTIVE',2,'reviewer1','reviewer1',$1)
+  `, [randomUUID()]);
+  const client = await pool.connect();
+  try {
+    const worker = new PostgresMaterialImportReviewWorker(pool);
+    await assert.rejects(
+      worker.createDraft(client, {
+        review_row_id: 999999,
+        submitted_by: "reviewer1",
+        operation_key: digest("legacy-review-governance-gate"),
+        final_payload_digest: digest("legacy-review-governance-payload"),
+        final_payload: {
+          effective_values: {
+            fields: { CATEGORY_ID: 9105 },
+            attributes: {},
+          },
+        },
+      }, seeded.batchId, 999999, randomUUID()),
+      (error) => error?.code === "IMPORT_REVIEW_GOVERNANCE_REQUIRED" && error?.status === 409,
+    );
+    await assert.rejects(
+      worker.bindActive(client, {
+        existing_material_id: seeded.activeMaterialId,
+        review_row_id: 999998,
+        submitted_by: "reviewer1",
+        final_payload: {
+          effective_values: {
+            fields: { CATEGORY_ID: 9105 },
+            attributes: {},
+          },
+        },
+      }, 999999, randomUUID()),
+      (error) => error?.code === "IMPORT_REVIEW_GOVERNANCE_REQUIRED" && error?.status === 409,
+    );
+  } finally {
+    client.release();
+  }
+  assert.equal(await pool.query("select count(*)::integer count from material_master").then((value) => value.rows[0].count), 1);
+});

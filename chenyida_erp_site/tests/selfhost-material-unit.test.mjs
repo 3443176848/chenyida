@@ -48,11 +48,11 @@ test("formal codes are deterministic and bounded", () => {
 
 test("typed dynamic attributes are validated without string degradation", () => {
   const result = validateDraftPayload(payload({
-    RESISTANCE: { value: 10.25, unit: "ohm", source: "MANUAL", confidence: 1 },
+    RESISTANCE: { value: "10.25", unit: "ohm", source: "MANUAL", confidence: 1 },
     HALOGEN_FREE: { value: true, source: "MANUAL", confidence: 1 },
     COLOR: { value: "BLACK", source: "MANUAL", confidence: 1 },
   }), metadata);
-  assert.equal(result.attributes[0].value, 10.25);
+  assert.equal(result.attributes[0].value, "10.250");
   assert.equal(result.attributes[1].value, true);
   assert.equal(result.attributes[2].value, "BLACK");
   assert.equal(result.attributes[0].normalizedValue, "10.250");
@@ -61,12 +61,31 @@ test("typed dynamic attributes are validated without string degradation", () => 
 test("required, unknown, type, enum and unit violations fail closed", () => {
   for (const [attributes, code] of [
     [{}, "MATERIAL_ATTRIBUTE_REQUIRED"],
-    [{ RESISTANCE: { value: "10", unit: "ohm" } }, "MATERIAL_ATTRIBUTE_DECIMAL_INVALID"],
+    [{ RESISTANCE: { value: "10.0001", unit: "ohm" } }, "MATERIAL_ATTRIBUTE_DECIMAL_INVALID"],
     [{ RESISTANCE: { value: 10, unit: "V" } }, "MATERIAL_ATTRIBUTE_UNIT_INVALID"],
     [{ RESISTANCE: { value: 10, unit: "ohm" }, UNKNOWN: { value: "x" } }, "MATERIAL_ATTRIBUTE_UNKNOWN"],
     [{ RESISTANCE: { value: 10, unit: "ohm" }, COLOR: { value: "GREEN" } }, "MATERIAL_ATTRIBUTE_ENUM_INVALID"],
   ]) {
     assert.throws(() => validateDraftPayload(payload(attributes), metadata), (error) => error instanceof MaterialWorkflowError && (error.code === code || error.details.some((issue) => issue.code === code)));
+  }
+});
+
+test("decimal validation preserves scale-18 identity without binary floating-point drift", () => {
+  const exactMetadata = {
+    ...metadata,
+    definitions: [{ ...metadata.definitions[0], attributeCode: "CAPACITANCE", name: "容值", decimalScale: 18, canonicalUnit: "F" }],
+  };
+  const exactPayload = (value) => payload({ CAPACITANCE: { value, unit: "F", source: "MANUAL", confidence: 1 } });
+  const fromString = validateDraftPayload(exactPayload("0.000000000000000001"), exactMetadata).attributes[0];
+  assert.equal(fromString.value, "0.000000000000000001");
+  assert.equal(fromString.normalizedValue, "0.000000000000000001");
+  assert.equal(validateDraftPayload(exactPayload(0.1), exactMetadata).attributes[0].normalizedValue, "0.100000000000000000");
+  assert.equal(validateDraftPayload(exactPayload(1e-18), exactMetadata).attributes[0].normalizedValue, "0.000000000000000001");
+  for (const value of ["0.0000000000000000001", "1e-18", 0.12345678901234568]) {
+    assert.throws(
+      () => validateDraftPayload(exactPayload(value), exactMetadata),
+      (error) => error instanceof MaterialWorkflowError && error.details.some((issue) => issue.code === "MATERIAL_ATTRIBUTE_DECIMAL_INVALID"),
+    );
   }
 });
 

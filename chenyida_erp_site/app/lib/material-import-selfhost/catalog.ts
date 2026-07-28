@@ -75,7 +75,8 @@ const STATIC_TARGETS = Object.freeze([
   staticTarget("SPECIAL", "supplier_reference", "SUPPLIER_ITEM_NAME", "供应商物料名称", "TEXT", 40),
   staticTarget("SPECIAL", "supplier_reference", "SUPPLIER_SPECIFICATION", "供应商规格", "TEXT", 50),
   staticTarget("SPECIAL", "supplier_reference", "PURCHASE_UOM", "采购单位", "TEXT", 60),
-  staticTarget("SPECIAL", "ignore", "IGNORE", "明确忽略", "NONE", 70),
+  staticTarget("SPECIAL", "supplier_reference", "SOURCE_QUANTITY", "BOM 来源数量", "DECIMAL", 70),
+  staticTarget("SPECIAL", "ignore", "IGNORE", "明确忽略", "NONE", 80),
 ]);
 
 function safeString(value: unknown, field: string, maximum = 200): string {
@@ -94,7 +95,7 @@ function arrayOfStrings(value: unknown): readonly string[] {
 function attributeTarget(row: AttributeRow, order: number): MappingTarget {
   if (!/^[A-Z][A-Z0-9_]{0,127}$/.test(row.attribute_code)) mappingFailure("IMPORT_MAPPING_TARGET_CATALOG_NOT_AVAILABLE", "属性稳定 code 无效", 503);
   const valueTypes = new Set(["TEXT", "INTEGER", "DECIMAL", "BOOLEAN", "DATE", "ENUM"]);
-  if (!valueTypes.has(row.data_type) || !Number.isInteger(row.decimal_scale) || row.decimal_scale < 0 || row.decimal_scale > 9) mappingFailure("IMPORT_MAPPING_TARGET_CATALOG_NOT_AVAILABLE", "属性类型元数据无效", 503);
+  if (!valueTypes.has(row.data_type) || !Number.isInteger(row.decimal_scale) || row.decimal_scale < 0 || row.decimal_scale > 18) mappingFailure("IMPORT_MAPPING_TARGET_CATALOG_NOT_AVAILABLE", "属性类型元数据无效", 503);
   const enumValues = arrayOfStrings(row.allowed_values);
   if (row.data_type !== "ENUM" && enumValues.length) mappingFailure("IMPORT_MAPPING_TARGET_CATALOG_NOT_AVAILABLE", "非枚举属性包含枚举值", 503);
   const categories = Array.isArray(row.categories) ? row.categories.map((value) => {

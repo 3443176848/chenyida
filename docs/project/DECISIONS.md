@@ -876,6 +876,20 @@
 - 旧运行面：旧 Python 不删除、不读取或迁移 SQLite 正文，改为 `127.0.0.1:18889` 本机回退入口并保持 systemd active/enabled。
 - 数据边界：本决定不修改 Schema/Migration 或业务表，不解决 LANDING-TASK02 的 438 条隔离来源，不上传真实表格、备份、凭据或业务正文，不部署历史 Sites/D1。
 
+## D-079 BOM 物料治理以版本化精确身份生成候选，正式物料仍由人工受控流程生效
+
+- 日期：2026-07-29
+- 状态：`ACCEPTED / IMPLEMENTED IN NON-PRODUCTION SOURCE`
+- 确认人：项目负责人（本次提供完整治理任务、核心规则和四项验收样例）
+- 唯一判定：治理身份必须由类别+类型化关键规格+性能等级组成。物料名称、供应商料号、原始料号和自由文本描述不是通用唯一键，只能作来源、别名或证据。
+- 规范化：电子量使用精确十进制量纲和版本化解码/默认，禁止浮点近似判等。只有经审批的 `0201WMJ0000TCE` 规则可解码，且只有 0201 电阻配置可补 `1/20W`；未知厂商编码不猜测。
+- 归并边界：只有全部必需项完整且无冲突的 READY 身份才可精确归组；缺项、冲突、无法解析或不支持品类 fail closed。RES 包含封装/阻值/精度/功率，CAP 包含封装/容量/耐压/介质/精度，IND 包含封装/感值/额定电流/精度；IC/二极管/三极管使用完整 MPN+封装，CON 使用品牌+MPN+PIN 数+间距+结构。
+- 正式生效：`RES_...`/`CAP_...` 等标准规格 key 是治理候选身份，不是正式 ERP 编码。人工只能精确绑定当前 ACTIVE，或经既有 Material Workflow 建立未编码 DRAFT；只有既有审批事务可生成 `CYD-{CATEGORY}-{SEQUENCE}`。AI/自动化不得批准、覆盖或直接创建 ACTIVE。
+- 替代料：同规格不同来源与型号敏感类兼容关系只生成 `PENDING_REVIEW` 候选。不自动写正式 Supplier Mapping 或正式替代关系，优先级/客户范围/生效仍须独立审批。
+- 全局一物一码：治理建稿、治理 Draft 批准和普通 Draft 批准共享 PostgreSQL advisory identity lock 与正式身份扫描；已有 DRAFT/PENDING_REVIEW、ACTIVE、FROZEN、INACTIVE 不得被绕过。决策绑定必须 live revalidation，可收敛运行快照后新建的精确 ACTIVE。旧 Import Review 对受治理类别禁止 CREATE/BIND 旁路。
+- 兼容门禁：已有正式物料若缺新必需属性、基础字段与属性冲突或无法按当前规则可靠重建，只能生成兼容证据并阻断同类新建稿/批准。本版本不猜测修复，也不提供 ACTIVE 属性修订流程；后续必须另立受控修订任务。
+- 授权边界：本决定只授权 alpha.35/0035 源码、隔离迁移/数据库验证和文档。不授权读取/回填真实 BOM，不授权治理 UI、历史 ACTIVE 修订、正式替代料审批、常驻/生产 Migration、build、restart 或 deploy。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

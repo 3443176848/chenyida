@@ -2,6 +2,23 @@
 
 最后更新时间：2026-07-29（Asia/Shanghai）
 
+## SELFHOST-PHASE6-TASK01 BOM 物料规格标准化与主数据治理
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / ISOLATED NON-PRODUCTION VERIFIED | 完成提交 `feat: add BOM material governance pipeline`，实际 SHA 以 Git log 为准；不是并行运行面或生产部署验收 |
+| 版本/运行边界 | PASS / SOURCE ONLY | 源码 `0.1.0-alpha.35`/`0035`；当前 18888 Web/Worker/PostgreSQL/Caddy 仍为 alpha.34/0034。0035 未应用常驻库，未 build/restart/deploy |
+| Pipeline/规则 | PASS | 复用已发布 Parser/Mapping/Normalization；版本化 `bom-material-governance-v1` 完成分类、精确十进制规格解析、标准规格、严格身份分组、候选/异常/替代建议；缺项或冲突 fail closed |
+| 验收样例 | PASS | `0201WMJ0000TCE` 与 `0201,0R,±5%` 在明示厂商规则+0201 默认功率下同组；`0201 1uF` 与 `0201 100pF` 不同组；型号敏感类的不同 MPN/来源只形成待审替代候选；追溯为 `material <- group <- row <- batch/BOM` |
+| 数据库 | PASS / EXPAND ONLY | 唯一 0035 新增 9 张 governance 表、Mapping 自适应结构证据 6 列、metadata v2 4 属性/6 分类节点/更严精度和叶子绑定；外键、CHECK、唯一/查询索引、事实不可变与服务写入守卫生效，0001—0034 未改 |
+| API/安全 | PASS | latest/list/create run，run/group/rows，5 类报告和 `BIND_EXISTING/CREATE_DRAFT/EXCLUDE`；Session/capability、owner/read_any、CSRF、Idempotency-Key+digest、CAS、限流、事务审计、稳定中文错误、X-Request-ID/no-store 通过 |
+| 全局身份/并发 | PASS / FAIL CLOSED | 治理建稿、普通/治理 Draft 批准共享 advisory identity lock，`CREATED_DRAFT` 保留身份；绑定时 live revalidation 可收敛快照后新 ACTIVE。旧 Review 对受治理类 CREATE/BIND 旁路被禁止；无法安全重建的旧正式身份阻断新建稿/批准 |
+| Migration 验证 | PASS | contract `5/5`、0034→0035 upgrade `5/5`；另在空隔离库串行应用 0001—0035 全量成功，覆盖重复执行、失败回滚、约束和升级后汇总 |
+| 业务/回归测试 | PASS | Governance unit `61/61`、PG `16/16`；Material PG `7/7`、Normalization PG `5/5`、Import Worker PG `1/1`、Review PG `4/4`；Material unit/UI `63/63`，`npm test` `3/3`，typecheck 通过，lint `0 error / 8 既有 warning`，credentials 最终 1,050 文件通过 |
+| 已知限制 | ENFORCED / FOLLOW-UP | 旧 ACTIVE/FROZEN/INACTIVE 兼容冲突只检测和阻断，无 ACTIVE 属性修订流程；`MECH/OTHER` 为 `UNSUPPORTED`；旧治理 Draft 不支持跨规则版本；替代项不自动生效，无 UI/真实回填/生产迁移/部署 |
+| 数据/Git 边界 | PASS WITH RECORDED DEVIATION | 治理实现/测试未打开、解析或回填真实 BOM，未改常驻业务计数。`shujvbiao/` 未修改、暂存或提交；但凭据扫描器原默认 `git ls-files --others` 曾在断网只读容器中对其路径发起读取，未输出/传输内容。偏差已记录，扫描器已在打开内容前排除该受保护未跟踪目录并复扫通过；未 push/PR |
+| 资源/清理 | PASS | 起点 available 约 2.1 GiB、Swap 131—132 MiB、根盘 35 GiB；最终 2.2 GiB/135 MiB/35 GiB，Load `0.21/0.76/0.69`。四容器 running，restart 0/OOM false；测试时只有一个临时容器。`material_governance_task01_test`/`material_governance_upgrade_test` 及任务容器已删除，四个受保护卷均存在且未删除 |
+
 ## SELFHOST-LANDING-TASK04 兼容业务台供应商导入入口收敛
 
 | 验证项 | 结果 | 说明 |
