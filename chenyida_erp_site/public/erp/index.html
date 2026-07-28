@@ -28,7 +28,7 @@
       <aside class="sidebar">
         <button class="nav active" data-tab="dashboard">总览</button>
         <a class="nav nav-link" href="/materials" target="_top">物料主数据</a>
-        <button class="nav" data-tab="import">供应商导入</button>
+        <a class="nav nav-link" href="/materials/imports/new" target="_top">供应商导入</a>
         <button class="nav" data-tab="cleaning">清洗审核</button>
         <button class="nav" data-tab="items">内部物料库</button>
         <button class="nav" data-tab="mappings">供应商映射</button>
@@ -57,37 +57,12 @@
           <div class="work-panel">
             <h3>现场执行顺序</h3>
             <ol class="steps">
-              <li>采购把供应商表贴到“供应商导入”。</li>
+              <li>采购在“供应商导入”上传 CSV、XLS 或 XLSX 文件。</li>
               <li>系统自动匹配内部物料并分流。</li>
               <li>自动匹配由采购确认，疑似匹配由工程确认。</li>
               <li>新物料走建档，生成晨亿达内部物料编码。</li>
               <li>BOM、采购、库存、生产只使用内部物料编码。</li>
             </ol>
-          </div>
-        </section>
-
-        <section id="import" class="tab">
-          <div class="section-head">
-            <div>
-              <h2>供应商导入</h2>
-              <p>支持 CSV 表头：import_batch_no, supplier_name, raw_item_name, raw_item_code, raw_spec...</p>
-            </div>
-            <button id="loadSampleBtn" class="secondary">载入示例</button>
-          </div>
-          <div class="form-grid">
-            <label>
-              导入批次号
-              <input id="batchNo" placeholder="留空自动生成" />
-            </label>
-            <label>
-              CSV 文件
-              <input id="csvFile" type="file" accept=".csv" />
-            </label>
-          </div>
-          <textarea id="csvText" class="csv-box" spellcheck="false" placeholder="把供应商 CSV 内容粘贴到这里，或选择 CSV 文件。"></textarea>
-          <div class="button-row">
-            <button id="runImportBtn" class="primary">运行导入与匹配</button>
-            <span id="importMsg" class="muted"></span>
           </div>
         </section>
 
@@ -758,6 +733,6 @@
     </dialog>
 
     <div id="toast" class="toast" hidden></div>
-    <script type="module" src="./app.js?v=20260714-material-read-ui"></script>
+    <script type="module" src="./app.js?v=20260728-import-handoff"></script>
   </body>
 </html>

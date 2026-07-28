@@ -34,6 +34,7 @@
 - Git 复核：TASK10 起点为本地 `main`/HEAD `55f8fe9693ebc0f630920e92eca1f74584d852af`、behind 0/ahead 73、工作区 clean；功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 严格以起点为 Parent，Compose/回归修正为 `b4f3f5f5de30259e44d5b00a5587dee29331539f`，最终另建 ops 验收提交；仍不 push、不创建 PR，不得描述为已同步。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
+- 兼容供应商导入：LANDING-TASK04 已在源码把 `public/erp/` 的 CSV-only/退役入口改为直达 `/materials/imports/new`，入口 URL 已版本化且兼容 HTML 为 `no-store`；CSV/XLS/XLSX 页面/Worker 路由合同及回归通过，但未做 Excel→PG E2E。尚未 build/restart/deploy，公网运行面仍是旧静态资源。
 
 ### 低资源主机事实
 
@@ -175,7 +176,7 @@
 
 ## 当前路线
 
-`SELFHOST-LANDING-TASK03` 已 `DONE / PUBLIC HTTPS ACTIVE`；入口为 `https://43.135.157.211.nip.io:18888`。当前无 `DOING`；438 条来源保留在 root-only 清单，6 个不完整 BOM 保持 DRAFT。post-import dump 的 offhost copy 和公司自有域名替换仍待用户完成；不得自动启动下一任务。
+`SELFHOST-LANDING-TASK04` 已 `DONE / SOURCE FIXED / DEPLOYMENT PENDING`；兼容业务台源码入口已收敛到 CSV/XLS/XLSX 原生批次工作区，但公网尚未部署。当前无 `DOING`；438 条来源保留在 root-only 清单，6 个不完整 BOM 保持 DRAFT。post-import dump 的 offhost copy、公司自有域名替换及本次源码部署均待独立授权；不得自动启动下一任务。
 
 ## 恢复上下文检查清单
 

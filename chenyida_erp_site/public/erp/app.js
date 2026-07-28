@@ -1234,29 +1234,6 @@ async function refreshAll() {
   }
 }
 
-async function loadSample() {
-  const sample = await api("/api/sample-import");
-  $("#csvText").value = sample.csv;
-  toast("已载入示例供应商物料");
-}
-
-async function runImport() {
-  const csvText = $("#csvText").value.trim();
-  if (!csvText) {
-    toast("请先粘贴或选择 CSV");
-    return;
-  }
-  const batchNo = $("#batchNo").value.trim();
-  const result = await api("/api/import", {
-    method: "POST",
-    body: JSON.stringify({ csvText, batchNo }),
-  });
-  $("#importMsg").textContent = `已导入 ${result.count} 行，批次 ${result.batch_no}`;
-  await refreshAll();
-  setTab("cleaning");
-  toast("导入与匹配完成");
-}
-
 async function confirmMapping(id) {
   await api("/api/cleaning/confirm", {
     method: "POST",
@@ -1738,7 +1715,7 @@ function bindEvents() {
   $("#passwordForm").addEventListener("submit", (event) => changePassword(event).catch((error) => {
     $("#passwordMsg").textContent = error.message;
   }));
-  $$(".nav").forEach((btn) => btn.addEventListener("click", () => setTab(btn.dataset.tab)));
+  $$(".nav[data-tab]").forEach((btn) => btn.addEventListener("click", () => setTab(btn.dataset.tab)));
   $("#refreshBtn").addEventListener("click", refreshAll);
   $("#refreshOpsBtn").addEventListener("click", () => refreshOperations().catch((error) => toast(error.message)));
   $("#createUserForm").addEventListener("submit", (event) => createUser(event).catch((error) => {
@@ -1749,13 +1726,6 @@ function bindEvents() {
     const resetUsername = event.target.dataset.resetUser;
     if (username) toggleUser(username, event.target.dataset.userActive === "1", Number(event.target.dataset.userVersion)).catch((error) => toast(error.message));
     if (resetUsername) resetUserPassword(resetUsername).catch((error) => toast(error.message));
-  });
-  $("#loadSampleBtn").addEventListener("click", loadSample);
-  $("#runImportBtn").addEventListener("click", runImport);
-  $("#csvFile").addEventListener("change", async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    $("#csvText").value = await file.text();
   });
   $("#cleaningTable").addEventListener("click", async (event) => {
     const confirmId = event.target.dataset.confirm;

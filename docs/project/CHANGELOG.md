@@ -4,6 +4,14 @@
 
 ## 2026-07-28
 
+### SELFHOST-LANDING-TASK04 - `fix: route compatibility supplier import to native workflow`
+
+- 根因：PostgreSQL Parser/Worker 已支持 CSV/XLS/XLSX，但 `public/erp/` 仍保留初版 CSV 文本页，且其 `/api/import`、`/api/import-file`、`/api/sample-import` 已被自托管运行面明确退役为 410，因此旧入口既只显示 CSV 又不可用。
+- 入口：兼容业务台“供应商导入”改为直达 `/materials/imports/new`，明确 CSV/XLS/XLSX；删除 CSV 文本框、示例载入、`file.text()` 与旧提交函数，Tab 事件不再绑定原生链接。所有工作台→兼容页 URL 增加统一版本标识，兼容 HTML 配置 `no-store`。
+- 回归：增加兼容入口→原生工作区、三类 Worker parser 静态路由、缓存保护与 legacy 410 合同；收窄两条被 Mapping 版本历史误伤的既有 Import UI 正则而不降低原语义。Dashboard 12/12、Import UI 102/102、Parser 38/38、typecheck、语法、lint、credentials 和 diff 通过。Parser 内容单测覆盖 CSV/XLSX，XLS 只覆盖 OLE 签名分类；未做 Excel→PG E2E。
+- 边界：版本保持 `0.1.0-alpha.34`，Migration 保持 `0034`；不改 API/Schema/Compose/业务数据，未 build、重启、部署或导入真实文件。在线页面仍为旧资源，生产部署须另行明确授权。
+- 后续：只读审计确认列表实际 `{items,next_cursor}` 与页面期望 `{data,total,page}` 失配且 cursor 被忽略；解析失败终态、创建/上传幂等及版本/SHA/重复/安全语义也需独立任务。本提交不以入口修复冒充这些合同已验收。
+
 ### SELFHOST-LANDING-TASK03 - `ops: expose parallel erp through https 18888`
 
 - 入口：用户明确指定公网 `18888`；Caddy 通过 `43.135.157.211.nip.io` 获取公开可信证书，`https://43.135.157.211.nip.io:18888` 指向新 Node/PostgreSQL ERP，80 只承担 ACME 和 308 HTTPS 跳转。DNS 服务只解析名称，ERP 流量不经过第三方代理。

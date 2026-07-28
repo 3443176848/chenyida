@@ -41,7 +41,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | TASK10 功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 严格以 `55f8fe9693ebc0f630920e92eca1f74584d852af` 为 Parent；Compose/回归修正提交 `b4f3f5f5de30259e44d5b00a5587dee29331539f`；独立验收提交以 Git log 为准 |
 | 当前根仓库运维基线 | `SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03` 严格以 `0d24eddcc5176602370214bfc8f8003844ab2b80` 为 Parent；独立提交消息为 `ops: rotate parallel database credential safely`，实际提交 SHA 以 Git log 为准 |
-| Git 同步与工作区 | LANDING-TASK03 起点 `a91907c3c473017a92d20e638ad2c75deba5bb7a`、behind 0/ahead 79；完成提交后实际 SHA 以 Git log 为准；仍不 push、不创建 PR、不改写历史，唯一授权未跟踪目录为 `shujvbiao/` |
+| Git 同步与工作区 | LANDING-TASK04 起点 `844067e79093fac5172ecb455f9b57aa01e29e7b`、behind 0/ahead 80；本任务独立提交后为 behind 0/ahead 81，实际 SHA 以 Git log 为准；仍不 push、不创建 PR、不改写历史，唯一授权未跟踪目录为 `shujvbiao/` |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
@@ -49,14 +49,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码和并行 PostgreSQL 均为 `0001`—`0034`；SELFHOST-LANDING-TASK02 已在主库受控写入 532 Material、6 Product/Version、6 BOM/Version 与 316 BOM Line，来源分类 1,113、来源链接 1,318；6 个含隔离行的 BOM 均保持 DRAFT。Inventory/PO/Receipt/WO/Shipment/Finance 仍为 0；SQLite/D1 未读取或写入业务正文 |
 | 当前运行状态 | `https://43.135.157.211.nip.io:18888` 经 Caddy 可信 TLS 到 Web；80 仅重定向/ACME，Web 仍为 `127.0.0.1:3000`、PostgreSQL 无宿主端口。PostgreSQL/Web/Worker/Caddy 为 healthy/healthy/running/running、restart 0/OOM false；旧 Python 保留在 `127.0.0.1:18889`，NRestarts 0 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务、Dashboard，制造成品 Lot/FQC/Shipment 精确消费，以及 Supplier Receipt Lot→IQC 冻结/放行/安全整单冲销的非生产链路 |
-| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK10 已完成并行验收；LANDING-TASK02 已完成真实 BOM 自动分类、隔离导入、主库写入与灾备恢复；alpha.34 及本次 post-import 备份的异机复制仍未完成 |
-| 当前任务 | `SELFHOST-LANDING-TASK03` 已 `DONE / PUBLIC HTTPS ACTIVE`；公网入口固定 `18888`，生产 Cookie/TLS/匿名门禁/数据不变/资源稳定性通过 |
-| 下一任务 | 停止，不自动开始新任务。建议用户用公司自有域名替换临时解析域名，并完成 post-import dump 异机复制；438 条隔离来源仍保留 root-only 清单 |
+| 当前阶段 | Phase 4 TASK01—TASK10 与 Phase 5 TASK01—TASK10 已完成并行验收；LANDING-TASK02 已完成真实 BOM 自动分类、隔离导入、主库写入与灾备恢复；LANDING-TASK04 源码已修复兼容业务台供应商导入入口但尚未部署；alpha.34 post-import 备份异机复制仍未完成 |
+| 当前任务 | `SELFHOST-LANDING-TASK04` 已 `DONE / SOURCE FIXED / DEPLOYMENT PENDING`；兼容入口收敛到 PostgreSQL 原生 CSV/XLS/XLSX 批次导入工作区，旧一步导入保持退役；数据库和在线运行面未改变 |
+| 下一任务 | 停止，不自动部署。若要让公网兼容业务台生效，须另行明确授权串行 build/rebuild/restart/在线只读验收；批次列表契约、解析失败终态、上传安全语义须另立任务。公司域名与 post-import dump 异机复制仍为独立事项 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
+- SELFHOST-LANDING-TASK04 已删除兼容业务台 CSV-only/已退役的一步导入入口，将“供应商导入”直达 `/materials/imports/new`；入口统一版本化且兼容 HTML 配置 `no-store`。原生页面与 Worker 的 CSV/XLS/XLSX 路由合同由 Dashboard 12/12、Import UI 102/102、Parser 38/38 和静态质量门禁验证，但未做 Excel→PostgreSQL E2E。源码尚未部署，在线页面仍为旧资源
 - SELFHOST-PHASE5-TASK10 已在同一并行环境交付 `0.1.0-alpha.34`/`0034`，把 IQC 管理的 Purchase Receipt Line 稳定绑定 Supplier Receipt Inventory Lot。主链 `10×12 CNY` 收货即 `on-hand/frozen/available=10/10/0`，IQC `10/8/2` 后 RELEASE 8/Close 为 `10/2/8`，Source 120、AP/Production Issue 0；独立 3 件支线沿原 Lot 全额冲销为 REVERSED，已有 IQC 的主链冲销 409。真实 HTTP、重启、接受态第二库恢复、最终 clean-0034 恢复和缓存清理通过；未启动后续任务
 - SELFHOST-PHASE5-TASK09 已在同一并行环境交付 `0.1.0-alpha.33`/`0033`，把 BATCH Completion→Allocation→FQC→Shipment/FQC Consumption/Inventory Ledger 全部绑定同一稳定 Inventory Lot。实际 Lot A/B `4/6`、冻结 B 2 后拒发 6 零半记录、解冻后发 B 6、冲销 A 4 并从同一 A 再发 4，最终有效 Shipment/FQC `4/6`、Source 200、AR/Settlement 0；ORDER null Lot、整栈重启、接受态第二库恢复、最终 clean-0033 恢复和资源清理通过。后续 TASK10 已在独立授权下完成
 - SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03 已在不重启 PostgreSQL、不修改 Schema/Migration/业务代码的前提下轮换并行非生产数据库角色密码与 `/etc/chenyida-erp/parallel.env`，串行恢复 Web/Worker；新密码 `SELECT 1` 成功、旧密码 SCRAM 认证 `28P01`，唯一合法 LOGIN 审计和 ACTIVE session 保持 1/1。该任务建立的 baseline-delta 规则已由后续 TASK09 遵守
@@ -194,14 +195,16 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 33. 根自托管页面已退出 legacy iframe；`public/erp/` 仍保留为显式业务工作区和回滚证据。64 个盘点操作及 23 个 legacy 刷新 GET 已有自托管覆盖或明确退役合同，但这不等于全部 UI 已重写为原生 React。
 34. TASK01 staging、TASK02 Opening 与 TASK03 public materialization 仍只在合成 `_migration_test` 验证；TASK04 已完成获准真实快照的 Schema/聚合质量与无目标 planner，但没有连接目标、物化、逐行业务处置、附件核对或容量验收，不能据此宣布真实迁移或生产 Go-Live。
 35. TASK05 环境使用 development Cookie 和明文 HTTP，因此严格只绑定回环并通过 SSH 隧道验收；它没有 HTTPS、域名、真实数据、生产恢复或流量切换批准。管理员首次登录后必须改密并删除 root-only 临时凭据文件。
+36. LANDING-TASK04 只修复兼容供应商导入的源码入口和静态缓存保护，在线运行面尚未部署；列表实际 `{items,next_cursor}` 与页面期望 `{data,total,page}` 失配且 cursor 被忽略，解析重试耗尽终态、创建/上传幂等及版本/SHA/重复/安全检查语义也存在只读审计缺口。Excel→PostgreSQL E2E 未执行，不能由 CSV/XLS/XLSX 文件选择器推断为已验收。
 
 ## 当前任务与下一任务
 
+- `SELFHOST-LANDING-TASK04` 已把兼容业务台仍遗留的 CSV-only 页面收敛到 `/materials/imports/new`；旧 `/api/import` 继续在 PostgreSQL 运行面明确退役。源码回归通过但尚未部署，在线页面仍显示旧入口。
 - `SELFHOST-LANDING-TASK03` 根据用户明确授权把公网 `18888` 从旧 Python 切到新 PostgreSQL ERP：可信 TLS、80→HTTPS 跳转、生产 Cookie、匿名 401 和安全响应头通过；旧 Python 仅回环保留，数据库与真实 BOM 计数未变。入口为 `https://43.135.157.211.nip.io:18888`。
 - `SELFHOST-LANDING-TASK02` 经用户澄清“不依赖逐行人工分类”后连续执行：离线确定性规则按来源编码/MPN/严格规格组合、类别、位号和可数件单位完成 532 Material、6 Product、6 个 DRAFT BOM 与 316 行主库导入；438 条真正歧义来源隔离。migration_tool 来源链接承载逐行 provenance，0034 不变，同批次重放新增 0，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`。
 - 后续必须先人工确认单位/分类/稳定身份/A200/版本，并另立 provenance migration 任务；本轮停止。LANDING-TASK01 的 offhost copy 仍是独立未完成用户动作。
 
-- 当前无 `DOING`；`SELFHOST-PHASE5-TASK10` 已完成并行非生产 Supplier Receipt Lot 与 IQC 隔离放行，版本为 `0.1.0-alpha.34`、migration 为 `0001`—`0034`。
+- 当前无 `DOING`；版本仍为 `0.1.0-alpha.34`、migration 仍为 `0001`—`0034`。LANDING-TASK04 未执行数据库、build、重启或在线部署动作。
 - 当前审计/会话基线为同一次合法管理员登录：`IDENTITY/LOGIN/success` 1 条、ACTIVE session 1 条；不可变审计不得为追求“零记录”而删除。
 - TASK09 已以保存的非敏感基线摘要执行 delta 验收，并在清理后返回完全相同的合法 Audit/Session 记录集与计数；未来任务仍须遵守相同规则。
 - 2026-07-27 服务器重启/不可用的根因保持 `UNKNOWN`，不得无证据归因 OOM；资源保护不等于生产上线。
@@ -285,3 +288,4 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - SELFHOST-LANDING-TASK01 已封存 `0.1.0-alpha.34` 完整 main 历史、clean-0034 PostgreSQL custom dump 和 uploads/attachments/backup-status 三个文件卷；Git Bundle clone、固定新空库恢复、文件卷 root-only 恢复与 SHA256SUMS 均实际验证。工件只位于 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z`，含敏感身份数据，尚未异机复制、未 push 或上传
 - SELFHOST-LANDING-TASK02 已对指定 8 个真实表格完成离线强校验、确定性分类、clean-0034 staging/重放、主库导入和 post-import 恢复；532 Material、6 Product、6 个 DRAFT BOM、316 行及 1,318 来源链接落库，438 条隔离，详细逐行证据只存仓库外 root-only 目录
 - SELFHOST-LANDING-TASK03 已将公网 18888 受控切换到新 PostgreSQL ERP：Caddy 可信 TLS、生产 Cookie、匿名认证门禁和 60 秒资源观察通过；旧 Python 在回环 18889 保留，未改业务数据、Schema/Migration 或四个 ERP 持久卷
+- SELFHOST-LANDING-TASK04 已在源码删除兼容业务台 CSV-only/退役导入表单并直达原生 CSV/XLS/XLSX 批次工作区，入口版本化且 HTML `no-store`；Dashboard 12/12、Import UI 102/102、Parser 38/38 及质量门禁通过，未做 Excel→PG E2E，未部署在线运行面

@@ -2,6 +2,18 @@
 
 最后更新时间：2026-07-28（Asia/Shanghai）
 
+## SELFHOST-LANDING-TASK04 兼容业务台供应商导入入口收敛
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / SOURCE FIXED / DEPLOYMENT PENDING | 问题来自 `public/erp/` 的 CSV-only 遗留页；源码已修复，在线运行面尚未部署 |
+| 入口/缓存 | PASS | “供应商导入”直达 `/materials/imports/new`；兼容页明确 CSV/XLS/XLSX。原生工作台入口统一带版本 query，`/erp/index.html` 配置 `private, no-store` 与 `Pragma: no-cache` |
+| 退役保护 | PASS | 删除 CSV 文本、`file.text()` 和旧 API 调用；`sample-import`/`import`/`import-file` 继续返回 410，不恢复一步直写 |
+| 自动验证 | PASS | Dashboard UI/Unit/API coverage 12/12、Material Import UI 102/102、Parser 38/38、Dashboard typecheck、脚本语法、定向 lint、diff 与 1,023 个任务仓库文件 credentials 通过；全量 lint 0 error/8 既有 warning。Parser 内容单测覆盖 CSV/XLSX，XLS 只覆盖 OLE 签名分类/Worker 静态路由，未做 Excel→PG E2E |
+| 数据/运行边界 | PASS | 版本仍 alpha.34、Migration 仍 0034；未改 API/Schema/Migration/Compose/数据，未 build、重启或部署。最终只读核验在线页仍含 `accept=".csv"` 且为 `Cache-Control: public, max-age=3600`，即本源码尚未生效 |
+| 资源 | PASS | 前后 available 2.2 GiB、Swap 114 MiB、根盘可用 36 GiB；四服务 restart 0/OOM false，无测试容器残留 |
+| 后续风险 | SEPARATE TASK REQUIRED | 列表实际 `{items,next_cursor}` 与页面期望 `{data,total,page}` 失配且 cursor 被忽略；解析失败终态、创建/上传幂等及版本/SHA/重复/安全契约也未验收 |
+
 ## SELFHOST-LANDING-TASK03 18888 公网 HTTPS 入口
 
 | 验证项 | 结果 | 说明 |
