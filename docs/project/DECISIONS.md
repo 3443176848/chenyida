@@ -890,6 +890,16 @@
 - 兼容门禁：已有正式物料若缺新必需属性、基础字段与属性冲突或无法按当前规则可靠重建，只能生成兼容证据并阻断同类新建稿/批准。本版本不猜测修复，也不提供 ACTIVE 属性修订流程；后续必须另立受控修订任务。
 - 授权边界：本决定只授权 alpha.35/0035 源码、隔离迁移/数据库验证和文档。不授权读取/回填真实 BOM，不授权治理 UI、历史 ACTIVE 修订、正式替代料审批、常驻/生产 Migration、build、restart 或 deploy。
 
+## D-080 TLS 终止后的写请求只信任显式公网 Origin，不信任客户端转发头
+
+- 日期：2026-07-29
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED AS ALPHA.34 HOTFIX`
+- 确认人：项目负责人（提供失败请求证据并明确授权修复当前公网首次改密）
+- 来源权威：Caddy 终止公网 TLS 后，浏览器 `Origin` 必须与规范化的单值 `ERP_PUBLIC_ORIGIN` 精确一致；代理后的内部 HTTP `Request.url` 不能代表浏览器来源。配置存在时公网值是唯一允许来源；只有未配置的开发/测试环境才回退原生 request origin。
+- 配置门禁：只接受绝对 HTTP(S) origin，禁止凭据、通配、路径、查询和 fragment；production 禁止 HTTP。不得直接信任客户端可伪造的 `Forwarded` 或 `X-Forwarded-*`。切换公司域名、协议或端口时必须通过独立受控配置变更同步更新 allowlist。
+- CSRF/身份：身份写仍强制 Origin；通用写保持既有缺失 Origin 语义，但 Cookie/Header Token 双提交继续强制且常量时间比较。Session、must-change、权限、限流、幂等、CAS 和事务审计均不因代理兼容而放宽。
+- 发布边界：当前只允许 `https://43.135.157.211.nip.io:18888`，并以 alpha.34 最小 Web hotfix 部署；0035、PostgreSQL、Worker、Caddy、业务数据和历史 Sites/D1 不在授权范围。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

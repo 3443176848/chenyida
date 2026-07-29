@@ -2,6 +2,7 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { PoolClient } from "pg";
 import { getPool, withTransaction } from "../../db/index.ts";
 import { runtimeConfig } from "./infrastructure/config.ts";
+import { requestOriginMatches } from "./infrastructure/request-origin.ts";
 import { LocalFileStorage } from "./infrastructure/file-storage.ts";
 import { PostgresBackgroundJobQueue } from "./infrastructure/background-jobs.ts";
 import { systemClock, uuidGenerator } from "./infrastructure/primitives.ts";
@@ -61,7 +62,7 @@ async function audit(client: PoolClient, input: { username?: string; action: str
 }
 
 function requirePermission(user: IdentityActor, permission: string) { if (!user.permissions.includes("*") && !user.permissions.includes(permission)) throw new ApiError("PERMISSION_DENIED", "没有权限执行此操作", 403); }
-function requireCsrf(request: Request) { const origin = request.headers.get("origin"); if (origin && origin !== new URL(request.url).origin) throw new ApiError("CSRF_INVALID", "请求来源校验失败", 403); const token = request.headers.get("x-csrf-token") || ""; const cookie = cookies(request)[CSRF_COOKIE] || ""; if (!token || !cookie || !constantEqual(token, cookie)) throw new ApiError("CSRF_INVALID", "CSRF Token 无效", 403); }
+function requireCsrf(request: Request) { const origin = request.headers.get("origin"); if (origin && !requestOriginMatches(request, runtimeConfig().publicOrigin)) throw new ApiError("CSRF_INVALID", "请求来源校验失败", 403); const token = request.headers.get("x-csrf-token") || ""; const cookie = cookies(request)[CSRF_COOKIE] || ""; if (!token || !cookie || !constantEqual(token, cookie)) throw new ApiError("CSRF_INVALID", "CSRF Token 无效", 403); }
 
 function batchDto(row: Record<string, unknown>) { return { id: Number(row.id), batch_no: row.batch_no, source_kind: row.source_kind, status: row.status, retry_of_batch_id: row.retry_of_batch_id ? Number(row.retry_of_batch_id) : null, created_by: row.created_by, current_version: Number(row.current_version), file_count: Number(row.file_count), total_rows: Number(row.total_rows), accepted_rows: Number(row.accepted_rows), rejected_rows: Number(row.rejected_rows), failure_stage: row.failure_stage, failure_code: row.failure_code, failure_message: row.failure_message, created_at: new Date(String(row.created_at)).toISOString(), updated_at: new Date(String(row.updated_at)).toISOString() }; }
 function fileDto(row: Record<string, unknown> | undefined) {

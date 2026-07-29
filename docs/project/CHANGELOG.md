@@ -4,6 +4,14 @@
 
 ## 2026-07-29
 
+### SELFHOST-OPS-TRUSTED-ORIGIN-05 - `fix: trust configured public origin behind TLS`
+
+- 根因/修复：Caddy 在公网终止 TLS 后以内部 HTTP 反代，旧身份与通用写请求却把浏览器 HTTPS `Origin` 直接和内部 `Request.url` 比较，导致合法首次改密返回 `CSRF_INVALID`。新增规范化的单值 `ERP_PUBLIC_ORIGIN`；配置存在时只接受精确协议、主机和端口，不接受凭据、通配、路径或客户端转发头。
+- 安全/测试：身份写继续强制 Origin，Cookie/Header CSRF 双提交、Session、must-change、幂等、限流、权限和审计不变。合法代理形态、错误/缺失/内部 HTTP Origin、非法配置和错误 Token 已由 unit `11/11` 与隔离 PostgreSQL `9/9` 覆盖；部署 UI `4/4`、build 和镜像 health 通过。公网合法 Origin 无凭据探针进入 `AUTH_REQUIRED/401`，不再被来源门禁误拦。
+- 部署边界：最终镜像基于 `0.1.0-alpha.34` 运行基线只叠加该 hotfix，Web 镜像为 `sha256:f9c34a11b900...`。首个从当前 alpha.35 源码生成的候选镜像在最终交付前因超出最小边界被拦截；0035 从未应用，任务时段只有两条身份认证探针，无治理请求/写入；候选容器和镜像已删除。
+- 数据/运行：只重建 Web，PostgreSQL/Worker/Caddy 容器未更换；34/head 0034 及 checksum manifest `b2ff69f7...13b8b`、用户/admin `2/2`、Session/有效 `3/1`、幂等 3、业务 `532/6/6/316` 不变。两次无凭据探针使 Audit/Identity `885/13→887/15`，均为合法 `AUTH_REQUIRED` 记录。
+- 资源/保密：临时 Origin 测试库、runner、容器、alpha.34 build worktree 和越界候选镜像已清理；四卷、旧 Web 回滚镜像和 root-only 0600 env 回滚副本保留。未 prune、push、PR、发布 Sites/D1、操作 Python，Git 不含密码、Cookie、Token、凭据或真实业务数据。
+
 ### SELFHOST-OPS-ADMIN-ACCOUNT-04 - `ops: provision second administrator safely`
 
 - 身份变更：只在当前 `chenyida-erp-parallel` 通过正式 Identity Service 新增 `admin2`；用户/active admin `1→2`，账号为 active admin、version 2、首次登录必须改密。PBKDF2-SHA256/310,000 次、管理员权限映射及临时密码验证通过；现有管理员和 Session `2/0` 不变。

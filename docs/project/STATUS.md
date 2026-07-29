@@ -2,6 +2,20 @@
 
 最后更新时间：2026-07-29（Asia/Shanghai）
 
+## SELFHOST-OPS-TRUSTED-ORIGIN-05 公网 HTTPS 请求来源校验修复
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / DEPLOYED / USER RETRY REQUIRED | 合法公网 Origin 已不再被 Caddy 内部 HTTP 转发误判；`admin2` 已登录，仍须本人重新提交首次改密 |
+| 根因/修复 | PASS | 旧逻辑比较浏览器 HTTPS `Origin` 与代理后内部 HTTP `Request.url`。现改为规范化、单值 `ERP_PUBLIC_ORIGIN`；配置存在时仅允许精确协议/主机/端口，不接受通配、路径、凭据或任意转发头 |
+| CSRF/身份边界 | PASS / FAIL CLOSED | 身份写仍强制 Origin；Cookie/Header Token 仍常量时间双提交。错误、缺失、HTTP 内部或错误端口 Origin 与错误 Token 均拒绝；Session、must-change、幂等、限流、权限和审计未放宽 |
+| 自动验证 | PASS | 来源+身份 unit `11/11`、隔离 PostgreSQL Identity `9/9`、部署 UI 合同 `4/4`、alpha.34 hotfix build 与候选 health 200；公网合法 Origin 无凭据探针返回 `AUTH_REQUIRED/401`，不再返回来源校验失败 |
+| 运行版本 | PASS / MINIMAL HOTFIX | 最终 Web 基于 `0.1.0-alpha.34` 基线，仅叠加 Origin 修复，镜像 `sha256:f9c34a11b900...`。首个 alpha.35 候选镜像在最终验收前被发现超出最小边界，未应用 0035、无治理请求/写入，随后由 alpha.34 hotfix 替换并删除 |
+| 数据/Migration | UNCHANGED | 34/head 0034，checksum manifest `b2ff69f7...13b8b`；用户/admin `2/2`、Session/有效 `3/1`、幂等 3、Material/Product/BOM/Line `532/6/6/316`。两次公网无凭据验收使 Audit/Identity `885/13→887/15`，均为合法 `AUTH_REQUIRED` |
+| 服务/回滚 | PASS / READY | 仅重建 Web；PostgreSQL/Worker/Caddy 容器 ID/启动时间不变。内网/TLS health 200，四服务 restart 0/OOM false。旧 Web 镜像保留为 `origin05-predeploy-alpha34-20260729`，旧 root-only env 保留在任务专用 0600 回滚副本 |
+| 资源/清理 | PASS | 起点约 2.3 GiB available/126—127 MiB Swap/35 GiB/低 Load；最终约 2.2 GiB/142 MiB/34 GiB/`1.08/0.48/0.29`。临时数据库、runner、容器、候选镜像和 worktree 已清理，四个 ERP 卷保留；2.789 GB Build Cache 未 prune |
+| Git/外部边界 | PASS | 只提交代码、测试和脱敏文档；不含密码、摘要、Cookie、Token、env、备份或真实业务数据。未 push/PR，未发布历史 Sites/D1，未操作 Python 服务 |
+
 ## SELFHOST-OPS-ADMIN-ACCOUNT-04 新增第二管理员账号
 
 | 验证项 | 结果 | 说明 |

@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { runtimeConfig } from "../infrastructure/config.ts";
+import { requestOriginMatches } from "../infrastructure/request-origin.ts";
 import { IdentityError, identityErrorBody, internalIdentityError } from "./errors.ts";
 import { constantTimeTextEqual, normalizeUsername } from "./password.ts";
 import { PostgresIdentityRepository } from "./repository.ts";
@@ -109,8 +110,7 @@ function assertKeys(body: Record<string, unknown>, allowed: readonly string[]): 
 }
 
 function requireCsrf(request: Request): void {
-  const origin = request.headers.get("origin");
-  if (!origin || origin !== new URL(request.url).origin) throw new IdentityError("CSRF_INVALID", "请求来源校验失败", 403);
+  if (!requestOriginMatches(request, runtimeConfig().publicOrigin)) throw new IdentityError("CSRF_INVALID", "请求来源校验失败", 403);
   const header = request.headers.get("x-csrf-token") || "";
   const cookie = cookies(request)[CSRF_COOKIE] || "";
   if (!header || !cookie || !constantTimeTextEqual(header, cookie)) throw new IdentityError("CSRF_INVALID", "CSRF Token 无效", 403);

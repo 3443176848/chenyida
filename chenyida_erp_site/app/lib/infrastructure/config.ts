@@ -1,9 +1,11 @@
 import { resolve } from "node:path";
+import { normalizePublicOrigin } from "./request-origin.ts";
 
 export type RuntimeConfig = {
   environment: "development" | "test" | "production";
   databaseUrl: string;
   setupToken: string;
+  publicOrigin: string | null;
   uploadRoot: string;
   attachmentRoot: string;
   backupStatusFile: string;
@@ -28,10 +30,13 @@ export function runtimeConfig(): RuntimeConfig {
   }
   const setupToken = process.env.ERP_SETUP_TOKEN || "";
   if (environment === "production" && setupToken.length < 24) throw new Error("ERP_SETUP_TOKEN must be at least 24 characters in production");
+  const publicOrigin = normalizePublicOrigin(process.env.ERP_PUBLIC_ORIGIN);
+  if (environment === "production" && publicOrigin?.startsWith("http://")) throw new Error("ERP_PUBLIC_ORIGIN must use HTTPS in production");
   return {
     environment,
     databaseUrl,
     setupToken,
+    publicOrigin,
     uploadRoot: resolve(process.env.ERP_UPLOAD_ROOT || "/data/chenyida-erp/uploads"),
     attachmentRoot: resolve(process.env.ERP_ATTACHMENT_ROOT || "/data/chenyida-erp/attachments"),
     backupStatusFile: resolve(process.env.ERP_BACKUP_STATUS_FILE || "/data/chenyida-erp/backup-status/latest.json"),

@@ -35,14 +35,14 @@ function applyCookies(response, cookieJar) {
   }
 }
 
-async function api(path, { method = "GET", body, cookieJar = jar(), key, csrf = true, origin = true, full = false } = {}) {
+async function api(path, { method = "GET", body, cookieJar = jar(), key, csrf = true, origin = true, requestOrigin = "http://local.test", full = false } = {}) {
   const headers = new Headers({ "X-Request-ID": randomUUID() });
   if (body !== undefined) headers.set("Content-Type", "application/json");
   if (Object.keys(cookieJar).length) headers.set("Cookie", Object.entries(cookieJar).map(([name, value]) => `${name}=${value}`).join("; "));
-  if (origin) headers.set("Origin", "http://local.test");
+  if (origin) headers.set("Origin", typeof origin === "string" ? origin : new URL(requestOrigin).origin);
   if (csrf && cookieJar.CYD_ERP_CSRF) headers.set("X-CSRF-Token", cookieJar.CYD_ERP_CSRF);
   if (key) headers.set("Idempotency-Key", key);
-  const request = new Request(`http://local.test${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const request = new Request(`${requestOrigin}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const response = full ? await handleSelfhostApi(request) : await handleSelfhostIdentityApi(request, { pool, requestId: headers.get("X-Request-ID") });
   assert.ok(response, `route not handled: ${method} ${path}`);
   applyCookies(response, cookieJar);
@@ -119,6 +119,29 @@ test("create, first-login must-change, own password change and multi-session rev
   assert.equal((await login("buyer01", passwords.changed)).response.status, 200);
   const material = await api("/api/material-master/materials?page=1&page_size=20", { cookieJar: firstJar, full: true });
   assert.equal(material.response.status, 200);
+});
+
+test("explicit TLS public origin fixes proxy termination without weakening first-change CSRF", async () => {
+  const previousPublicOrigin = process.env.ERP_PUBLIC_ORIGIN;
+  try {
+    const admin = await setupAdmin();
+    assert.equal((await createUser(admin.cookieJar)).response.status, 201);
+    const buyerJar = jar(); await login("buyer01", passwords.temporary, buyerJar);
+    process.env.ERP_PUBLIC_ORIGIN = "https://erp.example.test:18888";
+    const body = { old_password: passwords.temporary, new_password: passwords.changed, expected_version: 1 };
+    const internalOrigin = "http://erp.example.test:18888";
+    const wrong = await api("/api/me/password", { method: "POST", cookieJar: buyerJar, key: "proxy-wrong-origin-key", body, origin: "https://evil.example:18888", requestOrigin: internalOrigin });
+    assert.equal(wrong.response.status, 403); assert.equal(wrong.payload.code, "CSRF_INVALID"); assert.equal(wrong.payload.message, "请求来源校验失败");
+    const missing = await api("/api/me/password", { method: "POST", cookieJar: buyerJar, key: "proxy-missing-origin-key", body, origin: false, requestOrigin: internalOrigin });
+    assert.equal(missing.response.status, 403); assert.equal(missing.payload.code, "CSRF_INVALID");
+    const missingToken = await api("/api/me/password", { method: "POST", cookieJar: buyerJar, key: "proxy-missing-token-key", body, origin: process.env.ERP_PUBLIC_ORIGIN, csrf: false, requestOrigin: internalOrigin });
+    assert.equal(missingToken.response.status, 403); assert.equal(missingToken.payload.code, "CSRF_INVALID"); assert.equal(missingToken.payload.message, "CSRF Token 无效");
+    const changed = await api("/api/me/password", { method: "POST", cookieJar: buyerJar, key: "proxy-valid-origin-key", body, origin: process.env.ERP_PUBLIC_ORIGIN, requestOrigin: internalOrigin });
+    assert.equal(changed.response.status, 200); assert.equal(changed.payload.user.must_change_password, false); assert.equal(changed.payload.user.version, 2);
+  } finally {
+    if (previousPublicOrigin === undefined) delete process.env.ERP_PUBLIC_ORIGIN;
+    else process.env.ERP_PUBLIC_ORIGIN = previousPublicOrigin;
+  }
 });
 
 test("status and reset enforce CAS and immediately revoke every target session", async () => {
