@@ -4,6 +4,13 @@
 
 ## 2026-07-29
 
+### SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 - `ops: waive admin2 first password change`
+
+- 授权/范围：项目负责人明确要求 `admin2` 不用首次改密。本次只清除该账号 must-change 标记并递增 version；密码、active admin、角色、合法 Session 和其他账号保持，不新增通用豁免 API。
+- 事务/审计：使用 serializable 事务、任务 advisory lock、目标行锁、active/role/version 2/must-change true 前置门禁和 CAS；账号更新与唯一 `USER_FIRST_PASSWORD_CHANGE_WAIVED/success` Identity Audit 同事务。任务重放实际为 no-op，审计仍只有 1 条。
+- 核对：`admin2` must-change/version `true/2→false/3`，密码二次指纹、Session/有效 `3/1`、身份幂等 3 不变；Audit/Identity `887/15→888/16`。34/head 0034、checksum manifest `b2ff69f7...13b8b` 和业务 `532/6/6/316` 保持。
+- 运行/边界：Identity unit 8/8，本机/TLS health 与匿名 Session 200；四服务容器、四卷、restart/OOM 和资源门禁通过。没有 build/restart/Migration/deploy、push/PR、Sites/D1/Python 操作；task SQL 已删除，Git 不含密码、摘要、Cookie、Token、凭据或业务数据。
+
 ### SELFHOST-OPS-TRUSTED-ORIGIN-05 - `fix: trust configured public origin behind TLS`
 
 - 根因/修复：Caddy 在公网终止 TLS 后以内部 HTTP 反代，旧身份与通用写请求却把浏览器 HTTPS `Origin` 直接和内部 `Request.url` 比较，导致合法首次改密返回 `CSRF_INVALID`。新增规范化的单值 `ERP_PUBLIC_ORIGIN`；配置存在时只接受精确协议、主机和端口，不接受凭据、通配、路径或客户端转发头。

@@ -2,6 +2,18 @@
 
 最后更新时间：2026-07-29（Asia/Shanghai）
 
+## SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 单账号首次改密豁免
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / SINGLE-ACCOUNT WAIVER APPLIED | 项目负责人明确要求 `admin2` 无需首次改密；账号已可直接使用 |
+| 账号状态 | PASS | active admin 保持，must-change `true→false`、version `2→3`；密码二次指纹不变，未读取/重置/输出密码或摘要 |
+| 事务/审计 | PASS / IDEMPOTENT | serializable 事务、advisory lock、行锁、预期 version/CAS；新增唯一 `USER_FIRST_PASSWORD_CHANGE_WAIVED/success` Identity Audit，重放为 no-op |
+| 会话/全局策略 | UNCHANGED | Session/有效 `3/1`、`admin2` 有效 Session 1；未撤销会话。D-045 新建/重置用户强制首次改密继续生效，无通用豁免 API |
+| 数据/Migration | UNCHANGED | Audit/Identity `887/15→888/16`，幂等 3；34/head 0034、manifest `b2ff69f7...13b8b`、Material/Product/BOM/Line `532/6/6/316` 不变 |
+| 服务/资源 | PASS | Identity unit 8/8；本机/TLS health 与匿名 Session 200。四服务容器未重建、restart 0/OOM false；约 2.3 GiB available、142 MiB Swap、34 GiB 根盘、内核 OOM 0 |
+| 清理/Git | PASS | task-only SQL 已删除，无临时容器/数据库，四卷保留。仅脱敏文档，不含密码/摘要/Token/Cookie/凭据/业务数据；未 build/restart/deploy、push/PR 或操作 Python/Sites/D1 |
+
 ## SELFHOST-OPS-TRUSTED-ORIGIN-05 公网 HTTPS 请求来源校验修复
 
 | 验证项 | 结果 | 说明 |

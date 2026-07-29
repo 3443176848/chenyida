@@ -31,11 +31,12 @@
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
 - 发布标识：包名为 `chenyida-erp-selfhosted`；源码为 `0.1.0-alpha.35`/`0035`，当前受控公网运行面仍为 `0.1.0-alpha.34`/`0034`。0035 未应用，alpha.35 未 build/restart/deploy。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.35`。
-- Git 复核：TRUSTED-ORIGIN-05 起点为本地 `main`/HEAD `f3092ee133e8286e7ba672b495288a884db0c5d8`、领先 origin 86；完成提交消息为 `fix: trust configured public origin behind TLS`，实际 SHA 以 Git log 为准。未 push/PR/改写历史；`shujvbiao/` 未修改、暂存、打开或提交，Git 只记录来源校验代码、测试和脱敏文档，不含密码、摘要、Cookie、Token、真实 XLSX、逐行报告或 dump。
+- Git 复核：ADMIN2-FIRST-CHANGE-WAIVER-06 起点为本地 `main`/HEAD `424fc51`、领先 origin 87；完成提交消息为 `ops: waive admin2 first password change`，实际 SHA 以 Git log 为准。未 push/PR/改写历史；`shujvbiao/` 未修改、暂存、打开或提交，Git 只记录脱敏任务文档，不含密码、二次指纹、摘要、Cookie、Token、真实 XLSX、逐行报告或 dump。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
 - V9 重导入 staging：LANDING-TASK05 对单个 SHA 绑定 XLSX 解析 197 行；编码唯一连续、来源完整，但显式单位 0，产品/BOM 结构字段 0。恢复库首次 staged 197、重放新增 0，全部 review；5,556 条拟删除计划未执行，主库 213 表计数完全不变。
-- 第二管理员：SELFHOST-OPS-ADMIN-ACCOUNT-04 通过既有 Identity Service 新增 `admin2`，最终为 active admin、version 2、`must_change_password=true`。其后已成功登录并形成合法 Session，但首次改密曾被代理来源误判阻断；当前用户/active admin `2/2`、Session/有效 `3/1`、Audit/Identity Audit `887/15`、持久幂等 3。一次误输出的旧密码摘要已通过正式密码重置和新随机盐立即失效；Material/Product/BOM/BOM Line 保持 `532/6/6/316`。
+- 第二管理员：SELFHOST-OPS-ADMIN-ACCOUNT-04 通过既有 Identity Service 新增 `admin2`；其后已成功登录并形成合法 Session，代理来源误判已由 TRUSTED-ORIGIN-05 修复。ADMIN2-FIRST-CHANGE-WAIVER-06 又按项目负责人明确授权清除该账号 must-change，当前为 active admin、version 3、`must_change_password=false`。用户/active admin `2/2`、Session/有效 `3/1`、Audit/Identity Audit `888/16`、持久幂等 3；密码二次指纹不变，Material/Product/BOM/BOM Line 保持 `532/6/6/316`。
+- 单账号豁免：SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 采用 serializable 事务、任务 advisory lock、行锁和 version 2 CAS，把账号更新与唯一 `USER_FIRST_PASSWORD_CHANGE_WAIVED/success` 审计同事务提交；同任务重放 no-op。现有有效 Session 保留，D-045 全局新建/重置用户强制首次改密策略与 API 不变。
 - 公网来源校验：SELFHOST-OPS-TRUSTED-ORIGIN-05 以显式、规范化、单值 `ERP_PUBLIC_ORIGIN` 取代“浏览器 Origin 直接等于代理后内部 Request URL”的错误假设。配置存在时只接受该公网 HTTPS origin，不读取任意转发头；身份写仍要求 Origin 和 Cookie/Header CSRF 双提交。基于 alpha.34 的最小 Web hotfix 已部署，镜像 `sha256:f9c34a11b900...`；0035、PostgreSQL、Worker、Caddy 和业务数据未动。
 - 兼容供应商导入：LANDING-TASK04 功能提交 `cda8c7e` 已在单独授权下部署到当前 18888 Web；`public/erp/` 的 CSV-only/退役入口已改为直达 `/materials/imports/new`，入口 URL 已版本化。公网 HTML/JS SHA 与源码一致，响应含 `private, no-store` 和 `Pragma: no-cache`；框架仍并列冗余 `public, max-age=3600` 头。未做 Excel→PG E2E。
 - BOM 物料治理：PHASE6-TASK01 在既有 Import/Mapping/Normalization/Review 后新增确定性规格治理层，用品类+关键规格+性能等级的完整身份进行严格归组，保留原始行/BOM/料号透明度，替代项只是候选。受控决策可精确绑定 ACTIVE 或调用既有 Workflow 建 DRAFT；不自动编码、审批或建正式替代关系。
@@ -51,6 +52,7 @@
 - LANDING-TASK05 的 dump、恢复、staging 和测试严格串行；起点 available `2,351,184 KiB`、Swap `130,592 KiB`、Load `0.06/0.09/0.11`、根盘 35 GiB，提交后约 2.2 GiB/126 MiB/`0.08/0.14/0.14`/35 GiB；独立 60 秒 Swap 增长 0。四服务 restart 0/OOM false，临时库/runner/cache 删除，四个受保护卷保留。
 - ADMIN-ACCOUNT-04 不执行 build/restart/deploy；身份写入和测试串行。起点 available 2.3 GiB、Swap 126 MiB、根盘 35 GiB、Load `0.05/0.12/0.14`，最终 2.3 GiB/126 MiB/35 GiB/`0.10/0.14/0.13`；四服务 restart 0/OOM false、内核 OOM 0。所有账号、语法与测试 runner 及 root-only 临时目录均已删除，四个受保护卷保留。
 - TRUSTED-ORIGIN-05 的单元、隔离 PostgreSQL、两次镜像 build 和 Web 更新全部串行；起点 available 约 2.3 GiB、Swap 126—127 MiB、根盘 35 GiB、Load 低于 0.3，最终约 2.2 GiB/142 MiB/34 GiB/Load `1.08/0.48/0.29`。四服务 restart 0/OOM false，内核无 OOM；只重建 Web，PostgreSQL/Worker/Caddy 容器 ID 不变。临时数据库、runner、候选镜像和 worktree 已清理，四个受保护卷保留；2.789 GB Build Cache 未执行未授权 prune。
+- ADMIN2-FIRST-CHANGE-WAIVER-06 只有一次轻量 PostgreSQL 事务和一个断网 Identity unit runner；起点/最终 available 均约 2.3 GiB、Swap 142 MiB、根盘 34 GiB，最终 Load `0.08/0.16/0.12`。四服务未重建、restart 0/OOM false、内核 OOM 0；task SQL/runner 已清理，四个受保护卷保留。
 
 ### 治理资料
 
@@ -150,6 +152,7 @@
 37. SELFHOST-PHASE6-TASK01 采用 D-079：治理只消费已发布 Normalization，以版本化规则/配置快照和精确十进制形成“类别+关键规格+性能等级”身份。只有完整 READY 才精确归组，缺项/冲突 fail closed；标准候选 key 不是 ERP 编码。人工可精确绑定 ACTIVE 或经既有 Material Workflow 建 DRAFT，治理与普通审批共享 advisory identity lock 且绑定时 live revalidation；替代项只是候选。`0.1.0-alpha.35`/`0035` 只通过源码与隔离 PostgreSQL 验收，未进入常驻运行面。
 38. SELFHOST-OPS-ADMIN-ACCOUNT-04 后当前身份基线为用户/active admin `2/2`、Session/有效 Session `2/0`、Audit/Identity Audit `881/9`、持久幂等 3；`admin2` 为 active admin、version 2、`must_change_password=true` 且尚未登录。弱密码拒绝、成功创建、匿名认证门禁和安全重置审计均为合法安全记录，必须保留；曾被误输出的旧摘要已失效。
 39. SELFHOST-OPS-TRUSTED-ORIGIN-05 后当前身份基线为用户/active admin `2/2`、Session/有效 `3/1`、Audit/Identity `887/15`、持久幂等 3；`admin2` 已登录但仍为 version 2、`must_change_password=true`。任务起点 `885/13` 后新增两条无凭据公网验收的 `SELF_PASSWORD_CHANGED/failed/AUTH_REQUIRED` 合法审计；没有治理或业务写入。Migration manifest 仍为 `b2ff69f7...13b8b`，Material/Product/BOM/Line 仍为 `532/6/6/316`。
+40. SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 后当前身份基线为用户/active admin `2/2`、Session/有效 `3/1`、Audit/Identity `888/16`、持久幂等 3；`admin2` 为 active admin、version 3、`must_change_password=false`。唯一 delta 是账号 version/flag 和一条专用成功 Identity Audit；密码二次指纹、Session、Migration manifest 与业务计数不变。
 
 ## 当前风险
 
@@ -175,7 +178,7 @@
 - Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现；历史 Site 未部署这些代码，本任务也未访问公网重新确认其状态。
 - Node/PostgreSQL 已完成真实 BOM 部分导入并在用户授权下开放受控公网 HTTPS 入口；这不代表 438 条隔离来源已解决，也不代表全部业务域完成正式投产验收。
 - `chenyida-erp-parallel` 使用 production 运行门禁；Caddy 公网监听 80/18888，Web 仅回环 3000、PostgreSQL 无宿主端口。入口临时依赖 DNS-only 名称，后续应替换为公司自有域名。
-- `admin2` 仍持有一次性临时凭据并被 `must_change_password` 全局门禁限制；项目负责人首次登录后必须立即设置不同的新密码。曾误输出的旧密码摘要已经正式重置失效，不得尝试恢复、复用或删除相应审计证据。
+- `admin2` 当前凭据已按项目负责人明确决定继续有效，不再受首次改密门禁；这是单账号审计例外，不得扩展为其他账号或全局策略。曾误输出的旧密码摘要已经正式重置失效，不得尝试恢复、复用或删除相应审计证据。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
 - 业务决策 `B01-B24` 尚未全部确认。
 - 根自托管页面已退出 legacy iframe；显式 `/erp/index.html` 仍承载尚未重写的业务 UI。Dashboard/backup 治理已接通，但真实数据、生产备份恢复演练和切换仍未完成，不能描述为已投产。
@@ -193,7 +196,7 @@
 
 ## 当前路线
 
-`SELFHOST-OPS-TRUSTED-ORIGIN-05` 已 `DONE / DEPLOYED / USER FIRST-CHANGE RETRY REQUIRED`；源码仍为 alpha.35/0035，当前 18888 Web 为 alpha.34 基线+Origin hotfix，PostgreSQL/Worker 仍为 alpha.34/0034。下一步由项目负责人刷新页面并重新提交 `admin2` 首次改密；不自动清理或导入业务数据，不应用 0035 或启动其他任务。
+`SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06` 已 `DONE / SINGLE-ACCOUNT WAIVER APPLIED`；源码仍为 alpha.35/0035，当前 18888 Web 为 alpha.34 基线+Origin hotfix，PostgreSQL/Worker 仍为 alpha.34/0034。`admin2` 刷新后可直接使用；不自动清理或导入业务数据，不应用 0035 或启动其他任务。
 
 ## 恢复上下文检查清单
 

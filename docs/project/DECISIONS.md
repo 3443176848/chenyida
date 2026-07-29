@@ -900,6 +900,16 @@
 - CSRF/身份：身份写仍强制 Origin；通用写保持既有缺失 Origin 语义，但 Cookie/Header Token 双提交继续强制且常量时间比较。Session、must-change、权限、限流、幂等、CAS 和事务审计均不因代理兼容而放宽。
 - 发布边界：当前只允许 `https://43.135.157.211.nip.io:18888`，并以 alpha.34 最小 Web hotfix 部署；0035、PostgreSQL、Worker、Caddy、业务数据和历史 Sites/D1 不在授权范围。
 
+## D-081 `admin2` 可按项目负责人明确授权豁免首次改密，但不形成全局能力
+
+- 日期：2026-07-29
+- 状态：`ACCEPTED / APPLIED AS SINGLE-ACCOUNT OPS EXCEPTION`
+- 确认人：项目负责人（明确要求 `admin2` 不用首次改密）
+- 例外范围：只把当前 `chenyida-erp-parallel` 中 `admin2.must_change_password` 清除；保留当前密码、active admin 角色和合法 Session。账号 version 按 CAS 递增并写专用不可变 Identity Audit。
+- 全局策略：D-045 的新建/重置用户强制首次改密继续有效；不修改 Service/API/Schema，不新增管理员日常可调用的通用豁免入口，其他账号不能由此自动获得豁免。
+- 安全与追踪：事务必须校验目标、active/role/version/当前标记，账号更新和 `USER_FIRST_PASSWORD_CHANGE_WAIVED` 审计同事务；审计记录项目负责人授权、单账号范围、未改密码、未撤销会话和未改全局策略，不记录密码、摘要、Cookie 或 Token。同任务重放必须 no-op 或 fail closed。
+- 授权边界：本决定不授权修改密码策略、删除审计、批量豁免、角色/权限变更、Schema/Migration、业务数据、服务部署、历史 Sites/D1 或 Python 运行面。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
