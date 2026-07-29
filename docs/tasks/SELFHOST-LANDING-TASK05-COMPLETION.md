@@ -35,7 +35,7 @@
 - Migration 仍为 34 条、head `0034_supplier_receipt_lot_iqc.sql`，checksum manifest `b2ff69f7b72db5f5bdd02b0fc6cc4e70dd913e52e1140a4abe1a8c3549d13b8b`。
 - 唯一管理员保持 active、无需改密，`setup_completed=1`；2 个 Session 与 4 条 Identity 审计原样保留，最终有 1 个有效 Session。未读取密码、Token、Cookie、原 Session digest 或数据库凭据，也未用未知凭据模拟登录。
 - PostgreSQL accepting，Web health/root 与 Caddy TLS health 为 200，匿名 Material API 为 401，Worker running；四容器 RestartCount 0、OOMKilled false，内核 OOM 记录 0。
-- 起点/终点 available memory 均约 2.2 GiB、Swap `127→126 MiB`、根盘可用 35 GiB；最终 60 秒 Swap `129300→129300 KiB`、增长 0，Load `0.84/0.36/0.18`。
+- 起点 07:50 SAR 为 available `2,351,184 KiB`、Swap used `130,592 KiB`、Load `0.06/0.09/0.11`，根盘可用 35 GiB；提交后 available 约 2.2 GiB、Swap 126 MiB、Load `0.08/0.14/0.14`、根盘仍 35 GiB。独立 60 秒观察的 Swap `129300→129300 KiB`、增长 0；内核 OOM 0。
 - 任务临时 staging 数据库、两个自动删除 runner 和任务 Python cache 已删除；无任务容器残留。四个 ERP 持久卷全部保留；pre-clean dump/list 与 root-only intake 证据保留。
 - root-only 目录 `/var/lib/chenyida-erp/intake/bom-v9-reset-20260728T235056Z` 为 0700，报告/payload/`needs-review.csv` 为 0600。Git 只包含通用显式字段 staging 工具、合成测试和脱敏文档，不包含原 XLSX、逐行 payload/CSV、dump、凭据或真实数据库内容。
 - 未 build、Migration 常驻库、restart、deploy、切流、push、PR 或操作 Python 服务；完成后停止。

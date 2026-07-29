@@ -46,7 +46,7 @@
 - LANDING-TASK01 不执行 build；所有 Git、dump、恢复和测试串行。起点 65 秒 Swap `137476→137476 KiB`、增长 0，Build Cache 全程 0B；三容器 restart 0/OOM false，四卷、resource-guard、Python PID 和 SQLite metadata 保持。
 - LANDING-TASK04 部署严格串行 build/recreate Web；起点 available 2.1 GiB、Swap 114 MiB、根盘 36 GiB，最终 available 2.2 GiB、Swap 123 MiB、根盘 35 GiB。build 后 60 秒 Swap +100 KiB，部署后 60 秒 -24 KiB；容器 restart 0/OOM false、内核 OOM 记录 0。Build Cache 1.401 GB 保留，未执行未授权 prune。
 - PHASE6-TASK01 的 PostgreSQL 测试、迁移和 Node 重任务串行，任一时刻只有一个临时容器，Node heap 512 MiB/容器 768 MiB。起点 available 约 2.1 GiB、Swap 131—132 MiB、根盘 35 GiB；最终 available 2.2 GiB、Swap 135 MiB、根盘 35 GiB、Load `0.21/0.76/0.69`，四服务 restart 0/OOM false。两个任务测试库和临时容器已删除，四个受保护卷保留。
-- LANDING-TASK05 的 dump、恢复、staging 和测试严格串行；起点/终点 available 约 2.2 GiB、Swap `127→126 MiB`、根盘 35 GiB，最终 60 秒 Swap 增长 0、Load `0.84/0.36/0.18`。四服务 restart 0/OOM false，临时库/runner/cache 删除，四个受保护卷保留。
+- LANDING-TASK05 的 dump、恢复、staging 和测试严格串行；起点 available `2,351,184 KiB`、Swap `130,592 KiB`、Load `0.06/0.09/0.11`、根盘 35 GiB，提交后约 2.2 GiB/126 MiB/`0.08/0.14/0.14`/35 GiB；独立 60 秒 Swap 增长 0。四服务 restart 0/OOM false，临时库/runner/cache 删除，四个受保护卷保留。
 
 ### 治理资料
 
