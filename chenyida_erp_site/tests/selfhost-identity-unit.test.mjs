@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { IdentityError } from "../app/lib/identity-selfhost/errors.ts";
-import { assertProtectedIdentityGate, buildAuthCookieHeaders, buildCsrfCookieHeader, identityFailureResponse } from "../app/lib/identity-selfhost/handler.ts";
+import { assertProtectedIdentityGate, buildAuthCookieHeaders, buildClearCookieHeaders, buildCsrfCookieHeader, identityFailureResponse } from "../app/lib/identity-selfhost/handler.ts";
 import { assertPasswordChanged, hashPassword, validateDisplayName, validatePassword, validateUsername, verifyPassword } from "../app/lib/identity-selfhost/password.ts";
 import { permissionsForRole, validateRole } from "../app/lib/identity-selfhost/permissions.ts";
 import { assertResetAllowed, assertStatusChangeAllowed } from "../app/lib/identity-selfhost/service.ts";
@@ -66,6 +66,19 @@ test("cookie policy is environment-aware and keeps CSRF readable", () => {
   const production = buildAuthCookieHeaders(request, "session-value", "csrf-value", "production").getSetCookie();
   assert.ok(production.every((value) => /Secure/.test(value)));
   assert.match(buildCsrfCookieHeader(request, "csrf-value", "production"), /Secure/);
+  const cleared = buildClearCookieHeaders(request, "production").getSetCookie();
+  assert.equal(cleared.length, production.length);
+  const byName = (values, name) => values.find((value) => value.startsWith(`${name}=`));
+  const sessionSet = byName(production, "CYD_ERP_SESSION");
+  const sessionClear = byName(cleared, "CYD_ERP_SESSION");
+  const csrfSet = byName(production, "CYD_ERP_CSRF");
+  const csrfClear = byName(cleared, "CYD_ERP_CSRF");
+  for (const value of [sessionSet, sessionClear, csrfSet, csrfClear]) {
+    assert.match(value, /Path=\//); assert.match(value, /SameSite=Lax/); assert.match(value, /Secure/); assert.doesNotMatch(value, /Domain=/i);
+  }
+  assert.match(sessionSet, /HttpOnly/); assert.match(sessionClear, /HttpOnly/);
+  assert.doesNotMatch(csrfSet, /HttpOnly/); assert.doesNotMatch(csrfClear, /HttpOnly/);
+  assert.match(sessionClear, /Max-Age=0/); assert.match(csrfClear, /Max-Age=0/);
 });
 
 test("stable error mapping never exposes internal exceptions", async () => {

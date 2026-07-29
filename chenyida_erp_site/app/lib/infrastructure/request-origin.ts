@@ -31,10 +31,29 @@ function normalizeHeaderOrigin(value: string | null): string | null {
   }
 }
 
-export function requestOriginMatches(request: Request, publicOrigin: string | null): boolean {
+export function isStrictLoopbackOrigin(value: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  return ["http:", "https:"].includes(parsed.protocol)
+    && ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname)
+    && !parsed.username
+    && !parsed.password
+    && parsed.pathname === "/"
+    && !parsed.search
+    && !parsed.hash;
+}
+
+export function requestOriginMatches(request: Request, publicOrigin: string | null, allowUatLoopbackOrigin = false): boolean {
   const suppliedOrigin = normalizeHeaderOrigin(request.headers.get("origin"));
   if (!suppliedOrigin) return false;
-  return publicOrigin !== null
-    ? suppliedOrigin === publicOrigin
-    : suppliedOrigin === new URL(request.url).origin;
+  const requestOrigin = new URL(request.url).origin;
+  if (publicOrigin !== null && suppliedOrigin === publicOrigin) return true;
+  if (publicOrigin === null) return suppliedOrigin === requestOrigin;
+  return allowUatLoopbackOrigin
+    && isStrictLoopbackOrigin(suppliedOrigin)
+    && isStrictLoopbackOrigin(requestOrigin);
 }

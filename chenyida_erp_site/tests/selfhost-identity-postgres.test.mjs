@@ -12,6 +12,9 @@ if (!databaseUrl || !/test/i.test(databaseUrl)) throw new Error("isolated TEST_I
 process.env.DATABASE_URL = databaseUrl;
 process.env.ERP_ENV = "test";
 process.env.ERP_SETUP_TOKEN = "identity-test-setup-token-value";
+process.env.ERP_PUBLIC_ORIGIN = "";
+process.env.ERP_DEPLOYMENT_CLASS = "test";
+process.env.ERP_UAT_ALLOW_LOOPBACK_ORIGIN = "false";
 const pool = new Pool({ connectionString: databaseUrl, max: 20, application_name: "identity-security-integration-test" });
 
 const passwords = {
@@ -40,7 +43,7 @@ async function api(path, { method = "GET", body, cookieJar = jar(), key, csrf = 
   if (body !== undefined) headers.set("Content-Type", "application/json");
   if (Object.keys(cookieJar).length) headers.set("Cookie", Object.entries(cookieJar).map(([name, value]) => `${name}=${value}`).join("; "));
   if (origin) headers.set("Origin", typeof origin === "string" ? origin : new URL(requestOrigin).origin);
-  if (csrf && cookieJar.CYD_ERP_CSRF) headers.set("X-CSRF-Token", cookieJar.CYD_ERP_CSRF);
+  if (csrf && cookieJar.CYD_ERP_CSRF) headers.set("X-CSRF-Token", typeof csrf === "string" ? csrf : cookieJar.CYD_ERP_CSRF);
   if (key) headers.set("Idempotency-Key", key);
   const request = new Request(`${requestOrigin}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const response = full ? await handleSelfhostApi(request) : await handleSelfhostIdentityApi(request, { pool, requestId: headers.get("X-Request-ID") });
@@ -144,6 +147,91 @@ test("explicit TLS public origin fixes proxy termination without weakening first
   }
 });
 
+test("explicit UAT loopback origin supports admin user creation and logout without widening CSRF", async () => {
+  const previous = {
+    publicOrigin: process.env.ERP_PUBLIC_ORIGIN,
+    deploymentClass: process.env.ERP_DEPLOYMENT_CLASS,
+    loopback: process.env.ERP_UAT_ALLOW_LOOPBACK_ORIGIN,
+  };
+  const requestOrigin = "http://127.0.0.1:3000";
+  const browserOrigin = "http://127.0.0.1:43127";
+  try {
+    process.env.ERP_PUBLIC_ORIGIN = "https://erp.example.test:18888";
+    process.env.ERP_DEPLOYMENT_CLASS = "uat";
+    process.env.ERP_UAT_ALLOW_LOOPBACK_ORIGIN = "true";
+    const admin = await setupAdmin();
+    const body = { username: "uatloop01", display_name: "UAT 经营负责人", role: "manager", temporary_password: "Quartz!5729Lake" };
+
+    const unknownOrigin = await api("/api/users", {
+      method: "POST", cookieJar: admin.cookieJar, key: "uat-loopback-unknown-origin", body,
+      origin: "https://evil.example", requestOrigin,
+    });
+    assert.equal(unknownOrigin.response.status, 403); assert.equal(unknownOrigin.payload.code, "CSRF_INVALID");
+    const missingCsrf = await api("/api/users", {
+      method: "POST", cookieJar: admin.cookieJar, key: "uat-loopback-missing-csrf", body,
+      csrf: false, origin: browserOrigin, requestOrigin,
+    });
+    assert.equal(missingCsrf.response.status, 403); assert.equal(missingCsrf.payload.code, "CSRF_INVALID");
+    const wrongCsrf = await api("/api/users", {
+      method: "POST", cookieJar: admin.cookieJar, key: "uat-loopback-wrong-csrf", body,
+      csrf: "not-the-cookie-csrf-value", origin: browserOrigin, requestOrigin,
+    });
+    assert.equal(wrongCsrf.response.status, 403); assert.equal(wrongCsrf.payload.code, "CSRF_INVALID");
+
+    const created = await api("/api/users", {
+      method: "POST", cookieJar: admin.cookieJar, key: "uat-loopback-create-manager", body,
+      origin: browserOrigin, requestOrigin,
+    });
+    assert.equal(created.response.status, 201); assert.equal(created.payload.user.role, "manager");
+    const weak = await api("/api/users", {
+      method: "POST", cookieJar: admin.cookieJar, key: "uat-loopback-create-weak",
+      body: { ...body, username: "weakuser", temporary_password: "weak" },
+      origin: browserOrigin, requestOrigin,
+    });
+    assert.equal(weak.response.status, 400); assert.equal(weak.payload.code, "PASSWORD_WEAK");
+    const duplicate = await api("/api/users", {
+      method: "POST", cookieJar: admin.cookieJar, key: "uat-loopback-create-duplicate", body,
+      origin: browserOrigin, requestOrigin,
+    });
+    assert.equal(duplicate.response.status, 409); assert.equal(duplicate.payload.code, "USERNAME_EXISTS");
+
+    const revokedJar = { ...admin.cookieJar };
+    const loggedOut = await api("/api/logout", {
+      method: "POST", cookieJar: admin.cookieJar, body: {}, origin: browserOrigin, requestOrigin,
+    });
+    assert.equal(loggedOut.response.status, 200);
+    const clearHeaders = loggedOut.response.headers.getSetCookie();
+    assert.equal(clearHeaders.length, 2);
+    assert.ok(clearHeaders.every((value) => /Path=\//.test(value) && /SameSite=Lax/.test(value) && /Max-Age=0/.test(value)));
+    assert.equal(admin.cookieJar.CYD_ERP_SESSION, undefined); assert.equal(admin.cookieJar.CYD_ERP_CSRF, undefined);
+    const revoked = await api("/api/users", { cookieJar: revokedJar, origin: browserOrigin, requestOrigin });
+    assert.equal(revoked.response.status, 401); assert.equal(revoked.payload.code, "SESSION_REVOKED");
+    const repeated = await api("/api/logout", {
+      method: "POST", cookieJar: admin.cookieJar, body: {}, origin: false, csrf: false, requestOrigin,
+    });
+    assert.equal(repeated.response.status, 200);
+
+    const audit = await pool.query(`
+      select action,result,error_code,target_username from audit_log
+      where action in ('USER_CREATED','LOGOUT') order by id
+    `);
+    assert.ok(audit.rows.some((row) => row.action === "USER_CREATED" && row.result === "success" && row.target_username === "uatloop01"));
+    assert.ok(audit.rows.some((row) => row.action === "USER_CREATED" && row.result === "failed" && row.error_code === "CSRF_INVALID"));
+    assert.ok(audit.rows.some((row) => row.action === "USER_CREATED" && row.result === "failed" && row.error_code === "PASSWORD_WEAK"));
+    assert.ok(audit.rows.some((row) => row.action === "USER_CREATED" && row.result === "failed" && row.error_code === "USERNAME_EXISTS"));
+    assert.ok(audit.rows.some((row) => row.action === "LOGOUT" && row.result === "success" && row.target_username === "rootadmin"));
+  } finally {
+    for (const [key, value] of [
+      ["ERP_PUBLIC_ORIGIN", previous.publicOrigin],
+      ["ERP_DEPLOYMENT_CLASS", previous.deploymentClass],
+      ["ERP_UAT_ALLOW_LOOPBACK_ORIGIN", previous.loopback],
+    ]) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test("status and reset enforce CAS and immediately revoke every target session", async () => {
   const admin = await setupAdmin();
   await createUser(admin.cookieJar);
@@ -164,14 +252,20 @@ test("status and reset enforce CAS and immediately revoke every target session",
 
 test("logout requires Origin and CSRF only when a valid session exists", async () => {
   const admin = await setupAdmin();
+  const revokedJar = { ...admin.cookieJar };
   const missingOrigin = await api("/api/logout", { method: "POST", cookieJar: admin.cookieJar, body: {}, origin: false });
   assert.equal(missingOrigin.response.status, 403); assert.equal(missingOrigin.payload.code, "CSRF_INVALID");
   const wrong = await api("/api/logout", { method: "POST", cookieJar: admin.cookieJar, body: {}, csrf: false });
   assert.equal(wrong.response.status, 403);
   const loggedOut = await api("/api/logout", { method: "POST", cookieJar: admin.cookieJar, body: {} });
   assert.equal(loggedOut.response.status, 200); assert.equal(admin.cookieJar.CYD_ERP_SESSION, undefined);
+  const oldSession = await api("/api/users", { cookieJar: revokedJar });
+  assert.equal(oldSession.response.status, 401); assert.equal(oldSession.payload.code, "SESSION_REVOKED");
   const anonymous = await api("/api/logout", { method: "POST", cookieJar: jar(), body: {}, origin: false, csrf: false });
   assert.equal(anonymous.response.status, 200);
+  const audit = await pool.query("select result,error_code from audit_log where action='LOGOUT' order by id");
+  assert.equal(audit.rows.filter((row) => row.result === "failed" && row.error_code === "CSRF_INVALID").length, 2);
+  assert.equal(audit.rows.filter((row) => row.result === "success").length, 1);
 });
 
 test("non-admin cannot manage users or audit; audit query is bounded, filterable and minimal", async () => {
@@ -188,6 +282,11 @@ test("non-admin cannot manage users or audit; audit query is bounded, filterable
   });
   const forbiddenUsers = await api("/api/users", { cookieJar: buyerJar });
   assert.equal(forbiddenUsers.response.status, 403); assert.equal(forbiddenUsers.payload.code, "PERMISSION_DENIED");
+  const forbiddenCreate = await api("/api/users", {
+    method: "POST", cookieJar: buyerJar, key: "buyer-forbidden-create-key",
+    body: { username: "denied01", display_name: "无权限用户", role: "manager", temporary_password: "Quartz!5729Lake" },
+  });
+  assert.equal(forbiddenCreate.response.status, 403); assert.equal(forbiddenCreate.payload.code, "PERMISSION_DENIED");
   const forbiddenAudit = await api("/api/system/audit-logs", { cookieJar: buyerJar });
   assert.equal(forbiddenAudit.response.status, 403); assert.equal(forbiddenAudit.payload.code, "PERMISSION_DENIED");
   const audit = await api("/api/system/audit-logs?action=USER_CREATED&target_username=buyer01&result=success&page=1&page_size=1", { cookieJar: admin.cookieJar });
@@ -195,6 +294,8 @@ test("non-admin cannot manage users or audit; audit query is bounded, filterable
   assert.deepEqual(Object.keys(audit.payload.data[0]).sort(), ["action", "actor", "created_at", "error_code", "id", "new_version", "old_version", "operation_id", "request_id", "result", "target_username"].sort());
   const invalidPage = await api("/api/system/audit-logs?page_size=101", { cookieJar: admin.cookieJar });
   assert.equal(invalidPage.response.status, 400); assert.equal(invalidPage.payload.code, "QUERY_INVALID");
+  const deniedCreateAudit = await pool.query("select result,error_code from audit_log where action='USER_CREATED' and username='buyer01' and target_username='denied01'");
+  assert.deepEqual(deniedCreateAudit.rows, [{ result: "failed", error_code: "PERMISSION_DENIED" }]);
   const allText = JSON.stringify(audit.payload);
   assert.doesNotMatch(allText, /Copper|River!|CYD_ERP_SESSION|password_hash|token_hash/i);
 });

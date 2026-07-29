@@ -1,4 +1,4 @@
-import { api, safeMaterialReturnTo } from "./api-client.js";
+import { api, ErpApiError, logoutSession, safeMaterialReturnTo } from "./api-client.js?v=20260729-identity-logout-fix";
 
 const state = {
   summary: {},
@@ -60,6 +60,11 @@ function toast(message) {
   setTimeout(() => {
     el.hidden = true;
   }, 2600);
+}
+
+function identityErrorText(error) {
+  if (!(error instanceof ErpApiError)) return "系统暂时无法完成请求";
+  return `${error.message}（${error.code}${error.requestId ? ` · 请求 ${error.requestId}` : ""}）`;
 }
 
 function setTab(name) {
@@ -1087,11 +1092,17 @@ async function setupSystem(event) {
 }
 
 async function logout() {
-  await api("/api/logout", { method: "POST", body: JSON.stringify({}), protectedWrite: { csrfToken: state.session.csrf_token || "" } }).catch(() => null);
-  state.session = { authenticated: false, user: null };
-  updateUserBar();
-  showLogin();
-  toast("已退出登录");
+  const button = $("#logoutBtn");
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    await logoutSession(state.session.csrf_token || "");
+    state.session = { authenticated: false, user: null };
+    window.top.location.replace("/");
+  } catch (error) {
+    button.disabled = false;
+    toast(`退出失败：${identityErrorText(error)}`);
+  }
 }
 
 function openPasswordDialog() {
@@ -1709,7 +1720,7 @@ function bindEvents() {
   $("#loginForm").addEventListener("submit", (event) => login(event).catch((error) => {
     $("#loginMsg").textContent = error.message;
   }));
-  $("#logoutBtn").addEventListener("click", logout);
+  $("#logoutBtn").addEventListener("click", () => void logout());
   $("#changePasswordBtn").addEventListener("click", openPasswordDialog);
   $("#cancelPasswordBtn").addEventListener("click", () => $("#passwordDialog").close());
   $("#passwordForm").addEventListener("submit", (event) => changePassword(event).catch((error) => {
@@ -1719,7 +1730,7 @@ function bindEvents() {
   $("#refreshBtn").addEventListener("click", refreshAll);
   $("#refreshOpsBtn").addEventListener("click", () => refreshOperations().catch((error) => toast(error.message)));
   $("#createUserForm").addEventListener("submit", (event) => createUser(event).catch((error) => {
-    $("#createUserMsg").textContent = error.message;
+    $("#createUserMsg").textContent = identityErrorText(error);
   }));
   $("#usersTable").addEventListener("click", (event) => {
     const username = event.target.dataset.toggleUser;

@@ -3,9 +3,11 @@ import { normalizePublicOrigin } from "./request-origin.ts";
 
 export type RuntimeConfig = {
   environment: "development" | "test" | "production";
+  deploymentClass: "development" | "test" | "uat" | "production";
   databaseUrl: string;
   setupToken: string;
   publicOrigin: string | null;
+  allowUatLoopbackOrigin: boolean;
   uploadRoot: string;
   attachmentRoot: string;
   backupStatusFile: string;
@@ -20,6 +22,24 @@ function positiveInteger(name: string, fallback: number): number {
   return value;
 }
 
+export function resolveOriginPolicy(
+  environment: RuntimeConfig["environment"],
+  deploymentClassValue: string | undefined,
+  allowLoopbackValue: string | undefined,
+): Pick<RuntimeConfig, "deploymentClass" | "allowUatLoopbackOrigin"> {
+  const deploymentClass = (deploymentClassValue?.trim().toLowerCase() || environment) as RuntimeConfig["deploymentClass"];
+  if (!["development", "test", "uat", "production"].includes(deploymentClass)) {
+    throw new Error("ERP_DEPLOYMENT_CLASS must be development, test, uat, or production");
+  }
+  const candidate = allowLoopbackValue?.trim().toLowerCase() || "false";
+  if (!["true", "false"].includes(candidate)) throw new Error("ERP_UAT_ALLOW_LOOPBACK_ORIGIN must be true or false");
+  const allowUatLoopbackOrigin = candidate === "true";
+  if (allowUatLoopbackOrigin && deploymentClass !== "uat") {
+    throw new Error("ERP_UAT_ALLOW_LOOPBACK_ORIGIN requires ERP_DEPLOYMENT_CLASS=uat");
+  }
+  return { deploymentClass, allowUatLoopbackOrigin };
+}
+
 export function runtimeConfig(): RuntimeConfig {
   const environment = (process.env.ERP_ENV || "development") as RuntimeConfig["environment"];
   if (!["development", "test", "production"].includes(environment)) throw new Error("ERP_ENV must be development, test, or production");
@@ -32,8 +52,10 @@ export function runtimeConfig(): RuntimeConfig {
   if (environment === "production" && setupToken.length < 24) throw new Error("ERP_SETUP_TOKEN must be at least 24 characters in production");
   const publicOrigin = normalizePublicOrigin(process.env.ERP_PUBLIC_ORIGIN);
   if (environment === "production" && publicOrigin?.startsWith("http://")) throw new Error("ERP_PUBLIC_ORIGIN must use HTTPS in production");
+  const originPolicy = resolveOriginPolicy(environment, process.env.ERP_DEPLOYMENT_CLASS, process.env.ERP_UAT_ALLOW_LOOPBACK_ORIGIN);
   return {
     environment,
+    ...originPolicy,
     databaseUrl,
     setupToken,
     publicOrigin,

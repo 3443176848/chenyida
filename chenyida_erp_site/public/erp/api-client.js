@@ -89,6 +89,15 @@ export async function api(path, options = {}) {
   return data;
 }
 
+export async function logoutSession(csrfToken) {
+  if (!csrfToken) throw new ErpApiError("退出请求缺少 CSRF Token，请刷新页面后重试", { code: "PROTECTED_WRITE_CONTEXT_REQUIRED" });
+  return api("/api/logout", {
+    method: "POST",
+    body: "{}",
+    protectedWrite: { csrfToken },
+  });
+}
+
 function parseXhrBody(xhr) {
   const contentType = xhr.getResponseHeader("Content-Type") || "";
   const text = String(xhr.responseText || "");

@@ -5,6 +5,8 @@ x-app-environment: &app-environment
   DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
   ERP_SETUP_TOKEN: ${ERP_SETUP_TOKEN:?ERP_SETUP_TOKEN is required}
   ERP_PUBLIC_ORIGIN: ${ERP_PUBLIC_ORIGIN:-}
+  ERP_DEPLOYMENT_CLASS: ${ERP_DEPLOYMENT_CLASS:-}
+  ERP_UAT_ALLOW_LOOPBACK_ORIGIN: ${ERP_UAT_ALLOW_LOOPBACK_ORIGIN:-false}
   ERP_UPLOAD_ROOT: /data/chenyida-erp/uploads
   ERP_ATTACHMENT_ROOT: /data/chenyida-erp/attachments
   ERP_BACKUP_STATUS_FILE: /data/chenyida-erp/backup-status/latest.json

@@ -4,6 +4,8 @@ import test from "node:test";
 
 const app = await readFile(new URL("../public/erp/app.js", import.meta.url), "utf8");
 const client = await readFile(new URL("../public/erp/api-client.js", import.meta.url), "utf8");
+const workbench = await readFile(new URL("../app/_components/erp-workbench.tsx", import.meta.url), "utf8");
+const html = await readFile(new URL("../public/erp/index.html", import.meta.url), "utf8");
 
 test("identity forms use alpha.2 field names, expected versions, CSRF and idempotency", () => {
   assert.match(app, /temporary_password/);
@@ -34,4 +36,27 @@ test("passwords and tokens are not written to URLs, logs or browser storage", ()
   assert.doesNotMatch(app, /console\.(?:log|info|warn|error)\([^)]*(?:password|token)/i);
   assert.doesNotMatch(client, /localStorage|sessionStorage/);
   assert.doesNotMatch(app, /URLSearchParams\([^)]*(?:password|token)/i);
+});
+
+test("both workbenches share the same fail-visible secure logout helper", () => {
+  assert.match(client, /export async function logoutSession\(csrfToken\)/);
+  assert.match(client, /api\("\/api\/logout",\s*\{[\s\S]*method: "POST"[\s\S]*protectedWrite: \{ csrfToken \}/);
+  assert.match(client, /credentials: "same-origin"/);
+  assert.equal((client.match(/api\("\/api\/logout"/g) || []).length, 1);
+  for (const source of [app, workbench]) {
+    assert.match(source, /logoutSession\(/);
+    assert.match(source, /location\.replace\("\/"\)/);
+    assert.doesNotMatch(source, /api\("\/api\/logout"/);
+    assert.doesNotMatch(source, /logout[\s\S]{0,250}\.catch\(\(\)=>null\)/);
+  }
+  assert.match(app, /退出失败：\$\{identityErrorText\(error\)\}/);
+  assert.match(workbench, /退出失败：\$\{explain\(reason\)\}/);
+  assert.match(html, /id="toast"[^>]*role="alert"[^>]*aria-live="assertive"/);
+  assert.match(workbench, /role="alert"/);
+});
+
+test("user creation presents stable identity code and request context", () => {
+  assert.match(app, /createUserMsg"\)\.textContent = identityErrorText\(error\)/);
+  assert.match(app, /error\.code/);
+  assert.match(app, /error\.requestId/);
 });

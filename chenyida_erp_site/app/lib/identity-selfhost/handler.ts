@@ -110,7 +110,8 @@ function assertKeys(body: Record<string, unknown>, allowed: readonly string[]): 
 }
 
 function requireCsrf(request: Request): void {
-  if (!requestOriginMatches(request, runtimeConfig().publicOrigin)) throw new IdentityError("CSRF_INVALID", "请求来源校验失败", 403);
+  const config = runtimeConfig();
+  if (!requestOriginMatches(request, config.publicOrigin, config.allowUatLoopbackOrigin)) throw new IdentityError("CSRF_INVALID", "请求来源校验失败", 403);
   const header = request.headers.get("x-csrf-token") || "";
   const cookie = cookies(request)[CSRF_COOKIE] || "";
   if (!header || !cookie || !constantTimeTextEqual(header, cookie)) throw new IdentityError("CSRF_INVALID", "CSRF Token 无效", 403);
