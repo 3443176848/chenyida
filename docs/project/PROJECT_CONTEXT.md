@@ -31,10 +31,11 @@
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
 - 发布标识：包名为 `chenyida-erp-selfhosted`；源码为 `0.1.0-alpha.35`/`0035`，当前受控公网运行面仍为 `0.1.0-alpha.34`/`0034`。0035 未应用，alpha.35 未 build/restart/deploy。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.35`。
-- Git 复核：TASK05 起点为本地 `main`/HEAD `aa60f74`、领先 origin 83；完成提交消息为 `ops: stage guarded bom v9 reimport`，实际 SHA 以 Git log 为准。未 push/PR/改写历史；`shujvbiao/` 未修改、暂存、打开或提交，真实 XLSX/逐行报告/dump 均在仓库外。
+- Git 复核：ADMIN-ACCOUNT-04 起点为本地 `main`/HEAD `a723c8f94d4c258f34397cca345d9c1a6648bdd1`、领先 origin 85；完成提交消息为 `ops: provision second administrator safely`，实际 SHA 以 Git log 为准。未 push/PR/改写历史；`shujvbiao/` 未修改、暂存、打开或提交，Git 只记录脱敏任务文档，不含密码、摘要、Token、真实 XLSX、逐行报告或 dump。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
 - V9 重导入 staging：LANDING-TASK05 对单个 SHA 绑定 XLSX 解析 197 行；编码唯一连续、来源完整，但显式单位 0，产品/BOM 结构字段 0。恢复库首次 staged 197、重放新增 0，全部 review；5,556 条拟删除计划未执行，主库 213 表计数完全不变。
+- 第二管理员：SELFHOST-OPS-ADMIN-ACCOUNT-04 通过既有 Identity Service 新增 `admin2`，最终为 active admin、version 2、`must_change_password=true`，尚未登录。用户/active admin `1/1→2/2`，Session/有效 Session 保持 `2/0`，Audit/Identity Audit `877/5→881/9`，持久幂等 `0→3`；一次误输出的旧密码摘要已通过正式密码重置和新随机盐立即失效。Material/Product/BOM/BOM Line 保持 `532/6/6/316`。
 - 兼容供应商导入：LANDING-TASK04 功能提交 `cda8c7e` 已在单独授权下部署到当前 18888 Web；`public/erp/` 的 CSV-only/退役入口已改为直达 `/materials/imports/new`，入口 URL 已版本化。公网 HTML/JS SHA 与源码一致，响应含 `private, no-store` 和 `Pragma: no-cache`；框架仍并列冗余 `public, max-age=3600` 头。未做 Excel→PG E2E。
 - BOM 物料治理：PHASE6-TASK01 在既有 Import/Mapping/Normalization/Review 后新增确定性规格治理层，用品类+关键规格+性能等级的完整身份进行严格归组，保留原始行/BOM/料号透明度，替代项只是候选。受控决策可精确绑定 ACTIVE 或调用既有 Workflow 建 DRAFT；不自动编码、审批或建正式替代关系。
 
@@ -47,6 +48,7 @@
 - LANDING-TASK04 部署严格串行 build/recreate Web；起点 available 2.1 GiB、Swap 114 MiB、根盘 36 GiB，最终 available 2.2 GiB、Swap 123 MiB、根盘 35 GiB。build 后 60 秒 Swap +100 KiB，部署后 60 秒 -24 KiB；容器 restart 0/OOM false、内核 OOM 记录 0。Build Cache 1.401 GB 保留，未执行未授权 prune。
 - PHASE6-TASK01 的 PostgreSQL 测试、迁移和 Node 重任务串行，任一时刻只有一个临时容器，Node heap 512 MiB/容器 768 MiB。起点 available 约 2.1 GiB、Swap 131—132 MiB、根盘 35 GiB；最终 available 2.2 GiB、Swap 135 MiB、根盘 35 GiB、Load `0.21/0.76/0.69`，四服务 restart 0/OOM false。两个任务测试库和临时容器已删除，四个受保护卷保留。
 - LANDING-TASK05 的 dump、恢复、staging 和测试严格串行；起点 available `2,351,184 KiB`、Swap `130,592 KiB`、Load `0.06/0.09/0.11`、根盘 35 GiB，提交后约 2.2 GiB/126 MiB/`0.08/0.14/0.14`/35 GiB；独立 60 秒 Swap 增长 0。四服务 restart 0/OOM false，临时库/runner/cache 删除，四个受保护卷保留。
+- ADMIN-ACCOUNT-04 不执行 build/restart/deploy；身份写入和测试串行。起点 available 2.3 GiB、Swap 126 MiB、根盘 35 GiB、Load `0.05/0.12/0.14`，最终 2.3 GiB/126 MiB/35 GiB/`0.10/0.14/0.13`；四服务 restart 0/OOM false、内核 OOM 0。所有账号、语法与测试 runner 及 root-only 临时目录均已删除，四个受保护卷保留。
 
 ### 治理资料
 
@@ -142,8 +144,9 @@
 33. SELFHOST-PHASE5-TASK05 采用 D-072：只有结构化 Operation Run Report IPQC failed 才能建立唯一 NCR；failed 数量由 active rework、final scrap 与 unresolved 守恒。quality 的 DRAFT 在 submit 时生成不可变 digest/snapshot，production 只接收或退回，ACCEPTED 仅占用额度等待后续任务。`0.1.0-alpha.29`/`0029`、passed 8/failed 2、v1 退回/v2 接收、重启、第二新空库恢复与最终清理已通过；未执行返工工序或库存报废。
 34. SELFHOST-PHASE5-TASK06 采用 D-073：ACCEPTED Request 由 production 显式派工为既有 `production_operation_runs` 的 REWORK 类型；processed 只表示重复加工次数，返工 good 必须经新的稳定 Run Report IPQC 复检并 `CLOSED + RELEASED` 后才恢复后序额度。`0.1.0-alpha.30`/`0030`、原检 10/8/2/8、返工 2、复检 2/2/0/2、AOI 8/2、成品 8+2=10、重启、第二新空库恢复和清理已通过；原 failed 2 保持，Execution COMPLETED、NCR RESOLVED。
 35. SELFHOST-OPS-PARALLEL-DB-CREDENTIAL-ROTATION-03 已安全轮换并行非生产 PostgreSQL 角色密码与 root-only env；PostgreSQL 容器没有重启，Web/Worker 串行重建。新密码经 Compose 网络执行 `SELECT 1` 成功，旧密码经 SCRAM 返回 `28P01`；凭据值和连接字符串未写入仓库、日志或报告。
-36. 当前数据库合法基线不再是 Audit/Session 0：唯一 `IDENTITY/LOGIN/success` 审计与唯一 ACTIVE session 在同一时间创建，属于同一次合法管理员登录，必须保留。未来 TASK09 若另获授权，必须先记录该基线的主键或不可逆摘要（不含 token、密码、请求正文或连接字符串），所有验收使用 baseline-delta，清理后必须返回完全相同的基线记录集与计数；不得删除不可变审计。
+36. TASK09 前确认数据库合法基线不再是 Audit/Session 0：当时的 `IDENTITY/LOGIN/success` 审计与 ACTIVE session 属于合法管理员登录，必须保留。后续任务仍须使用 baseline-delta，不得删除不可变审计；当前精确身份基线由第 38 项取代。
 37. SELFHOST-PHASE6-TASK01 采用 D-079：治理只消费已发布 Normalization，以版本化规则/配置快照和精确十进制形成“类别+关键规格+性能等级”身份。只有完整 READY 才精确归组，缺项/冲突 fail closed；标准候选 key 不是 ERP 编码。人工可精确绑定 ACTIVE 或经既有 Material Workflow 建 DRAFT，治理与普通审批共享 advisory identity lock 且绑定时 live revalidation；替代项只是候选。`0.1.0-alpha.35`/`0035` 只通过源码与隔离 PostgreSQL 验收，未进入常驻运行面。
+38. SELFHOST-OPS-ADMIN-ACCOUNT-04 后当前身份基线为用户/active admin `2/2`、Session/有效 Session `2/0`、Audit/Identity Audit `881/9`、持久幂等 3；`admin2` 为 active admin、version 2、`must_change_password=true` 且尚未登录。弱密码拒绝、成功创建、匿名认证门禁和安全重置审计均为合法安全记录，必须保留；曾被误输出的旧摘要已失效。
 
 ## 当前风险
 
@@ -169,6 +172,7 @@
 - Material Draft、Review Queue、Import Workspace 和 Normalization Review UI 已完成非生产实现；历史 Site 未部署这些代码，本任务也未访问公网重新确认其状态。
 - Node/PostgreSQL 已完成真实 BOM 部分导入并在用户授权下开放受控公网 HTTPS 入口；这不代表 438 条隔离来源已解决，也不代表全部业务域完成正式投产验收。
 - `chenyida-erp-parallel` 使用 production 运行门禁；Caddy 公网监听 80/18888，Web 仅回环 3000、PostgreSQL 无宿主端口。入口临时依赖 DNS-only 名称，后续应替换为公司自有域名。
+- `admin2` 仍持有一次性临时凭据并被 `must_change_password` 全局门禁限制；项目负责人首次登录后必须立即设置不同的新密码。曾误输出的旧密码摘要已经正式重置失效，不得尝试恢复、复用或删除相应审计证据。
 - 在线同库备份和本地零字节历史备份不能视为可靠灾备。
 - 业务决策 `B01-B24` 尚未全部确认。
 - 根自托管页面已退出 legacy iframe；显式 `/erp/index.html` 仍承载尚未重写的业务 UI。Dashboard/backup 治理已接通，但真实数据、生产备份恢复演练和切换仍未完成，不能描述为已投产。
@@ -186,7 +190,7 @@
 
 ## 当前路线
 
-`SELFHOST-LANDING-TASK05` 已 `DONE / STAGING ONLY / REVIEW REQUIRED`，结论 `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED`；源码仍为 alpha.35/0035，当前 18888 运行面仍为 alpha.34/0034。下一步只能在补充显式单位和适用 BOM 契约后另立任务；不自动清理、导入、应用 Migration 或部署。
+`SELFHOST-OPS-ADMIN-ACCOUNT-04` 已 `DONE / ACCOUNT ACTIVE / FIRST-LOGIN CHANGE REQUIRED`；源码仍为 alpha.35/0035，当前 18888 运行面仍为 alpha.34/0034。下一步由项目负责人使用 `admin2` 首次登录并立即修改临时密码；不自动清理或导入业务数据，不应用 Migration、restart 或 deploy。
 
 ## 恢复上下文检查清单
 

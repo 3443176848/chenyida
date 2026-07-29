@@ -2,6 +2,19 @@
 
 最后更新时间：2026-07-29（Asia/Shanghai）
 
+## SELFHOST-OPS-ADMIN-ACCOUNT-04 新增第二管理员账号
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / FIRST-LOGIN CHANGE REQUIRED | `admin2` 已是 active admin、version 2、`must_change_password=true`，尚未登录 |
+| 密码/权限 | PASS | 最终 PBKDF2-SHA256/310,000 次新随机盐摘要与临时密码验证通过；admin `*`/用户管理权限映射通过 |
+| 安全门禁 | PASS WITH REMEDIATION | 首次弱密码被 `PASSWORD_WEAK` 拒绝；创建时旧摘要误入工具输出后立即由正式 reset 生成新盐并失效，事件和补救完整记录 |
+| 身份 delta | PASS | 用户/admin `1/1→2/2`；Session/有效 `2/0→2/0`；Audit/Identity `877/5→881/9`；幂等 `0→3`；限流 attempt/new/rejected `0/0/0→3/3/0` |
+| 业务/Migration | UNCHANGED | 34/head 0034，Material/Product/BOM/Line `532/6/6/316`；现有管理员、Schema、角色映射、四卷不变 |
+| 服务/测试 | PASS | 本机/TLS health 200、匿名用户 API 401；PostgreSQL/Web/Worker/Caddy healthy/healthy/running/running，restart 0/OOM false；Identity unit 8/8、部署 Web UI 4/4 |
+| 资源/清理 | PASS | 起点 2.3 GiB/126 MiB/35 GiB/Load `0.05/0.12/0.14`，最终 2.3 GiB/126 MiB/35 GiB/`0.10/0.14/0.13`；runner/临时目录全部删除 |
+| Git/部署 | PASS | 仅脱敏文档；无密码、摘要、Token、凭据或业务数据。未 build/restart/Migration/deploy、push/PR 或操作 Python 服务 |
+
 ## SELFHOST-LANDING-TASK05 PostgreSQL 业务数据重置与 V9 主数据重导入
 
 | 验证项 | 结果 | 说明 |

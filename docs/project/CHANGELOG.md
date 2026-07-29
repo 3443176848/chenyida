@@ -4,6 +4,13 @@
 
 ## 2026-07-29
 
+### SELFHOST-OPS-ADMIN-ACCOUNT-04 - `ops: provision second administrator safely`
+
+- 身份变更：只在当前 `chenyida-erp-parallel` 通过正式 Identity Service 新增 `admin2`；用户/active admin `1→2`，账号为 active admin、version 2、首次登录必须改密。PBKDF2-SHA256/310,000 次、管理员权限映射及临时密码验证通过；现有管理员和 Session `2/0` 不变。
+- 门禁/审计：首次弱密码由 `PASSWORD_WEAK` 原子拒绝；新合规临时密码创建成功。最终只读核对曾误输出创建时摘要，随即通过正式管理员重置用同一临时密码生成新随机盐，使旧摘要失效。最终 Audit/Identity `877/5→881/9`，幂等 `0→3`，限流 attempt/new/rejected `0/0/0→3/3/0`，全部安全证据保留。
+- 数据/运行边界：34 migrations/head 0034、Material/Product/BOM/Line `532/6/6/316`、四卷和部署均不变；本机/TLS health 200、匿名用户 API 401，四服务 restart 0/OOM false。Identity unit 8/8、部署 Web UI 合同 4/4 通过；临时 runner/目录全部删除。
+- 保密/Git：密码只经关闭回显 stdin 进入一次性 root-only runner，未进入命令参数、环境文件、脚本、系统日志、报告或 Git；最终摘要、Token、凭据和业务数据未提交。未 build/restart/deploy、push/PR 或操作 Python 服务。
+
 ### SELFHOST-LANDING-TASK05 - `ops: stage guarded bom v9 reimport`
 
 - 输入/门禁：对单个 SHA 绑定 XLSX 做只读显式字段解析；1 Sheet、197 行、0 公式/外链。197 个 ERP 编码有效、唯一、连续，来源追踪完整且精确身份重复 0；“使用次数”519 仅为来源统计，不解释为数量。
