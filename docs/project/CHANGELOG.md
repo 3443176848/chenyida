@@ -4,6 +4,15 @@
 
 ## 2026-07-29
 
+### SELFHOST-OPS-UAT-BLOCKER-FIX - `fix: secure UAT identity writes and logout` / `docs: record UAT identity blocker acceptance`
+
+- 根因：真实 SSH/Codex 浏览器转发使用动态端口回环 Origin，而并行环境此前只接受精确公网 HTTPS Origin；即使 Session、CSRF Cookie/Header、credentials 和幂等键正确，请求仍被来源门禁拒绝。经营与兼容工作台又分别吞掉 logout 403 并乐观清页面状态，服务端 Session 实际未撤销。
+- 安全修复：增加独立 deployment class；只有显式 `uat`+flag 才接受浏览器 Origin 与 Request URL origin 均为严格字面量 loopback。生产仍只接受显式可信 HTTPS Origin，不信任 Host/Forwarded/X-Forwarded、不允许通配。两个工作台统一安全 POST logout、same-origin credentials 与双提交 CSRF，只在服务端撤销/成功审计/对称清 Cookie 后跳转，失败显示稳定错误码和中文提示。
+- 回归：request-origin/identity/双 UI 合计 `24/24`，隔离 PostgreSQL identity `10/10`，alpha.34 candidate build 与 Compose/API smoke initial/restart 均通过；未知外部 Origin、错误/缺失 CSRF、弱密码、重复用户名、未授权角色、审计、旧 Session、重复退出和 Cookie 对称属性均覆盖。测试库/容器已清理，未写主库。
+- 浏览器：使用既有管理员凭据创建唯一临时 manager 并在列表确认，经营/兼容两个入口 logout 后旧 Session 均为 `REVOKED`、成功审计存在，重新登录和匿名重复退出通过；账号未做业务试用，最终通过页面停用。部署后审计 908—920 全部成功。首次脚本提前结束遗留一个丢失令牌、等待 TTL 的会话，按禁止直接 SQL 删除边界保留并记录。
+- 部署/数据：部署前 dump 1,985,741 bytes、SHA-256 `d8951686192b500bee1770be258c8ee3eddb5e8d8509c0664cb6ca7b64714c79` 的 list/新库恢复核对通过；只更新 Web 到 `sha256:273aa687e741...`。运行仍为 alpha.34/0034，无 Migration；PostgreSQL/Worker/Caddy、四卷和业务 `532/6/6/316` 保持。
+- 资源/Git：最终 2.3 GiB available、Swap 3.2 MiB、根盘 34 GiB、60 秒 Swap 增长 0，四服务 restart 0/OOM false、内核 OOM 0。代码 `dfa30bf` 的 Parent 为 `5fc1266b`；文档提交以 `dfa30bf` 为 Parent。未 push/PR/改写历史、prune 或操作 Python/SQLite/D1；任务脚本、临时库/容器和 build worktree 已清理，备份/回滚镜像保留。
+
 ### SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 - `ops: waive admin2 first password change`
 
 - 授权/范围：项目负责人明确要求 `admin2` 不用首次改密。本次只清除该账号 must-change 标记并递增 version；密码、active admin、角色、合法 Session 和其他账号保持，不新增通用豁免 API。

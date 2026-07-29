@@ -2,7 +2,7 @@
 
 状态：`IMPLEMENTED IN NON-PRODUCTION`
 
-适用版本：`chenyida-erp-selfhosted@0.1.0-alpha.2`
+适用版本：身份基线始于 `chenyida-erp-selfhosted@0.1.0-alpha.2`；2026-07-29 的 `SELFHOST-OPS-UAT-BLOCKER-FIX` 已作为 alpha.34 运行面聚焦 hotfix 部署到当前非生产并行环境，源码主线仍为 alpha.35。
 
 ## 1. 运行边界
 
@@ -43,6 +43,10 @@
 
 Session Cookie 为 `HttpOnly; SameSite=Lax`；CSRF Cookie 为 `SameSite=Lax` 且可由浏览器读取。`ERP_ENV=production` 时，即使内部 Request URL 为 HTTP，两类 Cookie 都强制 `Secure`。有效 session 的 logout 和所有身份写执行严格同源 Origin 与双提交 CSRF。
 
+公网来源由规范化的单值 `ERP_PUBLIC_ORIGIN` 精确限定；生产部署类别只接受显式配置的可信 HTTPS Origin，不信任 `Host`、`Forwarded` 或 `X-Forwarded-*` 推导来源。当前 UAT 还需兼容 SSH 隧道和受控浏览器转发的动态回环端口，因此只有同时显式设置 `ERP_DEPLOYMENT_CLASS=uat` 与 `ERP_UAT_ALLOW_LOOPBACK_ORIGIN=true` 时，才额外接受严格字面量 `localhost`、`127.0.0.1` 或 `[::1]`。该例外要求浏览器 `Origin` 和请求 URL 的 origin 都是 HTTP(S) 回环；未知域名、外部 IP、单边回环、带凭据或非 HTTP(S) URL 均继续拒绝。生产部署类别不能启用该例外。
+
+经营工作台和兼容工作台统一调用 `public/erp/api-client.js` 的安全退出函数：固定 `POST /api/logout`、`credentials: same-origin`，并从 CSRF Cookie 发送匹配 Header。只有服务端返回成功、事务撤销 Session、写入成功审计并返回对称的 Cookie 清理头后，页面才清理本地状态并跳转登录页；失败时保留当前状态并显示稳定错误码和中文提示，不再吞错或伪装退出。匿名重复退出保持幂等成功，不产生 500。
+
 must-change 账号只允许 `GET /api/session`、`POST /api/logout`、`POST /api/me/password`；其他身份或业务 API 在服务端统一返回 `403 PASSWORD_CHANGE_REQUIRED`。
 
 ## 5. 限流、幂等与审计
@@ -61,4 +65,4 @@ SHA-256：`6e185d01a69c4bd132c577793ae72baceaa075e5beecc738bcdf4310430d7079`。�
 
 ## 7. 运维与后续限制
 
-本版本尚未发布或部署。生产 migration 前仍需快照、真实旧角色预检、受控试迁移、容量/安全验收和明确授权。身份模块不解决 Dashboard、备份、客户、供应商、产品、BOM、库存、采购、生产、销售、品质或财务；这些域不得通过扩展身份模块绕过独立任务。
+身份基线及本次来源/退出聚焦修复已部署到当前 `chenyida-erp-parallel` 非生产环境；这不是生产发布。运行面仍为 alpha.34/0034，本次没有新增、修改或运行 Migration，alpha.35/0035 仍未部署。任何生产 migration、域名/Origin 切换或正式投用仍需快照、真实旧角色预检、受控试迁移、容量/安全验收和明确授权。身份模块不解决 Dashboard、备份、客户、供应商、产品、BOM、库存、采购、生产、销售、品质或财务；这些域不得通过扩展身份模块绕过独立任务。

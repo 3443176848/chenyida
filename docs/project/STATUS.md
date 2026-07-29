@@ -2,6 +2,23 @@
 
 最后更新时间：2026-07-29（Asia/Shanghai）
 
+## SELFHOST-OPS-UAT-BLOCKER-FIX 用户创建来源校验与退出登录修复
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | ADMIN IDENTITY CSRF AND LOGOUT BLOCKERS FIXED IN PARALLEL ENVIRONMENT | 完成聚焦诊断、修复、隔离回归、备份、alpha.34 Web 更新和真实 Chromium 验收；停止，不开始角色业务试用 |
+| 根因/修复 | PASS | 受控浏览器/SSH 转发使用动态回环 Origin，而运行面原只允许公网单值 HTTPS；两个前端又吞掉 logout 403 并乐观清状态。现仅显式 UAT deployment class 可用双端严格 loopback，两个工作台复用失败可见的安全 POST logout |
+| 安全边界 | PASS / FAIL CLOSED | 生产类别仍只接受显式可信 HTTPS Origin；未知外部 Origin、错误/缺失 CSRF、单边回环和非法配置均拒绝。不信任 Host/Forwarded/X-Forwarded，不使用通配/CORS `*`/GET logout，不降低 Secure/HttpOnly/SameSite/Path、Session、权限、密码、幂等或审计 |
+| 自动测试 | PASS | 来源/身份/unit/UI `24/24`；隔离 PostgreSQL `10/10`；alpha.34 candidate build；Identity API smoke 初次/重启均通过。测试数据库、临时容器和 runner 已删除，未写主库 |
+| 浏览器创建用户 | PASS / DISABLED | 唯一 `uat_fixcheck_manager_5317094938` 以“经营负责人”从网页创建、列表可见并有 `USER_CREATED/success`；未做业务试用，最终通过页面停用且有 `USER_STATUS_CHANGED/success` |
+| 两个退出入口 | PASS | 经营与兼容工作台均 logout 200、回登录页、旧 Session 为 `REVOKED`；两次之间和之后重新登录成功，匿名重复 logout 200，无 500；设置/清理 Cookie 属性对称 |
+| Session/审计 | PASS WITH RECORDED HARNESS ARTIFACT | 部署后审计 908—920 全部成功；两个目标退出及完整复验的旧 Session 均撤销。首次脚本在停用后刷新检查提前结束，遗留一个丢失令牌、等待 8 小时 TTL 的会话，按禁令未直接 SQL 删除；最终 Session/有效 `14/5`、Audit `920` |
+| 版本/Migration | UNCHANGED | 源码 alpha.35/0035；运行 Web alpha.34 hotfix、PostgreSQL/Worker alpha.34/0034。本任务无结构变化，不新增、修改或运行 Migration；业务 `532/6/6/316` 保持 |
+| 部署/回滚 | PASS / READY | 只重建 Web，镜像 `sha256:273aa687e741...`；旧 Web `sha256:f9c34a11b900...` 以任务回滚 tag 保留。PostgreSQL/Worker/Caddy 容器未重建，四卷创建时间不变 |
+| 备份/清理 | PASS | pre-deploy custom dump 1,985,741 bytes、SHA-256 `d8951686192b500bee1770be258c8ee3eddb5e8d8509c0664cb6ca7b64714c79`，list 与新库恢复关键计数一致；备份/root-only env 副本保留。恢复库、测试库、临时容器、浏览器/测试脚本、端口和 build worktree 已清理，未 prune |
+| 最终资源 | PASS | available 2.3 GiB、Swap 3.2 MiB、根盘可用 34 GiB、Load `0.01/0.21/0.30`；60 秒 Swap `3,252→3,252 KiB`，增长 0。四服务 restart 0/OOM false，内核 OOM 0；PostgreSQL/Web healthy、Worker/Caddy running |
+| Git | PASS | 代码提交 `dfa30bf`，Parent `5fc1266b`；文档/验收记录以代码提交为 Parent 独立提交，实际 SHA 以 Git log 为准。未 push/PR/amend/rebase/reset，最终 tracked clean，受保护未跟踪 `shujvbiao/` 保留 |
+
 ## SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 单账号首次改密豁免
 
 | 验证项 | 结果 | 说明 |

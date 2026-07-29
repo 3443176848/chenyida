@@ -898,7 +898,7 @@
 - 来源权威：Caddy 终止公网 TLS 后，浏览器 `Origin` 必须与规范化的单值 `ERP_PUBLIC_ORIGIN` 精确一致；代理后的内部 HTTP `Request.url` 不能代表浏览器来源。配置存在时公网值是唯一允许来源；只有未配置的开发/测试环境才回退原生 request origin。
 - 配置门禁：只接受绝对 HTTP(S) origin，禁止凭据、通配、路径、查询和 fragment；production 禁止 HTTP。不得直接信任客户端可伪造的 `Forwarded` 或 `X-Forwarded-*`。切换公司域名、协议或端口时必须通过独立受控配置变更同步更新 allowlist。
 - CSRF/身份：身份写仍强制 Origin；通用写保持既有缺失 Origin 语义，但 Cookie/Header Token 双提交继续强制且常量时间比较。Session、must-change、权限、限流、幂等、CAS 和事务审计均不因代理兼容而放宽。
-- 发布边界：当前只允许 `https://43.135.157.211.nip.io:18888`，并以 alpha.34 最小 Web hotfix 部署；0035、PostgreSQL、Worker、Caddy、业务数据和历史 Sites/D1 不在授权范围。
+- 发布边界：该任务部署时只允许 `https://43.135.157.211.nip.io:18888`，并以 alpha.34 最小 Web hotfix 部署；后续 UAT 严格回环例外由 D-082 单独授权，不改写本决定的公网边界。0035、PostgreSQL、Worker、Caddy、业务数据和历史 Sites/D1 不在授权范围。
 
 ## D-081 `admin2` 可按项目负责人明确授权豁免首次改密，但不形成全局能力
 
@@ -909,6 +909,16 @@
 - 全局策略：D-045 的新建/重置用户强制首次改密继续有效；不修改 Service/API/Schema，不新增管理员日常可调用的通用豁免入口，其他账号不能由此自动获得豁免。
 - 安全与追踪：事务必须校验目标、active/role/version/当前标记，账号更新和 `USER_FIRST_PASSWORD_CHANGE_WAIVED` 审计同事务；审计记录项目负责人授权、单账号范围、未改密码、未撤销会话和未改全局策略，不记录密码、摘要、Cookie 或 Token。同任务重放必须 no-op 或 fail closed。
 - 授权边界：本决定不授权修改密码策略、删除审计、批量豁免、角色/权限变更、Schema/Migration、业务数据、服务部署、历史 Sites/D1 或 Python 运行面。
+
+## D-082 UAT 回环来源必须显式启用，两个工作台退出统一失败可见的服务端撤销链路
+
+- 日期：2026-07-29
+- 状态：`ACCEPTED / IMPLEMENTED / PARALLEL ACCEPTED`
+- 确认人：项目负责人（明确授权 `SELFHOST-OPS-UAT-BLOCKER-FIX` 的聚焦修复、非生产部署和真实浏览器验收）
+- 根因边界：当前公网只允许单值 HTTPS `ERP_PUBLIC_ORIGIN`，而 SSH 隧道/Codex 浏览器转发实际使用动态端口回环 Origin；合法 Session、CSRF Cookie/Header 和幂等信息因此仍在来源门禁被拒绝。两个工作台又分别吞掉 logout 失败并乐观清理页面状态，导致服务端 Session 仍有效且用户看不到错误。
+- UAT 回环：只有 `ERP_DEPLOYMENT_CLASS=uat` 与 `ERP_UAT_ALLOW_LOOPBACK_ORIGIN=true` 同时显式配置时，才额外接受 HTTP(S) 严格字面量 `localhost`、`127.0.0.1` 或 `[::1]`，且浏览器 Origin 和 Request URL origin 必须同时为回环。动态端口可以不同于公网入口，但任意域名、外部 IP、单边回环、通配、客户端 `Host`/`Forwarded`/`X-Forwarded-*` 均不成为信任来源。生产部署类别仍只接受显式可信 HTTPS Origin，并拒绝启用回环例外。
+- 统一退出：经营工作台和兼容工作台必须复用同一 `POST /api/logout` 客户端，发送 `credentials: same-origin` 与 Cookie/Header CSRF 双提交。仅在服务端事务撤销 Session、成功审计并对称清除 Session/CSRF Cookie 后跳转登录页；失败必须显示稳定错误码和中文提示，不得吞错、改 GET 或只清浏览器状态。匿名重复 logout 保持幂等成功。
+- 授权边界：本决定不降低 Session、Cookie、CSRF、Origin、权限、幂等、密码或审计要求；不授权 Migration、业务数据修改、现有用户修改、角色业务试用、生产部署、历史 Sites/D1 或 Python 运行面操作。
 
 ## 待确认业务决策
 
