@@ -31,9 +31,10 @@
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
 - 发布标识：包名为 `chenyida-erp-selfhosted`；源码为 `0.1.0-alpha.35`/`0035`，当前受控公网运行面仍为 `0.1.0-alpha.34`/`0034`。0035 未应用，alpha.35 未 build/restart/deploy。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.35`。
-- Git 复核：TASK01 任务起点为本地 `main`/HEAD `cda8c7e`；执行期间独立 LANDING-TASK04 部署记录 `3025443` 已进入 `main`，TASK01 完成提交以 `3025443` 为 Parent，消息为 `feat: add BOM material governance pipeline`，实际 SHA 以 Git log 为准。未 push/PR/改写历史；`shujvbiao/` 未修改、暂存或提交。断网只读凭据扫描曾因 `--others` 对该路径发起读取，未输出/传输内容；偏差已记录，扫描器已在打开内容前排除该受保护未跟踪目录，最终复扫通过。
+- Git 复核：TASK05 起点为本地 `main`/HEAD `aa60f74`、领先 origin 83；完成提交消息为 `ops: stage guarded bom v9 reimport`，实际 SHA 以 Git log 为准。未 push/PR/改写历史；`shujvbiao/` 未修改、暂存、打开或提交，真实 XLSX/逐行报告/dump 均在仓库外。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
+- V9 重导入 staging：LANDING-TASK05 对单个 SHA 绑定 XLSX 解析 197 行；编码唯一连续、来源完整，但显式单位 0，产品/BOM 结构字段 0。恢复库首次 staged 197、重放新增 0，全部 review；5,556 条拟删除计划未执行，主库 213 表计数完全不变。
 - 兼容供应商导入：LANDING-TASK04 功能提交 `cda8c7e` 已在单独授权下部署到当前 18888 Web；`public/erp/` 的 CSV-only/退役入口已改为直达 `/materials/imports/new`，入口 URL 已版本化。公网 HTML/JS SHA 与源码一致，响应含 `private, no-store` 和 `Pragma: no-cache`；框架仍并列冗余 `public, max-age=3600` 头。未做 Excel→PG E2E。
 - BOM 物料治理：PHASE6-TASK01 在既有 Import/Mapping/Normalization/Review 后新增确定性规格治理层，用品类+关键规格+性能等级的完整身份进行严格归组，保留原始行/BOM/料号透明度，替代项只是候选。受控决策可精确绑定 ACTIVE 或调用既有 Workflow 建 DRAFT；不自动编码、审批或建正式替代关系。
 
@@ -45,6 +46,7 @@
 - LANDING-TASK01 不执行 build；所有 Git、dump、恢复和测试串行。起点 65 秒 Swap `137476→137476 KiB`、增长 0，Build Cache 全程 0B；三容器 restart 0/OOM false，四卷、resource-guard、Python PID 和 SQLite metadata 保持。
 - LANDING-TASK04 部署严格串行 build/recreate Web；起点 available 2.1 GiB、Swap 114 MiB、根盘 36 GiB，最终 available 2.2 GiB、Swap 123 MiB、根盘 35 GiB。build 后 60 秒 Swap +100 KiB，部署后 60 秒 -24 KiB；容器 restart 0/OOM false、内核 OOM 记录 0。Build Cache 1.401 GB 保留，未执行未授权 prune。
 - PHASE6-TASK01 的 PostgreSQL 测试、迁移和 Node 重任务串行，任一时刻只有一个临时容器，Node heap 512 MiB/容器 768 MiB。起点 available 约 2.1 GiB、Swap 131—132 MiB、根盘 35 GiB；最终 available 2.2 GiB、Swap 135 MiB、根盘 35 GiB、Load `0.21/0.76/0.69`，四服务 restart 0/OOM false。两个任务测试库和临时容器已删除，四个受保护卷保留。
+- LANDING-TASK05 的 dump、恢复、staging 和测试严格串行；起点/终点 available 约 2.2 GiB、Swap `127→126 MiB`、根盘 35 GiB，最终 60 秒 Swap 增长 0、Load `0.84/0.36/0.18`。四服务 restart 0/OOM false，临时库/runner/cache 删除，四个受保护卷保留。
 
 ### 治理资料
 
@@ -145,6 +147,8 @@
 
 ## 当前风险
 
+- V9 主数据表缺少逐行显式单位，且不包含产品/版本/BOM 行号/数量/位号/单位结构；197 行只能保留在 review。未经补充明确字段不得把 PCS、使用次数或原始描述猜成主库单位/BOM 数量，也不得先清空现有 532 Material/316 BOM Line。
+
 - Material Draft/Review/Active、Import Mapping/版本/复用、行级 Normalizer 及人工复核/ACTIVE绑定/Draft Commit 已完成 PostgreSQL 非生产移植；后续真实数据演练和迁移不得重新接入 D1 运行依赖。
 - `0002`/`0003`/`0004`/`0005`、双用户审批、Mapping确认、Normalization原子发布/取消、人工复核 finalization 和重启持久性只在一次性 PostgreSQL 17/Compose 测试环境验证；未迁移真实数据、执行生产容量测试、生产恢复演练或部署。
 - TASK01 staging、TASK02 Opening 和 TASK03 public materialization 只在隔离 `_migration_test` 合成环境验证；TASK04 已补充真实 source fingerprint、领域聚合质量和无目标 opening plan，但逐行业务确认、真实目标物化、文件存在性/摘要、容量和生产恢复仍是生产 NO-GO 项。
@@ -182,7 +186,7 @@
 
 ## 当前路线
 
-`SELFHOST-PHASE6-TASK01` 已 `DONE / NON-PRODUCTION SOURCE BASELINE`；源码为 alpha.35/0035，当前 18888 运行面仍为 alpha.34/0034。本轮停止，不自动应用 Migration 或部署。历史正式物料修订、治理 UI、真实样本试治理/试迁移、正式替代料审批、post-import dump 的 offhost copy、公司自有域名替换和导入契约/响应头收缩均待独立任务与明确授权。
+`SELFHOST-LANDING-TASK05` 已 `DONE / STAGING ONLY / REVIEW REQUIRED`，结论 `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED`；源码仍为 alpha.35/0035，当前 18888 运行面仍为 alpha.34/0034。下一步只能在补充显式单位和适用 BOM 契约后另立任务；不自动清理、导入、应用 Migration 或部署。
 
 ## 恢复上下文检查清单
 

@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-29（Asia/Shanghai）
 
+## SELFHOST-LANDING-TASK05 PostgreSQL 业务数据重置与 V9 主数据重导入
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / STAGING ONLY | `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED` |
+| 输入完整性 | PASS | 单个 XLSX 为 25,014 bytes、0600、SHA `cfd1e290...49df`；1 Sheet/197 行/12 列、公式/外链 0，解析前后 inode/size/mode/mtime/SHA 不变 |
+| 编码/重复/追踪 | PASS | 197 个 ERP 编码有效、唯一、连续 `00001`—`00197`；精确身份重复组 0，来源追踪 197/197；使用次数合计 519 仅作追踪 |
+| 单位/BOM 门禁 | REVIEW REQUIRED | 显式单位 0、缺单位 197；无产品编码/版本、BOM 版本/行号/数量/位号/单位，故 Material ready/Product/BOM/Line 均 0，不猜测 PCS 或 BOM 数量 |
+| staging/幂等 | PASS | 0034 恢复库首次 staged 197、重放新增 0；唯一 code/source_ref/row digest 197，`NEEDS_REVIEW=197`，`ELIGIBLE=0`；不写 public |
+| 拟删除/主库 | NOT EXECUTED / UNCHANGED | 213 表只读清单计划删除 5,556 条旧业务/导入记录；因无 ELIGIBLE 行没有执行。主库前后 table-count manifest 均为 `f59469...c792`，差异 0 |
+| pre-clean 备份 | PASS | `bom-v9-preclean-20260728T235231Z.dump` 1,982,039 bytes、SHA `b21b484b...16e2`；list 3,065 项，新空恢复 213 表逐项一致 |
+| post-import 备份 | N/A | 主库未清理、未导入，因此没有创建或伪造 post-import dump |
+| 系统/健康 | PASS | 34 migrations/checksum、唯一 login-ready admin、setup、2 Session/4 Identity audit 不变；有效 Session 1；PostgreSQL/Web/Caddy healthy，Worker running，匿名业务 API 401 |
+| 资源/清理 | PASS | 最终 available 2.2 GiB、Swap 126 MiB、根盘 35 GiB；60 秒 Swap 增长 0，restart 0/OOM false。staging 库/runner/cache 删除，四卷保留 |
+| Git/保密 | PASS | Git 仅 staging 工具、4 项合成单测与脱敏文档；原 XLSX、逐行 CSV/JSON、dump、凭据、真实 DB 内容均未提交。未 push/PR/deploy |
+
 ## SELFHOST-PHASE6-TASK01 BOM 物料规格标准化与主数据治理
 
 | 验证项 | 结果 | 说明 |

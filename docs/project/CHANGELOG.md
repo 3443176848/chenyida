@@ -4,6 +4,14 @@
 
 ## 2026-07-29
 
+### SELFHOST-LANDING-TASK05 - `ops: stage guarded bom v9 reimport`
+
+- 输入/门禁：对单个 SHA 绑定 XLSX 做只读显式字段解析；1 Sheet、197 行、0 公式/外链。197 个 ERP 编码有效、唯一、连续，来源追踪完整且精确身份重复 0；“使用次数”519 仅为来源统计，不解释为数量。
+- staging：新增只允许 root-only 输出的 `prepare.py` 与只允许 `ERP_ENV=test`、受控 staging 库名、0034 和 payload digest 的 PostgreSQL stager；首次写入 197、同 payload 重放新增 0。缺显式单位 197，因此 `ELIGIBLE=0`、`NEEDS_REVIEW=197`；表格没有产品/版本/BOM 行结构，相关实体均为 0。
+- 主库保护：只读生成 213 表计数和 5,556 条拟删除清单；因 staging 无合格行，没有执行任何主库清理或导入。主库逐表计数 manifest 前后完全一致，旧 532 Material、6 Product/Version、6 BOM/Version、316 Line 及 872 业务导入审计保持。
+- 灾备/系统：pre-clean custom dump 1,982,039 bytes、SHA `b21b484bc4dbb11fcc9354af649267a10bff4a125dcf84c8ba639164191916e2`，list 3,065 项和新空库 213 表逐表恢复通过；34 Migration/checksum、管理员、初始化、Session、Identity audit 不变。因无主库导入，post-import dump 不适用。
+- 保密/清理：原 XLSX metadata/SHA 不变；真实 payload、逐行 review、计数和 dump 仅在仓库外 root-only 目录。临时 staging 库/runner/cache 已删除，四卷和四服务保留，60 秒 Swap 增长 0、restart 0/OOM false。未 build/restart/deploy、push/PR 或操作 Python 服务。结论 `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED`。
+
 ### SELFHOST-PHASE6-TASK01 - `feat: add BOM material governance pipeline`
 
 - 范围/规则：在既有 CSV/XLS/XLSX Parser→Mapping→Normalization→Review 后增加可配置 `bom-material-governance-v1`；以品类+类型化关键规格+性能等级严格判同，使用精确十进制量纲，只对完整 READY 身份归组。`0201WMJ0000TCE` 与完整的 `0201,0R,±5%` 样例通过明示规则/默认归组；`1uF` 与 `100pF`、任一必需容量/耐压/介质/精度差异都不归并。型号敏感品类使用完整 MPN+封装，不做词干/模糊合并。
