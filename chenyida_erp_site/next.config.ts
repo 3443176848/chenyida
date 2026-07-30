@@ -3,9 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   async headers() {
-    return [
+    return ["/", "/materials/:path*", "/erp/index.html"].map((source) => (
       {
-        source: "/erp/index.html",
+        source,
         headers: [
           {
             key: "Cache-Control",
@@ -13,8 +13,8 @@ const nextConfig: NextConfig = {
           },
           { key: "Pragma", value: "no-cache" },
         ],
-      },
-    ];
+      }
+    ));
   },
 };
 

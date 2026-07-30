@@ -1,4 +1,4 @@
-import { api, ErpApiError, logoutSession, safeMaterialReturnTo } from "./api-client.js?v=20260729-identity-logout-fix";
+import { api, ErpApiError, isHistorySessionRestore, logoutSession, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "./api-client.js?v=20260730-review-logout-cache-03";
 
 const state = {
   summary: {},
@@ -53,6 +53,28 @@ function requestedLegacyTab() {
   return LEGACY_TABS.has(requested) ? requested : "dashboard";
 }
 
+function clearLegacyProtectedState() {
+  for (const key of [
+    "items", "mappings", "cleaning", "products", "customers", "suppliers", "boms", "bomLines", "readiness",
+    "purchaseOrders", "purchaseLines", "purchaseSuggestions", "inventory", "inventoryAdjustments", "workOrders",
+    "workMaterials", "productionReports", "quotations", "salesOrders", "shipments", "qualityInspections",
+    "qualityDefects", "financialDocuments", "financialPayments", "financeSources", "backups", "users", "qualitySourceOptions",
+  ]) state[key] = [];
+  for (const key of ["identityOperations", "masterDataOperations", "procurementOperations", "productionOperations", "salesOperations", "qualityOperations", "financeOperations"]) state[key].clear();
+  state.summary = {};
+  state.financeSummary = {};
+  state.managementDashboard = null;
+  state.selectedInspection = null;
+  state.operationsAvailability = { dashboard: false, backups: false };
+  state.session = { authenticated: false, user: null, setup_required: false };
+  updateUserBar();
+}
+
+function suspendLegacyProtectedView() {
+  suspendProtectedViews();
+  $("#loginOverlay").hidden = false;
+}
+
 function toast(message) {
   const el = $("#toast");
   el.textContent = message;
@@ -93,6 +115,7 @@ function canManageSystem() {
 }
 
 function showLogin() {
+  setProtectedViewState("anonymous");
   $("#loginOverlay").hidden = false;
   $("#setupForm").hidden = true;
   $("#loginForm").hidden = false;
@@ -199,6 +222,7 @@ function continueAfterAuthentication() {
 }
 
 function showSetup() {
+  setProtectedViewState("anonymous");
   $("#loginOverlay").hidden = false;
   $("#loginForm").hidden = true;
   $("#setupForm").hidden = false;
@@ -207,6 +231,7 @@ function showSetup() {
 
 function hideLogin() {
   $("#loginOverlay").hidden = true;
+  setProtectedViewState("authenticated");
 }
 
 function updateUserBar() {
@@ -219,14 +244,14 @@ function updateUserBar() {
   $("#userRole").textContent = user.role_label || user.role;
 }
 
-async function loadSession() {
+async function loadSession({ revealAuthenticated = true } = {}) {
   const result = await api("/api/session");
   state.session = result;
   updateUserBar();
   if (result.setup_required) {
     showSetup();
   } else if (result.authenticated) {
-    hideLogin();
+    if (revealAuthenticated) hideLogin();
   } else {
     showLogin();
   }
@@ -1035,6 +1060,8 @@ async function login(event) {
   submitButton.disabled = true;
   submitButton.textContent = "正在登录...";
   $("#loginMsg").textContent = "";
+  suspendLegacyProtectedView();
+  clearLegacyProtectedState();
   try {
     const result = await api("/api/login", {
       method: "POST",
@@ -1045,13 +1072,11 @@ async function login(event) {
     });
     state.session = { authenticated: true, user: result.user, setup_required: false, csrf_token: result.csrf_token };
     updateUserBar();
-    hideLogin();
     if (continueAfterAuthentication()) return;
     if (result.user.must_change_password) {
       openPasswordDialog();
     } else {
-      setTab(requestedLegacyTab());
-      await refreshAll();
+      await refreshAndRevealLegacy();
     }
     toast("登录成功");
   } finally {
@@ -1067,6 +1092,8 @@ async function setupSystem(event) {
   submitButton.disabled = true;
   submitButton.textContent = "正在创建...";
   $("#setupMsg").textContent = "";
+  suspendLegacyProtectedView();
+  clearLegacyProtectedState();
   try {
     const result = await api("/api/setup", {
       method: "POST",
@@ -1079,10 +1106,8 @@ async function setupSystem(event) {
     });
     state.session = { authenticated: true, user: result.user, setup_required: false, csrf_token: result.csrf_token };
     updateUserBar();
-    hideLogin();
     if (continueAfterAuthentication()) return;
-    setTab(requestedLegacyTab());
-    await refreshAll();
+    await refreshAndRevealLegacy();
     $("#setupForm").reset();
     toast("初始化完成，已进入系统");
   } finally {
@@ -1095,11 +1120,15 @@ async function logout() {
   const button = $("#logoutBtn");
   if (button.disabled) return;
   button.disabled = true;
+  suspendLegacyProtectedView();
   try {
     await logoutSession(state.session.csrf_token || "");
-    state.session = { authenticated: false, user: null };
+    clearLegacyProtectedState();
+    showLogin();
     window.top.location.replace("/");
   } catch (error) {
+    setProtectedViewState("authenticated");
+    $("#loginOverlay").hidden = true;
     button.disabled = false;
     toast(`退出失败：${identityErrorText(error)}`);
   }
@@ -1714,6 +1743,8 @@ async function closeQuality() { const selected = selectedQuality(); await qualit
 async function reopenQuality() { const selected = selectedQuality(); await qualityWrite(`quality-reopen:${selected.id}:${selected.version}`, `/api/quality-inspections/${selected.id}/reopen`, { expected_version: selected.version, reason: $("#qualityActionReason").value.trim() }); state.selectedInspection = null; $("#selectedInspection").value = ""; await refreshAll(); toast("检验已重开"); }
 
 function bindEvents() {
+  window.addEventListener("pagehide", suspendLegacyProtectedView);
+  window.addEventListener("pageshow", (event) => void revalidateRestoredSession(event));
   $("#setupForm").addEventListener("submit", (event) => setupSystem(event).catch((error) => {
     $("#setupMsg").textContent = error.message;
   }));
@@ -1812,16 +1843,49 @@ function bindEvents() {
   });
 }
 
+async function revalidateRestoredSession(event) {
+  if (!isHistorySessionRestore(event)) return;
+  suspendLegacyProtectedView();
+  clearLegacyProtectedState();
+  suspendProtectedViews();
+  let session;
+  try {
+    session = await loadSession({ revealAuthenticated: false });
+  } catch (error) {
+    clearLegacyProtectedState();
+    showLogin();
+    toast(identityErrorText(error));
+    return;
+  }
+  if (!session.authenticated) return;
+  if (continueAfterAuthentication()) return;
+  if (session.user.must_change_password) {
+    openPasswordDialog();
+    return;
+  }
+  try {
+    await refreshAndRevealLegacy();
+  } catch (error) {
+    clearLegacyProtectedState();
+    showLogin();
+    toast(identityErrorText(error));
+    return;
+  }
+}
+
+async function refreshAndRevealLegacy() {
+  setTab(requestedLegacyTab());
+  await refreshAll();
+  hideLogin();
+}
+
 async function initApp() {
   bindEvents();
-  const session = await loadSession();
+  const session = await loadSession({ revealAuthenticated: false });
   if (session.authenticated) {
     if (continueAfterAuthentication()) return;
     if (session.user.must_change_password) openPasswordDialog();
-    else {
-      setTab(requestedLegacyTab());
-      await refreshAll();
-    }
+    else await refreshAndRevealLegacy();
   }
 }
 

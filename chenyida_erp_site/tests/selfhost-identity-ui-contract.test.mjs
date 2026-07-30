@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { isHistorySessionRestore } from "../public/erp/api-client.js";
 
 const app = await readFile(new URL("../public/erp/app.js", import.meta.url), "utf8");
 const client = await readFile(new URL("../public/erp/api-client.js", import.meta.url), "utf8");
 const workbench = await readFile(new URL("../app/_components/erp-workbench.tsx", import.meta.url), "utf8");
 const html = await readFile(new URL("../public/erp/index.html", import.meta.url), "utf8");
+const materialShell = await readFile(new URL("../app/materials/_components/material-shell.tsx", import.meta.url), "utf8");
+const globals = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+const legacyStyles = await readFile(new URL("../public/erp/styles.css", import.meta.url), "utf8");
+const nextConfig = await readFile(new URL("../next.config.ts", import.meta.url), "utf8");
 
 test("identity forms use alpha.2 field names, expected versions, CSRF and idempotency", () => {
   assert.match(app, /temporary_password/);
@@ -53,6 +58,46 @@ test("both workbenches share the same fail-visible secure logout helper", () => 
   assert.match(workbench, /退出失败：\$\{explain\(reason\)\}/);
   assert.match(html, /id="toast"[^>]*role="alert"[^>]*aria-live="assertive"/);
   assert.match(workbench, /role="alert"/);
+});
+
+test("history restore detection covers pageshow persisted and back_forward without disabling history", () => {
+  assert.equal(isHistorySessionRestore({ persisted: true }, { type: "navigate" }), true);
+  assert.equal(isHistorySessionRestore({ persisted: false }, { type: "back_forward" }), true);
+  assert.equal(isHistorySessionRestore({ persisted: false }, { type: "navigate" }), false);
+  assert.equal(isHistorySessionRestore({ persisted: false }, { type: "reload" }), false);
+  assert.match(client, /path === "\/api\/session" \? "no-store"/);
+  assert.doesNotMatch(client, /addEventListener\("unload"|history\.(?:go|back|forward)\(/);
+});
+
+test("root, material and legacy shells conceal pagehide snapshots and revalidate pageshow restores", () => {
+  for (const source of [workbench, materialShell, app]) {
+    assert.match(source, /pagehide/);
+    assert.match(source, /pageshow/);
+    assert.match(source, /isHistorySessionRestore/);
+    assert.match(source, /suspendProtectedViews|suspendLegacyProtectedView/);
+    assert.match(source, /\/api\/session/);
+  }
+  assert.match(html, /data-cyd-auth-state="checking"/);
+  assert.match(html, /class="topbar" data-cyd-protected-view/);
+  assert.match(html, /class="layout" data-cyd-protected-view/);
+  assert.match(html, /id="loginOverlay" class="login-overlay">/);
+  assert.match(globals, /data-cyd-auth-state="checking"[^}]*visibility:hidden/);
+  assert.match(legacyStyles, /data-cyd-auth-state="anonymous"[^}]*visibility: hidden/);
+  for (const route of ['"/"', '"/materials/:path*"', '"/erp/index.html"']) assert.match(nextConfig, new RegExp(route.replace(/[/*]/g, "\\$&")));
+  assert.match(nextConfig, /private, no-store, max-age=0, must-revalidate/);
+  assert.match(nextConfig, /Pragma/);
+});
+
+test("legacy reveals protected DOM only after a complete authenticated refresh", () => {
+  assert.match(app, /async function refreshAndRevealLegacy\(\) \{[\s\S]*await refreshAll\(\);[\s\S]*hideLogin\(\);[\s\S]*\}/);
+  assert.match(app, /async function revalidateRestoredSession[\s\S]*await refreshAndRevealLegacy\(\);[\s\S]*catch \(error\) \{[\s\S]*clearLegacyProtectedState\(\);[\s\S]*showLogin\(\);[\s\S]*return;/);
+  assert.match(app, /async function initApp[\s\S]*loadSession\(\{ revealAuthenticated: false \}\)/);
+  for (const name of ["login", "setupSystem"]) {
+    const block = app.match(new RegExp(`async function ${name}\\(.*?(?=\\nasync function )`, "s"))?.[0] || "";
+    assert.match(block, /suspendLegacyProtectedView\(\);[\s\S]*clearLegacyProtectedState\(\);/);
+    assert.match(block, /await refreshAndRevealLegacy\(\)/);
+    assert.doesNotMatch(block, /hideLogin\(\)/);
+  }
 });
 
 test("user creation presents stable identity code and request context", () => {

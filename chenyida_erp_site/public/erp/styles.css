@@ -12,6 +12,12 @@
   --blue: #155e75;
 }
 
+html[data-cyd-auth-state="checking"] [data-cyd-protected-view],
+html[data-cyd-auth-state="anonymous"] [data-cyd-protected-view] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 * {
   box-sizing: border-box;
 }

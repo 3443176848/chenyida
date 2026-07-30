@@ -1,6 +1,7 @@
 :root { color-scheme: light; --ink:#142928; --muted:#617170; --paper:#f3f5ef; --panel:#fffdf7; --line:#dce2d8; --green:#0f6657; --orange:#d26724; --red:#a63c36; }
 * { box-sizing: border-box; }
 html, body { width:100%; min-height:100%; margin:0; background:var(--paper); color:var(--ink); font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif; }
+html[data-cyd-auth-state="checking"] [data-cyd-protected-view], html[data-cyd-auth-state="anonymous"] [data-cyd-protected-view], html[data-cyd-auth-state="checking"] .wb-shell, html[data-cyd-auth-state="anonymous"] .wb-shell { visibility:hidden!important; pointer-events:none!important; }
 button, input { font:inherit; }
 button { cursor:pointer; }
 .wb-center { min-height:100vh; display:grid; place-items:center; padding:32px; background:radial-gradient(circle at 20% 10%,#dfeadd 0,transparent 35%),linear-gradient(145deg,#f8f4e8,#e9efea); }

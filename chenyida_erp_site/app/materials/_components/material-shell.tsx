@@ -1,8 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { api, ErpApiError, safeMaterialReturnTo } from "../../../public/erp/api-client.js";
+import { api, ErpApiError, isHistorySessionRestore, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "../../../public/erp/api-client.js";
 
 export type SessionUser = { username?: string; display_name?: string; role?: string; role_label?: string; permissions?: string[] };
 export type MaterialSession = { authenticated: boolean; setup_required?: boolean; user?: SessionUser | null; csrf_token?: string };
@@ -28,28 +28,44 @@ export function MaterialShell({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<MaterialSession | null>(null);
   const [error, setError] = useState("");
 
+  const verifySession = useCallback(async () => {
+    suspendProtectedViews();
+    setSession(null);
+    setError("");
+    try {
+      const result = await api<MaterialSession>("/api/session");
+      if (!result.authenticated || result.setup_required) {
+        setProtectedViewState("anonymous");
+        redirectToExistingLogin();
+        return;
+      }
+      setSession(result);
+      window.requestAnimationFrame(() => setProtectedViewState("authenticated"));
+    } catch (reason: unknown) {
+      setProtectedViewState("anonymous");
+      if (reason instanceof ErpApiError && reason.status === 401) redirectToExistingLogin();
+      else setError("系统暂时无法验证登录状态，请稍后重试");
+    }
+  }, []);
+
   useEffect(() => {
     let active = true;
-    api<MaterialSession>("/api/session")
-      .then((result) => {
-        if (!active) return;
-        if (!result.authenticated || result.setup_required) {
-          redirectToExistingLogin();
-          return;
-        }
-        setSession(result);
-      })
-      .catch((reason: unknown) => {
-        if (!active) return;
-        if (reason instanceof ErpApiError && reason.status === 401) redirectToExistingLogin();
-        else setError("系统暂时无法验证登录状态，请稍后重试");
-      });
-    return () => { active = false; };
-  }, []);
+    const onPageHide = () => suspendProtectedViews();
+    const onPageShow = (event: PageTransitionEvent) => { if (active && isHistorySessionRestore(event)) void verifySession(); };
+    const timer = window.setTimeout(() => { if (active) void verifySession(); }, 0);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, [verifySession]);
 
   const user = session?.user;
   return (
-    <div className="mm-app-shell">
+    <div className="mm-app-shell" data-cyd-protected-view={session ? "" : undefined}>
       <header className="mm-topbar">
         <div><h1>晨亿达 ERP</h1><p>物料主数据工作区</p></div>
         <div className="mm-topbar-actions">

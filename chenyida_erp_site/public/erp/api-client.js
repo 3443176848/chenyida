@@ -12,6 +12,23 @@ export class ErpApiError extends Error {
   }
 }
 
+export function isHistorySessionRestore(event, navigationEntry) {
+  let entry = navigationEntry;
+  if (entry === undefined && typeof performance !== "undefined" && typeof performance.getEntriesByType === "function") {
+    entry = performance.getEntriesByType("navigation")[0];
+  }
+  return event?.persisted === true || entry?.type === "back_forward";
+}
+
+export function setProtectedViewState(state) {
+  if (typeof document === "undefined") return;
+  document.documentElement.dataset.cydAuthState = state;
+}
+
+export function suspendProtectedViews() {
+  setProtectedViewState("checking");
+}
+
 function errorBody(data) {
   if (data && typeof data === "object" && data.error && typeof data.error === "object") {
     return {
@@ -67,7 +84,7 @@ export async function api(path, options = {}) {
 
   let response;
   try {
-    response = await fetch(path, { ...requestOptions, method, credentials: "same-origin", headers });
+    response = await fetch(path, { ...requestOptions, method, credentials: "same-origin", headers, cache: path === "/api/session" ? "no-store" : requestOptions.cache });
   } catch (error) {
     if (protectedWriteRequest) {
       throw new ErpApiError("操作结果尚未确认，请使用原操作标识安全恢复", { code: "RESULT_UNKNOWN", resultUnknown: true });

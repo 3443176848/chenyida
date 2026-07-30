@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-cyd-auth-state="checking">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>晨亿达 ERP - 物料主数据治理</title>
-    <link rel="stylesheet" href="./styles.css?v=20260710-auth-flow" />
+    <link rel="stylesheet" href="./styles.css?v=20260730-review-logout-cache-03" />
   </head>
   <body>
-    <header class="topbar">
+    <header class="topbar" data-cyd-protected-view>
       <div>
         <h1>晨亿达 ERP</h1>
         <p>物料主数据治理工作台</p>
@@ -24,7 +24,7 @@
       </div>
     </header>
 
-    <main class="layout">
+    <main class="layout" data-cyd-protected-view>
       <aside class="sidebar">
         <button class="nav active" data-tab="dashboard">总览</button>
         <a class="nav nav-link" href="/materials" target="_top">物料主数据</a>
@@ -622,7 +622,7 @@
       </section>
     </main>
 
-    <div id="loginOverlay" class="login-overlay" hidden>
+    <div id="loginOverlay" class="login-overlay">
       <section class="auth-shell" aria-label="晨亿达 ERP 身份验证">
         <aside class="auth-brand">
           <div class="auth-mark" aria-hidden="true">CYD</div>
@@ -738,6 +738,6 @@
     </dialog>
 
     <div id="toast" class="toast" role="alert" aria-live="assertive" hidden></div>
-    <script type="module" src="./app.js?v=20260730-material-review-fix"></script>
+    <script type="module" src="./app.js?v=20260730-review-logout-cache-03"></script>
   </body>
 </html>
