@@ -13,6 +13,14 @@
 
 稳定外键、唯一约束、队列/项目/版本索引和数据库写守卫共同保证引用一致性。业务、事件、Audit 和 Idempotency 结果在单一事务提交。
 
+## Product/BOM 前置生命周期
+
+- Product Version（例如 `A0`）与 BOM Version（例如 `V1`）是不同版本轴；Product 状态、Product Version 发布状态、产品生命周期和 BOM 发布状态也不是同一字段。
+- BOM 属于稳定 `product_version_id`，不直接关联 Project；具体 Project 只在 Planning Handoff 的 Requirement Resolution/Package 中关联。
+- BOM 物料候选只包含 ACTIVE、正式内部编码非空且主单位可解析的 Material；显示 `正式内部编码 · 名称 · 单位`，业务引用始终使用稳定 `material_id`/`unit_id`，不得解析展示文本。
+- engineering 先为已发布 Product Version 保存 BOM DRAFT，再添加并校验行项目，最后调用既有 BOM release 服务。发布后内容不可原地修改，只能创建修订。
+- Planning Handoff 只接收属于同一 Product 的 RELEASED Product Version、RELEASED BOM Version 和 ACTIVE BOM Header；名称、供应商料号或页面展示文本不能作为桥接键。
+
 ## 状态机
 
 ```text

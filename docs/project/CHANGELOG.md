@@ -4,6 +4,16 @@
 
 ## 2026-07-31
 
+### SELFHOST-OPS-UAT-BOM-SELECTOR-FIX-04 - `fix: make bom material selection code-first` / `ops: accept bom selector fix`
+
+- 根因/Selector：旧兼容页从全量 `/api/items` 读取当前字段，却以旧 `internal_item_code` 作为 option value/写入回退，没有搜索且依赖长下拉。新增有界 `/api/bom-material-candidates`，只返回 ACTIVE、正式编码非空、enabled 主单位可解析的 `material_id/internal_code/name/unit_id/unit/status/version`；精确编码单一命中，否则支持编码前缀和名称。
+- UI/生命周期：结果显示 `正式编码 · 名称 · 单位`，选择与提交只使用稳定 material_id/unit_id；空/加载/无结果/错误/清除和竞态状态明确，桌面与 390px 可换行。Product Version、BOM Version、产品/生命周期/BOM 状态分开显示，并说明 BOM 属于 Product Version、Project 在 Planning Handoff 关联、先草稿校验后发布、发布后不可原地修改。
+- 服务端：保存和发布事务均锁定并重新验证 Material 存在、ACTIVE、正式编码、Unit enabled 与主单位；alpha.34 的 `base_unit_id=NULL` 只按 `base_uom` 精确兼容。同一 BOM Version 重复 material_id 被拒绝；数量精度、发布权限、幂等、CAS、审计、故障回滚和不可变规则保持。
+- 权威模型：Product/BOM/Planning 继续使用同一 PostgreSQL Product Version、BOM Version 和稳定 ID；真实 BOM release API 已存在并由 UI 调用，Planning 只接收 RELEASED Product/BOM，没有新增 Schema、Migration、状态机或伪按钮。
+- 验证/备份：隔离 PostgreSQL Master/Planning/Identity/Material/operations/Dashboard、兼容 120 项、TASK09 14 项、typecheck、209-table Schema consistency、lint、alpha.34 build、credentials、Python 三项与 diff check 通过。custom dump 2,023,590 bytes、SHA-256 `8facc469c6bbdf3d2dedce57ce2d8a740d58cd2d2f8cd6e85c714421d05c35b9` 已完成清单、独立 0034 恢复与 candidate HTTP smoke。
+- 部署/UAT：只替换 Web `sha256:881c033dc97e...→sha256:cb6a5c1fae896...`，PostgreSQL/Worker/Caddy ID 不变，Origin 保持 `https://43.135.148.43.nip.io:18888`，34/head 0034、0035 count 0。Chromium 对四码各唯一命中 IDs 533—536/PCS，只选择后清除，A0/V1 与发布说明清楚；只产生 2 LOGIN/2 LOGOUT，最终有效 engineering Session 0。
+- 数据/清理：项目 ACCEPTED/10、产品 ACTIVE+A0/DRAFT/样品、四物料 V3/ACTIVE/PCS 和比较指纹不变；目标/全部 UAT BOM `0/0`、Planning `0`。临时测试/恢复库、容器、浏览器、Playwright 镜像、worktree、candidate tag 和可归属 BuildKit cache 已清理；备份、当前镜像和旧 Web 回退 tag 保留。未运行 0035、创建 0036、部署 alpha.36、操作 Python 服务、push 或 PR。
+
 ### SELFHOST-OPS-PUBLIC-IP-CUTOVER-07 - `ops: record public IP cutover`
 
 - 入口：项目负责人明确授权“切换”后，公网入口从 `https://43.135.157.211.nip.io:18888` 改为 `https://43.135.148.43.nip.io:18888`；Caddy 域名和 Web 单值 `ERP_PUBLIC_ORIGIN` 同步更新，不保留双公网 Origin。

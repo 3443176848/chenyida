@@ -2,6 +2,29 @@
 
 最后更新时间：2026-07-31（Asia/Shanghai）
 
+## SELFHOST-OPS-UAT-BOM-SELECTOR-FIX-04 正式编码优先 BOM 物料选择与发布流程
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | BOM CODE-FIRST MATERIAL SELECTION FIXED — UAT BOM NOT CREATED | code-first 选择、事务校验、生命周期说明、隔离回归、alpha.34/0034 兼容部署和只读浏览器验收完成 |
+| Git | PASS | 起点 `28b79d2`/ahead 101；功能 `b66e742`，验收提交 `ops: accept bom selector fix`。无 push/PR/amend/rebase/reset/stash/restore，无工作簿访问或提交 |
+| 根因 | FIXED | `/api/items` 当前字段与旧 `internal_item_code` 前端适配不一致；option/提交依赖编码回退、无搜索且全量长下拉。正式编码不是主数据缺失 |
+| Selector DTO | PASS / BOUNDED | `/api/bom-material-candidates` 返回 material_id/internal_code/name/unit_id/unit/status/version；只含 ACTIVE+非空正式编码+enabled 主单位，最多 20；精确编码单一匹配，否则前缀/名称 |
+| UI/值语义 | PASS | 显示 `编码 · 名称 · 单位`，隐藏/提交只用 material_id/unit_id；空/等待/加载/无结果/错误/清除明确，重复行客户端拦截，桌面与 390px 无整页横向滚动 |
+| 服务端校验 | PASS / TRANSACTIONAL | 保存及发布都锁定并验证稳定 ID、ACTIVE、正式编码、Unit enabled、主单位；同 BOM Version 重复 material_id 拒绝。正数/六位数量、幂等、CAS、审计、回滚和不可变保持 |
+| 权威模型 | PASS / ONE MODEL | Product Version、BOM Version、BOM Line 与 Planning Resolution/Package 共用 PostgreSQL 稳定 ID。BOM 属于 Product Version，Project 在 Planning Handoff 关联，不用名称桥接 |
+| 发布流程 | PASS / EXISTING SERVICE | 真实 Product/BOM release API 和 engineering 既有权限存在；UI 明确先草稿/校验、草稿后显示发布、发布后不可原地修改、RELEASED 后才进入 Planning。没有伪按钮或新状态机 |
+| 自动验证 | PASS | 0034 隔离 PG Master 5、Planning 3、Identity 10、Material 7、operations 4、Dashboard 2；兼容 unit/UI 120、TASK09 14、typecheck、209-table Schema consistency、lint、build、File Storage/Environment、代码阶段 credentials 1,029 files 与最终暂存阶段稀疏 credentials 1,105 repository paths、Python 三项及 diff check 通过；最终扫描工作树未检出受保护目录或工作簿 |
+| 版本/Migration | COMPATIBLE HOTFIX | 源码 alpha.36/0035；运行仍 alpha.34/0034。无 Schema diff、无 0036，0035 未运行，TASK09/完整 alpha.36 未部署 |
+| 备份/恢复 | PASS | dump 2,023,590 bytes/0600/root，SHA-256 `8facc469c6bbdf3d2dedce57ce2d8a740d58cd2d2f8cd6e85c714421d05c35b9`；3,050 entries，独立 0034 恢复与候选 API smoke 通过 |
+| 部署/回滚 | PASS / WEB ONLY | Web `881c033dc97e...→cb6a5c1fae896...`；旧镜像回退 tag 保留。PostgreSQL/Worker/Caddy 完整 ID 不变，四服务 restart 0/OOM false，34/head 0034/0035 count 0 |
+| 公网浏览器 | PASS / READ ONLY | engineering 在新 Origin 搜索 PCB/SENSOR/CONN/METAL 四码，各 1 条、IDs 533—536、实际名称/PCS；仅未保存选择后清除。A0/V1、状态、项目关系与发布说明清楚 |
+| UAT 保护 | UNCHANGED | 项目 ACCEPTED/10，产品 ACTIVE+A0/DRAFT/样品，四物料 V3/ACTIVE/PCS/指纹不变；目标/全部 UAT BOM `0/0`，Planning `0`，无 BOM/Planning 写审计 |
+| logout/no-store | PASS | 测试路由只允许 login/logout POST；本轮 2 LOGIN/2 LOGOUT，最终 engineering ACTIVE Session 0。直接重访、back/forward/refresh 均未恢复受保护页面，响应 no-store |
+| 安全记录 | ACTION RECOMMENDED | root-only engineering 账号材料曾因本地分隔符错误只在授权工具输出中显示；未入 Git/文件/日志/外部系统，凭据未改。遵守本轮禁改密，建议可写试用前另行授权轮换 |
+| 资源/清理 | PASS | 首次约 2.3 GiB available/198 MiB Swap/29 GiB；最终约 2.3 GiB/204 MiB/29 GiB，未触发门禁。测试/恢复库、临时容器、浏览器、Playwright 镜像、worktree/candidate tag/task cache 已清理，备份/部署/回退镜像保留 |
+| engineering 试用 | READ-ONLY READY | 可恢复只读选择器试用；该 UAT Product Version 仍为 DRAFT，保存/发布 BOM 与 Planning 继续禁止。可写试用需单独发布授权并建议先轮换凭据 |
+
 ## SELFHOST-OPS-PUBLIC-IP-CUTOVER-07 公网 IP 与可信 HTTPS 入口切换
 
 | 验证项 | 结果 | 说明 |
