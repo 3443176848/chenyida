@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.35",
+  "version": "0.1.0-alpha.36",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -226,7 +226,11 @@
     "test:governance:unit": "node --experimental-strip-types --test tests/selfhost-material-governance-unit.test.mjs tests/selfhost-material-governance-source-adapter.test.mjs tests/selfhost-material-governance-handler.test.mjs tests/selfhost-material-governance-metadata.test.mjs tests/selfhost-adaptive-import-unit.test.mjs tests/selfhost-normalization-unit.test.mjs",
     "test:governance:migration": "node --experimental-strip-types --test tests/selfhost-material-governance-migration-contract.test.mjs",
     "test:governance:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-material-governance-migration-upgrade.test.mjs",
-    "test:governance:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-material-governance-postgres.test.mjs"
+    "test:governance:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-material-governance-postgres.test.mjs",
+    "typecheck:standardization": "tsc -p tsconfig.material-standardization.json --pretty false",
+    "test:standardization:unit": "node --experimental-strip-types --test tests/selfhost-material-standardization-unit.test.mjs",
+    "test:standardization:handler": "node --experimental-strip-types --test tests/selfhost-material-standardization-handler.test.mjs",
+    "test:standardization:ui": "node --experimental-strip-types --test tests/selfhost-material-standardization-ui-contract.test.mjs"
   },
   "dependencies": {
     "@noble/hashes": "2.2.0",

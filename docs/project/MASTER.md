@@ -37,7 +37,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码为 `0.1.0-alpha.35` / PostgreSQL migration head `0035_bom_material_governance.sql`；当前常驻运行环境仍为 `0.1.0-alpha.34` / `0034_supplier_receipt_lot_iqc.sql`。0035 未应用、alpha.35 未部署；新 ERP 已有受控公网 HTTPS 入口，不因入口开放而自动视为正式投产完成 |
+| 当前版本 | 源码为 `0.1.0-alpha.36` / PostgreSQL migration head `0035_bom_material_governance.sql`；当前常驻运行环境仍为 `0.1.0-alpha.34` / `0034_supplier_receipt_lot_iqc.sql`。0035 未应用、alpha.36 未部署；新 ERP 已有受控公网 HTTPS 入口，不因入口开放而自动视为正式投产完成 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | 运行时功能仍以 `SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02` 的 `54f648051a8454b022a6f12c41fe3f1558875a7c` 为最新功能基线；`SELFHOST-LANDING-TASK08` 只新增大批量物料流程、JSON 示例和治理记录，提交消息为 `docs: define bulk material standardization workflow`，实际 SHA 以 Git log 为准 |
 | 当前根仓库运维基线 | `SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02` 验收提交为 `ops: accept operations material review queue fix`，以 `54f6480` 为 Parent，实际 SHA 以 Git log 为准。alpha.34/0034 最小 Web hotfix 已受控替换；此前公网 Origin、CSRF/logout、管理员、数据库凭据轮换和资源保护基线保持 |
@@ -46,17 +46,18 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码 migration 为 `0001`—`0035`，并行常驻 PostgreSQL 严格保持 34 个 migration、head `0034_supplier_receipt_lot_iqc.sql`。LANDING-TASK08 未连接数据库、未新增或修改 Migration、未在主库运行 0035；0035 SHA-256 仍为 `d64ec733bb937d8cde11d93d5370605fb7e754ffb0c93d2f9795c8d7b66c9714` |
+| 当前数据库 | 源码 migration 为 `0001`—`0035`，并行常驻 PostgreSQL 严格保持 34 个 migration、head `0034_supplier_receipt_lot_iqc.sql`。LANDING-TASK09 未新增或修改 Migration、未在常驻库运行 0035、未写业务数据；0035 SHA-256 仍为 `d64ec733bb937d8cde11d93d5370605fb7e754ffb0c93d2f9795c8d7b66c9714` |
 | 当前运行状态 | `https://43.135.157.211.nip.io:18888` 经 Caddy 可信 TLS 到 Web；公网仍由单值 `ERP_PUBLIC_ORIGIN` 精确固定。Web 为 alpha.34/0034 兼容 hotfix 镜像 `sha256:f31199de3b8...`，只绑定 `127.0.0.1:3000`。LANDING-TASK08 未 build/restart/deploy；PostgreSQL/Web healthy，Worker/Caddy running，四服务 restart 0/OOM false |
-| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.35 源码新增可配置 BOM 物料规格治理候选层，尚未进入常驻运行面 |
-| 当前阶段 | `SELFHOST-LANDING-TASK08` 已完成大批量、分批、跨对话可恢复的离线整理流程设计；源码/运行面仍保持 alpha.35/0035 与 alpha.34/0034，没有运行变化 |
+| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.36 源码在供应商导入中增加 `CYD-MATERIAL-13C-v1` 服务端标准整理预览和受保护 CSV，尚未进入常驻运行面 |
+| 当前阶段 | `SELFHOST-LANDING-TASK09` 已把 TASK07 的固定 13 列整理体验接入供应商导入源码；解析完成后默认先看标准整理，Mapping/Normalization/Review 边界保留。源码/运行面分别为 alpha.36/0035 与 alpha.34/0034，没有运行变化 |
 | 当前任务 | `BULK MATERIAL STANDARDIZATION PROCESS DESIGNED — GENERIC RUNNER NOT IMPLEMENTED`：SOP、总索引/批次卡/manifest 示例和 D-083 已完成 |
-| 下一任务 | 停止。推荐先独立实现通用批次执行器，再以 5—10 份代表性资料建立首批来源档案；实际资料处理、数据库导入、UAT 凭据轮换、0035 部署和生产动作均需独立授权 |
+| 下一任务 | 停止。若要在当前 18888 使用本工作台，必须另行授权 alpha.36 兼容部署并完成部署前备份/回退；首批真实资料、跨批汇总、标准整理确认态、数据库导入、UAT 凭据轮换、0035 迁移和生产动作也都需独立授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
+- SELFHOST-LANDING-TASK09 在现有 PostgreSQL 供应商导入 Parse/Mapping 之上增加服务端 `CYD-MATERIAL-13C-v1` 确定性投影、分页预览和受会话保护的 UTF-8 CSV；模板精确命中时直通，其他来源只采用明确表头、当前 Mapping 和可证明标题/替代标记，未知留空。解析准备完成后页面默认进入“标准整理”，高级 Mapping、Normalization 和 Review 继续保留；alpha.36 源码未部署、未写业务数据
 - SELFHOST-LANDING-TASK08 发布大批量物料分批标准化 SOP V1：固定 `CYD-MATERIAL-13C-v1`、规则包、默认批次上限、一批一任务/一对话、结构指纹映射档案、私有总索引/批次卡/manifest、人工批准门禁、临时/批准两级汇总和跨对话指令；仅流程设计，通用执行器与新资料批次尚未开始
 - SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02 只为 operations 增加人工审核 queue/approve/reject 三项能力；队列、详情和按钮使用同一 PENDING_REVIEW 权威口径，工程创建人继续不可自审，正文不可代编辑。legacy 清洗入口明确退役，Dashboard 标注全局 DRAFT+PENDING_REVIEW。alpha.34/0034 最小 Web hotfix 已部署，Chromium 只读确认 533—536，未执行审核动作
 - SELFHOST-LANDING-TASK07 以 `moban.xlsx` 的 `原BOM -> Sheet1` 为真实行组转换示例，对全部来源分别输出同一 13 列标准页并合并为 591 行 `全部物料汇总`。模板 53/53 行证据与用量通过，591 行可追溯，94 条差异/缺项单列；57 行用量和 21 行板型不猜测，未写数据库、审核编码或部署
@@ -218,9 +219,11 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 40. LANDING-TASK07 的 591 行是按来源/BOM 上下文保留的离线明细，不是 591 个唯一正式物料；同一物料可跨板型重复出现，57 行用量和 21 行板型仍空白。不得跳过人工复核、稳定内部标识、单位/重复/替代关系和导入事务设计直接写库。
 41. 人工物料审核的权威集合固定为 `material_master.material_status='PENDING_REVIEW'`。operations 只有 queue/approve/reject 三项精确增量，不因此获得草稿代编辑、身份管理、系统审计或其他业务写权限；legacy 清洗队列不得复活或冒充人工审核。
 42. LANDING-TASK08 只定义流程，尚无通用执行器。新文件只有结构指纹命中已批准来源档案时才能直接套模板；未知布局必须先建立映射档案。临时汇总含待确认批次且不能入库，正式汇总也不等于已完成跨批去重、编码、单位、替代关系或数据库事务设计。
+43. LANDING-TASK09 的标准整理是绑定当前已发布 Parse 与当前 Mapping 的只读投影，不是新的业务事实表或入库确认态。`PROFILE_PENDING` 仍可预览/导出但必须人工核对；CSV 下载、Mapping 确认和 Normalization 均不等于正式物料已创建、审核或编码。
 
 ## 当前任务与下一任务
 
+- `SELFHOST-LANDING-TASK09` 已完成 alpha.36/0035 非生产源码：供应商导入解析准备完成后默认展示固定 13 列、问题统计和安全 CSV，公式不执行，数量用十进制文本计算，替代料只按显式标记折叠；读取使用 owner/`read_any`、repeatable-read 快照、5,000 行/32 MiB 门禁和 `private, no-store`。未处理新真实文件、写业务数据、运行 Migration、build/restart/deploy。
 - `SELFHOST-LANDING-TASK08` 已完成：大批量资料以后按 `CYD-MAT-YYYYMMDD-NNN/Rxxx` 一批一任务/一对话执行，以私有总索引和批次卡恢复，Codex 只推进到 `REVIEW_REQUIRED`，项目负责人批准后才进入已批准汇总。下一步不自动开始；通用执行器和 5—10 份代表性试点须分别授权。
 - `SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02` 已完成。功能提交 `54f6480` 精确增加 operations 审核三权限；alpha.34/0034 兼容 hotfix `sha256:f31199de3b8...` 只替换 Web。隔离 PostgreSQL、全套适用回归、备份恢复、候选 smoke 和真实 Chromium 只读验收通过；533—536 仍是 PENDING_REVIEW/V2/MANUAL/PCS/空编码，APPROVE/REJECT 三类证据计数为 0。
 - `SELFHOST-LANDING-TASK07` 已完成：模板 53/53 行组和用量核对通过，8 张来源标准页合并为 591 行总表并提供 591 行追溯、94 条异常和 GPT 下载副本。当前停止在离线人工审阅；数据库导入、编码/审核、0035 部署或任何生产动作均需独立授权。
@@ -236,7 +239,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - `SELFHOST-LANDING-TASK02` 经用户澄清“不依赖逐行人工分类”后连续执行：离线确定性规则按来源编码/MPN/严格规格组合、类别、位号和可数件单位完成 532 Material、6 Product、6 个 DRAFT BOM 与 316 行主库导入；438 条真正歧义来源隔离。migration_tool 来源链接承载逐行 provenance，0034 不变，同批次重放新增 0，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`。
 - 后续必须为 197 行提供显式单位；若需要 BOM，还必须另提供产品编码/版本、BOM 版本、行数量、位号和单位契约。完成前不得执行已生成的拟删除计划。本轮停止；LANDING-TASK01 的 offhost copy 仍是独立未完成用户动作。
 
-- 当前源码版本为 `0.1.0-alpha.35`、migration 为 `0001`—`0035`；运行面仍为 alpha.34/0034。源码 head 与运行 head 必须分开表述，不得把隔离验收写成已部署。
+- 当前源码版本为 `0.1.0-alpha.36`、migration 为 `0001`—`0035`；运行面仍为 alpha.34/0034。源码 head 与运行 head 必须分开表述，不得把源码验收写成已部署。
 - LANDING-TASK04 部署前后只读核对均为 Audit 876 条、Session 2 条（ACTIVE 1 条）；不可变审计和合法会话不得为追求“零记录”而删除。
 - TASK09 已以保存的非敏感基线摘要执行 delta 验收，并在清理后返回完全相同的合法 Audit/Session 记录集与计数；未来任务仍须遵守相同规则。
 - 2026-07-27 服务器重启/不可用的根因保持 `UNKNOWN`，不得无证据归因 OOM；资源保护不等于生产上线。

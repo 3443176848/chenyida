@@ -4,6 +4,15 @@
 
 ## 2026-07-30
 
+### SELFHOST-LANDING-TASK09 - `feat: add supplier material standardization workbench`
+
+- 工作流：把 TASK07 获确认的 `CYD-MATERIAL-13C-v1` 整理方式接入现有供应商导入；解析结构准备完成后默认进入“标准整理”，列表/新建页明确新路径，来源表头、高级 Mapping、Normalization 和 Review 继续保留。
+- 规则：模板 13 列逐字/列位命中时直通；其他来源只使用明确表头、当前 Mapping、可证明标题上下文和显式主替状态。供应商料号不得冒充内部型号，未知项目/板型/型号/数量留空；公式和错误单元格不执行，替代料只按显式标记折叠。
+- API/安全：新增 owner/`read_any` 保护的分页预览与 UTF-8 CSV；repeatable-read 只读快照、5,000 行/32 MiB、`private, no-store`、请求编号、稳定中文错误、导出审计、RFC 4180 与公式注入保护。需求/购买数量用字符串+BigInt 精确计算。
+- UI：固定 13 列表格展示 Profile 状态、来源、统计、问题明细、分页和下载，并反复说明预览/CSV 不等于正式入库、建稿、审核或编码。工作区由七个可见步骤扩展为八个。
+- 验证：Standardization 14 项，Mapping 5 项、Normalization 12 项、Review 10 项、Adaptive 5 项、FileStorage 3 项通过；两组 typecheck、lint `0 error / 8 个既有 warning`、credentials、Python 三项和 diff check 通过。
+- 边界：源码提升到 `0.1.0-alpha.36`，Migration head 仍为 0035；未处理新真实表格正文、写业务数据、运行 Migration、build/restart/deploy、push 或 PR。当前 18888 仍为 alpha.34/0034。
+
 ### SELFHOST-LANDING-TASK08 - `docs: define bulk material standardization workflow`
 
 - 流程：把 TASK07 固化为一批一任务/一对话的大批量 SOP；固定 `CYD-MATERIAL-13C-v1`、规则包、`CYD-MAT-YYYYMMDD-NNN/Rxxx`、默认 10 文件/5,000 行/100 MiB 上限和超限拆分规则。

@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-30（Asia/Shanghai）
 
+## SELFHOST-LANDING-TASK09 供应商导入 13 列标准整理工作台
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / SOURCE ONLY / NOT DEPLOYED | `SUPPLIER IMPORT 13-COLUMN STANDARDIZATION WORKBENCH IMPLEMENTED — SOURCE ONLY, NOT DEPLOYED` |
+| 用户路径 | PASS | `/materials/imports` 明确为供应商物料导入；解析结构准备完成后 `AWAITING_MAPPING` 默认进入“标准整理”，仍可进入来源表头、高级 Mapping、Normalization 和 Review |
+| 13 列规则 | PASS / FAIL CLOSED | `CYD-MATERIAL-13C-v1` 顺序固定；模板精确命中直通，其他来源只用明确表头/Mapping/标题/主替证据；未知留空，供应商料号不冒充内部型号，公式/错误不执行 |
+| 数量/替代 | PASS | 字符串+BigInt 精确计算需求与购买数量；购买量最低 0。只有显式替代状态才折叠，来源行号和稳定问题代码保留在预览 DTO |
+| API/安全 | PASS | owner/`material.import.read_any`、repeatable-read read-only、5,000 行/32 MiB、分页、`private, no-store`、稳定中文错误/X-Request-ID；CSV 有 UTF-8 BOM、RFC 4180、公式注入保护和成功导出审计 |
+| 自动测试 | PASS | Standardization `7+4+3=14`；Mapping 5、Normalization 12、Review 10、Adaptive 5、FileStorage 3；standardization/governance typecheck 通过 |
+| 静态/本地基线 | PASS | lint `0 error / 8 个既有 warning`；credentials 1,096 文件通过；Python 临时 SQLite self-test/smoke/go-live 通过；diff check 通过 |
+| 版本/Migration | SOURCE ONLY | 源码 alpha.36/0035；运行 Web/Worker/PostgreSQL 仍 alpha.34/0034。无 Schema/Migration 增删改或应用，无 build/restart/deploy |
+| 数据边界 | UNCHANGED | 未读取新业务表格正文、未修改 `shujvbiao/`、未写常驻 PostgreSQL/SQLite/D1、未创建 Draft/ACTIVE/编码/替代关系；没有跨文件/跨批合并 |
+| 资源/清理 | PASS | 起点约 2.1 GiB available、98 MiB Swap、31 GiB 根盘、Load `0.08/0.15/0.13`；最终 `2,458,736 KiB` available、`167,948 KiB` Swap、31 GiB、Load `1.36/0.98/0.68`。四服务 restart 0/OOM false、内核 OOM 0；一次最多一个 1 GiB/1 CPU 临时容器，任务容器和临时 SQLite 已清理，四个受保护卷存在且未删除 |
+| Git/外部边界 | PASS | 独立提交 `feat: add supplier material standardization workbench`，实际 SHA 以 Git log 为准；未 push/PR、未部署或外发业务数据 |
+
 ## SELFHOST-LANDING-TASK08 大批量物料分批与跨对话流程
 
 | 验证项 | 结果 | 说明 |

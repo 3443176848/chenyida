@@ -7,7 +7,7 @@ export const IMPORT_BATCH_STATUSES = [
   "RECONCILIATION_REQUIRED", "FAILED", "CANCELLED",
 ] as const;
 export type MaterialImportBatchStatus = typeof IMPORT_BATCH_STATUSES[number];
-export type MaterialImportView = "file" | "parse" | "sheet" | "mapping" | "confirmed" | "normalize" | "normalized" | "issues" | "review";
+export type MaterialImportView = "file" | "parse" | "standardize" | "sheet" | "mapping" | "confirmed" | "normalize" | "normalized" | "issues" | "review";
 
 export type MaterialImportFileSummary = {
   id: number; original_filename: string; filename_extension: string | null; declared_mime_type: string | null;
@@ -34,7 +34,7 @@ export const DEFAULT_IMPORT_LIST_QUERY: ImportListQuery = {
 };
 
 const STATUS_SET = new Set<string>(IMPORT_BATCH_STATUSES);
-const VIEW_SET = new Set<MaterialImportView>(["file", "parse", "sheet", "mapping", "confirmed", "normalize", "normalized", "issues", "review"]);
+const VIEW_SET = new Set<MaterialImportView>(["file", "parse", "standardize", "sheet", "mapping", "confirmed", "normalize", "normalized", "issues", "review"]);
 
 function positiveInteger(value: string | null, fallback: number): number {
   if (!value || !/^[1-9][0-9]*$/.test(value)) return fallback;
@@ -85,7 +85,7 @@ export type ImportWorkspaceQuery = { view: MaterialImportView; sheet: number | n
 export function defaultViewForStatus(status: MaterialImportBatchStatus): MaterialImportView {
   if (["CREATED", "UPLOAD_PENDING"].includes(status)) return "file";
   if (["FILE_READY", "QUEUED_FOR_PARSING", "PARSING"].includes(status)) return "parse";
-  if (status === "AWAITING_MAPPING") return "sheet";
+  if (status === "AWAITING_MAPPING") return "standardize";
   if (["MAPPING_CONFIRMED", "QUEUED_FOR_NORMALIZATION", "NORMALIZING"].includes(status)) return "normalize";
   if (status === "NORMALIZED") return "normalized";
   return "sheet";
@@ -97,10 +97,10 @@ export function legalImportView(status: MaterialImportBatchStatus, requested: st
   if (["CREATED", "UPLOAD_PENDING"].includes(status)) return view === "file" ? view : "file";
   if (["FILE_READY", "QUEUED_FOR_PARSING", "PARSING"].includes(status)) return view === "parse" ? view : "parse";
   if (status === "PARSED") return "sheet";
-  if (status === "AWAITING_MAPPING") return view === "mapping" ? "mapping" : "sheet";
-  if (status === "MAPPING_CONFIRMED") return ["sheet", "confirmed", "normalize"].includes(view) ? view : "normalize";
-  if (["QUEUED_FOR_NORMALIZATION", "NORMALIZING"].includes(status)) return ["normalize", "normalized", "issues", "confirmed"].includes(view) ? view : "normalize";
-  if (status === "NORMALIZED") return ["normalize", "normalized", "issues", "review", "confirmed"].includes(view) ? view : "normalized";
+  if (status === "AWAITING_MAPPING") return ["standardize", "sheet", "mapping"].includes(view) ? view : "standardize";
+  if (status === "MAPPING_CONFIRMED") return ["standardize", "sheet", "mapping", "confirmed", "normalize"].includes(view) ? view : "normalize";
+  if (["QUEUED_FOR_NORMALIZATION", "NORMALIZING"].includes(status)) return ["standardize", "normalize", "normalized", "issues", "confirmed"].includes(view) ? view : "normalize";
+  if (status === "NORMALIZED") return ["standardize", "normalize", "normalized", "issues", "review", "confirmed"].includes(view) ? view : "normalized";
   return defaultViewForStatus(status);
 }
 

@@ -24,13 +24,13 @@
 - 页面：TASK10 已把根 `app/page.tsx` 改为原生经营工作台；legacy `public/erp/index.html` 保留为显式业务工作区和回滚入口，不再作为根 iframe 默认依赖。Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给不依赖平台 binding 的 `app/lib/selfhost-api.ts`；旧 `erp-api.ts` 仅作迁移参考。
 - 根页迁移：TASK03—TASK10 已接通主数据/BOM/库存/采购/生产/销售/品质/财务、实时 Dashboard 与离线 backup 治理，根页已退出 iframe。完整 ERP API 的非生产实现不等于实际业务迁移：真实数据、账号和文件未迁移，采购、库存、生产、销售、品质、财务的实际业务仍依赖 Python/SQLite；生产恢复演练未做，不能描述为已投产。
-- 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL，Caddy production profile 提供 HTTPS。`chenyida-erp-parallel` 的 PostgreSQL/Web/Worker/Caddy 已实际应用 CPU/Memory/Swap/PID 限额；Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口，Caddy 在公网 18888 终止可信 TLS。当前运行面是受控非生产 alpha.34/0034，不代表 alpha.35 已部署或整体正式投产。历史 Sites `v3` 不作为后续交付目标。
+- 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL，Caddy production profile 提供 HTTPS。`chenyida-erp-parallel` 的 PostgreSQL/Web/Worker/Caddy 已实际应用 CPU/Memory/Swap/PID 限额；Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口，Caddy 在公网 18888 终止可信 TLS。当前运行面是受控非生产 alpha.34/0034，不代表 alpha.36 已部署或整体正式投产。历史 Sites `v3` 不作为后续交付目标。
 
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；源码为 `0.1.0-alpha.35`/`0035`，当前受控公网运行面仍为 `0.1.0-alpha.34`/`0034`。0035 未应用，alpha.35 未 build/restart/deploy。
-- 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.35`。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；源码为 `0.1.0-alpha.36`/`0035`，当前受控公网运行面仍为 `0.1.0-alpha.34`/`0034`。0035 未应用，alpha.36 未 build/restart/deploy。
+- 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.36`。
 - Git 复核：LANDING-TASK08 从本地 `main`/HEAD `9ffc383`、behind 0/ahead 94、clean 起步；独立提交消息为 `docs: define bulk material standardization workflow`，实际 SHA 以 Git log 为准。`shujvbiao/` 由 `.gitignore` 保护且本任务未读取、修改或提交业务文件；未 push/PR/amend/rebase/reset/stash/restore。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
@@ -86,7 +86,7 @@
 - `drizzle-postgres/0002_material_master_workflow.sql` 增加按分类编码序列、审核队列/事件历史索引及草稿/ACTIVE编码一致性约束；Material Draft/Review/Active 已通过独立 Repository/Service/API 使用 PostgreSQL，Schema/snapshot/journal 对齐。
 - `drizzle-postgres/0003_material_import_mapping.sql` 增加 parse run 行绑定、动态 Mapping 目标、源结构/metadata/mapping摘要、不可变确认快照、版本/SUPERSEDED、复用来源和STALE语义；Worker、API和现有Import Workspace已完成非生产自托管闭环。
 - `drizzle-postgres/0004_material_import_normalization.sql` 增加版本化 Normalization run、关系化核心/动态属性候选、lineage、稳定 issue、重试/重跑/取消、发布一致性约束和已发布数据不可变 trigger；Worker、API和现有 Review UI 已完成非生产闭环。
-- `drizzle-postgres/0005_material_import_review.sql` 增加 Review Session/Row、核心和动态属性覆盖历史、Issue resolution、Review validation issue、sealed finalization、行级 operation、ACTIVE binding、Draft link 和审计历史；TASK01 Material Service、API、Worker 与七步 Import Workspace 已完成非生产闭环。
+- `drizzle-postgres/0005_material_import_review.sql` 增加 Review Session/Row、核心和动态属性覆盖历史、Issue resolution、Review validation issue、sealed finalization、行级 operation、ACTIVE binding、Draft link 和审计历史；TASK01 Material Service、API、Worker 与现有 Import Workspace 已完成非生产闭环。LANDING-TASK09 在页面中增加“标准整理”后，工作区为八个可见步骤。
 - `drizzle-postgres/0006_identity_security.sql` 和 `0007_master_data_bom.sql` 分别补齐身份安全与关系化主数据/BOM；`0008_inventory_ledger.sql` 新增稳定 Material/Unit ID 的库存余额投影与不可变账本；`0009_procurement.sql`、`0010_production.sql`、`0011_sales.sql`、`0012_quality.sql` 和 `0013_finance.sql` 分别关系化采购、生产、销售、品质与财务结算事实，旧文本编码/JSON 表仅保留为迁移来源。
 - `drizzle-postgres/0014_migration_openings.sql` 新增不可变 Migration Opening Source、库存期初/冲销和 Finance Opening/冲销；只通过测试迁移 CLI 的内部 Service 物化，复用 Ledger/Balance 与 Finance Document/Event/Settlement，不回填旧数据或暴露 HTTP 写路由。
 - `drizzle-postgres/0015_market_project_handoff.sql` expand-only 新增稳定 Project、不可变 Requirement Version/Item、受控 Document Link、Handoff 投影和不可变 Event；服务端只允许 sales 市场与 engineering 项目角色按状态机操作，不回填旧数据或启动下游流程。
@@ -100,6 +100,7 @@
 - `drizzle-postgres/0033_finished_goods_lot_fqc_shipment.sql` expand-only 为 Allocation、FQC、Shipment Line 与 FQC Consumption Fact 增加 nullable 稳定 Lot 外键；BATCH 必须同 Lot，ORDER 保持 null。warehouse 显式选择 Lot，Shipment 原子消费同 Lot Balance/FQC 并写 Ledger/Source/Event；冲销只恢复原 Lot。实际 `4/6`、冻结拒发、冲销同 Lot 再发、ORDER、恢复与清理已通过；原材料/供应商/Receipt/领料 Lot 仍未实现。
 - `drizzle-postgres/0034_supplier_receipt_lot_iqc.sql` expand-only 将 `inventory_lots` 扩展为制造成品/供应商来料严格 XOR 来源；ACTIVE/STOCKED/IQC Receipt 原子生成 RML Lot 并同时增加 on-hand/frozen。IQC 沿 Receipt Line→Lot 创建，RELEASE 通过追加式 UNFREEZE 只解冻 passed 范围，失败量继续冻结；无 IQC/AP/领用等下游时整单冲销沿原 Lot 反向过账。真实主链 10/8/2→10/2/8 与 3 件 REVERSED 支线、重启和恢复已通过；生产领料 Lot 未实现。
 - `drizzle-postgres/0035_bom_material_governance.sql` expand-only 新增 Governance Run/Group/Row/Spec、Material/Alternative Candidate、Decision/Link/Event 九张关系表，并扩展导入透明度和 v2 规格 metadata。严格身份、来源不可变、外键/CHECK/索引、服务事务入口和全局正式物料冲突门禁已在空库与 0034 升级隔离库验证；尚未应用常驻 PostgreSQL。
+- LANDING-TASK09 不新增表或 Migration。`material-standardization-selfhost` 只在 repeatable-read 只读快照中消费当前已发布 Parse、选中 Sheet、当前 Mapping 与原始行，生成 `CYD-MATERIAL-13C-v1` 投影；5,000 候选行/32 MiB 门禁、owner/`read_any`、受保护分页预览、CSV 下载审计和公式注入保护均在服务端。
 - 本地文件卷保存二进制，数据库只保存受控相对路径和摘要元数据。
 - Worker 使用 PostgreSQL Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、重试和 CAS；Web/Worker 是独立入口。
 
@@ -113,7 +114,7 @@
 ## 主要模块
 
 - 身份与权限：初始化、登录、会话、角色、用户状态、密码重置、审计。
-- 物料治理：物料、供应商映射、CSV/XLSX/XLS 自适应导入、不可变原始行、Normalization/Review、品类+关键规格+性能等级的严格身份治理、候选报告和受控新物料建档。
+- 物料治理：物料、供应商映射、CSV/XLSX/XLS 自适应导入、不可变原始行、固定 13 列供应商标准整理、Normalization/Review、品类+关键规格+性能等级的严格身份治理、候选报告和受控新物料建档。
 - 工程：产品、BOM、BOM 行、齐套分析。
 - 供应链：供应商、采购建议、采购订单、收货、库存调整和库存流水。
 - 制造：工单、BOM 转工单、领料、完工和报工。
@@ -165,6 +166,7 @@
 39. SELFHOST-OPS-TRUSTED-ORIGIN-05 后当前身份基线为用户/active admin `2/2`、Session/有效 `3/1`、Audit/Identity `887/15`、持久幂等 3；`admin2` 已登录但仍为 version 2、`must_change_password=true`。任务起点 `885/13` 后新增两条无凭据公网验收的 `SELF_PASSWORD_CHANGED/failed/AUTH_REQUIRED` 合法审计；没有治理或业务写入。Migration manifest 仍为 `b2ff69f7...13b8b`，Material/Product/BOM/Line 仍为 `532/6/6/316`。
 40. SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 后当前身份基线为用户/active admin `2/2`、Session/有效 `3/1`、Audit/Identity `888/16`、持久幂等 3；`admin2` 为 active admin、version 3、`must_change_password=false`。唯一 delta 是账号 version/flag 和一条专用成功 Identity Audit；密码二次指纹、Session、Migration manifest 与业务计数不变。
 41. SELFHOST-OPS-UAT-BLOCKER-FIX 后当前身份基线为用户/active admin `3/2`、Session/有效 `14/5`、Audit `920`；唯一 UAT 临时 manager 已通过页面停用。审计 897—907 保留复现失败和公网对照证据，部署后 908—920 全部成功；两个目标 logout 与完整复验的旧 Session 均已撤销。首次验收脚本提前结束遗留一个丢失令牌的有效会话，等待正常 8 小时 TTL，不直接 SQL 删除或改写审计。
+42. SELFHOST-LANDING-TASK09 采用 D-084：供应商标准整理不是第二套 Parser/数据库，精确模板直通，其他来源只使用明确结构证据；`PROFILE_PENDING` 仍留空并提示人工确认。数量按字符串十进制计算，显式替代行才折叠；预览/CSV 不创建 Draft、正式料号或业务事实。`0.1.0-alpha.36`/`0035` 仅完成源码验收，未进入常驻运行面。
 
 ## 当前风险
 
@@ -208,7 +210,7 @@
 
 ## 当前路线
 
-`SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02` 已 `OPERATIONS MATERIAL REVIEW QUEUE FIXED — UAT APPROVAL NOT EXECUTED`；源码仍为 alpha.35/0035，当前 18888 Web 为 alpha.34/0034 基线+Origin/CSRF/logout+operations 审核最小 hotfix，PostgreSQL/Worker 仍为 alpha.34/0034。533—536 未审批、未退回、未生成编码；现在停止，不应用 0035、不启动其他角色或后续任务。由于 UAT 凭据材料在本次授权会话工具输出中曾意外显露，独立审核试用前建议先另行轮换该账号凭据。
+`SELFHOST-LANDING-TASK09` 已完成 alpha.36/0035 非生产源码，当前 18888 Web 仍为 alpha.34/0034 基线+Origin/CSRF/logout+operations 审核最小 hotfix，PostgreSQL/Worker 仍为 alpha.34/0034。13 列标准整理尚未部署，533—536 也未审批、未退回、未生成编码；现在停止，不应用 0035、不启动真实资料导入、数据库写入或其他角色试用。由于 UAT 凭据材料在既往授权会话工具输出中曾意外显露，独立审核试用前建议先另行轮换该账号凭据。
 
 ## 恢复上下文检查清单
 

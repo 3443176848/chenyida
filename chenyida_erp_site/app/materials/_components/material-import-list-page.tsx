@@ -39,8 +39,8 @@ export function MaterialImportListPage() {
   if (!canRead) return <MaterialImportErrorState title="没有导入读取权限" message="当前账号没有 material.import.read，页面不会请求批次正文。" />;
   const submit = (event: FormEvent) => { event.preventDefault(); navigate(changeImportListQuery(query, draft)); };
   return <section className="mi-list-page">
-    <div className="mm-breadcrumb"><Link href="/materials">物料主数据</Link><span>/</span><span>导入批次</span></div>
-    <header className="mm-page-head"><div><h2>物料导入批次</h2><p>解析与字段映射工作区；映射确认不代表正式物料已创建。</p></div>{canCreate ? <Link className="mm-primary-link" href="/materials/imports/new">新建导入批次</Link> : null}</header>
+    <div className="mm-breadcrumb"><Link href="/materials">物料主数据</Link><span>/</span><span>供应商导入</span></div>
+    <header className="mm-page-head"><div><h2>供应商物料导入</h2><p>上传并解析来源文件后，先按固定 13 列标准整理，再进入 Mapping、归一化和人工审核。</p></div>{canCreate ? <Link className="mm-primary-link" href="/materials/imports/new">新建供应商导入</Link> : null}</header>
     <form className="mi-filter-bar" onSubmit={submit}>
       <label>状态<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value })}><option value="">全部状态</option>{["CREATED","UPLOAD_PENDING","FILE_READY","QUEUED_FOR_PARSING","PARSING","PARSED","AWAITING_MAPPING","MAPPING_CONFIRMED","RECONCILIATION_REQUIRED","FAILED","CANCELLED"].map((item) => <option key={item}>{item}</option>)}</select></label>
       <label>来源<select value={draft.source_kind} onChange={(e) => setDraft({ ...draft, source_kind: e.target.value })}><option value="">全部</option><option>XLSX</option><option>CSV</option></select></label>

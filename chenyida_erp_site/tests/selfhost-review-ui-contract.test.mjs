@@ -7,10 +7,11 @@ const importWorkspace = await readFile(new URL("../app/materials/_components/mat
 const primitives = await readFile(new URL("../app/materials/_components/material-import-primitives.tsx", import.meta.url), "utf8");
 const normalization = await readFile(new URL("../app/materials/_components/material-import-normalization-review.tsx", import.meta.url), "utf8");
 
-test("review UI remains in existing seven-step import workspace and preserves deep links", () => {
+test("review UI remains in the import workspace with standardization and preserves deep links", () => {
   assert.match(importWorkspace, /MaterialImportReviewWorkspace/);
   const stepsBlock = primitives.slice(primitives.indexOf("const STEPS"), primitives.indexOf("function currentStep"));
-  assert.equal((stepsBlock.match(/\{ view: "/g) || []).length, 7);
+  assert.equal((stepsBlock.match(/\{ view: "/g) || []).length, 8);
+  assert.match(stepsBlock, /view: "standardize"/);
   assert.match(primitives, /\["normalized", "issues", "review"\]/);
   assert.match(normalization, /view=review&run_id=/);
   assert.match(workspace, /searchParams\.set\("row", String\(row\.normalized_row_id\)\)/);

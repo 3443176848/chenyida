@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "incremental": false,
+    "plugins": []
+  },
+  "include": [
+    "app/lib/material-standardization-selfhost/**/*.ts",
+    "app/lib/material-import/parser-model.ts",
+    "app/lib/material-import-selfhost/types.ts",
+    "app/materials/_lib/material-standardization.ts",
+    "app/materials/_lib/material-import.ts",
+    "app/materials/_components/material-standardization-preview.tsx",
+    "app/materials/_components/material-import-workspace.tsx",
+    "app/materials/_components/material-import-primitives.tsx",
+    "app/materials/_components/material-import-create-page.tsx",
+    "app/materials/_components/material-import-list-page.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "examples",
+    "app/api/erp-api.ts",
+    "scripts/seed-material-categories.ts"
+  ]
+}

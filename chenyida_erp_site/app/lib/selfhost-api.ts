@@ -8,6 +8,7 @@ import { PostgresBackgroundJobQueue } from "./infrastructure/background-jobs.ts"
 import { systemClock, uuidGenerator } from "./infrastructure/primitives.ts";
 import { handleSelfhostMaterialApi } from "./material-selfhost/handler.ts";
 import { handleSelfhostMaterialImportMappingApi } from "./material-import-selfhost/handler.ts";
+import { handleSelfhostMaterialStandardizationApi } from "./material-standardization-selfhost/handler.ts";
 import { handleSelfhostMaterialImportNormalizationApi } from "./material-import-normalization-selfhost/handler.ts";
 import { handleSelfhostMaterialImportReviewApi } from "./material-import-review-selfhost/handler.ts";
 import { handleSelfhostMaterialGovernanceApi } from "./material-governance-selfhost/handler.ts";
@@ -138,6 +139,8 @@ export async function handleSelfhostApi(request: Request): Promise<Response> {
     if (bomResponse) return bomResponse;
     const materialResponse = await handleSelfhostMaterialApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (materialResponse) return materialResponse;
+    const standardizationResponse = await handleSelfhostMaterialStandardizationApi(request, { pool, actor: user, requestId });
+    if (standardizationResponse) return standardizationResponse;
     const mappingResponse = await handleSelfhostMaterialImportMappingApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (mappingResponse) return mappingResponse;
     const normalizationResponse = await handleSelfhostMaterialImportNormalizationApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
