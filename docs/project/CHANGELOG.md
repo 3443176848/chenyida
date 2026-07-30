@@ -2,6 +2,17 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-31
+
+### SELFHOST-OPS-PUBLIC-IP-CUTOVER-07 - `ops: record public IP cutover`
+
+- 入口：项目负责人明确授权“切换”后，公网入口从 `https://43.135.157.211.nip.io:18888` 改为 `https://43.135.148.43.nip.io:18888`；Caddy 域名和 Web 单值 `ERP_PUBLIC_ORIGIN` 同步更新，不保留双公网 Origin。
+- 配置/回退：root-only env 只改变两项公开值，其他内容经安全比较一致；原文件以 0600 回退副本保留。复用原镜像和卷串行重建 Web/Caddy，不 build/pull，不重建 PostgreSQL/Worker。
+- TLS/网络：Let's Encrypt 新证书 CN/SAN 与新主机名匹配；ACME、外部 18888 登录页、HTTPS 首页/健康 200、HTTP 308→新 HTTPS 18888、匿名业务 API 401、安全头和旧 SNI 失败通过。
+- 数据边界：34/head 0034 及核心 `536/7/7/6/6/316` 不变。Web 重建前的并发外部身份流程使 Session/Audit/Idempotency `103/1147/43→105/1152/44`，时间证明确实早于切换；切换后三类新增为 0。533—536 更早已由外部正式流程成为 ACTIVE/version 3/有编码，本任务没有审核或改写。
+- 验证/资源：来源+身份 unit `15/15`、基础 `3/3`、lint `0 error / 8 个既有 warning`、1103 文件凭据扫描通过；最终 `2,474,940 KiB` available、`204,964 KiB` Swap、30 GiB、Load `0.02/0.29/0.28`，60 秒 Swap -4 KiB，内核 OOM 0、四服务 restart 0/OOM false、四卷保持，临时测试容器已删除。
+- Git/保密：只提交脱敏任务和状态文档；env、证书私钥、凭据、Token、Cookie、摘要、数据库正文和备份不进 Git。未 push/PR、未运行 0035、部署 alpha.36、修改安全组/systemd/Python/SQLite 或启动其他业务任务。
+
 ## 2026-07-30
 
 ### SELFHOST-OPS-UAT-MATERIAL-REVIEW-BLOCKERS-03-RETRY - `fix: clarify material review decision context` / `fix: invalidate protected views after logout` / `fix: enforce no-store on legacy shell` / `ops: accept material review blocker fixes`

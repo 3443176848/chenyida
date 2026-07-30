@@ -942,6 +942,16 @@
 - API/UI：分页预览和 CSV 只允许 `material.import.read`/`read_any` 且继续执行 owner 行级可见性；响应 `private, no-store`，导出写安全审计。解析准备完成后默认进入“标准整理”，同时保留来源表头、高级 Mapping、Normalization 和 Review；页面必须明确预览/下载不等于入库、建稿、审批或编码。
 - 授权边界：alpha.36/0035 只完成源码和隔离测试；不新增/应用 Migration，不处理新真实文件，不自动确认 Mapping/Profile，不写 Material Draft/ACTIVE/替代关系，不 build/restart/deploy。当前 18888 仍是 alpha.34/0034；任何部署、真实资料批次、跨批合并或数据库导入必须独立授权。
 
+## D-085 公网 IP 变化时域名与唯一可信 Origin 必须同一受控任务切换
+
+- 日期：2026-07-31
+- 状态：`ACCEPTED / DEPLOYED`
+- 确认人：项目负责人（告知服务器公网 IP 已变化，并明确回复“切换”）
+- 新入口：公网 IPv4 `43.135.148.43` 对应临时 DNS-only 名称 `43.135.148.43.nip.io`；唯一入口固定为 `https://43.135.148.43.nip.io:18888`。nip.io 只提供解析，不代理、不存储 ERP 流量。
+- 原子配置边界：Caddy `ERP_DOMAIN` 与 Web `ERP_PUBLIC_ORIGIN` 必须在同一任务切换，避免证书主机名和服务端写请求来源白名单分叉；旧主机名从当前 Caddy 配置退役，不保留双公网 Origin。
+- 部署边界：只复用原镜像串行重建 Web/Caddy并复用 Caddy 持久卷签发新证书；不 build、不重建 PostgreSQL/Worker、不修改 Schema/Migration/业务数据/权限/凭据/防火墙。原 root-only env 副本是回退权威。
+- 验收边界：DNS、公开可信证书/SAN、外部 18888 登录页、HTTPS 200、HTTP 308、匿名 401、安全头、旧 SNI 失败、资源/OOM/restart、卷和切换后数据库零写增量均须通过；公司自有域名仍是后续推荐方向。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

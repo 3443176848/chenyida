@@ -1,6 +1,22 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-30（Asia/Shanghai）
+最后更新时间：2026-07-31（Asia/Shanghai）
+
+## SELFHOST-OPS-PUBLIC-IP-CUTOVER-07 公网 IP 与可信 HTTPS 入口切换
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | PUBLIC IP HTTPS CUTOVER COMPLETE | 项目负责人明确授权“切换”；当前唯一公网入口为 `https://43.135.148.43.nip.io:18888` |
+| DNS/TLS | PASS / TRUSTED | 新名称解析到 `43.135.148.43`；Let's Encrypt `YE2` 证书 CN/SAN 精确匹配，有效期至 2026-10-28；旧主机名 SNI 已失败 |
+| HTTP/HTTPS | PASS | 外部只读探针实际读取登录页；HTTPS 首页/health 200，HTTP 80 308 到新 HTTPS 18888，HSTS/nosniff/DENY/referrer/permissions 头保持，匿名 `/api/materials` 401 |
+| 配置/回退 | PASS | root-only env 只改变 `ERP_DOMAIN`/`ERP_PUBLIC_ORIGIN` 且仍 0600；原配置 0600 副本保留，其他 env 内容安全比较一致 |
+| 部署边界 | PASS / MINIMAL | 使用原镜像串行重建 Web/Caddy；Web `sha256:881c033dc97e...`、Caddy `sha256:4c6e91c6ed0...`。PostgreSQL/Worker ID/镜像/启动时间不变，无 build/pull/Migration/alpha.36 |
+| 数据/Migration | PASS WITH CONCURRENT PRE-CUTOVER DELTA | 34/head 0034、核心 `536/7/7/6/6/316` 保持。切换前外部身份流程使 Session/Audit/Idempotency `103/1147/43→105/1152/44`，最晚 18:03:01Z，早于 Web 重建 18:03:29Z；切换后三类新增 0，本任务未调用身份/业务写接口 |
+| 既有物料状态 | OBSERVED / OUT OF SCOPE | 533—536 已在本任务前的 13:45—13:48Z 成为 ACTIVE/version 3/有编码，当前 536 Material 全部 ACTIVE；本任务不调查、撤销、审核或改写该既有业务事实 |
+| 自动验证 | PASS | request-origin+Identity unit `15/15`、基础 FileStorage `3/3`、lint `0 error / 8 个既有 warning`、1103 仓库文件凭据扫描及 diff/scope 检查通过 |
+| 服务/Volume | PASS | PostgreSQL/Web healthy，Worker/Caddy running；四服务 restart 0/OOM false，Web 只绑定 127.0.0.1:3000，PostgreSQL 无宿主端口，四个受保护卷 metadata 不变 |
+| 资源/清理 | PASS | 起点约 2.1 GiB/193 MiB/29 GiB/Load `0.24/0.28/0.17`；最终 `2,474,940 KiB`/`204,964 KiB`/30 GiB/`0.02/0.29/0.28`，60 秒 Swap -4 KiB、内核 OOM 0、Caddy error 0；临时测试容器已自动删除 |
+| Git/外部边界 | PASS | 提交 `ops: record public IP cutover`，实际 SHA 以 Git log 为准；不提交 env/私钥/凭据/数据库正文/备份，未 push/PR、未修改安全组/systemd/Python/SQLite |
 
 ## SELFHOST-OPS-UAT-MATERIAL-REVIEW-BLOCKERS-03-RETRY 审核上下文、精确待办与退出缓存修复
 
