@@ -1,0 +1,54 @@
+{
+  "schema_version": "cyd-material-pipeline-index-v1",
+  "template": {
+    "template_id": "CYD-MATERIAL-13C-v1",
+    "filename": "moban.xlsx",
+    "sha256": "581a0db72ed6ac207445e39bd8c9640a8765830ddcf385518ba177d74909a58c",
+    "columns": [
+      "序号",
+      "项目号",
+      "板子类型",
+      "内部型号",
+      "物料规格描述",
+      "品牌",
+      "用量",
+      "替代料",
+      "供应商",
+      "订单数量",
+      "需求数量",
+      "购买数量",
+      "库存数"
+    ]
+  },
+  "rule_pack": {
+    "rule_pack_id": "CYD-MATERIAL-NORMALIZATION-v1",
+    "generic_runner_status": "NOT_IMPLEMENTED",
+    "task07_reference_commit": "78701d16dcea6b4ae5a2ff73d138c8ec838c8498"
+  },
+  "active_batch_id": null,
+  "batches": [
+    {
+      "batch_id": "CYD-MAT-YYYYMMDD-NNN",
+      "revision": "R001",
+      "state": "RECEIVED",
+      "batch_card_path": "/private/path/to/batch-card.json",
+      "source_manifest_sha256": null,
+      "output_sha256": null,
+      "approved_by": null,
+      "approved_at": null,
+      "supersedes": null,
+      "superseded_by": null
+    }
+  ],
+  "provisional_consolidation": {
+    "manifest_sha256": null,
+    "output_sha256": null,
+    "batch_revision_count": 0
+  },
+  "approved_consolidation": {
+    "manifest_sha256": null,
+    "output_sha256": null,
+    "batch_revision_count": 0
+  },
+  "updated_at": "YYYY-MM-DDThh:mm:ss+08:00"
+}

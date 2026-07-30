@@ -7,6 +7,10 @@
 
 ## 文档索引
 
+- [大批量物料资料分批标准化 SOP V1](./bulk-material-standardization-sop-v1.md)
+- [大批量流程私有总索引示例](./templates/bulk-material-pipeline-index-v1.example.json)
+- [大批量流程批次卡示例](./templates/bulk-material-batch-card-v1.example.json)
+- [大批量流程来源清单示例](./templates/bulk-material-source-manifest-v1.example.json)
 - [分阶段实施计划](./phased-implementation-plan.md)
 - [需要人工确认的业务决策](./business-decisions.md)
 - [当前系统技术审计](../audits/current-system-audit.md)

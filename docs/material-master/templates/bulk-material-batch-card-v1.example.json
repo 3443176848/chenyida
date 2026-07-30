@@ -1,0 +1,57 @@
+{
+  "schema_version": "cyd-material-batch-card-v1",
+  "batch_id": "CYD-MAT-YYYYMMDD-NNN",
+  "revision": "R001",
+  "state": "RECEIVED",
+  "template_id": "CYD-MATERIAL-13C-v1",
+  "template_sha256": "581a0db72ed6ac207445e39bd8c9640a8765830ddcf385518ba177d74909a58c",
+  "rule_pack_id": "CYD-MATERIAL-NORMALIZATION-v1",
+  "execution_commit": null,
+  "limits": {
+    "max_source_files": 10,
+    "max_candidate_rows": 5000,
+    "max_total_bytes": 104857600
+  },
+  "source_manifest": {
+    "path": "/private/path/to/source-manifest.json",
+    "sha256": null,
+    "file_count": 0,
+    "total_bytes": 0,
+    "candidate_row_count": null
+  },
+  "mapping_profiles": [],
+  "outputs": {
+    "standardized_workbook_path": null,
+    "standardized_workbook_sha256": null,
+    "report_path": null,
+    "report_sha256": null,
+    "download_copy_path": null
+  },
+  "counts": {
+    "standard_rows": null,
+    "provenance_rows": null,
+    "alternative_bearing_rows": null,
+    "anomaly_rows": null,
+    "unknown_quantity_rows": null,
+    "unknown_board_type_rows": null
+  },
+  "review": {
+    "required": true,
+    "issue_group_digest": null,
+    "approved_by": null,
+    "approved_at": null,
+    "decision_log_path": "/private/path/to/decisions.jsonl",
+    "decision_log_sha256": null
+  },
+  "checkpoint": {
+    "completed_steps": [],
+    "next_action": "LOCK_SOURCE_MANIFEST",
+    "input_required": null,
+    "last_error_code": null,
+    "updated_at": "YYYY-MM-DDThh:mm:ss+08:00"
+  },
+  "supersedes": null,
+  "superseded_by": null,
+  "database_writes": 0,
+  "deployment_changes": 0
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": "cyd-material-source-manifest-v1",
+  "batch_id": "CYD-MAT-YYYYMMDD-NNN",
+  "revision": "R001",
+  "created_at": "YYYY-MM-DDThh:mm:ss+08:00",
+  "files": [
+    {
+      "source_file_id": "SRC-001",
+      "original_filename": "example.xlsx",
+      "stored_path": "/private/path/to/source/example.xlsx",
+      "size_bytes": 0,
+      "sha256": "PLACEHOLDER_SHA256",
+      "mode": "0400",
+      "file_role": "CURRENT_BOM",
+      "duplicate_of": null,
+      "sheets": [
+        {
+          "sheet_index": 0,
+          "sheet_name": "BOM",
+          "visibility": "visible",
+          "sheet_role": "CURRENT_BOM",
+          "structure_fingerprint": "PLACEHOLDER_FINGERPRINT",
+          "mapping_profile_id": null,
+          "mapping_profile_version": null,
+          "candidate_row_count": null,
+          "handling": "PENDING_CLASSIFICATION"
+        }
+      ]
+    }
+  ],
+  "manifest_sha256": "PLACEHOLDER_CANONICAL_MANIFEST_SHA256"
+}

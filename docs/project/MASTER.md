@@ -39,24 +39,25 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 源码为 `0.1.0-alpha.35` / PostgreSQL migration head `0035_bom_material_governance.sql`；当前常驻运行环境仍为 `0.1.0-alpha.34` / `0034_supplier_receipt_lot_iqc.sql`。0035 未应用、alpha.35 未部署；新 ERP 已有受控公网 HTTPS 入口，不因入口开放而自动视为正式投产完成 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02` 功能提交 `54f648051a8454b022a6f12c41fe3f1558875a7c`，Parent `78701d16dcea6b4ae5a2ff73d138c8ec838c8498`；只增加 operations 人工审核精确权限、legacy/Dashboard 口径提示和测试，不改变 alpha.35/0035 业务模型 |
+| 当前根仓库功能基线提交 | 运行时功能仍以 `SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02` 的 `54f648051a8454b022a6f12c41fe3f1558875a7c` 为最新功能基线；`SELFHOST-LANDING-TASK08` 只新增大批量物料流程、JSON 示例和治理记录，提交消息为 `docs: define bulk material standardization workflow`，实际 SHA 以 Git log 为准 |
 | 当前根仓库运维基线 | `SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02` 验收提交为 `ops: accept operations material review queue fix`，以 `54f6480` 为 Parent，实际 SHA 以 Git log 为准。alpha.34/0034 最小 Web hotfix 已受控替换；此前公网 Origin、CSRF/logout、管理员、数据库凭据轮换和资源保护基线保持 |
-| Git 同步与工作区 | 本任务从 `main`/`78701d16`、behind 0/ahead 92、clean 起步；功能提交后 ahead 93，验收提交后预计 ahead 94。`shujvbiao/` 继续由 `.gitignore` 保护且未读取、修改或提交；未 push/PR/amend/rebase/reset/stash/restore，凭据、摘要、Cookie、Token、备份和业务数据未进入 Git |
+| Git 同步与工作区 | LANDING-TASK08 从 `main`/`9ffc383`、behind 0/ahead 94、clean 起步；独立提交后预计 ahead 95。`shujvbiao/` 继续由 `.gitignore` 保护且本任务未读取、修改或提交业务文件；未 push/PR/amend/rebase/reset/stash/restore，凭据、摘要、Cookie、Token、备份和业务数据未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码 migration 为 `0001`—`0035`，并行常驻 PostgreSQL 严格保持 34 个 migration、head `0034_supplier_receipt_lot_iqc.sql`。本任务未新增或修改 Migration，未在主库运行 0035；0035 SHA-256 仍为 `d64ec733bb937d8cde11d93d5370605fb7e754ffb0c93d2f9795c8d7b66c9714` |
-| 当前运行状态 | `https://43.135.157.211.nip.io:18888` 经 Caddy 可信 TLS 到 Web；公网仍由单值 `ERP_PUBLIC_ORIGIN` 精确固定。Web 为 alpha.34/0034 兼容 hotfix 镜像 `sha256:f31199de3b8...`，只绑定 `127.0.0.1:3000`；只重建 Web，PostgreSQL/Worker/Caddy 容器未重建。PostgreSQL/Web healthy，Worker/Caddy running，四服务 restart 0/OOM false |
+| 当前数据库 | 源码 migration 为 `0001`—`0035`，并行常驻 PostgreSQL 严格保持 34 个 migration、head `0034_supplier_receipt_lot_iqc.sql`。LANDING-TASK08 未连接数据库、未新增或修改 Migration、未在主库运行 0035；0035 SHA-256 仍为 `d64ec733bb937d8cde11d93d5370605fb7e754ffb0c93d2f9795c8d7b66c9714` |
+| 当前运行状态 | `https://43.135.157.211.nip.io:18888` 经 Caddy 可信 TLS 到 Web；公网仍由单值 `ERP_PUBLIC_ORIGIN` 精确固定。Web 为 alpha.34/0034 兼容 hotfix 镜像 `sha256:f31199de3b8...`，只绑定 `127.0.0.1:3000`。LANDING-TASK08 未 build/restart/deploy；PostgreSQL/Web healthy，Worker/Caddy running，四服务 restart 0/OOM false |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.35 源码新增可配置 BOM 物料规格治理候选层，尚未进入常驻运行面 |
-| 当前阶段 | `SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02` 已完成精确授权、隔离回归、备份恢复、alpha.34/0034 最小 Web hotfix 和 operations 浏览器只读验收；源码保持 alpha.35/0035，运行面保持 alpha.34/0034 |
-| 当前任务 | `OPERATIONS MATERIAL REVIEW QUEUE FIXED — UAT APPROVAL NOT EXECUTED`：533—536 对 operations 可见且详情/动作入口一致，正文不可编辑；四条仍未审批、未退回、未生成编码 |
-| 下一任务 | 本轮立即停止。独立 operations 审核试用、UAT 凭据轮换、0035 部署、历史物料修订、治理 UI、数据库导入和备份异机复制均需独立授权；因本轮工具输出发生会话内凭据材料显露，建议先轮换该 UAT 账号再开始黑盒审核试用 |
+| 当前阶段 | `SELFHOST-LANDING-TASK08` 已完成大批量、分批、跨对话可恢复的离线整理流程设计；源码/运行面仍保持 alpha.35/0035 与 alpha.34/0034，没有运行变化 |
+| 当前任务 | `BULK MATERIAL STANDARDIZATION PROCESS DESIGNED — GENERIC RUNNER NOT IMPLEMENTED`：SOP、总索引/批次卡/manifest 示例和 D-083 已完成 |
+| 下一任务 | 停止。推荐先独立实现通用批次执行器，再以 5—10 份代表性资料建立首批来源档案；实际资料处理、数据库导入、UAT 凭据轮换、0035 部署和生产动作均需独立授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
+- SELFHOST-LANDING-TASK08 发布大批量物料分批标准化 SOP V1：固定 `CYD-MATERIAL-13C-v1`、规则包、默认批次上限、一批一任务/一对话、结构指纹映射档案、私有总索引/批次卡/manifest、人工批准门禁、临时/批准两级汇总和跨对话指令；仅流程设计，通用执行器与新资料批次尚未开始
 - SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02 只为 operations 增加人工审核 queue/approve/reject 三项能力；队列、详情和按钮使用同一 PENDING_REVIEW 权威口径，工程创建人继续不可自审，正文不可代编辑。legacy 清洗入口明确退役，Dashboard 标注全局 DRAFT+PENDING_REVIEW。alpha.34/0034 最小 Web hotfix 已部署，Chromium 只读确认 533—536，未执行审核动作
 - SELFHOST-LANDING-TASK07 以 `moban.xlsx` 的 `原BOM -> Sheet1` 为真实行组转换示例，对全部来源分别输出同一 13 列标准页并合并为 591 行 `全部物料汇总`。模板 53/53 行证据与用量通过，591 行可追溯，94 条差异/缺项单列；57 行用量和 21 行板型不猜测，未写数据库、审核编码或部署
 - SELFHOST-LANDING-TASK06 以 `moban.xlsx` 第二张 `Sheet1` 为唯一整理标准，对 8 份来源的既有 root-only 分类证据生成 `内部物料库.xlsx`。532 个既有正式编码原样沿用；147 个来源候选、45 个模板候选和 1 个版本冲突保持待确认。953 条非归档来源及 53 条模板逐行可追溯；未写数据库、审核物料或部署
@@ -152,6 +153,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前未完成模块
 
+- 大批量流程的通用批次执行器、来源档案注册表、init/resume/validate/consolidate 命令和代表性试点尚未实现；当前 TASK07 脚本只能作为已知 8 份来源的参考，不得直接宣称支持所有公司资料
 - LANDING-TASK07 工作簿仍有 57 行单机用量和 21 行板型待人工补充，A200 4 处模板/旧版差异与 J587 标题版本冲突待业务确认；正式去重、内部编码、审核、数据库导入和下游 BOM 引用均未执行
 - `PENDING_APPROVAL` 兼容值的破坏性收缩尚未实施；必须在旧值计数为零、旧实例全部退出且取得生产授权后另建任务
 - break-glass 紧急审批、多节点会签和自动生产审计归档/清理调度尚未设计或实现
@@ -215,9 +217,11 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 39. `admin2` 的首次改密要求已按项目负责人明确指令作单账号豁免，当前密码继续有效。该例外不改变 D-045，也不提供通用豁免能力；其他新建/重置用户仍必须首次改密。当前凭据应继续按管理员秘密保管，未来如需轮换必须使用独立受控任务。
 40. LANDING-TASK07 的 591 行是按来源/BOM 上下文保留的离线明细，不是 591 个唯一正式物料；同一物料可跨板型重复出现，57 行用量和 21 行板型仍空白。不得跳过人工复核、稳定内部标识、单位/重复/替代关系和导入事务设计直接写库。
 41. 人工物料审核的权威集合固定为 `material_master.material_status='PENDING_REVIEW'`。operations 只有 queue/approve/reject 三项精确增量，不因此获得草稿代编辑、身份管理、系统审计或其他业务写权限；legacy 清洗队列不得复活或冒充人工审核。
+42. LANDING-TASK08 只定义流程，尚无通用执行器。新文件只有结构指纹命中已批准来源档案时才能直接套模板；未知布局必须先建立映射档案。临时汇总含待确认批次且不能入库，正式汇总也不等于已完成跨批去重、编码、单位、替代关系或数据库事务设计。
 
 ## 当前任务与下一任务
 
+- `SELFHOST-LANDING-TASK08` 已完成：大批量资料以后按 `CYD-MAT-YYYYMMDD-NNN/Rxxx` 一批一任务/一对话执行，以私有总索引和批次卡恢复，Codex 只推进到 `REVIEW_REQUIRED`，项目负责人批准后才进入已批准汇总。下一步不自动开始；通用执行器和 5—10 份代表性试点须分别授权。
 - `SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02` 已完成。功能提交 `54f6480` 精确增加 operations 审核三权限；alpha.34/0034 兼容 hotfix `sha256:f31199de3b8...` 只替换 Web。隔离 PostgreSQL、全套适用回归、备份恢复、候选 smoke 和真实 Chromium 只读验收通过；533—536 仍是 PENDING_REVIEW/V2/MANUAL/PCS/空编码，APPROVE/REJECT 三类证据计数为 0。
 - `SELFHOST-LANDING-TASK07` 已完成：模板 53/53 行组和用量核对通过，8 张来源标准页合并为 591 行总表并提供 591 行追溯、94 条异常和 GPT 下载副本。当前停止在离线人工审阅；数据库导入、编码/审核、0035 部署或任何生产动作均需独立授权。
 - `SELFHOST-OPS-UAT-BLOCKER-FIX` 已完成。真实浏览器回环 Origin 以前与唯一公网 Origin 不匹配，两个前端又吞掉 logout 403；现只有显式 UAT 类别可使用严格双端 loopback，生产仍精确 HTTPS，两个页面复用服务端撤销型 POST logout 并显示失败。临时 manager 已创建、验证并页面停用，两个旧 Session 均为 `REVOKED`，成功审计和重新登录通过。

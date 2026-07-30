@@ -2,6 +2,22 @@
 
 最后更新时间：2026-07-30（Asia/Shanghai）
 
+## SELFHOST-LANDING-TASK08 大批量物料分批与跨对话流程
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / DOCS-ONLY PROCESS DESIGNED | `BULK MATERIAL STANDARDIZATION PROCESS DESIGNED — GENERIC RUNNER NOT IMPLEMENTED` |
+| 模板/规则 | FROZEN V1 | `CYD-MATERIAL-13C-v1` 绑定 `moban.xlsx` SHA 与 13 列；`CYD-MATERIAL-NORMALIZATION-v1`。变化必须新版本，不覆盖旧结果 |
+| 批次边界 | DEFINED | `CYD-MAT-YYYYMMDD-NNN/Rxxx`；默认最多 10 文件、5,000 候选行、100 MiB，异常/超限文件独立批次 |
+| 来源档案 | FAIL CLOSED | 结构指纹命中已批准档案才复用；未知布局进入 `PROFILE_PENDING`，文件名相似不能替代结构证据 |
+| 状态/恢复 | PASS | 私有总索引+batch-card+manifest+决定日志；每批只有一个 `checkpoint.next_action`，新对话不依赖旧聊天 |
+| 审核/汇总 | HUMAN GATED | Codex 最高到 `REVIEW_REQUIRED`；项目负责人批准后才进批准汇总。临时汇总禁止入库，批准汇总仍不等于主数据去重/编码完成 |
+| 示例/决策 | PASS | SOP、3 份合法 JSON 示例、README 入口和 D-083 完成；实际业务实例 root-only，不进入 Git |
+| 自动验证 | PASS | JSON 3/3、文档一致性、Python self-test/smoke/临时 go-live、Node 3/3、lint 0 error、credentials 1,083 文件和 diff/scope 检查通过 |
+| 数据/运行边界 | UNCHANGED | 未读取新业务文件、修改 TASK07 输出、实现通用执行器、连接数据库、运行 Migration/build/restart/deploy；四服务未重建、restart 0/OOM false |
+| 资源/清理 | PASS | 检查时约 2.1 GiB available、Swap 98 MiB、根盘 31 GiB、Load `0.06/0.11/0.15`；最终约 2.0 GiB/98 MiB/31 GiB/`0.04/0.11/0.15`。临时 SQLite 和测试容器已清理 |
+| Git | PASS | 只含流程、无业务数据 JSON 示例和脱敏治理文档；未 push/PR |
+
 ## SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02 operations 人工物料审核队列修复
 
 | 验证项 | 结果 | 说明 |

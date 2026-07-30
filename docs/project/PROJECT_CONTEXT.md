@@ -31,11 +31,12 @@
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
 - 发布标识：包名为 `chenyida-erp-selfhosted`；源码为 `0.1.0-alpha.35`/`0035`，当前受控公网运行面仍为 `0.1.0-alpha.34`/`0034`。0035 未应用，alpha.35 未 build/restart/deploy。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.35`。
-- Git 复核：SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02 从本地 `main`/HEAD `78701d16`、behind 0/ahead 92、clean 起步；功能提交 `54f648051a8454b022a6f12c41fe3f1558875a7c` 的 Parent 为 `78701d16`，验收提交为本文所在的 `ops: accept operations material review queue fix`。`shujvbiao/` 始终由 `.gitignore` 保护且未读取、修改或提交；未 push/PR/amend/rebase/reset/stash/restore。
+- Git 复核：LANDING-TASK08 从本地 `main`/HEAD `9ffc383`、behind 0/ahead 94、clean 起步；独立提交消息为 `docs: define bulk material standardization workflow`，实际 SHA 以 Git log 为准。`shujvbiao/` 由 `.gitignore` 保护且本任务未读取、修改或提交业务文件；未 push/PR/amend/rebase/reset/stash/restore。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
 - 离线内部物料库：LANDING-TASK06 以 `moban.xlsx` 第一张 `原BOM` 只作对照、第二张 `Sheet1` 作为唯一 13 列标准；复用 LANDING-TASK02 root-only 证据生成 724 行内部物料库、997 行标准明细、484 行待确认和 1,006 行来源映射。532 个正式编码只沿用既有结果；147 个来源候选、45 个模板候选不配码，另保留 1 个来源版本冲突。结果为 root-only 工作簿，未导入任何数据库。
 - 逐表标准化交付：LANDING-TASK07 进一步按项目负责人澄清，把 `moban.xlsx` 第一张作为真实原始数据、第二张作为整理目标，验证 53/53 行组规格证据和用量后逐来源整理。结果含 591 行总表、8 张来源标准页、591 行追溯和 94 条异常；57 行未知用量、21 行未知板型留空，A118 精确重复区段只计一次，A200 同逻辑旧版按模板优先。未导入任何数据库。
+- 大批量跨对话流程：LANDING-TASK08 固定 `CYD-MATERIAL-13C-v1`、`CYD-MATERIAL-NORMALIZATION-v1`、`CYD-MAT-YYYYMMDD-NNN/Rxxx` 和默认 10 文件/5,000 行/100 MiB 上限；私有总索引、批次卡、来源 manifest 与 `checkpoint.next_action` 是恢复权威。已知结构按版本化来源档案复用，未知结构先确认；Codex 不能自行批准批次，临时汇总不得入库。通用执行器和代表性试点尚未实现。
 - V9 重导入 staging：LANDING-TASK05 对单个 SHA 绑定 XLSX 解析 197 行；编码唯一连续、来源完整，但显式单位 0，产品/BOM 结构字段 0。恢复库首次 staged 197、重放新增 0，全部 review；5,556 条拟删除计划未执行，主库 213 表计数完全不变。
 - 第二管理员与 UAT 临时账号：`admin2` 仍为 active admin、version 3、`must_change_password=false`。UAT-BLOCKER-FIX 仅新增唯一临时 manager 并在浏览器验收后通过页面停用；最终用户/active admin `3/2`、Session/有效 `14/5`、Audit `920`，Material/Product/BOM/BOM Line 保持 `532/6/6/316`。临时账号未用于业务试用，现有管理员未修改。
 - 单账号豁免：SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 采用 serializable 事务、任务 advisory lock、行锁和 version 2 CAS，把账号更新与唯一 `USER_FIRST_PASSWORD_CHANGE_WAIVED/success` 审计同事务提交；同任务重放 no-op。现有有效 Session 保留，D-045 全局新建/重置用户强制首次改密策略与 API 不变。
@@ -62,6 +63,7 @@
 - LANDING-TASK06 只执行轻量离线 Excel/CSV/JSON 处理及串行测试；Node 检查使用一次一个、断网、只读、1 CPU/1 GiB 的自动删除容器。起点/最终 available 均约 2.4 GiB、Swap 47 MiB、根盘 33 GiB，最终 Load `0.79/0.67/0.50`；四服务 restart 0/OOM false、内核 OOM 0。探查进程、测试容器和临时 SQLite 目录均已清理，四卷保持。
 - LANDING-TASK07 只执行轻量离线 XLS/XLSX 解析、工作簿生成和串行测试；Node 检查同样限制为一次一个、断网、只读、1 CPU/1 GiB 的自动删除容器。起点约 2.4 GiB available、Swap 47 MiB、根盘 33 GiB、Load `0.36/0.24/0.17`；最终约 2.3 GiB/47 MiB/33 GiB/`0.34/0.69/0.56`。四服务未重建且 restart 0/OOM false，任务时段内核 OOM 0，四卷保持。
 - OPS-UAT-MATERIAL-REVIEW-FIX-02 的 PostgreSQL 测试、build、备份恢复、candidate smoke、Web 替换和 Chromium 验收严格串行，一次仅一个临时容器。起点约 2.3 GiB available、Swap 47 MiB、根盘 33 GiB；最终 2,307,512 KiB available、66,456 KiB Swap used、根盘 31 GiB、Load `0.16/0.42/0.47`，112 秒 Swap 增长 0，未触发门禁。四服务 restart 0/OOM false、任务时段内核 OOM 0；只替换 Web，临时数据库/容器/worktree/runner 清理，备份和明确回滚镜像保留，四卷 metadata 不变。
+- LANDING-TASK08 只编写大批量物料分批 SOP、三份无业务数据 JSON 示例和治理文档；不读取 `shujvbiao/`，不运行 build、数据库测试、Migration 或部署。检查时约 2.1 GiB available、Swap 98 MiB、根盘 31 GiB、Load `0.06/0.11/0.15`；最终约 2.0 GiB/98 MiB/31 GiB/`0.04/0.11/0.15`。Python 临时 SQLite 和 Node 只读测试容器已清理，四服务 restart 0/OOM false，四卷保持。
 
 ### 治理资料
 

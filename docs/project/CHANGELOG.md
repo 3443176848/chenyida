@@ -4,6 +4,14 @@
 
 ## 2026-07-30
 
+### SELFHOST-LANDING-TASK08 - `docs: define bulk material standardization workflow`
+
+- 流程：把 TASK07 固化为一批一任务/一对话的大批量 SOP；固定 `CYD-MATERIAL-13C-v1`、规则包、`CYD-MAT-YYYYMMDD-NNN/Rxxx`、默认 10 文件/5,000 行/100 MiB 上限和超限拆分规则。
+- 恢复：定义 root-only 私有总索引、来源 manifest、批次卡、追加式决定日志和唯一 `checkpoint.next_action`；提供三份合法 JSON 示例与新建/继续/批准批次的复制指令，新对话不依赖旧聊天。
+- 映射/审核：已知结构必须命中版本化来源档案，未知布局进入 `PROFILE_PENDING`；Codex 最高推进到 `REVIEW_REQUIRED`，项目负责人明确批准批次/修订/输出摘要后才能进入批准汇总。
+- 汇总边界：临时汇总允许含机器验证的待确认批次但禁止入库；批准汇总只拼接最新未取代批准批次，仍不执行跨批模糊去重、正式编码、单位/供应商/替代关系审批或数据库写入。D-083 已记录。
+- 验证/范围：JSON 3/3、文档一致性、Python 三项、Node 3/3、lint、credentials 1,083 文件和 diff/scope 检查通过；仅文档和无业务数据示例，未读取新业务文件、实现通用执行器、连接数据库、运行 Migration、build/restart/deploy、push 或 PR。
+
 ### SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02 - `fix: authorize operations material review queue` / `ops: accept operations material review queue fix`
 
 - 权限/口径：`operations` 静态权限只增加 `material.review.queue`、`material.review.approve`、`material.review.reject`，没有草稿代编辑、admin/身份、系统审计或其他业务写增量。人工队列继续以 `material_status=PENDING_REVIEW` 为权威；engineering 创建人不可自审，无关角色返回稳定 403 中文错误。
