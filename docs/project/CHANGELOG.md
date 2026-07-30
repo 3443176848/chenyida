@@ -4,6 +4,14 @@
 
 ## 2026-07-30
 
+### SELFHOST-LANDING-TASK07 - `feat: standardize source material workbooks`
+
+- 语义纠正：按项目负责人澄清，以 `moban.xlsx` 第一张 `原BOM` 为真实原始数据、第二张 `Sheet1` 为目标格式；53 个原始主料组与 53 个目标行的规格证据、上下文和用量全部自动核对通过。
+- 离线整理：8 份来源分别生成同一 13 列标准页，再合并为 591 行 `全部物料汇总`；另有 591 行来源追溯、94 条异常和来源说明。A118 42 行完全重复区段只计一次；A200 同逻辑旧版不重复计入，4 处差异按模板优先保留证据。
+- 缺项边界：57 行无可验证用量、21 行无可证明板型，均留空；供应商仅取模板或来源明确供应商列。9 条 PCB/PCBA/空板本体依模板排除，J587 文件名/表内版本冲突保留人工确认，不猜测库存、订单或正式编码。
+- 输出/验证：root-only 工作簿 197,821 bytes、SHA `aeea74c2...1c91`；专项 7/7、既有回归 3/3、Python 三项、Node 3/3、lint、credentials 1,076 文件、ZIP/openpyxl/13 列/2,364 公式及来源摘要不变全部通过。
+- 边界：业务文件、逐行报告和 GPT 下载副本均在仓库外；未连接或写 PostgreSQL/SQLite/D1，未改 Schema/Migration/API/UI/Compose，未 build/restart/deploy、push 或 PR。
+
 ### SELFHOST-LANDING-TASK06 - `feat: add guarded internal material library export`
 
 - 模板：项目负责人确认 `moban.xlsx` 第一张 `原BOM` 仅作原版对照，第二张 `Sheet1` 为整理后标准；导出器固定验证其首行 13 列，并把后续分段的列位变化统一映射回标准列。

@@ -39,24 +39,25 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 源码为 `0.1.0-alpha.35` / PostgreSQL migration head `0035_bom_material_governance.sql`；当前常驻运行环境仍为 `0.1.0-alpha.34` / `0034_supplier_receipt_lot_iqc.sql`。0035 未应用、alpha.35 未部署；新 ERP 已有受控公网 HTTPS 入口，不因入口开放而自动视为正式投产完成 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | 运行时功能仍以 `SELFHOST-PHASE6-TASK01` 的 `feat: add BOM material governance pipeline` 为最新源码基线；`SELFHOST-LANDING-TASK06` 只新增离线导出器/测试/文档，独立提交消息为 `feat: add guarded internal material library export`，实际 SHA 以 Git log 为准；TASK10 及既有验收历史不改写 |
+| 当前根仓库功能基线提交 | 运行时功能仍以 `SELFHOST-PHASE6-TASK01` 的 `feat: add BOM material governance pipeline` 为最新源码基线；`SELFHOST-LANDING-TASK07` 只新增逐表标准化离线导出器/测试/文档，独立提交消息为 `feat: standardize source material workbooks`，实际 SHA 以 Git log 为准；TASK10 及既有验收历史不改写 |
 | 当前根仓库运维基线 | `SELFHOST-OPS-UAT-BLOCKER-FIX` 代码提交 `dfa30bf7575a4cd3d06756a626480ca20204cec6`，Parent `5fc1266b70f57e1c5d44464f14f2a615dbeab3e4`；文档/验收记录以该提交为 Parent 独立提交。此前公网 Origin、管理员、数据库凭据轮换和资源保护基线保持不变 |
-| Git 同步与工作区 | LANDING-TASK06 起点为本地 `main`/`6105dda`、behind 0/ahead 90，唯一未跟踪业务目录为 `shujvbiao/`；用户本任务明确授权只读处理。目录现由 `.gitignore` 保护，8 份来源、模板和生成工作簿均未暂存或提交；独立任务提交后 ahead 91。未 push/PR/改写历史，密码、摘要、Cookie、Token、凭据、备份和业务数据未进入 Git |
+| Git 同步与工作区 | LANDING-TASK07 基于本地 `main`/`0959b63`、behind 0/ahead 91；`shujvbiao/` 继续由 `.gitignore` 保护，8 份来源、模板、结果工作簿和逐行业务报告均未暂存或提交。独立任务提交后预计 ahead 92；两个并行出现且不属于本交付的未跟踪脚本/测试保持原样并排除出提交。未 push/PR/改写历史，密码、摘要、Cookie、Token、凭据、备份和业务数据未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码 migration 为 `0001`—`0035`，并行常驻 PostgreSQL 仍为 `0001`—`0034`。LANDING-TASK06 没有连接 PostgreSQL/SQLite/D1，没有新增、修改或运行 Migration；数据库计数沿用上一已验证快照，不把离线工作簿冒充已入库 |
-| 当前运行状态 | `https://43.135.157.211.nip.io:18888` 经 Caddy 可信 TLS 到 Web；公网仍由单值 `ERP_PUBLIC_ORIGIN` 精确固定。Web 为基于 alpha.34 的身份/退出 hotfix 镜像 `sha256:273aa687e741...`，仍只绑定 `127.0.0.1:3000`；PostgreSQL 无宿主端口。LANDING-TASK06 仅只读核对容器，PostgreSQL/Web/Worker/Caddy 最终 healthy/healthy/running/running、restart 0/OOM false，未 build/restart/deploy |
+| 当前数据库 | 源码 migration 为 `0001`—`0035`，并行常驻 PostgreSQL 仍为 `0001`—`0034`。LANDING-TASK07 没有连接 PostgreSQL/SQLite/D1，没有新增、修改或运行 Migration；数据库计数沿用上一已验证快照，不把离线工作簿冒充已入库 |
+| 当前运行状态 | `https://43.135.157.211.nip.io:18888` 经 Caddy 可信 TLS 到 Web；公网仍由单值 `ERP_PUBLIC_ORIGIN` 精确固定。Web 为基于 alpha.34 的身份/退出 hotfix 镜像 `sha256:273aa687e741...`，仍只绑定 `127.0.0.1:3000`；PostgreSQL 无宿主端口。LANDING-TASK07 仅只读核对容器，PostgreSQL/Web/Worker/Caddy 保持 healthy/healthy/running/running、restart 0/OOM false，未 build/restart/deploy |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.35 源码新增可配置 BOM 物料规格治理候选层，尚未进入常驻运行面 |
-| 当前阶段 | `SELFHOST-LANDING-TASK06` 已完成离线内部物料库整理；常驻 Web/数据库/Worker 仍为 alpha.34/0034，源码仍为 alpha.35/0035，运行面没有变化 |
-| 当前任务 | `SELFHOST-LANDING-TASK06` 已 `OFFLINE INTERNAL MATERIAL LIBRARY CREATED — REVIEW REQUIRED`：生成 724 行内部物料库、997 行标准明细、484 行待确认和 1,006 行来源映射；工作簿不等于正式入库 |
-| 下一任务 | 停止。只有项目负责人审阅 147 个来源候选、45 个模板候选和 1 个版本冲突并另行授权后，才能设计数据库导入；0035 部署、历史物料修订、治理 UI、公司域名和备份异机复制也仍需独立任务与授权 |
+| 当前阶段 | `SELFHOST-LANDING-TASK07` 已完成逐表标准化离线工作簿；常驻 Web/数据库/Worker 仍为 alpha.34/0034，源码仍为 alpha.35/0035，运行面没有变化 |
+| 当前任务 | `SELFHOST-LANDING-TASK07` `DONE / OFFLINE WORKBOOK / REVIEW REQUIRED`：591 行汇总、8 张逐来源标准表、591 行追溯和 94 条异常已交付，数据库尚未导入 |
+| 下一任务 | 停止在可下载工作簿和人工审阅；数据库导入、0035 部署、历史物料修订、治理 UI、公司域名和备份异机复制均需独立任务与授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
+- SELFHOST-LANDING-TASK07 以 `moban.xlsx` 的 `原BOM -> Sheet1` 为真实行组转换示例，对全部来源分别输出同一 13 列标准页并合并为 591 行 `全部物料汇总`。模板 53/53 行证据与用量通过，591 行可追溯，94 条差异/缺项单列；57 行用量和 21 行板型不猜测，未写数据库、审核编码或部署
 - SELFHOST-LANDING-TASK06 以 `moban.xlsx` 第二张 `Sheet1` 为唯一整理标准，对 8 份来源的既有 root-only 分类证据生成 `内部物料库.xlsx`。532 个既有正式编码原样沿用；147 个来源候选、45 个模板候选和 1 个版本冲突保持待确认。953 条非归档来源及 53 条模板逐行可追溯；未写数据库、审核物料或部署
 - SELFHOST-OPS-UAT-BLOCKER-FIX 以显式 UAT deployment class 和严格双端 loopback 判断兼容 SSH/浏览器转发，生产继续只接受精确可信 HTTPS Origin；经营/兼容工作台统一安全 POST logout、失败可见。隔离回归、alpha.34 API smoke、备份恢复及真实 Chromium 创建临时 manager、双入口 Session 撤销/成功审计/重新登录/页面停用均通过，未运行 Migration 或开始角色试用
 - SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 根据项目负责人明确授权，仅为 `admin2` 清除 must-change 并以 CAS 把 version 2→3；密码二次指纹与合法 Session 不变，新增唯一专用 Identity Audit，重放 no-op。D-045 全局新建/重置用户强制首次改密策略和 API 均未修改
@@ -150,6 +151,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前未完成模块
 
+- LANDING-TASK07 工作簿仍有 57 行单机用量和 21 行板型待人工补充，A200 4 处模板/旧版差异与 J587 标题版本冲突待业务确认；正式去重、内部编码、审核、数据库导入和下游 BOM 引用均未执行
 - `PENDING_APPROVAL` 兼容值的破坏性收缩尚未实施；必须在旧值计数为零、旧实例全部退出且取得生产授权后另建任务
 - break-glass 紧急审批、多节点会签和自动生产审计归档/清理调度尚未设计或实现
 - 在线导入中心的真实样本 Sheet/表头/字段召回率、规格提取误判率、逐行冲突人工处置和大规模查询容量验收
@@ -210,9 +212,11 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 37. 0035 提升了治理相关 metadata 的精度和必填边界，但不猜测回填已有正式物料。任一同治理大类、无法安全重建完整身份的旧正式行都会阻止新建稿/批准；这是防止一物多码的安全门禁，不是旧数据已修复。必须另立受控修订与重新治理任务，不得放宽或绕过。
 38. Caddy TLS 终止后的写请求必须以显式 `ERP_PUBLIC_ORIGIN` 校验浏览器 Origin，不能直接拿代理后的内部 HTTP `Request.url` 比较，也不能信任客户端可伪造的 `Forwarded`/`X-Forwarded-*`。当前只允许 `https://43.135.157.211.nip.io:18888`；切换公司域名时必须同步受控更新该单值配置。
 39. `admin2` 的首次改密要求已按项目负责人明确指令作单账号豁免，当前密码继续有效。该例外不改变 D-045，也不提供通用豁免能力；其他新建/重置用户仍必须首次改密。当前凭据应继续按管理员秘密保管，未来如需轮换必须使用独立受控任务。
+40. LANDING-TASK07 的 591 行是按来源/BOM 上下文保留的离线明细，不是 591 个唯一正式物料；同一物料可跨板型重复出现，57 行用量和 21 行板型仍空白。不得跳过人工复核、稳定内部标识、单位/重复/替代关系和导入事务设计直接写库。
 
 ## 当前任务与下一任务
 
+- `SELFHOST-LANDING-TASK07` 已完成：模板 53/53 行组和用量核对通过，8 张来源标准页合并为 591 行总表并提供 591 行追溯、94 条异常和 GPT 下载副本。当前停止在离线人工审阅；数据库导入、编码/审核、0035 部署或任何生产动作均需独立授权。
 - `SELFHOST-OPS-UAT-BLOCKER-FIX` 已完成。真实浏览器回环 Origin 以前与唯一公网 Origin 不匹配，两个前端又吞掉 logout 403；现只有显式 UAT 类别可使用严格双端 loopback，生产仍精确 HTTPS，两个页面复用服务端撤销型 POST logout 并显示失败。临时 manager 已创建、验证并页面停用，两个旧 Session 均为 `REVOKED`，成功审计和重新登录通过。
 - `SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06` 已在单一 serializable 事务中完成 `admin2` must-change `true→false`、version `2→3` 与专用 Identity Audit；密码二次指纹、Session `3/1`、权限和全局策略不变，同任务重放为 no-op。
 - `SELFHOST-OPS-TRUSTED-ORIGIN-05` 已部署 alpha.34 最小 Web hotfix。合法公网 HTTPS Origin 的无凭据 `/api/me/password` 验收进入 `AUTH_REQUIRED`，不再返回来源校验失败；错误/缺失 Origin、错误 CSRF Token 和内部 HTTP Origin 在单元/隔离 PostgreSQL 测试中继续 fail closed。

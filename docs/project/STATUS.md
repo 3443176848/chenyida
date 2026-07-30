@@ -2,6 +2,21 @@
 
 最后更新时间：2026-07-30（Asia/Shanghai）
 
+## SELFHOST-LANDING-TASK07 按原始模板逐表标准化并汇总
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / OFFLINE WORKBOOK / REVIEW REQUIRED | `OFFLINE STANDARDIZED BOM WORKBOOK CREATED — REVIEW REQUIRED`；工作簿供人工审阅和后续独立数据库导入，不代表已入库或生效 |
+| 模板合同 | PASS | `moban.xlsx` 第一张 `原BOM` 为真实原始数据、第二张 `Sheet1` 为目标；53/53 主料组规格证据、上下文和用量匹配，40 条备选折叠、2 条板件本体按模板排除 |
+| 标准明细 | 591 | 1928C 22、A118 233、A200 BOM 53、A200 物料清单 57、A200 注意事项 0、G20-G15G 56、J587 46、V700 124；8 张逐来源页后合并到一张总表 |
+| 追溯/替代 | PASS | 来源追溯 591/591；150 行带替代料。A118 一个 42 行完全重复区段只保留一次并留异常证据，不做跨项目/板型模糊去重 |
+| 待确认 | 94 | 用量待确认 57、板型待确认 21、板件本体排除 9、A200 模板/旧版差异 4、说明档 1、J587 版本冲突 1、A118 重复区段 1 |
+| 工作簿安全 | PASS | 2,364 个受控需求/购买公式；ZIP/openpyxl/13 列合同通过，宏/外链/电话样式/敏感连接或凭据 0；输出 197,821 bytes、0600、SHA `aeea74c2...1c91` |
+| 自动验证 | PASS | 专项 7/7、既有回归 3/3、py_compile、Python self-test/smoke/临时 go-live、Node 3/3、lint 0 error、credentials 1,076 文件通过 |
+| 数据/运行边界 | UNCHANGED | 未连接或写 PostgreSQL/SQLite/D1，未运行 Migration/build/restart/deploy；四服务未重建、restart 0/OOM false，四卷保持 |
+| 资源/清理 | PASS | 起点约 2.4 GiB available、Swap 47 MiB、根盘 33 GiB、Load `0.36/0.24/0.17`；最终约 2.3 GiB/47 MiB/33 GiB/`0.34/0.69/0.56`。临时 SQLite 已清理，任务测试容器自动删除，内核 OOM 0 |
+| Git/下载 | PASS | Git 只含通用工具、合成测试和脱敏文档；业务工作簿未提交。GPT 下载副本与工作文件 SHA 一致，未 push/PR |
+
 ## SELFHOST-LANDING-TASK06 按整理后模板生成内部物料库
 
 | 验证项 | 结果 | 说明 |
