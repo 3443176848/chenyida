@@ -33,30 +33,31 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-07-29（Asia/Shanghai）
+快照时间：2026-07-30（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
 | 当前版本 | 源码为 `0.1.0-alpha.35` / PostgreSQL migration head `0035_bom_material_governance.sql`；当前常驻运行环境仍为 `0.1.0-alpha.34` / `0034_supplier_receipt_lot_iqc.sql`。0035 未应用、alpha.35 未部署；新 ERP 已有受控公网 HTTPS 入口，不因入口开放而自动视为正式投产完成 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-PHASE6-TASK01` 以 `3025443` 为 Parent，独立提交消息为 `feat: add BOM material governance pipeline`，实际 SHA 以 Git log 为准；TASK10 功能提交 `a10264020738d5ff281db9a6f7b6774df8cbb61b` 及既有验收历史不改写 |
+| 当前根仓库功能基线提交 | 运行时功能仍以 `SELFHOST-PHASE6-TASK01` 的 `feat: add BOM material governance pipeline` 为最新源码基线；`SELFHOST-LANDING-TASK06` 只新增离线导出器/测试/文档，独立提交消息为 `feat: add guarded internal material library export`，实际 SHA 以 Git log 为准；TASK10 及既有验收历史不改写 |
 | 当前根仓库运维基线 | `SELFHOST-OPS-UAT-BLOCKER-FIX` 代码提交 `dfa30bf7575a4cd3d06756a626480ca20204cec6`，Parent `5fc1266b70f57e1c5d44464f14f2a615dbeab3e4`；文档/验收记录以该提交为 Parent 独立提交。此前公网 Origin、管理员、数据库凭据轮换和资源保护基线保持不变 |
-| Git 同步与工作区 | 任务起点为本地 `main`/`5fc1266b70f57e1c5d44464f14f2a615dbeab3e4`、behind 0/ahead 88、tracked clean；代码提交后 ahead 89，文档提交完成后 ahead 90。未 push/PR/改写历史；受保护未跟踪 `shujvbiao/` 未修改、暂存、打开或提交，密码、摘要、Cookie、Token、凭据、备份和业务数据未进入 Git |
+| Git 同步与工作区 | LANDING-TASK06 起点为本地 `main`/`6105dda`、behind 0/ahead 90，唯一未跟踪业务目录为 `shujvbiao/`；用户本任务明确授权只读处理。目录现由 `.gitignore` 保护，8 份来源、模板和生成工作簿均未暂存或提交；独立任务提交后 ahead 91。未 push/PR/改写历史，密码、摘要、Cookie、Token、凭据、备份和业务数据未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码 migration 为 `0001`—`0035`，并行常驻 PostgreSQL 仍为 `0001`—`0034`；本任务没有新增、修改或运行 Migration。当前用户/active admin `3/2`；唯一 UAT 临时 manager 已通过页面停用。Session/有效 `14/5`，Audit `920`；部署后 908—920 全部为成功身份审计。Material/Product/BOM/Line 仍为 `532/6/6/316`，交易事实 0 |
-| 当前运行状态 | `https://43.135.157.211.nip.io:18888` 经 Caddy 可信 TLS 到 Web；公网仍由单值 `ERP_PUBLIC_ORIGIN` 精确固定。仅在显式 UAT deployment class 下额外接受双端严格 loopback Origin，不信任代理头；生产类别不能启用。Web 为基于 alpha.34 的身份/退出 hotfix 镜像 `sha256:273aa687e741...`，仍只绑定 `127.0.0.1:3000`；PostgreSQL 无宿主端口。PostgreSQL/Web/Worker/Caddy 为 healthy/healthy/running/running、restart 0/OOM false；只重建 Web，PostgreSQL、Worker、Caddy 保持 |
+| 当前数据库 | 源码 migration 为 `0001`—`0035`，并行常驻 PostgreSQL 仍为 `0001`—`0034`。LANDING-TASK06 没有连接 PostgreSQL/SQLite/D1，没有新增、修改或运行 Migration；数据库计数沿用上一已验证快照，不把离线工作簿冒充已入库 |
+| 当前运行状态 | `https://43.135.157.211.nip.io:18888` 经 Caddy 可信 TLS 到 Web；公网仍由单值 `ERP_PUBLIC_ORIGIN` 精确固定。Web 为基于 alpha.34 的身份/退出 hotfix 镜像 `sha256:273aa687e741...`，仍只绑定 `127.0.0.1:3000`；PostgreSQL 无宿主端口。LANDING-TASK06 仅只读核对容器，PostgreSQL/Web/Worker/Caddy 最终 healthy/healthy/running/running、restart 0/OOM false，未 build/restart/deploy |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.35 源码新增可配置 BOM 物料规格治理候选层，尚未进入常驻运行面 |
-| 当前阶段 | `SELFHOST-OPS-UAT-BLOCKER-FIX` 已完成；常驻 Web 为 alpha.34 身份/退出聚焦 hotfix，数据库/Worker 保持 alpha.34/0034，源码仍为 alpha.35/0035 |
-| 当前任务 | `SELFHOST-OPS-UAT-BLOCKER-FIX` 已 `ADMIN IDENTITY CSRF AND LOGOUT BLOCKERS FIXED IN PARALLEL ENVIRONMENT`；真实 Chromium 创建用户、两个 logout、Session 撤销、审计、停用和重新登录均验收通过 |
-| 下一任务 | 停止，不开始 manager 或其他角色业务试用。V9 单位/BOM 契约、0035 部署、历史物料修订、治理 UI、公司域名和备份异机复制仍需独立任务与授权 |
+| 当前阶段 | `SELFHOST-LANDING-TASK06` 已完成离线内部物料库整理；常驻 Web/数据库/Worker 仍为 alpha.34/0034，源码仍为 alpha.35/0035，运行面没有变化 |
+| 当前任务 | `SELFHOST-LANDING-TASK06` 已 `OFFLINE INTERNAL MATERIAL LIBRARY CREATED — REVIEW REQUIRED`：生成 724 行内部物料库、997 行标准明细、484 行待确认和 1,006 行来源映射；工作簿不等于正式入库 |
+| 下一任务 | 停止。只有项目负责人审阅 147 个来源候选、45 个模板候选和 1 个版本冲突并另行授权后，才能设计数据库导入；0035 部署、历史物料修订、治理 UI、公司域名和备份异机复制也仍需独立任务与授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
+- SELFHOST-LANDING-TASK06 以 `moban.xlsx` 第二张 `Sheet1` 为唯一整理标准，对 8 份来源的既有 root-only 分类证据生成 `内部物料库.xlsx`。532 个既有正式编码原样沿用；147 个来源候选、45 个模板候选和 1 个版本冲突保持待确认。953 条非归档来源及 53 条模板逐行可追溯；未写数据库、审核物料或部署
 - SELFHOST-OPS-UAT-BLOCKER-FIX 以显式 UAT deployment class 和严格双端 loopback 判断兼容 SSH/浏览器转发，生产继续只接受精确可信 HTTPS Origin；经营/兼容工作台统一安全 POST logout、失败可见。隔离回归、alpha.34 API smoke、备份恢复及真实 Chromium 创建临时 manager、双入口 Session 撤销/成功审计/重新登录/页面停用均通过，未运行 Migration 或开始角色试用
 - SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 根据项目负责人明确授权，仅为 `admin2` 清除 must-change 并以 CAS 把 version 2→3；密码二次指纹与合法 Session 不变，新增唯一专用 Identity Audit，重放 no-op。D-045 全局新建/重置用户强制首次改密策略和 API 均未修改
 - SELFHOST-OPS-TRUSTED-ORIGIN-05 用规范化、单值 `ERP_PUBLIC_ORIGIN` 修复 TLS 终止后浏览器 HTTPS Origin 与 Web 内部 HTTP URL 不一致的误拦截；不信任任意转发头，Cookie/Header CSRF 双提交、Session、幂等和审计保持。基于 alpha.34 的最小 Web hotfix 已部署，0035 未应用

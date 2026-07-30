@@ -1,6 +1,22 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-29（Asia/Shanghai）
+最后更新时间：2026-07-30（Asia/Shanghai）
+
+## SELFHOST-LANDING-TASK06 按整理后模板生成内部物料库
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DONE / OFFLINE EXPORT / REVIEW REQUIRED | `OFFLINE INTERNAL MATERIAL LIBRARY CREATED — REVIEW REQUIRED`；结果是离线审核工作簿，不是数据库入库或生产生效 |
+| 模板合同 | PASS | `moban.xlsx` 第一张 `原BOM` 仅对照，第二张 `Sheet1` 为唯一标准；首行 13 列逐字匹配，后续分段错位已归一 |
+| 输入完整性 | PASS / UNCHANGED | 8 份来源/13 Sheet/1,113 行与 LANDING-TASK02 manifest 完全一致；源文件和模板前后 filename/size/inode/mode/uid/gid/mtime/SHA 无变化 |
+| 内部物料库 | 724 / REVIEW REQUIRED | 532 个既有正式编码、147 个来源隔离候选、45 个模板隔离候选；正式编码唯一，候选正式编码为空，不做模糊归并或新编码 |
+| 标准明细/追溯 | PASS | 997 条标准BOM明细，项目/板型/内部型号/规格空值 0；1,006 条来源映射覆盖 953 条非归档来源+53 条模板。未知用量留空，110 个未知内部型号明确“待确认” |
+| 待确认 | 484 | 438 条来源分类问题、45 条模板严格关联问题、1 条文件名/表内标题版本冲突；物料身份 147、BOM 数量/结构 291 |
+| 工作簿安全 | PASS | 1,994 个受控需求/购买公式；宏/外链/电话样式/敏感连接或凭据均 0，ZIP/openpyxl 重开通过；输出 345,691 bytes、0600、SHA `01d0239a...5fa0` |
+| 自动验证 | PASS | 专项+classifier 7/7、py_compile、Python self-test/smoke/临时 go-live、Node 3/3、lint 0 error/8 既有 warning、最终 credentials 1,070 文件、diff/scope 检查通过 |
+| 数据/运行边界 | UNCHANGED | 未连接 PostgreSQL/SQLite/D1，未运行 Migration、build/restart/deploy；四服务最终 healthy/healthy/running/running，restart 0/OOM false，四卷保持 |
+| 资源/清理 | PASS | 起点/最终 available 约 2.4 GiB、Swap 47 MiB、根盘 33 GiB；最终 Load `0.79/0.67/0.50`、内核 OOM 0。探查进程、Node 容器和临时 SQLite 目录无残留 |
+| Git/保密 | PASS | `shujvbiao/` 已忽略；Git 只含通用离线工具、合成测试和脱敏文档，不含源表、结果表、逐行业务报告或凭据；未 push/PR |
 
 ## SELFHOST-OPS-UAT-BLOCKER-FIX 用户创建来源校验与退出登录修复
 

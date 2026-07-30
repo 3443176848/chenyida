@@ -31,9 +31,10 @@
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
 - 发布标识：包名为 `chenyida-erp-selfhosted`；源码为 `0.1.0-alpha.35`/`0035`，当前受控公网运行面仍为 `0.1.0-alpha.34`/`0034`。0035 未应用，alpha.35 未 build/restart/deploy。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.35`。
-- Git 复核：UAT-BLOCKER-FIX 起点为本地 `main`/HEAD `5fc1266b70f57e1c5d44464f14f2a615dbeab3e4`、behind 0/ahead 88、tracked clean；代码提交为 `dfa30bf7575a4cd3d06756a626480ca20204cec6`，Parent 为起点，文档提交以代码提交为 Parent。未 push/PR/改写历史；`shujvbiao/` 未修改、暂存、打开或提交，Git 不含密码、摘要、Cookie、Token、真实 XLSX、逐行报告、日志或 dump。
+- Git 复核：LANDING-TASK06 起点为本地 `main`/HEAD `6105dda`、behind 0/ahead 90，tracked clean，另有用户业务目录 `shujvbiao/` 未跟踪。用户明确授权本任务只读处理后，目录已加入 `.gitignore`；源 XLS/XLSX、模板、生成工作簿和逐行业务报告均未暂存或提交。任务独立提交消息为 `feat: add guarded internal material library export`，实际 SHA 以 Git log 为准；未 push/PR/改写历史。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
+- 离线内部物料库：LANDING-TASK06 以 `moban.xlsx` 第一张 `原BOM` 只作对照、第二张 `Sheet1` 作为唯一 13 列标准；复用 LANDING-TASK02 root-only 证据生成 724 行内部物料库、997 行标准明细、484 行待确认和 1,006 行来源映射。532 个正式编码只沿用既有结果；147 个来源候选、45 个模板候选不配码，另保留 1 个来源版本冲突。结果为 root-only 工作簿，未导入任何数据库。
 - V9 重导入 staging：LANDING-TASK05 对单个 SHA 绑定 XLSX 解析 197 行；编码唯一连续、来源完整，但显式单位 0，产品/BOM 结构字段 0。恢复库首次 staged 197、重放新增 0，全部 review；5,556 条拟删除计划未执行，主库 213 表计数完全不变。
 - 第二管理员与 UAT 临时账号：`admin2` 仍为 active admin、version 3、`must_change_password=false`。UAT-BLOCKER-FIX 仅新增唯一临时 manager 并在浏览器验收后通过页面停用；最终用户/active admin `3/2`、Session/有效 `14/5`、Audit `920`，Material/Product/BOM/BOM Line 保持 `532/6/6/316`。临时账号未用于业务试用，现有管理员未修改。
 - 单账号豁免：SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 采用 serializable 事务、任务 advisory lock、行锁和 version 2 CAS，把账号更新与唯一 `USER_FIRST_PASSWORD_CHANGE_WAIVED/success` 审计同事务提交；同任务重放 no-op。现有有效 Session 保留，D-045 全局新建/重置用户强制首次改密策略与 API 不变。
@@ -55,6 +56,7 @@
 - TRUSTED-ORIGIN-05 的单元、隔离 PostgreSQL、两次镜像 build 和 Web 更新全部串行；起点 available 约 2.3 GiB、Swap 126—127 MiB、根盘 35 GiB、Load 低于 0.3，最终约 2.2 GiB/142 MiB/34 GiB/Load `1.08/0.48/0.29`。四服务 restart 0/OOM false，内核无 OOM；只重建 Web，PostgreSQL/Worker/Caddy 容器 ID 不变。临时数据库、runner、候选镜像和 worktree 已清理，四个受保护卷保留；2.789 GB Build Cache 未执行未授权 prune。
 - ADMIN2-FIRST-CHANGE-WAIVER-06 只有一次轻量 PostgreSQL 事务和一个断网 Identity unit runner；起点/最终 available 均约 2.3 GiB、Swap 142 MiB、根盘 34 GiB，最终 Load `0.08/0.16/0.12`。四服务未重建、restart 0/OOM false、内核 OOM 0；task SQL/runner 已清理，四个受保护卷保留。
 - UAT-BLOCKER-FIX 的 unit/UI、隔离 PostgreSQL、两次 alpha.34 API smoke、build、备份恢复、Web 更新和 Chromium 验收全部串行；起点 available 约 2.4 GiB、Swap 124 KiB、根盘 34 GiB，最终约 2.3 GiB/3.2 MiB/34 GiB、Load `0.01/0.21/0.30`，60 秒 Swap 增长 0。四服务 restart 0/OOM false、内核 OOM 0；只重建 Web，PostgreSQL/Worker/Caddy 和四卷保持，临时数据库、容器、runner 与 build worktree 已清理。
+- LANDING-TASK06 只执行轻量离线 Excel/CSV/JSON 处理及串行测试；Node 检查使用一次一个、断网、只读、1 CPU/1 GiB 的自动删除容器。起点/最终 available 均约 2.4 GiB、Swap 47 MiB、根盘 33 GiB，最终 Load `0.79/0.67/0.50`；四服务 restart 0/OOM false、内核 OOM 0。探查进程、测试容器和临时 SQLite 目录均已清理，四卷保持。
 
 ### 治理资料
 

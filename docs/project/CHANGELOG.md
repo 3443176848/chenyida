@@ -2,6 +2,16 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-07-30
+
+### SELFHOST-LANDING-TASK06 - `feat: add guarded internal material library export`
+
+- 模板：项目负责人确认 `moban.xlsx` 第一张 `原BOM` 仅作原版对照，第二张 `Sheet1` 为整理后标准；导出器固定验证其首行 13 列，并把后续分段的列位变化统一映射回标准列。
+- 离线整理：复用 LANDING-TASK02 root-only manifest、逐行 profile/classification 和既有 payload；8 份来源/1,113 行及模板前后不变。532 个既有正式编码原样沿用；147 个来源候选和 45 个模板候选无正式编码，缺项/冲突 fail closed。
+- 结果：仓库外 root-only `内部物料库.xlsx` 含 724 行物料库、997 行标准明细、484 行待确认、1,006 行来源映射和来源说明；完整覆盖 953 条非归档来源+53 条模板。输出 SHA `01d0239a...5fa0`，宏/外链/电话/敏感内容 0。
+- 工具/测试：新增固定确认、输入漂移门禁、稀疏 XLSX 区段解析、严格匹配、候选隔离、原子输出和自校验工具及合成集成测试。专项+classifier 7/7、Python 三项、Node 3/3、lint 0 error/8 既有 warning、最终 credentials 1,070 文件和 ZIP 完整性通过。
+- 边界：`shujvbiao/` 加入 `.gitignore`，源表/模板/结果表/逐行业务报告不进入 Git。未连接或写 PostgreSQL/SQLite/D1，未改 Schema/Migration/API/UI/Compose，未 build/restart/deploy、push 或 PR。
+
 ## 2026-07-29
 
 ### SELFHOST-OPS-UAT-BLOCKER-FIX - `fix: secure UAT identity writes and logout` / `docs: record UAT identity blocker acceptance`

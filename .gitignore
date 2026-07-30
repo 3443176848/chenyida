@@ -27,3 +27,6 @@ Thumbs.db
 
 # Source reference decks are kept local unless explicitly shared
 *.pptx
+
+# Local business spreadsheets and generated material-library workbooks
+/shujvbiao/
