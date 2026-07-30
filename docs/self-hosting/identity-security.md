@@ -2,7 +2,7 @@
 
 状态：`IMPLEMENTED IN NON-PRODUCTION`
 
-适用版本：身份基线始于 `chenyida-erp-selfhosted@0.1.0-alpha.2`；2026-07-30 的 `SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02` 已连同既有 Origin/CSRF/logout 修复，以 alpha.34/0034 兼容 hotfix 部署到当前非生产并行环境，源码主线仍为 alpha.35/0035。
+适用版本：身份基线始于 `chenyida-erp-selfhosted@0.1.0-alpha.2`；2026-07-30 的 `SELFHOST-OPS-UAT-MATERIAL-REVIEW-BLOCKERS-03-RETRY` 已连同既有 Origin/CSRF/logout 与 operations 审核修复，以 alpha.34/0034 兼容 hotfix 部署到当前非生产并行环境，源码主线为 alpha.36/0035。
 
 ## 1. 运行边界
 
@@ -55,6 +55,8 @@ Session Cookie 为 `HttpOnly; SameSite=Lax`；CSRF Cookie 为 `SameSite=Lax` 且
 
 经营工作台和兼容工作台统一调用 `public/erp/api-client.js` 的安全退出函数：固定 `POST /api/logout`、`credentials: same-origin`，并从 CSRF Cookie 发送匹配 Header。只有服务端返回成功、事务撤销 Session、写入成功审计并返回对称的 Cookie 清理头后，页面才清理本地状态并跳转登录页；失败时保留当前状态并显示稳定错误码和中文提示，不再吞错或伪装退出。匿名重复退出保持幂等成功，不产生 500。
 
+受保护页面不能假设 DOM 在浏览器历史恢复时仍可信。经营、Material 和 legacy 页面在 `pagehide` 立即隐藏受保护视图；`pageshow.persisted=true` 或 Performance Navigation 类型为 `back_forward` 时，必须重新请求 `/api/session`，在成功校验前不得恢复内容。legacy 聚合刷新只有全部成功后才解除登录覆盖层，任何网络、认证或局部刷新失败都 fail closed。根页、Material 和 legacy HTML 使用 `Cache-Control: private, no-store, max-age=0, must-revalidate` 与 `Pragma: no-cache`；该保护不删除或禁用浏览器历史。
+
 must-change 账号只允许 `GET /api/session`、`POST /api/logout`、`POST /api/me/password`；其他身份或业务 API 在服务端统一返回 `403 PASSWORD_CHANGE_REQUIRED`。
 
 ## 5. 限流、幂等与审计
@@ -73,4 +75,4 @@ SHA-256：`6e185d01a69c4bd132c577793ae72baceaa075e5beecc738bcdf4310430d7079`。�
 
 ## 7. 运维与后续限制
 
-身份基线、来源/退出修复及 operations 人工审核精确增量已部署到当前 `chenyida-erp-parallel` 非生产环境；这不是生产发布。运行面仍为 alpha.34/0034，本次没有新增、修改或运行 Migration，alpha.35/0035 仍未部署。任何生产 migration、域名/Origin 切换或正式投用仍需快照、真实旧角色预检、受控试迁移、容量/安全验收和明确授权。身份模块不解决 Dashboard、备份、客户、供应商、产品、BOM、库存、采购、生产、销售、品质或财务；这些域不得通过扩展身份模块绕过独立任务。
+身份基线、来源/退出修复、历史恢复缓存保护及 operations 人工审核精确增量已部署到当前 `chenyida-erp-parallel` 非生产环境；这不是生产发布。运行面仍为 alpha.34/0034，本次没有新增、修改或运行 Migration，alpha.36/0035 仍未部署。任何生产 migration、域名/Origin 切换或正式投用仍需快照、真实旧角色预检、受控试迁移、容量/安全验收和明确授权。身份模块不解决 Dashboard、备份、客户、供应商、产品、BOM、库存、采购、生产、销售、品质或财务；这些域不得通过扩展身份模块绕过独立任务。

@@ -2,6 +2,24 @@
 
 最后更新时间：2026-07-30（Asia/Shanghai）
 
+## SELFHOST-OPS-UAT-MATERIAL-REVIEW-BLOCKERS-03-RETRY 审核上下文、精确待办与退出缓存修复
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | MATERIAL REVIEW DECISION CONTEXT AND LOGOUT CACHE FIXED | 三项 blocker 已修复、部署并只读验收；完成后停止，不开始物料审核 |
+| 审核详情 | PASS / HONEST | 完整名称、分类/单位/来源、创建/提交人和时间、V2/状态、SUBMIT 工程说明、编码状态、审核范围、批准/退回后果与工程 BOM 下一步可见；当前说明为空时明确“未保存”，不伪造外部字段 |
+| Dashboard | PASS / 4 = 4 | operations 卡片“物料审核待办 4”链接原生队列；搜索 `042576` 后 total/列表为 4，非零时无“当前没有立即待办”；legacy 全局 DRAFT+PENDING_REVIEW 口径已标注 |
+| 权限 | PASS / UNCHANGED | operations 增量仍仅 `material.review.queue/approve/reject`；正文编辑 403、无关角色 403，无身份/admin/审计/BOM 或其他业务写增量 |
+| 退出缓存 | PASS / FAIL CLOSED | 双入口 POST logout 撤销 Session 并清 Cookie；实际 Chromium back/forward/refresh 保持登录页，受保护 DOM 0。实际 Chrome 因 no-store/Cookie 变化未复用 bfcache，真实 back_forward 与同浏览器 persisted pageshow 分支均通过；未禁用历史 |
+| 自动测试 | PASS | 隔离 PG `4+10+2+7`；最终相关 unit/UI/handler/API 118 项，TASK09 14 项；typecheck、218 表 Schema consistency、lint 0 error、build、credentials、Python 三项和 diff check 通过 |
+| 版本/Migration | COMPATIBLE HOTFIX | 源码 alpha.36/0035；运行 Web alpha.34/0034 hotfix `sha256:881c033dc97e...`。无 0036，0035 未运行，完整 alpha.36/标准化工作台未部署 |
+| 备份/恢复 | PASS | root-only dump 2,019,961 bytes、SHA-256 `281e2597...972b`，3,065 entries/213 table-data；独立 0034 恢复的 migration/表/Material/User/Audit 和保护摘要一致，恢复库已删除 |
+| 服务/回滚 | PASS | 只重建 Web；PostgreSQL/Worker/Caddy 容器 ID 不变，四服务 restart 0/OOM false，四卷创建事实不变。旧 Web 以 `rollback-review-blockers-03-20260730T114146Z` 保留 |
+| 保护记录 | UNCHANGED | 533—536 均 PENDING_REVIEW/version 2/MANUAL/PCS/空编码；保护摘要前后 `51d81e45e03656033c4db7a16e0a8b96`，APPROVE/REJECT version/change/audit 和审核 POST 均为 0 |
+| Session | CLEAN | 使用既有 operations 账号且未改密；最终 operations 有效 Session 0，临时浏览器资源已删除 |
+| 资源/清理 | PASS | 起点约 2.4 GiB/163 MiB Swap/31 GiB；最终约 2.3 GiB/187 MiB/30 GiB/Load `0.21/0.45/0.68`，内核 OOM 0。测试/恢复库、容器、脚本、buildcheck 镜像和 worktree 已清理 |
+| Git | PASS | 起点 `35aa8f6`；功能 `c14505d`、`8d8a494`、`a4de64f`，验收提交消息 `ops: accept material review blocker fixes`。未改写 `9d21d39`/`35aa8f6`，未 push/PR/amend/rebase/reset |
+
 ## SELFHOST-LANDING-TASK09 供应商导入 13 列标准整理工作台
 
 | 验证项 | 结果 | 说明 |
@@ -178,7 +196,7 @@
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
 | 任务状态 | DONE / DEPLOYED | 功能提交 `cda8c7e` 已经 2026-07-29 单独授权部署到当前 18888 Web；公网兼容页已不再显示旧 CSV-only 表单 |
-| 入口/缓存 | PASS / FOLLOW-UP | “供应商导入”直达 `/materials/imports/new`；兼容页明确 CSV/XLS/XLSX。公网响应含 `private, no-store, max-age=0, must-revalidate` 与 `Pragma: no-cache`，但框架同时并列冗余 `public, max-age=3600`；精确消除矛盾头属后续收缩任务 |
+| 入口/缓存 | PASS / FOLLOW-UP RESOLVED | “供应商导入”直达 `/materials/imports/new`；兼容页明确 CSV/XLS/XLSX。LANDING-TASK04 部署时响应含 `private, no-store` 但并列框架 `public`；该矛盾头已由 MATERIAL-REVIEW-BLOCKERS-03-RETRY 的动态 legacy route 精确消除 |
 | 退役保护 | PASS | 删除 CSV 文本、`file.text()` 和旧 API 调用；`sample-import`/`import`/`import-file` 继续返回 410，不恢复一步直写 |
 | 自动/镜像/在线验证 | PASS | Dashboard UI/Unit/API coverage 12/12、Material Import UI 102/102、Parser 38/38（合计 152/152）、build 与新镜像静态合同通过。公网 `index.html`/`app.js` SHA 精确匹配源码，旧控件/API 标记消失；未做 Excel→PG E2E |
 | 数据/运行边界 | PASS | 版本仍 alpha.34、Migration 仍 0034；Material/Product/Product Version/BOM/BOM Version/Line 仍 `532/6/6/6/6/316`，Inventory/PO/Receipt/WO/Shipment/Finance 仍 0。仅以 `--no-deps` 重建 Web；PostgreSQL/Worker/Caddy 容器未更换，未运行 Migration 或写数据 |

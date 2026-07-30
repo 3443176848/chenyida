@@ -4,6 +4,16 @@
 
 ## 2026-07-30
 
+### SELFHOST-OPS-UAT-MATERIAL-REVIEW-BLOCKERS-03-RETRY - `fix: clarify material review decision context` / `fix: invalidate protected views after logout` / `fix: enforce no-store on legacy shell` / `ops: accept material review blocker fixes`
+
+- 审核详情：API 从现有当前 SUBMIT version 返回提交说明、提交人、时间和版本；UI 原样显示待审名称、分类/单位/来源、创建/提交事实、状态、工程说明或“未保存”、正式编码状态、审核范围、批准/退回后果和工程建立 BOM 下一步。不解析名称中的 `·`，不伪造外部编号、供应商、报价或价格。
+- Dashboard/权限：新增权限绑定的 PENDING_REVIEW 精确待办，当前 API、卡片和原生队列均为 4，非零时不显示“当前没有立即待办”；legacy 统计继续明确为全局 DRAFT+PENDING_REVIEW。operations 仍只有 queue/approve/reject 三项审核增量，正文编辑和无关角色服务端 403。
+- 退出/缓存：经营、Material 和 legacy 在 pagehide 先隐藏受保护内容，pageshow persisted/back_forward 重新校验 Session，legacy 刷新 fail closed；根页、Material 与 legacy 响应统一 `private, no-store, max-age=0, must-revalidate`。POST logout、Origin/CSRF、Session 撤销和 Cookie 清理保持，不禁用浏览器历史。
+- 测试：隔离 PostgreSQL operations/Identity/Dashboard/Material 为 `4+10+2+7`，最终相关 unit/UI/handler/API coverage 118 项，TASK09 标准化 14 项；三组 typecheck、218 表 Schema consistency、lint 0 error、alpha.34 与 alpha.36 buildcheck、credentials、Python 三项和 diff check 通过。
+- 备份/部署：custom dump 2,019,961 bytes、SHA-256 `281e25978b9db99000488779b858431cb20a2535364f64a01dec13bf7037972b`，3,065 entries/213 table-data，独立 0034 恢复通过。只替换 Web 为 `sha256:881c033dc97e...`；原 `sha256:f31199de3b8...` 以明确回滚 tag 保留，PostgreSQL/Worker/Caddy 容器与四卷不变，0035 未运行、alpha.36 未部署。
+- 只读 UAT：operations Dashboard/队列均为 4，搜索 `042576` 并打开 533—536，详情和决策说明可见、正文编辑控件 0、approve/reject 请求 0；两套工作台 logout→back/forward/refresh 保持未登录。四条最终仍 PENDING_REVIEW/V2/MANUAL/PCS/空编码，APPROVE/REJECT version/change/audit 为 0，有效 operations Session 0。
+- 资源/清理：最终约 2.3 GiB available、187 MiB Swap、30 GiB 根盘、Load `0.21/0.45/0.68`，内核 OOM 0，四服务 restart 0/OOM false。测试/恢复库、临时容器、浏览器、脚本、buildcheck 镜像和 worktree 已清理；备份、当前镜像和单一回滚 tag 保留。
+
 ### SELFHOST-LANDING-TASK09 - `feat: add supplier material standardization workbench`
 
 - 工作流：把 TASK07 获确认的 `CYD-MATERIAL-13C-v1` 整理方式接入现有供应商导入；解析结构准备完成后默认进入“标准整理”，列表/新建页明确新路径，来源表头、高级 Mapping、Normalization 和 Review 继续保留。

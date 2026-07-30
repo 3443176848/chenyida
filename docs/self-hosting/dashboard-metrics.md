@@ -22,4 +22,6 @@
 
 ## Material 待处理显示边界
 
-兼容工作台的 `summary.pending` 是全局 `material_master.material_status in ('DRAFT','PENDING_REVIEW')` 汇总，不是当前角色可处理的审核队列数量；UI 必须显示为“全局待处理（DRAFT + PENDING_REVIEW）”。人工审核队列的唯一数量来源仍是 `GET /api/material-master/review-queue` 返回的 `pagination.total`，其集合固定为 `PENDING_REVIEW` 并要求 `material.review.queue`。筛选、列表、详情和动作入口不得用全局兼容统计代替该队列口径。
+兼容工作台的 `summary.pending` 是全局 `material_master.material_status in ('DRAFT','PENDING_REVIEW')` 汇总，不是当前角色可处理的审核队列数量；UI 必须显示为“全局待处理（DRAFT + PENDING_REVIEW）”。
+
+有 `material.review.queue` 的角色另取 `material-review-pending` 指标，权威条件精确为 `material_master.material_status='PENDING_REVIEW'`，并链接 `/materials/review`。它必须与 `GET /api/material-master/review-queue` 的 `pagination.total`、筛选和列表保持一致；非零时风险区不得同时显示“当前没有立即待办”。筛选、列表、详情和动作入口不得用全局兼容统计代替该队列口径。2026-07-30 operations 真实只读验收中指标和队列均为 4。
