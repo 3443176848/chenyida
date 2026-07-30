@@ -1,6 +1,6 @@
 # SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02 — operations 人工物料审核队列修复
 
-状态：`DOING — UAT APPROVAL NOT EXECUTED`
+状态：`DONE — UAT APPROVAL NOT EXECUTED`
 
 日期：2026-07-30（Asia/Shanghai）
 
@@ -67,3 +67,14 @@
 - `OPERATIONS MATERIAL REVIEW QUEUE FIXED — UAT APPROVAL NOT EXECUTED`
 - `OPERATIONS MATERIAL REVIEW QUEUE PARTIALLY FIXED — UAT APPROVAL NOT EXECUTED`
 - `BLOCKED — NO UNSAFE CHANGE`
+
+## 完成结果
+
+最终结论：`OPERATIONS MATERIAL REVIEW QUEUE FIXED — UAT APPROVAL NOT EXECUTED`。
+
+- 源码提交 `54f648051a8454b022a6f12c41fe3f1558875a7c` 只为 `operations` 增加 `material.review.queue`、`material.review.approve`、`material.review.reject`，并收敛 legacy 清洗入口和 Dashboard 全局统计文案；验收提交为本文所在的 `ops: accept operations material review queue fix`，其 SHA 以 `git log` 为准。
+- operations 精确权限、跨创建人队列/详情、engineering 自审拒绝、无关角色 403、正文不可编辑、批准编码、退回原因、幂等/CAS/并发、故障回滚、审计和 UI 一致性均在隔离 PostgreSQL 或合成 UI 合同中通过；未在主库执行审核写入。
+- alpha.34/0034 兼容 hotfix 镜像为 `sha256:f31199de3b8aea025c317b7d67aa26b42a60e037eca7ea7a20f7533dd2e6af38`。只替换 Web；PostgreSQL、Worker、Caddy 未重建，主库仍为 34 migrations / `0034_supplier_receipt_lot_iqc.sql`，0035 未运行。
+- 真实 Chromium 仅登录 `uat_20260729_operations`，以 `042576` 检索确认 533—536 全部可见、详情可打开、批准/退回按钮存在、正文编辑控件为 0；安全退出后旧 Session 返回 `SESSION_REVOKED`。浏览器没有点击批准或退回。
+- 533—536 最终均为 `PENDING_REVIEW`、version 2（UI `V2`）、`MANUAL`、`PCS`、无正式内部编码；四条的 APPROVE/REJECT version、change log 和 audit 计数均为 0。
+- 完整证据、测试矩阵、备份恢复、容器/Volume/资源和清理记录见 `SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02-COMPLETION.md`。

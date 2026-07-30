@@ -1,14 +1,23 @@
 # Material Review Queue 与审核工作台 V1
 
-状态：`IMPLEMENTED_NON_PRODUCTION / AWAITING_ACCEPTANCE`
+状态：`IMPLEMENTED_NON_PRODUCTION / OPERATIONS UAT READ-ONLY ACCEPTED`
 
-任务：`PHASE1-TASK13`（设计）、`PHASE1-TASK14`（实施）
+任务：`PHASE1-TASK13`（设计）、`PHASE1-TASK14`（实施）、`SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02`（自托管 operations 权限与只读验收）
 
 日期：2026-07-15
 
 目标运行面：`chenyida_erp_site/` 在线 Site
 
 低保真线框稿见 [material-review-ui-v1-wireframes.md](./material-review-ui-v1-wireframes.md)。
+
+## 0A. 2026-07-30 自托管 operations 验收补充
+
+- 自托管角色映射只为 `operations` 增加 queue/approve/reject 三项审核能力；没有草稿代编辑、身份/admin、系统审计或其他业务写增量。
+- `GET /api/material-master/review-queue`、统一详情和审核工作台使用同一个 `material.review.queue` 边界及 `PENDING_REVIEW` 权威集合。跨创建人可见性由服务端 Repository 实现，不靠前端放宽；工程创建人/最后修改人继续不可自审。
+- 批准/退回继续复用既有稳定错误码、中文提示、请求编号、幂等正文摘要、expected version/CAS、职责分离、正式编码/必填退回原因、单事务版本/变更/审计和并发唯一成功边界。
+- 审核工作台正文仍为只读展示；按钮只按独立 approve/reject 权限呈现，浏览器角色名不构成授权。
+- legacy“清洗审核”已明确标记为退役导入清洗入口，跳转原生 `/materials/review` 与 `/materials/imports`，不再把旧 Cleaning Rows 当人工物料审核队列。
+- alpha.34/0034 兼容 hotfix 只读 Chromium 验收中，operations 以 `042576` 找到 533—536，队列 total 4、列表 4、详情 4，批准/退回按钮存在、正文编辑控件 0；未点击审核动作。四条最终仍为 PENDING_REVIEW/V2/MANUAL/PCS/空编码。
 
 ## 0. PHASE1-TASK14 实施结果
 

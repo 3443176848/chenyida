@@ -31,7 +31,7 @@
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
 - 发布标识：包名为 `chenyida-erp-selfhosted`；源码为 `0.1.0-alpha.35`/`0035`，当前受控公网运行面仍为 `0.1.0-alpha.34`/`0034`。0035 未应用，alpha.35 未 build/restart/deploy。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.35`。
-- Git 复核：LANDING-TASK07 基于本地 `main`/HEAD `0959b63`、behind 0/ahead 91；`shujvbiao/` 已由 `.gitignore` 保护，源 XLS/XLSX、模板、生成工作簿和逐行业务报告均未暂存或提交。任务独立提交消息为 `feat: standardize source material workbooks`，实际 SHA 以 Git log 为准；两个并行出现的未跟踪脚本/测试保持原样并排除出提交。未 push/PR/改写历史。
+- Git 复核：SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02 从本地 `main`/HEAD `78701d16`、behind 0/ahead 92、clean 起步；功能提交 `54f648051a8454b022a6f12c41fe3f1558875a7c` 的 Parent 为 `78701d16`，验收提交为本文所在的 `ops: accept operations material review queue fix`。`shujvbiao/` 始终由 `.gitignore` 保护且未读取、修改或提交；未 push/PR/amend/rebase/reset/stash/restore。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
 - 离线内部物料库：LANDING-TASK06 以 `moban.xlsx` 第一张 `原BOM` 只作对照、第二张 `Sheet1` 作为唯一 13 列标准；复用 LANDING-TASK02 root-only 证据生成 724 行内部物料库、997 行标准明细、484 行待确认和 1,006 行来源映射。532 个正式编码只沿用既有结果；147 个来源候选、45 个模板候选不配码，另保留 1 个来源版本冲突。结果为 root-only 工作簿，未导入任何数据库。
@@ -39,8 +39,10 @@
 - V9 重导入 staging：LANDING-TASK05 对单个 SHA 绑定 XLSX 解析 197 行；编码唯一连续、来源完整，但显式单位 0，产品/BOM 结构字段 0。恢复库首次 staged 197、重放新增 0，全部 review；5,556 条拟删除计划未执行，主库 213 表计数完全不变。
 - 第二管理员与 UAT 临时账号：`admin2` 仍为 active admin、version 3、`must_change_password=false`。UAT-BLOCKER-FIX 仅新增唯一临时 manager 并在浏览器验收后通过页面停用；最终用户/active admin `3/2`、Session/有效 `14/5`、Audit `920`，Material/Product/BOM/BOM Line 保持 `532/6/6/316`。临时账号未用于业务试用，现有管理员未修改。
 - 单账号豁免：SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 采用 serializable 事务、任务 advisory lock、行锁和 version 2 CAS，把账号更新与唯一 `USER_FIRST_PASSWORD_CHANGE_WAIVED/success` 审计同事务提交；同任务重放 no-op。现有有效 Session 保留，D-045 全局新建/重置用户强制首次改密策略与 API 不变。
-- 公网与 UAT 来源校验：公网继续由显式、规范化、单值 `ERP_PUBLIC_ORIGIN` 精确限制，不读取任意转发头。只有 `ERP_DEPLOYMENT_CLASS=uat` 与 `ERP_UAT_ALLOW_LOOPBACK_ORIGIN=true` 同时启用时才额外允许浏览器 Origin 与 Request URL origin 均为严格字面量 loopback；生产类别不能启用。身份写仍要求 Origin 和 Cookie/Header CSRF 双提交。基于 alpha.34 的当前 Web hotfix 镜像为 `sha256:273aa687e741...`；0035、PostgreSQL、Worker、Caddy 和业务数据未动。
+- 公网与 UAT 来源校验：公网继续由显式、规范化、单值 `ERP_PUBLIC_ORIGIN` 精确限制，不读取任意转发头。只有 `ERP_DEPLOYMENT_CLASS=uat` 与 `ERP_UAT_ALLOW_LOOPBACK_ORIGIN=true` 同时启用时才额外允许浏览器 Origin 与 Request URL origin 均为严格字面量 loopback；生产类别不能启用。身份写仍要求 Origin 和 Cookie/Header CSRF 双提交。基于 alpha.34/0034 的当前 Web hotfix 镜像为 `sha256:f31199de3b8...`；只增加既有 Origin/CSRF/logout 与 operations 人工审核最小差异，0035、PostgreSQL、Worker、Caddy 未动。
 - 安全退出：经营工作台与兼容工作台统一调用共享 `POST /api/logout`，发送 same-origin credentials 和 CSRF Header；服务端撤销 Session、写成功审计并对称清 Cookie 后才跳转，失败显示稳定错误码/中文提示。真实 Chromium 已证明两个入口的旧 Session 都返回 `REVOKED`、重复退出 200 且可重新登录。
+- operations 人工物料审核：角色静态映射只新增 `material.review.queue/approve/reject`；没有 `material.draft.edit_any`、身份/admin、`system.audit.read` 或其他业务写增量。Repository 的跨创建人可见性只对 PENDING_REVIEW+queue 开放，批准/退回继续由既有职责分离、幂等、CAS、事务和审计保护。legacy“清洗审核”明确退役并链接 `/materials/review` 与 `/materials/imports`；Dashboard 兼容统计明确标为全局 DRAFT+PENDING_REVIEW。
+- operations UAT 只读证据：真实 Chromium 只登录 `uat_20260729_operations`，用 `042576` 找到 533—536，四条详情、批准和退回按钮可见，正文编辑控件 0；未点击任何审核动作，退出后旧 Session 为 `SESSION_REVOKED`。数据库最终仍为 4 条 PENDING_REVIEW/version 2/MANUAL/PCS/空编码，相关 APPROVE/REJECT version、change log、audit 均为 0。
 - 兼容供应商导入：LANDING-TASK04 功能提交 `cda8c7e` 已在单独授权下部署到当前 18888 Web；`public/erp/` 的 CSV-only/退役入口已改为直达 `/materials/imports/new`，入口 URL 已版本化。公网 HTML/JS SHA 与源码一致，响应含 `private, no-store` 和 `Pragma: no-cache`；框架仍并列冗余 `public, max-age=3600` 头。未做 Excel→PG E2E。
 - BOM 物料治理：PHASE6-TASK01 在既有 Import/Mapping/Normalization/Review 后新增确定性规格治理层，用品类+关键规格+性能等级的完整身份进行严格归组，保留原始行/BOM/料号透明度，替代项只是候选。受控决策可精确绑定 ACTIVE 或调用既有 Workflow 建 DRAFT；不自动编码、审批或建正式替代关系。
 
@@ -59,6 +61,7 @@
 - UAT-BLOCKER-FIX 的 unit/UI、隔离 PostgreSQL、两次 alpha.34 API smoke、build、备份恢复、Web 更新和 Chromium 验收全部串行；起点 available 约 2.4 GiB、Swap 124 KiB、根盘 34 GiB，最终约 2.3 GiB/3.2 MiB/34 GiB、Load `0.01/0.21/0.30`，60 秒 Swap 增长 0。四服务 restart 0/OOM false、内核 OOM 0；只重建 Web，PostgreSQL/Worker/Caddy 和四卷保持，临时数据库、容器、runner 与 build worktree 已清理。
 - LANDING-TASK06 只执行轻量离线 Excel/CSV/JSON 处理及串行测试；Node 检查使用一次一个、断网、只读、1 CPU/1 GiB 的自动删除容器。起点/最终 available 均约 2.4 GiB、Swap 47 MiB、根盘 33 GiB，最终 Load `0.79/0.67/0.50`；四服务 restart 0/OOM false、内核 OOM 0。探查进程、测试容器和临时 SQLite 目录均已清理，四卷保持。
 - LANDING-TASK07 只执行轻量离线 XLS/XLSX 解析、工作簿生成和串行测试；Node 检查同样限制为一次一个、断网、只读、1 CPU/1 GiB 的自动删除容器。起点约 2.4 GiB available、Swap 47 MiB、根盘 33 GiB、Load `0.36/0.24/0.17`；最终约 2.3 GiB/47 MiB/33 GiB/`0.34/0.69/0.56`。四服务未重建且 restart 0/OOM false，任务时段内核 OOM 0，四卷保持。
+- OPS-UAT-MATERIAL-REVIEW-FIX-02 的 PostgreSQL 测试、build、备份恢复、candidate smoke、Web 替换和 Chromium 验收严格串行，一次仅一个临时容器。起点约 2.3 GiB available、Swap 47 MiB、根盘 33 GiB；最终 2,307,512 KiB available、66,456 KiB Swap used、根盘 31 GiB、Load `0.16/0.42/0.47`，112 秒 Swap 增长 0，未触发门禁。四服务 restart 0/OOM false、任务时段内核 OOM 0；只替换 Web，临时数据库/容器/worktree/runner 清理，备份和明确回滚镜像保留，四卷 metadata 不变。
 
 ### 治理资料
 
@@ -203,7 +206,7 @@
 
 ## 当前路线
 
-`SELFHOST-OPS-UAT-BLOCKER-FIX` 已 `ADMIN IDENTITY CSRF AND LOGOUT BLOCKERS FIXED IN PARALLEL ENVIRONMENT`；源码仍为 alpha.35/0035，当前 18888 Web 为 alpha.34 基线+身份/退出 hotfix，PostgreSQL/Worker 仍为 alpha.34/0034。临时 manager 已页面停用；现在停止，不开始角色业务试用，不自动清理或导入业务数据，不应用 0035 或启动其他任务。
+`SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02` 已 `OPERATIONS MATERIAL REVIEW QUEUE FIXED — UAT APPROVAL NOT EXECUTED`；源码仍为 alpha.35/0035，当前 18888 Web 为 alpha.34/0034 基线+Origin/CSRF/logout+operations 审核最小 hotfix，PostgreSQL/Worker 仍为 alpha.34/0034。533—536 未审批、未退回、未生成编码；现在停止，不应用 0035、不启动其他角色或后续任务。由于 UAT 凭据材料在本次授权会话工具输出中曾意外显露，独立审核试用前建议先另行轮换该账号凭据。
 
 ## 恢复上下文检查清单
 

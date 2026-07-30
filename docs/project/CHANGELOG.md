@@ -4,6 +4,15 @@
 
 ## 2026-07-30
 
+### SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02 - `fix: authorize operations material review queue` / `ops: accept operations material review queue fix`
+
+- 权限/口径：`operations` 静态权限只增加 `material.review.queue`、`material.review.approve`、`material.review.reject`，没有草稿代编辑、admin/身份、系统审计或其他业务写增量。人工队列继续以 `material_status=PENDING_REVIEW` 为权威；engineering 创建人不可自审，无关角色返回稳定 403 中文错误。
+- UI：原生队列、筛选、total、详情与动作入口复用同一权限/状态口径；legacy“清洗审核”明确为退役导入清洗入口并引导 `/materials/review`、`/materials/imports`。兼容 Dashboard 的待处理指标明确标注为全局 `DRAFT + PENDING_REVIEW`，不再冒充当前角色队列。
+- 测试：Review UI 52/52、Identity 9/9、Dashboard UI 5/5、非数据库适用回归 275 项通过；隔离 PostgreSQL operations 4/4、Identity 10/10、Material 7/7、Normalization 5/5、Review 4/4、BOM Governance 16/16、Mapping 6/6。typecheck、Schema consistency、lint 0 error、alpha.35 build、最终 credentials 1,077 文件、diff check 和 Python 三项通过。
+- 备份/部署：pre-deploy custom dump 2,013,262 bytes、SHA-256 `afe2cc5aa68940c1cf303317d4936d20814f2d2cfc36a55b48709d6b489dee15`，3,050 list entries/213 table-data，独立 0034 恢复与 candidate API smoke 通过。只把 alpha.34 兼容 Web 替换为 `sha256:f31199de3b8...`；PostgreSQL/Worker/Caddy 未重建，34/head 0034 和四卷不变，0035 未运行。
+- 浏览器/数据：真实 Chromium 只登录 operations，以 `042576` 确认 533—536 全部可见、详情可开、批准/退回按钮存在且正文无编辑控件；未点击审核动作并安全退出。四条最终均为 PENDING_REVIEW/V2/MANUAL/PCS/空编码，APPROVE/REJECT version/change/audit 计数均为 0。
+- 安全/清理：一次凭据文件脱敏失败和一次失败清理约束错误使凭据材料/Session 摘要只在本次授权会话工具输出中显露；未写 Git、文件、日志或外部系统，凭据文件未改，遗留浏览器 Session 已按有效约束撤销并审计。建议在独立审核试用前另行轮换该 UAT 账号。临时库、容器、runner 与 worktree 已清理；备份和显式回滚镜像保留，未 prune、push、PR 或操作 Python systemd。
+
 ### SELFHOST-LANDING-TASK07 - `feat: standardize source material workbooks`
 
 - 语义纠正：按项目负责人澄清，以 `moban.xlsx` 第一张 `原BOM` 为真实原始数据、第二张 `Sheet1` 为目标格式；53 个原始主料组与 53 个目标行的规格证据、上下文和用量全部自动核对通过。

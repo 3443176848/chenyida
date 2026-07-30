@@ -2,6 +2,25 @@
 
 最后更新时间：2026-07-30（Asia/Shanghai）
 
+## SELFHOST-OPS-UAT-MATERIAL-REVIEW-FIX-02 operations 人工物料审核队列修复
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | OPERATIONS MATERIAL REVIEW QUEUE FIXED — UAT APPROVAL NOT EXECUTED | 精确权限修复、隔离回归、备份恢复、alpha.34/0034 hotfix、部署健康和 operations Chromium 只读验收通过；未执行 UAT 审核 |
+| 权限差异 | PASS / EXACT | operations 仅新增 `material.review.queue/approve/reject`；明确没有 `material.draft.edit_any`、身份/admin、`system.audit.read`、工程正文代编辑或其他业务写增量 |
+| 服务端边界 | PASS / FAIL CLOSED | 跨创建人 PENDING_REVIEW 队列和详情可见；engineering 创建人自审拒绝，无关角色 403 中文提示。批准/退回复用稳定编码、必填原因、幂等正文冲突、expected version/CAS、并发唯一成功、事务回滚和审计 |
+| UI/口径 | PASS | 队列 total/筛选/列表/详情/按钮同口径；legacy 清洗入口明确退役并引导原生审核/导入；Dashboard 显式标为全局 DRAFT+PENDING_REVIEW |
+| 自动测试 | PASS | UI/Identity/Dashboard 66 项；适用非数据库回归 275 项；隔离 PostgreSQL 52 项；typecheck、Schema consistency、lint 0 error、build、credentials、diff check 和 Python 三项通过 |
+| 版本/Migration | UNCHANGED | 源码 alpha.35/0035；运行 Web alpha.34 hotfix，PostgreSQL/Worker alpha.34/0034。无 Migration 增删改或运行；0035 SHA-256 `d64ec733...9714` |
+| 备份/恢复 | PASS | root-only dump 2,013,262 bytes、SHA-256 `afe2cc5...e15`；pg_restore list 3,050 entries/426 table entries/213 table-data，独立恢复关键计数和受保护记录摘要一致，恢复库已删除 |
+| 兼容 hotfix | PASS / DEPLOYED | alpha.34 基线叠加当前已有 Origin/CSRF/logout 与本任务权限/UI 最小差异，镜像 `sha256:f31199de3b8...`；0034 candidate smoke 通过。只重建 Web，旧 `sha256:273aa687e741...` 以回滚 tag 保留 |
+| 浏览器只读 | PASS | operations 搜索 `042576` 得 4/4：533—536 全部可见、详情可开、批准/退回按钮存在、正文编辑控件 0；未点击保护动作，logout 成功，旧 Session `SESSION_REVOKED` |
+| 保护记录 | UNCHANGED | 533—536 均 PENDING_REVIEW/version 2(V2)/MANUAL/PCS/空正式编码；material version/change/audit 的 APPROVE/REJECT 计数全部 0 |
+| 服务/Volume | PASS | PostgreSQL/Web healthy，Worker/Caddy running；四服务 restart 0/OOM false，Web 只绑定 127.0.0.1:3000，四个受保护卷 driver/created metadata 不变 |
+| 安全事件 | ACTION RECOMMENDED | 凭据材料和一个 Session 摘要曾因工具输出脱敏/约束错误只在本次授权会话中显露；未进入仓库、文件、服务日志或外部系统，凭据文件未改，任务 Session 已撤销。建议独立试用前另行轮换 operations UAT 凭据 |
+| 资源/清理 | PASS | 起点约 2.3 GiB available/47 MiB Swap/33 GiB 根盘；最终 2,307,512 KiB available、66,456 KiB Swap used、31 GiB 根盘、Load `0.16/0.42/0.47`，112 秒 Swap 增长 0，内核 OOM 0。测试/恢复库、临时容器、runner/worktree 已清理；备份与回滚镜像按设计保留 |
+| Git | PASS | 功能 `54f6480` Parent `78701d16`；验收提交 `ops: accept operations material review queue fix` 以功能提交为 Parent，SHA 以 Git log 为准。未 push/PR/amend/rebase/reset/stash/restore |
+
 ## SELFHOST-LANDING-TASK07 按原始模板逐表标准化并汇总
 
 | 验证项 | 结果 | 说明 |

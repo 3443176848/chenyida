@@ -19,3 +19,7 @@
 | Backup | 最近成功校验 | 只读受信 `latest.json`；无文件路径、URL、连接串或正文 |
 
 `dashboard.read` 仅允许读取角色对应数据域。admin/manager/operations 另有 `dashboard.management.read`；系统审计继续要求 `system.audit.read`，备份状态保持 admin-only `system.backup.read`。兼容扁平字段也按相同 domain 裁剪，浏览器隐藏不是授权边界。
+
+## Material 待处理显示边界
+
+兼容工作台的 `summary.pending` 是全局 `material_master.material_status in ('DRAFT','PENDING_REVIEW')` 汇总，不是当前角色可处理的审核队列数量；UI 必须显示为“全局待处理（DRAFT + PENDING_REVIEW）”。人工审核队列的唯一数量来源仍是 `GET /api/material-master/review-queue` 返回的 `pagination.total`，其集合固定为 `PENDING_REVIEW` 并要求 `material.review.queue`。筛选、列表、详情和动作入口不得用全局兼容统计代替该队列口径。
