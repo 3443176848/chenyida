@@ -95,6 +95,15 @@ test("root, material and legacy shells conceal pagehide snapshots and revalidate
   assert.doesNotMatch(legacyShellRoute, /public, max-age/);
 });
 
+test("legacy protected-state cleanup erases BOM selector text and stable IDs before logout or history restore", () => {
+  const clear = app.match(/function clearLegacyProtectedState\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+  for (const selector of ["#lineItemSearch", "#lineItem", "#lineUnitId", "#lineUom", "#lineItemSelected", "#lineItemSearchStatus", "#lineItemResults"]) assert.ok(clear.includes(selector), selector);
+  assert.match(clear, /bomMaterialSearchController\?\.abort\(\)/);
+  assert.match(clear, /bomLinesRequestToken \+= 1/);
+  assert.match(app, /async function logout\(\)[\s\S]*clearLegacyProtectedState\(\);[\s\S]*location\.replace\("\/"\)/);
+  assert.match(app, /async function revalidateRestoredSession[\s\S]*clearLegacyProtectedState\(\)/);
+});
+
 test("legacy reveals protected DOM only after a complete authenticated refresh", () => {
   assert.match(app, /async function refreshAndRevealLegacy\(\) \{[\s\S]*await refreshAll\(\);[\s\S]*hideLogin\(\);[\s\S]*\}/);
   assert.match(app, /async function revalidateRestoredSession[\s\S]*await refreshAndRevealLegacy\(\);[\s\S]*catch \(error\) \{[\s\S]*clearLegacyProtectedState\(\);[\s\S]*showLogin\(\);[\s\S]*return;/);

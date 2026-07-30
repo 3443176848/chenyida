@@ -27,6 +27,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+  overflow-x: hidden;
 }
 
 .topbar {
@@ -119,6 +120,7 @@ body {
 .content {
   padding: 24px;
   overflow: auto;
+  min-width: 0;
 }
 
 .tab {
@@ -212,6 +214,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 18px;
+  min-width: 0;
 }
 
 .work-panel h3 {
@@ -259,6 +262,7 @@ textarea {
   grid-template-columns: repeat(2, minmax(260px, 1fr));
   gap: 14px;
   margin-bottom: 14px;
+  min-width: 0;
 }
 
 .form-grid.three {
@@ -269,6 +273,7 @@ textarea {
   display: grid;
   grid-template-columns: repeat(2, minmax(300px, 1fr));
   gap: 14px;
+  min-width: 0;
 }
 
 .spaced {
@@ -288,6 +293,108 @@ select {
   border-radius: 6px;
   padding: 9px 10px;
   background: #fff;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+input[readonly] {
+  background: #f8fafc;
+  color: #475569;
+}
+
+.workflow-note {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border: 1px solid #99d5ce;
+  border-radius: 8px;
+  background: var(--soft);
+  line-height: 1.6;
+}
+
+.workflow-note strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.workflow-note ol {
+  margin: 8px 0 0;
+  padding-left: 22px;
+}
+
+.workflow-hint {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.bom-version-context {
+  margin-top: 14px;
+}
+
+.bom-material-picker {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 6px;
+}
+
+.bom-material-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bom-material-search-row .secondary {
+  white-space: nowrap;
+}
+
+.bom-material-selected {
+  margin: 0;
+  padding: 9px 10px;
+  border-left: 3px solid var(--brand);
+  background: #f0fdfa;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.bom-material-results {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.bom-material-option {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.bom-material-option:hover,
+.bom-material-option:focus-visible,
+.bom-material-option[aria-selected="true"] {
+  border-color: var(--brand);
+  background: var(--soft);
+  outline: none;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
 }
 
 .csv-box {
@@ -661,5 +768,24 @@ dialog h3 {
   }
   .auth-field-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .content {
+    padding: 12px;
+  }
+  .work-panel {
+    padding: 14px;
+  }
+  .button-row {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .bom-material-search-row {
+    grid-template-columns: 1fr;
+  }
+  .bom-material-search-row .secondary {
+    justify-self: start;
   }
 }

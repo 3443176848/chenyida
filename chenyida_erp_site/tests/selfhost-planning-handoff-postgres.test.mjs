@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { Pool } from "pg";
+import { handleBomApi } from "../app/lib/bom-selfhost/handler.ts";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
 import { handlePlanningHandoffApi } from "../app/lib/planning-handoff-selfhost/handler.ts";
 import { PlanningHandoffRepository } from "../app/lib/planning-handoff-selfhost/repository.ts";
@@ -17,6 +18,18 @@ async function api(path, { method = "GET", role = "engineering", username, body,
   const request = new Request(`http://local.test${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const result = await handlePlanningHandoffApi(request, { pool, actor: actor(role, username), requestId, requireCsrf: () => { if (headers.get("X-CSRF-Token") !== "test-csrf") throw Object.assign(new Error("CSRF Token 无效"), { code: "CSRF_INVALID", status: 403 }); } });
   assert.ok(result); return { response: result, payload: await result.json(), requestId };
+}
+
+async function releaseBom(bomHeaderId, bomVersionId) {
+  const requestId = randomUUID();
+  const request = new Request(`http://local.test/api/boms/${bomHeaderId}/versions/${bomVersionId}/release`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": randomUUID(), "X-CSRF-Token": "test-csrf", "X-Request-ID": requestId },
+    body: JSON.stringify({ expected_version: 1 }),
+  });
+  const response = await handleBomApi(request, { pool, actor: actor("engineering"), requestId, requireCsrf: () => {} });
+  assert.ok(response); const payload = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(payload));
 }
 
 async function project(client, { code, customerId, status = "ACCEPTED", owner = "engineering01", quantity = "10.000000" }) {
@@ -36,7 +49,15 @@ async function seed() {
   const unit = await pool.query("insert into units(code,name,symbol,unit_type,enabled) values('PCS','件','PCS','COUNT',true) returning id"); const unitId = Number(unit.rows[0].id);
   const category = await pool.query("insert into material_categories(category_code,category_name_cn,category_level,status,created_by,updated_by,request_id) values('PLAN-COMP','计划零件',1,'ACTIVE','admin01','admin01',$1) returning id", [randomUUID()]);
   const material = await pool.query("insert into material_master(internal_material_code,standard_name,category_id,brand,manufacturer,manufacturer_part_number,base_uom,base_unit_id,material_status,procurement_type,inventory_type,inspection_type,environmental_requirement,source_type,last_modified_by,approved_by,approved_at,created_by,updated_by,request_id) values('MAT-PLAN-0001','精密连接器',$1,'ACME','ACME','X-100','PCS',$2,'ACTIVE','PURCHASED','STOCK','IQC','RoHS','MANUAL','admin01','admin01',now(),'admin01','admin01',$3) returning id", [category.rows[0].id, unitId, randomUUID()]);
-  async function productFixture(code, customerId, released = true) { const p = await pool.query("insert into products(product_code,product_name,customer_id,status,created_by,updated_by,request_id) values($1,$2,$3,'ACTIVE','engineering01','engineering01',$4) returning id", [code, `产品 ${code}`, customerId, randomUUID()]); const pv = await pool.query("insert into product_versions(product_id,version_no,version_code,status,product_type,lifecycle_status,engineering_owner,released_by,released_at,created_by,updated_by,request_id) values($1,1,'V1',$2,'ASSEMBLY','ACTIVE','engineering01',$3,$4,'engineering01','engineering01',$5) returning id", [p.rows[0].id, released ? "RELEASED" : "DRAFT", released ? "engineering01" : "", released ? new Date() : null, randomUUID()]); const bh = await pool.query("insert into bom_headers(bom_code,product_id,status,created_by,updated_by,request_id) values($1,$2,'ACTIVE','engineering01','engineering01',$3) returning id", [`BOM-${code}`, p.rows[0].id, randomUUID()]); const bv = await pool.query("insert into bom_versions(bom_header_id,product_version_id,version_no,version_code,status,released_by,released_at,created_by,updated_by,request_id) values($1,$2,1,'V1',$3,$4,$5,'engineering01','engineering01',$6) returning id", [bh.rows[0].id, pv.rows[0].id, "DRAFT", "", null, randomUUID()]); await pool.query("insert into bom_lines(bom_version_id,line_no,material_id,quantity_per,unit_id,loss_rate,process_stage,created_by,updated_by,request_id) values($1,1,$2,'2.500000',$3,'0.10000000','ASSEMBLY','engineering01','engineering01',$4)", [bv.rows[0].id, material.rows[0].id, unitId, randomUUID()]); if (released) await pool.query("update bom_versions set status='RELEASED',released_by='engineering01',released_at=now() where id=$1", [bv.rows[0].id]); return { productId: Number(p.rows[0].id), productVersionId: Number(pv.rows[0].id), bomHeaderId: Number(bh.rows[0].id), bomVersionId: Number(bv.rows[0].id) }; }
+  async function productFixture(code, customerId, released = true) {
+    const p = await pool.query("insert into products(product_code,product_name,customer_id,status,created_by,updated_by,request_id) values($1,$2,$3,'ACTIVE','engineering01','engineering01',$4) returning id", [code, `产品 ${code}`, customerId, randomUUID()]);
+    const pv = await pool.query("insert into product_versions(product_id,version_no,version_code,status,product_type,lifecycle_status,engineering_owner,released_by,released_at,created_by,updated_by,request_id) values($1,1,'V1',$2,'ASSEMBLY','ACTIVE','engineering01',$3,$4,'engineering01','engineering01',$5) returning id", [p.rows[0].id, released ? "RELEASED" : "DRAFT", released ? "engineering01" : "", released ? new Date() : null, randomUUID()]);
+    const bh = await pool.query("insert into bom_headers(bom_code,product_id,status,created_by,updated_by,request_id) values($1,$2,'ACTIVE','engineering01','engineering01',$3) returning id", [`BOM-${code}`, p.rows[0].id, randomUUID()]);
+    const bv = await pool.query("insert into bom_versions(bom_header_id,product_version_id,version_no,version_code,status,released_by,released_at,created_by,updated_by,request_id) values($1,$2,1,'V1','DRAFT','',null,'engineering01','engineering01',$3) returning id", [bh.rows[0].id, pv.rows[0].id, randomUUID()]);
+    await pool.query("insert into bom_lines(bom_version_id,line_no,material_id,quantity_per,unit_id,loss_rate,process_stage,created_by,updated_by,request_id) values($1,1,$2,'2.500000',$3,'0.10000000','ASSEMBLY','engineering01','engineering01',$4)", [bv.rows[0].id, material.rows[0].id, unitId, randomUUID()]);
+    if (released) await releaseBom(Number(bh.rows[0].id), Number(bv.rows[0].id));
+    return { productId: Number(p.rows[0].id), productVersionId: Number(pv.rows[0].id), bomHeaderId: Number(bh.rows[0].id), bomVersionId: Number(bv.rows[0].id) };
+  }
   const valid = await productFixture("PROD-PLAN-1", Number(c1.rows[0].id)); const wrongCustomer = await productFixture("PROD-PLAN-2", Number(c2.rows[0].id)); const draft = await productFixture("PROD-PLAN-3", Number(c1.rows[0].id), false);
   const client = await pool.connect(); client.unitId = unitId; try { await client.query("begin"); const accepted = await project(client, { code: "PRJ-00000161", customerId: Number(c1.rows[0].id) }); const pending = await project(client, { code: "PRJ-00000162", customerId: Number(c1.rows[0].id), status: "SUBMITTED" }); const fault = await project(client, { code: "PRJ-00000163", customerId: Number(c1.rows[0].id) });
     const batch = await client.query("insert into material_import_batches(batch_no,source_kind,created_by) values('PLANNING-FILE-BATCH','PROJECT_REFERENCE','sales01') returning id"); const file = await client.query("insert into material_import_files(batch_id,storage_name,relative_path,original_filename,mime_type,sha256,size_bytes,storage_status) values($1,$2,'controlled/planning/private.pdf','drawing.pdf','application/pdf',$3,321,'STORED') returning id", [batch.rows[0].id, randomUUID(), "b".repeat(64)]); await client.query("insert into project_document_links(project_id,requirement_version_id,file_id,document_type,display_name,created_by,request_id) values($1,$2,$3,'DRAWING','受控图纸','sales01',$4)", [accepted.projectId, accepted.requirementVersionId, file.rows[0].id, randomUUID()]); await client.query("commit"); return { accepted, pending, fault, valid, wrongCustomer, draft };
@@ -50,6 +71,11 @@ test.after(async () => pool.end());
 
 test("fail-closed preparation validates acceptance, ownership, customer, releases and complete resolution", async () => {
   const refs = await seed();
+  const available = await api(`/api/projects/${refs.accepted.projectId}/requirement-resolutions`);
+  assert.equal(available.response.status, 200);
+  assert.ok(available.payload.data.candidates.some((row) => Number(row.bom_version_id) === refs.valid.bomVersionId));
+  assert.ok(!available.payload.data.candidates.some((row) => Number(row.bom_version_id) === refs.draft.bomVersionId));
+  assert.ok(!available.payload.data.candidates.some((row) => Number(row.bom_version_id) === refs.wrongCustomer.bomVersionId));
   const notAccepted = await api(`/api/projects/${refs.pending.projectId}/requirement-resolutions`, { method: "POST", body: resolution(refs, refs.valid, refs.pending) }); assert.equal(notAccepted.response.status, 409); assert.equal(notAccepted.payload.code, "PROJECT_NOT_ACCEPTED");
   const wrongOwner = await api(`/api/projects/${refs.accepted.projectId}/requirement-resolutions`, { method: "POST", username: "engineering02", body: resolution(refs) }); assert.equal(wrongOwner.response.status, 403); assert.equal(wrongOwner.payload.code, "PROJECT_OWNER_REQUIRED");
   const planPrepare = await api(`/api/projects/${refs.accepted.projectId}/requirement-resolutions`, { method: "POST", role: "planning", username: "planning01", body: resolution(refs) }); assert.equal(planPrepare.response.status, 403);

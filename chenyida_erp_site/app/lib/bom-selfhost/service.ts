@@ -30,14 +30,20 @@ export class BomService {
     return this.repository.execute(meta, async (client) => {
       const header = await client.query(`select h.*,v.id bom_version_id,v.status version_status from bom_headers h join bom_versions v on v.bom_header_id=h.id and v.version_no=h.current_version_no where h.id=$1 for update of h,v`, [headerId]);
       if (!header.rows[0]) throw new MasterDataError("BOM_NOT_FOUND", "BOM 不存在", 404); if (header.rows[0].version_status !== "DRAFT") throw new MasterDataError("BOM_RELEASED_IMMUTABLE", "已发布 BOM 不可修改，请新建版本", 409);
-      let materialId = input.material_id ? positiveInt(input.material_id, "material_id") : 0;
-      if (!materialId) { const found = await client.query("select id from material_master where internal_material_code=$1 and material_status='ACTIVE'", [boundedText(input.internal_item_code, "内部物料编码", 100, true)]); materialId = Number(found.rows[0]?.id || 0); }
-      let unitId = input.unit_id ? positiveInt(input.unit_id, "unit_id") : 0;
-      if (!unitId) { const found = await client.query("select id from units where code=$1 and enabled=true", [boundedText(input.uom, "单位", 40, true).toUpperCase()]); unitId = Number(found.rows[0]?.id || 0); }
-      const references = await client.query(`select m.internal_material_code,m.standard_name,u.code unit_code from material_master m cross join units u where m.id=$1 and m.material_status='ACTIVE' and u.id=$2 and u.enabled=true`, [materialId, unitId]);
-      if (!references.rows[0]) throw new MasterDataError("BOM_REFERENCE_NOT_ACTIVE", "BOM 行物料或单位不存在或未启用", 422);
+      const materialId = positiveInt(input.material_id, "material_id"); const unitId = positiveInt(input.unit_id, "unit_id");
+      const material = await client.query(`select id,internal_material_code,standard_name,base_unit_id,base_uom,material_status from material_master where id=$1 for share`, [materialId]);
+      if (!material.rows[0]) throw new MasterDataError("BOM_MATERIAL_NOT_FOUND", "BOM 行物料不存在", 422);
+      if (material.rows[0].material_status !== "ACTIVE" || !String(material.rows[0].internal_material_code || "").trim()) throw new MasterDataError("BOM_MATERIAL_NOT_ACTIVE", "BOM 行物料未启用或尚无正式内部编码", 422);
+      const unit = await client.query("select id,code,enabled from units where id=$1 for share", [unitId]);
+      if (!unit.rows[0] || unit.rows[0].enabled !== true) throw new MasterDataError("BOM_UNIT_NOT_ACTIVE", "BOM 行单位不存在或未启用", 422);
+      const matchesMasterUnit = material.rows[0].base_unit_id !== null
+        ? Number(material.rows[0].base_unit_id) === unitId
+        : String(material.rows[0].base_uom || "").trim().toUpperCase() === String(unit.rows[0].code || "").trim().toUpperCase();
+      if (!matchesMasterUnit) throw new MasterDataError("BOM_UNIT_MISMATCH", "BOM 行单位必须与物料主数据单位一致", 422);
+      const duplicate = await client.query("select 1 from bom_lines where bom_version_id=$1 and material_id=$2 limit 1", [header.rows[0].bom_version_id, materialId]);
+      if (duplicate.rows[0]) throw new MasterDataError("BOM_MATERIAL_DUPLICATE", "同一物料不能在同一 BOM 版本中重复添加", 409);
       const lineNo = positiveInt(input.line_no, "line_no"); const result = await client.query(`insert into bom_lines(bom_version_id,line_no,material_id,quantity_per,unit_id,loss_rate,process_stage,remark,created_by,updated_by,request_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$9,$10) returning *`, [header.rows[0].bom_version_id, lineNo, materialId, quantity(input.quantity_per ?? input.qty_per, "quantity_per"), unitId, loss(input.loss_rate), boundedText(input.process_stage, "工序", 100), boundedText(input.remark, "备注"), meta.actor.username, meta.requestId]);
-      return { status: 201, body: { ok: true, data: { ...result.rows[0], ...references.rows[0] }, request_id: meta.requestId }, targetType: "BOM_LINE", targetId: Number(result.rows[0].id) };
+      return { status: 201, body: { ok: true, data: { ...result.rows[0], internal_material_code: material.rows[0].internal_material_code, standard_name: material.rows[0].standard_name, unit_code: unit.rows[0].code }, request_id: meta.requestId }, targetType: "BOM_LINE", targetId: Number(result.rows[0].id) };
     });
   }
 
@@ -46,10 +52,11 @@ export class BomService {
     return this.repository.execute(meta, async (client) => {
       const header = await client.query("select * from bom_headers where id=$1 for update", [headerId]); if (!header.rows[0]) throw new MasterDataError("BOM_NOT_FOUND", "BOM 不存在", 404);
       if (Number(header.rows[0].version) !== expected) throw new MasterDataError("VERSION_CONFLICT", "BOM 版本已变化，请刷新后重试", 409);
-      const validation = await client.query(`select v.status,v.version_no,pv.status product_status,count(l.id)::int line_count,count(*) filter (where m.material_status<>'ACTIVE' or u.enabled=false)::int invalid_count from bom_versions v join product_versions pv on pv.id=v.product_version_id left join bom_lines l on l.bom_version_id=v.id left join material_master m on m.id=l.material_id left join units u on u.id=l.unit_id where v.id=$1 and v.bom_header_id=$2 group by v.status,v.version_no,pv.status`, [versionId, headerId]);
+      await client.query(`select m.id material_id,u.id unit_id from bom_versions v join bom_lines l on l.bom_version_id=v.id join material_master m on m.id=l.material_id join units u on u.id=l.unit_id where v.id=$1 and v.bom_header_id=$2 for share of m,u`, [versionId, headerId]);
+      const validation = await client.query(`select v.status,v.version_no,pv.status product_status,count(l.id)::int line_count,count(*) filter (where l.id is not null and (m.id is null or m.material_status<>'ACTIVE' or nullif(btrim(m.internal_material_code),'') is null or u.id is null or u.enabled=false or not ((m.base_unit_id is not null and l.unit_id=m.base_unit_id) or (m.base_unit_id is null and nullif(btrim(m.base_uom),'') is not null and upper(u.code)=upper(btrim(m.base_uom))))))::int invalid_count from bom_versions v join product_versions pv on pv.id=v.product_version_id left join bom_lines l on l.bom_version_id=v.id left join material_master m on m.id=l.material_id left join units u on u.id=l.unit_id where v.id=$1 and v.bom_header_id=$2 group by v.status,v.version_no,pv.status`, [versionId, headerId]);
       const row = validation.rows[0]; if (!row || row.status !== "DRAFT") throw new MasterDataError("BOM_VERSION_STATE_CONFLICT", "BOM 版本不存在或不能发布", 409);
       if (row.product_status !== "RELEASED") throw new MasterDataError("PRODUCT_VERSION_NOT_RELEASED", "关联产品版本未发布", 422);
-      if (Number(row.line_count) < 1 || Number(row.invalid_count) > 0) throw new MasterDataError("BOM_STRUCTURE_INVALID", "BOM 必须至少有一行且全部物料和单位有效", 422);
+      if (Number(row.line_count) < 1 || Number(row.invalid_count) > 0) throw new MasterDataError("BOM_STRUCTURE_INVALID", "BOM 必须至少有一行，且全部物料为 ACTIVE 正式物料并使用主数据单位", 422);
       const version = await client.query(`update bom_versions set status='RELEASED',released_by=$3,released_at=now(),updated_by=$3,updated_at=now(),request_id=$4 where id=$1 and bom_header_id=$2 and status='DRAFT' returning *`, [versionId, headerId, meta.actor.username, meta.requestId]);
       await client.query("update bom_headers set version=version+1,updated_by=$2,updated_at=now(),request_id=$3 where id=$1", [headerId, meta.actor.username, meta.requestId]);
       return { status: 200, body: { ok: true, data: version.rows[0], request_id: meta.requestId }, targetType: "BOM_VERSION", targetId: versionId, oldVersion: expected, newVersion: expected + 1 };

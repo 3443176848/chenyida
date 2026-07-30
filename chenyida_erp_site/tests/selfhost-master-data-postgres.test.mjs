@@ -30,6 +30,16 @@ async function seedReferences() {
   await pool.query(`insert into material_master(internal_material_code,standard_name,category_id,base_uom,base_unit_id,material_status,procurement_type,inventory_type,inspection_type,environmental_requirement,source_type,last_modified_by,created_by,updated_by,request_id) values('CYD-TEST-000001','测试物料',$1,'PCS',$2,'ACTIVE','PURCHASE','STOCK','IQC','ROHS','MANUAL','test','test','test',$3)`, [category.rows[0].id, unit.rows[0].id, randomUUID()]);
 }
 
+async function insertSelectorMaterial({ code, name, status = "ACTIVE", unitId, version = 1 }) {
+  const category = await pool.query("select id from material_categories where category_code='TEST_LEAF'");
+  const result = await pool.query(`insert into material_master(
+    internal_material_code,standard_name,category_id,base_uom,base_unit_id,material_status,procurement_type,inventory_type,
+    inspection_type,environmental_requirement,source_type,version,last_modified_by,created_by,updated_by,request_id
+  ) values($1,$2,$3,'PCS',$4,$5,'PURCHASE','STOCK','IQC','ROHS','MANUAL',$6,'test','test','test',$7)
+  returning id,internal_material_code,standard_name,base_unit_id,material_status,version`, [code, name, category.rows[0].id, unitId, status, version, randomUUID()]);
+  return result.rows[0];
+}
+
 test.beforeEach(async () => {
   await pool.query(`truncate bom_lines,bom_versions,bom_headers,product_versions,products,customers,supplier_mapping_price_history,supplier_mappings,suppliers,business_code_sequences,identity_write_rate_limit_buckets,idempotency_keys,audit_log,app_users,material_master,units,material_categories restart identity cascade`);
   await seedReferences();
@@ -83,6 +93,162 @@ test("customer supplier product BOM mapping and inventory-backed readiness compl
   assert.equal(staleProduct.response.status, 409); assert.equal(staleProduct.payload.code, "VERSION_CONFLICT");
   const items = await api(handleMasterDataApi, "/api/items", { role: "operations" }); assert.equal(items.payload.rows.length, 1); assert.equal(items.payload.rows[0].status, "ACTIVE");
   assert.equal(Number((await pool.query("select count(*) count from inventory_transactions")).rows[0].count), 0);
+});
+
+test("BOM material candidates are code-first bounded stable-ID DTOs and line writes revalidate material identity", async () => {
+  const pcs = (await pool.query("select id from units where code='PCS'")).rows[0];
+  const box = (await pool.query("insert into units(code,name,symbol,unit_type,enabled) values('BOX','箱','BOX','COUNT',true) returning id")).rows[0];
+  const disabledUnit = (await pool.query("insert into units(code,name,symbol,unit_type,enabled) values('OFF','停用单位','OFF','COUNT',false) returning id")).rows[0];
+  const materials = {};
+  for (const [key, code, name, version] of [
+    ["pcb", "CYD-RB_PCB-990001", "合成测试控制板", 3],
+    ["pcbPrefix", "CYD-RB_PCB-990001-ALT", "合成测试控制板前缀项", 1],
+    ["sensor", "CYD-RB_SENSOR-990003", "合成温度传感器", 2],
+    ["conn", "CYD-RB_CONN-990075", "合成微型连接器", 4],
+    ["metal", "CYD-RB_METAL-990015", "合成金属外壳", 5],
+  ]) materials[key] = await insertSelectorMaterial({ code, name, unitId: pcs.id, version });
+  await pool.query("update material_master set base_unit_id=null where id=$1", [materials.pcb.id]);
+  materials.frozen = await insertSelectorMaterial({ code: "CYD-RB_CONN-999999", name: "不可选物料", status: "FROZEN", unitId: pcs.id });
+  await insertSelectorMaterial({ code: "CYD-RB_CONN-999999-ALT", name: "不应由冻结精确编码回退命中", unitId: pcs.id });
+  await insertSelectorMaterial({ code: "CYD-RB_CONN-999998", name: "停用单位物料", unitId: disabledUnit.id });
+  await insertSelectorMaterial({ code: null, name: "不可选物料", status: "DRAFT", unitId: pcs.id });
+  await insertSelectorMaterial({ code: null, name: "不可选物料", status: "PENDING_REVIEW", unitId: pcs.id });
+
+  const category = (await pool.query("select id from material_categories where category_code='TEST_LEAF'")).rows[0];
+  await pool.query(`insert into material_master(
+    internal_material_code,standard_name,category_id,base_uom,base_unit_id,material_status,procurement_type,inventory_type,
+    inspection_type,environmental_requirement,source_type,last_modified_by,created_by,updated_by,request_id
+  ) select 'CYD-RB_LIMIT-' || lpad(value::text,6,'0'),'有界候选物料 ' || value,$1,'PCS',$2,'ACTIVE','PURCHASE','STOCK',
+    'IQC','ROHS','MANUAL','test','test','test',$3 from generate_series(1,25) value`, [category.id, pcs.id, randomUUID()]);
+
+  const empty = await api(handleBomApi, "/api/bom-material-candidates?q=&limit=20", { role: "engineering" });
+  assert.equal(empty.response.status, 200); assert.deepEqual(empty.payload.rows, []);
+  for (const [key, code] of [
+    ["pcb", "CYD-RB_PCB-990001"],
+    ["sensor", "CYD-RB_SENSOR-990003"],
+    ["conn", "CYD-RB_CONN-990075"],
+    ["metal", "CYD-RB_METAL-990015"],
+  ]) {
+    const exact = await api(handleBomApi, `/api/bom-material-candidates?q=${encodeURIComponent(code)}&limit=20`, { role: "engineering" });
+    assert.equal(exact.response.status, 200); assert.equal(exact.payload.rows.length, 1);
+    assert.deepEqual(Object.keys(exact.payload.rows[0]).sort(), ["internal_code", "material_id", "name", "status", "unit", "unit_id", "version"]);
+    assert.equal(exact.payload.rows[0].material_id, Number(materials[key].id));
+    assert.equal(exact.payload.rows[0].internal_code, code); assert.equal(exact.payload.rows[0].unit, "PCS");
+    assert.equal(exact.payload.rows[0].status, "ACTIVE"); assert.equal(exact.payload.rows[0].version, Number(materials[key].version));
+    assert.ok(Number.isSafeInteger(exact.payload.rows[0].material_id)); assert.ok(Number.isSafeInteger(exact.payload.rows[0].unit_id));
+  }
+  const prefix = await api(handleBomApi, "/api/bom-material-candidates?q=CYD-RB_SENSOR-99&limit=20", { role: "engineering" });
+  assert.deepEqual(prefix.payload.rows.map((row) => row.internal_code), ["CYD-RB_SENSOR-990003"]);
+  const byName = await api(handleBomApi, `/api/bom-material-candidates?q=${encodeURIComponent("微型连接器")}&limit=20`, { role: "engineering" });
+  assert.deepEqual(byName.payload.rows.map((row) => row.material_id), [Number(materials.conn.id)]);
+  const excluded = await api(handleBomApi, `/api/bom-material-candidates?q=${encodeURIComponent("不可选物料")}&limit=20`, { role: "engineering" });
+  assert.deepEqual(excluded.payload.rows, []);
+  const ineligibleExact = await api(handleBomApi, `/api/bom-material-candidates?q=${encodeURIComponent("CYD-RB_CONN-999999")}&limit=20`, { role: "engineering" });
+  assert.deepEqual(ineligibleExact.payload.rows, []);
+  const disabledUnitExact = await api(handleBomApi, `/api/bom-material-candidates?q=${encodeURIComponent("CYD-RB_CONN-999998")}&limit=20`, { role: "engineering" });
+  assert.deepEqual(disabledUnitExact.payload.rows, []);
+  const bounded = await api(handleBomApi, `/api/bom-material-candidates?q=${encodeURIComponent("有界候选物料")}&limit=999`, { role: "engineering" });
+  assert.equal(bounded.payload.rows.length, 20);
+  assert.ok(bounded.payload.rows.every((row) => row.status === "ACTIVE" && row.internal_code));
+
+  const product = await api(handleMasterDataApi, "/api/products", { method: "POST", role: "engineering", body: { product_name: "BOM 选择器合成产品", product_version: "A0" } });
+  assert.equal(product.response.status, 201);
+  const productId = Number(product.payload.data.id); const productVersionId = Number(product.payload.data.current_version.id);
+  const releasedProduct = await api(handleMasterDataApi, `/api/products/${productId}/versions/${productVersionId}/release`, { method: "POST", role: "engineering", body: { expected_version: 1 } });
+  assert.equal(releasedProduct.response.status, 200);
+  const bom = await api(handleBomApi, "/api/boms", { method: "POST", role: "engineering", body: { product_id: productId, version_code: "V1" } });
+  assert.equal(bom.response.status, 201); const bomId = Number(bom.payload.bom_id);
+
+  const missing = await api(handleBomApi, "/api/bom-lines", { method: "POST", role: "engineering", body: { bom_id: bomId, line_no: 1, material_id: Number.MAX_SAFE_INTEGER, quantity_per: "1", unit_id: Number(pcs.id) } });
+  assert.equal(missing.response.status, 422);
+  const inactive = await api(handleBomApi, "/api/bom-lines", { method: "POST", role: "engineering", body: { bom_id: bomId, line_no: 1, material_id: Number(materials.frozen.id), quantity_per: "1", unit_id: Number(pcs.id) } });
+  assert.equal(inactive.response.status, 422);
+  const wrongUnit = await api(handleBomApi, "/api/bom-lines", { method: "POST", role: "engineering", body: { bom_id: bomId, line_no: 1, material_id: Number(materials.pcb.id), quantity_per: "1", unit_id: Number(box.id) } });
+  assert.equal(wrongUnit.response.status, 422);
+  const zeroQuantity = await api(handleBomApi, "/api/bom-lines", { method: "POST", role: "engineering", body: { bom_id: bomId, line_no: 1, material_id: Number(materials.sensor.id), quantity_per: "0", unit_id: Number(pcs.id) } });
+  assert.equal(zeroQuantity.response.status, 400);
+  const overPrecision = await api(handleBomApi, "/api/bom-lines", { method: "POST", role: "engineering", body: { bom_id: bomId, line_no: 1, material_id: Number(materials.sensor.id), quantity_per: "1.0000001", unit_id: Number(pcs.id) } });
+  assert.equal(overPrecision.response.status, 400);
+  const line = await api(handleBomApi, "/api/bom-lines", { method: "POST", role: "engineering", body: { bom_id: bomId, line_no: 1, material_id: Number(materials.pcb.id), quantity_per: "1.250000", unit_id: Number(pcs.id), process_stage: "SMT" } });
+  assert.equal(line.response.status, 201); assert.equal(Number(line.payload.data.material_id), Number(materials.pcb.id)); assert.equal(Number(line.payload.data.unit_id), Number(pcs.id));
+  const duplicate = await api(handleBomApi, "/api/bom-lines", { method: "POST", role: "engineering", body: { bom_id: bomId, line_no: 2, material_id: Number(materials.pcb.id), quantity_per: "2", unit_id: Number(pcs.id), process_stage: "ASSEMBLY" } });
+  assert.equal(duplicate.response.status, 409);
+  const persisted = await pool.query("select material_id,unit_id,quantity_per::text quantity_per from bom_lines where bom_version_id=$1", [bom.payload.data.current_version.id]);
+  assert.deepEqual(persisted.rows, [{ material_id: String(materials.pcb.id), unit_id: String(pcs.id), quantity_per: "1.250000" }]);
+});
+
+test("BOM release preserves permission idempotency CAS audit rollback and legacy base-unit contracts", async () => {
+  const material = (await pool.query("select id from material_master where internal_material_code='CYD-TEST-000001'")).rows[0];
+  const unit = (await pool.query("select id from units where code='PCS'")).rows[0];
+  await pool.query("update material_master set base_unit_id=null where id=$1", [material.id]);
+  const legacyUnit = (await pool.query("select base_unit_id,base_uom from material_master where id=$1", [material.id])).rows[0];
+  assert.equal(legacyUnit.base_unit_id, null); assert.equal(legacyUnit.base_uom, "PCS");
+
+  const product = await api(handleMasterDataApi, "/api/products", { method: "POST", role: "engineering", body: { product_name: "BOM 发布合同合成产品", product_version: "A0" } });
+  assert.equal(product.response.status, 201);
+  const productId = Number(product.payload.data.id); const productVersionId = Number(product.payload.data.current_version.id);
+  const productRelease = await api(handleMasterDataApi, `/api/products/${productId}/versions/${productVersionId}/release`, { method: "POST", role: "engineering", body: { expected_version: 1 } });
+  assert.equal(productRelease.response.status, 200);
+
+  const createDraftBom = async (versionCode) => {
+    const created = await api(handleBomApi, "/api/boms", { method: "POST", role: "engineering", body: { product_id: productId, version_code: versionCode } });
+    assert.equal(created.response.status, 201);
+    const headerId = Number(created.payload.bom_id); const versionId = Number(created.payload.data.current_version.id);
+    const line = await api(handleBomApi, "/api/bom-lines", { method: "POST", role: "engineering", body: { bom_id: headerId, line_no: 1, material_id: Number(material.id), quantity_per: "1.000000", unit_id: Number(unit.id) } });
+    assert.equal(line.response.status, 201);
+    return { headerId, versionId };
+  };
+
+  const releasable = await createDraftBom("V1");
+  const readiness = await api(handleBomApi, `/api/bom-readiness?bom_id=${releasable.headerId}&order_qty=1`, { role: "engineering" });
+  assert.equal(readiness.response.status, 200); assert.equal(readiness.payload.structure_ready, true);
+  assert.notEqual(readiness.payload.rows[0].readiness_status, "UNIT_CONVERSION_REQUIRED");
+
+  const releasePath = `/api/boms/${releasable.headerId}/versions/${releasable.versionId}/release`;
+  const denied = await api(handleBomApi, releasePath, { method: "POST", role: "warehouse", body: { expected_version: 1 } });
+  assert.equal(denied.response.status, 403); assert.equal(denied.payload.code, "PERMISSION_DENIED");
+
+  const releaseKey = "bom-release-contract-0001";
+  const released = await api(handleBomApi, releasePath, { method: "POST", role: "engineering", key: releaseKey, body: { expected_version: 1 } });
+  assert.equal(released.response.status, 200); assert.equal(released.payload.data.status, "RELEASED");
+  const replay = await api(handleBomApi, releasePath, { method: "POST", role: "engineering", key: releaseKey, body: { expected_version: 1 } });
+  assert.equal(replay.response.status, 200); assert.equal(replay.response.headers.get("Idempotency-Replayed"), "true");
+  assert.equal(Number(replay.payload.data.id), releasable.versionId);
+  const idempotencyConflict = await api(handleBomApi, releasePath, { method: "POST", role: "engineering", key: releaseKey, body: { expected_version: 2 } });
+  assert.equal(idempotencyConflict.response.status, 409); assert.equal(idempotencyConflict.payload.code, "IDEMPOTENCY_CONFLICT");
+  const stale = await api(handleBomApi, releasePath, { method: "POST", role: "engineering", key: "bom-release-stale-0001", body: { expected_version: 1 } });
+  assert.equal(stale.response.status, 409); assert.equal(stale.payload.code, "VERSION_CONFLICT");
+
+  const releaseState = (await pool.query(`select h.version,v.status from bom_headers h join bom_versions v on v.id=$2 and v.bom_header_id=h.id where h.id=$1`, [releasable.headerId, releasable.versionId])).rows[0];
+  assert.equal(Number(releaseState.version), 2); assert.equal(releaseState.status, "RELEASED");
+  const successAudits = await pool.query("select detail,old_version,new_version from audit_log where action='BOM_VERSION_RELEASED' and result='success'");
+  assert.equal(successAudits.rows.length, 1); assert.equal(Number(successAudits.rows[0].detail.target_id), releasable.versionId);
+  assert.equal(Number(successAudits.rows[0].old_version), 1); assert.equal(Number(successAudits.rows[0].new_version), 2);
+  const persistedReleaseKeys = await pool.query("select count(*) count from idempotency_keys where username='engineering01' and method='POST' and path=$1", [releasePath]);
+  assert.equal(Number(persistedReleaseKeys.rows[0].count), 1);
+
+  const rollbackDraft = await createDraftBom("V2");
+  const rollbackPath = `/api/boms/${rollbackDraft.headerId}/versions/${rollbackDraft.versionId}/release`;
+  try {
+    await pool.query(`create or replace function fail_bom_release_audit_for_test() returns trigger language plpgsql as $$
+      begin
+        if new.action='BOM_VERSION_RELEASED' and new.result='success' then raise exception 'forced BOM release audit failure'; end if;
+        return new;
+      end $$`);
+    await pool.query("create trigger fail_bom_release_audit_for_test before insert on audit_log for each row execute function fail_bom_release_audit_for_test()");
+    const failed = await api(handleBomApi, rollbackPath, { method: "POST", role: "engineering", key: "bom-release-audit-failure-0001", body: { expected_version: 1 } });
+    assert.equal(failed.response.status, 500); assert.equal(failed.payload.code, "INTERNAL_ERROR");
+
+    const rolledBack = (await pool.query(`select h.version,v.status,v.released_at from bom_headers h join bom_versions v on v.id=$2 and v.bom_header_id=h.id where h.id=$1`, [rollbackDraft.headerId, rollbackDraft.versionId])).rows[0];
+    assert.equal(Number(rolledBack.version), 1); assert.equal(rolledBack.status, "DRAFT"); assert.equal(rolledBack.released_at, null);
+    assert.equal(Number((await pool.query("select count(*) count from idempotency_keys where username='engineering01' and method='POST' and path=$1", [rollbackPath])).rows[0].count), 0);
+    assert.equal(Number((await pool.query("select count(*) count from audit_log where action='BOM_VERSION_RELEASED' and result='success' and detail->>'target_id'=$1", [String(rollbackDraft.versionId)])).rows[0].count), 0);
+    const failureAudit = (await pool.query("select action,result,error_code from audit_log where request_id=$1", [failed.payload.request_id])).rows[0];
+    assert.deepEqual(failureAudit, { action: "BOM_VERSION_RELEASED", result: "failed", error_code: "INTERNAL_ERROR" });
+  } finally {
+    await pool.query("drop trigger if exists fail_bom_release_audit_for_test on audit_log");
+    await pool.query("drop function if exists fail_bom_release_audit_for_test()");
+  }
 });
 
 test("permission CSRF active-reference overlap concurrency and rollback protections fail closed", async () => {

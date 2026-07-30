@@ -1,4 +1,4 @@
-import { api, ErpApiError, isHistorySessionRestore, logoutSession, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "./api-client.js?v=20260730-review-logout-cache-03";
+import { api, ErpApiError, isHistorySessionRestore, logoutSession, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "./api-client.js?v=20260731-bom-selector-fix-04";
 
 const state = {
   summary: {},
@@ -10,6 +10,9 @@ const state = {
   suppliers: [],
   boms: [],
   bomLines: [],
+  bomLinesBomId: null,
+  bomMaterialCandidates: [],
+  selectedBomMaterial: null,
   readiness: [],
   purchaseOrders: [],
   purchaseLines: [],
@@ -44,6 +47,10 @@ const state = {
   operationsAvailability: { dashboard: false, backups: false },
 };
 
+let bomMaterialSearchController = null;
+let bomMaterialSearchTimer = null;
+let bomLinesRequestToken = 0;
+
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 const LEGACY_TABS = new Set(["dashboard", "partners", "bom", "purchase", "production", "sales", "quality", "finance", "operations"]);
@@ -55,7 +62,7 @@ function requestedLegacyTab() {
 
 function clearLegacyProtectedState() {
   for (const key of [
-    "items", "mappings", "cleaning", "products", "customers", "suppliers", "boms", "bomLines", "readiness",
+    "items", "mappings", "cleaning", "products", "customers", "suppliers", "boms", "bomLines", "bomMaterialCandidates", "readiness",
     "purchaseOrders", "purchaseLines", "purchaseSuggestions", "inventory", "inventoryAdjustments", "workOrders",
     "workMaterials", "productionReports", "quotations", "salesOrders", "shipments", "qualityInspections",
     "qualityDefects", "financialDocuments", "financialPayments", "financeSources", "backups", "users", "qualitySourceOptions",
@@ -65,6 +72,21 @@ function clearLegacyProtectedState() {
   state.financeSummary = {};
   state.managementDashboard = null;
   state.selectedInspection = null;
+  state.selectedBomMaterial = null;
+  state.bomLinesBomId = null;
+  bomLinesRequestToken += 1;
+  bomMaterialSearchController?.abort();
+  bomMaterialSearchController = null;
+  if (bomMaterialSearchTimer) window.clearTimeout(bomMaterialSearchTimer);
+  bomMaterialSearchTimer = null;
+  for (const selector of ["#lineItemSearch", "#lineItem", "#lineUnitId", "#lineUom", "#lineItemSelected", "#lineItemSearchStatus", "#lineItemResults"]) {
+    const element = $(selector);
+    if (!element) continue;
+    if ("value" in element) element.value = "";
+    element.textContent = "";
+    element.removeAttribute("aria-busy");
+  }
+  if ($("#lineItemSelected")) $("#lineItemSelected").hidden = true;
   state.operationsAvailability = { dashboard: false, backups: false };
   state.session = { authenticated: false, user: null, setup_required: false };
   updateUserBar();
@@ -112,6 +134,11 @@ function escapeHtml(value) {
 
 function canManageSystem() {
   return state.session.user?.role === "admin";
+}
+
+function hasPermission(permission) {
+  const permissions = state.session.user?.permissions || [];
+  return permissions.includes("*") || permissions.includes(permission);
 }
 
 function showLogin() {
@@ -390,17 +417,22 @@ function renderProducts() {
       <td>${escapeHtml(product.customer_name)}</td>
       <td>${escapeHtml(product.product_type)}</td>
       <td>${escapeHtml(product.product_version)}</td>
+      <td>${escapeHtml(product.product_version_status)}</td>
       <td>${escapeHtml(product.lifecycle_status)}</td>
+      <td>${escapeHtml(product.status)}</td>
       <td>${escapeHtml(product.layer_count)}</td>
       <td>${escapeHtml(product.board_thickness)}</td>
       <td>${escapeHtml(product.surface_finish)}</td>
       <td>${escapeHtml(product.smt_required)}</td>
+      <td>${product.product_version_status === "DRAFT" && hasPermission("master.product.manage")
+        ? `<button data-release-product="${escapeHtml(product.id)}" data-product-version-id="${escapeHtml(product.product_version_id)}" data-product-version="${escapeHtml(product.version)}">发布产品版本</button>`
+        : escapeHtml(product.product_version_status === "RELEASED" ? "已发布" : "—")}</td>
     </tr>
   `).join("");
   $("#productsTable").innerHTML = `
     <thead><tr>
-      <th>产品编码</th><th>产品名称</th><th>客户</th><th>类型</th><th>版本</th>
-      <th>状态</th><th>层数</th><th>板厚</th><th>表面处理</th><th>SMT</th>
+      <th>产品编码</th><th>产品名称</th><th>客户</th><th>类型</th><th>产品版本</th>
+      <th>产品版本发布状态</th><th>产品生命周期状态</th><th>产品状态</th><th>层数</th><th>板厚</th><th>表面处理</th><th>SMT</th><th>操作</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   `;
@@ -452,12 +484,18 @@ function renderPartners() {
 }
 
 function renderBomSelectors() {
-  const productOptions = optionList(state.products, "product_code", ["product_code", "product_name"]);
-  const bomOptions = optionList(state.boms, "id", ["bom_code", "product_name"]);
-  const itemOptions = optionList(state.items, "internal_item_code", ["internal_item_code", "standard_name"]);
+  const selectedProductId = $("#bomProduct").value;
+  const selectedLineBomId = $("#lineBom").value;
+  const productOptions = state.products.map((product) => {
+    const label = `${product.product_code} · ${product.product_name} · 产品版本 ${product.product_version || "—"} · ${product.product_version_status || "—"}`;
+    return `<option value="${escapeHtml(product.id)}">${escapeHtml(label)}</option>`;
+  }).join("");
+  const bomOptions = state.boms.map((bom) => `<option value="${escapeHtml(bom.id)}">${escapeHtml(`${bom.bom_code} · ${bom.product_name} · BOM ${bom.bom_version} · ${bom.bom_status}`)}</option>`).join("");
   const inventoryOptions = optionList(state.inventory, "material_id", ["internal_material_code", "standard_name"]);
   $("#bomProduct").innerHTML = productOptions;
+  if (state.products.some((product) => String(product.id) === selectedProductId)) $("#bomProduct").value = selectedProductId;
   $("#lineBom").innerHTML = bomOptions;
+  if (state.boms.some((bom) => String(bom.id) === selectedLineBomId)) $("#lineBom").value = selectedLineBomId;
   $("#readyBom").innerHTML = bomOptions;
   $("#purchaseBom").innerHTML = bomOptions;
   $("#productionBom").innerHTML = bomOptions;
@@ -468,8 +506,116 @@ function renderBomSelectors() {
   $("#salesProduct").innerHTML = salesProducts;
   $("#quoteFinishedMaterial").innerHTML = finishedMaterials;
   $("#salesFinishedMaterial").innerHTML = finishedMaterials;
-  $("#lineItem").innerHTML = itemOptions;
   $("#adjustItem").innerHTML = inventoryOptions;
+  renderBomProductContext();
+  renderBomMaterialCandidates();
+  updateBomLineActionState();
+}
+
+function renderBomProductContext() {
+  const product = state.products.find((row) => String(row.id) === $("#bomProduct").value);
+  $("#bomProductVersion").value = product?.product_version || "";
+  $("#bomProductVersionStatus").value = product?.product_version_status || "";
+  $("#bomProductLifecycle").value = product?.lifecycle_status || "";
+  $("#bomProductStatus").value = product?.status || "";
+  const eligible = product?.status === "ACTIVE" && product?.product_version_status === "RELEASED";
+  $("#createBomBtn").disabled = !eligible;
+  $("#bomProductEligibility").textContent = !product
+    ? "当前没有可选产品。"
+    : eligible
+      ? "该 Product Version 已发布，可以保存 BOM 草稿。"
+      : "该 Product Version 尚未发布，不能保存 BOM 草稿；可继续只读检索物料。";
+}
+
+function bomMaterialLabel(candidate) {
+  return `${candidate.internal_code} · ${candidate.name} · ${candidate.unit}`;
+}
+
+function updateBomLineActionState() {
+  const bom = state.boms.find((row) => String(row.id) === $("#lineBom").value);
+  const linesBelongToBom = String(state.bomLinesBomId || "") === String(bom?.id || "");
+  $("#addBomLineBtn").disabled = !state.selectedBomMaterial || bom?.bom_status !== "DRAFT" || !linesBelongToBom;
+}
+
+function renderBomMaterialCandidates(statusText) {
+  const selectedId = Number(state.selectedBomMaterial?.material_id || 0);
+  $("#lineItemResults").innerHTML = state.bomMaterialCandidates.map((candidate) => `
+    <button type="button" class="bom-material-option" role="option" data-material-id="${escapeHtml(candidate.material_id)}" aria-selected="${Number(candidate.material_id) === selectedId ? "true" : "false"}">
+      ${escapeHtml(bomMaterialLabel(candidate))}
+    </button>
+  `).join("");
+  if (statusText !== undefined) $("#lineItemSearchStatus").textContent = statusText;
+}
+
+function clearBomMaterialSelection({ clearSearch = true, status = "请输入正式内部编码或名称。" } = {}) {
+  state.selectedBomMaterial = null;
+  state.bomMaterialCandidates = [];
+  $("#lineItem").value = "";
+  $("#lineUnitId").value = "";
+  $("#lineUom").value = "";
+  $("#lineItemSelected").hidden = true;
+  $("#lineItemSelected").textContent = "";
+  if (clearSearch) $("#lineItemSearch").value = "";
+  renderBomMaterialCandidates(status);
+  updateBomLineActionState();
+}
+
+function selectBomMaterial(materialId) {
+  const candidate = state.bomMaterialCandidates.find((row) => Number(row.material_id) === Number(materialId));
+  if (!candidate) return;
+  state.selectedBomMaterial = candidate;
+  $("#lineItem").value = String(candidate.material_id);
+  $("#lineUnitId").value = String(candidate.unit_id);
+  $("#lineUom").value = candidate.unit;
+  $("#lineItemSelected").textContent = `已选择：${bomMaterialLabel(candidate)}`;
+  $("#lineItemSelected").hidden = false;
+  renderBomMaterialCandidates(`已选择正式物料 ${candidate.internal_code}。`);
+  updateBomLineActionState();
+}
+
+async function searchBomMaterials() {
+  const query = $("#lineItemSearch").value.normalize("NFKC").trim();
+  bomMaterialSearchController?.abort();
+  if (!query) {
+    clearBomMaterialSelection({ clearSearch: false });
+    return;
+  }
+  state.selectedBomMaterial = null;
+  state.bomMaterialCandidates = [];
+  $("#lineItem").value = "";
+  $("#lineUnitId").value = "";
+  $("#lineUom").value = "";
+  $("#lineItemSelected").hidden = true;
+  $("#lineItemResults").setAttribute("aria-busy", "true");
+  renderBomMaterialCandidates("正在加载物料候选…");
+  updateBomLineActionState();
+  const controller = new AbortController();
+  bomMaterialSearchController = controller;
+  try {
+    const result = await api(`/api/bom-material-candidates?q=${encodeURIComponent(query)}&limit=20`, { signal: controller.signal });
+    if (bomMaterialSearchController !== controller) return;
+    if ($("#lineItemSearch").value.normalize("NFKC").trim() !== query) return;
+    state.bomMaterialCandidates = result.rows || [];
+    renderBomMaterialCandidates(state.bomMaterialCandidates.length ? `找到 ${state.bomMaterialCandidates.length} 条候选。` : "没有匹配的 ACTIVE 正式物料。");
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    if (bomMaterialSearchController !== controller) return;
+    state.bomMaterialCandidates = [];
+    renderBomMaterialCandidates(`检索失败：${error.message || "请稍后重试"}`);
+  } finally {
+    if (bomMaterialSearchController === controller) {
+      $("#lineItemResults").removeAttribute("aria-busy");
+      bomMaterialSearchController = null;
+    }
+  }
+}
+
+function scheduleBomMaterialSearch() {
+  if (bomMaterialSearchTimer) window.clearTimeout(bomMaterialSearchTimer);
+  bomMaterialSearchTimer = window.setTimeout(() => {
+    bomMaterialSearchTimer = null;
+    searchBomMaterials().catch((error) => toast(error.message));
+  }, 250);
 }
 
 function renderBoms() {
@@ -480,14 +626,20 @@ function renderBoms() {
       <td>${escapeHtml(bom.product_code)}</td>
       <td>${escapeHtml(bom.product_name)}</td>
       <td>${escapeHtml(bom.customer_name)}</td>
+      <td>${escapeHtml(bom.product_version)}</td>
+      <td>${escapeHtml(bom.product_version_status)}</td>
+      <td>${escapeHtml(bom.product_lifecycle_status)}</td>
       <td>${escapeHtml(bom.bom_version)}</td>
       <td>${escapeHtml(bom.bom_status)}</td>
-      <td><button data-view-bom="${bom.id}">查看明细</button></td>
+      <td><div class="row-actions">
+        <button data-view-bom="${escapeHtml(bom.id)}">查看明细</button>
+        ${bom.bom_status === "DRAFT" && hasPermission("master.bom.manage") ? `<button data-release-bom="${escapeHtml(bom.id)}" data-bom-version-id="${escapeHtml(bom.bom_version_id)}" data-bom-version="${escapeHtml(bom.version)}">发布 BOM</button>` : ""}
+      </div></td>
     </tr>
   `).join("");
   $("#bomsTable").innerHTML = `
     <thead><tr>
-      <th>ID</th><th>BOM 编码</th><th>产品编码</th><th>产品名称</th><th>客户</th><th>版本</th><th>状态</th><th>操作</th>
+      <th>ID</th><th>BOM 编码</th><th>产品编码</th><th>产品名称</th><th>客户</th><th>产品版本</th><th>产品版本发布状态</th><th>产品生命周期状态</th><th>BOM 版本</th><th>BOM 发布状态</th><th>操作</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   `;
@@ -497,10 +649,10 @@ function renderBomLines() {
   const rows = state.bomLines.map((line) => `
     <tr>
       <td>${escapeHtml(line.line_no)}</td>
-      <td>${escapeHtml(line.internal_item_code)}</td>
+      <td>${escapeHtml(line.internal_material_code || line.internal_item_code)}</td>
       <td>${escapeHtml(line.standard_name)}</td>
       <td>${escapeHtml(line.item_category)}</td>
-      <td>${escapeHtml(line.qty_per)}</td>
+      <td>${escapeHtml(line.quantity_per || line.qty_per)}</td>
       <td>${escapeHtml(line.uom)}</td>
       <td>${escapeHtml(line.loss_rate)}</td>
       <td>${escapeHtml(line.process_stage)}</td>
@@ -518,7 +670,7 @@ function renderBomLines() {
 function renderReadiness() {
   const rows = state.readiness.map((line) => `
     <tr>
-      <td>${escapeHtml(line.internal_item_code)}</td>
+      <td>${escapeHtml(line.internal_material_code || line.internal_item_code)}</td>
       <td>${escapeHtml(line.standard_name)}</td>
       <td>${escapeHtml(line.required_qty)}</td>
       <td>${escapeHtml(line.available_qty)}</td>
@@ -1267,8 +1419,9 @@ async function refreshAll() {
   await renderQualityRefOptions();
   renderQualityInspections();
   renderQualityDefects();
-  if (!state.bomLines.length && state.boms.length) {
-    await loadBomLines(state.boms[0].id);
+  const selectedBomId = $("#lineBom").value;
+  if (selectedBomId && String(state.bomLinesBomId || "") !== selectedBomId) {
+    await loadBomLines(selectedBomId);
   } else {
     renderBomLines();
   }
@@ -1379,12 +1532,15 @@ async function createSupplier() {
 }
 
 async function createBom() {
+  const product = state.products.find((row) => String(row.id) === $("#bomProduct").value);
+  if (!product || product.status !== "ACTIVE" || product.product_version_status !== "RELEASED") {
+    toast("请先发布所选 Product Version，再保存 BOM 草稿");
+    return;
+  }
   const payload = {
     bom_code: $("#bomCode").value.trim(),
-    product_code: $("#bomProduct").value,
-    bom_version: $("#bomVersion").value.trim(),
-    bom_status: $("#bomStatus").value.trim(),
-    approved_by: "",
+    product_id: Number(product.id),
+    version_code: $("#bomVersion").value.trim(),
   };
   const result = await masterDataWrite("create-bom", "/api/boms", payload);
   await refreshAll();
@@ -1393,27 +1549,69 @@ async function createBom() {
 }
 
 async function addBomLine() {
+  const candidate = state.selectedBomMaterial;
+  const bom = state.boms.find((row) => String(row.id) === $("#lineBom").value);
+  if (!candidate) {
+    toast("请先检索并选择一条 ACTIVE 正式物料");
+    return;
+  }
+  if (!bom || bom.bom_status !== "DRAFT") {
+    toast("只能向 DRAFT BOM Version 添加明细");
+    return;
+  }
+  if (String(state.bomLinesBomId || "") !== String(bom.id)) {
+    toast("BOM 明细仍在加载，请稍后重试");
+    return;
+  }
+  if (state.bomLines.some((line) => Number(line.material_id) === Number(candidate.material_id))) {
+    toast("同一物料不能在同一 BOM Version 中重复添加");
+    return;
+  }
   const payload = {
-    bom_id: $("#lineBom").value,
+    bom_id: Number(bom.id),
     line_no: $("#lineNo").value.trim(),
-    internal_item_code: $("#lineItem").value,
-    qty_per: $("#lineQty").value.trim(),
-    uom: $("#lineUom").value.trim(),
+    material_id: Number($("#lineItem").value),
+    unit_id: Number($("#lineUnitId").value),
+    quantity_per: $("#lineQty").value.trim(),
     process_stage: $("#lineStage").value.trim(),
     loss_rate: $("#lineLoss").value.trim(),
   };
-  await masterDataWrite(`create-bom-line:${payload.bom_id}:${payload.line_no}`, "/api/bom-lines", payload);
+  await masterDataWrite(`create-bom-line:${payload.bom_id}:${payload.material_id}:${payload.line_no}`, "/api/bom-lines", payload);
   await loadBomLines(payload.bom_id);
+  clearBomMaterialSelection();
   toast("BOM 明细已加入");
+}
+
+async function releaseProductVersion(productId, productVersionId, expectedVersion) {
+  if (!window.confirm("确认发布该 Product Version？发布后内容不可原地修改。")) return;
+  await masterDataWrite(`release-product-version:${productId}:${productVersionId}:${expectedVersion}`, `/api/products/${productId}/versions/${productVersionId}/release`, { expected_version: Number(expectedVersion) });
+  await refreshAll();
+  toast("Product Version 已发布");
+}
+
+async function releaseBomVersion(bomId, bomVersionId, expectedVersion) {
+  if (!window.confirm("确认发布该 BOM Version？服务端将重新校验明细，发布后不可原地修改。")) return;
+  await masterDataWrite(`release-bom-version:${bomId}:${bomVersionId}:${expectedVersion}`, `/api/boms/${bomId}/versions/${bomVersionId}/release`, { expected_version: Number(expectedVersion) });
+  await refreshAll();
+  toast("BOM Version 已发布，可进入 Planning Handoff 候选");
 }
 
 async function loadBomLines(bomId) {
   if (!bomId) return;
-  const result = await api(`/api/bom-lines?bom_id=${encodeURIComponent(bomId)}`);
-  state.bomLines = result.rows;
-  $("#lineBom").value = String(bomId);
-  $("#readyBom").value = String(bomId);
+  const requestedBomId = String(bomId); const requestToken = ++bomLinesRequestToken;
+  $("#lineBom").value = requestedBomId;
+  state.bomLines = [];
+  state.bomLinesBomId = null;
   renderBomLines();
+  updateBomLineActionState();
+  const result = await api(`/api/bom-lines?bom_id=${encodeURIComponent(bomId)}`);
+  if (requestToken !== bomLinesRequestToken || $("#lineBom").value !== requestedBomId) return;
+  state.bomLines = result.rows;
+  state.bomLinesBomId = requestedBomId;
+  $("#lineBom").value = requestedBomId;
+  $("#readyBom").value = requestedBomId;
+  renderBomLines();
+  updateBomLineActionState();
 }
 
 async function checkReadiness() {
@@ -1781,6 +1979,33 @@ function bindEvents() {
   $("#createProductBtn").addEventListener("click", createProduct);
   $("#createBomBtn").addEventListener("click", createBom);
   $("#addBomLineBtn").addEventListener("click", addBomLine);
+  $("#bomProduct").addEventListener("change", renderBomProductContext);
+  $("#lineBom").addEventListener("change", (event) => loadBomLines(event.target.value).catch((error) => toast(error.message)));
+  $("#lineItemSearch").addEventListener("input", () => {
+    bomMaterialSearchController?.abort();
+    bomMaterialSearchController = null;
+    $("#lineItemResults").removeAttribute("aria-busy");
+    state.selectedBomMaterial = null;
+    state.bomMaterialCandidates = [];
+    $("#lineItem").value = "";
+    $("#lineUnitId").value = "";
+    $("#lineUom").value = "";
+    $("#lineItemSelected").hidden = true;
+    renderBomMaterialCandidates($("#lineItemSearch").value.trim() ? "等待检索…" : "请输入正式内部编码或名称。");
+    updateBomLineActionState();
+    scheduleBomMaterialSearch();
+  });
+  $("#clearLineItemBtn").addEventListener("click", () => {
+    bomMaterialSearchController?.abort();
+    if (bomMaterialSearchTimer) window.clearTimeout(bomMaterialSearchTimer);
+    bomMaterialSearchTimer = null;
+    clearBomMaterialSelection();
+    $("#lineItemSearch").focus();
+  });
+  $("#lineItemResults").addEventListener("click", (event) => {
+    const option = event.target.closest("[data-material-id]");
+    if (option) selectBomMaterial(option.dataset.materialId);
+  });
   $("#checkReadyBtn").addEventListener("click", checkReadiness);
   $("#loadPurchaseSuggestionsBtn").addEventListener("click", loadPurchaseSuggestions);
   $("#createPoFromShortageBtn").addEventListener("click", createPoFromShortage);
@@ -1805,9 +2030,15 @@ function bindEvents() {
   $("#closeInspectionBtn").addEventListener("click", () => closeQuality().catch((error) => toast(error.message)));
   $("#reopenInspectionBtn").addEventListener("click", () => reopenQuality().catch((error) => toast(error.message)));
   $("#qualityInspectionsTable").addEventListener("click", (event) => { const button = event.target.closest("[data-quality-id]"); if (!button) return; state.selectedInspection = { id: Number(button.dataset.qualityId), version: Number(button.dataset.qualityVersion) }; $("#selectedInspection").value = `${button.dataset.qualityCode} (v${button.dataset.qualityVersion})`; });
-  $("#bomsTable").addEventListener("click", async (event) => {
-    const bomId = event.target.dataset.viewBom;
-    if (bomId) await loadBomLines(bomId);
+  $("#productsTable").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-release-product]");
+    if (button) releaseProductVersion(button.dataset.releaseProduct, button.dataset.productVersionId, button.dataset.productVersion).catch((error) => toast(error.message));
+  });
+  $("#bomsTable").addEventListener("click", (event) => {
+    const viewButton = event.target.closest("[data-view-bom]");
+    const releaseButton = event.target.closest("[data-release-bom]");
+    if (viewButton) loadBomLines(viewButton.dataset.viewBom).catch((error) => toast(error.message));
+    if (releaseButton) releaseBomVersion(releaseButton.dataset.releaseBom, releaseButton.dataset.bomVersionId, releaseButton.dataset.bomVersion).catch((error) => toast(error.message));
   });
   $("#purchaseOrdersTable").addEventListener("click", async (event) => {
     const poId = event.target.dataset.viewPo;
