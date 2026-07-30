@@ -11,6 +11,8 @@ const materialShell = await readFile(new URL("../app/materials/_components/mater
 const globals = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 const legacyStyles = await readFile(new URL("../public/erp/styles.css", import.meta.url), "utf8");
 const nextConfig = await readFile(new URL("../next.config.ts", import.meta.url), "utf8");
+const proxy = await readFile(new URL("../proxy.ts", import.meta.url), "utf8");
+const legacyShellRoute = await readFile(new URL("../app/erp-shell/route.ts", import.meta.url), "utf8");
 
 test("identity forms use alpha.2 field names, expected versions, CSRF and idempotency", () => {
   assert.match(app, /temporary_password/);
@@ -86,6 +88,11 @@ test("root, material and legacy shells conceal pagehide snapshots and revalidate
   for (const route of ['"/"', '"/materials/:path*"', '"/erp/index.html"']) assert.match(nextConfig, new RegExp(route.replace(/[/*]/g, "\\$&")));
   assert.match(nextConfig, /private, no-store, max-age=0, must-revalidate/);
   assert.match(nextConfig, /Pragma/);
+  assert.match(proxy, /matcher: \["\/erp\/index\.html"\]/);
+  assert.match(proxy, /target\.pathname = "\/erp-shell"/);
+  assert.match(legacyShellRoute, /join\(process\.cwd\(\), "public", "erp", "index\.html"\)/);
+  assert.match(legacyShellRoute, /private, no-store, max-age=0, must-revalidate/);
+  assert.doesNotMatch(legacyShellRoute, /public, max-age/);
 });
 
 test("legacy reveals protected DOM only after a complete authenticated refresh", () => {
