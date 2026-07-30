@@ -406,6 +406,12 @@ export class PostgresMaterialRepository {
     const changes = await this.pool.query(`select change_type,field_name,changed_by,created_at from material_change_logs where material_id=$1 order by id desc limit 5`, [materialId]);
     const totals = await this.pool.query<{ versions: string; changes: string; audits: string }>(`select (select count(*) from material_versions where material_id=$1) versions,(select count(*) from material_change_logs where material_id=$1) changes,(select count(*) from audit_log where material_id=$1) audits`, [materialId]);
     const rejection = await this.pool.query(`select version_no version,change_reason reason,reviewed_by,reviewed_at from material_versions where material_id=$1 and event_type='REJECT' order by version_no desc,id desc limit 1`, [materialId]);
+    const submission = await this.pool.query(`
+      select version_no version,nullif(btrim(change_reason),'') comment,changed_by submitted_by,created_at submitted_at
+      from material_versions
+      where material_id=$1 and version_no=$2 and event_type='SUBMIT'
+      order by id desc limit 1
+    `, [materialId, Number(row.version)]);
     const validation = await this.currentValidation(row, attributes);
     return {
       material: {
@@ -427,6 +433,9 @@ export class PostgresMaterialRepository {
         change_logs: { items: changes.rows.map((item) => ({ ...item, created_at: iso(item.created_at) })), total: Number(totals.rows[0].changes), has_more: Number(totals.rows[0].changes) > 5 },
         audit_logs: { total: Number(totals.rows[0].audits), has_more: Number(totals.rows[0].audits) > 5 },
       },
+      current_submission: submission.rows[0] ? {
+        ...submission.rows[0], version: Number(submission.rows[0].version), submitted_at: iso(submission.rows[0].submitted_at),
+      } : null,
       last_rejection: rejection.rows[0] ? { ...rejection.rows[0], version: Number(rejection.rows[0].version), reviewed_at: iso(rejection.rows[0].reviewed_at) } : null,
     };
   }

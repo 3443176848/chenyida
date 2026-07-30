@@ -13,7 +13,7 @@ import {
 } from "../_lib/material-review";
 import { sourceLabel } from "../_lib/material-ui";
 import {
-  MaterialAttributesCard, MaterialBasicCard, MaterialLastRejectionCard,
+  MaterialAttributesCard, MaterialLastRejectionCard, MaterialReviewDecisionCard,
   MaterialRecentChangesCard, MaterialRecentVersionsCard, MaterialResponsibilitiesCard,
   MaterialValidationPanel, materialAttributeTargetId, type MaterialDetail, type MaterialIssue,
 } from "./material-detail-sections";
@@ -319,7 +319,7 @@ export function MaterialReviewWorkspace({ materialId }: { materialId: number }) 
 
     <div className="mm-review-layout">
       <main className="mm-review-main">
-        <MaterialBasicCard detail={detail} />
+        <MaterialReviewDecisionCard detail={detail} />
         <MaterialResponsibilitiesCard detail={detail} />
         <MaterialAttributesCard detail={detail} />
         <MaterialLastRejectionCard detail={detail} />
@@ -341,7 +341,7 @@ export function MaterialReviewWorkspace({ materialId }: { materialId: number }) 
     {approveOpen ? <DialogShell title={detail.validation.warnings.length ? "确认警告并审核通过？" : "确认审核通过？"} onCancel={() => { if (!busy) setApproveOpen(false); }} busy={busy} actions={<button className="primary" disabled={busy || Boolean(detail.validation.warnings.length && !warningConfirmed)} onClick={() => void confirmApprove()}>确认审核通过</button>}>
       <p>物料：{detail.material.standard_name}</p><p>当前版本：V{detail.material.current_version}</p><p>Validation：{detail.validation.errors.length} 个错误，{detail.validation.warnings.length} 个警告</p><p>审核意见：{reviewComment.trim() || "—"}</p>
       {detail.validation.warnings.length ? <><ul>{detail.validation.warnings.map((issue, index) => <li key={`${issue.code}-${index}`}><b>警告 WARNING · {issue.code}</b><br />{issue.message}</li>)}</ul><label className="mm-warning-confirm"><input type="checkbox" checked={warningConfirmed} onChange={(event) => setWarningConfirmed(event.target.checked)} />我已核对当前版本和当前 Validation</label><small>此确认只绑定当前 material_id、版本、本次 Validation 摘要和本次详情加载；服务端仍会最终重校验。</small></> : null}
-      <p>审核通过后将生成唯一正式物料编码并转为 ACTIVE。</p>
+      <p>审核通过后将生成唯一正式内部物料编码并转为 ACTIVE；随后由工程继续使用该物料建立 BOM。</p>
     </DialogShell> : null}
 
     {rejectOpen ? <DialogShell title="驳回物料修改" initialFocus="first" onCancel={() => { if (!busy) setRejectOpen(false); }} busy={busy} actions={<button className="danger" disabled={busy} onClick={() => void confirmReject()}>确认驳回修改</button>}>

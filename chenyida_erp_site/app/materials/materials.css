@@ -258,6 +258,10 @@
 .mm-review-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 310px); gap: 10px; align-items: start; }
 .mm-review-main { min-width: 0; display: grid; gap: 10px; }
 .mm-review-main .mm-card, .mm-review-main .mm-card-basic, .mm-review-main .mm-attributes { grid-column: 1; grid-row: auto; }
+.mm-review-decision { border-left: 4px solid var(--mm-brand); }
+.mm-review-decision .mm-field-grid { margin-bottom: 10px; }
+.mm-review-scope { margin: 0; padding: 9px 10px; border: 1px solid #b9cbd5; background: #f2f7f9; color: #29485a; font-size: 12px; line-height: 1.65; }
+.mm-review-consequences { display: grid; gap: 5px; margin: 9px 0 0; padding-left: 20px; color: #33465a; font-size: 12px; line-height: 1.55; }
 .mm-review-history-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .mm-review-aside { position: sticky; top: 0; display: grid; gap: 10px; }
 .mm-review-aside .mm-validation { grid-column: auto; grid-row: auto; max-height: 43vh; overflow: auto; }

@@ -4,6 +4,8 @@ import test from "node:test";
 import { Pool } from "pg";
 
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
+import { PostgresDashboardRepository } from "../app/lib/dashboard-selfhost/repository.ts";
+import { DashboardService } from "../app/lib/dashboard-selfhost/service.ts";
 import { MaterialWorkflowError } from "../app/lib/material-selfhost/errors.ts";
 import { handleSelfhostMaterialApi } from "../app/lib/material-selfhost/handler.ts";
 
@@ -19,6 +21,7 @@ const actors = {
   engineering: { username: "engineering1", must_change_password: false, permissions: permissionsForRole("engineering") },
   unrelated: { username: "warehouse1", must_change_password: false, permissions: permissionsForRole("warehouse") },
 };
+const dashboardOperations = { username: "operations1", role: "operations", permissions: permissionsForRole("operations") };
 const categoryId = 9904;
 
 async function resetDatabase() {
@@ -114,7 +117,7 @@ async function api(actor, path, { method = "GET", body, key = randomUUID(), csrf
   return { response, payload: await response.json(), requestId };
 }
 
-async function createPending(name, value = 10) {
+async function createPending(name, value = 10, submitComment = "operations 审核隔离测试") {
   const created = await api(actors.engineering, "/api/material-master/drafts", {
     method: "POST",
     body: draft(name, value),
@@ -124,7 +127,7 @@ async function createPending(name, value = 10) {
   const materialId = Number(created.payload.data.material_id);
   const submitted = await api(actors.engineering, `/api/material-master/drafts/${materialId}/submit`, {
     method: "POST",
-    body: { expected_version: 1, submit_comment: "operations 审核隔离测试" },
+    body: { expected_version: 1, submit_comment: submitComment },
     key: `submit-${randomUUID()}`,
   });
   assert.equal(submitted.response.status, 200);
@@ -136,8 +139,19 @@ test.beforeEach(resetDatabase);
 test.after(async () => pool.end());
 
 test("operations sees cross-creator PENDING_REVIEW queue/detail but cannot edit material body", async () => {
-  const materialId = await createPending("OPS-QUEUE-CROSS-CREATOR", 11);
-  const queue = await api(actors.operations1, "/api/material-master/review-queue?page=1&page_size=20&keyword=OPS-QUEUE-CROSS-CREATOR&sort=submitted_at_desc");
+  const names = ["OPS-QUEUE·042576·CROSS-CREATOR", "OPS-QUEUE-SECOND", "OPS-QUEUE-THIRD", "OPS-QUEUE-FOURTH"];
+  const materialIds = [];
+  for (let index = 0; index < names.length; index += 1) {
+    materialIds.push(await createPending(names[index], 11 + index, index === 0 ? "工程说明：按当前完整待审名称建立后续 BOM" : "operations 审核隔离测试"));
+  }
+  const materialId = materialIds[0];
+  const fullQueue = await api(actors.operations1, "/api/material-master/review-queue?page=1&page_size=20&sort=submitted_at_desc");
+  assert.equal(fullQueue.response.status, 200);
+  assert.equal(fullQueue.payload.pagination.total, 4);
+  assert.equal(fullQueue.payload.data.length, 4);
+  assert.deepEqual(fullQueue.payload.data.map((row) => row.material_id).sort((left, right) => left - right), [...materialIds].sort((left, right) => left - right));
+
+  const queue = await api(actors.operations1, "/api/material-master/review-queue?page=1&page_size=20&keyword=042576&sort=submitted_at_desc");
   assert.equal(queue.response.status, 200);
   assert.equal(queue.payload.pagination.total, 1);
   assert.equal(queue.payload.data.length, 1);
@@ -150,10 +164,29 @@ test("operations sees cross-creator PENDING_REVIEW queue/detail but cannot edit 
   assert.equal(detail.payload.data.material.material_status, "PENDING_REVIEW");
   assert.equal(detail.payload.data.material.current_version, 2);
   assert.equal(detail.payload.data.material.material_code, null);
+  assert.equal(detail.payload.data.material.standard_name, names[0]);
+  assert.deepEqual(Object.keys(detail.payload.data.current_submission).sort(), ["comment", "submitted_at", "submitted_by", "version"]);
+  assert.equal(detail.payload.data.current_submission.version, 2);
+  assert.equal(detail.payload.data.current_submission.comment, "工程说明：按当前完整待审名称建立后续 BOM");
+  assert.equal(detail.payload.data.current_submission.submitted_by, "engineering1");
+  assert.equal(detail.payload.data.current_submission.submitted_at, detail.payload.data.material.submitted_at);
+
+  const sourceFiltered = await api(actors.operations1, "/api/material-master/review-queue?page=1&page_size=20&source_type=MANUAL&creator=engineering1&sort=submitted_at_desc");
+  assert.equal(sourceFiltered.payload.pagination.total, 4);
+  assert.equal(sourceFiltered.payload.data.length, 4);
+
+  const dashboard = await new DashboardService(new PostgresDashboardRepository(pool), "/missing").management(dashboardOperations);
+  const reviewMetric = dashboard.metrics.find((item) => item.code === "material-review-pending");
+  assert.deepEqual(reviewMetric, {
+    code: "material-review-pending", label: "物料审核待办", value: 4,
+    hint: "仅 PENDING_REVIEW；与原生审核队列同口径", tone: "warning", href: "/materials/review",
+  });
+  assert.ok(dashboard.risks.some((item) => item.code === "MATERIAL_REVIEW_PENDING" && item.text === "4 项物料待审核"));
+  assert.ok(!dashboard.risks.some((item) => item.code === "NO_VISIBLE_RISK"));
 
   const edit = await api(actors.operations1, `/api/material-master/drafts/${materialId}`, {
     method: "PATCH",
-    body: { ...draft("OPS-ILLEGAL-EDIT", 12), expected_version: 2 },
+    body: { ...draft("OPS-ILLEGAL-EDIT", 19), expected_version: 2 },
     key: "operations-edit-forbidden",
   });
   assert.equal(edit.response.status, 403);

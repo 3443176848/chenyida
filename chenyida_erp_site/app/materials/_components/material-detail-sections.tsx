@@ -40,6 +40,7 @@ export type MaterialDetail = {
     change_logs: { items: MaterialChangeSummary[]; total: number; has_more: boolean };
     audit_logs?: { total: number; has_more: boolean };
   };
+  current_submission?: { version: number; comment: string | null; submitted_by: string; submitted_at: string } | null;
   last_rejection?: { version: number; reason: string; reviewed_by: string; reviewed_at: string } | null;
 };
 
@@ -71,6 +72,28 @@ export function MaterialResponsibilitiesCard({ detail }: { detail: MaterialDetai
     ["提交时间", formatShanghaiDate(material.submitted_at, true)], ["批准人", material.approved_by], ["批准时间", formatShanghaiDate(material.approved_at, true)],
     ["创建时间", formatShanghaiDate(material.created_at, true)], ["更新时间", formatShanghaiDate(material.updated_at, true)],
   ]} /></section>;
+}
+
+export function MaterialReviewDecisionCard({ detail }: { detail: MaterialDetail }) {
+  const material = detail.material;
+  const categoryPath = detail.category_path.map((node) => node.category_name).join(" / ");
+  const submission = detail.current_submission;
+  const engineeringNote = submission?.comment?.trim() || "未保存（当前提交没有可展示的工程说明/备注）";
+  return <section className="mm-card mm-review-decision" aria-label="物料审核决策信息">
+    <h3>物料审核决策信息</h3>
+    <MaterialFieldGrid fields={[
+      ["待审名称", material.standard_name], ["分类", categoryPath], ["单位", material.unit], ["来源类型", sourceLabel(material.source_type)],
+      ["创建人", material.created_by], ["提交人", material.submitted_by], ["提交时间", formatShanghaiDate(material.submitted_at, true)],
+      ["版本", `V${material.current_version}`], ["状态", statusLabel(material.material_status)],
+      ["工程说明/备注", engineeringNote], ["正式内部编码", material.material_code || "尚未生成"],
+    ]} />
+    <p className="mm-review-scope">本页审核物料主数据身份、名称、分类、单位和工程说明。供应商映射、采购报价及价格不属于本次物料审核范围，由对应业务模块独立治理。</p>
+    <ul className="mm-review-consequences">
+      <li><b>批准后果：</b>生成唯一正式内部物料编码，物料转为 ACTIVE。</li>
+      <li><b>退回后果：</b>物料回到 DRAFT，不生成正式内部编码；创建或编辑人员修改后可重新提交。</li>
+      <li><b>批准后下一步：</b>由工程继续使用该正式内部物料建立 BOM。</li>
+    </ul>
+  </section>;
 }
 
 export function MaterialAttributesCard({ detail }: { detail: MaterialDetail }) {

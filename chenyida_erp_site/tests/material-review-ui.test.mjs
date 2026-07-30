@@ -229,7 +229,7 @@ test("46 1366 布局使用约 300px sticky 审核栏且窄宽降级", () => {
 });
 
 test("47 工作台复用只读单元且不出现物料编辑保存控件", () => {
-  for (const component of ["MaterialBasicCard", "MaterialResponsibilitiesCard", "MaterialAttributesCard", "MaterialValidationPanel"]) assert.match(workspaceSource, new RegExp(component));
+  for (const component of ["MaterialReviewDecisionCard", "MaterialResponsibilitiesCard", "MaterialAttributesCard", "MaterialValidationPanel"]) assert.match(workspaceSource, new RegExp(component));
   assert.doesNotMatch(workspaceSource, /保存草稿|审核并编辑|MaterialDraftForm/);
   assert.match(detailSource, /MaterialDetailSections/);
 });
@@ -263,4 +263,16 @@ test("52 operations 队列数量、列表、详情和审核按钮使用同一能
   assert.match(workspaceSource, /capabilities\.reject[^]*驳回修改/);
   assert.match(workspaceSource, /capabilities\.approve[^]*审核通过/);
   assert.doesNotMatch(workspaceSource, /MaterialDraftForm|保存草稿|编辑正文/);
+});
+
+test("53 审核决策信息使用当前提交事实且不拆分或伪造外部标识", () => {
+  assert.match(sectionsSource, /current_submission/);
+  for (const text of [
+    "待审名称", "分类", "单位", "来源类型", "创建人", "提交人", "提交时间", "版本", "状态", "工程说明/备注", "尚未生成",
+    "本页审核物料主数据身份、名称、分类、单位和工程说明。供应商映射、采购报价及价格不属于本次物料审核范围，由对应业务模块独立治理。",
+    "批准后果", "退回后果", "批准后下一步", "由工程继续使用该正式内部物料建立 BOM",
+  ]) assert.match(sectionsSource, new RegExp(text));
+  assert.match(workspaceSource, /随后由工程继续使用该物料建立 BOM/);
+  assert.doesNotMatch(`${workspaceSource}\n${sectionsSource}`, /standard_name\s*\.split|split\([^)]*·/);
+  assert.doesNotMatch(`${workspaceSource}\n${sectionsSource}`, /external_identifier|supplier_item_code|purchase_quote|unit_price/i);
 });
