@@ -20,7 +20,7 @@
         <button id="changePasswordBtn" class="ghost-button" hidden>修改密码</button>
         <button id="logoutBtn" class="ghost-button" hidden>退出</button>
         <a class="ghost-link" href="/api/export/items.csv">导出物料库</a>
-        <a class="ghost-link" href="/api/export/cleaning.csv">导出清洗结果</a>
+        <a class="ghost-link" href="/materials">物料 / 导入 / 审核</a>
       </div>
     </header>
 
@@ -29,7 +29,7 @@
         <button class="nav active" data-tab="dashboard">总览</button>
         <a class="nav nav-link" href="/materials" target="_top">物料主数据</a>
         <a class="nav nav-link" href="/materials/imports/new" target="_top">供应商导入</a>
-        <button class="nav" data-tab="cleaning">清洗审核</button>
+        <a class="nav nav-link" href="/materials/review" target="_top">物料审核（旧“清洗审核”已退役）</a>
         <button class="nav" data-tab="items">内部物料库</button>
         <button class="nav" data-tab="mappings">供应商映射</button>
         <button class="nav" data-tab="partners">客户供应商</button>
@@ -69,12 +69,17 @@
         <section id="cleaning" class="tab">
           <div class="section-head">
             <div>
-              <h2>清洗审核</h2>
-              <p>处理自动匹配、疑似匹配和新物料。人工只审核异常，不再逐条录入。</p>
+              <h2>旧“清洗审核”已退役</h2>
+              <p>这是退役的导入清洗入口，不是人工物料审核队列。请使用原生“物料 / 导入 / 审核”。</p>
             </div>
           </div>
-          <div class="table-wrap">
-            <table id="cleaningTable"></table>
+          <div class="work-panel">
+            <p>人工物料审核统一使用 PENDING_REVIEW 队列；导入复核仍按原生批次工作流处理。</p>
+            <div class="button-row">
+              <a class="ghost-link" href="/materials/review" target="_top">进入物料审核队列</a>
+              <a class="ghost-link" href="/materials/imports" target="_top">进入物料导入批次</a>
+            </div>
+            <table id="cleaningTable" hidden aria-hidden="true"></table>
           </div>
         </section>
 
@@ -733,6 +738,6 @@
     </dialog>
 
     <div id="toast" class="toast" role="alert" aria-live="assertive" hidden></div>
-    <script type="module" src="./app.js?v=20260729-identity-logout-fix"></script>
+    <script type="module" src="./app.js?v=20260730-material-review-fix"></script>
   </body>
 </html>

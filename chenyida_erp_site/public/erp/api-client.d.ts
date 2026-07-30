@@ -10,6 +10,7 @@ export class ErpApiError extends Error {
 export type ProtectedWriteContext = { idempotencyKey: string; csrfToken: string };
 export type ErpApiOptions = RequestInit & { protectedWrite?: ProtectedWriteContext };
 export function api<T = unknown>(path: string, options?: ErpApiOptions): Promise<T>;
+export function logoutSession(csrfToken: string): Promise<unknown>;
 export type MaterialMultipartProgress = { loaded: number; total: number; lengthComputable: boolean };
 export type MaterialMultipartOptions = {
   file: File;

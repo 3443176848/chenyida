@@ -7,6 +7,7 @@ import {
   reviewValidationFingerprint, safeReviewReturnTo, serializeReviewQueueQuery,
 } from "../app/materials/_lib/material-review.ts";
 import { createWriteOperation, sameWriteRequest } from "../app/materials/_lib/material-draft.ts";
+import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
 import { api, ErpApiError } from "../public/erp/api-client.js";
 
 const files = await Promise.all([
@@ -250,4 +251,16 @@ test("51 两条路由、共享 Client、页面内存与既有回归边界完整"
   assert.equal((queueSource.match(/public\/erp\/api-client\.js/g) || []).length, 1);
   assert.equal((workspaceSource.match(/public\/erp\/api-client\.js/g) || []).length, 1);
   assert.doesNotMatch(`${queueSource}\n${workspaceSource}`, /localStorage|sessionStorage|indexedDB|serviceWorker/i);
+});
+
+test("52 operations 队列数量、列表、详情和审核按钮使用同一能力与 PENDING_REVIEW 口径", () => {
+  assert.deepEqual(reviewCapabilities(permissionsForRole("operations")), { queue: true, approve: true, reject: true });
+  assert.match(shellSource, /material\.review\.queue[^]*\/materials\/review/);
+  assert.match(queueSource, /仅显示待审核 PENDING_REVIEW/);
+  assert.match(queueSource, /response\.pagination[^]*setResult\(response\)/);
+  assert.match(queueSource, /result\?\.data\.map[^]*\/materials\/\$\{row\.material_id\}\/review/);
+  assert.match(workspaceSource, /\/api\/material-master\/materials\/\$\{materialId\}/);
+  assert.match(workspaceSource, /capabilities\.reject[^]*驳回修改/);
+  assert.match(workspaceSource, /capabilities\.approve[^]*审核通过/);
+  assert.doesNotMatch(workspaceSource, /MaterialDraftForm|保存草稿|编辑正文/);
 });

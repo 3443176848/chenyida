@@ -24,6 +24,29 @@ test("role allowlist and server-side permission matrix are fixed", () => {
   assert.ok(permissionsForRole("purchase").includes("material.read"));
 });
 
+test("operations receives only the material review permission increment", () => {
+  const reviewPermissions = ["material.review.queue", "material.review.approve", "material.review.reject"];
+  const baselinePermissions = [
+    "dashboard.management.read", "dashboard.read", "finance.read", "inventory.read", "master.bom.read",
+    "master.customer.read", "master.product.read", "master.supplier.read", "master.supplier_mapping.read",
+    "material.read", "operations.audit_status.read", "planning.read", "procurement.read", "production.read",
+    "production.work_center.manage", "production.work_center.read", "quality.read", "sales.read",
+  ];
+  const operations = permissionsForRole("operations");
+  assert.deepEqual(operations.filter((permission) => !reviewPermissions.includes(permission)), baselinePermissions);
+  for (const permission of reviewPermissions) assert.ok(operations.includes(permission), permission);
+  for (const permission of [
+    "*", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit",
+    "material.audit.read", "system.audit.read", "system.backup.read", "system.user.read", "system.user.create",
+    "system.user.status", "system.user.reset", "master.bom.manage", "inventory.adjust", "inventory.reverse",
+    "procurement.plan", "procurement.order", "procurement.receive", "production.plan", "production.issue",
+    "production.report", "sales.order", "sales.ship", "quality.inspect", "finance.post",
+  ]) assert.equal(operations.includes(permission), false, permission);
+  for (const role of IDENTITY_ROLES.filter((role) => !["admin", "manager", "operations"].includes(role))) {
+    for (const permission of reviewPermissions) assert.equal(permissionsForRole(role).includes(permission), false, `${role}:${permission}`);
+  }
+});
+
 test("password policy rejects weak, default, username-containing and unchanged values", () => {
   assert.equal(validatePassword("River!4826Stone", "rootadmin"), "River!4826Stone");
   for (const [password, username, code] of [

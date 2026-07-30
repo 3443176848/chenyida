@@ -253,7 +253,7 @@ function renderSummary() {
     ["质量异常", state.summary.open_quality_issues],
     ["应收余额", state.summary.receivable_balance],
     ["应付余额", state.summary.payable_balance],
-    ["待处理", state.summary.pending],
+    ["全局待处理（DRAFT + PENDING_REVIEW）", state.summary.pending],
     ["自动匹配", state.summary.auto_count],
     ["疑似匹配", state.summary.suspect_count],
     ["新物料", state.summary.new_count],

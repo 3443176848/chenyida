@@ -70,6 +70,7 @@ const materialRequirementRead = ["planning.requirement.read", "planning.purchase
 const materialRequirementPlanning = [...materialRequirementRead, "planning.requirement.prepare", "planning.requirement.submit"];
 const materialRequirementPurchase = [...materialRequirementRead, "planning.purchase_request.decide"];
 const materialRequirementAll = [...materialRequirementPlanning, "planning.purchase_request.decide"];
+const materialReviewPermissions = ["material.review.queue", "material.review.approve", "material.review.reject"];
 
 const ROLE_PERMISSIONS: Record<IdentityRole, string[]> = {
   admin: ["*", ...dashboardRead, "system.backup.read", "system.user.read", "system.user.create", "system.user.status", "system.user.reset", "system.audit.read", "material.read", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit", "material.review.queue", "material.review.approve", "material.review.reject", "material.audit.read", "material.import.create", "material.import.read", "material.import.read_any", "material.import.cancel", "material.import.parse", "material.import.map", "material.import.normalize", "material.import.commit", ...reviewManagerPermissions, ...governanceDecisionPermissions, ...masterManage, ...inventoryManage, ...procurementManage, ...productionManage, ...salesManage, ...qualityManage, ...financeManage, ...projectAdmin],
@@ -82,7 +83,7 @@ const ROLE_PERMISSIONS: Record<IdentityRole, string[]> = {
   quality: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...salesRead, ...salesDeliveryRead, ...qualityManage.filter((permission) => permission !== "quality.reopen"), ...finishedGoodsAllocationRead, ...financeRead],
   sales: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...salesRead, ...salesDeliverySales, ...qualityRead, ...finishedGoodsAllocationManage, ...financeRead, ...projectMarket, "sales.quote", "sales.order", "master.customer.manage"],
   finance: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...procurementFulfillmentRead, ...productionRead, ...salesRead, ...salesDeliveryRead, ...qualityRead, ...financeManage, ...financeProjectRead, "procurement.finance_source.read", "sales.finance_source.read"],
-  operations: [...readOnly, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...productionWorkCenterManage, ...salesRead, ...qualityRead, ...financeRead],
+  operations: [...readOnly, ...materialReviewPermissions, ...masterRead, ...inventoryRead, ...procurementRead, ...productionRead, ...productionWorkCenterManage, ...salesRead, ...qualityRead, ...financeRead],
 };
 
 export function validateRole(value: unknown): IdentityRole {
