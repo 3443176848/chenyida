@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
-import { api, ErpApiError } from "../../../public/erp/api-client.js";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { api, createSessionWriteRegistry, ErpApiError, sessionPost } from "../../../public/erp/api-client.js";
 import "../../procurement/sourcing/sourcing.css";
 
 type Session = { authenticated: boolean; csrf_token?: string; user: { permissions: string[] } | null };
@@ -14,11 +14,14 @@ export default function ProductionHandoffsPage() {
   const [session,setSession]=useState<Session|null>(null);
   const [rows,setRows]=useState<Handoff[]>([]);
   const [error,setError]=useState("");
+  const operations=useRef(createSessionWriteRegistry());
   async function fetchData():Promise<Loaded>{const current=await api<Session>("/api/session");const handoffs=current.authenticated&&can(current,"production.handoff.read")?(await api<{data:Handoff[]}>("/api/production-handoffs?page_size=100")).data:[];return{session:current,rows:handoffs};}
   function applyData(value:Loaded){setSession(value.session);setRows(value.rows);}
   async function reload(){applyData(await fetchData());}
   useEffect(()=>{let cancelled=false;void fetchData().then(value=>{if(!cancelled)applyData(value);}).catch(e=>{if(!cancelled)setError(e instanceof ErpApiError?e.message:"读取失败");});return()=>{cancelled=true;};},[]);
-  async function post(path:string,body:Record<string,unknown>){if(!session)return;setError("");try{await api(path,{method:"POST",body:JSON.stringify(body),protectedWrite:{csrfToken:session.csrf_token!,idempotencyKey:crypto.randomUUID()}});await reload();}catch(e){setError(e instanceof ErpApiError?e.message:"操作失败");}}
+  useEffect(()=>{operations.current.clear()},[session?.csrf_token]);
+  useEffect(()=>{const clear=()=>operations.current.clear();window.addEventListener("pagehide",clear);window.addEventListener("cyd-erp-auth-required",clear);return()=>{clear();window.removeEventListener("pagehide",clear);window.removeEventListener("cyd-erp-auth-required",clear)}},[]);
+  async function post(path:string,body:Record<string,unknown>){if(!session)return;setError("");try{await sessionPost(operations.current,path,body,session.csrf_token||"");await reload();}catch(e){setError(e instanceof ErpApiError?`【${e.code}】${e.message}${e.requestId?`（请求 ${e.requestId}）`:""}`:"操作失败");}}
   async function prepare(event:FormEvent<HTMLFormElement>){event.preventDefault();const data=new FormData(event.currentTarget);await post(`/api/planning-packages/${Number(data.get("package_id"))}/production-handoffs`,{items:[{package_item_id:Number(data.get("package_item_id")),finished_material_id:Number(data.get("finished_material_id"))}]});}
   return <main className="sourcing-shell">
     <header className="sourcing-header"><div><Link href="/">← 经营工作台</Link><h1>计划到生产交接</h1><p>只消费当前 ACCEPTED Planning Package，固化产品、BOM、数量、单位与成品物料。</p></div></header>

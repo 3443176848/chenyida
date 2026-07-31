@@ -1,4 +1,5 @@
 export class ErpApiError extends Error {
+  constructor(message: string, options?: { status?: number; code?: string; requestId?: string; details?: unknown[]; retryAfter?: string; httpStatus?: number; resultUnknown?: boolean });
   status: number;
   code: string;
   requestId: string;
@@ -10,6 +11,10 @@ export class ErpApiError extends Error {
 export type ProtectedWriteContext = { idempotencyKey: string; csrfToken: string };
 export type ErpApiOptions = RequestInit & { protectedWrite?: ProtectedWriteContext };
 export function api<T = unknown>(path: string, options?: ErpApiOptions): Promise<T>;
+export function currentCsrfToken(fallback?: string): string;
+export type SessionWriteRegistry = Map<string, ProtectedWriteContext>;
+export function createSessionWriteRegistry(): SessionWriteRegistry;
+export function sessionPost<T = unknown>(registry: SessionWriteRegistry, path: string, body: Record<string, unknown>, fallbackCsrfToken?: string): Promise<T>;
 export function logoutSession(csrfToken: string): Promise<unknown>;
 export function isHistorySessionRestore(event?: { persisted?: boolean }, navigationEntry?: { type?: string }): boolean;
 export function setProtectedViewState(state: "checking" | "authenticated" | "anonymous"): void;

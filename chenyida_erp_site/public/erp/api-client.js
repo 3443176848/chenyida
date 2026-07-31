@@ -46,6 +46,43 @@ function errorBody(data) {
   };
 }
 
+export function currentCsrfToken(fallback = "") {
+  if (typeof document === "undefined") return String(fallback || "");
+  const pair = String(document.cookie || "").split(";").map((entry) => entry.trim()).find((entry) => entry.startsWith("CYD_ERP_CSRF="));
+  if (!pair) return "";
+  try { return decodeURIComponent(pair.slice("CYD_ERP_CSRF=".length)); } catch { return ""; }
+}
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+export function createSessionWriteRegistry() { return new Map(); }
+
+export async function sessionPost(registry, path, body, fallbackCsrfToken = "") {
+  if (!(registry instanceof Map)) throw new ErpApiError("写操作上下文无效", { code: "PROTECTED_WRITE_CONTEXT_REQUIRED" });
+  const csrfToken = currentCsrfToken(fallbackCsrfToken);
+  if (!csrfToken) throw new ErpApiError("当前会话缺少 CSRF Token，请重新登录后重试", { code: "PROTECTED_WRITE_CONTEXT_REQUIRED" });
+  for (const [key, operation] of registry) if (operation.csrfToken !== csrfToken) registry.delete(key);
+  const payload = stableJson(body);
+  const operationKey = `POST\n${path}\n${payload}`;
+  let operation = registry.get(operationKey);
+  if (!operation) {
+    operation = { csrfToken, idempotencyKey: crypto.randomUUID() };
+    registry.set(operationKey, operation);
+  }
+  try {
+    const result = await api(path, { method: "POST", body: payload, protectedWrite: operation });
+    registry.delete(operationKey);
+    return result;
+  } catch (error) {
+    if (!(error instanceof ErpApiError) || !error.resultUnknown) registry.delete(operationKey);
+    throw error;
+  }
+}
+
 export async function api(path, options = {}) {
   const { protectedWrite, ...requestOptions } = options;
   const method = String(options.method || "GET").toUpperCase();
@@ -68,18 +105,26 @@ export async function api(path, options = {}) {
   const financeWrite = (["/api/finance/documents", "/api/finance/settlements", "/api/financial-documents/from-source", "/api/financial-documents/from-sales-order", "/api/financial-documents/from-purchase-order", "/api/financial-payments"].includes(path)
     || /^\/api\/(?:financial-documents\/[1-9]\d*\/settlements|(?:financial-payments|finance-settlements)\/[1-9]\d*\/reversal)$/.test(path)) && method === "POST";
   const projectWrite = (path === "/api/projects" || /^\/api\/projects\/[1-9]\d*(?:\/(?:submit|accept|return|documents)(?:\/[1-9]\d*)?)?$/.test(path)) && ["POST", "PATCH", "DELETE"].includes(method);
+  const planningWrite = (/^\/api\/projects\/[1-9]\d*\/(?:requirement-resolutions|planning-packages)$/.test(path)
+    || /^\/api\/planning-packages\/[1-9]\d*\/(?:submit|accept|return|material-requirement-plans|production-handoffs)$/.test(path)
+    || /^\/api\/material-requirement-plans\/[1-9]\d*\/submit$/.test(path)
+    || /^\/api\/purchase-requests\/[1-9]\d*\/(?:accept|return)$/.test(path)
+    || /^\/api\/production-handoffs\/[1-9]\d*\/submit$/.test(path)) && method === "POST";
   const logoutWrite = path === "/api/logout" && method === "POST";
   const protectedBusinessWrite = (materialWrite || identityWrite || masterDataWrite || procurementWrite || productionWrite || qualityWrite);
-  const protectedWriteRequest = protectedBusinessWrite || projectWrite || financeWrite;
+  const explicitlyProtectedWrite = Boolean(protectedWrite) && ["POST", "PATCH", "PUT", "DELETE"].includes(method) && !logoutWrite;
+  const protectedWriteRequest = protectedBusinessWrite || projectWrite || planningWrite || financeWrite || explicitlyProtectedWrite;
   if (protectedWriteRequest) {
-    if (!protectedWrite?.idempotencyKey || !protectedWrite?.csrfToken) {
+    const csrfToken = currentCsrfToken(protectedWrite?.csrfToken);
+    if (!protectedWrite?.idempotencyKey || !csrfToken) {
       throw new ErpApiError("受保护写请求缺少幂等键或 CSRF Token", { code: "PROTECTED_WRITE_CONTEXT_REQUIRED" });
     }
     headers["Idempotency-Key"] = protectedWrite.idempotencyKey;
-    headers["X-CSRF-Token"] = protectedWrite.csrfToken;
+    headers["X-CSRF-Token"] = csrfToken;
   } else if (logoutWrite) {
-    if (!protectedWrite?.csrfToken) throw new ErpApiError("退出请求缺少 CSRF Token", { code: "PROTECTED_WRITE_CONTEXT_REQUIRED" });
-    headers["X-CSRF-Token"] = protectedWrite.csrfToken;
+    const csrfToken = currentCsrfToken(protectedWrite?.csrfToken);
+    if (!csrfToken) throw new ErpApiError("退出请求缺少 CSRF Token", { code: "PROTECTED_WRITE_CONTEXT_REQUIRED" });
+    headers["X-CSRF-Token"] = csrfToken;
   } else if (method === "POST") headers["Idempotency-Key"] ||= crypto.randomUUID();
 
   let response;
