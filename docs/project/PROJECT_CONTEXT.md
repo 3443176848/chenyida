@@ -24,14 +24,14 @@
 - 页面：TASK10 已把根 `app/page.tsx` 改为原生经营工作台；legacy `public/erp/index.html` 保留为显式业务工作区和回滚入口，不再作为根 iframe 默认依赖。Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给不依赖平台 binding 的 `app/lib/selfhost-api.ts`；旧 `erp-api.ts` 仅作迁移参考。
 - 根页迁移：TASK03—TASK10 已接通主数据/BOM/库存/采购/生产/销售/品质/财务、实时 Dashboard 与离线 backup 治理，根页已退出 iframe。完整 ERP API 的非生产实现不等于实际业务迁移：真实数据、账号和文件未迁移，采购、库存、生产、销售、品质、财务的实际业务仍依赖 Python/SQLite；生产恢复演练未做，不能描述为已投产。
-- 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL，Caddy production profile 提供 HTTPS。`chenyida-erp-parallel` 的 PostgreSQL/Web/Worker/Caddy 已实际应用 CPU/Memory/Swap/PID 限额；Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口，Caddy 在公网 18888 终止可信 TLS。当前入口为 `https://43.135.148.43.nip.io:18888`；运行面是受控非生产 alpha.34/0034，不代表 alpha.36 已部署或整体正式投产。历史 Sites `v3` 不作为后续交付目标。
+- 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL，Caddy production profile 提供 HTTPS。`chenyida-erp-parallel` 的 PostgreSQL/Web/Worker/Caddy 已实际应用 CPU/Memory/Swap/PID 限额；Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口，Caddy 在公网 18888 终止可信 TLS。当前入口为 `https://43.135.148.43.nip.io:18888`；运行面是受控非生产 alpha.37/0036，不代表正式投产、真实公司数据迁移或生产批准。历史 Sites `v3` 不作为后续交付目标。
 
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；源码为 `0.1.0-alpha.36`/`0035`，当前受控公网运行面仍为 `0.1.0-alpha.34`/`0034`。0035 未应用；alpha.36 只做隔离 buildcheck，未作为运行镜像部署或重启运行面。
-- 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.36`。
-- Git 复核：PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05 从 clean `main`/`3cb5c38`、behind 0/ahead 103 起步；功能提交 `2b923da`、`fbaf34a`，验收提交消息 `ops: accept planning csrf and bom immutability fixes`，完成后应为 ahead 106。未 push/PR/amend/rebase/reset/stash/restore，既有提交未改写；未读取、修改或提交 `shujvbiao/` 及工作簿。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与受控公网并行 UAT Web 均为 `0.1.0-alpha.37`，源码和并行 PostgreSQL 都是 36/head `0036_project_requirement_unit_resolution.sql`。alpha.37 是非生产 UAT 部署记录，不是生产 release。
+- 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.37`。
+- Git 复核：IMPLEMENT-07 从 clean `main@d06b44f5958527707f38e4c12f0d3143ce31875b`、Parent `525ad2907287d736ecd40d3df24b77c6c5be8ff4`、behind 0/ahead 107 起步；功能提交为 `91c0fd29d534246c55ddd669e894cdde9b774e52`，部署/文档由独立 `ops: deploy requirement unit resolution in parallel environment` 提交收口。未 push/PR/amend/rebase/reset/stash/restore，既有提交未改写；未读取、修改或提交 `shujvbiao/`。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
 - 离线内部物料库：LANDING-TASK06 以 `moban.xlsx` 第一张 `原BOM` 只作对照、第二张 `Sheet1` 作为唯一 13 列标准；复用 LANDING-TASK02 root-only 证据生成 724 行内部物料库、997 行标准明细、484 行待确认和 1,006 行来源映射。532 个正式编码只沿用既有结果；147 个来源候选、45 个模板候选不配码，另保留 1 个来源版本冲突。结果为 root-only 工作簿，未导入任何数据库。
@@ -40,7 +40,7 @@
 - V9 重导入 staging：LANDING-TASK05 对单个 SHA 绑定 XLSX 解析 197 行；编码唯一连续、来源完整，但显式单位 0，产品/BOM 结构字段 0。恢复库首次 staged 197、重放新增 0，全部 review；5,556 条拟删除计划未执行，主库 213 表计数完全不变。
 - 第二管理员与 UAT 临时账号：`admin2` 仍为 active admin、version 3、`must_change_password=false`。UAT-BLOCKER-FIX 仅新增唯一临时 manager 并在浏览器验收后通过页面停用；最终用户/active admin `3/2`、Session/有效 `14/5`、Audit `920`，Material/Product/BOM/BOM Line 保持 `532/6/6/316`。临时账号未用于业务试用，现有管理员未修改。
 - 单账号豁免：SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 采用 serializable 事务、任务 advisory lock、行锁和 version 2 CAS，把账号更新与唯一 `USER_FIRST_PASSWORD_CHANGE_WAIVED/success` 审计同事务提交；同任务重放 no-op。现有有效 Session 保留，D-045 全局新建/重置用户强制首次改密策略与 API 不变。
-- 公网与 UAT 来源校验：公网继续由显式、规范化、单值 `ERP_PUBLIC_ORIGIN` 精确限制，不读取任意转发头；当前唯一公网值为 `https://43.135.148.43.nip.io:18888`。只有 `ERP_DEPLOYMENT_CLASS=uat` 与 `ERP_UAT_ALLOW_LOOPBACK_ORIGIN=true` 同时启用时才额外允许浏览器 Origin 与 Request URL origin 均为严格字面量 loopback；生产类别不能启用。身份和 Planning 写均要求 Origin 和 Cookie/Header CSRF 双提交。当前 Web hotfix 镜像为 `sha256:7e0a3040acd17277db49fc1b7541c072c566e95e12b70bce9170dd39165a6bde`，部署前 `sha256:cb6a5c1fae89608e07e72d458b4466e0b571e36374b16f3b592248280f8dc6e1` 有精确回退 tag，0035 未应用。
+- 公网与 UAT 来源校验：公网继续由显式、规范化、单值 `ERP_PUBLIC_ORIGIN` 精确限制，不读取任意转发头；当前唯一公网值为 `https://43.135.148.43.nip.io:18888`。只有 `ERP_DEPLOYMENT_CLASS=uat` 与 `ERP_UAT_ALLOW_LOOPBACK_ORIGIN=true` 同时启用时才额外允许浏览器 Origin 与 Request URL origin 均为严格字面量 loopback；生产类别不能启用。身份和 Planning 写均要求 Origin 和 Cookie/Header CSRF 双提交。当前 alpha.37 Web 为 `sha256:6667bd2ca64e7255befe4398b4e73ec1fe554418d76062d2d378de8edaa7143e`；部署前 `sha256:7e0a3040acd17277db49fc1b7541c072c566e95e12b70bce9170dd39165a6bde` 有精确回退 tag。Worker/Caddy 未因 0036 替换或重建。
 - 公网 IP 切换：PUBLIC-IP-CUTOVER-07 同步更新 Caddy `ERP_DOMAIN` 和 Web `ERP_PUBLIC_ORIGIN`，以原镜像串行重建 Web/Caddy并取得 `43.135.148.43.nip.io` 的 Let's Encrypt 证书；外部 18888 登录页、200/308/401、安全头和旧 SNI 退役通过。PostgreSQL/Worker 容器未更换，root-only 原 env 回退副本保留。
 - 安全退出：经营工作台与兼容工作台统一调用共享 `POST /api/logout`，发送 same-origin credentials 和 CSRF Header；服务端撤销 Session、写成功审计并对称清 Cookie 后才跳转，失败显示稳定错误码/中文提示。受保护页面在 `pagehide` 先隐藏，`pageshow.persisted` 或 `back_forward` 必须重新校验 Session；根页、Material 和 legacy 响应均为 `private, no-store`。真实 Chromium 已证明两个入口 logout 后 back/forward/refresh 均保持登录页和受保护内容不可见。
 - operations 人工物料审核：角色静态映射只新增 `material.review.queue/approve/reject`；没有 `material.draft.edit_any`、身份/admin、`system.audit.read` 或其他业务写增量。Repository 的跨创建人可见性只对 PENDING_REVIEW+queue 开放，批准/退回继续由既有职责分离、幂等、CAS、事务和审计保护。详情原样显示待审名称、分类/单位/来源、创建/提交事实、版本/状态、现有 SUBMIT 工程说明、编码状态、审核范围、后果与工程 BOM 下一步；说明为空时明确“未保存”，不伪造外部编号、供应商或价格。Dashboard 可处理数精确取 PENDING_REVIEW，legacy 全局统计仍标注 DRAFT+PENDING_REVIEW。
@@ -49,8 +49,8 @@
 - Planning CSRF 共享客户端：此前 Planning 页面虽传入 `protectedWrite`，但共享路由分类未匹配 requirement resolution、planning package 及 submit/accept/return 等端点，请求落入普通 POST 分支并丢失 `X-CSRF-Token` 和调用方幂等键。现由共享 `sessionPost` 在发送时读当前 `CYD_ERP_CSRF` Cookie，以当前 Token+method/path+canonical 正文绑定页内幂等键；Session/页历史/认证变化清空上下文。服务端 Origin/CSRF/Session/权限/审计未放宽，错误仍显示稳定中文代码和 request_id。
 - RELEASED BOM 与最小披露：BOM 管理页首次进入固定为“请选择或搜索 BOM”，只有明确搜索并选择后才请求 `/api/bom-lines`；有界搜索支持 BOM 编码、产品编码和产品名称。RELEASED 详情只显示已发布事实和“已发布，只读；如需修改请创建新版本”，不渲染 Material/数量/损耗/行号编辑器及新增/删除/保存/发布动作。服务端对 RELEASED 行 POST/PATCH/DELETE 统一返回 `409 BOM_RELEASED_IMMUTABLE`，与既有 DB trigger 共同 fail closed。
 - FIX-05 主库只读证据：真实 Chromium 路由层阻断除 login/logout 外全部 POST；首次 BOM 明细请求 0，选择 `BOM-UAT-BB-PROD-042576-V1` 的 UI 动作只加载该明细 1 次，验收脚本另用一次只读 GET 核对精确四行；RELEASED 可变控件 0，四行为 533—536/1 PCS/0，390px 无溢出。engineering Planning 页只读识别 A0/V1，未登录 planning、未点击保存/生成/提交；退出后 back/forward/refresh 均为匿名。
-- 当前数据库只读基线：34/head 0034，Material/Product/Product Version/BOM Header/BOM Version/Line `536/7/7/7/7/320`，536 个 Material 全部 ACTIVE。`PRJ-00000001` 为 ACCEPTED/10；当前 Requirement Item 稳定 ID 1、数量 10、`unit_id=NULL/unit_pending=true`。Product 7/A0 与 BOM 7/V1 均 RELEASED，四行 533—536 保持；Product/BOM Resolution 已为 1，但 Package/Item/Handoff Event 为 `0/0/0`、Planning 待接收为 0。三条指定请求保持 failed/`REQUIREMENT_ITEMS_UNRESOLVED`，历史 CSRF 证据也未删除或改写；0035 count 0。
-- Planning Unit Resolution 缺口：0016/0034 的 `project_requirement_resolutions` 只保存 Product/Product Version/BOM Header/BOM Version，不保存单位或单位版本；源 Requirement Item 又由 0015 DB trigger 保持不可变。快照查询用 `project_requirement_items.unit_id` INNER JOIN enabled Unit，因 NULL 排除当前行后统一误报 `REQUIREMENT_ITEMS_UNRESOLVED`。不得写回源需求、从 BOM 猜 PCS 或制作 alpha.34 隐藏热修；proposed D-086/后续 0036 才能提供正式边界。
+- 当前数据库只读基线：36/head 0036，Material/Product/Product Version/BOM Header/BOM Version/Line `536/7/7/7/7/320`。`PRJ-00000001` 为 ACCEPTED/10；Requirement Item 稳定 ID 1、数量 10、`unit_id=NULL/unit_pending=true`。Product 7/A0 与 BOM 7/V1 均 RELEASED，四行 533—536 各 1 PCS；Product/BOM Resolution 为 1 且引用 7/7/7/7，Unit Resolution Version/Head 为 `0/0`，Package/Item/Handoff Event 为 `0/0/0`、Planning 待接收为 0。保护事实指纹 `fb71309bf73dce907f0bcb2e294d1b31` 在 0034→0035→0036 前后相同。
+- Planning Unit Resolution 边界：0036 已新增追加式 `project_requirement_unit_resolution_versions` 和每 Requirement Item 独立 CAS `project_requirement_unit_resolution_heads`；源 Requirement Item 仍由 0015 trigger 保持不可变。新 Package Item 必须引用生成时精确 Unit Resolution Version，不从源 NULL 或 BOM Line 猜单位；`REQUIREMENT_DECLARED` 只表示迁移可直接证明的原始单位，`ENGINEERING_CONFIRMED` 只表示正式获权 API 确认。
 - 兼容供应商导入：LANDING-TASK04 功能提交 `cda8c7e` 已在单独授权下部署到当前 18888 Web；`public/erp/` 的 CSV-only/退役入口已改为直达 `/materials/imports/new`，入口 URL 已版本化。公网 HTML/JS SHA 与源码一致；MATERIAL-REVIEW-BLOCKERS-03-RETRY 已把 legacy 壳改为动态只读路由，使响应只保留 `private, no-store` 和 `Pragma: no-cache`，不再并列 `public, max-age=3600`。未做 Excel→PG E2E。
 - BOM 物料治理：PHASE6-TASK01 在既有 Import/Mapping/Normalization/Review 后新增确定性规格治理层，用品类+关键规格+性能等级的完整身份进行严格归组，保留原始行/BOM/料号透明度，替代项只是候选。受控决策可精确绑定 ACTIVE 或调用既有 Workflow 建 DRAFT；不自动编码、审批或建正式替代关系。
 
@@ -63,6 +63,7 @@
 - LANDING-TASK01 不执行 build；所有 Git、dump、恢复和测试串行。起点 65 秒 Swap `137476→137476 KiB`、增长 0，Build Cache 全程 0B；三容器 restart 0/OOM false，四卷、resource-guard、Python PID 和 SQLite metadata 保持。
 - LANDING-TASK04 部署严格串行 build/recreate Web；起点 available 2.1 GiB、Swap 114 MiB、根盘 36 GiB，最终 available 2.2 GiB、Swap 123 MiB、根盘 35 GiB。build 后 60 秒 Swap +100 KiB，部署后 60 秒 -24 KiB；容器 restart 0/OOM false、内核 OOM 记录 0。Build Cache 1.401 GB 保留，未执行未授权 prune。
 - PHASE6-TASK01 的 PostgreSQL 测试、迁移和 Node 重任务串行，任一时刻只有一个临时容器，Node heap 512 MiB/容器 768 MiB。起点 available 约 2.1 GiB、Swap 131—132 MiB、根盘 35 GiB；最终 available 2.2 GiB、Swap 135 MiB、根盘 35 GiB、Load `0.21/0.76/0.69`，四服务 restart 0/OOM false。两个任务测试库和临时容器已删除，四个受保护卷保留。
+- IMPLEMENT-07 的 build、Migration、隔离 PostgreSQL、dump/restore、Web 更新和两个 Chromium 验收均严格串行，一次最多一个临时重任务容器。起点约 2.2 GiB available/233 MiB Swap/26 GiB/Load `0.24/1.05/0.88`；最终精确清理后为 2.3 GiB/210 MiB/26 GiB/`0.30/0.30/0.40`。四服务 restart 0/OOM false、任务 OOM 0；临时库/容器/build worktree/runner/在线隔离 dump/Playwright 镜像已清理，正式备份、当前/回退 Web 镜像和四个受保护卷保留。
 - LANDING-TASK05 的 dump、恢复、staging 和测试严格串行；起点 available `2,351,184 KiB`、Swap `130,592 KiB`、Load `0.06/0.09/0.11`、根盘 35 GiB，提交后约 2.2 GiB/126 MiB/`0.08/0.14/0.14`/35 GiB；独立 60 秒 Swap 增长 0。四服务 restart 0/OOM false，临时库/runner/cache 删除，四个受保护卷保留。
 - MATERIAL-REVIEW-BLOCKERS-03-RETRY 的隔离 PostgreSQL、build、备份恢复、Web 替换和真实 Chromium 严格串行；起点约 2.4 GiB available/163 MiB Swap/31 GiB 根盘，最终约 2.3 GiB/187 MiB/30 GiB/Load `0.21/0.45/0.68`。内核 OOM 0，四服务 restart 0/OOM false；只重建 Web，测试/恢复库、容器、浏览器和 worktree 已清理，四卷保持。
 - BOM-SELECTOR-FIX-04 的隔离 PostgreSQL、alpha.34 build、备份恢复、Web 替换和 Chromium 严格串行；首次门禁约 2.3 GiB available/198 MiB Swap/29 GiB，部署前 2.3 GiB/180 MiB/29 GiB/Load `0.09/0.44/0.48`，浏览器后 2.3 GiB/204 MiB，最终根盘恢复 29 GiB。内核/容器 OOM 0、四服务 restart 0；测试/恢复库、临时容器、浏览器、Playwright 镜像、task worktree 和可归属 BuildKit cache 已清理，备份/当前镜像/回退 tag 和四卷保留。
@@ -110,7 +111,7 @@
 - `drizzle-postgres/0032_finished_goods_inventory_lots.sql` expand-only 增加唯一 Finished Goods Inventory Lot、Ledger/Balance nullable 稳定 Lot 外键、一致性/不可变/服务写/deferred 守恒 guard；Batch Completion 创建或复用同一 Lot，冲销回写原 Lot，ORDER 历史继续 null/空 Lot。Lot Balance 与 Material Aggregate、freeze/unfreeze、API/UI/genealogy 已在回环环境验证；原材料、供应商和 Shipment Lot 未实现。
 - `drizzle-postgres/0033_finished_goods_lot_fqc_shipment.sql` expand-only 为 Allocation、FQC、Shipment Line 与 FQC Consumption Fact 增加 nullable 稳定 Lot 外键；BATCH 必须同 Lot，ORDER 保持 null。warehouse 显式选择 Lot，Shipment 原子消费同 Lot Balance/FQC 并写 Ledger/Source/Event；冲销只恢复原 Lot。实际 `4/6`、冻结拒发、冲销同 Lot 再发、ORDER、恢复与清理已通过；原材料/供应商/Receipt/领料 Lot 仍未实现。
 - `drizzle-postgres/0034_supplier_receipt_lot_iqc.sql` expand-only 将 `inventory_lots` 扩展为制造成品/供应商来料严格 XOR 来源；ACTIVE/STOCKED/IQC Receipt 原子生成 RML Lot 并同时增加 on-hand/frozen。IQC 沿 Receipt Line→Lot 创建，RELEASE 通过追加式 UNFREEZE 只解冻 passed 范围，失败量继续冻结；无 IQC/AP/领用等下游时整单冲销沿原 Lot 反向过账。真实主链 10/8/2→10/2/8 与 3 件 REVERSED 支线、重启和恢复已通过；生产领料 Lot 未实现。
-- `drizzle-postgres/0035_bom_material_governance.sql` expand-only 新增 Governance Run/Group/Row/Spec、Material/Alternative Candidate、Decision/Link/Event 九张关系表，并扩展导入透明度和 v2 规格 metadata。严格身份、来源不可变、外键/CHECK/索引、服务事务入口和全局正式物料冲突门禁已在空库与 0034 升级隔离库验证；尚未应用常驻 PostgreSQL。
+- `drizzle-postgres/0035_bom_material_governance.sql` expand-only 新增 Governance Run/Group/Row/Spec、Material/Alternative Candidate、Decision/Link/Event 九张关系表，并扩展导入透明度和 v2 规格 metadata。严格身份、来源不可变、外键/CHECK/索引、服务事务入口和全局正式物料冲突门禁已在空库与 0034 升级隔离库验证；该 migration 后由 IMPLEMENT-07 作为 0034→0035→0036 的前置步骤受控应用到并行非生产 UAT，仍未处理真实治理数据。
 - LANDING-TASK09 不新增表或 Migration。`material-standardization-selfhost` 只在 repeatable-read 只读快照中消费当前已发布 Parse、选中 Sheet、当前 Mapping 与原始行，生成 `CYD-MATERIAL-13C-v1` 投影；5,000 候选行/32 MiB 门禁、owner/`read_any`、受保护分页预览、CSV 下载审计和公式注入保护均在服务端。
 - 本地文件卷保存二进制，数据库只保存受控相对路径和摘要元数据。
 - Worker 使用 PostgreSQL Outbox、`FOR UPDATE SKIP LOCKED`、租约、心跳、重试和 CAS；Web/Worker 是独立入口。
@@ -182,13 +183,13 @@
 44. SELFHOST-OPS-PUBLIC-IP-CUTOVER-07 采用 D-085：公网 IP 变化时，Caddy `ERP_DOMAIN` 与 Web 单值 `ERP_PUBLIC_ORIGIN` 必须同一受控任务切换，不能临时双允许旧/新公网 Origin。当前唯一入口为 `https://43.135.148.43.nip.io:18888`；旧主机名从当前 Caddy 退役，root-only env 副本是回退权威。
 45. SELFHOST-OPS-UAT-BOM-SELECTOR-FIX-04 不新增决策或状态机：`products/product_versions/bom_headers/bom_versions/bom_lines` 与 Planning 表继续是唯一权威，全部引用稳定 ID。Product Version 与 BOM Version 分轴；BOM 属于 Product Version，Project 只在 Planning Handoff 关联。正式编码/名称/单位组合只用于展示，保存和发布均由服务端事务重验 ACTIVE 正式 Material 与主单位。
 46. SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05 不改变状态机或服务端安全决策：Planning 写统一由共享客户端发送当前 Cookie/Header CSRF，RELEASED BOM 前端只读与服务端/DB 不可变必须同时成立，BOM 首页默认不加载历史明细。
-47. SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06 采用分支 B：0034 没有合规 Unit Resolution 字段/版本/CAS，且已提交 Requirement Item 不可原地修改。当前 Product/BOM Resolution 保留；后续必须以 0036 新增追加式 Unit Resolution 版本事实、独立 CAS Head，并让新 Package Item 引用稳定 `unit_resolution_id`。本决定仍是 proposed，未实现、迁移或部署。
+47. SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07 已实施 D-086：alpha.37/0036 用追加式 Unit Resolution Version、每需求行独立 CAS Head 和 Package Item 精确 `unit_resolution_id` provenance 解除 Schema 阻断；Unit 保存和新 Package 都重验 enabled，权限/Origin/CSRF/幂等/审计/故障回滚保持事务边界。并行非生产 UAT 已迁移部署，但主 UAT 尚未产生任何 Resolution 或 Package。
 
 ## 当前风险
 
 - V9 主数据表缺少逐行显式单位，且不包含产品/版本/BOM 行号/数量/位号/单位结构；197 行只能保留在 review。未经补充明确字段不得把 PCS、使用次数或原始描述猜成主库单位/BOM 数量，也不得先清空现有 532 Material/316 BOM Line。
 - 当前受保护 Product Version 7/A0 与 BOM Version 7/V1 均已 RELEASED，四行 533—536 是不可变事实。不得通过前端隐藏或临时调用绕过服务端/DB 不可变；修改必须在后续独立授权下创建新版本。Planning Package 当前为 0，本任务不自动开始交接试用。
-- `PRJ-00000001` 的 Requirement Item 仍为 `unit_id=NULL/unit_pending=true`，而现有 Product/BOM Resolution 不含 Unit。engineering 不能在当前 Schema 合规保存单位；任何写回源需求、BOM 单位推断、JSON/备注旁路或取消快照门禁都会破坏数据边界。必须先独立实施并验收 0036，当前不具备重新开始 engineering 黑盒交接的条件。
+- `PRJ-00000001` 的 Requirement Item 仍为 `unit_id=NULL/unit_pending=true`，Unit Resolution Head 尚不存在；alpha.37/0036 已提供正式确认边界，但本任务刻意未选择或保存 PCS、未创建 Package。下一轮 engineering 黑盒试用必须显式选择 enabled Unit 并使用独立 CAS，不得写回源需求、从 BOM 推断单位或绕过完整性门禁。
 - BOM-SELECTOR-FIX-04 曾因本地命令分隔符错误在授权工具输出中显示 root-only engineering 账号材料；未进入仓库、文件、服务日志或外部系统，账号/密码未改。FIX-05 以不输出凭据值的方式只完成一次 login/logout，Session 已撤销；任何凭据轮换仍须单独授权。
 
 - Material Draft/Review/Active、Import Mapping/版本/复用、行级 Normalizer 及人工复核/ACTIVE绑定/Draft Commit 已完成 PostgreSQL 非生产移植；后续真实数据演练和迁移不得重新接入 D1 运行依赖。
@@ -229,7 +230,7 @@
 
 ## 当前路线
 
-`SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06` 已按分支 B 停止实现。当前入口保持 `https://43.135.148.43.nip.io:18888`；Web 是 alpha.34/0034 兼容 hotfix `sha256:7e0a3040acd17277db49fc1b7541c072c566e95e12b70bce9170dd39165a6bde`，Caddy、PostgreSQL、Worker 和 0034 不变，0035/0036 与完整 alpha.36 未部署。主库 Requirement Item 仍 pending Unit、Product/BOM Resolution 为 1、Package 为 0。下一步只能是单独确认 D-086 并授权 0036；在完成迁移、隔离测试和部署前，不得恢复 engineering 黑盒交接或登录 planning。
+`SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07` 已完成。当前入口保持 `https://43.135.148.43.nip.io:18888`；Web 是 alpha.37 `sha256:6667bd2ca64e7255befe4398b4e73ec1fe554418d76062d2d378de8edaa7143e`，PostgreSQL 为 36/head 0036，Caddy 与 Worker 镜像保持。主 UAT Requirement Item 仍 pending Unit、Product/BOM Resolution 为 1、Unit Resolution 和 Package 都为 0。技术阻断已解除；下一步只能在新的明确任务中恢复 engineering 黑盒续测，本轮不选择 PCS、不生成交接包、不登录 planning。
 
 ## 恢复上下文检查清单
 

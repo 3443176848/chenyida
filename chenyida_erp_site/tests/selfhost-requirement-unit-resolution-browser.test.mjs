@@ -5,6 +5,7 @@ import { Pool } from "pg";
 import { hashPassword } from "../app/lib/identity-selfhost/password.ts";
 
 const REQUIRED_DATABASE = "cyd_unit_resolution_browser_test_0036";
+const REQUIRED_BROWSER_ORIGIN = "http://127.0.0.1:43136";
 const databaseUrl = process.env.DATABASE_URL || "";
 const acceptanceConfirm = process.env.ERP_REQUIREMENT_UNIT_BROWSER_CONFIRM || "";
 const browserBaseUrl = process.env.ERP_BROWSER_BASE_URL || "";
@@ -17,14 +18,6 @@ function parsedDatabaseName(value) {
   }
 }
 
-function isIsolatedBrowserHost(hostname) {
-  const host = hostname.toLowerCase();
-  if (["localhost", "127.0.0.1", "::1", "web", "host.docker.internal"].includes(host)) return true;
-  if (/^10(?:\.\d{1,3}){3}$/.test(host) || /^192\.168(?:\.\d{1,3}){2}$/.test(host)) return true;
-  if (/^172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}$/.test(host)) return true;
-  return /^[a-z0-9][a-z0-9-]*$/.test(host);
-}
-
 if (parsedDatabaseName(databaseUrl) !== REQUIRED_DATABASE) {
   throw new Error(`DATABASE_URL must target the isolated ${REQUIRED_DATABASE} database`);
 }
@@ -35,10 +28,10 @@ if (acceptanceConfirm !== "ISOLATED_0036_SYNTHETIC_ONLY") {
 let browserOrigin;
 try {
   const parsed = new URL(browserBaseUrl);
-  if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password || parsed.pathname !== "/" || parsed.search || parsed.hash || !isIsolatedBrowserHost(parsed.hostname)) throw new Error();
+  if (parsed.origin !== REQUIRED_BROWSER_ORIGIN || parsed.href !== `${REQUIRED_BROWSER_ORIGIN}/`) throw new Error();
   browserOrigin = parsed.origin;
 } catch {
-  throw new Error("ERP_BROWSER_BASE_URL must be an isolated loopback, private-address, or Docker-service origin");
+  throw new Error(`ERP_BROWSER_BASE_URL must be exactly ${REQUIRED_BROWSER_ORIGIN}`);
 }
 
 const pool = new Pool({ connectionString: databaseUrl, max: 4, application_name: "requirement-unit-resolution-browser-0036" });
@@ -201,7 +194,29 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
       ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}),
       args: ["--disable-dev-shm-usage"],
     });
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, ignoreHTTPSErrors: true });
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+    const allowedPostPaths = [
+      /^\/api\/login$/,
+      /^\/api\/logout$/,
+      /^\/api\/projects\/\d+\/requirement-unit-resolutions$/,
+      /^\/api\/projects\/\d+\/planning-packages$/,
+      /^\/api\/planning-packages\/\d+\/(?:submit|return|accept)$/,
+    ];
+    await context.route("**/*", async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const method = request.method().toUpperCase();
+      if (url.origin !== browserOrigin) {
+        await route.abort("blockedbyclient");
+        return;
+      }
+      if (["GET", "HEAD", "OPTIONS"].includes(method)
+        || (method === "POST" && allowedPostPaths.some((pattern) => pattern.test(url.pathname)))) {
+        await route.continue();
+        return;
+      }
+      await route.abort("blockedbyclient");
+    });
     const page = await context.newPage();
     assert.deepEqual(page.viewportSize(), { width: 390, height: 844 });
 

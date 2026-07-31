@@ -2,6 +2,26 @@
 
 本文主体保留 2026-07-11 的历史架构快照，不再代表当前发布状态。2026-07-24 起，运行面、版本、migration、部署和回退的当前权威记录为 `MASTER.md`、`PROJECT_CONTEXT.md` 与 `RELEASES.md`：Python/SQLite 是实际常驻开发运行面，Sites/D1 是历史运行面，Node/PostgreSQL 是尚未生产部署的未来唯一生产方向。
 
+## 2026-07-31 alpha.37 Project Requirement Unit Resolution
+
+`SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07` 以 expand-only `0036_project_requirement_unit_resolution.sql` 在既有 Project Requirement 与 Planning Package 之间增加独立单位解析边界。已提交销售 Requirement Item 继续不可变，允许保留 `unit_id=NULL/unit_pending=true`；工程确认不写回销售源事实，也不从 Product、BOM、BOM Line、名称或 PCS 文本推断单位。
+
+```mermaid
+flowchart LR
+    R[Immutable Requirement Item] --> V[Append-only Unit Resolution Version]
+    V --> H[Per-item CAS Head]
+    H --> P[New Planning Package Item]
+    P --> X[Pinned unit_resolution_id]
+    B[Released Product/BOM Resolution] --> P
+    U[Stable enabled Unit ID] --> V
+```
+
+`project_requirement_unit_resolution_versions` 保存稳定 Requirement Item/Project/Requirement Version/Unit、来源类型、supersedes、actor、request 与摘要，只允许受控服务事务追加；数据库 trigger 禁止 UPDATE/DELETE。`project_requirement_unit_resolution_heads` 按 Requirement Item 保存 current resolution 和独立单调版本，服务端使用显式 `expected_head_version` CAS，因而并发确认只有一个成功，不复用不会随解析递增的 Project Version。
+
+`ENGINEERING_CONFIRMED` 只表示 engineering 项目负责人、manager 或 admin 通过正式 API 明确确认；`REQUIREMENT_DECLARED` 只表示迁移可直接证明的既有 `unit_pending=false/unit_id` 来源。pending/NULL、名称和 BOM Unit 不回填。确认事务同时写 Version、Head、Audit 和 Idempotency；Session、Origin、Cookie/Header CSRF、权限、canonical-body Idempotency、Unit enabled、CAS 与故障注入都 fail closed。
+
+新 Planning Package Item 固定引用创建时精确 `unit_resolution_id`，package/source digest 覆盖该来源。后续 Head 推进或 Unit 停用不改变历史 Package；停用 Unit 不能用于新确认或新 Package。0036 前历史 Package 的 provenance 保持 nullable 可读，不做猜测回填。本模型已在隔离 PostgreSQL 完成空库、0035、真实 0034 快照串行升级、重放、失败回滚、约束和完整浏览器旅程，并部署到并行非生产 UAT；主 UAT 当前 Resolution 与 Package 都为 0，尚未执行业务确认。
+
 ## 2026-07-28 alpha.34 可移植灾备边界
 
 `SELFHOST-LANDING-TASK01` 不改变业务架构，而是在运行面之外建立 root-only 的可移植恢复边界：完整 main Git Bundle 恢复源码和历史；PostgreSQL custom dump 恢复关系库；uploads、attachments、backup-status 三个 tar 恢复文件状态；`parallel.env` 的实际值不进入包，必须在恢复目标重新安全配置。

@@ -955,7 +955,7 @@
 ## D-086 Planning 需求单位解析必须使用独立版本事实和 CAS Head
 
 - 日期：2026-07-31
-- 状态：`ACCEPTED / IMPLEMENTATION AND PARALLEL UAT DEPLOYMENT AUTHORIZED`
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
 - 确认人：项目负责人（2026-07-31 明确授权独立 0036 实现、全部隔离升级/恢复测试通过后的并行非生产 UAT 0034→0035→0036 升级与 alpha.37 Web 部署）
 - 提出依据：项目负责人要求修复 Planning Handoff “单位待确认却无处确认”，并明确禁止改写已提交销售需求、静默推断 PCS 或放宽快照门禁。
 - 已确认缺口：0015 的 Requirement Item 以 `unit_id=NULL/unit_pending=true` 合法保留未知单位，并由不可变 trigger 保护。0016/0034 的 `project_requirement_resolutions` 只保存 Product/BOM 稳定 ID，没有 Unit、单位版本或独立 CAS；快照又从源 Requirement Item INNER JOIN enabled Unit，因而无法合规解析当前行。
@@ -965,6 +965,8 @@
 - 有效性与错误：Unit 保存和生成时都锁定校验存在且 enabled；空/未知/停用分别使用 `REQUIREMENT_UNIT_UNRESOLVED`、`REQUIREMENT_UNIT_INVALID`、`REQUIREMENT_UNIT_DISABLED`，Product/BOM 缺失使用 `REQUIREMENT_PRODUCT_BOM_UNRESOLVED`，并指明具体 Requirement Item/line。BOM 组件 Unit 不能推断需求数量 Unit。
 - 安全边界：只有 engineering/project owner 的 `planning.prepare` 可写；严格 Origin、Cookie/Header CSRF、Idempotency-Key+canonical body、独立 CAS、Unit/Product/BOM/Audit/幂等同事务和故障零半记录。planning、sales、无关角色 403；Package 非 RETURNED 后锁定依据，退回修订产生新 Resolution/Package 版本。
 - 迁移边界：不修改 0035；只可新增 0036，并按 0034→0035→0036 在真实快照的隔离副本验证空库/已有库/重放/回滚/约束/摘要。不得自动把现有 pending 行回填 PCS，不得制作 alpha.34 兼容热修；当前主 UAT Package 必须保持 0。隔离门禁全部通过后才允许执行本次明确授权的并行非生产 UAT 升级，生产数据库和真实公司数据仍未获授权。
+- 实施结果：`0.1.0-alpha.37` 以唯一新增 `0036_project_requirement_unit_resolution.sql` 落实上述模型；功能提交为 `91c0fd29d534246c55ddd669e894cdde9b774e52`。空库 0001→0036、0035→0036、真实 0034 快照的 0035→0036、重放、失败回滚、约束、隔离完整浏览器旅程和恢复门禁通过后，并行非生产 UAT 已由 0034 串行升级到 0035/0036并部署 alpha.37 Web。
+- 数据保护结果：主 UAT 的 `unit_id=NULL/unit_pending=true` 未回填；Unit Resolution Version/Head 与 Planning Package/Item/Event 都保持 0，Product/BOM Resolution 仍精确指向 7/7/7/7，受保护业务指纹 `fb71309bf73dce907f0bcb2e294d1b31` 升级前后相同。Engineering 只读验收未选择或保存 PCS、未生成 Package，未登录 planning；后续业务黑盒试用必须另立任务。
 
 ## 待确认业务决策
 

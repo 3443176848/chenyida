@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
-最后核验：2026-07-28（Asia/Shanghai）
-适用任务：`PHASE0-TASK03` 发布基线复核；最新功能验收为 `SELFHOST-PHASE5-TASK10`，最新恢复封存为 `SELFHOST-LANDING-TASK01`
+最后核验：2026-07-31（Asia/Shanghai）
+适用任务：最新功能与并行非生产部署验收为 `SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07`；历史发布/恢复记录保留下文
 
 ## 1. 使用规则
 
@@ -17,6 +17,7 @@
 
 | 运行面 | 版本/标识 | Git 基线 | 数据库基线 | 测试状态 | 部署状态 | 真实数据迁移 | 回退基线 | 批准状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Node.js / PostgreSQL Project Unit Resolution 并行 UAT | `0.1.0-alpha.37` | 功能提交 `91c0fd29d534246c55ddd669e894cdde9b774e52`；运维/文档提交消息 `ops: deploy requirement unit resolution in parallel environment`，SHA 以 Git log 为准 | 源码与并行 PostgreSQL 均为 `0001`—`0036`；主 UAT Unit Resolution/Head 与 Package/Item/Event 均为 0 | Migration 6/6、Project PG 5/5、Planning PG 10/10、静态 89/89、适用 PG 25/25、npm 3/3、typecheck/lint/build、隔离和主 UAT 只读 Chromium 通过 | `DEPLOYED` 到受控并行非生产 UAT；`NOT_RELEASED` 到生产 | `NOT_MIGRATED`；未迁移真实公司数据 | 正式 0034 停服 dump 已校验并恢复第二新空库；旧 Web 精确 tag 保留；回退恢复演练通过 | `VERSIONED REQUIREMENT UNIT RESOLUTION DEPLOYED — UAT PACKAGE UNCHANGED`；只解除技术阻断，不代表业务 Package 已创建 |
 | Node.js / PostgreSQL alpha.34 本机灾备封存 | `0.1.0-alpha.34` / `READY_FOR_OFFHOST_COPY` | 起点 `82e9f07ce1666ace2677853408c7fb4339808cfc`；docs-only 提交后创建完整 main Bundle，最终 SHA 只记录在包内 | clean-0034 custom dump；34 migrations/checksum；205 业务表 0；三个文件卷 tar | Bundle clone、固定新空库单事务恢复、三个 tar 恢复、npm test/lint/credentials、health、SHA256SUMS 通过 | 本机 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` root-only；不是生产部署 | `NOT_MIGRATED`；`offhost_copy_completed=false` | Bundle + dump + 三 tar + RESTORE/MANIFEST/SHA256SUMS；异机凭据必须重建并轮换 | `ALPHA.34 RECOVERY PACKAGE VERIFIED AND READY FOR OFFHOST COPY`；异机校验前不得称备份完成 |
 | 历史 OpenAI Sites / Cloudflare D1 | 历史记录 `v3` | `2b4f1787ddbc7e0941ab2d5f5cadea6e817e8f12`；后续纳管来源 `9f2c2dca9ccde237cb2db6c01d2e3792b284e6e9` | 仓库 D1/Drizzle `0000`—`0008`；生产实际已应用版本本任务未访问、未核验 | 仅保留历史验收记录；本任务未访问公开 Site | `HISTORICAL`；文档曾记录为公开 `v3`，本任务不重新确认在线状态；不是未来生产权威方向 | 未向 PostgreSQL 迁移 | 历史提交 `2b4f178` 和 D1 migration/快照仅作迁移与行为证据；不是已验证的当前回退方案 | 历史状态；无新的部署批准 |
 | 当前 Python / SQLite 开发运行面 | `legacy-development`，尚无统一 SemVer | 本次复核起点为根仓库 `3ae79f167a22bd8c5bb8120e2b5e8356f59d89b4`；Python/systemd 路径自 `39946f6` 后无差异，常驻进程未记录启动 commit，不能反推为当前 HEAD | 本地 SQLite 历史 26 表 + migration `0001`—`0004`；开发库只读核验为 29 张非系统表并记录四个版本 | 本次重新执行 Python self-test、smoke 和临时库 go-live；结果见本节后续复核记录 | `DEVELOPMENT`；systemd `enabled/active`，源码与已安装 unit SHA-256 一致，Python 监听 `0.0.0.0:18888`；不是正式生产投用 | 真实业务未迁出；采购、库存、生产、销售、品质和财务的实际业务继续依赖本运行面 | Git 源码 + 执行前 SQLite 可恢复快照；正式回退点尚未建立 | 仅开发常驻；未获生产批准 |
@@ -29,13 +30,13 @@
 | Node.js / PostgreSQL 原始自托管开发基线 | `0.1.0-alpha.1` | 功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；发布追踪提交 `12d3ea30d21cce6918de0c525d81f19af289f5ac` | PostgreSQL `0001`—`0005` | PHASE0-TASK03 的隔离 lint/test/typecheck/build/credentials、Python 三项与 diff check 通过 | `NOT_RELEASED` / `NOT_DEPLOYED`；历史开发基线，不代表当前包版本 | `NOT_MIGRATED` | Git `39946f6` + 当时 migration checksum；未建立生产恢复点 | `NOT_APPROVED_FOR_PRODUCTION`；该历史定义保留且不因后续 alpha 演进而改写 |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.1` 是 PHASE0-TASK03 建立的原始非生产发布基线，不是当前包版本。当前源码和回环并行验收环境已演进到 `0.1.0-alpha.34`/`0034`；既有部门交接、Manufacturing Batch、Finished Goods Lot/FQC/Shipment 事实保持有效，并新增 Supplier Receipt Lot→IQC 隔离放行。这只证明合成非生产链路成立，不表示真实数据已迁移、HTTPS/生产恢复通过或已批准上线。
+`0.1.0-alpha.1` 是 PHASE0-TASK03 建立的原始非生产发布基线，不是当前包版本。当前源码和并行非生产 UAT 已演进到 `0.1.0-alpha.37`/`0036`；既有部门交接、Manufacturing Batch、Finished Goods Lot/FQC/Shipment 与 Supplier Receipt Lot→IQC 事实保持，并新增版本化 Project Requirement Unit Resolution。这只证明非生产链路和升级恢复门禁成立，不表示真实公司数据已迁移或已批准生产上线。
 
 Git 同步状态以 2026-07-27 PHASE5-TASK10 起点计：本地 `main`/HEAD 为 `55f8fe9693ebc0f630920e92eca1f74584d852af`，`origin/main...HEAD` 为 behind 0/ahead 73。TASK10 增加功能、Compose/回归修正和独立验收提交，均未推送；最终状态以 `git status --short --branch` 为准。
 
 ## 3. Migration 文件与 SHA-256 基线
 
-当前 Phase 5 head：`0034_supplier_receipt_lot_iqc.sql`，SHA-256 `29b380050d7d7003df82df981aea061e7287845dde773f181caf918a49d47b2d`。TASK10 已确认 `0001`—`0033` 相对严格起点无差异；完整运行库 checksum 与文件一致。下表保留 PHASE0 历史发布基线及后续已记录条目，不改写历史值。
+当前源码与并行非生产 UAT head：`0036_project_requirement_unit_resolution.sql`，SHA-256 `a5ad532837acb0c9704f5c885206cf2ec10c891628c7fe4ed660233468b134a0`。IMPLEMENT-07 已确认 `0001`—`0035` 相对严格起点无差异，逐文件 SHA 汇总 `504ba2fdc555135935436fccc8d618225fad47e3de169af9fd9cb7ae99a511c0`；完整运行库 checksum 与文件一致。下表保留历史值并追加 0035/0036。
 
 ### PostgreSQL 自托管
 
@@ -75,8 +76,10 @@ Git 同步状态以 2026-07-27 PHASE5-TASK10 起点计：本地 `main`/HEAD 为 
 | `0032` | `0032_finished_goods_inventory_lots.sql` | `3a2fc22ff73706d226641119135b68d042d393124c89233a63d774f76aa2d4fa` |
 | `0033` | `0033_finished_goods_lot_fqc_shipment.sql` | `ca01cbc6a40ebfe9c17e9c3133f8704748d12b64c21d56155313ff73ce0c3d44` |
 | `0034` | `0034_supplier_receipt_lot_iqc.sql` | `29b380050d7d7003df82df981aea061e7287845dde773f181caf918a49d47b2d` |
+| `0035` | `0035_bom_material_governance.sql` | `d64ec733bb937d8cde11d93d5370605fb7e754ffb0c93d2f9795c8d7b66c9714` |
+| `0036` | `0036_project_requirement_unit_resolution.sql` | `a5ad532837acb0c9704f5c885206cf2ec10c891628c7fe4ed660233468b134a0` |
 
-当前源码与并行 PostgreSQL 均为 `0001 -> 0034`；0034 已通过隔离 migration/API 和回环并行验收，验收业务已清空。没有生产 PostgreSQL 部署或真实数据迁移。
+当前源码与并行 PostgreSQL 均为 `0001 -> 0036`；0034→0035→0036 已通过隔离升级/恢复/回退和并行非生产 UAT 部署验收。没有生产 PostgreSQL 部署或真实公司数据迁移。
 
 ### 历史 Cloudflare D1 / Drizzle
 
@@ -194,7 +197,23 @@ SQLite 的 `local_schema_migrations` 只保存版本和应用时间，不保存 
 
 数据库回退默认使用“恢复到新空目标并切换”，不得对已过账业务原地逆向改写。Migration Down 只有在明确证明无业务数据、约束允许且有批准时才可使用；否则使用快照恢复或新增前向修复 migration。
 
-## 5.1 `0.1.0-alpha.34` Supplier Receipt Lot/IQC 并行验收记录
+## 5.1 `0.1.0-alpha.37` Project Requirement Unit Resolution 并行 UAT 部署记录
+
+| 项目 | 记录 |
+| --- | --- |
+| 任务 | `SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07` |
+| 包版本 | `chenyida-erp-selfhosted@0.1.0-alpha.37` |
+| 状态 | `DEPLOYED TO PARALLEL NON-PRODUCTION UAT` / `NOT_RELEASED` / `NOT_MIGRATED` / `NOT_APPROVED_FOR_PRODUCTION` |
+| Git | 起点 `d06b44f5958527707f38e4c12f0d3143ce31875b`，Parent `525ad2907287d736ecd40d3df24b77c6c5be8ff4`；功能 `91c0fd29d534246c55ddd669e894cdde9b774e52`；ops 提交以 Git log 为准；未 push/PR |
+| PostgreSQL | 只新增 `0036_project_requirement_unit_resolution.sql`，SHA-256 `a5ad532837acb0c9704f5c885206cf2ec10c891628c7fe4ed660233468b134a0`；0035 SHA 保持 `d64ec733...9714`，0001—0035 汇总保持 `504ba2fd...11c0`；最终主库 36/head 0036 |
+| 功能 | 追加式 Requirement Unit Resolution Version、每 Requirement Item 独立 CAS Head、稳定 Unit FK、受控来源类型、Package Item 精确 provenance；正式 API 执行 Session/Origin/CSRF/权限/幂等/CAS/Audit/故障回滚；UI 不预选 Unit 并分别显示 Product/BOM 与 Unit 完整性 |
+| 隔离验收 | 空库 0001→0036、0035→0036、真实 0034 备份的 0035→0036、重放、失败回滚、约束、回退恢复和 390px Chromium 完整生成/退回/修订/重提/接收旅程通过；所有写入均为合成隔离数据 |
+| 正式备份/恢复 | root:root 0600 custom dump，SHA-256 `75e1ffbf2ea846761ece1d4c73dea96e871eca5fcde86d28f24782b10f862df7`；`pg_restore --list` 与第二新空数据库 34/head 0034 及保护事实恢复核对通过；备份保留 |
+| 部署 | 暂停 Web/Worker 写入后串行应用 0035、0036；Web `sha256:7e0a3040acd172...→sha256:6667bd2ca64e...`，旧镜像精确回退 tag 保留。Worker 因无共享代码依赖保持 `sha256:32d1ae335610...`，Caddy 不重建，PostgreSQL Volume 与 Origin/端口不变 |
+| UAT 保护 | `PRJ-00000001` ACCEPTED/10；Requirement Item 1 仍 NULL/pending；Product/BOM Resolution 仍 7/7/7/7；Unit Resolution/Head `0/0`，Package/Item/Event/待接收 `0/0/0/0`；保护指纹 `fb71309bf73dce907f0bcb2e294d1b31` 前后相同 |
+| 批准结论 | `VERSIONED REQUIREMENT UNIT RESOLUTION DEPLOYED — UAT PACKAGE UNCHANGED`；可在后续独立任务恢复 engineering 黑盒续测，不授权生产或自动创建 Package |
+
+## 5.2 `0.1.0-alpha.34` Supplier Receipt Lot/IQC 并行验收记录
 
 | 项目 | 记录 |
 | --- | --- |

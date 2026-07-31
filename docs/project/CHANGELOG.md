@@ -4,6 +4,19 @@
 
 ## 2026-07-31
 
+### SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07 - `feat: add versioned requirement unit resolution` / `ops: deploy requirement unit resolution in parallel environment`
+
+- Git/版本：从 clean `main@d06b44f5958527707f38e4c12f0d3143ce31875b`、Parent `525ad2907287d736ecd40d3df24b77c6c5be8ff4`、behind 0/ahead 107 起步；功能提交 `91c0fd29d534246c55ddd669e894cdde9b774e52`。包升级为 `0.1.0-alpha.37`；未 push/PR 或改写历史。
+- Schema：唯一新增 `0036_project_requirement_unit_resolution.sql`，SHA-256 `a5ad532837acb0c9704f5c885206cf2ec10c891628c7fe4ed660233468b134a0`。`0001`—`0035` 无修改，逐文件 SHA 汇总仍为 `504ba2fdc555135935436fccc8d618225fad47e3de169af9fd9cb7ae99a511c0`，0035 仍为 `d64ec733bb937d8cde11d93d5370605fb7e754ffb0c93d2f9795c8d7b66c9714`。
+- 模型/API：新增追加式 Unit Resolution Version、每 Requirement Item 独立 CAS Head、稳定 Unit/需求链外键、受控来源类型、Version UPDATE/DELETE 禁止和 Package Item 精确 provenance。正式写接口执行 Session、Origin、Cookie/Header CSRF、角色权限、canonical-body 幂等、CAS、enabled Unit、Audit 与故障零半记录；Package 创建不再从源 nullable Unit 或 BOM 推断。
+- UI：pending 行显示 enabled Unit 的 `中文名 · CODE` 选择器且不自动预选 PCS；Product/BOM 与 Unit 完整性分别显示，缺失行明确，未完整时保存/生成门禁生效，刷新保留 Resolution Version，390px 无页面级横向溢出，并说明确认不改销售原始需求。
+- 测试：Migration 6/6、Project PostgreSQL 5/5、Planning PostgreSQL 10/10、静态适用回归 89/89、其他适用 PostgreSQL 25/25、`npm test` 3/3；两个 typecheck、lint `0 error / 10 existing warnings` 和 production build 通过。真实 Chromium 隔离全旅程 1/1，覆盖无预选/停用 Unit、CSRF/Origin、幂等/CAS、退回修订重提接收、四行各 10 PCS、固定 v1/v2 provenance、源 Requirement 不变和退出失效。
+- 隔离升级/回退：在线一致 0034 隔离 dump SHA-256 `52bd21d05dcb9fda9d98a3a4b8949e2513ba8b818a8c2e60e243cded9f6c19a1`；空库 0001→0036、0035→0036、0034 恢复库的 0035→0036、重放、失败回滚和约束均通过。升级库删除后从同一备份恢复到另一新空库为 34/head 0034，保护事实一致；临时库已删除。
+- 正式备份/部署：停服 root:root 0600 custom dump SHA-256 `75e1ffbf2ea846761ece1d4c73dea96e871eca5fcde86d28f24782b10f862df7`，`pg_restore --list` 和第二新空库 34/head 0034 恢复通过。暂停 Web/Worker 写入后串行应用 0035、0036；只替换 Web `sha256:7e0a3040acd172...→sha256:6667bd2ca64e...`，旧 Web 回退 tag 保留。Worker 保持 `sha256:32d1ae335610...`，Caddy 未重建，PostgreSQL Volume、公网 Origin/端口和四个受保护卷保持。
+- UAT 保护：业务保护指纹 `fb71309bf73dce907f0bcb2e294d1b31` 升级前后相同。Requirement Item 1 仍 `unit_id=NULL/unit_pending=true`、数量 10；Product/BOM Resolution 仍 7/7/7/7；Unit Resolution Version/Head `0/0`，Package/Item/Event/待接收 `0/0/0/0`；Product/BOM/Material 533—536/四行各 1 PCS 未变。
+- 只读验收：Engineering 页面出现未预选的单位选择器，显示 Product/BOM 完成与 Unit 缺失，保存/生成禁用，390px 通过；未选择/保存 PCS、未生成 Package、未登录 planning，退出后会话失效。凭据格式探测曾产生 1 次 engineering 登录 401，无会话或业务写；随后只在内存核对密码摘要完成正式验收，不影响业务指纹。
+- 运行状态：最终四服务 restart 0/OOM false，Web/PostgreSQL healthy、Worker/Caddy running；精确清理后 available memory 2.3 GiB、Swap 210 MiB、根盘 26 GiB、Load `0.30/0.30/0.40`，未触发停止阈值。临时库/容器/worktree/runner/在线隔离 dump/Playwright 镜像已清理；正式备份、当前/旧 Web 回退镜像和四个受保护卷保留。
+
 ### SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06 - `docs: diagnose planning unit resolution schema gap`
 
 - 严格门禁：从 clean `main`/`525ad2907287d736ecd40d3df24b77c6c5be8ff4`、behind 0/ahead 106 起步；源码 alpha.36/0035，常驻 alpha.34/0034，Web 镜像与唯一公网 Origin 精确符合任务要求。无未知执行流或重型容器，四服务 restart 0/OOM false。

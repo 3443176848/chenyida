@@ -2,6 +2,27 @@
 
 最后更新时间：2026-07-31（Asia/Shanghai）
 
+## SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07 版本化需求单位解析实施与并行 UAT 部署
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | VERSIONED REQUIREMENT UNIT RESOLUTION DEPLOYED — UAT PACKAGE UNCHANGED | alpha.37/0036 已实现、隔离验证并部署到并行非生产 UAT；未执行业务单位确认或 Package 创建 |
+| Git | PASS | 起点 `d06b44f5958527707f38e4c12f0d3143ce31875b`、Parent `525ad2907287d736ecd40d3df24b77c6c5be8ff4`；功能提交 `91c0fd29d534246c55ddd669e894cdde9b774e52`，独立 ops 提交以 Git log 为准；未 push/PR/历史改写 |
+| 版本/Migration | PASS / DEPLOYED TO UAT | package alpha.37；36/head `0036_project_requirement_unit_resolution.sql`，SHA-256 `a5ad532837acb0c9704f5c885206cf2ec10c891628c7fe4ed660233468b134a0`。0001—0035 汇总 `504ba2fd...11c0`、0035 `d64ec733...9714` 未变 |
+| 数据模型 | PASS | Resolution Version 只追加；每 Requirement Item 独立 Head/CAS；稳定 Unit 与复合需求链 FK；Version UPDATE/DELETE 和直接 Head 推进禁止；新 Package Item 固定精确 `unit_resolution_id` provenance |
+| 服务端安全/事务 | PASS | engineering 项目负责人、manager、admin 可确认；planning/sales/operations 等拒绝。Session、Origin、CSRF、权限、Idempotency-Key、CAS、enabled Unit、Audit 与故障回滚同一服务事务，中文稳定错误码带 request_id |
+| UI | PASS | pending 行显示 enabled Unit `中文名 · CODE`，不预选 PCS；Product/BOM 和 Unit 分别显示状态，缺失行明确；未完整时保存/生成受控，刷新显示 Resolution 版本，390px 无页面级横向溢出 |
+| 自动测试 | PASS | Migration 6/6、Project PG 5/5、Planning PG 10/10、静态回归 89/89、适用 PG 25/25、npm 3/3；两个 typecheck、lint 0 error/10 既有 warning、production build 通过 |
+| 隔离浏览器 | PASS / REAL CHROMIUM | 390×844 全旅程 1/1：无 PCS 预选、停用 Unit 隐藏、未知 Origin 拒绝、保存刷新 v1、退回修订重提接收、四行各 10 PCS、Package v1/v2 固定各自 Resolution、源 Requirement NULL/pending、退出失效；只用合成隔离数据 |
+| 隔离升级/回退 | PASS | 空库 0001→0036、0035→0036、0034 dump 恢复后 0035→0036、重放、失败回滚和约束通过；回退恢复到另一新空库为 34/head 0034，保护事实一致，临时库已删除 |
+| 正式备份/第二库恢复 | PASS | root:root 0600 custom dump SHA-256 `75e1ffbf2ea846761ece1d4c73dea96e871eca5fcde86d28f24782b10f862df7`；`pg_restore --list` 与第二新空库 34/head 0034/保护事实恢复通过；备份保留 |
+| 部署 | PASS / WEB ONLY | 并行 UAT 串行应用 0035、0036；Web `7e0a3040acd1...→6667bd2ca64e...`。Worker 保持 `32d1ae335610...`，Caddy 不重建，PostgreSQL Volume、Origin/端口与四卷不变；旧 Web 精确回退 tag 保留 |
+| UAT 数据 | PASS / UNCHANGED | 指纹 `fb71309bf73dce907f0bcb2e294d1b31` 前后相同；Requirement Item NULL/pending/10，Product/BOM Resolution 7/7/7/7，Unit Resolution/Head 0/0，Package/Item/Event/待接收 0/0/0/0；Material 533—536 V3/ACTIVE/PCS、四行各 1 PCS 保持 |
+| 主 UAT 只读验收 | PASS | Engineering 390px 显示空单位选择器和缺失状态；未选择/保存 PCS、未生成 Package、未登录 planning。退出后 Session 失效。此前一次格式探测登录 401 没有 Session 或业务写，不影响指纹 |
+| 运行健康/资源 | PASS | 最终清理后 available 2.3 GiB、Swap 210 MiB/1 GiB、根盘 26 GiB、Load `0.30/0.30/0.40`；Web/PostgreSQL healthy、Worker/Caddy running，四服务 restart 0/OOM false，任务 OOM 0；临时库/容器/worktree/runner/在线隔离 dump/Playwright 镜像已清理，正式备份、当前/回退 Web 镜像和四个受保护卷保留 |
+| 范围保护 | PASS | 未访问生产数据库、迁移真实公司数据、修改 Python/SQLite、切流、push/PR 或登录 planning；未读取/修改 `shujvbiao/`，未删除四个受保护 Volume |
+| 后续 | READY FOR SEPARATE ENGINEERING BLACK-BOX TASK | Schema 阻断已解除；业务续测必须另立任务并从 Unit Resolution 0、Package 0 起点显式确认，不得自动推断 PCS |
+
 ## SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06 需求单位解析 Schema 缺口诊断
 
 | 验证项 | 结果 | 说明 |
