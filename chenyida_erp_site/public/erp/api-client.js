@@ -92,7 +92,8 @@ export async function api(path, options = {}) {
   const materialWrite = path.startsWith("/api/material-master/") && (["POST", "PATCH"].includes(method) || method === "PUT");
   const identityWrite = ["/api/me/password", "/api/users", "/api/users/status", "/api/users/reset-password"].includes(path) && method === "POST";
   const masterDataWrite = (["/api/customers", "/api/suppliers", "/api/products", "/api/mappings", "/api/boms", "/api/bom-lines"].includes(path)
-    || /^\/api\/(customers|suppliers|products|mappings|boms)\/[1-9]\d*\//.test(path)) && ["POST", "PATCH"].includes(method);
+    || /^\/api\/(customers|suppliers|products|mappings|boms)\/[1-9]\d*\//.test(path)
+    || /^\/api\/bom-lines\/[1-9]\d*$/.test(path)) && ["POST", "PATCH", "DELETE"].includes(method);
   const procurementWrite = (path === "/api/purchase-orders" || path === "/api/purchase-orders/from-shortage" || path === "/api/purchase-receipts" || path === "/api/purchase-receive"
     || /^\/api\/(purchase-orders|purchase-receipts)\/[1-9]\d*\/(close|reversal)$/.test(path) || /^\/api\/purchase-orders\/[1-9]\d*$/.test(path)) && ["POST", "PATCH"].includes(method);
   const productionWrite = (path === "/api/work-orders" || path === "/api/work-orders/from-bom" || path === "/api/work-orders/issue-materials" || path === "/api/work-orders/complete"

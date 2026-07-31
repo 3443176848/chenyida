@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import { MasterDataError } from "../master-data-selfhost/errors.ts";
 import { PostgresMasterDataRepository } from "../master-data-selfhost/repository.ts";
 import type { MutationMeta, MutationResult } from "../master-data-selfhost/types.ts";
@@ -6,10 +7,36 @@ const positiveInt = (value: unknown, field: string) => { const result = Number(v
 const boundedText = (value: unknown, field: string, maximum = 2000, required = false) => { const result = String(value ?? "").normalize("NFKC").trim(); if ((required && !result) || result.length > maximum || /[\u0000-\u001f\u007f]/.test(result)) throw new MasterDataError("REQUEST_VALIDATION_FAILED", `${field} 无效`); return result; };
 const quantity = (value: unknown, field: string) => { const raw = String(value ?? ""); if (!/^(0|[1-9]\d*)(\.\d{1,6})?$/.test(raw) || Number(raw) <= 0) throw new MasterDataError("REQUEST_VALIDATION_FAILED", `${field} 必须是正数且最多六位小数`); return raw; };
 const loss = (value: unknown) => { const raw = String(value ?? "0"); if (!/^(0(\.\d{1,8})?)$/.test(raw) || Number(raw) >= 1) throw new MasterDataError("REQUEST_VALIDATION_FAILED", "loss_rate 必须在 0（含）到 1（不含）之间"); return raw; };
+const assertOnlyKeys = (input: Record<string, unknown>, allowed: string[]) => { const extra = Object.keys(input).find((key) => !allowed.includes(key)); if (extra) throw new MasterDataError("REQUEST_VALIDATION_FAILED", `请求正文不能指定字段：${extra}`); };
 
 export class BomService {
   readonly repository: PostgresMasterDataRepository;
   constructor(repository: PostgresMasterDataRepository) { this.repository = repository; }
+
+  private async lineValues(client: PoolClient, bomVersionId: number, input: Record<string, unknown>, excludeLineId = 0) {
+    const materialId = positiveInt(input.material_id, "material_id"); const unitId = positiveInt(input.unit_id, "unit_id");
+    const material = await client.query(`select id,internal_material_code,standard_name,base_unit_id,base_uom,material_status from material_master where id=$1 for share`, [materialId]);
+    if (!material.rows[0]) throw new MasterDataError("BOM_MATERIAL_NOT_FOUND", "BOM 行物料不存在", 422);
+    if (material.rows[0].material_status !== "ACTIVE" || !String(material.rows[0].internal_material_code || "").trim()) throw new MasterDataError("BOM_MATERIAL_NOT_ACTIVE", "BOM 行物料未启用或尚无正式内部编码", 422);
+    const unit = await client.query("select id,code,enabled from units where id=$1 for share", [unitId]);
+    if (!unit.rows[0] || unit.rows[0].enabled !== true) throw new MasterDataError("BOM_UNIT_NOT_ACTIVE", "BOM 行单位不存在或未启用", 422);
+    const matchesMasterUnit = material.rows[0].base_unit_id !== null
+      ? Number(material.rows[0].base_unit_id) === unitId
+      : String(material.rows[0].base_uom || "").trim().toUpperCase() === String(unit.rows[0].code || "").trim().toUpperCase();
+    if (!matchesMasterUnit) throw new MasterDataError("BOM_UNIT_MISMATCH", "BOM 行单位必须与物料主数据单位一致", 422);
+    const duplicate = await client.query("select 1 from bom_lines where bom_version_id=$1 and material_id=$2 and id<>$3 limit 1", [bomVersionId, materialId, excludeLineId]);
+    if (duplicate.rows[0]) throw new MasterDataError("BOM_MATERIAL_DUPLICATE", "同一物料不能在同一 BOM 版本中重复添加", 409);
+    return { materialId, unitId, lineNo: positiveInt(input.line_no, "line_no"), quantityPer: quantity(input.quantity_per ?? input.qty_per, "quantity_per"), lossRate: loss(input.loss_rate), processStage: boundedText(input.process_stage, "工序", 100), remark: boundedText(input.remark, "备注"), material: material.rows[0], unit: unit.rows[0] };
+  }
+
+  private async editableLine(client: PoolClient, lineId: number, input: Record<string, unknown>) {
+    const result = await client.query(`select l.*,v.status version_status,v.version_no,h.id bom_id,h.current_version_no from bom_lines l join bom_versions v on v.id=l.bom_version_id join bom_headers h on h.id=v.bom_header_id where l.id=$1 for update of h,v,l`, [lineId]);
+    const line = result.rows[0]; if (!line) throw new MasterDataError("BOM_LINE_NOT_FOUND", "BOM 行不存在", 404);
+    if (line.version_status !== "DRAFT") throw new MasterDataError("BOM_RELEASED_IMMUTABLE", "已发布 BOM 不可修改，请新建版本", 409);
+    if (Number(line.version_no) !== Number(line.current_version_no)) throw new MasterDataError("BOM_VERSION_STATE_CONFLICT", "只有当前 DRAFT BOM Version 可以修改", 409);
+    if (positiveInt(input.bom_id, "bom_id") !== Number(line.bom_id)) throw new MasterDataError("BOM_LINE_REFERENCE_INVALID", "BOM 行与 BOM 不匹配", 422);
+    return line;
+  }
 
   async create(meta: MutationMeta, input: Record<string, unknown>): Promise<MutationResult> {
     return this.repository.execute(meta, async (client) => {
@@ -30,20 +57,27 @@ export class BomService {
     return this.repository.execute(meta, async (client) => {
       const header = await client.query(`select h.*,v.id bom_version_id,v.status version_status from bom_headers h join bom_versions v on v.bom_header_id=h.id and v.version_no=h.current_version_no where h.id=$1 for update of h,v`, [headerId]);
       if (!header.rows[0]) throw new MasterDataError("BOM_NOT_FOUND", "BOM 不存在", 404); if (header.rows[0].version_status !== "DRAFT") throw new MasterDataError("BOM_RELEASED_IMMUTABLE", "已发布 BOM 不可修改，请新建版本", 409);
-      const materialId = positiveInt(input.material_id, "material_id"); const unitId = positiveInt(input.unit_id, "unit_id");
-      const material = await client.query(`select id,internal_material_code,standard_name,base_unit_id,base_uom,material_status from material_master where id=$1 for share`, [materialId]);
-      if (!material.rows[0]) throw new MasterDataError("BOM_MATERIAL_NOT_FOUND", "BOM 行物料不存在", 422);
-      if (material.rows[0].material_status !== "ACTIVE" || !String(material.rows[0].internal_material_code || "").trim()) throw new MasterDataError("BOM_MATERIAL_NOT_ACTIVE", "BOM 行物料未启用或尚无正式内部编码", 422);
-      const unit = await client.query("select id,code,enabled from units where id=$1 for share", [unitId]);
-      if (!unit.rows[0] || unit.rows[0].enabled !== true) throw new MasterDataError("BOM_UNIT_NOT_ACTIVE", "BOM 行单位不存在或未启用", 422);
-      const matchesMasterUnit = material.rows[0].base_unit_id !== null
-        ? Number(material.rows[0].base_unit_id) === unitId
-        : String(material.rows[0].base_uom || "").trim().toUpperCase() === String(unit.rows[0].code || "").trim().toUpperCase();
-      if (!matchesMasterUnit) throw new MasterDataError("BOM_UNIT_MISMATCH", "BOM 行单位必须与物料主数据单位一致", 422);
-      const duplicate = await client.query("select 1 from bom_lines where bom_version_id=$1 and material_id=$2 limit 1", [header.rows[0].bom_version_id, materialId]);
-      if (duplicate.rows[0]) throw new MasterDataError("BOM_MATERIAL_DUPLICATE", "同一物料不能在同一 BOM 版本中重复添加", 409);
-      const lineNo = positiveInt(input.line_no, "line_no"); const result = await client.query(`insert into bom_lines(bom_version_id,line_no,material_id,quantity_per,unit_id,loss_rate,process_stage,remark,created_by,updated_by,request_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$9,$10) returning *`, [header.rows[0].bom_version_id, lineNo, materialId, quantity(input.quantity_per ?? input.qty_per, "quantity_per"), unitId, loss(input.loss_rate), boundedText(input.process_stage, "工序", 100), boundedText(input.remark, "备注"), meta.actor.username, meta.requestId]);
-      return { status: 201, body: { ok: true, data: { ...result.rows[0], internal_material_code: material.rows[0].internal_material_code, standard_name: material.rows[0].standard_name, unit_code: unit.rows[0].code }, request_id: meta.requestId }, targetType: "BOM_LINE", targetId: Number(result.rows[0].id) };
+      const values = await this.lineValues(client, Number(header.rows[0].bom_version_id), input); const result = await client.query(`insert into bom_lines(bom_version_id,line_no,material_id,quantity_per,unit_id,loss_rate,process_stage,remark,created_by,updated_by,request_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$9,$10) returning *`, [header.rows[0].bom_version_id, values.lineNo, values.materialId, values.quantityPer, values.unitId, values.lossRate, values.processStage, values.remark, meta.actor.username, meta.requestId]);
+      return { status: 201, body: { ok: true, data: { ...result.rows[0], internal_material_code: values.material.internal_material_code, standard_name: values.material.standard_name, unit_code: values.unit.code }, request_id: meta.requestId }, targetType: "BOM_LINE", targetId: Number(result.rows[0].id) };
+    });
+  }
+
+  async updateLine(lineId: number, meta: MutationMeta, input: Record<string, unknown>): Promise<MutationResult> {
+    return this.repository.execute(meta, async (client) => {
+      const line = await this.editableLine(client, lineId, input);
+      assertOnlyKeys(input, ["bom_id", "line_no", "material_id", "unit_id", "quantity_per", "qty_per", "loss_rate", "process_stage", "remark"]);
+      const merged = { line_no: input.line_no ?? line.line_no, material_id: input.material_id ?? line.material_id, unit_id: input.unit_id ?? line.unit_id, quantity_per: input.quantity_per ?? input.qty_per ?? line.quantity_per, loss_rate: input.loss_rate ?? line.loss_rate, process_stage: input.process_stage ?? line.process_stage, remark: input.remark ?? line.remark };
+      const values = await this.lineValues(client, Number(line.bom_version_id), merged, lineId);
+      const result = await client.query(`update bom_lines set line_no=$2,material_id=$3,quantity_per=$4,unit_id=$5,loss_rate=$6,process_stage=$7,remark=$8,updated_by=$9,updated_at=now(),request_id=$10 where id=$1 returning *`, [lineId, values.lineNo, values.materialId, values.quantityPer, values.unitId, values.lossRate, values.processStage, values.remark, meta.actor.username, meta.requestId]);
+      return { status: 200, body: { ok: true, data: { ...result.rows[0], internal_material_code: values.material.internal_material_code, standard_name: values.material.standard_name, unit_code: values.unit.code }, request_id: meta.requestId }, targetType: "BOM_LINE", targetId: lineId };
+    });
+  }
+
+  async deleteLine(lineId: number, meta: MutationMeta, input: Record<string, unknown>): Promise<MutationResult> {
+    return this.repository.execute(meta, async (client) => {
+      await this.editableLine(client, lineId, input); assertOnlyKeys(input, ["bom_id"]);
+      const result = await client.query("delete from bom_lines where id=$1 returning id", [lineId]);
+      return { status: 200, body: { ok: true, deleted: true, line_id: Number(result.rows[0].id), request_id: meta.requestId }, targetType: "BOM_LINE", targetId: lineId };
     });
   }
 

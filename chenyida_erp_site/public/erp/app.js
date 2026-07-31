@@ -1,4 +1,4 @@
-import { api, ErpApiError, isHistorySessionRestore, logoutSession, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "./api-client.js?v=20260731-bom-selector-fix-04";
+import { api, ErpApiError, isHistorySessionRestore, logoutSession, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "./api-client.js?v=20260731-csrf-bom-immutable-fix-05";
 
 const state = {
   summary: {},
@@ -9,8 +9,10 @@ const state = {
   customers: [],
   suppliers: [],
   boms: [],
+  bomSearchResults: [],
   bomLines: [],
   bomLinesBomId: null,
+  selectedBomId: null,
   bomMaterialCandidates: [],
   selectedBomMaterial: null,
   readiness: [],
@@ -49,6 +51,8 @@ const state = {
 
 let bomMaterialSearchController = null;
 let bomMaterialSearchTimer = null;
+let bomSearchController = null;
+let bomSearchTimer = null;
 let bomLinesRequestToken = 0;
 
 const $ = (selector) => document.querySelector(selector);
@@ -62,7 +66,7 @@ function requestedLegacyTab() {
 
 function clearLegacyProtectedState() {
   for (const key of [
-    "items", "mappings", "cleaning", "products", "customers", "suppliers", "boms", "bomLines", "bomMaterialCandidates", "readiness",
+    "items", "mappings", "cleaning", "products", "customers", "suppliers", "boms", "bomSearchResults", "bomLines", "bomMaterialCandidates", "readiness",
     "purchaseOrders", "purchaseLines", "purchaseSuggestions", "inventory", "inventoryAdjustments", "workOrders",
     "workMaterials", "productionReports", "quotations", "salesOrders", "shipments", "qualityInspections",
     "qualityDefects", "financialDocuments", "financialPayments", "financeSources", "backups", "users", "qualitySourceOptions",
@@ -74,12 +78,17 @@ function clearLegacyProtectedState() {
   state.selectedInspection = null;
   state.selectedBomMaterial = null;
   state.bomLinesBomId = null;
+  state.selectedBomId = null;
   bomLinesRequestToken += 1;
+  bomSearchController?.abort();
+  bomSearchController = null;
+  if (bomSearchTimer) window.clearTimeout(bomSearchTimer);
+  bomSearchTimer = null;
   bomMaterialSearchController?.abort();
   bomMaterialSearchController = null;
   if (bomMaterialSearchTimer) window.clearTimeout(bomMaterialSearchTimer);
   bomMaterialSearchTimer = null;
-  for (const selector of ["#lineItemSearch", "#lineItem", "#lineUnitId", "#lineUom", "#lineItemSelected", "#lineItemSearchStatus", "#lineItemResults"]) {
+  for (const selector of ["#bomSearch", "#lineBom", "#lineItemSearch", "#lineItem", "#lineUnitId", "#lineUom", "#lineItemSelected", "#lineItemSearchStatus", "#lineItemResults", "#lineNo", "#lineQty", "#lineLoss", "#lineStage"]) {
     const element = $(selector);
     if (!element) continue;
     if ("value" in element) element.value = "";
@@ -87,6 +96,8 @@ function clearLegacyProtectedState() {
     element.removeAttribute("aria-busy");
   }
   if ($("#lineItemSelected")) $("#lineItemSelected").hidden = true;
+  if ($("#lineBom")) $("#lineBom").innerHTML = '<option value="">请选择或搜索 BOM</option>';
+  if ($("#bomSearchStatus")) $("#bomSearchStatus").textContent = "请输入关键词后搜索；不会自动加载明细。";
   state.operationsAvailability = { dashboard: false, backups: false };
   state.session = { authenticated: false, user: null, setup_required: false };
   updateUserBar();
@@ -485,17 +496,20 @@ function renderPartners() {
 
 function renderBomSelectors() {
   const selectedProductId = $("#bomProduct").value;
-  const selectedLineBomId = $("#lineBom").value;
   const productOptions = state.products.map((product) => {
     const label = `${product.product_code} · ${product.product_name} · 产品版本 ${product.product_version || "—"} · ${product.product_version_status || "—"}`;
     return `<option value="${escapeHtml(product.id)}">${escapeHtml(label)}</option>`;
   }).join("");
   const bomOptions = state.boms.map((bom) => `<option value="${escapeHtml(bom.id)}">${escapeHtml(`${bom.bom_code} · ${bom.product_name} · BOM ${bom.bom_version} · ${bom.bom_status}`)}</option>`).join("");
+  const resultIds = new Set(state.bomSearchResults.map((bom) => Number(bom.id)));
+  const selected = state.boms.find((bom) => Number(bom.id) === Number(state.selectedBomId));
+  const detailOptions = [...state.bomSearchResults, ...(selected && !resultIds.has(Number(selected.id)) ? [selected] : [])]
+    .map((bom) => `<option value="${escapeHtml(bom.id)}">${escapeHtml(`${bom.bom_code} · ${bom.product_code} · ${bom.product_name} · ${bom.bom_status}`)}</option>`).join("");
   const inventoryOptions = optionList(state.inventory, "material_id", ["internal_material_code", "standard_name"]);
   $("#bomProduct").innerHTML = productOptions;
   if (state.products.some((product) => String(product.id) === selectedProductId)) $("#bomProduct").value = selectedProductId;
-  $("#lineBom").innerHTML = bomOptions;
-  if (state.boms.some((bom) => String(bom.id) === selectedLineBomId)) $("#lineBom").value = selectedLineBomId;
+  $("#lineBom").innerHTML = `<option value="">请选择或搜索 BOM</option>${detailOptions}`;
+  $("#lineBom").value = selected ? String(selected.id) : "";
   $("#readyBom").innerHTML = bomOptions;
   $("#purchaseBom").innerHTML = bomOptions;
   $("#productionBom").innerHTML = bomOptions;
@@ -509,6 +523,7 @@ function renderBomSelectors() {
   $("#adjustItem").innerHTML = inventoryOptions;
   renderBomProductContext();
   renderBomMaterialCandidates();
+  applyBomDetailMode();
   updateBomLineActionState();
 }
 
@@ -519,12 +534,35 @@ function renderBomProductContext() {
   $("#bomProductLifecycle").value = product?.lifecycle_status || "";
   $("#bomProductStatus").value = product?.status || "";
   const eligible = product?.status === "ACTIVE" && product?.product_version_status === "RELEASED";
-  $("#createBomBtn").disabled = !eligible;
+  const releasedDetail = state.boms.find((row) => Number(row.id) === Number(state.selectedBomId))?.bom_status === "RELEASED";
+  $("#createBomBtn").disabled = !eligible || releasedDetail;
   $("#bomProductEligibility").textContent = !product
     ? "当前没有可选产品。"
+    : releasedDetail
+      ? "当前正在查看已发布 BOM；清除选择后才可保存新草稿。"
     : eligible
       ? "该 Product Version 已发布，可以保存 BOM 草稿。"
       : "该 Product Version 尚未发布，不能保存 BOM 草稿；可继续只读检索物料。";
+}
+
+function selectedBom() {
+  return state.boms.find((row) => Number(row.id) === Number(state.selectedBomId));
+}
+
+function applyBomDetailMode() {
+  const bom = selectedBom();
+  const isDraft = bom?.bom_status === "DRAFT";
+  const isReleased = bom?.bom_status === "RELEASED";
+  $("#bomLineEditor").hidden = !isDraft;
+  $("#bomLineEditor").disabled = !isDraft;
+  $("#bomReadOnlyNotice").hidden = !isReleased;
+  $("#newBomFields").disabled = isReleased;
+  $("#bomDetailState").textContent = !bom
+    ? "请选择或搜索 BOM"
+    : isReleased
+      ? `${bom.bom_code} · ${bom.product_code} · ${bom.product_name} · ${bom.bom_version} / RELEASED`
+      : `${bom.bom_code} · ${bom.product_code} · ${bom.product_name} · ${bom.bom_version} / DRAFT`;
+  renderBomProductContext();
 }
 
 function bomMaterialLabel(candidate) {
@@ -532,7 +570,7 @@ function bomMaterialLabel(candidate) {
 }
 
 function updateBomLineActionState() {
-  const bom = state.boms.find((row) => String(row.id) === $("#lineBom").value);
+  const bom = selectedBom();
   const linesBelongToBom = String(state.bomLinesBomId || "") === String(bom?.id || "");
   $("#addBomLineBtn").disabled = !state.selectedBomMaterial || bom?.bom_status !== "DRAFT" || !linesBelongToBom;
 }
@@ -560,7 +598,21 @@ function clearBomMaterialSelection({ clearSearch = true, status = "请输入正�
   updateBomLineActionState();
 }
 
+function resetBomLineDraft({ defaults = false } = {}) {
+  bomMaterialSearchController?.abort();
+  bomMaterialSearchController = null;
+  if (bomMaterialSearchTimer) window.clearTimeout(bomMaterialSearchTimer);
+  bomMaterialSearchTimer = null;
+  $("#lineItemResults").removeAttribute("aria-busy");
+  clearBomMaterialSelection();
+  $("#lineNo").value = defaults ? "10" : "";
+  $("#lineQty").value = defaults ? "1" : "";
+  $("#lineLoss").value = defaults ? "0" : "";
+  $("#lineStage").value = "";
+}
+
 function selectBomMaterial(materialId) {
+  if (selectedBom()?.bom_status !== "DRAFT" || String(state.bomLinesBomId || "") !== String(state.selectedBomId || "")) return;
   const candidate = state.bomMaterialCandidates.find((row) => Number(row.material_id) === Number(materialId));
   if (!candidate) return;
   state.selectedBomMaterial = candidate;
@@ -574,6 +626,11 @@ function selectBomMaterial(materialId) {
 }
 
 async function searchBomMaterials() {
+  const activeBomId = String(state.selectedBomId || "");
+  if (selectedBom()?.bom_status !== "DRAFT" || String(state.bomLinesBomId || "") !== activeBomId) {
+    clearBomMaterialSelection();
+    return;
+  }
   const query = $("#lineItemSearch").value.normalize("NFKC").trim();
   bomMaterialSearchController?.abort();
   if (!query) {
@@ -594,6 +651,7 @@ async function searchBomMaterials() {
   try {
     const result = await api(`/api/bom-material-candidates?q=${encodeURIComponent(query)}&limit=20`, { signal: controller.signal });
     if (bomMaterialSearchController !== controller) return;
+    if (selectedBom()?.bom_status !== "DRAFT" || String(state.selectedBomId || "") !== activeBomId || String(state.bomLinesBomId || "") !== activeBomId) return;
     if ($("#lineItemSearch").value.normalize("NFKC").trim() !== query) return;
     state.bomMaterialCandidates = result.rows || [];
     renderBomMaterialCandidates(state.bomMaterialCandidates.length ? `找到 ${state.bomMaterialCandidates.length} 条候选。` : "没有匹配的 ACTIVE 正式物料。");
@@ -611,6 +669,7 @@ async function searchBomMaterials() {
 }
 
 function scheduleBomMaterialSearch() {
+  if (selectedBom()?.bom_status !== "DRAFT" || String(state.bomLinesBomId || "") !== String(state.selectedBomId || "")) return;
   if (bomMaterialSearchTimer) window.clearTimeout(bomMaterialSearchTimer);
   bomMaterialSearchTimer = window.setTimeout(() => {
     bomMaterialSearchTimer = null;
@@ -618,8 +677,72 @@ function scheduleBomMaterialSearch() {
   }, 250);
 }
 
+function clearSelectedBomDetail({ clearSearch = false } = {}) {
+  bomLinesRequestToken += 1;
+  state.selectedBomId = null;
+  state.bomLines = [];
+  state.bomLinesBomId = null;
+  state.readiness = [];
+  resetBomLineDraft();
+  if (clearSearch) {
+    bomSearchController?.abort();
+    bomSearchController = null;
+    if (bomSearchTimer) window.clearTimeout(bomSearchTimer);
+    bomSearchTimer = null;
+    state.bomSearchResults = [];
+    $("#bomSearch").value = "";
+    $("#bomSearchStatus").textContent = "请输入关键词后搜索；不会自动加载明细。";
+  }
+  renderBomSelectors();
+  renderBoms();
+  renderBomLines();
+}
+
+async function searchBoms() {
+  const query = $("#bomSearch").value.normalize("NFKC").trim();
+  bomSearchController?.abort();
+  if (!query) {
+    state.bomSearchResults = [];
+    $("#bomSearchStatus").textContent = "请输入关键词后搜索；不会自动加载明细。";
+    renderBoms();
+    renderBomSelectors();
+    return;
+  }
+  const controller = new AbortController();
+  bomSearchController = controller;
+  $("#bomSearch").setAttribute("aria-busy", "true");
+  $("#bomSearchStatus").textContent = "正在搜索 BOM…";
+  try {
+    const result = await api(`/api/boms?q=${encodeURIComponent(query)}&limit=20`, { signal: controller.signal });
+    if (bomSearchController !== controller || $("#bomSearch").value.normalize("NFKC").trim() !== query) return;
+    state.bomSearchResults = result.rows || [];
+    $("#bomSearchStatus").textContent = state.bomSearchResults.length ? `找到 ${state.bomSearchResults.length} 条 BOM；请选择后加载明细。` : "没有匹配的 BOM。";
+    renderBoms();
+    renderBomSelectors();
+  } catch (error) {
+    if (error?.name === "AbortError" || bomSearchController !== controller) return;
+    state.bomSearchResults = [];
+    $("#bomSearchStatus").textContent = `搜索失败：${error.message || "请稍后重试"}`;
+    renderBoms();
+    renderBomSelectors();
+  } finally {
+    if (bomSearchController === controller) {
+      $("#bomSearch").removeAttribute("aria-busy");
+      bomSearchController = null;
+    }
+  }
+}
+
+function scheduleBomSearch() {
+  if (bomSearchTimer) window.clearTimeout(bomSearchTimer);
+  bomSearchTimer = window.setTimeout(() => {
+    bomSearchTimer = null;
+    searchBoms().catch((error) => toast(error.message));
+  }, 250);
+}
+
 function renderBoms() {
-  const rows = state.boms.map((bom) => `
+  const rows = state.bomSearchResults.map((bom) => `
     <tr data-bom-id="${bom.id}">
       <td>${escapeHtml(bom.id)}</td>
       <td>${escapeHtml(bom.bom_code)}</td>
@@ -641,11 +764,21 @@ function renderBoms() {
     <thead><tr>
       <th>ID</th><th>BOM 编码</th><th>产品编码</th><th>产品名称</th><th>客户</th><th>产品版本</th><th>产品版本发布状态</th><th>产品生命周期状态</th><th>BOM 版本</th><th>BOM 发布状态</th><th>操作</th>
     </tr></thead>
-    <tbody>${rows}</tbody>
+    <tbody>${rows || '<tr><td colspan="11">请选择或搜索 BOM；搜索不会加载明细。</td></tr>'}</tbody>
   `;
 }
 
 function renderBomLines() {
+  const bom = selectedBom();
+  if (!bom) {
+    $("#bomLinesTable").innerHTML = '<tbody><tr><td>请选择或搜索 BOM</td></tr></tbody>';
+    return;
+  }
+  if (String(state.bomLinesBomId || "") !== String(bom.id)) {
+    $("#bomLinesTable").innerHTML = '<tbody><tr><td>正在加载所选 BOM 明细…</td></tr></tbody>';
+    return;
+  }
+  const editable = bom.bom_status === "DRAFT" && hasPermission("master.bom.manage");
   const rows = state.bomLines.map((line) => `
     <tr>
       <td>${escapeHtml(line.line_no)}</td>
@@ -657,13 +790,14 @@ function renderBomLines() {
       <td>${escapeHtml(line.loss_rate)}</td>
       <td>${escapeHtml(line.process_stage)}</td>
       <td>${escapeHtml(line.on_hand_qty)}</td>
+      ${editable ? `<td><div class="row-actions"><button type="button" data-edit-bom-line="${escapeHtml(line.id)}">编辑</button><button type="button" data-delete-bom-line="${escapeHtml(line.id)}">删除</button></div></td>` : ""}
     </tr>
   `).join("");
   $("#bomLinesTable").innerHTML = `
     <thead><tr>
-      <th>行号</th><th>物料编码</th><th>物料名称</th><th>品类</th><th>单件用量</th><th>单位</th><th>损耗率</th><th>工序</th><th>库存</th>
+      <th>行号</th><th>物料编码</th><th>物料名称</th><th>品类</th><th>单件用量</th><th>单位</th><th>损耗率</th><th>工序</th><th>库存</th>${editable ? "<th>操作</th>" : ""}
     </tr></thead>
-    <tbody>${rows}</tbody>
+    <tbody>${rows || `<tr><td colspan="${editable ? 10 : 9}">当前 BOM 没有明细。</td></tr>`}</tbody>
   `;
 }
 
@@ -1377,7 +1511,9 @@ async function refreshAll() {
   state.products = products.rows;
   state.customers = customers.rows;
   state.suppliers = suppliers.rows;
+  const searchedBomIds = new Set(state.bomSearchResults.map((row) => Number(row.id)));
   state.boms = boms.rows;
+  state.bomSearchResults = state.boms.filter((row) => searchedBomIds.has(Number(row.id)));
   state.purchaseOrders = purchaseOrders.rows;
   state.purchaseLines = purchaseLines.rows;
   state.inventory = inventory.rows;
@@ -1419,11 +1555,15 @@ async function refreshAll() {
   await renderQualityRefOptions();
   renderQualityInspections();
   renderQualityDefects();
-  const selectedBomId = $("#lineBom").value;
-  if (selectedBomId && String(state.bomLinesBomId || "") !== selectedBomId) {
+  const selectedBomId = state.selectedBomId;
+  if (selectedBomId && state.boms.some((bom) => Number(bom.id) === Number(selectedBomId))) {
     await loadBomLines(selectedBomId);
   } else {
+    state.selectedBomId = null;
+    state.bomLines = [];
+    state.bomLinesBomId = null;
     renderBomLines();
+    applyBomDetailMode();
   }
 }
 
@@ -1550,7 +1690,7 @@ async function createBom() {
 
 async function addBomLine() {
   const candidate = state.selectedBomMaterial;
-  const bom = state.boms.find((row) => String(row.id) === $("#lineBom").value);
+  const bom = selectedBom();
   if (!candidate) {
     toast("请先检索并选择一条 ACTIVE 正式物料");
     return;
@@ -1582,6 +1722,30 @@ async function addBomLine() {
   toast("BOM 明细已加入");
 }
 
+async function editBomLine(lineId) {
+  const bom = selectedBom(); const line = state.bomLines.find((row) => Number(row.id) === Number(lineId));
+  if (!bom || bom.bom_status !== "DRAFT" || !line) return;
+  const lineNo = window.prompt("行号", String(line.line_no)); if (lineNo === null) return;
+  const quantityPer = window.prompt("单件用量", String(line.quantity_per)); if (quantityPer === null) return;
+  const lossRate = window.prompt("损耗率（0 到 1 之间）", String(line.loss_rate)); if (lossRate === null) return;
+  const processStage = window.prompt("工序阶段", String(line.process_stage || "")); if (processStage === null) return;
+  await masterDataWrite(`update-bom-line:${line.id}`, `/api/bom-lines/${line.id}`, {
+    bom_id: Number(bom.id), line_no: lineNo.trim(), material_id: Number(line.material_id), unit_id: Number(line.unit_id),
+    quantity_per: quantityPer.trim(), loss_rate: lossRate.trim(), process_stage: processStage.trim(), remark: String(line.remark || ""),
+  }, "PATCH");
+  await loadBomLines(bom.id);
+  toast("DRAFT BOM 明细已更新");
+}
+
+async function deleteBomLine(lineId) {
+  const bom = selectedBom(); const line = state.bomLines.find((row) => Number(row.id) === Number(lineId));
+  if (!bom || bom.bom_status !== "DRAFT" || !line) return;
+  if (!window.confirm(`确认删除 DRAFT BOM 第 ${line.line_no} 行？`)) return;
+  await masterDataWrite(`delete-bom-line:${line.id}`, `/api/bom-lines/${line.id}`, { bom_id: Number(bom.id) }, "DELETE");
+  await loadBomLines(bom.id);
+  toast("DRAFT BOM 明细已删除");
+}
+
 async function releaseProductVersion(productId, productVersionId, expectedVersion) {
   if (!window.confirm("确认发布该 Product Version？发布后内容不可原地修改。")) return;
   await masterDataWrite(`release-product-version:${productId}:${productVersionId}:${expectedVersion}`, `/api/products/${productId}/versions/${productVersionId}/release`, { expected_version: Number(expectedVersion) });
@@ -1597,20 +1761,26 @@ async function releaseBomVersion(bomId, bomVersionId, expectedVersion) {
 }
 
 async function loadBomLines(bomId) {
-  if (!bomId) return;
+  if (!bomId) { clearSelectedBomDetail(); return; }
   const requestedBomId = String(bomId); const requestToken = ++bomLinesRequestToken;
-  $("#lineBom").value = requestedBomId;
+  const bom = state.boms.find((row) => String(row.id) === requestedBomId);
+  if (!bom) { clearSelectedBomDetail(); return; }
+  state.selectedBomId = Number(bom.id);
+  resetBomLineDraft({ defaults: bom.bom_status === "DRAFT" });
   state.bomLines = [];
   state.bomLinesBomId = null;
+  renderBomSelectors();
   renderBomLines();
+  applyBomDetailMode();
   updateBomLineActionState();
   const result = await api(`/api/bom-lines?bom_id=${encodeURIComponent(bomId)}`);
-  if (requestToken !== bomLinesRequestToken || $("#lineBom").value !== requestedBomId) return;
+  if (requestToken !== bomLinesRequestToken || String(state.selectedBomId || "") !== requestedBomId) return;
   state.bomLines = result.rows;
   state.bomLinesBomId = requestedBomId;
   $("#lineBom").value = requestedBomId;
   $("#readyBom").value = requestedBomId;
   renderBomLines();
+  applyBomDetailMode();
   updateBomLineActionState();
 }
 
@@ -1981,7 +2151,23 @@ function bindEvents() {
   $("#addBomLineBtn").addEventListener("click", addBomLine);
   $("#bomProduct").addEventListener("change", renderBomProductContext);
   $("#lineBom").addEventListener("change", (event) => loadBomLines(event.target.value).catch((error) => toast(error.message)));
+  $("#bomSearch").addEventListener("input", () => {
+    bomSearchController?.abort();
+    bomSearchController = null;
+    $("#bomSearch").removeAttribute("aria-busy");
+    clearSelectedBomDetail();
+    state.bomSearchResults = [];
+    renderBoms();
+    renderBomSelectors();
+    $("#bomSearchStatus").textContent = $("#bomSearch").value.trim() ? "等待搜索…" : "请输入关键词后搜索；不会自动加载明细。";
+    scheduleBomSearch();
+  });
+  $("#clearBomSearchBtn").addEventListener("click", () => {
+    clearSelectedBomDetail({ clearSearch: true });
+    $("#bomSearch").focus();
+  });
   $("#lineItemSearch").addEventListener("input", () => {
+    if (selectedBom()?.bom_status !== "DRAFT" || String(state.bomLinesBomId || "") !== String(state.selectedBomId || "")) return;
     bomMaterialSearchController?.abort();
     bomMaterialSearchController = null;
     $("#lineItemResults").removeAttribute("aria-busy");
@@ -2039,6 +2225,12 @@ function bindEvents() {
     const releaseButton = event.target.closest("[data-release-bom]");
     if (viewButton) loadBomLines(viewButton.dataset.viewBom).catch((error) => toast(error.message));
     if (releaseButton) releaseBomVersion(releaseButton.dataset.releaseBom, releaseButton.dataset.bomVersionId, releaseButton.dataset.bomVersion).catch((error) => toast(error.message));
+  });
+  $("#bomLinesTable").addEventListener("click", (event) => {
+    const editButton = event.target.closest("[data-edit-bom-line]");
+    const deleteButton = event.target.closest("[data-delete-bom-line]");
+    if (editButton) editBomLine(editButton.dataset.editBomLine).catch((error) => toast(error.message));
+    if (deleteButton) deleteBomLine(deleteButton.dataset.deleteBomLine).catch((error) => toast(error.message));
   });
   $("#purchaseOrdersTable").addEventListener("click", async (event) => {
     const poId = event.target.dataset.viewPo;

@@ -66,6 +66,38 @@ test("BOM material selector uses bounded code-first search and submits only stab
   for (const selector of ["#lineItemSearch", "#lineItemSelected", "#lineItemResults"]) assert.ok(protectedClear.includes(selector), selector);
 });
 
+test("BOM detail starts unselected and uses bounded summary search without loading lines", () => {
+  assert.ok(html.includes('<option value="">请选择或搜索 BOM</option>'));
+  for (const id of ["bomSearch", "bomSearchStatus", "clearBomSearchBtn", "bomDetailState", "bomReadOnlyNotice", "bomLineEditor"]) assert.ok(html.includes(`id="${id}"`), id);
+  assert.ok(html.includes("请输入关键词后搜索；不会自动加载明细。"));
+  assert.match(legacy, /\/api\/boms\?q=\$\{encodeURIComponent\(query\)\}&limit=20/);
+  assert.match(bom, /position\(lower\(\$1\) in lower\(h\.bom_code\)\)>0/);
+  assert.match(bom, /position\(lower\(\$1\) in lower\(p\.product_code\)\)>0/);
+  assert.match(bom, /position\(lower\(\$1\) in lower\(p\.product_name\)\)>0/);
+  assert.match(bom, /limit \$2/);
+  const search = legacy.slice(legacy.indexOf("async function searchBoms()"), legacy.indexOf("function scheduleBomSearch"));
+  assert.doesNotMatch(search, /\/api\/bom-lines/);
+  const refresh = legacy.slice(legacy.indexOf("async function refreshAll()"), legacy.indexOf("async function confirmMapping"));
+  assert.match(refresh, /state\.selectedBomId/);
+  assert.doesNotMatch(refresh, /const selectedBomId = \$\("#lineBom"\)\.value/);
+  assert.match(styles, /\.bom-search-row[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\) auto/);
+});
+
+test("RELEASED BOM mode has an explicit read-only contract and no mutation controls", () => {
+  assert.ok(html.includes("已发布，只读；如需修改请创建新版本"));
+  const editor = html.match(/<fieldset[^>]*id="bomLineEditor"[^>]*>/)?.[0] || "";
+  assert.match(editor, /disabled/); assert.match(editor, /hidden/);
+  assert.match(legacy, /bom\.bom_status === "DRAFT" && hasPermission\("master\.bom\.manage"\)/);
+  assert.match(legacy, /data-edit-bom-line/); assert.match(legacy, /data-delete-bom-line/);
+  assert.match(legacy, /\$\("#bomLineEditor"\)\.hidden = !isDraft/);
+  assert.match(legacy, /\$\("#bomLineEditor"\)\.disabled = !isDraft/);
+  assert.match(legacy, /\$\("#newBomFields"\)\.disabled = isReleased/);
+  assert.match(legacy, /resetBomLineDraft\(\{ defaults: bom\.bom_status === "DRAFT" \}\)/);
+  assert.match(bom, /BOM_LINE_UPDATED/); assert.match(bom, /BOM_LINE_DELETED/);
+  assert.match(bom, /request\.method === "PATCH"/); assert.match(bom, /request\.method === "DELETE"/);
+  assert.match(bom, /service\.updateLine/); assert.match(bom, /service\.deleteLine/);
+});
+
 test("Product and BOM versions are distinct and the UI calls the real release lifecycle", () => {
   assert.match(html, />产品版本</);
   assert.match(html, />BOM 版本</);

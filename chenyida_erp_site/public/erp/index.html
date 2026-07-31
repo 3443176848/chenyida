@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>晨亿达 ERP - 物料主数据治理</title>
-    <link rel="stylesheet" href="./styles.css?v=20260731-bom-selector-fix-04" />
+    <link rel="stylesheet" href="./styles.css?v=20260731-csrf-bom-immutable-fix-05" />
   </head>
   <body>
     <header class="topbar" data-cyd-protected-view>
@@ -211,48 +211,61 @@
             </ol>
           </div>
           <div class="two-panels">
-            <div class="work-panel">
-              <h3>新增 BOM</h3>
-              <label>BOM 编码<input id="bomCode" placeholder="BOM-CYD-FPC-001-V1" /></label>
-              <label>产品<select id="bomProduct"></select></label>
-              <div class="form-grid bom-version-context">
-                <label>产品版本<input id="bomProductVersion" readonly /></label>
-                <label>产品版本发布状态<input id="bomProductVersionStatus" readonly /></label>
-                <label>产品生命周期状态<input id="bomProductLifecycle" readonly /></label>
-                <label>产品状态<input id="bomProductStatus" readonly /></label>
-                <label>BOM 版本<input id="bomVersion" value="V1" /></label>
-                <label>BOM 发布状态<input id="bomStatus" value="DRAFT（草稿）" readonly /></label>
-              </div>
-              <p id="bomProductEligibility" class="muted" aria-live="polite"></p>
-              <div class="button-row">
-                <button id="createBomBtn" class="primary">保存 BOM 草稿</button>
-              </div>
+            <div class="work-panel" id="newBomPanel">
+              <fieldset id="newBomFields" class="panel-fieldset">
+                <h3>新增 BOM</h3>
+                <label>BOM 编码<input id="bomCode" placeholder="BOM-CYD-FPC-001-V1" /></label>
+                <label>产品<select id="bomProduct"></select></label>
+                <div class="form-grid bom-version-context">
+                  <label>产品版本<input id="bomProductVersion" readonly /></label>
+                  <label>产品版本发布状态<input id="bomProductVersionStatus" readonly /></label>
+                  <label>产品生命周期状态<input id="bomProductLifecycle" readonly /></label>
+                  <label>产品状态<input id="bomProductStatus" readonly /></label>
+                  <label>BOM 版本<input id="bomVersion" value="V1" /></label>
+                  <label>BOM 发布状态<input id="bomStatus" value="DRAFT（草稿）" readonly /></label>
+                </div>
+                <p id="bomProductEligibility" class="muted" aria-live="polite"></p>
+                <div class="button-row">
+                  <button id="createBomBtn" class="primary">保存 BOM 草稿</button>
+                </div>
+              </fieldset>
             </div>
             <div class="work-panel">
-              <h3>新增 BOM 明细</h3>
-              <label>BOM<select id="lineBom"></select></label>
-              <label for="lineItemSearch">正式内部编码或名称</label>
-              <div class="bom-material-picker">
-                <div class="bom-material-search-row">
-                  <input id="lineItemSearch" type="search" autocomplete="off" placeholder="输入完整编码、编码前缀或名称" aria-controls="lineItemResults" aria-describedby="lineItemSearchStatus" />
-                  <button id="clearLineItemBtn" type="button" class="secondary">清除</button>
+              <h3>BOM 明细</h3>
+              <label for="bomSearch">搜索 BOM 编码、产品编码或名称</label>
+              <div class="bom-search-row">
+                <input id="bomSearch" type="search" autocomplete="off" placeholder="输入 BOM 编码、产品编码或产品名称" aria-describedby="bomSearchStatus" />
+                <button id="clearBomSearchBtn" type="button" class="secondary">清除</button>
+              </div>
+              <p id="bomSearchStatus" class="muted" role="status" aria-live="polite">请输入关键词后搜索；不会自动加载明细。</p>
+              <label>BOM<select id="lineBom"><option value="">请选择或搜索 BOM</option></select></label>
+              <p id="bomDetailState" class="bom-detail-state" role="status" aria-live="polite">请选择或搜索 BOM</p>
+              <p id="bomReadOnlyNotice" class="bom-readonly-notice" role="note" hidden>已发布，只读；如需修改请创建新版本</p>
+              <fieldset id="bomLineEditor" class="panel-fieldset" disabled hidden>
+                <legend>编辑 DRAFT BOM 明细</legend>
+                <label for="lineItemSearch">正式内部编码或名称</label>
+                <div class="bom-material-picker">
+                  <div class="bom-material-search-row">
+                    <input id="lineItemSearch" type="search" autocomplete="off" placeholder="输入完整编码、编码前缀或名称" aria-controls="lineItemResults" aria-describedby="lineItemSearchStatus" />
+                    <button id="clearLineItemBtn" type="button" class="secondary">清除</button>
+                  </div>
+                  <input id="lineItem" type="hidden" />
+                  <input id="lineUnitId" type="hidden" />
+                  <p id="lineItemSelected" class="bom-material-selected" hidden></p>
+                  <p id="lineItemSearchStatus" class="muted" role="status" aria-live="polite">请输入正式内部编码或名称。</p>
+                  <div id="lineItemResults" class="bom-material-results" role="listbox" aria-label="BOM 物料候选"></div>
                 </div>
-                <input id="lineItem" type="hidden" />
-                <input id="lineUnitId" type="hidden" />
-                <p id="lineItemSelected" class="bom-material-selected" hidden></p>
-                <p id="lineItemSearchStatus" class="muted" role="status" aria-live="polite">请输入正式内部编码或名称。</p>
-                <div id="lineItemResults" class="bom-material-results" role="listbox" aria-label="BOM 物料候选"></div>
-              </div>
-              <div class="form-grid">
-                <label>行号<input id="lineNo" value="10" /></label>
-                <label>单件用量<input id="lineQty" value="1" /></label>
-                <label>主数据单位<input id="lineUom" readonly /></label>
-                <label>损耗率<input id="lineLoss" value="0.03" /></label>
-              </div>
-              <label>工序阶段<input id="lineStage" placeholder="SMT / FPC / PCB" /></label>
-              <div class="button-row">
-                <button id="addBomLineBtn" class="primary">加入明细</button>
-              </div>
+                <div class="form-grid">
+                  <label>行号<input id="lineNo" value="10" /></label>
+                  <label>单件用量<input id="lineQty" value="1" /></label>
+                  <label>主数据单位<input id="lineUom" readonly /></label>
+                  <label>损耗率<input id="lineLoss" value="0" /></label>
+                </div>
+                <label>工序阶段<input id="lineStage" placeholder="SMT / FPC / PCB" /></label>
+                <div class="button-row">
+                  <button id="addBomLineBtn" class="primary">加入明细</button>
+                </div>
+              </fieldset>
             </div>
           </div>
           <div class="work-panel spaced">
@@ -766,6 +779,6 @@
     </dialog>
 
     <div id="toast" class="toast" role="alert" aria-live="assertive" hidden></div>
-    <script type="module" src="./app.js?v=20260731-bom-selector-fix-04"></script>
+    <script type="module" src="./app.js?v=20260731-csrf-bom-immutable-fix-05"></script>
   </body>
 </html>

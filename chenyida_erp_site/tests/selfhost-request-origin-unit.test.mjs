@@ -13,26 +13,31 @@ function request(url, origin, extraHeaders = {}) {
 test("direct same-origin and explicit TLS public origin are accepted", () => {
   assert.equal(requestOriginMatches(request("http://local.test/api/session", "http://local.test"), null), true);
   assert.equal(requestOriginMatches(
-    request("http://43.135.157.211.nip.io:18888/api/me/password", "https://43.135.157.211.nip.io:18888"),
-    "https://43.135.157.211.nip.io:18888",
+    request("http://43.135.148.43.nip.io:18888/api/me/password", "https://43.135.148.43.nip.io:18888"),
+    "https://43.135.148.43.nip.io:18888",
   ), true);
   assert.equal(requestOriginMatches(
-    request("http://43.135.157.211.nip.io:18888/api/me/password", "http://43.135.157.211.nip.io:18888"),
-    "https://43.135.157.211.nip.io:18888",
+    request("http://43.135.148.43.nip.io:18888/api/me/password", "http://43.135.148.43.nip.io:18888"),
+    "https://43.135.148.43.nip.io:18888",
+  ), false);
+  assert.equal(requestOriginMatches(
+    request("http://43.135.148.43.nip.io:18888/api/me/password", "https://43.135.157.211.nip.io:18888"),
+    "https://43.135.148.43.nip.io:18888",
   ), false);
 });
 
 test("missing, malformed, wildcard, wrong scheme, host, port, and path origins fail closed", () => {
-  const internal = "http://43.135.157.211.nip.io:18888/api/me/password";
-  const configured = "https://43.135.157.211.nip.io:18888";
+  const internal = "http://43.135.148.43.nip.io:18888/api/me/password";
+  const configured = "https://43.135.148.43.nip.io:18888";
   for (const origin of [
     undefined,
     "null",
-    "https://43.135.157.211.nip.io",
-    "http://43.135.157.211.nip.io:18888",
+    "https://43.135.148.43.nip.io",
+    "http://43.135.148.43.nip.io:18888",
+    "https://43.135.157.211.nip.io:18888",
     "https://evil.example:18888",
-    "https://43.135.157.211.nip.io:18889",
-    "https://43.135.157.211.nip.io:18888/path",
+    "https://43.135.148.43.nip.io:18889",
+    "https://43.135.148.43.nip.io:18888/path",
   ]) assert.equal(requestOriginMatches(request(internal, origin), configured), false, String(origin));
 });
 

@@ -49,6 +49,18 @@ test("browser writes and logout fail closed without the current CSRF cookie", as
   await assert.rejects(logoutSession("old"), (error) => error.code === "PROTECTED_WRITE_CONTEXT_REQUIRED");
 });
 
+test("BOM line PATCH and DELETE use the shared protected-write client", async () => {
+  cookie("bom-session-token");
+  const requests = [];
+  globalThis.fetch = async (path, options) => { requests.push({ path, options }); return ok(); };
+  await api("/api/bom-lines/7", { method: "PATCH", body: "{}", protectedWrite: { csrfToken: "old", idempotencyKey: "bom-line-patch-key" } });
+  await api("/api/bom-lines/7", { method: "DELETE", body: "{}", protectedWrite: { csrfToken: "old", idempotencyKey: "bom-line-delete-key" } });
+  assert.deepEqual(requests.map((request) => [request.options.method, request.options.credentials, request.options.headers["X-CSRF-Token"]]), [
+    ["PATCH", "same-origin", "bom-session-token"],
+    ["DELETE", "same-origin", "bom-session-token"],
+  ]);
+});
+
 test("logout and relogin use only the new current-session token", async () => {
   const requests = [];
   globalThis.fetch = async (path, options) => { requests.push({ path, options }); return ok(); };

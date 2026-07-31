@@ -177,6 +177,65 @@ test("BOM material candidates are code-first bounded stable-ID DTOs and line wri
   assert.deepEqual(persisted.rows, [{ material_id: String(materials.pcb.id), unit_id: String(pcs.id), quantity_per: "1.250000" }]);
 });
 
+test("BOM search is bounded and RELEASED line add update delete stay transactionally immutable", async () => {
+  const unit = (await pool.query("select id from units where code='PCS'")).rows[0];
+  const originalMaterial = (await pool.query("select id from material_master where internal_material_code='CYD-TEST-000001'")).rows[0];
+  const secondMaterial = await insertSelectorMaterial({ code: "CYD-TEST-000002", name: "第二合成物料", unitId: unit.id });
+  const product = await api(handleMasterDataApi, "/api/products", { method: "POST", role: "engineering", body: { product_name: "BOM 搜索与不可变合成产品", product_version: "A0" } });
+  assert.equal(product.response.status, 201);
+  const productId = Number(product.payload.data.id); const productVersionId = Number(product.payload.data.current_version.id);
+  await api(handleMasterDataApi, `/api/products/${productId}/versions/${productVersionId}/release`, { method: "POST", role: "engineering", body: { expected_version: 1 } });
+  const created = await api(handleBomApi, "/api/boms", { method: "POST", role: "engineering", body: { product_id: productId, bom_code: "BOM-SEARCH-IMMUTABLE", version_code: "V1" } });
+  assert.equal(created.response.status, 201); const bomId = Number(created.payload.bom_id); const bomVersionId = Number(created.payload.data.current_version.id);
+
+  for (const query of ["BOM-SEARCH", product.payload.data.product_code, "不可变合成产品"]) {
+    const found = await api(handleBomApi, `/api/boms?q=${encodeURIComponent(query)}&limit=999`, { role: "engineering" });
+    assert.equal(found.response.status, 200); assert.equal(found.payload.limit, 20);
+    assert.deepEqual(found.payload.rows.map((row) => Number(row.id)), [bomId]);
+    assert.ok(found.payload.rows.every((row) => !("lines" in row)));
+  }
+  const emptySearch = await api(handleBomApi, "/api/boms?q=&limit=20", { role: "engineering" });
+  assert.deepEqual(emptySearch.payload.rows, []);
+
+  const draftLine = await api(handleBomApi, "/api/bom-lines", { method: "POST", role: "engineering", body: { bom_id: bomId, line_no: 10, material_id: Number(originalMaterial.id), quantity_per: "1", unit_id: Number(unit.id), loss_rate: "0" } });
+  assert.equal(draftLine.response.status, 201); const lineId = Number(draftLine.payload.data.id);
+  const updated = await api(handleBomApi, `/api/bom-lines/${lineId}`, { method: "PATCH", role: "engineering", body: { bom_id: bomId, line_no: 20, quantity_per: "2", loss_rate: "0.1", process_stage: "ASSEMBLY" } });
+  assert.equal(updated.response.status, 200); assert.equal(updated.payload.data.quantity_per, "2.000000"); assert.equal(updated.payload.data.loss_rate, "0.10000000");
+  const deleted = await api(handleBomApi, `/api/bom-lines/${lineId}`, { method: "DELETE", role: "engineering", body: { bom_id: bomId } });
+  assert.equal(deleted.response.status, 200); assert.equal(deleted.payload.deleted, true);
+  assert.equal(Number((await pool.query("select count(*) count from bom_lines where bom_version_id=$1", [bomVersionId])).rows[0].count), 0);
+  const restoredLine = await api(handleBomApi, "/api/bom-lines", { method: "POST", role: "engineering", body: { bom_id: bomId, line_no: 10, material_id: Number(originalMaterial.id), quantity_per: "1", unit_id: Number(unit.id), loss_rate: "0" } });
+  const releasedLineId = Number(restoredLine.payload.data.id);
+  const released = await api(handleBomApi, `/api/boms/${bomId}/versions/${bomVersionId}/release`, { method: "POST", role: "engineering", body: { expected_version: 1 } });
+  assert.equal(released.response.status, 200);
+
+  const before = (await pool.query(`select h.version header_version,v.status version_status,
+    (select count(*)::int from bom_versions where bom_header_id=h.id) version_count,
+    (select count(*)::int from bom_lines where bom_version_id=v.id) line_count,
+    (select count(*)::int from audit_log where result='success' and action in ('BOM_LINE_ADDED','BOM_LINE_UPDATED','BOM_LINE_DELETED')) success_audits,
+    (select count(*)::int from idempotency_keys where path in ('/api/bom-lines','/api/bom-lines/${releasedLineId}')) idempotency_count
+    from bom_headers h join bom_versions v on v.id=$2 where h.id=$1`, [bomId, bomVersionId])).rows[0];
+  const attempts = [
+    await api(handleBomApi, "/api/bom-lines", { method: "POST", role: "engineering", body: { bom_id: bomId, line_no: 20, material_id: Number(secondMaterial.id), quantity_per: "1", unit_id: Number(unit.id), loss_rate: "0" } }),
+    await api(handleBomApi, `/api/bom-lines/${releasedLineId}`, { method: "PATCH", role: "engineering", body: { bom_id: bomId, quantity_per: "9" } }),
+    await api(handleBomApi, `/api/bom-lines/${releasedLineId}`, { method: "DELETE", role: "engineering", body: { bom_id: bomId } }),
+  ];
+  for (const attempt of attempts) { assert.equal(attempt.response.status, 409); assert.equal(attempt.payload.code, "BOM_RELEASED_IMMUTABLE"); }
+  const after = (await pool.query(`select h.version header_version,v.status version_status,
+    (select count(*)::int from bom_versions where bom_header_id=h.id) version_count,
+    (select count(*)::int from bom_lines where bom_version_id=v.id) line_count,
+    (select count(*)::int from audit_log where result='success' and action in ('BOM_LINE_ADDED','BOM_LINE_UPDATED','BOM_LINE_DELETED')) success_audits,
+    (select count(*)::int from idempotency_keys where path in ('/api/bom-lines','/api/bom-lines/${releasedLineId}')) idempotency_count
+    from bom_headers h join bom_versions v on v.id=$2 where h.id=$1`, [bomId, bomVersionId])).rows[0];
+  assert.deepEqual(after, before);
+  assert.equal(Number((await pool.query("select count(*) count from audit_log where result='failed' and action in ('BOM_LINE_ADDED','BOM_LINE_UPDATED','BOM_LINE_DELETED') and error_code='BOM_RELEASED_IMMUTABLE'")).rows[0].count), 3);
+
+  await assert.rejects(pool.query("insert into bom_lines(bom_version_id,line_no,material_id,quantity_per,unit_id,loss_rate,created_by,updated_by,request_id) values($1,30,$2,1,$3,0,'test','test',$4)", [bomVersionId, secondMaterial.id, unit.id, randomUUID()]), /released bom lines are immutable/);
+  await assert.rejects(pool.query("update bom_lines set quantity_per=3 where id=$1", [releasedLineId]), /released bom lines are immutable/);
+  await assert.rejects(pool.query("delete from bom_lines where id=$1", [releasedLineId]), /released bom lines are immutable/);
+  assert.equal(Number((await pool.query("select count(*) count from bom_lines where bom_version_id=$1", [bomVersionId])).rows[0].count), 1);
+});
+
 test("BOM release preserves permission idempotency CAS audit rollback and legacy base-unit contracts", async () => {
   const material = (await pool.query("select id from material_master where internal_material_code='CYD-TEST-000001'")).rows[0];
   const unit = (await pool.query("select id from units where code='PCS'")).rows[0];

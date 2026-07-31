@@ -333,6 +333,49 @@ input[readonly] {
   margin-top: 14px;
 }
 
+.panel-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.panel-fieldset legend {
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.bom-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bom-search-row .secondary {
+  white-space: nowrap;
+}
+
+.bom-detail-state,
+.bom-readonly-notice {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+
+.bom-detail-state {
+  background: var(--soft);
+  color: var(--muted);
+}
+
+.bom-readonly-notice {
+  border: 1px solid #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+  font-weight: 700;
+}
+
 .bom-material-picker {
   display: grid;
   gap: 8px;
@@ -782,9 +825,11 @@ dialog h3 {
     align-items: stretch;
     flex-wrap: wrap;
   }
+  .bom-search-row,
   .bom-material-search-row {
     grid-template-columns: 1fr;
   }
+  .bom-search-row .secondary,
   .bom-material-search-row .secondary {
     justify-self: start;
   }
