@@ -3,7 +3,7 @@ import type { IdentityActor } from "../identity-selfhost/types.ts";
 import { PlanningHandoffError } from "./errors.ts";
 import { PlanningHandoffRepository } from "./repository.ts";
 import type { PlanningMutationMeta, PlanningMutationResult, ResolutionInput } from "./types.ts";
-import { assertOnlyKeys, boundedText, canonicalDigest, expectedVersion, optionalDate, resolutionInput } from "./validation.ts";
+import { assertOnlyKeys, boundedText, canonicalDigest, expectedVersion, optionalDate, resolutionInput, unitResolutionInput } from "./validation.ts";
 
 type ProjectRow = Record<string, unknown> & { id: string; status: string; version: number; project_owner: string | null; current_requirement_version_no: number; requirement_version_id: string; customer_id: string };
 type PackageRow = Record<string, unknown> & { id: string; project_id: string; package_version_no: number; status: string; version: number; prepared_by: string; submitted_by: string | null; project_owner: string | null };
@@ -35,12 +35,18 @@ export class PlanningHandoffService {
     const client = await this.repository.pool.connect();
     try {
       const project = await this.acceptedProject(client, projectId); if (actor.role === "engineering" && project.project_owner !== actor.username) throw new PlanningHandoffError("PROJECT_NOT_FOUND", "项目不存在", 404);
-      const rows = await client.query(`select ri.id requirement_item_id,ri.line_no,ri.provisional_name,ri.quantity::text,ri.unit_id,ri.unit_pending,ri.specification_requirement,u.code unit_code,
+      const rows = await client.query(`select ri.id requirement_item_id,ri.line_no,ri.provisional_name,ri.quantity::text,ri.unit_id,ri.unit_id source_unit_id,ri.unit_pending,ri.unit_pending source_unit_pending,ri.specification_requirement,su.code unit_code,su.code source_unit_code,
         r.id resolution_id,r.product_id,r.product_version_id,r.bom_header_id,r.bom_version_id,r.resolved_by,r.resolved_at,
-        p.product_code,p.product_name,pv.version_code product_version_code,bh.bom_code,bv.version_code bom_version_code
-        from project_requirement_items ri left join units u on u.id=ri.unit_id left join project_requirement_resolutions r on r.requirement_item_id=ri.id
+        p.product_code,p.product_name,pv.version_code product_version_code,bh.bom_code,bv.version_code bom_version_code,
+        ur.id unit_resolution_id,ur.resolution_version_no unit_resolution_version_no,uh.version unit_resolution_head_version,ur.source_type unit_resolution_source_type,
+        ur.unit_id resolved_unit_id,ru.code resolved_unit_code,ru.name resolved_unit_name,ru.enabled resolved_unit_enabled
+        from project_requirement_items ri left join units su on su.id=ri.unit_id left join project_requirement_resolutions r on r.requirement_item_id=ri.id
         left join products p on p.id=r.product_id left join product_versions pv on pv.id=r.product_version_id left join bom_headers bh on bh.id=r.bom_header_id left join bom_versions bv on bv.id=r.bom_version_id
+        left join project_requirement_unit_resolution_heads uh on uh.requirement_item_id=ri.id
+        left join project_requirement_unit_resolution_versions ur on ur.id=uh.current_resolution_id and ur.requirement_item_id=ri.id
+        left join units ru on ru.id=ur.unit_id
         where ri.requirement_version_id=$1 order by ri.line_no`, [Number(project.requirement_version_id)]);
+      const enabledUnits = await client.query("select id,code,name,symbol from units where enabled=true order by code,id");
       const candidates = await client.query(`select p.id product_id,p.product_code,p.product_name,pv.id product_version_id,pv.version_code product_version_code,pv.product_type,pv.lifecycle_status,
         bh.id bom_header_id,bh.bom_code,bv.id bom_version_id,bv.version_code bom_version_code,count(bl.id)::int bom_line_count
         from products p join product_versions pv on pv.product_id=p.id and pv.status='RELEASED'
@@ -49,7 +55,7 @@ export class PlanningHandoffService {
         where p.status='ACTIVE' and p.customer_id=$1 and p.customer_id is not null
         and not exists(select 1 from bom_lines x left join material_master xm on xm.id=x.material_id left join units xu on xu.id=x.unit_id where x.bom_version_id=bv.id and (xm.id is null or xm.material_status<>'ACTIVE' or xu.id is null or xu.enabled=false))
         group by p.id,p.product_code,p.product_name,pv.id,pv.version_code,pv.product_type,pv.lifecycle_status,bh.id,bh.bom_code,bv.id,bv.version_code order by p.product_code,pv.version_no,bh.bom_code,bv.version_no`, [Number(project.customer_id)]);
-      return { project: { id: Number(project.id), project_code: project.project_code, project_name: project.project_name, customer_id: Number(project.customer_id), project_owner: project.project_owner, version: Number(project.version), requirement_version_id: Number(project.requirement_version_id) }, rows: rows.rows, candidates: candidates.rows };
+      return { project: { id: Number(project.id), project_code: project.project_code, project_name: project.project_name, customer_id: Number(project.customer_id), project_owner: project.project_owner, version: Number(project.version), requirement_version_id: Number(project.requirement_version_id) }, rows: rows.rows, candidates: candidates.rows, enabled_units: enabledUnits.rows };
     } finally { client.release(); }
   }
 
@@ -82,19 +88,73 @@ export class PlanningHandoffService {
     });
   }
 
+  async saveUnitResolution(projectId: number, meta: PlanningMutationMeta, input: Record<string, unknown>): Promise<PlanningMutationResult> {
+    const parsed = unitResolutionInput(input);
+    return this.repository.execute(meta, async (client) => {
+      const project = await this.acceptedProject(client, projectId, true); this.assertEngineeringOwner(meta.actor, project);
+      const currentPackage = await client.query("select status from project_planning_packages where project_id=$1 order by package_version_no desc limit 1", [projectId]);
+      if (currentPackage.rows[0] && currentPackage.rows[0].status !== "RETURNED") throw new PlanningHandoffError("PLANNING_PACKAGE_STATE_CONFLICT", "只能在首次生成交接包前或上一版本退回后修订单位解析", 409);
+      const item = await client.query(`select ri.id,ri.line_no from project_requirement_items ri
+        where ri.id=$1 and ri.requirement_version_id=$2 for update of ri`, [parsed.requirementItemId, Number(project.requirement_version_id)]);
+      if (!item.rows[0]) throw new PlanningHandoffError("REQUIREMENT_UNIT_INVALID", "需求明细不属于项目当前需求版本，请刷新页面后重试", 422);
+      const unit = await client.query("select id,code,name,enabled from units where id=$1 for update", [parsed.unitId]);
+      if (!unit.rows[0]) throw new PlanningHandoffError("REQUIREMENT_UNIT_INVALID", "所选单位不存在，请刷新单位列表后重新选择", 422);
+      if (!unit.rows[0].enabled) throw new PlanningHandoffError("REQUIREMENT_UNIT_DISABLED", "所选单位已停用，请刷新单位列表并选择启用单位", 422);
+      const head = await client.query("select current_resolution_id,version from project_requirement_unit_resolution_heads where requirement_item_id=$1 for update", [parsed.requirementItemId]);
+      const currentHeadVersion = Number(head.rows[0]?.version || 0);
+      if (currentHeadVersion !== parsed.expectedHeadVersion) throw new PlanningHandoffError("REQUIREMENT_UNIT_VERSION_CONFLICT", "该需求单位解析已被其他人员更新，请刷新后重新确认", 409);
+      const nextVersion = currentHeadVersion + 1;
+      const supersedesResolutionId = head.rows[0]?.current_resolution_id ? Number(head.rows[0].current_resolution_id) : null;
+      const contentDigest = canonicalDigest({ project_id: projectId, requirement_version_id: Number(project.requirement_version_id), requirement_item_id: parsed.requirementItemId, resolution_version_no: nextVersion, unit_id: parsed.unitId, source_type: "ENGINEERING_CONFIRMED", supersedes_resolution_id: supersedesResolutionId, resolved_by: meta.actor.username });
+      const resolution = await client.query(`insert into project_requirement_unit_resolution_versions(project_id,requirement_version_id,requirement_item_id,resolution_version_no,unit_id,source_type,supersedes_resolution_id,resolved_by,request_id,content_digest)
+        values($1,$2,$3,$4,$5,'ENGINEERING_CONFIRMED',$6,$7,$8,$9) returning *`, [projectId, Number(project.requirement_version_id), parsed.requirementItemId, nextVersion, parsed.unitId, supersedesResolutionId, meta.actor.username, meta.requestId, contentDigest]);
+      await this.fault?.("after_unit_resolution_version");
+      let savedHead;
+      if (currentHeadVersion === 0) {
+        savedHead = await client.query(`insert into project_requirement_unit_resolution_heads(requirement_item_id,project_id,requirement_version_id,current_resolution_id,version)
+          values($1,$2,$3,$4,1) returning *`, [parsed.requirementItemId, projectId, Number(project.requirement_version_id), Number(resolution.rows[0].id)]);
+      } else {
+        savedHead = await client.query(`update project_requirement_unit_resolution_heads set current_resolution_id=$2,version=version+1,updated_at=now()
+          where requirement_item_id=$1 and version=$3 returning *`, [parsed.requirementItemId, Number(resolution.rows[0].id), parsed.expectedHeadVersion]);
+      }
+      if (!savedHead.rows[0]) throw new PlanningHandoffError("REQUIREMENT_UNIT_VERSION_CONFLICT", "该需求单位解析已被其他人员更新，请刷新后重新确认", 409);
+      await this.fault?.("after_unit_resolution_head");
+      const resolutionId = Number(resolution.rows[0].id);
+      const body = { ok: true, project_id: projectId, requirement_item_id: parsed.requirementItemId, unit_resolution_id: resolutionId, unit_resolution_version_no: nextVersion, unit_resolution_head_version: nextVersion, unit: { id: parsed.unitId, code: unit.rows[0].code, name: unit.rows[0].name }, request_id: meta.requestId };
+      return { status: 201, body, objectId: resolutionId, oldVersion: currentHeadVersion, newVersion: nextVersion, auditDetail: { project_id: projectId, requirement_item_id: parsed.requirementItemId, unit_id: parsed.unitId, unit_resolution_id: resolutionId, source_type: "ENGINEERING_CONFIRMED" } };
+    });
+  }
+
   private async snapshotSources(client: PoolClient, project: ProjectRow) {
-    const itemCount = await client.query("select count(*)::int count from project_requirement_items where requirement_version_id=$1", [Number(project.requirement_version_id)]);
-    const items = await client.query(`select ri.id requirement_item_id,ri.line_no,ri.provisional_name,ri.quantity::text required_quantity,ri.unit_id,ri.specification_requirement,u.code requirement_unit_code,
+    const items = await client.query(`select ri.id requirement_item_id,ri.line_no,ri.provisional_name,ri.quantity::text required_quantity,ri.unit_id source_unit_id,ri.unit_pending source_unit_pending,ri.specification_requirement,
+      uh.current_resolution_id unit_resolution_id,uh.version unit_resolution_head_version,ur.resolution_version_no unit_resolution_version_no,ur.source_type unit_resolution_source_type,ur.content_digest unit_resolution_digest,
+      ur.unit_id,ru.code requirement_unit_code,ru.name requirement_unit_name,ru.enabled requirement_unit_enabled,
       r.product_id,r.product_version_id,r.bom_header_id,r.bom_version_id,p.product_code,p.product_name,pv.version_code product_version_code,pv.product_type,pv.lifecycle_status,
-      bh.bom_code,bv.version_code bom_version_code
-      from project_requirement_items ri join units u on u.id=ri.unit_id and u.enabled=true
-      join project_requirement_resolutions r on r.requirement_item_id=ri.id and r.project_id=$2 and r.requirement_version_id=$1
-      join products p on p.id=r.product_id and p.status='ACTIVE' and p.customer_id=$3 and p.customer_id is not null
-      join product_versions pv on pv.id=r.product_version_id and pv.product_id=p.id and pv.status='RELEASED'
-      join bom_headers bh on bh.id=r.bom_header_id and bh.product_id=p.id and bh.status='ACTIVE'
-      join bom_versions bv on bv.id=r.bom_version_id and bv.bom_header_id=bh.id and bv.product_version_id=pv.id and bv.status='RELEASED'
+      bh.bom_code,bv.id validated_bom_version_id,bv.version_code bom_version_code
+      from project_requirement_items ri
+      left join project_requirement_unit_resolution_heads uh on uh.requirement_item_id=ri.id and uh.project_id=$2 and uh.requirement_version_id=$1
+      left join project_requirement_unit_resolution_versions ur on ur.id=uh.current_resolution_id and ur.requirement_item_id=ri.id and ur.project_id=$2 and ur.requirement_version_id=$1
+      left join units ru on ru.id=ur.unit_id
+      left join project_requirement_resolutions r on r.requirement_item_id=ri.id and r.project_id=$2 and r.requirement_version_id=$1
+      left join products p on p.id=r.product_id and p.status='ACTIVE' and p.customer_id=$3 and p.customer_id is not null
+      left join product_versions pv on pv.id=r.product_version_id and pv.product_id=p.id and pv.status='RELEASED'
+      left join bom_headers bh on bh.id=r.bom_header_id and bh.product_id=p.id and bh.status='ACTIVE'
+      left join bom_versions bv on bv.id=r.bom_version_id and bv.bom_header_id=bh.id and bv.product_version_id=pv.id and bv.status='RELEASED'
       where ri.requirement_version_id=$1 order by ri.line_no`, [Number(project.requirement_version_id), Number(project.id), Number(project.customer_id)]);
-    if (Number(itemCount.rows[0].count) < 1 || items.rowCount !== Number(itemCount.rows[0].count)) throw new PlanningHandoffError("REQUIREMENT_ITEMS_UNRESOLVED", "每条需求明细必须关联有效的 Product Version 和 BOM Version", 422);
+    if (!items.rows.length) throw new PlanningHandoffError("REQUIREMENT_PRODUCT_BOM_UNRESOLVED", "当前需求版本没有可交接明细，请返回项目需求页面补充后重试", 422);
+    const missingUnits = items.rows.filter((item) => !item.unit_resolution_id).map((item) => Number(item.line_no));
+    if (missingUnits.length) throw new PlanningHandoffError("REQUIREMENT_UNIT_UNRESOLVED", `需求第 ${missingUnits.join("、")} 行尚未确认单位，请在工程解析页逐项选择有效单位后重试`, 422);
+    const invalidUnits = items.rows.filter((item) => !item.unit_id || !item.requirement_unit_code).map((item) => Number(item.line_no));
+    if (invalidUnits.length) throw new PlanningHandoffError("REQUIREMENT_UNIT_INVALID", `需求第 ${invalidUnits.join("、")} 行的单位引用无效，请刷新页面后重新确认`, 422);
+    const disabledUnits = items.rows.filter((item) => item.requirement_unit_enabled !== true).map((item) => Number(item.line_no));
+    if (disabledUnits.length) throw new PlanningHandoffError("REQUIREMENT_UNIT_DISABLED", `需求第 ${disabledUnits.join("、")} 行的已确认单位已停用，请选择启用单位后再生成交接包`, 422);
+    const missingProductBom = items.rows.filter((item) => !item.validated_bom_version_id).map((item) => Number(item.line_no));
+    if (missingProductBom.length) throw new PlanningHandoffError("REQUIREMENT_PRODUCT_BOM_UNRESOLVED", `需求第 ${missingProductBom.join("、")} 行尚未完成有效 Product/BOM 解析，请逐项保存后重试`, 422);
+    const lockedUnits = await client.query(`select uh.requirement_item_id from project_requirement_unit_resolution_heads uh
+      join project_requirement_unit_resolution_versions ur on ur.id=uh.current_resolution_id and ur.requirement_item_id=uh.requirement_item_id
+      join units u on u.id=ur.unit_id and u.enabled=true
+      where uh.project_id=$1 and uh.requirement_version_id=$2 for update of uh,u`, [Number(project.id), Number(project.requirement_version_id)]);
+    if (lockedUnits.rowCount !== items.rowCount) throw new PlanningHandoffError("REQUIREMENT_UNIT_VERSION_CONFLICT", "需求单位解析在生成交接包时发生变化，请刷新后重试", 409);
     const snapshots: Array<Record<string, unknown> & { lines: Record<string, unknown>[] }> = [];
     for (const item of items.rows) {
       const lines = await client.query(`select bl.id source_bom_line_id,bl.line_no,bl.material_id,bl.unit_id,bl.quantity_per::text,bl.loss_rate::text,
@@ -125,7 +185,7 @@ export class PlanningHandoffService {
       const packageId = Number(saved.rows[0].id); await this.fault?.("after_package_header");
       for (const item of snapshots) {
         const sourceDigest = canonicalDigest({ ...item, lines: item.lines });
-        const packageItem = await client.query(`insert into project_planning_package_items(package_id,requirement_item_id,product_version_id,bom_version_id,required_quantity,unit_id,line_no,source_digest) values($1,$2,$3,$4,$5,$6,$7,$8) returning *`, [packageId, Number(item.requirement_item_id), Number(item.product_version_id), Number(item.bom_version_id), item.required_quantity, Number(item.unit_id), Number(item.line_no), sourceDigest]);
+        const packageItem = await client.query(`insert into project_planning_package_items(package_id,requirement_item_id,product_version_id,bom_version_id,required_quantity,unit_id,unit_resolution_id,line_no,source_digest) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`, [packageId, Number(item.requirement_item_id), Number(item.product_version_id), Number(item.bom_version_id), item.required_quantity, Number(item.unit_id), Number(item.unit_resolution_id), Number(item.line_no), sourceDigest]);
         for (const line of item.lines) await client.query(`insert into project_planning_package_bom_lines(package_item_id,source_bom_line_id,material_id,unit_id,quantity_per,loss_rate,calculated_gross_quantity,specification_snapshot,material_digest,line_no) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [Number(packageItem.rows[0].id), Number(line.source_bom_line_id), Number(line.material_id), Number(line.unit_id), line.quantity_per, line.loss_rate, line.calculated_gross_quantity, line.specification_snapshot, line.material_digest, Number(line.line_no)]);
       }
       for (const document of documents.rows) await client.query("insert into project_planning_document_links(package_id,project_document_link_id,created_by,request_id) values($1,$2,$3,$4)", [packageId, Number(document.project_document_link_id), meta.actor.username, meta.requestId]);
@@ -146,7 +206,13 @@ export class PlanningHandoffService {
     const header = await this.repository.pool.query(`select pp.*,p.project_code,p.project_name,p.project_goal,p.project_owner,p.customer_id,c.customer_code,c.customer_name,rv.version_no requirement_version_no,rv.customer_requirement_summary from project_planning_packages pp join business_projects p on p.id=pp.project_id join customers c on c.id=p.customer_id join project_requirement_versions rv on rv.id=pp.requirement_version_id where pp.id=$1`, [packageId]);
     if (!header.rows[0] || (actor.role === "engineering" && header.rows[0].project_owner !== actor.username)) throw new PlanningHandoffError("PLANNING_PACKAGE_NOT_FOUND", "计划交接包不存在", 404);
     const [items, lines, documents, events] = await Promise.all([
-      this.repository.pool.query(`select pi.*,pi.required_quantity::text,ri.provisional_name,ri.specification_requirement,u.code unit_code,p.product_code,p.product_name,pv.version_code product_version_code,bh.bom_code,bv.version_code bom_version_code from project_planning_package_items pi join project_requirement_items ri on ri.id=pi.requirement_item_id join units u on u.id=pi.unit_id join product_versions pv on pv.id=pi.product_version_id join products p on p.id=pv.product_id join bom_versions bv on bv.id=pi.bom_version_id join bom_headers bh on bh.id=bv.bom_header_id where pi.package_id=$1 order by pi.line_no`, [packageId]),
+      this.repository.pool.query(`select pi.*,pi.required_quantity::text,ri.provisional_name,ri.specification_requirement,u.code unit_code,u.name unit_name,
+        ur.resolution_version_no unit_resolution_version_no,ur.source_type unit_resolution_source_type,ur.content_digest unit_resolution_digest,
+        p.product_code,p.product_name,pv.version_code product_version_code,bh.bom_code,bv.version_code bom_version_code
+        from project_planning_package_items pi join project_requirement_items ri on ri.id=pi.requirement_item_id join units u on u.id=pi.unit_id
+        left join project_requirement_unit_resolution_versions ur on ur.id=pi.unit_resolution_id and ur.requirement_item_id=pi.requirement_item_id and ur.unit_id=pi.unit_id
+        join product_versions pv on pv.id=pi.product_version_id join products p on p.id=pv.product_id join bom_versions bv on bv.id=pi.bom_version_id join bom_headers bh on bh.id=bv.bom_header_id
+        where pi.package_id=$1 order by pi.line_no`, [packageId]),
       this.repository.pool.query(`select bl.*,bl.quantity_per::text,bl.loss_rate::text,bl.calculated_gross_quantity::text,u.code unit_code from project_planning_package_bom_lines bl join project_planning_package_items pi on pi.id=bl.package_item_id join units u on u.id=bl.unit_id where pi.package_id=$1 order by pi.line_no,bl.line_no`, [packageId]),
       this.repository.pool.query(`select dl.id,dl.project_document_link_id,l.document_type,l.display_name,f.original_filename,f.mime_type,f.sha256,f.size_bytes::text,f.storage_status from project_planning_document_links dl join project_document_links l on l.id=dl.project_document_link_id join material_import_files f on f.id=l.file_id where dl.package_id=$1 order by dl.id`, [packageId]),
       this.repository.pool.query("select id,package_id,project_id,event_type,actor,reason,request_id,created_at from project_planning_handoff_events where package_id=$1 order by id", [packageId]),

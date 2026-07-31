@@ -37,5 +37,7 @@ test("project API delegates state changes and never embeds SQL or storage paths"
   assert.match(handler, /requireCsrf/); assert.match(handler, /Idempotency-Key/); assert.match(handler, /X-Request-ID/); assert.match(handler, /page_size/);
   assert.doesNotMatch(handler, /insert into|update business_projects|relative_path|stack/i);
   assert.match(service, /PROJECT_IMMUTABLE_AFTER_SUBMIT/); assert.match(service, /HANDOFF_SELF_ACCEPT_FORBIDDEN/); assert.match(service, /for update/); assert.match(service, /project_handoff_events/);
+  assert.match(service, /project_requirement_unit_resolution_versions/); assert.match(service, /REQUIREMENT_DECLARED/); assert.match(service, /project_requirement_unit_resolution_heads/);
+  assert.match(service, /select id from units where id=any\(\$1::bigint\[\]\) and enabled=true order by id for update/);
   assert.doesNotMatch(service, /relative_path|absolute_path|file_body/i);
 });

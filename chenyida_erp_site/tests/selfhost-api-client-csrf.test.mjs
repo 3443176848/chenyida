@@ -15,6 +15,7 @@ test.afterEach(() => {
 test("all Planning module writes are protected POST requests using the current cookie and same-origin credentials", async () => {
   const paths = [
     "/api/projects/1/requirement-resolutions",
+    "/api/projects/1/requirement-unit-resolutions",
     "/api/projects/1/planning-packages",
     "/api/planning-packages/1/submit",
     "/api/planning-packages/1/accept",

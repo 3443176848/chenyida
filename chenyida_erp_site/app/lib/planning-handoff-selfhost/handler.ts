@@ -30,10 +30,11 @@ function mutationMeta(request: Request, dependencies: Dependencies, action: stri
 export async function handlePlanningHandoffApi(request: Request, dependencies: Dependencies): Promise<Response | null> {
   const url = new URL(request.url); const path = url.pathname;
   const resolutions = path.match(/^\/api\/projects\/([1-9]\d*)\/requirement-resolutions$/);
+  const unitResolutions = path.match(/^\/api\/projects\/([1-9]\d*)\/requirement-unit-resolutions$/);
   const packages = path.match(/^\/api\/projects\/([1-9]\d*)\/planning-packages$/);
   const packageDetail = path.match(/^\/api\/planning-packages\/([1-9]\d*)$/);
   const packageAction = path.match(/^\/api\/planning-packages\/([1-9]\d*)\/(submit|accept|return)$/);
-  if (!resolutions && !packages && !packageDetail && !packageAction && path !== "/api/planning-handoffs") return null;
+  if (!resolutions && !unitResolutions && !packages && !packageDetail && !packageAction && path !== "/api/planning-handoffs") return null;
   const repository = new PlanningHandoffRepository(dependencies.pool); const service = new PlanningHandoffService(repository); let action = "PLANNING_HANDOFF_REQUEST";
   try {
     if (request.method === "GET") {
@@ -47,6 +48,7 @@ export async function handlePlanningHandoffApi(request: Request, dependencies: D
     if (request.method !== "POST") throw new PlanningHandoffError("METHOD_NOT_ALLOWED", "接口不支持该请求方法", 405);
     dependencies.requireCsrf(); const parsed = await readBody(request); let result;
     if (resolutions) { action = "PROJECT_REQUIREMENTS_RESOLVED"; requirePermission(dependencies.actor, "planning.prepare"); result = await service.saveResolutions(positiveId(resolutions[1], "projectId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
+    else if (unitResolutions) { action = "PROJECT_REQUIREMENT_UNIT_RESOLVED"; requirePermission(dependencies.actor, "planning.prepare"); result = await service.saveUnitResolution(positiveId(unitResolutions[1], "projectId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
     else if (packages) { action = "PLANNING_PACKAGE_PREPARED"; requirePermission(dependencies.actor, "planning.prepare"); result = await service.createPackage(positiveId(packages[1], "projectId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
     else if (packageAction?.[2] === "submit") { action = "PLANNING_PACKAGE_SUBMITTED"; requirePermission(dependencies.actor, "planning.submit"); result = await service.submit(positiveId(packageAction[1], "packageId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
     else if (packageAction?.[2] === "accept") { action = "PLANNING_PACKAGE_ACCEPTED"; requirePermission(dependencies.actor, "planning.accept"); result = await service.accept(positiveId(packageAction[1], "packageId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
@@ -56,6 +58,7 @@ export async function handlePlanningHandoffApi(request: Request, dependencies: D
   } catch (error) {
     const known = mapPlanningHandoffError(error); await repository.failureAudit(dependencies.actor.username, dependencies.requestId, action, known.code);
     console.error(JSON.stringify({ level: "error", event: "planning_handoff_api_failed", request_id: dependencies.requestId, code: known.code }));
-    return response({ error: { code: known.code, message: known.message, request_id: dependencies.requestId }, code: known.code, message: known.message, request_id: dependencies.requestId }, known.status, dependencies.requestId);
+    const message = `${known.message}（请求号：${dependencies.requestId}）`;
+    return response({ error: { code: known.code, message, request_id: dependencies.requestId }, code: known.code, message, request_id: dependencies.requestId }, known.status, dependencies.requestId);
   }
 }

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import { ProjectError } from "./errors.ts";
 import { assertOnlyKeys, expectedVersion, positiveId, requirementInput, safeDocumentInput, boundedText } from "./validation.ts";
@@ -60,13 +61,23 @@ export class ProjectService {
 
   private async validateReferences(client: PoolClient, customerId: number, requirement: RequirementInput) {
     const customer = await client.query("select 1 from customers where id=$1 and status='ACTIVE'", [customerId]); if (!customer.rows[0]) throw new ProjectError("CUSTOMER_NOT_ACTIVE", "客户不存在或未启用", 422);
-    const unitIds = [...new Set(requirement.items.flatMap((item) => item.unitId ? [item.unitId] : []))]; if (unitIds.length) { const found = await client.query("select id from units where id=any($1::bigint[]) and enabled=true", [unitIds]); if (found.rowCount !== unitIds.length) throw new ProjectError("UNIT_NOT_ACTIVE", "需求明细单位不存在或未启用", 422); }
+    const unitIds = [...new Set(requirement.items.flatMap((item) => item.unitId ? [item.unitId] : []))].sort((left, right) => left - right); if (unitIds.length) { const found = await client.query("select id from units where id=any($1::bigint[]) and enabled=true order by id for update", [unitIds]); if (found.rowCount !== unitIds.length) throw new ProjectError("UNIT_NOT_ACTIVE", "需求明细单位不存在或未启用", 422); }
   }
 
   private async insertRequirement(client: PoolClient, projectId: number, versionNo: number, meta: ProjectMutationMeta, requirement: RequirementInput) {
     const version = await client.query(`insert into project_requirement_versions(project_id,version_no,customer_requirement_summary,quantity_requirement,quantity_unit,delivery_requirement,commercial_terms,technical_requirements,content_digest,created_by)
       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`, [projectId, versionNo, requirement.customerRequirementSummary, requirement.quantityRequirement, requirement.quantityUnit, requirement.deliveryRequirement, requirement.commercialTerms, requirement.technicalRequirements, requirement.contentDigest, meta.actor.username]);
-    for (const item of requirement.items) await client.query(`insert into project_requirement_items(requirement_version_id,line_no,provisional_name,quantity,unit_id,unit_pending,specification_requirement) values($1,$2,$3,$4,$5,$6,$7)`, [version.rows[0].id, item.lineNo, item.provisionalName, item.quantity, item.unitId, item.unitPending, item.specificationRequirement]);
+    for (const item of requirement.items) {
+      const savedItem = await client.query(`insert into project_requirement_items(requirement_version_id,line_no,provisional_name,quantity,unit_id,unit_pending,specification_requirement) values($1,$2,$3,$4,$5,$6,$7) returning id,created_at`, [version.rows[0].id, item.lineNo, item.provisionalName, item.quantity, item.unitId, item.unitPending, item.specificationRequirement]);
+      if (item.unitId) {
+        const requirementItemId = Number(savedItem.rows[0].id);
+        const contentDigest = createHash("sha256").update(JSON.stringify(["project-requirement-unit-resolution-v1", projectId, Number(version.rows[0].id), requirementItemId, 1, item.unitId, "REQUIREMENT_DECLARED", requirement.contentDigest])).digest("hex");
+        const resolution = await client.query(`insert into project_requirement_unit_resolution_versions(project_id,requirement_version_id,requirement_item_id,resolution_version_no,unit_id,source_type,supersedes_resolution_id,resolved_by,resolved_at,request_id,content_digest)
+          values($1,$2,$3,1,$4,'REQUIREMENT_DECLARED',null,$5,$6,$7,$8) returning id`, [projectId, Number(version.rows[0].id), requirementItemId, item.unitId, meta.actor.username, savedItem.rows[0].created_at, meta.requestId, contentDigest]);
+        await client.query(`insert into project_requirement_unit_resolution_heads(requirement_item_id,project_id,requirement_version_id,current_resolution_id,version)
+          values($1,$2,$3,$4,1)`, [requirementItemId, projectId, Number(version.rows[0].id), Number(resolution.rows[0].id)]);
+      }
+    }
     return version.rows[0];
   }
 

@@ -10,7 +10,7 @@ const dashboard = await readFile(new URL("../app/lib/dashboard-selfhost/service.
 test("planning UI shows package source, database results and explicit locked submission", () => {
   assert.match(planningPage, /MaterialRequirementWorkspace/); assert.match(workspace, /已接收交接包/); assert.match(workspace, /生成物料需求预览/); assert.match(workspace, /加锁重算并提交采购部/);
   for (const field of ["gross_requirement", "stock_available", "eligible_inbound", "stock_allocated", "inbound_allocated", "net_purchase_requirement"]) assert.match(workspace, new RegExp(field));
-  assert.match(workspace, /DRAFT 不占用库存或在途/); assert.match(workspace, /不会修改正式 reserved_qty/); assert.match(workspace, /crypto\.randomUUID/);
+  assert.match(workspace, /DRAFT 不占用库存或在途/); assert.match(workspace, /不会修改正式 reserved_qty/); assert.match(workspace, /createSessionWriteRegistry/); assert.match(workspace, /sessionPost/); assert.doesNotMatch(workspace, /crypto\.randomUUID/);
   assert.doesNotMatch(workspace, /parseFloat|Number\(.*(?:gross|stock|inbound|net)/s);
 });
 

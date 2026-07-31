@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const workspace = await readFile(new URL("../app/planning/planning-workspace.tsx", import.meta.url), "utf8");
+const planningCss = await readFile(new URL("../app/planning/planning.css", import.meta.url), "utf8");
 const engineeringPage = await readFile(new URL("../app/engineering/projects/[projectId]/planning/page.tsx", import.meta.url), "utf8");
 const planningPage = await readFile(new URL("../app/planning/handoffs/page.tsx", import.meta.url), "utf8");
 const dashboard = await readFile(new URL("../app/lib/dashboard-selfhost/service.ts", import.meta.url), "utf8");
@@ -13,6 +14,52 @@ test("engineering planning page resolves stable versions and shows immutable pac
   assert.match(engineeringPage, /EngineeringPlanningWorkspace/); assert.match(workspace, /需求明细解析/); assert.match(workspace, /Product.*BOM/s); assert.match(workspace, /零件规格快照/);
   assert.match(workspace, /生成交接包/); assert.match(workspace, /提交计划部/); assert.match(workspace, /交接包版本/); assert.match(workspace, /退回原因/);
   assert.match(workspace, /requirement_item_id/); assert.match(workspace, /product_version_id/); assert.match(workspace, /bom_version_id/); assert.match(workspace, /expected_version/);
+});
+
+test("engineering resolves each pending requirement with a versioned stable Unit ID", () => {
+  assert.match(workspace, /enabled_units/);
+  assert.match(workspace, /resolved_unit_id/);
+  assert.match(workspace, /unit_resolution_id/);
+  assert.match(workspace, /unit_resolution_version_no/);
+  assert.match(workspace, /unit_resolution_head_version/);
+  assert.match(workspace, /requirement-unit-resolutions/);
+  assert.match(workspace, /requirement_item_id:row\.requirement_item_id,unit_id:unitId,expected_head_version/);
+  assert.match(workspace, /<option value="">请选择有效单位<\/option>/);
+  assert.match(workspace, /unit\.name} · {unit\.code}/);
+  assert.match(workspace, /销售原始单位：{row\.unit_pending\?"待确认"/);
+  assert.match(workspace, /不会改写销售原始需求/);
+  assert.match(workspace, /不会从 BOM 推断单位/);
+  assert.match(workspace, /Unit Resolution v/);
+  assert.match(workspace, /ENGINEERING_CONFIRMED:"工程确认"/);
+  assert.match(workspace, /REQUIREMENT_DECLARED:"销售需求声明"/);
+  assert.doesNotMatch(workspace, /请选择有效单位[\s\S]{0,120}selected/);
+});
+
+test("package creation is gated by persisted Unit and Product BOM resolutions", () => {
+  assert.match(workspace, /unitComplete\(row\)&&productBomComplete\(row\)&&!unitChoiceDirty\(row\)&&!productChoiceDirty\(row\)/);
+  assert.match(workspace, /row\.unit_resolution_id&&row\.unit_resolution_version_no&&row\.resolved_unit_id&&unitById\.has/);
+  assert.match(workspace, /单位（当前选择尚未保存）/);
+  assert.match(workspace, /Product \/ BOM（当前选择尚未保存）/);
+  assert.match(workspace, /Product \/ BOM（当前解析已失效，需重新选择并保存）/);
+  assert.match(workspace, /candidate&&Number\(candidate\.product_id\)===Number\(row\.product_id\)&&Number\(candidate\.product_version_id\)===Number\(row\.product_version_id\)&&Number\(candidate\.bom_header_id\)===Number\(row\.bom_header_id\)/);
+  assert.match(workspace, /生成交接包前仍需完成/);
+  assert.match(workspace, /第 \$\{row\.line_no} 行/);
+  assert.match(workspace, /本地选择尚未保存时不会计入交接完整性/);
+  assert.match(workspace, /disabled={busy\|\|!allPersistedResolutionsComplete}/);
+  assert.match(workspace, /单位：{unitIsComplete\?"已完成":"未完成"}/);
+  assert.match(workspace, /Product \/ BOM：{productIsComplete\?"已完成":"未完成"}/);
+});
+
+test("planning workspace keeps narrow screens contained and tables locally scrollable", () => {
+  assert.match(planningCss, /@media\(max-width:420px\)/);
+  assert.match(planningCss, /@media\(max-width:900px\)\{\.planning-resolution\{grid-template-columns:1fr\}/);
+  assert.match(planningCss, /\.planning-shell\{box-sizing:border-box;width:100%;max-width:100%\}/);
+  assert.doesNotMatch(planningCss, /\.planning-shell\{[^}]*overflow-x:hidden/);
+  assert.match(planningCss, /\.planning-table-scroll\{[^}]*overflow-x:auto/);
+  assert.match(workspace, /className="planning-table-scroll"/);
+  assert.match(workspace, /系统管理员/);
+  assert.match(workspace, /工程人员/);
+  assert.doesNotMatch(workspace, /<span>{user\.role}<\/span>/);
 });
 
 test("planning page has pending and accepted queues with read-only decision detail", () => {

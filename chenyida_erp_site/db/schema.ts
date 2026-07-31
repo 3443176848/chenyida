@@ -323,6 +323,7 @@ export const projectRequirementVersions = pgTable("project_requirement_versions"
   technicalRequirements: text("technical_requirements").notNull().default(""), contentDigest: text("content_digest").notNull(),
   createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [
+  uniqueIndex("project_requirement_versions_id_project_uq").on(t.id, t.projectId),
   uniqueIndex("project_requirement_versions_project_no_uq").on(t.projectId, t.versionNo),
   uniqueIndex("project_requirement_versions_project_digest_uq").on(t.projectId, t.contentDigest),
   index("project_requirement_versions_project_created_idx").on(t.projectId, t.createdAt, t.id),
@@ -339,6 +340,7 @@ export const projectRequirementItems = pgTable("project_requirement_items", {
   specificationRequirement: text("specification_requirement").notNull().default(""), productId: bigint("product_id", { mode: "number" }).references(() => products.id, { onDelete: "restrict" }),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [
+  uniqueIndex("project_requirement_items_id_version_uq").on(t.id, t.requirementVersionId),
   uniqueIndex("project_requirement_items_version_line_uq").on(t.requirementVersionId, t.lineNo),
   index("project_requirement_items_product_idx").on(t.productId, t.id).where(sql`${t.productId} is not null`),
   check("project_requirement_items_line_ck", sql`${t.lineNo}>0`), check("project_requirement_items_quantity_ck", sql`${t.quantity}>0`),
@@ -408,6 +410,52 @@ export const projectRequirementResolutions = pgTable("project_requirement_resolu
   index("project_requirement_resolutions_product_bom_idx").on(t.productVersionId, t.bomVersionId, t.id),
 ]);
 
+export const projectRequirementUnitResolutionVersions = pgTable("project_requirement_unit_resolution_versions", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }),
+  requirementVersionId: bigint("requirement_version_id", { mode: "number" }).notNull().references(() => projectRequirementVersions.id, { onDelete: "restrict" }),
+  requirementItemId: bigint("requirement_item_id", { mode: "number" }).notNull().references(() => projectRequirementItems.id, { onDelete: "restrict" }),
+  resolutionVersionNo: integer("resolution_version_no").notNull(),
+  unitId: bigint("unit_id", { mode: "number" }).notNull().references(() => units.id, { onDelete: "restrict" }),
+  sourceType: text("source_type").notNull(),
+  supersedesResolutionId: bigint("supersedes_resolution_id", { mode: "number" }).references((): AnyPgColumn => projectRequirementUnitResolutionVersions.id, { onDelete: "restrict" }),
+  resolvedBy: text("resolved_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
+  resolvedAt: timestamptz("resolved_at").notNull().defaultNow(),
+  requestId: uuid("request_id").notNull(),
+  contentDigest: text("content_digest").notNull(),
+}, (t) => [
+  uniqueIndex("project_requirement_unit_resolution_versions_item_no_uq").on(t.requirementItemId, t.resolutionVersionNo),
+  uniqueIndex("project_requirement_unit_resolution_versions_chain_no_uq").on(t.projectId, t.requirementVersionId, t.requirementItemId, t.resolutionVersionNo),
+  uniqueIndex("project_requirement_unit_resolution_versions_id_chain_uq").on(t.id, t.projectId, t.requirementVersionId, t.requirementItemId),
+  uniqueIndex("project_requirement_unit_resolution_versions_id_item_unit_uq").on(t.id, t.requirementItemId, t.unitId),
+  index("project_requirement_unit_resolution_versions_project_idx").on(t.projectId, t.requirementVersionId, t.requirementItemId, t.resolutionVersionNo),
+  index("project_requirement_unit_resolution_versions_unit_idx").on(t.unitId, t.id),
+  index("project_requirement_unit_resolution_versions_request_idx").on(t.requestId, t.id),
+  foreignKey({ name: "project_requirement_unit_resolution_versions_project_version_fk", columns: [t.requirementVersionId, t.projectId], foreignColumns: [projectRequirementVersions.id, projectRequirementVersions.projectId] }).onDelete("restrict"),
+  foreignKey({ name: "project_requirement_unit_resolution_versions_item_version_fk", columns: [t.requirementItemId, t.requirementVersionId], foreignColumns: [projectRequirementItems.id, projectRequirementItems.requirementVersionId] }).onDelete("restrict"),
+  foreignKey({ name: "project_requirement_unit_resolution_versions_supersedes_chain_fk", columns: [t.supersedesResolutionId, t.projectId, t.requirementVersionId, t.requirementItemId], foreignColumns: [t.id, t.projectId, t.requirementVersionId, t.requirementItemId] }).onDelete("restrict"),
+  check("project_requirement_unit_resolution_versions_no_ck", sql`${t.resolutionVersionNo}>0`),
+  check("project_requirement_unit_resolution_versions_source_ck", sql`${t.sourceType} in ('ENGINEERING_CONFIRMED','REQUIREMENT_DECLARED')`),
+  check("project_requirement_unit_resolution_versions_chain_ck", sql`(${t.resolutionVersionNo}=1 and ${t.supersedesResolutionId} is null) or (${t.resolutionVersionNo}>1 and ${t.supersedesResolutionId} is not null)`),
+  check("project_requirement_unit_resolution_versions_digest_ck", sql`${t.contentDigest} ~ '^[0-9a-f]{64}$'`),
+]);
+
+export const projectRequirementUnitResolutionHeads = pgTable("project_requirement_unit_resolution_heads", {
+  requirementItemId: bigint("requirement_item_id", { mode: "number" }).primaryKey().references(() => projectRequirementItems.id, { onDelete: "restrict" }),
+  projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }),
+  requirementVersionId: bigint("requirement_version_id", { mode: "number" }).notNull().references(() => projectRequirementVersions.id, { onDelete: "restrict" }),
+  currentResolutionId: bigint("current_resolution_id", { mode: "number" }).notNull().references(() => projectRequirementUnitResolutionVersions.id, { onDelete: "restrict" }),
+  version: integer("version").notNull(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("project_requirement_unit_resolution_heads_current_uq").on(t.currentResolutionId),
+  index("project_requirement_unit_resolution_heads_project_idx").on(t.projectId, t.requirementVersionId, t.requirementItemId),
+  foreignKey({ name: "project_requirement_unit_resolution_heads_project_version_fk", columns: [t.requirementVersionId, t.projectId], foreignColumns: [projectRequirementVersions.id, projectRequirementVersions.projectId] }).onDelete("restrict"),
+  foreignKey({ name: "project_requirement_unit_resolution_heads_item_version_fk", columns: [t.requirementItemId, t.requirementVersionId], foreignColumns: [projectRequirementItems.id, projectRequirementItems.requirementVersionId] }).onDelete("restrict"),
+  foreignKey({ name: "project_requirement_unit_resolution_heads_current_chain_fk", columns: [t.currentResolutionId, t.projectId, t.requirementVersionId, t.requirementItemId], foreignColumns: [projectRequirementUnitResolutionVersions.id, projectRequirementUnitResolutionVersions.projectId, projectRequirementUnitResolutionVersions.requirementVersionId, projectRequirementUnitResolutionVersions.requirementItemId] }).onDelete("restrict"),
+  check("project_requirement_unit_resolution_heads_version_ck", sql`${t.version}>0`),
+]);
+
 export const projectPlanningPackages = pgTable("project_planning_packages", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }),
@@ -441,10 +489,13 @@ export const projectPlanningPackageItems = pgTable("project_planning_package_ite
   bomVersionId: bigint("bom_version_id", { mode: "number" }).notNull().references(() => bomVersions.id, { onDelete: "restrict" }),
   requiredQuantity: numeric("required_quantity", { precision: 24, scale: 6 }).notNull(), unitId: bigint("unit_id", { mode: "number" }).notNull().references(() => units.id, { onDelete: "restrict" }),
   lineNo: integer("line_no").notNull(), sourceDigest: text("source_digest").notNull(),
+  unitResolutionId: bigint("unit_resolution_id", { mode: "number" }).references(() => projectRequirementUnitResolutionVersions.id, { onDelete: "restrict" }),
 }, (t) => [
   uniqueIndex("project_planning_package_items_package_line_uq").on(t.packageId, t.lineNo),
   uniqueIndex("project_planning_package_items_package_requirement_uq").on(t.packageId, t.requirementItemId),
   index("project_planning_package_items_product_bom_idx").on(t.productVersionId, t.bomVersionId, t.id),
+  index("project_planning_package_items_unit_resolution_idx").on(t.unitResolutionId, t.id).where(sql`${t.unitResolutionId} is not null`),
+  foreignKey({ name: "project_planning_package_items_unit_resolution_provenance_fk", columns: [t.unitResolutionId, t.requirementItemId, t.unitId], foreignColumns: [projectRequirementUnitResolutionVersions.id, projectRequirementUnitResolutionVersions.requirementItemId, projectRequirementUnitResolutionVersions.unitId] }).onDelete("restrict"),
   check("project_planning_package_items_quantity_ck", sql`${t.requiredQuantity}>0 and ${t.lineNo}>0`),
   check("project_planning_package_items_digest_ck", sql`${t.sourceDigest} ~ '^[0-9a-f]{64}$'`),
 ]);

@@ -32,6 +32,7 @@ async function seed() {
 }
 
 const body = (refs, suffix = "A") => ({ customer_id: refs.customerId, project_name: `客户项目 ${suffix}`, project_goal: "形成稳定项目记录", target_delivery_date: "2026-10-31", customer_requirement_summary: `需求摘要 ${suffix}`, quantity_requirement: "12.500000", quantity_unit: "套", delivery_requirement: "分两批交付", commercial_terms: "含税，条款待确认", technical_requirements: "依据受控图纸评审", items: [{ provisional_name: `控制组件 ${suffix}`, quantity: "12.5", unit_pending: true, specification_requirement: "尺寸待工程确认" }] });
+const declaredUnitBody = (refs, suffix = "UNIT") => ({ ...body(refs, suffix), items: [{ provisional_name: `明确单位组件 ${suffix}`, quantity: "12.5", unit_pending: false, unit_id: refs.unitId, specification_requirement: "销售来源已明确单位" }] });
 
 test.beforeEach(async () => {
   await pool.query(`truncate project_handoff_events,project_document_links,project_handoffs,project_requirement_items,project_requirement_versions,business_projects,
@@ -75,4 +76,38 @@ test("roles, CSRF, controlled document metadata, CAS and transaction faults fail
   const results = await Promise.all(["A", "B"].map((suffix) => api(`/api/projects/${projectId}`, { method: "PATCH", key: `project-cas-${suffix}`, body: { ...body(refs, suffix), expected_version: 2 } }))); assert.deepEqual(results.map((item) => item.response.status).sort(), [200, 409]); assert.equal(Number((await pool.query("select count(*) count from project_requirement_versions where project_id=$1", [projectId])).rows[0].count), 2);
   const fault = new ProjectService(new ProjectRepository(pool), (checkpoint) => { if (checkpoint === "after_project_requirement") throw new Error("forced rollback"); }); const meta = { actor: actor("sales", "sales01"), requestId: randomUUID(), operationId: randomUUID(), keyDigest: "f".repeat(64), requestDigest: "e".repeat(64), method: "POST", route: "/api/projects", action: "PROJECT_CREATED" };
   await assert.rejects(fault.create(meta, body(refs, "FAULT")), /服务器暂时无法处理项目请求/); assert.equal(Number((await pool.query("select count(*) count from business_projects where project_name='客户项目 FAULT'")).rows[0].count), 0); assert.equal(Number((await pool.query("select count(*) count from project_requirement_versions v left join business_projects p on p.id=v.project_id where p.id is null")).rows[0].count), 0); assert.equal(Number((await pool.query("select count(*) count from idempotency_keys where key_digest=$1", [meta.keyDigest])).rows[0].count), 0);
+});
+
+test("an explicitly declared source unit creates traceable provenance without engineering confirmation", async () => {
+  const refs = await seed(); const created = await api("/api/projects", { method: "POST", body: declaredUnitBody(refs) }); assert.equal(created.response.status, 201);
+  const facts = await pool.query(`select ri.unit_id,ri.unit_pending,ur.source_type,ur.resolution_version_no,ur.unit_id resolution_unit_id,uh.version head_version,uh.current_resolution_id=ur.id head_matches
+    from business_projects p join project_requirement_versions rv on rv.project_id=p.id and rv.version_no=p.current_requirement_version_no
+    join project_requirement_items ri on ri.requirement_version_id=rv.id
+    join project_requirement_unit_resolution_heads uh on uh.requirement_item_id=ri.id
+    join project_requirement_unit_resolution_versions ur on ur.id=uh.current_resolution_id
+    where p.id=$1`, [Number(created.payload.project_id)]);
+  assert.deepEqual(facts.rows[0], { unit_id: String(refs.unitId), unit_pending: false, source_type: "REQUIREMENT_DECLARED", resolution_version_no: 1, resolution_unit_id: String(refs.unitId), head_version: 1, head_matches: true });
+  await assert.rejects(pool.query("update project_requirement_unit_resolution_versions set source_type='ENGINEERING_CONFIRMED' where requirement_item_id=(select id from project_requirement_items order by id desc limit 1)"), /immutable|PlanningHandoffService/i);
+});
+
+test("an explicit source Unit is locked against a concurrent disable before provenance is created", async () => {
+  const refs = await seed();
+  const blocker = await pool.connect();
+  try {
+    await blocker.query("begin");
+    await blocker.query("update units set enabled=false where id=$1", [refs.unitId]);
+    const creation = api("/api/projects", { method: "POST", body: declaredUnitBody(refs, "DISABLE-RACE") });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await blocker.query("commit");
+    const rejected = await creation;
+    assert.equal(rejected.response.status, 422);
+    assert.equal(rejected.payload.code, "UNIT_NOT_ACTIVE");
+    assert.equal(Number((await pool.query("select count(*) count from business_projects where project_name='客户项目 DISABLE-RACE'")).rows[0].count), 0);
+    assert.equal(Number((await pool.query("select count(*) count from project_requirement_unit_resolution_versions")).rows[0].count), 0);
+  } catch (error) {
+    await blocker.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    blocker.release();
+  }
 });

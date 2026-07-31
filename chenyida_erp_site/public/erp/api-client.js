@@ -106,7 +106,7 @@ export async function api(path, options = {}) {
   const financeWrite = (["/api/finance/documents", "/api/finance/settlements", "/api/financial-documents/from-source", "/api/financial-documents/from-sales-order", "/api/financial-documents/from-purchase-order", "/api/financial-payments"].includes(path)
     || /^\/api\/(?:financial-documents\/[1-9]\d*\/settlements|(?:financial-payments|finance-settlements)\/[1-9]\d*\/reversal)$/.test(path)) && method === "POST";
   const projectWrite = (path === "/api/projects" || /^\/api\/projects\/[1-9]\d*(?:\/(?:submit|accept|return|documents)(?:\/[1-9]\d*)?)?$/.test(path)) && ["POST", "PATCH", "DELETE"].includes(method);
-  const planningWrite = (/^\/api\/projects\/[1-9]\d*\/(?:requirement-resolutions|planning-packages)$/.test(path)
+  const planningWrite = (/^\/api\/projects\/[1-9]\d*\/(?:requirement-resolutions|requirement-unit-resolutions|planning-packages)$/.test(path)
     || /^\/api\/planning-packages\/[1-9]\d*\/(?:submit|accept|return|material-requirement-plans|production-handoffs)$/.test(path)
     || /^\/api\/material-requirement-plans\/[1-9]\d*\/submit$/.test(path)
     || /^\/api\/purchase-requests\/[1-9]\d*\/(?:accept|return)$/.test(path)

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
-import { canonicalDigest, optionalDate, resolutionInput } from "../app/lib/planning-handoff-selfhost/validation.ts";
+import { canonicalDigest, optionalDate, resolutionInput, unitResolutionInput } from "../app/lib/planning-handoff-selfhost/validation.ts";
 
 test("planning is a formal separated role with the minimum handoff permissions", () => {
   const engineering = permissionsForRole("engineering");
@@ -27,11 +27,19 @@ test("resolution inputs require explicit stable identifiers and deterministic di
   assert.throws(() => optionalDate("2026-02-30"), /无效/);
 });
 
+test("unit resolution requires a stable unit id and an independent zero-based CAS version", () => {
+  assert.deepEqual(unitResolutionInput({ requirement_item_id: 8, unit_id: 2, expected_head_version: 0 }), { requirementItemId: 8, unitId: 2, expectedHeadVersion: 0 });
+  assert.throws(() => unitResolutionInput({ requirement_item_id: 8, unit_id: null, expected_head_version: 0 }), error => error.code === "REQUIREMENT_UNIT_UNRESOLVED");
+  assert.throws(() => unitResolutionInput({ requirement_item_id: 8, unit_id: "PCS", expected_head_version: 0 }), error => error.code === "REQUIREMENT_UNIT_INVALID");
+  assert.throws(() => unitResolutionInput({ requirement_item_id: 8, unit_id: 2, expected_head_version: -1 }), /expected_head_version/);
+  assert.throws(() => unitResolutionInput({ requirement_item_id: 8, unit_id: 2, expected_head_version: 0, unit_code: "PCS" }), /未知字段/);
+});
+
 test("planning API owns a bounded transactional boundary and excludes downstream planning", async () => {
   const handler = await readFile(new URL("../app/lib/planning-handoff-selfhost/handler.ts", import.meta.url), "utf8");
   const service = await readFile(new URL("../app/lib/planning-handoff-selfhost/service.ts", import.meta.url), "utf8");
   const repository = await readFile(new URL("../app/lib/planning-handoff-selfhost/repository.ts", import.meta.url), "utf8");
-  for (const route of ["requirement-resolutions", "planning-packages", "planning-handoffs", "submit|accept|return"]) assert.match(handler, new RegExp(route));
+  for (const route of ["requirement-resolutions", "requirement-unit-resolutions", "planning-packages", "planning-handoffs", "submit|accept|return"]) assert.match(handler, new RegExp(route));
   assert.match(handler, /256 \* 1024/); assert.match(handler, /requireCsrf/); assert.match(handler, /Idempotency-Key/); assert.match(handler, /X-Request-ID/);
   assert.match(service, /for update/); assert.match(service, /status='RELEASED'/); assert.match(service, /material_status='ACTIVE'/); assert.match(service, /round\(\$2::numeric\*bl\.quantity_per\*\(1\+bl\.loss_rate\),6\)/);
   assert.match(service, /package_digest/); assert.match(service, /RESUBMITTED/); assert.match(repository, /client\.query\("begin"\)/); assert.match(repository, /idempotency_keys/); assert.match(repository, /audit_log/);

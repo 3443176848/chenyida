@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { PlanningHandoffError } from "./errors.ts";
-import type { ResolutionInput } from "./types.ts";
+import type { ResolutionInput, UnitResolutionInput } from "./types.ts";
 
 export const stableValue = (value: unknown): unknown => Array.isArray(value) ? value.map(stableValue) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, child]) => [key, stableValue(child)])) : value;
 export const canonicalDigest = (value: unknown) => createHash("sha256").update(JSON.stringify(stableValue(value))).digest("hex");
@@ -14,4 +14,21 @@ export function resolutionInput(value: Record<string, unknown>): { expected: num
   if (!Array.isArray(value.resolutions) || value.resolutions.length < 1 || value.resolutions.length > 200) throw new PlanningHandoffError("REQUEST_VALIDATION_FAILED", "resolutions 必须包含 1 至 200 条解析");
   const seen = new Set<number>(); const rows = value.resolutions.map((raw, index) => { if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new PlanningHandoffError("REQUEST_VALIDATION_FAILED", `resolutions[${index}] 无效`); const row = raw as Record<string, unknown>; assertOnlyKeys(row, ["requirement_item_id", "product_id", "product_version_id", "bom_header_id", "bom_version_id"]); const result = { requirementItemId: positiveId(row.requirement_item_id, "requirement_item_id"), productId: positiveId(row.product_id, "product_id"), productVersionId: positiveId(row.product_version_id, "product_version_id"), bomHeaderId: positiveId(row.bom_header_id, "bom_header_id"), bomVersionId: positiveId(row.bom_version_id, "bom_version_id") }; if (seen.has(result.requirementItemId)) throw new PlanningHandoffError("REQUEST_VALIDATION_FAILED", "同一需求明细不能重复解析"); seen.add(result.requirementItemId); return result; });
   return { expected, rows };
+}
+
+export function unitResolutionInput(value: Record<string, unknown>): UnitResolutionInput {
+  assertOnlyKeys(value, ["requirement_item_id", "unit_id", "expected_head_version"]);
+  const requirementItemId = positiveId(value.requirement_item_id, "requirement_item_id");
+  if (value.unit_id === null || value.unit_id === undefined || value.unit_id === "") {
+    throw new PlanningHandoffError("REQUIREMENT_UNIT_UNRESOLVED", "请明确选择该需求明细的有效单位后重试", 422);
+  }
+  const unitId = Number(value.unit_id);
+  if (!Number.isSafeInteger(unitId) || unitId < 1) {
+    throw new PlanningHandoffError("REQUIREMENT_UNIT_INVALID", "所选单位标识无效，请刷新单位列表后重试", 422);
+  }
+  const expectedHeadVersion = Number(value.expected_head_version);
+  if (!Number.isSafeInteger(expectedHeadVersion) || expectedHeadVersion < 0) {
+    throw new PlanningHandoffError("REQUEST_VALIDATION_FAILED", "expected_head_version 必须是大于等于 0 的整数");
+  }
+  return { requirementItemId, unitId, expectedHeadVersion };
 }

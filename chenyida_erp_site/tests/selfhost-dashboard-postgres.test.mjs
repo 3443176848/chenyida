@@ -67,7 +67,7 @@ test("read-only repeatable-read snapshot aggregates exact material-review work",
   });
   assert.ok(result.risks.some((item) => item.code === "MATERIAL_REVIEW_PENDING"));
   assert.ok(!result.risks.some((item) => item.code === "NO_VISIBLE_RISK"));
-  assert.equal(result.summary.groups.operations.migrations[0].version, "0035_bom_material_governance.sql");
+  assert.equal(result.summary.groups.operations.migrations[0].version, "0036_project_requirement_unit_resolution.sql");
   assert.equal(result.recent_activity.length, 0);
 });
 
@@ -91,5 +91,5 @@ test("trusted verification file is independent from PostgreSQL business facts", 
   }));
   const result = await service.backup(actor("admin"));
   assert.equal(result.verification_status, "VERIFIED");
-  assert.equal(result.current_migration.version, "0035_bom_material_governance.sql");
+  assert.equal(result.current_migration.version, "0036_project_requirement_unit_resolution.sql");
 });
