@@ -2,6 +2,28 @@
 
 最后更新时间：2026-07-31（Asia/Shanghai）
 
+## SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05 Planning CSRF 与 RELEASED BOM 不可变修复
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | PLANNING CSRF AND RELEASED BOM IMMUTABILITY FIXED — UAT HANDOFF NOT CREATED | 共享客户端、BOM 前后端不可变、默认最小披露、隔离写旅程、兼容部署和主库只读验收完成 |
+| Git | PASS | 起点 `3cb5c38`/ahead 103；功能提交 `2b923da`、`fbaf34a`，验收提交 `ops: accept planning csrf and bom immutability fixes`。无 push/PR/amend/rebase/reset/stash/restore，未读取、修改或提交 `shujvbiao/`/工作簿 |
+| CSRF 根因 | FIXED | Planning 路由未被共享客户端的 protected-write 分类识别，普通 POST 分支丢失 `X-CSRF-Token` 和调用方幂等键；Header 名和 same-origin credentials 本身正确，重新登录无法修复“根本未发 Header” |
+| 共享客户端 | PASS / CURRENT SESSION | 所有 Planning 写统一 `sessionPost`；每次发送读当前 `CYD_ERP_CSRF` Cookie，POST+same-origin+`X-CSRF-Token`；页内幂等键绑当前 Token/method/path/canonical 正文，logout/重新登录/认证失效/页历史变化清旧上下文 |
+| 服务端安全 | PASS / UNCHANGED | Origin/CSRF/Session/权限/限流/审计未放宽；缺失/错误/旧 Session Token、旧公网/未知 Origin 拒绝，不信任 Forwarded/X-Forwarded；错误仍为中文稳定码+request_id，不记录 Token/Cookie/敏感正文 |
+| RELEASED BOM UI | PASS / 0 MUTATION CONTROLS | 只显示“已发布，只读；如需修改请创建新版本”和四行事实；Material、行号、数量、损耗率编辑器及新增/编辑/删除/保存/发布动作为 0，旧 DRAFT 输入不泄漏到 RELEASED |
+| RELEASED BOM 服务 | PASS / FAIL CLOSED | DRAFT 在获权下可增改删；RELEASED POST/PATCH/DELETE 均 `409 BOM_RELEASED_IMMUTABLE`，Line/Version/Event/成功 Audit 零半记录；数据库 trigger 仍在 |
+| 默认披露 | PASS / EXPLICIT SELECTION | 初次进入显示“请选择或搜索 BOM”且 BOM Line 请求 0；有界 Header/Product 搜索支持 BOM 编码、Product 编码/名称，明确选择后才读明细；390px 通过 |
+| 隔离 Planning 写旅程 | PASS / REAL CHROMIUM / 0034 | 合成项目完成 current/缺失/错误/旧 Token、logout→login、公网/回环/拒绝 Origin、保存→生成→提交→退回→修订→重提→接收、幂等/异正文/CAS；18 次共享受保护写、11 次 Planning 写、18 次 Cookie/Header 匹配，v1 RETURNED/v2 ACCEPTED |
+| 自动回归 | PASS | 当前源码相关 unit/UI/handler/PG、Identity/Origin/logout/no-store、Project/Planning、Product/BOM、Material selector、Dashboard、TASK09、typecheck、218-table Schema consistency、lint 0 error、build、credentials、diff check 通过；文档收口后断网只读合同 20/20，稀疏 credentials 1,108 files；兼容源 140/140、PG `16+19`、209-table consistency、typecheck/lint/build/credentials 通过；Python 三项通过 |
+| 版本/Migration | COMPATIBLE HOTFIX | 源码 alpha.36/0035；运行 alpha.34/0034。无 Schema diff/0036，0035 未运行，TASK09/完整 alpha.36 未部署 |
+| 备份/恢复 | PASS | dump 2,027,218 bytes/0600/root，SHA-256 `b30fa30408da026bd4114a52011e56485956fb72529e6e3467dfa5e4d5aa0d44`，3,065 list 行/213 TABLE DATA；独立 0034 恢复的 migration、210 表、保护 UAT、Planning 0 和三条旧 CSRF 失败一致，恢复库已删除 |
+| 部署/回退 | PASS / WEB ONLY | Web `cb6a5c1fae89...→7e0a3040acd1...`，旧镜像以 `rollback-fix05-predeploy-20260731T022228Z` 保留；PostgreSQL/Worker/Caddy ID 不变，四服务 restart 0/OOM false，34/head 0034，Origin 保持新公网值 |
+| 主库验收 | PASS / READ ONLY | engineering 仅 login/logout POST；初次明细请求 0，选择 BOM 7 后只读四行，写控件 0，Planning 识别 A0/V1，退出后 back/forward/refresh 匿名。未登录 planning，未点击任何 Planning/BOM 写动作 |
+| UAT 保护 | UNCHANGED | Project ACCEPTED/10、Product 7/A0 RELEASED、BOM 7/V1 RELEASED、四行 533—536/1 PCS/0 不变；Planning resolution/package/item/event `0/0/0/0`，三条历史 `CSRF_INVALID` 不变；只新增 1 LOGIN/1 LOGOUT，Session 已撤销 |
+| 资源/清理 | PASS | 起点约 2.2 GiB available/196—197 MiB Swap/29 GiB；最终扫描及清理后约 2.3 GiB/223 MiB/28 GiB/Load `0.12/0.14/0.17`，未触发门禁。内核 OOM 0、restart 0；测试/恢复库、临时容器、runner、Playwright 镜像、worktree/candidate tag 已清理，备份/当前/回退镜像保留，未 prune |
+| engineering 试用 | READY AFTER NEW AUTHORIZATION | 技术 blocker 已解除，可在项目负责人重新授权后开始 Planning Handoff 试用；本任务已停止，未创建交接包 |
+
 ## SELFHOST-OPS-UAT-BOM-SELECTOR-FIX-04 正式编码优先 BOM 物料选择与发布流程
 
 | 验证项 | 结果 | 说明 |

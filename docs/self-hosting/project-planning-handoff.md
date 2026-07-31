@@ -1,6 +1,6 @@
 # Project → Planning 数据模型与状态机
 
-适用任务：`SELFHOST-PHASE4-TASK02`。权威运行面仅为 Node.js/PostgreSQL 自托管方向；不修改 TASK01 的 MARKET→PROJECT 投影与历史事件。
+适用任务：`SELFHOST-PHASE4-TASK02`；2026-07-31 由 `SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05` 补充共享 CSRF 客户端、RELEASED BOM 不可变表现和默认最小披露合同。权威运行面仅为 Node.js/PostgreSQL 自托管方向；不修改 TASK01 的 MARKET→PROJECT 投影与历史事件。
 
 ## 关系边界
 
@@ -21,6 +21,10 @@
 - engineering 先为已发布 Product Version 保存 BOM DRAFT，再添加并校验行项目，最后调用既有 BOM release 服务。发布后内容不可原地修改，只能创建修订。
 - Planning Handoff 只接收属于同一 Product 的 RELEASED Product Version、RELEASED BOM Version 和 ACTIVE BOM Header；名称、供应商料号或页面展示文本不能作为桥接键。
 
+RELEASED BOM 在兼容管理页只显示已发布行事实和“已发布，只读；如需修改请创建新版本”。Material 搜索/选择、行号、数量、损耗率和工序输入及新增/编辑/删除/保存/发布动作均不对 RELEASED 详情渲染；从 DRAFT 切换时必须清空未保存输入。这是用户界面合同，不取代服务端不可变：RELEASED BOM Line 的 POST/PATCH/DELETE 均返回 `409 BOM_RELEASED_IMMUTABLE`，且不产生 Line、Version、Event 或成功 Audit 半记录。既有 PostgreSQL trigger 继续作为数据库层最后防线。
+
+BOM 管理页初始状态为“请选择或搜索 BOM”，不自动选中第一条历史 BOM，不请求任何 BOM Line。用户明确搜索后，服务端只返回有界 BOM Header/Product 摘要，支持 BOM 编码、Product 编码或名称；只在明确选择某条后才单独读取明细。这不改变有权用户主动查询范围。
+
 ## 状态机
 
 ```text
@@ -32,6 +36,12 @@ SUBMITTED --planning accept--> ACCEPTED
 ```
 
 只有 TASK01 已接收的 `ACCEPTED` Project 可进入本状态机。普通 engineering 只能操作自己负责的项目；planning 只能读取、接收或退回，不能改 BOM 或提交包。接收不触发 TASK03。
+
+## 写请求安全客户端
+
+Planning 页面的保存 Resolution、生成 Package、submit、return 后创建修订、resubmit 以及同模块后续写路由统一调用 `public/erp/api-client.js` 的 `sessionPost`，不直接拼装 fetch。每次请求固定为 POST、`credentials: same-origin`，并在发送时读当前 `CYD_ERP_CSRF` Cookie 并发送 `X-CSRF-Token`；浏览器只认发送时的当前 Cookie，Cookie 缺失即 fail closed，页面初始 `/api/session` 快照不得作为回退。无 `document` 时的显式 Token 后备仅用于非浏览器单元测试。
+
+页内 Idempotency-Key 以当前 CSRF Session 标识+method/path+canonical JSON 正文绑定，仅在网络结果未知且正文和会话未变时重用。正文变更、Cookie/Session 变更、logout、撤销、重新登录、pagehide 或认证失效均使旧上下文失效。服务端仍在读取正文和进入业务事务前校验 Origin 及 Cookie/Header 双提交；缺失、错误或旧 Session Token、旧公网 Origin、未知 Origin 与伪造 `Forwarded`/`X-Forwarded-*` 不能放行。错误保持稳定中文代码和 request_id，日志/审计不记录 Token、Cookie 或完整请求正文。
 
 ## 生成前 fail-closed 校验
 

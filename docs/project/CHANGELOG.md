@@ -4,6 +4,17 @@
 
 ## 2026-07-31
 
+### SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05 - `fix: use current csrf token for planning writes` / `fix: enforce released bom read-only ui` / `ops: accept planning csrf and bom immutability fixes`
+
+- CSRF 根因/修复：Planning 页面虽传入 `protectedWrite`，但共享客户端的路由分类没有覆盖 requirement resolution、planning package 和 submit/accept/return 等路由，请求落入普通 POST 分支，因而丢失 `X-CSRF-Token` 和调用方 Idempotency-Key；`credentials: same-origin` 与 Header 名本身正确。现在所有 Planning 写统一使用 `sessionPost`，发送时读当前 `CYD_ERP_CSRF` Cookie，以当前 Token+method/path+canonical 正文绑定页内幂等键，Session/logout/重新登录/页历史变化清空旧上下文。
+- 服务端安全：Planning 仍只允许 POST，在读取正文和进入业务前执行现有 Origin/CSRF/Session/权限校验；缺失、错误、旧 Session Token、旧公网和未知 Origin 继续 fail closed，不信任 `Forwarded`/`X-Forwarded-*`。中文稳定错误码、request_id、日志去敏和审计边界未放宽。
+- BOM 不可变：RELEASED 详情不再显示 Material 搜索/选择、行号/数量/损耗输入或新增/编辑/删除/保存/发布动作，明示“已发布，只读；如需修改请创建新版本”，切换详情会清除旧 DRAFT 输入。新增 line PATCH/DELETE 服务路由，DRAFT 可依权限修改，RELEASED POST/PATCH/DELETE 均稳定返回 `409 BOM_RELEASED_IMMUTABLE`，失败时无 Line/Version/Event/成功 Audit 半记录；既有 DB trigger 保持。
+- 最小披露：BOM 页默认显示“请选择或搜索 BOM”，不自动选中或读取第一条历史明细。`GET /api/boms?q=&limit=` 只返回有界 Header/Product 摘要，支持 BOM 编码、Product 编码和名称；只在用户明确选择后读取 BOM Line，桌面与 390px 通过。
+- 隔离验证：当前源码专项/适用回归、TASK09 14 项、六组 typecheck、218-table Schema consistency、lint `0 error / 10 warnings`、alpha.36 buildcheck、credentials、`git diff --check` 和 Python 三项通过。alpha.34/0034 兼容源合同 140/140、五组 typecheck、209-table Schema consistency、lint `0 error / 9 warnings`、build、credentials 通过；隔离 PostgreSQL Identity+Project+Planning `16/16`、Master/BOM+Material+operations+Dashboard `19/19`。
+- 隔离浏览器：全新 0034 数据库与合成账号/项目完成 current/缺失/错误/旧 Session CSRF、logout→login、可信公网/回环、旧公网/未知/伪造转发头、保存→生成→提交→退回→修订→重提→接收、幂等重放/异正文/CAS、DRAFT/RELEASED BOM 和默认空选择。结果 package v1 RETURNED/v2 ACCEPTED，共享受保护写 18、Planning 写 11、Cookie/Header 匹配 18；全部仅在隔离库，库已删除。
+- 备份/部署：pre-deploy custom dump 2,027,218 bytes/0600/root，SHA-256 `b30fa30408da026bd4114a52011e56485956fb72529e6e3467dfa5e4d5aa0d44`，3,065 list 行/213 TABLE DATA，独立单事务 0034 恢复核对通过。兼容 patch SHA-256 `b842ae9cbbb74b7b5a383b6d062fc500746361a0b53a46f551085d25e1`，只替换 Web `sha256:cb6a5c1fae896... → sha256:7e0a3040acd172...`；PostgreSQL/Worker/Caddy 未重建，34/head 0034、新公网 Origin 和四卷保持，0035/0036/TASK09/完整 alpha.36 未进入镜像。
+- 主库/清理：engineering 只读 Chromium 仅发出 login/logout POST；首次 BOM Line 请求 0，明确选择的 UI 动作只加载该明细 1 次，脚本另以只读 GET 核对精确四行；RELEASED 可变控件 0，A0/V1 可识别，logout 后 back/forward/refresh 匿名。`PRJ-00000001` ACCEPTED/10、Product 7/A0 RELEASED、BOM 7/V1 RELEASED 及四行 533—536/1 PCS/0 不变，Planning `0/0/0/0`，三条旧 CSRF 失败保持；只新增 1 LOGIN/1 LOGOUT，有效任务 Session 0。测试/恢复库、临时容器、浏览器、Playwright 镜像、worktree/candidate tag 已清理，备份、当前镜像和精确回退 tag 保留，未 prune/push/PR。
+
 ### SELFHOST-OPS-UAT-BOM-SELECTOR-FIX-04 - `fix: make bom material selection code-first` / `ops: accept bom selector fix`
 
 - 根因/Selector：旧兼容页从全量 `/api/items` 读取当前字段，却以旧 `internal_item_code` 作为 option value/写入回退，没有搜索且依赖长下拉。新增有界 `/api/bom-material-candidates`，只返回 ACTIVE、正式编码非空、enabled 主单位可解析的 `material_id/internal_code/name/unit_id/unit/status/version`；精确编码单一命中，否则支持编码前缀和名称。

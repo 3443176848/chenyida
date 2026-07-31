@@ -2,7 +2,10 @@
 
 ## 状态
 
-- 状态：`DOING`
+- 状态：`DONE`
+- 完成日期：2026-07-31（Asia/Shanghai）
+- 最终结论：`PLANNING CSRF AND RELEASED BOM IMMUTABILITY FIXED — UAT HANDOFF NOT CREATED`
+- 完成报告：`docs/tasks/SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05-COMPLETION.md`
 - 开始日期：2026-07-31（Asia/Shanghai）
 - 执行面：源码 `0.1.0-alpha.36` / `0035`；运行面 `0.1.0-alpha.34` / `0034`
 - 可信起点：`main@3cb5c38bcfc9502bfb41cdd5d1aeec5f869722e8`，Parent `b66e742abe866aa7e1644c09c4fc28efb5e373e4`，`origin/main...HEAD = behind 0 / ahead 103`，工作区 clean。
