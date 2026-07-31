@@ -4,6 +4,15 @@
 
 ## 2026-07-31
 
+### SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06 - `docs: diagnose planning unit resolution schema gap`
+
+- 严格门禁：从 clean `main`/`525ad2907287d736ecd40d3df24b77c6c5be8ff4`、behind 0/ahead 106 起步；源码 alpha.36/0035，常驻 alpha.34/0034，Web 镜像与唯一公网 Origin 精确符合任务要求。无未知执行流或重型容器，四服务 restart 0/OOM false。
+- 根因：当前 Requirement Item 为 `unit_id=NULL/unit_pending=true`；0015 的数据库触发器禁止改写已提交需求。0016/0034 的 Product/BOM Resolution 不含 Unit/版本/CAS，“保存解析”只能保存 Product/BOM；快照 INNER JOIN `project_requirement_items.unit_id` 和 enabled Unit 后排除该行，再统一抛出误导性的 `REQUIREMENT_ITEMS_UNRESOLVED`。
+- 分支 B：确认没有 alpha.34/0034 合规热修位置。禁止写回需求、从 BOM/名称/产品类型推断 PCS、用 JSON/备注旁路或放宽完整性门禁；未修改代码、0035、Schema、migration、测试断言或部署配置。
+- 数据方案：proposed D-086 定义 0036 追加式 Unit Resolution 版本事实、独立 CAS Head、复合归属 FK、enabled Unit 双阶段校验和 Package Item `unit_resolution_id` provenance；Product/BOM Resolution 保留稳定 ID。0034→0035→0036 必须另行授权、备份、隔离升级与验收。
+- UAT 保护：只读确认 Project ACCEPTED/10、Product/BOM 7/7 RELEASED、BOM 四行 533—536 各 1 PCS；Product/BOM Resolution/Package/Item/Event `1/0/0/0`，待接收 0。三条指定 failed/`REQUIREMENT_ITEMS_UNRESOLVED` 记录保持。综合指纹前后均为 `b239c62091cf51de8fa5b3ff6fb6521a`；本轮没有 engineering/planning 登录或业务写。
+- 测试/部署：Branch B 没有运行 Planning 功能或隔离 PostgreSQL 写测试，未伪造用户列出的验收项；Python 文档基线三项通过。Node unit/UI 因当前镜像看不到沙箱只读源码挂载而在发现测试前退出，断言 0，临时容器已自动删除。未 build、backup/restore、deploy、restart 或创建 Package；最终 available memory 约 2.3 GiB、Swap 222 MiB、根盘 28 GiB、Load `0.09/0.11/0.09`，四服务 restart 0/OOM false。
+
 ### SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05 - `fix: use current csrf token for planning writes` / `fix: enforce released bom read-only ui` / `ops: accept planning csrf and bom immutability fixes`
 
 - CSRF 根因/修复：Planning 页面虽传入 `protectedWrite`，但共享客户端的路由分类没有覆盖 requirement resolution、planning package 和 submit/accept/return 等路由，请求落入普通 POST 分支，因而丢失 `X-CSRF-Token` 和调用方 Idempotency-Key；`credentials: same-origin` 与 Header 名本身正确。现在所有 Planning 写统一使用 `sessionPost`，发送时读当前 `CYD_ERP_CSRF` Cookie，以当前 Token+method/path+canonical 正文绑定页内幂等键，Session/logout/重新登录/页历史变化清空旧上下文。

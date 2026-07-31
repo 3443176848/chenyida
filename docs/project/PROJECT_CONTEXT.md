@@ -49,7 +49,8 @@
 - Planning CSRF 共享客户端：此前 Planning 页面虽传入 `protectedWrite`，但共享路由分类未匹配 requirement resolution、planning package 及 submit/accept/return 等端点，请求落入普通 POST 分支并丢失 `X-CSRF-Token` 和调用方幂等键。现由共享 `sessionPost` 在发送时读当前 `CYD_ERP_CSRF` Cookie，以当前 Token+method/path+canonical 正文绑定页内幂等键；Session/页历史/认证变化清空上下文。服务端 Origin/CSRF/Session/权限/审计未放宽，错误仍显示稳定中文代码和 request_id。
 - RELEASED BOM 与最小披露：BOM 管理页首次进入固定为“请选择或搜索 BOM”，只有明确搜索并选择后才请求 `/api/bom-lines`；有界搜索支持 BOM 编码、产品编码和产品名称。RELEASED 详情只显示已发布事实和“已发布，只读；如需修改请创建新版本”，不渲染 Material/数量/损耗/行号编辑器及新增/删除/保存/发布动作。服务端对 RELEASED 行 POST/PATCH/DELETE 统一返回 `409 BOM_RELEASED_IMMUTABLE`，与既有 DB trigger 共同 fail closed。
 - FIX-05 主库只读证据：真实 Chromium 路由层阻断除 login/logout 外全部 POST；首次 BOM 明细请求 0，选择 `BOM-UAT-BB-PROD-042576-V1` 的 UI 动作只加载该明细 1 次，验收脚本另用一次只读 GET 核对精确四行；RELEASED 可变控件 0，四行为 533—536/1 PCS/0，390px 无溢出。engineering Planning 页只读识别 A0/V1，未登录 planning、未点击保存/生成/提交；退出后 back/forward/refresh 均为匿名。
-- 当前数据库只读基线：34/head 0034，Material/Product/Product Version/BOM Header/BOM Version/Line `536/7/7/7/7/320`，536 个 Material 全部 ACTIVE。`PRJ-00000001` 为 ACCEPTED/10，Product 7/A0 与 BOM 7/V1 均 RELEASED，四行 533—536 保持。FIX-05 只新增一次 engineering LOGIN/LOGOUT 成功审计，Session 已撤销；Planning resolution/package/item/event 仍为 `0/0/0/0`，三条历史 `CSRF_INVALID` 失败证据未删除或改写，0035 count 0。
+- 当前数据库只读基线：34/head 0034，Material/Product/Product Version/BOM Header/BOM Version/Line `536/7/7/7/7/320`，536 个 Material 全部 ACTIVE。`PRJ-00000001` 为 ACCEPTED/10；当前 Requirement Item 稳定 ID 1、数量 10、`unit_id=NULL/unit_pending=true`。Product 7/A0 与 BOM 7/V1 均 RELEASED，四行 533—536 保持；Product/BOM Resolution 已为 1，但 Package/Item/Handoff Event 为 `0/0/0`、Planning 待接收为 0。三条指定请求保持 failed/`REQUIREMENT_ITEMS_UNRESOLVED`，历史 CSRF 证据也未删除或改写；0035 count 0。
+- Planning Unit Resolution 缺口：0016/0034 的 `project_requirement_resolutions` 只保存 Product/Product Version/BOM Header/BOM Version，不保存单位或单位版本；源 Requirement Item 又由 0015 DB trigger 保持不可变。快照查询用 `project_requirement_items.unit_id` INNER JOIN enabled Unit，因 NULL 排除当前行后统一误报 `REQUIREMENT_ITEMS_UNRESOLVED`。不得写回源需求、从 BOM 猜 PCS 或制作 alpha.34 隐藏热修；proposed D-086/后续 0036 才能提供正式边界。
 - 兼容供应商导入：LANDING-TASK04 功能提交 `cda8c7e` 已在单独授权下部署到当前 18888 Web；`public/erp/` 的 CSV-only/退役入口已改为直达 `/materials/imports/new`，入口 URL 已版本化。公网 HTML/JS SHA 与源码一致；MATERIAL-REVIEW-BLOCKERS-03-RETRY 已把 legacy 壳改为动态只读路由，使响应只保留 `private, no-store` 和 `Pragma: no-cache`，不再并列 `public, max-age=3600`。未做 Excel→PG E2E。
 - BOM 物料治理：PHASE6-TASK01 在既有 Import/Mapping/Normalization/Review 后新增确定性规格治理层，用品类+关键规格+性能等级的完整身份进行严格归组，保留原始行/BOM/料号透明度，替代项只是候选。受控决策可精确绑定 ACTIVE 或调用既有 Workflow 建 DRAFT；不自动编码、审批或建正式替代关系。
 
@@ -181,11 +182,13 @@
 44. SELFHOST-OPS-PUBLIC-IP-CUTOVER-07 采用 D-085：公网 IP 变化时，Caddy `ERP_DOMAIN` 与 Web 单值 `ERP_PUBLIC_ORIGIN` 必须同一受控任务切换，不能临时双允许旧/新公网 Origin。当前唯一入口为 `https://43.135.148.43.nip.io:18888`；旧主机名从当前 Caddy 退役，root-only env 副本是回退权威。
 45. SELFHOST-OPS-UAT-BOM-SELECTOR-FIX-04 不新增决策或状态机：`products/product_versions/bom_headers/bom_versions/bom_lines` 与 Planning 表继续是唯一权威，全部引用稳定 ID。Product Version 与 BOM Version 分轴；BOM 属于 Product Version，Project 只在 Planning Handoff 关联。正式编码/名称/单位组合只用于展示，保存和发布均由服务端事务重验 ACTIVE 正式 Material 与主单位。
 46. SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05 不改变状态机或服务端安全决策：Planning 写统一由共享客户端发送当前 Cookie/Header CSRF，RELEASED BOM 前端只读与服务端/DB 不可变必须同时成立，BOM 首页默认不加载历史明细。
+47. SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06 采用分支 B：0034 没有合规 Unit Resolution 字段/版本/CAS，且已提交 Requirement Item 不可原地修改。当前 Product/BOM Resolution 保留；后续必须以 0036 新增追加式 Unit Resolution 版本事实、独立 CAS Head，并让新 Package Item 引用稳定 `unit_resolution_id`。本决定仍是 proposed，未实现、迁移或部署。
 
 ## 当前风险
 
 - V9 主数据表缺少逐行显式单位，且不包含产品/版本/BOM 行号/数量/位号/单位结构；197 行只能保留在 review。未经补充明确字段不得把 PCS、使用次数或原始描述猜成主库单位/BOM 数量，也不得先清空现有 532 Material/316 BOM Line。
 - 当前受保护 Product Version 7/A0 与 BOM Version 7/V1 均已 RELEASED，四行 533—536 是不可变事实。不得通过前端隐藏或临时调用绕过服务端/DB 不可变；修改必须在后续独立授权下创建新版本。Planning Package 当前为 0，本任务不自动开始交接试用。
+- `PRJ-00000001` 的 Requirement Item 仍为 `unit_id=NULL/unit_pending=true`，而现有 Product/BOM Resolution 不含 Unit。engineering 不能在当前 Schema 合规保存单位；任何写回源需求、BOM 单位推断、JSON/备注旁路或取消快照门禁都会破坏数据边界。必须先独立实施并验收 0036，当前不具备重新开始 engineering 黑盒交接的条件。
 - BOM-SELECTOR-FIX-04 曾因本地命令分隔符错误在授权工具输出中显示 root-only engineering 账号材料；未进入仓库、文件、服务日志或外部系统，账号/密码未改。FIX-05 以不输出凭据值的方式只完成一次 login/logout，Session 已撤销；任何凭据轮换仍须单独授权。
 
 - Material Draft/Review/Active、Import Mapping/版本/复用、行级 Normalizer 及人工复核/ACTIVE绑定/Draft Commit 已完成 PostgreSQL 非生产移植；后续真实数据演练和迁移不得重新接入 D1 运行依赖。
@@ -226,7 +229,7 @@
 
 ## 当前路线
 
-`SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05` 已完成。当前入口保持 `https://43.135.148.43.nip.io:18888`；Web 是 alpha.34/0034 兼容 hotfix `sha256:7e0a3040acd17277db49fc1b7541c072c566e95e12b70bce9170dd39165a6bde`，Caddy、PostgreSQL、Worker 和 0034 不变，13 列标准整理、0035 和完整 alpha.36 未部署。Planning 写客户端、RELEASED BOM 不可变和 BOM 默认最小披露已通过隔离写验收；主库 Product/BOM/四行不变，Planning Package 仍为 0。现在停止；技术上可在后续独立授权下重新开始 engineering Planning Handoff 试用，不得由本任务自动继续。
+`SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06` 已按分支 B 停止实现。当前入口保持 `https://43.135.148.43.nip.io:18888`；Web 是 alpha.34/0034 兼容 hotfix `sha256:7e0a3040acd17277db49fc1b7541c072c566e95e12b70bce9170dd39165a6bde`，Caddy、PostgreSQL、Worker 和 0034 不变，0035/0036 与完整 alpha.36 未部署。主库 Requirement Item 仍 pending Unit、Product/BOM Resolution 为 1、Package 为 0。下一步只能是单独确认 D-086 并授权 0036；在完成迁移、隔离测试和部署前，不得恢复 engineering 黑盒交接或登录 planning。
 
 ## 恢复上下文检查清单
 

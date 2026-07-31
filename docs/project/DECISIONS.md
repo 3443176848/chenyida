@@ -952,6 +952,18 @@
 - 部署边界：只复用原镜像串行重建 Web/Caddy并复用 Caddy 持久卷签发新证书；不 build、不重建 PostgreSQL/Worker、不修改 Schema/Migration/业务数据/权限/凭据/防火墙。原 root-only env 副本是回退权威。
 - 验收边界：DNS、公开可信证书/SAN、外部 18888 登录页、HTTPS 200、HTTP 308、匿名 401、安全头、旧 SNI 失败、资源/OOM/restart、卷和切换后数据库零写增量均须通过；公司自有域名仍是后续推荐方向。
 
+## D-086 Planning 需求单位解析必须使用独立版本事实和 CAS Head
+
+- 日期：2026-07-31
+- 状态：`PROPOSED / SCHEMA CHANGE REQUIRED / NOT IMPLEMENTED`
+- 提出依据：项目负责人要求修复 Planning Handoff “单位待确认却无处确认”，并明确禁止改写已提交销售需求、静默推断 PCS 或放宽快照门禁；最终 Schema 设计与实施仍需另行确认和授权。
+- 已确认缺口：0015 的 Requirement Item 以 `unit_id=NULL/unit_pending=true` 合法保留未知单位，并由不可变 trigger 保护。0016/0034 的 `project_requirement_resolutions` 只保存 Product/BOM 稳定 ID，没有 Unit、单位版本或独立 CAS；快照又从源 Requirement Item INNER JOIN enabled Unit，因而无法合规解析当前行。
+- 建议模型：0036 新增 append-only `project_requirement_unit_resolution_versions`，保存 project/requirement version/item/unit/supersedes/actor/request/digest，并以复合 FK 证明同一需求链；新增 `project_requirement_unit_resolution_heads`，按 Requirement Item 保存 current resolution 和单调 version，以独立 expected-version CAS 保证并发单胜。版本事实只插入、不更新/删除。
+- 快照来源：新 Package Item 的 `unit_id` 取当前 Unit Resolution，不取源需求或 BOM；建议扩展 nullable `unit_resolution_id` provenance，并对 0036 后新包由服务强制非 NULL。既有包不得猜测回填，package/source digest 必须覆盖 Unit Resolution。
+- 有效性与错误：Unit 保存和生成时都锁定校验存在且 enabled；空/未知/停用分别使用 `REQUIREMENT_UNIT_UNRESOLVED`、`REQUIREMENT_UNIT_INVALID`、`REQUIREMENT_UNIT_DISABLED`，Product/BOM 缺失使用 `REQUIREMENT_PRODUCT_BOM_UNRESOLVED`，并指明具体 Requirement Item/line。BOM 组件 Unit 不能推断需求数量 Unit。
+- 安全边界：只有 engineering/project owner 的 `planning.prepare` 可写；严格 Origin、Cookie/Header CSRF、Idempotency-Key+canonical body、独立 CAS、Unit/Product/BOM/Audit/幂等同事务和故障零半记录。planning、sales、无关角色 403；Package 非 RETURNED 后锁定依据，退回修订产生新 Resolution/Package 版本。
+- 迁移边界：不修改 0035；未来只可新增 0036，并按 0034→0035→0036 在真实快照的隔离副本验证空库/已有库/重放/回滚/约束/摘要。不得自动把现有 pending 行回填 PCS，不得制作 alpha.34 兼容热修；当前主 UAT Package 保持 0。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

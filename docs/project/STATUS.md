@@ -2,6 +2,25 @@
 
 最后更新时间：2026-07-31（Asia/Shanghai）
 
+## SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06 需求单位解析 Schema 缺口诊断
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | SCHEMA CHANGE REQUIRED — UAT PACKAGE UNCHANGED | 分支 B；只完成根因、数据边界与 0036 方案，不实现、不部署、不继续试用 |
+| 起点门禁 | PASS | clean `main`/`525ad2907287d736ecd40d3df24b77c6c5be8ff4`，behind 0/ahead 106；alpha.36/0035 源码、alpha.34/0034 常驻面、Web `sha256:7e0a3040acd1...`、新公网 Origin 全部吻合；无其他执行流/重型容器 |
+| 根因 | CONFIRMED | Requirement Item 是 `unit_id=NULL/unit_pending=true`；Product/BOM Resolution 不含 Unit；快照 INNER JOIN 排除 NULL 后统一误报。源 Requirement Item 有 DB 不可变 trigger，不能写回 |
+| Product/BOM 关系 | PRESERVED | Resolution ID 1 已稳定引用 Product/Product Version/BOM Header/BOM Version `7/7/7/7`；Unit Resolution 是缺失的独立事实，不能从 BOM 四行 PCS 推断 |
+| Schema | REQUIRED / NOT CREATED | proposed D-086：0036 追加式 Unit Resolution 版本表、独立 CAS Head、复合 FK/唯一/索引、enabled Unit 校验、Package Item provenance；未修改 0035、未创建 0036 |
+| 安全/事务 | DESIGN REQUIRED | 后续 engineering/`planning.prepare`、严格 Origin/CSRF、幂等正文摘要、独立 CAS、并发单胜、Unit+Product/BOM+Audit 同事务/零半记录；本轮无写端点可验收，不宣称通过 |
+| 错误/UI | DESIGN REQUIRED | 后续拆分 Unit 与 Product/BOM 缺失、无效/停用 Unit 稳定码；pending 行显示 enabled Unit 选择器和逐行缺失项，未完整时禁用生成，刷新持久，390px 无横向溢出 |
+| 自动测试 | DOCS BASELINE ONLY | Planning 功能测试 0、隔离 PostgreSQL 写测试 0；Python self-test/smoke/隔离 go-live 三项通过。Node unit/UI 因镜像看不到沙箱源码挂载而在测试发现前退出，断言 0、容器已删；后续 0036 必测矩阵完整保留，不伪造通过 |
+| UAT 保护 | UNCHANGED | 当前 Requirement Item 仍 pending；Project ACCEPTED/10、Product 7/A0 RELEASED、BOM 7/V1 RELEASED、四行 533—536/1 PCS/0 保持；Resolution/Package/Item/Event `1/0/0/0`，待接收 0，三条指定失败记录保持 |
+| UAT 指纹 | UNCHANGED | 同一只读查询的前后综合指纹均为 `b239c62091cf51de8fa5b3ff6fb6521a` |
+| 版本/部署 | UNCHANGED | 源码 alpha.36/0035；运行 alpha.34/0034；Web 镜像、Origin、PostgreSQL/Worker/Caddy 保持。无 build/Migration/backup/restore/deploy/restart |
+| 资源/清理 | PASS | 起点/终态 available memory 均约 2.3 GiB，Swap 约 `223→222 MiB`，根盘 28 GiB，终态 Load `0.09/0.11/0.09`；四服务 restart 0/OOM false。临时 SQLite/容器均删除，四个受保护 Volume 保持 |
+| Git/边界 | DOCS ONLY | 只允许 `docs: diagnose planning unit resolution schema gap` 独立提交；无功能/ops 验收提交，无 reset/stash/restore/checkout/rebase/amend，不访问 `shujvbiao/`，不输出凭据 |
+| engineering 试用 | BLOCKED | 未选择/提交 PCS，未生成 Package，未登录 planning；0036 完成独立迁移、测试、恢复和部署前不能重新开始黑盒交接 |
+
 ## SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05 Planning CSRF 与 RELEASED BOM 不可变修复
 
 | 验证项 | 结果 | 说明 |

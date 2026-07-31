@@ -39,24 +39,25 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 源码为 `0.1.0-alpha.36` / PostgreSQL migration head `0035_bom_material_governance.sql`；当前常驻运行环境仍为 `0.1.0-alpha.34` / `0034_supplier_receipt_lot_iqc.sql`。0035 未应用、alpha.36 未部署；新 ERP 已有受控公网 HTTPS 入口，不因入口开放而自动视为正式投产完成 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05` 两个独立功能提交为 `2b923da44d94567e5e23fd0f428d9d3b5e7f506e` 与 `fbaf34a001a976dfcb307da4bcf8e3730d5cb1ca`，严格继承指定起点 `3cb5c38bcfc9502bfb41cdd5d1aeec5f869722e8`；Planning 当前 CSRF 双提交客户端、RELEASED BOM 前后端不可变与 BOM 默认空选择已实现，既有历史未改写 |
-| 当前根仓库运维基线 | 本任务以独立 `ops: accept planning csrf and bom immutability fixes` 文档/验收提交收口；alpha.34/0034 兼容 Web 已仅替换 Web，部署前 Web 有精确回退 tag。公网 Origin、CSRF/logout、operations 审核、审核详情、Dashboard/no-store、BOM code-first、数据库凭据轮换和资源保护基线保持 |
-| Git 同步与工作区 | 本任务从 clean `main`/`3cb5c38`、behind 0/ahead 103 起步；功能提交 `2b923da`、`fbaf34a` 后 ahead 105，验收提交后应为 ahead 106。未 push/PR/amend/rebase/reset/stash/restore；未读取、修改或提交 `shujvbiao/` 及工作簿，env、证书私钥、凭据、Cookie、Token、备份和业务数据未进入 Git |
+| 当前根仓库功能基线提交 | 功能基线仍是 `SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05` 的 `2b923da44d94567e5e23fd0f428d9d3b5e7f506e` 与 `fbaf34a001a976dfcb307da4bcf8e3730d5cb1ca`；本轮 `SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06` 判定需要 Schema，只有独立 `docs: diagnose planning unit resolution schema gap` 诊断提交，不产生功能提交或伪验收提交 |
+| 当前根仓库运维基线 | FIX-05 已以独立 `ops: accept planning csrf and bom immutability fixes` 文档/验收提交收口；alpha.34/0034 兼容 Web 已仅替换 Web，部署前 Web 有精确回退 tag。本轮分支 B 未执行任何运维写操作，公网 Origin、CSRF/logout、operations 审核、审核详情、Dashboard/no-store、BOM code-first、数据库凭据轮换和资源保护基线保持 |
+| Git 同步与工作区 | UNIT-RESOLUTION-FIX-06 从 clean `main`/`525ad2907287d736ecd40d3df24b77c6c5be8ff4`、behind 0/ahead 106 起步，只允许独立诊断文档提交。未 push/PR/amend/rebase/reset/stash/restore；未读取、修改或提交 `shujvbiao/` 及工作簿，env、证书私钥、凭据、Cookie、Token、备份和业务数据未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码 migration 为 `0001`—`0035`，并行常驻 PostgreSQL 严格保持 34 个 migration、head `0034_supplier_receipt_lot_iqc.sql`；Material/Product/Product Version/BOM Header/BOM Version/Line 为 `536/7/7/7/7/320`。本任务未新增 Schema/0036、未运行 0035；只新增一次 engineering LOGIN/LOGOUT 成功审计，对应 Session 已撤销，业务写为 0。`PRJ-00000001` ACCEPTED/10、Product 7/A0 RELEASED、BOM 7/V1 RELEASED、四行 533—536 不变，Planning resolution/package/item/event 仍为 `0/0/0/0`，三条旧 `CSRF_INVALID` 失败证据保持 |
+| 当前数据库 | 源码 migration 为 `0001`—`0035`，并行常驻 PostgreSQL 严格保持 34 个 migration、head `0034_supplier_receipt_lot_iqc.sql`；Material/Product/Product Version/BOM Header/BOM Version/Line 为 `536/7/7/7/7/320`。`PRJ-00000001` ACCEPTED/10 的当前 Requirement Item 为 `unit_id=NULL/unit_pending=true`；Product/BOM Resolution 已为 1 且稳定引用 7/7/7/7，Package/Item/Event 仍为 `0/0/0`。三条指定失败记录保持 failed/`REQUIREMENT_ITEMS_UNRESOLVED`。本轮只读，未新增 Schema/0036、未运行 0035、未改业务数据或审计 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经 Caddy 可信 TLS 到 Web；单值 `ERP_PUBLIC_ORIGIN` 与入口精确一致。Web 为 alpha.34/0034 兼容 hotfix `sha256:7e0a3040acd17277db49fc1b7541c072c566e95e12b70bce9170dd39165a6bde`，部署前 `sha256:cb6a5c1fae89608e07e72d458b4466e0b571e36374b16f3b592248280f8dc6e1` 已保留精确回退 tag；仅替换 Web，PostgreSQL/Worker/Caddy ID 未变。PostgreSQL/Web healthy，Worker/Caddy running，四服务 restart 0/OOM false |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.36 源码在供应商导入中增加 `CYD-MATERIAL-13C-v1` 服务端标准整理预览和受保护 CSV，尚未进入常驻运行面 |
-| 当前阶段 | `SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05` 已完成 Planning 当前 Session CSRF 共享客户端、RELEASED BOM 前后端不可变、默认最小披露、隔离 0034 完整写旅程、兼容部署与主库只读验收；源码/运行面仍分别为 alpha.36/0035 与 alpha.34/0034 |
-| 当前任务 | `PLANNING CSRF AND RELEASED BOM IMMUTABILITY FIXED — UAT HANDOFF NOT CREATED`；隔离写旅程通过，主库 UAT Planning Package 仍为 0 |
-| 下一任务 | 停止。技术上已可在项目负责人重新授权后开始 engineering Planning Handoff 试用；本任务未创建或推进交接包，不自动开始试用。任何 0035、alpha.36、生产迁移或其他业务动作仍须独立授权 |
+| 当前阶段 | `SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06` 已完成分支 B 根因与数据边界诊断：0034 没有工程 Unit Resolution 持久化边界，源 Requirement Item 又不可变；源码/运行面仍分别为 alpha.36/0035 与 alpha.34/0034 |
+| 当前任务 | `SCHEMA CHANGE REQUIRED — UAT PACKAGE UNCHANGED`；只形成 0036 版本化 Unit Resolution/独立 CAS/快照 provenance 方案，未实现、测试写旅程或部署，主库 UAT Planning Package 仍为 0 |
+| 下一任务 | 停止。必须由项目负责人另行确认 D-086 方案并授权 0036 实现、隔离升级/测试、备份恢复和部署；此前不得重新开始 engineering 黑盒交接，不得登录 planning 或创建 Package |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
+- SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06 只完成 Schema 缺口诊断并以 BLOCKED 收口：当前需求行 `unit_id=NULL/unit_pending=true`，0034 Product/BOM Resolution 不保存单位，快照 INNER JOIN 排除该行后误报统一错误；源需求不可变，禁止写回或从 BOM 猜 PCS。proposed D-086 定义 0036 Unit Resolution 版本事实、独立 CAS Head 和 Package provenance；未改代码/Migration/主库/部署，Package 保持 0
 - SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05 修复 Planning 路由未被共享客户端识别而丢失 `X-CSRF-Token`/调用方幂等键的根因；发送时读当前 CSRF Cookie，页内键绑定当前 Token+正文并在会话变更时清空。RELEASED BOM 只显示四行事实，POST/PATCH/DELETE 皆由服务端以 `BOM_RELEASED_IMMUTABLE` 拒绝；BOM 首页空选择且搜索有界。alpha.34/0034 Web `sha256:7e0a3040acd1...` 已部署，主库 UAT Handoff 未创建
 - SELFHOST-OPS-UAT-BOM-SELECTOR-FIX-04 将兼容 BOM 页从旧字段/全量长下拉改为服务端有界 code-first 候选，显示 `正式编码 · 名称 · 单位` 并只提交稳定 material_id/unit_id；保存和发布事务重新校验 ACTIVE、正式编码、enabled 主单位与重复物料。Product Version、BOM Version、状态及“BOM 属于产品版本；项目在计划交接关联”已明确，复用真实发布服务。该 FIX-04 验收时部署 alpha.34/0034 Web `sha256:cb6a5c1...`，四码浏览器各唯一命中，且当时 UAT BOM/Planning 均为 0
 - SELFHOST-OPS-PUBLIC-IP-CUTOVER-07 根据项目负责人明确“切换”授权，把 Caddy `ERP_DOMAIN` 与 Web 单值 `ERP_PUBLIC_ORIGIN` 从旧 IP 名称同步更新为 `43.135.148.43.nip.io`；原镜像串行重建 Web/Caddy，新 Let's Encrypt 证书、外部 18888、HTTP 308、HTTPS 200、匿名 401、安全头和旧 SNI 退役通过。PostgreSQL/Worker、0034、核心聚合和四卷未由本任务改变
