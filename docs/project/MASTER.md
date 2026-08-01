@@ -49,9 +49,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0036`，36/head `0036_project_requirement_unit_resolution.sql`。Package ID 1/v1/SUBMITTED、总数 1、v2/RETURN/ACCEPT 0 仍是 FIX-08 的最后已验证业务基线；CREDENTIAL-RECONCILIATION-10 没有读取数据库、Package 或发起任何 API 请求，不能将该历史基线冒充本轮黑盒结果 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已由 alpha.37 `sha256:6667bd2ca64e7255befe4398b4e73ec1fe554418d76062d2d378de8edaa7143e` 替换为同版本 `sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25`，旧 Web 有精确回退 tag；Worker 镜像仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。PostgreSQL/Web healthy，Worker/Caddy running，四服务 restart 0/OOM false |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.37 另提供版本化 Requirement Unit Resolution 与 Planning 精确单位来源。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
-| 当前阶段 | `SELFHOST-OPS-UAT-CREDENTIAL-RECONCILIATION-10` 为 BLOCKED/NO IDENTITY CHANGE；`SELFHOST-OPS-UAT-ROLE-CREDENTIAL-ROTATION-09` 的 PARTIAL 状态和 `SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 的 BLOCKED 状态均未解除 |
-| 当前任务 | `BLOCKED — NO FURTHER IDENTITY CHANGE`。受控结构预检没有取得继续执行所需的 PASS；管理员改密、manager 重置、十账号验证、审计核对和正式文件提升均未运行，身份/API/业务请求均为 0 |
-| 下一任务 | 停止所有 UAT/Planning 登录并保留既有恢复候选。只有项目负责人另立并明确授权安全的格式核验与身份收口方案后，才能处置 Admin/manager Session 风险；十账号退出验证与正式文件提升完成前不得开始 planning-only 核验 |
+| 当前阶段 | `SELFHOST-OPS-OFFLINE-IDENTITY-RECOVERY-11` 正在按项目负责人明确授权的方案 B 执行；前置 TASK09/TASK10 的 Session 与 Canonical 文件风险仍保持，只有本任务全部门禁、单事务恢复、文件提升和验证通过后才可解除 |
+| 当前任务 | `SELFHOST-OPS-OFFLINE-IDENTITY-RECOVERY-11`：为 admin 与固定十个 UAT 账号建立不接 Web 的受守卫离线恢复 CLI，完成隔离演练后停写执行原子重置、目标 Session 撤销、恢复审计与 Canonical 文件提升；不触碰业务、Migration、版本、镜像或其他用户 |
+| 下一任务 | 本任务完成后立即停止，不自动开始 Planning 核验、退回或其他业务任务；若任一正式提升失败，保留 Stage 并以 PARTIAL 收口 |
 
 ## 当前完成模块
 

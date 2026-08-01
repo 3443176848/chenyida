@@ -968,6 +968,17 @@
 - 实施结果：`0.1.0-alpha.37` 以唯一新增 `0036_project_requirement_unit_resolution.sql` 落实上述模型；功能提交为 `91c0fd29d534246c55ddd669e894cdde9b774e52`。空库 0001→0036、0035→0036、真实 0034 快照的 0035→0036、重放、失败回滚、约束、隔离完整浏览器旅程和恢复门禁通过后，并行非生产 UAT 已由 0034 串行升级到 0035/0036并部署 alpha.37 Web。
 - 数据保护结果：主 UAT 的 `unit_id=NULL/unit_pending=true` 未回填；Unit Resolution Version/Head 与 Planning Package/Item/Event 都保持 0，Product/BOM Resolution 仍精确指向 7/7/7/7，受保护业务指纹 `fb71309bf73dce907f0bcb2e294d1b31` 升级前后相同。Engineering 只读验收未选择或保存 PCS、未生成 Package，未登录 planning；后续业务黑盒试用必须另立任务。
 
+## D-087 并行 UAT 身份恢复采用停写离线单事务与 Canonical 原子提升
+
+- 日期：2026-08-01
+- 状态：`ACCEPTED / IMPLEMENTING FOR PARALLEL NON-PRODUCTION UAT`
+- 确认人：项目负责人（明确选择并授权方案 B）
+- 背景：TASK09 已重置十个 UAT 账号但未完成 Session 退出和正式文件提升，TASK10 又在旧凭据结构预检阶段 fail closed；管理员与首个 UAT 的 Session 风险、失效正式 UAT 文件和唯一旧候选不能通过继续网页尝试安全收口。
+- 决定：建立不接 Web 路由的 root-only 离线恢复 CLI。只有 CLI environment 为 `parallel-uat`、运行配置 `ERP_DEPLOYMENT_CLASS=uat`、数据库身份与 0036 精确吻合、Web/Worker 已停止写入、显式确认和唯一 run-id 全部通过时，才可在一个 PostgreSQL 事务内锁定并核验 admin 与固定十个 UAT 账号、复用现有 Password 模块生成 hash、更新密码/version/must-change、撤销目标 Session、写 11 条 `OFFLINE_IDENTITY_RECOVERY` 审计并持久化 run-id 证据。
+- 文件边界：密码由密码学安全随机源产生并先写入两个 root:root 0600 Stage；文件/目录 fsync、标准 JSON 与固定结构验证必须在数据库事务前完成。事务提交后 Stage 是唯一有效恢复材料；只有两份 Canonical 正式文件均原子提升并 fsync 成功后才删除旧 UAT 候选。提升失败不得恢复旧密码，必须保留 Stage 并以 PARTIAL 停止。
+- 验证边界：主库写入前必须完成单元、隔离 PostgreSQL、0036 主库备份隔离恢复和隔离 Web/Chromium 演练。正式浏览器只验证 admin 登录/退出和十个 UAT 的强制改密门禁/退出，不执行改密、不进入业务页面；最终撤销本任务遗留的目标 Session。
+- 数据与授权边界：不读取旧凭据正文或旧密码 hash，不输出密码/hash/Token/Cookie/Session digest/连接串；不修改用户名、角色、active、其他用户/Session、业务数据、Planning Package、Schema/Migration、版本、镜像、公开部署或生产环境。本决定不授权 Planning 核验或退回流程。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
