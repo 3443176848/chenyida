@@ -4,6 +4,17 @@
 
 ## 2026-08-01
 
+### SELFHOST-OPS-UAT-CREDENTIAL-RECONCILIATION-10 - `ops: record blocked credential reconciliation`
+
+- Git/范围：从 clean `main@a4eff293668e24f4f780eb5df840bfc7e510365e`、Parent `615fe3ab4913c1964cfeb7337196f0d3e1a8d787`、behind 0/ahead 112 起步；获权范围仅为管理员本人改密、manager 二次重置、十账号 Identity 验证/退出和候选提升，不包含业务、数据库直改、重启或部署。
+- 严格门禁：Branch/HEAD/Parent/同步、clean worktree、alpha.37、0001—0036、运行库 36/head、指定 Web 摘要、root-only 0600 凭据文件、候选存在、服务健康、无其他浏览器/执行流和资源阈值均通过。
+- Fail closed：单一受控进程在凭据结构预检阶段返回 FAIL，并在建立管理员候选、启动 Chromium 或发送任何 Identity/业务 API 请求前停止。失败输出只含阶段、FAIL 和计数；没有输出或持久化密码、Token、Cookie、CSRF、Session 摘要、密码摘要或凭据正文。该结果不区分文件事实异常和解析器格式覆盖不足，本轮不重跑或扩大诊断。
+- 身份/文件：管理员本人改密、旧/新密码验证、manager 二次重置、十账号验证、退出、审计页面核对和正式提升均未运行；身份变更与本任务 Identity 事件均为 0。管理员/UAT 正式文件及既有 UAT 候选未变化，均保持 `root:root 0600`；本轮隐藏阶段路径最终不存在。上一轮 Admin/manager Session 风险保持开放，没有新增 Session。
+- 业务/服务：没有打开 Identity、强制改密、经营或 Planning 页面，没有 API/Package/业务请求；未读身份表、Session 表或密码摘要。没有 build、Migration、PostgreSQL 测试、Compose 重建、服务重启、部署、prune 或资源删除；alpha.37/0036 和四服务保持 restart 0/OOM false。
+- 资源/清理：起点约 2.2 GiB available/218 MiB Swap/22 GiB/Load `0.19/0.14/0.10`；最终约 2.2 GiB/217 MiB/22 GiB/`0.40/0.23/0.20`，内核 OOM 0。受控容器自动删除且浏览器未启动；控制脚本、临时依赖/cache 和精确 `/run` 目录已删除。遵守保护规则，未删除已拉取镜像、Volume 或备份。
+- 提交门禁：断网只读凭据扫描通过 1,119 个仓库文件，`git diff --check`、Python self-test/smoke 和隔离临时 SQLite go-live 通过；没有连接或写入常驻 PostgreSQL/SQLite。
+- 结论：`BLOCKED — NO FURTHER IDENTITY CHANGE`。需另立并明确授权安全格式核验/身份收口任务；在 Admin/manager 风险、十账号退出与正式文件提升全部完成前，不得开始 planning 核验或退回流程。
+
 ### SELFHOST-OPS-UAT-ROLE-CREDENTIAL-ROTATION-09 - `ops: rotate exposed UAT role credentials`
 
 - Git/范围：从 clean `main@615fe3ab4913c1964cfeb7337196f0d3e1a8d787`、Parent `682e79378660ef7859617655836f02e2112df244`、behind 0/ahead 111 起步；只处理十个指定 UAT 角色账号，不修改业务代码、Migration、部署配置或其他用户，不 push/PR 或改写历史。

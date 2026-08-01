@@ -40,18 +40,18 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.37`；PostgreSQL 已由 0034 串行升级到 36/head `0036_project_requirement_unit_resolution.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 功能提交为 `682e79378660ef7859617655836f02e2112df244`（`fix: expose planning handoff traceability`）；本轮没有修改业务代码、Migration 或部署配置 |
-| 当前根仓库运维基线 | ROLE-CREDENTIAL-ROTATION-09 已通过管理员网页重置十个指定 UAT 账号，角色/启用状态保持且 Identity audit 成功 10/失败 0；首个账号退出/Session 失效未完成，其余九个未验证，正式凭据文件未提升，root-only 0600 恢复候选保留。状态为 PARTIAL，不能开始 planning 核验 |
-| Git 同步与工作区 | 凭据轮换从 clean `main@615fe3ab4913c1964cfeb7337196f0d3e1a8d787`、Parent `682e79378660ef7859617655836f02e2112df244`、behind 0/ahead 111 起步；只允许无秘密运维文档独立提交。未 push/PR/amend/rebase/reset/stash/restore；未读取或修改 `shujvbiao/`，凭据值、Cookie、Token、Session 摘要和业务数据未进入 Git |
+| 当前根仓库运维基线 | CREDENTIAL-RECONCILIATION-10 在单一受控进程的凭据结构预检阶段 fail closed，Chromium 和任何 Identity/业务请求均未启动，身份变更为 0。管理员文件、正式 UAT 文件和既有 root-only 0600 UAT 恢复候选未变化；ROLE-CREDENTIAL-ROTATION-09 遗留的 Admin/manager Session 风险、九账号未验证和正式文件未提升状态全部保持，不能开始 planning 核验 |
+| Git 同步与工作区 | 安全收口从 clean `main@a4eff293668e24f4f780eb5df840bfc7e510365e`、Parent `615fe3ab4913c1964cfeb7337196f0d3e1a8d787`、behind 0/ahead 112 起步；只允许无秘密阻断报告独立提交。未 push/PR/amend/rebase/reset/stash/restore；未读取或修改 `shujvbiao/`，凭据值、Cookie、Token、Session 摘要和业务数据未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0036`，36/head `0036_project_requirement_unit_resolution.sql`。Package ID 1/v1/SUBMITTED、总数 1、v2/RETURN/ACCEPT 0 仍是 FIX-08 的最后已验证业务基线；凭据轮换本轮没有读取 Package 或发起任何业务请求，不能将该历史基线冒充本轮黑盒结果 |
+| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0036`，36/head `0036_project_requirement_unit_resolution.sql`。Package ID 1/v1/SUBMITTED、总数 1、v2/RETURN/ACCEPT 0 仍是 FIX-08 的最后已验证业务基线；CREDENTIAL-RECONCILIATION-10 没有读取数据库、Package 或发起任何 API 请求，不能将该历史基线冒充本轮黑盒结果 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已由 alpha.37 `sha256:6667bd2ca64e7255befe4398b4e73ec1fe554418d76062d2d378de8edaa7143e` 替换为同版本 `sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25`，旧 Web 有精确回退 tag；Worker 镜像仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。PostgreSQL/Web healthy，Worker/Caddy running，四服务 restart 0/OOM false |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.37 另提供版本化 Requirement Unit Resolution 与 Planning 精确单位来源。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
-| 当前阶段 | `SELFHOST-OPS-UAT-ROLE-CREDENTIAL-ROTATION-09` 为 PARTIAL/BLOCKED：十个重置已提交，验证和正式文件提升未完成；`SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 继续 BLOCKED |
-| 当前任务 | `PARTIAL UAT CREDENTIAL ROTATION — RECOVERY CANDIDATE RETAINED`。首个账号旧密码拒绝、新密码认证、强制改密页通过，但 UAT/管理员页面退出及 Session 失效证明未完成；其余九个未验证。没有业务页面/API 或 Package 操作 |
-| 下一任务 | 停止所有 UAT/Planning 登录并保留恢复候选。只有项目负责人另行明确授权后，才能先处置管理员和首个 UAT Session 风险、完成十账号验证并决定是否原子提升候选；planning-only 只读核验仍须再另立任务 |
+| 当前阶段 | `SELFHOST-OPS-UAT-CREDENTIAL-RECONCILIATION-10` 为 BLOCKED/NO IDENTITY CHANGE；`SELFHOST-OPS-UAT-ROLE-CREDENTIAL-ROTATION-09` 的 PARTIAL 状态和 `SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 的 BLOCKED 状态均未解除 |
+| 当前任务 | `BLOCKED — NO FURTHER IDENTITY CHANGE`。受控结构预检没有取得继续执行所需的 PASS；管理员改密、manager 重置、十账号验证、审计核对和正式文件提升均未运行，身份/API/业务请求均为 0 |
+| 下一任务 | 停止所有 UAT/Planning 登录并保留既有恢复候选。只有项目负责人另立并明确授权安全的格式核验与身份收口方案后，才能处置 Admin/manager Session 风险；十账号退出验证与正式文件提升完成前不得开始 planning-only 核验 |
 
 ## 当前完成模块
 

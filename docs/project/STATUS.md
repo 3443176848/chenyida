@@ -2,6 +2,26 @@
 
 最后更新时间：2026-08-01（Asia/Shanghai）
 
+## SELFHOST-OPS-UAT-CREDENTIAL-RECONCILIATION-10 管理员与 UAT 凭据安全收口
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | BLOCKED — NO FURTHER IDENTITY CHANGE | 单一受控进程在凭据结构预检返回 FAIL 后立即停止；Chromium、Identity API 和业务 API 均未启动，身份变更 0 |
+| 严格起点 | PASS | clean `main@a4eff293668e24f4f780eb5df840bfc7e510365e`、Parent `615fe3ab4913c1964cfeb7337196f0d3e1a8d787`、behind 0/ahead 112；alpha.37、36/head 0036、指定 Web 镜像、文件元数据及四服务状态吻合 |
+| 结构预检 | FAIL CLOSED | 受控进程未取得允许继续的结构 PASS，且没有输出凭据正文。无法据此区分文件事实异常与解析器格式覆盖不足；严格规则禁止本轮重跑或继续身份步骤 |
+| 管理员 | NOT RUN / UNCHANGED | 本人改密、旧密码拒绝、新密码登录、不触发 must-change 和页面退出均未执行；正式管理员文件未变，未遗留本轮管理员候选 |
+| manager | NOT RUN / RISK OPEN | 未执行第二次重置，上一轮 manager Session 风险未被本任务撤销 |
+| 十账号验证 | NOT RUN 0/10 | manager、sales、engineering、planning、purchase、warehouse、production、quality、finance、operations 的旧密码拒绝、新密码认证、强制改密、安全退出和 Session 失效均无新增结果 |
+| 角色/启用状态 | NOT RECHECKED | 没有进入管理员页面；沿用上一轮记录，不冒充本轮验证 |
+| Identity 审计 | NOT QUERIED / TASK EVENTS 0 | 本任务未发送 Identity 请求，因此未生成本任务 Identity 事件；未读取或导出审计日志 |
+| 文件 | RETAINED / UNCHANGED | 管理员与正式 UAT 文件仍为 `root:root 0600`；既有 `/etc/chenyida-erp/.uat-role-accounts.txt.candidate-20260801025603-b821881a80` 仍为 `root:root 0600`，未提升/覆盖/删除；本轮三个隐藏阶段路径最终不存在 |
+| Session 风险 | LEGACY RISK OPEN / NO NEW SESSION | 本任务没有创建 Session；ROLE-CREDENTIAL-ROTATION-09 遗留的 Admin 与 manager Session 风险保持开放 |
+| 业务保护 | PASS / ZERO REQUEST | 没有打开 Identity/强制改密/经营/Planning 页面，也没有发送 API 请求；未读 Package、数据库身份数据或 Session 表，未执行任何业务动作 |
+| 版本/服务 | UNCHANGED | alpha.37、0001—0036、Web/Worker/PostgreSQL/Caddy 保持；未 build、Migration、PostgreSQL 测试、Compose 重建、重启或部署，四服务 restart 0/OOM false、内核 OOM 0 |
+| 资源/清理 | PASS | 起点约 2.2 GiB available/218 MiB Swap/22 GiB/Load `0.19/0.14/0.10`；最终约 2.2 GiB/217 MiB/22 GiB/`0.40/0.23/0.20`。临时容器自动删除，无浏览器 profile；控制脚本、临时依赖/cache 和精确 `/run` 目录已清理。按保护规则未删除镜像/Volume/备份 |
+| Git/检查 | DOCS-ONLY CLOSURE / PASS | 起点 `a4eff293668e24f4f780eb5df840bfc7e510365e`；1,119 文件凭据扫描、`git diff --check`、Python self-test/smoke/隔离 go-live 通过。只提交无秘密阻断报告，提交消息 `ops: record blocked credential reconciliation`，实际 SHA 以 Git log 为准；不 push/PR/改写历史 |
+| 后续 | NEW EXPLICIT AUTHORIZATION REQUIRED | 保留既有候选并停止 UAT/Planning 登录；另立安全格式核验与身份收口任务。Admin/manager 风险、十账号退出 10/10 和正式文件提升全部完成前不得开始 planning 核验 |
+
 ## SELFHOST-OPS-UAT-ROLE-CREDENTIAL-ROTATION-09 UAT 角色凭据轮换与恢复候选
 
 | 验证项 | 结果 | 说明 |
