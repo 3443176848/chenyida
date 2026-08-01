@@ -9,6 +9,7 @@ const REQUIRED_BROWSER_ORIGIN = "http://127.0.0.1:43136";
 const databaseUrl = process.env.DATABASE_URL || "";
 const acceptanceConfirm = process.env.ERP_REQUIREMENT_UNIT_BROWSER_CONFIRM || "";
 const browserBaseUrl = process.env.ERP_BROWSER_BASE_URL || "";
+const traceabilityReturnOnly = process.env.ERP_PLANNING_TRACEABILITY_BROWSER_MODE === "TRACEABILITY_RETURN_ONLY";
 
 function parsedDatabaseName(value) {
   try {
@@ -42,8 +43,8 @@ async function loadChromium() {
   const candidates = [process.env.PLAYWRIGHT_MODULE_PATH, "playwright", "@playwright/test", "playwright-core"].filter(Boolean);
   for (const specifier of candidates) {
     try {
-      const module = await import(specifier);
-      if (module.chromium) return module.chromium;
+      const loaded = await import(specifier);
+      if (loaded.chromium) return loaded.chromium;
     } catch {
       // The isolated runner may provide Playwright outside this repository.
     }
@@ -200,7 +201,7 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
       /^\/api\/logout$/,
       /^\/api\/projects\/\d+\/requirement-unit-resolutions$/,
       /^\/api\/projects\/\d+\/planning-packages$/,
-      /^\/api\/planning-packages\/\d+\/(?:submit|return|accept)$/,
+      traceabilityReturnOnly ? /^\/api\/planning-packages\/\d+\/(?:submit|return)$/ : /^\/api\/planning-packages\/\d+\/(?:submit|return|accept)$/,
     ];
     await context.route("**/*", async (route) => {
       const request = route.request();
@@ -278,9 +279,68 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
     await pendingV1.waitFor();
     await pendingV1.click();
     await page.getByRole("heading", { name: `${fixture.projectCode} · 交接包 v1`, exact: true }).waitFor();
-    await page.getByLabel("退回原因", { exact: true }).fill("浏览器验收：请将工程需求单位修订为套后重新提交");
-    await page.getByRole("button", { name: "退回项目部", exact: true }).click();
-    await page.getByText("已退回项目部，旧包保持不可变", { exact: true }).waitFor();
+    const trace = await pool.query(`select pp.id,pp.package_digest,a.request_id::text create_request,e.request_id::text submit_request
+      from project_planning_packages pp
+      join audit_log a on a.route_code='PLANNING_HANDOFF' and a.action='PLANNING_PACKAGE_PREPARED' and a.result='success' and a.detail @> jsonb_build_object('object_id',pp.id)
+      join project_planning_handoff_events e on e.package_id=pp.id and e.event_type='SUBMITTED'
+      where pp.project_id=$1 and pp.package_version_no=1`, [fixture.projectId]);
+    assert.equal(trace.rowCount, 1);
+    await page.getByText("Package 稳定 ID", { exact: true }).waitFor();
+    await page.getByText(String(trace.rows[0].id), { exact: true }).first().waitFor();
+    await page.locator("code.planning-trace-value", { hasText: trace.rows[0].package_digest }).waitFor();
+    await page.locator("code.planning-trace-value", { hasText: trace.rows[0].create_request }).waitFor();
+    await page.locator("code.planning-trace-value", { hasText: trace.rows[0].submit_request }).waitFor();
+    assert.equal(await page.getByText("创建交接包", { exact: true }).count(), 1);
+    assert.equal(await page.getByText("提交计划部", { exact: true }).count(), 1);
+    assert.equal(await page.locator(".planning-event dd").filter({ hasText: /Asia\/Shanghai/ }).count(), 2);
+    await page.getByText("计划部待接收队列", { exact: true }).waitFor();
+    await page.getByText("未指定具体接收人", { exact: true }).waitFor();
+    await page.getByText("未配置处理时限", { exact: true }).waitFor();
+    await page.getByText("Product 稳定 ID", { exact: true }).waitFor();
+    await page.getByText("BOM Version 稳定 ID", { exact: true }).waitFor();
+    await page.getByText(/非生成时状态快照/).waitFor();
+    await page.getByText("销售原始单位", { exact: true }).waitFor();
+    await page.getByText("工程正式解析", { exact: true }).waitFor();
+    await page.getByText("Unit Resolution ID", { exact: true }).waitFor();
+    await page.getByText(/固定引用的 Unit Resolution v1/).waitFor();
+    assert.equal(await page.locator(".planning-material-table").isVisible(), false);
+    assert.equal(await page.locator(".planning-material-card").count(), 4);
+    for (const materialId of fixture.materialIds) await page.locator(".planning-material-card").getByText(new RegExp(`Material ID ${materialId}$`)).waitFor();
+    assert.equal(await page.locator(".planning-material-card").getByText("1 PCS", { exact: true }).count(), 4);
+    assert.equal(await page.locator(".planning-material-card").getByText("10 PCS", { exact: true }).count(), 4);
+    await page.getByText(/接收交接包：/).waitFor();
+    await page.getByText(/退回工程\/项目部修订：/).waitFor();
+    const returnReason = page.getByLabel("退回原因（必填）", { exact: true });
+    const returnButton = page.getByRole("button", { name: "退回工程/项目部修订", exact: true });
+    await returnReason.waitFor(); await returnButton.waitFor();
+    await assertNoPageOverflow(page, "planning package v1 traceability detail");
+    const materialWidths = await page.locator(".planning-material-cards").evaluate((element) => ({ client: element.clientWidth, scroll: element.scrollWidth }));
+    assert.ok(materialWidths.scroll <= materialWidths.client + 1, "mobile material cards must not require horizontal scrolling");
+    for (const locator of [returnReason, returnButton, page.getByText("计划部待接收队列", { exact: true })]) {
+      const box = await locator.boundingBox(); assert.ok(box && box.x >= -1 && box.x + box.width <= 391, "critical review controls must fit the 390px viewport");
+    }
+    await returnReason.fill("浏览器验收：请将工程需求单位修订为套后重新提交");
+    await returnButton.click();
+    await page.getByText("已退回工程/项目部修订；旧包保持不可变", { exact: true }).waitFor();
+
+    if (traceabilityReturnOnly) {
+      const protectedState = await pool.query(`select pp.status,pp.package_version_no,
+        (select count(*)::integer from project_planning_packages where project_id=$1) package_count,
+        (select count(*)::integer from project_planning_packages where project_id=$1 and package_version_no=2) v2_count,
+        (select count(*)::integer from project_planning_handoff_events where package_id=pp.id and event_type='RETURNED') return_count,
+        (select count(*)::integer from project_planning_handoff_events where package_id=pp.id and event_type='ACCEPTED') accept_count
+        from project_planning_packages pp where pp.project_id=$1 and pp.package_version_no=1`, [fixture.projectId]);
+      assert.deepEqual(protectedState.rows[0], { status: "RETURNED", package_version_no: 1, package_count: 1, v2_count: 0, return_count: 1, accept_count: 0 });
+      const source = await pool.query("select unit_id,unit_pending from project_requirement_items where id=$1", [fixture.requirementItemId]);
+      assert.deepEqual(source.rows[0], { unit_id: null, unit_pending: true });
+      await logout(page);
+      const anonymousSession = await context.request.get(`${browserOrigin}/api/session`);
+      assert.equal(anonymousSession.status(), 200); assert.equal((await anonymousSession.json()).authenticated, false);
+      const protectedAfterLogout = await context.request.get(`${browserOrigin}/api/planning-handoffs?status=SUBMITTED&page_size=100`);
+      assert.equal(protectedAfterLogout.status(), 401);
+      await context.close();
+      return;
+    }
 
     await logout(page);
     await login(page, fixture.credentials.engineering);
@@ -312,11 +372,11 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
     await pendingV2.waitFor();
     await pendingV2.click();
     await page.getByRole("heading", { name: `${fixture.projectCode} · 交接包 v2`, exact: true }).waitFor();
-    await page.getByText(/需求 10\.000000 SET · Unit Resolution v2/).waitFor();
+    await page.getByText("需求 10 SET", { exact: true }).waitFor();
     const bomRows = page.locator(".planning-lines tbody tr");
     assert.equal(await bomRows.count(), 4);
     for (let index = 0; index < 4; index += 1) {
-      assert.equal((await bomRows.nth(index).locator("td").last().innerText()).trim(), "10.000000 PCS");
+      assert.equal((await bomRows.nth(index).locator("td").last().innerText()).trim(), "10 PCS");
     }
     await assertNoPageOverflow(page, "planning package v2 detail");
     await page.getByRole("button", { name: "接收交接包", exact: true }).click();

@@ -230,6 +230,65 @@ test("package pins the exact Unit Resolution and disabled current Unit blocks on
   assert.equal(historical.response.status, 200); assert.equal(historical.payload.data.items[0].unit_code, "SET"); assert.equal(historical.payload.data.items[0].unit_resolution_version_no, 2);
 });
 
+test("package detail exposes only scoped immutable traceability and separates creation gates from current state", async () => {
+  const refs = await seed();
+  const unitV1 = await saveUnit(refs); assert.equal(unitV1.response.status, 201);
+  assert.equal((await saveProductBom(refs)).response.status, 200);
+  const created = await api(`/api/projects/${refs.accepted.projectId}/planning-packages`, { method: "POST", body: { expected_version: refs.accepted.version } });
+  assert.equal(created.response.status, 201, JSON.stringify(created.payload));
+  const packageId = Number(created.payload.package_id);
+
+  const planningDraft = await api(`/api/planning-packages/${packageId}`, { role: "planning", username: "planning01" });
+  assert.equal(planningDraft.response.status, 403); assert.equal(planningDraft.payload.code, "PLANNING_PACKAGE_FORBIDDEN");
+  const otherEngineer = await api(`/api/planning-packages/${packageId}`, { role: "engineering", username: "engineering02" });
+  assert.equal(otherEngineer.response.status, 403); assert.equal(otherEngineer.payload.code, "PLANNING_PACKAGE_FORBIDDEN");
+  const service = new PlanningHandoffService(new PlanningHandoffRepository(pool));
+  await assert.rejects(service.detail({ ...actor("planning", "planning01"), permissions: [] }, packageId), (error) => error?.status === 403 && error?.code === "PERMISSION_DENIED");
+
+  const submitted = await api(`/api/planning-packages/${packageId}/submit`, { method: "POST", body: { expected_version: 1 } });
+  assert.equal(submitted.response.status, 200, JSON.stringify(submitted.payload));
+  const lureRequestId = randomUUID();
+  await pool.query("insert into audit_log(username,action,detail,request_id,result,route_code,retention_until) values('operations01','PLANNING_PACKAGE_PREPARED',$1,$2,'success','PLANNING_HANDOFF',now()+interval '1 day')", [{ object_id: packageId + 9999 }, lureRequestId]);
+  await pool.query("update products set status='INACTIVE' where id=$1", [refs.valid.productId]);
+  await pool.query("update bom_headers set status='INACTIVE' where id=$1", [refs.valid.bomHeaderId]);
+
+  const detail = await api(`/api/planning-packages/${packageId}`, { role: "planning", username: "planning01" });
+  assert.equal(detail.response.status, 200, JSON.stringify(detail.payload));
+  const data = detail.payload.data;
+  assert.equal(Number(data.header.id), packageId);
+  assert.equal(data.header.package_digest, created.payload.package_digest);
+  assert.equal(data.header.package_digest.length, 64);
+  assert.deepEqual(data.responsibility, { queue_role: "PLANNING", assignee: null, handling_deadline: null });
+  assert.deepEqual(data.traceability, { complete: true, creation_request_source: "PACKAGE_SCOPED_AUDIT", transition_source: "PACKAGE_EVENT", unit_resolution_source: "PACKAGE_ITEM_FIXED_REFERENCE" });
+  assert.deepEqual(data.trace_events.map((event) => event.action), ["CREATE", "SUBMIT"]);
+  assert.deepEqual(data.trace_events.map((event) => event.actor), ["engineering01", "engineering01"]);
+  assert.deepEqual(data.trace_events.map((event) => event.request_id), [created.requestId, submitted.requestId]);
+  assert.deepEqual(data.trace_events.map((event) => event.result), ["SUCCESS", "SUCCESS"]);
+  assert.ok(data.trace_events.every((event) => event.occurred_at));
+  const packageRequest = await pool.query("select request_id::text from project_planning_packages where id=$1", [packageId]);
+  assert.equal(packageRequest.rows[0].request_id, submitted.requestId);
+  assert.notEqual(packageRequest.rows[0].request_id, data.trace_events[0].request_id);
+
+  const item = data.items[0];
+  assert.equal(item.source_unit_id, null); assert.equal(item.source_unit_pending, true);
+  assert.equal(Number(item.unit_resolution_id), Number(unitV1.payload.unit_resolution_id));
+  assert.equal(item.unit_resolution_version_no, 1); assert.equal(item.unit_resolution_source_type, "ENGINEERING_CONFIRMED");
+  assert.equal(Number(item.unit_id), refs.unitId); assert.equal(item.unit_name, "件"); assert.equal(item.unit_code, "PCS");
+  assert.equal(Number(item.product_id), refs.valid.productId); assert.equal(Number(item.product_version_id), refs.valid.productVersionId);
+  assert.equal(Number(item.bom_header_id), refs.valid.bomHeaderId); assert.equal(Number(item.bom_version_id), refs.valid.bomVersionId);
+  assert.equal(item.product_current_status, "INACTIVE"); assert.equal(item.product_version_current_status, "RELEASED");
+  assert.equal(item.bom_current_status, "INACTIVE"); assert.equal(item.bom_version_current_status, "RELEASED");
+  assert.deepEqual(item.creation_validation, { outcome: "PASSED", evidence_source: "PACKAGE_CREATION_SERVICE_GATE", product_required_status: "ACTIVE", product_version_required_status: "RELEASED", bom_required_status: "ACTIVE", bom_version_required_status: "RELEASED" });
+  assert.equal(item.bom_lines.length, 4);
+  assert.deepEqual(item.bom_lines.map((line) => Number(line.material_id)), refs.materialIds);
+  assert.ok(item.bom_lines.every((line) => line.quantity_per === "1.000000" && line.unit_code === "PCS" && line.calculated_gross_quantity === "10.000000"));
+  assert.deepEqual(item.bom_lines.map((line) => line.specification_snapshot.internal_material_code), ["MAT-PLAN-0001", "MAT-PLAN-0002", "MAT-PLAN-0003", "MAT-PLAN-0004"]);
+  const serialized = JSON.stringify(data);
+  assert.ok(!serialized.includes(lureRequestId));
+  for (const forbidden of ["idempotency_key_digest", "operation_id", "target_username", "session_token"]) assert.ok(!serialized.includes(forbidden));
+  assert.ok(!permissionsForRole("planning").includes("system.audit.read"));
+});
+
 test("four 1 PCS BOM lines snapshot to four 10 PCS requirements through return, revise, resubmit and accept", async () => {
   const refs = await seed();
   assert.equal((await saveUnit(refs)).response.status, 201);
@@ -241,7 +300,7 @@ test("four 1 PCS BOM lines snapshot to four 10 PCS requirements through return, 
     where pi.package_id=$1 order by bl.line_no`, [packageId]);
   assert.equal(gross.rowCount, 4);
   assert.deepEqual(gross.rows, Array.from({ length: 4 }, () => ({ required_quantity: "10.000000", quantity_per: "1.000000", loss_rate: "0.00000000", calculated_gross_quantity: "10.000000", unit_code: "PCS" })));
-  const detail = await api(`/api/planning-packages/${packageId}`, { role: "planning", username: "planning01" });
+  const detail = await api(`/api/planning-packages/${packageId}`, { role: "engineering", username: "engineering01" });
   assert.equal(detail.response.status, 200); assert.equal(detail.payload.data.documents[0].original_filename, "drawing.pdf");
   assert.equal(detail.payload.data.items[0].unit_resolution_version_no, 1); assert.equal(detail.payload.data.items[0].unit_resolution_source_type, "ENGINEERING_CONFIRMED");
   for (const field of ["relative_path", "storage_name", "file_body"]) assert.ok(!(field in detail.payload.data.documents[0]));

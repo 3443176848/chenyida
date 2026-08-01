@@ -50,13 +50,16 @@ test("package creation is gated by persisted Unit and Product BOM resolutions", 
   assert.match(workspace, /Product \/ BOM：{productIsComplete\?"已完成":"未完成"}/);
 });
 
-test("planning workspace keeps narrow screens contained and tables locally scrollable", () => {
+test("planning workspace keeps narrow screens contained and switches materials to cards", () => {
   assert.match(planningCss, /@media\(max-width:420px\)/);
   assert.match(planningCss, /@media\(max-width:900px\)\{\.planning-resolution\{grid-template-columns:1fr\}/);
   assert.match(planningCss, /\.planning-shell\{box-sizing:border-box;width:100%;max-width:100%\}/);
   assert.doesNotMatch(planningCss, /\.planning-shell\{[^}]*overflow-x:hidden/);
-  assert.match(planningCss, /\.planning-table-scroll\{[^}]*overflow-x:auto/);
-  assert.match(workspace, /className="planning-table-scroll"/);
+  assert.match(planningCss, /@media\(max-width:600px\)\{[\s\S]*?\.planning-material-table\{display:none\}/);
+  assert.match(planningCss, /\.planning-material-cards\{display:grid/);
+  assert.match(planningCss, /\.planning-trace-value\{[^}]*overflow-wrap:anywhere/);
+  assert.match(workspace, /className="planning-material-cards"/);
+  assert.match(workspace, /className="planning-table-scroll planning-material-table"/);
   assert.match(workspace, /系统管理员/);
   assert.match(workspace, /工程人员/);
   assert.doesNotMatch(workspace, /<span>{user\.role}<\/span>/);
@@ -68,6 +71,36 @@ test("planning page has pending and accepted queues with read-only decision deta
   assert.match(apiClient, /planningWrite/); assert.match(apiClient, /currentCsrfToken/); assert.match(apiClient, /credentials: "same-origin"/); assert.match(apiClient, /X-CSRF-Token/); assert.match(apiClient, /Idempotency-Key/);
   assert.doesNotMatch(workspace, /crypto\.randomUUID/);
   assert.doesNotMatch(workspace, /localStorage|sessionStorage|relative_path|absolute_path|storage_name|file_body/);
+});
+
+test("planning detail exposes scoped traceability, fixed units and explicit current evidence", () => {
+  assert.match(workspace, /Package 稳定 ID/);
+  assert.match(workspace, /Package Version/);
+  assert.match(workspace, /Package 完整摘要/);
+  assert.match(workspace, /未指定具体接收人/);
+  assert.match(workspace, /未配置处理时限/);
+  assert.match(workspace, /trace_events\.map/);
+  assert.match(workspace, /创建交接包/);
+  assert.match(workspace, /提交计划部/);
+  assert.match(workspace, /请求号/);
+  assert.match(workspace, /Asia\/Shanghai/);
+  assert.doesNotMatch(workspace, /new Date\(event\.created_at\)\.toLocaleString/);
+  assert.match(workspace, /Product 稳定 ID/);
+  assert.match(workspace, /Product Version 稳定 ID/);
+  assert.match(workspace, /BOM 稳定 ID/);
+  assert.match(workspace, /BOM Version 稳定 ID/);
+  assert.match(workspace, /非生成时状态快照/);
+  assert.match(workspace, /销售原始单位/);
+  assert.match(workspace, /工程正式解析/);
+  assert.match(workspace, /Unit Resolution ID/);
+  assert.match(workspace, /固定引用的 Unit Resolution/);
+  assert.match(workspace, /没有改写销售原始需求/);
+  assert.match(workspace, /Material ID/);
+  assert.match(workspace, /compactNumber\(line\.quantity_per\)} {line\.unit_code}/);
+  assert.match(workspace, /退回工程\/项目部修订/);
+  assert.match(workspace, /接收和退回按钮已停用并隐藏/);
+  const packageView = workspace.slice(workspace.indexOf("function PackageView"));
+  assert.doesNotMatch(packageView, /<input|<select/);
 });
 
 test("dashboard preserves the TASK02 queue while its package workspace stays upstream-only", () => {

@@ -203,22 +203,69 @@ export class PlanningHandoffService {
 
   async detail(actor: IdentityActor, packageId: number) {
     if (!allowed(actor, "planning.read")) throw new PlanningHandoffError("PERMISSION_DENIED", "没有权限读取计划交接", 403);
-    const header = await this.repository.pool.query(`select pp.*,p.project_code,p.project_name,p.project_goal,p.project_owner,p.customer_id,c.customer_code,c.customer_name,rv.version_no requirement_version_no,rv.customer_requirement_summary from project_planning_packages pp join business_projects p on p.id=pp.project_id join customers c on c.id=p.customer_id join project_requirement_versions rv on rv.id=pp.requirement_version_id where pp.id=$1`, [packageId]);
-    if (!header.rows[0] || (actor.role === "engineering" && header.rows[0].project_owner !== actor.username)) throw new PlanningHandoffError("PLANNING_PACKAGE_NOT_FOUND", "计划交接包不存在", 404);
-    const [items, lines, documents, events] = await Promise.all([
-      this.repository.pool.query(`select pi.*,pi.required_quantity::text,ri.provisional_name,ri.specification_requirement,u.code unit_code,u.name unit_name,
-        ur.resolution_version_no unit_resolution_version_no,ur.source_type unit_resolution_source_type,ur.content_digest unit_resolution_digest,
-        p.product_code,p.product_name,pv.version_code product_version_code,bh.bom_code,bv.version_code bom_version_code
-        from project_planning_package_items pi join project_requirement_items ri on ri.id=pi.requirement_item_id join units u on u.id=pi.unit_id
+    const client = await this.repository.pool.connect();
+    try {
+      await client.query("begin transaction isolation level repeatable read read only");
+      const header = await client.query(`select pp.id,pp.project_id,pp.package_version_no,pp.requirement_version_id,pp.status,pp.target_delivery_date,pp.package_digest,
+      pp.prepared_by,pp.prepared_at,pp.submitted_by,pp.submitted_at,pp.accepted_by,pp.accepted_at,pp.returned_by,pp.returned_at,pp.return_reason,pp.version,pp.updated_at,
+      p.project_code,p.project_name,p.project_goal,p.project_owner,p.customer_id,c.customer_code,c.customer_name,rv.version_no requirement_version_no,rv.customer_requirement_summary
+      from project_planning_packages pp join business_projects p on p.id=pp.project_id join customers c on c.id=p.customer_id
+      join project_requirement_versions rv on rv.id=pp.requirement_version_id where pp.id=$1`, [packageId]);
+      if (!header.rows[0]) throw new PlanningHandoffError("PLANNING_PACKAGE_NOT_FOUND", "计划交接包不存在", 404);
+      if (actor.role === "engineering" && header.rows[0].project_owner !== actor.username) throw new PlanningHandoffError("PLANNING_PACKAGE_FORBIDDEN", "没有权限查看该计划交接包", 403);
+      if (header.rows[0].status === "DRAFT" && !["admin", "manager", "engineering"].includes(actor.role)) throw new PlanningHandoffError("PLANNING_PACKAGE_FORBIDDEN", "该计划交接包尚未提交，无权查看", 403);
+      const items = await client.query(`select pi.id,pi.package_id,pi.requirement_item_id,pi.product_version_id,pi.bom_version_id,pi.required_quantity::text,pi.unit_id,pi.unit_resolution_id,pi.line_no,pi.source_digest,
+        ri.provisional_name,ri.specification_requirement,ri.unit_id source_unit_id,ri.unit_pending source_unit_pending,su.code source_unit_code,su.name source_unit_name,
+        u.code unit_code,u.name unit_name,ur.resolution_version_no unit_resolution_version_no,ur.source_type unit_resolution_source_type,
+        ur.unit_id resolved_unit_id,ur.content_digest unit_resolution_digest,p.id product_id,p.product_code,p.product_name,p.status product_current_status,
+        pv.version_code product_version_code,pv.status product_version_current_status,bh.id bom_header_id,bh.bom_code,bh.status bom_current_status,
+        bv.version_code bom_version_code,bv.status bom_version_current_status
+        from project_planning_package_items pi join project_requirement_items ri on ri.id=pi.requirement_item_id
+        left join units su on su.id=ri.unit_id join units u on u.id=pi.unit_id
         left join project_requirement_unit_resolution_versions ur on ur.id=pi.unit_resolution_id and ur.requirement_item_id=pi.requirement_item_id and ur.unit_id=pi.unit_id
-        join product_versions pv on pv.id=pi.product_version_id join products p on p.id=pv.product_id join bom_versions bv on bv.id=pi.bom_version_id join bom_headers bh on bh.id=bv.bom_header_id
-        where pi.package_id=$1 order by pi.line_no`, [packageId]),
-      this.repository.pool.query(`select bl.*,bl.quantity_per::text,bl.loss_rate::text,bl.calculated_gross_quantity::text,u.code unit_code from project_planning_package_bom_lines bl join project_planning_package_items pi on pi.id=bl.package_item_id join units u on u.id=bl.unit_id where pi.package_id=$1 order by pi.line_no,bl.line_no`, [packageId]),
-      this.repository.pool.query(`select dl.id,dl.project_document_link_id,l.document_type,l.display_name,f.original_filename,f.mime_type,f.sha256,f.size_bytes::text,f.storage_status from project_planning_document_links dl join project_document_links l on l.id=dl.project_document_link_id join material_import_files f on f.id=l.file_id where dl.package_id=$1 order by dl.id`, [packageId]),
-      this.repository.pool.query("select id,package_id,project_id,event_type,actor,reason,request_id,created_at from project_planning_handoff_events where package_id=$1 order by id", [packageId]),
-    ]);
-    const byItem = new Map<number, Record<string, unknown>[]>(); for (const line of lines.rows) { const key = Number(line.package_item_id); const rows = byItem.get(key) || []; rows.push(line); byItem.set(key, rows); }
-    return { header: header.rows[0], items: items.rows.map((item) => ({ ...item, bom_lines: byItem.get(Number(item.id)) || [] })), documents: documents.rows, events: events.rows };
+        join product_versions pv on pv.id=pi.product_version_id join products p on p.id=pv.product_id
+        join bom_versions bv on bv.id=pi.bom_version_id and bv.product_version_id=pi.product_version_id join bom_headers bh on bh.id=bv.bom_header_id and bh.product_id=p.id
+        where pi.package_id=$1 order by pi.line_no`, [packageId]);
+      const lines = await client.query(`select bl.id,bl.package_item_id,bl.source_bom_line_id,bl.material_id,bl.unit_id,bl.quantity_per::text,bl.loss_rate::text,
+        bl.calculated_gross_quantity::text,bl.specification_snapshot,bl.material_digest,bl.line_no,u.code unit_code,u.name unit_name
+        from project_planning_package_bom_lines bl join project_planning_package_items pi on pi.id=bl.package_item_id
+        join units u on u.id=bl.unit_id where pi.package_id=$1 order by pi.line_no,bl.line_no`, [packageId]);
+      const documents = await client.query(`select dl.id,dl.project_document_link_id,l.document_type,l.display_name,f.original_filename,f.mime_type,f.sha256,f.size_bytes::text,f.storage_status from project_planning_document_links dl join project_document_links l on l.id=dl.project_document_link_id join material_import_files f on f.id=l.file_id where dl.package_id=$1 order by dl.id`, [packageId]);
+      const events = await client.query("select id,package_id,project_id,event_type,actor,reason,request_id,created_at from project_planning_handoff_events where package_id=$1 order by id", [packageId]);
+      const creationAudits = await client.query(`select a.username actor,a.request_id,a.result,a.created_at
+        from audit_log a join project_planning_packages pp on pp.id=$1
+        where a.route_code='PLANNING_HANDOFF' and a.action='PLANNING_PACKAGE_PREPARED' and a.result='success'
+        and a.detail @> jsonb_build_object('object_id',$1::bigint) order by a.id limit 2`, [packageId]);
+      const byItem = new Map<number, Record<string, unknown>[]>(); for (const line of lines.rows) { const key = Number(line.package_item_id); const rows = byItem.get(key) || []; rows.push(line); byItem.set(key, rows); }
+      const candidateCreationAudit = creationAudits.rows.length === 1 ? creationAudits.rows[0] : null;
+      const creationAudit = candidateCreationAudit && candidateCreationAudit.actor === header.rows[0].prepared_by && new Date(candidateCreationAudit.created_at).getTime() === new Date(header.rows[0].prepared_at).getTime() ? candidateCreationAudit : null;
+      const traceEvents = [
+        { id: `CREATE-${packageId}`, action: "CREATE", actor: header.rows[0].prepared_by, occurred_at: header.rows[0].prepared_at, request_id: creationAudit?.request_id ?? null, result: creationAudit ? "SUCCESS" : "TRACE_INCOMPLETE", reason: "", evidence_source: creationAudit ? "PACKAGE_SNAPSHOT_AND_SCOPED_AUDIT" : "PACKAGE_SNAPSHOT" },
+        ...events.rows.map((event) => ({ id: `EVENT-${event.id}`, action: event.event_type === "SUBMITTED" ? "SUBMIT" : event.event_type === "RESUBMITTED" ? "RESUBMIT" : event.event_type, actor: event.actor, occurred_at: event.created_at, request_id: event.request_id, result: "SUCCESS", reason: event.reason, evidence_source: "PACKAGE_EVENT" })),
+      ];
+      const responsibility = header.rows[0].status === "SUBMITTED"
+        ? { queue_role: "PLANNING", assignee: null, handling_deadline: null }
+        : ["DRAFT", "RETURNED"].includes(header.rows[0].status)
+          ? { queue_role: "ENGINEERING_PROJECT", assignee: null, handling_deadline: null }
+          : { queue_role: "COMPLETED", assignee: null, handling_deadline: null };
+      const creationValidation = { outcome: "PASSED", evidence_source: "PACKAGE_CREATION_SERVICE_GATE", product_required_status: "ACTIVE", product_version_required_status: "RELEASED", bom_required_status: "ACTIVE", bom_version_required_status: "RELEASED" };
+      const response = {
+        header: header.rows[0],
+        responsibility,
+        traceability: { complete: Boolean(creationAudit), creation_request_source: creationAudit ? "PACKAGE_SCOPED_AUDIT" : null, transition_source: "PACKAGE_EVENT", unit_resolution_source: "PACKAGE_ITEM_FIXED_REFERENCE" },
+        trace_events: traceEvents,
+        items: items.rows.map((item) => ({ ...item, creation_validation: creationValidation, bom_lines: byItem.get(Number(item.id)) || [] })),
+        documents: documents.rows,
+        events: events.rows,
+      };
+      await client.query("commit");
+      return response;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   private async packageForUpdate(client: PoolClient, packageId: number): Promise<PackageRow> {
