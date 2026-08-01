@@ -38,7 +38,7 @@
 - 逐表标准化交付：LANDING-TASK07 进一步按项目负责人澄清，把 `moban.xlsx` 第一张作为真实原始数据、第二张作为整理目标，验证 53/53 行组规格证据和用量后逐来源整理。结果含 591 行总表、8 张来源标准页、591 行追溯和 94 条异常；57 行未知用量、21 行未知板型留空，A118 精确重复区段只计一次，A200 同逻辑旧版按模板优先。未导入任何数据库。
 - 大批量跨对话流程：LANDING-TASK08 固定 `CYD-MATERIAL-13C-v1`、`CYD-MATERIAL-NORMALIZATION-v1`、`CYD-MAT-YYYYMMDD-NNN/Rxxx` 和默认 10 文件/5,000 行/100 MiB 上限；私有总索引、批次卡、来源 manifest 与 `checkpoint.next_action` 是恢复权威。已知结构按版本化来源档案复用，未知结构先确认；Codex 不能自行批准批次，临时汇总不得入库。通用执行器和代表性试点尚未实现。
 - V9 重导入 staging：LANDING-TASK05 对单个 SHA 绑定 XLSX 解析 197 行；编码唯一连续、来源完整，但显式单位 0，产品/BOM 结构字段 0。恢复库首次 staged 197、重放新增 0，全部 review；5,556 条拟删除计划未执行，主库 213 表计数完全不变。
-- 第二管理员与 UAT 账号：`admin2` 的既有 active/version/must-change 历史事实不变。FIX-08 准备主 UAT planning 只读核验时发生 UAT 角色凭据输出事件；只读计数确认资料中的 10 组凭据全部仍有效，其中 1 组为 planning。发现后未创建 Session、未登录 planning/engineering、未改身份或业务数据。任何后续登录前必须由项目负责人明确授权，以受控 Identity 流程轮换全部 10 组凭据；本仓库不得记录凭据值、用户名、摘要或 Session 信息。
+- 第二管理员与 UAT 账号：`admin2` 的既有 active/version/must-change 历史事实不变。ROLE-CREDENTIAL-ROTATION-09 已用管理员网页重置十个指定 UAT 账号，逐项角色/active 状态保持，Identity audit 成功 10/失败 0；首个账号旧密码拒绝、新密码认证和强制改密页通过，但 UAT/管理员页面退出及 Session 失效未完成，其余九个未验证。正式文件未提升，root-only 0600 候选保留。任何后续登录、候选提升或 Session 风险处置都需独立授权；本仓库不得记录凭据值、用户名、摘要或 Session 信息。
 - 单账号豁免：SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 采用 serializable 事务、任务 advisory lock、行锁和 version 2 CAS，把账号更新与唯一 `USER_FIRST_PASSWORD_CHANGE_WAIVED/success` 审计同事务提交；同任务重放 no-op。现有有效 Session 保留，D-045 全局新建/重置用户强制首次改密策略与 API 不变。
 - 公网与 UAT 来源校验：公网继续由显式、规范化、单值 `ERP_PUBLIC_ORIGIN` 精确限制，不读取任意转发头；当前唯一公网值为 `https://43.135.148.43.nip.io:18888`。只有 `ERP_DEPLOYMENT_CLASS=uat` 与 `ERP_UAT_ALLOW_LOOPBACK_ORIGIN=true` 同时启用时才额外允许浏览器 Origin 与 Request URL origin 均为严格字面量 loopback；生产类别不能启用。身份和 Planning 写均要求 Origin 和 Cookie/Header CSRF 双提交。当前 alpha.37 Web 为 `sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25`；部署前 `sha256:6667bd2ca64e7255befe4398b4e73ec1fe554418d76062d2d378de8edaa7143e` 有精确回退 tag。PostgreSQL/Worker/Caddy 未因 FIX-08 替换或重建。
 - 公网 IP 切换：PUBLIC-IP-CUTOVER-07 同步更新 Caddy `ERP_DOMAIN` 和 Web `ERP_PUBLIC_ORIGIN`，以原镜像串行重建 Web/Caddy并取得 `43.135.148.43.nip.io` 的 Let's Encrypt 证书；外部 18888 登录页、200/308/401、安全头和旧 SNI 退役通过。PostgreSQL/Worker 容器未更换，root-only 原 env 回退副本保留。
@@ -66,6 +66,7 @@
 - PHASE6-TASK01 的 PostgreSQL 测试、迁移和 Node 重任务串行，任一时刻只有一个临时容器，Node heap 512 MiB/容器 768 MiB。起点 available 约 2.1 GiB、Swap 131—132 MiB、根盘 35 GiB；最终 available 2.2 GiB、Swap 135 MiB、根盘 35 GiB、Load `0.21/0.76/0.69`，四服务 restart 0/OOM false。两个任务测试库和临时容器已删除，四个受保护卷保留。
 - IMPLEMENT-07 的 build、Migration、隔离 PostgreSQL、dump/restore、Web 更新和两个 Chromium 验收均严格串行，一次最多一个临时重任务容器。起点约 2.2 GiB available/233 MiB Swap/26 GiB/Load `0.24/1.05/0.88`；最终精确清理后为 2.3 GiB/210 MiB/26 GiB/`0.30/0.30/0.40`。四服务 restart 0/OOM false、任务 OOM 0；临时库/容器/build worktree/runner/在线隔离 dump/Playwright 镜像已清理，正式备份、当前/回退 Web 镜像和四个受保护卷保留。
 - FIX-08 的测试、build、备份恢复、Web 更新和隔离 Chromium 严格串行，一次最多一个临时重任务容器。检查范围约为 2.1—2.3 GiB available、196—224 MiB Swap、根盘最低 21 GiB、Load 低于停止阈值；最终为 2.2 GiB/214 MiB/22 GiB/`0.17/0.54/0.74`。四服务 restart 0/OOM false；隔离库、恢复库、runner/builder/Playwright 基础镜像和精确临时目录已清理，正式备份、当前/回退 Web 和四卷保留。
+- ROLE-CREDENTIAL-ROTATION-09 只运行一个受限 Chromium 实例和顺序 Context，不执行 build、Migration、PostgreSQL 测试或 Compose 重建。起点约 2.3 GiB available/218 MiB Swap/22 GiB/Load `0.44/0.31/0.21`，最终约 2.3 GiB/218 MiB/22 GiB/`0.13/0.18/0.20`；内核 OOM 0、四服务 restart 0/OOM false。临时容器/profile/cache/依赖/控制目录已清理，四卷保持；root-only 恢复候选因 PARTIAL 规则保留。
 - LANDING-TASK05 的 dump、恢复、staging 和测试严格串行；起点 available `2,351,184 KiB`、Swap `130,592 KiB`、Load `0.06/0.09/0.11`、根盘 35 GiB，提交后约 2.2 GiB/126 MiB/`0.08/0.14/0.14`/35 GiB；独立 60 秒 Swap 增长 0。四服务 restart 0/OOM false，临时库/runner/cache 删除，四个受保护卷保留。
 - MATERIAL-REVIEW-BLOCKERS-03-RETRY 的隔离 PostgreSQL、build、备份恢复、Web 替换和真实 Chromium 严格串行；起点约 2.4 GiB available/163 MiB Swap/31 GiB 根盘，最终约 2.3 GiB/187 MiB/30 GiB/Load `0.21/0.45/0.68`。内核 OOM 0，四服务 restart 0/OOM false；只重建 Web，测试/恢复库、容器、浏览器和 worktree 已清理，四卷保持。
 - BOM-SELECTOR-FIX-04 的隔离 PostgreSQL、alpha.34 build、备份恢复、Web 替换和 Chromium 严格串行；首次门禁约 2.3 GiB available/198 MiB Swap/29 GiB，部署前 2.3 GiB/180 MiB/29 GiB/Load `0.09/0.44/0.48`，浏览器后 2.3 GiB/204 MiB，最终根盘恢复 29 GiB。内核/容器 OOM 0、四服务 restart 0；测试/恢复库、临时容器、浏览器、Playwright 镜像、task worktree 和可归属 BuildKit cache 已清理，备份/当前镜像/回退 tag 和四卷保留。
@@ -190,9 +191,9 @@
 ## 当前风险
 
 - V9 主数据表缺少逐行显式单位，且不包含产品/版本/BOM 行号/数量/位号/单位结构；197 行只能保留在 review。未经补充明确字段不得把 PCS、使用次数或原始描述猜成主库单位/BOM 数量，也不得先清空现有 532 Material/316 BOM Line。
-- 当前受保护 Product Version 7/A0 与 BOM Version 7/V1 均已 RELEASED，四行 533—536 是不可变事实。不得通过前端隐藏或临时调用绕过服务端/DB 不可变；修改必须在后续独立授权下创建新版本。Planning Package ID 1/v1 当前为 SUBMITTED，禁止在当前安全阻断期间接收、退回或创建 v2。
+- 当前受保护 Product Version 7/A0、BOM Version 7/V1 和 Planning Package ID 1/v1/SUBMITTED 都是 FIX-08 最后已验证业务基线；凭据轮换没有读取或操作这些业务事实。不得通过前端隐藏或临时调用绕过服务端/DB 不可变，且禁止在当前安全阻断期间接收、退回或创建 v2。
 - `PRJ-00000001` 的源 Requirement Item 仍为 `unit_id=NULL/unit_pending=true`；Unit Resolution Head 已固定指向 ID 1/v1/Unit ID 1/PCS，Package Item 也固定引用该 Resolution Version。不得写回源需求、读取后来变化的 Head 冒充快照、从 BOM 推断单位或绕过完整性门禁。
-- 历史 BOM-SELECTOR-FIX-04 曾发生 root-only engineering 账号材料输出事件；FIX-08 又发生 UAT 角色凭据输出事件，只读计数确认 10 组凭据仍有效。当前所有 UAT 角色登录均须停止；未获项目负责人明确授权，不得轮换、停用或使用这些凭据。凭据值和身份信息不得进入仓库。
+- 历史 BOM-SELECTOR-FIX-04 曾发生 root-only engineering 账号材料输出事件；FIX-08 又发生 UAT 角色凭据输出事件。后续轮换已重置十账号但验证/正式文件提升未完成，管理员和首个 UAT Session 风险开放；当前所有 UAT 角色登录均须停止，恢复候选不得删除或提升。凭据值和身份信息不得进入仓库。
 
 - Material Draft/Review/Active、Import Mapping/版本/复用、行级 Normalizer 及人工复核/ACTIVE绑定/Draft Commit 已完成 PostgreSQL 非生产移植；后续真实数据演练和迁移不得重新接入 D1 运行依赖。
 - `0002`/`0003`/`0004`/`0005`、双用户审批、Mapping确认、Normalization原子发布/取消、人工复核 finalization 和重启持久性只在一次性 PostgreSQL 17/Compose 测试环境验证；未迁移真实数据、执行生产容量测试、生产恢复演练或部署。
@@ -232,7 +233,7 @@
 
 ## 当前路线
 
-`SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 当前为 BLOCKED。Package 范围追溯功能已提交并以 Web-only 方式部署到 alpha.37 `sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25`；PostgreSQL 为 36/head 0036，Caddy 与 Worker 保持。主 UAT Package ID 1/v1 仍 SUBMITTED、总数 1、v2/RETURN/ACCEPT 0。由于 10 组仍有效的 UAT 角色凭据发生输出事件，所有 UAT 角色登录必须停止；只能在项目负责人明确授权受控轮换后，另行执行 planning-only 只读浏览器核验。在此之前不得接收、退回或登录 engineering。
+`SELFHOST-OPS-UAT-ROLE-CREDENTIAL-ROTATION-09` 当前为 PARTIAL/BLOCKED。十账号网页重置与审计已成功，但首个 UAT 和管理员退出/Session 失效未完成，其余九个未验证；正式凭据文件未提升，root-only 0600 恢复候选保留。`SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 因此继续 BLOCKED；Package ID 1/v1/SUBMITTED、总数 1、v2/RETURN/ACCEPT 0 只是 FIX-08 最后已验证基线，本轮未读或操作业务数据。另行授权完成身份恢复前，不得接收、退回、登录 engineering 或开始 planning-only 核验。
 
 ## 恢复上下文检查清单
 

@@ -4,6 +4,17 @@
 
 ## 2026-08-01
 
+### SELFHOST-OPS-UAT-ROLE-CREDENTIAL-ROTATION-09 - `ops: rotate exposed UAT role credentials`
+
+- Git/范围：从 clean `main@615fe3ab4913c1964cfeb7337196f0d3e1a8d787`、Parent `682e79378660ef7859617655836f02e2112df244`、behind 0/ahead 111 起步；只处理十个指定 UAT 角色账号，不修改业务代码、Migration、部署配置或其他用户，不 push/PR 或改写历史。
+- 受控重置：单 Chromium、顺序隔离 Context、Identity-only API allowlist；十个目标账号均经管理员网页重置成功，每次成功立即原子更新/fsync 候选。角色与 active 状态保持，`admin`、UAT admin-check 及其他账号未重置，管理员凭据文件未修改；Identity audit 成功 10、失败 0。
+- 验证/安全停止：首个账号旧密码返回 `LOGIN_FAILED`，新临时密码认证成功并进入首次强制改密页，未执行实际改密或越过该页；页面退出/Session 失效未形成完成证明，流程立即停止，其余九个未验证。管理员退出也未到达完成证明，因此两类任务 Session 均按风险开放处理，未直接读取或修改 Session 表。
+- 恢复：保留 `/etc/chenyida-erp/.uat-role-accounts.txt.candidate-20260801025603-b821881a80`（`root:root 0600`）；候选未提升，正式文件保持 `root:root 0600`，其中十个旧密码已失效。没有旧凭据副本，不对普通文件底层不可恢复性作声明。
+- 业务保护：没有进入经营工作台或 Planning Package 详情，没有发起接收、退回、v2 或任何业务域请求；本轮没有读取 Package 数据，FIX-08 的 Package 基线不冒充本轮黑盒结果。未 build、Migration、PostgreSQL 测试、Compose 重建或服务重启。
+- 提交门禁：仓库凭据扫描通过 1,118 个文件，`git diff --check` 通过；扫描器排除禁止读取的 `shujvbiao/`。Git 变更只含无秘密项目状态和任务报告。
+- 资源/清理：起点约 2.3 GiB available/218 MiB Swap/22 GiB/Load `0.44/0.31/0.21`；最终约 2.3 GiB/218 MiB/22 GiB/`0.13/0.18/0.20`，内核 OOM 0、四服务 restart 0/OOM false。临时 Chromium 容器、profile/cache、依赖、控制脚本和目录已清理；未 prune、删除镜像/Volume/备份，恢复候选按失败规则保留。
+- 结论：`PARTIAL UAT CREDENTIAL ROTATION — RECOVERY CANDIDATE RETAINED`。另行授权完成 Session 风险处置、十账号验证和候选提升前，停止所有 UAT/Planning 登录。
+
 ### SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08 - `fix: expose planning handoff traceability` / `ops: record blocked planning traceability rollout`
 
 - Git/范围：从 clean `main@a254bca5d59dd3f17047c9d6495dfdf2df1a798e`、Parent `91c0fd29d534246c55ddd669e894cdde9b774e52`、behind 0/ahead 109 起步；功能提交 `682e79378660ef7859617655836f02e2112df244`。只改 Planning Handoff 详情的只读合同、展示、测试和项目文档；未 push/PR 或改写历史。

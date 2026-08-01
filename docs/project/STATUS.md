@@ -2,6 +2,24 @@
 
 最后更新时间：2026-08-01（Asia/Shanghai）
 
+## SELFHOST-OPS-UAT-ROLE-CREDENTIAL-ROTATION-09 UAT 角色凭据轮换与恢复候选
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | PARTIAL UAT CREDENTIAL ROTATION — RECOVERY CANDIDATE RETAINED | 十个密码重置已提交，但页面退出/Session 失效及其余账号验证未完成；正式凭据文件未提升 |
+| 严格起点 | PASS | clean `main@615fe3ab4913c1964cfeb7337196f0d3e1a8d787`、Parent `682e79378660ef7859617655836f02e2112df244`、behind 0/ahead 111；alpha.37、36/head 0036、指定 Web 镜像及四服务状态吻合 |
+| 重置范围 | PASS 10/10 | 只通过管理员网页逐个重置十个指定 UAT 角色账号；逐项角色和 active 状态保持。`admin`、UAT admin-check 及其他账号未重置，管理员凭据文件未修改 |
+| Identity 审计 | PASS | 本任务窗口内目标 `USER_PASSWORD_RESET` 成功 10、失败 0；未展示或复制敏感正文 |
+| 旧密码拒绝 | PARTIAL 1/10 | 首个账号返回 `LOGIN_FAILED`；其余九个因安全停止未验证 |
+| 新密码/强制改密 | PARTIAL 1/10 | 首个账号认证成功并停在首次强制改密页，未实际改密、未越过该页；其余九个未验证 |
+| 页面退出/Session | FAIL CLOSED / RISK OPEN | 首个 UAT 与管理员页面退出、Session 失效没有完成证明；其余九个未登录验证。未读取全局 Session 表或直接 SQL 撤销 Session，不能用关闭 Chromium 冒充退出成功 |
+| 恢复候选 | RETAINED | `/etc/chenyida-erp/.uat-role-accounts.txt.candidate-20260801025603-b821881a80` 为 `root:root 0600`；每次重置后原子更新并 fsync。未提升、未删除，正式文件仍为 `root:root 0600` 且十个旧密码均已失效 |
+| 业务保护 | PASS / NO BUSINESS REQUEST | 没有打开经营工作台或 Planning Package 详情，没有发起接收、退回、v2、项目/主数据或任何业务域请求。本轮未读 Package 数据，不能冒充新的黑盒状态证据 |
+| 版本/服务 | UNCHANGED | alpha.37、0001—0036 和 Web 镜像保持；未 build、Migration、PostgreSQL 测试、Compose 重建或服务重启，四服务 restart 0/OOM false |
+| 资源/清理 | PASS WITH CANDIDATE RETAINED | 起点约 2.3 GiB available/218 MiB Swap/22 GiB/Load `0.44/0.31/0.21`；最终约 2.3 GiB/218 MiB/22 GiB/`0.13/0.18/0.20`。内核 OOM 0，四服务 restart 0/OOM false；临时容器、profile/cache、依赖、控制脚本和目录已清理，未 prune、删除镜像/Volume/备份，恢复候选按规则保留 |
+| Git | DOCS CLOSURE | 起点 `615fe3ab4913c1964cfeb7337196f0d3e1a8d787`；1,118 文件凭据扫描和 `git diff --check` 通过，仅提交无秘密的状态/任务报告，提交消息 `ops: rotate exposed UAT role credentials`，实际 SHA 以 Git log 为准；不 push/PR/改写历史 |
+| 后续 | EXPLICIT RECOVERY AUTHORIZATION REQUIRED | 保留候选并停止所有 UAT/Planning 登录；另行授权后先处置管理员和首个 UAT Session 风险，再完成十账号验证。全部退出/失效通过前不得提升候选或开始 planning-only 核验 |
+
 ## SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08 Planning 审核追溯修复与安全停止
 
 | 验证项 | 结果 | 说明 |
@@ -19,10 +37,10 @@
 | 部署 | PASS / WEB ONLY | Web `sha256:6667bd2ca64e...→sha256:6b94a9c73a18...`，旧 Web 精确回退 tag 保留；PostgreSQL、Worker、Caddy 未重建，Origin/端口、四卷保持 |
 | UAT 数据 | PASS / UNCHANGED | 部署前后业务指纹均为 `a7869b3ae5d75b7b68fac1234e04288c755622ee3f549497b2c96dc366701679`；Package ID 1/v1/SUBMITTED/摘要前缀 `9d7a6a7ec9aefbaf`，总数 1、v2/RETURN/ACCEPT 0，Resolution/Product/BOM/Material/Event/Audit 未修改 |
 | 主 UAT 浏览器 | NOT RUN / SAFETY STOP | 没有登录 planning 或 engineering，没有创建 Session，没有填写原因、点击接收/退回或产生 v2；不得把隔离结果描述成主 UAT 证据 |
-| 凭据事件 | OPEN SECURITY BLOCKER | shell 诊断错误输出暴露 root-only UAT 角色凭据正文；只读计数确认 10 组均仍有效，其中 1 组为 planning。发现后停止登录；文档和 Git 不记录用户名、凭据值、摘要、Cookie、Token 或 Session 信息 |
+| 凭据事件 | PARTIAL ROTATION / BLOCKER OPEN | 后续 ROLE-CREDENTIAL-ROTATION-09 已通过网页重置十账号，但验证在首个账号退出前安全停止；正式文件未提升，恢复候选保留，管理员和首个 UAT Session 风险未解除。文档和 Git 不记录凭据值、摘要、Cookie、Token 或 Session 信息 |
 | 运行健康/资源 | PASS | 最终 available 2.2 GiB、Swap 214 MiB/1 GiB、根盘 22 GiB、Load `0.17/0.54/0.74`；Web/PostgreSQL healthy、Worker/Caddy running，四服务 restart 0/OOM false。任务检查范围约 2.1—2.3 GiB available、196—224 MiB Swap、根盘最低 21 GiB，未触发停止阈值 |
 | 清理 | PASS | 本任务隔离测试/恢复库、临时 runner/builder/Playwright 基础镜像和精确临时目录已删除；正式备份、当前/回退 Web 保留。未 prune，四个受保护 Volume 保持 |
-| 后续 | EXPLICIT AUTHORIZATION REQUIRED | 先经项目负责人明确授权，以受控 Identity 流程轮换全部 10 组已暴露凭据；再以新的安全凭据机制另立 planning-only 只读核验。此前不得重新开始 planning 退回试用 |
+| 后续 | EXPLICIT RECOVERY AUTHORIZATION REQUIRED | 先在独立授权下处理恢复候选、Session 风险和十账号完整验证；正式文件原子提升后，仍须另立 planning-only 只读核验。此前不得重新开始 planning 退回试用 |
 
 ## SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07 版本化需求单位解析实施与并行 UAT 部署
 
