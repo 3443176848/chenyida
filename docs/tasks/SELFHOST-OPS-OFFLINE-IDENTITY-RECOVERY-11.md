@@ -2,11 +2,13 @@
 
 ## 状态
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始日期：2026-08-01（Asia/Shanghai）
+- 完成日期：2026-08-01（Asia/Shanghai）
 - 起点：clean `main@753c68c84427de93536a1f282b6e80987f7c9466`，`origin/main...HEAD` behind 0 / ahead 113。
 - 运行基线：`0.1.0-alpha.37`、36/head `0036_project_requirement_unit_resolution.sql`、Web `sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25`。
 - 授权：项目负责人已明确选择方案 B，并授权当前并行非生产 UAT 的离线身份恢复、11 个目标账号密码重置、相关 Session 全部撤销、恢复审计和 Canonical 文件原子安装。
+- 结论：`OFFLINE IDENTITY RECOVERY COMPLETED — CANONICAL CREDENTIALS ACTIVE`
 
 ## 唯一目标
 
@@ -59,6 +61,31 @@
 - 演练前后业务指纹均为 `04cdbc8a49112bc43b5652760408d46d10dbdda1801c1c9b816aa9891a5b5c3c`，受保护数据指纹均为 `5414589704ac085792cab1a546e658a61b39c2988800a23ad091e756275e7d41`；角色、active、Migration 和 Schema 保持。
 - 演练库、临时备份、临时 Web 副本、浏览器证据和秘密 Stage 已精确清理；Playwright 固定版本运行材料暂留 `/run`，仅供正式浏览器验证，正式完成后清理。
 - Identity、事务/Stage、测试/runner 三个只读复审均已完成；当前未发现正式主库执行代码阻断。
+
+## 正式执行结果（2026-08-01）
+
+| 项目 | 结果 |
+| --- | --- |
+| Recovery run-id | `3b03aaab-11ef-4dfe-963b-001a6ece660f`；唯一持久证据、11 条恢复审计与最终化标记均通过 |
+| 正式备份 | `/var/backups/chenyida-erp/parallel-uat-pre-identity-recovery-3b03aaab11ef.dump`，`root:root 0600`，2,134,619 bytes，SHA-256 `4c071223172d8a0fcb8c196690ec57c0f414eb83fde40f316449d5200f6bc42a`；`pg_restore --list` 通过 |
+| 第二新空库恢复 | 36 migrations/head 0036；用户 14、Session 118、目标账号 11、角色/active 匹配 11、目标有效 Session 0；两类业务保护指纹与主库正式执行前一致，恢复库已删除 |
+| 单一事务 | 11 个账号全部行锁并原子更新；提交前精确核验用户名、角色、active 和账号总数；角色、active、用户名未修改 |
+| Session 撤销 | 正式恢复事务撤销 12 条目标既有 Session；正式浏览器验证后目标有效 Session 与未撤销 Session均为 0，其他用户 Session 不在写入范围 |
+| 恢复审计 | 11 条 `OFFLINE_IDENTITY_RECOVERY` 成功审计；操作者语义为离线恢复，不冒充网页管理员；未记录秘密正文 |
+| 业务保护 | 业务指纹执行前后均为 `04cdbc8a49112bc43b5652760408d46d10dbdda1801c1c9b816aa9891a5b5c3c`，受保护数据指纹均为 `5414589704ac085792cab1a546e658a61b39c2988800a23ad091e756275e7d41`；Migration/Schema/版本未变。Planning 表仅被受控备份/恢复与整体指纹核对覆盖读取，未做 Package 对象级核验、修改或业务操作 |
+| Canonical | 两份标准 JSON 均通过 Schema；`/etc/chenyida-erp/parallel-admin.txt` 与 `/etc/chenyida-erp/uat-role-accounts.txt` 均为单硬链接普通文件、`root:root 0600`；未输出文件摘要或正文 |
+| Stage/旧候选 | 两份正式 Stage 已在最终化后删除；旧 UAT candidate 仅在两份 Canonical 均提升成功后删除；不声称普通删除在底层不可恢复 |
+| 浏览器验证 | 单一 Chromium 顺序验证：admin 登录成功、不强制改密并安全退出；十个固定 UAT 账号全部登录成功、仅到强制改密页、未实际改密并安全退出；back/forward/refresh 均不能恢复受保护内容；未进入业务页面 |
+| 停服/恢复 | Web/Worker 两次停写窗口分别 92 秒与 21 秒，合计 113 秒；PostgreSQL/Caddy 保持运行。原 Web/Worker 容器与镜像恢复，未 build、未换镜像 |
+| 运行状态 | Web/PostgreSQL healthy，Worker/Caddy running；四服务 restart 0、OOM false；四个受保护 Volume 均存在 |
+| 临时资源 | 隔离数据库、临时备份、临时 Web、测试/检查/浏览器容器、浏览器网络、Playwright 运行目录、测试 Stage 与临时 SQLite 均已清理；正式备份、Canonical、浏览器证据和 PREPARED/COMPLETED 标记保留 |
+
+## 提交与最终验证
+
+- 工具与测试提交：`a48dcc8a290b96da1ea6e426aaa2c6d73416c2fc`（`ops: add guarded offline identity recovery`）。完成记录使用独立 `ops: complete canonical credential recovery` 提交，实际 SHA 以 `git log` 为准。
+- 定向 unit 7/7、隔离 PostgreSQL 12/12、最终 0036 备份恢复/隔离 Web/单 Chromium 演练、Site lint、`npm test` 3/3、Python `server.py --self-test`、`smoke_test.py`、隔离临时 SQLite `go_live_check.py --no-backup` 均通过。
+- 仓库凭据扫描和 `git diff --check` 通过；Git 中没有凭据、密码摘要、Token、Cookie、Session 摘要、数据库连接串、备份正文或 Canonical 正文。未 push、PR 或改写历史。
+- 正式完成后立即停止；没有开始 Planning 核验、接收、退回或其他业务任务。
 
 ## 明确禁止
 

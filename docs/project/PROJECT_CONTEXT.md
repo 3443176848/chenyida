@@ -33,13 +33,14 @@
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.37`。
 - Git 复核：FIX-08 从 clean `main@a254bca5d59dd3f17047c9d6495dfdf2df1a798e`、Parent `91c0fd29d534246c55ddd669e894cdde9b774e52`、behind 0/ahead 109 起步；功能提交为 `682e79378660ef7859617655836f02e2112df244`，安全停止/运维文档由独立 `ops: record blocked planning traceability rollout` 提交收口。未 push/PR/amend/rebase/reset/stash/restore，既有提交未改写；未读取、修改或提交 `shujvbiao/`。
 - 身份收口 Git 复核：CREDENTIAL-RECONCILIATION-10 从 clean `main@a4eff293668e24f4f780eb5df840bfc7e510365e`、Parent `615fe3ab4913c1964cfeb7337196f0d3e1a8d787`、behind 0/ahead 112 起步；结构预检 fail closed 后只允许无秘密报告提交。未 push/PR/amend/rebase/reset/stash/restore，未读取、修改或提交 `shujvbiao/`。
+- 离线身份恢复 Git 复核：OFFLINE-IDENTITY-RECOVERY-11 从 clean `main@753c68c84427de93536a1f282b6e80987f7c9466`、behind 0/ahead 113 起步；工具/测试提交为 `a48dcc8a290b96da1ea6e426aaa2c6d73416c2fc`，完成记录由独立 `ops: complete canonical credential recovery` 提交收口。未 push/PR 或改写历史，未读取/修改 `shujvbiao/`，秘密和数据库/备份正文未进入 Git。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
 - 离线内部物料库：LANDING-TASK06 以 `moban.xlsx` 第一张 `原BOM` 只作对照、第二张 `Sheet1` 作为唯一 13 列标准；复用 LANDING-TASK02 root-only 证据生成 724 行内部物料库、997 行标准明细、484 行待确认和 1,006 行来源映射。532 个正式编码只沿用既有结果；147 个来源候选、45 个模板候选不配码，另保留 1 个来源版本冲突。结果为 root-only 工作簿，未导入任何数据库。
 - 逐表标准化交付：LANDING-TASK07 进一步按项目负责人澄清，把 `moban.xlsx` 第一张作为真实原始数据、第二张作为整理目标，验证 53/53 行组规格证据和用量后逐来源整理。结果含 591 行总表、8 张来源标准页、591 行追溯和 94 条异常；57 行未知用量、21 行未知板型留空，A118 精确重复区段只计一次，A200 同逻辑旧版按模板优先。未导入任何数据库。
 - 大批量跨对话流程：LANDING-TASK08 固定 `CYD-MATERIAL-13C-v1`、`CYD-MATERIAL-NORMALIZATION-v1`、`CYD-MAT-YYYYMMDD-NNN/Rxxx` 和默认 10 文件/5,000 行/100 MiB 上限；私有总索引、批次卡、来源 manifest 与 `checkpoint.next_action` 是恢复权威。已知结构按版本化来源档案复用，未知结构先确认；Codex 不能自行批准批次，临时汇总不得入库。通用执行器和代表性试点尚未实现。
 - V9 重导入 staging：LANDING-TASK05 对单个 SHA 绑定 XLSX 解析 197 行；编码唯一连续、来源完整，但显式单位 0，产品/BOM 结构字段 0。恢复库首次 staged 197、重放新增 0，全部 review；5,556 条拟删除计划未执行，主库 213 表计数完全不变。
-- 第二管理员与 UAT 账号：`admin2` 的既有 active/version/must-change 历史事实不变。ROLE-CREDENTIAL-ROTATION-09 已用管理员网页重置十个指定 UAT 账号，逐项角色/active 状态保持，Identity audit 成功 10/失败 0；首个账号旧密码拒绝、新密码认证和强制改密页通过，但 UAT/管理员页面退出及 Session 失效未完成，其余九个未验证。CREDENTIAL-RECONCILIATION-10 后续获权执行方案 A，但单一受控进程在凭据结构预检即 fail closed：Chromium/API/身份变更均为 0，管理员/正式 UAT 文件和既有 root-only 0600 候选未变化，Admin/manager 遗留 Session 风险未解除。任何后续格式核验、登录、候选提升或 Session 风险处置都需另立授权；本仓库不得记录凭据值、用户名、摘要或 Session 信息。
+- 第二管理员与 UAT 账号：`admin2` 的既有 active/version/must-change 历史事实不变。ROLE-CREDENTIAL-ROTATION-09 和 CREDENTIAL-RECONCILIATION-10 的历史 PARTIAL/BLOCKED 事实保留；后续 OFFLINE-IDENTITY-RECOVERY-11 已按方案 B 对 admin 与固定十个 UAT 账号完成单事务恢复、目标既有 Session 撤销、11 条恢复审计、Canonical 激活和 1+10 身份页验证。目标账号角色/active 保持，最终有效且未撤销 Session 均为 0；旧 candidate 与 Stage 已按成功规则删除。仓库不记录凭据值、摘要、Token、Cookie 或 Session 信息。
 - 单账号豁免：SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 采用 serializable 事务、任务 advisory lock、行锁和 version 2 CAS，把账号更新与唯一 `USER_FIRST_PASSWORD_CHANGE_WAIVED/success` 审计同事务提交；同任务重放 no-op。现有有效 Session 保留，D-045 全局新建/重置用户强制首次改密策略与 API 不变。
 - 公网与 UAT 来源校验：公网继续由显式、规范化、单值 `ERP_PUBLIC_ORIGIN` 精确限制，不读取任意转发头；当前唯一公网值为 `https://43.135.148.43.nip.io:18888`。只有 `ERP_DEPLOYMENT_CLASS=uat` 与 `ERP_UAT_ALLOW_LOOPBACK_ORIGIN=true` 同时启用时才额外允许浏览器 Origin 与 Request URL origin 均为严格字面量 loopback；生产类别不能启用。身份和 Planning 写均要求 Origin 和 Cookie/Header CSRF 双提交。当前 alpha.37 Web 为 `sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25`；部署前 `sha256:6667bd2ca64e7255befe4398b4e73ec1fe554418d76062d2d378de8edaa7143e` 有精确回退 tag。PostgreSQL/Worker/Caddy 未因 FIX-08 替换或重建。
 - 公网 IP 切换：PUBLIC-IP-CUTOVER-07 同步更新 Caddy `ERP_DOMAIN` 和 Web `ERP_PUBLIC_ORIGIN`，以原镜像串行重建 Web/Caddy并取得 `43.135.148.43.nip.io` 的 Let's Encrypt 证书；外部 18888 登录页、200/308/401、安全头和旧 SNI 退役通过。PostgreSQL/Worker 容器未更换，root-only 原 env 回退副本保留。
@@ -69,6 +70,7 @@
 - FIX-08 的测试、build、备份恢复、Web 更新和隔离 Chromium 严格串行，一次最多一个临时重任务容器。检查范围约为 2.1—2.3 GiB available、196—224 MiB Swap、根盘最低 21 GiB、Load 低于停止阈值；最终为 2.2 GiB/214 MiB/22 GiB/`0.17/0.54/0.74`。四服务 restart 0/OOM false；隔离库、恢复库、runner/builder/Playwright 基础镜像和精确临时目录已清理，正式备份、当前/回退 Web 和四卷保留。
 - ROLE-CREDENTIAL-ROTATION-09 只运行一个受限 Chromium 实例和顺序 Context，不执行 build、Migration、PostgreSQL 测试或 Compose 重建。起点约 2.3 GiB available/218 MiB Swap/22 GiB/Load `0.44/0.31/0.21`，最终约 2.3 GiB/218 MiB/22 GiB/`0.13/0.18/0.20`；内核 OOM 0、四服务 restart 0/OOM false。临时容器/profile/cache/依赖/控制目录已清理，四卷保持；root-only 恢复候选因 PARTIAL 规则保留。
 - CREDENTIAL-RECONCILIATION-10 没有启动 Chromium 或发送 API。起点约 2.2 GiB available/218 MiB Swap/22 GiB/Load `0.19/0.14/0.10`，最终约 2.2 GiB/217 MiB/22 GiB/`0.40/0.23/0.20`；内核 OOM 0、四服务 restart 0/OOM false。临时容器自动删除；控制脚本、临时依赖/cache 和精确 `/run` 目录清理，既有 UAT 恢复候选和四卷保持；按保护规则未删除镜像。
+- OFFLINE-IDENTITY-RECOVERY-11 的测试、备份/恢复、停服事务、隔离/正式 Chromium 和最终化全部串行，一次最多一个临时重型资源。正式前约 2.1 GiB available/227 MiB Swap/21 GiB/Load `0.06/0.26/0.34`，最终约 2.2 GiB/218 MiB/20 GiB/`0.11/0.41/0.41`；未触发停止阈值，内核 OOM 0、四服务 restart 0/OOM false。隔离库、容器/网络、Playwright 运行材料、测试 Stage 和临时 SQLite 已清理；正式备份、Canonical、完成标记、无秘密浏览器证据和四个受保护 Volume 保留，未 prune。
 - LANDING-TASK05 的 dump、恢复、staging 和测试严格串行；起点 available `2,351,184 KiB`、Swap `130,592 KiB`、Load `0.06/0.09/0.11`、根盘 35 GiB，提交后约 2.2 GiB/126 MiB/`0.08/0.14/0.14`/35 GiB；独立 60 秒 Swap 增长 0。四服务 restart 0/OOM false，临时库/runner/cache 删除，四个受保护卷保留。
 - MATERIAL-REVIEW-BLOCKERS-03-RETRY 的隔离 PostgreSQL、build、备份恢复、Web 替换和真实 Chromium 严格串行；起点约 2.4 GiB available/163 MiB Swap/31 GiB 根盘，最终约 2.3 GiB/187 MiB/30 GiB/Load `0.21/0.45/0.68`。内核 OOM 0，四服务 restart 0/OOM false；只重建 Web，测试/恢复库、容器、浏览器和 worktree 已清理，四卷保持。
 - BOM-SELECTOR-FIX-04 的隔离 PostgreSQL、alpha.34 build、备份恢复、Web 替换和 Chromium 严格串行；首次门禁约 2.3 GiB available/198 MiB Swap/29 GiB，部署前 2.3 GiB/180 MiB/29 GiB/Load `0.09/0.44/0.48`，浏览器后 2.3 GiB/204 MiB，最终根盘恢复 29 GiB。内核/容器 OOM 0、四服务 restart 0；测试/恢复库、临时容器、浏览器、Playwright 镜像、task worktree 和可归属 BuildKit cache 已清理，备份/当前镜像/回退 tag 和四卷保留。
@@ -193,9 +195,9 @@
 ## 当前风险
 
 - V9 主数据表缺少逐行显式单位，且不包含产品/版本/BOM 行号/数量/位号/单位结构；197 行只能保留在 review。未经补充明确字段不得把 PCS、使用次数或原始描述猜成主库单位/BOM 数量，也不得先清空现有 532 Material/316 BOM Line。
-- 当前受保护 Product Version 7/A0、BOM Version 7/V1 和 Planning Package ID 1/v1/SUBMITTED 都是 FIX-08 最后已验证业务基线；凭据轮换没有读取或操作这些业务事实。不得通过前端隐藏或临时调用绕过服务端/DB 不可变，且禁止在当前安全阻断期间接收、退回或创建 v2。
+- 当前受保护 Product Version 7/A0、BOM Version 7/V1 和 Planning Package ID 1/v1/SUBMITTED 都是 FIX-08 最后已验证业务基线；OFFLINE-IDENTITY-RECOVERY-11 只有受控备份/恢复与整体指纹核对覆盖读取相关表，未做这些对象的业务级核验、修改或操作。身份风险虽已解除，仍不得把该任务当作 Planning 授权，接收、退回或创建 v2 必须另立任务。
 - `PRJ-00000001` 的源 Requirement Item 仍为 `unit_id=NULL/unit_pending=true`；Unit Resolution Head 已固定指向 ID 1/v1/Unit ID 1/PCS，Package Item 也固定引用该 Resolution Version。不得写回源需求、读取后来变化的 Head 冒充快照、从 BOM 推断单位或绕过完整性门禁。
-- 历史 BOM-SELECTOR-FIX-04 曾发生 root-only engineering 账号材料输出事件；FIX-08 又发生 UAT 角色凭据输出事件。后续轮换已重置十账号但验证/正式文件提升未完成，管理员和首个 UAT Session 风险开放；当前所有 UAT 角色登录均须停止，恢复候选不得删除或提升。凭据值和身份信息不得进入仓库。
+- 历史 BOM-SELECTOR-FIX-04 和 FIX-08 的凭据事件及 TASK09/TASK10 的 PARTIAL/BLOCKED 记录继续保留；OFFLINE-IDENTITY-RECOVERY-11 已通过全新 Canonical、目标 Session 撤销和完整退出验证解除当前暴露/遗留 Session 风险。凭据值和身份信息仍不得进入仓库；后续登录和业务操作必须使用各自任务授权。
 
 - Material Draft/Review/Active、Import Mapping/版本/复用、行级 Normalizer 及人工复核/ACTIVE绑定/Draft Commit 已完成 PostgreSQL 非生产移植；后续真实数据演练和迁移不得重新接入 D1 运行依赖。
 - `0002`/`0003`/`0004`/`0005`、双用户审批、Mapping确认、Normalization原子发布/取消、人工复核 finalization 和重启持久性只在一次性 PostgreSQL 17/Compose 测试环境验证；未迁移真实数据、执行生产容量测试、生产恢复演练或部署。
@@ -235,7 +237,7 @@
 
 ## 当前路线
 
-`SELFHOST-OPS-UAT-ROLE-CREDENTIAL-ROTATION-09` 当前为 PARTIAL/BLOCKED。十账号网页重置与审计已成功，但首个 UAT 和管理员退出/Session 失效未完成，其余九个未验证；正式凭据文件未提升，root-only 0600 恢复候选保留。`SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 因此继续 BLOCKED；Package ID 1/v1/SUBMITTED、总数 1、v2/RETURN/ACCEPT 0 只是 FIX-08 最后已验证基线，本轮未读或操作业务数据。另行授权完成身份恢复前，不得接收、退回、登录 engineering 或开始 planning-only 核验。
+`SELFHOST-OPS-OFFLINE-IDENTITY-RECOVERY-11` 已完成：11 个目标账号原子恢复、12 条目标旧 Session 撤销、11 条恢复审计、Canonical 激活、admin 与十 UAT 的身份页验证和最终零有效目标 Session 均通过，业务指纹不变。ROLE-CREDENTIAL-ROTATION-09/CREDENTIAL-RECONCILIATION-10 继续保持历史 PARTIAL/BLOCKED 记录，但其当前身份风险已由 TASK11 解除。现在没有自动执行任务；Planning Package ID 1/v1/SUBMITTED 等仍只是 FIX-08 最后已验证基线，任何 planning-only 核验、接收或退回必须重新明确授权。
 
 ## 恢复上下文检查清单
 

@@ -2,6 +2,26 @@
 
 最后更新时间：2026-08-01（Asia/Shanghai）
 
+## SELFHOST-OPS-OFFLINE-IDENTITY-RECOVERY-11 受控离线身份恢复与 Canonical 凭据激活
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | OFFLINE IDENTITY RECOVERY COMPLETED — CANONICAL CREDENTIALS ACTIVE | 方案 B 已在当前并行非生产 UAT 完整执行；正式 run-id `3b03aaab-11ef-4dfe-963b-001a6ece660f`，完成后停止，未开始 Planning 核验 |
+| 严格起点 | PASS | clean `main@753c68c84427de93536a1f282b6e80987f7c9466`、behind 0/ahead 113；alpha.37、36/head 0036、指定 Web 镜像、四服务、四卷、旧文件元数据与资源门禁全部吻合；旧凭据正文未读 |
+| CLI 守卫 | PASS | 不接 Web 路由；拒绝 production、非 root、未知数据库身份、非 0036、Web/Worker 可写、缺少确认和重复 run-id；禁 core、umask 077、错误与输出去敏，复用现有 Password/Identity/PostgreSQL 事务边界 |
+| 定向/隔离测试 | PASS | unit 7/7、隔离 PostgreSQL 12/12；覆盖 11 账号原子更新、角色/active 保持、目标 Session 撤销、其他用户 Session 不变、11 审计、故障零半记录、run-id、Stage 失败、提升失败恢复和最终化幂等 |
+| 最终隔离演练 | PASS | 从 0036 主库备份恢复后，以 run-id `08ab9e35-07c5-467d-9b45-7ceccc78dec3` 完成 11 账号/12 Session/11 审计、Canonical、单 Chromium 1+10 登录/门禁/退出和零有效目标 Session；指纹不变，演练资源已清理 |
+| 正式备份/恢复 | PASS | root:root 0600 dump 2,134,619 bytes，SHA-256 `4c071223172d8a0fcb8c196690ec57c0f414eb83fde40f316449d5200f6bc42a`；`pg_restore --list` 与第二新空库 36/head 0036、非敏感身份计数和两类业务指纹核对通过；恢复库已删，正式备份保留 |
+| 正式事务 | PASS / ATOMIC | 11 个目标账号锁定并更新，用户名/角色/active 保持；撤销 12 条目标既有 Session；写 11 条 `OFFLINE_IDENTITY_RECOVERY` 审计和唯一 run-id 证据；其他用户/Session 与业务表不在写入范围 |
+| 业务保护 | PASS / UNCHANGED | 业务指纹 `04cdbc8a49112bc43b5652760408d46d10dbdda1801c1c9b816aa9891a5b5c3c`、受保护指纹 `5414589704ac085792cab1a546e658a61b39c2988800a23ad091e756275e7d41` 正式执行前后相同；版本、Migration、Schema、镜像未变。Planning 表仅被受控备份/恢复与整体指纹核对覆盖读取，未做 Package 对象级核验、修改或业务操作 |
+| Canonical/Stage | PASS / ACTIVE | Admin/UAT Canonical 均为标准 JSON、单硬链接普通文件、`root:root 0600`，Schema PASS；两份 Stage 最终删除，旧 UAT candidate 仅在双文件成功后删除；PREPARED/COMPLETED 标记与浏览器证据保留 |
+| 主 UAT 浏览器 | PASS 1+10 | admin 登录成功、不强制改密并安全退出；十个固定 UAT 账号均登录成功、仅到强制改密页、未实际改密并安全退出；历史导航/刷新不恢复受保护内容，未进入经营或 Planning 页面 |
+| 最终 Session | PASS / ZERO RISK OPEN | 正式浏览器后 11 个目标账号有效且未撤销 Session 均为 0；无需单账号 fallback，没有本任务遗留 Session 风险 |
+| 停服/服务 | PASS / 113 SECONDS | Web/Worker 两次停写 92 秒与 21 秒；PostgreSQL/Caddy 保持运行。原 Web/Worker 容器 ID 与镜像恢复，Web/PostgreSQL healthy、Worker/Caddy running，restart 0/OOM false；未 build/换镜像/重建 Volume |
+| 自动基线 | PASS | Site lint、`npm test` 3/3、Python self-test/smoke/隔离 go-live、仓库凭据扫描和 `git diff --check` 通过；未读取 `shujvbiao/` |
+| 资源/清理 | PASS | 起点约 2.1 GiB available/227 MiB Swap/21 GiB 根盘/Load `0.06/0.26/0.34`；最终约 2.2 GiB/218 MiB/20 GiB/`0.11/0.41/0.41`，内核 OOM 0、四服务 restart 0/OOM false，未触发门禁。隔离库、临时容器/网络/浏览器运行材料/测试 Stage/临时 SQLite 均清理，四个受保护 Volume 保持；未 prune |
+| Git | TWO FOCUSED COMMITS | 工具/测试提交 `a48dcc8a290b96da1ea6e426aaa2c6d73416c2fc`；完成记录提交 `ops: complete canonical credential recovery` 的实际 SHA 以 `git log` 为准；不 push/PR/amend/rebase/reset/stash/restore |
+
 ## SELFHOST-OPS-UAT-CREDENTIAL-RECONCILIATION-10 管理员与 UAT 凭据安全收口
 
 | 验证项 | 结果 | 说明 |

@@ -4,6 +4,18 @@
 
 ## 2026-08-01
 
+### SELFHOST-OPS-OFFLINE-IDENTITY-RECOVERY-11 - `ops: add guarded offline identity recovery` / `ops: complete canonical credential recovery`
+
+- Git/范围：从 strict clean `main@753c68c84427de93536a1f282b6e80987f7c9466`、behind 0/ahead 113 起步；只获权处理当前并行非生产 UAT 的 admin 与固定十个 UAT 账号。工具/测试提交 `a48dcc8a290b96da1ea6e426aaa2c6d73416c2fc`；未 push/PR 或改写历史，未读取/修改 `shujvbiao/`。
+- 离线工具：新增不接 Web 路由的 root-only Identity Recovery CLI、正式 runner、离线状态证明、受控检查、Canonical Stage/提升、隔离 Web/浏览器与证据最终化。严格拒绝 production、非 root、未知数据库、非 0036、可写服务、缺确认和重复 run-id；复用现有 Password/Identity/PostgreSQL 事务，不独立实现密码算法或 HTTP 恢复入口。
+- 测试/演练：unit 7/7、隔离 PostgreSQL 12/12；最终 0036 主库备份恢复演练完成 11 账号原子更新、12 Session 撤销、11 审计、Canonical 与单 Chromium admin+十 UAT 登录/强制改密门禁/退出，最终目标有效 Session 0，业务与受保护指纹不变，演练资源已清理。
+- 正式备份：root:root 0600 custom dump 2,134,619 bytes，SHA-256 `4c071223172d8a0fcb8c196690ec57c0f414eb83fde40f316449d5200f6bc42a`；`pg_restore --list` 与第二新空库 36/head 0036、身份非敏感计数和两类业务指纹通过。恢复库已删除，正式备份保留。
+- 正式恢复：run-id `3b03aaab-11ef-4dfe-963b-001a6ece660f`；单事务锁定并更新 11 账号、撤销 12 条目标既有 Session、写 11 条 `OFFLINE_IDENTITY_RECOVERY` 审计与唯一持久证据。用户名、角色、active、其他用户/Session、业务表、Migration/Schema/版本均不在变更范围。
+- Canonical/浏览器：两份正式文件标准 JSON Schema PASS、单硬链接普通文件、`root:root 0600`；双文件成功后删除旧 candidate，最终化后删除 Stage。单 Chromium 验证 admin 不强制改密并退出、十 UAT 全部仅到强制改密页并退出，历史导航/刷新不恢复受保护内容；最终目标有效与未撤销 Session 均为 0，未进入业务页面。
+- 业务/服务：业务指纹 `04cdbc8a49112bc43b5652760408d46d10dbdda1801c1c9b816aa9891a5b5c3c` 与受保护指纹 `5414589704ac085792cab1a546e658a61b39c2988800a23ad091e756275e7d41` 前后一致；Planning 表只被受控备份/恢复与整体指纹核对覆盖读取，未做 Package 对象级核验、修改或业务操作。Web/Worker 停写合计 113 秒并恢复原容器/镜像，PostgreSQL/Caddy 保持运行，四服务 restart 0/OOM false。
+- 验证/清理：Site lint、`npm test` 3/3、Python 三项、仓库凭据扫描和 `git diff --check` 通过。隔离库、临时容器/网络/浏览器运行材料/测试 Stage/临时 SQLite 均清理；四个受保护 Volume、正式备份、Canonical、完成标记与无秘密浏览器证据保留，未 prune。
+- 结论：`OFFLINE IDENTITY RECOVERY COMPLETED — CANONICAL CREDENTIALS ACTIVE`。完成后立即停止，不开始 Planning 核验、接收、退回或其他业务任务。
+
 ### SELFHOST-OPS-UAT-CREDENTIAL-RECONCILIATION-10 - `ops: record blocked credential reconciliation`
 
 - Git/范围：从 clean `main@a4eff293668e24f4f780eb5df840bfc7e510365e`、Parent `615fe3ab4913c1964cfeb7337196f0d3e1a8d787`、behind 0/ahead 112 起步；获权范围仅为管理员本人改密、manager 二次重置、十账号 Identity 验证/退出和候选提升，不包含业务、数据库直改、重启或部署。
