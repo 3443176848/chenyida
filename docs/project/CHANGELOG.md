@@ -2,6 +2,20 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-01
+
+### SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08 - `fix: expose planning handoff traceability` / `ops: record blocked planning traceability rollout`
+
+- Git/范围：从 clean `main@a254bca5d59dd3f17047c9d6495dfdf2df1a798e`、Parent `91c0fd29d534246c55ddd669e894cdde9b774e52`、behind 0/ahead 109 起步；功能提交 `682e79378660ef7859617655836f02e2112df244`。只改 Planning Handoff 详情的只读合同、展示、测试和项目文档；未 push/PR 或改写历史。
+- 权威查询：详情使用单连接 `REPEATABLE READ READ ONLY`，先执行现有 `planning.read` 与 Package 范围授权，再从不可变 Package Snapshot、精确 Package Event、Package Item 固定 `unit_resolution_id` 和稳定关联对象投影。CREATE 请求只精确匹配该 Package 的成功准备审计；没有授予 planning 全局审计权限，也没有补写历史。
+- UI：新增 Package 稳定 ID/version/完整摘要/责任队列/assignee 与 SLA 空状态、CREATE/SUBMIT/RETURN/ACCEPT 时间线和 Asia/Shanghai 标注；Product/BOM 创建服务门禁证据与当前状态分开，销售源单位 pending 与工程 `件 · PCS`/Unit ID 1/Resolution v1 并列；四条 Material 显示稳定 ID、正式编码、名称、1 PCS、损耗和 10 PCS。退回文案、决策后果、终态只读原因和 390px 卡片布局完成。
+- 测试：适用 Node 103/103，Planning unit/UI/PostgreSQL `4/7/11`，两个 typecheck、lint 0 error/10 既有 warning、1,117 文件凭据扫描通过。隔离 Chromium 1/1 在 390×844 完成合成查看→退回、无全局溢出、v2/ACCEPT 0、退出 Session 失效；没有对主 UAT 执行退回。
+- 数据库/版本：没有新增 0037，没有修改 0001—0036，alpha.37 不变；0036 SHA-256 仍为 `a5ad532837acb0c9704f5c885206cf2ec10c891628c7fe4ed660233468b134a0`。功能核验没有发现历史追溯缺口。
+- 备份/部署：root:root 0600 custom dump 2,131,480 bytes、SHA-256 `25c302316d415602825d1d9d85e8456a5c46db5c4167cc5f8da27b0ea8f42ff2`，`pg_restore --list` 与第二新空库 36/head 0036 恢复通过。只替换 Web `sha256:6667bd2ca64e...→sha256:6b94a9c73a18...`；PostgreSQL/Worker/Caddy、Origin/端口和四卷保持。
+- UAT 保护：部署前后业务指纹均为 `a7869b3ae5d75b7b68fac1234e04288c755622ee3f549497b2c96dc366701679`。Package ID 1/v1 仍 SUBMITTED、总数 1、v2/RETURN/ACCEPT 0；Unit Resolution、Product/BOM、Material 533—536、Event/Audit 均未修改。
+- 安全停止：准备主 UAT planning 只读浏览器核验时，shell 诊断错误输出暴露 root-only UAT 角色凭据正文；后续只读计数确认 10 组仍有效，其中 1 组为 planning。立即停止登录，未创建 Session、未登录 planning/engineering、未执行接收/退回。凭据值和身份信息未写入仓库；因轮换属于新的权限变化且未获授权，主 UAT 浏览器验收未执行，任务以 `BLOCKED — NO UNSAFE CHANGE` 收口。
+- 资源/清理：最终 available 2.2 GiB、Swap 214 MiB、根盘 22 GiB、Load `0.17/0.54/0.74`；四服务 restart 0/OOM false。隔离库、恢复库、临时浏览器/构建镜像和精确临时目录已清理，正式备份与当前/回退 Web 保留；未 prune 或删除受保护卷。
+
 ## 2026-07-31
 
 ### SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07 - `feat: add versioned requirement unit resolution` / `ops: deploy requirement unit resolution in parallel environment`

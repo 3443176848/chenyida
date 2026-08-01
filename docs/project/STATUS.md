@@ -1,6 +1,28 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-07-31（Asia/Shanghai）
+最后更新时间：2026-08-01（Asia/Shanghai）
+
+## SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08 Planning 审核追溯修复与安全停止
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | BLOCKED — NO UNSAFE CHANGE | 只读追溯功能、隔离验证、备份恢复和 Web-only 部署已完成；主 UAT planning 浏览器核验因凭据输出事件停止，不能标记为完成 |
+| Git | FEATURE COMMITTED / OPS CLOSURE | 起点 `a254bca5d59dd3f17047c9d6495dfdf2df1a798e`、Parent `91c0fd29d534246c55ddd669e894cdde9b774e52`、behind 0/ahead 109；功能提交 `682e79378660ef7859617655836f02e2112df244`，安全停止/运维文档以独立提交收口；未 push/PR/历史改写 |
+| 历史追溯缺口 | NOT FOUND | Package ID/version/digest/创建事实、CREATE 请求号、SUBMIT Event、固定 Unit Resolution v1、稳定 Product/BOM/Material 关联均已有权威事实；未补写、重建或伪造历史 |
+| 查询与权限 | PASS / PACKAGE SCOPED | 单连接 `REPEATABLE READ READ ONLY`；先校验 `planning.read` 和 Package 对象范围，再读取该 Package 的创建审计与 Event。另一 Package 审计诱饵、DRAFT/跨项目 403 通过；未授予 `system.audit.read` |
+| DTO/页面 | PASS / SYNTHETIC VERIFIED | 显示 Package ID/version/完整摘要/状态/责任队列/assignee 与 SLA 空状态、CREATE/SUBMIT/后续决策时间线、Asia/Shanghai、Product/BOM 稳定 ID、创建门禁证据与当前状态、销售源单位 pending、固定 Resolution v1、Material 533—536 ID/编码/名称/1 PCS/损耗/10 PCS |
+| 操作与响应式 | PASS / SYNTHETIC VERIFIED | 退回文案为“退回工程/项目部修订”，接收/退回后果和必填原因明确，终态无可操作按钮；390×844 无页面级或物料区横向溢出，宽表切换卡片，摘要和请求号可换行/复制 |
+| 自动测试 | PASS | 适用 Node 103/103；Planning unit 4/4、UI 7/7、PostgreSQL 11/11；两个 typecheck 通过，lint 0 error/10 既有 warning，仓库凭据扫描 1,117 文件通过 |
+| 隔离 Chromium | PASS 1/1 | 合成库完成查看→退回；v1 仅 1 个、v2/ACCEPT 0，源销售单位仍 NULL/pending，退出 Session 失效。首次断言运行在退回前因时区说明计数问题结束，修正断言后重跑通过 |
+| 版本/Migration | UNCHANGED | 源码与运行面保持 alpha.37；0001—0036 未修改、不新增 0037，0036 SHA-256 `a5ad532837acb0c9704f5c885206cf2ec10c891628c7fe4ed660233468b134a0`；主 UAT 未运行 Migration |
+| 正式备份/恢复 | PASS | root:root 0600 custom dump 2,131,480 bytes，SHA-256 `25c302316d415602825d1d9d85e8456a5c46db5c4167cc5f8da27b0ea8f42ff2`；`pg_restore --list` 与第二新空库 36/head 0036 恢复、0036 hash 和业务指纹核对通过，恢复库已删除 |
+| 部署 | PASS / WEB ONLY | Web `sha256:6667bd2ca64e...→sha256:6b94a9c73a18...`，旧 Web 精确回退 tag 保留；PostgreSQL、Worker、Caddy 未重建，Origin/端口、四卷保持 |
+| UAT 数据 | PASS / UNCHANGED | 部署前后业务指纹均为 `a7869b3ae5d75b7b68fac1234e04288c755622ee3f549497b2c96dc366701679`；Package ID 1/v1/SUBMITTED/摘要前缀 `9d7a6a7ec9aefbaf`，总数 1、v2/RETURN/ACCEPT 0，Resolution/Product/BOM/Material/Event/Audit 未修改 |
+| 主 UAT 浏览器 | NOT RUN / SAFETY STOP | 没有登录 planning 或 engineering，没有创建 Session，没有填写原因、点击接收/退回或产生 v2；不得把隔离结果描述成主 UAT 证据 |
+| 凭据事件 | OPEN SECURITY BLOCKER | shell 诊断错误输出暴露 root-only UAT 角色凭据正文；只读计数确认 10 组均仍有效，其中 1 组为 planning。发现后停止登录；文档和 Git 不记录用户名、凭据值、摘要、Cookie、Token 或 Session 信息 |
+| 运行健康/资源 | PASS | 最终 available 2.2 GiB、Swap 214 MiB/1 GiB、根盘 22 GiB、Load `0.17/0.54/0.74`；Web/PostgreSQL healthy、Worker/Caddy running，四服务 restart 0/OOM false。任务检查范围约 2.1—2.3 GiB available、196—224 MiB Swap、根盘最低 21 GiB，未触发停止阈值 |
+| 清理 | PASS | 本任务隔离测试/恢复库、临时 runner/builder/Playwright 基础镜像和精确临时目录已删除；正式备份、当前/回退 Web 保留。未 prune，四个受保护 Volume 保持 |
+| 后续 | EXPLICIT AUTHORIZATION REQUIRED | 先经项目负责人明确授权，以受控 Identity 流程轮换全部 10 组已暴露凭据；再以新的安全凭据机制另立 planning-only 只读核验。此前不得重新开始 planning 退回试用 |
 
 ## SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07 版本化需求单位解析实施与并行 UAT 部署
 

@@ -2,7 +2,7 @@
 
 ## 状态
 
-- 状态：`DOING`
+- 状态：`BLOCKED`
 - 开始日期：2026-08-01（Asia/Shanghai）
 - 起点：`main@a254bca5d59dd3f17047c9d6495dfdf2df1a798e`，Parent `91c0fd29d534246c55ddd669e894cdde9b774e52`，behind 0 / ahead 109，工作区 clean。
 - 源码与运行面：`0.1.0-alpha.37`；PostgreSQL 为 36/head `0036_project_requirement_unit_resolution.sql`，0036 SHA-256 `a5ad532837acb0c9704f5c885206cf2ec10c891628c7fe4ed660233468b134a0`。
@@ -51,4 +51,20 @@
 - Planning 专项：unit 4/4、UI 7/7、PostgreSQL 11/11；包含另一 Package 审计诱饵、DRAFT/跨项目 403、CREATE/SUBMIT 请求号、固定 Resolution v1、当前状态分栏、四个 Material ID 和 RELEASED BOM 不可变回归。
 - `typecheck:planning`、`typecheck:project`：通过；lint：0 error、10 个既有 warning；凭据扫描：通过（1,117 个仓库文件）。
 - 隔离 Chromium 1.51.1：1/1。390×844 无页面级或物料区横向溢出；合成 v1 完成查看→退回，Package 仅 1 个、v2/ACCEPT 为 0，销售源单位仍 NULL/pending，退出后 Session 失效。首次运行只因时区说明也被计入事件数量而在退回前结束，不计为通过；收紧断言后重跑通过。
-- 候选 Web：`sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25`。此时现网仍为原 Web，尚未备份、部署或登录主 UAT planning。
+- 候选 Web：`sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25`。该镜像随后按下述 Web-only 边界部署；未登录主 UAT planning。
+
+## 备份、恢复与 Web-only 部署结果
+
+- 部署前业务指纹为 `a7869b3ae5d75b7b68fac1234e04288c755622ee3f549497b2c96dc366701679`。root:root 0600 PostgreSQL custom dump 为 2,131,480 bytes，SHA-256 `25c302316d415602825d1d9d85e8456a5c46db5c4167cc5f8da27b0ea8f42ff2`；`pg_restore --list` 通过，第二新空库恢复后为 36/head 0036、0036 SHA-256 与预期一致，业务指纹仍为 `a7869b3ae5d75b7b68fac1234e04288c755622ee3f549497b2c96dc366701679`。
+- 旧 Web 已保留精确回退 tag，只把 Web 从 `sha256:6667bd2ca64e7255befe4398b4e73ec1fe554418d76062d2d378de8edaa7143e` 替换为 `sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25`。PostgreSQL、Worker、Caddy 容器未重建；公网 Origin、端口边界、四个受保护 Volume、alpha.37 和 0001—0036 均保持。
+- 部署后同一业务指纹仍为 `a7869b3ae5d75b7b68fac1234e04288c755622ee3f549497b2c96dc366701679`。受保护对象仍为 Package ID 1/v1/`SUBMITTED`/摘要前缀 `9d7a6a7ec9aefbaf`，Package 总数 1、v2 为 0、RETURN/ACCEPT 为 0；Unit Resolution ID 1/v1、Product/BOM、Material 533—536、事件和审计记录均未修改。
+- 部署后 Web/PostgreSQL healthy，Worker/Caddy running；四服务 restart 0/OOM false。最终为 available memory 2.2 GiB、Swap 214 MiB/1 GiB、根盘可用 22 GiB、Load `0.17/0.54/0.74`；Web/Worker/PostgreSQL/Caddy 分别约 36/75/177/15 MiB。全程重任务串行，资源检查约为 available 2.1—2.3 GiB、Swap 196—224 MiB、根盘最低可用 21 GiB、Load 低于停止阈值。
+- 本任务创建的隔离测试库、第二恢复库、临时浏览器 runner、builder、Playwright 基础镜像和精确临时目录已删除；正式备份、当前 Web 和精确回退 Web 保留。未执行 Docker system/volume prune，四个受保护 Volume 未删除。
+
+## 安全阻断与最终结论
+
+- 在准备主 UAT planning 只读浏览器核验时，错误地把 root-only UAT 角色凭据资料当作 shell 文本解析，shell 错误输出暴露了其中的凭据正文。发现后立即停止登录；没有使用已暴露凭据创建 Session，没有登录 planning 或 engineering，也没有点击接收、退回或执行其他主 UAT 写操作。
+- 后续只读摘要校验仅输出计数，确认资料中的 10 组 UAT 角色凭据当前全部仍有效，其中 1 组为可用 planning 凭据。任何凭据值、用户名、摘要或 Session 信息均不得进入仓库文档。
+- 因已暴露凭据不能继续安全使用，而轮换/停用身份属于新的权限变化且尚无项目负责人明确授权，主 UAT planning 的只读浏览器字段核验、退出和 Session 失效核验没有执行；不得把隔离 Chromium 结果冒充主 UAT 结果。
+- 功能与权威数据核验没有发现历史追溯缺口，已部署的只读合同和 Package 范围授权测试均通过；但本任务不能标记完成，也不能重新开始 planning 退回试用。解除阻断需要项目负责人明确授权：通过受控 Identity 流程轮换全部 10 组已暴露 UAT 凭据，提供新的安全使用机制，再单独完成 planning-only 只读浏览器核验。
+- 最终状态：`BLOCKED — NO UNSAFE CHANGE`。这里的“NO UNSAFE CHANGE”指未对 Package、Resolution、Product、BOM、Material、Event、Audit、Session 或其他业务事实执行不安全修改；凭据输出事件已如实登记，不能视为已消除。

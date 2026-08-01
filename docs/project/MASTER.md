@@ -33,31 +33,31 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-07-31（Asia/Shanghai）
+快照时间：2026-08-01（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.37`；PostgreSQL 已由 0034 串行升级到 36/head `0036_project_requirement_unit_resolution.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07` 功能提交为 `91c0fd29d534246c55ddd669e894cdde9b774e52`（`feat: add versioned requirement unit resolution`）；独立运维/文档提交以 `ops: deploy requirement unit resolution in parallel environment` 收口，其 SHA 由提交后的 Git log 给出 |
-| 当前根仓库运维基线 | 所有隔离升级、恢复、回退、回归和浏览器门禁通过后，已停服备份并把并行非生产 UAT 从 0034 串行升级到 0035/0036，只替换 Web 为 alpha.37。Worker 因不引用本次共享 Schema/服务未替换，Caddy 未重建，PostgreSQL Volume、公网 Origin/端口和四个受保护卷保持 |
-| Git 同步与工作区 | IMPLEMENT-07 从 clean `main@d06b44f5958527707f38e4c12f0d3143ce31875b`、Parent `525ad2907287d736ecd40d3df24b77c6c5be8ff4`、behind 0/ahead 107 起步；功能提交 `91c0fd29d534246c55ddd669e894cdde9b774e52` 已创建，运维/文档由独立提交收口。未 push/PR/amend/rebase/reset/stash/restore；未读取、修改或提交 `shujvbiao/`，敏感配置、凭据、Cookie、Token、备份和业务数据未进入 Git |
+| 当前根仓库功能基线提交 | `SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 功能提交为 `682e79378660ef7859617655836f02e2112df244`（`fix: expose planning handoff traceability`）；独立安全停止/运维文档提交以 `ops: record blocked planning traceability rollout` 收口，其 SHA 由提交后的 Git log 给出 |
+| 当前根仓库运维基线 | Package 范围只读追溯合同、响应式 UI、103/103 自动回归、隔离 Chromium 1/1、正式备份/第二库恢复及 Web-only 部署已完成；Web 为 alpha.37 新镜像，PostgreSQL/Worker/Caddy 未重建，Origin/端口、0036 和四卷保持。主 UAT planning 浏览器核验因 UAT 凭据输出事件安全停止，任务为 BLOCKED，不得宣称完成 |
+| Git 同步与工作区 | FIX-08 从 clean `main@a254bca5d59dd3f17047c9d6495dfdf2df1a798e`、Parent `91c0fd29d534246c55ddd669e894cdde9b774e52`、behind 0/ahead 109 起步；功能提交 `682e79378660ef7859617655836f02e2112df244` 已创建，安全停止/运维文档由独立提交收口。未 push/PR/amend/rebase/reset/stash/restore；未读取或修改 `shujvbiao/`，凭据值、Cookie、Token、Session 摘要、备份和业务数据未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0036`，36/head `0036_project_requirement_unit_resolution.sql`。`PRJ-00000001` ACCEPTED/10 的 Requirement Item 仍为 `unit_id=NULL/unit_pending=true`；Product/BOM Resolution 仍为 1 且引用 7/7/7/7；Unit Resolution Version/Head 为 `0/0`，Package/Item/Event 与 Planning 待接收为 `0/0/0/0`。Product/BOM/Material 533—536/四行事实和受保护业务指纹 `fb71309bf73dce907f0bcb2e294d1b31` 升级前后相同 |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已由 `sha256:7e0a3040acd17277db49fc1b7541c072c566e95e12b70bce9170dd39165a6bde` 替换为 alpha.37 `sha256:6667bd2ca64e7255befe4398b4e73ec1fe554418d76062d2d378de8edaa7143e`，旧 Web 有精确回退 tag；Worker 镜像仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。PostgreSQL/Web healthy，Worker/Caddy running，四服务 restart 0/OOM false |
+| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0036`，36/head `0036_project_requirement_unit_resolution.sql`。`PRJ-00000001` 的 Package ID 1/v1 仍为 `SUBMITTED`（待计划部接收），摘要前缀 `9d7a6a7ec9aefbaf`；Package 总数 1、v2 为 0、RETURN/ACCEPT 为 0。Unit Resolution ID 1/v1 固定 Unit ID 1/`件 · PCS`，Product/BOM 均 RELEASED，Material 533—536 各 10 PCS 毛需求。部署前后业务指纹均为 `a7869b3ae5d75b7b68fac1234e04288c755622ee3f549497b2c96dc366701679` |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已由 alpha.37 `sha256:6667bd2ca64e7255befe4398b4e73ec1fe554418d76062d2d378de8edaa7143e` 替换为同版本 `sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25`，旧 Web 有精确回退 tag；Worker 镜像仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。PostgreSQL/Web healthy，Worker/Caddy running，四服务 restart 0/OOM false |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.37 另提供版本化 Requirement Unit Resolution 与 Planning 精确单位来源。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
-| 当前阶段 | `SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07` 已完成：D-086 模型、0036、服务/API/UI、隔离测试、正式备份/第二库恢复、并行 UAT 0034→0035→0036 与 alpha.37 Web 部署全部通过 |
-| 当前任务 | `VERSIONED REQUIREMENT UNIT RESOLUTION DEPLOYED — UAT PACKAGE UNCHANGED`；主 UAT 只读 Engineering 390px 验收显示单位选择器且未选择/保存 PCS、未生成 Package、未登录 planning，退出后会话失效 |
-| 下一任务 | 停止。本任务不创建主 UAT Planning Package。技术阻断已解除，可由项目负责人另立任务恢复 engineering 黑盒续测；后续仍须从当前 NULL/pending、Resolution 0、Package 0 起点开始并继续禁止自动推断单位 |
+| 当前阶段 | `SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 为 BLOCKED：功能、测试、备份恢复及 Web-only 部署完成，受保护 UAT v1 未变；主 UAT planning 只读浏览器核验未执行 |
+| 当前任务 | `BLOCKED — NO UNSAFE CHANGE`。准备浏览器核验时发生 UAT 角色凭据输出事件；只读摘要确认 10 组凭据仍有效。发现后未创建 Session、未登录 planning/engineering、未接收/退回，Package v1 仍待计划部接收 |
+| 下一任务 | 停止所有 UAT 角色登录。只有项目负责人明确授权后，才能通过受控 Identity 流程轮换全部 10 组已暴露凭据；随后以新的安全凭据机制另行执行 planning-only 只读浏览器核验。在此之前不得重新开始 planning 退回试用 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
-- SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07 已按 D-086 交付 alpha.37/0036：Unit Resolution Version 只追加、Head 按 Requirement Item 独立 CAS、Package Item 固定精确 resolution provenance；enabled Unit、权限、Origin/CSRF、幂等、审计与事务回滚均由服务端保护。隔离写旅程和迁移/恢复门禁通过后已部署并行非生产 UAT；主 UAT Requirement Unit 仍 pending，Resolution/Package 均为 0
+- SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07 已按 D-086 交付 alpha.37/0036：Unit Resolution Version 只追加、Head 按 Requirement Item 独立 CAS、Package Item 固定精确 resolution provenance；enabled Unit、权限、Origin/CSRF、幂等、审计与事务回滚均由服务端保护。隔离写旅程和迁移/恢复门禁通过后已部署并行非生产 UAT；该任务完成时主 UAT Requirement Unit 仍 pending、Resolution/Package 均为 0，后续 FIX-08 当前事实以本文件顶部为准
 - SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06 只完成 Schema 缺口诊断并以 BLOCKED 收口：当前需求行 `unit_id=NULL/unit_pending=true`，0034 Product/BOM Resolution 不保存单位，快照 INNER JOIN 排除该行后误报统一错误；源需求不可变，禁止写回或从 BOM 猜 PCS。proposed D-086 定义 0036 Unit Resolution 版本事实、独立 CAS Head 和 Package provenance；未改代码/Migration/主库/部署，Package 保持 0
 - SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05 修复 Planning 路由未被共享客户端识别而丢失 `X-CSRF-Token`/调用方幂等键的根因；发送时读当前 CSRF Cookie，页内键绑定当前 Token+正文并在会话变更时清空。RELEASED BOM 只显示四行事实，POST/PATCH/DELETE 皆由服务端以 `BOM_RELEASED_IMMUTABLE` 拒绝；BOM 首页空选择且搜索有界。alpha.34/0034 Web `sha256:7e0a3040acd1...` 已部署，主库 UAT Handoff 未创建
 - SELFHOST-OPS-UAT-BOM-SELECTOR-FIX-04 将兼容 BOM 页从旧字段/全量长下拉改为服务端有界 code-first 候选，显示 `正式编码 · 名称 · 单位` 并只提交稳定 material_id/unit_id；保存和发布事务重新校验 ACTIVE、正式编码、enabled 主单位与重复物料。Product Version、BOM Version、状态及“BOM 属于产品版本；项目在计划交接关联”已明确，复用真实发布服务。该 FIX-04 验收时部署 alpha.34/0034 Web `sha256:cb6a5c1...`，四码浏览器各唯一命中，且当时 UAT BOM/Planning 均为 0
@@ -230,11 +230,13 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 45. SELFHOST-OPS-UAT-BOM-SELECTOR-FIX-04 继续以 `products/product_versions/bom_headers/bom_versions/bom_lines` 和 Planning 关系表为唯一权威；候选显示文本不能作为业务键。选择器只返回 ACTIVE 正式物料并以 material_id/unit_id 提交，保存和发布事务均重验主单位；Product Version 与 BOM Version 分轴，BOM 属于 Product Version，Project 只在 Planning Handoff 关联。
 46. Planning 写路由必须由共享安全客户端在发送时读当前 CSRF Cookie，不得依赖页面初始会话快照；缺失、错误、旧 Session Token 和非可信 Origin 继续 fail closed。RELEASED BOM 的前端只读不替代服务端/DB 不可变边界；BOM 管理页默认不得自动载入历史明细。
 47. D-086 已由 alpha.37/0036 在并行非生产 UAT 落地：源 Requirement Item 继续不可变且可保持 NULL/pending；工程单位确认写入追加式 Unit Resolution Version，并以每 Requirement Item 独立 CAS Head 指向当前版本。新 Package Item 固定引用生成时的精确 `unit_resolution_id`，后续 Head 变化或 Unit 停用不改历史包；BOM Line Unit 不能推断 Requirement Unit。
+48. FIX-08 的 Package 范围只读追溯功能已部署且没有历史数据缺口，但主 UAT 浏览器核验前发生 UAT 角色凭据输出事件。10 组凭据仍有效，不能继续使用；未获明确授权不得轮换、停用或登录。该安全阻断与功能正确性必须分开记录，隔离 Chromium 结果不得冒充主 UAT 浏览器证据。
 
 ## 当前任务与下一任务
 
-- `SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07` 已完成：功能提交 `91c0fd29d534246c55ddd669e894cdde9b774e52`，alpha.37/0036 的版本事实、CAS Head、稳定 Unit FK、Package provenance、正式 API 和 390px UI 已通过隔离迁移/恢复/回退、专项/回归与真实 Chromium。正式 root-only 0600 备份和第二新空库恢复通过后，并行非生产 UAT 已从 0034 串行升级到 0035/0036，只替换 Web；Worker/Caddy 不变。主 UAT 仍是 Requirement NULL/pending、Unit Resolution 0、Package/Item/Event 0，未确认 PCS、未登录 planning。下一步仅可在新任务中恢复 engineering 黑盒续测。
-- `SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05` 已完成：Planning 当前 Cookie/Header 双提交、Session+正文幂等、RELEASED BOM 前后端不可变与默认空选择均通过隔离测试。alpha.34/0034 兼容 Web `sha256:7e0a3040acd1...` 已仅替换 Web；主库只读 Chromium 只产生一次 engineering 登录/退出，`PRJ-00000001`、Product 7/A0、BOM 7/V1/四行 533—536 不变，Planning Package 仍为 0。本任务立即停止；可在后续独立授权下重新开始 engineering Planning Handoff 试用。
+- `SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 为 BLOCKED：功能提交 `682e79378660ef7859617655836f02e2112df244` 已从不可变 Package Snapshot、精确 Package Event、固定 Unit Resolution Version 和稳定关联对象补齐详情，103/103 自动回归及隔离 Chromium 1/1 通过；正式备份/第二库恢复后只替换 Web 为 `sha256:6b94a9c73a18...`。主 UAT 业务指纹、Package ID 1/v1/SUBMITTED、Package 总数 1、v2/RETURN/ACCEPT 0 保持。因 10 组仍有效的 UAT 角色凭据在诊断输出中暴露，未执行 planning 浏览器核验或任何登录；必须先获明确授权受控轮换，不能重新开始退回试用。
+- `SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07` 已完成：功能提交 `91c0fd29d534246c55ddd669e894cdde9b774e52`，alpha.37/0036 的版本事实、CAS Head、稳定 Unit FK、Package provenance、正式 API 和 390px UI 已通过隔离迁移/恢复/回退、专项/回归与真实 Chromium。正式 root-only 0600 备份和第二新空库恢复通过后，并行非生产 UAT 已从 0034 串行升级到 0035/0036，只替换 Web；Worker/Caddy 不变。该任务完成时主 UAT 为 Requirement NULL/pending、Unit Resolution 0、Package/Item/Event 0；这是历史验收状态，不是当前 UAT 基线。
+- `SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05` 已完成：Planning 当前 Cookie/Header 双提交、Session+正文幂等、RELEASED BOM 前后端不可变与默认空选择均通过隔离测试。alpha.34/0034 兼容 Web `sha256:7e0a3040acd1...` 已仅替换 Web；该任务完成时主库只读 Chromium 只产生一次 engineering 登录/退出，`PRJ-00000001`、Product 7/A0、BOM 7/V1/四行 533—536 不变，Planning Package 为 0；这是历史验收状态，不再作为当前续测授权。
 - `SELFHOST-OPS-UAT-BOM-SELECTOR-FIX-04` 已完成：功能提交 `b66e742`，alpha.34/0034 兼容 Web `sha256:cb6a5c1fae896...` 已只替换 Web。四个正式编码各唯一命中并显示名称/PCS，稳定 material_id 为 533—536；Product A0 与 BOM V1、产品/BOM 状态和现有发布流程已明确。该任务结束时 UAT BOM/Planning 仍为 0；后续新建的 UAT RELEASED BOM 已作为 FIX-05 严格保护起点，不反向改写旧记录。
 - `SELFHOST-OPS-PUBLIC-IP-CUTOVER-07` 已完成：当前公网入口为 `https://43.135.148.43.nip.io:18888`，Caddy 名称和 Web 唯一可信 Origin 同步切换，新证书、外部读取、200/308/401、安全头与旧 SNI 退役通过。只用原镜像重建 Web/Caddy；PostgreSQL/Worker、0034、核心业务聚合和四卷保持。
 - `SELFHOST-OPS-UAT-MATERIAL-REVIEW-BLOCKERS-03-RETRY` 已完成并部署 alpha.34/0034 最小兼容 hotfix。审核详情、范围、批准/退回后果与工程 BOM 下一步已补齐；Dashboard 与原生队列均为 4；经营和 legacy 的 logout→back/forward/refresh 真实 Chromium 验收通过。工程说明实际为空时诚实显示未保存，没有新增 0036、运行 0035、部署 alpha.36 或扩大权限。
@@ -330,7 +332,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - 已完成：`PHASE3-TASK02` 批准全部 16 项决定并完成非生产 Normalization 服务、`0006`、五个 API、权限/限流/取消、隔离迁移与集成测试；未创建 Draft/正式物料，未迁移或部署生产。
 - 已完成：`PHASE3-TASK03` Material Import Normalization Review UI V1 docs-only 设计与正式规格确认；四份正式文档覆盖统一路由、七步 Stepper、启动/轮询/取消、Current/Latest、Rows/Drawer/Issues、37 个线框、104 项测试、局部门禁和性能门禁，14 项决定均为 `APPROVED`；未实施运行时代码或改变生产环境。
 - 已完成：`PHASE3-TASK04` Material Import Normalization Review UI V1 非生产实施；统一工作区、七步 Stepper、Current/Latest、冻结幂等与 `RESULT_UNKNOWN`、2/5/10 轮询、取消、汇总、Rows/Issues cursor、Row Drawer、安全有界渲染和权限清理均已落地；104/104 计划测试、100/100 Import UI 回归及本地 Playwright 性能/可访问性门禁通过，未改 API/Schema/Migration/业务服务或生产环境。
-- 下一：停止。当前 UAT Product Version A0 与 BOM Version V1 已 RELEASED 且只读，Requirement Unit 仍 NULL/pending，Unit Resolution 与 Planning Package 均为 0。alpha.37/0036 已解除 Schema 阻断，技术上可在后续独立授权下重新开始 engineering Planning Handoff 黑盒试用；本任务不选择 PCS、不生成 Package、不登录 planning。任何 Product/BOM 修订、凭据轮换、真实数据或生产动作仍须后续独立任务和明确授权。
+- 下一：停止。当前 UAT Product Version A0 与 BOM Version V1 已 RELEASED 且只读，源 Requirement Unit 仍 NULL/pending；Unit Resolution ID 1/v1 已存在且 Package ID 1/v1 为 SUBMITTED/待计划部接收，Package 总数 1、v2/RETURN/ACCEPT 0。因 10 组仍有效的 UAT 角色凭据发生输出事件，不得登录 planning/engineering 或重新开始退回试用；只有项目负责人明确授权受控轮换全部凭据后，才能另立 planning-only 只读浏览器核验。任何 Product/BOM 修订、身份变化、真实数据或生产动作仍须独立任务和明确授权。
 
 ## 更新规则
 
