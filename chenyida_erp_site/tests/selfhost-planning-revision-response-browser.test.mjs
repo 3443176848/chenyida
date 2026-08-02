@@ -28,7 +28,7 @@ const sha256 = (value) => createHash("sha256").update(String(value)).digest("hex
 
 async function loadChromium() {
   for (const specifier of [process.env.PLAYWRIGHT_MODULE_PATH, "playwright", "@playwright/test", "playwright-core"].filter(Boolean)) {
-    try { const loaded = await import(specifier); if (loaded.chromium) return loaded.chromium; } catch { /* try the next isolated runner module */ }
+    try { const loaded = await import(specifier); const chromium = loaded.chromium || loaded.default?.chromium; if (chromium) return chromium; } catch { /* try the next isolated runner module */ }
   }
   throw new Error("Playwright is required in the isolated browser-test runner");
 }
@@ -104,14 +104,56 @@ async function noOverflow(page, stage) {
   assert.ok(width.document <= width.viewport + 1, `${stage}: document overflow`); assert.ok(width.body <= width.viewport + 1, `${stage}: body overflow`);
 }
 
+async function assertSafeDialog(page, dialog, stage) {
+  const cancel = dialog.getByRole("button", { name: "取消", exact: true });
+  await cancel.waitFor();
+  await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "取消");
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent?.trim()), "取消", `${stage}: default focus must be cancel`);
+  for (let index = 0; index < 12; index += 1) {
+    await page.keyboard.press("Tab");
+    assert.equal(await dialog.evaluate((node) => node.contains(document.activeElement)), true, `${stage}: focus escaped dialog`);
+  }
+  const controls = await dialog.locator(".planning-dialog-actions button").evaluateAll((nodes) => nodes.map((node) => { const rect = node.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right }; }));
+  assert.equal(controls.length, 2, `${stage}: cancel and confirm must both render`);
+  for (const rect of controls) assert.ok(rect.top >= 0 && rect.bottom <= 844 && rect.left >= 0 && rect.right <= 390, `${stage}: footer action outside viewport`);
+  const containment = await dialog.evaluate((node) => ({ client: node.clientWidth, scroll: node.scrollWidth }));
+  assert.ok(containment.scroll <= containment.client + 1, `${stage}: dialog horizontal overflow`);
+  await noOverflow(page, stage);
+}
+
+async function handoffState(projectId) {
+  const packages = await pool.query("select package_version_no,status from project_planning_packages where project_id=$1 order by package_version_no", [projectId]);
+  const events = await pool.query("select event_type,count(*)::integer count from project_planning_handoff_events where project_id=$1 group by event_type order by event_type", [projectId]);
+  return { packages: packages.rows.map((row) => [Number(row.package_version_no), row.status]), events: Object.fromEntries(events.rows.map((row) => [row.event_type, row.count])) };
+}
+
+async function downstreamCounts() {
+  return (await pool.query(`select
+    (select count(*)::integer from planning_material_requirement_plans) material_plans,
+    (select count(*)::integer from planning_purchase_requests) purchase_requests,
+    (select count(*)::integer from production_work_orders) work_orders,
+    (select count(*)::integer from inventory_transactions) inventory_transactions,
+    (select count(*)::integer from finance_documents) finance_documents`)).rows[0];
+}
+
+async function postFromPage(page, path, body) {
+  return page.evaluate(async ({ requestPath, requestBody, key }) => {
+    const session = await fetch("/api/session", { credentials: "same-origin" }).then((response) => response.json());
+    const response = await fetch(requestPath, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-CSRF-Token": session.csrf_token, "Idempotency-Key": key }, body: JSON.stringify(requestBody) });
+    return { status: response.status };
+  }, { requestPath: path, requestBody: body, key: randomUUID() });
+}
+
 test("isolated Chromium completes v1 RETURN response fixed v2 lineage and Planning acceptance", { timeout: 240_000 }, async () => {
-  await assertIsolatedSchema(); await clearSyntheticData(); const fixture = await seedFixture(); const chromium = await loadChromium(); let browser;
+  await assertIsolatedSchema(); await clearSyntheticData(); const fixture = await seedFixture(); assert.deepEqual(await downstreamCounts(), { material_plans: 0, purchase_requests: 0, work_orders: 0, inventory_transactions: 0, finance_documents: 0 }); const chromium = await loadChromium(); let browser;
   try {
     browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ["--disable-dev-shm-usage"] });
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
     const allowedPosts = [/^\/api\/login$/, /^\/api\/logout$/, /^\/api\/projects\/\d+\/planning-packages$/, /^\/api\/planning-packages\/\d+\/(?:submit|return|accept|revision-responses|successor)$/];
+    const businessPosts = []; const postCount = (path) => businessPosts.filter((value) => value === path).length;
     await context.route("**/*", async (route) => {
       const request = route.request(); const url = new URL(request.url()); const method = request.method().toUpperCase();
+      if (url.origin === browserOrigin && method === "POST" && !["/api/login", "/api/logout"].includes(url.pathname)) businessPosts.push(url.pathname);
       if (url.origin === browserOrigin && (["GET", "HEAD", "OPTIONS"].includes(method) || (method === "POST" && allowedPosts.some((pattern) => pattern.test(url.pathname))))) await route.continue(); else await route.abort("blockedbyclient");
     });
     const page = await context.newPage(); assert.deepEqual(page.viewportSize(), { width: 390, height: 844 });
@@ -153,19 +195,105 @@ test("isolated Chromium completes v1 RETURN response fixed v2 lineage and Planni
     const successorResponsePromise = page.waitForResponse((response) => response.url() === `${browserOrigin}/api/planning-packages/${v1Id}/successor` && response.request().method() === "POST");
     await successorDialog.getByRole("button", { name: "确认生成 v2", exact: true }).click();
     const successorResponse = await successorResponsePromise; assert.equal(successorResponse.status(), 201);
-    const v2 = await pool.query("select id,previous_package_id,responds_to_return_event_id,revision_response_version_id,package_digest from project_planning_packages where project_id=$1 and package_version_no=2", [fixture.projectId]); const v2Id = Number(v2.rows[0].id);
+    const v2 = await pool.query("select id,previous_package_id,responds_to_return_event_id,revision_response_version_id,package_digest,status,version from project_planning_packages where project_id=$1 and package_version_no=2", [fixture.projectId]); const v2Id = Number(v2.rows[0].id);
+    const returnEvent = (await pool.query("select id,actor,reason,request_id::text,created_at from project_planning_handoff_events where package_id=$1 and event_type='RETURNED'", [v1Id])).rows[0];
     await page.waitForURL((url) => url.searchParams.get("package") === String(v2Id));
     await page.getByRole("heading", { name: `${fixture.projectCode} · 交接包 v2`, exact: true }).waitFor();
     await page.getByRole("heading", { name: "v1 → Planning RETURN → Engineering Response → v2", exact: true }).waitFor();
-    await page.getByRole("button", { name: "重新提交计划部", exact: true }).click(); await page.getByText("修订包已重新提交", { exact: true }).waitFor();
+    const resubmitPath = `/api/planning-packages/${v2Id}/submit`;
+    for (const cancellation of ["cancel", "close", "escape"]) {
+      await page.getByRole("button", { name: "重新提交计划部", exact: true }).click();
+      const resubmitDialog = page.getByRole("dialog", { name: "确认重新提交 Package v2", exact: true }); await resubmitDialog.waitFor();
+      await assertSafeDialog(page, resubmitDialog, `resubmit ${cancellation}`);
+      if (cancellation === "cancel") {
+        await resubmitDialog.getByText(fixture.projectCode, { exact: true }).waitFor();
+        await resubmitDialog.getByLabel("前驱退回").getByText(`ID ${v1Id}/v1`, { exact: true }).waitFor();
+        await resubmitDialog.getByLabel("前驱退回").getByText(String(returnEvent.id), { exact: true }).waitFor();
+        await resubmitDialog.getByText(returnReason, { exact: true }).waitFor();
+        await resubmitDialog.getByLabel("工程回复").getByText(`ID ${responseRow.rows[0].id}/v1`, { exact: true }).waitFor();
+        await resubmitDialog.getByText(expectedResponse, { exact: true }).waitFor();
+        await resubmitDialog.getByText(`ID ${v2Id}/v2`, { exact: true }).waitFor();
+        await resubmitDialog.getByText(/Product A0 · BOM V1/).waitFor();
+        await resubmitDialog.getByText("Unit Resolution v1 / 件 · PCS", { exact: true }).waitFor();
+        assert.equal(await resubmitDialog.locator(".planning-confirm-materials li").count(), 4);
+        assert.equal(await resubmitDialog.locator(".planning-confirm-materials li").getByText("毛需求 10 PCS", { exact: true }).count(), 4);
+        await resubmitDialog.getByText("提交后进入计划部待接收队列。", { exact: true }).waitFor();
+        await resubmitDialog.getByText("不自动创建采购申请、工单、库存或财务等下游业务记录。", { exact: true }).waitFor();
+        await resubmitDialog.getByText("查看完整 Package SHA-256 摘要", { exact: true }).click();
+        await resubmitDialog.getByText(v2.rows[0].package_digest, { exact: true }).waitFor();
+      }
+      const postsBeforeCancel = postCount(resubmitPath);
+      if (cancellation === "cancel") await resubmitDialog.getByRole("button", { name: "取消", exact: true }).click();
+      else if (cancellation === "close") await resubmitDialog.getByRole("button", { name: "关闭确认窗口", exact: true }).click();
+      else await page.keyboard.press("Escape");
+      await resubmitDialog.waitFor({ state: "detached" });
+      assert.equal(postCount(resubmitPath), postsBeforeCancel, `resubmit ${cancellation} must issue zero business requests`);
+      const cancelledState = await handoffState(fixture.projectId);
+      assert.deepEqual(cancelledState.packages, [[1, "RETURNED"], [2, "DRAFT"]]); assert.equal(cancelledState.events.RESUBMITTED || 0, 0);
+    }
+    assert.deepEqual(await downstreamCounts(), { material_plans: 0, purchase_requests: 0, work_orders: 0, inventory_transactions: 0, finance_documents: 0 });
+
+    await page.getByRole("button", { name: "重新提交计划部", exact: true }).click(); const confirmedResubmitDialog = page.getByRole("dialog", { name: "确认重新提交 Package v2", exact: true }); await confirmedResubmitDialog.waitFor();
+    const resubmitPostsBefore = postCount(resubmitPath); const resubmitResponsePromise = page.waitForResponse((response) => response.url() === `${browserOrigin}${resubmitPath}` && response.request().method() === "POST");
+    await confirmedResubmitDialog.getByRole("button", { name: "确认重新提交", exact: true }).evaluate((button) => { button.click(); button.click(); });
+    const resubmitResponse = await resubmitResponsePromise; assert.equal(resubmitResponse.status(), 200); const resubmitPayload = await resubmitResponse.json();
+    await page.getByRole("heading", { name: "重新提交完成凭证", exact: true }).waitFor();
+    assert.equal(postCount(resubmitPath), resubmitPostsBefore + 1, "double click must issue one RESUBMIT request");
+    await page.getByText("SUBMITTED", { exact: true }).waitFor(); await page.getByText(fixture.credentials.engineering.username, { exact: true }).waitFor();
+    await page.getByText(resubmitPayload.request_id, { exact: true }).waitFor(); await page.getByText(/下一队列：计划部待接收队列/).waitFor();
+    let state = await handoffState(fixture.projectId); assert.deepEqual(state.packages, [[1, "RETURNED"], [2, "SUBMITTED"]]); assert.equal(state.events.RESUBMITTED, 1);
+    const submittedV2 = (await pool.query("select version,submitted_by,submitted_at from project_planning_packages where id=$1", [v2Id])).rows[0];
+    const unauthorizedAccept = await postFromPage(page, `/api/planning-packages/${v2Id}/accept`, { expected_version: Number(submittedV2.version) }); assert.equal(unauthorizedAccept.status, 403, "engineering cannot ACCEPT");
+    state = await handoffState(fixture.projectId); assert.equal(state.events.ACCEPTED || 0, 0);
+
     await logout(page); await login(page, fixture.credentials.planning);
     await page.goto(`${browserOrigin}/planning/handoffs`, { waitUntil: "domcontentloaded" });
     await page.locator("button.planning-row", { hasText: `${fixture.projectCode} · Package ID ${v2Id}/v2` }).click();
     await page.getByRole("heading", { name: "v1 → Planning RETURN → Engineering Response → v2", exact: true }).waitFor(); await page.getByText(expectedResponse, { exact: true }).waitFor();
     await page.getByText("Product", { exact: true }).first().waitFor(); await page.getByText("A0", { exact: true }).waitFor(); await page.getByText("V1", { exact: true }).waitFor(); await page.getByText(/固定引用的 Unit Resolution v1/).waitFor();
     assert.equal(await page.locator(".planning-material-card").count(), 4); assert.equal(await page.locator(".planning-material-card").getByText("10 PCS", { exact: true }).count(), 4); await noOverflow(page, "planning v2 lineage");
-    await page.getByRole("button", { name: "接收交接包", exact: true }).click(); await page.getByRole("dialog", { name: "确认接收交接包", exact: true }).getByRole("button", { name: "确认接收", exact: true }).click();
-    await page.getByText("计划交接包已接收；未自动启动物料需求", { exact: true }).waitFor();
+    const unauthorizedResubmit = await postFromPage(page, resubmitPath, { expected_version: Number(submittedV2.version) }); assert.equal(unauthorizedResubmit.status, 403, "planning cannot RESUBMIT");
+    const staleAccept = await postFromPage(page, `/api/planning-packages/${v2Id}/accept`, { expected_version: Number(submittedV2.version) - 1 }); assert.equal(staleAccept.status, 409, "stale ACCEPT must fail CAS");
+    state = await handoffState(fixture.projectId); assert.equal(state.events.ACCEPTED || 0, 0); assert.deepEqual(state.packages, [[1, "RETURNED"], [2, "SUBMITTED"]]);
+
+    const acceptPath = `/api/planning-packages/${v2Id}/accept`;
+    for (const cancellation of ["cancel", "close", "escape"]) {
+      await page.getByRole("button", { name: "接收交接包", exact: true }).click();
+      const acceptDialog = page.getByRole("dialog", { name: "确认最终接收 Package v2", exact: true }); await acceptDialog.waitFor();
+      await assertSafeDialog(page, acceptDialog, `accept ${cancellation}`);
+      if (cancellation === "cancel") {
+        await acceptDialog.getByText(fixture.projectCode, { exact: true }).waitFor(); await acceptDialog.getByText(`ID ${v2Id}/v2`, { exact: true }).waitFor();
+        await acceptDialog.getByText("SUBMITTED", { exact: true }).waitFor(); await acceptDialog.getByText(fixture.credentials.engineering.username, { exact: true }).first().waitFor();
+        await acceptDialog.getByText("RESUBMIT 时间", { exact: true }).waitFor(); await acceptDialog.getByText(/Asia\/Shanghai/).first().waitFor();
+        await acceptDialog.getByLabel("前驱退回").getByText(`ID ${v1Id}/v1`, { exact: true }).waitFor(); await acceptDialog.getByText("RETURNED", { exact: true }).waitFor();
+        await acceptDialog.getByLabel("前驱退回").getByText(String(returnEvent.id), { exact: true }).waitFor(); await acceptDialog.getByText(returnEvent.actor, { exact: true }).waitFor();
+        await acceptDialog.getByText(returnEvent.request_id, { exact: true }).waitFor(); await acceptDialog.getByText(returnReason, { exact: true }).waitFor();
+        await acceptDialog.getByLabel("工程回复").getByText(`ID ${responseRow.rows[0].id}/v1`, { exact: true }).waitFor(); await acceptDialog.getByText(expectedResponse, { exact: true }).waitFor();
+        await acceptDialog.getByText(responseRow.rows[0].request_id, { exact: true }).waitFor(); await acceptDialog.getByText(/Product A0 · BOM V1/).waitFor();
+        await acceptDialog.getByText("Unit Resolution v1 / 件 · PCS", { exact: true }).waitFor(); assert.equal(await acceptDialog.locator(".planning-confirm-materials li").count(), 4);
+        assert.equal(await acceptDialog.locator(".planning-confirm-materials li").getByText("毛需求 10 PCS", { exact: true }).count(), 4);
+        for (const consequence of ["写入一条不可变 ACCEPT 事件。", `Package ID ${v2Id}/v2 转为 ACCEPTED。`, `Package ID ${v1Id}/v1 继续保持 RETURNED。`, "当前版本不再允许退回或重复接收。", "不自动创建采购申请、工单、库存或财务记录。"]) await acceptDialog.getByText(consequence, { exact: true }).waitFor();
+        await acceptDialog.getByText("下一业务阶段：计划部门基于已接收的Package v2进行物料需求计算和缺料分析，随后通过独立操作形成采购需求交接。", { exact: true }).waitFor();
+        for (const boundary of ["当前未指定具体处理人。", "当前未配置处理时限。", "接收本身不会自动执行下一阶段。"]) await acceptDialog.getByText(boundary, { exact: true }).waitFor();
+        await acceptDialog.getByText("查看完整 Package SHA-256 摘要", { exact: true }).click(); await acceptDialog.getByText(v2.rows[0].package_digest, { exact: true }).waitFor();
+      }
+      const postsBeforeCancel = postCount(acceptPath);
+      if (cancellation === "cancel") await acceptDialog.getByRole("button", { name: "取消", exact: true }).click();
+      else if (cancellation === "close") await acceptDialog.getByRole("button", { name: "关闭确认窗口", exact: true }).click();
+      else await page.keyboard.press("Escape");
+      await acceptDialog.waitFor({ state: "detached" }); assert.equal(postCount(acceptPath), postsBeforeCancel, `accept ${cancellation} must issue zero business requests`);
+      const cancelledState = await handoffState(fixture.projectId); assert.deepEqual(cancelledState.packages, [[1, "RETURNED"], [2, "SUBMITTED"]]); assert.equal(cancelledState.events.ACCEPTED || 0, 0);
+    }
+    assert.deepEqual(await downstreamCounts(), { material_plans: 0, purchase_requests: 0, work_orders: 0, inventory_transactions: 0, finance_documents: 0 });
+
+    await page.getByRole("button", { name: "接收交接包", exact: true }).click(); const confirmedAcceptDialog = page.getByRole("dialog", { name: "确认最终接收 Package v2", exact: true }); await confirmedAcceptDialog.waitFor();
+    const acceptPostsBefore = postCount(acceptPath); const acceptResponsePromise = page.waitForResponse((response) => response.url() === `${browserOrigin}${acceptPath}` && response.request().method() === "POST" && response.status() === 200);
+    await confirmedAcceptDialog.getByRole("button", { name: "确认最终接收", exact: true }).evaluate((button) => { button.click(); button.click(); });
+    const acceptResponse = await acceptResponsePromise; const acceptPayload = await acceptResponse.json(); assert.equal(postCount(acceptPath), acceptPostsBefore + 1, "double click must issue one ACCEPT request");
+    await page.getByText("计划交接包已接收；未自动执行下一业务阶段", { exact: true }).waitFor(); await page.getByRole("heading", { name: "操作完成凭证", exact: true }).waitFor();
+    await page.getByText("ACCEPTED", { exact: true }).waitFor(); await page.getByText(fixture.credentials.planning.username, { exact: true }).waitFor(); await page.getByText(acceptPayload.request_id, { exact: true }).waitFor(); await page.getByText(/下一队列：计划部物料需求计算与缺料分析/).waitFor();
+    state = await handoffState(fixture.projectId); assert.deepEqual(state.packages, [[1, "RETURNED"], [2, "ACCEPTED"]]); assert.equal(state.events.RESUBMITTED, 1); assert.equal(state.events.ACCEPTED, 1);
+    assert.deepEqual(await downstreamCounts(), { material_plans: 0, purchase_requests: 0, work_orders: 0, inventory_transactions: 0, finance_documents: 0 });
 
     const packages = await pool.query("select id,package_version_no,status,package_digest,previous_package_id,responds_to_return_event_id,revision_response_version_id from project_planning_packages where project_id=$1 order by package_version_no", [fixture.projectId]);
     assert.deepEqual(packages.rows.map((row) => [row.package_version_no, row.status]), [[1, "RETURNED"], [2, "ACCEPTED"]]); assert.notEqual(packages.rows[0].package_digest, packages.rows[1].package_digest);

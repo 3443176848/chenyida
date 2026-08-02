@@ -62,6 +62,11 @@ test("planning workspace keeps narrow screens contained and switches materials t
   assert.match(planningCss, /\.planning-trace-value\{[^}]*overflow-wrap:anywhere/);
   assert.match(planningCss, /\.planning-dialog\{[^}]*width:min\(560px,100%\)/);
   assert.match(planningCss, /@media\(max-width:420px\)[\s\S]*?\.planning-dialog-actions\{[^}]*flex-direction:column/);
+  assert.match(planningCss, /\.planning-dialog\{display:flex;flex-direction:column;overflow:hidden;padding:0\}/);
+  assert.match(planningCss, /\.planning-dialog-body\{[^}]*overflow-y:auto/);
+  assert.match(planningCss, /\.planning-dialog-actions\{[^}]*flex:0 0 auto/);
+  assert.match(planningCss, /\.planning-handoff-dialog,\.planning-resubmit-dialog\{width:min\(780px,100%\)/);
+  assert.match(planningCss, /\.planning-confirm-digest code\{[^}]*overflow-wrap:anywhere/);
   assert.match(planningCss, /\.planning-row-reason\{[^}]*overflow-wrap:anywhere/);
   assert.match(workspace, /className="planning-material-cards"/);
   assert.match(workspace, /className="planning-table-scroll planning-material-table"/);
@@ -72,13 +77,61 @@ test("planning workspace keeps narrow screens contained and switches materials t
 
 test("planning page has pending and processed queues with confirmed decisions and read-only history", () => {
   assert.match(planningPage, /PlanningHandoffWorkspace/); assert.match(workspace, /待接收交接包/); assert.match(workspace, /已处理交接包/); assert.match(workspace, /status=PROCESSED/); assert.match(planningService, /wanted === "PROCESSED" \? \["RETURNED", "ACCEPTED"\]/);
-  assert.match(workspace, /接收交接包/); assert.match(workspace, /退回原因/); assert.match(workspace, /确认接收交接包/); assert.match(workspace, /确认退回工程\/项目部修订/); assert.match(workspace, /确认后将写入不可变 RETURN 事件/); assert.match(workspace, /确认后将写入不可变 ACCEPT 事件/);
+  assert.match(workspace, /接收交接包/); assert.match(workspace, /退回原因/); assert.match(workspace, /确认最终接收 Package/); assert.match(workspace, /确认退回工程\/项目部修订/); assert.match(workspace, /写入一条不可变 RETURN 事件/); assert.match(workspace, /写入一条不可变 ACCEPT 事件/);
   assert.match(workspace, /操作完成凭证/); assert.match(workspace, /查看已处理详情/); assert.match(workspace, /数据库保存的退回原因/); assert.match(workspace, /result:"SUCCESS"/);
   assert.match(workspace, /calculated_gross_quantity/); assert.match(workspace, /specification_snapshot/); assert.match(workspace, /package_digest/); assert.match(workspace, /sessionPost/); assert.match(workspace, /createSessionWriteRegistry/); assert.match(workspace, /useEffect\(.*load/s);
   assert.match(apiClient, /planningWrite/); assert.match(apiClient, /currentCsrfToken/); assert.match(apiClient, /credentials: "same-origin"/); assert.match(apiClient, /X-CSRF-Token/); assert.match(apiClient, /Idempotency-Key/);
   assert.doesNotMatch(workspace, /crypto\.randomUUID/);
   assert.doesNotMatch(workspace, /localStorage|sessionStorage|relative_path|absolute_path|storage_name|file_body/);
   assert.doesNotMatch(permissions.match(/planning:\s*\[[^\]]*\]/s)?.[0]||"", /system\.audit\.read/);
+});
+
+test("final ACCEPT confirmation carries immutable v2 lineage, consequences and the authoritative next stage", () => {
+  for (const text of [
+    "当前目标", "完整 Package SHA-256 摘要", "提交人", "RESUBMIT 时间",
+    "前驱退回", "RETURN Event", "RETURN 操作者", "RETURN 时间", "完整退回原因",
+    "工程回复", "回复操作者", "回复时间", "完整回复正文",
+    "固定快照摘要", "Product", "BOM", "Unit Resolution", "毛需求",
+    "本确认窗口内容来自不可变", "接收后果", "写入一条不可变 ACCEPT 事件",
+    "继续保持 RETURNED", "当前版本不再允许退回或重复接收",
+    "不自动创建采购申请、工单、库存或财务记录",
+    "下一业务阶段：计划部门基于已接收的Package v", "进行物料需求计算和缺料分析，随后通过独立操作形成采购需求交接。",
+    "当前未指定具体处理人。", "当前未配置处理时限。", "接收本身不会自动执行下一阶段。",
+  ]) assert.ok(workspace.includes(text), `missing ACCEPT confirmation text: ${text}`);
+  assert.match(workspace, /setDecisionPrompt\(\{kind,reason:normalizedReason,detail\}\)/);
+  assert.match(workspace, /const currentDetail=prompt\.detail/);
+  assert.match(workspace, /decisionInFlight\.current/);
+  assert.match(workspace, /detail\.header\.status!=="SUBMITTED"/);
+  assert.match(workspace, /expected_version:currentDetail\.header\.version/);
+});
+
+test("Engineering RESUBMIT confirmation carries the fixed source, response, target and queue consequence", () => {
+  for (const text of [
+    "确认重新提交 Package", "源 Package", "RETURN Event", "完整退回原因", "工程回复",
+    "目标 Package", "固定快照摘要", "Product", "BOM", "Unit Resolution", "毛需求",
+    "写入一条不可变 RESUBMIT 事件", "转为 SUBMITTED", "提交后进入计划部待接收队列",
+    "不自动创建采购申请、工单、库存或财务等下游业务记录", "重新提交完成凭证",
+    "下一队列：计划部待接收队列",
+  ]) assert.ok(workspace.includes(text), `missing RESUBMIT confirmation text: ${text}`);
+  assert.match(workspace, /setResubmitPrompt\(\{detail:target\}\)/);
+  assert.match(workspace, /const target=resubmitPrompt\.detail/);
+  assert.match(workspace, /resubmitInFlight\.current/);
+  assert.match(workspace, /target\.header\.status!=="DRAFT"/);
+  assert.match(workspace, /target\.header\.package_version_no<=1/);
+  assert.match(workspace, /expected_version:target\.header\.version/);
+});
+
+test("decision dialogs default to cancel and trap keyboard focus without weakening server gates", () => {
+  assert.match(workspace, /role="dialog" aria-modal="true" aria-labelledby={dialogId}/);
+  assert.match(workspace, /requestAnimationFrame\(\(\)=>cancelRef\.current\?\.focus\(\)\)/);
+  assert.match(workspace, /event\.key==="Escape"/);
+  assert.match(workspace, /event\.key!=="Tab"/);
+  assert.match(workspace, /aria-label="关闭确认窗口"/);
+  assert.match(workspace, /event\.target===event\.currentTarget&&!busy/);
+  assert.match(workspace, /disabled={busy}/);
+  assert.match(workspace, /sessionPost/);
+  assert.match(planningService, /expected_version|expectedVersion/);
+  for (const gate of ["planning.accept", "planning.prepare"]) assert.ok(workspace.includes(gate));
 });
 
 test("planning detail exposes scoped traceability, fixed units and explicit current evidence", () => {
@@ -146,5 +199,6 @@ test("revision response and successor confirmation remain contained at 390px", (
 test("dashboard preserves the TASK02 queue while its package workspace stays upstream-only", () => {
   assert.match(dashboard, /计划部门/); assert.match(dashboard, /\/planning\/handoffs/); assert.match(dashboard, /pending_planning_handoffs/);
   assert.match(legacyOperations, /option value="planning">计划/);
-  assert.doesNotMatch(workspace, /创建采购申请|创建采购订单|净需求计算|供应商推荐/);
+  assert.doesNotMatch(workspace, /<button[^>]*>创建(?:采购申请|采购订单)|净需求计算|供应商推荐/);
+  assert.doesNotMatch(workspace, /material-requirement-plans|planning-purchase-requests/);
 });
