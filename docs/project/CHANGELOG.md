@@ -2,6 +2,20 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-02
+
+### SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12 - `fix: expose planning decision history` / `ops: accept planning decision history in parallel environment`
+
+- Git/范围：从 strict clean `main@eaeae1c816256eb48355bdb117ecc20f6ac8545f`、behind 0/ahead 115 起步；功能提交 `180f6b58b583bd2dba350f017504be916db9673d`。只修改 Planning Handoff 服务投影、UI/CSS、测试和项目文档；未 push/PR、改写历史、访问生产或处理全局导航债务。
+- Unicode/历史：预期全角标点与数据库 ASCII 标点先精确比较为不相同；仅 U+FF1A→U+003A 和 U+FF0C→U+002C 两处，分别 NFKC 后完全相同。原始文本经过全半角规范化，NFKC 语义核对 PASS；数据库实际原因保持权威，Package/RETURN Event 历史没有修改、补写或美化。登记 `LOW` 体验问题，不阻断链路。
+- 服务/UI：Planning 新增待接收/已处理双视图；`PROCESSED` 服务端只映射 RETURNED/ACCEPTED 并按终态时间倒序。已处理 Package 可按稳定 ID/version 重开，显示 CREATE/SUBMIT/RESUBMIT/RETURN/ACCEPT、操作者、Asia/Shanghai、请求号、SUCCESS、完整原因、责任队列及 assignee/SLA 空状态。
+- 决策安全：接收/退回在业务 POST 前弹出确认窗口；完成凭证只使用服务端返回的动作、操作者、时间、请求号、结果和数据库保存原因，并提供“查看已处理详情”。Product/BOM、Unit Resolution、Material Snapshot 和终态详情只读；没有增加 `system.audit.read`、扩大 planning 权限或改变状态机。
+- 测试：Planning unit/UI/PG `4/7/11`，Identity/Project/Master-BOM PG `10/5/6`，0036 upgrade `6/6`，适用静态/安全回归 `65/65`；两组 typecheck、production build、lint `0 error / 10 existing warnings`、1,137 文件凭据扫描和 diff check 通过。隔离 Chromium `1/1` 在 390×844 完成合成退回、确认、凭证、历史重开、NFKC、退出与匿名 401。
+- 备份/部署：root:root 0600 custom dump 2,139,142 bytes、SHA-256 `1d5cdd88257f2e53830598a498b609ac7208b792f7fcfdae2f8306b37d36eb5f` 的 list 与第二新空库 36/head 0036 恢复通过。只替换 Web 为 `sha256:fb88dd8afb8b7f08cf6c8dff9aa66566ad9aec0a203460e7fd09bc32af728edc`；旧 Web 有精确 rollback tag，PostgreSQL/Worker/Caddy、四卷、alpha.37/0036 不变。
+- 主 UAT：只登录 planning，浏览器门禁只允许 login、只读请求与 logout；未登录 engineering、未接收/退回、未创建 v2。Package ID 1/v1 在已处理可见并重开，最终 RETURNED、RETURN 1、ACCEPT 0、v2 0，RETURN 操作者/上海时间/请求号/结果/实际原因和工程/项目部责任队列完整；活跃 planning Session 0。
+- 数据/清理：部署前备份恢复库与主 UAT 后主库的受保护摘要均为 `3960cf1f1fc3fdaca0bacd246732d27a0ff223e894953e7be2427fa22b150dca`（217 tables / 201 sequences）。任务临时库/容器/网络/模块/脚本/指纹已清理；正式备份、候选/回滚镜像和四卷保留，未 prune。最终约 2.1 GiB available、221 MiB Swap、22 GiB、Load `0.08/0.10/0.21`，内核 OOM 0、四服务 restart 0/OOM false。
+- 结论：`PLANNING DECISION HISTORY FIXED — UAT V1 RETURN VERIFIED`。完成后停止，不登录 engineering，不创建 v2。
+
 ## 2026-08-01
 
 ### SELFHOST-OPS-OFFLINE-IDENTITY-RECOVERY-11 - `ops: add guarded offline identity recovery` / `ops: complete canonical credential recovery`

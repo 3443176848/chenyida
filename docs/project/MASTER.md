@@ -33,30 +33,31 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-08-01（Asia/Shanghai）
+快照时间：2026-08-02（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.37`；PostgreSQL 已由 0034 串行升级到 36/head `0036_project_requirement_unit_resolution.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 功能提交为 `682e79378660ef7859617655836f02e2112df244`（`fix: expose planning handoff traceability`）；本轮没有修改业务代码、Migration 或部署配置 |
-| 当前根仓库运维基线 | OFFLINE-IDENTITY-RECOVERY-11 已按方案 B 完成：受守卫离线 CLI 在停写窗口以单事务重置 admin 与固定十个 UAT 账号、撤销 12 条目标既有 Session、写 11 条恢复审计和唯一 run-id 证据；两份 Canonical 已激活，旧候选与 Stage 已按成功规则删除，浏览器 1+10 验证及最终零有效目标 Session 通过 |
-| Git 同步与工作区 | 本任务从 clean `main@753c68c84427de93536a1f282b6e80987f7c9466`、behind 0/ahead 113 起步；工具/测试提交为 `a48dcc8a290b96da1ea6e426aaa2c6d73416c2fc`，完成记录由独立 `ops: complete canonical credential recovery` 提交收口。未 push/PR/amend/rebase/reset/stash/restore；未读取或修改 `shujvbiao/`，秘密与数据库/备份正文未进入 Git |
+| 当前根仓库功能基线提交 | `SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12` 功能提交为 `180f6b58b583bd2dba350f017504be916db9673d`（`fix: expose planning decision history`）；版本仍为 alpha.37，Migration 仍为 0036 |
+| 当前根仓库运维基线 | Planning 决策历史已由独立 `ops: accept planning decision history in parallel environment` 提交收口；Web-only 部署、备份恢复、隔离 Chromium 与 planning-only 主 UAT 已通过，最终结论 `PLANNING DECISION HISTORY FIXED — UAT V1 RETURN VERIFIED` |
+| Git 同步与工作区 | 本任务从 clean `main@eaeae1c816256eb48355bdb117ecc20f6ac8545f`、behind 0/ahead 115 起步；功能提交如上，运维/文档由本条所述独立 ops 提交收口，完成后 ahead 117。未 push/PR/amend/rebase/reset/stash/restore；未读取或修改 `shujvbiao/`，秘密、数据库和备份正文未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0036`，36/head `0036_project_requirement_unit_resolution.sql`。本次身份恢复前后业务指纹 `04cdbc8a49112bc43b5652760408d46d10dbdda1801c1c9b816aa9891a5b5c3c`、受保护指纹 `5414589704ac085792cab1a546e658a61b39c2988800a23ad091e756275e7d41` 一致；Planning 表只被受控备份/恢复与整体指纹核对覆盖读取，未做 Package 对象级核验、修改或业务操作，FIX-08 的 Package ID 1/v1/SUBMITTED 仍只是最后已验证业务基线 |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已由 alpha.37 `sha256:6667bd2ca64e7255befe4398b4e73ec1fe554418d76062d2d378de8edaa7143e` 替换为同版本 `sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25`，旧 Web 有精确回退 tag；Worker 镜像仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。PostgreSQL/Web healthy，Worker/Caddy running，四服务 restart 0/OOM false |
+| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0036`，36/head `0036_project_requirement_unit_resolution.sql`。Package ID 1/v1 当前为 `RETURNED`，RETURN 1、ACCEPT 0、v2 0；数据库 ASCII 标点原因是权威历史值，与全角预期仅两处标点差异且 NFKC 完全等价。部署前备份恢复库与主 UAT 后主库的受保护摘要均为 `3960cf1f1fc3fdaca0bacd246732d27a0ff223e894953e7be2427fa22b150dca`（217 tables / 201 sequences），历史业务数据未修改 |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已 Web-only 更新为 alpha.37 `sha256:fb88dd8afb8b7f08cf6c8dff9aa66566ad9aec0a203460e7fd09bc32af728edc`，旧 `sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25` 有精确回退 tag；Worker 镜像仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。PostgreSQL/Web healthy，Worker/Caddy running，四服务 restart 0/OOM false |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.37 另提供版本化 Requirement Unit Resolution 与 Planning 精确单位来源。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
-| 当前阶段 | `SELFHOST-OPS-OFFLINE-IDENTITY-RECOVERY-11` 已完成并以 `OFFLINE IDENTITY RECOVERY COMPLETED — CANONICAL CREDENTIALS ACTIVE` 收口；TASK09/TASK10 遗留的目标 Session、失效正式 UAT 文件和旧 candidate 风险已由本任务解除 |
-| 当前任务 | 无自动执行任务；本轮完成后已停止。Identity Recovery 工具保留为非公开、显式授权、停写且受守卫的运维能力，不会由 Web、后台任务或启动流程触发 |
-| 下一任务 | 必须由项目负责人另行明确授权；不自动开始 Planning 核验、接收、退回、实际改密或其他业务任务 |
+| 当前阶段 | `SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12` 已完成：待接收/已处理、终态历史重开、完整决策证据、确认窗口、完成凭证和 390px 已通过主 UAT；Unicode 标点现象登记 LOW、历史未改 |
+| 当前任务 | 无自动执行任务；本轮以 `PLANNING DECISION HISTORY FIXED — UAT V1 RETURN VERIFIED` 停止。planning 已安全退出，活跃 Session 0 |
+| 下一任务 | 必须由项目负责人另行明确授权；不自动登录 engineering、创建 v2、接收/退回其他 Package、迁移真实数据或执行生产动作 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
+- SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12 已补齐 Planning 待接收/已处理双视图、RETURNED/ACCEPTED 历史重开、Package 范围 CREATE/SUBMIT/RESUBMIT/RETURN/ACCEPT 证据、决策确认、服务端完成凭证与 390px；Product/BOM、Unit Resolution、Material 终态快照继续只读，权限/版本/Migration 不变。主 UAT 只登录 planning 并只读确认 1/v1/RETURNED、RETURN 1、ACCEPT 0、v2 0 后退出；数据库 ASCII 原因与全角预期仅两处标点差异，NFKC PASS、LOW、历史未修改
 - SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07 已按 D-086 交付 alpha.37/0036：Unit Resolution Version 只追加、Head 按 Requirement Item 独立 CAS、Package Item 固定精确 resolution provenance；enabled Unit、权限、Origin/CSRF、幂等、审计与事务回滚均由服务端保护。隔离写旅程和迁移/恢复门禁通过后已部署并行非生产 UAT；该任务完成时主 UAT Requirement Unit 仍 pending、Resolution/Package 均为 0，后续 FIX-08 当前事实以本文件顶部为准
 - SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-FIX-06 只完成 Schema 缺口诊断并以 BLOCKED 收口：当前需求行 `unit_id=NULL/unit_pending=true`，0034 Product/BOM Resolution 不保存单位，快照 INNER JOIN 排除该行后误报统一错误；源需求不可变，禁止写回或从 BOM 猜 PCS。proposed D-086 定义 0036 Unit Resolution 版本事实、独立 CAS Head 和 Package provenance；未改代码/Migration/主库/部署，Package 保持 0
 - SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05 修复 Planning 路由未被共享客户端识别而丢失 `X-CSRF-Token`/调用方幂等键的根因；发送时读当前 CSRF Cookie，页内键绑定当前 Token+正文并在会话变更时清空。RELEASED BOM 只显示四行事实，POST/PATCH/DELETE 皆由服务端以 `BOM_RELEASED_IMMUTABLE` 拒绝；BOM 首页空选择且搜索有界。alpha.34/0034 Web `sha256:7e0a3040acd1...` 已部署，主库 UAT Handoff 未创建
@@ -232,12 +233,14 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 47. D-086 已由 alpha.37/0036 在并行非生产 UAT 落地：源 Requirement Item 继续不可变且可保持 NULL/pending；工程单位确认写入追加式 Unit Resolution Version，并以每 Requirement Item 独立 CAS Head 指向当前版本。新 Package Item 固定引用生成时的精确 `unit_resolution_id`，后续 Head 变化或 Unit 停用不改历史包；BOM Line Unit 不能推断 Requirement Unit。
 48. FIX-08 的 Package 范围只读追溯功能已部署且没有历史数据缺口，但其主 UAT 浏览器核验曾因 UAT 角色凭据事件停止。ROLE-CREDENTIAL-ROTATION-09/CREDENTIAL-RECONCILIATION-10 的历史 PARTIAL/BLOCKED 记录继续保留，不得改写为当时已完成。
 49. OFFLINE-IDENTITY-RECOVERY-11 已按 D-087 解除上述身份恢复风险：11 个目标账号单事务恢复、目标旧 Session 撤销、Canonical 双文件激活、1+10 身份页验证和最终零有效目标 Session 通过。该完成不构成 Planning 核验授权，不能自动进入 Package 接收/退回。
+50. FIX-12 已以新的明确 planning-only 授权完成主 UAT 历史回看，不能反向改写 FIX-08/TASK09/TASK10 的历史结论。退回原因的数据库 ASCII 标点与预期全角标点仅在 NFKC 后等价，登记为 LOW；数据库原文仍是权威历史值，未来不得以体验优化为由静默修复 Package 或 RETURN Event。
 
 ## 当前任务与下一任务
 
+- `SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12` 已完成：功能提交 `180f6b58b583bd2dba350f017504be916db9673d`；待接收/已处理、终态历史重开、完整事件、确认窗口、完成凭证和 390px 均通过隔离 PostgreSQL/Chromium、备份恢复、Web-only 部署与 planning-only 主 UAT。Package ID 1/v1 最终 RETURNED、RETURN 1、ACCEPT 0、v2 0；数据库原因 NFKC PASS 且历史未改，planning 已退出、有效 Session 0。当前停止，不自动登录 engineering 或创建 v2。
 - `SELFHOST-OPS-OFFLINE-IDENTITY-RECOVERY-11` 已完成：正式 run-id `3b03aaab-11ef-4dfe-963b-001a6ece660f`，11 个目标账号/12 条目标旧 Session/11 条恢复审计在单事务完成；两份 Canonical Schema/owner/mode、admin 与十 UAT 的登录/强制改密门禁/退出、最终零有效目标 Session、业务指纹、备份恢复和资源清理全部通过。工具提交 `a48dcc8a290b96da1ea6e426aaa2c6d73416c2fc`，完成记录由独立 ops 提交收口。
 - `SELFHOST-OPS-UAT-ROLE-CREDENTIAL-ROTATION-09` 与 `SELFHOST-OPS-UAT-CREDENTIAL-RECONCILIATION-10` 保持历史 PARTIAL/BLOCKED 结论；其未完成的身份风险已由后续 TASK11 正式解除，不回写或美化当时结果。
-- `SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 功能仍已部署，但主 UAT Planning 核验仍需新任务授权。TASK11 只有受控备份/恢复与整体指纹核对覆盖读取 Planning 表，未做 Package 对象级核验或业务操作，也未进入业务页面；不能把身份验证冒充 Planning 验收或自动开始退回。
+- `SELFHOST-OPS-UAT-PLANNING-REVIEW-TRACEABILITY-FIX-08` 保持其历史 BLOCKED 结论：当时主 UAT 未执行。其功能与身份阻断已分别由后续 TASK11 和 FIX-12 解除；FIX-12 的新授权和验收不能反向美化 FIX-08 当时结果。
 - `SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07` 已完成：功能提交 `91c0fd29d534246c55ddd669e894cdde9b774e52`，alpha.37/0036 的版本事实、CAS Head、稳定 Unit FK、Package provenance、正式 API 和 390px UI 已通过隔离迁移/恢复/回退、专项/回归与真实 Chromium。正式 root-only 0600 备份和第二新空库恢复通过后，并行非生产 UAT 已从 0034 串行升级到 0035/0036，只替换 Web；Worker/Caddy 不变。该任务完成时主 UAT 为 Requirement NULL/pending、Unit Resolution 0、Package/Item/Event 0；这是历史验收状态，不是当前 UAT 基线。
 - `SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05` 已完成：Planning 当前 Cookie/Header 双提交、Session+正文幂等、RELEASED BOM 前后端不可变与默认空选择均通过隔离测试。alpha.34/0034 兼容 Web `sha256:7e0a3040acd1...` 已仅替换 Web；该任务完成时主库只读 Chromium 只产生一次 engineering 登录/退出，`PRJ-00000001`、Product 7/A0、BOM 7/V1/四行 533—536 不变，Planning Package 为 0；这是历史验收状态，不再作为当前续测授权。
 - `SELFHOST-OPS-UAT-BOM-SELECTOR-FIX-04` 已完成：功能提交 `b66e742`，alpha.34/0034 兼容 Web `sha256:cb6a5c1fae896...` 已只替换 Web。四个正式编码各唯一命中并显示名称/PCS，稳定 material_id 为 533—536；Product A0 与 BOM V1、产品/BOM 状态和现有发布流程已明确。该任务结束时 UAT BOM/Planning 仍为 0；后续新建的 UAT RELEASED BOM 已作为 FIX-05 严格保护起点，不反向改写旧记录。

@@ -1,6 +1,27 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-01（Asia/Shanghai）
+最后更新时间：2026-08-02（Asia/Shanghai）
+
+## SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12 Planning 决策历史修复与主 UAT 回看
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | PLANNING DECISION HISTORY FIXED — UAT V1 RETURN VERIFIED | 功能、隔离测试、备份恢复、Web-only 部署与 planning-only 主 UAT 均完成；已停止，未登录 engineering、未创建 v2 |
+| 严格起点 | PASS | clean `main@eaeae1c816256eb48355bdb117ecc20f6ac8545f`、behind 0/ahead 115；alpha.37、36/head 0036、Package ID 1/v1/RETURNED、RETURN 1、ACCEPT 0、v2 0 全部吻合 |
+| Unicode 门禁 | PASS / LOW | 预期与数据库原文精确不等；仅 U+FF1A→U+003A、U+FF0C→U+002C 两处，分别 NFKC 后完全相等。原始文本经过全半角规范化，语义核对 PASS；数据库原文权威，历史未修改 |
+| 功能提交 | PASS | `180f6b58b583bd2dba350f017504be916db9673d`（`fix: expose planning decision history`）；未新增 Migration、Schema、版本或权限 |
+| 队列/历史 | PASS | Planning 明确提供“待接收 / 已处理”；已处理只含 RETURNED/ACCEPTED 并可重开稳定 Package ID/version，完整显示 CREATE/SUBMIT/RESUBMIT/RETURN/ACCEPT |
+| 决策 UX | PASS | 接收/退回均有 POST 前确认；服务端成功响应生成操作者、时间、请求号、结果与完整原因凭证，并提供“查看已处理详情”；终态按钮隐藏 |
+| 快照与权限 | PASS / READ ONLY | Product A0、BOM V1、Unit Resolution v1、四项 Material 的 1 PCS/10 PCS 固定快照只读；未增加 `system.audit.read` 或扩大 planning 权限，未处理全局跨角色导航 |
+| 定向/回归 | PASS | Planning unit/UI/PG `4/7/11`；Identity/Project/Master-BOM PG `10/5/6`；0036 upgrade `6/6`；适用静态/安全回归 `65/65`，覆盖权限、诱饵审计、CSRF、Origin、幂等、并发与回滚 |
+| Chromium | PASS 1/1 + MAIN UAT | 隔离 390×844 合成退回→确认→完成凭证→已处理重开通过；主 UAT 只登录 planning，网络只允许 login/GET/logout，Package 1/v1 从已处理重开、390px、退出及匿名 401 通过 |
+| 构建/静态门禁 | PASS | Planning/Project typecheck、production build、`git diff --check`、1,137 文件断网凭据扫描通过；lint `0 error / 10 existing warnings` |
+| 备份/恢复 | PASS | root:root 0600 custom dump 2,139,142 bytes，SHA-256 `1d5cdd88257f2e53830598a498b609ac7208b792f7fcfdae2f8306b37d36eb5f`；list、第二空库恢复、36/head 0036 与对象核对通过，恢复库已删，备份保留 |
+| Web-only 部署 | PASS | Web 更新为 `sha256:fb88dd8afb8b7f08cf6c8dff9aa66566ad9aec0a203460e7fd09bc32af728edc`；旧 `sha256:6b94a9c73a18...` 有精确 rollback tag。PostgreSQL/Worker/Caddy ID、0036 和四卷未变 |
+| 主 UAT 最终对象 | PASS / UNCHANGED | 1/v1/RETURNED、RETURN 1、ACCEPT 0、v2 0；数据库实际原因、RETURN 操作者、Asia/Shanghai 时间、请求号、SUCCESS、工程/项目部责任队列、assignee/SLA 空状态均可见；planning 活跃 Session 0 |
+| 业务保护 | PASS / UNCHANGED | 部署前备份恢复库与主 UAT 后主库同源摘要均为 `3960cf1f1fc3fdaca0bacd246732d27a0ff223e894953e7be2427fa22b150dca`（217 tables / 201 sequences）；除允许的 login/logout 身份记录外无业务写 |
+| 资源/清理 | PASS | 起点约 2.2 GiB available/217 MiB Swap/20 GiB/Load `0.10/0.14/0.12`；最终约 2.1 GiB/221 MiB/22 GiB/`0.08/0.10/0.21`。内核 OOM 0、四服务 restart 0/OOM false；任务临时库/容器/网络/模块/脚本/指纹 0，四卷保持，未 prune |
+| Git | TWO FOCUSED COMMITS | 功能提交如上；收口提交为 `ops: accept planning decision history in parallel environment`，实际 SHA 以 `git log` 为准；未 push/PR 或改写历史 |
 
 ## SELFHOST-OPS-OFFLINE-IDENTITY-RECOVERY-11 受控离线身份恢复与 Canonical 凭据激活
 
