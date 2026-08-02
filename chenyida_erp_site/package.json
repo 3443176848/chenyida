@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.37",
+  "version": "0.1.0-alpha.38",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -129,6 +129,8 @@
     "test:planning:ui": "node --experimental-strip-types --test tests/selfhost-planning-handoff-ui-contract.test.mjs",
     "test:planning:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-planning-handoff-postgres.test.mjs",
     "test:planning:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-planning-handoff-migration-upgrade.test.mjs",
+    "test:planning:revision-migration": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-planning-revision-response-migration.test.mjs",
+    "test:planning:revision-browser": "node --experimental-strip-types tests/selfhost-planning-revision-response-browser.test.mjs",
     "test:requirement-unit-resolution:migration-contract": "node --experimental-strip-types --test tests/selfhost-requirement-unit-resolution-migration-contract.test.mjs",
     "test:requirement-unit-resolution:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-requirement-unit-resolution-migration-upgrade.test.mjs",
     "typecheck:material-requirement": "tsc -p tsconfig.phase4-task03.json --pretty false",

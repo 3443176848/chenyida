@@ -16,7 +16,7 @@ async function readBody(request: Request) {
   const raw = await request.text(); if (!raw || Buffer.byteLength(raw) > 256 * 1024) throw new PlanningHandoffError("REQUEST_VALIDATION_FAILED", "请求正文为空或超过 256 KiB");
   let value: unknown; try { value = JSON.parse(raw); } catch { throw new PlanningHandoffError("REQUEST_VALIDATION_FAILED", "请求正文不是有效 JSON"); }
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new PlanningHandoffError("REQUEST_VALIDATION_FAILED", "请求正文必须是对象");
-  const forbidden = ["status", "package_digest", "package_version_no", "prepared_by", "submitted_by", "accepted_by", "returned_by", "request_id", "calculated_gross_quantity", "specification_snapshot"].find((key) => key in (value as Record<string, unknown>));
+  const forbidden = ["status", "package_digest", "package_version_no", "previous_package_id", "responds_to_return_event_id", "response_text_digest", "response_version_no", "prepared_by", "submitted_by", "accepted_by", "returned_by", "request_id", "calculated_gross_quantity", "specification_snapshot"].find((key) => key in (value as Record<string, unknown>));
   if (forbidden) throw new PlanningHandoffError("REQUEST_VALIDATION_FAILED", `请求正文不能指定服务端字段：${forbidden}`);
   return { value: value as Record<string, unknown>, digest: canonicalDigest(value) };
 }
@@ -34,7 +34,9 @@ export async function handlePlanningHandoffApi(request: Request, dependencies: D
   const packages = path.match(/^\/api\/projects\/([1-9]\d*)\/planning-packages$/);
   const packageDetail = path.match(/^\/api\/planning-packages\/([1-9]\d*)$/);
   const packageAction = path.match(/^\/api\/planning-packages\/([1-9]\d*)\/(submit|accept|return)$/);
-  if (!resolutions && !unitResolutions && !packages && !packageDetail && !packageAction && path !== "/api/planning-handoffs") return null;
+  const revisionResponses = path.match(/^\/api\/planning-packages\/([1-9]\d*)\/revision-responses$/);
+  const packageSuccessor = path.match(/^\/api\/planning-packages\/([1-9]\d*)\/successor$/);
+  if (!resolutions && !unitResolutions && !packages && !packageDetail && !packageAction && !revisionResponses && !packageSuccessor && path !== "/api/planning-handoffs") return null;
   const repository = new PlanningHandoffRepository(dependencies.pool); const service = new PlanningHandoffService(repository); let action = "PLANNING_HANDOFF_REQUEST";
   try {
     if (request.method === "GET") {
@@ -50,6 +52,8 @@ export async function handlePlanningHandoffApi(request: Request, dependencies: D
     if (resolutions) { action = "PROJECT_REQUIREMENTS_RESOLVED"; requirePermission(dependencies.actor, "planning.prepare"); result = await service.saveResolutions(positiveId(resolutions[1], "projectId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
     else if (unitResolutions) { action = "PROJECT_REQUIREMENT_UNIT_RESOLVED"; requirePermission(dependencies.actor, "planning.prepare"); result = await service.saveUnitResolution(positiveId(unitResolutions[1], "projectId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
     else if (packages) { action = "PLANNING_PACKAGE_PREPARED"; requirePermission(dependencies.actor, "planning.prepare"); result = await service.createPackage(positiveId(packages[1], "projectId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
+    else if (revisionResponses) { action = "PLANNING_REVISION_RESPONSE_SAVED"; requirePermission(dependencies.actor, "planning.prepare"); result = await service.saveRevisionResponse(positiveId(revisionResponses[1], "packageId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
+    else if (packageSuccessor) { action = "PLANNING_REVISION_SUCCESSOR_CREATED"; requirePermission(dependencies.actor, "planning.prepare"); result = await service.createSuccessorPackage(positiveId(packageSuccessor[1], "packageId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
     else if (packageAction?.[2] === "submit") { action = "PLANNING_PACKAGE_SUBMITTED"; requirePermission(dependencies.actor, "planning.submit"); result = await service.submit(positiveId(packageAction[1], "packageId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
     else if (packageAction?.[2] === "accept") { action = "PLANNING_PACKAGE_ACCEPTED"; requirePermission(dependencies.actor, "planning.accept"); result = await service.accept(positiveId(packageAction[1], "packageId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
     else if (packageAction?.[2] === "return") { action = "PLANNING_PACKAGE_RETURNED"; requirePermission(dependencies.actor, "planning.accept"); result = await service.returnToProject(positiveId(packageAction[1], "packageId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }

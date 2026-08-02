@@ -12,6 +12,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  type PgTableExtraConfigValue,
   text,
   timestamp,
   uniqueIndex,
@@ -461,6 +462,9 @@ export const projectPlanningPackages = pgTable("project_planning_packages", {
   projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }),
   packageVersionNo: integer("package_version_no").notNull(),
   requirementVersionId: bigint("requirement_version_id", { mode: "number" }).notNull().references(() => projectRequirementVersions.id, { onDelete: "restrict" }),
+  previousPackageId: bigint("previous_package_id", { mode: "number" }),
+  respondsToReturnEventId: bigint("responds_to_return_event_id", { mode: "number" }),
+  revisionResponseVersionId: bigint("revision_response_version_id", { mode: "number" }),
   status: text("status").notNull().default("DRAFT"), targetDeliveryDate: date("target_delivery_date", { mode: "string" }), packageDigest: text("package_digest").notNull(),
   preparedBy: text("prepared_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), preparedAt: timestamptz("prepared_at").notNull().defaultNow(),
   submittedBy: text("submitted_by").references(() => appUsers.username, { onDelete: "restrict" }), submittedAt: timestamptz("submitted_at"),
@@ -468,15 +472,24 @@ export const projectPlanningPackages = pgTable("project_planning_packages", {
   returnedBy: text("returned_by").references(() => appUsers.username, { onDelete: "restrict" }), returnedAt: timestamptz("returned_at"),
   returnReason: text("return_reason").notNull().default(""), version: integer("version").notNull().default(1), requestId: uuid("request_id").notNull(),
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
-}, (t) => [
+}, (t): PgTableExtraConfigValue[] => [
+  uniqueIndex("project_planning_packages_id_project_uq").on(t.id, t.projectId),
   uniqueIndex("project_planning_packages_project_version_uq").on(t.projectId, t.packageVersionNo),
   uniqueIndex("project_planning_packages_project_digest_uq").on(t.projectId, t.packageDigest),
+  uniqueIndex("project_planning_packages_previous_uq").on(t.previousPackageId).where(sql`${t.previousPackageId} is not null`),
+  uniqueIndex("project_planning_packages_return_successor_uq").on(t.respondsToReturnEventId).where(sql`${t.respondsToReturnEventId} is not null`),
+  uniqueIndex("project_planning_packages_project_response_uq").on(t.projectId, t.revisionResponseVersionId).where(sql`${t.revisionResponseVersionId} is not null`),
   index("project_planning_packages_queue_idx").on(t.status, t.submittedAt, t.id),
   index("project_planning_packages_project_idx").on(t.projectId, t.packageVersionNo, t.id),
   index("project_planning_packages_preparer_idx").on(t.preparedBy, t.status, t.updatedAt, t.id),
+  index("project_planning_packages_lineage_idx").on(t.previousPackageId, t.respondsToReturnEventId, t.revisionResponseVersionId),
+  foreignKey({ name: "project_planning_packages_previous_project_fk", columns: [t.previousPackageId, t.projectId], foreignColumns: [t.id, t.projectId] }).onDelete("restrict"),
+  foreignKey({ name: "project_planning_packages_return_source_fk", columns: [t.respondsToReturnEventId, t.previousPackageId, t.projectId], foreignColumns: [projectPlanningHandoffEvents.id, projectPlanningHandoffEvents.packageId, projectPlanningHandoffEvents.projectId] }).onDelete("restrict"),
+  foreignKey({ name: "project_planning_packages_response_source_fk", columns: [t.revisionResponseVersionId, t.previousPackageId, t.respondsToReturnEventId, t.projectId], foreignColumns: [projectPlanningRevisionResponseVersions.id, projectPlanningRevisionResponseVersions.sourcePackageId, projectPlanningRevisionResponseVersions.returnEventId, projectPlanningRevisionResponseVersions.projectId] }).onDelete("restrict"),
   check("project_planning_packages_status_ck", sql`${t.status} in ('DRAFT','SUBMITTED','RETURNED','ACCEPTED')`),
   check("project_planning_packages_version_ck", sql`${t.version}>0 and ${t.packageVersionNo}>0`),
   check("project_planning_packages_digest_ck", sql`${t.packageDigest} ~ '^[0-9a-f]{64}$'`),
+  check("project_planning_packages_lineage_ck", sql`(${t.packageVersionNo}=1 and ${t.previousPackageId} is null and ${t.respondsToReturnEventId} is null and ${t.revisionResponseVersionId} is null) or (${t.packageVersionNo}>1 and ((${t.previousPackageId} is null and ${t.respondsToReturnEventId} is null and ${t.revisionResponseVersionId} is null) or (${t.previousPackageId} is not null and ${t.respondsToReturnEventId} is not null and ${t.revisionResponseVersionId} is not null)))`),
   check("project_planning_packages_submit_ck", sql`(${t.status}='DRAFT' and ${t.submittedBy} is null and ${t.submittedAt} is null) or (${t.status}<>'DRAFT' and ${t.submittedBy} is not null and ${t.submittedAt} is not null)`),
   check("project_planning_packages_accept_ck", sql`(${t.status}='ACCEPTED' and ${t.acceptedBy} is not null and ${t.acceptedAt} is not null and ${t.returnedBy} is null and ${t.returnedAt} is null and ${t.returnReason}='') or ${t.status}<>'ACCEPTED'`),
   check("project_planning_packages_return_ck", sql`(${t.status}='RETURNED' and ${t.returnedBy} is not null and ${t.returnedAt} is not null and char_length(btrim(${t.returnReason})) between 1 and 1000 and ${t.acceptedBy} is null and ${t.acceptedAt} is null) or ${t.status}<>'RETURNED'`),
@@ -522,13 +535,58 @@ export const projectPlanningDocumentLinks = pgTable("project_planning_document_l
 }, (t) => [uniqueIndex("project_planning_document_links_package_document_uq").on(t.packageId, t.projectDocumentLinkId), index("project_planning_document_links_package_idx").on(t.packageId, t.id)]);
 
 export const projectPlanningHandoffEvents = pgTable("project_planning_handoff_events", {
-  id: bigserial("id", { mode: "number" }).primaryKey(), packageId: bigint("package_id", { mode: "number" }).notNull().references(() => projectPlanningPackages.id, { onDelete: "restrict" }),
+  id: bigserial("id", { mode: "number" }).primaryKey(), packageId: bigint("package_id", { mode: "number" }).notNull().references((): AnyPgColumn => projectPlanningPackages.id, { onDelete: "restrict" }),
   projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }), eventType: text("event_type").notNull(),
   actor: text("actor").notNull().references(() => appUsers.username, { onDelete: "restrict" }), reason: text("reason").notNull().default(""), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
-}, (t) => [
+}, (t): PgTableExtraConfigValue[] => [
+  uniqueIndex("project_planning_handoff_events_id_package_project_uq").on(t.id, t.packageId, t.projectId),
+  uniqueIndex("project_planning_handoff_events_package_created_uq").on(t.packageId).where(sql`${t.eventType}='CREATED'`),
+  uniqueIndex("project_planning_handoff_events_package_returned_uq").on(t.packageId).where(sql`${t.eventType}='RETURNED'`),
   index("project_planning_handoff_events_project_idx").on(t.projectId, t.id), index("project_planning_handoff_events_package_idx").on(t.packageId, t.id), index("project_planning_handoff_events_request_idx").on(t.requestId, t.id),
-  check("project_planning_handoff_events_type_ck", sql`${t.eventType} in ('SUBMITTED','ACCEPTED','RETURNED','RESUBMITTED')`),
+  check("project_planning_handoff_events_type_ck", sql`${t.eventType} in ('CREATED','SUBMITTED','ACCEPTED','RETURNED','RESUBMITTED')`),
   check("project_planning_handoff_events_reason_ck", sql`(${t.eventType}='RETURNED' and char_length(btrim(${t.reason})) between 1 and 1000) or (${t.eventType}<>'RETURNED' and char_length(${t.reason})<=1000)`),
+]);
+
+export const projectPlanningRevisionResponseVersions = pgTable("project_planning_revision_response_versions", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  sourcePackageId: bigint("source_package_id", { mode: "number" }).notNull().references((): AnyPgColumn => projectPlanningPackages.id, { onDelete: "restrict" }),
+  returnEventId: bigint("return_event_id", { mode: "number" }).notNull().references((): AnyPgColumn => projectPlanningHandoffEvents.id, { onDelete: "restrict" }),
+  projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }),
+  responseVersionNo: integer("response_version_no").notNull(),
+  responseText: text("response_text").notNull(),
+  responseTextDigest: text("response_text_digest").notNull(),
+  supersedesResponseId: bigint("supersedes_response_id", { mode: "number" }).references((): AnyPgColumn => projectPlanningRevisionResponseVersions.id, { onDelete: "restrict" }),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  requestId: uuid("request_id").notNull(),
+}, (t): PgTableExtraConfigValue[] => [
+  uniqueIndex("project_planning_revision_response_versions_return_no_uq").on(t.returnEventId, t.responseVersionNo),
+  uniqueIndex("project_planning_revision_response_versions_id_lineage_uq").on(t.id, t.sourcePackageId, t.returnEventId, t.projectId),
+  index("project_planning_revision_response_versions_source_idx").on(t.sourcePackageId, t.returnEventId, t.responseVersionNo),
+  index("project_planning_revision_response_versions_request_idx").on(t.requestId, t.id),
+  foreignKey({ name: "project_planning_revision_response_versions_source_project_fk", columns: [t.sourcePackageId, t.projectId], foreignColumns: [projectPlanningPackages.id, projectPlanningPackages.projectId] }).onDelete("restrict"),
+  foreignKey({ name: "project_planning_revision_response_versions_return_source_fk", columns: [t.returnEventId, t.sourcePackageId, t.projectId], foreignColumns: [projectPlanningHandoffEvents.id, projectPlanningHandoffEvents.packageId, projectPlanningHandoffEvents.projectId] }).onDelete("restrict"),
+  foreignKey({ name: "project_planning_revision_response_versions_supersedes_lineage_fk", columns: [t.supersedesResponseId, t.sourcePackageId, t.returnEventId, t.projectId], foreignColumns: [t.id, t.sourcePackageId, t.returnEventId, t.projectId] }).onDelete("restrict"),
+  check("project_planning_revision_response_versions_no_ck", sql`${t.responseVersionNo}>0`),
+  check("project_planning_revision_response_versions_chain_ck", sql`(${t.responseVersionNo}=1 and ${t.supersedesResponseId} is null) or (${t.responseVersionNo}>1 and ${t.supersedesResponseId} is not null)`),
+  check("project_planning_revision_response_versions_text_ck", sql`${t.responseText}=btrim(${t.responseText}) and char_length(${t.responseText}) between 10 and 2000 and regexp_replace(${t.responseText}, E'\\n', '', 'g') !~ '[[:cntrl:]]'`),
+  check("project_planning_revision_response_versions_digest_ck", sql`${t.responseTextDigest} ~ '^[0-9a-f]{64}$'`),
+]);
+
+export const projectPlanningRevisionResponseHeads = pgTable("project_planning_revision_response_heads", {
+  returnEventId: bigint("return_event_id", { mode: "number" }).primaryKey().references((): AnyPgColumn => projectPlanningHandoffEvents.id, { onDelete: "restrict" }),
+  sourcePackageId: bigint("source_package_id", { mode: "number" }).notNull().references((): AnyPgColumn => projectPlanningPackages.id, { onDelete: "restrict" }),
+  projectId: bigint("project_id", { mode: "number" }).notNull().references(() => businessProjects.id, { onDelete: "restrict" }),
+  currentResponseVersionId: bigint("current_response_version_id", { mode: "number" }).notNull().references((): AnyPgColumn => projectPlanningRevisionResponseVersions.id, { onDelete: "restrict" }),
+  version: integer("version").notNull(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t): PgTableExtraConfigValue[] => [
+  uniqueIndex("project_planning_revision_response_heads_current_uq").on(t.currentResponseVersionId),
+  index("project_planning_revision_response_heads_source_idx").on(t.sourcePackageId, t.returnEventId),
+  foreignKey({ name: "project_planning_revision_response_heads_source_project_fk", columns: [t.sourcePackageId, t.projectId], foreignColumns: [projectPlanningPackages.id, projectPlanningPackages.projectId] }).onDelete("restrict"),
+  foreignKey({ name: "project_planning_revision_response_heads_return_source_fk", columns: [t.returnEventId, t.sourcePackageId, t.projectId], foreignColumns: [projectPlanningHandoffEvents.id, projectPlanningHandoffEvents.packageId, projectPlanningHandoffEvents.projectId] }).onDelete("restrict"),
+  foreignKey({ name: "project_planning_revision_response_heads_current_lineage_fk", columns: [t.currentResponseVersionId, t.sourcePackageId, t.returnEventId, t.projectId], foreignColumns: [projectPlanningRevisionResponseVersions.id, projectPlanningRevisionResponseVersions.sourcePackageId, projectPlanningRevisionResponseVersions.returnEventId, projectPlanningRevisionResponseVersions.projectId] }).onDelete("restrict"),
+  check("project_planning_revision_response_heads_version_ck", sql`${t.version}>0`),
 ]);
 
 export const planningMaterialRequirementPlans = pgTable("planning_material_requirement_plans", {

@@ -7,3 +7,5 @@ export type PlanningMutationResult = PlanningMutationWorkResult & Readonly<{ rep
 export type PlanningMutationWork = (client: PoolClient) => Promise<PlanningMutationWorkResult>;
 export type ResolutionInput = Readonly<{ requirementItemId: number; productId: number; productVersionId: number; bomHeaderId: number; bomVersionId: number }>;
 export type UnitResolutionInput = Readonly<{ requirementItemId: number; unitId: number; expectedHeadVersion: number }>;
+export type RevisionResponseInput = Readonly<{ expectedHeadVersion: number; responseText: string; responseTextDigest: string }>;
+export type SuccessorPackageInput = Readonly<{ expectedPackageVersion: number; expectedResponseHeadVersion: number; revisionResponseVersionId: number }>;

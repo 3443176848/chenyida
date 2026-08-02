@@ -4,6 +4,15 @@
 
 ## 2026-08-02
 
+### SELFHOST-OPS-UAT-PLANNING-REVISION-RESPONSE-13 - `feat: add planning revision response lineage`（部署待独立 ops 提交）
+
+- Git/范围：从 strict clean `main@174181991c0bf51ee397627ea8fce546d1b64e68`、Parent `180f6b58b583bd2dba350f017504be916db9673d`、behind 0/ahead 117 起步；只实现 Planning RETURN 后工程回复、固定后继谱系、测试和项目文档，不读取/修改 `shujvbiao/`，不 push/PR 或改写历史。
+- Schema/版本：0036 无完整合规模型，故唯一新增 `0037_project_planning_revision_response_lineage.sql`，升级 `0.1.0-alpha.38`；0001—0036 未修改。新增追加式 Response Version、每 RETURN 独立 CAS Head、Package previous/RETURN/Response 复合外键、唯一后继/单次消费、索引和不可变 SQL guard；既有 RETURNED v1 不回填或伪造回复。
+- 服务/摘要：回复按 LF、Unicode NFC、trim 和 10—2000 字符保存并保留中文全角标点；权限/owner/责任队列、Origin/CSRF、限流、幂等、CAS、并发和故障回滚 fail closed。v2 原子复制 Product/BOM/Unit Resolution/Material/Document 固定快照并把源 Package、RETURN、精确 Response Version/正文摘要纳入 Package 摘要；Audit 不存完整正文。
+- UI：RETURNED v1 显示完整退回事实、工程回复、Version/actor/time/request_id、固定复用和确认后果；未保存或脏回复禁用 v2。仅回复模式不渲染 Product/BOM/Unit 选择器；v2 显示 `v1 → Planning RETURN → Engineering Response → v2` 完整固定谱系。
+- 测试：静态/安全回归 49/49、Planning PostgreSQL 12/12、Migration 4/4、隔离 Chromium 1/1，共 66/66；Planning typecheck、production build、lint 0 error 与 diff check 通过。覆盖文本、持久化、CAS/追加版本、幂等异正文、并发、权限、RETURN 归属、唯一后继、零半记录、SQL guard、固定回复/快照和 390px 完整接收旅程。
+- 部署边界：候选 Web `sha256:694a3190f517c94e36be3993e4b06e96b9194ea4e22e9add7f7ea533f09cab25` 已构建；运行面仍 alpha.37/0036 和原 Web。主 UAT 指纹 `0dfc969bf0785326091e649c6af5fd8f52023d0caf43cc0ebf60b90e9db243c8`，Response 0/v2 0；备份恢复、0037 和 Web 部署待独立 ops 门禁。
+
 ### SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12 - `fix: expose planning decision history` / `ops: accept planning decision history in parallel environment`
 
 - Git/范围：从 strict clean `main@eaeae1c816256eb48355bdb117ecc20f6ac8545f`、behind 0/ahead 115 起步；功能提交 `180f6b58b583bd2dba350f017504be916db9673d`。只修改 Planning Handoff 服务投影、UI/CSS、测试和项目文档；未 push/PR、改写历史、访问生产或处理全局导航债务。

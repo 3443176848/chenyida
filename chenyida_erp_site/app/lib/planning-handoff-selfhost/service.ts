@@ -3,10 +3,10 @@ import type { IdentityActor } from "../identity-selfhost/types.ts";
 import { PlanningHandoffError } from "./errors.ts";
 import { PlanningHandoffRepository } from "./repository.ts";
 import type { PlanningMutationMeta, PlanningMutationResult, ResolutionInput } from "./types.ts";
-import { assertOnlyKeys, boundedText, canonicalDigest, expectedVersion, optionalDate, resolutionInput, unitResolutionInput } from "./validation.ts";
+import { assertOnlyKeys, boundedText, canonicalDigest, expectedVersion, optionalDate, resolutionInput, revisionResponseInput, successorPackageInput, unitResolutionInput } from "./validation.ts";
 
 type ProjectRow = Record<string, unknown> & { id: string; status: string; version: number; project_owner: string | null; current_requirement_version_no: number; requirement_version_id: string; customer_id: string };
-type PackageRow = Record<string, unknown> & { id: string; project_id: string; package_version_no: number; status: string; version: number; prepared_by: string; submitted_by: string | null; project_owner: string | null };
+type PackageRow = Record<string, unknown> & { id: string; project_id: string; requirement_version_id: string; package_version_no: number; status: string; version: number; prepared_by: string; submitted_by: string | null; project_owner: string | null };
 const allowed = (actor: IdentityActor, permission: string) => actor.permissions.includes("*") || actor.permissions.includes(permission);
 
 export class PlanningHandoffService {
@@ -79,7 +79,7 @@ export class PlanningHandoffService {
       const project = await this.acceptedProject(client, projectId, true); this.assertEngineeringOwner(meta.actor, project);
       if (Number(project.version) !== parsed.expected) throw new PlanningHandoffError("PROJECT_VERSION_CONFLICT", "项目版本已变化，请刷新后重试", 409);
       const currentPackage = await client.query("select status from project_planning_packages where project_id=$1 order by package_version_no desc limit 1", [projectId]);
-      if (currentPackage.rows[0] && currentPackage.rows[0].status !== "RETURNED") throw new PlanningHandoffError("PLANNING_PACKAGE_STATE_CONFLICT", "只能在首次生成交接包前或上一版本退回后修订解析", 409);
+      if (currentPackage.rows[0]) throw new PlanningHandoffError("PLANNING_PACKAGE_STATE_CONFLICT", "已有交接包后，Product/BOM 解析只能通过独立的变更解析流程修改；本次退回仅允许保存工程修订回复", 409);
       for (const row of parsed.rows) { await this.validateResolution(client, project, row); await client.query(`insert into project_requirement_resolutions(project_id,requirement_version_id,requirement_item_id,product_id,product_version_id,bom_header_id,bom_version_id,resolved_by,request_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9)
         on conflict(requirement_item_id) do update set product_id=excluded.product_id,product_version_id=excluded.product_version_id,bom_header_id=excluded.bom_header_id,bom_version_id=excluded.bom_version_id,resolved_by=excluded.resolved_by,resolved_at=now(),request_id=excluded.request_id`, [projectId, Number(project.requirement_version_id), row.requirementItemId, row.productId, row.productVersionId, row.bomHeaderId, row.bomVersionId, meta.actor.username, meta.requestId]); }
       await this.fault?.("after_resolutions");
@@ -93,7 +93,7 @@ export class PlanningHandoffService {
     return this.repository.execute(meta, async (client) => {
       const project = await this.acceptedProject(client, projectId, true); this.assertEngineeringOwner(meta.actor, project);
       const currentPackage = await client.query("select status from project_planning_packages where project_id=$1 order by package_version_no desc limit 1", [projectId]);
-      if (currentPackage.rows[0] && currentPackage.rows[0].status !== "RETURNED") throw new PlanningHandoffError("PLANNING_PACKAGE_STATE_CONFLICT", "只能在首次生成交接包前或上一版本退回后修订单位解析", 409);
+      if (currentPackage.rows[0]) throw new PlanningHandoffError("PLANNING_PACKAGE_STATE_CONFLICT", "已有交接包后，单位解析只能通过独立的变更解析流程修改；本次退回仅允许保存工程修订回复", 409);
       const item = await client.query(`select ri.id,ri.line_no from project_requirement_items ri
         where ri.id=$1 and ri.requirement_version_id=$2 for update of ri`, [parsed.requirementItemId, Number(project.requirement_version_id)]);
       if (!item.rows[0]) throw new PlanningHandoffError("REQUIREMENT_UNIT_INVALID", "需求明细不属于项目当前需求版本，请刷新页面后重试", 422);
@@ -170,28 +170,180 @@ export class PlanningHandoffService {
     return snapshots;
   }
 
+  private packageDigest(
+    projectId: number,
+    packageVersionNo: number,
+    requirementVersionId: number,
+    targetDeliveryDate: string | null,
+    snapshots: Array<Record<string, unknown> & { lines: Record<string, unknown>[] }>,
+    documents: Record<string, unknown>[],
+    lineage: Record<string, unknown> | null,
+  ) {
+    const items = snapshots.map((item) => ({
+      requirement_item_id: Number(item.requirement_item_id),
+      product_version_id: Number(item.product_version_id),
+      bom_version_id: Number(item.bom_version_id),
+      required_quantity: String(item.required_quantity),
+      unit_id: Number(item.unit_id),
+      unit_resolution_id: Number(item.unit_resolution_id),
+      line_no: Number(item.line_no),
+      source_digest: String(item.source_digest),
+      lines: item.lines.map((line) => ({
+        source_bom_line_id: Number(line.source_bom_line_id),
+        material_id: Number(line.material_id),
+        unit_id: Number(line.unit_id),
+        quantity_per: String(line.quantity_per),
+        loss_rate: String(line.loss_rate),
+        calculated_gross_quantity: String(line.calculated_gross_quantity),
+        specification_snapshot: line.specification_snapshot,
+        material_digest: String(line.material_digest),
+        line_no: Number(line.line_no),
+      })),
+    }));
+    const documentSnapshot = documents.map((document) => ({
+      project_document_link_id: Number(document.project_document_link_id),
+      document_type: String(document.document_type || ""),
+      display_name: String(document.display_name || ""),
+      sha256: String(document.sha256 || ""),
+      size_bytes: String(document.size_bytes || ""),
+    }));
+    return canonicalDigest({ project_id: projectId, package_version_no: packageVersionNo, requirement_version_id: requirementVersionId, target_delivery_date: targetDeliveryDate, lineage, items, documents: documentSnapshot });
+  }
+
+  private async fixedPackageSources(client: PoolClient, sourcePackageId: number) {
+    const sourceCount = await client.query("select count(*)::int count from project_planning_package_items where package_id=$1", [sourcePackageId]);
+    const items = await client.query(`select pi.id source_package_item_id,pi.requirement_item_id,pi.product_version_id,pi.bom_version_id,
+      pi.required_quantity::text,pi.unit_id,pi.unit_resolution_id,pi.line_no,pi.source_digest,
+      p.status product_status,pv.status product_version_status,bh.status bom_status,bv.status bom_version_status,
+      u.enabled unit_enabled,ur.id validated_unit_resolution_id
+      from project_planning_package_items pi
+      left join product_versions pv on pv.id=pi.product_version_id
+      left join products p on p.id=pv.product_id
+      left join bom_versions bv on bv.id=pi.bom_version_id and bv.product_version_id=pi.product_version_id
+      left join bom_headers bh on bh.id=bv.bom_header_id and bh.product_id=p.id
+      left join units u on u.id=pi.unit_id
+      left join project_requirement_unit_resolution_versions ur on ur.id=pi.unit_resolution_id and ur.requirement_item_id=pi.requirement_item_id and ur.unit_id=pi.unit_id
+      where pi.package_id=$1 order by pi.line_no`, [sourcePackageId]);
+    if (!items.rows.length || items.rowCount !== Number(sourceCount.rows[0].count)) throw new PlanningHandoffError("PLANNING_HANDOFF_CONSTRAINT_VIOLATION", "源 Package 快照不完整，不能生成后继版本", 422);
+    const invalidProductBom = items.rows.filter((item) => item.product_status !== "ACTIVE" || item.product_version_status !== "RELEASED" || item.bom_status !== "ACTIVE" || item.bom_version_status !== "RELEASED");
+    if (invalidProductBom.length) throw new PlanningHandoffError("RESOLUTION_REFERENCE_INVALID", "源 Package 固定引用的 Product/BOM 已失效；请先发起独立变更解析流程", 422);
+    const invalidUnits = items.rows.filter((item) => !item.validated_unit_resolution_id || item.unit_enabled !== true);
+    if (invalidUnits.length) throw new PlanningHandoffError("REQUIREMENT_UNIT_INVALID", "源 Package 固定引用的 Unit Resolution 或单位已失效；请先发起独立变更解析流程", 422);
+    const snapshots: Array<Record<string, unknown> & { lines: Record<string, unknown>[] }> = [];
+    for (const item of items.rows) {
+      const lines = await client.query(`select source_bom_line_id,material_id,unit_id,quantity_per::text,loss_rate::text,
+        calculated_gross_quantity::text,specification_snapshot,material_digest,line_no
+        from project_planning_package_bom_lines where package_item_id=$1 order by line_no`, [Number(item.source_package_item_id)]);
+      if (!lines.rows.length) throw new PlanningHandoffError("PLANNING_HANDOFF_CONSTRAINT_VIOLATION", "源 Package 物料快照不完整，不能生成后继版本", 422);
+      snapshots.push({ ...item, lines: lines.rows });
+    }
+    const documents = await client.query(`select dl.project_document_link_id,l.document_type,l.display_name,f.sha256,f.size_bytes::text
+      from project_planning_document_links dl
+      join project_document_links l on l.id=dl.project_document_link_id
+      join material_import_files f on f.id=l.file_id
+      where dl.package_id=$1 order by dl.id`, [sourcePackageId]);
+    return { snapshots, documents: documents.rows };
+  }
+
   async createPackage(projectId: number, meta: PlanningMutationMeta, input: Record<string, unknown>): Promise<PlanningMutationResult> {
     assertOnlyKeys(input, ["expected_version", "target_delivery_date"]); const expected = expectedVersion(input.expected_version); const requestedDate = optionalDate(input.target_delivery_date);
     return this.repository.execute(meta, async (client) => {
       const project = await this.acceptedProject(client, projectId, true); this.assertEngineeringOwner(meta.actor, project); if (Number(project.version) !== expected) throw new PlanningHandoffError("PROJECT_VERSION_CONFLICT", "项目版本已变化，请刷新后重试", 409);
       const previous = await client.query("select * from project_planning_packages where project_id=$1 order by package_version_no desc limit 1", [projectId]);
-      if (previous.rows[0] && previous.rows[0].status !== "RETURNED") throw new PlanningHandoffError("PLANNING_PACKAGE_STATE_CONFLICT", "当前项目已有未退回或已接收的计划交接包", 409);
-      const packageVersionNo = Number(previous.rows[0]?.package_version_no || 0) + 1; const snapshots = await this.snapshotSources(client, project);
+      if (previous.rows[0]) throw new PlanningHandoffError("PLANNING_PACKAGE_STATE_CONFLICT", "当前项目已有计划交接包；Planning 退回后请先保存工程修订回复，再从源 Package 生成固定谱系后继", 409);
+      const packageVersionNo = 1; const sourceSnapshots = await this.snapshotSources(client, project);
+      const snapshots: Array<Record<string, unknown> & { lines: Record<string, unknown>[] }> = sourceSnapshots.map((item) => ({ ...item, source_digest: canonicalDigest({ ...item, lines: item.lines }) }));
       const documents = await client.query(`select l.id project_document_link_id,l.document_type,l.display_name,f.original_filename,f.mime_type,f.sha256,f.size_bytes::text,f.storage_status from project_document_links l join material_import_files f on f.id=l.file_id where l.project_id=$1 and l.requirement_version_id=$2 and f.storage_status='STORED' order by l.id`, [projectId, Number(project.requirement_version_id)]);
       const sourceTargetDate = project.target_delivery_date; const targetDate = requestedDate ?? (sourceTargetDate instanceof Date ? sourceTargetDate.toISOString().slice(0, 10) : sourceTargetDate ? String(sourceTargetDate).slice(0, 10) : null);
-      const digestPayload = { project_id: projectId, package_version_no: packageVersionNo, requirement_version_id: Number(project.requirement_version_id), target_delivery_date: targetDate, items: snapshots, documents: documents.rows };
-      const packageDigest = canonicalDigest(digestPayload);
+      const packageDigest = this.packageDigest(projectId, packageVersionNo, Number(project.requirement_version_id), targetDate, snapshots, documents.rows, null);
       const saved = await client.query(`insert into project_planning_packages(project_id,package_version_no,requirement_version_id,status,target_delivery_date,package_digest,prepared_by,request_id) values($1,$2,$3,'DRAFT',$4,$5,$6,$7) returning *`, [projectId, packageVersionNo, Number(project.requirement_version_id), targetDate, packageDigest, meta.actor.username, meta.requestId]);
       const packageId = Number(saved.rows[0].id); await this.fault?.("after_package_header");
+      await client.query("insert into project_planning_handoff_events(package_id,project_id,event_type,actor,request_id) values($1,$2,'CREATED',$3,$4)", [packageId, projectId, meta.actor.username, meta.requestId]);
+      await this.fault?.("after_package_create_event");
       for (const item of snapshots) {
-        const sourceDigest = canonicalDigest({ ...item, lines: item.lines });
-        const packageItem = await client.query(`insert into project_planning_package_items(package_id,requirement_item_id,product_version_id,bom_version_id,required_quantity,unit_id,unit_resolution_id,line_no,source_digest) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`, [packageId, Number(item.requirement_item_id), Number(item.product_version_id), Number(item.bom_version_id), item.required_quantity, Number(item.unit_id), Number(item.unit_resolution_id), Number(item.line_no), sourceDigest]);
+        const packageItem = await client.query(`insert into project_planning_package_items(package_id,requirement_item_id,product_version_id,bom_version_id,required_quantity,unit_id,unit_resolution_id,line_no,source_digest) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`, [packageId, Number(item.requirement_item_id), Number(item.product_version_id), Number(item.bom_version_id), item.required_quantity, Number(item.unit_id), Number(item.unit_resolution_id), Number(item.line_no), item.source_digest]);
         for (const line of item.lines) await client.query(`insert into project_planning_package_bom_lines(package_item_id,source_bom_line_id,material_id,unit_id,quantity_per,loss_rate,calculated_gross_quantity,specification_snapshot,material_digest,line_no) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [Number(packageItem.rows[0].id), Number(line.source_bom_line_id), Number(line.material_id), Number(line.unit_id), line.quantity_per, line.loss_rate, line.calculated_gross_quantity, line.specification_snapshot, line.material_digest, Number(line.line_no)]);
       }
       for (const document of documents.rows) await client.query("insert into project_planning_document_links(package_id,project_document_link_id,created_by,request_id) values($1,$2,$3,$4)", [packageId, Number(document.project_document_link_id), meta.actor.username, meta.requestId]);
       await this.fault?.("after_package_snapshot");
       const body = { ok: true, project_id: projectId, package_id: packageId, data: saved.rows[0], item_count: snapshots.length, package_digest: packageDigest, request_id: meta.requestId };
       return { status: 201, body, objectId: packageId, newVersion: 1 };
+    });
+  }
+
+  async saveRevisionResponse(packageId: number, meta: PlanningMutationMeta, input: Record<string, unknown>): Promise<PlanningMutationResult> {
+    const parsed = revisionResponseInput(input);
+    return this.repository.execute(meta, async (client) => {
+      const source = await this.packageForUpdate(client, packageId); this.assertEngineeringOwner(meta.actor, source as unknown as ProjectRow);
+      if (source.status !== "RETURNED") throw new PlanningHandoffError("PACKAGE_NOT_RETURNED", "只有 Planning 已退回且责任队列已回到工程/项目部的 Package 才能保存修订回复", 409);
+      const returnEvents = await client.query("select id,package_id,project_id,event_type,actor,reason,request_id,created_at from project_planning_handoff_events where package_id=$1 and project_id=$2 and event_type='RETURNED' order by id for update", [packageId, Number(source.project_id)]);
+      if (returnEvents.rowCount !== 1) throw new PlanningHandoffError("RETURN_EVENT_NOT_FOUND", "没有找到唯一且属于该源 Package 的 Planning RETURN 事件，请联系管理员核验事件链", 409);
+      const returnEventId = Number(returnEvents.rows[0].id);
+      const head = await client.query("select current_response_version_id,version from project_planning_revision_response_heads where return_event_id=$1 for update", [returnEventId]);
+      const currentHeadVersion = Number(head.rows[0]?.version || 0);
+      if (currentHeadVersion !== parsed.expectedHeadVersion) throw new PlanningHandoffError("REVISION_VERSION_CONFLICT", "工程修订回复已被其他人员更新，请刷新后基于最新版本继续", 409);
+      const nextVersion = currentHeadVersion + 1;
+      const supersedesResponseId = head.rows[0]?.current_response_version_id ? Number(head.rows[0].current_response_version_id) : null;
+      const saved = await client.query(`insert into project_planning_revision_response_versions(source_package_id,return_event_id,project_id,response_version_no,response_text,response_text_digest,supersedes_response_id,created_by,request_id)
+        values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id,source_package_id,return_event_id,project_id,response_version_no,response_text,response_text_digest,supersedes_response_id,created_by,created_at,request_id`, [packageId, returnEventId, Number(source.project_id), nextVersion, parsed.responseText, parsed.responseTextDigest, supersedesResponseId, meta.actor.username, meta.requestId]);
+      await this.fault?.("after_revision_response_version");
+      let savedHead;
+      if (currentHeadVersion === 0) {
+        savedHead = await client.query(`insert into project_planning_revision_response_heads(return_event_id,source_package_id,project_id,current_response_version_id,version)
+          values($1,$2,$3,$4,1) returning *`, [returnEventId, packageId, Number(source.project_id), Number(saved.rows[0].id)]);
+      } else {
+        savedHead = await client.query(`update project_planning_revision_response_heads set current_response_version_id=$2,version=version+1,updated_at=now()
+          where return_event_id=$1 and version=$3 returning *`, [returnEventId, Number(saved.rows[0].id), parsed.expectedHeadVersion]);
+      }
+      if (!savedHead.rows[0]) throw new PlanningHandoffError("REVISION_VERSION_CONFLICT", "工程修订回复已被其他人员更新，请刷新后基于最新版本继续", 409);
+      await this.fault?.("after_revision_response_head");
+      const responseVersionId = Number(saved.rows[0].id);
+      const body = { ok: true, package_id: packageId, return_event_id: returnEventId, revision_response_version_id: responseVersionId, response_head_version: nextVersion, response: saved.rows[0], request_id: meta.requestId };
+      return { status: 201, body, objectId: responseVersionId, oldVersion: currentHeadVersion, newVersion: nextVersion, auditDetail: { source_package_id: packageId, return_event_id: returnEventId, revision_response_version_id: responseVersionId, response_version_no: nextVersion, response_text_digest: parsed.responseTextDigest } };
+    });
+  }
+
+  async createSuccessorPackage(sourcePackageId: number, meta: PlanningMutationMeta, input: Record<string, unknown>): Promise<PlanningMutationResult> {
+    const parsed = successorPackageInput(input);
+    return this.repository.execute(meta, async (client) => {
+      const source = await this.packageForUpdate(client, sourcePackageId); this.assertEngineeringOwner(meta.actor, source as unknown as ProjectRow);
+      if (source.status !== "RETURNED") throw new PlanningHandoffError("PACKAGE_NOT_RETURNED", "源 Package 不是 RETURNED，不能生成工程修订后继版本", 409);
+      if (Number(source.version) !== parsed.expectedPackageVersion) throw new PlanningHandoffError("REVISION_VERSION_CONFLICT", "源 Package 状态或版本已变化，请刷新后重试", 409);
+      const returnEvents = await client.query("select id,package_id,project_id,event_type,actor,reason,request_id,created_at from project_planning_handoff_events where package_id=$1 and project_id=$2 and event_type='RETURNED' order by id for update", [sourcePackageId, Number(source.project_id)]);
+      if (returnEvents.rowCount !== 1) throw new PlanningHandoffError("RETURN_EVENT_NOT_FOUND", "没有找到唯一且属于源 Package 的 Planning RETURN 事件，不能生成后继版本", 409);
+      const returnEventId = Number(returnEvents.rows[0].id);
+      const successor = await client.query("select id,package_version_no from project_planning_packages where previous_package_id=$1 or responds_to_return_event_id=$2 or (project_id=$3 and package_version_no=$4) order by id limit 1", [sourcePackageId, returnEventId, Number(source.project_id), Number(source.package_version_no) + 1]);
+      if (successor.rows[0]) throw new PlanningHandoffError("SUCCESSOR_PACKAGE_EXISTS", `该 Planning RETURN 已存在直接后继 Package v${successor.rows[0].package_version_no}，请刷新查看`, 409);
+      const responseHead = await client.query(`select h.version head_version,h.current_response_version_id,rr.id,rr.response_version_no,rr.response_text_digest
+        from project_planning_revision_response_heads h
+        join project_planning_revision_response_versions rr on rr.id=h.current_response_version_id and rr.source_package_id=h.source_package_id and rr.return_event_id=h.return_event_id and rr.project_id=h.project_id
+        where h.return_event_id=$1 and h.source_package_id=$2 and h.project_id=$3 for update of h`, [returnEventId, sourcePackageId, Number(source.project_id)]);
+      if (!responseHead.rows[0]) throw new PlanningHandoffError("REVISION_RESPONSE_REQUIRED", "请先保存工程修订回复并刷新确认回复 Version，再生成 v2", 422);
+      if (Number(responseHead.rows[0].head_version) !== parsed.expectedResponseHeadVersion || Number(responseHead.rows[0].current_response_version_id) !== parsed.revisionResponseVersionId) {
+        throw new PlanningHandoffError("REVISION_VERSION_CONFLICT", "工程修订回复 Head 已变化，请刷新确认最新回复后再生成 v2", 409);
+      }
+      const consumed = await client.query("select id from project_planning_packages where project_id=$1 and revision_response_version_id=$2 limit 1", [Number(source.project_id), parsed.revisionResponseVersionId]);
+      if (consumed.rows[0]) throw new PlanningHandoffError("RETURN_ALREADY_RESPONDED", "当前工程回复 Version 已被 Package 固定引用，请刷新查看已有后继版本", 409);
+      const fixed = await this.fixedPackageSources(client, sourcePackageId);
+      const packageVersionNo = Number(source.package_version_no) + 1;
+      const sourceDate = source.target_delivery_date; const targetDate = sourceDate instanceof Date ? sourceDate.toISOString().slice(0, 10) : sourceDate ? String(sourceDate).slice(0, 10) : null;
+      const lineage = { previous_package_id: sourcePackageId, return_event_id: returnEventId, revision_response_version_id: parsed.revisionResponseVersionId, response_text_digest: String(responseHead.rows[0].response_text_digest) };
+      const packageDigest = this.packageDigest(Number(source.project_id), packageVersionNo, Number(source.requirement_version_id), targetDate, fixed.snapshots, fixed.documents, lineage);
+      const saved = await client.query(`insert into project_planning_packages(project_id,package_version_no,requirement_version_id,previous_package_id,responds_to_return_event_id,revision_response_version_id,status,target_delivery_date,package_digest,prepared_by,request_id)
+        values($1,$2,$3,$4,$5,$6,'DRAFT',$7,$8,$9,$10) returning *`, [Number(source.project_id), packageVersionNo, Number(source.requirement_version_id), sourcePackageId, returnEventId, parsed.revisionResponseVersionId, targetDate, packageDigest, meta.actor.username, meta.requestId]);
+      const packageId = Number(saved.rows[0].id); await this.fault?.("after_successor_header");
+      await client.query("insert into project_planning_handoff_events(package_id,project_id,event_type,actor,request_id) values($1,$2,'CREATED',$3,$4)", [packageId, Number(source.project_id), meta.actor.username, meta.requestId]);
+      await this.fault?.("after_successor_create_event");
+      for (const item of fixed.snapshots) {
+        const packageItem = await client.query(`insert into project_planning_package_items(package_id,requirement_item_id,product_version_id,bom_version_id,required_quantity,unit_id,unit_resolution_id,line_no,source_digest)
+          values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`, [packageId, Number(item.requirement_item_id), Number(item.product_version_id), Number(item.bom_version_id), item.required_quantity, Number(item.unit_id), Number(item.unit_resolution_id), Number(item.line_no), item.source_digest]);
+        for (const line of item.lines) await client.query(`insert into project_planning_package_bom_lines(package_item_id,source_bom_line_id,material_id,unit_id,quantity_per,loss_rate,calculated_gross_quantity,specification_snapshot,material_digest,line_no)
+          values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [Number(packageItem.rows[0].id), Number(line.source_bom_line_id), Number(line.material_id), Number(line.unit_id), line.quantity_per, line.loss_rate, line.calculated_gross_quantity, line.specification_snapshot, line.material_digest, Number(line.line_no)]);
+      }
+      for (const document of fixed.documents) await client.query("insert into project_planning_document_links(package_id,project_document_link_id,created_by,request_id) values($1,$2,$3,$4)", [packageId, Number(document.project_document_link_id), meta.actor.username, meta.requestId]);
+      await this.fault?.("after_successor_snapshot");
+      const body = { ok: true, project_id: Number(source.project_id), package_id: packageId, data: saved.rows[0], item_count: fixed.snapshots.length, package_digest: packageDigest, lineage, request_id: meta.requestId };
+      return { status: 201, body, objectId: packageId, newVersion: 1, auditDetail: { source_package_id: sourcePackageId, return_event_id: returnEventId, revision_response_version_id: parsed.revisionResponseVersionId, response_text_digest: responseHead.rows[0].response_text_digest } };
     });
   }
 
@@ -206,7 +358,7 @@ export class PlanningHandoffService {
     const client = await this.repository.pool.connect();
     try {
       await client.query("begin transaction isolation level repeatable read read only");
-      const header = await client.query(`select pp.id,pp.project_id,pp.package_version_no,pp.requirement_version_id,pp.status,pp.target_delivery_date,pp.package_digest,
+      const header = await client.query(`select pp.id,pp.project_id,pp.package_version_no,pp.requirement_version_id,pp.previous_package_id,pp.responds_to_return_event_id,pp.revision_response_version_id,pp.status,pp.target_delivery_date,pp.package_digest,
       pp.prepared_by,pp.prepared_at,pp.submitted_by,pp.submitted_at,pp.accepted_by,pp.accepted_at,pp.returned_by,pp.returned_at,pp.return_reason,pp.version,pp.updated_at,
       p.project_code,p.project_name,p.project_goal,p.project_owner,p.customer_id,c.customer_code,c.customer_name,rv.version_no requirement_version_no,rv.customer_requirement_summary
       from project_planning_packages pp join business_projects p on p.id=pp.project_id join customers c on c.id=p.customer_id
@@ -232,6 +384,24 @@ export class PlanningHandoffService {
         join units u on u.id=bl.unit_id where pi.package_id=$1 order by pi.line_no,bl.line_no`, [packageId]);
       const documents = await client.query(`select dl.id,dl.project_document_link_id,l.document_type,l.display_name,f.original_filename,f.mime_type,f.sha256,f.size_bytes::text,f.storage_status from project_planning_document_links dl join project_document_links l on l.id=dl.project_document_link_id join material_import_files f on f.id=l.file_id where dl.package_id=$1 order by dl.id`, [packageId]);
       const events = await client.query("select id,package_id,project_id,event_type,actor,reason,request_id,created_at from project_planning_handoff_events where package_id=$1 order by id", [packageId]);
+      const revisionCurrent = await client.query(`select e.id return_event_id,e.actor return_actor,e.reason return_reason,e.request_id return_request_id,e.created_at return_created_at,
+        h.version response_head_version,rr.id revision_response_version_id,rr.response_version_no,rr.response_text,rr.response_text_digest,rr.created_by response_created_by,rr.created_at response_created_at,rr.request_id response_request_id,
+        successor.id successor_package_id,successor.package_version_no successor_package_version_no,successor.status successor_status
+        from project_planning_handoff_events e
+        left join project_planning_revision_response_heads h on h.return_event_id=e.id and h.source_package_id=e.package_id and h.project_id=e.project_id
+        left join project_planning_revision_response_versions rr on rr.id=h.current_response_version_id and rr.source_package_id=e.package_id and rr.return_event_id=e.id and rr.project_id=e.project_id
+        left join project_planning_packages successor on successor.previous_package_id=e.package_id and successor.responds_to_return_event_id=e.id
+        where e.package_id=$1 and e.event_type='RETURNED'`, [packageId]);
+      const fixedLineage = await client.query(`select previous.id previous_package_id,previous.package_version_no previous_package_version_no,previous.status previous_package_status,previous.package_digest previous_package_digest,
+        e.id return_event_id,e.actor return_actor,e.reason return_reason,e.request_id return_request_id,e.created_at return_created_at,
+        rr.id revision_response_version_id,rr.response_version_no,rr.response_text,rr.response_text_digest,rr.created_by response_created_by,rr.created_at response_created_at,rr.request_id response_request_id,
+        h.version current_response_head_version
+        from project_planning_packages successor
+        join project_planning_packages previous on previous.id=successor.previous_package_id and previous.project_id=successor.project_id
+        join project_planning_handoff_events e on e.id=successor.responds_to_return_event_id and e.package_id=previous.id and e.project_id=successor.project_id and e.event_type='RETURNED'
+        join project_planning_revision_response_versions rr on rr.id=successor.revision_response_version_id and rr.source_package_id=previous.id and rr.return_event_id=e.id and rr.project_id=successor.project_id
+        left join project_planning_revision_response_heads h on h.return_event_id=e.id and h.source_package_id=previous.id and h.project_id=successor.project_id
+        where successor.id=$1`, [packageId]);
       const creationAudits = await client.query(`select a.username actor,a.request_id,a.result,a.created_at
         from audit_log a join project_planning_packages pp on pp.id=$1
         where a.route_code='PLANNING_HANDOFF' and a.action='PLANNING_PACKAGE_PREPARED' and a.result='success'
@@ -239,22 +409,26 @@ export class PlanningHandoffService {
       const byItem = new Map<number, Record<string, unknown>[]>(); for (const line of lines.rows) { const key = Number(line.package_item_id); const rows = byItem.get(key) || []; rows.push(line); byItem.set(key, rows); }
       const candidateCreationAudit = creationAudits.rows.length === 1 ? creationAudits.rows[0] : null;
       const creationAudit = candidateCreationAudit && candidateCreationAudit.actor === header.rows[0].prepared_by && new Date(candidateCreationAudit.created_at).getTime() === new Date(header.rows[0].prepared_at).getTime() ? candidateCreationAudit : null;
+      const persistedCreateEvent = events.rows.find((event) => event.event_type === "CREATED") || null;
+      const mappedEvents = events.rows.filter((event) => event.event_type !== "CREATED").map((event) => ({
+        id: `EVENT-${event.id}`,
+        action: event.event_type === "SUBMITTED" ? "SUBMIT"
+          : event.event_type === "RESUBMITTED" ? "RESUBMIT"
+            : event.event_type === "RETURNED" ? "RETURN"
+              : event.event_type === "ACCEPTED" ? "ACCEPT"
+                : event.event_type,
+        actor: event.actor,
+        occurred_at: event.created_at,
+        request_id: event.request_id,
+        result: "SUCCESS",
+        reason: event.reason,
+        evidence_source: "PACKAGE_EVENT",
+      }));
       const traceEvents = [
-        { id: `CREATE-${packageId}`, action: "CREATE", actor: header.rows[0].prepared_by, occurred_at: header.rows[0].prepared_at, request_id: creationAudit?.request_id ?? null, result: creationAudit ? "SUCCESS" : "TRACE_INCOMPLETE", reason: "", evidence_source: creationAudit ? "PACKAGE_SNAPSHOT_AND_SCOPED_AUDIT" : "PACKAGE_SNAPSHOT" },
-        ...events.rows.map((event) => ({
-          id: `EVENT-${event.id}`,
-          action: event.event_type === "SUBMITTED" ? "SUBMIT"
-            : event.event_type === "RESUBMITTED" ? "RESUBMIT"
-              : event.event_type === "RETURNED" ? "RETURN"
-                : event.event_type === "ACCEPTED" ? "ACCEPT"
-                  : event.event_type,
-          actor: event.actor,
-          occurred_at: event.created_at,
-          request_id: event.request_id,
-          result: "SUCCESS",
-          reason: event.reason,
-          evidence_source: "PACKAGE_EVENT",
-        })),
+        persistedCreateEvent
+          ? { id: `EVENT-${persistedCreateEvent.id}`, action: "CREATE", actor: persistedCreateEvent.actor, occurred_at: persistedCreateEvent.created_at, request_id: persistedCreateEvent.request_id, result: "SUCCESS", reason: "", evidence_source: "PACKAGE_EVENT" }
+          : { id: `CREATE-${packageId}`, action: "CREATE", actor: header.rows[0].prepared_by, occurred_at: header.rows[0].prepared_at, request_id: creationAudit?.request_id ?? null, result: creationAudit ? "SUCCESS" : "TRACE_INCOMPLETE", reason: "", evidence_source: creationAudit ? "PACKAGE_SNAPSHOT_AND_SCOPED_AUDIT" : "PACKAGE_SNAPSHOT" },
+        ...mappedEvents,
       ];
       const responsibility = header.rows[0].status === "SUBMITTED"
         ? { queue_role: "PLANNING", assignee: null, handling_deadline: null }
@@ -265,11 +439,13 @@ export class PlanningHandoffService {
       const response = {
         header: header.rows[0],
         responsibility,
-        traceability: { complete: Boolean(creationAudit), creation_request_source: creationAudit ? "PACKAGE_SCOPED_AUDIT" : null, transition_source: "PACKAGE_EVENT", unit_resolution_source: "PACKAGE_ITEM_FIXED_REFERENCE" },
+        traceability: { complete: Boolean(persistedCreateEvent || creationAudit), creation_request_source: persistedCreateEvent ? "PACKAGE_EVENT" : creationAudit ? "PACKAGE_SCOPED_AUDIT" : null, transition_source: "PACKAGE_EVENT", unit_resolution_source: "PACKAGE_ITEM_FIXED_REFERENCE", revision_lineage_source: fixedLineage.rows[0] ? "PACKAGE_FIXED_FOREIGN_KEYS" : revisionCurrent.rows[0] ? "RETURN_RESPONSE_HEAD" : null },
         trace_events: traceEvents,
         items: items.rows.map((item) => ({ ...item, creation_validation: creationValidation, bom_lines: byItem.get(Number(item.id)) || [] })),
         documents: documents.rows,
         events: events.rows,
+        revision: revisionCurrent.rows[0] || null,
+        lineage: fixedLineage.rows[0] || null,
       };
       await client.query("commit");
       return response;

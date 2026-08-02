@@ -115,6 +115,34 @@ test("planning detail exposes scoped traceability, fixed units and explicit curr
   assert.doesNotMatch(packageView, /<input|<select/);
 });
 
+test("returned engineering detail saves a versioned reply before creating an immutable successor lineage", () => {
+  assert.match(workspace, /工程修订回复/);
+  assert.match(workspace, /revision-responses/);
+  assert.match(workspace, /expected_head_version/);
+  assert.match(workspace, /response_head_version/);
+  assert.match(workspace, /保存新的回复 Version/);
+  assert.match(workspace, /生成 v\{detail\.header\.package_version_no\+1\}/);
+  assert.match(workspace, /previous_package_id/);
+  assert.match(workspace, /responds_to_return_event_id/);
+  assert.match(workspace, /revision_response_version_id/);
+  assert.match(workspace, /v\{lineage\.previous_package_version_no\} → Planning RETURN → Engineering Response → v/);
+  assert.match(workspace, /当前输入尚未保存/);
+  assert.match(workspace, /固定复用（只读）/);
+  assert.match(workspace, /不会自动提交 Planning/);
+  assert.match(workspace, /Number\(row\.id\)===requested/);
+  assert.match(workspace, /Unicode NFC 与 LF/);
+  assert.doesNotMatch(workspace, /localStorage|sessionStorage/);
+});
+
+test("revision response and successor confirmation remain contained at 390px", () => {
+  assert.match(planningCss, /\.planning-revision-editor textarea\{[^}]*min-height/);
+  assert.match(planningCss, /\.planning-response-body>p\{[^}]*white-space:pre-wrap/);
+  assert.match(planningCss, /\.planning-successor-dialog\{width:min\(720px,100%\)/);
+  assert.match(planningCss, /@media\(max-width:420px\)[\s\S]*?\.planning-revision-editor textarea/);
+  assert.match(planningCss, /@media\(max-width:600px\)[\s\S]*?\.planning-lineage-flow\{display:grid/);
+  assert.match(planningCss, /overflow-wrap:anywhere/);
+});
+
 test("dashboard preserves the TASK02 queue while its package workspace stays upstream-only", () => {
   assert.match(dashboard, /计划部门/); assert.match(dashboard, /\/planning\/handoffs/); assert.match(dashboard, /pending_planning_handoffs/);
   assert.match(legacyOperations, /option value="planning">计划/);

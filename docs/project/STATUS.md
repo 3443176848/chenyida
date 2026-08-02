@@ -2,6 +2,20 @@
 
 最后更新时间：2026-08-02（Asia/Shanghai）
 
+## SELFHOST-OPS-UAT-PLANNING-REVISION-RESPONSE-13 Planning 工程修订回复与后继谱系
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | IMPLEMENTED / DEPLOYMENT PENDING | alpha.38/0037 功能、迁移、UI 和隔离完整旅程已通过；尚未迁移或替换并行 UAT Web |
+| 严格起点 | PASS | clean `main@174181991c0bf51ee397627ea8fce546d1b64e68`、Parent `180f6b58b583bd2dba350f017504be916db9673d`、behind 0/ahead 117；alpha.37/0036、镜像、Canonical、四服务和主 UAT 指纹均吻合 |
+| Schema 决定 | 0037 REQUIRED | 0036 没有关系化 Response Version、RETURN 独立 Head 或 Package 后继谱系；唯一新增 0037，0001—0036 未修改 |
+| 数据模型 | PASS | append-only Response Version + CAS Head；Package 固定 previous/RETURN/Response 复合 FK；唯一后继、Response 单次消费、快照复制、摘要绑定与 SQL guard |
+| 服务/UI | PASS | NFC/LF/10—2000、权限/owner/责任队列、CSRF/Origin、幂等/限流、CAS/并发/事务审计；RETURNED v1 回复/固定复用/确认窗口和 v2 完整谱系，选择器在仅回复模式移除 |
+| 自动验证 | PASS 66/66 | 静态/安全 49/49、Planning PostgreSQL 12/12、Migration 4/4、隔离 Chromium 1/1；typecheck、production build、lint 0 error、diff check 通过 |
+| 运行面 | UNCHANGED / PENDING | 并行 UAT 仍 alpha.37/0036，Web `sha256:fb88dd8afb8b7f08cf6c8dff9aa66566ad9aec0a203460e7fd09bc32af728edc`；Worker 不依赖本次代码 |
+| 主 UAT | UNCHANGED | 起点业务指纹 `0dfc969bf0785326091e649c6af5fd8f52023d0caf43cc0ebf60b90e9db243c8`；Package 1/v1 RETURNED、RETURN 1、Response 0、v2 0，未填写回复、生成/提交 v2或登录 planning |
+| 下一门禁 | PENDING | root-only 0600 dump/list/第二库恢复、真实 0036 隔离升级与完整旅程、迁移/只换 Web、engineering-only 只读核验和最终清理 |
+
 ## SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12 Planning 决策历史修复与主 UAT 回看
 
 | 验证项 | 结果 | 说明 |

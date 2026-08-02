@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { PlanningHandoffError } from "./errors.ts";
-import type { ResolutionInput, UnitResolutionInput } from "./types.ts";
+import type { ResolutionInput, RevisionResponseInput, SuccessorPackageInput, UnitResolutionInput } from "./types.ts";
 
 export const stableValue = (value: unknown): unknown => Array.isArray(value) ? value.map(stableValue) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, child]) => [key, stableValue(child)])) : value;
 export const canonicalDigest = (value: unknown) => createHash("sha256").update(JSON.stringify(stableValue(value))).digest("hex");
@@ -31,4 +31,34 @@ export function unitResolutionInput(value: Record<string, unknown>): UnitResolut
     throw new PlanningHandoffError("REQUEST_VALIDATION_FAILED", "expected_head_version 必须是大于等于 0 的整数");
   }
   return { requirementItemId, unitId, expectedHeadVersion };
+}
+
+export function normalizeRevisionResponseText(value: unknown): string {
+  if (typeof value !== "string") throw new PlanningHandoffError("REVISION_RESPONSE_REQUIRED", "请填写工程修订回复后再保存", 422);
+  const responseText = value.replace(/\r\n?/g, "\n").normalize("NFC").trim();
+  if (!responseText) throw new PlanningHandoffError("REVISION_RESPONSE_REQUIRED", "请填写工程修订回复后再保存", 422);
+  const length = [...responseText].length;
+  if (length < 10 || length > 2000 || /[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f]/.test(responseText)) {
+    throw new PlanningHandoffError("REVISION_RESPONSE_INVALID", "工程修订回复须为 10 至 2000 个字符，可使用规范换行但不能包含控制字符", 422);
+  }
+  return responseText;
+}
+
+export function revisionResponseInput(value: Record<string, unknown>): RevisionResponseInput {
+  assertOnlyKeys(value, ["expected_head_version", "response_text"]);
+  const expectedHeadVersion = Number(value.expected_head_version);
+  if (!Number.isSafeInteger(expectedHeadVersion) || expectedHeadVersion < 0) {
+    throw new PlanningHandoffError("REVISION_VERSION_CONFLICT", "工程修订回复版本无效，请刷新后重试", 409);
+  }
+  const responseText = normalizeRevisionResponseText(value.response_text);
+  return { expectedHeadVersion, responseText, responseTextDigest: createHash("sha256").update(responseText, "utf8").digest("hex") };
+}
+
+export function successorPackageInput(value: Record<string, unknown>): SuccessorPackageInput {
+  assertOnlyKeys(value, ["expected_package_version", "expected_response_head_version", "revision_response_version_id"]);
+  return {
+    expectedPackageVersion: expectedVersion(value.expected_package_version),
+    expectedResponseHeadVersion: expectedVersion(value.expected_response_head_version),
+    revisionResponseVersionId: positiveId(value.revision_response_version_id, "revision_response_version_id"),
+  };
 }

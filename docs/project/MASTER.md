@@ -37,7 +37,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.37`；PostgreSQL 已由 0034 串行升级到 36/head `0036_project_requirement_unit_resolution.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
+| 当前版本 | 源码候选为 `0.1.0-alpha.38`/0037；并行非生产 UAT 运行面仍为 `0.1.0-alpha.37`/36/head `0036_project_requirement_unit_resolution.sql`，部署门禁尚未执行。这不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12` 功能提交为 `180f6b58b583bd2dba350f017504be916db9673d`（`fix: expose planning decision history`）；版本仍为 alpha.37，Migration 仍为 0036 |
 | 当前根仓库运维基线 | Planning 决策历史已由独立 `ops: accept planning decision history in parallel environment` 提交收口；Web-only 部署、备份恢复、隔离 Chromium 与 planning-only 主 UAT 已通过，最终结论 `PLANNING DECISION HISTORY FIXED — UAT V1 RETURN VERIFIED` |
@@ -49,9 +49,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0036`，36/head `0036_project_requirement_unit_resolution.sql`。Package ID 1/v1 当前为 `RETURNED`，RETURN 1、ACCEPT 0、v2 0；数据库 ASCII 标点原因是权威历史值，与全角预期仅两处标点差异且 NFKC 完全等价。部署前备份恢复库与主 UAT 后主库的受保护摘要均为 `3960cf1f1fc3fdaca0bacd246732d27a0ff223e894953e7be2427fa22b150dca`（217 tables / 201 sequences），历史业务数据未修改 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已 Web-only 更新为 alpha.37 `sha256:fb88dd8afb8b7f08cf6c8dff9aa66566ad9aec0a203460e7fd09bc32af728edc`，旧 `sha256:6b94a9c73a182799ffad6df5f89ecb86e5407162f0f233e8741aea3fd9dc4e25` 有精确回退 tag；Worker 镜像仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。PostgreSQL/Web healthy，Worker/Caddy running，四服务 restart 0/OOM false |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.37 另提供版本化 Requirement Unit Resolution 与 Planning 精确单位来源。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
-| 当前阶段 | `SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12` 已完成：待接收/已处理、终态历史重开、完整决策证据、确认窗口、完成凭证和 390px 已通过主 UAT；Unicode 标点现象登记 LOW、历史未改 |
-| 当前任务 | 无自动执行任务；本轮以 `PLANNING DECISION HISTORY FIXED — UAT V1 RETURN VERIFIED` 停止。planning 已安全退出，活跃 Session 0 |
-| 下一任务 | 必须由项目负责人另行明确授权；不自动登录 engineering、创建 v2、接收/退回其他 Package、迁移真实数据或执行生产动作 |
+| 当前阶段 | `SELFHOST-OPS-UAT-PLANNING-REVISION-RESPONSE-13` 已完成 alpha.38/0037 实现、关系约束、定向/迁移/PostgreSQL/390px Chromium 隔离验证；部署前备份恢复门禁与主 UAT engineering-only 只读核验待执行 |
+| 当前任务 | `SELFHOST-OPS-UAT-PLANNING-REVISION-RESPONSE-13`：唯一 DOING；当前结论 `REVISION RESPONSE IMPLEMENTED — DEPLOYMENT NOT YET PERFORMED` |
+| 下一任务 | 先完成本任务明确授权的备份、第二库恢复、真实 0036 隔离升级/旅程、并行非生产 UAT 0037+Web 部署及 engineering-only 只读核验；禁止主 UAT 填回复、生成/提交 v2或登录 planning |
 
 ## 当前完成模块
 
@@ -348,3 +348,4 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - SELFHOST-LANDING-TASK03 已将公网 18888 受控切换到新 PostgreSQL ERP：Caddy 可信 TLS、生产 Cookie、匿名认证门禁和 60 秒资源观察通过；旧 Python 在回环 18889 保留，未改业务数据、Schema/Migration 或四个 ERP 持久卷
 - SELFHOST-LANDING-TASK04 已在源码删除兼容业务台 CSV-only/退役导入表单并直达原生 CSV/XLS/XLSX 批次工作区，功能提交 `cda8c7e` 已部署到当前 18888 Web；Dashboard 12/12、Import UI 102/102、Parser 38/38、build、镜像静态合同及在线 SHA/路由/健康验收通过。未做 Excel→PG E2E，未执行 Migration 或写业务数据
 - SELFHOST-LANDING-TASK05 已对单个 V9 XLSX 完成 root-only 显式字段 staging、pre-clean dump/list/恢复和重放；197 行全部缺显式单位且无 BOM 结构，主库未清理或导入，详细逐行证据只在仓库外 root-only 目录
+- SELFHOST-OPS-UAT-PLANNING-REVISION-RESPONSE-13 已实现 alpha.38/0037 候选：追加式 Revision Response Version、每 RETURN 独立 CAS Head、v1/RETURN/Response/v2 复合外键谱系、唯一后继/单次消费、不可变 SQL guard、固定 Product/BOM/Unit/Material/Document 快照和摘要绑定；隔离 66 项自动断言与 390px 完整旅程通过。并行 UAT 尚未升级，主 UAT v1 未写回复或生成 v2

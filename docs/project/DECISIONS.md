@@ -981,6 +981,19 @@
 - 实施结果：工具提交 `a48dcc8a290b96da1ea6e426aaa2c6d73416c2fc`。正式 run-id `3b03aaab-11ef-4dfe-963b-001a6ece660f` 在停写窗口完成 11 账号原子恢复、12 条目标既有 Session 撤销、11 条恢复审计与唯一持久证据；Canonical 双文件激活、旧 candidate/Stage 成功处置、admin+十 UAT 单 Chromium 登录/门禁/退出和最终零有效目标 Session 通过。
 - 保护结果：正式执行前后业务与受保护数据指纹分别保持 `04cdbc8a49112bc43b5652760408d46d10dbdda1801c1c9b816aa9891a5b5c3c`、`5414589704ac085792cab1a546e658a61b39c2988800a23ad091e756275e7d41`；alpha.37、36/head 0036、Schema、镜像、其他用户/Session 和 Planning Package 均未由本任务改变或操作。结论为 `OFFLINE IDENTITY RECOVERY COMPLETED — CANONICAL CREDENTIALS ACTIVE`。
 
+## D-088 Planning 退回回复采用追加版本、独立 Head 与固定后继谱系
+
+- 日期：2026-08-02
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYMENT PENDING`
+- 确认人：项目负责人（明确授权唯一新增 0037、alpha.38、隔离升级/恢复和门禁通过后的并行非生产 UAT 部署）
+- 缺口：0036 可以保存 Product/BOM Resolution、Unit Resolution 和不可变 Package Snapshot，但没有关系化 Engineering Revision Response、按 RETURN 独立 CAS Head、Response 精确消费或 Package 后继外键，不能用 Event/备注/JSON/审计替代业务权威。
+- 决定：0037 新增 append-only Revision Response Version 和每 RETURN Event 唯一 Revision Head；Response 保存 source Package/RETURN/Project、递增版本、NFC/LF 正文与 SHA-256、supersedes、actor、时间和 request_id。Head 使用独立 expected version CAS，只能逐一推进。
+- 后继谱系：新 v2 必须同时固定 `previous_package_id`、`responds_to_return_event_id` 和 `revision_response_version_id`；复合 FK 证明 Project/Package/RETURN/Response 同源，唯一索引保证一个 RETURN 只有一个直接后继、同项目 Response Version 只消费一次。
+- 固定复用：本轮是“仅回复修订”，v2 原样复制 v1 的 Product/BOM/Unit Resolution、需求数量、BOM Material 与 Document Snapshot；已有 Package 后 Product/BOM/Unit Resolution 不得经当前表单改变，未来变更须独立 change-resolution 流程。
+- 不可变与摘要：Response Version、Package 稳定字段、Item/BOM/Document Snapshot 与 Event 由 PostgreSQL guard 禁止 UPDATE/DELETE/绕过服务；v2 摘要绑定源 Package、RETURN、精确 Response Version/正文摘要及全部业务快照。后续 Head 变化不影响已生成 v2。
+- 事务与安全：保存回复与生成 v2 均在各自单事务内完成业务事实、Head/CAS、Event、Audit 和 Idempotency；权限、owner、责任队列、Origin、CSRF、限流、幂等、唯一性、当前 RELEASED/有效引用和故障回滚 fail closed。Audit 不保存完整正文。
+- 历史边界：既有 RETURNED v1 保持无回复原样，不回填、不伪造历史 Response，不改写 v1、RETURN Event 或原因。主 UAT 部署只允许 engineering 只读确认能力存在，禁止填写回复、生成/提交 v2或登录 planning。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

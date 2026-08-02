@@ -29,7 +29,7 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；源码与受控公网并行 UAT Web 均为 `0.1.0-alpha.37`，源码和并行 PostgreSQL 都是 36/head `0036_project_requirement_unit_resolution.sql`。alpha.37 是非生产 UAT 部署记录，不是生产 release。
+- 发布标识：包名为 `chenyida-erp-selfhosted`；源码候选为 `0.1.0-alpha.38`/0037，受控公网并行 UAT 运行面暂仍为 `0.1.0-alpha.37`/36/head `0036_project_requirement_unit_resolution.sql`。alpha.38 的部署前备份恢复门禁尚未完成；两者都不是生产 release。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.37`。
 - Git 复核：FIX-08 从 clean `main@a254bca5d59dd3f17047c9d6495dfdf2df1a798e`、Parent `91c0fd29d534246c55ddd669e894cdde9b774e52`、behind 0/ahead 109 起步；功能提交为 `682e79378660ef7859617655836f02e2112df244`，安全停止/运维文档由独立 `ops: record blocked planning traceability rollout` 提交收口。未 push/PR/amend/rebase/reset/stash/restore，既有提交未改写；未读取、修改或提交 `shujvbiao/`。
 - 身份收口 Git 复核：CREDENTIAL-RECONCILIATION-10 从 clean `main@a4eff293668e24f4f780eb5df840bfc7e510365e`、Parent `615fe3ab4913c1964cfeb7337196f0d3e1a8d787`、behind 0/ahead 112 起步；结构预检 fail closed 后只允许无秘密报告提交。未 push/PR/amend/rebase/reset/stash/restore，未读取、修改或提交 `shujvbiao/`。
@@ -51,7 +51,8 @@
 - Planning CSRF 共享客户端：此前 Planning 页面虽传入 `protectedWrite`，但共享路由分类未匹配 requirement resolution、planning package 及 submit/accept/return 等端点，请求落入普通 POST 分支并丢失 `X-CSRF-Token` 和调用方幂等键。现由共享 `sessionPost` 在发送时读当前 `CYD_ERP_CSRF` Cookie，以当前 Token+method/path+canonical 正文绑定页内幂等键；Session/页历史/认证变化清空上下文。服务端 Origin/CSRF/Session/权限/审计未放宽，错误仍显示稳定中文代码和 request_id。
 - RELEASED BOM 与最小披露：BOM 管理页首次进入固定为“请选择或搜索 BOM”，只有明确搜索并选择后才请求 `/api/bom-lines`；有界搜索支持 BOM 编码、产品编码和产品名称。RELEASED 详情只显示已发布事实和“已发布，只读；如需修改请创建新版本”，不渲染 Material/数量/损耗/行号编辑器及新增/删除/保存/发布动作。服务端对 RELEASED 行 POST/PATCH/DELETE 统一返回 `409 BOM_RELEASED_IMMUTABLE`，与既有 DB trigger 共同 fail closed。
 - FIX-05 主库只读证据：真实 Chromium 路由层阻断除 login/logout 外全部 POST；首次 BOM 明细请求 0，选择 `BOM-UAT-BB-PROD-042576-V1` 的 UI 动作只加载该明细 1 次，验收脚本另用一次只读 GET 核对精确四行；RELEASED 可变控件 0，四行为 533—536/1 PCS/0，390px 无溢出。engineering Planning 页只读识别 A0/V1，未登录 planning、未点击保存/生成/提交；退出后 back/forward/refresh 均为匿名。
-- 当前数据库只读基线：36/head 0036。`PRJ-00000001` 的 Package ID 1/v1 为 `SUBMITTED`（待计划部接收），摘要前缀 `9d7a6a7ec9aefbaf`，Package 总数 1、v2 为 0、RETURN/ACCEPT 为 0；源 Requirement Item 仍 `unit_id=NULL/unit_pending=true`。Package Item 固定 Unit Resolution ID 1/v1/`ENGINEERING_CONFIRMED`/Unit ID 1/`件 · PCS`；Product `UAT-BB-PROD-042576` A0 与 BOM `BOM-UAT-BB-PROD-042576-V1` V1 当前均 RELEASED，Material 533—536 各 1 PCS 单耗、0 损耗、10 PCS 毛需求。FIX-08 部署前后业务指纹均为 `a7869b3ae5d75b7b68fac1234e04288c755622ee3f549497b2c96dc366701679`。
+- 当前数据库只读基线：36/head 0036。`PRJ-00000001` 的 Package ID 1/v1 为 `RETURNED`、row version 3、完整摘要 `9d7a6a7ec9aefbaf21be5dcb5eb3a556a47c6ef00c96f111f3be0476ade3a241`；CREATE/SUBMIT/RETURN/ACCEPT 为 `1/1/1/0`，v2 0。唯一 RETURN Event ID 2 属于 v1；Package 原因与 Event 原因逐字一致且历史不可改写。Package Item 固定 Product/Version 7/7 A0/RELEASED、BOM Header/Version 7/7 V1/RELEASED、Unit Resolution ID 1/v1，Material 533—536 毛需求各 10 PCS。REVISION-RESPONSE-13 起点业务指纹为 `0dfc969bf0785326091e649c6af5fd8f52023d0caf43cc0ebf60b90e9db243c8`，Revision Response 0、v2 0。
+- Planning Revision Response 候选边界：0037 使用关系化 append-only Response Version、每 RETURN Event 独立 CAS Head 和 Package previous/RETURN/Response 固定外键；新 v2 只能复制源 Package 的 Product/BOM/Unit Resolution/Material/Document Snapshot，并把精确 Response Version/正文摘要纳入 Package 摘要。既有 v1 和 RETURN 原因不回填、不改写；当前并行 UAT 尚未应用 0037，主 UAT 禁止填写回复、生成/提交 v2或登录 planning。
 - Planning Unit Resolution 边界：0036 已新增追加式 `project_requirement_unit_resolution_versions` 和每 Requirement Item 独立 CAS `project_requirement_unit_resolution_heads`；源 Requirement Item 仍由 0015 trigger 保持不可变。新 Package Item 必须引用生成时精确 Unit Resolution Version，不从源 NULL 或 BOM Line 猜单位；`REQUIREMENT_DECLARED` 只表示迁移可直接证明的原始单位，`ENGINEERING_CONFIRMED` 只表示正式获权 API 确认。
 - Planning 审核追溯边界：FIX-08 详情读取在同一 `REPEATABLE READ READ ONLY` 事务中先执行 `planning.read` 与 Package 对象范围授权，再从 Package Snapshot、该 Package 的 Event、精确匹配的创建审计和 Package Item 固定 Resolution Version 投影。Product/BOM 的创建服务门禁证据与当前状态分栏；不得称为生成时状态快照。planning 未获得 `system.audit.read`，不能查看其他 Package 或系统审计。
 - 兼容供应商导入：LANDING-TASK04 功能提交 `cda8c7e` 已在单独授权下部署到当前 18888 Web；`public/erp/` 的 CSV-only/退役入口已改为直达 `/materials/imports/new`，入口 URL 已版本化。公网 HTML/JS SHA 与源码一致；MATERIAL-REVIEW-BLOCKERS-03-RETRY 已把 legacy 壳改为动态只读路由，使响应只保留 `private, no-store` 和 `Pragma: no-cache`，不再并列 `public, max-age=3600`。未做 Excel→PG E2E。
@@ -237,7 +238,7 @@
 
 ## 当前路线
 
-`SELFHOST-OPS-OFFLINE-IDENTITY-RECOVERY-11` 已完成：11 个目标账号原子恢复、12 条目标旧 Session 撤销、11 条恢复审计、Canonical 激活、admin 与十 UAT 的身份页验证和最终零有效目标 Session 均通过，业务指纹不变。ROLE-CREDENTIAL-ROTATION-09/CREDENTIAL-RECONCILIATION-10 继续保持历史 PARTIAL/BLOCKED 记录，但其当前身份风险已由 TASK11 解除。现在没有自动执行任务；Planning Package ID 1/v1/SUBMITTED 等仍只是 FIX-08 最后已验证基线，任何 planning-only 核验、接收或退回必须重新明确授权。
+`SELFHOST-OPS-UAT-PLANNING-REVISION-RESPONSE-13` 是当前唯一任务：alpha.38/0037 的关系化 Engineering Revision Response、RETURN 独立 CAS Head 和固定 v1→RETURN→Response→v2 谱系已完成实现与隔离验证，运行面仍为 alpha.37/0036。下一步只执行已明确授权的备份恢复、真实 0036 隔离升级/旅程、并行非生产 UAT 0037+Web 部署和 engineering-only 只读核验；主 UAT 禁止填写回复、生成/提交 v2或登录 planning。此前 OFFLINE-IDENTITY-RECOVERY-11 已完成的身份恢复事实和 ROLE-CREDENTIAL-ROTATION-09/CREDENTIAL-RECONCILIATION-10 的历史 PARTIAL/BLOCKED 记录均保持。
 
 ## 恢复上下文检查清单
 

@@ -11,7 +11,7 @@ const snapshot = JSON.parse(await readFile(new URL("drizzle-postgres/meta/0036_s
 const previousSnapshot = JSON.parse(await readFile(new URL("drizzle-postgres/meta/0035_snapshot.json", siteRoot), "utf8"));
 const journal = JSON.parse(await readFile(new URL("drizzle-postgres/meta/_journal.json", siteRoot), "utf8"));
 const migrationNames = (await readdir(new URL("drizzle-postgres/", siteRoot)))
-  .filter((name) => /^\d{4}_.+\.sql$/.test(name))
+  .filter((name) => /^\d{4}_.+\.sql$/.test(name) && name <= migrationName)
   .sort();
 
 function sorted(values) {
@@ -44,7 +44,7 @@ function schemaColumns(tableName) {
   return [...schemaTableBlock(tableName).matchAll(factory)].map((match) => match[1]);
 }
 
-test("0036 is the only new migration and preserves the immutable 0035 checksum", async () => {
+test("0036 closes its immutable migration prefix and preserves the immutable 0035 checksum", async () => {
   assert.equal(migrationNames.length, 36);
   assert.equal(migrationNames.at(-1), migrationName);
   const previous = await readFile(new URL("drizzle-postgres/0035_bom_material_governance.sql", siteRoot));
@@ -55,8 +55,9 @@ test("0036 is the only new migration and preserves the immutable 0035 checksum",
 });
 
 test("0036 journal and snapshot form the next immutable migration link", () => {
-  assert.equal(journal.entries.at(-1)?.idx, 36);
-  assert.equal(journal.entries.at(-1)?.tag, "0036_project_requirement_unit_resolution");
+  const entry = journal.entries.find((item) => item.idx === 36);
+  assert.equal(entry?.idx, 36);
+  assert.equal(entry?.tag, "0036_project_requirement_unit_resolution");
   assert.equal(snapshot.prevId, previousSnapshot.id);
   assert.match(snapshot.id, /^[0-9a-f-]{36}$/);
 });

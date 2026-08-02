@@ -10,7 +10,7 @@ import { PlanningHandoffService } from "../app/lib/planning-handoff-selfhost/ser
 
 const databaseUrl = process.env.TEST_PLANNING_DATABASE_URL;
 if (!databaseUrl || !/planning_test/i.test(databaseUrl)) throw new Error("isolated TEST_PLANNING_DATABASE_URL containing planning_test is required");
-const pool = new Pool({ connectionString: databaseUrl, max: 20, application_name: "planning-handoff-integration-test" });
+const pool = new Pool({ connectionString: databaseUrl, max: 4, application_name: "planning-handoff-integration-test" });
 const actor = (role, username = `${role}01`) => ({ username, display_name: role, role, is_active: true, must_change_password: false, version: 1, last_login_at: null, permissions: permissionsForRole(role) });
 
 // This helper exercises the handler's CSRF callback boundary. Origin rejection is
@@ -82,8 +82,11 @@ const resolution = (refs, fixture = refs.valid, target = refs.accepted, itemIds 
 const unitResolution = (refs, target = refs.accepted, requirementItemId = target.itemId, unitId = refs.unitId, expectedHeadVersion = 0) => ({ requirement_item_id: requirementItemId, unit_id: unitId, expected_head_version: expectedHeadVersion });
 const saveUnit = (refs, options = {}) => api(`/api/projects/${(options.target || refs.accepted).projectId}/requirement-unit-resolutions`, { method: "POST", body: unitResolution(refs, options.target || refs.accepted, options.itemId || (options.target || refs.accepted).itemId, options.unitId ?? refs.unitId, options.expected ?? 0), key: options.key, role: options.role, username: options.username, csrf: options.csrf });
 const saveProductBom = (refs, target = refs.accepted, itemIds = target.itemIds) => api(`/api/projects/${target.projectId}/requirement-resolutions`, { method: "POST", body: resolution(refs, refs.valid, target, itemIds) });
+const revisionText = "已按计划部退回要求补充：本批计划数量10 PCS，按BOM V1四项物料整批齐套。Product A0、BOM V1、Unit Resolution v1及四项物料数量保持不变。";
+const saveResponse = (packageId, options = {}) => api(`/api/planning-packages/${packageId}/revision-responses`, { method: "POST", body: { expected_head_version: options.expected ?? 0, response_text: options.text ?? revisionText }, key: options.key, role: options.role, username: options.username, csrf: options.csrf });
+const createSuccessor = (packageId, packageVersion, response, options = {}) => api(`/api/planning-packages/${packageId}/successor`, { method: "POST", body: { expected_package_version: packageVersion, expected_response_head_version: options.expectedHead ?? response.payload.response_head_version, revision_response_version_id: options.responseId ?? response.payload.revision_response_version_id }, key: options.key, role: options.role, username: options.username, csrf: options.csrf });
 
-test.beforeEach(async () => { await pool.query(`truncate project_planning_handoff_events,project_planning_document_links,project_planning_package_bom_lines,project_planning_package_items,project_planning_packages,project_requirement_unit_resolution_heads,project_requirement_unit_resolution_versions,project_requirement_resolutions,
+test.beforeEach(async () => { await pool.query(`truncate project_planning_revision_response_heads,project_planning_revision_response_versions,project_planning_handoff_events,project_planning_document_links,project_planning_package_bom_lines,project_planning_package_items,project_planning_packages,project_requirement_unit_resolution_heads,project_requirement_unit_resolution_versions,project_requirement_resolutions,
   project_handoff_events,project_document_links,project_handoffs,project_requirement_items,project_requirement_versions,business_projects,bom_lines,bom_versions,bom_headers,product_versions,products,material_attribute_values,material_master,material_categories,material_import_files,material_import_batches,customers,units,identity_write_rate_limit_buckets,idempotency_keys,audit_log,app_users restart identity cascade`); });
 test.after(async () => pool.end());
 
@@ -204,30 +207,56 @@ test("every requirement line needs independent Unit and Product/BOM resolution",
   assert.equal(complete.response.status, 201, JSON.stringify(complete.payload)); assert.equal(complete.payload.item_count, 2);
 });
 
-test("package pins the exact Unit Resolution and disabled current Unit blocks only new packages", async () => {
+test("revision responses append immutably with exact idempotency and one CAS winner", async () => {
   const refs = await seed();
-  const unitV1 = await saveUnit(refs); assert.equal(unitV1.response.status, 201);
+  assert.equal((await saveUnit(refs)).response.status, 201);
   assert.equal((await saveProductBom(refs)).response.status, 200);
   const packageV1 = await api(`/api/projects/${refs.accepted.projectId}/planning-packages`, { method: "POST", body: { expected_version: refs.accepted.version } });
   assert.equal(packageV1.response.status, 201); const packageV1Id = Number(packageV1.payload.package_id);
+
+  const beforeReturn = await saveResponse(packageV1Id);
+  assert.equal(beforeReturn.response.status, 409); assert.equal(beforeReturn.payload.code, "PACKAGE_NOT_RETURNED");
   assert.equal((await api(`/api/planning-packages/${packageV1Id}/submit`, { method: "POST", body: { expected_version: 1 } })).response.status, 200);
-  assert.equal((await api(`/api/planning-packages/${packageV1Id}/return`, { method: "POST", role: "planning", username: "planning01", body: { expected_version: 2, reason: "验证单位版本快照" } })).response.status, 200);
+  assert.equal((await api(`/api/planning-packages/${packageV1Id}/return`, { method: "POST", role: "planning", username: "planning01", body: { expected_version: 2, reason: "请补充工程交接说明" } })).response.status, 200);
 
-  const unitV2 = await saveUnit(refs, { expected: 1, unitId: refs.alternateUnitId }); assert.equal(unitV2.response.status, 201);
-  const packageV2 = await api(`/api/projects/${refs.accepted.projectId}/planning-packages`, { method: "POST", body: { expected_version: refs.accepted.version } });
-  assert.equal(packageV2.response.status, 201); const packageV2Id = Number(packageV2.payload.package_id);
-  const provenance = await pool.query("select package_id,unit_id,unit_resolution_id from project_planning_package_items where package_id in($1,$2) order by package_id", [packageV1Id, packageV2Id]);
-  assert.deepEqual(provenance.rows.map((row) => [Number(row.package_id), Number(row.unit_id), Number(row.unit_resolution_id)]), [[packageV1Id, refs.unitId, Number(unitV1.payload.unit_resolution_id)], [packageV2Id, refs.alternateUnitId, Number(unitV2.payload.unit_resolution_id)]]);
-  const oldDetail = await api(`/api/planning-packages/${packageV1Id}`, { role: "planning", username: "planning01" });
-  assert.equal(oldDetail.response.status, 200); assert.equal(oldDetail.payload.data.items[0].unit_code, "PCS"); assert.equal(oldDetail.payload.data.items[0].unit_resolution_version_no, 1);
+  const denied = await saveResponse(packageV1Id, { role: "planning", username: "planning01" });
+  assert.equal(denied.response.status, 403); assert.equal(denied.payload.code, "PERMISSION_DENIED");
+  for (const [text, code] of [["   ", "REVISION_RESPONSE_REQUIRED"], ["回复太短", "REVISION_RESPONSE_INVALID"], ["长".repeat(2001), "REVISION_RESPONSE_INVALID"]]) {
+    const invalid = await saveResponse(packageV1Id, { text });
+    assert.equal(invalid.response.status, 422); assert.equal(invalid.payload.code, code);
+  }
 
-  assert.equal((await api(`/api/planning-packages/${packageV2Id}/submit`, { method: "POST", body: { expected_version: 1 } })).response.status, 200);
-  assert.equal((await api(`/api/planning-packages/${packageV2Id}/return`, { method: "POST", role: "planning", username: "planning01", body: { expected_version: 2, reason: "验证停用单位行为" } })).response.status, 200);
-  await pool.query("update units set enabled=false where id=$1", [refs.alternateUnitId]);
-  const blocked = await api(`/api/projects/${refs.accepted.projectId}/planning-packages`, { method: "POST", body: { expected_version: refs.accepted.version } });
-  assert.equal(blocked.response.status, 422); assert.equal(blocked.payload.code, "REQUIREMENT_UNIT_DISABLED");
-  const historical = await api(`/api/planning-packages/${packageV2Id}`, { role: "planning", username: "planning01" });
-  assert.equal(historical.response.status, 200); assert.equal(historical.payload.data.items[0].unit_code, "SET"); assert.equal(historical.payload.data.items[0].unit_resolution_version_no, 2);
+  const key = "revision-response-idempotency-001";
+  const raw = "  工程修订回复版本一：中文，全角标点保持。\r\nCafe\u0301 已规范化。  ";
+  const first = await saveResponse(packageV1Id, { key, text: raw });
+  assert.equal(first.response.status, 201, JSON.stringify(first.payload));
+  assert.equal(first.payload.response.response_text, "工程修订回复版本一：中文，全角标点保持。\nCafé 已规范化。");
+  const replay = await saveResponse(packageV1Id, { key, text: raw });
+  assert.equal(replay.response.status, 201); assert.equal(replay.response.headers.get("Idempotency-Replayed"), "true");
+  assert.equal(replay.payload.revision_response_version_id, first.payload.revision_response_version_id);
+  const idempotencyConflict = await saveResponse(packageV1Id, { key, expected: 1, text: "这是不同的工程修订回复正文，不能复用同一个幂等键。" });
+  assert.equal(idempotencyConflict.response.status, 409); assert.equal(idempotencyConflict.payload.code, "IDEMPOTENCY_CONFLICT");
+
+  const second = await saveResponse(packageV1Id, { expected: 1, text: revisionText });
+  assert.equal(second.response.status, 201, JSON.stringify(second.payload));
+  const raced = await Promise.all([
+    saveResponse(packageV1Id, { expected: 2, key: "revision-response-race-001", text: `${revisionText} 第一并发候选。` }),
+    saveResponse(packageV1Id, { expected: 2, key: "revision-response-race-002", text: `${revisionText} 第二并发候选。` }),
+  ]);
+  assert.deepEqual(raced.map((entry) => entry.response.status).sort(), [201, 409]);
+  assert.equal(raced.find((entry) => entry.response.status === 409).payload.code, "REVISION_VERSION_CONFLICT");
+  const versions = await pool.query("select id,response_version_no,response_text,response_text_digest,supersedes_response_id from project_planning_revision_response_versions where source_package_id=$1 order by response_version_no", [packageV1Id]);
+  assert.equal(versions.rowCount, 3);
+  assert.deepEqual(versions.rows.map((row) => row.response_version_no), [1, 2, 3]);
+  assert.equal(Number(versions.rows[1].supersedes_response_id), Number(versions.rows[0].id));
+  assert.equal(Number(versions.rows[2].supersedes_response_id), Number(versions.rows[1].id));
+  const head = await pool.query("select current_response_version_id,version from project_planning_revision_response_heads");
+  assert.equal(head.rows[0].version, 3); assert.equal(Number(head.rows[0].current_response_version_id), Number(versions.rows[2].id));
+  await assert.rejects(pool.query("update project_planning_revision_response_versions set response_text='直接改写被拒绝' where id=$1", [versions.rows[0].id]), /immutable/i);
+  await assert.rejects(pool.query("delete from project_planning_revision_response_versions where id=$1", [versions.rows[0].id]), /immutable/i);
+  await assert.rejects(pool.query("update project_planning_revision_response_heads set version=version+1"), /PlanningHandoffService|service/i);
+  const audits = await pool.query("select detail::text from audit_log where action='PLANNING_REVISION_RESPONSE_SAVED' and result='success'");
+  assert.equal(audits.rowCount, 3); assert.ok(audits.rows.every((row) => !row.detail.includes("工程修订回复") && !row.detail.includes("response_text\"")));
 });
 
 test("package detail exposes only scoped immutable traceability and separates creation gates from current state", async () => {
@@ -259,7 +288,7 @@ test("package detail exposes only scoped immutable traceability and separates cr
   assert.equal(data.header.package_digest, created.payload.package_digest);
   assert.equal(data.header.package_digest.length, 64);
   assert.deepEqual(data.responsibility, { queue_role: "PLANNING", assignee: null, handling_deadline: null });
-  assert.deepEqual(data.traceability, { complete: true, creation_request_source: "PACKAGE_SCOPED_AUDIT", transition_source: "PACKAGE_EVENT", unit_resolution_source: "PACKAGE_ITEM_FIXED_REFERENCE" });
+  assert.deepEqual(data.traceability, { complete: true, creation_request_source: "PACKAGE_EVENT", transition_source: "PACKAGE_EVENT", unit_resolution_source: "PACKAGE_ITEM_FIXED_REFERENCE", revision_lineage_source: null });
   assert.deepEqual(data.trace_events.map((event) => event.action), ["CREATE", "SUBMIT"]);
   assert.deepEqual(data.trace_events.map((event) => event.actor), ["engineering01", "engineering01"]);
   assert.deepEqual(data.trace_events.map((event) => event.request_id), [created.requestId, submitted.requestId]);
@@ -289,60 +318,87 @@ test("package detail exposes only scoped immutable traceability and separates cr
   assert.ok(!permissionsForRole("planning").includes("system.audit.read"));
 });
 
-test("four 1 PCS BOM lines snapshot to four 10 PCS requirements through return, revise, resubmit and accept", async () => {
+test("v1 return, Engineering response, fixed v2 lineage, resubmit and Planning accept is complete", async () => {
   const refs = await seed();
-  assert.equal((await saveUnit(refs)).response.status, 201);
+  const unitV1 = await saveUnit(refs); assert.equal(unitV1.response.status, 201);
   assert.equal((await saveProductBom(refs)).response.status, 200);
   const created = await api(`/api/projects/${refs.accepted.projectId}/planning-packages`, { method: "POST", body: { expected_version: refs.accepted.version, target_delivery_date: "2026-12-30" } });
-  assert.equal(created.response.status, 201, JSON.stringify(created.payload)); const packageId = Number(created.payload.package_id);
-  const gross = await pool.query(`select pi.required_quantity::text,bl.quantity_per::text,bl.loss_rate::text,bl.calculated_gross_quantity::text,u.code unit_code
-    from project_planning_package_items pi join project_planning_package_bom_lines bl on bl.package_item_id=pi.id join units u on u.id=bl.unit_id
-    where pi.package_id=$1 order by bl.line_no`, [packageId]);
-  assert.equal(gross.rowCount, 4);
-  assert.deepEqual(gross.rows, Array.from({ length: 4 }, () => ({ required_quantity: "10.000000", quantity_per: "1.000000", loss_rate: "0.00000000", calculated_gross_quantity: "10.000000", unit_code: "PCS" })));
-  const detail = await api(`/api/planning-packages/${packageId}`, { role: "engineering", username: "engineering01" });
-  assert.equal(detail.response.status, 200); assert.equal(detail.payload.data.documents[0].original_filename, "drawing.pdf");
-  assert.equal(detail.payload.data.items[0].unit_resolution_version_no, 1); assert.equal(detail.payload.data.items[0].unit_resolution_source_type, "ENGINEERING_CONFIRMED");
-  for (const field of ["relative_path", "storage_name", "file_body"]) assert.ok(!(field in detail.payload.data.documents[0]));
-  assert.equal((await api(`/api/planning-packages/${packageId}/submit`, { method: "POST", body: { expected_version: 1 } })).response.status, 200);
+  assert.equal(created.response.status, 201, JSON.stringify(created.payload)); const v1Id = Number(created.payload.package_id);
+  assert.equal((await api(`/api/planning-packages/${v1Id}/submit`, { method: "POST", body: { expected_version: 1 } })).response.status, 200);
   const lockedUnit = await saveUnit(refs, { expected: 1 }); assert.equal(lockedUnit.response.status, 409); assert.equal(lockedUnit.payload.code, "PLANNING_PACKAGE_STATE_CONFLICT");
   const lockedProduct = await saveProductBom(refs); assert.equal(lockedProduct.response.status, 409); assert.equal(lockedProduct.payload.code, "PLANNING_PACKAGE_STATE_CONFLICT");
-  await assert.rejects(pool.query("update product_versions set version_code='MUTATED' where id=$1", [refs.valid.productVersionId]), /released product version is immutable/i);
-  await assert.rejects(pool.query("update bom_lines set quantity_per=2 where bom_version_id=$1", [refs.valid.bomVersionId]), /released bom lines are immutable/i);
-  await assert.rejects(pool.query("update project_planning_package_bom_lines set calculated_gross_quantity=1 where package_item_id in(select id from project_planning_package_items where package_id=$1)", [packageId]), /PlanningHandoffService|immutable/i);
-  await assert.rejects(pool.query("delete from project_planning_handoff_events where package_id=$1", [packageId]), /PlanningHandoffService|immutable/i);
-  const returnReason = "请补充替代规格边界";
-  const returned = await api(`/api/planning-packages/${packageId}/return`, { method: "POST", role: "planning", username: "planning01", body: { expected_version: 2, reason: returnReason } }); assert.equal(returned.response.status, 200);
-  assert.equal(returned.payload.data.return_reason, returnReason);
-  const pendingAfterReturn = await api("/api/planning-handoffs?status=SUBMITTED&page_size=100", { role: "planning", username: "planning01" });
-  assert.equal(pendingAfterReturn.response.status, 200); assert.deepEqual(pendingAfterReturn.payload.data, []);
-  const processedAfterReturn = await api("/api/planning-handoffs?status=PROCESSED&page_size=100", { role: "planning", username: "planning01" });
-  assert.equal(processedAfterReturn.response.status, 200); assert.equal(processedAfterReturn.payload.pagination.total, 1);
-  assert.deepEqual(processedAfterReturn.payload.data.map((row) => [Number(row.id), row.package_version_no, row.status, row.return_reason]), [[packageId, 1, "RETURNED", returnReason]]);
-  const returnedDetail = await api(`/api/planning-packages/${packageId}`, { role: "planning", username: "planning01" });
-  assert.equal(returnedDetail.response.status, 200);
-  assert.equal(returnedDetail.payload.data.header.return_reason, returnReason);
-  assert.deepEqual(returnedDetail.payload.data.responsibility, { queue_role: "ENGINEERING_PROJECT", assignee: null, handling_deadline: null });
-  assert.deepEqual(returnedDetail.payload.data.trace_events.map((event) => event.action), ["CREATE", "SUBMIT", "RETURN"]);
-  assert.deepEqual(returnedDetail.payload.data.trace_events.map((event) => event.result), ["SUCCESS", "SUCCESS", "SUCCESS"]);
-  const returnTrace = returnedDetail.payload.data.trace_events.at(-1);
-  assert.equal(returnTrace.action, "RETURN"); assert.equal(returnTrace.actor, "planning01"); assert.equal(returnTrace.request_id, returned.requestId);
-  assert.equal(returnTrace.result, "SUCCESS"); assert.equal(returnTrace.reason, returnReason); assert.ok(returnTrace.occurred_at);
-  const revisedUnit = await saveUnit(refs, { expected: 1 }); assert.equal(revisedUnit.response.status, 201);
-  const revisedProduct = await saveProductBom(refs); assert.equal(revisedProduct.response.status, 200);
-  const v2 = await api(`/api/projects/${refs.accepted.projectId}/planning-packages`, { method: "POST", body: { expected_version: refs.accepted.version } }); assert.equal(v2.response.status, 201); assert.equal(Number(v2.payload.data.package_version_no), 2); const v2Id = Number(v2.payload.package_id);
-  const snapshotVersions = await pool.query("select package_id,unit_resolution_id from project_planning_package_items where package_id in($1,$2) order by package_id", [packageId, v2Id]);
-  assert.notEqual(Number(snapshotVersions.rows[0].unit_resolution_id), Number(snapshotVersions.rows[1].unit_resolution_id));
+  const returnReason = "请在工程交接说明中补充本批计划数量10 PCS,按BOM V1四项物料整批齐套。";
+  const returned = await api(`/api/planning-packages/${v1Id}/return`, { method: "POST", role: "planning", username: "planning01", body: { expected_version: 2, reason: returnReason } });
+  assert.equal(returned.response.status, 200); assert.equal(returned.payload.data.return_reason, returnReason);
+  const v1BeforeResponse = await pool.query("select row_to_json(pp)::text fingerprint from project_planning_packages pp where id=$1", [v1Id]);
+  const v1SnapshotsBefore = await pool.query(`select pi.requirement_item_id,pi.product_version_id,pi.bom_version_id,pi.required_quantity::text,pi.unit_id,pi.unit_resolution_id,pi.line_no,pi.source_digest,
+    bl.source_bom_line_id,bl.material_id,bl.quantity_per::text,bl.loss_rate::text,bl.calculated_gross_quantity::text,bl.material_digest,bl.line_no bom_line_no
+    from project_planning_package_items pi join project_planning_package_bom_lines bl on bl.package_item_id=pi.id where pi.package_id=$1 order by pi.line_no,bl.line_no`, [v1Id]);
+
+  const missing = await api(`/api/planning-packages/${v1Id}/successor`, { method: "POST", body: { expected_package_version: 3, expected_response_head_version: 1, revision_response_version_id: 999999 } });
+  assert.equal(missing.response.status, 422); assert.equal(missing.payload.code, "REVISION_RESPONSE_REQUIRED");
+  const response = await saveResponse(v1Id, { text: `  ${revisionText}  ` });
+  assert.equal(response.response.status, 201, JSON.stringify(response.payload)); assert.equal(response.payload.response.response_text, revisionText);
+  const refreshed = await api(`/api/planning-packages/${v1Id}`);
+  assert.equal(refreshed.response.status, 200); assert.equal(refreshed.payload.data.revision.response_text, revisionText);
+  assert.equal(refreshed.payload.data.revision.response_head_version, 1); assert.equal(refreshed.payload.data.revision.response_request_id, response.requestId);
+
+  const successors = await Promise.all([
+    createSuccessor(v1Id, 3, response, { key: "successor-race-001" }),
+    createSuccessor(v1Id, 3, response, { key: "successor-race-002" }),
+  ]);
+  assert.deepEqual(successors.map((entry) => entry.response.status).sort(), [201, 409]);
+  assert.equal(successors.find((entry) => entry.response.status === 409).payload.code, "SUCCESSOR_PACKAGE_EXISTS");
+  const winner = successors.find((entry) => entry.response.status === 201); const v2Id = Number(winner.payload.package_id);
+  const replay = await createSuccessor(v1Id, 3, response, { key: winner === successors[0] ? "successor-race-001" : "successor-race-002" });
+  assert.equal(replay.response.status, 201); assert.equal(replay.response.headers.get("Idempotency-Replayed"), "true"); assert.equal(Number(replay.payload.package_id), v2Id);
+
+  const v2Draft = await api(`/api/planning-packages/${v2Id}`);
+  assert.equal(v2Draft.response.status, 200); assert.equal(v2Draft.payload.data.lineage.response_text, revisionText);
+  assert.equal(Number(v2Draft.payload.data.lineage.previous_package_id), v1Id);
+  assert.equal(Number(v2Draft.payload.data.lineage.revision_response_version_id), Number(response.payload.revision_response_version_id));
+  assert.equal(v2Draft.payload.data.traceability.revision_lineage_source, "PACKAGE_FIXED_FOREIGN_KEYS");
+  assert.deepEqual(v2Draft.payload.data.trace_events.map((event) => event.action), ["CREATE"]);
+
+  const laterResponse = await saveResponse(v1Id, { expected: 1, text: `${revisionText}\n后续 Head 版本仅用于证明固定引用不漂移。` });
+  assert.equal(laterResponse.response.status, 201);
+  const fixedAfterHeadAdvance = await api(`/api/planning-packages/${v2Id}`);
+  assert.equal(fixedAfterHeadAdvance.payload.data.lineage.response_text, revisionText);
+  assert.equal(fixedAfterHeadAdvance.payload.data.lineage.response_version_no, 1);
+  assert.equal(fixedAfterHeadAdvance.payload.data.lineage.current_response_head_version, 2);
+
+  const snapshots = await pool.query(`select pp.package_version_no,pi.product_version_id,pi.bom_version_id,pi.required_quantity::text,pi.unit_id,pi.unit_resolution_id,
+    bl.material_id,bl.calculated_gross_quantity::text,u.code unit_code
+    from project_planning_packages pp join project_planning_package_items pi on pi.package_id=pp.id
+    join project_planning_package_bom_lines bl on bl.package_item_id=pi.id join units u on u.id=bl.unit_id
+    where pp.id in($1,$2) order by pp.package_version_no,bl.line_no`, [v1Id, v2Id]);
+  assert.equal(snapshots.rowCount, 8);
+  const snapshotProjection = (row) => [Number(row.product_version_id), Number(row.bom_version_id), row.required_quantity, Number(row.unit_id), Number(row.unit_resolution_id), Number(row.material_id), row.calculated_gross_quantity, row.unit_code];
+  const v1Snapshot = snapshots.rows.filter((row) => row.package_version_no === 1).map(snapshotProjection);
+  const v2Snapshot = snapshots.rows.filter((row) => row.package_version_no === 2).map(snapshotProjection);
+  assert.deepEqual(v2Snapshot, v1Snapshot);
+  assert.ok(v2Snapshot.every((row) => row[0] === refs.valid.productVersionId && row[1] === refs.valid.bomVersionId && row[4] === Number(unitV1.payload.unit_resolution_id)));
+  assert.deepEqual(v2Snapshot.map((row) => [row[5], row[6], row[7]]), refs.materialIds.map((id) => [id, "10.000000", "PCS"]));
+
+  const v1AfterResponse = await pool.query("select row_to_json(pp)::text fingerprint from project_planning_packages pp where id=$1", [v1Id]);
+  const v1SnapshotsAfter = await pool.query(`select pi.requirement_item_id,pi.product_version_id,pi.bom_version_id,pi.required_quantity::text,pi.unit_id,pi.unit_resolution_id,pi.line_no,pi.source_digest,
+    bl.source_bom_line_id,bl.material_id,bl.quantity_per::text,bl.loss_rate::text,bl.calculated_gross_quantity::text,bl.material_digest,bl.line_no bom_line_no
+    from project_planning_package_items pi join project_planning_package_bom_lines bl on bl.package_item_id=pi.id where pi.package_id=$1 order by pi.line_no,bl.line_no`, [v1Id]);
+  assert.equal(v1AfterResponse.rows[0].fingerprint, v1BeforeResponse.rows[0].fingerprint); assert.deepEqual(v1SnapshotsAfter.rows, v1SnapshotsBefore.rows);
+  await assert.rejects(pool.query("update project_planning_packages set package_digest=$2 where id=$1", [v1Id, "0".repeat(64)]), /PlanningHandoffService|immutable/i);
+  await assert.rejects(pool.query("update project_planning_packages set revision_response_version_id=$2 where id=$1", [v2Id, laterResponse.payload.revision_response_version_id]), /PlanningHandoffService|immutable/i);
+
   assert.equal((await api(`/api/planning-packages/${v2Id}/submit`, { method: "POST", body: { expected_version: 1 } })).response.status, 200);
+  const planningDetail = await api(`/api/planning-packages/${v2Id}`, { role: "planning", username: "planning01" });
+  assert.equal(planningDetail.response.status, 200); assert.equal(planningDetail.payload.data.lineage.response_text, revisionText);
   const outcomes = await Promise.all(["planning01", "planning02"].map((username) => api(`/api/planning-packages/${v2Id}/accept`, { method: "POST", role: "planning", username, key: `parallel-planning-${username}`, body: { expected_version: 2 } })));
-  assert.deepEqual(outcomes.map((item) => item.response.status).sort(), [200, 409]);
-  const processedAfterAccept = await api("/api/planning-handoffs?status=PROCESSED&page_size=100", { role: "planning", username: "planning01" });
-  assert.equal(processedAfterAccept.response.status, 200); assert.equal(processedAfterAccept.payload.pagination.total, 2);
-  assert.deepEqual(processedAfterAccept.payload.data.map((row) => [row.package_version_no, row.status]), [[2, "ACCEPTED"], [1, "RETURNED"]]);
-  const packages = await pool.query("select package_version_no,status,package_digest from project_planning_packages where project_id=$1 order by package_version_no", [refs.accepted.projectId]);
+  assert.deepEqual(outcomes.map((entry) => entry.response.status).sort(), [200, 409]);
+  const packages = await pool.query("select package_version_no,status,previous_package_id,responds_to_return_event_id,revision_response_version_id,package_digest from project_planning_packages where project_id=$1 order by package_version_no", [refs.accepted.projectId]);
   assert.deepEqual(packages.rows.map((row) => [row.package_version_no, row.status]), [[1, "RETURNED"], [2, "ACCEPTED"]]); assert.notEqual(packages.rows[0].package_digest, packages.rows[1].package_digest);
+  assert.equal(Number(packages.rows[1].previous_package_id), v1Id); assert.equal(Number(packages.rows[1].revision_response_version_id), Number(response.payload.revision_response_version_id));
   const events = await pool.query("select event_type,reason from project_planning_handoff_events where project_id=$1 order by id", [refs.accepted.projectId]);
-  assert.deepEqual(events.rows.map((row) => row.event_type), ["SUBMITTED", "RETURNED", "RESUBMITTED", "ACCEPTED"]); assert.equal(events.rows[1].reason, returnReason);
+  assert.deepEqual(events.rows.map((row) => row.event_type), ["CREATED", "SUBMITTED", "RETURNED", "CREATED", "RESUBMITTED", "ACCEPTED"]); assert.equal(events.rows[2].reason, returnReason);
+  assert.equal(Number((await pool.query("select count(*) count from project_planning_packages where previous_package_id=$1", [v1Id])).rows[0].count), 1);
   assert.equal(Number((await pool.query("select count(*) count from purchase_orders")).rows[0].count), 0); assert.equal(Number((await pool.query("select count(*) count from production_work_orders")).rows[0].count), 0);
 });
 
@@ -368,6 +424,40 @@ test("package fault injection rolls back header, snapshots, audit and idempotenc
   const meta = { actor: actor("engineering", "engineering01"), requestId: randomUUID(), operationId: randomUUID(), keyDigest, requestDigest: "e".repeat(64), method: "POST", route: `/api/projects/${refs.fault.projectId}/planning-packages`, action: "PLANNING_PACKAGE_PREPARED" };
   await assert.rejects(service.createPackage(refs.fault.projectId, meta, { expected_version: refs.fault.version }), /服务器暂时无法处理计划交接请求/);
   assert.equal(Number((await pool.query("select count(*) count from project_planning_packages where project_id=$1", [refs.fault.projectId])).rows[0].count), 0); assert.equal(Number((await pool.query("select count(*) count from project_planning_package_items pi left join project_planning_packages pp on pp.id=pi.package_id where pp.id is null")).rows[0].count), 0); assert.equal(Number((await pool.query("select count(*) count from idempotency_keys where key_digest=$1", [keyDigest])).rows[0].count), 0); assert.equal(Number((await pool.query("select count(*) count from audit_log where request_id=$1", [meta.requestId])).rows[0].count), 0);
+});
+
+test("revision response and successor fault checkpoints leave zero half-records", async () => {
+  const refs = await seed();
+  assert.equal((await saveUnit(refs, { target: refs.fault })).response.status, 201);
+  assert.equal((await saveProductBom(refs, refs.fault)).response.status, 200);
+  const created = await api(`/api/projects/${refs.fault.projectId}/planning-packages`, { method: "POST", body: { expected_version: refs.fault.version } });
+  const sourceId = Number(created.payload.package_id); assert.equal(created.response.status, 201);
+  assert.equal((await api(`/api/planning-packages/${sourceId}/submit`, { method: "POST", body: { expected_version: 1 } })).response.status, 200);
+  assert.equal((await api(`/api/planning-packages/${sourceId}/return`, { method: "POST", role: "planning", username: "planning01", body: { expected_version: 2, reason: "故障注入退回" } })).response.status, 200);
+  const repository = new PlanningHandoffRepository(pool);
+  const mutationMeta = (suffix, action, route) => ({ actor: actor("engineering", "engineering01"), requestId: randomUUID(), operationId: randomUUID(), keyDigest: suffix.repeat(64), requestDigest: `${suffix}d`.repeat(64).slice(0, 64), method: "POST", route, action });
+
+  for (const [index, checkpoint] of ["after_revision_response_version", "after_revision_response_head"].entries()) {
+    const service = new PlanningHandoffService(repository, current => { if (current === checkpoint) throw new Error(`forced ${checkpoint}`); });
+    const meta = mutationMeta(String(index + 2), "PLANNING_REVISION_RESPONSE_SAVED", `/api/planning-packages/${sourceId}/revision-responses`);
+    await assert.rejects(service.saveRevisionResponse(sourceId, meta, { expected_head_version: 0, response_text: revisionText }), /服务器暂时无法处理计划交接请求/);
+    assert.equal(Number((await pool.query("select count(*) count from project_planning_revision_response_versions where source_package_id=$1", [sourceId])).rows[0].count), 0);
+    assert.equal(Number((await pool.query("select count(*) count from project_planning_revision_response_heads where source_package_id=$1", [sourceId])).rows[0].count), 0);
+    assert.equal(Number((await pool.query("select count(*) count from audit_log where request_id=$1", [meta.requestId])).rows[0].count), 0);
+    assert.equal(Number((await pool.query("select count(*) count from idempotency_keys where key_digest=$1", [meta.keyDigest])).rows[0].count), 0);
+  }
+
+  const response = await saveResponse(sourceId); assert.equal(response.response.status, 201);
+  for (const [index, checkpoint] of ["after_successor_header", "after_successor_create_event", "after_successor_snapshot"].entries()) {
+    const service = new PlanningHandoffService(repository, current => { if (current === checkpoint) throw new Error(`forced ${checkpoint}`); });
+    const meta = mutationMeta(String(index + 5), "PLANNING_REVISION_SUCCESSOR_CREATED", `/api/planning-packages/${sourceId}/successor`);
+    await assert.rejects(service.createSuccessorPackage(sourceId, meta, { expected_package_version: 3, expected_response_head_version: 1, revision_response_version_id: response.payload.revision_response_version_id }), /服务器暂时无法处理计划交接请求/);
+    assert.equal(Number((await pool.query("select count(*) count from project_planning_packages where previous_package_id=$1", [sourceId])).rows[0].count), 0);
+    assert.equal(Number((await pool.query("select count(*) count from project_planning_package_items pi left join project_planning_packages pp on pp.id=pi.package_id where pp.id is null")).rows[0].count), 0);
+    assert.equal(Number((await pool.query("select count(*) count from project_planning_handoff_events e left join project_planning_packages pp on pp.id=e.package_id where pp.id is null")).rows[0].count), 0);
+    assert.equal(Number((await pool.query("select count(*) count from audit_log where request_id=$1", [meta.requestId])).rows[0].count), 0);
+    assert.equal(Number((await pool.query("select count(*) count from idempotency_keys where key_digest=$1", [meta.keyDigest])).rows[0].count), 0);
+  }
 });
 
 test("Product/BOM preparation still validates acceptance, ownership, customer and release state", async () => {
