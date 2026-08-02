@@ -7,6 +7,8 @@ const planningCss = await readFile(new URL("../app/planning/planning.css", impor
 const engineeringPage = await readFile(new URL("../app/engineering/projects/[projectId]/planning/page.tsx", import.meta.url), "utf8");
 const planningPage = await readFile(new URL("../app/planning/handoffs/page.tsx", import.meta.url), "utf8");
 const dashboard = await readFile(new URL("../app/lib/dashboard-selfhost/service.ts", import.meta.url), "utf8");
+const planningService = await readFile(new URL("../app/lib/planning-handoff-selfhost/service.ts", import.meta.url), "utf8");
+const permissions = await readFile(new URL("../app/lib/identity-selfhost/permissions.ts", import.meta.url), "utf8");
 const legacyOperations = await readFile(new URL("../public/erp/index.html", import.meta.url), "utf8");
 const apiClient = await readFile(new URL("../public/erp/api-client.js", import.meta.url), "utf8");
 
@@ -58,6 +60,9 @@ test("planning workspace keeps narrow screens contained and switches materials t
   assert.match(planningCss, /@media\(max-width:600px\)\{[\s\S]*?\.planning-material-table\{display:none\}/);
   assert.match(planningCss, /\.planning-material-cards\{display:grid/);
   assert.match(planningCss, /\.planning-trace-value\{[^}]*overflow-wrap:anywhere/);
+  assert.match(planningCss, /\.planning-dialog\{[^}]*width:min\(560px,100%\)/);
+  assert.match(planningCss, /@media\(max-width:420px\)[\s\S]*?\.planning-dialog-actions\{[^}]*flex-direction:column/);
+  assert.match(planningCss, /\.planning-row-reason\{[^}]*overflow-wrap:anywhere/);
   assert.match(workspace, /className="planning-material-cards"/);
   assert.match(workspace, /className="planning-table-scroll planning-material-table"/);
   assert.match(workspace, /系统管理员/);
@@ -65,12 +70,15 @@ test("planning workspace keeps narrow screens contained and switches materials t
   assert.doesNotMatch(workspace, /<span>{user\.role}<\/span>/);
 });
 
-test("planning page has pending and accepted queues with read-only decision detail", () => {
-  assert.match(planningPage, /PlanningHandoffWorkspace/); assert.match(workspace, /待接收交接包/); assert.match(workspace, /已接收历史/); assert.match(workspace, /接收交接包/); assert.match(workspace, /退回原因/);
+test("planning page has pending and processed queues with confirmed decisions and read-only history", () => {
+  assert.match(planningPage, /PlanningHandoffWorkspace/); assert.match(workspace, /待接收交接包/); assert.match(workspace, /已处理交接包/); assert.match(workspace, /status=PROCESSED/); assert.match(planningService, /wanted === "PROCESSED" \? \["RETURNED", "ACCEPTED"\]/);
+  assert.match(workspace, /接收交接包/); assert.match(workspace, /退回原因/); assert.match(workspace, /确认接收交接包/); assert.match(workspace, /确认退回工程\/项目部修订/); assert.match(workspace, /确认后将写入不可变 RETURN 事件/); assert.match(workspace, /确认后将写入不可变 ACCEPT 事件/);
+  assert.match(workspace, /操作完成凭证/); assert.match(workspace, /查看已处理详情/); assert.match(workspace, /数据库保存的退回原因/); assert.match(workspace, /result:"SUCCESS"/);
   assert.match(workspace, /calculated_gross_quantity/); assert.match(workspace, /specification_snapshot/); assert.match(workspace, /package_digest/); assert.match(workspace, /sessionPost/); assert.match(workspace, /createSessionWriteRegistry/); assert.match(workspace, /useEffect\(.*load/s);
   assert.match(apiClient, /planningWrite/); assert.match(apiClient, /currentCsrfToken/); assert.match(apiClient, /credentials: "same-origin"/); assert.match(apiClient, /X-CSRF-Token/); assert.match(apiClient, /Idempotency-Key/);
   assert.doesNotMatch(workspace, /crypto\.randomUUID/);
   assert.doesNotMatch(workspace, /localStorage|sessionStorage|relative_path|absolute_path|storage_name|file_body/);
+  assert.doesNotMatch(permissions.match(/planning:\s*\[[^\]]*\]/s)?.[0]||"", /system\.audit\.read/);
 });
 
 test("planning detail exposes scoped traceability, fixed units and explicit current evidence", () => {
@@ -82,6 +90,10 @@ test("planning detail exposes scoped traceability, fixed units and explicit curr
   assert.match(workspace, /trace_events\.map/);
   assert.match(workspace, /创建交接包/);
   assert.match(workspace, /提交计划部/);
+  assert.match(workspace, /RETURN:"退回工程\/项目部修订"/);
+  assert.match(workspace, /event\.action/);
+  assert.match(workspace, /event\.result/);
+  assert.match(workspace, /SUCCESS ·/);
   assert.match(workspace, /请求号/);
   assert.match(workspace, /Asia\/Shanghai/);
   assert.doesNotMatch(workspace, /new Date\(event\.created_at\)\.toLocaleString/);

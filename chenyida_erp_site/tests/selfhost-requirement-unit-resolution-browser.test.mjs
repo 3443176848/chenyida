@@ -275,7 +275,7 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
     await logout(page);
     await login(page, fixture.credentials.planning);
     await openPlanningWorkspace(page);
-    const pendingV1 = page.locator("button.planning-row").filter({ hasText: `${fixture.projectCode} · v1` }).first();
+    const pendingV1 = page.locator("button.planning-row").filter({ hasText: fixture.projectCode }).filter({ hasText: /\/v1/ }).first();
     await pendingV1.waitFor();
     await pendingV1.click();
     await page.getByRole("heading", { name: `${fixture.projectCode} · 交接包 v1`, exact: true }).waitFor();
@@ -319,9 +319,53 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
     for (const locator of [returnReason, returnButton, page.getByText("计划部待接收队列", { exact: true })]) {
       const box = await locator.boundingBox(); assert.ok(box && box.x >= -1 && box.x + box.width <= 391, "critical review controls must fit the 390px viewport");
     }
-    await returnReason.fill("浏览器验收：请将工程需求单位修订为套后重新提交");
+    const browserReturnInput = "浏览器验收：请将工程需求单位修订为套后重新提交";
+    const browserReturnReason = browserReturnInput.normalize("NFKC");
+    assert.notEqual(browserReturnInput, browserReturnReason); assert.equal(browserReturnInput.normalize("NFKC"), browserReturnReason);
+    await returnReason.fill(browserReturnInput);
     await returnButton.click();
+    const returnDialog = page.getByRole("dialog", { name: "确认退回工程/项目部修订", exact: true });
+    await returnDialog.waitFor();
+    await returnDialog.getByText(browserReturnInput, { exact: true }).waitFor();
+    await assertNoPageOverflow(page, "planning return confirmation dialog");
+    const stateBeforeConfirm = await pool.query(`select pp.status,
+      (select count(*)::integer from project_planning_handoff_events where package_id=pp.id and event_type='RETURNED') return_count
+      from project_planning_packages pp where pp.project_id=$1 and pp.package_version_no=1`, [fixture.projectId]);
+    assert.deepEqual(stateBeforeConfirm.rows[0], { status: "SUBMITTED", return_count: 0 });
+    await returnDialog.getByRole("button", { name: "确认退回", exact: true }).click();
     await page.getByText("已退回工程/项目部修订；旧包保持不可变", { exact: true }).waitFor();
+    const returnReceipt = page.locator(".planning-receipt");
+    await returnReceipt.getByRole("heading", { name: "操作完成凭证", exact: true }).waitFor();
+    await returnReceipt.getByText("RETURN", { exact: true }).waitFor();
+    await returnReceipt.getByText("SUCCESS", { exact: true }).waitFor();
+    await returnReceipt.getByText(browserReturnReason, { exact: true }).waitFor();
+    const returnDecision = await pool.query(`select pp.status,pp.returned_by,pp.returned_at,pp.return_reason,e.request_id::text,e.created_at
+      from project_planning_packages pp join project_planning_handoff_events e on e.package_id=pp.id and e.event_type='RETURNED'
+      where pp.project_id=$1 and pp.package_version_no=1`, [fixture.projectId]);
+    assert.equal(returnDecision.rowCount, 1);
+    assert.equal(returnDecision.rows[0].status, "RETURNED"); assert.equal(returnDecision.rows[0].returned_by, fixture.credentials.planning.username); assert.equal(returnDecision.rows[0].return_reason, browserReturnReason);
+    await returnReceipt.getByText(fixture.credentials.planning.username, { exact: true }).waitFor();
+    await returnReceipt.locator("code.planning-trace-value", { hasText: returnDecision.rows[0].request_id }).waitFor();
+    assert.equal(await returnReceipt.getByText(/Asia\/Shanghai/).count(), 1);
+    await assertNoPageOverflow(page, "planning return completion receipt");
+    await returnReceipt.getByRole("button", { name: "查看已处理详情", exact: true }).click();
+    await page.getByRole("heading", { name: `${fixture.projectCode} · 交接包 v1`, exact: true }).waitFor();
+    assert.equal(await page.getByRole("tab", { name: /已处理/ }).getAttribute("aria-selected"), "true");
+    await page.locator(".planning-return p", { hasText: browserReturnReason }).waitFor();
+    assert.deepEqual(await page.locator("code.planning-event-code").allTextContents(), ["CREATE", "SUBMIT", "RETURN"]);
+    assert.equal(await page.locator(".planning-event dd").filter({ hasText: /Asia\/Shanghai/ }).count(), 3);
+    const returnEvent = page.locator(".planning-event").last();
+    await returnEvent.getByText(fixture.credentials.planning.username, { exact: true }).waitFor();
+    await returnEvent.getByText("SUCCESS", { exact: true }).first().waitFor();
+    await returnEvent.locator("code.planning-trace-value", { hasText: returnDecision.rows[0].request_id }).waitFor();
+    const returnReasonParagraph = returnEvent.locator("p", { hasText: browserReturnReason });
+    await returnReasonParagraph.waitFor(); assert.equal((await returnReasonParagraph.innerText()).trim(), `原因：${browserReturnReason}`);
+    await page.getByText("工程/项目部修订队列", { exact: true }).waitFor();
+    await page.getByText("未指定具体接收人", { exact: true }).waitFor();
+    await page.getByText("未配置处理时限", { exact: true }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "接收交接包", exact: true }).count(), 0);
+    assert.equal(await page.getByRole("button", { name: "退回工程/项目部修订", exact: true }).count(), 0);
+    await assertNoPageOverflow(page, "processed returned package history detail");
 
     if (traceabilityReturnOnly) {
       const protectedState = await pool.query(`select pp.status,pp.package_version_no,
@@ -338,6 +382,8 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
       assert.equal(anonymousSession.status(), 200); assert.equal((await anonymousSession.json()).authenticated, false);
       const protectedAfterLogout = await context.request.get(`${browserOrigin}/api/planning-handoffs?status=SUBMITTED&page_size=100`);
       assert.equal(protectedAfterLogout.status(), 401);
+      const protectedHistoryAfterLogout = await context.request.get(`${browserOrigin}/api/planning-handoffs?status=PROCESSED&page_size=100`);
+      assert.equal(protectedHistoryAfterLogout.status(), 401);
       await context.close();
       return;
     }
@@ -368,7 +414,7 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
     await logout(page);
     await login(page, fixture.credentials.planning);
     await openPlanningWorkspace(page);
-    const pendingV2 = page.locator("button.planning-row").filter({ hasText: `${fixture.projectCode} · v2` }).first();
+    const pendingV2 = page.locator("button.planning-row").filter({ hasText: fixture.projectCode }).filter({ hasText: /\/v2/ }).first();
     await pendingV2.waitFor();
     await pendingV2.click();
     await page.getByRole("heading", { name: `${fixture.projectCode} · 交接包 v2`, exact: true }).waitFor();
@@ -380,7 +426,19 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
     }
     await assertNoPageOverflow(page, "planning package v2 detail");
     await page.getByRole("button", { name: "接收交接包", exact: true }).click();
+    const acceptDialog = page.getByRole("dialog", { name: "确认接收交接包", exact: true });
+    await acceptDialog.waitFor();
+    const acceptedBeforeConfirm = await pool.query("select status,(select count(*)::integer from project_planning_handoff_events where package_id=pp.id and event_type='ACCEPTED') accept_count from project_planning_packages pp where project_id=$1 and package_version_no=2", [fixture.projectId]);
+    assert.deepEqual(acceptedBeforeConfirm.rows[0], { status: "SUBMITTED", accept_count: 0 });
+    await acceptDialog.getByRole("button", { name: "确认接收", exact: true }).click();
     await page.getByText("计划交接包已接收；未自动启动物料需求", { exact: true }).waitFor();
+    const acceptReceipt = page.locator(".planning-receipt");
+    await acceptReceipt.getByRole("heading", { name: "操作完成凭证", exact: true }).waitFor();
+    await acceptReceipt.getByText("ACCEPT", { exact: true }).waitFor();
+    await acceptReceipt.getByText("SUCCESS", { exact: true }).waitFor();
+    await acceptReceipt.getByRole("button", { name: "查看已处理详情", exact: true }).click();
+    await page.getByRole("heading", { name: `${fixture.projectCode} · 交接包 v2`, exact: true }).waitFor();
+    assert.equal(await page.getByRole("tab", { name: /已处理/ }).getAttribute("aria-selected"), "true");
 
     const source = await pool.query("select unit_id,unit_pending from project_requirement_items where id=$1", [fixture.requirementItemId]);
     assert.deepEqual(source.rows[0], { unit_id: null, unit_pending: true });
@@ -423,6 +481,8 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
     assert.equal((await anonymousSession.json()).authenticated, false);
     const protectedAfterLogout = await context.request.get(`${browserOrigin}/api/planning-handoffs?status=SUBMITTED&page_size=100`);
     assert.equal(protectedAfterLogout.status(), 401);
+    const protectedHistoryAfterLogout = await context.request.get(`${browserOrigin}/api/planning-handoffs?status=PROCESSED&page_size=100`);
+    assert.equal(protectedHistoryAfterLogout.status(), 401);
     assert.equal(Number((await pool.query("select count(*) count from app_sessions where revoked_at is null and expires_at>now()")).rows[0].count), 0);
 
     await context.close();

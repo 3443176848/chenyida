@@ -241,7 +241,20 @@ export class PlanningHandoffService {
       const creationAudit = candidateCreationAudit && candidateCreationAudit.actor === header.rows[0].prepared_by && new Date(candidateCreationAudit.created_at).getTime() === new Date(header.rows[0].prepared_at).getTime() ? candidateCreationAudit : null;
       const traceEvents = [
         { id: `CREATE-${packageId}`, action: "CREATE", actor: header.rows[0].prepared_by, occurred_at: header.rows[0].prepared_at, request_id: creationAudit?.request_id ?? null, result: creationAudit ? "SUCCESS" : "TRACE_INCOMPLETE", reason: "", evidence_source: creationAudit ? "PACKAGE_SNAPSHOT_AND_SCOPED_AUDIT" : "PACKAGE_SNAPSHOT" },
-        ...events.rows.map((event) => ({ id: `EVENT-${event.id}`, action: event.event_type === "SUBMITTED" ? "SUBMIT" : event.event_type === "RESUBMITTED" ? "RESUBMIT" : event.event_type, actor: event.actor, occurred_at: event.created_at, request_id: event.request_id, result: "SUCCESS", reason: event.reason, evidence_source: "PACKAGE_EVENT" })),
+        ...events.rows.map((event) => ({
+          id: `EVENT-${event.id}`,
+          action: event.event_type === "SUBMITTED" ? "SUBMIT"
+            : event.event_type === "RESUBMITTED" ? "RESUBMIT"
+              : event.event_type === "RETURNED" ? "RETURN"
+                : event.event_type === "ACCEPTED" ? "ACCEPT"
+                  : event.event_type,
+          actor: event.actor,
+          occurred_at: event.created_at,
+          request_id: event.request_id,
+          result: "SUCCESS",
+          reason: event.reason,
+          evidence_source: "PACKAGE_EVENT",
+        })),
       ];
       const responsibility = header.rows[0].status === "SUBMITTED"
         ? { queue_role: "PLANNING", assignee: null, handling_deadline: null }
@@ -297,9 +310,24 @@ export class PlanningHandoffService {
   returnToProject(packageId: number, meta: PlanningMutationMeta, input: Record<string, unknown>) { return this.decide(packageId, meta, input, "RETURNED"); }
 
   async queue(actor: IdentityActor, page: number, pageSize: number, status?: string) {
-    if (!allowed(actor, "planning.read")) throw new PlanningHandoffError("PERMISSION_DENIED", "没有权限读取计划交接", 403); const wanted = status || "SUBMITTED"; if (!["SUBMITTED", "RETURNED", "ACCEPTED"].includes(wanted)) throw new PlanningHandoffError("REQUEST_VALIDATION_FAILED", "status 无效");
-    const values: unknown[] = [wanted]; let visible = "true"; if (actor.role === "engineering") { values.push(actor.username); visible = `p.project_owner=$${values.length}`; }
-    values.push(pageSize, (page - 1) * pageSize); const rows = await this.repository.pool.query(`select pp.*,p.project_code,p.project_name,p.project_owner,c.customer_code,c.customer_name,count(pi.id)::int item_count from project_planning_packages pp join business_projects p on p.id=pp.project_id join customers c on c.id=p.customer_id left join project_planning_package_items pi on pi.package_id=pp.id where pp.status=$1 and ${visible} group by pp.id,p.project_code,p.project_name,p.project_owner,c.customer_code,c.customer_name order by coalesce(pp.submitted_at,pp.prepared_at),pp.id limit $${values.length - 1} offset $${values.length}`, values);
-    const count = await this.repository.pool.query(`select count(*)::int count from project_planning_packages pp join business_projects p on p.id=pp.project_id where pp.status=$1 and ${visible}`, values.slice(0, values.length - 2)); return { rows: rows.rows, pagination: { page, page_size: pageSize, total: Number(count.rows[0].count) } };
+    if (!allowed(actor, "planning.read")) throw new PlanningHandoffError("PERMISSION_DENIED", "没有权限读取计划交接", 403);
+    const wanted = status || "SUBMITTED";
+    if (!["SUBMITTED", "RETURNED", "ACCEPTED", "PROCESSED"].includes(wanted)) throw new PlanningHandoffError("REQUEST_VALIDATION_FAILED", "status 无效");
+    const statuses = wanted === "PROCESSED" ? ["RETURNED", "ACCEPTED"] : [wanted];
+    const values: unknown[] = [statuses];
+    let visible = "true";
+    if (actor.role === "engineering") { values.push(actor.username); visible = `p.project_owner=$${values.length}`; }
+    const order = wanted === "SUBMITTED"
+      ? "coalesce(pp.submitted_at,pp.prepared_at),pp.id"
+      : "coalesce(pp.accepted_at,pp.returned_at,pp.submitted_at,pp.prepared_at) desc,pp.id desc";
+    values.push(pageSize, (page - 1) * pageSize);
+    const rows = await this.repository.pool.query(`select pp.*,p.project_code,p.project_name,p.project_owner,c.customer_code,c.customer_name,count(pi.id)::int item_count
+      from project_planning_packages pp join business_projects p on p.id=pp.project_id join customers c on c.id=p.customer_id
+      left join project_planning_package_items pi on pi.package_id=pp.id
+      where pp.status=any($1::text[]) and ${visible}
+      group by pp.id,p.project_code,p.project_name,p.project_owner,c.customer_code,c.customer_name
+      order by ${order} limit $${values.length - 1} offset $${values.length}`, values);
+    const count = await this.repository.pool.query(`select count(*)::int count from project_planning_packages pp join business_projects p on p.id=pp.project_id where pp.status=any($1::text[]) and ${visible}`, values.slice(0, values.length - 2));
+    return { rows: rows.rows, pagination: { page, page_size: pageSize, total: Number(count.rows[0].count) } };
   }
 }
