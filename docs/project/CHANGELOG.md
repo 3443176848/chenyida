@@ -4,6 +4,19 @@
 
 ## 2026-08-02
 
+### SELFHOST-OPS-UAT-PLANNING-HANDOFF-CONFIRMATIONS-FIX-14 - `fix: complete planning handoff confirmations` / `ops: accept handoff confirmation fix`
+
+- Git/范围：从 strict clean `main@9c2a7ea436e9b8b5e95ad8eb82e52a43090b109a`、behind 0/ahead 119 起步；只修改 Planning Handoff 确认界面、前端提交保护、测试、只读主 UAT runner 和项目文档。功能提交 `f19a91b680a58150378626d4800e9fb0af12f484`；未 push/PR、改写历史、读取/修改 `shujvbiao/`，未修改 Package、Event、业务数据、Schema、Migration、package 或版本。
+- ACCEPT 确认：窗口内完整显示 PRJ-00000001、目标 Package 2/v2/SUBMITTED/摘要/提交人/RESUBMIT 时间、前驱 1/v1/RETURNED/RETURN Event 2/操作者/上海时间/请求号/完整原因、Response 1/v1/操作者/时间/请求号/完整正文，以及 A0/V1/Unit Resolution v1/件·PCS/四项 10 PCS 不可变 v2 快照。后果明确为单 ACCEPT、v2 ACCEPTED、v1 继续 RETURNED、终态不可重复，以及不创建采购申请/工单/库存/财务。
+- RESUBMIT 确认：窗口内显示项目、源 v1、RETURN Event/原因、Engineering Response、目标 v2、Product/BOM/Unit Resolution、四项物料与数量、提交后进入计划部待接收队列且不自动创建下游单据；仅在隔离环境执行写验收，主 v2 未重放。
+- 流程依据：沿用 D-059 的“ACCEPT 只形成交接事实、不自动启动下阶段”和 D-060/TASK03 的“最新 ACCEPTED Package 供计划部门做物料需求计算/缺料分析，再经独立操作形成采购需求交接”。确认窗同时明确当前无具体处理人、无时限、接收本身不自动执行下一阶段；未新增 ADR。
+- 交互/权限：共享可访问模态框默认焦点为取消，焦点约束、ESC/关闭/背景关闭等价取消，固定底栏与 390×844 换行/无页面横向溢出通过；同步 ref 防双击、按钮立即禁用、稳定 Package DTO/ID、无自动重试。服务端既有权限、CSRF、Origin、CAS、幂等、状态和对象范围门禁保持；越权 403、过期状态 409。未增加 `system.audit.read` 或业务权限，全局跨角色导航债务继续为 HIGH。
+- 测试：Planning UI 12/12、Planning/Identity/CSRF/Origin 静态回归 35/35、Planning PostgreSQL 12/12、0037 Migration 4/4、Identity PostgreSQL 10/10、隔离 Chromium 1/1，共 74/74；另有 Python self-test/smoke/隔离 go-live 3/3、typecheck、production build 和 lint 0 error/10 既有 warning。隔离浏览器完成 RETURN→Response→v2，RESUBMIT 与 ACCEPT 各自取消/关闭/ESC 零业务请求后双击确认，最终各只有一个事件；v1 RETURNED、无下游记录。
+- 备份/恢复：pre-deploy custom dump `/var/backups/chenyida-erp/handoff-confirmation-fix-20260802T1510Z.dump` 为 root:root 0600、2,179,303 bytes、SHA-256 `518bf47f797ff2e4817458b5c7e5e4090b0f8aaf77519c80c5c1598e9690efee`；标准 `pg_restore --list` 3285 项与第二新空库恢复通过，恢复库 37/head 0037/checksum、主 UAT 对象和业务指纹一致后已删除。
+- 部署/主 UAT：只替换 Web `sha256:694a3190f517c94e36be3993e4b06e96b9194ea4e22e9add7f7ea533f09cab25→sha256:a6327f593a6d084c609127e1bdb09e60b2bd07ff6a2c85213b36f1315c622a78`；PostgreSQL、Worker、Caddy 未重建，四服务 restart 0/OOM false。主 UAT 只用 planning 在 390×844 打开 Package 2/v2 ACCEPT 窗并取消，页面业务 POST 0、当前 Session 正常 LOGOUT；未登录 engineering。保护指纹前后均为 `5ddca35cab36890c20b88ecadc758a32bd60b87e2a136c477d8fde6c7e4538c2`，v1/v2 为 RETURNED/SUBMITTED，Response/RETURN/RESUBMIT/ACCEPT/v3 `1/1/1/0/0`，物料需求计划/采购需求 0。
+- 资源/清理：全部重任务串行、一次一个临时容器；约 2.2 GiB available、Swap 252→258 MiB、根盘 22 GiB、低 Load，未触发门槛，内核 OOM 0。隔离数据库/恢复库、测试容器、候选提取目录和一次性 Python venv/SQLite 均精确清理；正式备份、当前/回退 Web 镜像与四个受保护 Volume 保留，未 prune。
+- 结论：`HANDOFF DECISION CONFIRMATIONS FIXED — UAT V2 STILL SUBMITTED`。确认窗口阻断已解除，可在下一次明确授权后重新开始 planning 最终接收；本任务停止，不 ACCEPT、不创建物料需求。
+
 ### SELFHOST-OPS-UAT-PLANNING-REVISION-RESPONSE-13 - `feat: add planning revision response lineage` / `ops: deploy planning revision workflow`
 
 - Git/范围：从 strict clean `main@174181991c0bf51ee397627ea8fce546d1b64e68`、Parent `180f6b58b583bd2dba350f017504be916db9673d`、behind 0/ahead 117 起步；只实现 Planning RETURN 后工程回复、固定后继谱系、测试和项目文档，不读取/修改 `shujvbiao/`，不 push/PR 或改写历史。

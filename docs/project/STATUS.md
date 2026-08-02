@@ -2,6 +2,27 @@
 
 最后更新时间：2026-08-02（Asia/Shanghai）
 
+## SELFHOST-OPS-UAT-PLANNING-HANDOFF-CONFIRMATIONS-FIX-14 最终接收与重新提交确认修复
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | HANDOFF DECISION CONFIRMATIONS FIXED — UAT V2 STILL SUBMITTED | 确认 UX、隔离写验收、备份恢复、Web-only 部署与主 UAT planning 打开后取消均完成；未接收主 v2 |
+| 严格起点 | PASS | clean `main@9c2a7ea436e9b8b5e95ad8eb82e52a43090b109a`、behind 0/ahead 119；alpha.38、0001—0037、0037 SHA、指定 Web 镜像、服务、四卷和主 UAT 状态均吻合 |
+| 功能提交 | PASS | `f19a91b680a58150378626d4800e9fb0af12f484`（`fix: complete planning handoff confirmations`）；仅 UI/CSS/前端保护和测试，无 API/Schema/Migration/package/版本变化 |
+| ACCEPT 窗口 | PASS | 目标 v2、前驱 v1 RETURN、Response、完整摘要/正文/请求号/操作者/上海时间、A0/V1/Unit Resolution v1/四项 10 PCS、不可变谱系、五项后果和精确下一阶段全部在窗口内部 |
+| RESUBMIT 窗口 | PASS / ISOLATED WRITE ONLY | 项目、源 v1、RETURN/原因、Response、目标 v2、固定 Product/BOM/Unit/四项物料、待接收队列和不自动下游完整；主 UAT 未重放 RESUBMIT |
+| 权威下一阶段 | D-059 / D-060 / TASK03 | ACCEPT 只形成交接事实；计划部门随后基于最新 ACCEPTED v2 独立执行物料需求计算与缺料分析，再以独立操作形成采购需求交接。当前无 assignee/SLA，接收不自动执行下一阶段 |
+| 交互/可访问性 | PASS | 默认取消焦点、焦点约束、ESC/关闭/背景关闭零请求、确认立即禁用、同步双击单请求、稳定 Package ID、无自动重试；390×844 无页面横向溢出，长正文/摘要/请求号换行且固定操作区不遮挡 |
+| 权限/并发 | PASS / UNCHANGED | planning/engineering 对应对象范围门禁；越权 403、过期 CAS 409、幂等与单事件通过。CSRF/Origin/状态/事务门禁未改，未增加 `system.audit.read` 或扩大权限；全局跨角色导航债务继续为 HIGH |
+| 自动验证 | PASS 74/74 + PYTHON 3/3 | UI 12、静态/安全 35、Planning PG 12、0037 migration 4、Identity PG 10、Chromium 1；另有 Python self-test/smoke/隔离 go-live、typecheck、production build、lint 0 error/10 既有 warning |
+| 隔离 Chromium | PASS 1/1 | v1 退回→回复→v2；RESUBMIT 与 ACCEPT 均先以取消/关闭/ESC 验证零业务请求，再双击确认只形成单一事件；v1 继续 RETURNED、v2 最终仅在隔离库 ACCEPTED、下游记录 0，资源已清理 |
+| 备份/恢复 | PASS | root:root 0600 custom dump 2,179,303 bytes，SHA-256 `518bf47f797ff2e4817458b5c7e5e4090b0f8aaf77519c80c5c1598e9690efee`；`pg_restore --list` 3285 项、第二新空库 37/head 0037/checksum/业务对象/指纹恢复通过，恢复库已删 |
+| Web-only 部署 | PASS | Web `694a3190…→a6327f59…`，旧 Web 精确 rollback tag 保留；PostgreSQL/Worker/Caddy 未重建，四卷保持，restart 0/OOM false |
+| 主 UAT 浏览器 | PASS / CANCEL ONLY | 仅 planning login；390×844 打开 Package 2/v2 ACCEPT 窗并核对字段，点击取消，页面业务 POST 0、ACCEPT 0；未登录 engineering。本次新 Session 已正常 LOGOUT 并确认失效；一条 22:03 创建的既有有效 planning Session 早于本次验收，未冒充本次 Session、未越权撤销 |
+| 主 UAT 数据 | PASS / UNCHANGED | 指纹前后 `5ddca35cab36890c20b88ecadc758a32bd60b87e2a136c477d8fde6c7e4538c2`；v1 RETURNED/摘要 `9d7a6a7e…`，v2 SUBMITTED/摘要 `d67acce3…`，Response/RETURN/RESUBMIT/ACCEPT/v3 `1/1/1/0/0`，物料需求计划/采购需求 0 |
+| 资源/清理 | PASS | 起点约 2.2 GiB available/252 MiB Swap/22 GiB/低 Load，终点约 2.2 GiB/258 MiB/22 GiB/Load `0.20/0.23/0.28`；内核 OOM 0、四服务 restart 0/OOM false。任务临时数据库/容器/恢复库/提取目录/venv/SQLite 均清理，备份、候选/回滚 Web 和四卷保留，未 prune |
+| 后续 | READY FOR SEPARATE PLANNING FINAL ACCEPTANCE | 确认窗口阻断已解除；需下一次明确授权后才可 ACCEPT。当前停止，不创建物料需求或采购交接 |
+
 ## SELFHOST-OPS-UAT-PLANNING-REVISION-RESPONSE-13 Planning 工程修订回复与后继谱系
 
 | 验证项 | 结果 | 说明 |
