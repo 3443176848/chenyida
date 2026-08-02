@@ -984,7 +984,7 @@
 ## D-088 Planning 退回回复采用追加版本、独立 Head 与固定后继谱系
 
 - 日期：2026-08-02
-- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYMENT PENDING`
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
 - 确认人：项目负责人（明确授权唯一新增 0037、alpha.38、隔离升级/恢复和门禁通过后的并行非生产 UAT 部署）
 - 缺口：0036 可以保存 Product/BOM Resolution、Unit Resolution 和不可变 Package Snapshot，但没有关系化 Engineering Revision Response、按 RETURN 独立 CAS Head、Response 精确消费或 Package 后继外键，不能用 Event/备注/JSON/审计替代业务权威。
 - 决定：0037 新增 append-only Revision Response Version 和每 RETURN Event 唯一 Revision Head；Response 保存 source Package/RETURN/Project、递增版本、NFC/LF 正文与 SHA-256、supersedes、actor、时间和 request_id。Head 使用独立 expected version CAS，只能逐一推进。
@@ -993,6 +993,7 @@
 - 不可变与摘要：Response Version、Package 稳定字段、Item/BOM/Document Snapshot 与 Event 由 PostgreSQL guard 禁止 UPDATE/DELETE/绕过服务；v2 摘要绑定源 Package、RETURN、精确 Response Version/正文摘要及全部业务快照。后续 Head 变化不影响已生成 v2。
 - 事务与安全：保存回复与生成 v2 均在各自单事务内完成业务事实、Head/CAS、Event、Audit 和 Idempotency；权限、owner、责任队列、Origin、CSRF、限流、幂等、唯一性、当前 RELEASED/有效引用和故障回滚 fail closed。Audit 不保存完整正文。
 - 历史边界：既有 RETURNED v1 保持无回复原样，不回填、不伪造历史 Response，不改写 v1、RETURN Event 或原因。主 UAT 部署只允许 engineering 只读确认能力存在，禁止填写回复、生成/提交 v2或登录 planning。
+- 实施结果：功能提交 `58e011db0c8d9045c3919c36c2c64f1655f050b6`；alpha.38/0037 在空库、0036、真实 0036 备份恢复副本、重放、失败回滚、SQL guard 与两次隔离完整浏览器旅程通过后部署到并行非生产 UAT。主 UAT 只读核验最终 v1/RETURN/Response/v2 `1/1/0/0`，跨迁移保护指纹 `a25be9c924bb2e7af54acd36c1c5f758e0caf0b2f4d8ccf426bf428aee41d739` 不变；未填写回复、生成/提交 v2或登录 planning。
 
 ## 待确认业务决策
 

@@ -6,15 +6,17 @@
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | IMPLEMENTED / DEPLOYMENT PENDING | alpha.38/0037 功能、迁移、UI 和隔离完整旅程已通过；尚未迁移或替换并行 UAT Web |
+| 任务状态 | PLANNING REVISION RESPONSE DEPLOYED — UAT V1 UNCHANGED | alpha.38/0037 功能、迁移、恢复、Web-only 部署与 engineering-only 主 UAT 只读验收完成 |
 | 严格起点 | PASS | clean `main@174181991c0bf51ee397627ea8fce546d1b64e68`、Parent `180f6b58b583bd2dba350f017504be916db9673d`、behind 0/ahead 117；alpha.37/0036、镜像、Canonical、四服务和主 UAT 指纹均吻合 |
 | Schema 决定 | 0037 REQUIRED | 0036 没有关系化 Response Version、RETURN 独立 Head 或 Package 后继谱系；唯一新增 0037，0001—0036 未修改 |
 | 数据模型 | PASS | append-only Response Version + CAS Head；Package 固定 previous/RETURN/Response 复合 FK；唯一后继、Response 单次消费、快照复制、摘要绑定与 SQL guard |
 | 服务/UI | PASS | NFC/LF/10—2000、权限/owner/责任队列、CSRF/Origin、幂等/限流、CAS/并发/事务审计；RETURNED v1 回复/固定复用/确认窗口和 v2 完整谱系，选择器在仅回复模式移除 |
-| 自动验证 | PASS 66/66 | 静态/安全 49/49、Planning PostgreSQL 12/12、Migration 4/4、隔离 Chromium 1/1；typecheck、production build、lint 0 error、diff check 通过 |
-| 运行面 | UNCHANGED / PENDING | 并行 UAT 仍 alpha.37/0036，Web `sha256:fb88dd8afb8b7f08cf6c8dff9aa66566ad9aec0a203460e7fd09bc32af728edc`；Worker 不依赖本次代码 |
-| 主 UAT | UNCHANGED | 起点业务指纹 `0dfc969bf0785326091e649c6af5fd8f52023d0caf43cc0ebf60b90e9db243c8`；Package 1/v1 RETURNED、RETURN 1、Response 0、v2 0，未填写回复、生成/提交 v2或登录 planning |
-| 下一门禁 | PENDING | root-only 0600 dump/list/第二库恢复、真实 0036 隔离升级与完整旅程、迁移/只换 Web、engineering-only 只读核验和最终清理 |
+| 自动验证 | PASS 67 EXECUTIONS | 静态/安全 49/49、Planning PostgreSQL 12/12、Migration 4/4、隔离 Chromium 同一 1 项在新库和真实恢复升级库各通过一次；三项 Python 基线、typecheck、production build、lint 0 error、credentials 和 diff check 通过 |
+| 备份/恢复 | PASS | root:root 0600 dump 2,140,261 bytes，SHA-256 `653b239b65f31a89b0a29281f8f68c1c0ab26d43df4cd936bb544b0d69bbad69`；list、第二空库 0036 恢复、另一恢复库 0036→0037+完整旅程通过，恢复库已删 |
+| Migration/运行面 | PASS / DEPLOYED | 37/head 0037，SHA-256 `139f2623a184ae3d6927c95b56569cc438deffc2a0b46c325c9f04d59471d99f`；Web `fb88dd8a…→694a3190…`，Worker 保持 `32d1ae33…`，PostgreSQL/Worker/Caddy 与四卷未重建 |
+| 主 UAT | PASS / UNCHANGED | 跨迁移保护指纹前后均 `a25be9c924bb2e7af54acd36c1c5f758e0caf0b2f4d8ccf426bf428aee41d739`；v1/RETURN/Response/v2 `1/1/0/0`，CREATE/SUBMIT/RETURN/ACCEPT `1/1/1/0`，Product/BOM/Unit/四条 10 PCS 不变 |
+| 主 UAT 浏览器 | PASS / READ ONLY | engineering login/logout 1/1、业务 POST 0、Response/v2 write 0、planning login 0；空回复输入、v2 禁用、选择器 0、390px 与退出 Session 0 通过 |
+| 资源/清理 | PASS | 起点约 2.1 GiB available/227 MiB Swap/22 GiB/低 Load；最终 2.1 GiB/240 MiB/22 GiB/Load `0.04/0.16/0.27`。内核 OOM 0、四服务 restart 0/OOM false；临时库/容器/app 提取/Playwright/Python 目录均清零，备份、候选/回滚 Web 和四卷保留，未 prune |
 
 ## SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12 Planning 决策历史修复与主 UAT 回看
 

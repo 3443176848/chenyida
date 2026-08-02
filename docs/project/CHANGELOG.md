@@ -4,14 +4,19 @@
 
 ## 2026-08-02
 
-### SELFHOST-OPS-UAT-PLANNING-REVISION-RESPONSE-13 - `feat: add planning revision response lineage`（部署待独立 ops 提交）
+### SELFHOST-OPS-UAT-PLANNING-REVISION-RESPONSE-13 - `feat: add planning revision response lineage` / `ops: deploy planning revision workflow`
 
 - Git/范围：从 strict clean `main@174181991c0bf51ee397627ea8fce546d1b64e68`、Parent `180f6b58b583bd2dba350f017504be916db9673d`、behind 0/ahead 117 起步；只实现 Planning RETURN 后工程回复、固定后继谱系、测试和项目文档，不读取/修改 `shujvbiao/`，不 push/PR 或改写历史。
 - Schema/版本：0036 无完整合规模型，故唯一新增 `0037_project_planning_revision_response_lineage.sql`，升级 `0.1.0-alpha.38`；0001—0036 未修改。新增追加式 Response Version、每 RETURN 独立 CAS Head、Package previous/RETURN/Response 复合外键、唯一后继/单次消费、索引和不可变 SQL guard；既有 RETURNED v1 不回填或伪造回复。
 - 服务/摘要：回复按 LF、Unicode NFC、trim 和 10—2000 字符保存并保留中文全角标点；权限/owner/责任队列、Origin/CSRF、限流、幂等、CAS、并发和故障回滚 fail closed。v2 原子复制 Product/BOM/Unit Resolution/Material/Document 固定快照并把源 Package、RETURN、精确 Response Version/正文摘要纳入 Package 摘要；Audit 不存完整正文。
 - UI：RETURNED v1 显示完整退回事实、工程回复、Version/actor/time/request_id、固定复用和确认后果；未保存或脏回复禁用 v2。仅回复模式不渲染 Product/BOM/Unit 选择器；v2 显示 `v1 → Planning RETURN → Engineering Response → v2` 完整固定谱系。
 - 测试：静态/安全回归 49/49、Planning PostgreSQL 12/12、Migration 4/4、隔离 Chromium 1/1，共 66/66；Planning typecheck、production build、lint 0 error 与 diff check 通过。覆盖文本、持久化、CAS/追加版本、幂等异正文、并发、权限、RETURN 归属、唯一后继、零半记录、SQL guard、固定回复/快照和 390px 完整接收旅程。
-- 部署边界：候选 Web `sha256:694a3190f517c94e36be3993e4b06e96b9194ea4e22e9add7f7ea533f09cab25` 已构建；运行面仍 alpha.37/0036 和原 Web。主 UAT 指纹 `0dfc969bf0785326091e649c6af5fd8f52023d0caf43cc0ebf60b90e9db243c8`，Response 0/v2 0；备份恢复、0037 和 Web 部署待独立 ops 门禁。
+- Git：功能提交 `58e011db0c8d9045c3919c36c2c64f1655f050b6`；部署、只读验收、清理与完成文档由独立 `ops: deploy planning revision workflow` 收口。不 push/PR 或改写历史。
+- 备份/恢复：root:root 0600 custom dump 2,140,261 bytes、SHA-256 `653b239b65f31a89b0a29281f8f68c1c0ab26d43df4cd936bb544b0d69bbad69`，list 通过；第二新空库恢复为 0036且保护指纹一致，另一真实恢复副本升级 0037 后 Response/Head/v2 0、指纹不变并完成第二次隔离 Chromium 旅程，临时库均删除。
+- 部署：并行非生产 UAT 串行应用 0037，checksum `139f2623a184ae3d6927c95b56569cc438deffc2a0b46c325c9f04d59471d99f`；只替换 Web `sha256:fb88dd8afb8b...→sha256:694a3190f517...`。Worker 保持 `sha256:32d1ae335610...`，PostgreSQL/Worker/Caddy 容器和四卷未重建，旧 Web 精确 rollback tag 保留。
+- 主 UAT：engineering-only 网络白名单核验 login/logout 1/1、业务 POST 0、Response/v2 write 0、planning login 0；空回复输入、v2 禁用、Product/BOM/Unit selector 0、A0/V1/Unit Resolution v1/四条 10 PCS 与 390px 通过并退出。跨迁移保护指纹前后均 `a25be9c924bb2e7af54acd36c1c5f758e0caf0b2f4d8ccf426bf428aee41d739`；v1/RETURN/Response/v2 `1/1/0/0`，历史原因/Event 未改。
+- 资源/清理：67 次自动执行、三项 Python 基线、typecheck/build/lint/credentials/diff 通过；起点约 2.1 GiB available/227 MiB Swap/22 GiB/低 Load，最终 2.1 GiB/240 MiB/22 GiB/Load `0.04/0.16/0.27`，内核 OOM 0、四服务 restart 0/OOM false。临时数据库、容器、app 提取、Playwright 与 Python 目录清零；正式备份、当前/候选/回滚 Web 和四个受保护卷保留，未 prune。
+- 结论：`PLANNING REVISION RESPONSE DEPLOYED — UAT V1 UNCHANGED`。可在下一独立授权任务重新开始 engineering v2 黑盒试用；本轮停止，不填写回复、不生成/提交 v2、不登录 planning。
 
 ### SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12 - `fix: expose planning decision history` / `ops: accept planning decision history in parallel environment`
 
