@@ -26,19 +26,24 @@ test("purchase detail renders honest scoped lineage, immutable quantities and se
   assert.match(workspace,/净采购 = max\(毛需求 - 快照库存分配 - 快照在途分配, 0\)/);assert.match(workspace,/库存可用 = Σ在手 - Σ正式预留 - Σ冻结\/Hold/);assert.match(workspace,/数据库约束保证结果非负/);assert.match(workspace,/计划分配不计入 Inventory 正式预留/);
   assert.match(workspace,/模型没有“已到货但未完成入库”的独立数量字段/);assert.match(workspace,/模型未单独记录/);assert.match(workspace,/不会自动重算或改写 PRQ/);
   assert.match(workspace,/Package ACCEPT/);assert.match(workspace,/PRQ SUBMIT/);assert.match(workspace,/SUCCESS/);assert.match(workspace,/不会自动生成采购单据/);
+  for (const field of ["decision_counts","package_accept_event","plan_generate_event","prq_submit_event","current_supply_observed_at","type","timezone"]) assert.match(workspace,new RegExp(field));
+  assert.match(workspace,/ACCEPT 事件数量/);assert.match(workspace,/RETURN 事件数量/);assert.match(workspace,/不以状态或队列数量推断/);
   assert.doesNotMatch(workspace,/净需求为 0，不生成/);assert.match(workspace,/提交快照净采购为 0；未生成 PRQ/);assert.match(workspace,/未找到采购申请；请核验关系化提交事实/);
 });
 
 test("purchase decisions require confirmation and cancellation paths contain no business mutation", () => {
   assert.match(workspace,/PurchaseDecisionDialog/);assert.match(workspace,/decisionInFlight\.current/);assert.match(workspace,/event\.key === "Escape"/);assert.match(workspace,/event\.target === event\.currentTarget/);assert.match(workspace,/ref=\{cancelRef\}/);assert.match(workspace,/disabled=\{busy\}/);
-  assert.match(workspace,/decisionRefreshInFlight\.current/);assert.match(workspace,/api<\{ data: RequestDetail \}>\(`\/api\/purchase-requests\/\$\{detail\.header\.id\}`\)/);assert.match(workspace,/已重新读取当前供应/);
-  assert.match(workspace,/接收不会修改库存、正式预留或 Planning Allocation/);assert.match(workspace,/接收不会自动创建 RFQ、Quote、Award、PO、Delivery Plan、Receipt、Ledger、AP 或 Work Order/);
+  assert.match(workspace,/decisionRefreshInFlight\.current/);assert.match(workspace,/api<\{ data: RequestDetail \}>\(`\/api\/purchase-requests\/\$\{detail\.header\.id\}`\)/);assert.match(workspace,/正在重新读取当前供应/);assert.match(workspace,/已重新读取当前供应/);
+  assert.match(workspace,/isPurchaseAcceptancePreviewComplete/);assert.match(workspace,/confirmDisabled=\{!complete\}/);assert.match(workspace,/资料不完整，禁止接收/);
+  for (const heading of ["Package ACCEPT 完整凭证","Plan GENERATE 完整凭证","PRQ SUBMIT 完整凭证","接收前显式决策计数","当前供应九项","供应公式与边界"]) assert.match(workspace,new RegExp(heading));
+  for (const label of ["当前在手总量","当前正式预留量","当前品质冻结量","当前库存可用量","当前计划库存分配量","当前未分配库存可用量","当前有效在途总量","当前计划在途分配量","当前未分配在途可用量"]) assert.match(workspace,new RegExp(label));
+  assert.match(workspace,/不修改 Package、Plan、PRQ 明细、库存、正式预留或 Planning Allocation/);assert.match(workspace,/不自动创建 RFQ、Quote、Award、PO、Delivery Plan、Receipt、Ledger、AP 或 Work Order/);
   assert.match(workspace,/不修改原需求计划及提交时分配快照/);assert.match(workspace,/从已处理记录查看凭证/);assert.match(workspace,/Idempotency|createSessionWriteRegistry/);
   const closeBody=workspace.match(/const closeDecision[^;]+;/)?.[0]||"";assert.doesNotMatch(closeBody,/mutate|sessionPost|fetch|api\(/);
 });
 
 test("390px purchase layout keeps key quantities and units intact without page overflow", () => {
-  assert.match(styles,/@media\(max-width:420px\)/);assert.match(styles,/\.planning-quantity\{[^}]*white-space:nowrap/);assert.match(styles,/\.purchase-supply-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);assert.match(styles,/\.purchase-confirm-supply-cards article>dl\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);assert.match(styles,/max-width:100%/);assert.match(workspace,/purchase-line-cards/);assert.match(workspace,/purchase-supply-formulas/);
+  assert.match(styles,/@media\(max-width:420px\)/);assert.match(styles,/\.planning-quantity\{[^}]*white-space:nowrap/);assert.match(styles,/\.purchase-supply-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);assert.match(styles,/\.purchase-confirm-supply-cards article>dl\{grid-template-columns:1fr/);assert.match(styles,/max-width:100%/);assert.match(workspace,/purchase-line-cards/);assert.match(workspace,/purchase-supply-formulas/);assert.match(workspace,/data-current-supply-nine="complete"/);
 });
 
 test("dashboard exposes both native handoff queues", () => {

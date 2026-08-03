@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import type { IdentityActor } from "../identity-selfhost/types.ts";
 import { calculateMaterialRequirements } from "./calculation.ts";
-import { currentSupplyFormula, currentSupplyModel, loadCurrentSupplyBreakdowns } from "./current-supply.ts";
+import { currentSupplyFormula, currentSupplyModel, loadCurrentSupplyBreakdowns, type CurrentSupplyBreakdown } from "./current-supply.ts";
 import { MaterialRequirementError } from "./errors.ts";
 import { MaterialRequirementRepository } from "./repository.ts";
 import type { RequirementMutationMeta, RequirementMutationResult } from "./types.ts";
@@ -10,6 +10,61 @@ import { assertOnlyKeys, boundedText, expectedVersion, requiredDate } from "./va
 type PackageRow = Record<string, unknown> & { id: string; project_id: string; status: string; version: number; package_digest: string; target_delivery_date: unknown; latest_package_id: string };
 type PlanRow = Record<string, unknown> & { id: string; project_id: string; planning_package_id: string; status: string; version: number; required_date: unknown; source_package_version: number; source_package_digest: string; calculation_digest: string };
 const allowed = (actor: IdentityActor, permission: string) => actor.permissions.includes("*") || actor.permissions.includes(permission);
+
+type PurchaseTraceEvent = Readonly<{
+  id: number;
+  action: string;
+  type: string;
+  actor: string;
+  occurred_at: unknown;
+  timezone: "Asia/Shanghai";
+  request_id: string;
+  result: "SUCCESS";
+  evidence_source: "PACKAGE_EVENT" | "MATERIAL_REQUIREMENT_EVENT";
+}>;
+
+const supplyQuantityFields: readonly (keyof CurrentSupplyBreakdown)[] = [
+  "on_hand_qty",
+  "reserved_qty",
+  "frozen_qty",
+  "inventory_available_qty",
+  "stock_allocated_to_active_plans_qty",
+  "unallocated_inventory_available_qty",
+  "effective_inbound_qty",
+  "inbound_allocated_to_active_plans_qty",
+  "unallocated_inbound_available_qty",
+];
+
+const traceabilityIncomplete = () => new MaterialRequirementError(
+  "PURCHASE_REQUEST_CONFIRMATION_INCOMPLETE",
+  "采购接收确认所需的完整追溯、决策计数或当前供应无法取得，已禁止继续接收",
+  409,
+);
+
+function requireTraceEvent(
+  rows: readonly Record<string, unknown>[],
+  expectedType: string,
+  action: string,
+  evidenceSource: PurchaseTraceEvent["evidence_source"],
+): PurchaseTraceEvent {
+  if (rows.length !== 1) throw traceabilityIncomplete();
+  const row = rows[0];
+  const actor = typeof row.actor === "string" ? row.actor.trim() : "";
+  const requestId = typeof row.request_id === "string" ? row.request_id : "";
+  const occurredAt = row.created_at;
+  if (row.event_type !== expectedType || !actor || !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(requestId) || !occurredAt || Number.isNaN(new Date(occurredAt as string | number | Date).valueOf())) {
+    throw traceabilityIncomplete();
+  }
+  return {
+    id: Number(row.id), action, type: expectedType, actor, occurred_at: occurredAt,
+    timezone: "Asia/Shanghai", request_id: requestId, result: "SUCCESS", evidence_source: evidenceSource,
+  };
+}
+
+function completeCurrentSupply(value: CurrentSupplyBreakdown | undefined): value is CurrentSupplyBreakdown {
+  if (!value || value.inventory_location_scope !== "MAIN" || !Number.isSafeInteger(value.inventory_position_count) || !Number.isSafeInteger(value.inventory_lot_position_count)) return false;
+  return supplyQuantityFields.every((field) => typeof value[field] === "string" && /^-?\d+\.\d{6}$/.test(value[field] as string));
+}
 
 type PurchaseRequestScopeRow = Readonly<{ status: string; submitted_by: string; accepted_by: string | null; returned_by: string | null }>;
 export type PurchaseRequestReadScope = "ALL" | "PURCHASE_QUEUE" | "PLANNING_OWN" | "NONE";
@@ -184,31 +239,49 @@ export class MaterialRequirementService {
           and ur.requirement_item_id=pi.requirement_item_id and ur.unit_id=pi.unit_id
         where pi.package_id=$1 order by pi.line_no`, [Number(header.planning_package_id)]);
       const packageAcceptResult = await client.query(`select id,event_type,actor,request_id,created_at
-        from project_planning_handoff_events where package_id=$1 and event_type='ACCEPTED' order by id desc limit 1`, [Number(header.planning_package_id)]);
+        from project_planning_handoff_events where package_id=$1 and project_id=$2 and event_type='ACCEPTED' order by id`, [Number(header.planning_package_id), Number(header.project_id)]);
       const generatedEventResult = await client.query(`select id,event_type,actor,request_id,created_at,to_status
-        from planning_material_requirement_events where plan_id=$1 and event_type in ('GENERATED','REGENERATED') order by id desc limit 1`, [Number(header.plan_id)]);
+        from planning_material_requirement_events where plan_id=$1 and event_type in ('GENERATED','REGENERATED') order by id`, [Number(header.plan_id)]);
       const submitEventResult = await client.query(`select id,event_type,actor,request_id,created_at,to_status
-        from planning_material_requirement_events where plan_id=$1 and purchase_request_id=$2 and event_type='SUBMITTED' order by id desc limit 1`, [Number(header.plan_id), requestId]);
+        from planning_material_requirement_events where plan_id=$1 and purchase_request_id=$2 and event_type='SUBMITTED' order by id`, [Number(header.plan_id), requestId]);
+      const decisionCountResult = await client.query(`select
+          count(*) filter(where event_type='PURCHASE_ACCEPTED')::int accept_count,
+          count(*) filter(where event_type='PURCHASE_RETURNED')::int return_count
+        from planning_material_requirement_events
+        where plan_id=$1 and purchase_request_id=$2 and event_type in ('PURCHASE_ACCEPTED','PURCHASE_RETURNED')`, [Number(header.plan_id), requestId]);
       const requiredDateValue = header.required_date instanceof Date ? header.required_date.toISOString().slice(0, 10) : String(header.required_date).slice(0, 10);
       const currentByLineId = await loadCurrentSupplyBreakdowns(client, lineResult.rows.map((line) => ({
         lineId: Number(line.id), materialId: Number(line.material_id), unitId: Number(line.unit_id),
         snapshotStockAvailable: String(line.stock_available), snapshotStockAllocated: String(line.stock_allocated),
         snapshotInboundAvailable: String(line.eligible_inbound), snapshotInboundAllocated: String(line.inbound_allocated),
       })), requiredDateValue);
-      const checkedAtResult = await client.query("select statement_timestamp() checked_at");
-      const packageAccept = packageAcceptResult.rows[0];
-      const generatedEvent = generatedEventResult.rows[0];
-      const submitEvent = submitEventResult.rows[0];
-      const traceEvent = (row: Record<string, unknown> | undefined, action: string) => row ? {
-        id: Number(row.id), action, actor: row.actor, occurred_at: row.created_at, request_id: row.request_id,
-        result: "SUCCESS", evidence_source: action === "ACCEPT" ? "PACKAGE_EVENT" : "MATERIAL_REQUIREMENT_EVENT",
-      } : null;
-      const lines = lineResult.rows.map((line) => ({ ...line, current_supply: currentByLineId.get(Number(line.id)) ?? null }));
+      const observedAtResult = await client.query("select statement_timestamp() observed_at");
+      if (
+        lineResult.rows.length < 1 || lineResult.rows.length !== Number(header.line_count) || packageItemResult.rows.length < 1
+        || typeof header.package_digest !== "string" || !/^[0-9a-f]{64}$/i.test(header.package_digest)
+        || header.package_status !== "ACCEPTED" || header.source_package_digest !== header.package_digest
+      ) throw traceabilityIncomplete();
+      const packageAcceptEvent = requireTraceEvent(packageAcceptResult.rows, "ACCEPTED", "ACCEPT", "PACKAGE_EVENT");
+      const generatedType = generatedEventResult.rows[0]?.event_type === "REGENERATED" ? "REGENERATED" : "GENERATED";
+      const planGenerateEvent = requireTraceEvent(generatedEventResult.rows, generatedType, generatedType === "REGENERATED" ? "REGENERATE" : "GENERATE", "MATERIAL_REQUIREMENT_EVENT");
+      const prqSubmitEvent = requireTraceEvent(submitEventResult.rows, "SUBMITTED", "SUBMIT", "MATERIAL_REQUIREMENT_EVENT");
+      const decisionCounts = {
+        accept_count: Number(decisionCountResult.rows[0]?.accept_count),
+        return_count: Number(decisionCountResult.rows[0]?.return_count),
+      };
+      if (!Number.isSafeInteger(decisionCounts.accept_count) || decisionCounts.accept_count < 0 || !Number.isSafeInteger(decisionCounts.return_count) || decisionCounts.return_count < 0) throw traceabilityIncomplete();
+      const lines = lineResult.rows.map((line) => {
+        const currentSupply = currentByLineId.get(Number(line.id));
+        if (!completeCurrentSupply(currentSupply)) throw traceabilityIncomplete();
+        return { ...line, current_supply: currentSupply };
+      });
+      const currentSupplyObservedAt = observedAtResult.rows[0]?.observed_at;
+      if (!currentSupplyObservedAt || Number.isNaN(new Date(currentSupplyObservedAt).valueOf())) throw traceabilityIncomplete();
       const response = {
         header,
         package: {
           id: Number(header.planning_package_id), version_no: Number(header.package_version_no), status: header.package_status,
-          digest: header.package_digest, project_code: header.project_code, accept_event: traceEvent(packageAccept, "ACCEPT"),
+          digest: header.package_digest, project_code: header.project_code, accept_event: packageAcceptEvent,
           items: packageItemResult.rows,
           acceptance_effect: "PACKAGE_ACCEPT_DOES_NOT_CREATE_PURCHASE_DOCUMENTS",
         },
@@ -217,7 +290,7 @@ export class MaterialRequirementService {
           source_package_id: Number(header.planning_package_id), source_package_version_no: Number(header.package_version_no),
           prepared_by: header.prepared_by, calculated_at: header.prepared_at,
           snapshot_cutoff_at: header.plan_submitted_at, submission_revalidated_at: header.plan_submitted_at,
-          generated_event: traceEvent(generatedEvent, generatedEvent?.event_type === "REGENERATED" ? "REGENERATE" : "GENERATE"),
+          generated_event: planGenerateEvent,
           note: null, note_captured: false,
         },
         purchase_request: {
@@ -225,7 +298,7 @@ export class MaterialRequirementService {
           source_plan_id: Number(header.plan_id), source_plan_version_no: Number(header.plan_version_no),
           project_code: header.project_code, required_date: header.required_date,
           submitted_by: header.submitted_by, submitted_at: header.submitted_at,
-          submit_event: traceEvent(submitEvent, "SUBMIT"), line_count: Number(header.line_count),
+          submit_event: prqSubmitEvent, line_count: Number(header.line_count),
           total_requested_quantity: header.requested_quantity, independently_versioned: false,
           supplier_selection: null, price: null, assignee: null, handling_deadline: null,
           handoff_note: null, handoff_note_captured: false,
@@ -234,7 +307,12 @@ export class MaterialRequirementService {
         quantity_formula: "net_purchase_requirement = max(gross_requirement - stock_allocated - inbound_allocated, 0)",
         current_supply_formula: currentSupplyFormula,
         current_supply_model: currentSupplyModel,
-        current_supply_checked_at: checkedAtResult.rows[0].checked_at,
+        decision_counts: decisionCounts,
+        package_accept_event: packageAcceptEvent,
+        plan_generate_event: planGenerateEvent,
+        prq_submit_event: prqSubmitEvent,
+        current_supply_observed_at: currentSupplyObservedAt,
+        current_supply_checked_at: currentSupplyObservedAt,
       };
       await client.query("commit");
       return response;

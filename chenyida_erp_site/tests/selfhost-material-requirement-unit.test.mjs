@@ -48,6 +48,10 @@ test("calculation and submission are PostgreSQL numeric, locked and scope-bounde
   assert.doesNotMatch(service, /insert into purchase_orders|insert into supplier|request_for_quotation|supplier_quote/i); assert.doesNotMatch(service, /update inventory_stock_balances/);
   const requestDetail = service.slice(service.indexOf("async requestDetail"), service.indexOf("async requestQueue"));
   assert.match(requestDetail, /begin transaction isolation level repeatable read read only/); assert.ok(requestDetail.indexOf("canReadPurchaseRequest") < requestDetail.indexOf("loadCurrentSupplyBreakdowns"));
+  assert.match(requestDetail, /count\(\*\) filter\(where event_type='PURCHASE_ACCEPTED'\)/);assert.match(requestDetail,/count\(\*\) filter\(where event_type='PURCHASE_RETURNED'\)/);
+  for(const field of ["decision_counts","package_accept_event","plan_generate_event","prq_submit_event","current_supply_observed_at"])assert.match(requestDetail,new RegExp(field));
+  assert.match(requestDetail,/requireTraceEvent/);assert.match(requestDetail,/completeCurrentSupply/);assert.match(service,/PURCHASE_REQUEST_CONFIRMATION_INCOMPLETE/);
+  assert.doesNotMatch(requestDetail,/insert\s+into|update\s+[a-z_]|delete\s+from/i);
   assert.match(currentSupply, /sum\(b\.on_hand_qty\)/); assert.match(currentSupply, /sum\(b\.reserved_qty\)/); assert.match(currentSupply, /sum\(b\.frozen_qty\)/);
   assert.match(currentSupply, /i\.on_hand_qty-i\.reserved_qty-i\.frozen_qty/); assert.doesNotMatch(currentSupply, /greatest\(i\.on_hand_qty-i\.reserved_qty-i\.frozen_qty,0\)/); assert.match(currentSupply, /p\.status in \('SUBMITTED','ACCEPTED'\)/);
   assert.match(currentSupply, /dp\.status in \('PENDING','PARTIAL'\)/); assert.match(currentSupply, /po\.status in \('OPEN','PARTIALLY_RECEIVED'\)/); assert.match(currentSupply, /pol\.order_qty-pol\.received_qty/);
