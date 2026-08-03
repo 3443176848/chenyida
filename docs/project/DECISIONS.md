@@ -995,6 +995,19 @@
 - 历史边界：既有 RETURNED v1 保持无回复原样，不回填、不伪造历史 Response，不改写 v1、RETURN Event 或原因。主 UAT 部署只允许 engineering 只读确认能力存在，禁止填写回复、生成/提交 v2或登录 planning。
 - 实施结果：功能提交 `58e011db0c8d9045c3919c36c2c64f1655f050b6`；alpha.38/0037 在空库、0036、真实 0036 备份恢复副本、重放、失败回滚、SQL guard 与两次隔离完整浏览器旅程通过后部署到并行非生产 UAT。主 UAT 只读核验最终 v1/RETURN/Response/v2 `1/1/0/0`，跨迁移保护指纹 `a25be9c924bb2e7af54acd36c1c5f758e0caf0b2f4d8ccf426bf428aee41d739` 不变；未填写回复、生成/提交 v2或登录 planning。
 
+## D-089 采购审核的当前供应必须是授权范围内的只读实时投影
+
+- 日期：2026-08-03
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
+- 确认人：项目负责人（明确要求补齐采购需求审核页当前库存、预留和在途供应分解，并禁止接收/退回主 PRQ、库存写入或创建采购下游单据）
+- 库存权威：当前版本按已授权 PRQ 行的稳定 Material+Unit，在 `location_code='MAIN'` 内聚合全部无批次和 Lot 库存位置。`库存可用 = Σon_hand_qty - Σreserved_qty - Σfrozen_qty`；Inventory `reserved_qty` 是正式预留，Planning Allocation 是独立业务事实，禁止互相冒充。只有来源 Plan 为 SUBMITTED/ACCEPTED 的 Allocation 才参与当前计划分配，`未分配库存可用 = max(库存可用 - 有效计划库存分配, 0)`。
+- 在途权威：当前有效在途只含 PO 头/行均为 OPEN/PARTIALLY_RECEIVED、在 PRQ 需求截止日内且尚未收货的数量。有 Delivery Plan 时只含 PENDING/PARTIAL 的 `planned_quantity-received_quantity`；无 Delivery Plan 时才使用 PO 的 `order_qty-received_qty`。COMPLETED/CANCELLED/CLOSED、已收货部分及其无效来源 Allocation 均排除，`未分配在途可用 = max(有效在途 - 有效计划在途分配, 0)`。
+- 诚实模型：当前 Inventory 位置域只有 MAIN，没有可展示的多仓库维度；数据库没有“其他不可用”或“已到货但未完成入库”的独立数量字段。接口和页面必须明确标注模型未单独记录，不得以 0 伪装存在该字段，也不得暴露供应商价格、PO 明细或其他项目数据。
+- 快照边界：Material Requirement Plan/PRQ 的提交时库存、在途、分配和净采购是固化历史快照；当前供应在 repeatable-read/read-only 查询中实时计算，与快照分区展示。差异只提示采购人员通过正式退回/调整流程处理，不自动重算或改写 PRQ、Plan 或快照。
+- 授权/写入：purchase 必须先通过既有 PRQ 对象范围授权，再仅以该 PRQ 行集查询供应汇总；诱饵 PRQ/非授权对象 403 或不可见，不开放全局 Inventory/Lot/项目枚举，不增加 Inventory/Ledger 写或 `system.audit.read`。GET 正常及失败不产生 Inventory、Allocation 或 Audit 业务写入。
+- 接收边界：接收确认打开前重新查询当前供应并显示查询时间和四条摘要；该展示不参与服务端自动重算。既有状态、CAS、幂等、CSRF、Origin 和单事务门禁保持，接收仍只形成 Purchase ACCEPT 事实，不修改库存或自动创建 RFQ、PO、收货、AP 等下游。
+- 实施结果：功能提交 `ce3f14a0c989875e7527e42136967f9efe6ee548`，不新增 0038、不修改 0001—0037或 alpha.38；隔离 PostgreSQL/Chromium、备份恢复和 Web-only 部署通过。主 UAT Material 533—536 的当前九项供应分别均为 0 PCS，purchase 打开刷新后的接收确认并取消；`PRQ-00000001` 仍 SUBMITTED，ACCEPT/RETURN、Inventory/Allocation 和全部下游不变。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

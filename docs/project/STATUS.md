@@ -2,6 +2,29 @@
 
 最后更新时间：2026-08-03（Asia/Shanghai）
 
+## SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16 采购审核当前供应分解修复
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | PURCHASE SUPPLY BREAKDOWN FIXED — UAT PRQ STILL PENDING | 权威当前供应投影、快照/当前/差异分区、确认刷新、范围授权、隔离验收、备份恢复、Web-only 部署和 purchase-only 主 UAT 取消均完成；未接收/退回主 PRQ |
+| 严格起点 | PASS | clean `main@231813f4cbb7db364a26fba5d358d76e06c69604`、Parent `22ea9a282ef4d7a7e58e84b9db73061a0ef6e109`、behind 0/ahead 123；alpha.38、0001—0037、0037 SHA、FIX-15 Web 镜像、Canonical、服务/四卷和主 UAT 基线全部吻合 |
+| 功能提交 | PASS | `ce3f14a0c989875e7527e42136967f9efe6ee548`（`fix: expose purchase current supply breakdown`）；无 0038、Schema、版本或业务状态机变化 |
+| 库存口径 | PASS / AUTHORITATIVE | 授权 PRQ 行范围内聚合 MAIN 的全部无 Lot/Lot 位置；库存可用为 Σ在手−ΣInventory 正式预留−Σ冻结，计划库存 Allocation 仅计 SUBMITTED/ACCEPTED Plan 且单独显示，未分配库存再取 max；模型无其他不可用独立数量 |
+| 在途口径 | PASS / AUTHORITATIVE | 仅计 OPEN/PARTIALLY_RECEIVED PO/Line 和截止日前有效剩余；Delivery Plan 只取 PENDING/PARTIAL 的 planned−received，无 Plan 才取 PO order−received。完成/取消/关闭、已收货部分和无效来源 Allocation 排除；模型无已到货未入库独立数量 |
+| 快照/差异 | PASS / IMMUTABLE | 四条分别显示提交时毛需求、库存/在途可用与分配、净采购、PRQ 和截止时间；当前查询另区，差异只提示正式退回/调整，不重算或改写 PRQ/快照 |
+| 接收确认 | PASS / FRESH READ | 打开前重新 GET；四条只读摘要含 PRQ、当前在手/预留/有效在途、未分配库存/在途、差异和查询时间，并明确接收不改库存或自动创建 RFQ/PO；既有 CAS/幂等/状态/事务门禁未改 |
+| 权限/零写 | PASS / SCOPED | purchase 先通过 PRQ 对象范围授权，再查询精确行集；诱饵 PRQ 403，不可枚举其他库存/Lot/项目或供应商敏感价格。GET 正常/失败、确认刷新对 Inventory、Allocation、Audit 和下游均零业务写；未增加 Inventory/Ledger 写或 `system.audit.read` |
+| 自动验证 | PASS | unit/UI 10/10、静态/跨域回归 78/78、当前供应 PG 6/6、跨域 PG 32/32、隔离 Chromium 1/1、`npm test` 3/3、Python 3/3；typecheck/build、lint 0 error/10 warning、credentials/diff 通过 |
+| 边界覆盖 | PASS | 覆盖 on_hand/reserved 0 与正数、冻结、reserved/Allocation 分离、多 Lot 聚合守恒、有效/部分收货/完成/取消在途、在途 Allocation 守恒、快照差异不改 PRQ、诱饵 403、查询零写及接收确认刷新 |
+| 390px | PASS | 390×844 每个 Material 独立卡片，快照/当前分区清楚，公式可折叠；在手、预留、库存可用、在途和 PRQ 数量不拆字，无页面级横向溢出 |
+| 备份/恢复 | PASS | root:root 0600 custom dump 2,185,039 bytes，SHA-256 `43f4e4620e51c5b2ee5876e13556907e38817399dd0eac0fedd2320bc95c75c6`；`pg_restore --list` 3,285 项，第二新空库 37/head 0037/checksum 与业务/供应指纹一致，恢复库已删 |
+| Web-only 部署 | PASS | Web `d5c514ab…→d7ced686…`，旧 Web 精确 rollback tag 保留；PostgreSQL/Worker/Caddy 容器未重建，四卷保持，restart 0/OOM false |
+| 主 UAT 浏览器 | PASS / CANCEL ONLY | 仅 purchase login；分别核对 Material 533—536 的九项当前供应均为 0 PCS，确认窗口 fresh GET 1 后取消并 logout；业务 POST 0、ACCEPT/RETURN 0、下游 0 |
+| 主 UAT 数据 | PASS / UNCHANGED | 部署前/恢复库/验收后业务指纹 `cc6a9d4f4350b6aa2846a9f681e6f47c451ba8bdf5f49c6a42848885633f6d66`、供应指纹 `c93374feeeb48fe1a978bfb6e844cdf3f32b9fab26477e022956932364d9efb1`；PRQ/Plan SUBMITTED、Package 2/v2 ACCEPTED、四条各 10 PCS、Allocation/全部下游 0 |
+| 资源/清理 | PASS | 起点约 2.3 GiB available/295 MiB Swap/22 GiB，终点 2.3 GiB/303 MiB/21 GiB/Load `0.19/0.20/0.29`；内核 OOM 0、四服务 restart 0/OOM false。FIX-16 临时库/容器/Volume/`/tmp` 路径 0，四个受保护 Volume、备份及当前/回退镜像保留，未 prune |
+| Git | TWO FOCUSED COMMITS | 功能提交如上；收口提交为 `ops: accept purchase supply review fix`，实际 SHA 以 `git log` 为准；不 push/PR/amend/rebase/reset/stash/restore |
+| 后续 | EXPLICIT PURCHASE DECISION AUTHORIZATION REQUIRED | 当前立即停止。下一次明确授权前不得接收/退回主 PRQ；任何当前供应差异不自动重算 PRQ，接收本身不创建 RFQ、PO 或其他下游单据 |
+
 ## SELFHOST-OPS-UAT-PURCHASE-REQUEST-TRACEABILITY-FIX-15 采购需求接收追溯与确认修复
 
 | 验证项 | 结果 | 说明 |

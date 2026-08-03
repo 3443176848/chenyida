@@ -4,6 +4,19 @@
 
 ## 2026-08-03
 
+### SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16 - `fix: expose purchase current supply breakdown` / `ops: accept purchase supply review fix`
+
+- Git/范围：从 strict clean `main@231813f4cbb7db364a26fba5d358d76e06c69604`、Parent `22ea9a282ef4d7a7e58e84b9db73061a0ef6e109`、behind 0/ahead 123 起步；只修改 Purchase Request 当前供应只读投影、GET 失败审计边界、Purchase UI/CSS、测试、只读 UAT runner 和项目文档。功能提交 `ce3f14a0c989875e7527e42136967f9efe6ee548`；不新增 0038、不修改 0001—0037或 alpha.38，不 push/PR 或改写历史，不读取/修改 `shujvbiao/`。
+- 当前库存：服务端在已授权 PRQ 的精确 Material+Unit 行集内，以 repeatable-read/read-only 事务一次聚合 `location_code='MAIN'` 的全部无批次与 Lot 位置。`库存可用 = Σ在手 - ΣInventory 正式预留 - Σ品质冻结`；有效计划的库存 Allocation 仅含 SUBMITTED/ACCEPTED Plan，并与 `reserved_qty` 独立；`未分配库存可用 = max(库存可用 - 有效计划库存分配, 0)`。当前模型无多仓库和“其他不可用”独立数量，页面诚实标注而不造字段。
+- 当前在途：PO 头/行只含 OPEN/PARTIALLY_RECEIVED 且在需求截止日内的剩余量；有 Delivery Plan 时只含 PENDING/PARTIAL 的 `planned-received`，否则使用 PO `order-received`。完成、取消、关闭、已收货部分及超期来源排除；在途 Allocation 还必须引用当前有效 PO Line，取消/完成来源的历史 Allocation 不抵扣其他在途。`未分配在途可用 = max(有效在途 - 有效计划在途分配, 0)`；模型未单列“已到货但未入库”，响应不伪造该数量。
+- 页面/确认：每个 Material 明确分为“1. 提交时快照 / 2. 当前供应状态 / 3. 差异提示”，显示快照截止、当前查询时间、九项当前数量和真实公式；差异只提示正式退回/调整，不修改固化快照或 PRQ。接收按钮在打开确认前重新 GET，窗口显示四条 PRQ、当前在手/预留/有效在途、未分配库存/在途与差异，并明确接收不改库存、不自动创建 RFQ/PO；原 POST 的状态、CAS、幂等和事务门禁未改。390×844 卡片、折叠公式、数量不逐字符拆分且无页面级横向溢出。
+- 权限/零写：先完成既有 purchase 对象范围授权，再查询该 PRQ 行 Material；诱饵 PRQ 403，不能枚举全部库存、Lot、供应商或项目。响应不含供应商价格/下游明细，未授予 Inventory/Ledger 写或 `system.audit.read`。GET 失败不再写 Audit，授权/正常查询及确认刷新均对 Inventory、Allocation、Audit 和下游零业务写入。
+- 测试：定向 unit/UI 10/10、静态及 Inventory/Procurement/Planning/Identity/CSRF/Origin 回归 78/78、当前供应 PostgreSQL 6/6、跨域 PostgreSQL 32/32、隔离 Chromium 1/1、`npm test` 3/3 与 Python self-test/smoke/隔离 go-live 3/3 全部通过；另有 typecheck、alpha.38 production build、lint 0 error/10 warning、凭据扫描和 diff check。覆盖 0/正数库存、正式预留、冻结、多 Lot 守恒、Allocation 分离、有效/部分收货/完成/取消在途、在途分配、快照差异不改 PRQ、诱饵 403/零 Audit 及 390px 接收确认。
+- 备份/恢复：pre-deploy custom dump `/var/backups/chenyida-erp/purchase-supply-breakdown-fix16-predeploy-20260803T080434Z.dump` 为 root:root 0600、2,185,039 bytes、SHA-256 `43f4e4620e51c5b2ee5876e13556907e38817399dd0eac0fedd2320bc95c75c6`；`pg_restore --list` 3,285 项通过，第二新空库恢复为 37/head 0037/checksum。正式部署指纹在主库部署前、恢复库和主 UAT 后均为业务 `cc6a9d4f4350b6aa2846a9f681e6f47c451ba8bdf5f49c6a42848885633f6d66`、供应 `c93374feeeb48fe1a978bfb6e844cdf3f32b9fab26477e022956932364d9efb1`，恢复库已删除。
+- 部署/主 UAT：只替换 Web `sha256:d5c514ab8ef497c702ef5c16c69da4d58c5ce849b96d09fa781fa679963c29dc→sha256:d7ced686803c1f5f71ec101ebe28e3080005d534480dd39bfc8a91913ef12a5d` 并保留精确回退 tag；PostgreSQL、Worker、Caddy 未重建，0037 与四卷保持。purchase-only 390×844 只读 runner 分别核对 Material 533—536 的九项当前供应全部 0 PCS，确认窗口重新 GET 后取消并安全退出；浏览器业务 POST 0、ACCEPT/RETURN 0、Inventory/Allocation 与全部下游不变。
+- 数据/资源：最终 `PRQ-00000001`/Plan 1/v1 仍 SUBMITTED，Package 2/v2 仍 ACCEPTED，四条仍各 10 PCS；Allocation 与 RFQ/Quote/Award/PO/Delivery Plan/Receipt/Ledger/AP/Work Order 均为 0。起点/终点 available memory 均约 2.3 GiB，Swap 295→303 MiB，根盘 22→21 GiB，最终 Load `0.19/0.20/0.29`；内核 OOM 0、四服务 restart 0/OOM false。FIX-16 临时库/容器/Volume/`/tmp` 路径均清零，四个受保护 Volume、正式备份和当前/回退镜像保留，未 prune。
+- 结论：`PURCHASE SUPPLY BREAKDOWN FIXED — UAT PRQ STILL PENDING`。立即停止，不接收或退回主 PRQ，不修改库存/分配，不创建 RFQ 或任何下游单据。
+
 ### SELFHOST-OPS-UAT-PURCHASE-REQUEST-TRACEABILITY-FIX-15 - `fix: expose purchase request traceability` / `ops: accept purchase review traceability fix`
 
 - Git/范围：从 strict clean `main@977fa3d942a5af830ec36981a1a3cb3e9adcc8cc`、behind 0/ahead 121 起步；只修改 Purchase Request 关系化详情投影、对象范围授权、Planning/Purchase UI/CSS、测试、只读 UAT runner 和项目文档。功能提交 `22ea9a282ef4d7a7e58e84b9db73061a0ef6e109`；未 push/PR 或改写历史，未读取/修改 `shujvbiao/`，未提交凭据、连接信息、数据库或备份正文。

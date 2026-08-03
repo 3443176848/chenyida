@@ -39,24 +39,25 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.38`；PostgreSQL 为 37/head `0037_project_planning_revision_response_lineage.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-OPS-UAT-PURCHASE-REQUEST-TRACEABILITY-FIX-15` 功能提交为 `22ea9a282ef4d7a7e58e84b9db73061a0ef6e109`（`fix: expose purchase request traceability`）；版本仍为 alpha.38，Migration 仍止于 0037 |
-| 当前根仓库运维基线 | Purchase 接收页的 Package ACCEPT→Material Requirement Plan→PRQ、提交时分配快照与当前供应分栏、诚实空状态、确认 UX、隔离写验收、备份恢复、Web-only 部署和 purchase-only 主 UAT 打开后取消均已通过；最终结论 `PURCHASE REQUEST TRACEABILITY FIXED — UAT PRQ STILL PENDING` |
-| Git 同步与工作区 | 本任务从 clean `main@977fa3d942a5af830ec36981a1a3cb3e9adcc8cc`、behind 0/ahead 121 起步；功能提交如上，运维 runner/文档由独立 `ops: accept purchase review traceability fix` 收口，完成后应为 ahead 123。未 push/PR/amend/rebase/reset/stash/restore；未读取或修改 `shujvbiao/`，秘密、连接信息、数据库和备份正文未进入 Git |
+| 当前根仓库功能基线提交 | `SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16` 功能提交为 `ce3f14a0c989875e7527e42136967f9efe6ee548`（`fix: expose purchase current supply breakdown`）；版本仍为 alpha.38，Migration 仍止于 0037 |
+| 当前根仓库运维基线 | Purchase 审核详情和接收确认已按当前权威模型补齐在手、Inventory 正式预留、品质冻结、库存可用、有效计划分配、未分配库存、有效在途、在途分配和未分配在途；快照/当前值/差异严格分区，范围授权、零查询写入、隔离验收、备份恢复、Web-only 部署及 purchase-only 主 UAT 打开确认后取消均通过。最终结论 `PURCHASE SUPPLY BREAKDOWN FIXED — UAT PRQ STILL PENDING` |
+| Git 同步与工作区 | 本任务从 clean `main@231813f4cbb7db364a26fba5d358d76e06c69604`、Parent `22ea9a282ef4d7a7e58e84b9db73061a0ef6e109`、behind 0/ahead 123 起步；功能提交如上，运维 runner/文档由独立 `ops: accept purchase supply review fix` 收口，完成后应为 ahead 125。未 push/PR/amend/rebase/reset/stash/restore；未读取或修改 `shujvbiao/`，秘密、连接信息、数据库和备份正文未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0037`，37/head `0037_project_planning_revision_response_lineage.sql`，SHA-256 `139f2623a184ae3d6927c95b56569cc438deffc2a0b46c325c9f04d59471d99f`。主 UAT Package ID 2/v2 为 `ACCEPTED`；Material Requirement Plan ID 1/v1 与 `PRQ-00000001` 均为 `SUBMITTED`（待采购接收）。四条 Material 533—536 各为毛需求 10、库存可用/分配 0/0、在途可用/分配 0/0、净采购 10、PRQ 10 PCS，合计 40 PCS；PRQ 1、Purchase ACCEPT/RETURN、RFQ/Quote/Award/PO/Receipt/Ledger/AP 均为 `0`。部署前后业务指纹均为 `c3c1cfbecee7dcb2199bacc6425dcc02d875cb546049eacc5982ca4a6eb22fca`，未修改或重放既有业务记录/Event |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已 Web-only 更新为 alpha.38 `sha256:d5c514ab8ef497c702ef5c16c69da4d58c5ce849b96d09fa781fa679963c29dc`，旧 `sha256:a6327f593a6d084c609127e1bdb09e60b2bd07ff6a2c85213b36f1315c622a78` 保留精确回退 tag；Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。只重建 Web；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false |
+| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0037`，37/head `0037_project_planning_revision_response_lineage.sql`，SHA-256 `139f2623a184ae3d6927c95b56569cc438deffc2a0b46c325c9f04d59471d99f`。主 UAT Package ID 2/v2 为 `ACCEPTED`；Material Requirement Plan ID 1/v1 与 `PRQ-00000001` 均为 `SUBMITTED`（待采购接收）。四条 Material 533—536 各为毛需求 10、快照库存可用/分配 0/0、快照在途可用/分配 0/0、净采购 10、PRQ 10 PCS；当前每条在手、正式预留、品质冻结、库存可用、计划库存分配、未分配库存、有效在途、在途分配和未分配在途也分别为 0 PCS。Allocation 与 RFQ/Quote/Award/PO/Delivery Plan/Receipt/Ledger/AP/Work Order 均为 0。正式部署指纹在主库部署前、第二新空恢复库和主 UAT 只读验收后均为业务 `cc6a9d4f4350b6aa2846a9f681e6f47c451ba8bdf5f49c6a42848885633f6d66`、供应 `c93374feeeb48fe1a978bfb6e844cdf3f32b9fab26477e022956932364d9efb1`；未修改或重放业务记录 |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已 Web-only 更新为 alpha.38 `sha256:d7ced686803c1f5f71ec101ebe28e3080005d534480dd39bfc8a91913ef12a5d`，旧 `sha256:d5c514ab8ef497c702ef5c16c69da4d58c5ce849b96d09fa781fa679963c29dc` 保留精确回退 tag `chenyida-erp-parallel-web:rollback-purchase-supply-fix16-predeploy-20260803T080857Z`；Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。只重建 Web；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.38 另提供版本化 Requirement Unit Resolution、Planning Revision Response 与固定后继谱系。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
-| 当前阶段 | `SELFHOST-OPS-UAT-PURCHASE-REQUEST-TRACEABILITY-FIX-15` 已完成采购详情谱系/数量分配、确认界面、对象范围授权、隔离全旅程、备份恢复、Web-only 部署与 purchase-only 主 UAT 取消验收；主 `PRQ-00000001` 继续待采购接收 |
-| 当前任务 | 无自动执行任务；本轮以 `PURCHASE REQUEST TRACEABILITY FIXED — UAT PRQ STILL PENDING` 停止。主 UAT 本次 purchase Session 已安全退出，未接收/退回 PRQ，未创建 RFQ 或任何下游单据 |
-| 下一任务 | 采购接收页追溯与确认阻断已解除；只有项目负责人下一次明确授权后才可接收或退回主 PRQ。接收后仍须以独立操作开展寻源、询价和报价比较，不得自动创建 RFQ、定标、PO、收货或 AP |
+| 当前阶段 | `SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16` 已完成权威当前供应投影、快照/当前/差异分区、接收确认刷新、对象范围授权、隔离旅程、备份恢复、Web-only 部署与 purchase-only 主 UAT 取消验收；主 `PRQ-00000001` 继续待采购接收 |
+| 当前任务 | 无自动执行任务；本轮以 `PURCHASE SUPPLY BREAKDOWN FIXED — UAT PRQ STILL PENDING` 停止。主 UAT 本次 purchase Session 已安全退出，未接收/退回 PRQ，未修改库存/分配，未创建 RFQ 或任何下游单据 |
+| 下一任务 | 当前供应分解阻断已解除；只有项目负责人下一次明确授权后才可接收或退回主 PRQ。当前供应变化只作提示，不重算 PRQ；接收后仍须以独立操作开展寻源、询价和报价比较，不得自动创建 RFQ、定标、PO、收货或 AP |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
+- SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16 已在 purchase 对象范围内以单一只读快照实时汇总 MAIN 全部 Inventory 位置、Inventory 正式预留/冻结、有效计划库存分配、有效 PO/Delivery Plan 剩余量和有效在途分配；快照、当前值和差异明确分区，模型未记录项诚实标注。接收确认打开前重新查询，四个 Material 分别展示当前摘要；主 UAT 仅登录 purchase、打开详情及确认后取消，四条当前供应九项均为 0，PRQ 仍待接收且库存、Allocation、Purchase ACCEPT/RETURN 和全部下游不变
 - SELFHOST-OPS-UAT-PURCHASE-REQUEST-TRACEABILITY-FIX-15 已补齐 purchase 对象范围内 Package ACCEPT→Plan→PRQ SUBMIT 的关系化谱系、提交时库存/在途分配快照与当前供应分栏、PRQ 非独立版本和两类说明未采集的诚实空状态；接收/退回确认具备默认取消、ESC/关闭零业务请求、同步双击保护、服务端权限/CSRF/Origin/CAS/幂等/状态门禁和 390px 卡片布局。主 UAT 仅登录 purchase、打开 `PRQ-00000001` 详情及接收确认并取消，PRQ 仍待采购接收，Purchase ACCEPT/RETURN 与全部下游为 0
 - SELFHOST-OPS-UAT-PLANNING-HANDOFF-CONFIRMATIONS-FIX-14 已补齐 Planning ACCEPT 和 Engineering RESUBMIT 的完整谱系、固定快照、后果与下一阶段确认；安全默认焦点、取消/ESC/关闭零请求、同步双击保护、稳定 Package ID、成功凭证、焦点约束和 390px 固定操作区通过。既有服务端权限、CSRF、Origin、CAS、幂等和状态门禁未放宽；主 UAT 只登录 planning、打开 v2 确认并取消，Package 2/v2 仍 SUBMITTED、ACCEPT 0，下游计划/采购需求 0
 - SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12 已补齐 Planning 待接收/已处理双视图、RETURNED/ACCEPTED 历史重开、Package 范围 CREATE/SUBMIT/RESUBMIT/RETURN/ACCEPT 证据、决策确认、服务端完成凭证与 390px；Product/BOM、Unit Resolution、Material 终态快照继续只读，权限/版本/Migration 不变。主 UAT 只登录 planning 并只读确认 1/v1/RETURNED、RETURN 1、ACCEPT 0、v2 0 后退出；数据库 ASCII 原因与全角预期仅两处标点差异，NFKC PASS、LOW、历史未修改
@@ -240,6 +241,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
+- `SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16` 已完成：功能提交 `ce3f14a0c989875e7527e42136967f9efe6ee548`；alpha.38/0037 的当前库存/正式预留/冻结/有效计划分配及有效在途分解、快照/当前/差异分区、接收确认刷新、范围授权和零查询写入已通过定向/跨域 PostgreSQL、390px 隔离 Chromium、备份恢复与 Web-only 部署。主 UAT 只登录 purchase，分别核对 Material 533—536 的九项当前供应 0 PCS，打开刷新后的接收确认并取消；最终 PRQ/Plan 仍 SUBMITTED、Package 2/v2 仍 ACCEPTED、ACCEPT/RETURN/Allocation/全部下游 0。当前立即停止，不接收或退回 PRQ，不创建 RFQ。
+- `SELFHOST-OPS-UAT-PURCHASE-REQUEST-TRACEABILITY-FIX-15` 已完成：功能提交 `22ea9a282ef4d7a7e58e84b9db73061a0ef6e109`；Package→Plan→PRQ 关系化详情、提交快照、对象范围授权、确认界面与 390px 已通过隔离测试、备份恢复、Web-only 部署及 purchase-only 主 UAT 打开后取消。该任务历史结论保持，当前供应细分缺口已由后续 FIX-16 解除。
 - `SELFHOST-OPS-UAT-PLANNING-REVISION-RESPONSE-13` 已完成：功能提交 `58e011db0c8d9045c3919c36c2c64f1655f050b6`；alpha.38/0037 的追加式工程回复、RETURN CAS Head、固定 v1→RETURN→Response→v2 谱系、不可变 guard、正式 API 和 390px UI 已通过隔离升级、真实 0036 备份恢复升级、专项/回归和完整 Chromium 旅程。正式 root-only 0600 备份、第二新空库恢复和主 UAT 前后指纹通过后，只替换 Web 并串行应用 0037；Worker/PostgreSQL/Caddy 与四卷未重建。主 UAT 最终仍为 v1 RETURNED、RETURN 1、Response 0、v2 0，engineering 已退出且 planning 未登录；当前立即停止，等待独立的 engineering v2 黑盒试用授权。
 - `SELFHOST-OPS-UAT-PLANNING-DECISION-HISTORY-FIX-12` 已完成：功能提交 `180f6b58b583bd2dba350f017504be916db9673d`；待接收/已处理、终态历史重开、完整事件、确认窗口、完成凭证和 390px 均通过隔离 PostgreSQL/Chromium、备份恢复、Web-only 部署与 planning-only 主 UAT。Package ID 1/v1 最终 RETURNED、RETURN 1、ACCEPT 0、v2 0；数据库原因 NFKC PASS 且历史未改，planning 已退出、有效 Session 0。当前停止，不自动登录 engineering 或创建 v2。
 - `SELFHOST-OPS-OFFLINE-IDENTITY-RECOVERY-11` 已完成：正式 run-id `3b03aaab-11ef-4dfe-963b-001a6ece660f`，11 个目标账号/12 条目标旧 Session/11 条恢复审计在单事务完成；两份 Canonical Schema/owner/mode、admin 与十 UAT 的登录/强制改密门禁/退出、最终零有效目标 Session、业务指纹、备份恢复和资源清理全部通过。工具提交 `a48dcc8a290b96da1ea6e426aaa2c6d73416c2fc`，完成记录由独立 ops 提交收口。
@@ -260,7 +263,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - `SELFHOST-OPS-ADMIN-ACCOUNT-04` 已通过正式 Identity Service 创建第二 active admin `admin2`，最终 version 2、首次改密；用户/admin `1/1→2/2`，Session/有效 `2/0` 不变。弱密码门禁、摘要输出事件、正式重置补救、4 条 Identity Audit、3 条幂等和资源/健康/清理均已记录。
 - `SELFHOST-LANDING-TASK05` 已完成 V9 staging。pre-clean dump 恢复 213 表一致；staging 首次 197、重放新增 0。197 行全部因 `EXPLICIT_UNIT_MISSING` 待确认，主库前后计数 manifest 一致，固定结论 `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED`。
 - `SELFHOST-PHASE6-TASK01` 已交付 alpha.35/0035 的 BOM 物料规格标准化与主数据治理源码。严格身份、可解释归并、原始行追溯、异常与替代候选、人工受控绑定/建稿已通过隔离 PostgreSQL 验收；正式替代关系仍不自动写入。
-- 常驻 18888 Web 已运行 alpha.38 `sha256:694a3190f517c94e36be3993e4b06e96b9194ea4e22e9add7f7ea533f09cab25`，PostgreSQL 为 37/head 0037；PUBLIC-IP-CUTOVER-07 的 Origin/端口和 Caddy 保持，Worker 镜像未替换，PostgreSQL/Caddy 与四个受保护卷均未重建。该状态只属于并行非生产 UAT，不等于生产发布。
+- 常驻 18888 Web 已运行 alpha.38 `sha256:d7ced686803c1f5f71ec101ebe28e3080005d534480dd39bfc8a91913ef12a5d`，PostgreSQL 为 37/head 0037；PUBLIC-IP-CUTOVER-07 的 Origin/端口和 Caddy 保持，Worker 镜像未替换，PostgreSQL/Caddy 与四个受保护卷均未重建。该状态只属于并行非生产 UAT，不等于生产发布。
 - `SELFHOST-LANDING-TASK04` 已把兼容业务台的 CSV-only 页面收敛到 `/materials/imports/new`；旧 `/api/import` 继续在 PostgreSQL 运行面明确退役。功能提交 `cda8c7e` 已经用户单独授权部署到当前 18888 Web，公网 HTML/JS SHA 与源码一致。
 - `SELFHOST-LANDING-TASK03` 根据用户明确授权把公网 `18888` 从旧 Python 切到新 PostgreSQL ERP：可信 TLS、80→HTTPS 跳转、生产 Cookie、匿名 401 和安全响应头通过；旧 Python 仅回环保留。该任务的原入口 `43.135.157.211.nip.io` 已由 PUBLIC-IP-CUTOVER-07 受控替换，当前入口为 `https://43.135.148.43.nip.io:18888`。
 - `SELFHOST-LANDING-TASK02` 经用户澄清“不依赖逐行人工分类”后连续执行：离线确定性规则按来源编码/MPN/严格规格组合、类别、位号和可数件单位完成 532 Material、6 Product、6 个 DRAFT BOM 与 316 行主库导入；438 条真正歧义来源隔离。migration_tool 来源链接承载逐行 provenance，0034 不变，同批次重放新增 0，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`。
