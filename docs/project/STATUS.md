@@ -1,6 +1,27 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-02（Asia/Shanghai）
+最后更新时间：2026-08-03（Asia/Shanghai）
+
+## SELFHOST-OPS-UAT-PURCHASE-REQUEST-TRACEABILITY-FIX-15 采购需求接收追溯与确认修复
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | PURCHASE REQUEST TRACEABILITY FIXED — UAT PRQ STILL PENDING | 关系化追溯、提交快照/当前供应分栏、确认 UX、隔离写验收、备份恢复、Web-only 部署和 purchase-only 主 UAT 打开后取消均完成；未接收或退回主 PRQ |
+| 严格起点 | PASS | clean `main@977fa3d942a5af830ec36981a1a3cb3e9adcc8cc`、behind 0/ahead 121；alpha.38、0001—0037、0037 SHA、指定 Web 镜像、Canonical、服务/四卷和主 UAT 状态全部吻合 |
+| 功能提交 | PASS | `22ea9a282ef4d7a7e58e84b9db73061a0ef6e109`（`fix: expose purchase request traceability`）；未新增 Schema/Migration/package 版本，未改既有业务记录/Event |
+| 权威 DTO | PASS | 单一 repeatable-read/read-only 快照投影 Package 2/v2 ACCEPT Event、Plan ID 1/v1 GENERATED、PRQ ID 1 SUBMIT 与四行稳定 Material/Unit；当前供应独立计算，不替换提交快照 |
+| 诚实展示 | PASS | 完整 Package 摘要、Product A0/BOM V1/Unit Resolution v1、actor/上海时间/请求号/SUCCESS 可见；Plan/PRQ 无说明准确显示未采集，PRQ 准确标注未单独业务版本化，供应商/价格/接收人/时限均为空状态 |
+| 数量/矛盾文案 | PASS | 533—536 均为 10、库存 0/0、在途 0/0、净采购 10、PRQ 10 PCS；实际公式可见。非零净采购不再误报 0；零 PRQ 未接收不再误报“采购已接收” |
+| 确认与 390px | PASS | 接收/退回均为 POST 前确认；默认取消、关闭/ESC/背景取消零业务请求、确认立即保护、双击单请求。四行卡片默认显示稳定 ID/编码/毛需求/净采购/申请量，详细分配可展开，PCS 不拆分且无页面横向溢出 |
+| 权限/安全 | PASS / SCOPED | purchase 仅见待接收队列和本人已处理历史；其他 purchase 已处理诱饵 403，Package/PRQ Event 查询精确对象范围。未增加 `system.audit.read` 或扩大写权限；CSRF/Origin/CAS/幂等/状态/事务门禁保持，全局跨角色导航继续为 HIGH |
+| 自动验证 | PASS | 分组执行 `47/47` 定向静态/安全、Material PG `5/5`、跨域 PG `32/32`、跨域 UI `31/31`、最终 Material unit/UI `10/10`、隔离 Chromium `1/1`；typecheck/build、lint 0 error/10 warning、credentials/diff 和 Python `3/3` 通过 |
+| 隔离 Chromium | PASS 1/1 | 390×844 下接收取消/关闭/ESC、退回取消均零写；双击接收只形成一个 ACCEPT 并可从已处理重开，CAS/幂等和全部下游 0；只发生在专用隔离库，资源已清理 |
+| 备份/恢复 | PASS | root:root 0600 custom dump 2,184,317 bytes，SHA-256 `b1fbf44297b52e151b597d9c9f31a3297e6ee25c73d02ba6e4429a07aba853bb`；容器内 `pg_restore --list` 3,285 项，第二新空库 37/0037 checksum、主 UAT 谱系/四行/零下游与主库一致，恢复库已删 |
+| Web-only 部署 | PASS | Web `a6327f59…→d5c514ab…`，旧 Web 精确 rollback tag 保留；PostgreSQL/Worker/Caddy 容器 ID/启动时间不变，四卷保持，restart 0/OOM false |
+| 主 UAT 浏览器 | PASS / CANCEL ONLY | 仅 purchase login；详情与四行展开通过，打开 `PRQ-00000001` 接收确认并取消，最终 login/logout 1/1、业务 POST 0、ACCEPT/RETURN 0、下游 0。本任务最近三条 Session 均 LOGOUT；四条更早有效 Session 未越权撤销 |
+| 主 UAT 数据 | PASS / UNCHANGED | 业务指纹前后 `c3c1cfbecee7dcb2199bacc6425dcc02d875cb546049eacc5982ca4a6eb22fca`；PRQ/Plan 仍 SUBMITTED，Package 2/v2 仍 ACCEPTED，四行仍各 10 PCS，PRQ 1、Purchase ACCEPT/RETURN 与 RFQ/Quote/Award/PO/Receipt/Ledger/AP 全为 0 |
+| 资源/清理 | PASS | 起点约 2.2 GiB available/270 MiB Swap/22 GiB/低 Load；终点 2.3 GiB/289 MiB/22 GiB/Load `0.15/0.20/0.31`。内核 OOM 0、四服务 restart 0/OOM false；任务临时库/容器/Volume/venv/SQLite 均清理，备份、候选/回退 Web 和四卷保留，未 prune |
+| 后续 | EXPLICIT PURCHASE DECISION AUTHORIZATION REQUIRED | 本任务立即停止。下一次明确授权前不得接收/退回主 PRQ；接收本身仍不得自动创建 RFQ、定标、PO、收货或 AP |
 
 ## SELFHOST-OPS-UAT-PLANNING-HANDOFF-CONFIRMATIONS-FIX-14 最终接收与重新提交确认修复
 

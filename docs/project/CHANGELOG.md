@@ -2,6 +2,20 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-03
+
+### SELFHOST-OPS-UAT-PURCHASE-REQUEST-TRACEABILITY-FIX-15 - `fix: expose purchase request traceability` / `ops: accept purchase review traceability fix`
+
+- Git/范围：从 strict clean `main@977fa3d942a5af830ec36981a1a3cb3e9adcc8cc`、behind 0/ahead 121 起步；只修改 Purchase Request 关系化详情投影、对象范围授权、Planning/Purchase UI/CSS、测试、只读 UAT runner 和项目文档。功能提交 `22ea9a282ef4d7a7e58e84b9db73061a0ef6e109`；未 push/PR 或改写历史，未读取/修改 `shujvbiao/`，未提交凭据、连接信息、数据库或备份正文。
+- 数据/API：不新增 0038、不修改 0001—0037、不改 alpha.38。PRQ 详情在 repeatable-read/read-only 事务中复用 Package Snapshot/ACCEPT Event、Material Requirement Plan/Line/Allocation、PRQ/Line 与精确 PRQ SUBMIT Event，返回 Package→Plan→PRQ 完整 DTO；先做对象范围判断，再读取源对象 Event，不开放全局 Audit。purchase 可读待处理与本人已处理记录，其他 purchase 已处理诱饵为 403；未增加 `system.audit.read`。
+- 快照/诚实状态：四行显示稳定 Material ID/内部编码/名称/单位、毛需求、提交时库存可用与分配、提交时在途可用与分配、净采购和 PRQ 申请量；当前库存/供应另栏计算，不覆盖提交快照。Plan/PRQ 无说明显示“未采集”，PRQ 明确未单独业务版本化；供应商、价格、接收人和时限不伪造。非零净采购与零 PRQ 的矛盾文案已按关系事实修正。
+- UI/确认：详情显示 Package 2/v2/ACCEPTED/完整摘要、A0/V1/Unit Resolution v1、ACCEPT/GENERATE/SUBMIT actor/Asia/Shanghai/request_id/SUCCESS、Plan ID/v1、PRQ ID/来源与 40 PCS。接收/退回均先确认；默认取消焦点、焦点约束、取消/关闭/背景/ESC 零业务请求、同步 ref 防双击、提交中禁用。接收后果明确“进入寻源、询价和报价比较；接收本身不创建 RFQ/定标/PO/收货/AP”，退回保持原计划快照。390px 卡片无页面横向溢出，PCS 不逐字符拆分。
+- 测试：分组执行 47/47 定向 unit/UI/安全/CSRF/Origin/Planning/Inventory/Procurement/Identity、Material PostgreSQL 5/5、跨域 PostgreSQL 32/32、跨域 UI 31/31、最终 Material unit/UI 10/10 与最终候选隔离 Chromium 1/1；另有 typecheck、alpha.38 production build、lint 0 error/10 warning、仓库凭据扫描、diff check 和 Python 三项 3/3。隔离浏览器验证三类接收取消、退回取消、双击单事件、已处理凭证、CAS/幂等及零下游。
+- 备份/恢复：pre-deploy custom dump `/var/backups/chenyida-erp/purchase-request-traceability-fix15-predeploy-20260803T030456Z.dump` 为 root:root 0600、2,184,317 bytes、SHA-256 `b1fbf44297b52e151b597d9c9f31a3297e6ee25c73d02ba6e4429a07aba853bb`；容器内 `pg_restore --list` 3,285 项通过，第二新空库的 37/head 0037/checksum、Package/Plan/PRQ/Event、四行和全部下游计数与主库一致，恢复库已删除。
+- 部署/主 UAT：只替换 Web `sha256:a6327f593a6d084c609127e1bdb09e60b2bd07ff6a2c85213b36f1315c622a78→sha256:d5c514ab8ef497c702ef5c16c69da4d58c5ce849b96d09fa781fa679963c29dc`；PostgreSQL、Worker、Caddy 未重建，四卷不变。主 UAT 仅用 purchase 在 390×844 打开详情、展开四行、打开接收确认并取消；最终浏览器业务 POST 0、ACCEPT/RETURN 0、下游 0，当前 Session 正常 LOGOUT。两次前置 runner locator 二义均在详情断言阶段安全停止且指纹不变，收窄断言后完整通过。
+- 数据/资源：主 UAT 业务指纹前后均为 `c3c1cfbecee7dcb2199bacc6425dcc02d875cb546049eacc5982ca4a6eb22fca`；`PRQ-00000001` 与 Plan v1 仍 SUBMITTED，Package 2/v2 仍 ACCEPTED，四行仍各 10 PCS，PRQ 1、Purchase ACCEPT/RETURN 与全部下游 0。起点/终点约 2.2→2.3 GiB available、Swap 270→289 MiB、根盘 22 GiB、低 Load，内核 OOM 0、四服务 restart 0/OOM false；临时库/容器/Volume/venv/SQLite 精确清理，正式备份与候选/回退镜像保留，未 prune。
+- 结论：`PURCHASE REQUEST TRACEABILITY FIXED — UAT PRQ STILL PENDING`。立即停止，不接收或退回主 UAT PRQ，不创建 RFQ 或任何下游单据。
+
 ## 2026-08-02
 
 ### SELFHOST-OPS-UAT-PLANNING-HANDOFF-CONFIRMATIONS-FIX-14 - `fix: complete planning handoff confirmations` / `ops: accept handoff confirmation fix`

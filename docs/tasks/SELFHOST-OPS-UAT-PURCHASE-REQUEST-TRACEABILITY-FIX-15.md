@@ -2,7 +2,7 @@
 
 ## 状态与唯一范围
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始日期：2026-08-03（Asia/Shanghai）
 - 负责人：Codex（严格门禁、权威 DTO、范围授权、确认 UX、隔离测试、备份恢复、Web-only 部署、主 UAT 只读核验、文档与独立提交）；项目负责人（固定主 UAT 保护状态与执行边界）
 - 唯一范围：补齐采购需求接收页的 Package ACCEPT、Material Requirement Plan、数量分配快照与 PRQ SUBMIT 谱系，修复矛盾文案，并增加接收/退回确认与前端单请求保护。
@@ -48,3 +48,48 @@
 - `PURCHASE TRACEABILITY FIXED — MAIN UAT NOT VERIFIED`
 - `PROCUREMENT TRACEABILITY SCHEMA GAP — UAT PRQ UNCHANGED`
 - `BLOCKED — NO UNSAFE CHANGE`
+
+## 实现结果
+
+- 功能提交：`22ea9a282ef4d7a7e58e84b9db73061a0ef6e109`（`fix: expose purchase request traceability`）；完成 runner、部署事实与文档由独立 `ops: accept purchase review traceability fix` 收口。
+- `requestDetail` 在单一 repeatable-read/read-only 事务中先读取 PRQ→Plan→Package 头并执行对象范围授权，再读取 Package Item、精确 Package ACCEPT Event、Plan GENERATED/REGENERATED Event、精确绑定该 PRQ 的 SUBMITTED Event 和固定行快照。purchase 可见待接收队列及本人已处理记录；其他 purchase 的已处理诱饵为 403；未增加 `system.audit.read`。
+- DTO 显式提供 Package ID/version/status/完整摘要、Product Version/BOM Version/Unit Resolution、Plan 稳定 ID/version/创建计算人/计算时间/提交锁定快照截止时间、PRQ 稳定 ID/来源计划/提交凭证，以及每行稳定 Material/Unit、毛需求、库存可用/分配、在途可用/分配、净采购和 PRQ 申请量。
+- 当前库存与在途按当前关系事实重新计算并单独置于 `current_supply`，不覆盖提交快照。Plan/PRQ 无说明字段时分别显示“该版本未采集计划说明”“该版本未采集采购交接说明”；PRQ 明确为未单独业务版本化，只固定引用 Plan v1。
+- 非零净采购不再显示“净需求为 0，不生成”；零净采购只显示“提交快照净采购为 0；未生成 PRQ”；关系事实不一致时 fail visible，不用本地过期状态冒充已接收。
+- 接收/退回确认沿用服务端 permission、CSRF、Origin、CAS、幂等、事务和状态门禁；取消、关闭、背景与 ESC 不发业务请求，同步 ref 拦截双击，提交中按钮禁用。接收确认显示 Package ACCEPT、Plan、四条 Material/编码/数量、40 PCS、后果、assignee/SLA 空状态和精确下一阶段；退回确认显示必填原因、返回计划部与原快照不变。
+- 390×844 使用四条卡片；Material ID、编码、毛需求、净采购与申请量默认可见，详细库存/在途及当前供应可展开；数量和 PCS 不拆分，无页面级横向溢出。
+
+## 自动验证
+
+- Material Requirement 定向 unit/UI、安全、CSRF、Origin、Planning、Inventory、Procurement、Identity 回归最终均通过；记录的分组执行为 `47/47`、PostgreSQL `5/5`、跨域 PostgreSQL `32/32`、跨域 UI `31/31`、最终 material unit/UI `10/10`。
+- PostgreSQL 覆盖完整 Package→ACCEPT→Plan→PRQ DTO、稳定 Material/Unit 映射、快照/当前供应分离、精确 SUBMIT Event、诚实空状态、purchase 对象范围 403、零净采购、双击同幂等键单事件、过期 CAS 409 和接收不创建 RFQ/Quote/Award/PO/Receipt/Ledger/AP。
+- 最终候选镜像的隔离 Chromium `1/1`：390×844 下待接收→详情→接收取消/关闭/ESC 三路径零写→退回取消零写→接收双击只形成一个事件→已处理记录重开；隔离下游全为 0，临时库/容器/卷已清理。
+- Material Requirement typecheck、alpha.38 production build、最终 lint `0 error / 10 warning`、仓库凭据扫描和 `git diff --check` 通过；Python `server.py --self-test`、`smoke_test.py`、任务专属临时 SQLite `go_live_check.py --no-backup` 为 `3/3`，临时 venv/SQLite 已删除。
+- 开发期曾分别遇到隔离 fixture 状态序列、响应包装读取、浏览器 fixture 项目编码和 React Compiler memoization 检查问题，均只在隔离环境或提交前检查中暴露并修正；最终上述门禁全部重跑通过，没有降低断言或跳过用例。
+
+## 备份、恢复与 Web-only 部署
+
+- pre-deploy custom dump：`/var/backups/chenyida-erp/purchase-request-traceability-fix15-predeploy-20260803T030456Z.dump`，root:root、0600、2,184,317 bytes，SHA-256 `b1fbf44297b52e151b597d9c9f31a3297e6ee25c73d02ba6e4429a07aba853bb`。
+- 宿主未安装 `pg_restore`，首次宿主清单命令在读取正文前退出；随后改用运行 PostgreSQL 容器内同版本工具从标准输入执行，`pg_restore --list` 3,285 项通过。第二新空库恢复为 37/head 0037，0037 checksum、Package/Plan/PRQ/Event、四行数量和 PRQ/Purchase ACCEPT/全部下游计数与主库逐项一致；恢复库已精确删除，正式备份保留。
+- 最终候选/运行 Web 为 `sha256:d5c514ab8ef497c702ef5c16c69da4d58c5ce849b96d09fa781fa679963c29dc`（88,463,228 bytes）；旧 Web `sha256:a6327f593a6d084c609127e1bdb09e60b2bd07ff6a2c85213b36f1315c622a78` 保留 `rollback-purchase-traceability-predeploy-20260803T0307Z` 标签。
+- 部署使用 `COMPOSE_PARALLEL_LIMIT=1`、`--no-deps --no-build --pull never --force-recreate web`，只重建 Web。PostgreSQL、Worker、Caddy 的容器 ID/启动时间不变，四个受保护 Volume 不变；Web/PostgreSQL healthy、Worker/Caddy running，restart 0、OOM false。
+- package 保持 `0.1.0-alpha.38`；未新增 0038，0001—0037 未修改，0037 SHA-256 仍为 `139f2623a184ae3d6927c95b56569cc438deffc2a0b46c325c9f04d59471d99f`。
+
+## 主 UAT 只读验收与保护结果
+
+- Canonical purchase 账号只用于受控浏览器登录；路由层只放行同源 GET/HEAD/OPTIONS 与 login/logout，其他业务 POST 记录后立即阻断。最终 390×844 验收完整显示 Package 2/v2/ACCEPTED/摘要/ACCEPT actor/上海时间/请求号/SUCCESS、Plan ID 1/v1/生成与快照时间、PRQ SUBMIT、四行 533—536 的全部快照/当前分栏和 40 PCS。
+- 接收确认显示 `2/v2 · ACCEPT SUCCESS`、Plan v1、四条 Material/编码/10 PCS、合计 40 PCS、后果、无处理人/时限和精确下一阶段；仅点击取消。最终浏览器证据为 login/logout `1/1`、business POST 0、ACCEPT 0、RETURN 0、downstream 0。
+- 前两次 runner 在详情断言阶段因同一时间、同一行数在多个合法位置显示而触发 strict locator 二义并安全停止；均未进入确认窗、未发采购业务 POST，`finally` 完成 LOGOUT，业务指纹保持。收窄 locator 后最终完整旅程通过。
+- 主 UAT 业务指纹前后均为 `c3c1cfbecee7dcb2199bacc6425dcc02d875cb546049eacc5982ca4a6eb22fca`：`PRQ-00000001` 仍为 `SUBMITTED` / 待采购接收，Plan ID 1/v1 仍 `SUBMITTED`，Package 2/v2 仍 `ACCEPTED`，四行仍各 10 PCS，PRQ 总数 1，Purchase ACCEPT/RETURN 与 RFQ/Quote/Award/PO/Receipt/Ledger/AP 全为 0。
+- 本任务最近三条 purchase UAT Session 均为 `REVOKED/LOGOUT`；数据库已有四条更早有效 purchase Session，不属于本次浏览器且未获权撤销，因此保持原状。
+
+## 资源与清理
+
+- 起点约 available 2.2 GiB、Swap 270 MiB、根盘 22 GiB、低 Load；终点 available 2.3 GiB、Swap 289 MiB、根盘 22 GiB、Load `0.15/0.20/0.31`。任务窗口内核 OOM 0，四服务 restart 0/OOM false，未触发停止阈值。
+- build、测试、备份恢复、部署均串行，一次只有一个临时重任务容器。任务隔离/恢复数据库、Node/Playwright/Python 容器、临时 Volume、venv 和 SQLite 均精确清理；正式备份、候选/当前/回退 Web 镜像及四个受保护 Volume 有意保留。未执行任何 prune。
+
+## 最终结论
+
+`PURCHASE REQUEST TRACEABILITY FIXED — UAT PRQ STILL PENDING`
+
+本任务立即停止；不接收或退回主 UAT PRQ，不创建 RFQ 或任何下游单据。
