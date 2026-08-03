@@ -2,6 +2,26 @@
 
 最后更新时间：2026-08-03（Asia/Shanghai）
 
+## SELFHOST-UAT-FIX-17 采购接收确认完整追溯、计数与九项供应
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | PURCHASE DECISION CONFIRMATION FIXED — MAIN UAT NOT VERIFIED | 功能、自动/隔离验收、备份恢复与 Web-only 部署完成；主 UAT 唯一一次打开确认窗后 runner 因“状态”定位二义安全中止，遵守一次打开限制未重跑 |
+| 严格起点 | PASS | clean `main@af7496babe8b704d04b22ad33bbb98a270519529`、Parent `ce3f14a0c989875e7527e42136967f9efe6ee548`、behind 0/ahead 125；alpha.38、0001—0037、0037 SHA、FIX-16 Web、服务/四卷和主 UAT 基线吻合 |
+| 功能提交 | PASS | `13da8a14d037d279278ef8c8ea86e52d79552512`（`fix: complete purchase acceptance confirmation`）；无 0038、Schema、版本或业务状态机变化 |
+| 权威读取 | PASS / READ ONLY | Package ACCEPT、Plan GENERATED/REGENERATED、PRQ SUBMIT 和 Purchase ACCEPT/RETURN 计数均来自精确对象范围不可变 Event；九项供应复用 MAIN Inventory、有效 Planning Allocation 和有效 PO/Delivery Plan 投影，不从状态/队列/Audit 推断 |
+| 失败关闭 | PASS | 三段事件、摘要/行、显式计数、观察时间或任一 Material 九项供应缺失时，服务端返回稳定 `409 PURCHASE_REQUEST_CONFIRMATION_INCOMPLETE`；客户端保持确认禁用。GET 在授权后的 repeatable-read/read-only 事务内且零业务/Audit/Idempotency/Inventory 写 |
+| 确认窗口 | PASS / ISOLATED | 打开先显示“正在重新读取当前供应”，默认取消焦点；完整后显示查询时间、PRQ/Project、Package/Plan/PRQ 三段凭证、0/0 计数、四个 Material 七项固定量与九项当前供应、公式/边界/后果。桌面与 390px 无页面溢出 |
+| 自动验证 | PASS | FIX-17 unit/UI 10/10、适用静态/UI 62/62、FIX-17 PG 8/8、跨域 PG 34/34、隔离 Chromium 1/1、Schema 4/4、npm 3/3、CSRF/Origin 11/11、Python 3/3；typecheck/build、lint 0 error/10 warning、1,155 文件凭据扫描和 diff check 通过 |
+| 非零/并发边界 | PASS | 12−2−1=9，库存 Allocation 3 后未分配 6；在途 8、Allocation 2 后未分配 6。重新打开读取新值；单 ACCEPT、幂等重放、异正文/CAS/并发、故障回滚及零下游均在隔离库通过 |
+| 备份/恢复 | PASS | root:root 0600 custom dump 2,185,361 bytes，SHA-256 `896b92493480fe3aa08d3b84600e1804df60794108c776ef29aabee2fce0e8e8`；`pg_restore --list` 3,285 项，第二空库 37/head 0037/checksum/身份非敏感计数/保护指纹一致，恢复库已删 |
+| Web-only 部署 | PASS | Web `d7ced686…→97dcabe8…`，旧 Web 精确 rollback tag 保留；PostgreSQL/Worker/Caddy 容器未重建，Migration/Origin/端口/四卷保持，restart 0/OOM false |
+| 主 UAT 浏览器 | NOT VERIFIED / SAFE STOP | 仅 purchase login；已核对队列 1/0、详情 ACCEPT/RETURN 0/0、加载窗、安全焦点并打开一次完整确认窗。runner 在读取两个“状态”字段时中止；未确认/退回/重跑或创建下游，最新任务 Session 为 `LOGOUT` |
+| 主 UAT 数据 | PASS / UNCHANGED | 正式保护指纹在部署前、恢复库、UAT 前后均为 `e80ed1795079a3467ba4f05e2751fd8a9575e1b441b2433b371651479ca2cab0`；PRQ/Plan SUBMITTED、Package 2/v2 ACCEPTED、决策 0/0、四行/九项供应、Inventory/Allocation 与全部下游不变 |
+| 资源/清理 | PASS | 起点约 2.1 GiB available/302 MiB Swap/21 GiB，终点约 2.2 GiB/304 MiB/21 GiB/Load `0.24/0.32/0.27`；内核 OOM 0、四服务 restart 0/OOM false。临时库/容器/网络/Playwright/Python 路径 0，未 prune，四卷/正式备份/镜像保留 |
+| Git | TWO FOCUSED COMMITS | 功能提交如上；收口提交为 `ops: accept purchase confirmation fix`，实际 SHA 以 `git log` 为准；不 push/PR/amend/rebase/reset/stash/restore |
+| 后续 | NEW EXPLICIT UAT AUTHORIZATION REQUIRED | 本任务立即停止。若需补做主 UAT 完整逐项核对，必须另行授权；不得在本任务接收/退回主 PRQ 或开始 RFQ |
+
 ## SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16 采购审核当前供应分解修复
 
 | 验证项 | 结果 | 说明 |

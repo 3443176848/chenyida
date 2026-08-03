@@ -4,6 +4,17 @@
 
 ## 2026-08-03
 
+### SELFHOST-UAT-FIX-17 - `fix: complete purchase acceptance confirmation` / `ops: accept purchase confirmation fix`
+
+- Git/范围：从 strict clean `main@af7496babe8b704d04b22ad33bbb98a270519529`、Parent `ce3f14a0c989875e7527e42136967f9efe6ee548`、behind 0/ahead 125 起步；功能提交 `13da8a14d037d279278ef8c8ea86e52d79552512`。只修改 Purchase Request 确认读取/展示、对应测试、保护/UAT runner 和项目文档；不新增 0038、不改 0001—0037/alpha.38，不 push/PR 或改写历史。
+- 权威合同：Package ACCEPT、Plan GENERATE、PRQ SUBMIT 直接读取精确 Package/Project、Plan、Plan+PRQ 的不可变 Event，返回 action/type/actor/timezone/request_id/result；Purchase ACCEPT/RETURN 直接按当前 Plan+PRQ 的真实不可变 Event 计数。九项当前供应复用 FIX-16 的 MAIN Inventory/有效 Planning Allocation/有效 PO 与 Delivery Plan 投影；没有从状态、队列或无关 Audit 推断，也没有第二权威模型。
+- 失败关闭/零写：详情在现有认证、purchase capability、对象范围之后使用单一 repeatable-read/read-only 事务；关键 Event、摘要/行、计数、观察时间或九项供应缺失即 `409 PURCHASE_REQUEST_CONFIRMATION_INCOMPLETE`，客户端确认保持禁用。读取不写业务、Audit、Idempotency、Inventory 或 Allocation；接收 POST 的 Origin、Cookie/Header CSRF、CAS、持久幂等、事务和状态门禁未放宽。
+- UI：接收前显示“正在重新读取当前供应”和安全取消焦点；完整后显示刷新时间、PRQ/项目/日期/状态、Package 2/v2 摘要与 ACCEPT、Plan 1/v1 计算/快照与 GENERATE、PRQ SUBMIT、显式 0/0、四 Material 七项固定量与九项当前供应、公式/边界/接收后果。取消/关闭/ESC 零业务写，桌面和 390×844 无页面级横向溢出。
+- 测试：FIX-17 unit/UI 10/10、适用静态/UI 62/62、FIX-17 PostgreSQL 8/8、跨域 PostgreSQL 34/34、隔离 Chromium 1/1、0037 Schema/Migration 4/4、`npm test` 3/3、CSRF/Origin 11/11、Python 3/3；typecheck、production/Docker build、lint 0 error/10 warning、1,155 文件凭据扫描和 diff check 通过。覆盖 12−2−1=9、库存 Allocation 3→未分配 6、在途 8/Allocation 2→未分配 6、重新打开新值、权限/诱饵、零查询写、单 ACCEPT、幂等/CAS/并发/故障零半记录和零下游。
+- 备份/部署：root:root 0600 custom dump 2,185,361 bytes、SHA-256 `896b92493480fe3aa08d3b84600e1804df60794108c776ef29aabee2fce0e8e8`，list 3,285 项和第二空库 37/head 0037/checksum/身份非敏感计数/保护指纹恢复通过。只替换 Web `sha256:d7ced686…→sha256:97dcabe8…`；PostgreSQL/Worker/Caddy、Migration、Origin、端口和四卷不变，restart 0/OOM false。
+- 主 UAT/安全停止：只用 purchase 登录；确认队列 1/0、详情 ACCEPT/RETURN 0/0、加载窗和安全焦点，并唯一一次打开确认窗。runner 因“状态”标签同时匹配 PRQ 与 Package 而中止；未确认/退回、未重跑、未创建下游，最新任务 Session 为 `LOGOUT`。保护指纹在部署前、恢复库、UAT 前后均为 `e80ed1795079a3467ba4f05e2751fd8a9575e1b441b2433b371651479ca2cab0`，PRQ 仍待接收、四项九供应/Inventory/Allocation/全部下游不变。
+- 资源/结论：起点约 2.1 GiB available/302 MiB Swap/21 GiB，终点约 2.2 GiB/304 MiB/21 GiB/Load `0.24/0.32/0.27`；内核 OOM 0、四服务 restart 0/OOM false。FIX-17 临时库/容器/网络/模块/SQLite 路径清零，正式备份、当前/候选/回退镜像和四卷保留，未 prune。结论：`PURCHASE DECISION CONFIRMATION FIXED — MAIN UAT NOT VERIFIED`；完成后停止，不接收/退回主 PRQ，不开始 RFQ。
+
 ### SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16 - `fix: expose purchase current supply breakdown` / `ops: accept purchase supply review fix`
 
 - Git/范围：从 strict clean `main@231813f4cbb7db364a26fba5d358d76e06c69604`、Parent `22ea9a282ef4d7a7e58e84b9db73061a0ef6e109`、behind 0/ahead 123 起步；只修改 Purchase Request 当前供应只读投影、GET 失败审计边界、Purchase UI/CSS、测试、只读 UAT runner 和项目文档。功能提交 `ce3f14a0c989875e7527e42136967f9efe6ee548`；不新增 0038、不修改 0001—0037或 alpha.38，不 push/PR 或改写历史，不读取/修改 `shujvbiao/`。

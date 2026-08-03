@@ -2,8 +2,9 @@
 
 ## 状态与唯一范围
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始日期：2026-08-03（Asia/Shanghai）
+- 完成日期：2026-08-03 20:46（Asia/Shanghai）
 - 负责人：Codex（严格门禁、权威事件与供应诊断、服务端读取合同、确认窗口、隔离测试、备份恢复、Web-only 部署、purchase-only 主 UAT 只读验收、文档与独立提交）；项目负责人（固定主 UAT 保护事实、执行边界和最终状态）
 - 依赖：`SELFHOST-OPS-UAT-PURCHASE-REQUEST-TRACEABILITY-FIX-15`、`SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16`
 - 唯一范围：只修复采购接收确认窗口的可核验性，补齐当前 PRQ 精确归属的 Package ACCEPT、Plan GENERATE、PRQ SUBMIT 完整凭证，真实不可变 Purchase ACCEPT/RETURN 决策计数，以及每个 Material 的九项当前供应。
@@ -52,3 +53,11 @@
 - `PURCHASE DECISION CONFIRMATION FIXED — MAIN UAT NOT VERIFIED`
 - `BLOCKED — NO UNSAFE CHANGE`
 
+## 完成结论
+
+- 功能提交：`13da8a14d037d279278ef8c8ea86e52d79552512`（`fix: complete purchase acceptance confirmation`）。
+- 完整读取合同、失败关闭、显式决策计数、九项供应、刷新等待窗、安全焦点和桌面/390px 确认窗已经实现，并通过自动、隔离 PostgreSQL 与隔离 Chromium 验收；没有新增 0038 或修改 0001—0037/alpha.38。
+- Web-only 部署、正式备份和第二空库恢复通过。主 UAT 唯一一次打开确认窗口后，验收 runner 因“状态”字段精确定位不足遇到 PRQ 与 Package 两个状态而安全中止；未点击确认/退回、未重跑窗口、未创建下游，本次 Session 已 `LOGOUT`。
+- 主 UAT 保护指纹在部署前、恢复库、UAT 前后保持 `e80ed1795079a3467ba4f05e2751fd8a9575e1b441b2433b371651479ca2cab0`；PRQ 仍为 `SUBMITTED`，ACCEPT/RETURN 为 `0/0`，待接收/已处理为 `1/0`，四个 Material 九项供应、Inventory、Allocation 和全部下游均未变化。
+- 完成报告：`docs/tasks/SELFHOST-UAT-FIX-17-COMPLETION.md`。
+- 最终状态：`PURCHASE DECISION CONFIRMATION FIXED — MAIN UAT NOT VERIFIED`。
