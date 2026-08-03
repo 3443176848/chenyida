@@ -1,0 +1,163 @@
+import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
+import test from "node:test";
+import { Pool } from "pg";
+import { hashPassword } from "../app/lib/identity-selfhost/password.ts";
+import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
+import { MaterialRequirementRepository } from "../app/lib/material-requirement-selfhost/repository.ts";
+import { MaterialRequirementService } from "../app/lib/material-requirement-selfhost/service.ts";
+
+const REQUIRED_DATABASE = "erp_fix15_material_requirement_test";
+const REQUIRED_ORIGIN = "http://127.0.0.1:43138";
+const databaseUrl = process.env.DATABASE_URL || "";
+const confirmation = process.env.ERP_PURCHASE_TRACE_BROWSER_CONFIRM || "";
+const sha256 = (value) => createHash("sha256").update(String(value)).digest("hex");
+const databaseName = (value) => { try { return decodeURIComponent(new URL(value).pathname.replace(/^\//, "")); } catch { return ""; } };
+if (databaseName(databaseUrl) !== REQUIRED_DATABASE) throw new Error(`DATABASE_URL must target isolated ${REQUIRED_DATABASE}`);
+if (confirmation !== "ISOLATED_FIX15_SYNTHETIC_ONLY") throw new Error("ERP_PURCHASE_TRACE_BROWSER_CONFIRM=ISOLATED_FIX15_SYNTHETIC_ONLY is required");
+
+const pool = new Pool({ connectionString: databaseUrl, max: 3, application_name: "purchase-traceability-browser-fix15" });
+let server;
+
+async function loadChromium() {
+  for (const specifier of [process.env.PLAYWRIGHT_MODULE_PATH, "playwright", "@playwright/test", "playwright-core"].filter(Boolean)) {
+    try { const loaded = await import(specifier); const chromium = loaded.chromium || loaded.default?.chromium; if (chromium) return chromium; } catch { /* use the next isolated module */ }
+  }
+  throw new Error("Playwright is required in the isolated browser-test runner");
+}
+
+async function clearSyntheticData() {
+  const tables = await pool.query("select tablename from pg_tables where schemaname='public' and tablename not in ('schema_migrations','app_meta') order by tablename");
+  const quoted = tables.rows.map(({ tablename }) => `"${String(tablename).replaceAll('"', '""')}"`);
+  if (quoted.length) await pool.query(`truncate table ${quoted.join(",")} restart identity cascade`);
+}
+
+const actor = (role, username) => ({ username, display_name: role, role, is_active: true, must_change_password: false, version: 1, last_login_at: null, permissions: permissionsForRole(role) });
+const meta = (identity, action) => ({ actor: identity, requestId: randomUUID(), operationId: randomUUID(), keyDigest: sha256(randomUUID()), requestDigest: sha256(randomUUID()), method: "POST", route: `/isolated/fix15/${action}`, action });
+
+async function seedFixture() {
+  const suffix = randomUUID().replaceAll("-", "").slice(0, 10);
+  const credentials = { username: `fix15_purchase_${suffix}`, password: `Isolated!Purchase9-${randomUUID()}` };
+  const planningUsername = `fix15_planning_${suffix}`, engineeringUsername = `fix15_engineering_${suffix}`, salesUsername = `fix15_sales_${suffix}`;
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query("select set_config('cyd.project_service_write','allowed',true),set_config('cyd.planning_service_write','allowed',true)");
+    await client.query(`insert into app_users(username,display_name,role,password_hash,is_active,must_change_password,version) values
+      ($1,'隔离采购','purchase',$2,true,false,1),($3,'隔离计划','planning',$4,true,false,1),
+      ($5,'隔离工程','engineering',$6,true,false,1),($7,'隔离销售','sales',$8,true,false,1)`, [credentials.username, await hashPassword(credentials.password), planningUsername, await hashPassword(`Isolated!Planning9-${randomUUID()}`), engineeringUsername, await hashPassword(`Isolated!Engineering9-${randomUUID()}`), salesUsername, await hashPassword(`Isolated!Sales9-${randomUUID()}`)]);
+    const unit = (await client.query("insert into units(code,name,symbol,unit_type,enabled) values('PCS','件','PCS','COUNT',true) returning id")).rows[0];
+    const category = (await client.query("insert into material_categories(category_code,category_name_cn,category_level,status,created_by,updated_by,request_id) values('FIX15-PART','采购追溯零件',1,'ACTIVE',$1,$1,$2) returning id", [engineeringUsername, randomUUID()])).rows[0];
+    const materialIds = [];
+    for (let index = 1; index <= 4; index += 1) {
+      const material = await client.query("insert into material_master(internal_material_code,standard_name,category_id,base_uom,base_unit_id,material_status,procurement_type,inventory_type,inspection_type,environmental_requirement,source_type,last_modified_by,created_by,updated_by,request_id) values($1,$2,$3,'PCS',$4,'ACTIVE','PURCHASED','STOCKED','IQC','RoHS','MANUAL',$5,$5,$5,$6) returning id", [`MAT-FIX15-${String(index).padStart(3, "0")}`, `采购追溯零件 ${index}`, category.id, unit.id, engineeringUsername, randomUUID()]);
+      materialIds.push(Number(material.rows[0].id));
+    }
+    const customer = (await client.query("insert into customers(customer_code,customer_name,normalized_name,status,created_by,updated_by,request_id) values('CUS-FIX15','采购追溯客户','采购追溯客户','ACTIVE',$1,$1,$2) returning id", [salesUsername, randomUUID()])).rows[0];
+    const product = (await client.query("insert into products(product_code,product_name,customer_id,status,created_by,updated_by,request_id) values('PRD-FIX15','采购追溯产品',$1,'ACTIVE',$2,$2,$3) returning id", [customer.id, engineeringUsername, randomUUID()])).rows[0];
+    const productVersion = (await client.query("insert into product_versions(product_id,version_no,version_code,status,product_type,lifecycle_status,engineering_owner,released_by,released_at,created_by,updated_by,request_id) values($1,1,'A0','RELEASED','ASSEMBLY','ACTIVE',$2,$2,now(),$2,$2,$3) returning id", [product.id, engineeringUsername, randomUUID()])).rows[0];
+    const bomHeader = (await client.query("insert into bom_headers(bom_code,product_id,status,created_by,updated_by,request_id) values('BOM-FIX15',$1,'ACTIVE',$2,$2,$3) returning id", [product.id, engineeringUsername, randomUUID()])).rows[0];
+    const bomVersion = (await client.query("insert into bom_versions(bom_header_id,product_version_id,version_no,version_code,status,created_by,updated_by,request_id) values($1,$2,1,'V1','DRAFT',$3,$3,$4) returning id", [bomHeader.id, productVersion.id, engineeringUsername, randomUUID()])).rows[0];
+    const bomLineIds = [];
+    for (let index = 0; index < materialIds.length; index += 1) {
+      const line = await client.query("insert into bom_lines(bom_version_id,line_no,material_id,quantity_per,unit_id,loss_rate,created_by,updated_by,request_id) values($1,$2,$3,1,$4,0,$5,$5,$6) returning id", [bomVersion.id, index + 1, materialIds[index], unit.id, engineeringUsername, randomUUID()]); bomLineIds.push(Number(line.rows[0].id));
+    }
+    await client.query("update bom_versions set status='RELEASED',released_by=$2,released_at=now() where id=$1", [bomVersion.id, engineeringUsername]);
+    const project = (await client.query("insert into business_projects(project_code,customer_id,project_name,project_goal,market_owner,project_owner,status,target_delivery_date,current_requirement_version_no,version,request_id,created_by) values('PRJ-99000015',$1,'采购追溯浏览器项目','隔离采购接收验证',$2,$3,'ACCEPTED','2026-10-30',1,4,$4,$2) returning id", [customer.id, salesUsername, engineeringUsername, randomUUID()])).rows[0];
+    const requirement = (await client.query("insert into project_requirement_versions(project_id,version_no,customer_requirement_summary,quantity_requirement,quantity_unit,content_digest,created_by) values($1,1,'10 PCS 采购追溯需求',10,'PCS',$2,$3) returning id", [project.id, sha256(`requirement-${suffix}`), salesUsername])).rows[0];
+    const item = (await client.query("insert into project_requirement_items(requirement_version_id,line_no,provisional_name,quantity,unit_id,unit_pending) values($1,1,'采购追溯产品',10,$2,false) returning id", [requirement.id, unit.id])).rows[0];
+    await client.query("insert into project_requirement_resolutions(project_id,requirement_version_id,requirement_item_id,product_id,product_version_id,bom_header_id,bom_version_id,resolved_by,request_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9)", [project.id, requirement.id, item.id, product.id, productVersion.id, bomHeader.id, bomVersion.id, engineeringUsername, randomUUID()]);
+    const unitResolution = (await client.query("insert into project_requirement_unit_resolution_versions(project_id,requirement_version_id,requirement_item_id,resolution_version_no,unit_id,source_type,resolved_by,request_id,content_digest) values($1,$2,$3,1,$4,'REQUIREMENT_DECLARED',$5,$6,$7) returning id", [project.id, requirement.id, item.id, unit.id, salesUsername, randomUUID(), sha256(`unit-${suffix}`)])).rows[0];
+    await client.query("insert into project_requirement_unit_resolution_heads(requirement_item_id,project_id,requirement_version_id,current_resolution_id,version) values($1,$2,$3,$4,1)", [item.id, project.id, requirement.id, unitResolution.id]);
+    const packageDigest = sha256(`package-${suffix}`);
+    const packageRow = (await client.query("insert into project_planning_packages(project_id,package_version_no,requirement_version_id,status,target_delivery_date,package_digest,prepared_by,version,request_id) values($1,1,$2,'DRAFT','2026-10-30',$3,$4,1,$5) returning id", [project.id, requirement.id, packageDigest, engineeringUsername, randomUUID()])).rows[0];
+    await client.query("insert into project_planning_handoff_events(package_id,project_id,event_type,actor,request_id) values($1,$2,'CREATED',$3,$4)", [packageRow.id, project.id, engineeringUsername, randomUUID()]);
+    const packageItem = (await client.query("insert into project_planning_package_items(package_id,requirement_item_id,product_version_id,bom_version_id,required_quantity,unit_id,unit_resolution_id,line_no,source_digest) values($1,$2,$3,$4,10,$5,$6,1,$7) returning id", [packageRow.id, item.id, productVersion.id, bomVersion.id, unit.id, unitResolution.id, sha256(`item-${suffix}`)])).rows[0];
+    for (let index = 0; index < materialIds.length; index += 1) {
+      const snapshot = { internal_material_code: `MAT-FIX15-${String(index + 1).padStart(3, "0")}`, standard_name: `采购追溯零件 ${index + 1}`, category_code: "FIX15-PART", base_uom: "PCS" };
+      await client.query("insert into project_planning_package_bom_lines(package_item_id,source_bom_line_id,material_id,unit_id,quantity_per,loss_rate,calculated_gross_quantity,specification_snapshot,material_digest,line_no) values($1,$2,$3,$4,1,0,10,$5,$6,$7)", [packageItem.id, bomLineIds[index], materialIds[index], unit.id, snapshot, sha256(JSON.stringify(snapshot)), index + 1]);
+    }
+    await client.query("update project_planning_packages set status='SUBMITTED',submitted_by=$2,submitted_at=now(),version=2,request_id=$3,updated_at=now() where id=$1", [packageRow.id, engineeringUsername, randomUUID()]);
+    await client.query("insert into project_planning_handoff_events(package_id,project_id,event_type,actor,request_id) values($1,$2,'SUBMITTED',$3,$4)", [packageRow.id, project.id, engineeringUsername, randomUUID()]);
+    await client.query("update project_planning_packages set status='ACCEPTED',accepted_by=$2,accepted_at=now(),version=3,request_id=$3,updated_at=now() where id=$1", [packageRow.id, planningUsername, randomUUID()]);
+    await client.query("insert into project_planning_handoff_events(package_id,project_id,event_type,actor,request_id) values($1,$2,'ACCEPTED',$3,$4)", [packageRow.id, project.id, planningUsername, randomUUID()]);
+    await client.query("commit");
+    const service = new MaterialRequirementService(new MaterialRequirementRepository(pool)); const planningActor = actor("planning", planningUsername);
+    const generated = await service.generate(Number(packageRow.id), meta(planningActor, "BROWSER_PLAN_GENERATE"), { required_date: "2026-10-30" });
+    const submitted = await service.submit(Number(generated.body.plan_id), meta(planningActor, "BROWSER_PLAN_SUBMIT"), { expected_version: 1 });
+    return { credentials, planningUsername, packageId: Number(packageRow.id), packageDigest, planId: Number(generated.body.plan_id), requestId: Number(submitted.body.purchase_request.id), requestCode: String(submitted.body.purchase_request.request_code), projectCode: "PRJ-99000015", materialIds };
+  } catch (error) { await client.query("rollback").catch(() => undefined); throw error; } finally { client.release(); }
+}
+
+async function waitForServer() {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    if (server?.exitCode !== null) throw new Error("isolated standalone server exited before health check");
+    try { const response = await fetch(`${REQUIRED_ORIGIN}/api/health`); if (response.ok) return; } catch { /* continue bounded readiness polling */ }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error("isolated standalone server did not become healthy");
+}
+
+async function stopServer() {
+  if (!server || server.exitCode !== null) return;
+  server.kill("SIGTERM");
+  await Promise.race([new Promise((resolve) => server.once("exit", resolve)), new Promise((resolve) => setTimeout(resolve, 5_000))]);
+  if (server.exitCode === null) server.kill("SIGKILL");
+}
+
+async function login(page, credentials) {
+  await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" }); await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
+  await page.getByLabel("账号", { exact: true }).fill(credentials.username); await page.getByLabel("密码", { exact: true }).fill(credentials.password);
+  const response = page.waitForResponse((item) => item.url() === `${REQUIRED_ORIGIN}/api/login` && item.request().method() === "POST"); await page.getByRole("button", { name: "登录", exact: true }).click(); assert.equal((await response).status(), 200); await page.getByRole("heading", { name: "经营工作台", exact: true }).waitFor();
+}
+
+async function noOverflow(page, stage) {
+  const width = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, document: document.documentElement.scrollWidth, body: document.body.scrollWidth }));
+  assert.ok(width.document <= width.viewport + 1, `${stage}: document overflow`); assert.ok(width.body <= width.viewport + 1, `${stage}: body overflow`);
+}
+
+async function state(requestId) {
+  const request = (await pool.query("select status,version,accepted_by from planning_purchase_requests where id=$1", [requestId])).rows[0];
+  const acceptedEvents = Number((await pool.query("select count(*) count from planning_material_requirement_events where purchase_request_id=$1 and event_type='PURCHASE_ACCEPTED'", [requestId])).rows[0].count);
+  const downstream = (await pool.query(`select (select count(*)::int from procurement_rfqs) rfqs,(select count(*)::int from procurement_supplier_quotes) quotes,(select count(*)::int from procurement_sourcing_awards) awards,(select count(*)::int from purchase_orders) purchase_orders,(select count(*)::int from purchase_receipts) receipts,(select count(*)::int from inventory_ledger_entries) ledger,(select count(*)::int from finance_documents) finance_documents`)).rows[0];
+  return { request: { status: request.status, version: Number(request.version), accepted_by: request.accepted_by }, acceptedEvents, downstream };
+}
+
+test.before(async () => {
+  assert.deepEqual((await pool.query("select current_database() name,(select count(*)::int from schema_migrations) migration_count")).rows[0], { name: REQUIRED_DATABASE, migration_count: 37 });
+  await clearSyntheticData();
+  const serverEntry = process.env.ERP_BROWSER_SERVER_ENTRY || "/app/dist/standalone/server.js";
+  server = spawn(process.execPath, [serverEntry], { cwd: new URL(".", `file://${serverEntry}`).pathname, env: { ...process.env, HOSTNAME: "0.0.0.0", PORT: "43138", ERP_ENV: "test", ERP_DEPLOYMENT_CLASS: "test", ERP_PUBLIC_ORIGIN: REQUIRED_ORIGIN, ERP_UPLOAD_ROOT: "/tmp/fix15-uploads", ERP_ATTACHMENT_ROOT: "/tmp/fix15-attachments", ERP_BACKUP_STATUS_FILE: "/tmp/fix15-backup-status.json" }, stdio: "ignore" });
+  await waitForServer();
+});
+
+test("isolated Chromium cancels without writes, accepts once and reopens the processed credential", { timeout: 180_000 }, async () => {
+  const fixture = await seedFixture(); const initial = await state(fixture.requestId); assert.deepEqual(initial, { request: { status: "SUBMITTED", version: 1, accepted_by: null }, acceptedEvents: 0, downstream: { rfqs: 0, quotes: 0, awards: 0, purchase_orders: 0, receipts: 0, ledger: 0, finance_documents: 0 } });
+  const chromium = await loadChromium(); let browser;
+  try {
+    browser = await chromium.launch({ headless: true, args: ["--disable-dev-shm-usage", "--no-sandbox"] });
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); const businessPosts = [];
+    await context.route("**/*", async (route) => { const request = route.request(), url = new URL(request.url()), method = request.method().toUpperCase(); if (url.origin === REQUIRED_ORIGIN && method === "POST" && !["/api/login", "/api/logout"].includes(url.pathname)) businessPosts.push(url.pathname); if (url.origin === REQUIRED_ORIGIN) await route.continue(); else await route.abort("blockedbyclient"); });
+    const page = await context.newPage(); await login(page, fixture.credentials); await page.goto(`${REQUIRED_ORIGIN}/planning/purchase-requests`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "采购申请接收工作台", exact: true }).waitFor(); await page.locator("button.planning-row", { hasText: fixture.requestCode }).click();
+    await page.getByRole("heading", { name: new RegExp(fixture.requestCode) }).waitFor(); await page.getByText(`ID ${fixture.packageId}/v1`, { exact: true }).first().waitFor(); await page.getByText("Product A0", { exact: true }).waitFor(); await page.getByText(/BOM V1/).waitFor(); await page.getByText("Unit Resolution v1 · PCS", { exact: true }).waitFor();
+    await page.getByText("该版本未采集计划说明", { exact: true }).waitFor(); await page.getByText("该版本未采集采购交接说明", { exact: true }).waitFor(); await page.getByText("净采购 = max(毛需求 - 库存分配 - 在途分配, 0)", { exact: true }).waitFor();
+    assert.equal(await page.locator(".purchase-line-card").count(), 4); for (const materialId of fixture.materialIds) await page.getByText(`Material ID ${materialId}`, { exact: true }).first().waitFor(); assert.equal(await page.locator(".purchase-key-quantities").getByText("10 PCS", { exact: true }).count(), 12); await noOverflow(page, "purchase detail 390px");
+    const acceptPath = `/api/purchase-requests/${fixture.requestId}/accept`;
+    for (const cancellation of ["cancel", "close", "escape"]) {
+      await page.getByRole("button", { name: "接收采购申请", exact: true }).click(); const dialog = page.getByRole("dialog", { name: `确认接收 ${fixture.requestCode}`, exact: true }); await dialog.waitFor(); await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "取消");
+      await dialog.getByText(`${fixture.packageId}/v1 · ACCEPT SUCCESS`, { exact: true }).waitFor(); await dialog.getByRole("heading", { name: "采购需求（4 条）", exact: true }).waitFor();
+      await dialog.getByText("采购部门基于已接收PRQ开展供应商寻源、询价和报价比较；接收本身不会自动创建RFQ、定标、PO、收货或AP。", { exact: true }).waitFor(); assert.equal(await dialog.locator(".planning-confirm-materials li").count(), 4); await noOverflow(page, `accept ${cancellation}`); const before = businessPosts.filter((path) => path === acceptPath).length;
+      if (cancellation === "cancel") await dialog.getByRole("button", { name: "取消", exact: true }).click(); else if (cancellation === "close") await dialog.getByRole("button", { name: "关闭确认窗口", exact: true }).click(); else await page.keyboard.press("Escape");
+      await dialog.waitFor({ state: "detached" }); assert.equal(businessPosts.filter((path) => path === acceptPath).length, before); assert.deepEqual(await state(fixture.requestId), initial);
+    }
+    await page.getByLabel("退回原因（必填）", { exact: true }).fill("隔离浏览器验证退回取消不写入"); await page.getByRole("button", { name: "退回计划部", exact: true }).click(); const returnDialog = page.getByRole("dialog", { name: "确认退回计划部门修订", exact: true }); await returnDialog.waitFor(); await returnDialog.getByText("不修改原需求计划及提交时分配快照。", { exact: true }).waitFor(); const returnPath = `/api/purchase-requests/${fixture.requestId}/return`, returnBefore = businessPosts.filter((path) => path === returnPath).length; await returnDialog.getByRole("button", { name: "取消", exact: true }).click(); await returnDialog.waitFor({ state: "detached" }); assert.equal(businessPosts.filter((path) => path === returnPath).length, returnBefore); assert.deepEqual(await state(fixture.requestId), initial);
+    await page.getByRole("button", { name: "接收采购申请", exact: true }).click(); const confirm = page.getByRole("dialog", { name: `确认接收 ${fixture.requestCode}`, exact: true }); await confirm.waitFor(); const postBefore = businessPosts.filter((path) => path === acceptPath).length; const responsePromise = page.waitForResponse((response) => response.url() === `${REQUIRED_ORIGIN}${acceptPath}` && response.request().method() === "POST" && response.status() === 200); await confirm.getByRole("button", { name: "确认接收", exact: true }).evaluate((button) => { button.click(); button.click(); }); const response = await responsePromise, payload = await response.json();
+    await page.getByRole("heading", { name: "操作完成凭证", exact: true }).waitFor(); await page.getByText(payload.request_id, { exact: true }).waitFor(); assert.equal(businessPosts.filter((path) => path === acceptPath).length, postBefore + 1); const accepted = await state(fixture.requestId); assert.deepEqual(accepted.downstream, initial.downstream); assert.equal(accepted.request.status, "ACCEPTED"); assert.equal(accepted.request.version, 2); assert.equal(accepted.request.accepted_by, fixture.credentials.username); assert.equal(accepted.acceptedEvents, 1);
+    await page.getByRole("button", { name: "从已处理记录查看凭证", exact: true }).click(); await page.getByText("该 PRQ 已处理；关系化快照保持只读。", { exact: true }).waitFor(); await page.getByText(fixture.requestCode, { exact: true }).first().waitFor(); await noOverflow(page, "processed credential 390px");
+    await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" }); await page.getByRole("button", { name: "退出", exact: true }).click(); await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor(); await context.close();
+  } finally { await browser?.close().catch(() => undefined); }
+});
+
+test.after(async () => { await stopServer(); await clearSyntheticData(); await pool.end(); });

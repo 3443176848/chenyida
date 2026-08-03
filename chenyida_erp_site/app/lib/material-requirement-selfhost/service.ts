@@ -10,6 +10,24 @@ type PackageRow = Record<string, unknown> & { id: string; project_id: string; st
 type PlanRow = Record<string, unknown> & { id: string; project_id: string; planning_package_id: string; status: string; version: number; required_date: unknown; source_package_version: number; source_package_digest: string; calculation_digest: string };
 const allowed = (actor: IdentityActor, permission: string) => actor.permissions.includes("*") || actor.permissions.includes(permission);
 
+type PurchaseRequestScopeRow = Readonly<{ status: string; submitted_by: string; accepted_by: string | null; returned_by: string | null }>;
+export type PurchaseRequestReadScope = "ALL" | "PURCHASE_QUEUE" | "PLANNING_OWN" | "NONE";
+
+export function purchaseRequestReadScope(actor: Pick<IdentityActor, "role" | "permissions">): PurchaseRequestReadScope {
+  if (actor.permissions.includes("*") || ["admin", "manager"].includes(actor.role)) return "ALL";
+  if (actor.role === "purchase") return "PURCHASE_QUEUE";
+  if (actor.role === "planning") return "PLANNING_OWN";
+  return "NONE";
+}
+
+export function canReadPurchaseRequest(actor: Pick<IdentityActor, "username" | "role" | "permissions">, row: PurchaseRequestScopeRow) {
+  const scope = purchaseRequestReadScope(actor);
+  if (scope === "ALL") return true;
+  if (scope === "PLANNING_OWN") return row.submitted_by === actor.username;
+  if (scope === "PURCHASE_QUEUE") return row.status === "SUBMITTED" || row.accepted_by === actor.username || row.returned_by === actor.username;
+  return false;
+}
+
 export class MaterialRequirementService {
   readonly repository: MaterialRequirementRepository; readonly fault?: (checkpoint: string) => void | Promise<void>;
   constructor(repository: MaterialRequirementRepository, fault?: (checkpoint: string) => void | Promise<void>) { this.repository = repository; this.fault = fault; }
@@ -116,10 +134,140 @@ export class MaterialRequirementService {
   }
 
   async requestDetail(actor: IdentityActor, requestId: number) {
-    if (!allowed(actor, "planning.purchase_request.read")) throw new MaterialRequirementError("PERMISSION_DENIED", "没有权限读取采购申请", 403); const result = await this.repository.pool.query(`select r.*,p.project_id,p.plan_version_no,p.required_date,p.status plan_status,bp.project_code,bp.project_name from planning_purchase_requests r join planning_material_requirement_plans p on p.id=r.plan_id join business_projects bp on bp.id=p.project_id where r.id=$1`, [requestId]); if (!result.rows[0]) throw new MaterialRequirementError("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在", 404); const lines = await this.repository.pool.query("select l.*,l.requested_quantity::text,u.code unit_code,pl.material_snapshot from planning_purchase_request_lines l join units u on u.id=l.unit_id join planning_material_requirement_lines pl on pl.id=l.plan_line_id where l.purchase_request_id=$1 order by l.line_no", [requestId]); return { header: result.rows[0], lines: lines.rows };
+    if (!allowed(actor, "planning.purchase_request.read")) throw new MaterialRequirementError("PERMISSION_DENIED", "没有权限读取采购申请", 403);
+    const client = await this.repository.pool.connect();
+    try {
+      await client.query("begin transaction isolation level repeatable read read only");
+      const headerResult = await client.query(`select r.*,p.project_id,p.planning_package_id,p.plan_version_no,p.required_date,p.status plan_status,
+        p.source_package_version,p.source_package_digest,p.calculation_digest,p.prepared_by,p.prepared_at,
+        p.submitted_by plan_submitted_by,p.submitted_at plan_submitted_at,p.version plan_row_version,
+        bp.project_code,bp.project_name,pp.package_version_no,pp.status package_status,pp.package_digest,
+        pp.accepted_by package_accepted_by,pp.accepted_at package_accepted_at,
+        (select count(*)::int from planning_purchase_request_lines rl where rl.purchase_request_id=r.id) line_count,
+        (select coalesce(sum(rl.requested_quantity),0)::numeric(24,6)::text from planning_purchase_request_lines rl where rl.purchase_request_id=r.id) requested_quantity
+        from planning_purchase_requests r
+        join planning_material_requirement_plans p on p.id=r.plan_id
+        join business_projects bp on bp.id=p.project_id
+        join project_planning_packages pp on pp.id=p.planning_package_id
+        where r.id=$1`, [requestId]);
+      const header = headerResult.rows[0];
+      if (!header) throw new MaterialRequirementError("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在", 404);
+      if (!canReadPurchaseRequest(actor, header as PurchaseRequestScopeRow)) throw new MaterialRequirementError("PURCHASE_REQUEST_FORBIDDEN", "没有权限查看该采购申请及其来源快照", 403);
+
+      const lineResult = await client.query(`select rl.id,rl.purchase_request_id,rl.plan_line_id,rl.line_no,rl.material_id,rl.unit_id,
+        rl.requested_quantity::text,pl.line_no plan_line_no,pl.material_id plan_material_id,pl.unit_id plan_unit_id,
+        pl.material_snapshot,pl.material_digest,
+        pl.gross_requirement::text,pl.stock_available::text,pl.stock_allocated::text,
+        pl.eligible_inbound::text,pl.inbound_allocated::text,pl.net_purchase_requirement::text,
+        pl.source_digest,u.code unit_code,u.name unit_name
+        from planning_purchase_request_lines rl
+        join planning_material_requirement_lines pl on pl.id=rl.plan_line_id and pl.plan_id=$2
+        join units u on u.id=rl.unit_id
+        where rl.purchase_request_id=$1 order by rl.line_no`, [requestId, Number(header.plan_id)]);
+      if (lineResult.rows.some((line) => Number(line.material_id) !== Number(line.plan_material_id) || Number(line.unit_id) !== Number(line.plan_unit_id))) {
+        throw new MaterialRequirementError("PURCHASE_REQUEST_TRACEABILITY_CONFLICT", "采购申请物料快照与稳定物料标识不一致", 409);
+      }
+
+      const packageItemResult = await client.query(`select pi.id,pi.line_no,pi.requirement_item_id,pi.product_version_id,pi.bom_version_id,
+        pi.required_quantity::text,pi.unit_id,pi.unit_resolution_id,pi.source_digest,
+        p.id product_id,p.product_code,p.product_name,pv.version_no product_version_no,pv.version_code product_version_code,
+        bh.id bom_header_id,bh.bom_code,bv.version_no bom_version_no,bv.version_code bom_version_code,
+        ur.resolution_version_no unit_resolution_version_no,ur.source_type unit_resolution_source_type,u.code unit_code
+        from project_planning_package_items pi
+        join product_versions pv on pv.id=pi.product_version_id
+        join products p on p.id=pv.product_id
+        join bom_versions bv on bv.id=pi.bom_version_id and bv.product_version_id=pi.product_version_id
+        join bom_headers bh on bh.id=bv.bom_header_id and bh.product_id=p.id
+        join units u on u.id=pi.unit_id
+        left join project_requirement_unit_resolution_versions ur on ur.id=pi.unit_resolution_id
+          and ur.requirement_item_id=pi.requirement_item_id and ur.unit_id=pi.unit_id
+        where pi.package_id=$1 order by pi.line_no`, [Number(header.planning_package_id)]);
+      const packageAcceptResult = await client.query(`select id,event_type,actor,request_id,created_at
+        from project_planning_handoff_events where package_id=$1 and event_type='ACCEPTED' order by id desc limit 1`, [Number(header.planning_package_id)]);
+      const generatedEventResult = await client.query(`select id,event_type,actor,request_id,created_at,to_status
+        from planning_material_requirement_events where plan_id=$1 and event_type in ('GENERATED','REGENERATED') order by id desc limit 1`, [Number(header.plan_id)]);
+      const submitEventResult = await client.query(`select id,event_type,actor,request_id,created_at,to_status
+        from planning_material_requirement_events where plan_id=$1 and purchase_request_id=$2 and event_type='SUBMITTED' order by id desc limit 1`, [Number(header.plan_id), requestId]);
+      const checkedAtResult = await client.query("select now() checked_at");
+      const requiredDateValue = header.required_date instanceof Date ? header.required_date.toISOString().slice(0, 10) : String(header.required_date).slice(0, 10);
+      const current = await calculateMaterialRequirements(client, Number(header.planning_package_id), requiredDateValue, false);
+      const currentByMaterial = new Map(current.lines.map((line) => [`${line.materialId}:${line.unitId}`, line]));
+      const packageAccept = packageAcceptResult.rows[0];
+      const generatedEvent = generatedEventResult.rows[0];
+      const submitEvent = submitEventResult.rows[0];
+      const traceEvent = (row: Record<string, unknown> | undefined, action: string) => row ? {
+        id: Number(row.id), action, actor: row.actor, occurred_at: row.created_at, request_id: row.request_id,
+        result: "SUCCESS", evidence_source: action === "ACCEPT" ? "PACKAGE_EVENT" : "MATERIAL_REQUIREMENT_EVENT",
+      } : null;
+      const lines = lineResult.rows.map((line) => {
+        const currentLine = currentByMaterial.get(`${Number(line.material_id)}:${Number(line.unit_id)}`);
+        return {
+          ...line,
+          current_supply: currentLine ? { stock_available: currentLine.stockAvailable, eligible_inbound: currentLine.eligibleInbound } : null,
+        };
+      });
+      const response = {
+        header,
+        package: {
+          id: Number(header.planning_package_id), version_no: Number(header.package_version_no), status: header.package_status,
+          digest: header.package_digest, project_code: header.project_code, accept_event: traceEvent(packageAccept, "ACCEPT"),
+          items: packageItemResult.rows,
+          acceptance_effect: "PACKAGE_ACCEPT_DOES_NOT_CREATE_PURCHASE_DOCUMENTS",
+        },
+        plan: {
+          id: Number(header.plan_id), version_no: Number(header.plan_version_no), status: header.plan_status,
+          source_package_id: Number(header.planning_package_id), source_package_version_no: Number(header.package_version_no),
+          prepared_by: header.prepared_by, calculated_at: header.prepared_at,
+          snapshot_cutoff_at: header.plan_submitted_at, submission_revalidated_at: header.plan_submitted_at,
+          generated_event: traceEvent(generatedEvent, generatedEvent?.event_type === "REGENERATED" ? "REGENERATE" : "GENERATE"),
+          note: null, note_captured: false,
+        },
+        purchase_request: {
+          id: Number(header.id), request_code: header.request_code, status: header.status,
+          source_plan_id: Number(header.plan_id), source_plan_version_no: Number(header.plan_version_no),
+          project_code: header.project_code, required_date: header.required_date,
+          submitted_by: header.submitted_by, submitted_at: header.submitted_at,
+          submit_event: traceEvent(submitEvent, "SUBMIT"), line_count: Number(header.line_count),
+          total_requested_quantity: header.requested_quantity, independently_versioned: false,
+          supplier_selection: null, price: null, assignee: null, handling_deadline: null,
+          handoff_note: null, handoff_note_captured: false,
+        },
+        lines,
+        quantity_formula: "net_purchase_requirement = max(gross_requirement - stock_allocated - inbound_allocated, 0)",
+        current_supply_checked_at: checkedAtResult.rows[0].checked_at,
+      };
+      await client.query("commit");
+      return response;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async requestQueue(actor: IdentityActor, page: number, pageSize: number, status?: string) {
-    if (!allowed(actor, "planning.purchase_request.read")) throw new MaterialRequirementError("PERMISSION_DENIED", "没有权限读取采购申请", 403); const wanted = status || "SUBMITTED"; if (!["SUBMITTED", "ACCEPTED", "RETURNED"].includes(wanted)) throw new MaterialRequirementError("REQUEST_VALIDATION_FAILED", "status 无效"); const rows = await this.repository.pool.query(`select r.*,p.project_id,p.plan_version_no,p.required_date,bp.project_code,bp.project_name,count(l.id)::int line_count,coalesce(sum(l.requested_quantity),0)::numeric(24,6)::text requested_quantity from planning_purchase_requests r join planning_material_requirement_plans p on p.id=r.plan_id join business_projects bp on bp.id=p.project_id left join planning_purchase_request_lines l on l.purchase_request_id=r.id where r.status=$1 group by r.id,p.id,bp.id order by r.submitted_at,r.id limit $2 offset $3`, [wanted, pageSize, (page - 1) * pageSize]); const count = await this.repository.pool.query("select count(*)::int count from planning_purchase_requests where status=$1", [wanted]); return { rows: rows.rows, pagination: { page, page_size: pageSize, total: Number(count.rows[0].count) } };
+    if (!allowed(actor, "planning.purchase_request.read")) throw new MaterialRequirementError("PERMISSION_DENIED", "没有权限读取采购申请", 403);
+    const wanted = status || "SUBMITTED";
+    if (!["SUBMITTED", "ACCEPTED", "RETURNED", "PROCESSED"].includes(wanted)) throw new MaterialRequirementError("REQUEST_VALIDATION_FAILED", "status 无效");
+    const scope = purchaseRequestReadScope(actor);
+    if (scope === "NONE") throw new MaterialRequirementError("PERMISSION_DENIED", "没有权限读取采购申请", 403);
+    const values: unknown[] = [];
+    const clauses: string[] = [];
+    if (wanted === "PROCESSED") clauses.push("r.status in ('ACCEPTED','RETURNED')");
+    else { values.push(wanted); clauses.push(`r.status=$${values.length}`); }
+    if (scope === "PLANNING_OWN") { values.push(actor.username); clauses.push(`r.submitted_by=$${values.length}`); }
+    if (scope === "PURCHASE_QUEUE" && wanted !== "SUBMITTED") { values.push(actor.username); clauses.push(`(r.accepted_by=$${values.length} or r.returned_by=$${values.length})`); }
+    values.push(pageSize, (page - 1) * pageSize);
+    const limitPosition = values.length - 1; const offsetPosition = values.length;
+    const where = clauses.join(" and ");
+    const rows = await this.repository.pool.query(`select r.*,p.project_id,p.plan_version_no,p.required_date,bp.project_code,bp.project_name,
+      count(l.id)::int line_count,coalesce(sum(l.requested_quantity),0)::numeric(24,6)::text requested_quantity
+      from planning_purchase_requests r join planning_material_requirement_plans p on p.id=r.plan_id
+      join business_projects bp on bp.id=p.project_id left join planning_purchase_request_lines l on l.purchase_request_id=r.id
+      where ${where} group by r.id,p.id,bp.id order by r.submitted_at,r.id limit $${limitPosition} offset $${offsetPosition}`, values);
+    const countValues = values.slice(0, -2);
+    const count = await this.repository.pool.query(`select count(*)::int count from planning_purchase_requests r where ${where}`, countValues);
+    return { rows: rows.rows, pagination: { page, page_size: pageSize, total: Number(count.rows[0].count) } };
   }
 }

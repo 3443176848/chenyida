@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
+import { canReadPurchaseRequest, purchaseRequestReadScope } from "../app/lib/material-requirement-selfhost/service.ts";
 import { canonicalDigest, requiredDate } from "../app/lib/material-requirement-selfhost/validation.ts";
 
 test("planning and purchase capabilities are separated while managers retain the full loop", () => {
@@ -9,8 +10,25 @@ test("planning and purchase capabilities are separated while managers retain the
   for (const value of ["planning.requirement.read", "planning.requirement.prepare", "planning.requirement.submit"]) assert.ok(planning.includes(value));
   assert.ok(!planning.includes("planning.purchase_request.decide"));
   for (const value of ["planning.requirement.read", "planning.purchase_request.read", "planning.purchase_request.decide"]) assert.ok(purchase.includes(value));
+  assert.ok(!purchase.includes("system.audit.read"));
   assert.ok(!purchase.includes("planning.requirement.prepare")); assert.ok(!permissionsForRole("production").includes("planning.requirement.submit"));
   for (const role of ["admin", "manager"]) for (const value of ["planning.requirement.prepare", "planning.requirement.submit", "planning.purchase_request.decide"]) assert.ok(permissionsForRole(role).includes(value));
+});
+
+test("purchase request read scope is object bounded without global audit access", () => {
+  const actor=(role,username)=>({role,username,permissions:permissionsForRole(role)});
+  const submitted={status:"SUBMITTED",submitted_by:"planning01",accepted_by:null,returned_by:null};
+  const acceptedByOwner={...submitted,status:"ACCEPTED",accepted_by:"purchase01"};
+  const returnedByOther={...submitted,status:"RETURNED",returned_by:"purchase02"};
+  assert.equal(purchaseRequestReadScope(actor("purchase","purchase01")),"PURCHASE_QUEUE");
+  assert.equal(purchaseRequestReadScope(actor("planning","planning01")),"PLANNING_OWN");
+  assert.equal(purchaseRequestReadScope(actor("manager","manager01")),"ALL");
+  assert.equal(purchaseRequestReadScope(actor("production","production01")),"NONE");
+  assert.equal(canReadPurchaseRequest(actor("purchase","purchase01"),submitted),true);
+  assert.equal(canReadPurchaseRequest(actor("purchase","purchase01"),acceptedByOwner),true);
+  assert.equal(canReadPurchaseRequest(actor("purchase","purchase01"),returnedByOther),false);
+  assert.equal(canReadPurchaseRequest(actor("planning","planning01"),submitted),true);
+  assert.equal(canReadPurchaseRequest(actor("planning","planning02"),submitted),false);
 });
 
 test("dates and source digests are deterministic", () => {
