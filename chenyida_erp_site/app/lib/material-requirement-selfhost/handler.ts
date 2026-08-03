@@ -50,7 +50,7 @@ export async function handleMaterialRequirementApi(request: Request, dependencie
     else throw new MaterialRequirementError("NOT_FOUND", "接口不存在", 404);
     return response(result.body, result.status, dependencies.requestId, result.replayed);
   } catch (error) {
-    const known = mapMaterialRequirementError(error); await repository.failureAudit(dependencies.actor.username, dependencies.requestId, action, known.code); console.error(JSON.stringify({ level: "error", event: "material_requirement_api_failed", request_id: dependencies.requestId, code: known.code }));
+    const known = mapMaterialRequirementError(error); if (request.method !== "GET") await repository.failureAudit(dependencies.actor.username, dependencies.requestId, action, known.code); console.error(JSON.stringify({ level: "error", event: "material_requirement_api_failed", request_id: dependencies.requestId, code: known.code }));
     return response({ error: { code: known.code, message: known.message, request_id: dependencies.requestId }, code: known.code, message: known.message, request_id: dependencies.requestId }, known.status, dependencies.requestId);
   }
 }

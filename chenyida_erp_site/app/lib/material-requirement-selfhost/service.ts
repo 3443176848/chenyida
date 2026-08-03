@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import type { IdentityActor } from "../identity-selfhost/types.ts";
 import { calculateMaterialRequirements } from "./calculation.ts";
+import { currentSupplyFormula, currentSupplyModel, loadCurrentSupplyBreakdowns } from "./current-supply.ts";
 import { MaterialRequirementError } from "./errors.ts";
 import { MaterialRequirementRepository } from "./repository.ts";
 import type { RequirementMutationMeta, RequirementMutationResult } from "./types.ts";
@@ -188,10 +189,13 @@ export class MaterialRequirementService {
         from planning_material_requirement_events where plan_id=$1 and event_type in ('GENERATED','REGENERATED') order by id desc limit 1`, [Number(header.plan_id)]);
       const submitEventResult = await client.query(`select id,event_type,actor,request_id,created_at,to_status
         from planning_material_requirement_events where plan_id=$1 and purchase_request_id=$2 and event_type='SUBMITTED' order by id desc limit 1`, [Number(header.plan_id), requestId]);
-      const checkedAtResult = await client.query("select now() checked_at");
       const requiredDateValue = header.required_date instanceof Date ? header.required_date.toISOString().slice(0, 10) : String(header.required_date).slice(0, 10);
-      const current = await calculateMaterialRequirements(client, Number(header.planning_package_id), requiredDateValue, false);
-      const currentByMaterial = new Map(current.lines.map((line) => [`${line.materialId}:${line.unitId}`, line]));
+      const currentByLineId = await loadCurrentSupplyBreakdowns(client, lineResult.rows.map((line) => ({
+        lineId: Number(line.id), materialId: Number(line.material_id), unitId: Number(line.unit_id),
+        snapshotStockAvailable: String(line.stock_available), snapshotStockAllocated: String(line.stock_allocated),
+        snapshotInboundAvailable: String(line.eligible_inbound), snapshotInboundAllocated: String(line.inbound_allocated),
+      })), requiredDateValue);
+      const checkedAtResult = await client.query("select statement_timestamp() checked_at");
       const packageAccept = packageAcceptResult.rows[0];
       const generatedEvent = generatedEventResult.rows[0];
       const submitEvent = submitEventResult.rows[0];
@@ -199,13 +203,7 @@ export class MaterialRequirementService {
         id: Number(row.id), action, actor: row.actor, occurred_at: row.created_at, request_id: row.request_id,
         result: "SUCCESS", evidence_source: action === "ACCEPT" ? "PACKAGE_EVENT" : "MATERIAL_REQUIREMENT_EVENT",
       } : null;
-      const lines = lineResult.rows.map((line) => {
-        const currentLine = currentByMaterial.get(`${Number(line.material_id)}:${Number(line.unit_id)}`);
-        return {
-          ...line,
-          current_supply: currentLine ? { stock_available: currentLine.stockAvailable, eligible_inbound: currentLine.eligibleInbound } : null,
-        };
-      });
+      const lines = lineResult.rows.map((line) => ({ ...line, current_supply: currentByLineId.get(Number(line.id)) ?? null }));
       const response = {
         header,
         package: {
@@ -234,6 +232,8 @@ export class MaterialRequirementService {
         },
         lines,
         quantity_formula: "net_purchase_requirement = max(gross_requirement - stock_allocated - inbound_allocated, 0)",
+        current_supply_formula: currentSupplyFormula,
+        current_supply_model: currentSupplyModel,
         current_supply_checked_at: checkedAtResult.rows[0].checked_at,
       };
       await client.query("commit");
