@@ -2,6 +2,26 @@
 
 最后更新时间：2026-08-04（Asia/Shanghai）
 
+## SELFHOST-UAT-FIX-19 RFQ 草稿稳定 Purchase Request ID 绑定
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | RFQ PURCHASE REQUEST ID BINDING FIXED — UAT RFQ NOT CREATED | 稳定 ID/DTO/幂等修复、隔离 RFQ 旅程、回归、备份恢复、Web-only 部署和主 UAT 未提交表单验收完成 |
+| 严格起点 | PASS | clean `main@5a7cb547a07b1e113d89c51366fc099d851fe1cb`、Parent `9d6ed0d0bc728bdaafc619fe609d92d87ebcb188`、behind 0/ahead 129；alpha.38、0001—0037、0037 SHA、FIX-18 Web、四服务/四卷和主 UAT 保护事实全部吻合 |
+| 精确根因 | FIXED | PostgreSQL bigint ID 为字符串 `"1"`，旧 UI 用 `row.id === Number("1")` 比较而丢失 request；序列化省略 `purchase_request_id/expected_version`。不是字段名、闭包、重置或按标签反查 |
+| 功能提交 | PASS | `23d654c383015864be9a2ade71e78d94eb77adaf`（`fix: bind rfq draft to stable purchase request id`）；无 0038、Schema、版本或状态机变化 |
+| DTO/幂等 | PASS | option 仅保存稳定 PR/Supplier ID；UI 一次正整数规范，Supplier 验证/去重/排序；Handler/Service 统一规范四字段 DTO 并以规范正文摘要。空/0/负数/小数/NaN/非十进制/布尔/数组/对象继续拒绝 |
+| 服务端门禁 | PASS / UNCHANGED | PRQ 存在、ACCEPTED/latest、purchase 权限/对象范围、Supplier ACTIVE/Mapping、四行来源、活动 Round 唯一、CAS、CSRF、Origin、事务/审计/幂等均保持 |
+| 隔离 RFQ | PASS | 合成 PR ID 1、四条 Material、Supplier 1/2 创建一个 DRAFT；四行/双 Supplier 精确绑定，规范重放同 RFQ、异正文冲突、并发单胜、故障零半记录，Quote/Award/全部下游 0 |
+| 自动验证 | PASS | RFQ unit/UI 6/6+4/4、RFQ PG 5/5、Chromium 1/1、适用静态/UI 68/68+guard 6/6、Schema 4/4、sourcing upgrade 3/3、相关 PG 33/33、`npm test` 3/3、Python 3/3；typecheck/build/credentials/diff/lint 通过 |
+| 备份/恢复 | PASS | root:root 0600 custom dump 2,188,178 bytes，SHA-256 `55e169b4ad372391117aea6c042aa1ec3d87a9e85e01dbbba1456b9f9ecc3a28`；list 3,285 项，第二空库 37/head 0037/checksum/身份计数/保护指纹一致，恢复库已删 |
+| Web-only 部署 | PASS | Web `6eeba640…→6622029f…`，旧 Web 精确 rollback tag 保留；`--no-deps --no-build` 只替换 Web，PostgreSQL/Worker/Caddy、Migration、Origin、端口和四卷不变，内外 health 通过 |
+| 主 UAT 浏览器 | PASS / UNSAVED ONLY | 仅 purchase 登录；PRQ value 1、Supplier value 集合 1/2、四行/40 PCS、合法表单、桌面/390px 通过，随后清空并退出。建立草稿未点击，业务 POST 0、Session revoked |
+| 主 UAT 数据 | PASS / UNCHANGED | 正式保护指纹在主库、恢复库、部署/UAT 前后和 runner 安全停止后均为 `fc48f001fe3b0afaff69ac245a1fefc8bf6731d38358004314cc12daa308cff4`；RFQ/Quote/Award 前后 `0/0/0`，PRQ、Supplier、失败证据和全部下游不变 |
+| 资源/清理 | PASS WITH RECOVERED TEST OOM | 起点约 2.2 GiB available/258 MiB Swap/21 GiB，终点约 2.2 GiB/266 MiB/20 GiB/Load `0.19/0.22/0.45`；内核 OOM 0、四服务 RestartCount 0/OOM false。Lint 曾因任务临时生成树产生两次 Node V8 heap exhaustion，精确清理后完整通过；任务临时库/容器/Playwright/Python/SQLite 路径 0 |
+| Git | TWO FOCUSED COMMITS | 功能提交如上；收口提交为 `ops: accept rfq draft binding fix`，实际 SHA 以 `git log` 为准；不 push/PR/amend/rebase/reset/stash/restore |
+| 后续 | SOURCING BLACK-BOX MAY RESUME WITH NEW AUTH | 可以在新的明确授权任务中从单个 RFQ 草稿重新开始采购寻源黑盒试用；Quote、Award、转 PO 和其他下游仍需独立授权，本任务停止 |
+
 ## SELFHOST-UAT-FIX-18 采购接收历史凭证与 Plan 状态投影
 
 | 验证项 | 结果 | 说明 |

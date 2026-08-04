@@ -2,8 +2,9 @@
 
 ## 状态与唯一范围
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始时间：2026-08-04 11:38 CST（Asia/Shanghai）
+- 完成时间：2026-08-04 12:45 CST（Asia/Shanghai）
 - 负责人：Codex（严格门禁、隔离复现、稳定 ID/DTO/幂等修复、串行测试、备份恢复、Web-only 部署与 purchase-only 主 UAT 只读验收）；项目负责人（固定主 UAT 保护事实、部署授权和零下游边界）
 - 依赖：`SELFHOST-PHASE4-TASK04`、`SELFHOST-OPS-UAT-PURCHASE-REQUEST-TRACEABILITY-FIX-15`、`SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16`、`SELFHOST-UAT-FIX-17`、`SELFHOST-UAT-FIX-18`
 - 唯一范围：只修复合法 Purchase Request 稳定数据库 ID `1` 在建立 RFQ 草稿请求边界被错误拒绝的问题；保持 RFQ、报价、定标和所有下游业务规则不变。
@@ -51,3 +52,12 @@
 - `RFQ PURCHASE REQUEST ID BINDING FIXED — UAT RFQ NOT CREATED`
 - `RFQ PURCHASE REQUEST ID BINDING FIXED — MAIN UAT NOT VERIFIED`
 - `BLOCKED — NO UNSAFE CHANGE`
+
+## 完成摘要
+
+- 精确根因：PostgreSQL `bigint` 的 Purchase Request `id` 在页面 DTO 中为字符串 `"1"`，旧前端却用 `row.id === Number(formValue)` 查找；`"1" === 1` 为 false，导致已选请求对象变成 `undefined`。序列化时 `purchase_request_id` 和 `expected_version` 被省略，服务端因此正确返回 `purchase_request_id 必须是正整数`。不是字段名不一致、空值覆盖、闭包、表单重置或反向解析标签。
+- 修复：下拉项和 Supplier checkbox 只使用稳定数据库 ID 的十进制字符串 value；请求边界一次规范为安全正整数，Supplier 去重排序；Handler/Service 用同一规范 DTO 计算幂等摘要并保留全部权限、状态、映射、并发与事务门禁。
+- 结果：功能提交为 `23d654c383015864be9a2ade71e78d94eb77adaf`；未新增 0038，alpha.38/0037 不变。隔离环境成功创建并重放一个四行/双 Supplier RFQ，Quote/Award/全部下游为 0；故障注入零半记录。
+- 部署与主 UAT：只替换 Web `sha256:6eeba640…→sha256:6622029f…`，PostgreSQL/Worker/Caddy 未重建。主 UAT 只选择 PRQ 1 和 Supplier 1/2、核对四行/40 PCS/合法表单、清空并退出；业务 POST 0，RFQ/Quote/Award 前后 `0/0/0`，保护指纹均为 `fc48f001fe3b0afaff69ac245a1fefc8bf6731d38358004314cc12daa308cff4`。
+- 正式完成报告：`docs/tasks/SELFHOST-UAT-FIX-19-COMPLETION.md`。
+- 最终状态：`RFQ PURCHASE REQUEST ID BINDING FIXED — UAT RFQ NOT CREATED`。

@@ -4,6 +4,17 @@
 
 ## 2026-08-04
 
+### SELFHOST-UAT-FIX-19 - `fix: bind rfq draft to stable purchase request id` / `ops: accept rfq draft binding fix`
+
+- Git/范围：从 strict clean `main@5a7cb547a07b1e113d89c51366fc099d851fe1cb`、Parent `9d6ed0d0bc728bdaafc619fe609d92d87ebcb188`、behind 0/ahead 129 起步；功能提交 `23d654c383015864be9a2ade71e78d94eb77adaf`。只修改 RFQ create 稳定 ID/DTO/幂等边界、响应式 CSS、测试、保护/UAT runner 和项目文档；不新增 0038、不改 0001—0037/alpha.38，不 push/PR 或改写历史。
+- 根因/DTO：PostgreSQL bigint Purchase Request ID 为字符串 `"1"`，旧 UI 用 `row.id === Number(formValue)` 比较，导致 request 未命中；FormData 的稳定 value 正确，但 JSON 最终只剩 `supplier_ids` 和 `response_deadline`。没有字段名不一致、闭包/表单重置或按 PRQ/项目标签反查。原残缺幂等摘要与失败 request_id/审计只读保留。
+- 修复：PRQ/Supplier option 只保存稳定数据库 ID；UI 请求边界一次 canonical decimal→safe positive integer，Supplier 验证、去重和数值排序。Handler 与 Service 复用同一四字段规范函数，并只以规范化后的 PR ID、Supplier IDs、日期和 expected_version 计算幂等摘要；既有权限、状态、Mapping、四行来源、Round 唯一、CAS、CSRF、Origin、事务和失败审计门禁未放宽。
+- 测试：RFQ unit/UI 6/6+4/4、PostgreSQL 5/5、隔离 Chromium 1/1；适用静态/UI 68/68+环境守卫 6/6、Schema 4/4、sourcing upgrade 3/3、Material Requirement 8/8、Master/Supplier/BOM 6/6、Mapping 6/6、Inventory 3/3、Identity/CSRF/Origin/CAS/Idempotency 10/10、`npm test` 3/3、Python 3/3。typecheck、production build、最终 lint 0 error/10 既有 warning、1,166 文件凭据扫描和 diff check 通过。
+- 隔离旅程：合成 PR ID 1、四条 Material 533—536 各 10 PCS、Supplier 1/2 创建唯一 DRAFT；四行和两邀请精确绑定，规范等价重放返回同 RFQ、异正文冲突、并发单胜、非 ACCEPTED/不存在/越权/无效 Supplier 拒绝，故障注入零半记录。Quote/Award/PO/Receipt/Ledger/AP/Work Order 全为 0。
+- 备份/部署：root:root 0600 custom dump 2,188,178 bytes、SHA-256 `55e169b4ad372391117aea6c042aa1ec3d87a9e85e01dbbba1456b9f9ecc3a28`，list 3,285 项及第二空库 37/head 0037/checksum/身份计数/完整指纹恢复通过。使用 `--no-deps --no-build` 只替换 Web `sha256:6eeba640…→sha256:6622029f…`；PostgreSQL/Worker/Caddy、Migration、Origin、端口和四卷不变，restart 0/OOM false。
+- 主 UAT：只用 `uat_20260729_purchase` 直接打开采购寻源页，确认唯一 PRQ value 1、Supplier value 集合 1/2、四行/40 PCS 和合法未提交表单，桌面/390×844 通过后清空并退出。最终 business POST 0、Session revoked；RFQ/Quote/Award 前后 `0/0/0`，正式保护指纹始终为 `fc48f001fe3b0afaff69ac245a1fefc8bf6731d38358004314cc12daa308cff4`。
+- 资源/结论：起点约 2.2 GiB available/258 MiB Swap/21 GiB，终点约 2.2 GiB/266 MiB/20 GiB/Load `0.19/0.22/0.45`；内核 OOM 0、四服务 RestartCount 0/OOM false。任务生成树曾使两个临时 Node lint 进程 V8 heap exhaustion，精确清理后完整 lint 通过；临时库/恢复库/容器/Playwright/Python/SQLite 路径清零，正式备份、镜像和四卷保留，未 prune。结论：`RFQ PURCHASE REQUEST ID BINDING FIXED — UAT RFQ NOT CREATED`；可以在新的明确授权任务中从单个 RFQ 草稿重新开始黑盒试用，本任务停止。
+
 ### SELFHOST-UAT-FIX-18 - `fix: expose purchase acceptance history` / `ops: accept purchase history traceability`
 
 - Git/范围：从 strict clean `main@eff3df28e1781f13dc5a529f13e83e621bda5a28`、Parent `13da8a14d037d279278ef8c8ea86e52d79552512`、behind 0/ahead 127 起步；功能提交 `9d6ed0d0bc728bdaafc619fe609d92d87ebcb188`。只修改 Purchase Request 详情读模型、历史/即时凭证 UI、相关测试、保护/UAT runner 和项目文档；不新增 0038、不改 0001—0037/alpha.38，不 push/PR 或改写历史。

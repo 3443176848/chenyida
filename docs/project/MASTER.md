@@ -39,23 +39,25 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.38`；PostgreSQL 为 37/head `0037_project_planning_revision_response_lineage.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-18` 功能提交为 `9d6ed0d0bc728bdaafc619fe609d92d87ebcb188`（`fix: expose purchase acceptance history`）；版本仍为 alpha.38，Migration 仍止于 0037 |
-| 当前根仓库运维基线 | 已处理 Purchase Request 和即时完成页均显示精确 Purchase 决策 Event、显式 SUCCESS、独立 1/0 计数和可复制 request_id；Plan 分支 A 明确为“采购交接状态”，与 PRQ 状态分别读取且不暗示快照改写。自动/隔离验收、备份恢复、Web-only 部署和 purchase-only 主 UAT 只读验收全部通过，最终结论 `PURCHASE ACCEPTANCE HISTORY FIXED — UAT ACCEPTANCE VERIFIED` |
-| Git 同步与工作区 | 本任务从 clean `main@eff3df28e1781f13dc5a529f13e83e621bda5a28`、Parent `13da8a14d037d279278ef8c8ea86e52d79552512`、behind 0/ahead 127 起步；功能提交如上，保护 runner、D-090、部署事实和文档由独立 `ops: accept purchase history traceability` 收口，完成后应为 ahead 129。未 push/PR/amend/rebase/reset/stash/restore；未读取或修改 `shujvbiao/`，秘密、连接信息、数据库和备份正文未进入 Git |
+| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-19` 功能提交为 `23d654c383015864be9a2ade71e78d94eb77adaf`（`fix: bind rfq draft to stable purchase request id`）；版本仍为 alpha.38，Migration 仍止于 0037 |
+| 当前根仓库运维基线 | RFQ 草稿页面、Handler 与 Service 统一使用规范化后的 Purchase Request/Supplier 稳定数据库 ID，幂等摘要绑定规范 DTO；隔离 RFQ 全旅程、回归、备份恢复、Web-only 部署及 purchase-only 主 UAT 未提交表单验收通过。主 UAT RFQ/Quote/Award 与全部下游仍为 0，最终结论 `RFQ PURCHASE REQUEST ID BINDING FIXED — UAT RFQ NOT CREATED` |
+| Git 同步与工作区 | 本任务从 clean `main@5a7cb547a07b1e113d89c51366fc099d851fe1cb`、Parent `9d6ed0d0bc728bdaafc619fe609d92d87ebcb188`、behind 0/ahead 129 起步；功能提交如上，保护/UAT runner、部署事实、完成报告和项目文档由独立 `ops: accept rfq draft binding fix` 收口，完成后应为 ahead 131。未 push/PR/amend/rebase/reset/stash/restore；未读取或修改 `shujvbiao/`，秘密、连接信息、数据库和备份正文未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0037`，37/head `0037_project_planning_revision_response_lineage.sql`，SHA-256 `139f2623a184ae3d6927c95b56569cc438deffc2a0b46c325c9f04d59471d99f`。主 UAT Package ID 2/v2、Material Requirement Plan ID 1/v1 与 PRQ ID 1 / `PRQ-00000001` 均为 `ACCEPTED`；Plan 的该值是采购交接状态，v1 计算快照未改写。Purchase ACCEPT/RETURN 为 `1/0`、待接收/已处理为 `0/1`。Purchase ACCEPT actor `uat_20260729_purchase`，时间 `2026/08/04 06:06:15 Asia/Shanghai`，request_id `80568b28-47f5-4f58-8901-afc053871998`，读模型结果 SUCCESS。四条 Material 533—536 各为 10 PCS，九项当前供应均为 0；Inventory Balance/Allocation 与 RFQ/Quote/Award/PO/Delivery Plan/Receipt/Ledger/AP/Work Order 均为 0。正式保护指纹在部署前、第二新空恢复库、UAT 前后均为 `814811509c476e270f9cd82badb85aa8bb1bf8e1f01e8bb72b4cd9fec9c9a4ff`；本任务没有再次接收、退回、编辑、重放或创建下游 |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已 Web-only 更新为 alpha.38 `sha256:6eeba6409f51605fe422c39d674ddfa03d5f5079bb546566288336f15296df64`，旧 `sha256:97dcabe8d15c66dc54aec3e6a1f3febf168605b30292fad532177f000e2f18df` 保留精确回退 tag `chenyida-erp-parallel-web:rollback-purchase-history-fix18-predeploy-20260804T020447Z`；Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。只重建 Web；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false |
+| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0037`，37/head `0037_project_planning_revision_response_lineage.sql`，SHA-256 `139f2623a184ae3d6927c95b56569cc438deffc2a0b46c325c9f04d59471d99f`。主 UAT PRQ ID 1 / `PRQ-00000001` / `PRJ-00000001` 为 `ACCEPTED`、version 2，Purchase ACCEPT/RETURN 为 `1/0`；四条 Material 533—536 各 10 PCS。Supplier ID 1/2 分别为 `SUP-000001`/`SUP-000002` 且 ACTIVE。失败 request_id `e2d8caab-a39d-4756-894b-329ae548e3f5` 与 `REQUEST_VALIDATION_FAILED` 审计保持；RFQ/Quote/Award/PO/Delivery Plan/Receipt/Ledger/AP/Work Order 均为 0。FIX-19 保护指纹在主库、第二新空恢复库、部署/UAT 前后均为 `fc48f001fe3b0afaff69ac245a1fefc8bf6731d38358004314cc12daa308cff4` |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已 Web-only 更新为 alpha.38 `sha256:6622029fb3c401d1b71f10047e53021147bb386cf3dedb3208d1dfba6c7636d0`，旧 `sha256:6eeba6409f51605fe422c39d674ddfa03d5f5079bb546566288336f15296df64` 保留精确回退 tag `chenyida-erp-parallel-web:rollback-rfq-binding-fix19-predeploy-20260804T042812Z`；Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。只重建 Web；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.38 另提供版本化 Requirement Unit Resolution、Planning Revision Response 与固定后继谱系。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
-| 当前阶段 | `SELFHOST-UAT-FIX-18` 已补齐已处理 Purchase ACCEPT 历史/即时凭证、SUCCESS 提交语义和 Plan 分支 A 状态说明；自动/隔离验收、备份恢复、Web-only 部署及主 UAT 只读验收均通过，主保护指纹和全部下游不变 |
-| 当前任务 | 无自动执行任务；本轮以 `PURCHASE ACCEPTANCE HISTORY FIXED — UAT ACCEPTANCE VERIFIED` 停止。主 UAT purchase Session 已撤销，浏览器业务 POST 0、非目标对象 GET 0；未创建 RFQ 或任何下游单据 |
-| 下一任务 | 已接收 PRQ 和完整决策凭证满足开始采购寻源与询价的业务前置条件；实际创建 RFQ、询价、报价比较或任何下游单据必须由项目负责人另立任务并明确授权，不得从本任务自动继续 |
+| 当前阶段 | `SELFHOST-UAT-FIX-19` 已修复 RFQ 草稿稳定 Purchase Request ID 绑定及规范幂等正文；隔离创建/重放/并发/回滚与完整 Chromium 通过，正式部署和主 UAT 未提交表单验收完成，主保护指纹和全部下游不变 |
+| 当前任务 | 无自动执行任务；本轮以 `RFQ PURCHASE REQUEST ID BINDING FIXED — UAT RFQ NOT CREATED` 停止。主 UAT purchase Session 已撤销，浏览器业务 POST 0；未创建 RFQ、Quote、Award 或任何下游单据 |
+| 下一任务 | 可以在新的明确授权任务中重新开始采购寻源黑盒试用，并从单个 RFQ 草稿开始；Quote、Award、转 PO 或其他下游写仍须按独立授权边界执行，不得从本任务自动继续 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-UAT-FIX-19 已消除 PostgreSQL bigint 字符串 ID 与前端 Number 严格比较导致 request 丢失的根因；Purchase Request/Supplier option 只提交稳定 ID，请求边界一次规范、Supplier 去重排序，Handler/Service 幂等摘要绑定规范 DTO。隔离 RFQ 四行/双 Supplier 创建、重放、并发与故障回滚通过；Web-only 部署及主 UAT 未提交选择验收通过，业务 POST 0、RFQ/Quote/Award/全部下游 0
 
 - SELFHOST-UAT-FIX-18 已从当前 Plan+PRQ 的不可变 Purchase 决策 Event 投影 action/type/actor/上海时间/request_id/SUCCESS 与独立 1/0 计数；已处理和即时凭证均失败关闭且不使用 Session/队列/Audit 补值。Plan 属于分支 A，页面明确为采购交接状态并说明 v1 计算快照不变。备份恢复、Web-only 部署和 purchase-only 主 UAT 只读验收通过；保护指纹不变、业务 POST 0、全部下游 0
 
