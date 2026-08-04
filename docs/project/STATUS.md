@@ -1,6 +1,27 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-03（Asia/Shanghai）
+最后更新时间：2026-08-04（Asia/Shanghai）
+
+## SELFHOST-UAT-FIX-18 采购接收历史凭证与 Plan 状态投影
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | PURCHASE ACCEPTANCE HISTORY FIXED — UAT ACCEPTANCE VERIFIED | 历史/即时 Purchase 决策凭证、SUCCESS 语义、Plan 分支 A 标注、自动/隔离验收、备份恢复、Web-only 部署和主 UAT 只读验收全部完成 |
+| 严格起点 | PASS | clean `main@eff3df28e1781f13dc5a529f13e83e621bda5a28`、Parent `13da8a14d037d279278ef8c8ea86e52d79552512`、behind 0/ahead 127；alpha.38、0001—0037、0037 SHA、FIX-17 Web、四服务/四卷和已接收主 UAT 基线全部吻合 |
+| 功能提交 | PASS | `9d6ed0d0bc728bdaafc619fe609d92d87ebcb188`（`fix: expose purchase acceptance history`）；无 0038、Schema、版本、状态机或历史数据变化 |
+| Purchase 权威 | PASS / IMMUTABLE EVENT | 当前 Plan+PRQ 的唯一 `PURCHASE_ACCEPTED/RETURNED` Event 提供 action/type/actor/time/request_id 与独立计数；PRQ 表提供稳定 ID/状态。禁止由 Session、页面/队列状态或 Audit 补值，事实缺失/矛盾统一 409 失败关闭 |
+| SUCCESS 语义 | PASS / COMMITTED PROJECTION | Event、PRQ/Plan 转换、成功 Audit、Idempotency 同事务提交；只在提交后可读，故完整不可变 Event 投影为 SUCCESS。没有 result 列、失败 Event 或占位 actor/request_id |
+| Plan 投影 | BRANCH A / PASS | 数据库 Plan 和 PRQ 确实分别转为 ACCEPTED；页面分别显示“采购交接状态”和“PRQ 状态”，明确 Plan v1 计算快照/行/分配/来源摘要仍不可变 |
+| 历史/即时 UI | PASS | 独立“采购决策凭证”显示 PR ID/PRQ/决策/Event/Actor/上海时间/SUCCESS/1/0/可复制请求号；与 Package ACCEPT、Plan GENERATE、PRQ SUBMIT 分区；终态无接收/退回/编辑控件 |
+| 自动验证 | PASS | FIX-18 unit/UI 10/10、PG 8/8、隔离 Chromium 1/1、适用静态/UI 63/63、跨域 PG 34/34、Schema/Migration 7/7、npm 3/3、Python 3/3；typecheck/build、lint 0 error/10 warning、1,159 文件凭据扫描和 diff check 通过 |
+| 并发/权限/零写 | PASS | 0/0→1/0、同键重放不重复、异键并发单胜、诱饵隔离、未授权/跨项目 403、历史 GET 零业务写、故障零半记录；接收后全部采购/库存/生产/财务下游仍为 0 |
+| 备份/恢复 | PASS | root:root 0600 custom dump 2,186,157 bytes，SHA-256 `3041980fa1d79e489360bdeacacfe15ee4686673334ee7b8158cea3ca6b7247a`；list 3,285 项、第二空库 37/head 0037/checksum/身份计数/保护指纹一致，恢复库已删 |
+| Web-only 部署 | PASS | Web `97dcabe8…→6eeba640…`，旧 Web 精确 rollback tag 保留；`--no-deps --no-build` 仅替换 Web，PostgreSQL/Worker/Caddy、Migration、Origin、端口和四卷不变，内外 health 通过 |
+| 主 UAT 浏览器 | PASS / READ ONLY | 仅 purchase 登录和目标 PRQ GET；完整凭证、SUCCESS、1/0、Plan/PRQ 状态、三段上游、四行/九供应、复制、刷新、桌面/390px、logout 后历史保护通过。业务 POST 0、其他对象 GET 0、Session revoked |
+| 主 UAT 数据 | PASS / UNCHANGED | 正式保护指纹在部署前、恢复库、UAT 前/旁路停止后/最终后均为 `814811509c476e270f9cd82badb85aa8bb1bf8e1f01e8bb72b4cd9fec9c9a4ff`；PRQ/Plan ACCEPTED、决策 1/0、四行/九供应、Inventory/Allocation 和全部下游不变 |
+| 资源/清理 | PASS | 起点约 2.2 GiB available/309 MiB Swap/21 GiB，终点约 2.1 GiB/257 MiB/21 GiB/Load `0.16/0.33/0.34`；内核 OOM 0、四服务 RestartCount 0/OOM false。任务临时库/容器/网络/Playwright/Python/SQLite/build 路径 0，未 prune，四卷与正式备份/镜像保留 |
+| Git | TWO FOCUSED COMMITS | 功能提交如上；收口提交为 `ops: accept purchase history traceability`，实际 SHA 以 `git log` 为准；不 push/PR/amend/rebase/reset/stash/restore |
+| 后续 | SOURCING PREREQUISITES READY / NEW AUTH REQUIRED | 已接收 PRQ 与完整凭证满足寻源/询价前置条件；实际 RFQ、询价、报价比较或任何下游写必须另立明确授权任务，本任务未创建下游 |
 
 ## SELFHOST-UAT-FIX-17 采购接收确认完整追溯、计数与九项供应
 

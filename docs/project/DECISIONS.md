@@ -1008,6 +1008,18 @@
 - 接收边界：接收确认打开前重新查询当前供应并显示查询时间和四条摘要；该展示不参与服务端自动重算。既有状态、CAS、幂等、CSRF、Origin 和单事务门禁保持，接收仍只形成 Purchase ACCEPT 事实，不修改库存或自动创建 RFQ、PO、收货、AP 等下游。
 - 实施结果：功能提交 `ce3f14a0c989875e7527e42136967f9efe6ee548`，不新增 0038、不修改 0001—0037或 alpha.38；隔离 PostgreSQL/Chromium、备份恢复和 Web-only 部署通过。主 UAT Material 533—536 的当前九项供应分别均为 0 PCS，purchase 打开刷新后的接收确认并取消；`PRQ-00000001` 仍 SUBMITTED，ACCEPT/RETURN、Inventory/Allocation 和全部下游不变。
 
+## D-090 Purchase 决策成功凭证与 Plan 采购交接状态的投影语义
+
+- 日期：2026-08-04
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
+- 确认人：项目负责人（明确要求补齐已处理 Purchase ACCEPT 权威凭证、澄清 Plan/PRQ 状态并禁止重放主 UAT 决策或创建下游）
+- Purchase 权威：采购决定只以 `planning_material_requirement_events` 中同时绑定精确 Plan ID 与 Purchase Request ID 的不可变 `PURCHASE_ACCEPTED` / `PURCHASE_RETURNED` Event 为业务权威。actor、occurred_at、request_id 与 ACCEPT/RETURN 计数直接读取该 Event；稳定 PRQ ID 和状态读取 `planning_purchase_requests`。禁止从当前登录用户、队列数量、页面状态或普通 Audit 反推历史决定。
+- SUCCESS 语义：Event 表没有 result 列。Purchase 决策 Event、PRQ/Plan 状态转换、成功 Audit 和 Idempotency 在同一事务中提交，独立读取只能观察到已提交 Event，回滚不会留下它。因此读模型可以把完整且一致的不可变 Event 投影为 `SUCCESS`；该值表示事务提交后可见的成功业务事实，不表示数据库有 result 列，不允许生成或猜测失败 Event。权威 Event 缺失、重复或与 PRQ actor/time/request_id/终态不一致时必须失败关闭。
+- Plan 状态：既有 Purchase ACCEPT/RETURN 事务会把 `planning_material_requirement_plans.status` 与 PRQ 分别从 `SUBMITTED` 转为对应 `ACCEPTED`/`RETURNED`，并受状态约束、CAS、同事务 Event/Audit/Idempotency 和回滚保护。该字段正式命名为“采购交接状态”，表示计划部到采购部的交接终态；Plan 版本的计算快照、行项目、Allocation 与来源摘要继续不可变，`ACCEPTED` 不表示重新计算或改写快照。
+- UI/DTO 边界：Plan 状态必须读取 `planning_material_requirement_plans.status`，PRQ 状态必须读取 `planning_purchase_requests.status` 并分别展示。Purchase 决策凭证必须与 Package ACCEPT、Plan GENERATE、PRQ SUBMIT 分区，不能冒充 Planning ACCEPT；终态页面不得提供再次接收、退回或编辑动作。
+- 后续边界：Purchase ACCEPT 只形成采购交接事实，不自动创建 RFQ、Quote、Award、PO、Delivery Plan、Receipt、Ledger、AP 或 Work Order。完整 ACCEPTED PRQ 与可追溯凭证满足寻源/询价的业务前置条件，但创建下游仍需新的独立授权任务。
+- 实施结果：功能提交 `9d6ed0d0bc728bdaafc619fe609d92d87ebcb188`；不新增 0038、不修改 0001—0037或 alpha.38。隔离 PostgreSQL/Chromium、备份恢复、Web-only 部署和 purchase-only 主 UAT 只读验收通过；正式保护指纹 `814811509c476e270f9cd82badb85aa8bb1bf8e1f01e8bb72b4cd9fec9c9a4ff` 前后不变，主 UAT 业务 POST 0、下游 0。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

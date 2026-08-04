@@ -33,29 +33,31 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-08-03（Asia/Shanghai）
+快照时间：2026-08-04（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.38`；PostgreSQL 为 37/head `0037_project_planning_revision_response_lineage.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-17` 功能提交为 `13da8a14d037d279278ef8c8ea86e52d79552512`（`fix: complete purchase acceptance confirmation`）；版本仍为 alpha.38，Migration 仍止于 0037 |
-| 当前根仓库运维基线 | Purchase 接收确认已补齐三段完整不可变事件凭证、当前 PRQ 的真实 ACCEPT/RETURN 计数、四个 Material 七项固定数量与九项当前供应、刷新加载窗和前后端失败关闭；自动/隔离验收、备份恢复和 Web-only 部署通过。主 UAT 唯一一次打开窗口后 runner 因“状态”定位二义安全中止且未重跑，最终结论 `PURCHASE DECISION CONFIRMATION FIXED — MAIN UAT NOT VERIFIED` |
-| Git 同步与工作区 | 本任务从 clean `main@af7496babe8b704d04b22ad33bbb98a270519529`、Parent `ce3f14a0c989875e7527e42136967f9efe6ee548`、behind 0/ahead 125 起步；功能提交如上，保护 runner/部署事实/文档由独立 `ops: accept purchase confirmation fix` 收口，完成后应为 ahead 127。未 push/PR/amend/rebase/reset/stash/restore；未读取或修改 `shujvbiao/`，秘密、连接信息、数据库和备份正文未进入 Git |
+| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-18` 功能提交为 `9d6ed0d0bc728bdaafc619fe609d92d87ebcb188`（`fix: expose purchase acceptance history`）；版本仍为 alpha.38，Migration 仍止于 0037 |
+| 当前根仓库运维基线 | 已处理 Purchase Request 和即时完成页均显示精确 Purchase 决策 Event、显式 SUCCESS、独立 1/0 计数和可复制 request_id；Plan 分支 A 明确为“采购交接状态”，与 PRQ 状态分别读取且不暗示快照改写。自动/隔离验收、备份恢复、Web-only 部署和 purchase-only 主 UAT 只读验收全部通过，最终结论 `PURCHASE ACCEPTANCE HISTORY FIXED — UAT ACCEPTANCE VERIFIED` |
+| Git 同步与工作区 | 本任务从 clean `main@eff3df28e1781f13dc5a529f13e83e621bda5a28`、Parent `13da8a14d037d279278ef8c8ea86e52d79552512`、behind 0/ahead 127 起步；功能提交如上，保护 runner、D-090、部署事实和文档由独立 `ops: accept purchase history traceability` 收口，完成后应为 ahead 129。未 push/PR/amend/rebase/reset/stash/restore；未读取或修改 `shujvbiao/`，秘密、连接信息、数据库和备份正文未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0037`，37/head `0037_project_planning_revision_response_lineage.sql`，SHA-256 `139f2623a184ae3d6927c95b56569cc438deffc2a0b46c325c9f04d59471d99f`。主 UAT Package ID 2/v2 为 `ACCEPTED`；Material Requirement Plan ID 1/v1 与 `PRQ-00000001` 均为 `SUBMITTED`（待采购接收），Purchase ACCEPT/RETURN 为 `0/0`、待接收/已处理为 `1/0`。四条 Material 533—536 各为毛需求 10、快照库存可用/分配 0/0、快照在途可用/分配 0/0、净采购 10、PRQ 10 PCS；当前九项供应均为 0 PCS。Inventory Balance/Allocation 与 RFQ/Quote/Award/PO/Delivery Plan/Receipt/Ledger/AP/Work Order 均为 0。正式保护指纹在部署前、第二新空恢复库、UAT 前后均为 `e80ed1795079a3467ba4f05e2751fd8a9575e1b441b2433b371651479ca2cab0`；未接收、退回、修改或重放业务记录 |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已 Web-only 更新为 alpha.38 `sha256:97dcabe8d15c66dc54aec3e6a1f3febf168605b30292fad532177f000e2f18df`，旧 `sha256:d7ced686803c1f5f71ec101ebe28e3080005d534480dd39bfc8a91913ef12a5d` 保留精确回退 tag `chenyida-erp-parallel-web:rollback-purchase-confirmation-fix17-predeploy-20260803T123806Z`；Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。只重建 Web；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false |
+| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0037`，37/head `0037_project_planning_revision_response_lineage.sql`，SHA-256 `139f2623a184ae3d6927c95b56569cc438deffc2a0b46c325c9f04d59471d99f`。主 UAT Package ID 2/v2、Material Requirement Plan ID 1/v1 与 PRQ ID 1 / `PRQ-00000001` 均为 `ACCEPTED`；Plan 的该值是采购交接状态，v1 计算快照未改写。Purchase ACCEPT/RETURN 为 `1/0`、待接收/已处理为 `0/1`。Purchase ACCEPT actor `uat_20260729_purchase`，时间 `2026/08/04 06:06:15 Asia/Shanghai`，request_id `80568b28-47f5-4f58-8901-afc053871998`，读模型结果 SUCCESS。四条 Material 533—536 各为 10 PCS，九项当前供应均为 0；Inventory Balance/Allocation 与 RFQ/Quote/Award/PO/Delivery Plan/Receipt/Ledger/AP/Work Order 均为 0。正式保护指纹在部署前、第二新空恢复库、UAT 前后均为 `814811509c476e270f9cd82badb85aa8bb1bf8e1f01e8bb72b4cd9fec9c9a4ff`；本任务没有再次接收、退回、编辑、重放或创建下游 |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已 Web-only 更新为 alpha.38 `sha256:6eeba6409f51605fe422c39d674ddfa03d5f5079bb546566288336f15296df64`，旧 `sha256:97dcabe8d15c66dc54aec3e6a1f3febf168605b30292fad532177f000e2f18df` 保留精确回退 tag `chenyida-erp-parallel-web:rollback-purchase-history-fix18-predeploy-20260804T020447Z`；Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。只重建 Web；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.38 另提供版本化 Requirement Unit Resolution、Planning Revision Response 与固定后继谱系。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
-| 当前阶段 | `SELFHOST-UAT-FIX-17` 已完成完整事件/计数/九项供应读取合同、失败关闭、确认 UI、隔离旅程、备份恢复与 Web-only 部署；主 UAT 逐项核对未完成，但保护指纹证明主 `PRQ-00000001` 继续待采购接收且全部下游不变 |
-| 当前任务 | 无自动执行任务；本轮以 `PURCHASE DECISION CONFIRMATION FIXED — MAIN UAT NOT VERIFIED` 停止。主 UAT 本次 purchase Session 已 `LOGOUT`，未接收/退回 PRQ，未修改库存/分配，未创建 RFQ 或任何下游单据 |
-| 下一任务 | 若需补做主 UAT 完整逐项核对，必须由项目负责人新建并明确授权独立只读任务；不得在本任务重开确认窗口。任何接收/退回或寻源、询价、报价比较仍需后续独立授权，接收本身不得自动创建下游 |
+| 当前阶段 | `SELFHOST-UAT-FIX-18` 已补齐已处理 Purchase ACCEPT 历史/即时凭证、SUCCESS 提交语义和 Plan 分支 A 状态说明；自动/隔离验收、备份恢复、Web-only 部署及主 UAT 只读验收均通过，主保护指纹和全部下游不变 |
+| 当前任务 | 无自动执行任务；本轮以 `PURCHASE ACCEPTANCE HISTORY FIXED — UAT ACCEPTANCE VERIFIED` 停止。主 UAT purchase Session 已撤销，浏览器业务 POST 0、非目标对象 GET 0；未创建 RFQ 或任何下游单据 |
+| 下一任务 | 已接收 PRQ 和完整决策凭证满足开始采购寻源与询价的业务前置条件；实际创建 RFQ、询价、报价比较或任何下游单据必须由项目负责人另立任务并明确授权，不得从本任务自动继续 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-UAT-FIX-18 已从当前 Plan+PRQ 的不可变 Purchase 决策 Event 投影 action/type/actor/上海时间/request_id/SUCCESS 与独立 1/0 计数；已处理和即时凭证均失败关闭且不使用 Session/队列/Audit 补值。Plan 属于分支 A，页面明确为采购交接状态并说明 v1 计算快照不变。备份恢复、Web-only 部署和 purchase-only 主 UAT 只读验收通过；保护指纹不变、业务 POST 0、全部下游 0
 
 - SELFHOST-UAT-FIX-17 已在 purchase 对象范围内精确投影 Package ACCEPT、Plan GENERATE、PRQ SUBMIT 和真实 Purchase ACCEPT/RETURN 计数；确认打开前重新读取四个 Material 的完整九项供应，缺任一关键字段前后端均失败关闭。自动/隔离 Chromium、备份恢复和 Web-only 部署通过；主 UAT 唯一一次打开确认窗后 runner 定位二义安全中止，未重跑或执行业务决定，PRQ/Inventory/Allocation/全部下游不变，故最终为 `MAIN UAT NOT VERIFIED`
 - SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16 已在 purchase 对象范围内以单一只读快照实时汇总 MAIN 全部 Inventory 位置、Inventory 正式预留/冻结、有效计划库存分配、有效 PO/Delivery Plan 剩余量和有效在途分配；快照、当前值和差异明确分区，模型未记录项诚实标注。接收确认打开前重新查询，四个 Material 分别展示当前摘要；主 UAT 仅登录 purchase、打开详情及确认后取消，四条当前供应九项均为 0，PRQ 仍待接收且库存、Allocation、Purchase ACCEPT/RETURN 和全部下游不变

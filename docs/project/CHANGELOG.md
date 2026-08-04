@@ -2,6 +2,19 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-04
+
+### SELFHOST-UAT-FIX-18 - `fix: expose purchase acceptance history` / `ops: accept purchase history traceability`
+
+- Git/范围：从 strict clean `main@eff3df28e1781f13dc5a529f13e83e621bda5a28`、Parent `13da8a14d037d279278ef8c8ea86e52d79552512`、behind 0/ahead 127 起步；功能提交 `9d6ed0d0bc728bdaafc619fe609d92d87ebcb188`。只修改 Purchase Request 详情读模型、历史/即时凭证 UI、相关测试、保护/UAT runner 和项目文档；不新增 0038、不改 0001—0037/alpha.38，不 push/PR 或改写历史。
+- 权威合同：Purchase ACCEPT/RETURN 只读取同时绑定当前 Plan+PRQ 的不可变 `planning_material_requirement_events`；稳定 PRQ ID/状态分别读取 PRQ 表，Plan 状态读取 Plan 表。Event actor/time/request_id 必须与 PRQ accepted/returned 字段一致，计数必须与终态一致；不从 Session、页面/队列状态或 Audit 推断，缺失/重复/矛盾返回 `409 PURCHASE_REQUEST_CONFIRMATION_INCOMPLETE`。
+- SUCCESS/Plan 语义：决策 Event、PRQ/Plan 转换、成功 Audit 和 Idempotency 同事务提交，独立读取只看到已提交 Event，故读模型可精确投影 `SUCCESS`；不伪造失败 Event。主 Plan 属于分支 A，Purchase ACCEPT 使 Plan 与 PRQ 各自转为 ACCEPTED；页面标注“采购交接状态”，明确 v1 计算快照/行/分配/来源摘要仍不可变。D-090 正式记录该语义。
+- UI：已处理详情新增独立“采购决策凭证”，显示 Purchase Request ID、PRQ、决策/中文、Event 类型、Actor、Asia/Shanghai 时间、显式 SUCCESS、独立 1/0 与可复制 request_id，并与 Package ACCEPT、Plan GENERATE、PRQ SUBMIT 分区。即时成功后重新 GET 权威 Event，不再以当前用户或占位值拼接；终态无接收/退回/编辑控件，桌面和 390×844 无页面横向溢出。
+- 测试：FIX-18 unit/UI 10/10、PostgreSQL 8/8、隔离 Chromium 1/1、适用静态/UI 63/63、跨域 PostgreSQL 34/34、Schema/Migration 7/7、`npm test` 3/3、Python 3/3；typecheck、production/Docker build、lint 0 error/10 warning、1,159 文件凭据扫描和 diff check 通过。覆盖 0/0→1/0、持久 actor/time/request、幂等/并发/CAS、诱饵/权限、零查询写、Web 重启/刷新/重新登录、复制、退出历史保护和零自动下游。
+- 备份/部署：root:root 0600 custom dump 2,186,157 bytes、SHA-256 `3041980fa1d79e489360bdeacacfe15ee4686673334ee7b8158cea3ca6b7247a`，list 3,285 项及第二空库 37/head 0037/checksum/身份计数/完整指纹恢复通过。使用 `--no-deps --no-build` 只替换 Web `sha256:97dcabe8…→sha256:6eeba640…`；PostgreSQL/Worker/Caddy、Migration、Origin、端口和四卷不变，restart 0/OOM false。
+- 主 UAT：只用 `uat_20260729_purchase` 打开目标已处理 PRQ；完整 ACCEPT/SUCCESS/1/0、Plan/PRQ 状态、三段上游、四行 10 PCS、九项供应 0、复制、刷新、桌面/390px 和退出历史保护通过。最终 runner 为 business POST 0、其他对象 GET 0、Session revoked。正式保护指纹在主库、恢复库和全部 UAT 前后均为 `814811509c476e270f9cd82badb85aa8bb1bf8e1f01e8bb72b4cd9fec9c9a4ff`，没有重复决定或下游写。
+- 资源/结论：起点约 2.2 GiB available/309 MiB Swap/21 GiB，终点约 2.1 GiB/257 MiB/21 GiB/Load `0.16/0.33/0.34`；内核 OOM 0、四服务 RestartCount 0/OOM false。临时库/容器/网络/Playwright/Python/SQLite/build 路径清零，正式备份、镜像和四卷保留，未 prune。结论：`PURCHASE ACCEPTANCE HISTORY FIXED — UAT ACCEPTANCE VERIFIED`；已具备寻源/询价业务前置条件，但实际 RFQ/下游写须另立授权任务，本任务停止。
+
 ## 2026-08-03
 
 ### SELFHOST-UAT-FIX-17 - `fix: complete purchase acceptance confirmation` / `ops: accept purchase confirmation fix`
