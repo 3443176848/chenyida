@@ -84,7 +84,10 @@ export class SupplierMappingService {
       join suppliers s on s.id=sm.supplier_id
       join material_master m on m.id=sm.material_id
       join units pu on pu.id=sm.purchase_unit_id
-      left join units bu on bu.id=m.base_unit_id
+      left join units bu on bu.enabled=true and (
+        (m.base_unit_id is not null and bu.id=m.base_unit_id)
+        or (m.base_unit_id is null and nullif(btrim(m.base_uom),'') is not null and upper(bu.code)=upper(btrim(m.base_uom)))
+      )
       left join lateral (
         select e.result,e.event_type,e.actor,e.created_at,e.request_id
         from supplier_mapping_events e where e.mapping_version_id=sm.id order by e.id desc limit 1
@@ -111,8 +114,11 @@ export class SupplierMappingService {
     }
     if (kind === "material") {
       const result = await this.repository.pool.query(`
-        select m.id,m.internal_material_code code,m.standard_name name,m.material_status status,m.base_unit_id,u.code base_unit
-        from material_master m join units u on u.id=m.base_unit_id and u.enabled=true
+        select m.id,m.internal_material_code code,m.standard_name name,m.material_status status,coalesce(m.base_unit_id,u.id) base_unit_id,u.code base_unit
+        from material_master m join units u on u.enabled=true and (
+          (m.base_unit_id is not null and u.id=m.base_unit_id)
+          or (m.base_unit_id is null and nullif(btrim(m.base_uom),'') is not null and upper(u.code)=upper(btrim(m.base_uom)))
+        )
         where m.material_status='ACTIVE' and m.internal_material_code ~ '^CYD-[A-Z0-9_]+-[0-9]{6}$'
           and ($1='' or m.id::text=$1 or m.internal_material_code ilike $1||'%' or m.standard_name ilike '%'||$1||'%')
         order by case when m.id::text=$1 or upper(m.internal_material_code)=upper($1) then 0 when m.internal_material_code ilike $1||'%' then 1 else 2 end,m.internal_material_code,m.id limit $2
@@ -323,11 +329,14 @@ export class SupplierMappingService {
   private async validateReferences(client: PoolClient, input: SupplierMappingDraftInput): Promise<ReferenceRow> {
     const result = await client.query<ReferenceRow>(`
       select s.id supplier_id,s.supplier_code,s.supplier_name,s.status supplier_status,
-        m.id material_id,m.internal_material_code,m.standard_name,m.material_status,m.base_unit_id,m.base_uom,
+        m.id material_id,m.internal_material_code,m.standard_name,m.material_status,coalesce(m.base_unit_id,bu.id) base_unit_id,m.base_uom,
         bu.code internal_unit_code,bu.enabled internal_unit_enabled,
         pu.id purchase_unit_id,pu.code purchase_unit_code,pu.enabled purchase_unit_enabled
       from suppliers s cross join material_master m cross join units pu
-      left join units bu on bu.id=m.base_unit_id
+      left join units bu on bu.enabled=true and (
+        (m.base_unit_id is not null and bu.id=m.base_unit_id)
+        or (m.base_unit_id is null and nullif(btrim(m.base_uom),'') is not null and upper(bu.code)=upper(btrim(m.base_uom)))
+      )
       where s.id=$1 and m.id=$2 and pu.id=$3
     `, [input.supplierId, input.materialId, input.purchaseUnitId]);
     const reference = rowData(result.rows, "MAPPING_REFERENCE_NOT_FOUND", "供应商、物料或单位不存在", 422);
@@ -335,7 +344,8 @@ export class SupplierMappingService {
     if (reference.material_status !== "ACTIVE" || !FORMAL_MATERIAL_CODE.test(reference.internal_material_code)) {
       throw new SupplierMappingError("MATERIAL_NOT_FORMAL_ACTIVE", "Material 必须为 ACTIVE 且具有正式内部编码", 422);
     }
-    if (!reference.base_unit_id || !reference.internal_unit_enabled || reference.base_uom !== reference.internal_unit_code) {
+    if (!reference.base_unit_id || !reference.internal_unit_enabled
+      || String(reference.base_uom || "").trim().toUpperCase() !== String(reference.internal_unit_code || "").trim().toUpperCase()) {
       throw new SupplierMappingError("MATERIAL_BASE_UNIT_INVALID", "Material 必须具有一致且启用的主单位", 422);
     }
     if (!reference.purchase_unit_enabled) throw new SupplierMappingError("SUPPLIER_UNIT_NOT_ACTIVE", "Supplier Unit 必须为启用单位", 422);

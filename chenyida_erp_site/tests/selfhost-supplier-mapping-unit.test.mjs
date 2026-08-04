@@ -86,6 +86,7 @@ test("RFQ request builder refuses disabled coverage rows even when a forged chec
 
 test("mapping and RFQ server paths share one authoritative current 1:1 coverage query and legacy writes are closed", async () => {
   const coverage = await readFile(new URL("../app/lib/supplier-mapping-selfhost/coverage.ts", import.meta.url), "utf8");
+  const mappingService = await readFile(new URL("../app/lib/supplier-mapping-selfhost/service.ts", import.meta.url), "utf8");
   const sourcing = await readFile(new URL("../app/lib/procurement-sourcing-selfhost/service.ts", import.meta.url), "utf8");
   const legacyHandler = await readFile(new URL("../app/lib/master-data-selfhost/handler.ts", import.meta.url), "utf8");
   const legacyService = await readFile(new URL("../app/lib/master-data-selfhost/service.ts", import.meta.url), "utf8");
@@ -93,6 +94,9 @@ test("mapping and RFQ server paths share one authoritative current 1:1 coverage 
     "sm.status='ACTIVE'", "sm.conversion_numerator=sm.conversion_denominator", "sm.valid_from<=statement_timestamp()",
     "sm.valid_to is null or sm.valid_to>statement_timestamp()", "mapping_match.mapping_count=1",
   ]) assert.match(coverage, new RegExp(predicate.replace(/[()]/g, "\\$&")));
+  assert.match(coverage, /m\.base_unit_id is null[\s\S]*upper\(u\.code\)=upper\(btrim\(m\.base_uom\)\)/);
+  assert.match(mappingService, /coalesce\(m\.base_unit_id,u\.id\) base_unit_id/);
+  assert.match(mappingService, /m\.base_unit_id is null[\s\S]*upper\(u\.code\)=upper\(btrim\(m\.base_uom\)\)/);
   assert.match(sourcing, /loadSupplierMappingCoverage\(client, requestId, suppliers\)/);
   assert.match(sourcing, /loadSupplierMappingCoverage\(client, Number\(rfq\.purchase_request_id\), supplierIds\)/);
   assert.match(sourcing, /requireRfqCoverage\(coverage, suppliers\)/);

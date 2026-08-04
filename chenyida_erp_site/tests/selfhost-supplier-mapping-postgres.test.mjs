@@ -406,6 +406,35 @@ test("supplier-part, active-period, unit, validity and controlled replacement co
   ]);
 });
 
+test("legacy formal material base_uom resolves to one enabled stable Unit for mapping and RFQ coverage", async () => {
+  const refs = await seed();
+  await pool.query("update material_master set base_unit_id=null where id=$1", [refs.materialIds[0]]);
+  await pool.query("update material_master set base_unit_id=null,base_uom='NO_SUCH_UNIT' where id=$1", [refs.materialIds[1]]);
+
+  const options = await mappingApi(`/api/supplier-mappings/options?type=material&limit=20&q=${refs.materialCodes[0]}`);
+  assert.equal(options.response.status, 200);
+  assert.deepEqual(options.payload.data.map((row) => ({ id: row.id, base_unit_id: row.base_unit_id, base_unit: row.base_unit })), [
+    { id: refs.materialIds[0], base_unit_id: refs.unitId, base_unit: "T20PCS" },
+  ]);
+  const invalidOptions = await mappingApi(`/api/supplier-mappings/options?type=material&limit=20&q=${refs.materialCodes[1]}`);
+  assert.deepEqual(invalidOptions.payload.data, []);
+  const invalidCreate = await mappingApi("/api/supplier-mappings", {
+    method: "POST", body: mappingBody(refs, refs.supplierA, 1, "LEGACY-INVALID-UNIT"),
+  });
+  assert.equal(invalidCreate.response.status, 422);
+  assert.equal(invalidCreate.payload.code, "MATERIAL_BASE_UNIT_INVALID");
+
+  await createSubmitApprove(refs, refs.supplierA, 0, "LEGACY-BASE-UOM");
+  const purchaseRequestId = await seedAcceptedPurchaseRequest(refs);
+  const coverage = await sourcingApi(`/api/procurement/rfqs/coverage?purchase_request_id=${purchaseRequestId}`);
+  assert.equal(coverage.response.status, 200);
+  const supplier = coverage.payload.data.find((row) => row.supplier_id === refs.supplierA);
+  assert.deepEqual({ covered: supplier.covered_count, required: supplier.required_count, selectable: supplier.selectable }, {
+    covered: 1, required: 4, selectable: false,
+  });
+  assert.deepEqual(supplier.missing.map((row) => row.material_id), refs.materialIds.slice(1));
+});
+
 test("fault injection rolls back mapping, claim, lifecycle event, audit and idempotency atomically", async () => {
   const refs = await seed();
   const body = mappingBody(refs, refs.supplierA, 0, "FAULT-CREATE");

@@ -30,7 +30,9 @@ export async function loadSupplierMappingCoverage(
 ): Promise<SupplierMappingCoverage[]> {
   const result = await database.query(`
     with requested_lines as (
-      select distinct l.material_id,l.unit_id,m.internal_material_code,m.standard_name,m.material_status,m.base_unit_id,u.code unit_code
+      select distinct l.material_id,l.unit_id,m.internal_material_code,m.standard_name,m.material_status,u.code unit_code,
+        ((m.base_unit_id is not null and m.base_unit_id=l.unit_id)
+          or (m.base_unit_id is null and nullif(btrim(m.base_uom),'') is not null and upper(u.code)=upper(btrim(m.base_uom)))) base_unit_matches
       from planning_purchase_request_lines l
       join material_master m on m.id=l.material_id
       join units u on u.id=l.unit_id
@@ -44,7 +46,7 @@ export async function loadSupplierMappingCoverage(
         supplier_scope.supplier_status='ACTIVE'
           and requested_lines.material_status='ACTIVE'
           and requested_lines.internal_material_code ~ '^CYD-[A-Z0-9_]+-[0-9]{6}$'
-          and requested_lines.base_unit_id=requested_lines.unit_id
+          and requested_lines.base_unit_matches
           and mapping_match.mapping_count=1 covered,
         mapping_match.mapping_rows
       from supplier_scope
