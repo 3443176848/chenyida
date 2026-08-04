@@ -2,6 +2,25 @@
 
 最后更新时间：2026-08-04（Asia/Shanghai）
 
+## SELFHOST-OPS-TARGETED-OPERATIONS-IDENTITY-RECOVERY-13 operations 定向离线身份最终化
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | OPERATIONS IDENTITY RECOVERED — BROWSER VERIFICATION INCOMPLETE | 数据库与 Canonical 身份最终化、Session 收口、备份恢复、业务保护和服务恢复通过；浏览器真实 LOGIN/LOGOUT success，但完整页面/历史断言未完成 |
+| 严格起点 | PASS | clean `main@b7221a94375487a9656fff84f46dbabb95a5a26a`、behind 0/ahead 135；alpha.39、0001—0038、0038 SHA、Web `c1576bd2…`、Canonical v2/v2.1、目标 v6/must-change=true、Mapping/下游零事实全部吻合 |
+| 定向能力 | PASS / FAIL CLOSED | 固定 operations、role/active/version、UUID run-id、确认短语、root、非生产数据库、0038、Web/Worker 停写和镜像；拒绝通配/列表/其他账号/重复 run-id。密码只经 CSPRNG+匿名管道进入 CLI/候选 |
+| 自动验证 | PASS | targeted unit 5/5、legacy unit 9/9、隔离 PostgreSQL 4/4、适用 typecheck/lint、npm 3/3、credentials 1,202 文件与 diff check；覆盖单目标、其他账号秘密/非秘密保持、Session/审计、故障零半记录与候选补偿 |
+| 备份/恢复 | PASS | root:root 0600 dump 2,212,808 bytes，SHA-256 `9b18cb329dfe8775b03f5288a900b31f0ebb7d5d6599c91d1a40a6a8605269cd`；`pg_restore --list` 3,321 项，第二空库 38/head 0038、225 表、身份计数和 FIX-20 保护事实一致，恢复库已删，正式备份保留 |
+| 正式事务 | PASS | run-id `e0fec2fb-3894-4a19-93af-79eb85d9dfd4`；只把 operations must-change `true→false`、version `6→7`，username/role/active 保持；恢复审计 1，事务撤销既有 Session 0 |
+| 其他身份 | PASS / UNCHANGED | 其他十个受控账号的非敏感与秘密指纹、全部其他账号及其他 Session 指纹在事务内相同；Canonical 其他九个 UAT 账号全部字段和密码保持，正式后十个其他受控账号仍精确 active |
+| Canonical | SCHEMA_PASS / CONSISTENT | 候选 10 账号、0 错误、差异恰好 2；正式 v2、validator v2.1、writer v2，10 账号/0 错误/PASS、operations false、root:root 0600、单硬链接、候选消失；受控内存比对与真实登录证明密码和数据库 hash 一致 |
+| Session/审计 | PASS | 正式事务撤销 0；attempt-2 创建的验证 Session 由 logout 撤销 1；两次失败 cleanup 各撤销 0。最终 operations 未撤销/有效 Session `0/0`；`OFFLINE_IDENTITY_RECOVERY` 恰好 1，cleanup 与 LOGIN/LOGOUT 为独立审计动作 |
+| 浏览器 | INCOMPLETE / SAFE LOGOUT | attempt-1 在登录前因缺临时模块 fail closed；attempt-2 通过匿名页并产生 LOGIN success，但 verifier 错误要求 `/api/login` 返回 `authenticated` 而提前失败，随后 `/api/session` 识别认证并 LOGOUT success。未完成浏览器 must-change/角色页面和 back/forward/refresh，不再重跑 |
+| 业务保护 | PASS / UNCHANGED | 排除身份/系统表的全业务指纹前后为 `c55aff391533a1c508fdfdaa42fa3ebc4d0868a25b7585ccdeefaf14b3554b36`（217 表/203 序列）；Mapping/RFQ/Quote/Award `0/0/0/0`，PRQ ACCEPTED、Supplier 1/2、Material 533—536 与 PO/收货/库存/财务/生产下游均保持 |
+| 服务 | PASS | Web/PostgreSQL healthy，Worker/Caddy running；Web/Worker 原镜像保持，四服务 RestartCount 0、OOM false，HTTP health 200；无版本、Migration、Compose、Volume 或部署变化 |
+| 资源/清理 | PASS | 起点 available memory 约 2.2 GiB、Swap 257 MiB、根盘 20 GiB、Load `0.03/0.16/0.22`；终点 2.2 GiB、256 MiB、20 GiB、Load `0.45/0.61/0.36`，任务期内核 OOM 0、Docker OOM/restart event 0。临时库/恢复库/runner/网络/Profile/模块/候选/证据已清零，正式备份与四个受保护 Volume 保留，未 prune |
+| Git/后续 | TWO FOCUSED COMMITS / MAPPING NOT RELEASED | 功能 `7b95b13cd1e6c64d0f7fd4536e3456ca2a9d25db`；收口消息 `ops: activate operations UAT identity safely`。不 push/PR；先另立 verifier 只读复验任务，完成后仍需独立 Mapping 授权，当前不创建八条 Mapping |
+
 ## SELFHOST-OPS-CANONICAL-SCHEMA-RECONCILIATION-12 Canonical UAT 凭据 Schema 对齐
 
 | 验证项 | 结果 | 说明 |

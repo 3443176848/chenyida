@@ -4,6 +4,17 @@
 
 ## 2026-08-04
 
+### SELFHOST-OPS-TARGETED-OPERATIONS-IDENTITY-RECOVERY-13 - `feat: add targeted offline identity recovery` / `ops: activate operations UAT identity safely`
+
+- Git/范围：从 strict clean `main@b7221a94375487a9656fff84f46dbabb95a5a26a`、behind 0/ahead 135 起步；功能提交 `7b95b13cd1e6c64d0f7fd4536e3456ca2a9d25db`。只新增 operations 单账号离线最终化 CLI/runner/测试并执行经授权的非生产 UAT 恢复；不改 alpha.39、0001—0038、镜像、角色/权限或业务代码，不 push/PR。
+- 安全模式：精确绑定 operations、role/active/version、UUID run-id、确认短语、root、非生产数据库、0038、Web/Worker 停写和固定镜像；禁止通配/列表/其他账号/重复 run-id。密码由 CSPRNG 生成，只经匿名管道在内存中进入强哈希和 v2 候选；候选必须 root:root 0600、十账号、v2.1 PASS且只存在 password/must-change 两项差异。
+- 事务/补偿：SERIALIZABLE 单事务锁定账号与 Migration，CAS 更新目标密码、must-change/version，撤销目标 Session并写唯一恢复审计/run marker；事务内证明其他账号非敏感/秘密指纹、其他 Session和业务指纹不变。Canonical 只在数据库提交后原子提升/fsync；保留候选补偿只复用同一 run-id/密码，禁止生成第二密码。
+- 测试：targeted unit 5/5、legacy unit 9/9、隔离 PostgreSQL 4/4、适用 typecheck/lint、npm 3/3、1,202 文件 credentials scan 和 diff check 通过。覆盖单目标十一身份、强哈希、Session/审计、重复 run、错误目标/role/version/database/Migration/service、候选/数据库/提升故障、事务零半记录和浏览器失败清理。
+- 备份：正式 prewrite dump root:root 0600、2,212,808 bytes、SHA-256 `9b18cb329dfe8775b03f5288a900b31f0ebb7d5d6599c91d1a40a6a8605269cd`；`pg_restore --list` 3,321 项，第二空库 38/head 0038、225 表、身份计数、FIX-20 指纹和业务零事实恢复一致。恢复库已删，备份保留。
+- 正式结果：run-id `e0fec2fb-3894-4a19-93af-79eb85d9dfd4` 只把 operations must-change `true→false`、version `6→7`；username/role/active、其他十个受控账号、其他全部账号/Session 与业务表保持。恢复事务既有 Session 撤销 0、恢复审计恰好 1；Canonical 10 账号/0 错误/PASS、root:root 0600且与数据库秘密一致，候选消失。
+- 浏览器：attempt-1 在登录前因未预置临时 Playwright 模块 fail closed并清理 0 Session；固定版本模块断网启停自检后唯一 attempt-2 实际产生 LOGIN success，但 verifier 错误要求 `/api/login` 响应含 `authenticated` 而报失败，随后 best-effort Session 检查产生 LOGOUT success。最终有效 Session 0；按两次上限不修复后重跑，页面 must-change/角色与 back/forward/refresh 未完成。
+- 业务/服务/结论：排除身份/系统表的业务指纹前后均为 `c55aff391533a1c508fdfdaa42fa3ebc4d0868a25b7585ccdeefaf14b3554b36`；Mapping/RFQ/Quote/Award `0/0/0/0`，PRQ、Supplier 1/2、Material 533—536 和全部下游不变。原 Web/Worker 恢复，四服务 restart 0/OOM false；临时库/容器/网络/Profile/候选/模块清零，四卷保留。结论 `OPERATIONS IDENTITY RECOVERED — BROWSER VERIFICATION INCOMPLETE`；本任务不放行八条 Mapping。
+
 ### SELFHOST-OPS-CANONICAL-SCHEMA-RECONCILIATION-12 - `fix: diagnose canonical credential schema safely`
 
 - Git/范围：从 strict clean `main@2f2a62b81622afd708538da5f9cfd9afc835dda6`、Parent `1e9221d90db621becc2badf40b3e0ed3017b73e6`、behind 0/ahead 134 起步；只修改离线恢复 Canonical Schema/解析验证边界、脱敏诊断 CLI、合成测试和项目文档。不访问 PostgreSQL、正式 API、浏览器、身份或业务数据，不改 Migration、版本、镜像、Compose 或部署。

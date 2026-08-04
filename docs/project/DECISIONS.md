@@ -1044,6 +1044,18 @@
 - 诊断边界：权威 CLI 提供 root-only、固定路径、`O_NOFOLLOW`、断网可运行且在建立 PostgreSQL Pool 前返回的 `--diagnose-schema`。输出只含版本、脱敏 Pointer、Schema 关键字、预期/实际类型、白名单用户名/角色、账号数和错误数；密码、秘密、摘要、Token、Cookie、注释和实际字段值不得输出，秘密字段名固定为 `<redacted>`。
 - 实施结果：根因唯一分类 A；修复后正式 Canonical 为 10 账号、0 错误、`SCHEMA_PASS`，正式文件字节和全部账号语义未变，没有身份/API/PostgreSQL/服务或业务写入。operations 首次改密可以在新的明确授权 Identity 任务中重新执行，本决定本身不授权登录或改密。
 
+## D-093 单账号最终化必须使用定向离线事务与两项 Canonical 差异
+
+- 日期：2026-08-04
+- 状态：`ACCEPTED / IMPLEMENTED / APPLIED TO PARALLEL NON-PRODUCTION UAT`
+- 确认人：项目负责人（明确授权只恢复 `uat_20260729_operations`，禁止修改其他账号和业务数据）
+- 精确范围：单账号最终化模式只接受固定用户名 `uat_20260729_operations`、role=operations、active=true、预期 version、UUID v4 run-id 和绑定全部参数的显式确认短语；通配符、列表、其他用户名、隐式全账号、重复 run-id、非 root、非 UAT 数据库、非 0038、Web/Worker 未停写或镜像不符全部失败关闭。该模式不是可供日常调用的通用账号重置 API。
+- 秘密与 Canonical：新最终密码只能由 CSPRNG 产生，并经匿名管道在受控内存中同时提供给密码哈希和 Canonical v2 写入器；不得进入参数、环境变量、日志或终端。正式文件同目录候选必须 root:root 0600、十账号、v2/v2.1 `SCHEMA_PASS`，且相对正式 Canonical 只允许 operations password 和 `must_change_password true→false` 两项语义差异；其他九个 UAT 账号全部字段与密码保持。
+- 事务与补偿：SERIALIZABLE 单事务锁定账号与 Migration，使用预期 role/active/version CAS 更新目标 password hash、must-change、version，撤销该账号全部 Session，并写唯一不可变 `OFFLINE_IDENTITY_RECOVERY` 审计和永久 run-id marker。事务内必须证明其他账号的非敏感/秘密指纹、其他 Session 和业务表不变。数据库成功后才可原子提升并 fsync 候选；提升失败保持停写、保留同一候选，只允许同 run-id 补偿提升，禁止生成第二个密码。
+- 浏览器失败边界：正式浏览器只允许目标身份 API、匿名根页与静态资产，不进入业务页面；失败后必须离线撤销目标验证 Session且不改密码。最多 attempt 1/2；第二次仍因运行器或定位失败即按浏览器不完整收口，不得修复后继续重跑。
+- 实施结果：run-id `e0fec2fb-3894-4a19-93af-79eb85d9dfd4` 只把 operations must-change `true→false`、version `6→7`，事务既有 Session 撤销 0、恢复审计 1、最终有效 Session 0；Canonical 与数据库秘密一致，其他身份和业务指纹保持。Chromium attempt-2 实际形成 `LOGIN success` 与 `LOGOUT success`，但 verifier 错误要求 `/api/login` 响应含 `authenticated`，未完成页面 must-change 与历史导航断言，因此结论为 `OPERATIONS IDENTITY RECOVERED — BROWSER VERIFICATION INCOMPLETE`。
+- 后续边界：本决定不授权 Mapping 业务。完整浏览器验收未补齐前不放行 purchase 创建/提交八条 Mapping；修复 verifier 和只读复验必须是新的明确授权任务，Mapping 创建/提交/异人审核仍需独立业务授权。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
