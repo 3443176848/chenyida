@@ -5,6 +5,7 @@ import { Pool } from "pg";
 import { handleMasterDataApi } from "../app/lib/master-data-selfhost/handler.ts";
 import { handleBomApi } from "../app/lib/bom-selfhost/handler.ts";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
+import { insertActiveSupplierMappingFixture } from "./helpers/supplier-mapping-fixture.mjs";
 
 const databaseUrl = process.env.TEST_MASTER_DATA_DATABASE_URL;
 if (!databaseUrl || !/master_data_test/i.test(databaseUrl)) throw new Error("isolated TEST_MASTER_DATA_DATABASE_URL containing master_data_test is required");
@@ -79,14 +80,19 @@ test("customer supplier product BOM mapping and inventory-backed readiness compl
   const revision = await api(handleBomApi, `/api/boms/${bomId}/versions`, { method: "POST", role: "engineering", body: { expected_version: 2, version_code: "B0" } });
   assert.equal(revision.response.status, 201);
 
-  const mapping = await api(handleMasterDataApi, "/api/mappings", { method: "POST", role: "purchase", body: { supplier_id: supplier.payload.data.id, material_id: material.rows[0].id, purchase_unit_id: unit.rows[0].id, supplier_item_code: "V-100", valid_from: "2026-01-01T00:00:00.000Z" } });
-  assert.equal(mapping.response.status, 201);
-  const price = await api(handleMasterDataApi, `/api/mappings/${mapping.payload.data.id}/prices`, { method: "POST", role: "purchase", body: { price: "12.345600", minimum_order_qty: "0", currency_code: "CNY", price_uom: "PCS", effective_from: "2026-01-01T00:00:00.000Z" } });
+  const blockedMapping = await api(handleMasterDataApi, "/api/mappings", { method: "POST", role: "purchase", body: { supplier_id: supplier.payload.data.id, material_id: material.rows[0].id, purchase_unit_id: unit.rows[0].id, supplier_item_code: "V-100", valid_from: "2026-01-01T00:00:00.000Z" } });
+  assert.equal(blockedMapping.response.status, 409); assert.equal(blockedMapping.payload.code, "SUPPLIER_MAPPING_GOVERNANCE_REQUIRED");
+  const mapping = await insertActiveSupplierMappingFixture(pool, `insert into supplier_mappings(
+    material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,purchase_uom,purchase_unit_id,
+    conversion_numerator,conversion_denominator,status,valid_from,created_by,updated_by,request_id
+  ) values($1,$2,'合成供应商',$3,'V-100','PCS',$4,1,1,'ACTIVE','2026-01-01T00:00:00.000Z','test','test',$5) returning id`, [material.rows[0].id, supplier.payload.data.id, supplier.payload.data.supplier_code, unit.rows[0].id, randomUUID()]);
+  const mappingId = Number(mapping.rows[0].id);
+  const price = await api(handleMasterDataApi, `/api/mappings/${mappingId}/prices`, { method: "POST", role: "admin", body: { price: "12.345600", minimum_order_qty: "0", currency_code: "CNY", price_uom: "PCS", effective_from: "2026-01-01T00:00:00.000Z" } });
   assert.equal(price.response.status, 201);
-  const invalidPricePeriod = await api(handleMasterDataApi, `/api/mappings/${mapping.payload.data.id}/prices`, { method: "POST", role: "purchase", body: { price: "1", currency_code: "CNY", price_uom: "PCS", effective_from: "invalid-date" } });
+  const invalidPricePeriod = await api(handleMasterDataApi, `/api/mappings/${mappingId}/prices`, { method: "POST", role: "admin", body: { price: "1", currency_code: "CNY", price_uom: "PCS", effective_from: "invalid-date" } });
   assert.equal(invalidPricePeriod.response.status, 400); assert.equal(invalidPricePeriod.payload.code, "REQUEST_VALIDATION_FAILED");
-  const mappingInactive = await api(handleMasterDataApi, `/api/mappings/${mapping.payload.data.id}/status`, { method: "PATCH", role: "purchase", body: { status: "INACTIVE", expected_version: 1 } });
-  assert.equal(mappingInactive.response.status, 200); assert.equal(mappingInactive.payload.data.version, 2);
+  const mappingInactive = await api(handleMasterDataApi, `/api/mappings/${mappingId}/status`, { method: "PATCH", role: "admin", body: { status: "INACTIVE", expected_version: 1 } });
+  assert.equal(mappingInactive.response.status, 409); assert.equal(mappingInactive.payload.code, "SUPPLIER_MAPPING_GOVERNANCE_REQUIRED");
   const productInactive = await api(handleMasterDataApi, `/api/products/${productId}/status`, { method: "PATCH", role: "engineering", body: { status: "INACTIVE", expected_version: 2 } });
   assert.equal(productInactive.response.status, 200); assert.equal(productInactive.payload.data.version, 3);
   const staleProduct = await api(handleMasterDataApi, `/api/products/${productId}/status`, { method: "PATCH", role: "engineering", body: { status: "ACTIVE", expected_version: 2 } });
@@ -317,10 +323,11 @@ test("permission CSRF active-reference overlap concurrency and rollback protecti
   assert.deepEqual(created.map((item) => item.response.status), [201, 201]); assert.equal(new Set(created.map((item) => item.payload.customer_code)).size, 2);
   const supplier = await api(handleMasterDataApi, "/api/suppliers", { method: "POST", role: "purchase", body: { supplier_name: "重叠供应商" } });
   const material = await pool.query("select id from material_master limit 1"); const unit = await pool.query("select id from units limit 1");
-  const first = await api(handleMasterDataApi, "/api/mappings", { method: "POST", role: "purchase", body: { supplier_id: supplier.payload.data.id, material_id: material.rows[0].id, purchase_unit_id: unit.rows[0].id, supplier_item_code: "OVERLAP", valid_from: "2026-01-01T00:00:00Z" } }); assert.equal(first.response.status, 201);
+  const first = await api(handleMasterDataApi, "/api/mappings", { method: "POST", role: "purchase", body: { supplier_id: supplier.payload.data.id, material_id: material.rows[0].id, purchase_unit_id: unit.rows[0].id, supplier_item_code: "OVERLAP", valid_from: "2026-01-01T00:00:00Z" } }); assert.equal(first.response.status, 409); assert.equal(first.payload.code, "SUPPLIER_MAPPING_GOVERNANCE_REQUIRED");
   const overlap = await api(handleMasterDataApi, "/api/mappings", { method: "POST", role: "purchase", body: { supplier_id: supplier.payload.data.id, material_id: material.rows[0].id, purchase_unit_id: unit.rows[0].id, supplier_item_code: "OVERLAP", valid_from: "2026-06-01T00:00:00Z" } }); assert.equal(overlap.response.status, 409);
   await pool.query("update material_master set material_status='FROZEN' where id=$1", [material.rows[0].id]);
-  const inactive = await api(handleMasterDataApi, "/api/mappings", { method: "POST", role: "purchase", body: { supplier_id: supplier.payload.data.id, material_id: material.rows[0].id, purchase_unit_id: unit.rows[0].id, supplier_item_code: "FROZEN", valid_from: "2026-01-01T00:00:00Z" } }); assert.equal(inactive.response.status, 422);
+  const inactive = await api(handleMasterDataApi, "/api/mappings", { method: "POST", role: "purchase", body: { supplier_id: supplier.payload.data.id, material_id: material.rows[0].id, purchase_unit_id: unit.rows[0].id, supplier_item_code: "FROZEN", valid_from: "2026-01-01T00:00:00Z" } }); assert.equal(inactive.response.status, 409); assert.equal(inactive.payload.code, "SUPPLIER_MAPPING_GOVERNANCE_REQUIRED");
+  assert.equal(Number((await pool.query("select count(*) count from supplier_mappings")).rows[0].count), 0);
   await pool.query(`create or replace function fail_master_audit_for_test() returns trigger language plpgsql as $$ begin if new.action='CUSTOMER_CREATED' then raise exception 'forced audit failure'; end if; return new; end $$`);
   await pool.query("create trigger fail_master_audit_for_test before insert on audit_log for each row execute function fail_master_audit_for_test()");
   const failed = await api(handleMasterDataApi, "/api/customers", { method: "POST", role: "sales", key: "rollback-customer-key", body: { customer_name: "必须回滚客户" } }); assert.equal(failed.response.status, 500);

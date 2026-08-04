@@ -6,6 +6,7 @@ import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts"
 import { handleProcurementApi } from "../app/lib/procurement-selfhost/handler.ts";
 import { ProcurementRepository } from "../app/lib/procurement-selfhost/repository.ts";
 import { ProcurementService } from "../app/lib/procurement-selfhost/service.ts";
+import { insertActiveSupplierMappingFixture } from "./helpers/supplier-mapping-fixture.mjs";
 
 const databaseUrl = process.env.TEST_PROCUREMENT_DATABASE_URL;
 if (!databaseUrl || !/procurement_test/i.test(databaseUrl)) throw new Error("isolated TEST_PROCUREMENT_DATABASE_URL containing procurement_test is required");
@@ -33,7 +34,7 @@ async function seed() {
     ('SUP-000001','启用供应商','启用供应商','ACTIVE','test','test',$1),('SUP-000002','停用供应商','停用供应商','INACTIVE','test','test',$2)`, [randomUUID(), randomUUID()]);
   const supplier = await pool.query("select id,status from suppliers order by id"); const materials = await pool.query("select id,base_unit_id,material_status from material_master order by id");
   const mappings = [];
-  for (let index = 0; index < 2; index += 1) { const result = await pool.query(`insert into supplier_mappings(material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,purchase_uom,purchase_unit_id,conversion_numerator,conversion_denominator,status,valid_from,created_by,updated_by,request_id)
+  for (let index = 0; index < 2; index += 1) { const result = await insertActiveSupplierMappingFixture(pool, `insert into supplier_mappings(material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,purchase_uom,purchase_unit_id,conversion_numerator,conversion_denominator,status,valid_from,created_by,updated_by,request_id)
       values($1,$2,'启用供应商','SUP-000001',$3,'PCS',$4,1,1,'ACTIVE',now()-interval '1 day','test','test',$5) returning id`, [materials.rows[index].id, supplier.rows[0].id, `S-${index + 1}`, pcs.id, randomUUID()]); mappings.push(result.rows[0]);
     await pool.query(`insert into supplier_mapping_price_history(supplier_mapping_id,price,currency_code,price_uom,effective_from,created_by,request_id) values($1,$2,'CNY','PCS',now()-interval '1 day','test',$3)`, [result.rows[0].id, String(index + 1), randomUUID()]); }
   return { supplierId: Number(supplier.rows[0].id), inactiveSupplierId: Number(supplier.rows[1].id), one: materials.rows[0], two: materials.rows[1], draft: materials.rows[2], pcs, box, mappingOne: mappings[0], mappingTwo: mappings[1] };

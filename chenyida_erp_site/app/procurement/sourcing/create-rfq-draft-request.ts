@@ -7,6 +7,7 @@ export type SelectablePurchaseRequest = Readonly<{
 
 export type SelectableSupplier = Readonly<{
   id: StableOptionId;
+  selectable?: boolean;
 }>;
 
 export type CreateRfqDraftRequest = Readonly<{
@@ -77,7 +78,7 @@ export function buildCreateRfqDraftRequest(
   }
 
   const availableSupplierIds = new Set(
-    suppliers.map((supplier) => stableOptionValue(supplier.id, "supplier_ids")),
+    suppliers.filter((supplier) => supplier.selectable !== false).map((supplier) => stableOptionValue(supplier.id, "supplier_ids")),
   );
   const selectedSupplierIds = form.supplierIds.map((value) => {
     if (typeof value !== "string" || !availableSupplierIds.has(value)) {
@@ -86,7 +87,7 @@ export function buildCreateRfqDraftRequest(
     return positiveDecimalFormId(value, "supplier_ids");
   });
   const supplierIds = [...new Set(selectedSupplierIds)].sort((left, right) => left - right);
-  if (!supplierIds.length) throw new RfqDraftRequestError("请至少选择一个 ACTIVE 供应商");
+  if (!supplierIds.length) throw new RfqDraftRequestError("请至少选择一个 Mapping 覆盖率完整的 ACTIVE 供应商");
 
   return {
     purchase_request_id: purchaseRequestId,

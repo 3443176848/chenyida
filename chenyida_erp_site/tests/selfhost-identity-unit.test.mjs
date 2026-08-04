@@ -24,8 +24,11 @@ test("role allowlist and server-side permission matrix are fixed", () => {
   assert.ok(permissionsForRole("purchase").includes("material.read"));
 });
 
-test("operations receives only the material review permission increment", () => {
+test("operations receives only the governed material and supplier-mapping review increments", () => {
   const reviewPermissions = ["material.review.queue", "material.review.approve", "material.review.reject"];
+  const supplierMappingReviewPermissions = [
+    "supplier_mapping.read", "supplier_mapping.review_queue", "supplier_mapping.approve", "supplier_mapping.reject",
+  ];
   const baselinePermissions = [
     "dashboard.management.read", "dashboard.read", "finance.read", "inventory.read", "master.bom.read",
     "master.customer.read", "master.product.read", "master.supplier.read", "master.supplier_mapping.read",
@@ -33,17 +36,22 @@ test("operations receives only the material review permission increment", () => 
     "production.work_center.manage", "production.work_center.read", "quality.read", "sales.read",
   ];
   const operations = permissionsForRole("operations");
-  assert.deepEqual(operations.filter((permission) => !reviewPermissions.includes(permission)), baselinePermissions);
-  for (const permission of reviewPermissions) assert.ok(operations.includes(permission), permission);
+  const governedReviewPermissions = [...reviewPermissions, ...supplierMappingReviewPermissions];
+  assert.deepEqual(operations.filter((permission) => !governedReviewPermissions.includes(permission)), baselinePermissions);
+  for (const permission of governedReviewPermissions) assert.ok(operations.includes(permission), permission);
   for (const permission of [
     "*", "material.draft.create", "material.draft.edit_own", "material.draft.edit_any", "material.draft.submit",
     "material.audit.read", "system.audit.read", "system.backup.read", "system.user.read", "system.user.create",
     "system.user.status", "system.user.reset", "master.bom.manage", "inventory.adjust", "inventory.reverse",
     "procurement.plan", "procurement.order", "procurement.receive", "production.plan", "production.issue",
     "production.report", "sales.order", "sales.ship", "quality.inspect", "finance.post",
+    "supplier_mapping.create", "supplier_mapping.edit_draft", "supplier_mapping.submit",
   ]) assert.equal(operations.includes(permission), false, permission);
   for (const role of IDENTITY_ROLES.filter((role) => !["admin", "manager", "operations"].includes(role))) {
     for (const permission of reviewPermissions) assert.equal(permissionsForRole(role).includes(permission), false, `${role}:${permission}`);
+    for (const permission of supplierMappingReviewPermissions.filter((item) => item !== "supplier_mapping.read")) {
+      assert.equal(permissionsForRole(role).includes(permission), false, `${role}:${permission}`);
+    }
   }
 });
 

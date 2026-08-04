@@ -1,0 +1,13 @@
+.rfq-request ul, .rfq-supplier ul { margin: 7px 0; padding-left: 20px; }
+.rfq-request li, .rfq-supplier li { margin: 4px 0; overflow-wrap: anywhere; }
+.rfq-coverage { display: grid; gap: 9px; min-width: 0; }
+.rfq-supplier { min-width: 0; border: 1px solid #b9c8d3; border-radius: 6px; padding: 9px; background: #fff; }
+.rfq-supplier.blocked { border-color: #d6b262; background: #fff9e8; }
+.rfq-supplier.eligible { border-color: #4c9b78; background: #edf8f2; }
+.rfq-supplier p { margin: 6px 0; }
+.rfq-supplier small { display: block; overflow-wrap: anywhere; }
+@media (max-width: 420px) {
+  .rfq-coverage { padding: 8px; }
+  .rfq-supplier { padding: 8px; }
+  .rfq-supplier .sourcing-check { align-items: flex-start; }
+}

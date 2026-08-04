@@ -26,6 +26,7 @@ import { handleProjectApi } from "./project-selfhost/handler.ts";
 import { handlePlanningHandoffApi } from "./planning-handoff-selfhost/handler.ts";
 import { handleMaterialRequirementApi } from "./material-requirement-selfhost/handler.ts";
 import { handleProcurementSourcingApi } from "./procurement-sourcing-selfhost/handler.ts";
+import { handleSupplierMappingApi } from "./supplier-mapping-selfhost/handler.ts";
 import { handleProcurementFulfillmentApi } from "./procurement-fulfillment-selfhost/handler.ts";
 import { handleProductionHandoffApi } from "./production-handoff-selfhost/handler.ts";
 import { handleProductionRoutingApi } from "./production-routing-selfhost/handler.ts";
@@ -107,6 +108,8 @@ export async function handleSelfhostApi(request: Request): Promise<Response> {
     if (materialRequirementResponse) return materialRequirementResponse;
     const procurementSourcingResponse = await handleProcurementSourcingApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (procurementSourcingResponse) return procurementSourcingResponse;
+    const supplierMappingResponse = await handleSupplierMappingApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
+    if (supplierMappingResponse) return supplierMappingResponse;
     const procurementFulfillmentResponse = await handleProcurementFulfillmentApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (procurementFulfillmentResponse) return procurementFulfillmentResponse;
     const productionHandoffResponse = await handleProductionHandoffApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });

@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.38",
+  "version": "0.1.0-alpha.39",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vinext dev",
     "build": "vinext build",
+    "postbuild": "node scripts/ensure-vinext-client-assets.mjs",
     "start": "vinext start",
     "worker": "node --experimental-strip-types worker/selfhost.ts",
     "db:migrate": "node --experimental-strip-types scripts/migrate-postgres.ts",
@@ -139,6 +140,12 @@
     "test:material-requirement:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-material-requirement-postgres.test.mjs",
     "test:material-requirement:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-material-requirement-migration-upgrade.test.mjs",
     "typecheck:procurement-sourcing": "tsc -p tsconfig.phase4-task04.json --pretty false",
+    "typecheck:supplier-mapping": "tsc -p tsconfig.phase4-task04.json --pretty false",
+    "test:supplier-mapping:migration": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-supplier-mapping-migration.test.mjs",
+    "test:supplier-mapping:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-supplier-mapping-postgres.test.mjs",
+    "test:supplier-mapping:unit": "node --experimental-strip-types --test tests/selfhost-supplier-mapping-unit.test.mjs",
+    "test:supplier-mapping:ui": "node --experimental-strip-types --test tests/selfhost-supplier-mapping-ui-contract.test.mjs",
+    "test:supplier-mapping:browser": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-supplier-mapping-browser.test.mjs",
     "test:procurement-sourcing:unit": "node --experimental-strip-types --test tests/selfhost-procurement-sourcing-unit.test.mjs",
     "test:procurement-sourcing:ui": "node --experimental-strip-types --test tests/selfhost-procurement-sourcing-ui-contract.test.mjs",
     "test:procurement-sourcing:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-procurement-sourcing-postgres.test.mjs tests/selfhost-rfq-binding-fix19-postgres.test.mjs",

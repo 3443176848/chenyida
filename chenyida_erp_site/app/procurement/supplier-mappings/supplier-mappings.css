@@ -1,0 +1,35 @@
+.sm-shell { overflow-x: clip; }
+.sm-user { display: grid; justify-items: end; gap: 5px; }
+.sm-user span { color: #587084; }
+.sm-links { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.sm-links a, .sm-quiet { border: 1px solid #9bb0c2; border-radius: 5px; background: #f7fafc; color: #183a55; padding: 7px 10px; text-decoration: none; }
+.sm-filter, .sm-create { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; align-items: end; }
+.sm-filter label, .sm-option-searches label { display: grid; gap: 5px; min-width: 0; }
+.sm-filter input, .sm-filter select, .sm-option-searches input { width: 100%; min-width: 0; }
+.sm-option-searches { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin: 10px 0; }
+.sm-option-searches label span { display: flex; gap: 5px; min-width: 0; }
+.sm-option-searches button { flex: 0 0 auto; }
+.sm-create { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.sm-workflow { display: flex; flex-wrap: wrap; gap: 8px 24px; padding-left: 22px; }
+.sm-list { display: grid; gap: 12px; }
+.sm-card { min-width: 0; border: 1px solid #c7d3dc; border-radius: 7px; padding: 12px; background: #fff; }
+.sm-card .sourcing-title > div { min-width: 0; display: grid; gap: 4px; }
+.sm-card .sourcing-title b, .sm-mono { overflow-wrap: anywhere; font-family: ui-monospace,SFMono-Regular,Consolas,monospace; }
+.sm-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0; margin: 10px 0; border-top: 1px solid #dce4ea; border-left: 1px solid #dce4ea; }
+.sm-facts div { min-width: 0; padding: 8px; border-right: 1px solid #dce4ea; border-bottom: 1px solid #dce4ea; }
+.sm-facts dt { color: #587084; font-size: 12px; }
+.sm-facts dd { margin: 3px 0 0; overflow-wrap: anywhere; }
+.sm-edit { margin-top: 10px; border: 1px solid #c7d3dc; padding: 9px; }
+.sm-edit summary { cursor: pointer; font-weight: 700; }
+.sm-review-actions { display: grid; grid-template-columns: minmax(160px,.35fr) minmax(0,1fr); gap: 12px; align-items: start; padding-top: 10px; border-top: 2px solid #d6b262; }
+.sm-review-actions form { display: grid; gap: 7px; }
+.sm-review-actions label { display: grid; gap: 5px; }
+
+@media (max-width: 760px) {
+  .sm-user { justify-items: start; }
+  .sm-filter, .sm-create, .sm-option-searches, .sm-facts, .sm-review-actions { grid-template-columns: minmax(0,1fr); }
+  .sm-option-searches label span { display: grid; grid-template-columns: minmax(0,1fr) auto; }
+  .sm-card { padding: 9px; }
+  .sm-card .sourcing-title { align-items: flex-start; gap: 7px; }
+  .sm-links a { flex: 1 1 100%; }
+}

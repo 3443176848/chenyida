@@ -7,7 +7,11 @@ test("master-data permissions are fixed by role on the server", () => {
   assert.ok(permissionsForRole("sales").includes("master.customer.manage"));
   assert.ok(!permissionsForRole("sales").includes("master.supplier.manage"));
   assert.ok(permissionsForRole("purchase").includes("master.supplier.manage"));
-  assert.ok(permissionsForRole("purchase").includes("master.supplier_mapping.manage"));
+  assert.ok(!permissionsForRole("purchase").includes("master.supplier_mapping.manage"));
+  for (const permission of ["supplier_mapping.read", "supplier_mapping.create", "supplier_mapping.edit_draft", "supplier_mapping.submit"]) assert.ok(permissionsForRole("purchase").includes(permission));
+  for (const permission of ["supplier_mapping.read", "supplier_mapping.review_queue", "supplier_mapping.approve", "supplier_mapping.reject"]) assert.ok(permissionsForRole("operations").includes(permission));
+  assert.ok(!permissionsForRole("purchase").includes("supplier_mapping.approve"));
+  assert.ok(!permissionsForRole("operations").includes("supplier_mapping.edit_draft"));
   assert.ok(permissionsForRole("engineering").includes("master.product.manage"));
   assert.ok(permissionsForRole("engineering").includes("master.bom.manage"));
   for (const role of ["production", "warehouse", "quality", "finance", "operations"]) {

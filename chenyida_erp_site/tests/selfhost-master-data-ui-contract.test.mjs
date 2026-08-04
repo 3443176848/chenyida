@@ -4,6 +4,7 @@ import test from "node:test";
 
 const api = await readFile(new URL("../app/lib/selfhost-api.ts", import.meta.url), "utf8");
 const master = await readFile(new URL("../app/lib/master-data-selfhost/handler.ts", import.meta.url), "utf8");
+const mapping = await readFile(new URL("../app/lib/supplier-mapping-selfhost/handler.ts", import.meta.url), "utf8");
 const bom = await readFile(new URL("../app/lib/bom-selfhost/handler.ts", import.meta.url), "utf8");
 const legacy = await readFile(new URL("../public/erp/app.js", import.meta.url), "utf8");
 const apiClient = await readFile(new URL("../public/erp/api-client.js", import.meta.url), "utf8");
@@ -12,9 +13,10 @@ const styles = await readFile(new URL("../public/erp/styles.css", import.meta.ur
 
 test("legacy master-data and BOM paths delegate to self-hosted handlers", () => {
   for (const path of ["/api/items", "/api/mappings", "/api/products", "/api/customers", "/api/suppliers"]) assert.ok(master.includes(path), path);
-  assert.match(master, /products\|mappings.*status/);
+  assert.match(master, /SUPPLIER_MAPPING_GOVERNANCE_REQUIRED/);
+  assert.match(mapping, /\/api\/supplier-mappings/);
   for (const path of ["/api/boms", "/api/bom-lines", "/api/bom-readiness"]) assert.ok(bom.includes(path), path);
-  assert.match(api, /handleMasterDataApi/); assert.match(api, /handleBomApi/);
+  assert.match(api, /handleMasterDataApi/); assert.match(api, /handleBomApi/); assert.match(api, /handleSupplierMappingApi/);
   assert.match(legacy, /masterDataWrite\("create-customer", "\/api\/customers"/); assert.match(legacy, /masterDataWrite\("create-bom", "\/api\/boms"/);
   assert.match(legacy, /csrfToken: state\.session\.csrf_token/); assert.match(apiClient, /masterDataWrite/);
   assert.match(legacy, /customer_id: customer\?\.id \|\| null/); assert.match(legacy, /请选择已存在的客户档案/);

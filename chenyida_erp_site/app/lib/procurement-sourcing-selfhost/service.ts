@@ -4,9 +4,18 @@ import { ProcurementSourcingError } from "./errors.ts";
 import { ProcurementSourcingRepository } from "./repository.ts";
 import type { FaultInjector, SourcingMutationMeta } from "./types.ts";
 import { booleanValue, boundedText, canonicalDigest, dateOnly, decimal, exactKeys, expectedVersion, nonNegativeInteger, normalizeCreateRfqInput, positiveId } from "./validation.ts";
+import { loadSupplierMappingCoverage, requireCompleteCoverage } from "../supplier-mapping-selfhost/coverage.ts";
+import { SupplierMappingError } from "../supplier-mapping-selfhost/errors.ts";
 
 const rowData = <T>(result: { rows: T[] }, code: string, message: string): T => { if (!result.rows[0]) throw new ProcurementSourcingError(code, message, 404); return result.rows[0]; };
 const lockRfq = async (client: PoolClient, id: number) => rowData(await client.query<any>("select * from procurement_rfqs where id=$1 for update", [id]), "RFQ_NOT_FOUND", "询价不存在");
+const requireRfqCoverage = (rows: Parameters<typeof requireCompleteCoverage>[0], supplierIds: readonly number[]) => {
+  try { requireCompleteCoverage(rows, supplierIds); }
+  catch (error) {
+    if (error instanceof SupplierMappingError) throw new ProcurementSourcingError(error.code, error.message, error.status);
+    throw error;
+  }
+};
 
 export class ProcurementSourcingService {
   private readonly repository: ProcurementSourcingRepository; private readonly fault: FaultInjector;
@@ -14,11 +23,30 @@ export class ProcurementSourcingService {
 
   async acceptedRequests(page: number, pageSize: number) {
     const offset = (page - 1) * pageSize; const result = await this.repository.pool.query(`select r.id,r.request_code,r.status,r.version,p.required_date,p.plan_version_no,b.project_code,b.project_name,count(l.id)::int line_count,coalesce(sum(l.requested_quantity),0)::text requested_quantity,
+      jsonb_agg(jsonb_build_object('line_id',l.id,'line_no',l.line_no,'material_id',l.material_id,'internal_material_code',m.internal_material_code,'standard_name',m.standard_name,'unit_id',l.unit_id,'unit_code',u.code,'requested_quantity',l.requested_quantity) order by l.line_no,l.id) lines,
       not exists(select 1 from procurement_rfqs q where q.purchase_request_id=r.id and q.status in ('DRAFT','ISSUED')) rfq_available
-      from planning_purchase_requests r join planning_material_requirement_plans p on p.id=r.plan_id join business_projects b on b.id=p.project_id join planning_purchase_request_lines l on l.purchase_request_id=r.id
+      from planning_purchase_requests r join planning_material_requirement_plans p on p.id=r.plan_id join business_projects b on b.id=p.project_id join planning_purchase_request_lines l on l.purchase_request_id=r.id join material_master m on m.id=l.material_id join units u on u.id=l.unit_id
       where r.status='ACCEPTED' and not exists(select 1 from planning_purchase_requests newer join planning_material_requirement_plans np on np.id=newer.plan_id where np.project_id=p.project_id and np.plan_version_no>p.plan_version_no)
       group by r.id,p.required_date,p.plan_version_no,b.project_code,b.project_name order by r.accepted_at,id limit $1 offset $2`, [pageSize, offset]);
     return { rows: result.rows, pagination: { page, page_size: pageSize, returned: result.rowCount || 0 } };
+  }
+
+  async coverage(purchaseRequestId: number) {
+    const request = await this.repository.pool.query("select status from planning_purchase_requests where id=$1", [purchaseRequestId]);
+    if (!request.rows[0]) throw new ProcurementSourcingError("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在", 404);
+    if (request.rows[0].status !== "ACCEPTED") throw new ProcurementSourcingError("PURCHASE_REQUEST_NOT_ACCEPTED", "只有已接收采购申请可以查询 RFQ Mapping 覆盖率", 409);
+    const rows = await loadSupplierMappingCoverage(this.repository.pool, purchaseRequestId);
+    return rows.map((row) => ({
+      supplier_id: row.supplier_id,
+      supplier_code: row.supplier_code,
+      supplier_name: row.supplier_name,
+      supplier_status: row.supplier_status,
+      covered_count: row.covered_count,
+      required_count: row.required_count,
+      selectable: row.selectable,
+      unavailable_reason: row.unavailable_reason,
+      missing: row.missing,
+    }));
   }
 
   async list(page: number, pageSize: number, status?: string) {
@@ -57,8 +85,8 @@ export class ProcurementSourcingService {
       if (request.version !== expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "采购申请版本已变化", 409); if (request.status !== "ACCEPTED") throw new ProcurementSourcingError("PURCHASE_REQUEST_NOT_ACCEPTED", "只有已接收采购申请可以创建询价", 409);
       const newer = await client.query("select 1 from planning_purchase_requests r join planning_material_requirement_plans p on p.id=r.plan_id where p.project_id=$1 and p.plan_version_no>$2 limit 1", [request.project_id, request.plan_version_no]); if (newer.rows[0]) throw new ProcurementSourcingError("PURCHASE_REQUEST_NOT_LATEST", "只能对最新采购申请创建询价", 409);
       const lines = await client.query<any>(`select l.*,m.base_unit_id,m.material_status from planning_purchase_request_lines l join material_master m on m.id=l.material_id where l.purchase_request_id=$1 order by l.line_no`, [requestId]); if (!lines.rowCount) throw new ProcurementSourcingError("PURCHASE_REQUEST_EMPTY", "采购申请没有可询价行", 422);
-      const active = await client.query("select id,status from suppliers where id=any($1::bigint[]) order by id for share", [suppliers]); if (active.rowCount !== suppliers.length || active.rows.some((row) => row.status !== "ACTIVE")) throw new ProcurementSourcingError("SUPPLIER_NOT_ACTIVE", "候选供应商必须全部为 ACTIVE", 422);
-      const mappingSnapshots: Record<number, unknown[]> = {}; for (const supplierId of suppliers) { const mappings: unknown[] = []; for (const line of lines.rows) { const mapped = await client.query<any>(`select id,material_id,supplier_id,purchase_unit_id,conversion_numerator::text,conversion_denominator::text,version,valid_from::text,valid_to::text from supplier_mappings where supplier_id=$1 and material_id=$2 and status='ACTIVE' and purchase_unit_id=$3 and conversion_numerator=conversion_denominator and valid_from<=now() and (valid_to is null or valid_to>now()) order by valid_from desc,id desc limit 1`, [supplierId, line.material_id, line.unit_id]); if (!mapped.rows[0] || (Number(line.unit_id) !== Number(line.base_unit_id) && mapped.rows[0].conversion_numerator !== mapped.rows[0].conversion_denominator)) throw new ProcurementSourcingError("SUPPLIER_MAPPING_REQUIRED", "每个候选供应商与申请物料必须存在当前有效的 1:1 Supplier Mapping", 422); mappings.push(mapped.rows[0]); } mappingSnapshots[supplierId] = mappings; }
+      const coverage = await loadSupplierMappingCoverage(client, requestId, suppliers); requireRfqCoverage(coverage, suppliers);
+      const mappingSnapshots = Object.fromEntries(coverage.map((row) => [row.supplier_id, row.mapping_snapshots]));
       const source = { request_id: request.id, version: request.version, plan_version_no: request.plan_version_no, required_date: String(request.required_date), lines: lines.rows.map((line) => ({ id: line.id, line_no: line.line_no, material_id: line.material_id, unit_id: line.unit_id, requested_quantity: line.requested_quantity })) }; const sourceDigest = canonicalDigest(source);
       const seq = await client.query<any>("insert into business_code_sequences(sequence_code,current_value,version,updated_at) values('PROCUREMENT_RFQ',1,1,now()) on conflict(sequence_code) do update set current_value=business_code_sequences.current_value+1,version=business_code_sequences.version+1,updated_at=now() returning current_value"); const code = `RFQ-${String(seq.rows[0].current_value).padStart(8, "0")}`; const round = Number((await client.query("select coalesce(max(round_no),0)+1 round from procurement_rfqs where purchase_request_id=$1", [requestId])).rows[0].round);
       const rfq = await client.query<any>("insert into procurement_rfqs(rfq_code,purchase_request_id,round_no,response_deadline,source_purchase_request_version,source_digest,request_id,created_by) values($1,$2,$3,$4,$5,$6,$7,$8) returning *", [code, requestId, round, deadline, request.version, sourceDigest, meta.requestId, meta.actor.username]);
@@ -70,7 +98,9 @@ export class ProcurementSourcingService {
 
   async issue(id: number, meta: SourcingMutationMeta, input: Record<string, unknown>) {
     exactKeys(input, ["expected_version"]); const expected = expectedVersion(input.expected_version); return this.repository.execute(meta, async (client) => { const rfq = await lockRfq(client, id); if (rfq.version !== expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "RFQ 版本已变化", 409); if (rfq.status !== "DRAFT") throw new ProcurementSourcingError("RFQ_NOT_DRAFT", "只有 DRAFT 询价可以发出", 409);
-      const invalid = await client.query(`select 1 from procurement_rfq_suppliers rs join suppliers s on s.id=rs.supplier_id cross join procurement_rfq_lines l where rs.rfq_id=$1 and (s.status<>'ACTIVE' or not exists(select 1 from supplier_mappings sm where sm.supplier_id=rs.supplier_id and sm.material_id=l.material_id and sm.purchase_unit_id=l.unit_id and sm.status='ACTIVE' and sm.conversion_numerator=sm.conversion_denominator and sm.valid_from<=now() and (sm.valid_to is null or sm.valid_to>now()))) limit 1`, [id]); if (invalid.rows[0]) throw new ProcurementSourcingError("RFQ_SOURCE_CHANGED", "供应商或 1:1 Supplier Mapping 已变化，请创建新询价", 409);
+      const invited = await client.query<{ supplier_id: string | number }>("select supplier_id from procurement_rfq_suppliers where rfq_id=$1 order by supplier_id for share", [id]);
+      const supplierIds = invited.rows.map((row) => Number(row.supplier_id));
+      const coverage = await loadSupplierMappingCoverage(client, Number(rfq.purchase_request_id), supplierIds); requireRfqCoverage(coverage, supplierIds);
       await client.query("update procurement_rfqs set status='ISSUED',issued_by=$2,issued_at=now(),version=version+1,updated_at=now() where id=$1", [id, meta.actor.username]); await client.query("insert into procurement_sourcing_events(rfq_id,event_type,actor,request_id) values($1,'RFQ_ISSUED',$2,$3)", [id, meta.actor.username, meta.requestId]); this.fault("after_rfq_issued"); const body = { rfq_id: id, status: "ISSUED", version: expected + 1, request_id: meta.requestId }; return { status: 200, body, objectId: id, oldVersion: expected, newVersion: expected + 1 }; });
   }
 

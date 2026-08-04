@@ -6,6 +6,7 @@ import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts"
 import { handleProcurementSourcingApi } from "../app/lib/procurement-sourcing-selfhost/handler.ts";
 import { ProcurementSourcingRepository } from "../app/lib/procurement-sourcing-selfhost/repository.ts";
 import { ProcurementSourcingService } from "../app/lib/procurement-sourcing-selfhost/service.ts";
+import { withSupplierMappingFixtureTriggersDisabled } from "./helpers/supplier-mapping-fixture.mjs";
 
 const databaseUrl = process.env.TEST_PROCUREMENT_SOURCING_DATABASE_URL;
 if (!databaseUrl || !/procurement_sourcing_test/i.test(databaseUrl)) {
@@ -97,7 +98,7 @@ async function createPurchaseRequest(client, fixture, sequence, status = "ACCEPT
         index + 1,
         materialId,
         fixture.unitId,
-        { internal_material_code: `MAT-FIX19-${materialId}`, standard_name: `FIX-19 物料 ${materialId}` },
+        { internal_material_code: `CYD-FIX19-${String(materialId).padStart(6, "0")}`, standard_name: `FIX-19 物料 ${materialId}` },
         digest(`material-${sequence}-${materialId}`),
         digest(`source-${sequence}-${materialId}`),
       ],
@@ -167,7 +168,7 @@ async function seed() {
           last_modified_by,created_by,updated_by,request_id
         ) values($1,$2,$3,$4,'PCS',$5,'ACTIVE','PURCHASED','STOCKED','IQC','RoHS','MANUAL',
           'admin01','admin01','admin01',$6)`,
-        [materialId, `MAT-FIX19-${materialId}`, `FIX-19 物料 ${materialId}`, category.rows[0].id, unitId, randomUUID()],
+        [materialId, `CYD-FIX19-${String(materialId).padStart(6, "0")}`, `FIX-19 物料 ${materialId}`, category.rows[0].id, unitId, randomUUID()],
       );
     }
     await client.query("select setval(pg_get_serial_sequence('material_master','id'),536,true)");
@@ -200,27 +201,29 @@ async function seed() {
       );
       supplierIds.push(Number(supplier.rows[0].id));
     }
-    for (const supplierId of supplierIds.slice(0, 3)) {
-      for (const materialId of materialIds) {
-        await client.query(
-          `insert into supplier_mappings(
-            material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,purchase_uom,
-            purchase_unit_id,conversion_numerator,conversion_denominator,status,valid_from,
-            created_by,updated_by,request_id
-          ) values($1,$2,$3,$4,$5,'PCS',$6,1,1,'ACTIVE',now()-interval '1 day',
-            'admin01','admin01',$7)`,
-          [
-            materialId,
-            supplierId,
-            supplierDefinitions[supplierId - 1][1],
-            supplierDefinitions[supplierId - 1][0],
-            `PART-${supplierId}-${materialId}`,
-            unitId,
-            randomUUID(),
-          ],
-        );
+    await withSupplierMappingFixtureTriggersDisabled(client, async () => {
+      for (const supplierId of supplierIds.slice(0, 3)) {
+        for (const materialId of materialIds) {
+          await client.query(
+            `insert into supplier_mappings(
+              material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,purchase_uom,
+              purchase_unit_id,conversion_numerator,conversion_denominator,status,valid_from,
+              created_by,updated_by,request_id
+            ) values($1,$2,$3,$4,$5,'PCS',$6,1,1,'ACTIVE',now()-interval '1 day',
+              'admin01','admin01',$7)`,
+            [
+              materialId,
+              supplierId,
+              supplierDefinitions[supplierId - 1][1],
+              supplierDefinitions[supplierId - 1][0],
+              `PART-${supplierId}-${materialId}`,
+              unitId,
+              randomUUID(),
+            ],
+          );
+        }
       }
-    }
+    });
     await client.query("commit");
     return {
       accepted,
@@ -399,13 +402,13 @@ test("concurrent create has one winner and invalid, stale-label, state and permi
     [
       { purchase_request_id: fixture.accepted[2], supplier_ids: [fixture.inactiveSupplier], response_deadline: "2026-10-15", expected_version: 1 },
       422,
-      "SUPPLIER_NOT_ACTIVE",
+      "SUPPLIER_MAPPING_INCOMPLETE",
       "purchase",
     ],
     [
       { purchase_request_id: fixture.accepted[2], supplier_ids: [fixture.noMappingSupplier], response_deadline: "2026-10-15", expected_version: 1 },
       422,
-      "SUPPLIER_MAPPING_REQUIRED",
+      "SUPPLIER_MAPPING_INCOMPLETE",
       "purchase",
     ],
   ];

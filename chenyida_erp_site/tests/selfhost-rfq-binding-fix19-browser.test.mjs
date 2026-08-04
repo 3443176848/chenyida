@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import test from "node:test";
 import { Pool } from "pg";
 import { hashPassword } from "../app/lib/identity-selfhost/password.ts";
+import { withSupplierMappingFixtureTriggersDisabled } from "./helpers/supplier-mapping-fixture.mjs";
 
 const REQUIRED_DATABASE = "procurement_sourcing_test_fix19_20260804";
 const REQUIRED_ORIGIN = "http://127.0.0.1:43139";
@@ -78,7 +79,7 @@ async function seedFixture() {
           last_modified_by,created_by,updated_by,request_id
         ) values($1,$2,$3,$4,'PCS',$5,'ACTIVE','PURCHASED','STOCKED','IQC','RoHS','MANUAL',
           'admin01','admin01','admin01',$6)`,
-        [materialId, `MAT-FIX19-${materialId}`, `FIX-19 物料 ${materialId}`, category.id, unit.id, randomUUID()],
+        [materialId, `CYD-FIX19-${String(materialId).padStart(6, "0")}`, `FIX-19 物料 ${materialId}`, category.id, unit.id, randomUUID()],
       );
     }
     await client.query("select setval(pg_get_serial_sequence('material_master','id'),536,true)");
@@ -129,7 +130,7 @@ async function seedFixture() {
           index + 1,
           materialId,
           unit.id,
-          { internal_material_code: `MAT-FIX19-${materialId}`, standard_name: `FIX-19 物料 ${materialId}` },
+          { internal_material_code: `CYD-FIX19-${String(materialId).padStart(6, "0")}`, standard_name: `FIX-19 物料 ${materialId}` },
           sha256(`fix19-browser-material-${materialId}`),
           sha256(`fix19-browser-source-${materialId}`),
         ],
@@ -173,6 +174,7 @@ async function seedFixture() {
       ["SUP-000001", "FIX-19 快速交付供应商 A"],
       ["SUP-000002", "FIX-19 低价供应商 B"],
     ];
+    const supplierRows = [];
     for (const [supplierCode, supplierName] of supplierDefinitions) {
       const supplier = (await client.query(
         `insert into suppliers(
@@ -180,26 +182,31 @@ async function seedFixture() {
         ) values($1,$2,$2,'ACTIVE',$3,$3,$4) returning id`,
         [supplierCode, supplierName, credentials.username, randomUUID()],
       )).rows[0];
-      for (const materialId of materialIds) {
-        await client.query(
-          `insert into supplier_mappings(
-            material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,purchase_uom,
-            purchase_unit_id,conversion_numerator,conversion_denominator,status,valid_from,
-            created_by,updated_by,request_id
-          ) values($1,$2,$3,$4,$5,'PCS',$6,1,1,'ACTIVE',now()-interval '1 day',$7,$7,$8)`,
-          [
-            materialId,
-            supplier.id,
-            supplierName,
-            supplierCode,
-            `${supplierCode}-${materialId}`,
-            unit.id,
-            credentials.username,
-            randomUUID(),
-          ],
-        );
-      }
+      supplierRows.push({ supplier, supplierCode, supplierName });
     }
+    await withSupplierMappingFixtureTriggersDisabled(client, async () => {
+      for (const { supplier, supplierCode, supplierName } of supplierRows) {
+        for (const materialId of materialIds) {
+          await client.query(
+            `insert into supplier_mappings(
+              material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,purchase_uom,
+              purchase_unit_id,conversion_numerator,conversion_denominator,status,valid_from,
+              created_by,updated_by,request_id
+            ) values($1,$2,$3,$4,$5,'PCS',$6,1,1,'ACTIVE',now()-interval '1 day',$7,$7,$8)`,
+            [
+              materialId,
+              supplier.id,
+              supplierName,
+              supplierCode,
+              `${supplierCode}-${materialId}`,
+              unit.id,
+              credentials.username,
+              randomUUID(),
+            ],
+          );
+        }
+      }
+    });
     await client.query("commit");
     assert.equal(Number(purchaseRequest.id), 1);
     return { credentials, materialIds };
@@ -441,7 +448,7 @@ test("isolated Chromium creates one stable-ID RFQ draft and no downstream record
 
     const sourcePanel = page.locator("section.sourcing-panel", { has: page.getByRole("heading", { name: "采购申请来源", exact: true }) });
     assert.equal(await sourcePanel.locator("tbody tr").count(), 4);
-    for (const materialId of fixture.materialIds) await sourcePanel.getByText(`MAT-FIX19-${materialId}`, { exact: true }).waitFor();
+    for (const materialId of fixture.materialIds) await sourcePanel.getByText(`CYD-FIX19-${String(materialId).padStart(6, "0")}`, { exact: true }).waitFor();
     const suppliersPanel = page.locator("section.sourcing-panel", { has: page.getByRole("heading", { name: "候选供应商与报价版本", exact: true }) });
     assert.equal(await suppliersPanel.locator(".sourcing-cards .sourcing-card").count(), 2);
     await noOverflow(page, "RFQ detail desktop");

@@ -1448,16 +1448,88 @@ export const materialImportIdempotency = pgTable("material_import_idempotency", 
 export const supplierMappings = pgTable("supplier_mappings", {
   id: bigserial("id", { mode: "number" }).primaryKey(), materialId: bigint("material_id", { mode: "number" }).notNull().references(() => materialMaster.id, { onDelete: "restrict" }),
   supplierId: bigint("supplier_id", { mode: "number" }).references(() => suppliers.id, { onDelete: "restrict" }), supplierName: text("supplier_name").notNull(), supplierKey: text("supplier_key").notNull(),
-  supplierItemCode: text("supplier_item_code").notNull(), supplierItemName: text("supplier_item_name").notNull().default(""), supplierSpecification: text("supplier_specification").notNull().default(""),
+  supplierItemCode: text("supplier_item_code").notNull(), supplierItemCodeNormalized: text("supplier_item_code_normalized"), supplierItemName: text("supplier_item_name").notNull().default(""), supplierSpecification: text("supplier_specification").notNull().default(""),
   manufacturer: text("manufacturer").notNull().default(""), mpn: text("mpn").notNull().default(""), revision: text("revision").notNull().default(""), purchaseUom: text("purchase_uom").notNull(),
   purchaseUnitId: bigint("purchase_unit_id", { mode: "number" }).references(() => units.id, { onDelete: "restrict" }), conversionNumerator: bigint("conversion_numerator", { mode: "number" }).notNull().default(1),
   conversionDenominator: bigint("conversion_denominator", { mode: "number" }).notNull().default(1), status: text("status").notNull(), validFrom: timestamptz("valid_from").notNull(), validTo: timestamptz("valid_to"),
+  mappingUid: uuid("mapping_uid").notNull().default(sql`gen_random_uuid()`), mappingVersionNo: integer("mapping_version_no").notNull().default(1),
+  supersedesMappingVersionId: bigint("supersedes_mapping_version_id", { mode: "number" }).references((): AnyPgColumn => supplierMappings.id, { onDelete: "restrict" }),
+  supersededByMappingVersionId: bigint("superseded_by_mapping_version_id", { mode: "number" }).references((): AnyPgColumn => supplierMappings.id, { onDelete: "restrict" }),
+  contentDigest: text("content_digest"), createdRequestId: uuid("created_request_id"),
+  submittedBy: text("submitted_by").references(() => appUsers.username, { onDelete: "restrict" }), submittedAt: timestamptz("submitted_at"), submittedRequestId: uuid("submitted_request_id"),
+  reviewedBy: text("reviewed_by").references(() => appUsers.username, { onDelete: "restrict" }), reviewedAt: timestamptz("reviewed_at"), reviewedRequestId: uuid("reviewed_request_id"), reviewOutcome: text("review_outcome"), reviewReason: text("review_reason").notNull().default(""),
   version: integer("version").notNull().default(1), ...auditColumns,
 }, (t) => [
-  uniqueIndex("supplier_mappings_identity_period_uq").on(t.supplierKey, t.supplierItemCode, t.manufacturer, t.mpn, t.revision, t.validFrom),
+  uniqueIndex("supplier_mappings_uid_version_uq").on(t.mappingUid, t.mappingVersionNo),
+  uniqueIndex("supplier_mappings_supersedes_uq").on(t.supersedesMappingVersionId).where(sql`${t.supersedesMappingVersionId} is not null`),
+  uniqueIndex("supplier_mappings_superseded_by_uq").on(t.supersededByMappingVersionId).where(sql`${t.supersededByMappingVersionId} is not null`),
+  uniqueIndex("supplier_mappings_open_draft_uq").on(t.mappingUid).where(sql`${t.status}='DRAFT'`),
+  uniqueIndex("supplier_mappings_pending_review_uq").on(t.mappingUid).where(sql`${t.status}='PENDING_REVIEW'`),
+  uniqueIndex("supplier_mappings_active_supplier_part_uq").on(t.supplierId, sql`upper(btrim(${t.supplierItemCode}))`).where(sql`${t.status}='ACTIVE' and ${t.supplierId} is not null`),
   index("supplier_mappings_material_idx").on(t.materialId), index("supplier_mappings_supplier_status_idx").on(t.supplierId, t.status, t.validFrom),
-  check("supplier_mappings_status_ck", sql`${t.status} in ('ACTIVE','INACTIVE')`), check("supplier_mappings_version_ck", sql`${t.version} > 0`),
+  index("supplier_mappings_review_queue_idx").on(t.status, t.submittedAt, t.id), index("supplier_mappings_uid_history_idx").on(t.mappingUid, t.mappingVersionNo, t.id),
+  check("supplier_mappings_status_ck", sql`${t.status} in ('DRAFT','PENDING_REVIEW','ACTIVE','REJECTED','INACTIVE')`), check("supplier_mappings_version_ck", sql`${t.version} > 0 and ${t.mappingVersionNo} > 0`),
   check("supplier_mappings_conversion_ck", sql`${t.conversionNumerator} > 0 and ${t.conversionDenominator} > 0`), check("supplier_mappings_period_ck", sql`${t.validTo} is null or ${t.validTo} > ${t.validFrom}`),
+  check("supplier_mappings_digest_ck", sql`${t.contentDigest} is null or ${t.contentDigest} ~ '^[0-9a-f]{64}$'`),
+  check("supplier_mappings_review_outcome_ck", sql`${t.reviewOutcome} is null or ${t.reviewOutcome} in ('APPROVED','REJECTED')`),
+  check("supplier_mappings_governed_lifecycle_ck", sql`
+    (${t.status}='DRAFT'
+      and ${t.submittedBy} is null and ${t.submittedAt} is null and ${t.submittedRequestId} is null
+      and ${t.reviewedBy} is null and ${t.reviewedAt} is null and ${t.reviewedRequestId} is null
+      and ${t.reviewOutcome} is null and ${t.contentDigest} is null and ${t.reviewReason}='')
+    or (${t.status}='PENDING_REVIEW'
+      and ${t.submittedBy} is not null and ${t.submittedAt} is not null and ${t.submittedRequestId} is not null
+      and ${t.reviewedBy} is null and ${t.reviewedAt} is null and ${t.reviewedRequestId} is null
+      and ${t.reviewOutcome} is null and ${t.contentDigest} is not null and ${t.reviewReason}='')
+    or (${t.status}='REJECTED'
+      and ${t.submittedBy} is not null and ${t.submittedAt} is not null and ${t.submittedRequestId} is not null
+      and ${t.reviewedBy} is not null and ${t.reviewedAt} is not null and ${t.reviewedRequestId} is not null
+      and ${t.reviewOutcome}='REJECTED' and ${t.contentDigest} is not null
+      and char_length(btrim(${t.reviewReason})) between 1 and 500)
+    or (${t.status} in ('ACTIVE','INACTIVE') and (
+      (${t.submittedBy} is null and ${t.submittedAt} is null and ${t.submittedRequestId} is null
+        and ${t.reviewedBy} is null and ${t.reviewedAt} is null and ${t.reviewedRequestId} is null
+        and ${t.reviewOutcome} is null and ${t.contentDigest} is null and ${t.reviewReason}='')
+      or (${t.submittedBy} is not null and ${t.submittedAt} is not null and ${t.submittedRequestId} is not null
+        and ${t.reviewedBy} is not null and ${t.reviewedAt} is not null and ${t.reviewedRequestId} is not null
+        and ${t.reviewOutcome}='APPROVED' and ${t.contentDigest} is not null and ${t.reviewReason}='')
+    ))
+  `),
+  check("supplier_mappings_governed_text_ck", sql`
+    char_length(btrim(${t.supplierItemCode})) between 1 and 160
+    and (${t.supplierItemCodeNormalized} is null or char_length(${t.supplierItemCodeNormalized}) between 1 and 160)
+    and char_length(${t.supplierItemName})<=200
+    and char_length(${t.supplierSpecification})<=1000
+    and char_length(${t.manufacturer})<=160
+    and char_length(${t.mpn})<=160
+    and char_length(${t.revision})<=80
+    and char_length(${t.reviewReason})<=500
+  `),
+]);
+
+export const supplierMappingSupplierPartKeys = pgTable("supplier_mapping_supplier_part_keys", {
+  supplierId: bigint("supplier_id", { mode: "number" }).notNull().references(() => suppliers.id, { onDelete: "restrict" }),
+  normalizedSupplierItemCode: text("normalized_supplier_item_code").notNull(), mappingUid: uuid("mapping_uid").notNull(),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("supplier_mapping_supplier_part_keys_identity_uq").on(t.supplierId, t.normalizedSupplierItemCode),
+  index("supplier_mapping_supplier_part_keys_mapping_idx").on(t.mappingUid, t.supplierId),
+  check("supplier_mapping_supplier_part_keys_code_ck", sql`char_length(${t.normalizedSupplierItemCode}) between 1 and 160 and ${t.normalizedSupplierItemCode}=btrim(upper(${t.normalizedSupplierItemCode}))`),
+]);
+
+export const supplierMappingEvents = pgTable("supplier_mapping_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(), mappingUid: uuid("mapping_uid").notNull(),
+  mappingVersionId: bigint("mapping_version_id", { mode: "number" }).notNull().references(() => supplierMappings.id, { onDelete: "restrict" }),
+  mappingVersionNo: integer("mapping_version_no").notNull(), eventType: text("event_type").notNull(), fromStatus: text("from_status"), toStatus: text("to_status").notNull(),
+  actor: text("actor").notNull().references(() => appUsers.username, { onDelete: "restrict" }), result: text("result").notNull().default("SUCCESS"), reason: text("reason").notNull().default(""),
+  requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("supplier_mapping_events_request_type_uq").on(t.requestId, t.mappingVersionId, t.eventType),
+  index("supplier_mapping_events_mapping_history_idx").on(t.mappingUid, t.mappingVersionNo, t.id),
+  index("supplier_mapping_events_review_queue_idx").on(t.eventType, t.createdAt, t.id),
+  check("supplier_mapping_events_type_ck", sql`${t.eventType} in ('CREATED','DRAFT_EDITED','SUBMITTED','APPROVED','REJECTED','NEW_VERSION_CREATED','SUPERSEDED')`),
+  check("supplier_mapping_events_status_ck", sql`${t.toStatus} in ('DRAFT','PENDING_REVIEW','ACTIVE','REJECTED','INACTIVE') and (${t.fromStatus} is null or ${t.fromStatus} in ('DRAFT','PENDING_REVIEW','ACTIVE','REJECTED','INACTIVE'))`),
+  check("supplier_mapping_events_result_ck", sql`${t.result}='SUCCESS'`), check("supplier_mapping_events_version_ck", sql`${t.mappingVersionNo}>0`),
 ]);
 
 export const supplierMappingPriceHistory = pgTable("supplier_mapping_price_history", {

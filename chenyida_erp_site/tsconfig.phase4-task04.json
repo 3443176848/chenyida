@@ -3,11 +3,13 @@
   "compilerOptions": { "target": "ES2022", "incremental": false, "plugins": [] },
   "include": [
     "app/lib/procurement-sourcing-selfhost/**/*.ts",
+    "app/lib/supplier-mapping-selfhost/**/*.ts",
     "app/lib/material-requirement-selfhost/**/*.ts",
     "app/lib/identity-selfhost/**/*.ts",
     "app/lib/dashboard-selfhost/**/*.ts",
     "app/lib/selfhost-api.ts",
     "app/procurement/**/*.tsx",
+    "app/operations/supplier-mappings/**/*.tsx",
     "db/**/*.ts"
   ],
   "exclude": ["node_modules", "examples", "app/api/erp-api.ts", "scripts/seed-material-categories.ts"]

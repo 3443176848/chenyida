@@ -107,20 +107,6 @@ export class MasterDataService {
     });
   }
 
-  async createMapping(meta: MutationMeta, input: Record<string, unknown>): Promise<MutationResult> {
-    const supplierId = integer(input.supplier_id, "supplier_id"); const materialId = integer(input.material_id, "material_id"); const unitId = integer(input.purchase_unit_id, "purchase_unit_id");
-    const validFrom = new Date(String(input.valid_from || new Date().toISOString())); const validTo = input.valid_to ? new Date(String(input.valid_to)) : null;
-    if (Number.isNaN(validFrom.getTime()) || (validTo && Number.isNaN(validTo.getTime()))) throw new MasterDataError("REQUEST_VALIDATION_FAILED", "有效期无效");
-    return this.repository.execute(meta, async (client) => {
-      await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`supplier-mapping:${supplierId}:${text(input.supplier_item_code, "供应商料号", 160, true)}`]);
-      const source = await client.query(`select s.supplier_name,s.supplier_code,m.internal_material_code,u.code unit_code from suppliers s cross join material_master m cross join units u where s.id=$1 and s.status='ACTIVE' and m.id=$2 and m.material_status='ACTIVE' and u.id=$3 and u.enabled=true`, [supplierId, materialId, unitId]);
-      if (!source.rows[0]) throw new MasterDataError("MAPPING_REFERENCE_NOT_ACTIVE", "供应商、物料或单位不存在或未启用", 422);
-      const supplierItemCode = text(input.supplier_item_code, "供应商料号", 160, true); const manufacturer = text(input.manufacturer, "制造商", 160); const mpn = text(input.mpn, "MPN", 160); const revision = text(input.revision, "版本", 80);
-      const result = await client.query(`insert into supplier_mappings(material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,supplier_item_name,supplier_specification,manufacturer,mpn,revision,purchase_uom,purchase_unit_id,conversion_numerator,conversion_denominator,status,valid_from,valid_to,created_by,updated_by,request_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'ACTIVE',$15,$16,$17,$17,$18) returning *`, [materialId, supplierId, source.rows[0].supplier_name, source.rows[0].supplier_code, supplierItemCode, text(input.supplier_item_name, "供应商物料名称", 200), text(input.supplier_specification, "供应商规格", 1000), manufacturer, mpn, revision, source.rows[0].unit_code, unitId, integer(input.conversion_numerator ?? 1, "换算分子"), integer(input.conversion_denominator ?? 1, "换算分母"), validFrom, validTo, meta.actor.username, meta.requestId]);
-      return { status: 201, body: { ok: true, data: result.rows[0], request_id: meta.requestId }, targetType: "SUPPLIER_MAPPING", targetId: Number(result.rows[0].id), newVersion: 1 };
-    });
-  }
-
   async addPrice(mappingId: number, meta: MutationMeta, input: Record<string, unknown>): Promise<MutationResult> {
     const effectiveFrom = date(input.effective_from, "生效时间", new Date()); const effectiveTo = input.effective_to ? date(input.effective_to, "失效时间") : null;
     if (effectiveTo && effectiveTo <= effectiveFrom) throw new MasterDataError("REQUEST_VALIDATION_FAILED", "价格失效时间必须晚于生效时间");
@@ -131,12 +117,4 @@ export class MasterDataService {
     });
   }
 
-  async setMappingStatus(mappingId: number, meta: MutationMeta, input: Record<string, unknown>): Promise<MutationResult> {
-    const next = status(input.status); const expected = integer(input.expected_version, "expected_version")!;
-    return this.repository.execute(meta, async (client) => {
-      const result = await client.query("update supplier_mappings set status=$3,version=version+1,updated_by=$4,updated_at=now(),request_id=$5 where id=$1 and supplier_id is not null and version=$2 returning *", [mappingId, expected, next, meta.actor.username, meta.requestId]);
-      if (!result.rows[0]) throw new MasterDataError("VERSION_CONFLICT", "供应商物料映射版本已变化，请刷新后重试", 409);
-      return { status: 200, body: { ok: true, data: result.rows[0], request_id: meta.requestId }, targetType: "SUPPLIER_MAPPING", targetId: mappingId, oldVersion: expected, newVersion: expected + 1 };
-    });
-  }
 }
