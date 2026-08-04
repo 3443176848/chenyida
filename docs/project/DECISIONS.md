@@ -1034,6 +1034,16 @@
 - 实施结果：功能提交 `ddab02a57e0e87255c7a35d125959ac750b108e1`，兼容修复 `1e9221d90db621becc2badf40b3e0ed3017b73e6`；alpha.39/0038 SHA `2da259364151af098641795da55604dc3012b6adf92aec67038c0554e0592941` 已部署。隔离八 Mapping/两家 4/4/RFQ DRAFT 通过；主 UAT purchase 只读通过且 Mapping/RFQ/Quote/Award/PO 仍为 0。operations Canonical `must_change_password=true`，本任务禁止修改凭据，故 operations 主 UAT 未验证，最终为 `SUPPLIER MAPPING GOVERNANCE DEPLOYED — MAIN UAT NOT VERIFIED`。
 - 后续边界：处理 operations 强制改密必须另立受控 Identity 任务；创建/审核八条主 UAT Mapping 必须再获独立业务授权。本任务不自动继续。
 
+## D-092 Canonical v2 状态 Schema 与离线恢复初始状态门禁必须分离
+
+- 日期：2026-08-04
+- 状态：`ACCEPTED / IMPLEMENTED`
+- 确认人：项目负责人（明确授权 `SELFHOST-OPS-CANONICAL-SCHEMA-RECONCILIATION-12` 的脱敏诊断及仅在确定安全时对齐验证器）
+- 背景：`chenyida-erp-uat-credentials-v2` 同时被用作离线恢复输出和后续 UAT 当前凭据 Canonical。旧验证器把恢复写入时十个 UAT 账号必须 `must_change_password=true` 的初始状态写成长期 Schema `const`，因此错误拒绝已经由受控首次改密转换为 false、且被后续只读 UAT 证明有效的 engineering、planning、purchase 当前记录。
+- 决定：长期 Canonical v2 的 `must_change_password` 必须是必需且严格的 boolean；固定账号数、顺序、用户名、角色、密码策略、密码唯一性、字段集合、run-id 和顶层格式继续严格。离线恢复写入器仍只生成十个 true，并由独立恢复状态校验覆盖写入、Stage、提升和最终化；长期 Schema 绝不能代替或放宽该恢复门禁。
+- 诊断边界：权威 CLI 提供 root-only、固定路径、`O_NOFOLLOW`、断网可运行且在建立 PostgreSQL Pool 前返回的 `--diagnose-schema`。输出只含版本、脱敏 Pointer、Schema 关键字、预期/实际类型、白名单用户名/角色、账号数和错误数；密码、秘密、摘要、Token、Cookie、注释和实际字段值不得输出，秘密字段名固定为 `<redacted>`。
+- 实施结果：根因唯一分类 A；修复后正式 Canonical 为 10 账号、0 错误、`SCHEMA_PASS`，正式文件字节和全部账号语义未变，没有身份/API/PostgreSQL/服务或业务写入。operations 首次改密可以在新的明确授权 Identity 任务中重新执行，本决定本身不授权登录或改密。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

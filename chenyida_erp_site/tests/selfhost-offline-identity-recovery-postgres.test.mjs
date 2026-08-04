@@ -15,7 +15,7 @@ import {
   RECOVERY_ACTION,
   RECOVERY_ACTOR,
   RECOVERY_SESSION_CLEANUP_ACTION,
-  validateCanonicalFiles,
+  validateRecoveryCredentialFiles,
 } from "../tools/offline-identity-recovery/core.ts";
 
 const expectedDatabase = process.env.RECOVERY_EXPECTED_DATABASE || "";
@@ -194,7 +194,7 @@ test("atomically recovers eleven accounts, preserves roles/status and unrelated 
   assert.equal(result.accountCount, 11);
   assert.equal(result.sessionRevokedCount, 33);
   assert.equal(result.auditCount, 11);
-  await validateCanonicalFiles(result.stages.adminCanonical, result.stages.uatCanonical, runId);
+  await validateRecoveryCredentialFiles(result.stages.adminCanonical, result.stages.uatCanonical, runId);
   assert.equal((await stat(result.stages.adminCanonical)).mode & 0o777, 0o600);
   assert.equal((await stat(result.stages.uatCanonical)).mode & 0o777, 0o600);
 
@@ -417,7 +417,7 @@ test("database commit plus promotion failure retains both stages and supports co
 
   const promoted = await executeRetainedStagePromotion(options(runId, directory));
   assert.equal(promoted.status, "canonical_active");
-  await validateCanonicalFiles(result.stages.adminCanonical, result.stages.uatCanonical, runId);
+  await validateRecoveryCredentialFiles(result.stages.adminCanonical, result.stages.uatCanonical, runId);
   const finalized = await executeStageFinalization(await finalizationOptions(runId, directory));
   assert.equal(finalized.status, "completed");
   await assert.rejects(access(result.stages.adminStage));
@@ -442,7 +442,7 @@ test("commit acknowledgement loss is resolved from persistent evidence and can c
     target_active_sessions: 0,
     unrelated_active_sessions: 1,
   });
-  await validateCanonicalFiles(result.stages.adminCanonical, result.stages.uatCanonical, runId);
+  await validateRecoveryCredentialFiles(result.stages.adminCanonical, result.stages.uatCanonical, runId);
   const finalized = await executeStageFinalization(await finalizationOptions(runId, directory));
   assert.equal(finalized.status, "completed");
 });
@@ -474,7 +474,7 @@ test("unverifiable commit outcome returns PARTIAL and retains both recoverable s
   });
   const promoted = await executeRetainedStagePromotion(options(runId, directory));
   assert.equal(promoted.status, "canonical_active");
-  await validateCanonicalFiles(result.stages.adminCanonical, result.stages.uatCanonical, runId);
+  await validateRecoveryCredentialFiles(result.stages.adminCanonical, result.stages.uatCanonical, runId);
   const finalized = await executeStageFinalization(await finalizationOptions(runId, directory));
   assert.equal(finalized.status, "completed");
 });

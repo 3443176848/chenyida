@@ -1,12 +1,17 @@
+import path from "node:path";
 import { Pool } from "pg";
 import {
+  diagnoseUatCredentialFile,
   executeBrowserFailureSessionCleanup,
   executeRecovery,
   executeRetainedStagePromotion,
   executeStageFinalization,
+  formatUatSchemaDiagnosis,
   RECOVERY_ACCOUNTS,
   RecoveryError,
 } from "./core.ts";
+
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type Arguments = {
   environment: "parallel-uat" | "parallel-uat-rehearsal" | "";
@@ -17,6 +22,7 @@ type Arguments = {
   promoteRetainedStageOnly: boolean;
   finalizeRecoveryStage: boolean;
   cleanupBrowserFailureSessions: boolean;
+  diagnoseSchema: boolean;
   sessionCleanupConfirmation: boolean;
   sessionCleanupUsername?: string;
   expectedDatabaseName?: string;
@@ -35,6 +41,7 @@ function parseArguments(argv: string[]): Arguments {
     promoteRetainedStageOnly: false,
     finalizeRecoveryStage: false,
     cleanupBrowserFailureSessions: false,
+    diagnoseSchema: false,
     sessionCleanupConfirmation: false,
   };
   const seen = new Set<string>();
@@ -60,6 +67,10 @@ function parseArguments(argv: string[]): Arguments {
     }
     if (flag === "--revoke-target-sessions-after-browser-failure") {
       parsed.cleanupBrowserFailureSessions = true;
+      continue;
+    }
+    if (flag === "--diagnose-schema") {
+      parsed.diagnoseSchema = true;
       continue;
     }
     if (flag === "--confirm-browser-failure-session-cleanup") {
@@ -94,7 +105,8 @@ async function main(): Promise<number> {
     const args = parseArguments(process.argv.slice(2));
     const selectedModes = Number(args.promoteRetainedStageOnly)
       + Number(args.finalizeRecoveryStage)
-      + Number(args.cleanupBrowserFailureSessions);
+      + Number(args.cleanupBrowserFailureSessions)
+      + Number(args.diagnoseSchema);
     if (selectedModes > 1
       || args.finalizationConfirmation && !args.finalizeRecoveryStage
       || args.browserVerificationEvidencePath && !args.finalizeRecoveryStage
@@ -102,6 +114,31 @@ async function main(): Promise<number> {
       || args.sessionCleanupUsername && !args.cleanupBrowserFailureSessions
       || args.cleanupBrowserFailureSessions && !args.sessionCleanupUsername) {
       throw new RecoveryError("RECOVERY_ARGUMENT_INVALID", "PRECHECK");
+    }
+    if (args.diagnoseSchema) {
+      const expectedClass = args.environment === "parallel-uat" ? "uat" : "test";
+      if (!UUID_V4.test(args.recoveryRunId)
+        || !["parallel-uat", "parallel-uat-rehearsal"].includes(args.environment)
+        || (process.geteuid?.() ?? -1) !== 0
+        || process.env.ERP_DEPLOYMENT_CLASS !== expectedClass
+        || process.env.ERP_DEPLOYMENT_CLASS === "production"
+        || args.expectedMigration
+        || args.confirmation
+        || args.finalizationConfirmation
+        || args.offlineAttestationPath
+        || args.browserVerificationEvidencePath
+        || args.expectedDatabaseName
+        || (args.environment === "parallel-uat" && args.stageDirectory)
+        || (args.environment === "parallel-uat-rehearsal"
+          && args.stageDirectory !== `/run/chenyida-erp/identity-recovery-tests/${args.recoveryRunId}`)) {
+        throw new RecoveryError("RECOVERY_ARGUMENT_INVALID", "PRECHECK");
+      }
+      const credentialPath = args.environment === "parallel-uat"
+        ? "/etc/chenyida-erp/uat-role-accounts.txt"
+        : path.join(args.stageDirectory!, "uat-role-accounts.txt");
+      const diagnosis = await diagnoseUatCredentialFile(credentialPath, args.recoveryRunId);
+      for (const outputLine of formatUatSchemaDiagnosis(diagnosis)) line(outputLine);
+      return diagnosis.valid ? 0 : 2;
     }
     const databaseUrl = process.env.DATABASE_URL || "";
     pool = new Pool({

@@ -2,6 +2,23 @@
 
 最后更新时间：2026-08-04（Asia/Shanghai）
 
+## SELFHOST-OPS-CANONICAL-SCHEMA-RECONCILIATION-12 Canonical UAT 凭据 Schema 对齐
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | CANONICAL VALIDATOR FIXED — FILE UNCHANGED | 根因 A 已修复；正式 Canonical 未改，未执行任何身份或业务变化 |
+| 严格起点 | PASS | clean `main@2f2a62b81622afd708538da5f9cfd9afc835dda6`、Parent `1e9221d90db621becc2badf40b3e0ed3017b73e6`、behind 0/ahead 134；alpha.39、0001—0038、0038 SHA、Web `c1576bd2…`、服务/四卷全部吻合 |
+| 脱敏诊断 | ROOT CAUSE A | 10 账号、3 错误；仅 `/accounts/2|3|4/must_change_password` 命中旧 `const`，预期/实际类型均为 boolean，对应 engineering/planning/purchase；没有其他 Schema 或密码策略错误 |
+| 精确根因 | FIXED / VALIDATOR STALE | 恢复 writer 的初始全 true 被误当成 v2 Canonical 永久状态；后续受控 UAT 已证明这三个账号当前 false 状态有效，而 operations 仍为 true |
+| 版本 | PASS | Schema `chenyida-erp-uat-credentials-v2`；validator/parser `offline-identity-recovery-uat-validator-v2.1`；writer `offline-identity-recovery-credential-writer-v2` |
+| 修复边界 | PASS / STRICT | 长期 Schema 要求严格 boolean；固定 10 账号、顺序、用户名、角色、密码策略、唯一性、字段与 run-id 不变；恢复 writer/Stage/提升/最终化继续单独强制初始 true |
+| 安全诊断 | PASS | `--diagnose-schema` 固定正式/演练路径、root、deployment class、run-id、0600/nlink1、`O_NOFOLLOW` 和 64 KiB 上限，在创建 PostgreSQL Pool 前返回；秘密字段固定 `<redacted>`，异常只输出稳定代码 |
+| 正式复验 | SCHEMA_PASS | 账号 10、错误 0；正式文件仍为 root:root 0600、单硬链接、size 1,944/inode 193179676/mtime 不变；候选不存在，全部账号语义保持 |
+| 自动验证 | PASS WITH EXPLICIT PG EXCLUSION | 离线恢复 unit 9/9、npm 3/3、Python compile/self-test/smoke/go-live 4 项、lint 0 error/10 既有 warning、credentials 1,194 文件和 diff check 通过；按绝对禁令不运行 PostgreSQL 集成测试 |
+| 运行/业务保护 | PASS / ZERO WRITE | 无 Chromium、登录、正式 API、PostgreSQL、Migration、服务/镜像/Compose/Volume 或身份/业务写；Mapping 0、RFQ/Quote/Award 0/0/0、PRQ ACCEPTED 与账号/Session 状态保持 |
+| 资源/清理 | PASS | available memory 约 2.2→2.2 GiB，Swap 258→258 MiB，根盘 20→20 GiB，Load `0.01/0.23/0.28`→`0.45/0.46/0.47`；内核 OOM 0、四服务 RestartCount 0/OOM false。测试串行、一次一个容器；Python 任务目录、容器 tmpfs、任务容器和 Canonical 副本/候选均为 0，未 prune，四卷保留 |
+| Git/后续 | ONE FOCUSED COMMIT / IDENTITY RETRY READY | 独立消息 `fix: diagnose canonical credential schema safely`；operations 首次改密的 Schema 阻断已解除，但只能在新的明确授权 Identity 任务执行；本任务停止且不开始 Mapping |
+
 ## SELFHOST-UAT-FIX-20 受控 Supplier Mapping 维护、审核与 RFQ 覆盖门禁
 
 | 验证项 | 结果 | 说明 |

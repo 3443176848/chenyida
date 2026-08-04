@@ -40,8 +40,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.39`；PostgreSQL 为 38/head `0038_supplier_mapping_governance.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-20` 功能提交为 `ddab02a57e0e87255c7a35d125959ac750b108e1`（`feat: add governed supplier material mappings`），legacy 主单位兼容修复为 `1e9221d90db621becc2badf40b3e0ed3017b73e6`（`fix: resolve legacy material units for supplier mappings`）；版本 alpha.39，Migration 0038 |
-| 当前根仓库运维基线 | Supplier Mapping 单一权威已具备 purchase 草稿/提交、operations 只读异人审核、不可变版本/Event 与 RFQ 当前有效 1:1 覆盖门禁；隔离八 Mapping/两家 4/4/RFQ DRAFT、备份恢复和部署通过。主 UAT purchase 只读通过但 operations Canonical 强制改密，最终结论 `SUPPLIER MAPPING GOVERNANCE DEPLOYED — MAIN UAT NOT VERIFIED` |
-| Git 同步与工作区 | 本任务从 clean `main@2cdbc43d1293b6f13bf5bba1e140ec6808b05dd5`、Parent `23d654c383015864be9a2ade71e78d94eb77adaf`、behind 0/ahead 131 起步；功能与兼容修复提交如上，保护 runner、部署事实、完成报告和项目文档由独立 `ops: deploy supplier mapping governance` 收口，完成后应为 ahead 134。未 push/PR/amend/rebase/reset/stash/restore；秘密、连接信息、数据库和备份正文未进入 Git |
+| 当前根仓库运维基线 | `SELFHOST-OPS-CANONICAL-SCHEMA-RECONCILIATION-12` 已把长期 Canonical v2 boolean 状态与离线恢复初始全 true 门禁分离；脱敏诊断根因 A，正式 UAT 文件 10 账号/0 错误/PASS 且字节不变。Supplier Mapping 部署与主 UAT 零 Mapping/下游事实保持；operations 首次改密可在新的明确授权 Identity 任务重新执行 |
+| Git 同步与工作区 | 本任务从 clean `main@2f2a62b81622afd708538da5f9cfd9afc835dda6`、Parent `1e9221d90db621becc2badf40b3e0ed3017b73e6`、behind 0/ahead 134 起步；验证器、诊断、合成测试和项目文档由独立 `fix: diagnose canonical credential schema safely` 收口，完成后应为 ahead 135。未 push/PR/amend/rebase/reset/stash/restore；Canonical、秘密、连接信息、数据库和诊断正文未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
@@ -49,13 +49,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0038`，38/head `0038_supplier_mapping_governance.sql`，SHA-256 `2da259364151af098641795da55604dc3012b6adf92aec67038c0554e0592941`。主 UAT PRQ 1 仍 ACCEPTED；Supplier 1/2 ACTIVE；Material 533—536 保持正式编码与 `base_uom=PCS`，目标 2×4 Mapping 为 0。两条历史 RFQ 失败 request_id 原样保留；RFQ/Quote/Award/PO/Delivery Plan/Receipt/Ledger/AP/Work Order 均为 0。部署前备份恢复副本与部署后主库业务指纹均为 `8ad0c2e19863808ed9fed62b0da8f5ef4e78bbaf586fe1be146a286bcf3f0ce0` |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 为 alpha.39 `sha256:c1576bd22a209fb6f524e304bcf12cc38af4d67a35c76f37fa8dc1311c2922c8`；原 alpha.38 与首次 alpha.39 分别保留精确 predeploy/pre-hotfix 回退 tag。Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.39 新增 Supplier Mapping 治理和 RFQ 覆盖率门禁，并保留 Requirement Unit Resolution、Planning Revision Response 与固定后继谱系。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
-| 当前阶段 | `SELFHOST-UAT-FIX-20` 已部署 Supplier Mapping 权限、生命周期、不可变审核、0038 与 RFQ 1:1 coverage；隔离完整验收和 purchase 主 UAT 只读通过，operations 主 UAT 因 Canonical 强制改密未验证 |
-| 当前任务 | 无自动执行任务；本轮以 `SUPPLIER MAPPING GOVERNANCE DEPLOYED — MAIN UAT NOT VERIFIED` 停止。主 UAT Mapping/RFQ/Quote/Award/PO 均未创建，业务 POST 0，最终有效 Session 0 |
-| 下一任务 | 先以独立受控 Identity 任务处理 `uat_20260729_operations` 的强制改密并完成只读登录验收；随后才可在新的明确业务授权中由 purchase 创建并提交八条主 UAT Mapping、operations 异人审核。不得从本任务自动继续 |
+| 当前阶段 | `SELFHOST-OPS-CANONICAL-SCHEMA-RECONCILIATION-12` 已修复阻断 operations 首次改密工具的 Canonical Schema 误报；正式文件、身份、Session、数据库、服务和 Supplier Mapping 业务均未变 |
+| 当前任务 | 无自动执行任务；本轮以 `CANONICAL VALIDATOR FIXED — FILE UNCHANGED` 停止。不登录 operations，不开始 Mapping；主 UAT Mapping/RFQ/Quote/Award/PO 均保持 0 |
+| 下一任务 | 可新立受控 Identity 任务执行 `uat_20260729_operations` 首次改密和只读登录验收；成功后仍须新的明确业务授权，才可由 purchase 创建/提交八条主 UAT Mapping并由 operations 异人审核。不得从本任务自动继续 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-OPS-CANONICAL-SCHEMA-RECONCILIATION-12 新增 root-only、固定路径且不建立数据库连接的脱敏 `--diagnose-schema`，证明旧验证器仅把 engineering/planning/purchase 的当前 boolean must-change 状态误当恢复初始 const。长期 v2 Schema 现接受严格 boolean，恢复 writer/Stage/提升/最终化仍强制初始全 true；正式 Canonical 10 账号/0 错误/PASS且字节不变，无登录、API、PostgreSQL、身份或业务写
 
 - SELFHOST-UAT-FIX-20 复用 `supplier_mappings` 单一权威，交付 alpha.39/0038、purchase 草稿/提交、operations 只读异人审核、稳定 Mapping ID/不可变版本与 Event、Supplier part/有效期唯一约束，以及 RFQ create/issue 共用的当前有效 1:1 coverage。隔离八 Mapping 与两家 4/4/RFQ DRAFT 通过；主 UAT purchase 只读为 0/4×2、业务 POST 0，operations 因 Canonical must-change 未验证，主 Mapping 和全部下游仍为 0
 

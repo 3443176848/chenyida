@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { constants as fileConstants } from "node:fs";
 import {
   chmod,
   chown,
@@ -20,6 +21,9 @@ export const RECOVERY_SESSION_CLEANUP_ACTION = "OFFLINE_IDENTITY_RECOVERY_SESSIO
 export const RECOVERY_REASON = "用户明确授权的非生产凭据恢复";
 export const RECOVERY_REASON_CODE = "USER_AUTHORIZED_NON_PRODUCTION_CREDENTIAL_RECOVERY";
 export const RECOVERY_ACTOR = "offline_identity_recovery";
+export const UAT_CREDENTIAL_SCHEMA_VERSION = "chenyida-erp-uat-credentials-v2";
+export const UAT_CREDENTIAL_VALIDATOR_VERSION = "offline-identity-recovery-uat-validator-v2.1";
+export const UAT_CREDENTIAL_WRITER_VERSION = "offline-identity-recovery-credential-writer-v2";
 
 export const RECOVERY_ACCOUNTS = [
   { username: "admin", role: "admin", mustChangePassword: false },
@@ -56,7 +60,7 @@ export const UAT_CREDENTIAL_SCHEMA = {
   additionalProperties: false,
   required: ["format_version", "generated_at", "accounts", "recovery_run_id"],
   properties: {
-    format_version: { const: "chenyida-erp-uat-credentials-v2" },
+    format_version: { const: UAT_CREDENTIAL_SCHEMA_VERSION },
     generated_at: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\+08:00$" },
     accounts: {
       type: "array",
@@ -70,7 +74,7 @@ export const UAT_CREDENTIAL_SCHEMA = {
           username: { type: "string" },
           role: { type: "string" },
           password: { type: "string", minLength: 12, maxLength: 128 },
-          must_change_password: { const: true },
+          must_change_password: { type: "boolean" },
         },
       },
     },
@@ -158,7 +162,7 @@ type CredentialAccount = {
   username: string;
   role: string;
   password: string;
-  must_change_password: true;
+  must_change_password: boolean;
 };
 
 export type AdminCredentialDocument = {
@@ -259,7 +263,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 type JsonSchema = {
-  type?: "object" | "array" | "string";
+  type?: "object" | "array" | "string" | "boolean";
   const?: unknown;
   required?: readonly string[];
   additionalProperties?: boolean;
@@ -275,6 +279,7 @@ type JsonSchema = {
 
 function validatesSchema(schema: JsonSchema, value: unknown): boolean {
   if (Object.hasOwn(schema, "const") && value !== schema.const) return false;
+  if (schema.type === "boolean" && typeof value !== "boolean") return false;
   if (schema.type === "string") {
     if (typeof value !== "string") return false;
     if (schema.minLength !== undefined && value.length < schema.minLength) return false;
@@ -296,6 +301,307 @@ function validatesSchema(schema: JsonSchema, value: unknown): boolean {
     if (schema.properties && Object.entries(schema.properties).some(([key, child]) => Object.hasOwn(value, key) && !validatesSchema(child, value[key]))) return false;
   }
   return true;
+}
+
+export type UatSchemaDiagnosticKeyword =
+  | "required"
+  | "type"
+  | "const"
+  | "enum"
+  | "additionalProperties"
+  | "minItems"
+  | "maxItems"
+  | "uniqueItems"
+  | "minLength"
+  | "maxLength"
+  | "pattern"
+  | "format";
+
+export type UatSchemaDiagnosticError = {
+  pointer: string;
+  keyword: UatSchemaDiagnosticKeyword;
+  expectedType: string;
+  actualType: string;
+  field: string;
+  username: string;
+  role: string;
+};
+
+export type UatSchemaDiagnosis = {
+  valid: boolean;
+  schemaVersion: typeof UAT_CREDENTIAL_SCHEMA_VERSION;
+  validatorVersion: typeof UAT_CREDENTIAL_VALIDATOR_VERSION;
+  writerVersion: typeof UAT_CREDENTIAL_WRITER_VERSION;
+  accountCount: number;
+  errorCount: number;
+  errors: UatSchemaDiagnosticError[];
+};
+
+const DIAGNOSTIC_ERROR_LIMIT = 256;
+const EXPECTED_UAT_ACCOUNTS = RECOVERY_ACCOUNTS.slice(1);
+const EXPECTED_UAT_USERNAMES = new Set(EXPECTED_UAT_ACCOUNTS.map((account) => account.username));
+const EXPECTED_UAT_ROLES = new Set(EXPECTED_UAT_ACCOUNTS.map((account) => account.role));
+const SAFE_DIAGNOSTIC_FIELDS = new Set([
+  "root",
+  "account",
+  "format_version",
+  "generated_at",
+  "accounts",
+  "recovery_run_id",
+  "username",
+  "role",
+  "must_change_password",
+]);
+
+function diagnosticType(value: unknown): string {
+  if (value === undefined) return "missing";
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value;
+}
+
+function diagnosticField(value: string): string {
+  const normalized = value.toLowerCase();
+  return SAFE_DIAGNOSTIC_FIELDS.has(normalized) ? normalized : "<redacted>";
+}
+
+function diagnosticPointer(parent: string, field: string): string {
+  return `${parent}/${diagnosticField(field)}`;
+}
+
+function diagnosticAccountContext(value: unknown): { username: string; role: string } {
+  if (!isPlainObject(value)) return { username: "<unknown>", role: "<unknown>" };
+  const username = typeof value.username === "string" && EXPECTED_UAT_USERNAMES.has(value.username as never)
+    ? value.username
+    : value.username === undefined ? "<missing>" : "<invalid>";
+  const role = typeof value.role === "string" && EXPECTED_UAT_ROLES.has(value.role as never)
+    ? value.role
+    : value.role === undefined ? "<missing>" : "<invalid>";
+  return { username, role };
+}
+
+export function diagnoseUatCredentialValue(
+  value: unknown,
+  expectedRecoveryRunId?: string,
+): UatSchemaDiagnosis {
+  const errors: UatSchemaDiagnosticError[] = [];
+  let errorCount = 0;
+  let accountCount = 0;
+  const addError = (
+    pointer: string,
+    keyword: UatSchemaDiagnosticKeyword,
+    expectedType: string,
+    actualValue: unknown,
+    field: string,
+    context: { username: string; role: string } = { username: "<unknown>", role: "<unknown>" },
+  ): void => {
+    errorCount += 1;
+    if (errors.length >= DIAGNOSTIC_ERROR_LIMIT) return;
+    errors.push({
+      pointer,
+      keyword,
+      expectedType,
+      actualType: diagnosticType(actualValue),
+      field: diagnosticField(field),
+      username: context.username,
+      role: context.role,
+    });
+  };
+
+  if (!isPlainObject(value)) {
+    addError("/", "type", "object", value, "root");
+    return {
+      valid: false,
+      schemaVersion: UAT_CREDENTIAL_SCHEMA_VERSION,
+      validatorVersion: UAT_CREDENTIAL_VALIDATOR_VERSION,
+      writerVersion: UAT_CREDENTIAL_WRITER_VERSION,
+      accountCount,
+      errorCount,
+      errors,
+    };
+  }
+
+  const requiredTopLevel = UAT_CREDENTIAL_SCHEMA.required;
+  for (const field of requiredTopLevel) {
+    if (!Object.hasOwn(value, field)) {
+      const expectedType = field === "accounts" ? "array" : "string";
+      addError(diagnosticPointer("", field), "required", expectedType, undefined, field);
+    }
+  }
+  for (const field of Object.keys(value)) {
+    if (!requiredTopLevel.includes(field as never)) {
+      addError(diagnosticPointer("", field), "additionalProperties", "absent", value[field], field);
+    }
+  }
+
+  if (Object.hasOwn(value, "format_version")) {
+    if (typeof value.format_version !== "string") {
+      addError("/format_version", "type", "string", value.format_version, "format_version");
+    } else if (value.format_version !== UAT_CREDENTIAL_SCHEMA_VERSION) {
+      addError("/format_version", "const", "string", value.format_version, "format_version");
+    }
+  }
+  if (Object.hasOwn(value, "generated_at")) {
+    if (typeof value.generated_at !== "string") {
+      addError("/generated_at", "type", "string", value.generated_at, "generated_at");
+    } else if (!new RegExp(UAT_CREDENTIAL_SCHEMA.properties.generated_at.pattern).test(value.generated_at)) {
+      addError("/generated_at", "pattern", "string", value.generated_at, "generated_at");
+    }
+  }
+  if (Object.hasOwn(value, "recovery_run_id")) {
+    if (typeof value.recovery_run_id !== "string") {
+      addError("/recovery_run_id", "type", "string", value.recovery_run_id, "recovery_run_id");
+    } else {
+      if (!UUID_V4.test(value.recovery_run_id)) {
+        addError("/recovery_run_id", "format", "string", value.recovery_run_id, "recovery_run_id");
+      }
+      if (expectedRecoveryRunId !== undefined && value.recovery_run_id !== expectedRecoveryRunId) {
+        addError("/recovery_run_id", "const", "string", value.recovery_run_id, "recovery_run_id");
+      }
+    }
+  }
+
+  if (Object.hasOwn(value, "accounts")) {
+    if (!Array.isArray(value.accounts)) {
+      addError("/accounts", "type", "array", value.accounts, "accounts");
+    } else {
+      accountCount = value.accounts.length;
+      if (value.accounts.length < 10) addError("/accounts", "minItems", "array", value.accounts, "accounts");
+      if (value.accounts.length > 10) addError("/accounts", "maxItems", "array", value.accounts, "accounts");
+      const usernames = new Set<string>();
+      const passwords = new Set<string>();
+      value.accounts.forEach((account, index) => {
+        const parent = `/accounts/${index}`;
+        const context = diagnosticAccountContext(account);
+        if (!isPlainObject(account)) {
+          addError(parent, "type", "object", account, "account", context);
+          return;
+        }
+        const requiredAccountFields = UAT_CREDENTIAL_SCHEMA.properties.accounts.items.required;
+        for (const field of requiredAccountFields) {
+          if (!Object.hasOwn(account, field)) {
+            const expectedType = field === "must_change_password" ? "boolean" : "string";
+            addError(diagnosticPointer(parent, field), "required", expectedType, undefined, field, context);
+          }
+        }
+        for (const field of Object.keys(account)) {
+          if (!requiredAccountFields.includes(field as never)) {
+            addError(diagnosticPointer(parent, field), "additionalProperties", "absent", account[field], field, context);
+          }
+        }
+
+        if (Object.hasOwn(account, "username")) {
+          if (typeof account.username !== "string") {
+            addError(`${parent}/username`, "type", "string", account.username, "username", context);
+          } else {
+            if (usernames.has(account.username)) {
+              addError(`${parent}/username`, "uniqueItems", "string", account.username, "username", context);
+            }
+            usernames.add(account.username);
+            const expected = EXPECTED_UAT_ACCOUNTS[index];
+            if (!EXPECTED_UAT_USERNAMES.has(account.username as never)
+              || expected && account.username !== expected.username) {
+              addError(`${parent}/username`, "enum", "string", account.username, "username", context);
+            }
+          }
+        }
+        if (Object.hasOwn(account, "role")) {
+          if (typeof account.role !== "string") {
+            addError(`${parent}/role`, "type", "string", account.role, "role", context);
+          } else {
+            const expected = EXPECTED_UAT_ACCOUNTS[index];
+            if (!EXPECTED_UAT_ROLES.has(account.role as never)
+              || expected && account.role !== expected.role) {
+              addError(`${parent}/role`, "enum", "string", account.role, "role", context);
+            }
+          }
+        }
+        if (Object.hasOwn(account, "password")) {
+          const pointer = diagnosticPointer(parent, "password");
+          if (typeof account.password !== "string") {
+            addError(pointer, "type", "string", account.password, "password", context);
+          } else {
+            if (account.password.length < 12) addError(pointer, "minLength", "string", account.password, "password", context);
+            if (account.password.length > 128) addError(pointer, "maxLength", "string", account.password, "password", context);
+            if (passwords.has(account.password)) {
+              addError(pointer, "uniqueItems", "string", account.password, "password", context);
+            }
+            passwords.add(account.password);
+            if (typeof account.username === "string") {
+              try {
+                validatePassword(account.password, account.username);
+              } catch {
+                addError(pointer, "pattern", "string", account.password, "password", context);
+              }
+            }
+          }
+        }
+        if (Object.hasOwn(account, "must_change_password")) {
+          if (typeof account.must_change_password !== "boolean") {
+            addError(`${parent}/must_change_password`, "type", "boolean", account.must_change_password, "must_change_password", context);
+          }
+        }
+      });
+    }
+  }
+
+  return {
+    valid: errorCount === 0,
+    schemaVersion: UAT_CREDENTIAL_SCHEMA_VERSION,
+    validatorVersion: UAT_CREDENTIAL_VALIDATOR_VERSION,
+    writerVersion: UAT_CREDENTIAL_WRITER_VERSION,
+    accountCount,
+    errorCount,
+    errors,
+  };
+}
+
+export function diagnoseUatCredentialJson(
+  raw: string | Buffer,
+  expectedRecoveryRunId?: string,
+): UatSchemaDiagnosis {
+  try {
+    return diagnoseUatCredentialValue(JSON.parse(raw.toString()), expectedRecoveryRunId);
+  } catch {
+    return diagnoseUatCredentialValue(undefined, expectedRecoveryRunId);
+  }
+}
+
+export async function diagnoseUatCredentialFile(
+  filePath: string,
+  expectedRecoveryRunId?: string,
+): Promise<UatSchemaDiagnosis> {
+  await assertCredentialDiagnosticDirectory(path.dirname(filePath));
+  const { payload, metadata } = await readRootOnlyRegularFile(filePath);
+  if (metadata.size !== payload.length) throw new RecoveryError("RECOVERY_FILE_METADATA_INVALID", "FILE");
+  return diagnoseUatCredentialJson(payload, expectedRecoveryRunId);
+}
+
+export function formatUatSchemaDiagnosis(diagnosis: UatSchemaDiagnosis): string[] {
+  const lines = [
+    `SCHEMA_VERSION ${diagnosis.schemaVersion}`,
+    `VALIDATOR_VERSION ${diagnosis.validatorVersion}`,
+    `WRITER_VERSION ${diagnosis.writerVersion}`,
+    `COUNT ACCOUNTS ${diagnosis.accountCount}`,
+  ];
+  diagnosis.errors.forEach((error, index) => {
+    lines.push([
+      "ERROR", String(index + 1),
+      "POINTER", error.pointer,
+      "KEYWORD", error.keyword,
+      "EXPECTED_TYPE", error.expectedType,
+      "ACTUAL_TYPE", error.actualType,
+      "FIELD", error.field,
+      "USERNAME", error.username,
+      "ROLE", error.role,
+    ].join(" "));
+  });
+  lines.push(`COUNT ERRORS ${diagnosis.errorCount}`);
+  if (diagnosis.errors.length !== diagnosis.errorCount) {
+    lines.push(`COUNT DISPLAYED_ERRORS ${diagnosis.errors.length}`);
+  }
+  lines.push(`FINAL ${diagnosis.valid ? "SCHEMA_PASS" : "SCHEMA_INVALID"}`);
+  return lines;
 }
 
 function exactKeys(value: Record<string, unknown>, expected: readonly string[]): boolean {
@@ -343,13 +649,13 @@ export function createCredentialDocuments(recoveryRunId: string, now = new Date(
       recovery_run_id: recoveryRunId,
     },
     uat: {
-      format_version: "chenyida-erp-uat-credentials-v2",
+      format_version: UAT_CREDENTIAL_SCHEMA_VERSION,
       generated_at: generatedAt,
       accounts: uatAccounts,
       recovery_run_id: recoveryRunId,
     },
   };
-  assertCanonicalDocuments(documents, recoveryRunId);
+  assertRecoveryCredentialDocuments(documents, recoveryRunId);
   return documents;
 }
 
@@ -367,7 +673,7 @@ function assertUatDocument(value: unknown, recoveryRunId: string): asserts value
   if (!validatesSchema(UAT_CREDENTIAL_SCHEMA, value)
     || !isPlainObject(value)
     || !exactKeys(value, UAT_CREDENTIAL_SCHEMA.required)
-    || value.format_version !== "chenyida-erp-uat-credentials-v2"
+    || value.format_version !== UAT_CREDENTIAL_SCHEMA_VERSION
     || typeof value.generated_at !== "string"
     || !new RegExp(UAT_CREDENTIAL_SCHEMA.properties.generated_at.pattern).test(value.generated_at)
     || value.recovery_run_id !== recoveryRunId
@@ -384,7 +690,7 @@ function assertUatDocument(value: unknown, recoveryRunId: string): asserts value
       || raw.username !== expected.username
       || raw.role !== expected.role
       || typeof raw.password !== "string"
-      || raw.must_change_password !== true) {
+      || typeof raw.must_change_password !== "boolean") {
       throw new RecoveryError("RECOVERY_UAT_SCHEMA_INVALID", "SCHEMA");
     }
     validatePassword(raw.password, expected.username);
@@ -400,6 +706,13 @@ export function assertCanonicalDocuments(documents: CredentialDocuments, recover
     || documents.admin.password === documents.uat.accounts[0]?.password
     || documents.uat.accounts.some((account) => account.password === documents.admin.password)) {
     throw new RecoveryError("RECOVERY_DOCUMENT_CROSS_CHECK_FAILED", "SCHEMA");
+  }
+}
+
+export function assertRecoveryCredentialDocuments(documents: CredentialDocuments, recoveryRunId: string): void {
+  assertCanonicalDocuments(documents, recoveryRunId);
+  if (documents.uat.accounts.some((account) => account.must_change_password !== true)) {
+    throw new RecoveryError("RECOVERY_UAT_INITIAL_STATE_INVALID", "SCHEMA");
   }
 }
 
@@ -433,6 +746,46 @@ async function assertRootOnlyRegularFile(filePath: string): Promise<void> {
   const stat = await lstat(filePath);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.uid !== 0 || stat.gid !== 0 || (stat.mode & 0o777) !== 0o600 || stat.nlink !== 1) {
     throw new RecoveryError("RECOVERY_FILE_METADATA_INVALID", "FILE");
+  }
+}
+
+async function readRootOnlyRegularFile(filePath: string) {
+  let handle: Awaited<ReturnType<typeof open>> | null = null;
+  try {
+    handle = await open(filePath, fileConstants.O_RDONLY | fileConstants.O_NOFOLLOW);
+    const metadata = await handle.stat();
+    if (!metadata.isFile()
+      || metadata.uid !== 0
+      || metadata.gid !== 0
+      || (metadata.mode & 0o777) !== 0o600
+      || metadata.nlink !== 1
+      || metadata.size < 2
+      || metadata.size > 65536) {
+      throw new RecoveryError("RECOVERY_FILE_METADATA_INVALID", "FILE");
+    }
+    return { payload: await handle.readFile(), metadata };
+  } catch (error) {
+    if (error instanceof RecoveryError) throw error;
+    throw new RecoveryError("RECOVERY_FILE_METADATA_INVALID", "FILE");
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+}
+
+async function assertCredentialDiagnosticDirectory(directory: string): Promise<void> {
+  try {
+    const metadata = await lstat(directory);
+    if (!metadata.isDirectory()
+      || metadata.isSymbolicLink()
+      || metadata.uid !== 0
+      || metadata.gid !== 0
+      || (metadata.mode & 0o022) !== 0
+      || await realpath(directory) !== directory) {
+      throw new RecoveryError("RECOVERY_DIRECTORY_METADATA_INVALID", "FILE");
+    }
+  } catch (error) {
+    if (error instanceof RecoveryError) throw error;
+    throw new RecoveryError("RECOVERY_DIRECTORY_METADATA_INVALID", "FILE");
   }
 }
 
@@ -520,7 +873,10 @@ export async function writeCredentialStages(
     await fsyncDirectory(stages.directory);
     const parsedAdmin = JSON.parse(await readFile(stages.adminStage, "utf8"));
     const parsedUat = JSON.parse(await readFile(stages.uatStage, "utf8"));
-    assertCanonicalDocuments({ admin: parsedAdmin, uat: parsedUat } as CredentialDocuments, documents.admin.recovery_run_id);
+    assertRecoveryCredentialDocuments(
+      { admin: parsedAdmin, uat: parsedUat } as CredentialDocuments,
+      documents.admin.recovery_run_id,
+    );
     await assertRootOnlyRegularFile(stages.adminStage);
     await assertRootOnlyRegularFile(stages.uatStage);
   } catch (error) {
@@ -586,7 +942,7 @@ export async function promoteCredentialStages(
 
     const parsedAdmin = JSON.parse(await readFile(stages.adminCanonical, "utf8"));
     const parsedUat = JSON.parse(await readFile(stages.uatCanonical, "utf8"));
-    assertCanonicalDocuments({ admin: parsedAdmin, uat: parsedUat } as CredentialDocuments, recoveryRunId);
+    assertRecoveryCredentialDocuments({ admin: parsedAdmin, uat: parsedUat } as CredentialDocuments, recoveryRunId);
     await assertRootOnlyRegularFile(stages.adminCanonical);
     await assertRootOnlyRegularFile(stages.uatCanonical);
     const adminStage = await readFile(stages.adminStage);
@@ -860,7 +1216,7 @@ async function assertAvailableStagesMatchCanonical(
       throw new RecoveryError("RECOVERY_STAGE_CANONICAL_MISMATCH", "FINALIZE");
     }
   }
-  await validateCanonicalFiles(stages.adminCanonical, stages.uatCanonical, recoveryRunId);
+  await validateRecoveryCredentialFiles(stages.adminCanonical, stages.uatCanonical, recoveryRunId);
 }
 
 export function assertStaticGuards(input: {
@@ -1809,7 +2165,7 @@ export async function executeRetainedStagePromotion(options: RecoveryOptions): P
     admin: JSON.parse(await readFile(stages.adminStage, "utf8")),
     uat: JSON.parse(await readFile(stages.uatStage, "utf8")),
   } as CredentialDocuments;
-  assertCanonicalDocuments(documents, options.recoveryRunId);
+  assertRecoveryCredentialDocuments(documents, options.recoveryRunId);
   let verifiedSessionRevokedCount: number | null = null;
   try {
     await withCommittedRecoveryEvidence(options, parsedUrl, documents, async (outcome) => {
@@ -1864,7 +2220,7 @@ export async function executeStageFinalization(options: RecoveryOptions): Promis
     admin: JSON.parse(adminCanonical.toString("utf8")),
     uat: JSON.parse(uatCanonical.toString("utf8")),
   } as CredentialDocuments;
-  assertCanonicalDocuments(documents, options.recoveryRunId);
+  assertRecoveryCredentialDocuments(documents, options.recoveryRunId);
   const adminCanonicalDigest = sha256(adminCanonical);
   const uatCanonicalDigest = sha256(uatCanonical);
   const expectedBrowserEvidencePath = browserVerificationEvidencePath(options, stages);
@@ -2009,11 +2365,25 @@ export async function validateCanonicalFiles(
   uatPath: string,
   recoveryRunId: string,
 ): Promise<void> {
+  const documents = await readCanonicalFiles(adminPath, uatPath);
+  assertCanonicalDocuments(documents, recoveryRunId);
+}
+
+export async function validateRecoveryCredentialFiles(
+  adminPath: string,
+  uatPath: string,
+  recoveryRunId: string,
+): Promise<void> {
+  const documents = await readCanonicalFiles(adminPath, uatPath);
+  assertRecoveryCredentialDocuments(documents, recoveryRunId);
+}
+
+async function readCanonicalFiles(adminPath: string, uatPath: string): Promise<CredentialDocuments> {
   await assertRootOnlyRegularFile(adminPath);
   await assertRootOnlyRegularFile(uatPath);
   const admin = JSON.parse(await readFile(adminPath, "utf8"));
   const uat = JSON.parse(await readFile(uatPath, "utf8"));
-  assertCanonicalDocuments({ admin, uat } as CredentialDocuments, recoveryRunId);
+  return { admin, uat } as CredentialDocuments;
 }
 
 export async function activeTargetSessionCount(pool: Pool): Promise<number> {

@@ -4,6 +4,16 @@
 
 ## 2026-08-04
 
+### SELFHOST-OPS-CANONICAL-SCHEMA-RECONCILIATION-12 - `fix: diagnose canonical credential schema safely`
+
+- Git/范围：从 strict clean `main@2f2a62b81622afd708538da5f9cfd9afc835dda6`、Parent `1e9221d90db621becc2badf40b3e0ed3017b73e6`、behind 0/ahead 134 起步；只修改离线恢复 Canonical Schema/解析验证边界、脱敏诊断 CLI、合成测试和项目文档。不访问 PostgreSQL、正式 API、浏览器、身份或业务数据，不改 Migration、版本、镜像、Compose 或部署。
+- 根因 A：正式 v2 是有效 JSON、固定十账号且除三项外全部严格约束通过；旧 validator 仅在 engineering/planning/purchase 的 `/must_change_password` 上以 `const` 拒绝 boolean。恢复 writer 的初始全 true 被错误当成 Canonical 生命周期永久值；后续受控 UAT 已证明三个当前 false 状态有效，故不是 C/D 类文件或账号损坏。
+- 修复：`chenyida-erp-uat-credentials-v2` 把必需 `must_change_password` 定义为严格 boolean；密码策略、唯一密码、固定账号/角色/顺序、字段集合、run-id 和顶层格式不变。恢复 writer、Stage、提升、保留 Stage 恢复和最终化改用独立强校验，继续只接受初始全 true，不能以长期 Schema 绕过恢复门禁。
+- 安全诊断：新增 `offline-identity-recovery-uat-validator-v2.1` 的 `--diagnose-schema`。固定正式/演练路径、root/deployment class/run-id，使用 root-only 文件句柄、`O_NOFOLLOW`、0600/nlink1 与大小上限，在构建 PostgreSQL Pool 前结束；只输出脱敏 Pointer/关键字/类型/白名单账号角色/计数，密码和秘密类字段固定 `<redacted>`，异常不输出正文或环境材料。
+- 文件/正式复验：`/etc/chenyida-erp/uat-role-accounts.txt` 全程只读，size/inode/mtime/owner/mode/nlink 与起点一致，没有候选或副本；最终 Schema 为账号 10、错误 0、PASS。密码、角色、顺序、must-change 和全部账号语义字节保持。
+- 测试：离线恢复 unit 9/9 覆盖必需字段、类型、多余字段、重复用户名、非法角色、密码错误、must-change、顶层版本、恶意注释、malformed JSON 和 CLI 数据库隔离/泄漏路径；npm 3/3、Python compile/self-test/smoke/go-live、lint 0 error/10 既有 warning、1,194 文件 credentials scan 和 diff check 通过。绝对禁止 PostgreSQL，故不运行 PG 集成测试。
+- 资源/结论：available memory 约 2.2→2.2 GiB、Swap 258→258 MiB、根盘 20→20 GiB、Load `0.01/0.23/0.28`→`0.45/0.46/0.47`；内核 OOM 0、四服务 RestartCount 0/OOM false。全部测试断网、只读、限额且串行；任务容器/Python 目录和 Canonical 临时材料清零，服务未重启，四卷不变。结论 `CANONICAL VALIDATOR FIXED — FILE UNCHANGED`；operations 首次改密可在新的明确授权 Identity 任务重试，本任务不登录 operations、不开始 Mapping。
+
 ### SELFHOST-UAT-FIX-20 - `feat: add governed supplier material mappings` / `fix: resolve legacy material units for supplier mappings` / `ops: deploy supplier mapping governance`
 
 - Git/范围：从 strict clean `main@2cdbc43d1293b6f13bf5bba1e140ec6808b05dd5`、Parent `23d654c383015864be9a2ade71e78d94eb77adaf`、behind 0/ahead 131 起步；功能提交 `ddab02a57e0e87255c7a35d125959ac750b108e1`，legacy Unit 兼容修复 `1e9221d90db621becc2badf40b3e0ed3017b73e6`。没有改写 0001—0037、历史或未知文件，不 push/PR/amend/rebase/reset/stash/restore。

@@ -1,20 +1,30 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import test from "node:test";
 import {
   assertCanonicalDocuments,
   assertObservedDatabaseState,
   assertOfflineState,
+  assertRecoveryCredentialDocuments,
   assertStaticGuards,
   createCredentialDocuments,
+  diagnoseUatCredentialJson,
+  diagnoseUatCredentialValue,
+  formatUatSchemaDiagnosis,
   RECOVERY_ACCOUNTS,
 } from "../tools/offline-identity-recovery/core.ts";
 import { validatePassword } from "../app/lib/identity-selfhost/password.ts";
 
 const execFileAsync = promisify(execFile);
 const runId = "d13e64b8-ea35-4e95-b08f-673e613aa403";
+
+function assertRedactedOutput(output, forbiddenValues, label) {
+  for (const value of forbiddenValues) {
+    if (value && output.includes(value)) throw new Error(`redaction check failed: ${label}`);
+  }
+}
 
 function base(overrides = {}) {
   return {
@@ -70,6 +80,7 @@ test("observed database and offline guards reject wrong migration and running wr
 test("CSPRNG canonical documents use fixed account order, unique policy-valid secrets and schemas", () => {
   const documents = createCredentialDocuments(runId, new Date("2026-08-01T11:22:33.444Z"));
   assertCanonicalDocuments(documents, runId);
+  assertRecoveryCredentialDocuments(documents, runId);
   assert.equal(documents.admin.username, "admin");
   assert.equal(documents.admin.must_change_password, false);
   assert.equal(documents.uat.accounts.length, 10);
@@ -79,6 +90,193 @@ test("CSPRNG canonical documents use fixed account order, unique policy-valid se
   assert.doesNotThrow(() => validatePassword(documents.admin.password, "admin"));
   documents.uat.accounts.forEach((account) => assert.doesNotThrow(() => validatePassword(account.password, account.username)));
   assert.equal(documents.admin.generated_at, "2026-08-01T19:22:33.444+08:00");
+});
+
+test("redacted UAT schema diagnosis classifies synthetic failures without emitting secret material", () => {
+  const sentinel = "DO_NOT_EMIT_CANONICAL_SECRET_MATERIAL";
+  const documents = createCredentialDocuments(runId, new Date("2026-08-01T11:22:33.444Z"));
+  const secretValues = documents.uat.accounts.map((account) => account.password);
+  const cases = [
+    {
+      name: "missing field",
+      mutate: (value) => { delete value.accounts[0].role; },
+      pointer: "/accounts/0/role",
+      keyword: "required",
+      expectedType: "string",
+      actualType: "missing",
+    },
+    {
+      name: "wrong type",
+      mutate: (value) => { value.generated_at = 42; },
+      pointer: "/generated_at",
+      keyword: "type",
+      expectedType: "string",
+      actualType: "number",
+    },
+    {
+      name: "additional property",
+      mutate: (value) => { value.accounts[0].unexpected = sentinel; },
+      pointer: "/accounts/0/<redacted>",
+      keyword: "additionalProperties",
+      expectedType: "absent",
+      actualType: "string",
+    },
+    {
+      name: "duplicate username",
+      mutate: (value) => { value.accounts[1].username = value.accounts[0].username; },
+      pointer: "/accounts/1/username",
+      keyword: "uniqueItems",
+      expectedType: "string",
+      actualType: "string",
+    },
+    {
+      name: "invalid role",
+      mutate: (value) => { value.accounts[0].role = sentinel; },
+      pointer: "/accounts/0/role",
+      keyword: "enum",
+      expectedType: "string",
+      actualType: "string",
+    },
+    {
+      name: "secret field policy failure",
+      mutate: (value) => { value.accounts[0].password = sentinel; },
+      pointer: "/accounts/0/<redacted>",
+      keyword: "pattern",
+      expectedType: "string",
+      actualType: "string",
+    },
+    {
+      name: "missing secret field",
+      mutate: (value) => { delete value.accounts[0].password; },
+      pointer: "/accounts/0/<redacted>",
+      keyword: "required",
+      expectedType: "string",
+      actualType: "missing",
+    },
+    {
+      name: "must-change failure",
+      mutate: (value) => { value.accounts[0].must_change_password = sentinel; },
+      pointer: "/accounts/0/must_change_password",
+      keyword: "type",
+      expectedType: "boolean",
+      actualType: "string",
+    },
+    {
+      name: "top-level version failure",
+      mutate: (value) => { value.format_version = sentinel; },
+      pointer: "/format_version",
+      keyword: "const",
+      expectedType: "string",
+      actualType: "string",
+    },
+    {
+      name: "comment content",
+      mutate: (value) => { value.accounts[0].comment = sentinel; },
+      pointer: "/accounts/0/<redacted>",
+      keyword: "additionalProperties",
+      expectedType: "absent",
+      actualType: "string",
+    },
+  ];
+
+  for (const fixture of cases) {
+    const value = structuredClone(documents.uat);
+    fixture.mutate(value);
+    const diagnosis = diagnoseUatCredentialValue(value, runId);
+    assert.equal(diagnosis.valid, false, fixture.name);
+    assert.ok(diagnosis.errors.some((error) => error.pointer === fixture.pointer
+      && error.keyword === fixture.keyword
+      && error.expectedType === fixture.expectedType
+      && error.actualType === fixture.actualType), fixture.name);
+    const output = formatUatSchemaDiagnosis(diagnosis).join("\n");
+    assertRedactedOutput(output, [sentinel, ...secretValues], fixture.name);
+    assert.doesNotMatch(output, /POINTER \/accounts\/\d+\/password(?: |$)/, fixture.name);
+    assert.doesNotMatch(output, /FIELD password(?: |$)/, fixture.name);
+  }
+
+  const malformed = formatUatSchemaDiagnosis(diagnoseUatCredentialJson(`{"comment":"${sentinel}"`, runId)).join("\n");
+  assertRedactedOutput(malformed, [sentinel, ...secretValues], "malformed JSON");
+  assert.match(malformed, /POINTER \/ KEYWORD type EXPECTED_TYPE object ACTUAL_TYPE missing/);
+
+  const mismatchedRun = diagnoseUatCredentialValue(documents.uat, "e13e64b8-ea35-4e95-b08f-673e613aa403");
+  assert.deepEqual(mismatchedRun.errors.map(({ pointer, keyword }) => ({ pointer, keyword })), [
+    { pointer: "/recovery_run_id", keyword: "const" },
+  ]);
+
+  const currentCanonical = structuredClone(documents);
+  currentCanonical.uat.accounts[2].must_change_password = false;
+  currentCanonical.uat.accounts[3].must_change_password = false;
+  currentCanonical.uat.accounts[4].must_change_password = false;
+  assert.equal(diagnoseUatCredentialValue(currentCanonical.uat, runId).valid, true);
+  assert.doesNotThrow(() => assertCanonicalDocuments(currentCanonical, runId));
+  assert.throws(
+    () => assertRecoveryCredentialDocuments(currentCanonical, runId),
+    (error) => error?.code === "RECOVERY_UAT_INITIAL_STATE_INVALID",
+  );
+});
+
+test("diagnose-schema CLI reads only a guarded synthetic file and keeps failures redacted", async (context) => {
+  const directory = `/run/chenyida-erp/identity-recovery-tests/${runId}`;
+  const filePath = `${directory}/uat-role-accounts.txt`;
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const documents = createCredentialDocuments(runId, new Date("2026-08-01T11:22:33.444Z"));
+  const credentialSecrets = documents.uat.accounts.map((account) => account.password);
+  await writeFile(filePath, `${JSON.stringify(documents.uat, null, 2)}\n`, { mode: 0o600 });
+  const args = [
+    "--diagnose-schema",
+    "--environment", "parallel-uat-rehearsal",
+    "--expected-run-id", runId,
+    "--stage-directory", directory,
+  ];
+  const environment = {
+    PATH: process.env.PATH,
+    ERP_DEPLOYMENT_CLASS: "test",
+    DATABASE_URL: "DO_NOT_READ_DATABASE_URL",
+  };
+  let passed;
+  try {
+    passed = await execFileAsync("./tools/offline-identity-recovery/identity-recovery", args, {
+      cwd: "/app",
+      env: environment,
+    });
+  } catch {
+    throw new Error("diagnostic CLI success path failed safely");
+  }
+  assertRedactedOutput(`${passed.stdout}${passed.stderr}`, credentialSecrets, "diagnostic CLI success");
+  assert.match(passed.stdout, /FINAL SCHEMA_PASS/);
+  assert.match(passed.stdout, /COUNT ERRORS 0/);
+
+  const sentinel = "DO_NOT_EMIT_DIAGNOSTIC_SECRET";
+  documents.uat.accounts[0].password = sentinel;
+  await writeFile(filePath, `${JSON.stringify(documents.uat, null, 2)}\n`, { mode: 0o600 });
+  await assert.rejects(
+    execFileAsync("./tools/offline-identity-recovery/identity-recovery", args, {
+      cwd: "/app",
+      env: environment,
+    }),
+    (error) => {
+      const output = `${error?.stdout || ""}${error?.stderr || ""}`;
+      assertRedactedOutput(output, [sentinel, "DO_NOT_READ_DATABASE_URL", ...credentialSecrets], "diagnostic CLI");
+      assert.match(output, /POINTER \/accounts\/0\/<redacted>/);
+      assert.match(output, /FINAL SCHEMA_INVALID/);
+      return true;
+    },
+  );
+
+  await chmod(filePath, 0o644);
+  await assert.rejects(
+    execFileAsync("./tools/offline-identity-recovery/identity-recovery", args, {
+      cwd: "/app",
+      env: environment,
+    }),
+    (error) => {
+      const output = `${error?.stdout || ""}${error?.stderr || ""}`;
+      assertRedactedOutput(output, [sentinel, "DO_NOT_READ_DATABASE_URL", ...credentialSecrets], "diagnostic metadata failure");
+      assert.match(output, /RECOVERY_FILE_METADATA_INVALID/);
+      return true;
+    },
+  );
 });
 
 test("CLI failure output is fixed and redacts environment material", async () => {
@@ -99,8 +297,8 @@ test("CLI failure output is fixed and redacts environment material", async () =>
     }),
     (error) => {
       const output = `${error?.stdout || ""}${error?.stderr || ""}`;
+      assertRedactedOutput(output, [sentinel, "postgresql://", "postgres://"], "recovery CLI failure");
       assert.match(output, /RECOVERY_PRODUCTION_FORBIDDEN/);
-      assert.doesNotMatch(output, new RegExp(sentinel));
       assert.doesNotMatch(output, /postgres(?:ql)?:\/\//i);
       assert.doesNotMatch(output, /password_hash|token_hash|session/i);
       return true;
