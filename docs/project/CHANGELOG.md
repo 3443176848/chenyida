@@ -4,6 +4,16 @@
 
 ## 2026-08-04
 
+### SELFHOST-OPS-OPERATIONS-BROWSER-VERIFICATION-14 - `fix: align identity verifier with login contract` / `fix: avoid rereading logout body after navigation` / `ops: verify operations UAT identity`
+
+- Git/范围：从 strict clean `main@7864905`、Parent `7b95b13`、behind 0/ahead 137 起步；登录合同提交 `1dcfc5a7d93d5f4092d088cecd3cc7c6c744b8b9`，UAT 后竞态补丁 `82f29c9157ceea1602969f4301477a7b2d18aa61`。只修改离线 targeted browser verifier、合成测试、脚本入口和项目文档；不改 Identity 服务端合同、Web 运行代码、版本、Migration、镜像、Compose、Origin、端口或 Volume，不 push/PR/改写历史。
+- 权威合同/修复：`POST /api/login` 的成功合同为 HTTP 200、`application/json`、`ok=true`、结构化 `user`、精确 username/role；`is_active`/`must_change_password` 返回时必须为 true/false，且无错误代码。页面还必须进入“经营工作台”，当前用户标签必须绑定响应 user、角色为 operations/运营，登录页和强制改密页必须消失。旧 verifier 的 `authenticated=true` 属于 `/api/session` 合同，已删除；只有 `authenticated=true` 而缺 `ok/user` 明确拒绝。
+- 合成/回归：新 verifier 最终 8/8，覆盖最小合法合同、合法附加字段、`ok=false`、缺 user、错 username/role、must-change=true、inactive、仅 authenticated、错误码、HTML/错误 Content-Type、401/403/429/500、malformed JSON、成功响应但仍在登录页、强制改密页和正式 runner 接线。targeted recovery 5/5、legacy recovery 9/9、Identity unit/UI 9/9+10/10、npm 3/3、全仓 lint 0 error/10 既有 warning、1,205 文件 credentials scan、Node 静态检查、Python 三项和 diff check 通过。
+- Chromium：首次 runner 调用在创建网络/Chromium/Session 前以 `TARGETED_BROWSER_MODULE_MISSING` fail closed；恢复精确 1.51.1 临时模块树后，唯一实际 Chromium 通过登录响应全部合同、精确 operations 身份、两次已认证工作台、当前用户标签/角色和 must-change=0，未点击任何业务入口。实际 logout 已由服务端以 `LOGOUT` 撤销，最终有效 Session 0。
+- 未完成原因/补丁：页面 logout 成功后立即 `location.replace("/")`；runner 等待 click 导航完成后再读取已释放 response body，得到 `TARGETED_BROWSER_LOGOUT_JSON_INVALID`，因此匿名页、back、forward、refresh 和最终 protected DOM 断言未执行。后续补丁只校验 logout HTTP/Content-Type，并以页面成功消费 JSON 后呈现的匿名页、`/api/session` 和 history DOM 作为持久证据；按一次实际流程上限未重跑，不能把该补丁视为主 UAT 通过。
+- 保护/清理：Canonical v2/v2.1 仍 10 账号、0 错误/PASS且字节/元数据不变；operations password/role/active/must-change/version 保持，其他身份保持，最终有效 Session 0。排除身份/系统表的业务指纹前后均为 `c55aff391533a1c508fdfdaa42fa3ebc4d0868a25b7585ccdeefaf14b3554b36`（217 表/203 序列），Mapping/RFQ/Quote/Award `0/0/0/0`、PRQ ACCEPTED、Supplier 1/2 和 Material 533—536 保持，业务 POST 0。临时模块/Profile/evidence/容器/网络/测试目录和浏览器进程清零，Recovery-13 正式备份与四卷保留。
+- 结论：`OPERATIONS IDENTITY RECOVERED — BROWSER VERIFICATION STILL INCOMPLETE`。不允许从本任务开始 purchase 创建/提交八条 Mapping；补做 operations logout/history 仍需新授权，Mapping 业务本身也需独立明确授权。
+
 ### SELFHOST-OPS-TARGETED-OPERATIONS-IDENTITY-RECOVERY-13 - `feat: add targeted offline identity recovery` / `ops: activate operations UAT identity safely`
 
 - Git/范围：从 strict clean `main@b7221a94375487a9656fff84f46dbabb95a5a26a`、behind 0/ahead 135 起步；功能提交 `7b95b13cd1e6c64d0f7fd4536e3456ca2a9d25db`。只新增 operations 单账号离线最终化 CLI/runner/测试并执行经授权的非生产 UAT 恢复；不改 alpha.39、0001—0038、镜像、角色/权限或业务代码，不 push/PR。

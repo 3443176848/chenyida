@@ -2,6 +2,25 @@
 
 最后更新时间：2026-08-04（Asia/Shanghai）
 
+## SELFHOST-OPS-OPERATIONS-BROWSER-VERIFICATION-14 operations Identity 合同修复与只读浏览器复验
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | OPERATIONS IDENTITY RECOVERED — BROWSER VERIFICATION STILL INCOMPLETE | 登录响应合同、operations 工作台身份/角色与非强制改密已由唯一实际 Chromium 通过；logout 已安全撤销且最终 Session 0，但 back/forward/refresh 与最终 protected DOM 未执行 |
+| 严格起点 | PASS | clean `main@7864905`、Parent `7b95b13`、behind 0/ahead 137；alpha.39、0001—0038、Canonical v2/v2.1 10/0/PASS、operations role/active/must-change/version、Session 0、业务零事实与 PRQ ACCEPTED 全部吻合 |
+| 登录权威合同 | PASS / SERVER UNCHANGED | HTTP 200、`application/json`、`ok=true`、结构化 `user`、精确 username/role；返回 active/must-change 时必须 true/false，无错误代码。`authenticated` 只属于 `/api/session`，不能替代 `ok/user` |
+| verifier 新断言 | PASS / OFFLINE TOOL | 必须同时通过网络合同与已认证“经营工作台” DOM；当前用户标签精确绑定响应 display_name/username、角色 operations/运营；登录页与强制改密页为 0。拒绝仅 authenticated、错身份、错误 Content-Type/状态/JSON 和页面未认证伪成功 |
+| 合成测试 | PASS 8/8 | 覆盖两个合法响应及用户要求的全部拒绝集，并覆盖 inactive、错误码、logout transport 和正式 runner 接线；不含真实密码或 Canonical 内容 |
+| 相关回归 | PASS | targeted recovery 5/5、legacy recovery 9/9、Identity unit 9/9、Identity UI 10/10、npm 3/3、全仓 lint 0 error/10 既有 warning、1,205 文件 credentials、Node 静态检查、Python self-test/smoke/go-live 三项与 diff check |
+| 浏览器登录/页面 | PASS / ONE ACTUAL CHROMIUM | 模块 preflight 失败未启动浏览器；恢复临时模块后唯一实际流程通过 login HTTP/JSON/ok/user、精确 operations username/role、active=true/must-change=false、两次工作台、当前用户 display-name 标签和角色；精确账号字符串由 login/session 证明，现有 Web 按 `display_name || username` 显示。未进入 Mapping 或其他业务模块 |
+| logout | SERVER PASS / VERIFIER RACE | 页面点击“退出”，最新验证 Session 为 `LOGOUT` 且最终有效 Session 0。runner 在 `location.replace` 后重读已释放 body 报 `TARGETED_BROWSER_LOGOUT_JSON_INVALID`；随后补丁改用 transport+匿名页/Session 作为持久证明，但未重跑 |
+| back/forward/refresh | NOT VERIFIED | 唯一实际流程在匿名页断言前停止，故 back、forward、refresh 与最终受保护 DOM=0 均不能报告通过；没有第二次 Chromium |
+| Canonical/身份 | PASS / UNCHANGED | 正式 Canonical 字节与 root:root 0600/nlink1 元数据不变，post diagnosis 仍 v2/v2.1、10 账号、0 错误/PASS；operations password/role/active/must-change=false/version 7 不变，其他身份不变 |
+| 业务保护 | PASS / UNCHANGED | 指纹前后 `c55aff391533a1c508fdfdaa42fa3ebc4d0868a25b7585ccdeefaf14b3554b36`（217 表/203 序列）；Mapping/RFQ/Quote/Award `0/0/0/0`，PRQ ACCEPTED，Supplier 1/2 ACTIVE，Material 533—536 ACTIVE/PCS/legacy unit 保持；业务 POST 0 |
+| 部署/服务 | PASS / NO DEPLOY | 未 build/redeploy/restart Web、Worker、PostgreSQL 或 Caddy，未运行 Migration/备份，未改 Origin/端口/Volume。四服务原镜像与状态保持，RestartCount 0、OOM false，任务期内核 OOM/restart event 0 |
+| 资源/清理 | PASS | 起点/终点 available memory 约 2.2/2.2 GiB，Swap 256/256 MiB，根盘可用 20/20 GiB，Load `0.19/0.15/0.11`→`0.01/0.10/0.12`。临时模块、Profile、evidence、runner、测试目录、容器、网络和浏览器进程均 0；Recovery-13 正式备份及四个受保护 Volume 保留 |
+| Git/后续 | THREE FOCUSED COMMITS / MAPPING NOT RELEASED | `1dcfc5a7d93d5f4092d088cecd3cc7c6c744b8b9` 修 login contract，`82f29c9157ceea1602969f4301477a7b2d18aa61` 修 logout body 生命周期竞态，文档提交消息 `ops: verify operations UAT identity`。未 push/PR/改历史；需新授权补做 history，且另获 Mapping 授权后才可开始八条 Mapping |
+
 ## SELFHOST-OPS-TARGETED-OPERATIONS-IDENTITY-RECOVERY-13 operations 定向离线身份最终化
 
 | 验证项 | 结果 | 说明 |
