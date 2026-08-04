@@ -1,6 +1,12 @@
 import { link, lstat, open, readFile, realpath, unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import {
+  assertTargetedAuthenticatedWorkspace,
+  TargetedBrowserContractError,
+  validateTargetedLoginResponse,
+  validateTargetedLogoutResponse,
+} from "./targeted-browser-contract.mjs";
 
 const ORIGIN = "https://43.135.148.43.nip.io:18888";
 const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -123,10 +129,10 @@ async function readTargetCredential() {
   return { username: targets[0].username, role: targets[0].role, password: targets[0].password };
 }
 
-async function identityFetch(context, operation, payload = {}) {
+async function identityFetch(context, operation) {
   const cookies = await context.cookies(ORIGIN);
   const csrf = cookies.find((cookie) => cookie.name === "CYD_ERP_CSRF")?.value || "";
-  const endpoint = operation === "login" ? "/api/login" : operation === "logout" ? "/api/logout" : "/api/session";
+  const endpoint = operation === "logout" ? "/api/logout" : "/api/session";
   const url = `${ORIGIN}${endpoint}`;
   const response = operation === "session"
     ? await context.request.get(url, { failOnStatusCode: false, maxRedirects: 0 })
@@ -138,7 +144,7 @@ async function identityFetch(context, operation, payload = {}) {
         "Origin": ORIGIN,
         ...(operation === "logout" ? { "X-CSRF-Token": csrf } : {}),
       },
-      data: operation === "login" ? payload : {},
+      data: {},
     });
   if (response.url() !== url) throw new BrowserFailure("TARGETED_BROWSER_IDENTITY_REDIRECTED");
   const body = await response.json().catch(() => ({}));
@@ -165,26 +171,50 @@ async function configureContext(browser) {
   const context = await browser.newContext({ serviceWorkers: "block", ignoreHTTPSErrors: false });
   const blockedRequests = [];
   const businessRequests = [];
+  const identityPosts = [];
+  const workspaceReads = [];
+  await context.addInitScript(() => {
+    window.__cydTargetedPageShowPersisted = false;
+    window.addEventListener("pageshow", (event) => {
+      window.__cydTargetedPageShowPersisted = event.persisted === true;
+    }, { capture: true });
+  });
+  if (typeof context.routeWebSocket !== "function") {
+    throw new BrowserFailure("TARGETED_BROWSER_RUNTIME_UNSUPPORTED");
+  }
+  await context.routeWebSocket("**/*", (webSocket) => {
+    blockedRequests.push("WEBSOCKET");
+    webSocket.close();
+  });
   await context.route("**/*", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method().toUpperCase();
+    if (url.origin !== ORIGIN || url.username || url.password || url.hash) {
+      blockedRequests.push("EXTERNAL_ORIGIN");
+      await route.abort("blockedbyclient");
+      return;
+    }
     const identityApi = url.origin === ORIGIN && url.search === ""
       && (url.pathname === "/api/session" && method === "GET"
         || ["/api/login", "/api/logout"].includes(url.pathname) && method === "POST");
     const rootPage = url.origin === ORIGIN && url.pathname === "/" && method === "GET"
-      && ["?targeted-identity-recovery=before", "?targeted-identity-recovery=logged-out"].includes(url.search);
+      && ["", "?targeted-identity-verification=before", "?targeted-identity-verification=protected"].includes(url.search);
+    const workspaceRead = url.origin === ORIGIN && url.search === "" && method === "GET"
+      && ["/api/summary", "/api/management-dashboard"].includes(url.pathname);
     const asset = url.origin === ORIGIN && url.search === "" && ["GET", "HEAD"].includes(method)
       && (/^\/assets\/[A-Za-z0-9._-]+\.(?:js|css|woff2?)$/.test(url.pathname) || url.pathname === "/favicon.ico");
-    if (!identityApi && !rootPage && !asset) {
+    if (!identityApi && !rootPage && !workspaceRead && !asset) {
       if (url.pathname.startsWith("/api/")) businessRequests.push("API");
-      blockedRequests.push("BLOCKED");
+      blockedRequests.push(url.pathname.startsWith("/api/") ? "API" : "PAGE");
       await route.abort("blockedbyclient");
       return;
     }
+    if (identityApi && method === "POST") identityPosts.push(url.pathname);
+    if (workspaceRead) workspaceReads.push(url.pathname);
     await route.continue();
   });
-  return { context, blockedRequests, businessRequests };
+  return { context, blockedRequests, businessRequests, identityPosts, workspaceReads };
 }
 
 async function assertAnonymousLoginPage(page, context, expectedSearch) {
@@ -194,6 +224,9 @@ async function assertAnonymousLoginPage(page, context, expectedSearch) {
   if (await page.getByRole("heading", { name: "请先修改临时密码", exact: true }).count()) {
     throw new BrowserFailure("TARGETED_BROWSER_FORCE_CHANGE_RESTORED");
   }
+  if (await page.getByRole("heading", { name: "经营工作台", exact: true }).count()) {
+    throw new BrowserFailure("TARGETED_BROWSER_PROTECTED_CONTENT_RESTORED");
+  }
   if (await page.locator(".wb-shell").count()) throw new BrowserFailure("TARGETED_BROWSER_PROTECTED_CONTENT_RESTORED");
   const url = new URL(page.url());
   if (url.origin !== ORIGIN || url.pathname !== "/" || url.search !== expectedSearch || url.hash) {
@@ -201,6 +234,35 @@ async function assertAnonymousLoginPage(page, context, expectedSearch) {
   }
   const passwordValues = await page.locator('input[type="password"]').evaluateAll((inputs) => inputs.map((input) => input.value));
   if (passwordValues.some((value) => value !== "")) throw new BrowserFailure("TARGETED_BROWSER_PASSWORD_RESTORED");
+}
+
+async function assertAuthenticatedWorkspace(page, context, expected) {
+  await page.getByRole("heading", { name: "经营工作台", exact: true }).waitFor({ timeout: 15000 });
+  const state = {
+    loginHeadingCount: await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).count(),
+    forceChangeHeadingCount: await page.getByRole("heading", { name: "请先修改临时密码", exact: true }).count(),
+    workspaceHeadingCount: await page.getByRole("heading", { name: "经营工作台", exact: true }).count(),
+    protectedDomCount: await page.locator(".wb-shell").count(),
+    currentUserLabel: (await page.locator(".wb-user b").innerText()).trim(),
+    currentRoleLabel: (await page.locator(".wb-user small").innerText()).trim(),
+  };
+  assertTargetedAuthenticatedWorkspace(state, expected);
+  const session = await identityFetch(context, "session");
+  if (session.status !== 200 || !session.authenticated
+    || session.username !== TARGET_USERNAME || session.role !== TARGET_ROLE || session.mustChange) {
+    throw new BrowserFailure("TARGETED_BROWSER_SESSION_MISMATCH");
+  }
+  return state;
+}
+
+async function assertHistoryTraversal(page) {
+  const state = await page.evaluate(() => ({
+    navigationType: performance.getEntriesByType("navigation")[0]?.type || "",
+    persisted: window.__cydTargetedPageShowPersisted === true,
+  }));
+  if (state.navigationType !== "back_forward" && !state.persisted) {
+    throw new BrowserFailure("TARGETED_BROWSER_HISTORY_TRAVERSAL_UNPROVEN");
+  }
 }
 
 async function fsyncDirectory(directory) {
@@ -212,7 +274,7 @@ async function fsyncDirectory(directory) {
   }
 }
 
-async function writeEvidence(args, blockedRequestCount, businessRequestCount) {
+async function writeEvidence(args, observations) {
   const directory = path.dirname(args.evidencePath);
   const metadata = await lstat(directory);
   if (!metadata.isDirectory() || metadata.isSymbolicLink() || metadata.uid !== 0 || metadata.gid !== 0
@@ -225,8 +287,8 @@ async function writeEvidence(args, blockedRequestCount, businessRequestCount) {
   try {
     handle = await open(temporary, "wx", 0o600);
     await handle.writeFile(`${JSON.stringify({
-      format_version: "chenyida-erp-targeted-browser-verification-v1",
-      verifier_version: "offline-identity-recovery-targeted-browser-v1",
+      format_version: "chenyida-erp-targeted-browser-verification-v2",
+      verifier_version: "offline-identity-recovery-targeted-browser-v2",
       recovery_run_id: args.runId,
       verification_attempt: args.attempt,
       origin: ORIGIN,
@@ -234,14 +296,21 @@ async function writeEvidence(args, blockedRequestCount, businessRequestCount) {
       web_image_id: EXPECTED_WEB_IMAGE,
       username: TARGET_USERNAME,
       role: TARGET_ROLE,
+      login_contract_ok_user: true,
+      workspace_authenticated: true,
+      current_user_label_matched: true,
+      current_role_label_matched: true,
       login_count: 1,
       force_change_count: 0,
       logout_count: 1,
       back_count: 1,
       forward_count: 1,
       refresh_count: 1,
-      blocked_request_count: blockedRequestCount,
-      business_request_count: businessRequestCount,
+      protected_dom_final_count: 0,
+      blocked_request_count: observations.blockedRequestCount,
+      business_request_count: observations.businessRequestCount,
+      business_post_count: 0,
+      workspace_read_count: observations.workspaceReadCount,
       issued_at_epoch: Math.floor(Date.now() / 1000),
     })}\n`, "utf8");
     await handle.chmod(0o600);
@@ -280,45 +349,72 @@ try {
   const configured = await configureContext(browser);
   context = configured.context;
   const page = await context.newPage();
-  await page.goto(`${ORIGIN}/?targeted-identity-recovery=before`, { waitUntil: "domcontentloaded" });
-  await assertAnonymousLoginPage(page, context, "?targeted-identity-recovery=before");
+  await page.goto(`${ORIGIN}/?targeted-identity-verification=before`, { waitUntil: "domcontentloaded" });
+  await assertAnonymousLoginPage(page, context, "?targeted-identity-verification=before");
 
-  const login = await identityFetch(context, "login", { username: credential.username, password: credential.password });
-  if (login.status !== 200 || !login.authenticated
-    || login.username !== TARGET_USERNAME || login.role !== TARGET_ROLE || login.mustChange) {
-    throw new BrowserFailure("TARGETED_BROWSER_LOGIN_FAILED");
-  }
-  const session = await identityFetch(context, "session");
-  if (session.status !== 200 || !session.authenticated
-    || session.username !== TARGET_USERNAME || session.role !== TARGET_ROLE || session.mustChange) {
-    throw new BrowserFailure("TARGETED_BROWSER_SESSION_MISMATCH");
-  }
-  const logout = await identityFetch(context, "logout");
-  if (logout.status !== 200 || !logout.ok) throw new BrowserFailure("TARGETED_BROWSER_LOGOUT_FAILED");
-  const anonymous = await identityFetch(context, "session");
-  if (anonymous.status !== 200 || anonymous.authenticated) throw new BrowserFailure("TARGETED_BROWSER_LOGOUT_INCOMPLETE");
+  await page.getByLabel("账号", { exact: true }).fill(credential.username);
+  await page.getByLabel("密码", { exact: true }).fill(credential.password);
+  const loginResponsePromise = page.waitForResponse((candidate) => candidate.url() === `${ORIGIN}/api/login`
+    && candidate.request().method() === "POST", { timeout: 15000 });
+  const [loginResponse] = await Promise.all([
+    loginResponsePromise,
+    page.getByRole("button", { name: "登录", exact: true }).click(),
+  ]);
+  const login = await validateTargetedLoginResponse(loginResponse, {
+    username: TARGET_USERNAME,
+    role: TARGET_ROLE,
+  });
+  await assertAuthenticatedWorkspace(page, context, login);
 
-  await page.goto(`${ORIGIN}/?targeted-identity-recovery=logged-out`, { waitUntil: "domcontentloaded" });
-  await assertAnonymousLoginPage(page, context, "?targeted-identity-recovery=logged-out");
+  await page.goto(`${ORIGIN}/?targeted-identity-verification=protected`, { waitUntil: "domcontentloaded" });
+  await assertAuthenticatedWorkspace(page, context, login);
+
+  const logoutResponsePromise = page.waitForResponse((candidate) => candidate.url() === `${ORIGIN}/api/logout`
+    && candidate.request().method() === "POST", { timeout: 15000 });
+  const [logoutResponse] = await Promise.all([
+    logoutResponsePromise,
+    page.getByRole("button", { name: "退出", exact: true }).click(),
+  ]);
+  await validateTargetedLogoutResponse(logoutResponse);
+  await assertAnonymousLoginPage(page, context, "");
   await page.goBack({ waitUntil: "domcontentloaded" });
-  await assertAnonymousLoginPage(page, context, "?targeted-identity-recovery=before");
+  await assertAnonymousLoginPage(page, context, "?targeted-identity-verification=before");
+  await assertHistoryTraversal(page);
   await page.goForward({ waitUntil: "domcontentloaded" });
-  await assertAnonymousLoginPage(page, context, "?targeted-identity-recovery=logged-out");
+  await assertAnonymousLoginPage(page, context, "");
+  await assertHistoryTraversal(page);
   await page.reload({ waitUntil: "domcontentloaded" });
-  await assertAnonymousLoginPage(page, context, "?targeted-identity-recovery=logged-out");
+  await assertAnonymousLoginPage(page, context, "");
+  const anonymous = await identityFetch(context, "session");
+  if (anonymous.status !== 200 || anonymous.authenticated) {
+    throw new BrowserFailure("TARGETED_BROWSER_LOGOUT_INCOMPLETE");
+  }
+  if (configured.identityPosts.length !== 2
+    || configured.identityPosts[0] !== "/api/login" || configured.identityPosts[1] !== "/api/logout") {
+    throw new BrowserFailure("TARGETED_BROWSER_IDENTITY_POST_COUNT_INVALID");
+  }
   if (configured.blockedRequests.length !== 0 || configured.businessRequests.length !== 0) {
     throw new BrowserFailure("TARGETED_BROWSER_REQUEST_SCOPE_VIOLATION");
   }
-  await writeEvidence(args, configured.blockedRequests.length, configured.businessRequests.length);
+  await writeEvidence(args, {
+    blockedRequestCount: configured.blockedRequests.length,
+    businessRequestCount: configured.businessRequests.length,
+    workspaceReadCount: configured.workspaceReads.length,
+  });
   output("STAGE", "TARGETED_BROWSER", "PASS");
   output("ACCOUNT", TARGET_USERNAME, "PASS");
   output("ROLE", TARGET_ROLE, "PASS");
+  output("CONTRACT", "LOGIN_OK_USER", "PASS");
+  output("PAGE", "WORKSPACE", "PASS");
+  output("PAGE", "CURRENT_USER", "PASS");
+  output("PAGE", "CURRENT_ROLE", "PASS");
   output("COUNT", "LOGIN", 1);
   output("COUNT", "FORCE_CHANGE", 0);
   output("COUNT", "LOGOUT", 1);
   output("COUNT", "BACK", 1);
   output("COUNT", "FORWARD", 1);
   output("COUNT", "REFRESH", 1);
+  output("COUNT", "PROTECTED_DOM_FINAL", 0);
   output("COUNT", "BUSINESS_REQUEST", 0);
   output("FINAL", "TARGETED_BROWSER_VERIFIED");
   await context.close();
@@ -328,7 +424,8 @@ try {
   if (context) await bestEffortLogout(context);
   await context?.close().catch(() => undefined);
   await browser?.close().catch(() => undefined);
-  const code = error instanceof BrowserFailure ? error.code : "TARGETED_BROWSER_INTERNAL_ERROR";
+  const code = error instanceof BrowserFailure || error instanceof TargetedBrowserContractError
+    ? error.code : "TARGETED_BROWSER_INTERNAL_ERROR";
   output("STAGE", "TARGETED_BROWSER", "FAIL", code);
   output("FINAL", "BLOCKED");
   process.exitCode = 2;
