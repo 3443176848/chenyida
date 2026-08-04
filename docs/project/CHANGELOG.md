@@ -4,6 +4,18 @@
 
 ## 2026-08-04
 
+### SELFHOST-UAT-FIX-20 - `feat: add governed supplier material mappings` / `fix: resolve legacy material units for supplier mappings` / `ops: deploy supplier mapping governance`
+
+- Git/范围：从 strict clean `main@2cdbc43d1293b6f13bf5bba1e140ec6808b05dd5`、Parent `23d654c383015864be9a2ade71e78d94eb77adaf`、behind 0/ahead 131 起步；功能提交 `ddab02a57e0e87255c7a35d125959ac750b108e1`，legacy Unit 兼容修复 `1e9221d90db621becc2badf40b3e0ed3017b73e6`。没有改写 0001—0037、历史或未知文件，不 push/PR/amend/rebase/reset/stash/restore。
+- 模型/Migration：诊断确认既有 `supplier_mappings` 是导入、采购、收货和 RFQ 共用权威，但缺少 DRAFT/PENDING_REVIEW/REJECTED、跨版本稳定 ID、提交/审核事实和不可变 Event，故采用分支 B。唯一新增 `0038_supplier_mapping_governance.sql`（SHA-256 `2da259364151af098641795da55604dc3012b6adf92aec67038c0554e0592941`），扩展稳定身份/版本、provenance、Event、Supplier part claim、partial unique/GIST exclusion/guard，版本升级为 alpha.39。
+- 权限/生命周期：purchase 仅获 `supplier_mapping.read/create/edit_draft/submit`，operations 仅获 `read/review_queue/approve/reject`，engineering 保持只读；创建人自审、purchase 审核和 operations 正文编辑均由服务端禁止。DRAFT→PENDING_REVIEW→ACTIVE/REJECTED，提交后冻结、退回原因必填、ACTIVE 不原改，替代版本与 Event/Audit/Idempotency 同事务固化。
+- 页面/RFQ：新增 purchase 维护页和 operations 只读审核页，提供稳定 ID、编码优先有界搜索、筛选、完整版本/单位/换算/有效期/provenance/request_id 事实和 390px 布局。RFQ page/create/issue 共用当前有效 1:1 Mapping coverage；逐 Supplier 显示 x/y 与缺失 Material，0/4 或部分覆盖禁选，伪造请求以 `SUPPLIER_MAPPING_INCOMPLETE` fail closed，4/4 才允许 DRAFT。
+- legacy Unit 修复：主 UAT 暴露 Material 533—536 为既有 `base_unit_id=NULL`、`base_uom=PCS`。复用 BOM 治理规则，优先关系化 Unit ID，否则仅把 base_uom 精确匹配唯一 enabled Unit.code；无匹配继续失败关闭，不回填主库、不新增 0039、不修改已应用 0038。
+- 测试：Supplier Mapping Unit/UI 最终 12/12、PostgreSQL 8/8、Migration 5/5；sourcing/FIX-19 5/5、master 6/6、跨域 PostgreSQL 42/42、适用静态/UI 87/87、npm 3/3、Python 3/3，typecheck、production build/postbuild consistency、lint 0 error/10 既有 warning、credentials 和 diff check 通过。隔离 Chromium 完成 8 Mapping 创建/提交/异人批准、两家 4/4、RFQ DRAFT 1，Quote/Award/PO 0，桌面/390×844和退出失效通过。
+- 备份/部署：predeploy custom dump 为 root:root 0600、2,189,463 bytes、SHA-256 `2d1fe44fd42c7a7281fd50d0d7d20144228ee4b26f62c2fe6c93e2df24dcb96c`；容器内 list 3,285 项，第二空库 0037 恢复、0037→0038、重复 runner 和保护事实通过。停 Web/Worker并确认应用连接 0 后串行应用 0038，再替换 Web/恢复 Worker；Unit 修复只做 Web-only 替换。最终 Web `sha256:c1576bd22a209fb6f524e304bcf12cc38af4d67a35c76f37fa8dc1311c2922c8`，PostgreSQL/Caddy/四卷未更换，精确回退 tag 保留。
+- 主 UAT/结论：purchase 只读验收入口、Material 搜索、两家 0/4、各缺 533—536、不可勾选、桌面/390px与安全退出通过，business POST 0。operations Canonical/数据库账号既有 `must_change_password=true`，runner 在登录前安全停止；未改凭据或绕过身份。前后业务指纹均为 `8ad0c2e19863808ed9fed62b0da8f5ef4e78bbaf586fe1be146a286bcf3f0ce0`，Mapping/RFQ/Quote/Award/PO/全部下游仍 0，历史失败请求保留。
+- 资源/停止：available memory 约 2.2→2.2 GiB、Swap 265→263 MiB（峰值约 301）、根盘约 20 GiB、Load `0.20/0.11/0.09`→`0.37/0.38/0.38`；内核 OOM 0、四服务 RestartCount 0/OOM false，临时库/容器/目录清零，未 prune。结论 `SUPPLIER MAPPING GOVERNANCE DEPLOYED — MAIN UAT NOT VERIFIED`；operations 身份阻断解除并获新授权前不开始八条主 UAT Mapping。
+
 ### SELFHOST-UAT-FIX-19 - `fix: bind rfq draft to stable purchase request id` / `ops: accept rfq draft binding fix`
 
 - Git/范围：从 strict clean `main@5a7cb547a07b1e113d89c51366fc099d851fe1cb`、Parent `9d6ed0d0bc728bdaafc619fe609d92d87ebcb188`、behind 0/ahead 129 起步；功能提交 `23d654c383015864be9a2ade71e78d94eb77adaf`。只修改 RFQ create 稳定 ID/DTO/幂等边界、响应式 CSS、测试、保护/UAT runner 和项目文档；不新增 0038、不改 0001—0037/alpha.38，不 push/PR 或改写历史。

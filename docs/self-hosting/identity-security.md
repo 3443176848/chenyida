@@ -2,7 +2,7 @@
 
 状态：`IMPLEMENTED IN NON-PRODUCTION`
 
-适用版本：身份基线始于 `chenyida-erp-selfhosted@0.1.0-alpha.2`；2026-07-31 的 `SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05` 已连同既有 Origin/CSRF/logout、operations 审核与 no-store 修复，以 alpha.34/0034 兼容 hotfix 部署到当前非生产并行环境，源码主线为 alpha.36/0035。
+适用版本：身份基线始于 `chenyida-erp-selfhosted@0.1.0-alpha.2`；既有 Origin/CSRF/logout、operations 物料审核与 no-store 修复保持。当前非生产并行环境为 alpha.39/0038，并由 `SELFHOST-UAT-FIX-20` 增加 Supplier Mapping 的 purchase/operations 精确权限和职责分离；这不是生产发布。
 
 ## 1. 运行边界
 
@@ -21,6 +21,8 @@
 - `material.review.reject`
 
 这三项不隐含 `material.draft.edit_any`，也不授予用户/角色/admin 管理、`system.audit.read`、工程物料正文代编辑，或 BOM、采购、库存、生产、销售、品质、财务写能力。审核列表和详情只因 `material.review.queue` 对跨创建人的 `PENDING_REVIEW` 开放；批准/退回仍分别要求独立写权限，并执行创建人/最后修改人职责分离。engineering 可读取自己的记录，但不得审核自己的记录；其他无审核能力角色由服务端稳定返回 403 和中文提示。
+
+Supplier Mapping 的精确增量为：purchase 获得 `supplier_mapping.read/create/edit_draft/submit`；operations 获得 `supplier_mapping.read/review_queue/approve/reject`；engineering 沿既有规则只读。purchase 不能批准或退回，operations 不能创建、提交或代改正文，创建人不能审核自己创建的 Mapping；admin/manager 的既有继承也不绕过自审门禁。完整生命周期、API、审计和 RFQ coverage 合同见 `docs/material-master/supplier-mapping-governance-v1.md`。
 
 | Method | Route | 权限/说明 |
 | --- | --- | --- |
@@ -77,4 +79,4 @@ SHA-256：`6e185d01a69c4bd132c577793ae72baceaa075e5beecc738bcdf4310430d7079`。�
 
 ## 7. 运维与后续限制
 
-身份基线、来源/退出修复、历史恢复缓存保护、operations 人工审核精确增量及 Planning 当前 CSRF 客户端已部署到当前 `chenyida-erp-parallel` 非生产环境；这不是生产发布。运行面仍为 alpha.34/0034，本次没有新增、修改或运行 Migration，alpha.36/0035 仍未部署。任何生产 migration、域名/Origin 切换或正式投用仍需快照、真实旧角色预检、受控试迁移、容量/安全验收和明确授权。身份模块不解决 Dashboard、备份、客户、供应商、产品、BOM、库存、采购、生产、销售、品质或财务；这些域不得通过扩展身份模块绕过独立任务。
+身份基线、来源/退出修复、历史恢复缓存保护、operations 人工物料审核、Planning 当前 CSRF 客户端及 Supplier Mapping 精确权限已部署到当前 `chenyida-erp-parallel` 非生产环境；这不是生产发布。运行面为 alpha.39/0038，0038 只扩展 Supplier Mapping 治理，不改写既有身份表或 Canonical 凭据。任何生产 migration、域名/Origin 切换或正式投用仍需快照、真实旧角色预检、受控试迁移、容量/安全验收和明确授权。身份模块不解决 Dashboard、备份、客户、供应商、产品、BOM、库存、采购、生产、销售、品质或财务；这些域不得通过扩展身份模块绕过独立任务。

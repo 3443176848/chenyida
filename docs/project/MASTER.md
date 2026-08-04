@@ -37,25 +37,27 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.38`；PostgreSQL 为 37/head `0037_project_planning_revision_response_lineage.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
+| 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.39`；PostgreSQL 为 38/head `0038_supplier_mapping_governance.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-19` 功能提交为 `23d654c383015864be9a2ade71e78d94eb77adaf`（`fix: bind rfq draft to stable purchase request id`）；版本仍为 alpha.38，Migration 仍止于 0037 |
-| 当前根仓库运维基线 | RFQ 草稿页面、Handler 与 Service 统一使用规范化后的 Purchase Request/Supplier 稳定数据库 ID，幂等摘要绑定规范 DTO；隔离 RFQ 全旅程、回归、备份恢复、Web-only 部署及 purchase-only 主 UAT 未提交表单验收通过。主 UAT RFQ/Quote/Award 与全部下游仍为 0，最终结论 `RFQ PURCHASE REQUEST ID BINDING FIXED — UAT RFQ NOT CREATED` |
-| Git 同步与工作区 | 本任务从 clean `main@5a7cb547a07b1e113d89c51366fc099d851fe1cb`、Parent `9d6ed0d0bc728bdaafc619fe609d92d87ebcb188`、behind 0/ahead 129 起步；功能提交如上，保护/UAT runner、部署事实、完成报告和项目文档由独立 `ops: accept rfq draft binding fix` 收口，完成后应为 ahead 131。未 push/PR/amend/rebase/reset/stash/restore；未读取或修改 `shujvbiao/`，秘密、连接信息、数据库和备份正文未进入 Git |
+| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-20` 功能提交为 `ddab02a57e0e87255c7a35d125959ac750b108e1`（`feat: add governed supplier material mappings`），legacy 主单位兼容修复为 `1e9221d90db621becc2badf40b3e0ed3017b73e6`（`fix: resolve legacy material units for supplier mappings`）；版本 alpha.39，Migration 0038 |
+| 当前根仓库运维基线 | Supplier Mapping 单一权威已具备 purchase 草稿/提交、operations 只读异人审核、不可变版本/Event 与 RFQ 当前有效 1:1 覆盖门禁；隔离八 Mapping/两家 4/4/RFQ DRAFT、备份恢复和部署通过。主 UAT purchase 只读通过但 operations Canonical 强制改密，最终结论 `SUPPLIER MAPPING GOVERNANCE DEPLOYED — MAIN UAT NOT VERIFIED` |
+| Git 同步与工作区 | 本任务从 clean `main@2cdbc43d1293b6f13bf5bba1e140ec6808b05dd5`、Parent `23d654c383015864be9a2ade71e78d94eb77adaf`、behind 0/ahead 131 起步；功能与兼容修复提交如上，保护 runner、部署事实、完成报告和项目文档由独立 `ops: deploy supplier mapping governance` 收口，完成后应为 ahead 134。未 push/PR/amend/rebase/reset/stash/restore；秘密、连接信息、数据库和备份正文未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0037`，37/head `0037_project_planning_revision_response_lineage.sql`，SHA-256 `139f2623a184ae3d6927c95b56569cc438deffc2a0b46c325c9f04d59471d99f`。主 UAT PRQ ID 1 / `PRQ-00000001` / `PRJ-00000001` 为 `ACCEPTED`、version 2，Purchase ACCEPT/RETURN 为 `1/0`；四条 Material 533—536 各 10 PCS。Supplier ID 1/2 分别为 `SUP-000001`/`SUP-000002` 且 ACTIVE。失败 request_id `e2d8caab-a39d-4756-894b-329ae548e3f5` 与 `REQUEST_VALIDATION_FAILED` 审计保持；RFQ/Quote/Award/PO/Delivery Plan/Receipt/Ledger/AP/Work Order 均为 0。FIX-19 保护指纹在主库、第二新空恢复库、部署/UAT 前后均为 `fc48f001fe3b0afaff69ac245a1fefc8bf6731d38358004314cc12daa308cff4` |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 已 Web-only 更新为 alpha.38 `sha256:6622029fb3c401d1b71f10047e53021147bb386cf3dedb3208d1dfba6c7636d0`，旧 `sha256:6eeba6409f51605fe422c39d674ddfa03d5f5079bb546566288336f15296df64` 保留精确回退 tag `chenyida-erp-parallel-web:rollback-rfq-binding-fix19-predeploy-20260804T042812Z`；Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`。只重建 Web；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false |
-| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.38 另提供版本化 Requirement Unit Resolution、Planning Revision Response 与固定后继谱系。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
-| 当前阶段 | `SELFHOST-UAT-FIX-19` 已修复 RFQ 草稿稳定 Purchase Request ID 绑定及规范幂等正文；隔离创建/重放/并发/回滚与完整 Chromium 通过，正式部署和主 UAT 未提交表单验收完成，主保护指纹和全部下游不变 |
-| 当前任务 | 无自动执行任务；本轮以 `RFQ PURCHASE REQUEST ID BINDING FIXED — UAT RFQ NOT CREATED` 停止。主 UAT purchase Session 已撤销，浏览器业务 POST 0；未创建 RFQ、Quote、Award 或任何下游单据 |
-| 下一任务 | 可以在新的明确授权任务中重新开始采购寻源黑盒试用，并从单个 RFQ 草稿开始；Quote、Award、转 PO 或其他下游写仍须按独立授权边界执行，不得从本任务自动继续 |
+| 当前数据库 | 源码与并行 UAT PostgreSQL 都是 `0001`—`0038`，38/head `0038_supplier_mapping_governance.sql`，SHA-256 `2da259364151af098641795da55604dc3012b6adf92aec67038c0554e0592941`。主 UAT PRQ 1 仍 ACCEPTED；Supplier 1/2 ACTIVE；Material 533—536 保持正式编码与 `base_uom=PCS`，目标 2×4 Mapping 为 0。两条历史 RFQ 失败 request_id 原样保留；RFQ/Quote/Award/PO/Delivery Plan/Receipt/Ledger/AP/Work Order 均为 0。部署前备份恢复副本与部署后主库业务指纹均为 `8ad0c2e19863808ed9fed62b0da8f5ef4e78bbaf586fe1be146a286bcf3f0ce0` |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 为 alpha.39 `sha256:c1576bd22a209fb6f524e304bcf12cc38af4d67a35c76f37fa8dc1311c2922c8`；原 alpha.38 与首次 alpha.39 分别保留精确 predeploy/pre-hotfix 回退 tag。Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false |
+| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.39 新增 Supplier Mapping 治理和 RFQ 覆盖率门禁，并保留 Requirement Unit Resolution、Planning Revision Response 与固定后继谱系。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
+| 当前阶段 | `SELFHOST-UAT-FIX-20` 已部署 Supplier Mapping 权限、生命周期、不可变审核、0038 与 RFQ 1:1 coverage；隔离完整验收和 purchase 主 UAT 只读通过，operations 主 UAT 因 Canonical 强制改密未验证 |
+| 当前任务 | 无自动执行任务；本轮以 `SUPPLIER MAPPING GOVERNANCE DEPLOYED — MAIN UAT NOT VERIFIED` 停止。主 UAT Mapping/RFQ/Quote/Award/PO 均未创建，业务 POST 0，最终有效 Session 0 |
+| 下一任务 | 先以独立受控 Identity 任务处理 `uat_20260729_operations` 的强制改密并完成只读登录验收；随后才可在新的明确业务授权中由 purchase 创建并提交八条主 UAT Mapping、operations 异人审核。不得从本任务自动继续 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-UAT-FIX-20 复用 `supplier_mappings` 单一权威，交付 alpha.39/0038、purchase 草稿/提交、operations 只读异人审核、稳定 Mapping ID/不可变版本与 Event、Supplier part/有效期唯一约束，以及 RFQ create/issue 共用的当前有效 1:1 coverage。隔离八 Mapping 与两家 4/4/RFQ DRAFT 通过；主 UAT purchase 只读为 0/4×2、业务 POST 0，operations 因 Canonical must-change 未验证，主 Mapping 和全部下游仍为 0
 
 - SELFHOST-UAT-FIX-19 已消除 PostgreSQL bigint 字符串 ID 与前端 Number 严格比较导致 request 丢失的根因；Purchase Request/Supplier option 只提交稳定 ID，请求边界一次规范、Supplier 去重排序，Handler/Service 幂等摘要绑定规范 DTO。隔离 RFQ 四行/双 Supplier 创建、重放、并发与故障回滚通过；Web-only 部署及主 UAT 未提交选择验收通过，业务 POST 0、RFQ/Quote/Award/全部下游 0
 

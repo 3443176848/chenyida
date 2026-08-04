@@ -1020,6 +1020,20 @@
 - 后续边界：Purchase ACCEPT 只形成采购交接事实，不自动创建 RFQ、Quote、Award、PO、Delivery Plan、Receipt、Ledger、AP 或 Work Order。完整 ACCEPTED PRQ 与可追溯凭证满足寻源/询价的业务前置条件，但创建下游仍需新的独立授权任务。
 - 实施结果：功能提交 `9d6ed0d0bc728bdaafc619fe609d92d87ebcb188`；不新增 0038、不修改 0001—0037或 alpha.38。隔离 PostgreSQL/Chromium、备份恢复、Web-only 部署和 purchase-only 主 UAT 只读验收通过；正式保护指纹 `814811509c476e270f9cd82badb85aa8bb1bf8e1f01e8bb72b4cd9fec9c9a4ff` 前后不变，主 UAT 业务 POST 0、下游 0。
 
+## D-091 Supplier Mapping 单一权威、异人审核与 RFQ 当前有效 1:1 覆盖门禁
+
+- 日期：2026-08-04
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
+- 确认人：项目负责人（明确指定 purchase 创建/提交、operations 只读审核、创建人与审核人分离、RFQ 全覆盖门禁及主 UAT 零业务写）
+- 权威模型：`supplier_mappings` 继续作为 Mapping 正文与版本的唯一关系化权威，不建立第二套正文表。0038 增加稳定 `mapping_uid`、只增版本、提交/审核 provenance、不可变 lifecycle Event 和 Supplier part claim；claim/Event 只承担唯一性或证据，不承载 Mapping 正文。
+- 职责分离：purchase 精确拥有 read/create/edit_draft/submit；operations 精确拥有 read/review_queue/approve/reject；engineering 保持只读。DRAFT 仅创建人可改，提交后正文冻结，退回原因必填，创建人不得审核自己的 Mapping。admin/manager 继承不绕过自审和状态门禁。
+- 生命周期：正式支持 `DRAFT→PENDING_REVIEW→ACTIVE` 和 `PENDING_REVIEW→REJECTED`。ACTIVE 不原地修改；后续变化从 ACTIVE/REJECTED 创建新 DRAFT 版本，获批替代在同一事务内把旧 ACTIVE 固化为 INACTIVE。历史版本、Event 和 part claim 禁止直接 UPDATE/DELETE。
+- 单位兼容：Material 必须 ACTIVE、正式编码且具有可证明主单位。优先关系化 `base_unit_id`；既有正式 Material 若该列为空，复用 BOM 治理既有决策，以非空 `base_uom` 精确匹配唯一启用 `units.code` 并使用其稳定 ID。无匹配继续失败关闭；不为本任务回填或猜测主 UAT 数据。
+- RFQ 门禁：页面、RFQ create 和 issue 复用同一 coverage 查询。仅 Supplier ACTIVE、Material ACTIVE/正式编码/主单位匹配、Mapping ACTIVE、Unit 相同、当前有效期、1:1 且唯一命中的全部申请行可选；部分或零覆盖禁用，服务端以 `SUPPLIER_MAPPING_INCOMPLETE` 返回限定于当前 Supplier/PRQ 的缺失组合。
+- 事务与安全：创建、编辑、提交、批准、退回、新版本均要求权限、可信 Origin、Cookie/Header CSRF、正文上限、限流、Idempotency-Key/canonical digest、CAS、并发唯一性，并在同一事务提交 Mapping/版本/Event/Audit/Idempotency；失败零半记录。
+- 实施结果：功能提交 `ddab02a57e0e87255c7a35d125959ac750b108e1`，兼容修复 `1e9221d90db621becc2badf40b3e0ed3017b73e6`；alpha.39/0038 SHA `2da259364151af098641795da55604dc3012b6adf92aec67038c0554e0592941` 已部署。隔离八 Mapping/两家 4/4/RFQ DRAFT 通过；主 UAT purchase 只读通过且 Mapping/RFQ/Quote/Award/PO 仍为 0。operations Canonical `must_change_password=true`，本任务禁止修改凭据，故 operations 主 UAT 未验证，最终为 `SUPPLIER MAPPING GOVERNANCE DEPLOYED — MAIN UAT NOT VERIFIED`。
+- 后续边界：处理 operations 强制改密必须另立受控 Identity 任务；创建/审核八条主 UAT Mapping 必须再获独立业务授权。本任务不自动继续。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

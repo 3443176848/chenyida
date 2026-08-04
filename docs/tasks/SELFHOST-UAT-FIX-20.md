@@ -2,7 +2,7 @@
 
 ## 状态与唯一范围
 
-- 状态：`DOING`
+- 状态：`SUPPLIER MAPPING GOVERNANCE DEPLOYED — MAIN UAT NOT VERIFIED`
 - 开始时间：2026-08-04 14:59 CST（Asia/Shanghai）
 - 负责人：Codex（严格门禁、现有模型诊断、权限与生命周期、API/UI、RFQ 覆盖率、隔离测试、备份恢复、自托管 UAT 部署、主 UAT 只读验收、文档与独立提交）；项目负责人（固定职责边界、主 UAT 零业务写与部署授权）
 - 依赖：`SELFHOST-PHASE2-TASK03`、`SELFHOST-PHASE4-TASK04`、`SELFHOST-UAT-FIX-18`、`SELFHOST-UAT-FIX-19`、D-003、D-040、D-045、D-046、D-061、D-079、D-080、D-082
@@ -78,8 +78,8 @@
 
 - Supplier Mapping：Unit/UI `5/5 + 5/5`，隔离 PostgreSQL `7/7`，Migration `5/5`；覆盖八条生命周期、职责分离、自审/越权、唯一性、Unit/1:1、有效期、幂等/异正文、CAS、并发单胜、退回原因、ACTIVE 不可原地修改和故障零半记录。
 - RFQ：隔离 PostgreSQL 已验证 `0/4`、`3/4` 拒绝和 `4/4` 创建；Quote/Award/PO 保持 0。Procurement Sourcing/FIX-19 回归 `5/5`，Master/Supplier/BOM `6/6`，Identity/Material Requirement/Procurement/Fulfillment/Quality/IQC 跨域回归 `42/42`。
-- 隔离 Chromium `1/1`：purchase 页面创建并提交八条，operations 逐条批准，两家 Supplier 均为 `4/4`，仅建立一个 RFQ DRAFT；Quote/Award/PO 0，桌面和 390×844 无页面级横向溢出，两个账号最终 Session 0。最终精确候选镜像 `sha256:28a08d406aff6e49aad9c6576cfc8cfb2a54dc3ae0eda35eeba957930324fd1e`（88,495,506 bytes）复验同样通过。
-- 适用静态/UI 回归最终 `87/87`；`npm test` `3/3`、typecheck、Schema/snapshot consistency、credentials `1,189` 文件、production build、lint `0 error / 10 existing warnings` 和 `git diff --check` 通过。
+- 隔离 Chromium `1/1`：purchase 页面创建并提交八条，operations 逐条批准，两家 Supplier 均为 `4/4`，仅建立一个 RFQ DRAFT；Quote/Award/PO 0，桌面和 390×844 无页面级横向溢出，两个账号最终 Session 0。最终 legacy Unit 兼容候选镜像 `sha256:c1576bd22a209fb6f524e304bcf12cc38af4d67a35c76f37fa8dc1311c2922c8`（88,495,899 bytes）复验同样通过；首次 0038 部署候选 `sha256:28a08d40…` 已保留回退 tag。
+- 适用静态/UI 回归最终 `87/87`；`npm test` `3/3`、typecheck、Schema/snapshot consistency、credentials `1,193` 文件、production build、lint `0 error / 10 existing warnings` 和 `git diff --check` 通过。
 - Python：项目 venv 下 self-test、smoke 和本任务临时 SQLite go-live `3/3`；首次误用系统 Python 时 smoke 在导入 `openpyxl` 前停止，未进入用例或接触常驻数据，随后按固定项目 venv 复验通过。
 
 ## 验证、备份、部署与完成边界
@@ -90,6 +90,16 @@
 - 部署前创建 root:root 0600 PostgreSQL custom dump，记录大小/SHA，`pg_restore --list` 和第二新空库恢复通过；若新增 0038，恢复副本还需完成 0037→0038。
 - 分支 A 只替换 Web；分支 B 按停写、备份、串行 Migration、核对、Web 更新执行。PostgreSQL、Worker、Caddy 和四个受保护 Volume 不更换或删除。
 - 主 UAT 最终只读验收 purchase 入口与两家 0/4/缺失 533—536/不可选、operations 入口与空队列/无编辑控件；两账号退出，业务 POST 0，保护指纹保持。
+
+## 完成事实
+
+- 0038 已在停写窗口串行部署，随后只用 Web-only 热修复兼容既有正式 Material 的 `base_unit_id=NULL / base_uom=PCS`；没有修改已应用 Migration 或回填主 UAT 数据。
+- 正式备份 root:root 0600、2,189,463 bytes，SHA-256 `2d1fe44fd42c7a7281fd50d0d7d20144228ee4b26f62c2fe6c93e2df24dcb96c`；list 3,285 项、第二空库恢复和 0037→0038 通过。
+- 部署前备份恢复副本与部署后主库的业务指纹均为 `8ad0c2e19863808ed9fed62b0da8f5ef4e78bbaf586fe1be146a286bcf3f0ce0`；Schema 仅按计划从 37/0037/223 表变为 38/0038/225 表。
+- purchase 主 UAT 只读通过：入口、稳定搜索、0/4×2、每家缺失 533—536、不可选择、桌面/390×844、业务 POST 0 和 Session 撤销均通过；Mapping/RFQ/Quote/Award/PO 仍为 0。
+- operations Canonical 账号为 active 但 `must_change_password=true`；完整 runner 在发出 login 前安全停止。本任务没有修改 Canonical 或身份状态，也没有绕过角色，因此 operations 主 UAT 未验证。
+- 功能提交 `ddab02a57e0e87255c7a35d125959ac750b108e1`，兼容修复 `1e9221d90db621becc2badf40b3e0ed3017b73e6`；完整证据见 `SELFHOST-UAT-FIX-20-COMPLETION.md` 和 D-091。
+- 在另立 Identity 任务解决 operations 强制改密并完成只读验收前，不开始八条主 UAT Mapping 的端到端创建/审核。
 
 ## 允许的最终状态
 

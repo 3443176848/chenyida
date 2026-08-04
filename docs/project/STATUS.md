@@ -2,6 +2,28 @@
 
 最后更新时间：2026-08-04（Asia/Shanghai）
 
+## SELFHOST-UAT-FIX-20 受控 Supplier Mapping 维护、审核与 RFQ 覆盖门禁
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | SUPPLIER MAPPING GOVERNANCE DEPLOYED — MAIN UAT NOT VERIFIED | alpha.39/0038、purchase 维护、operations 只读异人审核、不可变版本/Event 和 RFQ 当前有效 1:1 Mapping 门禁已部署；主 UAT 未创建 Mapping 或任何下游单据 |
+| 严格起点 | PASS | clean `main@2cdbc43d1293b6f13bf5bba1e140ec6808b05dd5`、Parent `23d654c383015864be9a2ade71e78d94eb77adaf`、behind 0/ahead 131；alpha.38、0001—0037、0037 SHA、Web `6622029f…`、服务/四卷和主 UAT 保护事实全部吻合 |
+| 模型诊断 | BRANCH B / SINGLE AUTHORITY | 既有 `supplier_mappings` 已是关系化权威，但不能表达草稿、审核与不可变决策；保留该表为唯一正文/版本权威，仅新增 0038，不建第二套模型 |
+| Migration/版本 | PASS / DEPLOYED | `0.1.0-alpha.39`，38/head `0038_supplier_mapping_governance.sql`，SHA-256 `2da259364151af098641795da55604dc3012b6adf92aec67038c0554e0592941`；0001—0037 未修改 |
+| 权限/职责分离 | PASS | purchase=`read/create/edit_draft/submit`；operations=`read/review_queue/approve/reject`；engineering 只读；operations 无正文编辑，purchase 无审核，自审禁止，admin/manager 仍受自审门禁 |
+| 生命周期 | PASS | DRAFT→PENDING_REVIEW→ACTIVE/REJECTED；提交后冻结、退回原因必填、ACTIVE 不原改，替代版本同事务固化；Supplier part 与 ACTIVE 1:1 有效期唯一性由数据库保护 |
+| RFQ 合同 | PASS | page/create/issue 共用权威 coverage 查询；0/4、3/4 禁选并返回精确缺失组合和 `SUPPLIER_MAPPING_INCOMPLETE`，4/4 才可创建 DRAFT；不自动创建 Quote/Award/PO |
+| legacy Unit 兼容 | PASS | Material 主单位优先 `base_unit_id`；为空时仅允许 `base_uom` 精确匹配唯一 enabled Unit.code。主 UAT 533—536 的 PCS 被稳定解析；无匹配继续 fail closed，无数据回填或 0039 |
+| 自动验证 | PASS | Unit/UI 最终 12/12；Supplier Mapping PG 8/8；Migration 5/5；跨域 PG 42/42 + sourcing 5/5 + master 6/6；静态/UI 87/87，npm 3/3，Python 3/3；typecheck、build、lint 0 error/10 既有 warning、credentials 和 diff check 通过 |
+| 隔离 Chromium | PASS | purchase 创建/提交 8 条、operations 逐条异人批准、两家 4/4、RFQ DRAFT 1；Quote/Award/PO 0，Session 0，桌面与 390×844 通过 |
+| 备份/恢复 | PASS | root:root 0600 custom dump 2,189,463 bytes，SHA-256 `2d1fe44fd42c7a7281fd50d0d7d20144228ee4b26f62c2fe6c93e2df24dcb96c`；list 3,285 项，第二空库 37/head 0037 恢复后升级 38/head 0038、重复 runner 与保护事实通过，恢复库已删 |
+| 部署 | PASS | 停 Web/Worker 阻断写入并确认连接 0 后串行应用 0038、替换 Web、原样启动 Worker；兼容修复后仅 Web-only 替换。最终 Web `sha256:c1576bd22a209fb6f524e304bcf12cc38af4d67a35c76f37fa8dc1311c2922c8`；PostgreSQL/Caddy/四卷未更换 |
+| 主 UAT purchase | PASS / READ ONLY | 新建/保存/提交入口和有界 Material 搜索存在；Supplier 1/2 均 0/4、分别精确缺 533—536且不可选；桌面/390×844、退出和 Session 失效通过，业务 POST 0 |
+| 主 UAT operations | NOT VERIFIED / SAFE STOP | Canonical 与数据库账号均既有 `must_change_password=true`；runner 在登录前停止。未修改 Canonical/密码/身份，也未以 admin/manager 绕过；当前队列页面因此未在主 UAT 登录验证 |
+| 主 UAT 数据 | PASS / UNCHANGED | 部署前恢复副本与部署后主库业务指纹均为 `8ad0c2e19863808ed9fed62b0da8f5ef4e78bbaf586fe1be146a286bcf3f0ce0`；Mapping/RFQ/Quote/Award/PO 和全部下游为 0，两条历史失败请求原样保留，最终 Session 0 |
+| 资源/清理 | PASS | available memory 约 2.2→2.2 GiB，Swap 265→263 MiB（峰值约 301），根盘约 20 GiB，Load `0.20/0.11/0.09`→`0.37/0.38/0.38`；内核 OOM 0、四服务 RestartCount 0/OOM false；临时库/容器/目录 0，未 prune，四卷保留 |
+| Git/后续 | TWO FEATURE COMMITS + OPS CLOSEOUT | `ddab02a57e0e87255c7a35d125959ac750b108e1`、`1e9221d90db621becc2badf40b3e0ed3017b73e6`，收口消息 `ops: deploy supplier mapping governance`；operations 身份阻断解除并获得新授权前，不开始主 UAT 八条 Mapping |
+
 ## SELFHOST-UAT-FIX-19 RFQ 草稿稳定 Purchase Request ID 绑定
 
 | 验证项 | 结果 | 说明 |
