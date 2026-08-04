@@ -38,6 +38,8 @@
     "test:identity:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-identity-postgres.test.mjs",
     "test:identity:migration-upgrade": "node --experimental-strip-types --test tests/selfhost-identity-migration-upgrade.test.mjs",
     "test:identity:compose": "node scripts/selfhost-identity-compose-smoke.mjs",
+    "test:identity-recovery-targeted:unit": "node --experimental-strip-types --test tests/selfhost-targeted-offline-identity-recovery-unit.test.mjs",
+    "test:identity-recovery-targeted:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-targeted-offline-identity-recovery-postgres.test.mjs",
     "test:master-data:unit": "node --experimental-strip-types --test tests/selfhost-master-data-unit.test.mjs",
     "test:master-data:ui": "node --experimental-strip-types --test tests/selfhost-master-data-ui-contract.test.mjs",
     "test:master-data:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-master-data-postgres.test.mjs",

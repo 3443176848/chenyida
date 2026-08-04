@@ -1,4 +1,5 @@
 import path from "node:path";
+import { fstatSync } from "node:fs";
 import { Pool } from "pg";
 import {
   diagnoseUatCredentialFile,
@@ -10,6 +11,13 @@ import {
   RECOVERY_ACCOUNTS,
   RecoveryError,
 } from "./core.ts";
+import {
+  executeTargetedRecovery,
+  executeTargetedRetainedCandidatePromotion,
+  executeTargetedVerificationSessionCleanup,
+  TARGETED_ACCOUNT,
+  type TargetedRecoveryOptions,
+} from "./targeted.ts";
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -25,6 +33,16 @@ type Arguments = {
   diagnoseSchema: boolean;
   sessionCleanupConfirmation: boolean;
   sessionCleanupUsername?: string;
+  targetedFinalizeAccount: boolean;
+  promoteRetainedTargetedCandidateOnly: boolean;
+  revokeTargetedVerificationSessions: boolean;
+  targetedPasswordStdin: boolean;
+  targetUsername?: string;
+  expectedRole?: string;
+  expectedActive?: string;
+  expectedUserVersion?: string;
+  targetedConfirmationPhrase?: string;
+  verificationAttempt?: string;
   expectedDatabaseName?: string;
   stageDirectory?: string;
   offlineAttestationPath?: string;
@@ -43,6 +61,10 @@ function parseArguments(argv: string[]): Arguments {
     cleanupBrowserFailureSessions: false,
     diagnoseSchema: false,
     sessionCleanupConfirmation: false,
+    targetedFinalizeAccount: false,
+    promoteRetainedTargetedCandidateOnly: false,
+    revokeTargetedVerificationSessions: false,
+    targetedPasswordStdin: false,
   };
   const seen = new Set<string>();
   for (let index = 0; index < argv.length; index += 1) {
@@ -77,6 +99,22 @@ function parseArguments(argv: string[]): Arguments {
       parsed.sessionCleanupConfirmation = true;
       continue;
     }
+    if (flag === "--targeted-finalize-account") {
+      parsed.targetedFinalizeAccount = true;
+      continue;
+    }
+    if (flag === "--promote-retained-targeted-candidate-only") {
+      parsed.promoteRetainedTargetedCandidateOnly = true;
+      continue;
+    }
+    if (flag === "--targeted-password-stdin") {
+      parsed.targetedPasswordStdin = true;
+      continue;
+    }
+    if (flag === "--revoke-targeted-verification-sessions") {
+      parsed.revokeTargetedVerificationSessions = true;
+      continue;
+    }
     const value = argv[index + 1];
     if (!value || value.startsWith("--")) throw new RecoveryError("RECOVERY_ARGUMENT_INVALID", "PRECHECK");
     index += 1;
@@ -88,6 +126,12 @@ function parseArguments(argv: string[]): Arguments {
     else if (flag === "--offline-attestation") parsed.offlineAttestationPath = value;
     else if (flag === "--browser-verification-evidence") parsed.browserVerificationEvidencePath = value;
     else if (flag === "--session-cleanup-username") parsed.sessionCleanupUsername = value;
+    else if (flag === "--target-username") parsed.targetUsername = value;
+    else if (flag === "--expected-role") parsed.expectedRole = value;
+    else if (flag === "--expected-active") parsed.expectedActive = value;
+    else if (flag === "--expected-user-version") parsed.expectedUserVersion = value;
+    else if (flag === "--targeted-confirmation-phrase") parsed.targetedConfirmationPhrase = value;
+    else if (flag === "--verification-attempt") parsed.verificationAttempt = value;
     else throw new RecoveryError("RECOVERY_ARGUMENT_INVALID", "PRECHECK");
   }
   return parsed;
@@ -95,6 +139,41 @@ function parseArguments(argv: string[]): Arguments {
 
 function line(...parts: Array<string | number>): void {
   process.stdout.write(`${parts.join(" ")}\n`);
+}
+
+async function readTargetedPasswordFromPipe(): Promise<string> {
+  let metadata;
+  try {
+    metadata = fstatSync(0);
+  } catch {
+    throw new RecoveryError("TARGETED_PASSWORD_PIPE_REQUIRED", "PRECHECK");
+  }
+  if (process.stdin.isTTY === true || metadata.isFile() || metadata.isDirectory()) {
+    throw new RecoveryError("TARGETED_PASSWORD_PIPE_REQUIRED", "PRECHECK");
+  }
+  const chunks: Buffer[] = [];
+  let length = 0;
+  for await (const raw of process.stdin) {
+    const chunk = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+    length += chunk.length;
+    if (length > 130) {
+      chunks.forEach((value) => value.fill(0));
+      chunk.fill(0);
+      throw new RecoveryError("TARGETED_PASSWORD_PIPE_INVALID", "PRECHECK");
+    }
+    chunks.push(chunk);
+  }
+  const payload = Buffer.concat(chunks);
+  chunks.forEach((value) => value.fill(0));
+  try {
+    if (payload.length < 2 || payload.at(-1) !== 0x0a || payload.subarray(0, -1).includes(0x0a)
+      || payload.subarray(0, -1).includes(0x0d) || payload.includes(0x00)) {
+      throw new RecoveryError("TARGETED_PASSWORD_PIPE_INVALID", "PRECHECK");
+    }
+    return payload.subarray(0, -1).toString("utf8");
+  } finally {
+    payload.fill(0);
+  }
 }
 
 async function main(): Promise<number> {
@@ -106,7 +185,10 @@ async function main(): Promise<number> {
     const selectedModes = Number(args.promoteRetainedStageOnly)
       + Number(args.finalizeRecoveryStage)
       + Number(args.cleanupBrowserFailureSessions)
-      + Number(args.diagnoseSchema);
+      + Number(args.diagnoseSchema)
+      + Number(args.targetedFinalizeAccount)
+      + Number(args.promoteRetainedTargetedCandidateOnly)
+      + Number(args.revokeTargetedVerificationSessions);
     if (selectedModes > 1
       || args.finalizationConfirmation && !args.finalizeRecoveryStage
       || args.browserVerificationEvidencePath && !args.finalizeRecoveryStage
@@ -115,13 +197,44 @@ async function main(): Promise<number> {
       || args.cleanupBrowserFailureSessions && !args.sessionCleanupUsername) {
       throw new RecoveryError("RECOVERY_ARGUMENT_INVALID", "PRECHECK");
     }
+    const targetedMode = args.targetedFinalizeAccount
+      || args.promoteRetainedTargetedCandidateOnly
+      || args.revokeTargetedVerificationSessions;
+    const targetedFieldsPresent = args.targetedPasswordStdin
+      || args.targetUsername !== undefined
+      || args.expectedRole !== undefined
+      || args.expectedActive !== undefined
+      || args.expectedUserVersion !== undefined
+      || args.targetedConfirmationPhrase !== undefined
+      || args.verificationAttempt !== undefined;
+    if (targetedMode) {
+      if (args.confirmation
+        || args.finalizationConfirmation
+        || args.sessionCleanupConfirmation
+        || args.sessionCleanupUsername
+        || args.browserVerificationEvidencePath
+        || args.finalizeRecoveryStage
+        || args.promoteRetainedStageOnly
+        || args.cleanupBrowserFailureSessions
+        || args.diagnoseSchema
+        || !args.targetUsername
+        || !args.expectedRole
+        || !args.expectedActive
+        || !args.expectedUserVersion
+        || !args.targetedConfirmationPhrase
+        || args.revokeTargetedVerificationSessions !== (args.verificationAttempt !== undefined)
+        || args.targetedFinalizeAccount !== args.targetedPasswordStdin) {
+        throw new RecoveryError("RECOVERY_ARGUMENT_INVALID", "PRECHECK");
+      }
+    } else if (targetedFieldsPresent) {
+      throw new RecoveryError("RECOVERY_ARGUMENT_INVALID", "PRECHECK");
+    }
     if (args.diagnoseSchema) {
       const expectedClass = args.environment === "parallel-uat" ? "uat" : "test";
       if (!UUID_V4.test(args.recoveryRunId)
         || !["parallel-uat", "parallel-uat-rehearsal"].includes(args.environment)
         || (process.geteuid?.() ?? -1) !== 0
         || process.env.ERP_DEPLOYMENT_CLASS !== expectedClass
-        || process.env.ERP_DEPLOYMENT_CLASS === "production"
         || args.expectedMigration
         || args.confirmation
         || args.finalizationConfirmation
@@ -147,6 +260,81 @@ async function main(): Promise<number> {
       application_name: "chenyida-erp-offline-recovery",
     });
     pool.on("error", fatal);
+    if (targetedMode) {
+      const expectedUserVersion = Number(args.expectedUserVersion);
+      const verificationAttempt = Number(args.verificationAttempt);
+      if (!Number.isSafeInteger(expectedUserVersion)
+        || !["true", "false"].includes(args.expectedActive || "")
+        || args.revokeTargetedVerificationSessions && ![1, 2].includes(verificationAttempt)) {
+        throw new RecoveryError("RECOVERY_ARGUMENT_INVALID", "PRECHECK");
+      }
+      let password: string | undefined;
+      try {
+        if (args.targetedFinalizeAccount) password = await readTargetedPasswordFromPipe();
+        const targetedOptions: TargetedRecoveryOptions = {
+          pool,
+          environment: args.environment as "parallel-uat" | "parallel-uat-rehearsal",
+          deploymentClass: process.env.ERP_DEPLOYMENT_CLASS || "",
+          expectedMigration: args.expectedMigration,
+          recoveryRunId: args.recoveryRunId,
+          targetUsername: args.targetUsername!,
+          expectedRole: args.expectedRole!,
+          expectedActive: args.expectedActive === "true",
+          expectedUserVersion,
+          confirmationPhrase: args.targetedConfirmationPhrase!,
+          effectiveUid: process.geteuid?.() ?? -1,
+          databaseUrl,
+          password,
+          expectedDatabaseName: args.expectedDatabaseName,
+          stageDirectory: args.stageDirectory,
+          offlineAttestationPath: args.offlineAttestationPath,
+          promote: true,
+        };
+        if (args.revokeTargetedVerificationSessions) {
+          const cleanup = await executeTargetedVerificationSessionCleanup(targetedOptions, verificationAttempt);
+          line("STAGE", "PRECHECK", "PASS");
+          line("STAGE", "SESSION_CLEANUP", "PASS");
+          line("ACCOUNT", TARGETED_ACCOUNT.username, "PASS");
+          line("COUNT", "ACCOUNTS", cleanup.accountCount);
+          line("COUNT", "SESSIONS_REVOKED", cleanup.sessionRevokedCount);
+          line("COUNT", "AUDIT", cleanup.auditCount);
+          line("COUNT", "REMAINING_SESSIONS", cleanup.remainingSessionCount);
+          line("FINAL", "TARGETED_SESSION_CLEANUP_COMPLETED");
+          return 0;
+        }
+        const result = args.promoteRetainedTargetedCandidateOnly
+          ? await executeTargetedRetainedCandidatePromotion(targetedOptions)
+          : await executeTargetedRecovery(targetedOptions);
+        line("STAGE", "PRECHECK", "PASS");
+        line("STAGE", "CANONICAL_CANDIDATE", "PASS");
+        line("SCHEMA_VERSION", "chenyida-erp-uat-credentials-v2");
+        line("VALIDATOR_VERSION", "offline-identity-recovery-uat-validator-v2.1");
+        line("WRITER_VERSION", "offline-identity-recovery-credential-writer-v2");
+        line("COUNT", "CANONICAL_ACCOUNTS", result.canonicalAccountCount);
+        line("COUNT", "CANONICAL_ERRORS", result.canonicalErrorCount);
+        line("COUNT", "CANONICAL_DIFFS", result.canonicalDiffCount);
+        if (result.status === "partial") {
+          if (result.partialPhase !== "TRANSACTION_OUTCOME") line("STAGE", "DATABASE_TRANSACTION", "PASS");
+          line("STAGE", result.partialPhase || "INTERNAL", "FAIL", result.code || "TARGETED_RECOVERY_PARTIAL");
+          line("FINAL", "PARTIAL");
+          return 3;
+        }
+        line("STAGE", "DATABASE_TRANSACTION", "PASS");
+        line("ACCOUNT", TARGETED_ACCOUNT.username, "PASS");
+        line("COUNT", "ACCOUNTS", result.accountCount);
+        line("COUNT", "SESSIONS_REVOKED", result.sessionRevokedCount);
+        line("COUNT", "AUDIT", result.auditCount);
+        line("COUNT", "OTHER_CONTROLLED_ACCOUNTS", result.otherControlledAccountCount);
+        line("STAGE", "OTHER_ACCOUNTS", result.otherAccountsUnchanged ? "PASS" : "FAIL");
+        line("STAGE", "OTHER_SESSIONS", result.otherSessionsUnchanged ? "PASS" : "FAIL");
+        line("STAGE", "BUSINESS_PROTECTION", result.businessFingerprintBefore === result.businessFingerprintAfter ? "PASS" : "FAIL");
+        line("STAGE", "PROMOTION", "PASS");
+        line("FINAL", "TARGETED_CANONICAL_ACTIVE");
+        return 0;
+      } finally {
+        password = undefined;
+      }
+    }
     const recoveryOptions = {
       pool,
       environment: args.environment as "parallel-uat" | "parallel-uat-rehearsal",

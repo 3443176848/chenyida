@@ -104,7 +104,7 @@ const IDENTITY_AND_SYSTEM_TABLES = new Set([
   "app_meta",
   "schema_migrations",
 ]);
-const EXPECTED_MIGRATIONS = [
+export const EXPECTED_MIGRATIONS = [
   ["0001_selfhost_baseline.sql", "c1cd71803b0f504594a41234a82eb13ce8e6713f5d346f3e49247b4921ff1702"],
   ["0002_material_master_workflow.sql", "2d8d4facf54c950fa19d1346705aa0f549669544da1a87c2fc584c1fe8b7eb80"],
   ["0003_material_import_mapping.sql", "8ce859551198a8a5a334665f68eee503590fa5472f3a6396f44670d2110dddbf"],
@@ -1601,7 +1601,7 @@ async function performRecoveryTransaction(
     `, [RECOVERY_ACTION, options.recoveryRunId, usernames]);
     if (audit.rowCount !== RECOVERY_ACCOUNTS.length
       || audit.rows.some((row) => Number(row.count) !== 1)
-      || audit.rows.some((row) => !usernames.includes(row.target_username))) {
+      || audit.rows.some((row) => !usernames.includes(row.target_username as typeof usernames[number]))) {
       throw new RecoveryError("RECOVERY_AUDIT_COUNT_MISMATCH", "TRANSACTION");
     }
     await assertObservedPreflight(client, expectedDatabase, options.expectedMigration);
