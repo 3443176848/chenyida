@@ -26,8 +26,11 @@ test("purchase detail renders honest scoped lineage, immutable quantities and se
   assert.match(workspace,/净采购 = max\(毛需求 - 快照库存分配 - 快照在途分配, 0\)/);assert.match(workspace,/库存可用 = Σ在手 - Σ正式预留 - Σ冻结\/Hold/);assert.match(workspace,/数据库约束保证结果非负/);assert.match(workspace,/计划分配不计入 Inventory 正式预留/);
   assert.match(workspace,/模型没有“已到货但未完成入库”的独立数量字段/);assert.match(workspace,/模型未单独记录/);assert.match(workspace,/不会自动重算或改写 PRQ/);
   assert.match(workspace,/Package ACCEPT/);assert.match(workspace,/PRQ SUBMIT/);assert.match(workspace,/SUCCESS/);assert.match(workspace,/不会自动生成采购单据/);
-  for (const field of ["decision_counts","package_accept_event","plan_generate_event","prq_submit_event","current_supply_observed_at","type","timezone"]) assert.match(workspace,new RegExp(field));
+  for (const field of ["decision_counts","package_accept_event","plan_generate_event","prq_submit_event","purchase_decision_event","decision_event","current_supply_observed_at","type","timezone"]) assert.match(workspace,new RegExp(field));
   assert.match(workspace,/ACCEPT 事件数量/);assert.match(workspace,/RETURN 事件数量/);assert.match(workspace,/不以状态或队列数量推断/);
+  for (const text of ["采购决策凭证","业务事件类型","Actor","结果 SUCCESS 表示","不是 Planning ACCEPT","采购交接状态","PRQ 状态","计算快照、行项目、分配及来源摘要仍不可变"]) assert.match(workspace,new RegExp(text));
+  assert.match(workspace,/detail\.plan\.status/);assert.match(workspace,/request\.status/);assert.match(workspace,/isPurchaseDecisionEvidenceComplete/);assert.match(workspace,/data-purchase-decision-evidence="complete"/);
+  assert.doesNotMatch(workspace,/服务端未返回操作者|服务端未返回操作时间/);assert.doesNotMatch(workspace,/result\.data\.accepted_by\s*\|\||result\.data\.returned_by\s*\|\|/);
   assert.doesNotMatch(workspace,/净需求为 0，不生成/);assert.match(workspace,/提交快照净采购为 0；未生成 PRQ/);assert.match(workspace,/未找到采购申请；请核验关系化提交事实/);
 });
 
@@ -39,6 +42,8 @@ test("purchase decisions require confirmation and cancellation paths contain no 
   for (const label of ["当前在手总量","当前正式预留量","当前品质冻结量","当前库存可用量","当前计划库存分配量","当前未分配库存可用量","当前有效在途总量","当前计划在途分配量","当前未分配在途可用量"]) assert.match(workspace,new RegExp(label));
   assert.match(workspace,/不修改 Package、Plan、PRQ 明细、库存、正式预留或 Planning Allocation/);assert.match(workspace,/不自动创建 RFQ、Quote、Award、PO、Delivery Plan、Receipt、Ledger、AP 或 Work Order/);
   assert.match(workspace,/不修改原需求计划及提交时分配快照/);assert.match(workspace,/从已处理记录查看凭证/);assert.match(workspace,/Idempotency|createSessionWriteRegistry/);
+  assert.match(workspace,/提交后的权威采购决策凭证未能完整读取/);assert.match(workspace,/禁止重试接收或退回/);assert.match(workspace,/<dt>结果<\/dt><dd><code>SUCCESS<\/code>/);
+  assert.match(workspace,/request\.status === "SUBMITTED" && canDecide/);assert.match(workspace,/该 PRQ 已处理；关系化快照保持只读/);
   const closeBody=workspace.match(/const closeDecision[^;]+;/)?.[0]||"";assert.doesNotMatch(closeBody,/mutate|sessionPost|fetch|api\(/);
 });
 

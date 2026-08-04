@@ -49,8 +49,12 @@ test("calculation and submission are PostgreSQL numeric, locked and scope-bounde
   const requestDetail = service.slice(service.indexOf("async requestDetail"), service.indexOf("async requestQueue"));
   assert.match(requestDetail, /begin transaction isolation level repeatable read read only/); assert.ok(requestDetail.indexOf("canReadPurchaseRequest") < requestDetail.indexOf("loadCurrentSupplyBreakdowns"));
   assert.match(requestDetail, /count\(\*\) filter\(where event_type='PURCHASE_ACCEPTED'\)/);assert.match(requestDetail,/count\(\*\) filter\(where event_type='PURCHASE_RETURNED'\)/);
-  for(const field of ["decision_counts","package_accept_event","plan_generate_event","prq_submit_event","current_supply_observed_at"])assert.match(requestDetail,new RegExp(field));
+  for(const field of ["decision_counts","package_accept_event","plan_generate_event","prq_submit_event","purchase_decision_event","decision_event","current_supply_observed_at"])assert.match(requestDetail,new RegExp(field));
+  assert.match(requestDetail,/event_type in \('PURCHASE_ACCEPTED','PURCHASE_RETURNED'\)/);assert.match(requestDetail,/where plan_id=\$1 and purchase_request_id=\$2/);
+  assert.match(requestDetail,/header\.plan_status !== "ACCEPTED"/);assert.match(requestDetail,/header\.plan_status !== "RETURNED"/);assert.match(requestDetail,/status: header\.plan_status/);assert.match(requestDetail,/status: header\.status/);
+  assert.match(requestDetail,/purchaseDecisionEvent\.actor !== header\.accepted_by/);assert.match(requestDetail,/purchaseDecisionEvent\.request_id !== header\.request_id/);
   assert.match(requestDetail,/requireTraceEvent/);assert.match(requestDetail,/completeCurrentSupply/);assert.match(service,/PURCHASE_REQUEST_CONFIRMATION_INCOMPLETE/);
+  assert.match(service,/SUCCESS is a committed-event read-model projection, not a stored event column/);assert.match(service,/rollback removes it together with every other decision write/);
   assert.doesNotMatch(requestDetail,/insert\s+into|update\s+[a-z_]|delete\s+from/i);
   assert.match(currentSupply, /sum\(b\.on_hand_qty\)/); assert.match(currentSupply, /sum\(b\.reserved_qty\)/); assert.match(currentSupply, /sum\(b\.frozen_qty\)/);
   assert.match(currentSupply, /i\.on_hand_qty-i\.reserved_qty-i\.frozen_qty/); assert.doesNotMatch(currentSupply, /greatest\(i\.on_hand_qty-i\.reserved_qty-i\.frozen_qty,0\)/); assert.match(currentSupply, /p\.status in \('SUBMITTED','ACCEPTED'\)/);

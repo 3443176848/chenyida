@@ -28,7 +28,7 @@ type RequestDetail = {
   header: RequestRow & { plan_id: number; planning_package_id: number; submitted_by: string; submitted_at: string };
   package: { id: number; version_no: number; status: string; digest: string; project_code: string; accept_event: TraceEvent | null; items: PackageTraceItem[] };
   plan: { id: number; version_no: number; status: string; source_package_id: number; source_package_version_no: number; prepared_by: string; calculated_at: string; snapshot_cutoff_at: string; submission_revalidated_at: string; generated_event: TraceEvent | null; note: null; note_captured: false };
-  purchase_request: { id: number; request_code: string; status: string; source_plan_id: number; source_plan_version_no: number; project_code: string; required_date: string; submitted_by: string; submitted_at: string; submit_event: TraceEvent | null; line_count: number; total_requested_quantity: string; independently_versioned: false; supplier_selection: null; price: null; assignee: null; handling_deadline: null; handoff_note: null; handoff_note_captured: false };
+  purchase_request: { id: number; request_code: string; status: string; source_plan_id: number; source_plan_version_no: number; project_code: string; required_date: string; submitted_by: string; submitted_at: string; submit_event: TraceEvent | null; decision_event: TraceEvent | null; line_count: number; total_requested_quantity: string; independently_versioned: false; supplier_selection: null; price: null; assignee: null; handling_deadline: null; handoff_note: null; handoff_note_captured: false };
   lines: RequestLine[];
   quantity_formula: string;
   current_supply_formula: { inventory_available: string; unallocated_inventory_available: string; effective_inbound: string; unallocated_inbound_available: string };
@@ -37,13 +37,14 @@ type RequestDetail = {
   package_accept_event: TraceEvent;
   plan_generate_event: TraceEvent;
   prq_submit_event: TraceEvent;
+  purchase_decision_event: TraceEvent | null;
   current_supply_observed_at: string;
   current_supply_checked_at: string;
 };
 type DecisionPrompt = { kind: "accept" | "return"; reason: string; detail: RequestDetail };
 type DecisionRefresh = { requestId: number; requestCode: string };
-type DecisionResult = { request_id: string; data: RequestRow & { accepted_by?: string; accepted_at?: string; returned_by?: string; returned_at?: string; return_reason?: string } };
-type DecisionReceipt = { kind: "accept" | "return"; requestId: string; requestCode: string; requestRecordId: number; projectCode: string; status: string; actor: string; occurredAt: string; reason: string };
+type DecisionResult = { request_id: string };
+type DecisionReceipt = { kind: "accept" | "return"; detail: RequestDetail };
 
 const labels: Record<string, string> = { DRAFT: "预览", STALE: "已失效", SUBMITTED: "待采购接收", ACCEPTED: "采购已接收", RETURNED: "采购已退回", STOCK: "库存", INBOUND: "在途", GENERATED: "已生成", REGENERATED: "已重新生成", PURCHASE_ACCEPTED: "采购接收", PURCHASE_RETURNED: "采购退回" };
 const shanghaiTime = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
@@ -59,11 +60,12 @@ const compactQuantity = (value: string) => {
 };
 const materialCode = (line: Pick<RequestLine, "material_snapshot"> | Pick<PlanLine, "material_snapshot">) => String(line.material_snapshot?.internal_material_code || "未记录编码");
 const materialName = (line: Pick<RequestLine, "material_snapshot"> | Pick<PlanLine, "material_snapshot">) => String(line.material_snapshot?.standard_name || "未记录名称");
+const samePositiveStableId = (left: number | string, right: number | string) => /^[1-9]\d*$/.test(String(left)) && String(left) === String(right);
 const acceptanceSupplyFields: readonly (keyof CurrentSupply)[] = ["on_hand_qty", "reserved_qty", "frozen_qty", "inventory_available_qty", "stock_allocated_to_active_plans_qty", "unallocated_inventory_available_qty", "effective_inbound_qty", "inbound_allocated_to_active_plans_qty", "unallocated_inbound_available_qty"];
 const completeTraceEvent = (event: TraceEvent | null | undefined) => Boolean(event && event.id > 0 && event.action && event.type && event.actor && event.result === "SUCCESS" && event.timezone === "Asia/Shanghai" && event.request_id && !Number.isNaN(new Date(event.occurred_at).valueOf()));
 export function isPurchaseAcceptancePreviewComplete(detail: RequestDetail) {
   return Boolean(
-    Number(detail.header.id) > 0 && detail.purchase_request.id === Number(detail.header.id) && detail.purchase_request.status === "SUBMITTED"
+    samePositiveStableId(detail.header.id, detail.purchase_request.id) && detail.purchase_request.status === "SUBMITTED"
     && /^[0-9a-f]{64}$/i.test(detail.package.digest)
     && completeTraceEvent(detail.package_accept_event) && completeTraceEvent(detail.plan_generate_event) && completeTraceEvent(detail.prq_submit_event)
     && completeTraceEvent(detail.package.accept_event) && completeTraceEvent(detail.plan.generated_event) && completeTraceEvent(detail.purchase_request.submit_event)
@@ -71,6 +73,26 @@ export function isPurchaseAcceptancePreviewComplete(detail: RequestDetail) {
     && Number.isSafeInteger(detail.decision_counts.return_count) && detail.decision_counts.return_count >= 0
     && !Number.isNaN(new Date(detail.current_supply_observed_at).valueOf()) && detail.lines.length > 0
     && detail.lines.every((line) => line.current_supply && acceptanceSupplyFields.every((field) => typeof line.current_supply?.[field] === "string" && /^-?\d+\.\d{6}$/.test(line.current_supply[field] as string)))
+  );
+}
+
+export function isPurchaseDecisionEvidenceComplete(detail: RequestDetail, expectedKind?: "accept" | "return", expectedRequestId?: string) {
+  const request = detail.purchase_request;
+  const kind = request.status === "ACCEPTED" ? "accept" : request.status === "RETURNED" ? "return" : null;
+  const event = detail.purchase_decision_event;
+  const expectedType = kind === "accept" ? "PURCHASE_ACCEPTED" : "PURCHASE_RETURNED";
+  const expectedAction = kind === "accept" ? "ACCEPT" : "RETURN";
+  const expectedAcceptCount = kind === "accept" ? 1 : 0;
+  const expectedReturnCount = kind === "return" ? 1 : 0;
+  return Boolean(
+    kind && (!expectedKind || kind === expectedKind)
+    && samePositiveStableId(detail.header.id, request.id)
+    && detail.plan.id === request.source_plan_id && detail.plan.status === request.status
+    && completeTraceEvent(event) && event?.type === expectedType && event?.action === expectedAction
+    && detail.purchase_request.decision_event?.id === event?.id
+    && (!expectedRequestId || event?.request_id === expectedRequestId)
+    && detail.decision_counts.accept_count === expectedAcceptCount
+    && detail.decision_counts.return_count === expectedReturnCount
   );
 }
 
@@ -179,15 +201,21 @@ export function PurchaseRequestWorkspace() {
     const prompt = decisionPrompt;
     try {
       const result = await mutate(`/api/purchase-requests/${prompt.detail.header.id}/${prompt.kind}`, { expected_version: prompt.detail.header.version, ...(prompt.kind === "return" ? { reason: prompt.reason } : {}) }) as DecisionResult;
-      const actor = prompt.kind === "accept" ? result.data.accepted_by || session.user?.username || "" : result.data.returned_by || session.user?.username || "";
-      const occurredAt = prompt.kind === "accept" ? result.data.accepted_at || "" : result.data.returned_at || "";
-      setReceipt({ kind: prompt.kind, requestId: result.request_id, requestCode: prompt.detail.header.request_code, requestRecordId: prompt.detail.header.id, projectCode: prompt.detail.header.project_code, status: result.data.status, actor, occurredAt, reason: result.data.return_reason || prompt.reason });
-      setNotice(prompt.kind === "accept" ? "接收完成；未自动创建 RFQ、定标、PO、收货或 AP。" : "退回完成；原需求计划快照保持不变。");
       setDecisionPrompt(null); setDetail(null); setView("PROCESSED"); await load();
+      try {
+        const committedDetail = (await api<{ data: RequestDetail }>(`/api/purchase-requests/${prompt.detail.header.id}`)).data;
+        if (!isPurchaseDecisionEvidenceComplete(committedDetail, prompt.kind, result.request_id)) throw new Error("authoritative purchase decision evidence is incomplete");
+        setReceipt({ kind: prompt.kind, detail: committedDetail });
+        setNotice(prompt.kind === "accept" ? "接收完成；未自动创建 RFQ、定标、PO、收货或 AP。" : "退回完成；原需求计划快照保持不变。");
+      } catch {
+        setReceipt(null);
+        setNotice("采购决定已提交；请勿重复操作。");
+        setError("提交后的权威采购决策凭证未能完整读取；请从已处理历史重新打开核验，禁止重试接收或退回。");
+      }
     } catch (reason) { setError(errorMessage(reason)); }
     finally { decisionInFlight.current = false; setBusy(false); }
   }
-  async function openReceiptDetail() { if (!receipt) return; setView("PROCESSED"); await choose(receipt.requestRecordId); }
+  async function openReceiptDetail() { if (!receipt) return; setView("PROCESSED"); await choose(receipt.detail.purchase_request.id); }
   if (!session) return <State>{error || "正在读取会话…"}</State>; if (!session.authenticated) return <State>请先登录。</State>; if (!can(session.user, "planning.purchase_request.read")) return <State error>没有权限读取采购申请。</State>;
   const rows = view === "PENDING" ? pending : processed;
   return <Shell title="采购申请接收工作台" subtitle="核对 Package、需求计划、提交快照与当前供应后，只接收或退回 PRQ。" user={session.user!}><div className="planning-grid"><aside className="planning-panel"><div className="planning-view-tabs" role="tablist"><button type="button" role="tab" aria-selected={view === "PENDING"} className={view === "PENDING" ? "active" : ""} onClick={() => { setView("PENDING"); setDetail(null); setReceipt(null); }}>待接收申请 <span>{pending.length}</span></button><button type="button" role="tab" aria-selected={view === "PROCESSED"} className={view === "PROCESSED" ? "active" : ""} onClick={() => { setView("PROCESSED"); setDetail(null); setReceipt(null); }}>已处理 <span>{processed.length}</span></button></div><div className="planning-list" role="tabpanel">{rows.length ? rows.map((row) => <button type="button" className={`planning-row ${detail?.header.id === row.id ? "active" : ""}`} key={row.id} onClick={() => void choose(row.id)}><b>{row.request_code}</b><Status value={row.status} /><strong>{row.project_code} · {row.line_count} 行 · <Quantity value={row.requested_quantity} /></strong>{row.return_reason ? <small className="planning-row-reason">{row.return_reason}</small> : null}</button>) : <State>{view === "PENDING" ? "当前没有待接收申请。" : "当前没有本人已处理申请。"}</State>}</div></aside><section className="planning-panel">{detail ? <PurchaseRequestView detail={detail} canDecide={can(session.user, "planning.purchase_request.decide")} busy={busy} onAccept={() => void requestDecision("accept")} onReturn={returnRequest} /> : receipt ? <DecisionReceiptView receipt={receipt} onOpen={() => void openReceiptDetail()} /> : <State>选择 PRQ 查看固定来源、提交快照和当前供应状态。</State>}{notice ? <State>{notice}</State> : null}{error ? <State error>{error}</State> : null}</section></div>{decisionRefresh ? <PurchaseSupplyRefreshDialog refresh={decisionRefresh} onCancel={closeDecisionRefresh} /> : decisionPrompt ? <PurchaseDecisionDialog prompt={decisionPrompt} busy={busy} onCancel={closeDecision} onConfirm={() => void confirmDecision()} /> : null}</Shell>;
@@ -202,16 +230,23 @@ function EventEvidence({ title, event }: { title: string; event: TraceEvent | nu
   return <article className="planning-event"><div className="planning-event-heading"><div><code className="planning-event-code">{event.action}</code><b>{title}</b></div><span className="planning-event-result success">{event.result}</span></div><dl><div><dt>动作 / 类型</dt><dd>{event.action} / {event.type}</dd></div><div><dt>操作者</dt><dd>{event.actor}</dd></div><div><dt>时间</dt><dd>{formatShanghaiTime(event.occurred_at)}</dd></div><div><dt>展示时区</dt><dd>{event.timezone}</dd></div><div><dt>结果</dt><dd>SUCCESS · 不可变事件已提交</dd></div><div><dt>证据来源</dt><dd>{event.evidence_source === "PACKAGE_EVENT" ? "Package Event" : "Material Requirement Event"}</dd></div></dl><CopyValue label="请求号" value={event.request_id} /></article>;
 }
 
+function PurchaseDecisionEvidence({ detail }: { detail: RequestDetail }) {
+  const event = detail.purchase_decision_event;
+  if (!isPurchaseDecisionEvidenceComplete(detail) || !event) return <State error>当前 PRQ 的权威采购决策事件不完整；未使用当前用户、页面状态、队列数量或占位请求号补齐凭证。</State>;
+  const accepted = event.type === "PURCHASE_ACCEPTED";
+  return <section className="planning-card purchase-trace-section purchase-decision-evidence purchase-decision-counts" data-purchase-decision-evidence="complete"><div className="planning-event-heading"><div><code className="planning-event-code">{event.action}</code><h3>采购决策凭证</h3></div><span className="planning-event-result success">{event.result}</span></div><dl className="planning-facts planning-package-facts"><div><dt>Purchase Request ID</dt><dd>{detail.purchase_request.id}</dd></div><div><dt>PRQ</dt><dd>{detail.purchase_request.request_code}</dd></div><div><dt>决策</dt><dd><code>{event.action}</code> / {accepted ? "采购接收" : "采购退回"}</dd></div><div><dt>业务事件类型</dt><dd><code>{event.type}</code></dd></div><div><dt>Actor</dt><dd>{event.actor}</dd></div><div><dt>时间</dt><dd>{formatShanghaiTime(event.occurred_at)}</dd></div><div><dt>展示时区</dt><dd>{event.timezone}</dd></div><div><dt>结果</dt><dd><code>{event.result}</code></dd></div><div><dt>ACCEPT 事件数量</dt><dd>{detail.decision_counts.accept_count}</dd></div><div><dt>RETURN 事件数量</dt><dd>{detail.decision_counts.return_count}</dd></div></dl><CopyValue label="请求号" value={event.request_id} /><p className="planning-evidence-note">结果 SUCCESS 表示该服务专用、不可变的 Purchase Request 决策事件已随同一事务成功提交；它不是 Planning ACCEPT，也不是从当前登录用户、页面状态或队列数量推断。</p></section>;
+}
+
 function PurchaseRequestView({ detail, canDecide, busy, onAccept, onReturn }: { detail: RequestDetail; canDecide: boolean; busy: boolean; onAccept: () => void; onReturn: (event: FormEvent<HTMLFormElement>) => void }) {
   const request = detail.purchase_request;
   return <><div className="planning-title"><div><p className="planning-kicker">PURCHASE REQUEST TRACEABILITY</p><h2>{request.request_code} · {detail.header.project_name}</h2></div><Status value={request.status} /></div>
     <section className="planning-card purchase-trace-section"><h3>Package 与 ACCEPT 谱系</h3><dl className="planning-facts planning-package-facts"><div><dt>来源 Package</dt><dd>ID {detail.package.id}/v{detail.package.version_no}</dd></div><div><dt>Package 状态</dt><dd>{detail.package.status}</dd></div><div><dt>项目</dt><dd>{detail.package.project_code}</dd></div><div><dt>固定产品行</dt><dd>{detail.package.items.length} 行</dd></div></dl><CopyValue label="完整 Package SHA-256 摘要" value={detail.package.digest} /><div className="purchase-source-items">{detail.package.items.map((item) => <article key={item.id}><b>Product {item.product_version_code}</b><span>{item.product_name} · 内部产品编码 {item.product_code}</span><span>BOM {item.bom_version_code}（{item.bom_code}）</span><span>Unit Resolution {item.unit_resolution_version_no ? `v${item.unit_resolution_version_no}` : "未记录"} · {item.unit_code}</span></article>)}</div><EventEvidence title="Package ACCEPT" event={detail.package.accept_event} /><p className="planning-gate-evidence">该 ACCEPT 仅确认工程 Package 进入计划阶段，不会自动生成采购单据。</p></section>
-    <section className="planning-card purchase-trace-section"><h3>Material Requirement Plan 谱系</h3><dl className="planning-facts planning-package-facts"><div><dt>稳定 ID</dt><dd>Material Requirement Plan ID {detail.plan.id}</dd></div><div><dt>计划版本</dt><dd>v{detail.plan.version_no}</dd></div><div><dt>来源 Package</dt><dd>ID {detail.plan.source_package_id}/v{detail.plan.source_package_version_no}</dd></div><div><dt>计划状态</dt><dd>{detail.plan.status}</dd></div><div><dt>创建 / 计算人</dt><dd>{detail.plan.prepared_by}</dd></div><div><dt>计算时间</dt><dd>{formatShanghaiTime(detail.plan.calculated_at)}</dd></div><div><dt>数据快照截止时间</dt><dd>{formatShanghaiTime(detail.plan.snapshot_cutoff_at)}</dd></div><div><dt>提交锁定复核时间</dt><dd>{formatShanghaiTime(detail.plan.submission_revalidated_at)}</dd></div></dl><EventEvidence title="计划生成事件" event={detail.plan.generated_event} /><p className="planning-empty-fact">该版本未采集计划说明</p></section>
+    <section className="planning-card purchase-trace-section"><h3>Material Requirement Plan 谱系</h3><dl className="planning-facts planning-package-facts"><div><dt>稳定 ID</dt><dd>Material Requirement Plan ID {detail.plan.id}</dd></div><div><dt>计划版本</dt><dd>v{detail.plan.version_no}</dd></div><div><dt>来源 Package</dt><dd>ID {detail.plan.source_package_id}/v{detail.plan.source_package_version_no}</dd></div><div><dt>采购交接状态</dt><dd><code>{detail.plan.status}</code></dd></div><div><dt>创建 / 计算人</dt><dd>{detail.plan.prepared_by}</dd></div><div><dt>计算时间</dt><dd>{formatShanghaiTime(detail.plan.calculated_at)}</dd></div><div><dt>数据快照截止时间</dt><dd>{formatShanghaiTime(detail.plan.snapshot_cutoff_at)}</dd></div><div><dt>提交锁定复核时间</dt><dd>{formatShanghaiTime(detail.plan.submission_revalidated_at)}</dd></div></dl><EventEvidence title="计划生成事件" event={detail.plan.generated_event} /><p className="planning-gate-evidence">该字段记录计划部→采购部交接状态；Plan v{detail.plan.version_no} 计算快照、行项目、分配及来源摘要仍不可变，<code>ACCEPTED</code> 不表示快照被改写。</p><p className="planning-empty-fact">该版本未采集计划说明</p></section>
     <section className="planning-card purchase-trace-section purchase-supply-section" data-supply-section="snapshot"><h3>1. 提交时快照</h3><p className="planning-evidence-note">以下数量在计划提交时固化，只用于追溯；当前供应变化不会替换快照或自动改变 PRQ 申请量。</p><dl className="planning-facts"><div><dt>快照截止时间</dt><dd>{formatShanghaiTime(detail.plan.snapshot_cutoff_at)}</dd></div><div><dt>来源计划</dt><dd>ID {detail.plan.id}/v{detail.plan.version_no}</dd></div><div><dt>固定 PRQ 行数</dt><dd>{detail.lines.length} 条</dd></div></dl><p className="purchase-formula">净采购 = max(毛需求 - 快照库存分配 - 快照在途分配, 0)</p><div className="purchase-line-cards">{detail.lines.map((line) => <SnapshotSupplyCard key={line.id} line={line} />)}</div></section>
     <section className="planning-card purchase-trace-section purchase-supply-section" data-supply-section="current"><h3>2. 当前供应状态</h3><p className="purchase-query-time"><b>查询时间：</b>{formatShanghaiTime(detail.current_supply_observed_at)}</p><p className="planning-evidence-note">只汇总本 PRQ 已授权行对应 Material + Unit。库存位置域为 MAIN，并汇总该域的全部无批次与批次位置；计划分配不计入 Inventory 正式预留。</p><div className="purchase-line-cards">{detail.lines.map((line) => <CurrentSupplyCard key={line.id} line={line} />)}</div><details className="purchase-supply-formulas"><summary>查看权威供应公式与在途边界</summary><div><p><code>库存可用 = Σ在手 - Σ正式预留 - Σ冻结/Hold</code>（每个库存位置由数据库约束保证结果非负）</p><p><code>未分配库存可用 = max(库存可用 - 有效计划库存分配, 0)</code></p><p><code>未分配在途可用 = max(有效在途 - 有效计划在途分配, 0)</code></p><p>有效计划仅指 SUBMITTED / ACCEPTED。有效在途仅含截至 PRQ 需求日的 OPEN / PARTIALLY_RECEIVED PO 剩余量；存在 Delivery Plan 时，仅 PENDING / PARTIAL 的计划剩余量有效，COMPLETED / CANCELLED / CLOSED 排除。</p><p>已过账收货已通过 received quantity 从在途扣除并进入库存。当前模型没有“已到货但未完成入库”的独立数量字段，也没有“其他不可用”独立字段，因此均不伪造数量。</p></div></details></section>
     <section className="planning-card purchase-trace-section purchase-supply-section" data-supply-section="difference"><h3>3. 差异提示</h3><p className="planning-evidence-note">差额比较“提交时未分配可用量”与“当前未分配可用量”。无论是否变化，系统都不会自动重算或改写 PRQ；采购人员应通过正式退回或后续受控调整流程处理变化。</p><div className="purchase-difference-cards">{detail.lines.map((line) => <SupplyDifferenceCard key={line.id} line={line} />)}</div></section>
-    <section className="planning-card purchase-trace-section"><h3>PRQ 提交凭证</h3><dl className="planning-facts planning-package-facts"><div><dt>稳定 ID</dt><dd>Purchase Request ID {request.id}</dd></div><div><dt>编号</dt><dd>{request.request_code}</dd></div><div><dt>状态</dt><dd>{labels[request.status] || request.status}</dd></div><div><dt>来源计划</dt><dd>ID {request.source_plan_id}/v{request.source_plan_version_no}</dd></div><div><dt>项目</dt><dd>{request.project_code}</dd></div><div><dt>需求日期</dt><dd>{dateOnly(request.required_date)}</dd></div><div><dt>提交人</dt><dd>{request.submitted_by}</dd></div><div><dt>提交时间</dt><dd>{formatShanghaiTime(request.submitted_at)}</dd></div><div><dt>行数 / 合计</dt><dd>{request.line_count} 行 · <Quantity value={request.total_requested_quantity} /></dd></div></dl><EventEvidence title="PRQ SUBMIT" event={request.submit_event} /><p className="planning-gate-evidence">PRQ未单独版本化；固定引用需求计划v{request.source_plan_version_no}</p><dl className="planning-facts planning-package-facts purchase-empty-facts"><div><dt>供应商</dt><dd>未选择供应商</dd></div><div><dt>价格</dt><dd>未填写价格</dd></div><div><dt>接收人</dt><dd>未指定接收人</dd></div><div><dt>处理时限</dt><dd>未配置处理时限</dd></div></dl><p className="planning-empty-fact">该版本未采集采购交接说明</p></section>
-    <section className="planning-card purchase-trace-section purchase-decision-counts"><h3>不可变采购决策计数</h3><dl className="planning-facts"><div><dt>ACCEPT 事件数量</dt><dd>{detail.decision_counts.accept_count}</dd></div><div><dt>RETURN 事件数量</dt><dd>{detail.decision_counts.return_count}</dd></div></dl><p className="planning-evidence-note">计数直接来自当前 PRQ 的不可变 PURCHASE_ACCEPTED / PURCHASE_RETURNED 事件，不以状态或队列数量推断。</p></section>
+    <section className="planning-card purchase-trace-section"><h3>PRQ 提交凭证</h3><dl className="planning-facts planning-package-facts"><div><dt>稳定 ID</dt><dd>Purchase Request ID {request.id}</dd></div><div><dt>编号</dt><dd>{request.request_code}</dd></div><div><dt>PRQ 状态</dt><dd><code>{request.status}</code> / {labels[request.status] || request.status}</dd></div><div><dt>来源计划</dt><dd>ID {request.source_plan_id}/v{request.source_plan_version_no}</dd></div><div><dt>项目</dt><dd>{request.project_code}</dd></div><div><dt>需求日期</dt><dd>{dateOnly(request.required_date)}</dd></div><div><dt>提交人</dt><dd>{request.submitted_by}</dd></div><div><dt>提交时间</dt><dd>{formatShanghaiTime(request.submitted_at)}</dd></div><div><dt>行数 / 合计</dt><dd>{request.line_count} 行 · <Quantity value={request.total_requested_quantity} /></dd></div></dl><EventEvidence title="PRQ SUBMIT" event={request.submit_event} /><p className="planning-gate-evidence">PRQ未单独版本化；固定引用需求计划v{request.source_plan_version_no}</p><dl className="planning-facts planning-package-facts purchase-empty-facts"><div><dt>供应商</dt><dd>未选择供应商</dd></div><div><dt>价格</dt><dd>未填写价格</dd></div><div><dt>接收人</dt><dd>未指定接收人</dd></div><div><dt>处理时限</dt><dd>未配置处理时限</dd></div></dl><p className="planning-empty-fact">该版本未采集采购交接说明</p></section>
+    {request.status === "SUBMITTED" ? <section className="planning-card purchase-trace-section purchase-decision-counts"><h3>不可变采购决策计数</h3><dl className="planning-facts"><div><dt>ACCEPT 事件数量</dt><dd>{detail.decision_counts.accept_count}</dd></div><div><dt>RETURN 事件数量</dt><dd>{detail.decision_counts.return_count}</dd></div></dl><p className="planning-evidence-note">计数直接来自当前 PRQ 的不可变 PURCHASE_ACCEPTED / PURCHASE_RETURNED 事件，不以状态或队列数量推断。</p></section> : <PurchaseDecisionEvidence detail={detail} />}
     {request.status === "SUBMITTED" && canDecide ? <div className="planning-actions planning-decision-actions"><button type="button" disabled={busy} onClick={onAccept}>接收采购申请</button><form className="planning-form" onSubmit={onReturn}><label>退回原因（必填）<textarea name="reason" required maxLength={1000} placeholder="说明需计划部门修订的需求或数量问题" /></label><button className="planning-danger" disabled={busy}>退回计划部</button></form></div> : request.status === "SUBMITTED" ? <State>当前账号仅可查看，没有接收或退回权限。</State> : <p className="planning-terminal">该 PRQ 已处理；关系化快照保持只读。</p>}
   </>;
 }
@@ -279,6 +314,6 @@ function PurchaseDecisionDialog({ prompt, busy, onCancel, onConfirm }: { prompt:
 }
 
 function DecisionReceiptView({ receipt, onOpen }: { receipt: DecisionReceipt; onOpen: () => void }) {
-  const accepted = receipt.kind === "accept";
-  return <div className="planning-receipt" role="status"><p className="planning-kicker">PURCHASE DECISION RECEIPT</p><h2>操作完成凭证</h2><dl className="planning-facts"><div><dt>操作</dt><dd><code>{accepted ? "ACCEPT" : "RETURN"}</code></dd></div><div><dt>PRQ</dt><dd>{receipt.requestCode}</dd></div><div><dt>项目</dt><dd>{receipt.projectCode}</dd></div><div><dt>状态</dt><dd>{labels[receipt.status] || receipt.status}</dd></div><div><dt>操作者</dt><dd>{receipt.actor || "服务端未返回操作者"}</dd></div><div><dt>时间</dt><dd>{receipt.occurredAt ? formatShanghaiTime(receipt.occurredAt) : "服务端未返回操作时间"}</dd></div></dl><CopyValue label="请求号" value={receipt.requestId} />{accepted ? <p>下一队列：采购寻源与询价；接收本身未创建 RFQ、定标、PO、收货或 AP。</p> : <><div className="planning-confirm-reason"><b>数据库保存的退回原因</b><p>{receipt.reason}</p></div><p>下一队列：计划部门修订；原计划快照未修改。</p></>}<button type="button" onClick={onOpen}>从已处理记录查看凭证</button></div>;
+  const accepted = receipt.kind === "accept"; const request = receipt.detail.purchase_request;
+  return <div className="planning-receipt" role="status"><p className="planning-kicker">PURCHASE DECISION RECEIPT</p><h2>操作完成凭证</h2><dl className="planning-facts"><div><dt>结果</dt><dd><code>SUCCESS</code></dd></div><div><dt>项目</dt><dd>{request.project_code}</dd></div><div><dt>采购交接状态</dt><dd><code>{receipt.detail.plan.status}</code></dd></div><div><dt>PRQ 状态</dt><dd><code>{request.status}</code> / {labels[request.status] || request.status}</dd></div></dl><PurchaseDecisionEvidence detail={receipt.detail} />{accepted ? <p>下一队列：采购寻源与询价；接收本身未创建 RFQ、定标、PO、收货或 AP。</p> : <><div className="planning-confirm-reason"><b>数据库保存的退回原因</b><p>{receipt.detail.header.return_reason}</p></div><p>下一队列：计划部门修订；原计划快照未修改。</p></>}<button type="button" onClick={onOpen}>从已处理记录查看凭证</button></div>;
 }
