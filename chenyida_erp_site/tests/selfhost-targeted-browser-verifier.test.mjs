@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   assertTargetedAuthenticatedWorkspace,
   validateTargetedLoginResponse,
+  validateTargetedLogoutTransport,
 } from "../tools/offline-identity-recovery/targeted-browser-contract.mjs";
 
 const EXPECTED = Object.freeze({ username: "synthetic_operations", role: "operations" });
@@ -101,6 +102,19 @@ test("rejects inactive responses when the authority returns active state", async
   }), EXPECTED), "TARGETED_BROWSER_LOGIN_ACTIVE_INVALID");
 });
 
+test("logout transport validation defers durable proof to the anonymous page and session", async () => {
+  const accepted = await validateTargetedLogoutTransport(response({ ok: true }));
+  assert.equal(accepted.status, 200);
+  await rejectsCode(
+    validateTargetedLogoutTransport(response({ ok: true }, { status: 403 })),
+    "TARGETED_BROWSER_LOGOUT_HTTP_INVALID",
+  );
+  await rejectsCode(
+    validateTargetedLogoutTransport(response({ ok: true }, { contentType: "text/html" })),
+    "TARGETED_BROWSER_LOGOUT_CONTENT_TYPE_INVALID",
+  );
+});
+
 test("requires the authenticated workspace after a valid login response", () => {
   const expected = { ...EXPECTED, displayName: "Synthetic Operations", roleLabel: "运营" };
   const valid = {
@@ -141,6 +155,8 @@ test("formal verifier wires the contract to the page login and safe logout flow"
   assert.match(source, /validateTargetedLoginResponse\(loginResponse/);
   assert.match(source, /assertAuthenticatedWorkspace\(page, context, login\)/);
   assert.match(source, /getByRole\("button", \{ name: "退出", exact: true \}\)\.click\(\)/);
+  assert.match(source, /validateTargetedLogoutTransport\(logoutResponse\)/);
+  assert.match(source, /assertAnonymousLoginPage\(page, context, ""\)/);
   assert.doesNotMatch(source, /identityFetch\(context, "login"/);
   assert.doesNotMatch(source, /!login\.authenticated/);
 });

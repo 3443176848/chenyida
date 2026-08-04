@@ -5,7 +5,7 @@ import {
   assertTargetedAuthenticatedWorkspace,
   TargetedBrowserContractError,
   validateTargetedLoginResponse,
-  validateTargetedLogoutResponse,
+  validateTargetedLogoutTransport,
 } from "./targeted-browser-contract.mjs";
 
 const ORIGIN = "https://43.135.148.43.nip.io:18888";
@@ -375,7 +375,7 @@ try {
     logoutResponsePromise,
     page.getByRole("button", { name: "退出", exact: true }).click(),
   ]);
-  await validateTargetedLogoutResponse(logoutResponse);
+  await validateTargetedLogoutTransport(logoutResponse);
   await assertAnonymousLoginPage(page, context, "");
   await page.goBack({ waitUntil: "domcontentloaded" });
   await assertAnonymousLoginPage(page, context, "?targeted-identity-verification=before");

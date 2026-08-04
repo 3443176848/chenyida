@@ -16,10 +16,10 @@ function object(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-async function responseMetadata(response) {
+async function responseMetadata(response, prefix) {
   if (!response || typeof response.status !== "function"
     || typeof response.headers !== "function" || typeof response.text !== "function") {
-    fail("TARGETED_BROWSER_LOGIN_RESPONSE_INVALID");
+    fail(`${prefix}_RESPONSE_INVALID`);
   }
   const status = response.status();
   const headers = await response.headers();
@@ -30,7 +30,7 @@ async function responseMetadata(response) {
 }
 
 async function jsonBody(response, prefix, expectedStatus = 200) {
-  const { status, contentType } = await responseMetadata(response);
+  const { status, contentType } = await responseMetadata(response, prefix);
   if (status !== expectedStatus) fail(`${prefix}_HTTP_INVALID`);
   if (!/^application\/json(?:\s*;|$)/i.test(contentType)) fail(`${prefix}_CONTENT_TYPE_INVALID`);
   let body;
@@ -86,11 +86,16 @@ export async function validateTargetedLoginResponse(response, expected) {
   };
 }
 
-export async function validateTargetedLogoutResponse(response) {
-  const body = await jsonBody(response, "TARGETED_BROWSER_LOGOUT");
-  assertNoErrorCode(body, "TARGETED_BROWSER_LOGOUT");
-  if (body.ok !== true) fail("TARGETED_BROWSER_LOGOUT_OK_INVALID");
-  return { ok: true };
+export async function validateTargetedLogoutTransport(response) {
+  const { status, contentType } = await responseMetadata(response, "TARGETED_BROWSER_LOGOUT");
+  if (status !== 200) fail("TARGETED_BROWSER_LOGOUT_HTTP_INVALID");
+  if (!/^application\/json(?:\s*;|$)/i.test(contentType)) {
+    fail("TARGETED_BROWSER_LOGOUT_CONTENT_TYPE_INVALID");
+  }
+  // The UI consumes the JSON body and immediately replaces the document.  The
+  // resulting anonymous page plus /api/session are the durable logout proof;
+  // rereading the disposed response body after navigation is inherently racy.
+  return { status, contentType };
 }
 
 export function assertTargetedAuthenticatedWorkspace(state, expected) {
