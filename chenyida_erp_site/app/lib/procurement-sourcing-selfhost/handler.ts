@@ -4,7 +4,7 @@ import type { IdentityActor } from "../identity-selfhost/types.ts";
 import { ProcurementSourcingError, mapProcurementSourcingError } from "./errors.ts";
 import { ProcurementSourcingRepository } from "./repository.ts";
 import { ProcurementSourcingService } from "./service.ts";
-import { canonicalDigest, positiveId } from "./validation.ts";
+import { canonicalDigest, normalizeCreateRfqInput, positiveId } from "./validation.ts";
 
 type Dependencies = Readonly<{ pool: Pool; actor: IdentityActor; requestId: string; requireCsrf: () => void }>;
 const allowed = (actor: IdentityActor, permission: string) => actor.permissions.includes("*") || actor.permissions.includes(permission);
@@ -21,7 +21,7 @@ export async function handleProcurementSourcingApi(request: Request, dependencie
   try {
     if (request.method === "GET") { requirePermission(dependencies.actor, "procurement.rfq.read"); if (rfqDetail) return response({ data: await service.detail(positiveId(rfqDetail[1], "rfqId")), request_id: dependencies.requestId }, 200, dependencies.requestId); if (comparison) return response({ data: await service.comparison(positiveId(comparison[1], "comparisonId")), request_id: dependencies.requestId }, 200, dependencies.requestId); if (collection) { const page = pageValue(url.searchParams.get("page"), "page", 1, 1_000_000), pageSize = pageValue(url.searchParams.get("page_size"), "page_size", 20, 100); const result = url.searchParams.get("queue") === "accepted" ? await service.acceptedRequests(page, pageSize) : await service.list(page, pageSize, url.searchParams.get("status") || undefined); return response({ data: result.rows, rows: result.rows, pagination: result.pagination, request_id: dependencies.requestId }, 200, dependencies.requestId); } throw new ProcurementSourcingError("METHOD_NOT_ALLOWED", "接口不支持该请求方法", 405); }
     if (request.method !== "POST") throw new ProcurementSourcingError("METHOD_NOT_ALLOWED", "接口不支持该请求方法", 405); dependencies.requireCsrf(); const parsed = await readBody(request); let result;
-    if (collection) { action = "RFQ_CREATED"; requirePermission(dependencies.actor, "procurement.rfq.manage"); result = await service.create(mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
+    if (collection) { action = "RFQ_CREATED"; requirePermission(dependencies.actor, "procurement.rfq.manage"); const normalized = normalizeCreateRfqInput(parsed.value); result = await service.create(mutationMeta(request, dependencies, action, canonicalDigest(normalized)), normalized); }
     else if (issue) { action = "RFQ_ISSUED"; requirePermission(dependencies.actor, "procurement.rfq.manage"); result = await service.issue(positiveId(issue[1], "rfqId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
     else if (quotes) { action = "QUOTE_SUBMITTED"; requirePermission(dependencies.actor, "procurement.quote.record"); result = await service.recordQuote(positiveId(quotes[1], "rfqId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }
     else if (revise) { action = "QUOTE_REVISED"; requirePermission(dependencies.actor, "procurement.quote.record"); result = await service.reviseQuote(positiveId(revise[1], "quoteId"), mutationMeta(request, dependencies, action, parsed.digest), parsed.value); }

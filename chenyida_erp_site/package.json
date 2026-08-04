@@ -141,7 +141,7 @@
     "typecheck:procurement-sourcing": "tsc -p tsconfig.phase4-task04.json --pretty false",
     "test:procurement-sourcing:unit": "node --experimental-strip-types --test tests/selfhost-procurement-sourcing-unit.test.mjs",
     "test:procurement-sourcing:ui": "node --experimental-strip-types --test tests/selfhost-procurement-sourcing-ui-contract.test.mjs",
-    "test:procurement-sourcing:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-procurement-sourcing-postgres.test.mjs",
+    "test:procurement-sourcing:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-procurement-sourcing-postgres.test.mjs tests/selfhost-rfq-binding-fix19-postgres.test.mjs",
     "test:procurement-sourcing:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-procurement-sourcing-migration-upgrade.test.mjs",
     "typecheck:procurement-fulfillment": "tsc -p tsconfig.phase4-task05.json --pretty false",
     "test:procurement-fulfillment:unit": "node --experimental-strip-types --test tests/selfhost-procurement-fulfillment-unit.test.mjs",

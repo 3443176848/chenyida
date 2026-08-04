@@ -3,7 +3,7 @@ import type { PoolClient } from "pg";
 import { ProcurementSourcingError } from "./errors.ts";
 import { ProcurementSourcingRepository } from "./repository.ts";
 import type { FaultInjector, SourcingMutationMeta } from "./types.ts";
-import { booleanValue, boundedText, canonicalDigest, dateOnly, decimal, exactKeys, expectedVersion, nonNegativeInteger, positiveId, uniqueIds } from "./validation.ts";
+import { booleanValue, boundedText, canonicalDigest, dateOnly, decimal, exactKeys, expectedVersion, nonNegativeInteger, normalizeCreateRfqInput, positiveId } from "./validation.ts";
 
 const rowData = <T>(result: { rows: T[] }, code: string, message: string): T => { if (!result.rows[0]) throw new ProcurementSourcingError(code, message, 404); return result.rows[0]; };
 const lockRfq = async (client: PoolClient, id: number) => rowData(await client.query<any>("select * from procurement_rfqs where id=$1 for update", [id]), "RFQ_NOT_FOUND", "询价不存在");
@@ -51,8 +51,8 @@ export class ProcurementSourcingService {
   }
 
   async create(meta: SourcingMutationMeta, input: Record<string, unknown>) {
-    exactKeys(input, ["purchase_request_id", "supplier_ids", "response_deadline", "expected_version"]); const requestId = positiveId(input.purchase_request_id, "purchase_request_id"), suppliers = uniqueIds(input.supplier_ids, "supplier_ids", 20), deadline = dateOnly(input.response_deadline, "response_deadline"), expected = expectedVersion(input.expected_version);
-    return this.repository.execute(meta, async (client) => {
+    const normalized = normalizeCreateRfqInput(input), requestId = normalized.purchase_request_id, suppliers = normalized.supplier_ids, deadline = normalized.response_deadline, expected = normalized.expected_version;
+    return this.repository.execute({ ...meta, requestDigest: canonicalDigest(normalized) }, async (client) => {
       await client.query("select pg_advisory_xact_lock($1)", [requestId]); const request = rowData(await client.query<any>(`select r.*,p.project_id,p.plan_version_no,p.required_date from planning_purchase_requests r join planning_material_requirement_plans p on p.id=r.plan_id where r.id=$1 for update`, [requestId]), "PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
       if (request.version !== expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "采购申请版本已变化", 409); if (request.status !== "ACCEPTED") throw new ProcurementSourcingError("PURCHASE_REQUEST_NOT_ACCEPTED", "只有已接收采购申请可以创建询价", 409);
       const newer = await client.query("select 1 from planning_purchase_requests r join planning_material_requirement_plans p on p.id=r.plan_id where p.project_id=$1 and p.plan_version_no>$2 limit 1", [request.project_id, request.plan_version_no]); if (newer.rows[0]) throw new ProcurementSourcingError("PURCHASE_REQUEST_NOT_LATEST", "只能对最新采购申请创建询价", 409);
