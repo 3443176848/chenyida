@@ -1,6 +1,26 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-04（Asia/Shanghai）
+最后更新时间：2026-08-05（Asia/Shanghai）
+
+## SELFHOST-UAT-FIX-21 Supplier Mapping 批准确认、审核意见与成功凭证
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | SUPPLIER MAPPING APPROVAL SAFEGUARDS DEPLOYED — UAT 1 ACTIVE 7 PENDING | 审核保护已 Web-only 部署，operations-only 主 UAT 只读验收通过；没有批准/退回剩余七条或创建 RFQ |
+| 严格起点 | PASS | clean `main@2d0cf5f033cad724bf2215e77e4fda953a499cd4`、behind 0/ahead 140；alpha.39、0001—0038、Web `c1576bd2…`、服务/资源、1 ACTIVE / 7 PENDING、PRQ ACCEPTED 和下游 0 全部吻合 |
+| 模型分支 | BRANCH A / NO 0039 | 0038 的不可变 APPROVED Event 已关系化保存 actor/time/request/result/status，通用 `reason` 可保存批准意见；成功 Audit 保存 CAS 前后。保持 alpha.39/0038，不改 0001—0038、不伪造回填 |
+| 审核意见 | PASS / INDEPENDENT | APPROVE 正文只接受必填 `review_comment` 并原样保存到 APPROVED Event.reason；REJECT 继续只接受 `reason` 并保存到 Mapping.review_reason。批准意见不进入退回字段或不必要日志 |
+| 预览权威 | PASS / ZERO WRITE | repeatable-read/read-only 预览读取 Mapping、Supplier/Material/Unit、创建/提交 Event、Supplier part claim、ACTIVE 1:1 有效期冲突与摘要；Supplier/Material 状态取主表。GET 正常/失败均不写 Audit或业务事实 |
+| 确认/安全 | PASS | 点击批准只打开窗口；意见必填，默认焦点在意见；取消/关闭/ESC 零业务请求。确认前二次预览，按钮同步锁、幂等/CAS/并发单胜、自审/越权、CSRF/Origin、限流、冲突和故障整事务回滚保持 |
+| 成功/历史凭证 | PASS | Mapping/Event/Audit 投影 actor、上海时间、request_id、SUCCESS、意见、V/CAS 前后、终态、稳定 Supplier/Material、料号、单位换算和有效期；刷新、重登和 Web 重启后可重开 |
+| 旧 ACTIVE 真实性 | PASS / UNCHANGED | `224d1965-44ef-4c3e-901e-1926b6b07ff8` 的真实 APPROVE 为 operations actor、`2026-08-05 09:34:45.436464`、request `b38c84b9-29a1-47ab-b68b-a6baf56e7121`、SUCCESS、V1/CAS 2→V1/CAS 3、ACTIVE；既有意见为空，页面显示“历史批准未采集审核意见” |
+| 列表/响应式 | PASS | operations 可按状态、Supplier、Material、后缀、Mapping ID 搜索；展示 Version/CAS、双方状态、冲突与创建/提交/审核 provenance；待审核/已生效/已退回区分，桌面与 390×844 无页面级横向溢出 |
+| 自动验证 | PASS | Supplier Mapping Unit `6/6`、UI `5/5`、隔离 PostgreSQL `10/10`、Migration 0038 `5/5`、隔离 Chromium `1/1`；Sourcing/FIX-19 PG `5/5`、Identity PG `10/10`，适用静态/UI/npm/CSRF/Origin 回归、Python `3/3`、typecheck、Schema consistency、production build、credentials、diff check 通过；lint 0 error/10 既有 warning |
+| 备份/恢复 | PASS | `/var/backups/chenyida-erp/supplier-mapping-fix21-predeploy-20260805T031625Z.dump` 为 root:root 0600、2,227,987 bytes、SHA-256 `fb14cf1ba9220ca8eafd564eb673b62cacd5ac2db92bf928e8fec99222e77f71`；list 3,306 项，第二新空库恢复同一 38/head/225 表和保护指纹后已删除 |
+| Web-only 部署 | PASS | Web `sha256:c1576bd2…→sha256:c98d3e8a…`；旧镜像保留 `rollback-approval-safeguards-fix21-predeploy-20260805T031959Z`。没有运行 Migration；PostgreSQL/Worker/Caddy 容器身份和四卷不变，四服务 restart 0/OOM false |
+| 主 UAT | PASS / READ ONLY | 只登录 operations：默认 7 待审，打开指定 PENDING 完整预览、核验独立意见后取消；重开唯一 ACTIVE 真实凭证；状态/后缀/Mapping ID 与桌面/390px通过。业务 POST 0，最终 Session 0 |
+| 保护事实 | PASS / UNCHANGED | 部署前、备份恢复副本、部署后、两次只读 runner 前后均为 `2562f52e82eebbede265e367a5e13e31aa13ab34b5fee16b279d074b10266cd8`；8/1/7/0、Event 8/8/1、PRQ ACCEPTED、RFQ/Quote/Award/PO 0/0/0/0 保持 |
+| Git/后续 | TWO FOCUSED COMMITS / NEW AUTH REQUIRED | 功能 `a86d9adceefb45efca1c43f1f8475703e8fa943d`；文档/部署以 `ops: deploy supplier mapping approval safeguards` 收口。未 push/PR/改历史；剩余七条只有在新的明确授权任务中才可继续决定，本任务不授权 RFQ |
 
 ## SELFHOST-OPS-OPERATIONS-BROWSER-VERIFICATION-14 operations Identity 合同修复与只读浏览器复验
 

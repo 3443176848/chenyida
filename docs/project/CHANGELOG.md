@@ -2,6 +2,20 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-05
+
+### SELFHOST-UAT-FIX-21 - `fix: add supplier mapping approval confirmation` / `ops: deploy supplier mapping approval safeguards`
+
+- Git/范围：从 strict clean `main@2d0cf5f033cad724bf2215e77e4fda953a499cd4`、behind 0/ahead 140 起步；功能提交 `a86d9adceefb45efca1c43f1f8475703e8fa943d`。只修改 operations Supplier Mapping 审核预览、确认、意见、凭证、列表/UI及对应测试/只读运维脚本和项目文档；不批准或退回主 UAT 剩余七条，不重做既有 ACTIVE，不创建 RFQ，不 push/PR 或改写历史。
+- 模型/版本：采用分支 A。0038 的不可变 `supplier_mapping_events.reason` 保存独立 APPROVE `review_comment`，Mapping.review_reason 继续只承载退回原因；APPROVED Event+同 request_id 成功 Audit 已具备 actor/time/result/status 与 CAS 前后，足以投影持久凭证。无 0039，不改 0001—0038，版本保持 alpha.39；历史空意见不回填，固定显示“历史批准未采集审核意见”。D-094 记录该决定。
+- 服务/API：新增 operations 权限保护的 GET review-preview，以 repeatable-read/read-only 快照返回稳定 Mapping/Version/CAS、Supplier/Material 当前主表状态、Unit/换算/有效期、创建/提交 SUCCESS Event、Supplier part claim、ACTIVE 1:1 有效期冲突、可批准条件和批准后 RFQ/零下游语义；GET 成功和失败均零 Audit。APPROVE 只接受必填 `review_comment`，事务内重验权限、自审、引用、稳定占用、冲突、摘要、CAS、幂等和故障回滚，并返回完整成功凭证。
+- UI：operations 列表新增状态、Mapping ID、Supplier/Material ID/编码/名称、supplier part 后缀筛选，展示 Version/CAS、当前来源状态、冲突和创建/提交/审核 provenance。批准按钮先打开确认窗；意见独立必填、默认焦点安全、取消/关闭/ESC 零请求、同步双击保护、确认前二次预览。成功/历史凭证在刷新、重登和 Web 重启后可重开；桌面和 390×844 无页面级横向溢出。
+- 自动验证：Supplier Mapping Unit `6/6`、UI `5/5`、隔离 PostgreSQL `10/10`、0038 Migration `5/5`、隔离 Chromium `1/1`；Sourcing/FIX-19 PostgreSQL `5/5`、Identity PostgreSQL `10/10`，适用静态/UI、npm、CSRF/Origin 回归与 Python `3/3` 通过。typecheck、38/38 migration checksum/Schema consistency、production build/postbuild、credentials 和 diff check 通过；完整 lint 0 error/10 个既有 warning。隔离浏览器最终 8 Mapping/1 APPROVED/7 PENDING、单 APPROVE、下游 0、Session 0。
+- 备份/恢复：predeploy custom dump `/var/backups/chenyida-erp/supplier-mapping-fix21-predeploy-20260805T031625Z.dump` 为 root:root 0600、2,227,987 bytes、SHA-256 `fb14cf1ba9220ca8eafd564eb673b62cacd5ac2db92bf928e8fec99222e77f71`；`pg_restore --list` 3,306 项，第二新空库恢复为 38/head 0038、225 表及同一完整保护指纹，恢复库已精确删除。
+- 部署/保护：Web-only 从 `sha256:c1576bd2…` 替换为 `sha256:c98d3e8a…`，旧镜像以 `rollback-approval-safeguards-fix21-predeploy-20260805T031959Z` 保留；没有运行 Migration，PostgreSQL/Worker/Caddy 容器身份、Origin、端口与四卷不变。保护指纹在部署前、恢复库、部署后及主 UAT 前后始终为 `2562f52e82eebbede265e367a5e13e31aa13ab34b5fee16b279d074b10266cd8`。
+- 主 UAT：只用 operations 登录。首次 runner 在任何预览打开前因卡片 Version 文案断言不符安全停止，finally 撤销 Session且指纹不变；收紧为实际完整 Version Fact 文案后只读复验通过：7 条待审、指定 PENDING 完整预览/意见/取消、唯一 ACTIVE 真实凭证及历史空意见、状态/后缀/Mapping ID、桌面/390px和安全退出。业务 POST 0，最终 1 ACTIVE / 7 PENDING / 0 REJECTED，Event CREATED/SUBMITTED/APPROVED 为 8/8/1，RFQ/Quote/Award/PO 0/0/0/0，Session 0。
+- 结论：`SUPPLIER MAPPING APPROVAL SAFEGUARDS DEPLOYED — UAT 1 ACTIVE 7 PENDING`。剩余七条是否批准或退回必须另立明确任务；本任务立即停止，不创建 RFQ。
+
 ## 2026-08-04
 
 ### SELFHOST-OPS-OPERATIONS-BROWSER-VERIFICATION-14 - `fix: align identity verifier with login contract` / `fix: avoid rereading logout body after navigation` / `ops: verify operations UAT identity`

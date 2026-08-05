@@ -2,8 +2,9 @@
 
 ## 状态与唯一范围
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始时间：2026-08-05 09:52 CST（Asia/Shanghai）
+- 完成时间：2026-08-05 11:29 CST（Asia/Shanghai）
 - 负责人：Codex（严格门禁、权威模型诊断、审核预览/确认/凭证、隔离测试、备份恢复、自托管 UAT Web 部署、主 UAT operations-only 只读验收、文档与独立提交）；项目负责人（固定部分批准事实、部署与只读验收授权）
 - 依赖：`SELFHOST-UAT-FIX-20`、`SELFHOST-OPS-OPERATIONS-BROWSER-VERIFICATION-14`、D-003、D-040、D-045、D-046、D-061、D-079、D-080、D-082、D-091
 - 唯一范围：只修复自托管 Vinext/Node.js/PostgreSQL 运行面的 operations Supplier Mapping 审核体验与可追溯性，包括服务端审核预览、批准确认窗口、独立必填审核意见、成功/历史凭证和列表筛选。
@@ -77,3 +78,11 @@
 - `BLOCKED — NO UNSAFE CHANGE`
 
 完成后立即停止；不得批准剩余七条，不得创建 RFQ。
+
+## 完成结论
+
+- 最终状态：`SUPPLIER MAPPING APPROVAL SAFEGUARDS DEPLOYED — UAT 1 ACTIVE 7 PENDING`
+- 模型：分支 A，无 0039，保持 `0.1.0-alpha.39` / 0038。
+- 功能提交：`a86d9adceefb45efca1c43f1f8475703e8fa943d`。
+- 完成报告：`docs/tasks/SELFHOST-UAT-FIX-21-COMPLETION.md`。
+- 主 UAT 最终事实：1 ACTIVE / 7 PENDING_REVIEW / 0 REJECTED；RFQ/Quote/Award/PO 0/0/0/0；业务 POST 0；Session 0；保护指纹 `2562f52e82eebbede265e367a5e13e31aa13ab34b5fee16b279d074b10266cd8` 不变。

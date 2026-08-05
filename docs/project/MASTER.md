@@ -33,29 +33,31 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-08-04（Asia/Shanghai）
+快照时间：2026-08-05（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.39`；PostgreSQL 为 38/head `0038_supplier_mapping_governance.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-20` 功能提交为 `ddab02a57e0e87255c7a35d125959ac750b108e1`（`feat: add governed supplier material mappings`），legacy 主单位兼容修复为 `1e9221d90db621becc2badf40b3e0ed3017b73e6`（`fix: resolve legacy material units for supplier mappings`）；版本 alpha.39，Migration 0038 |
-| 当前根仓库运维基线 | `SELFHOST-OPS-OPERATIONS-BROWSER-VERIFICATION-14` 已把 targeted verifier 的登录断言从错误的 `authenticated=true` 对齐到权威 `HTTP 200 + application/json + ok=true + user` 合同，并在唯一实际 Chromium 中通过 operations 精确 username/role、工作台当前用户标签、角色及 must-change=0。页面退出已由服务端记为 `LOGOUT`、最终有效 Session 0；但 runner 在 `location.replace` 后重读已释放的 logout body 而提前失败，back/forward/refresh 与最终受保护 DOM 未执行，故浏览器验收仍不完整 |
-| Git 同步与工作区 | 本任务从 clean `main@7864905`、Parent `7b95b13`、behind 0/ahead 137 起步；登录合同修复提交 `1dcfc5a7d93d5f4092d088cecd3cc7c6c744b8b9`，UAT 暴露的退出导航竞态补充修复提交 `82f29c9157ceea1602969f4301477a7b2d18aa61`，任务报告以 `ops: verify operations UAT identity` 独立收口，完成后应为 ahead 140。未 push/PR/amend/rebase/reset/stash/restore；密码、hash、Token、Cookie、Session 摘要、Canonical 正文、连接信息和备份未进入 Git |
+| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-21` 功能提交为 `a86d9adceefb45efca1c43f1f8475703e8fa943d`（`fix: add supplier mapping approval confirmation`）；版本保持 alpha.39，Migration 保持 0038 |
+| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-21` 已部署 operations Supplier Mapping 服务端零写审核预览、独立必填批准意见、二次 CAS/冲突复核、确认窗口、持久成功/历史凭证与完整筛选。主 UAT operations-only 只读验收通过，业务 POST 0、最终 Session 0，仍为 1 ACTIVE / 7 PENDING_REVIEW |
+| Git 同步与工作区 | 本任务从 clean `main@2d0cf5f033cad724bf2215e77e4fda953a499cd4`、behind 0/ahead 140 起步；功能提交 `a86d9adceefb45efca1c43f1f8475703e8fa943d`，运维/文档以 `ops: deploy supplier mapping approval safeguards` 独立收口，完成后为 ahead 142。未 push/PR/amend/rebase/reset/stash/restore；密码、hash、Token、Cookie、Session 摘要、Canonical 正文、连接信息和备份未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码与并行 UAT PostgreSQL 仍为 `0001`—`0038`，38/head `0038_supplier_mapping_governance.sql`，SHA-256 `2da259364151af098641795da55604dc3012b6adf92aec67038c0554e0592941`。operations 唯一、role=operations、active=true、must-change=false、version 7，正式恢复审计 1、最终有效 Session 0；其他十个受控账号与全部其他账号保持。排除身份/系统表的业务指纹前后为 `c55aff391533a1c508fdfdaa42fa3ebc4d0868a25b7585ccdeefaf14b3554b36`；PRQ 1 ACCEPTED、Supplier 1/2 ACTIVE、Material 533—536 保持，Mapping/RFQ/Quote/Award 与全部下游仍为 0 |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 为 alpha.39 `sha256:c1576bd22a209fb6f524e304bcf12cc38af4d67a35c76f37fa8dc1311c2922c8`，Worker 为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false。Canonical v2/v2.1 为 10 账号、0 错误/PASS、root:root 0600；正式 prewrite 备份已恢复核验并保留 |
+| 当前数据库 | 源码与并行 UAT PostgreSQL 仍为 `0001`—`0038`，38/head `0038_supplier_mapping_governance.sql`，SHA-256 `2da259364151af098641795da55604dc3012b6adf92aec67038c0554e0592941`；未新增 0039。Supplier Mapping 为总数 8、ACTIVE 1、PENDING_REVIEW 7、REJECTED 0；Event 为 CREATED 8/SUBMITTED 8/APPROVED 1。唯一 ACTIVE `224d1965-44ef-4c3e-901e-1926b6b07ff8` 的真实 APPROVE 凭证仍为 operations actor、request `b38c84b9-29a1-47ab-b68b-a6baf56e7121`、CAS 2→3、意见为空；页面诚实显示“历史批准未采集审核意见”。保护指纹前后均为 `2562f52e82eebbede265e367a5e13e31aa13ab34b5fee16b279d074b10266cd8`，PRQ 1 ACCEPTED、RFQ/Quote/Award/PO 0/0/0/0、最终 Session 0 |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 为 alpha.39 `sha256:c98d3e8aeef8087d9daa951d0f0c3c7ceb97307edd2d13e92c582c42935f3978`，Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false。旧 Web 以 `rollback-approval-safeguards-fix21-predeploy-20260805T031959Z` 保留，四个受保护 Volume 未更换 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.39 新增 Supplier Mapping 治理和 RFQ 覆盖率门禁，并保留 Requirement Unit Resolution、Planning Revision Response 与固定后继谱系。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
-| 当前阶段 | `SELFHOST-OPS-OPERATIONS-BROWSER-VERIFICATION-14` 已修复 `/api/login` 权威合同断言并证明 operations 可只读进入经营工作台且无强制改密；logout 已安全撤销 Session。由于唯一 Chromium 在历史导航断言前受离线 verifier body 生命周期竞态中止，完整退出历史验收仍未完成 |
-| 当前任务 | 无自动执行任务；本轮以 `OPERATIONS IDENTITY RECOVERED — BROWSER VERIFICATION STILL INCOMPLETE` 停止。不登录 purchase，不进入 Supplier Mapping，不创建、提交或审核 Mapping；主 UAT Mapping/RFQ/Quote/Award/PO 均保持 0 |
-| 下一任务 | 仅可在新的明确授权任务中使用已修复的 logout transport→匿名页/Session/history 判定补做一次只读 operations 退出历史验证，禁止改密或修改 Canonical。完整通过后仍必须另获 Mapping 业务授权，才可由 purchase 创建/提交八条 Mapping 并由 operations 异人审核；不得从本任务自动继续 |
+| 当前阶段 | `SELFHOST-UAT-FIX-21` 已完成并部署。operations 审核页具备服务端预览、确认、审核意见、冲突失败关闭和持久凭证；主 UAT operations-only 只读打开 PENDING 预览后取消，并重开 ACTIVE 历史凭证，保护事实不变 |
+| 当前任务 | 无自动执行任务；本轮以 `SUPPLIER MAPPING APPROVAL SAFEGUARDS DEPLOYED — UAT 1 ACTIVE 7 PENDING` 停止。不批准或退回剩余七条，不撤销既有 ACTIVE，不创建 RFQ |
+| 下一任务 | 若要继续，只能在新的明确授权任务中逐条决定剩余七条 PENDING_REVIEW；本任务只证明批准保护已就绪，不构成继续批准、退回或创建 RFQ/Quote/Award/PO 的授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-UAT-FIX-21 采用分支 A：APPROVED Event.reason 保存独立批准意见，Mapping/Event/Audit 投影持久凭证，旧空意见如实显示；服务端零写预览与确认时二次 CAS/冲突核验、完整 operations 列表筛选和 390px 模态框已部署。隔离 PostgreSQL/Chromium、备份恢复及 operations-only 主 UAT 只读验收通过；保护指纹不变，最终仍为 1 ACTIVE / 7 PENDING、下游 0、Session 0
 
 - SELFHOST-OPS-OPERATIONS-BROWSER-VERIFICATION-14 将 operations targeted browser verifier 对齐 Identity 权威登录合同：成功必须为 HTTP 200 JSON、`ok=true`、结构化 `user`、精确 username/role，返回 active/must-change 时分别必须 true/false，且必须进入经营工作台；完全拒绝仅有 `authenticated=true` 的伪成功。唯一实际 Chromium 已通过登录、工作台当前用户标签/角色及 must-change=0，安全 logout 后有效 Session 0；但退出导航释放 response body 导致 verifier 在匿名页与 back/forward/refresh 断言前中止。后续离线修复不再重读 body，改由 transport+匿名页+Session+history 作为持久证据；遵守一次流程上限未重跑，当前仍不放行 Mapping
 
