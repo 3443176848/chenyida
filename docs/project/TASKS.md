@@ -11,14 +11,13 @@
 
 ## 当前任务
 
-| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-UAT-FIX-23 | 补齐 RFQ Mapping 固定确认的资格与冲突证据 | DOING | Codex（权威只读预览、共享 POST 重验规则、Audit/Event 措辞、串行测试、备份恢复、Web-only 部署和 purchase-only 只读 UAT）、项目负责人（固定范围与部署/只读验收授权） | 2026-08-05 | SELFHOST-UAT-FIX-22、D-061、D-091、D-094、D-095 | 仅修复 Mapping 固定预览和历史凭证措辞；保持 alpha.40/0039。主 UAT 禁止生成 Binding、发出 RFQ 或创建下游记录。见[任务文档](../tasks/SELFHOST-UAT-FIX-23.md)。 |
+当前无 `DOING` 任务。下一业务写必须由项目负责人另立任务并明确授权。
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-UAT-FIX-23 | 补齐 RFQ Mapping 固定确认的资格与冲突证据 | DONE | Codex（权威只读预览、共享 POST 重验规则、Audit/Event 措辞、串行测试、备份恢复、Web-only 部署和 purchase-only 只读 UAT）、项目负责人（固定范围与部署/只读验收授权） | 2026-08-05 | 2026-08-05 | SELFHOST-UAT-FIX-22、D-061、D-091、D-094、D-095 | `RFQ BINDING PREVIEW FIXED — UAT BINDINGS STILL ZERO`。两家各 4/4、缺失和两类冲突 0、八条 Mapping与不可变 Binding 说明由权威预览展示；正式 POST 共用同一规则并事务重验。Web-only 部署与主 UAT ESC/取消通过，业务 POST/Binding/ISSUED/Quote/Award/PO 均 0，Session 0，指纹不变。见[任务文档](../tasks/SELFHOST-UAT-FIX-23.md)及[完成报告](../tasks/SELFHOST-UAT-FIX-23-COMPLETION.md)。 |
 | SELFHOST-OPS-OPERATIONS-BROWSER-VERIFICATION-14 | operations Identity 浏览器验证器合同修复与只读复验 | DONE | Codex（严格门禁、Identity 合同核对、离线 verifier/合成测试、唯一 Chromium 只读复验、安全退出、业务保护与清理）、项目负责人（明确一次流程、零改密/零业务写边界） | 2026-08-04 | 2026-08-04 | SELFHOST-OPS-TARGETED-OPERATIONS-IDENTITY-RECOVERY-13、SELFHOST-UAT-FIX-20 | `OPERATIONS IDENTITY RECOVERED — BROWSER VERIFICATION STILL INCOMPLETE`。登录验证器已要求 HTTP 200 JSON、`ok=true`、结构化 user、精确 operations username/role、可选 active=true/must-change=false及已认证工作台，并拒绝 `authenticated=true` 伪成功。唯一实际 Chromium 通过登录合同、工作台当前用户标签/角色和 must-change=0，服务端 logout/最终 Session 0；但导航后重读已释放 logout body 提前失败，back/forward/refresh 与最终 protected DOM 未验。竞态已离线修复但按一次上限未重跑；业务指纹及 Canonical/身份不变，不放行 Mapping。见任务报告。 |
 | SELFHOST-OPS-TARGETED-OPERATIONS-IDENTITY-RECOVERY-13 | operations 单账号离线身份最终化恢复 | DONE | Codex（定向 CLI、安全守卫、隔离测试、备份恢复、正式离线恢复、Canonical 同步、浏览器验证与清理）、项目负责人（明确单账号授权） | 2026-08-04 | 2026-08-04 | SELFHOST-OPS-OFFLINE-IDENTITY-RECOVERY-11、SELFHOST-OPS-CANONICAL-SCHEMA-RECONCILIATION-12、SELFHOST-UAT-FIX-20 | `OPERATIONS IDENTITY RECOVERED — BROWSER VERIFICATION INCOMPLETE`。run-id `e0fec2fb-3894-4a19-93af-79eb85d9dfd4`；只把 operations must-change `true→false`、version `6→7` 并同步 Canonical，其他账号与业务指纹不变，恢复审计 1、最终有效 Session 0。Chromium attempt-2 实际 LOGIN/LOGOUT success，但验证器错误要求 login 响应含 `authenticated` 而提前失败，未完成页面 must-change 和历史导航断言；当前不放行八条 Mapping。见任务报告与 D-093。 |
 | SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16 | 采购需求审核当前库存、预留和在途供应分解修复 | DONE | Codex（严格门禁、权威供应投影、范围授权、响应式 UI、隔离测试、备份恢复、Web-only 部署与 purchase-only 只读 UAT）、项目负责人（固定主 UAT 保护状态与执行边界） | 2026-08-03 | 2026-08-03 | SELFHOST-OPS-UAT-PURCHASE-REQUEST-TRACEABILITY-FIX-15 | `PURCHASE SUPPLY BREAKDOWN FIXED — UAT PRQ STILL PENDING`。功能提交 `ce3f14a0c989875e7527e42136967f9efe6ee548`；当前供应九项分解、快照/当前/差异分区、接收确认实时刷新、对象范围授权、零查询写入、390px、隔离测试、备份恢复和 Web-only 部署通过。主 UAT 四条 Material 均如实为九项 0 PCS，确认打开后取消；PRQ/Plan 仍 SUBMITTED，Package 2/v2 仍 ACCEPTED，ACCEPT/RETURN、Inventory/Allocation 与全部下游不变。见 `docs/tasks/SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16.md`。 |

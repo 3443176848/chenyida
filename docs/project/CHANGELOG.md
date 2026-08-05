@@ -4,6 +4,16 @@
 
 ## 2026-08-05
 
+### SELFHOST-UAT-FIX-23 - `fix: expose rfq mapping qualification evidence` / `ops: deploy rfq binding preview safeguards`
+
+- Git/范围：从 strict clean `main@7cd9cd011e8c770933a061aa9ee51f8104b01ba3`、Parent `b339acd97f08e4cc09451173b48580015817d9f8`、behind 0/ahead 144 起步；功能提交 `f919890436662265bb22e2bec9ae00f5c2761372`，部署、主 UAT 只读 runner、最终验收与文档由独立 `ops: deploy rfq binding preview safeguards` 收口。只修改 RFQ Mapping 固定预览/重验、创建 Audit/Event 措辞、UI/测试/文档；不新增 Migration，不固定或发出主 RFQ，不录 Quote/Award/PO，不 push/PR 或改写历史。
+- 权威预览/POST：新增 manage 权限与 RFQ/PRQ 数据域保护的 repeatable-read/read-only GET，重新读取 RFQ/PRQ CAS、四行、两 Supplier、Material、当前 Mapping ID/Version/CAS/digest、Unit/1:1/有效期、稳定 supplier part claim、Binding和下游；成功/失败零 Audit/Event/Idempotency/Binding。正式 POST 共用同一资格加载器，在事务锁后复核数据域、全规则和资格摘要；摘要不是锁，CAS/幂等/并发/回滚保持。
+- 冲突/UI：同一 Supplier/Material 当前有效 ACTIVE 1:1 数必须为 1；同 Supplier 的标准化 supplier part 不得多 ACTIVE 或由其他 Mapping UID 稳定占用。缺失/失效/来源状态/CAS/已有 Binding等均返回稳定阻断和中文建议。确认窗显示两家 4/4、两类冲突 0、八条 Mapping、observed_at、Binding 0→8和不可变关系化快照；默认取消，加载/错误/取消/关闭/ESC及 390px 通过。
+- Audit/Event：历史主 RFQ 标记为“RFQ 创建成功审计”，显示真实 actor、上海时间、request_id、SUCCESS和不存在→v1，并明确不是独立 RFQ_CREATED Event；新 RFQ 的 `RFQ_CREATED 业务 Event` 独立显示，事件区与 Audit 分列。
+- 自动验证：Unit/UI `16/16`、Sourcing/FIX-23 PostgreSQL `19/19`、隔离 Chromium `2/2`、0018 upgrade `3/3`、FIX-22/0039 Migration `6/6`、Material Requirement `18/18`、npm `3/3`、environment `6/6`及 Python三项通过。typecheck、build/postbuild、1,222 文件 credentials、diff check通过；lint 0 error/11 既有 warning。原始 HEAD 与任务树的 `db:generate` 都提出语义等价 CHECK 表限定化 0040，故作为起点 Drizzle 漂移记录并丢弃生成物；0039 schema/snapshot/journal 契约仍 `6/6`，无 Schema/Migration 变化。
+- 备份/部署：predeploy dump `/var/backups/chenyida-erp/rfq-binding-preview-fix23-predeploy-20260805T131610Z.dump` 为 root:root 0600、2,282,691 bytes、SHA-256 `ef5855252729ec072886e14a0dc4d40bac839b407989a63c8f3baab9fe7ece77`；list 3,359 行，第二空库恢复 39/head/226 表及保护指纹一致后已删除。只替换 Web `58d97778…→5fe40694…`，未运行 Migration或重建 PostgreSQL/Worker/Caddy，四卷/Origin/端口保持，旧 Web 精确 rollback tag 保留。
+- 主 UAT/结论：唯一 purchase-only Chromium 一次通过。服务端结果为 Supplier 1/2 各 4/4、缺失 0、Supplier/Material 冲突 0、supplier part 冲突 0、八条 Mapping、预期 8/当前 Binding 0；桌面 ESC、390×844 取消，`business_post=0`，安全退出 Session 0。最终 RFQ DRAFT v1、Binding/Event/ISSUED/Quote/Award/PO 全 0，指纹仍 `9d4641b1b6324de4e3a1a26e7461ca2e15bd7613cb99a277c11e6bca869ac66e`。结论 `RFQ BINDING PREVIEW FIXED — UAT BINDINGS STILL ZERO`；可在新明确授权任务中固定，实际发出仍需再次授权。
+
 ### SELFHOST-UAT-FIX-22 - `fix: expose rfq draft traceability` / `ops: deploy rfq issuance safeguards`
 
 - Git/范围：从 strict clean `main@60538d08509f91eeb0df91718c7276172c23557d`、Parent `a86d9adceefb45efca1c43f1f8475703e8fa943d`、behind 0/ahead 142 起步；功能提交 `b339acd97f08e4cc09451173b48580015817d9f8`，部署、Asia/Shanghai 日期投影修复、最终 UAT 与文档由独立 `ops: deploy rfq issuance safeguards` 提交收口。只修改 RFQ 创建凭证、Supplier×Line Mapping 绑定/追溯、发出确认/重验/凭证、0039、测试/保护/UAT runner 和项目文档；不固定或发出主 RFQ，不录 Quote、Award、PO，不 push/PR 或改写历史。

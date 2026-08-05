@@ -2,6 +2,25 @@
 
 最后更新时间：2026-08-05（Asia/Shanghai）
 
+## SELFHOST-UAT-FIX-23 RFQ Mapping 固定权威预览与凭证措辞
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | RFQ BINDING PREVIEW FIXED — UAT BINDINGS STILL ZERO | 权威 Mapping 固定预览、共享 POST 重验、不可变说明和 Audit/Event 分列已 Web-only 部署；主 RFQ 未固定、未发出、未录报价或定标 |
+| 严格起点 | PASS | clean `main@7cd9cd0`、Parent `b339acd`、behind 0/ahead 144；alpha.40、0001—0039、0039 SHA、Web `58d97778…`、服务/资源和主 RFQ DRAFT/四行/两 Supplier/八 ACTIVE Mapping/零下游全部吻合 |
+| 权威预览 | PASS / ZERO BUSINESS WRITE | manage 权限、RFQ/PRQ 数据域、repeatable-read/read-only；返回 RFQ/PRQ CAS、四行、两 Supplier、逐组合 Mapping/Unit/1:1/有效期/冲突、observed_at/timezone和资格摘要。成功/失败均不写 Audit/Event/Idempotency/Binding |
+| 冲突与资格 | PASS | Supplier/Material 当前有效 ACTIVE 1:1 数必须为 1；同 Supplier 标准化 part 不得多 ACTIVE 或跨 Mapping UID 稳定占用。主 UAT两家各 4/4、缺失 0、两类冲突 0、候选/预期 8、当前 Binding 0 |
+| POST 失败关闭 | PASS | 预览和固定共用同一 Service 加载器；POST 锁后复核 actor 数据域、RFQ/PRQ/Supplier/Material/Mapping/Binding和摘要。预览不是锁，CAS/幂等/并发单胜/事务回滚未放宽；漂移生成零 Binding |
+| UI/措辞 | PASS | 加载态、observed_at、默认取消、取消/关闭/ESC零业务写、八 Mapping、两家4/4与零冲突、Binding 0→8、不可变关系化快照和零自动下游说明完整；桌面/390×844无溢出。历史“RFQ 创建成功审计”与独立 `RFQ_CREATED 业务 Event` 分列 |
+| 自动验证 | PASS | Unit/UI `16/16`、PostgreSQL `19/19`、隔离 Chromium `2/2`、0018 `3/3`、0039 Migration `6/6`、Material Requirement `18/18`、npm `3/3`、environment `6/6`、Python三项；typecheck/build/credentials/diff通过，lint 0 error/11既有 warning |
+| Schema consistency | PASS CONTRACT / PRE-EXISTING GENERATOR DRIFT | 0039 schema/snapshot/journal契约 `6/6`；任务树与原始 HEAD 的 `db:generate` 均提出两个语义等价 CHECK 表限定化 0040。生成物已丢弃，未新增/修改 Migration或Schema |
+| 备份/恢复 | PASS | root:root 0600 dump 2,282,691 bytes，SHA-256 `ef5855252729ec072886e14a0dc4d40bac839b407989a63c8f3baab9fe7ece77`；list 3,359 行，第二空库 39/head/226 表与指纹一致，恢复库已删 |
+| Web-only 部署 | PASS | Web `sha256:58d97778…→sha256:5fe406949d4678d5beb06ba6db4d931f88f5f24989332654b557b8a4f9df6e4b`、88,543,673 bytes；未运行 Migration，PostgreSQL/Worker/Caddy容器身份及四卷/Origin/端口保持，旧 Web rollback tag保留 |
+| 主 UAT | PASS / READ ONLY | purchase-only 一次通过：创建成功 Audit 准确、两家4/4、两类冲突0、八 Mapping及不可变说明；桌面 ESC、390px取消，预览 GET 2、`business_post=0`、安全退出 Session 0 |
+| 主 UAT 数据 | PASS / UNCHANGED | 最终指纹 `9d4641b1b6324de4e3a1a26e7461ca2e15bd7613cb99a277c11e6bca869ac66e`；RFQ DRAFT v1、Binding/Event/ISSUED/Quote/Award/PO 0，四行/两 Supplier/八 ACTIVE Mapping保持 |
+| 资源/清理 | PASS | available memory 约 2.1→2.3 GiB，Swap 234→268 MiB，根盘 20→19 GiB，最终 Load `0.43/0.36/0.54`；内核 OOM 0、四服务 restart 0/OOM false。临时库/恢复库/容器/runtime/validation image清零，未 prune |
+| Git/后续 | TWO FOCUSED COMMITS / NEW AUTH REQUIRED | 功能 `f919890436662265bb22e2bec9ae00f5c2761372`；收口消息 `ops: deploy rfq binding preview safeguards`。可在新明确授权任务中执行 Mapping 固定；固定后仍 DRAFT，实际发出另需授权 |
+
 ## SELFHOST-UAT-FIX-22 RFQ 草稿创建凭证、Mapping 追溯与发出保护
 
 | 验证项 | 结果 | 说明 |

@@ -2,8 +2,9 @@
 
 ## 状态
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始：2026-08-05
+- 完成：2026-08-05
 - 负责人：Codex；项目负责人负责既定范围、Web-only 部署和主 UAT 只读授权
 - 依赖：SELFHOST-UAT-FIX-22、D-061、D-091、D-094、D-095
 
@@ -38,3 +39,11 @@
 - 隔离验证：Unit/UI `16/16`、Sourcing/FIX-23 PostgreSQL `19/19`、Migration/FIX-22 `6/6`、Material Requirement `18/18`、Chromium `2/2`；正常隔离固定恰好生成 8 条 Binding，RFQ 仍 DRAFT，下游 0。
 - 最终 typecheck、目标 lint 与 build/postbuild 已通过；全量 lint 为 0 error / 11 个既有 warning，凭据扫描覆盖 1,220 个文件，Python 三项通过。
 - `db:generate` 在任务树和原始 `7cd9cd0` 独立副本都会提出仅将两个既有 `supplier_mappings` CHECK 表达式表限定化的语义等价 0040。FIX-22 的 schema/snapshot/journal 契约测试仍为 `6/6`；该起点漂移不属于本任务，生成物已丢弃，未新增或修改 Migration/Schema。
+
+## 完成结论
+
+- `RFQ BINDING PREVIEW FIXED — UAT BINDINGS STILL ZERO`
+- 最终 Web 为 `sha256:5fe406949d4678d5beb06ba6db4d931f88f5f24989332654b557b8a4f9df6e4b`；只重建 Web，0039、PostgreSQL、Worker、Caddy、Origin、端口和四卷保持。
+- 主 UAT purchase-only 只读验收通过：Supplier 1/2 各 `4/4`、两类冲突 0、八条 Mapping、Binding 0，ESC/取消、桌面/390px、业务 POST 0和 Session 0。
+- 最终 RFQ 仍 DRAFT v1，RFQ Event/ISSUED/Quote/Award/PO 为 `0/0/0/0/0`，保护指纹不变。
+- 详细证据见[完成报告](SELFHOST-UAT-FIX-23-COMPLETION.md)。
