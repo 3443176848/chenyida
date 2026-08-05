@@ -325,6 +325,14 @@ async function noDialogOverflow(dialog, stage) {
   assert.ok(widths.bodyScroll <= widths.bodyClient + 1, `${stage}: dialog body overflow`);
 }
 
+async function visibleBindingIds(scope) {
+  return scope.locator(".rfq-mapping-card").evaluateAll((cards) => cards.map((card) => {
+    const fact = [...card.querySelectorAll("dl > div")]
+      .find((row) => row.querySelector("dt")?.textContent?.trim() === "Binding ID");
+    return fact?.querySelector("dd")?.textContent?.trim() || "";
+  }));
+}
+
 async function sourcingState() {
   const header = (await pool.query(
     `select id::int,rfq_code,purchase_request_id::int,round_no::int,status,response_deadline::text,
@@ -339,7 +347,8 @@ async function sourcingState() {
     "select rfq_id::int,supplier_id::int from procurement_rfq_suppliers order by rfq_id,supplier_id",
   )).rows;
   const bindings = (await pool.query(
-    `select binding.rfq_id::int,binding.supplier_id::int,binding.material_id::int,
+    `select binding.id::text binding_id,binding.rfq_id::int,binding.rfq_supplier_id::int,
+      binding.rfq_line_id::int,binding.supplier_id::int,binding.material_id::int,
       binding.supplier_mapping_version_id::int,binding.mapping_uid::text mapping_id,
       binding.mapping_version_no::int mapping_version,binding.mapping_row_version::int,
       binding.supplier_part_number,binding.binding_source,binding.binding_status,
@@ -524,6 +533,9 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
     assert.equal(new Set(draft.lines.map((line) => line.purchase_request_line_id)).size, 4);
     assert.deepEqual(draft.suppliers, [{ rfq_id: 1, supplier_id: 1 }, { rfq_id: 1, supplier_id: 2 }]);
     assert.equal(draft.bindings.length, 8);
+    assert.ok(draft.bindings.every((row) => /^[1-9]\d*$/.test(row.binding_id)));
+    assert.equal(new Set(draft.bindings.map((row) => row.binding_id)).size, 8);
+    const draftBindingIds = draft.bindings.map((row) => row.binding_id);
     assert.deepEqual(draft.bindings.map((row) => row.mapping_id), MAPPING_UIDS.flat());
     assert.ok(draft.bindings.every((row) => row.mapping_version === 1 && row.mapping_row_version === 1));
     assert.ok(draft.bindings.every((row) => row.supplier_part_number === `${row.supplier_id === 1 ? "SUP-000001" : "SUP-000002"}-${row.material_id}`
@@ -566,13 +578,20 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
       draft.events[0].occurred_at_shanghai,
       "Asia/Shanghai",
       "创建时已固定 Mapping",
-      "PCS → PCS · 1:1",
+      "Supplier Unit",
+      "Internal Unit",
+      "换算",
+      "1:1",
       "ACTIVE · RFQ_CREATE",
+      "Binding ID",
+      "RFQ Line ID",
+      "Material ID",
     ]) assert.ok(bodyText.includes(required), `draft evidence missing: ${required}`);
     for (const mappingId of MAPPING_UIDS.flat()) assert.ok(bodyText.includes(mappingId), `draft Mapping missing: ${mappingId}`);
     for (const binding of draft.bindings) assert.ok(bodyText.includes(binding.supplier_part_number), `draft supplier part missing: ${binding.supplier_part_number}`);
     assert.equal(await page.locator(".rfq-mapping-trace .rfq-mapping-group").count(), 2);
     assert.equal(await page.locator(".rfq-mapping-trace .rfq-mapping-card").count(), 8);
+    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), draftBindingIds);
     assert.equal(await page.getByText("报价入口未启用", { exact: true }).count(), 1);
     assert.equal(await page.getByRole("heading", { name: "代录供应商报价", exact: true }).count(), 0);
     await noOverflow(page, "draft detail desktop");
@@ -593,6 +612,7 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
       draft.events[0].request_id, draft.events[0].occurred_at_shanghai,
       "10.000000 PCS", "ID 1 · SUP-000001", "ID 2 · SUP-000002",
       "已固定 Mapping · 8 条", "v1 / Row v1", "已绑定版本当前状态", "最新 Mapping 版本",
+      "Mapping 固定凭证", "固定 Binding 数量", "八条 Binding 稳定 ID",
       "当前状态漂移", "当前版本漂移", "发出前服务端重新校验 PRQ、Supplier、Mapping、截止日期、CAS 与当前 DRAFT 状态",
       "发出成功后 RFQ 行、Supplier 与 Mapping ID / Version 范围冻结", "只有发出成功后才允许录入 Supplier 报价",
       "不自动创建 Quote、Award、PO、库存或财务记录",
@@ -601,7 +621,9 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
     }
     for (const materialId of MATERIAL_IDS) assert.ok(dialogText.includes(`Material ${materialId}`), `issue dialog Material missing: ${materialId}`);
     for (const binding of draft.bindings) assert.ok(dialogText.includes(binding.supplier_part_number), `issue dialog supplier part missing: ${binding.supplier_part_number}`);
+    for (const bindingId of draftBindingIds) assert.ok(dialogText.includes(bindingId), `issue dialog Binding ID missing: ${bindingId}`);
     for (const mappingId of MAPPING_UIDS.flat()) assert.ok(dialogText.includes(mappingId));
+    assert.deepEqual(await visibleBindingIds(dialog), draftBindingIds);
     await noDialogOverflow(dialog, "issue dialog desktop");
     await dialog.getByRole("button", { name: "取消", exact: true }).click();
     assert.equal(businessPosts.length, 1, "cancel must send zero business requests");
@@ -680,6 +702,7 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
     assert.deepEqual(issued.lines, draft.lines);
     assert.deepEqual(issued.suppliers, draft.suppliers);
     assert.deepEqual(issued.bindings, draft.bindings);
+    assert.deepEqual(issued.bindings.map((row) => row.binding_id), draftBindingIds);
     assert.equal(issued.events.length, 2);
     assert.deepEqual(
       { event_type: issued.events[1].event_type, actor: issued.events[1].actor, result: issued.events[1].result, old_version: issued.events[1].old_version, new_version: issued.events[1].new_version, from_status: issued.events[1].from_status, to_status: issued.events[1].to_status, credential_version: issued.events[1].credential_version },
@@ -718,6 +741,7 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
     assert.ok(restartedText.includes(draft.events[0].occurred_at_shanghai));
     for (const mappingId of MAPPING_UIDS.flat()) assert.ok(restartedText.includes(mappingId), `restarted Mapping missing: ${mappingId}`);
     assert.equal(await page.locator(".rfq-mapping-trace .rfq-mapping-card").count(), 8);
+    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), draftBindingIds);
     assert.deepEqual(await sourcingState(), issued);
     await page.setViewportSize({ width: 390, height: 844 });
     await noOverflow(page, "issued detail after web restart 390x844");
@@ -937,6 +961,9 @@ test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exi
       { status: "DRAFT", version: 2, traceability_version: 1 },
     );
     assert.equal(fixed.bindings.length, 8);
+    assert.ok(fixed.bindings.every((row) => /^[1-9]\d*$/.test(row.binding_id)));
+    assert.equal(new Set(fixed.bindings.map((row) => row.binding_id)).size, 8);
+    const fixedBindingIds = fixed.bindings.map((row) => row.binding_id);
     assert.deepEqual(fixed.bindings.map((row) => row.mapping_id), MAPPING_UIDS.flat());
     assert.ok(fixed.bindings.every((row) => row.binding_source === "LEGACY_DRAFT_CONFIRMATION" && row.binding_status === "ACTIVE"));
     assert.equal(fixed.events.length, 1);
@@ -964,9 +991,107 @@ test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exi
     assert.ok(fixedText.includes("不是独立 RFQ_CREATED 业务 Event"));
     assert.ok(fixedText.includes("RFQ_MAPPING_CONFIRMED"));
     assert.ok(fixedText.includes("DRAFT / 草稿 / 待发出"));
+    for (const required of [
+      "Mapping 固定凭证",
+      "RFQ_MAPPING_CONFIRMED",
+      "SUCCESS",
+      fixture.credentials.username,
+      fixed.events[0].occurred_at_shanghai,
+      fixed.events[0].request_id,
+      "v1 → v2",
+      "固定 Binding 数量",
+      "八条 Binding 稳定 ID",
+      fixed.events[0].scope_digest,
+      "不可变快照说明",
+      "Binding ID",
+      "RFQ ID",
+      "RFQ Line ID",
+      "Supplier ID",
+      "Material ID",
+      "Mapping ID",
+      "Mapping Version",
+      "supplier_part_number",
+      "Supplier Unit",
+      "Internal Unit",
+      "换算",
+      "有效期",
+      "是否发生状态漂移",
+      "是否发生版本漂移",
+    ]) assert.ok(fixedText.includes(required), `fixed Binding evidence missing: ${required}`);
+    for (const bindingId of fixedBindingIds) assert.ok(fixedText.includes(bindingId), `fixed Binding ID missing: ${bindingId}`);
     assert.equal(await page.locator(".rfq-mapping-trace .rfq-mapping-card").count(), 8);
+    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), fixedBindingIds);
+    const fixedReceipt = page.locator("details.rfq-receipt").filter({ hasText: "Mapping 固定凭证" }).first();
+    assert.equal(await fixedReceipt.getAttribute("open"), "");
+    await fixedReceipt.locator("summary").click();
+    assert.equal(await fixedReceipt.getAttribute("open"), null);
+    await fixedReceipt.locator("summary").click();
+    assert.equal(await fixedReceipt.getAttribute("open"), "");
     await noOverflow(page, "fixed legacy detail desktop");
 
+    const fixedWriteBaseline = await previewWriteState(1);
+    const businessWritesAfterFixed = businessWrites.length;
+    const issueButton = page.getByRole("button", { name: "发出询价并冻结范围", exact: true });
+    await issueButton.click();
+    dialog = page.getByRole("dialog", { name: "发出询价并冻结范围", exact: true });
+    await dialog.waitFor();
+    assert.equal(await dialog.getByRole("button", { name: "发出询价并冻结范围", exact: true }).isEnabled(), true);
+    const issueText = await dialog.innerText();
+    for (const required of [
+      "ID 1 · RFQ-00000001",
+      "Round 1 / v2",
+      "RFQ 创建成功审计",
+      "Mapping 固定凭证",
+      "RFQ_MAPPING_CONFIRMED",
+      fixture.credentials.username,
+      fixed.events[0].occurred_at_shanghai,
+      fixed.events[0].request_id,
+      "SUCCESS",
+      "v1 → v2",
+      fixed.events[0].scope_digest,
+      "固定范围 · 4 条 Material",
+      "受邀 Supplier · 2 家",
+      "2099-08-31",
+      "CNY",
+      "当前状态漂移",
+      "当前版本漂移",
+      "发出成功后 RFQ 行、Supplier 与 Mapping ID / Version 范围冻结",
+      "只有发出成功后才允许录入 Supplier 报价",
+      "本操作不自动创建 Quote、Award、PO、库存或财务记录",
+    ]) assert.ok(issueText.includes(required), `fixed issue confirmation missing: ${required}`);
+    for (const bindingId of fixedBindingIds) assert.ok(issueText.includes(bindingId), `fixed issue Binding ID missing: ${bindingId}`);
+    for (const mappingId of MAPPING_UIDS.flat()) assert.ok(issueText.includes(mappingId), `fixed issue Mapping missing: ${mappingId}`);
+    assert.deepEqual(await visibleBindingIds(dialog), fixedBindingIds);
+    await noDialogOverflow(dialog, "fixed issue dialog desktop");
+    await dialog.getByRole("button", { name: "取消", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(businessWrites.length, businessWritesAfterFixed, "fixed issue cancel must add zero business writes");
+    assert.deepEqual(await previewWriteState(1), fixedWriteBaseline);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "RFQ-00000001 · Round 1", exact: true }).waitFor();
+    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), fixedBindingIds);
+    await stopServer();
+    await startServer();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "RFQ-00000001 · Round 1", exact: true }).waitFor();
+    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), fixedBindingIds);
+    assert.deepEqual(await previewWriteState(1), fixedWriteBaseline);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await noOverflow(page, "fixed legacy detail 390x844");
+    await page.getByRole("button", { name: "发出询价并冻结范围", exact: true }).click();
+    dialog = page.getByRole("dialog", { name: "发出询价并冻结范围", exact: true });
+    await dialog.waitFor();
+    assert.deepEqual(await visibleBindingIds(dialog), fixedBindingIds);
+    await noOverflow(page, "fixed issue dialog page 390x844");
+    await noDialogOverflow(dialog, "fixed issue dialog 390x844");
+    await dialog.getByRole("button", { name: "取消", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(businessWrites.length, businessWritesAfterFixed, "fixed mobile issue cancel must add zero business writes");
+    assert.deepEqual(await previewWriteState(1), fixedWriteBaseline);
+
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: "退出", exact: true }).click();
     await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
@@ -977,7 +1102,7 @@ test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exi
       [fixture.credentials.username],
     )).rows[0].count), 0);
     await context.close();
-    console.info("RFQ_MAPPING_PREVIEW_FIX23_BROWSER_OK rfq=1 audit=1 preview_gets=4 zero_write_exits=3 bindings=8 status=DRAFT issued=0 quote=0 award=0 po=0 desktop=1 mobile=1 session=0");
+    console.info(`RFQ_BINDING_IDENTIFIERS_FIX24_BROWSER_OK rfq=1 audit=1 preview_gets=4 zero_write_exits=5 bindings=8 binding_ids=${fixedBindingIds.join(",")} receipt=1 issue_cancel=2 restart=1 status=DRAFT issued=0 quote=0 award=0 po=0 desktop=1 mobile=1 session=0`);
   } finally {
     await browser?.close().catch(() => undefined);
   }

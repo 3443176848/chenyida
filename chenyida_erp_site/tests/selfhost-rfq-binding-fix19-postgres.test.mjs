@@ -506,14 +506,41 @@ test("stable Purchase Request ID 1 creates one four-line RFQ and normalized repl
   assert.equal(conflict.payload.request_id, conflict.requestId);
   const bait = await api("/api/procurement/rfqs", { method: "POST", body: { ...body, purchase_request_id: fixture.accepted[4] } });
   assert.equal(bait.response.status, 201, JSON.stringify(bait.payload));
+  const beforeDetailReads = await previewWriteCounts(rfqId);
   const detail = await api(`/api/procurement/rfqs/${rfqId}`);
   assert.equal(detail.response.status, 200);
+  const refreshedDetail = await api(`/api/procurement/rfqs/${rfqId}`);
+  assert.deepEqual(await previewWriteCounts(rfqId), beforeDetailReads);
   assert.equal(detail.payload.data.creation_receipt.authority, "IMMUTABLE_EVENT");
   assert.equal(detail.payload.data.creation_receipt.result, "SUCCESS");
   assert.equal(detail.payload.data.creation_receipt.request_id, created.payload.request_id);
   assert.equal(detail.payload.data.mapping_traceability.mode, "BOUND_AT_CREATE");
   assert.equal(detail.payload.data.mapping_traceability.bindings.length, 8);
   assert.equal(detail.payload.data.mapping_traceability.can_issue, true);
+  const projectedBindings = detail.payload.data.mapping_traceability.bindings;
+  const bindingIds = projectedBindings.map((row) => row.binding_id);
+  assert.ok(bindingIds.every((bindingId) => typeof bindingId === "string" && /^[1-9]\d*$/.test(bindingId)));
+  assert.equal(new Set(bindingIds).size, 8);
+  assert.deepEqual(refreshedDetail.payload.data.mapping_traceability.bindings.map((row) => row.binding_id), bindingIds);
+  assert.ok(projectedBindings.every((row) => Number(row.rfq_id) === rfqId && Number.isSafeInteger(Number(row.rfq_line_id))));
+  assert.deepEqual(projectedBindings.map((row) => [row.supplier_code, row.internal_material_code]),
+    [...projectedBindings].sort((left, right) => left.supplier_code.localeCompare(right.supplier_code)
+      || left.supplier_id - right.supplier_id || left.internal_material_code.localeCompare(right.internal_material_code)
+      || left.material_id - right.material_id).map((row) => [row.supplier_code, row.internal_material_code]));
+  assert.deepEqual(detail.payload.data.mapping_binding_receipt, {
+    ...detail.payload.data.mapping_binding_receipt,
+    authority: "IMMUTABLE_EVENT",
+    verified: true,
+    event_type: "RFQ_CREATED",
+    immutable: true,
+    result: "SUCCESS",
+    binding_count: 8,
+    binding_ids: bindingIds,
+    issues: [],
+  });
+  assert.equal(detail.payload.data.mapping_binding_receipt.scope_digest, detail.payload.data.creation_receipt.scope_digest);
+  assert.equal(detail.payload.data.mapping_binding_receipt.scope_digest, await expectedScopeDigest(rfqId));
+  assert.ok(projectedBindings.every((row) => row.binding_scope_digest === detail.payload.data.mapping_binding_receipt.scope_digest));
   const shanghaiValidity = (await pool.query(
     `select supplier_id::int,material_id::int,
       to_char(valid_from at time zone 'Asia/Shanghai','YYYY-MM-DD') valid_from,
@@ -537,6 +564,7 @@ test("stable Purchase Request ID 1 creates one four-line RFQ and normalized repl
     && row.current_status === "ACTIVE" && row.status_drift === false && row.version_drift === false && row.eligible === true));
   assert.ok(detail.payload.data.events.every((event) => Number(event.rfq_id) === rfqId));
   assert.ok(detail.payload.data.events.every((event) => event.request_id !== bait.payload.request_id));
+  assert.ok(projectedBindings.every((row) => Number(row.rfq_id) !== Number(bait.payload.rfq_id)));
   assert.deepEqual(await downstreamCounts(), {
     quotes: 0,
     awards: 0,
@@ -888,6 +916,20 @@ test("legacy DRAFT is never backfilled implicitly and requires an explicit idemp
   assert.ok(bindings.every((row) => row.binding_source === "LEGACY_DRAFT_CONFIRMATION" && row.bound_by === "purchase01" && row.request_id === confirmed.payload.request_id));
   const confirmationScope = (await pool.query("select scope_digest from procurement_sourcing_events where rfq_id=$1 and event_type='RFQ_MAPPING_CONFIRMED'", [rfqId])).rows[0].scope_digest;
   assert.equal(confirmationScope, await expectedScopeDigest(rfqId));
+  const beforeFixedDetail = await previewWriteCounts(rfqId);
+  const fixedDetail = await api(`/api/procurement/rfqs/${rfqId}`);
+  assert.deepEqual(await previewWriteCounts(rfqId), beforeFixedDetail);
+  const fixedIds = fixedDetail.payload.data.mapping_traceability.bindings.map((row) => row.binding_id);
+  assert.equal(new Set(fixedIds).size, 8);
+  assert.ok(fixedIds.every((bindingId) => /^[1-9]\d*$/.test(bindingId)));
+  assert.equal(fixedDetail.payload.data.mapping_binding_receipt.event_type, "RFQ_MAPPING_CONFIRMED");
+  assert.equal(fixedDetail.payload.data.mapping_binding_receipt.actor, "purchase01");
+  assert.equal(fixedDetail.payload.data.mapping_binding_receipt.request_id, confirmed.payload.request_id);
+  assert.equal(fixedDetail.payload.data.mapping_binding_receipt.result, "SUCCESS");
+  assert.equal(fixedDetail.payload.data.mapping_binding_receipt.verified, true);
+  assert.deepEqual([fixedDetail.payload.data.mapping_binding_receipt.old_version, fixedDetail.payload.data.mapping_binding_receipt.new_version], [1, 2]);
+  assert.equal(fixedDetail.payload.data.mapping_binding_receipt.scope_digest, confirmationScope);
+  assert.deepEqual(fixedDetail.payload.data.mapping_binding_receipt.binding_ids, fixedIds);
   const issued = await api(`/api/procurement/rfqs/${rfqId}/issue`, { method: "POST", body: { expected_version: 2 } });
   assert.equal(issued.response.status, 200, JSON.stringify(issued.payload));
   assert.deepEqual([issued.payload.status, issued.payload.version, issued.payload.mapping_count], ["ISSUED", 3, 8]);
@@ -925,6 +967,40 @@ test("legacy DRAFT is never backfilled implicitly and requires an explicit idemp
     await unverifiedProjectionClient.query("rollback");
   } finally { unverifiedProjectionClient.release(); }
   assert.deepEqual((await pool.query("select status,version from procurement_rfqs where id=$1", [unverifiedId])).rows[0], { status: "DRAFT", version: 2 });
+});
+
+test("missing, duplicate, or cross-RFQ stable Binding IDs fail issuance before any business write", async () => {
+  const fixture = await seed();
+  const created = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[0], supplier_ids: [fixture.supplierA, fixture.supplierB], response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  const rfqId = created.payload.rfq_id;
+  const originalIds = (await api(`/api/procurement/rfqs/${rfqId}`)).payload.data.mapping_traceability.bindings.map((row) => row.binding_id);
+  const malformedCases = [
+    ["missing", (rows) => rows.map((row, index) => index === 0 ? { ...row, binding_id: "" } : row)],
+    ["duplicate", (rows) => rows.map((row, index) => index === 1 ? { ...row, binding_id: rows[0].binding_id } : row)],
+    ["cross-rfq", (rows) => rows.map((row, index) => index === 0 ? { ...row, rfq_id: rfqId + 999 } : row)],
+  ];
+  const beforeDownstream = await downstreamCounts();
+  for (const [suffix, mutateRows] of malformedCases) {
+    const repository = new ProcurementSourcingRepository(pool);
+    const realRead = repository.rfqMappingBindings.bind(repository);
+    repository.rfqMappingBindings = async (client, id) => mutateRows(await realRead(client, id));
+    const service = new ProcurementSourcingService(repository);
+    const requestId = randomUUID();
+    await assert.rejects(service.issue(rfqId, {
+      actor: actor("purchase"), requestId, operationId: randomUUID(), keyDigest: digest(`fix24-${suffix}-key`),
+      requestDigest: digest(`fix24-${suffix}-body`), method: "POST", route: `/api/procurement/rfqs/${rfqId}/issue`, action: "RFQ_ISSUED",
+    }, { expected_version: 1 }), (error) => error?.code === "RFQ_MAPPING_CREDENTIAL_UNVERIFIED");
+    assert.deepEqual((await pool.query("select status,version from procurement_rfqs where id=$1", [rfqId])).rows[0], { status: "DRAFT", version: 1 });
+  }
+  assert.deepEqual(await downstreamCounts(), beforeDownstream);
+  assert.equal(Number((await pool.query("select count(*) count from procurement_sourcing_events where rfq_id=$1 and event_type='RFQ_ISSUED'", [rfqId])).rows[0].count), 0);
+  assert.deepEqual((await api(`/api/procurement/rfqs/${rfqId}`)).payload.data.mapping_traceability.bindings.map((row) => row.binding_id), originalIds);
+  const issued = await api(`/api/procurement/rfqs/${rfqId}/issue`, { method: "POST", body: { expected_version: 1 } });
+  assert.equal(issued.response.status, 200, JSON.stringify(issued.payload));
+  assert.deepEqual((await api(`/api/procurement/rfqs/${rfqId}`)).payload.data.mapping_traceability.bindings.map((row) => row.binding_id), originalIds);
+  assert.deepEqual(await downstreamCounts(), beforeDownstream);
 });
 
 test("authoritative Mapping preview fails closed for 3/4 coverage and performs zero business writes", async () => {
@@ -1056,6 +1132,13 @@ test("preview is purchase-domain scoped, permission protected, and GET failures 
   const planning = await mappingPreview(rfqId, 1, { role: "planning" });
   assert.equal(planning.response.status, 403);
   assert.equal(planning.payload.code, "PERMISSION_DENIED");
+  const wrongPurchaseDetail = await api(`/api/procurement/rfqs/${rfqId}`, { role: "purchase", username: "purchase02" });
+  assert.equal(wrongPurchaseDetail.response.status, 403);
+  assert.equal(wrongPurchaseDetail.payload.code, "RFQ_FORBIDDEN");
+  assert.equal(wrongPurchaseDetail.payload.request_id, wrongPurchaseDetail.requestId);
+  const warehouseDetail = await api(`/api/procurement/rfqs/${rfqId}`, { role: "warehouse" });
+  assert.equal(warehouseDetail.response.status, 403);
+  assert.equal(warehouseDetail.payload.code, "PERMISSION_DENIED");
   assert.deepEqual(await previewWriteCounts(rfqId), before);
 });
 

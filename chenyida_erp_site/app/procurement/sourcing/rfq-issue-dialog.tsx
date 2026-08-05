@@ -24,6 +24,8 @@ export type RfqCreationReceipt = {
 };
 
 export type RfqMappingRow = {
+  binding_id?: string | null;
+  rfq_id?: number | null;
   supplier_id: number;
   supplier_code: string;
   supplier_name: string;
@@ -49,6 +51,8 @@ export type RfqMappingRow = {
   bound_by?: string | null;
   bound_at?: string | null;
   binding_request_id?: string | null;
+  bound_at_shanghai?: string | null;
+  binding_scope_digest?: string | null;
   current_status: string | null;
   current_bound_mapping_version?: number | null;
   current_bound_row_version?: number | null;
@@ -58,7 +62,30 @@ export type RfqMappingRow = {
   status_drift: boolean;
   version_drift: boolean;
   eligible: boolean;
-  issue_reason: string;
+  issue_reason?: string;
+};
+
+export type RfqMappingBindingReceipt = {
+  authority: "IMMUTABLE_EVENT" | "UNVERIFIED";
+  verified: boolean;
+  event_type: "RFQ_CREATED" | "RFQ_MAPPING_CONFIRMED";
+  immutable: boolean;
+  authority_note: string;
+  actor: string | null;
+  occurred_at: string | null;
+  occurred_at_shanghai: string;
+  request_id: string | null;
+  result: "SUCCESS" | "UNVERIFIED";
+  idempotency_key_digest: string | null;
+  old_version: number | null;
+  new_version: number | null;
+  from_status: string | null;
+  to_status: string | null;
+  scope_digest: string | null;
+  computed_scope_digest: string;
+  binding_count: number;
+  binding_ids: string[];
+  issues: string[];
 };
 
 export type RfqMappingTraceability = {
@@ -139,6 +166,7 @@ export type RfqDialogDetail = {
     supplier_status: string;
   }>;
   creation_receipt: RfqCreationReceipt | null;
+  mapping_binding_receipt: RfqMappingBindingReceipt | null;
   mapping_traceability: RfqMappingTraceability | null;
   downstream_counts: RfqDownstreamCounts;
   issue_receipt: RfqIssueReceipt | null;
@@ -332,7 +360,13 @@ const modeLabels: Record<RfqMappingTraceability["mode"], string> = {
 
 function groupMappings(rows: RfqMappingRow[]) {
   const groups = new Map<number, RfqMappingRow[]>();
-  for (const row of rows) groups.set(row.supplier_id, [...(groups.get(row.supplier_id) || []), row]);
+  const sorted = [...rows].sort((left, right) => left.supplier_code.localeCompare(right.supplier_code)
+    || left.supplier_id - right.supplier_id
+    || left.internal_material_code.localeCompare(right.internal_material_code)
+    || left.material_id - right.material_id
+    || String(left.binding_id || "").length - String(right.binding_id || "").length
+    || String(left.binding_id || "").localeCompare(String(right.binding_id || "")));
+  for (const row of sorted) groups.set(row.supplier_id, [...(groups.get(row.supplier_id) || []), row]);
   return [...groups.entries()];
 }
 
@@ -350,24 +384,32 @@ function MappingRows({ rows }: { rows: RfqMappingRow[] }) {
             </div>
             <div className="rfq-mapping-list">
               {supplierRows.map((row) => (
-                <article className={row.eligible && !row.status_drift && !row.version_drift ? "rfq-mapping-card" : "rfq-mapping-card drift"} key={`${supplierId}:${row.material_id}:${row.mapping_id}`}>
+                <article className={row.eligible && !row.status_drift && !row.version_drift ? "rfq-mapping-card" : "rfq-mapping-card drift"} key={row.binding_id || `${supplierId}:${row.material_id}:${row.mapping_id}`}>
                   <div className="rfq-mapping-title">
                     <b>Material ID {row.material_id} · {row.internal_material_code}</b>
                     <span>{row.standard_name}</span>
                   </div>
                   <dl>
+                    <div className="wide"><dt>Binding ID</dt><dd><TraceValue>{row.binding_id}</TraceValue></dd></div>
+                    <div><dt>RFQ ID</dt><dd>{row.rfq_id ?? "—"}</dd></div>
+                    <div><dt>RFQ Line ID</dt><dd>{row.rfq_line_id ?? "—"}</dd></div>
+                    <div><dt>Supplier ID</dt><dd>{row.supplier_id}</dd></div>
+                    <div><dt>Material ID</dt><dd>{row.material_id}</dd></div>
                     <div><dt>supplier_part_number</dt><dd>{row.supplier_part_number || "—"}</dd></div>
                     <div className="wide"><dt>Mapping ID</dt><dd><TraceValue>{row.mapping_id}</TraceValue></dd></div>
                     <div><dt>Mapping Version</dt><dd>{row.mapping_version === null ? "—" : `v${row.mapping_version}`} / {row.mapping_row_version === null ? "Row —" : `Row v${row.mapping_row_version}`}</dd></div>
-                    <div><dt>单位换算</dt><dd>{row.purchase_unit_code || "—"} → {row.base_unit_code || "—"} · {row.conversion_numerator ?? "—"}:{row.conversion_denominator ?? "—"}</dd></div>
+                    <div><dt>Supplier Unit</dt><dd>{row.purchase_unit_code || "—"}</dd></div>
+                    <div><dt>Internal Unit</dt><dd>{row.base_unit_code || "—"}</dd></div>
+                    <div><dt>换算</dt><dd>{row.conversion_numerator ?? "—"}:{row.conversion_denominator ?? "—"}</dd></div>
                     <div><dt>有效期</dt><dd>{shortDate(row.valid_from)} — {shortDate(row.valid_to) === "—" ? "长期" : shortDate(row.valid_to)}</dd></div>
-                    <div><dt>{row.binding_source === "CURRENT_QUALIFICATION" ? "资格状态 / 来源" : "绑定时状态 / 来源"}</dt><dd>{row.binding_source === "CURRENT_QUALIFICATION" ? `${row.current_status || "—"} · 当前资格检查（尚未固定）` : `${row.binding_status || "尚未固定"} · ${row.binding_source}`}</dd></div>
+                    <div><dt>{row.binding_source === "CURRENT_QUALIFICATION" ? "资格状态 / 来源" : "固定时 Mapping 状态 / 绑定时状态 / 来源"}</dt><dd>{row.binding_source === "CURRENT_QUALIFICATION" ? `${row.current_status || "—"} · 当前资格检查（尚未固定）` : `${row.binding_status || "尚未固定"} · ${row.binding_source}`}</dd></div>
                     <div><dt>RFQ 邀请状态</dt><dd>{row.invitation_status || "—"}</dd></div>
-                    <div><dt>已绑定版本当前状态</dt><dd>{row.current_status || "—"} · v{row.current_bound_mapping_version ?? row.mapping_version ?? "—"} / Row v{row.current_bound_row_version ?? row.mapping_row_version ?? "—"}</dd></div>
+                    <div><dt>当前 Mapping 状态 / 已绑定版本当前状态</dt><dd>{row.current_status || "—"} · v{row.current_bound_mapping_version ?? row.mapping_version ?? "—"} / Row v{row.current_bound_row_version ?? row.mapping_row_version ?? "—"}</dd></div>
                     <div><dt>最新 Mapping 版本</dt><dd>{row.latest_mapping_status || row.current_status || "—"} · v{row.current_mapping_version ?? row.mapping_version ?? "—"} / Row v{row.current_mapping_row_version ?? row.mapping_row_version ?? "—"}</dd></div>
-                    <div><dt>当前状态漂移</dt><dd>{row.binding_source === "CURRENT_QUALIFICATION" ? "不适用（尚未固定）" : row.status_drift ? "是" : "否"}</dd></div>
-                    <div><dt>当前版本漂移</dt><dd>{row.binding_source === "CURRENT_QUALIFICATION" ? "不适用（尚未固定）" : row.version_drift ? "是" : "否"}</dd></div>
-                    {row.bound_by || row.bound_at || row.binding_request_id ? <div className="wide"><dt>固定凭证</dt><dd>{row.bound_by || "—"} · {formatShanghaiTime(row.bound_at)} · <TraceValue>{row.binding_request_id}</TraceValue></dd></div> : null}
+                    <div><dt>是否发生状态漂移 / 当前状态漂移</dt><dd>{row.binding_source === "CURRENT_QUALIFICATION" ? "不适用（尚未固定）" : row.status_drift ? "是" : "否"}</dd></div>
+                    <div><dt>是否发生版本漂移 / 当前版本漂移</dt><dd>{row.binding_source === "CURRENT_QUALIFICATION" ? "不适用（尚未固定）" : row.version_drift ? "是" : "否"}</dd></div>
+                    {row.bound_by || row.bound_at || row.binding_request_id ? <div className="wide"><dt>固定凭证归属</dt><dd>{row.bound_by || "—"} · {formatShanghaiTime(row.bound_at, row.bound_at_shanghai)} · <TraceValue>{row.binding_request_id}</TraceValue></dd></div> : null}
+                    {row.binding_scope_digest ? <div className="wide"><dt>固定范围摘要</dt><dd><TraceValue>{row.binding_scope_digest}</TraceValue></dd></div> : null}
                   </dl>
                   {row.issue_reason ? <p className="rfq-mapping-issue">{row.issue_reason}</p> : null}
                 </article>
@@ -377,6 +419,34 @@ function MappingRows({ rows }: { rows: RfqMappingRow[] }) {
         );
       })}
     </div>
+  );
+}
+
+export function MappingBindingReceiptView({ receipt, compact = false }: { receipt: RfqMappingBindingReceipt | null; compact?: boolean }) {
+  if (!receipt) return <div className="rfq-trace-warning" role="status">当前响应缺少 Mapping 固定凭证，发出已失败关闭。</div>;
+  return (
+    <details className={compact ? "rfq-receipt compact" : "rfq-receipt"} open>
+      <summary><b>Mapping 固定凭证</b> · {receipt.event_type} · {receipt.result}</summary>
+      <section aria-label="Mapping 固定凭证">
+        <div className="rfq-section-heading">
+          <div><p className="rfq-eyebrow">MAPPING BINDING RECEIPT</p><h3>Mapping 固定凭证</h3></div>
+          <span className={receipt.verified ? "rfq-proof success" : "rfq-proof warning"}>{receipt.result}</span>
+        </div>
+        <dl className="rfq-receipt-facts">
+          <div><dt>Event</dt><dd>{receipt.event_type}</dd></div>
+          <div><dt>actor</dt><dd>{receipt.actor || "—"}</dd></div>
+          <div><dt>精确时间</dt><dd>{formatShanghaiTime(receipt.occurred_at, receipt.occurred_at_shanghai)}</dd></div>
+          <div><dt>result</dt><dd>{receipt.result}</dd></div>
+          <div><dt>RFQ Version / CAS</dt><dd>{receipt.old_version === null ? "不存在" : `v${receipt.old_version}`} → {receipt.new_version === null ? "未验证" : `v${receipt.new_version}`}</dd></div>
+          <div><dt>固定 Binding 数量</dt><dd>{receipt.binding_count}</dd></div>
+        </dl>
+        <div className="rfq-trace-line"><span>request_id</span><TraceValue>{receipt.request_id}</TraceValue></div>
+        <div className="rfq-trace-line"><span>固定范围摘要</span><TraceValue>{receipt.scope_digest}</TraceValue></div>
+        <div className="rfq-trace-line"><span>八条 Binding 稳定 ID</span><TraceValue>{receipt.binding_ids.join(" · ")}</TraceValue></div>
+        <p className="rfq-proof-note"><b>不可变快照说明：</b>{receipt.authority_note}</p>
+        {receipt.issues.length ? <div className="rfq-trace-issues" role="alert"><b>固定凭证校验失败</b><ul>{receipt.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></div> : null}
+      </section>
+    </details>
   );
 }
 
@@ -598,6 +668,16 @@ function ScopeSummary({ detail, rows }: { detail: RfqDialogDetail; rows: RfqMapp
         </dl>
       </section>
       <CreationReceiptView receipt={detail.creation_receipt} compact />
+      <MappingBindingReceiptView receipt={detail.mapping_binding_receipt} compact />
+      <section className="rfq-confirm-section" aria-label="发出前固定范围检查">
+        <h3>发出前固定范围检查</h3>
+        <dl className="rfq-receipt-facts">
+          <div><dt>固定凭证</dt><dd>{detail.mapping_binding_receipt?.verified ? "完整 / SUCCESS" : "缺失或未验证"}</dd></div>
+          <div><dt>Binding 稳定 ID</dt><dd>{detail.mapping_binding_receipt?.binding_ids.length || 0} / {detail.lines.length * detail.suppliers.length}</dd></div>
+          <div><dt>当前状态漂移</dt><dd>{rows.some((row) => row.status_drift) ? "存在" : "无"}</dd></div>
+          <div><dt>当前版本漂移</dt><dd>{rows.some((row) => row.version_drift) ? "存在" : "无"}</dd></div>
+        </dl>
+      </section>
       <section className="rfq-confirm-section" aria-label="RFQ 行">
         <h3>固定范围 · {detail.lines.length} 条 Material</h3>
         <div className="rfq-confirm-lines">
@@ -622,6 +702,24 @@ function ScopeSummary({ detail, rows }: { detail: RfqDialogDetail; rows: RfqMapp
       </section>
     </>
   );
+}
+
+export function hasCompleteBindingIdentifiers(detail: RfqDialogDetail, rows: RfqMappingRow[]) {
+  const expected = detail.lines.length * detail.suppliers.length;
+  const receipt = detail.mapping_binding_receipt;
+  const ids = rows.map((row) => String(row.binding_id || ""));
+  const receiptIds = new Set(receipt?.binding_ids || []);
+  return expected > 0
+    && rows.length === expected
+    && ids.every((bindingId) => /^[1-9]\d*$/.test(bindingId))
+    && new Set(ids).size === expected
+    && rows.every((row) => Boolean(row.mapping_id) && Number.isSafeInteger(Number(row.mapping_version)))
+    && receipt?.verified === true
+    && receipt.result === "SUCCESS"
+    && receipt.binding_count === expected
+    && receipt.binding_ids.length === expected
+    && receiptIds.size === expected
+    && ids.every((bindingId) => receiptIds.has(bindingId));
 }
 
 export function RfqScopeDialog({
@@ -650,7 +748,7 @@ export function RfqScopeDialog({
   const rows = kind === "bind" || trace?.mode === "UNBOUND_LEGACY_DRAFT" ? trace?.current_qualification || [] : trace?.bindings || [];
   const expectedMappings = detail.lines.length * detail.suppliers.length;
   const confirmReady = kind === "issue"
-    ? Boolean(detail.creation_receipt?.result === "SUCCESS" && trace?.complete && trace.can_issue && trace.mode !== "UNBOUND_LEGACY_DRAFT" && rows.length === expectedMappings)
+    ? Boolean(detail.creation_receipt?.result === "SUCCESS" && trace?.complete && trace.can_issue && trace.mode !== "UNBOUND_LEGACY_DRAFT" && rows.length === expectedMappings && hasCompleteBindingIdentifiers(detail, rows))
     : Boolean(mappingPreview?.qualification_passed);
 
   useEffect(() => {
@@ -734,7 +832,7 @@ export function RfqScopeDialog({
           {kind === "issue" && !confirmReady ? (
             <div className="rfq-trace-issues" role="alert">
               <b>当前不可发出</b>
-              <p>{trace?.mode === "UNBOUND_LEGACY_DRAFT" ? "历史草稿尚未固定 Mapping。请先退出本窗口，使用独立的显式固定操作。" : trace?.issues.join("；") || `Mapping 覆盖必须精确为 ${detail.suppliers.length} × ${detail.lines.length}，且全部有效、无漂移。`}</p>
+              <p>{trace?.mode === "UNBOUND_LEGACY_DRAFT" ? "历史草稿尚未固定 Mapping。请先退出本窗口，使用独立的显式固定操作。" : trace?.issues.join("；") || `Mapping 覆盖必须精确为 ${detail.suppliers.length} × ${detail.lines.length}，每条都必须有真实且唯一的 Binding ID、Mapping ID / Version 和完整固定 Event 凭证，且全部有效、无漂移。`}</p>
             </div>
           ) : null}
         </div>

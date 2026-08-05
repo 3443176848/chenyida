@@ -1083,6 +1083,17 @@
 - 验证与主 UAT 边界：0039 空库/0038升级/重放/回滚/历史 DRAFT及历史 ISSUED兼容、Unit/UI/PostgreSQL、Material Requirement、真实 Sourcing→Award→Fulfillment、隔离 Chromium、typecheck/lint/build/凭据扫描和 Python 基线均在隔离环境验证。主 UAT 部署和验收只能读取 `RFQ-00000001`、打开发出确认并取消后退出；不得固定 Mapping、发出、录报价或定标。正式发出必须另立任务并重新授权。
 - 实施结果：功能提交 `b339acd97f08e4cc09451173b48580015817d9f8`，alpha.40/0039 已部署到受控并行非生产 UAT；0039 SHA-256 为 `3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`，最终 Web 为 `sha256:58d97778d88d6103ca4d6cc3e0bfe8033bf0921a6c1b7ecbec31254403792651`。正式备份/第二库恢复/升级、隔离发出和主 UAT purchase-only 只读取消验收通过。主 `RFQ-00000001` 最终仍为 DRAFT v1、generation 1、Binding 0、Quote/Award/PO 0/0/0；业务 POST 0、Session 0，保护指纹保持 `9d4641b1b6324de4e3a1a26e7461ca2e15bd7613cb99a277c11e6bca869ac66e`。下一任务必须先另获授权显式固定当前 Mapping，不能直接发出。
 
+## D-096 RFQ Binding 直接公开 0039 独立主键并以固定 Event 校验发出凭证
+
+- 日期：2026-08-05
+- 状态：`ACCEPTED / IMPLEMENTED`
+- 确认人：项目负责人（明确要求诊断 0039 Binding 标识模型，并按已有独立 ID 的分支 A 贯通详情、固定凭证和发出确认；禁止再次固定或发出主 RFQ）
+- 主键结论：`procurement_rfq_supplier_line_mapping_bindings.id` 是 `bigserial PRIMARY KEY NOT NULL`，由 PostgreSQL 持久、唯一并可独立引用；它已经存在于 0039，但此前 Repository/DTO/UI 没有明确公开。数组序号、Supplier×Line 复合位置、摘要截断或临时拼接均不得冒充 Binding ID。
+- 迁移结论：采用分支 A，不新增 0040、不修改 0001—0039、不回填或重排既有八条 Binding，版本保持 `0.1.0-alpha.40`。Repository 以文本投影 bigint 主键避免 JavaScript 精度损失，并按 Supplier code/ID、Material code/ID、Binding ID 稳定排序。
+- 凭证权威：固定凭证必须同时验证预期 lifecycle generation 的唯一 SUCCESS Event、稳定且唯一的 Binding ID、完整 Supplier×RFQ Line 组合、Binding 的 RFQ/Line/Supplier 归属、来源/状态、actor/时间/request_id 归属以及由不可变 Binding 快照重新计算的 scope digest。任一不一致时详情如实标为 UNVERIFIED，UI 禁用发出，POST 返回稳定 `RFQ_MAPPING_CREDENTIAL_UNVERIFIED` 并保持事务零业务写。
+- 展示与安全：详情和发出确认明确分列 Binding ID、Mapping ID、RFQ Line ID、Material ID，并显示 Supplier/Material 名称、Mapping Version、supplier part、单位换算、有效期、固定/当前状态和漂移。Mapping 固定凭证可重新打开；所有 GET 使用 read-only 事务且失败不写 Audit，仍执行 purchase 权限和 RFQ/PRQ 数据域。发出 POST 继续重验 CAS、范围数量、摘要、当前 Mapping、PRQ、截止日和下游状态。
+- 主 UAT 边界：`RFQ-00000001` 的八个真实 Binding ID、固定 Event 和发出窗口只允许 purchase 读取；桌面/390px均必须取消并安全退出。不得再次固定 Mapping、发出 RFQ、录 Quote、定标或创建 PO；是否正式发出必须由后续独立任务重新授权。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
