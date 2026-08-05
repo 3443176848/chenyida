@@ -1072,7 +1072,7 @@
 ## D-095 RFQ Mapping 绑定采用关系化版本事实，历史草稿必须显式确认后才能发出
 
 - 日期：2026-08-05
-- 状态：`ACCEPTED / IMPLEMENTED / PENDING PARALLEL NON-PRODUCTION UAT DEPLOYMENT`
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
 - 确认人：项目负责人（明确指定 Schema 分支、0039/alpha.40、主 RFQ 草稿保护、隔离发出与备份恢复通过后的并行非生产 UAT 部署）
 - 缺口与分支：0018/0038 只在 RFQ Supplier 邀请保存 Mapping 摘要，未关系化保存 Supplier×RFQ Line 对应的稳定 Mapping ID、Mapping Version 或版本事实外键；既有创建 Audit 也不是完整 RFQ lifecycle Event。当前 ACTIVE Mapping 不能冒充历史创建时绑定，因此采用分支 B：唯一新增 0039，版本升级为 `0.1.0-alpha.40`，不修改 0001—0038。
 - 绑定事实：0039 新增不可变 `procurement_rfq_supplier_line_mapping_bindings`，逐 RFQ/Supplier/Line 保存 Supplier、Material、精确 Mapping version row、稳定 `mapping_uid`、Mapping version/CAS/content digest、Supplier part、Unit、1:1 换算、有效期、绑定状态、来源、actor、时间和 request_id，并以关系 FK/唯一索引证明完整 Supplier×Line 覆盖。新 RFQ 为 traceability generation 2，在创建事务中固定绑定；既有 RFQ 保持 generation 1，迁移不回填任何绑定。
@@ -1081,6 +1081,7 @@
 - 数据库完整性：generation insert/scope/binding/event guards 与 deferred commit guard 防止 header-only、binding-only、缺 Event、缺精确 Audit/Idempotency 或单事务二次 CAS 的半记录。deferred guard 只对本事务 RFQ INSERT、DRAFT Mapping 确认、DRAFT→ISSUED、Binding INSERT 和三类 lifecycle Event执行完整校验；0038 已存在且无绑定的历史 ISSUED RFQ可继续 Quote/Comparison/Award/Close，不伪造 v2 凭证。
 - UI 语义：详情明确区分 `DRAFT / 草稿 / 待发出`、历史未绑定草稿的“当前资格/拟绑定”与发出后冻结快照。发出按钮只打开确认窗口；取消、关闭、ESC 零业务请求，默认焦点为取消，确认同步禁用并防双击。窗口列出创建凭证、PRQ、四行、两 Supplier、八 Mapping ID/Version、截止日/CNY、重验结果和发出后不可变/下游零自动创建说明。
 - 验证与主 UAT 边界：0039 空库/0038升级/重放/回滚/历史 DRAFT及历史 ISSUED兼容、Unit/UI/PostgreSQL、Material Requirement、真实 Sourcing→Award→Fulfillment、隔离 Chromium、typecheck/lint/build/凭据扫描和 Python 基线均在隔离环境验证。主 UAT 部署和验收只能读取 `RFQ-00000001`、打开发出确认并取消后退出；不得固定 Mapping、发出、录报价或定标。正式发出必须另立任务并重新授权。
+- 实施结果：功能提交 `b339acd97f08e4cc09451173b48580015817d9f8`，alpha.40/0039 已部署到受控并行非生产 UAT；0039 SHA-256 为 `3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`，最终 Web 为 `sha256:58d97778d88d6103ca4d6cc3e0bfe8033bf0921a6c1b7ecbec31254403792651`。正式备份/第二库恢复/升级、隔离发出和主 UAT purchase-only 只读取消验收通过。主 `RFQ-00000001` 最终仍为 DRAFT v1、generation 1、Binding 0、Quote/Award/PO 0/0/0；业务 POST 0、Session 0，保护指纹保持 `9d4641b1b6324de4e3a1a26e7461ca2e15bd7613cb99a277c11e6bca869ac66e`。下一任务必须先另获授权显式固定当前 Mapping，不能直接发出。
 
 ## 待确认业务决策
 

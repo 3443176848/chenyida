@@ -221,7 +221,8 @@ async function seed() {
               material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,purchase_uom,
               purchase_unit_id,conversion_numerator,conversion_denominator,status,valid_from,
               created_by,updated_by,request_id
-            ) values($1,$2,$3,$4,$5,'PCS',$6,1,1,'ACTIVE',now()-interval '1 day',
+            ) values($1,$2,$3,$4,$5,'PCS',$6,1,1,'ACTIVE',
+              ((statement_timestamp() at time zone 'Asia/Shanghai')::date::timestamp at time zone 'Asia/Shanghai'),
               'admin01','admin01',$7)`,
             [
               materialId,
@@ -474,6 +475,22 @@ test("stable Purchase Request ID 1 creates one four-line RFQ and normalized repl
   assert.equal(detail.payload.data.mapping_traceability.mode, "BOUND_AT_CREATE");
   assert.equal(detail.payload.data.mapping_traceability.bindings.length, 8);
   assert.equal(detail.payload.data.mapping_traceability.can_issue, true);
+  const shanghaiValidity = (await pool.query(
+    `select supplier_id::int,material_id::int,
+      to_char(valid_from at time zone 'Asia/Shanghai','YYYY-MM-DD') valid_from,
+      case when valid_to is null then null else to_char(valid_to at time zone 'Asia/Shanghai','YYYY-MM-DD') end valid_to
+    from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1 order by supplier_id,material_id`,
+    [rfqId],
+  )).rows;
+  const expectedValidity = new Map(shanghaiValidity.map((row) => [`${row.supplier_id}:${row.material_id}`, row]));
+  for (const row of [
+    ...detail.payload.data.mapping_traceability.bindings,
+    ...detail.payload.data.mapping_traceability.current_qualification,
+  ]) {
+    const expected = expectedValidity.get(`${row.supplier_id}:${row.material_id}`);
+    assert.equal(row.valid_from, expected?.valid_from);
+    assert.equal(row.valid_to, expected?.valid_to);
+  }
   assert.ok(detail.payload.data.mapping_traceability.bindings.every((row) => row.supplier_part_number === `PART-${row.supplier_id}-${row.material_id}`
     && row.purchase_unit_code === "PCS" && row.base_unit_code === "PCS"
     && String(row.conversion_numerator) === "1" && String(row.conversion_denominator) === "1"

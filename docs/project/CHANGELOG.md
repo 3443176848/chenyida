@@ -4,6 +4,17 @@
 
 ## 2026-08-05
 
+### SELFHOST-UAT-FIX-22 - `fix: expose rfq draft traceability` / `ops: deploy rfq issuance safeguards`
+
+- Git/范围：从 strict clean `main@60538d08509f91eeb0df91718c7276172c23557d`、Parent `a86d9adceefb45efca1c43f1f8475703e8fa943d`、behind 0/ahead 142 起步；功能提交 `b339acd97f08e4cc09451173b48580015817d9f8`，部署、Asia/Shanghai 日期投影修复、最终 UAT 与文档由独立 `ops: deploy rfq issuance safeguards` 提交收口。只修改 RFQ 创建凭证、Supplier×Line Mapping 绑定/追溯、发出确认/重验/凭证、0039、测试/保护/UAT runner 和项目文档；不固定或发出主 RFQ，不录 Quote、Award、PO，不 push/PR 或改写历史。
+- 权威模型/版本：现有 0018/0038 只有 RFQ Line→PRQ Line、RFQ Supplier→Supplier 和邀请级 Mapping 摘要，没有精确 Mapping version fact，故采用分支 B。alpha.40 新增唯一 `0039_rfq_traceability.sql`，SHA-256 `3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；0001—0038 未改。新 generation 2 RFQ 在创建事务固定 2×4 Mapping 并写不可变 `RFQ_CREATED/SUCCESS` credential；历史 generation 1 草稿不回填、不伪造。
+- 创建凭证/读模型：新 RFQ 读取唯一不可变 Event；0039 前 RFQ 只在唯一成功 Audit 精确匹配 object、actor、request_id、创建时间、Idempotency 摘要和 `null→v1` 时显示 `EXACT_SUCCESS_AUDIT`，否则 `UNVERIFIED` 并禁止发出。详情明确 `DRAFT / 草稿 / 待发出`、来源 PRQ/项目/截止日/CNY，以及历史未绑定的“当前资格/拟绑定”与发出后冻结快照。
+- 发出保护：确认窗口列出创建凭证、四条各 10 PCS、两 Supplier、八 Mapping ID/Version、截止日/CNY和下游后果；默认取消、取消/关闭/ESC 零请求、同步双击门禁。服务端和数据库共同重验 PRQ、Supplier/邀请、Material、Mapping stable ID/version/CAS/content/status/effective period/1:1/唯一性、上海截止日、DRAFT/CAS；成功只写单个 ISSUED credential/Audit/Idempotency，不自动创建 Quote/Award/PO/库存/财务。
+- 自动验证：Migration 6/6；Unit/UI 14/14、Sourcing/FIX-22 PostgreSQL 12/12（合计 26/26）；Material Requirement 12/12；真实 Sourcing→Award→Fulfillment 2/2；隔离 Chromium 1/1。typecheck、Schema consistency、build/postbuild、credentials、diff check、Python三项通过；lint 0 error/11 个既有 warning。最终隔离发出证明 Event 1、Binding 8、单 issue POST、重启持久、桌面/390px、下游 0和 Session 0。
+- 备份/恢复：predeploy dump `/var/backups/chenyida-erp/rfq-traceability-fix22-predeploy-20260805T094629Z.dump` 为 root:root 0600、2,232,310 bytes、SHA-256 `960cd6a882b1ab923f2ee38dd83e9fc41f53942048bd5c1c07fcc44f1f3ae6c2`；`pg_restore --list` 3,321 行。第二新空库恢复 0038、匹配保护指纹、升级 0039 后再次匹配，随后精确删除。
+- 部署/保护：主库停写、备份和指纹复核后串行应用 0039并替换 Web；最终为 alpha.40 Web `sha256:58d97778d88d6103ca4d6cc3e0bfe8033bf0921a6c1b7ecbec31254403792651`、88,531,959 bytes。PostgreSQL、Worker、Caddy和四卷未更换，restart 0/OOM false。旧 Web 保留回滚 tag；UTC 截日只读投影在不改 Migration/绑定快照下修为 Asia/Shanghai 并经最终镜像重验，该修复属于运维收口提交。
+- 主 UAT/结论：前两次 runner 均在确认窗口前分别因响应合同断言和真实时区投影问题安全停止，业务写 0、Session 0、指纹不变；修复后 purchase-only 最终只读验收通过，桌面/390×844 各打开确认并取消，`business_post=0`。最终 RFQ DRAFT v1、Binding 0、Quote/Award/PO 0/0/0、Session 0，指纹始终为 `9d4641b1b6324de4e3a1a26e7461ca2e15bd7613cb99a277c11e6bca869ac66e`。结论 `RFQ TRACEABILITY DEPLOYED — UAT RFQ STILL DRAFT`；必须另立任务先显式固定 Mapping，不能直接发出。
+
 ### SELFHOST-UAT-FIX-21 - `fix: add supplier mapping approval confirmation` / `ops: deploy supplier mapping approval safeguards`
 
 - Git/范围：从 strict clean `main@2d0cf5f033cad724bf2215e77e4fda953a499cd4`、behind 0/ahead 140 起步；功能提交 `a86d9adceefb45efca1c43f1f8475703e8fa943d`。只修改 operations Supplier Mapping 审核预览、确认、意见、凭证、列表/UI及对应测试/只读运维脚本和项目文档；不批准或退回主 UAT 剩余七条，不重做既有 ACTIVE，不创建 RFQ，不 push/PR 或改写历史。

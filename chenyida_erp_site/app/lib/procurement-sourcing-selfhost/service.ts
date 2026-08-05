@@ -104,10 +104,12 @@ const frozenScope = (rfq: any, lines: any[], suppliers: any[], bindings: any[]) 
 });
 
 async function exactBindingRows(client: PoolClient, rfqId: number) {
-  return (await client.query<any>(`select b.*,b.mapping_uid mapping_id,b.mapping_version_no mapping_version,b.request_id binding_request_id,rs.status invitation_status,s.supplier_code,s.supplier_name,s.status supplier_status,m.internal_material_code,m.standard_name,m.material_status,
+  const rows = (await client.query<any>(`select b.*,b.mapping_uid mapping_id,b.mapping_version_no mapping_version,b.request_id binding_request_id,rs.status invitation_status,s.supplier_code,s.supplier_name,s.status supplier_status,m.internal_material_code,m.standard_name,m.material_status,
       pu.code purchase_unit_code,bu.code base_unit_code,sm.status current_status,sm.version current_bound_row_version,sm.mapping_version_no current_bound_mapping_version,
       sm.content_digest current_content_digest,latest.status latest_mapping_status,latest.mapping_version_no current_mapping_version,latest.version current_mapping_row_version,
       active_match.mapping_count current_active_count,active_match.mapping_version_id current_active_mapping_version_id,
+      to_char(b.valid_from at time zone 'Asia/Shanghai','YYYY-MM-DD') valid_from_shanghai,
+      case when b.valid_to is null then null else to_char(b.valid_to at time zone 'Asia/Shanghai','YYYY-MM-DD') end valid_to_shanghai,
       (sm.status is distinct from b.binding_status) status_drift,
       (latest.id is distinct from b.supplier_mapping_version_id or sm.version is distinct from b.mapping_row_version or active_match.mapping_version_id is distinct from b.supplier_mapping_version_id) version_drift,
       (rs.status='INVITED' and s.status='ACTIVE' and m.material_status='ACTIVE' and sm.status='ACTIVE' and sm.version=b.mapping_row_version and sm.mapping_version_no=b.mapping_version_no
@@ -124,6 +126,11 @@ async function exactBindingRows(client: PoolClient, rfqId: number) {
     left join lateral (select x.id,x.status,x.mapping_version_no,x.version from supplier_mappings x where x.mapping_uid=b.mapping_uid order by x.mapping_version_no desc,x.id desc limit 1) latest on true
     left join lateral (select count(*)::int mapping_count,(array_agg(x.id order by x.mapping_version_no desc,x.id desc))[1] mapping_version_id from supplier_mappings x where x.supplier_id=b.supplier_id and x.material_id=b.material_id and x.purchase_unit_id=b.purchase_unit_id and x.status='ACTIVE' and x.conversion_numerator=x.conversion_denominator and x.valid_from<=statement_timestamp() and (x.valid_to is null or x.valid_to>statement_timestamp())) active_match on true
     where b.rfq_id=$1 order by s.supplier_code,b.supplier_id,b.rfq_line_id`, [rfqId])).rows;
+  return rows.map(({ valid_from_shanghai, valid_to_shanghai, ...row }) => ({
+    ...row,
+    valid_from: valid_from_shanghai,
+    valid_to: valid_to_shanghai,
+  }));
 }
 
 export class ProcurementSourcingService {
@@ -187,7 +194,9 @@ export class ProcurementSourcingService {
       const current = await client.query<any>(`select rs.id rfq_supplier_id,rs.supplier_id,rs.status invitation_status,s.supplier_code,s.supplier_name,s.status supplier_status,l.id rfq_line_id,l.material_id,m.internal_material_code,m.standard_name,m.material_status,
           l.unit_id purchase_unit_id,u.code purchase_unit_code,bu.code base_unit_code,match.mapping_count current_active_count,sm.id mapping_version_id,sm.mapping_uid mapping_id,
           sm.mapping_version_no mapping_version,sm.version mapping_row_version,sm.status current_status,sm.supplier_item_code supplier_part_number,
-          sm.conversion_numerator::text conversion_numerator,sm.conversion_denominator::text conversion_denominator,sm.valid_from,sm.valid_to,
+          sm.conversion_numerator::text conversion_numerator,sm.conversion_denominator::text conversion_denominator,
+          to_char(sm.valid_from at time zone 'Asia/Shanghai','YYYY-MM-DD') valid_from,
+          case when sm.valid_to is null then null else to_char(sm.valid_to at time zone 'Asia/Shanghai','YYYY-MM-DD') end valid_to,
           (rs.status='INVITED' and s.status='ACTIVE' and m.material_status='ACTIVE' and match.mapping_count=1) eligible,
           case when rs.status<>'INVITED' then 'RFQ Supplier 邀请状态已漂移为 '||rs.status when s.status<>'ACTIVE' then 'Supplier 当前不是 ACTIVE' when m.material_status<>'ACTIVE' then 'Material 当前不是 ACTIVE' when match.mapping_count=0 then '缺少当前有效 1:1 Mapping' when match.mapping_count>1 then '当前有效 Mapping 冲突' else '' end issue_reason,
           'CURRENT_QUALIFICATION' binding_source,'CURRENT_ACTIVE_CANDIDATE' binding_status,false status_drift,false version_drift

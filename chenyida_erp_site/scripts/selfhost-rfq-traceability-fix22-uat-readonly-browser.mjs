@@ -603,7 +603,8 @@ try {
   const detailResponse = await detailResponsePromise;
   assert.equal(detailResponse.status(), 200);
   const detailPayload = await detailResponse.json();
-  assert.equal(detailPayload.ok, true);
+  assert.match(detailPayload.request_id, /^[0-9a-f-]{36}$/i);
+  assert.ok(detailPayload.data && typeof detailPayload.data === "object");
   const { receipt, trace, current } = assertDetailPayload(detailPayload.data);
 
   const bodyText = await page.locator("body").innerText();

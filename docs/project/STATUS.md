@@ -2,6 +2,26 @@
 
 最后更新时间：2026-08-05（Asia/Shanghai）
 
+## SELFHOST-UAT-FIX-22 RFQ 草稿创建凭证、Mapping 追溯与发出保护
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | RFQ TRACEABILITY DEPLOYED — UAT RFQ STILL DRAFT | alpha.40/0039、RFQ 创建凭证、精确 Mapping 绑定和安全发出确认已部署；主 RFQ 未固定 Mapping、未发出、未录报价或定标 |
+| 严格起点 | PASS | clean `main@60538d08509f91eeb0df91718c7276172c23557d`、Parent `a86d9ad…`、behind 0/ahead 142；alpha.39、0001—0038、Web `c98d3e8a…`、服务/资源和主 RFQ DRAFT/四行/双 Supplier/八 ACTIVE Mapping/下游 0 全部吻合 |
+| 模型分支 | BRANCH B / 0039 | 原 Schema 没有 RFQ Supplier×Line→精确 Supplier Mapping version 关系，只存邀请摘要。新增不可变绑定表和 generation 2 lifecycle credential；现有 generation 1 草稿不回填、不伪造 |
+| Migration/版本 | PASS / DEPLOYED | `0.1.0-alpha.40`，39/head `0039_rfq_traceability.sql`，SHA-256 `3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；0001—0038 未修改，0038 SHA 保持 |
+| 创建凭证 | PASS / FAIL CLOSED | 新 RFQ 使用同事务不可变 `RFQ_CREATED/SUCCESS` Event；历史 RFQ 仅以唯一精确成功 Audit 投影 `EXACT_SUCCESS_AUDIT`，不由“页面可打开”反推。主 RFQ 显示真实 actor/上海时间/request_id/不存在→v1并说明未伪造 Event |
+| Mapping 追溯 | PASS | 新 RFQ 创建时保存 Supplier/Material、精确 Mapping row/UID、Version/CAS/digest、supplier part、Unit、1:1、有效期、绑定来源/状态/actor/time/request_id。主 RFQ Binding 0，八条只显示当前资格/拟绑定和上海业务日期 |
+| 发出确认/门禁 | PASS | 四行、两 Supplier、八 Mapping、PRQ、截止日/CNY和后果完整；默认取消，取消/关闭/ESC 零请求，同步双击保护。服务/数据库重验状态/CAS/PRQ/Supplier/Material/Mapping/截止日并按组合失败关闭；成功不自动建下游 |
+| 自动验证 | PASS | Migration 6/6；Unit/UI 14/14、PostgreSQL 12/12（合计 26/26）；Material Requirement 12/12；真实 Sourcing→Award→Fulfillment 2/2；最终隔离 Chromium 1/1；typecheck、Schema、build、credentials、diff、Python三项通过，lint 0 error/11 既有 warning |
+| 隔离发出 | PASS | 草稿创建、取消/关闭/ESC、Mapping 漂移阻断、正式发出、刷新和 Web 重启通过；创建 Event 1、Binding 8、发出 Event 1、双击 issue POST 1，Quote/Award/PO 0，Session 0，桌面/390px通过 |
+| 备份/恢复 | PASS | root:root 0600 dump 2,232,310 bytes，SHA-256 `960cd6a882b1ab923f2ee38dd83e9fc41f53942048bd5c1c07fcc44f1f3ae6c2`；list 3,321 行。第二新空库恢复 0038、匹配指纹、升级 0039 后再匹配，恢复库已删 |
+| 部署 | PASS | 最终 Web `sha256:58d97778d88d6103ca4d6cc3e0bfe8033bf0921a6c1b7ecbec31254403792651`、88,531,959 bytes；PostgreSQL/Worker/Caddy和四卷未更换，内外 health 通过，四服务 restart 0/OOM false，精确回滚标签保留 |
+| 主 UAT | PASS / READ ONLY | purchase-only 核验创建凭证、DRAFT双语义、历史未固定和八条拟 Mapping；桌面/390×844 各打开确认并取消，安全退出。`business_post=0`、Session 0 |
+| 主 UAT 数据 | PASS / UNCHANGED | 指纹部署前/迁移后/Web更新后/UAT后均为 `9d4641b1b6324de4e3a1a26e7461ca2e15bd7613cb99a277c11e6bca869ac66e`；RFQ DRAFT v1、PRQ ACCEPTED、Binding/Event 0、Quote/Award/PO及全部下游 0 |
+| 资源/清理 | PASS | available memory 约 2.0→2.1 GiB，Swap 259→239 MiB，根盘 20→20 GiB，Load `0.24/0.20/0.13`→`0.16/0.30/0.41`；临时数据库/容器/standalone/Playwright目录为 0，未 prune，正式备份/镜像/四卷保留 |
+| Git/后续 | TWO FOCUSED COMMITS / NEW AUTH REQUIRED | 功能 `b339acd`；收口消息 `ops: deploy rfq issuance safeguards`。未 push/PR/改历史；主 RFQ 必须先在新授权任务中显式固定当前 Mapping，实际发出仍须明确授权，不能直接发出 |
+
 ## SELFHOST-UAT-FIX-21 Supplier Mapping 批准确认、审核意见与成功凭证
 
 | 验证项 | 结果 | 说明 |

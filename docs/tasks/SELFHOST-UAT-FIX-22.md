@@ -2,8 +2,9 @@
 
 ## 状态与唯一范围
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始时间：2026-08-05 15:48 CST（Asia/Shanghai）
+- 完成时间：2026-08-05 18:01 CST（Asia/Shanghai）
 - 负责人：Codex（严格门禁、权威模型诊断、0039/alpha.40、RFQ 追溯与发出保护、串行测试、备份恢复、自托管 UAT 部署、purchase-only 主 UAT 只读取消验收）；项目负责人（固定主 RFQ 草稿事实、Migration/部署与只读验收授权）
 - 依赖：`SELFHOST-UAT-FIX-19`、`SELFHOST-UAT-FIX-20`、`SELFHOST-UAT-FIX-21`、D-003、D-040、D-045、D-046、D-061、D-080、D-082、D-091、D-094、D-095
 - 唯一范围：只修复自托管 Vinext/Node.js/PostgreSQL 运行面的 RFQ 草稿创建凭证、逐 Supplier×RFQ Line 的 Supplier Mapping 稳定 ID/Version 追溯，以及“发出询价并冻结范围”的确认、重验和成功凭证。
@@ -58,19 +59,29 @@
 - 部署前 root:root 0600 PostgreSQL custom dump、SHA、`pg_restore --list`、第二空库恢复和 0038→0039 升级通过；正式部署串行停写、备份、Migration、核对和仅必要 Web 更新，不重建无关服务或更换受保护 Volume。
 - 主 UAT 只登录 purchase，打开 RFQ、核验凭证/历史未固定状态、打开完整发出确认后取消，桌面/390×844及安全退出；业务 POST 0、RFQ 仍 DRAFT、Quote/Award/PO 0、保护指纹不变、最终 Session 0。
 
-## 部署前实现与验证结果
+## 实现、部署与验证结果
 
 - 唯一新增 Migration `0039_rfq_traceability.sql`，SHA-256 `3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；`0038` SHA 保持 `2da259364151af098641795da55604dc3012b6adf92aec67038c0554e0592941`。版本已更新为 `0.1.0-alpha.40`。
 - 新 RFQ 创建时保存精确 2×4 Mapping version bindings 并写 `RFQ_CREATED` credential；既有主 RFQ 仍为未绑定历史 DRAFT，只显示当前资格和拟绑定，不执行补救确认。
 - 发出确认窗口、同步单击门禁、取消/关闭/ESC 零请求、服务端与数据库双重重验、ISSUED 成功凭证、范围冻结和 Quote 入口状态已实现。
 - Migration 6/6；Unit/UI/Sourcing/FIX-22 PostgreSQL 26/26；Material Requirement 12/12；真实 Sourcing→Award→Fulfillment 2/2；隔离 Chromium 1/1。隔离浏览器证明创建事件 1、绑定 8、发出事件 1、双击单 POST、Quote/Award/PO 0、Web 重启持久、桌面/390px和 Session 0。
-- typecheck 通过；lint 0 error/11 个既有 warning；build、凭据扫描 1217 文件、`git diff --check`、Python `server.py --self-test`/`smoke_test.py`/`go_live_check.py` 通过。最终候选 Web 镜像 `sha256:eb2a0cc9441b87a70ac33b34452b7616d0f394ef41a7030cd80aa3451677d758`，大小 88,531,882 bytes。
+- typecheck 通过；lint 0 error/11 个既有 warning；build、凭据扫描、`git diff --check`、Python `server.py --self-test`/`smoke_test.py`/`go_live_check.py` 通过。最终部署 Web 镜像 `sha256:58d97778d88d6103ca4d6cc3e0bfe8033bf0921a6c1b7ecbec31254403792651`，大小 88,531,959 bytes。
 - 两轮独立静态复审发现并闭合 Material Requirement project advisory 锁序死锁风险与历史 ISSUED v1 兼容风险；最终结论无部署阻断。
+- 正式 predeploy custom dump `/var/backups/chenyida-erp/rfq-traceability-fix22-predeploy-20260805T094629Z.dump` 为 root:root 0600、2,232,310 bytes、单硬链接，SHA-256 `960cd6a882b1ab923f2ee38dd83e9fc41f53942048bd5c1c07fcc44f1f3ae6c2`；`pg_restore --list` 3,321 行。第二新空库先恢复 0038 并匹配保护指纹，再升级 0039 并再次匹配，随后精确删除。
+- 主库在 Web/Worker 停写、备份和指纹复核后串行应用 0039；迁移前后指纹一致。随后部署 Web，最终又以 Web-only 方式修复 Mapping 有效期被 UTC 截日的只读投影问题；PostgreSQL、Worker、Caddy 容器身份和四个受保护 Volume 未更换，最终四服务 restart 0/OOM false。
+- 主 UAT 最终只读验收只使用 purchase：核验精确成功 Audit 创建凭证、DRAFT/草稿/待发出、历史草稿尚未固定 Mapping、八条当前资格/拟绑定 Mapping，桌面和 390×844 各打开发出确认后点击取消并安全退出。结果 `business_post=0`、RFQ DRAFT v1、Binding 0、Quote/Award/PO `0/0/0`、Session 0；保护指纹前后均为 `9d4641b1b6324de4e3a1a26e7461ca2e15bd7613cb99a277c11e6bca869ac66e`。
+- 功能提交为 `b339acd97f08e4cc09451173b48580015817d9f8`（`fix: expose rfq draft traceability`）；部署、只读投影修复、最终验收和文档以独立 `ops: deploy rfq issuance safeguards` 收口。未 push、PR 或改写历史。
 
-## 允许的最终状态
+## 完成结论与后续边界
 
-- `RFQ TRACEABILITY DEPLOYED — UAT RFQ STILL DRAFT`
-- `RFQ TRACEABILITY DEPLOYED — MAIN UAT NOT VERIFIED`
-- `BLOCKED — NO UNSAFE CHANGE`
+- 最终状态：`RFQ TRACEABILITY DEPLOYED — UAT RFQ STILL DRAFT`。
+- 主 `RFQ-00000001` 仍是 generation 1 历史草稿，0039 不回填、不伪造创建时 Mapping 绑定；详情中的八条只代表当前资格和拟绑定。
+- 现在仍不能直接正式发出该 RFQ。后续必须另立、明确授权的业务任务，先由 purchase 显式“确认并固定当前 Mapping”并重新核对凭证/指纹；只有该操作成功后，才可在再次明确授权下执行发出。Quote、Award、PO 仍分别需要后续业务授权。
+
+## 本次最终状态
+
+`RFQ TRACEABILITY DEPLOYED — UAT RFQ STILL DRAFT`
+
+完整证据见 [SELFHOST-UAT-FIX-22 完成报告](./SELFHOST-UAT-FIX-22-COMPLETION.md)。
 
 完成后立即停止；不发出主 UAT RFQ、不录报价、不定标。
