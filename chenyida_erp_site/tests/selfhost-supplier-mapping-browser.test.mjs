@@ -5,19 +5,19 @@ import test from "node:test";
 import { Pool } from "pg";
 import { hashPassword } from "../app/lib/identity-selfhost/password.ts";
 
-const REQUIRED_DATABASE = "supplier_mapping_test_fix20_20260804";
-const REQUIRED_ORIGIN = "http://127.0.0.1:43140";
+const REQUIRED_DATABASE = "supplier_mapping_test_fix21_20260805";
+const REQUIRED_ORIGIN = "http://127.0.0.1:43141";
 const databaseUrl = process.env.DATABASE_URL || "";
-const confirmation = process.env.ERP_SUPPLIER_MAPPING_FIX20_BROWSER_CONFIRM || "";
+const confirmation = process.env.ERP_SUPPLIER_MAPPING_FIX21_BROWSER_CONFIRM || "";
 const databaseName = (value) => {
   try { return decodeURIComponent(new URL(value).pathname.replace(/^\//, "")); } catch { return ""; }
 };
 if (databaseName(databaseUrl) !== REQUIRED_DATABASE) throw new Error(`DATABASE_URL must target isolated ${REQUIRED_DATABASE}`);
-if (confirmation !== "ISOLATED_FIX20_SYNTHETIC_ONLY") {
-  throw new Error("ERP_SUPPLIER_MAPPING_FIX20_BROWSER_CONFIRM=ISOLATED_FIX20_SYNTHETIC_ONLY is required");
+if (confirmation !== "ISOLATED_FIX21_SYNTHETIC_ONLY") {
+  throw new Error("ERP_SUPPLIER_MAPPING_FIX21_BROWSER_CONFIRM=ISOLATED_FIX21_SYNTHETIC_ONLY is required");
 }
 
-const pool = new Pool({ connectionString: databaseUrl, max: 3, application_name: "supplier-mapping-fix20-browser" });
+const pool = new Pool({ connectionString: databaseUrl, max: 3, application_name: "supplier-mapping-fix21-browser" });
 const sha256 = (value) => createHash("sha256").update(String(value)).digest("hex");
 const serverEntry = process.env.ERP_BROWSER_SERVER_ENTRY || "/standalone/server.js";
 let server;
@@ -30,7 +30,7 @@ async function loadChromium() {
       if (chromium) return chromium;
     } catch { /* use the next controlled module */ }
   }
-  throw new Error("Playwright is required in the isolated FIX-20 browser runner");
+  throw new Error("Playwright is required in the isolated FIX-21 browser runner");
 }
 
 async function clearSyntheticData() {
@@ -190,11 +190,11 @@ async function seedFixture() {
 
 async function waitForServer() {
   for (let attempt = 0; attempt < 120; attempt += 1) {
-    if (server?.exitCode !== null) throw new Error("isolated FIX-20 standalone server exited before health check");
+    if (server?.exitCode !== null) throw new Error("isolated FIX-21 standalone server exited before health check");
     try { if ((await fetch(`${REQUIRED_ORIGIN}/api/health`)).ok) return; } catch { /* bounded readiness polling */ }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error("isolated FIX-20 standalone server did not become healthy");
+  throw new Error("isolated FIX-21 standalone server did not become healthy");
 }
 
 async function startServer() {
@@ -203,16 +203,16 @@ async function startServer() {
     env: {
       ...process.env,
       HOSTNAME: "0.0.0.0",
-      PORT: "43140",
+      PORT: "43141",
       NODE_OPTIONS: "--max-old-space-size=384",
       ERP_ENV: "test",
       ERP_DEPLOYMENT_CLASS: "test",
       ERP_PUBLIC_ORIGIN: REQUIRED_ORIGIN,
       ERP_UAT_ALLOW_LOOPBACK_ORIGIN: "false",
-      ERP_SETUP_TOKEN: `isolated-fix20-${randomUUID()}`,
-      ERP_UPLOAD_ROOT: "/tmp/fix20-uploads",
-      ERP_ATTACHMENT_ROOT: "/tmp/fix20-attachments",
-      ERP_BACKUP_STATUS_FILE: "/tmp/fix20-backup-status.json",
+      ERP_SETUP_TOKEN: `isolated-fix21-${randomUUID()}`,
+      ERP_UPLOAD_ROOT: "/tmp/fix21-uploads",
+      ERP_ATTACHMENT_ROOT: "/tmp/fix21-attachments",
+      ERP_BACKUP_STATUS_FILE: "/tmp/fix21-backup-status.json",
     },
     stdio: "ignore",
   });
@@ -235,22 +235,17 @@ async function login(page, credentials) {
   await page.getByLabel("账号", { exact: true }).fill(credentials.username);
   await page.getByLabel("密码", { exact: true }).fill(credentials.password);
   const response = page.waitForResponse((item) => item.url() === `${REQUIRED_ORIGIN}/api/login` && item.request().method() === "POST");
+  const summaryResponse = page.waitForResponse((item) => item.url() === `${REQUIRED_ORIGIN}/api/summary` && item.request().method() === "GET");
   await page.getByRole("button", { name: "登录", exact: true }).click();
   assert.equal((await response).status(), 200);
+  const summary = await summaryResponse;
+  assert.equal(summary.status(), 200, `dashboard summary failed after login: ${await summary.text()}`);
   await page.getByRole("heading", { name: "经营工作台", exact: true }).waitFor();
 }
 
 async function logoutNative(page) {
   const response = page.waitForResponse((item) => item.url() === `${REQUIRED_ORIGIN}/api/logout` && item.request().method() === "POST");
   await page.getByRole("button", { name: "安全退出", exact: true }).click();
-  assert.equal((await response).status(), 200);
-  await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
-}
-
-async function logoutDashboard(page) {
-  await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" });
-  const response = page.waitForResponse((item) => item.url() === `${REQUIRED_ORIGIN}/api/logout` && item.request().method() === "POST");
-  await page.getByRole("button", { name: "退出", exact: true }).click();
   assert.equal((await response).status(), 200);
   await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
 }
@@ -286,15 +281,15 @@ async function governanceState() {
 test.before(async () => {
   assert.deepEqual(
     (await pool.query(
-      "select current_database() name,(select count(*)::int from schema_migrations) migration_count,max(version) over() head from schema_migrations order by version desc limit 1",
+      "select current_database() name,(select count(*)::int from schema_migrations) migration_count,max(version) over() head,exists(select 1 from information_schema.columns where table_schema='public' and table_name='schema_migrations' and column_name='applied_at') ledger_applied_at from schema_migrations order by version desc limit 1",
     )).rows[0],
-    { name: REQUIRED_DATABASE, migration_count: 38, head: "0038_supplier_mapping_governance.sql" },
+    { name: REQUIRED_DATABASE, migration_count: 38, head: "0038_supplier_mapping_governance.sql", ledger_applied_at: true },
   );
   await clearSyntheticData();
   await startServer();
 });
 
-test("isolated Chromium governs eight mappings before one RFQ draft and creates no downstream documents", { timeout: 300_000 }, async () => {
+test("isolated Chromium confirms one approval, preserves seven pending mappings and reopens its durable receipt", { timeout: 300_000 }, async () => {
   const fixture = await seedFixture();
   assert.deepEqual(await governanceState(), {
     mappings: [], events: [],
@@ -350,7 +345,7 @@ test("isolated Chromium governs eight mappings before one RFQ draft and creates 
     const mappingIds = [];
     for (const supplier of fixture.suppliers) {
       for (const material of fixture.materials) {
-        const partNumber = `FIX20-S${supplier.id}-M${material.id}`;
+        const partNumber = `FIX21-S${supplier.id}-M${material.id}`;
         await createForm.locator('select[name="supplier_id"]').selectOption(String(supplier.id));
         await createForm.locator('select[name="material_id"]').selectOption(String(material.id));
         await createForm.locator('input[name="supplier_item_code"]').fill(partNumber);
@@ -392,60 +387,133 @@ test("isolated Chromium governs eight mappings before one RFQ draft and creates 
     await page.setViewportSize({ width: 390, height: 844 });
     await noOverflow(page, "operations review 390x844");
     await page.setViewportSize({ width: 1440, height: 900 });
-    for (let remaining = 8; remaining > 0; remaining -= 1) {
-      const approve = page.getByRole("button", { name: "批准并生效", exact: true }).first();
-      const approvedResponse = page.waitForResponse((response) => response.url().endsWith("/approve") && response.request().method() === "POST");
-      await approve.click();
-      assert.equal((await approvedResponse).status(), 200);
-      await page.waitForFunction((expected) => document.querySelectorAll("article.sm-card").length === expected, remaining - 1);
-    }
-    await page.getByText("当前审核队列为 0。", { exact: true }).waitFor();
-    await logoutNative(page);
+    const approvedMappingId = mappingIds[0];
+    const approvedPartNumber = `FIX21-S${fixture.suppliers[0].id}-M${fixture.materials[0].id}`;
+    const approve = page.locator("article.sm-card", { hasText: approvedPartNumber }).getByRole("button", { name: "批准并生效", exact: true });
+    const approvedEvents = async () => Number((await pool.query("select count(*) count from supplier_mapping_events where event_type='APPROVED'")).rows[0].count);
 
-    await login(page, fixture.credentials.purchase);
-    await page.goto(`${REQUIRED_ORIGIN}/procurement/supplier-mappings`, { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { name: "供应商物料映射", exact: true }).waitFor();
-    await page.waitForFunction(() => document.querySelectorAll("article.sm-card").length === 8);
-    assert.equal(await page.locator("article.sm-card").getByText("已生效", { exact: true }).count(), 8);
-    await page.goto(`${REQUIRED_ORIGIN}/procurement/sourcing`, { waitUntil: "domcontentloaded" });
-    await page.getByRole("heading", { name: "供应商询价与定标", exact: true }).waitFor();
-    const requestSelect = page.locator('select[name="purchase_request_id"]');
-    await requestSelect.selectOption("1");
-    await page.waitForFunction(() => document.querySelectorAll("article.rfq-supplier.eligible").length === 2);
-    for (const supplier of fixture.suppliers) {
-      const card = page.locator("article.rfq-supplier", { hasText: supplier.code });
-      assert.match(await card.innerText(), /覆盖 4\/4 · 可选/);
-      assert.match(await card.innerText(), /全部申请物料均有当前有效 1:1 Mapping/);
-      const checkbox = card.locator('input[name="supplier_ids"]');
-      assert.equal(await checkbox.isEnabled(), true);
-      await checkbox.check();
+    await approve.click();
+    let dialog = page.getByRole("dialog", { name: "确认批准并生效" });
+    await dialog.waitFor();
+    assert.match(await dialog.innerText(), new RegExp(approvedMappingId));
+    for (const fact of ["PENDING_REVIEW", "Supplier", "Material", "ACTIVE", "创建成功事实", "提交成功事实", "相同 Supplier / Material ACTIVE", "Supplier 内料号冲突", "RFQ 0 / Quote 0 / Award 0 / PO 0"]) {
+      assert.match(await dialog.innerText(), new RegExp(fact));
     }
-    await page.getByLabel("报价截止日", { exact: true }).fill("2026-10-15");
-    await noOverflow(page, "RFQ coverage desktop");
+    assert.equal(await approvedEvents(), 0);
+    assert.equal(businessMutations.filter(({ path }) => path.endsWith("/approve")).length, 0);
+    await dialog.getByRole("button", { name: "关闭审核窗口", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(await approvedEvents(), 0);
+
+    await approve.click();
+    dialog = page.getByRole("dialog", { name: "确认批准并生效" });
+    await dialog.getByRole("button", { name: "取消", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(await approvedEvents(), 0);
+
+    await approve.click();
+    dialog = page.getByRole("dialog", { name: "确认批准并生效" });
+    await dialog.waitFor();
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(await approvedEvents(), 0);
+
+    await approve.click();
+    dialog = page.getByRole("dialog", { name: "确认批准并生效" });
+    const comment = dialog.getByLabel("审核意见（独立字段，必填）", { exact: true });
+    await comment.waitFor();
+    const confirm = dialog.getByRole("button", { name: "确认批准并生效", exact: true });
+    assert.equal(await confirm.isDisabled(), true);
+    const approvalComment = "UAT审核通过：供应商、正式物料、PCS单位及1:1换算核对一致。";
+    await comment.fill(approvalComment);
+    assert.equal(await confirm.isEnabled(), true);
+    const approvedResponse = page.waitForResponse((response) => response.url().endsWith("/approve") && response.request().method() === "POST");
+    await confirm.dblclick();
+    assert.equal((await approvedResponse).status(), 200);
+    const receipt = page.getByRole("dialog", { name: "批准成功凭证" });
+    await receipt.waitFor();
+    for (const fact of [approvedMappingId, "APPROVE", "SUCCESS", approvalComment, "批准前 Version / CAS", "批准后 Version / CAS", "ACTIVE / 生效"]) {
+      assert.match(await receipt.innerText(), new RegExp(fact.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    }
+    assert.equal(await approvedEvents(), 1);
+    assert.equal(businessMutations.filter(({ path }) => path.endsWith("/approve")).length, 1);
+    await receipt.getByRole("button", { name: "关闭凭证", exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll("article.sm-card").length === 7);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "供应商映射运营审核", exact: true }).waitFor();
+    await page.waitForFunction(() => document.querySelectorAll("article.sm-card").length === 7);
+    const filterForm = page.locator("form.sm-filter");
+    await filterForm.locator('select[name="status"]').selectOption("ACTIVE");
+    await filterForm.locator('input[name="mapping_id"]').fill(approvedMappingId);
+    await filterForm.locator('input[name="supplier_part_number"]').fill("M533");
+    await filterForm.getByRole("button", { name: "筛选", exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll("article.sm-card").length === 1);
+    await page.getByRole("button", { name: "查看批准凭证", exact: true }).click();
+    const persistedReceipt = page.getByRole("dialog", { name: "批准成功凭证" });
+    await persistedReceipt.waitFor();
+    assert.match(await persistedReceipt.innerText(), new RegExp(approvalComment));
     await page.setViewportSize({ width: 390, height: 844 });
-    await noOverflow(page, "RFQ coverage 390x844");
+    await noOverflow(page, "persisted approval receipt 390x844");
+    await persistedReceipt.getByRole("button", { name: "关闭凭证", exact: true }).click();
     await page.setViewportSize({ width: 1440, height: 900 });
-    const rfqResponse = page.waitForResponse((response) => response.url() === `${REQUIRED_ORIGIN}/api/procurement/rfqs` && response.request().method() === "POST");
-    await page.getByRole("button", { name: "建立询价草稿", exact: true }).click();
-    assert.equal((await rfqResponse).status(), 201);
-    await page.getByRole("heading", { name: "RFQ-00000001 · Round 1", exact: true }).waitFor();
-    await noOverflow(page, "RFQ draft desktop");
+
+    await logoutNative(page);
+    await login(page, fixture.credentials.operations);
+    await page.goto(`${REQUIRED_ORIGIN}/operations/supplier-mappings`, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => document.querySelectorAll("article.sm-card").length === 7);
+    const reloginFilter = page.locator("form.sm-filter");
+    await reloginFilter.locator('select[name="status"]').selectOption("ACTIVE");
+    await reloginFilter.locator('input[name="mapping_id"]').fill(approvedMappingId);
+    await reloginFilter.getByRole("button", { name: "筛选", exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll("article.sm-card").length === 1);
+    await page.getByRole("button", { name: "查看批准凭证", exact: true }).click();
+    const reloginReceipt = page.getByRole("dialog", { name: "批准成功凭证" });
+    await reloginReceipt.waitFor();
+    assert.match(await reloginReceipt.innerText(), new RegExp(approvalComment));
+    await reloginReceipt.getByRole("button", { name: "关闭凭证", exact: true }).click();
+
+    await stopServer();
+    await startServer();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "供应商映射运营审核", exact: true }).waitFor();
+    await page.waitForFunction(() => document.querySelectorAll("article.sm-card").length === 7);
+    const restartFilter = page.locator("form.sm-filter");
+    await restartFilter.locator('select[name="status"]').selectOption("ACTIVE");
+    await restartFilter.locator('input[name="mapping_id"]').fill(approvedMappingId);
+    await restartFilter.getByRole("button", { name: "筛选", exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll("article.sm-card").length === 1);
+    await page.getByRole("button", { name: "查看批准凭证", exact: true }).click();
+    const restartReceipt = page.getByRole("dialog", { name: "批准成功凭证" });
+    await restartReceipt.waitFor();
+    assert.match(await restartReceipt.innerText(), new RegExp(approvalComment));
+    await restartReceipt.getByRole("button", { name: "关闭凭证", exact: true }).click();
+
+    await restartFilter.locator('input[name="mapping_id"]').fill("");
+    await restartFilter.locator('input[name="supplier_part_number"]').fill("");
+    await restartFilter.locator('select[name="status"]').selectOption("PENDING_REVIEW");
+    await restartFilter.getByRole("button", { name: "筛选", exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll("article.sm-card").length === 7);
 
     assert.deepEqual(await governanceState(), {
-      mappings: [{ status: "ACTIVE", count: 8, created_by: fixture.credentials.purchase.username, reviewed_by: fixture.credentials.operations.username }],
+      mappings: [
+        { status: "ACTIVE", count: 1, created_by: fixture.credentials.purchase.username, reviewed_by: fixture.credentials.operations.username },
+        { status: "PENDING_REVIEW", count: 7, created_by: fixture.credentials.purchase.username, reviewed_by: null },
+      ],
       events: [
-        { event_type: "APPROVED", count: 8 },
+        { event_type: "APPROVED", count: 1 },
         { event_type: "CREATED", count: 8 },
         { event_type: "SUBMITTED", count: 8 },
       ],
-      sourcing: { rfqs: 1, rfq_lines: 4, rfq_suppliers: 2, quotes: 0, awards: 0, purchase_orders: 0 },
+      sourcing: { rfqs: 0, rfq_lines: 0, rfq_suppliers: 0, quotes: 0, awards: 0, purchase_orders: 0 },
     });
+    assert.deepEqual((await pool.query("select reason,result from supplier_mapping_events where event_type='APPROVED'")).rows, [{ reason: approvalComment, result: "SUCCESS" }]);
     assert.equal(businessMutations.filter(({ path }) => path === "/api/supplier-mappings").length, 8);
     assert.equal(businessMutations.filter(({ path }) => path.endsWith("/submit")).length, 8);
-    assert.equal(businessMutations.filter(({ path }) => path.endsWith("/approve")).length, 8);
-    assert.equal(businessMutations.filter(({ path }) => path === "/api/procurement/rfqs").length, 1);
-    assert.equal(businessMutations.length, 25);
-    await logoutDashboard(page);
+    assert.equal(businessMutations.filter(({ path }) => path.endsWith("/approve")).length, 1);
+    assert.equal(businessMutations.filter(({ path }) => path === "/api/procurement/rfqs").length, 0);
+    assert.equal(businessMutations.length, 17);
+    await logoutNative(page);
     assert.deepEqual(authPosts, ["/api/login", "/api/logout", "/api/login", "/api/logout", "/api/login", "/api/logout"]);
     assert.equal(Number((await pool.query(
       "select count(*) count from app_sessions where username=any($1::text[]) and revoked_at is null and expires_at>now()",
@@ -454,7 +522,7 @@ test("isolated Chromium governs eight mappings before one RFQ draft and creates 
     assert.deepEqual(failedResponses, []);
     assert.deepEqual(consoleErrors, []);
     await context.close();
-    console.info("SUPPLIER_MAPPING_FIX20_BROWSER_OK mappings=8 active=8 coverage=4/4x2 rfq=1 quote=0 award=0 po=0 sessions=0 desktop=1 mobile=1");
+    console.info("SUPPLIER_MAPPING_FIX21_BROWSER_OK mappings=8 active=1 pending=7 approve_events=1 rfq=0 quote=0 award=0 po=0 sessions=0 desktop=1 mobile=1");
   } finally { await browser?.close().catch(() => undefined); }
 });
 

@@ -1056,6 +1056,18 @@
 - 实施结果：run-id `e0fec2fb-3894-4a19-93af-79eb85d9dfd4` 只把 operations must-change `true→false`、version `6→7`，事务既有 Session 撤销 0、恢复审计 1、最终有效 Session 0；Canonical 与数据库秘密一致，其他身份和业务指纹保持。Chromium attempt-2 实际形成 `LOGIN success` 与 `LOGOUT success`，但 verifier 错误要求 `/api/login` 响应含 `authenticated`，未完成页面 must-change 与历史导航断言，因此结论为 `OPERATIONS IDENTITY RECOVERED — BROWSER VERIFICATION INCOMPLETE`。
 - 后续边界：本决定不授权 Mapping 业务。完整浏览器验收未补齐前不放行 purchase 创建/提交八条 Mapping；修复 verifier 和只读复验必须是新的明确授权任务，Mapping 创建/提交/异人审核仍需独立业务授权。
 
+## D-094 Supplier Mapping 批准意见复用不可变 Event 通用字段并由零写预览形成凭证
+
+- 日期：2026-08-05
+- 状态：`ACCEPTED / IMPLEMENTED IN SOURCE`
+- 确认人：项目负责人（明确要求补齐 operations 审核确认、独立审核意见和可持久重开的批准成功凭证，同时保护主 UAT 既有 1 ACTIVE / 7 PENDING_REVIEW）
+- 存储决定：0038 的 `supplier_mapping_events.reason` 是审核生命周期 Event 的通用可空文本字段，且 Event 已关系化保存 Mapping 版本、事件类型、actor、occurred_at、request_id、result 和终态；批准意见保存到对应不可变 `APPROVED` Event 的 `reason`。`supplier_mappings.review_reason` 继续只承载退回原因并在 APPROVED 时保持空字符串，不把批准意见混入退回语义。因此不新增 0039、不修改 0001—0038，版本保持 `0.1.0-alpha.39`。
+- 历史真实性：既有 APPROVED Event 的空 `reason` 表示当时未采集审核意见。读模型和页面固定显示“历史批准未采集审核意见”，禁止补写、猜测或以复核时间冒充批准时间；既有 Event、Mapping Version/CAS、actor、时间和 request_id 均保持不变。
+- 预览权威：operations 确认前由 repeatable-read/read-only 服务端查询重新读取稳定 Mapping ID/版本/CAS、Supplier、Material、Unit、有效期、创建/提交成功 Event、当前 Supplier/Material ACTIVE 数量、ACTIVE 有效期冲突和 Supplier 内料号占用。Supplier/Material ACTIVE 状态取各自主表，冲突语义与 0038 的 Supplier part claim、ACTIVE 1:1 有效期约束一致；GET 正常或失败均不得写 Audit 或业务事实。
+- 确认与事务：批准窗口使用独立必填 `review_comment`，不接受退回 `reason`；确认时再次读取预览，随后批准事务仍执行权限、自审、CSRF、Origin、限流、幂等、CAS、稳定占用、冲突、正文摘要、单事务 Event/Audit/Idempotency 和故障回滚。按钮同步锁阻止双击形成第二请求；ACTIVE 不可再次批准或原地编辑。
+- 凭证投影：成功凭证只由当前 Mapping、不可变 APPROVED Event 和同 request_id 的成功 Audit 投影，展示批准前后 Mapping Version/CAS、最终 ACTIVE、稳定 Supplier/Material、料号、单位换算和有效期；刷新、重新登录和 Web 重启后可重新读取。批准不自动创建 RFQ、Quote、Award、PO 或其他下游事实。
+- 主 UAT 边界：本决定只授权 Web 审核保护能力和 operations 只读验收；不得批准或退回剩余七条 PENDING_REVIEW，不得撤销或重做既有 ACTIVE 批准，不得创建 RFQ。是否继续批准剩余七条必须取得新的明确业务授权。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

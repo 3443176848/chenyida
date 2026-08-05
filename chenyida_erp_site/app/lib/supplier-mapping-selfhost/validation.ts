@@ -44,6 +44,14 @@ export function boundedText(value: unknown, field: string, maximum: number, requ
   return parsed;
 }
 
+export function boundedExactText(value: unknown, field: string, maximum: number, required = false): string {
+  const parsed = String(value ?? "").trim();
+  if ((required && !parsed) || parsed.length > maximum || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(parsed)) {
+    throw new SupplierMappingError("REQUEST_VALIDATION_FAILED", `${field} 长度或字符无效`);
+  }
+  return parsed;
+}
+
 function dateOnly(value: unknown, field: string, optional = false): string | null {
   if (optional && (value === null || value === undefined || value === "")) return null;
   const parsed = String(value ?? "").trim();

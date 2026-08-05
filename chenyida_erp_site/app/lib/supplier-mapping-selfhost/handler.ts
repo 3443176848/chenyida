@@ -76,14 +76,28 @@ export async function handleSupplierMappingApi(request: Request, dependencies: D
   const collection = path === "/api/supplier-mappings";
   const queue = path === "/api/supplier-mappings/review-queue";
   const options = path === "/api/supplier-mappings/options";
+  const preview = path.match(/^\/api\/supplier-mappings\/([0-9a-f-]+)\/review-preview$/i);
   const action = path.match(/^\/api\/supplier-mappings\/([0-9a-f-]+)\/(draft|submit|approve|reject|versions)$/i);
-  if (!collection && !queue && !options && !action) return null;
+  if (!collection && !queue && !options && !preview && !action) return null;
 
   const repository = new SupplierMappingRepository(dependencies.pool);
   const service = new SupplierMappingService(repository);
   let auditAction = "SUPPLIER_MAPPING_REQUEST";
   try {
     if (request.method === "GET") {
+      if (preview) {
+        requirePermission(dependencies.actor, "supplier_mapping.review_queue");
+        if (!url.searchParams.has("expected_version")) {
+          throw new SupplierMappingError("REQUEST_VALIDATION_FAILED", "审核预览必须提供 expected_version");
+        }
+        const result = await service.reviewPreview(
+          mappingUid(preview[1]),
+          positiveQuery(url.searchParams.get("expected_version"), "expected_version", 1, 1_000_000_000),
+          dependencies.actor.username,
+        );
+        return response({ ...result, request_id: dependencies.requestId }, 200, dependencies.requestId);
+      }
+      if (action) throw new SupplierMappingError("METHOD_NOT_ALLOWED", "接口不支持该请求方法", 405);
       if (options) {
         requirePermission(dependencies.actor, "supplier_mapping.read");
         const items = await service.referenceOptions(
@@ -100,7 +114,10 @@ export async function handleSupplierMappingApi(request: Request, dependencies: D
       const result = await service.list({
         page,
         pageSize,
-        status: queue ? "PENDING_REVIEW" : url.searchParams.get("status") || undefined,
+        status: queue
+          ? (url.searchParams.has("status") ? url.searchParams.get("status") || undefined : "PENDING_REVIEW")
+          : url.searchParams.get("status") || undefined,
+        mappingId: url.searchParams.get("mapping_id") || undefined,
         supplierQuery: url.searchParams.get("supplier") || undefined,
         materialQuery: url.searchParams.get("material") || undefined,
         supplierPartNumber: url.searchParams.get("supplier_part_number") || undefined,
@@ -108,7 +125,7 @@ export async function handleSupplierMappingApi(request: Request, dependencies: D
       return response({ data: result.rows, rows: result.rows, pagination: result.pagination, request_id: dependencies.requestId }, 200, dependencies.requestId);
     }
 
-    if ((collection && request.method !== "POST") || queue || options || (action && !["POST", "PATCH"].includes(request.method))) {
+    if ((collection && request.method !== "POST") || queue || options || preview || (action && !["POST", "PATCH"].includes(request.method))) {
       throw new SupplierMappingError("METHOD_NOT_ALLOWED", "接口不支持该请求方法", 405);
     }
     dependencies.requireCsrf();
@@ -148,7 +165,9 @@ export async function handleSupplierMappingApi(request: Request, dependencies: D
     return response(result.body, result.status, dependencies.requestId, result.replayed);
   } catch (error) {
     const known = mapSupplierMappingError(error);
-    await repository.failureAudit(dependencies.actor.username, dependencies.requestId, auditAction, known.code);
+    if (request.method !== "GET") {
+      await repository.failureAudit(dependencies.actor.username, dependencies.requestId, auditAction, known.code);
+    }
     console.error(JSON.stringify({ level: "error", event: "supplier_mapping_api_failed", request_id: dependencies.requestId, code: known.code }));
     return response({
       error: { code: known.code, message: known.message, request_id: dependencies.requestId },

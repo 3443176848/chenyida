@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
 import { mappingIncompleteMessage } from "../app/lib/supplier-mapping-selfhost/coverage.ts";
-import { canonicalDigest, mappingUid, parseDraftInput, positiveId } from "../app/lib/supplier-mapping-selfhost/validation.ts";
+import { boundedExactText, canonicalDigest, mappingUid, parseDraftInput, positiveId } from "../app/lib/supplier-mapping-selfhost/validation.ts";
 import { buildCreateRfqDraftRequest } from "../app/procurement/sourcing/create-rfq-draft-request.ts";
 
 test("the exact role matrix separates purchase authorship from operations review", () => {
@@ -57,6 +57,7 @@ test("draft validation uses stable IDs, controlled rational precision and Shangh
   }
   assert.equal(mappingUid("123E4567-E89B-42D3-A456-426614174000"), "123e4567-e89b-42d3-a456-426614174000");
   assert.throws(() => mappingUid("Mapping 1"), /稳定 UUID/);
+  assert.equal(boundedExactText(" UAT审核通过：1:1。 ", "审核意见", 500, true), "UAT审核通过：1:1。");
 });
 
 test("canonical request digests and Chinese missing-combination errors are deterministic and scoped", () => {
@@ -102,4 +103,18 @@ test("mapping and RFQ server paths share one authoritative current 1:1 coverage 
   assert.match(sourcing, /requireRfqCoverage\(coverage, suppliers\)/);
   assert.match(legacyHandler, /SUPPLIER_MAPPING_GOVERNANCE_REQUIRED/);
   assert.doesNotMatch(legacyService, /createMapping|setMappingStatus/);
+});
+
+test("approval comments use the existing immutable event fact while rejection reasons remain row-scoped", async () => {
+  const service = await readFile(new URL("../app/lib/supplier-mapping-selfhost/service.ts", import.meta.url), "utf8");
+  const handler = await readFile(new URL("../app/lib/supplier-mapping-selfhost/handler.ts", import.meta.url), "utf8");
+  const schema = await readFile(new URL("../db/schema.ts", import.meta.url), "utf8");
+  assert.match(service, /decision === "APPROVE" \? \["expected_version", "review_comment"\]/);
+  assert.match(service, /boundedExactText\(input\.review_comment, "审核意见", 500, true\)/);
+  assert.match(service, /const storedReviewReason = decision === "REJECT" \? reason : ""/);
+  assert.match(service, /supplier_mapping_events[\s\S]*actor,reason,request_id/);
+  assert.match(service, /review_comment_display: input\.reviewComment \|\| "历史批准未采集审核意见"/);
+  assert.match(schema, /supplierMappingEvents[\s\S]*reason: text\("reason"\)/);
+  assert.match(handler, /if \(request\.method !== "GET"\)[\s\S]*failureAudit/);
+  assert.doesNotMatch(service, /safeDetail:\s*\{[^}]*review_comment/);
 });

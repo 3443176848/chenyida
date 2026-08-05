@@ -24,6 +24,22 @@
 .sm-review-actions { display: grid; grid-template-columns: minmax(160px,.35fr) minmax(0,1fr); gap: 12px; align-items: start; padding-top: 10px; border-top: 2px solid #d6b262; }
 .sm-review-actions form { display: grid; gap: 7px; }
 .sm-review-actions label { display: grid; gap: 5px; }
+.sm-dialog-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 18px; background: rgba(11,30,44,.68); overflow: auto; }
+.sm-dialog { width: min(980px,100%); max-height: calc(100dvh - 36px); overflow: auto; border: 1px solid #7d91a1; border-radius: 8px; background: #fff; box-shadow: 0 18px 60px rgba(0,0,0,.35); padding: 18px; }
+.sm-dialog > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 1px solid #d8e1e7; padding-bottom: 10px; }
+.sm-dialog h2, .sm-dialog p { margin-top: 0; }
+.sm-dialog-close { min-width: 42px; font-size: 24px; line-height: 1; }
+.sm-dialog-warning { margin: 12px 0; padding: 10px; border-left: 4px solid #c49327; background: #fff8e8; }
+.sm-preview-facts { margin-bottom: 12px; }
+.sm-blockers { border: 1px solid #c94d4d; border-radius: 5px; background: #fff2f2; padding: 10px; color: #762525; }
+.sm-blockers ul { margin: 7px 0 0; padding-left: 22px; }
+.sm-blockers li + li { margin-top: 7px; }
+.sm-blockers span { color: #573c3c; }
+.sm-review-comment { display: grid; gap: 6px; margin-top: 12px; font-weight: 700; }
+.sm-review-comment textarea { min-height: 100px; width: 100%; resize: vertical; }
+.sm-dialog footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.sm-receipt-banner { padding: 10px; margin-top: 12px; border: 1px solid #79a484; border-radius: 5px; background: #effaf2; color: #225e31; font-weight: 800; }
+.sm-history-missing { color: #7a4e00; font-weight: 800; }
 
 @media (max-width: 760px) {
   .sm-user { justify-items: start; }
@@ -32,4 +48,7 @@
   .sm-card { padding: 9px; }
   .sm-card .sourcing-title { align-items: flex-start; gap: 7px; }
   .sm-links a { flex: 1 1 100%; }
+  .sm-dialog-backdrop { padding: 0; place-items: stretch; }
+  .sm-dialog { width: 100%; max-height: 100dvh; min-height: 100dvh; border: 0; border-radius: 0; padding: 12px; }
+  .sm-dialog footer { display: grid; grid-template-columns: minmax(0,1fr); }
 }
