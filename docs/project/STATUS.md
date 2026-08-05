@@ -1,6 +1,25 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-05（Asia/Shanghai）
+最后更新时间：2026-08-06（Asia/Shanghai）
+
+## SELFHOST-UAT-FIX-24 RFQ Binding 稳定 ID 与发出前固定凭证
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | RFQ BINDING IDENTIFIERS DEPLOYED — UAT RFQ STILL DRAFT | 真实 Binding PK、独立 Mapping固定凭证和发出前完整检查已 Web-only 部署；主 RFQ未再次固定、未发出、未录报价或定标 |
+| 严格起点 | PASS | clean `main@3bea653`、Parent `f919890`、behind 0/ahead 146；alpha.40、0001—0039、0039 SHA、Web `5fe40694…`、服务/资源及主 RFQ DRAFT v2/Binding 8/Event 1/下游 0全部吻合 |
+| 主键模型 | BRANCH A / NO 0040 | 0039 已有 `id bigserial PRIMARY KEY NOT NULL`，运行时 `bigint`、sequence-backed、唯一且稳定。显式文本 `binding_id` 贯通 Repository/DTO/Service/Handler/UI；复合键/序号/哈希未冒充 ID |
+| 详情/排序 | PASS | 八条按 Supplier code、Material code、Binding ID稳定排序；逐卡显示 RFQ/Line/Supplier/Material/Mapping稳定 ID及双方名称、part、单位/1:1、有效期、固定/当前状态、两类漂移和摘要归属，四类 ID标签分离 |
+| 固定凭证 | PASS / IMMUTABLE | 唯一 `RFQ_MAPPING_CONFIRMED` SUCCESS Event投影 actor、上海时间、request_id、v1→v2、Binding 8、八 ID、固定摘要和不可变说明；刷新、重登和 Web重启后可重开 |
+| 发出窗口/门禁 | PASS / CANCEL ONLY | 创建 Audit、完整固定 Event、八 Binding及 Mapping ID/Version、4 Material、2 Supplier、截止日/CNY、漂移与后果齐全；缺失/重复/跨 RFQ或凭证不完整禁用。主 UAT桌面/390px均可确认但只取消 |
+| 权限/零写 | PASS | 详情/发出预览为 purchase权限和 RFQ/PRQ数据域内只读事务；未授权/跨域403。POST继续重验 CAS、数量、摘要、Mapping漂移、PRQ、截止日、幂等/并发/回滚，不因展示放宽 |
+| 自动验证 | PASS | Unit/UI `17/17`、PostgreSQL `20/20`、Chromium `2/2`、0039 `6/6`、0018 `3/3`、Material Requirement `18/18`、npm `3/3`、environment `6/6`、Python三项；typecheck/Schema/build/credentials/diff通过，lint 0 error/11既有 warning |
+| 备份/恢复 | PASS | root:root 0600 dump 2,284,331 bytes，SHA-256 `e937d7bcabbc78cc415dacf8565a58e7255724997b9332834acff8d5ec705ab6`；list 3,359行，第二空库 39/head/226表、八 ID和指纹一致，恢复库已删 |
+| Web-only 部署 | PASS | Web `sha256:5fe40694…→sha256:315f0b7945a7b3eb27841ffaae8a444fba45dd94791519dc856173a95d830635`、88,545,226 bytes；无 Migration，PostgreSQL/Worker/Caddy身份及四卷/Origin/端口保持，旧 Web rollback tag保留 |
+| 主 UAT | PASS / READ ONLY | purchase-only 读取 ID `3,4,1,2,7,8,5,6`、重开固定凭证、刷新，并在桌面/390×844两次打开窗口后取消；`business_post=0`、安全退出 Session 0 |
+| 主 UAT 数据 | PASS / UNCHANGED | 最终指纹 `9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`；RFQ DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO及全部下游 0 |
+| 资源/清理 | PASS | final-deploy前/最终 available约 2.2/2.2 GiB，Swap 284/283 MiB，根盘 18/19 GiB，最终 Load `0.19/0.48/0.44`；内核 OOM 0、四服务 restart 0/OOM false。临时库/恢复库/容器/runtime/SQLite/过期候选镜像清零，未 prune |
+| Git/后续 | TWO FOCUSED COMMITS / NEW AUTH REQUIRED | 功能 `e329931`；收口消息 `ops: deploy rfq binding traceability`。技术凭证完整，但正式发出必须在新任务中重新校验并获明确授权；本任务停止 |
 
 ## SELFHOST-UAT-FIX-23 RFQ Mapping 固定权威预览与凭证措辞
 

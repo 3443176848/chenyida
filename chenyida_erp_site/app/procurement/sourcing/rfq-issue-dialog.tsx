@@ -394,6 +394,8 @@ function MappingRows({ rows }: { rows: RfqMappingRow[] }) {
                     <div><dt>RFQ ID</dt><dd>{row.rfq_id ?? "—"}</dd></div>
                     <div><dt>RFQ Line ID</dt><dd>{row.rfq_line_id ?? "—"}</dd></div>
                     <div><dt>Supplier ID</dt><dd>{row.supplier_id}</dd></div>
+                    <div><dt>Supplier 编码</dt><dd>{row.supplier_code}</dd></div>
+                    <div className="wide"><dt>Supplier 名称</dt><dd>{row.supplier_name}</dd></div>
                     <div><dt>Material ID</dt><dd>{row.material_id}</dd></div>
                     <div><dt>supplier_part_number</dt><dd>{row.supplier_part_number || "—"}</dd></div>
                     <div className="wide"><dt>Mapping ID</dt><dd><TraceValue>{row.mapping_id}</TraceValue></dd></div>

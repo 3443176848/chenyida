@@ -2,6 +2,17 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-06
+
+### SELFHOST-UAT-FIX-24 - `fix: expose rfq binding identifiers` / `ops: deploy rfq binding traceability`
+
+- Git/范围：从 strict clean `main@3bea653`、Parent `f919890`、behind 0/ahead 146起步；功能提交 `e329931`，最终镜像、主 UAT、清理和文档由独立 ops提交收口。仅贯通 RFQ Binding真实主键、固定凭证和发出前展示；不再次固定 Mapping、不发出主 RFQ、不修改 RFQ/Supplier/Mapping/PRQ/截止日、不创建 Quote/Award/PO，不 push/PR或改写历史。
+- 模型/API：0039 已有 `id bigserial PRIMARY KEY NOT NULL`，采用分支 A；Repository 将 bigint显式投影为文本 `binding_id`，经 DTO/Service/Handler进入详情和发出预览。没有 0040、不改 0001—0039，保持 alpha.40。GET为 purchase权限和对象范围内的只读事务；POST继续复核 CAS、Binding数量/唯一性/归属、摘要、Mapping/状态漂移、PRQ和截止日。
+- UI/凭证：八条 Binding按 Supplier/Material/ID稳定排序并独立显示 Supplier/Material、Mapping、单位、换算、有效期和漂移；Binding/Mapping/Line/Material ID标签分离。可重开的 `RFQ_MAPPING_CONFIRMED` 凭证显示 actor、上海时间、request_id、SUCCESS、v1→v2、八 ID和固定摘要；缺 ID或凭证未验证时禁用发出。发出窗口同时显示创建 Audit、四 Material、两 Supplier、截止日/CNY和零自动下游说明。
+- 自动验证：Unit/UI `17/17`、隔离 PostgreSQL `20/20`、Chromium `2/2`、0039 `6/6`、0018 upgrade `3/3`、Material Requirement `18/18`、npm `3/3`、environment `6/6`和 Python三项通过；typecheck、Schema consistency、最终 build/postbuild、1,226文件凭据扫描和 diff check通过，lint 0 error/11既有 warning。首次主 UAT发现逐卡 Supplier信息缺失后安全停止、指纹/Session不变；补齐并重建后最终通过。
+- 备份/部署：predeploy dump为 root:root 0600、2,284,331 bytes、SHA-256 `e937d7bcabbc78cc415dacf8565a58e7255724997b9332834acff8d5ec705ab6`；list 3,359行，第二空库恢复 39/head/226表及保护指纹一致。只替换 Web `5fe40694…→315f0b79…`；PostgreSQL/Worker/Caddy和四卷不变，四服务 restart 0/OOM false，旧 Web精确 rollback tag保留。
+- 主 UAT/结论：purchase-only 最终 runner读取 Binding ID `3,4,1,2,7,8,5,6`，重开完整固定凭证，在桌面与390×844分别打开发出窗口并取消；`business_post=0`、Session 0。RFQ仍 DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO 0，保护指纹仍 `9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`。结论 `RFQ BINDING IDENTIFIERS DEPLOYED — UAT RFQ STILL DRAFT`；正式发出必须另获授权。
+
 ## 2026-08-05
 
 ### SELFHOST-UAT-FIX-23 - `fix: expose rfq mapping qualification evidence` / `ops: deploy rfq binding preview safeguards`

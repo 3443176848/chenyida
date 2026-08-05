@@ -2,8 +2,9 @@
 
 ## 状态
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始：2026-08-05
+- 完成：2026-08-06
 - 负责人：Codex；项目负责人负责既定展示、Web-only 部署和主 UAT purchase-only 只读验收授权
 - 依赖：SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-23、D-061、D-091、D-094、D-095
 
@@ -34,3 +35,10 @@
 - 部署前建立覆盖 RFQ、八条 Binding、Event、Quote/Award/PO 及全部下游的保护指纹，并创建 root:root 0600 PostgreSQL custom dump；记录大小和 SHA-256，`pg_restore --list` 与第二空库恢复通过。
 - 本任务无 Migration，只允许替换 Web；不得重建 PostgreSQL、Worker、Caddy 或更换 Volume。
 - 主 UAT 仅以 purchase 登录，读取详情和八个真实 Binding ID、打开 Mapping 固定凭证、打开发出确认后取消，并做桌面/390×844检查与安全退出。最终必须保持业务 POST 0、DRAFT v2、Binding 8、ISSUED 0、Quote/Award/PO 0/0/0、保护指纹不变、Session 0。
+
+## 完成结果
+
+- 采用分支 A，真实主键为 `id bigserial PRIMARY KEY NOT NULL`；没有 0040，保持 alpha.40/0039。
+- 功能提交 `e329931`；最终 Web `sha256:315f0b7945a7b3eb27841ffaae8a444fba45dd94791519dc856173a95d830635` 已 Web-only 部署。
+- 主 UAT八个 Binding ID 为 `3,4,1,2,7,8,5,6`；完整固定凭证和桌面/390px发出窗口通过，只取消，业务 POST 0、Session 0。
+- 最终结论：`RFQ BINDING IDENTIFIERS DEPLOYED — UAT RFQ STILL DRAFT`。详见[完成报告](SELFHOST-UAT-FIX-24-COMPLETION.md)。

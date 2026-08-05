@@ -254,7 +254,7 @@
 
 ## 当前路线
 
-`SELFHOST-UAT-FIX-22` 已完成：alpha.40/0039、RFQ 创建凭证、精确 Mapping binding、发出确认/重验/成功凭证已经恢复验证并部署到并行非生产 UAT。主 RFQ 只读验收为 DRAFT v1、历史未固定、八条当前资格、业务 POST 0、Binding/Event 0、Quote/Award/PO 0、Session 0，保护指纹不变。现在没有自动执行任务；下一任务若获授权必须先显式确认并固定当前 Mapping，实际发出仍须再次明确授权，不能直接开始 Quote、Award 或 PO。此前身份恢复和历史 PARTIAL/BLOCKED 记录均保持。
+`SELFHOST-UAT-FIX-24` 已完成：alpha.40/0039 保持，0039 的真实 `id bigserial PRIMARY KEY` 已作为文本 Binding ID贯通 Repository/DTO/Handler/UI；独立 `RFQ_MAPPING_CONFIRMED` 固定凭证和发出前完整失败关闭展示已 Web-only 部署。主 `RFQ-00000001` 的八个稳定 ID为 `3,4,1,2,7,8,5,6`；purchase-only 桌面/390px只读验收仅打开详情、凭证和发出窗口后取消，业务 POST 0、Session 0，最终仍 DRAFT v2、Binding 8、ISSUED/Quote/Award/PO 0，保护指纹不变。现在没有自动执行任务；正式发出必须在新的明确授权任务中重新校验 CAS/Binding/摘要/Mapping/PRQ/截止日，不能直接开始 Quote、Award 或 PO。此前身份恢复和历史 PARTIAL/BLOCKED 记录均保持。
 
 ## 恢复上下文检查清单
 

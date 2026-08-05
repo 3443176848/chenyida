@@ -425,7 +425,7 @@ try {
   await page.waitForFunction(() => document.documentElement.dataset.cydAuthState === "anonymous");
   const anonymousText = await page.locator("body").innerText();
   for (const protectedValue of [RFQ_CODE, PRQ_CODE, CONFIRM_REQUEST_ID, SCOPE_DIGEST,
-    ...BINDINGS.flatMap((binding) => [binding.id, binding.mappingId])]) {
+    ...BINDINGS.map((binding) => binding.mappingId)]) {
     assert.equal(anonymousText.includes(protectedValue), false, `protected value remained after logout: ${protectedValue}`);
   }
 

@@ -33,29 +33,31 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-08-05（Asia/Shanghai）
+快照时间：2026-08-06（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.40`；PostgreSQL 为 39/head `0039_rfq_traceability.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-23` 功能提交为 `f919890436662265bb22e2bec9ae00f5c2761372`（`fix: expose rfq mapping qualification evidence`）；版本保持 alpha.40，Migration 保持 0039 |
-| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-23` 已部署零业务写入的 RFQ Mapping 固定权威预览、POST 同规则重验、不可变快照说明和 Audit/Event 分列。独立 `ops: deploy rfq binding preview safeguards` 承载 Web-only 部署、只读 runner、主 UAT 和文档；purchase-only 只读验收通过，业务 POST 0、Session 0，RFQ 仍 DRAFT v1且 Binding 0 |
-| Git 同步与工作区 | 本任务从 clean `main@7cd9cd011e8c770933a061aa9ee51f8104b01ba3`、Parent `b339acd97f08e4cc09451173b48580015817d9f8`、behind 0/ahead 144 起步；功能提交 `f919890436662265bb22e2bec9ae00f5c2761372`，部署/最终 UAT/文档以 `ops: deploy rfq binding preview safeguards` 独立收口，完成后为 ahead 146。未 push/PR/amend/rebase/reset/stash/restore；密码、Token、Cookie、Session 摘要、Canonical 正文、连接信息和备份未进入 Git |
+| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-24` 功能提交为 `e329931`（`fix: expose rfq binding identifiers`）；版本保持 alpha.40，Migration 保持 0039 |
+| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-24` 已 Web-only 部署真实 Binding ID、独立 Mapping 固定凭证和发出前完整失败关闭展示。独立 `ops: deploy rfq binding traceability` 承载逐卡 Supplier 信息修正、最终镜像、purchase-only 主 UAT、清理与文档；桌面/390px只读取消通过，业务 POST 0、Session 0，RFQ 仍 DRAFT v2且 Binding 8 |
+| Git 同步与工作区 | 本任务从 clean `main@3bea653`、Parent `f919890`、behind 0/ahead 146 起步；功能提交 `e329931`，部署/最终 UAT/文档以 `ops: deploy rfq binding traceability` 独立收口，完成后为 behind 0/ahead 148。未 push/PR/amend/rebase/reset/stash/restore；密码、Token、Cookie、Session 摘要、Canonical 正文、连接信息和备份未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码与并行 UAT PostgreSQL 为 `0001`—`0039`，39/head `0039_rfq_traceability.sql`，SHA-256 `3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；0038 SHA 保持。Supplier Mapping 为 8 ACTIVE。主 `RFQ-00000001` 为 generation 1 / DRAFT v1、来源 PRQ 1 ACCEPTED、四行/两 Supplier、Binding 0、RFQ Event/ISSUED 0、精确创建成功 Audit 1、Quote/Award/PO及全部下游 0。FIX-23 主 UAT 权威预览为两家各 4/4、缺失和两类冲突均 0；保护指纹始终为 `9d4641b1b6324de4e3a1a26e7461ca2e15bd7613cb99a277c11e6bca869ac66e`，最终 Session 0 |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 为 alpha.40 `sha256:5fe406949d4678d5beb06ba6db4d931f88f5f24989332654b557b8a4f9df6e4b`，Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false。FIX-23 predeploy Web 有精确 rollback tag，四个受保护 Volume 未更换 |
+| 当前数据库 | 源码与并行 UAT PostgreSQL 为 `0001`—`0039`，39/head `0039_rfq_traceability.sql`，SHA-256 `3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；没有 0040。Supplier Mapping 为 8 ACTIVE。主 `RFQ-00000001` 为 generation 1 / DRAFT v2、来源 PRQ 1 ACCEPTED、四行/两 Supplier、真实 Binding 8、`RFQ_MAPPING_CONFIRMED` 1、ISSUED 0、精确创建成功 Audit 1、Quote/Award/PO及全部下游 0；固定摘要 `9765f8fd…4848d`，保护指纹始终为 `9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`，最终 Session 0 |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 为 alpha.40 `sha256:315f0b7945a7b3eb27841ffaae8a444fba45dd94791519dc856173a95d830635`，Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false。FIX-24 predeploy Web 有精确 rollback tag，四个受保护 Volume 未更换 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.40 在 Supplier Mapping 治理和 RFQ 覆盖率之上增加 RFQ 精确 Mapping 绑定、创建/发出 lifecycle credential 和安全确认。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
-| 当前阶段 | `SELFHOST-UAT-FIX-23` 已完成并 Web-only 部署。主历史 RFQ 的成功 Audit 与业务 Event 分列，Mapping 固定窗口显示权威两家 4/4、零冲突、八条 Mapping 和不可变 Binding 说明；purchase-only 桌面/390px以 ESC/取消退出，业务事实和指纹保持 |
-| 当前任务 | `SELFHOST-UAT-FIX-24` DOING：0039 已有独立 `id bigserial PRIMARY KEY`，采用分支 A 补齐真实 Binding ID、Mapping 固定凭证和发出前失败关闭展示；保持 alpha.40/0039，主 RFQ 必须仍 DRAFT v2、Binding 8且不发出 |
-| 下一任务 | 可由项目负责人另立并明确授权：基于新的权威预览显式确认并固定主 RFQ 当前八条 Mapping；固定后 RFQ 仍 DRAFT。实际发出仍必须再次独立授权，不能从本任务直接发出，Quote/Award/PO也未获授权 |
+| 当前阶段 | `SELFHOST-UAT-FIX-24` 已完成并 Web-only 部署。真实 bigint Binding ID、完整 Mapping 固定 Event凭证、稳定排序和发出前失败关闭已贯通；purchase-only 桌面/390px只打开确认后取消，业务事实和指纹保持 |
+| 当前任务 | 无 `DOING`；FIX-24 已以 `RFQ BINDING IDENTIFIERS DEPLOYED — UAT RFQ STILL DRAFT` 收口并停止 |
+| 下一任务 | 只有项目负责人另立任务并明确授权后，才可重新读取 CAS/Binding/摘要/Mapping/PRQ/截止日并决定是否正式发出主 RFQ；本任务不授权发出，Quote/Award/PO也未获授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-UAT-FIX-24 采用分支 A，直接公开 0039 的 `id bigserial PRIMARY KEY`，以文本 DTO贯通 Repository/Service/Handler/UI；详情、独立固定凭证和发出窗口完整显示八个真实 ID及 Mapping Event。隔离测试、备份恢复、Web-only 部署和 purchase-only 桌面/390px只读取消通过；主 RFQ 最终仍 DRAFT v2、Binding 8、ISSUED/Quote/Award/PO 0、业务 POST 0、Session 0，保护指纹不变
 
 - SELFHOST-UAT-FIX-23 保持 alpha.40/0039，以共享 Service 规则交付零写权威 Mapping 固定预览和 POST 事务重验：主 RFQ 两家各 4/4、缺失/两类冲突 0、八条 Mapping逐项证据与不可变 Binding 后果完整，历史创建成功 Audit 与独立 Event 分列。隔离固定恰好 8、备份恢复、Web-only 部署和主 UAT purchase-only 只读 ESC/取消通过；主 RFQ 最终仍 DRAFT v1、Binding/Event/Quote/Award/PO 0、业务 POST 0、Session 0
 
@@ -260,7 +262,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- `SELFHOST-UAT-FIX-24` 正在执行：严格起点 `main@3bea653`、alpha.40/0039、Web `5fe40694…` 与主 `RFQ-00000001` DRAFT v2、Binding 8、固定 Event 1、ISSUED/Quote/Award/PO 0 已只读核验。0039 Binding 表有真实 `bigserial` 主键，故不新增 0040；当前只贯通稳定 ID 和固定凭证，主 UAT 只能打开详情/凭证/发出窗口后取消，不能再次固定或正式发出。
+- `SELFHOST-UAT-FIX-24` 已完成：功能提交 `e329931`，保持 alpha.40/0039且没有 0040；真实 bigint Binding ID、独立 `RFQ_MAPPING_CONFIRMED` 凭证和发出前完整检查已部署。主 `RFQ-00000001` 的八个 ID 为 `3,4,1,2,7,8,5,6`，purchase-only 桌面/390px只打开详情/凭证/发出窗口后取消；业务 POST 0、Session 0，RFQ 仍 DRAFT v2、Binding 8、ISSUED/Quote/Award/PO 0。当前无 `DOING`；正式发出必须另获明确授权。
 - `SELFHOST-UAT-FIX-22` 已完成：功能提交 `b339acd97f08e4cc09451173b48580015817d9f8`，部署、Asia/Shanghai 日期投影修复、最终 UAT 与文档由独立 `ops: deploy rfq issuance safeguards` 提交收口。alpha.40/0039 已部署，新 RFQ 创建时固定精确 Mapping；主 `RFQ-00000001` 仍为 generation 1 / DRAFT v1、Binding 0，页面八条 Mapping 仅是当前资格和拟绑定。purchase-only 桌面/390px只打开发出确认并取消，业务 POST 0、下游 0、Session 0。当前无 `DOING`；不能直接发出，下一任务必须先另获授权显式确认并固定当前 Mapping，实际发出仍须再次明确授权。
 - `SELFHOST-OPS-UAT-PURCHASE-SUPPLY-BREAKDOWN-FIX-16` 已完成：功能提交 `ce3f14a0c989875e7527e42136967f9efe6ee548`；alpha.38/0037 的当前库存/正式预留/冻结/有效计划分配及有效在途分解、快照/当前/差异分区、接收确认刷新、范围授权和零查询写入已通过定向/跨域 PostgreSQL、390px 隔离 Chromium、备份恢复与 Web-only 部署。主 UAT 只登录 purchase，分别核对 Material 533—536 的九项当前供应 0 PCS，打开刷新后的接收确认并取消；最终 PRQ/Plan 仍 SUBMITTED、Package 2/v2 仍 ACCEPTED、ACCEPT/RETURN/Allocation/全部下游 0。当前立即停止，不接收或退回 PRQ，不创建 RFQ。
 - `SELFHOST-OPS-UAT-PURCHASE-REQUEST-TRACEABILITY-FIX-15` 已完成：功能提交 `22ea9a282ef4d7a7e58e84b9db73061a0ef6e109`；Package→Plan→PRQ 关系化详情、提交快照、对象范围授权、确认界面与 390px 已通过隔离测试、备份恢复、Web-only 部署及 purchase-only 主 UAT 打开后取消。该任务历史结论保持，当前供应细分缺口已由后续 FIX-16 解除。

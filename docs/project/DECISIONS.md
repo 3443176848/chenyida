@@ -868,7 +868,7 @@
 ## D-078 公网 18888 只通过可信 TLS 进入新 PostgreSQL ERP，旧 Python 回环保留
 
 - 日期：2026-07-28
-- 状态：`ACCEPTED / IMPLEMENTED`
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
 - 确认人：项目负责人（明确要求公网访问入口并指定端口 `18888`）
 - 入口：公网 `18888` 由 Caddy 终止 TLS 并反向代理到只绑定 `127.0.0.1:3000` 的 Web；PostgreSQL 不发布宿主端口。80 只用于 ACME 与 308 HTTPS 跳转，不承载明文登录。
 - 运行安全：Web/Worker 使用 `ERP_ENV=production`，Cookie 强制 `Secure`；setup token 在切换时轮换。匿名业务 API 必须保持 401，Caddy 添加 HSTS、nosniff、frame deny、Referrer 与 Permissions Policy。
@@ -1093,6 +1093,7 @@
 - 凭证权威：固定凭证必须同时验证预期 lifecycle generation 的唯一 SUCCESS Event、稳定且唯一的 Binding ID、完整 Supplier×RFQ Line 组合、Binding 的 RFQ/Line/Supplier 归属、来源/状态、actor/时间/request_id 归属以及由不可变 Binding 快照重新计算的 scope digest。任一不一致时详情如实标为 UNVERIFIED，UI 禁用发出，POST 返回稳定 `RFQ_MAPPING_CREDENTIAL_UNVERIFIED` 并保持事务零业务写。
 - 展示与安全：详情和发出确认明确分列 Binding ID、Mapping ID、RFQ Line ID、Material ID，并显示 Supplier/Material 名称、Mapping Version、supplier part、单位换算、有效期、固定/当前状态和漂移。Mapping 固定凭证可重新打开；所有 GET 使用 read-only 事务且失败不写 Audit，仍执行 purchase 权限和 RFQ/PRQ 数据域。发出 POST 继续重验 CAS、范围数量、摘要、当前 Mapping、PRQ、截止日和下游状态。
 - 主 UAT 边界：`RFQ-00000001` 的八个真实 Binding ID、固定 Event 和发出窗口只允许 purchase 读取；桌面/390px均必须取消并安全退出。不得再次固定 Mapping、发出 RFQ、录 Quote、定标或创建 PO；是否正式发出必须由后续独立任务重新授权。
+- 实施结果：功能提交 `e329931`，保持 alpha.40/0039且没有 0040；最终 Web `sha256:315f0b7945a7b3eb27841ffaae8a444fba45dd94791519dc856173a95d830635` 已 Web-only 部署。主 UAT八个 Binding ID为 `3,4,1,2,7,8,5,6`，固定 Event、桌面/390px发出窗口和安全退出通过；业务 POST 0、Session 0，RFQ仍 DRAFT v2、Binding 8、ISSUED/Quote/Award/PO 0，保护指纹保持 `9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`。正式发出仍须新的明确授权。
 
 ## 待确认业务决策
 
