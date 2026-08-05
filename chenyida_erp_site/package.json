@@ -155,6 +155,7 @@
     "test:procurement-sourcing:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-procurement-sourcing-migration-upgrade.test.mjs",
     "test:procurement-sourcing:migration-fix22": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-rfq-traceability-fix22-migration.test.mjs",
     "test:procurement-sourcing:browser-fix22": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-rfq-traceability-fix22-browser.test.mjs",
+    "test:procurement-sourcing:browser-fix23": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-rfq-traceability-fix22-browser.test.mjs",
     "protect:rfq-traceability-fix22": "node --experimental-strip-types scripts/selfhost-rfq-traceability-fix22-protection.mjs",
     "uat:rfq-traceability-fix22": "node --experimental-strip-types scripts/selfhost-rfq-traceability-fix22-uat-readonly-browser.mjs",
     "typecheck:procurement-fulfillment": "tsc -p tsconfig.phase4-task05.json --pretty false",

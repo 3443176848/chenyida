@@ -9,6 +9,12 @@
 
 任何时刻原则上只能有一个 `DOING` 任务。任务完成后必须更新负责人、时间、依赖、说明，并同步更新 `MASTER.md`、`CHANGELOG.md` 和 `STATUS.md`。
 
+## 当前任务
+
+| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-UAT-FIX-23 | 补齐 RFQ Mapping 固定确认的资格与冲突证据 | DOING | Codex（权威只读预览、共享 POST 重验规则、Audit/Event 措辞、串行测试、备份恢复、Web-only 部署和 purchase-only 只读 UAT）、项目负责人（固定范围与部署/只读验收授权） | 2026-08-05 | SELFHOST-UAT-FIX-22、D-061、D-091、D-094、D-095 | 仅修复 Mapping 固定预览和历史凭证措辞；保持 alpha.40/0039。主 UAT 禁止生成 Binding、发出 RFQ 或创建下游记录。见[任务文档](../tasks/SELFHOST-UAT-FIX-23.md)。 |
+
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |

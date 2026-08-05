@@ -371,6 +371,36 @@ async function sourcingState() {
   return { header, lines, suppliers, bindings, events, downstream };
 }
 
+async function previewWriteState(rfqId) {
+  return (await pool.query(`select
+    (select count(*)::int from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1) bindings,
+    (select count(*)::int from procurement_sourcing_events where rfq_id=$1) events,
+    (select count(*)::int from audit_log) audits,
+    (select count(*)::int from idempotency_keys) idempotency,
+    (select status from procurement_rfqs where id=$1) rfq_status,
+    (select version::int from procurement_rfqs where id=$1) rfq_version,
+    (select count(*)::int from procurement_supplier_quotes where rfq_id=$1) quotes,
+    (select count(*)::int from procurement_sourcing_awards where rfq_id=$1) awards,
+    (select count(distinct link.purchase_order_id)::int from procurement_award_po_line_links link
+      join procurement_sourcing_awards award on award.id=link.award_id where award.rfq_id=$1) purchase_orders`, [rfqId])).rows[0];
+}
+
+async function convertToLegacyDraft(rfqId) {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await withSupplierMappingFixtureTriggersDisabled(client, async () => {
+      await client.query("delete from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1", [rfqId]);
+      await client.query("delete from procurement_sourcing_events where rfq_id=$1 and event_type='RFQ_CREATED'", [rfqId]);
+      await client.query("update procurement_rfqs set traceability_version=1 where id=$1", [rfqId]);
+    });
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally { client.release(); }
+}
+
 async function setSyntheticMappingRowVersion(mappingVersionId, version) {
   const client = await pool.connect();
   try {
@@ -527,7 +557,8 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
       "Round 1 / v1",
       "DRAFT / 草稿 / 待发出",
       "ID 1 · PRQ-00000001",
-      "IMMUTABLE_EVENT",
+      "RFQ_CREATED 业务 Event",
+      "独立 RFQ_CREATED 业务 Event",
       "RFQ_CREATED",
       "SUCCESS",
       fixture.credentials.username,
@@ -558,7 +589,7 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
     for (const required of [
       "ID 1 · RFQ-00000001", "Round 1 / v1", "DRAFT / 草稿 / 待发出",
       "ID 1 · PRQ-00000001", "PRJ-00000001", "2099-08-31", "CNY",
-      "IMMUTABLE_EVENT", "RFQ_CREATED", "SUCCESS", fixture.credentials.username,
+      "RFQ_CREATED 业务 Event", "独立 RFQ_CREATED 业务 Event", "RFQ_CREATED", "SUCCESS", fixture.credentials.username,
       draft.events[0].request_id, draft.events[0].occurred_at_shanghai,
       "10.000000 PCS", "ID 1 · SUP-000001", "ID 2 · SUP-000002",
       "已固定 Mapping · 8 条", "v1 / Row v1", "已绑定版本当前状态", "最新 Mapping 版本",
@@ -711,6 +742,242 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
     assert.deepEqual(await sourcingState(), issued);
     await context.close();
     console.info("RFQ_TRACEABILITY_FIX22_BROWSER_OK rfq=1 create_event=1 bindings=8 issue_event=1 issue_post=1 quote=0 award=0 po=0 restart=1 desktop=1 mobile=1 session=0");
+  } finally {
+    await browser?.close().catch(() => undefined);
+  }
+});
+
+test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exits, and fixes exactly eight Bindings", { timeout: 300_000 }, async () => {
+  await clearSyntheticData();
+  const fixture = await seedFixture();
+  const chromium = await loadChromium();
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true, args: ["--disable-dev-shm-usage", "--no-sandbox"] });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: "block" });
+    const authPosts = [];
+    const businessWrites = [];
+    const previewGets = [];
+    let releaseFirstPreview;
+    let holdFirstPreview = true;
+    await context.route("**/*", async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const method = request.method().toUpperCase();
+      if (url.origin !== REQUIRED_ORIGIN) return route.abort("blockedbyclient");
+      if (method === "GET" && url.pathname === "/api/procurement/rfqs/1/mapping-bindings/preview") {
+        previewGets.push(url.pathname);
+        if (holdFirstPreview) await new Promise((resolve) => { releaseFirstPreview = resolve; });
+      }
+      if (method === "POST" && ["/api/login", "/api/logout"].includes(url.pathname)) authPosts.push(url.pathname);
+      else if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+        businessWrites.push({ method, path: url.pathname, body: request.postDataJSON() });
+      }
+      return route.continue();
+    });
+
+    const page = await context.newPage();
+    await login(page, fixture.credentials);
+    await page.goto(`${REQUIRED_ORIGIN}/procurement/sourcing`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "供应商询价与定标", exact: true }).waitFor();
+    await page.locator('select[name="purchase_request_id"]').selectOption("1");
+    await page.locator('input[name="supplier_ids"][value="1"]').check();
+    await page.locator('input[name="supplier_ids"][value="2"]').check();
+    await page.getByLabel("报价截止日", { exact: true }).fill("2099-08-31");
+    const createResponse = page.waitForResponse(
+      (response) => response.url() === `${REQUIRED_ORIGIN}/api/procurement/rfqs`
+        && response.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "建立询价草稿", exact: true }).click();
+    assert.equal((await createResponse).status(), 201);
+    await page.getByRole("heading", { name: "RFQ-00000001 · Round 1", exact: true }).waitFor();
+
+    const newRfqText = await page.locator("body").innerText();
+    for (const required of [
+      "RFQ_CREATED 业务 Event",
+      "独立 RFQ_CREATED 业务 Event",
+      "RFQ 业务 Event（与 Audit 分列）",
+      "RFQ_CREATED",
+      "SUCCESS",
+    ]) assert.ok(newRfqText.includes(required), `new RFQ Event wording missing: ${required}`);
+
+    await convertToLegacyDraft(1);
+    const audit = (await pool.query(`select username,request_id::text,result,old_version::int,new_version::int,
+      operation_id::text,to_char(created_at at time zone 'Asia/Shanghai','YYYY-MM-DD HH24:MI:SS.US') occurred_at_shanghai
+      from audit_log where route_code='PROCUREMENT_SOURCING' and action='RFQ_CREATED' and detail->>'object_id'='1'`)).rows[0];
+    assert.ok(audit);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "RFQ 创建成功审计", exact: true }).waitFor();
+    const legacyText = await page.locator("body").innerText();
+    for (const required of [
+      "RFQ 创建成功审计",
+      "精确匹配的成功 Audit",
+      "这是与本 RFQ 精确匹配的成功 Audit，不是独立 RFQ_CREATED 业务 Event。",
+      "独立 RFQ_CREATED Event\n否",
+      fixture.credentials.username,
+      audit.request_id,
+      audit.occurred_at_shanghai,
+      "SUCCESS",
+      "不存在 → v1",
+      "尚无独立 RFQ 业务 Event；创建成功 Audit 在上方独立显示。",
+    ]) assert.ok(legacyText.includes(required), `legacy Audit wording missing: ${required}`);
+    assert.equal(audit.result, "success");
+    assert.equal(audit.old_version, null);
+    assert.equal(audit.new_version, 1);
+    assert.deepEqual(await previewWriteState(1), {
+      bindings: 0,
+      events: 0,
+      audits: 2,
+      idempotency: 1,
+      rfq_status: "DRAFT",
+      rfq_version: 1,
+      quotes: 0,
+      awards: 0,
+      purchase_orders: 0,
+    });
+
+    const openPreview = page.getByRole("button", { name: "确认并固定当前 Mapping", exact: true });
+    const zeroWriteBaseline = await previewWriteState(1);
+    const businessWritesAfterCreate = businessWrites.length;
+    await openPreview.click();
+    let dialog = page.getByRole("dialog", { name: "确认并固定当前 Mapping", exact: true });
+    await dialog.waitFor();
+    await dialog.getByText("正在重新查询当前权威资格与冲突证据…", { exact: true }).waitFor();
+    assert.equal(await dialog.getByRole("button", { name: "正在查询…", exact: true }).isDisabled(), true);
+    await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "取消");
+    holdFirstPreview = false;
+    releaseFirstPreview();
+    await dialog.getByRole("heading", { name: "当前资格检查：全部通过", exact: true }).waitFor();
+    assert.equal(await dialog.getByRole("button", { name: "确认并固定当前 Mapping", exact: true }).isEnabled(), true);
+    const previewText = await dialog.innerText();
+    for (const required of [
+      "服务端观测时间：",
+      "数据时区：Asia/Shanghai",
+      "ID 1 · RFQ-00000001",
+      "Round 1 / 当前 v1 / 页面 expected_version v1",
+      "DRAFT / 草稿 / 待发出",
+      "ID 1 · PRQ-00000001",
+      "权威 RFQ Line · 4 条",
+      "Supplier 资格覆盖 · 2 家",
+      "Supplier 1：4/4",
+      "Supplier 2：4/4",
+      "缺失组合：0",
+      "Supplier/Material 冲突：0",
+      "供应商料号冲突：0",
+      "候选 Mapping：8",
+      "预期 Binding：8",
+      "当前 Binding：0",
+      "Binding 0 → 预期 8",
+      "Supplier × RFQ Line Mapping · 8 条",
+      "PCS → PCS · 1:1",
+      "相同 Supplier/Material 当前 ACTIVE 数量\n1",
+      "Supplier 内相同 supplier_part_number 当前 ACTIVE 数量\n1",
+      "Supplier/Material 冲突\n否",
+      "供应商料号冲突\n否",
+      "当前资格\n通过",
+      "确认后将生成8条关系化、不可变的Supplier×RFQ Line Mapping Binding。",
+      "每条Binding固定引用本次确认的Mapping ID和Version。后续Supplier Mapping状态、版本或内容发生变化时，不会自动替换或改写本RFQ已固定的Binding。",
+      "固定 Mapping 不等于发出 RFQ",
+      "RFQ 继续保持 DRAFT / 草稿 / 待发出",
+      "本操作不创建 Quote、Award、PO、库存或财务记录。",
+      "正式发出仍需后续独立确认",
+      "当前预览不是提交锁",
+    ]) assert.ok(previewText.includes(required), `Mapping preview evidence missing: ${required}`);
+    assert.equal(await dialog.locator(".rfq-mapping-card").count(), 8);
+    for (const mappingId of MAPPING_UIDS.flat()) assert.ok(previewText.includes(mappingId), `preview Mapping missing: ${mappingId}`);
+    for (const materialId of MATERIAL_IDS) assert.ok(previewText.includes(`Material ID ${materialId}`), `preview Material missing: ${materialId}`);
+    await noOverflow(page, "Mapping preview desktop");
+    await noDialogOverflow(dialog, "Mapping preview desktop");
+    await dialog.getByRole("button", { name: "取消", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(businessWrites.length, businessWritesAfterCreate, "cancel must add zero business writes");
+    assert.deepEqual(await previewWriteState(1), zeroWriteBaseline);
+
+    await openPreview.click();
+    dialog = page.getByRole("dialog", { name: "确认并固定当前 Mapping", exact: true });
+    await dialog.getByRole("heading", { name: "当前资格检查：全部通过", exact: true }).waitFor();
+    const previewGetsBeforeClose = previewGets.length;
+    await dialog.getByRole("button", { name: "关闭确认窗口", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(previewGets.length, previewGetsBeforeClose, "close must add zero requests");
+    assert.equal(businessWrites.length, businessWritesAfterCreate, "close must add zero business writes");
+    assert.deepEqual(await previewWriteState(1), zeroWriteBaseline);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await noOverflow(page, "legacy detail 390x844");
+    await openPreview.click();
+    dialog = page.getByRole("dialog", { name: "确认并固定当前 Mapping", exact: true });
+    await dialog.getByRole("heading", { name: "当前资格检查：全部通过", exact: true }).waitFor();
+    await noOverflow(page, "Mapping preview page 390x844");
+    await noDialogOverflow(dialog, "Mapping preview 390x844");
+    const previewGetsBeforeEscape = previewGets.length;
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(previewGets.length, previewGetsBeforeEscape, "Escape must add zero requests");
+    assert.equal(businessWrites.length, businessWritesAfterCreate, "Escape must add zero business writes");
+    assert.deepEqual(await previewWriteState(1), zeroWriteBaseline);
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openPreview.click();
+    dialog = page.getByRole("dialog", { name: "确认并固定当前 Mapping", exact: true });
+    await dialog.getByRole("heading", { name: "当前资格检查：全部通过", exact: true }).waitFor();
+    const bindingResponse = page.waitForResponse(
+      (response) => response.url() === `${REQUIRED_ORIGIN}/api/procurement/rfqs/1/mapping-bindings`
+        && response.request().method() === "POST",
+    );
+    await dialog.getByRole("button", { name: "确认并固定当前 Mapping", exact: true }).click();
+    assert.equal((await bindingResponse).status(), 200);
+    await dialog.waitFor({ state: "detached" });
+    await page.getByText("当前 Mapping 已由采购显式确认并固定；RFQ 仍为 DRAFT / 草稿 / 待发出", { exact: true }).waitFor();
+    await page.getByText("Round 1 / v2", { exact: true }).waitFor();
+    const fixed = await sourcingState();
+    assert.equal(fixed.header.length, 1);
+    assert.deepEqual(
+      { status: fixed.header[0].status, version: fixed.header[0].version, traceability_version: fixed.header[0].traceability_version },
+      { status: "DRAFT", version: 2, traceability_version: 1 },
+    );
+    assert.equal(fixed.bindings.length, 8);
+    assert.deepEqual(fixed.bindings.map((row) => row.mapping_id), MAPPING_UIDS.flat());
+    assert.ok(fixed.bindings.every((row) => row.binding_source === "LEGACY_DRAFT_CONFIRMATION" && row.binding_status === "ACTIVE"));
+    assert.equal(fixed.events.length, 1);
+    assert.deepEqual(
+      { event_type: fixed.events[0].event_type, actor: fixed.events[0].actor, result: fixed.events[0].result, old_version: fixed.events[0].old_version, new_version: fixed.events[0].new_version, from_status: fixed.events[0].from_status, to_status: fixed.events[0].to_status },
+      { event_type: "RFQ_MAPPING_CONFIRMED", actor: fixture.credentials.username, result: "SUCCESS", old_version: 1, new_version: 2, from_status: "DRAFT", to_status: "DRAFT" },
+    );
+    assert.deepEqual(fixed.downstream, {
+      quotes: 0,
+      awards: 0,
+      purchase_orders: 0,
+      delivery_plans: 0,
+      receipts: 0,
+      ledger_entries: 0,
+      ap_documents: 0,
+      work_orders: 0,
+    });
+    assert.deepEqual(businessWrites.map(({ path }) => path), [
+      "/api/procurement/rfqs",
+      "/api/procurement/rfqs/1/mapping-bindings",
+    ]);
+    assert.equal(businessWrites.some(({ path }) => path.endsWith("/issue")), false);
+    const fixedText = await page.locator("body").innerText();
+    assert.ok(fixedText.includes("RFQ 创建成功审计"));
+    assert.ok(fixedText.includes("不是独立 RFQ_CREATED 业务 Event"));
+    assert.ok(fixedText.includes("RFQ_MAPPING_CONFIRMED"));
+    assert.ok(fixedText.includes("DRAFT / 草稿 / 待发出"));
+    assert.equal(await page.locator(".rfq-mapping-trace .rfq-mapping-card").count(), 8);
+    await noOverflow(page, "fixed legacy detail desktop");
+
+    await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "退出", exact: true }).click();
+    await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
+    await assertNoProtectedRfq(page, "FIX-23 logout");
+    assert.deepEqual(authPosts, ["/api/login", "/api/logout"]);
+    assert.equal(Number((await pool.query(
+      "select count(*) count from app_sessions where username=$1 and revoked_at is null and expires_at>now()",
+      [fixture.credentials.username],
+    )).rows[0].count), 0);
+    await context.close();
+    console.info("RFQ_MAPPING_PREVIEW_FIX23_BROWSER_OK rfq=1 audit=1 preview_gets=4 zero_write_exits=3 bindings=8 status=DRAFT issued=0 quote=0 award=0 po=0 desktop=1 mobile=1 session=0");
   } finally {
     await browser?.close().catch(() => undefined);
   }

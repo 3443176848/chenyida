@@ -50,7 +50,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 为 alpha.40 `sha256:58d97778d88d6103ca4d6cc3e0bfe8033bf0921a6c1b7ecbec31254403792651`，Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false。alpha.39 predeploy 与 alpha.40 时区修复前 Web 均有精确 rollback tag，四个受保护 Volume 未更换 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.40 在 Supplier Mapping 治理和 RFQ 覆盖率之上增加 RFQ 精确 Mapping 绑定、创建/发出 lifecycle credential 和安全确认。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
 | 当前阶段 | `SELFHOST-UAT-FIX-22` 已完成并部署。新 RFQ 创建时固定精确 Mapping；主历史 RFQ 诚实显示精确成功 Audit、未固定状态和八条当前资格，purchase-only 桌面/390px确认窗口均取消，业务事实和指纹保持 |
-| 当前任务 | 无 `DOING` 任务。`SELFHOST-UAT-FIX-22` 已按 `RFQ TRACEABILITY DEPLOYED — UAT RFQ STILL DRAFT` 收口 |
+| 当前任务 | `SELFHOST-UAT-FIX-23`（DOING）：补齐 RFQ Mapping 固定确认的权威资格、覆盖与冲突证据，并修正创建 Audit/Event 凭证措辞；保持 alpha.40/0039，主 UAT 只读且 Binding/ISSUED/Quote/Award/PO 必须为 0 |
 | 下一任务 | 必须由项目负责人另立并明确授权：先显式确认并固定主 RFQ 当前八条 Mapping；只有该操作成功且再次核对后，实际发出仍须明确授权。不能从本任务直接发出，Quote/Award/PO也未获授权 |
 
 ## 当前完成模块

@@ -144,6 +144,108 @@ export type RfqDialogDetail = {
   issue_receipt: RfqIssueReceipt | null;
 };
 
+export type RfqMappingQualificationPreview = {
+  rfq: {
+    id: number;
+    rfq_code: string;
+    round_no: number;
+    version: number;
+    expected_version: number;
+    status: string;
+    status_text: string;
+    purchase_request_id: number;
+    request_code: string;
+    source_purchase_request_version: number;
+    current_purchase_request_version: number;
+    project_id: number;
+    project_code: string;
+    project_name: string;
+    response_deadline: string;
+    currency_code: string;
+  };
+  lines: Array<{
+    id: number;
+    line_no: number;
+    purchase_request_line_id: number;
+    material_id: number;
+    internal_material_code: string;
+    standard_name: string;
+    material_status: string;
+    unit_id: number;
+    unit_code: string;
+    requested_quantity: string;
+    required_date: string;
+  }>;
+  suppliers: Array<{
+    rfq_supplier_id: number;
+    supplier_id: number;
+    supplier_code: string;
+    supplier_name: string;
+    status: string;
+    invitation_status: string;
+    required_material_count: number;
+    eligible_mapping_count: number;
+    coverage: string;
+    missing_material_count: number;
+    supplier_material_conflict_count: number;
+    supplier_part_number_conflict_count: number;
+    conflict_count: number;
+    eligible: boolean;
+  }>;
+  qualification_passed: boolean;
+  expected_binding_count: number;
+  actual_candidate_count: number;
+  current_binding_count: number;
+  missing_combination_count: number;
+  supplier_material_conflict_count: number;
+  supplier_part_number_conflict_count: number;
+  blocking_reasons: Array<{
+    code: string;
+    message: string;
+    suggestion: string;
+    supplier_id?: number;
+    material_id?: number;
+    mapping_id?: string | null;
+  }>;
+  observed_at: string;
+  data_timezone: "Asia/Shanghai";
+  qualification_digest: string;
+  combinations: Array<{
+    rfq_supplier_id: number;
+    rfq_line_id: number;
+    supplier_id: number;
+    supplier_code: string;
+    supplier_name: string;
+    supplier_status: string;
+    invitation_status: string;
+    material_id: number;
+    internal_material_code: string;
+    standard_name: string;
+    material_status: string;
+    mapping_version_id: number | null;
+    mapping_id: string | null;
+    mapping_version: number | null;
+    mapping_row_version: number | null;
+    mapping_content_digest: string | null;
+    supplier_part_number: string | null;
+    purchase_unit_id: number | null;
+    purchase_unit_code: string | null;
+    base_unit_code: string | null;
+    conversion_numerator: string | null;
+    conversion_denominator: string | null;
+    conversion_text: string;
+    valid_from: string | null;
+    valid_to: string | null;
+    mapping_status: string | null;
+    current_active_supplier_material_count: number;
+    current_active_supplier_part_number_count: number;
+    supplier_material_conflict: boolean;
+    supplier_part_number_conflict: boolean;
+    eligible: boolean;
+    issues: Array<{ code: string; message: string; suggestion: string }>;
+  }>;
+};
+
 const shanghaiFormatter = new Intl.DateTimeFormat("zh-CN", {
   timeZone: "Asia/Shanghai",
   year: "numeric",
@@ -188,26 +290,35 @@ export function CreationReceiptView({
       </div>
     );
   }
+  const isAudit = receipt.authority === "EXACT_SUCCESS_AUDIT";
+  const isBusinessEvent = receipt.authority === "IMMUTABLE_EVENT";
+  const title = receipt.result !== "SUCCESS"
+    ? "RFQ 创建凭证未验证"
+    : isAudit
+      ? "RFQ 创建成功审计"
+      : "RFQ_CREATED 业务 Event";
   return (
-    <section className={compact ? "rfq-receipt compact" : "rfq-receipt"} aria-label="RFQ 创建凭证">
+    <section className={compact ? "rfq-receipt compact" : "rfq-receipt"} aria-label={title}>
       <div className="rfq-section-heading">
         <div>
-          <p className="rfq-eyebrow">CREATION RECEIPT</p>
-          <h3>{receipt.result === "SUCCESS" ? "RFQ 创建成功凭证" : "RFQ 创建凭证未验证"}</h3>
+          <p className="rfq-eyebrow">{isAudit ? "CREATION AUDIT" : "CREATION BUSINESS EVENT"}</p>
+          <h3>{title}</h3>
         </div>
         <span className={receipt.result === "SUCCESS" ? "rfq-proof success" : "rfq-proof"}>{receipt.result}</span>
       </div>
       <dl className="rfq-receipt-facts">
-        <div><dt>权威来源</dt><dd>{receipt.authority}</dd></div>
-        <div><dt>不可变事件 / 操作</dt><dd>{receipt.event_type} · ID {receipt.operation_id ?? "—"}</dd></div>
+        <div><dt>凭证类型</dt><dd>{isAudit ? "精确匹配的成功 Audit" : isBusinessEvent ? "独立 RFQ_CREATED 业务 Event" : "未验证"}</dd></div>
+        <div><dt>{isAudit ? "Audit 操作" : "业务 Event"}</dt><dd>{receipt.event_type} · ID {receipt.operation_id ?? "—"}</dd></div>
+        <div><dt>独立 RFQ_CREATED Event</dt><dd>{isBusinessEvent ? "是" : "否"}</dd></div>
         <div><dt>创建 actor</dt><dd>{receipt.actor}</dd></div>
         <div><dt>精确时间</dt><dd>{formatShanghaiTime(receipt.occurred_at, receipt.occurred_at_shanghai)}</dd></div>
         <div><dt>创建前后 Version / CAS</dt><dd>{receipt.old_version === null ? "不存在" : `v${receipt.old_version}`} → {receipt.new_version === null ? "未验证" : `v${receipt.new_version}`}</dd></div>
-        <div><dt>不可变</dt><dd>{receipt.immutable ? "是" : "否"}</dd></div>
+        <div><dt>result</dt><dd>{receipt.result}</dd></div>
       </dl>
       <div className="rfq-trace-line"><span>request_id</span><TraceValue>{receipt.request_id}</TraceValue></div>
       {receipt.scope_digest ? <div className="rfq-trace-line"><span>冻结范围摘要</span><TraceValue>{receipt.scope_digest}</TraceValue></div> : null}
       <div className="rfq-trace-line"><span>Idempotency-Key 摘要</span><TraceValue>{receipt.idempotency_key_digest}</TraceValue></div>
+      {isAudit ? <p className="rfq-proof-note"><b>这是与本 RFQ 精确匹配的成功 Audit，不是独立 RFQ_CREATED 业务 Event。</b></p> : null}
       <p className="rfq-proof-note">{receipt.authority_note}</p>
     </section>
   );
@@ -335,6 +446,142 @@ export function IssueReceiptView({ detail }: { detail: RfqDialogDetail }) {
   );
 }
 
+function QualificationMappingRows({ preview }: { preview: RfqMappingQualificationPreview }) {
+  return (
+    <div className="rfq-mapping-groups">
+      {preview.suppliers.map((supplier) => {
+        const rows = preview.combinations.filter((row) => row.supplier_id === supplier.supplier_id);
+        return (
+          <section className="rfq-mapping-group" key={supplier.supplier_id} aria-label={`Supplier ${supplier.supplier_id} 资格 Mapping`}>
+            <div className="rfq-mapping-supplier">
+              <b>Supplier ID {supplier.supplier_id} · {supplier.supplier_code} · {supplier.supplier_name}</b>
+              <span>当前 ACTIVE · 覆盖 {supplier.coverage} · 冲突 {supplier.conflict_count}</span>
+            </div>
+            <div className="rfq-mapping-list">
+              {rows.map((row) => (
+                <article className={row.eligible ? "rfq-mapping-card" : "rfq-mapping-card drift"} key={`${row.rfq_line_id}:${row.supplier_id}`}>
+                  <div className="rfq-mapping-title">
+                    <b>RFQ Line ID {row.rfq_line_id} · Material ID {row.material_id}</b>
+                    <span>{row.internal_material_code} · {row.standard_name}</span>
+                  </div>
+                  <dl>
+                    <div><dt>supplier_part_number</dt><dd>{row.supplier_part_number || "—"}</dd></div>
+                    <div><dt>当前 Mapping 状态</dt><dd>{row.mapping_status || "—"}</dd></div>
+                    <div className="wide"><dt>Mapping ID</dt><dd><TraceValue>{row.mapping_id}</TraceValue></dd></div>
+                    <div><dt>Mapping Version / CAS</dt><dd>{row.mapping_version === null ? "—" : `v${row.mapping_version}`} / {row.mapping_row_version === null ? "—" : `Row v${row.mapping_row_version}`}</dd></div>
+                    <div><dt>单位换算</dt><dd>{row.purchase_unit_code || "—"} → {row.base_unit_code || "—"} · {row.conversion_text}</dd></div>
+                    <div><dt>有效期</dt><dd>{shortDate(row.valid_from)} — {row.valid_to ? shortDate(row.valid_to) : "长期"}</dd></div>
+                    <div><dt>相同 Supplier/Material 当前 ACTIVE 数量</dt><dd>{row.current_active_supplier_material_count}</dd></div>
+                    <div><dt>Supplier 内相同 supplier_part_number 当前 ACTIVE 数量</dt><dd>{row.current_active_supplier_part_number_count}</dd></div>
+                    <div><dt>Supplier/Material 冲突</dt><dd>{row.supplier_material_conflict ? "是" : "否"}</dd></div>
+                    <div><dt>供应商料号冲突</dt><dd>{row.supplier_part_number_conflict ? "是" : "否"}</dd></div>
+                    <div><dt>当前资格</dt><dd>{row.eligible ? "通过" : "未通过"}</dd></div>
+                  </dl>
+                  {row.issues.length ? (
+                    <div className="rfq-mapping-issue" role="alert">
+                      {row.issues.map((issue) => <p key={issue.code}><b>{issue.code}</b>：{issue.message}<br />处理建议：{issue.suggestion}</p>)}
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function MappingQualificationPreviewView({ preview }: { preview: RfqMappingQualificationPreview }) {
+  return (
+    <>
+      <section className="rfq-confirm-section rfq-qualification-summary" aria-label="当前 Mapping 资格检查结论">
+        <div className="rfq-section-heading">
+          <div>
+            <p className="rfq-eyebrow">AUTHORITATIVE QUALIFICATION</p>
+            <h3>当前资格检查：{preview.qualification_passed ? "全部通过" : "未通过"}</h3>
+          </div>
+          <span className={preview.qualification_passed ? "rfq-proof success" : "rfq-proof warning"}>{preview.qualification_passed ? "QUALIFIED" : "BLOCKED"}</span>
+        </div>
+        <p className="rfq-proof-note">服务端观测时间：{formatShanghaiTime(preview.observed_at)} · 数据时区：{preview.data_timezone}</p>
+        <dl className="rfq-receipt-facts">
+          <div><dt>RFQ</dt><dd>ID {preview.rfq.id} · {preview.rfq.rfq_code}</dd></div>
+          <div><dt>Round / 当前 CAS / expected_version</dt><dd>Round {preview.rfq.round_no} / 当前 v{preview.rfq.version} / 页面 expected_version v{preview.rfq.expected_version}</dd></div>
+          <div><dt>当前状态</dt><dd>{preview.rfq.status_text}</dd></div>
+          <div><dt>来源 PRQ 稳定 ID</dt><dd>ID {preview.rfq.purchase_request_id} · {preview.rfq.request_code}</dd></div>
+          <div><dt>来源 PRQ Version</dt><dd>固定 v{preview.rfq.source_purchase_request_version} · 当前 v{preview.rfq.current_purchase_request_version}</dd></div>
+          <div><dt>项目</dt><dd>ID {preview.rfq.project_id} · {preview.rfq.project_code} · {preview.rfq.project_name}</dd></div>
+        </dl>
+        <div className="rfq-qualification-counts">
+          <span>缺失组合：{preview.missing_combination_count}</span>
+          <span>Supplier/Material 冲突：{preview.supplier_material_conflict_count}</span>
+          <span>供应商料号冲突：{preview.supplier_part_number_conflict_count}</span>
+          <span>候选 Mapping：{preview.actual_candidate_count}</span>
+          <span>预期 Binding：{preview.expected_binding_count}</span>
+          <span>当前 Binding：{preview.current_binding_count}</span>
+          <span>Binding {preview.current_binding_count} → 预期 {preview.expected_binding_count}</span>
+        </div>
+      </section>
+
+      <section className="rfq-confirm-section" aria-label="RFQ 四条 Line">
+        <h3>权威 RFQ Line · {preview.lines.length} 条</h3>
+        <div className="rfq-confirm-lines">
+          {preview.lines.map((line) => (
+            <article key={line.id}>
+              <b>RFQ Line ID {line.id} · Line {line.line_no} · Material {line.material_id}</b>
+              <span>{line.internal_material_code} · {line.standard_name} · {line.material_status}</span>
+              <strong>{line.requested_quantity} {line.unit_code}</strong>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="rfq-confirm-section" aria-label="两家 Supplier 资格覆盖">
+        <h3>Supplier 资格覆盖 · {preview.suppliers.length} 家</h3>
+        <div className="rfq-qualification-suppliers">
+          {preview.suppliers.map((supplier) => (
+            <article className={supplier.eligible ? "eligible" : "blocked"} key={supplier.supplier_id}>
+              <b>Supplier {supplier.supplier_id}：{supplier.coverage}</b>
+              <span>{supplier.supplier_code} · {supplier.supplier_name} · {supplier.status}</span>
+              <small>必需 {supplier.required_material_count} · 合格 {supplier.eligible_mapping_count} · 缺失 {supplier.missing_material_count} · Supplier/Material 冲突 {supplier.supplier_material_conflict_count} · 供应商料号冲突 {supplier.supplier_part_number_conflict_count}</small>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {preview.blocking_reasons.length ? (
+        <section className="rfq-trace-issues" role="alert" aria-label="资格阻断项">
+          <b>当前不可固定</b>
+          <ul>{preview.blocking_reasons.map((reason, index) => (
+            <li key={`${reason.code}:${reason.supplier_id || 0}:${reason.material_id || 0}:${index}`}>
+              <b>{reason.code}</b>：{reason.message}；处理建议：{reason.suggestion}
+              {reason.mapping_id ? <>；Mapping <TraceValue>{reason.mapping_id}</TraceValue></> : null}
+            </li>
+          ))}</ul>
+        </section>
+      ) : null}
+
+      <section className="rfq-confirm-section" aria-label="八条 Mapping 资格证据">
+        <h3>Supplier × RFQ Line Mapping · {preview.combinations.length} 条</h3>
+        <QualificationMappingRows preview={preview} />
+      </section>
+
+      <section className="rfq-confirm-consequences" aria-label="不可变关系化快照说明">
+        <h3>不可变关系化快照说明</h3>
+        <p><b>确认后将生成{preview.expected_binding_count}条关系化、不可变的Supplier×RFQ Line Mapping Binding。</b></p>
+        <p><b>每条Binding固定引用本次确认的Mapping ID和Version。后续Supplier Mapping状态、版本或内容发生变化时，不会自动替换或改写本RFQ已固定的Binding。</b></p>
+        <ul>
+          <li>固定 Mapping 不等于发出 RFQ；确认后 RFQ 继续保持 DRAFT / 草稿 / 待发出。</li>
+          <li>本操作不创建 Quote、Award、PO、库存或财务记录。</li>
+          <li>正式发出仍需后续独立确认，并由服务端再次校验全部事实。</li>
+          <li>当前预览不是提交锁；正式 POST 仍执行 CAS、幂等、并发、事务和完整资格重验。</li>
+        </ul>
+        <div className="rfq-trace-line"><span>资格摘要 SHA-256</span><TraceValue>{preview.qualification_digest}</TraceValue></div>
+      </section>
+    </>
+  );
+}
+
 function ScopeSummary({ detail, rows }: { detail: RfqDialogDetail; rows: RfqMappingRow[] }) {
   return (
     <>
@@ -380,12 +627,18 @@ function ScopeSummary({ detail, rows }: { detail: RfqDialogDetail; rows: RfqMapp
 export function RfqScopeDialog({
   kind,
   detail,
+  mappingPreview,
+  previewLoading = false,
+  previewError = "",
   busy,
   onCancel,
   onConfirm,
 }: {
   kind: "issue" | "bind";
   detail: RfqDialogDetail;
+  mappingPreview?: RfqMappingQualificationPreview | null;
+  previewLoading?: boolean;
+  previewError?: string;
   busy: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -396,11 +649,9 @@ export function RfqScopeDialog({
   const trace = detail.mapping_traceability;
   const rows = kind === "bind" || trace?.mode === "UNBOUND_LEGACY_DRAFT" ? trace?.current_qualification || [] : trace?.bindings || [];
   const expectedMappings = detail.lines.length * detail.suppliers.length;
-  const qualificationReady = rows.length === expectedMappings && expectedMappings > 0
-    && rows.every((row) => row.eligible && !row.status_drift && !row.version_drift && Boolean(row.mapping_id));
   const confirmReady = kind === "issue"
     ? Boolean(detail.creation_receipt?.result === "SUCCESS" && trace?.complete && trace.can_issue && trace.mode !== "UNBOUND_LEGACY_DRAFT" && rows.length === expectedMappings)
-    : Boolean(trace?.mode === "UNBOUND_LEGACY_DRAFT" && qualificationReady);
+    : Boolean(mappingPreview?.qualification_passed);
 
   useEffect(() => {
     previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -448,7 +699,7 @@ export function RfqScopeDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="rfq-scope-dialog-title"
-        aria-busy={busy}
+        aria-busy={busy || previewLoading}
         tabIndex={-1}
         onKeyDown={onKeyDown}
       >
@@ -457,41 +708,42 @@ export function RfqScopeDialog({
           <button type="button" className="rfq-dialog-close" aria-label="关闭确认窗口" disabled={busy} onClick={onCancel}>关闭</button>
         </div>
         <div className="rfq-dialog-body">
-          <ScopeSummary detail={detail} rows={rows} />
-          {kind === "issue" ? (
-            <section className="rfq-confirm-consequences" aria-label="发出后果">
-              <h3>发出后果</h3>
-              <ul>
-                <li>发出前服务端重新校验 PRQ、Supplier、Mapping、截止日期、CAS 与当前 DRAFT 状态。</li>
-                <li>Mapping 失效、版本漂移或组合冲突时整笔失败，不留下半记录，并显示具体组合。</li>
-                <li>发出成功后 RFQ 行、Supplier 与 Mapping ID / Version 范围冻结，不可原地修改。</li>
-                <li>只有发出成功后才允许录入 Supplier 报价。</li>
-                <li>本操作不自动创建 Quote、Award、PO、库存或财务记录。</li>
-              </ul>
-            </section>
+          {kind === "bind" ? (
+            previewLoading ? (
+              <div className="rfq-trace-warning" role="status"><b>正在重新查询当前权威资格与冲突证据…</b><p>服务端正在读取 RFQ、PRQ、四条 Line、两家 Supplier、Mapping 与既有 Binding；此查询零业务写入。</p></div>
+            ) : previewError ? (
+              <div className="rfq-trace-issues" role="alert"><b>权威预览读取失败，已禁止固定</b><p className="rfq-copyable-error">{previewError}</p><p>请取消并刷新页面后重试；当前不会发送固定请求。</p></div>
+            ) : mappingPreview ? <MappingQualificationPreviewView preview={mappingPreview} /> : (
+              <div className="rfq-trace-issues" role="alert"><b>权威预览缺失，已禁止固定</b></div>
+            )
           ) : (
-            <section className="rfq-confirm-consequences" aria-label="Mapping 固定后果">
-              <h3>显式固定说明</h3>
-              <ul>
-                <li>此操作仅为历史草稿建立当前 2 × 4 Mapping 的稳定 ID 与 Version 绑定，不会伪造为创建时绑定。</li>
-                <li>服务端将重新校验当前 Mapping 的有效性、冲突、版本与 RFQ CAS，并记录 actor、时间和 request_id。</li>
-                <li>确认后 RFQ 仍保持 DRAFT / 草稿 / 待发出；不会发出 RFQ，也不会创建任何下游记录。</li>
-              </ul>
-            </section>
+            <>
+              <ScopeSummary detail={detail} rows={rows} />
+              <section className="rfq-confirm-consequences" aria-label="发出后果">
+                <h3>发出后果</h3>
+                <ul>
+                  <li>发出前服务端重新校验 PRQ、Supplier、Mapping、截止日期、CAS 与当前 DRAFT 状态。</li>
+                  <li>Mapping 失效、版本漂移或组合冲突时整笔失败，不留下半记录，并显示具体组合。</li>
+                  <li>发出成功后 RFQ 行、Supplier 与 Mapping ID / Version 范围冻结，不可原地修改。</li>
+                  <li>只有发出成功后才允许录入 Supplier 报价。</li>
+                  <li>本操作不自动创建 Quote、Award、PO、库存或财务记录。</li>
+                </ul>
+              </section>
+            </>
           )}
-          {!confirmReady ? (
+          {kind === "issue" && !confirmReady ? (
             <div className="rfq-trace-issues" role="alert">
-              <b>{kind === "issue" ? "当前不可发出" : "当前不可固定"}</b>
-              <p>{kind === "issue" && trace?.mode === "UNBOUND_LEGACY_DRAFT" ? "历史草稿尚未固定 Mapping。请先退出本窗口，使用独立的显式固定操作。" : trace?.issues.join("；") || `Mapping 覆盖必须精确为 ${detail.suppliers.length} × ${detail.lines.length}，且全部有效、无漂移。`}</p>
+              <b>当前不可发出</b>
+              <p>{trace?.mode === "UNBOUND_LEGACY_DRAFT" ? "历史草稿尚未固定 Mapping。请先退出本窗口，使用独立的显式固定操作。" : trace?.issues.join("；") || `Mapping 覆盖必须精确为 ${detail.suppliers.length} × ${detail.lines.length}，且全部有效、无漂移。`}</p>
             </div>
           ) : null}
         </div>
         <div className="rfq-dialog-actions">
           <button ref={cancelRef} type="button" className="rfq-secondary" disabled={busy} onClick={onCancel}>取消</button>
-          <button type="button" disabled={busy || !confirmReady} onClick={(event) => {
+          <button type="button" disabled={busy || previewLoading || !confirmReady} onClick={(event) => {
             event.currentTarget.disabled = true;
             onConfirm();
-          }}>{busy ? "正在提交…" : title}</button>
+          }}>{busy ? "正在提交…" : previewLoading ? "正在查询…" : title}</button>
         </div>
       </section>
     </div>

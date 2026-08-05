@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- PostgreSQL projection rows are validated at service boundaries. */
 import type { PoolClient } from "pg";
+import type { IdentityActor } from "../identity-selfhost/types.ts";
 import { ProcurementSourcingError } from "./errors.ts";
 import { ProcurementSourcingRepository } from "./repository.ts";
+import { coverageFromRfqMappingQualification, loadRfqMappingQualification } from "./rfq-mapping-qualification.ts";
 import type { FaultInjector, SourcingMutationMeta } from "./types.ts";
 import { booleanValue, boundedText, canonicalDigest, dateOnly, decimal, exactKeys, expectedVersion, nonNegativeInteger, normalizeCreateRfqInput, positiveId } from "./validation.ts";
 import { loadSupplierMappingCoverage, requireCompleteCoverage } from "../supplier-mapping-selfhost/coverage.ts";
@@ -59,17 +61,6 @@ async function requireExactCreationCredential(client: PoolClient, rfq: any) {
     throw new ProcurementSourcingError("RFQ_CREATION_CREDENTIAL_UNVERIFIED", "未找到唯一、精确关联的 RFQ 创建成功事件或历史成功审计，禁止发出", 409);
   }
   return exactEvent ? "IMMUTABLE_EVENT" : "EXACT_SUCCESS_AUDIT";
-}
-
-async function currentCoverageForRfq(client: PoolClient, rfq: any) {
-  const invited = await client.query<{ id: string | number; supplier_id: string | number; status: string }>("select id,supplier_id,status from procurement_rfq_suppliers where rfq_id=$1 order by supplier_id for share", [rfq.id]);
-  if (!invited.rowCount) throw new ProcurementSourcingError("RFQ_SUPPLIER_REQUIRED", "RFQ 至少需要一个受邀 Supplier", 422);
-  const invitationDrift = invited.rows.filter((row) => row.status !== "INVITED");
-  if (invitationDrift.length) throw new ProcurementSourcingError("RFQ_SUPPLIER_STATE_DRIFT", `受邀 Supplier 状态已漂移：${invitationDrift.map((row) => `Supplier ${row.supplier_id}: ${row.status}`).join("；")}`, 409);
-  const supplierIds = invited.rows.map((row) => Number(row.supplier_id));
-  const coverage = await loadSupplierMappingCoverage(client, Number(rfq.purchase_request_id), supplierIds);
-  requireRfqCoverage(coverage, supplierIds);
-  return { invited: invited.rows, supplierIds, coverage };
 }
 
 async function saveMappingBindings(client: PoolClient, rfq: any, rfqLines: any[], rfqSuppliers: any[], coverage: any[], source: "RFQ_CREATE" | "LEGACY_DRAFT_CONFIRMATION", meta: SourcingMutationMeta) {
@@ -174,6 +165,20 @@ export class ProcurementSourcingService {
     return { rows: result.rows, pagination: { page, page_size: pageSize, returned: result.rowCount || 0 } };
   }
 
+  async mappingBindingPreview(id: number, actor: IdentityActor, requestedExpectedVersion: number) {
+    const client = await this.repository.pool.connect();
+    try {
+      await client.query("begin isolation level repeatable read read only");
+      await client.query("set local statement_timeout='5s'");
+      const qualification = await loadRfqMappingQualification(client, id, actor, requestedExpectedVersion, false);
+      await client.query("commit");
+      return qualification;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
+  }
+
   async detail(id: number) {
     const client = await this.repository.pool.connect();
     try {
@@ -220,10 +225,10 @@ export class ProcurementSourcingService {
       let creationReceipt: Record<string, unknown>;
       if (creationEvents.length === 1) {
         const event = creationEvents[0];
-        creationReceipt = { authority: "IMMUTABLE_EVENT", event_type: "RFQ_CREATED", immutable: true, authority_note: "RFQ_CREATED 是与草稿同事务提交、数据库禁止改写或删除的业务事件。", actor: event.actor, occurred_at: event.created_at, occurred_at_shanghai: event.occurred_at_shanghai, request_id: event.request_id, result: "SUCCESS", idempotency_key_digest: event.idempotency_key_digest, old_version: event.old_version, new_version: event.new_version, operation_id: null, scope_digest: event.scope_digest };
+        creationReceipt = { authority: "IMMUTABLE_EVENT", event_type: "RFQ_CREATED", immutable: true, authority_note: "这是与 RFQ 草稿同事务提交、数据库禁止改写或删除的独立 RFQ_CREATED 业务 Event。Audit 与本业务 Event 分开显示。", actor: event.actor, occurred_at: event.created_at, occurred_at_shanghai: event.occurred_at_shanghai, request_id: event.request_id, result: "SUCCESS", idempotency_key_digest: event.idempotency_key_digest, old_version: event.old_version, new_version: event.new_version, operation_id: null, scope_digest: event.scope_digest };
       } else if (creationEvents.length === 0 && audits.rowCount === 1) {
         const audit = audits.rows[0];
-        creationReceipt = { authority: "EXACT_SUCCESS_AUDIT", event_type: "RFQ_CREATED", immutable: false, authority_note: "0039 前草稿没有独立 RFQ_CREATED 业务事件；SUCCESS 来自与创建事务一并提交且时间精确匹配的成功 Audit，RFQ 头创建字段受数据库保护。未伪造历史事件。", actor: audit.username, occurred_at: audit.created_at, occurred_at_shanghai: shanghaiTimestamp(audit.occurred_at_shanghai), request_id: audit.request_id, result: "SUCCESS", idempotency_key_digest: audit.idempotency_key_digest, old_version: audit.old_version, new_version: audit.new_version, operation_id: audit.operation_id };
+        creationReceipt = { authority: "EXACT_SUCCESS_AUDIT", event_type: "RFQ_CREATED", immutable: false, authority_note: "这是与本 RFQ 的 ID、创建 actor、时间、request_id 和 Version 变化精确匹配的成功 Audit；不是独立 RFQ_CREATED 业务 Event。SUCCESS 来自创建事务一并提交的 Audit，未伪造历史 Event。", actor: audit.username, occurred_at: audit.created_at, occurred_at_shanghai: shanghaiTimestamp(audit.occurred_at_shanghai), request_id: audit.request_id, result: "SUCCESS", idempotency_key_digest: audit.idempotency_key_digest, old_version: audit.old_version, new_version: audit.new_version, operation_id: audit.operation_id };
       } else {
         creationReceipt = { authority: "UNVERIFIED", event_type: "RFQ_CREATED", immutable: false, authority_note: "未找到唯一、精确关联的创建成功事件或审计；页面不会由可读取状态反推 SUCCESS。", actor: header.created_by, occurred_at: header.created_at, occurred_at_shanghai: "", request_id: header.request_id, result: "UNVERIFIED", idempotency_key_digest: null, old_version: null, new_version: null, operation_id: null };
       }
@@ -280,15 +285,19 @@ export class ProcurementSourcingService {
   }
 
   async confirmMappings(id: number, meta: SourcingMutationMeta, input: Record<string, unknown>) {
-    exactKeys(input, ["expected_version"]); const expected = expectedVersion(input.expected_version);
+    exactKeys(input, ["expected_version", "qualification_digest"]); const expected = expectedVersion(input.expected_version);
+    const requestedQualificationDigest = boundedText(input.qualification_digest, "qualification_digest", 64, true);
+    if (!/^[0-9a-f]{64}$/.test(requestedQualificationDigest)) throw new ProcurementSourcingError("REQUEST_VALIDATION_FAILED", "qualification_digest 必须是 64 位小写 SHA-256");
     return this.repository.execute(meta, async (client) => {
       const rfq = await lockRfq(client, id);
       if (rfq.version !== expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "RFQ 版本已变化", 409);
-      if (rfq.status !== "DRAFT") throw new ProcurementSourcingError("RFQ_NOT_DRAFT", "只有 DRAFT 询价可以确认 Mapping", 409);
-      if ((await client.query("select 1 from procurement_supplier_quotes where rfq_id=$1 limit 1", [id])).rows[0]) throw new ProcurementSourcingError("RFQ_HAS_QUOTE", "已有报价的 RFQ 不能补固定 Mapping", 409);
-      if ((await client.query("select 1 from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1 limit 1", [id])).rows[0]) throw new ProcurementSourcingError("RFQ_MAPPING_ALREADY_BOUND", "RFQ Mapping 已固定，不能重复或改绑", 409);
-      await requireCurrentRfqSource(client, rfq);
-      const { coverage } = await currentCoverageForRfq(client, rfq);
+      const qualification = await loadRfqMappingQualification(client, id, meta.actor, expected, true);
+      if (qualification.qualification_digest !== requestedQualificationDigest) throw new ProcurementSourcingError("RFQ_MAPPING_QUALIFICATION_DRIFT", "RFQ、PRQ、Supplier、Material、Mapping 或 Binding 事实已在预览后变化；未生成任何 Binding，请刷新预览", 409);
+      if (!qualification.qualification_passed) {
+        const reasons = qualification.blocking_reasons.map((reason) => reason.message).join("；");
+        throw new ProcurementSourcingError("RFQ_MAPPING_QUALIFICATION_FAILED", `当前 Mapping 资格检查未通过：${reasons || "覆盖或冲突证据不完整"}`, 409);
+      }
+      const coverage = coverageFromRfqMappingQualification(qualification);
       const rfqLines = (await client.query<any>("select * from procurement_rfq_lines where rfq_id=$1 order by line_no for share", [id])).rows;
       const rfqSuppliers = (await client.query<any>("select * from procurement_rfq_suppliers where rfq_id=$1 order by supplier_id for share", [id])).rows;
       const bindings = await saveMappingBindings(client, rfq, rfqLines, rfqSuppliers, coverage, "LEGACY_DRAFT_CONFIRMATION", meta);
