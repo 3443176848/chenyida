@@ -50,8 +50,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 为 alpha.39 `sha256:c98d3e8aeef8087d9daa951d0f0c3c7ceb97307edd2d13e92c582c42935f3978`，Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false。旧 Web 以 `rollback-approval-safeguards-fix21-predeploy-20260805T031959Z` 保留，四个受保护 Volume 未更换 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.39 新增 Supplier Mapping 治理和 RFQ 覆盖率门禁，并保留 Requirement Unit Resolution、Planning Revision Response 与固定后继谱系。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
 | 当前阶段 | `SELFHOST-UAT-FIX-21` 已完成并部署。operations 审核页具备服务端预览、确认、审核意见、冲突失败关闭和持久凭证；主 UAT operations-only 只读打开 PENDING 预览后取消，并重开 ACTIVE 历史凭证，保护事实不变 |
-| 当前任务 | 无自动执行任务；本轮以 `SUPPLIER MAPPING APPROVAL SAFEGUARDS DEPLOYED — UAT 1 ACTIVE 7 PENDING` 停止。不批准或退回剩余七条，不撤销既有 ACTIVE，不创建 RFQ |
-| 下一任务 | 若要继续，只能在新的明确授权任务中逐条决定剩余七条 PENDING_REVIEW；本任务只证明批准保护已就绪，不构成继续批准、退回或创建 RFQ/Quote/Award/PO 的授权 |
+| 当前任务 | `SELFHOST-UAT-FIX-22` 为唯一 `DOING`：只补齐 RFQ 草稿创建凭证、逐 Supplier×Line Mapping 稳定追溯和发出前确认。严格起点与主 `RFQ-00000001` 已匹配；现有 0018/0038 没有精确 Mapping 版本关系，采用分支 B 新增 0039/alpha.40。主 RFQ 必须保持 DRAFT，本任务不得在主 UAT 固定 Mapping、发出、录报价或定标 |
+| 下一任务 | 当前任务完成前无下一任务。完成后是否正式固定并发出主 RFQ 必须另获明确授权；本任务不构成发出授权 |
 
 ## 当前完成模块
 

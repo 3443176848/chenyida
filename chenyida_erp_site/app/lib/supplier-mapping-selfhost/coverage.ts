@@ -58,9 +58,14 @@ export async function loadSupplierMappingCoverage(
             'mapping_id',sm.mapping_uid,
             'mapping_version',sm.mapping_version_no,
             'row_version',sm.version,
+            'mapping_status',sm.status,
             'material_id',sm.material_id,
             'supplier_id',sm.supplier_id,
+            'supplier_part_number',sm.supplier_item_code,
             'purchase_unit_id',sm.purchase_unit_id,
+            'purchase_unit_code',pu.code,
+            'base_unit_id',mm.base_unit_id,
+            'base_unit_code',bu.code,
             'conversion_numerator',sm.conversion_numerator::text,
             'conversion_denominator',sm.conversion_denominator::text,
             'valid_from',sm.valid_from,
@@ -68,6 +73,9 @@ export async function loadSupplierMappingCoverage(
             'content_digest',sm.content_digest
           ) order by sm.id),'[]'::jsonb) mapping_rows
         from supplier_mappings sm
+        join material_master mm on mm.id=sm.material_id
+        join units pu on pu.id=sm.purchase_unit_id
+        left join units bu on bu.id=mm.base_unit_id
         where sm.supplier_id=supplier_scope.supplier_id
           and sm.material_id=requested_lines.material_id
           and sm.purchase_unit_id=requested_lines.unit_id

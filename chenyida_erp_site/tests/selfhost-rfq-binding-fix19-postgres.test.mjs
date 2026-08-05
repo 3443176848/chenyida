@@ -6,16 +6,24 @@ import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts"
 import { handleProcurementSourcingApi } from "../app/lib/procurement-sourcing-selfhost/handler.ts";
 import { ProcurementSourcingRepository } from "../app/lib/procurement-sourcing-selfhost/repository.ts";
 import { ProcurementSourcingService } from "../app/lib/procurement-sourcing-selfhost/service.ts";
+import { canonicalDigest } from "../app/lib/procurement-sourcing-selfhost/validation.ts";
 import { withSupplierMappingFixtureTriggersDisabled } from "./helpers/supplier-mapping-fixture.mjs";
 
-const databaseUrl = process.env.TEST_PROCUREMENT_SOURCING_DATABASE_URL;
-if (!databaseUrl || !/procurement_sourcing_test/i.test(databaseUrl)) {
-  throw new Error("isolated TEST_PROCUREMENT_SOURCING_DATABASE_URL containing procurement_sourcing_test is required");
+const REQUIRED_DATABASE = "procurement_sourcing_test_fix22_20260805";
+const REQUIRED_CONFIRMATION = "ISOLATED_FIX22_SYNTHETIC_ONLY";
+const databaseUrl = process.env.TEST_PROCUREMENT_SOURCING_DATABASE_URL || "";
+let configuredDatabase = "";
+try { configuredDatabase = decodeURIComponent(new URL(databaseUrl).pathname.replace(/^\//, "")); } catch { configuredDatabase = ""; }
+if (configuredDatabase !== REQUIRED_DATABASE) {
+  throw new Error(`TEST_PROCUREMENT_SOURCING_DATABASE_URL must target the exact isolated ${REQUIRED_DATABASE} database`);
+}
+if (process.env.ERP_PROCUREMENT_SOURCING_TEST_CONFIRM !== REQUIRED_CONFIRMATION) {
+  throw new Error(`ERP_PROCUREMENT_SOURCING_TEST_CONFIRM=${REQUIRED_CONFIRMATION} is required`);
 }
 
 const pool = new Pool({
   connectionString: databaseUrl,
-  max: 8,
+  max: 3,
   application_name: "rfq-binding-fix19-postgres-test",
 });
 const digest = (value) => createHash("sha256").update(value).digest("hex");
@@ -29,6 +37,10 @@ const actor = (role, username = `${role}01`) => ({
   last_login_at: null,
   permissions: permissionsForRole(role),
 });
+
+async function assertIsolatedDatabase() {
+  assert.equal((await pool.query("select current_database() name")).rows[0]?.name, REQUIRED_DATABASE);
+}
 
 async function api(path, { method = "GET", role = "purchase", key = randomUUID(), body } = {}) {
   const requestId = randomUUID();
@@ -60,7 +72,7 @@ async function createPurchaseRequest(client, fixture, sequence, status = "ACCEPT
       project_code,customer_id,project_name,project_goal,market_owner,project_owner,status,
       target_delivery_date,current_requirement_version_no,version,request_id,created_by
     ) values($1,$2,$3,'FIX-19 隔离采购申请','admin01','engineering01','ACCEPTED',
-      '2026-10-30',1,4,$4,'admin01') returning id`,
+      '2099-10-30',1,4,$4,'admin01') returning id`,
     [`PRJ-${String(sequence).padStart(8, "0")}`, fixture.customerId, `FIX-19 项目 ${sequence}`, randomUUID()],
   );
   const projectId = Number(project.rows[0].id);
@@ -74,7 +86,7 @@ async function createPurchaseRequest(client, fixture, sequence, status = "ACCEPT
     `insert into project_planning_packages(
       project_id,package_version_no,requirement_version_id,status,target_delivery_date,package_digest,
       prepared_by,submitted_by,submitted_at,accepted_by,accepted_at,version,request_id
-    ) values($1,1,$2,'ACCEPTED','2026-10-30',$3,'engineering01','engineering01',now(),
+    ) values($1,1,$2,'ACCEPTED','2099-10-30',$3,'engineering01','engineering01',now(),
       'planning01',now(),3,$4) returning id`,
     [projectId, requirement.rows[0].id, digest(`package-${sequence}`), randomUUID()],
   );
@@ -82,7 +94,7 @@ async function createPurchaseRequest(client, fixture, sequence, status = "ACCEPT
     `insert into planning_material_requirement_plans(
       project_id,planning_package_id,plan_version_no,required_date,status,source_package_version,
       source_package_digest,calculation_digest,prepared_by,submitted_by,submitted_at,version,request_id
-    ) values($1,$2,1,'2026-10-30','SUBMITTED',3,$3,$4,'planning01','planning01',now(),1,$5) returning id`,
+    ) values($1,$2,1,'2099-10-30','SUBMITTED',3,$3,$4,'planning01','planning01',now(),1,$5) returning id`,
     [projectId, packageRow.rows[0].id, digest(`package-${sequence}`), digest(`calculation-${sequence}`), randomUUID()],
   );
   const planId = Number(plan.rows[0].id);
@@ -180,10 +192,10 @@ async function seed() {
     );
     const fixture = { unitId, materialIds, customerId: Number(customer.rows[0].id) };
     const accepted = [];
-    for (let sequence = 1; sequence <= 5; sequence += 1) {
+    for (let sequence = 1; sequence <= 6; sequence += 1) {
       accepted.push(await createPurchaseRequest(client, fixture, sequence));
     }
-    const submitted = await createPurchaseRequest(client, fixture, 6, "SUBMITTED");
+    const submitted = await createPurchaseRequest(client, fixture, 7, "SUBMITTED");
 
     const supplierDefinitions = [
       ["SUP-000001", "FIX-19 供应商 A", "ACTIVE"],
@@ -265,12 +277,62 @@ async function downstreamCounts() {
     (select count(*)::int from production_work_orders) work_orders`)).rows[0];
 }
 
+async function expectedScopeDigest(rfqId) {
+  const rfq = (await pool.query(
+    "select id::int,purchase_request_id::int,round_no::int,response_deadline::text,currency_code from procurement_rfqs where id=$1",
+    [rfqId],
+  )).rows[0];
+  const lines = (await pool.query(
+    `select id::int,purchase_request_line_id::int,material_id::int,unit_id::int,
+      requested_quantity::text,line_no::int from procurement_rfq_lines where rfq_id=$1 order by id`,
+    [rfqId],
+  )).rows;
+  const suppliers = (await pool.query(
+    "select id::int,supplier_id::int from procurement_rfq_suppliers where rfq_id=$1 order by id",
+    [rfqId],
+  )).rows;
+  const mappings = (await pool.query(
+    `select rfq_supplier_id::int,rfq_line_id::int,mapping_uid::text mapping_id,
+      mapping_version_no::int mapping_version,mapping_row_version::int
+    from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1 order by rfq_supplier_id,rfq_line_id`,
+    [rfqId],
+  )).rows;
+  return canonicalDigest({
+    rfq_id: rfq.id,
+    purchase_request_id: rfq.purchase_request_id,
+    round_no: rfq.round_no,
+    response_deadline: rfq.response_deadline,
+    currency_code: rfq.currency_code,
+    lines: lines.map((line) => ({
+      rfq_line_id: line.id,
+      purchase_request_line_id: line.purchase_request_line_id,
+      material_id: line.material_id,
+      unit_id: line.unit_id,
+      requested_quantity: line.requested_quantity,
+      line_no: line.line_no,
+    })),
+    suppliers: suppliers.map((supplier) => ({ rfq_supplier_id: supplier.id, supplier_id: supplier.supplier_id })),
+    mappings,
+  });
+}
+
+async function assertMappingExclusionConstraint() {
+  assert.equal(Number((await pool.query(`select count(*) count from pg_constraint
+    where conrelid='supplier_mappings'::regclass and conname='supplier_mappings_active_material_period_excl'`)).rows[0].count), 1);
+}
+
 test.beforeEach(async () => {
+  await assertIsolatedDatabase();
+  await assertMappingExclusionConstraint();
   await pool.query(
     "truncate app_users,units,material_categories,customers,suppliers,business_code_sequences,idempotency_keys,identity_write_rate_limit_buckets,audit_log restart identity cascade",
   );
 });
-test.after(async () => pool.end());
+test.after(async () => {
+  await assertIsolatedDatabase();
+  await assertMappingExclusionConstraint();
+  await pool.end();
+});
 
 test("stable Purchase Request ID 1 creates one four-line RFQ and normalized replay returns it", async () => {
   const fixture = await seed();
@@ -280,7 +342,7 @@ test("stable Purchase Request ID 1 creates one four-line RFQ and normalized repl
   const body = {
     purchase_request_id: 1,
     supplier_ids: [2, 1],
-    response_deadline: "2026-10-15",
+    response_deadline: "2099-10-15",
     expected_version: 1,
   };
   const created = await api("/api/procurement/rfqs", { method: "POST", key, body });
@@ -289,14 +351,15 @@ test("stable Purchase Request ID 1 creates one four-line RFQ and normalized repl
   const rfqId = created.payload.rfq_id;
 
   const header = (await pool.query(
-    "select id::int,purchase_request_id::int,status,response_deadline::text from procurement_rfqs where id=$1",
+    "select id::int,purchase_request_id::int,status,response_deadline::text,traceability_version::int from procurement_rfqs where id=$1",
     [rfqId],
   )).rows[0];
   assert.deepEqual(header, {
     id: rfqId,
     purchase_request_id: 1,
     status: "DRAFT",
-    response_deadline: "2026-10-15",
+    response_deadline: "2099-10-15",
+    traceability_version: 2,
   });
   const lines = (await pool.query(
     `select lines.line_no::int,lines.purchase_request_line_id::int,lines.material_id::int,
@@ -306,13 +369,76 @@ test("stable Purchase Request ID 1 creates one four-line RFQ and normalized repl
   )).rows;
   assert.deepEqual(lines.map((line) => line.material_id), fixture.materialIds);
   assert.deepEqual(lines.map((line) => line.requested_quantity), Array(4).fill("10.000000"));
-  assert.deepEqual(lines.map((line) => line.required_date), Array(4).fill("2026-10-30"));
+  assert.deepEqual(lines.map((line) => line.required_date), Array(4).fill("2099-10-30"));
   assert.equal(new Set(lines.map((line) => line.purchase_request_line_id)).size, 4);
   const boundSuppliers = (await pool.query(
     "select supplier_id::int from procurement_rfq_suppliers where rfq_id=$1 order by supplier_id",
     [rfqId],
   )).rows.map((row) => row.supplier_id);
   assert.deepEqual(boundSuppliers, [1, 2]);
+  const mappingBindings = (await pool.query(
+    `select binding.supplier_id::int,binding.material_id::int,binding.mapping_uid::text,
+      binding.mapping_version_no::int,binding.mapping_row_version::int,binding.supplier_part_number,
+      binding.binding_source,binding.binding_status,binding.conversion_numerator::text,binding.conversion_denominator::text,
+      purchase_unit.code purchase_unit_code,base_unit.code base_unit_code,binding.valid_from,binding.valid_to,mapping.status current_status
+    from procurement_rfq_supplier_line_mapping_bindings binding
+    join units purchase_unit on purchase_unit.id=binding.purchase_unit_id
+    join material_master material on material.id=binding.material_id
+    left join units base_unit on base_unit.id=material.base_unit_id
+    join supplier_mappings mapping on mapping.id=binding.supplier_mapping_version_id
+    where binding.rfq_id=$1 order by binding.supplier_id,binding.material_id`,
+    [rfqId],
+  )).rows;
+  assert.equal(mappingBindings.length, 8);
+  assert.deepEqual(mappingBindings.map((row) => [row.supplier_id, row.material_id]), [
+    [1, 533], [1, 534], [1, 535], [1, 536], [2, 533], [2, 534], [2, 535], [2, 536],
+  ]);
+  assert.ok(mappingBindings.every((row) => row.mapping_uid && row.mapping_version_no === 1 && row.mapping_row_version > 0
+    && row.supplier_part_number === `PART-${row.supplier_id}-${row.material_id}`
+    && row.binding_source === "RFQ_CREATE" && row.binding_status === "ACTIVE" && row.current_status === "ACTIVE"
+    && row.purchase_unit_code === "PCS" && row.base_unit_code === "PCS"
+    && row.conversion_numerator === "1" && row.conversion_denominator === "1"
+    && row.valid_from && row.valid_to === null));
+  const createdEvent = (await pool.query(
+    "select event_type,credential_version,result,old_version,new_version,from_status,to_status,idempotency_key_digest,scope_digest from procurement_sourcing_events where rfq_id=$1",
+    [rfqId],
+  )).rows;
+  assert.equal(createdEvent.length, 1);
+  assert.deepEqual(createdEvent[0], {
+    event_type: "RFQ_CREATED", credential_version: 2, result: "SUCCESS", old_version: null, new_version: 1,
+    from_status: null, to_status: "DRAFT", idempotency_key_digest: createdEvent[0].idempotency_key_digest, scope_digest: createdEvent[0].scope_digest,
+  });
+  assert.match(createdEvent[0].idempotency_key_digest, /^[0-9a-f]{64}$/);
+  assert.match(createdEvent[0].scope_digest, /^[0-9a-f]{64}$/);
+
+  const frozenClient = await pool.connect();
+  try {
+    await frozenClient.query("begin");
+    await frozenClient.query("select set_config('cyd.procurement_sourcing_service_write','allowed',true)");
+    await assert.rejects(frozenClient.query(`insert into procurement_rfq_lines(
+      rfq_id,purchase_request_line_id,material_id,unit_id,requested_quantity,required_date,line_no,source_digest
+    ) select rfq_id,purchase_request_line_id,material_id,unit_id,requested_quantity,required_date,99,source_digest
+      from procurement_rfq_lines where rfq_id=$1 order by id limit 1`, [rfqId]), /scope can only be inserted/i);
+    await frozenClient.query("rollback");
+    await frozenClient.query("begin");
+    await frozenClient.query("select set_config('cyd.procurement_sourcing_service_write','allowed',true)");
+    await assert.rejects(frozenClient.query(`insert into procurement_rfq_suppliers(
+      rfq_id,supplier_id,status,invited_by,supplier_mapping_digest
+    ) select rfq_id,supplier_id,status,invited_by,supplier_mapping_digest
+      from procurement_rfq_suppliers where rfq_id=$1 order by id limit 1`, [rfqId]), /scope can only be inserted/i);
+    await frozenClient.query("rollback");
+    await frozenClient.query("begin");
+    await frozenClient.query("select set_config('cyd.procurement_sourcing_service_write','allowed',true)");
+    await assert.rejects(frozenClient.query(`insert into procurement_rfq_supplier_line_mapping_bindings(
+      rfq_id,rfq_supplier_id,rfq_line_id,supplier_id,material_id,supplier_mapping_version_id,mapping_uid,
+      mapping_version_no,mapping_row_version,mapping_content_digest,supplier_part_number,purchase_unit_id,
+      conversion_numerator,conversion_denominator,valid_from,valid_to,binding_source,binding_status,bound_by,request_id
+    ) select rfq_id,rfq_supplier_id,rfq_line_id,supplier_id,material_id,supplier_mapping_version_id,mapping_uid,
+      mapping_version_no,mapping_row_version,mapping_content_digest,supplier_part_number,purchase_unit_id,
+      conversion_numerator,conversion_denominator,valid_from,valid_to,binding_source,binding_status,bound_by,request_id
+      from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1 order by id limit 1`, [rfqId]), /scope is already frozen/i);
+    await frozenClient.query("rollback");
+  } finally { frozenClient.release(); }
 
   const replay = await api("/api/procurement/rfqs", {
     method: "POST",
@@ -320,7 +446,7 @@ test("stable Purchase Request ID 1 creates one four-line RFQ and normalized repl
     body: {
       purchase_request_id: "1",
       supplier_ids: ["1", "2"],
-      response_deadline: "2026-10-15",
+      response_deadline: "2099-10-15",
       expected_version: "1",
     },
   });
@@ -332,12 +458,29 @@ test("stable Purchase Request ID 1 creates one four-line RFQ and normalized repl
   const conflict = await api("/api/procurement/rfqs", {
     method: "POST",
     key,
-    body: { ...body, response_deadline: "2026-10-16" },
+    body: { ...body, response_deadline: "2099-10-16" },
   });
   assert.equal(conflict.response.status, 409);
   assert.equal(conflict.payload.code, "IDEMPOTENCY_CONFLICT");
   assert.match(conflict.payload.message, /同一 Idempotency-Key/);
   assert.equal(conflict.payload.request_id, conflict.requestId);
+  const bait = await api("/api/procurement/rfqs", { method: "POST", body: { ...body, purchase_request_id: fixture.accepted[4] } });
+  assert.equal(bait.response.status, 201, JSON.stringify(bait.payload));
+  const detail = await api(`/api/procurement/rfqs/${rfqId}`);
+  assert.equal(detail.response.status, 200);
+  assert.equal(detail.payload.data.creation_receipt.authority, "IMMUTABLE_EVENT");
+  assert.equal(detail.payload.data.creation_receipt.result, "SUCCESS");
+  assert.equal(detail.payload.data.creation_receipt.request_id, created.payload.request_id);
+  assert.equal(detail.payload.data.mapping_traceability.mode, "BOUND_AT_CREATE");
+  assert.equal(detail.payload.data.mapping_traceability.bindings.length, 8);
+  assert.equal(detail.payload.data.mapping_traceability.can_issue, true);
+  assert.ok(detail.payload.data.mapping_traceability.bindings.every((row) => row.supplier_part_number === `PART-${row.supplier_id}-${row.material_id}`
+    && row.purchase_unit_code === "PCS" && row.base_unit_code === "PCS"
+    && String(row.conversion_numerator) === "1" && String(row.conversion_denominator) === "1"
+    && row.binding_status === "ACTIVE" && row.binding_source === "RFQ_CREATE"
+    && row.current_status === "ACTIVE" && row.status_drift === false && row.version_drift === false && row.eligible === true));
+  assert.ok(detail.payload.data.events.every((event) => Number(event.rfq_id) === rfqId));
+  assert.ok(detail.payload.data.events.every((event) => event.request_id !== bait.payload.request_id));
   assert.deepEqual(await downstreamCounts(), {
     quotes: 0,
     awards: 0,
@@ -350,12 +493,81 @@ test("stable Purchase Request ID 1 creates one four-line RFQ and normalized repl
   });
 });
 
+test("database guards reject generation downgrade, partial lifecycle credentials, and a second RFQ CAS bump", async () => {
+  const fixture = await seed();
+  const downgradeClient = await pool.connect();
+  try {
+    await downgradeClient.query("begin");
+    await downgradeClient.query("select set_config('cyd.procurement_sourcing_service_write','allowed',true)");
+    await assert.rejects(downgradeClient.query(`insert into procurement_rfqs(
+      rfq_code,purchase_request_id,round_no,status,response_deadline,currency_code,
+      source_purchase_request_version,source_digest,version,request_id,created_by,traceability_version
+    ) select 'RFQ-99999999',id,1,'DRAFT','2099-10-15','CNY',version,$2,1,$3,'purchase01',1
+      from planning_purchase_requests where id=$1`, [
+      fixture.accepted[0], digest("fix22-generation-downgrade"), randomUUID(),
+    ]), /generation-2 DRAFT/i);
+    await downgradeClient.query("rollback");
+  } finally { downgradeClient.release(); }
+
+  const incompleteRepository = {
+    pool,
+    async execute(_meta, work) {
+      const client = await pool.connect();
+      try {
+        await client.query("begin");
+        await client.query("select set_config('cyd.procurement_sourcing_service_write','allowed',true)");
+        const result = await work(client);
+        await client.query("commit");
+        return { ...result, replayed: false };
+      } catch (error) {
+        await client.query("rollback").catch(() => undefined);
+        throw error;
+      } finally { client.release(); }
+    },
+  };
+  const beforeIncomplete = await structuralCounts();
+  const incompleteService = new ProcurementSourcingService(incompleteRepository);
+  await assert.rejects(incompleteService.create({
+    actor: actor("purchase"), requestId: randomUUID(), operationId: randomUUID(),
+    keyDigest: digest("fix22-incomplete-create-key"), requestDigest: digest("fix22-incomplete-create-body"),
+    method: "POST", route: "/api/procurement/rfqs", action: "RFQ_CREATED",
+  }, {
+    purchase_request_id: fixture.accepted[1], supplier_ids: [fixture.supplierA],
+    response_deadline: "2099-10-15", expected_version: 1,
+  }), /exact success Audit and Idempotency result/i);
+  assert.deepEqual(await structuralCounts(), beforeIncomplete);
+
+  const created = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[2], supplier_ids: [fixture.supplierA],
+    response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  assert.equal(created.response.status, 201, JSON.stringify(created.payload));
+  const bumpClient = await pool.connect();
+  try {
+    await bumpClient.query("begin");
+    await bumpClient.query("select set_config('cyd.procurement_sourcing_service_write','allowed',true)");
+    await bumpClient.query("savepoint first_rfq_bump");
+    await bumpClient.query(`update procurement_rfqs set status='ISSUED',issued_by='purchase01',
+      issued_at=now(),version=version+1,updated_at=now() where id=$1`, [created.payload.rfq_id]);
+    await bumpClient.query("release savepoint first_rfq_bump");
+    await assert.rejects(bumpClient.query(
+      "update procurement_rfqs set version=version+1,updated_at=now() where id=$1",
+      [created.payload.rfq_id],
+    ), /only once per transaction/i);
+    await bumpClient.query("rollback");
+  } finally { bumpClient.release(); }
+  assert.deepEqual(
+    (await pool.query("select status,version,issued_by,issued_at from procurement_rfqs where id=$1", [created.payload.rfq_id])).rows[0],
+    { status: "DRAFT", version: 1, issued_by: null, issued_at: null },
+  );
+});
+
 test("concurrent create has one winner and invalid, stale-label, state and permission inputs are rejected", async () => {
   const fixture = await seed();
   const concurrentBody = {
     purchase_request_id: fixture.accepted[1],
     supplier_ids: [fixture.supplierA, fixture.supplierB],
-    response_deadline: "2026-10-15",
+    response_deadline: "2099-10-15",
     expected_version: 1,
   };
   const concurrent = await Promise.all([
@@ -370,43 +582,43 @@ test("concurrent create has one winner and invalid, stale-label, state and permi
 
   const rejected = [
     [
-      { purchase_request_id: fixture.submitted, supplier_ids: [1], response_deadline: "2026-10-15", expected_version: 1 },
+      { purchase_request_id: fixture.submitted, supplier_ids: [1], response_deadline: "2099-10-15", expected_version: 1 },
       409,
       "PURCHASE_REQUEST_NOT_ACCEPTED",
       "purchase",
     ],
     [
-      { purchase_request_id: 999999, supplier_ids: [1], response_deadline: "2026-10-15", expected_version: 1 },
+      { purchase_request_id: 999999, supplier_ids: [1], response_deadline: "2099-10-15", expected_version: 1 },
       404,
       "PURCHASE_REQUEST_NOT_FOUND",
       "purchase",
     ],
     [
-      { purchase_request_id: fixture.accepted[2], supplier_ids: [1], response_deadline: "2026-10-15", expected_version: 1, project_id: 999 },
+      { purchase_request_id: fixture.accepted[2], supplier_ids: [1], response_deadline: "2099-10-15", expected_version: 1, project_id: 999 },
       400,
       "REQUEST_VALIDATION_FAILED",
       "purchase",
     ],
     [
-      { purchase_request_id: fixture.accepted[2], supplier_ids: [1], response_deadline: "2026-10-15", expected_version: 1 },
+      { purchase_request_id: fixture.accepted[2], supplier_ids: [1], response_deadline: "2099-10-15", expected_version: 1 },
       403,
       "PERMISSION_DENIED",
       "planning",
     ],
     [
-      { purchase_request_id: fixture.accepted[2], supplier_ids: [1, 1], response_deadline: "2026-10-15", expected_version: 1 },
+      { purchase_request_id: fixture.accepted[2], supplier_ids: [1, 1], response_deadline: "2099-10-15", expected_version: 1 },
       400,
       "REQUEST_VALIDATION_FAILED",
       "purchase",
     ],
     [
-      { purchase_request_id: fixture.accepted[2], supplier_ids: [fixture.inactiveSupplier], response_deadline: "2026-10-15", expected_version: 1 },
+      { purchase_request_id: fixture.accepted[2], supplier_ids: [fixture.inactiveSupplier], response_deadline: "2099-10-15", expected_version: 1 },
       422,
       "SUPPLIER_MAPPING_INCOMPLETE",
       "purchase",
     ],
     [
-      { purchase_request_id: fixture.accepted[2], supplier_ids: [fixture.noMappingSupplier], response_deadline: "2026-10-15", expected_version: 1 },
+      { purchase_request_id: fixture.accepted[2], supplier_ids: [fixture.noMappingSupplier], response_deadline: "2099-10-15", expected_version: 1 },
       422,
       "SUPPLIER_MAPPING_INCOMPLETE",
       "purchase",
@@ -448,7 +660,7 @@ test("fault after RFQ persistence rolls back header, four lines, suppliers, even
     service.create(meta, {
       purchase_request_id: fixture.accepted[3],
       supplier_ids: [fixture.supplierB, fixture.supplierA],
-      response_deadline: "2026-10-15",
+      response_deadline: "2099-10-15",
       expected_version: 1,
     }),
     (error) => error?.code === "INTERNAL_ERROR" && /服务器暂时无法处理采购询比价/.test(error.message),
@@ -472,4 +684,416 @@ test("fault after RFQ persistence rolls back header, four lines, suppliers, even
     ap_documents: 0,
     work_orders: 0,
   });
+});
+
+test("issuance is CAS-safe and idempotent, writes one complete ISSUED credential, and leaves all downstream documents empty", async () => {
+  const fixture = await seed();
+  const created = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[0], supplier_ids: [fixture.supplierA, fixture.supplierB], response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  assert.equal(created.response.status, 201, JSON.stringify(created.payload));
+  const rfqId = created.payload.rfq_id;
+  const createdScopeDigest = (await pool.query(
+    "select scope_digest from procurement_sourcing_events where rfq_id=$1 and event_type='RFQ_CREATED'",
+    [rfqId],
+  )).rows[0].scope_digest;
+  assert.equal(createdScopeDigest, await expectedScopeDigest(rfqId));
+  const attempts = await Promise.all([
+    api(`/api/procurement/rfqs/${rfqId}/issue`, { method: "POST", key: "fix22-issue-concurrent-a", body: { expected_version: 1 } }),
+    api(`/api/procurement/rfqs/${rfqId}/issue`, { method: "POST", key: "fix22-issue-concurrent-b", body: { expected_version: 1 } }),
+  ]);
+  assert.deepEqual(attempts.map((item) => item.response.status).sort(), [200, 409]);
+  const winnerIndex = attempts.findIndex((item) => item.response.status === 200);
+  const winnerKey = winnerIndex === 0 ? "fix22-issue-concurrent-a" : "fix22-issue-concurrent-b";
+  const replay = await api(`/api/procurement/rfqs/${rfqId}/issue`, { method: "POST", key: winnerKey, body: { expected_version: 1 } });
+  assert.equal(replay.response.status, 200);
+  assert.equal(replay.response.headers.get("Idempotency-Replayed"), "true");
+  const differentBody = await api(`/api/procurement/rfqs/${rfqId}/issue`, { method: "POST", key: winnerKey, body: { expected_version: 2 } });
+  assert.equal(differentBody.response.status, 409);
+  assert.equal(differentBody.payload.code, "IDEMPOTENCY_CONFLICT");
+  const event = (await pool.query(
+    `select event_type,credential_version,result,old_version,new_version,from_status,to_status,idempotency_key_digest,scope_digest
+    from procurement_sourcing_events where rfq_id=$1 and event_type='RFQ_ISSUED'`, [rfqId],
+  )).rows;
+  assert.equal(event.length, 1);
+  assert.deepEqual([event[0].event_type, event[0].credential_version, event[0].result, event[0].old_version, event[0].new_version, event[0].from_status, event[0].to_status], ["RFQ_ISSUED", 2, "SUCCESS", 1, 2, "DRAFT", "ISSUED"]);
+  assert.match(event[0].idempotency_key_digest, /^[0-9a-f]{64}$/);
+  assert.match(event[0].scope_digest, /^[0-9a-f]{64}$/);
+  assert.equal(event[0].scope_digest, createdScopeDigest);
+  assert.equal(event[0].scope_digest, await expectedScopeDigest(rfqId));
+  const header = (await pool.query("select status,version,issued_by,issued_at is not null issued from procurement_rfqs where id=$1", [rfqId])).rows[0];
+  assert.deepEqual(header, { status: "ISSUED", version: 2, issued_by: "purchase01", issued: true });
+  await assert.rejects(pool.query("update procurement_sourcing_events set reason='tampered' where rfq_id=$1 and event_type='RFQ_CREATED'", [rfqId]), /immutable/i);
+  await assert.rejects(pool.query("delete from procurement_sourcing_events where rfq_id=$1 and event_type='RFQ_ISSUED'", [rfqId]), /immutable/i);
+  const malformedEventClient = await pool.connect();
+  try {
+    await malformedEventClient.query("begin");
+    await malformedEventClient.query("select set_config('cyd.procurement_sourcing_service_write','allowed',true)");
+    await assert.rejects(malformedEventClient.query(
+      `insert into procurement_sourcing_events(
+        rfq_id,event_type,actor,request_id,credential_version,result,idempotency_key_digest,
+        old_version,new_version,from_status,to_status,scope_digest
+      ) values($1,'RFQ_ISSUED','planning01',$2,2,'SUCCESS',$3,1,2,'DRAFT','ISSUED',$4)`,
+      [rfqId, randomUUID(), digest("malformed-issue-key"), event[0].scope_digest],
+    ), /does not match RFQ CAS/i);
+    await malformedEventClient.query("rollback");
+  } finally { malformedEventClient.release(); }
+  await assert.rejects(pool.query("update procurement_rfq_supplier_line_mapping_bindings set mapping_version_no=2 where rfq_id=$1", [rfqId]), /immutable/i);
+  const scopeClient = await pool.connect();
+  try {
+    await scopeClient.query("begin");
+    await scopeClient.query("select set_config('cyd.procurement_sourcing_service_write','allowed',true)");
+    await assert.rejects(
+      scopeClient.query("update procurement_rfqs set response_deadline='2099-10-16',version=version+1,updated_at=now() where id=$1", [rfqId]),
+      /scope is immutable/i,
+    );
+    await scopeClient.query("rollback");
+  } finally { scopeClient.release(); }
+  const detail = await api(`/api/procurement/rfqs/${rfqId}`);
+  assert.equal(detail.payload.data.issue_receipt.event_type, "ISSUED");
+  assert.equal(detail.payload.data.issue_receipt.result, "SUCCESS");
+  assert.equal(detail.payload.data.issue_receipt.mapping_count, 8);
+  assert.deepEqual(detail.payload.data.downstream_counts, { quotes: 0, awards: 0, purchase_orders: 0 });
+  assert.deepEqual(await downstreamCounts(), { quotes: 0, awards: 0, purchase_orders: 0, delivery_plans: 0, receipts: 0, ledger_entries: 0, ap_documents: 0, work_orders: 0 });
+});
+
+test("legacy DRAFT is never backfilled implicitly and requires an explicit idempotent Mapping confirmation before issue", async () => {
+  const fixture = await seed();
+  const created = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[0], supplier_ids: [fixture.supplierA, fixture.supplierB], response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  const rfqId = created.payload.rfq_id;
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await withSupplierMappingFixtureTriggersDisabled(client, async () => {
+      await client.query("delete from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1", [rfqId]);
+      await client.query("delete from procurement_sourcing_events where rfq_id=$1 and event_type='RFQ_CREATED'", [rfqId]);
+      await client.query("update procurement_rfqs set traceability_version=1 where id=$1", [rfqId]);
+    });
+    await client.query("commit");
+  } catch (error) { await client.query("rollback"); throw error; } finally { client.release(); }
+  const legacy = await api(`/api/procurement/rfqs/${rfqId}`);
+  assert.equal(legacy.payload.data.creation_receipt.authority, "EXACT_SUCCESS_AUDIT");
+  assert.equal(legacy.payload.data.creation_receipt.result, "SUCCESS");
+  assert.equal(legacy.payload.data.mapping_traceability.mode, "UNBOUND_LEGACY_DRAFT");
+  assert.equal(legacy.payload.data.mapping_traceability.bindings.length, 0);
+  assert.equal(legacy.payload.data.mapping_traceability.current_qualification.length, 8);
+  assert.equal(legacy.payload.data.mapping_traceability.can_issue, false);
+  const blocked = await api(`/api/procurement/rfqs/${rfqId}/issue`, { method: "POST", body: { expected_version: 1 } });
+  assert.equal(blocked.response.status, 409);
+  assert.equal(blocked.payload.code, "RFQ_MAPPING_BINDING_REQUIRED");
+  const faultRequestId = randomUUID(), faultKeyDigest = digest("fix22-explicit-mapping-confirm-fault");
+  const faultService = new ProcurementSourcingService(new ProcurementSourcingRepository(pool), (checkpoint) => {
+    if (checkpoint === "after_mapping_bindings_saved") throw new Error("FIX22 forced Mapping confirmation failure");
+  });
+  await assert.rejects(faultService.confirmMappings(rfqId, {
+    actor: actor("purchase"), requestId: faultRequestId, operationId: randomUUID(), keyDigest: faultKeyDigest,
+    requestDigest: digest("mapping-confirm-fault-body"), method: "POST",
+    route: `/api/procurement/rfqs/${rfqId}/mapping-bindings`, action: "RFQ_MAPPING_CONFIRMED",
+  }, { expected_version: 1 }), (error) => error?.code === "INTERNAL_ERROR");
+  assert.deepEqual((await pool.query("select status,version from procurement_rfqs where id=$1", [rfqId])).rows[0], { status: "DRAFT", version: 1 });
+  assert.equal(Number((await pool.query("select count(*) count from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1", [rfqId])).rows[0].count), 0);
+  assert.equal(Number((await pool.query("select count(*) count from procurement_sourcing_events where rfq_id=$1 and event_type='RFQ_MAPPING_CONFIRMED'", [rfqId])).rows[0].count), 0);
+  assert.equal(Number((await pool.query("select count(*) count from audit_log where request_id=$1", [faultRequestId])).rows[0].count), 0);
+  assert.equal(Number((await pool.query("select count(*) count from idempotency_keys where key_digest=$1", [faultKeyDigest])).rows[0].count), 0);
+  const confirmKey = "fix22-explicit-mapping-confirm";
+  const confirmed = await api(`/api/procurement/rfqs/${rfqId}/mapping-bindings`, { method: "POST", key: confirmKey, body: { expected_version: 1 } });
+  assert.equal(confirmed.response.status, 200, JSON.stringify(confirmed.payload));
+  assert.deepEqual([confirmed.payload.status, confirmed.payload.version, confirmed.payload.mapping_binding_count, confirmed.payload.event], ["DRAFT", 2, 8, "RFQ_MAPPING_CONFIRMED"]);
+  const replay = await api(`/api/procurement/rfqs/${rfqId}/mapping-bindings`, { method: "POST", key: confirmKey, body: { expected_version: 1 } });
+  assert.equal(replay.response.headers.get("Idempotency-Replayed"), "true");
+  const different = await api(`/api/procurement/rfqs/${rfqId}/mapping-bindings`, { method: "POST", key: confirmKey, body: { expected_version: 2 } });
+  assert.equal(different.payload.code, "IDEMPOTENCY_CONFLICT");
+  const bindings = (await pool.query("select binding_source,bound_by,request_id::text from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1", [rfqId])).rows;
+  assert.equal(bindings.length, 8);
+  assert.ok(bindings.every((row) => row.binding_source === "LEGACY_DRAFT_CONFIRMATION" && row.bound_by === "purchase01" && row.request_id === confirmed.payload.request_id));
+  const confirmationScope = (await pool.query("select scope_digest from procurement_sourcing_events where rfq_id=$1 and event_type='RFQ_MAPPING_CONFIRMED'", [rfqId])).rows[0].scope_digest;
+  assert.equal(confirmationScope, await expectedScopeDigest(rfqId));
+  const issued = await api(`/api/procurement/rfqs/${rfqId}/issue`, { method: "POST", body: { expected_version: 2 } });
+  assert.equal(issued.response.status, 200, JSON.stringify(issued.payload));
+  assert.deepEqual([issued.payload.status, issued.payload.version, issued.payload.mapping_count], ["ISSUED", 3, 8]);
+  assert.equal((await pool.query("select scope_digest from procurement_sourcing_events where rfq_id=$1 and event_type='RFQ_ISSUED'", [rfqId])).rows[0].scope_digest, confirmationScope);
+
+  const unverifiedCreated = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[1], supplier_ids: [fixture.supplierA], response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  const unverifiedId = unverifiedCreated.payload.rfq_id;
+  const unverifiedClient = await pool.connect();
+  try {
+    await unverifiedClient.query("begin");
+    await withSupplierMappingFixtureTriggersDisabled(unverifiedClient, async () => {
+      await unverifiedClient.query("delete from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1", [unverifiedId]);
+      await unverifiedClient.query("delete from procurement_sourcing_events where rfq_id=$1", [unverifiedId]);
+      await unverifiedClient.query("delete from audit_log where request_id=(select request_id from procurement_rfqs where id=$1)", [unverifiedId]);
+      await unverifiedClient.query("update procurement_rfqs set traceability_version=1 where id=$1", [unverifiedId]);
+    });
+    await unverifiedClient.query("commit");
+  } catch (error) { await unverifiedClient.query("rollback"); throw error; } finally { unverifiedClient.release(); }
+  const unverifiedConfirm = await api(`/api/procurement/rfqs/${unverifiedId}/mapping-bindings`, { method: "POST", body: { expected_version: 1 } });
+  assert.equal(unverifiedConfirm.response.status, 200, JSON.stringify(unverifiedConfirm.payload));
+  const unverifiedIssue = await api(`/api/procurement/rfqs/${unverifiedId}/issue`, { method: "POST", body: { expected_version: 2 } });
+  assert.equal(unverifiedIssue.response.status, 409);
+  assert.equal(unverifiedIssue.payload.code, "RFQ_CREATION_CREDENTIAL_UNVERIFIED");
+  const unverifiedProjectionClient = await pool.connect();
+  try {
+    await unverifiedProjectionClient.query("begin");
+    await unverifiedProjectionClient.query("select set_config('cyd.procurement_sourcing_service_write','allowed',true)");
+    await assert.rejects(unverifiedProjectionClient.query(`update procurement_rfqs set
+      status='ISSUED',issued_by='purchase01',issued_at=now(),version=version+1,updated_at=now()
+      where id=$1`, [unverifiedId]), /exact RFQ_CREATED success Audit/i);
+    await unverifiedProjectionClient.query("rollback");
+  } finally { unverifiedProjectionClient.release(); }
+  assert.deepEqual((await pool.query("select status,version from procurement_rfqs where id=$1", [unverifiedId])).rows[0], { status: "DRAFT", version: 2 });
+});
+
+test("a newer Mapping version on the same stable ID blocks both the service and database issuance guard", async () => {
+  const fixture = await seed();
+  const created = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[0], supplier_ids: [fixture.supplierA, fixture.supplierB], response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  assert.equal(created.response.status, 201, JSON.stringify(created.payload));
+  const rfqId = created.payload.rfq_id;
+  const bound = (await pool.query(
+    "select supplier_mapping_version_id::int,supplier_id::int,material_id::int from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1 order by id limit 1",
+    [rfqId],
+  )).rows[0];
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await withSupplierMappingFixtureTriggersDisabled(client, () => client.query(`insert into supplier_mappings(
+      material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,supplier_item_code_normalized,
+      supplier_item_name,supplier_specification,manufacturer,mpn,revision,purchase_uom,purchase_unit_id,
+      conversion_numerator,conversion_denominator,status,valid_from,valid_to,mapping_uid,mapping_version_no,
+      supersedes_mapping_version_id,created_by,updated_by,request_id,created_request_id
+    ) select material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,supplier_item_code_normalized,
+      supplier_item_name,supplier_specification,manufacturer,mpn,revision,purchase_uom,purchase_unit_id,
+      conversion_numerator,conversion_denominator,'DRAFT',valid_from,valid_to,mapping_uid,mapping_version_no+1,
+      id,created_by,updated_by,$2,$2 from supplier_mappings where id=$1`,
+    [bound.supplier_mapping_version_id, randomUUID()]));
+    await client.query("commit");
+  } catch (error) { await client.query("rollback"); throw error; } finally { client.release(); }
+
+  const detail = await api(`/api/procurement/rfqs/${rfqId}`);
+  const drifted = detail.payload.data.mapping_traceability.bindings.find((row) => Number(row.supplier_id) === bound.supplier_id && Number(row.material_id) === bound.material_id);
+  assert.equal(drifted.version_drift, true);
+  assert.equal(drifted.eligible, false);
+  assert.equal(detail.payload.data.mapping_traceability.can_issue, false);
+  const blocked = await api(`/api/procurement/rfqs/${rfqId}/issue`, { method: "POST", body: { expected_version: 1 } });
+  assert.equal(blocked.response.status, 409);
+  assert.equal(blocked.payload.code, "RFQ_MAPPING_DRIFT");
+  assert.match(blocked.payload.message, new RegExp(`Supplier ${bound.supplier_id} / Material ${bound.material_id}`));
+  assert.match(blocked.payload.message, /Mapping ID\/Version\/CAS 已漂移/);
+
+  const projectionClient = await pool.connect();
+  try {
+    await projectionClient.query("begin");
+    await projectionClient.query("select set_config('cyd.procurement_sourcing_service_write','allowed',true)");
+    await assert.rejects(projectionClient.query(
+      "update procurement_rfqs set status='ISSUED',issued_by='purchase01',issued_at=now(),version=2,updated_at=now() where id=$1",
+      [rfqId],
+    ), /Mapping binding drift or conflict blocks issuance/i);
+    await projectionClient.query("rollback");
+  } finally { projectionClient.release(); }
+  assert.deepEqual((await pool.query("select status,version,issued_by,issued_at from procurement_rfqs where id=$1", [rfqId])).rows[0], { status: "DRAFT", version: 1, issued_by: null, issued_at: null });
+});
+
+test("Mapping CAS drift, inactivation, and an active conflict each fail closed with the Supplier and Material combination", async () => {
+  const fixture = await seed();
+  const created = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[0], supplier_ids: [fixture.supplierA, fixture.supplierB], response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  const rfqId = created.payload.rfq_id;
+  const bound = (await pool.query("select supplier_mapping_version_id::int,supplier_id::int,material_id::int,purchase_unit_id::int from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1 order by id limit 1", [rfqId])).rows[0];
+  let client = await pool.connect();
+  try {
+    await client.query("begin");
+    await withSupplierMappingFixtureTriggersDisabled(client, () => client.query("update supplier_mappings set version=version+1 where id=$1", [bound.supplier_mapping_version_id]));
+    await client.query("commit");
+  } catch (error) { await client.query("rollback"); throw error; } finally { client.release(); }
+  const drift = await api(`/api/procurement/rfqs/${rfqId}/issue`, { method: "POST", body: { expected_version: 1 } });
+  assert.equal(drift.response.status, 409);
+  assert.equal(drift.payload.code, "RFQ_MAPPING_DRIFT");
+  assert.match(drift.payload.message, new RegExp(`Supplier ${bound.supplier_id} / Material ${bound.material_id}`));
+  client = await pool.connect();
+  try {
+    await client.query("begin");
+    await withSupplierMappingFixtureTriggersDisabled(client, () => client.query("update supplier_mappings set status='INACTIVE',version=version+1 where id=$1", [bound.supplier_mapping_version_id]));
+    await client.query("commit");
+  } catch (error) { await client.query("rollback"); throw error; } finally { client.release(); }
+  const inactive = await api(`/api/procurement/rfqs/${rfqId}/issue`, { method: "POST", body: { expected_version: 1 } });
+  assert.equal(inactive.payload.code, "RFQ_MAPPING_DRIFT");
+  assert.match(inactive.payload.message, /Mapping 已失效/);
+
+  const conflictIds = [];
+  client = await pool.connect();
+  try {
+    await assertMappingExclusionConstraint();
+    await client.query("begin");
+    await client.query("alter table supplier_mappings drop constraint supplier_mappings_active_material_period_excl");
+    await withSupplierMappingFixtureTriggersDisabled(client, async () => {
+      for (const suffix of ["A", "B"]) {
+        const inserted = await client.query(`insert into supplier_mappings(
+          material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,supplier_item_code_normalized,purchase_uom,purchase_unit_id,
+          conversion_numerator,conversion_denominator,status,valid_from,created_by,updated_by,request_id,created_request_id
+        ) select material_id,supplier_id,supplier_name,supplier_key,$2,upper($2),purchase_uom,purchase_unit_id,1,1,'ACTIVE',now()-interval '1 day',created_by,updated_by,$3,$3
+          from supplier_mappings where id=$1 returning id`, [bound.supplier_mapping_version_id, `CONFLICT-${suffix}-${bound.material_id}`, randomUUID()]);
+        conflictIds.push(Number(inserted.rows[0].id));
+      }
+    });
+    await client.query("commit");
+  } catch (error) { await client.query("rollback"); throw error; } finally { client.release(); }
+  try {
+    const conflict = await api(`/api/procurement/rfqs/${rfqId}/issue`, { method: "POST", body: { expected_version: 1 } });
+    assert.equal(conflict.payload.code, "RFQ_MAPPING_DRIFT");
+    assert.match(conflict.payload.message, /当前有效 Mapping 冲突/);
+    assert.match(conflict.payload.message, new RegExp(`Supplier ${bound.supplier_id} / Material ${bound.material_id}`));
+  } finally {
+    client = await pool.connect();
+    try {
+      await client.query("begin");
+      await withSupplierMappingFixtureTriggersDisabled(client, () => client.query("delete from supplier_mappings where id=any($1::bigint[])", [conflictIds]));
+      await client.query(`alter table supplier_mappings add constraint supplier_mappings_active_material_period_excl
+        exclude using gist (supplier_id with =,material_id with =,tstzrange(valid_from,coalesce(valid_to,'infinity'::timestamptz),'[)') with &&)
+        where (status='ACTIVE' and supplier_id is not null and conversion_numerator=conversion_denominator)`);
+      await client.query("commit");
+    } catch (error) { await client.query("rollback"); throw error; } finally { client.release(); }
+    await assertMappingExclusionConstraint();
+  }
+});
+
+test("issue fault rolls back status, ISSUED event, success Audit, idempotency row, and all downstream effects", async () => {
+  const fixture = await seed();
+  const created = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[0], supplier_ids: [fixture.supplierA, fixture.supplierB], response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  const rfqId = created.payload.rfq_id, requestId = randomUUID(), keyDigest = digest("fix22-issue-fault-key");
+  const service = new ProcurementSourcingService(new ProcurementSourcingRepository(pool), (checkpoint) => { if (checkpoint === "after_rfq_issued") throw new Error("FIX22 forced issue failure"); });
+  await assert.rejects(service.issue(rfqId, { actor: actor("purchase"), requestId, operationId: randomUUID(), keyDigest, requestDigest: digest("issue-body"), method: "POST", route: `/api/procurement/rfqs/${rfqId}/issue`, action: "RFQ_ISSUED" }, { expected_version: 1 }), (error) => error?.code === "INTERNAL_ERROR");
+  assert.deepEqual((await pool.query("select status,version,issued_by,issued_at from procurement_rfqs where id=$1", [rfqId])).rows[0], { status: "DRAFT", version: 1, issued_by: null, issued_at: null });
+  assert.equal(Number((await pool.query("select count(*) count from procurement_sourcing_events where rfq_id=$1 and event_type='RFQ_ISSUED'", [rfqId])).rows[0].count), 0);
+  assert.equal(Number((await pool.query("select count(*) count from audit_log where request_id=$1", [requestId])).rows[0].count), 0);
+  assert.equal(Number((await pool.query("select count(*) count from idempotency_keys where key_digest=$1", [keyDigest])).rows[0].count), 0);
+  assert.deepEqual(await downstreamCounts(), { quotes: 0, awards: 0, purchase_orders: 0, delivery_plans: 0, receipts: 0, ledger_entries: 0, ap_documents: 0, work_orders: 0 });
+});
+
+test("issue revalidates PRQ status/version/latestness, Shanghai deadline, Supplier, and invitation state", async () => {
+  const fixture = await seed();
+  const sourceDrift = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[0], supplier_ids: [fixture.supplierA], response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  let client = await pool.connect();
+  try {
+    await client.query("begin");
+    await withSupplierMappingFixtureTriggersDisabled(client, () => client.query("update planning_purchase_requests set version=version+1 where id=$1", [fixture.accepted[0]]));
+    await client.query("commit");
+  } catch (error) { await client.query("rollback"); throw error; } finally { client.release(); }
+  const sourceBlocked = await api(`/api/procurement/rfqs/${sourceDrift.payload.rfq_id}/issue`, { method: "POST", body: { expected_version: 1 } });
+  assert.equal(sourceBlocked.payload.code, "RFQ_SOURCE_VERSION_DRIFT");
+  assert.match(sourceBlocked.payload.message, new RegExp(`PRQ ${fixture.accepted[0]}`));
+
+  const expired = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[1], supplier_ids: [fixture.supplierA], response_deadline: "2026-08-01", expected_version: 1,
+  } });
+  const deadlineBlocked = await api(`/api/procurement/rfqs/${expired.payload.rfq_id}/issue`, { method: "POST", body: { expected_version: 1 } });
+  assert.equal(deadlineBlocked.payload.code, "RFQ_DEADLINE_EXPIRED");
+  assert.match(deadlineBlocked.payload.message, /2026-08-01/);
+
+  const supplierDrift = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[2], supplier_ids: [fixture.supplierB], response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  await pool.query("update suppliers set status='INACTIVE' where id=$1", [fixture.supplierB]);
+  const supplierBlocked = await api(`/api/procurement/rfqs/${supplierDrift.payload.rfq_id}/issue`, { method: "POST", body: { expected_version: 1 } });
+  assert.equal(supplierBlocked.payload.code, "RFQ_MAPPING_DRIFT");
+  assert.match(supplierBlocked.payload.message, new RegExp(`Supplier ${fixture.supplierB}`));
+  assert.match(supplierBlocked.payload.message, /Supplier 已停用/);
+
+  const invitationDrift = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[3], supplier_ids: [fixture.supplierA], response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query("select set_config('cyd.procurement_sourcing_service_write','allowed',true)");
+    await client.query("update procurement_rfq_suppliers set status='DECLINED' where rfq_id=$1 and supplier_id=$2", [invitationDrift.payload.rfq_id, fixture.supplierA]);
+    await client.query("commit");
+  } catch (error) { await client.query("rollback"); throw error; } finally { client.release(); }
+  const invitationBlocked = await api(`/api/procurement/rfqs/${invitationDrift.payload.rfq_id}/issue`, { method: "POST", body: { expected_version: 1 } });
+  assert.equal(invitationBlocked.payload.code, "RFQ_MAPPING_DRIFT");
+  assert.match(invitationBlocked.payload.message, new RegExp(`Supplier ${fixture.supplierA}`));
+  assert.match(invitationBlocked.payload.message, /邀请状态已漂移为 DECLINED/);
+
+  const sourceStatus = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[4], supplier_ids: [fixture.supplierA], response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  client = await pool.connect();
+  try {
+    await client.query("begin");
+    await withSupplierMappingFixtureTriggersDisabled(client, () => client.query(`update planning_purchase_requests set
+      status='RETURNED',accepted_by=null,accepted_at=null,returned_by='purchase01',returned_at=now(),
+      return_reason='FIX22 isolated status drift',updated_at=now() where id=$1`, [fixture.accepted[4]]));
+    await client.query("commit");
+  } catch (error) { await client.query("rollback"); throw error; } finally { client.release(); }
+  const statusBlocked = await api(`/api/procurement/rfqs/${sourceStatus.payload.rfq_id}/issue`, { method: "POST", body: { expected_version: 1 } });
+  assert.equal(statusBlocked.payload.code, "RFQ_SOURCE_NOT_ACCEPTED");
+  assert.match(statusBlocked.payload.message, /RETURNED/);
+
+  const sourceLatest = await api("/api/procurement/rfqs", { method: "POST", body: {
+    purchase_request_id: fixture.accepted[5], supplier_ids: [fixture.supplierA], response_deadline: "2099-10-15", expected_version: 1,
+  } });
+  let concurrentLatestAttempt;
+  client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query("select set_config('cyd.material_requirement_service_write','allowed',true),set_config('cyd.planning_service_write','allowed',true)");
+    const projectId = Number((await client.query(`select plan.project_id from planning_purchase_requests request
+      join planning_material_requirement_plans plan on plan.id=request.plan_id where request.id=$1`, [fixture.accepted[5]])).rows[0].project_id);
+    await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`material-requirement-project:${projectId}`]);
+    await withSupplierMappingFixtureTriggersDisabled(client, () => client.query(`update planning_material_requirement_plans set
+      status='STALE',submitted_by=null,submitted_at=null,accepted_by=null,accepted_at=null,
+      version=version+1,updated_at=now()
+      where id=(select plan_id from planning_purchase_requests where id=$1)`, [fixture.accepted[5]]));
+    const newerPlan = await client.query(`insert into planning_material_requirement_plans(
+      project_id,planning_package_id,plan_version_no,required_date,status,source_package_version,
+      source_package_digest,calculation_digest,prepared_by,submitted_by,submitted_at,version,request_id
+    ) select project_id,planning_package_id,plan_version_no+1,required_date,'SUBMITTED',source_package_version,
+      source_package_digest,$2,prepared_by,'planning01',now(),1,$3 from planning_material_requirement_plans
+      where id=(select plan_id from planning_purchase_requests where id=$1) returning id`, [
+      fixture.accepted[5], digest("fix22-newer-submitted-plan"), randomUUID(),
+    ]);
+    const newerPlanId = Number(newerPlan.rows[0].id);
+    await client.query(`insert into planning_material_requirement_lines(
+      plan_id,line_no,material_id,unit_id,material_snapshot,material_digest,gross_requirement,
+      stock_available,eligible_inbound,stock_allocated,inbound_allocated,net_purchase_requirement,source_digest
+    ) select $2,line_no,material_id,unit_id,material_snapshot,material_digest,gross_requirement,
+      stock_available,eligible_inbound,stock_allocated,inbound_allocated,net_purchase_requirement,source_digest
+      from planning_material_requirement_lines
+      where plan_id=(select plan_id from planning_purchase_requests where id=$1)`, [fixture.accepted[5], newerPlanId]);
+    const newerRequest = await client.query(`insert into planning_purchase_requests(
+      request_code,plan_id,status,submitted_by,submitted_at,version,request_id
+    ) values('PRQ-99999999',$1,'SUBMITTED','planning01',now(),1,$2) returning id`, [newerPlanId, randomUUID()]);
+    await client.query(`insert into planning_purchase_request_lines(
+      purchase_request_id,plan_line_id,line_no,material_id,unit_id,requested_quantity
+    ) select $1,id,line_no,material_id,unit_id,net_purchase_requirement
+      from planning_material_requirement_lines where plan_id=$2 and net_purchase_requirement>0`, [
+      Number(newerRequest.rows[0].id), newerPlanId,
+    ]);
+    concurrentLatestAttempt = api(`/api/procurement/rfqs/${sourceLatest.payload.rfq_id}/issue`, { method: "POST", body: { expected_version: 1 } });
+    let advisoryWaitObserved = false;
+    for (let attempt = 0; attempt < 40 && !advisoryWaitObserved; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      advisoryWaitObserved = Number((await pool.query(`select count(*) count from pg_stat_activity
+        where datname=current_database() and application_name='rfq-binding-fix19-postgres-test'
+          and wait_event_type='Lock' and lower(coalesce(wait_event,''))='advisory'`)).rows[0].count) > 0;
+    }
+    assert.equal(advisoryWaitObserved, true, "RFQ issuance must wait for the shared Planning project lock");
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    if (concurrentLatestAttempt) await concurrentLatestAttempt.catch(() => undefined);
+    throw error;
+  } finally { client.release(); }
+  const latestBlocked = await concurrentLatestAttempt;
+  assert.equal(latestBlocked.payload.code, "RFQ_SOURCE_NOT_LATEST");
+  assert.match(latestBlocked.payload.message, new RegExp(`PRQ ${fixture.accepted[5]}`));
 });

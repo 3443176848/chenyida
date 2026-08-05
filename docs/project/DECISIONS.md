@@ -1069,6 +1069,19 @@
 - 主 UAT 边界：本决定只授权 Web 审核保护能力和 operations 只读验收；不得批准或退回剩余七条 PENDING_REVIEW，不得撤销或重做既有 ACTIVE 批准，不得创建 RFQ。是否继续批准剩余七条必须取得新的明确业务授权。
 - 实施结果：功能提交 `a86d9adceefb45efca1c43f1f8475703e8fa943d`；无 0039，alpha.39/0038 保持。隔离 PostgreSQL/Chromium、跨域回归、备份恢复和 Web-only 部署通过；主 UAT operations-only 打开 PENDING 预览并取消、重开 ACTIVE 历史凭证后安全退出。保护指纹前后为 `2562f52e82eebbede265e367a5e13e31aa13ab34b5fee16b279d074b10266cd8`，最终仍为 1 ACTIVE / 7 PENDING、下游 0、Session 0。
 
+## D-095 RFQ Mapping 绑定采用关系化版本事实，历史草稿必须显式确认后才能发出
+
+- 日期：2026-08-05
+- 状态：`ACCEPTED / IMPLEMENTED / PENDING PARALLEL NON-PRODUCTION UAT DEPLOYMENT`
+- 确认人：项目负责人（明确指定 Schema 分支、0039/alpha.40、主 RFQ 草稿保护、隔离发出与备份恢复通过后的并行非生产 UAT 部署）
+- 缺口与分支：0018/0038 只在 RFQ Supplier 邀请保存 Mapping 摘要，未关系化保存 Supplier×RFQ Line 对应的稳定 Mapping ID、Mapping Version 或版本事实外键；既有创建 Audit 也不是完整 RFQ lifecycle Event。当前 ACTIVE Mapping 不能冒充历史创建时绑定，因此采用分支 B：唯一新增 0039，版本升级为 `0.1.0-alpha.40`，不修改 0001—0038。
+- 绑定事实：0039 新增不可变 `procurement_rfq_supplier_line_mapping_bindings`，逐 RFQ/Supplier/Line 保存 Supplier、Material、精确 Mapping version row、稳定 `mapping_uid`、Mapping version/CAS/content digest、Supplier part、Unit、1:1 换算、有效期、绑定状态、来源、actor、时间和 request_id，并以关系 FK/唯一索引证明完整 Supplier×Line 覆盖。新 RFQ 为 traceability generation 2，在创建事务中固定绑定；既有 RFQ 保持 generation 1，迁移不回填任何绑定。
+- 创建与确认凭证：新 RFQ 创建事务追加唯一、不可变、credential v2 的 `RFQ_CREATED/SUCCESS` Event，保存 actor、Asia/Shanghai 可投影时间、request_id、Idempotency-Key 摘要、scope digest、`null→v1` 和 `null→DRAFT`。历史 DRAFT 只能由 purchase 通过独立幂等、CAS 的“确认并固定当前 Mapping”事务生成 `LEGACY_DRAFT_CONFIRMATION` 绑定和 `RFQ_MAPPING_CONFIRMED` Event；缺失、重复或不一致时失败关闭。主 `RFQ-00000001` 本任务禁止执行该确认。
+- 发出边界：发出前由服务端和 PostgreSQL 共同重验当前 DRAFT/CAS、来源 PRQ 仍为当前 ACCEPTED、上海日期截止日、Supplier/邀请、Material、精确 Mapping stable ID/version/CAS/content/ACTIVE/有效期/1:1/唯一性。成功事务只推进 `DRAFT→ISSUED`，写唯一 `RFQ_ISSUED/SUCCESS` Event、Audit 和 Idempotency 结果；范围与绑定保持不可变，不自动创建 Quote、Award、PO、库存、财务或生产记录。
+- 数据库完整性：generation insert/scope/binding/event guards 与 deferred commit guard 防止 header-only、binding-only、缺 Event、缺精确 Audit/Idempotency 或单事务二次 CAS 的半记录。deferred guard 只对本事务 RFQ INSERT、DRAFT Mapping 确认、DRAFT→ISSUED、Binding INSERT 和三类 lifecycle Event执行完整校验；0038 已存在且无绑定的历史 ISSUED RFQ可继续 Quote/Comparison/Award/Close，不伪造 v2 凭证。
+- UI 语义：详情明确区分 `DRAFT / 草稿 / 待发出`、历史未绑定草稿的“当前资格/拟绑定”与发出后冻结快照。发出按钮只打开确认窗口；取消、关闭、ESC 零业务请求，默认焦点为取消，确认同步禁用并防双击。窗口列出创建凭证、PRQ、四行、两 Supplier、八 Mapping ID/Version、截止日/CNY、重验结果和发出后不可变/下游零自动创建说明。
+- 验证与主 UAT 边界：0039 空库/0038升级/重放/回滚/历史 DRAFT及历史 ISSUED兼容、Unit/UI/PostgreSQL、Material Requirement、真实 Sourcing→Award→Fulfillment、隔离 Chromium、typecheck/lint/build/凭据扫描和 Python 基线均在隔离环境验证。主 UAT 部署和验收只能读取 `RFQ-00000001`、打开发出确认并取消后退出；不得固定 Mapping、发出、录报价或定标。正式发出必须另立任务并重新授权。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

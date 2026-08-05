@@ -104,8 +104,13 @@ export class MaterialRequirementService {
   async generate(packageId: number, meta: RequirementMutationMeta, input: Record<string, unknown>): Promise<RequirementMutationResult> {
     assertOnlyKeys(input, ["required_date"]);
     return this.repository.execute(meta, async (client) => {
+      const packageRef = await client.query<{ project_id: string }>(
+        "select project_id from project_planning_packages where id=$1",
+        [packageId],
+      );
+      if (!packageRef.rows[0]) throw new MaterialRequirementError("PLANNING_PACKAGE_NOT_FOUND", "计划交接包不存在", 404);
+      await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`material-requirement-project:${packageRef.rows[0].project_id}`]);
       const source = await this.latestAcceptedPackage(client, packageId, true); const demandDate = requiredDate(input.required_date, source.target_delivery_date);
-      await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`material-requirement-project:${source.project_id}`]);
       const previous = await client.query<PlanRow>("select * from planning_material_requirement_plans where project_id=$1 order by plan_version_no desc limit 1 for update", [Number(source.project_id)]); const prior = previous.rows[0];
       if (prior && ["SUBMITTED", "ACCEPTED"].includes(prior.status)) throw new MaterialRequirementError("MATERIAL_REQUIREMENT_STATE_CONFLICT", "当前项目已有已提交或已接收的物料需求计划", 409);
       if (prior?.status === "DRAFT") {
@@ -130,7 +135,14 @@ export class MaterialRequirementService {
   async submit(planId: number, meta: RequirementMutationMeta, input: Record<string, unknown>): Promise<RequirementMutationResult> {
     assertOnlyKeys(input, ["expected_version"]); const expected = expectedVersion(input.expected_version);
     return this.repository.execute(meta, async (client) => {
-      const plan = await this.planForUpdate(client, planId); if (plan.status !== "DRAFT" || Number(plan.version) !== expected) throw new MaterialRequirementError("MATERIAL_REQUIREMENT_VERSION_CONFLICT", "物料需求计划状态或版本已变化", 409);
+      const planRef = await client.query<{ project_id: string }>(
+        "select project_id from planning_material_requirement_plans where id=$1",
+        [planId],
+      );
+      if (!planRef.rows[0]) throw new MaterialRequirementError("MATERIAL_REQUIREMENT_NOT_FOUND", "物料需求计划不存在", 404);
+      await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`material-requirement-project:${planRef.rows[0].project_id}`]);
+      const plan = await this.planForUpdate(client, planId);
+      if (String(plan.project_id) !== String(planRef.rows[0].project_id) || plan.status !== "DRAFT" || Number(plan.version) !== expected) throw new MaterialRequirementError("MATERIAL_REQUIREMENT_VERSION_CONFLICT", "物料需求计划状态或版本已变化", 409);
       const source = await this.latestAcceptedPackage(client, Number(plan.planning_package_id), true);
       if (Number(source.version) !== Number(plan.source_package_version) || source.package_digest !== plan.source_package_digest) throw new MaterialRequirementError("MATERIAL_REQUIREMENT_RECALC_REQUIRED", "计划交接包来源已变化，请重新生成物料需求计划", 409);
       const demandDate = plan.required_date instanceof Date ? plan.required_date.toISOString().slice(0, 10) : String(plan.required_date).slice(0, 10); const calculation = await calculateMaterialRequirements(client, Number(plan.planning_package_id), demandDate, true);

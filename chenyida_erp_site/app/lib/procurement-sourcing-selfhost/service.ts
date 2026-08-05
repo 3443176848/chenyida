@@ -8,7 +8,7 @@ import { loadSupplierMappingCoverage, requireCompleteCoverage } from "../supplie
 import { SupplierMappingError } from "../supplier-mapping-selfhost/errors.ts";
 
 const rowData = <T>(result: { rows: T[] }, code: string, message: string): T => { if (!result.rows[0]) throw new ProcurementSourcingError(code, message, 404); return result.rows[0]; };
-const lockRfq = async (client: PoolClient, id: number) => rowData(await client.query<any>("select * from procurement_rfqs where id=$1 for update", [id]), "RFQ_NOT_FOUND", "询价不存在");
+const lockRfq = async (client: PoolClient, id: number) => rowData(await client.query<any>("select q.*,q.response_deadline::text response_deadline_text from procurement_rfqs q where q.id=$1 for update", [id]), "RFQ_NOT_FOUND", "询价不存在");
 const requireRfqCoverage = (rows: Parameters<typeof requireCompleteCoverage>[0], supplierIds: readonly number[]) => {
   try { requireCompleteCoverage(rows, supplierIds); }
   catch (error) {
@@ -16,6 +16,115 @@ const requireRfqCoverage = (rows: Parameters<typeof requireCompleteCoverage>[0],
     throw error;
   }
 };
+
+const shanghaiTimestamp = (value: unknown) => String(value || "");
+
+async function requireCurrentRfqSource(client: PoolClient, rfq: any) {
+  const project = rowData(await client.query<{ project_id: string | number }>(`select p.project_id
+    from planning_purchase_requests r join planning_material_requirement_plans p on p.id=r.plan_id
+    where r.id=$1`, [rfq.purchase_request_id]), "PURCHASE_REQUEST_NOT_FOUND", "RFQ 来源采购申请不存在");
+  await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`material-requirement-project:${project.project_id}`]);
+  const source = rowData(await client.query<any>(`select r.status,r.version,p.project_id,p.plan_version_no,
+      not exists(select 1 from planning_purchase_requests newer join planning_material_requirement_plans np on np.id=newer.plan_id where np.project_id=p.project_id and np.plan_version_no>p.plan_version_no) source_latest
+    from planning_purchase_requests r join planning_material_requirement_plans p on p.id=r.plan_id where r.id=$1 for share of r`, [rfq.purchase_request_id]), "PURCHASE_REQUEST_NOT_FOUND", "RFQ 来源采购申请不存在");
+  if (source.status !== "ACCEPTED") throw new ProcurementSourcingError("RFQ_SOURCE_NOT_ACCEPTED", `来源 PRQ ${rfq.purchase_request_id} 当前状态为 ${source.status}，不能发出`, 409);
+  if (Number(source.version) !== Number(rfq.source_purchase_request_version)) throw new ProcurementSourcingError("RFQ_SOURCE_VERSION_DRIFT", `来源 PRQ ${rfq.purchase_request_id} 版本已从 ${rfq.source_purchase_request_version} 漂移为 ${source.version}`, 409);
+  if (!source.source_latest) throw new ProcurementSourcingError("RFQ_SOURCE_NOT_LATEST", `来源 PRQ ${rfq.purchase_request_id} 已不是项目最新采购申请`, 409);
+  const deadline = await client.query<{ valid: boolean }>("select $1::date>=(statement_timestamp() at time zone 'Asia/Shanghai')::date valid", [rfq.response_deadline_text]);
+  if (!deadline.rows[0]?.valid) throw new ProcurementSourcingError("RFQ_DEADLINE_EXPIRED", `RFQ 报价截止日 ${rfq.response_deadline_text} 已失效`, 409);
+  return source;
+}
+
+async function requireExactCreationCredential(client: PoolClient, rfq: any) {
+  const credential = (await client.query<any>(`select
+      (select count(*)::int from procurement_sourcing_events event
+        where event.rfq_id=$1 and event.event_type='RFQ_CREATED') raw_event_count,
+      (select count(*)::int from procurement_sourcing_events event
+        where event.rfq_id=$1 and event.event_type='RFQ_CREATED'
+          and event.credential_version=2 and event.result='SUCCESS'
+          and event.actor=rfq.created_by and event.request_id=rfq.request_id
+          and event.created_at=rfq.created_at and event.old_version is null and event.new_version=1
+          and event.from_status is null and event.to_status='DRAFT'
+          and event.idempotency_key_digest is not null and event.scope_digest is not null) exact_event_count,
+      (select count(*)::int from audit_log audit
+        where audit.route_code='PROCUREMENT_SOURCING' and audit.action='RFQ_CREATED'
+          and audit.result='success' and audit.request_id=rfq.request_id and audit.username=rfq.created_by
+          and audit.old_version is null and audit.new_version=1
+          and audit.idempotency_key_digest is not null and audit.operation_id is not null
+          and audit.detail->>'object_id'=rfq.id::text and audit.created_at=rfq.created_at) exact_audit_count
+    from procurement_rfqs rfq where rfq.id=$1`, [rfq.id])).rows[0];
+  const exactEvent = Number(credential?.raw_event_count) === 1 && Number(credential?.exact_event_count) === 1;
+  const exactLegacyAudit = Number(credential?.raw_event_count) === 0 && Number(credential?.exact_audit_count) === 1;
+  if (!exactEvent && !exactLegacyAudit) {
+    throw new ProcurementSourcingError("RFQ_CREATION_CREDENTIAL_UNVERIFIED", "未找到唯一、精确关联的 RFQ 创建成功事件或历史成功审计，禁止发出", 409);
+  }
+  return exactEvent ? "IMMUTABLE_EVENT" : "EXACT_SUCCESS_AUDIT";
+}
+
+async function currentCoverageForRfq(client: PoolClient, rfq: any) {
+  const invited = await client.query<{ id: string | number; supplier_id: string | number; status: string }>("select id,supplier_id,status from procurement_rfq_suppliers where rfq_id=$1 order by supplier_id for share", [rfq.id]);
+  if (!invited.rowCount) throw new ProcurementSourcingError("RFQ_SUPPLIER_REQUIRED", "RFQ 至少需要一个受邀 Supplier", 422);
+  const invitationDrift = invited.rows.filter((row) => row.status !== "INVITED");
+  if (invitationDrift.length) throw new ProcurementSourcingError("RFQ_SUPPLIER_STATE_DRIFT", `受邀 Supplier 状态已漂移：${invitationDrift.map((row) => `Supplier ${row.supplier_id}: ${row.status}`).join("；")}`, 409);
+  const supplierIds = invited.rows.map((row) => Number(row.supplier_id));
+  const coverage = await loadSupplierMappingCoverage(client, Number(rfq.purchase_request_id), supplierIds);
+  requireRfqCoverage(coverage, supplierIds);
+  return { invited: invited.rows, supplierIds, coverage };
+}
+
+async function saveMappingBindings(client: PoolClient, rfq: any, rfqLines: any[], rfqSuppliers: any[], coverage: any[], source: "RFQ_CREATE" | "LEGACY_DRAFT_CONFIRMATION", meta: SourcingMutationMeta) {
+  const bySupplier = new Map(coverage.map((row) => [Number(row.supplier_id), row]));
+  const persisted: Array<Record<string, unknown>> = [];
+  for (const invitation of rfqSuppliers) {
+    const snapshots = bySupplier.get(Number(invitation.supplier_id))?.mapping_snapshots || [];
+    for (const line of rfqLines) {
+      const mapping = snapshots.find((item: any) => Number(item.material_id) === Number(line.material_id) && Number(item.purchase_unit_id) === Number(line.unit_id));
+      if (!mapping) throw new ProcurementSourcingError("SUPPLIER_MAPPING_INCOMPLETE", `Supplier ${invitation.supplier_id} / Material ${line.material_id} 缺少可固定 Mapping`, 422);
+      const locked = await client.query("select id from supplier_mappings where id=$1 for share", [mapping.mapping_version_id]);
+      if (!locked.rows[0]) throw new ProcurementSourcingError("SUPPLIER_MAPPING_INCOMPLETE", `Supplier ${invitation.supplier_id} / Material ${line.material_id} 的 Mapping 已不存在`, 422);
+      const binding = await client.query<any>(`insert into procurement_rfq_supplier_line_mapping_bindings(
+          rfq_id,rfq_supplier_id,rfq_line_id,supplier_id,material_id,supplier_mapping_version_id,mapping_uid,mapping_version_no,mapping_row_version,mapping_content_digest,
+          supplier_part_number,purchase_unit_id,conversion_numerator,conversion_denominator,valid_from,valid_to,binding_source,binding_status,bound_by,request_id
+        ) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'ACTIVE',$18,$19) returning *`, [
+        rfq.id, invitation.id, line.id, invitation.supplier_id, line.material_id, mapping.mapping_version_id, mapping.mapping_id, mapping.mapping_version, mapping.row_version,
+        mapping.content_digest || null, mapping.supplier_part_number, mapping.purchase_unit_id, mapping.conversion_numerator, mapping.conversion_denominator,
+        mapping.valid_from, mapping.valid_to || null, source, meta.actor.username, meta.requestId,
+      ]);
+      persisted.push(binding.rows[0]);
+    }
+  }
+  return persisted;
+}
+
+const frozenScope = (rfq: any, lines: any[], suppliers: any[], bindings: any[]) => ({
+  rfq_id: Number(rfq.id), purchase_request_id: Number(rfq.purchase_request_id), round_no: Number(rfq.round_no), response_deadline: String(rfq.response_deadline_text), currency_code: String(rfq.currency_code),
+  lines: [...lines].sort((left, right) => Number(left.id) - Number(right.id)).map((line) => ({ rfq_line_id: Number(line.id), purchase_request_line_id: Number(line.purchase_request_line_id), material_id: Number(line.material_id), unit_id: Number(line.unit_id), requested_quantity: String(line.requested_quantity), line_no: Number(line.line_no) })),
+  suppliers: [...suppliers].sort((left, right) => Number(left.id) - Number(right.id)).map((supplier) => ({ rfq_supplier_id: Number(supplier.id), supplier_id: Number(supplier.supplier_id) })),
+  mappings: [...bindings].sort((left, right) => Number(left.rfq_supplier_id) - Number(right.rfq_supplier_id) || Number(left.rfq_line_id) - Number(right.rfq_line_id)).map((binding) => ({ rfq_supplier_id: Number(binding.rfq_supplier_id), rfq_line_id: Number(binding.rfq_line_id), mapping_id: String(binding.mapping_uid), mapping_version: Number(binding.mapping_version_no), mapping_row_version: Number(binding.mapping_row_version) })),
+});
+
+async function exactBindingRows(client: PoolClient, rfqId: number) {
+  return (await client.query<any>(`select b.*,b.mapping_uid mapping_id,b.mapping_version_no mapping_version,b.request_id binding_request_id,rs.status invitation_status,s.supplier_code,s.supplier_name,s.status supplier_status,m.internal_material_code,m.standard_name,m.material_status,
+      pu.code purchase_unit_code,bu.code base_unit_code,sm.status current_status,sm.version current_bound_row_version,sm.mapping_version_no current_bound_mapping_version,
+      sm.content_digest current_content_digest,latest.status latest_mapping_status,latest.mapping_version_no current_mapping_version,latest.version current_mapping_row_version,
+      active_match.mapping_count current_active_count,active_match.mapping_version_id current_active_mapping_version_id,
+      (sm.status is distinct from b.binding_status) status_drift,
+      (latest.id is distinct from b.supplier_mapping_version_id or sm.version is distinct from b.mapping_row_version or active_match.mapping_version_id is distinct from b.supplier_mapping_version_id) version_drift,
+      (rs.status='INVITED' and s.status='ACTIVE' and m.material_status='ACTIVE' and sm.status='ACTIVE' and sm.version=b.mapping_row_version and sm.mapping_version_no=b.mapping_version_no
+        and sm.content_digest is not distinct from b.mapping_content_digest and active_match.mapping_count=1 and active_match.mapping_version_id=b.supplier_mapping_version_id
+        and latest.id=b.supplier_mapping_version_id
+        and b.valid_from<=statement_timestamp() and (b.valid_to is null or b.valid_to>statement_timestamp())) eligible
+    from procurement_rfq_supplier_line_mapping_bindings b
+    join procurement_rfq_suppliers rs on rs.id=b.rfq_supplier_id
+    join suppliers s on s.id=b.supplier_id join material_master m on m.id=b.material_id
+    join units pu on pu.id=b.purchase_unit_id
+    left join units bu on ((m.base_unit_id is not null and bu.id=m.base_unit_id)
+      or (m.base_unit_id is null and nullif(btrim(m.base_uom),'') is not null and upper(bu.code)=upper(btrim(m.base_uom))))
+    join supplier_mappings sm on sm.id=b.supplier_mapping_version_id
+    left join lateral (select x.id,x.status,x.mapping_version_no,x.version from supplier_mappings x where x.mapping_uid=b.mapping_uid order by x.mapping_version_no desc,x.id desc limit 1) latest on true
+    left join lateral (select count(*)::int mapping_count,(array_agg(x.id order by x.mapping_version_no desc,x.id desc))[1] mapping_version_id from supplier_mappings x where x.supplier_id=b.supplier_id and x.material_id=b.material_id and x.purchase_unit_id=b.purchase_unit_id and x.status='ACTIVE' and x.conversion_numerator=x.conversion_denominator and x.valid_from<=statement_timestamp() and (x.valid_to is null or x.valid_to>statement_timestamp())) active_match on true
+    where b.rfq_id=$1 order by s.supplier_code,b.supplier_id,b.rfq_line_id`, [rfqId])).rows;
+}
 
 export class ProcurementSourcingService {
   private readonly repository: ProcurementSourcingRepository; private readonly fault: FaultInjector;
@@ -59,18 +168,76 @@ export class ProcurementSourcingService {
   }
 
   async detail(id: number) {
-    const header = rowData(await this.repository.pool.query(`select q.*,r.request_code,p.required_date source_required_date,p.plan_version_no,b.project_code,b.project_name from procurement_rfqs q join planning_purchase_requests r on r.id=q.purchase_request_id join planning_material_requirement_plans p on p.id=r.plan_id join business_projects b on b.id=p.project_id where q.id=$1`, [id]), "RFQ_NOT_FOUND", "询价不存在");
-    const [lines, suppliers, quotes, quoteLines, comparisons, comparisonLines, award, events] = await Promise.all([
-      this.repository.pool.query(`select l.*,m.internal_material_code,m.standard_name,u.code unit_code from procurement_rfq_lines l join material_master m on m.id=l.material_id join units u on u.id=l.unit_id where l.rfq_id=$1 order by l.line_no`, [id]),
-      this.repository.pool.query(`select rs.*,s.supplier_code,s.supplier_name,s.status supplier_status from procurement_rfq_suppliers rs join suppliers s on s.id=rs.supplier_id where rs.rfq_id=$1 order by s.supplier_code`, [id]),
-      this.repository.pool.query(`select q.*,s.supplier_code,s.supplier_name,(q.valid_until<current_date) quote_expired from procurement_supplier_quotes q join suppliers s on s.id=q.supplier_id where q.rfq_id=$1 order by q.supplier_id,q.quote_version_no desc`, [id]),
-      this.repository.pool.query(`select l.* from procurement_supplier_quote_lines l join procurement_supplier_quotes q on q.id=l.quote_id where q.rfq_id=$1 order by l.rfq_line_id,q.supplier_id,q.quote_version_no desc`, [id]),
-      this.repository.pool.query(`select distinct on(c.rfq_line_id) c.* from procurement_quote_comparisons c where c.rfq_id=$1 order by c.rfq_line_id,c.comparison_version_no desc`, [id]),
-      this.repository.pool.query(`select cl.*,s.supplier_code,s.supplier_name from procurement_quote_comparison_lines cl join procurement_quote_comparisons c on c.id=cl.comparison_id join suppliers s on s.id=cl.supplier_id where c.rfq_id=$1 and not exists(select 1 from procurement_quote_comparisons n where n.rfq_line_id=c.rfq_line_id and n.comparison_version_no>c.comparison_version_no) order by c.rfq_line_id,cl.tax_included,cl.freight_included,cl.price_rank nulls last,s.supplier_code`, [id]),
-      this.repository.pool.query(`select a.*,coalesce(jsonb_agg(to_jsonb(al) order by al.rfq_line_id) filter(where al.id is not null),'[]'::jsonb) lines from procurement_sourcing_awards a left join procurement_sourcing_award_lines al on al.award_id=a.id where a.rfq_id=$1 group by a.id`, [id]),
-      this.repository.pool.query("select * from procurement_sourcing_events where rfq_id=$1 order by id", [id]),
-    ]);
-    return { header, lines: lines.rows, suppliers: suppliers.rows, quotes: quotes.rows, quote_lines: quoteLines.rows, comparisons: comparisons.rows, comparison_lines: comparisonLines.rows, award: award.rows[0] || null, events: events.rows };
+    const client = await this.repository.pool.connect();
+    try {
+      await client.query("begin isolation level repeatable read read only");
+      const header = rowData(await client.query<any>(`select q.*,r.request_code,r.status source_status,r.version source_current_version,p.required_date source_required_date,p.plan_version_no,b.project_code,b.project_name,
+          not exists(select 1 from planning_purchase_requests newer join planning_material_requirement_plans np on np.id=newer.plan_id where np.project_id=p.project_id and np.plan_version_no>p.plan_version_no) source_latest,
+          q.response_deadline>=(statement_timestamp() at time zone 'Asia/Shanghai')::date deadline_valid
+        from procurement_rfqs q join planning_purchase_requests r on r.id=q.purchase_request_id join planning_material_requirement_plans p on p.id=r.plan_id join business_projects b on b.id=p.project_id where q.id=$1`, [id]), "RFQ_NOT_FOUND", "询价不存在");
+      const lines = await client.query<any>(`select l.*,m.internal_material_code,m.standard_name,u.code unit_code from procurement_rfq_lines l join material_master m on m.id=l.material_id join units u on u.id=l.unit_id where l.rfq_id=$1 order by l.line_no`, [id]);
+      const suppliers = await client.query<any>(`select rs.*,s.supplier_code,s.supplier_name,s.status supplier_status from procurement_rfq_suppliers rs join suppliers s on s.id=rs.supplier_id where rs.rfq_id=$1 order by s.supplier_code,s.id`, [id]);
+      const quotes = await client.query<any>(`select q.*,s.supplier_code,s.supplier_name,(q.valid_until<current_date) quote_expired from procurement_supplier_quotes q join suppliers s on s.id=q.supplier_id where q.rfq_id=$1 order by q.supplier_id,q.quote_version_no desc`, [id]);
+      const quoteLines = await client.query<any>(`select l.* from procurement_supplier_quote_lines l join procurement_supplier_quotes q on q.id=l.quote_id where q.rfq_id=$1 order by l.rfq_line_id,q.supplier_id,q.quote_version_no desc`, [id]);
+      const comparisons = await client.query<any>(`select distinct on(c.rfq_line_id) c.* from procurement_quote_comparisons c where c.rfq_id=$1 order by c.rfq_line_id,c.comparison_version_no desc`, [id]);
+      const comparisonLines = await client.query<any>(`select cl.*,s.supplier_code,s.supplier_name from procurement_quote_comparison_lines cl join procurement_quote_comparisons c on c.id=cl.comparison_id join suppliers s on s.id=cl.supplier_id where c.rfq_id=$1 and not exists(select 1 from procurement_quote_comparisons n where n.rfq_line_id=c.rfq_line_id and n.comparison_version_no>c.comparison_version_no) order by c.rfq_line_id,cl.tax_included,cl.freight_included,cl.price_rank nulls last,s.supplier_code`, [id]);
+      const award = await client.query<any>(`select a.*,coalesce(jsonb_agg(to_jsonb(al) order by al.rfq_line_id) filter(where al.id is not null),'[]'::jsonb) lines from procurement_sourcing_awards a left join procurement_sourcing_award_lines al on al.award_id=a.id where a.rfq_id=$1 group by a.id`, [id]);
+      const events = await client.query<any>(`select e.*,to_char(e.created_at at time zone 'Asia/Shanghai','YYYY-MM-DD HH24:MI:SS.US') occurred_at_shanghai from procurement_sourcing_events e where e.rfq_id=$1 order by e.id`, [id]);
+      const bindings = await exactBindingRows(client, id);
+      const current = await client.query<any>(`select rs.id rfq_supplier_id,rs.supplier_id,rs.status invitation_status,s.supplier_code,s.supplier_name,s.status supplier_status,l.id rfq_line_id,l.material_id,m.internal_material_code,m.standard_name,m.material_status,
+          l.unit_id purchase_unit_id,u.code purchase_unit_code,bu.code base_unit_code,match.mapping_count current_active_count,sm.id mapping_version_id,sm.mapping_uid mapping_id,
+          sm.mapping_version_no mapping_version,sm.version mapping_row_version,sm.status current_status,sm.supplier_item_code supplier_part_number,
+          sm.conversion_numerator::text conversion_numerator,sm.conversion_denominator::text conversion_denominator,sm.valid_from,sm.valid_to,
+          (rs.status='INVITED' and s.status='ACTIVE' and m.material_status='ACTIVE' and match.mapping_count=1) eligible,
+          case when rs.status<>'INVITED' then 'RFQ Supplier 邀请状态已漂移为 '||rs.status when s.status<>'ACTIVE' then 'Supplier 当前不是 ACTIVE' when m.material_status<>'ACTIVE' then 'Material 当前不是 ACTIVE' when match.mapping_count=0 then '缺少当前有效 1:1 Mapping' when match.mapping_count>1 then '当前有效 Mapping 冲突' else '' end issue_reason,
+          'CURRENT_QUALIFICATION' binding_source,'CURRENT_ACTIVE_CANDIDATE' binding_status,false status_drift,false version_drift
+        from procurement_rfq_suppliers rs join suppliers s on s.id=rs.supplier_id cross join lateral (select l.* from procurement_rfq_lines l where l.rfq_id=rs.rfq_id) l
+        join material_master m on m.id=l.material_id join units u on u.id=l.unit_id
+        left join units bu on ((m.base_unit_id is not null and bu.id=m.base_unit_id)
+          or (m.base_unit_id is null and nullif(btrim(m.base_uom),'') is not null and upper(bu.code)=upper(btrim(m.base_uom))))
+        left join lateral (select count(*)::int mapping_count,(array_agg(x.id order by x.mapping_version_no desc,x.id desc))[1] mapping_version_id from supplier_mappings x where x.supplier_id=rs.supplier_id and x.material_id=l.material_id and x.purchase_unit_id=l.unit_id and x.status='ACTIVE' and x.conversion_numerator=x.conversion_denominator and x.valid_from<=statement_timestamp() and (x.valid_to is null or x.valid_to>statement_timestamp())) match on true
+        left join supplier_mappings sm on sm.id=match.mapping_version_id where rs.rfq_id=$1 order by s.supplier_code,rs.supplier_id,l.line_no`, [id]);
+      const creationEvents = events.rows.filter((event) => event.event_type === "RFQ_CREATED"
+        && Number(event.credential_version) === 2 && event.result === "SUCCESS"
+        && event.actor === header.created_by && event.request_id === header.request_id
+        && Number(event.new_version) === 1 && event.old_version === null
+        && event.from_status === null && event.to_status === "DRAFT"
+        && Boolean(event.idempotency_key_digest) && Boolean(event.scope_digest)
+        && new Date(event.created_at).valueOf() === new Date(header.created_at).valueOf());
+      const audits = await client.query<any>(`select a.*,to_char(a.created_at at time zone 'Asia/Shanghai','YYYY-MM-DD HH24:MI:SS.US') occurred_at_shanghai from audit_log a
+        where a.route_code='PROCUREMENT_SOURCING' and a.action='RFQ_CREATED' and a.result='success' and a.request_id=$2 and a.username=$3
+          and a.old_version is null and a.new_version=1 and a.idempotency_key_digest is not null and a.operation_id is not null
+          and a.detail->>'object_id'=($1::bigint)::text and a.created_at=(select created_at from procurement_rfqs where id=$1::bigint) order by a.id`, [id, header.request_id, header.created_by]);
+      let creationReceipt: Record<string, unknown>;
+      if (creationEvents.length === 1) {
+        const event = creationEvents[0];
+        creationReceipt = { authority: "IMMUTABLE_EVENT", event_type: "RFQ_CREATED", immutable: true, authority_note: "RFQ_CREATED 是与草稿同事务提交、数据库禁止改写或删除的业务事件。", actor: event.actor, occurred_at: event.created_at, occurred_at_shanghai: event.occurred_at_shanghai, request_id: event.request_id, result: "SUCCESS", idempotency_key_digest: event.idempotency_key_digest, old_version: event.old_version, new_version: event.new_version, operation_id: null, scope_digest: event.scope_digest };
+      } else if (creationEvents.length === 0 && audits.rowCount === 1) {
+        const audit = audits.rows[0];
+        creationReceipt = { authority: "EXACT_SUCCESS_AUDIT", event_type: "RFQ_CREATED", immutable: false, authority_note: "0039 前草稿没有独立 RFQ_CREATED 业务事件；SUCCESS 来自与创建事务一并提交且时间精确匹配的成功 Audit，RFQ 头创建字段受数据库保护。未伪造历史事件。", actor: audit.username, occurred_at: audit.created_at, occurred_at_shanghai: shanghaiTimestamp(audit.occurred_at_shanghai), request_id: audit.request_id, result: "SUCCESS", idempotency_key_digest: audit.idempotency_key_digest, old_version: audit.old_version, new_version: audit.new_version, operation_id: audit.operation_id };
+      } else {
+        creationReceipt = { authority: "UNVERIFIED", event_type: "RFQ_CREATED", immutable: false, authority_note: "未找到唯一、精确关联的创建成功事件或审计；页面不会由可读取状态反推 SUCCESS。", actor: header.created_by, occurred_at: header.created_at, occurred_at_shanghai: "", request_id: header.request_id, result: "UNVERIFIED", idempotency_key_digest: null, old_version: null, new_version: null, operation_id: null };
+      }
+      const expectedBindings = suppliers.rows.length * lines.rows.length;
+      const complete = expectedBindings > 0 && bindings.length === expectedBindings;
+      const creationOkay = creationReceipt.result === "SUCCESS";
+      const sourceOkay = header.source_status === "ACCEPTED" && Number(header.source_current_version) === Number(header.source_purchase_request_version) && header.source_latest === true && header.deadline_valid === true;
+      const mappingIssues = current.rows.filter((row) => !row.eligible).map((row) => `Supplier ${row.supplier_id} / Material ${row.material_id}: ${row.issue_reason}`);
+      const driftIssues = bindings.filter((row) => !row.eligible).map((row) => `Supplier ${row.supplier_id} / Material ${row.material_id}: ${row.current_active_count === 0 ? "Mapping 已失效" : row.current_active_count > 1 ? "Mapping 冲突" : row.status_drift ? `状态从 ${row.binding_status} 漂移为 ${row.current_status}` : "Mapping Version/CAS 已漂移"}`);
+      const issues = [...(!complete ? [bindings.length === 0 ? "历史草稿尚未固定 Mapping；当前资格结果不能冒充创建时绑定。" : `Mapping 绑定不完整：${bindings.length}/${expectedBindings}`] : []), ...(!creationOkay ? ["创建成功凭证未通过唯一、精确关联校验，禁止发出。"] : []), ...(!sourceOkay ? ["来源 PRQ 状态、版本、最新性或截止日期校验未通过。"] : []), ...mappingIssues, ...driftIssues];
+      const mode = bindings.length === 0 ? "UNBOUND_LEGACY_DRAFT" : bindings.every((row) => row.binding_source === "RFQ_CREATE") ? "BOUND_AT_CREATE" : "BOUND_BY_EXPLICIT_CONFIRMATION";
+      const downstream = await client.query<any>(`select (select count(*)::int from procurement_supplier_quotes where rfq_id=$1) quotes,
+        (select count(*)::int from procurement_sourcing_awards where rfq_id=$1) awards,
+        (select count(distinct link.purchase_order_id)::int from procurement_award_po_line_links link join procurement_sourcing_awards a on a.id=link.award_id where a.rfq_id=$1) purchase_orders`, [id]);
+      const issued = events.rows.filter((event) => event.event_type === "RFQ_ISSUED" && Number(event.credential_version) === 2).at(-1) || null;
+      const issueReceipt = issued ? { event_type: "ISSUED", actor: issued.actor, occurred_at: issued.created_at, occurred_at_shanghai: issued.occurred_at_shanghai, request_id: issued.request_id, result: issued.result, old_version: issued.old_version, new_version: issued.new_version, from_status: issued.from_status, to_status: issued.to_status, scope_digest: issued.scope_digest, supplier_count: suppliers.rows.length, mapping_count: bindings.length, quote_count: downstream.rows[0].quotes, award_count: downstream.rows[0].awards, purchase_order_count: downstream.rows[0].purchase_orders } : null;
+      await client.query("commit");
+      return { header, lines: lines.rows, suppliers: suppliers.rows, quotes: quotes.rows, quote_lines: quoteLines.rows, comparisons: comparisons.rows, comparison_lines: comparisonLines.rows, award: award.rows[0] || null, events: events.rows, creation_receipt: creationReceipt,
+        mapping_traceability: { mode, complete, can_issue: header.status === "DRAFT" && complete && creationOkay && sourceOkay && !issues.length, summary: mode === "UNBOUND_LEGACY_DRAFT" ? "历史草稿尚未固定 Mapping" : mode === "BOUND_AT_CREATE" ? "Mapping 已在 RFQ 创建事务中固定" : "Mapping 已由采购显式确认固定", issues, bindings, current_qualification: current.rows }, downstream_counts: downstream.rows[0], issue_receipt: issueReceipt };
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally { client.release(); }
   }
 
   async comparison(id: number) {
@@ -82,6 +249,7 @@ export class ProcurementSourcingService {
     const normalized = normalizeCreateRfqInput(input), requestId = normalized.purchase_request_id, suppliers = normalized.supplier_ids, deadline = normalized.response_deadline, expected = normalized.expected_version;
     return this.repository.execute({ ...meta, requestDigest: canonicalDigest(normalized) }, async (client) => {
       await client.query("select pg_advisory_xact_lock($1)", [requestId]); const request = rowData(await client.query<any>(`select r.*,p.project_id,p.plan_version_no,p.required_date from planning_purchase_requests r join planning_material_requirement_plans p on p.id=r.plan_id where r.id=$1 for update`, [requestId]), "PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
+      await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`material-requirement-project:${request.project_id}`]);
       if (request.version !== expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "采购申请版本已变化", 409); if (request.status !== "ACCEPTED") throw new ProcurementSourcingError("PURCHASE_REQUEST_NOT_ACCEPTED", "只有已接收采购申请可以创建询价", 409);
       const newer = await client.query("select 1 from planning_purchase_requests r join planning_material_requirement_plans p on p.id=r.plan_id where p.project_id=$1 and p.plan_version_no>$2 limit 1", [request.project_id, request.plan_version_no]); if (newer.rows[0]) throw new ProcurementSourcingError("PURCHASE_REQUEST_NOT_LATEST", "只能对最新采购申请创建询价", 409);
       const lines = await client.query<any>(`select l.*,m.base_unit_id,m.material_status from planning_purchase_request_lines l join material_master m on m.id=l.material_id where l.purchase_request_id=$1 order by l.line_no`, [requestId]); if (!lines.rowCount) throw new ProcurementSourcingError("PURCHASE_REQUEST_EMPTY", "采购申请没有可询价行", 422);
@@ -89,19 +257,66 @@ export class ProcurementSourcingService {
       const mappingSnapshots = Object.fromEntries(coverage.map((row) => [row.supplier_id, row.mapping_snapshots]));
       const source = { request_id: request.id, version: request.version, plan_version_no: request.plan_version_no, required_date: String(request.required_date), lines: lines.rows.map((line) => ({ id: line.id, line_no: line.line_no, material_id: line.material_id, unit_id: line.unit_id, requested_quantity: line.requested_quantity })) }; const sourceDigest = canonicalDigest(source);
       const seq = await client.query<any>("insert into business_code_sequences(sequence_code,current_value,version,updated_at) values('PROCUREMENT_RFQ',1,1,now()) on conflict(sequence_code) do update set current_value=business_code_sequences.current_value+1,version=business_code_sequences.version+1,updated_at=now() returning current_value"); const code = `RFQ-${String(seq.rows[0].current_value).padStart(8, "0")}`; const round = Number((await client.query("select coalesce(max(round_no),0)+1 round from procurement_rfqs where purchase_request_id=$1", [requestId])).rows[0].round);
-      const rfq = await client.query<any>("insert into procurement_rfqs(rfq_code,purchase_request_id,round_no,response_deadline,source_purchase_request_version,source_digest,request_id,created_by) values($1,$2,$3,$4,$5,$6,$7,$8) returning *", [code, requestId, round, deadline, request.version, sourceDigest, meta.requestId, meta.actor.username]);
-      for (const line of lines.rows) await client.query("insert into procurement_rfq_lines(rfq_id,purchase_request_line_id,material_id,unit_id,requested_quantity,required_date,line_no,source_digest) values($1,$2,$3,$4,$5,$6,$7,$8)", [rfq.rows[0].id, line.id, line.material_id, line.unit_id, line.requested_quantity, request.required_date, line.line_no, canonicalDigest({ purchase_request_line_id: line.id, material_id: line.material_id, unit_id: line.unit_id, requested_quantity: line.requested_quantity, required_date: String(request.required_date) })]);
-      for (const supplierId of suppliers) await client.query("insert into procurement_rfq_suppliers(rfq_id,supplier_id,invited_by,supplier_mapping_digest) values($1,$2,$3,$4)", [rfq.rows[0].id, supplierId, meta.actor.username, canonicalDigest(mappingSnapshots[supplierId])]);
-      this.fault("after_rfq_saved"); const body = { rfq_id: Number(rfq.rows[0].id), rfq_code: code, status: "DRAFT", round_no: round, version: 1, request_id: meta.requestId }; return { status: 201, body, objectId: body.rfq_id, newVersion: 1 };
+      const rfq = await client.query<any>("insert into procurement_rfqs(rfq_code,purchase_request_id,round_no,response_deadline,source_purchase_request_version,source_digest,request_id,created_by) values($1,$2,$3,$4,$5,$6,$7,$8) returning *,response_deadline::text response_deadline_text", [code, requestId, round, deadline, request.version, sourceDigest, meta.requestId, meta.actor.username]);
+      const rfqLines: any[] = [];
+      for (const line of lines.rows) rfqLines.push((await client.query<any>("insert into procurement_rfq_lines(rfq_id,purchase_request_line_id,material_id,unit_id,requested_quantity,required_date,line_no,source_digest) values($1,$2,$3,$4,$5,$6,$7,$8) returning *", [rfq.rows[0].id, line.id, line.material_id, line.unit_id, line.requested_quantity, request.required_date, line.line_no, canonicalDigest({ purchase_request_line_id: line.id, material_id: line.material_id, unit_id: line.unit_id, requested_quantity: line.requested_quantity, required_date: String(request.required_date) })])).rows[0]);
+      const rfqSuppliers: any[] = [];
+      for (const supplierId of suppliers) rfqSuppliers.push((await client.query<any>("insert into procurement_rfq_suppliers(rfq_id,supplier_id,invited_by,supplier_mapping_digest) values($1,$2,$3,$4) returning *", [rfq.rows[0].id, supplierId, meta.actor.username, canonicalDigest(mappingSnapshots[supplierId])])).rows[0]);
+      const bindings = await saveMappingBindings(client, rfq.rows[0], rfqLines, rfqSuppliers, coverage, "RFQ_CREATE", meta);
+      const scopeDigest = canonicalDigest(frozenScope(rfq.rows[0], rfqLines, rfqSuppliers, bindings));
+      await client.query(`insert into procurement_sourcing_events(rfq_id,event_type,actor,request_id,credential_version,result,idempotency_key_digest,old_version,new_version,from_status,to_status,scope_digest)
+        values($1,'RFQ_CREATED',$2,$3,2,'SUCCESS',$4,null,1,null,'DRAFT',$5)`, [rfq.rows[0].id, meta.actor.username, meta.requestId, meta.keyDigest, scopeDigest]);
+      this.fault("after_rfq_saved"); const body = { rfq_id: Number(rfq.rows[0].id), rfq_code: code, status: "DRAFT", round_no: round, version: 1, request_id: meta.requestId, mapping_binding_count: bindings.length, event: "RFQ_CREATED", result: "SUCCESS" }; return { status: 201, body, objectId: body.rfq_id, newVersion: 1 };
+    });
+  }
+
+  async confirmMappings(id: number, meta: SourcingMutationMeta, input: Record<string, unknown>) {
+    exactKeys(input, ["expected_version"]); const expected = expectedVersion(input.expected_version);
+    return this.repository.execute(meta, async (client) => {
+      const rfq = await lockRfq(client, id);
+      if (rfq.version !== expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "RFQ 版本已变化", 409);
+      if (rfq.status !== "DRAFT") throw new ProcurementSourcingError("RFQ_NOT_DRAFT", "只有 DRAFT 询价可以确认 Mapping", 409);
+      if ((await client.query("select 1 from procurement_supplier_quotes where rfq_id=$1 limit 1", [id])).rows[0]) throw new ProcurementSourcingError("RFQ_HAS_QUOTE", "已有报价的 RFQ 不能补固定 Mapping", 409);
+      if ((await client.query("select 1 from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1 limit 1", [id])).rows[0]) throw new ProcurementSourcingError("RFQ_MAPPING_ALREADY_BOUND", "RFQ Mapping 已固定，不能重复或改绑", 409);
+      await requireCurrentRfqSource(client, rfq);
+      const { coverage } = await currentCoverageForRfq(client, rfq);
+      const rfqLines = (await client.query<any>("select * from procurement_rfq_lines where rfq_id=$1 order by line_no for share", [id])).rows;
+      const rfqSuppliers = (await client.query<any>("select * from procurement_rfq_suppliers where rfq_id=$1 order by supplier_id for share", [id])).rows;
+      const bindings = await saveMappingBindings(client, rfq, rfqLines, rfqSuppliers, coverage, "LEGACY_DRAFT_CONFIRMATION", meta);
+      const nextVersion = expected + 1, scopeDigest = canonicalDigest(frozenScope(rfq, rfqLines, rfqSuppliers, bindings));
+      await client.query("update procurement_rfqs set version=version+1,updated_at=now() where id=$1", [id]);
+      await client.query(`insert into procurement_sourcing_events(rfq_id,event_type,actor,request_id,credential_version,result,idempotency_key_digest,old_version,new_version,from_status,to_status,scope_digest)
+        values($1,'RFQ_MAPPING_CONFIRMED',$2,$3,2,'SUCCESS',$4,$5,$6,'DRAFT','DRAFT',$7)`, [id, meta.actor.username, meta.requestId, meta.keyDigest, expected, nextVersion, scopeDigest]);
+      this.fault("after_mapping_bindings_saved");
+      const body = { rfq_id: id, status: "DRAFT", version: nextVersion, mapping_binding_count: bindings.length, event: "RFQ_MAPPING_CONFIRMED", result: "SUCCESS", request_id: meta.requestId };
+      return { status: 200, body, objectId: id, oldVersion: expected, newVersion: nextVersion };
     });
   }
 
   async issue(id: number, meta: SourcingMutationMeta, input: Record<string, unknown>) {
     exactKeys(input, ["expected_version"]); const expected = expectedVersion(input.expected_version); return this.repository.execute(meta, async (client) => { const rfq = await lockRfq(client, id); if (rfq.version !== expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "RFQ 版本已变化", 409); if (rfq.status !== "DRAFT") throw new ProcurementSourcingError("RFQ_NOT_DRAFT", "只有 DRAFT 询价可以发出", 409);
-      const invited = await client.query<{ supplier_id: string | number }>("select supplier_id from procurement_rfq_suppliers where rfq_id=$1 order by supplier_id for share", [id]);
-      const supplierIds = invited.rows.map((row) => Number(row.supplier_id));
-      const coverage = await loadSupplierMappingCoverage(client, Number(rfq.purchase_request_id), supplierIds); requireRfqCoverage(coverage, supplierIds);
-      await client.query("update procurement_rfqs set status='ISSUED',issued_by=$2,issued_at=now(),version=version+1,updated_at=now() where id=$1", [id, meta.actor.username]); await client.query("insert into procurement_sourcing_events(rfq_id,event_type,actor,request_id) values($1,'RFQ_ISSUED',$2,$3)", [id, meta.actor.username, meta.requestId]); this.fault("after_rfq_issued"); const body = { rfq_id: id, status: "ISSUED", version: expected + 1, request_id: meta.requestId }; return { status: 200, body, objectId: id, oldVersion: expected, newVersion: expected + 1 }; });
+      await requireExactCreationCredential(client, rfq);
+      await requireCurrentRfqSource(client, rfq);
+      const rfqLines = (await client.query<any>("select * from procurement_rfq_lines where rfq_id=$1 order by line_no for share", [id])).rows;
+      const rfqSuppliers = (await client.query<any>("select rs.* from procurement_rfq_suppliers rs join suppliers s on s.id=rs.supplier_id where rs.rfq_id=$1 order by rs.supplier_id for share of rs,s", [id])).rows;
+      await client.query("select sm.id from supplier_mappings sm join (select distinct mapping_uid from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1) b on b.mapping_uid=sm.mapping_uid order by sm.id for share of sm", [id]);
+      const bindings = await exactBindingRows(client, id), expectedBindingCount = rfqLines.length * rfqSuppliers.length;
+      if (!expectedBindingCount || bindings.length !== expectedBindingCount) throw new ProcurementSourcingError("RFQ_MAPPING_BINDING_REQUIRED", `RFQ Mapping 尚未完整固定：${bindings.length}/${expectedBindingCount}；请先执行显式确认`, 409);
+      const problems = bindings.filter((row) => !row.eligible).map((row) => {
+        const reason = row.invitation_status !== "INVITED" ? `RFQ Supplier 邀请状态已漂移为 ${row.invitation_status}` : row.supplier_status !== "ACTIVE" ? "Supplier 已停用" : row.material_status !== "ACTIVE" ? "Material 已停用" : Number(row.current_active_count) > 1 ? "当前有效 Mapping 冲突" : Number(row.current_active_count) === 0 ? "Mapping 已失效" : row.status_drift ? `Mapping 状态从 ${row.binding_status} 漂移为 ${row.current_status}` : "Mapping ID/Version/CAS 已漂移";
+        return `Supplier ${row.supplier_id} / Material ${row.material_id}: ${reason}`;
+      });
+      if (problems.length) throw new ProcurementSourcingError("RFQ_MAPPING_DRIFT", `发出前 Mapping 校验失败：${problems.join("；")}`, 409);
+      const downstream = (await client.query<any>(`select
+        (select count(*)::int from procurement_supplier_quotes where rfq_id=$1) quotes,
+        (select count(*)::int from procurement_sourcing_awards where rfq_id=$1) awards,
+        (select count(distinct link.purchase_order_id)::int from procurement_award_po_line_links link join procurement_sourcing_awards award on award.id=link.award_id where award.rfq_id=$1) purchase_orders`, [id])).rows[0];
+      if (downstream.quotes || downstream.awards || downstream.purchase_orders) throw new ProcurementSourcingError("RFQ_DOWNSTREAM_STATE_CONFLICT", "DRAFT RFQ 已存在 Quote、Award 或 PO，禁止发出", 409);
+      const scopeDigest = canonicalDigest(frozenScope(rfq, rfqLines, rfqSuppliers, bindings)), nextVersion = expected + 1;
+      await client.query("update procurement_rfqs set status='ISSUED',issued_by=$2,issued_at=now(),version=version+1,updated_at=now() where id=$1", [id, meta.actor.username]);
+      await client.query(`insert into procurement_sourcing_events(rfq_id,event_type,actor,request_id,credential_version,result,idempotency_key_digest,old_version,new_version,from_status,to_status,scope_digest)
+        values($1,'RFQ_ISSUED',$2,$3,2,'SUCCESS',$4,$5,$6,'DRAFT','ISSUED',$7)`, [id, meta.actor.username, meta.requestId, meta.keyDigest, expected, nextVersion, scopeDigest]);
+      this.fault("after_rfq_issued"); const body = { rfq_id: id, status: "ISSUED", version: nextVersion, request_id: meta.requestId, event: "ISSUED", result: "SUCCESS", old_version: expected, new_version: nextVersion, frozen_scope_digest: scopeDigest, supplier_count: rfqSuppliers.length, mapping_count: bindings.length, quote_count: downstream.quotes, award_count: downstream.awards, purchase_order_count: downstream.purchase_orders }; return { status: 200, body, objectId: id, oldVersion: expected, newVersion: nextVersion }; });
   }
 
   private quoteInput(input: Record<string, unknown>, revise: boolean) {

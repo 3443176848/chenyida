@@ -267,6 +267,13 @@
       "when": 1785827527497,
       "tag": "0038_supplier_mapping_governance",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1785916818389,
+      "tag": "0039_rfq_traceability",
+      "breakpoints": true
     }
   ]
 }
