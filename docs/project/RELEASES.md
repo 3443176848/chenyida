@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
 最后核验：2026-08-06（Asia/Shanghai）
-适用任务：最新功能与并行非生产部署验收为 `SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04`；历史发布/恢复记录保留下文
+适用任务：最新功能与并行非生产部署验收为 `SELFHOST-UAT-FIX-28`；历史发布/恢复记录保留下文
 
 ## 1. 使用规则
 
@@ -17,6 +17,7 @@
 
 | 运行面 | 版本/标识 | Git 基线 | 数据库基线 | 测试状态 | 部署状态 | 真实数据迁移 | 回退基线 | 批准状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Node.js / PostgreSQL RFQ Comparison聚合读模型并行UAT | `0.1.0-alpha.40` | 功能提交`80e1ad60fa1272017545e150721c8b71f7c68828`；运维/文档提交消息`ops: deploy RFQ comparison aggregate read model`，SHA以Git log为准 | 39/head0039且无0040；RFQ ISSUED v6、Binding8、Quote2、Comparison4/8/4、Award/PO0/0，指纹`16d70f18…cf5bc` | Unit/UI`10/10+18/18`、隔离PG`3/3`、0039回归`6/6`、Chromium`1/1+4/4`、Schema/typecheck/lint/build/npm/Python/environment/credentials及主UAT桌面/390×844通过 | Web-only`DEPLOYED`到受控非生产UAT；Web`0dfcc0a8…`，PostgreSQL/Worker/Caddy未重建，Migration未运行；`NOT_RELEASED`到生产 | `NOT_MIGRATED`；只保留既有合成UAT Comparison，主UAT业务POST0且未创建Award/PO | root:root0600 dump SHA`8e858983…bffa`已list/第二新库恢复；旧Web`89e76775…`精确tag保留 | `RFQ COMPARISON AGGREGATE READ MODEL FIXED — UAT AWARD NOT CREATED`；人工定标必须新授权 |
 | Node.js / PostgreSQL 八角色工作台并行 UAT | `0.1.0-alpha.40` / `20260806-enterprise-ui-refresh-01` | 功能提交`4767c3db3cf66eb0978f07d044437790c0d4b87f`；运维/文档提交消息`ops: deploy role-based ERP workbench`，SHA以Git log为准 | PostgreSQL仍为39/head0039；Session207/有效1、Audit1446及RFQ/Quote保护指纹前后一致 | UI73/73、五组typecheck、lint、production build/postbuild、npm3/3、Python三项、credentials/diff、候选合同、匿名HTTPS/八角色资产/401、60秒health7/7通过 | Web-only`DEPLOYED`到受控非生产UAT；Web`f45d734b…`，PostgreSQL/Caddy未替换，Worker仅备份窗口短停，Migration未运行；`NOT_RELEASED`到生产 | `NOT_MIGRATED`；没有登录、Session/Audit增量或业务POST | root:root0600 dump SHA`dad839ef…`已list/第二新库恢复；旧Web`f139257b…`精确tag保留 | `ROLE-BASED WORKBENCH DEPLOYED — ANONYMOUS READ-ONLY VERIFIED`；登录式浏览器验收或生产切流须新授权 |
 | Node.js / PostgreSQL RFQ Quote Traceability 并行 UAT | `0.1.0-alpha.40` | 功能提交 `1be492e68f6635bc00ea3fb8ce461eac0617d8e7`；运维/文档提交消息 `ops: deploy rfq quote traceability fix`，SHA 以 Git log 为准 | 源码与并行 PostgreSQL 均为 `0001`—`0039`；主 RFQ `ISSUED v4`、Binding 8、Supplier A/B Quote `1/0`、Quote/Award/PO `1/0/0` | Unit/UI `9/9 + 12/12`、隔离 PostgreSQL `21/21`、隔离 Chromium `3/3`、Migration `3/3 + 6/6`、npm/Python/typecheck/lint/build/credentials及主UAT purchase-only只读桌面/390×844验收通过 | Web-only `DEPLOYED` 到受控并行非生产 UAT；PostgreSQL/Worker/Caddy未重建，未运行Migration；`NOT_RELEASED` 到生产 | `NOT_MIGRATED`；只保留既有合成UAT事实，没有写入主UAT业务数据 | root:root 0600 dump SHA `4fa038e…` 已list并恢复第二新库；旧Web `sha256:c8c3fdd…`精确tag保留 | `RFQ QUOTE VERSION SEMANTICS FIXED — SUPPLIER A RETAINED`；Supplier B入口可用但不得在本任务创建Quote |
 | Node.js / PostgreSQL RFQ Traceability 并行 UAT | `0.1.0-alpha.40` | 功能提交 `b339acd97f08e4cc09451173b48580015817d9f8`；运维/文档提交消息 `ops: deploy rfq issuance safeguards`，SHA 以 Git log 为准 | 源码与并行 PostgreSQL 均为 `0001`—`0039`；主 RFQ generation 1 / DRAFT v1、Binding/Event 0、Quote/Award/PO及全部下游 0 | Migration 6/6、Unit/UI/PG 26/26、Material Requirement 12/12、真实跨域 2/2、隔离 Chromium、typecheck/lint/build/credentials/Python和主 UAT purchase-only只读取消验收通过 | `DEPLOYED` 到受控并行非生产 UAT；`NOT_RELEASED` 到生产 | `NOT_MIGRATED`；未固定或发出主 RFQ，未迁真实公司数据 | root:root 0600 dump SHA `960cd6a…` 已 list、第二空库恢复0038并升级0039；alpha.39和alpha.40时区修复前Web精确tag保留 | `RFQ TRACEABILITY DEPLOYED — UAT RFQ STILL DRAFT`；必须新授权先显式固定 Mapping，不能直接发出 |

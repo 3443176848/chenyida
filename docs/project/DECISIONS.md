@@ -1135,7 +1135,7 @@
 ## D-100 Comparison Version采用关系化复合身份、服务端状态投影和确定性摘要
 
 - 日期：2026-08-06
-- 状态：`ACCEPTED / IMPLEMENTED`
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
 - 确认人：项目负责人（明确要求复用逐RFQ Line Comparison模型，补齐版本级追溯、聚合摘要、Event操作分组和移动端展示；禁止创建Award/PO或默认新增0040）
 - 身份决定：`procurement_quote_comparisons.id`继续是每条Comparison Line的稳定数据库ID；现有关系模型没有独立Comparison Header ID，不伪造整数Header。Comparison Version的权威复合身份由RFQ ID、Round、Comparison Version以及按RFQ Line稳定排列的全部持久化`basis_digest`共同确定，页面必须如实说明该边界。
 - 状态投影：Schema没有独立Comparison状态列。服务端将RFQ/Round最新Version且其固定Quote输入仍为当前可定标版本投影为`CURRENT`；存在更新Version的历史版本投影为`SUPERSEDED`；最新Version若固定输入已漂移则失败关闭定标并投影`INPUT_DRIFT`。这些都是读模型状态，Award仍由服务端和数据库按最新Comparison Version、固定Quote Line和当前资格重新验证，不能信任页面标签。
@@ -1143,6 +1143,7 @@
 - 聚合与Event：Supplier总额、最晚承诺日、交期风险、Supplier间金额/百分比/日期差和逐Material对比均由同一确定性服务端读模型投影。Comparison Event必须独立查询，按actor、时间、request_id和result形成一次“Comparison生成操作凭证”；主UAT真实四条Line级Event应逐条关联Comparison Line/Material，但不得解释为四次点击或四个Comparison Version，也不得删除、合并或改写历史Event。
 - 生成与迁移：当前Quote输入摘要已存在于任一完整Comparison Version时，生成操作幂等返回该Version且不新增Comparison Line、Candidate、Event或RFQ CAS；Quote修订形成新当前输入后才允许生成下一Version，旧Version永久不可变。0039已保存稳定Comparison/Quote Line引用、basis、排名、金额、日期及Event身份，足以重算读模型，因此不修改0039、不新增0040，版本保持`0.1.0-alpha.40`。
 - UI与任务边界：桌面使用对比表，390×844使用Supplier汇总卡、Material逐项卡和可折叠追溯凭证；长digest/request_id可换行复制，生成按钮按服务端状态禁用，定标入口保持可见。本决定只授权Comparison读模型、幂等保护、Web-only部署和purchase-only只读验收；不授权打开定标窗口、创建Award、转PO或其他业务写入。
+- 实施结果：功能提交`80e1ad60fa1272017545e150721c8b71f7c68828`，最终Web`sha256:0dfcc0a8639e09e6ca0380292d979a2f73510a76cdcd23d46001bfb9c145273d`已Web-only部署。主UAT确定性输出摘要`79554d88ccdb643a860c0c69e77222abce80eb4d3d8314d88135d3966fb619ec`，保护指纹`16d70f1865e3a2e3b0e840f289d13b340e4f6b87800b1c79d98865112d0cf5bc`前后不变；purchase-only桌面/390×844只读通过，business POST 0、Session 0、Award/PO 0/0。当前`awardable_now=true`只表示具备另立人工定标任务的技术前置条件，不构成本任务授权。
 
 ## 待确认业务决策
 

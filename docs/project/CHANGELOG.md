@@ -4,6 +4,17 @@
 
 ## 2026-08-06
 
+### SELFHOST-UAT-FIX-28 - `feat: add RFQ comparison aggregate read model` / `ops: deploy RFQ comparison aggregate read model`
+
+- Git/范围：从唯一worktree、clean`main@0d4e28842130a3289bea24c4eb9762c250de9809`、Parent`943c7fa5da44182617fa8a4f1d75b49b6d6c3795`、behind0/ahead159起步；功能提交`80e1ad60fa1272017545e150721c8b71f7c68828`，部署/UAT/清理与项目文档由独立ops提交收口。只补齐现有Comparison的聚合读模型和幂等保护，不创建Award/PO，不push/PR或改写历史。
+- 模型/摘要：逐行`procurement_quote_comparisons.id`继续是稳定数据库ID，无独立Header ID；Version权威身份为RFQ、Round、Version和逐行持久化basis集合。CURRENT/SUPERSEDED/INPUT_DRIFT是服务端投影，输出摘要按Material/Supplier/Comparison Line/Candidate由不可变输出重算；主UAT摘要`79554d88…619ec`。
+- 汇总/Event/UI：服务端投影固定Quote Header/Version/Line、Supplier总额/交期、逐Material金额/日期和A/B差异。真实四条Line级Event按共享actor/时间/request_id/result显示为一个生成凭证，不改历史。桌面表与390×844 Supplier/Material卡、可折叠追溯和长ID复制通过；生成按钮在当前输入时禁用，定标入口仅保持可见。
+- 幂等/安全：同输入POST在隔离环境返回现有Version且Comparison/Candidate/Event/RFQ CAS零增量；Quote修订后才允许完整v2，v1不可变。历史Version Award拒绝、权限、Origin/CSRF、CAS、并发、幂等和故障回滚均通过。保持alpha.40/0039，未修改0039或新增0040。
+- 验证：Unit/UI`10/10+18/18`、隔离PostgreSQL`3/3`、0039`6/6`、Schema consistency、隔离Comparison/完整RFQ Chromium`1/1+4/4`、typecheck、production/Docker build、npm3/3、environment6/6、Python三项、1,254文件credentials和diff check通过；lint0 error/11既有warning。
+- 备份/部署：正式dump为root:root0600、2,291,624bytes、SHA-256`8e8589838c31f044c7741df9958556369b3eba4746d42c98b82dbb2d8bffa`；list3,359，第二新库39/head/226表和指纹一致后删除。仅替换Web`89e76775…→0dfcc0a8…`，无Migration；PostgreSQL/Worker/Caddy和四卷不变，旧Web精确rollback tag保留。
+- 主UAT/结论：purchase-only桌面/390×844只读通过，`business_post=0`、Session0；RFQ ISSUED v6、Binding8、Quote2、Comparison Line/Candidate/Event`4/8/4`、Award/PO`0/0`。保护指纹始终为`16d70f1865e3a2e3b0e840f289d13b340e4f6b87800b1c79d98865112d0cf5bc`。结论`RFQ COMPARISON AGGREGATE READ MODEL FIXED — UAT AWARD NOT CREATED`；`awardable_now=true`仅表示可另立定标任务。
+- 资源/清理：重任务串行；起点/终点available约2.2/1.9GiB、Swap275/269MiB、根盘18GiB、最终Load`0.11/0.26/0.44`；内核OOM0、四服务restart0/OOM false。恢复/隔离库、临时容器/runtime/SQLite/Schema输出清零，起点既有测试库恢复为空，正式备份和current/candidate/rollback镜像保留，未prune。
+
 ### SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06 - `ops: deploy localized ERP statuses`
 
 - 授权/范围：项目负责人在状态中文化源码任务完成后明确回复“授权”；从clean`main@943c7fa5da44182617fa8a4f1d75b49b6d6c3795`、behind0/ahead158起步，只把该提交Web-only部署到18888公开非生产UAT并做匿名只读验收。不登录、不发业务POST，不运行Migration，不替换PostgreSQL/Worker/Caddy/四卷，不部署历史Sites或生产。

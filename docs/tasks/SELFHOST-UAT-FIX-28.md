@@ -2,7 +2,7 @@
 
 ## 状态与唯一范围
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始：2026-08-06（Asia/Shanghai）
 - 负责人：Codex（严格门禁、主UAT只读核验、服务端聚合读模型、移动端展示、隔离测试、备份恢复、Web-only部署和purchase-only只读验收）；项目负责人（固定Comparison保护边界及实现、部署、只读验收授权）
 - 依赖：`SELFHOST-PHASE4-TASK04`、`SELFHOST-UAT-FIX-27`、D-061、D-062、D-090、D-095—D-099
@@ -50,3 +50,10 @@
 - `BLOCKED — NO UNSAFE CHANGE`
 
 完成后立即停止，不创建Award或PO。
+
+## 完成证据
+
+- 功能提交`80e1ad60fa1272017545e150721c8b71f7c68828`；服务端聚合读模型、幂等生成保护、桌面/390×844页面、保护/UAT runner和自动测试已实现，无0040。
+- Unit/UI/隔离PostgreSQL、0039回归、Schema consistency、Chromium、typecheck/lint/build、npm/Python/environment/credentials全部通过；正式备份/list/第二新库恢复和Web-only部署通过。
+- 主UAT purchase-only只读验收`business POST=0`、Session 0；RFQ ISSUED v6、Binding 8、Quote 2、Comparison `4/8/4`、Award/PO `0/0`，保护指纹`16d70f1865e3a2e3b0e840f289d13b340e4f6b87800b1c79d98865112d0cf5bc`前后不变。
+- 最终结论与全部证据见[完成报告](SELFHOST-UAT-FIX-28-COMPLETION.md)：`RFQ COMPARISON AGGREGATE READ MODEL FIXED — UAT AWARD NOT CREATED`。

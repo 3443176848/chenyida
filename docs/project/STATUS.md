@@ -2,6 +2,25 @@
 
 最后更新时间：2026-08-06（Asia/Shanghai）
 
+## SELFHOST-UAT-FIX-28 RFQ Comparison聚合读模型与摘要修复
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | RFQ COMPARISON AGGREGATE READ MODEL FIXED — UAT AWARD NOT CREATED | 复用既有逐RFQ Line关系模型完成聚合读模型、Web-only部署和purchase-only只读验收；未创建Award/PO |
+| 身份/Schema | COMPOSITE / NO 0040 | Comparison Line稳定ID为1—4；无独立Header ID，Version身份为RFQ 1、Round 1、Version 1及四个持久化basis；alpha.40/0039保持 |
+| 状态/输入 | CURRENT / NO DRIFT | 状态为服务端投影而非数据库列；Quote ID 1/v1、2/v1及固定Quote Line均当前，历史Version投影SUPERSEDED，漂移时INPUT_DRIFT并禁用定标 |
+| 输出摘要 | PASS / DETERMINISTIC | Material→Supplier→Comparison Line→Candidate稳定排序，摘要`79554d88…619ec`；输入basis持久化，输出摘要与Supplier/Material汇总为服务端派生 |
+| 金额/交期 | PASS | A `480.00 CNY / ON_TIME / 提前10天`，B `400.00 CNY / LATE / 延期6天`；差额80、以B为基准20%、A早16天 |
+| Event分组 | 4 DATABASE EVENTS / 1 UI RECEIPT | 四条真实Line级Event按同actor/时间/request_id/result显示为一个生成操作凭证；不是四次点击或四个Version，历史未改 |
+| 生成治理 | PASS / IDEMPOTENT | 当前输入按钮禁用且刷新保持；隔离同输入返回现有v1零Comparison/Event/CAS增量，Quote修订后才形成v2，v1不可变 |
+| 自动验证 | PASS | Unit/UI `10/10+18/18`、隔离PG`3/3`、0039`6/6`、Chromium`1/1+4/4`、typecheck/build/npm/Python/environment/credentials/diff通过；lint 0 error/11既有warning |
+| 备份/恢复 | PASS | root:root0600 dump 2,291,624 bytes、SHA`8e858983…bffa`、list3,359；第二新库39/head/226表与同指纹后删除 |
+| Web-only部署 | PASS | Web`89e76775…→0dfcc0a8…`；仅重建Web，无Migration，PostgreSQL/Worker/Caddy和四卷不变；旧Web精确rollback tag保留 |
+| 主UAT | PASS / READ ONLY | purchase-only桌面/390×844通过；生成禁用，定标仅可见未打开，`business_post=0`、Session0、Quote2、Comparison4/8/4、Award/PO0/0 |
+| 数据保护 | PASS / UNCHANGED | 保护指纹`16d70f1865e3a2e3b0e840f289d13b340e4f6b87800b1c79d98865112d0cf5bc`在主库起点、恢复库、部署前和UAT后完全一致 |
+| 资源/清理 | PASS | available约2.2→1.9GiB、Swap275→269MiB、根盘18GiB、最终Load`0.11/0.26/0.44`；内核OOM0，四服务restart0/OOM false，临时资源清零 |
+| Git/后续 | TWO FOCUSED COMMITS / NEW AUTH REQUIRED | 功能`80e1ad6`；收口消息`ops: deploy RFQ comparison aggregate read model`。`awardable_now=true`只允许另立任务，不构成定标授权 |
+
 ## SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06 ERP 可见状态中文化 Web-only 部署
 
 | 验证项 | 结果 | 说明 |
