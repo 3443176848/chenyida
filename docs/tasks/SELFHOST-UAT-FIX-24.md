@@ -40,5 +40,9 @@
 
 - 采用分支 A，真实主键为 `id bigserial PRIMARY KEY NOT NULL`；没有 0040，保持 alpha.40/0039。
 - 功能提交 `e329931`；最终 Web `sha256:315f0b7945a7b3eb27841ffaae8a444fba45dd94791519dc856173a95d830635` 已 Web-only 部署。
-- 主 UAT八个 Binding ID 为 `3,4,1,2,7,8,5,6`；完整固定凭证和桌面/390px发出窗口通过，只取消，业务 POST 0、Session 0。
+- 主 UAT 当次页面显示顺序中的 Binding ID 为 `3,4,1,2,7,8,5,6`；这是按 Supplier/Material code 排序后的卡片次序，不是可与 RFQ Line/Material ID 列表按位置配对的关联基线。每个 ID 的权威身份必须以同一 DTO 行及数据库外键为准。
 - 最终结论：`RFQ BINDING IDENTIFIERS DEPLOYED — UAT RFQ STILL DRAFT`。详见[完成报告](SELFHOST-UAT-FIX-24-COMPLETION.md)。
+
+## 后续基线更正
+
+2026-08-06 的 `SELFHOST-UAT-FIX-25` 证明 FIX-24 完成报告内的逐行明细表正确，但只摘录上述显示顺序会被误作位置 zip。任何将 `3,4,1,2,7,8,5,6` 依次配到 Material 533—536 的旧基线均已作废；替代基线见[FIX-25 完成报告](SELFHOST-UAT-FIX-25-COMPLETION.md)。

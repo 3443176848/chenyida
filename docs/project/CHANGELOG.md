@@ -4,14 +4,22 @@
 
 ## 2026-08-06
 
+### SELFHOST-UAT-FIX-25 - `docs: correct rfq binding association baseline`
+
+- Git/范围：从 strict clean `main@08af2f4`、Parent `e329931`、behind 0/ahead 148起步；只诊断 RFQ ID 1 的授权对象并更正任务/项目文档。不修改业务代码、Migration、数据库、部署配置或镜像，不登录 UAT，不执行业务 POST、备份恢复或部署，不 push/PR或改写历史。
+- 权威诊断：单一 `REPEATABLE READ READ ONLY` 快照逐条核对 Binding→RFQ Supplier/Supplier、Binding→RFQ Line/Material、Binding→Mapping fact/version/UUID以及 supplier part、Unit、1:1、状态/CAS。八条关联按 PK 为 1→S1/M533/`224d…`、2→S1/M534/`43ca…`、3→S1/M535/`aa16…`、4→S1/M536/`9659…`、5→S2/M533/`45a3…`、6→S2/M534/`5bd2…`、7→S2/M535/`3ac2…`、8→S2/M536/`5432…`；错配、重复、孤儿、跨 RFQ均为 0。
+- 摘要/代码链：以源码现有 `canonicalDigest` 复算固定范围为 `9765f8fdef768335a25b314867dd3e077429a84848cba067ff8394c8a017848d`，与唯一成功 Event 完全一致。Repository 直接投影 `b.id::text` 并用稳定 FK连接；DTO/UI对整行对象排序，未使用数组下标、位置或 `index + 1` 重配身份。
+- 根因/基线：采用分支 B。FIX-24 明细表本身正确，但摘要只列当次显示顺序 `3,4,1,2,7,8,5,6`；把它与 RFQ Line/Material 顺序 533—536按位置 zip，产生错误旧基线。项目文档现明确显示顺序不是身份，旧位置配对由逐行权威表替代；没有 UI旧值→新值或 Web部署。
+- 回归/结论：断网只读容器的 Node `3/3 + 8/8 + 9/9`、临时 SQLite Python三项、1,228文件凭据扫描、diff check、终点只读计数和资源检查通过；备份、恢复、Migration、Chromium和部署均不适用且未运行。主 RFQ前后均为 DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO 0，业务数据改写/POST均为 0；内核 OOM和四服务 restart/OOM均为0，任务临时资源清零。结论 `RFQ BINDING BASELINE CORRECTED — UAT RFQ STILL DRAFT`。
+
 ### SELFHOST-UAT-FIX-24 - `fix: expose rfq binding identifiers` / `ops: deploy rfq binding traceability`
 
 - Git/范围：从 strict clean `main@3bea653`、Parent `f919890`、behind 0/ahead 146起步；功能提交 `e329931`，最终镜像、主 UAT、清理和文档由独立 ops提交收口。仅贯通 RFQ Binding真实主键、固定凭证和发出前展示；不再次固定 Mapping、不发出主 RFQ、不修改 RFQ/Supplier/Mapping/PRQ/截止日、不创建 Quote/Award/PO，不 push/PR或改写历史。
 - 模型/API：0039 已有 `id bigserial PRIMARY KEY NOT NULL`，采用分支 A；Repository 将 bigint显式投影为文本 `binding_id`，经 DTO/Service/Handler进入详情和发出预览。没有 0040、不改 0001—0039，保持 alpha.40。GET为 purchase权限和对象范围内的只读事务；POST继续复核 CAS、Binding数量/唯一性/归属、摘要、Mapping/状态漂移、PRQ和截止日。
-- UI/凭证：八条 Binding按 Supplier/Material/ID稳定排序并独立显示 Supplier/Material、Mapping、单位、换算、有效期和漂移；Binding/Mapping/Line/Material ID标签分离。可重开的 `RFQ_MAPPING_CONFIRMED` 凭证显示 actor、上海时间、request_id、SUCCESS、v1→v2、八 ID和固定摘要；缺 ID或凭证未验证时禁用发出。发出窗口同时显示创建 Audit、四 Material、两 Supplier、截止日/CNY和零自动下游说明。
+- UI/凭证：八条 Binding按 Supplier/Material/ID稳定排序并独立显示 Supplier/Material、Mapping、单位、换算、有效期和漂移；Binding/Mapping/Line/Material ID标签分离。可重开的 `RFQ_MAPPING_CONFIRMED` 凭证显示 actor、上海时间、request_id、SUCCESS、v1→v2、八 ID和固定摘要；缺 ID或凭证未验证时禁用发出。发出窗口同时显示创建 Audit、四 Material、两 Supplier、截止日/CNY和零自动下游说明。FIX-25 后续明确：排序移动的是完整 DTO 行，显示次序不能按位置重配身份。
 - 自动验证：Unit/UI `17/17`、隔离 PostgreSQL `20/20`、Chromium `2/2`、0039 `6/6`、0018 upgrade `3/3`、Material Requirement `18/18`、npm `3/3`、environment `6/6`和 Python三项通过；typecheck、Schema consistency、最终 build/postbuild、1,226文件凭据扫描和 diff check通过，lint 0 error/11既有 warning。首次主 UAT发现逐卡 Supplier信息缺失后安全停止、指纹/Session不变；补齐并重建后最终通过。
 - 备份/部署：predeploy dump为 root:root 0600、2,284,331 bytes、SHA-256 `e937d7bcabbc78cc415dacf8565a58e7255724997b9332834acff8d5ec705ab6`；list 3,359行，第二空库恢复 39/head/226表及保护指纹一致。只替换 Web `5fe40694…→315f0b79…`；PostgreSQL/Worker/Caddy和四卷不变，四服务 restart 0/OOM false，旧 Web精确 rollback tag保留。
-- 主 UAT/结论：purchase-only 最终 runner读取 Binding ID `3,4,1,2,7,8,5,6`，重开完整固定凭证，在桌面与390×844分别打开发出窗口并取消；`business_post=0`、Session 0。RFQ仍 DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO 0，保护指纹仍 `9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`。结论 `RFQ BINDING IDENTIFIERS DEPLOYED — UAT RFQ STILL DRAFT`；正式发出必须另获授权。
+- 主 UAT/结论：purchase-only 最终 runner按当次页面显示顺序读取 Binding ID `3,4,1,2,7,8,5,6`，重开完整固定凭证，在桌面与390×844分别打开发出窗口并取消；该序列不代表与 RFQ Line/Material 列表的位置关联。`business_post=0`、Session 0。RFQ仍 DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO 0，保护指纹仍 `9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`。结论 `RFQ BINDING IDENTIFIERS DEPLOYED — UAT RFQ STILL DRAFT`；正式发出必须另获授权。
 
 ## 2026-08-05
 

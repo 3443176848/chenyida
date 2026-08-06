@@ -6,6 +6,10 @@
 
 RFQ 详情和发出确认现已公开 0039 中真实、独立的 Binding 主键，并用唯一成功的 `RFQ_MAPPING_CONFIRMED` Event、八条不可变 Binding 和固定范围摘要组成可重新打开的固定凭证。主 UAT 仅执行 purchase 登录、详情/凭证读取、桌面与 390×844 发出窗口打开后取消及安全退出；没有再次固定 Mapping、发出 RFQ、录入 Quote、定标或创建 PO。
 
+### 2026-08-06 后续基线更正
+
+本报告下方的逐行 Binding 明细表与 PostgreSQL 权威外键一致，不需要更改。需要更正的是把显示顺序 `3,4,1,2,7,8,5,6` 脱离同行字段后，再按位置与 Material 533—536 配对的派生基线；该做法会把卡片排序误当身份关联，现已由 `SELFHOST-UAT-FIX-25` 明确作废。权威关联和根因见[FIX-25 完成报告](SELFHOST-UAT-FIX-25-COMPLETION.md)。
+
 ## 严格起点与保护边界
 
 - 起点为 clean `main@3bea653`，Parent `f919890`，`origin/main...HEAD` behind 0 / ahead 146；版本 `0.1.0-alpha.40`，Migration `0001—0039`。
@@ -22,7 +26,7 @@ RFQ 详情和发出确认现已公开 0039 中真实、独立的 Binding 主键�
 
 ## 主 UAT 八条 Binding
 
-页面按 Supplier code、Material code、Binding ID 确定性排序；刷新、重新登录和 Web 重启后顺序与 ID 均保持：
+页面当次按 Supplier code、Material code、Binding ID 确定性排序；刷新、重新登录和 Web 重启后顺序与 ID 均保持。下列各行是完整身份关联；显示顺序只能移动整行，绝不能把 Binding ID 与另一行的 Supplier、Material 或 Mapping 按位置重新配对：
 
 | Binding ID | RFQ Line ID | Supplier ID / 编码 | Material ID / 正式编码 | Mapping ID | Version |
 | --- | ---: | --- | --- | --- | ---: |

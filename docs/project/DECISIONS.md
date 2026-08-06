@@ -1093,7 +1093,18 @@
 - 凭证权威：固定凭证必须同时验证预期 lifecycle generation 的唯一 SUCCESS Event、稳定且唯一的 Binding ID、完整 Supplier×RFQ Line 组合、Binding 的 RFQ/Line/Supplier 归属、来源/状态、actor/时间/request_id 归属以及由不可变 Binding 快照重新计算的 scope digest。任一不一致时详情如实标为 UNVERIFIED，UI 禁用发出，POST 返回稳定 `RFQ_MAPPING_CREDENTIAL_UNVERIFIED` 并保持事务零业务写。
 - 展示与安全：详情和发出确认明确分列 Binding ID、Mapping ID、RFQ Line ID、Material ID，并显示 Supplier/Material 名称、Mapping Version、supplier part、单位换算、有效期、固定/当前状态和漂移。Mapping 固定凭证可重新打开；所有 GET 使用 read-only 事务且失败不写 Audit，仍执行 purchase 权限和 RFQ/PRQ 数据域。发出 POST 继续重验 CAS、范围数量、摘要、当前 Mapping、PRQ、截止日和下游状态。
 - 主 UAT 边界：`RFQ-00000001` 的八个真实 Binding ID、固定 Event 和发出窗口只允许 purchase 读取；桌面/390px均必须取消并安全退出。不得再次固定 Mapping、发出 RFQ、录 Quote、定标或创建 PO；是否正式发出必须由后续独立任务重新授权。
-- 实施结果：功能提交 `e329931`，保持 alpha.40/0039且没有 0040；最终 Web `sha256:315f0b7945a7b3eb27841ffaae8a444fba45dd94791519dc856173a95d830635` 已 Web-only 部署。主 UAT八个 Binding ID为 `3,4,1,2,7,8,5,6`，固定 Event、桌面/390px发出窗口和安全退出通过；业务 POST 0、Session 0，RFQ仍 DRAFT v2、Binding 8、ISSUED/Quote/Award/PO 0，保护指纹保持 `9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`。正式发出仍须新的明确授权。
+- 实施结果：功能提交 `e329931`，保持 alpha.40/0039且没有 0040；最终 Web `sha256:315f0b7945a7b3eb27841ffaae8a444fba45dd94791519dc856173a95d830635` 已 Web-only 部署。主 UAT 当次页面显示顺序中的 Binding ID 为 `3,4,1,2,7,8,5,6`；该序列只描述整行卡片的排序，不能脱离同行 Supplier/Material/Mapping 后按位置配对。固定 Event、桌面/390px发出窗口和安全退出通过；业务 POST 0、Session 0，RFQ仍 DRAFT v2、Binding 8、ISSUED/Quote/Award/PO 0，保护指纹保持 `9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`。正式发出仍须新的明确授权。
+
+## D-097 RFQ Binding 身份基线以数据库行和稳定外键为准，禁止位置 zip
+
+- 日期：2026-08-06
+- 状态：`ACCEPTED / DOCUMENTED`
+- 确认人：项目负责人（要求在禁止主 UAT 写入和发出的前提下，逐条诊断 Binding 关联并按 A/B/C 分支处置）
+- 权威身份：Binding ID 必须取 `procurement_rfq_supplier_line_mapping_bindings.id`，并与同一数据库行的 `rfq_supplier_id`、`rfq_line_id`、`supplier_mapping_version_id`、`mapping_uid` 和 `mapping_version_no` 一起解释。显示排序、数组位置、Material 顺序、Supplier 顺序或 `index + 1` 均不构成身份。
+- 基线结论：主 RFQ 的权威关联按 Binding PK 为 1→Supplier 1/Material 533/Mapping `224d…`、2→1/534/`43ca…`、3→1/535/`aa16…`、4→1/536/`9659…`、5→Supplier 2/Material 533/`45a3…`、6→2/534/`5bd2…`、7→2/535/`3ac2…`、8→2/536/`5432…`。完整 UUID、RFQ Supplier/Line、Mapping fact/version、part、Unit、换算与状态见 FIX-25 完成报告。
+- 更正范围：FIX-24 的逐行明细表本来正确；被替代的是将其 UI 显示顺序 `3,4,1,2,7,8,5,6` 与 Material 533—536 列表按位置 zip 的派生旧基线。以后摘要性文档必须标注序列是“显示顺序”，或直接给出逐行关联表。
+- 完整性结果：限定范围只读事务确认八条 FK/Mapping Version 全部匹配，重复、孤儿、跨 RFQ和错配均为 0；现有 `canonicalDigest` 重算固定摘要为 `9765f8fdef768335a25b314867dd3e077429a84848cba067ff8394c8a017848d`，与唯一成功 Event 一致。
+- 实施边界：采用分支 B，只更正文档和验收基线；不修改代码、Migration、数据库、Web镜像或运行面，不登录主 UAT，不执行备份/恢复/部署，不发送业务 POST。RFQ保持 DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO 0。
 
 ## 待确认业务决策
 

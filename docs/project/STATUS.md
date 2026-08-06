@@ -2,6 +2,22 @@
 
 最后更新时间：2026-08-06（Asia/Shanghai）
 
+## SELFHOST-UAT-FIX-25 RFQ Binding 关联基线更正
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | RFQ BINDING BASELINE CORRECTED — UAT RFQ STILL DRAFT | 采用分支 B；数据库和页面身份正确，只替代由显示顺序位置 zip 产生的错误验收基线 |
+| 严格起点 | PASS | clean `main@08af2f4`、Parent `e329931`、behind 0/ahead 148；alpha.40、0001—0039、0039 SHA、Web `315f0b79…`、服务/资源和主 RFQ保护状态全部吻合 |
+| 权威关联 | PASS / 8 OF 8 | 按 PK 为 1→S1/M533/`224d…`、2→S1/M534/`43ca…`、3→S1/M535/`aa16…`、4→S1/M536/`9659…`、5→S2/M533/`45a3…`、6→S2/M534/`5bd2…`、7→S2/M535/`3ac2…`、8→S2/M536/`5432…`；Supplier/Line/Material/Mapping fact/version/part/Unit/1:1/状态逐项匹配 |
+| 完整性 | PASS | Binding 8、ID唯一 8、Supplier×Line唯一 8；RFQ Supplier、RFQ Line/Material、Mapping外键错配 0，重复/孤儿/跨 RFQ 0 |
+| 固定摘要 | PASS / IMMUTABLE | 源码现有 `canonicalDigest` 重算为 `9765f8fdef768335a25b314867dd3e077429a84848cba067ff8394c8a017848d`，与唯一 `RFQ_MAPPING_CONFIRMED/SUCCESS` Event一致，未改摘要 |
+| 查询/DTO/UI | CORRECT | Repository 直接投影 `b.id::text` 并用稳定 FK关联；Service/UI排序完整行对象，不使用数组位置、Material/Supplier顺序或 `index + 1` 生成/重配 ID |
+| 根因 | BASELINE POSITION ZIP | FIX-24 明细表正确；摘要性序列 `3,4,1,2,7,8,5,6` 只代表当次显示顺序，却被按位置配到 Material 533—536，产生错误旧基线 |
+| 页面旧值/新值 | UNCHANGED / NO DEPLOY | 没有 UI代码或值变化；现有页面逐行身份保持正确，只把文档改为权威关联表并明确显示顺序不是身份 |
+| 数据/运行面 | ZERO CHANGE | 未修改 RFQ/Binding/Event/Audit/PRQ/Supplier/Mapping/Material或下游；无 Migration、备份恢复、部署、UAT登录或业务 POST，PostgreSQL/Worker/Caddy/Web和四卷均未更换 |
+| 主 UAT 前后 | PASS / READ ONLY | 前后均为 RFQ 1 DRAFT v2、Binding 8、Mapping Event 1、ISSUED 0、Quote/Award/PO 0/0/0 |
+| 测试/资源/Git | PASS | Node `3/3 + 8/8 + 9/9`、Python三项、1,228文件凭据扫描、diff check和终点只读计数通过；资源约 2.2→2.1 GiB available、Swap 279→278 MiB、根盘19 GiB，内核 OOM 0、四服务 restart 0/OOM false，任务临时资源清零。提交消息 `docs: correct rfq binding association baseline`，实际 SHA以 Git为准，未 push/PR或改写历史 |
+
 ## SELFHOST-UAT-FIX-24 RFQ Binding 稳定 ID 与发出前固定凭证
 
 | 验证项 | 结果 | 说明 |
@@ -16,7 +32,7 @@
 | 自动验证 | PASS | Unit/UI `17/17`、PostgreSQL `20/20`、Chromium `2/2`、0039 `6/6`、0018 `3/3`、Material Requirement `18/18`、npm `3/3`、environment `6/6`、Python三项；typecheck/Schema/build/credentials/diff通过，lint 0 error/11既有 warning |
 | 备份/恢复 | PASS | root:root 0600 dump 2,284,331 bytes，SHA-256 `e937d7bcabbc78cc415dacf8565a58e7255724997b9332834acff8d5ec705ab6`；list 3,359行，第二空库 39/head/226表、八 ID和指纹一致，恢复库已删 |
 | Web-only 部署 | PASS | Web `sha256:5fe40694…→sha256:315f0b7945a7b3eb27841ffaae8a444fba45dd94791519dc856173a95d830635`、88,545,226 bytes；无 Migration，PostgreSQL/Worker/Caddy身份及四卷/Origin/端口保持，旧 Web rollback tag保留 |
-| 主 UAT | PASS / READ ONLY | purchase-only 读取 ID `3,4,1,2,7,8,5,6`、重开固定凭证、刷新，并在桌面/390×844两次打开窗口后取消；`business_post=0`、安全退出 Session 0 |
+| 主 UAT | PASS / READ ONLY | purchase-only 按当次页面显示顺序读取 ID `3,4,1,2,7,8,5,6`、重开固定凭证、刷新，并在桌面/390×844两次打开窗口后取消；该序列不定义与 RFQ Line/Material 的位置关联。`business_post=0`、安全退出 Session 0 |
 | 主 UAT 数据 | PASS / UNCHANGED | 最终指纹 `9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`；RFQ DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO及全部下游 0 |
 | 资源/清理 | PASS | final-deploy前/最终 available约 2.2/2.2 GiB，Swap 284/283 MiB，根盘 18/19 GiB，最终 Load `0.19/0.48/0.44`；内核 OOM 0、四服务 restart 0/OOM false。临时库/恢复库/容器/runtime/SQLite/过期候选镜像清零，未 prune |
 | Git/后续 | TWO FOCUSED COMMITS / NEW AUTH REQUIRED | 功能 `e329931`；收口消息 `ops: deploy rfq binding traceability`。技术凭证完整，但正式发出必须在新任务中重新校验并获明确授权；本任务停止 |
