@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { statusLabel } from "../../../public/erp/status-localization.js";
 import { importCellText, importColumnReference, type ImportRawCell } from "../_lib/material-import";
 import { MaterialImportDialog } from "./material-import-primitives";
 
@@ -14,8 +15,8 @@ export type MaterialImportRow = { sheet_index: number; row_number: number; schem
 function cellDetail(cell: ImportRawCell | undefined): string {
   if (!cell) return "该单元格未在稀疏行契约中提供。";
   if (cell.type === "FORMULA") return `公式，未执行\n公式文本：${cell.formula || cell.raw_value || ""}\n不可信缓存值：${cell.cached_value ?? "无"}`;
-  if (cell.type === "DATE") return `原始值：${cell.raw_value ?? ""}\n日期系统：${cell.date_system || "未提供"}\n格式：${cell.format_code || "未提供"}\n解释状态：${cell.interpretation_status || "未提供"}\n解释值：${cell.interpreted_iso_value || "无"}`;
-  if (cell.type === "ERROR") return `ERROR\n安全错误值：${cell.raw_value || "未知"}`;
+  if (cell.type === "DATE") return `原始值：${cell.raw_value ?? ""}\n日期系统：${cell.date_system || "未提供"}\n格式：${cell.format_code || "未提供"}\n解释状态：${statusLabel(cell.interpretation_status, "未提供")}\n解释值：${cell.interpreted_iso_value || "无"}`;
+  if (cell.type === "ERROR") return `错误\n安全错误值：${cell.raw_value || "未知"}`;
   return `${cell.type}\n原始值：${cell.raw_value ?? ""}\n显示值：${cell.display ?? ""}`;
 }
 
@@ -23,7 +24,7 @@ export function MaterialImportSheetSelector({ sheets, selected, disabled, onSele
   return <div className="mi-sheet-selector" role="list" aria-label="Workbook Sheets">{[...sheets].sort((a, b) => a.sheet_index - b.sheet_index).map((sheet) => {
     const selectable = sheet.visibility === "VISIBLE" && sheet.parse_disposition === "PARSED";
     return <button type="button" role="listitem" key={sheet.sheet_index} className={selected === sheet.sheet_index ? "selected" : ""} disabled={disabled || !selectable} onClick={() => onSelect(sheet)}>
-      <strong>{sheet.sheet_index} · {sheet.sheet_name}</strong><span>{sheet.visibility} · {selectable ? `${sheet.parsed_row_count} 行 / ${sheet.source_column_max} 列` : "仅安全元数据，不读取 Rows"}</span>{sheet.is_default_suggestion ? <small>建议</small> : null}
+      <strong>{sheet.sheet_index} · {sheet.sheet_name}</strong><span>{statusLabel(sheet.visibility)} · {selectable ? `${sheet.parsed_row_count} 行 / ${sheet.source_column_max} 列` : "仅显示安全元数据，不读取数据行"}</span>{sheet.is_default_suggestion ? <small>建议</small> : null}
     </button>;
   })}</div>;
 }

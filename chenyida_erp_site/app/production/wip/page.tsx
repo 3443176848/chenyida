@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, ErpApiError } from "../../../public/erp/api-client.js";
+import { statusLabel } from "../../../public/erp/status-localization.js";
 import "../../procurement/sourcing/sourcing.css";
 
 type Wip = {
@@ -20,11 +21,11 @@ export default function WipPage() {
     <header className="sourcing-header"><div><Link href="/">← 经营工作台</Link><h1>线性工序与 Batch WIP</h1><p>Work Order 汇总和 Manufacturing Batch 投影来自稳定事实；返工加工次数不增加净数量。WIP 不是 MAIN 库存 Ledger。成品 Manufacturing Batch 已绑定 Inventory Lot；原材料和供应商批次仍未启用。</p><nav><Link href="/production/batches">Batch genealogy</Link> · <Link href="/production/dispatch">分批派工</Link> · <Link href="/production/operations">工序执行</Link> · <Link href="/production/reporting">末工序正式报工</Link></nav></div></header>
     {error ? <div className="sourcing-state sourcing-error">{error}</div> : null}
     <section className="sourcing-panel"><h2>净生产 WIP（NORMAL）</h2>{rows.map((row) => <article className="sourcing-card" key={row.snapshot_operation_id}>
-      <b>{row.work_order_code} · {row.sequence_no} {row.operation_code} {row.operation_name} · {row.status}</b>
-      <small>Snapshot Operation #{row.snapshot_operation_id} · Work Center {row.work_center_code} · 门禁 {row.quality_gate_mode} · 投影 v{row.wip_version}</small>
+      <b>{row.work_order_code} · {row.sequence_no} {row.operation_code} {row.operation_name} · {statusLabel(row.status)}</b>
+      <small>Snapshot Operation #{row.snapshot_operation_id} · Work Center {row.work_center_code} · 门禁 {row.quality_gate_mode === "NONE" ? "无" : row.quality_gate_mode} · 投影 v{row.wip_version}</small>
       <p>来源 {row.source_input_qty} · 待派 {row.waiting_input_qty} · 已派 {row.dispatched_qty} · 在制 {row.in_progress_qty}</p>
       <p>good {row.completed_good_qty} · 待检 {row.quality_required_qty} · 已检 {row.quality_inspected_qty} · released {row.quality_released_qty} · Quality Hold {row.quality_hold_qty}</p>
       <p>损耗 {row.scrap_qty} · 已转下工序 {row.transferred_to_next_qty} · available_for_next {row.available_for_next_qty} · 末工序待最终报工 {row.final_output_available_qty}</p>
-    </article>)}</section><section className="sourcing-panel"><h2>返工执行数量边界</h2>{rework.map(row=><article className="sourcing-card" key={row.id}><b>{row.request_code} · {row.ncr_code} · {row.target_operation_code} · {row.status}</b><small>{row.work_order_code} · 原 failed {row.original_failed_qty}</small><p>accepted = 待派 {row.rework_waiting_dispatch_qty} + READY {row.rework_dispatched_qty} + 在制 {row.rework_in_progress_qty} + good 待复检 {row.rework_pending_reinspection_qty} + released {row.rework_released_qty} + scrap {row.rework_reported_scrap_qty}</p><p>reported good {row.rework_reported_good_qty} · completed {row.rework_completed_qty} · unresolved {row.unresolved_rework_qty}；不得与原 failed 重复计算。</p></article>)}</section>
+    </article>)}</section><section className="sourcing-panel"><h2>返工执行数量边界</h2>{rework.map(row=><article className="sourcing-card" key={row.id}><b>{row.request_code} · {row.ncr_code} · {row.target_operation_code} · {statusLabel(row.status)}</b><small>{row.work_order_code} · 原不合格 {row.original_failed_qty}</small><p>已接收 = 待派 {row.rework_waiting_dispatch_qty} + 就绪 {row.rework_dispatched_qty} + 在制 {row.rework_in_progress_qty} + 良品待复检 {row.rework_pending_reinspection_qty} + 已放行 {row.rework_released_qty} + 报废 {row.rework_reported_scrap_qty}</p><p>已报告良品 {row.rework_reported_good_qty} · 已完成 {row.rework_completed_qty} · 未解决 {row.unresolved_rework_qty}；不得与原不合格数量重复计算。</p></article>)}</section>
   </main>;
 }

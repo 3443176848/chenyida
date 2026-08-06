@@ -662,12 +662,12 @@ test("isolated Chromium enforces the RFQ issuance confirmation contract and issu
     for (const required of [
       "ID 1 · RFQ-00000001",
       "Round 1 / v1",
-      "DRAFT / 草稿 / 待发出",
+      "RFQ 仍为草稿、待发出",
       "ID 1 · PRQ-00000001",
-      "RFQ_CREATED 业务 Event",
-      "独立 RFQ_CREATED 业务 Event",
+      "RFQ_CREATED 业务事件",
+      "独立 RFQ_CREATED 业务事件",
       "RFQ_CREATED",
-      "SUCCESS",
+      "成功",
       fixture.credentials.username,
       draft.events[0].request_id,
       draft.events[0].occurred_at_shanghai,
@@ -707,15 +707,15 @@ test("isolated Chromium enforces the RFQ issuance confirmation contract and issu
     assert.equal(await dialog.locator(".rfq-mapping-card").count(), 8);
     const dialogText = await dialog.innerText();
     for (const required of [
-      "ID 1 · RFQ-00000001", "Round 1 / v1", "DRAFT / 草稿 / 待发出",
+      "ID 1 · RFQ-00000001", "Round 1 / v1", "草稿 / 待发出",
       "ID 1 · PRQ-00000001", "PRJ-00000001", "2099-08-31", "CNY",
-      "RFQ_CREATED 业务 Event", "独立 RFQ_CREATED 业务 Event", "RFQ_CREATED", "SUCCESS", fixture.credentials.username,
+      "RFQ_CREATED 业务事件", "独立 RFQ_CREATED 业务事件", "RFQ_CREATED", "成功", fixture.credentials.username,
       draft.events[0].request_id, draft.events[0].occurred_at_shanghai,
       "10.000000 PCS", "ID 1 · SUP-000001", "ID 2 · SUP-000002",
       "权威逐行关联（按 Binding ID 升序） · 8 条", "v1 / Row v1", "已绑定 Mapping 版本当前值", "最新 Mapping 版本",
       "Mapping 固定凭证", "固定 Binding 数量", "Binding 稳定 ID（按 ID 升序）",
       "身份关联口径", "不按任何摘要输入序列位置配对",
-      "状态漂移（Binding ↔ Mapping）", "版本漂移（固定 ↔ 当前）", "发出前服务端重新校验 PRQ、Supplier、Mapping、截止日期、CAS 与当前 DRAFT 状态",
+      "状态漂移（Binding ↔ Mapping）", "版本漂移（固定 ↔ 当前）", "发出前服务端重新校验 PRQ、Supplier、Mapping、截止日期、CAS 与当前草稿状态",
       "发出成功后 RFQ 行、Supplier 与 Mapping ID / Version 范围冻结", "只有发出成功后才允许录入 Supplier 报价",
       "本次发出不会自动创建或修改以下下游记录", "Quote（供应商报价）", "Award（定标）", "PO（采购订单）",
       "Delivery Plan（交付计划）", "Receipt／收货", "Inventory Ledger／库存流水", "AP／采购应付",
@@ -822,9 +822,9 @@ test("isolated Chromium enforces the RFQ issuance confirmation contract and issu
     assert.deepEqual(issued.downstream, draft.downstream);
 
     const issuedText = await page.locator("body").innerText();
-    for (const required of ["ISSUED / 已发出", "RFQ 发出成功凭证", "Event", "ISSUED", "SUCCESS",
+    for (const required of ["已发出", "RFQ 发出成功凭证", "业务事件", "询价已发出", "成功",
       fixture.credentials.username, issued.events[1].occurred_at_shanghai, "Asia/Shanghai", issued.events[1].request_id,
-      "v1 → v2", "ISSUED / 已发出", "2 Suppliers · 8 Mappings", issued.events[1].scope_digest,
+      "v1 → v2", "2 Suppliers · 8 Mappings", issued.events[1].scope_digest,
       "Quote 入口：已启用", "Quote：0", "Award：0", "PO：0"]) {
       assert.ok(issuedText.includes(required), `issuance evidence missing: ${required}`);
     }
@@ -926,11 +926,11 @@ test("isolated Chromium keeps a fixed legacy RFQ draft after all issuance confir
 
     const newRfqText = await page.locator("body").innerText();
     for (const required of [
-      "RFQ_CREATED 业务 Event",
-      "独立 RFQ_CREATED 业务 Event",
-      "RFQ 业务 Event（与 Audit 分列）",
+      "RFQ_CREATED 业务事件",
+      "独立 RFQ_CREATED 业务事件",
+      "RFQ 业务事件（与审计分列）",
       "RFQ_CREATED",
-      "SUCCESS",
+      "成功",
     ]) assert.ok(newRfqText.includes(required), `new RFQ Event wording missing: ${required}`);
 
     await convertToLegacyDraft(1);
@@ -943,15 +943,15 @@ test("isolated Chromium keeps a fixed legacy RFQ draft after all issuance confir
     const legacyText = await page.locator("body").innerText();
     for (const required of [
       "RFQ 创建成功审计",
-      "精确匹配的成功 Audit",
-      "这是与本 RFQ 精确匹配的成功 Audit，不是独立 RFQ_CREATED 业务 Event。",
-      "独立 RFQ_CREATED Event\n否",
+      "精确匹配的成功审计",
+      "这是与本 RFQ 精确匹配的成功审计，不是独立 RFQ_CREATED 业务事件。",
+      "独立 RFQ_CREATED 事件\n否",
       fixture.credentials.username,
       audit.request_id,
       audit.occurred_at_shanghai,
-      "SUCCESS",
+      "成功",
       "不存在 → v1",
-      "尚无独立 RFQ 业务 Event；创建成功 Audit 在上方独立显示。",
+      "尚无独立 RFQ 业务事件；创建成功审计在上方独立显示。",
     ]) assert.ok(legacyText.includes(required), `legacy Audit wording missing: ${required}`);
     assert.equal(audit.result, "success");
     assert.equal(audit.old_version, null);
@@ -987,7 +987,7 @@ test("isolated Chromium keeps a fixed legacy RFQ draft after all issuance confir
       "数据时区：Asia/Shanghai",
       "ID 1 · RFQ-00000001",
       "Round 1 / 当前 v1 / 页面 expected_version v1",
-      "DRAFT / 草稿 / 待发出",
+      "草稿 / 待发出",
       "ID 1 · PRQ-00000001",
       "权威 RFQ Line · 4 条",
       "Supplier 资格覆盖 · 2 家",
@@ -1002,15 +1002,15 @@ test("isolated Chromium keeps a fixed legacy RFQ draft after all issuance confir
       "Binding 0 → 预期 8",
       "Supplier × RFQ Line Mapping · 8 条",
       "PCS → PCS · 1:1",
-      "相同 Supplier/Material 当前 ACTIVE 数量\n1",
-      "Supplier 内相同 supplier_part_number 当前 ACTIVE 数量\n1",
+      "相同 Supplier/Material 当前已生效数量\n1",
+      "Supplier 内相同 supplier_part_number 当前已生效数量\n1",
       "Supplier/Material 冲突\n否",
       "供应商料号冲突\n否",
       "当前资格\n通过",
       "确认后将生成8条关系化、不可变的Supplier×RFQ Line Mapping Binding。",
       "每条Binding固定引用本次确认的Mapping ID和Version。后续Supplier Mapping状态、版本或内容发生变化时，不会自动替换或改写本RFQ已固定的Binding。",
-      "固定 Mapping 不等于发出 RFQ",
-      "RFQ 继续保持 DRAFT / 草稿 / 待发出",
+      "固定字段映射不等于发出询价单",
+      "询价单继续保持草稿 / 待发出",
       "本操作不创建 Quote、Award、PO、库存或财务记录。",
       "正式发出仍需后续独立确认",
       "当前预览不是提交锁",
@@ -1060,7 +1060,7 @@ test("isolated Chromium keeps a fixed legacy RFQ draft after all issuance confir
     await dialog.getByRole("button", { name: "确认并固定当前 Mapping", exact: true }).click();
     assert.equal((await bindingResponse).status(), 200);
     await dialog.waitFor({ state: "detached" });
-    await page.getByText("当前 Mapping 已由采购显式确认并固定；RFQ 仍为 DRAFT / 草稿 / 待发出", { exact: true }).waitFor();
+    await page.getByText("当前 Mapping 已由采购显式确认并固定；RFQ 仍为草稿、待发出", { exact: true }).waitFor();
     await page.getByText("Round 1 / v2", { exact: true }).waitFor();
     const fixed = await sourcingState();
     assert.equal(fixed.header.length, 1);
@@ -1111,13 +1111,13 @@ test("isolated Chromium keeps a fixed legacy RFQ draft after all issuance confir
     assert.equal(businessWrites.some(({ path }) => path.endsWith("/issue")), false);
     const fixedText = await page.locator("body").innerText();
     assert.ok(fixedText.includes("RFQ 创建成功审计"));
-    assert.ok(fixedText.includes("不是独立 RFQ_CREATED 业务 Event"));
-    assert.ok(fixedText.includes("RFQ_MAPPING_CONFIRMED"));
-    assert.ok(fixedText.includes("DRAFT / 草稿 / 待发出"));
+    assert.ok(fixedText.includes("不是独立 RFQ_CREATED 业务事件"));
+    assert.ok(fixedText.includes("询价映射已确认"));
+    assert.ok(fixedText.includes("RFQ 仍为草稿、待发出"));
     for (const required of [
       "Mapping 固定凭证",
-      "RFQ_MAPPING_CONFIRMED",
-      "SUCCESS",
+      "询价映射已确认",
+      "成功",
       fixture.credentials.username,
       fixed.events[0].occurred_at_shanghai,
       fixed.events[0].request_id,
@@ -1171,11 +1171,11 @@ test("isolated Chromium keeps a fixed legacy RFQ draft after all issuance confir
       "Round 1 / v2",
       "RFQ 创建成功审计",
       "Mapping 固定凭证",
-      "RFQ_MAPPING_CONFIRMED",
+      "询价映射已确认",
       fixture.credentials.username,
       fixed.events[0].occurred_at_shanghai,
       fixed.events[0].request_id,
-      "SUCCESS",
+      "成功",
       "v1 → v2",
       fixed.events[0].scope_digest,
       "固定范围 · 4 条 Material",
@@ -1362,12 +1362,12 @@ test("isolated Chromium traces the first Quote response while the second Supplie
     await page.getByRole("heading", { name: "Quote追溯 · 数据库ID 1", exact: true }).waitFor();
     const pageText = await page.locator("body").innerText();
     for (const required of [
-      "Round 1 / v3", "RESPONDED / 已报价", "INVITED / 待报价", "Quote入口：可报价",
+      "Round 1 / v3", "已报价", "待报价", "Quote入口：可报价",
       "稳定Quote数据库ID", "未设置独立Quote业务编号", "ID 1 / SUP-000001", "ID 1 / Round 1",
-      "当前 v1", "SUBMITTED", "ISO-Q-A", "2099-09-30", "10 PCS × 12.00 CNY",
-      "120.00 CNY", "480.00 CNY", "2099-10-20", "2099-10-30", "ON_TIME / 准时",
-      "准时，提前10天", fixture.credentials.username, "Asia/Shanghai", quoteA.request_id, "SUCCESS",
-      "只产生QUOTE_SUBMITTED", "没有独立CREATE Event", "事件未记录版本转换",
+      "当前 v1", "已提交", "ISO-Q-A", "2099-09-30", "10 PCS × 12.00 CNY",
+      "120.00 CNY", "480.00 CNY", "2099-10-20", "2099-10-30", "准时",
+      "准时，提前10天", fixture.credentials.username, "Asia/Shanghai", quoteA.request_id, "成功",
+      "只产生报价提交事件", "没有独立创建事件", "事件未记录版本转换",
       "RFQ Version是询价聚合CAS", "Supplier报价响应会正常推进CAS", fixedDigest,
     ]) assert.ok(pageText.includes(required), `Quote traceability missing: ${required}`);
     assert.equal(pageText.includes("vnull"), false);

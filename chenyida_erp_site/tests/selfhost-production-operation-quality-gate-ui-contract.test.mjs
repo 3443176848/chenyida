@@ -11,7 +11,7 @@ test("routing editor exposes only the controlled DRAFT quality gate field",async
 
 test("production pages expose the immutable snapshot gate and WIP quality projection",async()=>{
   for(const path of ["../app/production/dispatch/page.tsx","../app/production/operations/page.tsx","../app/production/wip/page.tsx"]){const source=await read(path);for(const token of ["quality_gate_mode","quality_required_qty","quality_inspected_qty","quality_released_qty","quality_hold_qty"])assert.match(source,new RegExp(token),path);assert.match(source,/Snapshot Operation/);assert.match(source,/Work Center/);}
-  const dispatch=await read("../app/production/dispatch/page.tsx");assert.match(dispatch,/Quality Hold 尚未形成可消费放行额度/);
+  const dispatch=await read("../app/production/dispatch/page.tsx");assert.match(dispatch,/品质冻结尚未形成可消费放行额度/);
 });
 
 test("quality page explicitly creates IPQC from a stable operation Run Report",async()=>{

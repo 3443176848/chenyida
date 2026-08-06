@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api, ErpApiError } from "../../../public/erp/api-client.js";
-import { flattenCategories, formatShanghaiDate, sourceLabel, type CategoryOption } from "../_lib/material-ui";
+import { flattenCategories, formatShanghaiDate, sourceLabel, statusLabel, type CategoryOption } from "../_lib/material-ui";
 import {
   DEFAULT_REVIEW_QUERY, hasReviewFilters, parseReviewQueueQuery, reviewCapabilities,
   reviewQueueApiQuery, serializeReviewQueueQuery, type ReviewQueueQuery,
@@ -133,7 +133,7 @@ export function MaterialReviewQueuePage() {
 
   return <section className="mm-page mm-review-queue-page" aria-labelledby="review-queue-title">
     <nav className="mm-breadcrumb" aria-label="面包屑"><Link href="/">首页</Link><span>/</span><Link href="/materials">物料主数据</Link><span>/</span><span>审核队列</span></nav>
-    <header className="mm-page-head"><div><h2 id="review-queue-title">物料审核队列</h2><p>仅显示待审核 PENDING_REVIEW；最终审核以工作台重新加载的详情为准。</p></div><span className="mm-readonly">服务端分页</span></header>
+    <header className="mm-page-head"><div><h2 id="review-queue-title">物料审核队列</h2><p>仅显示待审核物料；最终审核以工作台重新加载的详情为准。</p></div><span className="mm-readonly">服务端分页</span></header>
     {resultMessage ? <div className={`mm-review-result mm-review-result-${resultMessage.kind}`} role="status" aria-live="polite"><strong>审核结果</strong><span>{resultMessage.message}</span></div> : null}
 
     <form className="mm-filter-bar mm-review-filter-bar" onSubmit={applyDraft} aria-label="审核队列筛选">
@@ -155,8 +155,8 @@ export function MaterialReviewQueuePage() {
           {result?.data.map((row) => <tr key={row.material_id}>
             <td className="mm-review-sticky-name"><span className="mm-truncate" tabIndex={0} data-full-text={row.standard_name}>{row.standard_name}</span></td>
             <td><span className="mm-truncate mm-category-path" tabIndex={0} data-full-text={row.category_path}>{row.category_path || "—"}</span></td><td>{row.creator || "—"}</td><td>{row.last_modified_by || "—"}</td><td>{row.submitted_by || "—"}</td><td>{formatShanghaiDate(row.submitted_at)}</td><td>V{row.current_version}</td><td>{sourceLabel(row.source_type)}</td>
-            <td><span className="mm-review-validation-count"><b>错误 ERROR {row.validation_summary.error_count}</b><b>警告 WARNING {row.validation_summary.warning_count}</b><small>{row.validation_summary.basis || "CURRENT_METADATA"}</small></span></td>
-            <td><ul className="mm-review-issues">{(row.validation_summary.top_issues || []).slice(0, 5).map((issue, index) => <li key={`${issue.code}-${index}`}><b>{issue.severity}</b> {issue.code}<small>{issue.attribute_code || issue.field || "通用问题"} · {issue.message || "—"}</small></li>)}</ul></td>
+            <td><span className="mm-review-validation-count"><b>错误 {row.validation_summary.error_count}</b><b>警告 {row.validation_summary.warning_count}</b><small>{row.validation_summary.basis || "CURRENT_METADATA"}</small></span></td>
+            <td><ul className="mm-review-issues">{(row.validation_summary.top_issues || []).slice(0, 5).map((issue, index) => <li key={`${issue.code}-${index}`}><b>{statusLabel(issue.severity)}</b> {issue.code}<small>{issue.attribute_code || issue.field || "通用问题"} · {issue.message || "—"}</small></li>)}</ul></td>
             <td><Link className="mm-detail-link" href={`/materials/${row.material_id}/review?return_to=${encodeURIComponent(returnTo)}`}>进入审核</Link></td>
           </tr>)}
         </tbody></table>

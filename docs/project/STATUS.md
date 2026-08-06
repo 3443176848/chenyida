@@ -2,6 +2,19 @@
 
 最后更新时间：2026-08-06（Asia/Shanghai）
 
+## SELFHOST-UI-STATUS-LOCALIZATION-05 ERP 可见状态中文化
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | VISIBLE ERP STATUSES LOCALIZED — SOURCE ONLY | 原生与legacy已统一中文展示业务状态、角色、审核/执行结果和启停状态 |
+| 展示边界 | PASS / RAW VALUES IMMUTABLE | 共享`statusLabel/statusPairLabel/roleLabel`只转换最终可见文本；未知枚举保留原值，API/筛选/比较/提交/CSS/审计继续使用稳定原码 |
+| 页面覆盖 | PASS | 状态徽标、列表/详情、筛选显示、决策/操作凭证、审计结果与当前角色均已接入；纯英文眉题中文化，ERP/BOM/RFQ/PO/IQC/IPQC/FQC/AR/AP/ID/CAS保留 |
+| 自动验证 | PASS | 38个UI/物料/状态测试文件、10组typecheck、production build/postbuild、npm3/3、Python三项、1,247文件credentials和diff check通过；lint 0 error/11既有warning |
+| 浏览器边界 | SOURCE VERIFIED / UAT NOT RUN | 五个受影响浏览器验证脚本语法和中文期望已更新；未登录或连接公开UAT执行旅程 |
+| API/数据库/版本 | UNCHANGED | 认证、权限、业务、Schema/Migration、数据库枚举、alpha.40/0039均未改 |
+| UAT/部署 | NOT AUTHORIZED / UNCHANGED | 当前Web仍为`sha256:f45d734becf2…`；未构建在线镜像、替换容器、重启服务、运行Migration或部署 |
+| 资源/清理 | PASS | available约2.2→2.2GiB、Swap260→272MiB、根盘19GiB、Load`0.04/0.19/0.37`→`0.18/0.78/0.72`；内核OOM0、四服务restart0/OOM false，任务容器/挂载点/临时SQLite清零 |
+
 ## SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04 八角色工作台 Web-only 部署
 
 | 验证项 | 结果 | 说明 |

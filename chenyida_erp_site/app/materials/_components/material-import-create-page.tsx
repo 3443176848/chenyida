@@ -107,7 +107,7 @@ export function MaterialImportUploadFlow({ existingBatch }: { existingBatch?: Ma
     </div>
     {error ? <div className={`mi-operation-error ${error.unknown ? "unknown" : ""}`} role="alert"><strong>{error.code}</strong><p>{error.message}</p>{error.requestId ? <p className="mm-request-id">请求编号：{error.requestId}</p> : null}{error.unknown ? <button disabled={busy} onClick={() => void recoverUnknown()}>使用原操作标识安全恢复</button> : null}{error.code === "IMPORT_FILE_DUPLICATE" && duplicateBatch ? <button onClick={() => setDuplicateConfirm(true)}>允许重复并新建重试批次</button> : null}</div> : null}
     {confirm ? <MaterialImportDialog title={existingBatch ? "确认上传文件" : "确认创建导入批次"} busy={busy} primaryLabel={existingBatch ? "上传文件" : "创建并上传"} onClose={() => setConfirm(false)} onPrimary={() => void execute("REJECT")}><p>将先创建或使用一个批次，再以默认 REJECT 策略上传。文件安全和内容合法性仍由服务端判断。</p></MaterialImportDialog> : null}
-    {duplicateConfirm && duplicateBatch ? <MaterialImportDialog title="允许重复并新建重试批次" busy={busy} primaryLabel="新建重试批次" onClose={() => setDuplicateConfirm(false)} onPrimary={() => void execute("ALLOW_DUPLICATE", duplicateBatch.id)}><p>原批次保持 FAILED。系统会核对当前 File SHA，新建 retry_of_batch_id 指向原批次的批次，并使用新的创建和上传操作标识。</p></MaterialImportDialog> : null}
+    {duplicateConfirm && duplicateBatch ? <MaterialImportDialog title="允许重复并新建重试批次" busy={busy} primaryLabel="新建重试批次" onClose={() => setDuplicateConfirm(false)} onPrimary={() => void execute("ALLOW_DUPLICATE", duplicateBatch.id)}><p>原批次保持失败状态。系统会核对当前文件摘要，新建重试批次并指向原批次，同时使用新的创建和上传操作标识。</p></MaterialImportDialog> : null}
   </section>;
 }
 

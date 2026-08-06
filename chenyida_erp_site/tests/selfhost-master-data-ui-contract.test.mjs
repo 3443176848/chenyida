@@ -53,7 +53,7 @@ test("BOM material selector uses bounded code-first search and submits only stab
   assert.match(legacy, /bomMaterialSearchController\?\.abort\(\)/);
   assert.match(legacy, /bomLinesRequestToken/);
   assert.match(legacy, /state\.bomLinesBomId/);
-  for (const status of ["请输入正式内部编码或名称。", "正在加载物料候选…", "没有匹配的 ACTIVE 正式物料。", "检索失败："]) assert.ok(legacy.includes(status), status);
+  for (const status of ["请输入正式内部编码或名称。", "正在加载物料候选…", "没有匹配的已生效正式物料。", "检索失败："]) assert.ok(legacy.includes(status), status);
   assert.ok(legacy.includes("同一物料不能在同一 BOM Version 中重复添加"));
   assert.match(styles, /\.bom-material-option[\s\S]*overflow-wrap:\s*anywhere/);
   assert.match(styles, /@media\s*\(max-width:\s*480px\)/);

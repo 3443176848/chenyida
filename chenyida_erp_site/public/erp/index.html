@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>晨亿达 ERP - 物料主数据治理</title>
-    <link rel="stylesheet" href="./styles.css?v=20260806-enterprise-ui-refresh-01" />
+    <link rel="stylesheet" href="./styles.css?v=20260806-status-localization-05" />
   </head>
   <body>
     <header class="topbar" data-cyd-protected-view>
@@ -80,7 +80,7 @@
             </div>
           </div>
           <div class="work-panel">
-            <p>人工物料审核统一使用 PENDING_REVIEW 队列；导入复核仍按原生批次工作流处理。</p>
+            <p>人工物料审核统一进入待审核队列；导入复核仍按原生批次工作流处理。</p>
             <div class="button-row">
               <a class="ghost-link" href="/materials/review" target="_top">进入物料审核队列</a>
               <a class="ghost-link" href="/materials/imports" target="_top">进入物料导入批次</a>
@@ -193,7 +193,7 @@
               <button id="createProductBtn" class="primary">保存产品</button>
               <span id="productMsg" class="muted"></span>
             </div>
-            <p class="workflow-hint">新产品先保存为 DRAFT；产品版本发布后，才能为该版本创建 BOM 草稿。发布操作使用现有工程权限、幂等与版本冲突保护。</p>
+            <p class="workflow-hint">新产品先保存为草稿；产品版本发布后，才能为该版本创建 BOM 草稿。发布操作使用现有工程权限、幂等与版本冲突保护。</p>
           </div>
           <div class="table-wrap spaced">
             <table id="productsTable"></table>
@@ -228,7 +228,7 @@
                   <label>产品生命周期状态<input id="bomProductLifecycle" readonly /></label>
                   <label>产品状态<input id="bomProductStatus" readonly /></label>
                   <label>BOM 版本<input id="bomVersion" value="V1" /></label>
-                  <label>BOM 发布状态<input id="bomStatus" value="DRAFT（草稿）" readonly /></label>
+                  <label>BOM 发布状态<input id="bomStatus" value="草稿" readonly /></label>
                 </div>
                 <p id="bomProductEligibility" class="muted" aria-live="polite"></p>
                 <div class="button-row">
@@ -248,7 +248,7 @@
               <p id="bomDetailState" class="bom-detail-state" role="status" aria-live="polite">请选择或搜索 BOM</p>
               <p id="bomReadOnlyNotice" class="bom-readonly-notice" role="note" hidden>已发布，只读；如需修改请创建新版本</p>
               <fieldset id="bomLineEditor" class="panel-fieldset" disabled hidden>
-                <legend>编辑 DRAFT BOM 明细</legend>
+                <legend>编辑草稿 BOM 明细</legend>
                 <label for="lineItemSearch">正式内部编码或名称</label>
                 <div class="bom-material-picker">
                   <div class="bom-material-search-row">
@@ -558,7 +558,7 @@
               </div>
               <div class="form-grid">
                 <label>结果特性<input id="qualityCharacteristic" value="综合判定" /></label>
-                <label>检验结果<select id="qualityResult"><option value="PASS">PASS</option><option value="FAIL">FAIL</option></select></label>
+                <label>检验结果<select id="qualityResult"><option value="PASS">通过</option><option value="FAIL">不通过</option></select></label>
               </div>
               <div class="form-grid">
                 <label>责任环节<input id="responsibleStage" placeholder="供应商 / SMT / FPC / 包装" /></label>
@@ -574,7 +574,7 @@
               <label>当前检验<input id="selectedInspection" readonly placeholder="请从下表选择" /></label>
               <div class="form-grid">
                 <label>不良类型<input id="defectType" placeholder="开路 / 偏位 / 外观不良" /></label>
-                <label>严重度<select id="defectSeverity"><option value="MINOR">MINOR</option><option value="MAJOR">MAJOR</option><option value="CRITICAL">CRITICAL</option></select></label>
+                <label>严重度<select id="defectSeverity"><option value="MINOR">轻微</option><option value="MAJOR">主要</option><option value="CRITICAL">严重</option></select></label>
                 <label>缺陷数量<input id="defectQty" value="1" /></label>
                 <button id="addDefectBtn">追加缺陷</button>
               </div>
@@ -585,10 +585,10 @@
               <label>处置/关闭原因<input id="qualityActionReason" placeholder="必填" /></label>
               <div class="button-row"><button id="dispositionInspectionBtn">执行处置</button><button id="closeInspectionBtn" class="primary">关闭</button><button id="reopenInspectionBtn">重开（经理）</button></div>
               <ol class="steps">
-                <li>新检验保持 OPEN/PENDING，不自动放行。</li>
+                <li>新检验保持处理中、待处理，不自动放行。</li>
                 <li>检验创建人与处置人必须不同。</li>
                 <li>存在不良数量时先追加缺陷，再执行处置。</li>
-                <li>只有 CLOSED/RELEASED 的 FQC 数量可供出货。</li>
+                <li>只有已关闭、已放行的 FQC 数量可供出货。</li>
               </ol>
             </div>
           </div>
@@ -674,7 +674,7 @@
         <aside class="auth-brand">
           <div class="auth-mark" aria-hidden="true">CYD</div>
           <div>
-            <span class="auth-kicker">CHENYIDA ERP</span>
+            <span class="auth-kicker">晨亿达 ERP</span>
             <h1>晨亿达 ERP</h1>
             <p>业务数据协同工作台</p>
           </div>
@@ -785,6 +785,6 @@
     </dialog>
 
     <div id="toast" class="toast" role="alert" aria-live="assertive" hidden></div>
-    <script type="module" src="./app.js?v=20260806-enterprise-ui-refresh-01"></script>
+    <script type="module" src="./app.js?v=20260806-status-localization-05"></script>
   </body>
 </html>

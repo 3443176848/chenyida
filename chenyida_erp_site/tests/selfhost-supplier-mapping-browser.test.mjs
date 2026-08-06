@@ -396,7 +396,7 @@ test("isolated Chromium confirms one approval, preserves seven pending mappings 
     let dialog = page.getByRole("dialog", { name: "确认批准并生效" });
     await dialog.waitFor();
     assert.match(await dialog.innerText(), new RegExp(approvedMappingId));
-    for (const fact of ["PENDING_REVIEW", "Supplier", "Material", "ACTIVE", "创建成功事实", "提交成功事实", "相同 Supplier / Material ACTIVE", "Supplier 内料号冲突", "RFQ 0 / Quote 0 / Award 0 / PO 0"]) {
+    for (const fact of ["待审核", "Supplier", "Material", "已生效", "创建成功事实", "提交成功事实", "相同 Supplier / Material 已生效映射", "Supplier 内料号冲突", "RFQ 0 / Quote 0 / Award 0 / PO 0"]) {
       assert.match(await dialog.innerText(), new RegExp(fact));
     }
     assert.equal(await approvedEvents(), 0);
@@ -432,7 +432,7 @@ test("isolated Chromium confirms one approval, preserves seven pending mappings 
     assert.equal((await approvedResponse).status(), 200);
     const receipt = page.getByRole("dialog", { name: "批准成功凭证" });
     await receipt.waitFor();
-    for (const fact of [approvedMappingId, "APPROVE", "SUCCESS", approvalComment, "批准前 Version / CAS", "批准后 Version / CAS", "ACTIVE / 生效"]) {
+    for (const fact of [approvedMappingId, "批准", "成功", approvalComment, "批准前 Version / CAS", "批准后 Version / CAS", "已生效"]) {
       assert.match(await receipt.innerText(), new RegExp(fact.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     }
     assert.equal(await approvedEvents(), 1);

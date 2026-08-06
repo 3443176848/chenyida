@@ -16,7 +16,7 @@ test("native purchase mapping page exposes bounded stable-ID creation, draft edi
     "新建映射", "保存草稿", "提交审核", "草稿、待审核、已生效与历史版本",
     "Supplier ID / 编码 / 名称", "Material ID / 正式编码 / 名称", "supplier_part_number", "状态",
     "Mapping {row.mapping_id}", "Version {row.mapping_version}", "Supplier / Internal Unit", "换算关系",
-    "创建", "提交", "审核", "request_id", "Asia/Shanghai", "SUCCESS",
+    "创建", "提交", "审核", "request_id", "Asia/Shanghai", "审核成功",
   ]) assert.match(workspace, new RegExp(text.replace(/[{}]/g, "\\$&")));
   assert.match(workspace, /\/api\/supplier-mappings\/options\?type=\$\{kind\}&limit=20/);
   assert.match(workspace, /<option value=\{option\.id\}/);
@@ -43,7 +43,7 @@ test("operations route provides filtered read-only review, server preview, expli
   assert.match(workspace, /approvalBusyRef\.current/);
   assert.match(workspace, /服务端复核未通过，未发送批准请求/);
   for (const text of [
-    "Mapping ID", "Version / CAS / 状态", "创建成功事实", "提交成功事实", "相同 Supplier / Material ACTIVE",
+    "Mapping ID", "Version / CAS / 状态", "创建成功事实", "提交成功事实", "相同 Supplier / Material 已生效映射",
     "Supplier 内料号冲突", "批准推进语义", "RFQ 覆盖校验", "RFQ 0 / Quote 0 / Award 0 / PO 0",
     "批准成功凭证", "APPROVE", "Asia/Shanghai 时间", "审核意见", "批准前 Version / CAS", "批准后 Version / CAS",
     "历史批准未采集审核意见", "查看批准凭证",

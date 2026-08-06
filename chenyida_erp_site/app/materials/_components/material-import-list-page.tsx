@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { api, ErpApiError } from "../../../public/erp/api-client.js";
+import { statusLabel } from "../../../public/erp/status-localization.js";
 import { formatShanghaiDate } from "../_lib/material-ui";
 import { changeImportListQuery, DEFAULT_IMPORT_LIST_QUERY, importListApiQuery, parseImportListQuery, serializeImportListQuery, type ImportListQuery, type MaterialImportBatch } from "../_lib/material-import";
 import { redirectToExistingLogin, useMaterialSession } from "./material-shell";
@@ -42,7 +43,7 @@ export function MaterialImportListPage() {
     <div className="mm-breadcrumb"><Link href="/materials">物料主数据</Link><span>/</span><span>供应商导入</span></div>
     <header className="mm-page-head"><div><h2>供应商物料导入</h2><p>上传并解析来源文件后，先按固定 13 列标准整理，再进入 Mapping、归一化和人工审核。</p></div>{canCreate ? <Link className="mm-primary-link" href="/materials/imports/new">新建供应商导入</Link> : null}</header>
     <form className="mi-filter-bar" onSubmit={submit}>
-      <label>状态<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value })}><option value="">全部状态</option>{["CREATED","UPLOAD_PENDING","FILE_READY","QUEUED_FOR_PARSING","PARSING","PARSED","AWAITING_MAPPING","MAPPING_CONFIRMED","RECONCILIATION_REQUIRED","FAILED","CANCELLED"].map((item) => <option key={item}>{item}</option>)}</select></label>
+      <label>状态<select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value })}><option value="">全部状态</option>{["CREATED","UPLOAD_PENDING","FILE_READY","QUEUED_FOR_PARSING","PARSING","PARSED","AWAITING_MAPPING","MAPPING_CONFIRMED","RECONCILIATION_REQUIRED","FAILED","CANCELLED"].map((item) => <option value={item} key={item}>{statusLabel(item)}</option>)}</select></label>
       <label>来源<select value={draft.source_kind} onChange={(e) => setDraft({ ...draft, source_kind: e.target.value })}><option value="">全部</option><option>XLSX</option><option>CSV</option></select></label>
       <label>范围<select value={draft.created_by_me} onChange={(e) => setDraft({ ...draft, created_by_me: e.target.value as "true" | "false" })}><option value="true">仅我创建</option><option value="false">全部可见</option></select></label>
       <label>排序<select value={draft.sort} onChange={(e) => setDraft({ ...draft, sort: e.target.value as ImportListQuery["sort"] })}><option value="created_at_desc">创建时间倒序</option><option value="created_at_asc">创建时间正序</option></select></label>

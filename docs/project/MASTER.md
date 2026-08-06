@@ -39,23 +39,25 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.40`；PostgreSQL 为 39/head `0039_rfq_traceability.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-DASHBOARD-ROLE-HUB-03` 已完成八角色工作台源码；独立提交 `4767c3db3cf66eb0978f07d044437790c0d4b87f`（`feat: simplify ERP workbench role entrances`），父基线 `8aa3f70329a11cffb2ee43d2942b3c4484e6137f`，版本保持 alpha.40，Migration 保持 0039 |
+| 当前根仓库功能基线提交 | `SELFHOST-UI-STATUS-LOCALIZATION-05` 已完成可见状态中文化源码；独立提交消息为 `feat: localize visible ERP statuses`，实际 SHA 以 Git log 为准，父基线 `fb4c89bd`。版本保持 alpha.40，Migration 保持 0039 |
 | 当前根仓库运维基线 | `SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04` 已把八角色工作台 Web-only部署到18888非生产UAT；独立提交消息 `ops: deploy role-based ERP workbench` 收口备份恢复、回退镜像、匿名HTTPS/八角色资产/401验收和文档。无登录、业务POST、Migration或其他服务替换 |
-| Git 同步与工作区 | 八角色工作台从 clean `main@8aa3f70329a11cffb2ee43d2942b3c4484e6137f` 起步；功能提交为 `4767c3d`，运维记录由独立提交收口，均未 push/PR/amend/rebase/reset/stash/restore。密码、Token、Cookie、Session 摘要、连接信息和备份正文未进入 Git |
+| Git 同步与工作区 | 状态中文化从 clean `main@fb4c89bd`、behind 0/ahead 157 起步并由独立功能提交收口；未 push/PR/amend/rebase/reset/stash/restore。密码、Token、Cookie、Session 摘要、连接信息和备份正文未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0039`，39/head `0039_rfq_traceability.sql`，SHA-256`3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；没有0040。主`RFQ-00000001`为generation 1 / ISSUED v4、四行/两Supplier、Binding 8、`RFQ_MAPPING_CONFIRMED` 1、`RFQ_ISSUED` 1；Supplier A为RESPONDED并保留Quote ID 1/SUBMITTED v1，Supplier B为INVITED且Quote 0，Quote/Award/PO为1/0/0。八条Binding/Mapping事实未变，固定摘要仍为`9765f8fd…4848d` |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。八角色工作台 Web 为 alpha.40 `sha256:f45d734becf2be04dc03477b427762f82e700b615c4722a1001557d56180818a`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`f139257b…`有精确回退tag，四个受保护Volume未更换 |
-| 当前开发环境 | 登录后根工作台与当前公开非生产UAT均为管理员、采购、市场、计划、工程、财务、生产、仓库八部门导航和单一业务清单；40个现有模块完整唯一分组，实际链接仍由服务端Summary权限裁剪。认证、API、业务、alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04` 已完成 Web-only部署、正式备份/第二新库恢复、匿名只读在线验收和资源清理；当前UAT已运行 `f45d734b…` 八角色工作台 |
-| 当前任务 | 无 `DOING` 任务；`SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04` 已完成并停止 |
-| 下一任务 | 登录式浏览器验收、业务操作、真实数据迁移或生产切流仍须新的明确授权 |
+| 当前开发环境 | 本地源码已用共享词典统一原生与legacy的业务状态、角色、审核/执行结果及启停中文显示，未知枚举原样回退；八部门导航和服务端Summary权限裁剪保持。当前公开UAT仍运行上一版八角色工作台，尚未包含本次中文状态显示。认证、API、业务、alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
+| 当前阶段 | 可见状态中文化源码与自动验证已完成；公开非生产 UAT 未部署、未登录或写入，运行数据与服务不变 |
+| 当前任务 | 当前无 `DOING`；`SELFHOST-UI-STATUS-LOCALIZATION-05` 已以 `VISIBLE ERP STATUSES LOCALIZED — SOURCE ONLY` 完成 |
+| 下一任务 | 停止。公开 UAT 部署、登录式浏览器验收、业务操作、真实数据迁移或生产切流仍须新的明确授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-UI-STATUS-LOCALIZATION-05 建立共享状态/角色中文词典，贯通原生 React 与 legacy 兼容台的状态徽标、详情/列表、审核/执行结果、启停状态和角色显示；未知枚举保留原值，API/数据库枚举、业务逻辑、alpha.40/0039不变。38个UI测试文件、10组typecheck、lint/build、npm/Python/credentials通过；当前公开UAT未部署
 
 - SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04 已把 `4767c3d` 八角色工作台 Web-only部署到18888非生产UAT；新Web `f45d734b…`、旧Web `f139257b…`回退tag、root-only dump/list/第二新库恢复、匿名HTTPS/八角色资产/private-no-store/401和60秒稳定性均通过。0039、Session/Audit、保护指纹和RFQ/Quote事实不变，无登录、业务POST、Migration或其他服务替换
 
@@ -274,6 +276,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
+- `SELFHOST-UI-STATUS-LOCALIZATION-05` 已完成：共享 `statusLabel/statusPairLabel/roleLabel` 统一原生与legacy可见业务状态、角色、审核/执行结果和启停显示；未知枚举原样回退，原始值继续服务API、筛选、状态机、样式和审计。38个UI测试文件、10组typecheck、lint/build、npm/Python/credentials通过，版本仍alpha.40、Migration仍0039。当前无`DOING`；公开UAT保持既有Web镜像，部署或登录式浏览器验收须新授权。
 - `SELFHOST-UAT-FIX-27`已完成：功能提交`1be492e68f6635bc00ea3fb8ce461eac0617d8e7`，保持alpha.40/0039且没有0040；RFQ aggregate CAS/RESPONDED权威语义、固定范围漂移和Quote稳定ID/Event/金额/交期追溯已Web-only部署。正式备份/第二库恢复、隔离Supplier B报价及purchase-only桌面/390×844只读验收通过；business POST 0、Session 0，RFQ ISSUED v4、Binding 8、摘要不变、Supplier A Quote ID 1保留、Supplier B Quote 0、Quote/Award/PO 1/0/0。当前无`DOING`；任何后续报价、修订、比价、定标或PO必须另获明确授权。
 - `SELFHOST-UAT-FIX-26` 已完成：功能提交`f6f7d2a`，保持alpha.40/0039且没有0040；0039独立Binding状态、最终“确认发出”按钮、完整下游保护、Binding ID 1—8主展示和摘要顺序消歧已Web-only部署。正式备份/第二库恢复、隔离发出和purchase-only桌面/390×844只读取消均通过；业务POST 0、Session 0，RFQ仍DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO及全部下游0。当前无`DOING`；正式发出必须另立任务并重新获得明确授权。
 - `SELFHOST-UAT-FIX-25` 已完成：采用分支 B，八条 PostgreSQL 外键关联和固定摘要均正确，页面直接使用同一 DTO 行的 `binding.id`；旧错误基线来自把显示顺序 `3,4,1,2,7,8,5,6` 与 Material 533—536按位置 zip。现以逐行权威表替代该基线；没有代码/数据/Migration/部署变化或 UAT登录，业务 POST 0，RFQ仍 DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO 0。当前无 `DOING`；正式发出必须另获明确授权。

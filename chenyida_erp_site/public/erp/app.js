@@ -1,4 +1,5 @@
-import { api, ErpApiError, isHistorySessionRestore, logoutSession, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "./api-client.js?v=20260806-enterprise-ui-refresh-01";
+import { api, ErpApiError, isHistorySessionRestore, logoutSession, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "./api-client.js?v=20260806-status-localization-05";
+import { roleLabel, statusLabel, statusPairLabel } from "./status-localization.js?v=20260806-status-localization-05";
 
 const state = {
   summary: {},
@@ -279,7 +280,7 @@ function updateUserBar() {
   $("#changePasswordBtn").hidden = !user;
   if (!user) return;
   $("#userName").textContent = user.display_name || user.username;
-  $("#userRole").textContent = user.role_label || user.role;
+  $("#userRole").textContent = user.role_label || roleLabel(user.role);
 }
 
 async function loadSession({ revealAuthenticated = true } = {}) {
@@ -316,7 +317,7 @@ function renderSummary() {
     ["质量异常", state.summary.open_quality_issues],
     ["应收余额", state.summary.receivable_balance],
     ["应付余额", state.summary.payable_balance],
-    ["全局待处理（DRAFT + PENDING_REVIEW）", state.summary.pending],
+    ["全局待处理（草稿 + 待审核）", state.summary.pending],
     ["自动匹配", state.summary.auto_count],
     ["疑似匹配", state.summary.suspect_count],
     ["新物料", state.summary.new_count],
@@ -346,7 +347,7 @@ function renderOperations() {
     <tbody>${dashboard.recent_activity.map((row) => `
       <tr>
         <td>${escapeHtml(row.created_at)}</td>
-        <td>${escapeHtml(row.action)}</td>
+        <td>${escapeHtml(statusLabel(row.action))}</td>
         <td>${escapeHtml(row.detail)}</td>
       </tr>
     `).join("")}</tbody>
@@ -362,7 +363,7 @@ function renderOperations() {
     <tbody>${state.backups.map((row) => `
       <tr>
         <td>${escapeHtml(row.name)}</td>
-        <td>${escapeHtml(row.status || "VERIFIED")}</td>
+        <td>${escapeHtml(statusLabel(row.status || "VERIFIED"))}</td>
         <td>${escapeHtml(row.verified_at || row.created_at)}</td>
         <td>仅新建空目标</td>
       </tr>
@@ -374,7 +375,7 @@ function renderOperations() {
       <tr>
         <td>${escapeHtml(row.username)}</td>
         <td>${escapeHtml(row.display_name)}</td>
-        <td><span class="pill auto">${escapeHtml(row.role_label || row.role)}</span></td>
+        <td><span class="pill auto">${escapeHtml(row.role_label || roleLabel(row.role))}</span></td>
         <td>${row.is_active ? "启用" : "停用"}</td>
         <td>${escapeHtml(row.last_login_at || "-")}</td>
         <td>
@@ -428,9 +429,9 @@ function renderProducts() {
       <td>${escapeHtml(product.customer_name)}</td>
       <td>${escapeHtml(product.product_type)}</td>
       <td>${escapeHtml(product.product_version)}</td>
-      <td>${escapeHtml(product.product_version_status)}</td>
-      <td>${escapeHtml(product.lifecycle_status)}</td>
-      <td>${escapeHtml(product.status)}</td>
+      <td>${escapeHtml(statusLabel(product.product_version_status))}</td>
+      <td>${escapeHtml(statusLabel(product.lifecycle_status))}</td>
+      <td>${escapeHtml(statusLabel(product.status))}</td>
       <td>${escapeHtml(product.layer_count)}</td>
       <td>${escapeHtml(product.board_thickness)}</td>
       <td>${escapeHtml(product.surface_finish)}</td>
@@ -459,7 +460,7 @@ function renderPartners() {
     <tr>
       <td>${escapeHtml(row.customer_code)}</td>
       <td>${escapeHtml(row.customer_name)}</td>
-      <td>${escapeHtml(row.customer_status)}</td>
+      <td>${escapeHtml(statusLabel(row.customer_status))}</td>
       <td>${escapeHtml(row.contact_name)}</td>
       <td>${escapeHtml(row.phone)}</td>
       <td>${escapeHtml(row.payment_terms)}</td>
@@ -477,7 +478,7 @@ function renderPartners() {
     <tr>
       <td>${escapeHtml(row.supplier_code)}</td>
       <td>${escapeHtml(row.supplier_name)}</td>
-      <td>${escapeHtml(row.supplier_status)}</td>
+      <td>${escapeHtml(statusLabel(row.supplier_status))}</td>
       <td>${escapeHtml(row.supplier_level)}</td>
       <td>${escapeHtml(row.contact_name)}</td>
       <td>${escapeHtml(row.phone)}</td>
@@ -497,14 +498,14 @@ function renderPartners() {
 function renderBomSelectors() {
   const selectedProductId = $("#bomProduct").value;
   const productOptions = state.products.map((product) => {
-    const label = `${product.product_code} · ${product.product_name} · 产品版本 ${product.product_version || "—"} · ${product.product_version_status || "—"}`;
+    const label = `${product.product_code} · ${product.product_name} · 产品版本 ${product.product_version || "—"} · ${statusLabel(product.product_version_status)}`;
     return `<option value="${escapeHtml(product.id)}">${escapeHtml(label)}</option>`;
   }).join("");
-  const bomOptions = state.boms.map((bom) => `<option value="${escapeHtml(bom.id)}">${escapeHtml(`${bom.bom_code} · ${bom.product_name} · BOM ${bom.bom_version} · ${bom.bom_status}`)}</option>`).join("");
+  const bomOptions = state.boms.map((bom) => `<option value="${escapeHtml(bom.id)}">${escapeHtml(`${bom.bom_code} · ${bom.product_name} · BOM ${bom.bom_version} · ${statusLabel(bom.bom_status)}`)}</option>`).join("");
   const resultIds = new Set(state.bomSearchResults.map((bom) => Number(bom.id)));
   const selected = state.boms.find((bom) => Number(bom.id) === Number(state.selectedBomId));
   const detailOptions = [...state.bomSearchResults, ...(selected && !resultIds.has(Number(selected.id)) ? [selected] : [])]
-    .map((bom) => `<option value="${escapeHtml(bom.id)}">${escapeHtml(`${bom.bom_code} · ${bom.product_code} · ${bom.product_name} · ${bom.bom_status}`)}</option>`).join("");
+    .map((bom) => `<option value="${escapeHtml(bom.id)}">${escapeHtml(`${bom.bom_code} · ${bom.product_code} · ${bom.product_name} · ${statusLabel(bom.bom_status)}`)}</option>`).join("");
   const inventoryOptions = optionList(state.inventory, "material_id", ["internal_material_code", "standard_name"]);
   $("#bomProduct").innerHTML = productOptions;
   if (state.products.some((product) => String(product.id) === selectedProductId)) $("#bomProduct").value = selectedProductId;
@@ -530,9 +531,9 @@ function renderBomSelectors() {
 function renderBomProductContext() {
   const product = state.products.find((row) => String(row.id) === $("#bomProduct").value);
   $("#bomProductVersion").value = product?.product_version || "";
-  $("#bomProductVersionStatus").value = product?.product_version_status || "";
-  $("#bomProductLifecycle").value = product?.lifecycle_status || "";
-  $("#bomProductStatus").value = product?.status || "";
+  $("#bomProductVersionStatus").value = statusLabel(product?.product_version_status, "");
+  $("#bomProductLifecycle").value = statusLabel(product?.lifecycle_status, "");
+  $("#bomProductStatus").value = statusLabel(product?.status, "");
   const eligible = product?.status === "ACTIVE" && product?.product_version_status === "RELEASED";
   const releasedDetail = state.boms.find((row) => Number(row.id) === Number(state.selectedBomId))?.bom_status === "RELEASED";
   $("#createBomBtn").disabled = !eligible || releasedDetail;
@@ -654,7 +655,7 @@ async function searchBomMaterials() {
     if (selectedBom()?.bom_status !== "DRAFT" || String(state.selectedBomId || "") !== activeBomId || String(state.bomLinesBomId || "") !== activeBomId) return;
     if ($("#lineItemSearch").value.normalize("NFKC").trim() !== query) return;
     state.bomMaterialCandidates = result.rows || [];
-    renderBomMaterialCandidates(state.bomMaterialCandidates.length ? `找到 ${state.bomMaterialCandidates.length} 条候选。` : "没有匹配的 ACTIVE 正式物料。");
+    renderBomMaterialCandidates(state.bomMaterialCandidates.length ? `找到 ${state.bomMaterialCandidates.length} 条候选。` : "没有匹配的已生效正式物料。");
   } catch (error) {
     if (error?.name === "AbortError") return;
     if (bomMaterialSearchController !== controller) return;
@@ -750,10 +751,10 @@ function renderBoms() {
       <td>${escapeHtml(bom.product_name)}</td>
       <td>${escapeHtml(bom.customer_name)}</td>
       <td>${escapeHtml(bom.product_version)}</td>
-      <td>${escapeHtml(bom.product_version_status)}</td>
-      <td>${escapeHtml(bom.product_lifecycle_status)}</td>
+      <td>${escapeHtml(statusLabel(bom.product_version_status))}</td>
+      <td>${escapeHtml(statusLabel(bom.product_lifecycle_status))}</td>
       <td>${escapeHtml(bom.bom_version)}</td>
-      <td>${escapeHtml(bom.bom_status)}</td>
+      <td>${escapeHtml(statusLabel(bom.bom_status))}</td>
       <td><div class="row-actions">
         <button data-view-bom="${escapeHtml(bom.id)}">查看明细</button>
         ${bom.bom_status === "DRAFT" && hasPermission("master.bom.manage") ? `<button data-release-bom="${escapeHtml(bom.id)}" data-bom-version-id="${escapeHtml(bom.bom_version_id)}" data-bom-version="${escapeHtml(bom.version)}">发布 BOM</button>` : ""}
@@ -809,7 +810,7 @@ function renderReadiness() {
       <td>${escapeHtml(line.required_qty)}</td>
       <td>${escapeHtml(line.available_qty)}</td>
       <td>${escapeHtml(line.shortage_qty)}</td>
-      <td>${escapeHtml(line.readiness_status)}</td>
+      <td>${escapeHtml(statusLabel(line.readiness_status))}</td>
     </tr>
   `).join("");
   $("#readinessTable").innerHTML = `
@@ -850,7 +851,7 @@ function renderPurchaseOrders() {
     <tr>
       <td>${escapeHtml(po.po_code)}</td>
       <td>${escapeHtml(po.supplier_name)}</td>
-      <td>${escapeHtml(po.po_status)}</td>
+      <td>${escapeHtml(statusLabel(po.po_status))}</td>
       <td>${escapeHtml(po.source_type)}</td>
       <td>${escapeHtml(po.line_count)}</td>
       <td>${escapeHtml(po.total_order_qty)}</td>
@@ -879,7 +880,7 @@ function renderPurchaseLines() {
       <td>${escapeHtml(line.received_qty)}</td>
       <td>${escapeHtml(remainingQty(line))}</td>
       <td>${escapeHtml(line.uom)}</td>
-      <td>${escapeHtml(line.line_status)}</td>
+      <td>${escapeHtml(statusLabel(line.line_status))}</td>
       <td><button data-receive-line="${line.id}" ${remainingQty(line) <= 0 ? "disabled" : ""}>收货</button></td>
     </tr>
   `).join("");
@@ -925,7 +926,7 @@ function renderInventory() {
       <td>${escapeHtml(row.adjustment_code)}</td>
       <td>${escapeHtml(row.operation_type)}</td>
       <td>${escapeHtml(row.line_count)}</td>
-      <td>${escapeHtml(row.status)}</td>
+      <td>${escapeHtml(statusLabel(row.status))}</td>
       <td>${escapeHtml(row.reason)}</td>
       <td>${escapeHtml(row.created_by)}</td>
       <td>${escapeHtml(row.reversal_adjustment_code || "")}</td>
@@ -949,7 +950,7 @@ function renderWorkOrders() {
       <td>${escapeHtml(order.bom_code)}</td>
       <td>${escapeHtml(order.order_qty)}</td>
       <td>${escapeHtml(order.completed_qty)}</td>
-      <td>${escapeHtml(order.work_status)}</td>
+      <td>${escapeHtml(statusLabel(order.work_status))}</td>
       <td>${escapeHtml(order.owner)}</td>
       <td>${escapeHtml(order.finished_item_code)}</td>
       <td>
@@ -1038,7 +1039,7 @@ function renderQuotations() {
         <td>${escapeHtml(quote.quote_qty)}</td>
         <td>${escapeHtml(quote.unit_price)}</td>
         <td>${escapeHtml(quote.total_amount)}</td>
-        <td>${escapeHtml(quote.quote_status)}</td>
+        <td>${escapeHtml(statusLabel(quote.quote_status))}</td>
         <td>${escapeHtml(quote.valid_until)}</td>
         <td>${escapeHtml(quote.owner)}</td>
         <td>
@@ -1071,7 +1072,7 @@ function renderSalesOrders() {
         <td>${escapeHtml(order.order_qty)}</td>
         <td>${escapeHtml(order.shipped_qty)}</td>
         <td>${escapeHtml(remaining)}</td>
-        <td>${escapeHtml(order.sales_status)}</td>
+        <td>${escapeHtml(statusLabel(order.sales_status))}</td>
         <td>${escapeHtml(order.due_date)}</td>
         <td>${escapeHtml(order.finished_available_qty)}</td>
         <td>
@@ -1170,7 +1171,7 @@ function renderFinance() {
         <td>${escapeHtml(doc.total_amount)}</td>
         <td>${escapeHtml(doc.paid_amount)}</td>
         <td>${escapeHtml(doc.balance_amount)}</td>
-        <td>${escapeHtml(doc.doc_status || doc.status)}</td>
+        <td>${escapeHtml(statusLabel(doc.doc_status || doc.status))}</td>
         <td>${escapeHtml(doc.due_date)}</td>
       </tr>
     `).join("")}</tbody>
@@ -1218,7 +1219,7 @@ function renderQualityInspections() {
       <td>${escapeHtml(row.inspected_qty)}</td>
       <td>${escapeHtml(row.passed_qty)}</td>
       <td>${escapeHtml(row.failed_qty)}</td>
-      <td>${escapeHtml(`${row.lifecycle_status}/${row.decision_status}`)}</td>
+      <td>${escapeHtml(statusPairLabel(`${row.lifecycle_status}/${row.decision_status}`))}</td>
       <td>${escapeHtml(row.released_qty)}</td>
       <td>${escapeHtml(row.created_by)}</td>
       <td>${escapeHtml(row.responsible_stage)}</td>
@@ -1264,7 +1265,7 @@ function renderMappings() {
       <td>${escapeHtml(row.min_order_qty)}</td>
       <td>${escapeHtml(row.lead_time_days)}</td>
       <td>${escapeHtml(row.last_price)}</td>
-      <td>${escapeHtml(row.match_status)}</td>
+      <td>${escapeHtml(statusLabel(row.match_status))}</td>
       <td>${escapeHtml(row.approved_by)}</td>
     </tr>
   `).join("");
@@ -1294,8 +1295,8 @@ function renderCleaning() {
         <td>${escapeHtml(row.candidate_standard_name)}</td>
         <td>${pill(row.match_level)}</td>
         <td>${escapeHtml(row.confidence)}</td>
-        <td>${escapeHtml(row.owner_role)}</td>
-        <td>${escapeHtml(row.process_status)}</td>
+        <td>${escapeHtml(roleLabel(row.owner_role))}</td>
+        <td>${escapeHtml(statusLabel(row.process_status))}</td>
         <td>
           <div class="row-actions">
             <button data-confirm="${row.id}" ${canConfirm ? "" : "disabled"}>确认映射</button>
@@ -1692,11 +1693,11 @@ async function addBomLine() {
   const candidate = state.selectedBomMaterial;
   const bom = selectedBom();
   if (!candidate) {
-    toast("请先检索并选择一条 ACTIVE 正式物料");
+    toast("请先检索并选择一条已生效正式物料");
     return;
   }
   if (!bom || bom.bom_status !== "DRAFT") {
-    toast("只能向 DRAFT BOM Version 添加明细");
+    toast("只能向草稿 BOM 版本添加明细");
     return;
   }
   if (String(state.bomLinesBomId || "") !== String(bom.id)) {
@@ -1734,7 +1735,7 @@ async function editBomLine(lineId) {
     quantity_per: quantityPer.trim(), loss_rate: lossRate.trim(), process_stage: processStage.trim(), remark: String(line.remark || ""),
   }, "PATCH");
   await loadBomLines(bom.id);
-  toast("DRAFT BOM 明细已更新");
+  toast("草稿 BOM 明细已更新");
 }
 
 async function deleteBomLine(lineId) {
@@ -1743,7 +1744,7 @@ async function deleteBomLine(lineId) {
   if (!window.confirm(`确认删除 DRAFT BOM 第 ${line.line_no} 行？`)) return;
   await masterDataWrite(`delete-bom-line:${line.id}`, `/api/bom-lines/${line.id}`, { bom_id: Number(bom.id) }, "DELETE");
   await loadBomLines(bom.id);
-  toast("DRAFT BOM 明细已删除");
+  toast("草稿 BOM 明细已删除");
 }
 
 async function releaseProductVersion(productId, productVersionId, expectedVersion) {
@@ -2064,7 +2065,7 @@ async function createPayment() {
       reason: "财务登记收付款",
   });
   await refreshAll();
-  $("#financeMsg").textContent = `已登记 ${result.payment_code}，状态：${result.doc_status}`;
+  $("#financeMsg").textContent = `已登记 ${result.payment_code}，状态：${statusLabel(result.doc_status)}`;
   toast("收付款已登记");
 }
 
@@ -2096,10 +2097,10 @@ async function createQualityInspection() {
     responsible_stage: $("#responsibleStage").value.trim(),
     remark: $("#qualityRemark").value.trim(),
   };
-  if (hasFailure !== (payload.results[0].result === "FAIL")) { toast("不良数量与 PASS/FAIL 结果不一致"); return; }
+  if (hasFailure !== (payload.results[0].result === "FAIL")) { toast("不良数量与通过/失败结果不一致"); return; }
   if (hasFailure && !payload.defects[0].defect_type) { toast("有不良数量时请填写不良类型"); return; }
   const result = await qualityWrite(`quality-create:${crypto.randomUUID()}`, "/api/quality-inspections", payload);
-  $("#qualityMsg").textContent = `已保存 ${result.data.inspection_code}，状态：OPEN/PENDING`;
+  $("#qualityMsg").textContent = `已保存 ${result.data.inspection_code}，状态：${statusPairLabel("OPEN/PENDING")}`;
   await refreshAll();
   toast("品质检验记录已保存");
 }

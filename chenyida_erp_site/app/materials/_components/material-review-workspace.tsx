@@ -11,7 +11,7 @@ import {
   reviewCapabilities, reviewComment as normalizeReviewComment, reviewReason, reviewResponsibility,
   reviewValidationFingerprint, safeReviewReturnTo, type ReviewWriteOperation,
 } from "../_lib/material-review";
-import { sourceLabel } from "../_lib/material-ui";
+import { sourceLabel, statusLabel } from "../_lib/material-ui";
 import {
   MaterialAttributesCard, MaterialLastRejectionCard, MaterialReviewDecisionCard,
   MaterialRecentChangesCard, MaterialRecentVersionsCard, MaterialResponsibilitiesCard,
@@ -177,7 +177,7 @@ export function MaterialReviewWorkspace({ materialId }: { materialId: number }) 
         setConflict({ previousVersion, currentVersion: Number(latest.material.current_version), message: "物料版本或当前 Validation 已变化，旧确认已失效。请重新检查完整内容。" });
         return null;
       }
-      if (kind === "APPROVE" && latest.validation.errors.length) { setNotice("当前 Validation 存在 ERROR，不能批准；可按权限驳回修改。"); return null; }
+      if (kind === "APPROVE" && latest.validation.errors.length) { setNotice("当前校验存在错误，不能批准；可按权限驳回修改。"); return null; }
       return latest;
     } catch (reason) {
       if (reason instanceof ErpApiError && reason.status === 401) { setNotice("登录状态已失效；重新登录会离开并丢失当前页面内存意见。"); return null; }
@@ -253,10 +253,10 @@ export function MaterialReviewWorkspace({ materialId }: { materialId: number }) 
       if (latest) applyDetail(latest);
       if (kind === "APPROVE") {
         const code = String(response.data.internal_material_code || latest?.material.material_code || "");
-        if (!latest || latest.material.material_status !== "ACTIVE" || !code) { setNotice("审核已返回成功，但暂时无法确认最新 ACTIVE 详情；审核动作保持关闭。"); return response; }
+        if (!latest || latest.material.material_status !== "ACTIVE" || !code) { setNotice("审核已返回成功，但暂时无法确认最新已生效详情；审核动作保持关闭。"); return response; }
         setReviewComment(""); returnWithResult({ kind: "approve", message: `审核通过，正式物料编码：${code}` });
       } else {
-        if (!latest || latest.material.material_status !== "DRAFT" || !latest.last_rejection) { setNotice("驳回已返回成功，但暂时无法确认最新 DRAFT 与驳回历史；审核动作保持关闭。"); return response; }
+        if (!latest || latest.material.material_status !== "DRAFT" || !latest.last_rejection) { setNotice("驳回已返回成功，但暂时无法确认最新草稿与驳回历史；审核动作保持关闭。"); return response; }
         setRejectReason(""); returnWithResult({ kind: "reject", message: "已驳回为草稿，创建或编辑人员可以重新修改并提交。" });
       }
       return response;
@@ -331,7 +331,7 @@ export function MaterialReviewWorkspace({ materialId }: { materialId: number }) 
         <section className="mm-card mm-review-actions"><h3>审核操作</h3>
           {!capabilities.approve && !capabilities.reject ? <p>当前账号没有批准或驳回权限，仍可只读查看。</p> : <>
             {capabilities.approve ? <label>审核意见（可选）<textarea maxLength={1000} disabled={busy || resultUnknown || actionsClosed} value={reviewComment} onChange={(event) => { setReviewComment(event.target.value); if (approveOperationRef.current?.state === "FAILED") approveOperationRef.current = null; }} /><small>{reviewComment.length} / 1000</small></label> : null}
-            {hasErrors ? <p className="mm-review-block-message">当前 Validation 存在 ERROR，不能批准，需要驳回修改。</p> : null}
+            {hasErrors ? <p className="mm-review-block-message">当前校验存在错误，不能批准，需要驳回修改。</p> : null}
             <div className="mm-review-action-buttons">{capabilities.reject ? <button className="danger" disabled={!rejectAllowed || busy} onClick={() => { setRejectError(""); setRejectOpen(true); }}>驳回修改</button> : null}{capabilities.approve ? <button className="primary" disabled={!approveAllowed || busy} onClick={() => void prepareApprove()}>审核通过</button> : null}</div>
           </>}
         </section>
@@ -339,13 +339,13 @@ export function MaterialReviewWorkspace({ materialId }: { materialId: number }) 
     </div>
 
     {approveOpen ? <DialogShell title={detail.validation.warnings.length ? "确认警告并审核通过？" : "确认审核通过？"} onCancel={() => { if (!busy) setApproveOpen(false); }} busy={busy} actions={<button className="primary" disabled={busy || Boolean(detail.validation.warnings.length && !warningConfirmed)} onClick={() => void confirmApprove()}>确认审核通过</button>}>
-      <p>物料：{detail.material.standard_name}</p><p>当前版本：V{detail.material.current_version}</p><p>Validation：{detail.validation.errors.length} 个错误，{detail.validation.warnings.length} 个警告</p><p>审核意见：{reviewComment.trim() || "—"}</p>
-      {detail.validation.warnings.length ? <><ul>{detail.validation.warnings.map((issue, index) => <li key={`${issue.code}-${index}`}><b>警告 WARNING · {issue.code}</b><br />{issue.message}</li>)}</ul><label className="mm-warning-confirm"><input type="checkbox" checked={warningConfirmed} onChange={(event) => setWarningConfirmed(event.target.checked)} />我已核对当前版本和当前 Validation</label><small>此确认只绑定当前 material_id、版本、本次 Validation 摘要和本次详情加载；服务端仍会最终重校验。</small></> : null}
-      <p>审核通过后将生成唯一正式内部物料编码并转为 ACTIVE；随后由工程继续使用该物料建立 BOM。</p>
+      <p>物料：{detail.material.standard_name}</p><p>当前版本：V{detail.material.current_version}</p><p>校验结果：{detail.validation.errors.length} 个错误，{detail.validation.warnings.length} 个警告</p><p>审核意见：{reviewComment.trim() || "—"}</p>
+      {detail.validation.warnings.length ? <><ul>{detail.validation.warnings.map((issue, index) => <li key={`${issue.code}-${index}`}><b>{statusLabel(issue.severity)} · {issue.code}</b><br />{issue.message}</li>)}</ul><label className="mm-warning-confirm"><input type="checkbox" checked={warningConfirmed} onChange={(event) => setWarningConfirmed(event.target.checked)} />我已核对当前版本和当前校验结果</label><small>此确认只绑定当前 material_id、版本、本次校验摘要和本次详情加载；服务端仍会最终重校验。</small></> : null}
+      <p>审核通过后将生成唯一正式内部物料编码并转为已生效；随后由工程继续使用该物料建立 BOM。</p>
     </DialogShell> : null}
 
     {rejectOpen ? <DialogShell title="驳回物料修改" initialFocus="first" onCancel={() => { if (!busy) setRejectOpen(false); }} busy={busy} actions={<button className="danger" disabled={busy} onClick={() => void confirmReject()}>确认驳回修改</button>}>
-      <p>物料：{detail.material.standard_name}</p><p>当前版本：V{detail.material.current_version}</p><label>驳回原因 *<textarea maxLength={1000} aria-describedby="review-reason-count review-reason-error" value={rejectReason} onChange={(event) => { setRejectReason(event.target.value); setRejectError(""); if (rejectOperationRef.current?.state === "FAILED") rejectOperationRef.current = null; }} /></label><p id="review-reason-count">{rejectReason.length} / 1000</p>{rejectError ? <p id="review-reason-error" className="mm-field-issue" role="alert">{rejectError}</p> : null}<p>驳回后状态回到 DRAFT；创建或编辑人员可以重新修改和提交。</p>{reviewComment ? <p>已输入的批准意见仍保留在页面内存，不会作为驳回原因。</p> : null}
+      <p>物料：{detail.material.standard_name}</p><p>当前版本：V{detail.material.current_version}</p><label>驳回原因 *<textarea maxLength={1000} aria-describedby="review-reason-count review-reason-error" value={rejectReason} onChange={(event) => { setRejectReason(event.target.value); setRejectError(""); if (rejectOperationRef.current?.state === "FAILED") rejectOperationRef.current = null; }} /></label><p id="review-reason-count">{rejectReason.length} / 1000</p>{rejectError ? <p id="review-reason-error" className="mm-field-issue" role="alert">{rejectError}</p> : null}<p>驳回后状态回到草稿；创建或编辑人员可以重新修改和提交。</p>{reviewComment ? <p>已输入的批准意见仍保留在页面内存，不会作为驳回原因。</p> : null}
     </DialogShell> : null}
 
     {leaveTarget ? <DialogShell title="离开物料审核页？" onCancel={() => setLeaveTarget("")} actions={<button className="danger" onClick={() => { allowNavigationRef.current = true; window.location.assign(leaveTarget); }}>放弃意见并离开</button>}><p>{resultUnknown ? "审核结果仍待确认，离开后可能无法判断本次操作结果。" : "当前有尚未发送的审核意见或驳回原因，离开后这些内容会丢失。"}</p><p>本页面不会把意见保存到浏览器存储。</p></DialogShell> : null}

@@ -97,7 +97,7 @@ function WarningSubmitDialog({ detail, issues, comment, onComment, onCancel, onS
     if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls[controls.length - 1].focus(); }
     if (!event.shiftKey && document.activeElement === controls[controls.length - 1]) { event.preventDefault(); controls[0].focus(); }
   };
-  return <div className="mm-modal-backdrop"><div className="mm-modal" role="dialog" aria-modal="true" aria-labelledby="warning-title" ref={dialogRef} onKeyDown={trap}><h2 id="warning-title">存在校验警告</h2><p>草稿 V{String(detail.material.current_version)} 没有 ERROR，但有 {issues.length} 个 WARNING。本次确认只对当前版本和 Validation 有效。</p><ul>{issues.map((issue) => <li key={`${issue.code}-${issue.field}`}><b>{issue.code}</b>：{issue.message}</li>)}</ul><label>提交说明（可选）<textarea maxLength={1000} value={comment} onChange={(event) => onComment(event.target.value)} /></label><div className="mm-modal-actions"><button ref={cancelRef} onClick={onCancel}>返回修改</button><button className="primary" onClick={onSubmit}>确认警告并提交审核</button></div></div></div>;
+  return <div className="mm-modal-backdrop"><div className="mm-modal" role="dialog" aria-modal="true" aria-labelledby="warning-title" ref={dialogRef} onKeyDown={trap}><h2 id="warning-title">存在校验警告</h2><p>草稿 V{String(detail.material.current_version)} 没有错误，但有 {issues.length} 个警告。本次确认只对当前版本和校验结果有效。</p><ul>{issues.map((issue) => <li key={`${issue.code}-${issue.field}`}><b>{issue.code}</b>：{issue.message}</li>)}</ul><label>提交说明（可选）<textarea maxLength={1000} value={comment} onChange={(event) => onComment(event.target.value)} /></label><div className="mm-modal-actions"><button ref={cancelRef} onClick={onCancel}>返回修改</button><button className="primary" onClick={onSubmit}>确认警告并提交审核</button></div></div></div>;
 }
 
 export function MaterialDraftPage({ mode, materialId }: { mode: Mode; materialId?: number }) {
@@ -465,7 +465,7 @@ function MaterialDynamicAttributes({ schema, value, disabled, issues, onChange }
 
 function MaterialValidationSummary({ issues, onFocus }: { issues: DraftIssue[]; onFocus: (issue: DraftIssue) => void }) {
   const errors = issues.filter((issue) => issue.severity === "ERROR"); const warnings = issues.filter((issue) => issue.severity === "WARNING");
-  return <section id="draft-validation" className="mm-draft-validation"><h3>Validation 摘要</h3><p><b>错误 ERROR：{errors.length}</b><b>警告 WARNING：{warnings.length}</b></p>{issues.length ? <ul>{issues.map((issue, index) => <li key={`${issue.source}-${issue.code}-${index}`}><button onClick={() => onFocus(issue)}><span>{issue.source === "LOCAL" ? "本地检查" : "服务端校验"} · {issue.severity}</span><b>{issue.code}</b><small>{issue.message}</small></button></li>)}</ul> : <p className="mm-muted">暂无问题。服务端仍是最终校验边界。</p>}</section>;
+  return <section id="draft-validation" className="mm-draft-validation"><h3>校验摘要</h3><p><b>错误：{errors.length}</b><b>警告：{warnings.length}</b></p>{issues.length ? <ul>{issues.map((issue, index) => <li key={`${issue.source}-${issue.code}-${index}`}><button onClick={() => onFocus(issue)}><span>{issue.source === "LOCAL" ? "本地检查" : "服务端校验"} · {statusLabel(issue.severity)}</span><b>{issue.code}</b><small>{issue.message}</small></button></li>)}</ul> : <p className="mm-muted">暂无问题。服务端仍是最终校验边界。</p>}</section>;
 }
 
 function VersionConflict({ local, server, onDiscard }: { local: DraftForm; server: Detail; onDiscard: () => void }) {

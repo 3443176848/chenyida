@@ -11,12 +11,13 @@
 
 ## 当前任务
 
-当前无 `DOING` 任务。`SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04` 已完成并停止；登录式浏览器验收、业务操作、真实数据迁移或生产切流须新的明确授权。
+当前无 `DOING` 任务。状态中文化源码尚未部署；公开 UAT 发布、登录式浏览器验收或业务操作均须新的明确授权。
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-UI-STATUS-LOCALIZATION-05 | ERP 可见状态中文化 | DONE | Codex（状态盘点、统一中文词典、前端接入、测试、文档与独立提交）、项目负责人（指出英文状态并要求更改） | 2026-08-06 | 2026-08-06 | SELFHOST-UI-REFRESH-01、SELFHOST-DASHBOARD-ROLE-HUB-03、SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04 | `VISIBLE ERP STATUSES LOCALIZED — SOURCE ONLY`。共享词典统一原生与legacy的状态、角色、审核/执行结果和启停显示，未知枚举原样回退；38个UI测试文件、10组typecheck、lint/build、npm/Python/credentials通过。原始API/数据库枚举、业务、alpha.40/0039不变；公开UAT仍为既有Web镜像，未登录、写入、重启或部署。见[任务文档](../tasks/SELFHOST-UI-STATUS-LOCALIZATION-05.md)。 |
 | SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04 | 八角色工作台 Web-only 部署 | DONE | Codex（保护、备份恢复、候选镜像、Web-only替换、匿名在线验收与文档）、项目负责人（明确授权直接部署） | 2026-08-06 | 2026-08-06 | SELFHOST-DASHBOARD-ROLE-HUB-03、SELFHOST-UI-REFRESH-DEPLOY-02、SELFHOST-UAT-FIX-27 | `ROLE-BASED WORKBENCH DEPLOYED — ANONYMOUS READ-ONLY VERIFIED`。新Web `f45d734b…` 已上线，旧Web `f139257b…`具备精确回退tag；root-only dump/list/第二新库恢复、HTTPS八角色bundle、安全头、匿名401和60秒稳定性通过。0039、指纹、Session/Audit及RFQ/Quote事实不变；无登录、业务POST、Migration或其他服务替换。见[任务文档](../tasks/SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04.md)及[完成报告](../tasks/SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04-COMPLETION.md)。 |
 | SELFHOST-DASHBOARD-ROLE-HUB-03 | 登录后工作台八角色入口简化 | DONE | Codex（信息架构、UI、测试、文档与独立提交）、项目负责人（指定八个入口） | 2026-08-06 | 2026-08-06 | SELFHOST-UI-REFRESH-01、SELFHOST-UI-REFRESH-DEPLOY-02、SELFHOST-PHASE2-TASK10 | `ROLE-BASED WORKBENCH COMPLETE — SOURCE ONLY`。根工作台改为管理员、采购、市场、计划、工程、财务、生产、仓库八入口与单一部门清单；40模块完整唯一分组，仍由Summary服务端裁剪。UI73/73、五组typecheck、lint/build、npm/Python/credentials通过；alpha.40/0039不变。该源码任务自身未部署，后续DEPLOY-04已上线。见[任务文档](../tasks/SELFHOST-DASHBOARD-ROLE-HUB-03.md)。 |
 | SELFHOST-UI-REFRESH-DEPLOY-02 | 企业级 UI Web-only 部署与匿名只读验收 | DONE | Codex（保护基线、备份恢复、候选镜像、Web-only替换、匿名在线验收、清理与文档）、项目负责人（明确授权部署） | 2026-08-06 | 2026-08-06 | SELFHOST-UI-REFRESH-01、SELFHOST-UAT-FIX-27 | `ENTERPRISE UI DEPLOYED — ANONYMOUS READ-ONLY VERIFIED`。新Web `f139257b…` 已上线，旧Web `20b41bd…` 精确回退标签和root-only备份保留；HTTPS/新资产/安全头/匿名401通过。0039、保护指纹、Session/Audit和RFQ/Quote事实不变；无登录、业务POST、Migration或其他服务替换。见[任务文档](../tasks/SELFHOST-UI-REFRESH-DEPLOY-02.md)及[完成报告](../tasks/SELFHOST-UI-REFRESH-DEPLOY-02-COMPLETION.md)。 |

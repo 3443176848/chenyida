@@ -85,7 +85,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export function statusLabel(value: unknown): string {
-  return STATUS_LABELS[String(value)] || "未知状态";
+  return STATUS_LABELS[String(value)] || sharedStatusLabel(value, "未知状态");
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -186,3 +186,4 @@ export function parseHistoryQuery(input: string | URLSearchParams): { page: numb
   const pageSize = positiveInt(params.get("page_size"), 20);
   return { page: positiveInt(params.get("page"), 1), page_size: pageSize === 50 ? 50 : 20 };
 }
+import { statusLabel as sharedStatusLabel } from "../../../public/erp/status-localization.js";

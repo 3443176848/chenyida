@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { api, ErpApiError, isHistorySessionRestore, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "../../../public/erp/api-client.js";
+import { roleLabel } from "../../../public/erp/status-localization.js";
 
 export type SessionUser = { username?: string; display_name?: string; role?: string; role_label?: string; permissions?: string[] };
 export type MaterialSession = { authenticated: boolean; setup_required?: boolean; user?: SessionUser | null; csrf_token?: string };
@@ -69,7 +70,7 @@ export function MaterialShell({ children }: { children: ReactNode }) {
       <header className="mm-topbar">
         <div className="mm-topbar-brand"><span className="mm-brand-mark" aria-hidden="true">CY</span><div><h1>晨亿达 ERP</h1><p>物料主数据工作区</p></div></div>
         <div className="mm-topbar-actions">
-          {user ? <span className="mm-user"><b>{user.display_name || user.username || "当前用户"}</b><small>{user.role_label || user.role || "已登录"}</small></span> : null}
+          {user ? <span className="mm-user"><b>{user.display_name || user.username || "当前用户"}</b><small>{user.role_label || roleLabel(user.role,"已登录")}</small></span> : null}
           <Link href="/" className="mm-ghost-link">返回 ERP</Link>
         </div>
       </header>

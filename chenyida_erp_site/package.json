@@ -118,6 +118,7 @@
     "test:finance:compose": "node scripts/selfhost-finance-compose-smoke.mjs",
     "typecheck:finance": "tsc -p tsconfig.task09.json --pretty false",
     "test:ui:enterprise": "node --test tests/selfhost-enterprise-ui-contract.test.mjs",
+    "test:ui:status-localization": "node --test tests/selfhost-status-localization.test.mjs",
     "typecheck:dashboard": "tsc -p tsconfig.task10.json --pretty false",
     "test:dashboard:unit": "node --experimental-strip-types --test tests/selfhost-dashboard-unit.test.mjs",
     "test:dashboard:ui": "node --experimental-strip-types --test tests/selfhost-dashboard-ui-contract.test.mjs",

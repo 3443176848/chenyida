@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { api, createSessionWriteRegistry, ErpApiError, sessionPost } from "../../../public/erp/api-client.js";
+import { statusLabel } from "../../../public/erp/status-localization.js";
 import "../../procurement/sourcing/sourcing.css";
 
 type Session = { authenticated: boolean; csrf_token?: string; user: { permissions: string[] } | null };
@@ -24,9 +25,9 @@ export default function ProductionHandoffsPage() {
   async function post(path:string,body:Record<string,unknown>){if(!session)return;setError("");try{await sessionPost(operations.current,path,body,session.csrf_token||"");await reload();}catch(e){setError(e instanceof ErpApiError?`【${e.code}】${e.message}${e.requestId?`（请求 ${e.requestId}）`:""}`:"操作失败");}}
   async function prepare(event:FormEvent<HTMLFormElement>){event.preventDefault();const data=new FormData(event.currentTarget);await post(`/api/planning-packages/${Number(data.get("package_id"))}/production-handoffs`,{items:[{package_item_id:Number(data.get("package_item_id")),finished_material_id:Number(data.get("finished_material_id"))}]});}
   return <main className="sourcing-shell">
-    <header className="sourcing-header"><div><Link href="/">← 经营工作台</Link><h1>计划到生产交接</h1><p>只消费当前 ACCEPTED Planning Package，固化产品、BOM、数量、单位与成品物料。</p></div></header>
+    <header className="sourcing-header"><div><Link href="/">← 经营工作台</Link><h1>计划到生产交接</h1><p>只消费当前已接收的计划交接包，固化产品、BOM、数量、单位与成品物料。</p></div></header>
     {can(session,"production.handoff.prepare")?<form className="sourcing-form" onSubmit={prepare}><label>Planning Package ID<input name="package_id" required/></label><label>Package Item ID<input name="package_item_id" required/></label><label>成品 Material ID<input name="finished_material_id" required/></label><button>准备生产交接</button></form>:null}
-    <section className="sourcing-panel"><h2>交接版本</h2>{rows.map(row=><article className="sourcing-card" key={row.id}><b>{row.handoff_code} · v{row.handoff_version_no}</b><p>{row.project_code} · {row.project_name}</p><small>{row.status} · 行 {row.item_count} · 工单 {row.work_order_count}</small>{row.status==="DRAFT"&&can(session,"production.handoff.submit")?<button onClick={()=>post(`/api/production-handoffs/${row.id}/submit`,{expected_version:row.version})}>提交生产</button>:null}{row.status==="RETURNED"?<p>该版本已冻结，请按退回意见准备下一版本。</p>:null}</article>)}</section>
+    <section className="sourcing-panel"><h2>交接版本</h2>{rows.map(row=><article className="sourcing-card" key={row.id}><b>{row.handoff_code} · v{row.handoff_version_no}</b><p>{row.project_code} · {row.project_name}</p><small>{statusLabel(row.status)} · 行 {row.item_count} · 工单 {row.work_order_count}</small>{row.status==="DRAFT"&&can(session,"production.handoff.submit")?<button onClick={()=>post(`/api/production-handoffs/${row.id}/submit`,{expected_version:row.version})}>提交生产</button>:null}{row.status==="RETURNED"?<p>该版本已冻结，请按退回意见准备下一版本。</p>:null}</article>)}</section>
     {error?<div className="sourcing-state sourcing-error">{error}</div>:null}
   </main>;
 }

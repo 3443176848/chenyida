@@ -53,19 +53,19 @@ test("legacy cleaning is visibly retired and the pending card declares its globa
   assert.match(html, /不是人工物料审核队列/);
   assert.match(html, /href="\/materials\/review"/);
   assert.match(html, /href="\/materials\/imports"/);
-  assert.match(legacy, /全局待处理（DRAFT \+ PENDING_REVIEW）/);
+  assert.match(legacy, /全局待处理（草稿 \+ 待审核）/);
 });
 
 test("legacy supplier import delegates to the native PostgreSQL batch workflow", () => {
   assert.match(html, /href="\/materials\/imports\/new"[^>]*>供应商导入<\/a>/);
   assert.match(html, /CSV、XLS 或 XLSX/);
-  assert.match(html, /app\.js\?v=20260806-enterprise-ui-refresh-01/);
+  assert.match(html, /app\.js\?v=20260806-status-localization-05/);
   assert.doesNotMatch(html, /20260714-material-read-ui|id="(?:csvFile|csvText|runImportBtn|loadSampleBtn)"|accept="\.csv"/);
   assert.doesNotMatch(legacy, /\/api\/(?:sample-import|import(?:-file)?)|async function (?:loadSample|runImport)|csvFile|csvText|runImportBtn|loadSampleBtn|file\.text\(\)/);
   assert.match(legacy, /\.nav\[data-tab\]/);
   assert.match(materialImportCreate, /accept="\.xlsx,\.xls,\.csv"/);
   for (const parser of [/await parseMaterialImportCsv\(/, /await parseMaterialImportXls\(/, /await parseMaterialImportXlsx\(/]) assert.match(selfhostWorker, parser);
-  assert.match(dashboardService, /const LEGACY_UI_VERSION="20260806-enterprise-ui-refresh-01"/);
+  assert.match(dashboardService, /const LEGACY_UI_VERSION="20260806-status-localization-05"/);
   assert.doesNotMatch(dashboardService, /href:"\/erp\/index\.html\?tab=/);
   for (const tab of ["partners", "bom", "purchase", "production", "sales", "quality", "finance", "operations"]) assert.match(dashboardService, new RegExp(`legacyHref\\("${tab}"\\)`));
   for (const route of ["/", "/materials/:path*", "/erp/index.html"]) assert.ok(nextConfig.includes(`"${route}"`));

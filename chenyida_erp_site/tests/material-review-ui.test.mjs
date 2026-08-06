@@ -79,7 +79,7 @@ test("10 筛选无结果提供清除全部筛选", () => assert.match(queueSourc
 
 test("11 队列展示 CURRENT_METADATA 和最多五条问题", () => {
   assert.match(queueSource, /CURRENT_METADATA/); assert.match(queueSource, /top_issues \|\| \[\]\)\.slice\(0, 5\)/);
-  assert.match(queueSource, /错误 ERROR/); assert.match(queueSource, /警告 WARNING/);
+  assert.match(queueSource, /<b>错误 \{row\.validation_summary\.error_count\}<\/b>/); assert.match(queueSource, /<b>警告 \{row\.validation_summary\.warning_count\}<\/b>/);
 });
 
 test("12 队列以受限安全 return_to 进入工作台", () => {
@@ -101,7 +101,7 @@ test("14 ERROR 禁止批准但不自动驳回", () => {
 
 test("15 WARNING 在最终确认中要求明确勾选", () => {
   assert.match(workspaceSource, /warningConfirmed/);
-  assert.match(workspaceSource, /我已核对当前版本和当前 Validation/);
+  assert.match(workspaceSource, /我已核对当前版本和当前校验结果/);
 });
 
 test("16 WARNING 确认指纹绑定物料版本和完整规范化 Validation", () => {
@@ -256,7 +256,7 @@ test("51 两条路由、共享 Client、页面内存与既有回归边界完整"
 test("52 operations 队列数量、列表、详情和审核按钮使用同一能力与 PENDING_REVIEW 口径", () => {
   assert.deepEqual(reviewCapabilities(permissionsForRole("operations")), { queue: true, approve: true, reject: true });
   assert.match(shellSource, /material\.review\.queue[^]*\/materials\/review/);
-  assert.match(queueSource, /仅显示待审核 PENDING_REVIEW/);
+  assert.match(queueSource, /仅显示待审核物料/);
   assert.match(queueSource, /response\.pagination[^]*setResult\(response\)/);
   assert.match(queueSource, /result\?\.data\.map[^]*\/materials\/\$\{row\.material_id\}\/review/);
   assert.match(workspaceSource, /\/api\/material-master\/materials\/\$\{materialId\}/);

@@ -199,7 +199,7 @@ test("isolated Chromium completes v1 RETURN response fixed v2 lineage and Planni
     const returnEvent = (await pool.query("select id,actor,reason,request_id::text,created_at from project_planning_handoff_events where package_id=$1 and event_type='RETURNED'", [v1Id])).rows[0];
     await page.waitForURL((url) => url.searchParams.get("package") === String(v2Id));
     await page.getByRole("heading", { name: `${fixture.projectCode} · 交接包 v2`, exact: true }).waitFor();
-    await page.getByRole("heading", { name: "v1 → Planning RETURN → Engineering Response → v2", exact: true }).waitFor();
+    await page.getByRole("heading", { name: "v1 → 计划部退回 → 工程回复 → v2", exact: true }).waitFor();
     const resubmitPath = `/api/planning-packages/${v2Id}/submit`;
     for (const cancellation of ["cancel", "close", "escape"]) {
       await page.getByRole("button", { name: "重新提交计划部", exact: true }).click();
@@ -239,7 +239,7 @@ test("isolated Chromium completes v1 RETURN response fixed v2 lineage and Planni
     const resubmitResponse = await resubmitResponsePromise; assert.equal(resubmitResponse.status(), 200); const resubmitPayload = await resubmitResponse.json();
     await page.getByRole("heading", { name: "重新提交完成凭证", exact: true }).waitFor();
     assert.equal(postCount(resubmitPath), resubmitPostsBefore + 1, "double click must issue one RESUBMIT request");
-    await page.getByText("SUBMITTED", { exact: true }).waitFor(); await page.getByText(fixture.credentials.engineering.username, { exact: true }).waitFor();
+    await page.getByText("已提交", { exact: true }).waitFor(); await page.getByText(fixture.credentials.engineering.username, { exact: true }).waitFor();
     await page.getByText(resubmitPayload.request_id, { exact: true }).waitFor(); await page.getByText(/下一队列：计划部待接收队列/).waitFor();
     let state = await handoffState(fixture.projectId); assert.deepEqual(state.packages, [[1, "RETURNED"], [2, "SUBMITTED"]]); assert.equal(state.events.RESUBMITTED, 1);
     const submittedV2 = (await pool.query("select version,submitted_by,submitted_at from project_planning_packages where id=$1", [v2Id])).rows[0];
@@ -249,7 +249,7 @@ test("isolated Chromium completes v1 RETURN response fixed v2 lineage and Planni
     await logout(page); await login(page, fixture.credentials.planning);
     await page.goto(`${browserOrigin}/planning/handoffs`, { waitUntil: "domcontentloaded" });
     await page.locator("button.planning-row", { hasText: `${fixture.projectCode} · Package ID ${v2Id}/v2` }).click();
-    await page.getByRole("heading", { name: "v1 → Planning RETURN → Engineering Response → v2", exact: true }).waitFor(); await page.getByText(expectedResponse, { exact: true }).waitFor();
+    await page.getByRole("heading", { name: "v1 → 计划部退回 → 工程回复 → v2", exact: true }).waitFor(); await page.getByText(expectedResponse, { exact: true }).waitFor();
     await page.getByText("Product", { exact: true }).first().waitFor(); await page.getByText("A0", { exact: true }).waitFor(); await page.getByText("V1", { exact: true }).waitFor(); await page.getByText(/固定引用的 Unit Resolution v1/).waitFor();
     assert.equal(await page.locator(".planning-material-card").count(), 4); assert.equal(await page.locator(".planning-material-card").getByText("10 PCS", { exact: true }).count(), 4); await noOverflow(page, "planning v2 lineage");
     const unauthorizedResubmit = await postFromPage(page, resubmitPath, { expected_version: Number(submittedV2.version) }); assert.equal(unauthorizedResubmit.status, 403, "planning cannot RESUBMIT");
@@ -263,16 +263,16 @@ test("isolated Chromium completes v1 RETURN response fixed v2 lineage and Planni
       await assertSafeDialog(page, acceptDialog, `accept ${cancellation}`);
       if (cancellation === "cancel") {
         await acceptDialog.getByText(fixture.projectCode, { exact: true }).waitFor(); await acceptDialog.getByText(`ID ${v2Id}/v2`, { exact: true }).waitFor();
-        await acceptDialog.getByText("SUBMITTED", { exact: true }).waitFor(); await acceptDialog.getByText(fixture.credentials.engineering.username, { exact: true }).first().waitFor();
-        await acceptDialog.getByText("RESUBMIT 时间", { exact: true }).waitFor(); await acceptDialog.getByText(/Asia\/Shanghai/).first().waitFor();
-        await acceptDialog.getByLabel("前驱退回").getByText(`ID ${v1Id}/v1`, { exact: true }).waitFor(); await acceptDialog.getByText("RETURNED", { exact: true }).waitFor();
+        await acceptDialog.getByText("已提交", { exact: true }).waitFor(); await acceptDialog.getByText(fixture.credentials.engineering.username, { exact: true }).first().waitFor();
+        await acceptDialog.getByText("重新提交时间", { exact: true }).waitFor(); await acceptDialog.getByText(/Asia\/Shanghai/).first().waitFor();
+        await acceptDialog.getByLabel("前驱退回").getByText(`ID ${v1Id}/v1`, { exact: true }).waitFor(); await acceptDialog.getByText("已退回", { exact: true }).waitFor();
         await acceptDialog.getByLabel("前驱退回").getByText(String(returnEvent.id), { exact: true }).waitFor(); await acceptDialog.getByText(returnEvent.actor, { exact: true }).waitFor();
         await acceptDialog.getByText(returnEvent.request_id, { exact: true }).waitFor(); await acceptDialog.getByText(returnReason, { exact: true }).waitFor();
         await acceptDialog.getByLabel("工程回复").getByText(`ID ${responseRow.rows[0].id}/v1`, { exact: true }).waitFor(); await acceptDialog.getByText(expectedResponse, { exact: true }).waitFor();
         await acceptDialog.getByText(responseRow.rows[0].request_id, { exact: true }).waitFor(); await acceptDialog.getByText(/Product A0 · BOM V1/).waitFor();
         await acceptDialog.getByText("Unit Resolution v1 / 件 · PCS", { exact: true }).waitFor(); assert.equal(await acceptDialog.locator(".planning-confirm-materials li").count(), 4);
         assert.equal(await acceptDialog.locator(".planning-confirm-materials li").getByText("毛需求 10 PCS", { exact: true }).count(), 4);
-        for (const consequence of ["写入一条不可变 ACCEPT 事件。", `Package ID ${v2Id}/v2 转为 ACCEPTED。`, `Package ID ${v1Id}/v1 继续保持 RETURNED。`, "当前版本不再允许退回或重复接收。", "不自动创建采购申请、工单、库存或财务记录。"]) await acceptDialog.getByText(consequence, { exact: true }).waitFor();
+        for (const consequence of ["写入一条不可变接收事件。", `Package ID ${v2Id}/v2 转为已接收。`, `Package ID ${v1Id}/v1 继续保持已退回。`, "当前版本不再允许退回或重复接收。", "不自动创建采购申请、工单、库存或财务记录。"]) await acceptDialog.getByText(consequence, { exact: true }).waitFor();
         await acceptDialog.getByText("下一业务阶段：计划部门基于已接收的Package v2进行物料需求计算和缺料分析，随后通过独立操作形成采购需求交接。", { exact: true }).waitFor();
         for (const boundary of ["当前未指定具体处理人。", "当前未配置处理时限。", "接收本身不会自动执行下一阶段。"]) await acceptDialog.getByText(boundary, { exact: true }).waitFor();
         await acceptDialog.getByText("查看完整 Package SHA-256 摘要", { exact: true }).click(); await acceptDialog.getByText(v2.rows[0].package_digest, { exact: true }).waitFor();
@@ -291,7 +291,7 @@ test("isolated Chromium completes v1 RETURN response fixed v2 lineage and Planni
     await confirmedAcceptDialog.getByRole("button", { name: "确认最终接收", exact: true }).evaluate((button) => { button.click(); button.click(); });
     const acceptResponse = await acceptResponsePromise; const acceptPayload = await acceptResponse.json(); assert.equal(postCount(acceptPath), acceptPostsBefore + 1, "double click must issue one ACCEPT request");
     await page.getByText("计划交接包已接收；未自动执行下一业务阶段", { exact: true }).waitFor(); await page.getByRole("heading", { name: "操作完成凭证", exact: true }).waitFor();
-    await page.getByText("ACCEPTED", { exact: true }).waitFor(); await page.getByText(fixture.credentials.planning.username, { exact: true }).waitFor(); await page.getByText(acceptPayload.request_id, { exact: true }).waitFor(); await page.getByText(/下一队列：计划部物料需求计算与缺料分析/).waitFor();
+    await page.getByText("已接收", { exact: true }).waitFor(); await page.getByText(fixture.credentials.planning.username, { exact: true }).waitFor(); await page.getByText(acceptPayload.request_id, { exact: true }).waitFor(); await page.getByText(/下一队列：计划部物料需求计算与缺料分析/).waitFor();
     state = await handoffState(fixture.projectId); assert.deepEqual(state.packages, [[1, "RETURNED"], [2, "ACCEPTED"]]); assert.equal(state.events.RESUBMITTED, 1); assert.equal(state.events.ACCEPTED, 1);
     assert.deepEqual(await downstreamCounts(), { material_plans: 0, purchase_requests: 0, work_orders: 0, inventory_transactions: 0, finance_documents: 0 });
 

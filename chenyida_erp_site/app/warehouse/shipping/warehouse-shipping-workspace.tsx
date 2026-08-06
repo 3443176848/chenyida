@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api, ErpApiError } from "../../../public/erp/api-client.js";
+import { statusLabel } from "../../../public/erp/status-localization.js";
 import "../../procurement/sourcing/sourcing.css";
 
 type User = { username: string; display_name: string; role: string; permissions: string[] };
@@ -100,11 +101,11 @@ export function WarehouseShippingWorkspace() {
   if (!can(session.user, "sales.delivery.read")) return <main className="sourcing-shell">没有仓库发货读取权限。</main>;
 
   return <main className="sourcing-shell">
-    <div className="sourcing-banner">仓库只能执行已接收指令 · 必须选择 AVAILABLE Inventory Lot · 只消费同 Lot 的 CLOSED/RELEASED FQC</div>
-    <header className="sourcing-header"><div><Link href="/" className="sourcing-back">← 经营工作台</Link><p className="sourcing-kicker">WAREHOUSE SHIPPING</p><h1>销售分批发货</h1></div></header>
+    <div className="sourcing-banner">仓库只能执行已接收指令 · 必须选择可用库存批次 · 只消费同批次已关闭、已放行的 FQC</div>
+    <header className="sourcing-header"><div><Link href="/" className="sourcing-back">← 经营工作台</Link><p className="sourcing-kicker">仓库发货</p><h1>销售分批发货</h1></div></header>
     <section className="sourcing-panel">{rows.map((row) => <article className="sourcing-card" key={row.header.id}>
-      <div><b>{row.header.delivery_code} · {row.header.sales_order_code}</b><span className="sourcing-status status-pending">{row.header.status}</span></div>
-      {row.lines.map((line) => <div key={line.id}><p>{line.finished_item_code} · 指令 {line.quantity} · 已发 {line.executed_qty} {line.uom}</p>{line.lotOptions.map(lot=><small key={lot.inventory_lot_id??"ORDER"}>{lot.batch_code} / {lot.lot_code||"空 Lot"} / {lot.lot_status} · 库存可用 {lot.inventory_available_qty} · FQC 放行/已消费/可用 {lot.fqc_released_qty}/{lot.fqc_consumed_qty}/{lot.fqc_available_qty} · 本次上限 {lot.available_qty}<br/></small>)}</div>)}
+      <div><b>{row.header.delivery_code} · {row.header.sales_order_code}</b><span className="sourcing-status status-pending">{statusLabel(row.header.status)}</span></div>
+      {row.lines.map((line) => <div key={line.id}><p>{line.finished_item_code} · 指令 {line.quantity} · 已发 {line.executed_qty} {line.uom}</p>{line.lotOptions.map(lot=><small key={lot.inventory_lot_id??"ORDER"}>{lot.batch_code} / {lot.lot_code||"空 Lot"} / {statusLabel(lot.lot_status)} · 库存可用 {lot.inventory_available_qty} · FQC 放行/已消费/可用 {lot.fqc_released_qty}/{lot.fqc_consumed_qty}/{lot.fqc_available_qty} · 本次上限 {lot.available_qty}<br/></small>)}</div>)}
       {row.header.status === "SUBMITTED" && can(session.user, "sales.delivery.accept") ? <><button disabled={busy} onClick={() => void transition(row, "accept")}>接收指令</button><button disabled={busy} onClick={() => void transition(row, "return")}>退回销售</button></> : null}
       {["ACCEPTED", "PARTIAL"].includes(row.header.status) && can(session.user, "sales.delivery.execute") && row.lines[0] ? <form className="sourcing-form" onSubmit={(event) => ship(event, row)}><label>Inventory Lot<select name="inventory_lot_id" required>{row.lines[0].lotOptions.filter(lot=>lot.lot_status==="AVAILABLE"&&Number(lot.available_qty)>0).map(lot=><option key={lot.inventory_lot_id??"ORDER"} value={lot.inventory_lot_id??"ORDER"}>{lot.batch_code} / {lot.lot_code||"空 Lot"} · 可发 {lot.available_qty}</option>)}</select></label><label>本批发货数量<input name="quantity" required defaultValue={row.lines[0].lotOptions[0]?.available_qty??String(Number(row.lines[0].quantity) - Number(row.lines[0].executed_qty))} /></label><button disabled={busy||!row.lines[0].lotOptions.some(lot=>lot.lot_status==="AVAILABLE"&&Number(lot.available_qty)>0)}>按所选 Lot 原子过账</button></form> : null}
     </article>)}</section>

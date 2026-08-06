@@ -336,8 +336,8 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
     await page.getByText("已退回工程/项目部修订；旧包保持不可变", { exact: true }).waitFor();
     const returnReceipt = page.locator(".planning-receipt");
     await returnReceipt.getByRole("heading", { name: "操作完成凭证", exact: true }).waitFor();
-    await returnReceipt.getByText("RETURN", { exact: true }).waitFor();
-    await returnReceipt.getByText("SUCCESS", { exact: true }).waitFor();
+    await returnReceipt.getByText("退回工程/项目部修订", { exact: true }).waitFor();
+    await returnReceipt.getByText("成功", { exact: true }).waitFor();
     await returnReceipt.getByText(browserReturnReason, { exact: true }).waitFor();
     const returnDecision = await pool.query(`select pp.status,pp.returned_by,pp.returned_at,pp.return_reason,e.request_id::text,e.created_at
       from project_planning_packages pp join project_planning_handoff_events e on e.package_id=pp.id and e.event_type='RETURNED'
@@ -356,7 +356,7 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
     assert.equal(await page.locator(".planning-event dd").filter({ hasText: /Asia\/Shanghai/ }).count(), 3);
     const returnEvent = page.locator(".planning-event").last();
     await returnEvent.getByText(fixture.credentials.planning.username, { exact: true }).waitFor();
-    await returnEvent.getByText("SUCCESS", { exact: true }).first().waitFor();
+    await returnEvent.getByText("成功", { exact: true }).first().waitFor();
     await returnEvent.locator("code.planning-trace-value", { hasText: returnDecision.rows[0].request_id }).waitFor();
     const returnReasonParagraph = returnEvent.locator("p", { hasText: browserReturnReason });
     await returnReasonParagraph.waitFor(); assert.equal((await returnReasonParagraph.innerText()).trim(), `原因：${browserReturnReason}`);
@@ -434,8 +434,8 @@ test("real browser completes versioned requirement Unit Resolution handoff on an
     await page.getByText("计划交接包已接收；未自动启动物料需求", { exact: true }).waitFor();
     const acceptReceipt = page.locator(".planning-receipt");
     await acceptReceipt.getByRole("heading", { name: "操作完成凭证", exact: true }).waitFor();
-    await acceptReceipt.getByText("ACCEPT", { exact: true }).waitFor();
-    await acceptReceipt.getByText("SUCCESS", { exact: true }).waitFor();
+    await acceptReceipt.getByText("接收交接包", { exact: true }).waitFor();
+    await acceptReceipt.getByText("成功", { exact: true }).waitFor();
     await acceptReceipt.getByRole("button", { name: "查看已处理详情", exact: true }).click();
     await page.getByRole("heading", { name: `${fixture.projectCode} · 交接包 v2`, exact: true }).waitFor();
     assert.equal(await page.getByRole("tab", { name: /已处理/ }).getAttribute("aria-selected"), "true");

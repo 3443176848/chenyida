@@ -4,6 +4,14 @@
 
 ## 2026-08-06
 
+### SELFHOST-UI-STATUS-LOCALIZATION-05 - `feat: localize visible ERP statuses`
+
+- 范围：从 clean `main@fb4c89bd`、behind0/ahead157 起步，只修改自托管原生 React 与 legacy 兼容台的最终用户显示层、对应 UI/浏览器验证期望和项目文档。版本保持 alpha.40，Migration保持0039；不改认证、权限、API合同、状态机、数据库枚举、Compose或环境变量。
+- 实现：新增共享 `status-localization.js` 与类型声明，用 `statusLabel/statusPairLabel/roleLabel` 统一业务状态、组合状态、审核/执行结果、启停状态与角色名称；未知值原样回退，筛选值、比较、提交、CSS分类和审计原始码保持英文稳定枚举。工作台及业务页纯英文眉题同步中文化，稳定ERP业务缩写保留；legacy缓存标识更新为`20260806-status-localization-05`。
+- 验证：38个适用UI/物料/状态测试文件、10组typecheck、Vinext production build/postbuild、npm3/3和Python三项通过；lint 0 error/11既有warning，五个浏览器验证脚本语法通过，1,247文件credentials和diff check通过。登录式浏览器旅程未连接UAT执行。
+- 资源/边界：受限只读构建容器使用tmpfs，任务容器/挂载点/临时SQLite清零；available约2.2→2.2GiB、Swap260→272MiB、根盘19GiB、Load`0.04/0.19/0.37`→`0.18/0.78/0.72`，内核OOM0、四服务restart0/OOM false。
+- 结论：`VISIBLE ERP STATUSES LOCALIZED — SOURCE ONLY`。公开UAT仍运行Web`sha256:f45d734b…`；未登录、写入、构建在线镜像、重启、运行Migration或部署，发布须新明确授权。
+
 ### SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04 - `ops: deploy role-based ERP workbench`
 
 - 授权/范围：项目负责人明确要求直接部署；从 clean `main@4767c3db3cf66eb0978f07d044437790c0d4b87f`、behind0/ahead156起步，只把八角色工作台 Web-only部署到18888公开非生产UAT并做匿名只读验收。不登录、不发业务POST，不运行Migration，不替换PostgreSQL/Worker/Caddy/四卷，不部署历史Sites或执行生产切流。

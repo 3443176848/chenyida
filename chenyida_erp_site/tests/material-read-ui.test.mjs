@@ -144,7 +144,7 @@ test("25 属性单位紧邻数值", () => {
 });
 
 test("26 Validation 同时用文字展示 ERROR 和 WARNING", () => {
-  assert.match(detailUiSource, /错误 ERROR/); assert.match(detailUiSource, /警告 WARNING/);
+  assert.match(detailUiSource, /<span>错误 \{validation\.errors\?\.length \|\| 0\}<\/span>/); assert.match(detailUiSource, /<span>警告 \{validation\.warnings\?\.length \|\| 0\}<\/span>/);
   assert.doesNotMatch(detailUiSource, /validateForReview|重新计算/);
 });
 
@@ -172,7 +172,7 @@ test("31 INACTIVE 独立显示停用而不映射其他状态", () => {
 });
 
 test("32 未知状态安全显示且不崩溃", () => {
-  assert.equal(statusLabel("FUTURE_STATE"), "未知状态");
+  assert.equal(statusLabel("FUTURE_STATE"), "FUTURE_STATE");
 });
 
 test("33 Material 只读工作区不渲染批准驳回导入或 AI 操作", () => {

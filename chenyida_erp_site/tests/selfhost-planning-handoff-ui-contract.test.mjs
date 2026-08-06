@@ -70,14 +70,13 @@ test("planning workspace keeps narrow screens contained and switches materials t
   assert.match(planningCss, /\.planning-row-reason\{[^}]*overflow-wrap:anywhere/);
   assert.match(workspace, /className="planning-material-cards"/);
   assert.match(workspace, /className="planning-table-scroll planning-material-table"/);
-  assert.match(workspace, /系统管理员/);
-  assert.match(workspace, /工程人员/);
+  assert.match(workspace, /roleLabel\(user\.role,"受控业务人员"\)/);
   assert.doesNotMatch(workspace, /<span>{user\.role}<\/span>/);
 });
 
 test("planning page has pending and processed queues with confirmed decisions and read-only history", () => {
   assert.match(planningPage, /PlanningHandoffWorkspace/); assert.match(workspace, /待接收交接包/); assert.match(workspace, /已处理交接包/); assert.match(workspace, /status=PROCESSED/); assert.match(planningService, /wanted === "PROCESSED" \? \["RETURNED", "ACCEPTED"\]/);
-  assert.match(workspace, /接收交接包/); assert.match(workspace, /退回原因/); assert.match(workspace, /确认最终接收 Package/); assert.match(workspace, /确认退回工程\/项目部修订/); assert.match(workspace, /写入一条不可变 RETURN 事件/); assert.match(workspace, /写入一条不可变 ACCEPT 事件/);
+  assert.match(workspace, /接收交接包/); assert.match(workspace, /退回原因/); assert.match(workspace, /确认最终接收 Package/); assert.match(workspace, /确认退回工程\/项目部修订/); assert.match(workspace, /写入一条不可变退回事件/); assert.match(workspace, /写入一条不可变接收事件/);
   assert.match(workspace, /操作完成凭证/); assert.match(workspace, /查看已处理详情/); assert.match(workspace, /数据库保存的退回原因/); assert.match(workspace, /result:"SUCCESS"/);
   assert.match(workspace, /calculated_gross_quantity/); assert.match(workspace, /specification_snapshot/); assert.match(workspace, /package_digest/); assert.match(workspace, /sessionPost/); assert.match(workspace, /createSessionWriteRegistry/); assert.match(workspace, /useEffect\(.*load/s);
   assert.match(apiClient, /planningWrite/); assert.match(apiClient, /currentCsrfToken/); assert.match(apiClient, /credentials: "same-origin"/); assert.match(apiClient, /X-CSRF-Token/); assert.match(apiClient, /Idempotency-Key/);
@@ -88,12 +87,12 @@ test("planning page has pending and processed queues with confirmed decisions an
 
 test("final ACCEPT confirmation carries immutable v2 lineage, consequences and the authoritative next stage", () => {
   for (const text of [
-    "当前目标", "完整 Package SHA-256 摘要", "提交人", "RESUBMIT 时间",
-    "前驱退回", "RETURN Event", "RETURN 操作者", "RETURN 时间", "完整退回原因",
+    "当前目标", "完整 Package SHA-256 摘要", "提交人", "重新提交时间",
+    "前驱退回", "退回事件", "退回操作者", "退回时间", "完整退回原因",
     "工程回复", "回复操作者", "回复时间", "完整回复正文",
     "固定快照摘要", "Product", "BOM", "Unit Resolution", "毛需求",
-    "本确认窗口内容来自不可变", "接收后果", "写入一条不可变 ACCEPT 事件",
-    "继续保持 RETURNED", "当前版本不再允许退回或重复接收",
+    "本确认窗口内容来自不可变", "接收后果", "写入一条不可变接收事件",
+    "继续保持已退回", "当前版本不再允许退回或重复接收",
     "不自动创建采购申请、工单、库存或财务记录",
     "下一业务阶段：计划部门基于已接收的Package v", "进行物料需求计算和缺料分析，随后通过独立操作形成采购需求交接。",
     "当前未指定具体处理人。", "当前未配置处理时限。", "接收本身不会自动执行下一阶段。",
@@ -107,9 +106,9 @@ test("final ACCEPT confirmation carries immutable v2 lineage, consequences and t
 
 test("Engineering RESUBMIT confirmation carries the fixed source, response, target and queue consequence", () => {
   for (const text of [
-    "确认重新提交 Package", "源 Package", "RETURN Event", "完整退回原因", "工程回复",
+    "确认重新提交 Package", "源 Package", "退回事件", "完整退回原因", "工程回复",
     "目标 Package", "固定快照摘要", "Product", "BOM", "Unit Resolution", "毛需求",
-    "写入一条不可变 RESUBMIT 事件", "转为 SUBMITTED", "提交后进入计划部待接收队列",
+    "写入一条不可变重新提交事件", "转为已提交", "提交后进入计划部待接收队列",
     "不自动创建采购申请、工单、库存或财务等下游业务记录", "重新提交完成凭证",
     "下一队列：计划部待接收队列",
   ]) assert.ok(workspace.includes(text), `missing RESUBMIT confirmation text: ${text}`);
@@ -146,7 +145,7 @@ test("planning detail exposes scoped traceability, fixed units and explicit curr
   assert.match(workspace, /RETURN:"退回工程\/项目部修订"/);
   assert.match(workspace, /event\.action/);
   assert.match(workspace, /event\.result/);
-  assert.match(workspace, /SUCCESS ·/);
+  assert.match(workspace, /成功 ·/);
   assert.match(workspace, /请求号/);
   assert.match(workspace, /Asia\/Shanghai/);
   assert.doesNotMatch(workspace, /new Date\(event\.created_at\)\.toLocaleString/);
@@ -173,15 +172,15 @@ test("returned engineering detail saves a versioned reply before creating an imm
   assert.match(workspace, /revision-responses/);
   assert.match(workspace, /expected_head_version/);
   assert.match(workspace, /response_head_version/);
-  assert.match(workspace, /保存新的回复 Version/);
+  assert.match(workspace, /保存新的回复版本/);
   assert.match(workspace, /生成 v\{detail\.header\.package_version_no\+1\}/);
   assert.match(workspace, /previous_package_id/);
   assert.match(workspace, /responds_to_return_event_id/);
   assert.match(workspace, /revision_response_version_id/);
-  assert.match(workspace, /v\{lineage\.previous_package_version_no\} → Planning RETURN → Engineering Response → v/);
+  assert.match(workspace, /v\{lineage\.previous_package_version_no\} → 计划部退回 → 工程回复 → v/);
   assert.match(workspace, /当前输入尚未保存/);
   assert.match(workspace, /固定复用（只读）/);
-  assert.match(workspace, /不会自动提交 Planning/);
+  assert.match(workspace, /不会自动提交计划部/);
   assert.match(workspace, /Number\(row\.id\)===requested/);
   assert.match(workspace, /Unicode NFC 与 LF/);
   assert.doesNotMatch(workspace, /localStorage|sessionStorage/);

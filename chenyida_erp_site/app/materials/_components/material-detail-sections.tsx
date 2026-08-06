@@ -89,8 +89,8 @@ export function MaterialReviewDecisionCard({ detail }: { detail: MaterialDetail 
     ]} />
     <p className="mm-review-scope">本页审核物料主数据身份、名称、分类、单位和工程说明。供应商映射、采购报价及价格不属于本次物料审核范围，由对应业务模块独立治理。</p>
     <ul className="mm-review-consequences">
-      <li><b>批准后果：</b>生成唯一正式内部物料编码，物料转为 ACTIVE。</li>
-      <li><b>退回后果：</b>物料回到 DRAFT，不生成正式内部编码；创建或编辑人员修改后可重新提交。</li>
+      <li><b>批准后果：</b>生成唯一正式内部物料编码，物料转为已生效。</li>
+      <li><b>退回后果：</b>物料回到草稿，不生成正式内部编码；创建或编辑人员修改后可重新提交。</li>
       <li><b>批准后下一步：</b>由工程继续使用该正式内部物料建立 BOM。</li>
     </ul>
   </section>;
@@ -106,7 +106,7 @@ export function MaterialValidationPanel({ validation, onFocusIssue, heading = "�
   heading?: string;
 }) {
   const issues = [...(validation.errors || []), ...(validation.warnings || [])];
-  return <section className="mm-card mm-validation"><h3>{heading}</h3><div className="mm-validation-summary"><strong>{validation.valid ? "校验通过" : "校验未通过"}</strong><span>错误 ERROR {validation.errors?.length || 0}</span><span>警告 WARNING {validation.warnings?.length || 0}</span></div><p className="mm-validation-basis">依据：{displayValue(validation.basis)} · {formatShanghaiDate(validation.validated_at, true)}</p>{issues.length ? <ul>{issues.map((issue, index) => <li className={`mm-issue mm-issue-${String(issue.severity).toLowerCase()}`} key={`${issue.code}-${index}`}><b>{issue.severity === "ERROR" ? "错误 ERROR" : "警告 WARNING"}</b><span>{displayValue(issue.code)} · {displayValue(issue.field || issue.attribute_code)}</span><p>{displayValue(issue.message)}</p>{onFocusIssue && issue.attribute_code ? <button type="button" onClick={() => onFocusIssue(issue)}>定位到 {issue.attribute_code}</button> : null}</li>)}</ul> : <p className="mm-muted">没有错误或警告。</p>}</section>;
+  return <section className="mm-card mm-validation"><h3>{heading}</h3><div className="mm-validation-summary"><strong>{validation.valid ? "校验通过" : "校验未通过"}</strong><span>错误 {validation.errors?.length || 0}</span><span>警告 {validation.warnings?.length || 0}</span></div><p className="mm-validation-basis">依据：{displayValue(validation.basis)} · {formatShanghaiDate(validation.validated_at, true)}</p>{issues.length ? <ul>{issues.map((issue, index) => <li className={`mm-issue mm-issue-${String(issue.severity).toLowerCase()}`} key={`${issue.code}-${index}`}><b>{statusLabel(issue.severity)}</b><span>{displayValue(issue.code)} · {displayValue(issue.field || issue.attribute_code)}</span><p>{displayValue(issue.message)}</p>{onFocusIssue && issue.attribute_code ? <button type="button" onClick={() => onFocusIssue(issue)}>定位到 {issue.attribute_code}</button> : null}</li>)}</ul> : <p className="mm-muted">没有错误或警告。</p>}</section>;
 }
 
 function HistoryCard({ title, total, href, children }: { title: string; total: number; href: string; children: React.ReactNode }) {

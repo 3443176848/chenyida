@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ErpApiError, logoutSession } from "../../../public/erp/api-client.js";
+import { roleLabel,statusLabel } from "../../../public/erp/status-localization.js";
 import "../sourcing/sourcing.css";
 import "./supplier-mappings.css";
 
@@ -77,7 +78,7 @@ function State({ children, error = false }: { children: ReactNode; error?: boole
 }
 
 function Status({ value }: { value: string }) {
-  return <span className={`sourcing-status status-${value.toLowerCase()}`}>{statusLabels[value] || value}</span>;
+  return <span className={`sourcing-status status-${value.toLowerCase()}`}>{statusLabels[value] || statusLabel(value)}</span>;
 }
 
 function mappingBody(form: FormData) {
@@ -222,7 +223,7 @@ export function SupplierMappingWorkspace({ mode }: { mode: "manage" | "review" }
         },
       );
       setDialog({ kind: "receipt", preview: { ...fresh, approval_receipt: approved.approval_receipt } });
-      setNotice("审核 SUCCESS：Mapping 已生效；未自动创建 RFQ、Quote、Award 或 PO");
+      setNotice("审核成功：Mapping 已生效；未自动创建 RFQ、Quote、Award 或 PO");
       await readRows();
     } catch (reason) { setDialogError(errorText(reason)); }
     finally { approvalBusyRef.current = false; setApprovalBusy(false); }
@@ -237,8 +238,8 @@ export function SupplierMappingWorkspace({ mode }: { mode: "manage" | "review" }
   return <main className="sourcing-shell sm-shell">
     <div className="sourcing-banner">并行验收环境 · Mapping 只有异人批准后才进入 RFQ；本页不会自动创建 RFQ、Quote、Award 或 PO</div>
     <header className="sourcing-header">
-      <div><Link href="/" className="sourcing-back">← 经营工作台</Link><p className="sourcing-kicker">SUPPLIER MAPPING GOVERNANCE</p><h1>{title}</h1><p>{mode === "review" ? "只读核验已提交正文；批准或退回都形成不可变决策事实。" : "采购保存草稿并提交；ACTIVE 只能由运营异人审核产生。"}</p></div>
-      <div className="sm-user"><b>{session.user.display_name || session.user.username}</b><span>{session.user.role}</span><button className="sm-quiet" disabled={busy} onClick={() => void logout()}>安全退出</button></div>
+      <div><Link href="/" className="sourcing-back">← 经营工作台</Link><p className="sourcing-kicker">供应商映射治理</p><h1>{title}</h1><p>{mode === "review" ? "只读核验已提交正文；批准或退回都形成不可变决策事实。" : "采购保存草稿并提交；已生效状态只能由运营异人审核产生。"}</p></div>
+      <div className="sm-user"><b>{session.user.display_name || session.user.username}</b><span>{roleLabel(session.user.role)}</span><button className="sm-quiet" disabled={busy} onClick={() => void logout()}>安全退出</button></div>
     </header>
 
     <nav className="sm-links">
@@ -247,7 +248,7 @@ export function SupplierMappingWorkspace({ mode }: { mode: "manage" | "review" }
       <Link href="/procurement/sourcing">RFQ 覆盖率与询价</Link>
     </nav>
 
-    {mode === "review" ? <section className="sourcing-panel"><div className="sourcing-title"><h2>运营审核与历史凭证</h2><strong>{rows.length}</strong></div><p className="sourcing-note">默认显示 PENDING_REVIEW。正文已冻结且没有编辑入口；批准先预览、再确认，创建人不能自审。</p></section> : null}
+    {mode === "review" ? <section className="sourcing-panel"><div className="sourcing-title"><h2>运营审核与历史凭证</h2><strong>{rows.length}</strong></div><p className="sourcing-note">默认显示待审核记录。正文已冻结且没有编辑入口；批准先预览、再确认，创建人不能自审。</p></section> : null}
 
     <section className="sourcing-panel">
       <h2>搜索和筛选</h2>
@@ -264,7 +265,7 @@ export function SupplierMappingWorkspace({ mode }: { mode: "manage" | "review" }
     {mode === "manage" ? <>
       {can(session.user, "supplier_mapping.create") ? <section className="sourcing-panel">
         <div className="sourcing-title"><div><h2>新建映射</h2><p className="sourcing-note">所有选项提交稳定 ID；编码优先的检索最多返回 20 条，不按名称反向解析 ID。</p></div><Status value="DRAFT"/></div>
-        <ol className="sm-workflow"><li>新建映射</li><li>保存草稿</li><li>提交审核（保存后启用）</li><li>operations 异人批准或退回</li></ol>
+        <ol className="sm-workflow"><li>新建映射</li><li>保存草稿</li><li>提交审核（保存后启用）</li><li>运营人员异人批准或退回</li></ol>
         <div className="sm-option-searches">
           <OptionSearch label="搜索 Supplier" onSearch={(value) => readOptions("supplier", value)}/>
           <OptionSearch label="搜索 Material" onSearch={(value) => readOptions("material", value)}/>
@@ -333,19 +334,19 @@ function MappingCard({ row, mode, user, busy, write, openReview }: {
     <dl className="sm-facts">
       <div><dt>Supplier</dt><dd>ID {row.supplier_id} / <b>{row.supplier_code}</b> / {row.supplier_name}</dd></div>
       <div><dt>Material</dt><dd>ID {row.material_id} / <b>{row.internal_material_code}</b> / {row.standard_name}</dd></div>
-      <div><dt>Supplier / Material 当前状态</dt><dd>{row.supplier_status} / {row.material_status}</dd></div>
+      <div><dt>供应商 / 物料当前状态</dt><dd>{statusLabel(row.supplier_status)} / {statusLabel(row.material_status)}</dd></div>
       <div><dt>Supplier Part</dt><dd>{row.supplier_part_number}</dd></div>
       <div><dt>Supplier / Internal Unit</dt><dd>{row.supplier_unit} / {row.internal_unit}</dd></div>
       <div><dt>换算关系</dt><dd>{row.conversion_numerator} : {row.conversion_denominator}</dd></div>
       <div><dt>有效期</dt><dd>{shanghaiDate(row.valid_from)} → {row.valid_to ? shanghaiDate(row.valid_to) : "长期"}</dd></div>
       <div><dt>供应商正文</dt><dd>{row.supplier_item_name || "—"} / {row.supplier_specification || "—"}</dd></div>
       <div><dt>制造商 / MPN / Revision</dt><dd>{row.manufacturer || "—"} / {row.mpn || "—"} / {row.revision || "—"}</dd></div>
-      <div><dt>当前 ACTIVE / 冲突</dt><dd>{row.active_mapping_count} 条 / {row.active_conflict_count === 0 && row.supplier_part_conflict_count === 0 ? "无冲突" : `关系 ${row.active_conflict_count} · 料号 ${row.supplier_part_conflict_count}`}</dd></div>
+      <div><dt>当前已生效映射 / 冲突</dt><dd>{row.active_mapping_count} 条 / {row.active_conflict_count === 0 && row.supplier_part_conflict_count === 0 ? "无冲突" : `关系 ${row.active_conflict_count} · 料号 ${row.supplier_part_conflict_count}`}</dd></div>
       <div><dt>创建</dt><dd>{row.created_by} · {shanghaiTime(row.created_at)}<br/><span className="sm-mono">{row.created_request_id}</span></dd></div>
       <div><dt>提交</dt><dd>{row.submitted_by || "—"} · {shanghaiTime(row.submitted_at)}<br/><span className="sm-mono">{row.submitted_request_id || "—"}</span></dd></div>
       <div><dt>审核</dt><dd>{row.reviewed_by || "—"} · {shanghaiTime(row.reviewed_at)} · {row.review_outcome || "—"}<br/><span className="sm-mono">{row.reviewed_request_id || "—"}</span></dd></div>
       <div><dt>退回原因</dt><dd>{row.review_reason || "—"}</dd></div>
-      <div><dt>最新结果</dt><dd>{row.result || "—"} · {row.event_actor || "—"} · {shanghaiTime(row.event_at)}</dd></div>
+      <div><dt>最新结果</dt><dd>{statusLabel(row.result)} · {row.event_actor || "—"} · {shanghaiTime(row.event_at)}</dd></div>
       <div><dt>request_id</dt><dd className="sm-mono">{row.event_request_id || row.request_id}</dd></div>
     </dl>
 
@@ -365,11 +366,11 @@ function MappingCard({ row, mode, user, busy, write, openReview }: {
       <label>有效结束<input type="date" name="valid_to" defaultValue={shanghaiDate(row.valid_to)}/></label>
       <button disabled={busy}>保存草稿修改</button>
     </form></details> : null}
-    {canSubmit ? <button disabled={busy} onClick={() => void write(`${path}/submit`, "POST", { expected_version: row.expected_version }, "Mapping 已提交；正文冻结并等待 operations 审核")}>提交审核</button> : null}
-    {canVersion ? <button className="sm-quiet" disabled={busy} onClick={() => void write(`${path}/versions`, "POST", { expected_version: row.expected_version }, "已从不可变历史建立新 DRAFT 版本")}>创建受控新版本</button> : null}
+    {canSubmit ? <button disabled={busy} onClick={() => void write(`${path}/submit`, "POST", { expected_version: row.expected_version }, "Mapping 已提交；正文冻结并等待运营审核")}>提交审核</button> : null}
+    {canVersion ? <button className="sm-quiet" disabled={busy} onClick={() => void write(`${path}/versions`, "POST", { expected_version: row.expected_version }, "已从不可变历史建立新草稿版本")}>创建受控新版本</button> : null}
     {review ? <div className="sm-review-actions">
       <button disabled={busy || !can(user, "supplier_mapping.approve")} onClick={() => void openReview(row, "approve")}>批准并生效</button>
-      <form onSubmit={(event) => { event.preventDefault(); const reason = String(new FormData(event.currentTarget).get("reason") || ""); void write(`${path}/reject`, "POST", { expected_version: row.expected_version, reason }, "审核 SUCCESS：Mapping 已退回，正文历史保持不可变"); }}><label>退回原因（必填）<textarea name="reason" required maxLength={500}/></label><button className="danger" disabled={busy || !can(user, "supplier_mapping.reject")}>退回</button></form>
+      <form onSubmit={(event) => { event.preventDefault(); const reason = String(new FormData(event.currentTarget).get("reason") || ""); void write(`${path}/reject`, "POST", { expected_version: row.expected_version, reason }, "审核成功：Mapping 已退回，正文历史保持不可变"); }}><label>退回原因（必填）<textarea name="reason" required maxLength={500}/></label><button className="danger" disabled={busy || !can(user, "supplier_mapping.reject")}>退回</button></form>
     </div> : null}
     {mode === "review" && ["ACTIVE", "INACTIVE"].includes(row.status) && row.review_outcome === "APPROVED"
       ? <button className="sm-quiet" disabled={busy} onClick={() => void openReview(row, "receipt")}>查看批准凭证</button>
@@ -391,29 +392,29 @@ function ReviewDialog({ kind, preview, reviewComment, setReviewComment, error, b
   return <div className="sm-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
     <section className="sm-dialog" role="dialog" aria-modal="true" aria-labelledby="sm-review-title">
       <header>
-        <div><p className="sourcing-kicker">SERVER REVIEW PREVIEW</p><h2 id="sm-review-title">{kind === "approve" ? "确认批准并生效" : "批准成功凭证"}</h2></div>
+        <div><p className="sourcing-kicker">服务端审核预览</p><h2 id="sm-review-title">{kind === "approve" ? "确认批准并生效" : "批准成功凭证"}</h2></div>
         <button type="button" className="sm-dialog-close" aria-label="关闭审核窗口" disabled={busy} onClick={onClose}>×</button>
       </header>
       {kind === "receipt"
         ? (preview.approval_receipt
           ? <ApprovalReceiptView receipt={preview.approval_receipt}/>
-          : <State error>没有找到可验证的 APPROVE 成功事件，未生成凭证。</State>)
+          : <State error>没有找到可验证的批准成功事件，未生成凭证。</State>)
         : <>
-          <p className="sm-dialog-warning">批准将使该稳定 Mapping 进入 ACTIVE。请逐项核对，系统不会自动创建 RFQ、Quote、Award 或 PO。</p>
+          <p className="sm-dialog-warning">批准将使该稳定 Mapping 进入已生效状态。请逐项核对，系统不会自动创建 RFQ、Quote、Award 或 PO。</p>
           <dl className="sm-facts sm-preview-facts">
             <div><dt>Mapping ID</dt><dd className="sm-mono">{mapping.mapping_id}</dd></div>
-            <div><dt>Version / CAS / 状态</dt><dd>V{mapping.mapping_version} / CAS {mapping.expected_version} / {mapping.status}</dd></div>
-            <div><dt>Supplier</dt><dd>ID {mapping.supplier.id} / <b>{mapping.supplier.code}</b> / {mapping.supplier.name} / {mapping.supplier.status}</dd></div>
-            <div><dt>Material</dt><dd>ID {mapping.material.id} / <b>{mapping.material.code}</b> / {mapping.material.name} / {mapping.material.status}</dd></div>
+            <div><dt>Version / CAS / 状态</dt><dd>V{mapping.mapping_version} / CAS {mapping.expected_version} / {statusLabel(mapping.status)}</dd></div>
+            <div><dt>Supplier</dt><dd>ID {mapping.supplier.id} / <b>{mapping.supplier.code}</b> / {mapping.supplier.name} / {statusLabel(mapping.supplier.status)}</dd></div>
+            <div><dt>Material</dt><dd>ID {mapping.material.id} / <b>{mapping.material.code}</b> / {mapping.material.name} / {statusLabel(mapping.material.status)}</dd></div>
             <div><dt>supplier_part_number</dt><dd>{mapping.supplier_part_number}</dd></div>
             <div><dt>Supplier / Internal Unit</dt><dd>{mapping.units.supplier} / {mapping.units.internal || "—"}</dd></div>
             <div><dt>换算关系</dt><dd>{mapping.conversion.numerator} : {mapping.conversion.denominator}</dd></div>
             <div><dt>有效期</dt><dd>{shanghaiDate(mapping.validity.valid_from)} → {mapping.validity.valid_to ? shanghaiDate(mapping.validity.valid_to) : "长期"}</dd></div>
-            <div><dt>创建成功事实</dt><dd>{preview.lifecycle.created.actor || "—"} · {shanghaiTime(preview.lifecycle.created.occurred_at)} · {preview.lifecycle.created.result || "—"}<br/><span className="sm-mono">{preview.lifecycle.created.request_id || "—"}</span></dd></div>
-            <div><dt>提交成功事实</dt><dd>{preview.lifecycle.submitted.actor || "—"} · {shanghaiTime(preview.lifecycle.submitted.occurred_at)} · {preview.lifecycle.submitted.result || "—"}<br/><span className="sm-mono">{preview.lifecycle.submitted.request_id || "—"}</span></dd></div>
-            <div><dt>相同 Supplier / Material ACTIVE</dt><dd>{preview.conflicts.active_mapping_count} 条；冲突 {preview.conflicts.active_conflict_count} 条</dd></div>
+            <div><dt>创建成功事实</dt><dd>{preview.lifecycle.created.actor || "—"} · {shanghaiTime(preview.lifecycle.created.occurred_at)} · {statusLabel(preview.lifecycle.created.result)}<br/><span className="sm-mono">{preview.lifecycle.created.request_id || "—"}</span></dd></div>
+            <div><dt>提交成功事实</dt><dd>{preview.lifecycle.submitted.actor || "—"} · {shanghaiTime(preview.lifecycle.submitted.occurred_at)} · {statusLabel(preview.lifecycle.submitted.result)}<br/><span className="sm-mono">{preview.lifecycle.submitted.request_id || "—"}</span></dd></div>
+            <div><dt>相同 Supplier / Material 已生效映射</dt><dd>{preview.conflicts.active_mapping_count} 条；冲突 {preview.conflicts.active_conflict_count} 条</dd></div>
             <div><dt>Supplier 内料号冲突</dt><dd>{preview.conflicts.supplier_part_conflict_count} 条</dd></div>
-            <div><dt>批准推进语义</dt><dd>V{preview.approval_projection.before.mapping_version} / CAS {preview.approval_projection.before.cas} → V{preview.approval_projection.after.mapping_version} / CAS {preview.approval_projection.after.cas}；最终 ACTIVE</dd></div>
+            <div><dt>批准推进语义</dt><dd>V{preview.approval_projection.before.mapping_version} / CAS {preview.approval_projection.before.cas} → V{preview.approval_projection.after.mapping_version} / CAS {preview.approval_projection.after.cas}；最终已生效</dd></div>
             <div><dt>RFQ 覆盖校验</dt><dd>{preview.approval_projection.rfq_coverage_eligible_after_approval ? "可参与" : "不可计入"} · {preview.approval_projection.rfq_coverage_note}</dd></div>
             <div><dt>下游副作用</dt><dd>RFQ 0 / Quote 0 / Award 0 / PO 0</dd></div>
             <div><dt>批准条件</dt><dd>{conditions.can_approve ? "满足" : "不满足"}</dd></div>
@@ -435,17 +436,17 @@ function ReviewDialog({ kind, preview, reviewComment, setReviewComment, error, b
 
 function ApprovalReceiptView({ receipt }: { receipt: ApprovalReceipt }) {
   return <div className="sm-receipt">
-    <div className="sm-receipt-banner">APPROVE · {receipt.result} · {statusLabels[receipt.final_status] || receipt.final_status}</div>
+    <div className="sm-receipt-banner">批准 · {statusLabel(receipt.result)} · {statusLabels[receipt.final_status] || statusLabel(receipt.final_status)}</div>
     <dl className="sm-facts">
       <div><dt>Mapping ID</dt><dd className="sm-mono">{receipt.mapping_id}</dd></div>
-      <div><dt>决策 / 结果</dt><dd>{receipt.decision} / {receipt.result}</dd></div>
-      <div><dt>Actor</dt><dd>{receipt.actor}</dd></div>
+      <div><dt>决策 / 结果</dt><dd>{statusLabel(receipt.decision)} / {statusLabel(receipt.result)}</dd></div>
+      <div><dt>操作者</dt><dd>{receipt.actor}</dd></div>
       <div><dt>Asia/Shanghai 时间</dt><dd>{shanghaiTime(receipt.occurred_at)}</dd></div>
       <div><dt>request_id</dt><dd className="sm-mono">{receipt.request_id}</dd></div>
       <div><dt>审核意见</dt><dd className={receipt.historical_comment_missing ? "sm-history-missing" : ""}>{receipt.review_comment_display || HISTORICAL_APPROVAL_COMMENT_MISSING}</dd></div>
       <div><dt>批准前 Version / CAS</dt><dd>V{receipt.before.mapping_version} / {receipt.before.cas == null ? "历史未记录" : `CAS ${receipt.before.cas}`}</dd></div>
       <div><dt>批准后 Version / CAS</dt><dd>V{receipt.after.mapping_version} / {receipt.after.cas == null ? "历史未记录" : `CAS ${receipt.after.cas}`}</dd></div>
-      <div><dt>最终状态</dt><dd>{receipt.final_status} / 生效</dd></div>
+      <div><dt>最终状态</dt><dd>{statusLabel(receipt.final_status)}</dd></div>
       <div><dt>Supplier</dt><dd>ID {receipt.supplier.id} / <b>{receipt.supplier.code}</b> / {receipt.supplier.name}</dd></div>
       <div><dt>Material</dt><dd>ID {receipt.material.id} / <b>{receipt.material.code}</b> / {receipt.material.name}</dd></div>
       <div><dt>supplier_part_number</dt><dd>{receipt.supplier_part_number}</dd></div>
