@@ -21,7 +21,7 @@
 
 - 路径：`chenyida_erp_site/`
 - 技术：Vinext、React、TypeScript、标准 Node.js、PostgreSQL/Drizzle、本地持久化文件和 PostgreSQL 后台任务 Worker。
-- 页面：TASK10 已把根 `app/page.tsx` 改为原生经营工作台；`SELFHOST-UI-REFRESH-DEPLOY-02` 已把统一企业级登录/工作台/业务壳视觉部署到当前18888非生产UAT。legacy `public/erp/index.html` 保留为显式兼容业务工作区和回滚入口，不再作为根 iframe 默认依赖。Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
+- 页面：TASK10 已把根 `app/page.tsx` 改为原生经营工作台；`SELFHOST-UI-REFRESH-DEPLOY-02` 完成统一企业级视觉，`SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04` 又把登录后根工作台简化为管理员、采购、市场、计划、工程、财务、生产、仓库八入口并部署到当前18888非生产UAT。legacy `public/erp/index.html` 保留为显式兼容业务工作区和回滚入口，不再作为根 iframe 默认依赖。Material Master 和 Import Workspace 使用 `app/materials/` 原生 Vinext 路由。
 - API：`app/api/[...path]/route.ts` 转交给不依赖平台 binding 的 `app/lib/selfhost-api.ts`；旧 `erp-api.ts` 仅作迁移参考。
 - 根页迁移：TASK03—TASK10 已接通主数据/BOM/库存/采购/生产/销售/品质/财务、实时 Dashboard 与离线 backup 治理，根页已退出 iframe。完整 ERP API 的非生产实现不等于实际业务迁移：真实数据、账号和文件未迁移，采购、库存、生产、销售、品质、财务的实际业务仍依赖 Python/SQLite；生产恢复演练未做，不能描述为已投产。
 - 部署能力：`compose.yml` 可启动 Web、Worker、PostgreSQL，Caddy production profile 提供 HTTPS。`chenyida-erp-parallel` 的 PostgreSQL/Web/Worker/Caddy 已实际应用 CPU/Memory/Swap/PID 限额；Web 仅 `127.0.0.1:3000`、PostgreSQL 无宿主端口，Caddy 在公网 18888 终止可信 TLS。当前入口为 `https://43.135.148.43.nip.io:18888`；运行面是受控非生产 alpha.40/0039，不代表正式投产、真实公司数据迁移或生产批准。历史 Sites `v3` 不作为后续交付目标。
@@ -44,6 +44,7 @@
 - RFQ Issuance Confirmation FIX-26 Git 复核：从 clean `main@f0202b083387c4f60eb5537221b1ce51d2dd93de`、Parent `08af2f44c9b70ed04deeeb2e06f104be37734553`、behind 0/ahead149起步；功能提交`f6f7d2a`，最终镜像、备份恢复、purchase-only只读UAT、清理和文档由独立`ops: deploy rfq issuance confirmation contract`收口。未push/PR/amend/rebase/reset/stash/restore；凭据、数据库/备份正文和Session材料未进入Git。
 - RFQ Quote Semantics FIX-27 Git复核：从clean `main@119dd04f724fccb0ef2b849b974d3e93c5c55008`、Parent`f6f7d2ac492ca6d278c99dc991b20f26d882f682`、behind 0/ahead151起步；功能提交`1be492e68f6635bc00ea3fb8ce461eac0617d8e7`，最终镜像、正式备份/恢复、purchase-only只读UAT、runner小修、D-099和完成文档由独立`ops: deploy rfq quote traceability fix`收口。未push/PR/amend/rebase/reset/stash/restore；凭据、数据库/dump正文、Cookie/Token/Session材料未进入Git。
 - Enterprise UI部署Git复核：从clean `main@aac6f349f39e81b886916c639cbfc8a541bd0b7b`、behind0/ahead154起步；`aac6f34`为精确UI功能基线，备份恢复、回退镜像、Web-only替换、匿名在线验收和文档由独立`ops: deploy enterprise ui refresh`收口。未push/PR/amend/rebase/reset/stash/restore；无登录/业务POST/Migration，凭据、数据库/dump正文、Cookie/Token/Session材料未进入Git。
+- 八角色工作台部署Git复核：功能提交为`4767c3db3cf66eb0978f07d044437790c0d4b87f`；从clean`main@4767c3d`、behind0/ahead156开始独立部署任务，备份恢复、回退镜像、Web-only替换、匿名在线验收和文档由`ops: deploy role-based ERP workbench`收口。未push/PR/amend/rebase/reset/stash/restore；无登录/业务POST/Migration，凭据、数据库/dump正文、Cookie/Token/Session材料未进入Git。
 - Canonical Schema RECONCILIATION-12 Git 复核：从 clean `main@2f2a62b81622afd708538da5f9cfd9afc835dda6`、Parent `1e9221d90db621becc2badf40b3e0ed3017b73e6`、behind 0/ahead 134 起步；验证器、脱敏诊断、合成测试和完成文档由独立 `fix: diagnose canonical credential schema safely` 收口。未 push/PR/amend/rebase/reset/stash/restore，未读取 `shujvbiao/` 或 PostgreSQL，Canonical、秘密和诊断正文未进入 Git。
 - alpha.34 灾备：LANDING-TASK01 从 `82e9f07ce1666ace2677853408c7fb4339808cfc`/ahead 76 的 clean main 出发，在 `/var/backups/chenyida-erp/landing-alpha34-20260728T042820Z` 建立 root-only 完整包；Git Bundle、clean-0034 custom dump、三个文件卷及恢复清单均实际恢复验证。包内 PostgreSQL dump 含身份哈希和 Session 数据，必须按秘密材料处理；尚未异机复制，Git origin 仍未 push。
 - 真实 BOM 入库：LANDING-TASK02 对用户指定的 8 个本机只读表格完成强校验、离线确定性分类、clean-0034 staging、主库幂等写入和 post-import 恢复；13 Sheet/1,113 条中 ELIGIBLE 515、NEEDS_REVIEW 438、ARCHIVE_ONLY 160，形成 532 Material、6 Product/Version、6 DRAFT BOM/Version、316 行和 1,318 来源链接。交易事实保持 0，详细正文只存仓库外 root-only 目录。
@@ -54,7 +55,7 @@
 - 第二管理员与 UAT 账号：`admin2` 的既有 active/version/must-change 历史事实不变。ROLE-CREDENTIAL-ROTATION-09 和 CREDENTIAL-RECONCILIATION-10 的历史 PARTIAL/BLOCKED 事实保留；后续 OFFLINE-IDENTITY-RECOVERY-11 已按方案 B 对 admin 与固定十个 UAT 账号完成单事务恢复、目标既有 Session 撤销、11 条恢复审计、Canonical 激活和 1+10 身份页验证。RECONCILIATION-12 又确认 v2 文件当前状态中 engineering/planning/purchase 已为严格 boolean false、operations 仍为 true；旧 const 误报已修复但正式文件和全部身份语义未变。仓库不记录凭据值、摘要、Token、Cookie 或 Session 信息。
 - Canonical v2 验证边界：Schema `chenyida-erp-uat-credentials-v2` 要求固定十账号、顺序、用户名、角色、密码策略/唯一性、字段集合、run-id 和严格 boolean `must_change_password`。`offline-identity-recovery-uat-validator-v2.1` 可在 root-only 固定路径、`O_NOFOLLOW`、无数据库连接下输出脱敏错误；`offline-identity-recovery-credential-writer-v2` 仍只产生初始全 true，恢复 Stage/提升/最终化以独立强门禁拒绝其他状态。见 D-092。
 - 单账号豁免：SELFHOST-OPS-ADMIN2-FIRST-CHANGE-WAIVER-06 采用 serializable 事务、任务 advisory lock、行锁和 version 2 CAS，把账号更新与唯一 `USER_FIRST_PASSWORD_CHANGE_WAIVED/success` 审计同事务提交；同任务重放 no-op。现有有效 Session 保留，D-045 全局新建/重置用户强制首次改密策略与 API 不变。
-- 公网与 UAT 来源校验：公网继续由显式、规范化、单值 `ERP_PUBLIC_ORIGIN` 精确限制，不读取任意转发头；当前唯一公网值为 `https://43.135.148.43.nip.io:18888`。只有 `ERP_DEPLOYMENT_CLASS=uat` 与 `ERP_UAT_ALLOW_LOOPBACK_ORIGIN=true` 同时启用时才额外允许浏览器 Origin 与 Request URL origin 均为严格字面量 loopback；生产类别不能启用。身份和全部业务写均要求 Origin 和 Cookie/Header CSRF 双提交。当前企业级UI alpha.40 Web为`sha256:f139257b6b6b845bebbf9aa97eb909895158d637956f069b2c82f99b2b1d5b6d`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；0039未变。PostgreSQL、Worker、Caddy和四卷未更换，旧Web`20b41bd3…`已有精确UI回退tag。
+- 公网与 UAT 来源校验：公网继续由显式、规范化、单值 `ERP_PUBLIC_ORIGIN` 精确限制，不读取任意转发头；当前唯一公网值为 `https://43.135.148.43.nip.io:18888`。只有 `ERP_DEPLOYMENT_CLASS=uat` 与 `ERP_UAT_ALLOW_LOOPBACK_ORIGIN=true` 同时启用时才额外允许浏览器 Origin 与 Request URL origin 均为严格字面量 loopback；生产类别不能启用。身份和全部业务写均要求 Origin 和 Cookie/Header CSRF 双提交。当前八角色工作台 alpha.40 Web为`sha256:f45d734becf2be04dc03477b427762f82e700b615c4722a1001557d56180818a`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；0039未变。PostgreSQL、Caddy和四卷未更换，Worker仅在一致性备份窗口短停并恢复；旧Web`f139257b…`已有精确回退tag。
 - 公网 IP 切换：PUBLIC-IP-CUTOVER-07 同步更新 Caddy `ERP_DOMAIN` 和 Web `ERP_PUBLIC_ORIGIN`，以原镜像串行重建 Web/Caddy并取得 `43.135.148.43.nip.io` 的 Let's Encrypt 证书；外部 18888 登录页、200/308/401、安全头和旧 SNI 退役通过。PostgreSQL/Worker 容器未更换，root-only 原 env 回退副本保留。
 - 安全退出：经营工作台与兼容工作台统一调用共享 `POST /api/logout`，发送 same-origin credentials 和 CSRF Header；服务端撤销 Session、写成功审计并对称清 Cookie 后才跳转，失败显示稳定错误码/中文提示。受保护页面在 `pagehide` 先隐藏，`pageshow.persisted` 或 `back_forward` 必须重新校验 Session；根页、Material 和 legacy 响应均为 `private, no-store`。真实 Chromium 已证明两个入口 logout 后 back/forward/refresh 均保持登录页和受保护内容不可见。
 - operations 人工物料审核：角色静态映射只新增 `material.review.queue/approve/reject`；没有 `material.draft.edit_any`、身份/admin、`system.audit.read` 或其他业务写增量。Repository 的跨创建人可见性只对 PENDING_REVIEW+queue 开放，批准/退回继续由既有职责分离、幂等、CAS、事务和审计保护。详情原样显示待审名称、分类/单位/来源、创建/提交事实、版本/状态、现有 SUBMIT 工程说明、编码状态、审核范围、后果与工程 BOM 下一步；说明为空时明确“未保存”，不伪造外部编号、供应商或价格。Dashboard 可处理数精确取 PENDING_REVIEW，legacy 全局统计仍标注 DRAFT+PENDING_REVIEW。
@@ -77,6 +78,7 @@
 
 - 本机永久按 2 核、约 4 GiB 内存、1 GiB Swap 管理。2026-07-27 曾发生服务器重启或不可用，证据不足，根因记录为 `UNKNOWN`，不得无证据归因 OOM。
 - 所有 build、全量测试、Migration、备份恢复和 Compose 重启必须串行，固定 `COMPOSE_PARALLEL_LIMIT=1`；停止阈值、禁用清理命令和验证记录见 `docs/self-hosting/low-resource-server.md`。
+- ROLE-HUB-DEPLOY-04的build、备份恢复和Web替换全部串行。起点约2.2GiB available/306MiB Swap/19GiB/Load`2.51/1.97/1.03`，最终约2.1GiB/260MiB/19GiB/`0.40/0.38/0.57`；60秒SwapFree无下降，内核OOM0、四服务restart0/OOM false。无效dump、恢复库、临时目录/容器已精确清理；正式备份、current/candidate/rollback镜像和四卷保留。
 - FIX-26的隔离PostgreSQL/Chromium、lint、build、正式备份/恢复和Web替换全部串行，一次一个重任务。起点约2.1GiB available/279MiB Swap/19GiB/Load`0.38/0.37/0.30`，最终约2.0GiB/283MiB/19GiB/`0.12/0.17/0.32`；任务期Swap最高约296MiB，内核OOM0、四服务restart0/OOM false。临时数据库/容器/runtime/SQLite清零，正式备份、当前/候选/rollback镜像和四卷保留。
 - FIX-27的隔离PostgreSQL/Chromium、Migration、lint、build、正式备份/恢复和Web替换全部串行，一次一个重任务。起点约2.1GiB available/290MiB Swap/19GiB/Load`0.04/0.09/0.08`，最终约2.2GiB/287MiB/18GiB/`0.14/0.17/0.33`；Migration测试后Load瞬时6.21但30秒后3.18，未持续三分钟超过4，Swap最高约292MiB。内核OOM0、四服务restart0/OOM false；临时数据库/容器/runtime/SQLite清零，正式备份、当前/候选/rollback镜像和四卷保留。
 - FIX-18 的 Node/PG/Chromium、Docker build、备份恢复和 Web 替换全部串行，一次一个临时重任务。起点约 2.2 GiB available/309 MiB Swap/21 GiB/Load `0.15/0.14/0.08`，最终约 2.1 GiB/257 MiB/21 GiB/`0.16/0.33/0.34`；内核 OOM 0、四服务 RestartCount 0/OOM false。隔离/恢复数据库、临时容器/网络、Playwright/Python/SQLite 与忽略构建目录均清零，未 prune，正式备份、当前/候选/回退镜像和四卷保留。
@@ -214,6 +216,7 @@
 45. SELFHOST-OPS-UAT-BOM-SELECTOR-FIX-04 不新增决策或状态机：`products/product_versions/bom_headers/bom_versions/bom_lines` 与 Planning 表继续是唯一权威，全部引用稳定 ID。Product Version 与 BOM Version 分轴；BOM 属于 Product Version，Project 只在 Planning Handoff 关联。正式编码/名称/单位组合只用于展示，保存和发布均由服务端事务重验 ACTIVE 正式 Material 与主单位。
 46. SELFHOST-OPS-UAT-PLANNING-CSRF-BOM-IMMUTABILITY-FIX-05 不改变状态机或服务端安全决策：Planning 写统一由共享客户端发送当前 Cookie/Header CSRF，RELEASED BOM 前端只读与服务端/DB 不可变必须同时成立，BOM 首页默认不加载历史明细。
 47. SELFHOST-OPS-UAT-PLANNING-UNIT-RESOLUTION-IMPLEMENT-07 已实施 D-086：alpha.37/0036 用追加式 Unit Resolution Version、每需求行独立 CAS Head 和 Package Item 精确 `unit_resolution_id` provenance 解除 Schema 阻断；Unit 保存和新 Package 都重验 enabled，权限/Origin/CSRF/幂等/审计/故障回滚保持事务边界。并行非生产 UAT 已迁移部署；该任务完成时主 UAT 尚未产生 Resolution 或 Package，后续 FIX-08 当前基线见上文。
+48. SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04 已把 `4767c3d` 八角色工作台 Web-only部署到当前公开非生产UAT；当前Web为`sha256:f45d734becf2be04dc03477b427762f82e700b615c4722a1001557d56180818a`，旧`f139257b…`有精确回退tag。正式root-only dump SHA-256为`dad839eff68d649e1098b0df33ba3316245a93f65893aea985d012362df266d6`，第二新库恢复39/head、226表和相同保护指纹通过。匿名HTTPS/八角色资产/401和60秒稳定性通过；未登录、发业务POST或运行Migration，Session/Audit及RFQ/Quote事实不变。
 
 ## 当前风险
 
@@ -260,7 +263,7 @@
 
 ## 当前路线
 
-`SELFHOST-UAT-FIX-27`已完成：分支A确认RFQ Version保护整个询价聚合，Supplier A成功报价的`v3→v4`与`INVITED→RESPONDED`均为预期；固定范围漂移已与邀请生命周期/CAS推进解耦，Quote稳定ID、无业务编号、唯一SUBMITTED Event、服务端金额/交期追溯已Web-only部署。正式备份/第二库恢复、隔离Supplier B报价和purchase-only桌面/390×844只读UAT通过；business POST 0、Session 0，Supplier A Quote ID 1保留，Supplier B Quote 0，Quote/Award/PO 1/0/0。现在没有自动执行任务；任何后续报价、修订、比价、定标或PO必须获得新的明确授权。此前身份恢复和历史PARTIAL/BLOCKED记录均保持。
+`SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04`已完成：当前18888非生产UAT的登录后根工作台已由密集方块改为管理员、采购、市场、计划、工程、财务、生产、仓库八入口与单一部门清单，仍由服务端Summary权限裁剪。正式备份/第二新库恢复、Web-only替换、匿名HTTPS资产/401和60秒稳定性通过；未登录、发业务POST或运行Migration，0039、Session/Audit、保护指纹与RFQ/Quote事实不变。现在没有自动执行任务；登录式浏览器验收、业务操作、真实数据迁移或生产切流必须获得新的明确授权。此前身份恢复和历史PARTIAL/BLOCKED记录均保持。
 
 ## 恢复上下文检查清单
 

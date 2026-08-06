@@ -2,6 +2,22 @@
 
 最后更新时间：2026-08-06（Asia/Shanghai）
 
+## SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04 八角色工作台 Web-only 部署
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | ROLE-BASED WORKBENCH DEPLOYED — ANONYMOUS READ-ONLY VERIFIED | 项目负责人明确授权的 `4767c3d` 八角色工作台已部署到当前18888非生产UAT |
+| 严格范围 | WEB ONLY / ANONYMOUS READ ONLY | 只替换Web；不运行Migration，不登录、不发业务POST，不替换PostgreSQL/Worker/Caddy或四卷 |
+| 候选/回退 | PASS | 新Web `sha256:f45d734becf2…`、88,560,525 bytes；旧Web `sha256:f139257b6b6b…`已固定精确rollback tag |
+| 备份/恢复 | PASS | root:root 0600 dump 2,288,824 bytes、SHA-256 `dad839eff68d649e1098b0df33ba3316245a93f65893aea985d012362df266d6`、list3,359；第二新库恢复39/head、226表及相同指纹后删除 |
+| Web-only部署 | PASS | 仅`--no-deps --no-build --force-recreate web`替换Web；PostgreSQL/Caddy容器身份不变，Worker仅为备份窗口短停并恢复，migrate未运行，四卷不变 |
+| 在线验收 | PASS / ANONYMOUS | HTTP 308，HTTPS根页/health/legacy 200，新bundle含八角色入口和新CSS；private/no-store、安全头、匿名无Cookie、Summary/Materials 401通过 |
+| 数据保护 | PASS / UNCHANGED | 指纹`597eb456…9f9f`在部署前/恢复库/部署后一致；39/head、Session207/有效1、Audit1446、RFQ ISSUED v4、Binding8、Supplier A/B Quote1/0、Quote/Award/PO1/0/0不变 |
+| 稳定性 | PASS | 60秒health7/7、SwapFree无下降；内核OOM0，Web/PostgreSQL/Worker/Caddy均restart0/OOM false |
+| 资源/清理 | PASS | available约2.2→2.1GiB、Swap306→260MiB、根盘19GiB、Load`2.51/1.97/1.03`→`0.40/0.38/0.57`；无效dump、恢复库、临时目录/容器清零，正式备份和current/candidate/rollback镜像保留 |
+| 过程修正 | RECORDED / NO DATA CHANGE | 运行类别门禁和一次遗漏Compose项目名均在正式部署前失败关闭；无效dump已删，旧服务恢复后按精确项目名完成一致性备份与部署 |
+| Git/后续 | TWO FOCUSED COMMITS / NEW AUTH REQUIRED | 功能`4767c3d`；收口消息`ops: deploy role-based ERP workbench`。登录式浏览器验收、业务操作、迁移或生产切流须新授权 |
+
 ## SELFHOST-DASHBOARD-ROLE-HUB-03 登录后八角色工作台
 
 | 验证项 | 结果 | 说明 |
@@ -11,7 +27,7 @@
 | 权限与覆盖 | PASS | 当前40个Dashboard模块完整唯一归入八部门；实际链接只取服务端Summary裁剪结果，未授权部门不可进入 |
 | 密度与响应式 | PASS | 指标/风险/治理/事件/全模块方块退出首屏；桌面左右分栏，720px以下纵向，焦点/禁用/reduced-motion/无页面级溢出保持 |
 | 自动验证 | PASS | UI 73/73、五组typecheck、lint、生产build/postbuild、npm3/3、Python三项、1,241文件credentials及diff check通过 |
-| UAT/部署 | AUTHORIZED / NOT YET EXECUTED | 源码任务未登录、写入、构建在线镜像或替换服务；负责人随后明确授权独立Web-only部署任务 |
+| UAT/部署 | DEPLOYED BY FOLLOW-UP | 源码任务自身未部署；后续 `SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04` 已完成Web-only部署与匿名只读验收 |
 | 资源/清理 | PASS | available约2.1→2.2GiB、Swap292→306MiB、根盘19GiB、Load`0.07/0.18/0.32`→`2.51/1.97/1.03`；四服务restart0/OOM false，临时容器清零 |
 
 ## SELFHOST-UI-REFRESH-DEPLOY-02 企业级 UI Web-only 部署

@@ -4,6 +4,16 @@
 
 ## 2026-08-06
 
+### SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04 - `ops: deploy role-based ERP workbench`
+
+- 授权/范围：项目负责人明确要求直接部署；从 clean `main@4767c3db3cf66eb0978f07d044437790c0d4b87f`、behind0/ahead156起步，只把八角色工作台 Web-only部署到18888公开非生产UAT并做匿名只读验收。不登录、不发业务POST，不运行Migration，不替换PostgreSQL/Worker/Caddy/四卷，不部署历史Sites或执行生产切流。
+- 备份/恢复：正式predeploy custom dump为root:root0600、2,288,824bytes、SHA-256`dad839eff68d649e1098b0df33ba3316245a93f65893aea985d012362df266d6`，list3,359项；第二新库恢复39/head、226表、Session207、Audit1446、Quote/Award/PO`1/0/0`和保护指纹一致后已删，正式备份保留。
+- 镜像/替换：旧Web`sha256:f139257b…`固定为`rollback-role-hub-deploy04-predeploy-20260806T083541Z`；精确`4767c3d`源码构建新Web`sha256:f45d734b…`、88,560,525bytes。仅`--no-deps --no-build --force-recreate web`替换；PostgreSQL/Caddy容器身份不变，Worker仅在一致性备份窗口短停并恢复，migrate未运行，四卷不变。
+- 在线/保护：HTTP308，HTTPS根页/health/legacy200，新bundle含管理员、采购、市场、计划、工程、财务、生产、仓库及角色工作台CSS；private/no-store、安全头、匿名无Cookie和Summary/Materials401通过。部署前/恢复库/部署后指纹均为`597eb456…9f9f`，Session/Audit与RFQ/Quote事实不变，业务POST0。
+- 最终仓库校验：只读Node22容器内Dashboard/企业UI合同10/10、1,243文件credentials和diff check通过；完整功能构建与回归沿用功能提交的73/73 UI、五组typecheck、lint、production build/postbuild、npm/Python全通过证据。
+- 保护修正/资源：运行类别门禁和一次遗漏Compose项目名均在正式替换前失败关闭；未一致停服的dump不作恢复依据并已精确删除，旧服务恢复后以精确项目名完成正式备份和部署。60秒health7/7、SwapFree不降；available约2.2→2.1GiB、Swap306→260MiB、根盘19GiB、Load`2.51/1.97/1.03`→`0.40/0.38/0.57`，OOM0、四服务restart0/OOM false。临时资源清零，正式备份和current/candidate/rollback镜像保留。
+- 结论：`ROLE-BASED WORKBENCH DEPLOYED — ANONYMOUS READ-ONLY VERIFIED`。
+
 ### SELFHOST-DASHBOARD-ROLE-HUB-03 - `feat: simplify ERP workbench role entrances`
 
 - 范围/信息架构：从 clean `main@8aa3f70329a11cffb2ee43d2942b3c4484e6137f` 起步，只简化登录后根工作台；密集指标、风险、治理、事件和模块方块退出首屏，改为管理员、采购、市场、计划、工程、财务、生产、仓库八部门导航与单一当前部门业务清单。登录/设置/改密/退出、业务页面和 legacy 内容未改。
