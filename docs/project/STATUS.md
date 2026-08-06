@@ -2,6 +2,21 @@
 
 最后更新时间：2026-08-06（Asia/Shanghai）
 
+## SELFHOST-UI-REFRESH-DEPLOY-02 企业级 UI Web-only 部署
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | ENTERPRISE UI DEPLOYED — ANONYMOUS READ-ONLY VERIFIED | 项目负责人明确授权的 `aac6f34` UI 已部署到当前 18888 非生产 UAT |
+| 严格范围 | WEB ONLY / ANONYMOUS READ ONLY | 只替换 Web；不运行 Migration，不登录、不执行业务 POST，不替换 PostgreSQL/Worker/Caddy/四卷 |
+| 严格起点 | PASS | clean `main@aac6f34`、behind0/ahead154；alpha.40/0039；旧Web `20b41bd3…`，线上 legacy 仍为旧缓存版本 |
+| 资源起点 | PASS | available约2.2GiB、Swap289MiB、根盘18GiB、Load`0.21/0.35/0.43`；Web/PostgreSQL healthy，Worker/Caddy running |
+| 候选/部署 | PASS / WEB ONLY | Docker build/postbuild、UI 4/4、Dashboard 5/5、静态/运行合同通过；Web `20b41bd3…→f139257b…`，旧镜像精确rollback tag保留 |
+| 基线回归 | PASS | npm3/3、Python三项、1,240文件credentials和diff check通过；测试SQLite已精确删除 |
+| 在线验收 | PASS / ANONYMOUS | HTTPS根页/health/legacy/CSS 200，新bundle/缓存/设计令牌/安全头通过；匿名Session false/null且不发Cookie，Summary/Materials 401 |
+| 数据保护 | PASS / UNCHANGED | dump 2,288,827 bytes、SHA`8dd0141b…`、list3,359及第二新库恢复通过；39/head、226表、Session207/有效10、Audit1446和指纹`597eb456…9f9f`前后一致 |
+| 服务边界 | PASS | PostgreSQL/Worker/Caddy容器身份与四卷不变，migrate未运行；四服务restart0/OOM false，60秒health7/7、Swap无增长 |
+| 资源/清理 | PASS | available约2.2→2.2GiB、Swap289→292MiB、根盘18→19GiB、Load`0.21/0.35/0.43`→`0.28/0.49/0.49`；临时容器/恢复库/工作区输出清零，正式备份和镜像保留 |
+
 ## SELFHOST-UI-REFRESH-01 自托管 ERP 企业级 UI 统一改造
 
 | 验证项 | 结果 | 说明 |

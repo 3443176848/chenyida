@@ -39,23 +39,25 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.40`；PostgreSQL 为 39/head `0039_rfq_traceability.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-27` 功能提交为 `1be492e68f6635bc00ea3fb8ce461eac0617d8e7`（`fix: correct rfq quote traceability semantics`）；版本保持 alpha.40，Migration 保持 0039 |
-| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-27` 已 Web-only部署RFQ聚合CAS/邀请状态正确语义、固定范围漂移判定和Quote追溯：Supplier A Quote ID 1完整保留，Supplier B仍INVITED且主库Quote 0；独立`ops: deploy rfq quote traceability fix`收口备份恢复、purchase-only主UAT、清理和文档。桌面/390×844通过，business POST 0、Session 0 |
-| Git 同步与工作区 | FIX-27从clean `main@119dd04f724fccb0ef2b849b974d3e93c5c55008`、Parent `f6f7d2ac492ca6d278c99dc991b20f26d882f682`、behind 0/ahead151起步；功能提交`1be492e`，部署验收与文档由独立`ops: deploy rfq quote traceability fix`收口，实际SHA以`git log`为准。未push/PR/amend/rebase/reset/stash/restore；密码、Token、Cookie、Session摘要、Canonical正文、连接信息和备份未进入Git |
+| 当前根仓库功能基线提交 | 企业级 UI 功能提交 `aac6f349f39e81b886916c639cbfc8a541bd0b7b`（`feat: refresh self-hosted ERP interface`）；FIX-27业务基线`1be492e`继续保留，版本保持 alpha.40，Migration 保持 0039 |
+| 当前根仓库运维基线 | `SELFHOST-UI-REFRESH-DEPLOY-02` 已把企业级 UI Web-only部署到18888非生产UAT；独立`ops: deploy enterprise ui refresh`收口备份恢复、回退镜像、匿名HTTPS/资产/401验收和文档。无登录、业务POST、Migration或其他服务替换 |
+| Git 同步与工作区 | UI部署从clean `main@aac6f349f39e81b886916c639cbfc8a541bd0b7b`、behind0/ahead154起步；运维/文档由独立`ops: deploy enterprise ui refresh`收口，实际SHA以`git log`为准。未push/PR/amend/rebase/reset/stash/restore；密码、Token、Cookie、Session摘要、连接信息和备份正文未进入Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0039`，39/head `0039_rfq_traceability.sql`，SHA-256`3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；没有0040。主`RFQ-00000001`为generation 1 / ISSUED v4、四行/两Supplier、Binding 8、`RFQ_MAPPING_CONFIRMED` 1、`RFQ_ISSUED` 1；Supplier A为RESPONDED并保留Quote ID 1/SUBMITTED v1，Supplier B为INVITED且Quote 0，Quote/Award/PO为1/0/0。八条Binding/Mapping事实未变，固定摘要仍为`9765f8fd…4848d` |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。Web为alpha.40`sha256:20b41bd34741758e707f3748baaa1018232df6be5d44cd63bed290fd49c9f4f9`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart 0/OOM false。旧Web`c8c3fdd5…`有精确FIX-27 rollback tag，四个受保护Volume未更换 |
-| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台Worker已实现Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与Dashboard；alpha.40现明确RFQ aggregate CAS包含Supplier响应，固定范围漂移与邀请生命周期解耦，并提供服务端权威Quote金额/交期/Event追溯。Python/SQLite和历史Sites/D1未由本任务改变 |
-| 当前阶段 | `SELFHOST-UI-REFRESH-01`已完成源码 UI 统一，当前 18888 非生产 UAT 未部署且仍为改造前界面；FIX-27 的 RFQ/Quote 运行事实继续保持，不进入任何报价、定标、PO或其他下游 |
-| 当前任务 | 当前无 `DOING`；UI 源码、静态合同和构建验证已完成，浏览器/UAT 验收或部署必须另获明确授权 |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。企业级UI Web为alpha.40`sha256:f139257b6b6b845bebbf9aa97eb909895158d637956f069b2c82f99b2b1d5b6d`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`20b41bd3…`有精确UI回退tag，四个受保护Volume未更换 |
+| 当前开发环境 | Node.js/PostgreSQL/本地文件/后台Worker已实现Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与Dashboard；登录、经营工作台、原生业务壳和legacy兼容台现使用统一企业级视觉。alpha.40 RFQ/Quote权威语义和业务事实未变，Python/SQLite及历史Sites/D1未由本任务改变 |
+| 当前阶段 | `SELFHOST-UI-REFRESH-DEPLOY-02`已完成Web-only部署和匿名只读验收；FIX-27 的 RFQ/Quote运行事实、39/head和四卷保持，不进入任何报价、定标、PO或其他下游 |
+| 当前任务 | 当前无 `DOING`；登录式浏览器验收、业务操作、真实数据迁移或生产切流均须新的明确授权 |
 | 下一任务 | 必须由项目负责人另行明确授权；不得自动创建Supplier B Quote、修订Supplier A、生成Comparison/Award/PO或其他下游 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-UI-REFRESH-DEPLOY-02 已把 `aac6f34` 企业级 UI Web-only部署到18888非生产UAT；新Web `f139257b…`、旧Web `20b41bd…`精确回退tag、root-only dump/list/第二新库恢复、匿名HTTPS/新资产/private-no-store/401和60秒稳定性均通过。0039、Session/Audit与保护指纹不变，无登录、业务POST、Migration或其他服务替换
 
 - SELFHOST-UI-REFRESH-01 参考用友 YonSuite 官方展示中的一体化门户、角色工作台和紧凑企业信息布局，统一晨亿达自有登录、经营工作台、原生业务壳及 legacy 兼容台；新增企业 UI 合同，72/72 静态 UI、五组 typecheck、build/postbuild、lint、npm/Python 和 credentials 通过。API/认证/权限/业务/Schema/版本不变，未登录、写入、构建镜像、重启或部署当前 UAT
 

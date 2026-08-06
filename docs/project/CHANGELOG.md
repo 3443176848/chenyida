@@ -4,6 +4,14 @@
 
 ## 2026-08-06
 
+### SELFHOST-UI-REFRESH-DEPLOY-02 - `ops: deploy enterprise ui refresh`
+
+- 授权/范围：项目负责人在`SELFHOST-UI-REFRESH-01`完成后明确授权；从clean`main@aac6f349f39e81b886916c639cbfc8a541bd0b7b`、behind0/ahead154起步，只把企业级UI Web-only部署到18888非生产UAT并做匿名只读验收。不登录、不发业务POST，不运行Migration，不替换PostgreSQL/Worker/Caddy/四卷，不部署历史Sites或生产。
+- 备份/恢复：predeploy custom dump为root:root0600、2,288,827bytes、SHA-256`8dd0141bb047d75b0bfea87011d7ac56db46d27b7fe51907045b8a173c93de7d`，list3,359项；第二新库恢复39/head、226表、Session207/有效10、Audit1446和保护指纹一致后已删，正式备份保留。
+- 镜像/替换：旧Web`sha256:20b41bd3…`固定为`rollback-ui-refresh-deploy02-predeploy-20260806T080240Z`；精确`aac6f34`源码构建新Web`sha256:f139257b…`、88,560,352bytes。Docker生产build/postbuild、UI4/4、Dashboard5/5、npm3/3、Python三项、1,240文件credentials、diff check及候选静态/运行合同通过；仅`--no-deps --no-build --force-recreate web`替换，migrate未创建或运行。
+- 在线/保护：HTTPS根页/health/legacy/CSS200，新bundle、`20260806-enterprise-ui-refresh-01`、蓝色令牌、focus/reduced-motion、private/no-store和安全头通过；匿名Session false/null、不发Cookie，Summary/Materials401。部署后39/head、226表、Session/Audit和指纹`597eb456…9f9f`完全不变，RFQ ISSUED v4、Binding8、Supplier A/B Quote1/0、Quote/Award/PO1/0/0不变。
+- 资源/结论：60秒health7/7、SwapFree无下降，内核OOM0、四服务restart0/OOM false；available约2.2→2.2GiB、Swap289→292MiB、根盘18→19GiB、Load`0.21/0.35/0.43`→`0.28/0.49/0.49`。临时容器/恢复库/Python临时SQLite/工作区构建输出清零，未prune；正式备份、current/candidate/rollback镜像和四卷保留。结论`ENTERPRISE UI DEPLOYED — ANONYMOUS READ-ONLY VERIFIED`。
+
 ### SELFHOST-UI-REFRESH-01 - `feat: refresh self-hosted ERP interface`
 
 - Git/范围：从 strict clean `main@70045998c765d95e1abf57041cd46a8da4f9ed7e`、behind 0/ahead153起步；只统一自托管 Node/PostgreSQL ERP 的登录、经营工作台、原生共享业务壳、Supplier Mapping/RFQ扩展和legacy兼容台。版本保持alpha.40，Migration保持0039；不改API、认证、权限、业务、Schema、Compose或环境变量，不push/PR或改写历史。
