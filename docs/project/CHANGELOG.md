@@ -4,6 +4,15 @@
 
 ## 2026-08-06
 
+### SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06 - `ops: deploy localized ERP statuses`
+
+- 授权/范围：项目负责人在状态中文化源码任务完成后明确回复“授权”；从clean`main@943c7fa5da44182617fa8a4f1d75b49b6d6c3795`、behind0/ahead158起步，只把该提交Web-only部署到18888公开非生产UAT并做匿名只读验收。不登录、不发业务POST，不运行Migration，不替换PostgreSQL/Worker/Caddy/四卷，不部署历史Sites或生产。
+- 备份/恢复：正式目录`status-localization-deploy06-predeploy-20260806T110129Z`为root:root0700；custom dump为0600、2,291,624bytes、SHA-256`2beeaeb2ba2d7f7e5c07c7099d0d5985df1bb2ac6a67cc240bcfda0121418d99`，list3,359项。第二新库恢复39/head、226表、文件卷、Session/Audit、RFQ/Quote事实和业务指纹一致后已删，正式备份保留。
+- 镜像/替换：旧Web`sha256:f45d734b…`固定为`rollback-status-localization-deploy06-predeploy-20260806T110008Z`；精确`943c7fa`构建新Web`sha256:89e76775…`、88,572,838bytes。仅`--no-deps --no-build --force-recreate web`替换；PostgreSQL/Caddy容器身份不变，Worker只在一致性窗口短停并以原容器恢复，migrate未创建或运行，四卷不变。
+- 在线/保护：HTTP308，HTTPS根页/health/legacy/status asset/app.js200；两个在线资产SHA与源码一致，缓存标识和中文角色、状态、审核/执行结果通过。匿名Session false/null且无Cookie，Summary/Materials401，private/no-store和安全头保持。部署前/恢复库/部署后业务指纹均为`59057998…bdbc24`；39/head、226表、Session209、Audit1455、RFQ ISSUED v6/Binding8、Supplier A/B Quote1/1、Quote/Award/PO2/0/0保持。
+- 验证/资源：候选production build/postbuild、状态/企业UI/Dashboard合同13/13、npm3/3、候选健康、最终Python三项和1,249文件credentials通过；功能提交完整验证证据保持。公开域名连续60秒health7/7、SwapFree`766600→766676KiB`；起点/终检available约2.2/2.2GiB、Swap272/276MiB、根盘19/19GiB、Load`0.25/0.24/0.43`→`0.21/0.20/0.24`，OOM0、四服务restart0/OOM false。
+- 清理/结论：本机SNI探针和旧Migration断言 inspector均失败关闭，不计入在线健康且无数据写；最终使用公开域名与直接read-only业务指纹复核。临时worktree、容器、恢复库/文件、响应文件和SQLite清零，正式备份与current/candidate/rollback镜像保留，未prune。结论`STATUS LOCALIZATION DEPLOYED — ANONYMOUS READ-ONLY VERIFIED`。
+
 ### SELFHOST-UI-STATUS-LOCALIZATION-05 - `feat: localize visible ERP statuses`
 
 - 范围：从 clean `main@fb4c89bd`、behind0/ahead157 起步，只修改自托管原生 React 与 legacy 兼容台的最终用户显示层、对应 UI/浏览器验证期望和项目文档。版本保持 alpha.40，Migration保持0039；不改认证、权限、API合同、状态机、数据库枚举、Compose或环境变量。

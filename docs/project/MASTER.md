@@ -40,24 +40,26 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.40`；PostgreSQL 为 39/head `0039_rfq_traceability.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UI-STATUS-LOCALIZATION-05` 已完成可见状态中文化源码；独立提交消息为 `feat: localize visible ERP statuses`，实际 SHA 以 Git log 为准，父基线 `fb4c89bd`。版本保持 alpha.40，Migration 保持 0039 |
-| 当前根仓库运维基线 | `SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04` 已把八角色工作台 Web-only部署到18888非生产UAT；独立提交消息 `ops: deploy role-based ERP workbench` 收口备份恢复、回退镜像、匿名HTTPS/八角色资产/401验收和文档。无登录、业务POST、Migration或其他服务替换 |
-| Git 同步与工作区 | 状态中文化从 clean `main@fb4c89bd`、behind 0/ahead 157 起步并由独立功能提交收口；未 push/PR/amend/rebase/reset/stash/restore。密码、Token、Cookie、Session 摘要、连接信息和备份正文未进入 Git |
+| 当前根仓库运维基线 | `SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06` 已把精确功能提交 `943c7fa` Web-only部署到18888非生产UAT；独立提交消息为 `ops: deploy localized ERP statuses`，实际 SHA 以 Git log 为准。备份恢复、精确回退、匿名HTTPS/在线资产SHA/401和60秒稳定性均通过 |
+| Git 同步与工作区 | 部署从 clean `main@943c7fa`、behind 0/ahead 158 起步；只提交部署任务与项目文档，未 push/PR/amend/rebase/reset/stash/restore。密码、Token、Cookie、Session 摘要、连接信息和备份正文未进入 Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0039`，39/head `0039_rfq_traceability.sql`，SHA-256`3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；没有0040。主`RFQ-00000001`为generation 1 / ISSUED v4、四行/两Supplier、Binding 8、`RFQ_MAPPING_CONFIRMED` 1、`RFQ_ISSUED` 1；Supplier A为RESPONDED并保留Quote ID 1/SUBMITTED v1，Supplier B为INVITED且Quote 0，Quote/Award/PO为1/0/0。八条Binding/Mapping事实未变，固定摘要仍为`9765f8fd…4848d` |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。八角色工作台 Web 为 alpha.40 `sha256:f45d734becf2be04dc03477b427762f82e700b615c4722a1001557d56180818a`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`f139257b…`有精确回退tag，四个受保护Volume未更换 |
-| 当前开发环境 | 本地源码已用共享词典统一原生与legacy的业务状态、角色、审核/执行结果及启停中文显示，未知枚举原样回退；八部门导航和服务端Summary权限裁剪保持。当前公开UAT仍运行上一版八角色工作台，尚未包含本次中文状态显示。认证、API、业务、alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | 可见状态中文化源码与自动验证已完成；公开非生产 UAT 未部署、未登录或写入，运行数据与服务不变 |
-| 当前任务 | 当前无 `DOING`；`SELFHOST-UI-STATUS-LOCALIZATION-05` 已以 `VISIBLE ERP STATUSES LOCALIZED — SOURCE ONLY` 完成 |
-| 下一任务 | 停止。公开 UAT 部署、登录式浏览器验收、业务操作、真实数据迁移或生产切流仍须新的明确授权 |
+| 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0039`，39/head `0039_rfq_traceability.sql`，SHA-256`3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；没有0040。最终只读核验为226张public表、Session209行、Audit1455；主`RFQ-00000001`为ISSUED v6、Binding8，Supplier A/B Quote 1/1，Quote/Award/PO 2/0/0。业务指纹`590579989e2c…bdbc24`在部署前、恢复库、部署后完全一致；该事实晚于旧文档的v4/B Quote0快照，本任务不回退或解释既有变化 |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。状态中文化 Web 为 alpha.40 `sha256:89e7677538751f2c0a049a113f3d24372a18edaf752bf837038580ac951bd153`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`f45d734b…`有精确回退tag，四个受保护Volume未更换 |
+| 当前开发环境 | 本地源码和公开UAT均使用共享词典统一原生与legacy的业务状态、角色、审核/执行结果及启停中文显示，未知枚举原样回退；八部门导航和服务端Summary权限裁剪保持。认证、API、业务、alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
+| 当前阶段 | 状态中文化已 Web-only部署到公开非生产 UAT，并完成正式备份恢复、匿名只读在线验收和连续60秒稳定性检查；不是生产发布或真实数据迁移 |
+| 当前任务 | 当前无 `DOING`；`SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06` 已以 `STATUS LOCALIZATION DEPLOYED — ANONYMOUS READ-ONLY VERIFIED` 完成 |
+| 下一任务 | 停止。登录式浏览器验收、业务操作、Migration、真实数据迁移或生产切流仍须新的明确授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
-- SELFHOST-UI-STATUS-LOCALIZATION-05 建立共享状态/角色中文词典，贯通原生 React 与 legacy 兼容台的状态徽标、详情/列表、审核/执行结果、启停状态和角色显示；未知枚举保留原值，API/数据库枚举、业务逻辑、alpha.40/0039不变。38个UI测试文件、10组typecheck、lint/build、npm/Python/credentials通过；当前公开UAT未部署
+- SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06 已把 `943c7fa` 状态中文化 Web-only部署到18888非生产UAT；新Web `89e76775…`、旧Web `f45d734b…`精确回退tag、root-only dump/list/第二新库恢复、匿名HTTPS/在线资产SHA/401和连续60秒稳定性通过。0039、Session/Audit、业务指纹和RFQ/Quote事实保持，无登录、业务POST、Migration或其他服务替换
+
+- SELFHOST-UI-STATUS-LOCALIZATION-05 建立共享状态/角色中文词典，贯通原生 React 与 legacy 兼容台的状态徽标、详情/列表、审核/执行结果、启停状态和角色显示；未知枚举保留原值，API/数据库枚举、业务逻辑、alpha.40/0039不变。38个UI测试文件、10组typecheck、lint/build、npm/Python/credentials通过；源码任务自身未部署，后续 DEPLOY-06 已上线
 
 - SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04 已把 `4767c3d` 八角色工作台 Web-only部署到18888非生产UAT；新Web `f45d734b…`、旧Web `f139257b…`回退tag、root-only dump/list/第二新库恢复、匿名HTTPS/八角色资产/private-no-store/401和60秒稳定性均通过。0039、Session/Audit、保护指纹和RFQ/Quote事实不变，无登录、业务POST、Migration或其他服务替换
 
@@ -304,7 +306,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - `SELFHOST-OPS-ADMIN-ACCOUNT-04` 已通过正式 Identity Service 创建第二 active admin `admin2`，最终 version 2、首次改密；用户/admin `1/1→2/2`，Session/有效 `2/0` 不变。弱密码门禁、摘要输出事件、正式重置补救、4 条 Identity Audit、3 条幂等和资源/健康/清理均已记录。
 - `SELFHOST-LANDING-TASK05` 已完成 V9 staging。pre-clean dump 恢复 213 表一致；staging 首次 197、重放新增 0。197 行全部因 `EXPLICIT_UNIT_MISSING` 待确认，主库前后计数 manifest 一致，固定结论 `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED`。
 - `SELFHOST-PHASE6-TASK01` 已交付 alpha.35/0035 的 BOM 物料规格标准化与主数据治理源码。严格身份、可解释归并、原始行追溯、异常与替代候选、人工受控绑定/建稿已通过隔离 PostgreSQL 验收；正式替代关系仍不自动写入。
-- 常驻 18888 Web 已运行 alpha.40 `sha256:58d97778d88d6103ca4d6cc3e0bfe8033bf0921a6c1b7ecbec31254403792651`（88,531,959 bytes），PostgreSQL 为 39/head 0039；PUBLIC-IP-CUTOVER-07 的 Origin/端口和 Caddy 保持，Worker 镜像未替换，PostgreSQL/Caddy 与四个受保护卷均未重建。该状态只属于并行非生产 UAT，不等于生产发布。
+- 常驻 18888 Web 已运行状态中文化 alpha.40 `sha256:89e7677538751f2c0a049a113f3d24372a18edaf752bf837038580ac951bd153`（88,572,838 bytes），PostgreSQL 为 39/head 0039；PUBLIC-IP-CUTOVER-07 的 Origin/端口和 Caddy 保持，Worker 镜像未替换，PostgreSQL/Caddy 与四个受保护卷均未重建。该状态只属于并行非生产 UAT，不等于生产发布。
 - `SELFHOST-LANDING-TASK04` 已把兼容业务台的 CSV-only 页面收敛到 `/materials/imports/new`；旧 `/api/import` 继续在 PostgreSQL 运行面明确退役。功能提交 `cda8c7e` 已经用户单独授权部署到当前 18888 Web，公网 HTML/JS SHA 与源码一致。
 - `SELFHOST-LANDING-TASK03` 根据用户明确授权把公网 `18888` 从旧 Python 切到新 PostgreSQL ERP：可信 TLS、80→HTTPS 跳转、生产 Cookie、匿名 401 和安全响应头通过；旧 Python 仅回环保留。该任务的原入口 `43.135.157.211.nip.io` 已由 PUBLIC-IP-CUTOVER-07 受控替换，当前入口为 `https://43.135.148.43.nip.io:18888`。
 - `SELFHOST-LANDING-TASK02` 经用户澄清“不依赖逐行人工分类”后连续执行：离线确定性规则按来源编码/MPN/严格规格组合、类别、位号和可数件单位完成 532 Material、6 Product、6 个 DRAFT BOM 与 316 行主库导入；438 条真正歧义来源隔离。migration_tool 来源链接承载逐行 provenance，0034 不变，同批次重放新增 0，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`。
@@ -386,7 +388,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - 已完成：`PHASE3-TASK02` 批准全部 16 项决定并完成非生产 Normalization 服务、`0006`、五个 API、权限/限流/取消、隔离迁移与集成测试；未创建 Draft/正式物料，未迁移或部署生产。
 - 已完成：`PHASE3-TASK03` Material Import Normalization Review UI V1 docs-only 设计与正式规格确认；四份正式文档覆盖统一路由、七步 Stepper、启动/轮询/取消、Current/Latest、Rows/Drawer/Issues、37 个线框、104 项测试、局部门禁和性能门禁，14 项决定均为 `APPROVED`；未实施运行时代码或改变生产环境。
 - 已完成：`PHASE3-TASK04` Material Import Normalization Review UI V1 非生产实施；统一工作区、七步 Stepper、Current/Latest、冻结幂等与 `RESULT_UNKNOWN`、2/5/10 轮询、取消、汇总、Rows/Issues cursor、Row Drawer、安全有界渲染和权限清理均已落地；104/104 计划测试、100/100 Import UI 回归及本地 Playwright 性能/可访问性门禁通过，未改 API/Schema/Migration/业务服务或生产环境。
-- 下一：停止。当前 UAT Product Version A0 与 BOM Version V1 已 RELEASED 且只读，源 Requirement Unit 仍 NULL/pending；Unit Resolution ID 1/v1 已存在且 Package ID 1/v1 为 SUBMITTED/待计划部接收，Package 总数 1、v2/RETURN/ACCEPT 0。因 10 组仍有效的 UAT 角色凭据发生输出事件，不得登录 planning/engineering 或重新开始退回试用；只有项目负责人明确授权受控轮换全部凭据后，才能另立 planning-only 只读浏览器核验。任何 Product/BOM 修订、身份变化、真实数据或生产动作仍须独立任务和明确授权。
+- 下一：停止。状态中文化已完成匿名只读 Web-only部署；任何登录式浏览器验收、Product/BOM 修订、身份变化、业务操作、Migration、真实数据迁移或生产切流仍须独立任务和明确授权。既有 UAT 身份与业务保护规则继续有效。
 
 ## 更新规则
 

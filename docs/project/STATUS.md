@@ -2,6 +2,22 @@
 
 最后更新时间：2026-08-06（Asia/Shanghai）
 
+## SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06 ERP 可见状态中文化 Web-only 部署
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | STATUS LOCALIZATION DEPLOYED — ANONYMOUS READ-ONLY VERIFIED | 项目负责人明确授权的`943c7fa`状态中文化已部署到当前18888非生产UAT |
+| 严格范围 | WEB ONLY / ANONYMOUS READ ONLY | 只替换Web；不运行Migration，不登录、不发业务POST，不替换PostgreSQL/Worker/Caddy或四卷 |
+| 候选/回退 | PASS | 新Web`sha256:89e767753875…`、88,572,838bytes；旧Web`sha256:f45d734becf2…`已固定精确rollback tag |
+| 备份/恢复 | PASS | root-only dump 2,291,624bytes、SHA-256`2beeaeb2…d99`、list3,359；第二新库恢复39/head、226表、文件卷和相同业务指纹后删除 |
+| Web-only部署 | PASS | 仅`--no-deps --no-build --force-recreate web`替换Web；PostgreSQL/Caddy身份不变，Worker仅一致性窗口短停后以原容器恢复，migrate未运行，四卷不变 |
+| 在线验收 | PASS / ANONYMOUS | HTTP308，HTTPS根页/health/legacy/status asset/app.js200；在线SHA、中文状态词典、private/no-store、安全头、匿名无Cookie和Summary/Materials401通过 |
+| 数据保护 | PASS / UNCHANGED | 指纹`59057998…bdbc24`部署前/恢复库/部署后一致；39/head、Session209、Audit1455、RFQ ISSUED v6、Binding8、Supplier A/B Quote1/1、Quote/Award/PO2/0/0保持 |
+| 自动验证 | PASS | 候选build/postbuild、三组UI合同13/13、npm3/3、候选健康、部署收口Python三项及1,249文件credentials通过；完整源码回归沿用功能提交证据 |
+| 稳定性 | PASS | 公开域名连续60秒health7/7，SwapFree`766600→766676KiB`；内核OOM0，Web/PostgreSQL/Worker/Caddy均restart0/OOM false |
+| 资源/清理 | PASS | available约2.2→2.2GiB、Swap272→276MiB、根盘19GiB、Load`0.25/0.24/0.43`→`0.21/0.20/0.24`；临时worktree/容器/恢复库/文件/SQLite清零，正式备份和镜像保留 |
+| Git/后续 | TWO FOCUSED COMMITS / NEW AUTH REQUIRED | 功能`943c7fa`；收口消息`ops: deploy localized ERP statuses`。登录式浏览器验收、业务操作、Migration或生产切流须新授权 |
+
 ## SELFHOST-UI-STATUS-LOCALIZATION-05 ERP 可见状态中文化
 
 | 验证项 | 结果 | 说明 |
@@ -12,7 +28,7 @@
 | 自动验证 | PASS | 38个UI/物料/状态测试文件、10组typecheck、production build/postbuild、npm3/3、Python三项、1,247文件credentials和diff check通过；lint 0 error/11既有warning |
 | 浏览器边界 | SOURCE VERIFIED / UAT NOT RUN | 五个受影响浏览器验证脚本语法和中文期望已更新；未登录或连接公开UAT执行旅程 |
 | API/数据库/版本 | UNCHANGED | 认证、权限、业务、Schema/Migration、数据库枚举、alpha.40/0039均未改 |
-| UAT/部署 | NOT AUTHORIZED / UNCHANGED | 当前Web仍为`sha256:f45d734becf2…`；未构建在线镜像、替换容器、重启服务、运行Migration或部署 |
+| UAT/部署 | DEPLOYED BY FOLLOW-UP | 源码任务自身未部署；后续`SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06`已完成Web-only部署与匿名只读验收 |
 | 资源/清理 | PASS | available约2.2→2.2GiB、Swap260→272MiB、根盘19GiB、Load`0.04/0.19/0.37`→`0.18/0.78/0.72`；内核OOM0、四服务restart0/OOM false，任务容器/挂载点/临时SQLite清零 |
 
 ## SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04 八角色工作台 Web-only 部署
