@@ -2,6 +2,26 @@
 
 最后更新时间：2026-08-06（Asia/Shanghai）
 
+## SELFHOST-UAT-FIX-26 RFQ 发出确认硬性合同
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | RFQ ISSUANCE CONFIRMATION FIXED — UAT RFQ STILL DRAFT | 确认合同已Web-only部署；主RFQ未发出、未重新固定、未创建任何下游 |
+| 严格起点 | PASS | clean `main@f0202b0`、Parent `08af2f4`、behind 0/ahead149；alpha.40、0001—0039、0039 SHA、Web`315f0b79…`、主RFQ保护事实与资源均吻合 |
+| Binding状态分支 | INDEPENDENT FIELD / ACTIVE | 0039有独立`binding_status`并CHECK ACTIVE；页面分栏显示Binding ACTIVE、Mapping ACTIVE、邀请INVITED，固定来源、状态漂移和版本漂移独立；无Binding行不伪造ACTIVE |
+| 按钮/默认焦点 | PASS | 入口“发出询价并冻结范围”；最终写按钮精确“确认发出”；默认焦点取消。取消/关闭/ESC/背景关闭0业务请求，确认同步禁用 |
+| 下游保护 | PASS / EXHAUSTIVE | Quote、Award、PO、Delivery Plan、Receipt/收货、Inventory Ledger/库存流水、AP/采购应付、Work Order/生产工单、其他生产记录、财务记录逐项列出为不自动创建或修改 |
+| Binding关联/排序 | PASS / 1—8 | 主表按稳定Binding ID升序；1—4为Supplier1/Line1—4/Material533—536，5—8为Supplier2/Line1—4/Material533—536，八个Mapping UUID逐行与数据库一致 |
+| 摘要消歧 | PASS / IMMUTABLE | 主UI不再把`3,4,1,2,7,8,5,6`作为身份字段；摘要规范化与身份展示解耦。Binding、算法、Event和固定摘要`9765f8fd…4848d`均未改 |
+| 自动验证 | PASS | UI 10/10、Unit 8/8、隔离PG 20/20、Chromium 2/2、0039 Migration 6/6、npm 3/3、Python 3/3；typecheck/build/credentials/diff通过，lint 0 error/11既有warning |
+| 隔离发出/失败关闭 | PASS | 双击仅1个issue POST、1条`RFQ_ISSUED`和1次CAS；Quote/Award/PO及全部下游0。权限、CSRF、Origin、过期CAS、幂等冲突均fail closed；桌面/390×844无溢出 |
+| 备份/恢复 | PASS | root:root 0600 dump 2,284,946 bytes，SHA-256`b810d5a588a0a262ace478569815e1ca7e8c84dab7218368d435d8400263497d`；list 3,359行，第二空库39/head/226表和指纹一致，恢复库已删 |
+| Web-only部署 | PASS | Web`sha256:315f0b79…→sha256:c8c3fdd52236b84e3ceb67f7b81ca2e5530bfaba964a92ebd22dab9f7da19989`、88,546,098 bytes；无Migration，PostgreSQL/Worker/Caddy身份及四卷不变，旧Web rollback tag保留 |
+| 主 UAT | PASS / READ ONLY | purchase-only桌面/390×844两次打开窗口并只取消；Binding IDs `1,2,3,4,5,6,7,8`，`business_post=0`、Session0 |
+| 主 UAT数据 | PASS / UNCHANGED | 指纹`9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`；RFQ DRAFT v2、Binding8、Mapping Event1、ISSUED/Quote/Award/PO及全部下游0 |
+| 资源/清理 | PASS | 起点/最终available约2.1/2.0GiB、Swap279/283MiB、根盘19/19GiB、最终Load`0.12/0.17/0.32`；内核OOM0、四服务restart0/OOM false。临时库/容器/runtime/SQLite清零，正式备份/镜像/四卷保留 |
+| Git/后续 | TWO FOCUSED COMMITS / NEW AUTH REQUIRED | 功能`f6f7d2a`；收口消息`ops: deploy rfq issuance confirmation contract`。正式发出必须新任务重新校验并明确授权 |
+
 ## SELFHOST-UAT-FIX-25 RFQ Binding 关联基线更正
 
 | 验证项 | 结果 | 说明 |

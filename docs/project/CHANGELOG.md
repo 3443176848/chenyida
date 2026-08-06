@@ -4,6 +4,15 @@
 
 ## 2026-08-06
 
+### SELFHOST-UAT-FIX-26 - `fix: clarify rfq issuance confirmation` / `ops: deploy rfq issuance confirmation contract`
+
+- Git/范围：从 strict clean `main@f0202b083387c4f60eb5537221b1ce51d2dd93de`、Parent `08af2f4`、behind 0/ahead 149起步；功能提交`f6f7d2a`，部署/UAT/清理和文档由独立ops提交收口。只补齐发出确认UI合同、只读UAT/保护runner和测试；不改发出服务端业务规则、Migration、版本、Binding/Mapping/Event/摘要或主业务数据，不push/PR或改写历史。
+- 状态/身份：0039确有独立`binding_status`且限定ACTIVE，故Binding ACTIVE、Mapping ACTIVE、邀请INVITED分栏，并另列固定来源和两类漂移；尚未固定行不伪造状态。主表改为按数值Binding ID 1—8展示同一行的Supplier/RFQ Line/Material/Mapping外键；旧`3,4,1,2,7,8,5,6`序列退出身份主字段，摘要规范化与身份展示明确解耦。canonical摘要保持`9765f8fdef768335a25b314867dd3e077429a84848cba067ff8394c8a017848d`。
+- 确认合同：入口保持“发出询价并冻结范围”，最终写按钮精确为“确认发出”，默认焦点取消；取消、关闭、ESC/背景关闭零业务请求，确认同步禁用。窗口逐项列出Quote、Award、PO、Delivery Plan、Receipt、Inventory Ledger、AP、Work Order、其他生产记录和财务记录均不会自动创建或修改。
+- 测试：UI 10/10、Unit 8/8、隔离PostgreSQL 20/20、Chromium 2/2、0039 Migration 6/6、npm 3/3和Python三项通过；typecheck、production build/postbuild、功能树1,231/最终文档树1,232文件credentials及diff check通过，lint 0 error/11既有warning。隔离双击只产生一个issue POST、一条`RFQ_ISSUED` Event和一次CAS，权限/CSRF/Origin/过期CAS/幂等冲突失败关闭，全部下游0，桌面/390×844无溢出。
+- 备份/部署：predeploy dump为root:root 0600、2,284,946 bytes、SHA-256`b810d5a588a0a262ace478569815e1ca7e8c84dab7218368d435d8400263497d`；list 3,359行，第二空库恢复39/head/226表和保护指纹一致后已删除。仅替换Web`315f0b79…→c8c3fdd5…`，未运行Migration；PostgreSQL/Worker/Caddy和四卷不变，旧Web rollback tag保留。
+- 主 UAT/结论：purchase-only在桌面和390×844核对八条权威关联、三状态、摘要、最终按钮与完整下游保护，两次只取消；`business_post=0`、Session 0。最终RFQ仍DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO及全部下游0，指纹仍`9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`。结论`RFQ ISSUANCE CONFIRMATION FIXED — UAT RFQ STILL DRAFT`；正式发出需新任务明确授权。
+
 ### SELFHOST-UAT-FIX-25 - `docs: correct rfq binding association baseline`
 
 - Git/范围：从 strict clean `main@08af2f4`、Parent `e329931`、behind 0/ahead 148起步；只诊断 RFQ ID 1 的授权对象并更正任务/项目文档。不修改业务代码、Migration、数据库、部署配置或镜像，不登录 UAT，不执行业务 POST、备份恢复或部署，不 push/PR或改写历史。

@@ -2,9 +2,10 @@
 
 ## 状态与唯一范围
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始：2026-08-06（Asia/Shanghai）
 - 负责人：Codex（严格门禁、0039 权威模型核验、确认合同/UI、隔离 PostgreSQL/Chromium、备份恢复、Web-only 部署和 purchase-only 只读取消验收）；项目负责人（固定主 UAT 禁止发出及部署/只读验收授权）
+- 完成：2026-08-06（Asia/Shanghai）；见[完成报告](SELFHOST-UAT-FIX-26-COMPLETION.md)
 - 依赖：`SELFHOST-UAT-FIX-22`、`SELFHOST-UAT-FIX-24`、`SELFHOST-UAT-FIX-25`、D-061、D-091、D-094、D-095、D-096、D-097
 - 唯一范围：补齐 RFQ 发出确认窗口的最终按钮、默认焦点、零请求取消合同、完整下游保护说明、Binding/Mapping/邀请状态语义和 Binding ID 排序；不改变 RFQ 发出服务端业务规则、固定事实或摘要算法。
 

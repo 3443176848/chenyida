@@ -1106,6 +1106,18 @@
 - 完整性结果：限定范围只读事务确认八条 FK/Mapping Version 全部匹配，重复、孤儿、跨 RFQ和错配均为 0；现有 `canonicalDigest` 重算固定摘要为 `9765f8fdef768335a25b314867dd3e077429a84848cba067ff8394c8a017848d`，与唯一成功 Event 一致。
 - 实施边界：采用分支 B，只更正文档和验收基线；不修改代码、Migration、数据库、Web镜像或运行面，不登录主 UAT，不执行备份/恢复/部署，不发送业务 POST。RFQ保持 DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO 0。
 
+## D-098 RFQ 发出确认以独立 Binding 状态、稳定 ID 行和穷举下游保护为硬性合同
+
+- 日期：2026-08-06
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
+- 确认人：项目负责人（明确要求补齐发出确认硬性合同、消除 Binding状态与摘要排序歧义，并禁止发出主 UAT RFQ）
+- 状态模型：0039 权威表具有独立 `binding_status text NOT NULL` 且CHECK限定 `ACTIVE`，因此确认窗口必须把“Binding状态：ACTIVE”“Mapping状态：ACTIVE”“邀请状态：INVITED”分栏，并另列固定来源、状态漂移和版本漂移。尚未固定的资格行必须显示无Binding记录，不得伪造ACTIVE。
+- 操作合同：入口可保持“发出询价并冻结范围”，最终写按钮只能显示“确认发出”；默认焦点为取消等非破坏性控件。取消、关闭、ESC和背景关闭均为零业务请求，确认首次触发同步禁用；服务端既有权限、CSRF、Origin、CAS、幂等、并发、事务和审计门禁不得因UI措辞放宽。
+- 下游保护：窗口必须逐项声明本次发出不会自动创建或修改Quote、Award、PO、Delivery Plan、Receipt/收货、Inventory Ledger/库存流水、AP/采购应付、Work Order/生产工单、其他生产记录和财务记录；“库存或财务”等概括不能替代收货、AP和生产记录。
+- 身份与摘要：身份主展示固定按数值Binding ID升序并以同一数据库行的Supplier、RFQ Line、Material和Mapping外键解释。摘要规范化排序只服务`canonicalDigest`，不得以数组位置定义身份；旧`3,4,1,2,7,8,5,6`序列不得进入易被理解为配对关系的主字段。已保存Binding、摘要算法、固定摘要和`RFQ_MAPPING_CONFIRMED` Event保持不可变。
+- 实施结果：功能提交`f6f7d2a`，保持alpha.40/0039且没有0040；最终Web `sha256:c8c3fdd52236b84e3ceb67f7b81ca2e5530bfaba964a92ebd22dab9f7da19989`已Web-only部署。隔离发出、正式备份/第二库恢复及purchase-only桌面/390×844只读取消通过；`business_post=0`、Session 0，保护指纹保持`9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`。
+- 主 UAT边界：主`RFQ-00000001`仍为DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO 0。本决定和本次部署不授权发出；正式点击“确认发出”必须另立任务并重新校验当前CAS、Binding、摘要、Mapping、PRQ和截止日。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
