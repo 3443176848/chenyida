@@ -49,13 +49,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0039`，39/head `0039_rfq_traceability.sql`，SHA-256`3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；没有0040。主`RFQ-00000001`为generation 1 / ISSUED v4、四行/两Supplier、Binding 8、`RFQ_MAPPING_CONFIRMED` 1、`RFQ_ISSUED` 1；Supplier A为RESPONDED并保留Quote ID 1/SUBMITTED v1，Supplier B为INVITED且Quote 0，Quote/Award/PO为1/0/0。八条Binding/Mapping事实未变，固定摘要仍为`9765f8fd…4848d` |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。Web为alpha.40`sha256:20b41bd34741758e707f3748baaa1018232df6be5d44cd63bed290fd49c9f4f9`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart 0/OOM false。旧Web`c8c3fdd5…`有精确FIX-27 rollback tag，四个受保护Volume未更换 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台Worker已实现Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与Dashboard；alpha.40现明确RFQ aggregate CAS包含Supplier响应，固定范围漂移与邀请生命周期解耦，并提供服务端权威Quote金额/交期/Event追溯。Python/SQLite和历史Sites/D1未由本任务改变 |
-| 当前阶段 | `SELFHOST-UAT-FIX-27`已完成。分支A语义、漂移修复、Quote追溯、隔离Supplier B报价、正式备份/恢复、Web-only部署及purchase-only只读UAT通过；Supplier A保留，主UAT Supplier B Quote仍为0 |
-| 当前任务 | 当前没有`DOING`任务；FIX-27已按`RFQ QUOTE VERSION SEMANTICS FIXED — SUPPLIER A RETAINED`收口 |
+| 当前阶段 | `SELFHOST-UI-REFRESH-01`已完成源码 UI 统一，当前 18888 非生产 UAT 未部署且仍为改造前界面；FIX-27 的 RFQ/Quote 运行事实继续保持，不进入任何报价、定标、PO或其他下游 |
+| 当前任务 | 当前无 `DOING`；UI 源码、静态合同和构建验证已完成，浏览器/UAT 验收或部署必须另获明确授权 |
 | 下一任务 | 必须由项目负责人另行明确授权；不得自动创建Supplier B Quote、修订Supplier A、生成Comparison/Award/PO或其他下游 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-UI-REFRESH-01 参考用友 YonSuite 官方展示中的一体化门户、角色工作台和紧凑企业信息布局，统一晨亿达自有登录、经营工作台、原生业务壳及 legacy 兼容台；新增企业 UI 合同，72/72 静态 UI、五组 typecheck、build/postbuild、lint、npm/Python 和 credentials 通过。API/认证/权限/业务/Schema/版本不变，未登录、写入、构建镜像、重启或部署当前 UAT
 
 - SELFHOST-UAT-FIX-27采用分支A：RFQ Version确认为询价聚合CAS，Supplier A报价导致`v3→v4`及`INVITED→RESPONDED`均为预期；范围漂移改为固定Binding/Supplier-Line/Mapping事实/摘要判定。现有Quote ID 1无独立业务编号、SUBMITTED v1、四行各120.00/总额480.00、提前10天及唯一`QUOTE_SUBMITTED`无版本转换事实已准确展示；Supplier B仍INVITED，仅在隔离环境成功报价。无0040，仅替换Web，主UAT business POST 0、Session 0、Quote/Award/PO 1/0/0
 

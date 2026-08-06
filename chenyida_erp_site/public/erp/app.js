@@ -1,4 +1,4 @@
-import { api, ErpApiError, isHistorySessionRestore, logoutSession, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "./api-client.js?v=20260731-csrf-bom-immutable-fix-05";
+import { api, ErpApiError, isHistorySessionRestore, logoutSession, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "./api-client.js?v=20260806-enterprise-ui-refresh-01";
 
 const state = {
   summary: {},

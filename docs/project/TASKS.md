@@ -11,12 +11,13 @@
 
 ## 当前任务
 
-当前没有 `DOING` 任务。`SELFHOST-UAT-FIX-27` 已完成；Supplier B Quote、Supplier A修订、Comparison、Award、PO或其他下游均未获后续授权。
+当前无 `DOING` 任务。`SELFHOST-UI-REFRESH-01` 已完成源码 UI 改造；当前非生产 UAT 未部署，后续浏览器验收或部署必须由项目负责人另行明确授权。
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-UI-REFRESH-01 | 自托管 ERP 企业级 UI 统一改造 | DONE | Codex（视觉基线、共享样式、响应式实现、静态/构建验证、文档与独立提交）、项目负责人（提出参考用友 ERP 界面改造） | 2026-08-06 | 2026-08-06 | SELFHOST-PHASE2-TASK10、SELFHOST-LANDING-TASK04、SELFHOST-UAT-FIX-27 | `SELF-HOSTED ERP UI REFRESH COMPLETE — SOURCE ONLY`。统一登录、经营工作台、原生业务壳和 legacy 兼容台，新增企业 UI 合同；72/72 静态 UI、五组 typecheck、build/postbuild、lint、npm/Python 与凭证扫描通过。API/业务/Schema/版本不变，未登录、写入、构建镜像、重启或部署 UAT。见[任务文档](../tasks/SELFHOST-UI-REFRESH-01.md)。 |
 | SELFHOST-UAT-FIX-27 | RFQ Quote Version语义、漂移判断与追溯修复 | DONE | Codex（严格门禁、限定只读诊断、0039权威语义、服务端读模型/UI修复、隔离测试、备份恢复、Web-only部署和purchase-only只读验收）、项目负责人（主UAT保护、代码修复/部署/只读验收授权） | 2026-08-06 | 2026-08-06 | SELFHOST-UAT-FIX-20、SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-24、SELFHOST-UAT-FIX-26、D-061、D-091、D-094—D-099 | `RFQ QUOTE VERSION SEMANTICS FIXED — SUPPLIER A RETAINED`。采用分支A：Quote响应正常推进RFQ aggregate CAS并把对应邀请置RESPONDED；漂移只看固定Binding/Supplier-Line/Mapping事实/摘要。现有Quote ID 1的无业务编号、SUBMITTED v1、四行/480.00/提前10天和无Event版本转换已准确展示；Supplier B仍INVITED且仅隔离验证可报价。无0040，只替换Web；主UAT business POST 0、Session 0，最终Quote/Award/PO 1/0/0。见[任务文档](../tasks/SELFHOST-UAT-FIX-27.md)及[完成报告](../tasks/SELFHOST-UAT-FIX-27-COMPLETION.md)。 |
 | SELFHOST-UAT-FIX-26 | RFQ 发出确认窗口硬性合同与 Binding 摘要排序消歧 | DONE | Codex（严格门禁、0039 权威模型核验、确认合同/UI、隔离测试、备份恢复、Web-only 部署和 purchase-only 只读取消验收）、项目负责人（固定主 UAT 禁止发出及部署/只读验收授权） | 2026-08-06 | 2026-08-06 | SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-24、SELFHOST-UAT-FIX-25、D-095、D-096、D-097、D-098 | `RFQ ISSUANCE CONFIRMATION FIXED — UAT RFQ STILL DRAFT`。采用0039独立 Binding状态分支；最终写按钮为“确认发出”，完整下游保护逐项列出，Binding/Mapping/邀请状态分栏，主表按 Binding ID 1—8，摘要顺序退出身份关联。隔离发出、备份恢复、Web-only部署和桌面/390×844 purchase-only取消均通过；业务POST 0、Session 0，RFQ仍DRAFT v2、Binding/Event 8/1、ISSUED/Quote/Award/PO 0。见[任务文档](../tasks/SELFHOST-UAT-FIX-26.md)及[完成报告](../tasks/SELFHOST-UAT-FIX-26-COMPLETION.md)。 |
 | SELFHOST-UAT-FIX-25 | RFQ Binding 关联追溯诊断与基线更正 | DONE | Codex（严格门禁、限定 PostgreSQL 只读核验、权威摘要复算、查询/DTO/UI/报告链诊断、文档更正和隔离回归）、项目负责人（主 UAT 保护边界与分支授权） | 2026-08-06 | 2026-08-06 | SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-24、D-094、D-095、D-096、D-097 | `RFQ BINDING BASELINE CORRECTED — UAT RFQ STILL DRAFT`。采用分支 B：权威关联按 Binding PK 为 1→533、2→534、3→535、4→536、5→533、6→534、7→535、8→536（Supplier 1/2各四条）；固定摘要完全一致。根因是把显示顺序 `3,4,1,2,7,8,5,6` 与 Material 顺序位置 zip。只改文档，不改代码/数据库/Migration，不登录、不备份恢复或部署，业务 POST 0；RFQ仍 DRAFT v2、Binding/Event 8/1、ISSUED/Quote/Award/PO 0。见[任务文档](../tasks/SELFHOST-UAT-FIX-25.md)及[完成报告](../tasks/SELFHOST-UAT-FIX-25-COMPLETION.md)。 |

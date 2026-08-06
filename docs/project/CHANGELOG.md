@@ -4,6 +4,15 @@
 
 ## 2026-08-06
 
+### SELFHOST-UI-REFRESH-01 - `feat: refresh self-hosted ERP interface`
+
+- Git/范围：从 strict clean `main@70045998c765d95e1abf57041cd46a8da4f9ed7e`、behind 0/ahead153起步；只统一自托管 Node/PostgreSQL ERP 的登录、经营工作台、原生共享业务壳、Supplier Mapping/RFQ扩展和legacy兼容台。版本保持alpha.40，Migration保持0039；不改API、认证、权限、业务、Schema、Compose或环境变量，不push/PR或改写历史。
+- 视觉：参考用友YonSuite官方展示的一体化门户、角色工作台和紧凑信息密度，提取浅灰背景、白色工作区、蓝色主操作、深蓝导航、紧凑表格与统一状态色等通用模式；保留晨亿达自有名称和`CY`标识，不复制用友商标、Logo、截图或素材。登录/设置/改密改为品牌信息区+白色认证区，工作台改为紧凑顶栏/上下文条/指标卡/模块与事件面板，原生和legacy业务区共享一致令牌、焦点和响应式边界。
+- 合同/缓存：新增`selfhost-enterprise-ui-contract.test.mjs`及`test:ui:enterprise`，固定设计令牌、认证结构、稳定路由、响应式、可见焦点、reduced motion和legacy身份一致性；Dashboard与legacy缓存版本统一为`20260806-enterprise-ui-refresh-01`。没有改变认证请求、退出保护、API调用或任何服务端业务规则。
+- 验证：静态UI合同最终72/72；Dashboard、Review、Project、Planning、Procurement Sourcing五组typecheck通过；生产build五阶段及postbuild consistency、npm3/3、Python三项、1,238文件credentials和diff check通过，lint 0 error/11既有warning。首次build仅因只读node_modules不能建立Vite临时目录失败，以64MiB tmpfs隔离后完整通过，工作区未写构建产物；未运行浏览器/UAT业务验收。
+- 资源/清理：available约2.2→2.2GiB、Swap286→289MiB、根盘18→18GiB、Load`0.01/0.12/0.16`→`0.38/0.62/0.52`；内核OOM0、四服务restart0/OOM false。三个参考图、受限测试容器、Python go-live测试备份及其单条活动记录已精确清零且不可恢复；历史备份、业务数据、Python 18889服务、既有dist、四卷和常驻容器保持，未prune。
+- 结论：`SELF-HOSTED ERP UI REFRESH COMPLETE — SOURCE ONLY`。没有登录、写入、构建镜像、重启或部署当前18888非生产UAT；线上仍为改造前界面，浏览器验收或部署必须另立明确授权任务。
+
 ### SELFHOST-UAT-FIX-27 - `fix: correct rfq quote traceability semantics` / `ops: deploy rfq quote traceability fix`
 
 - Git/范围：从strict clean`main@119dd04f724fccb0ef2b849b974d3e93c5c55008`、Parent`f6f7d2a`、behind 0/ahead151起步；功能提交`1be492e68f6635bc00ea3fb8ce461eac0617d8e7`，部署/UAT/清理和文档由独立ops提交收口。只修复RFQ Quote聚合CAS/邀请语义、固定范围漂移和Quote追溯；不改Migration/版本，不删除、修订或重建Supplier A Quote，不创建主UAT Supplier B Quote/Award/PO，不push/PR或改写历史。

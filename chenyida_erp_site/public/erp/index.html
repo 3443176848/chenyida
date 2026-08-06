@@ -4,13 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>晨亿达 ERP - 物料主数据治理</title>
-    <link rel="stylesheet" href="./styles.css?v=20260731-csrf-bom-immutable-fix-05" />
+    <link rel="stylesheet" href="./styles.css?v=20260806-enterprise-ui-refresh-01" />
   </head>
   <body>
     <header class="topbar" data-cyd-protected-view>
-      <div>
-        <h1>晨亿达 ERP</h1>
-        <p>物料主数据治理工作台</p>
+      <div class="brand-lockup">
+        <span class="brand-mark" aria-hidden="true">CY</span>
+        <div>
+          <h1>晨亿达 ERP</h1>
+          <p>兼容业务协同工作台</p>
+        </div>
       </div>
       <div class="topbar-actions">
         <span id="userBadge" class="user-badge" hidden>
@@ -26,15 +29,18 @@
 
     <main class="layout" data-cyd-protected-view>
       <aside class="sidebar">
+        <span class="nav-section">工作门户</span>
         <button class="nav active" data-tab="dashboard">总览</button>
         <a class="nav nav-link" href="/materials" target="_top">物料主数据</a>
         <a class="nav nav-link" href="/materials/imports/new" target="_top">供应商导入</a>
         <a class="nav nav-link" href="/materials/review" target="_top">物料审核（旧“清洗审核”已退役）</a>
+        <span class="nav-section">基础资料</span>
         <button class="nav" data-tab="items">内部物料库</button>
         <button class="nav" data-tab="mappings">供应商映射</button>
         <button class="nav" data-tab="partners">客户供应商</button>
         <button class="nav" data-tab="products">产品工程</button>
         <button class="nav" data-tab="bom">BOM 管理</button>
+        <span class="nav-section">业务协同</span>
         <button class="nav" data-tab="purchase">采购与库存</button>
         <button class="nav" data-tab="production">生产协同</button>
         <button class="nav" data-tab="quotations">询价报价</button>
@@ -779,6 +785,6 @@
     </dialog>
 
     <div id="toast" class="toast" role="alert" aria-live="assertive" hidden></div>
-    <script type="module" src="./app.js?v=20260731-csrf-bom-immutable-fix-05"></script>
+    <script type="module" src="./app.js?v=20260806-enterprise-ui-refresh-01"></script>
   </body>
 </html>

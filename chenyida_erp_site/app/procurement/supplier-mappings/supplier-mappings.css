@@ -52,3 +52,31 @@
   .sm-dialog { width: 100%; max-height: 100dvh; min-height: 100dvh; border: 0; border-radius: 0; padding: 12px; }
   .sm-dialog footer { display: grid; grid-template-columns: minmax(0,1fr); }
 }
+
+/* Shared enterprise UI finish */
+.sm-user span,
+.sm-facts dt { color: var(--erp-muted); }
+
+.sm-links a,
+.sm-quiet {
+  border-color: var(--erp-border-strong);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--erp-primary);
+  font-weight: 700;
+}
+
+.sm-card,
+.sm-edit {
+  border-color: var(--erp-border);
+  border-radius: 6px;
+  box-shadow: var(--erp-shadow-sm);
+}
+
+.sm-facts,
+.sm-facts div { border-color: var(--erp-border); }
+.sm-review-actions { border-top-color: var(--erp-warning); }
+.sm-dialog-backdrop { background: rgba(16,42,73,.68); }
+.sm-dialog { border-color: var(--erp-border-strong); border-radius: 8px; box-shadow: 0 24px 70px rgba(16,42,73,.28); }
+.sm-dialog-warning { border-left-color: var(--erp-warning); background: var(--erp-warning-soft); }
+.sm-receipt-banner { border-color: #acd2bc; border-radius: 6px; background: var(--erp-success-soft); color: var(--erp-success); }

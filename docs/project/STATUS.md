@@ -2,6 +2,19 @@
 
 最后更新时间：2026-08-06（Asia/Shanghai）
 
+## SELFHOST-UI-REFRESH-01 自托管 ERP 企业级 UI 统一改造
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | SELF-HOSTED ERP UI REFRESH COMPLETE — SOURCE ONLY | 参考用友式一体化门户、角色工作台和紧凑信息密度，统一晨亿达自有视觉；不复制商标或素材 |
+| 严格范围 | UI ONLY | 登录、经营工作台、原生共享业务壳、Supplier Mapping/RFQ 扩展和 legacy 兼容台；API/认证/权限/业务/Schema/Migration 不变 |
+| 严格起点 | PASS | clean `main@70045998`、behind 0/ahead 153；alpha.40、0039；Web/PostgreSQL healthy，Worker/Caddy running |
+| 资源起点 | PASS | available 约2.2 GiB、Swap286 MiB、根盘18 GiB、Load `0.01/0.12/0.16`；四服务restart0/OOM false |
+| 视觉实现 | PASS | 统一企业级设计令牌、响应式认证区、紧凑经营工作台、原生业务壳及 legacy 兼容台；缓存版本统一，焦点可见并支持 reduced motion |
+| 自动验证 | PASS | 静态 UI 72/72、五组 typecheck、生产 build/postbuild、npm 3/3、Python三项、1,238文件 credentials 和 diff check通过；lint 0 error/11既有warning |
+| UAT/部署 | NOT AUTHORIZED / UNCHANGED | 未登录或写入UAT，未构建镜像、重启服务或部署；当前18888运行Web保持改造前界面，alpha.40/0039不变 |
+| 资源/清理 | PASS | available约2.2→2.2GiB、Swap286→289MiB、根盘18→18GiB、Load`0.01/0.12/0.16`→`0.38/0.62/0.52`；OOM0、四服务restart0/OOM false。任务参考图、容器、Python测试备份及活动行清零，历史数据/备份和四卷不变 |
+
 ## SELFHOST-UAT-FIX-27 RFQ Quote Version语义与追溯
 
 | 验证项 | 结果 | 说明 |
