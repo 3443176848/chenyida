@@ -30,6 +30,15 @@ export class ProcurementSourcingRepository {
         (latest.id is distinct from b.supplier_mapping_version_id
           or sm.version is distinct from b.mapping_row_version
           or active_match.mapping_version_id is distinct from b.supplier_mapping_version_id) version_drift,
+        (s.status='ACTIVE' and m.material_status='ACTIVE'
+          and sm.status='ACTIVE' and sm.version=b.mapping_row_version
+          and sm.mapping_version_no=b.mapping_version_no
+          and sm.content_digest is not distinct from b.mapping_content_digest
+          and active_match.mapping_count=1
+          and active_match.mapping_version_id=b.supplier_mapping_version_id
+          and latest.id=b.supplier_mapping_version_id
+          and b.valid_from<=statement_timestamp()
+          and (b.valid_to is null or b.valid_to>statement_timestamp())) scope_intact,
         (rs.status='INVITED' and s.status='ACTIVE' and m.material_status='ACTIVE'
           and sm.status='ACTIVE' and sm.version=b.mapping_row_version
           and sm.mapping_version_no=b.mapping_version_no
@@ -88,6 +97,7 @@ export class ProcurementSourcingRepository {
       current_active_mapping_version_id: row.current_active_mapping_version_id === null ? null : Number(row.current_active_mapping_version_id),
       status_drift: row.status_drift === true,
       version_drift: row.version_drift === true,
+      scope_intact: row.scope_intact === true,
       eligible: row.eligible === true,
     } as RfqBindingDto));
   }

@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前无 `DOING` 任务。FIX-26 已补齐 RFQ 发出确认硬性合同并完成 Web-only 部署及只读取消验收；正式发出主 RFQ 必须另立任务并获得新的明确授权。
+当前唯一 `DOING` 为 `SELFHOST-UAT-FIX-27`：诊断并修复RFQ Quote提交后的aggregate CAS/邀请状态语义、Mapping漂移误判及Quote追溯展示。主UAT只允许限定只读核验；Supplier A Quote必须保留，Supplier B Quote禁止创建。
 
 ## 已完成任务
 

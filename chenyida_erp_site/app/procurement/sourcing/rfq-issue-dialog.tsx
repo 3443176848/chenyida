@@ -61,6 +61,7 @@ export type RfqMappingRow = {
   current_mapping_row_version?: number | null;
   status_drift: boolean;
   version_drift: boolean;
+  scope_intact: boolean;
   eligible: boolean;
   issue_reason?: string;
 };
@@ -91,8 +92,11 @@ export type RfqMappingBindingReceipt = {
 export type RfqMappingTraceability = {
   mode: "BOUND_AT_CREATE" | "BOUND_BY_EXPLICIT_CONFIRMATION" | "UNBOUND_LEGACY_DRAFT";
   complete: boolean;
+  scope_intact: boolean;
   can_issue: boolean;
   summary: string;
+  cas_semantics: string;
+  drift_basis: string[];
   issues: string[];
   bindings: RfqMappingRow[];
   current_qualification: RfqMappingRow[];
@@ -389,8 +393,9 @@ function MappingRows({ rows }: { rows: RfqMappingRow[] }) {
               <span>当前供应商状态：{supplier.supplier_status}</span>
             </div>
             <div className="rfq-mapping-list">
-              {supplierRows.map((row) => (
-                <article className={row.eligible && !row.status_drift && !row.version_drift ? "rfq-mapping-card" : "rfq-mapping-card drift"} key={row.binding_id || `${supplierId}:${row.material_id}:${row.mapping_id}`}>
+              {supplierRows.map((row) => {
+                const mappingHealthy = row.binding_source === "CURRENT_QUALIFICATION" ? row.eligible : row.scope_intact;
+                return <article className={mappingHealthy && !row.status_drift && !row.version_drift ? "rfq-mapping-card" : "rfq-mapping-card drift"} key={row.binding_id || `${supplierId}:${row.material_id}:${row.mapping_id}`}>
                   <div className="rfq-mapping-title">
                     <b>{row.binding_id ? `Binding ID ${row.binding_id} → Supplier ID ${row.supplier_id} / RFQ Line ID ${row.rfq_line_id ?? "—"} / Material ID ${row.material_id}` : `Material ID ${row.material_id}`}</b>
                     <span>{row.internal_material_code} · {row.standard_name}</span>
@@ -424,8 +429,8 @@ function MappingRows({ rows }: { rows: RfqMappingRow[] }) {
                     {row.binding_scope_digest ? <div className="wide"><dt>固定范围摘要</dt><dd><TraceValue>{row.binding_scope_digest}</TraceValue></dd></div> : null}
                   </dl>
                   {row.issue_reason ? <p className="rfq-mapping-issue">{row.issue_reason}</p> : null}
-                </article>
-              ))}
+                </article>;
+              })}
             </div>
           </section>
         );
@@ -478,6 +483,11 @@ export function MappingTraceabilityView({ trace }: { trace: RfqMappingTraceabili
         <span className={trace.complete ? "rfq-proof success" : "rfq-proof warning"}>{modeLabels[trace.mode]}</span>
       </div>
       <p className="rfq-proof-note">{trace.summary}</p>
+      <div className={trace.scope_intact ? "rfq-trace-ok" : "rfq-trace-warning"}>
+        <b>RFQ CAS与固定范围判定</b>
+        <p>{trace.cas_semantics}</p>
+        <p>范围漂移权威字段：{trace.drift_basis.join("；")}。</p>
+      </div>
       {proposed ? (
         <div className="rfq-trace-warning">
           <b>当前资格检查 / 尚未冻结的拟绑定 Mapping</b>

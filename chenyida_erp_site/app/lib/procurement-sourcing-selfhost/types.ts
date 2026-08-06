@@ -53,8 +53,83 @@ export type RfqBindingDto = Readonly<{
   current_active_mapping_version_id: number | null;
   status_drift: boolean;
   version_drift: boolean;
+  scope_intact: boolean;
   eligible: boolean;
   binding_scope_digest?: string | null;
+}>;
+
+export type QuoteTraceDto = Readonly<{
+  id: string;
+  quote_id: string;
+  quote_business_code: string | null;
+  has_quote_business_code: boolean;
+  rfq_id: number;
+  rfq_code: string;
+  round_no: number;
+  supplier_id: number;
+  supplier_code: string;
+  supplier_name: string;
+  quote_version_no: number;
+  supplier_quote_reference: string;
+  status: string;
+  currency_code: string;
+  valid_until: string;
+  tax_included: boolean;
+  freight_included: boolean;
+  payment_terms: string;
+  version: number;
+  recorded_by: string;
+  recorded_at: Date | string;
+  recorded_at_shanghai: string;
+  request_id: string;
+  quote_expired: boolean;
+  line_count: number;
+  total_amount: string;
+}>;
+
+export type QuoteLineTraceDto = Readonly<{
+  id: string;
+  quote_id: string;
+  rfq_line_id: number;
+  line_no: number;
+  material_id: number;
+  internal_material_code: string;
+  standard_name: string;
+  unit_id: number;
+  unit_code: string;
+  currency_code: string;
+  quoted_quantity: string;
+  minimum_order_quantity: string;
+  unit_price: string;
+  line_amount: string;
+  lead_time_days: number;
+  promised_delivery_date: string;
+  required_date: string;
+  delivery_delta_days: number;
+  early_days: number;
+  late_days: number;
+  delivery_status: "ON_TIME" | "LATE";
+  delivery_explanation: string;
+}>;
+
+export type SourcingEventTraceDto = Readonly<{
+  id: string;
+  rfq_id: number;
+  quote_id: string | null;
+  comparison_id: string | null;
+  award_id: string | null;
+  event_type: string;
+  actor: string;
+  request_id: string;
+  result: string;
+  reason: string;
+  created_at: Date | string;
+  occurred_at_shanghai: string;
+  old_version: number | null;
+  new_version: number | null;
+  version_transition_recorded: boolean;
+  version_transition_semantics: "RECORDED" | "NOT_RECORDED";
+  scope_digest: string | null;
 }>;
 
 export type RfqMappingBindingReceiptDto = Readonly<{
@@ -84,19 +159,22 @@ export type RfqDetailDto = Readonly<{
   header: Record<string, unknown>;
   lines: Array<Record<string, unknown>>;
   suppliers: Array<Record<string, unknown>>;
-  quotes: Array<Record<string, unknown>>;
-  quote_lines: Array<Record<string, unknown>>;
+  quotes: QuoteTraceDto[];
+  quote_lines: QuoteLineTraceDto[];
   comparisons: Array<Record<string, unknown>>;
   comparison_lines: Array<Record<string, unknown>>;
   award: Record<string, unknown> | null;
-  events: Array<Record<string, unknown>>;
+  events: SourcingEventTraceDto[];
   creation_receipt: Record<string, unknown>;
   mapping_binding_receipt: RfqMappingBindingReceiptDto;
   mapping_traceability: Readonly<{
     mode: "BOUND_AT_CREATE" | "BOUND_BY_EXPLICIT_CONFIRMATION" | "UNBOUND_LEGACY_DRAFT";
     complete: boolean;
+    scope_intact: boolean;
     can_issue: boolean;
     summary: string;
+    cas_semantics: string;
+    drift_basis: string[];
     issues: string[];
     bindings: RfqBindingDto[];
     current_qualification: Array<Record<string, unknown>>;

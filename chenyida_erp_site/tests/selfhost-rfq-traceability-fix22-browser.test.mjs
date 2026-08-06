@@ -1249,6 +1249,167 @@ test("isolated Chromium keeps a fixed legacy RFQ draft after all issuance confir
   }
 });
 
+test("isolated Chromium traces the first Quote response while the second Supplier remains independently quoteable", { timeout: 300_000 }, async () => {
+  await clearSyntheticData();
+  const fixture = await seedFixture();
+  const chromium = await loadChromium();
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true, args: ["--disable-dev-shm-usage", "--no-sandbox"] });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: "block" });
+    const page = await context.newPage();
+    await login(page, fixture.credentials);
+    const session = await (await context.request.get(`${REQUIRED_ORIGIN}/api/session`)).json();
+    assert.ok(session.authenticated && session.csrf_token);
+    const mutationHeaders = (key = randomUUID(), origin = REQUIRED_ORIGIN, csrf = session.csrf_token) => ({
+      Origin: origin,
+      "X-CSRF-Token": csrf,
+      "Idempotency-Key": key,
+    });
+    const create = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs`, {
+      headers: mutationHeaders(),
+      data: { purchase_request_id: 1, supplier_ids: [1, 2], response_deadline: "2099-08-31", expected_version: 1 },
+    });
+    assert.equal(create.status(), 201, await create.text());
+    const issued = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/issue`, {
+      headers: mutationHeaders(),
+      data: { expected_version: 1 },
+    });
+    assert.equal(issued.status(), 200, await issued.text());
+    const fixed = await sourcingState();
+    assert.equal(fixed.header[0].version, 2);
+    assert.equal(fixed.header[0].status, "ISSUED");
+    assert.equal(fixed.bindings.length, 8);
+    const fixedBindings = structuredClone(fixed.bindings);
+    const fixedDigest = fixed.events.find((event) => event.event_type === "RFQ_ISSUED")?.scope_digest;
+    assert.ok(fixedDigest);
+
+    const rfqLines = (await pool.query("select id::int from procurement_rfq_lines where rfq_id=1 order by line_no")).rows;
+    const quoteBody = (supplierId, expectedVersion, reference) => ({
+      expected_version: expectedVersion,
+      supplier_id: supplierId,
+      supplier_quote_reference: reference,
+      valid_until: "2099-09-30",
+      tax_included: false,
+      freight_included: false,
+      payment_terms: "隔离浏览器测试付款条件",
+      lines: rfqLines.map(({ id }) => ({
+        rfq_line_id: id,
+        quoted_quantity: "10.000000",
+        minimum_order_quantity: "10.000000",
+        unit_price: "12.000000",
+        lead_time_days: 75,
+        promised_delivery_date: "2099-10-20",
+      })),
+    });
+    const beforeSecurity = await sourcingState();
+    const missingCsrf = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/quotes`, {
+      headers: { Origin: REQUIRED_ORIGIN, "Idempotency-Key": randomUUID() },
+      data: quoteBody(1, 2, "ISO-Q-A-MISSING-CSRF"),
+    });
+    assert.equal(missingCsrf.status(), 403);
+    const wrongOrigin = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/quotes`, {
+      headers: mutationHeaders(randomUUID(), "http://untrusted.invalid"),
+      data: quoteBody(1, 2, "ISO-Q-A-WRONG-ORIGIN"),
+    });
+    assert.equal(wrongOrigin.status(), 403);
+    const planningContext = await browser.newContext({ serviceWorkers: "block" });
+    try {
+      const planningLogin = await planningContext.request.post(`${REQUIRED_ORIGIN}/api/login`, {
+        headers: { Origin: REQUIRED_ORIGIN },
+        data: fixture.planningCredentials,
+      });
+      assert.equal(planningLogin.status(), 200);
+      const planningSession = await (await planningContext.request.get(`${REQUIRED_ORIGIN}/api/session`)).json();
+      const forbidden = await planningContext.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/quotes`, {
+        headers: { Origin: REQUIRED_ORIGIN, "X-CSRF-Token": planningSession.csrf_token, "Idempotency-Key": randomUUID() },
+        data: quoteBody(1, 2, "ISO-Q-A-FORBIDDEN"),
+      });
+      assert.equal(forbidden.status(), 403);
+    } finally {
+      await planningContext.close();
+    }
+    assert.deepEqual(await sourcingState(), beforeSecurity);
+
+    const quoteAResponse = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/quotes`, {
+      headers: mutationHeaders(),
+      data: quoteBody(1, 2, "ISO-Q-A"),
+    });
+    const quoteAText = await quoteAResponse.text();
+    assert.equal(quoteAResponse.status(), 201, quoteAText);
+    const quoteA = JSON.parse(quoteAText);
+    assert.deepEqual({ quote_id: quoteA.quote_id, quote_version_no: quoteA.quote_version_no, status: quoteA.status, rfq_version: quoteA.rfq_version }, { quote_id: 1, quote_version_no: 1, status: "SUBMITTED", rfq_version: 3 });
+    const staleB = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/quotes`, {
+      headers: mutationHeaders(),
+      data: quoteBody(2, 2, "ISO-Q-B-STALE"),
+    });
+    assert.equal(staleB.status(), 409);
+    assert.equal((await staleB.json()).code, "VERSION_CONFLICT");
+
+    const afterA = await sourcingState();
+    assert.equal(afterA.header[0].version, 3);
+    assert.equal(afterA.header[0].status, "ISSUED");
+    assert.deepEqual(afterA.bindings, fixedBindings);
+    assert.equal(afterA.events.filter((event) => event.event_type === "QUOTE_SUBMITTED").length, 1);
+    assert.equal(afterA.events.find((event) => event.event_type === "RFQ_ISSUED")?.scope_digest, fixedDigest);
+    assert.deepEqual((await pool.query("select supplier_id::int,status from procurement_rfq_suppliers where rfq_id=1 order by supplier_id")).rows, [
+      { supplier_id: 1, status: "RESPONDED" },
+      { supplier_id: 2, status: "INVITED" },
+    ]);
+
+    await page.goto(`${REQUIRED_ORIGIN}/procurement/sourcing/1`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "RFQ-00000001 · Round 1", exact: true }).waitFor();
+    await page.getByRole("heading", { name: "Quote追溯 · 数据库ID 1", exact: true }).waitFor();
+    const pageText = await page.locator("body").innerText();
+    for (const required of [
+      "Round 1 / v3", "RESPONDED / 已报价", "INVITED / 待报价", "Quote入口：可报价",
+      "稳定Quote数据库ID", "未设置独立Quote业务编号", "ID 1 / SUP-000001", "ID 1 / Round 1",
+      "当前 v1", "SUBMITTED", "ISO-Q-A", "2099-09-30", "10 PCS × 12.00 CNY",
+      "120.00 CNY", "480.00 CNY", "2099-10-20", "2099-10-30", "ON_TIME / 准时",
+      "准时，提前10天", fixture.credentials.username, "Asia/Shanghai", quoteA.request_id, "SUCCESS",
+      "只产生QUOTE_SUBMITTED", "没有独立CREATE Event", "事件未记录版本转换",
+      "RFQ Version是询价聚合CAS", "Supplier报价响应会正常推进CAS", fixedDigest,
+    ]) assert.ok(pageText.includes(required), `Quote traceability missing: ${required}`);
+    assert.equal(pageText.includes("vnull"), false);
+    assert.equal(pageText.includes("当前阻断项"), false);
+    assert.equal(await page.locator(".rfq-mapping-card.drift").count(), 0);
+    assert.equal(await page.locator('.sourcing-quote select[name="supplier_id"] option[value="1"]').count(), 0);
+    assert.equal(await page.locator('.sourcing-quote select[name="supplier_id"] option[value="2"]').count(), 1);
+    await noOverflow(page, "Quote traceability desktop");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await noOverflow(page, "Quote traceability 390x844");
+
+    const quoteBResponse = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/quotes`, {
+      headers: mutationHeaders(),
+      data: quoteBody(2, 3, "ISO-Q-B"),
+    });
+    assert.equal(quoteBResponse.status(), 201, await quoteBResponse.text());
+    const finalState = await sourcingState();
+    assert.equal(finalState.header[0].version, 4);
+    assert.deepEqual(finalState.bindings, fixedBindings);
+    assert.equal(finalState.downstream.quotes, 2);
+    assert.equal(finalState.downstream.awards, 0);
+    assert.equal(finalState.downstream.purchase_orders, 0);
+    assert.deepEqual((await pool.query("select supplier_id::int,status from procurement_rfq_suppliers where rfq_id=1 order by supplier_id")).rows, [
+      { supplier_id: 1, status: "RESPONDED" },
+      { supplier_id: 2, status: "RESPONDED" },
+    ]);
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "退出", exact: true }).click();
+    await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
+    assert.equal(Number((await pool.query(
+      "select count(*) count from app_sessions where username=$1 and revoked_at is null and expires_at>now()",
+      [fixture.credentials.username],
+    )).rows[0].count), 0);
+    await context.close();
+    console.info("RFQ_QUOTE_SEMANTICS_FIX27_BROWSER_OK rfq=1 quote_a=1 quote_b=1 aggregate_cas=4 bindings=8 drift=0 total_a=480.00 delivery_delta=10 desktop=1 mobile=1 award=0 po=0 session=0");
+  } finally {
+    await browser?.close().catch(() => undefined);
+  }
+});
+
 test.after(async () => {
   await stopServer();
   await clearSyntheticData();

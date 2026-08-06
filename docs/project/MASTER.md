@@ -50,8 +50,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888` 经未重建的 Caddy 可信 TLS 到 Web；单值 Origin 与端口边界保持。Web 为 alpha.40 `sha256:c8c3fdd52236b84e3ceb67f7b81ca2e5530bfaba964a92ebd22dab9f7da19989`，Worker 仍为 `sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务 restart 0/OOM false。旧 Web `315f0b79…` 有精确 FIX-26 rollback tag，四个受保护 Volume 未更换 |
 | 当前开发环境 | Node.js/PostgreSQL/本地文件/后台 Worker 已实现 Identity、主数据/BOM、库存、采购、生产、销售、品质、财务与 Dashboard；alpha.40 在 Supplier Mapping 治理和 RFQ 覆盖率之上增加 RFQ 精确 Mapping 绑定、创建/发出 lifecycle credential 和安全确认。Python/SQLite 和历史 Sites/D1 未由本任务改变 |
 | 当前阶段 | `SELFHOST-UAT-FIX-26` 已完成。0039 独立 `binding_status` 权威分支、发出确认硬性合同、Binding ID 1—8 主展示及摘要顺序消歧已 Web-only 部署；固定摘要、Binding/Event和全部下游未改变 |
-| 当前任务 | 无 `DOING`；FIX-26 已以 `RFQ ISSUANCE CONFIRMATION FIXED — UAT RFQ STILL DRAFT` 收口并停止 |
-| 下一任务 | 只有项目负责人另立任务并明确授权后，才可重新读取 CAS/Binding/摘要/Mapping/PRQ/截止日并决定是否正式发出主 RFQ；FIX-26 不构成发出、Quote、Award或PO授权 |
+| 当前任务 | `SELFHOST-UAT-FIX-27` 为唯一 `DOING`：按分支A修复Quote提交后的RFQ aggregate CAS/邀请状态语义、Mapping漂移误判及Quote追溯展示；Supplier A现有Quote必须保留，主UAT禁止创建Supplier B Quote |
+| 下一任务 | 完成FIX-27隔离测试、备份恢复、Web-only部署及purchase-only只读验收；不得由本任务创建Supplier B Quote、Award、PO或其他下游 |
 
 ## 当前完成模块
 
