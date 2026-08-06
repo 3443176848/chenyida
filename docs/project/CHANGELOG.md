@@ -4,6 +4,14 @@
 
 ## 2026-08-06
 
+### SELFHOST-DASHBOARD-ROLE-HUB-03 - `feat: simplify ERP workbench role entrances`
+
+- 范围/信息架构：从 clean `main@8aa3f70329a11cffb2ee43d2942b3c4484e6137f` 起步，只简化登录后根工作台；密集指标、风险、治理、事件和模块方块退出首屏，改为管理员、采购、市场、计划、工程、财务、生产、仓库八部门导航与单一当前部门业务清单。登录/设置/改密/退出、业务页面和 legacy 内容未改。
+- 权限/模块：40 个现有 Dashboard 模块被完整且唯一归入八部门；页面只从 `/api/summary` 消费服务端已裁剪模块，未授权部门不可进入，业务路由仍二次执行服务端认证授权。根工作台不再无用请求 Management Dashboard/Backup Governance；API 实现、权限定义、CSRF、幂等、业务、Schema/Migration、alpha.40 均不变。
+- 响应式/验证：桌面为角色导航+单清单，720px 以下纵向，保留焦点、选中/禁用态、无横向溢出和 reduced motion。UI 合同73/73、五组typecheck、lint、生产build/postbuild、npm3/3、Python三项、1,241文件credentials和diff check通过。
+- 资源/边界：唯一受限只读构建容器使用tmpfs且已清零；available约2.1→2.2GiB、Swap292→306MiB、根盘19→19GiB、Load`0.07/0.18/0.32`→`2.51/1.97/1.03`，四服务restart0/OOM false。本提交未登录、写入、构建在线镜像或部署UAT；项目负责人随后明确授权独立Web-only部署任务。
+- 结论：`ROLE-BASED WORKBENCH COMPLETE — SOURCE ONLY`。
+
 ### SELFHOST-UI-REFRESH-DEPLOY-02 - `ops: deploy enterprise ui refresh`
 
 - 授权/范围：项目负责人在`SELFHOST-UI-REFRESH-01`完成后明确授权；从clean`main@aac6f349f39e81b886916c639cbfc8a541bd0b7b`、behind0/ahead154起步，只把企业级UI Web-only部署到18888非生产UAT并做匿名只读验收。不登录、不发业务POST，不运行Migration，不替换PostgreSQL/Worker/Caddy/四卷，不部署历史Sites或生产。

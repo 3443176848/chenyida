@@ -11,19 +11,34 @@ const html = await readFile(new URL("../public/erp/index.html", import.meta.url)
 const materialImportCreate = await readFile(new URL("../app/materials/_components/material-import-create-page.tsx", import.meta.url), "utf8");
 const selfhostWorker = await readFile(new URL("../app/lib/selfhost-worker.ts", import.meta.url), "utf8");
 
-test("root is native, authenticated, non-production and independently loads cards", () => {
+test("root is native, authenticated, non-production and loads the permission-cropped summary", () => {
   assert.doesNotMatch(page, /<iframe/i);
   assert.match(page, /ErpWorkbench/);
   assert.doesNotMatch(workbench, /<iframe/i);
-  for (const route of ["/api/session", "/api/summary", "/api/management-dashboard", "/api/backup-governance", "/api/setup", "/api/login", "/api/me/password"]) assert.match(workbench, new RegExp(route));
+  for (const route of ["/api/session", "/api/summary", "/api/setup", "/api/login", "/api/me/password"]) assert.match(workbench, new RegExp(route));
+  assert.doesNotMatch(workbench, /\/api\/(?:management-dashboard|backup-governance)/);
   assert.match(workbench, /logoutSession/);
   assert.match(workbench, /非生产开发基线/);
   assert.match(workbench, /loadCard/);
   assert.doesNotMatch(workbench, /Promise\.all/);
 });
 
+test("root exposes exactly eight role entrances and keeps every authorized module in one group", () => {
+  const roleBlock = workbench.match(/const ROLE_ENTRANCES:[^=]+=\[([\s\S]*?)\n\];/);
+  const moduleBlock = dashboardService.match(/const MODULES:[^=]+=\[([\s\S]*?)\n\];/);
+  assert.ok(roleBlock);
+  assert.ok(moduleBlock);
+  assert.deepEqual([...roleBlock[1].matchAll(/label:"([^"]+)"/g)].map((match) => match[1]), ["管理员", "采购", "市场", "计划", "工程", "财务", "生产", "仓库"]);
+  const groupedCodes = [...roleBlock[1].matchAll(/moduleCodes:\[([^\]]*)\]/g)].flatMap((match) => [...match[1].matchAll(/"([^"]+)"/g)].map((code) => code[1]));
+  const serviceCodes = [...moduleBlock[1].matchAll(/\{code:"([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(new Set(groupedCodes).size, groupedCodes.length, "a module must not appear under multiple roles");
+  assert.deepEqual([...groupedCodes].sort(), [...serviceCodes].sort(), "all server-cropped modules must remain reachable");
+  for (const contract of ["wb-role-hub", "wb-role-tabs", "wb-role-panel", "role=\"tablist\"", "role=\"tabpanel\"", "服务端权限实时裁剪"]) assert.ok(workbench.includes(contract), contract);
+  assert.doesNotMatch(workbench, /wb-metrics|wb-modules|经营风险与待办|最近受控业务事件|备份与恢复治理/);
+});
+
 test("legacy remains explicit, has allowlisted deep links, and no browser backup restore control", () => {
-  assert.match(workbench, /legacy 兼容业务台/);
+  assert.match(workbench, /兼容业务台/);
   assert.match(legacy, /LEGACY_TABS = new Set/);
   assert.match(legacy, /requestedLegacyTab/);
   for (const tab of ["partners", "bom", "purchase", "production", "sales", "quality", "finance"]) assert.match(legacy, new RegExp(`"${tab}"`));
@@ -50,7 +65,6 @@ test("legacy supplier import delegates to the native PostgreSQL batch workflow",
   assert.match(legacy, /\.nav\[data-tab\]/);
   assert.match(materialImportCreate, /accept="\.xlsx,\.xls,\.csv"/);
   for (const parser of [/await parseMaterialImportCsv\(/, /await parseMaterialImportXls\(/, /await parseMaterialImportXlsx\(/]) assert.match(selfhostWorker, parser);
-  assert.match(workbench, /\/erp\/index\.html\?v=20260806-enterprise-ui-refresh-01/);
   assert.match(dashboardService, /const LEGACY_UI_VERSION="20260806-enterprise-ui-refresh-01"/);
   assert.doesNotMatch(dashboardService, /href:"\/erp\/index\.html\?tab=/);
   for (const tab of ["partners", "bom", "purchase", "production", "sales", "quality", "finance", "operations"]) assert.match(dashboardService, new RegExp(`legacyHref\\("${tab}"\\)`));

@@ -2,6 +2,18 @@
 
 最后更新时间：2026-08-06（Asia/Shanghai）
 
+## SELFHOST-DASHBOARD-ROLE-HUB-03 登录后八角色工作台
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | ROLE-BASED WORKBENCH COMPLETE — SOURCE ONLY | 根工作台已改为管理员、采购、市场、计划、工程、财务、生产、仓库八入口与单一当前部门清单 |
+| 严格范围 | ROOT UI ONLY | 只改根工作台组件、共享样式和 UI 契约；认证、权限定义、API、业务、Schema/Migration、版本及业务页面不变 |
+| 权限与覆盖 | PASS | 当前40个Dashboard模块完整唯一归入八部门；实际链接只取服务端Summary裁剪结果，未授权部门不可进入 |
+| 密度与响应式 | PASS | 指标/风险/治理/事件/全模块方块退出首屏；桌面左右分栏，720px以下纵向，焦点/禁用/reduced-motion/无页面级溢出保持 |
+| 自动验证 | PASS | UI 73/73、五组typecheck、lint、生产build/postbuild、npm3/3、Python三项、1,241文件credentials及diff check通过 |
+| UAT/部署 | AUTHORIZED / NOT YET EXECUTED | 源码任务未登录、写入、构建在线镜像或替换服务；负责人随后明确授权独立Web-only部署任务 |
+| 资源/清理 | PASS | available约2.1→2.2GiB、Swap292→306MiB、根盘19GiB、Load`0.07/0.18/0.32`→`2.51/1.97/1.03`；四服务restart0/OOM false，临时容器清零 |
+
 ## SELFHOST-UI-REFRESH-DEPLOY-02 企业级 UI Web-only 部署
 
 | 验证项 | 结果 | 说明 |

@@ -11,12 +11,13 @@
 
 ## 当前任务
 
-当前无 `DOING` 任务。`SELFHOST-UI-REFRESH-DEPLOY-02` 已完成企业级 UI Web-only 部署和匿名只读验收；登录式浏览器验收、业务操作或生产切流必须另获明确授权。
+当前无 `DOING` 任务。`SELFHOST-DASHBOARD-ROLE-HUB-03` 已完成源码与验证；项目负责人已明确授权后续 `SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04` Web-only 部署，须在独立任务中执行。
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-DASHBOARD-ROLE-HUB-03 | 登录后工作台八角色入口简化 | DONE | Codex（信息架构、UI、测试、文档与独立提交）、项目负责人（指定八个入口） | 2026-08-06 | 2026-08-06 | SELFHOST-UI-REFRESH-01、SELFHOST-UI-REFRESH-DEPLOY-02、SELFHOST-PHASE2-TASK10 | `ROLE-BASED WORKBENCH COMPLETE — SOURCE ONLY`。根工作台改为管理员、采购、市场、计划、工程、财务、生产、仓库八入口与单一部门清单；40 模块完整唯一分组，仍由 Summary 服务端裁剪。UI 73/73、五组 typecheck、lint/build、npm/Python/credentials通过；alpha.40/0039不变，UAT未部署。见[任务文档](../tasks/SELFHOST-DASHBOARD-ROLE-HUB-03.md)。 |
 | SELFHOST-UI-REFRESH-DEPLOY-02 | 企业级 UI Web-only 部署与匿名只读验收 | DONE | Codex（保护基线、备份恢复、候选镜像、Web-only替换、匿名在线验收、清理与文档）、项目负责人（明确授权部署） | 2026-08-06 | 2026-08-06 | SELFHOST-UI-REFRESH-01、SELFHOST-UAT-FIX-27 | `ENTERPRISE UI DEPLOYED — ANONYMOUS READ-ONLY VERIFIED`。新Web `f139257b…` 已上线，旧Web `20b41bd…` 精确回退标签和root-only备份保留；HTTPS/新资产/安全头/匿名401通过。0039、保护指纹、Session/Audit和RFQ/Quote事实不变；无登录、业务POST、Migration或其他服务替换。见[任务文档](../tasks/SELFHOST-UI-REFRESH-DEPLOY-02.md)及[完成报告](../tasks/SELFHOST-UI-REFRESH-DEPLOY-02-COMPLETION.md)。 |
 | SELFHOST-UI-REFRESH-01 | 自托管 ERP 企业级 UI 统一改造 | DONE | Codex（视觉基线、共享样式、响应式实现、静态/构建验证、文档与独立提交）、项目负责人（提出参考用友 ERP 界面改造） | 2026-08-06 | 2026-08-06 | SELFHOST-PHASE2-TASK10、SELFHOST-LANDING-TASK04、SELFHOST-UAT-FIX-27 | `SELF-HOSTED ERP UI REFRESH COMPLETE — SOURCE ONLY`。统一登录、经营工作台、原生业务壳和 legacy 兼容台，新增企业 UI 合同；72/72 静态 UI、五组 typecheck、build/postbuild、lint、npm/Python 与凭证扫描通过。API/业务/Schema/版本不变，未登录、写入、构建镜像、重启或部署 UAT。见[任务文档](../tasks/SELFHOST-UI-REFRESH-01.md)。 |
 | SELFHOST-UAT-FIX-27 | RFQ Quote Version语义、漂移判断与追溯修复 | DONE | Codex（严格门禁、限定只读诊断、0039权威语义、服务端读模型/UI修复、隔离测试、备份恢复、Web-only部署和purchase-only只读验收）、项目负责人（主UAT保护、代码修复/部署/只读验收授权） | 2026-08-06 | 2026-08-06 | SELFHOST-UAT-FIX-20、SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-24、SELFHOST-UAT-FIX-26、D-061、D-091、D-094—D-099 | `RFQ QUOTE VERSION SEMANTICS FIXED — SUPPLIER A RETAINED`。采用分支A：Quote响应正常推进RFQ aggregate CAS并把对应邀请置RESPONDED；漂移只看固定Binding/Supplier-Line/Mapping事实/摘要。现有Quote ID 1的无业务编号、SUBMITTED v1、四行/480.00/提前10天和无Event版本转换已准确展示；Supplier B仍INVITED且仅隔离验证可报价。无0040，只替换Web；主UAT business POST 0、Session 0，最终Quote/Award/PO 1/0/0。见[任务文档](../tasks/SELFHOST-UAT-FIX-27.md)及[完成报告](../tasks/SELFHOST-UAT-FIX-27-COMPLETION.md)。 |

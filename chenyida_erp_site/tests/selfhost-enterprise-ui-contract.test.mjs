@@ -44,7 +44,7 @@ test("enterprise theme defines one blue-gray visual language with accessible int
 });
 
 test("root authentication and workbench use branded enterprise shells without changing auth routes", () => {
-  for (const className of ["wb-auth-layout", "wb-auth-brand", "wb-auth-capabilities", "wb-auth-panel", "wb-header-brand", "wb-contextbar", "wb-authority"]) {
+  for (const className of ["wb-auth-layout", "wb-auth-brand", "wb-auth-capabilities", "wb-auth-panel", "wb-header-brand", "wb-contextbar", "wb-authority", "wb-role-hub", "wb-role-tabs", "wb-role-panel", "wb-role-modules"]) {
     assert.ok(workbench.includes(className), className);
   }
   for (const route of ["/api/session", "/api/login", "/api/setup", "/api/me/password", "/api/logout"]) {
@@ -53,6 +53,9 @@ test("root authentication and workbench use branded enterprise shells without ch
   assert.match(workbench, /autoComplete="username"/);
   assert.match(workbench, /autoComplete="current-password"/);
   assert.match(workbench, /data-cyd-protected-view/);
+  assert.match(globals, /\.wb-role-hub\s*\{/);
+  assert.match(globals, /\.wb-role-tabs button\.is-active/);
+  assert.match(globals, /@media \(max-width: 720px\)[\s\S]*\.wb-role-hub \{ min-height: 0; grid-template-columns: 1fr; \}/);
   assert.doesNotMatch(workbench, /yonyou|用友|<img|backgroundImage/i);
 });
 
@@ -77,6 +80,6 @@ test("legacy shell uses the same identity and one cache-busted asset release", (
   assert.match(legacyStyles, /\.auth-brand/);
   assert.match(legacyStyles, /:focus-visible/);
   const release = "20260806-enterprise-ui-refresh-01";
-  for (const source of [legacyHtml, legacyApp, workbench, dashboardService]) assert.ok(source.includes(release));
+  for (const source of [legacyHtml, legacyApp, dashboardService]) assert.ok(source.includes(release));
   assert.doesNotMatch(`${legacyHtml}\n${legacyStyles}`, /yonyou|用友|https?:\/\/.*\.(?:png|jpe?g|svg)/i);
 });
