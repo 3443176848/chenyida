@@ -288,7 +288,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await noOverflow(page, "390x844 Quote traceability");
   const mobileText = await page.locator("body").innerText();
-  includesAll(mobileText, ["Quote追溯 · 数据库ID 1", "480.00 CNY", "准时，提前10天", "SUP-000002 · INVITED"], "mobile Quote traceability");
+  includesAll(mobileText, ["Quote追溯 · 数据库ID 1", "480.00 CNY", "准时，提前10天", "SUP-000002", "INVITED / 待报价"], "mobile Quote traceability");
   assert.equal(await page.locator('.sourcing-quote select[name="supplier_id"] option[value="2"]').count(), 1);
   assert.deepEqual(businessWrites, []);
   assert.deepEqual(directBusinessWrites, []);

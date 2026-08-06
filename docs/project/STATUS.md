@@ -2,6 +2,28 @@
 
 最后更新时间：2026-08-06（Asia/Shanghai）
 
+## SELFHOST-UAT-FIX-27 RFQ Quote Version语义与追溯
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | RFQ QUOTE VERSION SEMANTICS FIXED — SUPPLIER A RETAINED | 采用分支A；错误漂移已修复并Web-only部署，Supplier A Quote ID 1保留，主UAT未创建Supplier B Quote |
+| 严格起点 | PASS | clean`main@119dd04`、Parent`f6f7d2a`、behind0/ahead151；alpha.40、0001—0039、0039 SHA、Web`c8c3fdd5…`、主RFQ保护事实和资源完全吻合 |
+| RFQ CAS | AGGREGATE / EXPECTED v3→v4 | Quote首版事务锁定RFQ并推进aggregate CAS；0039允许ISSUED→ISSUED且Version+1。v3→v4不是范围漂移，不回退 |
+| 邀请状态 | EXPECTED INVITED→RESPONDED | Supplier A成功Quote后为RESPONDED；Supplier B独立保持INVITED、Quote0且服务端入口可用 |
+| 漂移根因/修复 | FIXED / FAIL-CLOSED | 旧`eligible`混入邀请INVITED并被固定Binding阻断项复用；现以Binding/Supplier-Line/Mapping ID-Version-Row CAS-content-status-effective/唯一性和摘要判断，真实漂移仍阻断 |
+| 固定范围 | PASS / IMMUTABLE | Binding 1—8、Mapping ID/Version/Row CAS/content digest与Supplier/Line集合不变；重算摘要`9765f8fdef768335a25b314867dd3e077429a84848cba067ff8394c8a017848d`一致 |
+| Quote身份/状态 | ID 1 / SUBMITTED v1 | 无独立业务编号，精确显示“未设置独立Quote业务编号”；Supplier ID1/SUP-000001、RFQ ID1/Round1、外部参考`UAT-Q-A-042576`、有效期2026-09-30 |
+| Event语义 | DIRECT SUBMIT / NO CREATE | 唯一`QUOTE_SUBMITTED/SUCCESS`；单事务直接提交没有CREATE。历史Event无版本列，不回填，显示“事件未记录版本转换”，当前v1独立显示，无`vnull` |
+| 金额/交期 | SERVER AUTHORITATIVE | 四行各10 PCS×12.00 CNY=120.00，总额480.00；需求2026-10-30、承诺2026-10-20、`ON_TIME`/准时提前10天，均由服务端读模型投影 |
+| Supplier B隔离验证 | PASS / MAIN ZERO | 隔离环境可成功提交且并发单胜；临时库已删。主UAT只确认入口，不进入/填写/提交，Supplier B Quote仍0 |
+| 自动验证 | PASS | Unit/UI 9/9+12/12、隔离PG21/21、Chromium3/3、0018 3/3、0039 6/6、npm3/3、environment6/6、Python三项；typecheck/build/credentials/diff通过，lint0 error/11既有warning |
+| 备份/恢复 | PASS | root:root 0600 dump 2,286,915 bytes、SHA-256`4fa038e093a846ae0d8380f383b5fc9a89cb926aded1c3bc98746269f89a400d`；list3,359行，第二新库39/head/226表与保护指纹一致后已删 |
+| Web-only部署 | PASS | Web`c8c3fdd5…→20b41bd34741758e707f3748baaa1018232df6be5d44cd63bed290fd49c9f4f9`、88,551,279 bytes；无Migration，PostgreSQL/Worker/Caddy身份和四卷不变，旧Web rollback tag保留 |
+| 主UAT | PASS / READ ONLY | purchase-only桌面/390×844准确核对Quote追溯、金额、交期和无漂移；Supplier B入口仅观察；`business_post=0`、Session0。首次仅runner连续字符串断言错误，安全退出且哈希不变，修正后通过 |
+| 主UAT数据 | PASS / UNCHANGED | 指纹`597eb456837e0cda35d3544c1aeae94f3a190eed373d1145de5a72261fe37f9f`；RFQ ISSUED v4、Binding8、Mapping/Issued Event1/1、Supplier A/B Quote1/0、Quote/Award/PO1/0/0 |
+| 资源/清理 | PASS | 起点/最终available约2.1/2.2GiB、Swap290/287MiB、根盘19/18GiB、最终Load`0.14/0.17/0.33`；瞬时Load未持续越界，内核OOM0、四服务restart0/OOM false。临时库/容器/runtime/SQLite清零，未prune |
+| Git/后续 | TWO FOCUSED COMMITS / NEW AUTH REQUIRED | 功能`1be492e`；收口消息`ops: deploy rfq quote traceability fix`。后续Supplier B Quote、A修订、Comparison/Award/PO均须新授权 |
+
 ## SELFHOST-UAT-FIX-26 RFQ 发出确认硬性合同
 
 | 验证项 | 结果 | 说明 |

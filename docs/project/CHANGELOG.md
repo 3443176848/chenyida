@@ -4,6 +4,17 @@
 
 ## 2026-08-06
 
+### SELFHOST-UAT-FIX-27 - `fix: correct rfq quote traceability semantics` / `ops: deploy rfq quote traceability fix`
+
+- Git/范围：从strict clean`main@119dd04f724fccb0ef2b849b974d3e93c5c55008`、Parent`f6f7d2a`、behind 0/ahead151起步；功能提交`1be492e68f6635bc00ea3fb8ce461eac0617d8e7`，部署/UAT/清理和文档由独立ops提交收口。只修复RFQ Quote聚合CAS/邀请语义、固定范围漂移和Quote追溯；不改Migration/版本，不删除、修订或重建Supplier A Quote，不创建主UAT Supplier B Quote/Award/PO，不push/PR或改写历史。
+- 权威语义/根因：采用分支A。Quote首版在单事务中锁RFQ CAS、写Header/Lines、邀请`INVITED→RESPONDED`、RFQ Version+1和唯一`QUOTE_SUBMITTED`；因此主RFQ`v3→v4`和Supplier A RESPONDED均正常。旧详情把要求INVITED的`eligible`用于已固定Binding阻断并以“Mapping Version/CAS漂移”兜底，错误把正常响应当范围漂移；现以Binding/Supplier-Line/Mapping ID-Version-Row CAS-content-status-effective/唯一性和scope digest为唯一范围依据，真实漂移仍fail closed。
+- Quote追溯：服务端显式投影稳定Quote数据库ID、独立业务编号存在性、RFQ/Supplier/Quote版本状态、actor/上海时间/request_id、行金额/总额、需求/承诺日期、提前/延期和`ON_TIME|LATE`。页面显示Quote ID 1、无独立业务编号、Supplier 1/RFQ 1/Round1、SUBMITTED v1、`UAT-Q-A-042576`、四行各120.00/总额480.00、提前10天；单事务直接提交只有`QUOTE_SUBMITTED`，无CREATE，历史Event空版本显示“事件未记录版本转换”，无`vnull`。
+- Supplier独立入口：Supplier A显示RESPONDED且不再出现在首版Quote下拉；Supplier B显示INVITED且`quote_entry_enabled=true`。隔离环境验证Supplier B成功及并发单胜后删除测试库；主UAT只观察入口，未进入/填写/提交，Supplier B Quote始终0。
+- 自动验证：Unit/UI`9/9+12/12`、隔离PostgreSQL`21/21`、Chromium`3/3`、0018 upgrade`3/3`、0039`6/6`、npm`3/3`、environment`6/6`和Python三项通过；typecheck、production/Docker build、1,236文件credentials和diff check通过，lint 0 error/11既有warning。首次environment因容器漏挂根config失败，修正挂载后通过；没有改断言。
+- 备份/部署：predeploy dump为root:root 0600、2,286,915 bytes、SHA-256`4fa038e093a846ae0d8380f383b5fc9a89cb926aded1c3bc98746269f89a400d`；list 3,359行，第二新库恢复39/head/226表和指纹一致后已删。仅替换Web`c8c3fdd5…→20b41bd3…`，无Migration；PostgreSQL/Worker/Caddy和四卷不变，旧Web精确rollback tag保留。
+- 主UAT/结论：保护指纹在部署前、恢复库、部署后、首次runner停止后和最终UAT后始终为`597eb456837e0cda35d3544c1aeae94f3a190eed373d1145de5a72261fe37f9f`。首次runner仅因移动端把分栏文字错断言为连续字符串而停止，logout/Session0/业务零写；修正runner后purchase-only桌面/390×844通过，`business_post=0`、Session0。最终RFQ ISSUED v4、Binding8、摘要`9765f8fd…4848d`、Supplier A Quote ID1保留、Supplier B Quote0、Quote/Award/PO 1/0/0。结论`RFQ QUOTE VERSION SEMANTICS FIXED — SUPPLIER A RETAINED`。
+- 资源/清理：起点/最终available约2.1/2.2GiB、Swap290/287MiB、根盘19/18GiB、最终Load`0.14/0.17/0.33`；瞬时Load6.21未持续三分钟，Swap最高约292MiB，内核OOM0、四服务restart0/OOM false。临时库/恢复库/容器/runtime/SQLite清零，未prune；正式备份、当前/候选/rollback Web和四卷保留。
+
 ### SELFHOST-UAT-FIX-26 - `fix: clarify rfq issuance confirmation` / `ops: deploy rfq issuance confirmation contract`
 
 - Git/范围：从 strict clean `main@f0202b083387c4f60eb5537221b1ce51d2dd93de`、Parent `08af2f4`、behind 0/ahead 149起步；功能提交`f6f7d2a`，部署/UAT/清理和文档由独立ops提交收口。只补齐发出确认UI合同、只读UAT/保护runner和测试；不改发出服务端业务规则、Migration、版本、Binding/Mapping/Event/摘要或主业务数据，不push/PR或改写历史。

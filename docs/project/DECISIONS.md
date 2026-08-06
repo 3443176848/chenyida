@@ -1118,6 +1118,20 @@
 - 实施结果：功能提交`f6f7d2a`，保持alpha.40/0039且没有0040；最终Web `sha256:c8c3fdd52236b84e3ceb67f7b81ca2e5530bfaba964a92ebd22dab9f7da19989`已Web-only部署。隔离发出、正式备份/第二库恢复及purchase-only桌面/390×844只读取消通过；`business_post=0`、Session 0，保护指纹保持`9c7b43774e1d0562785933729d40329a69a3230b5b1580473ac29a2463037d3f`。
 - 主 UAT边界：主`RFQ-00000001`仍为DRAFT v2、Binding 8、Mapping Event 1、ISSUED/Quote/Award/PO 0。本决定和本次部署不授权发出；正式点击“确认发出”必须另立任务并重新校验当前CAS、Binding、摘要、Mapping、PRQ和截止日。
 
+## D-099 RFQ聚合CAS包含Supplier响应，固定范围漂移与邀请生命周期必须解耦
+
+- 日期：2026-08-06
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
+- 确认人：项目负责人（明确要求诊断Quote提交后的RFQ CAS与邀请状态权威语义，保留Supplier A Quote并禁止在主UAT创建Supplier B Quote）
+- 聚合语义：RFQ Head `version`是整个询价聚合的CAS，不只保护RFQ Header或发出范围。Supplier首版Quote提交在一个Repository事务内锁定RFQ并校验CAS，插入Quote Header/Lines，把对应邀请`INVITED→RESPONDED`，推进RFQ Version一次并写Quote Event/Audit/幂等结果。因此主RFQ`ISSUED v3→ISSUED v4`和Supplier A `INVITED→RESPONDED`均为正常成功语义，不得回退到v3或把RESPONDED纠正为INVITED。
+- 范围漂移：冻结范围完整性只由固定Binding数量/稳定ID/归属、Supplier与RFQ Line固定集合、Mapping ID/Version/Row CAS/content digest/状态/有效期/唯一性和固定scope digest决定。邀请响应状态及RFQ当前聚合CAS相对发出Event的变化不是Mapping漂移谓词；真实Binding/Mapping变化继续失败关闭。
+- Supplier独立性：每个RFQ Supplier邀请具有独立生命周期。Supplier A成功报价后为RESPONDED且不再允许直接提交首版；Supplier B保持INVITED、无Quote且可独立提交首版。页面和服务端必须按Supplier投影入口，不能因另一Supplier已响应而关闭整个RFQ报价入口。
+- Quote身份与Event：现有0039/0018模型没有独立Quote业务编号列，稳定数据库ID是当前权威身份；页面必须明确“未设置独立Quote业务编号”，不得伪造。Quote由单事务直接提交，只产生`QUOTE_SUBMITTED`，没有独立CREATE Event。现有Event未记录Quote版本转换时必须显示“事件未记录版本转换”，当前Quote v1从Quote Header独立显示；禁止渲染`vnull`、反推或回填历史Event。
+- 金额与交期：详情服务端必须投影或核对数量、单价、行金额、总额、需求日期、承诺日期、提前/延期天数、`ON_TIME|LATE`和中文解释；浏览器只做显示格式化，不能成为金额或交期业务语义的唯一权威。
+- 迁移决定：0039已经保存全部必需权威事实，故不修改0039、不新增0040、不回填历史Event，版本保持`0.1.0-alpha.40`。
+- 实施结果：功能提交`1be492e68f6635bc00ea3fb8ce461eac0617d8e7`，最终Web`sha256:20b41bd34741758e707f3748baaa1018232df6be5d44cd63bed290fd49c9f4f9`已Web-only部署。正式备份/第二库恢复、隔离PostgreSQL/Chromium和purchase-only主UAT只读验收通过；保护指纹始终为`597eb456837e0cda35d3544c1aeae94f3a190eed373d1145de5a72261fe37f9f`。最终RFQ ISSUED v4、Binding 8、固定摘要`9765f8fdef768335a25b314867dd3e077429a84848cba067ff8394c8a017848d`、Supplier A Quote ID 1/SUBMITTED v1、Supplier B Quote 0、Quote/Award/PO 1/0/0、business POST 0、Session 0。
+- 后续边界：本决定只确认当前语义和展示，不授权Supplier B报价、Supplier A修订、Comparison、Award、PO或其他下游。任何后续写入必须另立任务并重新读取当前CAS和保护事实。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

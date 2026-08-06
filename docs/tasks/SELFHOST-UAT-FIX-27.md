@@ -2,7 +2,7 @@
 
 ## 状态与唯一范围
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始：2026-08-06（Asia/Shanghai）
 - 负责人：Codex（严格门禁、限定只读诊断、0039权威语义、服务端读模型/UI修复、隔离测试、备份恢复、Web-only部署和purchase-only只读验收）；项目负责人（主UAT保护边界及代码修复、部署、只读验收授权）
 - 依赖：`SELFHOST-UAT-FIX-20`、`SELFHOST-UAT-FIX-22`、`SELFHOST-UAT-FIX-24`、`SELFHOST-UAT-FIX-26`、D-061、D-091、D-094—D-098
@@ -60,3 +60,10 @@
 - `RFQ QUOTE DATA INTEGRITY BLOCKED — NO UAT CHANGE`
 
 完成后立即停止，不创建Supplier B Quote。
+
+## 完成结果
+
+- 最终状态：`RFQ QUOTE VERSION SEMANTICS FIXED — SUPPLIER A RETAINED`。
+- 功能提交：`1be492e68f6635bc00ea3fb8ce461eac0617d8e7`（`fix: correct rfq quote traceability semantics`）；部署和验收由独立`ops: deploy rfq quote traceability fix`收口。
+- Web-only部署、正式备份/第二库恢复、最终保护哈希与purchase-only桌面/390×844只读验收均通过；`business_post=0`、Session 0，Supplier A Quote ID 1保留，Supplier B Quote 0，Quote/Award/PO `1/0/0`。
+- 详细证据见[完成报告](SELFHOST-UAT-FIX-27-COMPLETION.md)。

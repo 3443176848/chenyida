@@ -24,11 +24,12 @@ if (process.env.ERP_RFQ_QUOTE_FIX27_PROTECTION_CONFIRM !== REQUIRED_CONFIRMATION
 }
 const databaseUrl = process.env.ERP_FIX27_DATABASE_URL || "";
 const expectedDatabaseName = (process.env.ERP_FIX27_DATABASE_NAME || "").trim();
-if (!databaseUrl || expectedDatabaseName !== EXPECTED_DATABASE) {
-  throw new Error(`ERP_FIX27_DATABASE_URL and ERP_FIX27_DATABASE_NAME=${EXPECTED_DATABASE} are required`);
+const restoreDatabasePattern = /^rfq_quote_fix27_restore_\d{8}$/;
+if (!databaseUrl || (expectedDatabaseName !== EXPECTED_DATABASE && !restoreDatabasePattern.test(expectedDatabaseName))) {
+  throw new Error(`ERP_FIX27_DATABASE_URL must target ${EXPECTED_DATABASE} or an exact FIX-27 restore database`);
 }
 const connectionUrl = new URL(databaseUrl);
-assert.equal(decodeURIComponent(connectionUrl.pathname.replace(/^\//, "")), EXPECTED_DATABASE);
+assert.equal(decodeURIComponent(connectionUrl.pathname.replace(/^\//, "")), expectedDatabaseName);
 
 const args = process.argv.slice(2);
 let captureBaseline = false;
@@ -76,7 +77,7 @@ try {
   await client.query("begin isolation level repeatable read read only");
   await client.query("set local statement_timeout='15s'; set local lock_timeout='3s'");
   const connection = (await client.query("select current_database() database_name,current_setting('transaction_read_only') transaction_read_only")).rows[0];
-  assert.deepEqual(connection, { database_name: EXPECTED_DATABASE, transaction_read_only: "on" });
+  assert.deepEqual(connection, { database_name: expectedDatabaseName, transaction_read_only: "on" });
   const ledger = (await client.query("select version,checksum from schema_migrations order by version")).rows;
   assert.deepEqual(ledger, migrationNames.map((version) => ({ version, checksum: migrationManifest.get(version) })));
 

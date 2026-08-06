@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
-最后核验：2026-08-05（Asia/Shanghai）
-适用任务：最新功能与并行非生产部署验收为 `SELFHOST-UAT-FIX-22`；历史发布/恢复记录保留下文
+最后核验：2026-08-06（Asia/Shanghai）
+适用任务：最新功能与并行非生产部署验收为 `SELFHOST-UAT-FIX-27`；历史发布/恢复记录保留下文
 
 ## 1. 使用规则
 
@@ -17,6 +17,7 @@
 
 | 运行面 | 版本/标识 | Git 基线 | 数据库基线 | 测试状态 | 部署状态 | 真实数据迁移 | 回退基线 | 批准状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Node.js / PostgreSQL RFQ Quote Traceability 并行 UAT | `0.1.0-alpha.40` | 功能提交 `1be492e68f6635bc00ea3fb8ce461eac0617d8e7`；运维/文档提交消息 `ops: deploy rfq quote traceability fix`，SHA 以 Git log 为准 | 源码与并行 PostgreSQL 均为 `0001`—`0039`；主 RFQ `ISSUED v4`、Binding 8、Supplier A/B Quote `1/0`、Quote/Award/PO `1/0/0` | Unit/UI `9/9 + 12/12`、隔离 PostgreSQL `21/21`、隔离 Chromium `3/3`、Migration `3/3 + 6/6`、npm/Python/typecheck/lint/build/credentials及主UAT purchase-only只读桌面/390×844验收通过 | Web-only `DEPLOYED` 到受控并行非生产 UAT；PostgreSQL/Worker/Caddy未重建，未运行Migration；`NOT_RELEASED` 到生产 | `NOT_MIGRATED`；只保留既有合成UAT事实，没有写入主UAT业务数据 | root:root 0600 dump SHA `4fa038e…` 已list并恢复第二新库；旧Web `sha256:c8c3fdd…`精确tag保留 | `RFQ QUOTE VERSION SEMANTICS FIXED — SUPPLIER A RETAINED`；Supplier B入口可用但不得在本任务创建Quote |
 | Node.js / PostgreSQL RFQ Traceability 并行 UAT | `0.1.0-alpha.40` | 功能提交 `b339acd97f08e4cc09451173b48580015817d9f8`；运维/文档提交消息 `ops: deploy rfq issuance safeguards`，SHA 以 Git log 为准 | 源码与并行 PostgreSQL 均为 `0001`—`0039`；主 RFQ generation 1 / DRAFT v1、Binding/Event 0、Quote/Award/PO及全部下游 0 | Migration 6/6、Unit/UI/PG 26/26、Material Requirement 12/12、真实跨域 2/2、隔离 Chromium、typecheck/lint/build/credentials/Python和主 UAT purchase-only只读取消验收通过 | `DEPLOYED` 到受控并行非生产 UAT；`NOT_RELEASED` 到生产 | `NOT_MIGRATED`；未固定或发出主 RFQ，未迁真实公司数据 | root:root 0600 dump SHA `960cd6a…` 已 list、第二空库恢复0038并升级0039；alpha.39和alpha.40时区修复前Web精确tag保留 | `RFQ TRACEABILITY DEPLOYED — UAT RFQ STILL DRAFT`；必须新授权先显式固定 Mapping，不能直接发出 |
 | Node.js / PostgreSQL Supplier Mapping 治理并行 UAT | `0.1.0-alpha.39` | 功能提交 `ddab02a57e0e87255c7a35d125959ac750b108e1`；legacy Unit 修复 `1e9221d90db621becc2badf40b3e0ed3017b73e6`；运维/文档提交消息 `ops: deploy supplier mapping governance`，SHA 以 Git log 为准 | 源码与并行 PostgreSQL 均为 `0001`—`0038`；主 UAT 目标 Mapping、RFQ、Quote、Award、PO 和下游均为 0 | Unit/UI 12/12、Mapping PG 8/8、Migration 5/5、适用静态/UI/PG、npm/Python、typecheck/lint/build/credentials、隔离 Chromium 通过；purchase 主 UAT 只读通过，operations 因既有强制改密未验证 | `DEPLOYED` 到受控并行非生产 UAT；`NOT_RELEASED` 到生产 | `NOT_MIGRATED`；未创建八条主 UAT Mapping或其他业务事实 | root:root 0600 dump SHA `2d1fe44f…` 已 list/第二空库 0037 恢复和 0038 升级；原 alpha.38 与首次 alpha.39 Web 精确 tag 保留 | `SUPPLIER MAPPING GOVERNANCE DEPLOYED — MAIN UAT NOT VERIFIED`；operations 身份阻断解除并获新授权前不得开始八条 Mapping |
 | Node.js / PostgreSQL Project Unit Resolution 并行 UAT | `0.1.0-alpha.37` | 功能提交 `91c0fd29d534246c55ddd669e894cdde9b774e52`；运维/文档提交消息 `ops: deploy requirement unit resolution in parallel environment`，SHA 以 Git log 为准 | 源码与并行 PostgreSQL 均为 `0001`—`0036`；主 UAT Unit Resolution/Head 与 Package/Item/Event 均为 0 | Migration 6/6、Project PG 5/5、Planning PG 10/10、静态 89/89、适用 PG 25/25、npm 3/3、typecheck/lint/build、隔离和主 UAT 只读 Chromium 通过 | `DEPLOYED` 到受控并行非生产 UAT；`NOT_RELEASED` 到生产 | `NOT_MIGRATED`；未迁移真实公司数据 | 正式 0034 停服 dump 已校验并恢复第二新空库；旧 Web 精确 tag 保留；回退恢复演练通过 | `VERSIONED REQUIREMENT UNIT RESOLUTION DEPLOYED — UAT PACKAGE UNCHANGED`；只解除技术阻断，不代表业务 Package 已创建 |
@@ -32,9 +33,9 @@
 | Node.js / PostgreSQL 原始自托管开发基线 | `0.1.0-alpha.1` | 功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；发布追踪提交 `12d3ea30d21cce6918de0c525d81f19af289f5ac` | PostgreSQL `0001`—`0005` | PHASE0-TASK03 的隔离 lint/test/typecheck/build/credentials、Python 三项与 diff check 通过 | `NOT_RELEASED` / `NOT_DEPLOYED`；历史开发基线，不代表当前包版本 | `NOT_MIGRATED` | Git `39946f6` + 当时 migration checksum；未建立生产恢复点 | `NOT_APPROVED_FOR_PRODUCTION`；该历史定义保留且不因后续 alpha 演进而改写 |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.1` 是 PHASE0-TASK03 建立的原始非生产发布基线，不是当前包版本。当前源码和并行非生产 UAT 已演进到 `0.1.0-alpha.40`/`0039`；既有部门交接、Manufacturing Batch、Finished Goods Lot/FQC/Shipment、Supplier Receipt Lot→IQC、Project Unit Resolution、Revision Response 和 Supplier Mapping 治理事实保持，并新增 RFQ 精确 Mapping 绑定、创建/发出凭证与确认门禁。这只证明非生产链路和升级恢复门禁成立，不表示真实公司数据已迁移或已批准生产上线。
+`0.1.0-alpha.1` 是 PHASE0-TASK03 建立的原始非生产发布基线，不是当前包版本。当前源码和并行非生产 UAT 已演进到 `0.1.0-alpha.40`/`0039`；既有部门交接、Manufacturing Batch、Finished Goods Lot/FQC/Shipment、Supplier Receipt Lot→IQC、Project Unit Resolution、Revision Response 和 Supplier Mapping 治理事实保持，并新增 RFQ 精确 Mapping 绑定、创建/发出凭证与确认门禁，以及 Quote 聚合CAS、邀请响应、固定范围漂移和追溯展示的权威语义。这只证明非生产链路和升级恢复门禁成立，不表示真实公司数据已迁移或已批准生产上线。
 
-Git 同步状态以 2026-08-05 FIX-22 起点计：clean `main@60538d08509f91eeb0df91718c7276172c23557d`，`origin/main...HEAD` 为 behind 0/ahead 142；功能和独立运维/文档收口后为 ahead 144，均未推送。最终状态以 `git status --short --branch` 为准。
+Git 同步状态以 2026-08-06 FIX-27 起点计：clean `main@119dd04f724fccb0ef2b849b974d3e93c5c55008`，`origin/main...HEAD` 为 behind 0/ahead 151；功能和独立运维/文档收口后为 ahead 153，均未推送。最终状态以 `git status --short --branch` 为准。
 
 ## 3. Migration 文件与 SHA-256 基线
 
