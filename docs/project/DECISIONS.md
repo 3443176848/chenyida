@@ -1132,6 +1132,18 @@
 - 实施结果：功能提交`1be492e68f6635bc00ea3fb8ce461eac0617d8e7`，最终Web`sha256:20b41bd34741758e707f3748baaa1018232df6be5d44cd63bed290fd49c9f4f9`已Web-only部署。正式备份/第二库恢复、隔离PostgreSQL/Chromium和purchase-only主UAT只读验收通过；保护指纹始终为`597eb456837e0cda35d3544c1aeae94f3a190eed373d1145de5a72261fe37f9f`。最终RFQ ISSUED v4、Binding 8、固定摘要`9765f8fdef768335a25b314867dd3e077429a84848cba067ff8394c8a017848d`、Supplier A Quote ID 1/SUBMITTED v1、Supplier B Quote 0、Quote/Award/PO 1/0/0、business POST 0、Session 0。
 - 后续边界：本决定只确认当前语义和展示，不授权Supplier B报价、Supplier A修订、Comparison、Award、PO或其他下游。任何后续写入必须另立任务并重新读取当前CAS和保护事实。
 
+## D-100 Comparison Version采用关系化复合身份、服务端状态投影和确定性摘要
+
+- 日期：2026-08-06
+- 状态：`ACCEPTED / IMPLEMENTED`
+- 确认人：项目负责人（明确要求复用逐RFQ Line Comparison模型，补齐版本级追溯、聚合摘要、Event操作分组和移动端展示；禁止创建Award/PO或默认新增0040）
+- 身份决定：`procurement_quote_comparisons.id`继续是每条Comparison Line的稳定数据库ID；现有关系模型没有独立Comparison Header ID，不伪造整数Header。Comparison Version的权威复合身份由RFQ ID、Round、Comparison Version以及按RFQ Line稳定排列的全部持久化`basis_digest`共同确定，页面必须如实说明该边界。
+- 状态投影：Schema没有独立Comparison状态列。服务端将RFQ/Round最新Version且其固定Quote输入仍为当前可定标版本投影为`CURRENT`；存在更新Version的历史版本投影为`SUPERSEDED`；最新Version若固定输入已漂移则失败关闭定标并投影`INPUT_DRIFT`。这些都是读模型状态，Award仍由服务端和数据库按最新Comparison Version、固定Quote Line和当前资格重新验证，不能信任页面标签。
+- 输入与输出摘要：输入摘要直接展示逐Comparison Line持久化`basis_digest`，不创造单一aggregate持久化摘要。输出摘要由服务端按Material ID、Supplier ID、Comparison Line ID、Comparison Candidate ID稳定排序，从已保存Comparison Candidate和不可变Quote Line重算Version、固定Quote Line、Material、Supplier、数量、单价、行金额、排名、承诺日期、交期状态及提前/延期天数；该摘要是确定性读模型字段，不回填历史数据库字段。
+- 聚合与Event：Supplier总额、最晚承诺日、交期风险、Supplier间金额/百分比/日期差和逐Material对比均由同一确定性服务端读模型投影。Comparison Event必须独立查询，按actor、时间、request_id和result形成一次“Comparison生成操作凭证”；主UAT真实四条Line级Event应逐条关联Comparison Line/Material，但不得解释为四次点击或四个Comparison Version，也不得删除、合并或改写历史Event。
+- 生成与迁移：当前Quote输入摘要已存在于任一完整Comparison Version时，生成操作幂等返回该Version且不新增Comparison Line、Candidate、Event或RFQ CAS；Quote修订形成新当前输入后才允许生成下一Version，旧Version永久不可变。0039已保存稳定Comparison/Quote Line引用、basis、排名、金额、日期及Event身份，足以重算读模型，因此不修改0039、不新增0040，版本保持`0.1.0-alpha.40`。
+- UI与任务边界：桌面使用对比表，390×844使用Supplier汇总卡、Material逐项卡和可折叠追溯凭证；长digest/request_id可换行复制，生成按钮按服务端状态禁用，定标入口保持可见。本决定只授权Comparison读模型、幂等保护、Web-only部署和purchase-only只读验收；不授权打开定标窗口、创建Award、转PO或其他业务写入。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

@@ -169,6 +169,8 @@
     "uat:rfq-issuance-confirmation-fix26": "node --experimental-strip-types scripts/selfhost-rfq-issuance-confirmation-fix26-uat-readonly-browser.mjs",
     "protect:rfq-quote-semantics-fix27": "node --experimental-strip-types scripts/selfhost-rfq-quote-semantics-fix27-protection.mjs",
     "uat:rfq-quote-semantics-fix27": "node --experimental-strip-types scripts/selfhost-rfq-quote-semantics-fix27-uat-readonly-browser.mjs",
+    "protect:rfq-comparison-aggregate": "node --experimental-strip-types scripts/selfhost-rfq-comparison-aggregate-protection.mjs",
+    "uat:rfq-comparison-aggregate": "node --experimental-strip-types scripts/selfhost-rfq-comparison-aggregate-uat-readonly-browser.mjs",
     "typecheck:procurement-fulfillment": "tsc -p tsconfig.phase4-task05.json --pretty false",
     "test:procurement-fulfillment:unit": "node --experimental-strip-types --test tests/selfhost-procurement-fulfillment-unit.test.mjs",
     "test:procurement-fulfillment:ui": "node --experimental-strip-types --test tests/selfhost-procurement-fulfillment-ui-contract.test.mjs",

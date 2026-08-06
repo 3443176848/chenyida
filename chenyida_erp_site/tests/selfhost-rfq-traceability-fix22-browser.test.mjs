@@ -64,7 +64,7 @@ async function clearSyntheticData() {
   if (quoted.length) await pool.query(`truncate table ${quoted.join(",")} restart identity cascade`);
 }
 
-async function seedFixture() {
+async function seedFixture({ targetDate = "2099-10-30" } = {}) {
   const credentials = { username: "fix22_purchase", password: `Isolated!Fix22-${randomUUID()}` };
   const planningCredentials = { username: "planning01", password: `Isolated!Fix26-Planning-${randomUUID()}` };
   const client = await pool.connect();
@@ -112,8 +112,8 @@ async function seedFixture() {
         project_code,customer_id,project_name,project_goal,market_owner,project_owner,status,
         target_delivery_date,current_requirement_version_no,version,request_id,created_by
       ) values('PRJ-00000001',$1,'FIX-22 隔离 RFQ 项目','追溯与发出安全浏览器验收','admin01',
-        'engineering01','ACCEPTED','2099-10-30',1,4,$2,'admin01') returning id`,
-      [customer.id, randomUUID()],
+        'engineering01','ACCEPTED',$2,1,4,$3,'admin01') returning id`,
+      [customer.id, targetDate, randomUUID()],
     )).rows[0];
     const requirement = (await client.query(
       `insert into project_requirement_versions(
@@ -125,16 +125,16 @@ async function seedFixture() {
       `insert into project_planning_packages(
         project_id,package_version_no,requirement_version_id,status,target_delivery_date,package_digest,
         prepared_by,submitted_by,submitted_at,accepted_by,accepted_at,version,request_id
-      ) values($1,1,$2,'ACCEPTED','2099-10-30',$3,'engineering01','engineering01',now(),
-        'planning01',now(),3,$4) returning id`,
-      [project.id, requirement.id, sha256("fix22-browser-package"), randomUUID()],
+      ) values($1,1,$2,'ACCEPTED',$3,$4,'engineering01','engineering01',now(),
+        'planning01',now(),3,$5) returning id`,
+      [project.id, requirement.id, targetDate, sha256("fix22-browser-package"), randomUUID()],
     )).rows[0];
     const plan = (await client.query(
       `insert into planning_material_requirement_plans(
         project_id,planning_package_id,plan_version_no,required_date,status,source_package_version,
         source_package_digest,calculation_digest,prepared_by,submitted_by,submitted_at,version,request_id
-      ) values($1,$2,1,'2099-10-30','SUBMITTED',3,$3,$4,'planning01','planning01',now(),1,$5) returning id`,
-      [project.id, packageRow.id, sha256("fix22-browser-package"), sha256("fix22-browser-calculation"), randomUUID()],
+      ) values($1,$2,1,$3,'SUBMITTED',3,$4,$5,'planning01','planning01',now(),1,$6) returning id`,
+      [project.id, packageRow.id, targetDate, sha256("fix22-browser-package"), sha256("fix22-browser-calculation"), randomUUID()],
     )).rows[0];
     const planLineIds = [];
     for (const [index, materialId] of MATERIAL_IDS.entries()) {
@@ -291,15 +291,15 @@ async function stopServer() {
 
 async function login(page, credentials) {
   await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" });
-  await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "欢迎使用晨亿达 ERP", exact: true }).waitFor();
   await page.getByLabel("账号", { exact: true }).fill(credentials.username);
   await page.getByLabel("密码", { exact: true }).fill(credentials.password);
   const response = page.waitForResponse(
     (item) => item.url() === `${REQUIRED_ORIGIN}/api/login` && item.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "登录", exact: true }).click();
+  await page.getByRole("button", { name: "登录工作台", exact: true }).click();
   assert.equal((await response).status(), 200);
-  await page.getByRole("heading", { name: "经营工作台", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "角色工作台", exact: true }).waitFor();
 }
 
 async function noOverflow(page, stage) {
@@ -571,9 +571,9 @@ test("isolated Chromium enforces the RFQ issuance confirmation contract and issu
         rfq_line_id: String(row.rfq_line_id),
         material_id: String(row.material_id),
         mapping_id: row.mapping_id,
-        binding_status: "ACTIVE",
-        mapping_status: "ACTIVE",
-        invitation_status: "INVITED",
+        binding_status: "已生效",
+        mapping_status: "已生效",
+        invitation_status: "待报价",
         status_drift: "否",
         version_drift: "否",
       }));
@@ -856,8 +856,8 @@ test("isolated Chromium enforces the RFQ issuance confirmation contract and issu
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: "退出", exact: true }).click();
-    await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
+    await page.getByRole("button", { name: "安全退出", exact: true }).click();
+    await page.getByRole("heading", { name: "欢迎使用晨亿达 ERP", exact: true }).waitFor();
     await assertNoProtectedRfq(page, "logout");
     await page.goBack({ waitUntil: "domcontentloaded" });
     await assertNoProtectedRfq(page, "history back");
@@ -1081,9 +1081,9 @@ test("isolated Chromium keeps a fixed legacy RFQ draft after all issuance confir
         rfq_line_id: String(row.rfq_line_id),
         material_id: String(row.material_id),
         mapping_id: row.mapping_id,
-        binding_status: "ACTIVE",
-        mapping_status: "ACTIVE",
-        invitation_status: "INVITED",
+        binding_status: "已生效",
+        mapping_status: "已生效",
+        invitation_status: "待报价",
         status_drift: "否",
         version_drift: "否",
       }));
@@ -1234,8 +1234,8 @@ test("isolated Chromium keeps a fixed legacy RFQ draft after all issuance confir
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: "退出", exact: true }).click();
-    await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
+    await page.getByRole("button", { name: "安全退出", exact: true }).click();
+    await page.getByRole("heading", { name: "欢迎使用晨亿达 ERP", exact: true }).waitFor();
     await assertNoProtectedRfq(page, "FIX-23 logout");
     assert.deepEqual(authPosts, ["/api/login", "/api/logout"]);
     assert.equal(Number((await pool.query(
@@ -1397,14 +1397,242 @@ test("isolated Chromium traces the first Quote response while the second Supplie
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: "退出", exact: true }).click();
-    await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
+    await page.getByRole("button", { name: "安全退出", exact: true }).click();
+    await page.getByRole("heading", { name: "欢迎使用晨亿达 ERP", exact: true }).waitFor();
     assert.equal(Number((await pool.query(
       "select count(*) count from app_sessions where username=$1 and revoked_at is null and expires_at>now()",
       [fixture.credentials.username],
     )).rows[0].count), 0);
     await context.close();
     console.info("RFQ_QUOTE_SEMANTICS_FIX27_BROWSER_OK rfq=1 quote_a=1 quote_b=1 aggregate_cas=4 bindings=8 drift=0 total_a=480.00 delivery_delta=10 desktop=1 mobile=1 award=0 po=0 session=0");
+  } finally {
+    await browser?.close().catch(() => undefined);
+  }
+});
+
+test("isolated Chromium renders the Comparison aggregate read model on desktop and 390x844 without creating Award or PO", { timeout: 300_000 }, async () => {
+  await clearSyntheticData();
+  const fixture = await seedFixture({ targetDate: "2026-10-30" });
+  const chromium = await loadChromium();
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true, args: ["--disable-dev-shm-usage", "--no-sandbox"] });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: "block" });
+    const page = await context.newPage();
+    await login(page, fixture.credentials);
+    const session = await (await context.request.get(`${REQUIRED_ORIGIN}/api/session`)).json();
+    assert.ok(session.authenticated && session.csrf_token);
+    const mutationHeaders = (key = randomUUID()) => ({
+      Origin: REQUIRED_ORIGIN,
+      "X-CSRF-Token": session.csrf_token,
+      "Idempotency-Key": key,
+    });
+    const create = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs`, {
+      headers: mutationHeaders(),
+      data: { purchase_request_id: 1, supplier_ids: [1, 2], response_deadline: "2026-08-31", expected_version: 1 },
+    });
+    assert.equal(create.status(), 201, await create.text());
+    const issue = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/issue`, {
+      headers: mutationHeaders(),
+      data: { expected_version: 1 },
+    });
+    assert.equal(issue.status(), 200, await issue.text());
+    const rfqLines = (await pool.query(
+      "select id::int,material_id::int from procurement_rfq_lines where rfq_id=1 order by line_no",
+    )).rows;
+    assert.deepEqual(rfqLines.map(({ material_id }) => material_id), MATERIAL_IDS);
+    const quoteBody = ({ supplierId, expectedVersion, reference, price, promisedDate }) => ({
+      expected_version: expectedVersion,
+      supplier_id: supplierId,
+      supplier_quote_reference: reference,
+      valid_until: "2026-09-30",
+      tax_included: false,
+      freight_included: false,
+      payment_terms: "月结 30 天",
+      lines: rfqLines.map(({ id }) => ({
+        rfq_line_id: id,
+        quoted_quantity: "10.000000",
+        minimum_order_quantity: "10.000000",
+        unit_price: price,
+        lead_time_days: 75,
+        promised_delivery_date: promisedDate,
+      })),
+    });
+    const quoteAResponse = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/quotes`, {
+      headers: mutationHeaders(),
+      data: quoteBody({
+        supplierId: 1,
+        expectedVersion: 2,
+        reference: "UAT-Q-A-042576",
+        price: "12.000000",
+        promisedDate: "2026-10-20",
+      }),
+    });
+    assert.equal(quoteAResponse.status(), 201, await quoteAResponse.text());
+    const quoteBResponse = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/quotes`, {
+      headers: mutationHeaders(),
+      data: quoteBody({
+        supplierId: 2,
+        expectedVersion: 3,
+        reference: "UAT-Q-B-042576",
+        price: "10.000000",
+        promisedDate: "2026-11-05",
+      }),
+    });
+    assert.equal(quoteBResponse.status(), 201, await quoteBResponse.text());
+    const comparisonResponse = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/comparisons`, {
+      headers: mutationHeaders(),
+      data: { expected_version: 4 },
+    });
+    const comparisonText = await comparisonResponse.text();
+    assert.equal(comparisonResponse.status(), 201, comparisonText);
+    const comparison = JSON.parse(comparisonText);
+    assert.equal(comparison.comparison_version_no, 1);
+
+    const databaseBaseline = (await pool.query(`select
+      (select count(*)::int from procurement_quote_comparisons where rfq_id=1) comparison_lines,
+      (select count(*)::int from procurement_quote_comparison_lines line
+        join procurement_quote_comparisons comparison on comparison.id=line.comparison_id
+        where comparison.rfq_id=1) comparison_candidates,
+      (select count(*)::int from procurement_sourcing_events
+        where rfq_id=1 and event_type='COMPARISON_GENERATED') comparison_events,
+      (select count(*)::int from procurement_sourcing_awards where rfq_id=1) awards,
+      (select count(*)::int from purchase_orders) purchase_orders,
+      (select version::int from procurement_rfqs where id=1) rfq_version`)).rows[0];
+    assert.deepEqual(databaseBaseline, {
+      comparison_lines: 4,
+      comparison_candidates: 8,
+      comparison_events: 4,
+      awards: 0,
+      purchase_orders: 0,
+      rfq_version: 5,
+    });
+
+    const aggregateResponse = await context.request.get(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1`);
+    assert.equal(aggregateResponse.status(), 200);
+    const aggregate = (await aggregateResponse.json()).data.comparison_read_model;
+    assert.equal(aggregate.has_independent_header_id, false);
+    assert.equal(aggregate.comparison_header_id, null);
+    assert.equal(aggregate.current_version.comparison_version_no, 1);
+    assert.equal(aggregate.current_version.status, "CURRENT");
+    assert.equal(aggregate.current_version.persisted_status, false);
+    assert.equal(aggregate.current_version.quote_inputs_current, true);
+    assert.equal(aggregate.current_version.input_drift, false);
+    assert.equal(aggregate.current_version.comparison_rows.length, 4);
+    assert.equal(aggregate.current_version.fixed_quote_inputs.length, 8);
+    assert.equal(aggregate.current_version.output_summary.canonical_rows.length, 8);
+    assert.match(aggregate.current_version.output_summary.digest, /^[0-9a-f]{64}$/);
+    assert.equal(aggregate.current_version.operation_receipts.length, 1);
+    assert.equal(aggregate.current_version.operation_receipts[0].event_count, 4);
+    assert.deepEqual(
+      aggregate.current_version.supplier_summaries.map((row) => ({
+        supplier_id: row.supplier_id,
+        quote: `${row.quote_id}/v${row.quote_version_no}`,
+        reference: row.supplier_quote_reference,
+        total: row.total_amount,
+        promised: row.latest_promised_delivery_date,
+        delivery_status: row.delivery_status,
+        delivery_days: row.delivery_delta_days,
+      })),
+      [
+        { supplier_id: "1", quote: "1/v1", reference: "UAT-Q-A-042576", total: "480.000000", promised: "2026-10-20", delivery_status: "ON_TIME", delivery_days: 10 },
+        { supplier_id: "2", quote: "2/v1", reference: "UAT-Q-B-042576", total: "400.000000", promised: "2026-11-05", delivery_status: "LATE", delivery_days: 6 },
+      ],
+    );
+    assert.deepEqual(aggregate.current_version.aggregate_differences, {
+      higher_supplier_id: "1",
+      lower_supplier_id: "2",
+      amount_difference: "80.000000",
+      percentage_basis_supplier_id: "2",
+      percentage_difference: "20.000000",
+      earlier_supplier_id: "1",
+      later_supplier_id: "2",
+      delivery_day_difference: 16,
+      lowest_price_supplier_id: "2",
+      on_time_supplier_ids: ["1"],
+      late_risk_supplier_ids: ["2"],
+    });
+    assert.equal(aggregate.generation.enabled, false);
+    assert.equal(aggregate.generation.label, "当前Quote输入已生成最新比价");
+
+    const businessRequests = [];
+    await context.route("**/*", async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.origin !== REQUIRED_ORIGIN) return route.abort("blockedbyclient");
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method().toUpperCase())
+        && !['/api/logout'].includes(url.pathname)) {
+        businessRequests.push({ method: request.method(), path: url.pathname });
+      }
+      return route.continue();
+    });
+    await page.goto(`${REQUIRED_ORIGIN}/procurement/sourcing/1`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "RFQ-00000001 · Round 1", exact: true }).waitFor();
+    await page.getByRole("heading", { name: "服务端横向比价", exact: true }).waitFor();
+    await page.locator(".comparison-trace > summary").click();
+    const desktopText = await page.locator(".comparison-aggregate").innerText();
+    for (const required of [
+      "ID 1 / RFQ-00000001", "Round 1", "Comparison Version", "v1",
+      "CURRENT / 当前比价版本", "状态为服务端读模型投影，不是独立数据库状态列。",
+      "未设置独立Comparison Header ID；版本身份由RFQ、Round、Comparison Version及basis_digest共同确定。",
+      "Quote ID 1 / v1", "Quote ID 2 / v1", "UAT-Q-A-042576", "UAT-Q-B-042576",
+      "480.00 CNY", "400.00 CNY", "高 80.00 CNY", "高 20%", "早 16 天",
+      "2026-10-20", "2026-11-05", "ON_TIME", "LATE", "提前10天", "延期6天",
+      "未税 / 不含运费", "月结 30 天", "比价不等于定标；不自动产生Award。",
+    ]) assert.ok(desktopText.includes(required), `Comparison aggregate missing: ${required}`);
+    for (const row of aggregate.current_version.comparison_rows) {
+      assert.match(row.basis_digest, /^[0-9a-f]{64}$/);
+      assert.ok(desktopText.includes(row.basis_digest), `full basis_digest missing for Comparison Line ${row.comparison_line_id}`);
+    }
+    assert.ok(desktopText.includes(aggregate.current_version.output_summary.digest), "deterministic output digest missing");
+    assert.equal(await page.locator(".comparison-supplier-card").count(), 2);
+    assert.equal(await page.locator(".comparison-desktop tbody tr").count(), 4);
+    assert.equal(await page.locator(".comparison-material-card").count(), 4);
+    assert.equal(await page.locator(".comparison-operation").count(), 1);
+    assert.match(await page.locator(".comparison-operation").innerText(), /Event数量\s*4条Line级Event/);
+    assert.equal(await page.locator(".comparison-operation li").count(), 4);
+    assert.equal(await page.getByRole("button", { name: "当前Quote输入已生成最新比价", exact: true }).isDisabled(), true);
+    await page.getByRole("heading", { name: "人工定标与撤销", exact: true }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "确认人工定标", exact: true }).isVisible(), true);
+    assert.equal(await page.locator(".comparison-desktop").isVisible(), true);
+    assert.equal(await page.locator(".comparison-material-cards").isVisible(), false);
+    await noOverflow(page, "Comparison aggregate desktop");
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "服务端横向比价", exact: true }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "当前Quote输入已生成最新比价", exact: true }).isDisabled(), true);
+    assert.deepEqual(businessRequests, []);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await page.locator(".comparison-desktop").isVisible(), false);
+    assert.equal(await page.locator(".comparison-material-cards").isVisible(), true);
+    assert.equal(await page.locator(".comparison-material-card").count(), 4);
+    assert.equal(await page.locator(".comparison-supplier-card").count(), 2);
+    assert.equal(await page.getByRole("button", { name: "当前Quote输入已生成最新比价", exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole("button", { name: "确认人工定标", exact: true }).isVisible(), true);
+    await noOverflow(page, "Comparison aggregate 390x844");
+    assert.deepEqual(businessRequests, []);
+
+    assert.deepEqual((await pool.query(`select
+      (select count(*)::int from procurement_quote_comparisons where rfq_id=1) comparison_lines,
+      (select count(*)::int from procurement_quote_comparison_lines line
+        join procurement_quote_comparisons comparison on comparison.id=line.comparison_id
+        where comparison.rfq_id=1) comparison_candidates,
+      (select count(*)::int from procurement_sourcing_events
+        where rfq_id=1 and event_type='COMPARISON_GENERATED') comparison_events,
+      (select count(*)::int from procurement_sourcing_awards where rfq_id=1) awards,
+      (select count(*)::int from purchase_orders) purchase_orders,
+      (select version::int from procurement_rfqs where id=1) rfq_version`)).rows[0], databaseBaseline);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "安全退出", exact: true }).click();
+    await page.getByRole("heading", { name: "欢迎使用晨亿达 ERP", exact: true }).waitFor();
+    assert.equal(Number((await pool.query(
+      "select count(*) count from app_sessions where username=$1 and revoked_at is null and expires_at>now()",
+      [fixture.credentials.username],
+    )).rows[0].count), 0);
+    await context.close();
+    console.info("RFQ_COMPARISON_AGGREGATE_BROWSER_OK rfq=1 comparison_version=1 comparison_lines=4 candidates=8 events=4 desktop=1 mobile=1 business_post=0 award=0 po=0 session=0");
   } finally {
     await browser?.close().catch(() => undefined);
   }

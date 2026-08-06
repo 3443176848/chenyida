@@ -163,6 +163,22 @@ export type RfqDetailDto = Readonly<{
   quote_lines: QuoteLineTraceDto[];
   comparisons: Array<Record<string, unknown>>;
   comparison_lines: Array<Record<string, unknown>>;
+  comparison_read_model: Readonly<{
+    identity_note: string;
+    status_note: string;
+    input_summary_note: string;
+    output_summary_note: string;
+    has_independent_header_id: false;
+    comparison_header_id: null;
+    versions: Array<Record<string, unknown>>;
+    current_version: Record<string, unknown> | null;
+    generation: Readonly<{
+      enabled: boolean;
+      already_generated: boolean;
+      reason_code: string;
+      label: string;
+    }>;
+  }>;
   award: Record<string, unknown> | null;
   events: SourcingEventTraceDto[];
   creation_receipt: Record<string, unknown>;

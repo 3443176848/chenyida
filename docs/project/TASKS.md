@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前无 `DOING` 任务。状态中文化已 Web-only 部署并通过匿名只读验收；登录式浏览器验收、业务操作、Migration、真实数据迁移或生产切流须新的明确授权。
+当前唯一 `DOING` 任务为 `SELFHOST-UAT-FIX-28`：复用既有逐行Comparison关系模型，补齐版本级聚合读模型、摘要、Event操作分组及移动端展示；主UAT只读验收，禁止创建Award或PO。见[任务文档](../tasks/SELFHOST-UAT-FIX-28.md)。
 
 ## 已完成任务
 
