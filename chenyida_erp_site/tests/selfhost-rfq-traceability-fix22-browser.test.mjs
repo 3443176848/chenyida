@@ -66,6 +66,7 @@ async function clearSyntheticData() {
 
 async function seedFixture() {
   const credentials = { username: "fix22_purchase", password: `Isolated!Fix22-${randomUUID()}` };
+  const planningCredentials = { username: "planning01", password: `Isolated!Fix26-Planning-${randomUUID()}` };
   const client = await pool.connect();
   try {
     await client.query("begin");
@@ -76,9 +77,9 @@ async function seedFixture() {
       `insert into app_users(username,display_name,role,password_hash,is_active,must_change_password,version) values
         ($1,'FIX-22 隔离采购','purchase',$2,true,false,1),
         ('admin01','管理员','admin','x',true,false,1),
-        ('planning01','计划','planning','x',true,false,1),
+        ('planning01','计划','planning',$3,true,false,1),
         ('engineering01','工程','engineering','x',true,false,1)`,
-      [credentials.username, await hashPassword(credentials.password)],
+      [credentials.username, await hashPassword(credentials.password), await hashPassword(planningCredentials.password)],
     );
     const unit = (await client.query(
       "insert into units(code,name,symbol,unit_type,enabled) values('PCS','件','PCS','COUNT',true) returning id",
@@ -222,7 +223,7 @@ async function seedFixture() {
     await client.query("commit");
     assert.equal(Number(purchaseRequest.id), 1);
     assert.deepEqual(supplierRows.map(({ supplier }) => Number(supplier.id)), [1, 2]);
-    return { credentials };
+    return { credentials, planningCredentials };
   } catch (error) {
     await client.query("rollback").catch(() => undefined);
     throw error;
@@ -330,6 +331,31 @@ async function visibleBindingIds(scope) {
     const fact = [...card.querySelectorAll("dl > div")]
       .find((row) => row.querySelector("dt")?.textContent?.trim() === "Binding ID");
     return fact?.querySelector("dd")?.textContent?.trim() || "";
+  }));
+}
+
+async function visibleBindingAssociations(scope) {
+  return scope.locator(".rfq-mapping-card").evaluateAll((cards) => cards.map((card) => {
+    const facts = Object.fromEntries([...card.querySelectorAll("dl > div")].map((row) => [
+      row.querySelector("dt")?.textContent?.trim() || "",
+      row.querySelector("dd")?.textContent?.trim() || "",
+    ]));
+    const statuses = Object.fromEntries([...card.querySelectorAll("[data-rfq-status]")].map((row) => [
+      row.getAttribute("data-rfq-status") || "",
+      row.querySelector("b")?.textContent?.trim() || "",
+    ]));
+    return {
+      binding_id: facts["Binding ID"],
+      supplier_id: facts["Supplier ID"],
+      rfq_line_id: facts["RFQ Line ID"],
+      material_id: facts["Material ID"],
+      mapping_id: facts["Mapping ID"],
+      binding_status: statuses.binding,
+      mapping_status: statuses.mapping,
+      invitation_status: statuses.invitation,
+      status_drift: facts["状态漂移（Binding ↔ Mapping）"],
+      version_drift: facts["版本漂移（固定 ↔ 当前）"],
+    };
   }));
 }
 
@@ -450,7 +476,7 @@ test.before(async () => {
   await startServer();
 });
 
-test("isolated Chromium preserves RFQ evidence and requires a safe issue confirmation", { timeout: 300_000 }, async () => {
+test("isolated Chromium enforces the RFQ issuance confirmation contract and issues exactly once", { timeout: 300_000 }, async () => {
   const fixture = await seedFixture();
   assert.deepEqual(await sourcingState(), {
     header: [],
@@ -536,6 +562,21 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
     assert.ok(draft.bindings.every((row) => /^[1-9]\d*$/.test(row.binding_id)));
     assert.equal(new Set(draft.bindings.map((row) => row.binding_id)).size, 8);
     const draftBindingIds = draft.bindings.map((row) => row.binding_id);
+    const draftBindingIdsByIdentity = [...draftBindingIds].sort((left, right) => Number(left) - Number(right));
+    const draftAssociationsByIdentity = [...draft.bindings]
+      .sort((left, right) => Number(left.binding_id) - Number(right.binding_id))
+      .map((row) => ({
+        binding_id: row.binding_id,
+        supplier_id: String(row.supplier_id),
+        rfq_line_id: String(row.rfq_line_id),
+        material_id: String(row.material_id),
+        mapping_id: row.mapping_id,
+        binding_status: "ACTIVE",
+        mapping_status: "ACTIVE",
+        invitation_status: "INVITED",
+        status_drift: "否",
+        version_drift: "否",
+      }));
     assert.deepEqual(draft.bindings.map((row) => row.mapping_id), MAPPING_UIDS.flat());
     assert.ok(draft.bindings.every((row) => row.mapping_version === 1 && row.mapping_row_version === 1));
     assert.ok(draft.bindings.every((row) => row.supplier_part_number === `${row.supplier_id === 1 ? "SUP-000001" : "SUP-000002"}-${row.material_id}`
@@ -563,6 +604,60 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
       work_orders: 0,
     });
 
+    const securityBaseline = await sourcingState();
+    const securityContext = await browser.newContext({ serviceWorkers: "block" });
+    try {
+      const purchaseLogin = await securityContext.request.post(`${REQUIRED_ORIGIN}/api/login`, {
+        headers: { Origin: REQUIRED_ORIGIN },
+        data: fixture.credentials,
+      });
+      assert.equal(purchaseLogin.status(), 200);
+      const purchaseSession = await (await securityContext.request.get(`${REQUIRED_ORIGIN}/api/session`)).json();
+      assert.ok(purchaseSession.authenticated && purchaseSession.csrf_token);
+      const missingCsrf = await securityContext.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/issue`, {
+        headers: { Origin: REQUIRED_ORIGIN, "Idempotency-Key": "fix26-browser-missing-csrf" },
+        data: { expected_version: 1 },
+      });
+      assert.equal(missingCsrf.status(), 403);
+      assert.equal((await missingCsrf.json()).code, "CSRF_INVALID");
+      const wrongOrigin = await securityContext.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/issue`, {
+        headers: { Origin: "https://evil.example", "X-CSRF-Token": purchaseSession.csrf_token, "Idempotency-Key": "fix26-browser-wrong-origin" },
+        data: { expected_version: 1 },
+      });
+      assert.equal(wrongOrigin.status(), 403);
+      assert.equal((await wrongOrigin.json()).code, "CSRF_INVALID");
+      const staleCas = await securityContext.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/issue`, {
+        headers: { Origin: REQUIRED_ORIGIN, "X-CSRF-Token": purchaseSession.csrf_token, "Idempotency-Key": "fix26-browser-stale-cas" },
+        data: { expected_version: 2 },
+      });
+      assert.equal(staleCas.status(), 409);
+      assert.equal((await staleCas.json()).code, "VERSION_CONFLICT");
+      const purchaseLogout = await securityContext.request.post(`${REQUIRED_ORIGIN}/api/logout`, {
+        headers: { Origin: REQUIRED_ORIGIN, "X-CSRF-Token": purchaseSession.csrf_token },
+      });
+      assert.equal(purchaseLogout.status(), 200);
+
+      const planningLogin = await securityContext.request.post(`${REQUIRED_ORIGIN}/api/login`, {
+        headers: { Origin: REQUIRED_ORIGIN },
+        data: fixture.planningCredentials,
+      });
+      assert.equal(planningLogin.status(), 200);
+      const planningSession = await (await securityContext.request.get(`${REQUIRED_ORIGIN}/api/session`)).json();
+      const forbiddenIssue = await securityContext.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/issue`, {
+        headers: { Origin: REQUIRED_ORIGIN, "X-CSRF-Token": planningSession.csrf_token, "Idempotency-Key": "fix26-browser-forbidden-role" },
+        data: { expected_version: 1 },
+      });
+      assert.equal(forbiddenIssue.status(), 403);
+      assert.equal((await forbiddenIssue.json()).code, "PERMISSION_DENIED");
+      const planningLogout = await securityContext.request.post(`${REQUIRED_ORIGIN}/api/logout`, {
+        headers: { Origin: REQUIRED_ORIGIN, "X-CSRF-Token": planningSession.csrf_token },
+      });
+      assert.equal(planningLogout.status(), 200);
+    } finally {
+      await securityContext.close();
+    }
+    assert.deepEqual(await sourcingState(), securityBaseline, "Origin, CSRF, and permission failures must preserve the RFQ business state");
+
     const bodyText = await page.locator("body").innerText();
     for (const required of [
       "ID 1 · RFQ-00000001",
@@ -582,7 +677,12 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
       "Internal Unit",
       "换算",
       "1:1",
-      "ACTIVE · RFQ_CREATE",
+      "Binding状态",
+      "Mapping状态",
+      "邀请状态",
+      "Binding固定来源",
+      "状态漂移（Binding ↔ Mapping）",
+      "版本漂移（固定 ↔ 当前）",
       "Binding ID",
       "RFQ Line ID",
       "Material ID",
@@ -591,7 +691,8 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
     for (const binding of draft.bindings) assert.ok(bodyText.includes(binding.supplier_part_number), `draft supplier part missing: ${binding.supplier_part_number}`);
     assert.equal(await page.locator(".rfq-mapping-trace .rfq-mapping-group").count(), 2);
     assert.equal(await page.locator(".rfq-mapping-trace .rfq-mapping-card").count(), 8);
-    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), draftBindingIds);
+    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), draftBindingIdsByIdentity);
+    assert.deepEqual(await visibleBindingAssociations(page.locator(".rfq-mapping-trace")), draftAssociationsByIdentity);
     assert.equal(await page.getByText("报价入口未启用", { exact: true }).count(), 1);
     assert.equal(await page.getByRole("heading", { name: "代录供应商报价", exact: true }).count(), 0);
     await noOverflow(page, "draft detail desktop");
@@ -611,11 +712,14 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
       "RFQ_CREATED 业务 Event", "独立 RFQ_CREATED 业务 Event", "RFQ_CREATED", "SUCCESS", fixture.credentials.username,
       draft.events[0].request_id, draft.events[0].occurred_at_shanghai,
       "10.000000 PCS", "ID 1 · SUP-000001", "ID 2 · SUP-000002",
-      "已固定 Mapping · 8 条", "v1 / Row v1", "已绑定版本当前状态", "最新 Mapping 版本",
-      "Mapping 固定凭证", "固定 Binding 数量", "八条 Binding 稳定 ID",
-      "当前状态漂移", "当前版本漂移", "发出前服务端重新校验 PRQ、Supplier、Mapping、截止日期、CAS 与当前 DRAFT 状态",
+      "权威逐行关联（按 Binding ID 升序） · 8 条", "v1 / Row v1", "已绑定 Mapping 版本当前值", "最新 Mapping 版本",
+      "Mapping 固定凭证", "固定 Binding 数量", "Binding 稳定 ID（按 ID 升序）",
+      "身份关联口径", "不按任何摘要输入序列位置配对",
+      "状态漂移（Binding ↔ Mapping）", "版本漂移（固定 ↔ 当前）", "发出前服务端重新校验 PRQ、Supplier、Mapping、截止日期、CAS 与当前 DRAFT 状态",
       "发出成功后 RFQ 行、Supplier 与 Mapping ID / Version 范围冻结", "只有发出成功后才允许录入 Supplier 报价",
-      "不自动创建 Quote、Award、PO、库存或财务记录",
+      "本次发出不会自动创建或修改以下下游记录", "Quote（供应商报价）", "Award（定标）", "PO（采购订单）",
+      "Delivery Plan（交付计划）", "Receipt／收货", "Inventory Ledger／库存流水", "AP／采购应付",
+      "Work Order／生产工单", "其他生产记录", "财务记录",
     ]) {
       assert.ok(dialogText.includes(required), `issue dialog missing: ${required}`);
     }
@@ -623,7 +727,10 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
     for (const binding of draft.bindings) assert.ok(dialogText.includes(binding.supplier_part_number), `issue dialog supplier part missing: ${binding.supplier_part_number}`);
     for (const bindingId of draftBindingIds) assert.ok(dialogText.includes(bindingId), `issue dialog Binding ID missing: ${bindingId}`);
     for (const mappingId of MAPPING_UIDS.flat()) assert.ok(dialogText.includes(mappingId));
-    assert.deepEqual(await visibleBindingIds(dialog), draftBindingIds);
+    assert.deepEqual(await visibleBindingIds(dialog), draftBindingIdsByIdentity);
+    assert.deepEqual(await visibleBindingAssociations(dialog), draftAssociationsByIdentity);
+    assert.ok(dialogText.includes(draftBindingIdsByIdentity.join(" · ")), "receipt Binding IDs must use stable ID order");
+    assert.equal(await dialog.getByRole("button", { name: "确认发出", exact: true }).isEnabled(), true);
     await noDialogOverflow(dialog, "issue dialog desktop");
     await dialog.getByRole("button", { name: "取消", exact: true }).click();
     assert.equal(businessPosts.length, 1, "cancel must send zero business requests");
@@ -655,7 +762,7 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
       (response) => response.url() === `${REQUIRED_ORIGIN}/api/procurement/rfqs/1/issue`
         && response.request().method() === "POST",
     );
-    await dialog.getByRole("button", { name: "发出询价并冻结范围", exact: true }).click();
+    await dialog.getByRole("button", { name: "确认发出", exact: true }).click();
     assert.equal((await driftResponse).status(), 409);
     await dialog.waitFor({ state: "detached" });
     const driftText = await page.locator("body").innerText();
@@ -676,7 +783,7 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
         && response.request().method() === "POST",
     );
     const issuePostsBeforeDoubleClick = businessPosts.filter(({ path }) => path === "/api/procurement/rfqs/1/issue").length;
-    const disabledImmediately = await dialog.getByRole("button", { name: "发出询价并冻结范围", exact: true }).evaluate((button) => {
+    const disabledImmediately = await dialog.getByRole("button", { name: "确认发出", exact: true }).evaluate((button) => {
       button.click();
       const disabled = button.disabled;
       button.click();
@@ -711,6 +818,7 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
     assert.match(issued.events[1].request_id, /^[0-9a-f-]{36}$/);
     assert.match(issued.events[1].idempotency_key_digest, /^[0-9a-f]{64}$/);
     assert.match(issued.events[1].scope_digest, /^[0-9a-f]{64}$/);
+    assert.equal(issued.events[1].scope_digest, draft.events[0].scope_digest, "issuance must preserve the canonical frozen-scope digest");
     assert.deepEqual(issued.downstream, draft.downstream);
 
     const issuedText = await page.locator("body").innerText();
@@ -741,7 +849,7 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
     assert.ok(restartedText.includes(draft.events[0].occurred_at_shanghai));
     for (const mappingId of MAPPING_UIDS.flat()) assert.ok(restartedText.includes(mappingId), `restarted Mapping missing: ${mappingId}`);
     assert.equal(await page.locator(".rfq-mapping-trace .rfq-mapping-card").count(), 8);
-    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), draftBindingIds);
+    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), draftBindingIdsByIdentity);
     assert.deepEqual(await sourcingState(), issued);
     await page.setViewportSize({ width: 390, height: 844 });
     await noOverflow(page, "issued detail after web restart 390x844");
@@ -765,13 +873,13 @@ test("isolated Chromium preserves RFQ evidence and requires a safe issue confirm
     )).rows[0].count), 0);
     assert.deepEqual(await sourcingState(), issued);
     await context.close();
-    console.info("RFQ_TRACEABILITY_FIX22_BROWSER_OK rfq=1 create_event=1 bindings=8 issue_event=1 issue_post=1 quote=0 award=0 po=0 restart=1 desktop=1 mobile=1 session=0");
+    console.info("RFQ_ISSUANCE_CONFIRMATION_FIX26_BROWSER_ISSUE_OK rfq=1 create_event=1 bindings=8 issue_event=1 issue_post=1 quote=0 award=0 po=0 restart=1 desktop=1 mobile=1 session=0");
   } finally {
     await browser?.close().catch(() => undefined);
   }
 });
 
-test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exits, and fixes exactly eight Bindings", { timeout: 300_000 }, async () => {
+test("isolated Chromium keeps a fixed legacy RFQ draft after all issuance confirmation exits", { timeout: 300_000 }, async () => {
   await clearSyntheticData();
   const fixture = await seedFixture();
   const chromium = await loadChromium();
@@ -964,6 +1072,21 @@ test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exi
     assert.ok(fixed.bindings.every((row) => /^[1-9]\d*$/.test(row.binding_id)));
     assert.equal(new Set(fixed.bindings.map((row) => row.binding_id)).size, 8);
     const fixedBindingIds = fixed.bindings.map((row) => row.binding_id);
+    const fixedBindingIdsByIdentity = [...fixedBindingIds].sort((left, right) => Number(left) - Number(right));
+    const fixedAssociationsByIdentity = [...fixed.bindings]
+      .sort((left, right) => Number(left.binding_id) - Number(right.binding_id))
+      .map((row) => ({
+        binding_id: row.binding_id,
+        supplier_id: String(row.supplier_id),
+        rfq_line_id: String(row.rfq_line_id),
+        material_id: String(row.material_id),
+        mapping_id: row.mapping_id,
+        binding_status: "ACTIVE",
+        mapping_status: "ACTIVE",
+        invitation_status: "INVITED",
+        status_drift: "否",
+        version_drift: "否",
+      }));
     assert.deepEqual(fixed.bindings.map((row) => row.mapping_id), MAPPING_UIDS.flat());
     assert.ok(fixed.bindings.every((row) => row.binding_source === "LEGACY_DRAFT_CONFIRMATION" && row.binding_status === "ACTIVE"));
     assert.equal(fixed.events.length, 1);
@@ -1000,7 +1123,9 @@ test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exi
       fixed.events[0].request_id,
       "v1 → v2",
       "固定 Binding 数量",
-      "八条 Binding 稳定 ID",
+      "Binding 稳定 ID（按 ID 升序）",
+      "身份关联口径",
+      "不按任何摘要输入序列位置配对",
       fixed.events[0].scope_digest,
       "不可变快照说明",
       "Binding ID",
@@ -1015,12 +1140,16 @@ test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exi
       "Internal Unit",
       "换算",
       "有效期",
-      "是否发生状态漂移",
-      "是否发生版本漂移",
+      "Binding状态",
+      "Mapping状态",
+      "邀请状态",
+      "状态漂移（Binding ↔ Mapping）",
+      "版本漂移（固定 ↔ 当前）",
     ]) assert.ok(fixedText.includes(required), `fixed Binding evidence missing: ${required}`);
     for (const bindingId of fixedBindingIds) assert.ok(fixedText.includes(bindingId), `fixed Binding ID missing: ${bindingId}`);
     assert.equal(await page.locator(".rfq-mapping-trace .rfq-mapping-card").count(), 8);
-    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), fixedBindingIds);
+    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), fixedBindingIdsByIdentity);
+    assert.deepEqual(await visibleBindingAssociations(page.locator(".rfq-mapping-trace")), fixedAssociationsByIdentity);
     const fixedReceipt = page.locator("details.rfq-receipt").filter({ hasText: "Mapping 固定凭证" }).first();
     assert.equal(await fixedReceipt.getAttribute("open"), "");
     await fixedReceipt.locator("summary").click();
@@ -1035,7 +1164,7 @@ test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exi
     await issueButton.click();
     dialog = page.getByRole("dialog", { name: "发出询价并冻结范围", exact: true });
     await dialog.waitFor();
-    assert.equal(await dialog.getByRole("button", { name: "发出询价并冻结范围", exact: true }).isEnabled(), true);
+    assert.equal(await dialog.getByRole("button", { name: "确认发出", exact: true }).isEnabled(), true);
     const issueText = await dialog.innerText();
     for (const required of [
       "ID 1 · RFQ-00000001",
@@ -1053,15 +1182,27 @@ test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exi
       "受邀 Supplier · 2 家",
       "2099-08-31",
       "CNY",
-      "当前状态漂移",
-      "当前版本漂移",
+      "状态漂移（Binding ↔ Mapping）",
+      "版本漂移（固定 ↔ 当前）",
       "发出成功后 RFQ 行、Supplier 与 Mapping ID / Version 范围冻结",
       "只有发出成功后才允许录入 Supplier 报价",
-      "本操作不自动创建 Quote、Award、PO、库存或财务记录",
+      "本次发出不会自动创建或修改以下下游记录",
+      "Quote（供应商报价）",
+      "Award（定标）",
+      "PO（采购订单）",
+      "Delivery Plan（交付计划）",
+      "Receipt／收货",
+      "Inventory Ledger／库存流水",
+      "AP／采购应付",
+      "Work Order／生产工单",
+      "其他生产记录",
+      "财务记录",
     ]) assert.ok(issueText.includes(required), `fixed issue confirmation missing: ${required}`);
     for (const bindingId of fixedBindingIds) assert.ok(issueText.includes(bindingId), `fixed issue Binding ID missing: ${bindingId}`);
     for (const mappingId of MAPPING_UIDS.flat()) assert.ok(issueText.includes(mappingId), `fixed issue Mapping missing: ${mappingId}`);
-    assert.deepEqual(await visibleBindingIds(dialog), fixedBindingIds);
+    assert.deepEqual(await visibleBindingIds(dialog), fixedBindingIdsByIdentity);
+    assert.deepEqual(await visibleBindingAssociations(dialog), fixedAssociationsByIdentity);
+    assert.ok(issueText.includes(fixedBindingIdsByIdentity.join(" · ")), "fixed receipt Binding IDs must use stable ID order");
     await noDialogOverflow(dialog, "fixed issue dialog desktop");
     await dialog.getByRole("button", { name: "取消", exact: true }).click();
     await dialog.waitFor({ state: "detached" });
@@ -1070,12 +1211,12 @@ test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exi
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "RFQ-00000001 · Round 1", exact: true }).waitFor();
-    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), fixedBindingIds);
+    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), fixedBindingIdsByIdentity);
     await stopServer();
     await startServer();
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "RFQ-00000001 · Round 1", exact: true }).waitFor();
-    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), fixedBindingIds);
+    assert.deepEqual(await visibleBindingIds(page.locator(".rfq-mapping-trace")), fixedBindingIdsByIdentity);
     assert.deepEqual(await previewWriteState(1), fixedWriteBaseline);
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -1083,7 +1224,7 @@ test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exi
     await page.getByRole("button", { name: "发出询价并冻结范围", exact: true }).click();
     dialog = page.getByRole("dialog", { name: "发出询价并冻结范围", exact: true });
     await dialog.waitFor();
-    assert.deepEqual(await visibleBindingIds(dialog), fixedBindingIds);
+    assert.deepEqual(await visibleBindingIds(dialog), fixedBindingIdsByIdentity);
     await noOverflow(page, "fixed issue dialog page 390x844");
     await noDialogOverflow(dialog, "fixed issue dialog 390x844");
     await dialog.getByRole("button", { name: "取消", exact: true }).click();
@@ -1102,7 +1243,7 @@ test("isolated Chromium previews legacy RFQ Mapping evidence, has zero-write exi
       [fixture.credentials.username],
     )).rows[0].count), 0);
     await context.close();
-    console.info(`RFQ_BINDING_IDENTIFIERS_FIX24_BROWSER_OK rfq=1 audit=1 preview_gets=4 zero_write_exits=5 bindings=8 binding_ids=${fixedBindingIds.join(",")} receipt=1 issue_cancel=2 restart=1 status=DRAFT issued=0 quote=0 award=0 po=0 desktop=1 mobile=1 session=0`);
+    console.info(`RFQ_ISSUANCE_CONFIRMATION_FIX26_BROWSER_DRAFT_OK rfq=1 audit=1 preview_gets=4 zero_write_exits=5 bindings=8 binding_ids=${fixedBindingIdsByIdentity.join(",")} receipt=1 issue_cancel=2 restart=1 status=DRAFT issued=0 quote=0 award=0 po=0 desktop=1 mobile=1 session=0`);
   } finally {
     await browser?.close().catch(() => undefined);
   }

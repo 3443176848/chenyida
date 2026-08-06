@@ -11,7 +11,11 @@
 
 ## 当前任务
 
-当前无 `DOING` 任务。FIX-25 已按分支 B 完成 Binding 关联基线更正并停止；正式发出 RFQ 必须另立任务并获得新的明确授权。
+当前唯一 `DOING` 任务如下；本任务明确禁止发出主 UAT RFQ。
+
+| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-UAT-FIX-26 | RFQ 发出确认窗口硬性合同与 Binding 摘要排序消歧 | DOING | Codex（严格门禁、0039 权威模型核验、确认合同/UI、隔离测试、备份恢复、Web-only 部署和 purchase-only 只读取消验收）、项目负责人（固定主 UAT 禁止发出及部署/只读验收授权） | 2026-08-06 | — | SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-24、SELFHOST-UAT-FIX-25、D-095、D-096、D-097 | 最终写按钮必须为“确认发出”，默认安全焦点；完整列出 Quote/Award/PO/Delivery Plan/Receipt/Ledger/AP/Work Order/生产及财务保护。0039 已确认存在独立 `binding_status`，须与 Mapping ACTIVE、邀请 INVITED 分栏；主表按 Binding ID 1—8，历史摘要输入序列只作摘要计算说明。不得修改 Binding/Mapping/Event/摘要或发出主 RFQ。见[任务文档](../tasks/SELFHOST-UAT-FIX-26.md)。 |
 
 ## 已完成任务
 

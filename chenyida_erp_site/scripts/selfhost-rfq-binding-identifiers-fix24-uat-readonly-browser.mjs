@@ -29,14 +29,14 @@ const MATERIALS = [
   { id: 536, lineId: 4, code: "CYD-RB_METAL-000015", name: "UAT-BB-MAT-CASE-042576 · UAT测试外壳" },
 ];
 const BINDINGS = [
-  { id: "3", supplierId: 1, lineId: 3, materialId: 535, mappingId: "aa16f7e7-904d-4ae2-9f73-d34e7aaf257e", partNumber: "UAT-A-HARNESS-042576" },
-  { id: "4", supplierId: 1, lineId: 4, materialId: 536, mappingId: "9659ad2d-406a-4c4c-b575-51329badc63f", partNumber: "UAT-A-CASE-042576" },
   { id: "1", supplierId: 1, lineId: 1, materialId: 533, mappingId: "224d1965-44ef-4c3e-901e-1926b6b07ff8", partNumber: "UAT-A-PCBA-042576" },
   { id: "2", supplierId: 1, lineId: 2, materialId: 534, mappingId: "43ca04d8-9933-4dac-ba21-b7fb85741830", partNumber: "UAT-A-SENSOR-042576" },
-  { id: "7", supplierId: 2, lineId: 3, materialId: 535, mappingId: "3ac2ab72-c0dc-4fcf-b1dc-b21e43c3c0d6", partNumber: "UAT-B-HARNESS-042576" },
-  { id: "8", supplierId: 2, lineId: 4, materialId: 536, mappingId: "5432e7fc-463a-4cea-99fe-f3db8cf0af83", partNumber: "UAT-B-CASE-042576" },
+  { id: "3", supplierId: 1, lineId: 3, materialId: 535, mappingId: "aa16f7e7-904d-4ae2-9f73-d34e7aaf257e", partNumber: "UAT-A-HARNESS-042576" },
+  { id: "4", supplierId: 1, lineId: 4, materialId: 536, mappingId: "9659ad2d-406a-4c4c-b575-51329badc63f", partNumber: "UAT-A-CASE-042576" },
   { id: "5", supplierId: 2, lineId: 1, materialId: 533, mappingId: "45a3daf1-4e97-4a01-a94d-1f3089d3961b", partNumber: "UAT-B-PCBA-042576" },
   { id: "6", supplierId: 2, lineId: 2, materialId: 534, mappingId: "5bd2ced5-6696-4e69-a833-e886cf5e273f", partNumber: "UAT-B-SENSOR-042576" },
+  { id: "7", supplierId: 2, lineId: 3, materialId: 535, mappingId: "3ac2ab72-c0dc-4fcf-b1dc-b21e43c3c0d6", partNumber: "UAT-B-HARNESS-042576" },
+  { id: "8", supplierId: 2, lineId: 4, materialId: 536, mappingId: "5432e7fc-463a-4cea-99fe-f3db8cf0af83", partNumber: "UAT-B-CASE-042576" },
 ];
 
 if (process.env.ERP_RFQ_BINDING_FIX24_UAT_CONFIRM !== REQUIRED_CONFIRM) {
@@ -133,8 +133,7 @@ async function readProtectedState() {
       join units purchase_unit on purchase_unit.id=binding.purchase_unit_id
       left join units base_unit on base_unit.id=material.base_unit_id
       join supplier_mappings mapping on mapping.id=binding.supplier_mapping_version_id
-      where binding.rfq_id=1 order by supplier.supplier_code,binding.supplier_id,
-      material.internal_material_code,binding.material_id,binding.id`)).rows;
+      where binding.rfq_id=1 order by binding.id`)).rows;
     const events = (await client.query(`select id::int,event_type,actor,${shanghai("created_at")} occurred_at_shanghai,
       request_id::text,result,credential_version::int,old_version::int,new_version::int,from_status,to_status,
       scope_digest,idempotency_key_digest from procurement_sourcing_events where rfq_id=1 order by id`)).rows;
@@ -263,7 +262,23 @@ async function mappingCardFacts(scope) {
       row.querySelector("dt")?.textContent?.trim() || "",
       row.querySelector("dd")?.textContent?.trim() || "",
     ]));
-    return { text: card.textContent || "", binding_id: facts.get("Binding ID") || "" };
+    const statuses = new Map([...card.querySelectorAll("[data-rfq-status]")].map((row) => [
+      row.getAttribute("data-rfq-status") || "",
+      row.querySelector("b")?.textContent?.trim() || "",
+    ]));
+    return {
+      text: card.textContent || "",
+      binding_id: facts.get("Binding ID") || "",
+      supplier_id: facts.get("Supplier ID") || "",
+      rfq_line_id: facts.get("RFQ Line ID") || "",
+      material_id: facts.get("Material ID") || "",
+      mapping_id: facts.get("Mapping ID") || "",
+      binding_status: statuses.get("binding") || "",
+      mapping_status: statuses.get("mapping") || "",
+      invitation_status: statuses.get("invitation") || "",
+      status_drift: facts.get("状态漂移（Binding ↔ Mapping）") || "",
+      version_drift: facts.get("版本漂移（固定 ↔ 当前）") || "",
+    };
   }));
 }
 
@@ -346,7 +361,8 @@ try {
   includesAll(await receipt.innerText(), [
     "Mapping 固定凭证", "RFQ_MAPPING_CONFIRMED", REQUIRED_USERNAME,
     `${CONFIRM_TIME_SHANGHAI}（Asia/Shanghai）`, CONFIRM_REQUEST_ID, "SUCCESS", "v1 → v2",
-    "固定 Binding 数量", "8", SCOPE_DIGEST, "八条 Binding 稳定 ID",
+    "固定 Binding 数量", "8", SCOPE_DIGEST, "Binding 稳定 ID（按 ID 升序）",
+    BINDINGS.map((binding) => binding.id).join(" · "), "身份关联口径", "不按任何摘要输入序列位置配对",
     ...BINDINGS.map((binding) => binding.id), "不可变快照说明",
   ], "standalone Mapping receipt");
   assert.equal(await receipt.getAttribute("open"), "");
@@ -357,7 +373,7 @@ try {
 
   const trace = page.locator(".rfq-mapping-trace");
   const cards = await mappingCardFacts(trace);
-  assert.deepEqual(cards.map((card) => card.binding_id), BINDINGS.map((binding) => binding.id), "stable Supplier/Material UI order");
+  assert.deepEqual(cards.map((card) => card.binding_id), BINDINGS.map((binding) => binding.id), "stable Binding ID UI order");
   for (const [index, binding] of BINDINGS.entries()) {
     const supplier = SUPPLIERS.find((row) => row.id === binding.supplierId);
     const material = MATERIALS.find((row) => row.id === binding.materialId);
@@ -367,9 +383,32 @@ try {
       `Material ID ${binding.materialId}`, material.code, material.name,
       "Mapping ID", binding.mappingId, "Mapping Version", "v1", binding.partNumber,
       "Supplier Unit", "PCS", "Internal Unit", "换算", "1:1", "有效期", "2026-08-05", "长期",
-      "固定时 Mapping 状态", "ACTIVE", "当前 Mapping 状态", "是否发生状态漂移", "否",
-      "是否发生版本漂移", "固定范围摘要", SCOPE_DIGEST,
+      "Binding状态", "ACTIVE", "Mapping状态", "邀请状态", "INVITED", "Binding固定来源",
+      "状态漂移（Binding ↔ Mapping）", "否", "版本漂移（固定 ↔ 当前）", "固定范围摘要", SCOPE_DIGEST,
     ], `Binding card ${binding.id}`);
+    assert.deepEqual({
+      binding_id: cards[index].binding_id,
+      supplier_id: cards[index].supplier_id,
+      rfq_line_id: cards[index].rfq_line_id,
+      material_id: cards[index].material_id,
+      mapping_id: cards[index].mapping_id,
+      binding_status: cards[index].binding_status,
+      mapping_status: cards[index].mapping_status,
+      invitation_status: cards[index].invitation_status,
+      status_drift: cards[index].status_drift,
+      version_drift: cards[index].version_drift,
+    }, {
+      binding_id: binding.id,
+      supplier_id: String(binding.supplierId),
+      rfq_line_id: String(binding.lineId),
+      material_id: String(binding.materialId),
+      mapping_id: binding.mappingId,
+      binding_status: "ACTIVE",
+      mapping_status: "ACTIVE",
+      invitation_status: "INVITED",
+      status_drift: "否",
+      version_drift: "否",
+    }, `Binding card ${binding.id} authoritative association`);
   }
   await noOverflow(page, null, "desktop detail");
 
@@ -384,16 +423,20 @@ try {
   let dialog = page.getByRole("dialog", { name: "发出询价并冻结范围", exact: true });
   await dialog.waitFor();
   assert.equal(await page.evaluate(() => document.activeElement?.textContent?.trim()), "取消");
-  assert.equal(await dialog.getByRole("button", { name: "发出询价并冻结范围", exact: true }).isEnabled(), true);
+  assert.equal(await dialog.getByRole("button", { name: "确认发出", exact: true }).isEnabled(), true);
   const desktopDialogText = await dialog.innerText();
   includesAll(desktopDialogText, [
     "ID 1 · RFQ-00000001", "Round 1 / v2", "DRAFT / 草稿 / 待发出",
     "RFQ 创建成功审计", CREATION_REQUEST_ID, "Mapping 固定凭证", "RFQ_MAPPING_CONFIRMED",
     REQUIRED_USERNAME, `${CONFIRM_TIME_SHANGHAI}（Asia/Shanghai）`, CONFIRM_REQUEST_ID,
-    "SUCCESS", "v1 → v2", SCOPE_DIGEST, "固定 Binding 数量", "八条 Binding 稳定 ID",
+    "SUCCESS", "v1 → v2", SCOPE_DIGEST, "固定 Binding 数量", "Binding 稳定 ID（按 ID 升序）",
+    BINDINGS.map((binding) => binding.id).join(" · "), "身份关联口径", "不按任何摘要输入序列位置配对",
     "固定范围 · 4 条 Material", "受邀 Supplier · 2 家", "2026-08-31", "CNY",
     "当前状态漂移", "无", "当前版本漂移", "发出成功后 RFQ 行、Supplier 与 Mapping ID / Version 范围冻结",
-    "只有发出成功后才允许录入 Supplier 报价", "本操作不自动创建 Quote、Award、PO、库存或财务记录",
+    "只有发出成功后才允许录入 Supplier 报价", "本次发出不会自动创建或修改以下下游记录",
+    "Quote（供应商报价）", "Award（定标）", "PO（采购订单）", "Delivery Plan（交付计划）",
+    "Receipt／收货", "Inventory Ledger／库存流水", "AP／采购应付", "Work Order／生产工单",
+    "其他生产记录", "财务记录",
     ...BINDINGS.flatMap((binding) => [binding.id, binding.mappingId]),
   ], "desktop issue confirmation");
   assert.deepEqual((await mappingCardFacts(dialog)).map((card) => card.binding_id), BINDINGS.map((binding) => binding.id));
@@ -407,7 +450,7 @@ try {
   await issue.click();
   dialog = page.getByRole("dialog", { name: "发出询价并冻结范围", exact: true });
   await dialog.waitFor();
-  assert.equal(await dialog.getByRole("button", { name: "发出询价并冻结范围", exact: true }).isEnabled(), true);
+  assert.equal(await dialog.getByRole("button", { name: "确认发出", exact: true }).isEnabled(), true);
   assert.deepEqual((await mappingCardFacts(dialog)).map((card) => card.binding_id), BINDINGS.map((binding) => binding.id));
   await noOverflow(page, null, "390x844 issue page");
   await noOverflow(page, dialog, "390x844 issue dialog");
