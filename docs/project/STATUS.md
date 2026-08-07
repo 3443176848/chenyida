@@ -2,6 +2,26 @@
 
 最后更新时间：2026-08-07（Asia/Shanghai）
 
+## SELFHOST-UAT-FIX-30 RFQ Award Confirmation Contract Fix
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | RFQ AWARD CONFIRMATION FIXED — UAT AWARD NOT CREATED | 正式确认合同、隔离Award、备份恢复、Web-only部署和主UAT取消验收全部完成 |
+| 固定Quote | PASS / DIRECT DTO | A为Quote`1/v1`、Supplier`1 / SUP-000001`、`UAT-Q-A-042576`、480.00 CNY、2026-10-20、ON_TIME/提前10天；B为Quote`2/v1`、Supplier`2 / SUP-000002`、`UAT-Q-B-042576`、400.00 CNY、2026-11-05、LATE/延期6天；不反向查找 |
+| Award聚合/行 | EXACT 1 / 4 | 明确一次不可变Award操作、恰好四条Award Line；Comparison Line1—4对应Candidate`2/4/6/8`，均为Supplier A且不拆分数量 |
+| 上游不可变 | PASS / EXPLICIT | 逐项声明RFQ冻结范围、Quote1/v1、Quote2/v1、Comparison Version1、Comparison Line/Candidate、Binding/Mapping均不修改 |
+| 下游保护 | PASS / EXPLICIT ZERO AUTO-CREATE | 逐项列出PO、Delivery Plan、Receipt、Inventory Ledger、AP、Work Order、其他生产记录和其他财务记录均不自动创建 |
+| 下一阶段 | INDEPENDENT TASK | 明确通过独立“定标转PO与到货计划”任务处理；本次不自动执行，处理人未指定、时限未配置如实显示 |
+| DTO/服务端 | UNCHANGED / GUARDED | Award提交DTO未变；CURRENT/Quote/Candidate/CAS/basis/output、原因、purchase权限、Origin/CSRF、幂等、并发、审计和回滚保护未放宽 |
+| UI/可访问性 | PASS | RFQ/Round/CAS、四basis/output digest、Material533—536各10 PCS、金额/价差/交期差、原因/完整理由保留；默认焦点取消，桌面/390×844、长理由/digest/request_id均无页面级横向溢出 |
+| 自动/隔离验收 | PASS | Unit11/11、UI22/22、PG27/27、0039 6/6、安全20/20、浏览器5/5及适用typecheck/build/npm/Python通过；取消/关闭/ESC POST0，同步双击只产生Award1/Line4/PO0 |
+| 备份恢复 | PASS | root:root0600 dump 2,292,405 bytes，SHA`19d563f4…e39e`，list3359；第二新库恢复39/head0039、226表、0/0/0与保护指纹一致后删除 |
+| Web-only部署 | PASS / NO MIGRATION | Web更新为`sha256:f11843852426478828c87cf6ec1e889949614beb5ce54df49c23557d16b75e34`；旧`f239ffe3…`有FIX30精确回退tag，PostgreSQL/Worker/Caddy及四卷未重建，未运行Migration |
+| 主UAT | PASS / CANCEL ONLY | 只登录purchase，桌面/390×844本地选择Candidate`2/4/6/8`并打开确认后取消；刷新草稿清空，business POST0、Session0 |
+| 最终数据 | UNCHANGED | RFQ ISSUED v6、Quote2、Comparison v1/CURRENT、Line4、Candidate8、Award/Award Line/PO`0/0/0`；output digest`79554d88…619ec`与保护指纹`16d70f18…cf5bc`不变 |
+| 资源/清理 | PASS | available约`2.1→2.2GiB`，Swap`242→252MiB`、根盘18GiB、Load最终`0.16/0.34/0.58`；内核OOM0，四服务restart0/OOM false，任务临时资源清零且四个受保护Volume保留 |
+| Git/下一步 | TWO COMMITS / STOP | 功能`22aa4dc`与独立ops收口；不push/PR/改写历史。具备技术条件但正式Award仍须新授权和事实重验，转PO/到货计划另立任务 |
+
 ## SELFHOST-UAT-FIX-29 RFQ Award Candidate Selection Fix
 
 | 验证项 | 结果 | 说明 |

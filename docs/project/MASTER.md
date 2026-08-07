@@ -39,23 +39,25 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.40`；PostgreSQL 为 39/head `0039_rfq_traceability.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-29`功能提交`99a5e6bfe255cb46a0384106eb8ec0a08ec96832`已完成Candidate权威DTO、稳定字符串ID、逐Line选择、Candidate绑定Award DTO、服务端重验和正式确认窗口；版本保持alpha.40，Migration保持0039 |
-| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-29`已把精确功能提交Web-only部署到18888非生产UAT；独立提交消息为`ops: deploy RFQ award candidate selection fix`，实际SHA以Git log为准。正式备份/第二新库恢复、精确回退、隔离Award及purchase-only桌面/390×844取消验收通过 |
-| Git 同步与工作区 | 从唯一worktree、clean`main@8665f21577f2b5f5ab2b9e5ac442487dd6c2335d`、Parent`80e1ad60fa1272017545e150721c8b71f7c68828`、behind0/ahead161起步；功能与部署验收分为两个聚焦提交，最终预计ahead163。未push/PR/amend/rebase/reset/stash/restore，密码、Token、Cookie、Session材料、连接信息和备份正文未进入Git |
+| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-30`功能提交`22aa4dc053c9e0a8dc523956afe7742cf5d66fbc`已补齐固定Quote引用、一次不可变Award操作/恰好四条Award Line、上下游保护和独立转PO阶段说明；Award提交DTO与服务端安全边界不变，版本保持alpha.40，Migration保持0039 |
+| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-30`已把精确功能提交Web-only部署到18888非生产UAT；独立提交消息为`ops: deploy RFQ award confirmation contract fix`，实际SHA以Git log为准。正式备份/第二新库恢复、精确回退、隔离Award及purchase-only桌面/390×844取消验收通过 |
+| Git 同步与工作区 | 从唯一worktree、clean`main@92adf4646ec45c6ae317c81e974219e75ab54612`、Parent`99a5e6bfe255cb46a0384106eb8ec0a08ec96832`、behind0/ahead163起步；功能与部署验收分为两个聚焦提交，最终预计ahead165。未push/PR/amend/rebase/reset/stash/restore，密码、Token、Cookie、Session材料、连接信息和备份正文未进入Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0039`，39/head`0039_rfq_traceability.sql`，SHA-256`3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；没有0040。主`RFQ-00000001`为ISSUED v6、Binding8、Quote2、Comparison Version1/CURRENT、Line/Candidate`4/8`、Award/Award Line/PO`0/0/0`；输出摘要`79554d88…619ec`、保护指纹`16d70f18…cf5bc`在主库起点、恢复库、部署前和UAT后一致 |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。Candidate修复Web为alpha.40`sha256:f239ffe3059cfbd5cbb26a45d0960249450ec61989a8f91fb4e17dff3e26e4c1`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`0dfcc0a8…`有FIX29精确回退tag，四个受保护Volume未更换 |
-| 当前开发环境 | 本地源码和公开UAT在既有Comparison聚合之上，以规范十进制字符串Candidate ID按Comparison Line权威关联，每行恰好两个Supplier选项；Award提交绑定Candidate并由服务端重验CURRENT、固定Quote、CAS、摘要、完整行集和非最低价理由。共享中文状态、八部门导航与权限裁剪保持；alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | RFQ Award Candidate选择与确认合同已Web-only部署到公开非生产UAT，并完成隔离Award、正式备份恢复及purchase-only桌面/390×844确认后取消验收；主UAT business POST 0且未创建Award/PO，不是生产发布或真实数据迁移 |
-| 当前任务 | `SELFHOST-UAT-FIX-30`为当前唯一`DOING`：只补齐RFQ正式定标确认窗口合同、隔离验证、备份恢复、Web-only部署和purchase-only取消验收；主UAT禁止创建Award/PO |
-| 下一任务 | 本任务完成后停止。真正人工定标/Award、转PO、Migration、真实数据迁移或生产切流仍须新的明确授权，并重新读取当前CAS、Comparison摘要、Quote和Candidate资格 |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。确认合同修复Web为alpha.40`sha256:f11843852426478828c87cf6ec1e889949614beb5ce54df49c23557d16b75e34`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`f239ffe3…`有FIX30精确回退tag，四个受保护Volume未更换 |
+| 当前开发环境 | 本地源码和公开UAT在既有Comparison/Candidate/Quote权威DTO之上，以稳定字符串ID展示两份固定Quote，并明确一次不可变Award操作/恰好四条Award Line、上游不可变、完整下游零自动创建和独立转PO阶段；实际Award提交DTO未改，服务端继续重验CURRENT、固定Quote、CAS、摘要、完整行集和非最低价理由。共享中文状态、八部门导航与权限裁剪保持；alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
+| 当前阶段 | RFQ Award确认合同已Web-only部署到公开非生产UAT，并完成隔离Award、正式备份恢复及purchase-only桌面/390×844打开后取消验收；主UAT business POST 0且Award/Award Line/PO保持0/0/0，不是生产发布或真实数据迁移 |
+| 当前任务 | 当前无`DOING`；`SELFHOST-UAT-FIX-30`已完成并停止在主UAT Award/Award Line/PO `0/0/0` |
+| 下一任务 | 真正人工定标/Award、独立“定标转PO与到货计划”、Migration、真实数据迁移或生产切流均须新的明确授权；正式定标前必须重新读取当前CAS、Comparison摘要、Quote和Candidate资格 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-UAT-FIX-30补齐两份固定Quote ID/version/Supplier/外部引用/金额/交期，一次不可变Award操作与恰好四条Award Line，上游逐项不可变、PO/Delivery Plan/Receipt/Ledger/AP/Work Order/生产/财务逐项零自动创建和独立转PO阶段说明。隔离双击结果恰为Award1/Line4/PO0；正式备份恢复、Web-only部署及purchase-only桌面/390×844取消验收通过，主UAT business POST0、Session0、Award/Award Line/PO0/0/0
 
 - SELFHOST-UAT-FIX-29修复RFQ Line bigint字符串与旧Quote Line数字严格比较导致的空候选；Comparison DTO以Candidate稳定字符串ID贯通四组逐Line候选、非最低价交期优先、服务端CURRENT/Quote/CAS/摘要/完整行集重验和正式确认窗口。隔离Award恰为1/4/PO0；备份恢复、Web-only部署及purchase-only桌面/390×844取消验收通过，主UAT business POST0、Session0、Award/Award Line/PO0/0/0
 
@@ -282,6 +284,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
+- `SELFHOST-UAT-FIX-30`已完成：功能提交`22aa4dc053c9e0a8dc523956afe7742cf5d66fbc`，保持alpha.40/0039且没有0040；两份固定Quote、一次Award操作/四条Line精确语义、上游不可变、八类下游零自动创建和独立转PO阶段已Web-only部署。正式备份/第二库恢复、隔离双击Award1/Line4/PO0及purchase-only桌面/390×844打开后取消通过；主UAT business POST0、Session0，RFQ ISSUED v6、Award/Award Line/PO0/0/0。当前无`DOING`；真正人工定标或转PO必须新授权并重验当前事实。
 - `SELFHOST-UAT-FIX-29`已完成：功能提交`99a5e6bfe255cb46a0384106eb8ec0a08ec96832`，保持alpha.40/0039且没有0040；Candidate DTO/稳定字符串ID、四组逐Comparison Line两候选、Candidate绑定Award DTO、非最低价`DELIVERY_PRIORITY`与服务端CURRENT/Quote/CAS/摘要/完整行集重验已Web-only部署。正式备份/第二库恢复、隔离Award 1/Line4/PO0及purchase-only桌面/390×844确认后取消通过；主UAT business POST0、Session0，RFQ ISSUED v6、Award/Award Line/PO0/0/0。当前无`DOING`；真正人工定标或PO必须新授权并重验当前事实。
 - `SELFHOST-UAT-FIX-28`已完成：功能提交`80e1ad60fa1272017545e150721c8b71f7c68828`，保持alpha.40/0039且没有0040；Comparison Line稳定ID、RFQ/Round/Version/逐行basis复合身份、CURRENT/SUPERSEDED/INPUT_DRIFT投影、固定Quote输入、确定性输出摘要、Supplier/Material汇总和四Line Event单操作凭证已Web-only部署。正式备份/第二库恢复、隔离回归及purchase-only桌面/390×844只读验收通过；business POST0、Session0，RFQ ISSUED v6、Binding8、Quote2、Comparison4/8/4、Award/PO0/0。当前无`DOING`；人工定标或PO必须另获明确授权。
 - `SELFHOST-UI-STATUS-LOCALIZATION-05` 已完成：共享 `statusLabel/statusPairLabel/roleLabel` 统一原生与legacy可见业务状态、角色、审核/执行结果和启停显示；未知枚举原样回退，原始值继续服务API、筛选、状态机、样式和审计。38个UI测试文件、10组typecheck、lint/build、npm/Python/credentials通过，版本仍alpha.40、Migration仍0039。当前无`DOING`；公开UAT保持既有Web镜像，部署或登录式浏览器验收须新授权。
@@ -312,7 +315,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - `SELFHOST-OPS-ADMIN-ACCOUNT-04` 已通过正式 Identity Service 创建第二 active admin `admin2`，最终 version 2、首次改密；用户/admin `1/1→2/2`，Session/有效 `2/0` 不变。弱密码门禁、摘要输出事件、正式重置补救、4 条 Identity Audit、3 条幂等和资源/健康/清理均已记录。
 - `SELFHOST-LANDING-TASK05` 已完成 V9 staging。pre-clean dump 恢复 213 表一致；staging 首次 197、重放新增 0。197 行全部因 `EXPLICIT_UNIT_MISSING` 待确认，主库前后计数 manifest 一致，固定结论 `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED`。
 - `SELFHOST-PHASE6-TASK01` 已交付 alpha.35/0035 的 BOM 物料规格标准化与主数据治理源码。严格身份、可解释归并、原始行追溯、异常与替代候选、人工受控绑定/建稿已通过隔离 PostgreSQL 验收；正式替代关系仍不自动写入。
-- `SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06`完成时，18888 Web为状态中文化alpha.40 `sha256:89e7677538751f2c0a049a113f3d24372a18edaf752bf837038580ac951bd153`（88,572,838 bytes）；这是历史部署时点，当前Web以本文件顶部FIX29运行状态为准。PostgreSQL当时及当前均为39/head0039；PUBLIC-IP-CUTOVER-07的Origin/端口和Caddy保持，Worker镜像未替换，PostgreSQL/Caddy与四个受保护卷均未重建。该运行面只属于并行非生产UAT，不等于生产发布。
+- `SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06`完成时，18888 Web为状态中文化alpha.40 `sha256:89e7677538751f2c0a049a113f3d24372a18edaf752bf837038580ac951bd153`（88,572,838 bytes）；这是历史部署时点，当前Web以本文件顶部FIX30运行状态为准。PostgreSQL当时及当前均为39/head0039；PUBLIC-IP-CUTOVER-07的Origin/端口和Caddy保持，Worker镜像未替换，PostgreSQL/Caddy与四个受保护卷均未重建。该运行面只属于并行非生产UAT，不等于生产发布。
 - `SELFHOST-LANDING-TASK04` 已把兼容业务台的 CSV-only 页面收敛到 `/materials/imports/new`；旧 `/api/import` 继续在 PostgreSQL 运行面明确退役。功能提交 `cda8c7e` 已经用户单独授权部署到当前 18888 Web，公网 HTML/JS SHA 与源码一致。
 - `SELFHOST-LANDING-TASK03` 根据用户明确授权把公网 `18888` 从旧 Python 切到新 PostgreSQL ERP：可信 TLS、80→HTTPS 跳转、生产 Cookie、匿名 401 和安全响应头通过；旧 Python 仅回环保留。该任务的原入口 `43.135.157.211.nip.io` 已由 PUBLIC-IP-CUTOVER-07 受控替换，当前入口为 `https://43.135.148.43.nip.io:18888`。
 - `SELFHOST-LANDING-TASK02` 经用户澄清“不依赖逐行人工分类”后连续执行：离线确定性规则按来源编码/MPN/严格规格组合、类别、位号和可数件单位完成 532 Material、6 Product、6 个 DRAFT BOM 与 316 行主库导入；438 条真正歧义来源隔离。migration_tool 来源链接承载逐行 provenance，0034 不变，同批次重放新增 0，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`。

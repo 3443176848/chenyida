@@ -4,6 +4,18 @@
 
 ## 2026-08-07
 
+### SELFHOST-UAT-FIX-30 - `fix: complete RFQ award confirmation contract` / `ops: deploy RFQ award confirmation contract fix`
+
+- Git/范围：从唯一worktree、clean`main@92adf4646ec45c6ae317c81e974219e75ab54612`、Parent`99a5e6bfe255cb46a0384106eb8ec0a08ec96832`、behind0/ahead163起步；功能提交`22aa4dc053c9e0a8dc523956afe7742cf5d66fbc`，部署/UAT/清理和文档由独立ops提交收口。只补齐现有正式Award确认合同，不改Award提交DTO或服务端写语义，不创建主UAT Award/PO，不push/PR或改写历史。
+- Quote/字段：确认窗口从CURRENT Comparison/Candidate/Quote DTO固定展示Supplier A Quote`1/v1`、Supplier`1 / SUP-000001`、`UAT-Q-A-042576`、480.00 CNY、2026-10-20、ON_TIME/提前10天，以及Supplier B Quote`2/v1`、Supplier`2 / SUP-000002`、`UAT-Q-B-042576`、400.00 CNY、2026-11-05、LATE/延期6天。稳定ID保持字符串，不按Supplier名称、价格或日期反向查找。
+- 操作/保护合同：逐字明确本次只创建一次不可变Award操作并在其下恰好四条Award Line；显示操作1/Line4、Comparison Line1—4、Candidate`2/4/6/8`、全部Supplier A、不拆分数量。逐项声明RFQ、两份Quote、Comparison Version/Line/Candidate、Binding/Mapping不修改；逐项列出PO、Delivery Plan、Receipt、Inventory Ledger、AP、Work Order、其他生产及财务记录零自动创建。
+- 下一阶段/UI：明确“定标转PO与到货计划”为独立后续任务，本次不自动执行；处理人未指定、时限未配置如实显示。RFQ/Round/CAS、basis/output digest、Material 533—536各10 PCS、金额/价差/交期差、原因与完整理由保留；默认焦点取消，桌面/390×844及长理由/digest/request_id无页面级横向溢出。
+- 安全/测试：Award提交DTO精确键集合保持，服务端Comparison Version、Candidate、Quote、CAS、原因、purchase权限、Origin/CSRF、幂等、并发、审计和回滚未放宽。Unit11/11、UI22/22、隔离PostgreSQL27/27、0039 upgrade6/6、安全20/20、浏览器RFQ全套5/5、typecheck、lint0 error/11既有warning、production/Docker build、npm3/3、environment6/6及Python三项通过。
+- 隔离Award：取消、关闭和ESC均为业务POST0；同步双击最终确认只形成一次Award操作和恰好四条Line，Candidate为`2/4/6/8`，PO0。隔离数据库/runtime已清理，没有影响主库。
+- 备份/部署：正式dump root:root0600、2,292,405 bytes、SHA-256`19d563f424cb5bd628f2b2dc6114c74cc58eb7c66f3fb75038b14690a281e39e`、list3359；第二新库恢复39/head0039、226表、Award/Award Line/PO0/0/0及保护指纹后删除。仅替换Web`f239ffe3…→f1184385…`，旧Web精确rollback tag保留；未运行Migration，未重建PostgreSQL/Worker/Caddy，四卷未变。
+- 主UAT/结论：只登录purchase，本地选择Candidate`2/4/6/8`和`DELIVERY_PRIORITY`，桌面/390×844核对确认窗口后取消，刷新草稿清空并安全退出；`business_post=0`、Session0。RFQ仍ISSUED v6、Comparison v1/CURRENT、Award/Award Line/PO`0/0/0`，output digest与保护指纹不变。结论`RFQ AWARD CONFIRMATION FIXED — UAT AWARD NOT CREATED`。
+- 资源/清理：重任务串行；available约`2.1→2.2GiB`、Swap`242→252MiB`、根盘18GiB、Load`0.90/0.49/0.28→0.16/0.34/0.58`；内核OOM0、四服务restart0/OOM false。任务临时容器/runtime/SQLite/恢复与隔离库清零，正式dump、current/candidate/rollback镜像和受保护卷保留，未prune。
+
 ### SELFHOST-UAT-FIX-29 - `fix: bind RFQ awards to comparison candidates` / `ops: deploy RFQ award candidate selection fix`
 
 - Git/范围与根因：从唯一worktree、clean`main@8665f21577f2b5f5ab2b9e5ac442487dd6c2335d`、Parent`80e1ad60fa1272017545e150721c8b71f7c68828`、behind0/ahead161起步；功能提交`99a5e6bfe255cb46a0384106eb8ec0a08ec96832`，部署/UAT/清理和文档由独立ops提交收口。根因是RFQ Line bigint字符串与旧Quote Line数字严格比较使四行过滤为空，且旧UI错误使用Quote Line ID选择/提交。

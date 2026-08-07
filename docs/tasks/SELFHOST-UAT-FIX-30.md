@@ -2,8 +2,9 @@
 
 ## 状态与唯一范围
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始：2026-08-07（Asia/Shanghai）
+- 完成：2026-08-07（Asia/Shanghai）
 - 负责人：Codex（严格门禁、确认合同修复、串行隔离测试、正式备份恢复、Web-only 部署、purchase-only 主 UAT 取消验收）；项目负责人（固定实现、部署及只读验收边界）
 - 依赖：`SELFHOST-PHASE4-TASK04`、`SELFHOST-PHASE4-TASK05`、`SELFHOST-UAT-FIX-22`、`SELFHOST-UAT-FIX-27`、`SELFHOST-UAT-FIX-28`、`SELFHOST-UAT-FIX-29`、D-061、D-062、D-095—D-101
 - 唯一范围：补齐正式定标确认窗口中的固定 Quote 引用、一次 Award 操作/恰好四条 Award Line 语义、上游不可变边界、完整下游零自动创建保护及独立下一阶段说明。主 UAT 只选择 Candidate、打开窗口并取消，不创建 Award、PO 或其他下游。
@@ -42,3 +43,10 @@
 - `BLOCKED — NO UNSAFE CHANGE`
 
 完成后立即停止，不创建主 UAT Award 或 PO。
+
+## 完成结果
+
+- 最终状态：`RFQ AWARD CONFIRMATION FIXED — UAT AWARD NOT CREATED`。
+- 功能提交：`22aa4dc053c9e0a8dc523956afe7742cf5d66fbc`（`fix: complete RFQ award confirmation contract`）；部署、UAT、清理和项目文档由独立 `ops: deploy RFQ award confirmation contract fix` 提交收口，实际 SHA 以 Git log 为准。
+- 正式确认窗口、隔离 Award、备份恢复、Web-only 部署及 purchase-only 主 UAT 取消验收均通过；主 UAT `business POST 0`，最终 RFQ 仍为 `ISSUED v6`，Award/Award Line/PO 仍为 `0/0/0`。
+- 详细证据见[完成报告](SELFHOST-UAT-FIX-30-COMPLETION.md)。
