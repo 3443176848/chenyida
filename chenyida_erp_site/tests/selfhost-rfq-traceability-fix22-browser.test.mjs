@@ -37,6 +37,13 @@ const MAPPING_UIDS = [
   ],
 ];
 const MATERIAL_IDS = [533, 534, 535, 536];
+const FIX29_MATERIAL_DEFINITIONS = [
+  { id: 533, code: "CYD-RB_PCB-000016", name: "FIX-29 隔离 PCB 物料" },
+  { id: 534, code: "CYD-RB_SENSOR-000003", name: "FIX-29 隔离 Sensor 物料" },
+  { id: 535, code: "CYD-RB_CONN-000075", name: "FIX-29 隔离 Connector 物料" },
+  { id: 536, code: "CYD-RB_METAL-000015", name: "FIX-29 隔离 Metal 物料" },
+];
+const FIX29_AWARD_REASON = "交期优先，避免项目延期；供应商A承诺2026-10-20交付，满足2026-10-30需求日期，供应商B承诺2026-11-05交付，已晚于需求日期。";
 const pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "rfq-traceability-fix22-browser" });
 const sha256 = (value) => createHash("sha256").update(String(value)).digest("hex");
 const expectedMigration0039Checksum = createHash("sha256")
@@ -64,7 +71,14 @@ async function clearSyntheticData() {
   if (quoted.length) await pool.query(`truncate table ${quoted.join(",")} restart identity cascade`);
 }
 
-async function seedFixture({ targetDate = "2099-10-30" } = {}) {
+async function seedFixture({ targetDate = "2099-10-30", materialDefinitions } = {}) {
+  const definitions = materialDefinitions || MATERIAL_IDS.map((id) => ({
+    id,
+    code: `CYD-FIX22-${String(id).padStart(6, "0")}`,
+    name: `FIX-22 物料 ${id}`,
+  }));
+  assert.deepEqual(definitions.map(({ id }) => id), MATERIAL_IDS, "fixture Material IDs must remain fixed");
+  const materialDefinition = new Map(definitions.map((row) => [row.id, row]));
   const credentials = { username: "fix22_purchase", password: `Isolated!Fix22-${randomUUID()}` };
   const planningCredentials = { username: "planning01", password: `Isolated!Fix26-Planning-${randomUUID()}` };
   const client = await pool.connect();
@@ -91,6 +105,8 @@ async function seedFixture({ targetDate = "2099-10-30" } = {}) {
       [randomUUID()],
     )).rows[0];
     for (const materialId of MATERIAL_IDS) {
+      const definition = materialDefinition.get(materialId);
+      assert.ok(definition);
       await client.query(
         `insert into material_master(
           id,internal_material_code,standard_name,category_id,base_uom,base_unit_id,material_status,
@@ -98,7 +114,7 @@ async function seedFixture({ targetDate = "2099-10-30" } = {}) {
           last_modified_by,created_by,updated_by,request_id
         ) values($1,$2,$3,$4,'PCS',$5,'ACTIVE','PURCHASED','STOCKED','IQC','RoHS','MANUAL',
           'admin01','admin01','admin01',$6)`,
-        [materialId, `CYD-FIX22-${String(materialId).padStart(6, "0")}`, `FIX-22 物料 ${materialId}`, category.id, unit.id, randomUUID()],
+        [materialId, definition.code, definition.name, category.id, unit.id, randomUUID()],
       );
     }
     await client.query("select setval(pg_get_serial_sequence('material_master','id'),536,true)");
@@ -148,7 +164,7 @@ async function seedFixture({ targetDate = "2099-10-30" } = {}) {
           index + 1,
           materialId,
           unit.id,
-          { internal_material_code: `CYD-FIX22-${String(materialId).padStart(6, "0")}`, standard_name: `FIX-22 物料 ${materialId}` },
+          { internal_material_code: materialDefinition.get(materialId).code, standard_name: materialDefinition.get(materialId).name },
           sha256(`fix22-browser-material-${materialId}`),
           sha256(`fix22-browser-source-${materialId}`),
         ],
@@ -324,6 +340,92 @@ async function noDialogOverflow(dialog, stage) {
   });
   assert.ok(widths.dialogScroll <= widths.dialogClient + 1, `${stage}: dialog overflow`);
   assert.ok(widths.bodyScroll <= widths.bodyClient + 1, `${stage}: dialog body overflow`);
+}
+
+async function createFix29CurrentComparison(context, csrfToken) {
+  const mutationHeaders = (key = randomUUID()) => ({
+    Origin: REQUIRED_ORIGIN,
+    "X-CSRF-Token": csrfToken,
+    "Idempotency-Key": key,
+  });
+  const create = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs`, {
+    headers: mutationHeaders(),
+    data: { purchase_request_id: 1, supplier_ids: [1, 2], response_deadline: "2026-08-31", expected_version: 1 },
+  });
+  assert.equal(create.status(), 201, await create.text());
+  const issue = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/issue`, {
+    headers: mutationHeaders(),
+    data: { expected_version: 1 },
+  });
+  assert.equal(issue.status(), 200, await issue.text());
+  const rfqLines = (await pool.query(
+    "select id::text,material_id::int from procurement_rfq_lines where rfq_id=1 order by line_no",
+  )).rows;
+  assert.deepEqual(rfqLines.map(({ id, material_id }) => [id, material_id]), [["1", 533], ["2", 534], ["3", 535], ["4", 536]]);
+  const quoteBody = ({ supplierId, expectedVersion, reference, price, promisedDate }) => ({
+    expected_version: expectedVersion,
+    supplier_id: supplierId,
+    supplier_quote_reference: reference,
+    valid_until: "2026-09-30",
+    tax_included: false,
+    freight_included: false,
+    payment_terms: "纯虚拟UAT付款条件，仅用于表单验收。",
+    lines: rfqLines.map(({ id }) => ({
+      rfq_line_id: id,
+      quoted_quantity: "10.000000",
+      minimum_order_quantity: "10.000000",
+      unit_price: price,
+      lead_time_days: 75,
+      promised_delivery_date: promisedDate,
+    })),
+  });
+  const quoteA = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/quotes`, {
+    headers: mutationHeaders(),
+    data: quoteBody({ supplierId: 1, expectedVersion: 2, reference: "UAT-Q-A-042576", price: "12.000000", promisedDate: "2026-10-20" }),
+  });
+  assert.equal(quoteA.status(), 201, await quoteA.text());
+  const quoteB = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/quotes`, {
+    headers: mutationHeaders(),
+    data: quoteBody({ supplierId: 2, expectedVersion: 3, reference: "UAT-Q-B-042576", price: "10.000000", promisedDate: "2026-11-05" }),
+  });
+  assert.equal(quoteB.status(), 201, await quoteB.text());
+  const comparison = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/comparisons`, {
+    headers: mutationHeaders(),
+    data: { expected_version: 4 },
+  });
+  const comparisonText = await comparison.text();
+  assert.equal(comparison.status(), 201, comparisonText);
+  const comparisonPayload = JSON.parse(comparisonText);
+  assert.equal(comparisonPayload.comparison_version_no, 1);
+  const detailResponse = await context.request.get(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1`);
+  assert.equal(detailResponse.status(), 200);
+  const detail = (await detailResponse.json()).data;
+  assert.deepEqual({ status: detail.header.status, version: Number(detail.header.version) }, { status: "ISSUED", version: 5 });
+  const current = detail.comparison_read_model.current_version;
+  assert.ok(current);
+  assert.deepEqual({ version: current.comparison_version_no, status: current.status, awardable: current.awardable_now, drift: current.input_drift }, {
+    version: 1, status: "CURRENT", awardable: true, drift: false,
+  });
+  assert.equal(current.output_summary.digest, "79554d88ccdb643a860c0c69e77222abce80eb4d3d8314d88135d3966fb619ec");
+  const candidates = (await pool.query(`select candidate.id::text candidate_id,
+      candidate.comparison_id::text comparison_line_id,comparison.rfq_line_id::text rfq_line_id,
+      candidate.supplier_id::text supplier_id,quote_line.quote_id::text quote_id,quote.quote_version_no::int quote_version_no
+    from procurement_quote_comparison_lines candidate
+    join procurement_quote_comparisons comparison on comparison.id=candidate.comparison_id
+    join procurement_supplier_quote_lines quote_line on quote_line.id=candidate.quote_line_id
+    join procurement_supplier_quotes quote on quote.id=quote_line.quote_id
+    where comparison.rfq_id=1 and comparison.comparison_version_no=1 order by candidate.id`)).rows;
+  assert.deepEqual(candidates, [
+    { candidate_id: "1", comparison_line_id: "1", rfq_line_id: "1", supplier_id: "2", quote_id: "2", quote_version_no: 1 },
+    { candidate_id: "2", comparison_line_id: "1", rfq_line_id: "1", supplier_id: "1", quote_id: "1", quote_version_no: 1 },
+    { candidate_id: "3", comparison_line_id: "2", rfq_line_id: "2", supplier_id: "2", quote_id: "2", quote_version_no: 1 },
+    { candidate_id: "4", comparison_line_id: "2", rfq_line_id: "2", supplier_id: "1", quote_id: "1", quote_version_no: 1 },
+    { candidate_id: "5", comparison_line_id: "3", rfq_line_id: "3", supplier_id: "2", quote_id: "2", quote_version_no: 1 },
+    { candidate_id: "6", comparison_line_id: "3", rfq_line_id: "3", supplier_id: "1", quote_id: "1", quote_version_no: 1 },
+    { candidate_id: "7", comparison_line_id: "4", rfq_line_id: "4", supplier_id: "2", quote_id: "2", quote_version_no: 1 },
+    { candidate_id: "8", comparison_line_id: "4", rfq_line_id: "4", supplier_id: "1", quote_id: "1", quote_version_no: 1 },
+  ]);
+  return { detail, current, candidates };
 }
 
 async function visibleBindingIds(scope) {
@@ -1634,6 +1736,277 @@ test("isolated Chromium renders the Comparison aggregate read model on desktop a
     await context.close();
     console.info("RFQ_COMPARISON_AGGREGATE_BROWSER_OK rfq=1 comparison_version=1 comparison_lines=4 candidates=8 events=4 desktop=1 mobile=1 business_post=0 award=0 po=0 session=0");
   } finally {
+    await browser?.close().catch(() => undefined);
+  }
+});
+
+test("isolated Chromium cancels the FIX-29 Award confirmation with zero POST then creates exactly one four-line Award", { timeout: 300_000 }, async () => {
+  await clearSyntheticData();
+  const fixture = await seedFixture({ targetDate: "2026-10-30", materialDefinitions: FIX29_MATERIAL_DEFINITIONS });
+  const chromium = await loadChromium();
+  let browser;
+  let context;
+  let csrfToken = "";
+  let authenticated = false;
+  try {
+    browser = await chromium.launch({ headless: true, args: ["--disable-dev-shm-usage", "--no-sandbox"] });
+    context = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: "block" });
+    const page = await context.newPage();
+    await login(page, fixture.credentials);
+    const session = await (await context.request.get(`${REQUIRED_ORIGIN}/api/session`)).json();
+    assert.ok(session.authenticated && session.csrf_token);
+    csrfToken = session.csrf_token;
+    authenticated = true;
+    const { current } = await createFix29CurrentComparison(context, csrfToken);
+
+    const beforeAward = (await pool.query(`select
+      (select status from procurement_rfqs where id=1) rfq_status,
+      (select version::int from procurement_rfqs where id=1) rfq_version,
+      (select count(*)::int from procurement_sourcing_awards where rfq_id=1) awards,
+      (select count(*)::int from procurement_sourcing_award_lines award_line
+        join procurement_sourcing_awards award on award.id=award_line.award_id where award.rfq_id=1) award_lines,
+      (select count(*)::int from purchase_orders) purchase_orders`)).rows[0];
+    assert.deepEqual(beforeAward, { rfq_status: "ISSUED", rfq_version: 5, awards: 0, award_lines: 0, purchase_orders: 0 });
+
+    const businessRequests = [];
+    await context.route("**/*", async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.origin !== REQUIRED_ORIGIN) return route.abort("blockedbyclient");
+      const method = request.method().toUpperCase();
+      if (!["GET", "HEAD", "OPTIONS"].includes(method) && url.pathname !== "/api/logout") {
+        let body = null;
+        try { body = request.postDataJSON(); } catch { body = request.postData(); }
+        businessRequests.push({ method, path: url.pathname, body });
+      }
+      return route.continue();
+    });
+
+    await page.goto(`${REQUIRED_ORIGIN}/procurement/sourcing/1`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "RFQ-00000001 · Round 1", exact: true }).waitFor();
+    await page.getByRole("heading", { name: "人工定标与撤销", exact: true }).waitFor();
+    const form = page.locator("form.award-selection-form");
+    await form.waitFor();
+    assert.equal(await form.locator("fieldset.award-candidate-fieldset").count(), 4);
+    assert.equal(await form.locator("select.award-candidate-select").count(), 4);
+    const expectedCandidatePairs = [["1", "2"], ["3", "4"], ["5", "6"], ["7", "8"]];
+    for (const [index, [supplierB, supplierA]] of expectedCandidatePairs.entries()) {
+      const lineId = String(index + 1);
+      const select = form.locator(`select.award-candidate-select[name="candidate_${lineId}"]`);
+      assert.equal(await select.getAttribute("data-candidate-count"), "2");
+      assert.equal(await select.inputValue(), "", `Line ${lineId} must initially select 请选择`);
+      const options = await select.locator("option").evaluateAll((items) => items.map((option) => ({ value: option.value, label: option.textContent?.trim() || "" })));
+      assert.deepEqual(options.map(({ value }) => value), ["", supplierB, supplierA]);
+      for (const required of ["SUP-000002", "FIX-22 低价供应商 B", `Candidate ID ${supplierB}`, "Quote ID 2/v1", "单价 10.00 CNY", "行金额 100.00 CNY", "承诺日期 2026-11-05", "LATE / 延期6天", "价格排名1"]) {
+        assert.ok(options[1].label.includes(required), `Line ${lineId} Supplier B option missing ${required}`);
+      }
+      for (const required of ["SUP-000001", "FIX-22 快速交付供应商 A", `Candidate ID ${supplierA}`, "Quote ID 1/v1", "单价 12.00 CNY", "行金额 120.00 CNY", "承诺日期 2026-10-20", "ON_TIME / 提前10天", "价格排名2"]) {
+        assert.ok(options[2].label.includes(required), `Line ${lineId} Supplier A option missing ${required}`);
+      }
+      await select.selectOption(supplierB);
+      assert.equal(await select.inputValue(), supplierB, `Line ${lineId} Supplier B must be selectable`);
+    }
+    assert.deepEqual(businessRequests, [], "local Supplier B selections must send zero business requests");
+    for (const [index, [, supplierA]] of expectedCandidatePairs.entries()) {
+      const select = form.locator(`select.award-candidate-select[name="candidate_${index + 1}"]`);
+      await select.selectOption(supplierA);
+      assert.equal(await select.inputValue(), supplierA, `Line ${index + 1} Supplier A must be selectable`);
+    }
+    await form.locator('select[name="reason_code"]').selectOption("DELIVERY_PRIORITY");
+    await form.locator('textarea[name="reason"]').fill(FIX29_AWARD_REASON);
+
+    await form.getByRole("button", { name: "打开正式定标确认窗口", exact: true }).click();
+    let dialog = page.locator(".rfq-dialog.award-confirm-dialog[role=dialog]");
+    await dialog.getByRole("heading", { name: "正式定标确认", exact: true }).waitFor();
+    await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "取消");
+    assert.deepEqual(await dialog.locator("article[data-selected-candidate-id]").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-selected-candidate-id"))), ["2", "4", "6", "8"]);
+    const desktopText = await dialog.innerText();
+    for (const required of [
+      "ID 1 / RFQ-00000001", "Round 1 / v5", "v1 / CURRENT", "awardable_now", "true",
+      "79554d88ccdb643a860c0c69e77222abce80eb4d3d8314d88135d3966fb619ec",
+      ...current.comparison_rows.map((row) => row.basis_digest),
+      ...FIX29_MATERIAL_DEFINITIONS.flatMap(({ id, code }) => [String(id), code]),
+      "Candidate ID 2", "Candidate ID 4", "Candidate ID 6", "Candidate ID 8", "Quote ID 1 / v1",
+      "12.00 CNY", "120.00 CNY", "2026-10-20", "ON_TIME / 提前10天", "价格排名 2 / 非最低价",
+      "SUP-000001 · FIX-22 快速交付供应商 A", "SUP-000002 · FIX-22 低价供应商 B",
+      "480.00 CNY", "400.00 CNY", "80.00 CNY / 20%", "LATE / 延期6天",
+      "SUP-000001 比 SUP-000002 早 16 天。",
+      "DELIVERY_PRIORITY / 交期优先", FIX29_AWARD_REASON,
+      "本次只新增一个不可变 Sourcing Award 及其 Award Line",
+      "不会自动创建 PO、到货计划、收货、库存、应付或其他下游记录",
+    ]) assert.ok(desktopText.includes(required), `desktop Award confirmation missing ${required}`);
+    assert.equal(await dialog.getByRole("button", { name: "最终确认并创建 Award", exact: true }).isVisible(), true);
+    await noOverflow(page, "FIX-29 Award confirmation desktop");
+    await noDialogOverflow(dialog, "FIX-29 Award confirmation desktop");
+    assert.deepEqual(businessRequests, [], "opening confirmation must send zero business requests");
+    await dialog.getByRole("button", { name: "取消", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.deepEqual(businessRequests, [], "cancelling confirmation must send zero business requests");
+    assert.deepEqual((await pool.query(`select
+      (select count(*)::int from procurement_sourcing_awards where rfq_id=1) awards,
+      (select count(*)::int from procurement_sourcing_award_lines award_line join procurement_sourcing_awards award on award.id=award_line.award_id where award.rfq_id=1) award_lines,
+      (select count(*)::int from purchase_orders) purchase_orders`)).rows[0], { awards: 0, award_lines: 0, purchase_orders: 0 });
+
+    await form.getByRole("button", { name: "打开正式定标确认窗口", exact: true }).click();
+    dialog = page.locator(".rfq-dialog.award-confirm-dialog[role=dialog]");
+    await dialog.getByRole("heading", { name: "正式定标确认", exact: true }).waitFor();
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached" });
+    assert.deepEqual(businessRequests, [], "Escape from confirmation must send zero business requests");
+    await form.getByRole("button", { name: "打开正式定标确认窗口", exact: true }).click();
+    dialog = page.locator(".rfq-dialog.award-confirm-dialog[role=dialog]");
+    await dialog.getByRole("heading", { name: "正式定标确认", exact: true }).waitFor();
+    await page.locator(".rfq-dialog-backdrop").dispatchEvent("mousedown");
+    await dialog.waitFor({ state: "detached" });
+    assert.deepEqual(businessRequests, [], "backdrop exit from confirmation must send zero business requests");
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await form.getByRole("button", { name: "打开正式定标确认窗口", exact: true }).click();
+    dialog = page.locator(".rfq-dialog.award-confirm-dialog[role=dialog]");
+    await dialog.getByRole("heading", { name: "正式定标确认", exact: true }).waitFor();
+    await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "取消");
+    const mobileText = await dialog.innerText();
+    for (const required of ["RFQ-00000001", "v1 / CURRENT", "Candidate ID 2", "Candidate ID 8",
+      "SUP-000001 · FIX-22 快速交付供应商 A", "SUP-000002 · FIX-22 低价供应商 B",
+      "480.00 CNY", "400.00 CNY", "80.00 CNY / 20%", "SUP-000001 比 SUP-000002 早 16 天。",
+      "DELIVERY_PRIORITY / 交期优先", FIX29_AWARD_REASON]) {
+      assert.ok(mobileText.includes(required), `mobile Award confirmation missing ${required}`);
+    }
+    await noOverflow(page, "FIX-29 Award confirmation 390x844");
+    await noDialogOverflow(dialog, "FIX-29 Award confirmation 390x844");
+    assert.deepEqual(businessRequests, [], "mobile confirmation must remain zero-write before final confirmation");
+
+    const awardResponsePromise = page.waitForResponse((response) => response.url() === `${REQUIRED_ORIGIN}/api/procurement/rfqs/1/award`
+      && response.request().method() === "POST");
+    await dialog.getByRole("button", { name: "最终确认并创建 Award", exact: true }).click();
+    const awardResponse = await awardResponsePromise;
+    const awardPayload = await awardResponse.json();
+    assert.equal(awardResponse.status(), 201, JSON.stringify(awardPayload));
+    assert.deepEqual({
+      award_id: awardPayload.award_id,
+      rfq_id: awardPayload.rfq_id,
+      status: awardPayload.status,
+      reason_code: awardPayload.reason_code,
+      comparison_version_no: awardPayload.comparison_version_no,
+      award_line_count: awardPayload.award_line_count,
+      rfq_version: awardPayload.rfq_version,
+      purchase_order_created: awardPayload.purchase_order_created,
+    }, {
+      award_id: 1,
+      rfq_id: 1,
+      status: "AWARDED",
+      reason_code: "DELIVERY_PRIORITY",
+      comparison_version_no: 1,
+      award_line_count: 4,
+      rfq_version: 6,
+      purchase_order_created: false,
+    });
+    await dialog.waitFor({ state: "detached" });
+    await page.getByText("人工定标已形成一个不可变 Sourcing Award；没有产生采购订单或其他下游记录", { exact: true }).waitFor();
+    assert.equal(businessRequests.length, 1, "final confirmation must send exactly one business request");
+    assert.equal(businessRequests[0].method, "POST");
+    assert.equal(businessRequests[0].path, "/api/procurement/rfqs/1/award");
+    assert.deepEqual({
+      expected_version: businessRequests[0].body.expected_version,
+      expected_rfq_code: businessRequests[0].body.expected_rfq_code,
+      expected_round_no: businessRequests[0].body.expected_round_no,
+      expected_comparison_version: businessRequests[0].body.expected_comparison_version,
+      expected_comparison_output_digest: businessRequests[0].body.expected_comparison_output_digest,
+      reason_code: businessRequests[0].body.reason_code,
+      reason: businessRequests[0].body.reason,
+      selected_candidates: businessRequests[0].body.lines.map((line) => line.selected_candidate_id),
+      rfq_line_ids: businessRequests[0].body.lines.map((line) => line.rfq_line_id),
+      comparison_line_ids: businessRequests[0].body.lines.map((line) => line.comparison_line_id),
+      quote_ids: businessRequests[0].body.lines.map((line) => line.expected_quote_id),
+      quote_versions: businessRequests[0].body.lines.map((line) => line.expected_quote_version_no),
+    }, {
+      expected_version: 5,
+      expected_rfq_code: "RFQ-00000001",
+      expected_round_no: 1,
+      expected_comparison_version: 1,
+      expected_comparison_output_digest: "79554d88ccdb643a860c0c69e77222abce80eb4d3d8314d88135d3966fb619ec",
+      reason_code: "DELIVERY_PRIORITY",
+      reason: FIX29_AWARD_REASON,
+      selected_candidates: ["2", "4", "6", "8"],
+      rfq_line_ids: ["1", "2", "3", "4"],
+      comparison_line_ids: ["1", "2", "3", "4"],
+      quote_ids: ["1", "1", "1", "1"],
+      quote_versions: [1, 1, 1, 1],
+    });
+    assert.ok(businessRequests[0].body.lines.every((line) => typeof line.selected_candidate_id === "string"
+      && typeof line.rfq_line_id === "string" && typeof line.comparison_line_id === "string"
+      && typeof line.expected_quote_id === "string" && /^[0-9a-f]{64}$/.test(line.comparison_basis_digest)));
+
+    const awardState = (await pool.query(`select
+      (select status from procurement_rfqs where id=1) rfq_status,
+      (select version::int from procurement_rfqs where id=1) rfq_version,
+      (select count(*)::int from procurement_sourcing_awards where rfq_id=1) awards,
+      (select count(*)::int from procurement_sourcing_award_lines award_line join procurement_sourcing_awards award on award.id=award_line.award_id where award.rfq_id=1) award_lines,
+      (select count(*)::int from procurement_sourcing_events where rfq_id=1 and event_type='AWARDED') award_events,
+      (select count(*)::int from purchase_orders) purchase_orders,
+      (select count(*)::int from purchase_delivery_plans) delivery_plans,
+      (select count(*)::int from purchase_receipts) receipts`)).rows[0];
+    assert.deepEqual(awardState, {
+      rfq_status: "CLOSED", rfq_version: 6, awards: 1, award_lines: 4, award_events: 1,
+      purchase_orders: 0, delivery_plans: 0, receipts: 0,
+    });
+    const awardLines = (await pool.query(`select award_line.rfq_line_id::text rfq_line_id,
+        award_line.comparison_id::text comparison_line_id,candidate.id::text candidate_id,
+        quote.id::text quote_id,quote.quote_version_no::int quote_version_no,
+        award_line.supplier_id::text supplier_id,award_line.selected_quantity::text selected_quantity,
+        award_line.selected_unit_price::text selected_unit_price,award.reason_code,award.reason
+      from procurement_sourcing_award_lines award_line
+      join procurement_sourcing_awards award on award.id=award_line.award_id
+      join procurement_quote_comparison_lines candidate on candidate.comparison_id=award_line.comparison_id
+        and candidate.quote_line_id=award_line.selected_quote_line_id
+      join procurement_supplier_quote_lines quote_line on quote_line.id=award_line.selected_quote_line_id
+      join procurement_supplier_quotes quote on quote.id=quote_line.quote_id
+      where award.rfq_id=1 order by award_line.rfq_line_id`)).rows;
+    assert.deepEqual(awardLines.map((line) => ({
+      rfq_line_id: line.rfq_line_id,
+      comparison_line_id: line.comparison_line_id,
+      candidate_id: line.candidate_id,
+      quote_id: line.quote_id,
+      quote_version_no: line.quote_version_no,
+      supplier_id: line.supplier_id,
+      selected_quantity: line.selected_quantity,
+      selected_unit_price: line.selected_unit_price,
+      reason_code: line.reason_code,
+      reason: line.reason,
+    })), ["1", "2", "3", "4"].map((lineId, index) => ({
+      rfq_line_id: lineId,
+      comparison_line_id: lineId,
+      candidate_id: String((index + 1) * 2),
+      quote_id: "1",
+      quote_version_no: 1,
+      supplier_id: "1",
+      selected_quantity: "10.000000",
+      selected_unit_price: "12.000000",
+      reason_code: "DELIVERY_PRIORITY",
+      reason: FIX29_AWARD_REASON,
+    })));
+    await noOverflow(page, "FIX-29 awarded detail 390x844");
+
+    const logout = await context.request.post(`${REQUIRED_ORIGIN}/api/logout`, {
+      headers: { Origin: REQUIRED_ORIGIN, "X-CSRF-Token": csrfToken },
+    });
+    assert.equal(logout.status(), 200);
+    authenticated = false;
+    assert.equal((await (await context.request.get(`${REQUIRED_ORIGIN}/api/session`)).json()).authenticated, false);
+    assert.equal(Number((await pool.query(
+      "select count(*) count from app_sessions where username=$1 and revoked_at is null and expires_at>now()",
+      [fixture.credentials.username],
+    )).rows[0].count), 0);
+    await context.close();
+    context = undefined;
+    console.info("RFQ_AWARD_CANDIDATE_FIX29_BROWSER_OK rfq=1 comparison_version=1 candidates=8 selected=2,4,6,8 cancel_post=0 award_post=1 award=1 award_line=4 po=0 desktop=1 mobile=1 session=0");
+  } finally {
+    if (authenticated && context && csrfToken) {
+      await context.request.post(`${REQUIRED_ORIGIN}/api/logout`, {
+        headers: { Origin: REQUIRED_ORIGIN, "X-CSRF-Token": csrfToken },
+      }).catch(() => undefined);
+    }
+    await context?.close().catch(() => undefined);
     await browser?.close().catch(() => undefined);
   }
 });

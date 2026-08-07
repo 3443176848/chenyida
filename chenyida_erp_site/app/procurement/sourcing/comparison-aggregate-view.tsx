@@ -37,11 +37,16 @@ export type ComparisonSupplierSummary = {
 };
 
 export type ComparisonMaterialOffer = {
+  comparison_line_id: string;
   comparison_candidate_id: string;
+  quote_id: string;
+  quote_version_no: number;
   quote_line_id: string;
+  quote_input_current: boolean;
   supplier_id: string;
   supplier_code: string;
   supplier_name: string;
+  currency_code: string;
   quoted_quantity: string;
   unit_price: string;
   line_amount: string;
@@ -49,8 +54,12 @@ export type ComparisonMaterialOffer = {
   lowest_price: boolean;
   promised_delivery_date: string;
   delivery_status: "ON_TIME" | "LATE";
+  early_days: number;
+  late_days: number;
   delivery_delta_days: number;
   delivery_explanation: string;
+  comparable_status: string;
+  awardable: boolean;
 };
 
 export type ComparisonMaterialSummary = {

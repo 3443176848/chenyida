@@ -1145,6 +1145,19 @@
 - UI与任务边界：桌面使用对比表，390×844使用Supplier汇总卡、Material逐项卡和可折叠追溯凭证；长digest/request_id可换行复制，生成按钮按服务端状态禁用，定标入口保持可见。本决定只授权Comparison读模型、幂等保护、Web-only部署和purchase-only只读验收；不授权打开定标窗口、创建Award、转PO或其他业务写入。
 - 实施结果：功能提交`80e1ad60fa1272017545e150721c8b71f7c68828`，最终Web`sha256:0dfcc0a8639e09e6ca0380292d979a2f73510a76cdcd23d46001bfb9c145273d`已Web-only部署。主UAT确定性输出摘要`79554d88ccdb643a860c0c69e77222abce80eb4d3d8314d88135d3966fb619ec`，保护指纹`16d70f1865e3a2e3b0e840f289d13b340e4f6b87800b1c79d98865112d0cf5bc`前后不变；purchase-only桌面/390×844只读通过，business POST 0、Session 0、Award/PO 0/0。当前`awardable_now=true`只表示具备另立人工定标任务的技术前置条件，不构成本任务授权。
 
+## D-101 Award候选必须绑定稳定Comparison Candidate并由服务端重验非最低价理由
+
+- 日期：2026-08-07
+- 状态：`ACCEPTED / IMPLEMENTED IN SOURCE / ISOLATED VERIFIED / DEPLOYMENT PENDING`
+- 确认人：项目负责人（明确指定RFQ 1四行Candidate权威分组、允许有完整理由选择非最低价Supplier A，并禁止主UAT创建Award或PO）
+- 候选身份：浏览器提交的每行选择值只能是`procurement_quote_comparison_lines.id`的规范十进制字符串；Candidate必须经`comparison_id`关联指定Comparison Line，并经固定`quote_line_id`关联不可变Quote Line与Quote Header/version。数组位置、Supplier名称、价格、显示标签和RFQ Line编号均不得替代Candidate身份。
+- bigint合同：Comparison Line、Candidate、Quote、Quote Line、RFQ Line、Material和Supplier等PostgreSQL bigint在DTO边界保持字符串；只允许对业务金额、数量和显示顺序做明确数值处理，不得以JavaScript `Number`严格比较决定候选归属。
+- 当前与可定标：`CURRENT`是D-100定义的Version级服务端投影，不是Candidate数据库字段。候选必须同时属于同一最新Version、固定Quote输入仍当前、`COMPARABLE`且`awardable=true`；不得因Supplier已`RESPONDED`、Candidate为rank 2或不是最低价而从合法候选中删除。
+- Award重验：服务端按当前RFQ/Round/CAS锁定聚合，要求四个Material各且仅一次、无缺行/重复/额外行，逐项重验Candidate归属、Comparison Version、Quote/Quote Version/Quote Line、Supplier、数量、单位、币种、价格、交期、输入与输出摘要。Award Line保存的Comparison Line与固定Quote Line组合必须唯一回溯所选Candidate；历史Version、跨Line、错Quote、输入漂移、过期CAS和非CURRENT均失败关闭。
+- 非最低价原因：rank大于1的选择只接受适用的原因语义；本任务正式验证`DELIVERY_PRIORITY / 交期优先`及完整理由。已知但不适用的代码不得仅因枚举合法而放行。Origin、CSRF、purchase权限、幂等正文摘要、并发单胜、事务、审计和故障回滚保持。
+- 确认合同：四行初始均不默认获选；确认窗口必须显示RFQ/Round/CAS、Version/CURRENT、逐行basis与output digest、四行Material/Candidate/Quote/Supplier、总额/最低价/差额/百分比、交期差、原因与完整理由，并明确只新增Award及四条Award Line，不自动创建PO、到货计划或其他下游。安全默认焦点为取消，取消、ESC和遮罩关闭均为零业务POST。
+- Schema与任务边界：0018/0039已提供无歧义Candidate、Comparison与Quote Line关系以及Award Line约束，不修改0039、不新增0040、不改历史Candidate ID或Comparison数据。隔离环境可创建一次Award验证事务结果；主UAT只允许purchase选择Supplier A、打开桌面/390×844确认窗口并取消，最终必须保持Award/Award Line/PO`0/0/0`。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

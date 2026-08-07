@@ -11,7 +11,11 @@
 
 ## 当前任务
 
-当前无 `DOING` 任务。`SELFHOST-UAT-FIX-28`已完成Comparison聚合读模型、备份恢复、Web-only部署和purchase-only主UAT只读验收；后续人工定标、Award、PO、Migration、真实数据迁移或生产切流须新的明确授权。
+当前唯一 `DOING` 任务为 `SELFHOST-UAT-FIX-29`：修复 RFQ Award Candidate 四行下拉候选关联与确认窗口合同；主 UAT 只允许 purchase 选择、打开确认并取消，不创建 Award 或 PO。
+
+| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-UAT-FIX-29 | RFQ Award Candidate Selection Fix | DOING | Codex（严格门禁、精确只读诊断、候选/UI/服务端保护、隔离测试、备份恢复、Web-only部署、purchase-only取消验收）、项目负责人（固定主UAT保护与执行授权） | 2026-08-07 | — | SELFHOST-PHASE4-TASK04、SELFHOST-UAT-FIX-19、SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-27、SELFHOST-UAT-FIX-28、D-061、D-062、D-095—D-101 | bigint字符串与数字严格比较根因已修复；Candidate稳定ID、四组两候选、确认窗口和服务端重验通过Unit/UI、PG、安全与隔离Chromium，隔离Award 1/Line 4/PO 0。正式备份、Web-only部署及主UAT取消验收待执行；主UAT保持Award/Award Line/PO 0/0/0，无0040且0039未改。见[任务文档](../tasks/SELFHOST-UAT-FIX-29.md)。 |
 
 ## 已完成任务
 

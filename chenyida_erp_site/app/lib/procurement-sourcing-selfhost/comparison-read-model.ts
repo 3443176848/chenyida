@@ -214,10 +214,14 @@ export function buildComparisonReadModel(input: Readonly<{
     const offers = [...materialRows].sort((left, right) => compareId(left.supplier_id, right.supplier_id)).map((row) => ({
       comparison_line_id: id(row.comparison_id),
       comparison_candidate_id: id(row.comparison_candidate_id),
+      quote_id: id(row.quote_id),
+      quote_version_no: row.quote_version_no,
       quote_line_id: id(row.quote_line_id),
+      quote_input_current: row.quote_input_current,
       supplier_id: id(row.supplier_id),
       supplier_code: row.supplier_code,
       supplier_name: row.supplier_name,
+      currency_code: row.currency_code,
       quoted_quantity: decimal(scaled(row.quoted_quantity)),
       unit_price: decimal(scaled(row.unit_price)),
       line_amount: decimal(scaled(row.line_amount)),
@@ -225,8 +229,12 @@ export function buildComparisonReadModel(input: Readonly<{
       lowest_price: row.lowest_price,
       promised_delivery_date: row.promised_delivery_date,
       delivery_status: row.delivery_status,
+      early_days: row.early_days,
+      late_days: row.late_days,
       delivery_delta_days: row.delivery_status === "LATE" ? row.late_days : row.early_days,
       delivery_explanation: deliveryExplanation(row.delivery_status, row.early_days, row.late_days),
+      comparable_status: row.comparable_status,
+      awardable: row.awardable,
     }));
     return {
       comparison_id: id(materialRows[0].comparison_id),

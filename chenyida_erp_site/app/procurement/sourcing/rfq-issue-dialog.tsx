@@ -154,7 +154,7 @@ export type RfqDialogDetail = {
     currency_code: string;
   };
   lines: Array<{
-    id: number;
+    id: string;
     line_no: number;
     material_id?: number;
     internal_material_code: string;

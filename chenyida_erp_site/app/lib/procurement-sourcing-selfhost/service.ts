@@ -6,7 +6,7 @@ import { ProcurementSourcingError } from "./errors.ts";
 import { ProcurementSourcingRepository } from "./repository.ts";
 import { coverageFromRfqMappingQualification, loadRfqMappingQualification } from "./rfq-mapping-qualification.ts";
 import type { FaultInjector, RfqBindingDto, RfqDetailDto, RfqMappingBindingReceiptDto, SourcingMutationMeta } from "./types.ts";
-import { booleanValue, boundedText, canonicalDigest, dateOnly, decimal, exactKeys, expectedVersion, nonNegativeInteger, normalizeCreateRfqInput, positiveId } from "./validation.ts";
+import { booleanValue, boundedText, canonicalDigest, dateOnly, decimal, exactKeys, expectedVersion, nonNegativeInteger, normalizeCreateRfqInput, positiveId, stableId } from "./validation.ts";
 import { loadSupplierMappingCoverage, requireCompleteCoverage } from "../supplier-mapping-selfhost/coverage.ts";
 import { SupplierMappingError } from "../supplier-mapping-selfhost/errors.ts";
 import { buildComparisonReadModel, type ComparisonReadModelEvent, type ComparisonReadModelRow } from "./comparison-read-model.ts";
@@ -22,6 +22,11 @@ const requireRfqCoverage = (rows: Parameters<typeof requireCompleteCoverage>[0],
 };
 
 const shanghaiTimestamp = (value: unknown) => String(value || "");
+const compareStableIds = (left: unknown, right: unknown) => {
+  const a = BigInt(String(left));
+  const b = BigInt(String(right));
+  return a < b ? -1 : a > b ? 1 : 0;
+};
 
 async function loadCurrentComparisonBasis(client: PoolClient, rfqId: number) {
   return client.query<any>(`select l.id rfq_line_id,l.requested_quantity,l.required_date,q.id quote_id,
@@ -34,9 +39,9 @@ async function loadCurrentComparisonBasis(client: PoolClient, rfqId: number) {
 }
 
 function currentBasisDigestByRfqLine(rows: any[]) {
-  const grouped = new Map<number, any[]>();
+  const grouped = new Map<string, any[]>();
   for (const row of rows) {
-    const rfqLineId = Number(row.rfq_line_id);
+    const rfqLineId = String(row.rfq_line_id);
     grouped.set(rfqLineId, [...(grouped.get(rfqLineId) || []), row]);
   }
   return new Map([...grouped].map(([rfqLineId, basisRows]) => [rfqLineId, canonicalDigest(basisRows)]));
@@ -201,6 +206,46 @@ export function bindingScopeDriftReason(row: Pick<RfqBindingDto, "supplier_statu
   return "固定 Mapping 的内容摘要、有效期或唯一性已漂移";
 }
 
+function comparisonDerivedRows(outputRows: any[]): ComparisonReadModelRow[] {
+  return outputRows.map((row) => ({
+    comparison_version_no: Number(row.comparison_version_no),
+    comparison_id: row.comparison_line_id,
+    comparison_candidate_id: row.comparison_candidate_id,
+    basis_digest: row.basis_digest,
+    rfq_line_id: row.rfq_line_id,
+    quote_id: row.quote_id,
+    quote_version_no: Number(row.quote_version_no),
+    quote_line_id: row.quote_line_id,
+    quote_input_current: row.quote_input_current === true,
+    supplier_id: row.supplier_id,
+    supplier_code: row.supplier_code,
+    supplier_name: row.supplier_name,
+    supplier_quote_reference: row.supplier_quote_reference,
+    currency_code: row.currency_code,
+    valid_until: row.valid_until,
+    payment_terms: row.payment_terms,
+    tax_included: row.tax_included === true,
+    freight_included: row.freight_included === true,
+    material_id: row.material_id,
+    internal_material_code: row.internal_material_code,
+    standard_name: row.standard_name,
+    requested_quantity: row.requested_quantity,
+    quoted_quantity: row.quoted_quantity,
+    unit_code: row.unit_code,
+    unit_price: row.unit_price,
+    line_amount: row.line_amount,
+    price_rank: row.price_rank === null ? null : Number(row.price_rank),
+    lowest_price: row.lowest_price === true,
+    promised_delivery_date: row.promised_delivery_date,
+    required_date: row.required_date,
+    delivery_status: row.delivery_status,
+    early_days: Number(row.early_days),
+    late_days: Number(row.late_days),
+    comparable_status: row.comparable_status,
+    awardable: row.awardable === true,
+  }));
+}
+
 function comparisonAggregateProjection(input: Readonly<{
   header: any;
   rfqLines: any[];
@@ -214,7 +259,7 @@ function comparisonAggregateProjection(input: Readonly<{
   const statusNote = "状态为服务端读模型投影，不是独立数据库状态列。";
   const inputSummaryNote = "basis_digest是procurement_quote_comparisons逐RFQ Line持久化字段；版本身份展示按RFQ Line稳定排序的完整摘要集合，不伪造单一聚合持久化摘要。";
   const outputSummaryNote = "确定性输出摘要，由不可变Comparison Line重算；不是伪造的历史持久化字段。";
-  const expectedLineIds = new Set(input.rfqLines.map((line) => Number(line.id)));
+  const expectedLineIds = new Set(input.rfqLines.map((line) => String(line.id)));
   const currentDigests = currentBasisDigestByRfqLine(input.currentBasisRows);
   const currentBasisComplete = expectedLineIds.size > 0
     && [...expectedLineIds].every((rfqLineId) => currentDigests.has(rfqLineId));
@@ -230,7 +275,7 @@ function comparisonAggregateProjection(input: Readonly<{
   const latestVersionNo = versionNumbers.at(-1) || 0;
   const versions = versionNumbers.map((versionNo) => {
     const rows = grouped.get(versionNo) || [];
-    const lineIds = rows.map((row) => Number(row.rfq_line_id));
+    const lineIds = rows.map((row) => String(row.rfq_line_id));
     if (rows.length !== expectedLineIds.size || new Set(lineIds).size !== expectedLineIds.size
       || lineIds.some((rfqLineId) => !expectedLineIds.has(rfqLineId))) {
       throw new ProcurementSourcingError("COMPARISON_READ_MODEL_INCONSISTENT", `Comparison v${versionNo}未完整覆盖RFQ行`, 409);
@@ -251,7 +296,7 @@ function comparisonAggregateProjection(input: Readonly<{
     if (new Set(candidateIds).size !== candidateIds.length) {
       throw new ProcurementSourcingError("COMPARISON_READ_MODEL_INCONSISTENT", `Comparison v${versionNo}候选行ID重复`, 409);
     }
-    const basisMatches = currentBasisComplete && rows.every((row) => currentDigests.get(Number(row.rfq_line_id)) === row.basis_digest);
+    const basisMatches = currentBasisComplete && rows.every((row) => currentDigests.get(String(row.rfq_line_id)) === row.basis_digest);
     const fixedInputsCurrent = outputRows.every((row) => row.quote_input_current === true);
     const quoteInputsCurrent = basisMatches && fixedInputsCurrent;
     const latest = versionNo === latestVersionNo;
@@ -282,43 +327,7 @@ function comparisonAggregateProjection(input: Readonly<{
         rfq_new_version: audit?.new_version ?? null,
       };
     });
-    const derivedRows: ComparisonReadModelRow[] = outputRows.map((row) => ({
-      comparison_version_no: versionNo,
-      comparison_id: row.comparison_line_id,
-      comparison_candidate_id: row.comparison_candidate_id,
-      basis_digest: row.basis_digest,
-      rfq_line_id: row.rfq_line_id,
-      quote_id: row.quote_id,
-      quote_version_no: Number(row.quote_version_no),
-      quote_line_id: row.quote_line_id,
-      quote_input_current: row.quote_input_current === true,
-      supplier_id: row.supplier_id,
-      supplier_code: row.supplier_code,
-      supplier_name: row.supplier_name,
-      supplier_quote_reference: row.supplier_quote_reference,
-      currency_code: row.currency_code,
-      valid_until: row.valid_until,
-      payment_terms: row.payment_terms,
-      tax_included: row.tax_included === true,
-      freight_included: row.freight_included === true,
-      material_id: row.material_id,
-      internal_material_code: row.internal_material_code,
-      standard_name: row.standard_name,
-      requested_quantity: row.requested_quantity,
-      quoted_quantity: row.quoted_quantity,
-      unit_code: row.unit_code,
-      unit_price: row.unit_price,
-      line_amount: row.line_amount,
-      price_rank: row.price_rank === null ? null : Number(row.price_rank),
-      lowest_price: row.lowest_price === true,
-      promised_delivery_date: row.promised_delivery_date,
-      required_date: row.required_date,
-      delivery_status: row.delivery_status,
-      early_days: Number(row.early_days),
-      late_days: Number(row.late_days),
-      comparable_status: row.comparable_status,
-      awardable: row.awardable === true,
-    }));
+    const derivedRows = comparisonDerivedRows(outputRows);
     let derived;
     try { derived = buildComparisonReadModel({ rows: derivedRows, events: derivedEvents }); }
     catch {
@@ -355,7 +364,7 @@ function comparisonAggregateProjection(input: Readonly<{
     };
   });
   const currentVersion = versions.find((version) => version.comparison_version_no === latestVersionNo) || null;
-  const matchingPersistedInput = versions.some((version) => version.comparison_rows.every((row) => currentDigests.get(Number(row.rfq_line_id)) === row.basis_digest));
+  const matchingPersistedInput = versions.some((version) => version.comparison_rows.every((row) => currentDigests.get(String(row.rfq_line_id)) === row.basis_digest));
   let reasonCode = "QUOTE_INPUT_CHANGED";
   let label = latestVersionNo ? `Quote输入已变化，可生成Comparison v${latestVersionNo + 1}` : "生成最新比价";
   if (!input.currentBasisRows.length) { reasonCode = "CURRENT_QUOTE_REQUIRED"; label = "至少需要一份当前Quote"; }
@@ -374,6 +383,71 @@ function comparisonAggregateProjection(input: Readonly<{
     current_version: currentVersion,
     generation: { enabled, already_generated: matchingPersistedInput, reason_code: reasonCode, label },
   };
+}
+
+async function loadAwardComparisonSnapshot(client: PoolClient, rfq: any, rfqLines: any[]) {
+  const comparisonRows = await client.query<any>(`select c.id::text comparison_line_id,
+      c.rfq_id::text rfq_id,c.rfq_line_id::text rfq_line_id,c.comparison_version_no::int comparison_version_no,
+      c.basis_digest,c.generated_by,c.generated_at,
+      to_char(c.generated_at at time zone 'Asia/Shanghai','YYYY-MM-DD HH24:MI:SS.US') generated_at_shanghai,
+      c.request_id::text request_id,rl.line_no::int line_no,rl.material_id::text material_id,
+      m.internal_material_code,m.standard_name,rl.requested_quantity::text requested_quantity,
+      rl.required_date::text required_date,u.code unit_code
+    from procurement_quote_comparisons c
+    join procurement_rfq_lines rl on rl.id=c.rfq_line_id
+    join material_master m on m.id=rl.material_id join units u on u.id=rl.unit_id
+    where c.rfq_id=$1 order by c.comparison_version_no,rl.line_no,c.id
+    for share of c`, [rfq.id]);
+  const outputRows = await client.query<any>(`select
+      cl.id::text comparison_candidate_id,c.id::text comparison_line_id,
+      c.comparison_version_no::int comparison_version_no,c.rfq_line_id::text rfq_line_id,
+      c.basis_digest,rl.line_no::int line_no,rl.material_id::text material_id,
+      m.internal_material_code,m.standard_name,rl.requested_quantity::text requested_quantity,
+      rl.required_date::text required_date,u.code unit_code,
+      cl.quote_line_id::text quote_line_id,ql.rfq_line_id::text quote_line_rfq_line_id,
+      ql.material_id::text quote_line_material_id,ql.unit_id::text quote_line_unit_id,
+      ql.quoted_quantity::text quoted_quantity,ql.unit_price::text quote_line_unit_price,
+      ql.minimum_order_quantity::text quote_line_minimum_order_quantity,
+      ql.promised_delivery_date::text quote_line_promised_delivery_date,
+      cl.supplier_id::text supplier_id,cl.supplier_id::text candidate_supplier_id,
+      s.supplier_code,s.supplier_name,q.supplier_id::text quote_supplier_id,
+      q.id::text quote_id,q.rfq_id::text quote_rfq_id,q.quote_version_no::int quote_version_no,
+      q.supplier_quote_reference,q.status quote_status,q.valid_until::text valid_until,q.payment_terms,
+      q.currency_code quote_currency_code,q.tax_included quote_tax_included,q.freight_included quote_freight_included,
+      cl.currency_code,cl.unit_id::text comparison_unit_id,cl.tax_included,cl.freight_included,
+      cl.unit_price::text unit_price,(ql.quoted_quantity*cl.unit_price)::numeric(30,6)::text line_amount,
+      cl.minimum_order_quantity::text minimum_order_quantity,
+      cl.promised_delivery_date::text promised_delivery_date,cl.price_rank::int price_rank,
+      cl.lowest_price,cl.moq_satisfied,cl.delivery_status,cl.quote_expired,
+      cl.comparable_status,cl.reason_code,cl.awardable,
+      (ql.quoted_quantity>=rl.requested_quantity) quantity_covers_request,
+      (ql.quoted_quantity>=cl.minimum_order_quantity) quantity_covers_moq,
+      (ql.quoted_quantity>rl.requested_quantity) excess,
+      greatest((rl.required_date-cl.promised_delivery_date)::int,0)::int early_days,
+      greatest((cl.promised_delivery_date-rl.required_date)::int,0)::int late_days,
+      (q.status='SUBMITTED' and q.valid_until>=current_date) quote_input_current,
+      (q.valid_until<current_date) quote_expired_now
+    from procurement_quote_comparison_lines cl
+    join procurement_quote_comparisons c on c.id=cl.comparison_id
+    join procurement_supplier_quote_lines ql on ql.id=cl.quote_line_id
+    join procurement_supplier_quotes q on q.id=ql.quote_id
+    join procurement_rfq_lines rl on rl.id=c.rfq_line_id
+    join material_master m on m.id=rl.material_id join units u on u.id=rl.unit_id
+    join suppliers s on s.id=cl.supplier_id
+    where c.rfq_id=$1
+    order by c.comparison_version_no,rl.material_id,cl.supplier_id,cl.id
+    for share of cl,ql,q`, [rfq.id]);
+  const currentBasis = await loadCurrentComparisonBasis(client, Number(rfq.id));
+  const projection = comparisonAggregateProjection({
+    header: rfq,
+    rfqLines,
+    comparisonRows: comparisonRows.rows,
+    outputRows: outputRows.rows,
+    currentBasisRows: currentBasis.rows,
+    events: [],
+    audits: [],
+  });
+  return { projection, comparisonRows: comparisonRows.rows, outputRows: outputRows.rows };
 }
 
 export class ProcurementSourcingService {
@@ -442,7 +516,12 @@ export class ProcurementSourcingService {
           q.response_deadline>=(statement_timestamp() at time zone 'Asia/Shanghai')::date deadline_valid
         from procurement_rfqs q join planning_purchase_requests r on r.id=q.purchase_request_id join planning_material_requirement_plans p on p.id=r.plan_id join business_projects b on b.id=p.project_id where q.id=$1`, [id]), "RFQ_NOT_FOUND", "询价不存在");
       assertRfqDataScope(actor, header);
-      const lines = await client.query<any>(`select l.*,m.internal_material_code,m.standard_name,u.code unit_code from procurement_rfq_lines l join material_master m on m.id=l.material_id join units u on u.id=l.unit_id where l.rfq_id=$1 order by l.line_no`, [id]);
+      const lines = await client.query<any>(`select l.id::text id,l.rfq_id::text rfq_id,
+          l.purchase_request_line_id::text purchase_request_line_id,l.material_id::int material_id,l.unit_id::int unit_id,
+          l.requested_quantity::text requested_quantity,l.required_date::text required_date,l.line_no::int line_no,
+          l.source_digest,l.created_at,m.internal_material_code,m.standard_name,u.code unit_code
+        from procurement_rfq_lines l join material_master m on m.id=l.material_id join units u on u.id=l.unit_id
+        where l.rfq_id=$1 order by l.line_no`, [id]);
       const suppliers = await client.query<any>(`select rs.*,s.supplier_code,s.supplier_name,s.status supplier_status,
           ($2::text='ISSUED' and rs.status='INVITED' and not exists(
             select 1 from procurement_supplier_quotes current_quote
@@ -463,7 +542,7 @@ export class ProcurementSourcingService {
           coalesce(sum(line.quoted_quantity*line.unit_price),0)::numeric(30,6)::text total_amount
           from procurement_supplier_quote_lines line where line.quote_id=q.id) totals on true
         where q.rfq_id=$1 order by q.supplier_id,q.quote_version_no desc`, [id]);
-      const quoteLines = await client.query<any>(`select l.id::text id,l.quote_id::text quote_id,l.rfq_line_id::int rfq_line_id,
+      const quoteLines = await client.query<any>(`select l.id::text id,l.quote_id::text quote_id,l.rfq_line_id::text rfq_line_id,
           rfq_line.line_no::int line_no,l.material_id::int material_id,material.internal_material_code,material.standard_name,
           l.unit_id::int unit_id,unit.code unit_code,q.currency_code,l.quoted_quantity::text quoted_quantity,
           l.minimum_order_quantity::text minimum_order_quantity,l.unit_price::text unit_price,
@@ -483,10 +562,10 @@ export class ProcurementSourcingService {
       const comparisons = await client.query<any>(`select distinct on(c.rfq_line_id) c.* from procurement_quote_comparisons c where c.rfq_id=$1 order by c.rfq_line_id,c.comparison_version_no desc`, [id]);
       const comparisonLines = await client.query<any>(`select cl.*,s.supplier_code,s.supplier_name from procurement_quote_comparison_lines cl join procurement_quote_comparisons c on c.id=cl.comparison_id join suppliers s on s.id=cl.supplier_id where c.rfq_id=$1 and not exists(select 1 from procurement_quote_comparisons n where n.rfq_line_id=c.rfq_line_id and n.comparison_version_no>c.comparison_version_no) order by c.rfq_line_id,cl.tax_included,cl.freight_included,cl.price_rank nulls last,s.supplier_code`, [id]);
       const comparisonRows = await client.query<any>(`select c.id::text comparison_line_id,
-          c.rfq_id::int rfq_id,c.rfq_line_id::int rfq_line_id,c.comparison_version_no::int comparison_version_no,
+          c.rfq_id::text rfq_id,c.rfq_line_id::text rfq_line_id,c.comparison_version_no::int comparison_version_no,
           c.basis_digest,c.generated_by,c.generated_at,
           to_char(c.generated_at at time zone 'Asia/Shanghai','YYYY-MM-DD HH24:MI:SS.US') generated_at_shanghai,
-          c.request_id::text request_id,rl.line_no::int line_no,rl.material_id::int material_id,
+          c.request_id::text request_id,rl.line_no::int line_no,rl.material_id::text material_id,
           m.internal_material_code,m.standard_name,rl.requested_quantity::text requested_quantity,
           rl.required_date::text required_date,u.code unit_code
         from procurement_quote_comparisons c
@@ -495,12 +574,12 @@ export class ProcurementSourcingService {
         where c.rfq_id=$1 order by c.comparison_version_no,rl.line_no,c.id`, [id]);
       const comparisonOutputRows = await client.query<any>(`select
           cl.id::text comparison_candidate_id,c.id::text comparison_line_id,
-          c.comparison_version_no::int comparison_version_no,c.rfq_line_id::int rfq_line_id,
-          c.basis_digest,rl.line_no::int line_no,rl.material_id::int material_id,
+          c.comparison_version_no::int comparison_version_no,c.rfq_line_id::text rfq_line_id,
+          c.basis_digest,rl.line_no::int line_no,rl.material_id::text material_id,
           m.internal_material_code,m.standard_name,rl.requested_quantity::text requested_quantity,
           rl.required_date::text required_date,u.code unit_code,
           cl.quote_line_id::text quote_line_id,ql.quoted_quantity::text quoted_quantity,
-          cl.supplier_id::int supplier_id,s.supplier_code,s.supplier_name,
+          cl.supplier_id::text supplier_id,s.supplier_code,s.supplier_name,
           q.id::text quote_id,q.quote_version_no::int quote_version_no,q.supplier_quote_reference,
           q.status quote_status,q.valid_until::text valid_until,q.payment_terms,
           cl.currency_code,cl.tax_included,cl.freight_included,cl.unit_price::text unit_price,
@@ -727,7 +806,42 @@ export class ProcurementSourcingService {
 
   async recordQuote(id: number, meta: SourcingMutationMeta, input: Record<string, unknown>) { const parsed = this.quoteInput(input, false); return this.repository.execute(meta, async (client) => { const rfq = await lockRfq(client, id); if (rfq.version !== parsed.expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "RFQ 版本已变化", 409); if (rfq.status !== "ISSUED") throw new ProcurementSourcingError("RFQ_NOT_ISSUED", "只有已发出的 RFQ 可以录入报价", 409); const invitation = await client.query<any>("select rs.*,s.status supplier_status from procurement_rfq_suppliers rs join suppliers s on s.id=rs.supplier_id where rs.rfq_id=$1 and rs.supplier_id=$2 for update of rs", [id, parsed.supplierId]); if (!invitation.rows[0] || invitation.rows[0].supplier_status !== "ACTIVE") throw new ProcurementSourcingError("SUPPLIER_NOT_INVITED", "供应商未受邀或已停用", 422); const prior = await client.query("select 1 from procurement_supplier_quotes where rfq_id=$1 and supplier_id=$2 and status='SUBMITTED'", [id, parsed.supplierId]); if (prior.rows[0]) throw new ProcurementSourcingError("QUOTE_REVISION_REQUIRED", "该供应商已有当前报价，改价必须创建新版本", 409); if (invitation.rows[0].status !== "INVITED") throw new ProcurementSourcingError("SUPPLIER_INVITATION_NOT_OPEN", `供应商邀请状态为 ${invitation.rows[0].status}，不能直接提交首版报价`, 409); const quote = await this.saveQuote(client, rfq, parsed.supplierId, 1, parsed, meta); await client.query("update procurement_rfq_suppliers set status='RESPONDED',responded_at=now() where rfq_id=$1 and supplier_id=$2", [id, parsed.supplierId]); await client.query("update procurement_rfqs set version=version+1,updated_at=now() where id=$1", [id]); await client.query("insert into procurement_sourcing_events(rfq_id,quote_id,event_type,actor,request_id) values($1,$2,'QUOTE_SUBMITTED',$3,$4)", [id, quote.id, meta.actor.username, meta.requestId]); this.fault("after_quote_saved"); const body = { quote_id: Number(quote.id), rfq_id: id, quote_version_no: 1, status: "SUBMITTED", rfq_version: rfq.version + 1, request_id: meta.requestId }; return { status: 201, body, objectId: body.quote_id, oldVersion: rfq.version, newVersion: rfq.version + 1 }; }); }
 
-  async reviseQuote(id: number, meta: SourcingMutationMeta, input: Record<string, unknown>) { const parsed = this.quoteInput(input, true); return this.repository.execute(meta, async (client) => { const old = rowData(await client.query<any>("select * from procurement_supplier_quotes where id=$1 for update", [id]), "QUOTE_NOT_FOUND", "报价不存在"); if (old.version !== parsed.expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "报价版本已变化", 409); if (old.status !== "SUBMITTED") throw new ProcurementSourcingError("QUOTE_NOT_CURRENT", "只有当前 SUBMITTED 报价可以修订", 409); const rfq = await lockRfq(client, Number(old.rfq_id)); if (rfq.version !== parsed.rfqExpected) throw new ProcurementSourcingError("VERSION_CONFLICT", "RFQ 版本已变化", 409); if (rfq.status !== "ISSUED") throw new ProcurementSourcingError("RFQ_NOT_ISSUED", "已关闭 RFQ 不能修订报价", 409); await client.query("update procurement_supplier_quotes set status='SUPERSEDED',version=version+1 where id=$1", [id]); const quote = await this.saveQuote(client, rfq, Number(old.supplier_id), Number(old.quote_version_no) + 1, parsed, meta); await client.query("update procurement_rfqs set version=version+1,updated_at=now() where id=$1", [rfq.id]); await client.query("insert into procurement_sourcing_events(rfq_id,quote_id,event_type,actor,request_id) values($1,$2,'QUOTE_SUPERSEDED',$3,$4),($1,$5,'QUOTE_SUBMITTED',$3,$4)", [rfq.id, id, meta.actor.username, meta.requestId, quote.id]); this.fault("after_quote_revision"); const body = { quote_id: Number(quote.id), superseded_quote_id: id, rfq_id: Number(rfq.id), quote_version_no: Number(old.quote_version_no) + 1, status: "SUBMITTED", rfq_version: rfq.version + 1, request_id: meta.requestId }; return { status: 201, body, objectId: body.quote_id, oldVersion: rfq.version, newVersion: rfq.version + 1 }; }); }
+  async reviseQuote(id: number, meta: SourcingMutationMeta, input: Record<string, unknown>) {
+    const parsed = this.quoteInput(input, true);
+    return this.repository.execute(meta, async (client) => {
+      const reference = rowData(
+        await client.query<any>("select id::text id,rfq_id::text rfq_id from procurement_supplier_quotes where id=$1", [id]),
+        "QUOTE_NOT_FOUND",
+        "报价不存在",
+      );
+      const rfq = await lockRfq(client, Number(reference.rfq_id));
+      const old = rowData(
+        await client.query<any>("select * from procurement_supplier_quotes where id=$1 for update", [id]),
+        "QUOTE_NOT_FOUND",
+        "报价不存在",
+      );
+      if (String(old.rfq_id) !== String(rfq.id)) throw new ProcurementSourcingError("QUOTE_RFQ_MISMATCH", "报价与 RFQ 关系已变化", 409);
+      if (old.version !== parsed.expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "报价版本已变化", 409);
+      if (old.status !== "SUBMITTED") throw new ProcurementSourcingError("QUOTE_NOT_CURRENT", "只有当前 SUBMITTED 报价可以修订", 409);
+      if (rfq.version !== parsed.rfqExpected) throw new ProcurementSourcingError("VERSION_CONFLICT", "RFQ 版本已变化", 409);
+      if (rfq.status !== "ISSUED") throw new ProcurementSourcingError("RFQ_NOT_ISSUED", "已关闭 RFQ 不能修订报价", 409);
+      await client.query("update procurement_supplier_quotes set status='SUPERSEDED',version=version+1 where id=$1", [id]);
+      const quote = await this.saveQuote(client, rfq, Number(old.supplier_id), Number(old.quote_version_no) + 1, parsed, meta);
+      await client.query("update procurement_rfqs set version=version+1,updated_at=now() where id=$1", [rfq.id]);
+      await client.query("insert into procurement_sourcing_events(rfq_id,quote_id,event_type,actor,request_id) values($1,$2,'QUOTE_SUPERSEDED',$3,$4),($1,$5,'QUOTE_SUBMITTED',$3,$4)", [rfq.id, id, meta.actor.username, meta.requestId, quote.id]);
+      this.fault("after_quote_revision");
+      const body = {
+        quote_id: Number(quote.id),
+        superseded_quote_id: id,
+        rfq_id: Number(rfq.id),
+        quote_version_no: Number(old.quote_version_no) + 1,
+        status: "SUBMITTED",
+        rfq_version: rfq.version + 1,
+        request_id: meta.requestId,
+      };
+      return { status: 201, body, objectId: body.quote_id, oldVersion: rfq.version, newVersion: rfq.version + 1 };
+    });
+  }
 
   async compare(id: number, meta: SourcingMutationMeta, input: Record<string, unknown>) {
     exactKeys(input, ["expected_version"]);
@@ -739,7 +853,7 @@ export class ProcurementSourcingService {
       if (!current.rowCount) throw new ProcurementSourcingError("QUOTE_REQUIRED", "至少需要一份当前报价才能生成比价", 422);
       const rfqLines = await client.query<any>("select * from procurement_rfq_lines where rfq_id=$1 order by line_no,id", [id]);
       const basisDigests = currentBasisDigestByRfqLine(current.rows);
-      if (!rfqLines.rowCount || rfqLines.rows.some((line) => !basisDigests.has(Number(line.id)))) {
+      if (!rfqLines.rowCount || rfqLines.rows.some((line) => !basisDigests.has(String(line.id)))) {
         throw new ProcurementSourcingError("QUOTE_SCOPE_MISMATCH", "当前报价必须完整覆盖全部 RFQ 行才能生成比价", 422);
       }
 
@@ -747,22 +861,22 @@ export class ProcurementSourcingService {
           comparison_version_no::int comparison_version_no,basis_digest
         from procurement_quote_comparisons where rfq_id=$1
         order by comparison_version_no,rfq_line_id,id`, [id]);
-      const expectedLineIds = new Set(rfqLines.rows.map((line) => Number(line.id)));
+      const expectedLineIds = new Set(rfqLines.rows.map((line) => String(line.id)));
       const versions = new Map<number, any[]>();
       for (const row of persisted.rows) {
         const version = Number(row.comparison_version_no);
         versions.set(version, [...(versions.get(version) || []), row]);
       }
       for (const [version, rows] of versions) {
-        const lineIds = rows.map((row) => Number(row.rfq_line_id));
+        const lineIds = rows.map((row) => String(row.rfq_line_id));
         if (rows.length !== expectedLineIds.size || new Set(lineIds).size !== expectedLineIds.size || lineIds.some((lineId) => !expectedLineIds.has(lineId))) {
           throw new ProcurementSourcingError("COMPARISON_VERSION_INCONSISTENT", `Comparison v${version} 未完整覆盖 RFQ 行，禁止继续生成`, 409);
         }
       }
-      const matchingVersion = [...versions.entries()].find(([, rows]) => rows.every((row) => basisDigests.get(Number(row.rfq_line_id)) === row.basis_digest));
+      const matchingVersion = [...versions.entries()].find(([, rows]) => rows.every((row) => basisDigests.get(String(row.rfq_line_id)) === row.basis_digest));
       if (matchingVersion) {
         const [versionNo, rows] = matchingVersion;
-        const ids = rows.sort((left, right) => Number(left.rfq_line_id) - Number(right.rfq_line_id)).map((row) => Number(row.id));
+        const ids = rows.sort((left, right) => compareStableIds(left.rfq_line_id, right.rfq_line_id)).map((row) => String(row.id));
         const body = {
           rfq_id: id,
           comparison_ids: ids,
@@ -777,16 +891,16 @@ export class ProcurementSourcingService {
       }
       if (Number(rfq.version) !== expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "RFQ 版本已变化", 409);
 
-      const latestVersions = rfqLines.rows.map((line) => Math.max(0, ...persisted.rows.filter((row) => Number(row.rfq_line_id) === Number(line.id)).map((row) => Number(row.comparison_version_no))));
+      const latestVersions = rfqLines.rows.map((line) => Math.max(0, ...persisted.rows.filter((row) => String(row.rfq_line_id) === String(line.id)).map((row) => Number(row.comparison_version_no))));
       if (new Set(latestVersions).size !== 1) throw new ProcurementSourcingError("COMPARISON_VERSION_INCONSISTENT", "逐行 Comparison Version 不一致，禁止继续生成", 409);
       const versionNo = latestVersions[0] + 1;
-      const ids: number[] = [];
+      const ids: string[] = [];
       for (const sourceLine of rfqLines.rows) {
-        const basisDigest = basisDigests.get(Number(sourceLine.id));
+        const basisDigest = basisDigests.get(String(sourceLine.id));
         const comparison = await client.query<any>(`insert into procurement_quote_comparisons(
             rfq_id,rfq_line_id,comparison_version_no,basis_digest,generated_by,request_id
-          ) values($1,$2,$3,$4,$5,$6) returning id`, [id, sourceLine.id, versionNo, basisDigest, meta.actor.username, meta.requestId]);
-        ids.push(Number(comparison.rows[0].id));
+          ) values($1,$2,$3,$4,$5,$6) returning id::text id`, [id, sourceLine.id, versionNo, basisDigest, meta.actor.username, meta.requestId]);
+        ids.push(String(comparison.rows[0].id));
         await client.query(`with ranked as (select ql.id quote_line_id,q.supplier_id,q.currency_code,
               ql.unit_id,q.tax_included,q.freight_included,ql.unit_price,ql.minimum_order_quantity,
               ql.promised_delivery_date,q.valid_until,
@@ -828,14 +942,187 @@ export class ProcurementSourcingService {
     });
   }
 
-  async award(id: number, meta: SourcingMutationMeta, input: Record<string, unknown>) { exactKeys(input, ["expected_version", "reason_code", "reason", "lines"]); const expected = expectedVersion(input.expected_version), reasonCode = boundedText(input.reason_code, "reason_code", 64, true), reason = boundedText(input.reason, "reason", 1000, true); if (!Array.isArray(input.lines) || !input.lines.length || input.lines.length > 200) throw new ProcurementSourcingError("REQUEST_VALIDATION_FAILED", "定标行必须包含 1—200 行"); const seen = new Set<number>(); const selections = input.lines.map((raw) => { if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new ProcurementSourcingError("REQUEST_VALIDATION_FAILED", "定标行无效"); const value = raw as Record<string, unknown>; exactKeys(value, ["rfq_line_id", "selected_quote_line_id", "selected_quantity", "selection_reason", "late_delivery_reason_code", "late_delivery_reason", "excess_quantity_reason"]); const rfqLineId = positiveId(value.rfq_line_id, "rfq_line_id"); if (seen.has(rfqLineId)) throw new ProcurementSourcingError("REQUEST_VALIDATION_FAILED", "一条 RFQ 行只能选择一个供应商"); seen.add(rfqLineId); return { rfqLineId, quoteLineId: positiveId(value.selected_quote_line_id, "selected_quote_line_id"), quantity: decimal(value.selected_quantity, "selected_quantity"), selectionReason: boundedText(value.selection_reason, "selection_reason", 1000), lateCode: boundedText(value.late_delivery_reason_code, "late_delivery_reason_code", 64), lateReason: boundedText(value.late_delivery_reason, "late_delivery_reason", 1000), excessReason: boundedText(value.excess_quantity_reason, "excess_quantity_reason", 1000) }; });
-    return this.repository.execute(meta, async (client) => { const rfq = await lockRfq(client, id); if (rfq.version !== expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "RFQ 版本已变化", 409); if (rfq.status !== "ISSUED") throw new ProcurementSourcingError("RFQ_NOT_ISSUED", "只有已发出的 RFQ 可以定标", 409); const rfqLines = await client.query<any>("select * from procurement_rfq_lines where rfq_id=$1 order by line_no", [id]); if (selections.length !== rfqLines.rowCount || selections.some((item) => !rfqLines.rows.some((line) => Number(line.id) === item.rfqLineId))) throw new ProcurementSourcingError("AWARD_SCOPE_MISMATCH", "定标必须覆盖每条 RFQ 行且不能拆单", 422); const rows: any[] = []; let soleSource = false;
-      for (const selection of selections) { const result = await client.query<any>(`select ql.*,q.supplier_id,q.valid_until,q.status quote_status,q.quote_version_no,c.id comparison_id,c.comparison_version_no,cl.price_rank,cl.comparable_status,cl.delivery_status,l.requested_quantity,l.required_date,
-        ($2::numeric>=l.requested_quantity) quantity_covers_request,($2::numeric>=ql.minimum_order_quantity) quantity_covers_moq,($2::numeric>l.requested_quantity) excess,
-        (select count(*) from procurement_supplier_quote_lines vql join procurement_supplier_quotes vq on vq.id=vql.quote_id where vql.rfq_line_id=l.id and vq.status='SUBMITTED' and vq.valid_until>=current_date) valid_quote_count
-        from procurement_supplier_quote_lines ql join procurement_supplier_quotes q on q.id=ql.quote_id join procurement_rfq_lines l on l.id=ql.rfq_line_id join procurement_quote_comparisons c on c.rfq_line_id=l.id and not exists(select 1 from procurement_quote_comparisons n where n.rfq_line_id=l.id and n.comparison_version_no>c.comparison_version_no) join procurement_quote_comparison_lines cl on cl.comparison_id=c.id and cl.quote_line_id=ql.id where ql.id=$1 and l.rfq_id=$3`, [selection.quoteLineId, selection.quantity, id]); const row = rowData(result, "QUOTE_LINE_NOT_COMPARABLE", "所选报价行不在当前 RFQ 最新比较中"); if (row.quote_status !== "SUBMITTED" || String(row.valid_until).slice(0, 10) < new Date().toISOString().slice(0, 10) || row.comparable_status !== "COMPARABLE") throw new ProcurementSourcingError("QUOTE_NOT_AWARDABLE", "过期、已修订或不可比较报价不能定标", 422); if (!row.quantity_covers_request || !row.quantity_covers_moq) throw new ProcurementSourcingError("AWARD_QUANTITY_TOO_LOW", "中标数量不得低于申请数量或供应商 MOQ", 422); if (row.excess && !selection.excessReason) throw new ProcurementSourcingError("EXCESS_QUANTITY_REASON_REQUIRED", "超过申请数量必须填写超量原因", 422); if (Number(row.valid_quote_count) === 1) soleSource = true; if (Number(row.price_rank) !== 1 && !selection.selectionReason && !reason) throw new ProcurementSourcingError("NON_LOWEST_REASON_REQUIRED", "选择非最低价必须填写明确理由", 422); if (row.delivery_status === "LATE" && (selection.lateCode !== "LATE_DELIVERY_ACCEPTED" || !selection.lateReason)) throw new ProcurementSourcingError("LATE_DELIVERY_REASON_REQUIRED", "晚于需求日期必须填写 LATE_DELIVERY_ACCEPTED 理由", 422); rows.push({ ...row, selection }); }
-      if (soleSource && reasonCode !== "SOLE_SOURCE") throw new ProcurementSourcingError("SOLE_SOURCE_REASON_REQUIRED", "单一有效报价定标必须使用 SOLE_SOURCE 理由", 422); const awardDigest = canonicalDigest({ rfq_id: id, reason_code: reasonCode, reason, selections }); const award = await client.query<any>("insert into procurement_sourcing_awards(rfq_id,award_digest,selected_by,reason_code,reason,request_id) values($1,$2,$3,$4,$5,$6) returning *", [id, awardDigest, meta.actor.username, reasonCode, reason, meta.requestId]); for (const row of rows) { const s = row.selection; await client.query("insert into procurement_sourcing_award_lines(award_id,rfq_line_id,comparison_id,selected_quote_line_id,supplier_id,selected_quantity,selected_unit_price,required_date,promised_delivery_date,selection_reason,late_delivery_reason_code,late_delivery_reason,excess_quantity_reason) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)", [award.rows[0].id, s.rfqLineId, row.comparison_id, s.quoteLineId, row.supplier_id, s.quantity, row.unit_price, row.required_date, row.promised_delivery_date, s.selectionReason, s.lateCode || null, s.lateReason, s.excessReason]); }
-      await client.query("update procurement_rfqs set status='CLOSED',closed_at=now(),version=version+1,updated_at=now() where id=$1", [id]); await client.query("insert into procurement_sourcing_events(rfq_id,award_id,event_type,actor,request_id,reason) values($1,$2,'AWARDED',$3,$4,$5)", [id, award.rows[0].id, meta.actor.username, meta.requestId, reason]); this.fault("after_award_saved"); const body = { award_id: Number(award.rows[0].id), rfq_id: id, status: "AWARDED", reason_code: reasonCode, rfq_version: expected + 1, purchase_order_created: false, request_id: meta.requestId }; return { status: 201, body, objectId: body.award_id, oldVersion: expected, newVersion: expected + 1 }; });
+  async award(id: number, meta: SourcingMutationMeta, input: Record<string, unknown>) {
+    exactKeys(input, [
+      "expected_version", "expected_rfq_code", "expected_round_no", "expected_comparison_version",
+      "expected_comparison_output_digest", "reason_code", "reason", "lines",
+    ]);
+    const expected = expectedVersion(input.expected_version);
+    const expectedRfqCode = boundedText(input.expected_rfq_code, "expected_rfq_code", 64, true);
+    const expectedRound = expectedVersion(input.expected_round_no, "expected_round_no");
+    const expectedComparisonVersion = expectedVersion(input.expected_comparison_version, "expected_comparison_version");
+    const expectedOutputDigest = boundedText(input.expected_comparison_output_digest, "expected_comparison_output_digest", 64, true);
+    if (!/^[0-9a-f]{64}$/.test(expectedOutputDigest)) throw new ProcurementSourcingError("REQUEST_VALIDATION_FAILED", "expected_comparison_output_digest 必须是 64 位小写 SHA-256");
+    const reasonCode = boundedText(input.reason_code, "reason_code", 64, true);
+    const reason = boundedText(input.reason, "reason", 1000, true);
+    const allowedReasonCodes = new Set(["LOWEST_PRICE", "DELIVERY_PRIORITY", "SOLE_SOURCE", "LATE_DELIVERY_ACCEPTED", "COMMERCIAL_TERMS", "OTHER"]);
+    const nonLowestReasonCodes = new Set(["DELIVERY_PRIORITY", "COMMERCIAL_TERMS", "OTHER"]);
+    if (!allowedReasonCodes.has(reasonCode)) throw new ProcurementSourcingError("AWARD_REASON_CODE_INVALID", "定标理由代码无效", 422);
+    if (!Array.isArray(input.lines) || !input.lines.length || input.lines.length > 200) {
+      throw new ProcurementSourcingError("AWARD_SELECTION_SET_INVALID", "定标必须包含 1—200 条且完整覆盖 RFQ 的 Candidate 选择", 422);
+    }
+    const awardId = (value: unknown, field: string) => {
+      if (typeof value !== "string") throw new ProcurementSourcingError("AWARD_CANDIDATE_ID_INVALID", `${field} 必须是规范十进制字符串`, 422);
+      try { return stableId(value, field); }
+      catch { throw new ProcurementSourcingError("AWARD_CANDIDATE_ID_INVALID", `${field} 必须是 PostgreSQL bigint 范围内的规范十进制字符串`, 422); }
+    };
+    const seenLines = new Set<string>();
+    const seenCandidates = new Set<string>();
+    const selections = input.lines.map((raw) => {
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new ProcurementSourcingError("AWARD_SELECTION_SET_INVALID", "定标行必须是对象", 422);
+      const value = raw as Record<string, unknown>;
+      exactKeys(value, [
+        "rfq_line_id", "comparison_line_id", "comparison_basis_digest", "selected_candidate_id",
+        "expected_quote_id", "expected_quote_version_no", "selection_reason",
+        "late_delivery_reason_code", "late_delivery_reason", "excess_quantity_reason",
+      ]);
+      const rfqLineId = awardId(value.rfq_line_id, "rfq_line_id");
+      const candidateId = awardId(value.selected_candidate_id, "selected_candidate_id");
+      if (seenLines.has(rfqLineId) || seenCandidates.has(candidateId)) {
+        throw new ProcurementSourcingError("AWARD_SELECTION_SET_INVALID", "RFQ Line 与 Candidate 均不得重复", 422);
+      }
+      seenLines.add(rfqLineId);
+      seenCandidates.add(candidateId);
+      const basisDigest = boundedText(value.comparison_basis_digest, "comparison_basis_digest", 64, true);
+      if (!/^[0-9a-f]{64}$/.test(basisDigest)) throw new ProcurementSourcingError("REQUEST_VALIDATION_FAILED", "comparison_basis_digest 必须是 64 位小写 SHA-256");
+      return {
+        rfqLineId,
+        comparisonLineId: awardId(value.comparison_line_id, "comparison_line_id"),
+        basisDigest,
+        candidateId,
+        expectedQuoteId: awardId(value.expected_quote_id, "expected_quote_id"),
+        expectedQuoteVersion: expectedVersion(value.expected_quote_version_no, "expected_quote_version_no"),
+        selectionReason: boundedText(value.selection_reason, "selection_reason", 1000),
+        lateCode: boundedText(value.late_delivery_reason_code, "late_delivery_reason_code", 64),
+        lateReason: boundedText(value.late_delivery_reason, "late_delivery_reason", 1000),
+        excessReason: boundedText(value.excess_quantity_reason, "excess_quantity_reason", 1000),
+      };
+    });
+
+    return this.repository.execute(meta, async (client) => {
+      const rfq = await lockRfq(client, id);
+      if (Number(rfq.version) !== expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "RFQ 版本已变化", 409);
+      if (rfq.status !== "ISSUED") throw new ProcurementSourcingError("RFQ_NOT_ISSUED", "只有已发出的 RFQ 可以定标", 409);
+      if (String(rfq.rfq_code) !== expectedRfqCode || Number(rfq.round_no) !== expectedRound) {
+        throw new ProcurementSourcingError("AWARD_RFQ_IDENTITY_MISMATCH", "RFQ 编号或 Round 与确认窗口不一致", 409);
+      }
+      const rfqLines = await client.query<any>(`select id::text id,rfq_id::text rfq_id,line_no::int line_no,
+          material_id::text material_id,unit_id::text unit_id,requested_quantity::text requested_quantity,
+          required_date::text required_date from procurement_rfq_lines where rfq_id=$1 order by line_no,id for share`, [id]);
+      const expectedLineIds = new Set(rfqLines.rows.map((line) => String(line.id)));
+      if (selections.length !== expectedLineIds.size || selections.some((selection) => !expectedLineIds.has(selection.rfqLineId))) {
+        throw new ProcurementSourcingError("AWARD_SELECTION_SET_INVALID", "定标必须覆盖每条 RFQ Line，且不能缺行、重复行或增加额外行", 422);
+      }
+
+      const snapshot = await loadAwardComparisonSnapshot(client, rfq, rfqLines.rows);
+      const current = snapshot.projection.current_version;
+      if (!current || Number(current.comparison_version_no) !== expectedComparisonVersion) {
+        throw new ProcurementSourcingError("AWARD_COMPARISON_NOT_CURRENT", "确认窗口引用的 Comparison Version 已不是当前版本", 409);
+      }
+      if (current.status !== "CURRENT" || current.input_drift || !current.quote_inputs_current) {
+        throw new ProcurementSourcingError("AWARD_COMPARISON_INPUT_DRIFT", "CURRENT Comparison 的固定 Quote 输入已经漂移", 409);
+      }
+      if (!current.awardable_now) throw new ProcurementSourcingError("AWARD_CANDIDATE_NOT_AWARDABLE", "CURRENT Comparison 当前不可定标", 409);
+      if (current.output_summary.digest !== expectedOutputDigest) {
+        throw new ProcurementSourcingError("AWARD_COMPARISON_OUTPUT_DRIFT", "Comparison 确定性输出摘要与确认窗口不一致", 409);
+      }
+      const currentRows = snapshot.outputRows.filter((row) => Number(row.comparison_version_no) === expectedComparisonVersion);
+      const resolved: any[] = [];
+      let soleSource = false;
+      for (const selection of selections) {
+        const candidate = snapshot.outputRows.find((row) => String(row.comparison_candidate_id) === selection.candidateId);
+        if (!candidate) throw new ProcurementSourcingError("AWARD_CANDIDATE_NOT_FOUND", `Candidate ${selection.candidateId} 不存在或不属于 RFQ ${id}`, 422);
+        if (Number(candidate.comparison_version_no) !== expectedComparisonVersion) {
+          throw new ProcurementSourcingError("AWARD_COMPARISON_NOT_CURRENT", `Candidate ${selection.candidateId} 属于历史 Comparison Version`, 409);
+        }
+        if (String(candidate.rfq_line_id) !== selection.rfqLineId || String(candidate.comparison_line_id) !== selection.comparisonLineId) {
+          throw new ProcurementSourcingError("AWARD_CANDIDATE_LINE_MISMATCH", `Candidate ${selection.candidateId} 不属于指定 RFQ / Comparison Line`, 422);
+        }
+        const identity = current.comparison_rows.find((row: any) => String(row.comparison_line_id) === selection.comparisonLineId);
+        if (!identity || String(identity.rfq_line_id) !== selection.rfqLineId || identity.basis_digest !== selection.basisDigest) {
+          throw new ProcurementSourcingError("AWARD_COMPARISON_INPUT_DRIFT", `Comparison Line ${selection.comparisonLineId} 的 basis_digest 已变化`, 409);
+        }
+        if (String(candidate.quote_id) !== selection.expectedQuoteId || Number(candidate.quote_version_no) !== selection.expectedQuoteVersion) {
+          throw new ProcurementSourcingError("AWARD_CANDIDATE_QUOTE_MISMATCH", `Candidate ${selection.candidateId} 的固定 Quote ID/version 与确认窗口不一致`, 409);
+        }
+        const snapshotIntact = String(candidate.rfq_line_id) === String(candidate.quote_line_rfq_line_id)
+          && String(candidate.material_id) === String(candidate.quote_line_material_id)
+          && String(candidate.quote_rfq_id) === String(id)
+          && String(candidate.supplier_id) === String(candidate.candidate_supplier_id)
+          && String(candidate.supplier_id) === String(candidate.quote_supplier_id)
+          && String(candidate.comparison_unit_id) === String(candidate.quote_line_unit_id)
+          && String(candidate.currency_code) === String(candidate.quote_currency_code)
+          && String(candidate.unit_price) === String(candidate.quote_line_unit_price)
+          && String(candidate.minimum_order_quantity) === String(candidate.quote_line_minimum_order_quantity)
+          && String(candidate.promised_delivery_date) === String(candidate.quote_line_promised_delivery_date)
+          && candidate.tax_included === candidate.quote_tax_included
+          && candidate.freight_included === candidate.quote_freight_included;
+        if (!snapshotIntact) throw new ProcurementSourcingError("AWARD_CANDIDATE_SNAPSHOT_DRIFT", `Candidate ${selection.candidateId} 的数量、单位、币种、价格或 Quote 固定关系不一致`, 409);
+        if (candidate.quote_input_current !== true || candidate.quote_status !== "SUBMITTED" || candidate.quote_expired_now === true
+          || candidate.quote_expired === true || candidate.comparable_status !== "COMPARABLE" || candidate.awardable !== true) {
+          throw new ProcurementSourcingError("AWARD_CANDIDATE_NOT_AWARDABLE", `Candidate ${selection.candidateId} 当前不可定标`, 409);
+        }
+        if (candidate.quantity_covers_request !== true || candidate.quantity_covers_moq !== true) {
+          throw new ProcurementSourcingError("AWARD_QUANTITY_TOO_LOW", "固定 Candidate 数量不得低于申请数量或供应商 MOQ", 422);
+        }
+        if (candidate.excess === true && !selection.excessReason) throw new ProcurementSourcingError("EXCESS_QUANTITY_REASON_REQUIRED", "固定 Candidate 数量超过申请数量时必须填写超量原因", 422);
+        const awardableCount = currentRows.filter((row) => String(row.comparison_line_id) === selection.comparisonLineId
+          && row.quote_input_current === true && row.comparable_status === "COMPARABLE" && row.awardable === true).length;
+        if (Number(candidate.price_rank) !== 1 && !nonLowestReasonCodes.has(reasonCode)
+          && !(reasonCode === "SOLE_SOURCE" && awardableCount === 1)) {
+          throw new ProcurementSourcingError("AWARD_NON_LOWEST_REASON_REQUIRED", "选择非最低价 Candidate 必须使用合法的非最低价理由代码并填写完整理由", 422);
+        }
+        if (candidate.delivery_status === "LATE" && (selection.lateCode !== "LATE_DELIVERY_ACCEPTED" || !selection.lateReason)) {
+          throw new ProcurementSourcingError("LATE_DELIVERY_REASON_REQUIRED", "晚于需求日期必须填写 LATE_DELIVERY_ACCEPTED 代码和完整理由", 422);
+        }
+        if (candidate.delivery_status !== "LATE" && (selection.lateCode || selection.lateReason)) {
+          throw new ProcurementSourcingError("AWARD_REASON_CODE_INVALID", "准时 Candidate 不得填写晚交期接受代码或理由", 422);
+        }
+        if (awardableCount === 1) soleSource = true;
+        resolved.push({ ...candidate, selection });
+      }
+      if (soleSource && reasonCode !== "SOLE_SOURCE") throw new ProcurementSourcingError("SOLE_SOURCE_REASON_REQUIRED", "存在单一有效 Candidate 的 RFQ Line，定标必须使用 SOLE_SOURCE 理由", 422);
+      if (!soleSource && reasonCode === "SOLE_SOURCE") throw new ProcurementSourcingError("AWARD_REASON_CODE_INVALID", "当前每条 RFQ Line 均有多个有效 Candidate，不能使用 SOLE_SOURCE", 422);
+
+      const awardDigest = canonicalDigest({
+        rfq_id: String(id),
+        rfq_code: expectedRfqCode,
+        round_no: expectedRound,
+        comparison_version_no: expectedComparisonVersion,
+        comparison_output_digest: expectedOutputDigest,
+        reason_code: reasonCode,
+        reason,
+        selections,
+      });
+      const award = await client.query<any>("insert into procurement_sourcing_awards(rfq_id,award_digest,selected_by,reason_code,reason,request_id) values($1,$2,$3,$4,$5,$6) returning *", [id, awardDigest, meta.actor.username, reasonCode, reason, meta.requestId]);
+      for (const row of resolved) {
+        const selection = row.selection;
+        await client.query(`insert into procurement_sourcing_award_lines(
+            award_id,rfq_line_id,comparison_id,selected_quote_line_id,supplier_id,selected_quantity,
+            selected_unit_price,required_date,promised_delivery_date,selection_reason,
+            late_delivery_reason_code,late_delivery_reason,excess_quantity_reason
+          ) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, [
+          award.rows[0].id, selection.rfqLineId, row.comparison_line_id, row.quote_line_id,
+          row.supplier_id, row.quoted_quantity, row.unit_price, row.required_date, row.promised_delivery_date,
+          selection.selectionReason, selection.lateCode || null, selection.lateReason, selection.excessReason,
+        ]);
+      }
+      await client.query("update procurement_rfqs set status='CLOSED',closed_at=now(),version=version+1,updated_at=now() where id=$1", [id]);
+      await client.query("insert into procurement_sourcing_events(rfq_id,award_id,event_type,actor,request_id,reason) values($1,$2,'AWARDED',$3,$4,$5)", [id, award.rows[0].id, meta.actor.username, meta.requestId, reason]);
+      this.fault("after_award_saved");
+      const body = {
+        award_id: Number(award.rows[0].id),
+        rfq_id: id,
+        status: "AWARDED",
+        reason_code: reasonCode,
+        comparison_version_no: expectedComparisonVersion,
+        award_line_count: resolved.length,
+        rfq_version: expected + 1,
+        purchase_order_created: false,
+        request_id: meta.requestId,
+      };
+      return { status: 201, body, objectId: body.award_id, oldVersion: expected, newVersion: expected + 1 };
+    });
   }
 
   async reverseAward(id: number, meta: SourcingMutationMeta, input: Record<string, unknown>) { exactKeys(input, ["expected_version", "reason"]); const expected = expectedVersion(input.expected_version), reason = boundedText(input.reason, "reason", 1000, true); return this.repository.execute(meta, async (client) => { const award = rowData(await client.query<any>("select * from procurement_sourcing_awards where id=$1 for update", [id]), "AWARD_NOT_FOUND", "定标结果不存在"); if (award.version !== expected) throw new ProcurementSourcingError("VERSION_CONFLICT", "定标版本已变化", 409); if (award.status !== "AWARDED") throw new ProcurementSourcingError("AWARD_ALREADY_REVERSED", "定标已经撤销", 409); if ((await client.query("select 1 from procurement_award_po_line_links where award_id=$1 limit 1", [id])).rows[0]) throw new ProcurementSourcingError("AWARD_HAS_PURCHASE_ORDER", "定标已经生成采购订单，不能直接撤销", 409); await client.query("update procurement_sourcing_awards set status='REVERSED',reversed_by=$2,reversed_at=now(),reversal_reason=$3,version=version+1 where id=$1", [id, meta.actor.username, reason]); await client.query("insert into procurement_sourcing_events(rfq_id,award_id,event_type,actor,request_id,reason) values($1,$2,'AWARD_REVERSED',$3,$4,$5)", [award.rfq_id, id, meta.actor.username, meta.requestId, reason]); this.fault("after_award_reversed"); const body = { award_id: id, rfq_id: Number(award.rfq_id), status: "REVERSED", version: expected + 1, request_id: meta.requestId }; return { status: 200, body, objectId: id, oldVersion: expected, newVersion: expected + 1 }; }); }

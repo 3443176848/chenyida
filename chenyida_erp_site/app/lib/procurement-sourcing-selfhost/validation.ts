@@ -6,6 +6,15 @@ export function canonicalDigest(value: unknown) {
   return createHash("sha256").update(JSON.stringify(normalize(value))).digest("hex");
 }
 export function positiveId(value: unknown, field: string) { const parsed = typeof value === "number" ? value : typeof value === "string" && /^[1-9]\d*$/.test(value) ? Number(value) : Number.NaN; if (!Number.isSafeInteger(parsed) || parsed < 1) throw new ProcurementSourcingError("REQUEST_VALIDATION_FAILED", `${field} 必须是正整数`); return parsed; }
+export function stableId(value: unknown, field: string) {
+  const text = typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? String(value)
+    : typeof value === "string" ? value : "";
+  if (!/^[1-9]\d*$/.test(text) || BigInt(text) > 9_223_372_036_854_775_807n) {
+    throw new ProcurementSourcingError("REQUEST_VALIDATION_FAILED", `${field} 必须是 PostgreSQL bigint 范围内的规范十进制正整数字符串`);
+  }
+  return text;
+}
 export function expectedVersion(value: unknown, field = "expected_version") { return positiveId(value, field); }
 export function boundedText(value: unknown, field: string, maximum: number, required = false) { const text = String(value ?? "").trim(); if ((required && !text) || text.length > maximum) throw new ProcurementSourcingError("REQUEST_VALIDATION_FAILED", `${field}长度必须在 ${required ? `1—${maximum}` : `0—${maximum}`} 字符之间`); return text; }
 export function dateOnly(value: unknown, field: string) { const text = String(value ?? "").trim(); const parsed = /^\d{4}-\d{2}-\d{2}$/.test(text) ? new Date(`${text}T00:00:00Z`) : null; if (!parsed || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== text) throw new ProcurementSourcingError("REQUEST_VALIDATION_FAILED", `${field}必须是有效的 YYYY-MM-DD 日期`); return text; }
