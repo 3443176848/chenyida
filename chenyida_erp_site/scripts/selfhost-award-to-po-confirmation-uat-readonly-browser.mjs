@@ -556,7 +556,7 @@ try {
   assert.equal(logout.status(), 200);
   assert.equal((await (await context.request.get(`${REQUIRED_ORIGIN}${SESSION_PATH}`)).json()).authenticated, false);
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => document.documentElement.dataset.cydAuthState === "anonymous");
+  await page.getByText("请先登录。", { exact: true }).waitFor();
   const anonymousText = await page.locator("body").innerText();
   for (const protectedValue of [
     "RFQ-00000001", PERSISTED_AWARD_DIGEST, DECISION_DIGEST, AWARD_REQUEST_ID, PAYMENT_TERMS, UAT_REMARK,

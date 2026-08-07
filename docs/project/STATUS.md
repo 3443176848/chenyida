@@ -6,8 +6,8 @@
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | IMPLEMENTED / PRE-DEPLOY VERIFIED | 两阶段源码、服务端同事务保护、串行隔离测试和候选Web已通过；正式备份恢复、Web-only部署及主UAT取消验收待执行 |
-| 根因 | FIXED IN SOURCE | 旧入口首击直接POST；新入口首击只GET权威预览并打开窗口，最终确认才POST |
+| 任务状态 | AWARD TO PO CONFIRMATION FIXED — UAT PO NOT CREATED | 两阶段源码、服务端同事务保护、隔离测试、正式备份恢复、Web-only部署及主UAT取消验收全部通过 |
+| 根因 | FIXED / DEPLOYED | 旧入口首击直接POST；新入口首击只GET权威预览并打开窗口，最终确认才POST |
 | 确认窗口 | COMPLETE / FAIL CLOSED | 展示Award/RFQ/Comparison/Quote谱系、Event actor/时间/request_id/SUCCESS、两类摘要、Supplier/付款条件、四条Line、PO/Line/Plan数量、上游不修改及下游零自动创建范围 |
 | 字段模型 | REMARK YES / EXTERNAL REF NO | 正常PO备注最多2,000字；无外部参考字段并准确提示，未挪用字段、未新增0040 |
 | 聚合语义 | EXACT 1 / 4 / 4 | 隔离正式转换为1个PO、4条PO Line、4个直接绑定PO Line的Delivery Plan；模型没有独立计划Line |
@@ -15,9 +15,12 @@
 | 事务边界 | ONE CONNECTION / ONE TRANSACTION | 同事务创建PO/Line/Link/Plan/Queue/Event/Audit/幂等结果；故障注入所有半记录为0 |
 | 下游保护 | ZERO AUTO-CREATE | Receipt/Warehouse Receipt/Ledger/IQC/AP/Payment/Work Order及其他生产/财务记录不自动创建 |
 | 自动/隔离验收 | PASS | Fulfillment 4/3/3、Sourcing 12/24、PG27、upgrade3+3+6、安全30、npm3、Python三项、typecheck/build/lint/credentials/diff及Chromium通过 |
-| 候选Web | READY | `sha256:2396c8bc4fd5658c26cef11c4a438b2edb474607b73b2b8ee7fe337b125575ed`，88,626,192 bytes，health 200/ok |
-| Schema/主UAT | UNCHANGED / NOT LOGGED IN | alpha.40、0001—0039，无0040；主UAT尚未登录或业务写，Award/PO/Delivery Plan保持`1/0/0` |
-| 下一步 | BACKUP / RESTORE / WEB-ONLY / CANCEL UAT | 必须串行完成正式dump和第二库恢复，只替换Web，再由purchase打开桌面/390×844窗口后取消，business POST保持0 |
+| 备份恢复 | PASS | root:root0600 dump 2,294,098 bytes、SHA`75e45758…3d97`、list3359；第二新库恢复39/head、226表、四basis、Award/Line/Event及下游0后删除 |
+| Web-only部署 | PASS / NO MIGRATION | Web`bb544f89…→2396c8bc…`；旧Web有精确回退tag，PostgreSQL/Worker/Caddy及四卷不变，未运行Migration |
+| 主UAT | PASS / CANCEL ONLY | 只登录purchase；桌面/390×844打开、核验、填备注并取消，`preview_get=1`、`business_post=0`、Session0，PO/Plan前后0 |
+| 最终数据 | UNCHANGED | RFQ CLOSED/v7、Quote2、Comparison v1、Award/Line/Event/PO/Plan`1/4/1/0/0`，`po_convertible_now=true`、`awardable_now=false` |
+| 资源/清理 | PASS | available约2.1→2.1GiB、Swap274→239MiB、根盘18GiB、最终Load`0.71/0.38/0.62`；内核OOM0、四服务restart0/OOM false，临时库/容器/runtime/SQLite清零 |
+| Git/下一步 | TWO COMMITS / NEW AUTH REQUIRED | 功能`a4ffb8e`及独立ops收口；具备重新执行正式转换的技术前置，但必须新任务、新授权并重验全部事实 |
 
 ## SELFHOST-UAT-FIX-31 RFQ Award History Traceability Fix
 

@@ -2,7 +2,7 @@
 
 ## 状态、授权与起点
 
-- 状态：`DOING`。
+- 状态：`DONE`。
 - 日期：2026-08-07（Asia/Shanghai）。
 - 授权：把现有“显式生成采购订单”入口改为安全两阶段合同；完成服务端权威预览、最终确认事务、隔离正式转换测试、正式备份恢复、Web-only 部署和 purchase-only 主 UAT 打开/核验/取消。主 UAT 明确禁止最终确认或创建 PO、到货计划及任何收货、库存、品质、财务或生产记录。
 - 精确起点：`main` / `c5af2fa1f8dbcfbb523b91cd00b63a91e9d72a8a`，Parent `a0147429d9b463650242c2115f0222b75008edeb`，behind 0 / ahead 167，工作区 clean，单一 worktree，无并发 Award/PO 任务；`0.1.0-alpha.40`；Migration 0001—0039；Web `sha256:bb544f89ac405c9565fa551c4120c89d4cc58022220db9a3f46c548a6533a81d`。
@@ -33,7 +33,7 @@
 - 不新增或运行 Migration。自动测试通过后执行 root:root 0600 正式 custom dump、SHA-256、`pg_restore --list` 和第二新数据库恢复验证；只构建并替换 Web，不重建 PostgreSQL、Worker 或 Caddy，不修改受保护 Volume。
 - 主 UAT 只登录 purchase，打开 Award 1 的转换窗口、核对桌面与 390×844、填写备注但不最终确认、取消、刷新并安全退出。业务 POST 必须为 0，PO和Delivery Plan前后均为0，Award仍AWARDED/v1，RFQ仍CLOSED/v7。
 
-## 实施与预部署验收记录
+## 实施、部署与验收记录
 
 - 前端已把入口改为无缓存权威 GET；Loading 与最终确认窗口均可取消。最终按钮在 DOM 事件内同步禁用，并由同步 ref 锁保证 React 重绘前双击也只有一个请求；失败后本窗口保持锁定，不自动重试，必须关闭后重新获取权威预览。
 - 服务端预览严格校验原生整数计数、Quote 未过期、税费/运费布尔值及非空付款条件。最终 POST 只接受确认断言和正常 PO `remark`；当前模型没有外部参考字段。金额显示使用六位十进制 BigInt half-up 到分，不截断。
@@ -41,7 +41,13 @@
 - 隔离 PostgreSQL 通过：强制故障后 PO/Line/source link/status event/Award link/Plan/queue/Plan event/成功 Audit/幂等键全部为0；`max=2`连接池双并发得到一个201和一个409。四行正式隔离转换为`1 PO / 4 PO Line / 4 Delivery Plan / 4 queue`，上游不变，Receipt/Ledger/IQC/AP/Payment/Work Order均为0。
 - 隔离 Chromium 通过：延迟 preview 在 Loading 窗口取消后不会复活；取消、关闭、ESC、背景关闭均0 POST；失败最终 POST恰好1且500ms内0重试；重新打开后成功双击只新增1 POST。桌面与390×844无页面级横向溢出。
 - 回归通过：Fulfillment Unit4/UI3/PG3，Sourcing Unit12/UI24、Sourcing/Binding PG27，0018/0019/0039隔离升级`3/3 + 3/3 + 6/6`，安全30，npm3，Python self-test/smoke/go-live，typecheck、production build、lint 0 error/11既有warning、1,273文件凭证扫描及diff check。候选Web为`sha256:2396c8bc4fd5658c26cef11c4a438b2edb474607b73b2b8ee7fe337b125575ed`、88,626,192 bytes，受限临时容器health 200/ok。
-- 所有隔离数据库与测试容器已删除；主 UAT 尚未登录或写入，正式备份、恢复、部署和取消验收仍待本任务后续阶段。
+- 正式dump为`/var/backups/chenyida-erp/award-po-confirmation-fix32-predeploy-20260807T144538Z.dump`，root:root、0600、单硬链接、2,294,098 bytes，SHA-256`75e45758f3f220f118ec98c8e2351274c4e640aa3c046507a2b294cebdaf3d97`，`pg_restore --list`3,359项。第二新库恢复39/head、226表、四个basis摘要、Award/Line/Event和下游全0后删除。
+- 仅替换Web`bb544f89…→2396c8bc…`；旧Web保留FIX32精确回退tag。PostgreSQL、Worker、Caddy与四个受保护Volume未重建或更换，未运行Migration。
+- 主UAT只登录purchase；桌面与390×844打开转换窗口、核验完整合同、填写备注、取消、刷新和安全退出通过：`preview_get=1`、`business_post=0`、PO/Plan前后0、Session0。首次流程已完成取消和logout，但验收器错误等待该履约页未维护的sourcing专用auth dataset而超时；只读核验Session/PO/Plan均0后，断言改为该页真实“请先登录。”匿名UI，复验通过。
+- 最终available约2.1 GiB、Swap239 MiB、根盘18 GiB、Load`0.71/0.38/0.62`；任务时段和本次启动内核OOM0，四服务restart0/OOM false。隔离/恢复库、临时容器、浏览器runtime和Python测试临时资源已清零；正式dump、当前/候选/回退镜像及四卷保留。
+- 功能提交`a4ffb8ee022234ea25add4ce636050366ac6887a`；部署/UAT/完成文档由独立`ops: deploy Award to PO confirmation fix`提交收口。未push、未PR、未改写历史。
+
+最终状态：`AWARD TO PO CONFIRMATION FIXED — UAT PO NOT CREATED`。真正执行主UAT转换必须另立任务、重新取得明确授权并重验当时全部权威事实。
 
 ## 完成条件
 

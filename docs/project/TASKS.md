@@ -11,16 +11,13 @@
 
 ## 当前任务
 
-`SELFHOST-UAT-FIX-32` 为当前唯一 `DOING`：修复 Award→PO 转换确认合同。主 UAT 只允许 purchase 打开、核验并取消，禁止最终确认，必须保持 Award/PO/Delivery Plan `1/0/0`。
-
-| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-UAT-FIX-32 | Award to PO Conversion Confirmation Contract Fix | DOING | Codex（严格门禁、两阶段确认、服务端事务保护、串行测试、备份恢复、Web-only部署、purchase-only取消UAT、清理与文档）、项目负责人（固定转换合同、部署及主UAT零PO授权） | 2026-08-07 | - | SELFHOST-PHASE4-TASK04、SELFHOST-PHASE4-TASK05、SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-26、SELFHOST-UAT-FIX-30、SELFHOST-UAT-FIX-31、D-061、D-062、D-095—D-103 | 两阶段源码、同连接事务重验和隔离正式转换已通过；候选Web`2396c8bc…575ed`健康。隔离为1 PO/4 Line/4 Plan，主UAT仍为PO/Plan 0；下一步正式备份恢复、Web-only部署和purchase-only取消验收。无0040，禁止主UAT最终确认。见[任务文档](../tasks/SELFHOST-UAT-FIX-32.md)。 |
+当前无`DOING`。`SELFHOST-UAT-FIX-32`已完成并停止在主UAT Award/PO/Delivery Plan `1/0/0`；真正转换仍须新的独立明确授权。
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-UAT-FIX-32 | Award to PO Conversion Confirmation Contract Fix | DONE | Codex（严格门禁、两阶段确认、服务端事务保护、串行测试、备份恢复、Web-only部署、purchase-only取消UAT、清理与文档）、项目负责人（固定转换合同、部署及主UAT零PO授权） | 2026-08-07 | 2026-08-07 | SELFHOST-PHASE4-TASK04、SELFHOST-PHASE4-TASK05、SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-26、SELFHOST-UAT-FIX-30、SELFHOST-UAT-FIX-31、D-061、D-062、D-095—D-103 | `AWARD TO PO CONFIRMATION FIXED — UAT PO NOT CREATED`。功能提交`a4ffb8e`；权威GET预览、完整确认窗口、显式最终POST及同连接事务重验已部署。隔离为1 PO/4 Line/4 Plan；主UAT purchase-only桌面/390×844打开、填备注、取消，`preview_get=1`、`business_post=0`、Session0，PO/Plan 0。无0040。见[任务文档](../tasks/SELFHOST-UAT-FIX-32.md)及[完成报告](../tasks/SELFHOST-UAT-FIX-32-COMPLETION.md)。 |
 | SELFHOST-UAT-FIX-31 | RFQ Award History Traceability Fix | DONE | Codex（严格门禁、权威模型诊断、Award历史读模型/UI、状态投影、串行测试、备份恢复、Web-only部署、purchase-only只读UAT、清理与文档）、项目负责人（固定主UAT保护与实现/部署/只读验收授权） | 2026-08-07 | 2026-08-07 | SELFHOST-PHASE4-TASK04、SELFHOST-PHASE4-TASK05、SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-28—30、D-061、D-062、D-095—D-102 | `RFQ AWARD HISTORY TRACEABILITY FIXED — UAT PO NOT CREATED`。功能提交`a014742`；Award ID1无业务编号、有v1/AWARDED，Line1—4闭合到Candidate2/4/6/8与Quote Line1—4；持久化Award摘要和派生decision digest分离，Event无CAS而Audit1469独立证明v6→v7。Web-only部署后purchase-only桌面/390×844、刷新重开、business POST0、Session0通过；最终Award/Line/Event/PO `1/4/1/0`，无0040。见[任务文档](../tasks/SELFHOST-UAT-FIX-31.md)及[完成报告](../tasks/SELFHOST-UAT-FIX-31-COMPLETION.md)。 |
 | SELFHOST-UAT-FIX-30 | RFQ Award Confirmation Contract Fix | DONE | Codex（严格门禁、确认合同修复、串行隔离测试、正式备份恢复、Web-only部署、purchase-only取消验收）、项目负责人（固定实现、部署及只读验收边界） | 2026-08-07 | 2026-08-07 | SELFHOST-PHASE4-TASK04、SELFHOST-PHASE4-TASK05、SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-27、SELFHOST-UAT-FIX-28、SELFHOST-UAT-FIX-29、D-061、D-062、D-095—D-101 | `RFQ AWARD CONFIRMATION FIXED — UAT AWARD NOT CREATED`。功能提交`22aa4dc`；固定Quote 1/v1与2/v1、一次不可变Award操作/恰好四条Line、上游不可变、完整下游零自动创建和独立转PO阶段已部署。隔离双击Award 1/Line 4/PO 0；主UAT purchase-only桌面/390×844打开后取消，business POST 0、Session 0，Award/Award Line/PO 0/0/0。无0040且0039未改。见[任务文档](../tasks/SELFHOST-UAT-FIX-30.md)及[完成报告](../tasks/SELFHOST-UAT-FIX-30-COMPLETION.md)。 |
 | SELFHOST-UAT-FIX-29 | RFQ Award Candidate Selection Fix | DONE | Codex（严格门禁、精确只读诊断、候选/UI/服务端保护、隔离测试、备份恢复、Web-only部署、purchase-only取消验收）、项目负责人（固定主UAT保护与实现、部署、只读验收授权） | 2026-08-07 | 2026-08-07 | SELFHOST-PHASE4-TASK04、SELFHOST-UAT-FIX-19、SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-27、SELFHOST-UAT-FIX-28、D-061、D-062、D-095—D-101 | `RFQ AWARD CANDIDATE SELECTION FIXED — UAT AWARD NOT CREATED`。功能提交`99a5e6b`；Candidate稳定字符串ID、四组逐Line两候选、非最低价交期优先与服务端重验已部署。隔离Award 1/Line 4/PO 0；主UAT purchase-only打开确认后取消，business POST 0、Session 0，Award/Award Line/PO 0/0/0。无0040且0039未改。见[任务文档](../tasks/SELFHOST-UAT-FIX-29.md)及[完成报告](../tasks/SELFHOST-UAT-FIX-29-COMPLETION.md)。 |

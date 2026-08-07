@@ -1174,7 +1174,7 @@
 ## D-103 Award转PO必须使用权威只读预览和单事务最终确认
 
 - 日期：2026-08-07
-- 状态：`ACCEPTED / IMPLEMENTED / PENDING PARALLEL NON-PRODUCTION UAT DEPLOYMENT`
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
 - 确认人：项目负责人（明确要求修复“显式生成采购订单”直接POST，授权隔离正式转换、备份恢复、Web-only部署和purchase-only主UAT打开/取消，禁止主UAT创建PO）
 - 两阶段合同：入口点击只允许通过只读一致快照重新读取Award、RFQ、Comparison、固定Quote、Award Event、两类摘要、完整Line、当前PO/计划计数、Supplier和付款条件后打开确认窗口。取消、关闭、ESC和背景关闭均为零业务POST，默认焦点为取消；只有明确最终确认才发送POST，按钮同步锁定，失败不自动重试。
 - 服务端权威：最终请求中的CAS、摘要、PO计数和Line ID只作为确认断言；Supplier、Material、单位、数量、价格、币种、交期和转换范围必须从不可变Award及其Comparison/Quote来源重新读取。服务端继续执行purchase权限、Origin/CSRF、幂等正文摘要、Award/RFQ CAS、完整唯一行集、当前Supplier/Mapping、并发单胜和故障回滚；任何漂移失败关闭。
@@ -1182,7 +1182,7 @@
 - 事务与下游：最终确认在一个服务端事务中创建PO、PO Line、Award→PO Line Link、逐Line Delivery Plan、收货队列、PO/计划Event、成功Audit和幂等结果；失败零半记录。该事务不创建Receipt、Warehouse Receipt、Inventory Ledger、IQC、AP、Payment、Work Order或其他生产/财务记录，后续到货、收货和IQC必须另立任务。
 - 字段与迁移：现行PO模型有正常header备注字段但没有外部参考字段。窗口允许最多2,000字PO备注并准确显示“当前PO模型未采集外部参考”；不得挪用其他字段，不新增或运行0040，版本保持alpha.40/0039。
 - 主UAT边界：主UAT只允许purchase打开Award 1转换窗口、核对桌面与390×844、填写备注后取消、刷新和安全退出；业务POST必须为0，PO与Delivery Plan前后均为0。真正转换仍须新的独立明确授权。
-- 实施结果：入口、权威预览、确认窗口、最终转换DTO和同事务写保护均已实现；最终确认在幂等回放检查之后复用外层事务连接读取完整Award历史，避免低容量连接池嵌套取连接。隔离结果为`1 PO / 4 PO Line / 4 Delivery Plan`，`max=2`连接池并发单胜、强制故障全部半记录为0；延迟/失败Chromium证明立即禁用、失败不重试和迟到预览不复活。当前候选Web为`sha256:2396c8bc4fd5658c26cef11c4a438b2edb474607b73b2b8ee7fe337b125575ed`；正式备份恢复、Web-only部署和主UAT取消验收仍待完成。
+- 实施结果：入口、权威预览、确认窗口、最终转换DTO和同事务写保护均已实现；最终确认在幂等回放检查之后复用外层事务连接读取完整Award历史，避免低容量连接池嵌套取连接。隔离结果为`1 PO / 4 PO Line / 4 Delivery Plan`，`max=2`连接池并发单胜、强制故障全部半记录为0；延迟/失败Chromium证明立即禁用、失败不重试和迟到预览不复活。Web`sha256:2396c8bc4fd5658c26cef11c4a438b2edb474607b73b2b8ee7fe337b125575ed`已Web-only部署；正式备份/第二库恢复和主UATpurchase-only桌面/390×844打开后取消通过，`preview_get=1`、`business_post=0`、Session0，PO/Delivery Plan保持0。
 
 ## 待确认业务决策
 

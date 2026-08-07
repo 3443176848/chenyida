@@ -11,7 +11,9 @@
 - 服务端/事务：最终DTO仅接受Award/RFQ CAS、两类摘要、完整Line ID、PO零计数等确认断言和备注；Supplier、Material、Unit、数量、价格、币种、交期及范围均从不可变Award来源重读。幂等回放先判定，随后在Award advisory lock和同一事务连接内重算完整预览并锁定Award/RFQ/PRQ/Line/Quote/Mapping；同事务创建PO/Line/Award Link/逐行Plan/Queue/Event/Audit/幂等结果，任一失败零半记录。
 - 下游边界：转换不自动创建Receipt、Warehouse Receipt、Inventory Ledger、IQC、AP、Payment、Work Order或其他生产/财务记录；供应商到货、仓库收货和IQC须独立任务。Award、RFQ、Quote和Comparison不修改。
 - 测试/隔离：Fulfillment Unit4/UI3/PG3，Sourcing Unit12/UI24、Sourcing/Binding PG27，0018/0019/0039升级`3/3 + 3/3 + 6/6`，安全30、npm3、Python三项、typecheck、production build、lint 0 error/11既有warning、凭证扫描及diff check通过。隔离正式转换为`1 PO / 4 PO Line / 4 Delivery Plan / 4 queue`，并发单胜、故障零半记录；Chromium覆盖延迟取消、全部退出零POST、失败无重试、同步禁用/双击单POST及桌面/390×844无页面级横向溢出。
-- 预部署：候选Web`sha256:2396c8bc4fd5658c26cef11c4a438b2edb474607b73b2b8ee7fe337b125575ed`、88,626,192 bytes，受限临时容器health 200/ok。正式备份恢复、Web-only部署和purchase-only主UAT取消验收尚待独立运维阶段；主UAT当前PO/Delivery Plan仍为0。
+- 备份/恢复：正式dump为root:root0600、单硬链接、2,294,098 bytes、SHA-256`75e45758f3f220f118ec98c8e2351274c4e640aa3c046507a2b294cebdaf3d97`，`pg_restore --list`3,359项；第二新库恢复39/head、226表、四basis摘要、Award/Line/Event、金额/交期及全部下游0后删除。
+- 部署/UAT：仅替换Web`bb544f89…→2396c8bc…`，旧Web有FIX32精确回退tag；PostgreSQL/Worker/Caddy身份和四卷不变，未运行Migration。purchase-only桌面/390×844打开、核验、填备注并取消通过，`preview_get=1`、`business_post=0`、Session0，PO/Plan前后0。首次流程已完成取消和logout，但验收器误等该履约页未维护的sourcing专用auth dataset而超时；确认Session/业务计数全0后改用真实“请先登录。”匿名UI断言，复验通过。
+- 资源/Git：起点/最终available约2.1/2.1GiB、Swap274/239MiB、根盘18GiB、最终Load`0.71/0.38/0.62`，内核OOM0、四服务restart0/OOM false；临时库/容器/runtime/SQLite清零。功能提交`a4ffb8ee022234ea25add4ce636050366ac6887a`，部署/UAT文档由独立ops提交收口；未push/PR或改写历史。结论`AWARD TO PO CONFIRMATION FIXED — UAT PO NOT CREATED`。
 
 ### SELFHOST-UAT-FIX-31 - `fix: add RFQ award history traceability` / `ops: deploy RFQ award history traceability fix`
 

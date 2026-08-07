@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
 最后核验：2026-08-07（Asia/Shanghai）
-适用任务：最新功能与并行非生产部署验收为 `SELFHOST-UAT-FIX-29`；历史发布/恢复记录保留下文
+适用任务：最新功能与并行非生产部署验收为 `SELFHOST-UAT-FIX-32`；历史发布/恢复记录保留下文
 
 ## 1. 使用规则
 
@@ -17,6 +17,7 @@
 
 | 运行面 | 版本/标识 | Git 基线 | 数据库基线 | 测试状态 | 部署状态 | 真实数据迁移 | 回退基线 | 批准状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Node.js / PostgreSQL Award→PO确认合同并行UAT | `0.1.0-alpha.40` | 功能提交`a4ffb8ee022234ea25add4ce636050366ac6887a`；运维/文档提交消息`ops: deploy Award to PO confirmation fix`，SHA以Git log为准 | 39/head0039且无0040；RFQ CLOSED v7、Quote2、Comparison v1、Award/Line/Event/PO/Plan`1/4/1/0/0` | Fulfillment4/3/3、Sourcing12/24、PG27、upgrade3+3+6、安全30、npm/Python/typecheck/lint/build/credentials；隔离`1 PO/4 Line/4 Plan`及主UAT桌面/390×844取消通过 | Web-only`DEPLOYED`到受控非生产UAT；Web`2396c8bc…`，PostgreSQL/Worker/Caddy未重建，Migration未运行；`NOT_RELEASED`到生产 | `NOT_MIGRATED`；主UAT只打开、核验、填备注并取消，`business_post=0`，未创建PO/Plan | root:root0600 dump SHA`75e45758…3d97`已list/第二新库恢复；旧Web`bb544f89…`精确tag保留 | `AWARD TO PO CONFIRMATION FIXED — UAT PO NOT CREATED`；正式转换必须新授权并重验CAS/摘要/Line/PO0 |
 | Node.js / PostgreSQL RFQ Award Candidate选择并行UAT | `0.1.0-alpha.40` | 功能提交`99a5e6bfe255cb46a0384106eb8ec0a08ec96832`；运维/文档提交消息`ops: deploy RFQ award candidate selection fix`，SHA以Git log为准 | 39/head0039且无0040；RFQ ISSUED v6、Binding8、Quote2、Comparison v1/CURRENT、Line/Candidate4/8、Award/Award Line/PO0/0/0，指纹`16d70f18…cf5bc` | Unit/UI33/33、Sourcing PG9/9、既有PG18/18、upgrade6/6、安全20/20、typecheck/lint/build/npm/Python/environment/credentials；隔离Award1/Line4/PO0及主UAT桌面/390×844取消通过 | Web-only`DEPLOYED`到受控非生产UAT；Web`f239ffe3…`，PostgreSQL/Worker/Caddy未重建，Migration未运行；`NOT_RELEASED`到生产 | `NOT_MIGRATED`；主UAT只在本地表单选择并取消，business POST0，未创建Award/PO | root:root0600 dump SHA`151910bc…e712`已list/第二新库恢复；旧Web`0dfcc0a8…`精确tag保留 | `RFQ AWARD CANDIDATE SELECTION FIXED — UAT AWARD NOT CREATED`；正式定标必须新授权并重验CAS/摘要/Quote/Candidate |
 | Node.js / PostgreSQL RFQ Comparison聚合读模型并行UAT | `0.1.0-alpha.40` | 功能提交`80e1ad60fa1272017545e150721c8b71f7c68828`；运维/文档提交消息`ops: deploy RFQ comparison aggregate read model`，SHA以Git log为准 | 39/head0039且无0040；RFQ ISSUED v6、Binding8、Quote2、Comparison4/8/4、Award/PO0/0，指纹`16d70f18…cf5bc` | Unit/UI`10/10+18/18`、隔离PG`3/3`、0039回归`6/6`、Chromium`1/1+4/4`、Schema/typecheck/lint/build/npm/Python/environment/credentials及主UAT桌面/390×844通过 | Web-only`DEPLOYED`到受控非生产UAT；Web`0dfcc0a8…`，PostgreSQL/Worker/Caddy未重建，Migration未运行；`NOT_RELEASED`到生产 | `NOT_MIGRATED`；只保留既有合成UAT Comparison，主UAT业务POST0且未创建Award/PO | root:root0600 dump SHA`8e858983…bffa`已list/第二新库恢复；旧Web`89e76775…`精确tag保留 | `RFQ COMPARISON AGGREGATE READ MODEL FIXED — UAT AWARD NOT CREATED`；人工定标必须新授权 |
 | Node.js / PostgreSQL 八角色工作台并行 UAT | `0.1.0-alpha.40` / `20260806-enterprise-ui-refresh-01` | 功能提交`4767c3db3cf66eb0978f07d044437790c0d4b87f`；运维/文档提交消息`ops: deploy role-based ERP workbench`，SHA以Git log为准 | PostgreSQL仍为39/head0039；Session207/有效1、Audit1446及RFQ/Quote保护指纹前后一致 | UI73/73、五组typecheck、lint、production build/postbuild、npm3/3、Python三项、credentials/diff、候选合同、匿名HTTPS/八角色资产/401、60秒health7/7通过 | Web-only`DEPLOYED`到受控非生产UAT；Web`f45d734b…`，PostgreSQL/Caddy未替换，Worker仅备份窗口短停，Migration未运行；`NOT_RELEASED`到生产 | `NOT_MIGRATED`；没有登录、Session/Audit增量或业务POST | root:root0600 dump SHA`dad839ef…`已list/第二新库恢复；旧Web`f139257b…`精确tag保留 | `ROLE-BASED WORKBENCH DEPLOYED — ANONYMOUS READ-ONLY VERIFIED`；登录式浏览器验收或生产切流须新授权 |
@@ -36,9 +37,9 @@
 | Node.js / PostgreSQL 原始自托管开发基线 | `0.1.0-alpha.1` | 功能基线 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`；发布追踪提交 `12d3ea30d21cce6918de0c525d81f19af289f5ac` | PostgreSQL `0001`—`0005` | PHASE0-TASK03 的隔离 lint/test/typecheck/build/credentials、Python 三项与 diff check 通过 | `NOT_RELEASED` / `NOT_DEPLOYED`；历史开发基线，不代表当前包版本 | `NOT_MIGRATED` | Git `39946f6` + 当时 migration checksum；未建立生产恢复点 | `NOT_APPROVED_FOR_PRODUCTION`；该历史定义保留且不因后续 alpha 演进而改写 |
 | 自托管生产版本 | 尚不存在 | `N/A` | `N/A` | `N/A` | `NOT_RELEASED` | `NOT_MIGRATED` | `NOT_ESTABLISHED` | `NOT_APPROVED` |
 
-`0.1.0-alpha.1` 是 PHASE0-TASK03 建立的原始非生产发布基线，不是当前包版本。当前源码和并行非生产 UAT 已演进到 `0.1.0-alpha.40`/`0039`；既有部门交接、Manufacturing Batch、Finished Goods Lot/FQC/Shipment、Supplier Receipt Lot→IQC、Project Unit Resolution、Revision Response 和 Supplier Mapping 治理事实保持，并新增 RFQ 精确 Mapping 绑定、创建/发出凭证与确认门禁，以及 Quote 聚合CAS、邀请响应、固定范围漂移和追溯展示的权威语义。这只证明非生产链路和升级恢复门禁成立，不表示真实公司数据已迁移或已批准生产上线。
+`0.1.0-alpha.1` 是 PHASE0-TASK03 建立的原始非生产发布基线，不是当前包版本。当前源码和并行非生产 UAT 已演进到 `0.1.0-alpha.40`/`0039`；既有部门交接、Manufacturing Batch、Finished Goods Lot/FQC/Shipment、Supplier Receipt Lot→IQC、Project Unit Resolution、Revision Response 和 Supplier Mapping 治理事实保持，并新增 RFQ 精确 Mapping 绑定、创建/发出凭证、Quote/Award追溯以及Award→PO权威预览/最终确认门禁。这只证明非生产链路和升级恢复门禁成立，不表示真实公司数据已迁移或已批准生产上线。
 
-Git 同步状态以2026-08-07 FIX29严格起点计：唯一worktree、clean`main@8665f21577f2b5f5ab2b9e5ac442487dd6c2335d`、Parent`80e1ad60fa1272017545e150721c8b71f7c68828`、behind0/ahead161；功能提交`99a5e6bfe255cb46a0384106eb8ec0a08ec96832`后ahead162，独立运维/文档收口后预计ahead163，均未推送。最终状态以`git status --short --branch`为准。
+Git 同步状态以2026-08-07 FIX32严格起点计：唯一worktree、clean`main@c5af2fa1f8dbcfbb523b91cd00b63a91e9d72a8a`、Parent`a0147429d9b463650242c2115f0222b75008edeb`、behind0/ahead167；功能提交`a4ffb8ee022234ea25add4ce636050366ac6887a`后ahead168，独立运维/文档收口后ahead169，均未推送。最终状态以`git status --short --branch`为准。
 
 ## 3. Migration 文件与 SHA-256 基线
 
