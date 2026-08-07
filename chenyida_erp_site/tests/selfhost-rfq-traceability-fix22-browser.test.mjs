@@ -1695,7 +1695,7 @@ test("isolated Chromium renders the Comparison aggregate read model on desktop a
     assert.equal(await page.locator(".comparison-operation li").count(), 4);
     assert.equal(await page.getByRole("button", { name: "当前Quote输入已生成最新比价", exact: true }).isDisabled(), true);
     await page.getByRole("heading", { name: "人工定标与撤销", exact: true }).waitFor();
-    assert.equal(await page.getByRole("button", { name: "确认人工定标", exact: true }).isVisible(), true);
+    assert.equal(await page.getByRole("button", { name: "打开正式定标确认窗口", exact: true }).isVisible(), true);
     assert.equal(await page.locator(".comparison-desktop").isVisible(), true);
     assert.equal(await page.locator(".comparison-material-cards").isVisible(), false);
     await noOverflow(page, "Comparison aggregate desktop");
@@ -1711,7 +1711,7 @@ test("isolated Chromium renders the Comparison aggregate read model on desktop a
     assert.equal(await page.locator(".comparison-material-card").count(), 4);
     assert.equal(await page.locator(".comparison-supplier-card").count(), 2);
     assert.equal(await page.getByRole("button", { name: "当前Quote输入已生成最新比价", exact: true }).isDisabled(), true);
-    assert.equal(await page.getByRole("button", { name: "确认人工定标", exact: true }).isVisible(), true);
+    assert.equal(await page.getByRole("button", { name: "打开正式定标确认窗口", exact: true }).isVisible(), true);
     await noOverflow(page, "Comparison aggregate 390x844");
     assert.deepEqual(businessRequests, []);
 
@@ -1740,9 +1740,11 @@ test("isolated Chromium renders the Comparison aggregate read model on desktop a
   }
 });
 
-test("isolated Chromium cancels the FIX-29 Award confirmation with zero POST then creates exactly one four-line Award", { timeout: 300_000 }, async () => {
+test("isolated Chromium enforces the FIX-30 Award confirmation contract then creates exactly one four-line Award", { timeout: 300_000 }, async () => {
   await clearSyntheticData();
   const fixture = await seedFixture({ targetDate: "2026-10-30", materialDefinitions: FIX29_MATERIAL_DEFINITIONS });
+  const isolatedAwardReason = `${FIX29_AWARD_REASON}\n${"长理由布局验收：保持完整换行、自动折行且不截断。".repeat(24)}`;
+  assert.ok(isolatedAwardReason.length <= 1000);
   const chromium = await loadChromium();
   let browser;
   let context;
@@ -1813,27 +1815,35 @@ test("isolated Chromium cancels the FIX-29 Award confirmation with zero POST the
       assert.equal(await select.inputValue(), supplierA, `Line ${index + 1} Supplier A must be selectable`);
     }
     await form.locator('select[name="reason_code"]').selectOption("DELIVERY_PRIORITY");
-    await form.locator('textarea[name="reason"]').fill(FIX29_AWARD_REASON);
+    await form.locator('textarea[name="reason"]').fill(isolatedAwardReason);
 
     await form.getByRole("button", { name: "打开正式定标确认窗口", exact: true }).click();
     let dialog = page.locator(".rfq-dialog.award-confirm-dialog[role=dialog]");
     await dialog.getByRole("heading", { name: "正式定标确认", exact: true }).waitFor();
     await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "取消");
     assert.deepEqual(await dialog.locator("article[data-selected-candidate-id]").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-selected-candidate-id"))), ["2", "4", "6", "8"]);
+    assert.deepEqual(await dialog.locator(".award-confirm-quotes article").evaluateAll((rows) => rows.map((row) => [row.getAttribute("data-supplier-id"), row.getAttribute("data-quote-id")])), [["1", "1"], ["2", "2"]]);
     const desktopText = await dialog.innerText();
     for (const required of [
       "ID 1 / RFQ-00000001", "Round 1 / v5", "v1 / CURRENT", "awardable_now", "true",
-      "79554d88ccdb643a860c0c69e77222abce80eb4d3d8314d88135d3966fb619ec",
+      "79554d88ccdb643a860c0c69e77222abce80eb4d3d8314d88135d3966fb619ec", current.request_id,
       ...current.comparison_rows.map((row) => row.basis_digest),
       ...FIX29_MATERIAL_DEFINITIONS.flatMap(({ id, code }) => [String(id), code]),
+      "Supplier A", "Supplier ID 1 / SUP-000001", "Quote ID 1/v1", "UAT-Q-A-042576", "480.00 CNY", "2026-10-20", "ON_TIME / 提前10天",
+      "Supplier B", "Supplier ID 2 / SUP-000002", "Quote ID 2/v1", "UAT-Q-B-042576", "400.00 CNY", "2026-11-05", "LATE / 延期6天",
+      "本次确认只创建一次不可变Award操作，并在该操作下创建恰好四条Award Line。", "Award操作", "Award Line", "四条均为Supplier A", "不拆分数量",
+      "Comparison Line 1", "Comparison Line 2", "Comparison Line 3", "Comparison Line 4",
       "Candidate ID 2", "Candidate ID 4", "Candidate ID 6", "Candidate ID 8", "Quote ID 1 / v1",
       "12.00 CNY", "120.00 CNY", "2026-10-20", "ON_TIME / 提前10天", "价格排名 2 / 非最低价",
       "SUP-000001 · FIX-22 快速交付供应商 A", "SUP-000002 · FIX-22 低价供应商 B",
       "480.00 CNY", "400.00 CNY", "80.00 CNY / 20%", "LATE / 延期6天",
       "SUP-000001 比 SUP-000002 早 16 天。",
-      "DELIVERY_PRIORITY / 交期优先", FIX29_AWARD_REASON,
-      "本次只新增一个不可变 Sourcing Award 及其 Award Line",
-      "不会自动创建 PO、到货计划、收货、库存、应付或其他下游记录",
+      "DELIVERY_PRIORITY / 交期优先", isolatedAwardReason,
+      "不修改RFQ已冻结范围", "不修改Quote ID 1/v1", "不修改Quote ID 2/v1", "不修改Comparison Version 1",
+      "不修改Comparison Line或Candidate", "不修改Binding或Mapping",
+      "PO", "Delivery Plan", "Receipt／收货", "Inventory Ledger／库存流水", "AP／采购应付", "Work Order／生产工单", "其他生产记录", "其他财务记录",
+      "下一业务阶段：通过独立的‘定标转PO与到货计划’任务，将已生效Award转换为采购订单及到货计划。本次定标不会自动执行该阶段。",
+      "具体处理人：未指定", "处理时限：未配置",
     ]) assert.ok(desktopText.includes(required), `desktop Award confirmation missing ${required}`);
     assert.equal(await dialog.getByRole("button", { name: "最终确认并创建 Award", exact: true }).isVisible(), true);
     await noOverflow(page, "FIX-29 Award confirmation desktop");
@@ -1846,6 +1856,13 @@ test("isolated Chromium cancels the FIX-29 Award confirmation with zero POST the
       (select count(*)::int from procurement_sourcing_awards where rfq_id=1) awards,
       (select count(*)::int from procurement_sourcing_award_lines award_line join procurement_sourcing_awards award on award.id=award_line.award_id where award.rfq_id=1) award_lines,
       (select count(*)::int from purchase_orders) purchase_orders`)).rows[0], { awards: 0, award_lines: 0, purchase_orders: 0 });
+
+    await form.getByRole("button", { name: "打开正式定标确认窗口", exact: true }).click();
+    dialog = page.locator(".rfq-dialog.award-confirm-dialog[role=dialog]");
+    await dialog.getByRole("heading", { name: "正式定标确认", exact: true }).waitFor();
+    await dialog.getByRole("button", { name: "关闭定标确认窗口", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.deepEqual(businessRequests, [], "closing confirmation must send zero business requests");
 
     await form.getByRole("button", { name: "打开正式定标确认窗口", exact: true }).click();
     dialog = page.locator(".rfq-dialog.award-confirm-dialog[role=dialog]");
@@ -1866,10 +1883,11 @@ test("isolated Chromium cancels the FIX-29 Award confirmation with zero POST the
     await dialog.getByRole("heading", { name: "正式定标确认", exact: true }).waitFor();
     await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "取消");
     const mobileText = await dialog.innerText();
-    for (const required of ["RFQ-00000001", "v1 / CURRENT", "Candidate ID 2", "Candidate ID 8",
+    for (const required of ["RFQ-00000001", "v1 / CURRENT", "Quote ID 1/v1", "Quote ID 2/v1", "Candidate ID 2", "Candidate ID 8",
       "SUP-000001 · FIX-22 快速交付供应商 A", "SUP-000002 · FIX-22 低价供应商 B",
       "480.00 CNY", "400.00 CNY", "80.00 CNY / 20%", "SUP-000001 比 SUP-000002 早 16 天。",
-      "DELIVERY_PRIORITY / 交期优先", FIX29_AWARD_REASON]) {
+      "本次确认只创建一次不可变Award操作，并在该操作下创建恰好四条Award Line。", "Inventory Ledger／库存流水", "Work Order／生产工单",
+      "下一业务阶段：通过独立的‘定标转PO与到货计划’任务", "DELIVERY_PRIORITY / 交期优先", isolatedAwardReason]) {
       assert.ok(mobileText.includes(required), `mobile Award confirmation missing ${required}`);
     }
     await noOverflow(page, "FIX-29 Award confirmation 390x844");
@@ -1878,7 +1896,11 @@ test("isolated Chromium cancels the FIX-29 Award confirmation with zero POST the
 
     const awardResponsePromise = page.waitForResponse((response) => response.url() === `${REQUIRED_ORIGIN}/api/procurement/rfqs/1/award`
       && response.request().method() === "POST");
-    await dialog.getByRole("button", { name: "最终确认并创建 Award", exact: true }).click();
+    await dialog.getByRole("button", { name: "最终确认并创建 Award", exact: true }).evaluate((button) => {
+      if (!(button instanceof HTMLButtonElement)) throw new Error("Award confirmation control is not a button");
+      button.click();
+      button.click();
+    });
     const awardResponse = await awardResponsePromise;
     const awardPayload = await awardResponse.json();
     assert.equal(awardResponse.status(), 201, JSON.stringify(awardPayload));
@@ -1926,7 +1948,7 @@ test("isolated Chromium cancels the FIX-29 Award confirmation with zero POST the
       expected_comparison_version: 1,
       expected_comparison_output_digest: "79554d88ccdb643a860c0c69e77222abce80eb4d3d8314d88135d3966fb619ec",
       reason_code: "DELIVERY_PRIORITY",
-      reason: FIX29_AWARD_REASON,
+      reason: isolatedAwardReason,
       selected_candidates: ["2", "4", "6", "8"],
       rfq_line_ids: ["1", "2", "3", "4"],
       comparison_line_ids: ["1", "2", "3", "4"],
@@ -1983,7 +2005,7 @@ test("isolated Chromium cancels the FIX-29 Award confirmation with zero POST the
       selected_quantity: "10.000000",
       selected_unit_price: "12.000000",
       reason_code: "DELIVERY_PRIORITY",
-      reason: FIX29_AWARD_REASON,
+      reason: isolatedAwardReason,
     })));
     await noOverflow(page, "FIX-29 awarded detail 390x844");
 
@@ -1999,7 +2021,7 @@ test("isolated Chromium cancels the FIX-29 Award confirmation with zero POST the
     )).rows[0].count), 0);
     await context.close();
     context = undefined;
-    console.info("RFQ_AWARD_CANDIDATE_FIX29_BROWSER_OK rfq=1 comparison_version=1 candidates=8 selected=2,4,6,8 cancel_post=0 award_post=1 award=1 award_line=4 po=0 desktop=1 mobile=1 session=0");
+    console.info("RFQ_AWARD_CONFIRMATION_FIX30_BROWSER_OK rfq=1 comparison_version=1 candidates=8 selected=2,4,6,8 cancel_close_escape_post=0 award_post=1 award=1 award_line=4 po=0 desktop=1 mobile=1 session=0");
   } finally {
     if (authenticated && context && csrfToken) {
       await context.request.post(`${REQUIRED_ORIGIN}/api/logout`, {

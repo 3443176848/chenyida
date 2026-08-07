@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前无 `DOING` 任务。`SELFHOST-UAT-FIX-29` 已完成并停止；正式人工定标、Award、PO、Migration、真实数据迁移或生产动作均须新的明确授权。
+当前唯一 `DOING` 任务为 `SELFHOST-UAT-FIX-30`（RFQ Award Confirmation Contract Fix）。范围只补齐正式定标确认窗口合同、隔离测试、备份恢复、Web-only部署及 purchase-only 主 UAT 打开后取消；禁止创建主 UAT Award/PO、修改上游事实、运行 Migration 或扩大权限。见[任务文档](../tasks/SELFHOST-UAT-FIX-30.md)。
 
 ## 已完成任务
 

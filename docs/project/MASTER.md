@@ -50,8 +50,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。Candidate修复Web为alpha.40`sha256:f239ffe3059cfbd5cbb26a45d0960249450ec61989a8f91fb4e17dff3e26e4c1`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`0dfcc0a8…`有FIX29精确回退tag，四个受保护Volume未更换 |
 | 当前开发环境 | 本地源码和公开UAT在既有Comparison聚合之上，以规范十进制字符串Candidate ID按Comparison Line权威关联，每行恰好两个Supplier选项；Award提交绑定Candidate并由服务端重验CURRENT、固定Quote、CAS、摘要、完整行集和非最低价理由。共享中文状态、八部门导航与权限裁剪保持；alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
 | 当前阶段 | RFQ Award Candidate选择与确认合同已Web-only部署到公开非生产UAT，并完成隔离Award、正式备份恢复及purchase-only桌面/390×844确认后取消验收；主UAT business POST 0且未创建Award/PO，不是生产发布或真实数据迁移 |
-| 当前任务 | 当前无`DOING`；`SELFHOST-UAT-FIX-29`已以`RFQ AWARD CANDIDATE SELECTION FIXED — UAT AWARD NOT CREATED`完成 |
-| 下一任务 | 停止。真正人工定标/Award、PO、Migration、真实数据迁移或生产切流仍须新的明确授权，并重新读取当前CAS、Comparison摘要、Quote和Candidate资格 |
+| 当前任务 | `SELFHOST-UAT-FIX-30`为当前唯一`DOING`：只补齐RFQ正式定标确认窗口合同、隔离验证、备份恢复、Web-only部署和purchase-only取消验收；主UAT禁止创建Award/PO |
+| 下一任务 | 本任务完成后停止。真正人工定标/Award、转PO、Migration、真实数据迁移或生产切流仍须新的明确授权，并重新读取当前CAS、Comparison摘要、Quote和Candidate资格 |
 
 ## 当前完成模块
 

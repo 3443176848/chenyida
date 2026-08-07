@@ -85,8 +85,10 @@ export type AwardDraft = Readonly<{
     status: ComparisonVersionReadModel["status"];
     awardable_now: boolean;
     output_digest: string;
+    request_id: string;
   }>;
   lines: AwardDraftLine[];
+  quote_summaries: ComparisonSupplierSummary[];
   reason_label: string;
   selected_total_amount: string;
   lowest_total_amount: string;
@@ -184,8 +186,48 @@ function materialForLine(version: ComparisonVersionReadModel, rfqLineId: string)
   return material;
 }
 
+function fixedQuoteSummaries(version: ComparisonVersionReadModel) {
+  const summaries = version.supplier_summaries.map((summary) => {
+    const supplierId = canonicalStableId(summary.supplier_id, "Quote Supplier ID");
+    const quoteId = canonicalStableId(summary.quote_id, "Quote ID");
+    if (!Number.isSafeInteger(summary.quote_version_no) || summary.quote_version_no < 1) {
+      throw new AwardSelectionError(`Quote ${quoteId} Version不是有效正整数`);
+    }
+    return { ...summary, supplier_id: supplierId, quote_id: quoteId };
+  }).sort((left, right) => compareStableId(left.supplier_id, right.supplier_id));
+  if (!summaries.length) throw new AwardSelectionError("CURRENT Comparison 缺少固定 Quote 汇总");
+
+  const summaryKeys = new Set<string>();
+  const supplierIds = new Set<string>();
+  for (const summary of summaries) {
+    const key = `${summary.supplier_id}:${summary.quote_id}:v${summary.quote_version_no}`;
+    if (supplierIds.has(summary.supplier_id) || summaryKeys.has(key)) {
+      throw new AwardSelectionError(`Supplier ${summary.supplier_id} 的固定 Quote 汇总不唯一`);
+    }
+    supplierIds.add(summary.supplier_id);
+    summaryKeys.add(key);
+  }
+
+  const fixedInputKeys = new Set<string>();
+  for (const input of version.fixed_quote_inputs) {
+    const supplierId = canonicalStableId(input.supplier_id, "固定 Quote Supplier ID");
+    const quoteId = canonicalStableId(input.quote_id, "固定 Quote ID");
+    if (!Number.isSafeInteger(input.quote_version_no) || input.quote_version_no < 1 || input.quote_input_current !== true) {
+      throw new AwardSelectionError(`固定 Quote ${quoteId} Version或CURRENT状态无效`);
+    }
+    const key = `${supplierId}:${quoteId}:v${input.quote_version_no}`;
+    if (!summaryKeys.has(key)) throw new AwardSelectionError(`固定 Quote ${quoteId}/v${input.quote_version_no} 与汇总不一致`);
+    fixedInputKeys.add(key);
+  }
+  if ([...summaryKeys].some((key) => !fixedInputKeys.has(key))) {
+    throw new AwardSelectionError("固定 Quote 输入与 Supplier 汇总不完整");
+  }
+  return summaries;
+}
+
 export function buildAwardDraft(detail: AwardCandidateDetail, form: Pick<FormData, "get">): AwardDraft {
   const version = currentVersion(detail.comparison_read_model);
+  const quoteSummaries = fixedQuoteSummaries(version);
   const reasonCode = boundedFormText(form, "reason_code", 64, true) as AwardReasonCode;
   if (!Object.hasOwn(awardReasonLabels, reasonCode)) throw new AwardSelectionError("请选择合法的定标理由代码");
   const reason = boundedFormText(form, "reason", 1000, true);
@@ -204,6 +246,12 @@ export function buildAwardDraft(detail: AwardCandidateDetail, form: Pick<FormDat
     if (!candidate) throw new AwardSelectionError(`Candidate ${candidateId} 不属于 RFQ Line ${rfqLineId} 的 CURRENT Comparison`);
     if (seenCandidates.has(candidateId)) throw new AwardSelectionError(`Candidate ${candidateId} 不能跨 RFQ Line 重复使用`);
     seenCandidates.add(candidateId);
+    const candidateSupplierId = canonicalStableId(candidate.supplier_id, "Candidate Supplier ID");
+    const candidateQuoteId = canonicalStableId(candidate.quote_id, "Candidate Quote ID");
+    const quoteSummary = quoteSummaries.find((summary) => summary.supplier_id === candidateSupplierId);
+    if (!quoteSummary || quoteSummary.quote_id !== candidateQuoteId || quoteSummary.quote_version_no !== candidate.quote_version_no) {
+      throw new AwardSelectionError(`Candidate ${candidateId} 的固定 Quote 引用与 CURRENT Comparison 汇总不一致`);
+    }
 
     const comparisonLineId = canonicalStableId(material.comparison_line_id, "Comparison Line ID");
     const comparisonRow = version.comparison_rows.find((row) => canonicalStableId(row.comparison_line_id, "Comparison Line ID") === comparisonLineId);
@@ -275,8 +323,8 @@ export function buildAwardDraft(detail: AwardCandidateDetail, form: Pick<FormDat
   const selectedSupplierIds = new Set(draftLines.map((row) => canonicalStableId(row.candidate.supplier_id, "Supplier ID")));
   const selectedSupplierId = selectedSupplierIds.size === 1 ? [...selectedSupplierIds][0] : null;
   const lowestSupplierId = version.aggregate_differences?.lowest_price_supplier_id || null;
-  const selectedSupplier = selectedSupplierId ? version.supplier_summaries.find((row) => row.supplier_id === selectedSupplierId) || null : null;
-  const lowestSupplier = lowestSupplierId ? version.supplier_summaries.find((row) => row.supplier_id === lowestSupplierId) || null : null;
+  const selectedSupplier = selectedSupplierId ? quoteSummaries.find((row) => row.supplier_id === selectedSupplierId) || null : null;
+  const lowestSupplier = lowestSupplierId ? quoteSummaries.find((row) => row.supplier_id === lowestSupplierId) || null : null;
   const deliveryDayDifference = selectedSupplier && lowestSupplier && selectedSupplier.supplier_id !== lowestSupplier.supplier_id
     ? version.aggregate_differences?.delivery_day_difference ?? null
     : 0;
@@ -305,8 +353,15 @@ export function buildAwardDraft(detail: AwardCandidateDetail, form: Pick<FormDat
   return {
     request,
     rfq: { id: canonicalStableId(detail.header.id, "RFQ ID"), rfq_code: detail.header.rfq_code, round_no: detail.header.round_no, version: detail.header.version },
-    comparison: { version_no: version.comparison_version_no, status: version.status, awardable_now: version.awardable_now, output_digest: version.output_summary.digest },
+    comparison: {
+      version_no: version.comparison_version_no,
+      status: version.status,
+      awardable_now: version.awardable_now,
+      output_digest: version.output_summary.digest,
+      request_id: version.request_id,
+    },
     lines: draftLines,
+    quote_summaries: quoteSummaries,
     reason_label: awardReasonLabels[reasonCode],
     selected_total_amount: decimal(selectedTotal),
     lowest_total_amount: decimal(lowestTotal),

@@ -14,6 +14,15 @@ function supplierLabel(supplier: AwardDraft["selected_supplier"]) {
   return `${supplier.supplier_code} · ${supplier.supplier_name}`;
 }
 
+function supplierContractAlias(index: number, count: number) {
+  if (count === 2 && index < 2) return `Supplier ${index === 0 ? "A" : "B"}`;
+  return `Supplier ${index + 1}`;
+}
+
+function awardLineCountLabel(count: number) {
+  return count === 4 ? "四" : String(count);
+}
+
 export function AwardConfirmDialog({
   draft,
   busy,
@@ -68,6 +77,13 @@ export function AwardConfirmDialog({
 
   const selectedSupplier = draft.selected_supplier;
   const lowestSupplier = draft.lowest_supplier;
+  const selectedSupplierIndex = selectedSupplier
+    ? draft.quote_summaries.findIndex((summary) => summary.supplier_id === selectedSupplier.supplier_id)
+    : -1;
+  const selectedSupplierAlias = selectedSupplierIndex >= 0
+    ? supplierContractAlias(selectedSupplierIndex, draft.quote_summaries.length)
+    : "混合Supplier";
+  const awardLineCount = awardLineCountLabel(draft.lines.length);
   return <div className="rfq-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}>
     <section
       ref={dialogRef}
@@ -92,6 +108,7 @@ export function AwardConfirmDialog({
             <div><dt>Comparison Version</dt><dd>v{draft.comparison.version_no} / {draft.comparison.status}</dd></div>
             <div><dt>awardable_now</dt><dd>{String(draft.comparison.awardable_now)}</dd></div>
             <div className="wide"><dt>output digest</dt><dd><code className="rfq-trace-value">{draft.comparison.output_digest}</code></dd></div>
+            <div className="wide"><dt>Comparison request_id</dt><dd><code className="rfq-trace-value">{draft.comparison.request_id}</code></dd></div>
           </dl>
           <div className="award-confirm-basis">
             {draft.lines.map((line) => <article key={line.comparison_line_id}>
@@ -103,15 +120,41 @@ export function AwardConfirmDialog({
           </div>
         </section>
 
+        <section className="rfq-confirm-section" aria-label="两份固定 Quote 引用">
+          <h3>两份固定 Quote 引用</h3>
+          <div className="award-confirm-quotes">
+            {draft.quote_summaries.map((quote, index) => <article key={`${quote.supplier_id}:${quote.quote_id}:v${quote.quote_version_no}`} data-supplier-id={quote.supplier_id} data-quote-id={quote.quote_id}>
+              <header><b>{supplierContractAlias(index, draft.quote_summaries.length)}</b><span>{quote.supplier_name}</span></header>
+              <strong>Supplier ID {quote.supplier_id} / {quote.supplier_code}</strong>
+              <span>Quote ID {quote.quote_id}/v{quote.quote_version_no}</span>
+              <span>Supplier Quote Reference {quote.supplier_quote_reference || "—"}</span>
+              <span>总额 {decimalDisplay(quote.total_amount, 2)} {quote.currency_code}</span>
+              <span>最晚承诺交付 {dateOnly(quote.latest_promised_delivery_date)}</span>
+              <span>{quote.delivery_status} / {quote.delivery_explanation}</span>
+            </article>)}
+          </div>
+        </section>
+
+        <section className="rfq-confirm-section award-confirm-operation" aria-label="Award 操作与行数量">
+          <h3>Award 操作与行数量</h3>
+          <p className="award-confirm-contract-statement"><b>本次确认只创建一次不可变Award操作，并在该操作下创建恰好{awardLineCount}条Award Line。</b></p>
+          <dl className="sourcing-facts">
+            <div><dt>Award操作</dt><dd>1</dd></div>
+            <div><dt>Award Line</dt><dd>{draft.lines.length}</dd></div>
+            <div><dt>Supplier归属</dt><dd>{awardLineCount}条均为{selectedSupplierAlias}{selectedSupplier ? `（${selectedSupplier.supplier_code}）` : ""}</dd></div>
+            <div><dt>数量策略</dt><dd>不拆分数量</dd></div>
+          </dl>
+        </section>
+
         <section className="rfq-confirm-section" aria-label="四行获选 Candidate">
           <h3>四行获选 Supplier 与固定 Candidate</h3>
           <div className="award-confirm-lines">
-            {draft.lines.map((line) => <article key={line.rfq_line_id} data-selected-candidate-id={line.candidate.comparison_candidate_id}>
-              <header><b>Line {line.line_no} · Material {line.material_id}</b><span>{line.internal_material_code} / {line.standard_name}</span></header>
+            {draft.lines.map((line, index) => <article key={line.rfq_line_id} data-selected-candidate-id={line.candidate.comparison_candidate_id}>
+              <header><b>Award Line {index + 1} · Comparison Line {line.comparison_line_id}</b><span>RFQ Line {line.rfq_line_id} · Material {line.material_id}</span><span>{line.internal_material_code} / {line.standard_name}</span></header>
               <strong>{line.candidate.supplier_code} · {line.candidate.supplier_name}</strong>
               <span>Candidate ID {line.candidate.comparison_candidate_id}</span>
               <span>Quote ID {line.candidate.quote_id} / v{line.candidate.quote_version_no}</span>
-              <span>数量 {decimalDisplay(line.candidate.quoted_quantity)} {line.unit_code}</span>
+              <span>数量 {decimalDisplay(line.candidate.quoted_quantity)} {line.unit_code} / 不拆分数量</span>
               <span>单价 {decimalDisplay(line.candidate.unit_price, 2)} {line.candidate.currency_code}</span>
               <span>行金额 {decimalDisplay(line.candidate.line_amount, 2)} {line.candidate.currency_code}</span>
               <span>需求 {dateOnly(line.required_date)} / 承诺 {dateOnly(line.candidate.promised_delivery_date)}</span>
@@ -144,9 +187,41 @@ export function AwardConfirmDialog({
           <ul>
             <li>服务端重新核对 RFQ ID/编号、Round、CAS、CURRENT Comparison Version、basis_digest 与 output digest。</li>
             <li>服务端按 Candidate ID 固定解析 Comparison Line、Quote ID/version、Supplier、数量、币种、单价与交期；页面值不能改写这些事实。</li>
-            <li>本次只新增一个不可变 Sourcing Award 及其 Award Line。</li>
-            <li><b>不会自动创建 PO、到货计划、收货、库存、应付或其他下游记录。</b></li>
+            <li>服务端继续执行权限、CSRF、Origin、CAS、原因、幂等、并发与事务回滚保护。</li>
           </ul>
+        </section>
+
+        <section className="rfq-confirm-section award-confirm-boundary" aria-label="上游不可变保护">
+          <h3>上游不可变保护</h3>
+          <ul>
+            <li>不修改RFQ已冻结范围</li>
+            {draft.quote_summaries.map((quote) => <li key={`${quote.quote_id}:v${quote.quote_version_no}`}>不修改Quote ID {quote.quote_id}/v{quote.quote_version_no}</li>)}
+            <li>不修改Comparison Version {draft.comparison.version_no}</li>
+            <li>不修改Comparison Line或Candidate</li>
+            <li>不修改Binding或Mapping</li>
+          </ul>
+        </section>
+
+        <section className="rfq-confirm-section award-confirm-boundary" aria-label="下游零自动创建">
+          <h3>下游零自动创建</h3>
+          <p><b>本次定标不会自动创建以下任何下游记录：</b></p>
+          <ul>
+            <li>PO</li>
+            <li>Delivery Plan</li>
+            <li>Receipt／收货</li>
+            <li>Inventory Ledger／库存流水</li>
+            <li>AP／采购应付</li>
+            <li>Work Order／生产工单</li>
+            <li>其他生产记录</li>
+            <li>其他财务记录</li>
+          </ul>
+        </section>
+
+        <section className="rfq-confirm-section award-confirm-next-stage" aria-label="下一业务阶段">
+          <h3>下一业务阶段</h3>
+          <p><b>下一业务阶段：通过独立的‘定标转PO与到货计划’任务，将已生效Award转换为采购订单及到货计划。本次定标不会自动执行该阶段。</b></p>
+          <p>具体处理人：未指定</p>
+          <p>处理时限：未配置</p>
         </section>
       </div>
       <div className="rfq-dialog-actions">
