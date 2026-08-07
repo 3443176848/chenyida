@@ -837,7 +837,13 @@ test("issuance is CAS-safe and idempotent, writes one complete ISSUED credential
   assert.equal(detail.payload.data.issue_receipt.event_type, "ISSUED");
   assert.equal(detail.payload.data.issue_receipt.result, "SUCCESS");
   assert.equal(detail.payload.data.issue_receipt.mapping_count, 8);
-  assert.deepEqual(detail.payload.data.downstream_counts, { quotes: 0, awards: 0, purchase_orders: 0 });
+  assert.deepEqual(detail.payload.data.downstream_counts, {
+    quotes: 0,
+    awards: 0,
+    purchase_orders: 0,
+    purchase_order_lines: 0,
+    delivery_plans: 0,
+  });
   assert.deepEqual(await downstreamCounts(), { quotes: 0, awards: 0, purchase_orders: 0, delivery_plans: 0, receipts: 0, ledger_entries: 0, ap_documents: 0, work_orders: 0 });
 });
 

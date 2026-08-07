@@ -4,6 +4,15 @@
 
 ## 2026-08-07
 
+### SELFHOST-UAT-FIX-32 - `fix: add Award to PO conversion confirmation` / `ops: deploy Award to PO confirmation fix`
+
+- 根因/合同：旧“显式生成采购订单”按钮首击直接POST。现改为先以无缓存权威GET重新读取Award/RFQ/Comparison/Quote/Event/摘要/四行/PO计数/Supplier/付款条件并打开本地确认窗口；取消、关闭、ESC和背景关闭均零业务POST，默认焦点取消。只有明确最终确认才POST，按钮在DOM事件内同步禁用并由同步ref防双击；失败后不自动重试。
+- 字段/模型：现有PO Header只有正常`remark`（最多2,000字），没有外部参考字段；窗口允许备注并准确提示“当前PO模型未采集外部参考”，不挪用其他字段、不增0040。Delivery Plan没有独立Header/Line层，每个计划记录直接唯一绑定一条PO Line；样本语义为一次转换、1个PO、4条PO Line、4个Delivery Plan。
+- 服务端/事务：最终DTO仅接受Award/RFQ CAS、两类摘要、完整Line ID、PO零计数等确认断言和备注；Supplier、Material、Unit、数量、价格、币种、交期及范围均从不可变Award来源重读。幂等回放先判定，随后在Award advisory lock和同一事务连接内重算完整预览并锁定Award/RFQ/PRQ/Line/Quote/Mapping；同事务创建PO/Line/Award Link/逐行Plan/Queue/Event/Audit/幂等结果，任一失败零半记录。
+- 下游边界：转换不自动创建Receipt、Warehouse Receipt、Inventory Ledger、IQC、AP、Payment、Work Order或其他生产/财务记录；供应商到货、仓库收货和IQC须独立任务。Award、RFQ、Quote和Comparison不修改。
+- 测试/隔离：Fulfillment Unit4/UI3/PG3，Sourcing Unit12/UI24、Sourcing/Binding PG27，0018/0019/0039升级`3/3 + 3/3 + 6/6`，安全30、npm3、Python三项、typecheck、production build、lint 0 error/11既有warning、凭证扫描及diff check通过。隔离正式转换为`1 PO / 4 PO Line / 4 Delivery Plan / 4 queue`，并发单胜、故障零半记录；Chromium覆盖延迟取消、全部退出零POST、失败无重试、同步禁用/双击单POST及桌面/390×844无页面级横向溢出。
+- 预部署：候选Web`sha256:2396c8bc4fd5658c26cef11c4a438b2edb474607b73b2b8ee7fe337b125575ed`、88,626,192 bytes，受限临时容器health 200/ok。正式备份恢复、Web-only部署和purchase-only主UAT取消验收尚待独立运维阶段；主UAT当前PO/Delivery Plan仍为0。
+
 ### SELFHOST-UAT-FIX-31 - `fix: add RFQ award history traceability` / `ops: deploy RFQ award history traceability fix`
 
 - 权威模型：采用分支A并如实显示模型边界。Award聚合稳定主键为`procurement_sourcing_awards.id=1`，无独立业务编号，有真实`version=1`与持久化`status=AWARDED`；四条稳定Award Line ID 1—4分别闭合到Comparison Line/Candidate/Quote Line `1/2/1`、`2/4/2`、`3/6/3`、`4/8/4`，均引用Quote 1/v1、Supplier 1和Material 533—536。缺失、重复或跨RFQ引用时详情失败关闭，不回填历史。

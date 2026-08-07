@@ -428,6 +428,108 @@ async function createFix29CurrentComparison(context, csrfToken) {
   return { detail, current, candidates };
 }
 
+async function createFix32Award(context, csrfToken, detail) {
+  const version = detail.comparison_read_model.current_version;
+  assert.ok(version && version.status === "CURRENT" && version.awardable_now === true);
+  const body = {
+    expected_version: Number(detail.header.version),
+    expected_rfq_code: detail.header.rfq_code,
+    expected_round_no: Number(detail.header.round_no),
+    expected_comparison_version: Number(version.comparison_version_no),
+    expected_comparison_output_digest: version.output_summary.digest,
+    reason_code: "DELIVERY_PRIORITY",
+    reason: FIX29_AWARD_REASON,
+    lines: detail.lines.map((line) => {
+      const material = version.material_summaries.find((row) => String(row.rfq_line_id) === String(line.id));
+      const candidate = material?.offers.find((row) => Number(row.supplier_id) === 1);
+      const identity = version.comparison_rows.find((row) => String(row.comparison_line_id) === String(material?.comparison_line_id));
+      assert.ok(material && candidate && identity, `missing Award authority for RFQ Line ${line.id}`);
+      return {
+        rfq_line_id: String(line.id),
+        comparison_line_id: String(material.comparison_line_id),
+        comparison_basis_digest: identity.basis_digest,
+        selected_candidate_id: String(candidate.comparison_candidate_id),
+        expected_quote_id: String(candidate.quote_id),
+        expected_quote_version_no: Number(candidate.quote_version_no),
+        selection_reason: candidate.price_rank === 1 ? "" : "非最低价但满足交期",
+        late_delivery_reason_code: candidate.delivery_status === "LATE" ? "LATE_DELIVERY_ACCEPTED" : "",
+        late_delivery_reason: candidate.delivery_status === "LATE" ? "隔离测试接受延期交付" : "",
+        excess_quantity_reason: "",
+      };
+    }),
+  };
+  const response = await context.request.post(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1/award`, {
+    headers: {
+      Origin: REQUIRED_ORIGIN,
+      "X-CSRF-Token": csrfToken,
+      "Idempotency-Key": `fix32-award-${randomUUID()}`,
+    },
+    data: body,
+  });
+  const payload = await response.json();
+  assert.equal(response.status(), 201, JSON.stringify(payload));
+  assert.deepEqual({
+    award_id: payload.award_id,
+    status: payload.status,
+    comparison_version_no: payload.comparison_version_no,
+    award_line_count: payload.award_line_count,
+    purchase_order_created: payload.purchase_order_created,
+  }, {
+    award_id: 1,
+    status: "AWARDED",
+    comparison_version_no: 1,
+    award_line_count: 4,
+    purchase_order_created: false,
+  });
+  const awardedResponse = await context.request.get(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1`);
+  assert.equal(awardedResponse.status(), 200);
+  const awarded = (await awardedResponse.json()).data;
+  assert.ok(awarded.award_history);
+  assert.equal(awarded.award_history.projections.po_convertible_now, true);
+  assert.equal(awarded.award_history.projections.po_count, 0);
+  return awarded;
+}
+
+async function fix32UpstreamState() {
+  return (await pool.query(`select
+    (select status from procurement_rfqs where id=1) rfq_status,
+    (select version::int from procurement_rfqs where id=1) rfq_version,
+    (select count(*)::int from procurement_supplier_quotes where rfq_id=1) quote_count,
+    (select jsonb_agg(to_jsonb(quote_row) order by quote_row.id) from procurement_supplier_quotes quote_row where quote_row.rfq_id=1) quote_facts,
+    (select jsonb_agg(to_jsonb(quote_line) order by quote_line.id) from procurement_supplier_quote_lines quote_line
+      join procurement_supplier_quotes quote_row on quote_row.id=quote_line.quote_id where quote_row.rfq_id=1) quote_line_facts,
+    (select count(*)::int from procurement_quote_comparisons where rfq_id=1) comparison_line_count,
+    (select count(distinct comparison_version_no)::int from procurement_quote_comparisons where rfq_id=1) comparison_version_count,
+    (select array_agg(basis_digest order by id) from procurement_quote_comparisons where rfq_id=1) comparison_basis_digests,
+    (select jsonb_agg(to_jsonb(comparison_row) order by comparison_row.id) from procurement_quote_comparisons comparison_row where comparison_row.rfq_id=1) comparison_facts,
+    (select jsonb_agg(to_jsonb(candidate) order by candidate.id) from procurement_quote_comparison_lines candidate
+      join procurement_quote_comparisons comparison_row on comparison_row.id=candidate.comparison_id where comparison_row.rfq_id=1) comparison_candidate_facts,
+    (select jsonb_agg(to_jsonb(binding) order by binding.id) from procurement_rfq_supplier_line_mapping_bindings binding where binding.rfq_id=1) binding_facts,
+    (select status from procurement_sourcing_awards where id=1) award_status,
+    (select version::int from procurement_sourcing_awards where id=1) award_version,
+    (select award_digest from procurement_sourcing_awards where id=1) award_digest,
+    (select count(*)::int from procurement_sourcing_award_lines where award_id=1) award_line_count,
+    (select jsonb_agg(to_jsonb(award_line) order by award_line.id) from procurement_sourcing_award_lines award_line where award_line.award_id=1) award_line_facts`)).rows[0];
+}
+
+async function fix32ConversionState() {
+  return (await pool.query(`select
+    (select count(*)::int from purchase_orders) purchase_orders,
+    (select count(*)::int from purchase_order_lines) purchase_order_lines,
+    (select count(*)::int from purchase_order_status_events where event_type='CREATED') purchase_order_events,
+    (select count(*)::int from procurement_award_po_line_links where award_id=1) award_links,
+    (select count(*)::int from purchase_delivery_plans) delivery_plans,
+    (select count(*)::int from warehouse_receiving_queue_entries) receiving_queue_entries,
+    (select count(*)::int from purchase_delivery_plan_events where event_type='CREATED') delivery_plan_events,
+    (select count(*)::int from purchase_receipts) receipts,
+    (select count(*)::int from inventory_ledger_entries) ledger_entries,
+    (select count(*)::int from quality_inspections) quality_inspections,
+    (select count(*)::int from finance_documents where doc_type='AP') ap_documents,
+    (select count(*)::int from finance_settlements where settlement_type in ('PAYMENT','PAYMENT_REVERSAL')) payments,
+    (select count(*)::int from production_work_orders) work_orders,
+    (select count(*)::int from audit_log where action='SOURCING_AWARD_CONVERTED' and result='success') conversion_audits`)).rows[0];
+}
+
 async function visibleBindingIds(scope) {
   return scope.locator(".rfq-mapping-card").evaluateAll((cards) => cards.map((card) => {
     const fact = [...card.querySelectorAll("dl > div")]
@@ -2188,6 +2290,329 @@ test("isolated Chromium enforces the FIX-31 Award confirmation and immutable his
     context = undefined;
     console.info("RFQ_AWARD_HISTORY_FIX31_BROWSER_OK rfq=1 comparison_version=1 candidates=8 selected=2,4,6,8 pre_award_post=0 award_post=1 history_post=0 award=1 award_line=4 po=0 desktop=1 mobile=1 refresh=1 reopen=1 session=0");
   } finally {
+    if (authenticated && context && csrfToken) {
+      await context.request.post(`${REQUIRED_ORIGIN}/api/logout`, {
+        headers: { Origin: REQUIRED_ORIGIN, "X-CSRF-Token": csrfToken },
+      }).catch(() => undefined);
+    }
+    await context?.close().catch(() => undefined);
+    await browser?.close().catch(() => undefined);
+  }
+});
+
+test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation contract", { timeout: 300_000 }, async () => {
+  await clearSyntheticData();
+  const fixture = await seedFixture({ targetDate: "2026-10-30", materialDefinitions: FIX29_MATERIAL_DEFINITIONS });
+  const chromium = await loadChromium();
+  let browser;
+  let context;
+  let csrfToken = "";
+  let authenticated = false;
+  let releaseDelayedPreview = () => {};
+  let releaseFailedConversionPost = () => {};
+  try {
+    browser = await chromium.launch({ headless: true, args: ["--disable-dev-shm-usage", "--no-sandbox"] });
+    context = await browser.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: "block" });
+    const page = await context.newPage();
+    await login(page, fixture.credentials);
+    const session = await (await context.request.get(`${REQUIRED_ORIGIN}/api/session`)).json();
+    assert.ok(session.authenticated && session.csrf_token);
+    csrfToken = session.csrf_token;
+    authenticated = true;
+    const { detail } = await createFix29CurrentComparison(context, csrfToken);
+    const awarded = await createFix32Award(context, csrfToken, detail);
+    const history = awarded.award_history;
+    const upstreamBefore = await fix32UpstreamState();
+    const zeroConversionState = {
+      purchase_orders: 0,
+      purchase_order_lines: 0,
+      purchase_order_events: 0,
+      award_links: 0,
+      delivery_plans: 0,
+      receiving_queue_entries: 0,
+      delivery_plan_events: 0,
+      receipts: 0,
+      ledger_entries: 0,
+      quality_inspections: 0,
+      ap_documents: 0,
+      payments: 0,
+      work_orders: 0,
+      conversion_audits: 0,
+    };
+    assert.deepEqual(await fix32ConversionState(), zeroConversionState);
+
+    const businessPosts = [];
+    const previewGets = [];
+    let delayNextPreview = true;
+    let failNextConversionPost = true;
+    let markDelayedPreviewObserved = () => {};
+    let markFailedConversionPostObserved = () => {};
+    const delayedPreviewObserved = new Promise((resolve) => { markDelayedPreviewObserved = resolve; });
+    const delayedPreviewGate = new Promise((resolve) => { releaseDelayedPreview = resolve; });
+    const failedConversionPostObserved = new Promise((resolve) => { markFailedConversionPostObserved = resolve; });
+    const failedConversionPostGate = new Promise((resolve) => { releaseFailedConversionPost = resolve; });
+    await context.route("**/*", async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.origin !== REQUIRED_ORIGIN) return route.abort("blockedbyclient");
+      const method = request.method().toUpperCase();
+      if (method === "GET" && url.pathname === "/api/procurement/awards/1/purchase-order-conversion-preview") {
+        previewGets.push({ method, path: url.pathname });
+        if (delayNextPreview) {
+          delayNextPreview = false;
+          markDelayedPreviewObserved();
+          await delayedPreviewGate;
+        }
+      }
+      if (!["GET", "HEAD", "OPTIONS"].includes(method) && url.pathname !== "/api/logout") {
+        let body = null;
+        try { body = request.postDataJSON(); } catch { body = request.postData(); }
+        businessPosts.push({ method, path: url.pathname, body });
+        if (method === "POST" && url.pathname === "/api/procurement/awards/1/purchase-orders" && failNextConversionPost) {
+          failNextConversionPost = false;
+          markFailedConversionPostObserved();
+          await failedConversionPostGate;
+          return route.fulfill({
+            status: 409,
+            contentType: "application/json",
+            body: JSON.stringify({ error: {
+              code: "FIX32_SYNTHETIC_CONVERSION_FAILURE",
+              message: "模拟最终转换失败",
+              request_id: "req-fix32-synthetic-failure",
+            } }),
+          });
+        }
+      }
+      return route.continue();
+    });
+
+    await page.goto(`${REQUIRED_ORIGIN}/procurement/fulfillment`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "定标转单、到货计划与来料谱系", exact: true }).waitFor();
+    await page.getByText("RFQ-00000001 · 定标 #1", { exact: true }).waitFor();
+    const entry = page.getByRole("button", { name: "显式生成采购订单", exact: true });
+    await entry.waitFor();
+
+    const delayedPreviewResponsePromise = page.waitForResponse((response) => response.url() === `${REQUIRED_ORIGIN}/api/procurement/awards/1/purchase-order-conversion-preview`
+      && response.request().method() === "GET");
+    await entry.click();
+    await delayedPreviewObserved;
+    const loadingDialog = page.locator(".rfq-dialog.award-po-dialog[role=dialog]");
+    await loadingDialog.getByRole("heading", { name: "正在重新读取转换权威数据", exact: true }).waitFor();
+    await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "取消");
+    await loadingDialog.getByRole("button", { name: "取消", exact: true }).click();
+    await loadingDialog.waitFor({ state: "detached" });
+    assert.equal(businessPosts.length, 0, "cancelling a delayed preview must send no business POST");
+    releaseDelayedPreview();
+    const delayedPreviewResponse = await delayedPreviewResponsePromise;
+    assert.equal(delayedPreviewResponse.status(), 200, await delayedPreviewResponse.text());
+    await page.waitForTimeout(100);
+    assert.equal(await page.locator(".rfq-dialog.award-po-dialog[role=dialog]").count(), 0, "a late preview response must not resurrect the cancelled dialog");
+    assert.equal(previewGets.length, 1);
+    assert.equal(await entry.isEnabled(), true);
+
+    const openDialog = async (expectedPreviewGetCount, expectedBusinessPostCount = 0) => {
+      const previewResponse = page.waitForResponse((response) => response.url() === `${REQUIRED_ORIGIN}/api/procurement/awards/1/purchase-order-conversion-preview`
+        && response.request().method() === "GET");
+      await entry.click();
+      const response = await previewResponse;
+      assert.equal(response.status(), 200, await response.text());
+      const dialog = page.locator(".rfq-dialog.award-po-dialog[role=dialog]");
+      await dialog.getByRole("heading", { name: "定标转采购订单最终确认", exact: true }).waitFor();
+      await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "取消");
+      assert.equal(previewGets.length, expectedPreviewGetCount);
+      assert.equal(businessPosts.length, expectedBusinessPostCount, "opening confirmation must not add a business POST");
+      return dialog;
+    };
+
+    let dialog = await openDialog(2);
+    assert.equal(await dialog.locator(".award-po-lines-desktop tbody tr").count(), 4);
+    assert.equal(await dialog.locator(".award-po-lines-desktop").isVisible(), true);
+    assert.equal(await dialog.locator(".award-po-lines-mobile").isVisible(), false);
+    const desktopText = await dialog.innerText();
+    for (const required of [
+      "#1 / v1 / AWARDED", "ID 1 / RFQ-00000001 / Round 1 / CLOSED", "Version 1 / CURRENT / awardable_now=false",
+      "po_convertible_now=true / 当前PO 0 / 当前计划 0", "Quote 1/v1", "Quote 2/v1", "Supplier 1 / SUP-000001",
+      "付款条件：纯虚拟UAT付款条件，仅用于表单验收。", "未税 / 不含运费",
+      `ID ${history.operation_receipt.event_id} / AWARDED`, "SUCCESS", history.operation_receipt.actor,
+      history.operation_receipt.occurred_at_shanghai, history.operation_receipt.request_id,
+      history.persisted_award_digest.value, history.decision_digest.value, history.identity.comparison_output_digest,
+      "Award Line", "533 / CYD-RB_PCB-000016", "534 / CYD-RB_SENSOR-000003", "535 / CYD-RB_CONN-000075", "536 / CYD-RB_METAL-000015",
+      "10 PCS", "12.00 CNY", "120.00 CNY", "2026-10-20",
+      "转换操作 1", "PO聚合 1", "PO Line 4", "Delivery Plan计划记录／聚合 4", "独立Delivery Plan Line 0", "待入库队列 4",
+      "Supplier：1 / SUP-000001", "总额：480.00 CNY", "当前PO模型未采集外部参考", "PO备注（可选，最多2000字）",
+      "Award、RFQ、Quote、Comparison不会被修改。", "Receipt", "Warehouse Receipt", "Inventory Ledger", "IQC", "AP", "Payment", "Work Order",
+      "供应商到货、仓库收货和IQC必须由后续独立任务完成。", "最终确认生成PO及到货计划", "取消",
+    ]) assert.ok(desktopText.includes(required), `FIX-32 desktop confirmation missing ${required}`);
+    assert.equal(await dialog.locator("textarea").count(), 1, "normal PO remark must be the only editable field");
+    assert.equal(await dialog.locator("input,select").count(), 0, "confirmation must not request warehouse, tax, address, contact or external reference input");
+    await noOverflow(page, "FIX-32 confirmation desktop");
+    await noDialogOverflow(dialog, "FIX-32 confirmation desktop");
+    await dialog.getByRole("button", { name: "取消", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(businessPosts.length, 0, "cancel must send no business POST");
+
+    dialog = await openDialog(3);
+    await dialog.getByRole("button", { name: "关闭确认窗口", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(businessPosts.length, 0, "close must send no business POST");
+
+    dialog = await openDialog(4);
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(businessPosts.length, 0, "Escape must send no business POST");
+
+    dialog = await openDialog(5);
+    await page.locator(".rfq-dialog-backdrop").click({ position: { x: 4, y: 4 } });
+    await dialog.waitFor({ state: "detached" });
+    assert.equal(businessPosts.length, 0, "backdrop close must send no business POST");
+    assert.deepEqual(await fix32ConversionState(), zeroConversionState);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    dialog = await openDialog(6);
+    assert.equal(await dialog.locator(".award-po-lines-desktop").isVisible(), false);
+    assert.equal(await dialog.locator(".award-po-lines-mobile").isVisible(), true);
+    assert.equal(await dialog.locator(".award-po-lines-mobile article").count(), 4);
+    await noOverflow(page, "FIX-32 confirmation 390x844");
+    await noDialogOverflow(dialog, "FIX-32 confirmation 390x844");
+    const remark = "纯虚拟UAT采购订单，仅用于黑盒验收，不对应真实采购。";
+    await dialog.getByLabel("PO备注（可选，最多2000字）", { exact: true }).fill(remark);
+    assert.equal(businessPosts.length, 0, "editing local remark must send no business POST");
+
+    const failedConversionResponsePromise = page.waitForResponse((response) => response.url() === `${REQUIRED_ORIGIN}/api/procurement/awards/1/purchase-orders`
+      && response.request().method() === "POST");
+    const finalButton = dialog.locator(".rfq-dialog-actions button").last();
+    assert.equal(await finalButton.innerText(), "最终确认生成PO及到货计划");
+    const disabledImmediately = await finalButton.evaluate((button) => {
+      if (!(button instanceof HTMLButtonElement)) throw new Error("FIX-32 final confirmation control is not a button");
+      button.click();
+      return button.disabled;
+    });
+    assert.equal(disabledImmediately, true, "the final button must be disabled synchronously when clicked");
+    await failedConversionPostObserved;
+    assert.equal(businessPosts.length, 1, "a delayed failed conversion must have exactly one in-flight POST");
+    assert.equal(await finalButton.isDisabled(), true, "the final button must stay disabled while the POST is pending");
+    releaseFailedConversionPost();
+    const failedConversionResponse = await failedConversionResponsePromise;
+    assert.equal(failedConversionResponse.status(), 409, await failedConversionResponse.text());
+    const failureAlert = dialog.getByRole("alert");
+    await failureAlert.waitFor();
+    const failureText = await failureAlert.innerText();
+    assert.ok(failureText.includes("模拟最终转换失败（请求 req-fix32-synthetic-failure）"));
+    assert.ok(failureText.includes("系统不会自动重试；请关闭窗口后重新读取权威数据，再决定是否重新确认。"));
+    assert.equal(await finalButton.innerText(), "本次确认已锁定");
+    assert.equal(await finalButton.isDisabled(), true, "the failed final action must remain locked");
+    await page.waitForTimeout(500);
+    assert.equal(businessPosts.length, 1, "a failed final action must not retry automatically");
+    assert.equal(await finalButton.isDisabled(), true, "the final button must remain disabled after the no-retry observation window");
+    assert.deepEqual(await fix32ConversionState(), zeroConversionState, "the synthetic failed POST must create no records");
+    await dialog.getByRole("button", { name: "关闭确认窗口", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+
+    dialog = await openDialog(7, 1);
+    assert.equal(await dialog.locator(".award-po-lines-mobile").isVisible(), true);
+    await dialog.getByLabel("PO备注（可选，最多2000字）", { exact: true }).fill(remark);
+    const conversionResponsePromise = page.waitForResponse((response) => response.url() === `${REQUIRED_ORIGIN}/api/procurement/awards/1/purchase-orders`
+      && response.request().method() === "POST");
+    await dialog.getByRole("button", { name: "最终确认生成PO及到货计划", exact: true }).evaluate((button) => {
+      if (!(button instanceof HTMLButtonElement)) throw new Error("FIX-32 final confirmation control is not a button");
+      button.click();
+      button.click();
+    });
+    const conversionResponse = await conversionResponsePromise;
+    const conversionPayload = await conversionResponse.json();
+    assert.equal(conversionResponse.status(), 201, JSON.stringify(conversionPayload));
+    assert.deepEqual(conversionPayload.data.summary, {
+      conversion_operation_count: 1,
+      purchase_order_aggregate_count: 1,
+      purchase_order_line_count: 4,
+      delivery_plan_aggregate_count: 4,
+      delivery_plan_line_count: 0,
+      receiving_queue_entry_count: 4,
+    });
+    await dialog.waitFor({ state: "detached" });
+    await page.getByText("采购订单、PO Line与逐行到货计划已在同一事务生成；未自动创建收货、库存、IQC、应付或生产记录", { exact: true }).waitFor();
+    assert.equal(businessPosts.length, 2, "the failed attempt and successful double click must send exactly two business POSTs total");
+    for (const [requestIndex, conversionRequest] of businessPosts.entries()) {
+      assert.equal(conversionRequest.method, "POST");
+      assert.equal(conversionRequest.path, "/api/procurement/awards/1/purchase-orders");
+      assert.equal(conversionRequest.body.remark, remark);
+      assert.deepEqual(conversionRequest.body.expected_award_line_ids, ["1", "2", "3", "4"]);
+      for (const forbidden of ["supplier_id", "currency_code", "unit_price", "price", "material_id", "quantity", "warehouse_id", "tax_rate", "external_reference"]) {
+        assert.equal(Object.hasOwn(conversionRequest.body, forbidden), false, `browser request ${requestIndex + 1} must not submit ${forbidden}`);
+      }
+    }
+
+    assert.deepEqual(await fix32UpstreamState(), upstreamBefore, "Award and all sourcing authority must remain unchanged");
+    assert.deepEqual(await fix32ConversionState(), {
+      purchase_orders: 1,
+      purchase_order_lines: 4,
+      purchase_order_events: 1,
+      award_links: 4,
+      delivery_plans: 4,
+      receiving_queue_entries: 4,
+      delivery_plan_events: 4,
+      receipts: 0,
+      ledger_entries: 0,
+      quality_inspections: 0,
+      ap_documents: 0,
+      payments: 0,
+      work_orders: 0,
+      conversion_audits: 1,
+    });
+    assert.deepEqual((await pool.query(`select
+      link.award_line_id::text award_line_id,rfq_line.material_id::int award_material_id,
+      po_line.material_id::int po_material_id,po_line.line_no::int po_line_no,
+      po_line.order_qty::text order_qty,po_line.unit_price::text unit_price,
+      plan.purchase_order_line_id=po_line.id plan_bound_to_line,plan.planned_quantity::text planned_quantity,
+      plan.promised_delivery_date::text promised_delivery_date
+      from procurement_award_po_line_links link
+      join procurement_sourcing_award_lines award_line on award_line.id=link.award_line_id
+      join procurement_rfq_lines rfq_line on rfq_line.id=award_line.rfq_line_id
+      join purchase_order_lines po_line on po_line.id=link.purchase_order_line_id
+      join purchase_delivery_plans plan on plan.purchase_order_line_id=po_line.id
+      where link.award_id=1 order by link.award_line_id`)).rows, [1, 2, 3, 4].map((awardLineId, index) => ({
+      award_line_id: String(awardLineId),
+      award_material_id: 533 + index,
+      po_material_id: 533 + index,
+      po_line_no: awardLineId,
+      order_qty: "10.000000",
+      unit_price: "12.000000",
+      plan_bound_to_line: true,
+      planned_quantity: "10.000000",
+      promised_delivery_date: "2026-10-20",
+    })));
+    assert.deepEqual((await pool.query(`select po.supplier_id::int supplier_id,po.currency_code,po.remark,
+      sum(line.order_qty*line.unit_price)::numeric(30,2)::text total_amount
+      from purchase_orders po join purchase_order_lines line on line.purchase_order_id=po.id
+      group by po.id,po.supplier_id,po.currency_code,po.remark`)).rows, [{
+      supplier_id: 1,
+      currency_code: "CNY",
+      remark: remark.normalize("NFKC").trim(),
+      total_amount: "480.00",
+    }]);
+
+    const convertedAwardCard = page.getByText("RFQ-00000001 · 定标 #1", { exact: true });
+    await convertedAwardCard.waitFor({ state: "detached" });
+    assert.equal(await convertedAwardCard.count(), 0, "converted Award must leave the pending list");
+    assert.equal(await page.locator(".sourcing-panel").filter({ hasText: "采购订单与到货计划" }).locator("article.sourcing-card").count(), 1);
+    assert.equal(previewGets.length, 7);
+
+    const logout = await context.request.post(`${REQUIRED_ORIGIN}/api/logout`, {
+      headers: { Origin: REQUIRED_ORIGIN, "X-CSRF-Token": csrfToken },
+    });
+    assert.equal(logout.status(), 200);
+    authenticated = false;
+    assert.equal((await (await context.request.get(`${REQUIRED_ORIGIN}/api/session`)).json()).authenticated, false);
+    assert.equal(Number((await pool.query(
+      "select count(*) count from app_sessions where username=$1 and revoked_at is null and expires_at>now()",
+      [fixture.credentials.username],
+    )).rows[0].count), 0);
+    await context.close();
+    context = undefined;
+    console.info("AWARD_PO_CONFIRMATION_FIX32_BROWSER_OK preview_get=7 delayed_preview_cancel_post=0 late_preview_resurrection=0 cancel_close_esc_backdrop_post=0 failed_final_post=1 failed_retry=0 successful_final_post=1 po=1 po_line=4 plan=4 queue=4 downstream=0 desktop=1 mobile=1 session=0");
+  } finally {
+    releaseDelayedPreview();
+    releaseFailedConversionPost();
     if (authenticated && context && csrfToken) {
       await context.request.post(`${REQUIRED_ORIGIN}/api/logout`, {
         headers: { Origin: REQUIRED_ORIGIN, "X-CSRF-Token": csrfToken },

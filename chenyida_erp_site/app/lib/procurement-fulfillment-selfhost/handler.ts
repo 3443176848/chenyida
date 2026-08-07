@@ -15,11 +15,18 @@ async function readBody(request: Request) { const raw = await request.text(); if
 function meta(request: Request, dependencies: Dependencies, action: string, requestDigest: string) { const key = request.headers.get("Idempotency-Key") || ""; if (key.length < 8 || key.length > 200 || !/^[\x21-\x7e]+$/.test(key)) throw new ProcurementError("IDEMPOTENCY_KEY_REQUIRED", "写操作必须提供有效 Idempotency-Key"); const route = new URL(request.url).pathname, raw = createHash("sha256").update(key).digest("hex"); return { actor: dependencies.actor, requestId: dependencies.requestId, operationId: randomUUID(), keyDigest: createHash("sha256").update(JSON.stringify([dependencies.actor.username, request.method, route, raw])).digest("hex"), requestDigest, method: request.method, route, action }; }
 
 export async function handleProcurementFulfillmentApi(request: Request, dependencies: Dependencies): Promise<Response | null> {
-  const url = new URL(request.url), path = url.pathname, convert = path.match(/^\/api\/procurement\/awards\/([1-9]\d*)\/purchase-orders$/), plans = path.match(/^\/api\/procurement\/purchase-orders\/([1-9]\d*)\/delivery-plans$/), receive = path.match(/^\/api\/procurement\/delivery-plans\/([1-9]\d*)\/receipts$/), planTransition = path.match(/^\/api\/procurement\/delivery-plans\/([1-9]\d*)\/(cancel|close)$/), reversal = path.match(/^\/api\/procurement\/fulfillment\/receipts\/([1-9]\d*)\/reversal$/);
+  const url = new URL(request.url), path = url.pathname,
+    preview = path.match(/^\/api\/procurement\/awards\/([1-9]\d*)\/purchase-order-conversion-preview$/),
+    convert = path.match(/^\/api\/procurement\/awards\/([1-9]\d*)\/purchase-orders$/),
+    plans = path.match(/^\/api\/procurement\/purchase-orders\/([1-9]\d*)\/delivery-plans$/),
+    receive = path.match(/^\/api\/procurement\/delivery-plans\/([1-9]\d*)\/receipts$/),
+    planTransition = path.match(/^\/api\/procurement\/delivery-plans\/([1-9]\d*)\/(cancel|close)$/),
+    reversal = path.match(/^\/api\/procurement\/fulfillment\/receipts\/([1-9]\d*)\/reversal$/);
   const collection = ["/api/procurement/fulfillment/pending-awards", "/api/procurement/fulfillment/orders", "/api/procurement/fulfillment/receiving-queue", "/api/procurement/fulfillment/payable-handoff"].includes(path);
-  if (!collection && !convert && !plans && !receive && !planTransition && !reversal) return null;
+  if (!collection && !preview && !convert && !plans && !receive && !planTransition && !reversal) return null;
   const repository = new ProcurementRepository(dependencies.pool), service = new ProcurementFulfillmentService(repository); let action = "PROCUREMENT_FULFILLMENT_REQUEST";
   try {
+    if (request.method === "GET" && preview) { requirePermission(dependencies.actor, "procurement.award.convert"); const data = await service.conversionPreview(numericId(preview[1], "awardId"), dependencies.actor); return response({ data, request_id: dependencies.requestId }, 200, dependencies.requestId); }
     if (request.method === "GET" && collection) { requirePermission(dependencies.actor, "procurement.fulfillment.read"); const page = pageValue(url.searchParams.get("page"), 1, 1_000_000), size = pageValue(url.searchParams.get("page_size"), 20, 100), offset = (page - 1) * size; const result = path.endsWith("pending-awards") ? await service.pendingAwards(size, offset) : path.endsWith("orders") ? await service.listOrdersAndPlans(size, offset) : path.endsWith("receiving-queue") ? await service.receivingQueue(size, offset) : await service.payableHandoff(size, offset); return response({ data: result.rows, rows: result.rows, pagination: { page, page_size: size }, request_id: dependencies.requestId }, 200, dependencies.requestId); }
     if (request.method !== "POST") throw new ProcurementError("METHOD_NOT_ALLOWED", "接口不支持该请求方法", 405);
     dependencies.requireCsrf(); const parsed = await readBody(request); let result;
@@ -30,5 +37,5 @@ export async function handleProcurementFulfillmentApi(request: Request, dependen
     else if (reversal) { action = "DELIVERY_PLAN_RECEIPT_REVERSED"; requirePermission(dependencies.actor, "procurement.receiving.reverse"); result = await service.reverseReceipt(numericId(reversal[1], "receiptId"), meta(request, dependencies, action, parsed.digest), parsed.value); }
     else throw new ProcurementError("NOT_FOUND", "接口不存在", 404);
     return response(result.body, result.status, dependencies.requestId, result.replayed);
-  } catch (error) { const known = mapProcurementError(error); await repository.failureAudit(dependencies.actor.username, dependencies.requestId, action, known.code); console.error(JSON.stringify({ level: "error", event: "procurement_fulfillment_api_failed", request_id: dependencies.requestId, code: known.code })); return response({ error: { code: known.code, message: known.message, request_id: dependencies.requestId }, code: known.code, message: known.message, request_id: dependencies.requestId }, known.status, dependencies.requestId); }
+  } catch (error) { const known = mapProcurementError(error); if (request.method !== "GET") await repository.failureAudit(dependencies.actor.username, dependencies.requestId, action, known.code); console.error(JSON.stringify({ level: "error", event: "procurement_fulfillment_api_failed", request_id: dependencies.requestId, code: known.code })); return response({ error: { code: known.code, message: known.message, request_id: dependencies.requestId }, code: known.code, message: known.message, request_id: dependencies.requestId }, known.status, dependencies.requestId); }
 }

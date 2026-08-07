@@ -48,10 +48,10 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0039`，39/head`0039_rfq_traceability.sql`，SHA-256`3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；没有0040。主`RFQ-00000001`为CLOSED v7、Binding8、Quote2、Comparison Version1/CURRENT、Line/Candidate`4/8`、Award/Award Line/Award Event/PO`1/4/1/0`；四条获选Candidate为`2/4/6/8`，Comparison输出摘要`79554d88…619ec` |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。Award历史修复Web为alpha.40`sha256:bb544f89ac405c9565fa551c4120c89d4cc58022220db9a3f46c548a6533a81d`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`f1184385…`有FIX31精确回退tag，四个受保护Volume未更换 |
-| 当前开发环境 | 本地源码已在既有Comparison/Candidate/Quote权威DTO上新增Award只读历史：稳定Award/Line ID、固定引用、原因、持久化`award_digest`、`AWARD_DECISION_V1`派生摘要、唯一Event与独立Audit CAS、`awardable_now=false`及`po_convertible_now`。Award提交DTO和数据库写语义未改；共享中文状态、八部门导航与权限裁剪保持；alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | FIX31 Award历史追溯已Web-only部署并完成正式备份恢复及purchase-only只读主UAT；`business_post=0`、Session0，主数据保持RFQ CLOSED/v7、Quote2、Comparison v1、Award/Line/Event/PO `1/4/1/0`，不是生产发布或真实数据迁移 |
-| 当前任务 | 当前无`DOING`；`SELFHOST-UAT-FIX-31`已完成并停止在Award/PO `1/0` |
-| 下一任务 | 当前`po_convertible_now=true`，具备另立“定标转PO与到货计划”任务的技术前置条件；真正转PO仍须新的明确授权并重新核验Award/RFQ/Line/PO、权限、CAS、Supplier、Mapping、幂等、审计和备份恢复 |
+| 当前开发环境 | FIX32源码已把Award→PO入口改为权威GET预览与显式最终POST：确认窗口展示完整谱系、Event、两类摘要、四条Award Line、Supplier/付款条件、`1 PO / 4 PO Line / 4 Delivery Plan`真实语义和下游零自动创建边界；最终POST在同一事务连接重验并写PO/Line/Link/Plan/Queue/Event/Audit/幂等结果。现有PO仅有正常`remark`、无外部参考字段；alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
+| 当前阶段 | FIX32源码、串行隔离回归和候选Web`sha256:2396c8bc…575ed`已通过；隔离正式转换为`1 PO / 4 PO Line / 4 Delivery Plan`，主UAT尚未登录或写入并保持PO/计划0。正式备份、第二库恢复、Web-only部署和purchase-only取消验收待执行；不是生产发布或真实数据迁移 |
+| 当前任务 | `SELFHOST-UAT-FIX-32`为唯一`DOING`：把Award→PO入口改为权威GET预览与显式最终POST两阶段合同；隔离库验证真实转换，主UAT只打开、核验、取消并保持Award/PO/Delivery Plan `1/0/0` |
+| 下一任务 | FIX32完成后，真正执行主UAT Award→PO转换仍须新的独立明确授权并重新核验当时的Award/RFQ/Comparison/Quote/Line/PO、权限、CAS、摘要、Supplier、Mapping、幂等、审计及备份恢复 |
 
 ## 当前完成模块
 

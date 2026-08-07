@@ -15,6 +15,8 @@
 | `GET /api/procurement/comparisons/:id` | `procurement.rfq.read` | 只返回服务端保存排名与风险，不由浏览器重算 |
 | `POST /api/procurement/rfqs/:id/award` | `procurement.sourcing.award` | 当前报价/最新比较、唯一供应商、理由、数量/MOQ/交期 |
 | `POST /api/procurement/awards/:id/reversal` | `procurement.sourcing.reverse` | 只追加撤销信息与事件，历史不删除 |
+| `GET /api/procurement/awards/:id/purchase-order-conversion-preview` | `procurement.award.convert` | 只读重算完整谱系、摘要、四行和PO/计划零计数；不写Audit或业务事实 |
+| `POST /api/procurement/awards/:id/purchase-orders` | `procurement.award.convert` | 最终显式确认；同事务重验CAS/摘要/行集/Quote/Mapping并创建PO、逐行Line与计划 |
 
 所有写路由均验收 Session/must-change、权限、CSRF、128 KiB 正文上限、Idempotency-Key、expected_version、稳定 request_id/中文错误、单事务 Audit/Event/Idempotency 和安全异常响应。
 
@@ -30,6 +32,8 @@
 8. 幂等重放、异正文冲突、CAS、并发比较/定标、故障注入回滚。
 9. TASK01—TASK03 及 Identity、Supplier Mapping、Procurement、Dashboard 回归。
 10. Award 前后 PO/Receipt/Inventory Ledger/Finance/Planning Allocation 计数与 `reserved_qty` 保护。
+11. Award转PO入口、取消、关闭、ESC和背景关闭均为0业务POST；取消Loading后迟到preview不得复活窗口，默认焦点为取消。
+12. 最终按钮DOM同步禁用，失败后不自动重试；重新打开后双击只有一个POST。隔离四行结果恰为1个PO、4条PO Line、4个直接计划聚合，Award和上游不变，全部收货/库存/IQC/财务/生产记录为0。
 
 ## 原生 UI
 

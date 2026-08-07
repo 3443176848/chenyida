@@ -520,10 +520,11 @@ export class ProcurementSourcingService {
     } finally { client.release(); }
   }
 
-  async detail(id: number, actor: Pick<IdentityActor, "username" | "role" | "permissions">): Promise<RfqDetailDto> {
-    const client = await this.repository.pool.connect();
+  async detail(id: number, actor: Pick<IdentityActor, "username" | "role" | "permissions">, transactionClient?: PoolClient): Promise<RfqDetailDto> {
+    const client = transactionClient ?? await this.repository.pool.connect();
+    const ownsTransaction = transactionClient === undefined;
     try {
-      await client.query("begin isolation level repeatable read read only");
+      if (ownsTransaction) await client.query("begin isolation level repeatable read read only");
       const header = rowData(await client.query<any>(`select q.*,q.response_deadline::text response_deadline_text,
           r.request_code,r.status source_status,r.version source_current_version,r.submitted_by,r.accepted_by,r.returned_by,
           p.required_date source_required_date,p.plan_version_no,b.project_code,b.project_name,
@@ -732,7 +733,9 @@ export class ProcurementSourcingService {
       const mode = bindings.length === 0 ? "UNBOUND_LEGACY_DRAFT" : bindings.every((row) => row.binding_source === "RFQ_CREATE") ? "BOUND_AT_CREATE" : "BOUND_BY_EXPLICIT_CONFIRMATION";
       const downstream = await client.query<any>(`select (select count(*)::int from procurement_supplier_quotes where rfq_id=$1) quotes,
         (select count(*)::int from procurement_sourcing_awards where rfq_id=$1) awards,
-        (select count(distinct link.purchase_order_id)::int from procurement_award_po_line_links link join procurement_sourcing_awards a on a.id=link.award_id where a.rfq_id=$1) purchase_orders`, [id]);
+        (select count(distinct link.purchase_order_id)::int from procurement_award_po_line_links link join procurement_sourcing_awards a on a.id=link.award_id where a.rfq_id=$1) purchase_orders,
+        (select count(distinct link.purchase_order_line_id)::int from procurement_award_po_line_links link join procurement_sourcing_awards a on a.id=link.award_id where a.rfq_id=$1) purchase_order_lines,
+        (select count(distinct plan.id)::int from purchase_delivery_plans plan join procurement_award_po_line_links link on link.purchase_order_line_id=plan.purchase_order_line_id join procurement_sourcing_awards a on a.id=link.award_id where a.rfq_id=$1) delivery_plans`, [id]);
       const issued = events.rows.filter((event) => event.event_type === "RFQ_ISSUED" && Number(event.credential_version) === 2).at(-1) || null;
       const issueReceipt = issued ? { event_type: "ISSUED", actor: issued.actor, occurred_at: issued.created_at, occurred_at_shanghai: issued.occurred_at_shanghai, request_id: issued.request_id, result: issued.result, old_version: issued.old_version, new_version: issued.new_version, from_status: issued.from_status, to_status: issued.to_status, scope_digest: issued.scope_digest, supplier_count: suppliers.rows.length, mapping_count: bindings.length, quote_count: downstream.rows[0].quotes, award_count: downstream.rows[0].awards, purchase_order_count: downstream.rows[0].purchase_orders } : null;
       const comparisonReadModel = comparisonAggregateProjection({
@@ -788,15 +791,15 @@ export class ProcurementSourcingService {
           throw new ProcurementSourcingError("AWARD_READ_MODEL_INCONSISTENT", "Award历史引用不完整或跨越RFQ边界，已停止展示且未修改任何数据", 409);
         }
       }
-      await client.query("commit");
+      if (ownsTransaction) await client.query("commit");
       return { header, lines: lines.rows, suppliers: suppliers.rows, quotes: quotes.rows, quote_lines: quoteLines.rows, comparisons: comparisons.rows, comparison_lines: comparisonLines.rows, award: award.rows[0] || null, events: events.rows, creation_receipt: creationReceipt, mapping_binding_receipt: mappingBindingReceipt,
         award_history: awardHistory,
         comparison_read_model: comparisonReadModel,
         mapping_traceability: { mode, complete, scope_intact: scopeIntact, can_issue: header.status === "DRAFT" && complete && mappingBindingReceipt.verified && creationOkay && sourceOkay && !issues.length, summary: mode === "UNBOUND_LEGACY_DRAFT" ? "历史草稿尚未固定 Mapping" : mode === "BOUND_AT_CREATE" ? "Mapping 已在 RFQ 创建事务中固定" : "Mapping 已由采购显式确认固定", cas_semantics: "RFQ Version是询价聚合CAS；Supplier报价响应会正常推进CAS，但不等于Mapping或固定范围漂移。", drift_basis: ["固定Binding完整性与稳定ID", "Supplier与RFQ Line固定集合", "Mapping ID、Version、Row CAS、状态、有效期与唯一性", "固定范围摘要"], issues, bindings, current_qualification: current.rows }, downstream_counts: downstream.rows[0], issue_receipt: issueReceipt };
     } catch (error) {
-      await client.query("rollback").catch(() => undefined);
+      if (ownsTransaction) await client.query("rollback").catch(() => undefined);
       throw error;
-    } finally { client.release(); }
+    } finally { if (ownsTransaction) client.release(); }
   }
 
   async comparison(id: number, actor: Pick<IdentityActor, "username" | "role" | "permissions">) {

@@ -11,7 +11,11 @@
 
 ## 当前任务
 
-当前无`DOING`。`SELFHOST-UAT-FIX-31`已完成并停止在主UAT Award/PO `1/0`；`po_convertible_now=true`只构成另立转PO任务的技术前置条件，不是授权。
+`SELFHOST-UAT-FIX-32` 为当前唯一 `DOING`：修复 Award→PO 转换确认合同。主 UAT 只允许 purchase 打开、核验并取消，禁止最终确认，必须保持 Award/PO/Delivery Plan `1/0/0`。
+
+| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-UAT-FIX-32 | Award to PO Conversion Confirmation Contract Fix | DOING | Codex（严格门禁、两阶段确认、服务端事务保护、串行测试、备份恢复、Web-only部署、purchase-only取消UAT、清理与文档）、项目负责人（固定转换合同、部署及主UAT零PO授权） | 2026-08-07 | - | SELFHOST-PHASE4-TASK04、SELFHOST-PHASE4-TASK05、SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-26、SELFHOST-UAT-FIX-30、SELFHOST-UAT-FIX-31、D-061、D-062、D-095—D-103 | 两阶段源码、同连接事务重验和隔离正式转换已通过；候选Web`2396c8bc…575ed`健康。隔离为1 PO/4 Line/4 Plan，主UAT仍为PO/Plan 0；下一步正式备份恢复、Web-only部署和purchase-only取消验收。无0040，禁止主UAT最终确认。见[任务文档](../tasks/SELFHOST-UAT-FIX-32.md)。 |
 
 ## 已完成任务
 
