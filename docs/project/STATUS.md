@@ -2,11 +2,11 @@
 
 最后更新时间：2026-08-07（Asia/Shanghai）
 
-## SELFHOST-UAT-FIX-31 RFQ Award History Traceability Fix（功能已验证，部署待收口）
+## SELFHOST-UAT-FIX-31 RFQ Award History Traceability Fix
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | IMPLEMENTED / DEPLOYMENT PENDING | Award历史读模型、响应式页面、状态投影和只读UAT runner已完成；当前UAT Web尚未替换，主UAT尚未执行 |
+| 任务状态 | RFQ AWARD HISTORY TRACEABILITY FIXED — UAT PO NOT CREATED | Award历史读模型、响应式页面、状态投影、备份恢复、Web-only部署和purchase-only主UAT全部完成；没有创建PO |
 | Award身份 | ID 1 / NO BUSINESS NUMBER / v1 / AWARDED | 稳定数据库ID和真实Version/状态直接来自Award Header；无独立业务编号时准确说明，不伪造字段 |
 | 四行引用 | PASS / STABLE IDS | Award Line 1—4闭合到Comparison Line 1—4、Candidate 2/4/6/8、Quote Line 1—4、Quote 1/v1、Supplier 1、Material 533—536；Supplier B Award Line 0 |
 | 摘要 | PERSISTED + DERIVED / SEPARATED | 持久化`award_digest=7ac6bf2e…a66e55`不冒充decision digest；无持久化decision字段，按`AWARD_DECISION_V1`从不可变事实稳定重算 |
@@ -15,8 +15,12 @@
 | UI/写边界 | READ ONLY | Award存在后不显示创建表单或确认按钮；历史页无Award/PO写调用，转PO只显示资格和独立任务边界 |
 | 自动验证 | PASS | typecheck、Unit12/12、UI24/24、PG27/27、0039 6/6、安全30/30、Chromium5/5、npm3/3、environment6/6、Python三项、lint/credentials/diff通过 |
 | Schema/版本 | UNCHANGED | alpha.40、0001—0039保持；没有0040、历史回填或主UAT业务字段修改 |
-| 候选镜像 | BUILT / NOT DEPLOYED | `sha256:bb544f89ac405c9565fa551c4120c89d4cc58022220db9a3f46c548a6533a81d`，88,616,950 bytes；当前Web仍为`f1184385…` |
-| 下一步 | SERIAL OPS | 正式备份与第二新库恢复通过后仅替换Web，再做purchase-only桌面/390×844只读主UAT；严禁转PO |
+| decision digest | DERIVED / VERIFIED | `AWARD_DECISION_V1`重算值`7beca9f364718d9161cc4205e282279cdcc97e3fee91073f3494b76abfa7651a`；非持久化且与Comparison output/持久化Award摘要明确分离 |
+| 备份恢复 | PASS | root:root0600 dump 2,293,634 bytes、SHA`7a3eb872…d4fa`、list3359；第二新库恢复39/head、226表与Award/Line/Event/PO`1/4/1/0`后删除 |
+| Web-only部署 | PASS / NO MIGRATION | Web更新为`sha256:bb544f89ac405c9565fa551c4120c89d4cc58022220db9a3f46c548a6533a81d`；旧`f1184385…`有精确回退tag，PostgreSQL/Worker/Caddy及四卷不变 |
+| 主UAT | PASS / READ ONLY | 只登录purchase；桌面/390×844、刷新、重开通过，`business_post=0`、Session0；RFQ v7、Quote2、Comparison v1、Award/Line/Event/PO `1/4/1/0`前后不变 |
+| 资源/清理 | PASS | available约2.1→2.2GiB、Swap252→273MiB、根盘18GiB、最终Load`0.11/0.20/0.37`；内核OOM0、四服务restart0/OOM false，临时库/容器/runtime/SQLite清零 |
+| Git/下一步 | TWO COMMITS / NEW AUTH REQUIRED | 功能`a014742`及独立ops收口；`po_convertible_now=true`允许另立转PO任务，但实际转换必须重新校验并取得明确授权 |
 
 ## SELFHOST-UAT-FIX-30 RFQ Award Confirmation Contract Fix
 

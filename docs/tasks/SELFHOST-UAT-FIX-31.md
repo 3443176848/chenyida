@@ -2,7 +2,7 @@
 
 ## 状态、授权与起点
 
-- 状态：`IMPLEMENTED / DEPLOYMENT AND MAIN UAT PENDING`。
+- 状态：`DONE — RFQ AWARD HISTORY TRACEABILITY FIXED — UAT PO NOT CREATED`。
 - 日期：2026-08-07（Asia/Shanghai）。
 - 授权：补齐现有 RFQ ID 1 / Comparison Version 1 / Award ID 1 的只读历史追溯、状态投影、测试、正式备份恢复、Web-only 部署及 purchase-only 主 UAT 验收；禁止再次定标、撤销、转 PO、建立到货计划、改写既有 Quote/Comparison/Candidate/Binding/Mapping/Event 或直接 SQL 回填业务字段。
 - 起点：`main` / `b725ae8e8d985b79cd26b1353974919300e79f3e`，Parent `22aa4dc053c9e0a8dc523956afe7742cf5d66fbc`，`origin/main...HEAD` behind 0 / ahead 165，工作区 clean，单一 worktree，无并发 RFQ/Award/PO 任务；`0.1.0-alpha.40`；PostgreSQL 0001—0039；Web `sha256:f11843852426478828c87cf6ec1e889949614beb5ce54df49c23557d16b75e34`。
@@ -37,10 +37,12 @@
 - 服务端读模型、DTO、历史页面、状态投影及 FIX-31 只读 UAT runner 已实现；没有修改 Award 写接口、数据库结构、0039 或运行数据，也没有新增 0040。
 - 自动验证通过：Procurement Sourcing typecheck；Unit `12/12`；UI `24/24`；Sourcing/Binding PostgreSQL `27/27`；0039 upgrade `6/6`；Origin/CSRF/Identity安全回归 `30/30`；隔离 Chromium `5/5`；lint `0 error / 11 existing warnings`；npm `3/3`；environment guard `6/6`；Python `server.py --self-test`、`smoke_test.py`、隔离 `go_live_check.py`；credentials扫描 `1,268` 个仓库文件及 `git diff --check`。
 - 隔离浏览器验证形成 Award 1 / Award Line 4 / PO 0，历史只读阶段 `business_post=0`，桌面、390×844、刷新、重开和退出清理均通过；该数据只存在于任务测试库，测试库已删除或恢复为空。
-- production Docker候选镜像为 `sha256:bb544f89ac405c9565fa551c4120c89d4cc58022220db9a3f46c548a6533a81d`，88,616,950 bytes；当前UAT Web仍为起点镜像 `sha256:f11843852426478828c87cf6ec1e889949614beb5ce54df49c23557d16b75e34`，尚未部署。
+- production Docker候选镜像为 `sha256:bb544f89ac405c9565fa551c4120c89d4cc58022220db9a3f46c548a6533a81d`，88,616,950 bytes；功能提交时UAT仍为起点镜像`sha256:f11843852426478828c87cf6ec1e889949614beb5ce54df49c23557d16b75e34`，后续独立ops阶段已将候选Web-only部署并完成主UAT。
 
 ## 完成条件
 
 - 更新 `MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md`；必要的决策边界写入 `DECISIONS.md`。
 - 功能与部署验收分别创建独立提交；不 push、不 PR、不改写历史。
 - 最终状态只能是 `RFQ AWARD HISTORY TRACEABILITY FIXED — UAT PO NOT CREATED`、`RFQ AWARD GOVERNANCE REQUIRES SCHEMA — UAT UNCHANGED` 或 `BLOCKED — NO UNSAFE CHANGE`。
+
+完成结果见[完成报告](SELFHOST-UAT-FIX-31-COMPLETION.md)。

@@ -4,14 +4,16 @@
 
 ## 2026-08-07
 
-### SELFHOST-UAT-FIX-31 - `fix: add RFQ award history traceability`（功能提交；部署待独立收口）
+### SELFHOST-UAT-FIX-31 - `fix: add RFQ award history traceability` / `ops: deploy RFQ award history traceability fix`
 
 - 权威模型：采用分支A并如实显示模型边界。Award聚合稳定主键为`procurement_sourcing_awards.id=1`，无独立业务编号，有真实`version=1`与持久化`status=AWARDED`；四条稳定Award Line ID 1—4分别闭合到Comparison Line/Candidate/Quote Line `1/2/1`、`2/4/2`、`3/6/3`、`4/8/4`，均引用Quote 1/v1、Supplier 1和Material 533—536。缺失、重复或跨RFQ引用时详情失败关闭，不回填历史。
 - 摘要边界：既有`award_digest=7ac6bf2e…a66e55`继续作为创建时持久化Award摘要展示，明确不等同于decision digest。Schema没有`decision_digest`字段；新增服务端`AWARD_DECISION_V1`，按Award Line ID稳定排序，从Award/RFQ/Round、Comparison Version/output digest、Line/Comparison/Candidate/Quote/Quote Line/Supplier/Material、数量/单价/金额和规范化理由确定性重算，并明确标注非持久化来源。
 - Event/CAS：只接受与Award actor、时间、request_id、结果及理由精确一致的唯一`AWARDED` Event；主数据Event ID9没有版本字段，页面显示“历史Award Event未记录版本转换”。同request_id唯一成功Audit ID1469独立证明RFQ CAS `v6→v7`，当前`v7`来自RFQ Head，Audit不冒充Event字段且不显示`vnull`。
 - 状态/UI：Comparison可以继续投影`CURRENT`，但存在Award或RFQ不再`ISSUED`时`awardable_now=false`，并显示“Comparison仍是当前版本，但RFQ已完成定标，不可再次创建Award。”；Award历史替代创建表单和确认按钮。`po_convertible_now`只读核验Award/RFQ状态、四行完整引用、来源PRQ和PO计数，本页不提供转PO写操作。
 - 测试/边界：typecheck、Unit12/12、UI24/24、Sourcing/Binding PG27/27、0039 6/6、安全30/30、隔离Chromium5/5、npm3/3、environment6/6、Python三项、lint、credentials和diff check通过。隔离浏览器结果Award1/Line4/PO0，历史阶段business POST0；没有0040、Migration或主UAT业务写。
-- 候选/待办：production Docker候选为`sha256:bb544f89ac405c9565fa551c4120c89d4cc58022220db9a3f46c548a6533a81d`、88,616,950 bytes；当前UAT仍运行`sha256:f1184385…`。正式备份/恢复、Web-only部署和purchase-only主UAT由独立ops提交收口，不push/PR或创建PO。
+- 备份/恢复：正式dump为root:root0600、2,293,634 bytes、SHA-256`7a3eb8720a0a7075a56288543ee9aeaaa0d3901d0699fdb2b4cd4d5b289cd4fa`，`pg_restore --list`3,359项；第二新库恢复39/head0039、226表、RFQ CLOSED v7和Award/Line/Event/PO`1/4/1/0`及四条引用后删除。
+- 部署/UAT：仅替换Web`f1184385…→bb544f89…`，旧Web有FIX31精确回退tag；PostgreSQL/Worker/Caddy身份和四卷不变，未运行Migration。purchase-only桌面/390×844、刷新重开和安全退出通过，decision digest为`7beca9f364718d9161cc4205e282279cdcc97e3fee91073f3494b76abfa7651a`，`business_post=0`、Session0、Award/PO保持1/0；没有创建PO。
+- 资源/Git：起点/最终available约2.1/2.2GiB、Swap252/273MiB、根盘18GiB、最终Load`0.11/0.20/0.37`，内核OOM0、四服务restart0/OOM false；临时库/容器/runtime/SQLite清零。功能提交`a014742`，部署/UAT文档由独立ops提交收口；未push/PR或改写历史。结论`RFQ AWARD HISTORY TRACEABILITY FIXED — UAT PO NOT CREATED`。
 
 ### SELFHOST-UAT-FIX-30 - `fix: complete RFQ award confirmation contract` / `ops: deploy RFQ award confirmation contract fix`
 

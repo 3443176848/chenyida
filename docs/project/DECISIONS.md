@@ -1162,14 +1162,14 @@
 ## D-102 Award历史以稳定关系事实、派生决策摘要和分离的Event/Audit证据为准
 
 - 日期：2026-08-07
-- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYMENT PENDING`
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
 - 确认人：项目负责人（要求补齐现有Award 1的聚合身份、四条Line引用、原因、摘要、Event/CAS和状态投影；禁止重做、撤销、回填、转PO或新增0040）
 - 聚合身份：`procurement_sourcing_awards.id`是Award稳定数据库主键；当前Schema没有独立Award业务编号，不得由ID拼造业务编号。模型有真实`version`字段；现有Award为v1/AWARDED。AWARDED Header与四条Line是同一用户事务形成的事实，不得为展示原地改写。
 - Line引用：`procurement_sourcing_award_lines.id`是稳定Line主键。Candidate身份由Award Line已保存的Comparison Line与Quote Line组合在不可变Comparison关系中唯一解析，并继续闭合到Quote Header/version、Supplier、RFQ Line、Material和Unit；任何缺失、重复、歧义或跨RFQ引用都必须失败关闭，不得Migration或SQL回填主UAT事实。
 - 摘要边界：既有`procurement_sourcing_awards.award_digest`是创建事务保存的Award请求摘要，不含数据库生成的Award/Line ID，不能冒充完整decision digest。当前Schema没有持久化`decision_digest`；服务端按`AWARD_DECISION_V1`、Award Line ID数值升序，从Award/RFQ/Round、Comparison Version/output digest、Line/Comparison/Candidate/Quote/Quote Line/Supplier/Material/Unit、数量、单价、金额、币种及规范化理由确定性重算。页面必须明确标注其为非持久化派生值，不回写数据库，也不得以Comparison output digest代替。
 - Event/CAS边界：Award操作凭证只接受与Award actor、时间、request_id、结果及理由精确一致的唯一AWARDED Event。Event没有old/new version时必须显示“历史Award Event未记录版本转换”，禁止显示`vnull`或反推字段；只有同request_id、同actor且唯一成功的精确Audit才可独立证明提交前CAS与推进值，当前CAS仍直接来自RFQ Head。Audit不得冒充Event字段。
 - 状态投影：Comparison的`CURRENT`只表示它仍是当前有效比较版本，不等于仍可定标。RFQ已有Award后`awardable_now`必须为false，创建表单和确认按钮必须消失。`po_convertible_now`是服务端只读投影，至少同时要求Award为AWARDED、RFQ为CLOSED、Line完整、引用闭合、来源采购申请仍ACCEPTED且PO计数为0；真正转换仍由独立任务在写事务重新验证权限、Award CAS、Supplier、Mapping和幂等。
-- 实施边界：采用现有事实充分的分支A并叠加无业务编号的准确显示，不新增Migration或0040。功能及隔离测试已通过；正式备份/恢复、Web-only部署和purchase-only主UAT仍属于当前任务的独立ops收口，主UAT必须business POST0、Award/PO保持1/0并安全退出。
+- 实施结果：采用现有事实充分的分支A并叠加无业务编号的准确显示，不新增Migration或0040。功能提交`a014742`，派生decision digest为`7beca9f364718d9161cc4205e282279cdcc97e3fee91073f3494b76abfa7651a`；最终Web`sha256:bb544f89ac405c9565fa551c4120c89d4cc58022220db9a3f46c548a6533a81d`已Web-only部署。正式备份/第二库恢复和purchase-only桌面/390×844主UAT通过，business POST0、Session0，Award/Line/Event/PO保持`1/4/1/0`。真正转PO仍须新的独立明确授权和事实重验。
 
 ## 待确认业务决策
 
