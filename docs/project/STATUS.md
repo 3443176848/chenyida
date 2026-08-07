@@ -1,6 +1,26 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-06（Asia/Shanghai）
+最后更新时间：2026-08-07（Asia/Shanghai）
+
+## SELFHOST-UAT-FIX-29 RFQ Award Candidate Selection Fix
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | RFQ AWARD CANDIDATE SELECTION FIXED — UAT AWARD NOT CREATED | Candidate选择、服务端重验、确认窗口、隔离Award、Web-only部署和主UAT取消验收全部完成 |
+| 根因 | FIXED | RFQ Line bigint由PostgreSQL返回字符串，旧Quote Line路径投影为数字，前端严格比较使四行过滤为空；旧UI还错误使用Quote Line ID作为选择/提交值 |
+| Candidate DTO | STABLE STRING IDS | Candidate、Comparison Line、Quote/Quote Line、RFQ Line等bigint在JSON中均为规范十进制字符串；关联仅使用Candidate→Comparison Line→RFQ Line及Candidate→固定Quote Line外键 |
+| 四行分组 | PASS / EXACT TWO EACH | Line 1—4分别为Candidate`1/2`、`3/4`、`5/6`、`7/8`；B固定Quote 2/v1、A固定Quote 1/v1，无跨Material混入 |
+| 选择合同 | PASS | 每行默认“请选择”并恰好两个Supplier option，value为Candidate ID；A rank2与B rank1均可选，不按Supplier名、位置、价格、RESPONDED或不存在的Candidate状态过滤 |
+| 确认窗口 | PASS | 显示RFQ/Round/CAS、v1/CURRENT、basis/output digest、四行身份、A480/B400、差80/20%、提前10/延期6/早16天、`DELIVERY_PRIORITY / 交期优先`及完整理由；默认焦点取消并明确不自动创建PO |
+| 服务端保护 | PASS | 同事务锁RFQ并重验CURRENT、固定Quote、CAS、basis/output、全行集、Candidate归属、数量/币种/价格和非最低价理由；Origin/CSRF/purchase权限/幂等/并发/审计/回滚未放宽 |
+| 拒绝回归 | PASS | 跨Line、历史Version、错Quote、缺行/重复/额外行、过期CAS、输入/输出漂移、非CURRENT、数字Candidate ID和不适用理由全部拒绝 |
+| 自动/隔离验收 | PASS | Unit/UI 33/33、Sourcing PG9/9、既有Binding/Quote/0039 PG18/18、upgrade6/6、安全20/20；隔离Chromium取消POST0，正式只POST一次，Award1/Line4/PO0，桌面与390×844无页面级溢出 |
+| 备份恢复 | PASS | root:root0600 dump 2,291,936 bytes，SHA`151910bc…e712`，list3359；第二新库恢复39/head0039、226表、保护指纹一致后精确删除 |
+| Web-only部署 | PASS / NO MIGRATION | Web更新为`sha256:f239ffe3059cfbd5cbb26a45d0960249450ec61989a8f91fb4e17dff3e26e4c1`；旧`0dfcc0a8…`有精确回退tag，PostgreSQL/Worker/Caddy及四卷未重建，未运行Migration |
+| 主UAT | PASS / CANCEL ONLY | 只登录purchase，本地选择A Candidate`2/4/6/8`、打开桌面/390×844确认窗口后取消并退出；business POST0、Session0 |
+| 最终数据 | UNCHANGED | RFQ ISSUED v6、Binding8、Quote2、Comparison v1/CURRENT、Line4、Candidate8、Award/Award Line/PO`0/0/0`；output digest`79554d88…619ec`与保护指纹`16d70f18…cf5bc`不变 |
+| 资源/清理 | PASS | 起点/最终available约2.1GiB，Swap`272→250MiB`、根盘18GiB、最终Load`0.04/0.10/0.16`；内核OOM0，四服务restart0/OOM false，任务临时库/容器/runtime清零且四个受保护Volume保留 |
+| Git/下一步 | TWO COMMITS / STOP | 功能`99a5e6b`与独立ops收口；不push/PR/改写历史。已具备技术条件，但正式点击创建Award仍需新授权及当前CAS/摘要/Quote/Candidate重验 |
 
 ## SELFHOST-UAT-FIX-28 RFQ Comparison聚合读模型与摘要修复
 

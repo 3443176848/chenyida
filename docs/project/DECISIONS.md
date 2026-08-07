@@ -1148,7 +1148,7 @@
 ## D-101 Award候选必须绑定稳定Comparison Candidate并由服务端重验非最低价理由
 
 - 日期：2026-08-07
-- 状态：`ACCEPTED / IMPLEMENTED IN SOURCE / ISOLATED VERIFIED / DEPLOYMENT PENDING`
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
 - 确认人：项目负责人（明确指定RFQ 1四行Candidate权威分组、允许有完整理由选择非最低价Supplier A，并禁止主UAT创建Award或PO）
 - 候选身份：浏览器提交的每行选择值只能是`procurement_quote_comparison_lines.id`的规范十进制字符串；Candidate必须经`comparison_id`关联指定Comparison Line，并经固定`quote_line_id`关联不可变Quote Line与Quote Header/version。数组位置、Supplier名称、价格、显示标签和RFQ Line编号均不得替代Candidate身份。
 - bigint合同：Comparison Line、Candidate、Quote、Quote Line、RFQ Line、Material和Supplier等PostgreSQL bigint在DTO边界保持字符串；只允许对业务金额、数量和显示顺序做明确数值处理，不得以JavaScript `Number`严格比较决定候选归属。
@@ -1157,6 +1157,7 @@
 - 非最低价原因：rank大于1的选择只接受适用的原因语义；本任务正式验证`DELIVERY_PRIORITY / 交期优先`及完整理由。已知但不适用的代码不得仅因枚举合法而放行。Origin、CSRF、purchase权限、幂等正文摘要、并发单胜、事务、审计和故障回滚保持。
 - 确认合同：四行初始均不默认获选；确认窗口必须显示RFQ/Round/CAS、Version/CURRENT、逐行basis与output digest、四行Material/Candidate/Quote/Supplier、总额/最低价/差额/百分比、交期差、原因与完整理由，并明确只新增Award及四条Award Line，不自动创建PO、到货计划或其他下游。安全默认焦点为取消，取消、ESC和遮罩关闭均为零业务POST。
 - Schema与任务边界：0018/0039已提供无歧义Candidate、Comparison与Quote Line关系以及Award Line约束，不修改0039、不新增0040、不改历史Candidate ID或Comparison数据。隔离环境可创建一次Award验证事务结果；主UAT只允许purchase选择Supplier A、打开桌面/390×844确认窗口并取消，最终必须保持Award/Award Line/PO`0/0/0`。
+- 实施结果：功能提交`99a5e6bfe255cb46a0384106eb8ec0a08ec96832`已Web-only部署为`sha256:f239ffe3059cfbd5cbb26a45d0960249450ec61989a8f91fb4e17dff3e26e4c1`。隔离Chromium选择Candidate`2/4/6/8`并仅POST一次，结果Award 1、Award Line 4、PO 0；主UAT只登录purchase并在桌面/390×844确认窗取消，business POST 0、Session 0、Award/Award Line/PO`0/0/0`。正式备份/第二新库恢复通过，保护指纹保持`16d70f1865e3a2e3b0e840f289d13b340e4f6b87800b1c79d98865112d0cf5bc`。真正人工定标仍须新的明确授权及当时CAS/摘要/Quote/Candidate重验。
 
 ## 待确认业务决策
 

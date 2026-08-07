@@ -11,16 +11,13 @@
 
 ## 当前任务
 
-当前唯一 `DOING` 任务为 `SELFHOST-UAT-FIX-29`：修复 RFQ Award Candidate 四行下拉候选关联与确认窗口合同；主 UAT 只允许 purchase 选择、打开确认并取消，不创建 Award 或 PO。
-
-| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-UAT-FIX-29 | RFQ Award Candidate Selection Fix | DOING | Codex（严格门禁、精确只读诊断、候选/UI/服务端保护、隔离测试、备份恢复、Web-only部署、purchase-only取消验收）、项目负责人（固定主UAT保护与执行授权） | 2026-08-07 | — | SELFHOST-PHASE4-TASK04、SELFHOST-UAT-FIX-19、SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-27、SELFHOST-UAT-FIX-28、D-061、D-062、D-095—D-101 | bigint字符串与数字严格比较根因已修复；Candidate稳定ID、四组两候选、确认窗口和服务端重验通过Unit/UI、PG、安全与隔离Chromium，隔离Award 1/Line 4/PO 0。正式备份、Web-only部署及主UAT取消验收待执行；主UAT保持Award/Award Line/PO 0/0/0，无0040且0039未改。见[任务文档](../tasks/SELFHOST-UAT-FIX-29.md)。 |
+当前无 `DOING` 任务。`SELFHOST-UAT-FIX-29` 已完成并停止；正式人工定标、Award、PO、Migration、真实数据迁移或生产动作均须新的明确授权。
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-UAT-FIX-29 | RFQ Award Candidate Selection Fix | DONE | Codex（严格门禁、精确只读诊断、候选/UI/服务端保护、隔离测试、备份恢复、Web-only部署、purchase-only取消验收）、项目负责人（固定主UAT保护与实现、部署、只读验收授权） | 2026-08-07 | 2026-08-07 | SELFHOST-PHASE4-TASK04、SELFHOST-UAT-FIX-19、SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-27、SELFHOST-UAT-FIX-28、D-061、D-062、D-095—D-101 | `RFQ AWARD CANDIDATE SELECTION FIXED — UAT AWARD NOT CREATED`。功能提交`99a5e6b`；Candidate稳定字符串ID、四组逐Line两候选、非最低价交期优先与服务端重验已部署。隔离Award 1/Line 4/PO 0；主UAT purchase-only打开确认后取消，business POST 0、Session 0，Award/Award Line/PO 0/0/0。无0040且0039未改。见[任务文档](../tasks/SELFHOST-UAT-FIX-29.md)及[完成报告](../tasks/SELFHOST-UAT-FIX-29-COMPLETION.md)。 |
 | SELFHOST-UAT-FIX-28 | RFQ Comparison聚合读模型与摘要修复 | DONE | Codex（严格门禁、服务端聚合读模型、幂等保护、响应式UI、隔离测试、备份恢复、Web-only部署、purchase-only只读UAT、清理与文档）、项目负责人（固定主UAT保护及实现/部署/只读验收授权） | 2026-08-06 | 2026-08-06 | SELFHOST-PHASE4-TASK04、SELFHOST-UAT-FIX-27、D-061、D-062、D-090、D-095—D-100 | `RFQ COMPARISON AGGREGATE READ MODEL FIXED — UAT AWARD NOT CREATED`。功能提交`80e1ad6`；复合Version身份、CURRENT/SUPERSEDED投影、固定Quote输入、持久化basis/确定性输出摘要、Supplier金额/交期汇总和四Line Event单操作凭证已部署。无0040；主UAT business POST 0、Session 0，最终RFQ v6、Quote 2、Comparison 4/8/4、Award/PO 0/0。见[任务文档](../tasks/SELFHOST-UAT-FIX-28.md)及[完成报告](../tasks/SELFHOST-UAT-FIX-28-COMPLETION.md)。 |
 | SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06 | ERP 可见状态中文化 Web-only 部署 | DONE | Codex（当前事实核验、保护、备份恢复、候选镜像、Web-only替换、匿名在线验收、清理、文档与独立提交）、项目负责人（源码完成后明确回复“授权”） | 2026-08-06 | 2026-08-06 | SELFHOST-UI-STATUS-LOCALIZATION-05、SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04 | `STATUS LOCALIZATION DEPLOYED — ANONYMOUS READ-ONLY VERIFIED`。精确`943c7fa`构建Web`89e76775…`并Web-only上线；旧Web`f45d734b…`精确回退tag、root-only备份/list/第二新库恢复、在线资产SHA/中文状态/匿名401及60秒稳定性通过。业务指纹、39/head、Session/Audit与RFQ/Quote事实保持；无登录、业务POST、Migration或其他服务替换。见[任务文档](../tasks/SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06.md)及[完成报告](../tasks/SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06-COMPLETION.md)。 |
 | SELFHOST-UI-STATUS-LOCALIZATION-05 | ERP 可见状态中文化 | DONE | Codex（状态盘点、统一中文词典、前端接入、测试、文档与独立提交）、项目负责人（指出英文状态并要求更改） | 2026-08-06 | 2026-08-06 | SELFHOST-UI-REFRESH-01、SELFHOST-DASHBOARD-ROLE-HUB-03、SELFHOST-DASHBOARD-ROLE-HUB-DEPLOY-04 | `VISIBLE ERP STATUSES LOCALIZED — SOURCE ONLY`。共享词典统一原生与legacy的状态、角色、审核/执行结果和启停显示，未知枚举原样回退；38个UI测试文件、10组typecheck、lint/build、npm/Python/credentials通过。原始API/数据库枚举、业务、alpha.40/0039不变；公开UAT仍为既有Web镜像，未登录、写入、重启或部署。见[任务文档](../tasks/SELFHOST-UI-STATUS-LOCALIZATION-05.md)。 |

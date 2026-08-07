@@ -2,10 +2,10 @@
 
 ## 状态与唯一范围
 
-- 状态：`DOING`
+- 状态：`DONE`
 - 开始：2026-08-07（Asia/Shanghai）
 - 负责人：Codex（严格门禁、精确只读诊断、候选关联与确认合同修复、隔离测试、备份恢复、Web-only 部署、purchase-only 主 UAT 取消验收）；项目负责人（固定 Candidate/Award/PO 保护事实及实现、部署、只读验收授权）
-- 依赖：`SELFHOST-PHASE4-TASK04`、`SELFHOST-UAT-FIX-19`、`SELFHOST-UAT-FIX-22`、`SELFHOST-UAT-FIX-27`、`SELFHOST-UAT-FIX-28`、D-061、D-062、D-095—D-100
+- 依赖：`SELFHOST-PHASE4-TASK04`、`SELFHOST-UAT-FIX-19`、`SELFHOST-UAT-FIX-22`、`SELFHOST-UAT-FIX-27`、`SELFHOST-UAT-FIX-28`、D-061、D-062、D-095—D-101
 - 唯一范围：修复 RFQ ID 1 / `RFQ-00000001` 四行定标下拉框未展示现有 Supplier Candidate 的问题，保持 Candidate、Comparison、Quote、RFQ、Binding 与全部主 UAT 业务事实不变；主 UAT 只验证候选选择和确认窗口，取消后退出，不创建 Award 或 PO。
 
 ## 严格起点与主 UAT 保护
@@ -41,7 +41,7 @@
 - 精确根因是详情中RFQ Line的PostgreSQL `bigint`以字符串返回，而旧Quote Line路径把`rfq_line_id`投影为数字；前端把RFQ Line声明为`number`并以严格相等比较，四行过滤结果均为空。旧定标表单又从Quote数组重建候选并提交Quote Line ID，未使用Comparison Candidate权威DTO。
 - 修复后Comparison Version DTO逐行提供Comparison Line、Candidate、Quote Header/version、Quote Line、Supplier、数量、币种、金额、承诺日期、交期、排名、`COMPARABLE`、`awardable`及输入是否当前；所有稳定bigint ID均为规范十进制字符串。
 - UI只按`candidate.comparison_line_id === line.comparison_line_id`关联。四行option value分别只允许`1/2`、`3/4`、`5/6`、`7/8`，默认保持“请选择”；不按Supplier名、显示标签、价格、数组位置、rank 1或`RESPONDED`状态过滤。
-- Award提交DTO为每行`rfq_line_id + comparison_candidate_id`，并绑定RFQ ID、Round、RFQ CAS、Comparison Version、basis/output digest、原因码和理由。服务端从Candidate重新解析固定Comparison/Quote Line/Quote Version/价格事实，不信任浏览器显示字段。
+- Award提交DTO每行携带`rfq_line_id`、`comparison_line_id`、`comparison_basis_digest`、`selected_candidate_id`、`expected_quote_id`、`expected_quote_version_no`及逐行理由字段；顶层绑定RFQ编号、Round、RFQ CAS、Comparison Version、output digest、原因码和理由。服务端从Candidate重新解析固定Comparison/Quote Line/Quote Version/价格事实，不信任浏览器显示字段。
 - 正式确认窗口已显示完整身份、摘要、四行选择、Supplier A `480.00 CNY`、Supplier B最低价`400.00 CNY`、价差`80.00 CNY / 20%`、A提前10天/B延期6天/A早16天、`DELIVERY_PRIORITY / 交期优先`及完整理由；取消是默认焦点，并明确不自动创建PO或其他下游。
 
 ## 四行权威Candidate分组
@@ -62,7 +62,7 @@
 - PostgreSQL覆盖超过`Number.MAX_SAFE_INTEGER`的Candidate字符串ID、精确四组Candidate与Quote引用、A/B两种合法Award、非最低价理由、跨Line/错Quote/历史Version、缺/重/额外行、CAS/摘要/输入漂移、幂等重放/异正文冲突、并发单胜和故障回滚。
 - 隔离Chromium通过：四行A/B均可选择，默认空选，桌面与390×844无页面级溢出；取消路径`business POST 0`；正式路径只提交一次，得到Award 1、Award Line 4、PO 0，最终Session 0。
 - 候选Docker Web镜像为`sha256:f239ffe3059cfbd5cbb26a45d0960249450ec61989a8f91fb4e17dff3e26e4c1`、88,599,819 bytes，版本保持alpha.40。`npm test 3/3`、environment guard`6/6`、Python三项和1,260文件凭据扫描通过；两次首次失败分别由测试容器漏挂`/config`及系统Python缺`openpyxl`导致，均在测试执行前失败并按既有只读环境复验通过。
-- 当前尚未执行正式备份、第二新库恢复、Web-only替换或主UAT；任务保持`DOING`。主UAT Award/Award Line/PO仍为`0/0/0`。
+- 正式root-only备份、`pg_restore --list`、第二新库恢复、Web-only替换和主UAT purchase-only取消验收均已通过；主UAT `business POST 0`、Session 0，RFQ仍为ISSUED v6，Award/Award Line/PO仍为`0/0/0`。详细证据见[完成报告](SELFHOST-UAT-FIX-29-COMPLETION.md)。
 
 ## 允许最终状态
 

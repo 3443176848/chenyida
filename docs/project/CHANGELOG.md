@@ -2,6 +2,19 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-07
+
+### SELFHOST-UAT-FIX-29 - `fix: bind RFQ awards to comparison candidates` / `ops: deploy RFQ award candidate selection fix`
+
+- Git/范围与根因：从唯一worktree、clean`main@8665f21577f2b5f5ab2b9e5ac442487dd6c2335d`、Parent`80e1ad60fa1272017545e150721c8b71f7c68828`、behind0/ahead161起步；功能提交`99a5e6bfe255cb46a0384106eb8ec0a08ec96832`，部署/UAT/清理和文档由独立ops提交收口。根因是RFQ Line bigint字符串与旧Quote Line数字严格比较使四行过滤为空，且旧UI错误使用Quote Line ID选择/提交。
+- DTO/关联与分组：Comparison DTO显式投影Candidate、Comparison Line、固定Quote Header/version/Line、Supplier、金额、交期、排名与可定标事实；bigint稳定ID统一为规范十进制字符串，UI只按Comparison Line ID关联并以Candidate ID作为option/Award值。四行精确为`1/2`、`3/4`、`5/6`、`7/8`，B固定Quote2/v1，A固定Quote1/v1。
+- UI/确认窗口：每行默认“请选择”且恰好两个Supplier；A rank2与B rank1均可选。确认窗口显示RFQ/Round/CAS、v1/CURRENT、basis/output digest、四行Candidate/Quote/Supplier、A480/B400、差80/20%、提前10/延期6/早16天、`DELIVERY_PRIORITY / 交期优先`及完整理由，默认焦点取消并明确不自动创建PO或其他下游。
+- 服务端安全：Award DTO绑定Candidate及预期Quote身份；事务按RFQ先锁并重验CURRENT、固定Quote、CAS、摘要、完整行集、Candidate归属、金额和非最低价理由。跨Line、历史Version、错Quote、缺/重/额外行、CAS/输入/输出漂移、非CURRENT、数字Candidate ID和不适用理由拒绝；Origin/CSRF/purchase权限/幂等/并发/审计/回滚未放宽。保持alpha.40/0039，不改0039、不增0040。
+- 测试/隔离Award：Unit/UI33/33、Sourcing PG9/9、既有Binding/Quote/0039 PG18/18、upgrade6/6、安全20/20、typecheck、lint0 error/11既有warning、Docker build、npm/Python/environment/credentials通过。隔离Chromium取消POST0；正式只POST一次并选择`2/4/6/8`，结果Award1/Line4/PO0，桌面/390×844无页面级溢出。
+- 备份/部署：正式dump root:root0600、2,291,936bytes、SHA-256`151910bc0ee6a993ed71bfded7e790bd50dc23a3070649524f041fdf60e2e712`、list3359；第二新库恢复39/head0039、226表及保护指纹后删除。仅替换Web`0dfcc0a8…→f239ffe3…`，旧Web精确rollback tag保留；不运行Migration，不重建PostgreSQL/Worker/Caddy，不更换四卷。
+- 主UAT/结论：唯一登录purchase，桌面/390×844本地选择A Candidate`2/4/6/8`、填写正式理由并打开确认后取消、清表退出；business POST0、Session0。RFQ仍ISSUED v6、Binding8、Quote2、Comparison v1/CURRENT、Line4、Candidate8、Award/Award Line/PO`0/0/0`；output digest`79554d88…619ec`和指纹`16d70f18…cf5bc`不变。结论`RFQ AWARD CANDIDATE SELECTION FIXED — UAT AWARD NOT CREATED`。
+- 资源/清理：重任务串行；available约2.1GiB保持，Swap`272→250MiB`、根盘18GiB、最终Load`0.04/0.10/0.16`；内核OOM0、四服务restart0/OOM false。恢复/隔离库、临时容器/runtime/SQLite/目录清零，任务误拉且未使用的`alpine:3.20`已删除，未prune；正式dump、current/candidate/rollback镜像和受保护卷保留。
+
 ## 2026-08-06
 
 ### SELFHOST-UAT-FIX-28 - `feat: add RFQ comparison aggregate read model` / `ops: deploy RFQ comparison aggregate read model`
