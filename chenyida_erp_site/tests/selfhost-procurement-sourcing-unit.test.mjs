@@ -6,6 +6,7 @@ import { buildCreateRfqDraftRequest } from "../app/procurement/sourcing/create-r
 import { bindingScopeDriftReason } from "../app/lib/procurement-sourcing-selfhost/service.ts";
 import { canonicalDigest, decimal, normalizeCreateRfqInput, positiveId } from "../app/lib/procurement-sourcing-selfhost/validation.ts";
 import { buildComparisonReadModel } from "../app/lib/procurement-sourcing-selfhost/comparison-read-model.ts";
+import { buildAwardHistoryReadModel, normalizeAwardDecisionText } from "../app/lib/procurement-sourcing-selfhost/award-read-model.ts";
 import { awardCandidateOptionLabel,awardCandidatesForRfqLine,buildAwardDraft,canonicalStableId } from "../app/procurement/sourcing/award-candidate-selection.ts";
 
 const all=["procurement.rfq.read","procurement.rfq.manage","procurement.quote.record","procurement.quote.compare","procurement.sourcing.award","procurement.sourcing.reverse"];
@@ -24,6 +25,36 @@ test("Comparison output summary deterministically aggregates the four-line UAT c
  assert.deepEqual({...model.aggregate_differences},{higher_supplier_id:"1",lower_supplier_id:"2",amount_difference:"80.000000",percentage_basis_supplier_id:"2",percentage_difference:"20.000000",earlier_supplier_id:"1",later_supplier_id:"2",delivery_day_difference:16,lowest_price_supplier_id:"2",on_time_supplier_ids:["1"],late_risk_supplier_ids:["2"]});
  assert.equal(model.material_summaries.length,4);assert.ok(model.material_summaries.every(row=>row.amount_difference==="20.000000"&&row.offers.length===2));assert.equal(model.operation_receipts.length,1);assert.equal(model.operation_receipts[0].event_count,4);assert.deepEqual([model.operation_receipts[0].old_version,model.operation_receipts[0].new_version],[5,6]);
  const single=buildComparisonReadModel({rows,events:[events[0]]});assert.equal(single.operation_receipts.length,1);assert.equal(single.operation_receipts[0].event_count,1);
+});
+test("Award history deterministically binds four stable Lines, one Event, exact Audit CAS and zero-line Supplier B",()=>{
+ const reason="交期优先，避免项目延期；供应商A承诺2026-10-20交付，满足2026-10-30需求日期，供应商B承诺2026-11-05交付，已晚于需求日期。";
+ const comparison={comparison_version_no:1,status:"CURRENT",awardable_now:false,awardability_note:"Comparison仍是当前版本，但RFQ已完成定标，不可再次创建Award。",output_summary:{digest:"79554d88ccdb643a860c0c69e77222abce80eb4d3d8314d88135d3966fb619ec"},fixed_quote_inputs:[
+  {quote_id:"1",quote_version_no:1,supplier_id:"1",supplier_code:"SUP-000001",supplier_name:"Supplier A",supplier_quote_reference:"UAT-Q-A",currency_code:"CNY"},
+  {quote_id:"2",quote_version_no:1,supplier_id:"2",supplier_code:"SUP-000002",supplier_name:"Supplier B",supplier_quote_reference:"UAT-Q-B",currency_code:"CNY"},
+ ]};
+ const award={id:"1",rfq_id:"1",status:"AWARDED",award_digest:"7ac6bf2eb579b13460d2d0b9496127c4a75cda73efa605e8ec291b4212a66e55",selected_by:"uat_20260729_purchase",selected_at:"2026-08-07T12:02:24.641511Z",selected_at_shanghai:"2026-08-07 20:02:24.641511",reason_code:"DELIVERY_PRIORITY",reason,version:1,request_id:"4634fff1-988d-465b-92c6-34ffe214ddda"};
+ const lines=[533,534,535,536].map((material,index)=>({award_line_id:String(index+1),award_id:"1",rfq_id:"1",rfq_line_id:String(index+1),line_no:index+1,material_id:String(material),internal_material_code:`CYD-${material}`,standard_name:`Material ${material}`,unit_id:"1",unit_code:"PCS",comparison_line_id:String(index+1),comparison_version_no:1,comparison_candidate_id:String((index+1)*2),quote_line_id:String(index+1),quote_id:"1",quote_version_no:1,supplier_id:"1",supplier_code:"SUP-000001",supplier_name:"Supplier A",selected_quantity:"10.000000",selected_unit_price:"12.000000",currency_code:"CNY",required_date:"2026-10-30",promised_delivery_date:"2026-10-20",selection_reason:"",late_delivery_reason_code:null,late_delivery_reason:"",excess_quantity_reason:""}));
+ const event={id:"9",award_id:"1",event_type:"AWARDED",actor:award.selected_by,request_id:award.request_id,result:"SUCCESS",reason,created_at:award.selected_at,occurred_at_shanghai:award.selected_at_shanghai,old_version:null,new_version:null,from_status:null,to_status:null};
+ const audit={audit_id:"1469",actor:award.selected_by,request_id:award.request_id,result:"success",old_version:6,new_version:7,occurred_at_shanghai:award.selected_at_shanghai};
+ const input={award,award_lines:lines,award_events:[event],award_audits:[audit],rfq:{id:"1",rfq_code:"RFQ-00000001",round_no:1,status:"CLOSED",version:7,source_status:"ACCEPTED"},rfq_line_ids:["1","2","3","4"],comparison_version:comparison,purchase_order_count:0};
+ const model=buildAwardHistoryReadModel(input),reordered=buildAwardHistoryReadModel({...input,award_lines:[...lines].reverse(),comparison_version:{...comparison,fixed_quote_inputs:[...comparison.fixed_quote_inputs].reverse()}});
+ assert.equal(model.decision_digest.value,reordered.decision_digest.value);assert.match(model.decision_digest.value,/^[0-9a-f]{64}$/);assert.notEqual(model.decision_digest.value,award.award_digest);
+ assert.deepEqual({id:model.identity.award_id,business:model.identity.has_business_number,version:model.identity.version,status:model.identity.status,submitted:model.identity.rfq_submitted_cas,current:model.identity.rfq_current_cas}, {id:"1",business:false,version:1,status:"AWARDED",submitted:6,current:7});
+ assert.deepEqual(model.lines.map(line=>[line.award_line_id,line.comparison_line_id,line.comparison_candidate_id,line.quote_line_id,line.material_id,line.supplier_id,line.line_amount]),[["1","1","2","1","533","1","120.000000"],["2","2","4","2","534","1","120.000000"],["3","3","6","3","535","1","120.000000"],["4","4","8","4","536","1","120.000000"]]);
+ assert.deepEqual(model.fixed_quotes.map(row=>[row.quote_id,row.quote_version_no,row.supplier_id]),[["1",1,"1"],["2",1,"2"]]);
+ assert.deepEqual(model.summary.supplier_summaries.map(row=>[row.supplier_id,row.award_line_count,row.total_amount]),[["1",4,"480.000000"],["2",0,"0.000000"]]);
+ assert.deepEqual({events:model.operation_receipt.event_count,operations:model.operation_receipt.user_operation_count,lines:model.operation_receipt.award_line_count,recorded:model.operation_receipt.version_transition_recorded,note:model.operation_receipt.version_transition_note,authority:model.operation_receipt.cas_evidence.authority,audit_new:model.operation_receipt.cas_evidence.audit_new_version},{events:1,operations:1,lines:4,recorded:false,note:"历史Award Event未记录版本转换。",authority:"EXACT_SUCCESS_AUDIT",audit_new:7});
+ assert.deepEqual({comparison:model.projections.comparison_status,awardable:model.projections.awardable_now,po:model.projections.po_convertible_now,count:model.projections.po_count},{comparison:"CURRENT",awardable:false,po:true,count:0});
+ assert.equal(model.identity.business_number_note,"未设置独立Award业务编号。");assert.equal(model.decision_digest.note,"确定性决策摘要，由不可变Award事实重算；不是伪造的历史持久化字段。");assert.equal(model.summary.duplicate_material,false);assert.equal(model.summary.split_award_lines,false);
+ assert.equal(normalizeAwardDecisionText("  交期\r\n  优先  "),"交期\n优先");
+ assert.throws(()=>buildAwardHistoryReadModel({...input,award_lines:[{...lines[0],comparison_candidate_id:null},...lines.slice(1)]}),/Candidate ID/);
+ assert.throws(()=>buildAwardHistoryReadModel({...input,award_lines:[{...lines[0],rfq_id:"2"},...lines.slice(1)]}),/crosses Award or RFQ scope/);
+ assert.throws(()=>buildAwardHistoryReadModel({...input,award_lines:[{...lines[0],quote_id:"2"},...lines.slice(1)]}),/fixed Comparison Quote/);
+ assert.throws(()=>buildAwardHistoryReadModel({...input,award_events:[{...event,reason:` ${reason}`}] }),/Event does not match/);
+ const laterHead=buildAwardHistoryReadModel({...input,rfq:{...input.rfq,version:8}});assert.deepEqual({submitted:laterHead.operation_receipt.cas_evidence.old_version,audit_new:laterHead.operation_receipt.cas_evidence.audit_new_version,current:laterHead.operation_receipt.cas_evidence.new_version},{submitted:6,audit_new:7,current:8});
+ assert.equal(buildAwardHistoryReadModel({...input,comparison_version:{...comparison,awardable_now:true}}).projections.awardable_now,false);
+ assert.equal(buildAwardHistoryReadModel({...input,purchase_order_count:1}).projections.po_convertible_now,false);
+ assert.equal(buildAwardHistoryReadModel({...input,rfq:{...input.rfq,source_status:"RETURNED"}}).projections.po_convertible_now,false);
 });
 test("Award Candidate DTO keeps bigint IDs as strings and groups the authoritative two candidates per RFQ Line",()=>{
  const materials=[533,534,535,536],rows=[];let candidate=1;

@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前无 `DOING`。`SELFHOST-UAT-FIX-30`已完成并停止在主UAT Award/Award Line/PO `0/0/0`；真正人工定标及独立“定标转PO与到货计划”均须新的明确授权和当前事实重验。
+`SELFHOST-UAT-FIX-31`（RFQ Award History Traceability Fix）为当前唯一 `DOING`。只补齐现有 RFQ 1 / Comparison v1 / Award 1 的聚合身份、四条稳定 Line 引用链、原因、摘要、Event/CAS 证据与状态投影；不修改历史业务事实、不新增 0040、不再次定标、不撤销、不转 PO。负责人：Codex；开始时间：2026-08-07；依赖：SELFHOST-PHASE4-TASK04、SELFHOST-PHASE4-TASK05、SELFHOST-UAT-FIX-22、SELFHOST-UAT-FIX-28—30、D-061、D-062、D-095—D-102。功能及隔离回归已通过，候选Web镜像已构建；正式备份、第二新库恢复、Web-only替换和purchase-only主UAT仍待执行。见[任务文档](../tasks/SELFHOST-UAT-FIX-31.md)。
 
 ## 已完成任务
 

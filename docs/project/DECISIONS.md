@@ -1159,6 +1159,18 @@
 - Schema与任务边界：0018/0039已提供无歧义Candidate、Comparison与Quote Line关系以及Award Line约束，不修改0039、不新增0040、不改历史Candidate ID或Comparison数据。隔离环境可创建一次Award验证事务结果；主UAT只允许purchase选择Supplier A、打开桌面/390×844确认窗口并取消，最终必须保持Award/Award Line/PO`0/0/0`。
 - 实施结果：功能提交`99a5e6bfe255cb46a0384106eb8ec0a08ec96832`已Web-only部署为`sha256:f239ffe3059cfbd5cbb26a45d0960249450ec61989a8f91fb4e17dff3e26e4c1`。隔离Chromium选择Candidate`2/4/6/8`并仅POST一次，结果Award 1、Award Line 4、PO 0；主UAT只登录purchase并在桌面/390×844确认窗取消，business POST 0、Session 0、Award/Award Line/PO`0/0/0`。正式备份/第二新库恢复通过，保护指纹保持`16d70f1865e3a2e3b0e840f289d13b340e4f6b87800b1c79d98865112d0cf5bc`。真正人工定标仍须新的明确授权及当时CAS/摘要/Quote/Candidate重验。
 
+## D-102 Award历史以稳定关系事实、派生决策摘要和分离的Event/Audit证据为准
+
+- 日期：2026-08-07
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYMENT PENDING`
+- 确认人：项目负责人（要求补齐现有Award 1的聚合身份、四条Line引用、原因、摘要、Event/CAS和状态投影；禁止重做、撤销、回填、转PO或新增0040）
+- 聚合身份：`procurement_sourcing_awards.id`是Award稳定数据库主键；当前Schema没有独立Award业务编号，不得由ID拼造业务编号。模型有真实`version`字段；现有Award为v1/AWARDED。AWARDED Header与四条Line是同一用户事务形成的事实，不得为展示原地改写。
+- Line引用：`procurement_sourcing_award_lines.id`是稳定Line主键。Candidate身份由Award Line已保存的Comparison Line与Quote Line组合在不可变Comparison关系中唯一解析，并继续闭合到Quote Header/version、Supplier、RFQ Line、Material和Unit；任何缺失、重复、歧义或跨RFQ引用都必须失败关闭，不得Migration或SQL回填主UAT事实。
+- 摘要边界：既有`procurement_sourcing_awards.award_digest`是创建事务保存的Award请求摘要，不含数据库生成的Award/Line ID，不能冒充完整decision digest。当前Schema没有持久化`decision_digest`；服务端按`AWARD_DECISION_V1`、Award Line ID数值升序，从Award/RFQ/Round、Comparison Version/output digest、Line/Comparison/Candidate/Quote/Quote Line/Supplier/Material/Unit、数量、单价、金额、币种及规范化理由确定性重算。页面必须明确标注其为非持久化派生值，不回写数据库，也不得以Comparison output digest代替。
+- Event/CAS边界：Award操作凭证只接受与Award actor、时间、request_id、结果及理由精确一致的唯一AWARDED Event。Event没有old/new version时必须显示“历史Award Event未记录版本转换”，禁止显示`vnull`或反推字段；只有同request_id、同actor且唯一成功的精确Audit才可独立证明提交前CAS与推进值，当前CAS仍直接来自RFQ Head。Audit不得冒充Event字段。
+- 状态投影：Comparison的`CURRENT`只表示它仍是当前有效比较版本，不等于仍可定标。RFQ已有Award后`awardable_now`必须为false，创建表单和确认按钮必须消失。`po_convertible_now`是服务端只读投影，至少同时要求Award为AWARDED、RFQ为CLOSED、Line完整、引用闭合、来源采购申请仍ACCEPTED且PO计数为0；真正转换仍由独立任务在写事务重新验证权限、Award CAS、Supplier、Mapping和幂等。
+- 实施边界：采用现有事实充分的分支A并叠加无业务编号的准确显示，不新增Migration或0040。功能及隔离测试已通过；正式备份/恢复、Web-only部署和purchase-only主UAT仍属于当前任务的独立ops收口，主UAT必须business POST0、Award/PO保持1/0并安全退出。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

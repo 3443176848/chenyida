@@ -10,6 +10,7 @@ import { booleanValue, boundedText, canonicalDigest, dateOnly, decimal, exactKey
 import { loadSupplierMappingCoverage, requireCompleteCoverage } from "../supplier-mapping-selfhost/coverage.ts";
 import { SupplierMappingError } from "../supplier-mapping-selfhost/errors.ts";
 import { buildComparisonReadModel, type ComparisonReadModelEvent, type ComparisonReadModelRow } from "./comparison-read-model.ts";
+import { buildAwardHistoryReadModel } from "./award-read-model.ts";
 
 const rowData = <T>(result: { rows: T[] }, code: string, message: string): T => { if (!result.rows[0]) throw new ProcurementSourcingError(code, message, 404); return result.rows[0]; };
 const lockRfq = async (client: PoolClient, id: number) => rowData(await client.query<any>("select q.*,q.response_deadline::text response_deadline_text from procurement_rfqs q where q.id=$1 for update", [id]), "RFQ_NOT_FOUND", "询价不存在");
@@ -254,6 +255,7 @@ function comparisonAggregateProjection(input: Readonly<{
   currentBasisRows: any[];
   events: any[];
   audits: any[];
+  awardExists: boolean;
 }>) {
   const identityNote = "未设置独立Comparison Header ID；版本身份由RFQ、Round、Comparison Version及basis_digest共同确定。";
   const statusNote = "状态为服务端读模型投影，不是独立数据库状态列。";
@@ -301,9 +303,19 @@ function comparisonAggregateProjection(input: Readonly<{
     const quoteInputsCurrent = basisMatches && fixedInputsCurrent;
     const latest = versionNo === latestVersionNo;
     const projectedStatus = latest ? (quoteInputsCurrent ? "CURRENT" : "INPUT_DRIFT") : "SUPERSEDED";
-    const awardableNow = latest && quoteInputsCurrent && rows.every((row) => outputRows.some((candidate) =>
+    const awardableNow = !input.awardExists && input.header.status === "ISSUED" && latest && quoteInputsCurrent
+      && rows.every((row) => outputRows.some((candidate) =>
       String(candidate.comparison_line_id) === String(row.comparison_line_id)
       && candidate.quote_input_current === true && candidate.comparable_status === "COMPARABLE" && candidate.awardable === true));
+    const awardabilityReasonCode = input.awardExists ? "RFQ_ALREADY_AWARDED"
+      : input.header.status !== "ISSUED" ? "RFQ_NOT_ISSUED"
+        : !latest ? "COMPARISON_NOT_LATEST"
+          : !quoteInputsCurrent ? "QUOTE_INPUT_DRIFT"
+            : awardableNow ? "AWARDABLE" : "NO_AWARDABLE_CANDIDATE";
+    const awardabilityNote = input.awardExists
+      ? "Comparison仍是当前版本，但RFQ已完成定标，不可再次创建Award。"
+      : awardableNow ? "Comparison为当前版本，RFQ仍为已发出且候选满足服务端定标条件。"
+        : "当前服务端状态不允许创建Award。";
     const eventRows = input.events.filter((event) => event.event_type === "COMPARISON_GENERATED"
       && event.comparison_id !== null && comparisonIds.has(String(event.comparison_id)));
     const derivedEvents: ComparisonReadModelEvent[] = eventRows.map((event) => {
@@ -344,6 +356,8 @@ function comparisonAggregateProjection(input: Readonly<{
       quote_inputs_current: quoteInputsCurrent,
       input_drift: !quoteInputsCurrent,
       awardable_now: awardableNow,
+      awardability_reason_code: awardabilityReasonCode,
+      awardability_note: awardabilityNote,
       generated_by: String(first.generated_by),
       generated_at_shanghai: String(first.generated_at_shanghai),
       request_id: String(first.request_id),
@@ -446,6 +460,7 @@ async function loadAwardComparisonSnapshot(client: PoolClient, rfq: any, rfqLine
     currentBasisRows: currentBasis.rows,
     events: [],
     audits: [],
+    awardExists: false,
   });
   return { projection, comparisonRows: comparisonRows.rows, outputRows: outputRows.rows };
 }
@@ -600,12 +615,57 @@ export class ProcurementSourcingService {
         join suppliers s on s.id=cl.supplier_id
         where c.rfq_id=$1
         order by c.comparison_version_no,rl.material_id,cl.supplier_id,cl.id`, [id]);
-      const award = await client.query<any>(`select a.*,coalesce(jsonb_agg(to_jsonb(al) order by al.rfq_line_id) filter(where al.id is not null),'[]'::jsonb) lines from procurement_sourcing_awards a left join procurement_sourcing_award_lines al on al.award_id=a.id where a.rfq_id=$1 group by a.id`, [id]);
+      const award = await client.query<any>(`select a.*,
+          to_char(a.selected_at at time zone 'Asia/Shanghai','YYYY-MM-DD HH24:MI:SS.US') selected_at_shanghai,
+          coalesce(jsonb_agg(to_jsonb(al) order by al.id) filter(where al.id is not null),'[]'::jsonb) lines
+        from procurement_sourcing_awards a
+        left join procurement_sourcing_award_lines al on al.award_id=a.id
+        where a.rfq_id=$1 group by a.id`, [id]);
+      const awardLineTrace = await client.query<any>(`select
+          al.id::text award_line_id,al.award_id::text award_id,a.rfq_id::text rfq_id,
+          rl.id::text rfq_line_id,rl.line_no::int line_no,rl.material_id::text material_id,
+          material.internal_material_code,material.standard_name,rl.unit_id::text unit_id,unit.code unit_code,
+          comparison.id::text comparison_line_id,comparison.comparison_version_no::int comparison_version_no,
+          candidate.id::text comparison_candidate_id,quote_line.id::text quote_line_id,
+          quote.id::text quote_id,quote.quote_version_no::int quote_version_no,
+          al.supplier_id::text supplier_id,supplier.supplier_code,supplier.supplier_name,
+          al.selected_quantity::text selected_quantity,al.selected_unit_price::text selected_unit_price,
+          quote.currency_code,al.required_date::text required_date,
+          al.promised_delivery_date::text promised_delivery_date,al.selection_reason,
+          al.late_delivery_reason_code,al.late_delivery_reason,al.excess_quantity_reason
+        from procurement_sourcing_award_lines al
+        join procurement_sourcing_awards a on a.id=al.award_id
+        left join procurement_rfq_lines rl on rl.id=al.rfq_line_id and rl.rfq_id=a.rfq_id
+        left join material_master material on material.id=rl.material_id
+        left join units unit on unit.id=rl.unit_id
+        left join procurement_quote_comparisons comparison
+          on comparison.id=al.comparison_id and comparison.rfq_id=a.rfq_id and comparison.rfq_line_id=al.rfq_line_id
+        left join procurement_quote_comparison_lines candidate
+          on candidate.comparison_id=al.comparison_id
+          and candidate.quote_line_id=al.selected_quote_line_id and candidate.supplier_id=al.supplier_id
+        left join procurement_supplier_quote_lines quote_line
+          on quote_line.id=al.selected_quote_line_id and quote_line.rfq_line_id=al.rfq_line_id
+          and quote_line.material_id=rl.material_id and quote_line.unit_id=rl.unit_id
+        left join procurement_supplier_quotes quote
+          on quote.id=quote_line.quote_id and quote.rfq_id=a.rfq_id and quote.supplier_id=al.supplier_id
+        left join suppliers supplier on supplier.id=al.supplier_id
+        where a.rfq_id=$1 order by al.id`, [id]);
       const events = await client.query<any>(`select e.*,
           to_char(e.created_at at time zone 'Asia/Shanghai','YYYY-MM-DD HH24:MI:SS.US') occurred_at_shanghai,
           (e.new_version is not null) version_transition_recorded,
           case when e.new_version is not null then 'RECORDED' else 'NOT_RECORDED' end version_transition_semantics
         from procurement_sourcing_events e where e.rfq_id=$1 order by e.id`, [id]);
+      const awardAudits = await client.query<any>(`select audit.id::text audit_id,audit.username actor,
+          audit.request_id::text request_id,audit.result,audit.old_version::int old_version,
+          audit.new_version::int new_version,
+          to_char(audit.created_at at time zone 'Asia/Shanghai','YYYY-MM-DD HH24:MI:SS.US') occurred_at_shanghai
+        from audit_log audit
+        join procurement_sourcing_awards award
+          on award.request_id=audit.request_id and award.selected_by=audit.username and award.selected_at=audit.created_at
+        where award.rfq_id=$1 and audit.route_code='PROCUREMENT_SOURCING'
+          and audit.action='SOURCING_AWARDED' and audit.result='success'
+          and audit.detail->>'object_id'=award.id::text
+        order by audit.id`, [id]);
       const currentComparisonBasis = await loadCurrentComparisonBasis(client, id);
       const comparisonAudits = await client.query<any>(`select a.id::text audit_id,a.username actor,
           a.request_id::text request_id,a.result,a.old_version::int old_version,a.new_version::int new_version,
@@ -683,9 +743,54 @@ export class ProcurementSourcingService {
         currentBasisRows: currentComparisonBasis.rows,
         events: events.rows,
         audits: comparisonAudits.rows,
+        awardExists: Boolean(award.rows[0]),
       });
+      let awardHistory: ReturnType<typeof buildAwardHistoryReadModel> | null = null;
+      if (award.rows[0]) {
+        try {
+          const referencedComparisonVersion = Number(awardLineTrace.rows[0]?.comparison_version_no);
+          const comparisonVersion = comparisonReadModel.versions.find((item) => Number(item.comparison_version_no) === referencedComparisonVersion)
+            || null;
+          if (!comparisonVersion) throw new Error("Award history has no Comparison Version");
+          awardHistory = buildAwardHistoryReadModel({
+            award: award.rows[0],
+            award_lines: awardLineTrace.rows,
+            award_events: events.rows,
+            award_audits: awardAudits.rows,
+            rfq: {
+              id: header.id,
+              rfq_code: header.rfq_code,
+              round_no: header.round_no,
+              status: header.status,
+              version: header.version,
+              source_status: header.source_status,
+            },
+            rfq_line_ids: lines.rows.map((line) => line.id),
+            comparison_version: {
+              comparison_version_no: Number(comparisonVersion.comparison_version_no),
+              status: String(comparisonVersion.status),
+              awardable_now: comparisonVersion.awardable_now === true,
+              awardability_note: String(comparisonVersion.awardability_note || ""),
+              output_summary: { digest: String(comparisonVersion.output_summary.digest) },
+              fixed_quote_inputs: comparisonVersion.fixed_quote_inputs.map((quote: any) => ({
+                quote_id: quote.quote_id,
+                quote_version_no: Number(quote.quote_version_no),
+                supplier_id: quote.supplier_id,
+                supplier_code: String(quote.supplier_code || ""),
+                supplier_name: String(quote.supplier_name || ""),
+                supplier_quote_reference: String(quote.supplier_quote_reference || ""),
+                currency_code: String(quote.currency_code || ""),
+              })),
+            },
+            purchase_order_count: downstream.rows[0].purchase_orders,
+          });
+        } catch {
+          throw new ProcurementSourcingError("AWARD_READ_MODEL_INCONSISTENT", "Award历史引用不完整或跨越RFQ边界，已停止展示且未修改任何数据", 409);
+        }
+      }
       await client.query("commit");
       return { header, lines: lines.rows, suppliers: suppliers.rows, quotes: quotes.rows, quote_lines: quoteLines.rows, comparisons: comparisons.rows, comparison_lines: comparisonLines.rows, award: award.rows[0] || null, events: events.rows, creation_receipt: creationReceipt, mapping_binding_receipt: mappingBindingReceipt,
+        award_history: awardHistory,
         comparison_read_model: comparisonReadModel,
         mapping_traceability: { mode, complete, scope_intact: scopeIntact, can_issue: header.status === "DRAFT" && complete && mappingBindingReceipt.verified && creationOkay && sourceOkay && !issues.length, summary: mode === "UNBOUND_LEGACY_DRAFT" ? "历史草稿尚未固定 Mapping" : mode === "BOUND_AT_CREATE" ? "Mapping 已在 RFQ 创建事务中固定" : "Mapping 已由采购显式确认固定", cas_semantics: "RFQ Version是询价聚合CAS；Supplier报价响应会正常推进CAS，但不等于Mapping或固定范围漂移。", drift_basis: ["固定Binding完整性与稳定ID", "Supplier与RFQ Line固定集合", "Mapping ID、Version、Row CAS、状态、有效期与唯一性", "固定范围摘要"], issues, bindings, current_qualification: current.rows }, downstream_counts: downstream.rows[0], issue_receipt: issueReceipt };
     } catch (error) {

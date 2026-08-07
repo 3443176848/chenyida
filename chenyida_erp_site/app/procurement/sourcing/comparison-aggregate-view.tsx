@@ -12,6 +12,7 @@ export type ComparisonFixedQuoteInput = {
   supplier_code: string;
   supplier_name: string;
   supplier_quote_reference: string;
+  currency_code: string;
   material_id: string;
   internal_material_code: string;
   quote_input_current: boolean;
@@ -103,6 +104,8 @@ export type ComparisonVersionReadModel = {
   quote_inputs_current: boolean;
   input_drift: boolean;
   awardable_now: boolean;
+  awardability_reason_code: string;
+  awardability_note: string;
   generated_by: string;
   generated_at_shanghai: string;
   request_id: string;
@@ -332,6 +335,7 @@ export function ComparisonAggregateView({ model, busy, showGenerateAction, onGen
         <div><dt>生成时间（Asia/Shanghai）</dt><dd>{version.generated_at_shanghai}</dd></div>
         <div><dt>生成request_id</dt><dd><Copyable label="生成request_id" value={version.request_id}/></dd></div>
       </dl>
+      <p className="comparison-governance-note" data-awardability-reason={version.awardability_reason_code}>{version.awardability_note}</p>
       <p className="comparison-governance-note">{model.has_independent_header_id ? model.identity_note : NO_HEADER_NOTE}</p>
       <p className="comparison-governance-note">{model.status_note || STATUS_NOTE} Award仍由服务端验证最新Comparison Version，不能信任页面标签。</p>
       {model.versions.length > 1 ? <div className="comparison-version-list" aria-label="Comparison版本列表">{model.versions.map(item => <span key={`${item.comparison_version_no}:${item.request_id}`}>v{item.comparison_version_no} · {projectedStatus(item.status)}</span>)}</div> : null}

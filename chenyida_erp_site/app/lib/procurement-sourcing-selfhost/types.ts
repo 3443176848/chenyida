@@ -1,5 +1,6 @@
 import type { PoolClient } from "pg";
 import type { IdentityActor } from "../identity-selfhost/types.ts";
+import type { AwardHistoryReadModel } from "./award-read-model.ts";
 
 export type SourcingMutationMeta = Readonly<{ actor: IdentityActor; requestId: string; operationId: string; keyDigest: string; requestDigest: string; method: string; route: string; action: string }>;
 export type SourcingWorkResult = { status: number; body: Record<string, unknown>; objectId: string | number; oldVersion?: number; newVersion?: number };
@@ -180,6 +181,7 @@ export type RfqDetailDto = Readonly<{
     }>;
   }>;
   award: Record<string, unknown> | null;
+  award_history: AwardHistoryReadModel | null;
   events: SourcingEventTraceDto[];
   creation_receipt: Record<string, unknown>;
   mapping_binding_receipt: RfqMappingBindingReceiptDto;

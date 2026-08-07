@@ -2,6 +2,22 @@
 
 最后更新时间：2026-08-07（Asia/Shanghai）
 
+## SELFHOST-UAT-FIX-31 RFQ Award History Traceability Fix（功能已验证，部署待收口）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | IMPLEMENTED / DEPLOYMENT PENDING | Award历史读模型、响应式页面、状态投影和只读UAT runner已完成；当前UAT Web尚未替换，主UAT尚未执行 |
+| Award身份 | ID 1 / NO BUSINESS NUMBER / v1 / AWARDED | 稳定数据库ID和真实Version/状态直接来自Award Header；无独立业务编号时准确说明，不伪造字段 |
+| 四行引用 | PASS / STABLE IDS | Award Line 1—4闭合到Comparison Line 1—4、Candidate 2/4/6/8、Quote Line 1—4、Quote 1/v1、Supplier 1、Material 533—536；Supplier B Award Line 0 |
+| 摘要 | PERSISTED + DERIVED / SEPARATED | 持久化`award_digest=7ac6bf2e…a66e55`不冒充decision digest；无持久化decision字段，按`AWARD_DECISION_V1`从不可变事实稳定重算 |
+| Event/CAS | EVENT 1 / AUDIT v6→v7 | 唯一AWARDED Event没有版本转换字段；同request_id唯一成功Audit独立证明v6→v7，当前v7来自RFQ Head，不回填或显示vnull |
+| 状态投影 | CURRENT + NOT AWARDABLE | Comparison仍CURRENT，但Award存在后`awardable_now=false`；`po_convertible_now`基于Award/RFQ/四行/引用/来源PRQ/PO计数只读计算 |
+| UI/写边界 | READ ONLY | Award存在后不显示创建表单或确认按钮；历史页无Award/PO写调用，转PO只显示资格和独立任务边界 |
+| 自动验证 | PASS | typecheck、Unit12/12、UI24/24、PG27/27、0039 6/6、安全30/30、Chromium5/5、npm3/3、environment6/6、Python三项、lint/credentials/diff通过 |
+| Schema/版本 | UNCHANGED | alpha.40、0001—0039保持；没有0040、历史回填或主UAT业务字段修改 |
+| 候选镜像 | BUILT / NOT DEPLOYED | `sha256:bb544f89ac405c9565fa551c4120c89d4cc58022220db9a3f46c548a6533a81d`，88,616,950 bytes；当前Web仍为`f1184385…` |
+| 下一步 | SERIAL OPS | 正式备份与第二新库恢复通过后仅替换Web，再做purchase-only桌面/390×844只读主UAT；严禁转PO |
+
 ## SELFHOST-UAT-FIX-30 RFQ Award Confirmation Contract Fix
 
 | 验证项 | 结果 | 说明 |

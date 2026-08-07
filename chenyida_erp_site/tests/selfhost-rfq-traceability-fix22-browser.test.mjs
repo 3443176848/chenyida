@@ -1694,7 +1694,7 @@ test("isolated Chromium renders the Comparison aggregate read model on desktop a
     assert.match(await page.locator(".comparison-operation").innerText(), /Event数量\s*4条Line级Event/);
     assert.equal(await page.locator(".comparison-operation li").count(), 4);
     assert.equal(await page.getByRole("button", { name: "当前Quote输入已生成最新比价", exact: true }).isDisabled(), true);
-    await page.getByRole("heading", { name: "人工定标与撤销", exact: true }).waitFor();
+    await page.getByRole("heading", { name: "人工定标", exact: true }).waitFor();
     assert.equal(await page.getByRole("button", { name: "打开正式定标确认窗口", exact: true }).isVisible(), true);
     assert.equal(await page.locator(".comparison-desktop").isVisible(), true);
     assert.equal(await page.locator(".comparison-material-cards").isVisible(), false);
@@ -1740,7 +1740,7 @@ test("isolated Chromium renders the Comparison aggregate read model on desktop a
   }
 });
 
-test("isolated Chromium enforces the FIX-30 Award confirmation contract then creates exactly one four-line Award", { timeout: 300_000 }, async () => {
+test("isolated Chromium enforces the FIX-31 Award confirmation and immutable history contract", { timeout: 300_000 }, async () => {
   await clearSyntheticData();
   const fixture = await seedFixture({ targetDate: "2026-10-30", materialDefinitions: FIX29_MATERIAL_DEFINITIONS });
   const isolatedAwardReason = `${FIX29_AWARD_REASON}\n${"长理由布局验收：保持完整换行、自动折行且不截断。".repeat(24)}`;
@@ -1786,7 +1786,7 @@ test("isolated Chromium enforces the FIX-30 Award confirmation contract then cre
 
     await page.goto(`${REQUIRED_ORIGIN}/procurement/sourcing/1`, { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "RFQ-00000001 · Round 1", exact: true }).waitFor();
-    await page.getByRole("heading", { name: "人工定标与撤销", exact: true }).waitFor();
+    await page.getByRole("heading", { name: "人工定标", exact: true }).waitFor();
     const form = page.locator("form.award-selection-form");
     await form.waitFor();
     assert.equal(await form.locator("fieldset.award-candidate-fieldset").count(), 4);
@@ -2007,7 +2007,172 @@ test("isolated Chromium enforces the FIX-30 Award confirmation contract then cre
       reason_code: "DELIVERY_PRIORITY",
       reason: isolatedAwardReason,
     })));
-    await noOverflow(page, "FIX-29 awarded detail 390x844");
+
+    const historyResponse = await context.request.get(`${REQUIRED_ORIGIN}/api/procurement/rfqs/1`);
+    assert.equal(historyResponse.status(), 200);
+    const awardedDetail = (await historyResponse.json()).data;
+    const history = awardedDetail.award_history;
+    assert.ok(history, "Award history server read model must exist after Award");
+    assert.deepEqual({
+      award_id: history.identity.award_id,
+      display_identity: history.identity.display_identity,
+      business_number: history.identity.business_number,
+      has_business_number: history.identity.has_business_number,
+      version: history.identity.version,
+      has_version: history.identity.has_version,
+      status: history.identity.status,
+      rfq_id: history.identity.rfq_id,
+      rfq_code: history.identity.rfq_code,
+      round_no: history.identity.round_no,
+      submitted_cas: history.identity.rfq_submitted_cas,
+      current_cas: history.identity.rfq_current_cas,
+      comparison_version: history.identity.comparison_version_no,
+      comparison_status: history.identity.comparison_status,
+      comparison_output_digest: history.identity.comparison_output_digest,
+    }, {
+      award_id: "1", display_identity: "定标 #1", business_number: null, has_business_number: false,
+      version: 1, has_version: true, status: "AWARDED", rfq_id: "1", rfq_code: "RFQ-00000001",
+      round_no: 1, submitted_cas: 5, current_cas: 6, comparison_version: 1,
+      comparison_status: "CURRENT",
+      comparison_output_digest: "79554d88ccdb643a860c0c69e77222abce80eb4d3d8314d88135d3966fb619ec",
+    });
+    assert.deepEqual(history.fixed_quotes.map((quote) => `${quote.quote_id}/v${quote.quote_version_no}`), ["1/v1", "2/v1"]);
+    assert.deepEqual(history.lines.map((line) => ({
+      award_line_id: line.award_line_id,
+      comparison_line_id: line.comparison_line_id,
+      candidate_id: line.comparison_candidate_id,
+      quote_line_id: line.quote_line_id,
+      quote: `${line.quote_id}/v${line.quote_version_no}`,
+      supplier_id: line.supplier_id,
+      material_id: line.material_id,
+      quantity: line.selected_quantity,
+      unit_price: line.selected_unit_price,
+      amount: line.line_amount,
+    })), ["1", "2", "3", "4"].map((lineId, index) => ({
+      award_line_id: lineId,
+      comparison_line_id: lineId,
+      candidate_id: String((index + 1) * 2),
+      quote_line_id: lineId,
+      quote: "1/v1",
+      supplier_id: "1",
+      material_id: String(533 + index),
+      quantity: "10.000000",
+      unit_price: "12.000000",
+      amount: "120.000000",
+    })));
+    assert.deepEqual(history.summary.supplier_summaries.map((supplier) => ({
+      supplier_id: supplier.supplier_id,
+      lines: supplier.award_line_count,
+      total: supplier.total_amount,
+    })), [{ supplier_id: "1", lines: 4, total: "480.000000" }, { supplier_id: "2", lines: 0, total: "0.000000" }]);
+    assert.equal(history.summary.split_award_lines, false);
+    assert.equal(history.summary.duplicate_material, false);
+    assert.match(history.persisted_award_digest.value, /^[0-9a-f]{64}$/);
+    assert.match(history.decision_digest.value, /^[0-9a-f]{64}$/);
+    assert.notEqual(history.decision_digest.value, history.persisted_award_digest.value);
+    assert.equal(history.decision_digest.persisted, false);
+    assert.equal(history.decision_digest.canonical_rule, "AWARD_DECISION_V1");
+    assert.deepEqual({
+      event_count: history.operation_receipt.event_count,
+      operation_count: history.operation_receipt.user_operation_count,
+      award_line_count: history.operation_receipt.award_line_count,
+      event_type: history.operation_receipt.event_type,
+      result: history.operation_receipt.result,
+      event_transition: history.operation_receipt.version_transition_recorded,
+      event_old: history.operation_receipt.event_old_version,
+      event_new: history.operation_receipt.event_new_version,
+      cas_authority: history.operation_receipt.cas_evidence.authority,
+      cas_old: history.operation_receipt.cas_evidence.old_version,
+      cas_audit_new: history.operation_receipt.cas_evidence.audit_new_version,
+      cas_new: history.operation_receipt.cas_evidence.new_version,
+    }, {
+      event_count: 1, operation_count: 1, award_line_count: 4, event_type: "AWARDED", result: "SUCCESS",
+      event_transition: false, event_old: null, event_new: null,
+      cas_authority: "EXACT_SUCCESS_AUDIT", cas_old: 5, cas_audit_new: 6, cas_new: 6,
+    });
+    assert.deepEqual({
+      comparison_status: history.projections.comparison_status,
+      awardable_now: history.projections.awardable_now,
+      po_convertible_now: history.projections.po_convertible_now,
+      po_count: history.projections.po_count,
+    }, { comparison_status: "CURRENT", awardable_now: false, po_convertible_now: true, po_count: 0 });
+    assert.equal(awardedDetail.comparison_read_model.current_version.awardable_now, false);
+
+    await page.getByRole("heading", { name: "定标 #1", exact: true }).waitFor();
+    assert.equal(await page.locator("form.award-selection-form").count(), 0, "Award form must disappear after Award");
+    assert.equal(await page.getByRole("button", { name: "打开正式定标确认窗口", exact: true }).count(), 0);
+    assert.equal(await page.locator(".award-confirm-dialog").count(), 0);
+    assert.equal(await page.getByRole("button", { name: /撤销|转PO|采购订单/ }).count(), 0);
+    const historyText = await page.locator(".award-history").innerText();
+    for (const required of [
+      "Award稳定数据库ID", "未设置独立Award业务编号。", "Award有独立Version字段", "AWARDED",
+      "RFQ-00000001", "Round 1", "v5", "v6", "v1", "CURRENT",
+      "79554d88ccdb643a860c0c69e77222abce80eb4d3d8314d88135d3966fb619ec",
+      "Quote ID 1 / v1", "Quote ID 2 / v1", "Supplier A", "Supplier B",
+      "Award Line ID 1", "Award Line ID 2", "Award Line ID 3", "Award Line ID 4",
+      "Candidate ID 2", "Candidate ID 4", "Candidate ID 6", "Candidate ID 8",
+      "Quote Line ID 1", "Quote Line ID 2", "Quote Line ID 3", "Quote Line ID 4",
+      "Material ID 533", "Material ID 534", "Material ID 535", "Material ID 536",
+      "480.00 CNY", "0.00 CNY", "Award Line 0", "无拆单", "无重复Material",
+      "DELIVERY_PRIORITY", isolatedAwardReason, "AWARD_DECISION_V1",
+      "确定性决策摘要，由不可变Award事实重算；不是伪造的历史持久化字段。",
+      "Event数量", "用户操作次数", "AWARDED", "SUCCESS", "历史Award Event未记录版本转换。",
+      "Audit独立记录同一次请求的RFQ CAS；它不是Award Event字段。",
+      "awardable_now", "false", "Comparison仍是当前版本，但RFQ已完成定标，不可再次创建Award。",
+      "po_convertible_now", "true", "本页只显示资格，不提供链接、按钮或业务POST。",
+    ]) assert.ok(historyText.includes(required), `Award history missing: ${required}`);
+    assert.equal(historyText.includes("vnull"), false);
+    assert.equal((await page.locator("body").innerText()).includes("允许进入定标"), false);
+    assert.equal(await page.locator(".award-history-desktop").isVisible(), false);
+    assert.equal(await page.locator(".award-history-mobile").isVisible(), true);
+    assert.equal(await page.locator(".award-history-mobile [data-award-line-id]").count(), 4);
+    assert.deepEqual(await page.locator(".award-history-mobile [data-award-line-id]").evaluateAll(
+      (rows) => rows.map((row) => row.getAttribute("data-award-line-id")),
+    ), ["1", "2", "3", "4"]);
+    await noOverflow(page, "FIX-31 Award history 390x844");
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "定标 #1", exact: true }).waitFor();
+    assert.equal(await page.locator("form.award-selection-form").count(), 0);
+    assert.ok((await page.locator(".award-history").innerText()).includes(history.decision_digest.value));
+    assert.deepEqual(await page.locator(".award-history-mobile [data-award-line-id]").evaluateAll(
+      (rows) => rows.map((row) => row.getAttribute("data-award-line-id")),
+    ), ["1", "2", "3", "4"]);
+    assert.equal((await page.locator("body").innerText()).includes("允许进入定标"), false);
+    assert.equal(businessRequests.length, 1, "refreshing immutable history must not send another business request");
+    await page.goto(`${REQUIRED_ORIGIN}/procurement/sourcing`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${REQUIRED_ORIGIN}/procurement/sourcing/1`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "定标 #1", exact: true }).waitFor();
+    assert.ok((await page.locator(".award-history").innerText()).includes(history.decision_digest.value));
+    assert.deepEqual(await page.locator(".award-history-mobile [data-award-line-id]").evaluateAll(
+      (rows) => rows.map((row) => row.getAttribute("data-award-line-id")),
+    ), ["1", "2", "3", "4"]);
+    assert.equal((await page.locator("body").innerText()).includes("允许进入定标"), false);
+    assert.equal(businessRequests.length, 1, "reopening immutable history must remain read-only");
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    assert.equal(await page.locator(".award-history-desktop").isVisible(), true);
+    assert.equal(await page.locator(".award-history-mobile").isVisible(), false);
+    assert.equal(await page.locator(".award-history-desktop tbody tr").count(), 4);
+    assert.deepEqual(await page.locator(".award-history-desktop tbody tr[data-award-line-id]").evaluateAll(
+      (rows) => rows.map((row) => row.getAttribute("data-award-line-id")),
+    ), ["1", "2", "3", "4"]);
+    assert.ok((await page.locator(".award-history").innerText()).includes(history.decision_digest.value));
+    assert.equal((await page.locator("body").innerText()).includes("允许进入定标"), false);
+    await noOverflow(page, "FIX-31 Award history desktop");
+    assert.equal(businessRequests.length, 1, "Award history must add zero business POST requests");
+    assert.deepEqual(businessRequests.map(({ method, path }) => ({ method, path })), [
+      { method: "POST", path: "/api/procurement/rfqs/1/award" },
+    ]);
+    assert.equal(businessRequests.filter(({ path }) => /purchase-orders|delivery-plans|convert/i.test(path)).length, 0);
+    assert.deepEqual((await pool.query(`select
+      (select count(*)::int from procurement_sourcing_awards where rfq_id=1) awards,
+      (select count(*)::int from procurement_sourcing_award_lines line
+        join procurement_sourcing_awards award on award.id=line.award_id where award.rfq_id=1) award_lines,
+      (select count(*)::int from procurement_sourcing_events where rfq_id=1 and event_type='AWARDED') award_events,
+      (select count(*)::int from purchase_orders) purchase_orders`)).rows[0], {
+      awards: 1, award_lines: 4, award_events: 1, purchase_orders: 0,
+    });
 
     const logout = await context.request.post(`${REQUIRED_ORIGIN}/api/logout`, {
       headers: { Origin: REQUIRED_ORIGIN, "X-CSRF-Token": csrfToken },
@@ -2021,7 +2186,7 @@ test("isolated Chromium enforces the FIX-30 Award confirmation contract then cre
     )).rows[0].count), 0);
     await context.close();
     context = undefined;
-    console.info("RFQ_AWARD_CONFIRMATION_FIX30_BROWSER_OK rfq=1 comparison_version=1 candidates=8 selected=2,4,6,8 cancel_close_escape_post=0 award_post=1 award=1 award_line=4 po=0 desktop=1 mobile=1 session=0");
+    console.info("RFQ_AWARD_HISTORY_FIX31_BROWSER_OK rfq=1 comparison_version=1 candidates=8 selected=2,4,6,8 pre_award_post=0 award_post=1 history_post=0 award=1 award_line=4 po=0 desktop=1 mobile=1 refresh=1 reopen=1 session=0");
   } finally {
     if (authenticated && context && csrfToken) {
       await context.request.post(`${REQUIRED_ORIGIN}/api/logout`, {

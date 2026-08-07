@@ -162,6 +162,7 @@ export function buildComparisonReadModel(input: Readonly<{
     supplier_code: row.supplier_code,
     supplier_name: row.supplier_name,
     supplier_quote_reference: row.supplier_quote_reference,
+    currency_code: row.currency_code,
     material_id: id(row.material_id),
     internal_material_code: row.internal_material_code,
     quote_input_current: row.quote_input_current,
