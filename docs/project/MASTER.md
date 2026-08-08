@@ -39,25 +39,25 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.40`；PostgreSQL 为 39/head `0039_rfq_traceability.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-33`源码候选已实现固定RFQ Binding→Mapping fact逐行资格、GET/POST共享loader/DTO、事务锁后漂移重验和四行响应式凭证；版本保持alpha.40，Migration保持0039，功能提交以`git log`为准 |
-| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-32`已把精确功能提交Web-only部署到18888非生产UAT；独立提交消息为`ops: deploy Award to PO confirmation fix`，实际SHA以Git log为准。正式备份/第二新库恢复、精确回退及purchase-only桌面/390×844打开后取消验收通过 |
-| Git 同步与工作区 | FIX33从唯一worktree、clean`main@79ac7fae76fdb69286a16f0bbd9551d41598cd57`、Parent`a4ffb8ee022234ea25add4ce636050366ac6887a`、behind0/ahead169起步；功能与部署验收继续分为两个聚焦提交。未push/PR/amend/rebase/reset/stash/restore，密码、Token、Cookie、Session材料、连接信息和备份正文不得进入Git |
+| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-33`功能提交`1f205af0bf81379345a09353d9d32ab5c7545971`：固定RFQ Binding→Mapping fact逐行资格、GET/POST共享loader/DTO、事务锁后漂移重验和四行响应式凭证；版本保持alpha.40，Migration保持0039 |
+| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-33`已把精确功能提交Web-only部署到18888非生产UAT；独立提交消息为`ops: deploy Award to PO mapping validation fix`，实际SHA以Git log为准。正式备份/第二新库恢复、精确回退及purchase-only桌面/390×844预览后取消验收通过 |
+| Git 同步与工作区 | FIX33从唯一worktree、clean`main@79ac7fae76fdb69286a16f0bbd9551d41598cd57`、Parent`a4ffb8ee022234ea25add4ce636050366ac6887a`、behind0/ahead169起步；功能提交后ahead170，独立部署/验收提交后ahead171。未push/PR/amend/rebase/reset/stash/restore，密码、Token、Cookie、Session材料、连接信息和备份正文未进入Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0039`，39/head`0039_rfq_traceability.sql`，SHA-256`3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；没有0040。主`RFQ-00000001`为CLOSED v7、Binding8、Quote2、Comparison Version1/CURRENT、Line/Candidate`4/8`、Award/Award Line/Award Event/PO`1/4/1/0`；四条获选Candidate为`2/4/6/8`，Comparison输出摘要`79554d88…619ec` |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。Award→PO确认修复Web为alpha.40`sha256:2396c8bc4fd5658c26cef11c4a438b2edb474607b73b2b8ee7fe337b125575ed`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`bb544f89…`有FIX32精确回退tag，四个受保护Volume未更换 |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。Supplier Mapping资格修复Web为alpha.40`sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`2396c8bc…`有FIX33精确回退tag，四个受保护Volume未更换 |
 | 当前开发环境 | FIX33源码以`AWARD_PO_MAPPING_QUALIFICATION_V1`统一GET预览与POST事务资格：只沿Award Line→Candidate→Quote Line→RFQ Binding→固定Mapping fact，返回UUID/fact/version/row CAS/digest、Unit、有效期、两类冲突及逐行原因；legacy `base_uom`按D-091唯一解析。确认窗口升级V2并显示桌面/390×844四行凭证；最终POST锁后重算且PO Line固定引用Mapping fact。alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | FIX33源码、串行隔离回归、production build和候选Web`sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`已通过；隔离成功为PO/Line/Plan/queue `1/4/4/4`，失败全0。正式备份、第二库恢复、Web-only部署和purchase-only取消验收待执行；主UAT尚未登录或业务写 |
-| 当前任务 | `SELFHOST-UAT-FIX-33`为唯一`DOING`：修复Award→PO预览/POST的Supplier Mapping资格漂移；禁止重试主UAT转换、修改四条Mapping或创建主UAT PO |
-| 下一任务 | FIX33完成后，真正执行主UAT Award→PO转换仍须新的独立明确授权，并重新核验当时Award/RFQ/Comparison/Quote/Line/Binding/Mapping、权限、CAS、摘要、幂等、审计及备份恢复 |
+| 当前阶段 | `AWARD TO PO SUPPLIER MAPPING VALIDATION FIXED — UAT PO NOT CREATED`。隔离成功为PO/Line/Plan/queue `1/4/4/4`、失败全0；正式备份/第二库恢复、Web-only部署和purchase-only桌面/390×844取消验收通过。主UAT`business_post=0`，PO/Line/Plan/queue仍`0/0/0/0` |
+| 当前任务 | 当前无`DOING`；FIX33已完成并立即停止，四条Supplier A Mapping、Award、RFQ及原失败请求保持 |
+| 下一任务 | 真正执行主UAT Award→PO转换在技术上已具备统一资格门禁，但仍须新的独立明确授权，并重新核验当时Award/RFQ/Comparison/Quote/Line/Binding/Mapping、权限、CAS、摘要、幂等、审计及备份恢复 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
-- SELFHOST-UAT-FIX-33功能候选：采用分支A，证明四条固定Supplier A Mapping权威有效；根因为GET只投影粗布尔值而POST忽略Binding动态重查并错误要求legacy Material非空`base_unit_id`。共享资格loader/DTO、固定fact谱系、锁后漂移保护和四行桌面/移动凭证已通过隔离`1/4/4/4`及失败全0；候选Web已构建，正式备份恢复、部署与主UAT取消验收待执行
+- SELFHOST-UAT-FIX-33完成：采用分支A，证明四条固定Supplier A Mapping权威有效；根因为GET只投影粗布尔值而POST忽略Binding动态重查并错误要求legacy Material非空`base_unit_id`。共享资格loader/DTO、固定fact谱系、锁后漂移保护和四行桌面/移动凭证已通过隔离`1/4/4/4`及失败全0，并完成正式备份恢复、Web-only部署与主UAT取消验收；`preview_get=1`、`business_post=0`、Session0、PO/计划0
 
 - SELFHOST-UAT-FIX-32完成：Award→PO首击改为权威GET预览和完整确认窗口，最终确认才POST；取消/关闭/ESC/背景关闭零业务请求，默认焦点取消，按钮同步禁用且失败不重试。服务端同连接事务重验CAS/摘要/完整Line/Supplier/Mapping/PO0并创建PO/Line/Link/Plan/Queue/Event/Audit/幂等结果。隔离结果`1/4/4`，主UAT只打开、核验、填写备注并取消，`preview_get=1`、`business_post=0`、Session0、PO/计划0
 
@@ -290,7 +290,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- `SELFHOST-UAT-FIX-33`正在执行：采用分支A且不新增0040；统一Supplier Mapping资格服务、固定Binding→Mapping fact谱系、legacy Unit兼容、逐行错误、事务锁和桌面/390×844凭证已完成预部署验证。候选Web为`sha256:83c1bff3…20664`；主UAT尚未登录或业务POST，四条Mapping和PO/计划保持起点事实。下一步只能串行完成正式备份/第二库恢复、Web-only替换及purchase-only打开后取消；禁止最终转换。
+- `SELFHOST-UAT-FIX-33`已完成：功能提交`1f205af0bf81379345a09353d9d32ab5c7545971`，采用分支A且不新增0040；统一Supplier Mapping资格服务、固定Binding→Mapping fact谱系、legacy Unit兼容、逐行错误、事务锁和桌面/390×844凭证已Web-only部署为`sha256:83c1bff3…20664`。正式备份/第二库恢复和purchase-only预览后取消通过；主UAT`business_post=0`、Session0，四条Mapping、失败请求、Award/RFQ不变，PO/Line/Plan/queue全0。当前无`DOING`；正式转换须新的明确授权和当时事实重验。
 - `SELFHOST-UAT-FIX-32`已完成：功能提交`a4ffb8ee022234ea25add4ce636050366ac6887a`，保持alpha.40/0039且没有0040；两阶段预览/最终确认、完整转换合同、同连接单事务重验、隔离`1 PO / 4 PO Line / 4 Delivery Plan`已Web-only部署。正式备份/第二库恢复和purchase-only桌面/390×844打开后取消通过；主UAT`business_post=0`、Session0，RFQ CLOSED v7、Award/Line/Event/PO/Plan `1/4/1/0/0`。真正转换仍须新授权并重新核验当前事实。
 - `SELFHOST-UAT-FIX-30`已完成：功能提交`22aa4dc053c9e0a8dc523956afe7742cf5d66fbc`，保持alpha.40/0039且没有0040；两份固定Quote、一次Award操作/四条Line精确语义、上游不可变、八类下游零自动创建和独立转PO阶段已Web-only部署。正式备份/第二库恢复、隔离双击Award1/Line4/PO0及purchase-only桌面/390×844打开后取消通过；主UAT business POST0、Session0，RFQ ISSUED v6、Award/Award Line/PO0/0/0。当前无`DOING`；真正人工定标或转PO必须新授权并重验当前事实。
 - `SELFHOST-UAT-FIX-29`已完成：功能提交`99a5e6bfe255cb46a0384106eb8ec0a08ec96832`，保持alpha.40/0039且没有0040；Candidate DTO/稳定字符串ID、四组逐Comparison Line两候选、Candidate绑定Award DTO、非最低价`DELIVERY_PRIORITY`与服务端CURRENT/Quote/CAS/摘要/完整行集重验已Web-only部署。正式备份/第二库恢复、隔离Award 1/Line4/PO0及purchase-only桌面/390×844确认后取消通过；主UAT business POST0、Session0，RFQ ISSUED v6、Award/Award Line/PO0/0/0。当前无`DOING`；真正人工定标或PO必须新授权并重验当前事实。

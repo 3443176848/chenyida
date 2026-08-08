@@ -2,7 +2,7 @@
 
 ## 状态、授权与起点
 
-- 状态：`FUNCTION IMPLEMENTED / PRE-DEPLOY VERIFIED`；任务台账仍为唯一`DOING`，正式备份恢复、Web-only部署和主UAT取消验收尚未执行。
+- 状态：`AWARD TO PO SUPPLIER MAPPING VALIDATION FIXED — UAT PO NOT CREATED`。
 - 日期：2026-08-08（Asia/Shanghai）。
 - 授权：诊断 Award #1 转 PO 的 Supplier Mapping 422，修复 GET 预览与最终 POST 的资格规则不一致；在隔离 PostgreSQL/Chromium 完成成功和失败验证后，执行正式备份恢复、Web-only 部署，并仅用 purchase 打开主 UAT 预览、填写备注、桌面/390×844核验、取消和安全退出。
 - 禁止：不得重试主 UAT 转换；不得修改、重提或重新批准主 UAT Mapping；不得修改 Award、Candidate、Binding、Quote 或 RFQ；不得创建主 UAT PO；不得直接 SQL 修主 UAT；不得登录 operations 或其他角色；不得新增或运行 0040。
@@ -52,9 +52,23 @@
 - 确认窗口合同升级为`AWARD_PO_CONFIRMATION_V2`，桌面表与390×844卡片逐行展示全部资格凭证。`po_convertible_now`只在完整行集全部qualified且PO/PO Line/Delivery Plan为0时为true；最终按钮还要求资格总结果为true。
 - 最终POST正文新增`expected_mapping_qualification_digest`断言；固定Mapping发生状态、version、CAS、digest、有效期或身份漂移时失败关闭，无关Mapping变化不阻断。PO Line的`supplier_mapping_id`只取固定Binding指向的Mapping fact，浏览器不能选择该值。
 - 隔离成功路径精确为`1 PO / 4 PO Line / 4 Delivery Plan / 4 queue`；所有隔离失败路径的PO/Line/Plan/queue均为0。真实Mapping新版本与转换并发无死锁、无半记录；受控冲突场景的GET/POST均返回同一逐行错误。
-- 串行回归通过：无数据库组合93/93，资格/履约/Mapping Unit 22/22，Fulfillment PostgreSQL 5/5，Supplier Mapping PostgreSQL 10/10，0038 5/5，0039 6/6，Sourcing PostgreSQL 9/9，RFQ Binding PostgreSQL 18/18，履约升级3/3，`npm test` 3/3；三个适用typecheck、production build、lint 0 error/11既有warning、1,277文件凭据扫描、`git diff --check`及Python self-test/smoke/go-live均通过。
+- 串行回归通过：无数据库组合93/93，资格/履约/Mapping Unit 22/22，Fulfillment PostgreSQL 5/5，Supplier Mapping PostgreSQL 10/10，0038 5/5，0039 6/6，Sourcing PostgreSQL 9/9，RFQ Binding PostgreSQL 18/18，履约升级3/3，`npm test` 3/3；三个适用typecheck、production build、lint 0 error/11既有warning、最终1,278文件凭据扫描、`git diff --check`及Python self-test/smoke/go-live均通过。
 - 最终隔离Chromium 1/1通过：四行资格摘要稳定、桌面与390×844均可读；取消/关闭/ESC/背景关闭零POST，隔离成功仍为1/4/4/4、下游0、Session0。候选Web`sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`、88,636,706 bytes，受限临时容器health通过。
 - 主UAT在预部署阶段未登录、未发送业务POST，失败请求、四条Mapping、Award/RFQ及PO/计划保护事实保持起点值。
+
+## 正式备份、部署与主UAT验收
+
+- 正式custom dump为`/var/backups/chenyida-erp/award-po-mapping-validation-fix33-predeploy-20260808T050516Z.dump`，root:root、0600、单硬链接、2,294,665 bytes，SHA-256`d3cf053f09948c6e4ae54caff028a7663a3750249bcaf3e8758e2f0ace49c5c2`，`pg_restore --list`3,359项。
+- 第二新库`award_po_mapping_fix33_restore_20260808t050516z`使用`--single-transaction --exit-on-error --no-owner --no-acl`恢复通过：39/head0039、226表、RFQ CLOSED/v7、Award1/v1/AWARDED、Line4、四条Mapping/Binding完整谱系、失败请求一次、成功转换0及PO/Line/Plan/queue全0。验证后连接0并精确删除恢复库；容器内临时dump删除，正式宿主dump保留。
+- 备份窗口按Web→Worker停止。Compose `start worker`因一次性migrate依赖容器不存在而在启动前安全退出；没有创建或替换任何容器，随后以`docker start`按Worker→Web恢复完全相同的原容器和镜像并通过健康检查。
+- Web-only部署为`sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`、88,636,706 bytes；旧Web`sha256:2396c8bc4fd5658c26cef11c4a438b2edb474607b73b2b8ee7fe337b125575ed`、88,626,192 bytes保留为`chenyida-erp-parallel-web:rollback-award-po-mapping-validation-fix33-predeploy-20260808T050516Z`。只使用`--no-deps --no-build --pull never --force-recreate web`；未运行Migration，未重建PostgreSQL、Worker或Caddy，四个受保护Volume保持。
+- HTTPS health 200/ok、根页200、匿名资格预览401；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。
+- 主UAT只执行一次purchase取消式流程。桌面1440×900及390×844均核对四行Mapping `qualified=true`、资格摘要、固定谱系和`po_convertible_now=true`；填写本地UAT备注后点击取消，没有点击最终转换。输出为`preview_get=1 business_post=0 desktop=1 mobile=1 cancelled=1 session=0`。
+- runner在路由层阻断除login/logout外全部业务写，并在只读repeatable-read事务中逐项比较前后事实。最终RFQ CLOSED/v7、Award1/v1/AWARDED、Award Line4，四条Mapping/Binding及原失败请求不变；成功转换0，PO/PO Line/Delivery Plan/queue `0/0/0/0`，purchase有效Session0。
+- 七个隔离测试库、第二恢复库、Python临时目录、Playwright runtime、UAT内部网络和全部任务临时容器均精确清理；正式dump、当前/候选/回退Web和四卷保留，未prune。
+- 起点available约2.1GiB、Swap233MiB、根盘18GiB、低Load；收口约2.1GiB、Swap250MiB、根盘18GiB、Load`0.55/0.39/0.39`。任务时段内核OOM0，四服务restart0/OOM false，未触发停止阈值。
+- Git功能提交为`1f205af0bf81379345a09353d9d32ab5c7545971`；部署验收与最终文档由独立`ops: deploy Award to PO mapping validation fix`提交收口，SHA以`git log`为准。FIX33从behind0/ahead169起步，两个提交后应为behind0/ahead171；未push、PR或改写历史。
+- 统一资格门禁、备份恢复和非生产部署已使正式转换在技术上具备再次执行条件，但本任务没有该业务授权。任何主UAT最终转换必须另立任务、取得新的明确授权，并重新核验当时资格摘要、Award/RFQ CAS、四条固定Binding/Mapping、PO0、权限、幂等和审计。
 
 ## 测试、部署与完成条件
 

@@ -10,8 +10,10 @@
 - Mapping/谱系：Award Line1—4固定到Candidate`2/4/6/8`、Quote Line1—4、Binding1—4及Mapping fact1—4/v1/row CAS3；UUID分别为`224d1965…07ff8`、`43ca04d8…18030`、`aa16f7e7…f257e`、`9659ad2d…c63f`。关联不使用名称、supplier part、价格、数组位置或Event join。
 - 统一合同：新增`AWARD_PO_MAPPING_QUALIFICATION_V1`服务端loader和逐行DTO，GET与POST共用transaction as-of、`[from,to)`、稳定字符串ID、Unit/正数等值换算、状态、固定version/CAS/digest及两类冲突规则。确认窗口升级V2并在桌面/390×844展示四行完整凭证；`po_convertible_now`只在全行qualified和PO/Line/Plan全0时为true。
 - 事务/并发：最终POST锁定Award/Line、Candidate、Quote/Line、Binding、Mapping、Supplier、Material和Unit，锁后重算相同摘要；PO Line只保存固定Mapping fact。资格读与Mapping写统一part→material advisory顺序并锁后重读版本，状态/有效期/version/CAS/digest真实漂移失败关闭，无关Mapping变化不阻断；业务/Event/Audit/幂等继续原子提交。
-- 测试/隔离：无数据库组合93/93、资格/履约/Mapping Unit22/22、Fulfillment PG5/5、Supplier Mapping PG10/10、0038/0039`5/5+6/6`、Sourcing PG9/9、Binding PG18/18、upgrade3/3、npm3/3、Python三项、三个typecheck、production build、lint0 error/11既有warning、1,277文件credentials、diff及Chromium1/1通过。成功为PO/Line/Plan/queue`1/4/4/4`，全部失败路径业务计数0。
-- 预部署：候选Web`sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`、88,636,706 bytes，受限临时容器health通过。保持alpha.40/0039且没有0040；正式备份、第二库恢复、Web-only部署和purchase-only取消UAT待独立ops阶段完成。主UAT尚未登录或业务POST，失败请求与四条Mapping保持。
+- 测试/隔离：无数据库组合93/93、资格/履约/Mapping Unit22/22、Fulfillment PG5/5、Supplier Mapping PG10/10、0038/0039`5/5+6/6`、Sourcing PG9/9、Binding PG18/18、upgrade3/3、npm3/3、Python三项、三个typecheck、production build、lint0 error/11既有warning、最终1,278文件credentials、diff及Chromium1/1通过。成功为PO/Line/Plan/queue`1/4/4/4`，全部失败路径业务计数0。
+- 备份/恢复：正式custom dump为root:root0600、单硬链接、2,294,665 bytes，SHA-256`d3cf053f09948c6e4ae54caff028a7663a3750249bcaf3e8758e2f0ace49c5c2`，`pg_restore --list`3,359项；第二新库单事务恢复39/head0039、226表、四条Mapping/Binding谱系、失败请求一次及PO/Line/Plan/queue全0后删除。备份窗口`compose start worker`因已不存在的一次性migrate依赖在启动前安全退出，未改容器；随后以`docker start`恢复完全相同Worker和旧Web。
+- 部署/UAT：仅替换Web`2396c8bc…→83c1bff3…`，旧镜像保留精确FIX33回退tag；PostgreSQL/Worker/Caddy及四卷不变，未运行Migration。purchase-only桌面与390×844只执行一次预览，四行均qualified且`po_convertible_now=true`，填写本地备注后取消并logout；`preview_get=1`、`business_post=0`、Session0，失败请求和四条Mapping不变，PO/Line/Plan/queue前后`0/0/0/0`。
+- 资源/清理/Git：起点/收口available约2.1GiB，Swap`233→250MiB`，根盘18GiB，收口Load`0.55/0.39/0.39`；任务时段内核OOM0，四服务restart0/OOM false。七个隔离库、恢复库、任务容器/网络/runtime和Python临时目录精确清理，正式dump和回退镜像保留，未prune。功能提交`1f205af0bf81379345a09353d9d32ab5c7545971`，部署/文档以独立`ops: deploy Award to PO mapping validation fix`收口；未push/PR或改写历史。
 
 ## 2026-08-07
 
