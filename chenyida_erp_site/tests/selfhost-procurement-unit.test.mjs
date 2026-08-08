@@ -20,7 +20,8 @@ test("receipt inputs require every concurrency version and deterministic unique 
 
 test("procurement permissions preserve management, warehouse and read-only separation", () => {
   for (const role of ["admin", "manager", "purchase"]) assert.ok(permissionsForRole(role).includes("procurement.order"));
-  assert.ok(permissionsForRole("warehouse").includes("procurement.receive"));
+  assert.ok(!permissionsForRole("warehouse").includes("procurement.receive"));
+  assert.ok(permissionsForRole("warehouse").includes("procurement.receiving.receive"));
   assert.ok(permissionsForRole("warehouse").includes("procurement.reverse"));
   assert.ok(!permissionsForRole("warehouse").includes("procurement.order"));
   assert.ok(permissionsForRole("engineering").includes("procurement.read"));

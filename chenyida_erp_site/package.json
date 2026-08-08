@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.40",
+  "version": "0.1.0-alpha.41",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -187,6 +187,8 @@
     "test:po-history:unit": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-procurement-fulfillment-unit.test.mjs tests/selfhost-procurement-fulfillment-ui-contract.test.mjs",
     "test:po-history:postgres": "node --experimental-strip-types --test --test-concurrency=1 --test-name-pattern=\"restricted PO history\" tests/selfhost-procurement-fulfillment-postgres.test.mjs",
     "test:procurement-fulfillment:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-procurement-fulfillment-migration-upgrade.test.mjs",
+    "test:warehouse-receipt-readiness:migration": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-warehouse-receipt-readiness-migration.test.mjs",
+    "uat:warehouse-receipt-readiness": "node --experimental-strip-types scripts/selfhost-warehouse-receipt-readiness-uat-readonly-browser.mjs",
     "test:procurement-fulfillment:compose": "node scripts/selfhost-procurement-fulfillment-compose-smoke.mjs",
     "typecheck:production-handoff": "tsc -p tsconfig.phase4-task06.json --pretty false",
     "test:production-handoff:unit": "node --experimental-strip-types --test tests/selfhost-production-handoff-unit.test.mjs",

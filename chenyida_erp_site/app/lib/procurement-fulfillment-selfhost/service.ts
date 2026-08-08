@@ -11,6 +11,7 @@ import { ProcurementSourcingService } from "../procurement-sourcing-selfhost/ser
 import { buildAwardConversionPreview, type AwardConversionPreview } from "./award-conversion-preview.ts";
 import { firstAwardMappingQualificationFailure, loadAwardMappingQualification } from "./award-mapping-qualification.ts";
 import { loadPurchaseOrderHistory, type PurchaseOrderHistoryReadModel } from "./purchase-order-history.ts";
+import { loadWarehouseReceiptReadiness, type WarehouseReceiptReadiness } from "./warehouse-receipt-readiness.ts";
 
 type AwardLine = {
   award_line_id: string; award_id: string; rfq_line_id: string; selected_quote_line_id: string; comparison_id: string;
@@ -34,6 +35,22 @@ const stableIds = (value: unknown, field: string) => {
   return result.sort((left, right) => BigInt(left) < BigInt(right) ? -1 : BigInt(left) > BigInt(right) ? 1 : 0);
 };
 const exactKeys = (value: Record<string, unknown>, expected: string[]) => { const extra = Object.keys(value).find((key) => !expected.includes(key)); if (extra) throw new ProcurementError("REQUEST_VALIDATION_FAILED", `请求正文包含不支持的字段：${extra}`); };
+const strictBoolean = (value: unknown, field: string) => { if (typeof value !== "boolean") throw new ProcurementError("REQUEST_VALIDATION_FAILED", `${field} 必须是布尔值`); return value; };
+const evidenceType = (value: unknown) => {
+  const result = String(value ?? "");
+  if (!["DELIVERY_NOTE", "LOGISTICS_HANDOVER", "OTHER_EQUIVALENT"].includes(result)) {
+    throw new ProcurementError("RECEIPT_EVIDENCE_TYPE_INVALID", "送货凭证类型无效", 422);
+  }
+  return result as "DELIVERY_NOTE" | "LOGISTICS_HANDOVER" | "OTHER_EQUIVALENT";
+};
+const evidenceDate = (value: unknown) => {
+  const result = String(value ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || Number.isNaN(new Date(`${result}T00:00:00Z`).valueOf())
+      || new Date(`${result}T00:00:00Z`).toISOString().slice(0, 10) !== result) {
+    throw new ProcurementError("RECEIPT_EVIDENCE_DATE_INVALID", "送货凭证日期必须是有效的YYYY-MM-DD日期", 422);
+  }
+  return result;
+};
 
 export class ProcurementFulfillmentService {
   readonly repository: ProcurementRepository;
@@ -112,6 +129,30 @@ export class ProcurementFulfillmentService {
     }
   }
 
+  async receiptReadiness(
+    deliveryPlanId: number,
+    actor: Pick<IdentityActor, "username" | "role" | "permissions">,
+    rawQuantity: string | null,
+  ): Promise<WarehouseReceiptReadiness> {
+    const previewQuantity = rawQuantity === null || rawQuantity.trim() === "" ? null : quantity(rawQuantity, "quantity");
+    const client = await this.repository.pool.connect();
+    try {
+      await client.query("begin isolation level repeatable read read only");
+      await client.query("set local statement_timeout='5s'");
+      const preview = await loadWarehouseReceiptReadiness(client, deliveryPlanId, actor.username, previewQuantity);
+      await client.query("commit");
+      return preview;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      if (error instanceof ProcurementError) throw error;
+      throw new ProcurementError(
+        "WAREHOUSE_RECEIPT_READINESS_INCONSISTENT",
+        "仓库收货谱系、凭证或下游投影不完整，已停止展示且未修改任何数据",
+        409,
+      );
+    } finally { client.release(); }
+  }
+
   private conversionAssertions(input: Record<string, unknown>, preview: AwardConversionPreview): ConversionAssertions {
     exactKeys(input, [
       "expected_award_version", "expected_rfq_id", "expected_rfq_version", "expected_comparison_version",
@@ -184,7 +225,7 @@ export class ProcurementFulfillmentService {
 
   async receivingQueue(limit: number, offset: number, actor: Pick<IdentityActor, "username" | "role" | "permissions">) {
     const unrestricted = actor.role !== "purchase" || actor.permissions.includes("*");
-    return this.repository.pool.query(`select q.id queue_id,q.version queue_version,p.*,po.po_code,po.status po_status,pol.line_no,pol.version purchase_order_line_version,
+    return this.repository.pool.query(`select q.id queue_id,q.version queue_version,p.*,po.po_code,po.status po_status,po.version po_version,pol.line_no,pol.version purchase_order_line_version,
       (p.planned_quantity-p.received_quantity)::text remaining_quantity,s.supplier_code,s.supplier_name,m.internal_material_code,m.standard_name,u.code unit_code,
       m.inventory_type,m.inspection_type,case when m.inventory_type='STOCKED' and m.inspection_type='IQC' then 0 else coalesce(b.version,0) end balance_version,coalesce(b.on_hand_qty,0)::text on_hand_quantity,
       (p.promised_delivery_date<current_date and p.status in ('PENDING','PARTIAL')) overdue
@@ -423,26 +464,121 @@ export class ProcurementFulfillmentService {
   }
 
   async receive(deliveryPlanId: number, meta: ProcurementMeta, input: Record<string, unknown>): Promise<ProcurementResult> {
-    const receiveQuantity = quantity(input.quantity, "quantity"), expectedPlanVersion = version(input.expected_version, "expected_version"), expectedLineVersion = version(input.expected_line_version, "expected_line_version"), expectedBalanceVersion = Number(input.expected_balance_version), normalizedSupplierLotCode = supplierLotCode(input.supplier_lot_code);
-    if (!Number.isSafeInteger(expectedBalanceVersion) || expectedBalanceVersion < 0) throw new ProcurementError("REQUEST_VALIDATION_FAILED", "expected_balance_version 必须是非负整数");
-    const reason = text(input.reason ?? "仓库按到货计划收货", "reason", 1000, true);
+    for (const field of ["received_at", "receipt_date", "actual_receipt_at", "actual_arrival_at", "browser_time"]) {
+      if (field in input) throw new ProcurementError("RECEIPT_TIME_SERVER_CONTROLLED", "实际收货时间只能由服务端在最终过账时生成", 422);
+    }
+    exactKeys(input, [
+      "quantity", "supplier_lot_code", "expected_purchase_order_version", "expected_version",
+      "expected_line_version", "expected_queue_version", "expected_balance_version",
+      "evidence_type", "evidence_reference", "evidence_document_date", "expected_early_arrival",
+      "early_arrival_reason", "early_arrival_confirmed", "physical_receipt_confirmed",
+      "expected_target_location_code", "reason",
+    ]);
+    const receiveQuantity = quantity(input.quantity, "quantity");
+    const expectedPurchaseOrderVersion = version(input.expected_purchase_order_version, "expected_purchase_order_version");
+    const expectedPlanVersion = version(input.expected_version, "expected_version");
+    const expectedLineVersion = version(input.expected_line_version, "expected_line_version");
+    const expectedQueueVersion = version(input.expected_queue_version, "expected_queue_version");
+    const expectedBalanceVersion = version(input.expected_balance_version, "expected_balance_version");
+    const normalizedSupplierLotCode = input.supplier_lot_code == null || String(input.supplier_lot_code).trim() === ""
+      ? null : supplierLotCode(input.supplier_lot_code);
+    const normalizedEvidenceType = evidenceType(input.evidence_type);
+    const evidenceReference = text(input.evidence_reference, "送货凭证编号", 128, true);
+    const evidenceDocumentDate = evidenceDate(input.evidence_document_date);
+    const expectedEarlyArrival = strictBoolean(input.expected_early_arrival, "expected_early_arrival");
+    const earlyArrivalReasonText = text(input.early_arrival_reason, "提前到货原因", 1000);
+    const earlyArrivalReason = earlyArrivalReasonText || null;
+    const earlyArrivalConfirmed = strictBoolean(input.early_arrival_confirmed, "early_arrival_confirmed");
+    const physicalReceiptConfirmed = strictBoolean(input.physical_receipt_confirmed, "physical_receipt_confirmed");
+    const expectedTargetLocationCode = String(input.expected_target_location_code ?? "");
+    const reason = text(input.reason, "收货说明", 1000, true);
+    if (!physicalReceiptConfirmed) {
+      throw new ProcurementError("PHYSICAL_RECEIPT_CONFIRMATION_REQUIRED", "必须明确确认本次登记的是已实际到达MAIN库位的物理收货", 422);
+    }
+    if (expectedTargetLocationCode !== "MAIN") {
+      throw new ProcurementError("RECEIPT_TARGET_LOCATION_CONFLICT", "目标库位已变化或不是当前唯一权威库位MAIN", 409);
+    }
     return this.repository.execute(meta, async (client) => {
-      const planResult = await client.query("select * from purchase_delivery_plans where id=$1 for update", [deliveryPlanId]); const plan = planResult.rows[0];
+      const planResult = await client.query(`select plan.*,
+          purchase_order.version purchase_order_version,purchase_order.status purchase_order_status,
+          purchase_order_line.version purchase_order_line_version,purchase_order_line.status purchase_order_line_status,
+          purchase_order_line.order_qty,purchase_order_line.received_qty,
+          queue.id queue_id,queue.version queue_version,queue.closed_at,
+          material.material_status,material.inventory_type,material.inspection_type,supplier.status supplier_status
+        from purchase_delivery_plans plan
+        join purchase_orders purchase_order on purchase_order.id=plan.purchase_order_id
+        join purchase_order_lines purchase_order_line on purchase_order_line.id=plan.purchase_order_line_id
+          and purchase_order_line.purchase_order_id=purchase_order.id
+        join warehouse_receiving_queue_entries queue on queue.delivery_plan_id=plan.id
+        join material_master material on material.id=plan.material_id and material.id=purchase_order_line.material_id
+        join suppliers supplier on supplier.id=plan.supplier_id and supplier.id=purchase_order.supplier_id
+        where plan.id=$1 for update of purchase_order,purchase_order_line,plan,queue`, [deliveryPlanId]);
+      const plan = planResult.rows[0];
       if (!plan) throw new ProcurementError("DELIVERY_PLAN_NOT_FOUND", "到货计划不存在", 404);
-      if (!['PENDING','PARTIAL'].includes(String(plan.status)) || Number(plan.version) !== expectedPlanVersion) throw new ProcurementError("DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT", "到货计划版本已变化或当前状态不可收货", 409);
-      if (!(await client.query("select 1 from warehouse_receiving_queue_entries where delivery_plan_id=$1 and closed_at is null for update", [deliveryPlanId])).rows[0]) throw new ProcurementError("RECEIVING_QUEUE_CLOSED", "待入库记录已关闭", 409);
-      const allowed = await client.query("select $1::numeric<=($2::numeric-$3::numeric) ok", [receiveQuantity, plan.planned_quantity, plan.received_quantity]);
+      if (!["OPEN", "PARTIALLY_RECEIVED"].includes(String(plan.purchase_order_status))
+          || Number(plan.purchase_order_version) !== expectedPurchaseOrderVersion) {
+        throw new ProcurementError("PURCHASE_ORDER_VERSION_OR_STATE_CONFLICT", "采购订单版本已变化或当前状态不可收货", 409);
+      }
+      if (!["OPEN", "PARTIALLY_RECEIVED"].includes(String(plan.purchase_order_line_status))
+          || Number(plan.purchase_order_line_version) !== expectedLineVersion) {
+        throw new ProcurementError("PURCHASE_ORDER_LINE_VERSION_CONFLICT", "采购明细版本已变化或当前状态不可收货", 409);
+      }
+      if (!["PENDING", "PARTIAL"].includes(String(plan.status)) || Number(plan.version) !== expectedPlanVersion) {
+        throw new ProcurementError("DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT", "到货计划版本已变化或当前状态不可收货", 409);
+      }
+      if (plan.closed_at != null || Number(plan.queue_version) !== expectedQueueVersion) {
+        throw new ProcurementError("RECEIVING_QUEUE_VERSION_OR_STATE_CONFLICT", "待入库队列版本已变化或已经关闭", 409);
+      }
+      if (String(plan.supplier_status) !== "ACTIVE") throw new ProcurementError("SUPPLIER_NOT_ACTIVE", "供应商不存在或未启用，不能继续收货", 422);
+      if (String(plan.material_status) !== "ACTIVE") throw new ProcurementError("MATERIAL_NOT_ACTIVE", "物料不存在或未启用，不能继续收货", 422);
+      const allowed = await client.query("select $1::numeric<=least($2::numeric-$3::numeric,$4::numeric-$5::numeric) ok", [receiveQuantity, plan.planned_quantity, plan.received_quantity, plan.order_qty, plan.received_qty]);
       if (!allowed.rows[0].ok) throw new ProcurementError("PURCHASE_RECEIPT_OVER_QUANTITY", "收货数量超过到货计划未收数量", 409);
+      const timing = (await client.query<{ receipt_date: string; early_arrival: boolean }>(`select
+        (transaction_timestamp() at time zone 'Asia/Shanghai')::date::text receipt_date,
+        ((transaction_timestamp() at time zone 'Asia/Shanghai')::date<$1::date) early_arrival`, [plan.promised_delivery_date])).rows[0];
+      if (!timing) throw new ProcurementError("INTERNAL_ERROR", "服务器暂时无法生成权威收货时间", 500);
+      if (evidenceDocumentDate > timing.receipt_date) {
+        throw new ProcurementError("RECEIPT_EVIDENCE_FUTURE_DATE", "送货凭证日期不能晚于服务端实际收货日期", 422);
+      }
+      if (timing.early_arrival !== expectedEarlyArrival) {
+        throw new ProcurementError("RECEIPT_CONFIRMATION_STALE", "提前到货判断已变化，请关闭后重新核对收货", 409);
+      }
+      if (timing.early_arrival && (!earlyArrivalReason || !earlyArrivalConfirmed)) {
+        throw new ProcurementError("EARLY_ARRIVAL_EVIDENCE_REQUIRED", "提前到货必须填写可审计送货凭证、提前到货原因并明确确认", 422);
+      }
+      if (!timing.early_arrival && (earlyArrivalReason || earlyArrivalConfirmed)) {
+        throw new ProcurementError("EARLY_ARRIVAL_EVIDENCE_NOT_APPLICABLE", "当前不是提前到货，请移除提前到货原因和确认", 422);
+      }
       const receipt = await this.procurement.createReceiptInTransaction(client, meta, Number(plan.purchase_order_id), [{ purchaseOrderLineId: Number(plan.purchase_order_line_id), quantity: receiveQuantity, expectedLineVersion, expectedBalanceVersion, supplierLotCode: normalizedSupplierLotCode }], reason);
       const data = receipt.body.data as Record<string, unknown>, receiptLine = (data.lines as Record<string, unknown>[])[0];
       await client.query(`insert into purchase_receipt_delivery_allocations(purchase_receipt_line_id,delivery_plan_id,quantity,created_by,request_id) values($1,$2,$3,$4,$5)`, [Number(receiptLine.id), deliveryPlanId, receiveQuantity, meta.actor.username, meta.requestId]);
+      await this.fault?.("after_receipt_allocation");
       const updated = await client.query(`update purchase_delivery_plans set received_quantity=received_quantity+$2::numeric,status=case when received_quantity+$2::numeric=planned_quantity then 'COMPLETED' else 'PARTIAL' end,
         version=version+1,updated_by=$3,updated_at=now() where id=$1 and version=$4 returning *`, [deliveryPlanId, receiveQuantity, meta.actor.username, expectedPlanVersion]);
       if (!updated.rows[0]) throw new ProcurementError("DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT", "到货计划版本已变化", 409);
       await client.query("insert into purchase_delivery_plan_events(delivery_plan_id,purchase_receipt_id,from_status,to_status,event_type,quantity,reason,actor,request_id) values($1,$2,$3,$4,'RECEIPT_POSTED',$5,$6,$7,$8)", [deliveryPlanId, Number(data.id), plan.status, updated.rows[0].status, receiveQuantity, reason, meta.actor.username, meta.requestId]);
-      if (updated.rows[0].status === "COMPLETED") await client.query("update warehouse_receiving_queue_entries set version=version+1,updated_by=$2,updated_at=now(),closed_by=$2,closed_at=now(),close_reason='到货计划已完成' where delivery_plan_id=$1 and closed_at is null", [deliveryPlanId, meta.actor.username]);
-      await this.fault?.("after_receipt_allocation");
-      return { ...receipt, body: { ...receipt.body, delivery_plan: updated.rows[0] } };
+      const queue = await client.query(`update warehouse_receiving_queue_entries set version=version+1,
+          updated_by=$2,updated_at=now(),closed_by=case when $3::text='COMPLETED' then $2 else null end,
+          closed_at=case when $3::text='COMPLETED' then now() else null end,
+          close_reason=case when $3::text='COMPLETED' then '到货计划已完成' else '' end
+        where id=$1 and version=$4 and closed_at is null returning *`, [Number(plan.queue_id), meta.actor.username, updated.rows[0].status, expectedQueueVersion]);
+      if (!queue.rows[0]) throw new ProcurementError("RECEIVING_QUEUE_VERSION_OR_STATE_CONFLICT", "待入库队列版本已变化或已经关闭", 409);
+      const evidence = await client.query(`insert into warehouse_receipt_evidence(
+          purchase_receipt_id,purchase_receipt_line_id,delivery_plan_id,queue_entry_id,
+          evidence_type,evidence_reference,evidence_document_date,early_arrival,early_arrival_reason,
+          early_arrival_confirmed,physical_receipt_confirmed,target_location_code,
+          expected_purchase_order_version,expected_purchase_order_line_version,expected_delivery_plan_version,
+          expected_queue_version,expected_balance_version,created_by,request_id,created_at)
+        select $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'MAIN',$12,$13,$14,$15,$16,$17,$18,receipt.created_at
+        from purchase_receipts receipt where receipt.id=$1 returning *`, [
+        Number(data.id), Number(receiptLine.id), deliveryPlanId, Number(plan.queue_id), normalizedEvidenceType,
+        evidenceReference, evidenceDocumentDate, timing.early_arrival, earlyArrivalReason,
+        earlyArrivalConfirmed, physicalReceiptConfirmed, expectedPurchaseOrderVersion, expectedLineVersion,
+        expectedPlanVersion, expectedQueueVersion, expectedBalanceVersion, meta.actor.username, meta.requestId,
+      ]);
+      if (!evidence.rows[0]) throw new ProcurementError("WAREHOUSE_RECEIPT_EVIDENCE_NOT_CREATED", "收货证据未能与收货单建立关系，已整体回滚", 409);
+      await this.fault?.("after_receipt_evidence");
+      return { ...receipt, body: { ...receipt.body, delivery_plan: updated.rows[0], receiving_queue: queue.rows[0], warehouse_receipt_evidence: evidence.rows[0] } };
     });
   }
 

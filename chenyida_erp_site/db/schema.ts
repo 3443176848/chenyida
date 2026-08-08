@@ -904,6 +904,42 @@ export const purchaseReceiptDeliveryAllocations = pgTable("purchase_receipt_deli
   id: bigserial("id", { mode: "number" }).primaryKey(), purchaseReceiptLineId: bigint("purchase_receipt_line_id", { mode: "number" }).notNull().references(() => purchaseReceiptLines.id, { onDelete: "restrict" }), deliveryPlanId: bigint("delivery_plan_id", { mode: "number" }).notNull().references(() => purchaseDeliveryPlans.id, { onDelete: "restrict" }), quantity: numeric("quantity", { precision: 24, scale: 6 }).notNull(), reversalOfAllocationId: bigint("reversal_of_allocation_id", { mode: "number" }), createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [foreignKey({ name: "purchase_receipt_delivery_allocations_reversal_fk", columns: [t.reversalOfAllocationId], foreignColumns: [t.id] }).onDelete("restrict"), uniqueIndex("purchase_receipt_delivery_allocations_receipt_line_uq").on(t.purchaseReceiptLineId), uniqueIndex("purchase_receipt_delivery_allocations_reversal_uq").on(t.reversalOfAllocationId).where(sql`${t.reversalOfAllocationId} is not null`), index("purchase_receipt_delivery_allocations_plan_idx").on(t.deliveryPlanId, t.id), check("purchase_receipt_delivery_allocations_quantity_ck", sql`${t.quantity}>0`)]);
 
+export const warehouseReceiptEvidence = pgTable("warehouse_receipt_evidence", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  purchaseReceiptId: bigint("purchase_receipt_id", { mode: "number" }).notNull().references(() => purchaseReceipts.id, { onDelete: "restrict" }),
+  purchaseReceiptLineId: bigint("purchase_receipt_line_id", { mode: "number" }).notNull().references(() => purchaseReceiptLines.id, { onDelete: "restrict" }),
+  deliveryPlanId: bigint("delivery_plan_id", { mode: "number" }).notNull().references(() => purchaseDeliveryPlans.id, { onDelete: "restrict" }),
+  queueEntryId: bigint("queue_entry_id", { mode: "number" }).notNull().references(() => warehouseReceivingQueueEntries.id, { onDelete: "restrict" }),
+  evidenceType: text("evidence_type").notNull(),
+  evidenceReference: text("evidence_reference").notNull(),
+  evidenceDocumentDate: date("evidence_document_date", { mode: "string" }).notNull(),
+  earlyArrival: boolean("early_arrival").notNull(),
+  earlyArrivalReason: text("early_arrival_reason"),
+  earlyArrivalConfirmed: boolean("early_arrival_confirmed").notNull().default(false),
+  physicalReceiptConfirmed: boolean("physical_receipt_confirmed").notNull(),
+  targetLocationCode: text("target_location_code").notNull().default("MAIN"),
+  expectedPurchaseOrderVersion: integer("expected_purchase_order_version").notNull(),
+  expectedPurchaseOrderLineVersion: integer("expected_purchase_order_line_version").notNull(),
+  expectedDeliveryPlanVersion: integer("expected_delivery_plan_version").notNull(),
+  expectedQueueVersion: integer("expected_queue_version").notNull(),
+  expectedBalanceVersion: integer("expected_balance_version").notNull(),
+  createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
+  requestId: uuid("request_id").notNull(),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("warehouse_receipt_evidence_receipt_uq").on(t.purchaseReceiptId),
+  uniqueIndex("warehouse_receipt_evidence_receipt_line_uq").on(t.purchaseReceiptLineId),
+  uniqueIndex("warehouse_receipt_evidence_request_uq").on(t.requestId),
+  index("warehouse_receipt_evidence_plan_idx").on(t.deliveryPlanId, t.id),
+  index("warehouse_receipt_evidence_queue_idx").on(t.queueEntryId, t.id),
+  check("warehouse_receipt_evidence_type_ck", sql`${t.evidenceType} in ('DELIVERY_NOTE','LOGISTICS_HANDOVER','OTHER_EQUIVALENT')`),
+  check("warehouse_receipt_evidence_reference_ck", sql`char_length(btrim(${t.evidenceReference})) between 1 and 128 and ${t.evidenceReference} !~ '[[:cntrl:]]'`),
+  check("warehouse_receipt_evidence_early_ck", sql`(${t.earlyArrival} and ${t.earlyArrivalConfirmed} and ${t.earlyArrivalReason} is not null and char_length(btrim(${t.earlyArrivalReason})) between 1 and 1000 and ${t.earlyArrivalReason} !~ '[[:cntrl:]]') or (not ${t.earlyArrival} and not ${t.earlyArrivalConfirmed} and ${t.earlyArrivalReason} is null)`),
+  check("warehouse_receipt_evidence_physical_ck", sql`${t.physicalReceiptConfirmed}`),
+  check("warehouse_receipt_evidence_location_ck", sql`${t.targetLocationCode}='MAIN'`),
+  check("warehouse_receipt_evidence_versions_ck", sql`${t.expectedPurchaseOrderVersion}>0 and ${t.expectedPurchaseOrderLineVersion}>0 and ${t.expectedDeliveryPlanVersion}>0 and ${t.expectedQueueVersion}>0 and ${t.expectedBalanceVersion}>=0`),
+]);
+
 export const purchaseDeliveryPlanEvents = pgTable("purchase_delivery_plan_events", {
   id: bigserial("id", { mode: "number" }).primaryKey(), deliveryPlanId: bigint("delivery_plan_id", { mode: "number" }).notNull().references(() => purchaseDeliveryPlans.id, { onDelete: "restrict" }), purchaseReceiptId: bigint("purchase_receipt_id", { mode: "number" }).references(() => purchaseReceipts.id, { onDelete: "restrict" }), fromStatus: text("from_status"), toStatus: text("to_status").notNull(), eventType: text("event_type").notNull(), quantity: numeric("quantity", { precision: 24, scale: 6 }), reason: text("reason").notNull().default(""), actor: text("actor").notNull().references(() => appUsers.username, { onDelete: "restrict" }), requestId: uuid("request_id").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [index("purchase_delivery_plan_events_plan_idx").on(t.deliveryPlanId, t.id), index("purchase_delivery_plan_events_request_idx").on(t.requestId, t.id), check("purchase_delivery_plan_events_status_ck", sql`(${t.fromStatus} is null or ${t.fromStatus} in ('PENDING','PARTIAL','COMPLETED','CANCELLED','CLOSED')) and ${t.toStatus} in ('PENDING','PARTIAL','COMPLETED','CANCELLED','CLOSED')`), check("purchase_delivery_plan_events_type_ck", sql`${t.eventType} in ('CREATED','RECEIPT_POSTED','RECEIPT_REVERSED','CANCELLED','CLOSED')`), check("purchase_delivery_plan_events_quantity_ck", sql`(${t.eventType} in ('RECEIPT_POSTED','RECEIPT_REVERSED') and ${t.quantity}>0 and ${t.purchaseReceiptId} is not null) or (${t.eventType} not in ('RECEIPT_POSTED','RECEIPT_REVERSED') and ${t.quantity} is null)`), check("purchase_delivery_plan_events_reason_ck", sql`char_length(${t.reason})<=1000`)]);

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
+import { requestOriginMatches } from "../app/lib/infrastructure/request-origin.ts";
 import { buildAwardConversionPreview } from "../app/lib/procurement-fulfillment-selfhost/award-conversion-preview.ts";
 import { legacyConversionHttpStatus, projectedQueueStatus, supplierSequenceLabel } from "../app/lib/procurement-fulfillment-selfhost/purchase-order-history.ts";
 import { buildAwardHistoryReadModel } from "../app/lib/procurement-sourcing-selfhost/award-read-model.ts";
@@ -91,10 +92,32 @@ test("fulfillment orchestrator reuses procurement receipt, inventory and finance
   assert.match(source,/SOURCING_AWARD/);assert.match(source,/supplier_id.*currency_code/);assert.match(source,/PURCHASE_RECEIPT_OVER_QUANTITY/);assert.match(source,/RECEIPT_REVERSAL_BLOCKED_BY_AP/);
 });
 
-test("0019 is the only new migration and protects relationship facts",async()=>{
+test("0019 remains the immutable fulfillment baseline and protects relationship facts",async()=>{
   const sql=await readFile(new URL("../drizzle-postgres/0019_sourcing_purchase_fulfillment.sql",import.meta.url),"utf8");
   for(const table of ["procurement_award_po_line_links","purchase_delivery_plans","warehouse_receiving_queue_entries","purchase_receipt_delivery_allocations","purchase_delivery_plan_events"])assert.match(sql,new RegExp(`CREATE TABLE "${table}"`));
   assert.match(sql,/award has purchase order/);assert.match(sql,/procurement_fulfillment_service_write/);assert.match(sql,/delivery plan received quantity must match purchase order line/);assert.match(sql,/procurement_fulfillment_immutable/);
+});
+
+test("0040 adds immutable relational receipt evidence and the server-only preview/final-post contract",async()=>{
+  const migration=await readFile(new URL("../drizzle-postgres/0040_warehouse_receipt_readiness.sql",import.meta.url),"utf8");
+  const service=await readFile(new URL("../app/lib/procurement-fulfillment-selfhost/service.ts",import.meta.url),"utf8");
+  const handler=await readFile(new URL("../app/lib/procurement-fulfillment-selfhost/handler.ts",import.meta.url),"utf8");
+  const readModel=await readFile(new URL("../app/lib/procurement-fulfillment-selfhost/warehouse-receipt-readiness.ts",import.meta.url),"utf8");
+  const api=await readFile(new URL("../app/lib/selfhost-api.ts",import.meta.url),"utf8");
+  assert.match(migration,/CREATE TABLE "warehouse_receipt_evidence"/);assert.match(migration,/purchase_receipt_id/);assert.match(migration,/delivery_plan_id/);assert.match(migration,/queue_entry_id/);assert.match(migration,/evidence_document_date/);assert.match(migration,/early_arrival_reason/);assert.match(migration,/physical_receipt_confirmed/);assert.match(migration,/expected_purchase_order_version/);assert.match(migration,/expected_queue_version/);assert.match(migration,/cyd_warehouse_receipt_evidence_guard/);assert.match(migration,/warehouse receipt evidence is immutable/);assert.match(migration,/warehouse receipt evidence lineage mismatch/);assert.doesNotMatch(migration,/alter table "supplier_mappings"/i);
+  assert.match(handler,/receipt-preview/);assert.match(handler,/request\.method === "GET" && receiptReadiness/);assert.match(handler,/procurement\.receiving\.receive/);assert.match(handler,/收货核对预览仅支持只读GET/);
+  assert.match(service,/begin isolation level repeatable read read only/);assert.match(service,/for update of purchase_order,purchase_order_line,plan,queue/);assert.match(service,/PURCHASE_ORDER_VERSION_OR_STATE_CONFLICT/);assert.match(service,/PURCHASE_ORDER_LINE_VERSION_CONFLICT/);assert.match(service,/DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT/);assert.match(service,/RECEIVING_QUEUE_VERSION_OR_STATE_CONFLICT/);assert.match(service,/EARLY_ARRIVAL_EVIDENCE_REQUIRED/);assert.match(service,/RECEIPT_EVIDENCE_FUTURE_DATE/);assert.match(service,/RECEIPT_TIME_SERVER_CONTROLLED/);assert.match(service,/after_receipt_evidence/);assert.match(service,/insert into warehouse_receipt_evidence/);
+  assert.match(readModel,/WAREHOUSE_RECEIPT_READINESS_V1/);assert.match(readModel,/Asia\/Shanghai/);assert.match(readModel,/system\.audit\.read/);assert.match(readModel,/PO OPEN不代表已到货/);assert.match(readModel,/Plan PENDING不代表已收货/);assert.match(readModel,/queue OPEN_PENDING不代表库存增加/);assert.match(readModel,/supplier_notification_or_in_transit_model_available: false/);assert.doesNotMatch(readModel,/idempotency_key_digest|request_body|response_body|session_header/i);
+  assert.match(api,/requestOriginMatches/);assert.match(api,/请求来源校验失败/);assert.match(api,/requireCsrf/);
+  assert.ok(permissionsForRole("warehouse").includes("procurement.receiving.receive"));assert.ok(!permissionsForRole("warehouse").includes("procurement.receive"));assert.ok(!permissionsForRole("warehouse").includes("quality.inspect"));assert.ok(permissionsForRole("quality").includes("quality.inspect"));
+});
+
+test("warehouse receipt writes accept only the configured exact Origin",()=>{
+  const publicOrigin="https://erp.example.test";
+  assert.equal(requestOriginMatches(new Request(`${publicOrigin}/api/procurement/delivery-plans/1/receipts`,{headers:{Origin:publicOrigin}}),publicOrigin),true);
+  assert.equal(requestOriginMatches(new Request(`${publicOrigin}/api/procurement/delivery-plans/1/receipts`,{headers:{Origin:"https://evil.example"}}),publicOrigin),false);
+  assert.equal(requestOriginMatches(new Request(`${publicOrigin}/api/procurement/delivery-plans/1/receipts`),publicOrigin),false);
+  assert.equal(requestOriginMatches(new Request(`${publicOrigin}/api/procurement/delivery-plans/1/receipts`,{headers:{Origin:`${publicOrigin}/path`}}),publicOrigin),false);
 });
 
 test("authoritative Award conversion preview derives one PO, four Lines and four direct Plan aggregates",()=>{

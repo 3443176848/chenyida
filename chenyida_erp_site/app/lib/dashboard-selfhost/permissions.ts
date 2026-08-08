@@ -9,4 +9,4 @@ const ROLE_DOMAINS:Record<string,DashboardDomain[]>={
 export function requireDashboard(actor:DashboardActor){if(!hasPermission(actor,"dashboard.read"))throw new DashboardError("PERMISSION_DENIED","没有权限读取经营看板",403);}
 export function requireManagement(actor:DashboardActor){requireDashboard(actor);if(!hasPermission(actor,"dashboard.management.read"))throw new DashboardError("PERMISSION_DENIED","没有权限读取管理看板",403);}
 export function canReadDomain(actor:DashboardActor,domain:DashboardDomain){return(ROLE_DOMAINS[actor.role]??[]).includes(domain);}
-export function permittedModules(actor:DashboardActor,modules:DashboardModule[]){return modules.filter(item=>hasPermission(actor,item.permission));}
+export function permittedModules(actor:DashboardActor,modules:DashboardModule[]){return modules.filter(item=>hasPermission(actor,item.permission)&&!item.excludedRoles?.includes(actor.role));}

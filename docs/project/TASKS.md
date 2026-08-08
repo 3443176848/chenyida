@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前无`DOING`。`SELFHOST-UAT-FIX-36`已完成受限历史DTO、响应式只读详情、跨数据域403、凭证最小投影、下游零投影、正式备份恢复、Web-only部署和purchase-only主UAT；D-105继续保持前向授权且不追溯授权原始写入。任何到货/仓库收货试用必须另立任务并获得明确授权；IQC、Ledger、AP、付款和生产写入仍分别禁止。
+| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-UAT-FIX-37 | Warehouse Receipt Readiness and Date Safeguards | DOING | Codex（严格门禁、Schema/语义诊断、最小权限读模型、两阶段确认、日期/证据保护、职责隔离、串行测试、备份恢复、受控部署、warehouse-only零POST主UAT、清理与文档）、项目负责人（固定D-105保护、实现/部署授权及主UAT零业务POST边界） | 2026-08-08 | — | SELFHOST-UAT-FIX-36、SELFHOST-UAT-DECISION-35、SELFHOST-PHASE5-TASK10、D-105 | 只允许warehouse只读与打开权威收货预览后取消；不得实际收货、IQC、Ledger、AP、付款或生产。先核验0034/0039关系模型，按证据字段完整性决定保持alpha.40/0039或新增唯一0040/alpha.41。见[任务文档](../tasks/SELFHOST-UAT-FIX-37.md)。 |
 
 ## 已完成任务
 

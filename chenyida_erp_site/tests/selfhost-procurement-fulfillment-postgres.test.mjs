@@ -8,7 +8,9 @@ import { handleProcurementFulfillmentApi } from "../app/lib/procurement-fulfillm
 import { loadAwardMappingQualification } from "../app/lib/procurement-fulfillment-selfhost/award-mapping-qualification.ts";
 import { ProcurementFulfillmentService } from "../app/lib/procurement-fulfillment-selfhost/service.ts";
 import { ProcurementRepository } from "../app/lib/procurement-selfhost/repository.ts";
+import { handleProcurementApi } from "../app/lib/procurement-selfhost/handler.ts";
 import { handleProcurementSourcingApi } from "../app/lib/procurement-sourcing-selfhost/handler.ts";
+import { handleQualityApi } from "../app/lib/quality-selfhost/handler.ts";
 import { handleSupplierMappingApi } from "../app/lib/supplier-mapping-selfhost/handler.ts";
 import { withSupplierMappingFixtureTriggersDisabled } from "./helpers/supplier-mapping-fixture.mjs";
 
@@ -16,8 +18,26 @@ const databaseUrl=process.env.TEST_PROCUREMENT_FULFILLMENT_DATABASE_URL;if(!data
 const pool=new Pool({connectionString:databaseUrl,max:2,application_name:"procurement-fulfillment-test"});
 const actor=(role,username=`${role}01`)=>({username,display_name:role,role,is_active:true,must_change_password:false,version:1,last_login_at:null,permissions:permissionsForRole(role)});
 async function call(handler,path,{method="GET",role="purchase",username,key=randomUUID(),body,csrf=true,poolOverride=pool}={}){const requestId=randomUUID(),headers=new Headers({"X-Request-ID":requestId});if(body!==undefined)headers.set("Content-Type","application/json");if(key)headers.set("Idempotency-Key",key);if(csrf)headers.set("X-CSRF-Token","test-csrf");const request=new Request(`http://local.test${path}`,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});const response=await handler(request,{pool:poolOverride,actor:actor(role,username),requestId,requireCsrf:()=>{if(headers.get("X-CSRF-Token")!=="test-csrf")throw Object.assign(new Error("CSRF Token 无效"),{code:"CSRF_INVALID",status:403})}});assert.ok(response);return{response,payload:await response.json()}}
-const fulfillment=(path,options)=>call(handleProcurementFulfillmentApi,path,options),finance=(path,options)=>call(handleFinanceApi,path,options),sourcing=(path,options)=>call(handleProcurementSourcingApi,path,options),supplierMapping=(path,options)=>call(handleSupplierMappingApi,path,options);
+const fulfillment=(path,options)=>call(handleProcurementFulfillmentApi,path,options),procurement=(path,options)=>call(handleProcurementApi,path,options),finance=(path,options)=>call(handleFinanceApi,path,options),quality=(path,options)=>call(handleQualityApi,path,{role:"quality",...options}),sourcing=(path,options)=>call(handleProcurementSourcingApi,path,options),supplierMapping=(path,options)=>call(handleSupplierMappingApi,path,options);
 async function conversionBody(awardId,remark="履约隔离测试PO备注") { const preview=await fulfillment(`/api/procurement/awards/${awardId}/purchase-order-conversion-preview`);assert.equal(preview.response.status,200,JSON.stringify(preview.payload));assert.equal(preview.payload.data.po_convertible_now,true);return{...preview.payload.data.confirmation,remark} }
+async function receiptBody(planId, receiveQuantity, overrides={}) {
+  const preview = await fulfillment(`/api/procurement/delivery-plans/${planId}/receipt-preview?quantity=${encodeURIComponent(receiveQuantity)}`, { role: "warehouse" });
+  assert.equal(preview.response.status, 200, JSON.stringify(preview.payload));
+  const readiness = preview.payload.data;
+  return {
+    ...readiness.confirmation,
+    quantity: receiveQuantity,
+    supplier_lot_code: readiness.selected_receipt.supplier_lot.applicability === "REQUIRED_FOR_IQC" ? `SUP-LOT-${randomUUID()}` : "",
+    evidence_type: "DELIVERY_NOTE",
+    evidence_reference: `ISOLATED-${randomUUID()}`,
+    evidence_document_date: readiness.selected_receipt.server_date_shanghai,
+    early_arrival_reason: readiness.selected_receipt.is_early_arrival ? "隔离数据库提前到货门禁测试" : "",
+    early_arrival_confirmed: readiness.selected_receipt.is_early_arrival,
+    physical_receipt_confirmed: true,
+    reason: "隔离数据库实际物理收货测试",
+    ...overrides,
+  };
+}
 
 async function insertGovernedMappingFixture(client, { materialId, supplierId, supplierCode, supplierName, supplierPartNumber, unitId }) {
   const createdRequestId = randomUUID(), submittedRequestId = randomUUID(), reviewedRequestId = randomUUID();
@@ -91,7 +111,13 @@ async function conversionBusinessCounts() {
 }
 
 let sequence=0;
-async function seedAward(lineCount=1) {
+async function seedAward(lineCount=1, {
+  inspectionType = "NONE",
+  promisedDeliveryDate = "2026-10-20",
+  targetDeliveryDate = "2026-10-20",
+  responseDeadline = "2026-09-01",
+  quoteValidUntil = "2027-12-31",
+} = {}) {
   sequence += 1;
   const suffix = String(sequence).padStart(8, "0");
   const sourceDigest = createHash("sha256").update("source-" + sequence).digest("hex");
@@ -132,8 +158,8 @@ async function seedAward(lineCount=1) {
       if (!material) {
         const baseUnitId = lineCount === 4 ? null : unitId;
         material = (await client.query(
-          "insert into material_master(internal_material_code,standard_name,category_id,base_uom,base_unit_id,material_status,procurement_type,inventory_type,inspection_type,environmental_requirement,source_type,last_modified_by,created_by,updated_by,request_id) values($1,$2,$3,'PCS',$4,'ACTIVE','PURCHASE','STOCKED','NONE','ROHS','MANUAL','admin01','admin01','admin01',$5) returning id",
-          [materialCode, `履约物料 ${lineNo}`, category.id, baseUnitId, randomUUID()],
+          "insert into material_master(internal_material_code,standard_name,category_id,base_uom,base_unit_id,material_status,procurement_type,inventory_type,inspection_type,environmental_requirement,source_type,last_modified_by,created_by,updated_by,request_id) values($1,$2,$3,'PCS',$4,'ACTIVE','PURCHASE','STOCKED',$5,'ROHS','MANUAL','admin01','admin01','admin01',$6) returning id",
+          [materialCode, `履约物料 ${lineNo}`, category.id, baseUnitId, inspectionType, randomUUID()],
         )).rows[0];
       }
       materialIds.push(Number(material.id));
@@ -173,20 +199,20 @@ async function seedAward(lineCount=1) {
     }
 
     const project = await client.query(
-      "insert into business_projects(project_code,customer_id,project_name,project_goal,market_owner,project_owner,status,target_delivery_date,current_requirement_version_no,version,request_id,created_by) values($1,$2,$3,'履约验收','admin01','engineering01','ACCEPTED','2026-10-20',1,4,$4,'admin01') returning id",
-      ["PRJ-" + suffix, customer.id, "履约项目 " + sequence, randomUUID()],
+      "insert into business_projects(project_code,customer_id,project_name,project_goal,market_owner,project_owner,status,target_delivery_date,current_requirement_version_no,version,request_id,created_by) values($1,$2,$3,'履约验收','admin01','engineering01','ACCEPTED',$4,1,4,$5,'admin01') returning id",
+      ["PRJ-" + suffix, customer.id, "履约项目 " + sequence, targetDeliveryDate, randomUUID()],
     );
     const requirement = await client.query(
       "insert into project_requirement_versions(project_id,version_no,customer_requirement_summary,quantity_requirement,quantity_unit,content_digest,created_by) values($1,1,'固化需求',10,'PCS',$2,'admin01') returning id",
       [project.rows[0].id, sourceDigest],
     );
     const planningPackage = await client.query(
-      "insert into project_planning_packages(project_id,package_version_no,requirement_version_id,status,target_delivery_date,package_digest,prepared_by,submitted_by,submitted_at,accepted_by,accepted_at,version,request_id) values($1,1,$2,'ACCEPTED','2026-10-20',$3,'engineering01','engineering01',now(),'planning01',now(),3,$4) returning id",
-      [project.rows[0].id, requirement.rows[0].id, sourceDigest, randomUUID()],
+      "insert into project_planning_packages(project_id,package_version_no,requirement_version_id,status,target_delivery_date,package_digest,prepared_by,submitted_by,submitted_at,accepted_by,accepted_at,version,request_id) values($1,1,$2,'ACCEPTED',$3,$4,'engineering01','engineering01',now(),'planning01',now(),3,$5) returning id",
+      [project.rows[0].id, requirement.rows[0].id, targetDeliveryDate, sourceDigest, randomUUID()],
     );
     const plan = await client.query(
-      "insert into planning_material_requirement_plans(project_id,planning_package_id,plan_version_no,required_date,status,source_package_version,source_package_digest,calculation_digest,prepared_by,submitted_by,submitted_at,version,request_id) values($1,$2,1,'2026-10-20','SUBMITTED',3,$3,$4,'planning01','planning01',now(),1,$5) returning id",
-      [project.rows[0].id, planningPackage.rows[0].id, sourceDigest, createHash("sha256").update("calc-" + sequence).digest("hex"), randomUUID()],
+      "insert into planning_material_requirement_plans(project_id,planning_package_id,plan_version_no,required_date,status,source_package_version,source_package_digest,calculation_digest,prepared_by,submitted_by,submitted_at,version,request_id) values($1,$2,1,$3,'SUBMITTED',3,$4,$5,'planning01','planning01',now(),1,$6) returning id",
+      [project.rows[0].id, planningPackage.rows[0].id, targetDeliveryDate, sourceDigest, createHash("sha256").update("calc-" + sequence).digest("hex"), randomUUID()],
     );
     const planLineIds = [];
     for (let index = 0; index < materialIds.length; index += 1) {
@@ -231,7 +257,7 @@ async function seedAward(lineCount=1) {
     body: {
       purchase_request_id: purchaseRequestId,
       supplier_ids: [supplierId],
-      response_deadline: "2026-09-01",
+      response_deadline: responseDeadline,
       expected_version: 1,
     },
   });
@@ -255,7 +281,7 @@ async function seedAward(lineCount=1) {
       expected_version: 2,
       supplier_id: supplierId,
       supplier_quote_reference: "QUOTE-" + suffix,
-      valid_until: "2027-12-31",
+      valid_until: quoteValidUntil,
       tax_included: false,
       freight_included: false,
       payment_terms: "纯虚拟UAT付款条件，仅用于表单验收。",
@@ -265,7 +291,7 @@ async function seedAward(lineCount=1) {
         minimum_order_quantity: "10.000000",
         unit_price: "12.000000",
         lead_time_days: 10,
-        promised_delivery_date: "2026-10-20",
+        promised_delivery_date: promisedDeliveryDate,
       })),
     },
   });
@@ -337,7 +363,7 @@ async function seedAward(lineCount=1) {
   };
 }
 
-test.beforeEach(async()=>{sequence=0;await pool.query("truncate app_users,units,material_categories,customers,suppliers,business_code_sequences,idempotency_keys,identity_write_rate_limit_buckets,audit_log restart identity cascade");await pool.query("insert into app_users(username,display_name,role,password_hash) values('admin01','管理员','admin','x'),('manager01','经理','manager','x'),('planning01','计划','planning','x'),('engineering01','项目','engineering','x'),('purchase01','采购','purchase','x'),('purchase02','跨域采购','purchase','x'),('operations01','运营','operations','x'),('warehouse01','仓库','warehouse','x'),('finance01','财务','finance','x')")});test.after(async()=>pool.end());
+test.beforeEach(async()=>{sequence=0;await pool.query("truncate app_users,units,material_categories,customers,suppliers,business_code_sequences,idempotency_keys,identity_write_rate_limit_buckets,audit_log restart identity cascade");await pool.query("insert into app_users(username,display_name,role,password_hash) values('admin01','管理员','admin','x'),('manager01','经理','manager','x'),('planning01','计划','planning','x'),('engineering01','项目','engineering','x'),('purchase01','采购','purchase','x'),('purchase02','跨域采购','purchase','x'),('operations01','运营','operations','x'),('warehouse01','仓库','warehouse','x'),('quality01','品质','quality','x'),('finance01','财务','finance','x')")});test.after(async()=>pool.end());
 
 test("restricted PO history projects lineage, credentials and zero downstream without granting cross-domain access",async()=>{
   await pool.query("select setval(pg_get_serial_sequence('procurement_sourcing_awards','id'),41,false)");
@@ -823,14 +849,213 @@ test("Award Mapping state, effective period, unit and fixed fact drift return th
   assert.deepEqual(await conversionBusinessCounts(), expectedZero);
 });
 
-test("Award 10 x 12 becomes PO with its authoritative plan, two receipts 4/6, inventory 10 and explicit AP 48/72",async()=>{const refs=await seedAward(),key="convert-award-main",body=await conversionBody(refs.awardId,"隔离采购订单备注");const converted=await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",key,body});assert.equal(converted.response.status,201,JSON.stringify(converted.payload));const replay=await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",key,body});assert.equal(replay.response.headers.get("Idempotency-Replayed"),"true");const conflict=await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",key,body:{...body,expected_award_version:2}});assert.equal(conflict.payload.code,"IDEMPOTENCY_CONFLICT");const po=converted.payload.data.purchase_orders[0],poId=Number(po.id),poLineId=Number(po.lines[0].id);assert.equal(po.remark,"隔离采购订单备注");assert.equal(po.lines[0].order_qty,"10.000000");assert.equal(po.lines[0].unit_price,"12.000000");assert.deepEqual(converted.payload.data.summary,{conversion_operation_count:1,purchase_order_aggregate_count:1,purchase_order_line_count:1,delivery_plan_aggregate_count:1,delivery_plan_line_count:0,receiving_queue_entry_count:1});const plan=po.delivery_plans[0],planId=Number(plan.id);let counts=(await pool.query("select (select count(*) from purchase_receipts)::int receipts,(select count(*) from inventory_ledger_entries)::int ledger,(select count(*) from finance_documents where doc_type='AP')::int ap,(select count(*) from purchase_delivery_plans)::int plans,(select count(*) from warehouse_receiving_queue_entries)::int queues,(select count(*) from purchase_delivery_plan_events where event_type='CREATED')::int plan_events")).rows[0];assert.deepEqual(counts,{receipts:0,ledger:0,ap:0,plans:1,queues:1,plan_events:1});
- const receiveKey="receive-four-main",receiveFour={quantity:"4",expected_version:1,expected_line_version:1,expected_balance_version:0,reason:"首批到货 4"},first=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",key:receiveKey,body:receiveFour});assert.equal(first.response.status,201,JSON.stringify(first.payload));assert.equal(first.payload.delivery_plan.status,"PARTIAL");assert.equal(first.payload.delivery_plan.received_quantity,"4.000000");assert.equal(first.payload.data.financial_source.amount,"48.000000");const firstReplay=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",key:receiveKey,body:receiveFour});assert.equal(firstReplay.response.headers.get("Idempotency-Replayed"),"true");const firstConflict=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",key:receiveKey,body:{...receiveFour,quantity:"3"}});assert.equal(firstConflict.payload.code,"IDEMPOTENCY_CONFLICT");
- const ap48=await finance("/api/finance/documents",{method:"POST",role:"finance",body:{doc_type:"AP",purchase_source_entry_id:Number(first.payload.data.financial_source.id),accounting_date:"2026-07-26",due_date:"2026-08-26"}});assert.equal(ap48.response.status,201,JSON.stringify(ap48.payload));assert.equal(ap48.payload.data.total_amount,"48.000000");const stale=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",body:{quantity:"1",expected_version:1,expected_line_version:2,expected_balance_version:1,reason:"陈旧计划"}});assert.equal(stale.payload.code,"DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT");const over=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",body:{quantity:"7",expected_version:2,expected_line_version:2,expected_balance_version:1,reason:"超收"}});assert.equal(over.payload.code,"PURCHASE_RECEIPT_OVER_QUANTITY");
- const faultRequest=randomUUID(),faultMeta={actor:actor("warehouse"),requestId:faultRequest,operationId:randomUUID(),keyDigest:createHash("sha256").update("fault-main").digest("hex"),requestDigest:createHash("sha256").update("fault-body").digest("hex"),method:"POST",route:`/api/procurement/delivery-plans/${planId}/receipts`,action:"DELIVERY_PLAN_RECEIVED"},faultService=new ProcurementFulfillmentService(new ProcurementRepository(pool),undefined,checkpoint=>{if(checkpoint==="after_receipt_allocation")throw new Error("forced fulfillment failure")});await assert.rejects(faultService.receive(planId,faultMeta,{quantity:"6",expected_version:2,expected_line_version:2,expected_balance_version:1,reason:"故障注入"}),/服务器暂时无法处理采购请求/);assert.deepEqual((await pool.query("select received_quantity,version from purchase_delivery_plans where id=$1",[planId])).rows[0],{received_quantity:"4.000000",version:2});assert.deepEqual((await pool.query("select on_hand_qty,version from inventory_stock_balances where material_id=$1",[refs.materialId])).rows[0],{on_hand_qty:"4.000000",version:1});assert.equal(Number((await pool.query("select count(*) count from purchase_receipts where reason='故障注入'")).rows[0].count),0);
- const second=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",body:{quantity:"6",expected_version:2,expected_line_version:2,expected_balance_version:1,reason:"第二批到货 6"}});assert.equal(second.response.status,201,JSON.stringify(second.payload));assert.equal(second.payload.delivery_plan.status,"COMPLETED");assert.equal(second.payload.data.financial_source.amount,"72.000000");const ap72=await finance("/api/finance/documents",{method:"POST",role:"finance",body:{doc_type:"AP",purchase_source_entry_id:Number(second.payload.data.financial_source.id),accounting_date:"2026-07-26",due_date:"2026-08-26"}});assert.equal(ap72.response.status,201,JSON.stringify(ap72.payload));assert.equal(ap72.payload.data.total_amount,"72.000000");
- const totals=(await pool.query(`select (select status from purchase_orders where id=$1) po_status,(select status from purchase_delivery_plans where id=$2) plan_status,(select received_qty::text from purchase_order_lines where id=$3) received,(select on_hand_qty::text from inventory_stock_balances where material_id=$4) inventory,(select sum(amount)::text from purchase_financial_source_entries where entry_type='RECEIPT') sources,(select sum(total_amount)::text from finance_documents where doc_type='AP') ap_total,(select count(*)::int from procurement_award_po_line_links where award_id=$5) links,(select count(*)::int from purchase_receipt_delivery_allocations where reversal_of_allocation_id is null) allocations`,[poId,planId,poLineId,refs.materialId,refs.awardId])).rows[0];assert.deepEqual(totals,{po_status:"RECEIVED",plan_status:"COMPLETED",received:"10.000000",inventory:"10.000000",sources:"120.000000",ap_total:"120.000000",links:1,allocations:2});
- const awardReverse=await sourcing(`/api/procurement/awards/${refs.awardId}/reversal`,{method:"POST",body:{expected_version:1,reason:"不应允许"}});assert.equal(awardReverse.payload.code,"AWARD_HAS_PURCHASE_ORDER");const blocked=await fulfillment(`/api/procurement/fulfillment/receipts/${second.payload.receipt_id}/reversal`,{method:"POST",role:"warehouse",body:{reason:"已有 AP 不应冲销",expected_plan_version:3,expected_line_versions:[{purchase_order_line_id:poLineId,expected_line_version:3}],expected_balance_versions:[{material_id:refs.materialId,expected_balance_version:2}]}});assert.equal(blocked.payload.code,"RECEIPT_REVERSAL_BLOCKED_BY_AP");assert.equal((await pool.query("select on_hand_qty::text value from inventory_stock_balances where material_id=$1",[refs.materialId])).rows[0].value,"10.000000");
- const pending=(await fulfillment("/api/procurement/fulfillment/payable-handoff?page_size=100",{role:"finance"})).payload.data;assert.deepEqual(pending.map(row=>[row.amount,row.handoff_status]).sort(),[["48.000000","AP_CREATED"],["72.000000","AP_CREATED"]]);await assert.rejects(pool.query("update procurement_award_po_line_links set award_id=award_id"),/immutable/);await assert.rejects(pool.query("update purchase_delivery_plans set version=version+1"),/service transaction/);
+test("warehouse receipt readiness GET exposes the four-line minimum DTO without cross-domain audit access or writes", async () => {
+  const refs = await seedAward(4);
+  const body = await conversionBody(refs.awardId, "仓库只读谱系隔离测试");
+  const converted = await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`, { method: "POST", body });
+  assert.equal(converted.response.status, 201, JSON.stringify(converted.payload));
+  const po = converted.payload.data.purchase_orders[0];
+  const planId = Number(po.delivery_plans[0].id);
+  const fingerprint = async () => (await pool.query(`select
+    (select count(*)::int from purchase_receipts) receipts,
+    (select count(*)::int from warehouse_receipt_evidence) evidence,
+    (select count(*)::int from inventory_lots) lots,
+    (select count(*)::int from quality_inspections) iqc,
+    (select count(*)::int from inventory_ledger_entries) ledger,
+    (select count(*)::int from finance_documents where doc_type='AP') ap,
+    (select count(*)::int from finance_settlements) payment,
+    (select count(*)::int from production_work_orders) work_orders,
+    (select jsonb_agg(jsonb_build_array(id,version,status,received_quantity) order by id) from purchase_delivery_plans) plans,
+    (select jsonb_agg(jsonb_build_array(id,version,closed_at) order by id) from warehouse_receiving_queue_entries) queues`)).rows[0];
+  const before = await fingerprint();
+
+  const response = await fulfillment(`/api/procurement/delivery-plans/${planId}/receipt-preview`, { role: "warehouse" });
+  assert.equal(response.response.status, 200, JSON.stringify(response.payload));
+  const readiness = response.payload.data;
+  assert.equal(readiness.contract_version, "WAREHOUSE_RECEIPT_READINESS_V1");
+  assert.equal(readiness.read_only, true);
+  assert.equal(readiness.data_timezone, "Asia/Shanghai");
+  assert.deepEqual(Object.keys(readiness.creation_evidence).sort(), ["action", "actor", "created_at_shanghai", "operation_id", "request_id", "result"]);
+  assert.equal(readiness.creation_evidence.result, "SUCCESS");
+  assert.equal(readiness.purchase_order.id, String(po.id));
+  assert.equal(readiness.purchase_order.version, 1);
+  assert.equal(readiness.purchase_order.status, "OPEN");
+  assert.equal(readiness.purchase_order.currency_code, "CNY");
+  assert.equal(readiness.purchase_order.total_amount, "480.000000");
+  assert.equal(readiness.lines.length, 4);
+  assert.deepEqual(readiness.lines.map((line) => [line.purchase_order_line_id, line.award_line_id, line.material_id, line.quantity, line.received_quantity, line.remaining_quantity, line.delivery_plan.version, line.delivery_plan.status, line.delivery_plan.promised_delivery_date, line.queue.version, line.queue.status]),
+    po.lines.map((line, index) => [String(line.id), String(index + 1), String(refs.materialIds[index]), "10.000000", "0.000000", "10.000000", 1, "PENDING", "2026-10-20", 1, "OPEN_PENDING"]));
+  assert.equal(readiness.selected_receipt.quantity, null);
+  assert.equal(readiness.selected_receipt.initial_confirmation_blocked, true);
+  assert.equal(readiness.selected_receipt.target.warehouse_model, "NOT_SEPARATELY_MODELED");
+  assert.equal(readiness.selected_receipt.target.location_code, "MAIN");
+  assert.equal(readiness.receipt_accounting_boundary.supplier_notification_or_in_transit_model_available, false);
+  assert.equal(readiness.receipt_accounting_boundary.next_responsibility.includes("quality"), true);
+  assert.equal(readiness.downstream.all_zero, true);
+  for (const field of ["receipt", "warehouse_receipt", "inventory_ledger", "lot", "iqc", "ap", "payment", "work_order", "production_report", "production_completion"]) assert.equal(readiness.downstream[field], 0, field);
+  const dtoKeys = [];
+  const collectKeys = (value) => { if (!value || typeof value !== "object") return;for (const [key, child] of Object.entries(value)) { dtoKeys.push(key.toLowerCase());collectKeys(child); } };
+  collectKeys(readiness);
+  for (const secret of ["request_body", "response_body", "cookie", "session", "sensitive_header", "idempotency_key_digest", "password_hash"]) assert.ok(!dtoKeys.includes(secret), secret);
+  assert.ok(!permissionsForRole("warehouse").includes("system.audit.read"));
+
+  const historyDenied = await fulfillment(`/api/procurement/purchase-orders/${po.id}/history`, { role: "warehouse" });
+  assert.equal(historyDenied.response.status, 403);assert.equal(historyDenied.payload.code, "PERMISSION_DENIED");
+  const previewDenied = await fulfillment(`/api/procurement/delivery-plans/${planId}/receipt-preview`, { role: "quality" });
+  assert.equal(previewDenied.response.status, 403);assert.equal(previewDenied.payload.code, "PERMISSION_DENIED");
+  const methodDenied = await fulfillment(`/api/procurement/delivery-plans/${planId}/receipt-preview`, { method: "POST", role: "warehouse", body: {} });
+  assert.equal(methodDenied.response.status, 405);assert.equal(methodDenied.payload.code, "METHOD_NOT_ALLOWED");
+  assert.deepEqual(await fingerprint(), before);
 });
 
-test("concurrent Award conversion creates one PO and plan result, plan cancellation is constrained and forbidden roles cannot mutate",async()=>{const refs=await seedAward(),body=await conversionBody(refs.awardId);const attempts=await Promise.all(["convert-concurrent-a","convert-concurrent-b"].map(key=>fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",key,body})));assert.deepEqual(attempts.map(x=>x.response.status).sort(),[201,409]);assert.equal(Number((await pool.query("select count(*) count from procurement_award_po_line_links where award_id=$1",[refs.awardId])).rows[0].count),1);assert.equal(Number((await pool.query("select count(*) count from purchase_orders where source_type='SOURCING_AWARD'")).rows[0].count),1);assert.equal(Number((await pool.query("select count(*) count from purchase_delivery_plans")).rows[0].count),1);for(const role of ["engineering","planning","finance","warehouse"]){const denied=await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",role,body});assert.equal(denied.response.status,403,role)}const poId=Number((await pool.query("select purchase_order_id from procurement_award_po_line_links where award_id=$1",[refs.awardId])).rows[0].purchase_order_id);const deniedPlan=await fulfillment(`/api/procurement/purchase-orders/${poId}/delivery-plans`,{method:"POST",role:"warehouse",body:{expected_version:1}});assert.equal(deniedPlan.response.status,403);const duplicatePlan=await fulfillment(`/api/procurement/purchase-orders/${poId}/delivery-plans`,{method:"POST",body:{expected_version:1}});assert.equal(duplicatePlan.payload.code,"DELIVERY_PLAN_ALREADY_EXISTS");const planId=Number((await pool.query("select id from purchase_delivery_plans where purchase_order_id=$1",[poId])).rows[0].id);const earlyClose=await fulfillment(`/api/procurement/delivery-plans/${planId}/close`,{method:"POST",body:{expected_version:1,reason:"尚未收货"}});assert.equal(earlyClose.payload.code,"DELIVERY_PLAN_CLOSE_CONFLICT");const cancelled=await fulfillment(`/api/procurement/delivery-plans/${planId}/cancel`,{method:"POST",body:{expected_version:1,reason:"采购取消未收货计划"}});assert.equal(cancelled.response.status,200);assert.equal(cancelled.payload.data.status,"CANCELLED");const queue=(await pool.query("select close_reason,created_by,updated_by,created_at,updated_at from warehouse_receiving_queue_entries where delivery_plan_id=$1",[planId])).rows[0];assert.equal(queue.close_reason,"采购取消未收货计划");assert.equal(queue.created_by,"purchase01");assert.equal(queue.updated_by,"purchase01");assert.ok(queue.created_at);assert.ok(queue.updated_at);const deniedReceive=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"purchase",body:{}});assert.equal(deniedReceive.response.status,403);const blockedReceive=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",body:{quantity:"1",expected_version:2,expected_line_version:1,expected_balance_version:0,reason:"取消后收货"}});assert.equal(blockedReceive.payload.code,"DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT")});
+test("receipt date, evidence, CAS, CSRF, role, legacy-entry and rate gates reject without half records", async () => {
+  const refs = await seedAward(1, { promisedDeliveryDate: "2099-10-20", targetDeliveryDate: "2099-10-30", responseDeadline: "2099-09-01", quoteValidUntil: "2099-12-31" });
+  const converted = await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`, { method: "POST", body: await conversionBody(refs.awardId) });
+  assert.equal(converted.response.status, 201, JSON.stringify(converted.payload));
+  const planId = Number(converted.payload.data.purchase_orders[0].delivery_plans[0].id);
+  const valid = await receiptBody(planId, "1");
+  assert.equal(valid.expected_early_arrival, true);
+  const state = async () => (await pool.query(`select
+    (select count(*)::int from purchase_receipts) receipts,
+    (select count(*)::int from purchase_receipt_lines) receipt_lines,
+    (select count(*)::int from warehouse_receipt_evidence) evidence,
+    (select count(*)::int from inventory_ledger_entries) ledger,
+    (select count(*)::int from inventory_lots) lots,
+    (select count(*)::int from quality_inspections) iqc,
+    (select count(*)::int from purchase_financial_source_entries) financial_sources,
+    (select version from purchase_orders limit 1) po_version,
+    (select version from purchase_order_lines limit 1) line_version,
+    (select version from purchase_delivery_plans limit 1) plan_version,
+    (select version from warehouse_receiving_queue_entries limit 1) queue_version`)).rows[0];
+  const before = await state();
+  const reject = async (candidate, code, options = {}) => {
+    const result = await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`, { method: "POST", role: "warehouse", body: candidate, ...options });
+    assert.notEqual(result.response.status, 201, JSON.stringify(result.payload));
+    assert.equal(result.payload.code, code, JSON.stringify(result.payload));
+    assert.deepEqual(await state(), before);
+  };
+  const missingQuantity = { ...valid };delete missingQuantity.quantity;
+  await reject(missingQuantity, "REQUEST_VALIDATION_FAILED");
+  await reject({ ...valid, quantity: "" }, "REQUEST_VALIDATION_FAILED");
+  await reject({ ...valid, quantity: "0" }, "REQUEST_VALIDATION_FAILED");
+  await reject({ ...valid, quantity: "-1" }, "REQUEST_VALIDATION_FAILED");
+  await reject({ ...valid, quantity: "11" }, "PURCHASE_RECEIPT_OVER_QUANTITY");
+  const future = new Date(`${valid.evidence_document_date}T00:00:00Z`);future.setUTCDate(future.getUTCDate() + 1);
+  await reject({ ...valid, evidence_document_date: future.toISOString().slice(0, 10) }, "RECEIPT_EVIDENCE_FUTURE_DATE");
+  await reject({ ...valid, actual_receipt_at: "2099-10-20T00:00:00+08:00" }, "RECEIPT_TIME_SERVER_CONTROLLED");
+  await reject({ ...valid, early_arrival_reason: "", early_arrival_confirmed: false }, "EARLY_ARRIVAL_EVIDENCE_REQUIRED");
+  await reject({ ...valid, expected_early_arrival: false }, "RECEIPT_CONFIRMATION_STALE");
+  await reject({ ...valid, expected_purchase_order_version: valid.expected_purchase_order_version + 1 }, "PURCHASE_ORDER_VERSION_OR_STATE_CONFLICT");
+  await reject({ ...valid, expected_line_version: valid.expected_line_version + 1 }, "PURCHASE_ORDER_LINE_VERSION_CONFLICT");
+  await reject({ ...valid, expected_version: valid.expected_version + 1 }, "DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT");
+  await reject({ ...valid, expected_queue_version: valid.expected_queue_version + 1 }, "RECEIVING_QUEUE_VERSION_OR_STATE_CONFLICT");
+  await reject({ ...valid, expected_balance_version: valid.expected_balance_version + 1 }, "INVENTORY_VERSION_CONFLICT");
+  await reject(valid, "CSRF_INVALID", { csrf: false });
+
+  const roleDenied = await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`, { method: "POST", role: "purchase", body: valid });
+  assert.equal(roleDenied.response.status, 403);assert.equal(roleDenied.payload.code, "PERMISSION_DENIED");
+  const legacyReceipt = await procurement("/api/purchase-receipts", { method: "POST", role: "warehouse", body: {} });
+  assert.equal(legacyReceipt.response.status, 403);assert.equal(legacyReceipt.payload.code, "PERMISSION_DENIED");
+  const legacyReceive = await procurement("/api/purchase-receive", { method: "POST", role: "warehouse", body: {} });
+  assert.equal(legacyReceive.response.status, 403);assert.equal(legacyReceive.payload.code, "PERMISSION_DENIED");
+  assert.ok(!permissionsForRole("warehouse").includes("procurement.receive"));
+
+  await pool.query(`insert into identity_write_rate_limit_buckets(username,bucket_start,attempt_count,new_key_count,rejected_count,updated_at)
+    values('warehouse01',date_trunc('minute',now()),60,20,0,now())
+    on conflict(username,bucket_start) do update set attempt_count=60,new_key_count=20,rejected_count=0,updated_at=now()`);
+  await reject(valid, "RATE_LIMITED");
+  await pool.query("delete from identity_write_rate_limit_buckets where username='warehouse01'");
+  assert.deepEqual(await state(), before);
+});
+
+test("complete early-arrival evidence wins once and IQC stock remains frozen for the quality queue", async () => {
+  const refs = await seedAward(1, { inspectionType: "IQC", promisedDeliveryDate: "2099-10-20", targetDeliveryDate: "2099-10-30", responseDeadline: "2099-09-01", quoteValidUntil: "2099-12-31" });
+  const converted = await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`, { method: "POST", body: await conversionBody(refs.awardId) });
+  assert.equal(converted.response.status, 201, JSON.stringify(converted.payload));
+  const planId = Number(converted.payload.data.purchase_orders[0].delivery_plans[0].id);
+  const body = await receiptBody(planId, "10", { reason: "隔离数据库完整提前到货证据" });
+  assert.equal(body.expected_early_arrival, true);assert.ok(body.supplier_lot_code);
+  const keys = ["early-receipt-a", "early-receipt-b"];
+  const attempts = await Promise.all(keys.map((key) => fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`, { method: "POST", role: "warehouse", key, body })));
+  assert.deepEqual(attempts.map((item) => item.response.status).sort(), [201, 409]);
+  const winningIndex = attempts.findIndex((item) => item.response.status === 201), won = attempts[winningIndex], winningKey = keys[winningIndex];
+  assert.ok(won);assert.equal(won.payload.warehouse_receipt_evidence.early_arrival, true);
+  const replay = await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`, { method: "POST", role: "warehouse", key: winningKey, body });
+  assert.equal(replay.response.headers.get("Idempotency-Replayed"), "true");
+  const conflict = await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`, { method: "POST", role: "warehouse", key: winningKey, body: { ...body, reason: "异正文" } });
+  assert.equal(conflict.response.status, 409);assert.equal(conflict.payload.code, "IDEMPOTENCY_CONFLICT");
+
+  const receiptLineId = Number(won.payload.data.lines[0].id);
+  const fact = (await pool.query(`select lot.lot_code,lot.supplier_lot_code,lot.status lot_status,lot.version lot_version,
+      balance.on_hand_qty::text on_hand,balance.frozen_qty::text frozen,
+      (balance.on_hand_qty-balance.reserved_qty-balance.frozen_qty)::text available,balance.version balance_version,
+      ledger.entry_type,ledger.on_hand_delta::text ledger_quantity,evidence.evidence_type,evidence.early_arrival,
+      (select count(*)::int from purchase_receipts) receipts,(select count(*)::int from purchase_receipt_lines) receipt_lines,
+      (select count(*)::int from warehouse_receipt_evidence) evidence_count,(select count(*)::int from quality_inspections) iqc,
+      (select count(*)::int from purchase_financial_source_entries) financial_sources,
+      (select count(*)::int from finance_documents where doc_type='AP') ap,
+      (select count(*)::int from finance_settlements) payment,
+      (select count(*)::int from production_work_orders) work_orders,
+      (select count(*)::int from production_reports) production_reports,
+      (select count(*)::int from production_completions) production_completions
+    from purchase_receipt_lines line join inventory_lots lot on lot.source_purchase_receipt_line_id=line.id
+    join inventory_stock_balances balance on balance.inventory_lot_id=lot.id and balance.location_code='MAIN'
+    join inventory_ledger_entries ledger on ledger.id=line.inventory_ledger_entry_id
+    join warehouse_receipt_evidence evidence on evidence.purchase_receipt_line_id=line.id where line.id=$1`, [receiptLineId])).rows[0];
+  assert.deepEqual(fact, { lot_code: won.payload.lot_code, supplier_lot_code: body.supplier_lot_code.toUpperCase(), lot_status: "FROZEN", lot_version: 1, on_hand: "10.000000", frozen: "10.000000", available: "0.000000", balance_version: 1, entry_type: "IQC_RECEIPT", ledger_quantity: "10.000000", evidence_type: "DELIVERY_NOTE", early_arrival: true, receipts: 1, receipt_lines: 1, evidence_count: 1, iqc: 0, financial_sources: 1, ap: 0, payment: 0, work_orders: 0, production_reports: 0, production_completions: 0 });
+
+  const iqcBody = { inspection_type: "IQC", purchase_receipt_line_id: receiptLineId, inspected_qty: "10", passed_qty: "10", failed_qty: "0", responsible_stage: "IQC", results: [{ characteristic: "综合", result: "PASS" }], defects: [] };
+  const warehouseDenied = await call(handleQualityApi, "/api/quality-inspections", { method: "POST", role: "warehouse", body: iqcBody });
+  assert.equal(warehouseDenied.response.status, 403);assert.equal(warehouseDenied.payload.code, "PERMISSION_DENIED");
+  assert.ok(!permissionsForRole("warehouse").includes("quality.inspect"));assert.ok(permissionsForRole("quality").includes("quality.inspect"));
+  const sourceOptions = await quality("/api/quality/source-options?inspection_type=IQC", { method: "GET" });
+  assert.equal(sourceOptions.response.status, 200);assert.equal(sourceOptions.payload.data.length, 1);assert.equal(Number(sourceOptions.payload.data[0].purchase_receipt_line_id), receiptLineId);
+  const inspected = await quality("/api/quality-inspections", { method: "POST", body: iqcBody });
+  assert.equal(inspected.response.status, 201, JSON.stringify(inspected.payload));
+  const afterInspection = (await pool.query(`select lot.status,balance.on_hand_qty::text on_hand,balance.frozen_qty::text frozen,
+      (balance.on_hand_qty-balance.reserved_qty-balance.frozen_qty)::text available,
+      (select count(*)::int from quality_inspections where purchase_receipt_line_id=$1) iqc
+    from inventory_lots lot join inventory_stock_balances balance on balance.inventory_lot_id=lot.id
+    where lot.source_purchase_receipt_line_id=$1`, [receiptLineId])).rows[0];
+  assert.deepEqual(afterInspection, { status: "FROZEN", on_hand: "10.000000", frozen: "10.000000", available: "0.000000", iqc: 1 });
+});
+
+test("Award 10 x 12 becomes PO with its authoritative plan, two evidenced receipts 4/6, inventory 10 and explicit AP 48/72",async()=>{
+  const refs=await seedAward(),key="convert-award-main",body=await conversionBody(refs.awardId,"隔离采购订单备注");
+  const converted=await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",key,body});
+  assert.equal(converted.response.status,201,JSON.stringify(converted.payload));
+  const replay=await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",key,body});assert.equal(replay.response.headers.get("Idempotency-Replayed"),"true");
+  const conflict=await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",key,body:{...body,expected_award_version:2}});assert.equal(conflict.payload.code,"IDEMPOTENCY_CONFLICT");
+  const po=converted.payload.data.purchase_orders[0],poId=Number(po.id),poLineId=Number(po.lines[0].id),planId=Number(po.delivery_plans[0].id);
+  assert.equal(po.remark,"隔离采购订单备注");assert.equal(po.lines[0].order_qty,"10.000000");assert.equal(po.lines[0].unit_price,"12.000000");
+  assert.deepEqual(converted.payload.data.summary,{conversion_operation_count:1,purchase_order_aggregate_count:1,purchase_order_line_count:1,delivery_plan_aggregate_count:1,delivery_plan_line_count:0,receiving_queue_entry_count:1});
+  let counts=(await pool.query("select (select count(*) from purchase_receipts)::int receipts,(select count(*) from warehouse_receipt_evidence)::int evidence,(select count(*) from inventory_ledger_entries)::int ledger,(select count(*) from finance_documents where doc_type='AP')::int ap,(select count(*) from purchase_delivery_plans)::int plans,(select count(*) from warehouse_receiving_queue_entries)::int queues,(select count(*) from purchase_delivery_plan_events where event_type='CREATED')::int plan_events")).rows[0];
+  assert.deepEqual(counts,{receipts:0,evidence:0,ledger:0,ap:0,plans:1,queues:1,plan_events:1});
+
+  const receiveKey="receive-four-main",receiveFour=await receiptBody(planId,"4",{reason:"首批到货 4"});
+  const first=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",key:receiveKey,body:receiveFour});
+  assert.equal(first.response.status,201,JSON.stringify(first.payload));assert.equal(first.payload.delivery_plan.status,"PARTIAL");assert.equal(first.payload.delivery_plan.received_quantity,"4.000000");assert.equal(first.payload.data.financial_source.amount,"48.000000");
+  assert.equal(Number(first.payload.warehouse_receipt_evidence.purchase_receipt_id),first.payload.receipt_id);
+  const firstReplay=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",key:receiveKey,body:receiveFour});assert.equal(firstReplay.response.headers.get("Idempotency-Replayed"),"true");
+  const firstConflict=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",key:receiveKey,body:{...receiveFour,quantity:"3"}});assert.equal(firstConflict.payload.code,"IDEMPOTENCY_CONFLICT");
+
+  const ap48=await finance("/api/finance/documents",{method:"POST",role:"finance",body:{doc_type:"AP",purchase_source_entry_id:Number(first.payload.data.financial_source.id),accounting_date:"2026-07-26",due_date:"2026-08-26"}});assert.equal(ap48.response.status,201,JSON.stringify(ap48.payload));assert.equal(ap48.payload.data.total_amount,"48.000000");
+  const current=await receiptBody(planId,"1");
+  const stale=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",body:{...current,expected_version:1,reason:"陈旧计划"}});assert.equal(stale.payload.code,"DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT");
+  const over=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",body:{...current,quantity:"7",reason:"超收"}});assert.equal(over.payload.code,"PURCHASE_RECEIPT_OVER_QUANTITY");
+
+  const faultBody=await receiptBody(planId,"6",{reason:"故障注入"});
+  const faultRequest=randomUUID(),faultMeta={actor:actor("warehouse"),requestId:faultRequest,operationId:randomUUID(),keyDigest:createHash("sha256").update("fault-main").digest("hex"),requestDigest:createHash("sha256").update("fault-body").digest("hex"),method:"POST",route:`/api/procurement/delivery-plans/${planId}/receipts`,action:"DELIVERY_PLAN_RECEIVED"},faultService=new ProcurementFulfillmentService(new ProcurementRepository(pool),undefined,checkpoint=>{if(checkpoint==="after_receipt_allocation")throw new Error("forced fulfillment failure")});
+  await assert.rejects(faultService.receive(planId,faultMeta,faultBody),/服务器暂时无法处理采购请求/);
+  assert.deepEqual((await pool.query("select received_quantity,version from purchase_delivery_plans where id=$1",[planId])).rows[0],{received_quantity:"4.000000",version:2});assert.deepEqual((await pool.query("select on_hand_qty,version from inventory_stock_balances where material_id=$1",[refs.materialId])).rows[0],{on_hand_qty:"4.000000",version:1});assert.equal(Number((await pool.query("select count(*) count from purchase_receipts where reason='故障注入'")).rows[0].count),0);assert.equal(Number((await pool.query("select count(*) count from warehouse_receipt_evidence where request_id=$1",[faultRequest])).rows[0].count),0);
+
+  const secondBody=await receiptBody(planId,"6",{reason:"第二批到货 6"});
+  const second=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",body:secondBody});assert.equal(second.response.status,201,JSON.stringify(second.payload));assert.equal(second.payload.delivery_plan.status,"COMPLETED");assert.equal(second.payload.data.financial_source.amount,"72.000000");
+  const ap72=await finance("/api/finance/documents",{method:"POST",role:"finance",body:{doc_type:"AP",purchase_source_entry_id:Number(second.payload.data.financial_source.id),accounting_date:"2026-07-26",due_date:"2026-08-26"}});assert.equal(ap72.response.status,201,JSON.stringify(ap72.payload));assert.equal(ap72.payload.data.total_amount,"72.000000");
+  const totals=(await pool.query(`select (select status from purchase_orders where id=$1) po_status,(select status from purchase_delivery_plans where id=$2) plan_status,(select received_qty::text from purchase_order_lines where id=$3) received,(select on_hand_qty::text from inventory_stock_balances where material_id=$4) inventory,(select sum(amount)::text from purchase_financial_source_entries where entry_type='RECEIPT') sources,(select sum(total_amount)::text from finance_documents where doc_type='AP') ap_total,(select count(*)::int from procurement_award_po_line_links where award_id=$5) links,(select count(*)::int from purchase_receipt_delivery_allocations where reversal_of_allocation_id is null) allocations,(select count(*)::int from warehouse_receipt_evidence) evidence`,[poId,planId,poLineId,refs.materialId,refs.awardId])).rows[0];assert.deepEqual(totals,{po_status:"RECEIVED",plan_status:"COMPLETED",received:"10.000000",inventory:"10.000000",sources:"120.000000",ap_total:"120.000000",links:1,allocations:2,evidence:2});
+  const awardReverse=await sourcing(`/api/procurement/awards/${refs.awardId}/reversal`,{method:"POST",body:{expected_version:1,reason:"不应允许"}});assert.equal(awardReverse.payload.code,"AWARD_HAS_PURCHASE_ORDER");
+  const blocked=await fulfillment(`/api/procurement/fulfillment/receipts/${second.payload.receipt_id}/reversal`,{method:"POST",role:"warehouse",body:{reason:"已有 AP 不应冲销",expected_plan_version:3,expected_line_versions:[{purchase_order_line_id:poLineId,expected_line_version:3}],expected_balance_versions:[{material_id:refs.materialId,expected_balance_version:2}]}});assert.equal(blocked.payload.code,"RECEIPT_REVERSAL_BLOCKED_BY_AP");assert.equal((await pool.query("select on_hand_qty::text value from inventory_stock_balances where material_id=$1",[refs.materialId])).rows[0].value,"10.000000");
+  const pending=(await fulfillment("/api/procurement/fulfillment/payable-handoff?page_size=100",{role:"finance"})).payload.data;assert.deepEqual(pending.map(row=>[row.amount,row.handoff_status]).sort(),[["48.000000","AP_CREATED"],["72.000000","AP_CREATED"]]);await assert.rejects(pool.query("update procurement_award_po_line_links set award_id=award_id"),/immutable/);await assert.rejects(pool.query("update purchase_delivery_plans set version=version+1"),/service transaction/);
+});
+
+test("concurrent Award conversion creates one PO and plan result, plan cancellation is constrained and forbidden roles cannot mutate",async()=>{const refs=await seedAward(),body=await conversionBody(refs.awardId);const attempts=await Promise.all(["convert-concurrent-a","convert-concurrent-b"].map(key=>fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",key,body})));assert.deepEqual(attempts.map(x=>x.response.status).sort(),[201,409]);assert.equal(Number((await pool.query("select count(*) count from procurement_award_po_line_links where award_id=$1",[refs.awardId])).rows[0].count),1);assert.equal(Number((await pool.query("select count(*) count from purchase_orders where source_type='SOURCING_AWARD'")).rows[0].count),1);assert.equal(Number((await pool.query("select count(*) count from purchase_delivery_plans")).rows[0].count),1);for(const role of ["engineering","planning","finance","warehouse"]){const denied=await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",role,body});assert.equal(denied.response.status,403,role)}const poId=Number((await pool.query("select purchase_order_id from procurement_award_po_line_links where award_id=$1",[refs.awardId])).rows[0].purchase_order_id);const deniedPlan=await fulfillment(`/api/procurement/purchase-orders/${poId}/delivery-plans`,{method:"POST",role:"warehouse",body:{expected_version:1}});assert.equal(deniedPlan.response.status,403);const duplicatePlan=await fulfillment(`/api/procurement/purchase-orders/${poId}/delivery-plans`,{method:"POST",body:{expected_version:1}});assert.equal(duplicatePlan.payload.code,"DELIVERY_PLAN_ALREADY_EXISTS");const planId=Number((await pool.query("select id from purchase_delivery_plans where purchase_order_id=$1",[poId])).rows[0].id);const earlyClose=await fulfillment(`/api/procurement/delivery-plans/${planId}/close`,{method:"POST",body:{expected_version:1,reason:"尚未收货"}});assert.equal(earlyClose.payload.code,"DELIVERY_PLAN_CLOSE_CONFLICT");const cancelled=await fulfillment(`/api/procurement/delivery-plans/${planId}/cancel`,{method:"POST",body:{expected_version:1,reason:"采购取消未收货计划"}});assert.equal(cancelled.response.status,200);assert.equal(cancelled.payload.data.status,"CANCELLED");const queue=(await pool.query("select close_reason,created_by,updated_by,created_at,updated_at from warehouse_receiving_queue_entries where delivery_plan_id=$1",[planId])).rows[0];assert.equal(queue.close_reason,"采购取消未收货计划");assert.equal(queue.created_by,"purchase01");assert.equal(queue.updated_by,"purchase01");assert.ok(queue.created_at);assert.ok(queue.updated_at);const deniedReceive=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"purchase",body:{}});assert.equal(deniedReceive.response.status,403);const blockedBody=await receiptBody(planId,"1",{reason:"取消后收货"});const blockedReceive=await fulfillment(`/api/procurement/delivery-plans/${planId}/receipts`,{method:"POST",role:"warehouse",body:blockedBody});assert.equal(blockedReceive.payload.code,"DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT")});
