@@ -2,7 +2,7 @@
 
 ## 状态、授权与起点
 
-- 状态：`DOING（功能与隔离验收已通过；正式备份、恢复、Web-only部署和主UAT待执行）`。
+- 状态：`DONE — PO HISTORY TRACEABILITY FIXED — UAT DOWNSTREAM UNCHANGED`。
 - 日期：2026-08-08（Asia/Shanghai）。
 - 授权：为现有 PO ID 1 / `PO-00000001`补齐受限、只读、可刷新重开的聚合谱系、Line、Delivery Plan/queue、Event/Audit/Idempotency及下游零状态；完成隔离测试、正式备份恢复、Web-only部署和purchase-only主UAT只读验收。
 - 严格起点：clean单一worktree `main@a67886428570612b21bc372a0a2a53fe90eac439`，Parent `e67c9209bc24314000f70760b7b79282c4a9b469`，behind 0 / ahead 173；`0.1.0-alpha.40`；Migration 0001—0039且无0040；Web `sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`。
@@ -32,15 +32,20 @@
 - 主UAT只登录purchase，只读打开目标PO详情，核对桌面/390×844、刷新、重开和全部零状态；路由层阻断业务POST，最终`business_post=0`、保护指纹前后相同、Session失效。
 - 功能与部署验收分别创建独立提交；不push、不PR、不改写历史。
 
-## 功能阶段结果
+## 完成结果
 
 - 已新增通用`PO_HISTORY_TRACEABILITY_V1`受限DTO和独立详情URL。服务端先复用RFQ→PRQ purchase数据域判断，再在同一`REPEATABLE READ READ ONLY`事务投影PO聚合、完整上游谱系、四条Line、四条Plan/queue、受限Event/Audit/Idempotency摘要、独立历史失败Audit及下游计数；不授予purchase `system.audit.read`。
 - 成功Audit按真实Award ID关联，不依赖Award ID与PO ID偶然同号；隔离PostgreSQL专门以Award ID 41 / PO ID 1验证通过。GET刷新/重开保持业务指纹不变，跨数据域为403，历史路由非GET为405且不写失败Audit。
 - 页面没有表单或PO/Line/Plan/queue编辑控件；桌面使用聚合谱系与表格，390×844改用Line卡、Plan/queue卡和折叠凭证；状态同时显示代码与中文，UUID、digest、request_id可换行和复制。
 - 主库只读保护已通过：`state_fingerprint=721f25f875e4e3af7cc8401f9bff9dadcc959092047844d446461999afa60594`、`history_fingerprint=d11b46bc41f59bcc7b10a19041940664c37c0753c65160a17551322652b14ae7`，business POST 0、PO/Line/Plan/queue `1/4/4/4`、下游全0、前后不变。
 - 用户任务文本中的成功`request_id`少了末尾`d`且不是合法UUID；数据库、既有审计报告和本读模型的真实值均为`773c23b6-0923-4ab5-a451-bb80aa4bdf9d`。产品只展示数据库值，不补写、不截断。
-- 隔离回归通过：PO专项Unit/UI 9/9、Fulfillment PostgreSQL 6/6及偏移ID专项1/1、Sourcing/Binding PostgreSQL 20/20、0019/0038/0039升级`3/3 + 5/5 + 6/6`、安全/Origin/Identity、两个typecheck、全量lint、npm 3/3、Python三项、credentials 1,287文件及隔离Chromium 1/1。Chromium覆盖桌面/390×844、刷新、历史重开、服务重启、Session0和下游0。
-- 候选Web为`sha256:664e0ac6bd289251f289a8785ac05d955470064a3f921c3ae834f79665a4ec89`、88,658,388 bytes；尚未部署，当前UAT Web仍为`sha256:83c1bff3…`。没有运行Migration或修改主业务数据。
+- 隔离回归通过：PO专项Unit/UI 9/9、Fulfillment PostgreSQL 6/6及偏移ID专项1/1、Sourcing/Binding PostgreSQL 20/20、0019/0038/0039升级`3/3 + 5/5 + 6/6`、安全/Origin/Identity、两个typecheck、全量lint、npm 3/3、Python三项、功能阶段credentials 1,287文件、最终文档后credentials 1,288文件及隔离Chromium 1/1。Chromium覆盖桌面/390×844、刷新、历史重开、服务重启、Session0和下游0。
+- 正式备份为`/var/backups/chenyida-erp/po-history-traceability-fix36-predeploy-20260808T091428Z.dump`，root:root 0600、2,297,975 bytes、SHA-256`0e6f8215512eb28c1dc72d2dec84b1d645a173bd9cbf93127adf1a2205df38f1`；`pg_restore --list`为3,359行/3,348 TOC项，第二新数据库单事务恢复后核对39/head0039、226表、目标`1/4/4/4`及下游全0，恢复库已精确删除。
+- Web已由`sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`单独替换为`sha256:664e0ac6bd289251f289a8785ac05d955470064a3f921c3ae834f79665a4ec89`（88,658,388 bytes）；旧Web精确回退tag保留。没有运行Migration，没有重建PostgreSQL、Worker或Caddy，没有更换四个受保护Volume。
+- 主UAT只登录purchase，桌面1440与390×844核对聚合、谱系、四Line、四Plan/queue、凭证和下游全0，并通过刷新、历史重开、退出及Session失效；`business_post=0`，浏览器保护指纹`ae02a432618e8128544cb049155628f483b195b78ac177426459039b1509cc68`前后相同，最终purchase有效Session为0。
+- 主库终检继续为状态指纹`721f25f875e4e3af7cc8401f9bff9dadcc959092047844d446461999afa60594`、历史指纹`d11b46bc41f59bcc7b10a19041940664c37c0753c65160a17551322652b14ae7`；PO/Line/Plan/queue `1/4/4/4`且Receipt、Warehouse Receipt、Inventory Ledger、Lot、IQC、AP、Payment、Work Order、生产报告/完工记录全0。
+- 功能提交为`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`（`feat: add restricted PO history traceability`）；部署验收和文档以独立`ops: deploy PO history traceability fix`提交收口。未push、未PR、未改写历史。
+- 完整证据见[完成报告](SELFHOST-UAT-FIX-36-COMPLETION.md)。本任务到此停止；到货/仓库收货只有在新的独立任务、明确授权和当时事实重验后才可试用，IQC、入库和AP继续分别受限。
 
 ## 允许的最终状态
 

@@ -4,16 +4,18 @@
 
 ## 2026-08-08
 
-### SELFHOST-UAT-FIX-36 - `feat: add restricted PO history traceability`（功能阶段）
+### SELFHOST-UAT-FIX-36 - `feat: add restricted PO history traceability` / `ops: deploy PO history traceability fix`
 
 - 读模型/API：新增`GET /api/procurement/purchase-orders/:id/history`和`PO_HISTORY_TRACEABILITY_V1`。先沿PO→Award→RFQ→PRQ复用purchase数据域判断，再在单一`REPEATABLE READ READ ONLY`快照读取PO聚合、Project→MRP→PRQ→RFQ→Comparison→Quote→Award→PO、四条Line稳定引用、四条Plan/queue及下游计数；缺失、重复或漂移时失败关闭。
 - 凭证/权限：DTO只公开目标PO精确CREATED Event、成功`SOURCING_AWARD_CONVERTED` Audit、HTTP201与两项digest，不返回请求/响应正文、Cookie、Session或敏感Header，也不授予purchase `system.audit.read`。唯一未绑定失败Audit只按同actor/action受限时间窗且业务记录0单独显示；422明确来自旧错误合同投影，不与成功PO合并。
 - UI/语义：新增可刷新、可历史重开的独立PO详情URL；桌面显示谱系/Line/Plan/凭证，390×844使用摘要、Line和Plan/queue卡及折叠凭证。状态有代码和中文，稳定ID/UUID/digest/request_id可换行复制；无PO/Line/Plan/queue编辑或到货、收货、IQC、库存、AP、生产按钮。页面明确OPEN/PENDING/OPEN_PENDING均不代表下游动作。
 - 数据域：purchase跨项目/跨数据域详情返回403，订单、queue及应付列表同步按现有PRQ数据域过滤，避免由列表泄漏其他PO/Supplier。非GET历史路由返回405且不写失败Audit。
 - D-105边界：产品不硬编码目标PO或D-105，不显示“授权已验证”。PO结构完整与原始写入授权不可证明保持并存；D-105只在治理/验收报告说明前向授权且不追溯授权原始写入。
-- 测试：专项Unit/UI9、Fulfillment PG6及Award41/PO1偏移专项、Sourcing/Binding PG20、0019/0038/0039升级`3+5+6`、安全/Identity/Origin、两个typecheck、lint、npm3、Python三项、credentials1287及Chromium1全部通过。Chromium覆盖4 Line/4 Plan/4 queue、桌面/390×844、刷新/重开/服务重启、下游0及Session0；首次因测试遗留390px viewport失败，补齐桌面前置后原断言重跑通过。
+- 测试：专项Unit/UI9、Fulfillment PG6及Award41/PO1偏移专项、Sourcing/Binding PG20、0019/0038/0039升级`3+5+6`、安全/Identity/Origin、两个typecheck、lint、npm3、Python三项、credentials功能1287/最终文档1288及Chromium1全部通过。Chromium覆盖4 Line/4 Plan/4 queue、桌面/390×844、刷新/重开/服务重启、下游0及Session0；首次因测试遗留390px viewport失败，补齐桌面前置后原断言重跑通过。
 - 主库保护/Schema：只读保护得到状态指纹`721f25f875e4e3af7cc8401f9bff9dadcc959092047844d446461999afa60594`和历史指纹`d11b46bc41f59bcc7b10a19041940664c37c0753c65160a17551322652b14ae7`，business POST0、下游0且前后相同。实际成功UUID为`773c23b6-0923-4ab5-a451-bb80aa4bdf9d`；任务原文漏末尾`d`，未改库。无0040，0039 SHA仍`3cbf5738…e3f37`。
-- 候选/待办：候选Web`sha256:664e0ac6bd289251f289a8785ac05d955470064a3f921c3ae834f79665a4ec89`、88,658,388 bytes构建通过；尚未部署，当前Web仍`83c1bff3…`。正式备份、第二新库恢复、Web-only替换和purchase-only主UAT由独立部署提交收口。
+- 备份/恢复：正式root:root0600 custom dump为2,297,975 bytes、SHA-256`0e6f8215512eb28c1dc72d2dec84b1d645a173bd9cbf93127adf1a2205df38f1`；`pg_restore --list`3,359行/3,348 TOC，第二新库单事务恢复39/head0039、226表、PO/Line/Plan/queue`1/4/4/4`及下游0，主/恢复指纹一致后精确删除恢复库。
+- Web-only部署：Web`sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664→sha256:664e0ac6bd289251f289a8785ac05d955470064a3f921c3ae834f79665a4ec89`，旧Web精确回退tag保留；只recreate Web，没有Migration或PostgreSQL/Worker/Caddy/四卷替换，HTTPS及60秒health`7/7`。
+- 主UAT/收口：只登录purchase，桌面1440和390×844核对聚合、谱系、四Line、四Plan/queue、凭证和下游0，刷新/历史重开/退出通过；`business_post=0`、Session0，浏览器指纹`ae02a432…cc68`与主库状态/历史指纹前后不变。功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`，部署验收独立提交；最终`PO HISTORY TRACEABILITY FIXED — UAT DOWNSTREAM UNCHANGED`。
 
 ### SELFHOST-UAT-DECISION-35 - `docs: retain unauthorized UAT purchase order under control`
 

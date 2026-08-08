@@ -2,20 +2,23 @@
 
 最后更新时间：2026-08-08（Asia/Shanghai）
 
-## SELFHOST-UAT-FIX-36 PO History Traceability（功能通过 / 部署待执行）
+## SELFHOST-UAT-FIX-36 PO History Traceability（完成）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DOING / FUNCTION VERIFIED | 受限DTO、响应式详情、隔离测试和候选构建完成；正式备份恢复、Web-only部署及purchase-only主UAT尚未执行 |
+| 任务状态 | PO HISTORY TRACEABILITY FIXED — UAT DOWNSTREAM UNCHANGED | 受限DTO、响应式详情、隔离测试、正式备份恢复、Web-only部署及purchase-only主UAT全部完成 |
 | 读模型 | PASS / READ ONLY | `PO_HISTORY_TRACEABILITY_V1`在purchase数据域校验后，以单一repeatable-read/read-only事务投影PO、完整上游谱系、四Line、四Plan/queue、凭证和下游计数 |
 | 权限/凭证 | PASS / MINIMIZED | 跨数据域403且列表不泄漏；purchase无`system.audit.read`。DTO只给目标PO Event/Audit/Idempotency状态和摘要，不给正文、Cookie、Session或Header |
 | D-105 | FORWARD ONLY / NON-RETROACTIVE | 产品不硬编码D-105或目标PO，也不声称授权已验证；原始写入无法绑定事前授权的判断不变 |
-| 主库保护 | PASS / ZERO WRITE | PO/Line/Plan/queue`1/4/4/4`、下游全0、business POST0；状态指纹`721f25f8…05194`与历史指纹`d11b46bc…14ae7`刷新重开不变 |
+| 主库保护 | PASS / ZERO WRITE | PO/Line/Plan/queue`1/4/4/4`、下游全0、business POST0；状态指纹`721f25f8…05194`、历史指纹`d11b46bc…14ae7`及浏览器指纹`ae02a432…cc68`前后不变 |
 | 请求ID核对 | DATABASE VALUE PRESERVED | 实际为`773c23b6-0923-4ab5-a451-bb80aa4bdf9d`；任务原文少末尾`d`，产品按数据库真实UUID展示，未补写或截断 |
-| 自动/隔离 | PASS | Unit/UI9、Fulfillment PG6+偏移ID专项、Sourcing/Binding PG20、upgrade`3+5+6`、安全/Identity/Origin、typecheck2、lint、npm3、Python三项、credentials1287、Chromium1通过 |
+| 自动/隔离 | PASS | Unit/UI9、Fulfillment PG6+偏移ID专项、Sourcing/Binding PG20、upgrade`3+5+6`、安全/Identity/Origin、typecheck2、lint、npm3、Python三项、credentials功能1287/最终1288、Chromium1通过 |
 | 响应式/重开 | PASS | 桌面与390×844、刷新、back/forward、Web进程重启重开、无页面横向溢出、Session0均在隔离Chromium通过 |
-| Schema/候选 | NO 0040 / BUILD PASS | alpha.40、0039 SHA`3cbf5738…e3f37`不变；候选Web`sha256:664e0ac6…`、88,658,388 bytes，当前运行Web仍`sha256:83c1bff3…` |
-| 下一门禁 | BACKUP / RESTORE / WEB-ONLY / PURCHASE UAT | 完成后仍不得执行到货、收货、IQC、入库、AP或生产；任何下游试用须独立授权 |
+| 备份/恢复 | PASS | root:root0600 dump 2,297,975 bytes、SHA`0e6f8215…38f1`、list3,359行/3,348 TOC；第二新库恢复39/head0039、226表、`1/4/4/4`及下游0后精确删除 |
+| Schema/Web-only | NO 0040 / DEPLOYED | alpha.40、0039 SHA`3cbf5738…e3f37`不变；Web`83c1bff3…→664e0ac6…`，仅recreate Web，PostgreSQL/Worker/Caddy及四卷不变，连续health`7/7` |
+| 主UAT/会话 | PASS / PURCHASE ONLY | 1440和390×844聚合/谱系/Line/Plan/queue/凭证/下游0、刷新和重开通过；只登录purchase，business POST0，退出后Session0 |
+| 资源/清理 | PASS | 最终available约1.9GiB、Swap277MiB、根盘17GiB、Load`0.09/0.23/0.36`；内核OOM0，四服务restart0/OOM false；临时库/容器/Volume精确清理，正式备份及回退镜像保留 |
+| 下一门禁 | INDEPENDENT RECEIVING AUTHORIZATION REQUIRED | 技术前置已具备，但本任务未登录warehouse或验证主UAT写路径；到货/仓库收货、IQC、入库、AP和生产均须新的独立授权 |
 
 ## SELFHOST-UAT-DECISION-35 Controlled Retention Decision for Unauthorized UAT PO
 
