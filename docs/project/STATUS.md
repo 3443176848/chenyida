@@ -2,6 +2,22 @@
 
 最后更新时间：2026-08-08（Asia/Shanghai）
 
+## SELFHOST-UAT-DECISION-35 Controlled Retention Decision for Unauthorized UAT PO
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | CONTROLLED UAT PO RETENTION DECISION RECORDED | D-105已记录受控保留；本书面决定与提交构成控制事件，只提供前向授权并明确“不追溯性授权” |
+| 决策 | D-105 / ACCEPTED | 标题`Controlled retention of unauthorized UAT PO-00000001`；分类保持为未经事前授权但结构完整的UAT写入，即数据结构完整但来源授权不可证明 |
+| PO事实 | PRESERVED 1/4/4/4 | `PO ID 1 / PO-00000001`；request`773c23b6-0923-4ab5-a451-bb80aa4bdf9d`、actor`uat_20260729_purchase`、2026-08-08 14:11:45.086372 Asia/Shanghai；Award`1/v1/AWARDED`、Supplier`1/SUP-000001`、480.00 CNY |
+| 证据保护 | CONTROLLED RETENTION | PO、四条Line、四条Plan、四条queue及Event/Audit/Idempotency证据原样保留；不删除、修改、取消、重建或重复转换，Award→PO不再重试 |
+| 下游 | MUST REMAIN ZERO | Receipt、Ledger、IQC、AP、付款及生产记录保持0；本任务没有数据库连接或业务写，未改变`SELFHOST-UAT-AUDIT-34`记录的基线 |
+| 授权边界 | READ-ONLY PO TRACEABILITY ONLY | 正式提交后现有PO作为固定UAT起点；只授权后续只读PO追溯验收。warehouse、quality、finance及到货/收货/IQC/入库/库存/AP/付款/生产仍未授权，每个写阶段须独立明确授权 |
+| 下一任务 | PO HISTORY TRACEABILITY ONLY | 只能修复/验收PO历史追溯页面并先补齐完整谱系和凭证；不是仓库收货或IQC任务 |
+| 范围 | DOCS ONLY / NO UAT ACCESS | 仅更新MASTER/TASKS/PROJECT_CONTEXT/DECISIONS/CHANGELOG/STATUS和本任务报告；未登录UAT、连接PostgreSQL、调用Identity/业务API、改凭据、Migration、build、deploy或restart |
+| 非数据库验证 | PASS / ISOLATED | 文档7份/本地引用38、`git diff --check`、credentials 1,280文件、Python self-test/smoke、临时SQLite go-live及轻量`npm test` 3/3串行收口；宿主npm缺失后使用本机已有Node镜像的断网只读自动删除容器复验 |
+| 资源/清理 | PASS | available约`1.9→1.9GiB`，Swap`238→238MiB`，根盘18GiB，最终Load`0.01/0.10/0.10`；内核OOM0，四服务restart0/OOM false。任务临时目录/容器/网络/Volume清零，四个受保护Volume保留 |
+| Git | ONE DOCS COMMIT / NO PUSH | 起点clean`main@e67c9209bc24314000f70760b7b79282c4a9b469`、Parent`9a8a3bd8a84bacb2836ac116d3b8a80783e96fe6`、behind0/ahead172；提交消息`docs: retain unauthorized UAT purchase order under control`，提交后ahead173，实际SHA以Git log为准 |
+
 ## SELFHOST-UAT-AUDIT-34 Existing UAT PO Provenance and Integrity Audit
 
 | 验证项 | 结果 | 说明 |

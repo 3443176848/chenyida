@@ -4,6 +4,16 @@
 
 ## 2026-08-08
 
+### SELFHOST-UAT-DECISION-35 - `docs: retain unauthorized UAT purchase order under control`
+
+- 决策：新增D-105 `Controlled retention of unauthorized UAT PO-00000001`。本书面决定及独立提交是控制事件，只提供前向授权并明确“不追溯性授权”；现有PO继续分类为未经事前授权但结构完整的UAT写入，即数据结构完整但来源授权不可证明。
+- 事实：受控对象为`PO ID 1 / PO-00000001`，request`773c23b6-0923-4ab5-a451-bb80aa4bdf9d`，actor`uat_20260729_purchase`，时间`2026-08-08 14:11:45.086372 Asia/Shanghai`；PO/Line/Plan/queue `1/4/4/4`，Award`1/v1/AWARDED`，Supplier`1/SUP-000001`，金额480.00 CNY。Receipt、Ledger、IQC、AP、付款和生产记录为0；事实来源为`SELFHOST-UAT-AUDIT-34`，本任务没有连接数据库重新取数。
+- 控制：原样保留PO、四条Line、四条Plan、四条queue及Event/Audit/Idempotency证据；不删除、修改、取消或重建，不重试Award→PO。正式提交后，`PO-00000001`只作为后续UAT固定起点；本决定只放行后续只读PO追溯验收，每个后续写阶段仍须独立明确授权。
+- 下一步：下一任务只能是PO历史追溯页面修复/验收，并在仓库/IQC前先补齐完整谱系和凭证。warehouse、quality及finance试用仍未授权；Receipt/IQC/Ledger/AP/生产记录必须保持0，不得从本决定启动到货、收货、IQC、入库、库存、AP、付款或生产。
+- 范围/验证：只更新项目文档；未登录UAT、连接PostgreSQL、调用Identity或业务API、修改凭据、运行Migration/build、部署或重启。项目`.venv`的Python self-test、smoke、任务专用临时SQLite `go_live_check --no-backup`均通过；宿主`npm`不存在而在测试启动前返回127，随后以本机已有Node镜像在断网、只读、1 CPU/1 GiB、自动删除容器中通过`npm test` 3/3。七份Markdown/38个本地引用、1,280文件credentials及`git diff --check`全部通过。
+- 资源/清理：起点/收口available约1.9/1.9GiB，Swap`238/238MiB`，根盘18GiB，Load由`0.15/0.14/0.10`收口到`0.01/0.10/0.10`；内核OOM0，四服务restart0/OOM false。任务临时目录、容器、网络和Volume清零，四个受保护Volume保留；未prune、未删除备份或镜像。
+- Git：从clean`main@e67c9209bc24314000f70760b7b79282c4a9b469`、Parent`9a8a3bd8a84bacb2836ac116d3b8a80783e96fe6`、behind0/ahead172起步，只形成一个聚焦文档提交；提交后ahead173，实际SHA以Git log为准。不push/PR/amend/rebase/reset/stash/restore。
+
 ### SELFHOST-UAT-AUDIT-34 - `docs: audit existing UAT PO provenance`
 
 - 范围/分支：仅对Award ID1、`PO-00000001`及直接谱系执行`REPEATABLE READ READ ONLY`取证；未运行Migration、重做转换、补写Event/Audit或创建任何下游。采用分支B：`UNAUTHORIZED UAT PO WRITE CONFIRMED — DATA PRESERVED`。

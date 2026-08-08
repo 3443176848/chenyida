@@ -40,8 +40,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.40`；PostgreSQL 为 39/head `0039_rfq_traceability.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-33`功能提交`1f205af0bf81379345a09353d9d32ab5c7545971`：固定RFQ Binding→Mapping fact逐行资格、GET/POST共享loader/DTO、事务锁后漂移重验和四行响应式凭证；版本保持alpha.40，Migration保持0039 |
-| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-33`已把精确功能提交Web-only部署到18888非生产UAT；其后`SELFHOST-UAT-AUDIT-34`只读确认现有PO来源并按分支B保留数据、封锁下游，没有重新部署、Migration或业务写。审计独立提交消息为`docs: audit existing UAT PO provenance`，实际SHA以Git log为准 |
-| Git 同步与工作区 | AUDIT34从唯一worktree、clean`main@9a8a3bd8a84bacb2836ac116d3b8a80783e96fe6`、Parent`1f205af0bf81379345a09353d9d32ab5c7545971`、behind0/ahead171起步；只形成一个聚焦文档提交，提交后ahead172。未push/PR/amend/rebase/reset/stash/restore，密码、Token、Cookie、Session正文、连接信息和备份正文未进入Git |
+| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-33`已把精确功能提交Web-only部署到18888非生产UAT；其后`SELFHOST-UAT-AUDIT-34`只读确认现有PO来源并封锁下游。`SELFHOST-UAT-DECISION-35`只以D-105及项目文档记录受控保留、前向授权和“不追溯性授权”，没有登录UAT、连接PostgreSQL、调用业务API、重新部署、Migration或业务写 |
+| Git 同步与工作区 | DECISION35从唯一worktree、clean`main@e67c9209bc24314000f70760b7b79282c4a9b469`、Parent`9a8a3bd8a84bacb2836ac116d3b8a80783e96fe6`、behind0/ahead172起步；只形成一个聚焦文档提交`docs: retain unauthorized UAT purchase order under control`，提交后ahead173，实际SHA以Git log为准。未push/PR/amend/rebase/reset/stash/restore，密码、Token、Cookie、Session正文、连接信息和备份正文未进入Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
@@ -49,13 +49,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0039`，39/head`0039_rfq_traceability.sql`，SHA-256`3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；没有0040。主`RFQ-00000001`为CLOSED v7，Award为1/v1/AWARDED且Line4；现有`PO-00000001`为1/v1/OPEN，PO Line/Delivery Plan/queue为`4/4/4`，目标Receipt/IQC/库存/财务/生产下游全0。四条获选Candidate仍为`2/4/6/8`，Binding/Mapping保持 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。Supplier Mapping资格修复Web为alpha.40`sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`2396c8bc…`有FIX33精确回退tag，四个受保护Volume未更换 |
 | 当前开发环境 | FIX33源码以`AWARD_PO_MAPPING_QUALIFICATION_V1`统一GET预览与POST事务资格：只沿Award Line→Candidate→Quote Line→RFQ Binding→固定Mapping fact，返回UUID/fact/version/row CAS/digest、Unit、有效期、两类冲突及逐行原因；legacy `base_uom`按D-091唯一解析。确认窗口升级V2并显示桌面/390×844四行凭证；最终POST锁后重算且PO Line固定引用Mapping fact。alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `UNAUTHORIZED UAT PO WRITE CONFIRMED — DATA PRESERVED`。AUDIT34证明现有成功转换只有一次且内部结构/谱系完整，但仓库中没有可把它绑定到获授权任务的记录；数据不追认、不删除、不补偿，收货/IQC/AP/付款/生产均封锁 |
-| 当前任务 | 当前无`DOING`；AUDIT34已完成。目标谱系保护指纹前后同为`12d2c02031f34a5212bec80f5f9a5edcc8b1983fe24b96570f87fb17e2f5af18`，浏览器`business_post=0`、Session0 |
-| 下一任务 | 项目负责人先对现有PO的授权缺口作书面决定。未经新的明确任务，不得追认、删除、停用、补偿或开始仓库收货/IQC；如决定保留，后续履约任务仍须重验当前CAS、零收货、Supplier Lot、库存版本、IQC权限和备份恢复边界 |
+| 当前阶段 | `CONTROLLED UAT PO RETENTION DECISION RECORDED`。D-105将现有PO分类为数据结构完整但来源授权不可证明的UAT写入，受控保留全部对象和证据；本控制事件只提供前向授权并明确“不追溯性授权”，不改变原始写入的授权判断 |
+| 当前任务 | 当前无`DOING`；`SELFHOST-UAT-DECISION-35`已完成。Award→PO转换不再重试，`PO-00000001`作为固定UAT起点；本任务只改项目文档并运行非数据库验证，未登录UAT或修改任何业务事实 |
+| 下一任务 | 只能立项PO历史追溯页面修复/验收，并先补齐完整谱系和凭证；其UAT阶段只允许只读PO追溯验收。warehouse、quality及finance试用仍未授权，Receipt/IQC/Ledger/AP/生产记录必须保持0；不得从本决定开始收货、IQC、入库、AP、付款或生产 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-UAT-DECISION-35完成：D-105 `Controlled retention of unauthorized UAT PO-00000001`正式记录受控保留。现有`PO-00000001`及Line/Plan/queue `1/4/4/4`、Event/Audit/Idempotency证据原样保留；Award→PO不再重试。本控制事件是前向授权并执行“不追溯性授权”，只允许以后把该PO作为固定起点进行只读追溯验收，不授权warehouse/quality/finance或任何Receipt/IQC/Ledger/AP/生产写入
 
 - SELFHOST-UAT-AUDIT-34完成：只读事务确认`PO-00000001`由唯一request `773c23b6-0923-4ab5-a451-bb80aa4bdf9d`、actor `uat_20260729_purchase`于2026-08-08 14:11:45创建；PO/Line/Plan/queue精确`1/4/4/4`，四条Award→Candidate→Quote Line→Binding→Mapping→Material谱系、Event/Audit/Idempotency闭合，下游全0。但FIX33零POST收口后不存在新的仓库任务授权链，故按分支B保留数据并封锁履约；只读浏览器桌面/390×844、business POST0、Session0和指纹不变通过
 
@@ -292,6 +294,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
+- `SELFHOST-UAT-DECISION-35`已完成：D-105将未经事前授权的`PO-00000001`置于受控保留状态；它是控制事件，只提供前向授权并明确“不追溯性授权”。PO/Line/Plan/queue `1/4/4/4`及Event/Audit/Idempotency证据不得改动，Award→PO不再重试；当前无`DOING`，下一任务只能是PO历史追溯页面修复/验收，Receipt/IQC/Ledger/AP/生产记录继续保持0。
+- `SELFHOST-UAT-AUDIT-34`已完成：唯一成功PO request、actor、时间、结构、谱系和下游零计数已由限定只读取证确认；结论是数据结构完整但来源授权不可证明。审计没有删除、修改、补偿或继续任何下游，D-105现已对其作出前向受控保留决定。
+- 阅读边界：以下FIX-33/FIX-32等条目中的PO为0及“另获转换授权”只记录各自任务收口时点，不是当前执行指令；当前路线以D-105为准，现有PO受控保留且Award→PO不再重试。
 - `SELFHOST-UAT-FIX-33`已完成：功能提交`1f205af0bf81379345a09353d9d32ab5c7545971`，采用分支A且不新增0040；统一Supplier Mapping资格服务、固定Binding→Mapping fact谱系、legacy Unit兼容、逐行错误、事务锁和桌面/390×844凭证已Web-only部署为`sha256:83c1bff3…20664`。正式备份/第二库恢复和purchase-only预览后取消通过；主UAT`business_post=0`、Session0，四条Mapping、失败请求、Award/RFQ不变，PO/Line/Plan/queue全0。当前无`DOING`；正式转换须新的明确授权和当时事实重验。
 - `SELFHOST-UAT-FIX-32`已完成：功能提交`a4ffb8ee022234ea25add4ce636050366ac6887a`，保持alpha.40/0039且没有0040；两阶段预览/最终确认、完整转换合同、同连接单事务重验、隔离`1 PO / 4 PO Line / 4 Delivery Plan`已Web-only部署。正式备份/第二库恢复和purchase-only桌面/390×844打开后取消通过；主UAT`business_post=0`、Session0，RFQ CLOSED v7、Award/Line/Event/PO/Plan `1/4/1/0/0`。真正转换仍须新授权并重新核验当前事实。
 - `SELFHOST-UAT-FIX-30`已完成：功能提交`22aa4dc053c9e0a8dc523956afe7742cf5d66fbc`，保持alpha.40/0039且没有0040；两份固定Quote、一次Award操作/四条Line精确语义、上游不可变、八类下游零自动创建和独立转PO阶段已Web-only部署。正式备份/第二库恢复、隔离双击Award1/Line4/PO0及purchase-only桌面/390×844打开后取消通过；主UAT business POST0、Session0，RFQ ISSUED v6、Award/Award Line/PO0/0/0。当前无`DOING`；真正人工定标或转PO必须新授权并重验当前事实。
@@ -407,7 +412,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - 已完成：`PHASE3-TASK02` 批准全部 16 项决定并完成非生产 Normalization 服务、`0006`、五个 API、权限/限流/取消、隔离迁移与集成测试；未创建 Draft/正式物料，未迁移或部署生产。
 - 已完成：`PHASE3-TASK03` Material Import Normalization Review UI V1 docs-only 设计与正式规格确认；四份正式文档覆盖统一路由、七步 Stepper、启动/轮询/取消、Current/Latest、Rows/Drawer/Issues、37 个线框、104 项测试、局部门禁和性能门禁，14 项决定均为 `APPROVED`；未实施运行时代码或改变生产环境。
 - 已完成：`PHASE3-TASK04` Material Import Normalization Review UI V1 非生产实施；统一工作区、七步 Stepper、Current/Latest、冻结幂等与 `RESULT_UNKNOWN`、2/5/10 轮询、取消、汇总、Rows/Issues cursor、Row Drawer、安全有界渲染和权限清理均已落地；104/104 计划测试、100/100 Import UI 回归及本地 Playwright 性能/可访问性门禁通过，未改 API/Schema/Migration/业务服务或生产环境。
-- 下一：停止。状态中文化已完成匿名只读 Web-only部署；任何登录式浏览器验收、Product/BOM 修订、身份变化、业务操作、Migration、真实数据迁移或生产切流仍须独立任务和明确授权。既有 UAT 身份与业务保护规则继续有效。
+- 下一：只允许另立PO历史追溯页面修复/验收任务，并在UAT仅执行只读PO追溯验收；不得重试Award→PO，也不得开始仓库收货、IQC、入库、库存、AP、付款或生产。warehouse、quality及finance试用仍须各自独立明确授权。
 
 ## 更新规则
 

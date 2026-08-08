@@ -1198,6 +1198,26 @@
 - 主UAT边界：失败请求`f30a7801-1cd0-4849-95a8-9c61d5c52e67`及其唯一HTTP 422事实必须保留。主UAT只允许purchase打开Award 1预览、核对桌面/390×844、填写备注后取消并退出；`business_post=0`，Award、Mapping、PO及计划前后不变。
 - 实施结果：采用分支A，不新增或运行0040。功能提交`1f205af0bf81379345a09353d9d32ab5c7545971`；GET/POST共享资格服务、逐行凭证、事务锁后重算和固定Mapping fact的PO Line谱系已通过隔离测试。Web由`sha256:2396c8bc4fd5658c26cef11c4a438b2edb474607b73b2b8ee7fe337b125575ed`Web-only替换为`sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`；正式dump SHA-256`d3cf053f09948c6e4ae54caff028a7663a3750249bcaf3e8758e2f0ace49c5c2`已list并恢复第二新库。主UATpurchase-only桌面/390×844核对四行qualified后取消，`preview_get=1`、`business_post=0`、Session0；失败请求、四条Mapping及Award/RFQ保持，PO/PO Line/Delivery Plan/queue仍为0。
 
+## D-105 Controlled retention of unauthorized UAT PO-00000001
+
+- 日期：2026-08-08
+- 状态：`ACCEPTED / CONTROLLED RETENTION / FORWARD AUTHORIZATION ONLY`
+- 确认人：项目负责人（明确要求对未经事前授权的UAT PO作出受控保留决定，并限定后续只读追溯边界）
+- 控制事件与授权属性：本书面决定及其独立Git提交构成控制事件，只提供前向授权，并采用“不追溯性授权”原则；它不改变原始写入的授权判断。该对象继续分类为“未经事前授权但结构完整的UAT写入”，即数据结构完整但来源授权不可证明。
+- 事实基线：PO为`ID 1 / PO-00000001`；唯一成功创建请求为`773c23b6-0923-4ab5-a451-bb80aa4bdf9d`，actor为`uat_20260729_purchase`，创建时间为`2026-08-08 14:11:45.086372 Asia/Shanghai`。结构`PO / PO Line / Delivery Plan / queue = 1 / 4 / 4 / 4`；来源Award为`ID 1 / v1 / AWARDED`，Supplier为`ID 1 / SUP-000001`，金额为`480.00 CNY`。Receipt、Ledger、IQC、AP、付款和生产记录均为0。权威取证见[SELFHOST-UAT-AUDIT-34](../tasks/SELFHOST-UAT-AUDIT-34.md)。
+- 控制结论：
+  1. 原始PO写入无法绑定到仓库内事前授权的任务执行流。
+  2. 不把该写入追溯描述为具有事前授权。
+  3. 分类继续为“未经事前授权但结构完整的UAT写入”。
+  4. 原样保留该PO、四条PO Line、四条Delivery Plan、四条queue，以及Event、Audit和Idempotency证据。
+  5. 不删除、不修改、不取消、不重建该PO，也不重试或重复执行Award→PO转换。
+  6. 从本书面决定正式提交后，允许把现有`PO-00000001`作为后续UAT的固定起点。
+  7. 本决定只授权后续只读PO追溯验收。
+  8. 本决定不自动授权到货、收货、IQC、入库、库存、AP、付款或生产操作。
+  9. 每个后续写阶段仍须获得独立明确授权。
+  10. 在进入仓库或IQC前，必须先补齐并验收PO历史页面的完整谱系和凭证。
+- 后续门禁：Award→PO转换不再重试。下一任务只能是PO历史追溯页面修复/验收，且本决定对UAT的授权范围仅为只读追溯验收；warehouse、quality和finance试用仍未授权。Receipt、IQC、Ledger、AP和生产记录必须保持0，任何偏离都必须立即停止并重新取证。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
