@@ -330,7 +330,9 @@ export async function loadWarehouseReceiptReadiness(
     && ["PENDING", "PARTIAL"].includes(String(selected.plan_status))
     && selected.closed_at == null && String(selected.supplier_status) === "ACTIVE"
     && String(selected.material_status) === "ACTIVE" && subtractDecimal(remaining, "0") !== "0.000000";
-  const iqcManaged = selected.inventory_type === "STOCKED" && selected.inspection_type === "IQC";
+  const inventoryType = requiredText(selected.inventory_type);
+  const inspectionType = requiredText(selected.inspection_type);
+  const iqcManaged = inventoryType === "STOCKED" && inspectionType === "IQC";
 
   return {
     contract_version: "WAREHOUSE_RECEIPT_READINESS_V1",
@@ -385,11 +387,21 @@ export async function loadWarehouseReceiptReadiness(
       physical_receipt_model: true, supplier_notification_or_in_transit_model_available: false,
       receipt_created_on_post: true,
       warehouse_receipt_model: "系统创建Purchase Receipt及Receipt Line；没有独立的Warehouse Receipt聚合表。",
-      iqc_material_internal_lot: "ACTIVE/STOCKED/IQC物料在收货事务中创建唯一内部RML Lot，初始状态FROZEN。",
-      iqc_material_inventory: "收货事务立即增加on-hand与frozen，available保持0。",
-      available_inventory_rule: "quality角色完成IQC合格放行并追加UNFREEZE Ledger后，可用库存才增加。",
-      ledger_rule: "Inventory Ledger在实际收货事务中产生，不等待IQC；IQC后续只对合格量追加解冻账。",
-      next_responsibility: "收货后下一责任队列属于quality；warehouse没有IQC检验、处置或关闭写权限。",
+      iqc_material_internal_lot: iqcManaged
+        ? "当前选中物料为ACTIVE/STOCKED/IQC；收货事务创建唯一内部RML Lot，初始状态FROZEN。"
+        : `当前选中物料为ACTIVE/${inventoryType}/${inspectionType}，未启用IQC Lot模式；收货不创建内部RML Lot，Supplier批次不适用。`,
+      iqc_material_inventory: iqcManaged
+        ? "当前选中物料收货时立即增加on-hand与frozen，available保持0。"
+        : "当前选中物料按普通RECEIPT入账，不创建IQC冻结；on-hand增加且available按余额公式立即重算。",
+      available_inventory_rule: iqcManaged
+        ? "quality角色完成IQC合格放行并追加UNFREEZE Ledger后，可用库存才增加。"
+        : "当前选中物料不等待IQC放行；普通RECEIPT事务完成后即可按on-hand、reserved与frozen的权威余额计算可用量。",
+      ledger_rule: iqcManaged
+        ? "Inventory Ledger在实际收货事务中产生，不等待IQC；IQC后续只对合格量追加解冻账。"
+        : "Inventory Ledger在实际收货事务中以普通RECEIPT产生；当前物料没有后续IQC解冻账。",
+      next_responsibility: iqcManaged
+        ? "收货后下一责任队列属于quality；warehouse没有IQC检验、处置或关闭写权限。"
+        : "当前选中物料不创建供应商来料IQC责任队列；若物料权威配置为IQC，检验、处置和关闭只能由quality负责，warehouse无写权限。",
       exceptions_are_separate_operations: "不合格、退货与让步接收均为独立受控操作，本次收货不会自动执行。",
       no_automatic_records: ["AP", "Payment", "Work Order", "Production Issue", "Production Report", "Production Completion"],
     },

@@ -176,7 +176,11 @@ function assertReadiness(readiness, planId) {
   assert.equal(readiness.selected_receipt.quantity, null);assert.equal(readiness.selected_receipt.is_early_arrival, true);
   assert.equal(readiness.selected_receipt.initial_confirmation_blocked, true);
   assert.equal(readiness.selected_receipt.target.location_code, "MAIN");
-  assert.equal(readiness.selected_receipt.supplier_lot.applicability, "REQUIRED_FOR_IQC");
+  assert.equal(readiness.selected_receipt.supplier_lot.applicability, "NOT_APPLICABLE");
+  assert.match(readiness.receipt_accounting_boundary.iqc_material_internal_lot, /不创建内部RML Lot/);
+  assert.match(readiness.receipt_accounting_boundary.iqc_material_inventory, /不创建IQC冻结/);
+  assert.match(readiness.receipt_accounting_boundary.available_inventory_rule, /不等待IQC放行/);
+  assert.match(readiness.receipt_accounting_boundary.next_responsibility, /不创建供应商来料IQC责任队列/);
   for (const key of ["receipt", "warehouse_receipt", "inventory_ledger", "lot", "iqc", "purchase_financial_source",
     "ap", "payment", "work_order", "production_report", "production_completion"]) assert.equal(readiness.downstream[key], 0, key);
   assert.equal(readiness.downstream.all_zero, true);
@@ -290,7 +294,7 @@ try {
       "四层稳定谱系", "服务端当前时间", "承诺/计划日期", "2026-10-20", "实际收货时间规则", "提前到货", "是",
       "送货凭证", "Supplier批次", "目标仓库", "目标库位", "MAIN", "经办账号", USERNAME, "收货说明",
       "Receipt", "Warehouse Receipt Line", "Inventory Ledger", "RML Lot", "IQC", "AP", "Payment", "Work Order",
-      "IQC、库存与职责边界", "初始状态FROZEN", "available保持0", "下一责任队列属于quality",
+      "IQC、库存与职责边界", "不创建内部RML Lot", "不创建IQC冻结", "不等待IQC放行", "不创建供应商来料IQC责任队列",
       "不合格、退货与让步接收均为独立受控操作", "当前确认资料不完整或权威状态不可过账"]) {
       assert.ok(text.includes(required), `${stage} preview missing ${required}`);
     }

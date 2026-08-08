@@ -889,6 +889,11 @@ test("warehouse receipt readiness GET exposes the four-line minimum DTO without 
   assert.equal(readiness.selected_receipt.initial_confirmation_blocked, true);
   assert.equal(readiness.selected_receipt.target.warehouse_model, "NOT_SEPARATELY_MODELED");
   assert.equal(readiness.selected_receipt.target.location_code, "MAIN");
+  assert.equal(readiness.selected_receipt.supplier_lot.applicability, "NOT_APPLICABLE");
+  assert.match(readiness.receipt_accounting_boundary.iqc_material_internal_lot, /不创建内部RML Lot/);
+  assert.match(readiness.receipt_accounting_boundary.iqc_material_inventory, /不创建IQC冻结/);
+  assert.match(readiness.receipt_accounting_boundary.available_inventory_rule, /不等待IQC放行/);
+  assert.match(readiness.receipt_accounting_boundary.next_responsibility, /不创建供应商来料IQC责任队列/);
   assert.equal(readiness.receipt_accounting_boundary.supplier_notification_or_in_transit_model_available, false);
   assert.equal(readiness.receipt_accounting_boundary.next_responsibility.includes("quality"), true);
   assert.equal(readiness.downstream.all_zero, true);
@@ -973,6 +978,12 @@ test("complete early-arrival evidence wins once and IQC stock remains frozen for
   const converted = await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`, { method: "POST", body: await conversionBody(refs.awardId) });
   assert.equal(converted.response.status, 201, JSON.stringify(converted.payload));
   const planId = Number(converted.payload.data.purchase_orders[0].delivery_plans[0].id);
+  const iqcPreview = await fulfillment(`/api/procurement/delivery-plans/${planId}/receipt-preview`, { role: "warehouse" });
+  assert.equal(iqcPreview.response.status, 200, JSON.stringify(iqcPreview.payload));
+  assert.equal(iqcPreview.payload.data.selected_receipt.supplier_lot.applicability, "REQUIRED_FOR_IQC");
+  assert.match(iqcPreview.payload.data.receipt_accounting_boundary.iqc_material_internal_lot, /初始状态FROZEN/);
+  assert.match(iqcPreview.payload.data.receipt_accounting_boundary.iqc_material_inventory, /available保持0/);
+  assert.match(iqcPreview.payload.data.receipt_accounting_boundary.next_responsibility, /下一责任队列属于quality/);
   const body = await receiptBody(planId, "10", { reason: "隔离数据库完整提前到货证据" });
   assert.equal(body.expected_early_arrival, true);assert.ok(body.supplier_lot_code);
   const keys = ["early-receipt-a", "early-receipt-b"];
