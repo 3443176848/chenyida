@@ -1,6 +1,23 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-07（Asia/Shanghai）
+最后更新时间：2026-08-08（Asia/Shanghai）
+
+## SELFHOST-UAT-FIX-33 Award to PO Supplier Mapping Validation Diagnosis and Fix
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | IMPLEMENTED / PRE-DEPLOY VERIFIED | 分支A源码、统一资格合同、隔离测试和候选Web已通过；正式备份恢复、Web-only部署及主UAT取消验收待执行 |
+| 诊断分支/根因 | BRANCH A / FIXED IN SOURCE | GET只信任Award历史粗粒度`po_convertible_now`；POST另行动态重查Mapping、忽略固定Binding，并以`material.base_unit_id=unit.id`错误过滤四条legacy `base_unit_id=NULL/base_uom=PCS`合法Mapping |
+| 四条Mapping | AUTHORITATIVE / QUALIFIED | Supplier1/SUP-000001，Material533—536，Mapping UUID`224d1965…07ff8`、`43ca04d8…18030`、`aa16f7e7…f257e`、`9659ad2d…c63f`，fact1—4/v1/row CAS3，ACTIVE、PCS→PCS、正数1:1、2026-08-05起长期有效、两类冲突0 |
+| 四条谱系 | STABLE IDS / NO NAME BRIDGE | Award Line1—4→Candidate`2/4/6/8`→Quote Line1—4→RFQ Binding1—4→上述固定Mapping fact；Event join不参与基数 |
+| GET/POST资格 | SAME LOADER / SAME DTO | 共用`AWARD_PO_MAPPING_QUALIFICATION_V1`、transaction as-of、`[from,to)`、bigint字符串ID和相同逐行错误；确认正文断言资格digest |
+| Unit/冲突 | FAIL CLOSED | 优先关系化base Unit；legacy仅按`base_uom`唯一解析启用Unit；Supplier/Internal/RFQ Unit一致且比率为正数等值；Supplier/Material及Supplier Part两类冲突均核验 |
+| 事务/漂移 | LOCKED / ATOMIC | 锁定Award/Line/Candidate/Quote/Binding/Mapping/Supplier/Material/Unit，和Mapping写共用part→material advisory顺序；固定状态/version/CAS/digest/有效期漂移拒绝，无关Mapping变化不阻断，PO Line只用固定fact |
+| 隔离成功/失败 | EXACT 1/4/4/4 / FAILURES 0 | 成功为PO/PO Line/Delivery Plan/queue `1/4/4/4`；缺失、冲突、状态、日期、Unit、比例、漂移、并发和故障路径业务记录全0 |
+| 自动/浏览器 | PASS | 无DB93、Unit22、Fulfillment PG5、Mapping PG10、0038/0039`5/6`、Sourcing PG9、Binding PG18、upgrade3、npm3、Python三项、三个typecheck、build、lint0 error/11既有warning、credentials1277、diff及Chromium1通过；桌面/390×844四行凭证可读 |
+| 候选Web | READY / HEALTH OK | `sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`，88,636,706 bytes；受限临时容器health通过 |
+| Schema/主UAT | UNCHANGED / NOT LOGGED IN | alpha.40、0001—0039且无0040；失败请求`f30a7801-1cd0-4849-95a8-9c61d5c52e67`保留，主UAT尚未登录或业务POST，Mapping/Award/PO/计划保持起点事实 |
+| 下一步 | BACKUP / RESTORE / WEB-ONLY / CANCEL UAT | 串行正式dump和第二新库恢复，仅替换Web；purchase只打开桌面/390×844预览、填备注后取消并退出，禁止最终转换 |
 
 ## SELFHOST-UAT-FIX-32 Award to PO Conversion Confirmation Contract Fix
 

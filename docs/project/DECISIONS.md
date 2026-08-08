@@ -1184,6 +1184,20 @@
 - 主UAT边界：主UAT只允许purchase打开Award 1转换窗口、核对桌面与390×844、填写备注后取消、刷新和安全退出；业务POST必须为0，PO与Delivery Plan前后均为0。真正转换仍须新的独立明确授权。
 - 实施结果：入口、权威预览、确认窗口、最终转换DTO和同事务写保护均已实现；最终确认在幂等回放检查之后复用外层事务连接读取完整Award历史，避免低容量连接池嵌套取连接。隔离结果为`1 PO / 4 PO Line / 4 Delivery Plan`，`max=2`连接池并发单胜、强制故障全部半记录为0；延迟/失败Chromium证明立即禁用、失败不重试和迟到预览不复活。Web`sha256:2396c8bc4fd5658c26cef11c4a438b2edb474607b73b2b8ee7fe337b125575ed`已Web-only部署；正式备份/第二库恢复和主UATpurchase-only桌面/390×844打开后取消通过，`preview_get=1`、`business_post=0`、Session0，PO/Delivery Plan保持0。
 
+## D-104 Award转PO的Supplier Mapping资格必须沿固定RFQ Binding复用统一服务端合同
+
+- 日期：2026-08-08
+- 状态：`ACCEPTED / IMPLEMENTED`
+- 确认人：项目负责人（要求诊断并修复Award 1转PO时四条已固定Supplier A Mapping被误判的问题，授权分支A实现、隔离测试、备份恢复、Web-only部署和purchase-only取消UAT；禁止重试主UAT转换、修改Mapping或创建主UAT PO）
+- 权威身份：每条资格只能沿Award Line→Comparison Candidate→固定Quote Line→RFQ Supplier/Line→唯一RFQ Binding→固定Mapping fact追溯。Mapping身份使用UUID、fact ID、固定version、row CAS和content digest；Supplier名称、supplier part、价格、数组位置及名称桥接均不得决定身份。
+- 统一资格合同：GET预览与最终POST必须复用同一个服务端资格函数和`AWARD_PO_MAPPING_QUALIFICATION_V1`行级DTO；每次调用使用单一明确as-of及`[valid_from, valid_to)`边界。结果逐行返回Award Line、Candidate、Quote Line、Binding、Supplier、Material、Mapping、状态、Unit、换算、有效期、digest、冲突数、`qualified`、稳定错误代码和中文原因。
+- Unit与兼容边界：关系化`material.base_unit_id`存在时直接使用；legacy Material仅可按D-091由`base_uom`精确解析唯一启用Unit。Supplier/Internal Unit必须一致，换算分子分母必须为正且数值相等；不得把合法legacy PCS物料误判为缺失Mapping，也不得放宽非1:1或歧义Unit。
+- 冲突与类型边界：资格基于固定Mapping fact，而非动态反向选择Mapping；同时核验Supplier/Material当前ACTIVE冲突及Supplier内supplier part冲突。Mapping Event/Version join不得改变fact基数；PostgreSQL bigint在DTO和比较边界保持规范十进制字符串。
+- 预览与漂移：`po_convertible_now=true`只允许在完整四行全部qualified且PO/PO Line/Delivery Plan为0时返回。确认窗口必须展示四行资格凭证；最终POST在当前事务as-of重新计算同一资格摘要，并拒绝预览后的Binding、Mapping状态/version/CAS/digest、有效期或相关身份漂移，无关Mapping变化不得阻断。
+- 事务边界：最终POST锁定Award、Award Line及固定资格事实，不信任浏览器传入Supplier、Material、价格或Mapping ID；PO Line固定保存对应Mapping fact引用。PO、四条PO Line、四条Delivery Plan、四条queue及Event/Audit/幂等结果继续在单事务创建，任一失败全部为0。
+- 主UAT边界：失败请求`f30a7801-1cd0-4849-95a8-9c61d5c52e67`及其唯一HTTP 422事实必须保留。主UAT只允许purchase打开Award 1预览、核对桌面/390×844、填写备注后取消并退出；`business_post=0`，Award、Mapping、PO及计划前后不变。
+- 实施结果：采用分支A，不新增或运行0040。GET/POST共享资格服务、逐行凭证、事务锁后重算和固定Mapping fact的PO Line谱系已通过隔离测试；候选Web为`sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`。正式备份、第二库恢复、Web-only部署和主UAT取消验收仍待执行，因此本记录尚不标记DEPLOYED。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

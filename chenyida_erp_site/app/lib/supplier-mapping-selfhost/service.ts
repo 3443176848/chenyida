@@ -388,7 +388,10 @@ export class SupplierMappingService {
     const draftInput = Object.fromEntries(Object.entries(input).filter(([key]) => key !== "expected_version"));
     const parsed = parseDraftInput(draftInput);
     return this.repository.execute(meta, async (client) => {
+      const observed = await this.peekLatest(client, mappingId);
+      await this.lockIdentities(client, [this.inputFromRow(observed), parsed]);
       const current = await this.lockLatest(client, mappingId);
+      this.requireObservedLatest(observed, current);
       this.requireDraftOwner(current, meta, expected);
       if (Number(current.supplier_id) !== parsed.supplierId
         || String(current.supplier_item_code_normalized) !== parsed.normalizedSupplierItemCode) {
@@ -399,7 +402,6 @@ export class SupplierMappingService {
         );
       }
       const reference = await this.validateReferences(client, parsed);
-      await this.lockIdentity(client, parsed);
       await this.claimSupplierPart(client, parsed, mappingId, meta);
       const updated = rowData((await client.query<any>(`
         update supplier_mappings set material_id=$3,supplier_id=$4,supplier_name=$5,supplier_key=$6,
@@ -447,13 +449,15 @@ export class SupplierMappingService {
       ? boundedExactText(input.review_comment, "审核意见", 500, true)
       : boundedText(input.reason, "退回原因", 500, true);
     return this.repository.execute(meta, async (client) => {
+      const observed = await this.peekLatest(client, mappingId);
+      await this.lockIdentity(client, this.inputFromRow(observed));
       const current = await this.lockLatest(client, mappingId);
+      this.requireObservedLatest(observed, current);
       if (Number(current.version) !== expected) throw new SupplierMappingError("VERSION_CONFLICT", "待审核 Mapping 版本已变化，请刷新后重试", 409);
       if (current.status !== "PENDING_REVIEW") throw new SupplierMappingError("MAPPING_NOT_PENDING_REVIEW", "只有 PENDING_REVIEW Mapping 可以审核", 409);
       if (current.created_by === meta.actor.username) throw new SupplierMappingError("SELF_REVIEW_FORBIDDEN", "创建人不能审核自己创建的 Supplier Mapping", 403);
       const parsed = this.inputFromRow(current);
       const reference = await this.validateReferences(client, parsed);
-      await this.lockIdentity(client, parsed);
       if (decision === "APPROVE") await this.assertApprovalConflicts(client, current);
       if (canonicalDigest(this.contentFromRow(current)) !== current.content_digest) {
         throw new SupplierMappingError("MAPPING_CONTENT_DIGEST_MISMATCH", "提交后的 Mapping 正文摘要不一致，已拒绝审核", 409);
@@ -502,12 +506,14 @@ export class SupplierMappingService {
     exactKeys(input, ["expected_version"]);
     const expected = expectedVersion(input.expected_version);
     return this.repository.execute(meta, async (client) => {
+      const observed = await this.peekLatest(client, mappingId);
+      await this.lockIdentity(client, this.inputFromRow(observed));
       const current = await this.lockLatest(client, mappingId);
+      this.requireObservedLatest(observed, current);
       if (Number(current.version) !== expected) throw new SupplierMappingError("VERSION_CONFLICT", "Mapping 版本已变化，请刷新后重试", 409);
       if (!["ACTIVE", "REJECTED"].includes(current.status)) throw new SupplierMappingError("MAPPING_NEW_VERSION_NOT_ALLOWED", "只有 ACTIVE 或 REJECTED Mapping 可以创建新版本", 409);
       const parsed = this.inputFromRow(current);
       const reference = await this.validateReferences(client, parsed);
-      await this.lockIdentity(client, parsed);
       await this.claimSupplierPart(client, parsed, mappingId, meta);
       const nextVersion = Number(current.mapping_version_no) + 1;
       const created = rowData((await client.query<any>(`
@@ -547,14 +553,33 @@ export class SupplierMappingService {
     };
   }
 
-  private async lockLatest(client: PoolClient, mappingId: string) {
+  private async latest(client: PoolClient, mappingId: string, lock: boolean) {
     const result = await client.query<any>(`
       select sm.*,
         to_char(sm.valid_from at time zone 'Asia/Shanghai','YYYY-MM-DD') valid_from_date,
         case when sm.valid_to is null then null else to_char(sm.valid_to at time zone 'Asia/Shanghai','YYYY-MM-DD') end valid_to_date
-      from supplier_mappings sm where sm.mapping_uid=$1 order by sm.mapping_version_no desc limit 1 for update
+      from supplier_mappings sm where sm.mapping_uid=$1 order by sm.mapping_version_no desc limit 1 ${lock ? "for update" : ""}
     `, [mappingId]);
     return rowData(result.rows, "MAPPING_NOT_FOUND", "Supplier Mapping 不存在");
+  }
+
+  private async peekLatest(client: PoolClient, mappingId: string) {
+    return this.latest(client, mappingId, false);
+  }
+
+  private async lockLatest(client: PoolClient, mappingId: string) {
+    return this.latest(client, mappingId, true);
+  }
+
+  private requireObservedLatest(observed: any, current: any) {
+    const unchanged = String(current.id) === String(observed.id)
+      && String(current.mapping_uid) === String(observed.mapping_uid)
+      && Number(current.mapping_version_no) === Number(observed.mapping_version_no)
+      && Number(current.version) === Number(observed.version)
+      && String(current.supplier_id) === String(observed.supplier_id)
+      && String(current.material_id) === String(observed.material_id)
+      && String(current.supplier_item_code_normalized) === String(observed.supplier_item_code_normalized);
+    if (!unchanged) throw new SupplierMappingError("VERSION_CONFLICT", "Supplier Mapping 在并发锁等待期间已变化，请刷新后重试", 409);
   }
 
   private requireDraftOwner(current: any, meta: SupplierMappingMutationMeta, expected: number) {
@@ -590,8 +615,17 @@ export class SupplierMappingService {
   }
 
   private async lockIdentity(client: PoolClient, input: SupplierMappingDraftInput) {
-    await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`supplier-part:${input.supplierId}:${input.normalizedSupplierItemCode}`]);
-    await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`supplier-material:${input.supplierId}:${input.materialId}`]);
+    await this.lockIdentities(client, [input]);
+  }
+
+  private async lockIdentities(client: PoolClient, inputs: readonly SupplierMappingDraftInput[]) {
+    const supplierPartKeys = [...new Set(inputs.map((input) =>
+      `supplier-part:${input.supplierId}:${input.normalizedSupplierItemCode}`))].sort();
+    const supplierMaterialKeys = [...new Set(inputs.map((input) =>
+      `supplier-material:${input.supplierId}:${input.materialId}`))].sort();
+    for (const key of [...supplierPartKeys, ...supplierMaterialKeys]) {
+      await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [key]);
+    }
   }
 
   private async assertApprovalConflicts(client: PoolClient, current: any) {

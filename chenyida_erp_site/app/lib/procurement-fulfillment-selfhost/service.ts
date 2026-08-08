@@ -9,6 +9,7 @@ import type { ProcurementMeta, ProcurementResult, PurchaseOrderLineInput } from 
 import { ProcurementSourcingRepository } from "../procurement-sourcing-selfhost/repository.ts";
 import { ProcurementSourcingService } from "../procurement-sourcing-selfhost/service.ts";
 import { buildAwardConversionPreview, type AwardConversionPreview } from "./award-conversion-preview.ts";
+import { firstAwardMappingQualificationFailure, loadAwardMappingQualification } from "./award-mapping-qualification.ts";
 
 type AwardLine = {
   award_line_id: string; award_id: string; rfq_line_id: string; selected_quote_line_id: string; comparison_id: string;
@@ -43,25 +44,32 @@ export class ProcurementFulfillmentService {
   }
 
   async conversionPreview(awardId: number, actor: Pick<IdentityActor, "username" | "role" | "permissions">, transactionClient?: PoolClient) {
-    const query = transactionClient ?? this.repository.pool;
-    const source = await query.query<{ rfq_id: string }>("select rfq_id::text from procurement_sourcing_awards where id=$1", [awardId]);
-    if (!source.rows[0]) throw new ProcurementError("SOURCING_AWARD_NOT_FOUND", "采购定标不存在", 404);
+    const client = transactionClient ?? await this.repository.pool.connect();
+    const ownsTransaction = transactionClient === undefined;
     try {
+      if (ownsTransaction) await client.query("begin isolation level repeatable read read only");
+      const source = await client.query<{ rfq_id: string }>("select rfq_id::text from procurement_sourcing_awards where id=$1", [awardId]);
+      if (!source.rows[0]) throw new ProcurementError("SOURCING_AWARD_NOT_FOUND", "采购定标不存在", 404);
       const sourcing = new ProcurementSourcingService(new ProcurementSourcingRepository(this.repository.pool));
-      return buildAwardConversionPreview(await sourcing.detail(numericId(source.rows[0].rfq_id, "rfqId"), actor, transactionClient), awardId);
+      const detail = await sourcing.detail(numericId(source.rows[0].rfq_id, "rfqId"), actor, client);
+      const qualification = await loadAwardMappingQualification(client, awardId);
+      const preview = buildAwardConversionPreview(detail, awardId, qualification);
+      if (ownsTransaction) await client.query("commit");
+      return preview;
     } catch (error) {
+      if (ownsTransaction) await client.query("rollback").catch(() => undefined);
       if (error instanceof ProcurementError) throw error;
       const known = error as { code?: string; status?: number };
       if (known.code === "RFQ_FORBIDDEN") throw new ProcurementError("PERMISSION_DENIED", "没有权限查看该采购定标", 403);
       if (known.status === 404) throw new ProcurementError("SOURCING_AWARD_NOT_FOUND", "采购定标或来源询价不存在", 404);
       throw new ProcurementError("AWARD_CONVERSION_PREVIEW_INCONSISTENT", "采购定标权威预览不完整或已变化，已停止转换", 409);
-    }
+    } finally { if (ownsTransaction) client.release(); }
   }
 
   private conversionAssertions(input: Record<string, unknown>, preview: AwardConversionPreview): ConversionAssertions {
     exactKeys(input, [
       "expected_award_version", "expected_rfq_id", "expected_rfq_version", "expected_comparison_version",
-      "expected_comparison_output_digest", "expected_award_digest", "expected_decision_digest", "expected_po_count",
+      "expected_comparison_output_digest", "expected_award_digest", "expected_decision_digest", "expected_mapping_qualification_digest", "expected_po_count",
       "expected_delivery_plan_count", "expected_award_line_ids", "remark",
     ]);
     const assertions: ConversionAssertions = {
@@ -72,6 +80,7 @@ export class ProcurementFulfillmentService {
       expected_comparison_output_digest: sha256(input.expected_comparison_output_digest, "expected_comparison_output_digest"),
       expected_award_digest: sha256(input.expected_award_digest, "expected_award_digest"),
       expected_decision_digest: sha256(input.expected_decision_digest, "expected_decision_digest"),
+      expected_mapping_qualification_digest: sha256(input.expected_mapping_qualification_digest, "expected_mapping_qualification_digest"),
       expected_po_count: version(input.expected_po_count, "expected_po_count"),
       expected_delivery_plan_count: version(input.expected_delivery_plan_count, "expected_delivery_plan_count"),
       expected_award_line_ids: stableIds(input.expected_award_line_ids, "expected_award_line_ids"),
@@ -233,9 +242,6 @@ export class ProcurementFulfillmentService {
         || row.quote_status !== "SUBMITTED" || !row.quote_current) {
         throw new ProcurementError("SOURCING_QUOTE_NOT_CURRENT", "选中报价或Comparison已失效、被替代或版本漂移", 409);
       }
-      if (row.supplier_status !== "ACTIVE" || row.material_status !== "ACTIVE" || !row.unit_enabled) {
-        throw new ProcurementError("PURCHASE_REFERENCE_NOT_ACTIVE", "定标Supplier、Material或Unit不存在或未启用", 422);
-      }
       const sameNumeric = await client.query(`select
         $1::numeric=$2::numeric and $1::numeric=$3::numeric price_ok,
         $4::numeric=$5::numeric quantity_ok`, [row.selected_unit_price, row.quote_unit_price, row.candidate_unit_price, row.selected_quantity, row.quoted_quantity]);
@@ -254,8 +260,8 @@ export class ProcurementFulfillmentService {
     const plans: Record<string, unknown>[] = [];
     for (const row of rows) {
       const plan = await client.query(`insert into purchase_delivery_plans(purchase_order_id,purchase_order_line_id,supplier_id,material_id,unit_id,planned_quantity,received_quantity,promised_delivery_date,status,created_by,updated_by,request_id)
-        values($1,$2,$3,$4,$5,$6,0,$7,'PENDING',$8,$8,$9) returning *`, [Number(purchaseOrder.id), Number(row.id), Number(purchaseOrder.supplier_id), Number(row.material_id), Number(row.unit_id), row.order_qty, row.promised_delivery_date, meta.actor.username, meta.requestId]);
-      const planId = Number(plan.rows[0].id);
+        values($1,$2,$3,$4,$5,$6,0,$7,'PENDING',$8,$8,$9) returning *`, [String(purchaseOrder.id), String(row.id), String(purchaseOrder.supplier_id), String(row.material_id), String(row.unit_id), row.order_qty, row.promised_delivery_date, meta.actor.username, meta.requestId]);
+      const planId = String(plan.rows[0].id);
       await client.query("insert into warehouse_receiving_queue_entries(delivery_plan_id,created_by,updated_by) values($1,$2,$2)", [planId, meta.actor.username]);
       await client.query("insert into purchase_delivery_plan_events(delivery_plan_id,from_status,to_status,event_type,actor,request_id) values($1,null,'PENDING','CREATED',$2,$3)", [planId, meta.actor.username, meta.requestId]);
       plans.push(plan.rows[0]);
@@ -266,8 +272,18 @@ export class ProcurementFulfillmentService {
   async convertAward(awardId: number, meta: ProcurementMeta, input: Record<string, unknown>): Promise<ProcurementResult> {
     return this.repository.execute(meta, async (client) => {
       await client.query("select pg_advisory_xact_lock(hashtextextended($1,0))", [`SOURCING_AWARD_CONVERT:${awardId}`]);
-      const expected = this.conversionAssertions(input, await this.conversionPreview(awardId, meta.actor, client));
-      const rows = await this.awardLines(client, awardId, expected); const groups = new Map<string, AwardLine[]>();
+      const transactionPreview = await this.conversionPreview(awardId, meta.actor, client);
+      const expected = this.conversionAssertions(input, transactionPreview);
+      const rows = await this.awardLines(client, awardId, expected);
+      const mappingQualification = await loadAwardMappingQualification(client, awardId, { lock: true });
+      const mappingFailure = firstAwardMappingQualificationFailure(mappingQualification);
+      if (mappingFailure) throw new ProcurementError(mappingFailure.error_code || "AWARD_MAPPING_QUALIFICATION_FAILED", mappingFailure.reason, 422);
+      if (mappingQualification.qualification_digest !== expected.expected_mapping_qualification_digest
+        || mappingQualification.qualification_digest !== transactionPreview.mapping_qualification.qualification_digest) {
+        throw new ProcurementError("AWARD_MAPPING_QUALIFICATION_DRIFT", "Award转PO固定Supplier Mapping资格在预览后发生漂移，请关闭后重新打开确认窗口", 409);
+      }
+      const qualificationByAwardLine = new Map(mappingQualification.lines.map((line) => [line.award_line_id, line]));
+      const groups = new Map<string, AwardLine[]>();
       for (const row of rows) groups.set(`${row.supplier_id}:${row.currency_code}`, [...(groups.get(`${row.supplier_id}:${row.currency_code}`) ?? []), row]);
       const created: Record<string, unknown>[] = [];
       let purchaseOrderLineCount = 0; let deliveryPlanCount = 0;
@@ -275,23 +291,23 @@ export class ProcurementFulfillmentService {
         if (new Set(group.map((row) => row.material_id)).size !== group.length) throw new ProcurementError("AWARD_CONVERSION_PO_MODEL_CONFLICT", "同一PO聚合包含重复Material", 409);
         const orderLines: PurchaseOrderLineInput[] = [];
         for (const row of group) {
-          const mapping = await client.query(`select sm.id from supplier_mappings sm
-            join suppliers supplier on supplier.id=sm.supplier_id and supplier.status='ACTIVE'
-            join material_master material on material.id=sm.material_id and material.material_status='ACTIVE' and material.inventory_type='STOCKED'
-            join units unit on unit.id=sm.purchase_unit_id and unit.enabled=true and material.base_unit_id=unit.id
-            where sm.supplier_id=$1 and sm.material_id=$2 and sm.purchase_unit_id=$3 and sm.status='ACTIVE'
-            and sm.conversion_numerator=1 and sm.conversion_denominator=1 and sm.valid_from<=now()
-            and (sm.valid_to is null or sm.valid_to>now()) order by sm.id for update of sm,supplier,material,unit`, [Number(row.supplier_id), Number(row.material_id), Number(row.unit_id)]);
-          if (mapping.rows.length !== 1) throw new ProcurementError("AWARD_SUPPLIER_MAPPING_NOT_UNIQUE", "定标物料必须存在唯一有效的一比一Supplier Mapping", 422);
-          orderLines.push({ materialId: Number(row.material_id), unitId: Number(row.unit_id), supplierMappingId: Number(mapping.rows[0].id), orderQty: row.selected_quantity, unitPrice: row.selected_unit_price, remark: "采购定标转单" });
+          const qualification = qualificationByAwardLine.get(row.award_line_id);
+          if (!qualification?.qualified || !qualification.mapping_fact_id) {
+            throw new ProcurementError(qualification?.error_code || "AWARD_MAPPING_QUALIFICATION_FAILED", qualification?.reason || `Award Line ${row.award_line_id} 缺少固定Supplier Mapping资格`, 422);
+          }
+          orderLines.push({ materialId: row.material_id, unitId: row.unit_id, supplierMappingId: qualification.mapping_fact_id, orderQty: row.selected_quantity, unitPrice: row.selected_unit_price, remark: "采购定标转单" });
         }
         const promised = group.map((row) => dateOnly(row.promised_delivery_date)).sort().at(-1)!;
-        const order = await this.procurement.createOrderInTransaction(client, meta, Number(group[0].supplier_id), group[0].currency_code, "SOURCING_AWARD", new Date(`${promised}T00:00:00Z`), expected.remark, orderLines);
+        const order = await this.procurement.createOrderInTransaction(client, meta, group[0].supplier_id, group[0].currency_code, "SOURCING_AWARD", new Date(`${promised}T00:00:00Z`), expected.remark, orderLines, undefined, mappingQualification.observed_at);
         const saved = order.lines as Record<string, unknown>[];
         for (let index = 0; index < group.length; index += 1) {
-          const row = group[index], poLine = saved[index]; const sourceDigest = digest([awardId, row.award_line_id, order.id, poLine.id, row.supplier_id, row.material_id, row.unit_id, row.selected_quantity, row.selected_unit_price, row.currency_code, dateOnly(row.promised_delivery_date)]);
+          const row = group[index], poLine = saved[index], qualification = qualificationByAwardLine.get(row.award_line_id)!;
+          const sourceDigest = digest([awardId, row.award_line_id, qualification.rfq_binding_id, qualification.mapping_fact_id,
+            qualification.mapping_uuid, qualification.mapping_version_no, qualification.mapping_row_cas, qualification.content_digest,
+            order.id, poLine.id, row.supplier_id, row.material_id, row.unit_id, row.selected_quantity, row.selected_unit_price,
+            row.currency_code, dateOnly(row.promised_delivery_date)]);
           await client.query(`insert into procurement_award_po_line_links(award_id,award_line_id,purchase_order_id,purchase_order_line_id,source_digest,operation_id,created_by,request_id)
-            values($1,$2,$3,$4,$5,$6,$7,$8)`, [awardId, Number(row.award_line_id), Number(order.id), Number(poLine.id), sourceDigest, meta.operationId, meta.actor.username, meta.requestId]);
+            values($1,$2,$3,$4,$5,$6,$7,$8)`, [awardId, row.award_line_id, String(order.id), String(poLine.id), sourceDigest, meta.operationId, meta.actor.username, meta.requestId]);
           poLine.promised_delivery_date = dateOnly(row.promised_delivery_date);
         }
         await this.fault?.("after_award_po_links");

@@ -68,11 +68,12 @@ export function ProcurementFulfillmentWorkspace() {
     try {
       const result = await api<{ data: AwardConversionPreview }>(`/api/procurement/awards/${row.award_id}/purchase-order-conversion-preview`, { cache: "no-store" });
       if (previewRun.current !== run) return;
-      if (result.data.contract_version !== "AWARD_PO_CONFIRMATION_V1"
+      if (result.data.contract_version !== "AWARD_PO_CONFIRMATION_V2"
         || result.data.award.award_id !== String(row.award_id)
         || result.data.award.version !== row.award_version
         || result.data.rfq.rfq_id !== String(row.rfq_id)
-        || result.data.po_convertible_now !== true) throw new Error("conversion preview mismatch");
+        || result.data.mapping_qualification.contract_version !== "AWARD_PO_MAPPING_QUALIFICATION_V1"
+        || !/^[0-9a-f]{64}$/.test(result.data.mapping_qualification.qualification_digest)) throw new Error("conversion preview mismatch");
       setConversionPreview(result.data);
     } catch (previewError) {
       if (previewRun.current === run) setError(message(previewError));
@@ -87,7 +88,8 @@ export function ProcurementFulfillmentWorkspace() {
   }
 
   async function confirmConversion() {
-    if (!session || !conversionPreview || conversionInFlight.current) return;
+    if (!session || !conversionPreview || conversionInFlight.current
+      || conversionPreview.po_convertible_now !== true || conversionPreview.mapping_qualification.all_qualified !== true) return;
     conversionInFlight.current = true;
     setConversionSubmitted(true); setConversionBusy(true); setConversionError("");
     try {

@@ -11,10 +11,10 @@ if (!databaseUrl || !/supplier_mapping_migration_test/i.test(databaseUrl)) {
 
 const pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "supplier-mapping-migration-test" });
 const directory = new URL("../drizzle-postgres/", import.meta.url);
-const names = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();
+const migrationName = "0038_supplier_mapping_governance.sql";
+const names = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/.test(name) && name <= migrationName).sort();
 const sources = new Map(await Promise.all(names.map(async (name) => [name, await readFile(new URL(name, directory), "utf8")])));
 const checksum = (name) => createHash("sha256").update(sources.get(name)).digest("hex");
-const migrationName = "0038_supplier_mapping_governance.sql";
 const migration = sources.get(migrationName);
 const schema = await readFile(new URL("../db/schema.ts", import.meta.url), "utf8");
 const journal = JSON.parse(await readFile(new URL("../drizzle-postgres/meta/_journal.json", import.meta.url), "utf8"));
@@ -83,8 +83,8 @@ test("0038 static schema, journal, snapshot and immutable 0001-0037 history are 
   assert.equal(checksum("0037_project_planning_revision_response_lineage.sql"), "139f2623a184ae3d6927c95b56569cc438deffc2a0b46c325c9f04d59471d99f");
   const immutableDigest = createHash("sha256").update(names.slice(0, 37).map((name) => `${name}:${checksum(name)}\n`).join("")).digest("hex");
   assert.equal(immutableDigest, "47fb40b7740ea6b8cdb84002f34a92b13e05b42e06a117d216cae52be85dc4c3");
-  assert.equal(journal.entries.at(-1)?.idx, 38);
-  assert.equal(journal.entries.at(-1)?.tag, "0038_supplier_mapping_governance");
+  const journalEntry = journal.entries.find((entry) => entry.tag === "0038_supplier_mapping_governance");
+  assert.equal(journalEntry?.idx, 38);
   assert.equal(snapshot38.prevId, snapshot37.id);
   for (const table of ["supplier_mapping_events", "supplier_mapping_supplier_part_keys"]) {
     assert.ok(snapshot38.tables[`public.${table}`]);

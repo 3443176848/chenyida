@@ -6,7 +6,7 @@ import type { InventoryMutationMeta, InventoryMutationResult } from "../inventor
 import { ProcurementError } from "./errors.ts";
 import { currency, expectedBalanceVersions, id, lines, optionalDate, quantity, receiptLines, supplierLotCode, text, version } from "./rules.ts";
 import { ProcurementRepository } from "./repository.ts";
-import type { ProcurementMeta, ProcurementResult, PurchaseOrderLineInput, ReceiptLineInput } from "./types.ts";
+import type { DatabaseId, ProcurementMeta, ProcurementResult, PurchaseOrderLineInput, ReceiptLineInput } from "./types.ts";
 
 type Queryable = Pool | PoolClient;
 type LockedPoLine = { id: string; purchase_order_id: string; material_id: string; unit_id: string; supplier_mapping_id: string; order_qty: string; received_qty: string; unit_price: string; status: string; version: number };
@@ -102,24 +102,39 @@ export class ProcurementService {
     return this.suggestionRows(this.repository.pool, bomId, quantity(orderQtyValue, "order_qty"), currency(currencyValue));
   }
 
-  private async validateOrderReferences(client: PoolClient, supplierId: number, orderLines: PurchaseOrderLineInput[]) {
+  private async validateOrderReferences(client: PoolClient, supplierId: DatabaseId, orderLines: PurchaseOrderLineInput[], referenceAsOf?: string) {
     const supplier = await client.query("select 1 from suppliers where id=$1 and status='ACTIVE'", [supplierId]);
     if (!supplier.rows[0]) throw new ProcurementError("SUPPLIER_NOT_ACTIVE", "供应商不存在或未启用", 422);
     for (const line of orderLines) {
-      const valid = await client.query(`select 1 from material_master m join units u on u.id=m.base_unit_id and u.enabled=true
-        join supplier_mappings sm on sm.id=$3 and sm.supplier_id=$1 and sm.material_id=m.id and sm.purchase_unit_id=u.id
-        where m.id=$2 and m.material_status='ACTIVE' and m.inventory_type='STOCKED' and u.id=$4 and sm.status='ACTIVE' and sm.conversion_numerator=1 and sm.conversion_denominator=1
-          and sm.valid_from<=now() and (sm.valid_to is null or sm.valid_to>now())`, [supplierId, line.materialId, line.supplierMappingId, line.unitId]);
-      if (!valid.rows[0]) throw new ProcurementError("PURCHASE_REFERENCE_NOT_ACTIVE", "供应商映射、物料或基础单位不存在、未启用或不一致", 422);
+      const valid = await client.query<{ match_count: number }>(`select count(*)::int match_count
+        from material_master material
+        join supplier_mappings mapping on mapping.id=$3 and mapping.supplier_id=$1 and mapping.material_id=material.id
+        join units supplier_unit on supplier_unit.id=mapping.purchase_unit_id and supplier_unit.enabled=true
+        join lateral (
+          select internal_unit.id from units internal_unit
+          where internal_unit.enabled=true and (
+            (material.base_unit_id is not null and internal_unit.id=material.base_unit_id)
+            or (material.base_unit_id is null and nullif(btrim(material.base_uom),'') is not null
+              and upper(internal_unit.code)=upper(btrim(material.base_uom)))
+          )
+        ) internal_unit on true
+        where material.id=$2 and material.material_status='ACTIVE' and material.inventory_type='STOCKED'
+          and supplier_unit.id=$4 and internal_unit.id=supplier_unit.id
+          and mapping.status='ACTIVE' and mapping.conversion_numerator>0
+          and mapping.conversion_denominator>0 and mapping.conversion_numerator=mapping.conversion_denominator
+          and mapping.valid_from<=coalesce($5::timestamptz,transaction_timestamp())
+          and (mapping.valid_to is null or mapping.valid_to>coalesce($5::timestamptz,transaction_timestamp()))`,
+      [supplierId, line.materialId, line.supplierMappingId, line.unitId, referenceAsOf ?? null]);
+      if (Number(valid.rows[0]?.match_count) !== 1) throw new ProcurementError("PURCHASE_REFERENCE_NOT_ACTIVE", "供应商映射、物料或内部单位不存在、未启用或不一致", 422);
     }
   }
 
-  async createOrderInTransaction(client: PoolClient, meta: ProcurementMeta, supplierId: number, currencyCode: string, sourceType: "MANUAL" | "BOM_SHORTAGE" | "SOURCING_AWARD", expectedAt: Date | null, remark: string, orderLines: PurchaseOrderLineInput[], source?: { bomVersionId: number; orderQty: string }): Promise<Record<string, unknown>> {
-    await this.validateOrderReferences(client, supplierId, orderLines);
+  async createOrderInTransaction(client: PoolClient, meta: ProcurementMeta, supplierId: DatabaseId, currencyCode: string, sourceType: "MANUAL" | "BOM_SHORTAGE" | "SOURCING_AWARD", expectedAt: Date | null, remark: string, orderLines: PurchaseOrderLineInput[], source?: { bomVersionId: number; orderQty: string }, referenceAsOf?: string): Promise<Record<string, unknown>> {
+    await this.validateOrderReferences(client, supplierId, orderLines, referenceAsOf);
     const code = await this.repository.nextCode(client, "PURCHASE_ORDER", "PO"); const operationId = sourceType === "MANUAL" ? meta.operationId : randomUUID();
     const header = await client.query(`insert into purchase_orders(po_code,supplier_id,currency_code,source_type,expected_at,remark,operation_id,created_by,request_id)
       values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`, [code, supplierId, currencyCode, sourceType, expectedAt, remark, operationId, meta.actor.username, meta.requestId]);
-    const purchaseOrderId = Number(header.rows[0].id); const savedLines = [];
+    const purchaseOrderId = String(header.rows[0].id); const savedLines = [];
     for (let index = 0; index < orderLines.length; index += 1) { const line = orderLines[index]; const saved = await client.query(`insert into purchase_order_lines(purchase_order_id,line_no,material_id,unit_id,supplier_mapping_id,order_qty,unit_price,remark)
       values($1,$2,$3,$4,$5,$6,$7,$8) returning *`, [purchaseOrderId, index + 1, line.materialId, line.unitId, line.supplierMappingId, line.orderQty, line.unitPrice, line.remark]); savedLines.push(saved.rows[0]); }
     await client.query(`insert into purchase_order_source_links(purchase_order_id,source_type,bom_version_id,order_qty,source_operation_id) values($1,$2,$3,$4,$5)`, [purchaseOrderId, sourceType, source?.bomVersionId ?? null, source?.orderQty ?? null, meta.operationId]);

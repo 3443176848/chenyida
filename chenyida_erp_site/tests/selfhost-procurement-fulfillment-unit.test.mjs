@@ -5,6 +5,65 @@ import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts"
 import { buildAwardConversionPreview } from "../app/lib/procurement-fulfillment-selfhost/award-conversion-preview.ts";
 import { buildAwardHistoryReadModel } from "../app/lib/procurement-sourcing-selfhost/award-read-model.ts";
 
+const mappingUuids = [
+  "224d1965-44ef-4c3e-901e-1926b6b07ff8",
+  "43ca04d8-9933-4dac-ba21-b7fb85741830",
+  "aa16f7e7-904d-4ae2-9f73-d34e7aaf257e",
+  "9659ad2d-406a-4c4c-b575-51329badc63f",
+];
+const supplierParts = ["UAT-A-PCBA-042576", "UAT-A-SENSOR-042576", "UAT-A-HARNESS-042576", "UAT-A-CASE-042576"];
+const qualifiedMappingDigest = "a".repeat(64);
+const blockedMappingDigest = "b".repeat(64);
+
+function fourLineMappingQualification(lines, { blockedAwardLineId = null } = {}) {
+  const credentialLines = lines.map((line, index) => {
+    const qualified = line.award_line_id !== blockedAwardLineId;
+    return {
+      award_line_id: line.award_line_id,
+      candidate_id: line.comparison_candidate_id,
+      quote_line_id: line.quote_line_id,
+      rfq_binding_id: String(index + 1),
+      supplier_id: line.supplier_id,
+      supplier_code: line.supplier_code,
+      material_id: line.material_id,
+      mapping_uuid: mappingUuids[index],
+      mapping_fact_id: String(index + 1),
+      mapping_version_no: 1,
+      mapping_row_cas: 3,
+      binding_status: "ACTIVE",
+      mapping_status: qualified ? "ACTIVE" : "INACTIVE",
+      supplier_status: "ACTIVE",
+      material_status: "ACTIVE",
+      supplier_part_number: supplierParts[index],
+      supplier_unit_id: "1",
+      supplier_unit_code: "PCS",
+      internal_unit_id: "1",
+      internal_unit_code: "PCS",
+      conversion_numerator: "1",
+      conversion_denominator: "1",
+      valid_from: "2026-08-05",
+      valid_to: null,
+      content_digest: String(index + 1).repeat(64),
+      supplier_material_conflict_count: 0,
+      supplier_part_number_conflict_count: 0,
+      qualified,
+      error_code: qualified ? null : "AWARD_MAPPING_NOT_ACTIVE",
+      reason: qualified ? "Supplier Mapping资格通过" : `Award Line ${line.award_line_id} / Supplier ${line.supplier_id} / Material ${line.material_id}：Mapping Fact ${index + 1} 状态为INACTIVE`,
+    };
+  });
+  const qualifiedLineCount = credentialLines.filter((line) => line.qualified).length;
+  return {
+    contract_version: "AWARD_PO_MAPPING_QUALIFICATION_V1",
+    observed_at: "2026-08-08T02:00:00.000000Z",
+    data_timezone: "Asia/Shanghai",
+    qualification_digest: blockedAwardLineId === null ? qualifiedMappingDigest : blockedMappingDigest,
+    all_qualified: qualifiedLineCount === credentialLines.length,
+    qualified_line_count: qualifiedLineCount,
+    line_count: credentialLines.length,
+    lines: credentialLines,
+  };
+}
+
 test("purchase, warehouse and finance receive only their fulfillment handoff writes",()=>{
   for(const permission of ["procurement.fulfillment.read","procurement.award.convert","procurement.delivery_plan.manage"])assert.ok(permissionsForRole("purchase").includes(permission),permission);
   for(const permission of ["procurement.fulfillment.read","procurement.receiving.receive","procurement.receiving.reverse"])assert.ok(permissionsForRole("warehouse").includes(permission),permission);
@@ -35,14 +94,31 @@ test("authoritative Award conversion preview derives one PO, four Lines and four
   const event={id:"9",award_id:"1",event_type:"AWARDED",actor:award.selected_by,request_id:award.request_id,result:"SUCCESS",reason,created_at:award.selected_at,occurred_at_shanghai:award.selected_at_shanghai,old_version:null,new_version:null,from_status:null,to_status:null};
   const history=buildAwardHistoryReadModel({award,award_lines:lines,award_events:[event],award_audits:[{audit_id:"1469",actor:award.selected_by,request_id:award.request_id,result:"success",old_version:6,new_version:7,occurred_at_shanghai:award.selected_at_shanghai}],rfq:{id:"1",rfq_code:"RFQ-00000001",round_no:1,status:"CLOSED",version:7,source_status:"ACCEPTED"},rfq_line_ids:["1","2","3","4"],comparison_version:comparison,purchase_order_count:0});
   const detail={header:{status:"CLOSED"},award_history:history,quotes:[{quote_id:"1",quote_version_no:1,supplier_id:1,supplier_code:"SUP-000001",supplier_name:"Supplier A",supplier_quote_reference:"UAT-Q-A-042576",status:"SUBMITTED",currency_code:"CNY",payment_terms:"纯虚拟UAT付款条件，仅用于表单验收。",tax_included:false,freight_included:false,quote_expired:false}],downstream_counts:{purchase_orders:0,purchase_order_lines:0,delivery_plans:0}};
-  const preview=buildAwardConversionPreview(detail,1);
+  const mappingQualification=fourLineMappingQualification(lines);
+  const preview=buildAwardConversionPreview(detail,1,mappingQualification);
+  assert.equal(preview.contract_version,"AWARD_PO_CONFIRMATION_V2");
+  assert.deepEqual(preview.mapping_qualification,mappingQualification);
+  assert.equal(preview.po_convertible_now,true);
   assert.equal(preview.digests.decision_digest,"7beca9f364718d9161cc4205e282279cdcc97e3fee91073f3494b76abfa7651a");
   assert.deepEqual(preview.lines.map(line=>[line.award_line_id,line.material_id,line.internal_material_code,line.selected_quantity,line.selected_unit_price,line.line_amount,line.promised_delivery_date]),[["1","533",codes[0],"10.000000","12.000000","120.000000","2026-10-20"],["2","534",codes[1],"10.000000","12.000000","120.000000","2026-10-20"],["3","535",codes[2],"10.000000","12.000000","120.000000","2026-10-20"],["4","536",codes[3],"10.000000","12.000000","120.000000","2026-10-20"]]);
   assert.deepEqual(preview.planned_result,{conversion_operation_count:1,purchase_order_aggregate_count:1,purchase_order_line_count:4,delivery_plan_aggregate_count:4,delivery_plan_line_count:0,receiving_queue_entry_count:4,delivery_plan_event_count:4,totals_by_currency:[{currency_code:"CNY",total_amount:"480.000000"}],planned_delivery_dates:["2026-10-20"]});
   assert.equal(preview.model_capabilities.external_reference,false);assert.equal(preview.model_capabilities.remark,true);assert.equal(preview.selected_quotes[0].payment_terms,"纯虚拟UAT付款条件，仅用于表单验收。");
   assert.deepEqual(preview.confirmation.expected_award_line_ids,["1","2","3","4"]);assert.equal(preview.confirmation.expected_rfq_version,7);
-  assert.throws(()=>buildAwardConversionPreview({...detail,downstream_counts:{purchase_orders:1,purchase_order_lines:4,delivery_plans:4}},1),/PO计数投影不一致|当前不能转换/);
-  for(const field of ["purchase_order_lines","delivery_plans"]){const missing=structuredClone(detail);delete missing.downstream_counts[field];assert.throws(()=>buildAwardConversionPreview(missing,1),/缺少有效当前/);}
-  for(const value of [null,false,"",[],"0"]){const invalid=structuredClone(detail);invalid.downstream_counts.delivery_plans=value;assert.throws(()=>buildAwardConversionPreview(invalid,1),/缺少有效当前到货计划数量/);}
-  for(const [field,value] of [["quote_expired",undefined],["quote_expired",true],["tax_included","false"],["freight_included",0],["payment_terms",""],["payment_terms",123],["payment_terms",{}]]){const invalid=structuredClone(detail);if(value===undefined)delete invalid.quotes[0][field];else invalid.quotes[0][field]=value;assert.throws(()=>buildAwardConversionPreview(invalid,1),/已停止转换|付款条件/);}
+  assert.equal(preview.confirmation.expected_mapping_qualification_digest,qualifiedMappingDigest);
+
+  const blockedQualification=fourLineMappingQualification(lines,{blockedAwardLineId:"3"});
+  const blockedPreview=buildAwardConversionPreview(detail,1,blockedQualification);
+  assert.equal(blockedPreview.contract_version,"AWARD_PO_CONFIRMATION_V2");
+  assert.equal(blockedPreview.po_convertible_now,false);
+  assert.equal(blockedPreview.mapping_qualification.all_qualified,false);
+  assert.equal(blockedPreview.mapping_qualification.qualified_line_count,3);
+  assert.equal(blockedPreview.mapping_qualification.lines.find(line=>line.award_line_id==="3").error_code,"AWARD_MAPPING_NOT_ACTIVE");
+  assert.match(blockedPreview.mapping_qualification.lines.find(line=>line.award_line_id==="3").reason,/Award Line 3 \/ Supplier 1 \/ Material 535：/);
+  assert.equal(blockedPreview.confirmation.expected_mapping_qualification_digest,blockedMappingDigest);
+
+  assert.throws(()=>buildAwardConversionPreview({...detail,downstream_counts:{purchase_orders:1,purchase_order_lines:4,delivery_plans:4}},1,mappingQualification),/PO计数投影不一致|当前不能转换/);
+  for(const field of ["purchase_order_lines","delivery_plans"]){const missing=structuredClone(detail);delete missing.downstream_counts[field];assert.throws(()=>buildAwardConversionPreview(missing,1,mappingQualification),/缺少有效当前/);}
+  for(const value of [null,false,"",[],"0"]){const invalid=structuredClone(detail);invalid.downstream_counts.delivery_plans=value;assert.throws(()=>buildAwardConversionPreview(invalid,1,mappingQualification),/缺少有效当前到货计划数量/);}
+  for(const [field,value] of [["quote_expired",undefined],["quote_expired",true],["tax_included","false"],["freight_included",0],["payment_terms",""],["payment_terms",123],["payment_terms",{}]]){const invalid=structuredClone(detail);if(value===undefined)delete invalid.quotes[0][field];else invalid.quotes[0][field]=value;assert.throws(()=>buildAwardConversionPreview(invalid,1,mappingQualification),/已停止转换|付款条件/);}
+  assert.throws(()=>buildAwardConversionPreview(detail,1,{...mappingQualification,all_qualified:false}),/资格摘要不完整或自相矛盾/);
 });

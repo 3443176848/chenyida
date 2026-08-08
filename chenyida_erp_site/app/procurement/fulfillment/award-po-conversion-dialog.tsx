@@ -13,6 +13,9 @@ const money = (value: string) => {
   return `${cents / 100n}.${String(cents % 100n).padStart(2, "0")}`;
 };
 
+const display = (value: string | number | null | undefined) => value === null || value === undefined || value === "" ? "—" : String(value);
+const qualifiedText = (qualified: boolean) => qualified ? "qualified=true / 合格" : "qualified=false / 不合格";
+
 function DialogFrame({ children, title, busy, onCancel, actions }: Readonly<{
   children: ReactNode;
   title: string;
@@ -69,7 +72,9 @@ export function AwardPoConversionDialog({ preview, remark, onRemark, busy, submi
   onConfirm: () => void;
 }>) {
   const total = preview.planned_result.totals_by_currency[0];
-  return <DialogFrame title="定标转采购订单最终确认" busy={busy} onCancel={onCancel} actions={<button type="button" disabled={busy || submitted} onClick={(event) => { event.currentTarget.disabled = true; onConfirm(); }}>{busy ? "正在生成…" : submitted ? "本次确认已锁定" : "最终确认生成PO及到货计划"}</button>}>
+  const mappingQualification: AwardConversionPreview["mapping_qualification"] | undefined = preview.mapping_qualification;
+  const mappingQualified = preview.po_convertible_now === true && mappingQualification?.all_qualified === true;
+  return <DialogFrame title="定标转采购订单最终确认" busy={busy} onCancel={onCancel} actions={<button type="button" disabled={busy || submitted || !mappingQualified} onClick={(event) => { event.currentTarget.disabled = true; onConfirm(); }}>{busy ? "正在生成…" : submitted ? "本次确认已锁定" : "最终确认生成PO及到货计划"}</button>}>
     <section className="rfq-confirm-section award-po-identity"><h3>完整业务谱系</h3><dl className="rfq-receipt-facts">
       <div><dt>Award</dt><dd>#{preview.award.award_id} / v{preview.award.version} / {preview.award.status}</dd></div>
       <div><dt>RFQ</dt><dd>ID {preview.rfq.rfq_id} / {preview.rfq.rfq_code} / Round {preview.rfq.round_no} / {preview.rfq.status} / v{preview.rfq.version}</dd></div>
@@ -90,6 +95,43 @@ export function AwardPoConversionDialog({ preview, remark, onRemark, busy, submi
     <section className="rfq-confirm-section"><h3>四条转换范围</h3><div className="sourcing-table-wrap award-po-lines-desktop"><table><thead><tr><th>Award Line</th><th>Material</th><th>数量</th><th>单价</th><th>金额</th><th>计划日期</th><th>固定来源</th></tr></thead><tbody>{preview.lines.map((line) => <tr key={line.award_line_id}><td>{line.award_line_id}</td><td>{line.material_id} / {line.internal_material_code}<br/>{line.standard_name}</td><td>{compactDecimal(line.selected_quantity)} {line.unit_code}</td><td>{money(line.selected_unit_price)} {line.currency_code}</td><td>{money(line.line_amount)} {line.currency_code}</td><td>{line.promised_delivery_date}</td><td>Comparison Line {line.comparison_line_id}<br/>Candidate {line.comparison_candidate_id}<br/>Quote {line.quote_id}/v{line.quote_version_no} / Line {line.quote_line_id}</td></tr>)}</tbody></table></div>
       <div className="award-po-lines-mobile">{preview.lines.map((line) => <article key={line.award_line_id}><header><b>Award Line {line.award_line_id}</b><span>{line.material_id} / {line.internal_material_code}</span></header><span>{line.standard_name}</span><span>{compactDecimal(line.selected_quantity)} {line.unit_code} × {money(line.selected_unit_price)} {line.currency_code}</span><strong>{money(line.line_amount)} {line.currency_code}</strong><span>计划日期：{line.promised_delivery_date}</span><span>Comparison {line.comparison_line_id} / Candidate {line.comparison_candidate_id} / Quote {line.quote_id}/v{line.quote_version_no} / Line {line.quote_line_id}</span></article>)}</div>
     </section>
+
+    <section className="rfq-confirm-section"><h3>Supplier Mapping资格凭证</h3>{mappingQualification ? <>
+      <dl className="rfq-receipt-facts">
+        <div><dt>资格合同</dt><dd>{mappingQualification.contract_version}</dd></div>
+        <div><dt>观测时间</dt><dd>{mappingQualification.observed_at}<br/>{mappingQualification.data_timezone}</dd></div>
+        <div><dt>逐行结论</dt><dd>{qualifiedText(mappingQualification.all_qualified)}<br/>{mappingQualification.qualified_line_count}/{mappingQualification.line_count} 行合格</dd></div>
+        <div><dt>资格摘要</dt><dd><code className="rfq-trace-value">{mappingQualification.qualification_digest}</code></dd></div>
+      </dl>
+      <div className="sourcing-table-wrap award-po-lines-desktop award-po-qualification-desktop"><table><caption className="sr-only">Supplier Mapping逐行资格凭证</caption><thead><tr><th>资格</th><th>固定业务谱系</th><th>Supplier / Material</th><th>Mapping Fact</th><th>料号 / Unit</th><th>换算 / 有效期</th><th>冲突</th><th>摘要 / 阻断原因</th></tr></thead><tbody>{mappingQualification.lines.map((line) => <tr key={`${line.award_line_id}-${line.mapping_fact_id}`} data-award-line-id={line.award_line_id} data-qualified={String(line.qualified)}>
+        <td><strong>{qualifiedText(line.qualified)}</strong></td>
+        <td>Award Line {line.award_line_id}<br/>Candidate {line.candidate_id}<br/>Quote Line {line.quote_line_id}<br/>RFQ Binding {line.rfq_binding_id}</td>
+        <td>Supplier {line.supplier_id} / {line.supplier_code}<br/>Supplier状态：{line.supplier_status}<br/>Material {line.material_id}<br/>Material状态：{line.material_status}</td>
+        <td><code className="rfq-trace-value">{line.mapping_uuid}</code><br/>Fact {line.mapping_fact_id} / v{line.mapping_version_no} / Row CAS {line.mapping_row_cas}<br/>Binding状态：{line.binding_status}<br/>Mapping状态：{line.mapping_status}</td>
+        <td>{line.supplier_part_number}<br/>Supplier Unit {line.supplier_unit_id} / {line.supplier_unit_code}<br/>Internal Unit {line.internal_unit_id} / {line.internal_unit_code}</td>
+        <td>{line.conversion_numerator}:{line.conversion_denominator}<br/>{line.valid_from}<br/>至 {display(line.valid_to)}</td>
+        <td>Supplier/Material：{line.supplier_material_conflict_count}<br/>Supplier Part：{line.supplier_part_number_conflict_count}</td>
+        <td><code className="rfq-trace-value">{line.content_digest}</code><br/>错误代码：{display(line.error_code)}<br/>原因：{display(line.reason)}</td>
+      </tr>)}</tbody></table></div>
+      <div className="award-po-lines-mobile award-po-qualification-mobile">{mappingQualification.lines.map((line) => <article key={`${line.award_line_id}-${line.mapping_fact_id}`} data-award-line-id={line.award_line_id} data-qualified={String(line.qualified)}>
+        <header><b>Award Line {line.award_line_id}</b><strong>{qualifiedText(line.qualified)}</strong></header>
+        <span>Candidate {line.candidate_id} / Quote Line {line.quote_line_id} / RFQ Binding {line.rfq_binding_id}</span>
+        <span>Supplier {line.supplier_id} / {line.supplier_code} / {line.supplier_status}</span>
+        <span>Material {line.material_id} / {line.material_status}</span>
+        <span>Mapping UUID：<code className="rfq-trace-value">{line.mapping_uuid}</code></span>
+        <span>Fact {line.mapping_fact_id} / v{line.mapping_version_no} / Row CAS {line.mapping_row_cas}</span>
+        <span>Binding状态：{line.binding_status} / Mapping状态：{line.mapping_status}</span>
+        <span>Supplier Part：{line.supplier_part_number}</span>
+        <span>Supplier Unit {line.supplier_unit_id} / {line.supplier_unit_code}</span>
+        <span>Internal Unit {line.internal_unit_id} / {line.internal_unit_code}</span>
+        <span>换算：{line.conversion_numerator}:{line.conversion_denominator}</span>
+        <span>有效期：{line.valid_from} 至 {display(line.valid_to)}</span>
+        <span>冲突：Supplier/Material {line.supplier_material_conflict_count} / Supplier Part {line.supplier_part_number_conflict_count}</span>
+        <span>content digest：<code className="rfq-trace-value">{line.content_digest}</code></span>
+        <span>错误代码：{display(line.error_code)}</span>
+        <span>原因：{display(line.reason)}</span>
+      </article>)}</div>
+    </> : <div className="sourcing-state sourcing-error" role="alert">Supplier Mapping资格凭证缺失，已禁止最终转换。</div>}</section>
 
     <section className="rfq-confirm-section"><h3>将创建的权威记录</h3><div className="award-po-summary">
       <span>转换操作 {preview.planned_result.conversion_operation_count}</span><span>PO聚合 {preview.planned_result.purchase_order_aggregate_count}</span><span>PO Line {preview.planned_result.purchase_order_line_count}</span><span>Delivery Plan计划记录／聚合 {preview.planned_result.delivery_plan_aggregate_count}</span><span>独立Delivery Plan Line {preview.planned_result.delivery_plan_line_count}</span><span>待入库队列 {preview.planned_result.receiving_queue_entry_count}</span>

@@ -5,17 +5,90 @@ import { Pool } from "pg";
 import { handleFinanceApi } from "../app/lib/finance-selfhost/handler.ts";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
 import { handleProcurementFulfillmentApi } from "../app/lib/procurement-fulfillment-selfhost/handler.ts";
+import { loadAwardMappingQualification } from "../app/lib/procurement-fulfillment-selfhost/award-mapping-qualification.ts";
 import { ProcurementFulfillmentService } from "../app/lib/procurement-fulfillment-selfhost/service.ts";
 import { ProcurementRepository } from "../app/lib/procurement-selfhost/repository.ts";
 import { handleProcurementSourcingApi } from "../app/lib/procurement-sourcing-selfhost/handler.ts";
+import { handleSupplierMappingApi } from "../app/lib/supplier-mapping-selfhost/handler.ts";
 import { withSupplierMappingFixtureTriggersDisabled } from "./helpers/supplier-mapping-fixture.mjs";
 
 const databaseUrl=process.env.TEST_PROCUREMENT_FULFILLMENT_DATABASE_URL;if(!databaseUrl||!/procurement_fulfillment_test/i.test(databaseUrl))throw new Error("isolated TEST_PROCUREMENT_FULFILLMENT_DATABASE_URL containing procurement_fulfillment_test is required");
-const pool=new Pool({connectionString:databaseUrl,max:20,application_name:"procurement-fulfillment-test"});
+const pool=new Pool({connectionString:databaseUrl,max:2,application_name:"procurement-fulfillment-test"});
 const actor=(role,username=`${role}01`)=>({username,display_name:role,role,is_active:true,must_change_password:false,version:1,last_login_at:null,permissions:permissionsForRole(role)});
 async function call(handler,path,{method="GET",role="purchase",key=randomUUID(),body,csrf=true,poolOverride=pool}={}){const requestId=randomUUID(),headers=new Headers({"X-Request-ID":requestId});if(body!==undefined)headers.set("Content-Type","application/json");if(key)headers.set("Idempotency-Key",key);if(csrf)headers.set("X-CSRF-Token","test-csrf");const request=new Request(`http://local.test${path}`,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});const response=await handler(request,{pool:poolOverride,actor:actor(role),requestId,requireCsrf:()=>{if(headers.get("X-CSRF-Token")!=="test-csrf")throw Object.assign(new Error("CSRF Token 无效"),{code:"CSRF_INVALID",status:403})}});assert.ok(response);return{response,payload:await response.json()}}
-const fulfillment=(path,options)=>call(handleProcurementFulfillmentApi,path,options),finance=(path,options)=>call(handleFinanceApi,path,options),sourcing=(path,options)=>call(handleProcurementSourcingApi,path,options);
+const fulfillment=(path,options)=>call(handleProcurementFulfillmentApi,path,options),finance=(path,options)=>call(handleFinanceApi,path,options),sourcing=(path,options)=>call(handleProcurementSourcingApi,path,options),supplierMapping=(path,options)=>call(handleSupplierMappingApi,path,options);
 async function conversionBody(awardId,remark="履约隔离测试PO备注") { const preview=await fulfillment(`/api/procurement/awards/${awardId}/purchase-order-conversion-preview`);assert.equal(preview.response.status,200,JSON.stringify(preview.payload));assert.equal(preview.payload.data.po_convertible_now,true);return{...preview.payload.data.confirmation,remark} }
+
+async function insertGovernedMappingFixture(client, { materialId, supplierId, supplierCode, supplierName, supplierPartNumber, unitId }) {
+  const createdRequestId = randomUUID(), submittedRequestId = randomUUID(), reviewedRequestId = randomUUID();
+  const contentDigest = createHash("sha256").update(JSON.stringify([
+    String(supplierId), String(materialId), supplierPartNumber, String(unitId), "1", "1", "ACTIVE",
+  ])).digest("hex");
+  return withSupplierMappingFixtureTriggersDisabled(client, async () => {
+    const mapping = (await client.query(`insert into supplier_mappings(
+        material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,supplier_item_code_normalized,
+        purchase_uom,purchase_unit_id,conversion_numerator,conversion_denominator,status,valid_from,
+        mapping_version_no,content_digest,created_request_id,submitted_by,submitted_at,submitted_request_id,
+        reviewed_by,reviewed_at,reviewed_request_id,review_outcome,review_reason,version,
+        created_by,created_at,updated_by,updated_at,request_id
+      ) values($1,$2,$3,$4,$5,upper(btrim($5)),'PCS',$6,1,1,'ACTIVE',now()-interval '1 day',
+        1,$7,$8,'purchase01',now()-interval '2 hours',$9,
+        'operations01',now()-interval '1 hour',$10,'APPROVED','',3,
+        'purchase01',now()-interval '3 hours','operations01',now()-interval '1 hour',$10)
+      returning id::text id,mapping_uid::text mapping_uid,mapping_version_no,version,content_digest`, [
+      materialId, supplierId, supplierName, supplierCode, supplierPartNumber, unitId, contentDigest,
+      createdRequestId, submittedRequestId, reviewedRequestId,
+    ])).rows[0];
+    await client.query(`insert into supplier_mapping_supplier_part_keys(
+        supplier_id,normalized_supplier_item_code,mapping_uid,created_by,request_id,created_at
+      ) values($1,upper(btrim($2)),$3,'purchase01',$4,now()-interval '3 hours')`, [
+      supplierId, supplierPartNumber, mapping.mapping_uid, createdRequestId,
+    ]);
+    await client.query(`insert into supplier_mapping_events(
+        mapping_uid,mapping_version_id,mapping_version_no,event_type,from_status,to_status,actor,result,reason,request_id,created_at
+      ) values
+        ($1,$2,1,'CREATED',null,'DRAFT','purchase01','SUCCESS','',$3,now()-interval '3 hours'),
+        ($1,$2,1,'SUBMITTED','DRAFT','PENDING_REVIEW','purchase01','SUCCESS','',$4,now()-interval '2 hours'),
+        ($1,$2,1,'APPROVED','PENDING_REVIEW','ACTIVE','operations01','SUCCESS','',$5,now()-interval '1 hour')`, [
+      mapping.mapping_uid, mapping.id, createdRequestId, submittedRequestId, reviewedRequestId,
+    ]);
+    return mapping;
+  });
+}
+
+async function isolatedFixtureMutation(work) {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    const result = await withSupplierMappingFixtureTriggersDisabled(client, () => work(client));
+    await client.query("commit");
+    return result;
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally { client.release(); }
+}
+
+async function awardMappingQualification(awardId) {
+  const client = await pool.connect();
+  try {
+    await client.query("begin isolation level repeatable read read only");
+    const qualification = await loadAwardMappingQualification(client, String(awardId));
+    await client.query("commit");
+    return qualification;
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally { client.release(); }
+}
+
+async function conversionBusinessCounts() {
+  return (await pool.query(`select
+    (select count(*)::int from purchase_orders) purchase_orders,
+    (select count(*)::int from purchase_order_lines) purchase_order_lines,
+    (select count(*)::int from purchase_delivery_plans) delivery_plans,
+    (select count(*)::int from warehouse_receiving_queue_entries) receiving_queue_entries`)).rows[0];
+}
 
 let sequence=0;
 async function seedAward(lineCount=1) {
@@ -57,9 +130,10 @@ async function seedAward(lineCount=1) {
         [materialCode],
       )).rows[0];
       if (!material) {
+        const baseUnitId = lineCount === 4 ? null : unitId;
         material = (await client.query(
           "insert into material_master(internal_material_code,standard_name,category_id,base_uom,base_unit_id,material_status,procurement_type,inventory_type,inspection_type,environmental_requirement,source_type,last_modified_by,created_by,updated_by,request_id) values($1,$2,$3,'PCS',$4,'ACTIVE','PURCHASE','STOCKED','NONE','ROHS','MANUAL','admin01','admin01','admin01',$5) returning id",
-          [materialCode, `履约物料 ${lineNo}`, category.id, unitId, randomUUID()],
+          [materialCode, `履约物料 ${lineNo}`, category.id, baseUnitId, randomUUID()],
         )).rows[0];
       }
       materialIds.push(Number(material.id));
@@ -81,12 +155,12 @@ async function seedAward(lineCount=1) {
         [supplierId, materialIds[index]],
       )).rows[0];
       if (!mapping) {
-        mapping = (await withSupplierMappingFixtureTriggersDisabled(client, () => client.query(
-          "insert into supplier_mappings(material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,purchase_uom,purchase_unit_id,conversion_numerator,conversion_denominator,status,valid_from,created_by,updated_by,request_id) values($1,$2,'供应商 A','SUP-FUL-A',$3,'PCS',$4,1,1,'ACTIVE',now()-interval '1 day','admin01','admin01',$5) returning id",
-          [materialIds[index], supplierId, `PART-A-${index + 1}`, unitId, randomUUID()],
-        ))).rows[0];
+        mapping = await insertGovernedMappingFixture(client, {
+          materialId: materialIds[index], supplierId, supplierCode: "SUP-FUL-A", supplierName: "供应商 A",
+          supplierPartNumber: `PART-A-${index + 1}`, unitId,
+        });
       }
-      mappingIds.push(Number(mapping.id));
+      mappingIds.push(String(mapping.id));
     }
     mappingId = mappingIds[0];
 
@@ -245,6 +319,11 @@ async function seedAward(lineCount=1) {
     },
   });
   assert.equal(awarded.response.status, 201, JSON.stringify(awarded.payload));
+  const bindings = (await pool.query(`select id::text binding_id,rfq_line_id::text rfq_line_id,
+    supplier_mapping_version_id::text mapping_fact_id,mapping_uid::text mapping_uuid,
+    mapping_version_no,mapping_row_version,mapping_content_digest
+    from procurement_rfq_supplier_line_mapping_bindings where rfq_id=$1 and supplier_id=$2 order by rfq_line_id`, [rfqId, supplierId])).rows;
+  assert.equal(bindings.length, lineCount);
   return {
     awardId: Number(awarded.payload.award_id),
     materialId,
@@ -252,17 +331,101 @@ async function seedAward(lineCount=1) {
     supplierId,
     mappingId,
     mappingIds,
+    bindings,
+    unitId: String((await pool.query("select id::text id from units where code='PCS'")).rows[0].id),
     rfqId,
   };
 }
 
-test.beforeEach(async()=>{sequence=0;await pool.query("truncate app_users,units,material_categories,customers,suppliers,business_code_sequences,idempotency_keys,identity_write_rate_limit_buckets,audit_log restart identity cascade");await pool.query("insert into app_users(username,display_name,role,password_hash) values('admin01','管理员','admin','x'),('manager01','经理','manager','x'),('planning01','计划','planning','x'),('engineering01','项目','engineering','x'),('purchase01','采购','purchase','x'),('warehouse01','仓库','warehouse','x'),('finance01','财务','finance','x')")});test.after(async()=>pool.end());
+test.beforeEach(async()=>{sequence=0;await pool.query("truncate app_users,units,material_categories,customers,suppliers,business_code_sequences,idempotency_keys,identity_write_rate_limit_buckets,audit_log restart identity cascade");await pool.query("insert into app_users(username,display_name,role,password_hash) values('admin01','管理员','admin','x'),('manager01','经理','manager','x'),('planning01','计划','planning','x'),('engineering01','项目','engineering','x'),('purchase01','采购','purchase','x'),('operations01','运营','operations','x'),('warehouse01','仓库','warehouse','x'),('finance01','财务','finance','x')")});test.after(async()=>pool.end());
 
 test("four-line Award confirmation fails closed and atomically creates one PO with 4 Lines and 4 direct plans", async () => {
   const refs = await seedAward(4);
   const previewResponse = await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-order-conversion-preview`);
   assert.equal(previewResponse.response.status, 200, JSON.stringify(previewResponse.payload));
   const preview = previewResponse.payload.data;
+  assert.equal(preview.contract_version, "AWARD_PO_CONFIRMATION_V2");
+  assert.deepEqual({
+    contract: preview.mapping_qualification.contract_version,
+    allQualified: preview.mapping_qualification.all_qualified,
+    qualifiedLines: preview.mapping_qualification.qualified_line_count,
+    lines: preview.mapping_qualification.line_count,
+  }, {
+    contract: "AWARD_PO_MAPPING_QUALIFICATION_V1",
+    allQualified: true,
+    qualifiedLines: 4,
+    lines: 4,
+  });
+  assert.match(preview.mapping_qualification.qualification_digest, /^[0-9a-f]{64}$/);
+  assert.ok(preview.mapping_qualification.lines.every((line) => line.qualified
+    && line.error_code === null && line.reason === "Supplier Mapping资格通过"
+    && line.mapping_status === "ACTIVE" && line.binding_status === "ACTIVE"
+    && line.supplier_status === "ACTIVE" && line.material_status === "ACTIVE"
+    && line.supplier_unit_code === "PCS" && line.internal_unit_code === "PCS"
+    && line.conversion_numerator === "1" && line.conversion_denominator === "1"
+    && line.supplier_material_conflict_count === 0 && line.supplier_part_number_conflict_count === 0));
+  assert.deepEqual((await pool.query(`select count(*)::int line_count,
+      count(*) filter(where material.base_unit_id is null and material.base_uom='PCS')::int legacy_unit_count
+    from procurement_sourcing_award_lines line
+    join procurement_rfq_lines rfq_line on rfq_line.id=line.rfq_line_id
+    join material_master material on material.id=rfq_line.material_id
+    where line.award_id=$1`, [refs.awardId])).rows[0], { line_count: 4, legacy_unit_count: 4 });
+  const governedMappingFacts = (await pool.query(`select mapping.id::text mapping_fact_id,
+      mapping.mapping_uid::text mapping_uuid,mapping.mapping_version_no,mapping.version mapping_row_cas,
+      mapping.content_digest,count(event.id)::int event_count,
+      array_agg(event.event_type order by event.created_at,event.id) event_types
+    from supplier_mappings mapping
+    join supplier_mapping_events event on event.mapping_version_id=mapping.id
+    where mapping.id=any($1::bigint[])
+    group by mapping.id order by mapping.id`, [refs.mappingIds])).rows;
+  assert.equal(governedMappingFacts.length, 4);
+  assert.ok(governedMappingFacts.every((row) => row.mapping_version_no === 1 && row.mapping_row_cas === 3
+    && /^[0-9a-f]{64}$/.test(row.content_digest) && row.event_count === 3
+    && JSON.stringify(row.event_types) === JSON.stringify(["CREATED", "SUBMITTED", "APPROVED"])));
+  const authoritativeLineage = (await pool.query(`select line.id::text award_line_id,candidate.id::text candidate_id,
+      quote_line.id::text quote_line_id,binding.id::text rfq_binding_id,line.supplier_id::text supplier_id,
+      rfq_line.material_id::text material_id,binding.supplier_mapping_version_id::text mapping_fact_id,
+      binding.mapping_uid::text mapping_uuid,binding.mapping_version_no,binding.mapping_row_version mapping_row_cas,
+      binding.mapping_content_digest content_digest
+    from procurement_sourcing_award_lines line
+    join procurement_sourcing_awards award on award.id=line.award_id
+    join procurement_rfq_lines rfq_line on rfq_line.id=line.rfq_line_id and rfq_line.rfq_id=award.rfq_id
+    join procurement_quote_comparison_lines candidate on candidate.comparison_id=line.comparison_id
+      and candidate.quote_line_id=line.selected_quote_line_id and candidate.supplier_id=line.supplier_id
+    join procurement_supplier_quote_lines quote_line on quote_line.id=line.selected_quote_line_id
+      and quote_line.rfq_line_id=line.rfq_line_id
+    join procurement_rfq_supplier_line_mapping_bindings binding on binding.rfq_id=award.rfq_id
+      and binding.rfq_line_id=line.rfq_line_id and binding.supplier_id=line.supplier_id
+    where line.award_id=$1 order by line.id`, [refs.awardId])).rows;
+  assert.deepEqual(preview.mapping_qualification.lines.map((line) => ({
+    award_line_id: line.award_line_id,
+    candidate_id: line.candidate_id,
+    quote_line_id: line.quote_line_id,
+    rfq_binding_id: line.rfq_binding_id,
+    supplier_id: line.supplier_id,
+    material_id: line.material_id,
+    mapping_fact_id: line.mapping_fact_id,
+    mapping_uuid: line.mapping_uuid,
+    mapping_version_no: line.mapping_version_no,
+    mapping_row_cas: line.mapping_row_cas,
+    content_digest: line.content_digest,
+  })), authoritativeLineage);
+  const directQualification = await awardMappingQualification(refs.awardId);
+  assert.equal(directQualification.qualification_digest, preview.mapping_qualification.qualification_digest);
+  assert.deepEqual(directQualification.lines, preview.mapping_qualification.lines);
+  await isolatedFixtureMutation(async (client) => {
+    const unrelatedSupplier = (await client.query(`insert into suppliers(
+        supplier_code,supplier_name,normalized_name,status,created_by,updated_by,request_id
+      ) values('SUP-FUL-UNRELATED','无关供应商','无关供应商','ACTIVE','admin01','admin01',$1) returning id::text id`, [randomUUID()])).rows[0];
+    await insertGovernedMappingFixture(client, {
+      materialId: refs.materialIds[0], supplierId: unrelatedSupplier.id,
+      supplierCode: "SUP-FUL-UNRELATED", supplierName: "无关供应商",
+      supplierPartNumber: "UNRELATED-PART", unitId: refs.unitId,
+    });
+  });
+  const afterUnrelatedMapping = (await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-order-conversion-preview`)).payload.data;
+  assert.equal(afterUnrelatedMapping.mapping_qualification.qualification_digest, preview.mapping_qualification.qualification_digest);
+  assert.deepEqual(afterUnrelatedMapping.mapping_qualification.lines, preview.mapping_qualification.lines);
   assert.deepEqual(preview.current_counts, { purchase_orders: 0, purchase_order_lines: 0, delivery_plans: 0 });
   assert.deepEqual({
     operation: preview.planned_result.conversion_operation_count,
@@ -399,11 +562,16 @@ test("four-line Award confirmation fails closed and atomically creates one PO wi
     award_line.supplier_id::text award_supplier_id,rfq_line.material_id::text award_material_id,
     award_line.selected_quantity::text award_quantity,award_line.selected_unit_price::text award_price,
     award_line.promised_delivery_date::text award_date,po_line.id::text po_line_id,
-    po_line.material_id::text po_material_id,po_line.order_qty::text po_quantity,po_line.unit_price::text po_price,
+    po_line.material_id::text po_material_id,po_line.supplier_mapping_id::text po_mapping_fact_id,
+    binding.id::text rfq_binding_id,binding.supplier_mapping_version_id::text binding_mapping_fact_id,
+    po_line.order_qty::text po_quantity,po_line.unit_price::text po_price,
     plan.id::text plan_id,plan.purchase_order_line_id::text plan_po_line_id,plan.material_id::text plan_material_id,
     plan.planned_quantity::text plan_quantity,plan.promised_delivery_date::text plan_date
     from procurement_sourcing_award_lines award_line
+    join procurement_sourcing_awards award on award.id=award_line.award_id
     join procurement_rfq_lines rfq_line on rfq_line.id=award_line.rfq_line_id
+    join procurement_rfq_supplier_line_mapping_bindings binding on binding.rfq_id=award.rfq_id
+      and binding.rfq_line_id=award_line.rfq_line_id and binding.supplier_id=award_line.supplier_id
     join procurement_award_po_line_links link on link.award_line_id=award_line.id
     join purchase_order_lines po_line on po_line.id=link.purchase_order_line_id
     join purchase_delivery_plans plan on plan.purchase_order_line_id=po_line.id
@@ -412,13 +580,204 @@ test("four-line Award confirmation fails closed and atomically creates one PO wi
   assert.ok(linked.every((row) => row.award_material_id === row.po_material_id
     && row.po_material_id === row.plan_material_id && row.award_quantity === row.po_quantity
     && row.po_quantity === row.plan_quantity && row.award_price === row.po_price
-    && row.award_date === row.plan_date && row.po_line_id === row.plan_po_line_id));
+    && row.award_date === row.plan_date && row.po_line_id === row.plan_po_line_id
+    && row.po_mapping_fact_id === row.binding_mapping_fact_id));
+  assert.deepEqual(linked.map((row) => row.po_mapping_fact_id), preview.mapping_qualification.lines.map((line) => line.mapping_fact_id));
   assert.deepEqual(await zeroCounts(), { ...emptyConversionCounts, purchase_orders: 1, purchase_order_lines: 4, po_source_links: 1, po_status_events: 1, links: 4, plans: 4, queues: 4, plan_events: 4, conversion_success_audits: 1, conversion_idempotency_keys: 1 });
   assert.deepEqual((await pool.query(`select award.status award_status,award.version award_version,award.award_digest,
     rfq.status rfq_status,rfq.version rfq_version,
     (select count(*)::int from procurement_supplier_quotes where rfq_id=rfq.id) quote_count,
     (select count(*)::int from procurement_quote_comparisons where rfq_id=rfq.id) comparison_line_count
     from procurement_sourcing_awards award join procurement_rfqs rfq on rfq.id=award.rfq_id where award.id=$1`, [refs.awardId])).rows[0], upstream);
+});
+
+test("concurrent Mapping version creation and Award conversion serialize without deadlock or partial PO facts", async () => {
+  const refs = await seedAward(4);
+  const body = await conversionBody(refs.awardId, "Mapping并发隔离测试");
+  const mappingUuid = refs.bindings[0].mapping_uuid;
+  const [converted, versioned] = await Promise.all([
+    fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`, {
+      method: "POST", key: "mapping-conversion-race", body,
+    }),
+    supplierMapping(`/api/supplier-mappings/${mappingUuid}/versions`, {
+      method: "POST", key: "mapping-version-race", body: { expected_version: 3 },
+    }),
+  ]);
+  assert.equal(versioned.response.status, 201, JSON.stringify(versioned.payload));
+  assert.ok([201, 422].includes(converted.response.status), JSON.stringify(converted.payload));
+  const counts = await conversionBusinessCounts();
+  if (converted.response.status === 201) {
+    assert.deepEqual(counts, {
+      purchase_orders: 1, purchase_order_lines: 4, delivery_plans: 4, receiving_queue_entries: 4,
+    });
+  } else {
+    assert.equal(converted.payload.code, "AWARD_MAPPING_VERSION_DRIFT");
+    assert.match(converted.payload.message, /Award Line .*Supplier .*Material .*最新版本/);
+    assert.deepEqual(counts, {
+      purchase_orders: 0, purchase_order_lines: 0, delivery_plans: 0, receiving_queue_entries: 0,
+    });
+  }
+});
+
+test("Award Mapping state, effective period, unit and fixed fact drift return the same GET/POST blocker and create no PO facts", async () => {
+  const refs = await seedAward(4);
+  const previewResult = await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-order-conversion-preview`);
+  assert.equal(previewResult.response.status, 200, JSON.stringify(previewResult.payload));
+  const baseline = previewResult.payload.data;
+  assert.equal(baseline.mapping_qualification.all_qualified, true);
+  const body = { ...baseline.confirmation, remark: "Mapping失败关闭隔离测试" };
+  const mappingFactId = refs.mappingIds[0], bindingId = refs.bindings[0].binding_id;
+  const original = (await pool.query(`select mapping.valid_from,mapping.valid_to,mapping.content_digest,
+      mapping.purchase_unit_id::text purchase_unit_id,supplier.status supplier_status,
+      material.material_status
+    from supplier_mappings mapping
+    join suppliers supplier on supplier.id=mapping.supplier_id
+    join material_master material on material.id=mapping.material_id
+    where mapping.id=$1`, [mappingFactId])).rows[0];
+  const expectedZero = { purchase_orders: 0, purchase_order_lines: 0, delivery_plans: 0, receiving_queue_entries: 0 };
+
+  const assertBlocked = async (expectedCode, mutate, restore) => {
+    await isolatedFixtureMutation(mutate);
+    try {
+      const blockedPreviewResult = await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-order-conversion-preview`);
+      assert.equal(blockedPreviewResult.response.status, 200, JSON.stringify(blockedPreviewResult.payload));
+      const blockedPreview = blockedPreviewResult.payload.data;
+      assert.equal(blockedPreview.po_convertible_now, false);
+      const previewFailure = blockedPreview.mapping_qualification.lines.find((line) => !line.qualified);
+      assert.ok(previewFailure);
+      assert.equal(previewFailure.error_code, expectedCode);
+      assert.match(previewFailure.reason, /^Award Line [1-9]\d* \/ Supplier [1-9]\d* \/ Material [1-9]\d*：/);
+      const rejected = await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`, {
+        method: "POST", body,
+      });
+      assert.equal(rejected.response.status, 422, JSON.stringify(rejected.payload));
+      assert.equal(rejected.payload.code, expectedCode, JSON.stringify(rejected.payload));
+      assert.equal(rejected.payload.message, previewFailure.reason);
+      assert.deepEqual(await conversionBusinessCounts(), expectedZero);
+    } finally { await isolatedFixtureMutation(restore); }
+    const restored = (await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-order-conversion-preview`)).payload.data;
+    assert.equal(restored.po_convertible_now, true);
+    assert.equal(restored.mapping_qualification.qualification_digest, baseline.mapping_qualification.qualification_digest);
+  };
+
+  await assertBlocked("AWARD_MAPPING_NOT_ACTIVE",
+    (client) => client.query("update supplier_mappings set status='INACTIVE' where id=$1", [mappingFactId]),
+    (client) => client.query("update supplier_mappings set status='ACTIVE' where id=$1", [mappingFactId]));
+
+  await assertBlocked("AWARD_MAPPING_NOT_YET_EFFECTIVE",
+    async (client) => {
+      await client.query("update supplier_mappings set valid_from=transaction_timestamp()+interval '1 day' where id=$1", [mappingFactId]);
+      await client.query("update procurement_rfq_supplier_line_mapping_bindings set valid_from=transaction_timestamp()+interval '1 day' where id=$1", [bindingId]);
+    },
+    async (client) => {
+      await client.query("update supplier_mappings set valid_from=$2 where id=$1", [mappingFactId, original.valid_from]);
+      await client.query("update procurement_rfq_supplier_line_mapping_bindings set valid_from=$2 where id=$1", [bindingId, original.valid_from]);
+    });
+
+  await assertBlocked("AWARD_MAPPING_EXPIRED",
+    async (client) => {
+      await client.query("update supplier_mappings set valid_to=transaction_timestamp()-interval '1 hour' where id=$1", [mappingFactId]);
+      await client.query("update procurement_rfq_supplier_line_mapping_bindings set valid_to=transaction_timestamp()-interval '1 hour' where id=$1", [bindingId]);
+    },
+    async (client) => {
+      await client.query("update supplier_mappings set valid_to=$2 where id=$1", [mappingFactId, original.valid_to]);
+      await client.query("update procurement_rfq_supplier_line_mapping_bindings set valid_to=$2 where id=$1", [bindingId, original.valid_to]);
+    });
+
+  const alternateUnitId = await isolatedFixtureMutation(async (client) => String((await client.query(
+    "insert into units(code,name,symbol,unit_type,enabled) values('EACH','单件','EA','COUNT',true) returning id",
+  )).rows[0].id));
+  await assertBlocked("AWARD_MAPPING_UNIT_MISMATCH",
+    async (client) => {
+      await client.query("update supplier_mappings set purchase_unit_id=$2 where id=$1", [mappingFactId, alternateUnitId]);
+      await client.query("update procurement_rfq_supplier_line_mapping_bindings set purchase_unit_id=$2 where id=$1", [bindingId, alternateUnitId]);
+    },
+    async (client) => {
+      await client.query("update supplier_mappings set purchase_unit_id=$2 where id=$1", [mappingFactId, original.purchase_unit_id]);
+      await client.query("update procurement_rfq_supplier_line_mapping_bindings set purchase_unit_id=$2 where id=$1", [bindingId, original.purchase_unit_id]);
+    });
+
+  await assertBlocked("AWARD_MAPPING_SUPPLIER_NOT_ACTIVE",
+    (client) => client.query("update suppliers set status='INACTIVE' where id=$1", [refs.supplierId]),
+    (client) => client.query("update suppliers set status=$2 where id=$1", [refs.supplierId, original.supplier_status]));
+
+  await assertBlocked("AWARD_MAPPING_MATERIAL_NOT_ACTIVE",
+    (client) => client.query("update material_master set material_status='INACTIVE' where id=$1", [refs.materialIds[0]]),
+    (client) => client.query("update material_master set material_status=$2 where id=$1", [refs.materialIds[0], original.material_status]));
+
+  const driftDigest = createHash("sha256").update("fixed-mapping-real-drift").digest("hex");
+  await assertBlocked("AWARD_MAPPING_DIGEST_DRIFT",
+    (client) => client.query("update supplier_mappings set content_digest=$2 where id=$1", [mappingFactId, driftDigest]),
+    (client) => client.query("update supplier_mappings set content_digest=$2 where id=$1", [mappingFactId, original.content_digest]));
+
+  const conflictClient = await pool.connect();
+  let conflictCode = "";
+  try {
+    await conflictClient.query("begin");
+    await conflictClient.query("set local session_replication_role=replica");
+    try {
+      await conflictClient.query(`insert into supplier_mappings(
+          material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,purchase_uom,purchase_unit_id,
+          conversion_numerator,conversion_denominator,status,valid_from,created_by,updated_by,request_id
+        ) values($1,$2,'供应商 A','SUP-FUL-A','CONFLICTING-PART','PCS',$3,1,1,'ACTIVE',
+          transaction_timestamp()-interval '1 day','purchase01','purchase01',$4)`, [
+        refs.materialIds[0], refs.supplierId, refs.unitId, randomUUID(),
+      ]);
+    } catch (error) { conflictCode = String(error.code || ""); }
+  } finally {
+    await conflictClient.query("rollback").catch(() => undefined);
+    conflictClient.release();
+  }
+  assert.equal(conflictCode, "23P01", "PostgreSQL exclusion constraint must reject a second overlapping ACTIVE 1:1 Mapping");
+  assert.equal((await awardMappingQualification(refs.awardId)).qualification_digest, baseline.mapping_qualification.qualification_digest);
+
+  const exclusionName = "supplier_mappings_active_material_period_excl";
+  const exclusionDefinition = (await pool.query(
+    "select pg_get_constraintdef(oid) definition from pg_constraint where conname=$1 and conrelid='supplier_mappings'::regclass",
+    [exclusionName],
+  )).rows[0]?.definition;
+  assert.ok(exclusionDefinition);
+  let syntheticConflictId = null;
+  await pool.query(`alter table supplier_mappings drop constraint ${exclusionName}`);
+  try {
+    syntheticConflictId = await isolatedFixtureMutation(async (client) => String((await client.query(`insert into supplier_mappings(
+        material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,purchase_uom,purchase_unit_id,
+        conversion_numerator,conversion_denominator,status,valid_from,created_by,updated_by,request_id
+      ) values($1,$2,'供应商 A','SUP-FUL-A','CONFLICTING-PART','PCS',$3,1,1,'ACTIVE',
+        transaction_timestamp()-interval '1 day','purchase01','purchase01',$4) returning id::text id`, [
+      refs.materialIds[0], refs.supplierId, refs.unitId, randomUUID(),
+    ])).rows[0].id));
+    const conflictPreview = (await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-order-conversion-preview`)).payload.data;
+    const conflictFailure = conflictPreview.mapping_qualification.lines.find((line) => !line.qualified);
+    assert.equal(conflictPreview.po_convertible_now, false);
+    assert.equal(conflictFailure?.error_code, "AWARD_MAPPING_SUPPLIER_MATERIAL_CONFLICT");
+    assert.equal(conflictFailure?.supplier_material_conflict_count, 1);
+    const conflictPost = await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`, {
+      method: "POST", body,
+    });
+    assert.equal(conflictPost.response.status, 422, JSON.stringify(conflictPost.payload));
+    assert.equal(conflictPost.payload.code, "AWARD_MAPPING_SUPPLIER_MATERIAL_CONFLICT");
+    assert.equal(conflictPost.payload.message, conflictFailure.reason);
+    assert.deepEqual(await conversionBusinessCounts(), expectedZero);
+  } finally {
+    if (syntheticConflictId) {
+      await isolatedFixtureMutation((client) => client.query("delete from supplier_mappings where id=$1", [syntheticConflictId]));
+    }
+    await pool.query(`alter table supplier_mappings add constraint ${exclusionName} ${exclusionDefinition}`);
+  }
+  assert.equal((await awardMappingQualification(refs.awardId)).qualification_digest, baseline.mapping_qualification.qualification_digest);
+
+  await isolatedFixtureMutation((client) => client.query("delete from supplier_mappings where id=$1", [mappingFactId]));
+  const missingPreview = (await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-order-conversion-preview`)).payload.data;
+  const missingFailure = missingPreview.mapping_qualification.lines.find((line) => !line.qualified);
+  assert.equal(missingPreview.po_convertible_now, false);
+  assert.ok(missingFailure);
+  assert.equal(missingFailure.error_code, "AWARD_MAPPING_FACT_MISSING");
+  const missingPost = await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`, { method: "POST", body });
+  assert.equal(missingPost.response.status, 422, JSON.stringify(missingPost.payload));
+  assert.equal(missingPost.payload.code, "AWARD_MAPPING_FACT_MISSING");
+  assert.equal(missingPost.payload.message, missingFailure.reason);
+  assert.deepEqual(await conversionBusinessCounts(), expectedZero);
 });
 
 test("Award 10 x 12 becomes PO with its authoritative plan, two receipts 4/6, inventory 10 and explicit AP 48/72",async()=>{const refs=await seedAward(),key="convert-award-main",body=await conversionBody(refs.awardId,"隔离采购订单备注");const converted=await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",key,body});assert.equal(converted.response.status,201,JSON.stringify(converted.payload));const replay=await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",key,body});assert.equal(replay.response.headers.get("Idempotency-Replayed"),"true");const conflict=await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",key,body:{...body,expected_award_version:2}});assert.equal(conflict.payload.code,"IDEMPOTENCY_CONFLICT");const po=converted.payload.data.purchase_orders[0],poId=Number(po.id),poLineId=Number(po.lines[0].id);assert.equal(po.remark,"隔离采购订单备注");assert.equal(po.lines[0].order_qty,"10.000000");assert.equal(po.lines[0].unit_price,"12.000000");assert.deepEqual(converted.payload.data.summary,{conversion_operation_count:1,purchase_order_aggregate_count:1,purchase_order_line_count:1,delivery_plan_aggregate_count:1,delivery_plan_line_count:0,receiving_queue_entry_count:1});const plan=po.delivery_plans[0],planId=Number(plan.id);let counts=(await pool.query("select (select count(*) from purchase_receipts)::int receipts,(select count(*) from inventory_ledger_entries)::int ledger,(select count(*) from finance_documents where doc_type='AP')::int ap,(select count(*) from purchase_delivery_plans)::int plans,(select count(*) from warehouse_receiving_queue_entries)::int queues,(select count(*) from purchase_delivery_plan_events where event_type='CREATED')::int plan_events")).rows[0];assert.deepEqual(counts,{receipts:0,ledger:0,ap:0,plans:1,queues:1,plan_events:1});

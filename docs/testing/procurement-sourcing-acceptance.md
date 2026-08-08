@@ -15,8 +15,8 @@
 | `GET /api/procurement/comparisons/:id` | `procurement.rfq.read` | 只返回服务端保存排名与风险，不由浏览器重算 |
 | `POST /api/procurement/rfqs/:id/award` | `procurement.sourcing.award` | 当前报价/最新比较、唯一供应商、理由、数量/MOQ/交期 |
 | `POST /api/procurement/awards/:id/reversal` | `procurement.sourcing.reverse` | 只追加撤销信息与事件，历史不删除 |
-| `GET /api/procurement/awards/:id/purchase-order-conversion-preview` | `procurement.award.convert` | 只读重算完整谱系、摘要、四行和PO/计划零计数；不写Audit或业务事实 |
-| `POST /api/procurement/awards/:id/purchase-orders` | `procurement.award.convert` | 最终显式确认；同事务重验CAS/摘要/行集/Quote/Mapping并创建PO、逐行Line与计划 |
+| `GET /api/procurement/awards/:id/purchase-order-conversion-preview` | `procurement.award.convert` | 只读重算完整谱系、摘要、固定Binding/Mapping逐行资格和PO/计划零计数；不写Audit或业务事实 |
+| `POST /api/procurement/awards/:id/purchase-orders` | `procurement.award.convert` | 最终显式确认；锁后复用同一资格loader重验CAS/摘要/行集/Quote/Binding/Mapping并创建PO、逐行Line与计划 |
 
 所有写路由均验收 Session/must-change、权限、CSRF、128 KiB 正文上限、Idempotency-Key、expected_version、稳定 request_id/中文错误、单事务 Audit/Event/Idempotency 和安全异常响应。
 
@@ -34,6 +34,11 @@
 10. Award 前后 PO/Receipt/Inventory Ledger/Finance/Planning Allocation 计数与 `reserved_qty` 保护。
 11. Award转PO入口、取消、关闭、ESC和背景关闭均为0业务POST；取消Loading后迟到preview不得复活窗口，默认焦点为取消。
 12. 最终按钮DOM同步禁用，失败后不自动重试；重新打开后双击只有一个POST。隔离四行结果恰为1个PO、4条PO Line、4个直接计划聚合，Award和上游不变，全部收货/库存/IQC/财务/生产记录为0。
+13. UAT同构四条ACTIVE 1:1 Mapping在legacy `base_unit_id=NULL/base_uom=PCS`下全部qualified；GET与POST共用`AWARD_PO_MAPPING_QUALIFICATION_V1`行结果和资格摘要。
+14. 每行严格闭合Award Line→Candidate→Quote Line→RFQ Binding→固定Mapping fact/version/CAS/digest；bigint保持字符串，三条Mapping Event不得放大为三条ACTIVE Mapping。
+15. 缺失、两条ACTIVE冲突、停用、未生效、过期、Supplier/Material停用、Unit不一致、非1:1及固定事实漂移均返回具体Award Line/Supplier/Material错误，失败的PO/Line/Plan/queue全部为0。
+16. 无关Mapping变化不改变资格摘要；固定Mapping治理写与转换并发无死锁且只能得到成功或稳定漂移失败。隔离成功计数固定为PO/Line/Plan/queue `1/4/4/4`。
+17. 确认窗口桌面表和390×844卡片完整展示四行资格凭证；主UAT验收只能打开、核对、填写备注后取消，business POST必须为0。
 
 ## 原生 UI
 

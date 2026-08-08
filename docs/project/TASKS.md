@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前无`DOING`。`SELFHOST-UAT-FIX-32`已完成并停止在主UAT Award/PO/Delivery Plan `1/0/0`；真正转换仍须新的独立明确授权。
+| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-UAT-FIX-33 | Award to PO Supplier Mapping Validation Diagnosis and Fix | DOING | Codex（严格门禁、只读诊断、统一资格合同、串行隔离测试、备份恢复、Web-only部署、purchase-only取消UAT、清理与文档）、项目负责人（固定主UAT零转换/零Mapping修改边界，并授权分支A实现、部署与只读验收） | 2026-08-08 | SELFHOST-UAT-FIX-32、SELFHOST-UAT-FIX-23、SELFHOST-UAT-FIX-25、D-091、D-095—D-104 | 采用分支A：四条固定Mapping/Binding权威有效；GET未执行逐行资格，POST忽略Binding且错误要求legacy Material非空`base_unit_id`。共享资格合同、锁后漂移保护、桌面/390×844凭证、隔离成功`1/4/4/4`及失败全0已通过；候选Web`83c1bff3…20664`待正式备份恢复和Web-only部署。无0040，禁止重试主UAT转换或修改Mapping；见[任务文档](../tasks/SELFHOST-UAT-FIX-33.md)。 |
 
 ## 已完成任务
 

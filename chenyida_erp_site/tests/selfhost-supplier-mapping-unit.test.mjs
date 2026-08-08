@@ -85,7 +85,7 @@ test("RFQ request builder refuses disabled coverage rows even when a forged chec
   }), { purchase_request_id: 1, supplier_ids: [2], response_deadline: "2026-12-01", expected_version: 3 });
 });
 
-test("mapping and RFQ server paths share one authoritative current 1:1 coverage query and legacy writes are closed", async () => {
+test("RFQ creation shares authoritative current coverage while fixed bindings prevent downstream dynamic rematching", async () => {
   const coverage = await readFile(new URL("../app/lib/supplier-mapping-selfhost/coverage.ts", import.meta.url), "utf8");
   const mappingService = await readFile(new URL("../app/lib/supplier-mapping-selfhost/service.ts", import.meta.url), "utf8");
   const sourcing = await readFile(new URL("../app/lib/procurement-sourcing-selfhost/service.ts", import.meta.url), "utf8");
@@ -99,7 +99,8 @@ test("mapping and RFQ server paths share one authoritative current 1:1 coverage 
   assert.match(mappingService, /coalesce\(m\.base_unit_id,u\.id\) base_unit_id/);
   assert.match(mappingService, /m\.base_unit_id is null[\s\S]*upper\(u\.code\)=upper\(btrim\(m\.base_uom\)\)/);
   assert.match(sourcing, /loadSupplierMappingCoverage\(client, requestId, suppliers\)/);
-  assert.match(sourcing, /loadSupplierMappingCoverage\(client, Number\(rfq\.purchase_request_id\), supplierIds\)/);
+  assert.doesNotMatch(sourcing, /loadSupplierMappingCoverage\(client, Number\(rfq\.purchase_request_id\), supplierIds\)/);
+  assert.match(sourcing, /procurement_rfq_supplier_line_mapping_bindings/);
   assert.match(sourcing, /requireRfqCoverage\(coverage, suppliers\)/);
   assert.match(legacyHandler, /SUPPLIER_MAPPING_GOVERNANCE_REQUIRED/);
   assert.doesNotMatch(legacyService, /createMapping|setMappingStatus/);

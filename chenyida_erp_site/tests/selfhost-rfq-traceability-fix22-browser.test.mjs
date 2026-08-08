@@ -46,6 +46,12 @@ const FIX29_MATERIAL_DEFINITIONS = [
 const FIX29_AWARD_REASON = "交期优先，避免项目延期；供应商A承诺2026-10-20交付，满足2026-10-30需求日期，供应商B承诺2026-11-05交付，已晚于需求日期。";
 const pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "rfq-traceability-fix22-browser" });
 const sha256 = (value) => createHash("sha256").update(String(value)).digest("hex");
+const mappingContentDigest = (supplierCode, materialId, mappingUid) => sha256(JSON.stringify([
+  "FIX22_BROWSER_MAPPING_V1",
+  supplierCode,
+  materialId,
+  mappingUid,
+]));
 const expectedMigration0039Checksum = createHash("sha256")
   .update(await readFile(new URL("../drizzle-postgres/0039_rfq_traceability.sql", import.meta.url)))
   .digest("hex");
@@ -219,8 +225,10 @@ async function seedFixture({ targetDate = "2099-10-30", materialDefinitions } = 
             `insert into supplier_mappings(
               material_id,supplier_id,supplier_name,supplier_key,supplier_item_code,purchase_uom,
               purchase_unit_id,conversion_numerator,conversion_denominator,status,valid_from,mapping_uid,
-              created_by,updated_by,request_id
-            ) values($1,$2,$3,$4,$5,'PCS',$6,1,1,'ACTIVE',now()-interval '1 day',$7,$8,$8,$9)`,
+              content_digest,submitted_by,submitted_at,submitted_request_id,reviewed_by,reviewed_at,
+              reviewed_request_id,review_outcome,created_by,updated_by,request_id
+            ) values($1,$2,$3,$4,$5,'PCS',$6,1,1,'ACTIVE',now()-interval '1 day',$7,$8,
+              $9,now(),$10,$9,now(),$11,'APPROVED',$9,$9,$12)`,
             [
               materialId,
               supplier.id,
@@ -229,7 +237,10 @@ async function seedFixture({ targetDate = "2099-10-30", materialDefinitions } = 
               `${supplierCode}-${materialId}`,
               unit.id,
               MAPPING_UIDS[supplierIndex][materialIndex],
+              mappingContentDigest(supplierCode, materialId, MAPPING_UIDS[supplierIndex][materialIndex]),
               credentials.username,
+              randomUUID(),
+              randomUUID(),
               randomUUID(),
             ],
           );
@@ -2343,6 +2354,110 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
 
     const businessPosts = [];
     const previewGets = [];
+    const conversionPreviews = [];
+    let latestConversionPreview;
+    const expectedQualificationLineage = MATERIAL_IDS.map((materialId, index) => ({
+      award_line_id: String(index + 1),
+      candidate_id: String((index + 1) * 2),
+      quote_line_id: String(index + 1),
+      rfq_binding_id: String(index + 1),
+      supplier_id: "1",
+      material_id: String(materialId),
+      mapping_uuid: MAPPING_UIDS[0][index],
+      mapping_fact_id: String(index + 1),
+      mapping_version_no: 1,
+      mapping_row_cas: 1,
+    }));
+    const assertQualificationPreview = (preview) => {
+      assert.equal(preview.contract_version, "AWARD_PO_CONFIRMATION_V2");
+      assert.equal(preview.po_convertible_now, true);
+      const qualification = preview.mapping_qualification;
+      assert.ok(qualification);
+      assert.equal(qualification.contract_version, "AWARD_PO_MAPPING_QUALIFICATION_V1");
+      assert.match(qualification.observed_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/);
+      assert.equal(qualification.data_timezone, "Asia/Shanghai");
+      assert.match(qualification.qualification_digest, /^[0-9a-f]{64}$/);
+      assert.equal(qualification.all_qualified, true);
+      assert.equal(qualification.qualified_line_count, 4);
+      assert.equal(qualification.line_count, 4);
+      assert.equal(qualification.lines.length, 4);
+      assert.deepEqual(qualification.lines.map((line) => ({
+        award_line_id: line.award_line_id,
+        candidate_id: line.candidate_id,
+        quote_line_id: line.quote_line_id,
+        rfq_binding_id: line.rfq_binding_id,
+        supplier_id: line.supplier_id,
+        material_id: line.material_id,
+        mapping_uuid: line.mapping_uuid,
+        mapping_fact_id: line.mapping_fact_id,
+        mapping_version_no: line.mapping_version_no,
+        mapping_row_cas: line.mapping_row_cas,
+      })), expectedQualificationLineage);
+      for (const [index, line] of qualification.lines.entries()) {
+        const materialId = MATERIAL_IDS[index];
+        assert.equal(line.supplier_code, "SUP-000001");
+        assert.equal(line.binding_status, "ACTIVE");
+        assert.equal(line.mapping_status, "ACTIVE");
+        assert.equal(line.supplier_status, "ACTIVE");
+        assert.equal(line.material_status, "ACTIVE");
+        assert.equal(line.supplier_part_number, `SUP-000001-${materialId}`);
+        assert.equal(line.supplier_unit_id, "1");
+        assert.equal(line.supplier_unit_code, "PCS");
+        assert.equal(line.internal_unit_id, "1");
+        assert.equal(line.internal_unit_code, "PCS");
+        assert.equal(line.conversion_numerator, "1");
+        assert.equal(line.conversion_denominator, "1");
+        assert.match(line.valid_from, /^\d{4}-\d{2}-\d{2}$/);
+        assert.equal(line.valid_to, null);
+        assert.equal(line.content_digest, mappingContentDigest("SUP-000001", materialId, MAPPING_UIDS[0][index]));
+        assert.equal(line.supplier_material_conflict_count, 0);
+        assert.equal(line.supplier_part_number_conflict_count, 0);
+        assert.equal(line.qualified, true);
+        assert.equal(line.error_code, null);
+        assert.equal(line.reason, "Supplier Mapping资格通过");
+      }
+      assert.equal(preview.confirmation.expected_decision_digest, preview.digests.decision_digest);
+      assert.equal(preview.confirmation.expected_mapping_qualification_digest, qualification.qualification_digest);
+      return qualification;
+    };
+    const assertQualificationCredential = async (dialog, mode) => {
+      const qualification = latestConversionPreview.mapping_qualification;
+      const desktop = dialog.locator(".award-po-qualification-desktop");
+      const mobile = dialog.locator(".award-po-qualification-mobile");
+      assert.equal(await desktop.isVisible(), mode === "desktop");
+      assert.equal(await mobile.isVisible(), mode === "mobile");
+      const credentialText = await dialog.innerText();
+      for (const required of [
+        "Supplier Mapping资格凭证", "AWARD_PO_MAPPING_QUALIFICATION_V1", qualification.observed_at,
+        "Asia/Shanghai", "qualified=true / 合格", "4/4 行合格", qualification.qualification_digest,
+      ]) assert.ok(credentialText.includes(required), `${mode} Mapping credential missing ${required}`);
+      const items = mode === "desktop" ? desktop.locator("tbody tr") : mobile.locator("article");
+      assert.equal(await items.count(), 4);
+      for (const [index, line] of qualification.lines.entries()) {
+        const item = items.nth(index);
+        assert.equal(await item.getAttribute("data-award-line-id"), line.award_line_id);
+        assert.equal(await item.getAttribute("data-qualified"), "true");
+        const itemText = await item.innerText();
+        const common = [
+          "qualified=true / 合格", `Award Line ${line.award_line_id}`, `Candidate ${line.candidate_id}`,
+          `Quote Line ${line.quote_line_id}`, `RFQ Binding ${line.rfq_binding_id}`, line.mapping_uuid,
+          `Fact ${line.mapping_fact_id} / v${line.mapping_version_no} / Row CAS ${line.mapping_row_cas}`,
+          "Binding状态：ACTIVE", "Mapping状态：ACTIVE", line.supplier_part_number,
+          `Supplier Unit ${line.supplier_unit_id} / PCS`, `Internal Unit ${line.internal_unit_id} / PCS`,
+          line.valid_from, line.content_digest, "错误代码：—", "原因：Supplier Mapping资格通过",
+        ];
+        const responsive = mode === "desktop" ? [
+          "Supplier 1 / SUP-000001", "Supplier状态：ACTIVE", `Material ${line.material_id}`,
+          "Material状态：ACTIVE", "1:1", "至 —", "Supplier/Material：0", "Supplier Part：0",
+        ] : [
+          "Supplier 1 / SUP-000001 / ACTIVE", `Material ${line.material_id} / ACTIVE`,
+          "换算：1:1", `有效期：${line.valid_from} 至 —`, "冲突：Supplier/Material 0 / Supplier Part 0",
+        ];
+        for (const required of [...common, ...responsive]) {
+          assert.ok(itemText.includes(required), `${mode} Mapping credential line ${line.award_line_id} missing ${required}`);
+        }
+      }
+    };
     let delayNextPreview = true;
     let failNextConversionPost = true;
     let markDelayedPreviewObserved = () => {};
@@ -2404,7 +2519,11 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
     assert.equal(businessPosts.length, 0, "cancelling a delayed preview must send no business POST");
     releaseDelayedPreview();
     const delayedPreviewResponse = await delayedPreviewResponsePromise;
-    assert.equal(delayedPreviewResponse.status(), 200, await delayedPreviewResponse.text());
+    const delayedPreviewPayload = await delayedPreviewResponse.json();
+    assert.equal(delayedPreviewResponse.status(), 200, JSON.stringify(delayedPreviewPayload));
+    latestConversionPreview = delayedPreviewPayload.data;
+    assertQualificationPreview(latestConversionPreview);
+    conversionPreviews.push(latestConversionPreview);
     await page.waitForTimeout(100);
     assert.equal(await page.locator(".rfq-dialog.award-po-dialog[role=dialog]").count(), 0, "a late preview response must not resurrect the cancelled dialog");
     assert.equal(previewGets.length, 1);
@@ -2415,7 +2534,11 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
         && response.request().method() === "GET");
       await entry.click();
       const response = await previewResponse;
-      assert.equal(response.status(), 200, await response.text());
+      const payload = await response.json();
+      assert.equal(response.status(), 200, JSON.stringify(payload));
+      latestConversionPreview = payload.data;
+      assertQualificationPreview(latestConversionPreview);
+      conversionPreviews.push(latestConversionPreview);
       const dialog = page.locator(".rfq-dialog.award-po-dialog[role=dialog]");
       await dialog.getByRole("heading", { name: "定标转采购订单最终确认", exact: true }).waitFor();
       await page.waitForFunction(() => document.activeElement?.textContent?.trim() === "取消");
@@ -2425,9 +2548,10 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
     };
 
     let dialog = await openDialog(2);
-    assert.equal(await dialog.locator(".award-po-lines-desktop tbody tr").count(), 4);
-    assert.equal(await dialog.locator(".award-po-lines-desktop").isVisible(), true);
-    assert.equal(await dialog.locator(".award-po-lines-mobile").isVisible(), false);
+    assert.equal(await dialog.locator(".award-po-lines-desktop:not(.award-po-qualification-desktop) tbody tr").count(), 4);
+    assert.equal(await dialog.locator(".award-po-lines-desktop:not(.award-po-qualification-desktop)").isVisible(), true);
+    assert.equal(await dialog.locator(".award-po-lines-mobile:not(.award-po-qualification-mobile)").isVisible(), false);
+    await assertQualificationCredential(dialog, "desktop");
     const desktopText = await dialog.innerText();
     for (const required of [
       "#1 / v1 / AWARDED", "ID 1 / RFQ-00000001 / Round 1 / CLOSED", "Version 1 / CURRENT / awardable_now=false",
@@ -2469,14 +2593,16 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
 
     await page.setViewportSize({ width: 390, height: 844 });
     dialog = await openDialog(6);
-    assert.equal(await dialog.locator(".award-po-lines-desktop").isVisible(), false);
-    assert.equal(await dialog.locator(".award-po-lines-mobile").isVisible(), true);
-    assert.equal(await dialog.locator(".award-po-lines-mobile article").count(), 4);
+    assert.equal(await dialog.locator(".award-po-lines-desktop:not(.award-po-qualification-desktop)").isVisible(), false);
+    assert.equal(await dialog.locator(".award-po-lines-mobile:not(.award-po-qualification-mobile)").isVisible(), true);
+    assert.equal(await dialog.locator(".award-po-lines-mobile:not(.award-po-qualification-mobile) article").count(), 4);
+    await assertQualificationCredential(dialog, "mobile");
     await noOverflow(page, "FIX-32 confirmation 390x844");
     await noDialogOverflow(dialog, "FIX-32 confirmation 390x844");
     const remark = "纯虚拟UAT采购订单，仅用于黑盒验收，不对应真实采购。";
     await dialog.getByLabel("PO备注（可选，最多2000字）", { exact: true }).fill(remark);
     assert.equal(businessPosts.length, 0, "editing local remark must send no business POST");
+    const failedExpectedMappingQualificationDigest = latestConversionPreview.mapping_qualification.qualification_digest;
 
     const failedConversionResponsePromise = page.waitForResponse((response) => response.url() === `${REQUIRED_ORIGIN}/api/procurement/awards/1/purchase-orders`
       && response.request().method() === "POST");
@@ -2509,8 +2635,9 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
     await dialog.waitFor({ state: "detached" });
 
     dialog = await openDialog(7, 1);
-    assert.equal(await dialog.locator(".award-po-lines-mobile").isVisible(), true);
+    assert.equal(await dialog.locator(".award-po-lines-mobile:not(.award-po-qualification-mobile)").isVisible(), true);
     await dialog.getByLabel("PO备注（可选，最多2000字）", { exact: true }).fill(remark);
+    const successfulExpectedMappingQualificationDigest = latestConversionPreview.mapping_qualification.qualification_digest;
     const conversionResponsePromise = page.waitForResponse((response) => response.url() === `${REQUIRED_ORIGIN}/api/procurement/awards/1/purchase-orders`
       && response.request().method() === "POST");
     await dialog.getByRole("button", { name: "最终确认生成PO及到货计划", exact: true }).evaluate((button) => {
@@ -2532,11 +2659,17 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
     await dialog.waitFor({ state: "detached" });
     await page.getByText("采购订单、PO Line与逐行到货计划已在同一事务生成；未自动创建收货、库存、IQC、应付或生产记录", { exact: true }).waitFor();
     assert.equal(businessPosts.length, 2, "the failed attempt and successful double click must send exactly two business POSTs total");
+    assert.equal(conversionPreviews.length, 7);
+    assert.equal(new Set(conversionPreviews.map((preview) => preview.mapping_qualification.qualification_digest)).size, 1,
+      "unchanged fixed Mapping facts must produce one stable qualification digest across all previews");
+    const submittedQualificationDigests = [failedExpectedMappingQualificationDigest, successfulExpectedMappingQualificationDigest];
     for (const [requestIndex, conversionRequest] of businessPosts.entries()) {
       assert.equal(conversionRequest.method, "POST");
       assert.equal(conversionRequest.path, "/api/procurement/awards/1/purchase-orders");
       assert.equal(conversionRequest.body.remark, remark);
       assert.deepEqual(conversionRequest.body.expected_award_line_ids, ["1", "2", "3", "4"]);
+      assert.equal(conversionRequest.body.expected_decision_digest, history.decision_digest.value);
+      assert.equal(conversionRequest.body.expected_mapping_qualification_digest, submittedQualificationDigests[requestIndex]);
       for (const forbidden of ["supplier_id", "currency_code", "unit_price", "price", "material_id", "quantity", "warehouse_id", "tax_rate", "external_reference"]) {
         assert.equal(Object.hasOwn(conversionRequest.body, forbidden), false, `browser request ${requestIndex + 1} must not submit ${forbidden}`);
       }
@@ -2609,7 +2742,7 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
     )).rows[0].count), 0);
     await context.close();
     context = undefined;
-    console.info("AWARD_PO_CONFIRMATION_FIX32_BROWSER_OK preview_get=7 delayed_preview_cancel_post=0 late_preview_resurrection=0 cancel_close_esc_backdrop_post=0 failed_final_post=1 failed_retry=0 successful_final_post=1 po=1 po_line=4 plan=4 queue=4 downstream=0 desktop=1 mobile=1 session=0");
+    console.info("AWARD_PO_CONFIRMATION_FIX32_BROWSER_OK preview_get=7 mapping_qualified=4 mapping_digest_stable=1 delayed_preview_cancel_post=0 late_preview_resurrection=0 cancel_close_esc_backdrop_post=0 failed_final_post=1 failed_retry=0 successful_final_post=1 po=1 po_line=4 plan=4 queue=4 downstream=0 desktop=1 mobile=1 session=0");
   } finally {
     releaseDelayedPreview();
     releaseFailedConversionPost();

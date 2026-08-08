@@ -1,5 +1,6 @@
 import { ProcurementError } from "../procurement-selfhost/errors.ts";
 import type { RfqDetailDto } from "../procurement-sourcing-selfhost/types.ts";
+import type { AwardMappingQualification } from "./award-mapping-qualification.ts";
 
 const stableId = (value: unknown, field: string) => {
   const result = String(value ?? "");
@@ -40,7 +41,7 @@ const decimalScaled = (value: unknown, field: string) => {
 const decimal = (value: bigint) => `${value / 1_000_000n}.${String(value % 1_000_000n).padStart(6, "0")}`;
 const stableSort = (left: string, right: string) => BigInt(left) < BigInt(right) ? -1 : BigInt(left) > BigInt(right) ? 1 : 0;
 
-export function buildAwardConversionPreview(detail: RfqDetailDto, requestedAwardId: number) {
+export function buildAwardConversionPreview(detail: RfqDetailDto, requestedAwardId: number, mappingQualification: AwardMappingQualification) {
   const history = detail.award_history;
   if (!history || stableId(history.identity.award_id, "Award ID") !== String(requestedAwardId)) {
     throw new ProcurementError("SOURCING_AWARD_NOT_FOUND", "采购定标不存在或不属于当前询价", 404);
@@ -68,6 +69,28 @@ export function buildAwardConversionPreview(detail: RfqDetailDto, requestedAward
   if (!lines.length || lines.length !== history.summary.award_line_count || new Set(lines.map((line) => line.award_line_id)).size !== lines.length
     || new Set(lines.map((line) => line.rfq_line_id)).size !== lines.length) {
     throw new ProcurementError("AWARD_CONVERSION_PREVIEW_INCONSISTENT", "Award Line不完整或重复，已停止转换", 409);
+  }
+  if (mappingQualification.contract_version !== "AWARD_PO_MAPPING_QUALIFICATION_V1"
+    || typeof mappingQualification.observed_at !== "string" || !mappingQualification.observed_at
+    || mappingQualification.data_timezone !== "Asia/Shanghai"
+    || !/^[0-9a-f]{64}$/.test(mappingQualification.qualification_digest)
+    || !Number.isSafeInteger(mappingQualification.line_count)
+    || !Number.isSafeInteger(mappingQualification.qualified_line_count)
+    || mappingQualification.line_count !== lines.length
+    || mappingQualification.lines.length !== lines.length
+    || mappingQualification.qualified_line_count !== mappingQualification.lines.filter((line) => line.qualified).length
+    || mappingQualification.all_qualified !== (mappingQualification.qualified_line_count === mappingQualification.line_count)) {
+    throw new ProcurementError("AWARD_MAPPING_QUALIFICATION_INCONSISTENT", "Award转PO Supplier Mapping资格摘要不完整或自相矛盾，已停止转换", 409);
+  }
+  const qualificationByAwardLine = new Map(mappingQualification.lines.map((line) => [line.award_line_id, line]));
+  if (qualificationByAwardLine.size !== lines.length || lines.some((line) => {
+    const qualification = qualificationByAwardLine.get(line.award_line_id);
+    return !qualification || qualification.candidate_id !== line.comparison_candidate_id
+      || qualification.quote_line_id !== line.quote_line_id
+      || qualification.supplier_id !== line.supplier_id
+      || qualification.material_id !== line.material_id;
+  })) {
+    throw new ProcurementError("AWARD_MAPPING_LINEAGE_INCONSISTENT", "Award Line、Candidate、Quote Line与Supplier Mapping资格谱系不一致，已停止转换", 409);
   }
 
   const quoteById = new Map(detail.quotes.map((quote) => [String(quote.quote_id), quote]));
@@ -130,8 +153,10 @@ export function buildAwardConversionPreview(detail: RfqDetailDto, requestedAward
     throw new ProcurementError("AWARD_CONVERSION_PREVIEW_INCONSISTENT", "Award成功Event不完整，已停止转换", 409);
   }
 
+  const poConvertibleNow = mappingQualification.all_qualified && currentPoCount === 0
+    && currentPoLineCount === 0 && currentDeliveryPlanCount === 0;
   return {
-    contract_version: "AWARD_PO_CONFIRMATION_V1" as const,
+    contract_version: "AWARD_PO_CONFIRMATION_V2" as const,
     award: {
       award_id: awardId,
       version: awardVersion,
@@ -171,6 +196,7 @@ export function buildAwardConversionPreview(detail: RfqDetailDto, requestedAward
       decision_digest_rule: history.decision_digest.canonical_rule,
     },
     lines,
+    mapping_qualification: mappingQualification,
     current_counts: {
       purchase_orders: currentPoCount,
       purchase_order_lines: currentPoLineCount,
@@ -207,11 +233,12 @@ export function buildAwardConversionPreview(detail: RfqDetailDto, requestedAward
       expected_comparison_output_digest: comparisonOutputDigest,
       expected_award_digest: awardDigest,
       expected_decision_digest: decisionDigest,
+      expected_mapping_qualification_digest: mappingQualification.qualification_digest,
       expected_po_count: currentPoCount,
       expected_delivery_plan_count: currentDeliveryPlanCount,
       expected_award_line_ids: lines.map((line) => line.award_line_id),
     },
-    po_convertible_now: true,
+    po_convertible_now: poConvertibleNow,
   };
 }
 

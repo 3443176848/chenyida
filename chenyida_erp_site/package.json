@@ -178,7 +178,7 @@
     "uat:rfq-award-history-fix31": "node --experimental-strip-types scripts/selfhost-rfq-award-history-fix31-uat-readonly-browser.mjs",
     "uat:award-to-po-confirmation": "node --experimental-strip-types scripts/selfhost-award-to-po-confirmation-uat-readonly-browser.mjs",
     "typecheck:procurement-fulfillment": "tsc -p tsconfig.phase4-task05.json --pretty false",
-    "test:procurement-fulfillment:unit": "node --experimental-strip-types --test tests/selfhost-procurement-fulfillment-unit.test.mjs",
+    "test:procurement-fulfillment:unit": "node --experimental-strip-types --test tests/selfhost-award-mapping-qualification-unit.test.mjs tests/selfhost-procurement-fulfillment-unit.test.mjs",
     "test:procurement-fulfillment:ui": "node --experimental-strip-types --test tests/selfhost-procurement-fulfillment-ui-contract.test.mjs",
     "test:procurement-fulfillment:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-procurement-fulfillment-postgres.test.mjs",
     "test:procurement-fulfillment:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-procurement-fulfillment-migration-upgrade.test.mjs",

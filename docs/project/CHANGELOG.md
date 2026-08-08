@@ -2,6 +2,17 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-08
+
+### SELFHOST-UAT-FIX-33 - `fix: unify Award to PO mapping qualification` / `ops: deploy Award to PO mapping validation fix`
+
+- 分支/根因：采用分支A。四条固定Supplier A Mapping及RFQ Binding权威有效；GET预览此前只返回Award历史粗布尔值，POST却忽略固定Binding重新按Supplier/Material/Unit查询，并额外要求`material.base_unit_id=unit.id`。主UAT四条legacy Material为`base_unit_id=NULL/base_uom=PCS`，按D-091可唯一解析PCS，因此旧POST把四条合法事实全部过滤为0并返回泛化422。
+- Mapping/谱系：Award Line1—4固定到Candidate`2/4/6/8`、Quote Line1—4、Binding1—4及Mapping fact1—4/v1/row CAS3；UUID分别为`224d1965…07ff8`、`43ca04d8…18030`、`aa16f7e7…f257e`、`9659ad2d…c63f`。关联不使用名称、supplier part、价格、数组位置或Event join。
+- 统一合同：新增`AWARD_PO_MAPPING_QUALIFICATION_V1`服务端loader和逐行DTO，GET与POST共用transaction as-of、`[from,to)`、稳定字符串ID、Unit/正数等值换算、状态、固定version/CAS/digest及两类冲突规则。确认窗口升级V2并在桌面/390×844展示四行完整凭证；`po_convertible_now`只在全行qualified和PO/Line/Plan全0时为true。
+- 事务/并发：最终POST锁定Award/Line、Candidate、Quote/Line、Binding、Mapping、Supplier、Material和Unit，锁后重算相同摘要；PO Line只保存固定Mapping fact。资格读与Mapping写统一part→material advisory顺序并锁后重读版本，状态/有效期/version/CAS/digest真实漂移失败关闭，无关Mapping变化不阻断；业务/Event/Audit/幂等继续原子提交。
+- 测试/隔离：无数据库组合93/93、资格/履约/Mapping Unit22/22、Fulfillment PG5/5、Supplier Mapping PG10/10、0038/0039`5/5+6/6`、Sourcing PG9/9、Binding PG18/18、upgrade3/3、npm3/3、Python三项、三个typecheck、production build、lint0 error/11既有warning、1,277文件credentials、diff及Chromium1/1通过。成功为PO/Line/Plan/queue`1/4/4/4`，全部失败路径业务计数0。
+- 预部署：候选Web`sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`、88,636,706 bytes，受限临时容器health通过。保持alpha.40/0039且没有0040；正式备份、第二库恢复、Web-only部署和purchase-only取消UAT待独立ops阶段完成。主UAT尚未登录或业务POST，失败请求与四条Mapping保持。
+
 ## 2026-08-07
 
 ### SELFHOST-UAT-FIX-32 - `fix: add Award to PO conversion confirmation` / `ops: deploy Award to PO confirmation fix`
