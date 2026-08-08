@@ -4,6 +4,16 @@
 
 ## 2026-08-08
 
+### SELFHOST-UAT-AUDIT-34 - `docs: audit existing UAT PO provenance`
+
+- 范围/分支：仅对Award ID1、`PO-00000001`及直接谱系执行`REPEATABLE READ READ ONLY`取证；未运行Migration、重做转换、补写Event/Audit或创建任何下游。采用分支B：`UNAUTHORIZED UAT PO WRITE CONFIRMED — DATA PRESERVED`。
+- 来源：唯一SUCCESS request为`773c23b6-0923-4ab5-a451-bb80aa4bdf9d`，actor`uat_20260729_purchase`，时间2026-08-08 14:11:45.086372；Audit1491、Idempotency201、PO CREATED Event及对象计数一致。历史422 request`f30a7801…`仍为failed且业务记录0。
+- 授权判断：成功请求在purchase LOGIN/LOGOUT时间窗内，但数据库没有task/runner/browser/session绑定；FIX33明确主UAT business POST0并要求新授权，仓库内无后续转换任务、授权记录或提交。因此不能证明授权来源，也不能凭关系化事实证明或排除隔离runner误连；不推断凭据泄露或自然人身份。
+- 完整性：PO/Line/Delivery Plan/queue精确`1/4/4/4`，Award Line1—4→Candidate`2/4/6/8`→Quote Line1—4→Binding/Mapping fact1—4→Material533—536逐条闭合，各10 PCS×12.00=120.00 CNY、计划日2026-10-20；重复、第五行、Supplier B行、孤儿和错配均0。实际备注使用半角逗号，不等于要求的全角原文，未改写。
+- 上下游：Award1/v1/AWARDED和RFQ1/CLOSED/v7保持，转换不改上游CAS；目标Receipt、Warehouse Receipt、Ledger/Lot、IQC、AP、Payment、Work Order及生产记录全0，禁止继续履约。
+- 只读UAT/保护：桌面1440×900与390×844及detail/queue GET通过，页面缺少独立详情/Audit组件已如实记录；`business_post=0`、Session0。目标指纹前后均`12d2c02031f34a5212bec80f5f9a5edcc8b1983fe24b96570f87fb17e2f5af18`。
+- 测试/资源/Git：项目`.venv`串行通过Python self-test、smoke和临时SQLite `go_live_check --no-backup`；首次系统Python smoke缺依赖而在导入阶段停止，切回既有项目环境后通过，未连接主UAT。起点至最终available约2.1→1.9GiB、Swap235→237MiB、根盘18GiB，内核OOM0、四服务restart0/OOM false；任务临时资源清零、未prune、受保护卷未改。仅更新五个审计文档并形成一个聚焦提交，不push/PR/改写历史。
+
 ### SELFHOST-UAT-FIX-33 - `fix: unify Award to PO mapping qualification` / `ops: deploy Award to PO mapping validation fix`
 
 - 分支/根因：采用分支A。四条固定Supplier A Mapping及RFQ Binding权威有效；GET预览此前只返回Award历史粗布尔值，POST却忽略固定Binding重新按Supplier/Material/Unit查询，并额外要求`material.base_unit_id=unit.id`。主UAT四条legacy Material为`base_unit_id=NULL/base_uom=PCS`，按D-091可唯一解析PCS，因此旧POST把四条合法事实全部过滤为0并返回泛化422。

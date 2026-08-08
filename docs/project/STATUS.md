@@ -2,6 +2,26 @@
 
 最后更新时间：2026-08-08（Asia/Shanghai）
 
+## SELFHOST-UAT-AUDIT-34 Existing UAT PO Provenance and Integrity Audit
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | UNAUTHORIZED UAT PO WRITE CONFIRMED — DATA PRESERVED | 采用分支B；结构和关系化来源完整，但不能证明成功写入属于仓库内获授权任务。数据原样保留，不追认、不修复、不继续下游 |
+| 起点门禁 | PASS | 唯一worktree、clean`main@9a8a3bd8a84bacb2836ac116d3b8a80783e96fe6`、Parent`1f205af0bf81379345a09353d9d32ab5c7545971`、behind0/ahead171；alpha.40、Migration0001—0039、Web`83c1bff3…`，无并发Award/PO/履约流 |
+| 成功创建 | EXACTLY ONCE / SOURCE IDENTIFIED | PO ID1/`PO-00000001`/v1/OPEN；request`773c23b6-0923-4ab5-a451-bb80aa4bdf9d`，actor`uat_20260729_purchase`，2026-08-08 14:11:45.086372；Audit1491 SUCCESS、Idempotency201、PO CREATED Event1一致 |
+| 授权来源 | NOT PROVABLE | 成功请求位于purchase LOGIN/LOGOUT时间窗，但关系化记录不保存task/runner/browser/session绑定；FIX33在约43分44秒前仍明确business POST0、正式转换须新授权，仓库内没有后续转换任务、授权记录或提交。不能证明也不能排除浏览器/隔离runner误连，不推断凭据泄露或自然人身份 |
+| 历史失败 | ZERO BUSINESS RECORDS | request`f30a7801-1cd0-4849-95a8-9c61d5c52e67`，Audit1482 failed/`AWARD_SUPPLIER_MAPPING_NOT_UNIQUE`；FIX33报告HTTP422，PO/Link/Plan/Event/Idempotency均0 |
+| PO/Line | EXACT 1/4 | Supplier1/SUP-000001；CNY、40 PCS、已收0、480.00；四行Material533—536各10 PCS×12.00=120.00，Award Line1—4、Candidate2/4/6/8、Quote Line1—4、Binding/Mapping fact1—4闭合，Supplier B0、重复0、第五行0 |
+| 备注偏差 | SEMANTIC UAT / NOT EXACT TEXT | 实际`纯虚拟UAT采购订单,仅用于黑盒验收,不对应真实采购。`使用两个半角逗号，不等于要求的全角原文；本审计不改写 |
+| Plan/queue | EXACT 4/4 | Plan ID1—4各唯一绑定PO Line/Award Line/Material，10 PCS、2026-10-20、PENDING/v1及CREATED Event；queue ID1—4均OPEN_PENDING/v1。独立Plan Line表不存在，重复/孤儿/错PO/错Material/多重queue均0 |
+| Award/RFQ | UNCHANGED / CLOSED | Award1/v1/AWARDED、Line4、digest和内容保持，`po_convertible_now=false`、待转Award0；RFQ1/CLOSED/v7，其v6→v7由先前Award Audit1469证明，本次转换不改CAS。Quote/Comparison/Binding/Mapping计数与状态保持 |
+| 下游 | EXACT ZERO | 目标Receipt、Warehouse Receipt、Ledger、Lot、IQC、AP、Payment、Work Order、Production Report/Completion及关联计数全0；45个带request_id的`production_%`表按成功request扫描亦全0 |
+| 指纹/浏览器 | UNCHANGED / READ ONLY | 目标谱系SHA-256前后均`12d2c02031f34a5212bec80f5f9a5edcc8b1983fe24b96570f87fb17e2f5af18`。桌面1440×900、390×844及只读detail/queue GET通过；页面无独立详情/Audit组件并如实记录；`business_post=0`、最终Session0 |
+| Schema/运行面 | UNCHANGED | alpha.40、0039及Web镜像保持；未Migration、build、deploy、重启或读取日志正文；所有业务查询使用`REPEATABLE READ READ ONLY`事务 |
+| 测试 | PASS / ISOLATED | 项目`.venv`串行通过Python self-test、smoke和临时SQLite `go_live_check --no-backup`；首次系统Python smoke因缺`openpyxl`在导入阶段停止，切回既有项目环境后通过。未安装依赖、未连接主UAT |
+| 资源/清理 | PASS | 起点/浏览器后/文档测试后available约2.1/1.8/1.9GiB，Swap235/237/237MiB，根盘18GiB，最终Load`0.07/0.12/0.09`；内核OOM0、四服务restart0/OOM false。任务容器/临时目录/库/网络/持久文件清零，未prune，受保护卷未改 |
+| Git/放行 | ONE DOCS COMMIT / RECEIPT BLOCKED | 仅报告及MASTER/TASKS/STATUS/CHANGELOG，提交消息`docs: audit existing UAT PO provenance`；不push/PR/改历史。项目负责人书面决定前不得开始仓库收货/IQC或其他下游 |
+
 ## SELFHOST-UAT-FIX-33 Award to PO Supplier Mapping Validation Diagnosis and Fix
 
 | 验证项 | 结果 | 说明 |
