@@ -39,7 +39,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | --- | --- |
 | 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.40`；PostgreSQL 为 39/head `0039_rfq_traceability.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-33`功能提交`1f205af0bf81379345a09353d9d32ab5c7545971`：固定RFQ Binding→Mapping fact逐行资格、GET/POST共享loader/DTO、事务锁后漂移重验和四行响应式凭证；版本保持alpha.40，Migration保持0039 |
+| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-36`功能阶段已新增通用PO受限历史DTO、purchase数据域403、完整PO/Line/Plan/queue谱系、凭证最小投影、下游零计数和响应式只读详情；独立功能提交消息为`feat: add restricted PO history traceability`，实际SHA以Git log为准。版本保持alpha.40，Migration保持0039 |
 | 当前根仓库运维基线 | `SELFHOST-UAT-FIX-33`已把精确功能提交Web-only部署到18888非生产UAT；其后`SELFHOST-UAT-AUDIT-34`只读确认现有PO来源并封锁下游。`SELFHOST-UAT-DECISION-35`只以D-105及项目文档记录受控保留、前向授权和“不追溯性授权”，没有登录UAT、连接PostgreSQL、调用业务API、重新部署、Migration或业务写 |
 | Git 同步与工作区 | DECISION35从唯一worktree、clean`main@e67c9209bc24314000f70760b7b79282c4a9b469`、Parent`9a8a3bd8a84bacb2836ac116d3b8a80783e96fe6`、behind0/ahead172起步；只形成一个聚焦文档提交`docs: retain unauthorized UAT purchase order under control`，提交后ahead173，实际SHA以Git log为准。未push/PR/amend/rebase/reset/stash/restore，密码、Token、Cookie、Session正文、连接信息和备份正文未进入Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
@@ -48,14 +48,16 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0039`，39/head`0039_rfq_traceability.sql`，SHA-256`3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；没有0040。主`RFQ-00000001`为CLOSED v7，Award为1/v1/AWARDED且Line4；现有`PO-00000001`为1/v1/OPEN，PO Line/Delivery Plan/queue为`4/4/4`，目标Receipt/IQC/库存/财务/生产下游全0。四条获选Candidate仍为`2/4/6/8`，Binding/Mapping保持 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。Supplier Mapping资格修复Web为alpha.40`sha256:83c1bff341294d1bee2db8fd2ee963204012cfac63f1289ba7d3755ca2920664`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`2396c8bc…`有FIX33精确回退tag，四个受保护Volume未更换 |
-| 当前开发环境 | FIX33源码以`AWARD_PO_MAPPING_QUALIFICATION_V1`统一GET预览与POST事务资格：只沿Award Line→Candidate→Quote Line→RFQ Binding→固定Mapping fact，返回UUID/fact/version/row CAS/digest、Unit、有效期、两类冲突及逐行原因；legacy `base_uom`按D-091唯一解析。确认窗口升级V2并显示桌面/390×844四行凭证；最终POST锁后重算且PO Line固定引用Mapping fact。alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `CONTROLLED UAT PO RETENTION DECISION RECORDED`。D-105将现有PO分类为数据结构完整但来源授权不可证明的UAT写入，受控保留全部对象和证据；本控制事件只提供前向授权并明确“不追溯性授权”，不改变原始写入的授权判断 |
-| 当前任务 | 当前无`DOING`；`SELFHOST-UAT-DECISION-35`已完成。Award→PO转换不再重试，`PO-00000001`作为固定UAT起点；本任务只改项目文档并运行非数据库验证，未登录UAT或修改任何业务事实 |
-| 下一任务 | 只能立项PO历史追溯页面修复/验收，并先补齐完整谱系和凭证；其UAT阶段只允许只读PO追溯验收。warehouse、quality及finance试用仍未授权，Receipt/IQC/Ledger/AP/生产记录必须保持0；不得从本决定开始收货、IQC、入库、AP、付款或生产 |
+| 当前开发环境 | FIX36源码新增`PO_HISTORY_TRACEABILITY_V1`：先以RFQ/PRQ权威规则执行purchase数据域校验，再用单一repeatable-read/read-only事务投影PO聚合、Project→MRP→PRQ→RFQ→Comparison→Quote→Award→PO、四Line、四Plan/queue、精确成功凭证、独立未绑定失败Audit和下游计数。页面不硬编码目标PO或D-105、不声称授权已验证，也没有下游写控件；alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
+| 当前阶段 | `PO HISTORY TRACEABILITY FUNCTION VERIFIED — DEPLOY PENDING`。功能、隔离PostgreSQL/Chromium、0039与安全回归已通过；D-105仍只提供前向只读授权且不追溯原始写入。正式备份恢复、Web-only部署和purchase-only主UAT尚未执行 |
+| 当前任务 | `SELFHOST-UAT-FIX-36`为唯一`DOING`；候选Web`sha256:664e0ac6bd289251f289a8785ac05d955470064a3f921c3ae834f79665a4ec89`待部署。主库只读保护business POST0、PO/Line/Plan/queue `1/4/4/4`、下游全0、状态指纹`721f25f8…05194`不变 |
+| 下一任务 | 先完成FIX36正式备份、第二新库恢复、仅替换Web和purchase-only只读UAT；验收必须business POST0、Session失效和下游全0。到货/仓库收货试用即使技术条件具备也必须另获独立授权；warehouse、quality、finance及Receipt/IQC/Ledger/AP/生产写当前仍禁止 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-UAT-FIX-36功能阶段已验证、部署阶段仍DOING：`PO_HISTORY_TRACEABILITY_V1`在purchase数据域内只读投影PO、完整上游谱系、四条Line、四条Plan/queue、成功Event/Audit/Idempotency摘要、独立未绑定失败请求与下游零计数；桌面/390×844、刷新、重开和服务重启隔离Chromium通过。主库保护business POST0、状态指纹不变；产品不引用D-105或声称授权已验证。候选Web`664e0ac6…`尚未部署
 
 - SELFHOST-UAT-DECISION-35完成：D-105 `Controlled retention of unauthorized UAT PO-00000001`正式记录受控保留。现有`PO-00000001`及Line/Plan/queue `1/4/4/4`、Event/Audit/Idempotency证据原样保留；Award→PO不再重试。本控制事件是前向授权并执行“不追溯性授权”，只允许以后把该PO作为固定起点进行只读追溯验收，不授权warehouse/quality/finance或任何Receipt/IQC/Ledger/AP/生产写入
 

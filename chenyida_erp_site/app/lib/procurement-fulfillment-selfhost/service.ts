@@ -10,6 +10,7 @@ import { ProcurementSourcingRepository } from "../procurement-sourcing-selfhost/
 import { ProcurementSourcingService } from "../procurement-sourcing-selfhost/service.ts";
 import { buildAwardConversionPreview, type AwardConversionPreview } from "./award-conversion-preview.ts";
 import { firstAwardMappingQualificationFailure, loadAwardMappingQualification } from "./award-mapping-qualification.ts";
+import { loadPurchaseOrderHistory, type PurchaseOrderHistoryReadModel } from "./purchase-order-history.ts";
 
 type AwardLine = {
   award_line_id: string; award_id: string; rfq_line_id: string; selected_quote_line_id: string; comparison_id: string;
@@ -66,6 +67,51 @@ export class ProcurementFulfillmentService {
     } finally { if (ownsTransaction) client.release(); }
   }
 
+  async purchaseOrderHistory(
+    purchaseOrderId: number,
+    actor: Pick<IdentityActor, "username" | "role" | "permissions">,
+  ): Promise<PurchaseOrderHistoryReadModel> {
+    const client = await this.repository.pool.connect();
+    try {
+      await client.query("begin isolation level repeatable read read only");
+      await client.query("set local statement_timeout='5s'");
+      const source = await client.query<{ purchase_order_id: string; rfq_id: string | null }>(`select distinct
+          po.id::text purchase_order_id,award.rfq_id::text rfq_id
+        from purchase_orders po
+        left join procurement_award_po_line_links link on link.purchase_order_id=po.id
+        left join procurement_sourcing_awards award on award.id=link.award_id
+        where po.id=$1`, [purchaseOrderId]);
+      if (!source.rows.length) throw new ProcurementError("PURCHASE_ORDER_NOT_FOUND", "采购订单不存在", 404);
+      if (source.rows.length !== 1 || !source.rows[0].rfq_id) {
+        throw new ProcurementError(
+          "PURCHASE_ORDER_HISTORY_INCONSISTENT",
+          "采购订单历史来源不完整，已停止展示且未修改任何数据",
+          409,
+        );
+      }
+      const sourcing = new ProcurementSourcingService(new ProcurementSourcingRepository(this.repository.pool));
+      const detail = await sourcing.detail(numericId(source.rows[0].rfq_id, "rfqId"), actor, client);
+      const history = await loadPurchaseOrderHistory(client, purchaseOrderId, detail);
+      await client.query("commit");
+      return history;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      if (error instanceof ProcurementError) throw error;
+      const known = error as { code?: string; status?: number };
+      if (known.code === "RFQ_FORBIDDEN") {
+        throw new ProcurementError("PERMISSION_DENIED", "没有权限查看该采购订单及其项目数据域", 403);
+      }
+      if (known.status === 404) throw new ProcurementError("PURCHASE_ORDER_NOT_FOUND", "采购订单或其来源不存在", 404);
+      throw new ProcurementError(
+        "PURCHASE_ORDER_HISTORY_INCONSISTENT",
+        "采购订单历史引用、凭证或下游投影不完整，已停止展示且未修改任何数据",
+        409,
+      );
+    } finally {
+      client.release();
+    }
+  }
+
   private conversionAssertions(input: Record<string, unknown>, preview: AwardConversionPreview): ConversionAssertions {
     exactKeys(input, [
       "expected_award_version", "expected_rfq_id", "expected_rfq_version", "expected_comparison_version",
@@ -99,18 +145,21 @@ export class ProcurementFulfillmentService {
     return assertions;
   }
 
-  async pendingAwards(limit: number, offset: number) {
+  async pendingAwards(limit: number, offset: number, actor: Pick<IdentityActor, "username" | "role" | "permissions">) {
+    const unrestricted = actor.role !== "purchase" || actor.permissions.includes("*");
     return this.repository.pool.query(`select a.id award_id,a.version award_version,a.selected_at,a.reason_code,a.reason,r.id rfq_id,r.rfq_code,pr.request_code,
       count(al.id)::int line_count,coalesce(sum(al.selected_quantity),0)::text total_quantity,
       count(l.id)::int converted_line_count
       from procurement_sourcing_awards a join procurement_rfqs r on r.id=a.rfq_id join planning_purchase_requests pr on pr.id=r.purchase_request_id
       join procurement_sourcing_award_lines al on al.award_id=a.id left join procurement_award_po_line_links l on l.award_line_id=al.id
       where a.status='AWARDED' and pr.status='ACCEPTED'
+        and ($3::boolean or pr.accepted_by=$4 or pr.returned_by=$4)
       group by a.id,r.id,pr.id having count(l.id)<count(al.id)
-      order by a.selected_at,a.id limit $1 offset $2`, [limit, offset]);
+      order by a.selected_at,a.id limit $1 offset $2`, [limit, offset, unrestricted, actor.username]);
   }
 
-  async listOrdersAndPlans(limit: number, offset: number) {
+  async listOrdersAndPlans(limit: number, offset: number, actor: Pick<IdentityActor, "username" | "role" | "permissions">) {
+    const unrestricted = actor.role !== "purchase" || actor.permissions.includes("*");
     return this.repository.pool.query(`select po.id purchase_order_id,po.po_code,po.status po_status,po.currency_code,po.version po_version,s.supplier_code,s.supplier_name,
       count(pol.id)::int line_count,count(dp.id)::int plan_count,coalesce(sum(pol.order_qty),0)::text ordered_quantity,
       coalesce(sum(pol.received_qty),0)::text received_quantity,coalesce(receipt.receipt_count,0)::int receipt_count,
@@ -123,10 +172,18 @@ export class ProcurementFulfillmentService {
         string_agg(distinct qi.lifecycle_status||'/'||qi.decision_status||' released '||qi.released_qty::text,', ' order by qi.lifecycle_status||'/'||qi.decision_status||' released '||qi.released_qty::text) iqc_status
         from purchase_receipts pr join purchase_receipt_lines prl on prl.purchase_receipt_id=pr.id left join inventory_lots il on il.source_purchase_receipt_line_id=prl.id left join quality_inspections qi on qi.inventory_lot_id=il.id
         where pr.purchase_order_id=po.id and pr.receipt_type='RECEIPT') receipt on true
-      group by po.id,s.id,receipt.receipt_count,receipt.receipt_codes,receipt.internal_lots,receipt.supplier_lots,receipt.iqc_status order by po.created_at desc,po.id desc limit $1 offset $2`, [limit, offset]);
+      where ($3::boolean or exists(select 1 from purchase_order_lines scope_line
+        join procurement_award_po_line_links scope_link on scope_link.purchase_order_line_id=scope_line.id
+        join procurement_sourcing_awards scope_award on scope_award.id=scope_link.award_id
+        join procurement_rfqs scope_rfq on scope_rfq.id=scope_award.rfq_id
+        join planning_purchase_requests scope_prq on scope_prq.id=scope_rfq.purchase_request_id
+        where scope_line.purchase_order_id=po.id
+          and (scope_prq.status='SUBMITTED' or scope_prq.accepted_by=$4 or scope_prq.returned_by=$4)))
+      group by po.id,s.id,receipt.receipt_count,receipt.receipt_codes,receipt.internal_lots,receipt.supplier_lots,receipt.iqc_status order by po.created_at desc,po.id desc limit $1 offset $2`, [limit, offset, unrestricted, actor.username]);
   }
 
-  async receivingQueue(limit: number, offset: number) {
+  async receivingQueue(limit: number, offset: number, actor: Pick<IdentityActor, "username" | "role" | "permissions">) {
+    const unrestricted = actor.role !== "purchase" || actor.permissions.includes("*");
     return this.repository.pool.query(`select q.id queue_id,q.version queue_version,p.*,po.po_code,po.status po_status,pol.line_no,pol.version purchase_order_line_version,
       (p.planned_quantity-p.received_quantity)::text remaining_quantity,s.supplier_code,s.supplier_name,m.internal_material_code,m.standard_name,u.code unit_code,
       m.inventory_type,m.inspection_type,case when m.inventory_type='STOCKED' and m.inspection_type='IQC' then 0 else coalesce(b.version,0) end balance_version,coalesce(b.on_hand_qty,0)::text on_hand_quantity,
@@ -135,17 +192,33 @@ export class ProcurementFulfillmentService {
       join purchase_orders po on po.id=p.purchase_order_id join purchase_order_lines pol on pol.id=p.purchase_order_line_id
       join suppliers s on s.id=p.supplier_id join material_master m on m.id=p.material_id join units u on u.id=p.unit_id
       left join inventory_stock_balances b on b.material_id=p.material_id and b.location_code='MAIN' and b.lot_code=''
-      where q.closed_at is null and p.status in ('PENDING','PARTIAL') order by p.promised_delivery_date,p.id limit $1 offset $2`, [limit, offset]);
+      where q.closed_at is null and p.status in ('PENDING','PARTIAL')
+        and ($3::boolean or exists(select 1 from procurement_award_po_line_links scope_link
+          join procurement_sourcing_awards scope_award on scope_award.id=scope_link.award_id
+          join procurement_rfqs scope_rfq on scope_rfq.id=scope_award.rfq_id
+          join planning_purchase_requests scope_prq on scope_prq.id=scope_rfq.purchase_request_id
+          where scope_link.purchase_order_line_id=pol.id
+            and (scope_prq.status='SUBMITTED' or scope_prq.accepted_by=$4 or scope_prq.returned_by=$4)))
+      order by p.promised_delivery_date,p.id limit $1 offset $2`, [limit, offset, unrestricted, actor.username]);
   }
 
-  async payableHandoff(limit: number, offset: number) {
+  async payableHandoff(limit: number, offset: number, actor: Pick<IdentityActor, "username" | "role" | "permissions">) {
+    const unrestricted = actor.role !== "purchase" || actor.permissions.includes("*");
     return this.repository.pool.query(`select pf.id source_entry_id,pf.source_id,pf.amount::text,pf.currency_code,pf.created_at,pr.id receipt_id,pr.receipt_code,
       po.id purchase_order_id,po.po_code,s.supplier_code,s.supplier_name,fd.id ap_id,fd.doc_code ap_code,fd.status ap_status,
       case when fd.id is null then 'PENDING_AP' else 'AP_CREATED' end handoff_status
       from purchase_financial_source_entries pf join purchase_receipts pr on pr.id=pf.purchase_receipt_id
       join purchase_orders po on po.id=pr.purchase_order_id join suppliers s on s.id=pf.supplier_id
       left join finance_documents fd on fd.purchase_source_entry_id=pf.id and fd.doc_type='AP'
-      where pf.entry_type='RECEIPT' order by pf.created_at desc,pf.id desc limit $1 offset $2`, [limit, offset]);
+      where pf.entry_type='RECEIPT'
+        and ($3::boolean or exists(select 1 from purchase_order_lines scope_line
+          join procurement_award_po_line_links scope_link on scope_link.purchase_order_line_id=scope_line.id
+          join procurement_sourcing_awards scope_award on scope_award.id=scope_link.award_id
+          join procurement_rfqs scope_rfq on scope_rfq.id=scope_award.rfq_id
+          join planning_purchase_requests scope_prq on scope_prq.id=scope_rfq.purchase_request_id
+          where scope_line.purchase_order_id=po.id
+            and (scope_prq.status='SUBMITTED' or scope_prq.accepted_by=$4 or scope_prq.returned_by=$4)))
+      order by pf.created_at desc,pf.id desc limit $1 offset $2`, [limit, offset, unrestricted, actor.username]);
   }
 
   private async awardLines(client: PoolClient, awardId: number, expected: ConversionAssertions): Promise<AwardLine[]> {

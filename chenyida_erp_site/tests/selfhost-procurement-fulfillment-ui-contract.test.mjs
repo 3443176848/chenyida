@@ -18,3 +18,18 @@ test("Award conversion V2 shares Mapping qualification with preview and guards t
   assert.doesNotMatch(dialog,/slice\(0,\s*2\)/);assert.match(dialog,/BigInt/);assert.match(dialog,/micros \+ 5_000n/);
 });
 test("native pages exist and the dashboard links distinguish pending and generated AP",async()=>{for(const path of ["../app/procurement/fulfillment/page.tsx","../app/warehouse/receiving/page.tsx","../app/finance/payables/page.tsx"])assert.match(await read(path),/Workspace/);const dashboard=await read("../app/lib/dashboard-selfhost/service.ts");assert.match(dashboard,/已收货待生成应付/);assert.match(dashboard,/已生成采购应付/);assert.match(dashboard,/\/finance\/payables/)});
+
+test("PO history is a generic read-only responsive component with no downstream controls",async()=>{
+  const workspace=await read("../app/procurement/fulfillment/purchase-order-history-workspace.tsx");
+  const css=await read("../app/procurement/fulfillment/purchase-order-history.css");
+  const model=await read("../app/lib/procurement-fulfillment-selfhost/purchase-order-history.ts");
+  const page=await read("../app/procurement/fulfillment/purchase-orders/[purchaseOrderId]/page.tsx");
+  const list=await read("../app/procurement/fulfillment/procurement-fulfillment-workspace.tsx");
+  assert.match(page,/purchaseOrderId/);assert.match(list,/purchase-orders\/\$\{row\.purchase_order_id\}/);
+  assert.match(workspace,/PO_HISTORY_TRACEABILITY_V1/);assert.match(workspace,/cache: "no-store"/);
+  for(const text of ["PO聚合摘要","完整上游谱系","PO Line稳定谱系","Delivery Plan与queue","Event、Audit与幂等凭证","历史失败请求","下游零写入状态","PO OPEN不等于已到货","Delivery Plan PENDING不等于已收货","queue OPEN_PENDING","本页面不自动执行任何下游动作","模型没有独立Delivery Plan Line","无通用system.audit.read","实际存储备注"])assert.match(workspace+model,new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
+  for(const field of ["purchase_order_line_id","award_line_id","candidate_id","quote_line_id","binding_id","mapping_fact_id","mapping_uuid","mapping_version","mapping_row_cas","delivery_plan_id","plan_event_id","queue_id","queue_status","queue_version","comparison_output_digest","persisted_award_digest","derived_award_decision_digest","key_digest","request_digest"])assert.match(workspace,new RegExp(`\\b${field}\\b`),field);
+  assert.match(workspace,/po-history-mobile-card/);assert.match(css,/@media \(max-width: 600px\)/);assert.match(css,/\.po-history-desktop-table \{ display: none; \}/);assert.match(css,/overflow-x: hidden/);assert.match(css,/overflow-wrap: anywhere/);
+  assert.doesNotMatch(workspace,/method:\s*["']POST|protectedWrite|Idempotency-Key|<form|type=["']submit|到货按钮|收货按钮|IQC按钮|AP按钮/);
+  assert.doesNotMatch(workspace,/PO-00000001|D-105|已获事前授权|合规转换|补办授权|授权已验证/);
+});

@@ -2354,6 +2354,7 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
 
     const businessPosts = [];
     const previewGets = [];
+    const historyGets = [];
     const conversionPreviews = [];
     let latestConversionPreview;
     const expectedQualificationLineage = MATERIAL_IDS.map((materialId, index) => ({
@@ -2478,6 +2479,9 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
           markDelayedPreviewObserved();
           await delayedPreviewGate;
         }
+      }
+      if (method === "GET" && url.pathname === "/api/procurement/purchase-orders/1/history") {
+        historyGets.push({ method, path: url.pathname });
       }
       if (!["GET", "HEAD", "OPTIONS"].includes(method) && url.pathname !== "/api/logout") {
         let body = null;
@@ -2730,6 +2734,94 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
     assert.equal(await page.locator(".sourcing-panel").filter({ hasText: "采购订单与到货计划" }).locator("article.sourcing-card").count(), 1);
     assert.equal(previewGets.length, 7);
 
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.getByRole("link", { name: "查看只读历史详情", exact: true }).click();
+    await page.getByRole("heading", { name: "PO-00000001", exact: true }).waitFor();
+    const historyApi = await context.request.get(`${REQUIRED_ORIGIN}/api/procurement/purchase-orders/1/history`);
+    assert.equal(historyApi.status(), 200);
+    const historyPayload = await historyApi.json();
+    assert.equal(historyPayload.data.contract_version, "PO_HISTORY_TRACEABILITY_V1");
+    assert.equal(historyPayload.data.read_only, true);
+    assert.equal(historyPayload.data.purchase_order.purchase_order_id, "1");
+    assert.equal(historyPayload.data.purchase_order.po_convertible_now, false);
+    assert.equal(historyPayload.data.lines.length, 4);
+    assert.equal(historyPayload.data.delivery_plans.length, 4);
+    assert.equal(historyPayload.data.downstream.all_zero, true);
+    assert.equal(historyPayload.data.governance_boundary.authorization_verified, false);
+    assert.equal(Object.hasOwn(historyPayload.data.credentials.idempotency, "request"), false);
+    assert.equal(Object.hasOwn(historyPayload.data.credentials.idempotency, "response"), false);
+    assert.equal(historyPayload.data.credentials.historical_failed_attempt.available, false);
+    assert.deepEqual(historyPayload.data.lines.map((line) => [
+      line.purchase_order_line_id, line.award_line_id, line.candidate_id, line.quote_line_id,
+      line.binding_id, line.material_id, line.mapping_fact_id, line.mapping_uuid,
+    ]), [1, 2, 3, 4].map((lineId, index) => [
+      String(lineId), String(lineId), String(lineId * 2), String(lineId), String(lineId),
+      String(533 + index), String(lineId), MAPPING_UIDS[0][index],
+    ]));
+    assert.ok(historyPayload.data.delivery_plans.every((plan, index) => plan.delivery_plan_id === String(index + 1)
+      && plan.plan_event_id === String(index + 1) && plan.queue_id === String(index + 1)
+      && plan.status === "PENDING" && plan.queue_status === "OPEN_PENDING"));
+
+    const historyText = await page.locator("body").innerText();
+    for (const required of [
+      "只读历史视图", "PO聚合摘要", "OPEN / 处理中", "Supplier A", "Supplier B",
+      "PO行 4 · 480.00 CNY", "PO行 0 · 0.00 CNY", "完整上游谱系", "Project", "MRP", "PRQ",
+      "RFQ", "Comparison", "Quote", "Award", "PO", "PO Line稳定谱系", "无重复Material",
+      "Delivery Plan与queue", "模型没有独立Delivery Plan Line", "queue是待处理队列，不代表已收货或已入库",
+      "Event、Audit与幂等凭证", "历史失败请求 · 无可安全归属项", "下游零写入状态", "全部为0",
+      "Receipt", "Warehouse Receipt", "Inventory Ledger", "Lot", "IQC", "AP", "Payment", "Work Order",
+      "PO OPEN不等于已到货。", "Delivery Plan PENDING不等于已收货。",
+      "queue OPEN_PENDING是待处理队列，不等于库存增加。", "本页面不自动执行任何下游动作。",
+    ]) assert.ok(historyText.includes(required), `PO history desktop missing ${required}`);
+    for (const mappingUid of MAPPING_UIDS[0]) assert.ok(historyText.includes(mappingUid));
+    assert.equal(await page.locator('[data-testid^="po-line-row-"]').count(), 4);
+    assert.equal(await page.locator('[data-testid^="delivery-plan-row-"]').count(), 4);
+    assert.equal(await page.locator('[data-testid^="po-line-row-"]').first().isVisible(), true);
+    assert.equal(await page.locator('[data-testid^="po-line-card-"]').first().isVisible(), false);
+    assert.equal(await page.locator("form,input,select,textarea").count(), 0);
+    for (const forbidden of ["到货", "收货", "IQC", "入库", "生成AP", "编辑", "取消PO", "关闭PO"]) {
+      assert.equal(await page.getByRole("button", { name: forbidden, exact: true }).count(), 0, `forbidden history control ${forbidden}`);
+    }
+    await noOverflow(page, "PO history desktop");
+    const postsBeforeHistoryRefresh = businessPosts.length;
+    const stableLines = JSON.stringify(historyPayload.data.lines);
+    await page.getByRole("button", { name: "刷新只读快照", exact: true }).click();
+    await page.getByRole("button", { name: "刷新只读快照", exact: true }).waitFor();
+    assert.ok(historyGets.length >= 2, "initial history load and refresh must use GET");
+    assert.equal(businessPosts.length, postsBeforeHistoryRefresh);
+    const refreshedHistory = await (await context.request.get(`${REQUIRED_ORIGIN}/api/procurement/purchase-orders/1/history`)).json();
+    assert.equal(JSON.stringify(refreshedHistory.data.lines), stableLines);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "PO-00000001", exact: true }).waitFor();
+    assert.equal(await page.locator('[data-testid^="po-line-row-"]').count(), 4);
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await page.locator('[data-testid^="po-line-row-"]').first().isVisible(), false);
+    assert.equal(await page.locator('[data-testid^="po-line-card-"]').count(), 4);
+    assert.equal(await page.locator('[data-testid^="po-line-card-"]').first().isVisible(), true);
+    assert.equal(await page.locator('[data-testid^="delivery-plan-card-"]').count(), 4);
+    assert.equal(await page.locator('[data-testid^="delivery-plan-card-"]').first().isVisible(), true);
+    await noOverflow(page, "PO history 390x844");
+    await page.getByText(/Idempotency · HTTP 201/).click();
+    assert.ok((await page.locator("body").innerText()).includes(historyPayload.data.credentials.idempotency.request_digest));
+
+    await page.goBack({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "定标转单、到货计划与来料谱系", exact: true }).waitFor();
+    await page.goForward({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "PO-00000001", exact: true }).waitFor();
+    await stopServer();
+    await startServer();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "PO-00000001", exact: true }).waitFor();
+    assert.equal(await page.locator('[data-testid^="po-line-card-"]').count(), 4);
+    assert.equal(businessPosts.length, postsBeforeHistoryRefresh);
+    assert.deepEqual(await fix32ConversionState(), {
+      purchase_orders: 1, purchase_order_lines: 4, purchase_order_events: 1, award_links: 4,
+      delivery_plans: 4, receiving_queue_entries: 4, delivery_plan_events: 4, receipts: 0,
+      ledger_entries: 0, quality_inspections: 0, ap_documents: 0, payments: 0, work_orders: 0,
+      conversion_audits: 1,
+    });
+
     const logout = await context.request.post(`${REQUIRED_ORIGIN}/api/logout`, {
       headers: { Origin: REQUIRED_ORIGIN, "X-CSRF-Token": csrfToken },
     });
@@ -2742,7 +2834,7 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
     )).rows[0].count), 0);
     await context.close();
     context = undefined;
-    console.info("AWARD_PO_CONFIRMATION_FIX32_BROWSER_OK preview_get=7 mapping_qualified=4 mapping_digest_stable=1 delayed_preview_cancel_post=0 late_preview_resurrection=0 cancel_close_esc_backdrop_post=0 failed_final_post=1 failed_retry=0 successful_final_post=1 po=1 po_line=4 plan=4 queue=4 downstream=0 desktop=1 mobile=1 session=0");
+    console.info("AWARD_PO_CONFIRMATION_FIX32_BROWSER_OK preview_get=7 mapping_qualified=4 mapping_digest_stable=1 delayed_preview_cancel_post=0 late_preview_resurrection=0 cancel_close_esc_backdrop_post=0 failed_final_post=1 failed_retry=0 successful_final_post=1 po=1 po_line=4 plan=4 queue=4 downstream=0 po_history=1 history_get_only=1 history_refresh=1 history_reopen=1 history_restart=1 desktop=1 mobile=1 session=0");
   } finally {
     releaseDelayedPreview();
     releaseFailedConversionPost();

@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前无`DOING`。`SELFHOST-UAT-DECISION-35`已以D-105记录受控保留、前向授权和“不追溯性授权”：Award→PO转换不再重试，`PO-00000001`作为固定UAT起点。下一任务只能是PO历史追溯页面修复/验收；warehouse、quality及finance试用仍未授权，Receipt、IQC、Ledger、AP和生产记录必须保持0。
+`SELFHOST-UAT-FIX-36`为当前唯一`DOING`：受限历史DTO、响应式只读详情、跨数据域403、凭证最小投影、下游零投影及隔离桌面/390×844回归已通过，候选Web`664e0ac6…`待正式备份恢复、Web-only部署和purchase-only主UAT。D-105继续保持前向授权且不追溯授权原始写入；禁止重试Award→PO或执行任何到货、收货、IQC、Ledger、AP、付款和生产写入，主UAT必须business POST=0且下游保持0。见[任务文档](../tasks/SELFHOST-UAT-FIX-36.md)。
 
 ## 已完成任务
 

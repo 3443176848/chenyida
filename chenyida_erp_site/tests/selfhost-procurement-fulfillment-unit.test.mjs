@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
 import { buildAwardConversionPreview } from "../app/lib/procurement-fulfillment-selfhost/award-conversion-preview.ts";
+import { legacyConversionHttpStatus, projectedQueueStatus, supplierSequenceLabel } from "../app/lib/procurement-fulfillment-selfhost/purchase-order-history.ts";
 import { buildAwardHistoryReadModel } from "../app/lib/procurement-sourcing-selfhost/award-read-model.ts";
 
 const mappingUuids = [
@@ -70,6 +71,17 @@ test("purchase, warehouse and finance receive only their fulfillment handoff wri
   assert.ok(permissionsForRole("finance").includes("procurement.fulfillment.read"));assert.ok(permissionsForRole("finance").includes("finance.post"));
   assert.ok(!permissionsForRole("warehouse").includes("procurement.award.convert"));assert.ok(!permissionsForRole("purchase").includes("finance.post"));assert.ok(!permissionsForRole("finance").includes("procurement.receiving.receive"));
   for(const role of ["admin","manager"])for(const permission of ["procurement.award.convert","procurement.delivery_plan.manage","procurement.receiving.receive","procurement.receiving.reverse"])assert.ok(permissionsForRole(role).includes(permission),`${role}:${permission}`);
+  assert.ok(!permissionsForRole("purchase").includes("system.audit.read"));
+});
+
+test("PO history labels queue and legacy failure evidence without inventing stored authorization",()=>{
+  assert.equal(supplierSequenceLabel(0),"Supplier A");assert.equal(supplierSequenceLabel(1),"Supplier B");
+  assert.equal(projectedQueueStatus("PENDING",null),"OPEN_PENDING");
+  assert.equal(projectedQueueStatus("PARTIAL",null),"OPEN_PENDING");
+  assert.equal(projectedQueueStatus("COMPLETED",null),"OPEN");
+  assert.equal(projectedQueueStatus("PENDING","2026-08-08T00:00:00Z"),"CLOSED");
+  assert.deepEqual(legacyConversionHttpStatus("AWARD_SUPPLIER_MAPPING_NOT_UNIQUE"),{http_status:422,source:"LEGACY_ERROR_CONTRACT"});
+  assert.deepEqual(legacyConversionHttpStatus("UNKNOWN"),{http_status:null,source:"UNAVAILABLE"});
 });
 
 test("fulfillment orchestrator reuses procurement receipt, inventory and finance authority",async()=>{

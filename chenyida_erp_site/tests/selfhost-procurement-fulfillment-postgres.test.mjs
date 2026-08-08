@@ -15,7 +15,7 @@ import { withSupplierMappingFixtureTriggersDisabled } from "./helpers/supplier-m
 const databaseUrl=process.env.TEST_PROCUREMENT_FULFILLMENT_DATABASE_URL;if(!databaseUrl||!/procurement_fulfillment_test/i.test(databaseUrl))throw new Error("isolated TEST_PROCUREMENT_FULFILLMENT_DATABASE_URL containing procurement_fulfillment_test is required");
 const pool=new Pool({connectionString:databaseUrl,max:2,application_name:"procurement-fulfillment-test"});
 const actor=(role,username=`${role}01`)=>({username,display_name:role,role,is_active:true,must_change_password:false,version:1,last_login_at:null,permissions:permissionsForRole(role)});
-async function call(handler,path,{method="GET",role="purchase",key=randomUUID(),body,csrf=true,poolOverride=pool}={}){const requestId=randomUUID(),headers=new Headers({"X-Request-ID":requestId});if(body!==undefined)headers.set("Content-Type","application/json");if(key)headers.set("Idempotency-Key",key);if(csrf)headers.set("X-CSRF-Token","test-csrf");const request=new Request(`http://local.test${path}`,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});const response=await handler(request,{pool:poolOverride,actor:actor(role),requestId,requireCsrf:()=>{if(headers.get("X-CSRF-Token")!=="test-csrf")throw Object.assign(new Error("CSRF Token 无效"),{code:"CSRF_INVALID",status:403})}});assert.ok(response);return{response,payload:await response.json()}}
+async function call(handler,path,{method="GET",role="purchase",username,key=randomUUID(),body,csrf=true,poolOverride=pool}={}){const requestId=randomUUID(),headers=new Headers({"X-Request-ID":requestId});if(body!==undefined)headers.set("Content-Type","application/json");if(key)headers.set("Idempotency-Key",key);if(csrf)headers.set("X-CSRF-Token","test-csrf");const request=new Request(`http://local.test${path}`,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});const response=await handler(request,{pool:poolOverride,actor:actor(role,username),requestId,requireCsrf:()=>{if(headers.get("X-CSRF-Token")!=="test-csrf")throw Object.assign(new Error("CSRF Token 无效"),{code:"CSRF_INVALID",status:403})}});assert.ok(response);return{response,payload:await response.json()}}
 const fulfillment=(path,options)=>call(handleProcurementFulfillmentApi,path,options),finance=(path,options)=>call(handleFinanceApi,path,options),sourcing=(path,options)=>call(handleProcurementSourcingApi,path,options),supplierMapping=(path,options)=>call(handleSupplierMappingApi,path,options);
 async function conversionBody(awardId,remark="履约隔离测试PO备注") { const preview=await fulfillment(`/api/procurement/awards/${awardId}/purchase-order-conversion-preview`);assert.equal(preview.response.status,200,JSON.stringify(preview.payload));assert.equal(preview.payload.data.po_convertible_now,true);return{...preview.payload.data.confirmation,remark} }
 
@@ -337,7 +337,50 @@ async function seedAward(lineCount=1) {
   };
 }
 
-test.beforeEach(async()=>{sequence=0;await pool.query("truncate app_users,units,material_categories,customers,suppliers,business_code_sequences,idempotency_keys,identity_write_rate_limit_buckets,audit_log restart identity cascade");await pool.query("insert into app_users(username,display_name,role,password_hash) values('admin01','管理员','admin','x'),('manager01','经理','manager','x'),('planning01','计划','planning','x'),('engineering01','项目','engineering','x'),('purchase01','采购','purchase','x'),('operations01','运营','operations','x'),('warehouse01','仓库','warehouse','x'),('finance01','财务','finance','x')")});test.after(async()=>pool.end());
+test.beforeEach(async()=>{sequence=0;await pool.query("truncate app_users,units,material_categories,customers,suppliers,business_code_sequences,idempotency_keys,identity_write_rate_limit_buckets,audit_log restart identity cascade");await pool.query("insert into app_users(username,display_name,role,password_hash) values('admin01','管理员','admin','x'),('manager01','经理','manager','x'),('planning01','计划','planning','x'),('engineering01','项目','engineering','x'),('purchase01','采购','purchase','x'),('purchase02','跨域采购','purchase','x'),('operations01','运营','operations','x'),('warehouse01','仓库','warehouse','x'),('finance01','财务','finance','x')")});test.after(async()=>pool.end());
+
+test("restricted PO history projects lineage, credentials and zero downstream without granting cross-domain access",async()=>{
+  await pool.query("select setval(pg_get_serial_sequence('procurement_sourcing_awards','id'),41,false)");
+  const refs=await seedAward(4),failedRequestId=randomUUID();
+  await new ProcurementRepository(pool).failureAudit("purchase01",failedRequestId,"SOURCING_AWARD_CONVERTED","AWARD_SUPPLIER_MAPPING_NOT_UNIQUE");
+  const body=await conversionBody(refs.awardId,"纯虚拟UAT采购订单,仅用于黑盒验收,不对应真实采购。");
+  const converted=await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`,{method:"POST",key:"po-history-success",body});
+  assert.equal(converted.response.status,201,JSON.stringify(converted.payload));
+  const poId=Number(converted.payload.data.purchase_orders[0].id);
+  assert.notEqual(refs.awardId,poId,"history must bind the success Audit by Award ID, not a coincidentally equal PO ID");
+  const fingerprint=async()=> (await pool.query(`select
+    (select count(*)::int from purchase_orders) po,(select count(*)::int from purchase_order_lines) lines,
+    (select count(*)::int from purchase_delivery_plans) plans,(select count(*)::int from warehouse_receiving_queue_entries) queues,
+    (select count(*)::int from purchase_receipts) receipts,(select count(*)::int from inventory_ledger_entries) ledger,
+    (select count(*)::int from quality_inspections) iqc,(select count(*)::int from finance_documents where doc_type='AP') ap,
+    (select count(*)::int from finance_settlements) payment,(select count(*)::int from production_work_orders) work_orders`)).rows[0];
+  const before=await fingerprint();
+  const first=await fulfillment(`/api/procurement/purchase-orders/${poId}/history`,{username:"purchase01"});
+  assert.equal(first.response.status,200,JSON.stringify(first.payload));
+  const history=first.payload.data;
+  assert.equal(history.contract_version,"PO_HISTORY_TRACEABILITY_V1");assert.equal(history.read_only,true);
+  assert.equal(history.purchase_order.purchase_order_id,String(poId));assert.equal(history.purchase_order.remark,body.remark);
+  assert.equal(history.purchase_order.po_convertible_now,false);assert.equal(history.purchase_order.total_amount,"480.000000");
+  assert.deepEqual([history.lineage.project.id,history.lineage.material_requirement_plan.id,history.lineage.purchase_request.id,history.lineage.rfq.id,history.lineage.quote.id,history.lineage.award.id,history.lineage.purchase_order.id].map(String),[history.lineage.project.id,history.lineage.material_requirement_plan.id,history.lineage.purchase_request.id,String(refs.rfqId),history.lineage.quote.id,String(refs.awardId),String(poId)]);
+  assert.equal(history.lines.length,4);assert.equal(history.delivery_plans.length,4);assert.equal(history.line_summary.duplicate_material,false);
+  assert.deepEqual(history.lines.map(line=>[line.award_line_id,line.candidate_id,line.quote_line_id,line.binding_id,line.mapping_fact_id,line.quantity,line.unit_price,line.line_amount,line.received_quantity,line.planned_delivery_date]),refs.bindings.map((binding,index)=>[String(index+1),String(index+1),String(index+1),binding.binding_id,binding.mapping_fact_id,"10.000000","12.000000","120.000000","0.000000","2026-10-20"]));
+  assert.ok(history.delivery_plans.every((plan,index)=>plan.purchase_order_line_id===history.lines[index].purchase_order_line_id&&plan.award_line_id===history.lines[index].award_line_id&&plan.status==="PENDING"&&plan.version===1&&plan.queue_status==="OPEN_PENDING"&&plan.queue_version===1&&plan.plan_event_type==="CREATED"));
+  assert.equal(history.credentials.purchase_order_event.event_type,"CREATED");assert.equal(history.credentials.purchase_order_event.result,"SUCCESS");
+  assert.equal(history.credentials.audit.action,"SOURCING_AWARD_CONVERTED");assert.equal(history.credentials.audit.result,"SUCCESS");
+  assert.equal(history.credentials.idempotency.http_status,201);assert.match(history.credentials.idempotency.key_digest,/^[0-9a-f]{64}$/);assert.match(history.credentials.idempotency.request_digest,/^[0-9a-f]{64}$/);
+  assert.deepEqual({available:history.credentials.historical_failed_attempt.available,relation:history.credentials.historical_failed_attempt.relation,requestId:history.credentials.historical_failed_attempt.request_id,result:history.credentials.historical_failed_attempt.result,http:history.credentials.historical_failed_attempt.http_status,source:history.credentials.historical_failed_attempt.http_status_source,count:history.credentials.historical_failed_attempt.business_record_count},{available:true,relation:"UNBOUND_PRIOR_ATTEMPT",requestId:failedRequestId,result:"FAILED",http:422,source:"LEGACY_ERROR_CONTRACT",count:0});
+  for(const field of ["receipt","warehouse_receipt","inventory_ledger","lot","iqc","ap","payment","work_order","production_report","production_completion"])assert.equal(history.downstream[field],0,field);
+  assert.equal(history.downstream.all_zero,true);assert.equal(history.governance_boundary.authorization_verified,false);
+  const refreshed=await fulfillment(`/api/procurement/purchase-orders/${poId}/history`,{username:"purchase01"});
+  assert.equal(refreshed.response.status,200);assert.deepEqual(refreshed.payload.data.lines,history.lines);assert.deepEqual(refreshed.payload.data.delivery_plans,history.delivery_plans);assert.deepEqual(await fingerprint(),before);
+  const denied=await fulfillment(`/api/procurement/purchase-orders/${poId}/history`,{username:"purchase02"});
+  assert.equal(denied.response.status,403);assert.equal(denied.payload.code,"PERMISSION_DENIED");assert.doesNotMatch(JSON.stringify(denied.payload),/SUP-FUL-A|Idempotency|key_digest|request_digest/);
+  const hiddenList=await fulfillment("/api/procurement/fulfillment/orders?page_size=100",{username:"purchase02"});assert.equal(hiddenList.response.status,200);assert.deepEqual(hiddenList.payload.data,[]);
+  const visibleList=await fulfillment("/api/procurement/fulfillment/orders?page_size=100",{username:"purchase01"});assert.ok(visibleList.payload.data.some(row=>Number(row.purchase_order_id)===poId));
+  const auditCount=Number((await pool.query("select count(*) value from audit_log")).rows[0].value);
+  const rejectedMethod=await fulfillment(`/api/procurement/purchase-orders/${poId}/history`,{method:"POST",username:"purchase01",body:{}});assert.equal(rejectedMethod.response.status,405);assert.equal(Number((await pool.query("select count(*) value from audit_log")).rows[0].value),auditCount);
+  assert.ok(!permissionsForRole("purchase").includes("system.audit.read"));assert.deepEqual(await fingerprint(),before);
+});
 
 test("four-line Award confirmation fails closed and atomically creates one PO with 4 Lines and 4 direct plans", async () => {
   const refs = await seedAward(4);
