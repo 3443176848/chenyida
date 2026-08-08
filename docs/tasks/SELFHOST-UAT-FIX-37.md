@@ -2,7 +2,7 @@
 
 ## 状态、授权与严格起点
 
-- 状态：`DOING`。
+- 状态：`DONE`。
 - 日期：2026-08-08（Asia/Shanghai）。
 - 授权：修复仓库收货页的最小权限只读谱系、证据字段、提前到货门禁、两阶段确认、IQC职责边界；完成隔离测试、正式备份恢复、受控部署和warehouse-only主UAT只读/预览取消验收。
 - 主UAT硬边界：只允许账号`uat_20260729_warehouse`只读打开`PO-00000001`并在桌面与390×844打开权威确认预览后取消；不得填写虚假凭证、批次、日期或到货说明；`business POST = 0`；最终有效warehouse Session必须为0。
@@ -60,3 +60,10 @@
 
 - 成功：`WAREHOUSE RECEIPT READINESS FIXED — UAT RECEIPT NOT POSTED`
 - 阻断：`WAREHOUSE RECEIPT READINESS BLOCKED — NO UAT RECEIPT`
+
+## 完成记录
+
+- 新增且仅新增Migration `0040_warehouse_receipt_readiness.sql`，版本升级为`0.1.0-alpha.41`；0039及更早Migration未修改。
+- 功能提交：`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`（`feat: safeguard warehouse receipt readiness`）；inspection mode语义修正提交：`20a9123741862d81ac18af9e6bdee896674fe95c`（`fix: project receipt accounting by inspection mode`）。
+- 正式备份恢复、0040部署、Web-only替换和warehouse-only零业务POST主UAT已通过；最终Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产均为0，warehouse有效Session为0。
+- 完整证据见[完成报告](SELFHOST-UAT-FIX-37-COMPLETION.md)及[D-106](../project/DECISIONS.md#d-106-仓库实际收货采用关系化证据服务端时间和按检验模式分流)。

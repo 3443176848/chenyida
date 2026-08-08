@@ -1218,6 +1218,20 @@
   10. 在进入仓库或IQC前，必须先补齐并验收PO历史页面的完整谱系和凭证。
 - 后续门禁：Award→PO转换不再重试。下一任务只能是PO历史追溯页面修复/验收，且本决定对UAT的授权范围仅为只读追溯验收；warehouse、quality和finance试用仍未授权。Receipt、IQC、Ledger、AP和生产记录必须保持0，任何偏离都必须立即停止并重新取证。
 
+## D-106 仓库实际收货采用关系化证据、服务端时间和按检验模式分流
+
+- 日期：2026-08-08
+- 状态：`ACCEPTED / IMPLEMENTED / DEPLOYED TO PARALLEL NON-PRODUCTION UAT`
+- 确认人：项目负责人（明确要求修复仓库收货最小权限追溯、两阶段确认、日期/提前到货证据门禁及IQC职责边界，并授权隔离写测试、正式备份恢复、0040、Web-only部署和warehouse-only零业务POST主UAT）
+- 业务动作边界：当前收货模型只表示实物已到并执行实际物理收货，不表示Supplier通知或在途登记；系统没有独立通知模型时不得借用Receipt伪造。实际过账时间只能由服务端事务生成，不接收浏览器实际到货时间，也不得把计划日期冒充实际时间。证据日期不能在服务端当前业务日期之后。
+- 提前到货规则：早于承诺/计划日期不是永久禁止，但最终POST必须关系化保存可审计送货单或等价来源凭证、提前到货原因和显式提前确认；缺任一项以稳定`EARLY_ARRIVAL_EVIDENCE_REQUIRED`及中文提示失败关闭。正常到货仍须送货凭证；Supplier批次只在对应Material批次策略适用时必填，否则保存明确不适用投影。目标仓库/库位当前为权威固定`MAIN`，浏览器不能改写。
+- 关系化存储：现有Receipt/Allocation及自由备注不能完整承载上述证据，也没有Plan/queue CAS谱系，故采用新分支：唯一新增`0040_warehouse_receipt_readiness.sql`并升级`0.1.0-alpha.41`，不修改0039及更早Migration。`warehouse_receipt_evidence`不可变绑定Receipt、Receipt Line、Allocation、PO、PO Line、Delivery Plan和queue，保存凭证、证据日期、提前事实、原因/确认、Supplier批次适用值、MAIN、预期版本、actor、request和服务端时间；索引、外键、CHECK与服务触发器共同校验完整关系和版本推进。
+- 两阶段与事务：第一阶段只允许warehouse用最小权限DTO执行权威GET预览；数量、说明及证据默认空，取消为默认焦点，关闭/ESC/背景均零业务POST。只有显式“确认过账收货”发送一次POST，按钮同步锁定且不重试。最终事务重新锁定PO/Line/Plan/queue，验证状态、剩余量、四类CAS、权限、CSRF、Origin、限流和正文幂等；Receipt、Line、Allocation、Evidence、Plan/queue推进、Lot/IQC/Ledger、Audit/幂等结果要么全部提交，要么全部回滚。
+- 最小权限读模型：warehouse可查看PO稳定身份/商务、唯一成功创建actor/上海时间/request/operation/action/result、Line→Award Line→Material、Plan/queue版本状态及下游计数；不能获得`system.audit.read`，不能读取请求正文、Cookie、Session、敏感Header或跨数据域对象。产品不得硬编码D-105或目标PO，也不得把D-105前向控制事件描述为原始写入已获授权。
+- IQC和库存会计：收货结果必须按当前Material库存/检验模式从实际服务端模型投影，而不是统一宣称均需IQC。需要IQC的库存物料在收货事务生成Receipt、内部RML冻结Lot与`IQC_RECEIPT` Ledger，可用量保持0并移交quality；quality作出合格等独立决定后才按既有流程解冻/增加可用量。普通`STOCKED/NORMAL`物料不生成RML Lot、IQC冻结或IQC队列，收货事务生成普通`RECEIPT` Ledger并立即重算可用量。warehouse无Supplier IQC写权限，quality保持既有授权；不合格、退货和让步接收都是独立操作。
+- 下游隔离：收货不会自动创建AP、Payment、Work Order或其他生产记录；本决定不改变既有库存会计语义，也不授权任何主UAT实际Receipt、IQC、Ledger、AP、付款或生产操作。主样本Material 533—536当前均为`STOCKED/NORMAL`，这只决定当次权威预览文案，不被硬编码为通用事实。
+- 实施结果：功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`，mode语义修正提交`20a9123741862d81ac18af9e6bdee896674fe95c`；0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。隔离迁移/写路径、正式dump/list/第二新库恢复、0039→0040和Web-only部署通过，最终Web`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`。warehouse-only主UAT只读/预览取消，`business_post=0`、Session0，PO/Line/Plan/queue保持`1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

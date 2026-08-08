@@ -4,6 +4,18 @@
 
 ## 2026-08-08
 
+### SELFHOST-UAT-FIX-37 - `feat: safeguard warehouse receipt readiness` / `fix: project receipt accounting by inspection mode` / `ops: deploy warehouse receipt readiness safeguards`
+
+- Schema/版本：现有Receipt/Allocation模型没有可关系化保存送货单、证据日期、提前到货理由/显式确认及Plan/queue CAS谱系的位置，故版本升为`0.1.0-alpha.41`并唯一新增`0040_warehouse_receipt_readiness.sql`。新`warehouse_receipt_evidence`不可变绑定Receipt/Line/Allocation/PO/Line/Plan/queue，保存送货凭证、Supplier批次适用值、证据日期、提前判断/原因/确认、MAIN、预期版本、actor/request及服务端时间；触发器检查完整谱系与事务推进。0039及更早未修改。
+- DTO/API：新增warehouse专用`WAREHOUSE_RECEIPT_READINESS_V1`及`GET /api/procurement/delivery-plans/:id/receipt-preview`，最小投影PO商务/创建SUCCESS凭证、四Line/Award Line/Material、Plan/queue版本状态和Receipt/Lot/IQC/Ledger/AP/付款/生产计数。跨数据域403；warehouse不获`system.audit.read`，不返回请求正文、Cookie、Session、敏感Header或审计正文。
+- UI/两阶段：收货入口改为“核对收货”权威GET后才显示确认窗口；数量、说明及证据字段默认空，取消默认焦点。取消、关闭、ESC、背景关闭均零业务POST；最终按钮只在证据完整时启用，点击同步禁用且不自动重试。页面明确当前是实际物理收货，不是通知/在途登记，并展示服务端时间规则、计划日期、提前判断、目标MAIN、本次数量/剩余量、经办账号及下游边界。
+- 服务端门禁：拒绝客户端实际收货时间和未来证据日期；提前到货必须有可审计送货凭证、原因及显式确认，否则返回稳定`EARLY_ARRIVAL_EVIDENCE_REQUIRED`中文错误。最终事务锁定并重验PO/Line/Plan/queue、剩余量、四类CAS、权限、CSRF、Origin、限流及正文幂等；创建Receipt/Allocation/Evidence、状态推进、Lot/IQC/Ledger和Audit全在同一事务，故障零半记录。
+- IQC/会计：实际语义按Material inventory/inspection mode投影。IQC物料生成内部RML冻结Lot和`IQC_RECEIPT` Ledger，可用量保持0并进入quality责任队列；NORMAL物料不生成RML/IQC冻结或IQC队列，生成普通`RECEIPT` Ledger并立即重算可用量。warehouse的IQC写接口为403，quality保持既有权限；warehouse首页不再把供应商来料IQC列为获准业务。不合格、退货、让步接收均是独立操作，收货不自动创建AP、Payment、Work Order或生产记录。
+- 测试：Unit/UI/Dashboard/Procurement组合22/22；Identity19、Mapping11、Sourcing36、Fulfillment21回归通过。完整隔离Fulfillment PostgreSQL 9/9及NORMAL/IQC专项2/2覆盖空/0/负/超量、未来日期、提前缺证据/完整成功、四类CAS、幂等重放/冲突、并发单胜、CSRF/Origin/角色/限流、故障回滚、IQC隔离和实际Ledger语义。0040空库/0039升级/重放/约束/回滚3/3；typecheck、production Docker build、Origin回归、敏感扫描及diff检查通过。
+- 备份/恢复/部署：正式dump`warehouse-receipt-readiness-fix37-predeploy-20260808T120636Z.dump`为root:root0600、2,298,941 bytes、SHA-256`28e07b9dc04e686d5077fe9f68968ffb1a4253979d64b80317307f8543bc0868`，list3,359行。第二新库恢复39/head0039、核对业务后升级0040并重放无变化，随后删除；主库受控应用0040。仅把Web从`sha256:664e0ac6…a4ec89`替换为`sha256:0cf98937…b8a0d5f19`，PostgreSQL/Worker/Caddy和四卷未替换，旧Web回退tag保留。
+- 主UAT/保护：第一次只读UAT因页面把NORMAL物料误述为IQC收货而安全中止，未发业务POST并安全退出；随后按实际服务端mode修正文案、重建并Web-only替换。最终只登录`uat_20260729_warehouse`，桌面四种取消与390×844取消、跨域403、back/forward/refresh及退出通过；未填写虚假证据，`business_post=0`、Session0。业务指纹前后`48e2f2138541aea589f3e6a2a5b9c9b312036786ff13f27bb3baf2722c4bd013`一致，PO/Line/Plan/queue保持`1/4/4/4`且全部收货/库存/财务/生产下游0。
+- Git/资源：功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`，语义修正提交`20a9123741862d81ac18af9e6bdee896674fe95c`，部署/验收/文档由独立ops提交收口；未push/PR或改写历史。起点/收口available约`2.0/2.1GiB`、Swap`273/285MiB`、根盘17GiB，最终Load`0.45/0.37/0.44`；OOM0、四服务restart0/OOM false。临时库/验证容器删除，Playwright目录移入可恢复Trash，未prune。最终`WAREHOUSE RECEIPT READINESS FIXED — UAT RECEIPT NOT POSTED`。
+
 ### SELFHOST-UAT-FIX-36 - `feat: add restricted PO history traceability` / `ops: deploy PO history traceability fix`
 
 - 读模型/API：新增`GET /api/procurement/purchase-orders/:id/history`和`PO_HISTORY_TRACEABILITY_V1`。先沿PO→Award→RFQ→PRQ复用purchase数据域判断，再在单一`REPEATABLE READ READ ONLY`快照读取PO聚合、Project→MRP→PRQ→RFQ→Comparison→Quote→Award→PO、四条Line稳定引用、四条Plan/queue及下游计数；缺失、重复或漂移时失败关闭。

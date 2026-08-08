@@ -2,6 +2,25 @@
 
 最后更新时间：2026-08-08（Asia/Shanghai）
 
+## SELFHOST-UAT-FIX-37 Warehouse Receipt Readiness and Date Safeguards（完成）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | WAREHOUSE RECEIPT READINESS FIXED — UAT RECEIPT NOT POSTED | 关系化证据、最小权限DTO、两阶段确认、日期/提前到货门禁、事务保护、IQC职责隔离、正式备份恢复、0040、Web-only部署及warehouse-only主UAT全部完成 |
+| 严格起点 | PASS | 唯一worktree、clean`main@a40660cc3ba8e74495c919ba0f2602485597fc38`、Parent`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`、behind0/ahead175；alpha.40、0039、Web`664e0ac6…a4ec89`及主业务`1/4/4/4+下游0`完全吻合 |
+| Schema/版本 | alpha.41 / 0040 DEPLOYED | 现有Schema不能关系化保存必需送货证据，故唯一新增不可变`warehouse_receipt_evidence`及约束/索引/服务触发器；0040 SHA`b6781c94…a5a93`，0039及更早未改 |
+| 只读DTO/数据域 | PASS / MINIMUM | `WAREHOUSE_RECEIPT_READINESS_V1`展示PO商务/创建凭证、四Line/Plan/queue及下游计数；跨域403，warehouse无`system.audit.read`，不返回正文、Cookie、Session或敏感Header |
+| 两阶段/日期证据 | PASS | “核对收货”只发权威GET；取消/关闭/ESC/背景零业务POST。最终POST使用服务端实际时间并锁定PO/Line/Plan/queue，重验CAS/剩余量/CSRF/Origin/权限/幂等；未来证据日期拒绝，提前到货缺凭证/理由/显式确认返回稳定中文错误 |
+| IQC/库存语义 | PASS / MODE-SPECIFIC | IQC物料收货生成Receipt+RML冻结Lot、`IQC_RECEIPT` Ledger、可用量0并交quality；NORMAL物料不生成RML/IQC冻结或IQC队列，生成普通`RECEIPT` Ledger并重算可用量。主Material 533—536均为STOCKED/NORMAL；warehouse IQC写403，quality既有授权通过 |
+| 自动/隔离测试 | PASS | Unit/UI/Dashboard/Procurement 22/22；Identity UI/Unit19、Mapping11、Sourcing36、Fulfillment21；0040 Migration3/3；隔离NORMAL/IQC专项2/2；完整Fulfillment PG9/9；typecheck、production build、Origin、敏感扫描和`git diff --check`通过 |
+| 写保护覆盖 | PASS | 空/0/负数/超量、未来日期、提前缺证据/完整成功、PO/Line/Plan/queue陈旧CAS、幂等重放/异正文冲突/并发单胜、CSRF/Origin/角色/限流、故障回滚、IQC权限及Receipt/Lot/Ledger真实语义均在隔离PostgreSQL验证；Chromium写路径未连接主库 |
+| 备份/恢复 | PASS | root:root0600 dump 2,298,941 bytes、SHA`28e07b9d…0868`、`pg_restore --list`3,359行；第二新库恢复39/head0039后核对`1/4/4/4+下游0`，升级0040并重放无变化，随后精确删除 |
+| 部署 | WEB + MIGRATION ONLY | 主库受控应用0040；Web`664e0ac6…→0cf98937…`（88,678,839 bytes），仅recreate Web。PostgreSQL/Worker/Caddy容器未替换，四个受保护Volume未更换，旧Web保留精确回退tag |
+| 主UAT | PASS / WAREHOUSE READ-ONLY | `uat_20260729_warehouse`未改密；完整谱系、四行、下游0、桌面四种取消、390×844取消及back/forward/refresh/退出通过；`business_post=0`、Session0，前后浏览器业务指纹同为`48e2f213…013` |
+| 最终业务事实 | PRESERVED | PO 1/v1/OPEN；Line/Plan/queue`4/4/4`且各v1/未收；Receipt/Evidence/Lot/IQC/Ledger/AP/Payment/Work Order/生产记录全0；D-105受控对象未删除、修改、取消、重建或再次转换 |
+| 资源/清理 | PASS | 起点available约2.0GiB、Swap273MiB、根盘17GiB且1分钟Load低于4；最终收口available2.1GiB、Swap285MiB/1GiB、根盘17GiB、Load`0.45/0.37/0.44`。内核OOM0，四服务restart0/OOM false；临时数据库/验证容器精确清理，Playwright目录移入可恢复Trash，未prune，正式备份/回退镜像保留 |
+| 下一门禁 | NEW AUTHORIZATION REQUIRED | 本次只证明readiness；任何真实收货必须提供真实实物/送货证据并另获最终POST授权。IQC决定、AP、付款和生产均不在本任务授权内 |
+
 ## SELFHOST-UAT-FIX-36 PO History Traceability（完成）
 
 | 验证项 | 结果 | 说明 |

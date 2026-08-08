@@ -37,25 +37,27 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.40`；PostgreSQL 为 39/head `0039_rfq_traceability.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
+| 当前版本 | 源码与并行非生产 UAT Web 均为 `0.1.0-alpha.41`；PostgreSQL 为 40/head `0040_warehouse_receipt_readiness.sql`。这是受控非生产 UAT 部署，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-36`已新增通用PO受限历史DTO、purchase数据域403、完整PO/Line/Plan/queue谱系、凭证最小投影、下游零计数和响应式只读详情；独立功能提交为`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`（`feat: add restricted PO history traceability`）。版本保持alpha.40，Migration保持0039 |
-| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-36`已完成正式备份/list/第二新库恢复、Web-only替换、purchase-only桌面/390×844只读UAT、连续健康检查和资源清理；独立收口提交消息为`ops: deploy PO history traceability fix`，实际SHA以Git log为准。D-105仍只提供前向授权且不追溯原始写入 |
-| Git 同步与工作区 | FIX36从唯一worktree、clean`main@a67886428570612b21bc372a0a2a53fe90eac439`、Parent`e67c9209bc24314000f70760b7b79282c4a9b469`、behind0/ahead173起步；功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`后ahead174，独立运维/文档收口后ahead175。未push/PR/amend/rebase/reset/stash/restore，密码、Token、Cookie、Session正文、连接信息和备份正文未进入Git |
+| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-37`已新增warehouse最小权限收货谱系DTO、两阶段权威预览、关系化日期/送货证据、CAS/幂等/并发/事务门禁、IQC权限隔离和按inspection mode投影的库存会计边界；功能提交为`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`，语义修正提交为`20a9123741862d81ac18af9e6bdee896674fe95c`。版本为alpha.41，唯一新增Migration为0040 |
+| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-37`已完成root-only正式备份/list/第二新库恢复、0039→0040升级/重放、主库0040受控应用、Web-only替换、warehouse-only桌面/390×844预览取消UAT及安全退出；主UAT business POST0且全部收货下游保持0。独立收口提交消息为`ops: deploy warehouse receipt readiness safeguards`，实际SHA以Git log为准 |
+| Git 同步与工作区 | FIX37从唯一worktree、clean`main@a40660cc3ba8e74495c919ba0f2602485597fc38`、Parent`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`、behind0/ahead175起步；功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`及语义修正`20a9123741862d81ac18af9e6bdee896674fe95c`后ahead177，独立运维/文档收口后预计ahead178。未push/PR/amend/rebase/reset/stash/restore，密码、Token、Cookie、Session正文、连接信息和备份正文未进入Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0039`，39/head`0039_rfq_traceability.sql`，SHA-256`3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37`；没有0040。主`RFQ-00000001`为CLOSED v7，Award为1/v1/AWARDED且Line4；现有`PO-00000001`为1/v1/OPEN，PO Line/Delivery Plan/queue为`4/4/4`，目标Receipt/IQC/库存/财务/生产下游全0。四条获选Candidate仍为`2/4/6/8`，Binding/Mapping保持 |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。PO历史追溯alpha.40 Web为`sha256:664e0ac6bd289251f289a8785ac05d955470064a3f921c3ae834f79665a4ec89`，Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`83c1bff3…`有FIX36精确回退tag，四个受保护Volume未更换 |
-| 当前开发环境 | FIX36源码新增`PO_HISTORY_TRACEABILITY_V1`：先以RFQ/PRQ权威规则执行purchase数据域校验，再用单一repeatable-read/read-only事务投影PO聚合、Project→MRP→PRQ→RFQ→Comparison→Quote→Award→PO、四Line、四Plan/queue、精确成功凭证、独立未绑定失败Audit和下游计数。页面不硬编码目标PO或D-105、不声称授权已验证，也没有下游写控件；alpha.40/0039、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PO HISTORY TRACEABILITY FIXED — UAT DOWNSTREAM UNCHANGED`。功能、隔离回归、正式备份恢复、Web-only部署和purchase-only主UAT全部通过；business POST0、Session0、PO/Line/Plan/queue `1/4/4/4`且下游全0。D-105仍只提供前向只读授权且不追溯原始写入 |
-| 当前任务 | 当前无`DOING`。FIX36最终状态/历史/浏览器指纹均前后不变，Web`664e0ac6…`已上线；没有0040、Migration、业务数据修改或其他服务替换 |
-| 下一任务 | 技术上已具备另立“到货/仓库收货”试用任务的前置条件，但FIX36没有登录warehouse或验证主UAT写路径，也不构成执行授权。任何到货/收货必须新的独立任务、明确授权、只读门禁和正式备份；quality、finance及IQC/Ledger/AP/付款/生产仍分别禁止 |
+| 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0040`，40/head`0040_warehouse_receipt_readiness.sql`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`；0039及更早未修改。主`RFQ-00000001`为CLOSED v7，Award为1/v1/AWARDED且Line4；受控`PO-00000001`为1/v1/OPEN，PO Line/Delivery Plan/queue为`4/4/4`，新证据表及Receipt/Lot/IQC/Ledger/AP/付款/生产下游全0。四条获选Candidate、Binding及Mapping保持 |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。Warehouse Receipt Readiness alpha.41 Web为`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`（88,678,839 bytes），Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`664e0ac6…`有FIX37精确回退tag，四个受保护Volume未更换 |
+| 当前开发环境 | FIX37新增`WAREHOUSE_RECEIPT_READINESS_V1`最小权限DTO和`GET /api/procurement/delivery-plans/:id/receipt-preview`；最终POST锁定PO/Line/Plan/queue并重验CAS、剩余量、权限、CSRF、Origin、幂等和关系化证据。0040用不可变证据表绑定Receipt/Line/Plan/queue、送货凭证、证据日期、提前原因/确认、MAIN、actor/request/服务端时间及预期版本；warehouse无IQC写权，quality保持。主样本为STOCKED/NORMAL，故预览准确显示普通Receipt Ledger和立即重算可用库存，不伪造RML/IQC冻结；Python/SQLite及历史Sites/D1未改 |
+| 当前阶段 | `WAREHOUSE RECEIPT READINESS FIXED — UAT RECEIPT NOT POSTED`。功能、隔离写路径、迁移测试、正式备份恢复、0040、Web-only部署和warehouse-only主UAT全部通过；business POST0、Session0、PO/Line/Plan/queue `1/4/4/4`且Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。D-105原始写入判断不变 |
+| 当前任务 | 当前无`DOING`。FIX37只读/预览取消主UAT前后业务指纹一致，Web`0cf98937…`和0040已上线；除版本化证据Schema外没有主业务事实修改，只替换Web |
+| 下一任务 | 任何真实收货必须另立任务、重新核验当时实物/送货凭证并明确授权最终POST；IQC决定只属于quality，AP、付款和生产均需各自独立授权。当前不得根据本次预览验收自动继续任何写操作 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-UAT-FIX-37完成：warehouse最小权限DTO展示PO创建凭证、四Line/Plan/queue与下游计数；两阶段GET预览/显式最终POST、服务端实际时间、关系化提前到货证据、CAS/幂等/并发/故障回滚及IQC职责隔离已实现。alpha.41/0040通过空库、0039升级、重放、约束/回滚和第二新库恢复，仅替换Web为`0cf98937…`。主UAT只预览并覆盖桌面/390×844五类取消路径，business POST0、Session0，PO/Line/Plan/queue保持`1/4/4/4`且全部收货下游为0
 
 - SELFHOST-UAT-FIX-36完成：`PO_HISTORY_TRACEABILITY_V1`在purchase数据域内只读投影PO、完整上游谱系、四条Line、四条Plan/queue、成功Event/Audit/Idempotency摘要、独立未绑定失败请求与下游零计数；桌面/390×844、刷新、重开、隔离服务重启和主UAT通过。正式dump/list/第二新库恢复后只替换Web为`664e0ac6…`；主UAT business POST0、Session0、状态/历史/浏览器指纹不变，产品不引用D-105或声称授权已验证，全部下游保持0
 
@@ -296,7 +298,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- `SELFHOST-UAT-FIX-36`已完成：功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`；通用受限读模型、数据域403、PO聚合及完整上游谱系、四Line、四Plan/queue、Event/Audit/Idempotency最小投影和响应式只读详情已Web-only部署为`sha256:664e0ac6…a4ec89`。正式备份恢复、purchase-only桌面/390×844刷新重开和Session失效通过；business POST0，PO/Line/Plan/queue `1/4/4/4`及下游全0。当前无`DOING`；到货/仓库收货只有技术前置，仍须新任务和明确授权，IQC/Ledger/AP/生产继续禁止。
+- `SELFHOST-UAT-FIX-37`已完成：功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`及语义修正`20a9123741862d81ac18af9e6bdee896674fe95c`；alpha.41/0040关系化收货证据、最小权限谱系、权威GET预览、最终POST事务门禁、提前到货保护和按inspection mode分流已Web-only部署为`sha256:0cf98937…5f19`。正式备份/第二库恢复/0039→0040及warehouse-only桌面/390×844取消UAT通过；business POST0、Session0，PO/Line/Plan/queue `1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。当前无`DOING`；真实收货及后续部门动作均须另获授权。
+- `SELFHOST-UAT-FIX-36`已完成：功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`；通用受限读模型、数据域403、PO聚合及完整上游谱系、四Line、四Plan/queue、Event/Audit/Idempotency最小投影和响应式只读详情已Web-only部署为`sha256:664e0ac6…a4ec89`。正式备份恢复、purchase-only桌面/390×844刷新重开和Session失效通过；business POST0，PO/Line/Plan/queue `1/4/4/4`及下游全0。这是FIX37的前置历史，不是当前执行指令。
 - `SELFHOST-UAT-DECISION-35`已完成：D-105将未经事前授权的`PO-00000001`置于受控保留状态；它是控制事件，只提供前向授权并明确“不追溯性授权”。PO/Line/Plan/queue `1/4/4/4`及Event/Audit/Idempotency证据不得改动，Award→PO不再重试；FIX36只读验收不改变该判断或授权边界。
 - `SELFHOST-UAT-AUDIT-34`已完成：唯一成功PO request、actor、时间、结构、谱系和下游零计数已由限定只读取证确认；结论是数据结构完整但来源授权不可证明。审计没有删除、修改、补偿或继续任何下游，D-105现已对其作出前向受控保留决定。
 - 阅读边界：以下FIX-33/FIX-32等条目中的PO为0及“另获转换授权”只记录各自任务收口时点，不是当前执行指令；当前路线以D-105为准，现有PO受控保留且Award→PO不再重试。
@@ -333,13 +336,13 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - `SELFHOST-OPS-ADMIN-ACCOUNT-04` 已通过正式 Identity Service 创建第二 active admin `admin2`，最终 version 2、首次改密；用户/admin `1/1→2/2`，Session/有效 `2/0` 不变。弱密码门禁、摘要输出事件、正式重置补救、4 条 Identity Audit、3 条幂等和资源/健康/清理均已记录。
 - `SELFHOST-LANDING-TASK05` 已完成 V9 staging。pre-clean dump 恢复 213 表一致；staging 首次 197、重放新增 0。197 行全部因 `EXPLICIT_UNIT_MISSING` 待确认，主库前后计数 manifest 一致，固定结论 `STAGING COMPLETE — MAIN DATABASE NOT MODIFIED`。
 - `SELFHOST-PHASE6-TASK01` 已交付 alpha.35/0035 的 BOM 物料规格标准化与主数据治理源码。严格身份、可解释归并、原始行追溯、异常与替代候选、人工受控绑定/建稿已通过隔离 PostgreSQL 验收；正式替代关系仍不自动写入。
-- `SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06`完成时，18888 Web为状态中文化alpha.40 `sha256:89e7677538751f2c0a049a113f3d24372a18edaf752bf837038580ac951bd153`（88,572,838 bytes）；这是历史部署时点，当前Web以本文件顶部FIX30运行状态为准。PostgreSQL当时及当前均为39/head0039；PUBLIC-IP-CUTOVER-07的Origin/端口和Caddy保持，Worker镜像未替换，PostgreSQL/Caddy与四个受保护卷均未重建。该运行面只属于并行非生产UAT，不等于生产发布。
+- `SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06`完成时，18888 Web为状态中文化alpha.40 `sha256:89e7677538751f2c0a049a113f3d24372a18edaf752bf837038580ac951bd153`（88,572,838 bytes）；这是历史部署时点，当前Web以本文件顶部FIX37运行状态为准。PostgreSQL当时为39/head0039，当前已由FIX37受控升级为40/head0040；PUBLIC-IP-CUTOVER-07的Origin/端口和Caddy保持，Worker镜像未替换，PostgreSQL/Caddy容器与四个受保护卷均未重建。该运行面只属于并行非生产UAT，不等于生产发布。
 - `SELFHOST-LANDING-TASK04` 已把兼容业务台的 CSV-only 页面收敛到 `/materials/imports/new`；旧 `/api/import` 继续在 PostgreSQL 运行面明确退役。功能提交 `cda8c7e` 已经用户单独授权部署到当前 18888 Web，公网 HTML/JS SHA 与源码一致。
 - `SELFHOST-LANDING-TASK03` 根据用户明确授权把公网 `18888` 从旧 Python 切到新 PostgreSQL ERP：可信 TLS、80→HTTPS 跳转、生产 Cookie、匿名 401 和安全响应头通过；旧 Python 仅回环保留。该任务的原入口 `43.135.157.211.nip.io` 已由 PUBLIC-IP-CUTOVER-07 受控替换，当前入口为 `https://43.135.148.43.nip.io:18888`。
 - `SELFHOST-LANDING-TASK02` 经用户澄清“不依赖逐行人工分类”后连续执行：离线确定性规则按来源编码/MPN/严格规格组合、类别、位号和可数件单位完成 532 Material、6 Product、6 个 DRAFT BOM 与 316 行主库导入；438 条真正歧义来源隔离。migration_tool 来源链接承载逐行 provenance，0034 不变，同批次重放新增 0，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`。
 - 后续必须为 197 行提供显式单位；若需要 BOM，还必须另提供产品编码/版本、BOM 版本、行数量、位号和单位契约。完成前不得执行已生成的拟删除计划。本轮停止；LANDING-TASK01 的 offhost copy 仍是独立未完成用户动作。
 
-- 当前源码和并行非生产 UAT Web 版本均为 `0.1.0-alpha.40`，源码与并行 PostgreSQL migration 都为 `0001`—`0039`。生产版本仍不存在，不得把并行 UAT 部署写成生产发布或真实数据迁移。
+- 当前源码和并行非生产 UAT Web 版本均为 `0.1.0-alpha.41`，源码与并行 PostgreSQL migration 都为 `0001`—`0040`。生产版本仍不存在，不得把并行 UAT 部署写成生产发布或真实数据迁移。
 - LANDING-TASK04 部署前后只读核对均为 Audit 876 条、Session 2 条（ACTIVE 1 条）；不可变审计和合法会话不得为追求“零记录”而删除。
 - TASK09 已以保存的非敏感基线摘要执行 delta 验收，并在清理后返回完全相同的合法 Audit/Session 记录集与计数；未来任务仍须遵守相同规则。
 - 2026-07-27 服务器重启/不可用的根因保持 `UNKNOWN`，不得无证据归因 OOM；资源保护不等于生产上线。
