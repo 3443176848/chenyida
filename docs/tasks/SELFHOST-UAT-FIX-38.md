@@ -3,14 +3,15 @@
 ## 状态、阶段与授权边界
 
 - 任务状态：`DOING`。
-- 当前阶段：`VERSION_CONTRACT_SOURCE_READY / REBUILD_REQUIRED`；允许结论仅为`SELFHOST-UAT-FIX-38 VERSION CONTRACT SOURCE READY — REBUILD REQUIRED`。
-- 决策状态：`DECISION_RECORDED`；收货预检与运行时版本合同源码状态：`IMPLEMENTED_AND_ISOLATED_TESTED`；本阶段构建状态：`NOT BUILT`；部署状态：`NOT DEPLOYED`。
+- 当前阶段：`IMAGE_READY / DEPLOYMENT_NOT_AUTHORIZED`；允许结论仅为`FIX38 ALPHA.42 VERSIONED IMAGE CANDIDATE READY — NOT DEPLOYED`。
+- 决策状态：`DECISION_RECORDED`；收货预检与运行时版本合同源码状态：`IMPLEMENTED_AND_ISOLATED_TESTED`；本阶段构建、版本门禁和隔离烟测状态：`PASS`；部署状态：`NOT AUTHORIZED / NOT DEPLOYED`。
 - 日期：2026-08-09（Asia/Shanghai）。
-- 本阶段授权仅限运行时版本读取、health版本投影、Dockerfile最小运行时package metadata、无数据库专项测试和状态文档。未修改Schema、Migration、依赖、Compose、Caddy、systemd、Worker或业务逻辑；未build、Docker build、启动候选容器、部署、重启、登录UAT、调用UAT Receipt preview或发送UAT业务POST。
+- 本镜像阶段授权仅限从固定HEAD执行一次Git archive production-mode Web build、无网络只读版本门禁、唯一隔离数据库/角色及standalone匿名烟测、精确清理和状态文档。未修改Schema、Migration、依赖、Compose、Caddy、systemd、Worker或业务逻辑；未替换或重启UAT服务，未登录UAT，未调用UAT Receipt preview或发送UAT业务POST，未运行UAT Migration，未部署或push。
 - 本任务不授权真实收货、IQC决定、Ledger、AP、Payment、Work Order或生产操作；`PO-00000001`继续受D-105保护。
 
 ## 严格起点与受保护事实
 
+- 本镜像阶段从唯一worktree、clean `main@569aa954d764309e239d1f6c174e582596d33a24`、Parent `61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`、`origin/main...HEAD = behind 0 / ahead 184`起步；health提交`13f72b5f7aa51905af597733356420cc7b017b74`与Dockerfile提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`均在祖先链，工作区、任务状态、镜像、UAT和资源门禁全部匹配。
 - 运行时版本合同补救阶段从唯一worktree、clean `main@780075e0940a124410a72f9e39eac76cc5d9224e`、Parent `401e16b04e3b8cb70ddfd3508661353ff758fdec`、`origin/main...HEAD = behind 0 / ahead 181`起步；没有嵌套仓库、submodule或gitlink。
 - 源码候选现为`0.1.0-alpha.42`；运行中的并行非生产UAT仍为`0.1.0-alpha.41`。PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`，0040 SHA-256仍为`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`；当前UAT Web镜像仍为`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`。
 - 上一次构建产生的候选镜像`sha256:81126136c63714be2a53812b3512549ed1fa4eb9deb7c8c6462b715eafe4278e`（tag `chenyida-erp-parallel-web:0.1.0-alpha.42-fix38-780075e`）仍完整保留并固定为`REJECTED — DO NOT DEPLOY`：其`/app/package.json`缺少version且当时health没有version。它没有`latest`标签、没有关联容器，也不得作为新源码合同的通过证据。
@@ -22,7 +23,7 @@
 
 - 上一次候选构建门禁在任何候选容器或烟测启动前失败：standalone产物用仅含`private/type`的package JSON覆盖了源码metadata，最终镜像文件系统没有`0.1.0-alpha.42`，OCI version label不能替代应用运行时证据。
 - 同一候选的`/api/health`只有既有`ok/database/storage/worker/time`字段，无法证明正在运行的应用版本；因此该镜像拒绝部署，运行UAT继续使用alpha.41。
-- 本阶段只修复源码和构建合同。成功仍必须等待新的、基于当前源码重新构建的候选镜像；不得重新解释或重新标记已拒绝镜像。
+- 前一源码阶段只修复源码和构建合同；本镜像阶段已从固定新HEAD构建并验证新的候选，但没有部署。已拒绝镜像继续原样保留，不得重新解释、重新标记或部署。
 
 ## 背景与需求审计
 
@@ -65,7 +66,7 @@
 - warehouse UI预览GET现携带`evidence_document_date`；未来日期422在对应编辑卡片显示code/message/request_id，清除modal、preview、loading、submitted、dialog error、提交锁及幂等状态，最终按钮不可达。
 - 确认窗底部已改为“返回修改”，按钮、右上角关闭、ESC和背景点击复用同一清理路径；未调用`form.reset()`，未增加“清空本行”，未提交表单DOM值保留供继续修改。
 - NORMAL只投影普通Purchase Receipt/Receipt Line、普通`RECEIPT`和available立即重算；实际IQC模式继续投影RML/FROZEN、`IQC_RECEIPT`、quality责任队列及RELEASE后的`UNFREEZE`。
-- 源码候选版本保持`0.1.0-alpha.42`，不提升alpha.43。收货预检功能提交为`401e16b04e3b8cb70ddfd3508661353ff758fdec`；后续运行时版本与health提交为`13f72b5f7aa51905af597733356420cc7b017b74`，Docker metadata提交为`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`。本阶段未重新构建、部署或发布，运行UAT仍为alpha.41。
+- 源码候选版本保持`0.1.0-alpha.42`，不提升alpha.43。收货预检功能提交为`401e16b04e3b8cb70ddfd3508661353ff758fdec`；后续运行时版本与health提交为`13f72b5f7aa51905af597733356420cc7b017b74`，Docker metadata提交为`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`。源码阶段当时未重新构建；本镜像阶段已构建通过候选但未部署或发布，运行UAT仍为alpha.41。
 
 ## 运行时版本单一来源与health合同
 
@@ -81,9 +82,9 @@
 
 ## Standalone与Caddy安全头责任边界
 
-- 后续获授权的新候选独立容器不经过Caddy；其standalone烟测只验证应用负责的health、version、Cache-Control、匿名保护和无业务数据泄露。
+- 本阶段新候选独立容器未经过Caddy；standalone烟测只验证应用负责的health、version、Cache-Control、匿名保护和无业务数据泄露，现已通过并清理容器。
 - HSTS、X-Frame-Options、nosniff、Referrer-Policy和Permissions-Policy继续由Caddy边缘层负责，必须在后续Web-only部署后通过公开入口验证。
-- 不为迁就隔离烟测而在Node重复新增上述边缘安全头。本阶段没有候选容器，因此没有把Caddy头缺失误记为standalone失败或通过。
+- 不为迁就隔离烟测而在Node重复新增上述边缘安全头。实际standalone响应中这些边缘头为空，按既定责任边界不判失败；必须等另获部署授权后再从公开Caddy入口验证。
 
 ## 明确排除与延期
 
@@ -91,7 +92,7 @@
 - 不新增“清空本行”按钮，不决定显式清空或成功提交后的自动清空策略。
 - 不改变Receipt POST事务结构、库存会计、IQC放行流程或0040 Migration/触发器。
 - 不扩展采购会计、quality、finance、Python/SQLite或历史Sites/D1；不修改生产配置。
-- 不执行真实UAT Receipt、UAT Receipt preview、UAT业务POST、UAT登录、UAT PostgreSQL写、任何Migration、build、Docker build、候选容器、部署或服务重启；本运行时版本合同阶段也不创建隔离测试数据库。
+- 不执行真实UAT Receipt、UAT Receipt preview、UAT业务POST、UAT登录、UAT PostgreSQL写、UAT Migration、部署或服务重启。本镜像阶段只执行已授权的唯一build、隔离库Migration装载和临时候选容器烟测；这些临时资源已全部清理。
 
 ## D-107源码阶段历史验收结果
 
@@ -104,7 +105,7 @@
 7. PASS：两个唯一测试数据库均明确不为`chenyida_erp`，脚本URL guard拒绝UAT/生产URL；测试后逐一强制删除，所有`cyd-fix38-*`临时容器自动删除，未创建网络或持久目录。
 8. PASS：文档提交前以`REPEATABLE READ READ ONLY`事务再次复核UAT；40/head0040、PO/Line/Plan/queue为`1/4/4/4`、总已收0，warehouse账号active/version5/Session0，Receipt/Evidence/Lot/IQC/Ledger/AP/Payment/生产记录均为0，事务以ROLLBACK结束。
 
-## 运行时版本合同阶段验证与允许结论
+## 运行时版本合同源码阶段历史验证
 
 - 现有`node:22-bookworm-slim`镜像、仓库既有依赖、源码只读挂载、单容器/单CPU、1,280 MiB内存与Swap硬上限、`NODE_OPTIONS=--max-old-space-size=1024`及串行执行贯穿全部Node测试；全部使用`network none`，未安装依赖、下载镜像或创建测试数据库。
 - 最终串行结果：版本模块4/4、health合同3/3、Dockerfile合同4/4、FIX38 Unit组合17/17、UI contract 6/6、`typecheck:procurement-fulfillment`通过、`npm run lint` 0 error/0 warning、`npm test`3/3。
@@ -112,5 +113,32 @@
 - 最终只读`REPEATABLE READ READ ONLY`事务并ROLLBACK确认40/head0040、warehouse active/version5/Session0、PO/Line/Plan/queue `1/4/4/4`、已收0，Receipt/Evidence/Lot/IQC/Ledger/Purchase Source/AP/Payment/Work Order和生产Issue/Return/Report/Completion全0。
 - 起点/测试后available约2.2/2.2 GiB，Swap约300/311 MiB（1 GiB），根分区可用17 GiB，测试后Load `1.18/0.87/0.45`；四服务容器身份不变、restart0/OOM false、内核OOM 0。所有`cyd-fix38-*`临时容器、目录、网络、数据库和Volume增量均为0。
 - 被拒镜像`sha256:81126136c63714be2a53812b3512549ed1fa4eb9deb7c8c6462b715eafe4278e`及唯一FIX38 tag原样保留为`REJECTED — DO NOT DEPLOY`；`latest`和运行Web仍指向alpha.41的`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`。
-- 未运行`npm run build`、Docker build、候选容器、Migration、部署、服务重启、UAT登录、UAT Receipt preview、UAT业务POST、备份、恢复、push或PR。
-- 本阶段允许的成功结论仅为：`SELFHOST-UAT-FIX-38 VERSION CONTRACT SOURCE READY — REBUILD REQUIRED`。FIX38保持`DOING`；后续必须另获授权并从当前源码重新构建新候选，不能部署或复用已拒镜像。
+- 上述源码阶段当时未运行`npm run build`、Docker build、候选容器、Migration、部署、服务重启、UAT登录、UAT Receipt preview、UAT业务POST、备份、恢复、push或PR。
+- 上述源码阶段当时只允许`SELFHOST-UAT-FIX-38 VERSION CONTRACT SOURCE READY — REBUILD REQUIRED`；当前状态已由下方镜像阶段接续，已拒镜像仍不能复用。
+
+## alpha.42版本化镜像重建与隔离烟测
+
+### 唯一构建与镜像证据
+
+- 构建只执行一次，输入严格为Git tree `HEAD:chenyida_erp_site`（tree `19384bbc10f15f382d6ac70040827125e839653f`）；Dockerfile SHA-256 `3131dd62ded36d1ac058f7a0e3f8869a401c878851ae895bfa8f595b7ef40e49`，`.dockerignore` SHA-256 `53fce31d86668faca3449ca8e9c0c14b58c89276399e7e4708eedcad6f529a69`，package和lock根版本均为`0.1.0-alpha.42`。903个跟踪文件、49,341,766 bytes的context路径未命中环境文件、数据库、备份、日志、上传、附件、缓存或凭据；没有传递数据库、Session、Token或业务环境变量。
+- 精确候选tag为`chenyida-erp-parallel-web:0.1.0-alpha.42-fix38-569aa95`，完整Image ID为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，本地内容digest为`chenyida-erp-parallel-web@sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，未push且没有远端registry digest。创建时间`2026-08-09T21:11:11.69732358+08:00`，`linux/amd64`，88,679,975 bytes；比alpha.41增加1,136 bytes（0.001281%），比已拒候选增加966 bytes（0.001089%），远低于20%停止阈值。
+- OCI labels精确为version `0.1.0-alpha.42`、revision `569aa954d764309e239d1f6c174e582596d33a24`、task `SELFHOST-UAT-FIX-38`；9个rootfs layer，`User=node`、`Workdir=/app`、Entrypoint `docker-entrypoint.sh`、Cmd `node server.js`、暴露`3000/tcp`、镜像内无Healthcheck且不自动运行Migration。Worker运行镜像与源码target均未改变。
+- `network none`、只读、自动删除的版本门禁容器确认`/app/package.json`为合法JSON且恰好只有`name/version/private/type`，值为`chenyida-erp-selfhosted / 0.1.0-alpha.42 / true / module`；无scripts、devDependencies、registry、Token或数据库URL。2,298个文件中版本命中1处，`RECEIPT_EVIDENCE_FUTURE_DATE`、`evidence_document_date`和`返回修改`全部命中；Docker history敏感内容和敏感ARG/ENV均为0。
+
+### 隔离数据库与standalone smoke
+
+- 唯一测试库和角色最终名均为`fix38_image_smoke_569aa95_test351669cd`，密码与setup token只在root-only mode600任务文件保存且未打印。角色为LOGIN但非superuser/createdb/createrole/inherit/replication/bypassrls，connection limit 4，只拥有一个目标库、无成员关系、无UAT表读写或数据库CREATE权限；目标库撤销PUBLIC CONNECT，运行URL精确为`postgres:5432`及该库/角色，不存在UAT fallback。
+- 运行Worker镜像历史上只含0001—0034，首个初始化容器如实把新空库装载到34/head0034后删除；一次root-only工作树bind尝试在任何SQL前以EACCES失败并自动删除。随后从当前Git tree归档40个migration到任务临时目录，逐文件SHA与HEAD一致、0040 SHA仍为`b6781c94…a5a93`，由同一既有runner非root只读挂载补齐0035—0040。最终目标库为40/head0040、227张public表，Session、Receipt及全部下游为0；所有初始化容器先删除，才启动Web。
+- 唯一候选Web容器使用restart=no、0.75 CPU、512 MiB memory、768 MiB memory+swap、128 PID、只读rootfs、内部临时网络及三个任务临时bind目录；未挂UAT uploads/attachments/backup-status或任何受保护Volume，未接Caddy、未启动Worker、未建账号、未登录或公开暴露。Docker的`127.0.0.1::3000`随机映射没有产生HostPort，因此烟测改用容器内localhost及同一内部网络的等价非公开连接，没有扩大暴露面。启动后restart0/OOM false，约52.87 MiB；日志只有一条Vinext启动信息，密码/URL/Token、SQL堆栈和自动Migration命中均为0，最后migration时间早于Web启动。
+- health返回HTTP200、`ok=true`、`database=postgresql`、`storage=local`、`worker=postgresql-jobs`、`version=0.1.0-alpha.42`及合法time；`Cache-Control: no-store`与指定`X-Request-ID`一致，正文不含路径、环境、数据库URL或镜像ID。根页HTTP200且`private, no-store, max-age=0, must-revalidate`；匿名Session为false/null。`/warehouse/receiving`响应及初始DOM不含`PO-00000001`、`SUP-000001`、Material 533—536、四个Material code或创建审计凭证；仅调用health、根页、warehouse页和anonymous Session，Receipt preview与业务POST均为0。
+- Standalone没有HSTS、X-Frame-Options、nosniff、Referrer-Policy或Permissions-Policy，这是Caddy边缘责任且不构成失败。隔离库最终User/Session/Receipt/Evidence/Lot/IQC/Ledger/Purchase Source/AP/Payment/Work Order/生产全部为0。
+
+### 清理、UAT不变与部署门禁
+
+- 严格按候选容器→测试数据库→测试角色→临时网络→任务目录顺序清理；临时容器、数据库、角色、网络和目录最终均为0，随机秘密删除前覆盖。候选镜像、已拒镜像、alpha.41、build cache及四个受保护Volume全部保留，未prune。
+- UAT migration指纹`822e0e5bf92d4c267aa316668936a196ea23ec6c49a83ac82c777ce2c7fa2b19`与业务指纹`89915aaecad46c5a754ba3239c8bc9d8d4e4039dfad24827267614d32b06dd3b`在初始化前、初始化后和清理后逐字节一致：40/head0040、warehouse Session0、PO/Line/Plan/queue `1/4/4/4`、已收0，Receipt/Evidence/Lot/IQC/Ledger/AP/Payment/Work Order/生产全0。
+- UAT Web/Worker/PostgreSQL/Caddy完整容器ID分别保持`1e5394349c49895ca14aba09cd8f765cd88a7fff94b593ff675e165481b8865f`、`fb68d9a81b87fc625f5a78407b9e1020c7c65daa6b39079f6564ac860a57f6e0`、`f3a2f3cb32f4f76cf8a31a4db9b1276adb36484c912925889e909114a332ead3`、`c209765be0b4abb867870949f9e9d1a37eef44aa0f97862af742f87f7cc518df`；四服务restart0/OOM false，本地和公开health仍是运行alpha.41的原合同响应，当前Web及`latest`仍为`sha256:0cf98937…d5f19`。
+- 已拒镜像`sha256:81126136c63714be2a53812b3512549ed1fa4eb9deb7c8c6462b715eafe4278e`及唯一tag `0.1.0-alpha.42-fix38-780075e`继续`REJECTED — DO NOT DEPLOY`，无latest或容器。新通过候选只保留本机；下一阶段只有另获授权后才能把Compose Web精确目标设为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，只替换Web、不运行Migration、不重建PostgreSQL/Worker/Caddy。失败时只把Web回滚到`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`并复核health、Caddy安全头、匿名保护、Restart/OOM、业务指纹、Session及未来日期422/零业务POST。
+- 最新正式备份仍为`/var/backups/chenyida-erp/warehouse-receipt-readiness-fix37-predeploy-20260808T120636Z.dump`，2026-08-08 20:07:23 +0800、2,298,941 bytes、SHA-256 `28e07b9dc04e686d5077fe9f68968ffb1a4253979d64b80317307f8543bc0868`。异机复制仍未完成；远端`origin/main`为`39946f6b854a985b5c19106eaa6c938bddaf9c7c`，本阶段提交前behind0/ahead184、文档提交后预期ahead185；源码增量和新候选镜像都只在本机，仍有单机恢复风险，不能称生产就绪。
+- 资源起点为available约2.2 GiB、Swap311 MiB/1 GiB、根盘17 GiB、Load `0.23/0.29/0.27`；收口为available约1.9 GiB、Swap313 MiB/1 GiB、根盘17 GiB、Load `0.52/0.31/0.28`，最终60秒Swap增量0，Kernel OOM0，四服务restart0/OOM false。Docker images 57→58、build cache 97→105；未清理缓存或Volume。
+- 本阶段允许结论仅为`FIX38 ALPHA.42 VERSIONED IMAGE CANDIDATE READY — NOT DEPLOYED`。FIX38保持`DOING / IMAGE_READY / DEPLOYMENT_NOT_AUTHORIZED`；没有完成报告，没有把RELEASES标记为alpha.42已发布。

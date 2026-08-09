@@ -4,7 +4,16 @@
 
 ## 2026-08-09
 
-### SELFHOST-UAT-FIX-38 - `fix: validate receipt evidence date before confirmation` / `fix: expose runtime version in health` / `build: preserve runtime package version` / `docs: record FIX38 rebuild requirement`
+### SELFHOST-UAT-FIX-38 - `fix: validate receipt evidence date before confirmation` / `fix: expose runtime version in health` / `build: preserve runtime package version` / `docs: record FIX38 rebuild requirement` / `ops: build warehouse receipt date guard candidate`
+
+#### alpha.42版本化候选镜像与隔离烟测
+
+- 构建/镜像：从唯一clean `main@569aa954d764309e239d1f6c174e582596d33a24`的`HEAD:chenyida_erp_site` Git archive只执行一次Web target build；tree`19384bbc10f15f382d6ac70040827125e839653f`，Dockerfile/`.dockerignore` SHA分别为`3131dd62…e49`/`53fce31d…a69`，敏感context路径命中0。新tag`chenyida-erp-parallel-web:0.1.0-alpha.42-fix38-569aa95`，完整Image ID及本地内容digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，linux/amd64、88,679,975 bytes；没有latest、远端digest或镜像push。
+- 版本门禁：OCI version/revision/task精确为`0.1.0-alpha.42`/`569aa954…d33a24`/`SELFHOST-UAT-FIX-38`；非root node、`node server.js`、9 layers及无自动Migration保持。network-none只读检查确认`/app/package.json`恰好含`name/version/private/type`且version为alpha.42，三个FIX38标记齐全；scripts、devDependencies、registry、Token、数据库URL、敏感history及ARG/ENV命中0。
+- 隔离烟测：唯一最小权限库/角色显式隔离于UAT；运行Worker镜像仅装载0001—0034后删除，当前Git归档的40个既有migration逐SHA核对并以非root只读方式补齐0035—0040，最终40/head0040、227张public表。候选使用restart=no、0.75 CPU、512/768 MiB、只读rootfs、内部网络及临时bind启动，health为HTTP200、原字段加`version=0.1.0-alpha.42`、no-store/request ID；根页/warehouse页及匿名Session正常且不泄漏PO/Supplier/Material/审计信息。仅调用health、根、warehouse和匿名Session，登录、Receipt preview及业务POST均为0，隔离库Session/Receipt及全部下游0。
+- 安全头/清理：Standalone不含HSTS、X-Frame-Options、nosniff、Referrer-Policy或Permissions-Policy符合Caddy边缘责任，待后续获授权部署后从公开入口验收。按候选容器→测试库→测试角色→临时网络→任务目录清理并在删除前覆盖随机秘密，五类临时资源均为0；候选、alpha.41、已拒镜像、build cache和受保护Volume保留，未prune。
+- UAT/部署门禁：Web/Worker/PostgreSQL/Caddy完整容器身份、镜像、restart0/OOM false和受保护Volume不变；运行Web/latest仍为alpha.41的`sha256:0cf98937…d5f19`。migration/业务指纹在隔离初始化前后及清理后逐字节一致：40/head0040、Session0、PO/Line/Plan/queue`1/4/4/4`、已收0及Receipt全部下游0。未替换或重启UAT、未登录、未调用UAT Receipt preview/业务POST、未运行UAT Migration；通过候选只有另获授权后才能精确Image ID Web-only部署并以旧完整Image ID回滚。
+- 风险/状态：已拒镜像`sha256:81126136c63714be2a53812b3512549ed1fa4eb9deb7c8c6462b715eafe4278e`继续`REJECTED — DO NOT DEPLOY`且无latest/容器。最新正式dump仍为2,298,941 bytes、SHA`28e07b9d…0868`，异机复制未完成；`origin/main`仍落后本地184个提交，文档提交后预期185，源码与候选镜像只在本机且未push。资源从available约2.2GiB/Swap311MiB/根盘17GiB/Load`0.23/0.29/0.27`到约1.9GiB/313MiB/17GiB/`0.52/0.31/0.28`，60秒Swap增量0、内核OOM0。FIX38保持`DOING / IMAGE_READY / DEPLOYMENT_NOT_AUTHORIZED`，结论仅为`FIX38 ALPHA.42 VERSIONED IMAGE CANDIDATE READY — NOT DEPLOYED`。
 
 #### 运行时版本合同补救
 
@@ -12,7 +21,7 @@
 - 应用/health：新增严格的运行时版本模块，以`process.cwd()/package.json`及SemVer验证为唯一来源，成功值只缓存一次；不可读、损坏、缺失或非法version失败关闭，不回退unknown/latest/development。health保留`ok/database/storage/worker/time`与数据库检查，新增version并继续no-store/request ID；失败响应非2xx且不泄漏路径、堆栈、环境或原始metadata。提交`13f72b5f7aa51905af597733356420cc7b017b74`。
 - Docker：builder从源码package机械验证并确定性生成仅含`name/version/private/type`的JSON，Web final在standalone之后复制为`/app/package.json`；无alpha.42硬编码、完整依赖或环境变量替代。基础镜像、node用户、端口、`node server.js`、Worker、Compose、Caddy及Migration行为不变。提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`。
 - 测试：按无网络、源码只读、单容器/1 CPU/Node heap 1024 MiB顺序通过版本4/4、health3/3、Dockerfile4/4、FIX38 Unit17/17、UI6/6、专项typecheck、lint 0 error/0 warning及npm3/3。Docker合同首轮仅因测试fixture的Worker历史快照错误为3/4，核对HEAD后只修正fixture并重跑4/4；typecheck首次无诊断但清理发现compile cache，精确删除、禁用cache后原命令重跑通过且临时资源清零。
-- 边界/状态：standalone后续只负责health/version/Cache-Control/匿名保护/无泄漏；HSTS/X-Frame-Options/nosniff/Referrer-Policy/Permissions-Policy继续由Caddy在部署后验证。本阶段未build、Docker build、启动候选、Migration、部署、重启、登录UAT、Receipt preview、业务POST、备份、恢复或push。源码仍alpha.42，FIX38保持`DOING / VERSION_CONTRACT_SOURCE_READY / REBUILD_REQUIRED`，结论仅为`SELFHOST-UAT-FIX-38 VERSION CONTRACT SOURCE READY — REBUILD REQUIRED`。
+- 边界/历史状态：该源码阶段当时只负责health/version/Cache-Control/匿名保护/无泄漏合同，HSTS/X-Frame-Options/nosniff/Referrer-Policy/Permissions-Policy继续归Caddy；当时未build、Docker build、启动候选、Migration、部署、重启、登录UAT、Receipt preview、业务POST、备份、恢复或push，结论为`SELFHOST-UAT-FIX-38 VERSION CONTRACT SOURCE READY — REBUILD REQUIRED`。当前状态已由上方版本化候选镜像阶段接续。
 - 运行保护：最终只读事务并ROLLBACK确认40/head0040、warehouse active/version5/Session0、PO/Line/Plan/queue`1/4/4/4`、已收0及Receipt/Evidence/Lot/IQC/Ledger/Purchase Source/AP/Payment/Work Order/生产全0。起点/测试后available约2.2/2.2GiB、Swap约300/311MiB、根盘17GiB，测试后Load`1.18/0.87/0.45`；四服务restart0/OOM false、内核OOM0，无任务临时资源。
 
 #### 收货预检源码阶段

@@ -37,21 +37,21 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 当前版本 | 源码候选为`0.1.0-alpha.42`，运行时版本合同修复后尚未重新build或deploy；并行非生产UAT Web仍为`0.1.0-alpha.41`。PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。这是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
+| 当前版本 | 源码及本机通过门禁的候选镜像为`0.1.0-alpha.42`，但尚未部署；并行非生产UAT Web仍为`0.1.0-alpha.41`。PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。这是受控非生产候选验证，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
-| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。源码仍为alpha.42，没有Migration，尚未重新build或deploy |
+| 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration，也没有部署 |
 | 当前根仓库运维基线 | `SELFHOST-UAT-FIX-37`已完成root-only正式备份/list/第二新库恢复、0039→0040升级/重放、主库0040受控应用、Web-only替换、warehouse-only桌面/390×844预览取消UAT及安全退出；主UAT business POST0且全部收货下游保持0。独立收口提交消息为`ops: deploy warehouse receipt readiness safeguards`，实际SHA以Git log为准 |
-| Git 同步与工作区 | 运行时版本合同阶段从唯一worktree、clean`main@780075e0940a124410a72f9e39eac76cc5d9224e`、Parent`401e16b04e3b8cb70ddfd3508661353ff758fdec`、behind0/ahead181起步；两个代码提交为`13f72b5f7aa51905af597733356420cc7b017b74`和`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`，文档独立提交后应为ahead184。未push/PR/amend/rebase/reset/stash/restore，密码、Token、Cookie、Session正文、连接信息和备份正文不得进入Git |
+| Git 同步与工作区 | 镜像阶段从唯一worktree、clean`main@569aa954d764309e239d1f6c174e582596d33a24`、Parent`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`、`origin/main=39946f6b854a985b5c19106eaa6c938bddaf9c7c`、behind0/ahead184起步；仅五份文档以`ops: build warehouse receipt date guard candidate`独立提交后应为ahead185。未push镜像或Git，也未PR/amend/rebase/reset/stash/restore；源码增量与候选镜像仍只在本机 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0040`，40/head`0040_warehouse_receipt_readiness.sql`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`；0039及更早未修改。主`RFQ-00000001`为CLOSED v7，Award为1/v1/AWARDED且Line4；受控`PO-00000001`为1/v1/OPEN，PO Line/Delivery Plan/queue为`4/4/4`，新证据表及Receipt/Lot/IQC/Ledger/AP/付款/生产下游全0。四条获选Candidate、Binding及Mapping保持 |
-| 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。运行Web及`latest`仍为alpha.41的`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`（88,678,839 bytes），Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。失败候选`sha256:81126136c63714be2a53812b3512549ed1fa4eb9deb7c8c6462b715eafe4278e`仅保留精确FIX38 tag并标记`REJECTED — DO NOT DEPLOY`，没有容器或latest；四个受保护Volume未更换 |
-| 当前开发环境 | 既有D-107收货预检源码保持；新增运行时版本模块从`process.cwd()/package.json`严格读取并缓存SemVer版本，非法metadata失败关闭。`/api/health`保留原字段/数据库检查并新增version；Docker builder机械生成只含`name/version/private/type`的metadata，Web final复制为`/app/package.json`。基础镜像、Worker、`node server.js`、Compose、Caddy、最终Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `VERSION_CONTRACT_SOURCE_READY / REBUILD_REQUIRED`。允许结论仅为`SELFHOST-UAT-FIX-38 VERSION CONTRACT SOURCE READY — REBUILD REQUIRED`；当前源码合同通过但没有新候选镜像、部署或UAT复验，已拒镜像不能复用 |
-| 当前任务 | `SELFHOST-UAT-FIX-38`仍为唯一`DOING`。版本4/4、health3/3、Dockerfile4/4、FIX38 Unit17/17、UI6/6、专项typecheck、lint和npm test通过；UAT仍为alpha.41/Web`0cf98937…`/0040，未登录、未调用UAT Receipt preview、未发UAT业务POST，Session0及Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0 |
-| 下一任务 | 只有另获明确授权后，才能从当前源码重新构建全新FIX38候选并执行版本/health/匿名保护standalone门禁；部署及公开入口Caddy安全头验收仍需后续独立授权。当前不自动构建、部署或登录UAT，真实收货、IQC、AP、付款及生产继续需要各自明确授权 |
+| 当前运行状态 | `https://43.135.148.43.nip.io:18888`仍经原Caddy到原Web；运行Web及`latest`仍为alpha.41的`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`（88,678,839 bytes）。本机新通过候选为`chenyida-erp-parallel-web:0.1.0-alpha.42-fix38-569aa95` / `sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），没有latest、容器或远端digest；失败候选`sha256:81126136c63714be2a53812b3512549ed1fa4eb9deb7c8c6462b715eafe4278e`仍为`REJECTED — DO NOT DEPLOY`。四服务身份、restart0/OOM false及四个受保护Volume均未变化 |
+| 当前开发环境 | alpha.42候选的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，health返回原字段加alpha.42 version。候选在40/head0040的唯一隔离库、最小权限角色、只读rootfs和内部临时网络完成启动、health、匿名保护与零业务写烟测；Standalone不重复Caddy负责的边缘安全头。Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
+| 当前阶段 | `IMAGE_READY / DEPLOYMENT_NOT_AUTHORIZED`。允许结论仅为`FIX38 ALPHA.42 VERSIONED IMAGE CANDIDATE READY — NOT DEPLOYED`；候选只在本机保留，未替换或重启UAT、未迁移、未登录、未调用UAT Receipt preview或业务POST |
+| 当前任务 | `SELFHOST-UAT-FIX-38`仍为唯一`DOING`。候选镜像package/OCI/health均为alpha.42，隔离数据库为40/head0040且已与角色、容器、网络和临时目录全部清理；UAT仍为alpha.41/Web`0cf98937…`/0040，Session0、PO/Line/Plan/queue`1/4/4/4`、已收0及Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0 |
+| 下一任务 | 只有另获明确部署授权后，才能把Compose Web精确指向通过候选`sha256:e7761e2c…f94964`并仅替换Web；不得部署已拒镜像、不得运行Migration或重建PostgreSQL/Worker/Caddy。失败时只把Web回滚至`sha256:0cf98937…d5f19`，再复核本地/公开health、Caddy安全头、匿名保护、Restart/OOM、业务指纹、Session及未来日期422且业务POST0 |
 
 ## 当前完成模块
 
@@ -298,7 +298,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- `SELFHOST-UAT-FIX-38`为唯一`DOING`，当前阶段`VERSION_CONTRACT_SOURCE_READY / REBUILD_REQUIRED`：既有`401e16b…`收货预检保持，`13f72b5f7aa51905af597733356420cc7b017b74`新增严格缓存的运行时版本模块与health version，`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`让Docker builder从源码package机械生成最小metadata并由Web final复制到`/app/package.json`。全套无网络串行测试通过；未build、Docker build、启动候选、deploy、restart、登录UAT或调用UAT Receipt preview/业务POST。运行UAT仍alpha.41/Web`0cf98937…5f19`、Receipt及下游0；旧候选`81126136…278e`保持`REJECTED — DO NOT DEPLOY`，后续必须另获授权重新构建。
+- `SELFHOST-UAT-FIX-38`为唯一`DOING`，当前阶段`IMAGE_READY / DEPLOYMENT_NOT_AUTHORIZED`：从固定`main@569aa954…d33a24`的`HEAD:chenyida_erp_site`唯一构建新tag `0.1.0-alpha.42-fix38-569aa95`，完整Image ID `sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。镜像内最小package、OCI与health均精确为alpha.42；唯一隔离数据库/角色装载40/head0040，standalone启动、匿名保护及零业务写通过后已按序清零所有临时资源。未替换或重启UAT、未登录、未调用UAT Receipt preview/业务POST、未运行UAT Migration或push；运行UAT仍alpha.41/Web`0cf98937…5f19`且Receipt及下游0。旧候选`81126136…278e`仍为`REJECTED — DO NOT DEPLOY`；通过候选也只有另获授权后才能Web-only部署。
 - `SELFHOST-UAT-FIX-37`已完成：功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`及语义修正`20a9123741862d81ac18af9e6bdee896674fe95c`；alpha.41/0040关系化收货证据、最小权限谱系、权威GET预览、最终POST事务门禁、提前到货保护和按inspection mode分流已Web-only部署为`sha256:0cf98937…5f19`。正式备份/第二库恢复/0039→0040及warehouse-only桌面/390×844取消UAT通过；business POST0、Session0，PO/Line/Plan/queue `1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。这是FIX38前置历史；真实收货及后续部门动作均须另获授权。
 - `SELFHOST-UAT-FIX-36`已完成：功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`；通用受限读模型、数据域403、PO聚合及完整上游谱系、四Line、四Plan/queue、Event/Audit/Idempotency最小投影和响应式只读详情已Web-only部署为`sha256:664e0ac6…a4ec89`。正式备份恢复、purchase-only桌面/390×844刷新重开和Session失效通过；business POST0，PO/Line/Plan/queue `1/4/4/4`及下游全0。这是FIX37的前置历史，不是当前执行指令。
 - `SELFHOST-UAT-DECISION-35`已完成：D-105将未经事前授权的`PO-00000001`置于受控保留状态；它是控制事件，只提供前向授权并明确“不追溯性授权”。PO/Line/Plan/queue `1/4/4/4`及Event/Audit/Idempotency证据不得改动，Award→PO不再重试；FIX36只读验收不改变该判断或授权边界。
@@ -343,7 +343,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - `SELFHOST-LANDING-TASK02` 经用户澄清“不依赖逐行人工分类”后连续执行：离线确定性规则按来源编码/MPN/严格规格组合、类别、位号和可数件单位完成 532 Material、6 Product、6 个 DRAFT BOM 与 316 行主库导入；438 条真正歧义来源隔离。migration_tool 来源链接承载逐行 provenance，0034 不变，同批次重放新增 0，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`。
 - 后续必须为 197 行提供显式单位；若需要 BOM，还必须另提供产品编码/版本、BOM 版本、行数量、位号和单位契约。完成前不得执行已生成的拟删除计划。本轮停止；LANDING-TASK01 的 offhost copy 仍是独立未完成用户动作。
 
-- 当前源码候选为`0.1.0-alpha.42`且未build/deploy，并行非生产UAT Web仍为`0.1.0-alpha.41`；源码与并行PostgreSQL migration均为`0001`—`0040`。生产版本仍不存在，不得把源码候选或并行UAT写成生产发布或真实数据迁移。
+- 当前源码与本机通过门禁的候选镜像均为`0.1.0-alpha.42`，但未deploy；并行非生产UAT Web仍为`0.1.0-alpha.41`，源码与并行PostgreSQL migration均为`0001`—`0040`。生产版本仍不存在，不得把候选镜像或并行UAT写成生产发布或真实数据迁移。
 - LANDING-TASK04 部署前后只读核对均为 Audit 876 条、Session 2 条（ACTIVE 1 条）；不可变审计和合法会话不得为追求“零记录”而删除。
 - TASK09 已以保存的非敏感基线摘要执行 delta 验收，并在清理后返回完全相同的合法 Audit/Session 记录集与计数；未来任务仍须遵守相同规则。
 - 2026-07-27 服务器重启/不可用的根因保持 `UNKNOWN`，不得无证据归因 OOM；资源保护不等于生产上线。
