@@ -5,6 +5,11 @@ import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts"
 import { requestOriginMatches } from "../app/lib/infrastructure/request-origin.ts";
 import { buildAwardConversionPreview } from "../app/lib/procurement-fulfillment-selfhost/award-conversion-preview.ts";
 import { legacyConversionHttpStatus, projectedQueueStatus, supplierSequenceLabel } from "../app/lib/procurement-fulfillment-selfhost/purchase-order-history.ts";
+import {
+  assertReceiptEvidenceDateNotFuture,
+  optionalReceiptEvidenceDate,
+  receiptEvidenceDate,
+} from "../app/lib/procurement-fulfillment-selfhost/receipt-evidence-date.ts";
 import { buildAwardHistoryReadModel } from "../app/lib/procurement-sourcing-selfhost/award-read-model.ts";
 
 const mappingUuids = [
@@ -85,6 +90,22 @@ test("PO history labels queue and legacy failure evidence without inventing stor
   assert.deepEqual(legacyConversionHttpStatus("UNKNOWN"),{http_status:null,source:"UNAVAILABLE"});
 });
 
+test("receipt evidence dates use strict calendar parsing and a stable server-date future gate", async () => {
+  assert.equal(optionalReceiptEvidenceDate(null), null);
+  for (const value of ["2024-02-29", "2026-02-28", "9999-12-31"]) assert.equal(receiptEvidenceDate(value), value);
+  for (const value of ["", " 2026-02-28", "2026-2-28", "2026-02-30", "2026-13-01", "0000-01-01", "2026-02-28T00:00:00Z"]) {
+    assert.throws(() => receiptEvidenceDate(value), (error) => error.code === "RECEIPT_EVIDENCE_DATE_INVALID"
+      && error.status === 422 && error.message === "送货凭证日期必须是有效的YYYY-MM-DD日期");
+  }
+  assert.doesNotThrow(() => assertReceiptEvidenceDateNotFuture("2026-08-08", "2026-08-09"));
+  assert.doesNotThrow(() => assertReceiptEvidenceDateNotFuture("2026-08-09", "2026-08-09"));
+  assert.throws(() => assertReceiptEvidenceDateNotFuture("2026-08-10", "2026-08-09"), (error) =>
+    error.code === "RECEIPT_EVIDENCE_FUTURE_DATE" && error.status === 422
+      && error.message === "送货凭证日期不能晚于服务端实际收货日期");
+  const source = await readFile(new URL("../app/lib/procurement-fulfillment-selfhost/receipt-evidence-date.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /new Date|Date\.parse/);
+});
+
 test("fulfillment orchestrator reuses procurement receipt, inventory and finance authority",async()=>{
   const source=await readFile(new URL("../app/lib/procurement-fulfillment-selfhost/service.ts",import.meta.url),"utf8");
   assert.match(source,/createOrderInTransaction/);assert.match(source,/createReceiptInTransaction/);assert.match(source,/reverseReceiptInTransaction/);
@@ -103,11 +124,13 @@ test("0040 adds immutable relational receipt evidence and the server-only previe
   const service=await readFile(new URL("../app/lib/procurement-fulfillment-selfhost/service.ts",import.meta.url),"utf8");
   const handler=await readFile(new URL("../app/lib/procurement-fulfillment-selfhost/handler.ts",import.meta.url),"utf8");
   const readModel=await readFile(new URL("../app/lib/procurement-fulfillment-selfhost/warehouse-receipt-readiness.ts",import.meta.url),"utf8");
+  const evidenceDateRule=await readFile(new URL("../app/lib/procurement-fulfillment-selfhost/receipt-evidence-date.ts",import.meta.url),"utf8");
   const api=await readFile(new URL("../app/lib/selfhost-api.ts",import.meta.url),"utf8");
   assert.match(migration,/CREATE TABLE "warehouse_receipt_evidence"/);assert.match(migration,/purchase_receipt_id/);assert.match(migration,/delivery_plan_id/);assert.match(migration,/queue_entry_id/);assert.match(migration,/evidence_document_date/);assert.match(migration,/early_arrival_reason/);assert.match(migration,/physical_receipt_confirmed/);assert.match(migration,/expected_purchase_order_version/);assert.match(migration,/expected_queue_version/);assert.match(migration,/cyd_warehouse_receipt_evidence_guard/);assert.match(migration,/warehouse receipt evidence is immutable/);assert.match(migration,/warehouse receipt evidence lineage mismatch/);assert.doesNotMatch(migration,/alter table "supplier_mappings"/i);
-  assert.match(handler,/receipt-preview/);assert.match(handler,/request\.method === "GET" && receiptReadiness/);assert.match(handler,/procurement\.receiving\.receive/);assert.match(handler,/收货核对预览仅支持只读GET/);
-  assert.match(service,/begin isolation level repeatable read read only/);assert.match(service,/for update of purchase_order,purchase_order_line,plan,queue/);assert.match(service,/PURCHASE_ORDER_VERSION_OR_STATE_CONFLICT/);assert.match(service,/PURCHASE_ORDER_LINE_VERSION_CONFLICT/);assert.match(service,/DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT/);assert.match(service,/RECEIVING_QUEUE_VERSION_OR_STATE_CONFLICT/);assert.match(service,/EARLY_ARRIVAL_EVIDENCE_REQUIRED/);assert.match(service,/RECEIPT_EVIDENCE_FUTURE_DATE/);assert.match(service,/RECEIPT_TIME_SERVER_CONTROLLED/);assert.match(service,/after_receipt_evidence/);assert.match(service,/insert into warehouse_receipt_evidence/);
-  assert.match(readModel,/WAREHOUSE_RECEIPT_READINESS_V1/);assert.match(readModel,/Asia\/Shanghai/);assert.match(readModel,/system\.audit\.read/);assert.match(readModel,/PO OPEN不代表已到货/);assert.match(readModel,/Plan PENDING不代表已收货/);assert.match(readModel,/queue OPEN_PENDING不代表库存增加/);assert.match(readModel,/supplier_notification_or_in_transit_model_available: false/);assert.doesNotMatch(readModel,/idempotency_key_digest|request_body|response_body|session_header/i);
+  assert.match(handler,/receipt-preview/);assert.match(handler,/request\.method === "GET" && receiptReadiness/);assert.match(handler,/searchParams\.get\("evidence_document_date"\)/);assert.match(handler,/procurement\.receiving\.receive/);assert.match(handler,/收货核对预览仅支持只读GET/);
+  assert.match(service,/begin isolation level repeatable read read only/);assert.match(service,/for update of purchase_order,purchase_order_line,plan,queue/);assert.match(service,/PURCHASE_ORDER_VERSION_OR_STATE_CONFLICT/);assert.match(service,/PURCHASE_ORDER_LINE_VERSION_CONFLICT/);assert.match(service,/DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT/);assert.match(service,/RECEIVING_QUEUE_VERSION_OR_STATE_CONFLICT/);assert.match(service,/EARLY_ARRIVAL_EVIDENCE_REQUIRED/);assert.match(service,/assertReceiptEvidenceDateNotFuture/);assert.match(service,/RECEIPT_TIME_SERVER_CONTROLLED/);assert.match(service,/after_receipt_evidence/);assert.match(service,/insert into warehouse_receipt_evidence/);
+  assert.match(readModel,/WAREHOUSE_RECEIPT_READINESS_V1/);assert.match(readModel,/transaction_timestamp\(\)/);assert.doesNotMatch(readModel,/clock_timestamp\(\)/);assert.match(readModel,/optionalReceiptEvidenceDate/);assert.match(readModel,/assertReceiptEvidenceDateNotFuture/);assert.match(readModel,/Asia\/Shanghai/);assert.match(readModel,/system\.audit\.read/);assert.match(readModel,/PO OPEN不代表已到货/);assert.match(readModel,/Plan PENDING不代表已收货/);assert.match(readModel,/queue OPEN_PENDING不代表库存增加/);assert.match(readModel,/supplier_notification_or_in_transit_model_available: false/);assert.doesNotMatch(readModel,/idempotency_key_digest|request_body|response_body|session_header/i);
+  assert.match(evidenceDateRule,/RECEIPT_EVIDENCE_DATE_INVALID/);assert.match(evidenceDateRule,/RECEIPT_EVIDENCE_FUTURE_DATE/);assert.match(evidenceDateRule,/送货凭证日期不能晚于服务端实际收货日期/);assert.doesNotMatch(evidenceDateRule,/new Date|Date\.parse/);
   assert.match(api,/requestOriginMatches/);assert.match(api,/请求来源校验失败/);assert.match(api,/requireCsrf/);
   assert.ok(permissionsForRole("warehouse").includes("procurement.receiving.receive"));assert.ok(!permissionsForRole("warehouse").includes("procurement.receive"));assert.ok(!permissionsForRole("warehouse").includes("quality.inspect"));assert.ok(permissionsForRole("quality").includes("quality.inspect"));
 });

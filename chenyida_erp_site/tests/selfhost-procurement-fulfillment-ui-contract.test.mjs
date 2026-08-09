@@ -8,7 +8,7 @@ test("three native workspaces expose server-backed purchase, receiving and payab
   assert.match(warehouse,/receiving-queue/);assert.match(warehouse,/确认过账收货/);assert.match(warehouse,/expected_balance_version/);assert.match(warehouse,/expected_line_version/);
   assert.match(finance,/payable-handoff/);assert.match(finance,/核对并显式生成 AP/);assert.match(finance,/purchase_source_entry_id/);assert.doesNotMatch(finance,/name="amount"|total_amount:/);
 });
-test("warehouse receiving is a cancel-first GET preview with one guarded final POST and responsive evidence fields",async()=>{
+test("warehouse receiving is a return-first GET preview with one guarded final POST and responsive evidence fields",async()=>{
   const workspace=await read("../app/warehouse/receiving/warehouse-receiving-workspace.tsx");
   const css=await read("../app/warehouse/receiving/warehouse-receiving.css");
   const openPreview=workspace.match(/async function openPreview[^]*?(?=\n  function cancelPreview)/)?.[0]||"";
@@ -21,8 +21,27 @@ test("warehouse receiving is a cancel-first GET preview with one guarded final P
   assert.match(workspace,/disabled=\{busy \|\| submitted \|\| !ready\}/);assert.match(workspace,/crypto\.randomUUID\(\)/);
   assert.match(workspace,/const EMPTY_DRAFT[^]*?quantity: ""/);assert.match(workspace,/reason: ""/);assert.doesNotMatch(workspace,/name="quantity"[^>]*(?:value|defaultValue)="[1-9]/);assert.doesNotMatch(workspace,/name="reason"[^>]*(?:value|defaultValue)="[^\"]+/);
   for(const field of ["evidence_type","evidence_reference","evidence_document_date","supplier_lot_code","early_arrival_reason","early_arrival_confirmed","physical_receipt_confirmed","expected_purchase_order_version","expected_line_version","expected_version","expected_queue_version","expected_balance_version","expected_early_arrival","expected_target_location_code"])assert.match(workspace,new RegExp(`\\b${field}\\b`),field);
-  for(const text of ["PO OPEN不代表已到货","Plan PENDING不代表已收货","queue OPEN_PENDING不代表库存增加","实际物理收货","供应商通知或在途登记当前未建模","服务端当前时间","承诺/计划日期","实际收货时间规则","送货凭证","Supplier批次","目标仓库","目标库位","经办账号","收货说明","IQC、库存与职责边界","IQC检验、处置与关闭由quality负责","收货不会自动创建AP、付款、Work Order或其他生产记录"])assert.match(workspace,new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),text);
+  for(const text of ["PO OPEN不代表已到货","Plan PENDING不代表已收货","queue OPEN_PENDING不代表库存增加","实际物理收货","供应商通知或在途登记当前未建模","服务端当前时间","承诺/计划日期","实际收货时间规则","送货凭证","Supplier批次","目标仓库","目标库位","经办账号","收货说明","本次过账后果与职责边界","IQC检验、处置与关闭由quality负责","收货不会自动创建AP、付款、Work Order或其他生产记录"])assert.match(workspace,new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),text);
   assert.match(css,/overflow-x:\s*hidden/);assert.match(css,/overflow-wrap:\s*anywhere/);assert.match(css,/@media\s*\(max-width:\s*600px\)/);assert.doesNotMatch(css,/min-width:\s*[4-9]\d\dpx/);
+});
+test("warehouse preview sends the evidence date, fails closed on server errors and returns to the preserved form draft",async()=>{
+  const workspace=await read("../app/warehouse/receiving/warehouse-receiving-workspace.tsx");
+  const readModel=await read("../app/lib/procurement-fulfillment-selfhost/warehouse-receipt-readiness.ts");
+  const reset=workspace.match(/function resetConfirmationState[^]*?(?=\n  async function openPreview)/)?.[0]||"";
+  const openPreview=workspace.match(/async function openPreview[^]*?(?=\n  function cancelPreview)/)?.[0]||"";
+  const cancelPreview=workspace.match(/function cancelPreview[^]*?(?=\n  function confirmationReady)/)?.[0]||"";
+  const confirmationReady=workspace.match(/function confirmationReady[^]*?(?=\n  async function confirmReceipt)/)?.[0]||"";
+  assert.match(openPreview,/new URLSearchParams\(\)/);assert.match(openPreview,/parameters\.set\("evidence_document_date", nextDraft\.evidence_document_date\)/);assert.match(openPreview,/parameters\.toString\(\)/);
+  assert.match(openPreview,/setPreview\(response\.data\)/);assert.match(openPreview,/resetConfirmationState\(\)/);assert.match(openPreview,/setPreviewError\(\{ deliveryPlanId: row\.id, text: message\(previewError\) \}\)/);
+  assert.doesNotMatch(openPreview,/method:\s*"POST"|protectedWrite|Date\.now|new Date/);
+  assert.match(workspace,/data-receipt-preview-error/);assert.match(workspace,/error\.requestId/);assert.match(workspace,/error\.code/);
+  assert.match(confirmationReady,/evidence_document_date === value\.selected_receipt\.evidence_document_date/);assert.match(confirmationReady,/evidence_document_date <= value\.selected_receipt\.server_date_shanghai/);assert.doesNotMatch(confirmationReady,/Date\.now|new Date/);
+  for(const state of [/setPreviewLoading\(false\)/,/setPreview\(null\)/,/setDraft\(EMPTY_DRAFT\)/,/setPosting\(false\)/,/setSubmitted\(false\)/,/setDialogError\(""\)/,/postInFlight\.current = false/,/idempotencyKey\.current = ""/])assert.match(reset,state);
+  assert.match(cancelPreview,/resetConfirmationState\(true\)/);assert.doesNotMatch(cancelPreview,/api\(|fetch\(|method:\s*"POST"|protectedWrite/);
+  assert.match(workspace,/>返回修改<\/button>/);assert.match(workspace,/event\.key === "Escape"[^]*?onCancel\(\)/);assert.match(workspace,/event\.target === event\.currentTarget[^]*?onCancel\(\)/);assert.match(workspace,/aria-label="关闭收货确认窗口"[^]*?onClick=\{onCancel\}/);
+  assert.doesNotMatch(workspace,/form\.reset\(|清空本行/);assert.match(openPreview,/new FormData\(event\.currentTarget\)/);
+  assert.doesNotMatch(readModel,/若物料权威配置为IQC|不创建内部RML Lot|不创建IQC冻结|不创建供应商来料IQC责任队列/);
+  for(const text of ["普通Purchase Receipt及Receipt Line","普通RECEIPT入账","available立即按现有权威余额公式重算","普通收货事务完成后，本次warehouse收货流程结束","初始状态FROZEN","UNFREEZE Ledger","下一责任队列属于quality"])assert.match(readModel,new RegExp(text));
 });
 test("Award conversion V2 shares Mapping qualification with preview and guards the only explicit POST",async()=>{const workspace=await read("../app/procurement/fulfillment/procurement-fulfillment-workspace.tsx"),dialog=await read("../app/procurement/fulfillment/award-po-conversion-dialog.tsx"),preview=await read("../app/lib/procurement-fulfillment-selfhost/award-conversion-preview.ts");
   assert.match(workspace,/onClick=\{\(\) => void openConversion\(row\)\}/);assert.match(workspace,/purchase-order-conversion-preview/);assert.match(workspace,/cache: "no-store"/);assert.match(workspace,/AWARD_PO_CONFIRMATION_V2/);assert.match(workspace,/AWARD_PO_MAPPING_QUALIFICATION_V1/);assert.match(workspace,/mapping_qualification\.qualification_digest/);assert.match(workspace,/conversionPreview\.po_convertible_now !== true \|\| conversionPreview\.mapping_qualification\.all_qualified !== true/);assert.match(workspace,/conversionInFlight\.current/);assert.match(workspace,/setConversionSubmitted\(true\); setConversionBusy\(true\)/);assert.match(workspace,/\.\.\.conversionPreview\.confirmation/);assert.match(workspace,/remark: conversionRemark/);assert.match(workspace,/purchase-orders`, \{/);const openConversion=workspace.match(/async function openConversion\(row: Award\)[^]*?(?=\n  function cancelConversion)/)?.[0]||"";assert.doesNotMatch(openConversion,/post\(/);

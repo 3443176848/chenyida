@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { ProcurementError } from "../procurement-selfhost/errors.ts";
 import { projectedQueueStatus } from "./purchase-order-history.ts";
+import { assertReceiptEvidenceDateNotFuture, optionalReceiptEvidenceDate } from "./receipt-evidence-date.ts";
 
 type Row = Record<string, unknown>;
 
@@ -65,6 +66,7 @@ export type WarehouseReceiptReadiness = Readonly<{
     queue_id: string;
     server_time_shanghai: string;
     server_date_shanghai: string;
+    evidence_document_date: string | null;
     promised_delivery_date: string;
     actual_receipt_time_rule: string;
     is_early_arrival: boolean;
@@ -152,7 +154,9 @@ export async function loadWarehouseReceiptReadiness(
   deliveryPlanId: number,
   actorUsername: string,
   quantity: string | null,
+  rawEvidenceDocumentDate: string | null,
 ): Promise<WarehouseReceiptReadiness> {
+  const evidenceDocumentDate = optionalReceiptEvidenceDate(rawEvidenceDocumentDate);
   const exists = await client.query("select purchase_order_id from purchase_delivery_plans where id=$1", [deliveryPlanId]);
   if (!exists.rows[0]) throw new ProcurementError("DELIVERY_PLAN_NOT_FOUND", "到货计划不存在", 404);
 
@@ -189,12 +193,16 @@ export async function loadWarehouseReceiptReadiness(
     join suppliers supplier on supplier.id=plan.supplier_id and supplier.id=purchase_order.supplier_id
     left join inventory_stock_balances balance on balance.material_id=plan.material_id
       and balance.unit_id=plan.unit_id and balance.location_code='MAIN' and balance.inventory_lot_id is null
-    cross join lateral (select clock_timestamp() current_time) observed
+    cross join lateral (select transaction_timestamp() current_time) observed
     where plan.id=$1`, [deliveryPlanId]);
   if (selectedRows.rows.length !== 1) {
     throw new ProcurementError("PERMISSION_DENIED", "没有权限查看该到货计划及其采购数据域", 403);
   }
   const selected = selectedRows.rows[0];
+  const serverDateShanghai = requiredText(selected.server_date_shanghai);
+  if (evidenceDocumentDate !== null) {
+    assertReceiptEvidenceDateNotFuture(evidenceDocumentDate, serverDateShanghai);
+  }
   const purchaseOrderId = Number(selected.purchase_order_id);
 
   const sourceRows = await client.query<Row>(`select distinct project.id::text project_id,
@@ -359,13 +367,14 @@ export async function loadWarehouseReceiptReadiness(
     selected_receipt: {
       delivery_plan_id: stableId(selected.delivery_plan_id), purchase_order_line_id: stableId(selected.purchase_order_line_id),
       queue_id: stableId(selected.queue_id), server_time_shanghai: requiredText(selected.server_time_shanghai),
-      server_date_shanghai: requiredText(selected.server_date_shanghai), promised_delivery_date: requiredText(selected.promised_delivery_date),
+      server_date_shanghai: serverDateShanghai, evidence_document_date: evidenceDocumentDate,
+      promised_delivery_date: requiredText(selected.promised_delivery_date),
       actual_receipt_time_rule: "最终过账时由PostgreSQL服务端生成purchase_receipts.created_at；不接受浏览器日期，也不会用计划日期冒充实际到货时间。",
       is_early_arrival: isEarlyArrival, quantity, remaining_quantity: remaining,
       remaining_after_receipt: quantity === null ? null : subtractDecimal(remaining, quantity), operator_username: actorUsername,
       supplier_lot: iqcManaged
         ? { applicability: "REQUIRED_FOR_IQC", note: "该物料为STOCKED/IQC；供应商批次必填，服务端另生成唯一内部RML Lot。" }
-        : { applicability: "NOT_APPLICABLE", note: "该物料不适用Supplier Receipt RML Lot；不得伪造供应商批次。" },
+        : { applicability: "NOT_APPLICABLE", note: "当前实际模式不需要Supplier批次；不得伪造供应商批次。" },
       target: {
         warehouse_model: "NOT_SEPARATELY_MODELED", warehouse_note: "当前Inventory没有独立仓库维度，不伪造仓库主数据。",
         location_code: "MAIN", location_note: "当前Inventory唯一权威库位固定为MAIN。",
@@ -389,26 +398,26 @@ export async function loadWarehouseReceiptReadiness(
       warehouse_receipt_model: "系统创建Purchase Receipt及Receipt Line；没有独立的Warehouse Receipt聚合表。",
       iqc_material_internal_lot: iqcManaged
         ? "当前选中物料为ACTIVE/STOCKED/IQC；收货事务创建唯一内部RML Lot，初始状态FROZEN。"
-        : `当前选中物料为ACTIVE/${inventoryType}/${inspectionType}，未启用IQC Lot模式；收货不创建内部RML Lot，Supplier批次不适用。`,
+        : `当前选中物料为ACTIVE/${inventoryType}/${inspectionType}；本次只创建普通Purchase Receipt及Receipt Line。`,
       iqc_material_inventory: iqcManaged
         ? "当前选中物料收货时立即增加on-hand与frozen，available保持0。"
-        : "当前选中物料按普通RECEIPT入账，不创建IQC冻结；on-hand增加且available按余额公式立即重算。",
+        : "当前选中物料按普通RECEIPT入账；on-hand增加且available按现有权威余额公式立即重算。",
       available_inventory_rule: iqcManaged
         ? "quality角色完成IQC合格放行并追加UNFREEZE Ledger后，可用库存才增加。"
-        : "当前选中物料不等待IQC放行；普通RECEIPT事务完成后即可按on-hand、reserved与frozen的权威余额计算可用量。",
+        : "普通RECEIPT事务完成后，available立即按现有权威余额公式重算。",
       ledger_rule: iqcManaged
-        ? "Inventory Ledger在实际收货事务中产生，不等待IQC；IQC后续只对合格量追加解冻账。"
-        : "Inventory Ledger在实际收货事务中以普通RECEIPT产生；当前物料没有后续IQC解冻账。",
+        ? "Inventory Ledger在实际收货事务中以IQC_RECEIPT产生；quality合格放行后只对合格量追加UNFREEZE Ledger。"
+        : "Inventory Ledger在实际收货事务中以普通RECEIPT产生。",
       next_responsibility: iqcManaged
         ? "收货后下一责任队列属于quality；warehouse没有IQC检验、处置或关闭写权限。"
-        : "当前选中物料不创建供应商来料IQC责任队列；若物料权威配置为IQC，检验、处置和关闭只能由quality负责，warehouse无写权限。",
+        : "普通收货事务完成后，本次warehouse收货流程结束。",
       exceptions_are_separate_operations: "不合格、退货与让步接收均为独立受控操作，本次收货不会自动执行。",
       no_automatic_records: ["AP", "Payment", "Work Order", "Production Issue", "Production Report", "Production Completion"],
     },
     protected_boundaries: [
       "PO OPEN不代表已到货。", "Plan PENDING不代表已收货。", "queue OPEN_PENDING不代表库存增加。",
       "本模型登记实际物理收货，不是供应商通知或在途登记；当前没有独立通知/在途模型。",
-      "打开、取消、关闭本确认预览不会发送业务POST。",
+      "打开、返回修改、关闭本确认预览不会发送业务POST。",
     ],
     exposed_fields_note: "DTO不返回请求正文、响应正文、Cookie、Session、敏感Header、幂等Key摘要或通用审计详情；warehouse无需且未获得system.audit.read。",
   };

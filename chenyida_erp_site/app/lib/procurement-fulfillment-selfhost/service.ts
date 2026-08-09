@@ -11,6 +11,7 @@ import { ProcurementSourcingService } from "../procurement-sourcing-selfhost/ser
 import { buildAwardConversionPreview, type AwardConversionPreview } from "./award-conversion-preview.ts";
 import { firstAwardMappingQualificationFailure, loadAwardMappingQualification } from "./award-mapping-qualification.ts";
 import { loadPurchaseOrderHistory, type PurchaseOrderHistoryReadModel } from "./purchase-order-history.ts";
+import { assertReceiptEvidenceDateNotFuture, receiptEvidenceDate } from "./receipt-evidence-date.ts";
 import { loadWarehouseReceiptReadiness, type WarehouseReceiptReadiness } from "./warehouse-receipt-readiness.ts";
 
 type AwardLine = {
@@ -43,15 +44,6 @@ const evidenceType = (value: unknown) => {
   }
   return result as "DELIVERY_NOTE" | "LOGISTICS_HANDOVER" | "OTHER_EQUIVALENT";
 };
-const evidenceDate = (value: unknown) => {
-  const result = String(value ?? "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || Number.isNaN(new Date(`${result}T00:00:00Z`).valueOf())
-      || new Date(`${result}T00:00:00Z`).toISOString().slice(0, 10) !== result) {
-    throw new ProcurementError("RECEIPT_EVIDENCE_DATE_INVALID", "送货凭证日期必须是有效的YYYY-MM-DD日期", 422);
-  }
-  return result;
-};
-
 export class ProcurementFulfillmentService {
   readonly repository: ProcurementRepository;
   readonly procurement: ProcurementService;
@@ -133,13 +125,20 @@ export class ProcurementFulfillmentService {
     deliveryPlanId: number,
     actor: Pick<IdentityActor, "username" | "role" | "permissions">,
     rawQuantity: string | null,
+    rawEvidenceDocumentDate: string | null,
   ): Promise<WarehouseReceiptReadiness> {
     const previewQuantity = rawQuantity === null || rawQuantity.trim() === "" ? null : quantity(rawQuantity, "quantity");
     const client = await this.repository.pool.connect();
     try {
       await client.query("begin isolation level repeatable read read only");
       await client.query("set local statement_timeout='5s'");
-      const preview = await loadWarehouseReceiptReadiness(client, deliveryPlanId, actor.username, previewQuantity);
+      const preview = await loadWarehouseReceiptReadiness(
+        client,
+        deliveryPlanId,
+        actor.username,
+        previewQuantity,
+        rawEvidenceDocumentDate,
+      );
       await client.query("commit");
       return preview;
     } catch (error) {
@@ -484,7 +483,7 @@ export class ProcurementFulfillmentService {
       ? null : supplierLotCode(input.supplier_lot_code);
     const normalizedEvidenceType = evidenceType(input.evidence_type);
     const evidenceReference = text(input.evidence_reference, "送货凭证编号", 128, true);
-    const evidenceDocumentDate = evidenceDate(input.evidence_document_date);
+    const evidenceDocumentDate = receiptEvidenceDate(input.evidence_document_date);
     const expectedEarlyArrival = strictBoolean(input.expected_early_arrival, "expected_early_arrival");
     const earlyArrivalReasonText = text(input.early_arrival_reason, "提前到货原因", 1000);
     const earlyArrivalReason = earlyArrivalReasonText || null;
@@ -537,9 +536,7 @@ export class ProcurementFulfillmentService {
         (transaction_timestamp() at time zone 'Asia/Shanghai')::date::text receipt_date,
         ((transaction_timestamp() at time zone 'Asia/Shanghai')::date<$1::date) early_arrival`, [plan.promised_delivery_date])).rows[0];
       if (!timing) throw new ProcurementError("INTERNAL_ERROR", "服务器暂时无法生成权威收货时间", 500);
-      if (evidenceDocumentDate > timing.receipt_date) {
-        throw new ProcurementError("RECEIPT_EVIDENCE_FUTURE_DATE", "送货凭证日期不能晚于服务端实际收货日期", 422);
-      }
+      assertReceiptEvidenceDateNotFuture(evidenceDocumentDate, timing.receipt_date);
       if (timing.early_arrival !== expectedEarlyArrival) {
         throw new ProcurementError("RECEIPT_CONFIRMATION_STALE", "提前到货判断已变化，请关闭后重新核对收货", 409);
       }

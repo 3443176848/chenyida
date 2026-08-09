@@ -62,6 +62,7 @@ type ReceiptDraft = {
   physical_receipt_confirmed: boolean;
   reason: string;
 };
+type ReceiptPreviewError = { deliveryPlanId: number; text: string };
 
 const EMPTY_DRAFT: ReceiptDraft = {
   quantity: "",
@@ -79,6 +80,7 @@ const message = (error: unknown) => error instanceof ErpApiError
   ? `${error.message}（${error.code}${error.requestId ? ` · 请求 ${error.requestId}` : ""}）`
   : "系统暂时无法完成请求";
 const display = (value: string | null | undefined) => value?.trim() || "未填写";
+const canonicalDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 export function WarehouseReceivingWorkspace() {
   const [session, setSession] = useState<Session | null>(null);
@@ -91,6 +93,7 @@ export function WarehouseReceivingWorkspace() {
   const [posting, setPosting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [dialogError, setDialogError] = useState("");
+  const [previewError, setPreviewError] = useState<ReceiptPreviewError | null>(null);
   const previewRun = useRef(0);
   const postInFlight = useRef(false);
   const idempotencyKey = useRef("");
@@ -98,7 +101,8 @@ export function WarehouseReceivingWorkspace() {
 
   const clearProtectedState = useCallback(() => {
     setRows([]); setPreview(null); setDraft(EMPTY_DRAFT); setDialogError("");
-    setPreviewLoading(false); setPosting(false); setSubmitted(false); postInFlight.current = false;
+    setPreviewLoading(false); setPosting(false); setSubmitted(false); setPreviewError(null);
+    previewRun.current += 1; postInFlight.current = false; idempotencyKey.current = ""; trigger.current = null;
   }, []);
   const load = useCallback(async () => {
     suspendProtectedViews();
@@ -123,6 +127,13 @@ export function WarehouseReceivingWorkspace() {
     return () => { window.removeEventListener("pagehide", hide); window.removeEventListener("pageshow", show); };
   }, [load]);
 
+  function resetConfirmationState(restoreFocus = false) {
+    previewRun.current += 1; postInFlight.current = false; idempotencyKey.current = "";
+    setPreviewLoading(false); setPreview(null); setDraft(EMPTY_DRAFT); setPosting(false);
+    setSubmitted(false); setDialogError("");
+    if (restoreFocus) window.requestAnimationFrame(() => trigger.current?.focus());
+  }
+
   async function openPreview(event: FormEvent<HTMLFormElement>, row: Queue) {
     event.preventDefault();
     if (previewLoading || posting) return;
@@ -140,34 +151,42 @@ export function WarehouseReceivingWorkspace() {
       reason: String(values.get("reason") || "").trim(),
     };
     const run = previewRun.current + 1; previewRun.current = run;
-    setDraft(nextDraft); setPreview(null); setDialogError(""); setError(""); setNotice("");
-    setSubmitted(false); postInFlight.current = false; idempotencyKey.current = crypto.randomUUID(); setPreviewLoading(true);
+    setDraft(nextDraft); setPreview(null); setDialogError(""); setPreviewError(null); setError(""); setNotice("");
+    setPosting(false); setSubmitted(false); postInFlight.current = false; idempotencyKey.current = ""; setPreviewLoading(true);
     try {
-      const query = nextDraft.quantity ? `?quantity=${encodeURIComponent(nextDraft.quantity)}` : "";
+      const parameters = new URLSearchParams();
+      if (nextDraft.quantity) parameters.set("quantity", nextDraft.quantity);
+      if (nextDraft.evidence_document_date) parameters.set("evidence_document_date", nextDraft.evidence_document_date);
+      const encoded = parameters.toString(), query = encoded ? `?${encoded}` : "";
       const response = await api<{ data: WarehouseReceiptReadiness }>(`/api/procurement/delivery-plans/${row.id}/receipt-preview${query}`, { cache: "no-store" });
       if (previewRun.current !== run) return;
       if (response.data.contract_version !== "WAREHOUSE_RECEIPT_READINESS_V1"
           || response.data.read_only !== true || response.data.selected_receipt.delivery_plan_id !== String(row.id)) {
         throw new Error("receipt readiness preview mismatch");
       }
+      idempotencyKey.current = crypto.randomUUID();
       setPreview(response.data);
     } catch (previewError) {
-      if (previewRun.current === run) setError(message(previewError));
+      if (previewRun.current === run) {
+        resetConfirmationState();
+        setPreviewError({ deliveryPlanId: row.id, text: message(previewError) });
+      }
     } finally { if (previewRun.current === run) setPreviewLoading(false); }
   }
 
   function cancelPreview() {
     if (posting) return;
-    previewRun.current += 1; postInFlight.current = false; idempotencyKey.current = "";
-    setPreviewLoading(false); setPreview(null); setDraft(EMPTY_DRAFT); setDialogError(""); setSubmitted(false);
-    window.requestAnimationFrame(() => trigger.current?.focus());
+    resetConfirmationState(true);
   }
 
   function confirmationReady(value: WarehouseReceiptReadiness) {
     const supplierLotReady = value.selected_receipt.supplier_lot.applicability === "NOT_APPLICABLE" || Boolean(draft.supplier_lot_code);
     const earlyReady = !value.selected_receipt.is_early_arrival || (Boolean(draft.early_arrival_reason) && draft.early_arrival_confirmed);
+    const evidenceDateReady = canonicalDatePattern.test(draft.evidence_document_date)
+      && draft.evidence_document_date === value.selected_receipt.evidence_document_date
+      && draft.evidence_document_date <= value.selected_receipt.server_date_shanghai;
     return value.selected_receipt.authoritative_state_ready && value.selected_receipt.quantity !== null
-      && Boolean(draft.evidence_type && draft.evidence_reference && draft.evidence_document_date && draft.reason)
+      && Boolean(draft.evidence_type && draft.evidence_reference && draft.reason) && evidenceDateReady
       && draft.physical_receipt_confirmed && supplierLotReady && earlyReady;
   }
 
@@ -237,13 +256,13 @@ export function WarehouseReceivingWorkspace() {
         <label>送货凭证类型<select name="evidence_type" defaultValue=""><option value="">未选择</option><option value="DELIVERY_NOTE">送货单</option><option value="LOGISTICS_HANDOVER">物流交接凭证</option><option value="OTHER_EQUIVALENT">其他等价来源凭证</option></select></label>
         <label>送货凭证编号<input name="evidence_reference" autoComplete="off" maxLength={128} placeholder="不填写虚假凭证" /></label>
         <label>凭证日期<input name="evidence_document_date" type="date" autoComplete="off" /></label>
-        {iqc ? <label>Supplier批次（IQC必填）<input name="supplier_lot_code" autoComplete="off" maxLength={64} placeholder="由实物标签或真实凭证取得" /></label> : <><input name="supplier_lot_code" type="hidden" value=""/><p className="warehouse-model-note">该物料不适用Supplier Receipt RML Lot，不得伪造供应商批次。</p></>}
+        {iqc ? <label>Supplier批次（IQC必填）<input name="supplier_lot_code" autoComplete="off" maxLength={64} placeholder="由实物标签或真实凭证取得" /></label> : <><input name="supplier_lot_code" type="hidden" value=""/><p className="warehouse-model-note">当前实际模式不需要Supplier批次，不得伪造供应商批次。</p></>}
         <label>提前到货原因（仅提前时）<textarea name="early_arrival_reason" maxLength={1000} placeholder="不预填；必须基于真实提前到货事实" /></label>
         <label className="warehouse-check"><input name="early_arrival_confirmed" type="checkbox" />若服务端判定提前到货，我已明确核对并确认该原因</label>
         <label className="warehouse-check"><input name="physical_receipt_confirmed" type="checkbox" />我确认实物已实际到达系统固定MAIN库位；不是通知或在途登记</label>
         <label>收货说明（不预填）<textarea name="reason" maxLength={1000} placeholder="记录实际收货说明；可留空先看预览" /></label>
         <button type="submit" disabled={previewLoading || posting}>核对收货</button>
-      </form> : null}</article>;
+      </form> : null}{previewError?.deliveryPlanId === row.id ? <div className="sourcing-state sourcing-error" role="alert" data-receipt-preview-error>{previewError.text}</div> : null}</article>;
     })}{!rows.length ? <div className="sourcing-state">当前没有待入库计划。</div> : null}</section>
     {notice ? <div className="sourcing-state">{notice}</div> : null}{error ? <div className="sourcing-state sourcing-error" role="alert">{error}</div> : null}
     {previewLoading ? <ReceiptLoadingDialog onCancel={cancelPreview} /> : null}
@@ -265,10 +284,10 @@ function DialogFrame({ title, busy, onCancel, children, actions }: { title: stri
     if (event.shiftKey && (active === first || !dialogRef.current?.contains(active))) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && (active === last || !dialogRef.current?.contains(active))) { event.preventDefault(); first.focus(); }
   }
-  return <div className="rfq-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}><section ref={dialogRef} className="rfq-dialog warehouse-receipt-dialog" role="dialog" aria-modal="true" aria-labelledby="warehouse-receipt-dialog-title" aria-busy={busy} tabIndex={-1} onKeyDown={keyDown}><header className="rfq-dialog-heading"><div><p className="rfq-eyebrow">实际物理收货 · 权威GET预览</p><h2 id="warehouse-receipt-dialog-title">{title}</h2></div><button type="button" className="rfq-dialog-close" aria-label="关闭收货确认窗口" disabled={busy} onClick={onCancel}>关闭</button></header><div className="rfq-dialog-body">{children}</div><footer className="rfq-dialog-actions"><button ref={cancelRef} type="button" className="rfq-secondary" disabled={busy} onClick={onCancel}>取消</button>{actions}</footer></section></div>;
+  return <div className="rfq-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}><section ref={dialogRef} className="rfq-dialog warehouse-receipt-dialog" role="dialog" aria-modal="true" aria-labelledby="warehouse-receipt-dialog-title" aria-busy={busy} tabIndex={-1} onKeyDown={keyDown}><header className="rfq-dialog-heading"><div><p className="rfq-eyebrow">实际物理收货 · 权威GET预览</p><h2 id="warehouse-receipt-dialog-title">{title}</h2></div><button type="button" className="rfq-dialog-close" aria-label="关闭收货确认窗口" disabled={busy} onClick={onCancel}>关闭</button></header><div className="rfq-dialog-body">{children}</div><footer className="rfq-dialog-actions"><button ref={cancelRef} type="button" className="rfq-secondary" disabled={busy} onClick={onCancel}>返回修改</button>{actions}</footer></section></div>;
 }
 function ReceiptLoadingDialog({ onCancel }: { onCancel: () => void }) {
-  return <DialogFrame title="正在重新读取PO、Line、Plan与queue" busy={false} onCancel={onCancel}><div className="sourcing-state"><span className="sourcing-spinner"/>只执行权威GET；取消不会发送业务POST。</div></DialogFrame>;
+  return <DialogFrame title="正在重新读取PO、Line、Plan与queue" busy={false} onCancel={onCancel}><div className="sourcing-state"><span className="sourcing-spinner"/>只执行权威GET；返回修改不会发送业务POST。</div></DialogFrame>;
 }
 function ReceiptConfirmationDialog({ preview, draft, ready, busy, submitted, error, onCancel, onConfirm }: {
   preview: WarehouseReceiptReadiness;
@@ -287,9 +306,9 @@ function ReceiptConfirmationDialog({ preview, draft, ready, busy, submitted, err
     <section className="warehouse-preview-section"><h3>四层稳定谱系</h3><div className="warehouse-lineage-list">{preview.lines.map((line) => <article key={line.purchase_order_line_id}><b>PO Line #{line.purchase_order_line_id} / v{line.version} · Award Line #{line.award_line_id}</b><span>Material #{line.material_id} · {line.material_code} · {line.material_name}</span><span>数量 {line.quantity} · 已收 {line.received_quantity} · 未收 {line.remaining_quantity} {line.unit_code}</span><span>Plan #{line.delivery_plan.id}/v{line.delivery_plan.version} · {line.delivery_plan.status} · 计划 {line.delivery_plan.promised_delivery_date}</span><span>queue #{line.queue.id}/v{line.queue.version} · {line.queue.status}</span></article>)}</div></section>
     <section className="warehouse-preview-section"><h3>本次权威收货核对</h3><dl className="warehouse-preview-grid"><div><dt>服务端当前时间</dt><dd>{selected.server_time_shanghai}</dd></div><div><dt>承诺/计划日期</dt><dd>{selected.promised_delivery_date}</dd></div><div className="wide"><dt>实际收货时间规则</dt><dd>{selected.actual_receipt_time_rule}</dd></div><div><dt>提前到货</dt><dd>{selected.is_early_arrival ? "是" : "否"}</dd></div><div><dt>本次 / 过账前剩余 / 过账后剩余</dt><dd>{display(selected.quantity)} / {selected.remaining_quantity} / {selected.remaining_after_receipt ?? "待填写数量"}</dd></div><div><dt>目标仓库</dt><dd>{selected.target.warehouse_note}</dd></div><div><dt>目标库位</dt><dd>{selected.target.location_code} · {selected.target.location_note}</dd></div><div><dt>经办账号</dt><dd>{selected.operator_username}</dd></div><div><dt>Supplier批次</dt><dd>{selected.supplier_lot.note}<br/>输入：{display(draft.supplier_lot_code)}</dd></div><div><dt>送货凭证</dt><dd>{display(draft.evidence_type)} · {display(draft.evidence_reference)} · {display(draft.evidence_document_date)}</dd></div><div><dt>提前到货原因 / 确认</dt><dd>{display(draft.early_arrival_reason)} · {draft.early_arrival_confirmed ? "已确认" : "未确认"}</dd></div><div><dt>物理到货确认</dt><dd>{draft.physical_receipt_confirmed ? "已确认实物到MAIN" : "未确认"}</dd></div><div className="wide"><dt>收货说明</dt><dd>{display(draft.reason)}</dd></div></dl></section>
     <section className="warehouse-preview-section"><h3>当前下游计数</h3><div className="warehouse-count-grid">{[["Receipt", counts.receipt], ["Warehouse Receipt Line", counts.warehouse_receipt], ["Inventory Ledger", counts.inventory_ledger], ["RML Lot", counts.lot], ["IQC", counts.iqc], ["采购金额来源", counts.purchase_financial_source], ["AP", counts.ap], ["Payment", counts.payment], ["Work Order", counts.work_order], ["Production Report", counts.production_report], ["Production Completion", counts.production_completion]].map(([label, value]) => <span key={String(label)}><small>{label}</small><b>{String(value)}</b></span>)}</div><p>{String(counts.scope_note)}</p></section>
-    <section className="warehouse-preview-section"><h3>IQC、库存与职责边界</h3><ul><li>{preview.receipt_accounting_boundary.warehouse_receipt_model}</li><li>{preview.receipt_accounting_boundary.iqc_material_internal_lot}</li><li>{preview.receipt_accounting_boundary.iqc_material_inventory}</li><li>{preview.receipt_accounting_boundary.available_inventory_rule}</li><li>{preview.receipt_accounting_boundary.ledger_rule}</li><li>{preview.receipt_accounting_boundary.next_responsibility}</li><li>{preview.receipt_accounting_boundary.exceptions_are_separate_operations}</li><li>不会自动创建：{preview.receipt_accounting_boundary.no_automatic_records.join("、")}。</li></ul></section>
+    <section className="warehouse-preview-section"><h3>本次过账后果与职责边界</h3><ul><li>{preview.receipt_accounting_boundary.warehouse_receipt_model}</li><li>{preview.receipt_accounting_boundary.iqc_material_internal_lot}</li><li>{preview.receipt_accounting_boundary.iqc_material_inventory}</li><li>{preview.receipt_accounting_boundary.available_inventory_rule}</li><li>{preview.receipt_accounting_boundary.ledger_rule}</li><li>{preview.receipt_accounting_boundary.next_responsibility}</li><li>{preview.receipt_accounting_boundary.exceptions_are_separate_operations}</li><li>不会自动创建：{preview.receipt_accounting_boundary.no_automatic_records.join("、")}。</li></ul></section>
     <section className="warehouse-preview-section warehouse-protected-boundaries"><h3>不可误读边界</h3><ul>{preview.protected_boundaries.map((item) => <li key={item}>{item}</li>)}</ul><p>{preview.exposed_fields_note}</p></section>
-    {!ready ? <div className="sourcing-state sourcing-error" role="status">当前确认资料不完整或权威状态不可过账；“确认过账收货”保持禁用。取消后可基于真实实物与凭证重新核对。</div> : null}
+    {!ready ? <div className="sourcing-state sourcing-error" role="status">当前确认资料不完整或权威状态不可过账；“确认过账收货”保持禁用。返回修改后可基于真实实物与凭证重新核对。</div> : null}
     {error ? <div className="sourcing-state sourcing-error" role="alert">{error}</div> : null}
   </DialogFrame>;
 }

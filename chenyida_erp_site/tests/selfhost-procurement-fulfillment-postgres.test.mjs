@@ -886,16 +886,25 @@ test("warehouse receipt readiness GET exposes the four-line minimum DTO without 
   assert.deepEqual(readiness.lines.map((line) => [line.purchase_order_line_id, line.award_line_id, line.material_id, line.quantity, line.received_quantity, line.remaining_quantity, line.delivery_plan.version, line.delivery_plan.status, line.delivery_plan.promised_delivery_date, line.queue.version, line.queue.status]),
     po.lines.map((line, index) => [String(line.id), String(index + 1), String(refs.materialIds[index]), "10.000000", "0.000000", "10.000000", 1, "PENDING", "2026-10-20", 1, "OPEN_PENDING"]));
   assert.equal(readiness.selected_receipt.quantity, null);
+  assert.equal(readiness.selected_receipt.evidence_document_date, null);
   assert.equal(readiness.selected_receipt.initial_confirmation_blocked, true);
   assert.equal(readiness.selected_receipt.target.warehouse_model, "NOT_SEPARATELY_MODELED");
   assert.equal(readiness.selected_receipt.target.location_code, "MAIN");
   assert.equal(readiness.selected_receipt.supplier_lot.applicability, "NOT_APPLICABLE");
-  assert.match(readiness.receipt_accounting_boundary.iqc_material_internal_lot, /不创建内部RML Lot/);
-  assert.match(readiness.receipt_accounting_boundary.iqc_material_inventory, /不创建IQC冻结/);
-  assert.match(readiness.receipt_accounting_boundary.available_inventory_rule, /不等待IQC放行/);
-  assert.match(readiness.receipt_accounting_boundary.next_responsibility, /不创建供应商来料IQC责任队列/);
+  assert.match(readiness.receipt_accounting_boundary.iqc_material_internal_lot, /普通Purchase Receipt及Receipt Line/);
+  assert.match(readiness.receipt_accounting_boundary.iqc_material_inventory, /普通RECEIPT入账/);
+  assert.match(readiness.receipt_accounting_boundary.available_inventory_rule, /available立即按现有权威余额公式重算/);
+  assert.match(readiness.receipt_accounting_boundary.next_responsibility, /本次warehouse收货流程结束/);
+  const actualNormalConsequences = [
+    readiness.receipt_accounting_boundary.iqc_material_internal_lot,
+    readiness.receipt_accounting_boundary.iqc_material_inventory,
+    readiness.receipt_accounting_boundary.available_inventory_rule,
+    readiness.receipt_accounting_boundary.ledger_rule,
+    readiness.receipt_accounting_boundary.next_responsibility,
+  ].join("\n");
+  assert.doesNotMatch(actualNormalConsequences, /RML|FROZEN|UNFREEZE|IQC责任队列|若物料|quality/);
   assert.equal(readiness.receipt_accounting_boundary.supplier_notification_or_in_transit_model_available, false);
-  assert.equal(readiness.receipt_accounting_boundary.next_responsibility.includes("quality"), true);
+  assert.equal(readiness.receipt_accounting_boundary.next_responsibility.includes("quality"), false);
   assert.equal(readiness.downstream.all_zero, true);
   for (const field of ["receipt", "warehouse_receipt", "inventory_ledger", "lot", "iqc", "ap", "payment", "work_order", "production_report", "production_completion"]) assert.equal(readiness.downstream[field], 0, field);
   const dtoKeys = [];
@@ -911,6 +920,76 @@ test("warehouse receipt readiness GET exposes the four-line minimum DTO without 
   const methodDenied = await fulfillment(`/api/procurement/delivery-plans/${planId}/receipt-preview`, { method: "POST", role: "warehouse", body: {} });
   assert.equal(methodDenied.response.status, 405);assert.equal(methodDenied.payload.code, "METHOD_NOT_ALLOWED");
   assert.deepEqual(await fingerprint(), before);
+});
+
+test("receipt preview validates optional evidence dates against its PostgreSQL Shanghai transaction date without writes", async () => {
+  const refs = await seedAward(1);
+  const converted = await fulfillment(`/api/procurement/awards/${refs.awardId}/purchase-orders`, {
+    method: "POST",
+    body: await conversionBody(refs.awardId, "日期预检隔离测试"),
+  });
+  assert.equal(converted.response.status, 201, JSON.stringify(converted.payload));
+  const planId = Number(converted.payload.data.purchase_orders[0].delivery_plans[0].id);
+  const protectedState = async () => (await pool.query(`select
+      (select count(*)::int from purchase_receipts) receipts,
+      (select count(*)::int from purchase_receipt_lines) receipt_lines,
+      (select count(*)::int from warehouse_receipt_evidence) evidence,
+      (select count(*)::int from inventory_lots) lots,
+      (select count(*)::int from quality_inspections) iqc,
+      (select count(*)::int from inventory_ledger_entries) ledger,
+      (select count(*)::int from purchase_financial_source_entries) financial_sources,
+      (select count(*)::int from finance_documents where doc_type='AP') ap,
+      (select count(*)::int from finance_settlements) payments,
+      (select count(*)::int from production_work_orders) work_orders,
+      (select count(*)::int from production_material_issues) production_issues,
+      (select count(*)::int from production_material_returns) production_returns,
+      (select count(*)::int from production_reports) production_reports,
+      (select count(*)::int from production_completions) production_completions,
+      (select count(*)::int from audit_log) audits,
+      (select count(*)::int from idempotency_keys) idempotency,
+      (select jsonb_agg(jsonb_build_array(id,version,status,received_quantity) order by id) from purchase_delivery_plans) plans,
+      (select jsonb_agg(jsonb_build_array(id,version,closed_at) order by id) from warehouse_receiving_queue_entries) queues`)).rows[0];
+  const before = await protectedState();
+  const databaseDates = (await pool.query(`select
+      ((transaction_timestamp() at time zone 'Asia/Shanghai')::date-1)::text yesterday,
+      (transaction_timestamp() at time zone 'Asia/Shanghai')::date::text today,
+      ((transaction_timestamp() at time zone 'Asia/Shanghai')::date+1)::text tomorrow`)).rows[0];
+  const preview = (date) => fulfillment(`/api/procurement/delivery-plans/${planId}/receipt-preview${date === null ? "" : `?evidence_document_date=${encodeURIComponent(date)}`}`, { role: "warehouse" });
+
+  const missing = await preview(null);
+  assert.equal(missing.response.status, 200, JSON.stringify(missing.payload));
+  assert.equal(missing.payload.data.selected_receipt.evidence_document_date, null);
+  const yesterday = await preview(databaseDates.yesterday);
+  assert.equal(yesterday.response.status, 200, JSON.stringify(yesterday.payload));
+  assert.equal(yesterday.payload.data.selected_receipt.evidence_document_date, databaseDates.yesterday);
+  const today = await preview(databaseDates.today);
+  assert.equal(today.response.status, 200, JSON.stringify(today.payload));
+  assert.equal(today.payload.data.selected_receipt.server_date_shanghai, databaseDates.today);
+  assert.equal(today.payload.data.selected_receipt.evidence_document_date, databaseDates.today);
+
+  const future = await preview(databaseDates.tomorrow);
+  assert.equal(future.response.status, 422, JSON.stringify(future.payload));
+  assert.equal(future.payload.code, "RECEIPT_EVIDENCE_FUTURE_DATE");
+  assert.equal(future.payload.message, "送货凭证日期不能晚于服务端实际收货日期");
+  assert.ok(future.payload.request_id);
+  assert.equal(future.response.headers.get("X-Request-ID"), future.payload.request_id);
+  assert.deepEqual(future.payload.error, {
+    code: future.payload.code,
+    message: future.payload.message,
+    request_id: future.payload.request_id,
+  });
+  const farFuture = await preview("2099-12-31");
+  assert.equal(farFuture.response.status, 422, JSON.stringify(farFuture.payload));
+  assert.equal(farFuture.payload.code, "RECEIPT_EVIDENCE_FUTURE_DATE");
+  for (const invalid of ["", " ", "2026-2-03", "2026-02-30", "2026-02-03T00:00:00Z"]) {
+    const rejected = await preview(invalid);
+    assert.equal(rejected.response.status, 422, JSON.stringify(rejected.payload));
+    assert.equal(rejected.payload.code, "RECEIPT_EVIDENCE_DATE_INVALID");
+    assert.equal(rejected.payload.message, "送货凭证日期必须是有效的YYYY-MM-DD日期");
+    assert.ok(rejected.payload.request_id);
+    assert.equal(rejected.response.headers.get("X-Request-ID"), rejected.payload.request_id);
+  }
+  assert.deepEqual(await protectedState(), before);
 });
 
 test("receipt date, evidence, CAS, CSRF, role, legacy-entry and rate gates reject without half records", async () => {
@@ -945,8 +1024,8 @@ test("receipt date, evidence, CAS, CSRF, role, legacy-entry and rate gates rejec
   await reject({ ...valid, quantity: "0" }, "REQUEST_VALIDATION_FAILED");
   await reject({ ...valid, quantity: "-1" }, "REQUEST_VALIDATION_FAILED");
   await reject({ ...valid, quantity: "11" }, "PURCHASE_RECEIPT_OVER_QUANTITY");
-  const future = new Date(`${valid.evidence_document_date}T00:00:00Z`);future.setUTCDate(future.getUTCDate() + 1);
-  await reject({ ...valid, evidence_document_date: future.toISOString().slice(0, 10) }, "RECEIPT_EVIDENCE_FUTURE_DATE");
+  const futureEvidenceDate = (await pool.query(`select (((transaction_timestamp() at time zone 'Asia/Shanghai')::date + 1)::date)::text value`)).rows[0].value;
+  await reject({ ...valid, evidence_document_date: futureEvidenceDate }, "RECEIPT_EVIDENCE_FUTURE_DATE");
   await reject({ ...valid, actual_receipt_at: "2099-10-20T00:00:00+08:00" }, "RECEIPT_TIME_SERVER_CONTROLLED");
   await reject({ ...valid, early_arrival_reason: "", early_arrival_confirmed: false }, "EARLY_ARRIVAL_EVIDENCE_REQUIRED");
   await reject({ ...valid, expected_early_arrival: false }, "RECEIPT_CONFIRMATION_STALE");
@@ -983,6 +1062,8 @@ test("complete early-arrival evidence wins once and IQC stock remains frozen for
   assert.equal(iqcPreview.payload.data.selected_receipt.supplier_lot.applicability, "REQUIRED_FOR_IQC");
   assert.match(iqcPreview.payload.data.receipt_accounting_boundary.iqc_material_internal_lot, /初始状态FROZEN/);
   assert.match(iqcPreview.payload.data.receipt_accounting_boundary.iqc_material_inventory, /available保持0/);
+  assert.match(iqcPreview.payload.data.receipt_accounting_boundary.ledger_rule, /IQC_RECEIPT/);
+  assert.match(iqcPreview.payload.data.receipt_accounting_boundary.ledger_rule, /UNFREEZE/);
   assert.match(iqcPreview.payload.data.receipt_accounting_boundary.next_responsibility, /下一责任队列属于quality/);
   const body = await receiptBody(planId, "10", { reason: "隔离数据库完整提前到货证据" });
   assert.equal(body.expected_early_arrival, true);assert.ok(body.supplier_lot_code);
