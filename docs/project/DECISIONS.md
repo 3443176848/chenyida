@@ -1281,6 +1281,47 @@
 - 轻量lint和UI contract测试必须先确认无数据库URL、网络访问和UAT/生产写路径；后续PostgreSQL写测试只能使用隔离数据库。
 - 本决定不授权任何主UAT Receipt POST、IQC、Ledger、AP、Payment或生产写入；PO/Line/Plan/queue必须保持`1/4/4/4`，Receipt及全部下游保持0。
 
+## D-108 私有Git恢复远端与alpha.42三锚点恢复策略
+
+- 日期：2026-08-10
+- 状态：`ACCEPTED / PHASED IMPLEMENTATION / PRIVATE REPOSITORY CREATED`
+- 确认人：项目负责人（在`GITHUB AUTHORIZATION BLOCKED`后明确要求Codex协助配置GitHub CLI、认证并继续建立私有恢复远端）
+
+### Context
+
+- 当前`main`相对公开`origin/main`领先186个纯fast-forward提交，全部对象、拓扑和秘密扫描已通过，但出站历史包含内部项目文档、UAT标识、服务器路径、网络/容器和备份拓扑，不能推送到public仓库`3443176848/chenyida`。
+- alpha.42源码历史、通过镜像和最新PostgreSQL/文件卷恢复材料仍主要位于同一服务器，存在单机故障域风险。Git、镜像和数据库/文件卷必须分别建立可独立验证的恢复锚点。
+- 前次执行因本机无`gh`且GitHub应用没有创建仓库接口而在任何变更前停止；项目负责人现授权安装并配置`gh`，但设备授权仍由项目负责人在GitHub页面亲自完成。
+
+### Decision
+
+1. 保留现有public `origin`及其fetch/push URL、upstream和远端main，不向它推送当前内部历史，也不改变其visibility。
+2. 新建空private仓库`3443176848/chenyida-erp-recovery-private`，本地remote固定命名为`recovery-private`；创建后必须由认证元数据证明owner和visibility，不能只依赖匿名404或仓库名称推断。
+3. Git恢复锚点只接受普通、非强制的精确`<commit>:refs/heads/main`推送；禁止force、mirror、all、tags、历史改写、删除远端引用和覆盖非空未知历史，不建立PR或release。
+4. 本机GitHub认证采用`gh auth login --web`设备授权，不通过聊天、命令行参数、任务文档或仓库文件传递PAT；活动账号必须精确为`3443176848`，否则停止。
+5. 当前任务固定为`SELFHOST-OPS-RECOVERY-FOUNDATION-39`。Git private remote只是三锚点中的第一阶段；容器镜像远端registry/digest和PostgreSQL dump+文件卷异机恢复锚点必须在后续独立阶段完成并验证，不能因Git推送成功而标记整个任务`DONE`或宣称production ready。
+6. 每个锚点都必须保留来源SHA/digest/checksum、目标、可见性/访问边界和实际恢复验证；任一锚点只能关闭自身故障域风险，不能替代另外两项。
+
+### Consequences
+
+- `SELFHOST-OPS-RECOVERY-FOUNDATION-39`在Git阶段保持`DOING / PHASE_GIT_PRIVATE_REMOTE`；完成私有push后只可记录`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`，下一阶段仍需新的具体范围和门禁。
+- 新私有仓库将包含完整内部Git历史，因此必须保持private并按内部恢复材料治理；本决定不授权公开其中任何文档、拓扑或UAT标识。
+- `RELEASES.md`不因恢复remote而更新；Git恢复锚点不是产品release、生产部署或真实数据迁移。
+- 本决定不授权UAT登录/API、业务写、Migration、build、Compose、数据库或Volume读取/写入，也不授权镜像push或备份上传。
+
+### Implementation progress
+
+- GitHub官方RPM源和签名指纹核对后已安装`gh 2.97.0`；项目负责人经设备页完成授权，活动账号精确为`3443176848`。认证正文未读取，root配置文件元数据为`root:root / 0600`。
+- 认证视图先证明目标仓库不存在，随后创建空`3443176848/chenyida-erp-recovery-private`；GitHub元数据为`PRIVATE / ADMIN / non-fork / size 0`，分支、tag和release均为0。
+- 当前只完成私有仓库的创建；治理提交、增量扫描、精确private main push及双远端终检仍按任务文档顺序执行。
+
+### Rejected alternatives
+
+- 拒绝直接fast-forward到public `origin/main`，即使Git拓扑和秘密扫描通过。
+- 拒绝通过改写、拆分或删除186个本地提交来适配公开仓库；内部历史使用private恢复remote完整保留。
+- 拒绝把PAT粘贴到聊天、环境命令、remote URL或Git配置。
+- 拒绝把本机Git bundle、Docker本地tag或同盘dump单独称为异机恢复完成。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

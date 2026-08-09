@@ -33,7 +33,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-08-09（Asia/Shanghai）
+快照时间：2026-08-10（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
@@ -41,7 +41,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
 | 当前根仓库运维基线 | `SELFHOST-UAT-FIX-38`已把通过候选Web-only部署到并行非生产UAT；本地/公开alpha.42 health、Caddy安全头、匿名保护、未来日期422、合法日期4次预览、四种返回修改、390×844和安全退出通过。唯一warehouse登录/退出各1，Business mutation及Receipt POST0；最终Session0、收货及全部下游0。独立收口提交消息为`ops: deploy warehouse receipt date guard`，实际SHA以Git log为准 |
-| Git 同步与工作区 | 部署阶段从唯一worktree、clean`main@fc551c6571b57593a3232a14617935b3e3c3171f`、Parent`569aa954d764309e239d1f6c174e582596d33a24`、`origin/main=39946f6b854a985b5c19106eaa6c938bddaf9c7c`、behind0/ahead185起步；只更新获准的八份Markdown并以`ops: deploy warehouse receipt date guard`独立提交后预期ahead186。未push镜像或Git，也未PR/amend/rebase/reset/stash/restore；源码提交与当前alpha.42镜像仍只在本机 |
+| Git 同步与工作区 | `SELFHOST-OPS-RECOVERY-FOUNDATION-39`从唯一worktree、clean`main@acdf1de0364e04aef2a860b3ff1148469d978db7`、Parent`fc551c6571b57593a3232a14617935b3e3c3171f`、公开`origin/main=39946f6b854a985b5c19106eaa6c938bddaf9c7c`、behind0/ahead186起步。公开`origin`保持原HTTPS fetch/SSH push且禁止接收内部历史；GitHub官方RPM安装`gh 2.97.0`并由项目负责人完成设备授权，活动账号为`3443176848`。空private仓库`3443176848/chenyida-erp-recovery-private`已创建并验证为0 branch/tag/release；治理提交通过增量扫描后才可作为精确private main锚点，禁止force、tags、PR或改写历史 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
@@ -49,9 +49,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0040`，40/head`0040_warehouse_receipt_readiness.sql`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`；0039及更早未修改。主`RFQ-00000001`为CLOSED v7，Award为1/v1/AWARDED且Line4；受控`PO-00000001`为1/v1/OPEN，PO Line/Delivery Plan/queue为`4/4/4`，新证据表及Receipt/Lot/IQC/Ledger/AP/付款/生产下游全0。四条获选Candidate、Binding及Mapping保持 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `DONE / WEB_ONLY_UAT_DEPLOYED / ZERO_WRITE_REVALIDATED`。最终结论为`SELFHOST-UAT-FIX-38 DEPLOYED AND REVALIDATED — NO UAT RECEIPT`；仅为非生产UAT，不是生产就绪 |
-| 当前任务 | `SELFHOST-UAT-FIX-38`已`DONE`，当前无`DOING`任务。唯一warehouse登录/退出各1，未来日期422为1、合法preview200及确认窗各4，Business mutation/Receipt POST0；最终Session0、PO/Line/Plan/queue`1/4/4/4`、已收0及Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0 |
-| 下一任务 | 当前不自动启动后续任务。任何真实Receipt必须基于真实实物与凭证另获明确授权；quality IQC、Ledger后续、AP、Payment、Work Order、生产、真实数据迁移或生产切流均须独立任务。旧alpha.41回退锚点和被拒镜像继续保留 |
+| 当前阶段 | `DOING / RECOVERY_FOUNDATION / PHASE_GIT_PRIVATE_REMOTE`。FIX38仍为`DONE / WEB_ONLY_UAT_DEPLOYED / ZERO_WRITE_REVALIDATED`和`NO UAT RECEIPT`；恢复治理不改变非生产边界 |
+| 当前任务 | `SELFHOST-OPS-RECOVERY-FOUNDATION-39`为唯一`DOING`。D-108固定Git、镜像、PostgreSQL/文件卷三类独立恢复锚点；当前只执行Git private remote阶段，私有空仓库已创建，治理提交、增量复扫、精确main push及双远端终检仍按任务文档门禁完成 |
+| 下一任务 | 本任务Git阶段完成后仍不得自动执行其他恢复锚点；容器镜像远端registry/digest和PostgreSQL dump+文件卷异机恢复须分别限定范围和验证。任何真实Receipt、quality IQC、AP、Payment、生产、真实数据迁移或生产切流继续要求独立明确授权；旧alpha.41回退锚点和被拒镜像继续保留 |
 
 ## 当前完成模块
 

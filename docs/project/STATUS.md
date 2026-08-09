@@ -1,6 +1,21 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-09（Asia/Shanghai）
+最后更新时间：2026-08-10（Asia/Shanghai）
+
+## SELFHOST-OPS-RECOVERY-FOUNDATION-39 Git私有恢复锚点（进行中）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DOING / PHASE_GIT_PRIVATE_REMOTE | D-108将恢复基础拆为Git、镜像、PostgreSQL/文件卷三个独立锚点；当前只处理Git，不能因此标记整体DONE或production ready |
+| 严格起点 | PASS | 唯一worktree、clean`main@acdf1de0364e04aef2a860b3ff1148469d978db7`、Parent`fc551c6571…c3171f`、公开`origin/main=39946f6b…5c0`、behind0/ahead186；既有出站历史纯fast-forward且confirmed/possible secret均0 |
+| public边界 | PRESERVED / DO NOT PUSH | `3443176848/chenyida`继续为PUBLIC、默认main、当前身份ADMIN；内部文档、UAT标识、服务器/网络/容器/备份拓扑不允许进入public remote，现有origin配置不得变化 |
+| GitHub CLI | PASS / OFFICIAL RPM | OpenCloudOS 9.4按GitHub官方DNF4仓库安装`gh 2.97.0`，官方签名指纹核对通过；没有修改防火墙、systemd、Docker或应用配置 |
+| 设备认证 | PASS / EXACT ACCOUNT | 项目负责人亲自在GitHub设备页确认；活动账号为`3443176848`。认证正文未读取，root配置文件只核对为`root:root / 0600` |
+| private仓库 | PASS / EMPTY PRIVATE | `3443176848/chenyida-erp-recovery-private`由认证元数据证明为PRIVATE、ADMIN、non-fork、size0；创建后branch/tag/release均0，没有README或初始化提交 |
+| 文档与静态验证 | PASS | 47个本地Markdown链接、标题唯一性、唯一`DOING`、精确六文件范围、`RELEASES.md`未修改及diff检查通过；lint 0 error/11条既有warning，纯本地读文件的UI contract 6/6 |
+| 推送门禁 | FINAL COMMIT + INCREMENTAL SCAN REQUIRED | 只允许把`docs: define alpha42 recovery foundation`产生的精确完整SHA普通推到`recovery-private/main`；增量秘密/路径/diff失败、目标非空或需要force时立即停止 |
+| UAT/数据保护 | UNCHANGED / NO ACCESS | 不登录UAT、不调用业务API、不读写数据库、不运行Migration/build/Compose/deploy/restart；FIX38继续为alpha.42/0040、NO UAT RECEIPT |
+| 剩余风险 | OPEN | Git锚点仅关闭源码历史的单机风险；镜像没有远端registry digest，最新数据库/文件卷恢复锚点未完成异机复制，三锚点未全部建立前保持非生产且非生产就绪 |
 
 ## SELFHOST-UAT-FIX-38 Web-only部署与零业务写复验（完成）
 

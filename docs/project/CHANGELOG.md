@@ -2,6 +2,17 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-10
+
+### SELFHOST-OPS-RECOVERY-FOUNDATION-39 - `docs: define alpha42 recovery foundation`
+
+- 决策/范围：新增D-108和任务文档，把alpha.42恢复基础拆为Git、容器镜像、PostgreSQL dump+文件卷三个独立锚点；当前只执行Git private remote阶段并保持任务`DOING`。恢复remote不是release，不修改`RELEASES.md`，也不授权UAT、业务写、Migration、build、Compose、数据库/Volume操作或生产动作。
+- 出站门禁：既有186个提交为纯fast-forward且秘密扫描无confirmed/possible secret，但包含内部文档、UAT标识和服务器/网络/容器/备份拓扑，继续禁止推到public `3443176848/chenyida`。公开`origin`的HTTPS fetch、SSH push、upstream和`origin/main=39946f6b…5c0`必须保持。
+- GitHub配置：按官方DNF4流程安装`gh 2.97.0`，两个官方签名主指纹核对通过；项目负责人亲自在设备页授权，活动账号精确为`3443176848`。认证正文未读取，root配置元数据为`root:root / 0600`。
+- 私有仓库：认证后先确认目标不存在，再创建空`3443176848/chenyida-erp-recovery-private`；元数据为`PRIVATE / ADMIN / non-fork / size 0`，branch/tag/release均为0。只允许增量复扫后的精确治理提交普通推到private `main`，不force、tags、PR或改写历史。
+- 验证：47个本地Markdown链接、任务/D-108唯一性、唯一`DOING`、精确六文件范围、`RELEASES.md`未修改及`git diff --check`通过；断网、源码只读、1 CPU容器中的lint为0 error/11条既有warning，纯本地读文件的采购履约UI contract为6/6。
+- 运行保护：本阶段不登录UAT、不调用API、不触碰数据库、镜像或备份，不运行Migration/build/deploy/restart。alpha.42/0040、NO UAT RECEIPT、四服务restart0/OOM false和四个受保护Volume沿用只读核验基线；镜像与数据库/文件卷的异机风险仍开放。
+
 ## 2026-08-09
 
 ### SELFHOST-UAT-FIX-38 - `fix: validate receipt evidence date before confirmation` / `fix: expose runtime version in health` / `build: preserve runtime package version` / `docs: record FIX38 rebuild requirement` / `ops: build warehouse receipt date guard candidate` / `ops: deploy warehouse receipt date guard`
