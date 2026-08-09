@@ -1,0 +1,110 @@
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import test from "node:test";
+
+const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
+const sourcePackage = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+const runtimePackagePath = join(tmpdir(), "chenyida-runtime-package.json");
+
+function generatorScript() {
+  const match = dockerfile.match(/^RUN node --input-type=module -e '([^']+)'$/m);
+  assert.ok(match, "Dockerfile must contain one inline runtime-package generator");
+  return match[1];
+}
+
+async function runGenerator(packageMetadata) {
+  const directory = await mkdtemp(join(tmpdir(), "cyd-fix38-docker-contract-"));
+  try {
+    await rm(runtimePackagePath, { force: true });
+    await writeFile(join(directory, "package.json"), JSON.stringify(packageMetadata));
+    const result = spawnSync(process.execPath, ["--input-type=module", "-e", generatorScript()], {
+      cwd: directory,
+      encoding: "utf8",
+    });
+    const output = result.status === 0 ? JSON.parse(await readFile(runtimePackagePath, "utf8")) : null;
+    return { result, output };
+  } finally {
+    await unlink(runtimePackagePath).catch((error) => {
+      if (error.code !== "ENOENT") throw error;
+    });
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+test("Dockerfile mechanically emits only validated runtime package fields from source package.json", async () => {
+  const { result, output } = await runGenerator(sourcePackage);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(Object.keys(output), ["name", "version", "private", "type"]);
+  assert.deepEqual(output, {
+    name: sourcePackage.name,
+    version: sourcePackage.version,
+    private: sourcePackage.private,
+    type: sourcePackage.type,
+  });
+  assert.equal(output.scripts, undefined);
+  assert.equal(output.dependencies, undefined);
+  assert.equal(output.devDependencies, undefined);
+});
+
+test("Dockerfile generator fails when the source version is missing or invalid", async () => {
+  for (const version of [undefined, "", "unknown", "latest", "development", "01.0.0", 42]) {
+    const candidate = { ...sourcePackage, version };
+    const { result, output } = await runGenerator(candidate);
+    assert.notEqual(result.status, 0);
+    assert.equal(output, null);
+  }
+});
+
+test("final Web stage installs generated metadata without version substitutions or hardcoding", () => {
+  const webStage = dockerfile.slice(dockerfile.indexOf("FROM node:22-bookworm-slim AS web"), dockerfile.indexOf("FROM node:22-bookworm-slim AS worker"));
+  const standaloneCopy = webStage.indexOf("COPY --from=builder --chown=node:node /app/dist/standalone ./");
+  const metadataCopy = webStage.indexOf("COPY --from=builder --chown=node:node /tmp/chenyida-runtime-package.json ./package.json");
+
+  assert.ok(standaloneCopy >= 0);
+  assert.ok(metadataCopy > standaloneCopy);
+  assert.match(dockerfile, /readFileSync\("package\.json", "utf8"\)/);
+  assert.match(dockerfile, /versionPattern\.test\(source\.version\)/);
+  assert.doesNotMatch(dockerfile, /0\.1\.0-alpha\.42/);
+  assert.doesNotMatch(dockerfile, /APP_VERSION|npm_package_version/);
+  assert.doesNotMatch(webStage, /^COPY package\.json/m);
+});
+
+test("base images, Web runtime, Worker stage, and migration behavior remain unchanged", () => {
+  assert.deepEqual(
+    [...dockerfile.matchAll(/^FROM (.+)$/gm)].map((match) => match[1]),
+    [
+      "node:22-bookworm-slim AS dependencies",
+      "dependencies AS builder",
+      "node:22-bookworm-slim AS web",
+      "node:22-bookworm-slim AS worker",
+    ],
+  );
+
+  const webStage = dockerfile.slice(dockerfile.indexOf("FROM node:22-bookworm-slim AS web"), dockerfile.indexOf("FROM node:22-bookworm-slim AS worker"));
+  assert.match(webStage, /^USER node$/m);
+  assert.match(webStage, /^EXPOSE 3000$/m);
+  assert.match(webStage, /^CMD \["node", "server\.js"\]$/m);
+
+  const workerStage = dockerfile.slice(dockerfile.indexOf("FROM node:22-bookworm-slim AS worker"));
+  assert.equal(workerStage, `FROM node:22-bookworm-slim AS worker
+ENV NODE_ENV=production
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN NODE_OPTIONS=--max-old-space-size=1024 npm ci --omit=dev --ignore-scripts && npm cache clean --force
+COPY --chown=node:node app ./app
+COPY --chown=node:node db ./db
+COPY --chown=node:node drizzle-postgres ./drizzle-postgres
+COPY --chown=node:node scripts ./scripts
+COPY --chown=node:node seeds ./seeds
+COPY --chown=node:node tests ./tests
+COPY --chown=node:node worker ./worker
+RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments && chown -R node:node /data/chenyida-erp
+USER node
+CMD ["node", "--experimental-strip-types", "worker/selfhost.ts"]
+`);
+  assert.doesNotMatch(dockerfile, /db:migrate|migrate-postgres|drizzle-kit/);
+});
