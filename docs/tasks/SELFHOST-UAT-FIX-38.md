@@ -2,12 +2,29 @@
 
 ## 状态、阶段与授权边界
 
-- 任务状态：`DOING`。
-- 当前阶段：`IMAGE_READY / DEPLOYMENT_NOT_AUTHORIZED`；允许结论仅为`FIX38 ALPHA.42 VERSIONED IMAGE CANDIDATE READY — NOT DEPLOYED`。
-- 决策状态：`DECISION_RECORDED`；收货预检与运行时版本合同源码状态：`IMPLEMENTED_AND_ISOLATED_TESTED`；本阶段构建、版本门禁和隔离烟测状态：`PASS`；部署状态：`NOT AUTHORIZED / NOT DEPLOYED`。
+- 任务状态：`DONE`。
+- 当前阶段：`WEB_ONLY_UAT_DEPLOYED / ZERO_WRITE_REVALIDATED`；最终结论为`SELFHOST-UAT-FIX-38 DEPLOYED AND REVALIDATED — NO UAT RECEIPT`。
+- 决策状态：`DECISION_RECORDED`；收货预检与运行时版本合同源码、构建、版本门禁、隔离烟测、Web-only部署及唯一warehouse零业务写黑盒状态均为`PASS`。
 - 日期：2026-08-09（Asia/Shanghai）。
-- 本镜像阶段授权仅限从固定HEAD执行一次Git archive production-mode Web build、无网络只读版本门禁、唯一隔离数据库/角色及standalone匿名烟测、精确清理和状态文档。未修改Schema、Migration、依赖、Compose、Caddy、systemd、Worker或业务逻辑；未替换或重启UAT服务，未登录UAT，未调用UAT Receipt preview或发送UAT业务POST，未运行UAT Migration，未部署或push。
+- 最终部署阶段按单独书面授权只把并行非生产UAT Web从alpha.41替换为已通过候选alpha.42，并使用一个隔离Chromium、一个临时Profile、warehouse恰好一次登录/一次退出完成零业务写复验。未修改Schema、Migration、依赖、Compose、Caddy、systemd、Worker或业务逻辑；未运行Migration、未重建PostgreSQL/Worker/Caddy、未执行生产部署，也未push Git或镜像。
 - 本任务不授权真实收货、IQC决定、Ledger、AP、Payment、Work Order或生产操作；`PO-00000001`继续受D-105保护。
+
+## 最终Web-only部署与零写复验
+
+- 严格部署起点为唯一worktree、clean `main@fc551c6571b57593a3232a14617935b3e3c3171f`、Parent `569aa954d764309e239d1f6c174e582596d33a24`、`origin/main...HEAD = behind 0 / ahead 185`。旧运行Web为容器`1e5394349c49895ca14aba09cd8f765cd88a7fff94b593ff675e165481b8865f`、镜像`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`；候选、OCI labels和最小运行时package再次精确匹配alpha.42/revision `569aa954…d33a24`。
+- 先创建本地精确回退tag `chenyida-erp-parallel-web:0.1.0-alpha.41-fix38-rollback`，再把通过候选标记为`latest`；固定`COMPOSE_PARALLEL_LIMIT=1`且只执行一次`docker compose ... up -d --no-deps --no-build --pull never --force-recreate web`。新Web容器为`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`，实际镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`；PostgreSQL、Worker、Caddy容器ID逐字节不变。
+- 本地和公开`/api/health`均为HTTP200，返回`version=0.1.0-alpha.42`、`database=postgresql`、`storage=local`、`worker=postgresql-jobs`及合法time；公开入口保留HSTS、nosniff、DENY、Referrer-Policy、Permissions-Policy、no-store和request ID。匿名warehouse页面/API的PO、Supplier、Material及创建审计标记均为0，API为401；Web日志敏感内容和SQL堆栈命中0。
+- 登录前只读事务并ROLLBACK确认40/head0040、warehouse Session0、PO/Line/Plan/queue `1/4/4/4`、已收0及Receipt全部下游0。migration指纹`822e0e5bf92d4c267aa316668936a196ea23ec6c49a83ac82c777ce2c7fa2b19`和业务指纹`89915aaecad46c5a754ba3239c8bc9d8d4e4039dfad24827267614d32b06dd3b`保持。
+- 唯一Chromium从根工作台记录初始实际选中分组“管理员”，通过可见分组控件切到“仓库”，再通过可见“仓库待入库”进入页面。完整草稿用`2099-12-31`触发恰好一次preview HTTP422，稳定code `RECEIPT_EVIDENCE_FUTURE_DATE`、中文提示和正文/header request ID一致；编辑卡显示三项证据，确认窗和最终按钮不可达，草稿保留。
+- 合法日期只取登录前PostgreSQL只读事务的Asia/Shanghai日期`2026-08-09`。同一登录/浏览器内执行4次合法preview HTTP200并打开4次确认窗；NORMAL只投影普通Purchase Receipt/Receipt Line、普通`RECEIPT`及available立即重算，不包含`IQC_RECEIPT`、FROZEN、UNFREEZE或quality假设结果。“返回修改”为默认焦点，按钮、右上关闭、ESC和背景点击四种路径均清除modal/提交状态并保留底层草稿；390×844下无横向溢出且“返回修改”可键盘操作。
+- 最终请求计数为login POST 1、logout POST 1、未来日期preview GET 422为1、合法preview GET 200为4、确认窗打开4、Business POST/PUT/PATCH/DELETE为0、Receipt POST为0、UAT收货过账为0。退出后的Back/Forward/Refresh和直接匿名warehouse路由均未恢复PO、Supplier、Material或确认窗。
+- 退出后只读事务并ROLLBACK确认warehouse Session0，成功认证审计从LOGIN/LOGOUT `9/8`精确增至`10/9`；Migration、PO/Line/Plan/queue、已收数量、Receipt及全部库存/质量/财务/生产下游保持不变。候选运行稳定且无需回滚；`latest`最终指向alpha.42，旧alpha.41回退tag和被拒`sha256:81126136…278e`均保留。
+- 部署前约available 1.9 GiB、Swap312 MiB/1 GiB、根盘17 GiB、Load `0.06/0.20/0.25`；收口约2.0 GiB、Swap320 MiB、根盘17 GiB、Load `0.05/0.16/0.16`。四服务restart0/OOM false，Docker和内核OOM/restart事件0；13 MiB浏览器Profile/模块/runner及任务容器已精确删除，四个受保护Volume完整保留。
+- 最新正式FIX37备份仍在本机且未新增备份；异机复制仍未完成。部署和文档提交均未push，镜像无远端digest。结论只适用于`NON-PRODUCTION UAT ONLY / NOT PRODUCTION READY`，不能声称真实收货验收完成。
+
+## 候选形成阶段历史记录
+
+> 以下“未部署”“部署未授权”等表述记录FIX38各历史阶段当时的事实；当前最终状态以上述Web-only部署与零写复验为准，不改写历史证据。
 
 ## 严格起点与受保护事实
 

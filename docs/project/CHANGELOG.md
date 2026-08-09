@@ -4,7 +4,16 @@
 
 ## 2026-08-09
 
-### SELFHOST-UAT-FIX-38 - `fix: validate receipt evidence date before confirmation` / `fix: expose runtime version in health` / `build: preserve runtime package version` / `docs: record FIX38 rebuild requirement` / `ops: build warehouse receipt date guard candidate`
+### SELFHOST-UAT-FIX-38 - `fix: validate receipt evidence date before confirmation` / `fix: expose runtime version in health` / `build: preserve runtime package version` / `docs: record FIX38 rebuild requirement` / `ops: build warehouse receipt date guard candidate` / `ops: deploy warehouse receipt date guard`
+
+#### Web-only部署与零业务写复验 — `ops: deploy warehouse receipt date guard`
+
+- 部署：从clean`main@fc551c6571b57593a3232a14617935b3e3c3171f`、behind0/ahead185及旧Web`1e539434…`/`sha256:0cf98937…d5f19`起步；建立精确alpha.41回退tag，把通过候选标记latest，仅一次以`COMPOSE_PARALLEL_LIMIT=1`和`--no-deps --no-build --pull never --force-recreate web`替换Web。新容器`f0066fe6…a35f`实际运行`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`；Worker/PostgreSQL/Caddy完整ID不变，未重建、未重启或运行Migration。
+- 运行门禁：镜像package及OCI version/revision/task再次匹配alpha.42/`569aa954…d33a24`/FIX38；本地和公开health均HTTP200并返回`version=0.1.0-alpha.42`，Caddy的HSTS、nosniff、DENY、Referrer-Policy、Permissions-Policy、no-store和request ID通过。匿名warehouse页面/API受保护标记0、API401；Web日志敏感信息/SQL堆栈命中0。
+- 唯一黑盒：一个隔离Chromium和Profile、warehouse恰好一次login/logout；从根工作台实际初始“管理员”分组经可见“仓库”及“仓库待入库”导航进入页面。`2099-12-31`随preview GET发送并得到HTTP422、`RECEIPT_EVIDENCE_FUTURE_DATE`、指定中文提示和一致request ID，确认窗/最终按钮不可达且草稿保留。合法日期只取PostgreSQL只读事务的`2026-08-09`，4次preview200/4次确认窗只投影NORMAL实际结果；返回修改、关闭、ESC、背景和390×844键盘/无溢出均通过并保留草稿。
+- 请求/数据：login/logout POST `1/1`、未来422 `1`、合法200 `4`、Dialog `4`，Business POST/PUT/PATCH/DELETE、Receipt POST及UAT收货过账均0。退出后Back/Forward/Refresh及直接匿名路由不恢复受保护内容；warehouse Session`0→1→0`，成功LOGIN/LOGOUT Audit由`9/8→10/9`。前后只读事务均ROLLBACK，migration/业务指纹`822e0e5b…a2b19`/`89915aae…dd3b`不变，PO/Line/Plan/queue`1/4/4/4`、已收0及Receipt全部下游0。
+- 回滚/清理：latest最终为alpha.42；旧alpha.41回退tag指向`sha256:0cf98937…d5f19`，被拒`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`，无需回滚。518文件/13MiB浏览器Profile/模块/runner和任务容器清零，四卷保留，未prune。资源约从1.9GiB available/312MiB Swap/17GiB/Load`0.06/0.20/0.25`到2.0GiB/320MiB/17GiB/`0.05/0.16/0.16`，Docker/内核OOM及restart event0，四服务restart0/OOM false。
+- Git/风险：只更新FIX38任务/完成报告与六份项目状态文档，以本小节标题所列ops提交收口；未push Git或镜像。未新增备份，FIX37正式dump保留但异机复制仍未完成；最终仅为`SELFHOST-UAT-FIX-38 DEPLOYED AND REVALIDATED — NO UAT RECEIPT`和`NON-PRODUCTION UAT ONLY / NOT PRODUCTION READY`。
 
 #### alpha.42版本化候选镜像与隔离烟测
 

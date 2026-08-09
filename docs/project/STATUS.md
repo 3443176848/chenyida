@@ -2,7 +2,27 @@
 
 最后更新时间：2026-08-09（Asia/Shanghai）
 
-## SELFHOST-UAT-FIX-38 alpha.42版本化候选镜像（已就绪，未部署）
+## SELFHOST-UAT-FIX-38 Web-only部署与零业务写复验（完成）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | SELFHOST-UAT-FIX-38 DEPLOYED AND REVALIDATED — NO UAT RECEIPT | `DONE / WEB_ONLY_UAT_DEPLOYED / ZERO_WRITE_REVALIDATED`；仅为非生产UAT，不是生产发布或生产就绪 |
+| 严格起点 | PASS | 唯一worktree、clean`main@fc551c6571b57593a3232a14617935b3e3c3171f`、Parent`569aa954…d33a24`、behind0/ahead185；旧Web`1e539434…`/`sha256:0cf98937…d5f19`、候选`sha256:e7761e2c…f94964`、40/head0040、Session0、业务指纹及四服务restart0/OOM false匹配 |
+| Web-only部署 | PASS / ONE RECREATE | 建立旧alpha.41精确rollback tag，把通过候选标记latest，仅一次以`COMPOSE_PARALLEL_LIMIT=1`、`--no-deps --no-build --pull never --force-recreate web`替换Web；新容器`f0066fe6…a35f`，实际镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964` |
+| 服务边界 | PASS | Worker`fb68d9a8…f6e0`、PostgreSQL`f3a2f3cb…ead3`、Caddy`c209765b…8df`完整ID不变；未重建或重启，未运行Migration。四个受保护Volume完整 |
+| 版本/health | PASS / ALPHA.42 | 镜像package及OCI version/revision/task匹配`0.1.0-alpha.42`/`569aa954…d33a24`/FIX38；本地和公开health均HTTP200并返回alpha.42、postgresql/local/postgresql-jobs及合法time，no-store/request ID通过 |
+| Caddy/匿名 | PASS | 公开HSTS、nosniff、DENY、Referrer-Policy、Permissions-Policy通过；登录前及退出后的匿名warehouse页面/API均不含PO/Supplier/Material/创建审计，API401。Web日志凭据、DATABASE_URL、Token、SQL堆栈命中0 |
+| 未来日期 | PASS / FAIL CLOSED | 桌面完整草稿的`2099-12-31`随preview GET发送；HTTP422、`RECEIPT_EVIDENCE_FUTURE_DATE`、中文提示及body/header request ID一致。编辑卡显示证据，确认窗/最终按钮不可达，草稿保留，业务写0 |
+| 合法日期/NORMAL | PASS | 合法日期只取PostgreSQL只读事务的`2026-08-09`；同一登录4次preview200/4次确认窗。NORMAL只显示普通Purchase Receipt/Line、`RECEIPT`及available立即重算，不显示IQC_RECEIPT/FROZEN/UNFREEZE/quality假设结果 |
+| 返回修改/响应式 | PASS | “返回修改”默认焦点；按钮、右上关闭、ESC、背景四种路径均清除modal/提交状态并保留表单草稿。桌面及390×844无横向溢出，移动视口键盘Enter可操作“返回修改”；从未点击最终确认 |
+| 请求计数 | PASS / ZERO BUSINESS WRITE | login/logout POST `1/1`，未来preview422 `1`，合法preview200 `4`，Dialog `4`；Business POST/PUT/PATCH/DELETE `0`、Receipt POST `0`、UAT收货过账`0` |
+| Session/Audit | PASS | warehouse active/version5/must-change=false；有效Session`0→1→0`，只由正常logout撤销。成功LOGIN `9→10`、LOGOUT `8→9`，精确各增1；未直接删除Session或Audit |
+| 数据保护 | PASS / UNCHANGED | 前后只读事务均ROLLBACK；migration指纹`822e0e5b…a2b19`、业务指纹`89915aae…dd3b`不变。PO 1/v1/OPEN、Line/Plan/queue`4/4/4`、已收0；Receipt/Evidence/Lot/IQC/Ledger/Purchase Source/AP/Payment/Work Order/生产全0 |
+| 回滚锚点 | RETAINED / NOT USED | latest最终为`sha256:e7761e2c…f94964`；`0.1.0-alpha.41-fix38-rollback`精确指向`sha256:0cf98937…d5f19`。被拒`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`；无需回滚且三者均未删除/push |
+| 资源/清理 | PASS | Web替换前available约1.9GiB、Swap312MiB/1GiB、根盘17GiB、Load`0.06/0.20/0.25`；浏览器清理后约2.0GiB/320MiB/17GiB/`0.05/0.16/0.16`。Docker/内核OOM和restart event0，四服务restart0/OOM false；518文件/13MiB任务浏览器目录和容器清零 |
+| Git/备份/风险 | DOCS COMMIT / NO PUSH | 只更新八份获准Markdown并以`ops: deploy warehouse receipt date guard`收口，预期ahead186；未push Git或镜像。未新增备份，FIX37正式dump保留但异机复制未完成；`NON-PRODUCTION UAT ONLY / NOT PRODUCTION READY` |
+
+## SELFHOST-UAT-FIX-38 alpha.42版本化候选镜像（历史阶段：当时已就绪、未部署）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
