@@ -1,6 +1,24 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-08（Asia/Shanghai）
+最后更新时间：2026-08-09（Asia/Shanghai）
+
+## SELFHOST-UAT-FIX-38 服务端日期驱动的收货预检门禁（需求已决定，实现未开始）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 任务状态 | DECISION RECORDED — IMPLEMENTATION NOT STARTED | `DOING`；D-107和FIX38基线已记录。未修改源码/测试，未build、deploy或restart；计划alpha.42尚未产生 |
+| 严格起点 | PASS | 唯一worktree、clean`main@7d8f3cf6aa58808698ae6100424bc0e5df248b3d`、Parent`20a9123741862d81ac18af9e6bdee896674fe95c`、behind0/ahead178；alpha.41、40/head0040、Web`0cf98937…d5f19`完全匹配 |
+| 决策 | D-107 / ACCEPTED | Receipt preview日期以服务端事务Asia/Shanghai业务日期为权威；过账后果只投影实际inspection mode；四种关闭路径统一为返回修改并保留未提交编辑草稿 |
+| 唯一确认缺陷 | PREVIEW FAIL-CLOSED GAP | `openPreview`未传`evidence_document_date`，preview合同未校验，`confirmationReady`只检查非空，故未来日期可进入可执行确认窗 |
+| 最终写/数据库防线 | PRESERVED / SAFE | 最终Receipt POST仍在自己的写事务中用Asia/Shanghai日期返回`RECEIPT_EVIDENCE_FUTURE_DATE`；0040触发器独立约束。两者未改，现有数据安全 |
+| 后续preview验收 | HTTP 422 / MODAL UNREACHABLE | 实现后未来日期须由GET preview返回稳定code/message/request_id且确认窗不可达；今天/过去日期继续可预览，浏览器时间和仅HTML `max`不具权威性 |
+| NORMAL/IQC验收 | ACTUAL MODE ONLY | NORMAL不描述RML/FROZEN/UNFREEZE；实际IQC行显示RML、FROZEN、`IQC_RECEIPT`、可用量0及quality RELEASE→UNFREEZE。NORMAL缺少假设IQC不是缺陷 |
+| 返回修改验收 | POST 0 / DRAFT PRESERVED | 取消、关闭、ESC、背景均放弃当前确认并返回编辑；清除modal/preview/loading/submitted/error/提交锁/幂等状态，但不`form.reset()`且保留未发送输入。字段保留不是状态泄漏 |
+| 延期 | EXPLICIT | 教学模式比较、清空本行、显式清空及成功提交后自动清空另立任务；FIX38不实现 |
+| Schema/API/版本 | NO CHANGE IN THIS PHASE | 本阶段无Schema/Migration/API/运行代码变化；源码与UAT仍alpha.41/0040，Web镜像不变，alpha.42仅为后续候选计划 |
+| 本阶段验证 | PASS / DOCS-ONLY | 文档范围/一致性/diff检查通过；测试脚本确认无数据库或网络路径。宿主npm缺失后以既有Node镜像在断网、源码只读、自动删除容器中通过lint（0 error、11 warning）和UI contract 5/5；未运行全量npm、PG写测试、Migration或build |
+| UAT/数据保护 | PRESERVED / ZERO WRITE | 未登录UAT、未调用Receipt preview、业务POST0、warehouse Session0；PO/Line/Plan/queue`1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/Payment/生产全0 |
+| 下一阶段 | FIX38 SOURCE + ISOLATED TESTS ONLY | 先实现UI和server preview门禁并运行隔离测试；不得从本决定自动进入UAT部署或真实收货 |
 
 ## SELFHOST-UAT-FIX-37 Warehouse Receipt Readiness and Date Safeguards（完成）
 

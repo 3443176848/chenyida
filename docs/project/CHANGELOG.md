@@ -2,6 +2,16 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-09
+
+### SELFHOST-UAT-FIX-38 - `docs: decide warehouse receipt preview semantics`
+
+- 决策：新增D-107 `收货预检日期、实际检验模式投影与返回修改语义`并打开FIX38。Receipt preview必须接收`evidence_document_date`，在服务端只读事务内使用Asia/Shanghai业务日期拒绝未来日期；HTTP 422固定为`RECEIPT_EVIDENCE_FUTURE_DATE`、`送货凭证日期不能晚于服务端实际收货日期`并带request_id。浏览器时间和仅HTML `max`不是权威，preview不替代最终POST或0040防线。
+- 缺陷定界：唯一已确认缺陷是现有`openPreview`未传证据日期、preview合同未校验，而`confirmationReady`只检查非空，导致未来日期可进入可执行确认窗。最终Receipt POST和0040仍会独立拒绝，主UAT没有写入或数据损坏。
+- 模式/交互：本次过账后果只显示当前Material实际inspection mode；NORMAL不显示RML/FROZEN/UNFREEZE，实际IQC才显示RML冻结及quality RELEASE→UNFREEZE。四种关闭路径统一为“返回修改”、业务POST 0，清除modal/preview/提交/幂等状态但保留未发送编辑值；不使用`form.reset()`，不新增“清空本行”。
+- 范围/状态：仅新增FIX38任务文档并同步MASTER/TASKS/DECISIONS/STATUS/CHANGELOG；没有修改源码、测试、Schema、Migration、依赖或部署配置。计划候选alpha.42尚未实现、构建、部署或发布；UAT继续alpha.41/0040/Web`0cf98937…d5f19`。
+- 验证边界：只读核验Git/资源/容器/Migration/Session和业务零计数；不登录UAT、不调用Receipt preview、不发业务POST、不写PostgreSQL、不运行Migration/build/deploy/restart。51行UI测试脚本确认只读本地文件且无数据库/网络路径；宿主npm缺失后，以本机已有Node镜像在断网、源码只读、1 CPU/1,280 MiB、自动删除容器中通过lint（0 error、11条既有warning）和UI contract 5/5，未安装依赖。文档范围/一致性及diff检查通过，临时容器清零。
+
 ## 2026-08-08
 
 ### SELFHOST-UAT-FIX-37 - `feat: safeguard warehouse receipt readiness` / `fix: project receipt accounting by inspection mode` / `ops: deploy warehouse receipt readiness safeguards`

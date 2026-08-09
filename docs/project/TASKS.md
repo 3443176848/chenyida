@@ -13,7 +13,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| — | 当前无执行中任务 | — | — | — | — | — | `SELFHOST-UAT-FIX-37`已完成；任何实际收货、IQC决定、入库后续、AP、付款或生产操作均须新的独立任务、当时事实门禁和明确授权。 |
+| SELFHOST-UAT-FIX-38 | 服务端日期驱动的收货预检门禁 | DOING | Codex（需求审计、D-107、FIX38文档基线和非数据库验证）、项目负责人（确认日期权威、实际模式投影与返回修改语义） | 2026-08-09 | — | SELFHOST-UAT-FIX-37、D-106、D-107 | `DECISION_RECORDED / IMPLEMENTATION_NOT_STARTED / NOT BUILT / NOT DEPLOYED`。唯一已确认缺陷是未来证据日期未进入服务端preview门禁而可打开确认窗；最终POST及0040仍安全。NORMAL只显示实际NORMAL后果、关闭后保留未提交编辑值均是已确认验收语义，不列为缺陷。文档门禁、lint 0 error及UI contract 5/5通过；下一阶段才修改源码并执行隔离测试。计划alpha.42，当前UAT仍alpha.41且Receipt及全部下游0。见[任务文档](../tasks/SELFHOST-UAT-FIX-38.md)及[D-107](DECISIONS.md#d-107-收货预检日期实际检验模式投影与返回修改语义)。 |
 
 ## 已完成任务
 

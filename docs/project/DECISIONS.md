@@ -1232,6 +1232,55 @@
 - 下游隔离：收货不会自动创建AP、Payment、Work Order或其他生产记录；本决定不改变既有库存会计语义，也不授权任何主UAT实际Receipt、IQC、Ledger、AP、付款或生产操作。主样本Material 533—536当前均为`STOCKED/NORMAL`，这只决定当次权威预览文案，不被硬编码为通用事实。
 - 实施结果：功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`，mode语义修正提交`20a9123741862d81ac18af9e6bdee896674fe95c`；0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。隔离迁移/写路径、正式dump/list/第二新库恢复、0039→0040和Web-only部署通过，最终Web`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`。warehouse-only主UAT只读/预览取消，`business_post=0`、Session0，PO/Line/Plan/queue保持`1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。
 
+## D-107 收货预检日期、实际检验模式投影与返回修改语义
+
+- 日期：2026-08-09
+- 状态：`ACCEPTED / REQUIREMENT DECIDED / IMPLEMENTATION NOT STARTED`
+- 标题：`D-107：收货预检日期、实际检验模式投影与返回修改语义`
+- 确认人：项目负责人（要求先完成需求决策，只记录服务端日期预检、实际模式投影和返回修改语义；本阶段禁止源码、构建、Migration、部署及UAT收货操作）
+
+### Context
+
+- FIX37黑盒补充证明，当前`openPreview`只向Receipt preview传`quantity`，没有传`evidence_document_date`；preview合同也没有未来日期校验，而`confirmationReady`只检查日期非空。因此未来证据日期可进入可执行确认窗口。
+- 最终Receipt POST已在自己的事务中用Asia/Shanghai服务端业务日期拒绝未来日期，0040触发器也独立约束Evidence日期不晚于Receipt服务端时间；当前主UAT Receipt及全部下游仍为0，未发生数据安全事件。
+- 黑盒补充对NORMAL样本缺少“假设IQC结果”和确认窗关闭后编辑字段保留的FAIL判断不成立：前者与实际模式投影原则冲突，后者是返回编辑所需的未提交草稿保留。
+
+### Decision
+
+1. Receipt preview必须接收`evidence_document_date`，并在服务端只读事务中用该事务的`transaction_timestamp() at time zone 'Asia/Shanghai'`业务日期验证；浏览器`Date`、`Date.now()`、客户端时区或HTML `max`不得成为权威。
+2. 未来日期必须返回HTTP 422、`RECEIPT_EVIDENCE_FUTURE_DATE`、`送货凭证日期不能晚于服务端实际收货日期`和request_id；UI展示这三项且不得打开可执行确认窗口。今天及过去日期继续预览。
+3. 最终Receipt POST必须在自己的写事务中重新计算Asia/Shanghai业务日期并独立验证；preview不替代POST。0040触发器继续独立兜底，本决定不修改Migration。
+4. “本次过账后果”只投影当前Material的实际inspection mode。NORMAL不得描述RML、FROZEN或RELEASE→UNFREEZE；实际IQC行必须显示内部RML Lot、初始FROZEN、`IQC_RECEIPT` Ledger、可用量0及quality RELEASE后UNFREEZE。NORMAL订单没有假设IQC结果不是缺陷。
+5. 取消、右上角关闭、ESC和背景关闭均表示“放弃本次最终确认，返回编辑”，保持业务POST 0。实施时按钮改名“返回修改”；关闭必须清除modal、preview snapshot、loading、submitted、dialog error、提交锁与idempotency state，同时保留编辑区尚未发送的草稿，且不得调用`form.reset()`。
+6. modal关闭后字段仍保留是预期草稿语义，不是状态泄漏；modal、preview、提交或幂等状态未清除才是缺陷。
+
+### Consequences
+
+- FIX38的唯一已确认缺陷是未来证据日期没有在权威GET预检阶段失败关闭；最终POST和0040既有防线保持有效且仍需回归验证。
+- 实现需要调整Receipt UI、preview Handler/Service及Unit/UI contract/隔离PostgreSQL测试，但不需要Schema或Migration；计划候选版本为alpha.42，目前未实现、构建、部署或发布。
+- 关闭确认窗不清空业务编辑表单；用户可以修改原值后重新请求新的权威preview。旧preview、请求错误、提交锁及幂等身份不得跨确认周期复用。
+
+### Rejected alternatives
+
+- 拒绝用浏览器`Date`、`Date.now()`或客户端时区判定业务日期。
+- 拒绝只依赖HTML date input的`max`属性；它只能提供交互提示，不能成为安全门禁。
+- 拒绝把假设IQC结果混入NORMAL订单的“本次过账后果”。
+- 拒绝在关闭确认窗时清空全部输入；这会破坏返回修改语义并迫使重复录入。
+- 拒绝让preview成功替代最终POST的事务内日期复核或数据库约束。
+
+### Deferred work
+
+- 面向培训的NORMAL/IQC比较面板延后单独任务，且必须明确标记为非当前过账事实。
+- “清空本行”按钮、显式清空及成功提交后的自动清空策略延后决定；FIX38不实现。
+- 采购会计、quality、finance、Python/SQLite和历史Sites/D1均不在本决定范围。
+
+### Verification boundary
+
+- 当前仅记录需求和实施验收基线；不修改代码、测试、Schema、Migration、依赖或部署配置，不构建、不部署、不重启。
+- 可只读核验Git、容器、资源、Migration ledger、warehouse账号/Session及PO/下游计数；不得登录UAT、调用Receipt preview或发送业务POST。
+- 轻量lint和UI contract测试必须先确认无数据库URL、网络访问和UAT/生产写路径；后续PostgreSQL写测试只能使用隔离数据库。
+- 本决定不授权任何主UAT Receipt POST、IQC、Ledger、AP、Payment或生产写入；PO/Line/Plan/queue必须保持`1/4/4/4`，Receipt及全部下游保持0。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

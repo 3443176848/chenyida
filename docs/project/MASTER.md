@@ -33,7 +33,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-08-08（Asia/Shanghai）
+快照时间：2026-08-09（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
@@ -41,7 +41,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-37`已新增warehouse最小权限收货谱系DTO、两阶段权威预览、关系化日期/送货证据、CAS/幂等/并发/事务门禁、IQC权限隔离和按inspection mode投影的库存会计边界；功能提交为`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`，语义修正提交为`20a9123741862d81ac18af9e6bdee896674fe95c`。版本为alpha.41，唯一新增Migration为0040 |
 | 当前根仓库运维基线 | `SELFHOST-UAT-FIX-37`已完成root-only正式备份/list/第二新库恢复、0039→0040升级/重放、主库0040受控应用、Web-only替换、warehouse-only桌面/390×844预览取消UAT及安全退出；主UAT business POST0且全部收货下游保持0。独立收口提交消息为`ops: deploy warehouse receipt readiness safeguards`，实际SHA以Git log为准 |
-| Git 同步与工作区 | FIX37从唯一worktree、clean`main@a40660cc3ba8e74495c919ba0f2602485597fc38`、Parent`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`、behind0/ahead175起步；功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`及语义修正`20a9123741862d81ac18af9e6bdee896674fe95c`后ahead177，独立运维/文档收口后预计ahead178。未push/PR/amend/rebase/reset/stash/restore，密码、Token、Cookie、Session正文、连接信息和备份正文未进入Git |
+| Git 同步与工作区 | FIX37已由独立运维/文档提交`7d8f3cf6aa58808698ae6100424bc0e5df248b3d`收口。FIX38需求决策从唯一worktree、clean`main@7d8f3cf6aa58808698ae6100424bc0e5df248b3d`、Parent`20a9123741862d81ac18af9e6bdee896674fe95c`、behind0/ahead178起步，只允许六份文档形成独立提交，提交后预计ahead179。未push/PR/amend/rebase/reset/stash/restore，密码、Token、Cookie、Session正文、连接信息和备份正文不得进入Git |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
@@ -49,9 +49,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0040`，40/head`0040_warehouse_receipt_readiness.sql`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`；0039及更早未修改。主`RFQ-00000001`为CLOSED v7，Award为1/v1/AWARDED且Line4；受控`PO-00000001`为1/v1/OPEN，PO Line/Delivery Plan/queue为`4/4/4`，新证据表及Receipt/Lot/IQC/Ledger/AP/付款/生产下游全0。四条获选Candidate、Binding及Mapping保持 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经未重建Caddy可信TLS到Web；单值Origin与端口边界保持。Warehouse Receipt Readiness alpha.41 Web为`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`（88,678,839 bytes），Worker仍为`sha256:32d1ae335610c097d9fa38dd411acabc525c0fe17cfcb863271e32317afe96aa`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。旧Web`664e0ac6…`有FIX37精确回退tag，四个受保护Volume未更换 |
 | 当前开发环境 | FIX37新增`WAREHOUSE_RECEIPT_READINESS_V1`最小权限DTO和`GET /api/procurement/delivery-plans/:id/receipt-preview`；最终POST锁定PO/Line/Plan/queue并重验CAS、剩余量、权限、CSRF、Origin、幂等和关系化证据。0040用不可变证据表绑定Receipt/Line/Plan/queue、送货凭证、证据日期、提前原因/确认、MAIN、actor/request/服务端时间及预期版本；warehouse无IQC写权，quality保持。主样本为STOCKED/NORMAL，故预览准确显示普通Receipt Ledger和立即重算可用库存，不伪造RML/IQC冻结；Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `WAREHOUSE RECEIPT READINESS FIXED — UAT RECEIPT NOT POSTED`。功能、隔离写路径、迁移测试、正式备份恢复、0040、Web-only部署和warehouse-only主UAT全部通过；business POST0、Session0、PO/Line/Plan/queue `1/4/4/4`且Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。D-105原始写入判断不变 |
-| 当前任务 | 当前无`DOING`。FIX37只读/预览取消主UAT前后业务指纹一致，Web`0cf98937…`和0040已上线；除版本化证据Schema外没有主业务事实修改，只替换Web |
-| 下一任务 | 任何真实收货必须另立任务、重新核验当时实物/送货凭证并明确授权最终POST；IQC决定只属于quality，AP、付款和生产均需各自独立授权。当前不得根据本次预览验收自动继续任何写操作 |
+| 当前阶段 | `REQUIREMENT DECIDED — IMPLEMENTATION NOT STARTED`。D-107已确认服务端日期驱动的Receipt预检、按实际inspection mode投影和“返回修改”草稿语义；FIX38唯一已确认缺陷是未来证据日期可进入确认窗。最终Receipt POST和0040仍独立安全，尚未修改源码、构建或部署 |
+| 当前任务 | `SELFHOST-UAT-FIX-38`为唯一`DOING`，当前仅完成需求审计、D-107和任务基线。UAT仍为alpha.41/Web`0cf98937…`/0040；未登录、未调用Receipt preview、未发业务POST，Session0及Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0 |
+| 下一任务 | 在FIX38后续实现阶段修改Receipt UI与preview服务端合同，并仅用隔离环境完成Unit/UI contract/PostgreSQL测试；计划候选alpha.42但当前未构建、未部署。真实UAT收货、IQC、AP、付款及生产继续需要各自独立明确授权 |
 
 ## 当前完成模块
 
