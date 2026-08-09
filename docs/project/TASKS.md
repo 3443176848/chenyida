@@ -13,7 +13,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-UAT-FIX-38 | 服务端日期驱动的收货预检门禁 | DOING | Codex（需求审计、D-107、源码实现、隔离测试和SOURCE_READY文档）、项目负责人（确认日期权威、实际模式投影与返回修改语义；后续build/deploy/UAT另行授权） | 2026-08-09 | — | SELFHOST-UAT-FIX-37、D-106、D-107 | `SOURCE_READY / IMPLEMENTED_AND_ISOLATED_TESTED / NOT BUILT / NOT DEPLOYED`。功能提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`使preview在只读事务内按PostgreSQL Asia/Shanghai日期拒绝未来/非法证据日期，页面422失败关闭且显示code/message/request_id；确认门禁只信任服务端已验证日期。NORMAL只显示实际普通Receipt/`RECEIPT`/available结果，真实IQC继续显示RML/FROZEN/`IQC_RECEIPT`/UNFREEZE；四种返回修改路径清除确认状态但保留未提交表单值。Unit/UI/隔离PG/0040/typecheck/lint/npm test通过，最终POST及0040独立保护不变。源码为alpha.42候选；运行UAT仍alpha.41/Web`0cf98937…d5f19`，未登录、未预览、未业务POST，Receipt及全部下游0。见[任务文档](../tasks/SELFHOST-UAT-FIX-38.md)及[D-107](DECISIONS.md#d-107-收货预检日期实际检验模式投影与返回修改语义)。 |
+| SELFHOST-UAT-FIX-38 | 收货预检与Web运行时版本合同修复 | DOING | Codex（D-107源码、运行时版本/health/Docker metadata合同、串行测试和REBUILD_REQUIRED文档）、项目负责人（确认既有收货语义；后续rebuild/deploy/UAT另行授权） | 2026-08-09 | — | SELFHOST-UAT-FIX-37、D-106、D-107 | `VERSION_CONTRACT_SOURCE_READY / REBUILD_REQUIRED / NOT DEPLOYED`。既有`401e16b…`收货预检保持；`13f72b5f7aa51905af597733356420cc7b017b74`从运行时package严格读取/缓存版本并让health保留原字段后新增version，缺失或非法metadata非2xx失败关闭；`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`从源码package机械生成最小`name/version/private/type`并在Web final复制为`/app/package.json`，Worker/基础镜像/启动/Migration不变。版本4/4、health3/3、Dockerfile4/4、FIX38 Unit17/17、UI6/6、typecheck、lint、npm3/3通过。源码仍alpha.42；运行UAT仍alpha.41/Web`0cf98937…d5f19`且全部下游0。旧候选`81126136…278e`保留为`REJECTED — DO NOT DEPLOY`，无latest/容器；未build、部署、重启、登录、preview或业务POST。见[任务文档](../tasks/SELFHOST-UAT-FIX-38.md)及[D-107](DECISIONS.md#d-107-收货预检日期实际检验模式投影与返回修改语义)。 |
 
 ## 已完成任务
 

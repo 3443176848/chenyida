@@ -2,26 +2,26 @@
 
 最后更新时间：2026-08-09（Asia/Shanghai）
 
-## SELFHOST-UAT-FIX-38 服务端日期驱动的收货预检门禁（源码就绪，未构建/未部署）
+## SELFHOST-UAT-FIX-38 Web运行时版本合同补救（源码就绪，必须重建）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | SOURCE READY — NOT BUILT / NOT DEPLOYED | `DOING / SOURCE_READY`；D-107已由alpha.42候选源码和隔离测试实现。没有build、deploy、restart或UAT复验 |
-| 严格起点 | PASS | 唯一worktree、clean`main@6bb320118e9b4386ca4e59d7354dd4f599c7d850`、Parent`7d8f3cf6aa58808698ae6100424bc0e5df248b3d`、behind0/ahead179；alpha.41、40/head0040、Web`0cf98937…d5f19`完全匹配 |
-| 决策 | D-107 / ACCEPTED | Receipt preview日期以服务端事务Asia/Shanghai业务日期为权威；过账后果只投影实际inspection mode；四种关闭路径统一为返回修改并保留未提交编辑草稿 |
-| preview门禁 | FIXED / HTTP 422 / MODAL UNREACHABLE | UI安全传递非空`evidence_document_date`；preview在同一只读事务中用PostgreSQL `transaction_timestamp()`的Asia/Shanghai日期严格解析和比较。D−1/D为200，D+1/2099为稳定422；code/message/request_id及`X-Request-ID`一致，失败时确认窗和最终按钮不可达 |
-| 浏览器门禁 | SERVER-VALIDATED ONLY | `confirmationReady`要求草稿日期等于preview返回的已验证日期且不晚于`server_date_shanghai`；业务代码不读取浏览器当前时间。修改错误日期后可重新GET preview |
-| 最终写/数据库防线 | PRESERVED / INDEPENDENT | 最终Receipt POST仍在自己的写事务中重算Asia/Shanghai日期并复用相同稳定错误；preview成功不能替代POST重验。0040未改，空库/0039升级/幂等/约束/失败回滚3/3通过 |
-| NORMAL/IQC验收 | PASS / ACTUAL MODE ONLY | NORMAL当前结果仅为普通Purchase Receipt/Receipt Line、普通`RECEIPT`和available立即重算，不含RML/FROZEN/UNFREEZE/quality假设；实际IQC行继续显示RML、FROZEN、`IQC_RECEIPT`、quality RELEASE→UNFREEZE |
-| 返回修改验收 | PASS / POST 0 / DRAFT PRESERVED | 底部按钮、关闭、ESC、背景均复用返回修改路径；清除modal/preview/loading/submitted/error/提交锁/幂等状态，但不`form.reset()`或“清空本行”，未发送表单值保留 |
-| 延期 | EXPLICIT | 教学模式比较、清空本行、显式清空及成功提交后自动清空另立任务；FIX38不实现 |
-| Schema/API/版本 | alpha.42 SOURCE / NO MIGRATION | Handler/Service/preview DTO与UI源码更新，package/lockfile为alpha.42候选；没有Schema或Migration变化。运行UAT仍alpha.41/0040/Web`0cf98937…d5f19` |
-| 自动/隔离验证 | PASS | 日期最小1/1、专项Unit17/17、UI contract最终6/6、隔离Fulfillment PostgreSQL/API handler 10/10、0040数据库防线3/3、专项目typecheck、lint 0 error/11既有warning及`npm test`3/3通过。失败preview前后全部保护计数及Plan/queue状态不变 |
-| 测试隔离/清理 | PASS | 唯一库`procurement_fulfillment_test_fix38_20260809_1811`和`warehouse_receipt_readiness_migration_test_fix38_20260809_1812`均非UAT且已精确删除；`cyd-fix38-*`容器、任务网络和持久目录为0，受保护Volume未触碰。只在隔离库内部装载/重置既有migration测试夹具，未对UAT执行Migration |
-| Git | FUNCTION + DOCS COMMIT / NO PUSH | 功能提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`、Parent`6bb320118e9b4386ca4e59d7354dd4f599c7d850`；文档以`docs: record FIX38 source readiness`独立提交。未push或改写历史 |
-| UAT/数据保护 | PRESERVED / ZERO WRITE | 未登录UAT、未调用Receipt preview、业务POST0；最终只读事务复核40/head0040、warehouse active/version5/Session0、PO/Line/Plan/queue`1/4/4/4`、已收0，Receipt/Evidence/Lot/IQC/Ledger/AP/Payment/生产全0并ROLLBACK |
-| 资源/服务 | PASS | 源码阶段起点/文档提交前available约2.2/2.2GiB、Swap290/294MiB、根盘17GiB，最终Load`0.14/0.23/0.28`；内核OOM0，Web/PostgreSQL healthy、Worker/Caddy running，四服务restart0/OOM false |
-| 下一阶段 | SEPARATE BUILD / DEPLOY / UAT AUTHORIZATION REQUIRED | 候选构建、部署和零业务写UAT复验必须另获授权；本阶段不自动进入任何运行面操作，真实Receipt/IQC/AP/付款/生产继续禁止 |
+| 任务状态 | VERSION CONTRACT SOURCE READY — REBUILD REQUIRED | `DOING / VERSION_CONTRACT_SOURCE_READY / REBUILD_REQUIRED`；允许结论仅为`SELFHOST-UAT-FIX-38 VERSION CONTRACT SOURCE READY — REBUILD REQUIRED`，不是完成、发布或部署 |
+| 严格起点 | PASS | 唯一worktree、clean`main@780075e0940a124410a72f9e39eac76cc5d9224e`、Parent`401e16b04e3b8cb70ddfd3508661353ff758fdec`、behind0/ahead181；源码alpha.42、UAT alpha.41、40/head0040、Web`0cf98937…d5f19`、Session0、下游0及四服务restart0/OOM false完全匹配 |
+| 被拒候选 | RETAINED / REJECTED — DO NOT DEPLOY | `sha256:81126136c63714be2a53812b3512549ed1fa4eb9deb7c8c6462b715eafe4278e`、唯一tag`0.1.0-alpha.42-fix38-780075e`原样保留；`/app/package.json`缺version且旧health无version。没有候选容器、没有latest，不得重新标记或部署 |
+| 版本单一来源 | PACKAGE.JSON ONLY | `chenyida_erp_site/package.json.version`是唯一权威；运行时模块从`process.cwd()/package.json`严格读取SemVer并成功缓存一次，不读OCI/tag/Docker socket/`npm_package_version`/APP_VERSION，不回退unknown/latest/development |
+| health合同 | PASS / FAIL CLOSED | 保留`ok/database/storage/worker/time`和数据库检查，新增运行时`version`；继续`Cache-Control: no-store`与request ID。metadata缺失/损坏或数据库失败均返回现有通用非2xx，不返回`ok:true`、伪版本、堆栈、路径、环境值或原始JSON |
+| Docker metadata | MINIMUM / DETERMINISTIC | builder从源码package机械生成只含`name/version/private/type`的JSON，version或必要字段非法即失败；Web final在standalone后复制为`/app/package.json`。没有完整scripts/dependencies、alpha.42硬编码或环境替代 |
+| 运行布局 | PRESERVED | 基础镜像、非root node、端口、`node server.js`、Worker stage、Compose、Caddy、systemd和Migration行为均未改变；未运行build或Docker build |
+| Standalone/Caddy边界 | DOCUMENTED | 后续standalone只验health/version/Cache-Control/匿名保护/无数据泄露；HSTS、X-Frame-Options、nosniff、Referrer-Policy、Permissions-Policy由Caddy负责并在部署后公开入口验证，不向Node重复添加 |
+| FIX38回归 | PASS / BUSINESS UNCHANGED | Unit组合17/17与UI6/6继续覆盖未来日期preview、返回修改/草稿保留及NORMAL/IQC实际投影；0040及Receipt最终POST未修改，本阶段没有数据库测试或业务POST |
+| 新合同测试 | PASS | 版本模块4/4、health3/3、Dockerfile4/4；Docker合同首轮测试fixture的Worker快照错误导致3/4，核对HEAD后只校正fixture、Worker未改，最终重跑4/4 |
+| 全套串行验证 | PASS | `typecheck:procurement-fulfillment`通过、`npm run lint` 0 error/0 warning、`npm test`3/3。首次typecheck无诊断但清理发现compile cache；精确删除后禁用cache原命令重跑通过，最终临时资源0 |
+| Git | TWO CODE COMMITS + DOCS COMMIT / NO PUSH | health提交`13f72b5f7aa51905af597733356420cc7b017b74`（Parent`780075e…`）；Docker提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`（Parent`13f72b5…`）；文档以`docs: record FIX38 rebuild requirement`独立提交。未push或改写历史 |
+| UAT/数据保护 | PRESERVED / ZERO WRITE | 最终只读事务并ROLLBACK复核40/head0040、warehouse active/version5/Session0、PO/Line/Plan/queue`1/4/4/4`、已收0，Receipt/Evidence/Lot/IQC/Ledger/Purchase Source/AP/Payment/Work Order/生产全0；未登录、preview或业务POST |
+| 运行UAT | UNCHANGED ALPHA.41 | 运行Web及`latest`仍为`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`；四个服务容器ID及镜像不变，Web/PostgreSQL healthy、Worker/Caddy running |
+| 资源/清理 | PASS | 起点/测试后available约2.2/2.2GiB、Swap约300/311MiB、根盘17GiB，测试后Load`1.18/0.87/0.45`；内核OOM0，四服务restart0/OOM false。`cyd-fix38-*`容器/目录、网络、数据库和Volume增量0，未prune |
+| 下一阶段 | NEW REBUILD AUTHORIZATION REQUIRED | 必须另获授权后从当前源码构建全新候选并重新执行镜像内package、health、匿名保护门禁；已拒镜像不能复用。部署、公开入口Caddy头验收和任何UAT操作仍需后续独立授权 |
 
 ## SELFHOST-UAT-FIX-37 Warehouse Receipt Readiness and Date Safeguards（完成）
 

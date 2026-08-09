@@ -4,14 +4,25 @@
 
 ## 2026-08-09
 
-### SELFHOST-UAT-FIX-38 - `fix: validate receipt evidence date before confirmation` / `docs: record FIX38 source readiness`
+### SELFHOST-UAT-FIX-38 - `fix: validate receipt evidence date before confirmation` / `fix: expose runtime version in health` / `build: preserve runtime package version` / `docs: record FIX38 rebuild requirement`
+
+#### 运行时版本合同补救
+
+- 门禁原因：上一次候选`sha256:81126136c63714be2a53812b3512549ed1fa4eb9deb7c8c6462b715eafe4278e`的`/app/package.json`只有`private/type`且旧health无version，OCI label不能代替应用证据；该镜像与唯一FIX38 tag原样保留为`REJECTED — DO NOT DEPLOY`，没有latest或容器。运行Web/latest继续是alpha.41的`sha256:0cf98937…d5f19`。
+- 应用/health：新增严格的运行时版本模块，以`process.cwd()/package.json`及SemVer验证为唯一来源，成功值只缓存一次；不可读、损坏、缺失或非法version失败关闭，不回退unknown/latest/development。health保留`ok/database/storage/worker/time`与数据库检查，新增version并继续no-store/request ID；失败响应非2xx且不泄漏路径、堆栈、环境或原始metadata。提交`13f72b5f7aa51905af597733356420cc7b017b74`。
+- Docker：builder从源码package机械验证并确定性生成仅含`name/version/private/type`的JSON，Web final在standalone之后复制为`/app/package.json`；无alpha.42硬编码、完整依赖或环境变量替代。基础镜像、node用户、端口、`node server.js`、Worker、Compose、Caddy及Migration行为不变。提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`。
+- 测试：按无网络、源码只读、单容器/1 CPU/Node heap 1024 MiB顺序通过版本4/4、health3/3、Dockerfile4/4、FIX38 Unit17/17、UI6/6、专项typecheck、lint 0 error/0 warning及npm3/3。Docker合同首轮仅因测试fixture的Worker历史快照错误为3/4，核对HEAD后只修正fixture并重跑4/4；typecheck首次无诊断但清理发现compile cache，精确删除、禁用cache后原命令重跑通过且临时资源清零。
+- 边界/状态：standalone后续只负责health/version/Cache-Control/匿名保护/无泄漏；HSTS/X-Frame-Options/nosniff/Referrer-Policy/Permissions-Policy继续由Caddy在部署后验证。本阶段未build、Docker build、启动候选、Migration、部署、重启、登录UAT、Receipt preview、业务POST、备份、恢复或push。源码仍alpha.42，FIX38保持`DOING / VERSION_CONTRACT_SOURCE_READY / REBUILD_REQUIRED`，结论仅为`SELFHOST-UAT-FIX-38 VERSION CONTRACT SOURCE READY — REBUILD REQUIRED`。
+- 运行保护：最终只读事务并ROLLBACK确认40/head0040、warehouse active/version5/Session0、PO/Line/Plan/queue`1/4/4/4`、已收0及Receipt/Evidence/Lot/IQC/Ledger/Purchase Source/AP/Payment/Work Order/生产全0。起点/测试后available约2.2/2.2GiB、Swap约300/311MiB、根盘17GiB，测试后Load`1.18/0.87/0.45`；四服务restart0/OOM false、内核OOM0，无任务临时资源。
+
+#### 收货预检源码阶段
 
 - 决策/缺陷：D-107固定服务端日期、实际inspection mode投影和返回修改语义。实施前`openPreview`未传`evidence_document_date`、preview不校验且`confirmationReady`只检查非空，使未来日期可进入确认窗；最终Receipt POST和0040一直独立安全，主UAT没有因此产生写入。
 - 服务端：新增共享严格日历解析，Handler把证据日期传给preview Service；既有`REPEATABLE READ READ ONLY`事务以`transaction_timestamp() at time zone 'Asia/Shanghai'`取得同事务业务日期。未来日期稳定返回HTTP422、`RECEIPT_EVIDENCE_FUTURE_DATE`、指定中文提示和request_id；非法格式/日期返回`RECEIPT_EVIDENCE_DATE_INVALID`。最终POST复用同一规则但仍在自己的写事务独立重验，0040未修改。
 - UI/模式：预览URL只安全编码quantity和非空证据日期；422在对应编辑卡片显示code/message/request_id，清除确认、loading、submitted、error、提交锁及幂等状态，modal与最终按钮不可达。确认只接受与服务端已验证值一致且不晚于`server_date_shanghai`的日期，不使用浏览器当前时间。底部改为“返回修改”，关闭/ESC/背景复用相同零POST路径；不`form.reset()`或清空本行，未发送表单值保留。NORMAL只显示普通Receipt/`RECEIPT`/available结果，实际IQC才显示RML/FROZEN/`IQC_RECEIPT`/UNFREEZE。
 - 测试：日期最小1/1、专项Unit17/17、UI contract最终6/6、隔离Fulfillment PostgreSQL/API handler 10/10、0040数据库防线3/3、专项目typecheck、lint 0 error/11条既有warning及`npm test`3/3通过。两个唯一隔离测试库在测试后精确删除；测试库内部装载/重置既有0001—0040夹具，不是UAT Migration。现有Compose smoke会命中运行UAT、历史`npm run test:api`针对D1，均不适用于本源码阶段且未运行。
 - 版本/范围：源码候选升为`0.1.0-alpha.42`并同步lockfile；功能提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`。没有Schema/Migration、依赖、部署配置、历史Sites/D1或Python/SQLite变化；未build、Docker build、deploy、restart、登录UAT、调用UAT Receipt preview、发送UAT业务POST、备份、恢复或push。
-- UAT/资源：运行UAT仍为alpha.41/0040/Web`sha256:0cf98937…d5f19`；最终只读事务复核PO/Line/Plan/queue `1/4/4/4`、已收0、warehouse Session0及Receipt/Evidence/Lot/IQC/Ledger/AP/Payment/生产全0。起点/文档提交前available约2.2/2.2GiB、Swap290/294MiB（1GiB）、根盘17GiB，最终Load`0.14/0.23/0.28`；四服务restart0/OOM false、内核OOM0，任务临时资源清零。FIX38保持`DOING / SOURCE_READY`，允许结论仅为`SOURCE READY — NOT BUILT / NOT DEPLOYED`。
+- UAT/资源：运行UAT仍为alpha.41/0040/Web`sha256:0cf98937…d5f19`；最终只读事务复核PO/Line/Plan/queue `1/4/4/4`、已收0、warehouse Session0及Receipt/Evidence/Lot/IQC/Ledger/AP/Payment/生产全0。起点/文档提交前available约2.2/2.2GiB、Swap290/294MiB（1GiB）、根盘17GiB，最终Load`0.14/0.23/0.28`；四服务restart0/OOM false、内核OOM0，任务临时资源清零。该收货预检源码阶段当时保持`DOING / SOURCE_READY`且只允许`SOURCE READY — NOT BUILT / NOT DEPLOYED`；当前状态已由上方运行时版本合同补救阶段接续。
 
 ## 2026-08-08
 
