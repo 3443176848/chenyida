@@ -1,6 +1,7 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { PoolClient } from "pg";
 import { getPool, withTransaction } from "../../db/index.ts";
+import { getApplicationVersion } from "./application-version.ts";
 import { runtimeConfig } from "./infrastructure/config.ts";
 import { requestOriginMatches } from "./infrastructure/request-origin.ts";
 import { LocalFileStorage } from "./infrastructure/file-storage.ts";
@@ -58,6 +59,7 @@ function json(data: unknown, status = 200, requestId: string = randomUUID(), hea
   return Response.json(data, { status, headers: responseHeaders });
 }
 function failure(error: unknown, requestId: string) { const known = error instanceof ApiError ? error : new ApiError("INTERNAL_ERROR", "服务器暂时无法处理请求", 500); return json({ error: { code: known.code, message: known.message, request_id: requestId }, code: known.code, message: known.message, request_id: requestId }, known.status, requestId); }
+function logFailure(error: unknown, requestId: string, event = "api_request_failed") { console.error(JSON.stringify({ level: "error", event, request_id: requestId, code: error instanceof ApiError ? error.code : "INTERNAL_ERROR", message: error instanceof Error ? error.message : "unknown" })); }
 async function body(request: Request) { try { const value = await request.json(); if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(); return value as Record<string, unknown>; } catch { throw new ApiError("REQUEST_VALIDATION_FAILED", "请求正文不是有效 JSON"); } }
 async function audit(client: PoolClient, input: { username?: string; action: string; requestId: string; result?: string; routeCode?: string; materialId?: number; details?: Record<string, unknown>; errorCode?: string }) {
   await client.query(`insert into audit_log (username,action,detail,request_id,result,route_code,material_id,error_code,created_at) values ($1,$2,$3,$4,$5,$6,$7,$8,now())`, [input.username || "", input.action, input.details || {}, input.requestId, input.result || "success", input.routeCode || "", input.materialId || null, input.errorCode || null]);
@@ -65,6 +67,24 @@ async function audit(client: PoolClient, input: { username?: string; action: str
 
 function requirePermission(user: IdentityActor, permission: string) { if (!user.permissions.includes("*") && !user.permissions.includes(permission)) throw new ApiError("PERMISSION_DENIED", "没有权限执行此操作", 403); }
 function requireCsrf(request: Request) { const config = runtimeConfig(); if (!requestOriginMatches(request, config.publicOrigin, config.allowUatLoopbackOrigin)) throw new ApiError("CSRF_INVALID", "请求来源校验失败", 403); const token = request.headers.get("x-csrf-token") || ""; const cookie = cookies(request)[CSRF_COOKIE] || ""; if (!token || !cookie || !constantEqual(token, cookie)) throw new ApiError("CSRF_INVALID", "CSRF Token 无效", 403); }
+
+type HealthDatabase = { query(sql: string): Promise<unknown> };
+
+export async function handleSelfhostHealth(input: {
+  database: HealthDatabase;
+  requestId: string;
+  applicationVersion?: () => string;
+  now?: () => Date;
+}): Promise<Response> {
+  try {
+    const version = (input.applicationVersion || getApplicationVersion)();
+    await input.database.query("select 1");
+    return json({ ok: true, database: "postgresql", storage: "local", worker: "postgresql-jobs", version, time: (input.now || (() => new Date()))().toISOString() }, 200, input.requestId);
+  } catch (error) {
+    logFailure(error, input.requestId, "api_health_failed");
+    return failure(error, input.requestId);
+  }
+}
 
 function batchDto(row: Record<string, unknown>) { return { id: Number(row.id), batch_no: row.batch_no, source_kind: row.source_kind, status: row.status, retry_of_batch_id: row.retry_of_batch_id ? Number(row.retry_of_batch_id) : null, created_by: row.created_by, current_version: Number(row.current_version), file_count: Number(row.file_count), total_rows: Number(row.total_rows), accepted_rows: Number(row.accepted_rows), rejected_rows: Number(row.rejected_rows), failure_stage: row.failure_stage, failure_code: row.failure_code, failure_message: row.failure_message, created_at: new Date(String(row.created_at)).toISOString(), updated_at: new Date(String(row.updated_at)).toISOString() }; }
 function fileDto(row: Record<string, unknown> | undefined) {
@@ -90,7 +110,7 @@ function fileDto(row: Record<string, unknown> | undefined) {
 export async function handleSelfhostApi(request: Request): Promise<Response> {
   const suppliedRequestId = request.headers.get("x-request-id") || ""; const requestId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(suppliedRequestId) ? suppliedRequestId : randomUUID(); const url = new URL(request.url); const path = url.pathname; const pool = getPool();
   try {
-    if (path === "/api/health") { await pool.query("select 1"); return json({ ok: true, database: "postgresql", storage: "local", worker: "postgresql-jobs", time: new Date().toISOString() }, 200, requestId); }
+    if (path === "/api/health") return handleSelfhostHealth({ database: pool, requestId });
     const identityResponse = await handleSelfhostIdentityApi(request, { pool, requestId });
     if (identityResponse) return identityResponse;
     const identityRepository = new PostgresIdentityRepository(pool);
@@ -171,7 +191,7 @@ export async function handleSelfhostApi(request: Request): Promise<Response> {
     const jobStatus = path.match(/^\/api\/jobs\/([0-9a-f-]{36})$/i); if (jobStatus && request.method === "GET") { const found = await pool.query("select id,type,status,attempt_count,max_attempts,result,last_error_code,created_at,started_at,completed_at from background_jobs where id=$1", [jobStatus[1]]); if (!found.rows[0]) throw new ApiError("JOB_NOT_FOUND", "后台任务不存在", 404); return json({ data: found.rows[0] }, 200, requestId); }
     throw new ApiError("NOT_FOUND", "接口不存在", 404);
   } catch (error) {
-    console.error(JSON.stringify({ level: "error", event: "api_request_failed", request_id: requestId, code: error instanceof ApiError ? error.code : "INTERNAL_ERROR", message: error instanceof Error ? error.message : "unknown" }));
+    logFailure(error, requestId);
     return failure(error, requestId);
   }
 }
