@@ -13,7 +13,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-UAT-FIX-38 | 服务端日期驱动的收货预检门禁 | DOING | Codex（需求审计、D-107、FIX38文档基线和非数据库验证）、项目负责人（确认日期权威、实际模式投影与返回修改语义） | 2026-08-09 | — | SELFHOST-UAT-FIX-37、D-106、D-107 | `DECISION_RECORDED / IMPLEMENTATION_NOT_STARTED / NOT BUILT / NOT DEPLOYED`。唯一已确认缺陷是未来证据日期未进入服务端preview门禁而可打开确认窗；最终POST及0040仍安全。NORMAL只显示实际NORMAL后果、关闭后保留未提交编辑值均是已确认验收语义，不列为缺陷。文档门禁、lint 0 error及UI contract 5/5通过；下一阶段才修改源码并执行隔离测试。计划alpha.42，当前UAT仍alpha.41且Receipt及全部下游0。见[任务文档](../tasks/SELFHOST-UAT-FIX-38.md)及[D-107](DECISIONS.md#d-107-收货预检日期实际检验模式投影与返回修改语义)。 |
+| SELFHOST-UAT-FIX-38 | 服务端日期驱动的收货预检门禁 | DOING | Codex（需求审计、D-107、源码实现、隔离测试和SOURCE_READY文档）、项目负责人（确认日期权威、实际模式投影与返回修改语义；后续build/deploy/UAT另行授权） | 2026-08-09 | — | SELFHOST-UAT-FIX-37、D-106、D-107 | `SOURCE_READY / IMPLEMENTED_AND_ISOLATED_TESTED / NOT BUILT / NOT DEPLOYED`。功能提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`使preview在只读事务内按PostgreSQL Asia/Shanghai日期拒绝未来/非法证据日期，页面422失败关闭且显示code/message/request_id；确认门禁只信任服务端已验证日期。NORMAL只显示实际普通Receipt/`RECEIPT`/available结果，真实IQC继续显示RML/FROZEN/`IQC_RECEIPT`/UNFREEZE；四种返回修改路径清除确认状态但保留未提交表单值。Unit/UI/隔离PG/0040/typecheck/lint/npm test通过，最终POST及0040独立保护不变。源码为alpha.42候选；运行UAT仍alpha.41/Web`0cf98937…d5f19`，未登录、未预览、未业务POST，Receipt及全部下游0。见[任务文档](../tasks/SELFHOST-UAT-FIX-38.md)及[D-107](DECISIONS.md#d-107-收货预检日期实际检验模式投影与返回修改语义)。 |
 
 ## 已完成任务
 

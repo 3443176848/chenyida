@@ -3,19 +3,19 @@
 ## 状态、阶段与授权边界
 
 - 任务状态：`DOING`。
-- 当前阶段：`REQUIREMENT DECIDED — IMPLEMENTATION NOT STARTED`。
-- 决策状态：`DECISION_RECORDED`；实现状态：`IMPLEMENTATION_NOT_STARTED`；构建状态：`NOT BUILT`；部署状态：`NOT DEPLOYED`。
+- 当前阶段：`SOURCE_READY`；允许结论为`SELFHOST-UAT-FIX-38 SOURCE READY — NOT BUILT / NOT DEPLOYED`。
+- 决策状态：`DECISION_RECORDED`；源码实现状态：`IMPLEMENTED_AND_ISOLATED_TESTED`；构建状态：`NOT BUILT`；部署状态：`NOT DEPLOYED`。
 - 日期：2026-08-09（Asia/Shanghai）。
-- 本阶段授权仅限需求审计、D-107和FIX38文档基线、只读事实核验及不连接UAT/生产数据库的轻量静态验证。不得修改源码、测试、Schema、Migration、依赖或部署配置；不得构建、部署、重启、登录UAT、调用Receipt预览或发送任何业务POST。
+- 本阶段授权仅限FIX38源码、对应Unit/UI contract/隔离PostgreSQL测试、alpha.42源码候选版本和状态文档。未修改Schema、Migration、依赖或部署配置；未构建、部署、重启、登录UAT、调用UAT Receipt preview或发送UAT业务POST。
 - 本任务不授权真实收货、IQC决定、Ledger、AP、Payment、Work Order或生产操作；`PO-00000001`继续受D-105保护。
 
 ## 严格起点与受保护事实
 
-- 唯一worktree为`/opt/erp`；根仓库为clean `main@7d8f3cf6aa58808698ae6100424bc0e5df248b3d`，Parent `20a9123741862d81ac18af9e6bdee896674fe95c`，`origin/main...HEAD = behind 0 / ahead 178`；没有嵌套仓库、submodule或gitlink。
-- 源码与并行非生产UAT保持`0.1.0-alpha.41`；PostgreSQL Migration共40个，head为`0040_warehouse_receipt_readiness.sql`。当前UAT Web镜像保持`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`。
+- 源码阶段从唯一worktree、clean `main@6bb320118e9b4386ca4e59d7354dd4f599c7d850`、Parent `7d8f3cf6aa58808698ae6100424bc0e5df248b3d`、`origin/main...HEAD = behind 0 / ahead 179`起步；没有嵌套仓库、submodule或gitlink。
+- 源码候选现为`0.1.0-alpha.42`；运行中的并行非生产UAT仍为`0.1.0-alpha.41`。PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`，0040 SHA-256仍为`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`；当前UAT Web镜像仍为`sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`。
 - Web、PostgreSQL、Worker、Caddy均为RestartCount 0、OOM false；Web/PostgreSQL healthy，Worker/Caddy running。warehouse账号`uat_20260729_warehouse`为active、`must_change_password=false`，有效Session为0。
 - 只读事务确认PO为`1/v1/OPEN`，PO Line/Delivery Plan/queue为`4/4/4`且已收数量0；Receipt/Receipt Line/Evidence/Lot/IQC/Ledger/Purchase Financial Source/AP/Payment/Work Order及生产Issue/Return/Report/Completion均为0。
-- 起点资源：available memory约2.1 GiB，Swap已用282 MiB/1 GiB，根分区可用17 GiB，Load `0.21/0.37/0.26`；内核OOM计数0。未创建任务临时容器、数据库、文件或网络。
+- 源码阶段起点资源：available memory约2.2 GiB，Swap已用290 MiB/1 GiB，根分区可用17 GiB，Load约`0.23/0.27/0.27`；内核OOM计数0。测试前无任务临时容器、数据库、文件或网络。
 
 ## 背景与需求审计
 
@@ -23,11 +23,11 @@
 - 同一黑盒补充还把“当前NORMAL订单没有展示假设IQC结果”和“关闭确认窗后编辑区仍保留未提交字段”列为FAIL。需求复核确认，这两项不是直接缺陷：本次过账后果必须只描述当前Material的实际inspection mode；关闭确认窗返回编辑时保留尚未发送的草稿正是所需语义。
 - FIX38只修复并验证已确认的预检缺口，同时把实际模式投影和返回修改语义固化为回归合同；不借本任务扩展教学比较或草稿清空功能。
 
-## 唯一已确认缺陷
+## 已修复缺陷基线
 
-- `openPreview`当前只把`quantity`加入`GET /api/procurement/delivery-plans/:id/receipt-preview`查询，没有传递`evidence_document_date`。
-- 现有Receipt preview服务端合同不接收证据日期，也不在只读事务中用Asia/Shanghai服务端业务日期检查未来日期。
-- `confirmationReady`只检查`draft.evidence_document_date`非空，不证明该值已通过服务端日期门禁。因此未来日期可以打开带最终过账按钮的确认窗口；最终POST和0040仍会独立拒绝，不构成已过账事实。
+- 实施前`openPreview`只把`quantity`加入`GET /api/procurement/delivery-plans/:id/receipt-preview`查询，没有传递`evidence_document_date`；现已使用`URLSearchParams`安全传递非空日期，且不把其他凭证字段放入URL。
+- 实施前Receipt preview不接收证据日期；现已在既有`REPEATABLE READ READ ONLY`事务中，以PostgreSQL `transaction_timestamp()`的Asia/Shanghai日期执行严格日历解析和未来日期门禁。
+- 实施前`confirmationReady`只检查日期非空；现同时要求草稿日期等于服务端已验证日期且不晚于preview返回的`server_date_shanghai`，浏览器当前时间不参与权威判断。最终POST和0040继续独立拒绝未来日期。
 
 ## D-107实施合同
 
@@ -52,13 +52,13 @@
 - 编辑区尚未发送的数量、凭证、日期、Supplier批次、提前原因/确认、物理到货确认和说明必须保留，供用户继续修改；不得调用`form.reset()`。字段在modal关闭后仍存在是草稿保留，不是状态泄漏。
 - modal、preview、提交锁或幂等状态未清除才属于状态泄漏缺陷。本任务不增加“清空本行”按钮；显式清空或成功提交后的自动清空策略延后单独决定。
 
-## 后续实现范围
+## 源码实现结果
 
-- 修改warehouse Receipt UI，使预览GET带`evidence_document_date`，并以现有安全错误合同显示HTTP 422的code/message/request_id且保持modal不可达。
-- 扩展Receipt preview Handler/Service合同，在服务端只读事务内执行Asia/Shanghai日期复核；最终POST继续独立复核，0040保持不变。
-- 将确认窗底部按钮改为“返回修改”，统一四种关闭路径的modal/preview/loading/submitted/error/idempotency清理，同时保留编辑区未提交草稿且不使用`form.reset()`。
-- 固化NORMAL/IQC实际模式投影，不在NORMAL样本中加入假设IQC说明。
-- 增加对应Unit、UI contract和隔离PostgreSQL测试；计划源码候选版本为`0.1.0-alpha.42`。alpha.42目前未实现、未构建、未部署或发布。
+- 新增小型共享日期模块，使用纯日历规则拒绝非规范格式、空值、`0000`、不真实日期和时间戳；preview与最终POST复用稳定代码`RECEIPT_EVIDENCE_DATE_INVALID`及`RECEIPT_EVIDENCE_FUTURE_DATE`。
+- warehouse UI预览GET现携带`evidence_document_date`；未来日期422在对应编辑卡片显示code/message/request_id，清除modal、preview、loading、submitted、dialog error、提交锁及幂等状态，最终按钮不可达。
+- 确认窗底部已改为“返回修改”，按钮、右上角关闭、ESC和背景点击复用同一清理路径；未调用`form.reset()`，未增加“清空本行”，未提交表单DOM值保留供继续修改。
+- NORMAL只投影普通Purchase Receipt/Receipt Line、普通`RECEIPT`和available立即重算；实际IQC模式继续投影RML/FROZEN、`IQC_RECEIPT`、quality责任队列及RELEASE后的`UNFREEZE`。
+- 源码候选版本已同步为`0.1.0-alpha.42`，功能提交为`401e16b04e3b8cb70ddfd3508661353ff758fdec`，Parent为`6bb320118e9b4386ca4e59d7354dd4f599c7d850`。alpha.42未构建、未部署或发布，运行UAT仍为alpha.41。
 
 ## 明确排除与延期
 
@@ -66,24 +66,24 @@
 - 不新增“清空本行”按钮，不决定显式清空或成功提交后的自动清空策略。
 - 不改变Receipt POST事务结构、库存会计、IQC放行流程或0040 Migration/触发器。
 - 不扩展采购会计、quality、finance、Python/SQLite或历史Sites/D1；不修改生产配置。
-- 不执行真实UAT Receipt、Receipt preview、业务POST、登录、PostgreSQL写、Migration、build、Docker build、部署或服务重启。
+- 不执行真实UAT Receipt、UAT Receipt preview、UAT业务POST、UAT登录、UAT PostgreSQL写、UAT/部署Migration、build、Docker build、部署或服务重启；隔离测试库内部建立/重置测试夹具不改变此运行面边界。
 
-## 后续实现验收标准
+## 源码阶段验收结果
 
-1. 未来证据日期的preview稳定返回HTTP 422、`RECEIPT_EVIDENCE_FUTURE_DATE`、指定中文提示和request_id；确认modal及最终按钮不可达。
-2. 服务端当日和过去日期仍可完成只读预览；浏览器时钟、时区、`Date`、`Date.now()`及仅HTML `max`均不能决定结果。
-3. 最终Receipt POST继续在独立事务中重验未来日期，0040数据库防线继续有效；preview成功不是POST授权或替代门禁。
-4. “本次过账后果”严格随实际Material mode变化：NORMAL无RML/FROZEN/UNFREEZE，实际IQC行完整显示RML/FROZEN及quality RELEASE→UNFREEZE。
-5. 取消、关闭、ESC和背景点击均业务POST 0并返回编辑；保留未提交表单值，同时清除modal/preview/loading/submitted/error/idempotency及提交锁状态。
-6. 不出现“清空本行”，不使用`form.reset()`，不把草稿保留误报为状态泄漏。
-7. Unit/UI contract/隔离PostgreSQL写测试只连接隔离数据库；任何失败零半记录、零UAT写。
-8. 主UAT PO/Line/Plan/queue保持`1/4/4/4`，warehouse Session、Receipt/Evidence/Lot/IQC/Ledger/AP/Payment/生产记录保持0。
+1. PASS：缺省日期兼容；D−1和D返回200；D+1与2099返回422；非规范格式和不真实日期返回稳定日期错误，响应code/message/request_id与`X-Request-ID`一致。
+2. PASS：业务日期D来自隔离PostgreSQL的Asia/Shanghai事务时间；客户端业务代码不读取浏览器当前时间，`confirmationReady`只使用服务端已验证日期和服务端日期。
+3. PASS：最终Receipt POST继续在独立写事务中重验未来日期；0040空库、0039升级、重复执行、约束和失败回滚3/3通过，preview成功不替代POST重验。
+4. PASS：NORMAL当前结果不含RML/FROZEN/UNFREEZE/quality假设；实际IQC结果继续显示RML/FROZEN、`IQC_RECEIPT`、quality及UNFREEZE。
+5. PASS：返回修改、关闭、ESC和背景点击均无业务POST，清除受保护确认状态且保留未提交表单值；无`form.reset()`或“清空本行”。
+6. PASS：隔离preview失败前后Receipt、Evidence、Ledger、Lot、采购金额来源、AP及生产等全部保护计数和Plan/queue状态不变。
+7. PASS：两个唯一测试数据库均明确不为`chenyida_erp`，脚本URL guard拒绝UAT/生产URL；测试后逐一强制删除，所有`cyd-fix38-*`临时容器自动删除，未创建网络或持久目录。
+8. PASS：文档提交前以`REPEATABLE READ READ ONLY`事务再次复核UAT；40/head0040、PO/Line/Plan/queue为`1/4/4/4`、总已收0，warehouse账号active/version5/Session0，Receipt/Evidence/Lot/IQC/Ledger/AP/Payment/生产记录均为0，事务以ROLLBACK结束。
 
 ## 本阶段验证与允许结论
 
-- 本阶段仅运行`git diff --check`、文档一致性/范围扫描、`npm run lint`和`node --test tests/selfhost-procurement-fulfillment-ui-contract.test.mjs`；测试脚本必须先经人工源码检查，确认不解析数据库URL、不访问网络、不写UAT/生产数据库。
-- 测试脚本51行已完整检查，只用Node内置`test`、`assert`和本地`readFile`读取源码，不导入数据库驱动、不读取数据库URL、不调用`fetch`或其他网络接口。宿主机没有Node/npm，直接lint命令在测试启动前以127退出；随后复用本机已有`node:22-bookworm-slim`与仓库现有依赖，在断网、源码只读、1 CPU、1,280 MiB内存上限、自动删除的唯一临时容器中执行相同命令。`npm run lint`通过（0 error、11条既有warning），专项UI contract为5/5通过；没有安装或修改依赖。
-- 不运行全量`npm test`、PostgreSQL写测试、Migration测试、build或Docker build。资源门禁检查必须串行且前后记录。
-- 文档差异、编号标题唯一性、MASTER/TASKS/STATUS状态、alpha.42未部署措辞、FIX38非DONE和六文件范围检查均通过。收口资源为available memory约2.2 GiB、Swap已用290 MiB/1 GiB、根分区可用17 GiB、Load `0.43/0.43/0.32`；四服务restart0/OOM false、内核OOM 0，临时测试容器已自动删除，没有临时数据库、依赖、Profile或文件。
-- 本阶段允许的成功结论仅为：`SELFHOST-UAT-FIX-38 DECISION RECORDED — IMPLEMENTATION NOT STARTED`。
-- 后续源码实现、隔离写测试、候选构建、部署和任何UAT验收均须进入后续阶段并重新核验当时基线；本任务不自动放行。
+- 现有`node:22-bookworm-slim`镜像、仓库依赖、源码只读挂载、单容器/单CPU、1,280 MiB内存与Swap硬上限、`NODE_OPTIONS=--max-old-space-size=1024`及串行执行贯穿全部Node测试；无需网络的命令均使用`network none`，未安装依赖或下载镜像。
+- 日期最小单测1/1、专项Unit组合17/17、UI contract最终6/6、隔离Fulfillment PostgreSQL 10/10、0040数据库防线3/3、专项目typecheck、`npm run lint`（0 error、11条既有warning）和`npm test`3/3全部通过。隔离PostgreSQL套件直接以本地HTTP `Request`调用自托管handler，是源码阶段适用的隔离API验证；现有Compose smoke会连接运行UAT，历史`npm run test:api`针对D1，均未运行。
+- 第一次隔离容器在任何建表前因继承UAT专用loopback开关与`ERP_DEPLOYMENT_CLASS=test`冲突而停止；空库检查确认无`schema_migrations`或`app_users`后，将该UAT专用开关显式设为false并原样重跑，10/10通过。只在两个新建隔离测试库内装载/重置既有0001—0040测试夹具；未对UAT执行Migration。
+- 隔离库`procurement_fulfillment_test_fix38_20260809_1811`及`warehouse_receipt_readiness_migration_test_fix38_20260809_1812`均已精确删除；`cyd-fix38-*`临时容器、临时网络和持久目录均为0，受保护Volume未触碰。
+- 源码阶段起点/文档提交前最终资源available约2.2/2.2 GiB，Swap已用290/294 MiB（1 GiB），根分区可用17 GiB，最终Load `0.14/0.23/0.28`；四服务restart0/OOM false、内核OOM 0。未build、Docker build、deploy、restart、登录UAT、调用UAT Receipt preview、发送UAT业务POST、备份、恢复或push。
+- 本阶段允许的成功结论仅为：`SELFHOST-UAT-FIX-38 SOURCE READY — NOT BUILT / NOT DEPLOYED`。FIX38保持`DOING`；后续候选构建、部署和任何UAT验收必须另获授权并重新核验当时基线。

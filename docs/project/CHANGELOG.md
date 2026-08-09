@@ -4,13 +4,14 @@
 
 ## 2026-08-09
 
-### SELFHOST-UAT-FIX-38 - `docs: decide warehouse receipt preview semantics`
+### SELFHOST-UAT-FIX-38 - `fix: validate receipt evidence date before confirmation` / `docs: record FIX38 source readiness`
 
-- 决策：新增D-107 `收货预检日期、实际检验模式投影与返回修改语义`并打开FIX38。Receipt preview必须接收`evidence_document_date`，在服务端只读事务内使用Asia/Shanghai业务日期拒绝未来日期；HTTP 422固定为`RECEIPT_EVIDENCE_FUTURE_DATE`、`送货凭证日期不能晚于服务端实际收货日期`并带request_id。浏览器时间和仅HTML `max`不是权威，preview不替代最终POST或0040防线。
-- 缺陷定界：唯一已确认缺陷是现有`openPreview`未传证据日期、preview合同未校验，而`confirmationReady`只检查非空，导致未来日期可进入可执行确认窗。最终Receipt POST和0040仍会独立拒绝，主UAT没有写入或数据损坏。
-- 模式/交互：本次过账后果只显示当前Material实际inspection mode；NORMAL不显示RML/FROZEN/UNFREEZE，实际IQC才显示RML冻结及quality RELEASE→UNFREEZE。四种关闭路径统一为“返回修改”、业务POST 0，清除modal/preview/提交/幂等状态但保留未发送编辑值；不使用`form.reset()`，不新增“清空本行”。
-- 范围/状态：仅新增FIX38任务文档并同步MASTER/TASKS/DECISIONS/STATUS/CHANGELOG；没有修改源码、测试、Schema、Migration、依赖或部署配置。计划候选alpha.42尚未实现、构建、部署或发布；UAT继续alpha.41/0040/Web`0cf98937…d5f19`。
-- 验证边界：只读核验Git/资源/容器/Migration/Session和业务零计数；不登录UAT、不调用Receipt preview、不发业务POST、不写PostgreSQL、不运行Migration/build/deploy/restart。51行UI测试脚本确认只读本地文件且无数据库/网络路径；宿主npm缺失后，以本机已有Node镜像在断网、源码只读、1 CPU/1,280 MiB、自动删除容器中通过lint（0 error、11条既有warning）和UI contract 5/5，未安装依赖。文档范围/一致性及diff检查通过，临时容器清零。
+- 决策/缺陷：D-107固定服务端日期、实际inspection mode投影和返回修改语义。实施前`openPreview`未传`evidence_document_date`、preview不校验且`confirmationReady`只检查非空，使未来日期可进入确认窗；最终Receipt POST和0040一直独立安全，主UAT没有因此产生写入。
+- 服务端：新增共享严格日历解析，Handler把证据日期传给preview Service；既有`REPEATABLE READ READ ONLY`事务以`transaction_timestamp() at time zone 'Asia/Shanghai'`取得同事务业务日期。未来日期稳定返回HTTP422、`RECEIPT_EVIDENCE_FUTURE_DATE`、指定中文提示和request_id；非法格式/日期返回`RECEIPT_EVIDENCE_DATE_INVALID`。最终POST复用同一规则但仍在自己的写事务独立重验，0040未修改。
+- UI/模式：预览URL只安全编码quantity和非空证据日期；422在对应编辑卡片显示code/message/request_id，清除确认、loading、submitted、error、提交锁及幂等状态，modal与最终按钮不可达。确认只接受与服务端已验证值一致且不晚于`server_date_shanghai`的日期，不使用浏览器当前时间。底部改为“返回修改”，关闭/ESC/背景复用相同零POST路径；不`form.reset()`或清空本行，未发送表单值保留。NORMAL只显示普通Receipt/`RECEIPT`/available结果，实际IQC才显示RML/FROZEN/`IQC_RECEIPT`/UNFREEZE。
+- 测试：日期最小1/1、专项Unit17/17、UI contract最终6/6、隔离Fulfillment PostgreSQL/API handler 10/10、0040数据库防线3/3、专项目typecheck、lint 0 error/11条既有warning及`npm test`3/3通过。两个唯一隔离测试库在测试后精确删除；测试库内部装载/重置既有0001—0040夹具，不是UAT Migration。现有Compose smoke会命中运行UAT、历史`npm run test:api`针对D1，均不适用于本源码阶段且未运行。
+- 版本/范围：源码候选升为`0.1.0-alpha.42`并同步lockfile；功能提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`。没有Schema/Migration、依赖、部署配置、历史Sites/D1或Python/SQLite变化；未build、Docker build、deploy、restart、登录UAT、调用UAT Receipt preview、发送UAT业务POST、备份、恢复或push。
+- UAT/资源：运行UAT仍为alpha.41/0040/Web`sha256:0cf98937…d5f19`；最终只读事务复核PO/Line/Plan/queue `1/4/4/4`、已收0、warehouse Session0及Receipt/Evidence/Lot/IQC/Ledger/AP/Payment/生产全0。起点/文档提交前available约2.2/2.2GiB、Swap290/294MiB（1GiB）、根盘17GiB，最终Load`0.14/0.23/0.28`；四服务restart0/OOM false、内核OOM0，任务临时资源清零。FIX38保持`DOING / SOURCE_READY`，允许结论仅为`SOURCE READY — NOT BUILT / NOT DEPLOYED`。
 
 ## 2026-08-08
 
