@@ -1,0 +1,140 @@
+{
+  "schema": "AI_GOVERNANCE_DATASET_MANIFEST_V1",
+  "dataset_id": "synthetic-material-governance-v1",
+  "version": "1.0.0",
+  "created_at": "2026-08-10T19:32:00+08:00",
+  "deidentification_policy_version": "ai-governance-deidentification-v1",
+  "sample_schema_version": "ai-governance-evaluation-sample-v1",
+  "canonical_json_version": "canonical-json-lexicographic-v1",
+  "dataset_digest_rule": "sha256(canonical-json(manifest-without-dataset_digest))",
+  "holdout_policy": "FROZEN_NOT_FOR_TUNING",
+  "splits": {
+    "calibration": {
+      "file": "calibration.jsonl",
+      "sha256": "d251271991566a877ee721392e39c9e0c8be1afcede47fa868aeb0376133ed95",
+      "sample_count": 32,
+      "statistics": {
+        "capability": {
+          "ATTRIBUTE_EXTRACTION": 8,
+          "CLASSIFICATION": 8,
+          "MATERIAL_MATCH": 8,
+          "SUPPLIER_MAPPING": 8
+        },
+        "material_category": {
+          "CAP": 8,
+          "CON": 5,
+          "IC": 4,
+          "IND": 4,
+          "MECH": 1,
+          "OSC": 3,
+          "RES": 6,
+          "UNKNOWN": 1
+        },
+        "scenario": {
+          "alternative_compatibility_not_identity": 1,
+          "complete_capacitor_attributes": 1,
+          "complete_connector_attributes": 1,
+          "complete_ic_attributes": 1,
+          "complete_inductor_attributes": 1,
+          "complete_oscillator_attributes": 1,
+          "complete_resistor_attributes": 1,
+          "customer_specific_conflict_abstain": 1,
+          "duplicate_exact_candidates_abstain": 1,
+          "duplicate_supplier_fact_abstain": 1,
+          "equivalent_spec_supplier_mapping": 1,
+          "equivalent_unit_category": 1,
+          "equivalent_unit_exact_match": 1,
+          "frozen_candidate_abstain": 1,
+          "frozen_mapping_candidate_abstain": 1,
+          "inactive_supplier_fact_abstain": 1,
+          "incompatible_unit_category_abstain": 1,
+          "mapping_customer_scope_conflict": 1,
+          "missing_dielectric_field_abstention": 1,
+          "missing_identity_abstain": 1,
+          "missing_supplier_fact_abstain": 1,
+          "multiple_resistance_conflict": 1,
+          "positive_connector_category": 1,
+          "positive_explicit_hint": 1,
+          "positive_inductor_hint": 1,
+          "positive_model_category": 1,
+          "positive_oscillator_category": 1,
+          "prompt_injection_unknown_abstention": 1,
+          "supplier_fact_spec_conflict": 1,
+          "unique_exact_identity_match": 1,
+          "unique_supplier_fact_mapping": 1,
+          "unsupported_mechanical_abstention": 1
+        },
+        "risk_level": {
+          "CRITICAL": 7,
+          "HIGH": 9,
+          "LOW": 8,
+          "MEDIUM": 8
+        }
+      }
+    },
+    "holdout": {
+      "file": "holdout.jsonl",
+      "sha256": "73e3d84337609d87e0b554fefb531c25c1f39a5ad74998500b7ee21bf633bde3",
+      "sample_count": 32,
+      "statistics": {
+        "capability": {
+          "ATTRIBUTE_EXTRACTION": 8,
+          "CLASSIFICATION": 8,
+          "MATERIAL_MATCH": 8,
+          "SUPPLIER_MAPPING": 8
+        },
+        "material_category": {
+          "CAP": 7,
+          "CON": 4,
+          "IC": 4,
+          "IND": 4,
+          "OSC": 4,
+          "OTHER": 2,
+          "RES": 5,
+          "UNKNOWN": 2
+        },
+        "scenario": {
+          "ambiguous_multicategory_abstention": 1,
+          "conflicting_connector_brand": 1,
+          "conflicting_model_fields": 1,
+          "duplicate_capacitor_candidates": 1,
+          "duplicate_capacitor_supplier_fact": 1,
+          "explicit_other_abstention": 1,
+          "illegal_negative_voltage": 1,
+          "inactive_mapping_candidate": 1,
+          "inactive_material_candidate": 1,
+          "mapping_near_value_spec_conflict": 1,
+          "mapping_query_missing_identity": 1,
+          "matching_customer_specific_candidate": 1,
+          "matching_customer_specific_mapping": 1,
+          "missing_rated_current_field": 1,
+          "multiple_frequency_conflict": 1,
+          "near_value_nonmatch": 1,
+          "oscillator_alternative_not_same_material": 1,
+          "pattern_capacitor_without_hint": 1,
+          "pattern_connector_without_hint": 1,
+          "pattern_ic_without_hint": 1,
+          "pattern_inductor_without_hint": 1,
+          "pattern_oscillator_without_hint": 1,
+          "pattern_resistor_without_hint": 1,
+          "prompt_injection_supplier_part_abstain": 1,
+          "query_identity_conflict": 1,
+          "repeated_equivalent_capacitor_values": 1,
+          "resistor_compact_notation": 1,
+          "unique_connector_supplier_mapping": 1,
+          "unique_ic_identity_match": 1,
+          "unique_inductor_identity_match": 1,
+          "unique_inductor_supplier_mapping": 1,
+          "unknown_schema_like_text_abstention": 1
+        },
+        "risk_level": {
+          "CRITICAL": 8,
+          "HIGH": 13,
+          "LOW": 2,
+          "MEDIUM": 9
+        }
+      }
+    }
+  },
+  "dataset_digest": "4bde669dd59a3cbb239fcd4f9b62f7e8eccfd2b6921d45cb0545503ba4a34adb"
+}

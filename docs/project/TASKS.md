@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前没有`DOING`任务。`PHASE4-TASK01`已完成治理文档基线，结论为`PHASE4-TASK01 AI GOVERNANCE BASELINE ACCEPTED — IMPLEMENTATION NOT STARTED`。下一项`PHASE4-TASK02`及`TASK03`—`TASK05`都只为`TODO`，不得自动开始或据此接入模型、真实数据、试点或部署。
+当前唯一`DOING`任务为`PHASE4-TASK02`，状态为`DOING / OFFLINE_EVALUATOR_IMPLEMENTATION`。本任务只建立版本化静态合成/去敏评估集、确定性基线与离线 Evaluator，并在功能提交冻结后测量固定 holdout；不调用模型或外部服务，不读取真实数据或数据库，不修改 Schema/Migration/运行时路由，不批准准确率阈值，不部署，也不自动启动`PHASE4-TASK03`。
 
 ## 已完成任务
 
@@ -195,7 +195,7 @@
 | SELFHOST-PHASE1-TASK03 | 完成行级 Normalizer 与 Normalization Review 的 PostgreSQL 自托管移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围、验收标准与禁止事项确认） | 2026-07-23 | 2026-07-23 | SELFHOST-PHASE1-TASK02 | 已移植 run/rows/issues、关系化候选/lineage、Worker原子发布、重试/重跑/取消和Review UI；真实数据迁移及生产部署继续另立任务 |
 | SELFHOST-PHASE1-TASK04 | 完成 Normalization 人工复核与 Material Draft Commit 的 PostgreSQL 自托管移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围、验收标准与禁止事项确认） | 2026-07-24 | 2026-07-24 | SELFHOST-PHASE1-TASK03、SELFHOST-PHASE1-TASK01 | 已实现独立人工覆盖、Issue处理、ACTIVE精确绑定、Material Service建DRAFT和可恢复finalization；真实样本容量验收、真实数据迁移和生产部署继续另立任务 |
 | PHASE3-TASK02 | 实现 Material Import Normalization & Staging V1 | DONE | Codex（实施）、项目负责人（批准 16 项决定） | 2026-07-17 | 2026-07-17 | PHASE3-TASK01 | 已实现独立 run、行 JSON 快照、Issue、Outbox/租约/心跳、原子 pointer 发布、不同 processor 版本重跑、取消清理、五个 API、`material.import.normalize`、读写限流、`0006` Up/受保护 Down/快照及隔离测试；未创建 Draft/正式物料，未迁移或部署生产 |
-| PHASE4-TASK02 | 建立去敏评估集、确定性基线与离线Evaluator | TODO | 待指派 | - | - | PHASE4-TASK01、D-110 | 使用版本化不可变去敏样本和固定holdout分别测量分类、属性、候选匹配与供应商映射建议；不得自动开始，不得虚构阈值，测量结果及最低coverage须由项目负责人批准 |
+| PHASE4-TASK02 | 建立去敏评估集、确定性基线与离线Evaluator | DOING | Codex（离线Evaluator、静态合成评估集、专项测试、冻结holdout测量、文档与独立提交）、项目负责人（后续准确率阈值和最低coverage决策） | 2026-08-10 | - | PHASE4-TASK01、D-110 | `DOING / OFFLINE_EVALUATOR_IMPLEMENTATION`。只读复用现有确定性治理规则；源码候选计划升为alpha.43，运行UAT保持alpha.42/0040。不调用模型/外部服务，不使用真实数据，不修改Schema/Migration/API/UI/Worker/运行时规则，不批准阈值，不部署，不启动TASK03。见[任务文档](../tasks/PHASE4-TASK02.md)。 |
 | PHASE4-TASK03 | 建立AI Suggestion/Evidence关系化候选层 | TODO | 待指派 | - | - | PHASE4-TASK02、D-110 | 设计可追溯、可过期、可丢弃的建议与逐字段证据边界；不得直接写正式物料、映射或业务事实 |
 | PHASE4-TASK04 | 建立人工审核API/UI与受控正式提交衔接 | TODO | 待指派 | - | - | PHASE4-TASK03、既有Material Master审批合同 | 人工决定与AI建议分离，继续复用服务端权限、事务、CAS、幂等、审核和审计；不授权生产试点 |
 | PHASE4-TASK05 | 验收非生产试点门禁、漂移、停用与回退 | TODO | 待指派 | - | - | PHASE4-TASK02—TASK04、D-110、项目负责人独立试点授权 | 仅在前置合同和独立授权满足后验证非生产试点、版本漂移、停用开关、回退和事件响应；不自动授权真实数据外发、生产迁移或部署 |

@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "incremental": false,
+    "plugins": []
+  },
+  "include": [
+    "tools/ai-governance-evaluation/**/*.ts",
+    "app/lib/material-governance-selfhost/config.ts",
+    "app/lib/material-governance-selfhost/engine.ts",
+    "app/lib/material-governance-selfhost/types.ts"
+  ],
+  "exclude": ["node_modules", "examples"]
+}

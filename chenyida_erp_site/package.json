@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.42",
+  "version": "0.1.0-alpha.43",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -272,6 +272,9 @@
     "test:governance:migration": "node --experimental-strip-types --test tests/selfhost-material-governance-migration-contract.test.mjs",
     "test:governance:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-material-governance-migration-upgrade.test.mjs",
     "test:governance:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-material-governance-postgres.test.mjs",
+    "typecheck:ai-governance-evaluation": "tsc -p tsconfig.ai-governance-evaluation.json --pretty false",
+    "test:ai-governance-evaluation": "node --experimental-strip-types --test --test-concurrency=1 tests/ai-governance-evaluation.test.mjs tests/ai-governance-evaluation-cli.test.mjs",
+    "evaluate:ai-governance": "node --experimental-strip-types tools/ai-governance-evaluation/cli.ts",
     "typecheck:standardization": "tsc -p tsconfig.material-standardization.json --pretty false",
     "test:standardization:unit": "node --experimental-strip-types --test tests/selfhost-material-standardization-unit.test.mjs",
     "test:standardization:handler": "node --experimental-strip-types --test tests/selfhost-material-standardization-handler.test.mjs",
