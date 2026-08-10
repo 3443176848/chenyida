@@ -4,6 +4,17 @@
 
 ## 2026-08-10
 
+### PHASE4-TASK03 - `docs: define AI suggestion evidence candidate layer`
+
+- 0035审计：逐表复核九张`material_governance_*`表及对应Handler/Service/Repository/Source Adapter/类型/兼容层和无数据库、升级、PostgreSQL测试；确认run/group/row/spec/candidate属于确定性事实，decision/event属于人工治理事实，material link属于正式交接。AI不得写入或冒充这些表，也不得旁路Material Master或Supplier Mapping权威服务。
+- D-112：接受`AI Suggestion/Evidence Relational Candidate Contract`。AI只能位于已发布Normalization和0035确定性治理之后，绑定既有group/run/version/digest；四项能力固定为Classification、Attribute Extraction、Material Match、Supplier Mapping，disposition仅`SUGGEST/ABSTAIN`，不表示批准、建档、绑定、合并或正式业务事实。
+- 五表蓝图：计划关系表为`ai_governance_suggestion_runs`、`ai_governance_suggestions`、`ai_governance_suggestion_items`、`ai_governance_suggestion_evidence`、`ai_governance_suggestion_events`。显式FK、kind-specific CHECK、唯一/部分唯一索引和延迟完整性约束取代任意polymorphic ID或单表无约束JSON；原始导入正文、供应商/客户敏感正文和模型正文不复制进入候选层。
+- 生命周期/并发：run、suggestion、item、evidence和event均为不可变/追加事实；当前有效性由服务端按过期、终止事件、group/输入/引用版本、完整合同、D-111阈值和停用开关实时派生。TTL最多30日；`INVALIDATED/DISCARDED/SUPERSEDED`互斥追加，过期不依赖事件。`run_digest`及业务唯一约束保证同合同重放复用，变化创建新run和递增suggestion version；TASK04以后仍须独立人工决定、CAS、审计并调用既有权威服务。
+- D-111继承：当前只允许`LOCAL_DETERMINISTIC/NONE/NONE`，不得伪造confidence；正确性、证据、复现和covered accuracy保持1.000000，安全/formal action/错误候选保持0，六项最低coverage保持`0.50/0.75/0.75/0.75/0.25/0.25`，ABSTAIN留在分母且零support保持undefined。
+- 状态/范围：TASK01/TASK02保持DONE，TASK03为唯一`DOING / RELATIONAL_CONTRACT_ACCEPTED / IMPLEMENTATION_NOT_STARTED`，TASK04/TASK05保持TODO。下一实施阶段只计划`0041_ai_governance_suggestion_evidence.sql`，本阶段未创建。变更精确限于九份Markdown；未修改0035/0040、代码、Schema/Migration、API/UI/Service、Evaluator、数据集、机器报告、测试、package或`RELEASES.md`，未调用模型、访问UAT数据库、build、部署或重启。
+- Git：严格从clean `main@df254a6f8018292708f60c712c451368484deac7`、Parent`d5f4e970f0570c7838c23e3813ee9b4deaf0e2d8`、public behind0/ahead194、private behind0/ahead0开始；以本条提交消息创建单一提交，实际SHA以`git log`为准。验证后只允许普通fast-forward push到`recovery-private/main`，不向public origin推送。
+- 验证/资源：九份Markdown、61个本地链接、唯一D-112/任务标题/DOING、状态矩阵、0035/0040 checksum、无0041、`git diff --check`、全仓1,325文件/1,303文本及九文件增量敏感扫描通过。断网、源码只读、单容器、1 CPU且串行的lint为0 error/11条既有warning，`npm test`3/3、TASK02 Evaluator17/17、0035治理无数据库Unit61/61通过；未重跑正式holdout、创建PostgreSQL测试库或执行Migration。额外纯读journal/schema合同检查4/5，唯一失败为既有测试写死head35而当前合法head为40（`40 !== 35`）；其余0035结构/约束/守卫4项通过，本docs-only任务不修改测试或降低断言。验证前后available约`2.2/2.2GiB`、Swap`346/347MiB`、根盘可用`17/17GiB`、Load`0.02/0.13/0.11`→`0.81/0.75/0.38`；内核OOM匹配0，四服务restart0/OOM false。任务Node容器自动清零，四个受保护Volume保持，未prune。
+
 ### PHASE4-TASK02 - `docs: approve deterministic AI evaluation thresholds`
 
 - D-111：新增`deterministic-ai-governance-thresholds-v1`，只绑定当前`LOCAL_DETERMINISTIC/NONE/NONE`、`bom-material-governance-v1`、`ai-governance-evaluator-v1`、`synthetic-material-governance-v1@1.0.0`和冻结source revision `d69f6dff…194ec`。通用decision exact/evidence/stable/covered accuracy要求1.000000，禁止数据/formal action/关键安全违规和错误候选要求0。

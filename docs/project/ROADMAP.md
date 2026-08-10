@@ -10,7 +10,7 @@
 | Phase 1 | 物料主数据 | 6 | PLANNED |
 | Phase 2 | 导入采集与 Mapping | 8 | DONE（非生产） |
 | Phase 3 | 导入规范化、暂存与审阅 | 4 | DONE（非生产实现完成） |
-| Phase 4 | AI治理 | 5 | PLANNED（TASK01 DONE；TASK02 DONE / DETERMINISTIC THRESHOLDS APPROVED / RELEASE NOT AUTHORIZED；TASK03—TASK05 TODO） |
+| Phase 4 | AI治理 | 5 | PLANNED（TASK01 DONE；TASK02 DONE / DETERMINISTIC THRESHOLDS APPROVED / RELEASE NOT AUTHORIZED；TASK03 DOING / RELATIONAL CONTRACT ACCEPTED / IMPLEMENTATION NOT STARTED；TASK04—TASK05 TODO） |
 | Phase 5 | ERP融合 | 10 个已授权任务 | DONE（非生产并行验收） |
 | Phase 6 | 行业物料库 | 4 | PLANNED |
 
@@ -140,17 +140,17 @@ Import Workspace UI 已由 `PHASE2-TASK08` 独立实施；Catalog 与 50×256 �
 - 评估集覆盖正例、反例、冲突和行业特殊场景。
 - 人工确认结果可形成质量指标，但不自动改变生产阈值。
 
-**预计任务数**：5。**当前状态**：PLANNED（TASK01治理基线DONE；TASK02为`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`；TASK03—TASK05未开始）。
+**预计任务数**：5。**当前状态**：PLANNED（TASK01治理基线DONE；TASK02为`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`；TASK03为`DOING / RELATIONAL_CONTRACT_ACCEPTED / IMPLEMENTATION_NOT_STARTED`；TASK04—TASK05未开始）。
 
 **执行顺序**：
 
 - `PHASE4-TASK01`：建立AI治理评估与审批边界（DONE；D-110及V1合同已批准，AI仅建议、确定性门禁优先、关键安全违规允许值0；`IMPLEMENTATION NOT STARTED`）。
 - `PHASE4-TASK02`：建立版本化去敏评估集、固定holdout、确定性基线和离线Evaluator（DONE；`material-v1@1.0.0`共64条，固定holdout已从冻结提交`d69f6dff…194ec`测量且未重跑，关键安全违规0；D-111批准只绑定当前确定性身份的100%正确性/证据/复现、错误候选0和安全放弃coverage档案，治理层PASS但release仍未授权）。
-- `PHASE4-TASK03`：建立关系化AI Suggestion/Evidence候选层和完整追溯/过期合同（TODO；不得写正式业务事实）。
+- `PHASE4-TASK03`：建立关系化AI Suggestion/Evidence候选层和完整追溯/过期合同（DOING；D-112与五表蓝图已接受，0041/Schema/API/UI/Service尚未开始；不得写正式业务事实）。
 - `PHASE4-TASK04`：建立人工审核API/UI及与既有受控正式提交的衔接（TODO；人工决定与AI建议分离，不新增隐式权限）。
 - `PHASE4-TASK05`：验收非生产试点发布门禁、漂移监控、停用开关和回退（TODO；必须另获具体数据、模型、环境及时限授权）。
 
-D-110不授权模型调用、外部供应商、真实数据外发、Schema/Migration、生产试点或部署；D-111只批准当前冻结本地确定性阈值，不授权外部模型或发布，也不自动启动TASK03。
+D-110不授权模型调用、外部供应商、真实数据外发、Schema/Migration、生产试点或部署；D-111只批准当前冻结本地确定性阈值，不授权外部模型或发布；D-112只接受TASK03关系合同，不授权0041、实现、TASK04/TASK05或运行环境动作。
 
 ## Phase 5 ERP融合
 

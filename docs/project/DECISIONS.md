@@ -1475,6 +1475,57 @@
 - 拒绝把64条合成样本的100%决策匹配解释为production ready、真实分布准确率或外部模型准入。
 - 拒绝因TASK02完成而自动开始TASK03、接入模型、创建候选层或执行任何运行环境动作。
 
+## D-112 — AI Suggestion/Evidence Relational Candidate Contract
+
+- 日期：2026-08-10
+- 状态：`ACCEPTED / RELATIONAL CONTRACT / IMPLEMENTATION NOT STARTED`
+- 确认人：项目负责人（通过`PHASE4-TASK03 AI SUGGESTION/EVIDENCE RELATIONAL CONTRACT`指令明确批准关系化候选边界、D-112及docs-only范围）
+
+### Context
+
+- Migration 0035 已用九张 `material_governance_*` 表分离确定性运行/分组/来源/规格/候选、人工决定及正式 Material 衔接，并通过复合外键、唯一约束、单次 group CAS 和数据库不可变守卫证明其语义。AI输出具有不同的来源身份、版本、放弃、过期、失效和替代语义，不能写入或冒充这些确定性/人工事实。
+- Material Import 已有 Batch、Parse、Mapping、Normalization、Normalized Row、Field/Attribute Candidate、Issue 和 Lineage；Material Master 已有稳定 ID、类型化属性、生命周期、版本与审核；Supplier Mapping 已有稳定 `mapping_uid`、version chain、supplier-part claim、职责分离和追加事件。候选层应引用这些权威事实，不能复制正文或形成第二套主数据/映射状态机。
+- D-110 已规定 AI 只建议、失败关闭、证据和人工责任分离；D-111 只批准当前冻结 `LOCAL_DETERMINISTIC` 身份的阈值。本决定需要在不创建 Schema/Migration/API/UI/Service、不调用模型和不访问 UAT 数据库的前提下，固定下一实施阶段的数据合同。
+
+### Decision
+
+1. AI候选层使用独立 `ai_governance_*` 边界，不重载、扩写或改变0035的 `material_governance_material_candidates`、`material_governance_alternative_candidates`、`material_governance_decisions`、material links或events语义。
+2. V1 suggestion主体只绑定一个既有 `material_governance_group`及其 `governance_run_id`、group version和canonical input SHA-256；创建时group必须为同run的`PENDING v1`。AI必须位于已发布Normalization和确定性治理之后。
+3. V1只支持`CLASSIFICATION`、`ATTRIBUTE_EXTRACTION`、`MATERIAL_MATCH`、`SUPPLIER_MAPPING`四项能力；每个item kind必须与run capability相同。
+4. suggestion disposition只有`SUGGEST`和`ABSTAIN`。二者都不是批准、建档、绑定、合并、启用、映射或正式业务事实；`ABSTAIN`是安全放弃且不能进入后续审核。
+5. run、suggestion payload、item、score、evidence和source locator创建后不可原地修改；任何输入、输出或版本合同变化必须创建新run和递增suggestion version，历史事实保留。
+6. 每个run必须记录capability，schema/evaluator/rule/config版本与摘要，provider/model/model version/prompt身份，参数摘要，input version及SHA-256，`request_id`、`operation_id`、idempotency key摘要、发起principal、服务端创建时间、强制`expires_at`、`contract_digest`、`run_digest`和`result_digest`。
+7. 当前实现准入只允许`execution_mode/provider=LOCAL_DETERMINISTIC`、model/model version/prompt=`NONE/NONE/NONE`；没有prompt制品所以prompt digest为空，没有概率语义所以confidence semantics为空。外部AI继续默认禁用，不创建凭据或发送真实数据。
+8. 采用五表蓝图：`ai_governance_suggestion_runs`、`ai_governance_suggestions`、`ai_governance_suggestion_items`、`ai_governance_suggestion_evidence`、`ai_governance_suggestion_events`。全部外键默认`ON DELETE RESTRICT`，事实/事件拒绝UPDATE/DELETE。
+9. item必须使用显式关系字段：Classification引用Category FK；Attribute引用Attribute Definition FK和单一类型值列；Material Match引用Material FK/观察版本；Supplier Mapping引用Supplier+Material FK及supplier-part摘要。禁止任意`target_type/target_id` polymorphic ID，也不得把候选、字段值和引用全部塞入无约束JSON。
+10. 每个`SUGGEST`至少一个item，每个item至少一条同主体、逐字段或逐候选evidence；延迟数据库约束和服务事务必须在提交前验证。证据不足必须整体`ABSTAIN`或拒绝不完整输出，不能让无证据item进入审核。
+11. evidence只保存安全field locator、稳定内部FK、观察版本和SHA-256，可引用0035 row/spec/确定性候选、Normalization lineage、Material/Supplier/Mapping version或受控rule trace；不得保存原始供应商文件、原始行/模型正文、价格、联系信息、凭据、个人信息或客户专用正文。
+12. confidence允许为空；当前确定性基线必须为空，不能伪装成概率。未来非空值必须在0—1内并绑定已批准`confidence_semantics_version`，该变化需要新版本和重新评估。
+13. 当前有效性不保存为可更新status，而由服务端在同一快照中失败关闭派生：完整摘要/证据、`SUGGEST`、服务端时间未过期、无终止事件、输入版本/摘要仍匹配、group仍`PENDING`且version匹配、所有Category/Attribute/Material/Supplier/Unit/Mapping引用仍有资格且版本/摘要匹配、完整版本合同/阈值仍获批准、对应停用开关允许消费。
+14. `expires_at`必须晚于创建时间且V1最多30日，版本化config可设置更短TTL；过期仅由服务端/数据库业务时间判断，浏览器时钟、倒计时或缓存不具权威性。
+15. `INVALIDATED`、`DISCARDED`、`SUPERSEDED`只通过追加event记录，每个suggestion最多一个互斥终止事件；不得删除或改写原建议伪造历史。过期为服务端时间派生，不依赖可缺失的`EXPIRED`事件。
+16. 物理清理和保留期限不在TASK03实现范围。未来只有在无审核/审计/正式操作引用、满足保留政策和恢复要求并经独立任务授权后才可设计；当前全部RESTRICT且不可删除。
+17. 同一治理主体、group version、capability、input version/digest和完整contract digest必须形成确定性`run_digest`及唯一约束；相同请求重放返回既有完整结果，相同key不同请求冲突，不能产生重复或半成品建议。
+18. 正式业务表在TASK03不增加指向AI suggestion的反向依赖。AI表不得写Supplier Mapping claim、Material Master、0035决定/link/event或任何BOM、库存、采购、生产、品质、财务事实。
+19. TASK04只能通过独立人工review/decision引用`suggestion_uid + version + digest`，记录审核人/角色/逐项采用或更正/理由/CAS/审计，再调用既有权威Material Workflow或Supplier Mapping Service完成正式写入；禁止SQL直写或降低权限、职责分离、事务、CAS、幂等、审核和审计。
+20. D-111阈值原样继承：正确性、证据、稳定复现和coverage内准确率均为1.000000；安全违规、formal action和错误候选为0；overall/classification/attribute record/attribute field/material match/supplier mapping最低coverage为0.50/0.75/0.75/0.75/0.25/0.25。ABSTAIN保留在分母，零support保持undefined。
+21. provider、模型、prompt、参数、规则、阈值、Schema、证据合同、config、数据集、参考Category/Attribute定义或其他影响结果的版本变化都必须形成新版本并重新评估，不能静默沿用旧批准。
+22. 下一实施阶段计划新增唯一Migration `0041_ai_governance_suggestion_evidence.sql`，同时保持`db/schema.ts`、snapshot/journal、服务、数据库守卫和隔离测试一致。本阶段只接受蓝图，不创建0041，不修改0035/0040。
+
+### Consequences
+
+- `PHASE4-TASK03`状态为`DOING / RELATIONAL_CONTRACT_ACCEPTED / IMPLEMENTATION_NOT_STARTED`；关系合同已接受，但实现、测试迁移和人工审核衔接仍须后续独立授权，不能把合同接受解释成任务实现完成。
+- 0035的确定性候选继续由`bom-material-governance-v1`单独负责，人工决定和正式Material/Supplier Mapping服务继续是唯一写入权威。AI不可用、过期或失效时，确定性和人工流程仍可运行。
+- 本决定不实现或授权Schema、Migration、API、UI、Service、Evaluator变更、模型调用、真实数据、试点、build、部署、生产迁移或发布；源码保持alpha.43，UAT保持alpha.42/0040。
+- 详细逐表字段、FK、唯一约束、CHECK、索引、CAS、事件链和空值原因记录在[AI Suggestion/Evidence关系化候选合同V1](../material-master/ai-suggestion-evidence-relational-v1.md)。
+
+### Rejected alternatives
+
+- 拒绝把AI结果写入0035确定性候选表、人工decision/event表、Supplier Mapping或Material Master，以免混淆来源和绕过权威服务。
+- 拒绝单表`jsonb payload`、任意polymorphic ID或只保存自然语言解释/总分，因为它们不能提供类型、引用完整性、逐项证据和稳定查询约束。
+- 拒绝原地更新status/payload/evidence、删除旧建议或用浏览器时间决定过期，因为这些做法会破坏历史和并发一致性。
+- 拒绝用当前64条合成集阈值批准外部模型、真实数据或发布，也拒绝因建立表结构合同而自动开始TASK04/TASK05。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
