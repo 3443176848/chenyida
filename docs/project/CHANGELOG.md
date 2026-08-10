@@ -4,6 +4,16 @@
 
 ## 2026-08-10
 
+### SELFHOST-OPS-RECOVERY-FOUNDATION-39 - `docs: record private image recovery anchor`
+
+- 授权/准入：项目负责人明确给出`GHCR CREDENTIAL READY`。独立root-only配置确认临时classic PAT身份为`3443176848`、normalized scope只有`write:packages`；认证GitHub API和registry分别证明package及精确tag尚不存在，PAT正文未进入聊天、日志、Git、remote URL、命令参数或文档。
+- 唯一push：只把已验收且仍由运行Web引用的Image ID标记为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，只执行一次精确push且成功，没有重试、第二tag、第二registry、`latest`、alpha.41或被拒候选。
+- digest闭合：push返回、认证registry顶层manifest与唯一tag的GitHub package version digest三方均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。OCI index的linux/amd64 child为`sha256:36fd3118…482f`、attestation为`sha256:f4a82ba3…621b`、config为`sha256:72452032…32c7`，9个compressed layer digest与D-109预检逐项一致。
+- 私有/恢复验证：package为`PRIVATE`且没有repository association；三个预期OCI对象中只有顶层index携带唯一计划tag，没有`latest`。只执行一次按registry digest pull，回拉Image ID、平台、config、9层与运行合同全部匹配且未run/deploy/replace；独立空Docker配置的匿名查询被`HTTP_401_AUTHENTICATION_REQUIRED`拒绝。
+- 凭据/运行保护：验证后精确`docker logout ghcr.io`并逐项清理`/run/cyd-ghcr-auth`、PAT、Docker config、临时GitHub API配置及匿名配置目录；默认GitHub身份和默认Docker配置未改。四服务容器/Image身份、health、restart0/OOM false和四个受保护Volume不变；没有UAT登录/API、数据库读写、Migration、build、备份恢复、部署或重启。
+- 文档验证：变更范围精确为六份治理Markdown，48个本地链接、D-109/TASK39/唯一DOING、`git diff --check`通过；既有Node镜像在断网、源码只读、1 CPU、1,280 MiB、串行条件下完成lint 0 error/0 warning和UI contract 6/6，两个临时容器清零且没有安装依赖或连接数据库。
+- 状态/边界：六份治理Markdown把阶段更新为`ALPHA.42 PRIVATE GHCR IMAGE ANCHOR ESTABLISHED — DATA RECOVERY ANCHOR PENDING`。任务继续`DOING`；PostgreSQL dump与uploads、attachments、backup-status文件卷异机锚点未开始，不构成production ready。项目负责人仍须在GitHub网站手工撤销本次一次性classic PAT。
+
 ### SELFHOST-OPS-RECOVERY-FOUNDATION-39 - `docs: prepare private image recovery anchor`
 
 - 阶段纠偏：实际Git/GitHub状态证明前一治理提交`e1eff533eb7cb38d169f266bdf3a97b0d3dc7e71`已经普通推送到`recovery-private/main`，private仓库为`PRIVATE / ADMIN / main`且behind0/ahead0；D-108、总控、台账和状态统一改为`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`。公开`origin/main=39946f6b…5c0`、fetch/push URL、upstream、remote HEAD和public visibility保持不变。

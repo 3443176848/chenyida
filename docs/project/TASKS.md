@@ -13,9 +13,9 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-OPS-RECOVERY-FOUNDATION-39 | alpha.42三锚点恢复基础 | DOING | Codex（alpha.42镜像只读出站审计、GHCR准入治理、文档门禁、增量扫描和private Git精确同步）、项目负责人（GitHub设备授权、私有恢复锚点授权及后续GHCR凭据就绪确认） | 2026-08-10 | — | SELFHOST-UAT-FIX-38、SELFHOST-LANDING-TASK01、D-108、D-109 | `DOING / IMAGE_PREFLIGHT / GHCR_CREDENTIAL_REQUIRED`。D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`已复核；精确alpha.42镜像出站审计为0 confirmed/0 possible secret，一次性archive已清理且不是异机锚点。D-109固定候选`ghcr.io/3443176848/chenyida-erp-web`、唯一完整revision tag、private/no-latest/no-overwrite、最小`write:packages`classic PAT和push后按registry digest回拉合同；当前`TARGET EXISTENCE UNRESOLVED — CREDENTIAL REQUIRED`，没有docker login/tag/push。镜像远端及PostgreSQL/文件卷异机锚点仍未建立，FIX38继续NO UAT RECEIPT且非production ready。见[任务文档](../tasks/SELFHOST-OPS-RECOVERY-FOUNDATION-39.md)、[D-108](DECISIONS.md#d-108-私有git恢复远端与alpha42三锚点恢复策略)及[D-109](DECISIONS.md#d-109-私有ghcr镜像恢复锚点与最小凭据策略)。 |
+| SELFHOST-OPS-RECOVERY-FOUNDATION-39 | alpha.42三锚点恢复基础 | DOING | Codex（alpha.42镜像出站审计、唯一private GHCR tag/push、digest/private/anonymous验证、凭据清理、文档门禁、增量扫描和private Git精确同步）、项目负责人（GitHub设备授权、私有恢复锚点授权、`GHCR CREDENTIAL READY`确认及远端一次性PAT手工撤销） | 2026-08-10 | — | SELFHOST-UAT-FIX-38、SELFHOST-LANDING-TASK01、D-108、D-109 | `DOING / IMAGE_ANCHOR_ESTABLISHED / DATA_ANCHOR_PENDING`。D-108的Git private锚点保持；D-109的唯一`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`已一次push，push/认证registry/唯一tag package version digest三方均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association或`latest`；一次按digest回拉完全匹配，匿名读取401，本机一次性凭据已logout并清理。PostgreSQL dump与uploads、attachments、backup-status文件卷异机锚点仍未建立；FIX38继续NO UAT RECEIPT且非production ready。见[任务文档](../tasks/SELFHOST-OPS-RECOVERY-FOUNDATION-39.md)、[D-108](DECISIONS.md#d-108-私有git恢复远端与alpha42三锚点恢复策略)及[D-109](DECISIONS.md#d-109-私有ghcr镜像恢复锚点与最小凭据策略)。 |
 
-当前`IMAGE_PREFLIGHT`阶段不得扩展到镜像push、数据库/Volume备份上传、真实Receipt、quality、finance、production、Migration或生产部署。
+当前镜像阶段已经在授权范围内闭合，不得追加第二镜像/tag/registry或重推；下一阶段只能在另获明确方案和授权后处理PostgreSQL dump与文件卷异机锚点。不得扩展到真实Receipt、quality、finance、production、Migration或生产部署。
 
 ## 已完成任务
 

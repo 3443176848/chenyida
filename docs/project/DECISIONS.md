@@ -1304,7 +1304,7 @@
 
 ### Consequences
 
-- `SELFHOST-OPS-RECOVERY-FOUNDATION-39`在Git阶段保持`DOING / PHASE_GIT_PRIVATE_REMOTE`；私有push完成后只记录`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`。当前已进入`DOING / IMAGE_PREFLIGHT / GHCR_CREDENTIAL_REQUIRED`，仍需遵守D-109的独立范围和门禁。
+- `SELFHOST-OPS-RECOVERY-FOUNDATION-39`在Git阶段保持`DOING / PHASE_GIT_PRIVATE_REMOTE`；私有push完成后只记录`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`。当前Git与private GHCR镜像锚点均已建立，任务进入`DOING / IMAGE_ANCHOR_ESTABLISHED / DATA_ANCHOR_PENDING`，仍需遵守D-109的独立范围和门禁。
 - 新私有仓库将包含完整内部Git历史，因此必须保持private并按内部恢复材料治理；本决定不授权公开其中任何文档、拓扑或UAT标识。
 - `RELEASES.md`不因恢复remote而更新；Git恢复锚点不是产品release、生产部署或真实数据迁移。
 - 本决定不授权UAT登录/API、业务写、Migration、build、Compose、数据库或Volume读取/写入，也不授权镜像push或备份上传。
@@ -1314,7 +1314,7 @@
 - GitHub官方RPM源和签名指纹核对后已安装`gh 2.97.0`；项目负责人经设备页完成授权，活动账号精确为`3443176848`。认证正文未读取，root配置文件元数据为`root:root / 0600`。
 - 认证视图先证明目标仓库不存在，随后创建空`3443176848/chenyida-erp-recovery-private`；GitHub元数据为`PRIVATE / ADMIN / non-fork / size 0`，分支、tag和release均为0。
 - 治理提交`e1eff533eb7cb38d169f266bdf3a97b0d3dc7e71`已通过增量扫描并以普通精确SHA推送；本次镜像预检起点验证`recovery-private/main`逐字节等于该提交、behind0/ahead0，private仓库为`PRIVATE / ADMIN / main`，公开`origin/main`仍为`39946f6b854a985b5c19106eaa6c938bddaf9c7c`且URL、upstream、visibility未变。Git阶段结论为`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`。
-- 后续治理提交仍须按同一秘密门禁普通推送到private main；这只维护Git锚点，不建立镜像或PostgreSQL/文件卷锚点。
+- 后续治理提交仍须按同一秘密门禁普通推送到private main；这只维护Git锚点，不能替代已经独立验证的镜像锚点，也不能建立PostgreSQL/文件卷锚点。
 
 ### Rejected alternatives
 
@@ -1326,23 +1326,23 @@
 ## D-109 私有GHCR镜像恢复锚点与最小凭据策略
 
 - 日期：2026-08-10
-- 状态：`ACCEPTED / IMAGE PREFLIGHT PASSED / GHCR_CREDENTIAL_REQUIRED / NO IMAGE PUSH`
-- 确认人：项目负责人（授权alpha.42私有镜像出站预检，但明确禁止本阶段登录或推送镜像）
+- 状态：`ACCEPTED / PRIVATE GHCR IMAGE ANCHOR ESTABLISHED / DIGEST VERIFIED`
+- 确认人：项目负责人（先授权alpha.42私有镜像出站预检；随后以`GHCR CREDENTIAL READY`明确授权使用一次性临时凭据执行唯一tag、一次push、一次按digest pull及私有性验证）
 
 ### Context
 
 - D-108的Git私有恢复锚点已经建立，但已验收alpha.42 Web镜像仍只有本机Docker Image ID和本地tag，没有可从异机验证的private registry manifest digest；Git锚点不能替代镜像锚点。
 - 唯一准入候选为运行Web实际引用的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，版本`0.1.0-alpha.42`，source revision`569aa954d764309e239d1f6c174e582596d33a24`。alpha.41回退镜像和`sha256:81126136…278e`被拒候选不在上传范围。
 - GitHub官方[Container registry认证说明](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)规定命令行认证使用Personal Access Token (classic)，上传需要`write:packages`；`delete:packages`只用于删除，不属于本任务最小权限。官方[package访问与可见性说明](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility)说明个人账号首次发布默认private，但实际push阶段仍必须由认证元数据再次验证visibility。
-- 当前没有package-scoped GHCR凭据。匿名不可见或404不能可靠证明目标package不存在，因此不能据此创建、覆盖或声称名称空闲。
+- 预检结束时没有package-scoped GHCR凭据，匿名不可见或404不能可靠证明目标package不存在，因此当时不能据此创建、覆盖或声称名称空闲。项目负责人随后在任务外准备仅含`write:packages`的临时classic PAT；本阶段用认证API与registry先证明目标package和精确tag均不存在，完成唯一授权push后已清理本机凭据。
 
 ### Decision
 
 1. 候选目标固定为`ghcr.io/3443176848/chenyida-erp-web`；唯一计划immutable-intent tag固定为`0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`。
 2. 不使用或推送`latest`，不上传alpha.41回退镜像或被拒候选，不覆盖任何既有tag、未知package或未知manifest。package必须始终保持private。
-3. 目标存在性当前精确记录为`TARGET EXISTENCE UNRESOLVED — CREDENTIAL REQUIRED`；实际push前必须另获`GHCR CREDENTIAL READY`确认并在认证视图中核对owner、package、tag冲突和visibility。
+3. 预检时目标存在性精确记录为`TARGET EXISTENCE UNRESOLVED — CREDENTIAL REQUIRED`；项目负责人随后给出`GHCR CREDENTIAL READY`，实际push前已在认证视图中核对identity、scope、owner、package和tag冲突，push后由认证元数据确认visibility。
 4. 最小凭据仅接受用户在任务外安全创建、仅含`write:packages`的Personal Access Token (classic)；不要求、不接受也不记录`delete:packages`。PAT不得进入聊天、日志、Git、remote URL、命令参数或扫描报告，不读取Docker认证文件正文，也不使用`gh auth token`替代GHCR凭据。
-5. push阶段必须是新的独立执行范围；认证就绪之前禁止`docker login`、`docker tag`和`docker push`。本阶段不创建package、release、Git tag、Actions secret或Docker认证文件。
+5. push阶段必须是新的独立执行范围；认证就绪之前禁止`docker login`、`docker tag`和`docker push`。已执行阶段只允许创建一个精确本地tag并向唯一目标push一次；不创建release、Git tag、Actions secret或持久Docker认证文件。
 6. push成功后必须记录实际GHCR registry manifest digest，并从private package按该registry digest拉取验证。registry digest、本地Docker Image ID、archive SHA-256、config digest和layer digest分别记录，不得互相冒充。
 
 ### Image preflight evidence
@@ -1353,11 +1353,22 @@
 - 最终镜像没有Docker auth、SSH/PEM/P12/PFX私钥文件、数据库/dump/业务备份、浏览器Profile/Cookie/Session或上传/附件/客户供应商原始文件。保留的空npm `.npmrc`、Debian公共GPG keyring、apt/dpkg日志、source map、TypeScript声明/源码和test路径已记录为运行镜像最小化后续风险，但无confirmed/possible secret。
 - 审计结束后精确删除唯一任务目录，archive、解包layer、报告及扫描进程均无残留。本地archive没有异机副本，明确不是恢复锚点。
 
+### Private GHCR implementation evidence
+
+- 严格起点为`c96f9bfc912cb2a5dc6f4a3ad47bb51260847dbd`；public `origin/main`仍为`39946f6b854a985b5c19106eaa6c938bddaf9c7c`，private `recovery-private/main`与起点一致。运行Web仍精确引用验收Image ID，alpha.41和被拒候选身份均未变化。
+- 独立root-only临时配置验证PAT身份为`3443176848`，normalized scope只有`write:packages`且没有`delete:packages`或其他scope；认证package API返回目标不存在，认证registry查询返回精确tag不存在。PAT正文未进入聊天、日志、Git、remote URL、命令参数或文档。
+- 只创建`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`一个本地tag，并只执行一次精确push且成功，没有重试或第二目标。
+- push返回、认证registry顶层manifest与带唯一tag的GitHub package version三方registry digest完全一致：`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。
+- registry OCI index精确包含`linux/amd64` child `sha256:36fd3118a4725aa8546ca28d1f21fe53ca472e81da4d0febff576ba88e4b482f`和attestation child `sha256:f4a82ba3ef6234037ff270c38685adeed3374db341376a8ac95652ff0cd4621b`；platform config为`sha256:72452032dfdec71e55376a511ec762aeb5265f758f257a5b6c858b76372732c7`，9个compressed layer digest均与预检逐项一致。
+- GitHub package元数据为owner `3443176848`、container `chenyida-erp-web`、`PRIVATE`且无repository association。三个预期OCI对象中仅顶层index携带唯一计划tag；没有`latest`、额外tag、alpha.41或被拒候选。
+- 只执行一次精确按registry digest拉取并成功；回拉Image ID、`linux/amd64`、config、9层、labels、User、WorkingDir、Entrypoint、Cmd和`3000/tcp`均匹配验收基线。没有运行、替换或部署回拉镜像，运行Web容器及四服务身份、健康状态、restart/OOM状态均未变化。
+- 独立空Docker配置的匿名manifest查询被`HTTP_401_AUTHENTICATION_REQUIRED`拒绝。验证后执行精确`docker logout ghcr.io`，逐项核对并清理`/run/cyd-ghcr-auth`、PAT、Docker config、临时GitHub API配置及匿名配置目录；默认`gh`身份仍为`3443176848`，默认Docker配置未触碰。
+
 ### Consequences
 
-- 阶段结论固定为`ALPHA.42 IMAGE OUTBOUND REVIEW PASSED — GHCR CREDENTIAL REQUIRED / NO IMAGE PUSH`；这表示镜像内容通过出站预检，不表示远端镜像锚点已建立。
-- `SELFHOST-OPS-RECOVERY-FOUNDATION-39`继续`DOING / IMAGE_PREFLIGHT / GHCR_CREDENTIAL_REQUIRED`。PostgreSQL dump和文件卷异机锚点仍未开始，系统仍为非生产且非production ready。
-- 后续即使镜像push成功，也只能关闭镜像故障域；不得跳过private可见性复核、按digest回拉验证或数据库/文件卷恢复锚点。
+- 阶段结论更新为`ALPHA.42 PRIVATE GHCR IMAGE ANCHOR ESTABLISHED — DATA RECOVERY ANCHOR PENDING`；镜像内容、远端私有性、registry digest与按digest回拉均已验证。
+- `SELFHOST-OPS-RECOVERY-FOUNDATION-39`继续`DOING / IMAGE_ANCHOR_ESTABLISHED / DATA_ANCHOR_PENDING`。PostgreSQL dump和文件卷异机锚点仍未开始，系统仍为非生产且非production ready。
+- 镜像锚点只关闭镜像故障域，不能替代Git或数据库/文件卷恢复锚点。项目负责人仍须在GitHub网站手工撤销本次一次性classic PAT；本机凭据已清理不等于远端PAT已撤销。
 
 ### Rejected alternatives
 
@@ -1368,8 +1379,8 @@
 
 ### Verification boundary
 
-- 本阶段只读检查精确alpha.42镜像，并在`/var/tmp`一次性保存、离线扫描和清理；不build、不重建、不tag、不push、不登录registry。
-- 不登录UAT、不调用业务API、不查询或写入业务数据库，不运行Migration、备份、恢复、Compose更新、部署或服务重启。
+- 预检阶段只读检查精确alpha.42镜像，并在`/var/tmp`一次性保存、离线扫描和清理；没有build或重建。本次获授权阶段只执行唯一tag、一次精确push、一次按registry digest pull以及认证/匿名只读验证。
+- 不登录UAT、不调用业务API、不查询或写入业务数据库，不运行Migration、备份、恢复、Compose更新、部署或服务重启；没有运行或替换回拉镜像。
 - 只允许六份治理Markdown、独立提交、提交增量秘密扫描及精确private Git push；public `origin`和`RELEASES.md`保持不变。
 
 ## 待确认业务决策
