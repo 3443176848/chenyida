@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-`DOING / OFFLINE_EVALUATOR_IMPLEMENTATION`
+`DOING / SOURCE_READY / HOLDOUT_MEASURED / THRESHOLD_DECISION_REQUIRED`
 
 日期：2026-08-10（Asia/Shanghai）
 
@@ -50,4 +50,40 @@
 7. 如实记录 calibration/holdout；普通准确率或 coverage 不足不触发改标签或改规则。
 8. 只以机器报告和 Markdown 创建 `docs: record AI governance baseline metrics`。
 
-最终状态和实测结果在正式 holdout 测量后补充。
+## 最终判定
+
+`PHASE4-TASK02 OFFLINE EVALUATOR SOURCE READY — HOLDOUT MEASURED / THRESHOLD DECISION REQUIRED`
+
+本任务已经交付可复现的离线测量工具与第一份冻结 holdout 实测报告，但没有批准准确率阈值、最低 coverage 或任何发布决定。报告状态固定为：
+
+- `dataset_integrity=PASS`
+- `critical_safety_gate=PASS`
+- `accuracy_measurement=MEASURED`
+- `threshold_status=UNAPPROVED`
+- `release_decision=NOT_AUTHORIZED`
+
+## 冻结制品
+
+- 功能提交：`d69f6dff795377109244e788c2ffee73ef6194ec`，Parent `432551b1c8dbf9213954d57a77f0b022c843227e`。
+- 数据集：`synthetic-material-governance-v1@1.0.0`，dataset digest `4bde669dd59a3cbb239fcd4f9b62f7e8eccfd2b6921d45cb0545503ba4a34adb`。
+- calibration：32 条，SHA-256 `d251271991566a877ee721392e39c9e0c8be1afcede47fa868aeb0376133ed95`。
+- holdout：32 条，SHA-256 `73e3d84337609d87e0b554fefb531c25c1f39a5ad74998500b7ee21bf633bde3`，策略 `FROZEN_NOT_FOR_TUNING`。
+- 正式报告：`chenyida_erp_site/evals/ai-governance/material-v1/reports/deterministic-baseline-alpha43.json`，文件 SHA-256 `e2ed87e629633d09ae5de079e105d82e74a393a8c13ab8817fdf04a93d0b8a5e`，稳定 result digest `f1b5b6b95cc1fe1c624c910bb28aaa29b39db8a5b6a72088ecb773c8d26ac316`。
+
+## 正式测量摘要
+
+| Split | 样本 | 决策精确匹配 | Abstention | Coverage | Coverage 内准确率 | 证据合规 | 稳定复现 | 关键安全违规 |
+| --- | ---: | --- | --- | --- | --- | --- | --- | ---: |
+| calibration | 32 | 32/32 = 1.000000 | 14/32 = 0.437500 | 18/32 = 0.562500 | 18/18 = 1.000000 | 32/32 = 1.000000 | 32/32 = 1.000000 | 0 |
+| holdout | 32 | 32/32 = 1.000000 | 13/32 = 0.406250 | 19/32 = 0.593750 | 19/19 = 1.000000 | 32/32 = 1.000000 | 32/32 = 1.000000 | 0 |
+| overall | 64 | 64/64 = 1.000000 | 27/64 = 0.421875 | 37/64 = 0.578125 | 37/37 = 1.000000 | 64/64 = 1.000000 | 64/64 = 1.000000 | 0 |
+
+calibration 和 holdout 的失败 sample_id 都为空。该结果只描述此静态合成数据集与当前确定性规则的可复现测量，不是总体准确率门槛、外部有效性证明或 production-ready 结论。逐能力、逐字段、品类、scenario 和风险分层见[数据集与测量说明](../material-master/ai-governance-evaluation-dataset-v1.md)及机器报告。
+
+## 验证与边界
+
+- 专项测试 17/17、专项 typecheck、既有治理回归 61/61、`npm test` 3/3 通过；lint 为 0 error、11 条既有 warning、任务新增 warning 0；`git diff --check`和敏感扫描通过。
+- provider=`LOCAL_DETERMINISTIC`、model_id=`NONE`、prompt_version=`NONE`、rule_version=`bom-material-governance-v1`、evaluator_version=`ai-governance-evaluator-v1`。
+- 源码候选为 `0.1.0-alpha.43`；运行 UAT 仍为 alpha.42 原镜像，Migration 仍为 `0040`。
+- 未调用 AI 或外部服务，未读取真实业务数据、数据库或受保护 Volume 正文，未修改 Schema/Migration/API/UI/Worker/既有治理规则，未 build、部署或重启。
+- `D-110`不变，`D-111`未创建，`PHASE4-TASK03`仍为`TODO`且没有自动启动。

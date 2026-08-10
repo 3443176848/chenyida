@@ -4,6 +4,15 @@
 
 ## 2026-08-10
 
+### PHASE4-TASK02 - `feat: add offline AI governance evaluator` / `docs: record AI governance baseline metrics`
+
+- 数据集：新增`synthetic-material-governance-v1@1.0.0`，calibration/holdout各32条、四项能力每split各8条，覆盖RES/CAP/IND/IC/CON/OSC及MECH/OTHER/UNKNOWN放弃场景；文件SHA分别为`d2512719…ed95`、`73e3d843…bde3`，dataset digest为`4bde669d…4adb`。严格schema、manifest、全局ID/顺序/统计/摘要、未知字段、断裂引用、非合成身份、禁止数据、路径和symlink均失败关闭。
+- 工具：在独立`tools/ai-governance-evaluation/`实现canonical JSON、四项只读确定性适配器、比率/分类/属性/top-k/错误候选/abstention/coverage/分层/安全/复现指标、固定报告schema及受控CLI；provider/model/prompt/rule/evaluator固定为`LOCAL_DETERMINISTIC/NONE/NONE/bom-material-governance-v1/ai-governance-evaluator-v1`。运行时app不导入工具或评估集，不新增依赖、API、页面、Worker、Schema或Migration。
+- 冻结测量：功能提交`d69f6dff795377109244e788c2ffee73ef6194ec`严格Parent`432551b1c8dbf9213954d57a77f0b022c843227e`。提交后未修改工具/数据/标签/规则/package/测试，只执行一次正式all-splits测量；calibration与holdout均32/32 decision exact、证据32/32、稳定复现32/32、关键安全违规0，coverage分别18/32与19/32，失败sample_id为空。报告SHA`e2ed87e6…8a5e`、稳定result digest`f1b5b6b9…ac316`。
+- 阈值：报告明确为`dataset_integrity=PASS / critical_safety_gate=PASS / accuracy_measurement=MEASURED / threshold_status=UNAPPROVED / release_decision=NOT_AUTHORIZED`。64条合成集结果不等于production ready；准确率和最低coverage仍等待项目负责人决定，不创建D-111，不启动TASK03。
+- 版本/运行面：源码候选升至`0.1.0-alpha.43`，运行UAT继续alpha.42原Image、PostgreSQL继续40/head0040；未调用AI/外部服务、未使用真实数据、未连接数据库、未读取Volume正文、未build、部署、重启或修改既有治理规则。
+- 验证：专项17/17、专项typecheck、治理回归61/61、`npm test`3/3通过；lint 0 error/11条既有warning且任务新增warning0，`git diff --check`、去敏/凭据/路径/运行时边界扫描通过。所有Node操作均断网、只读源码、1 CPU、受限内存、单容器串行运行。
+
 ### PHASE4-TASK01 - `docs: define AI governance approval boundaries`
 
 - 决策/治理：新增D-110与《AI治理评估与审批边界V1》，固定AI只产生可丢弃建议和逐字段证据；确定性冲突及既有服务端权限、事务、CAS、幂等、审核、审计优先，异常失败关闭。采购、工程、品质和主数据管理员继续承担来源、规格、质量与最终建档/合并责任，AI不是审批人。
