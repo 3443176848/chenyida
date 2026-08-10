@@ -595,7 +595,12 @@ $$;
 CREATE FUNCTION cyd_ai_governance_suggestion_event_complete_trigger() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   PERFORM cyd_ai_governance_suggestion_assert_event(NEW.id);
-  PERFORM cyd_ai_governance_suggestion_assert_complete(NEW.suggestion_id);
+  -- Terminal events validate CAS/chain only. CREATED already proved the
+  -- historical target snapshot complete, and later drift may be the reason
+  -- that a replacement or invalidation is being appended.
+  IF NEW.event_type='CREATED' THEN
+    PERFORM cyd_ai_governance_suggestion_assert_complete(NEW.suggestion_id);
+  END IF;
   RETURN NULL;
 END;
 $$;

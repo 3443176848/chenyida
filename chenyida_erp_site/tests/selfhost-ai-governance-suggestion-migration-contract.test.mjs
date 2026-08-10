@@ -125,6 +125,7 @@ test("0041 service gate, immutability and deferred completeness are explicit", (
   ]) assert.match(migration, new RegExp(token), token);
   assert.match(migration, /event_type='SUPERSEDED'/);
   assert.match(migration, /event_type='CREATED'/);
+  assert.match(migration, /IF NEW\.event_type='CREATED' THEN\s+PERFORM cyd_ai_governance_suggestion_assert_complete\(NEW\.suggestion_id\)/);
   assert.match(migration, /event_type" in \('INVALIDATED','DISCARDED','SUPERSEDED'\)/);
 });
 

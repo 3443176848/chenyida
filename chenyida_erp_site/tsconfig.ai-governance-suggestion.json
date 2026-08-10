@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "incremental": false,
+    "plugins": []
+  },
+  "include": [
+    "app/lib/ai-governance-suggestion-selfhost/**/*.ts",
+    "app/lib/material-selfhost/types.ts",
+    "app/lib/selfhost-api.ts",
+    "db/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "examples",
+    "app/api/erp-api.ts",
+    "scripts/seed-material-categories.ts"
+  ]
+}

@@ -48,7 +48,7 @@ test("CLI evaluates calibration without network/database credentials and emits d
   assert.equal(report.dataset.sample_count, 32);
   assert.equal(report.baseline.provider, "LOCAL_DETERMINISTIC");
   assert.equal(report.baseline.model_id, "NONE");
-  assert.equal(report.baseline.package_version, "0.1.0-alpha.43");
+  assert.equal(report.baseline.package_version, "0.1.0-alpha.44");
   assert.equal(report.status.threshold_status, "UNAPPROVED");
   assert.equal(report.status.release_decision, "NOT_AUTHORIZED");
   assert.doesNotMatch(stdout, /DATABASE_URL|Bearer\s|api[_-]?key/i);

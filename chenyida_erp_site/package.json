@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.43",
+  "version": "0.1.0-alpha.44",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -275,6 +275,11 @@
     "typecheck:ai-governance-evaluation": "tsc -p tsconfig.ai-governance-evaluation.json --pretty false",
     "test:ai-governance-evaluation": "node --experimental-strip-types --test --test-concurrency=1 tests/ai-governance-evaluation.test.mjs tests/ai-governance-evaluation-cli.test.mjs",
     "evaluate:ai-governance": "node --experimental-strip-types tools/ai-governance-evaluation/cli.ts",
+    "typecheck:ai-governance-suggestion": "tsc -p tsconfig.ai-governance-suggestion.json --pretty false",
+    "test:ai-governance-suggestion:unit": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-ai-governance-suggestion-unit.test.mjs tests/selfhost-ai-governance-suggestion-handler.test.mjs",
+    "test:ai-governance-suggestion:migration": "node --experimental-strip-types --test tests/selfhost-ai-governance-suggestion-migration-contract.test.mjs",
+    "test:ai-governance-suggestion:migration-upgrade": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-ai-governance-suggestion-migration-upgrade.test.mjs",
+    "test:ai-governance-suggestion:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-ai-governance-suggestion-postgres.test.mjs",
     "typecheck:standardization": "tsc -p tsconfig.material-standardization.json --pretty false",
     "test:standardization:unit": "node --experimental-strip-types --test tests/selfhost-material-standardization-unit.test.mjs",
     "test:standardization:handler": "node --experimental-strip-types --test tests/selfhost-material-standardization-handler.test.mjs",
