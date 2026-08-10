@@ -54,8 +54,9 @@ function schemaColumns(tableName) {
 }
 
 test("0035 journal and snapshot form the next immutable migration link", () => {
-  assert.equal(journal.entries.at(-1)?.idx, 35);
-  assert.equal(journal.entries.at(-1)?.tag, "0035_bom_material_governance");
+  const entry = journal.entries.find((candidate) => candidate.idx === 35);
+  assert.equal(entry?.idx, 35);
+  assert.equal(entry?.tag, "0035_bom_material_governance");
   assert.equal(snapshot.prevId, previousSnapshot.id);
   assert.match(snapshot.id, /^[0-9a-f-]{36}$/);
 });

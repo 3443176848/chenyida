@@ -26,7 +26,7 @@ const pool = new Pool({
   application_name: "rfq-traceability-fix22-migration-test",
 });
 const directory = new URL("../drizzle-postgres/", import.meta.url);
-const names = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();
+const names = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/.test(name) && Number(name.slice(0, 4)) <= 39).sort();
 const sources = new Map(await Promise.all(names.map(async (name) => [
   name,
   await readFile(new URL(name, directory), "utf8"),
@@ -512,8 +512,9 @@ test("0039 DDL collision rolls back every event expansion and keeps the legacy d
 
 test("schema, snapshot, and migration journal describe the same 0039 traceability model", { concurrency: false }, () => {
   assert.equal(snapshot0039.prevId, snapshot0038.id);
-  assert.equal(journal.entries.at(-1)?.idx, 39);
-  assert.equal(journal.entries.at(-1)?.tag, "0039_rfq_traceability");
+  const entry = journal.entries.find((candidate) => candidate.idx === 39);
+  assert.equal(entry?.idx, 39);
+  assert.equal(entry?.tag, "0039_rfq_traceability");
   const rfq = snapshot0039.tables["public.procurement_rfqs"];
   const event = snapshot0039.tables["public.procurement_sourcing_events"];
   const binding = snapshot0039.tables["public.procurement_rfq_supplier_line_mapping_bindings"];

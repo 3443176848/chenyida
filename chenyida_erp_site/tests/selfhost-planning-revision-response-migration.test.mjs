@@ -11,7 +11,7 @@ if (!databaseUrl || !/planning_revision_migration_test/i.test(databaseUrl)) {
 
 const pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "planning-revision-migration-test" });
 const directory = new URL("../drizzle-postgres/", import.meta.url);
-const names = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();
+const names = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/.test(name) && Number(name.slice(0, 4)) <= 37).sort();
 const sources = new Map(await Promise.all(names.map(async (name) => [name, await readFile(new URL(name, directory), "utf8")])));
 const checksum = (name) => createHash("sha256").update(sources.get(name)).digest("hex");
 const migration = sources.get("0037_project_planning_revision_response_lineage.sql");
@@ -96,8 +96,9 @@ test("0037 static schema, journal and immutable 0001-0036 checksums are aligned"
   assert.equal(names.at(-1), "0037_project_planning_revision_response_lineage.sql");
   const immutableDigest = createHash("sha256").update(names.slice(0, 36).map((name) => `${name}:${checksum(name)}\n`).join("")).digest("hex");
   assert.equal(immutableDigest, "fedf885f6b495281578ee38d773571a5a4480425af5e22cf30de02a9e73c63e5");
-  assert.equal(journal.entries.at(-1)?.idx, 37);
-  assert.equal(journal.entries.at(-1)?.tag, "0037_project_planning_revision_response_lineage");
+  const entry = journal.entries.find((candidate) => candidate.idx === 37);
+  assert.equal(entry?.idx, 37);
+  assert.equal(entry?.tag, "0037_project_planning_revision_response_lineage");
   assert.equal(snapshot37.prevId, snapshot36.id);
   for (const table of ["project_planning_revision_response_versions", "project_planning_revision_response_heads"]) {
     assert.ok(snapshot37.tables[`public.${table}`]);

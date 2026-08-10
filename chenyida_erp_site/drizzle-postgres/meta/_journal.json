@@ -281,6 +281,13 @@
       "when": 1786187951085,
       "tag": "0040_warehouse_receipt_readiness",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1786377930102,
+      "tag": "0041_ai_governance_suggestion_evidence",
+      "breakpoints": true
     }
   ]
 }
