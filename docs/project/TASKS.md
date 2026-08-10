@@ -13,9 +13,9 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-OPS-RECOVERY-FOUNDATION-39 | alpha.42三锚点恢复基础 | DOING | Codex（Git出站门禁、官方`gh`安装、设备认证、private仓库、治理提交、增量扫描、精确push和双远端验证）、项目负责人（GitHub设备授权及私有恢复锚点授权） | 2026-08-10 | — | SELFHOST-UAT-FIX-38、SELFHOST-LANDING-TASK01、D-108 | `DOING / PHASE_GIT_PRIVATE_REMOTE`。公开`origin`保持public且禁止接收内部历史；活动GitHub账号精确为`3443176848`，空private仓库`3443176848/chenyida-erp-recovery-private`已验证为0 branch/tag/release。当前仅建立Git恢复锚点；治理提交必须增量复扫后普通推送到精确private main，禁止force/tags/PR/历史改写。镜像远端和PostgreSQL/文件卷异机锚点继续待独立阶段，FIX38仍为NO UAT RECEIPT。见[任务文档](../tasks/SELFHOST-OPS-RECOVERY-FOUNDATION-39.md)及[D-108](DECISIONS.md#d-108-私有git恢复远端与alpha42三锚点恢复策略)。 |
+| SELFHOST-OPS-RECOVERY-FOUNDATION-39 | alpha.42三锚点恢复基础 | DOING | Codex（alpha.42镜像只读出站审计、GHCR准入治理、文档门禁、增量扫描和private Git精确同步）、项目负责人（GitHub设备授权、私有恢复锚点授权及后续GHCR凭据就绪确认） | 2026-08-10 | — | SELFHOST-UAT-FIX-38、SELFHOST-LANDING-TASK01、D-108、D-109 | `DOING / IMAGE_PREFLIGHT / GHCR_CREDENTIAL_REQUIRED`。D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`已复核；精确alpha.42镜像出站审计为0 confirmed/0 possible secret，一次性archive已清理且不是异机锚点。D-109固定候选`ghcr.io/3443176848/chenyida-erp-web`、唯一完整revision tag、private/no-latest/no-overwrite、最小`write:packages`classic PAT和push后按registry digest回拉合同；当前`TARGET EXISTENCE UNRESOLVED — CREDENTIAL REQUIRED`，没有docker login/tag/push。镜像远端及PostgreSQL/文件卷异机锚点仍未建立，FIX38继续NO UAT RECEIPT且非production ready。见[任务文档](../tasks/SELFHOST-OPS-RECOVERY-FOUNDATION-39.md)、[D-108](DECISIONS.md#d-108-私有git恢复远端与alpha42三锚点恢复策略)及[D-109](DECISIONS.md#d-109-私有ghcr镜像恢复锚点与最小凭据策略)。 |
 
-本任务不得扩展到镜像push、数据库/Volume备份上传、真实Receipt、quality、finance、production、Migration或生产部署。
+当前`IMAGE_PREFLIGHT`阶段不得扩展到镜像push、数据库/Volume备份上传、真实Receipt、quality、finance、production、Migration或生产部署。
 
 ## 已完成任务
 

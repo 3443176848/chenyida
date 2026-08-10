@@ -4,6 +4,15 @@
 
 ## 2026-08-10
 
+### SELFHOST-OPS-RECOVERY-FOUNDATION-39 - `docs: prepare private image recovery anchor`
+
+- 阶段纠偏：实际Git/GitHub状态证明前一治理提交`e1eff533eb7cb38d169f266bdf3a97b0d3dc7e71`已经普通推送到`recovery-private/main`，private仓库为`PRIVATE / ADMIN / main`且behind0/ahead0；D-108、总控、台账和状态统一改为`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`。公开`origin/main=39946f6b…5c0`、fetch/push URL、upstream、remote HEAD和public visibility保持不变。
+- 镜像审计：只读核验运行Web确实引用alpha.42完整Image ID`sha256:e7761e2c…f94964`，version/revision/task labels、`linux/amd64`、非root用户、Entrypoint/Cmd/port、88,679,975 bytes及最小runtime package全部匹配。config digest、linux/amd64 manifest digest、9层压缩blob/rootfs diff ID和SLSA provenance均逐项校验。
+- 一次性archive：唯一`mktemp`目录中只执行一次`docker image save`；archive为88,699,904 bytes、SHA-256`d7c78654…bea2`，15/15 OCI blob和全部layer digest匹配。该同机archive只用于审计，不是异机恢复锚点；审计后目录、archive、解包层、报告和扫描进程均精确清零。
+- 出站扫描：config/Env/history/OCI metadata及8,112个regular file/metadata record、266,026,785 bytes完成多规则扫描，结果`CONFIRMED_SECRET=0 / POSSIBLE_SECRET=0 / TEST_FIXTURE=10 / DOCUMENTATION_PLACEHOLDER=1 / FALSE_POSITIVE=566`。10个fixture以GnuTLS ELF内`crypto-selftests-pk.c`边界和`gnutls_pk_self_test`符号证明为算法自检向量；路径穿越、非法/逃逸link、层内重复路径和world-writable regular file均0。空npm配置、Debian公共keyring/安装日志及source map/TypeScript/test运行残留已列为后续镜像最小化风险，没有业务原始文件或凭据。
+- D-109：候选private目标固定为`ghcr.io/3443176848/chenyida-erp-web`，唯一计划tag为`0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`；禁止latest、覆盖未知package/tag、上传回退或被拒镜像。当前`TARGET EXISTENCE UNRESOLVED — CREDENTIAL REQUIRED`；后续只接受任务外安全准备的最小`write:packages` classic PAT，认证后复核private visibility，push后按实际registry digest回拉验证。
+- 门禁/边界：仅六份Markdown，`RELEASES.md`不变；diff、48个本地链接、标题/唯一`DOING`、敏感信息通过。既有Node镜像在断网、源码只读、1 CPU、1,280 MiB、串行条件下完成lint 0 error/0 warning和UI contract 6/6，两个临时容器清零。独立提交增量扫描为0 confirmed/0 possible后只把精确SHA普通推到private main。本阶段没有docker login/tag/push、build、UAT登录/API、数据库读写、Migration、备份恢复、部署或重启；结论为`ALPHA.42 IMAGE OUTBOUND REVIEW PASSED — GHCR CREDENTIAL REQUIRED / NO IMAGE PUSH`，任务继续`DOING`且PostgreSQL/文件卷异机锚点未开始。
+
 ### SELFHOST-OPS-RECOVERY-FOUNDATION-39 - `docs: define alpha42 recovery foundation`
 
 - 决策/范围：新增D-108和任务文档，把alpha.42恢复基础拆为Git、容器镜像、PostgreSQL dump+文件卷三个独立锚点；当前只执行Git private remote阶段并保持任务`DOING`。恢复remote不是release，不修改`RELEASES.md`，也不授权UAT、业务写、Migration、build、Compose、数据库/Volume操作或生产动作。

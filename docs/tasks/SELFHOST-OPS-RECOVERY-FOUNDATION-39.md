@@ -2,102 +2,137 @@
 
 ## 任务状态
 
-`DOING / PHASE_GIT_PRIVATE_REMOTE`
+`DOING / IMAGE_PREFLIGHT / GHCR_CREDENTIAL_REQUIRED`
 
-本任务只建立 alpha.42 恢复基础。当前阶段只处理 Git 私有恢复锚点；容器镜像远端锚点和 PostgreSQL/文件卷异机恢复锚点保持待办，不因 Git 推送成功而自动开始或宣称完成。
+阶段判定：`ALPHA.42 IMAGE OUTBOUND REVIEW PASSED — GHCR CREDENTIAL REQUIRED / NO IMAGE PUSH`
 
-## 授权与目标
-
-项目负责人于 2026-08-10 在前序 `GITHUB AUTHORIZATION BLOCKED` 结果后明确要求 Codex 协助配置。该授权允许：
-
-1. 按 GitHub CLI 官方 RPM 仓库为当前 OpenCloudOS 9.4 主机安装 `gh`。
-2. 启动 GitHub 设备授权，由项目负责人在 GitHub 页面亲自完成一次授权。
-3. 只在认证身份精确为 `3443176848` 时创建空的 private 仓库 `3443176848/chenyida-erp-recovery-private`。
-4. 保留现有公开 `origin` 的 fetch URL、push URL、默认分支和 upstream，不向公开仓库推送内部历史。
-5. 对新增治理提交增量复扫后，以普通、非强制 push 将精确 `main` 提交写到新私有仓库的 `refs/heads/main`。
+Git 私有恢复锚点已经建立；本阶段只完成唯一 alpha.42 已验收 Web 镜像的出站审计和私有 GHCR 准入设计。没有登录 GHCR、创建或覆盖 package、创建镜像 tag、推送镜像，也没有把本地 Docker archive 称为异机恢复锚点。PostgreSQL dump 与文件卷异机锚点仍未开始，整个任务不得标记 `DONE` 或宣称 production ready。
 
 ## 严格起点
 
+### Git 与 GitHub
+
 - Branch：`main`
-- HEAD：`acdf1de0364e04aef2a860b3ff1148469d978db7`
-- Parent：`fc551c6571b57593a3232a14617935b3e3c3171f`
-- `origin/main`：`39946f6b854a985b5c19106eaa6c938bddaf9c7c`
-- ahead / behind：`186 / 0`
-- 工作树及索引：clean
-- Worktree：仅 `/opt/erp`
-- 公开 `origin` fetch：`https://github.com/3443176848/chenyida.git`
-- 公开 `origin` push：`git@github.com:3443176848/chenyida.git`
-- 新目标匿名 API 预检：HTTP 404；认证后必须再次确认仓库确实不存在
-- 主机：OpenCloudOS 9.4 / x86_64；起点 `gh` 未安装
-- 运行面沿用 FIX38：alpha.42 Web、40/head0040、四服务 restart 0/OOM false、四个受保护 Volume 完整；本阶段不登录或操作 UAT
+- HEAD：`e1eff533eb7cb38d169f266bdf3a97b0d3dc7e71`
+- Parent：`acdf1de0364e04aef2a860b3ff1148469d978db7`
+- 工作树及索引：clean；唯一 worktree：`/opt/erp`
+- public `origin/main`：`39946f6b854a985b5c19106eaa6c938bddaf9c7c`；相对 public 为 behind `0` / ahead `187`
+- `recovery-private/main`：`e1eff533eb7cb38d169f266bdf3a97b0d3dc7e71`；相对 private 为 behind `0` / ahead `0`
+- `recovery-private`：`3443176848/chenyida-erp-recovery-private`，认证元数据为 `PRIVATE / ADMIN / main / non-fork / active`
+- 活动 GitHub 账号：`3443176848`
+- public `origin` 保持 HTTPS fetch `https://github.com/3443176848/chenyida.git`、SSH push `git@github.com:3443176848/chenyida.git`、upstream `origin/main`、remote HEAD `refs/remotes/origin/main` 和 public visibility 不变
 
-## 当前阶段进度
+这证明 D-108 的 Git 阶段在本次预检开始前已经达到 `GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`；不得重复创建仓库或重复初始化 Git 锚点。
 
-- GitHub CLI已从GitHub官方RPM仓库安装为`gh 2.97.0`；RPM签名使用已核对的官方主指纹`2C6106201985B60E6C7AC87323F3D4EA75716059`和`7F38BBB59D064DBCB3D84D725612B36462313325`。
-- 项目负责人已在GitHub设备页亲自完成授权；活动账号由`gh api user`证明为`3443176848`。
-- `gh`报告当前主机没有可用系统密钥环，认证材料按其Linux回退保存在root配置中；只核对`/root/.config/gh/hosts.yml`元数据为`root:root / 0600`，未读取或输出正文。
-- `3443176848/chenyida-erp-recovery-private`已创建；认证元数据证明`PRIVATE / ADMIN / non-fork / size 0`，创建后为0 branch、0 tag、0 release。
-- 公开`3443176848/chenyida`继续为`PUBLIC / ADMIN / main`，本地`origin`尚未改变；`recovery-private`将在治理提交及增量复扫通过后才添加。
-- 文档门禁已通过：47个本地Markdown链接无断链、任务/D-108标题各唯一、TASKS仅本任务一个`DOING`、`RELEASES.md`未修改、`git diff --check`通过；断网、源码只读、1 CPU容器中的lint为0 error/11条既有warning，已完整检查为纯本地读文件的UI contract为6/6。
+### 运行面与资源
 
-## 固定远端与推送合同
+- Web 容器完整 ID：`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`
+- Web 容器实际引用完整 Image ID：`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`
+- 当前本地候选 tag：`chenyida-erp-parallel-web:0.1.0-alpha.42-fix38-569aa95`
+- 版本 / source revision：`0.1.0-alpha.42` / `569aa954d764309e239d1f6c174e582596d33a24`
+- alpha.41 回退镜像保持 `sha256:0cf98937f3ae28fe68e84436ab85c12ef5e8922f50a04973641cb79b8a0d5f19`
+- 被拒候选保持 `sha256:81126136c63714be2a53812b3512549ed1fa4eb9deb7c8c6462b715eafe4278e`，仍为 `REJECTED — DO NOT DEPLOY / DO NOT PUSH`
+- PostgreSQL、Worker、Caddy、Web 均运行；Web/PostgreSQL healthy；四服务 `RestartCount=0`、`OOMKilled=false`
+- `chenyida-erp-parallel_erp_postgres`、`chenyida-erp-parallel_erp_uploads`、`chenyida-erp-parallel_erp_attachments`、`chenyida-erp-parallel_erp_backup_status` 四个受保护 Volume 全部存在
+- 起点资源约为 available memory `2.2 GiB`、Swap `321 MiB / 1.0 GiB`、根分区可用 `17 GiB`、Load `0.14 / 0.18 / 0.15`；均未触发停止阈值，内核启动期 OOM 计数为 `0`
 
-- 私有仓库：`3443176848/chenyida-erp-recovery-private`
-- 本地 remote：`recovery-private`
-- 目标分支：`refs/heads/main`
-- 创建方式：空仓库，不初始化 README、license、`.gitignore`、release 或其他分支
-- 可见性：必须由认证后的 GitHub 元数据证明为 `PRIVATE`
-- 推送方式：`<精确完整提交>:refs/heads/main`，不使用 `--force`、`--force-with-lease`、`--mirror`、`--all`、`--tags` 或 `-u`
-- 公开 `origin`：URL、push URL、remote HEAD、upstream 和远端 main 必须前后完全一致
-- 不创建 PR，不改写历史，不 rebase、amend、reset、stash 或 restore
+## 镜像身份与 OCI metadata
 
-## 身份与秘密边界
+只审计上述精确 Image ID，没有 build、pull、tag 或 push：
 
-- 认证必须使用 `gh auth login --web` 的设备授权；项目负责人亲自在 GitHub 页面确认。
-- 不要求用户在聊天、命令行参数或仓库文件中粘贴 Personal Access Token。
-- 不读取、输出、复制或提交 GitHub 令牌；不得运行会显示 token 的命令。
-- `gh auth status` 必须证明活动账号精确为 `3443176848`；账号不匹配立即停止。
-- 认证成功后再次查询目标仓库；若已存在、可见性不明或不是 private，立即停止，不删除或改名任何仓库。
+| 项目 | 审计值 |
+| --- | --- |
+| 本地 Docker Image ID / OCI image index digest | `sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964` |
+| 本地 `linux/amd64` manifest digest | `sha256:36fd3118a4725aa8546ca28d1f21fe53ca472e81da4d0febff576ba88e4b482f` |
+| config digest | `sha256:72452032dfdec71e55376a511ec762aeb5265f758f257a5b6c858b76372732c7` |
+| Docker inspect size | `88,679,975 bytes` |
+| 创建时间 | `2026-08-09T21:11:11.69732358+08:00` |
+| OS / architecture | `linux / amd64` |
+| Entrypoint / Cmd | `docker-entrypoint.sh` / `node server.js` |
+| User / Workdir / Port | `node` / `/app` / `3000/tcp` |
+| Image Healthcheck | 无；运行服务 healthcheck 由 Compose 提供 |
+| OCI labels | `version=0.1.0-alpha.42`、`revision=569aa954d764309e239d1f6c174e582596d33a24`、`task=SELFHOST-UAT-FIX-38` |
+| `/app/package.json` | 仅 `name/private/type/version`；`chenyida-erp-selfhosted`、private、module、`0.1.0-alpha.42`；SHA-256 `a2f4565e12cfc982ad9e5ef3e6868db9023fd7ad32e0b1c8e271aa3bcbf47c60` |
+| provenance | 额外 in-toto/SLSA v1 attestation manifest `sha256:f4a82ba3ef6234037ff270c38685adeed3374db341376a8ac95652ff0cd4621b`；其 config 与 layer digest 也完成摘要验证和秘密扫描 |
 
-## 执行顺序
+本地 Image ID、保存 archive 的 SHA-256、config digest、layer digest 和未来 GHCR registry manifest digest 是不同身份。当前没有产生 GHCR registry digest；后续只能以实际 push 返回并经远端查询确认的 digest 记录恢复身份。
 
-1. 复核 Git、远端、资源、服务和受保护 Volume 基线。
-2. 建立本任务文档和 D-108，保持任务为唯一 `DOING`。
-3. 从 GitHub CLI 官方 RPM 仓库安装 `gh`，核对包签名来源和版本。（已完成）
-4. 完成设备授权并核对活动账号。（已完成）
-5. 认证后确认目标仓库不存在，再创建空 private 仓库并复核 owner、visibility、权限和空分支状态。（已完成）
-6. 更新 `MASTER.md`、`TASKS.md`、`CHANGELOG.md` 和 `STATUS.md`，形成独立提交 `docs: define alpha42 recovery foundation`。
-7. 仅对新增提交做增量敏感信息、禁止路径、提交对象和 diff 检查；任一确认或可能秘密立即停止。
-8. 添加 `recovery-private` HTTPS remote，不改变 `origin`，把精确新 HEAD 普通推送到私有 `main`。
-9. 以 GitHub 元数据和 `git ls-remote` 验证私有 `main` 精确等于本地 HEAD；再次证明公开 `origin/main` 未变化。
+## Config、Env 与 history 审计
 
-## 停止条件
+- `Config.Env` 仅记录 6 个变量名：`PATH`、`NODE_VERSION`、`YARN_VERSION`、`NODE_ENV`、`PORT`、`HOSTNAME`；不在文档输出值正文。
+- config history `17` 条，其中 `8` 条 empty layer；Docker history 同步扫描 `17` 条。
+- config、labels、Env、history、OCI metadata 和 provenance 中密码、Token/API Key、带凭据数据库 URL、Cookie/Session、Docker auth、私钥、Bearer/JWT、构建凭据的 `CONFIRMED_SECRET=0`、`POSSIBLE_SECRET=0`。
+- 审计只记录分类、计数和安全元数据，没有输出任何扫描命中正文。
 
-出现以下任一情况必须停止，不得创建仓库或推送：
+## 一次性 archive 与 layer 摘要
 
-- Git 起点、工作区、worktree、公开 origin 或 ahead/behind 不匹配。
-- GitHub 活动账号不是 `3443176848`，或认证权限不足。
-- 目标仓库已存在、名称冲突、创建结果不是 private，或默认权限/所有者不匹配。
-- 新提交扫描出现 `CONFIRMED_SECRET` 或 `POSSIBLE_SECRET`。
-- 推送需要强制、历史改写、删除、覆盖非空远端分支或修改公开 origin。
-- available memory 小于 768 MiB、Swap 使用率超过 80%、根盘可用小于 10 GiB、持续高 Load、OOM、容器重启或数据库失去健康。
+在 `mktemp` 创建的唯一目录 `/var/tmp/alpha42-image-preflight.vOgaG7E0` 中只执行一次 `docker image save`：
 
-## 明确排除
+- archive：`alpha42-image.tar`，`88,699,904 bytes`，`root:root / 0600`
+- archive SHA-256：`d7c78654ee422421a3f38527794145c84b6cc2f04039b63501a7a2a819a9bea2`
+- Docker 兼容 `manifest.json` SHA-256：`9faf2dfe099a9410ba8900292d7aea5f188dcd55464af05734c2c068b999d3f4`
+- OCI blobs：`15/15` 摘要匹配；9 个 rootfs diff ID 与各层解压 SHA-256 逐项匹配；所有层为 gzip，whiteout 为 `0`
+- 去敏审计报告 SHA-256：`eb569187c74e112032df8cd431c36c6f810da578e58b97d8c4dc781113a550f2`
 
-- 不向公开 `3443176848/chenyida` 推送。
-- 不把私有恢复仓库改为 public，不公开内部文档、UAT 标识、主机路径、网络、容器或备份拓扑。
-- 不推送容器镜像，不创建 registry、release、package、tag、PR 或 GitHub Actions secret。
-- 不创建或复制 PostgreSQL dump、Volume 归档或异机备份。
-- 不登录 UAT，不调用业务 API，不写数据库，不运行 Migration、build、测试数据库、Compose、部署或服务重启。
-- 不修改 `RELEASES.md`；Git 锚点不是产品发布。
-- 不修改 Swap、dockerd、内核、防火墙或 systemd。
+| 层 | compressed blob SHA-256 | compressed bytes | uncompressed diff ID SHA-256 | uncompressed bytes |
+| --- | --- | ---: | --- | ---: |
+| 1 | `039e6f9f9752f74a3ff4a6a224f64c7c864da16ed98f882107704328f41b9c42` | 28,232,590 | `66462cc862fe2053b9863fefa3866e07bb5dfb06f6b3ce3177cc096e4021aabe` | 77,895,680 |
+| 2 | `5404bc2cc13c8aefe11c6d1d4bc40a30e07879b45d93b485c1d72317488d3b04` | 3,311 | `971f4222c89e76e28d9b107cb29729a5abb9fd7adea0d4a1c419ce9b73204feb` | 21,504 |
+| 3 | `555d3507458376894ba4e9c5ea63da2b3d9dd3e9765e756483d94438eb840440` | 49,937,716 | `d84f419161f986391e64d28f3e40dd54381ea37495b0a25daef6353bd8df4d92` | 147,570,176 |
+| 4 | `8f99eb9866f3244aac3800fb9f992ecc69aef9894d3d0c29be5b09c4ae0e40e5` | 1,712,643 | `a45e8410aa35d5194fcdeb7f7969789ac3cc9431d5b69be8602492a2097909d7` | 7,214,592 |
+| 5 | `c0ed9f2d0e0e040af91270b0d33de349f4769825f106751ed52d7105fd1870bf` | 445 | `a8a755e4d6c4443f2aa3d52c6581a3253c71013f240d1a02edd519c317a66c4b` | 3,584 |
+| 6 | `6e0d99882c1df156ee50066b615827c1dedfc3adb35d2e0a6092e9028f28f53a` | 93 | `63d47df84155af5870167263d48f815a83567a3b33e4617c8d237d37e215da22` | 1,536 |
+| 7 | `c59c3a2d8e7edd31718b2536bfe02a62e4d589f4ca0be8986c953604ace0fb42` | 8,781,137 | `b2159d31e17b3d940f362f74dc6d3bad6b69d2e74a53e589834353196f05f48a` | 40,607,744 |
+| 8 | `b6916f863d3b65f90d7eb3ae4f72f3800be778c6b4df248e0b45c47bb4de0dea` | 226 | `7c76856cb4566d45d73ca91b22e414eb6d03fd4ae3922750b59c3101e3b96188` | 2,560 |
+| 9 | `be0fd3ae581bca3c603831dd9c1f70f9fabf99c0e22f177c42e094d3d6c82cfd` | 170 | `5bb9b7283b0f6f95245a86113537f7ce3db682673b7d4617987d1bd65ffa3b14` | 3,072 |
 
-## 本阶段验收标准
+该 archive 从未离开本机，也没有作为备份保留，因此明确 **不是异机镜像恢复锚点**。
 
-- `gh` 由 GitHub CLI 官方 RPM 仓库安装且可执行。
-- GitHub 活动账号精确为 `3443176848`，认证过程没有令牌泄漏。
-- `3443176848/chenyida-erp-recovery-private` 已创建且认证后元数据为 private。
-- 独立治理提交通过 diff、链接、敏感信息和增量历史检查。
-- `recovery-private/main` 精确等于本地最终 HEAD；公开 `origin/main` 仍为起点 SHA，公开 remote 配置不变。
-- 工作区最终 clean；UAT、数据库、镜像、服务和受保护 Volume 未被本阶段改变。
-- 任务仍为 `DOING`：只关闭 Git 单机恢复风险，镜像远端和数据库/文件卷异机恢复风险继续开放。
+## layer 路径、文件类型与秘密分类
+
+- 扫描 `8,112` 个 regular file/metadata record、`266,026,785` bytes；可读文本 `6,444`、二进制 `1,668`。
+- 最终文件系统共 `9,823` 个路径：regular `8,068`、directory `1,239`、symlink `514`、hardlink `2`。
+- 安全结构：路径穿越 `0`、层内重复路径 `0`、逃逸或非法 link `0`、world-writable regular file `0`；记录 `476` 个安全相对 symlink、`40` 个容器根内绝对 symlink 和 `13` 个基础系统 setuid/setgid 路径。
+- 敏感内容分类：`CONFIRMED_SECRET=0`、`POSSIBLE_SECRET=0`、`TEST_FIXTURE=10`、`DOCUMENTATION_PLACEHOLDER=1`、`FALSE_POSITIVE=566`。
+- 10 个 fixture 均位于 Debian GnuTLS ELF `usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3` 的 `crypto-selftests-pk.c` 已知答案自检区；以精确库路径、ELF magic、自检源码边界、`known-sig self test` 和 `gnutls_pk_self_test` 符号证明，不使用宽泛路径白名单。
+- documentation placeholder 为依赖文档中的通用赋值示例；566 个 false positive 为 Git/SHA 摘要或依赖代码标识符，均没有按正文输出。
+- Docker auth、SSH key、PEM/P12/PFX/私钥文件、数据库/dump/业务备份、浏览器 Profile/Cookie/Session、上传/附件/客户或供应商原始文件的最终 regular file 均为 `0`。
+- 唯一 `.npmrc` 为 npm 运行时的 `0 byte` 文件；11 个 `.gpg` 为 Debian 公共包信任 keyring；最终 4 个日志、合计 `113,590 bytes`，只属于 apt/dpkg 安装记录且秘密扫描为 0。
+- 运行镜像仍含 `4,888` 个 `node_modules` 路径、`516` 个 source map、`524` 个 `.d.ts`、`60` 个 `.ts` 和 `32` 个 test/fixture 路径；没有业务原始数据或凭据，但作为后续镜像瘦身/最小化风险保留，不在本 docs-only 任务修改镜像。
+
+## 私有 GHCR 准入决定
+
+D-109 固定以下合同：
+
+- 候选目标：`ghcr.io/3443176848/chenyida-erp-web`
+- 唯一计划 immutable-intent tag：`0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`
+- 不使用或推送 `latest`；不上传 alpha.41 回退镜像或被拒候选
+- package 必须保持 private；不创建或覆盖任何已知/未知 package 或 tag
+- 目标存在性：`TARGET EXISTENCE UNRESOLVED — CREDENTIAL REQUIRED`
+- 实际 push 前必须另获 `GHCR CREDENTIAL READY` 明确确认，并在认证视图中重新确认目标 package/tag 和 visibility；匿名不可见或 404 不能证明目标不存在
+- GitHub CLI 的 GHCR 命令行认证权威要求 Personal Access Token (classic)；上传只需要 `write:packages`，不需要也不允许 `delete:packages`
+- PAT 不得进入聊天、日志、Git、remote URL、Docker 认证正文输出或命令参数；本阶段不读取现有 GitHub token，也不把 `gh auth token` 当作 GHCR 凭据
+- 后续 push 成功后必须记录实际 GHCR registry manifest digest，并按该 registry digest 从 private package 拉取验证；本地 Image ID 或本地 archive SHA 不能代替 registry digest
+
+本阶段没有 package-scoped 凭据，因此没有执行 `docker login`、`docker tag` 或 `docker push`，也没有创建 package、release、Git tag、PR、Actions secret 或 Docker auth 文件。
+
+## 临时资源清理
+
+- 完成审计并固化去敏摘要后，精确删除 `/var/tmp/alpha42-image-preflight.vOgaG7E0`。
+- 复核 task directory、archive、解包 layer 和报告路径均不存在；匹配 `scan_image.py` 的 Python 进程为 `0`。
+- 没有删除任何镜像、镜像 tag、容器、网络或 Volume，没有执行任何 prune。
+
+## 文档、测试与 Git 收口
+
+- 只修改任务文档、`DECISIONS.md`、`MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md` 六份 Markdown；`RELEASES.md` 不变。
+- 运行 `git diff --check`、本地 Markdown 链接、任务/D-109 唯一性、唯一 `DOING`、精确文件范围和敏感信息门禁。
+- 文档-only 验证使用既有`node:22-bookworm-slim`镜像，断网、源码只读、1 CPU、1,280 MiB内存硬上限、Node heap 1,024 MiB且串行运行；`npm run lint`为0 error/0 warning，`tests/selfhost-procurement-fulfillment-ui-contract.test.mjs`为6/6。两个`--rm`容器均清零，不安装依赖、不连接数据库。
+- 独立提交消息固定为 `docs: prepare private image recovery anchor`。提交增量复扫只有 `CONFIRMED_SECRET=0 / POSSIBLE_SECRET=0` 才允许把精确完整 SHA 普通推送到 `recovery-private/main`。
+- 推送不使用 force、tags、mirror、all、`-u`，不向 public `origin` 推送；最终必须证明 private main 等于最终本地 HEAD，public `origin/main` 仍为 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`。
+
+## 明确边界与下一解除条件
+
+- 本阶段未登录 UAT、未调用业务 API、未读取或写入业务数据库、未运行 Migration、未备份或恢复、未 build、未部署、未重启服务、未推送镜像。
+- FIX38 继续为非生产 alpha.42 / 0040 / `NO UAT RECEIPT`；本任务继续 `DOING`。
+- PostgreSQL 与文件卷异机恢复锚点未开始；镜像远端恢复锚点也尚未建立。
+- 下一解除条件：项目负责人在本任务外安全创建仅含 `write:packages` 的 classic PAT，并以不进入聊天、日志、Git 或命令参数的方式完成 `ghcr.io` Docker 登录，再启动独立镜像 push 阶段。该阶段仍须先验证 package/tag 不冲突且保持 private，push 后按 registry digest 拉取验证。
