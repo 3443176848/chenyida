@@ -33,10 +33,11 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-08-10（Asia/Shanghai）
+快照时间：2026-08-11（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
+| 多智能体研发治理 | `PM-001`正式治理任务已完成，设计固定24个逻辑角色、能力型权限、Task Packet、三层状态、可恢复循环、ERP业务闭环和Migration/数据/权限/历史保护门禁。owner优先级切换按`PHASE4-TASK03 DOING→BLOCKED`、`PM-001 TODO→DOING→DONE`、`PHASE4-TASK03 BLOCKED→DOING`顺序记录，最终仍只有TASK03为DOING。控制面实现仍为`NOT_STARTED`，D-113为`PROPOSED` |
 | 当前版本 | AI Suggestion/Evidence源码候选为`0.1.0-alpha.44`，源码Migration为41/head `0041_ai_governance_suggestion_evidence.sql`；并行非生产UAT Web仍为`0.1.0-alpha.42`原镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，运行source revision仍为`569aa954d764309e239d1f6c174e582596d33a24`，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。alpha.44/0041未build、未部署或应用到UAT；当前运行面仍是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
@@ -57,6 +58,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- PM-001已交付[晨亿达ERP多智能体研发系统设计](../AI_AGENT_TEAM_DESIGN.md)：以唯一正式任务、最小能力、单一写者、隔离验证、独立否决和人工发布为原则，定义24个逻辑角色、权限矩阵、Task Packet、状态/知识/Bug/技术债模型、租约/心跳/fencing与低资源循环。该治理任务已按单一任务切换链收口；控制器、Policy Engine、Capability Broker、独立Agent身份和UAT/生产能力均未实现
 
 - PHASE4-TASK03已完成D-112第二阶段源码实施：[五表合同](../material-master/ai-suggestion-evidence-relational-v1.md)以alpha.44/0041、Schema/snapshot/journal和独立`LOCAL_DETERMINISTIC`模块落地，四能力安全`ABSTAIN`、稳定摘要、单事务候选/Audit/幂等、版本/SUPERSEDED、服务端过期/漂移及受保护POST/GET通过隔离测试。任务保持`DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`；正式holdout、build、部署、UAT Migration、人工审核、模型和试点均未开始
 
@@ -232,6 +235,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前未完成模块
 
+- PM-001只完成控制面设计；R1只读控制器、R2隔离身份/路径租约/能力代理、R3有界开发循环、R4受控UAT和R5生产候选均未实施，且必须先排队成为唯一正式任务，不得从路线表自动开始
 - PostgreSQL dump与uploads、attachments、backup-status文件卷的异机数据恢复锚点没有建立；TASK39已由项目负责人主动延期并行政关闭，单机数据恢复风险继续`OPEN`，未来必须重新立项和授权
 - 大批量流程的通用批次执行器、来源档案注册表、init/resume/validate/consolidate 命令和代表性试点尚未实现；当前 TASK07 脚本只能作为已知 8 份来源的参考，不得直接宣称支持所有公司资料
 - LANDING-TASK07 工作簿仍有 57 行单机用量和 21 行板型待人工补充，A200 4 处模板/旧版差异与 J587 标题版本冲突待业务确认；正式去重、内部编码、审核、数据库导入和下游 BOM 引用均未执行
@@ -253,6 +257,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前风险
 
+- D-113仍为`PROPOSED / DESIGN BASELINE / IMPLEMENTATION NOT STARTED`。在控制面通过越权、脑裂、租约失效、资源和恢复负测前，角色权限仍依赖现有仓库规则与人工流程，不能宣称已由OS、容器、命令代理或短时凭据技术强制
 - Git与private GHCR镜像锚点已建立，但PostgreSQL dump及uploads、attachments、backup-status异机锚点仍不存在；TASK39的行政关闭不消除该单机数据恢复风险，也不代表production ready
 - D-110关闭AI治理规格缺口，D-111只批准当前冻结本地确定性基线阈值，D-112只接受AI Suggestion/Evidence关系化合同；三者都不代表外部模型质量、供应商、隐私、地域、合同、凭据、真实数据、实现或试点获批。外部AI及候选层实现继续禁用，TASK03实施阶段与TASK04—TASK05仍须独立授权和验收
 - UAT 临时 manager 已通过页面停用且未用于业务试用。首次浏览器验收脚本在停用后的刷新检查处提前结束，遗留一个已丢失令牌、等待正常 8 小时 TTL 的会话；按不可变审计和禁止直接 SQL 删除边界保留。两个目标 logout 与完整复验的旧 Session 均已立即撤销，不得把该脚本残留误述为 logout 失败。
@@ -312,6 +317,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
+- `PM-001`已按owner优先级顺序完成并恢复`PHASE4-TASK03`为唯一DOING；它没有与TASK03并行执行。控制面后续R1～R5必须分别排队立项并取得唯一active task slot，本文不授权自动执行。
 - `PHASE4-TASK03`是唯一`DOING`，D-112五表及确定性候选Service/API已在alpha.44/0041源码实现并通过隔离验证，状态为`DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。`PHASE4-TASK01`已按D-110完成治理基线，`PHASE4-TASK02`已由D-111收口为`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`；外部AI禁用，正式holdout未重跑，源码未build/deploy，UAT仍alpha.42/0040，`PHASE4-TASK04`—`TASK05`保持`TODO`且不得自动开始。
 - `SELFHOST-UAT-FIX-37`已完成：功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`及语义修正`20a9123741862d81ac18af9e6bdee896674fe95c`；alpha.41/0040关系化收货证据、最小权限谱系、权威GET预览、最终POST事务门禁、提前到货保护和按inspection mode分流已Web-only部署为`sha256:0cf98937…5f19`。正式备份/第二库恢复/0039→0040及warehouse-only桌面/390×844取消UAT通过；business POST0、Session0，PO/Line/Plan/queue `1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。这是FIX38前置历史；真实收货及后续部门动作均须另获授权。
 - `SELFHOST-UAT-FIX-36`已完成：功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`；通用受限读模型、数据域403、PO聚合及完整上游谱系、四Line、四Plan/queue、Event/Audit/Idempotency最小投影和响应式只读详情已Web-only部署为`sha256:664e0ac6…a4ec89`。正式备份恢复、purchase-only桌面/390×844刷新重开和Session失效通过；business POST0，PO/Line/Plan/queue `1/4/4/4`及下游全0。这是FIX37的前置历史，不是当前执行指令。

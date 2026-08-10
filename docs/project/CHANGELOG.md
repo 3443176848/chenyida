@@ -2,6 +2,19 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-11
+
+### PM-001 - `docs: design ERP multi-agent development system`
+
+- 设计：新增[晨亿达ERP多智能体研发系统设计](../AI_AGENT_TEAM_DESIGN.md)，不是通用Agent模板；绑定自托管Node/PostgreSQL唯一生产方向、Python/SQLite与历史Sites/D1边界、当前alpha.44/0041源码和alpha.42/0040 UAT差异、受控PO零下游及`PHASE4-TASK03`发布未授权事实。
+- 角色/权限：定义24个逻辑角色，把Planning、Production、Warehouse和Quality职责分开，覆盖ERP CTO/PM、业务领域、架构/数据库/前后端、QA、安全、独立代码/DB审查、用户模拟、数据迁移、AI治理和Release/SRE；以细粒度capability、精确SHA/对象/次数/时限、独立worktree/身份和默认拒绝替代Prompt权限，UAT默认无连接，生产和真实资料当前全部拒绝。
+- 流程/状态：定义G0—G10门禁、单一active task slot和单一写者、Task Packet、TASKS四态/交付阶段/工作项运行态分离、Git TASKS blob与SQLite slot的PREPARED→状态Commit→COMMITTED两阶段协议、知识权威、Bug/技术债，以及lease token/version、hard deadline、fencing、修复预算、PARKED事件唤醒、完整检查点、全局heavy锁与DONE/BLOCKED停止条件；状态分歧全局失败关闭，禁止忙循环或自动启动下一任务。
+- ERP门禁：显式固定Migration不可破坏、生产数据安全、服务端权限优先、业务闭环优先和历史逻辑禁止删除；补齐Material、BOM/工艺准确状态、计划提交时不可变PR→Purchase接收→RFQ→Award→PO、Receipt→IQC→AP、Planning Handoff→Production→IPQC→Warehouse Completion、返工复检、SO→FQC→Shipment→AR和冲销链路。
+- 决策/边界：提出D-113，状态为`PROPOSED / DESIGN BASELINE / IMPLEMENTATION NOT STARTED`。owner优先级按`PHASE4-TASK03 DOING→BLOCKED`、`PM-001 TODO→DOING→DONE`、`PHASE4-TASK03 BLOCKED→DOING`顺序切换，无并行DOING；控制器、Agent Runtime、OS/容器隔离和Capability Broker均未实现。TASK03产品阶段、holdout和release门禁不变；用户输入`ERP_CURRENT_STATUS_REPORT.md`保持未跟踪且不纳入提交。
+- 影响：只新增/更新六份治理Markdown；未改业务/测试代码、package、Schema/Migration、API、版本或部署配置，未登录/调用UAT、读写数据库、build、deploy、restart、调用外部AI、读取真实资料或执行生产动作。
+- 验证：ERP业务、权限/安全、状态机/持续循环三项独立终审均PASS。Python self-test、仓库`.venv` smoke和18889 loopback `go_live_check --no-backup`通过；既有Node 22镜像在断网、源码只读、1 CPU/1,280 MiB/heap 768 MiB、串行临时容器中完成`npm test` 3/3与lint退出0。系统Python/npm和非特权容器首次环境探测分别因缺依赖/命令和root-owned源码EACCES未启动有效测试，未安装或修改环境；有效验证随后使用既有隔离运行时完成。
+- 资源/清理：起点/最终available `2.3/2.3 GiB`、Swap `354/354 MiB`、根盘`17/17 GiB`、Load `0.31/0.30/0.27`→`0.16/0.20/0.32`；内核OOM0，四服务restart0/OOM false。命名临时Node容器清零，未创建数据库/镜像/Volume或执行prune。
+
 ## 2026-08-10
 
 ### PHASE4-TASK03 - `feat: add AI suggestion evidence persistence` / `feat: add deterministic AI suggestion service` / `docs: record AI suggestion source readiness`

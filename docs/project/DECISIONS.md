@@ -1535,6 +1535,45 @@
 - 0041静态合同5/5、隔离Migration/约束7/7、Suggestion Unit/Handler 9/9、隔离Service 5/5、专项typecheck、0035回归61/61、TASK02 Evaluator17/17、`npm test`3/3和lint 0 error/11条既有warning通过；正式业务表写入为0，临时数据库/容器/目录已清理。
 - D-111身份、阈值、calibration、holdout、manifest、标签及机器报告均未修改，正式holdout没有重跑。因此alpha.44只是source ready；UAT仍为alpha.42/0040，0041未应用，未build、部署、调用模型或启动TASK04/TASK05。下一门禁是对alpha.44完整身份正式重验holdout并取得独立发布授权。
 
+## D-113 晨亿达ERP多智能体研发控制面采用单一任务、最小能力与可恢复有界循环
+
+- 日期：2026-08-11
+- 状态：`PROPOSED / DESIGN BASELINE / IMPLEMENTATION NOT STARTED`
+- 提案人：Codex（按`PM-001`设计要求形成提案；项目负责人是否接受及后续实施均待单独确认）
+
+### Context
+
+- 当前仓库同时保留自托管Node/PostgreSQL未来生产方向、Python/SQLite历史开发/迁移来源和历史Sites/D1证据，且`PHASE4-TASK03`仍是唯一`DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。通用Agent若不理解运行面、Migration、UAT受控PO、资源和业务交接，很容易把源码完成误报为发布或产生跨运行面重复逻辑。
+- Prompt中的“只读”“不部署”不能强制共享root Shell下的实际权限。并行实现者、测试库、Migration、状态文档、UAT写和低资源重任务必须由独立控制面防止覆盖、脑裂、重复副作用和生产越权。
+- 项目需要Agent在对话/进程结束后继续同一正式任务，但持续运行不能绕过人工决策、无限重试或自动开始下一任务。
+
+### Proposed decision
+
+1. `TASKS.md`继续只使用`TODO / DOING / DONE / BLOCKED`且同时最多一个正式`DOING`；交付阶段、qualifier和工作项运行态分层管理，不扩充台账状态语义。
+2. 每个正式任务建立版本化Task Packet，冻结Task ID、基线SHA、目标运行面、允许路径/动作、业务不变量、验收、风险、授权、资源、证据和退出条件。Packet改变会使受影响的旧测试、Agent审查和人工决定引用失效。
+3. Agent按24个逻辑角色启用最小集合，Planning、Production、Warehouse和Quality独立；业务/领域、数据库、安全、QA和代码审查拥有独立否决权。被审实现者不得兼任其独立审核者，批准绑定精确产品tree、Closure Docs Commit、最终SHA和Packet revision。
+4. 权限通过独立Unix/容器身份、只读或限定挂载、worktree、命令/秘密代理、网络策略、数据库指纹和短时capability强制；能力绑定Task、Agent、Role、产品tree/最终SHA、动作、对象、方法、次数和有效期。UAT metadata、业务读取和写入三权分离且默认无连接；普通Agent无Docker socket、privileged、生产、真实资料、秘密或部署能力。
+5. 同一时间只有一个路径/领域/Migration/状态文档写者；Git集成、Migration、共享测试库、Docker build、全量测试、备份恢复、Compose、UAT和发布串行，并以全局heavy锁遵守2核/4GiB/1GiB Swap保护。
+6. 外部控制器每轮只执行一个可验证的有界动作，使用lease token、版本、心跳、hard deadline、fencing epoch、CAS、幂等、追加事件、修复预算和完整检查点恢复。等待态释放租约并由事件唤醒；达到完成条件时DONE，出现人工/安全/数据/资源/恢复阻塞或预算耗尽时BLOCKED，不无限循环或自动开始下一任务。
+7. Git文档和Commit是长期项目权威，独立Control Store只保存去敏控制元数据、租约、事件和证据引用，不进入ERP PostgreSQL，也不保存秘密或业务正文；关键事件/授权/命令审计拒绝UPDATE/DELETE、形成哈希链并由独立身份外部只追加封存。
+8. 所有工作继续遵守运行面唯一、稳定内部ID、Migration不可破坏、生产数据默认拒绝、服务端权限优先、关键写单事务/幂等/CAS/审计、已过账事实只追加调整/冲销、业务闭环优先和历史逻辑禁止删除；旧逻辑只能停写、冻结、标记deprecated并追加替代版本。
+9. UAT业务写、Migration、真实资料、外部AI、备份恢复、部署、生产访问和发布必须由项目负责人对精确对象另行授权；生产能力采用互异人类批准集合与quorum，Agent PASS不计作人类批准。`UAT_ACCEPTED`不能自动发布，必须另有`RELEASE_AUTHORIZED`人工事件。
+10. Migration作者、持`DB_REVIEW`的独立审查者和共享/UAT/生产执行者必须三方互异；Integration为不能编辑文件或解决冲突的非Agent身份，只能把产品tree、Closure Docs Commit和最终tree身份已审的精确SHA fast-forward集成。
+11. Git中的`TASKS.md`与SQLite active slot使用PREPARED→精确状态Commit→COMMITTED两阶段协议；启动先RESERVED、Git确认后ACTIVE，结束先DRAINING、Git确认后释放。分支HEAD、TASKS blob、state commit或slot不一致时全局失败关闭，禁止任何Orchestrator认领工作项。
+
+### Consequences
+
+- [多智能体研发系统设计](../AI_AGENT_TEAM_DESIGN.md)成为后续R1只读控制器、R2隔离底座、R3有界开发循环、R4受控UAT和R5生产候选的提案基线；每一阶段必须另立任务、验收和授权。
+- `PM-001`按owner priority hold顺序成为唯一DOING并完成，随后恢复`PHASE4-TASK03`原DOING状态；无并行DOING。控制面实施状态保持`NOT_STARTED`，不能声称角色已被OS、容器、凭据代理或策略技术隔离。
+- 本提案不修改业务代码、Schema/Migration、API、测试、版本或部署配置，不授权holdout、build、UAT Migration、部署、生产、TASK04或TASK05，也不改变`PHASE4-TASK03`状态。
+
+### Rejected alternatives
+
+- 拒绝让多个Agent各自认领正式任务并直接并行写`main`，或依赖聊天记忆协调共享Migration、Service、测试数据库和项目状态文档。
+- 拒绝以Prompt、角色名或Agent自报PASS代替命令层权限、独立测试、人工授权、恢复点和审计。
+- 拒绝无限自循环、自动降低断言、盲目重试结果未知的写动作，或在当前Task完成后自动启动下一Task。
+- 拒绝把多智能体系统的运行状态、秘密或真实ERP业务数据写入项目PostgreSQL或发送给外部模型。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

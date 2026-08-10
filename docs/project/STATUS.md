@@ -1,6 +1,25 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-10（Asia/Shanghai）
+最后更新时间：2026-08-11（Asia/Shanghai）
+
+## PM-001 晨亿达ERP多智能体研发系统设计（治理任务完成，控制面未实施）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 最终状态 | DONE / DESIGN COMPLETE / IMPLEMENTATION NOT STARTED | 新增[系统设计](../AI_AGENT_TEAM_DESIGN.md)；PM-001正式治理任务完成，但Agent Control Plane、Runtime、Policy Engine、Capability Broker和独立执行身份均未实现或部署 |
+| 单一任务切换 | PASS / ORDERED | `PHASE4-TASK03 DOING→BLOCKED / OWNER_PRIORITY_HOLD`，随后`PM-001 TODO→DOING→DONE`，最后`PHASE4-TASK03 BLOCKED→DOING`；无并行DOING，TASK03期间没有产品工作项，恢复后原阶段/qualifier不变 |
+| 项目适配 | PASS / CHENYIDA ERP ONLY | 固定Node/PostgreSQL唯一生产方向、Python/SQLite迁移来源、历史Sites/D1证据边界、alpha.44/0041源码与alpha.42/0040 UAT分离、当前受控PO零下游事实和`PHASE4-TASK03`发布未授权状态 |
+| 角色体系 | 24 LOGICAL ROLES | ERP CTO、PM、状态、ERP业务、物料、BOM/工程、采购、仓库、Planning、生产、品质/返工、销售、财务、架构、数据库、前后端开发、QA、安全、代码/DB审查、用户模拟、数据迁移、AI治理和Release/SRE；实现者不得自审 |
+| 权限模型 | DEFAULT DENY / LEAST CAPABILITY | 定义代码/Migration/测试、UAT metadata/业务读/写、Git branch/commit/integrate/push、秘密/部署等分离能力；UAT默认无连接，普通Agent无Docker socket，生产及真实资料全部拒绝。批准集合、quorum、精确对象/SHA/次数/时限和独立`RELEASE_AUTHORIZED`事件由Broker强制 |
+| 工作流 | G0—G10 / HUMAN RELEASE | 需求→Task Packet→人工接受新业务决定→架构/DB/安全→单一写者→冻结产品tree→QA/安全/代码与DB Review/用户模拟→Closure Docs→最终身份Review→Integration精确fast-forward→独立人工UAT/发布授权；Migration作者/审查者/执行者三方分离 |
+| 状态/循环 | RECOVERABLE / BOUNDED | TASKS保持TODO/DOING/DONE/BLOCKED；Git TASKS blob与SQLite active slot以PREPARED→状态Commit→COMMITTED两阶段协议闭合，不一致全局失败关闭。lease token/version/fencing/hard deadline、CAS、修复预算、PARKED事件唤醒、完整检查点和全局heavy锁共同保护；每轮一个有界动作，DONE/BLOCKED终止且不自动启动下一任务 |
+| ERP硬门禁 | PASS / EXPLICIT | Migration不可破坏、生产数据默认拒绝、服务端权限优先、业务闭环优先、已过账事实只追加调整/冲销、历史逻辑不得删除且只能停写/冻结/废弃标记/追加替代；明确Material、BOM、采购、收货/IQC/AP、计划、生产、返工、销售/FQC/AR交接 |
+| 独立终审 | PASS / 3 OF 3 | ERP业务终审、权限/安全终审及状态机/持续循环终审均通过；终审前意见已补齐Planning/Production/Warehouse/Quality分工、真实单据状态、权限强制、三方Migration职责、等待/重试/恢复守卫和Git/Control Store两阶段状态协议 |
+| D-113 | PROPOSED / DESIGN BASELINE | 记录单一正式任务、最小能力、单一写者、隔离验证、独立否决和人工发布提案；项目负责人尚未将其接受为已实施控制面 |
+| Python基线 | PASS | 系统Python self-test为`SELF_TEST_OK`；仓库既有`.venv`执行smoke为`SMOKE_TEST_OK`，`go_live_check.py --host 127.0.0.1 --port 18889 --require-running --no-backup`为`GO_LIVE_CHECK_OK`。首次系统Python smoke因缺`openpyxl`未启动测试，未安装或修改环境 |
+| Node基线 | PASS / ISOLATED | 宿主无npm，使用既有`node:22-bookworm-slim`，断网、源码只读、1 CPU、1,280 MiB、heap 768 MiB、串行临时容器；`npm test` 3/3通过，lint退出0。非特权首次探测因root-owned源码EACCES未启动测试，随后以容器root只读挂载完成 |
+| 资源/清理 | PASS / NO THRESHOLD BREACH | 起点/最终available `2.3/2.3 GiB`，Swap `354/354 MiB`，根盘可用`17/17 GiB`，Load `0.31/0.30/0.27`→`0.16/0.20/0.32`；内核OOM匹配0，四服务restart0/OOM false。两个命名临时容器最终清零，未创建数据库/目录/镜像/Volume，未prune |
+| 变更边界 | DOCS ONLY / NO RUNTIME ACTION | 只新增设计并同步治理文档；`ERP_CURRENT_STATUS_REPORT.md`保持用户未跟踪输入且不纳入提交。未修改代码、测试、package、Schema/Migration、API、部署配置或业务数据，未登录/调用UAT、build、deploy、restart、外部AI或生产动作 |
 
 ## PHASE4-TASK03 AI Suggestion/Evidence候选层（源码就绪，待holdout重验）
 
