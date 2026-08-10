@@ -4,11 +4,11 @@
 
 本文件记录`PHASE4-TASK02`交付的静态合成/去敏评估集、离线确定性基线、指标合同和第一次冻结 holdout 实测结果。
 
-最终状态：`DOING / SOURCE_READY / HOLDOUT_MEASURED / THRESHOLD_DECISION_REQUIRED`
+最终状态：`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`
 
-最终判定：`PHASE4-TASK02 OFFLINE EVALUATOR SOURCE READY — HOLDOUT MEASURED / THRESHOLD DECISION REQUIRED`
+最终判定：`PHASE4-TASK02 OFFLINE EVALUATOR AND DETERMINISTIC THRESHOLDS ACCEPTED — RELEASE NOT AUTHORIZED`
 
-本交付只提供离线测量能力。它没有调用AI模型、接入外部服务、查询数据库、读取真实业务数据、创建Suggestion/Evidence候选层、批准阈值或授权发布。任何“准确率已通过”“production ready”或自动启动`PHASE4-TASK03`的解释都无效。
+本交付只提供离线测量能力；D-111后续仅批准当前冻结本地确定性基线的评估阈值。它没有调用AI模型、接入外部服务、查询数据库、读取真实业务数据、创建Suggestion/Evidence候选层或授权发布。任何“外部模型准确率已通过”“production ready”或自动启动`PHASE4-TASK03`的解释都无效。
 
 ## 数据集身份与完整性
 
@@ -140,9 +140,22 @@
 
 ## 阈值状态
 
-正式报告仍是：dataset integrity=`PASS`、critical safety gate=`PASS`、accuracy measurement=`MEASURED`、threshold status=`UNAPPROVED`、release decision=`NOT_AUTHORIZED`。
+正式机器报告生成时仍是：dataset integrity=`PASS`、critical safety gate=`PASS`、accuracy measurement=`MEASURED`、threshold status=`UNAPPROVED`、release decision=`NOT_AUTHORIZED`。D-111不修改该历史制品，而是在治理层追加`THRESHOLD_ASSESSMENT=PASS`；release decision继续为`NOT_AUTHORIZED`。
 
-本数据集是人为设计、静态、合成、规则语义覆盖集，样本量仅64；32/32 holdout结果不能证明真实业务分布、外部模型或未来漂移上的准确率。项目负责人仍须独立决定最低precision/recall、候选错误率、各能力coverage和分层门槛；若阈值决定需要新ADR，必须在后续独立阶段创建，当前不创建`D-111`。
+项目负责人通过D-111批准`deterministic-ai-governance-thresholds-v1`，且只绑定provider=`LOCAL_DETERMINISTIC`、model/prompt=`NONE/NONE`、rule=`bom-material-governance-v1`、evaluator=`ai-governance-evaluator-v1`、本数据集1.0.0和source revision `d69f6dff795377109244e788c2ffee73ef6194ec`：
+
+| 范围 | 批准阈值 |
+| --- | --- |
+| 数据、安全与通用正确性 | dataset integrity PASS；禁止数据、formal action、关键安全违规0；decision exact、evidence、stable reproduction、covered accuracy均1.000000 |
+| Classification | 已定义micro/macro P/R/F1及exact均1.000000；coverage ≥ 0.750000 |
+| Attribute Extraction | 已定义field P/R/F1、row exact、covered accuracy均1.000000；record coverage和field coverage均 ≥ 0.750000 |
+| Material Match | top-1/top-3与covered accuracy均1.000000；错误候选0；coverage ≥ 0.250000 |
+| Supplier Mapping | top-1/top-3与covered accuracy均1.000000；错误候选0；coverage ≥ 0.250000 |
+| Overall/分层 | overall coverage ≥ 0.500000；有样本分层decision exact/evidence均1.000000且安全违规0；零support保持undefined |
+
+当前calibration/holdout均满足全部门禁。较低的Match/Mapping coverage是对歧义和冲突的安全放弃，不得通过猜测提高；MECH、OTHER、UNKNOWN及其他零coverage层不获得支持声明。正式holdout未因D-111重跑，机器报告、Evaluator、数据集、标签、规则、测试和package均保持冻结。
+
+本数据集是人为设计、静态、合成、规则语义覆盖集，样本量仅64；32/32 holdout结果不能证明真实业务分布、外部模型或未来漂移上的准确率。任何外部模型、新数据集或版本变化仍须重新评估并由项目负责人独立批准，不能复用本决定自动放行。
 
 ## 运行与审阅
 

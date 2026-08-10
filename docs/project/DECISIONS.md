@@ -1437,6 +1437,44 @@
 - 拒绝把人工反馈直接用于在线学习、自动调参、自动修改规则或自动发布。
 - 拒绝让外部模型凭据、真实供应商/客户资料或生产正文进入本治理任务。
 
+## D-111 确定性AI治理评估阈值与TASK02收口
+
+- 日期：2026-08-10
+- 状态：`ACCEPTED / DETERMINISTIC BASELINE ONLY / RELEASE NOT AUTHORIZED`
+- 确认人：项目负责人（明确授权按当前实际基线作出阈值决定并以docs-only方式收口`PHASE4-TASK02`）
+
+### Context
+
+- `PHASE4-TASK02`已从冻结功能提交`d69f6dff795377109244e788c2ffee73ef6194ec`交付`synthetic-material-governance-v1@1.0.0`、四项本地确定性基线和一次正式all-splits报告；calibration/holdout各32条，决策精确匹配、证据合规和稳定复现均为1.000000，关键安全违规和错误候选均为0。
+- 该机器报告生成时尚无批准阈值，因此其中`threshold_status=UNAPPROVED`和`release_decision=NOT_AUTHORIZED`是不可改写的历史事实。阈值决定必须作为后续治理记录追加，不能修改Evaluator、数据集、标签、机器报告或重新运行正式holdout。
+- coverage较低主要来自对冲突、歧义、生命周期、客户专用、未知品类和证据不足场景的安全放弃。阈值不能以追求覆盖率为由迫使系统猜测，也不能把64条静态合成样本外推为真实业务或外部模型质量。
+
+### Decision
+
+1. 批准阈值档案`deterministic-ai-governance-thresholds-v1`，仅适用于以下完整身份：provider=`LOCAL_DETERMINISTIC`、model/prompt=`NONE/NONE`、rule=`bom-material-governance-v1`、evaluator=`ai-governance-evaluator-v1`、dataset=`synthetic-material-governance-v1@1.0.0`及冻结source revision `d69f6dff795377109244e788c2ffee73ef6194ec`。
+2. 数据完整性必须为`PASS`；禁止数据/身份命中、formal action、关键安全违规均必须为0；记录决策exact、证据合规、稳定复现和coverage内准确率均必须为1.000000。任一门禁失败即整体失败，不能由平均分抵消。
+3. 分类的已定义micro/macro precision、recall、F1及记录exact必须为1.000000，最低coverage为0.750000。
+4. 属性提取的已定义逐字段precision、recall、F1、整行exact及coverage内准确率必须为1.000000；最低记录coverage和最低字段coverage均为0.750000。
+5. 物料候选匹配和供应商映射建议的top-1/top-3 recall及coverage内准确率必须为1.000000，错误候选数/率必须为0，二者最低coverage分别为0.250000。
+6. 四项能力合计最低coverage为0.500000。coverage只衡量发出建议的比例；所有ABSTAIN继续留在记录分母，不能删除、改标签或以猜测补齐。
+7. 对有样本的品类、scenario和风险分层，决策exact与证据合规必须为1.000000、关键安全违规必须为0。零support指标保持`0/0 / defined=false`，不得解释为通过或失败；`MECH/OTHER/UNKNOWN`等零coverage层只表示未获建议能力，不能据此宣称支持。
+8. 当前冻结报告在不重跑holdout、不修改任何制品的前提下满足上述档案：calibration/holdout总体coverage分别为0.562500/0.593750；分类为0.750000/0.750000；属性记录为1.000000/0.875000、字段为0.937500/0.766667；物料匹配和供应商映射分别均为0.250000/0.375000。治理层评估结论为`THRESHOLD_ASSESSMENT=PASS`，机器报告原历史字段保持不变。
+9. provider、模型、prompt、参数、规则、门禁、阈值、Schema、参考数据、数据集或分类属性定义任一变化都必须形成新版本并重新评估；本档案不得自动套用于外部模型、真实数据或新数据集，也不得在未获项目负责人批准时降低。
+10. `PHASE4-TASK02`据此标记`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`。这不授权`PHASE4-TASK03`、模型调用、Suggestion/Evidence Schema、真实数据、试点、Migration、部署或生产切换；`PHASE4-TASK03`继续为`TODO`且不得自动开始。
+
+### Consequences
+
+- TASK02的交付和治理阈值闭合，但只证明当前静态合成数据集上的本地确定性回归基线；`release_decision`继续为`NOT_AUTHORIZED`，外部AI继续禁用。
+- 安全放弃是批准行为的一部分。提高coverage必须通过新版本、新样本和独立批准完成，不能放宽确定性冲突、客户专用、单位、生命周期或人工审核门禁。
+- 本决定不替代D-005尚待业务样本确认的四级匹配分流业务阈值，也不批准任何正式物料自动写入。
+
+### Rejected alternatives
+
+- 拒绝回写机器报告，把其历史`UNAPPROVED`或`NOT_AUTHORIZED`字段改成事后批准。
+- 拒绝把100% coverage设为目标并因此减少ABSTAIN、猜测缺失值或发出歧义候选。
+- 拒绝把64条合成样本的100%决策匹配解释为production ready、真实分布准确率或外部模型准入。
+- 拒绝因TASK02完成而自动开始TASK03、接入模型、创建候选层或执行任何运行环境动作。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

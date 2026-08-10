@@ -4,6 +4,15 @@
 
 ## 2026-08-10
 
+### PHASE4-TASK02 - `docs: approve deterministic AI evaluation thresholds`
+
+- D-111：新增`deterministic-ai-governance-thresholds-v1`，只绑定当前`LOCAL_DETERMINISTIC/NONE/NONE`、`bom-material-governance-v1`、`ai-governance-evaluator-v1`、`synthetic-material-governance-v1@1.0.0`和冻结source revision `d69f6dff…194ec`。通用decision exact/evidence/stable/covered accuracy要求1.000000，禁止数据/formal action/关键安全违规和错误候选要求0。
+- Coverage：最低门槛批准为overall 0.500000、Classification 0.750000、Attribute record/field各0.750000、Material Match 0.250000、Supplier Mapping 0.250000；ABSTAIN继续留在分母，有样本分层exact/evidence必须1.000000且安全违规0，零support保持undefined。当前calibration/holdout逐项满足，治理层为`THRESHOLD_ASSESSMENT=PASS`。
+- 历史/边界：不回写生成时为`threshold_status=UNAPPROVED / release_decision=NOT_AUTHORIZED`的机器报告，不重跑正式holdout。TASK02收口为`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`；TASK03—TASK05仍TODO，外部AI、真实数据、候选层、试点、Migration、部署和生产切换均未授权。
+- 变更范围：只更新九份Markdown；Evaluator、calibration/holdout、manifest、标签、机器报告、业务/测试代码、`package.json`、Schema、Migration和运行环境均未修改。源码仍alpha.43，UAT仍原alpha.42，PostgreSQL仍40/head0040。
+- Git：严格从clean `main@d5f4e970f0570c7838c23e3813ee9b4deaf0e2d8`、Parent`d69f6dff795377109244e788c2ffee73ef6194ec`、public behind0/ahead193、private behind0/ahead0开始；以本条提交消息创建单一提交，实际SHA以`git log`为准。验证后只普通fast-forward push到`recovery-private/main`，不向public origin推送。
+- 验证/资源：九份Markdown、54个本地引用、状态/阈值/报告完整性、敏感信息和`git diff --check`通过；Python self-test、smoke、临时测试库go-live及断网只读源码容器`npm test` 3/3通过，正式holdout未执行。起点/验证后available约`2.2/2.2GiB`、Swap`346/346MiB`、根盘`17/17GiB`、Load`0.38/0.18/0.21`→`0.05/0.07/0.12`；内核OOM匹配0，四服务restart0/OOM false。临时Python目录/Node容器自动清理，四个受保护Volume存在且未读取正文，未prune。
+
 ### PHASE4-TASK02 - `feat: add offline AI governance evaluator` / `docs: record AI governance baseline metrics`
 
 - 数据集：新增`synthetic-material-governance-v1@1.0.0`，calibration/holdout各32条、四项能力每split各8条，覆盖RES/CAP/IND/IC/CON/OSC及MECH/OTHER/UNKNOWN放弃场景；文件SHA分别为`d2512719…ed95`、`73e3d843…bde3`，dataset digest为`4bde669d…4adb`。严格schema、manifest、全局ID/顺序/统计/摘要、未知字段、断裂引用、非合成身份、禁止数据、路径和symlink均失败关闭。

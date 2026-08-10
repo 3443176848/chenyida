@@ -2,11 +2,11 @@
 
 ## 任务状态
 
-`DOING / SOURCE_READY / HOLDOUT_MEASURED / THRESHOLD_DECISION_REQUIRED`
+`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`
 
 日期：2026-08-10（Asia/Shanghai）
 
-负责人：Codex（离线 Evaluator、静态合成评估集、专项测试、冻结 holdout 测量、文档与独立提交）、项目负责人（后续准确率阈值和最低 coverage 决策）
+负责人：Codex（离线 Evaluator、静态合成评估集、专项测试、冻结 holdout 测量、阈值收口文档与独立提交）、项目负责人（D-111准确率阈值和最低coverage决定）
 
 依赖：`PHASE4-TASK01`、`D-110`
 
@@ -29,7 +29,7 @@
 - 只读复用既有 `governMaterialSource`、`governMaterialBatch` 和治理规则版本，不修改既有确定性规则。
 - 分别测量分类、属性提取、物料候选匹配和供应商映射建议。
 - 源码候选版本升为 `0.1.0-alpha.43`；运行 UAT 保持 alpha.42，不 build、不制作镜像、不部署。
-- 本任务只测量，不批准准确率阈值或最低 coverage；不创建 `D-111`，不启动 `PHASE4-TASK03`。
+- 实现与正式测量阶段只测量，不批准准确率阈值或最低coverage；后续项目负责人以独立docs-only授权创建`D-111`并收口本任务，仍不启动`PHASE4-TASK03`。
 
 ## 禁止事项
 
@@ -52,15 +52,17 @@
 
 ## 最终判定
 
-`PHASE4-TASK02 OFFLINE EVALUATOR SOURCE READY — HOLDOUT MEASURED / THRESHOLD DECISION REQUIRED`
+`PHASE4-TASK02 OFFLINE EVALUATOR AND DETERMINISTIC THRESHOLDS ACCEPTED — RELEASE NOT AUTHORIZED`
 
-本任务已经交付可复现的离线测量工具与第一份冻结 holdout 实测报告，但没有批准准确率阈值、最低 coverage 或任何发布决定。报告状态固定为：
+本任务已经交付可复现的离线测量工具与第一份冻结holdout实测报告；项目负责人随后通过D-111批准仅适用于当前冻结本地确定性基线的阈值档案。机器报告生成时的历史状态固定为：
 
 - `dataset_integrity=PASS`
 - `critical_safety_gate=PASS`
 - `accuracy_measurement=MEASURED`
 - `threshold_status=UNAPPROVED`
 - `release_decision=NOT_AUTHORIZED`
+
+D-111不回写机器报告，而是在治理层追加`THRESHOLD_ASSESSMENT=PASS`。`release_decision`继续为`NOT_AUTHORIZED`，外部AI、真实数据、试点、候选层和部署均未获授权。
 
 ## 冻结制品
 
@@ -80,10 +82,28 @@
 
 calibration 和 holdout 的失败 sample_id 都为空。该结果只描述此静态合成数据集与当前确定性规则的可复现测量，不是总体准确率门槛、外部有效性证明或 production-ready 结论。逐能力、逐字段、品类、scenario 和风险分层见[数据集与测量说明](../material-master/ai-governance-evaluation-dataset-v1.md)及机器报告。
 
+## D-111阈值决定
+
+批准档案`deterministic-ai-governance-thresholds-v1`只绑定当前provider/model/prompt/rule/evaluator/dataset/source revision，不自动适用于外部模型或新版本：
+
+| 门禁 | 最低要求 |
+| --- | --- |
+| 数据/安全 | dataset integrity PASS；禁止数据、formal action、关键安全违规均为0 |
+| 通用正确性 | 决策exact、证据合规、稳定复现、coverage内准确率均为1.000000 |
+| Classification | 已定义micro/macro P/R/F1和exact均1.000000；coverage ≥ 0.750000 |
+| Attribute Extraction | 已定义字段P/R/F1、row exact、covered accuracy均1.000000；记录coverage和字段coverage均 ≥ 0.750000 |
+| Material Match | top-1/top-3及covered accuracy均1.000000；错误候选0；coverage ≥ 0.250000 |
+| Supplier Mapping | top-1/top-3及covered accuracy均1.000000；错误候选0；coverage ≥ 0.250000 |
+| Overall | coverage ≥ 0.500000；ABSTAIN保留在分母，零support保持undefined |
+
+当前冻结结果逐项满足该档案。按品类、scenario和风险的有样本分层仍要求decision exact/evidence 1.000000和安全违规0；零coverage层不获得能力声明。正式holdout没有因阈值决定而重跑，Evaluator、数据集、标签、机器报告、代码、测试、package和治理规则均未修改。
+
 ## 验证与边界
 
-- 专项测试 17/17、专项 typecheck、既有治理回归 61/61、`npm test` 3/3 通过；lint 为 0 error、11 条既有 warning、任务新增 warning 0；`git diff --check`和敏感扫描通过。
+- 实现与测量阶段的专项测试 17/17、专项 typecheck、既有治理回归 61/61、`npm test` 3/3 通过；lint 为 0 error、11 条既有 warning、任务新增 warning 0。
+- D-111 docs-only收口验证九份Markdown、54个本地引用、状态/阈值/报告完整性、敏感信息和`git diff --check`通过；Python self-test、smoke、临时测试库go-live及断网只读源码容器`npm test` 3/3通过，没有重跑正式holdout。
+- 收口起点/验证后available约`2.2/2.2GiB`、Swap`346/346MiB`/1GiB、根盘`17/17GiB`、Load`0.38/0.18/0.21`→`0.05/0.07/0.12`；任务期内核OOM匹配0、四服务restart0/OOM false，临时测试资源自动清理，四个受保护Volume保持。
 - provider=`LOCAL_DETERMINISTIC`、model_id=`NONE`、prompt_version=`NONE`、rule_version=`bom-material-governance-v1`、evaluator_version=`ai-governance-evaluator-v1`。
 - 源码候选为 `0.1.0-alpha.43`；运行 UAT 仍为 alpha.42 原镜像，Migration 仍为 `0040`。
 - 未调用 AI 或外部服务，未读取真实业务数据、数据库或受保护 Volume 正文，未修改 Schema/Migration/API/UI/Worker/既有治理规则，未 build、部署或重启。
-- `D-110`不变，`D-111`未创建，`PHASE4-TASK03`仍为`TODO`且没有自动启动。
+- `D-110`不变，`D-111`已批准当前确定性阈值并将本任务收口为`DONE`；`PHASE4-TASK03`仍为`TODO`且没有自动启动。

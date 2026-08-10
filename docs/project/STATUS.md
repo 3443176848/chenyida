@@ -2,12 +2,12 @@
 
 最后更新时间：2026-08-10（Asia/Shanghai）
 
-## PHASE4-TASK02 离线Evaluator与冻结holdout测量（等待阈值决定）
+## PHASE4-TASK02 离线Evaluator、冻结holdout与D-111阈值收口
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 最终状态 | DOING / SOURCE_READY / HOLDOUT_MEASURED / THRESHOLD_DECISION_REQUIRED | 最终判定`PHASE4-TASK02 OFFLINE EVALUATOR SOURCE READY — HOLDOUT MEASURED / THRESHOLD DECISION REQUIRED`；不是DONE、阈值通过、发布授权或production ready |
-| 严格起点 | PASS | 唯一worktree、clean `main@432551b1c8dbf9213954d57a77f0b022c843227e`、Parent`f17cc31d60bac70d6d3545f1904de6d54feeb4dd`；public`39946f6b…5c0` behind0/ahead191，private与起点相同；alpha.42/0040、运行Image、四服务和四卷匹配，D-111与任务文档均不存在 |
+| 最终状态 | DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED | 最终判定`PHASE4-TASK02 OFFLINE EVALUATOR AND DETERMINISTIC THRESHOLDS ACCEPTED — RELEASE NOT AUTHORIZED`；只关闭当前确定性基线和阈值决定，不是外部模型、试点、发布或production ready |
+| 严格起点 | PASS | TASK02实现起点保持`432551b1…227e`；D-111 docs-only收口从唯一worktree、clean `main@d5f4e970f0570c7838c23e3813ee9b4deaf0e2d8`、Parent`d69f6dff…194ec`开始，public`39946f6b…5c0` behind0/ahead193，private与收口起点相同且behind0/ahead0；源码alpha.43、UAT alpha.42、0040均按授权视为PASS |
 | 功能提交 | PASS / FROZEN | `d69f6dff795377109244e788c2ffee73ef6194ec`，严格Parent`432551b1…227e`；18个文件、2,297行新增/5行删除。提交后工具、schema、数据、标签、规则、package和测试均未再修改 |
 | 数据集 | PASS / SYNTHETIC V1 | `synthetic-material-governance-v1@1.0.0`；calibration/holdout各32、四能力每split各8；split SHA为`d2512719…ed95`/`73e3d843…bde3`，dataset digest`4bde669d…4adb`，holdout为`FROZEN_NOT_FOR_TUNING` |
 | 去敏/完整性 | PASS / ZERO PROHIBITED MATCH | 64条均声明synthetic/deidentified，身份使用SYN/FIXTURE/EXAMPLE；公司、人员、价格、邮箱、电话、地址、IP、账号、PO/RFQ/UAT编号、Token/Key/密码/数据库URL命中0。篡改、摘要、重排、重复ID、未知字段、断裂引用、越界路径和symlink测试均失败关闭 |
@@ -17,11 +17,12 @@
 | 分类/属性 | MEASURED | 两split分类micro/macro P/R/F1及exact均1.000000。属性calibration field P/R/F1 30/30、30/30、60/60，row8/8，field coverage30/32；holdout为23/23、23/23、46/46，row8/8，field coverage23/30；零support字段保留0/0、defined=false |
 | 候选指标 | MEASURED | calibration Material/Supplier均top-1/top-3 8/8、错误候选0/2；holdout两项均8/8、错误候选0/3。ABSTAIN保留在分母，覆盖率单独披露 |
 | 报告/复现 | PASS | `AI_GOVERNANCE_EVALUATION_REPORT_V1`，source revision`d69f6dff…194ec`、package alpha.43、rule/evaluator版本正确；文件SHA`e2ed87e6…8a5e`，result digest及重算均`f1b5b6b9…ac316` |
-| 阈值/发布 | UNAPPROVED / NOT_AUTHORIZED | dataset integrity与critical safety gate PASS只允许继续治理判断；准确率和最低coverage尚未由项目负责人批准。D-110不变，D-111未创建，TASK03仍TODO |
-| 自动验证 | PASS | 专项17/17、专项typecheck、治理回归61/61、npm3/3；lint 0 error/11条既有warning、任务新增warning0；diff、manifest、敏感信息、禁止身份、运行时反向导入和临时路径扫描通过 |
+| D-111阈值档案 | ACCEPTED / CURRENT DETERMINISTIC IDENTITY ONLY | `deterministic-ai-governance-thresholds-v1`要求通用正确性/证据/复现1.000000、安全及错误候选0；最低coverage为overall 0.50、classification 0.75、attribute record/field各0.75、material match 0.25、supplier mapping 0.25。有样本分层exact/evidence 1.000000且安全0；零support保持undefined |
+| 阈值/发布 | PASS / NOT_AUTHORIZED | 当前calibration/holdout逐项满足D-111，治理层`THRESHOLD_ASSESSMENT=PASS`；机器报告生成时的`threshold_status=UNAPPROVED / release_decision=NOT_AUTHORIZED`保持不可变历史。D-110不变，TASK03仍TODO且未自动启动 |
+| 自动验证 | PASS | TASK02原专项17/17、专项typecheck、治理回归61/61、npm3/3及lint记录保持；D-111收口的九份Markdown、54个本地引用、状态/阈值/报告完整性、敏感信息与`git diff --check`通过，Python `server.py --self-test`、`smoke_test.py`、临时测试库`go_live_check.py --no-backup`及断网只读源码容器`npm test` 3/3通过。正式holdout未重跑 |
 | 版本/运行面 | SOURCE ALPHA.43 / UAT ALPHA.42 / 0040 | UAT Web继续完整Image`sha256:e7761e2c…f94964`，四服务restart0/OOM false；未build、制作镜像、部署、重启或运行Migration |
-| 资源/清理 | PASS / NO THRESHOLD BREACH | 严格起点available约2.2GiB、Swap343MiB/1GiB、根盘17GiB、Load`0.17/0.17/0.12`；正式测量前后均约2.2GiB/343MiB/17GiB，Load`0.27/0.56/0.44`→`0.17/0.51/0.42`。内核OOM0、任务容器与`/tmp/phase4-task02-*`清零，四个受保护Volume仅核对存在且未读取正文 |
-| 明确未执行 | PASS | 未调用AI/外部服务、创建/读取Key、使用真实业务/UAT数据、登录UAT、调用业务API、查询/写数据库、访问Volume正文、改Schema/Migration/API/UI/Worker/既有规则、build、部署、重启、备份恢复、GHCR/tag或public push |
+| 资源/清理 | PASS / NO THRESHOLD BREACH | TASK02正式测量历史资源记录保持；D-111收口起点/验证后available约`2.2/2.2GiB`、Swap`346/346MiB`/1GiB、根盘`17/17GiB`、Load`0.38/0.18/0.21`→`0.05/0.07/0.12`。任务期内核OOM匹配0，四服务restart0/OOM false/running，Web/PostgreSQL healthy；临时Python目录和受限Node容器均自动清理，四个受保护Volume存在且未读取正文，未启动重型任务或执行prune |
+| 明确未执行 | PASS | 未重跑正式holdout，未调用AI/外部服务、创建/读取Key、使用真实业务/UAT数据、登录UAT、调用业务API、查询/写数据库、访问Volume正文、改Evaluator/数据集/机器报告/代码/测试/package/Schema/Migration/API/UI/Worker/既有规则、build、部署、重启、备份恢复、GHCR/tag或public push |
 
 ## PHASE4-TASK01 AI治理评估与审批边界（治理基线完成，实现未开始）
 
