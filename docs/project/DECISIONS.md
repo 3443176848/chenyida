@@ -1299,12 +1299,12 @@
 2. 新建空private仓库`3443176848/chenyida-erp-recovery-private`，本地remote固定命名为`recovery-private`；创建后必须由认证元数据证明owner和visibility，不能只依赖匿名404或仓库名称推断。
 3. Git恢复锚点只接受普通、非强制的精确`<commit>:refs/heads/main`推送；禁止force、mirror、all、tags、历史改写、删除远端引用和覆盖非空未知历史，不建立PR或release。
 4. 本机GitHub认证采用`gh auth login --web`设备授权，不通过聊天、命令行参数、任务文档或仓库文件传递PAT；活动账号必须精确为`3443176848`，否则停止。
-5. 当前任务固定为`SELFHOST-OPS-RECOVERY-FOUNDATION-39`。Git private remote只是三锚点中的第一阶段；容器镜像远端registry/digest和PostgreSQL dump+文件卷异机恢复锚点必须在后续独立阶段完成并验证，不能因Git推送成功而标记整个任务`DONE`或宣称production ready。
+5. 原任务范围固定为`SELFHOST-OPS-RECOVERY-FOUNDATION-39`三锚点：Git private remote只是第一阶段，不能仅因Git或镜像锚点成功就宣称三锚点完成或production ready。项目负责人随后明确主动延期数据锚点并行政关闭该任务；因此最终`DONE`只表示负责人关闭当前范围，不表示PostgreSQL dump和文件卷异机锚点已经完成。
 6. 每个锚点都必须保留来源SHA/digest/checksum、目标、可见性/访问边界和实际恢复验证；任一锚点只能关闭自身故障域风险，不能替代另外两项。
 
 ### Consequences
 
-- `SELFHOST-OPS-RECOVERY-FOUNDATION-39`在Git阶段保持`DOING / PHASE_GIT_PRIVATE_REMOTE`；私有push完成后只记录`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`。当前Git与private GHCR镜像锚点均已建立，任务进入`DOING / IMAGE_ANCHOR_ESTABLISHED / DATA_ANCHOR_PENDING`，仍需遵守D-109的独立范围和门禁。
+- `SELFHOST-OPS-RECOVERY-FOUNDATION-39`在Git阶段保持`DOING / PHASE_GIT_PRIVATE_REMOTE`；私有push完成后只记录`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`。Git与private GHCR镜像锚点均已建立；项目负责人随后主动延期数据锚点，并把任务行政收口为`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`。这不改变D-109的独立范围和门禁，也不等于三锚点全部完成。
 - 新私有仓库将包含完整内部Git历史，因此必须保持private并按内部恢复材料治理；本决定不授权公开其中任何文档、拓扑或UAT标识。
 - `RELEASES.md`不因恢复remote而更新；Git恢复锚点不是产品release、生产部署或真实数据迁移。
 - 本决定不授权UAT登录/API、业务写、Migration、build、Compose、数据库或Volume读取/写入，也不授权镜像push或备份上传。
@@ -1367,8 +1367,13 @@
 ### Consequences
 
 - 阶段结论更新为`ALPHA.42 PRIVATE GHCR IMAGE ANCHOR ESTABLISHED — DATA RECOVERY ANCHOR PENDING`；镜像内容、远端私有性、registry digest与按digest回拉均已验证。
-- `SELFHOST-OPS-RECOVERY-FOUNDATION-39`继续`DOING / IMAGE_ANCHOR_ESTABLISHED / DATA_ANCHOR_PENDING`。PostgreSQL dump和文件卷异机锚点仍未开始，系统仍为非生产且非production ready。
-- 镜像锚点只关闭镜像故障域，不能替代Git或数据库/文件卷恢复锚点。项目负责人仍须在GitHub网站手工撤销本次一次性classic PAT；本机凭据已清理不等于远端PAT已撤销。
+- `SELFHOST-OPS-RECOVERY-FOUNDATION-39`已由项目负责人行政收口为`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`。PostgreSQL dump和文件卷异机锚点仍未开始，系统仍为非生产且非production ready；数据锚点延期后单机数据恢复风险继续`OPEN`。
+- 镜像锚点只关闭镜像故障域，不能替代Git或数据库/文件卷恢复锚点。项目负责人提供“`GHCR ONE-TIME PAT REVOKED`”证明，明确已通过GitHub网页撤销一次性classic PAT；本项目只记录该用户证明，没有读取、恢复、测试或验证PAT正文、scope或远端认证状态。
+
+### Administrative closure
+
+- 项目负责人选择不在本任务继续PostgreSQL dump或uploads、attachments、backup-status文件卷的异机锚点、校验和或恢复演练；未来如需执行必须重新立项并取得明确方案与授权。
+- 该范围收口不删除或修改当前、回退、被拒镜像，不读取或清理任何受保护Volume，也不改变alpha.42、0040、非生产UAT或`NO UAT RECEIPT`边界。
 
 ### Rejected alternatives
 

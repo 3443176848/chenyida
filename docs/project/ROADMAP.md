@@ -18,6 +18,7 @@
 
 - `SELFHOST-LANDING-TASK01`：DONE / READY_FOR_OFFHOST_COPY。alpha.34 完整 Git 历史、clean-0034 PostgreSQL、uploads/attachments/backup-status 已形成 root-only 包并通过 Git clone、固定新空库和文件恢复验证。
 - 当前只完成本机封存，`offhost_copy_completed=false`；下一步仅由项目负责人通过受控 scp/SFTP/VPN 下载，并在异机运行 `sha256sum -c SHA256SUMS`。校验返回前不删除服务器包，不启动真实迁移、生产部署或其他业务任务。
+- `SELFHOST-OPS-RECOVERY-FOUNDATION-39`：`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`。private Git与private GHCR镜像锚点已建立并验证；PostgreSQL dump和uploads、attachments、backup-status异机锚点未建立，由项目负责人主动延期，单机数据恢复风险继续`OPEN`。该行政收口不是三锚点完成或production ready。
 
 ## 部门业务主线（SELFHOST-PHASE4）
 

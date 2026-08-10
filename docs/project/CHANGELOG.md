@@ -4,6 +4,15 @@
 
 ## 2026-08-10
 
+### SELFHOST-OPS-RECOVERY-FOUNDATION-39 - `docs: close recovery foundation scope`
+
+- 项目负责人证明已通过GitHub网页完成“`GHCR ONE-TIME PAT REVOKED`”；本项目只记录该用户证明，没有读取、恢复、测试或验证PAT正文、scope或远端认证状态。
+- TASK39按`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`行政收口：D-108 private Git与D-109 private GHCR镜像锚点已建立并验证；PostgreSQL dump及uploads、attachments、backup-status异机锚点未建立，并由项目负责人主动延期。
+- 数据锚点延期后单机数据恢复风险继续`OPEN`；当前仍为alpha.42/0040非生产UAT、`NO UAT RECEIPT`且非production ready，不能把行政关闭写成三锚点全部完成。
+- 本收口没有执行备份、dump、Volume读取、恢复演练、上传、清理、UAT登录、业务API、数据库业务查询/写入、Migration、build、部署或重启，也没有删除当前/回退/被拒镜像、容器或受保护Volume。
+- 严格起点为唯一worktree、clean `main@19b770c0219d2592b6b94aa2a22f0af8465db88b`、Parent `c96f9bfc912cb2a5dc6f4a3ad47bb51260847dbd`；public `origin/main=39946f6b854a985b5c19106eaa6c938bddaf9c7c`且behind0/ahead189，private main等于起点且behind0/ahead0。收口使用独立提交，最终与PHASE4-TASK01提交一并只普通推送到private main，public不推送。
+- 验证：八份Markdown的48个本地引用、TASK39/D-109/PHASE4-TASK01当前行唯一性、当前DOING为0、精确路径、`git diff --check`通过；断网、源码只读、1 CPU/受限内存的lint为0 error/0 warning，既有只读UI合同6/6。仓库凭据脚本因Node slim无Git未启动，等价本机只读扫描1,304个仓库文件/1,282个文本文件通过。起点/验证后资源约为available `2.2/2.2 GiB`、Swap `337/338 MiB`、根盘`17/17 GiB`、Load `0.14/0.13/0.10`→`0.84/0.77/0.37`；内核OOM0、四服务restart0/OOM false，任务容器清零。
+
 ### SELFHOST-OPS-RECOVERY-FOUNDATION-39 - `docs: record private image recovery anchor`
 
 - 授权/准入：项目负责人明确给出`GHCR CREDENTIAL READY`。独立root-only配置确认临时classic PAT身份为`3443176848`、normalized scope只有`write:packages`；认证GitHub API和registry分别证明package及精确tag尚不存在，PAT正文未进入聊天、日志、Git、remote URL、命令参数或文档。

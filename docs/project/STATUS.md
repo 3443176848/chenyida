@@ -2,15 +2,15 @@
 
 最后更新时间：2026-08-10（Asia/Shanghai）
 
-## SELFHOST-OPS-RECOVERY-FOUNDATION-39 private GHCR镜像恢复锚点（镜像阶段完成，数据锚点待办）
+## SELFHOST-OPS-RECOVERY-FOUNDATION-39 行政收口（Git/镜像锚点完成，数据锚点延期）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 任务状态 | DOING / IMAGE_ANCHOR_ESTABLISHED / DATA_ANCHOR_PENDING | `ALPHA.42 PRIVATE GHCR IMAGE ANCHOR ESTABLISHED — DATA RECOVERY ANCHOR PENDING`；Git与镜像锚点已经建立，PostgreSQL/文件卷锚点未开始，整个任务不得标记DONE或production ready |
-| 严格Git起点 | PASS | 唯一worktree、clean `main@c96f9bfc912cb2a5dc6f4a3ad47bb51260847dbd`、Parent `e1eff533…e71`、提交`docs: prepare private image recovery anchor`；公开`origin/main=39946f6b…5c0`且behind0/ahead188，`recovery-private/main=c96f9bfc…dbd`且behind0/ahead0 |
-| Git私有锚点 | GIT PRIVATE RECOVERY ANCHOR ESTABLISHED | `3443176848/chenyida-erp-recovery-private`为PRIVATE/ADMIN/main/non-fork；活动账号精确为`3443176848`，本阶段只在六文档收口通过后普通推送最终精确SHA到private main |
+| 任务状态 | DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED | private Git与private GHCR镜像锚点已建立并验证；项目负责人主动延期PostgreSQL/文件卷数据锚点。行政关闭不是三锚点完成，单机数据恢复风险继续OPEN，当前仍非production ready |
+| 严格Git起点 | PASS | 唯一worktree、clean `main@19b770c0219d2592b6b94aa2a22f0af8465db88b`、Parent `c96f9bfc…dbd`；公开`origin/main=39946f6b…5c0`且behind0/ahead189，`recovery-private/main=19b770c…db88b`且behind0/ahead0；两个远端live main均匹配 |
+| Git私有锚点 | GIT PRIVATE RECOVERY ANCHOR ESTABLISHED | `3443176848/chenyida-erp-recovery-private`为PRIVATE/ADMIN/main/non-fork；本次两个独立提交和增量扫描全部通过后只允许一次普通push最终精确SHA到private main |
 | public边界 | PRESERVED / DO NOT PUSH | `3443176848/chenyida`继续PUBLIC/ADMIN/main，远端main仍为`39946f6b854a985b5c19106eaa6c938bddaf9c7c`；HTTPS fetch、SSH push、upstream、remote HEAD和visibility不变，不向public推送 |
-| GHCR授权/凭据 | PASS / MINIMUM SCOPE | 项目负责人明确给出`GHCR CREDENTIAL READY`；临时classic PAT的身份为`3443176848`、normalized scope只有`write:packages`，没有`delete:packages`或其他scope。PAT正文未进入聊天、日志、Git、remote URL、命令参数或文档 |
+| GHCR撤销证明 | OWNER ATTESTED / NOT TECHNICALLY REVERIFIED | 项目负责人明确声明`GHCR ONE-TIME PAT REVOKED`并说明通过GitHub网页完成；本项目只记录用户证明，不读取、恢复、测试或验证PAT正文、scope或远端认证状态 |
 | push前冲突门禁 | PASS / ABSENT IN AUTHENTICATED VIEW | 认证GitHub package API确认`3443176848/chenyida-erp-web`不存在，认证registry确认精确计划tag不存在；匿名404未被当作不存在证据 |
 | 运行镜像身份 | PASS / EXACT ALPHA.42 | Web容器`f0066fe6…a35f`实际引用验收Image ID `sha256:e7761e2c…f94964`；version/revision/task、linux/amd64、88,679,975 bytes、非root用户、运行入口和port匹配。alpha.41及被拒候选身份均未改变 |
 | 唯一tag/push | PASS / ONE PUSH / NO RETRY | 只创建`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`一个本地tag，只向该目标执行一次push且成功；没有第二tag/registry、`latest`、alpha.41、被拒候选或重试 |
@@ -21,10 +21,10 @@
 | 匿名验证 | HTTP 401 / PRIVATE ENFORCED | 使用独立空root-only Docker配置查询精确digest，被`HTTP_401_AUTHENTICATION_REQUIRED`拒绝；匿名目录随后精确清理 |
 | 凭据清理 | PASS / LOCAL AUTH ABSENT | 使用临时Docker配置执行`docker logout ghcr.io`，核对buildx只生成授权目录内已知元数据后逐项清理。`/run/cyd-ghcr-auth`、PAT、Docker config、临时GitHub API配置和匿名配置均不存在；默认`gh`身份不变，默认Docker配置未触碰 |
 | 服务/Volume | PASS / UNCHANGED | PostgreSQL、Worker、Caddy、Web容器ID/Image ID均不变，Web/PostgreSQL healthy，四服务RestartCount0/OOMKilled=false；四个受保护Volume全部存在，未删除镜像/tag/容器/网络/Volume且未prune |
-| UAT/数据保护 | UNCHANGED / NO ACCESS | 未登录UAT、未调用业务API、未查询或写入业务数据库，未运行Migration、备份、恢复、build、Compose更新、deploy或restart；FIX38继续alpha.42/0040/NO UAT RECEIPT |
-| 文档/测试/Git | SIX DOCS / PRIVATE PUSH ONLY | 只更新任务文档与`DECISIONS/MASTER/TASKS/CHANGELOG/STATUS`，`RELEASES.md`不变；以`docs: record private image recovery anchor`独立提交。diff、48个本地链接、唯一任务/D-109/DOING和精确范围通过；断网/源码只读/1 CPU/1,280 MiB的lint为0 error/0 warning、UI contract为6/6，两个容器清零。敏感扫描通过后才普通推送精确SHA到private main；不force/tags/PR/历史改写 |
-| 资源/清理 | PASS | 起点available约2.2GiB、Swap332MiB/1GiB、根盘17GiB、Load`0.22/0.16/0.11`、内核OOM0；GHCR操作与凭据清理后约2.2GiB/332MiB/17GiB/`0.03/0.08/0.08`，串行文档验证后约2.2GiB/336MiB/17GiB/`0.87/0.53/0.26`。四服务restart/OOM保持0；任务临时容器、认证目录及其他临时资源均无残留 |
-| 剩余风险/下一阶段 | DATA ANCHOR PENDING / SEPARATE AUTHORIZATION REQUIRED | PostgreSQL dump与uploads、attachments、backup-status文件卷异机锚点仍未开始；必须另获方案与授权后串行执行，不能自动启动。项目负责人还须在GitHub网站手工撤销一次性classic PAT；本机凭据删除不等于远端PAT已撤销 |
+| UAT/数据保护 | UNCHANGED / NO ACCESS | 收口未登录UAT、未调用业务API、未查询或写入业务数据库，未运行Migration、备份、dump、Volume读取、恢复、build、Compose更新、deploy或restart；FIX38继续alpha.42/0040/NO UAT RECEIPT |
+| 文档/测试/Git | PASS / DOCS-ONLY / PRIVATE PUSH ONLY | 八份Markdown的48个本地引用、TASK39/D-109/PHASE4-TASK01当前行唯一、DOING为0、精确路径与diff通过；断网只读受限容器lint 0 error/0 warning、既有UI合同6/6。凭据脚本因Node slim无Git未启动，等价本机只读扫描1,304文件/1,282文本通过。行政收口以`docs: close recovery foundation scope`独立提交；`RELEASES.md`不变，两个提交完成后才普通push private，不向public推送 |
+| 资源/清理 | PASS | 行政收口起点available约2.2GiB、Swap337MiB/1GiB、根盘17GiB、Load`0.14/0.13/0.10`；验证后2.2GiB/338MiB/17GiB/`0.84/0.77/0.37`。内核OOM匹配0、四服务restart0/OOM false；任务Node容器清零，没有创建或清理临时目录、镜像、网络或Volume |
+| 剩余风险/下一阶段 | DATA ANCHOR DEFERRED / RISK OPEN | PostgreSQL dump与uploads、attachments、backup-status文件卷异机锚点没有建立；项目负责人主动延期，未来必须重新立项、确认方案并授权，不能从已关闭TASK39自动启动。下一产品任务为PHASE4-TASK01，当前仍TODO |
 
 ## SELFHOST-UAT-FIX-38 Web-only部署与零业务写复验（完成）
 

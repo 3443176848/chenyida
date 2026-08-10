@@ -30,6 +30,7 @@
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
 - 发布标识：包名为 `chenyida-erp-selfhosted`；源码与受控公网并行UAT Web均为`0.1.0-alpha.42`，PostgreSQL为40/head `0040_warehouse_receipt_readiness.sql`。alpha.42是Web-only非生产UAT部署记录，不是生产release；本次UAT Receipt为0。
+- 恢复任务收口：private Git与private GHCR镜像锚点已经建立并验证；项目负责人证明已在GitHub网页撤销一次性PAT，并主动延期PostgreSQL dump与uploads、attachments、backup-status异机锚点。TASK39据此按`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`行政收口；数据锚点未建立、单机数据恢复风险继续`OPEN`，不构成production ready。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.42`。
 - Git 复核：FIX-08 从 clean `main@a254bca5d59dd3f17047c9d6495dfdf2df1a798e`、Parent `91c0fd29d534246c55ddd669e894cdde9b774e52`、behind 0/ahead 109 起步；功能提交为 `682e79378660ef7859617655836f02e2112df244`，安全停止/运维文档由独立 `ops: record blocked planning traceability rollout` 提交收口。未 push/PR/amend/rebase/reset/stash/restore，既有提交未改写；未读取、修改或提交 `shujvbiao/`。
 - 身份收口 Git 复核：CREDENTIAL-RECONCILIATION-10 从 clean `main@a4eff293668e24f4f780eb5df840bfc7e510365e`、Parent `615fe3ab4913c1964cfeb7337196f0d3e1a8d787`、behind 0/ahead 112 起步；结构预检 fail closed 后只允许无秘密报告提交。未 push/PR/amend/rebase/reset/stash/restore，未读取、修改或提交 `shujvbiao/`。
@@ -236,6 +237,7 @@
 
 ## 当前风险
 
+- private Git与镜像锚点不能替代数据恢复锚点；PostgreSQL dump和三个文件卷尚无异机锚点。TASK39已由项目负责人主动延期并行政关闭，未来恢复工作必须重新立项和授权。
 - V9 主数据表缺少逐行显式单位，且不包含产品/版本/BOM 行号/数量/位号/单位结构；197 行只能保留在 review。未经补充明确字段不得把 PCS、使用次数或原始描述猜成主库单位/BOM 数量，也不得先清空现有 532 Material/316 BOM Line。
 - 当前受保护 Product Version 7/A0、BOM Version 7/V1 和 Planning Package ID 1/v1/SUBMITTED 都是 FIX-08 最后已验证业务基线；OFFLINE-IDENTITY-RECOVERY-11 只有受控备份/恢复与整体指纹核对覆盖读取相关表，未做这些对象的业务级核验、修改或操作。身份风险虽已解除，仍不得把该任务当作 Planning 授权，接收、退回或创建 v2 必须另立任务。
 - `PRJ-00000001` 的源 Requirement Item 仍为 `unit_id=NULL/unit_pending=true`；Unit Resolution Head 已固定指向 ID 1/v1/Unit ID 1/PCS，Package Item 也固定引用该 Resolution Version。不得写回源需求、读取后来变化的 Head 冒充快照、从 BOM 推断单位或绕过完整性门禁。
@@ -279,7 +281,7 @@
 
 ## 当前路线
 
-`SELFHOST-UAT-FIX-38`已完成：alpha.42 Web-only部署服务端日期驱动的收货preview失败关闭、NORMAL实际模式投影、返回修改保留草稿和运行时version health。唯一`uat_20260729_warehouse`登录/退出各1；未来日期422一次、合法preview200/确认窗各4、返回修改/关闭/ESC/背景及390×844通过，`business mutation=0`、Receipt POST0、Session0；PO/Line/Plan/queue保持`1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。当前无自动执行任务；任何真实收货必须带当时真实证据并重新明确授权，quality IQC、AP、付款和生产继续各自独立。真实数据迁移、生产部署或切流仍须独立明确授权。
+`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭，数据锚点延期且风险继续开放。当前没有`DOING`任务；下一项`PHASE4-TASK01`仍为`TODO`，只允许在独立任务中建立AI治理、评估和审批合同。`SELFHOST-UAT-FIX-38`继续保持alpha.42/0040、`NO UAT RECEIPT`和非生产UAT边界；任何真实收货、数据恢复、真实迁移、生产部署或切流仍须独立明确授权。
 
 ## 恢复上下文检查清单
 

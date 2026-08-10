@@ -41,8 +41,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
 | 当前根仓库运维基线 | `SELFHOST-UAT-FIX-38`已把通过候选Web-only部署到并行非生产UAT；本地/公开alpha.42 health、Caddy安全头、匿名保护、未来日期422、合法日期4次预览、四种返回修改、390×844和安全退出通过。唯一warehouse登录/退出各1，Business mutation及Receipt POST0；最终Session0、收货及全部下游0。独立收口提交消息为`ops: deploy warehouse receipt date guard`，实际SHA以Git log为准 |
-| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。镜像阶段严格起点为唯一worktree、clean `main@c96f9bfc912cb2a5dc6f4a3ad47bb51260847dbd`、Parent `e1eff533eb7cb38d169f266bdf3a97b0d3dc7e71`，`recovery-private/main`逐字节同为`c96f9bfc…dbd`且behind0/ahead0；private仓库`3443176848/chenyida-erp-recovery-private`为PRIVATE/ADMIN/main。公开`origin/main=39946f6b854a985b5c19106eaa6c938bddaf9c7c`、behind0/ahead188，HTTPS fetch、SSH push、upstream、remote HEAD和public visibility不变。本阶段六文档提交增量扫描后只普通推送精确最终HEAD到private main，公开origin仍禁止接收内部历史 |
-| 镜像恢复锚点 | D-109的private GHCR镜像恢复锚点已建立：唯一目标/tag为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，一次push返回、认证registry与唯一tag package version三方digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association、无`latest`/额外tag；linux/amd64 child、attestation、config和9层均匹配预检，一次按digest pull完全匹配，匿名读取返回401。一次性本机凭据已logout并清理，仍需项目负责人在GitHub网站手工撤销PAT |
+| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。本次行政收口严格起点为唯一worktree、clean `main@19b770c0219d2592b6b94aa2a22f0af8465db88b`、Parent `c96f9bfc912cb2a5dc6f4a3ad47bb51260847dbd`，`recovery-private/main`逐字节同为`19b770c…db88b`且behind0/ahead0；private仓库`3443176848/chenyida-erp-recovery-private`为PRIVATE/ADMIN/main。公开`origin/main=39946f6b854a985b5c19106eaa6c938bddaf9c7c`、behind0/ahead189，HTTPS fetch、SSH push、upstream、remote HEAD和public visibility不变。本次两个独立提交及增量扫描全部通过后只允许一次普通push最终HEAD到private main，公开origin仍禁止接收内部历史 |
+| 镜像恢复锚点 | D-109的private GHCR镜像恢复锚点已建立：唯一目标/tag为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，一次push返回、认证registry与唯一tag package version三方digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association、无`latest`/额外tag；linux/amd64 child、attestation、config和9层均匹配预检，一次按digest pull完全匹配，匿名读取返回401。一次性本机凭据已logout并清理；项目负责人证明已通过GitHub网页撤销一次性PAT，本项目未读取或技术验证PAT正文/远端状态 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
@@ -50,15 +50,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0040`，40/head`0040_warehouse_receipt_readiness.sql`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`；0039及更早未修改。主`RFQ-00000001`为CLOSED v7，Award为1/v1/AWARDED且Line4；受控`PO-00000001`为1/v1/OPEN，PO Line/Delivery Plan/queue为`4/4/4`，新证据表及Receipt/Lot/IQC/Ledger/AP/付款/生产下游全0。四条获选Candidate、Binding及Mapping保持 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `DOING / IMAGE_ANCHOR_ESTABLISHED / DATA_ANCHOR_PENDING`。阶段结论为`ALPHA.42 PRIVATE GHCR IMAGE ANCHOR ESTABLISHED — DATA RECOVERY ANCHOR PENDING`；FIX38仍为`DONE / WEB_ONLY_UAT_DEPLOYED / ZERO_WRITE_REVALIDATED`和`NO UAT RECEIPT`，恢复治理不改变非生产边界 |
-| 当前任务 | `SELFHOST-OPS-RECOVERY-FOUNDATION-39`为唯一`DOING`。D-108的Git private锚点与D-109的private GHCR镜像锚点均已建立并分别验证；唯一镜像tag/digest、private/no-latest/no-association、按digest回拉、匿名401和本机凭据清理均闭合。PostgreSQL dump与uploads、attachments、backup-status文件卷异机锚点未开始，任务不得标记`DONE` |
-| 下一任务 | 只剩PostgreSQL dump与三个文件卷的异机恢复锚点方案、快照/校验和实际恢复验证；必须另获明确方案和授权后作为本任务下一独立阶段串行执行，不能自动开始。项目负责人还须在GitHub网站手工撤销一次性classic PAT。真实Receipt、IQC、AP、Payment、生产、真实迁移、部署或切流继续要求单独明确授权，alpha.41回退锚点和被拒镜像继续保留且不得上传 |
+| 当前阶段 | `DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`。D-108 Git与D-109 private GHCR镜像锚点已建立并验证；项目负责人主动延期PostgreSQL与文件卷数据锚点，单机数据恢复风险继续`OPEN`。FIX38仍为`DONE / WEB_ONLY_UAT_DEPLOYED / ZERO_WRITE_REVALIDATED`和`NO UAT RECEIPT`，当前仍是非生产UAT且非production ready |
+| 当前任务 | 当前没有`DOING`任务。`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已按项目负责人范围决定行政收口；数据锚点没有建立，不能写成三锚点完成，也不得从已关闭任务继续dump、备份、Volume读取、恢复或上传 |
+| 下一任务 | `PHASE4-TASK01`仅为下一项`TODO`：建立AI治理评估与审批边界。开始后也只允许文档治理设计，不实现模型调用、API、页面、Schema或Migration。后续任何数据锚点、真实Receipt、IQC、AP、Payment、生产、真实迁移、部署或切流均须重新立项并取得明确授权；alpha.41回退锚点和被拒镜像继续保留 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
-- SELFHOST-OPS-RECOVERY-FOUNDATION-39镜像阶段完成：D-108 private Git锚点保持，D-109唯一alpha.42 Web镜像以完整revision tag一次push到private GHCR；push、registry和package version digest三方为`sha256:e7761e2c…f94964`，OCI平台/attestation/config/9层匹配，一次按digest回拉匹配且匿名401。本机临时凭据已清理；数据/文件卷锚点仍待办，因此任务继续`DOING`且不构成生产就绪
+- SELFHOST-OPS-RECOVERY-FOUNDATION-39已按项目负责人范围决定行政收口：D-108 private Git锚点保持，D-109唯一alpha.42 Web镜像以完整revision tag一次push到private GHCR；push、registry和package version digest三方为`sha256:e7761e2c…f94964`，按digest回拉匹配且匿名401。本机临时凭据已清理，项目负责人证明已通过GitHub网页撤销一次性PAT；PostgreSQL与三个文件卷异机锚点未建立并被主动延期，因此状态为`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`，单机数据恢复风险仍开放且不构成生产就绪
 
 - SELFHOST-UAT-FIX-38完成：alpha.42收货preview把`evidence_document_date`交给PostgreSQL Asia/Shanghai只读事务门禁，未来日期以稳定422/code/message/request ID失败关闭；NORMAL只投影当前普通Receipt/`RECEIPT`/available后果，返回修改/关闭/ESC/背景清理确认状态并保留本地草稿。Web-only部署为`sha256:e7761e2c…f94964`，唯一warehouse登录/退出各1、未来422一次、合法preview/确认窗各4、桌面/390×844与匿名历史保护通过；Business mutation及Receipt POST0，最终Session0、PO/Line/Plan/queue及全部下游不变。PostgreSQL/Worker/Caddy未重建，Migration未运行
 
@@ -226,6 +226,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前未完成模块
 
+- PostgreSQL dump与uploads、attachments、backup-status文件卷的异机数据恢复锚点没有建立；TASK39已由项目负责人主动延期并行政关闭，单机数据恢复风险继续`OPEN`，未来必须重新立项和授权
 - 大批量流程的通用批次执行器、来源档案注册表、init/resume/validate/consolidate 命令和代表性试点尚未实现；当前 TASK07 脚本只能作为已知 8 份来源的参考，不得直接宣称支持所有公司资料
 - LANDING-TASK07 工作簿仍有 57 行单机用量和 21 行板型待人工补充，A200 4 处模板/旧版差异与 J587 标题版本冲突待业务确认；正式去重、内部编码、审核、数据库导入和下游 BOM 引用均未执行
 - `PENDING_APPROVAL` 兼容值的破坏性收缩尚未实施；必须在旧值计数为零、旧实例全部退出且取得生产授权后另建任务
@@ -246,6 +247,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前风险
 
+- Git与private GHCR镜像锚点已建立，但PostgreSQL dump及uploads、attachments、backup-status异机锚点仍不存在；TASK39的行政关闭不消除该单机数据恢复风险，也不代表production ready
 - UAT 临时 manager 已通过页面停用且未用于业务试用。首次浏览器验收脚本在停用后的刷新检查处提前结束，遗留一个已丢失令牌、等待正常 8 小时 TTL 的会话；按不可变审计和禁止直接 SQL 删除边界保留。两个目标 logout 与完整复验的旧 Session 均已立即撤销，不得把该脚本残留误述为 logout 失败。
 - V9 表格 197 行虽有唯一连续 ERP 编码和完整来源追踪，但没有单位列，也没有产品版本、BOM 版本、BOM 行数量/位号结构；`使用次数` 不能作为数量。未经逐行显式单位与独立 BOM 契约，不得清空现有主库或导入这些行
 

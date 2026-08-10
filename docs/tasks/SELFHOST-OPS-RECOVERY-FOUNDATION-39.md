@@ -2,13 +2,28 @@
 
 ## 任务状态
 
-`DOING / IMAGE_ANCHOR_ESTABLISHED / DATA_ANCHOR_PENDING`
+`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`
 
-阶段判定：`ALPHA.42 PRIVATE GHCR IMAGE ANCHOR ESTABLISHED — DATA RECOVERY ANCHOR PENDING`
+阶段判定：`RECOVERY FOUNDATION OWNER-CLOSED — GIT AND IMAGE ANCHORS ESTABLISHED / DATA ANCHOR DEFERRED`
 
-Git 私有恢复锚点和唯一 alpha.42 Web 镜像的 private GHCR 恢复锚点均已建立并完成 digest 回拉验证。GHCR package 保持 private，只有唯一完整 revision tag、没有 `latest` 或 public 仓库关联，匿名读取被拒；一次性 classic PAT、Docker config 和本任务认证目录已经清理。PostgreSQL dump 与文件卷异机锚点仍未开始，整个任务继续 `DOING`，不得标记 `DONE` 或宣称 production ready。
+Git 私有恢复锚点和唯一 alpha.42 Web 镜像的 private GHCR 恢复锚点均已建立并完成验证。GHCR package 保持 private，只有唯一完整 revision tag、没有 `latest` 或 public 仓库关联，匿名读取被拒；一次性 classic PAT、Docker config 和本任务认证目录已经清理。项目负责人提供了“`GHCR ONE-TIME PAT REVOKED`”证明，明确其已通过 GitHub 网页撤销该一次性 PAT；本任务只记录这项用户证明，不读取、恢复、测试或验证 PAT 正文、scope 或远端认证状态。
 
-## 严格起点
+项目负责人同时主动延期 PostgreSQL dump 与 uploads、attachments、backup-status 文件卷的异机恢复锚点，因此本任务按行政范围收口为 `DONE`，而不是三锚点全部完成。数据锚点没有建立，单机数据恢复风险继续 `OPEN`；当前环境仍是非生产 UAT，不是 production ready。
+
+## 行政收口严格起点
+
+- Branch：`main`
+- HEAD：`19b770c0219d2592b6b94aa2a22f0af8465db88b`
+- Parent：`c96f9bfc912cb2a5dc6f4a3ad47bb51260847dbd`
+- 工作树及索引：clean；唯一 worktree：`/opt/erp`
+- public `origin/main`：`39946f6b854a985b5c19106eaa6c938bddaf9c7c`；相对 public 为 behind `0` / ahead `189`
+- `recovery-private/main`：`19b770c0219d2592b6b94aa2a22f0af8465db88b`；相对 private 为 behind `0` / ahead `0`
+- 源码与非生产 UAT 仍为 `0.1.0-alpha.42`，运行 Web Image ID 仍为 `sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，源码迁移仍为 `0001`—`0040`
+- 四服务 `RestartCount=0`、`OOMKilled=false`；四个受保护 Volume 存在
+
+以上起点均经本地和远端只读核验匹配。以下原“严格起点”保留为镜像阶段历史证据。
+
+## 镜像阶段严格起点（历史）
 
 ### Git 与 GitHub
 
@@ -127,16 +142,19 @@ D-109 的准入合同已按项目负责人明确的 `GHCR CREDENTIAL READY` 授�
 
 ## 文档、测试与 Git 收口
 
-- 只修改任务文档、`DECISIONS.md`、`MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md` 六份 Markdown；`RELEASES.md` 不变。
-- 运行 `git diff --check`、本地 Markdown 链接、任务/D-109 唯一性、唯一 `DOING`、精确文件范围和敏感信息门禁。
+- 行政收口只修改任务文档及`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`ROADMAP.md`、`DECISIONS.md`、`CHANGELOG.md`、`STATUS.md`八份 Markdown；`RELEASES.md`不变。
+- 运行 `git diff --check`、本地 Markdown 链接、任务/D-109 唯一性、状态一致性、精确文件范围和敏感信息门禁。
 - 文档-only 验证继续使用既有 `node:22-bookworm-slim` 镜像，断网、源码只读、1 CPU、1,280 MiB 内存硬上限、Node heap 1,024 MiB 且串行运行；`npm run lint` 为 0 error/0 warning，`tests/selfhost-procurement-fulfillment-ui-contract.test.mjs` 为 6/6。两个 `--rm` 容器均清零，不安装依赖、不连接数据库。
-- 独立提交消息固定为 `docs: record private image recovery anchor`。提交增量复扫只有 `CONFIRMED_SECRET=0 / POSSIBLE_SECRET=0` 才允许把精确完整 SHA 普通推送到 `recovery-private/main`。
+- 本地链接检查覆盖本次八份 Markdown 的 48 个引用；TASK39/D-109/PHASE4-TASK01 当前行唯一、当前 `DOING` 为 0、精确文件范围和 `git diff --check` 均通过。仓库凭据脚本在既有 Node slim 镜像中因没有 `git` 可执行文件而未能启动，随后以相同规则在本机只读扫描 1,304 个仓库文件/1,282 个文本文件并通过；未联网安装依赖。
+- 本次行政收口的独立提交消息固定为 `docs: close recovery foundation scope`。提交增量复扫只有 `CONFIRMED_SECRET=0 / POSSIBLE_SECRET=0` 才允许在本次两个提交全部完成后，把最终精确完整 SHA 普通推送到 `recovery-private/main`。
 - 推送不使用 force、tags、mirror、all、`-u`，不向 public `origin` 推送；最终必须证明 private main 等于最终本地 HEAD，public `origin/main` 仍为 `39946f6b854a985b5c19106eaa6c938bddaf9c7c`。
 
 ## 明确边界与下一阶段
 
 - 本阶段未登录 UAT、未调用业务 API、未读取或写入业务数据库、未运行 Migration、未备份或恢复、未 build、未部署、未重启服务；只执行授权范围内的唯一 GHCR tag、一次 push、一次按 digest pull 和只读验证。
-- FIX38 继续为非生产 alpha.42 / 0040 / `NO UAT RECEIPT`；本任务继续 `DOING`。
+- FIX38 继续为非生产 alpha.42 / 0040 / `NO UAT RECEIPT`；本任务已由项目负责人按 `DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED` 行政收口。
 - 镜像远端恢复锚点已经建立；运行 Web 容器仍引用原 Image ID，四服务容器 ID、Image ID、健康状态、`RestartCount=0` 与 `OOMKilled=false` 全部不变，四个受保护 Volume 仍存在。GHCR 操作与凭据清理检查点约为 available memory `2.2 GiB`、Swap `332 MiB / 1.0 GiB`、根分区可用 `17 GiB`、Load `0.03 / 0.08 / 0.08`；串行文档验证后约为 `2.2 GiB`、`336 MiB / 1.0 GiB`、`17 GiB`、`0.87 / 0.53 / 0.26`，内核启动期 OOM 计数始终为 `0`。
-- PostgreSQL dump 与 uploads、attachments、backup-status 文件卷的异机恢复锚点仍未开始，是本任务剩余唯一恢复基础阶段；必须另行确认方案和授权，不能因镜像锚点完成而自动开始、部署、迁移或宣称 production ready。
-- 项目负责人仍须在 GitHub 网站手工撤销本次一次性 classic PAT；本机凭据已清理不等于远端 PAT 已撤销。
+- 行政收口起点为 available memory `2.2 GiB`、Swap `337 MiB / 1.0 GiB`、根分区可用 `17 GiB`、Load `0.14 / 0.13 / 0.10`；验证后为 `2.2 GiB`、`338 MiB / 1.0 GiB`、`17 GiB`、`0.84 / 0.77 / 0.37`。内核启动期 OOM 匹配为 0，四服务 `RestartCount=0`、`OOMKilled=false`；所有任务 Node 容器已清零，没有创建或清理临时目录、镜像、网络或 Volume。
+- PostgreSQL dump 与 uploads、attachments、backup-status 文件卷的异机恢复锚点仍未开始；它们已由项目负责人主动延期，未来如需恢复工作必须重新立项、确认方案和授权，不能从本已关闭任务自动继续。
+- 项目负责人证明已通过 GitHub 网页撤销一次性 classic PAT；这是一项用户提供的收口证据，不是 Codex 对 PAT 正文、scope 或远端认证状态的技术验证。
+- 本次收口没有执行备份、dump、Volume 读取、恢复演练、上传或清理，也没有删除现有镜像、回退镜像、被拒镜像、容器或 Volume。
