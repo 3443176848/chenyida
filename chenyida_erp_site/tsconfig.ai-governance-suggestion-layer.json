@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "incremental": false,
+    "plugins": []
+  },
+  "include": [
+    "tools/ai-governance-evaluation/suggestion-layer-dataset.ts",
+    "tools/ai-governance-evaluation/suggestion-layer-projection.ts",
+    "tools/ai-governance-evaluation/suggestion-layer-evaluator.ts",
+    "tools/ai-governance-evaluation/suggestion-layer-cli.ts"
+  ],
+  "exclude": ["node_modules", "examples"]
+}
