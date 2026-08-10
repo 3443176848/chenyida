@@ -2,25 +2,26 @@
 
 最后更新时间：2026-08-10（Asia/Shanghai）
 
-## PHASE4-TASK03 AI Suggestion/Evidence关系化候选合同（合同接受，实现未开始）
+## PHASE4-TASK03 AI Suggestion/Evidence候选层（源码就绪，待holdout重验）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 最终状态 | DOING / RELATIONAL_CONTRACT_ACCEPTED / IMPLEMENTATION_NOT_STARTED | 最终判定`PHASE4-TASK03 RELATIONAL CONTRACT ACCEPTED — IMPLEMENTATION NOT STARTED`；关系蓝图已接受，但没有数据库对象、运行时代码、模型、审核链或发布能力 |
-| 严格起点 | PASS | 唯一worktree、clean `main@df254a6f8018292708f60c712c451368484deac7`、Parent`d5f4e970…e2d8`；public`39946f6b…5c0` behind0/ahead194，private等于起点且behind0/ahead0；源码alpha.43、UAT alpha.42、0001—0040及四服务restart0/OOM false完全匹配 |
-| 0035审计 | PASS / NINE TABLES PRESERVED | run/group/row/spec/material candidate/alternative candidate继续是确定性治理事实，decision/event是人工治理事实，material link是正式Material交接；复合FK、唯一约束、单次group CAS和不可变守卫语义不变，AI不得写入或冒充任何0035表 |
-| 既有权威边界 | REFERENCE ONLY / NO COPY | Material Import的Batch/Parse/Mapping/Normalization/Row/Candidate/Issue/Lineage、Material Master的稳定ID/类型化属性/版本/审批、Supplier Mapping的`mapping_uid`/版本/claim/职责分离继续为权威。AI只保存安全ID、观察版本和摘要，不复制原始正文或建立第二套状态机 |
-| D-112 | ACCEPTED / UNIQUE | AI位于已发布Normalization和确定性治理之后；只绑定既有group/run/version/digest。四能力固定Classification/Attribute Extraction/Material Match/Supplier Mapping，disposition只有`SUGGEST/ABSTAIN`，绝不表示正式批准、建档、绑定、合并或映射 |
-| 五表合同 | RELATIONAL / TYPED / IMMUTABLE | `ai_governance_suggestion_runs`、`ai_governance_suggestions`、`ai_governance_suggestion_items`、`ai_governance_suggestion_evidence`、`ai_governance_suggestion_events`；显式FK、kind-specific CHECK、唯一/部分唯一索引及延迟完整性约束，拒绝任意polymorphic ID和无约束单表JSON |
-| Evidence/Score | FAIL CLOSED | 每个`SUGGEST` item至少一条同主体安全证据；证据不足只能整体`ABSTAIN`或拒绝提交。当前确定性身份没有概率语义，因此overall/item confidence必须为空，不得伪造分数；证据不保存原始行、模型正文、价格、联系信息、凭据或客户专用正文 |
-| 生命周期 | SERVER-DERIVED / MAX 30 DAYS | facts与CREATED/INVALIDATED/DISCARDED/SUPERSEDED事件均追加且不可改删；每建议最多一个互斥终止事件。有效性由服务端同一快照按过期、终止事件、group/输入/引用版本、完整合同/阈值和停用开关派生，浏览器时间不具权威；过期无需可缺失事件 |
-| 幂等/CAS/重评 | DETERMINISTIC REPLAY | `run_digest`和业务唯一约束固定同主体/版本/能力/输入/完整合同；同请求重放返回既有完整结果，异正文冲突。任何输入或合同变化创建新run和递增suggestion version，通过追加事件替代旧版本；TASK04才可新增独立人工决定并调用既有权威服务 |
-| D-111 | PRESERVED / LOCAL DETERMINISTIC ONLY | 当前准入仍为`LOCAL_DETERMINISTIC/NONE/NONE`；正确性、证据、复现、covered accuracy为1.000000，安全/formal action/错误候选为0，overall/classification/attribute record/field/material match/supplier mapping最低coverage为`0.50/0.75/0.75/0.75/0.25/0.25` |
-| 实现边界 | 0041 PLANNED / NOT CREATED | 下一阶段只计划`0041_ai_governance_suggestion_evidence.sql`；本轮未改0035/0040、Schema/Migration、代码、API/UI/Service、Evaluator、数据集、机器报告、测试、package或`RELEASES.md`，未调用模型、访问UAT数据库、build、部署或重启 |
-| 要求内自动验证 | PASS | 九份Markdown、61个本地链接、唯一D-112/任务标题/DOING、状态矩阵、0035/0040 checksum、无0041、`git diff --check`、全仓1,325文件/1,303文本及九文件增量敏感扫描通过。断网、源码只读、单容器、1 CPU且串行：lint 0 error/11条既有warning；`npm test` 3/3；TASK02 Evaluator 17/17；0035治理无数据库Unit 61/61。没有重跑正式holdout，没有创建PostgreSQL测试库或执行Migration |
-| 额外只读诊断 | BASELINE TEST DEFECT RECORDED | 额外journal/schema源码合同检查4/5；唯一失败是历史测试仍断言journal总数/head为35，而当前仓库合法head已为40（`40 !== 35`）。其余0035 Schema/约束/不可变守卫4项通过；未连接数据库或执行Migration，docs-only任务不修改测试或降低断言 |
-| 资源/清理 | PASS / NO THRESHOLD BREACH | 验证前后available约`2.2/2.2GiB`、Swap`346/347MiB`/1GiB、根盘可用`17/17GiB`、Load`0.02/0.13/0.11`→`0.81/0.75/0.38`；内核OOM匹配0，四服务restart0/OOM false，Web/PostgreSQL healthy。任务Node容器全部自动删除，四个受保护Volume存在，未prune或创建测试数据库 |
-| Git/发布边界 | ONE DOCS COMMIT / PRIVATE FF ONLY | 变更必须精确为九份Markdown，以`docs: define AI suggestion evidence candidate layer`独立提交；验证后只普通fast-forward push到`recovery-private/main`，public origin不推送。TASK01/TASK02保持DONE，TASK03是唯一DOING，TASK04/TASK05保持TODO |
+| 最终状态 | DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED | 最终判定`PHASE4-TASK03 AI SUGGESTION/EVIDENCE SOURCE READY — HOLDOUT REVALIDATION REQUIRED / NOT BUILT / NOT DEPLOYED`；源码与隔离验证完成，不等于D-111正式重验、构建、部署或发布 |
+| 严格起点 | PASS | 唯一worktree、clean `main@0d6b5961b2ed280ca80b15678ac42665aad1b45e`、Parent`df254a6f…ac7`；public`39946f6b…5c0` behind0/ahead195，private等于起点且behind0/ahead0；源码alpha.43、UAT alpha.42/0040、0035/0040 checksum及四服务restart0/OOM false匹配 |
+| 持久层提交 | PASS / `8b839a64…6105` | 五表Drizzle Schema、expand-only 0041、snapshot/journal、Migration/升级测试及历史journal断言修正已提交；0041 SHA-256为`676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2`，0001—0040未修改 |
+| 五表/约束 | RELATIONAL / TYPED / IMMUTABLE | Run/Suggestion/Item/Evidence/Event具备真实/复合FK、RESTRICT、kind-specific/typed-value/digest/TTL/score/version CHECK、业务唯一/部分唯一索引、service-only INSERT门禁、五表UPDATE/DELETE拒绝及延迟完整性/版本/事件链触发器；无任意polymorphic ID或第六张AI业务表 |
+| Schema基线 | PASS / HEAD 0041 | `db/schema.ts`、`0041_snapshot.json`、journal idx/tag/head 41与0041一致；0034/0035/0037/0039历史合同按自身`idx/tag`定位，不再把旧Migration误当全局head，未删除约束或降低断言 |
+| 服务提交 | PASS / `218ef1b4…0eb1` | 独立types/errors/canonical/config/adapter/repository/service/handler模块并只在`selfhost-api.ts`接线；源码版本同步为alpha.44，批准身份固定`LOCAL_DETERMINISTIC/NONE/NONE`及D-111完整rule/evaluator/config/threshold/dataset/source revision，confidence/semantics均NULL |
+| 四能力/ABSTAIN | FAIL CLOSED | Classification唯一ACTIVE Category；Attribute只用ACTIVE定义及严格类型/单位；Material Match唯一ACTIVE严格身份；Supplier Mapping唯一ACTIVE Supplier/part/精确Mapping/Material。缺失、歧义、冲突、失效、转换/证据失败或超限均安全`ABSTAIN`，不使用模糊匹配、总分或概率绕过 |
+| 原子性/幂等/CAS | PASS / FORMAL WRITE 0 | 服务端重读group/run/rows/specs/lineage及引用，单事务写run/suggestion/items/evidence/CREATED、必要SUPERSEDED、Audit和持久幂等；同key+摘要/run digest重放，异正文409，并发单run、连续版本和事件CAS失败关闭。故障全回滚，0035决定/link/event、Material、Supplier Mapping及其他正式业务表写入0 |
+| 读取有效性 | REPEATABLE READ / ZERO WRITE | GET在同一只读快照重算全部摘要并按数据库时间派生有效性；过期、终止、group不再PENDING、输入/引用/合同漂移均不可审核。创建响应不混入动态有效性，列表使用稳定UUID cursor；GET不补写INVALIDATED或Audit业务事实 |
+| API/安全 | PASS | POST/list/detail GET复用`material.import.governance.run/read`及批次可见性；must-change、Origin/CSRF、Idempotency-Key、256 KiB、精确字段、request ID、no-store、中文稳定错误和去敏Audit/通用500覆盖。没有discard/approve/accept/correct/formalize或TASK04正式提交API |
+| Migration验证 | PASS | 0041静态Migration/Schema/snapshot/journal合同5/5；隔离PostgreSQL空库0001→0041、0040已有数据升级、重复执行、失败回滚、旧数据保持及守卫/四item/SUGGEST/ABSTAIN/evidence/非法组合7/7；既有0035 Migration合同5/5 |
+| Service/回归验证 | PASS | Suggestion Unit/Handler9/9、隔离Service5/5、专项typecheck、0035 Governance Unit/Handler/Metadata61/61、TASK02 Evaluator17/17、`npm test`3/3通过；lint 0 error/11条既有无关warning且任务新增warning0，diff与敏感扫描通过 |
+| D-111/holdout | PRESERVED / REVALIDATION REQUIRED | TASK02 calibration、holdout、manifest、标签、阈值及机器报告无变化；开发测试没有使用holdout调规则，正式all-splits/holdout CLI未执行且没有新正式报告。alpha.44完整身份必须在任何release动作前单独重验 |
+| 版本/运行面 | SOURCE ALPHA.44/0041 / UAT ALPHA.42/0040 | 运行Web镜像标签仍为alpha.42/source revision`569aa954…a24`，四服务运行且restart0/OOM false；0041只在隔离数据库执行。未登录/调用UAT、未build/Docker build、部署、运行UAT Migration、重启、调用模型或读取模型凭据 |
+| 资源/清理 | PASS / NO THRESHOLD BREACH | 测试串行、断网、源码只读、1 CPU、受控heap且一次一个临时容器/库；起点/源码验证后available约`2.2/2.3GiB`、Swap`348/352MiB`、根盘`17/17GiB`、最终Load`0.27/0.71/0.53`。内核OOM匹配0，测试库/容器/目录清零，四个受保护Volume保持且未读取正文，未prune |
+| Git/发布边界 | THREE COMMITS / PRIVATE FF ONLY | 持久层与服务两个提交已创建，九份治理文档以`docs: record AI suggestion source readiness`独立收口；全部复核后只一次普通fast-forward push到`recovery-private/main`，public origin不推送，`RELEASES.md`不变。TASK04/TASK05保持TODO |
 
 ## PHASE4-TASK02 离线Evaluator、冻结holdout与D-111阈值收口
 
@@ -38,7 +39,7 @@
 | 候选指标 | MEASURED | calibration Material/Supplier均top-1/top-3 8/8、错误候选0/2；holdout两项均8/8、错误候选0/3。ABSTAIN保留在分母，覆盖率单独披露 |
 | 报告/复现 | PASS | `AI_GOVERNANCE_EVALUATION_REPORT_V1`，source revision`d69f6dff…194ec`、package alpha.43、rule/evaluator版本正确；文件SHA`e2ed87e6…8a5e`，result digest及重算均`f1b5b6b9…ac316` |
 | D-111阈值档案 | ACCEPTED / CURRENT DETERMINISTIC IDENTITY ONLY | `deterministic-ai-governance-thresholds-v1`要求通用正确性/证据/复现1.000000、安全及错误候选0；最低coverage为overall 0.50、classification 0.75、attribute record/field各0.75、material match 0.25、supplier mapping 0.25。有样本分层exact/evidence 1.000000且安全0；零support保持undefined |
-| 阈值/发布 | PASS / NOT_AUTHORIZED | 当前calibration/holdout逐项满足D-111，治理层`THRESHOLD_ASSESSMENT=PASS`；机器报告生成时的`threshold_status=UNAPPROVED / release_decision=NOT_AUTHORIZED`保持不可变历史。D-110不变；TASK02收口时TASK03仍TODO，现已由独立授权的D-112进入关系合同接受/实现未开始状态，不改变TASK02发布未授权结论 |
+| 阈值/发布 | PASS / NOT_AUTHORIZED | 当前calibration/holdout逐项满足D-111，治理层`THRESHOLD_ASSESSMENT=PASS`；机器报告生成时的`threshold_status=UNAPPROVED / release_decision=NOT_AUTHORIZED`保持不可变历史。D-110不变；TASK02收口时TASK03仍TODO，后续D-112源码实施现为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED`，不改变TASK02发布未授权结论 |
 | 自动验证 | PASS | TASK02原专项17/17、专项typecheck、治理回归61/61、npm3/3及lint记录保持；D-111收口的九份Markdown、54个本地引用、状态/阈值/报告完整性、敏感信息与`git diff --check`通过，Python `server.py --self-test`、`smoke_test.py`、临时测试库`go_live_check.py --no-backup`及断网只读源码容器`npm test` 3/3通过。正式holdout未重跑 |
 | 版本/运行面 | SOURCE ALPHA.43 / UAT ALPHA.42 / 0040 | UAT Web继续完整Image`sha256:e7761e2c…f94964`，四服务restart0/OOM false；未build、制作镜像、部署、重启或运行Migration |
 | 资源/清理 | PASS / NO THRESHOLD BREACH | TASK02正式测量历史资源记录保持；D-111收口起点/验证后available约`2.2/2.2GiB`、Swap`346/346MiB`/1GiB、根盘`17/17GiB`、Load`0.38/0.18/0.21`→`0.05/0.07/0.12`。任务期内核OOM匹配0，四服务restart0/OOM false/running，Web/PostgreSQL healthy；临时Python目录和受限Node容器均自动清理，四个受保护Volume存在且未读取正文，未启动重型任务或执行prune |

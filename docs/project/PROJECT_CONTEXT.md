@@ -29,10 +29,10 @@
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为 `chenyida-erp-selfhosted`；离线Evaluator源码候选已升为`0.1.0-alpha.43`，受控公网并行UAT Web仍运行`0.1.0-alpha.42`原镜像，PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。本任务未build或部署alpha.43；alpha.42仍只是Web-only非生产UAT记录，不是生产release，本次UAT Receipt为0。
+- 发布标识：包名为`chenyida-erp-selfhosted`；AI Suggestion/Evidence源码候选已升为`0.1.0-alpha.44`并新增源码head 0041，受控公网并行UAT Web仍运行`0.1.0-alpha.42`原镜像，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。本任务未build或部署alpha.44、未应用UAT Migration；alpha.42仍只是Web-only非生产UAT记录，不是生产release。
 - 恢复任务收口：private Git与private GHCR镜像锚点已经建立并验证；项目负责人证明已在GitHub网页撤销一次性PAT，并主动延期PostgreSQL dump与uploads、attachments、backup-status异机锚点。TASK39据此按`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`行政收口；数据锚点未建立、单机数据恢复风险继续`OPEN`，不构成production ready。
-- AI治理基线：D-110和`PHASE4-TASK01`继续约束AI仅建议、确定性门禁优先、失败关闭、外部模型默认禁用、完整建议追溯、人工决定分离、四角色审批、版本化去敏评估及停用/回退/漂移。`PHASE4-TASK02`已在独立工具边界交付64条静态合成/去敏数据、四项确定性基线、严格Schema/manifest/CLI/指标与一次冻结holdout报告；D-111又批准只绑定当前冻结本地确定性身份的正确性/证据/复现100%、安全和错误候选0以及分能力最低coverage，现状态为`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`。D-112进一步接受独立五表Suggestion/Evidence关系合同，要求不可变事实、追加式终态事件、服务端派生有效性、最多30天有效期和受控重评/替代；`PHASE4-TASK03`现为`DOING / RELATIONAL_CONTRACT_ACCEPTED / IMPLEMENTATION_NOT_STARTED`。机器报告历史字段不回写，实际候选表、计划Migration `0041_ai_governance_suggestion_evidence.sql`、模型、API/UI、真实数据和试点均未创建或启动；TASK04—TASK05仍为TODO。
-- 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到 `alpha.42`。
+- AI治理基线：D-110和`PHASE4-TASK01`继续约束AI仅建议、确定性门禁优先、失败关闭、外部模型默认禁用、完整建议追溯、人工决定分离、四角色审批、版本化去敏评估及停用/回退/漂移。`PHASE4-TASK02`已在独立工具边界交付64条静态合成/去敏数据、四项确定性基线、严格Schema/manifest/CLI/指标与一次冻结holdout报告；D-111只批准冻结本地确定性身份的正确性/证据/复现100%、安全和错误候选0及分能力最低coverage，状态仍为`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`。D-112五表合同现已在alpha.44源码实现为0041、Schema/snapshot/journal、独立`LOCAL_DETERMINISTIC`四能力Service和受保护POST/GET，具备不可变事实、追加终止事件、服务端派生有效性、事务幂等/CAS/Audit和安全`ABSTAIN`；`PHASE4-TASK03`现为`DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。TASK02数据集、holdout、manifest、标签和机器报告不变且正式holdout未重跑；未build/deploy、未应用UAT Migration、未调用模型，TASK04—TASK05仍为TODO。
+- 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到`alpha.44`，运行UAT仍为alpha.42。
 - Git 复核：FIX-08 从 clean `main@a254bca5d59dd3f17047c9d6495dfdf2df1a798e`、Parent `91c0fd29d534246c55ddd669e894cdde9b774e52`、behind 0/ahead 109 起步；功能提交为 `682e79378660ef7859617655836f02e2112df244`，安全停止/运维文档由独立 `ops: record blocked planning traceability rollout` 提交收口。未 push/PR/amend/rebase/reset/stash/restore，既有提交未改写；未读取、修改或提交 `shujvbiao/`。
 - 身份收口 Git 复核：CREDENTIAL-RECONCILIATION-10 从 clean `main@a4eff293668e24f4f780eb5df840bfc7e510365e`、Parent `615fe3ab4913c1964cfeb7337196f0d3e1a8d787`、behind 0/ahead 112 起步；结构预检 fail closed 后只允许无秘密报告提交。未 push/PR/amend/rebase/reset/stash/restore，未读取、修改或提交 `shujvbiao/`。
 - 离线身份恢复 Git 复核：OFFLINE-IDENTITY-RECOVERY-11 从 clean `main@753c68c84427de93536a1f282b6e80987f7c9466`、behind 0/ahead 113 起步；工具/测试提交为 `a48dcc8a290b96da1ea6e426aaa2c6d73416c2fc`，完成记录由独立 `ops: complete canonical credential recovery` 提交收口。未 push/PR 或改写历史，未读取/修改 `shujvbiao/`，秘密和数据库/备份正文未进入 Git。
@@ -239,7 +239,7 @@
 49. SELFHOST-UI-STATUS-LOCALIZATION-DEPLOY-06 已把 `943c7fa` 共享状态中文化 Web-only部署到公开非生产UAT；该任务完成时Web为`sha256:89e7677538751f2c0a049a113f3d24372a18edaf752bf837038580ac951bd153`，上一版`f45d734b…`有精确回退tag，当前Web以本文件顶部FIX37基线为准。正式root-only dump SHA-256为`2beeaeb2ba2d7f7e5c07c7099d0d5985df1bb2ac6a67cc240bcfda0121418d99`，当时第二新库恢复39/head、226表和相同业务指纹通过。匿名HTTPS/在线资产SHA/中文状态/401和连续60秒稳定性通过；该历史任务未登录、发业务POST或运行Migration，PostgreSQL/Worker/Caddy及四卷保持。
 50. PHASE4-TASK01采用D-110：AI只产生可丢弃建议和逐字段证据，正式写入继续由确定性规则、服务端权限、事务、CAS、幂等、审核和审计控制。版本化去敏评估集使用固定holdout，分类、属性提取、候选匹配、供应商映射分别评估；直接正式写入、绕过审核等关键安全违规允许值为0。外部AI保持禁用，阈值须由TASK02先测量再由项目负责人批准；本任务没有实现任何AI能力。
 51. PHASE4-TASK02采用D-111：`deterministic-ai-governance-thresholds-v1`只绑定当前LOCAL_DETERMINISTIC/NONE/NONE、既有rule/evaluator、数据集1.0.0和冻结source revision；通用正确性/证据/复现为1.000000、安全及错误候选为0，总体/分类/属性记录与字段/Match/Mapping最低coverage分别为0.50/0.75/0.75/0.75/0.25/0.25。现有calibration/holdout治理层PASS，机器报告历史`UNAPPROVED/NOT_AUTHORIZED`不回写；外部模型、真实数据、候选层、试点和发布仍未授权。
-52. PHASE4-TASK03采用D-112：AI建议必须进入独立的Run、Suggestion、Item、Evidence、Event五表候选层，只能绑定0035既有稳定ID、版本和摘要，不得复制原始导入正文或改写确定性候选、人工决定、Supplier Mapping、Material Master。当前身份仍固定`LOCAL_DETERMINISTIC/NONE/NONE`且不得伪造confidence；建议只能`SUGGEST/ABSTAIN`，最多30天有效，过期由服务端派生，重评产生新版本并通过追加事件失效/丢弃/替代旧版本。TASK04才可实现独立人工审核并调用既有权威服务；本阶段没有创建0041或任何运行时代码。
+52. PHASE4-TASK03采用D-112：AI建议进入独立Run、Suggestion、Item、Evidence、Event五表候选层，只绑定0035既有稳定ID、版本和摘要，不复制原始导入正文或改写确定性候选、人工决定、Supplier Mapping、Material Master。alpha.44/0041源码已实现`LOCAL_DETERMINISTIC/NONE/NONE`四能力、安全`SUGGEST/ABSTAIN`、7日配置TTL/数据库最多30日、服务端过期/漂移、重评新版本/SUPERSEDED、稳定摘要、事务幂等/CAS/Audit和受保护POST/GET；confidence保持NULL。TASK04才可实现独立人工审核并调用既有权威服务，当前正式holdout仍须重验且未build/deploy。
 
 ## 当前风险
 
@@ -282,12 +282,12 @@
 - 不扩大范围，不修改无关代码，不直接操作生产数据或生产环境。
 - 数据库变化必须使用版本化迁移并提供隔离迁移测试。
 - 新功能必须有测试；关键写操作必须有权限、事务、幂等、并发和审计。
-- D-110已明确AI不得直接覆盖正式数据或绕过物料合并审核；D-111只批准当前冻结本地确定性基线的评估阈值；D-112只接受独立Suggestion/Evidence五表关系合同，不等于创建表、运行Migration、开放审核或发布。外部模型质量、供应商、数据隐私/地域/合同、凭据、真实数据和试点仍未获准；外部AI和候选层实现保持禁用，TASK03实现及TASK04—TASK05必须独立授权和验收。
+- D-110已明确AI不得直接覆盖正式数据或绕过物料合并审核；D-111只批准当前冻结本地确定性基线的评估阈值；D-112五表关系合同已在alpha.44/0041源码实现，但不等于正式holdout重验、UAT Migration、人工审核或发布。外部模型质量、供应商、数据隐私/地域/合同、凭据、真实数据和试点仍未获准；外部AI保持禁用，TASK04—TASK05必须独立授权和验收。
 - 完成任务必须更新 `MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md` 并创建独立提交。
 
 ## 当前路线
 
-`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭，数据锚点延期且风险继续开放。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112现已接受Suggestion/Evidence五表关系合同，因此`PHASE4-TASK03`是唯一`DOING`任务，状态为`RELATIONAL_CONTRACT_ACCEPTED / IMPLEMENTATION_NOT_STARTED`。TASK04—TASK05保持`TODO`且不得自动开始；计划Migration `0041_ai_governance_suggestion_evidence.sql`尚不存在。外部AI保持禁用；`SELFHOST-UAT-FIX-38`继续保持alpha.42/0040、`NO UAT RECEIPT`和非生产UAT边界。任何模型/真实数据试点、真实收货、数据恢复、真实迁移、生产部署或切流仍须独立明确授权。
+`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭，数据锚点延期且风险继续开放。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API已在alpha.44/0041源码实现并通过隔离验证，因此`PHASE4-TASK03`是唯一`DOING`任务，状态为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。TASK04—TASK05保持`TODO`且不得自动开始；正式holdout未重跑，alpha.44/0041未build、部署或应用到UAT。外部AI保持禁用；`SELFHOST-UAT-FIX-38`继续保持alpha.42/0040、`NO UAT RECEIPT`和非生产UAT边界。任何模型/真实数据试点、真实收货、数据恢复、真实迁移、生产部署或切流仍须独立明确授权。
 
 ## 恢复上下文检查清单
 

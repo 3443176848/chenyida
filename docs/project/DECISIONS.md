@@ -1526,6 +1526,15 @@
 - 拒绝原地更新status/payload/evidence、删除旧建议或用浏览器时间决定过期，因为这些做法会破坏历史和并发一致性。
 - 拒绝用当前64条合成集阈值批准外部模型、真实数据或发布，也拒绝因建立表结构合同而自动开始TASK04/TASK05。
 
+### Implementation record — 2026-08-10
+
+- 项目负责人随后以`PHASE4-TASK03 AI SUGGESTION/EVIDENCE CANDIDATE LAYER SOURCE IMPLEMENTATION`指令单独授权D-112源码实施；本记录是D-112的实施结果，不新建D-113，也不改变原关系合同。
+- 状态更新为`DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。持久层提交`8b839a64b219b91f7b83ab8ce5a0819ac2486105`和服务提交`218ef1b483cbd915c6e83013d7193e37c53a0eb1`将源码升至alpha.44/head 0041；`0041_ai_governance_suggestion_evidence.sql` SHA-256为`676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2`，0035/0040保持原checksum。
+- 五表Schema、snapshot/journal、真实/复合FK、CHECK、唯一/部分唯一索引、service-only INSERT门禁、UPDATE/DELETE拒绝和延迟完整性/版本/事件链触发器均已实现。历史0034/0035/0037/0039 journal合同测试只机械改为按自身`idx/tag`定位；旧Migration、约束和测试数量未改写或降低。
+- 独立`LOCAL_DETERMINISTIC`模块实现四项能力、安全`ABSTAIN`、稳定canonical摘要、数据库时间、输入/引用重验、单事务run/suggestion/item/evidence/event/Audit/幂等、连续版本/SUPERSEDED和只读快照有效性。POST/GET复用既有治理权限及批次可见性，具备CSRF、正文上限、精确字段、request ID、稳定中文错误和去敏失败；没有TASK04人工审核或正式提交API。
+- 0041静态合同5/5、隔离Migration/约束7/7、Suggestion Unit/Handler 9/9、隔离Service 5/5、专项typecheck、0035回归61/61、TASK02 Evaluator17/17、`npm test`3/3和lint 0 error/11条既有warning通过；正式业务表写入为0，临时数据库/容器/目录已清理。
+- D-111身份、阈值、calibration、holdout、manifest、标签及机器报告均未修改，正式holdout没有重跑。因此alpha.44只是source ready；UAT仍为alpha.42/0040，0041未应用，未build、部署、调用模型或启动TASK04/TASK05。下一门禁是对alpha.44完整身份正式重验holdout并取得独立发布授权。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

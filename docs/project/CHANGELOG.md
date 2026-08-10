@@ -4,6 +4,18 @@
 
 ## 2026-08-10
 
+### PHASE4-TASK03 - `feat: add AI suggestion evidence persistence` / `feat: add deterministic AI suggestion service` / `docs: record AI suggestion source readiness`
+
+- 持久层：提交`8b839a64b219b91f7b83ab8ce5a0819ac2486105`新增expand-only `0041_ai_governance_suggestion_evidence.sql`、五表Drizzle Schema、snapshot/journal。Run/Suggestion/Item/Evidence/Event使用真实/复合FK、RESTRICT、kind-specific/typed-value/digest/TTL/score/version CHECK、业务唯一/部分唯一索引、`cyd.ai_governance_suggestion_service_write` INSERT门禁、五表UPDATE/DELETE拒绝及延迟完整性/版本/事件链触发器；0041 SHA-256为`676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2`，0035/0040 checksum不变。
+- Migration测试修正：0034/0035/0037/0039历史合同改为按自身`idx/tag`查journal entry，不再用`entries.at(-1)`错误证明旧Migration是当前head；未修改0001—0040、删除约束断言、降低数量或skip。0041负责断言idx/head 41；Schema/snapshot/journal与运行查询一致。
+- 确定性服务：提交`218ef1b483cbd915c6e83013d7193e37c53a0eb1`新增独立types/errors/canonical/config/adapter/repository/service/handler并只在`selfhost-api.ts`接线。身份固定`LOCAL_DETERMINISTIC/NONE/NONE`及D-111完整rule/evaluator/config/threshold/dataset/source revision；四能力只接受唯一ACTIVE/严格身份/严格类型和证据，缺失、歧义、冲突、漂移或超限均安全`ABSTAIN`，不使用模糊名称、总分或概率confidence。
+- 事务/读取：服务端按数据库时间重读batch/run/group/rows/specs/lineage和全部目标引用；canonical摘要排除随机/时间/展示字段。一个事务写run/suggestion/items/evidence/CREATED、必要SUPERSEDED、Audit和持久幂等响应；同key+摘要或run digest重放、异正文409、连续版本/CAS、故障全回滚。GET以只读同一快照重算摘要和有效性，过期/终止/group/输入/引用/合同漂移失败关闭且零业务写；正式业务表写入0。
+- API/安全：新增候选POST/list/detail GET，复用`material.import.governance.run/read`及批次可见性；must-change、Origin/CSRF、Idempotency-Key、256 KiB流式上限、精确字段、request ID、no-store、稳定中文错误、去敏Audit/通用500均覆盖。没有discard/approve/accept/correct/formalize或TASK04人工审核/正式提交API。
+- 验证：0041静态合同5/5、隔离Migration升级/约束7/7、Suggestion Unit/Handler9/9、隔离Service5/5、专项typecheck、0035 Migration合同5/5、0035 Governance Unit/Handler/Metadata61/61、TASK02 Evaluator17/17、`npm test`3/3通过；lint 0 error/11条既有无关warning且任务新增warning0，`git diff --check`及敏感扫描通过。隔离PostgreSQL证明原子Audit/幂等、并发单run、v2/SUPERSEDED、过期/漂移、GET零写、正式表零写和故障全回滚。
+- D-111/版本边界：源码升为alpha.44/head0041；TASK02 calibration、holdout、manifest、标签、阈值和既有机器报告未修改，正式holdout未重跑且没有新正式报告。UAT镜像仍alpha.42/source revision`569aa954…a24`，UAT PostgreSQL仍0040；未登录/调用UAT、未build、Docker build、部署、运行UAT Migration、调用模型、读取凭据或启动TASK04/TASK05，`RELEASES.md`不变。
+- 状态/Git：TASK03保持唯一`DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，最终判定为`PHASE4-TASK03 AI SUGGESTION/EVIDENCE SOURCE READY — HOLDOUT REVALIDATION REQUIRED / NOT BUILT / NOT DEPLOYED`。严格起点`main@0d6b5961b2ed280ca80b15678ac42665aad1b45e`、Parent`df254a6f…ac7`、public behind0/ahead195、private behind0/ahead0；三个聚焦提交完成并复核后只允许一次普通fast-forward push到`recovery-private/main`，不向public origin推送。
+- 资源/清理：Node/Migration/PostgreSQL测试全部串行、断网、源码只读、1 CPU、受控heap且一次一个临时容器/数据库。起点/源码验证后available约`2.2/2.3GiB`、Swap`348/352MiB`、根盘`17/17GiB`、最终Load`0.27/0.71/0.53`；内核OOM匹配0，四服务restart0/OOM false。任务测试库、容器和目录清零，四个受保护Volume保持且未读取正文，未prune。
+
 ### PHASE4-TASK03 - `docs: define AI suggestion evidence candidate layer`
 
 - 0035审计：逐表复核九张`material_governance_*`表及对应Handler/Service/Repository/Source Adapter/类型/兼容层和无数据库、升级、PostgreSQL测试；确认run/group/row/spec/candidate属于确定性事实，decision/event属于人工治理事实，material link属于正式交接。AI不得写入或冒充这些表，也不得旁路Material Master或Supplier Mapping权威服务。

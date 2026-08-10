@@ -1,6 +1,6 @@
 # AI Suggestion/Evidence 关系化候选合同 V1
 
-状态：`ACCEPTED / RELATIONAL CONTRACT ONLY / IMPLEMENTATION NOT STARTED`
+状态：`IMPLEMENTED IN SOURCE / HOLDOUT REVALIDATION REQUIRED / RELEASE NOT AUTHORIZED / NOT BUILT / NOT DEPLOYED`
 
 任务：`PHASE4-TASK03`
 
@@ -8,13 +8,13 @@
 
 日期：2026-08-10（Asia/Shanghai）
 
-计划 Migration：`0041_ai_governance_suggestion_evidence.sql`（仅计划，本阶段未创建）
+源码 Migration：`0041_ai_governance_suggestion_evidence.sql`，SHA-256 `676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2`（仅源码，未应用到UAT）
 
 ## 1. 目的与非目标
 
 本合同为确定性 Material Governance 之后、人工正式决定之前定义一个独立、关系化、可过期且可丢弃的 AI 建议候选层。它保存可复现的 run 身份、`SUGGEST`/`ABSTAIN` 结果、类型化候选项、逐项证据和追加生命周期事件，但不保存任何批准或正式业务事实。
 
-本合同不创建数据库对象，不实现 Service/API/UI/Evaluator，不调用模型，不接触真实数据，不授权试点、发布、部署或生产使用。D-110 的“AI仅建议”和 D-111 的确定性阈值继续是上位门禁。
+第二阶段已按本合同创建五表Schema/Migration、`LOCAL_DETERMINISTIC` Service和受保护生成/读取API源码，并只用合成数据在隔离PostgreSQL验证。它不实现TASK04人工审核/UI，不调用模型，不接触真实数据，也不授权试点、构建、发布、部署或生产使用。D-110的“AI仅建议”和D-111的确定性阈值继续是上位门禁；alpha.44完整身份仍须正式holdout重验。
 
 ## 2. 权威顺序与数据流
 
@@ -112,7 +112,7 @@ V1 表前缀固定为 `ai_governance_`，不得重载 0035 或正式业务表。
 | `ai_governance_suggestion_evidence` | 每个 item 至少一条 | 保存安全定位、稳定 FK、观察版本和摘要 |
 | `ai_governance_suggestion_events` | 每个 suggestion 一条 `CREATED`，最多一条终止事件 | 追加记录 `INVALIDATED`、`DISCARDED`、`SUPERSEDED` |
 
-所有外键默认 `ON DELETE RESTRICT`。所有五表都由数据库守卫拒绝 UPDATE/DELETE，并只允许未来 AI Suggestion Service 在单一事务中 INSERT；本任务不设计物理删除例外。
+所有外键默认`ON DELETE RESTRICT`。所有五表都由数据库守卫拒绝UPDATE/DELETE，并只允许AI Suggestion Service在设置`cyd.ai_governance_suggestion_service_write`的单一事务中INSERT；本任务不设计物理删除例外。
 
 ## 6. 共同字段与摘要规则
 
@@ -365,7 +365,7 @@ Suggestion 没有可更新的 `current_status`。未来读取或进入 TASK04 �
 
 ### 14.1 创建
 
-未来 Service 必须：
+当前 Service 必须并已经：
 
 1. 校验权限、must-change、Origin/CSRF、请求大小、字段和稳定错误合同；
 2. 计算请求摘要、idempotency key digest、canonical input/contract/run digest；
@@ -415,27 +415,37 @@ TASK04 只能新增与 AI suggestion 分离的人工 review/decision 事实。�
 - 把“人工查看”“置信度高”或 suggestion event 当作批准；
 - 降低既有权限、职责分离、事务、CAS、幂等、状态机和审计。
 
-## 17. 下一实施阶段验收要求
+## 17. 源码实施验收要求
 
-未来 `0041_ai_governance_suggestion_evidence.sql` 实施任务至少应覆盖：
+`0041_ai_governance_suggestion_evidence.sql`和确定性候选服务的源码验收覆盖：
 
 - Migration/schema/snapshot/journal 五表和列一致性；空库升级、0040已有数据升级、重复执行、失败回滚；
 - 所有 FK/复合 FK、kind-specific CHECK、typed value CHECK、digest/TTL/score CHECK、部分唯一和查询索引；
 - 五表 service-only INSERT、UPDATE/DELETE拒绝、跨主体 evidence 拒绝；
 - SUGGEST零item、item零evidence、ABSTAIN有item、非法 polymorphic 组合全部失败；
 - `run_digest`并发重放、新版本分配、终止事件互斥、CAS、事务故障回滚和审计一致性；
-- server-time过期、输入/版本/资格漂移、停用/未批准合同的失败关闭；
+- server-time过期、输入/版本/资格漂移和未批准合同的失败关闭；停用开关的运行验收仍归TASK05；
 - 不写0035候选/决定/链接、Material Master、Supplier Mapping或其他正式业务表；
 - 仅使用隔离 PostgreSQL 和合成数据，不连接 UAT/生产。
 
-实施前还必须再次确认 0035/0040 checksum 未变，并由独立任务明确授权 Migration、代码和测试范围。
+源码验证已再次确认0035/0040 checksum分别保持`d64ec733bb937d8cde11d93d5370605fb7e754ffb0c93d2f9795c8d7b66c9714`/`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。任何UAT Migration、构建、部署、正式holdout或人工审核仍须独立授权。
 
-## 18. 本版本结论
+## 18. 第二阶段源码实施记录
+
+- 持久层提交`8b839a64b219b91f7b83ab8ce5a0819ac2486105`实现五表Schema、0041、snapshot/journal、service-only INSERT门禁、UPDATE/DELETE拒绝、显式/复合FK、CHECK、唯一/部分唯一索引和延迟完整性/版本/事件链触发器；旧0034/0035/0037/0039合同测试改为按自身`idx/tag`定位，不再错误假定旧Migration是当前head。
+- 服务提交`218ef1b483cbd915c6e83013d7193e37c53a0eb1`实现独立types/errors/canonical/config/adapter/repository/service/handler。配置固定TTL 7日、每次rows/specs各500、lineage 1,000、Material候选50、items 64、分页100；数据库继续强制最多30日。
+- 四能力均使用服务端重读的ACTIVE引用和严格确定性规则：Classification唯一Category、Attribute严格类型/单位、Material Match唯一严格身份、Supplier Mapping唯一Supplier/part/精确Mapping/Material。任何缺失、歧义、冲突、生命周期或证据失败都返回`ABSTAIN`，不使用模糊名称、总分或概率置信度放行。
+- POST只接收`capability`和`expected_group_version`，在一个事务中持久化完整候选链、Audit与幂等响应；GET在`REPEATABLE READ READ ONLY`快照重算摘要和当前有效性且零业务写。创建响应不混入随时间变化的有效性，列表游标使用稳定UUID，不暴露数据库AI自增ID。
+- API复用`material.import.governance.run/read`和既有批次可见性，写请求具备must-change、Origin/CSRF、Idempotency-Key、256 KiB、精确字段、request ID、no-store、中文稳定错误及去敏通用500。没有人工批准、丢弃、更正或正式提交端点。
+- 0041静态合同5/5、隔离升级/约束7/7、Suggestion Unit/Handler 9/9、隔离Service 5/5、专项typecheck、0035回归61/61、TASK02 Evaluator17/17、`npm test`3/3和lint 0 error/11条既有warning均通过；测试数据库、容器及目录清零，正式业务表写入为0。
+- TASK02数据集、calibration、holdout、manifest、标签、机器报告和`RELEASES.md`未修改；正式holdout未重跑。源码为alpha.44/0041，UAT仍为alpha.42/0040，未build、未部署、未运行UAT Migration或调用模型。
+
+## 19. 本版本结论
 
 - 0035 确定性事实、人工决定和正式衔接保持权威且不被重载。
-- 五张 `ai_governance_*` 候选表的关系、约束、版本、证据和事件合同已接受。
+- 五张`ai_governance_*`候选表及确定性Service/API已在源码实现并通过隔离验证。
 - 当前只允许本地确定性身份；外部 AI 默认禁用。
-- `0041_ai_governance_suggestion_evidence.sql`仅为下一阶段计划，本阶段不存在。
-- API、UI、Service、Schema、Migration、模型、数据、试点、发布和部署均未开始。
+- `0041_ai_governance_suggestion_evidence.sql`存在于源码但未应用到UAT；人工审核UI、模型、真实数据和试点均未开始。
+- alpha.44仍须按D-111完成正式holdout重验；当前未build、未发布、未部署且release未授权。
 
-最终判定：`PHASE4-TASK03 RELATIONAL CONTRACT ACCEPTED — IMPLEMENTATION NOT STARTED`
+最终判定：`PHASE4-TASK03 AI SUGGESTION/EVIDENCE SOURCE READY — HOLDOUT REVALIDATION REQUIRED / NOT BUILT / NOT DEPLOYED`
