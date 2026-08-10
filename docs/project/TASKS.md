@@ -11,12 +11,13 @@
 
 ## 当前任务
 
-当前没有`DOING`任务。`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已经行政收口；下一项`PHASE4-TASK01`仍为`TODO`，不得在其独立任务开始前自动执行实现或后续任务。
+当前没有`DOING`任务。`PHASE4-TASK01`已完成治理文档基线，结论为`PHASE4-TASK01 AI GOVERNANCE BASELINE ACCEPTED — IMPLEMENTATION NOT STARTED`。下一项`PHASE4-TASK02`及`TASK03`—`TASK05`都只为`TODO`，不得自动开始或据此接入模型、真实数据、试点或部署。
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| PHASE4-TASK01 | 建立AI治理评估与审批边界 | DONE | Codex（治理规格、评估合同、文档验证与独立提交）、项目负责人（范围、D-110及后续阈值/试点审批边界） | 2026-08-10 | 2026-08-10 | Material Import治理链路、Material Master V2既有权限/审核/审计合同、SELFHOST-OPS-RECOVERY-FOUNDATION-39行政收口 | `PHASE4-TASK01 AI GOVERNANCE BASELINE ACCEPTED — IMPLEMENTATION NOT STARTED`。D-110固定AI仅建议、确定性门禁优先、失败关闭、外部AI默认禁用、完整追溯、人工决定分离、四角色审批、版本重评、停用/回退/漂移边界；版本化去敏评估集、固定holdout、四类能力分评、最低指标及关键安全违规0门禁已定义。没有模型/API/UI/Schema/Migration/Evaluator、真实数据或试点；TASK02—TASK05未开始。见[任务文档](../tasks/PHASE4-TASK01.md)、[治理与评估合同](../material-master/ai-governance-evaluation-and-approval-v1.md)及[D-110](DECISIONS.md#d-110-ai治理评估审批与外部模型准入边界)。 |
 | SELFHOST-OPS-RECOVERY-FOUNDATION-39 | alpha.42三锚点恢复基础 | DONE | Codex（Git/private GHCR锚点、凭据本机清理、范围收口、验证和文档）、项目负责人（私有恢复授权、一次性PAT网页撤销证明及数据锚点主动延期决定） | 2026-08-10 | 2026-08-10 | SELFHOST-UAT-FIX-38、SELFHOST-LANDING-TASK01、D-108、D-109 | `DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`。private Git与private GHCR镜像锚点已建立并验证；项目负责人证明已通过GitHub网页撤销一次性PAT，本项目未读取或技术验证其正文/远端状态。PostgreSQL dump与uploads、attachments、backup-status异机锚点未建立并被主动延期，单机数据恢复风险继续`OPEN`；仍为非生产UAT且非production ready。本收口没有执行备份、dump、Volume读取、恢复、上传、清理或删除镜像/容器/Volume。见[任务文档](../tasks/SELFHOST-OPS-RECOVERY-FOUNDATION-39.md)、[D-108](DECISIONS.md#d-108-私有git恢复远端与alpha42三锚点恢复策略)及[D-109](DECISIONS.md#d-109-私有ghcr镜像恢复锚点与最小凭据策略)。 |
 | SELFHOST-UAT-FIX-38 | 收货预检与Web运行时版本合同修复 | DONE | Codex（D-107源码、运行时版本合同、唯一镜像构建、隔离烟测、Web-only部署、唯一warehouse零业务写黑盒、清理及文档）、项目负责人（收货语义、候选镜像、Web-only替换和一次登录/退出零写复验授权） | 2026-08-09 | 2026-08-09 | SELFHOST-UAT-FIX-37、D-106、D-107 | `SELFHOST-UAT-FIX-38 DEPLOYED AND REVALIDATED — NO UAT RECEIPT`。并行非生产UAT Web-only替换为alpha.42完整镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`、source revision`569aa954…d33a24`；PostgreSQL/Worker/Caddy容器不变，未运行Migration。唯一warehouse登录/退出各1，未来日期422为1、合法preview200和确认窗各4，返回修改/关闭/ESC/背景与390×844通过；Business mutation及Receipt POST均0。最终Session0、认证Audit各增1、PO/Line/Plan/queue`1/4/4/4`且已收和Receipt全部下游0；旧alpha.41回退镜像与被拒`81126136…`保留，未push，非生产且非生产就绪。见[任务文档](../tasks/SELFHOST-UAT-FIX-38.md)、[完成报告](../tasks/SELFHOST-UAT-FIX-38-COMPLETION.md)及[D-107](DECISIONS.md#d-107-收货预检日期实际检验模式投影与返回修改语义)。 |
 | SELFHOST-UAT-FIX-37 | Warehouse Receipt Readiness and Date Safeguards | DONE | Codex（严格门禁、关系化证据模型、最小权限DTO、两阶段确认、日期/CAS/幂等/事务保护、职责隔离、串行隔离测试、正式备份恢复、0040升级、Web-only部署、warehouse-only零业务POST主UAT、清理与文档）、项目负责人（固定D-105保护、实现/备份恢复/受控部署及主UAT零业务POST授权） | 2026-08-08 | 2026-08-08 | SELFHOST-UAT-FIX-36、SELFHOST-UAT-DECISION-35、SELFHOST-PHASE5-TASK10、D-105、D-106 | `WAREHOUSE RECEIPT READINESS FIXED — UAT RECEIPT NOT POSTED`。新增alpha.41/0040关系化收货证据、warehouse最小权限谱系DTO、权威GET预览和最终POST事务门禁；按实际inspection mode投影普通收货与IQC冻结语义，warehouse的IQC写为403且quality权限保持。正式dump/list/第二新库恢复和0039→0040通过；仅替换Web为`sha256:0cf98937…5f19`。主UAT桌面/390×844仅预览取消，`business_post=0`、Session0，PO/Line/Plan/queue保持`1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`及语义修正`20a9123741862d81ac18af9e6bdee896674fe95c`；见[任务文档](../tasks/SELFHOST-UAT-FIX-37.md)、[完成报告](../tasks/SELFHOST-UAT-FIX-37-COMPLETION.md)及[D-106](DECISIONS.md#d-106-仓库实际收货采用关系化证据服务端时间和按检验模式分流)。 |
@@ -194,7 +195,10 @@
 | SELFHOST-PHASE1-TASK03 | 完成行级 Normalizer 与 Normalization Review 的 PostgreSQL 自托管移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围、验收标准与禁止事项确认） | 2026-07-23 | 2026-07-23 | SELFHOST-PHASE1-TASK02 | 已移植 run/rows/issues、关系化候选/lineage、Worker原子发布、重试/重跑/取消和Review UI；真实数据迁移及生产部署继续另立任务 |
 | SELFHOST-PHASE1-TASK04 | 完成 Normalization 人工复核与 Material Draft Commit 的 PostgreSQL 自托管移植 | DONE | Codex（诊断、非生产实施、隔离测试与文档）、项目负责人（任务范围、验收标准与禁止事项确认） | 2026-07-24 | 2026-07-24 | SELFHOST-PHASE1-TASK03、SELFHOST-PHASE1-TASK01 | 已实现独立人工覆盖、Issue处理、ACTIVE精确绑定、Material Service建DRAFT和可恢复finalization；真实样本容量验收、真实数据迁移和生产部署继续另立任务 |
 | PHASE3-TASK02 | 实现 Material Import Normalization & Staging V1 | DONE | Codex（实施）、项目负责人（批准 16 项决定） | 2026-07-17 | 2026-07-17 | PHASE3-TASK01 | 已实现独立 run、行 JSON 快照、Issue、Outbox/租约/心跳、原子 pointer 发布、不同 processor 版本重跑、取消清理、五个 API、`material.import.normalize`、读写限流、`0006` Up/受保护 Down/快照及隔离测试；未创建 Draft/正式物料，未迁移或部署生产 |
-| PHASE4-TASK01 | 建立AI治理评估与审批边界 | TODO | 待指派 | - | - | Material Import 治理链路完成 | 定义评估集、证据、模型版本、人工确认和禁止自动生效规则；原占位编号 `PHASE3-TASK01` 因本次明确任务编号顺延 |
+| PHASE4-TASK02 | 建立去敏评估集、确定性基线与离线Evaluator | TODO | 待指派 | - | - | PHASE4-TASK01、D-110 | 使用版本化不可变去敏样本和固定holdout分别测量分类、属性、候选匹配与供应商映射建议；不得自动开始，不得虚构阈值，测量结果及最低coverage须由项目负责人批准 |
+| PHASE4-TASK03 | 建立AI Suggestion/Evidence关系化候选层 | TODO | 待指派 | - | - | PHASE4-TASK02、D-110 | 设计可追溯、可过期、可丢弃的建议与逐字段证据边界；不得直接写正式物料、映射或业务事实 |
+| PHASE4-TASK04 | 建立人工审核API/UI与受控正式提交衔接 | TODO | 待指派 | - | - | PHASE4-TASK03、既有Material Master审批合同 | 人工决定与AI建议分离，继续复用服务端权限、事务、CAS、幂等、审核和审计；不授权生产试点 |
+| PHASE4-TASK05 | 验收非生产试点门禁、漂移、停用与回退 | TODO | 待指派 | - | - | PHASE4-TASK02—TASK04、D-110、项目负责人独立试点授权 | 仅在前置合同和独立授权满足后验证非生产试点、版本漂移、停用开关、回退和事件响应；不自动授权真实数据外发、生产迁移或部署 |
 
 ## 更新模板
 

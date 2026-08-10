@@ -41,7 +41,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
 | 当前根仓库运维基线 | `SELFHOST-UAT-FIX-38`已把通过候选Web-only部署到并行非生产UAT；本地/公开alpha.42 health、Caddy安全头、匿名保护、未来日期422、合法日期4次预览、四种返回修改、390×844和安全退出通过。唯一warehouse登录/退出各1，Business mutation及Receipt POST0；最终Session0、收货及全部下游0。独立收口提交消息为`ops: deploy warehouse receipt date guard`，实际SHA以Git log为准 |
-| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。本次行政收口严格起点为唯一worktree、clean `main@19b770c0219d2592b6b94aa2a22f0af8465db88b`、Parent `c96f9bfc912cb2a5dc6f4a3ad47bb51260847dbd`，`recovery-private/main`逐字节同为`19b770c…db88b`且behind0/ahead0；private仓库`3443176848/chenyida-erp-recovery-private`为PRIVATE/ADMIN/main。公开`origin/main=39946f6b854a985b5c19106eaa6c938bddaf9c7c`、behind0/ahead189，HTTPS fetch、SSH push、upstream、remote HEAD和public visibility不变。本次两个独立提交及增量扫描全部通过后只允许一次普通push最终HEAD到private main，公开origin仍禁止接收内部历史 |
+| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。本轮严格总起点为唯一worktree、clean `main@19b770c0219d2592b6b94aa2a22f0af8465db88b`、Parent `c96f9bfc912cb2a5dc6f4a3ad47bb51260847dbd`，`recovery-private/main`逐字节同为`19b770c…db88b`且behind0/ahead0；TASK39已先以独立提交`f17cc31d60bac70d6d3545f1904de6d54feeb4dd`收口。private仓库`3443176848/chenyida-erp-recovery-private`为PRIVATE/ADMIN/main。公开`origin/main=39946f6b854a985b5c19106eaa6c938bddaf9c7c`、behind0/ahead189，HTTPS fetch、SSH push、upstream、remote HEAD和public visibility不变；PHASE4-TASK01独立提交及最终增量扫描通过后只允许一次普通push最终HEAD到private main，公开origin仍禁止接收内部历史 |
 | 镜像恢复锚点 | D-109的private GHCR镜像恢复锚点已建立：唯一目标/tag为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，一次push返回、认证registry与唯一tag package version三方digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association、无`latest`/额外tag；linux/amd64 child、attestation、config和9层均匹配预检，一次按digest pull完全匹配，匿名读取返回401。一次性本机凭据已logout并清理；项目负责人证明已通过GitHub网页撤销一次性PAT，本项目未读取或技术验证PAT正文/远端状态 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
@@ -50,13 +50,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码与并行UAT PostgreSQL为`0001`—`0040`，40/head`0040_warehouse_receipt_readiness.sql`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`；0039及更早未修改。主`RFQ-00000001`为CLOSED v7，Award为1/v1/AWARDED且Line4；受控`PO-00000001`为1/v1/OPEN，PO Line/Delivery Plan/queue为`4/4/4`，新证据表及Receipt/Lot/IQC/Ledger/AP/付款/生产下游全0。四条获选Candidate、Binding及Mapping保持 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`。D-108 Git与D-109 private GHCR镜像锚点已建立并验证；项目负责人主动延期PostgreSQL与文件卷数据锚点，单机数据恢复风险继续`OPEN`。FIX38仍为`DONE / WEB_ONLY_UAT_DEPLOYED / ZERO_WRITE_REVALIDATED`和`NO UAT RECEIPT`，当前仍是非生产UAT且非production ready |
-| 当前任务 | 当前没有`DOING`任务。`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已按项目负责人范围决定行政收口；数据锚点没有建立，不能写成三锚点完成，也不得从已关闭任务继续dump、备份、Volume读取、恢复或上传 |
-| 下一任务 | `PHASE4-TASK01`仅为下一项`TODO`：建立AI治理评估与审批边界。开始后也只允许文档治理设计，不实现模型调用、API、页面、Schema或Migration。后续任何数据锚点、真实Receipt、IQC、AP、Payment、生产、真实迁移、部署或切流均须重新立项并取得明确授权；alpha.41回退锚点和被拒镜像继续保留 |
+| 当前阶段 | `PHASE4-TASK01 AI GOVERNANCE BASELINE ACCEPTED — IMPLEMENTATION NOT STARTED`。D-110已建立AI建议、确定性门禁、失败关闭、人工审批、去敏评估、版本/漂移及外部模型准入边界；外部AI保持禁用，没有模型、API、页面、Schema、Migration、Evaluator或试点实现。TASK39仍为`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`，单机数据恢复风险继续`OPEN` |
+| 当前任务 | 当前没有`DOING`任务。`PHASE4-TASK01`已完成治理文档基线；这不是AI实现、模型准入或试点授权。`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已行政收口，数据锚点未建立且不得从已关闭任务继续恢复动作 |
+| 下一任务 | `PHASE4-TASK02`仅为下一项`TODO`：建立版本化去敏评估集、确定性基线和离线Evaluator；不得自动开始，准确率阈值和最低coverage只能在已标注样本测量后由项目负责人批准。`PHASE4-TASK03`—`TASK05`同为`TODO`；任何外部模型、真实数据、试点、数据锚点、真实Receipt、迁移、部署或切流均须重新立项并取得明确授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- PHASE4-TASK01已完成D-110与AI治理评估/审批V1合同：AI仅生成候选和证据，确定性门禁与既有服务端权限/事务/CAS/幂等/审核/审计优先，异常失败关闭；采购、工程、品质和主数据管理员继续承担人工责任。版本化去敏评估集、固定holdout、四类能力分评、最低指标及安全违规0门禁已经定义。该完成仅为`GOVERNANCE BASELINE ACCEPTED / IMPLEMENTATION NOT STARTED`，外部AI禁用，TASK02—TASK05均未开始
 
 - SELFHOST-OPS-RECOVERY-FOUNDATION-39已按项目负责人范围决定行政收口：D-108 private Git锚点保持，D-109唯一alpha.42 Web镜像以完整revision tag一次push到private GHCR；push、registry和package version digest三方为`sha256:e7761e2c…f94964`，按digest回拉匹配且匿名401。本机临时凭据已清理，项目负责人证明已通过GitHub网页撤销一次性PAT；PostgreSQL与三个文件卷异机锚点未建立并被主动延期，因此状态为`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`，单机数据恢复风险仍开放且不构成生产就绪
 
@@ -236,7 +238,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - 动态属性、单位换算、替代料及客户专用料的下游拦截
 - SQLite、在线 D1 和治理模板之间的受控迁移与核对
 - 独立生产备份、生产恢复演练、远程 Test D1 和完整应用安全测试
-- AI 治理、AI 采购、AI 报价、AI 生产辅助及行业知识库
+- AI治理评估与审批基线已完成，但AI模型/API、离线Evaluator、Suggestion/Evidence候选层、人工审核工作台、非生产试点、AI采购/报价/生产辅助及行业知识库均未实现；外部AI保持禁用
 - Material Master 只读页面尚未在生产 Site 发布；当前公开版本仍不具备本任务的新路由和查询 API
 - Material Draft 页面尚未在生产 Site 发布；当前公开版本不具备创建、编辑或提交审核界面
 - Material Review Queue 与审核工作台尚未在生产 Site 发布；当前公开版本不具备审核队列、批准或驳回工作台
@@ -248,6 +250,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 ## 当前风险
 
 - Git与private GHCR镜像锚点已建立，但PostgreSQL dump及uploads、attachments、backup-status异机锚点仍不存在；TASK39的行政关闭不消除该单机数据恢复风险，也不代表production ready
+- D-110只关闭AI治理规格缺口，不代表模型质量、供应商、隐私、地域、合同、凭据、评估阈值或试点已获批准；外部AI及所有AI实现继续禁用，TASK02—TASK05必须独立授权和验收
 - UAT 临时 manager 已通过页面停用且未用于业务试用。首次浏览器验收脚本在停用后的刷新检查处提前结束，遗留一个已丢失令牌、等待正常 8 小时 TTL 的会话；按不可变审计和禁止直接 SQL 删除边界保留。两个目标 logout 与完整复验的旧 Session 均已立即撤销，不得把该脚本残留误述为 logout 失败。
 - V9 表格 197 行虽有唯一连续 ERP 编码和完整来源追踪，但没有单位列，也没有产品版本、BOM 版本、BOM 行数量/位号结构；`使用次数` 不能作为数量。未经逐行显式单位与独立 BOM 契约，不得清空现有主库或导入这些行
 
@@ -305,7 +308,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- `SELFHOST-UAT-FIX-38`为唯一`DOING`，当前阶段`IMAGE_READY / DEPLOYMENT_NOT_AUTHORIZED`：从固定`main@569aa954…d33a24`的`HEAD:chenyida_erp_site`唯一构建新tag `0.1.0-alpha.42-fix38-569aa95`，完整Image ID `sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。镜像内最小package、OCI与health均精确为alpha.42；唯一隔离数据库/角色装载40/head0040，standalone启动、匿名保护及零业务写通过后已按序清零所有临时资源。未替换或重启UAT、未登录、未调用UAT Receipt preview/业务POST、未运行UAT Migration或push；运行UAT仍alpha.41/Web`0cf98937…5f19`且Receipt及下游0。旧候选`81126136…278e`仍为`REJECTED — DO NOT DEPLOY`；通过候选也只有另获授权后才能Web-only部署。
+- 当前没有`DOING`任务。`PHASE4-TASK01`已按D-110完成治理、评估与人工审批文档基线，结论为`PHASE4-TASK01 AI GOVERNANCE BASELINE ACCEPTED — IMPLEMENTATION NOT STARTED`；外部AI禁用，没有模型/API/UI/Schema/Migration/Evaluator、真实数据或试点。下一项`PHASE4-TASK02`仅为`TODO`且不得自动开始，TASK03—TASK05同为`TODO`。
 - `SELFHOST-UAT-FIX-37`已完成：功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`及语义修正`20a9123741862d81ac18af9e6bdee896674fe95c`；alpha.41/0040关系化收货证据、最小权限谱系、权威GET预览、最终POST事务门禁、提前到货保护和按inspection mode分流已Web-only部署为`sha256:0cf98937…5f19`。正式备份/第二库恢复/0039→0040及warehouse-only桌面/390×844取消UAT通过；business POST0、Session0，PO/Line/Plan/queue `1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。这是FIX38前置历史；真实收货及后续部门动作均须另获授权。
 - `SELFHOST-UAT-FIX-36`已完成：功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`；通用受限读模型、数据域403、PO聚合及完整上游谱系、四Line、四Plan/queue、Event/Audit/Idempotency最小投影和响应式只读详情已Web-only部署为`sha256:664e0ac6…a4ec89`。正式备份恢复、purchase-only桌面/390×844刷新重开和Session失效通过；business POST0，PO/Line/Plan/queue `1/4/4/4`及下游全0。这是FIX37的前置历史，不是当前执行指令。
 - `SELFHOST-UAT-DECISION-35`已完成：D-105将未经事前授权的`PO-00000001`置于受控保留状态；它是控制事件，只提供前向授权并明确“不追溯性授权”。PO/Line/Plan/queue `1/4/4/4`及Event/Audit/Idempotency证据不得改动，Award→PO不再重试；FIX36只读验收不改变该判断或授权边界。

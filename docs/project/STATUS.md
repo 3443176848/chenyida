@@ -2,6 +2,24 @@
 
 最后更新时间：2026-08-10（Asia/Shanghai）
 
+## PHASE4-TASK01 AI治理评估与审批边界（治理基线完成，实现未开始）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 最终状态 | DONE / GOVERNANCE BASELINE ACCEPTED / IMPLEMENTATION NOT STARTED | 最终判定`PHASE4-TASK01 AI GOVERNANCE BASELINE ACCEPTED — IMPLEMENTATION NOT STARTED`；只建立治理、评估与人工审批合同，不代表模型、功能或试点完成 |
+| 前置交接 | PASS / TASK39 CLOSED FIRST | 本轮严格总起点为clean `main@19b770c0219d2592b6b94aa2a22f0af8465db88b`、Parent`c96f9bfc…dbd`；TASK39先以独立提交`f17cc31d60bac70d6d3545f1904de6d54feeb4dd`行政收口，本任务随后成为唯一产品范围 |
+| D-110 | ACCEPTED / UNIQUE | AI仅建议；既有服务端权限/事务/CAS/幂等/审核/审计和确定性门禁优先；异常失败关闭；外部AI默认禁用；建议全追溯、人工决定分离、角色职责、版本重评、停用/回退/漂移边界已固化 |
+| 禁止动作 | FAIL CLOSED | AI不得直接创建/合并/启停/覆盖正式物料，不得写正式属性、supplier/legacy mapping、BOM、库存、采购、生产、品质、财务或正式编码，不得绕过人工审批或自动训练/调阈值/改规则/发布 |
+| 人工审批 | PROCUREMENT / ENGINEERING / QUALITY / MASTER DATA | 采购确认来源和供应商事实，工程确认规格/同物，品质确认质量与合规，主数据管理员负责规则完整性和最终受控建档/合并；AI只建议且不是审批人，矩阵不授予新权限 |
+| 建议与决定 | TRACEABLE / SEPARATE | 建议必须绑定稳定ID以及输入、数据集、规则、模型、prompt、参数、Schema、逐字段证据、置信度、request和时间；人工决定单独绑定版本、审核人、采用/更正、理由、CAS和审计结果 |
+| 评估合同 | VERSIONED / DEIDENTIFIED / FIXED HOLDOUT | 不可变去敏数据集带稳定ID和摘要；固定holdout不用于调优；分类、属性提取、候选匹配、供应商映射建议分别评估并覆盖正反例、冲突、单位、客户专用、冻结、行业特殊及应放弃场景 |
+| 指标/门禁 | MEASURE FIRST / SAFETY VIOLATIONS 0 | 最低指标包含precision/recall/F1、exact match、top-k recall、错误候选率、abstention/coverage、复现率及安全违规；直接写正式事实、绕过审核等关键安全违规允许值0。准确率阈值由TASK02测量后交项目负责人批准 |
+| 后续路线 | TASK02—TASK05 TODO / NOT STARTED | TASK02评估集/基线/Evaluator、TASK03 Suggestion/Evidence候选层、TASK04人工审核API/UI、TASK05非生产试点门禁/漂移/停用/回退；均不得从TASK01自动开始 |
+| 实现/运行面 | DOCS ONLY / UNCHANGED | 没有模型/API/UI/Schema/Migration/Evaluator、真实数据或试点；alpha.42、40/head0040、运行Web Image、四服务及四个受保护Volume保持 |
+| 文档/测试 | PASS / DOCS ONLY | 九份目标Markdown的53个本地引用、D-110/任务H1/TASK01—TASK05台账行唯一、DOING为0、五份最终判定、精确路径、敏感信息及`git diff --check`通过；断网、源码只读、1 CPU/受限内存lint为0 error/11条既有warning，既有只读采购履约UI合同6/6 |
+| 资源/清理 | PASS / NO THRESHOLD BREACH | 验证前后available约`2.2/2.2 GiB`、Swap`338/343 MiB`、根盘`17/17 GiB`、Load`0.01/0.12/0.20`→`0.14/0.14/0.19`。内核OOM0；Web/Worker/PostgreSQL/Caddy均restart0/OOM false/running，Web/PostgreSQL healthy；任务Node容器自动删除，四个受保护Volume保持且未读取正文，没有其他临时资源 |
+| 明确未执行 | PASS / NO RUNTIME OR DATA ACTION | 未登录UAT、调用业务API、查询/写数据库、运行Migration/build/Docker build/Compose更新/deploy/restart、访问Volume、备份恢复、GHCR操作或public push；外部AI和模型凭据未接触 |
+
 ## SELFHOST-OPS-RECOVERY-FOUNDATION-39 行政收口（Git/镜像锚点完成，数据锚点延期）
 
 | 验证项 | 结果 | 说明 |
@@ -24,7 +42,7 @@
 | UAT/数据保护 | UNCHANGED / NO ACCESS | 收口未登录UAT、未调用业务API、未查询或写入业务数据库，未运行Migration、备份、dump、Volume读取、恢复、build、Compose更新、deploy或restart；FIX38继续alpha.42/0040/NO UAT RECEIPT |
 | 文档/测试/Git | PASS / DOCS-ONLY / PRIVATE PUSH ONLY | 八份Markdown的48个本地引用、TASK39/D-109/PHASE4-TASK01当前行唯一、DOING为0、精确路径与diff通过；断网只读受限容器lint 0 error/0 warning、既有UI合同6/6。凭据脚本因Node slim无Git未启动，等价本机只读扫描1,304文件/1,282文本通过。行政收口以`docs: close recovery foundation scope`独立提交；`RELEASES.md`不变，两个提交完成后才普通push private，不向public推送 |
 | 资源/清理 | PASS | 行政收口起点available约2.2GiB、Swap337MiB/1GiB、根盘17GiB、Load`0.14/0.13/0.10`；验证后2.2GiB/338MiB/17GiB/`0.84/0.77/0.37`。内核OOM匹配0、四服务restart0/OOM false；任务Node容器清零，没有创建或清理临时目录、镜像、网络或Volume |
-| 剩余风险/下一阶段 | DATA ANCHOR DEFERRED / RISK OPEN | PostgreSQL dump与uploads、attachments、backup-status文件卷异机锚点没有建立；项目负责人主动延期，未来必须重新立项、确认方案并授权，不能从已关闭TASK39自动启动。下一产品任务为PHASE4-TASK01，当前仍TODO |
+| 剩余风险/下一阶段 | DATA ANCHOR DEFERRED / RISK OPEN | PostgreSQL dump与uploads、attachments、backup-status文件卷异机锚点没有建立；项目负责人主动延期，未来必须重新立项、确认方案并授权，不能从已关闭TASK39自动启动。TASK39收口时移交给PHASE4-TASK01；该后续治理任务现已按本文件上方独立状态完成 |
 
 ## SELFHOST-UAT-FIX-38 Web-only部署与零业务写复验（完成）
 

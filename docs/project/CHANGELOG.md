@@ -4,6 +4,15 @@
 
 ## 2026-08-10
 
+### PHASE4-TASK01 - `docs: define AI governance approval boundaries`
+
+- 决策/治理：新增D-110与《AI治理评估与审批边界V1》，固定AI只产生可丢弃建议和逐字段证据；确定性冲突及既有服务端权限、事务、CAS、幂等、审核、审计优先，异常失败关闭。采购、工程、品质和主数据管理员继续承担来源、规格、质量与最终建档/合并责任，AI不是审批人。
+- 外部模型：默认禁用；本任务不选择供应商、模型或地域，不创建/读取Key，不发送真实供应商/客户/生产数据。未来准入必须另行完成数据分类、去标识化、保留/训练/删除条款、地域/跨境、合同/分包商和凭据生命周期审批。
+- 评估合同：版本化不可变去敏数据集、整体摘要、固定holdout、场景分层、四类能力分别评估；最低指标包含precision/recall/F1、exact match、top-k recall、错误候选、abstention/coverage、复现率和安全违规。直接正式写入、绕过审核等关键安全违规允许值为0；准确率阈值留待TASK02用已标注样本测量并由项目负责人批准。
+- 路线/状态：Phase 4固定为TASK01治理基线、TASK02评估集/基线/Evaluator、TASK03 Suggestion/Evidence候选层、TASK04人工审核API/UI、TASK05非生产试点门禁/漂移/停用/回退。TASK01为DONE，TASK02—TASK05为TODO且未自动开始；最终判定`PHASE4-TASK01 AI GOVERNANCE BASELINE ACCEPTED — IMPLEMENTATION NOT STARTED`。
+- 影响边界：只更新九份Markdown；没有模型调用、API、页面、业务代码、测试代码、`package.json`、Dockerfile、Schema、Migration、部署配置或业务数据变化。未登录UAT、调用业务API、查询/写入数据库、运行Migration/build/deploy/restart、访问Volume或执行GHCR动作；`RELEASES.md`不变。
+- 验证/资源：九份目标文档53个本地引用、D-110/任务H1/TASK01—TASK05台账行唯一、DOING为0、精确路径、敏感信息和`git diff --check`通过。断网、源码只读、1 CPU/受限内存容器中的lint为0 error/11条既有warning，只读采购履约UI合同6/6。验证前后available约`2.2/2.2 GiB`、Swap`338/343 MiB`、根盘`17/17 GiB`、Load`0.01/0.12/0.20`→`0.14/0.14/0.19`；内核OOM0、四服务restart0/OOM false、任务Node容器清零，四个受保护Volume保持。
+
 ### SELFHOST-OPS-RECOVERY-FOUNDATION-39 - `docs: close recovery foundation scope`
 
 - 项目负责人证明已通过GitHub网页完成“`GHCR ONE-TIME PAT REVOKED`”；本项目只记录该用户证明，没有读取、恢复、测试或验证PAT正文、scope或远端认证状态。
