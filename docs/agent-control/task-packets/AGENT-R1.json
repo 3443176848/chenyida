@@ -2,9 +2,9 @@
   "schema_version": "chenyida-erp-agent-task/v1",
   "task": {
     "id": "AGENT-R1",
-    "revision": 1,
-    "ledger_state": "DOING",
-    "delivery_stage": "IMPLEMENTING",
+    "revision": 2,
+    "ledger_state": "DONE",
+    "delivery_stage": "VERIFIED",
     "qualifiers": [
       "READ_ONLY_CONTROLLER",
       "NO_RUNTIME_AUTHORITY",

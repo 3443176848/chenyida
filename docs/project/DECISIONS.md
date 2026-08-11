@@ -1538,17 +1538,17 @@
 ## D-113 晨亿达ERP多智能体研发控制面采用单一任务、最小能力与可恢复有界循环
 
 - 日期：2026-08-11
-- 状态：`ACCEPTED / R1 AUTHORIZED / ENFORCEMENT NOT IMPLEMENTED`
+- 状态：`ACCEPTED / R1 COMPLETE / ENFORCEMENT NOT IMPLEMENTED`
 - 提案人：Codex（按`PM-001`设计要求形成提案）
 - 确认人：项目负责人（2026-08-11明确“接受 D-113”，并单独授权`AGENT-R1`只读控制器）
 
 ### Context
 
-- 当前仓库同时保留自托管Node/PostgreSQL未来生产方向、Python/SQLite历史开发/迁移来源和历史Sites/D1证据，且`PHASE4-TASK03`仍是唯一`DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。通用Agent若不理解运行面、Migration、UAT受控PO、资源和业务交接，很容易把源码完成误报为发布或产生跨运行面重复逻辑。
+- 提案形成时，仓库同时保留自托管Node/PostgreSQL未来生产方向、Python/SQLite历史开发/迁移来源和历史Sites/D1证据，且`PHASE4-TASK03`是唯一`DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。通用Agent若不理解运行面、Migration、UAT受控PO、资源和业务交接，很容易把源码完成误报为发布或产生跨运行面重复逻辑；当前TASK03已由后续owner指令暂停。
 - Prompt中的“只读”“不部署”不能强制共享root Shell下的实际权限。并行实现者、测试库、Migration、状态文档、UAT写和低资源重任务必须由独立控制面防止覆盖、脑裂、重复副作用和生产越权。
 - 项目需要Agent在对话/进程结束后继续同一正式任务，但持续运行不能绕过人工决策、无限重试或自动开始下一任务。
 
-### Proposed decision
+### Decision
 
 1. `TASKS.md`继续只使用`TODO / DOING / DONE / BLOCKED`且同时最多一个正式`DOING`；交付阶段、qualifier和工作项运行态分层管理，不扩充台账状态语义。
 2. 每个正式任务建立版本化Task Packet，冻结Task ID、基线SHA、目标运行面、允许路径/动作、业务不变量、验收、风险、授权、资源、证据和退出条件。Packet改变会使受影响的旧测试、Agent审查和人工决定引用失效。
@@ -1565,7 +1565,7 @@
 ### Consequences
 
 - [多智能体研发系统设计](../AI_AGENT_TEAM_DESIGN.md)成为后续R1只读控制器、R2隔离底座、R3有界开发循环、R4受控UAT和R5生产候选的提案基线；每一阶段必须另立任务、验收和授权。
-- `PM-001`按owner priority hold顺序成为唯一DOING并完成，随后恢复`PHASE4-TASK03`原DOING状态；无并行DOING。控制面实施状态保持`NOT_STARTED`，不能声称角色已被OS、容器、凭据代理或策略技术隔离。
+- `PM-001`按owner priority hold顺序成为唯一DOING并完成，随后恢复`PHASE4-TASK03`原DOING状态；无并行DOING。这是PM-001收口时点事实；后续项目负责人另行接受本决定并启动R1。即使R1观察器完成，也不能声称角色已被OS、容器、凭据代理或策略技术隔离。
 - 本提案不修改业务代码、Schema/Migration、API、测试、版本或部署配置，不授权holdout、build、UAT Migration、部署、生产、TASK04或TASK05，也不改变`PHASE4-TASK03`状态。
 
 ### Acceptance and R1 authorization
@@ -1574,6 +1574,12 @@
 - 同一指令要求`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`并新建、启动`AGENT-R1`。TASK03的source-ready、holdout待重验和release未授权限定原样保留，恢复必须另获项目负责人明确指示。
 - `AGENT-R1`只授权R1无状态只读控制器、机器可读Task Packet、错误注入/恢复测试和项目文档；控制器只能读取本地仓库权威材料并向stdout输出清单，不得写控制状态、连接UAT/生产、运行Migration/build/deploy或修改ERP业务逻辑。
 - 原Consequences中“本提案不改变PHASE4-TASK03状态”是提案形成时点事实；本次状态变化来自项目负责人新的明确调度指令，不是D-113自动启动后续阶段。
+
+### R1 implementation record
+
+- `AGENT-R1`已于2026-08-11完成：状态提交`d6bb223bd9381184d50ee8ac65c2a71d5033a58b`，只读控制器实现提交`903e2108bf71a1b4488a6b9d69da0e10aae07880`，治理收口使用独立`docs: complete read-only ERP agent controller`提交。
+- R1为无状态观察器：只读取本地Git、治理文档、package与Migration文件，向stdout输出确定性JSON；24/24错误注入/恢复测试、仓库`READY`、重复输出/工作区不变及零DOING `IDLE`通过。它不实现本决定第4、6、7、10、11项中的OS/容器隔离、Control Store、lease/fencing、能力代理、Agent Runtime或两阶段状态强制。
+- `PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`；R1完成不构成恢复TASK03或启动R2—R5的授权。
 
 ### Rejected alternatives
 

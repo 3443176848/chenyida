@@ -2,24 +2,28 @@
 
 最后更新时间：2026-08-11（Asia/Shanghai）
 
-## AGENT-R1 晨亿达ERP只读研发控制器（已立项并启动）
+## AGENT-R1 晨亿达ERP只读研发控制器（完成）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / READ_ONLY_CONTROLLER_IMPLEMENTING / NO_RUNTIME_AUTHORITY | `AGENT-R1`是唯一DOING；只实现本地仓库只读巡检和stdout清单，不建立控制状态或执行能力 |
-| D-113 | ACCEPTED / R1 ONLY | 项目负责人已接受D-113并单独授权R1；R2—R5、OS/容器隔离、Control Store、租约、Policy/Capability Broker和Agent Runtime仍未实施或授权 |
-| Owner优先级 | PASS / ORDERED | `PHASE4-TASK03 DOING→BLOCKED / OWNER_PRIORITY_HOLD`，随后`AGENT-R1 TODO→DOING`；TASK03原source-ready/holdout/release限定不变，无并行DOING |
-| 允许读取 | LOCAL REPOSITORY METADATA ONLY | Git、AGENTS/项目Markdown/Task Packet、package、Migration文件、journal和snapshot；不读取真实资料、秘密、业务正文或受保护Volume |
-| 禁止运行面 | NO UAT / NO PRODUCTION / NO DATABASE | 不访问网页/API/SSH/数据库，不登录，不执行Migration、build、deploy、restart、backup/restore或发布 |
-| ERP影响 | ZERO BUSINESS LOGIC CHANGE | 不修改Node/Python ERP业务代码、Schema/Migration、API/UI/Worker、版本或部署配置 |
-| 严格起点 | PASS WITH OWNER UNTRACKED INPUT | `main@fd5bf3f7ab1d710053c88aa460614ec79d77e66b`、唯一worktree；仅既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`，本任务不读取或纳入提交 |
-| 资源起点 | PASS / LIGHT ONLY | available约2.3 GiB、Swap354 MiB/1 GiB、根盘17 GiB、Load`0.30/0.19/0.13`；四容器running/restart0/OOM false。Compose因未注入受保护env失败关闭，不读取env补跑 |
+| 最终状态 | DONE / READ_ONLY_CONTROLLER_COMPLETE / NO_RUNTIME_AUTHORITY | 当前零DOING；控制器返回可审计`IDLE`并停止，不自动恢复TASK03或启动R2 |
+| D-113 | ACCEPTED / R1 COMPLETE | 项目负责人已接受D-113；R1观察型实现完成。R2—R5、OS/容器隔离、Control Store、租约、Policy/Capability Broker和Agent Runtime仍未实施或授权 |
+| Owner优先级 | PASS / ORDERED | `PHASE4-TASK03 DOING→BLOCKED / OWNER_PRIORITY_HOLD`，随后`AGENT-R1 TODO→DOING→DONE`；TASK03原source-ready/holdout/release限定不变，无并行DOING |
+| 实现 | PASS / STATELESS READ ONLY | Python标准库CLI、版本化Task Packet和说明文档；固定读取Git、治理Markdown、package及Migration文件，只向stdout输出确定性JSON，不创建控制库、缓存、日志、报告或锁 |
+| 状态与漂移 | PASS / FAIL CLOSED | 覆盖D-113、零/唯一/多个DOING、Packet一致性、branch/base/worktree、允许路径、源码版本及Migration编号/head/checksum/snapshot/journal；稳定退出码和去敏错误，不自动修复 |
+| 仓库实况 | READY → IDLE / DETERMINISTIC | R1为唯一DOING时连续两次`READY`、errors为空、输出逐字节一致且Git状态前后不变；收口为零DOING后连续两次`IDLE`且同样零变化。既有8个历史任务的状态一致重复终态行仅报`TASK_LEDGER_DUPLICATE_ROWS`告警 |
+| 专项测试 | PASS 24/24 | 成功、IDLE、双DOING、缺文档、未接受D-113、路径/branch/base/version/Migration漂移、symlink/hardlink、损坏Packet恢复、Git失败去敏、重复运行和CLI零写均通过 |
+| 静态/提交门禁 | PASS | 控制器无网络/数据库客户端、shell、临时文件或文件写API；唯一`subprocess.run`在只读Git适配器。敏感信息扫描、`git diff --check`和控制器缓存清理检查通过 |
+| Python基线 | PASS / LOCAL ONLY | `SELF_TEST_OK`、`SMOKE_TEST_OK`、loopback `GO_LIVE_CHECK_OK`；最后一项只检查既有本地开发服务/SQLite并显式`--no-backup`，不连接UAT/生产 |
+| Git | THREE FOCUSED COMMITS / NO PUSH | 状态提交`d6bb223b…58b`、实现提交`903e2108…880`、独立治理收口`docs: complete read-only ERP agent controller`；用户未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，未fetch/push |
+| 资源/清理 | PASS / NO THRESHOLD BREACH | 起点/收口available约`2.3/2.3 GiB`、Swap`354/354 MiB`、根盘可用`17/17 GiB`、Load`0.30/0.19/0.13`→`0.03/0.11/0.09`；任务窗口内核OOM 0，四容器running/restart0/OOM false。fixture自动清理，无pycache/临时容器/数据库/Volume；未prune |
+| 禁止事项 | PASS / NOT EXECUTED | 控制器没有网络或数据库能力；任务未访问UAT/生产网页、API、SSH或数据库，未运行holdout/Migration/Node全量测试/build/Compose变更/deploy/backup/restore/restart/外部AI，未修改ERP业务逻辑、Schema/Migration、package或部署配置 |
 
-## PM-001 晨亿达ERP多智能体研发系统设计（治理任务完成，控制面未实施）
+## PM-001 晨亿达ERP多智能体研发系统设计（治理任务完成；R1已另行实施）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 最终状态 | DONE / DESIGN COMPLETE / IMPLEMENTATION NOT STARTED | 新增[系统设计](../AI_AGENT_TEAM_DESIGN.md)；PM-001正式治理任务完成，但Agent Control Plane、Runtime、Policy Engine、Capability Broker和独立执行身份均未实现或部署 |
+| 最终状态 | DONE / DESIGN COMPLETE | 新增[系统设计](../AI_AGENT_TEAM_DESIGN.md)；PM-001正式治理任务完成。后续独立任务AGENT-R1已实现只读观察器，但Runtime、Policy Engine、Capability Broker和独立执行身份仍未实现或部署 |
 | 单一任务切换 | PASS / ORDERED | `PHASE4-TASK03 DOING→BLOCKED / OWNER_PRIORITY_HOLD`，随后`PM-001 TODO→DOING→DONE`，最后`PHASE4-TASK03 BLOCKED→DOING`；无并行DOING，TASK03期间没有产品工作项，恢复后原阶段/qualifier不变 |
 | 项目适配 | PASS / CHENYIDA ERP ONLY | 固定Node/PostgreSQL唯一生产方向、Python/SQLite迁移来源、历史Sites/D1证据边界、alpha.44/0041源码与alpha.42/0040 UAT分离、当前受控PO零下游事实和`PHASE4-TASK03`发布未授权状态 |
 | 角色体系 | 24 LOGICAL ROLES | ERP CTO、PM、状态、ERP业务、物料、BOM/工程、采购、仓库、Planning、生产、品质/返工、销售、财务、架构、数据库、前后端开发、QA、安全、代码/DB审查、用户模拟、数据迁移、AI治理和Release/SRE；实现者不得自审 |
@@ -28,7 +32,7 @@
 | 状态/循环 | RECOVERABLE / BOUNDED | TASKS保持TODO/DOING/DONE/BLOCKED；Git TASKS blob与SQLite active slot以PREPARED→状态Commit→COMMITTED两阶段协议闭合，不一致全局失败关闭。lease token/version/fencing/hard deadline、CAS、修复预算、PARKED事件唤醒、完整检查点和全局heavy锁共同保护；每轮一个有界动作，DONE/BLOCKED终止且不自动启动下一任务 |
 | ERP硬门禁 | PASS / EXPLICIT | Migration不可破坏、生产数据默认拒绝、服务端权限优先、业务闭环优先、已过账事实只追加调整/冲销、历史逻辑不得删除且只能停写/冻结/废弃标记/追加替代；明确Material、BOM、采购、收货/IQC/AP、计划、生产、返工、销售/FQC/AR交接 |
 | 独立终审 | PASS / 3 OF 3 | ERP业务终审、权限/安全终审及状态机/持续循环终审均通过；终审前意见已补齐Planning/Production/Warehouse/Quality分工、真实单据状态、权限强制、三方Migration职责、等待/重试/恢复守卫和Git/Control Store两阶段状态协议 |
-| D-113 | ACCEPTED / R1 AUTHORIZED | 设计决定已接受；仅`AGENT-R1`只读观察能力获准，不能据此声称完整控制面或技术隔离已实施 |
+| D-113 | ACCEPTED / R1 COMPLETE | 设计决定已接受，后续`AGENT-R1`只读观察能力已完成；不能据此声称完整控制面或技术隔离已实施 |
 | Python基线 | PASS | 系统Python self-test为`SELF_TEST_OK`；仓库既有`.venv`执行smoke为`SMOKE_TEST_OK`，`go_live_check.py --host 127.0.0.1 --port 18889 --require-running --no-backup`为`GO_LIVE_CHECK_OK`。首次系统Python smoke因缺`openpyxl`未启动测试，未安装或修改环境 |
 | Node基线 | PASS / ISOLATED | 宿主无npm，使用既有`node:22-bookworm-slim`，断网、源码只读、1 CPU、1,280 MiB、heap 768 MiB、串行临时容器；`npm test` 3/3通过，lint退出0。非特权首次探测因root-owned源码EACCES未启动测试，随后以容器root只读挂载完成 |
 | 资源/清理 | PASS / NO THRESHOLD BREACH | 起点/最终available `2.3/2.3 GiB`，Swap `354/354 MiB`，根盘可用`17/17 GiB`，Load `0.31/0.30/0.27`→`0.16/0.20/0.32`；内核OOM匹配0，四服务restart0/OOM false。两个命名临时容器最终清零，未创建数据库/目录/镜像/Volume，未prune |

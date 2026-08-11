@@ -1,12 +1,12 @@
 # 晨亿达 ERP 多智能体研发系统设计
 
 > 任务编号：`PM-001`
-> 文档状态：`DESIGN COMPLETE / IMPLEMENTATION NOT STARTED`
+> 文档状态：`DESIGN COMPLETE / R1 READ-ONLY CONTROLLER COMPLETE / R2-R5 NOT STARTED`
 > 设计日期：2026-08-11（Asia/Shanghai）
 > 事实基线：`main@0d09cfef140e612d193b42d47497da6fbfa9205f`
 > 输入依据：`ERP_CURRENT_STATUS_REPORT.md`、`AGENTS.md`、项目总控、任务台账、项目上下文及 D-040、D-110～D-112
 > 实施边界：本文只定义控制面，不创建 Agent 运行服务、不修改业务代码或 Migration，不连接 UAT/生产数据库，不授权部署、真实数据或外部 AI
-> 2026-08-11实施注记：项目负责人已接受D-113并单独授权`AGENT-R1`只读控制器；`PHASE4-TASK03`按`OWNER_PRIORITY_HOLD`暂停。R1授权不包含R2—R5、UAT/生产、Migration、build、部署或ERP业务变化。
+> 2026-08-11实施注记：项目负责人已接受D-113；`AGENT-R1`只读控制器已完成，`PHASE4-TASK03`继续按`OWNER_PRIORITY_HOLD`暂停，当前零DOING。R1实现不包含R2—R5、UAT/生产、Migration、build、部署或ERP业务变化。
 
 ## 1. 设计目标
 
@@ -17,7 +17,7 @@
 - 历史 Sites/D1 只保留为行为证据和迁移来源，不得恢复为新业务权威。
 - 当前源码候选是 `0.1.0-alpha.44` / Migration `0041`；受控公网 UAT 仍是 `0.1.0-alpha.42` / `0040`。
 - 当前 UAT 业务事实只推进到一个受控保留的 PO；收货、库存、生产、品质、销售和财务下游均未形成真实 UAT 闭环。
-- `PHASE4-TASK03` 仍是唯一 `DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，本设计不得自动推进其 holdout、build、UAT Migration、部署、TASK04 或 TASK05。
+- `PHASE4-TASK03` 当前为 `BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，本设计与R1控制器均不得自动恢复它或推进其 holdout、build、UAT Migration、部署、TASK04 或 TASK05。
 
 多智能体系统的目标是：
 
@@ -743,26 +743,26 @@ PM-001 TODO → DOING → DONE（设计、验证、治理文档和独立Commit�
 PHASE4-TASK03 BLOCKED → DOING（PM-001收口后恢复原阶段与qualifier）
 ```
 
-该顺序只表示调度状态，不重跑或改变PHASE4源码、holdout、UAT和发布事实；任一时点逻辑上只有一个DOING。当前控制面尚未实施，所以本次由闭环治理Commit统一记录顺序事件与最终状态；未来R1以后必须使用第8.3节的两阶段协议实时强制，不能事后补记。
+该顺序只表示调度状态，不重跑或改变PHASE4源码、holdout、UAT和发布事实；任一时点逻辑上只有一个DOING。PM-001收口时控制面尚未实施，所以当次由闭环治理Commit统一记录顺序事件与最终状态；R1现已提供只读核对，但第8.3节两阶段协议仍须R2/R3另行实现后才能实时强制，不能由R1冒充。
 
-设计交付完成后，实施状态必须保持：
+PM-001设计交付完成时的实施状态为：
 
 ```text
-CONTROL_PLANE_IMPLEMENTATION = NOT_STARTED
+CONTROL_PLANE_IMPLEMENTATION_AT_PM001_CLOSURE = NOT_STARTED
 AGENT_RUNTIME = NOT_DEPLOYED
 ENFORCED_CAPABILITY_BROKER = NOT_AVAILABLE
 UAT_OR_PRODUCTION_AUTHORIZATION = NONE
 ```
 
-因此，本文收口后恢复`PHASE4-TASK03`为唯一DOING且不改变其产品阶段，也不会证明任何 Agent 目前已经受到 OS、容器或凭据代理的技术隔离。
+后续项目负责人已接受D-113并按新调度指令暂停TASK03、完成R1。当前实施状态为`R1_READ_ONLY_CONTROLLER = COMPLETE`，而`R2_R3_ENFORCEMENT = NOT_STARTED`、`AGENT_RUNTIME = NOT_DEPLOYED`、`ENFORCED_CAPABILITY_BROKER = NOT_AVAILABLE`、`UAT_OR_PRODUCTION_AUTHORIZATION = NONE`；R1不证明任何Agent已受到OS、容器或凭据代理的技术隔离。
 
-### 13.2 当前唯一产品任务 `PHASE4-TASK03`
+### 13.2 当前被Owner暂停的产品任务 `PHASE4-TASK03`
 
 控制器首次只读导入时必须生成而不扩大以下事实：
 
 | 字段 | 当前值 |
 | --- | --- |
-| 台账状态 | `DOING`（唯一） |
+| 台账状态 | `BLOCKED / OWNER_PRIORITY_HOLD`；当前零DOING |
 | 交付阶段 | `SOURCE_READY` |
 | Qualifier | `HOLDOUT_REVALIDATION_REQUIRED`、`RELEASE_NOT_AUTHORIZED` |
 | 源码候选 | `0.1.0-alpha.44` / Migration `0041` |
@@ -770,14 +770,14 @@ UAT_OR_PRODUCTION_AUTHORIZATION = NONE
 | 未授权动作 | 新 holdout 执行、外部 AI、真实资料读取、build、UAT Migration、部署、发布、TASK04/TASK05 |
 | 恢复原则 | 只有项目负责人对精确对象和动作授权后，才创建新的有界工作项 |
 
-R1只读控制器不得因为读取到本文，就重跑holdout、生成release、同步UAT、改变受控PO，或擅自改写`PHASE4-TASK03`。当前文档尚未给该DOING任务定义`awaited_event/wait_deadline_at`，首次导入必须报告`STATE_RECONCILIATION_REQUIRED`并以无租约PARKED方式停止调度；项目负责人需在R3前明确补齐有界等待合同，或按真实阻塞条件把任务转为BLOCKED。未完成该对账前不能启动任何工作项。
+R1只读控制器不得因为读取到本文，就重跑holdout、生成release、同步UAT、改变受控PO，或擅自改写/恢复`PHASE4-TASK03`。项目负责人已把任务明确转为`BLOCKED / OWNER_PRIORITY_HOLD`，因此台账空闲时R1返回`IDLE`并停止；解除hold、补齐未来R3的`awaited_event/wait_deadline_at`合同或创建下一工作项，都必须由项目负责人另行明确决定。
 
 ## 14. 分阶段落地路线
 
 | 阶段 | 内容 | 放行条件 |
 | --- | --- | --- |
 | R0 设计基线（本次交付） | 角色、权限、Task Packet、状态、循环和 ERP 门禁 | 文档审查、基线测试、聚焦 Commit |
-| R1 只读控制器 | 解析文档、检查唯一 DOING、路径/版本/Migration 漂移、生成只读清单 | 不写代码/DB；错误注入和恢复测试通过 |
+| R1 只读控制器（DONE） | 解析文档、检查零/唯一 DOING、路径/版本/Migration 漂移、生成只读清单 | 运行时不写仓库/DB；24/24错误注入和恢复测试、仓库READY/IDLE通过 |
 | R2 隔离执行底座 | 独立 Unix/容器身份、worktree、路径租约、控制库、命令/秘密代理、全局重任务锁 | 策略负测证明越权路径、生产、真实资料和秘密默认拒绝 |
 | R3 有界开发循环 | 单一任务内调度实现、QA、安全、Review、状态和恢复 | 脑裂、租约过期、崩溃恢复、重复执行和证据失效测试通过 |
 | R4 受控 UAT | 精确 capability、幂等键、前后指纹、审计、回退和人工确认 | 不影响受控 PO；测试主体和数据可清理；每次写另授权 |

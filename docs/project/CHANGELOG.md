@@ -4,6 +4,16 @@
 
 ## 2026-08-11
 
+### AGENT-R1 - `feat: add read-only ERP agent controller` / `docs: complete read-only ERP agent controller`
+
+- 实现：新增Python标准库无状态CLI、版本化机器Task Packet和最小运行说明；固定检查D-113、零/唯一DOING、Task/Packet一致性、Git branch/base/worktree与允许路径、源码版本及Migration编号/head/checksum/snapshot/journal，只向stdout输出确定性JSON。实现提交为`903e2108bf71a1b4488a6b9d69da0e10aae07880`。
+- 失败关闭：文件读取拒绝缺失、不可读、非UTF-8、超限、symlink/hardlink；Packet拒绝重复键、未知字段、路径穿越、任务文档遗漏及检查目标重定向。Git只走固定白名单且`GIT_OPTIONAL_LOCKS=0`，失败返回稳定去敏错误；不调用shell、网络、数据库或文件写API。
+- 验证：专项unittest 24/24通过；R1为唯一DOING时仓库实况连续两次`READY`、errors为空、输出逐字节一致且运行前后Git状态不变，完成后零DOING连续两次`IDLE`。既有8个历史任务的状态一致重复终态行只产生`TASK_LEDGER_DUPLICATE_ROWS`告警，不在本任务内改写；重复active/nonterminal或冲突状态仍失败关闭。
+- 基线：本地Python `SELF_TEST_OK`、`SMOKE_TEST_OK`、`GO_LIVE_CHECK_OK`；go-live检查仅访问`127.0.0.1`既有开发服务/SQLite且显式`--no-backup`。控制器静态网络/数据库/写入边界、敏感信息、diff及无pycache检查通过。
+- 状态：`AGENT-R1 DOING→DONE / READ_ONLY_CONTROLLER_COMPLETE / NO_RUNTIME_AUTHORITY`，当前零DOING且控制器返回`IDLE`；`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，未自动启动R2—R5。
+- 边界：未访问UAT/生产网页、API、SSH或数据库，未执行holdout、Migration、Node全量测试、build、Compose变更、部署、备份恢复、重启、外部AI或Git push；未修改ERP业务逻辑、Schema/Migration、package、版本或部署配置。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交。
+- 资源/清理：起点/收口available约`2.3/2.3 GiB`、Swap`354/354 MiB`、根盘可用`17/17 GiB`、Load`0.30/0.19/0.13`→`0.03/0.11/0.09`；任务窗口内核OOM匹配0，四个既有容器running/restart0/OOM false。临时fixture自动清理，无pycache、临时容器、数据库、镜像或Volume，未prune；`docker compose ps`因当前Shell未注入受保护env继续失败关闭，没有读取env补跑。
+
 ### AGENT-R1 - `docs: start read-only ERP agent controller`
 
 - 决策：项目负责人接受D-113；接受仅确立控制面设计权威，不代表OS/容器隔离、Control Store、租约、Policy Engine、Capability Broker、Agent Runtime或R2—R5已实施。

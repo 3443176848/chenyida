@@ -37,12 +37,12 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 多智能体研发治理 | `PM-001`设计完成；项目负责人已接受D-113，并按`PHASE4-TASK03 DOING→BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO→DOING`切换唯一active task。R1只实现无状态只读控制器，OS/容器隔离、Control Store、租约、Policy/Capability Broker、调度Runtime及R2—R5仍为`NOT_IMPLEMENTED / NOT_AUTHORIZED` |
+| 多智能体研发治理 | `PM-001`设计及`AGENT-R1`只读控制器已完成；项目负责人已接受D-113，并按`PHASE4-TASK03 DOING→BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO→DOING→DONE`完成有序切换。当前零DOING、控制器返回`IDLE`且不会自动认领任务；OS/容器隔离、Control Store、租约、Policy/Capability Broker、调度Runtime及R2—R5仍为`NOT_IMPLEMENTED / NOT_AUTHORIZED` |
 | 当前版本 | AI Suggestion/Evidence源码候选为`0.1.0-alpha.44`，源码Migration为41/head `0041_ai_governance_suggestion_evidence.sql`；并行非生产UAT Web仍为`0.1.0-alpha.42`原镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，运行source revision仍为`569aa954d764309e239d1f6c174e582596d33a24`，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。alpha.44/0041未build、未部署或应用到UAT；当前运行面仍是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
 | 当前根仓库运维基线 | `SELFHOST-UAT-FIX-38`已把通过候选Web-only部署到并行非生产UAT；本地/公开alpha.42 health、Caddy安全头、匿名保护、未来日期422、合法日期4次预览、四种返回修改、390×844和安全退出通过。唯一warehouse登录/退出各1，Business mutation及Receipt POST0；最终Session0、收货及全部下游0。独立收口提交消息为`ops: deploy warehouse receipt date guard`，实际SHA以Git log为准 |
-| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。PHASE4-TASK03第二阶段严格起点为唯一worktree、clean `main@0d6b5961b2ed280ca80b15678ac42665aad1b45e`、Parent`df254a6f8018292708f60c712c451368484deac7`；起点`recovery-private/main`与HEAD相同且behind0/ahead0，公开`origin/main=39946f6b854a985b5c19106eaa6c938bddaf9c7c`且public behind0/ahead195。持久层提交`8b839a64…6105`、服务提交`218ef1b4…0eb1`，文档以独立`docs: record AI suggestion source readiness`收口；全部验证后只普通fast-forward push到private main，公开origin禁止接收内部历史 |
+| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。AGENT-R1从唯一worktree、`main@fd5bf3f7ab1d710053c88aa460614ec79d77e66b`启动，状态提交为`d6bb223b…58b`、控制器实现提交为`903e2108…880`，最终治理收口使用独立`docs: complete read-only ERP agent controller`提交；项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交。本任务未fetch/push或改动远端；公开origin继续禁止接收内部历史 |
 | 镜像恢复锚点 | D-109的private GHCR镜像恢复锚点已建立：唯一目标/tag为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，一次push返回、认证registry与唯一tag package version三方digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association、无`latest`/额外tag；linux/amd64 child、attestation、config和9层均匹配预检，一次按digest pull完全匹配，匿名读取返回401。一次性本机凭据已logout并清理；项目负责人证明已通过GitHub网页撤销一次性PAT，本项目未读取或技术验证PAT正文/远端状态 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
@@ -51,17 +51,19 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0041`，41/head`0041_ai_governance_suggestion_evidence.sql`且SHA-256为`676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2`；并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`，0035/0040及更早Migration未修改。0041只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `AGENT-R1 READ-ONLY CONTROLLER IMPLEMENTATION / NO RUNTIME AUTHORITY`。只实现本地仓库文档/Git/版本/Migration文件的只读漂移检查和stdout清单，不建立控制状态或执行能力 |
-| 当前任务 | `AGENT-R1`是唯一`DOING`，状态为`DOING / READ_ONLY_CONTROLLER_IMPLEMENTING / NO_RUNTIME_AUTHORITY`。`PHASE4-TASK03`保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED` |
-| 下一任务 | 只完成并验收`AGENT-R1`；完成后停止，不自动启动R2或恢复TASK03。任何holdout、build、UAT Migration、部署、TASK04/TASK05、外部模型、真实数据、试点、真实Receipt、生产或切流继续需要独立明确授权 |
+| 当前阶段 | `AGENT-R1 READ-ONLY CONTROLLER COMPLETE / NO RUNTIME AUTHORITY`。本地仓库文档/Git/版本/Migration文件只读漂移检查和stdout清单已实现并验收；不建立控制状态、调度或执行能力 |
+| 当前任务 | 当前没有`DOING`任务；只读控制器实况返回`IDLE`且不会自动启动下一任务。`PHASE4-TASK03`保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED` |
+| 下一任务 | 停止并等待项目负责人明确选择：恢复`PHASE4-TASK03`，或另立并授权R2；两者均不得自动开始。任何holdout、build、UAT Migration、部署、TASK04/TASK05、外部模型、真实数据、试点、真实Receipt、生产或切流继续需要独立明确授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
-- PM-001已交付[晨亿达ERP多智能体研发系统设计](../AI_AGENT_TEAM_DESIGN.md)：以唯一正式任务、最小能力、单一写者、隔离验证、独立否决和人工发布为原则，定义24个逻辑角色、权限矩阵、Task Packet、状态/知识/Bug/技术债模型、租约/心跳/fencing与低资源循环。该治理任务已按单一任务切换链收口；控制器、Policy Engine、Capability Broker、独立Agent身份和UAT/生产能力均未实现
+- AGENT-R1已交付[无状态只读控制器](../../tools/erp_agent_control/readonly_controller.py)与[机器可读Task Packet](../agent-control/task-packets/AGENT-R1.json)：固定读取本地Git、治理文档、package与Migration文件，验证D-113、零/唯一DOING、任务/路径/基线/版本/Migration漂移并只向stdout输出确定性JSON。24/24专项测试、仓库`READY`实况、重复输出/工作区不变、收口后`IDLE`及三项本地Python基线通过；R1没有Control Store、租约、调度、网络、数据库或执行能力
 
-- PHASE4-TASK03已完成D-112第二阶段源码实施：[五表合同](../material-master/ai-suggestion-evidence-relational-v1.md)以alpha.44/0041、Schema/snapshot/journal和独立`LOCAL_DETERMINISTIC`模块落地，四能力安全`ABSTAIN`、稳定摘要、单事务候选/Audit/幂等、版本/SUPERSEDED、服务端过期/漂移及受保护POST/GET通过隔离测试。任务保持`DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`；正式holdout、build、部署、UAT Migration、人工审核、模型和试点均未开始
+- PM-001已交付[晨亿达ERP多智能体研发系统设计](../AI_AGENT_TEAM_DESIGN.md)：以唯一正式任务、最小能力、单一写者、隔离验证、独立否决和人工发布为原则，定义24个逻辑角色、权限矩阵、Task Packet、状态/知识/Bug/技术债模型、租约/心跳/fencing与低资源循环。R1观察型控制器现已实现；Policy Engine、Capability Broker、独立Agent身份、R2—R5和UAT/生产能力仍未实现或授权
+
+- PHASE4-TASK03已完成D-112第二阶段源码实施：[五表合同](../material-master/ai-suggestion-evidence-relational-v1.md)以alpha.44/0041、Schema/snapshot/journal和独立`LOCAL_DETERMINISTIC`模块落地，四能力安全`ABSTAIN`、稳定摘要、单事务候选/Audit/幂等、版本/SUPERSEDED、服务端过期/漂移及受保护POST/GET通过隔离测试。项目负责人现将任务保持为`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`；正式holdout、build、部署、UAT Migration、人工审核、模型和试点均未开始
 
 - PHASE4-TASK02已交付独立离线Evaluator、`synthetic-material-governance-v1@1.0.0`、calibration/holdout各32条、四项确定性基线和机器报告；功能提交`d69f6dff…194ec`后只运行一次正式all-splits测量，result digest `f1b5b6b9…ac316`。关键安全违规0、失败sample_id为空，coverage为calibration 18/32、holdout 19/32。D-111批准当前确定性身份的正确性/证据/复现100%、安全和错误候选0以及总体50%、分类75%、属性记录/字段75%、Match/Mapping各25%的最低coverage，现有结果为治理层PASS；机器报告历史字段不回写，release仍未授权，TASK03不得降低或重解释该阈值，外部AI、真实数据和运行面均未接入
 
@@ -235,7 +237,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前未完成模块
 
-- PM-001控制面设计已完成且D-113已接受；`AGENT-R1`正在实现只读控制器。R2隔离身份/路径租约/能力代理、R3有界开发循环、R4受控UAT和R5生产候选均未实施或授权，不得从路线表自动开始
+- PM-001控制面设计、D-113接受及`AGENT-R1`无状态只读控制器已经完成；R2隔离身份/路径租约/能力代理、R3有界开发循环、R4受控UAT和R5生产候选均未实施或授权，不得从路线表自动开始
 - PostgreSQL dump与uploads、attachments、backup-status文件卷的异机数据恢复锚点没有建立；TASK39已由项目负责人主动延期并行政关闭，单机数据恢复风险继续`OPEN`，未来必须重新立项和授权
 - 大批量流程的通用批次执行器、来源档案注册表、init/resume/validate/consolidate 命令和代表性试点尚未实现；当前 TASK07 脚本只能作为已知 8 份来源的参考，不得直接宣称支持所有公司资料
 - LANDING-TASK07 工作簿仍有 57 行单机用量和 21 行板型待人工补充，A200 4 处模板/旧版差异与 J587 标题版本冲突待业务确认；正式去重、内部编码、审核、数据库导入和下游 BOM 引用均未执行
@@ -257,7 +259,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前风险
 
-- D-113已由项目负责人接受，但当前只授权`AGENT-R1`观察型R1。直到R2/R3以后通过越权、脑裂、租约失效、资源和恢复负测，角色权限仍依赖现有仓库规则与人工流程，不能宣称已由OS、容器、命令代理或短时凭据技术强制
+- D-113已由项目负责人接受，`AGENT-R1`观察型R1也已完成，但它只报告本地仓库漂移且没有运行时强制力。直到R2/R3以后通过越权、脑裂、租约失效、资源和恢复负测，角色权限仍依赖现有仓库规则与人工流程，不能宣称已由OS、容器、命令代理或短时凭据技术强制
 - Git与private GHCR镜像锚点已建立，但PostgreSQL dump及uploads、attachments、backup-status异机锚点仍不存在；TASK39的行政关闭不消除该单机数据恢复风险，也不代表production ready
 - D-110关闭AI治理规格缺口，D-111只批准当前冻结本地确定性基线阈值，D-112只接受AI Suggestion/Evidence关系化合同；三者都不代表外部模型质量、供应商、隐私、地域、合同、凭据、真实数据、实现或试点获批。外部AI及候选层实现继续禁用，TASK03实施阶段与TASK04—TASK05仍须独立授权和验收
 - UAT 临时 manager 已通过页面停用且未用于业务试用。首次浏览器验收脚本在停用后的刷新检查处提前结束，遗留一个已丢失令牌、等待正常 8 小时 TTL 的会话；按不可变审计和禁止直接 SQL 删除边界保留。两个目标 logout 与完整复验的旧 Session 均已立即撤销，不得把该脚本残留误述为 logout 失败。
@@ -317,7 +319,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 项目负责人已接受D-113，并以新的owner优先级指令把`PHASE4-TASK03`转为`BLOCKED / OWNER_PRIORITY_HOLD`、把新任务`AGENT-R1`转为唯一`DOING`。`AGENT-R1`只实现无状态只读控制器；R2～R5不得自动执行。
+- 项目负责人已接受D-113，并以owner优先级指令把`PHASE4-TASK03`转为`BLOCKED / OWNER_PRIORITY_HOLD`；`AGENT-R1`已按`TODO→DOING→DONE`完成无状态只读控制器。当前零`DOING`并等待项目负责人明确选择是否恢复TASK03或另立R2；两者均不得自动执行。
 - `PHASE4-TASK03`的D-112五表及确定性候选Service/API仍为alpha.44/0041源码就绪，状态保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。外部AI禁用，正式holdout未重跑，源码未build/deploy，UAT仍alpha.42/0040，`PHASE4-TASK04`—`TASK05`保持`TODO`且不得自动开始。
 - `SELFHOST-UAT-FIX-37`已完成：功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`及语义修正`20a9123741862d81ac18af9e6bdee896674fe95c`；alpha.41/0040关系化收货证据、最小权限谱系、权威GET预览、最终POST事务门禁、提前到货保护和按inspection mode分流已Web-only部署为`sha256:0cf98937…5f19`。正式备份/第二库恢复/0039→0040及warehouse-only桌面/390×844取消UAT通过；business POST0、Session0，PO/Line/Plan/queue `1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。这是FIX38前置历史；真实收货及后续部门动作均须另获授权。
 - `SELFHOST-UAT-FIX-36`已完成：功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`；通用受限读模型、数据域403、PO聚合及完整上游谱系、四Line、四Plan/queue、Event/Audit/Idempotency最小投影和响应式只读详情已Web-only部署为`sha256:664e0ac6…a4ec89`。正式备份恢复、purchase-only桌面/390×844刷新重开和Session失效通过；business POST0，PO/Line/Plan/queue `1/4/4/4`及下游全0。这是FIX37的前置历史，不是当前执行指令。
