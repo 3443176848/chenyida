@@ -28,7 +28,7 @@ try:
 except ImportError:  # Direct script execution.
     from readonly_controller import validate_task_packet
 
-VALIDATOR_VERSION = "0.4.1"
+VALIDATOR_VERSION = "0.4.2"
 BUNDLE_SCHEMA = "chenyida-erp-native-pilot-bundle/v1"
 REPORT_SCHEMA = "chenyida-erp-native-pilot-report/v1"
 CONTEXT_SCHEMA = "erp-agent-context/v1"

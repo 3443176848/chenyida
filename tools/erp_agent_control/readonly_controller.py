@@ -24,7 +24,7 @@ from typing import Any, Iterable
 
 sys.dont_write_bytecode = True
 
-CONTROLLER_VERSION = "0.2.5"
+CONTROLLER_VERSION = "0.2.6"
 REPORT_SCHEMA = "chenyida-erp-agent-readonly-report/v1"
 PACKET_SCHEMA_V1 = "chenyida-erp-agent-task/v1"
 PACKET_SCHEMA_V2 = "chenyida-erp-agent-task/v2"
@@ -181,6 +181,8 @@ def _validate_path_pattern(value: Any) -> str:
     """Allow only exact paths or one recursive suffix on a concrete prefix."""
 
     if isinstance(value, str) and value.endswith("/**"):
+        if len(value) > 512:
+            raise ValueError("repository path pattern too long")
         prefix = value[:-3]
         _validate_relative_path(prefix)
         return value

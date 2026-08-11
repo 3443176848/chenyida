@@ -470,6 +470,22 @@ class ReadonlyControllerTest(unittest.TestCase):
 
                 self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
 
+    def test_v2_recursive_scope_pattern_enforces_full_length_boundary(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        accepted_pattern = "a" * 509 + "/**"
+        packet["scope"]["allowed_changed_paths"] = [accepted_pattern]
+
+        validated = CONTROLLER.validate_task_packet(packet)
+
+        self.assertEqual(len(accepted_pattern), 512)
+        self.assertEqual(validated["scope"]["allowed_changed_paths"], [accepted_pattern])
+
+        rejected_pattern = "a" * 510 + "/**"
+        packet["scope"]["allowed_changed_paths"] = [rejected_pattern]
+        self.assertEqual(len(rejected_pattern), 513)
+        with self.assertRaises(ValueError):
+            CONTROLLER.validate_task_packet(packet)
+
     def test_v2_task_document_must_be_directly_under_tasks(self) -> None:
         packet = self.fixture.upgrade_packet_to_v2()
         packet["task"]["task_document"] = "docs/tasks/nested/AGENT-R1.md"

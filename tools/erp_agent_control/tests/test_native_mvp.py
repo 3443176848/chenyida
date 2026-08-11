@@ -14,7 +14,11 @@ import unittest
 
 from tools.erp_agent_control.native_mvp import RFC3339_RE, load_bundle, validate_bundle
 from tools.erp_agent_control.pilot_fixture import build_task_packet, build_valid_bundle, digest
-from tools.erp_agent_control.readonly_controller import TASK_DOCUMENT_RE, UAT_DECLARATION_DOCUMENTS
+from tools.erp_agent_control.readonly_controller import (
+    TASK_DOCUMENT_RE,
+    UAT_DECLARATION_DOCUMENTS,
+    validate_task_packet,
+)
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -134,13 +138,22 @@ class NativeMvpProtocolTest(unittest.TestCase):
         )
         task_path_pattern = task_schema["$defs"]["repositoryPath"]["pattern"]
         message_path_pattern = message_schema["$defs"]["repositoryPath"]["pattern"]
-        recursive_pattern = task_schema["$defs"]["repositoryRecursivePathPattern"]["pattern"]
+        recursive_rule = task_schema["$defs"]["repositoryRecursivePathPattern"]
+        recursive_pattern = recursive_rule["pattern"]
+
+        def recursive_schema_accepts(value: str) -> bool:
+            return (
+                recursive_rule["minLength"] <= len(value) <= recursive_rule["maxLength"]
+                and re.fullmatch(recursive_pattern, value) is not None
+            )
 
         self.assertIsNone(re.fullmatch(task_path_pattern, "docs/.git/config"))
         self.assertIsNone(re.fullmatch(message_path_pattern, "docs/.git/config"))
         self.assertIsNone(re.fullmatch(recursive_pattern, "*/*"))
         self.assertIsNone(re.fullmatch(recursive_pattern, "*/**"))
         self.assertIsNotNone(re.fullmatch(recursive_pattern, "docs/agent-control/**"))
+        self.assertTrue(recursive_schema_accepts("a" * 509 + "/**"))
+        self.assertFalse(recursive_schema_accepts("a" * 510 + "/**"))
         self.assertEqual(
             task_schema["$defs"]["repositoryPathPattern"],
             {
@@ -325,6 +338,21 @@ class NativeMvpProtocolTest(unittest.TestCase):
         self.bundle["task_packet"]["scope"]["allowed_changed_paths"] = ["*/*"]
 
         self.assertEqual(error_code(self.bundle), "TASK_PACKET_INVALID")
+
+    def test_manual_task_packet_validator_matches_recursive_pattern_length_bound(self) -> None:
+        packet = build_task_packet()
+        accepted_pattern = "a" * 509 + "/**"
+        packet["scope"]["allowed_changed_paths"] = [accepted_pattern]
+
+        self.assertEqual(
+            validate_task_packet(packet)["scope"]["allowed_changed_paths"],
+            [accepted_pattern],
+        )
+
+        rejected_pattern = "a" * 510 + "/**"
+        packet["scope"]["allowed_changed_paths"] = [rejected_pattern]
+        with self.assertRaises(ValueError):
+            validate_task_packet(packet)
 
     def test_uat_or_database_evidence_kind_is_forbidden_by_r1_5(self) -> None:
         message(self.bundle, 10)["evidence"][0]["kind"] = "DATABASE_ASSERTION"
