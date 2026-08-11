@@ -1,20 +1,26 @@
 {
-  "schema_version": "chenyida-erp-agent-task/v1",
+  "schema_version": "chenyida-erp-agent-task/v2",
   "task": {
     "id": "AGENT-R1-5",
-    "revision": 1,
+    "revision": 2,
     "ledger_state": "DOING",
-    "delivery_stage": "PLANNING",
+    "delivery_stage": "IMPLEMENTING",
     "qualifiers": [
-      "NATIVE_PROTOCOL_MVP_BOOTSTRAP",
+      "NATIVE_PROTOCOL_MVP",
       "SYNTHETIC_DOCS_TEST_ONLY",
       "NO_RUNTIME_AUTHORITY",
       "NO_UAT_OR_PRODUCTION_CONNECTION"
     ],
-    "task_document": "docs/tasks/AGENT-R1-5.md"
+    "task_document": "docs/tasks/AGENT-R1-5.md",
+    "objective": "Validate native role orchestration with strict, stateless, synthetic protocols.",
+    "non_goals": [
+      "ERP business or product-test changes",
+      "Schema, Migration, database, UAT, production, deployment, or network access",
+      "Persistent control store, daemon, capability broker, or R2 runtime enforcement"
+    ]
   },
   "baseline": {
-    "base_sha": "4dd4abea02fe876665c8721e57d81f300da94c0a",
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
     "expected_branch": "main",
     "source_version": "0.1.0-alpha.44",
     "source_migration": {
@@ -64,14 +70,18 @@
       "docs/project/TASKS.md",
       "docs/tasks/AGENT-R1-5.md"
     ],
-    "require_single_worktree": true
+    "require_single_worktree": true,
+    "data_classification": "SYNTHETIC_DOCS_TEST_ONLY"
   },
   "inspection": {
     "package_json": "chenyida_erp_site/package.json",
     "migration_directory": "chenyida_erp_site/drizzle-postgres",
     "migration_journal": "chenyida_erp_site/drizzle-postgres/meta/_journal.json",
     "migration_snapshot_directory": "chenyida_erp_site/drizzle-postgres/meta",
-    "required_decision": "D-113",
+    "required_decisions": [
+      "D-113",
+      "D-114"
+    ],
     "uat_document_markers": [
       {
         "path": "docs/project/MASTER.md",
@@ -88,5 +98,92 @@
         ]
       }
     ]
+  },
+  "orchestration": {
+    "product_writer_agent_id": "builder-r1-5",
+    "active_lease_generation": 1,
+    "roles": [
+      {
+        "agent_id": "builder-r1-5",
+        "role": "CHANGE_BUILDER",
+        "capability_profile": "SYNTHETIC_BUILDER",
+        "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+        "can_write": true
+      },
+      {
+        "agent_id": "erp-guardian-r1-5",
+        "role": "ERP_CONTRACT_GUARDIAN",
+        "capability_profile": "ERP_READ_ONLY",
+        "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+        "can_write": false
+      },
+      {
+        "agent_id": "adversarial-r1-5",
+        "role": "ADVERSARIAL_EXAMINER",
+        "capability_profile": "ADVERSARIAL_READ_ONLY",
+        "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+        "can_write": false
+      },
+      {
+        "agent_id": "security-r1-5",
+        "role": "SECURITY_BOUNDARY_EXAMINER",
+        "capability_profile": "SECURITY_READ_ONLY",
+        "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+        "can_write": false
+      },
+      {
+        "agent_id": "qa-r1-5",
+        "role": "INDEPENDENT_VERIFIER",
+        "capability_profile": "QA_TEST_READ_ONLY",
+        "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+        "can_write": false
+      },
+      {
+        "agent_id": "blackbox-r1-5",
+        "role": "BLACK_BOX_VERIFIER",
+        "capability_profile": "BLACK_BOX_PUBLIC_ONLY",
+        "context_visibility": "BLACK_BOX_PUBLIC_ONLY",
+        "can_write": false
+      }
+    ],
+    "required_gates": [
+      "ERP_CONTRACT",
+      "SECURITY",
+      "QA",
+      "BLACK_BOX"
+    ],
+    "allowed_capabilities": [
+      "READ_ONLY",
+      "WORKTREE_WRITE",
+      "TEST_EXECUTION",
+      "GIT_COMMIT"
+    ],
+    "forbidden_capabilities": [
+      "DATABASE_ACCESS",
+      "DEPLOY",
+      "GIT_PUSH",
+      "MODEL_INVOCATION",
+      "NETWORK_ACCESS",
+      "PRODUCTION_ACCESS",
+      "RUNTIME_DAEMON",
+      "UAT_ACCESS"
+    ],
+    "retry_policy": {
+      "max_candidate_revisions": 2,
+      "max_attempts_per_gate": 2,
+      "result_unknown_action": "RECONCILE_BEFORE_REPLAY"
+    }
+  },
+  "resources": {
+    "max_concurrent_light_agents": 2,
+    "max_product_writers": 1,
+    "max_heavy_actions": 1,
+    "max_temporary_containers": 1,
+    "max_temporary_databases": 0,
+    "network_allowed": false,
+    "database_allowed": false,
+    "uat_allowed": false,
+    "production_allowed": false,
+    "deploy_allowed": false
   }
 }

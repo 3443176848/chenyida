@@ -1,0 +1,24 @@
+{
+  "schema_version": "synthetic-retry-interface/v1",
+  "classification": "PUBLIC_SYNTHETIC",
+  "operation": "apply_quantity",
+  "request": {
+    "required": ["request_id", "quantity"],
+    "request_id": "non-empty stable synthetic identifier",
+    "quantity": "positive integer"
+  },
+  "observable_contract": {
+    "same_request_id_same_quantity": "APPLY_ONCE_AND_REPLAY_RESULT",
+    "same_request_id_different_quantity": "REJECT_CONFLICT",
+    "ambiguous_timeout": "RECONCILE_BEFORE_RETRY",
+    "invalid_quantity": "REJECT_WITHOUT_STATE_CHANGE"
+  },
+  "forbidden_inputs": [
+    "ERP product source",
+    "Git metadata",
+    "real business data",
+    "owner untracked input",
+    "secrets",
+    "UAT or production observations"
+  ]
+}

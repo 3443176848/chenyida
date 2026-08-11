@@ -25,9 +25,10 @@ from typing import Any, Iterable
 
 sys.dont_write_bytecode = True
 
-CONTROLLER_VERSION = "0.1.0"
+CONTROLLER_VERSION = "0.2.0"
 REPORT_SCHEMA = "chenyida-erp-agent-readonly-report/v1"
-PACKET_SCHEMA = "chenyida-erp-agent-task/v1"
+PACKET_SCHEMA_V1 = "chenyida-erp-agent-task/v1"
+PACKET_SCHEMA_V2 = "chenyida-erp-agent-task/v2"
 PACKET_DIRECTORY = "docs/agent-control/task-packets"
 PROJECT_PACKAGE_JSON = "chenyida_erp_site/package.json"
 PROJECT_MIGRATION_DIRECTORY = "chenyida_erp_site/drizzle-postgres"
@@ -58,6 +59,7 @@ TASK_ROW_RE = re.compile(
 STATIC_MESSAGES = {
     "CORE_DOCUMENTS": "项目权威文档完整且不是符号链接",
     "DECISION_D113_ACCEPTED": "D-113已由项目负责人接受",
+    "DECISION_D114_ACCEPTED": "D-114已由项目负责人接受",
     "GIT_BASELINE_ANCESTOR": "任务基线是当前HEAD的祖先",
     "GIT_BRANCH_MATCH": "当前分支与Task Packet一致",
     "GIT_COMMITTED_PATH_SCOPE": "基线后的已提交路径均在任务范围内",
@@ -78,6 +80,33 @@ STATIC_MESSAGES = {
     "TASK_PACKET_LEDGER_MATCH": "活动任务与Task Packet状态一致",
     "UAT_DECLARATION_MATCH": "UAT版本边界只按权威文档声明核对",
 }
+
+V2_ROLE_NAMES = frozenset(
+    {
+        "CHANGE_BUILDER",
+        "ERP_CONTRACT_GUARDIAN",
+        "ADVERSARIAL_EXAMINER",
+        "SECURITY_BOUNDARY_EXAMINER",
+        "INDEPENDENT_VERIFIER",
+        "BLACK_BOX_VERIFIER",
+    }
+)
+V2_REQUIRED_GATES = frozenset({"ERP_CONTRACT", "SECURITY", "QA", "BLACK_BOX"})
+V2_ALLOWED_CAPABILITIES = frozenset(
+    {"READ_ONLY", "WORKTREE_WRITE", "TEST_EXECUTION", "GIT_COMMIT"}
+)
+V2_REQUIRED_FORBIDDEN_CAPABILITIES = frozenset(
+    {
+        "DATABASE_ACCESS",
+        "DEPLOY",
+        "GIT_PUSH",
+        "MODEL_INVOCATION",
+        "NETWORK_ACCESS",
+        "PRODUCTION_ACCESS",
+        "RUNTIME_DAEMON",
+        "UAT_ACCESS",
+    }
+)
 
 
 class InspectionProblem(Exception):
@@ -221,27 +250,45 @@ def _require_string_list(value: Any) -> list[str]:
     return list(value)
 
 
-def _validate_packet(value: Any) -> dict[str, Any]:
-    packet = _require_exact_keys(value, {"schema_version", "task", "baseline", "scope", "inspection"})
-    if packet["schema_version"] != PACKET_SCHEMA:
-        raise ValueError("unsupported packet schema")
+def _require_integer(value: Any, *, minimum: int = 0, maximum: int | None = None) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise ValueError("integer out of range")
+    if maximum is not None and value > maximum:
+        raise ValueError("integer out of range")
+    return value
 
-    task = _require_exact_keys(
-        packet["task"],
-        {"id", "revision", "ledger_state", "delivery_stage", "qualifiers", "task_document"},
-    )
+
+def _validate_task(packet: dict[str, Any], *, version: int) -> None:
+    expected_keys = {
+        "id",
+        "revision",
+        "ledger_state",
+        "delivery_stage",
+        "qualifiers",
+        "task_document",
+    }
+    if version == 2:
+        expected_keys |= {"objective", "non_goals"}
+    task = _require_exact_keys(packet["task"], expected_keys)
     task_id = _require_string(task["id"])
     if not TASK_ID_RE.fullmatch(task_id):
         raise ValueError("invalid task id")
-    if isinstance(task["revision"], bool) or not isinstance(task["revision"], int) or task["revision"] < 1:
-        raise ValueError("invalid packet revision")
+    _require_integer(task["revision"], minimum=1)
     _require_string(task["ledger_state"], choices=LEDGER_STATES)
     _require_string(task["delivery_stage"])
     _require_string_list(task["qualifiers"])
     task_document = _validate_relative_path(task["task_document"])
     if not task_document.startswith("docs/tasks/") or not task_document.endswith(".md"):
         raise ValueError("task document must be a Markdown file in docs/tasks")
+    if version == 2:
+        if len(_require_string(task["objective"])) > 1024:
+            raise ValueError("task objective too long")
+        non_goals = _require_string_list(task["non_goals"])
+        if not non_goals or any(len(item) > 512 for item in non_goals):
+            raise ValueError("bounded non-goals required")
 
+
+def _validate_baseline(packet: dict[str, Any]) -> None:
     baseline = _require_exact_keys(
         packet["baseline"],
         {"base_sha", "expected_branch", "source_version", "source_migration", "uat"},
@@ -255,12 +302,7 @@ def _validate_packet(value: Any) -> dict[str, Any]:
         {"first_number", "head_number", "head_filename", "head_sha256"},
     )
     for key in ("first_number", "head_number"):
-        if (
-            isinstance(source_migration[key], bool)
-            or not isinstance(source_migration[key], int)
-            or source_migration[key] < 0
-        ):
-            raise ValueError("invalid migration number")
+        _require_integer(source_migration[key])
     if source_migration["head_number"] < source_migration["first_number"]:
         raise ValueError("invalid migration range")
     if not MIGRATION_RE.fullmatch(_require_string(source_migration["head_filename"])):
@@ -273,10 +315,17 @@ def _validate_packet(value: Any) -> dict[str, Any]:
     if uat["verification_scope"] != "DOCUMENT_DECLARATION_ONLY_NO_CONNECTION":
         raise ValueError("R1 cannot claim live UAT verification")
 
-    scope = _require_exact_keys(
-        packet["scope"],
-        {"allowed_changed_paths", "known_untracked_paths", "required_documents", "require_single_worktree"},
-    )
+
+def _validate_scope(packet: dict[str, Any], *, version: int) -> None:
+    expected_keys = {
+        "allowed_changed_paths",
+        "known_untracked_paths",
+        "required_documents",
+        "require_single_worktree",
+    }
+    if version == 2:
+        expected_keys.add("data_classification")
+    scope = _require_exact_keys(packet["scope"], expected_keys)
     allowed_paths = _require_string_list(scope["allowed_changed_paths"])
     for pattern in allowed_paths:
         _validate_relative_path(pattern, allow_glob=True)
@@ -294,11 +343,16 @@ def _validate_packet(value: Any) -> dict[str, Any]:
             raise ValueError("required documents are limited to project Markdown")
         if relative_path == "docs/ERP_CURRENT_STATUS_REPORT.md":
             raise ValueError("owner input cannot be read by R1")
-    if task["task_document"] not in required_documents:
+    if packet["task"]["task_document"] not in required_documents:
         raise ValueError("task document must be required")
     if not isinstance(scope["require_single_worktree"], bool):
         raise ValueError("boolean required")
+    if version == 2 and scope["data_classification"] != "SYNTHETIC_DOCS_TEST_ONLY":
+        raise ValueError("R1.5 permits synthetic docs/test data only")
 
+
+def _validate_inspection(packet: dict[str, Any], *, version: int) -> None:
+    decision_key = "required_decision" if version == 1 else "required_decisions"
     inspection = _require_exact_keys(
         packet["inspection"],
         {
@@ -306,7 +360,7 @@ def _validate_packet(value: Any) -> dict[str, Any]:
             "migration_directory",
             "migration_journal",
             "migration_snapshot_directory",
-            "required_decision",
+            decision_key,
             "uat_document_markers",
         },
     )
@@ -320,8 +374,10 @@ def _validate_packet(value: Any) -> dict[str, Any]:
         _validate_relative_path(inspection[key])
         if inspection[key] != expected_path:
             raise ValueError("R1 inspection path cannot be redirected")
-    if inspection["required_decision"] != "D-113":
+    if version == 1 and inspection[decision_key] != "D-113":
         raise ValueError("R1 requires D-113")
+    if version == 2 and set(_require_string_list(inspection[decision_key])) != {"D-113", "D-114"}:
+        raise ValueError("R1.5 requires accepted D-113 and D-114")
     markers = inspection["uat_document_markers"]
     if not isinstance(markers, list) or not markers:
         raise ValueError("UAT document markers required")
@@ -332,7 +388,159 @@ def _validate_packet(value: Any) -> dict[str, Any]:
         if not contains or any(len(item) > 128 for item in contains):
             raise ValueError("invalid UAT marker")
 
+
+def _validate_v2_orchestration(packet: dict[str, Any]) -> None:
+    orchestration = _require_exact_keys(
+        packet["orchestration"],
+        {
+            "product_writer_agent_id",
+            "active_lease_generation",
+            "roles",
+            "required_gates",
+            "allowed_capabilities",
+            "forbidden_capabilities",
+            "retry_policy",
+        },
+    )
+    product_writer = _require_string(orchestration["product_writer_agent_id"])
+    if not re.fullmatch(r"^[a-z][a-z0-9-]{2,63}$", product_writer):
+        raise ValueError("invalid product writer id")
+    _require_integer(orchestration["active_lease_generation"], minimum=1)
+
+    roles = orchestration["roles"]
+    if not isinstance(roles, list) or len(roles) != len(V2_ROLE_NAMES):
+        raise ValueError("R1.5 requires six separated roles")
+    expected_profiles = {
+        "CHANGE_BUILDER": "SYNTHETIC_BUILDER",
+        "ERP_CONTRACT_GUARDIAN": "ERP_READ_ONLY",
+        "ADVERSARIAL_EXAMINER": "ADVERSARIAL_READ_ONLY",
+        "SECURITY_BOUNDARY_EXAMINER": "SECURITY_READ_ONLY",
+        "INDEPENDENT_VERIFIER": "QA_TEST_READ_ONLY",
+        "BLACK_BOX_VERIFIER": "BLACK_BOX_PUBLIC_ONLY",
+    }
+    agent_ids: set[str] = set()
+    role_names: set[str] = set()
+    writers: list[str] = []
+    for raw_role in roles:
+        role = _require_exact_keys(
+            raw_role,
+            {"agent_id", "role", "capability_profile", "context_visibility", "can_write"},
+        )
+        agent_id = _require_string(role["agent_id"])
+        if not re.fullmatch(r"^[a-z][a-z0-9-]{2,63}$", agent_id) or agent_id in agent_ids:
+            raise ValueError("invalid or duplicate agent id")
+        agent_ids.add(agent_id)
+        role_name = _require_string(role["role"], choices=V2_ROLE_NAMES)
+        if role_name in role_names:
+            raise ValueError("role identity cannot be reused")
+        role_names.add(role_name)
+        if role["capability_profile"] != expected_profiles[role_name]:
+            raise ValueError("role capability profile mismatch")
+        expected_visibility = (
+            "BLACK_BOX_PUBLIC_ONLY" if role_name == "BLACK_BOX_VERIFIER" else "SYNTHETIC_PROTOCOL_ONLY"
+        )
+        if role["context_visibility"] != expected_visibility:
+            raise ValueError("role context boundary mismatch")
+        if not isinstance(role["can_write"], bool):
+            raise ValueError("role write flag must be boolean")
+        if role["can_write"]:
+            writers.append(agent_id)
+            if role_name != "CHANGE_BUILDER":
+                raise ValueError("review roles cannot write")
+    if role_names != set(V2_ROLE_NAMES) or writers != [product_writer]:
+        raise ValueError("exactly one declared product writer is required")
+
+    required_gates = set(_require_string_list(orchestration["required_gates"]))
+    if required_gates != set(V2_REQUIRED_GATES):
+        raise ValueError("required independent gates are incomplete")
+    allowed = set(_require_string_list(orchestration["allowed_capabilities"]))
+    forbidden = set(_require_string_list(orchestration["forbidden_capabilities"]))
+    if allowed != set(V2_ALLOWED_CAPABILITIES):
+        raise ValueError("R1.5 capability ceiling changed")
+    if forbidden != set(V2_REQUIRED_FORBIDDEN_CAPABILITIES) or allowed & forbidden:
+        raise ValueError("R1.5 forbidden capabilities changed")
+
+    retry_policy = _require_exact_keys(
+        orchestration["retry_policy"],
+        {"max_candidate_revisions", "max_attempts_per_gate", "result_unknown_action"},
+    )
+    _require_integer(retry_policy["max_candidate_revisions"], minimum=2, maximum=3)
+    _require_integer(retry_policy["max_attempts_per_gate"], minimum=1, maximum=3)
+    if retry_policy["result_unknown_action"] != "RECONCILE_BEFORE_REPLAY":
+        raise ValueError("RESULT_UNKNOWN must be reconciled before replay")
+
+    resources = _require_exact_keys(
+        packet["resources"],
+        {
+            "max_concurrent_light_agents",
+            "max_product_writers",
+            "max_heavy_actions",
+            "max_temporary_containers",
+            "max_temporary_databases",
+            "network_allowed",
+            "database_allowed",
+            "uat_allowed",
+            "production_allowed",
+            "deploy_allowed",
+        },
+    )
+    _require_integer(resources["max_concurrent_light_agents"], minimum=1, maximum=2)
+    if resources["max_product_writers"] != 1 or resources["max_heavy_actions"] != 1:
+        raise ValueError("single writer and single heavy action are mandatory")
+    _require_integer(resources["max_temporary_containers"], maximum=1)
+    if resources["max_temporary_databases"] != 0:
+        raise ValueError("R1.5 cannot create a database")
+    for key in (
+        "network_allowed",
+        "database_allowed",
+        "uat_allowed",
+        "production_allowed",
+        "deploy_allowed",
+    ):
+        if resources[key] is not False:
+            raise ValueError("R1.5 external/runtime capability must remain disabled")
+
+
+def _validate_packet(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError("packet object required")
+    schema_version = value.get("schema_version")
+    if schema_version == PACKET_SCHEMA_V1:
+        packet = _require_exact_keys(
+            value,
+            {"schema_version", "task", "baseline", "scope", "inspection"},
+        )
+        version = 1
+    elif schema_version == PACKET_SCHEMA_V2:
+        packet = _require_exact_keys(
+            value,
+            {
+                "schema_version",
+                "task",
+                "baseline",
+                "scope",
+                "inspection",
+                "orchestration",
+                "resources",
+            },
+        )
+        version = 2
+    else:
+        raise ValueError("unsupported packet schema")
+
+    _validate_task(packet, version=version)
+    _validate_baseline(packet)
+    _validate_scope(packet, version=version)
+    _validate_inspection(packet, version=version)
+    if version == 2:
+        _validate_v2_orchestration(packet)
     return packet
+
+
+def validate_task_packet(value: Any) -> dict[str, Any]:
+    """Validate a v1/v2 packet without reading or mutating repository state."""
+
+    return _validate_packet(copy.deepcopy(value))
 
 
 def _git_environment() -> dict[str, str]:
@@ -462,9 +670,11 @@ def _parse_task_rows(tasks_markdown: str) -> tuple[dict[str, str], list[str]]:
     return rows, sorted(set(duplicate_terminal_rows))
 
 
-def _decision_d113_is_accepted(decisions_markdown: str) -> bool:
+def _decision_is_accepted(decisions_markdown: str, decision_id: str) -> bool:
+    if not re.fullmatch(r"D-[0-9]{3}", decision_id):
+        return False
     section_match = re.search(
-        r"^## D-113\b(?P<section>.*?)(?=^## \S|\Z)",
+        rf"^## {re.escape(decision_id)}\b(?P<section>.*?)(?=^## \S|\Z)",
         decisions_markdown,
         flags=re.MULTILINE | re.DOTALL,
     )
@@ -714,7 +924,7 @@ def inspect_repository(repository: str | os.PathLike[str]) -> dict[str, Any]:
     findings.append(
         _finding(
             "DECISION_D113_ACCEPTED",
-            "PASS" if _decision_d113_is_accepted(decisions_text) else "FAIL",
+            "PASS" if _decision_is_accepted(decisions_text, "D-113") else "FAIL",
         )
     )
     doing_task_ids = sorted(task_id for task_id, state in task_rows.items() if state == "DOING")
@@ -760,6 +970,13 @@ def inspect_repository(repository: str | os.PathLike[str]) -> dict[str, Any]:
     }
     report["task"]["packet_revision"] = packet["task"]["revision"]
     findings.append(_finding("TASK_PACKET", "PASS", subject=packet_relative_path))
+    if packet["schema_version"] == PACKET_SCHEMA_V2:
+        findings.append(
+            _finding(
+                "DECISION_D114_ACCEPTED",
+                "PASS" if _decision_is_accepted(decisions_text, "D-114") else "FAIL",
+            )
+        )
 
     packet_matches = (
         packet["task"]["id"] == active_task_id

@@ -1,0 +1,35 @@
+{
+  "interface_digest": "sha256:5b6e0755ea38994446f5b22218e6fb4ad6e33d68b5644840267dfc00a8a3b0ef",
+  "isolation_claim": "PUBLIC_FIXTURE_ONLY_NO_REPOSITORY_OR_GIT_MOUNT",
+  "observations": [
+    {
+      "expected": {"accepted": 2, "applied_total": 4, "rejected": 0, "replayed": 1},
+      "observed": {"accepted": 2, "applied_total": 4, "rejected": 0, "replayed": 1},
+      "persona_id": "planner-double-submit",
+      "status": "PASS"
+    },
+    {
+      "expected": {"accepted": 1, "applied_total": 3, "rejected": 1, "replayed": 0},
+      "observed": {"accepted": 1, "applied_total": 3, "rejected": 1, "replayed": 0},
+      "persona_id": "operator-conflicting-retry",
+      "status": "PASS"
+    },
+    {
+      "expected": {"accepted": 2, "applied_total": 5, "rejected": 0, "replayed": 1},
+      "observed": {"accepted": 2, "applied_total": 5, "rejected": 0, "replayed": 1},
+      "persona_id": "auditor-timeout-reconcile",
+      "status": "PASS"
+    },
+    {
+      "expected": {"accepted": 0, "applied_total": 0, "rejected": 1, "replayed": 0},
+      "observed": {"accepted": 0, "applied_total": 0, "rejected": 1, "replayed": 0},
+      "persona_id": "clerk-invalid-quantity",
+      "status": "PASS"
+    }
+  ],
+  "persona_count": 4,
+  "persona_digest": "sha256:f60d39a9ba06a90ab8ef3f205bac0f4b751032d11e5d457d0bdce774407a9cc4",
+  "report_digest": "sha256:206bc6da9a4ea94f37510c8d8096e433a3d85decab6b5113899a453bf7b4136a",
+  "schema_version": "synthetic-blackbox-report/v1",
+  "status": "PASS"
+}

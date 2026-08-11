@@ -16,8 +16,9 @@ Agent之间只通过有界结构化消息交接。聊天记录、思维过程和
 | `created_at` | timestamp | 控制器时间，RFC 3339；Agent不得伪造业务时间 |
 | `task_id` | string | 必须匹配active Task Packet |
 | `agent` | object | `agent_id`、`instance_id`、`capability_profile`、`context_manifest_digest` |
-| `role` | string | Task Packet允许的单一角色 |
-| `input` | object | `base_sha`、`candidate_sha`、Task Packet revision、路径/工件摘要 |
+| `role` | string | Task Packet允许的单一机器角色名；R1.5使用`CHANGE_BUILDER`等六个固定值 |
+| `gate` | enum | `IMPLEMENTATION`、`ERP_CONTRACT`、`ADVERSARIAL`、`SECURITY`、`QA`、`BLACK_BOX`、`RECOVERY`或`CLOSURE` |
+| `input` | object | `base_sha`、`candidate_sha`、`task_packet_revision`、`lease_generation`、`attempt`和工件locator |
 | `assumptions` | array | 每项含ID、陈述、来源或待验证状态；不能把假设写成事实 |
 | `evidence` | array | 每项含ID、kind、locator、digest/exit_code、observed_at和去敏说明 |
 | `changes` | array | 修改路径、动作、目的；只读角色必须为空 |
@@ -27,6 +28,11 @@ Agent之间只通过有界结构化消息交接。聊天记录、思维过程和
 | `recommendation` | object | `decision`、理由、下一有界动作；不能隐含新权限 |
 | `status` | enum | `IN_PROGRESS`、`PASS`、`FAIL`、`VETOED`、`BLOCKED`、`COMPLETE`、`RESULT_UNKNOWN` |
 | `minority_report` | object/null | 非空时遵守第6节 |
+| `resolves_message_ids` | array | `RECOVERY`对`RESULT_UNKNOWN`消息的显式处置引用；其他场景为空 |
+| `resolves_claim_ids` | array | 新候选对Minority Report claim的显式处置引用 |
+| `checkpoint` | object/null | `CHECKPOINT`消息绑定candidate、packet revision、lease generation和此前完成消息；其他消息为`null` |
+
+机器合同是[`message-v1.schema.json`](../agent-control/schemas/message-v1.schema.json)。Schema只负责严格结构；[`native_mvp.py`](../../tools/erp_agent_control/native_mvp.py)继续验证角色/门禁、Context摘要、最新候选、lease/revision、Minority Report与不确定结果恢复语义。
 
 ## 3. 示例
 
@@ -38,17 +44,20 @@ Agent之间只通过有界结构化消息交接。聊天记录、思维过程和
   "created_at": "2026-08-11T12:00:00+08:00",
   "task_id": "EXAMPLE-TASK",
   "agent": {
-    "agent_id": "qa-01",
-    "instance_id": "attempt-02",
-    "capability_profile": "TEST_EXECUTION",
-    "context_manifest_digest": "sha256:example-context-digest"
+    "agent_id": "qa-r1-5",
+    "instance_id": "qa-r1-5-c2",
+    "capability_profile": "QA_TEST_READ_ONLY",
+    "context_manifest_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
   },
-  "role": "Independent Verifier",
+  "role": "INDEPENDENT_VERIFIER",
+  "gate": "QA",
   "input": {
-    "base_sha": "example-base-sha",
-    "candidate_sha": "example-candidate-sha",
-    "task_packet_revision": 3,
-    "artifacts": ["diff:sha256:example-diff-digest"]
+    "base_sha": "0000000000000000000000000000000000000000",
+    "candidate_sha": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": ["artifact://EXAMPLE-TASK/qa/test-01.json"]
   },
   "assumptions": [],
   "evidence": [
@@ -56,7 +65,7 @@ Agent之间只通过有界结构化消息交接。聊天记录、思维过程和
       "id": "E-001",
       "kind": "COMMAND_RESULT",
       "locator": "artifact://EXAMPLE-TASK/qa/test-01.json",
-      "digest": "sha256:example-result-digest",
+      "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
       "exit_code": 0,
       "observed_at": "2026-08-11T12:00:00+08:00",
       "redaction": "no business data"
@@ -81,7 +90,10 @@ Agent之间只通过有界结构化消息交接。聊天记录、思维过程和
     "next_action": "REQUEST_SECURITY_REVIEW"
   },
   "status": "PASS",
-  "minority_report": null
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
 }
 ```
 
@@ -109,6 +121,8 @@ Evidence必须可定位、绑定时间和候选SHA、能够由另一身份复核
 - 不匹配active task、过期capability、错误base/candidate、未知字段、缺少Evidence或违反角色写权限的消息全部拒绝。
 - 消息被追加而非原地修改；撤销通过新事件表达。
 - 新candidate SHA使旧候选的`PASS`、`VETOED`和测试签核失效，除非控制器记录了精确的、可证明不受影响的复用决定。
+- `RESULT_UNKNOWN`必须先由`RECOVERY`明确标记`MARK_NOT_APPLIED_SAFE_TO_RETRY`或`MARK_APPLIED_NO_REPLAY`；前者才允许新attempt，后者禁止重放。
+- R1.5的Task Packet禁止数据库、HTTP/UAT/生产/网络能力；即使Message Schema保留未来证据kind，当前无状态验证器也会拒绝相应消息。
 
 ## 6. Minority Report合同
 

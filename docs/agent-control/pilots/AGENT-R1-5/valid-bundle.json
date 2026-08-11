@@ -1,0 +1,1492 @@
+{
+  "schema_version": "chenyida-erp-native-pilot-bundle/v1",
+  "task_packet": {
+    "schema_version": "chenyida-erp-agent-task/v2",
+    "task": {
+      "id": "AGENT-R1-5",
+      "revision": 2,
+      "ledger_state": "DOING",
+      "delivery_stage": "IMPLEMENTING",
+      "qualifiers": [
+        "NATIVE_PROTOCOL_MVP",
+        "SYNTHETIC_DOCS_TEST_ONLY",
+        "NO_RUNTIME_AUTHORITY",
+        "NO_UAT_OR_PRODUCTION_CONNECTION"
+      ],
+      "task_document": "docs/tasks/AGENT-R1-5.md",
+      "objective": "Validate native role orchestration with strict, stateless, synthetic protocols.",
+      "non_goals": [
+        "ERP business or product-test changes",
+        "Schema, Migration, database, UAT, production, deployment, or network access",
+        "Persistent control store, daemon, capability broker, or R2 runtime enforcement"
+      ]
+    },
+    "baseline": {
+      "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+      "expected_branch": "main",
+      "source_version": "0.1.0-alpha.44",
+      "source_migration": {
+        "first_number": 1,
+        "head_number": 41,
+        "head_filename": "0041_ai_governance_suggestion_evidence.sql",
+        "head_sha256": "676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2"
+      },
+      "uat": {
+        "version": "0.1.0-alpha.42",
+        "migration_head": "0040",
+        "verification_scope": "DOCUMENT_DECLARATION_ONLY_NO_CONNECTION"
+      }
+    },
+    "scope": {
+      "allowed_changed_paths": [
+        "docs/AI_AGENT_TEAM_DESIGN.md",
+        "docs/agent-control/**",
+        "docs/ai-engineering/**",
+        "docs/project/CHANGELOG.md",
+        "docs/project/DECISIONS.md",
+        "docs/project/MASTER.md",
+        "docs/project/PROJECT_CONTEXT.md",
+        "docs/project/ROADMAP.md",
+        "docs/project/STATUS.md",
+        "docs/project/TASKS.md",
+        "docs/tasks/AGENT-R1-5.md",
+        "tools/erp_agent_control/**"
+      ],
+      "known_untracked_paths": [
+        "docs/ERP_CURRENT_STATUS_REPORT.md"
+      ],
+      "required_documents": [
+        "AGENTS.md",
+        "docs/AI_AGENT_TEAM_DESIGN.md",
+        "docs/agent-control/README.md",
+        "docs/ai-engineering/AGENTS.md",
+        "docs/ai-engineering/IMPLEMENTATION_PLAN.md",
+        "docs/ai-engineering/MESSAGE_PROTOCOL.md",
+        "docs/ai-engineering/PERMISSIONS.md",
+        "docs/project/CHANGELOG.md",
+        "docs/project/DECISIONS.md",
+        "docs/project/MASTER.md",
+        "docs/project/PROJECT_CONTEXT.md",
+        "docs/project/ROADMAP.md",
+        "docs/project/STATUS.md",
+        "docs/project/TASKS.md",
+        "docs/tasks/AGENT-R1-5.md"
+      ],
+      "require_single_worktree": true,
+      "data_classification": "SYNTHETIC_DOCS_TEST_ONLY"
+    },
+    "inspection": {
+      "package_json": "chenyida_erp_site/package.json",
+      "migration_directory": "chenyida_erp_site/drizzle-postgres",
+      "migration_journal": "chenyida_erp_site/drizzle-postgres/meta/_journal.json",
+      "migration_snapshot_directory": "chenyida_erp_site/drizzle-postgres/meta",
+      "required_decisions": [
+        "D-113",
+        "D-114"
+      ],
+      "uat_document_markers": [
+        {
+          "path": "docs/project/MASTER.md",
+          "contains": [
+            "0.1.0-alpha.42",
+            "0040"
+          ]
+        },
+        {
+          "path": "docs/project/PROJECT_CONTEXT.md",
+          "contains": [
+            "0.1.0-alpha.42",
+            "0040"
+          ]
+        }
+      ]
+    },
+    "orchestration": {
+      "product_writer_agent_id": "builder-r1-5",
+      "active_lease_generation": 1,
+      "roles": [
+        {
+          "agent_id": "builder-r1-5",
+          "role": "CHANGE_BUILDER",
+          "capability_profile": "SYNTHETIC_BUILDER",
+          "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+          "can_write": true
+        },
+        {
+          "agent_id": "erp-guardian-r1-5",
+          "role": "ERP_CONTRACT_GUARDIAN",
+          "capability_profile": "ERP_READ_ONLY",
+          "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+          "can_write": false
+        },
+        {
+          "agent_id": "adversarial-r1-5",
+          "role": "ADVERSARIAL_EXAMINER",
+          "capability_profile": "ADVERSARIAL_READ_ONLY",
+          "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+          "can_write": false
+        },
+        {
+          "agent_id": "security-r1-5",
+          "role": "SECURITY_BOUNDARY_EXAMINER",
+          "capability_profile": "SECURITY_READ_ONLY",
+          "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+          "can_write": false
+        },
+        {
+          "agent_id": "qa-r1-5",
+          "role": "INDEPENDENT_VERIFIER",
+          "capability_profile": "QA_TEST_READ_ONLY",
+          "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+          "can_write": false
+        },
+        {
+          "agent_id": "blackbox-r1-5",
+          "role": "BLACK_BOX_VERIFIER",
+          "capability_profile": "BLACK_BOX_PUBLIC_ONLY",
+          "context_visibility": "BLACK_BOX_PUBLIC_ONLY",
+          "can_write": false
+        }
+      ],
+      "required_gates": [
+        "ERP_CONTRACT",
+        "SECURITY",
+        "QA",
+        "BLACK_BOX"
+      ],
+      "allowed_capabilities": [
+        "READ_ONLY",
+        "WORKTREE_WRITE",
+        "TEST_EXECUTION",
+        "GIT_COMMIT"
+      ],
+      "forbidden_capabilities": [
+        "DATABASE_ACCESS",
+        "DEPLOY",
+        "GIT_PUSH",
+        "MODEL_INVOCATION",
+        "NETWORK_ACCESS",
+        "PRODUCTION_ACCESS",
+        "RUNTIME_DAEMON",
+        "UAT_ACCESS"
+      ],
+      "retry_policy": {
+        "max_candidate_revisions": 2,
+        "max_attempts_per_gate": 2,
+        "result_unknown_action": "RECONCILE_BEFORE_REPLAY"
+      }
+    },
+    "resources": {
+      "max_concurrent_light_agents": 2,
+      "max_product_writers": 1,
+      "max_heavy_actions": 1,
+      "max_temporary_containers": 1,
+      "max_temporary_databases": 0,
+      "network_allowed": false,
+      "database_allowed": false,
+      "uat_allowed": false,
+      "production_allowed": false,
+      "deploy_allowed": false
+    }
+  },
+  "candidates": [
+    {
+      "revision": 1,
+      "parent_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+      "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+      "disposition": "REJECTED",
+      "content": {
+        "contract_version": "synthetic-v1",
+        "duplicate_request_behavior": "DOUBLE_APPLY",
+        "timeout_recovery_behavior": "BLIND_REPLAY",
+        "data_classification": "SYNTHETIC_ONLY"
+      }
+    },
+    {
+      "revision": 2,
+      "parent_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+      "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+      "disposition": "FINAL",
+      "content": {
+        "contract_version": "synthetic-v2",
+        "duplicate_request_behavior": "IDEMPOTENT_REPLAY",
+        "timeout_recovery_behavior": "RECONCILE_BEFORE_REPLAY",
+        "data_classification": "SYNTHETIC_ONLY"
+      }
+    }
+  ],
+  "contexts": [
+    {
+      "schema_version": "erp-agent-context/v1",
+      "task_id": "AGENT-R1-5",
+      "task_packet_revision": 2,
+      "agent_id": "builder-r1-5",
+      "instance_id": "builder-r1-5-c1",
+      "role": "CHANGE_BUILDER",
+      "capability_profile": "SYNTHETIC_BUILDER",
+      "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+      "lease_generation": 1,
+      "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+      "documents": [
+        {
+          "locator": "bundle://synthetic-contract-v1",
+          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "classification": "SYNTHETIC_CONTRACT"
+        },
+        {
+          "locator": "bundle://candidate/c1",
+          "digest": "sha256:4864b8517efa91740d0f43952797c8b2d350ea5750c7c60ceff169e9a65f3233",
+          "classification": "SYNTHETIC_CANDIDATE"
+        },
+        {
+          "locator": "bundle://evidence/builder-r1-5/c1",
+          "digest": "sha256:edf82b321d516c0956eda58f87864e40e5c6f5a7f282a69874a28c18fab6cba2",
+          "classification": "SYNTHETIC_TEST_EVIDENCE"
+        }
+      ],
+      "forbidden_context": [
+        "OWNER_UNTRACKED_INPUT",
+        "PRODUCT_SOURCE",
+        "GIT_INTERNALS",
+        "REAL_BUSINESS_DATA",
+        "SECRETS",
+        "UAT_OR_PRODUCTION"
+      ],
+      "manifest_digest": "sha256:47c6bfd54dc97b4b0f0633189d680f1b3caea4e63d7428e6384b20acdc4f4930"
+    },
+    {
+      "schema_version": "erp-agent-context/v1",
+      "task_id": "AGENT-R1-5",
+      "task_packet_revision": 2,
+      "agent_id": "erp-guardian-r1-5",
+      "instance_id": "erp-guardian-r1-5-c1",
+      "role": "ERP_CONTRACT_GUARDIAN",
+      "capability_profile": "ERP_READ_ONLY",
+      "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+      "lease_generation": 1,
+      "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+      "documents": [
+        {
+          "locator": "bundle://synthetic-contract-v1",
+          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "classification": "SYNTHETIC_CONTRACT"
+        },
+        {
+          "locator": "bundle://candidate/c1",
+          "digest": "sha256:4864b8517efa91740d0f43952797c8b2d350ea5750c7c60ceff169e9a65f3233",
+          "classification": "SYNTHETIC_CANDIDATE"
+        },
+        {
+          "locator": "bundle://evidence/erp-guardian-r1-5/c1",
+          "digest": "sha256:6ee611401184636345125bcb950bd0dc78b5b954ae51b5a223ec47f9d9f14f18",
+          "classification": "SYNTHETIC_TEST_EVIDENCE"
+        }
+      ],
+      "forbidden_context": [
+        "OWNER_UNTRACKED_INPUT",
+        "PRODUCT_SOURCE",
+        "GIT_INTERNALS",
+        "REAL_BUSINESS_DATA",
+        "SECRETS",
+        "UAT_OR_PRODUCTION"
+      ],
+      "manifest_digest": "sha256:97e69233b8b11cdae699e829730a725c179e78fb0348710c024e664a12aeeecc"
+    },
+    {
+      "schema_version": "erp-agent-context/v1",
+      "task_id": "AGENT-R1-5",
+      "task_packet_revision": 2,
+      "agent_id": "adversarial-r1-5",
+      "instance_id": "adversarial-r1-5-c1",
+      "role": "ADVERSARIAL_EXAMINER",
+      "capability_profile": "ADVERSARIAL_READ_ONLY",
+      "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+      "lease_generation": 1,
+      "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+      "documents": [
+        {
+          "locator": "bundle://synthetic-contract-v1",
+          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "classification": "SYNTHETIC_CONTRACT"
+        },
+        {
+          "locator": "bundle://candidate/c1",
+          "digest": "sha256:4864b8517efa91740d0f43952797c8b2d350ea5750c7c60ceff169e9a65f3233",
+          "classification": "SYNTHETIC_CANDIDATE"
+        },
+        {
+          "locator": "bundle://evidence/adversarial-r1-5/c1",
+          "digest": "sha256:c580a6389f1c12f3e755f4c0d77362839328c78eb7bc64867eb2b91c68e21d38",
+          "classification": "SYNTHETIC_TEST_EVIDENCE"
+        }
+      ],
+      "forbidden_context": [
+        "OWNER_UNTRACKED_INPUT",
+        "PRODUCT_SOURCE",
+        "GIT_INTERNALS",
+        "REAL_BUSINESS_DATA",
+        "SECRETS",
+        "UAT_OR_PRODUCTION"
+      ],
+      "manifest_digest": "sha256:5b064e6a887bb3b492b6c57f55054271774a6dcefe325829ce6c9b0bf48789b4"
+    },
+    {
+      "schema_version": "erp-agent-context/v1",
+      "task_id": "AGENT-R1-5",
+      "task_packet_revision": 2,
+      "agent_id": "security-r1-5",
+      "instance_id": "security-r1-5-c1",
+      "role": "SECURITY_BOUNDARY_EXAMINER",
+      "capability_profile": "SECURITY_READ_ONLY",
+      "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+      "lease_generation": 1,
+      "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+      "documents": [
+        {
+          "locator": "bundle://synthetic-contract-v1",
+          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "classification": "SYNTHETIC_CONTRACT"
+        },
+        {
+          "locator": "bundle://candidate/c1",
+          "digest": "sha256:4864b8517efa91740d0f43952797c8b2d350ea5750c7c60ceff169e9a65f3233",
+          "classification": "SYNTHETIC_CANDIDATE"
+        },
+        {
+          "locator": "bundle://evidence/security-r1-5/c1",
+          "digest": "sha256:ce1f52b6582196e6c3c9aae65be07ada0c74e40fccb6493c8941180585509c19",
+          "classification": "SYNTHETIC_TEST_EVIDENCE"
+        }
+      ],
+      "forbidden_context": [
+        "OWNER_UNTRACKED_INPUT",
+        "PRODUCT_SOURCE",
+        "GIT_INTERNALS",
+        "REAL_BUSINESS_DATA",
+        "SECRETS",
+        "UAT_OR_PRODUCTION"
+      ],
+      "manifest_digest": "sha256:a4428cabf947ce11d87bb8f38509da80216b2142fcd711b5dec2efca83866f23"
+    },
+    {
+      "schema_version": "erp-agent-context/v1",
+      "task_id": "AGENT-R1-5",
+      "task_packet_revision": 2,
+      "agent_id": "qa-r1-5",
+      "instance_id": "qa-r1-5-c1",
+      "role": "INDEPENDENT_VERIFIER",
+      "capability_profile": "QA_TEST_READ_ONLY",
+      "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+      "lease_generation": 1,
+      "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+      "documents": [
+        {
+          "locator": "bundle://synthetic-contract-v1",
+          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "classification": "SYNTHETIC_CONTRACT"
+        },
+        {
+          "locator": "bundle://candidate/c1",
+          "digest": "sha256:4864b8517efa91740d0f43952797c8b2d350ea5750c7c60ceff169e9a65f3233",
+          "classification": "SYNTHETIC_CANDIDATE"
+        },
+        {
+          "locator": "bundle://evidence/qa-r1-5/c1",
+          "digest": "sha256:58f3964973749a83c46498d34c450ad9a04c9a14f6c9a227b9adce492d3fb453",
+          "classification": "SYNTHETIC_TEST_EVIDENCE"
+        }
+      ],
+      "forbidden_context": [
+        "OWNER_UNTRACKED_INPUT",
+        "PRODUCT_SOURCE",
+        "GIT_INTERNALS",
+        "REAL_BUSINESS_DATA",
+        "SECRETS",
+        "UAT_OR_PRODUCTION"
+      ],
+      "manifest_digest": "sha256:e087064e06b55fb19c1ccd071b9f26c5150e671b99e5e40281e9f7e5015c5f5e"
+    },
+    {
+      "schema_version": "erp-agent-context/v1",
+      "task_id": "AGENT-R1-5",
+      "task_packet_revision": 2,
+      "agent_id": "builder-r1-5",
+      "instance_id": "builder-r1-5-c2",
+      "role": "CHANGE_BUILDER",
+      "capability_profile": "SYNTHETIC_BUILDER",
+      "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+      "lease_generation": 1,
+      "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+      "documents": [
+        {
+          "locator": "bundle://synthetic-contract-v1",
+          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "classification": "SYNTHETIC_CONTRACT"
+        },
+        {
+          "locator": "bundle://candidate/c2",
+          "digest": "sha256:e88812fe46169ace30a731b63b571efdf6fc4a6bdbe3c8eaeeb843c58a04c5d1",
+          "classification": "SYNTHETIC_CANDIDATE"
+        },
+        {
+          "locator": "bundle://evidence/builder-r1-5/c2",
+          "digest": "sha256:bed4a327fbf9cbde882b69225c3de1fd75e69e0f6fe21bb9384d6d6c4eabbc2b",
+          "classification": "SYNTHETIC_TEST_EVIDENCE"
+        }
+      ],
+      "forbidden_context": [
+        "OWNER_UNTRACKED_INPUT",
+        "PRODUCT_SOURCE",
+        "GIT_INTERNALS",
+        "REAL_BUSINESS_DATA",
+        "SECRETS",
+        "UAT_OR_PRODUCTION"
+      ],
+      "manifest_digest": "sha256:b894183a5fb2bd83f99f2a808221a174d8626d173a6ad1ff92e73e8e57f6d4a8"
+    },
+    {
+      "schema_version": "erp-agent-context/v1",
+      "task_id": "AGENT-R1-5",
+      "task_packet_revision": 2,
+      "agent_id": "erp-guardian-r1-5",
+      "instance_id": "erp-guardian-r1-5-c2",
+      "role": "ERP_CONTRACT_GUARDIAN",
+      "capability_profile": "ERP_READ_ONLY",
+      "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+      "lease_generation": 1,
+      "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+      "documents": [
+        {
+          "locator": "bundle://synthetic-contract-v1",
+          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "classification": "SYNTHETIC_CONTRACT"
+        },
+        {
+          "locator": "bundle://candidate/c2",
+          "digest": "sha256:e88812fe46169ace30a731b63b571efdf6fc4a6bdbe3c8eaeeb843c58a04c5d1",
+          "classification": "SYNTHETIC_CANDIDATE"
+        },
+        {
+          "locator": "bundle://evidence/erp-guardian-r1-5/c2",
+          "digest": "sha256:17aa4e6656297e8d2992143cdd938ce31e7fc22c494431579ba06059f6d38bec",
+          "classification": "SYNTHETIC_TEST_EVIDENCE"
+        }
+      ],
+      "forbidden_context": [
+        "OWNER_UNTRACKED_INPUT",
+        "PRODUCT_SOURCE",
+        "GIT_INTERNALS",
+        "REAL_BUSINESS_DATA",
+        "SECRETS",
+        "UAT_OR_PRODUCTION"
+      ],
+      "manifest_digest": "sha256:05e791c0e2eeb493b2adda909aeb16e4d6599bd1f32f3491e961b6db1e0b3178"
+    },
+    {
+      "schema_version": "erp-agent-context/v1",
+      "task_id": "AGENT-R1-5",
+      "task_packet_revision": 2,
+      "agent_id": "adversarial-r1-5",
+      "instance_id": "adversarial-r1-5-c2",
+      "role": "ADVERSARIAL_EXAMINER",
+      "capability_profile": "ADVERSARIAL_READ_ONLY",
+      "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+      "lease_generation": 1,
+      "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+      "documents": [
+        {
+          "locator": "bundle://synthetic-contract-v1",
+          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "classification": "SYNTHETIC_CONTRACT"
+        },
+        {
+          "locator": "bundle://candidate/c2",
+          "digest": "sha256:e88812fe46169ace30a731b63b571efdf6fc4a6bdbe3c8eaeeb843c58a04c5d1",
+          "classification": "SYNTHETIC_CANDIDATE"
+        },
+        {
+          "locator": "bundle://evidence/adversarial-r1-5/c2",
+          "digest": "sha256:b6b50f4d0f0479f4991abf55dec1b31c8b944f25314a6cecccbda44361c90eb1",
+          "classification": "SYNTHETIC_TEST_EVIDENCE"
+        }
+      ],
+      "forbidden_context": [
+        "OWNER_UNTRACKED_INPUT",
+        "PRODUCT_SOURCE",
+        "GIT_INTERNALS",
+        "REAL_BUSINESS_DATA",
+        "SECRETS",
+        "UAT_OR_PRODUCTION"
+      ],
+      "manifest_digest": "sha256:2b7496c92ae023b36acde8b3051c05672be0633d23713a3328a0e6780579a5c0"
+    },
+    {
+      "schema_version": "erp-agent-context/v1",
+      "task_id": "AGENT-R1-5",
+      "task_packet_revision": 2,
+      "agent_id": "security-r1-5",
+      "instance_id": "security-r1-5-c2",
+      "role": "SECURITY_BOUNDARY_EXAMINER",
+      "capability_profile": "SECURITY_READ_ONLY",
+      "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+      "lease_generation": 1,
+      "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+      "documents": [
+        {
+          "locator": "bundle://synthetic-contract-v1",
+          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "classification": "SYNTHETIC_CONTRACT"
+        },
+        {
+          "locator": "bundle://candidate/c2",
+          "digest": "sha256:e88812fe46169ace30a731b63b571efdf6fc4a6bdbe3c8eaeeb843c58a04c5d1",
+          "classification": "SYNTHETIC_CANDIDATE"
+        },
+        {
+          "locator": "bundle://evidence/security-r1-5/c2",
+          "digest": "sha256:15cc49350f213bf0016daff3a0366d3ebe84efd55efdefcc0fdcb6d82dc50c95",
+          "classification": "SYNTHETIC_TEST_EVIDENCE"
+        }
+      ],
+      "forbidden_context": [
+        "OWNER_UNTRACKED_INPUT",
+        "PRODUCT_SOURCE",
+        "GIT_INTERNALS",
+        "REAL_BUSINESS_DATA",
+        "SECRETS",
+        "UAT_OR_PRODUCTION"
+      ],
+      "manifest_digest": "sha256:95b4b44e72d3c753ff40522d60952bd493433fed92220c6ac8ea9e3318b86add"
+    },
+    {
+      "schema_version": "erp-agent-context/v1",
+      "task_id": "AGENT-R1-5",
+      "task_packet_revision": 2,
+      "agent_id": "qa-r1-5",
+      "instance_id": "qa-r1-5-c2",
+      "role": "INDEPENDENT_VERIFIER",
+      "capability_profile": "QA_TEST_READ_ONLY",
+      "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+      "lease_generation": 1,
+      "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+      "documents": [
+        {
+          "locator": "bundle://synthetic-contract-v1",
+          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "classification": "SYNTHETIC_CONTRACT"
+        },
+        {
+          "locator": "bundle://candidate/c2",
+          "digest": "sha256:e88812fe46169ace30a731b63b571efdf6fc4a6bdbe3c8eaeeb843c58a04c5d1",
+          "classification": "SYNTHETIC_CANDIDATE"
+        },
+        {
+          "locator": "bundle://evidence/qa-r1-5/c2",
+          "digest": "sha256:757834f59b19a4ef064023ac6aea47593f253cb15c67fa86ad1cd52e22e22868",
+          "classification": "SYNTHETIC_TEST_EVIDENCE"
+        }
+      ],
+      "forbidden_context": [
+        "OWNER_UNTRACKED_INPUT",
+        "PRODUCT_SOURCE",
+        "GIT_INTERNALS",
+        "REAL_BUSINESS_DATA",
+        "SECRETS",
+        "UAT_OR_PRODUCTION"
+      ],
+      "manifest_digest": "sha256:1b522c8773fab244aba22994727a3630424381185b8950582d4c06d86e9dbe7c"
+    },
+    {
+      "schema_version": "erp-agent-context/v1",
+      "task_id": "AGENT-R1-5",
+      "task_packet_revision": 2,
+      "agent_id": "blackbox-r1-5",
+      "instance_id": "blackbox-r1-5-c2",
+      "role": "BLACK_BOX_VERIFIER",
+      "capability_profile": "BLACK_BOX_PUBLIC_ONLY",
+      "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+      "lease_generation": 1,
+      "visibility": "BLACK_BOX_PUBLIC_ONLY",
+      "documents": [
+        {
+          "locator": "blackbox://interface-v2",
+          "digest": "sha256:25b82b219a75e8b18d0c07092b425e270cbdd461ab18faa6c864433f3161a589",
+          "classification": "PUBLIC_INTERFACE"
+        },
+        {
+          "locator": "blackbox://personas-v1",
+          "digest": "sha256:d58739a5706fefaca733ffbbda41ff61d30138536b2c7d9dee19037f80589594",
+          "classification": "PUBLIC_PERSONA"
+        },
+        {
+          "locator": "blackbox://observation-v2",
+          "digest": "sha256:83e9d31d5544508c0f8e6b079a2a487e5c7943b122ade8bf6a0d20a3f7aa7cb0",
+          "classification": "PUBLIC_OBSERVATION"
+        }
+      ],
+      "forbidden_context": [
+        "OWNER_UNTRACKED_INPUT",
+        "PRODUCT_SOURCE",
+        "GIT_INTERNALS",
+        "REAL_BUSINESS_DATA",
+        "SECRETS",
+        "UAT_OR_PRODUCTION"
+      ],
+      "manifest_digest": "sha256:00b4cae7cf8e17a29554bc588090b07bf0c50361ceaa22dc4f00fc74faa8c033"
+    }
+  ],
+  "messages": [
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000001",
+      "message_type": "HANDOFF",
+      "created_at": "2026-08-11T04:01:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "builder-r1-5",
+        "instance_id": "builder-r1-5-c1",
+        "capability_profile": "SYNTHETIC_BUILDER",
+        "context_manifest_digest": "sha256:47c6bfd54dc97b4b0f0633189d680f1b3caea4e63d7428e6384b20acdc4f4930"
+      },
+      "role": "CHANGE_BUILDER",
+      "gate": "IMPLEMENTATION",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "bundle://evidence/message-01"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "FILE_SNAPSHOT",
+          "locator": "bundle://evidence/message-01",
+          "digest": "sha256:f1883887ebde47aadee1c99d84ee2f8b056303285806d09ad7beb961ebf96b5c",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:01:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [
+        {
+          "path": "docs/synthetic/contract.md",
+          "action": "MODIFY",
+          "purpose": "Expose the intentionally unsafe first synthetic candidate."
+        }
+      ],
+      "tests": [],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "REQUEST_INDEPENDENT_GATES",
+        "reason": "Synthetic protocol observation 01 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "PASS",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000002",
+      "message_type": "FINDING",
+      "created_at": "2026-08-11T04:02:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "erp-guardian-r1-5",
+        "instance_id": "erp-guardian-r1-5-c1",
+        "capability_profile": "ERP_READ_ONLY",
+        "context_manifest_digest": "sha256:97e69233b8b11cdae699e829730a725c179e78fb0348710c024e664a12aeeecc"
+      },
+      "role": "ERP_CONTRACT_GUARDIAN",
+      "gate": "ERP_CONTRACT",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "bundle://evidence/message-02"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "FILE_SNAPSHOT",
+          "locator": "bundle://evidence/message-02",
+          "digest": "sha256:6c330ab0692d9bf9c42d6f6d93eb4123b8901af5e914c41fc3f1646a7d14a48c",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:02:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "REJECT_DOUBLE_APPLY",
+        "reason": "Synthetic protocol observation 02 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "FAIL",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000003",
+      "message_type": "MINORITY_REPORT",
+      "created_at": "2026-08-11T04:03:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "adversarial-r1-5",
+        "instance_id": "adversarial-r1-5-c1",
+        "capability_profile": "ADVERSARIAL_READ_ONLY",
+        "context_manifest_digest": "sha256:5b064e6a887bb3b492b6c57f55054271774a6dcefe325829ce6c9b0bf48789b4"
+      },
+      "role": "ADVERSARIAL_EXAMINER",
+      "gate": "ADVERSARIAL",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "bundle://evidence/message-03"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "FILE_SNAPSHOT",
+          "locator": "bundle://evidence/message-03",
+          "digest": "sha256:946994d7efdef5df163f7c4f384e0bf910534feb3b69383c65f4fee02f81d0d9",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:03:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "FIX_OR_ESCALATE",
+        "reason": "Synthetic protocol observation 03 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "VETOED",
+      "minority_report": {
+        "claim_id": "MR-001",
+        "opposed_claim": "The first candidate is safe to retry after an ambiguous timeout.",
+        "evidence_refs": [
+          "E-001"
+        ],
+        "potential_harm": "A synthetic request can be applied twice.",
+        "falsification_test": "Inject an ambiguous timeout and retry the same synthetic request identifier.",
+        "requested_disposition": "FIX_OR_ESCALATE"
+      },
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000004",
+      "message_type": "VETO",
+      "created_at": "2026-08-11T04:04:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "security-r1-5",
+        "instance_id": "security-r1-5-c1",
+        "capability_profile": "SECURITY_READ_ONLY",
+        "context_manifest_digest": "sha256:a4428cabf947ce11d87bb8f38509da80216b2142fcd711b5dec2efca83866f23"
+      },
+      "role": "SECURITY_BOUNDARY_EXAMINER",
+      "gate": "SECURITY",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "bundle://evidence/message-04"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "FILE_SNAPSHOT",
+          "locator": "bundle://evidence/message-04",
+          "digest": "sha256:b6d5c1f4add6c8417c29746485e62a5382adec4f11755fbb09e9f9a2987bc682",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:04:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "REJECT_BLIND_REPLAY",
+        "reason": "Synthetic protocol observation 04 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "VETOED",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000005",
+      "message_type": "VERIFICATION",
+      "created_at": "2026-08-11T04:05:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "qa-r1-5",
+        "instance_id": "qa-r1-5-c1",
+        "capability_profile": "QA_TEST_READ_ONLY",
+        "context_manifest_digest": "sha256:e087064e06b55fb19c1ccd071b9f26c5150e671b99e5e40281e9f7e5015c5f5e"
+      },
+      "role": "INDEPENDENT_VERIFIER",
+      "gate": "QA",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "bundle://evidence/message-05"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "TEST_REPORT",
+          "locator": "bundle://evidence/message-05",
+          "digest": "sha256:418de962b7e9315b0259c8ffd2a58236dccf2a92b9edb76e80503281c411b44d",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:05:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [
+        {
+          "id": "T-001",
+          "command_id": "synthetic-retry-test-v1",
+          "environment": "in-memory synthetic fixture",
+          "result": "FAIL",
+          "exit_code": 1,
+          "artifact": "E-001"
+        }
+      ],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "REJECT_FAILED_RETRY_TEST",
+        "reason": "Synthetic protocol observation 05 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "FAIL",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000006",
+      "message_type": "CHECKPOINT",
+      "created_at": "2026-08-11T04:06:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "builder-r1-5",
+        "instance_id": "builder-r1-5-c1",
+        "capability_profile": "SYNTHETIC_BUILDER",
+        "context_manifest_digest": "sha256:47c6bfd54dc97b4b0f0633189d680f1b3caea4e63d7428e6384b20acdc4f4930"
+      },
+      "role": "CHANGE_BUILDER",
+      "gate": "IMPLEMENTATION",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 2,
+        "artifacts": [
+          "bundle://evidence/message-06"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "FILE_SNAPSHOT",
+          "locator": "bundle://evidence/message-06",
+          "digest": "sha256:e00a042352db432343d7a2de624785a41b10aedec21cf76804486989cd4cf9ca",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:06:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "CHECKPOINT_REJECTED_CANDIDATE",
+        "reason": "Synthetic protocol observation 06 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "IN_PROGRESS",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": {
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "completed_message_ids": [
+          "00000000-0000-4000-8000-000000000001",
+          "00000000-0000-4000-8000-000000000002",
+          "00000000-0000-4000-8000-000000000003",
+          "00000000-0000-4000-8000-000000000004",
+          "00000000-0000-4000-8000-000000000005"
+        ]
+      }
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000007",
+      "message_type": "HANDOFF",
+      "created_at": "2026-08-11T04:07:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "builder-r1-5",
+        "instance_id": "builder-r1-5-c2",
+        "capability_profile": "SYNTHETIC_BUILDER",
+        "context_manifest_digest": "sha256:b894183a5fb2bd83f99f2a808221a174d8626d173a6ad1ff92e73e8e57f6d4a8"
+      },
+      "role": "CHANGE_BUILDER",
+      "gate": "IMPLEMENTATION",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "bundle://evidence/message-07"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "FILE_SNAPSHOT",
+          "locator": "bundle://evidence/message-07",
+          "digest": "sha256:39be2a4d0454de5b2a70d7843545c13a5195abe070d6b2234135f03d9b23a165",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:07:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [
+        {
+          "path": "docs/synthetic/contract.md",
+          "action": "MODIFY",
+          "purpose": "Replace blind replay with reconcile-before-replay and idempotency."
+        }
+      ],
+      "tests": [],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "REQUEST_FRESH_GATES",
+        "reason": "Synthetic protocol observation 07 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "PASS",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000008",
+      "message_type": "VERIFICATION",
+      "created_at": "2026-08-11T04:08:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "erp-guardian-r1-5",
+        "instance_id": "erp-guardian-r1-5-c2",
+        "capability_profile": "ERP_READ_ONLY",
+        "context_manifest_digest": "sha256:05e791c0e2eeb493b2adda909aeb16e4d6599bd1f32f3491e961b6db1e0b3178"
+      },
+      "role": "ERP_CONTRACT_GUARDIAN",
+      "gate": "ERP_CONTRACT",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "bundle://evidence/message-08"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "FILE_SNAPSHOT",
+          "locator": "bundle://evidence/message-08",
+          "digest": "sha256:83359cc9296e9cb8815e57ea22631ffce0b5e4972cbbb7f85b0133ee8b4c8c4b",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:08:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "PASS_CURRENT_GATE",
+        "reason": "Synthetic protocol observation 08 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "PASS",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000009",
+      "message_type": "VERIFICATION",
+      "created_at": "2026-08-11T04:09:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "adversarial-r1-5",
+        "instance_id": "adversarial-r1-5-c2",
+        "capability_profile": "ADVERSARIAL_READ_ONLY",
+        "context_manifest_digest": "sha256:2b7496c92ae023b36acde8b3051c05672be0633d23713a3328a0e6780579a5c0"
+      },
+      "role": "ADVERSARIAL_EXAMINER",
+      "gate": "ADVERSARIAL",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "bundle://evidence/message-09"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "FILE_SNAPSHOT",
+          "locator": "bundle://evidence/message-09",
+          "digest": "sha256:97e9aeccf8574406b675be946907adb9737dac03677c4c05976836eedccfb8d0",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:09:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "DISPOSE_MR_001_AS_FIXED",
+        "reason": "Synthetic protocol observation 09 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "PASS",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [
+        "MR-001"
+      ],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000010",
+      "message_type": "VERIFICATION",
+      "created_at": "2026-08-11T04:10:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "security-r1-5",
+        "instance_id": "security-r1-5-c2",
+        "capability_profile": "SECURITY_READ_ONLY",
+        "context_manifest_digest": "sha256:95b4b44e72d3c753ff40522d60952bd493433fed92220c6ac8ea9e3318b86add"
+      },
+      "role": "SECURITY_BOUNDARY_EXAMINER",
+      "gate": "SECURITY",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "bundle://evidence/message-10"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "FILE_SNAPSHOT",
+          "locator": "bundle://evidence/message-10",
+          "digest": "sha256:d97d08326bd89a68d80df98eeea6aa7f3dd1410d338efc51ff3c818c68ce645c",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:10:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "PASS_CURRENT_GATE",
+        "reason": "Synthetic protocol observation 10 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "PASS",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000011",
+      "message_type": "VERIFICATION",
+      "created_at": "2026-08-11T04:11:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "qa-r1-5",
+        "instance_id": "qa-r1-5-c2",
+        "capability_profile": "QA_TEST_READ_ONLY",
+        "context_manifest_digest": "sha256:1b522c8773fab244aba22994727a3630424381185b8950582d4c06d86e9dbe7c"
+      },
+      "role": "INDEPENDENT_VERIFIER",
+      "gate": "QA",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "bundle://evidence/message-11"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "TEST_REPORT",
+          "locator": "bundle://evidence/message-11",
+          "digest": "sha256:4455124f8ccbc7f11bc082de564bd46258d41f988aa52ffed40df8c0d28c8ff8",
+          "exit_code": null,
+          "observed_at": "2026-08-11T04:11:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [
+        {
+          "id": "T-001",
+          "command_id": "synthetic-retry-test-v2",
+          "environment": "in-memory synthetic fixture with injected timeout",
+          "result": "RESULT_UNKNOWN",
+          "exit_code": null,
+          "artifact": "E-001"
+        }
+      ],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "RECONCILE_BEFORE_REPLAY",
+        "reason": "Synthetic protocol observation 11 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "RESULT_UNKNOWN",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000012",
+      "message_type": "RECOVERY",
+      "created_at": "2026-08-11T04:12:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "builder-r1-5",
+        "instance_id": "builder-r1-5-c2",
+        "capability_profile": "SYNTHETIC_BUILDER",
+        "context_manifest_digest": "sha256:b894183a5fb2bd83f99f2a808221a174d8626d173a6ad1ff92e73e8e57f6d4a8"
+      },
+      "role": "CHANGE_BUILDER",
+      "gate": "RECOVERY",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "bundle://evidence/message-12"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "FILE_SNAPSHOT",
+          "locator": "bundle://evidence/message-12",
+          "digest": "sha256:6adca3f6bb1fb67c8da92287ac2c5a0d0aa31253101e51b9c86a5348980bddef",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:12:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "MARK_NOT_APPLIED_SAFE_TO_RETRY",
+        "reason": "Synthetic protocol observation 12 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "PASS",
+      "minority_report": null,
+      "resolves_message_ids": [
+        "00000000-0000-4000-8000-000000000011"
+      ],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000013",
+      "message_type": "VERIFICATION",
+      "created_at": "2026-08-11T04:13:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "qa-r1-5",
+        "instance_id": "qa-r1-5-c2",
+        "capability_profile": "QA_TEST_READ_ONLY",
+        "context_manifest_digest": "sha256:1b522c8773fab244aba22994727a3630424381185b8950582d4c06d86e9dbe7c"
+      },
+      "role": "INDEPENDENT_VERIFIER",
+      "gate": "QA",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 2,
+        "artifacts": [
+          "bundle://evidence/message-13"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "TEST_REPORT",
+          "locator": "bundle://evidence/message-13",
+          "digest": "sha256:ced9947c72f23b40d22acd1be7a8303652e0965e51c6b181d12c4bc18f190285",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:13:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [
+        {
+          "id": "T-001",
+          "command_id": "synthetic-retry-test-v2",
+          "environment": "in-memory synthetic fixture after not-applied reconciliation",
+          "result": "PASS",
+          "exit_code": 0,
+          "artifact": "E-001"
+        }
+      ],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "PASS_CURRENT_GATE",
+        "reason": "Synthetic protocol observation 13 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "PASS",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000014",
+      "message_type": "VERIFICATION",
+      "created_at": "2026-08-11T04:14:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "blackbox-r1-5",
+        "instance_id": "blackbox-r1-5-c2",
+        "capability_profile": "BLACK_BOX_PUBLIC_ONLY",
+        "context_manifest_digest": "sha256:00b4cae7cf8e17a29554bc588090b07bf0c50361ceaa22dc4f00fc74faa8c033"
+      },
+      "role": "BLACK_BOX_VERIFIER",
+      "gate": "BLACK_BOX",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "blackbox://observation-v2"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "BLACK_BOX_OBSERVATION",
+          "locator": "blackbox://observation-v2",
+          "digest": "sha256:83e9d31d5544508c0f8e6b079a2a487e5c7943b122ade8bf6a0d20a3f7aa7cb0",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:14:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [
+        {
+          "id": "T-001",
+          "command_id": "source-blind-persona-runner",
+          "environment": "network-none; public fixture mount only",
+          "result": "PASS",
+          "exit_code": 0,
+          "artifact": "E-001"
+        }
+      ],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "PASS_CURRENT_GATE",
+        "reason": "Synthetic protocol observation 14 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "PASS",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    },
+    {
+      "schema_version": "erp-agent-message/v1",
+      "message_id": "00000000-0000-4000-8000-000000000015",
+      "message_type": "CLOSURE",
+      "created_at": "2026-08-11T04:15:00Z",
+      "task_id": "AGENT-R1-5",
+      "agent": {
+        "agent_id": "builder-r1-5",
+        "instance_id": "builder-r1-5-c2",
+        "capability_profile": "SYNTHETIC_BUILDER",
+        "context_manifest_digest": "sha256:b894183a5fb2bd83f99f2a808221a174d8626d173a6ad1ff92e73e8e57f6d4a8"
+      },
+      "role": "CHANGE_BUILDER",
+      "gate": "CLOSURE",
+      "input": {
+        "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "task_packet_revision": 2,
+        "lease_generation": 1,
+        "attempt": 1,
+        "artifacts": [
+          "bundle://evidence/message-15"
+        ]
+      },
+      "assumptions": [],
+      "evidence": [
+        {
+          "id": "E-001",
+          "kind": "FILE_SNAPSHOT",
+          "locator": "bundle://evidence/message-15",
+          "digest": "sha256:8ddc8a8c6e46c6cca7bfed4075b2a3e18a39b8ee6404d4826fe8c87269465e3e",
+          "exit_code": 0,
+          "observed_at": "2026-08-11T04:15:00Z",
+          "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
+        }
+      ],
+      "changes": [],
+      "tests": [],
+      "risks": [],
+      "blockers": [],
+      "recommendation": {
+        "decision": "CLOSE_SYNTHETIC_PILOT_ONLY",
+        "reason": "Synthetic protocol observation 15 is bound to the declared candidate.",
+        "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+      },
+      "status": "COMPLETE",
+      "minority_report": null,
+      "resolves_message_ids": [],
+      "resolves_claim_ids": [],
+      "checkpoint": null
+    }
+  ],
+  "expected": {
+    "final_candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+    "required_gate_status": {
+      "ERP_CONTRACT": "PASS",
+      "SECURITY": "PASS",
+      "QA": "PASS",
+      "BLACK_BOX": "PASS"
+    },
+    "minority_claims_resolved": [
+      "MR-001"
+    ],
+    "result_unknown_resolved": [
+      "00000000-0000-4000-8000-000000000011"
+    ]
+  }
+}

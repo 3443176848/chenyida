@@ -1,0 +1,42 @@
+{
+  "schema_version": "synthetic-retry-personas/v1",
+  "selection_rule": "one persona for each observable risk in the public interface",
+  "personas": [
+    {
+      "id": "planner-double-submit",
+      "risk": "duplicate delivery",
+      "steps": [
+        {"action": "apply", "request_id": "SYN-REQ-001", "quantity": 4},
+        {"action": "apply", "request_id": "SYN-REQ-001", "quantity": 4}
+      ],
+      "expected": {"accepted": 2, "replayed": 1, "rejected": 0, "applied_total": 4}
+    },
+    {
+      "id": "operator-conflicting-retry",
+      "risk": "same identity reused with different payload",
+      "steps": [
+        {"action": "apply", "request_id": "SYN-REQ-002", "quantity": 3},
+        {"action": "apply", "request_id": "SYN-REQ-002", "quantity": 8}
+      ],
+      "expected": {"accepted": 1, "replayed": 0, "rejected": 1, "applied_total": 3}
+    },
+    {
+      "id": "auditor-timeout-reconcile",
+      "risk": "ambiguous result replay",
+      "steps": [
+        {"action": "apply_unknown", "request_id": "SYN-REQ-003", "quantity": 5},
+        {"action": "reconcile", "request_id": "SYN-REQ-003", "quantity": 5},
+        {"action": "apply", "request_id": "SYN-REQ-003", "quantity": 5}
+      ],
+      "expected": {"accepted": 2, "replayed": 1, "rejected": 0, "applied_total": 5}
+    },
+    {
+      "id": "clerk-invalid-quantity",
+      "risk": "invalid quantity changes state",
+      "steps": [
+        {"action": "apply", "request_id": "SYN-REQ-004", "quantity": 0}
+      ],
+      "expected": {"accepted": 0, "replayed": 0, "rejected": 1, "applied_total": 0}
+    }
+  ]
+}

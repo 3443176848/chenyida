@@ -68,6 +68,98 @@ class RepositoryFixture:
             json.dumps(packet, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         )
 
+    def upgrade_packet_to_v2(self) -> dict:
+        packet = self.load_packet()
+        packet["schema_version"] = "chenyida-erp-agent-task/v2"
+        packet["task"]["revision"] = 2
+        packet["task"]["objective"] = "Validate a strict synthetic protocol."
+        packet["task"]["non_goals"] = ["No ERP runtime changes"]
+        packet["scope"]["data_classification"] = "SYNTHETIC_DOCS_TEST_ONLY"
+        packet["inspection"]["required_decisions"] = ["D-113", "D-114"]
+        del packet["inspection"]["required_decision"]
+        packet["orchestration"] = {
+            "product_writer_agent_id": "builder-r1-test",
+            "active_lease_generation": 1,
+            "roles": [
+                {
+                    "agent_id": "builder-r1-test",
+                    "role": "CHANGE_BUILDER",
+                    "capability_profile": "SYNTHETIC_BUILDER",
+                    "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+                    "can_write": True,
+                },
+                {
+                    "agent_id": "erp-r1-test",
+                    "role": "ERP_CONTRACT_GUARDIAN",
+                    "capability_profile": "ERP_READ_ONLY",
+                    "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+                    "can_write": False,
+                },
+                {
+                    "agent_id": "adversarial-r1-test",
+                    "role": "ADVERSARIAL_EXAMINER",
+                    "capability_profile": "ADVERSARIAL_READ_ONLY",
+                    "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+                    "can_write": False,
+                },
+                {
+                    "agent_id": "security-r1-test",
+                    "role": "SECURITY_BOUNDARY_EXAMINER",
+                    "capability_profile": "SECURITY_READ_ONLY",
+                    "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+                    "can_write": False,
+                },
+                {
+                    "agent_id": "qa-r1-test",
+                    "role": "INDEPENDENT_VERIFIER",
+                    "capability_profile": "QA_TEST_READ_ONLY",
+                    "context_visibility": "SYNTHETIC_PROTOCOL_ONLY",
+                    "can_write": False,
+                },
+                {
+                    "agent_id": "blackbox-r1-test",
+                    "role": "BLACK_BOX_VERIFIER",
+                    "capability_profile": "BLACK_BOX_PUBLIC_ONLY",
+                    "context_visibility": "BLACK_BOX_PUBLIC_ONLY",
+                    "can_write": False,
+                },
+            ],
+            "required_gates": ["ERP_CONTRACT", "SECURITY", "QA", "BLACK_BOX"],
+            "allowed_capabilities": ["READ_ONLY", "WORKTREE_WRITE", "TEST_EXECUTION", "GIT_COMMIT"],
+            "forbidden_capabilities": [
+                "DATABASE_ACCESS",
+                "DEPLOY",
+                "GIT_PUSH",
+                "MODEL_INVOCATION",
+                "NETWORK_ACCESS",
+                "PRODUCTION_ACCESS",
+                "RUNTIME_DAEMON",
+                "UAT_ACCESS",
+            ],
+            "retry_policy": {
+                "max_candidate_revisions": 2,
+                "max_attempts_per_gate": 2,
+                "result_unknown_action": "RECONCILE_BEFORE_REPLAY",
+            },
+        }
+        packet["resources"] = {
+            "max_concurrent_light_agents": 2,
+            "max_product_writers": 1,
+            "max_heavy_actions": 1,
+            "max_temporary_containers": 1,
+            "max_temporary_databases": 0,
+            "network_allowed": False,
+            "database_allowed": False,
+            "uat_allowed": False,
+            "production_allowed": False,
+            "deploy_allowed": False,
+        }
+        decisions = self.read("docs/project/DECISIONS.md")
+        decisions += "\n## D-114 Test decision\n\n- 状态：`ACCEPTED / R1.5 AUTHORIZED`\n"
+        self.write("docs/project/DECISIONS.md", decisions)
+        self.write_packet(packet)
+        return packet
+
     def _write_baseline(self) -> None:
         self.write("AGENTS.md", "# Test AGENTS\n")
         self.write(
@@ -243,6 +335,63 @@ class ReadonlyControllerTest(unittest.TestCase):
             "DOCUMENT_DECLARATION_ONLY_NO_CONNECTION",
         )
         self.assertEqual(finding_codes(report), set())
+
+    def test_v2_packet_is_ready_and_requires_d114(self) -> None:
+        self.fixture.upgrade_packet_to_v2()
+
+        report = self.inspect()
+
+        self.assertEqual(report["status"], "READY")
+        self.assertEqual(report["task"]["packet_revision"], 2)
+        self.assertIn("DECISION_D114_ACCEPTED", finding_codes(report, "PASS"))
+
+    def test_v2_unaccepted_d114_fails_closed(self) -> None:
+        self.fixture.upgrade_packet_to_v2()
+        decisions = self.fixture.read("docs/project/DECISIONS.md").replace(
+            "ACCEPTED / R1.5 AUTHORIZED",
+            "PROPOSED / NOT AUTHORIZED",
+        )
+        self.fixture.write("docs/project/DECISIONS.md", decisions)
+
+        report = self.inspect()
+
+        self.assertIn("DECISION_D114_ACCEPTED", finding_codes(report))
+
+    def test_v2_reviewer_write_permission_is_rejected(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        packet["orchestration"]["roles"][1]["can_write"] = True
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
+    def test_v2_forbidden_capability_cannot_be_allowed(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        packet["orchestration"]["allowed_capabilities"].append("NETWORK_ACCESS")
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
+    def test_v2_resource_ceiling_is_rejected(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        packet["resources"]["max_concurrent_light_agents"] = 3
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
+    def test_v2_unknown_field_is_rejected(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        packet["runtime"] = {"enabled": True}
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
 
     def test_idle_is_success_without_auto_start(self) -> None:
         tasks = self.fixture.read("docs/project/TASKS.md").replace(

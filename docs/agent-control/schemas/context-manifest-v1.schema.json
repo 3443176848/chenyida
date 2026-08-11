@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chenyida.invalid/schemas/agent-control/context-manifest-v1.schema.json",
+  "title": "ERP Agent Context Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "task_packet_revision",
+    "agent_id",
+    "instance_id",
+    "role",
+    "capability_profile",
+    "candidate_sha",
+    "lease_generation",
+    "visibility",
+    "documents",
+    "forbidden_context",
+    "manifest_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "erp-agent-context/v1"},
+    "task_id": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]{0,63}$"},
+    "task_packet_revision": {"type": "integer", "minimum": 1},
+    "agent_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+    "instance_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+    "role": {
+      "enum": [
+        "CHANGE_BUILDER",
+        "ERP_CONTRACT_GUARDIAN",
+        "ADVERSARIAL_EXAMINER",
+        "SECURITY_BOUNDARY_EXAMINER",
+        "INDEPENDENT_VERIFIER",
+        "BLACK_BOX_VERIFIER"
+      ]
+    },
+    "capability_profile": {
+      "enum": [
+        "SYNTHETIC_BUILDER",
+        "ERP_READ_ONLY",
+        "ADVERSARIAL_READ_ONLY",
+        "SECURITY_READ_ONLY",
+        "QA_TEST_READ_ONLY",
+        "BLACK_BOX_PUBLIC_ONLY"
+      ]
+    },
+    "candidate_sha": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$"},
+    "lease_generation": {"type": "integer", "minimum": 1},
+    "visibility": {"enum": ["SYNTHETIC_PROTOCOL_ONLY", "BLACK_BOX_PUBLIC_ONLY"]},
+    "documents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["locator", "digest", "classification"],
+        "properties": {
+          "locator": {"type": "string", "minLength": 1, "maxLength": 512},
+          "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "classification": {
+            "enum": [
+              "SYNTHETIC_CONTRACT",
+              "SYNTHETIC_CANDIDATE",
+              "SYNTHETIC_TEST_EVIDENCE",
+              "PUBLIC_INTERFACE",
+              "PUBLIC_PERSONA",
+              "PUBLIC_OBSERVATION"
+            ]
+          }
+        }
+      }
+    },
+    "forbidden_context": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "OWNER_UNTRACKED_INPUT",
+          "PRODUCT_SOURCE",
+          "GIT_INTERNALS",
+          "REAL_BUSINESS_DATA",
+          "SECRETS",
+          "UAT_OR_PRODUCTION"
+        ]
+      }
+    },
+    "manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

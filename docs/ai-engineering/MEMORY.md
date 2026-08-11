@@ -28,6 +28,10 @@
 - 明确排除的内容、数据分类、Token上限和过期时间；
 - `manifest_digest`。
 
+R1.5的机器合同是[`context-manifest-v1.schema.json`](../agent-control/schemas/context-manifest-v1.schema.json)：固定`task_id`、packet revision、`agent_id`/`instance_id`、机器角色、能力profile、candidate、lease generation、visibility、带摘要的document清单、六项禁止上下文和`manifest_digest`。摘要按移除`manifest_digest`后的规范JSON计算。当前合成试点要求每个实例只出现一次；Message必须逐字段匹配对应Manifest。
+
+`BLACK_BOX_PUBLIC_ONLY`Manifest只允许`blackbox://` locator和`PUBLIC_INTERFACE`、`PUBLIC_PERSONA`、`PUBLIC_OBSERVATION`三种分类。产品源码、Git元数据、负责人未跟踪输入、真实业务数据、秘密和UAT/生产均显式禁止。该约束已由无状态验证器和断网fixture试验验证，但原生LLM身份本身仍不是OS级强制隔离。
+
 文件漂移、任务revision或candidate变化使Manifest过期。Agent不得自行扩展L3；发现缺项时发`CONTEXT_REQUEST`，由Orchestrator验证必要性并生成新Manifest。
 
 ## 4. 角色隔离

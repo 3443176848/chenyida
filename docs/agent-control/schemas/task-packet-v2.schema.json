@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chenyida.invalid/schemas/agent-control/task-packet-v2.schema.json",
+  "title": "Chenyida ERP Agent Task Packet v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task",
+    "baseline",
+    "scope",
+    "inspection",
+    "orchestration",
+    "resources"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "chenyida-erp-agent-task/v2"
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision",
+        "ledger_state",
+        "delivery_stage",
+        "qualifiers",
+        "task_document",
+        "objective",
+        "non_goals"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]{0,63}$"},
+        "revision": {"type": "integer", "minimum": 1},
+        "ledger_state": {"enum": ["TODO", "DOING", "DONE", "BLOCKED"]},
+        "delivery_stage": {"type": "string", "minLength": 1, "maxLength": 128},
+        "qualifiers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "task_document": {
+          "type": "string",
+          "pattern": "^docs/tasks/[A-Za-z0-9._-]+\\.md$"
+        },
+        "objective": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "non_goals": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 512}
+        }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_sha", "expected_branch", "source_version", "source_migration", "uat"],
+      "properties": {
+        "base_sha": {"$ref": "#/$defs/sha1"},
+        "expected_branch": {"type": "string", "minLength": 1, "maxLength": 128},
+        "source_version": {"type": "string", "minLength": 1, "maxLength": 128},
+        "source_migration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["first_number", "head_number", "head_filename", "head_sha256"],
+          "properties": {
+            "first_number": {"type": "integer", "minimum": 0},
+            "head_number": {"type": "integer", "minimum": 0},
+            "head_filename": {
+              "type": "string",
+              "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"
+            },
+            "head_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "uat": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "migration_head", "verification_scope"],
+          "properties": {
+            "version": {"type": "string", "minLength": 1, "maxLength": 128},
+            "migration_head": {"type": "string", "minLength": 1, "maxLength": 32},
+            "verification_scope": {"const": "DOCUMENT_DECLARATION_ONLY_NO_CONNECTION"}
+          }
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed_changed_paths",
+        "known_untracked_paths",
+        "required_documents",
+        "require_single_worktree",
+        "data_classification"
+      ],
+      "properties": {
+        "allowed_changed_paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/repositoryPathPattern"}
+        },
+        "known_untracked_paths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/repositoryPath"}
+        },
+        "required_documents": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/repositoryPath"}
+        },
+        "require_single_worktree": {"type": "boolean"},
+        "data_classification": {"const": "SYNTHETIC_DOCS_TEST_ONLY"}
+      }
+    },
+    "inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_json",
+        "migration_directory",
+        "migration_journal",
+        "migration_snapshot_directory",
+        "required_decisions",
+        "uat_document_markers"
+      ],
+      "properties": {
+        "package_json": {"const": "chenyida_erp_site/package.json"},
+        "migration_directory": {"const": "chenyida_erp_site/drizzle-postgres"},
+        "migration_journal": {"const": "chenyida_erp_site/drizzle-postgres/meta/_journal.json"},
+        "migration_snapshot_directory": {"const": "chenyida_erp_site/drizzle-postgres/meta"},
+        "required_decisions": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {"enum": ["D-113", "D-114"]},
+          "allOf": [
+            {"contains": {"const": "D-113"}},
+            {"contains": {"const": "D-114"}}
+          ]
+        },
+        "uat_document_markers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "contains"],
+            "properties": {
+              "path": {"$ref": "#/$defs/repositoryPath"},
+              "contains": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {"type": "string", "minLength": 1, "maxLength": 128}
+              }
+            }
+          }
+        }
+      }
+    },
+    "orchestration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product_writer_agent_id",
+        "active_lease_generation",
+        "roles",
+        "required_gates",
+        "allowed_capabilities",
+        "forbidden_capabilities",
+        "retry_policy"
+      ],
+      "properties": {
+        "product_writer_agent_id": {"$ref": "#/$defs/agentId"},
+        "active_lease_generation": {"type": "integer", "minimum": 1},
+        "roles": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {"$ref": "#/$defs/roleAssignment"}
+        },
+        "required_gates": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {"enum": ["ERP_CONTRACT", "SECURITY", "QA", "BLACK_BOX"]}
+        },
+        "allowed_capabilities": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {"enum": ["READ_ONLY", "WORKTREE_WRITE", "TEST_EXECUTION", "GIT_COMMIT"]}
+        },
+        "forbidden_capabilities": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "DATABASE_ACCESS",
+              "DEPLOY",
+              "GIT_PUSH",
+              "MODEL_INVOCATION",
+              "NETWORK_ACCESS",
+              "PRODUCTION_ACCESS",
+              "RUNTIME_DAEMON",
+              "UAT_ACCESS"
+            ]
+          }
+        },
+        "retry_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_candidate_revisions", "max_attempts_per_gate", "result_unknown_action"],
+          "properties": {
+            "max_candidate_revisions": {"type": "integer", "minimum": 2, "maximum": 3},
+            "max_attempts_per_gate": {"type": "integer", "minimum": 1, "maximum": 3},
+            "result_unknown_action": {"const": "RECONCILE_BEFORE_REPLAY"}
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_concurrent_light_agents",
+        "max_product_writers",
+        "max_heavy_actions",
+        "max_temporary_containers",
+        "max_temporary_databases",
+        "network_allowed",
+        "database_allowed",
+        "uat_allowed",
+        "production_allowed",
+        "deploy_allowed"
+      ],
+      "properties": {
+        "max_concurrent_light_agents": {"type": "integer", "minimum": 1, "maximum": 2},
+        "max_product_writers": {"const": 1},
+        "max_heavy_actions": {"const": 1},
+        "max_temporary_containers": {"type": "integer", "minimum": 0, "maximum": 1},
+        "max_temporary_databases": {"const": 0},
+        "network_allowed": {"const": false},
+        "database_allowed": {"const": false},
+        "uat_allowed": {"const": false},
+        "production_allowed": {"const": false},
+        "deploy_allowed": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "sha1": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "agentId": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000\\\\]+$"
+    },
+    "repositoryPathPattern": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "not": {"enum": ["*", "**", "**/*"]},
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000\\\\]+$"
+    },
+    "roleAssignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_id", "role", "capability_profile", "context_visibility", "can_write"],
+      "properties": {
+        "agent_id": {"$ref": "#/$defs/agentId"},
+        "role": {
+          "enum": [
+            "CHANGE_BUILDER",
+            "ERP_CONTRACT_GUARDIAN",
+            "ADVERSARIAL_EXAMINER",
+            "SECURITY_BOUNDARY_EXAMINER",
+            "INDEPENDENT_VERIFIER",
+            "BLACK_BOX_VERIFIER"
+          ]
+        },
+        "capability_profile": {
+          "enum": [
+            "SYNTHETIC_BUILDER",
+            "ERP_READ_ONLY",
+            "ADVERSARIAL_READ_ONLY",
+            "SECURITY_READ_ONLY",
+            "QA_TEST_READ_ONLY",
+            "BLACK_BOX_PUBLIC_ONLY"
+          ]
+        },
+        "context_visibility": {"enum": ["SYNTHETIC_PROTOCOL_ONLY", "BLACK_BOX_PUBLIC_ONLY"]},
+        "can_write": {"type": "boolean"}
+      }
+    }
+  }
+}

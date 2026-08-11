@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chenyida.invalid/schemas/agent-control/message-v1.schema.json",
+  "title": "ERP Agent Message v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "message_id",
+    "message_type",
+    "created_at",
+    "task_id",
+    "agent",
+    "role",
+    "gate",
+    "input",
+    "assumptions",
+    "evidence",
+    "changes",
+    "tests",
+    "risks",
+    "blockers",
+    "recommendation",
+    "status",
+    "minority_report",
+    "resolves_message_ids",
+    "resolves_claim_ids",
+    "checkpoint"
+  ],
+  "properties": {
+    "schema_version": {"const": "erp-agent-message/v1"},
+    "message_id": {"type": "string", "format": "uuid"},
+    "message_type": {
+      "enum": [
+        "PLAN",
+        "HANDOFF",
+        "FINDING",
+        "VERIFICATION",
+        "VETO",
+        "MINORITY_REPORT",
+        "CHECKPOINT",
+        "RECOVERY",
+        "CLOSURE"
+      ]
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "task_id": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]{0,63}$"},
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_id", "instance_id", "capability_profile", "context_manifest_digest"],
+      "properties": {
+        "agent_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "instance_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"},
+        "capability_profile": {
+          "enum": [
+            "SYNTHETIC_BUILDER",
+            "ERP_READ_ONLY",
+            "ADVERSARIAL_READ_ONLY",
+            "SECURITY_READ_ONLY",
+            "QA_TEST_READ_ONLY",
+            "BLACK_BOX_PUBLIC_ONLY"
+          ]
+        },
+        "context_manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "role": {
+      "enum": [
+        "CHANGE_BUILDER",
+        "ERP_CONTRACT_GUARDIAN",
+        "ADVERSARIAL_EXAMINER",
+        "SECURITY_BOUNDARY_EXAMINER",
+        "INDEPENDENT_VERIFIER",
+        "BLACK_BOX_VERIFIER"
+      ]
+    },
+    "gate": {
+      "enum": ["IMPLEMENTATION", "ERP_CONTRACT", "ADVERSARIAL", "SECURITY", "QA", "BLACK_BOX", "RECOVERY", "CLOSURE"]
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_sha",
+        "candidate_sha",
+        "task_packet_revision",
+        "lease_generation",
+        "attempt",
+        "artifacts"
+      ],
+      "properties": {
+        "base_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "candidate_sha": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$"},
+        "task_packet_revision": {"type": "integer", "minimum": 1},
+        "lease_generation": {"type": "integer", "minimum": 1},
+        "attempt": {"type": "integer", "minimum": 1},
+        "artifacts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 512}
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "statement", "status", "source"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^A-[0-9]{3}$"},
+          "statement": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "status": {"enum": ["VERIFIED", "PENDING"]},
+          "source": {"type": ["string", "null"], "maxLength": 512}
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/evidence"}
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "action", "purpose"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 512},
+          "action": {"enum": ["ADD", "MODIFY", "DELETE"]},
+          "purpose": {"type": "string", "minLength": 1, "maxLength": 1024}
+        }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "command_id", "environment", "result", "exit_code", "artifact"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^T-[0-9]{3}$"},
+          "command_id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "environment": {"type": "string", "minLength": 1, "maxLength": 256},
+          "result": {"enum": ["PASS", "FAIL", "NOT_RUN", "RESULT_UNKNOWN"]},
+          "exit_code": {"type": ["integer", "null"]},
+          "artifact": {"type": ["string", "null"], "maxLength": 128}
+        }
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "probability", "impact", "trigger", "mitigation", "residual_risk"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^R-[0-9]{3}$"},
+          "severity": {"enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]},
+          "probability": {"enum": ["LOW", "MEDIUM", "HIGH"]},
+          "impact": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "trigger": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "mitigation": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "residual_risk": {"type": "string", "minLength": 1, "maxLength": 1024}
+        }
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "attempted", "evidence_refs", "unblock_owner"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^B-[0-9]{3}$"},
+          "category": {"type": "string", "minLength": 1, "maxLength": 128},
+          "attempted": {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 512}},
+          "evidence_refs": {"type": "array", "items": {"type": "string", "pattern": "^E-[0-9]{3}$"}},
+          "unblock_owner": {"type": "string", "minLength": 1, "maxLength": 128}
+        }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "reason", "next_action"],
+      "properties": {
+        "decision": {"type": "string", "minLength": 1, "maxLength": 128},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "next_action": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "status": {"enum": ["IN_PROGRESS", "PASS", "FAIL", "VETOED", "BLOCKED", "COMPLETE", "RESULT_UNKNOWN"]},
+    "minority_report": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["claim_id", "opposed_claim", "evidence_refs", "potential_harm", "falsification_test", "requested_disposition"],
+          "properties": {
+            "claim_id": {"type": "string", "pattern": "^MR-[0-9]{3}$"},
+            "opposed_claim": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^E-[0-9]{3}$"}},
+            "potential_harm": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "falsification_test": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "requested_disposition": {"enum": ["FIX_OR_ESCALATE", "TEST_OR_ESCALATE", "OWNER_DECISION"]}
+          }
+        }
+      ]
+    },
+    "resolves_message_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "format": "uuid"}
+    },
+    "resolves_claim_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^MR-[0-9]{3}$"}
+    },
+    "checkpoint": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["candidate_sha", "task_packet_revision", "lease_generation", "completed_message_ids"],
+          "properties": {
+            "candidate_sha": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$"},
+            "task_packet_revision": {"type": "integer", "minimum": 1},
+            "lease_generation": {"type": "integer", "minimum": 1},
+            "completed_message_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"type": "string", "format": "uuid"}
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "locator", "digest", "exit_code", "observed_at", "redaction"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^E-[0-9]{3}$"},
+        "kind": {
+          "enum": [
+            "GIT_OBJECT",
+            "FILE_SNAPSHOT",
+            "COMMAND_RESULT",
+            "TEST_REPORT",
+            "DATABASE_ASSERTION",
+            "HTTP_OBSERVATION",
+            "HUMAN_AUTHORIZATION",
+            "RESOURCE_SNAPSHOT",
+            "BLACK_BOX_OBSERVATION"
+          ]
+        },
+        "locator": {"type": "string", "minLength": 1, "maxLength": 512},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "exit_code": {"type": ["integer", "null"]},
+        "observed_at": {"type": "string", "format": "date-time"},
+        "redaction": {"type": "string", "minLength": 1, "maxLength": 512}
+      }
+    }
+  }
+}
