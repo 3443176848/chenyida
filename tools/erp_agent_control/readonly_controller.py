@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import copy
-import fnmatch
 import hashlib
 import json
 import os
@@ -25,7 +24,7 @@ from typing import Any, Iterable
 
 sys.dont_write_bytecode = True
 
-CONTROLLER_VERSION = "0.2.4"
+CONTROLLER_VERSION = "0.2.5"
 REPORT_SCHEMA = "chenyida-erp-agent-readonly-report/v1"
 PACKET_SCHEMA_V1 = "chenyida-erp-agent-task/v1"
 PACKET_SCHEMA_V2 = "chenyida-erp-agent-task/v2"
@@ -154,7 +153,7 @@ def _safe_display(value: str) -> str:
     return value.encode("utf-8", "backslashreplace").decode("utf-8")
 
 
-def _validate_relative_path(value: Any, *, allow_glob: bool = False) -> str:
+def _validate_relative_path(value: Any) -> str:
     if (
         not isinstance(value, str)
         or not value
@@ -171,11 +170,21 @@ def _validate_relative_path(value: Any, *, allow_glob: bool = False) -> str:
     path = PurePosixPath(value)
     if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
         raise ValueError("invalid repository-relative path")
-    if not allow_glob and any(character in value for character in "*?["):
+    if any(character in value for character in "*?["):
         raise ValueError("glob not allowed")
-    if path.parts[0] == ".git":
+    if ".git" in path.parts:
         raise ValueError("Git internals are never a packet path")
     return value
+
+
+def _validate_path_pattern(value: Any) -> str:
+    """Allow only exact paths or one recursive suffix on a concrete prefix."""
+
+    if isinstance(value, str) and value.endswith("/**"):
+        prefix = value[:-3]
+        _validate_relative_path(prefix)
+        return value
+    return _validate_relative_path(value)
 
 
 def _metadata_fingerprint(metadata: os.stat_result) -> tuple[int, ...]:
@@ -473,9 +482,7 @@ def _validate_scope(packet: dict[str, Any], *, version: int) -> None:
     if not allowed_paths:
         raise ValueError("at least one allowed path is required")
     for pattern in allowed_paths:
-        _validate_relative_path(pattern, allow_glob=True)
-        if pattern in {"*", "**", "**/*"}:
-            raise ValueError("unbounded path pattern")
+        _validate_path_pattern(pattern)
     known_untracked_paths = _require_string_list(scope["known_untracked_paths"])
     for relative_path in known_untracked_paths:
         _validate_relative_path(relative_path)
@@ -848,7 +855,12 @@ def _decision_is_accepted(decisions_markdown: str, decision_id: str) -> bool:
 
 
 def _path_allowed(path: str, patterns: list[str]) -> bool:
-    return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
+    for pattern in patterns:
+        if path == pattern:
+            return True
+        if pattern.endswith("/**") and path.startswith(pattern[:-3] + "/"):
+            return True
+    return False
 
 
 def _finding(

@@ -292,14 +292,19 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 512,
-      "pattern": "^(?!/)(?!.*\\/$)(?!.*//)(?!.*(?:^|/)\\.(?:/|$))(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000\\\\*?\\[]+$"
+      "pattern": "^(?!/)(?!.*\\/$)(?!.*//)(?!.*(?:^|/)(?:\\.|\\.\\.|\\.git)(?:/|$))[^\\u0000\\\\*?\\[]+$"
     },
     "repositoryPathPattern": {
+      "oneOf": [
+        {"$ref": "#/$defs/repositoryPath"},
+        {"$ref": "#/$defs/repositoryRecursivePathPattern"}
+      ]
+    },
+    "repositoryRecursivePathPattern": {
       "type": "string",
       "minLength": 1,
       "maxLength": 512,
-      "not": {"enum": ["*", "**", "**/*"]},
-      "pattern": "^(?!/)(?!.*\\/$)(?!.*//)(?!.*(?:^|/)\\.(?:/|$))(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000\\\\]+$"
+      "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)(?:\\.|\\.\\.|\\.git)(?:/|$))[^\\u0000\\\\*?\\[]+/\\*\\*$"
     },
     "roleAssignment": {
       "type": "object",

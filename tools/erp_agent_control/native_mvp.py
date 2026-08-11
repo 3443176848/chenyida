@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import copy
 from datetime import datetime
-import fnmatch
 import hashlib
 import json
 import os
@@ -29,7 +28,7 @@ try:
 except ImportError:  # Direct script execution.
     from readonly_controller import validate_task_packet
 
-VALIDATOR_VERSION = "0.4.0"
+VALIDATOR_VERSION = "0.4.1"
 BUNDLE_SCHEMA = "chenyida-erp-native-pilot-bundle/v1"
 REPORT_SCHEMA = "chenyida-erp-native-pilot-report/v1"
 CONTEXT_SCHEMA = "erp-agent-context/v1"
@@ -275,7 +274,7 @@ def _repository_path(value: Any, subject: str) -> str:
     if any(part in {"", ".", ".."} for part in path.split("/")):
         raise ProtocolProblem("CHANGE_PATH_INVALID", subject)
     parsed = PurePosixPath(path)
-    if any(part in {"", ".", ".."} for part in parsed.parts) or parsed.parts[0] == ".git":
+    if any(part in {"", ".", "..", ".git"} for part in parsed.parts):
         raise ProtocolProblem("CHANGE_PATH_INVALID", subject)
     if any(character in path for character in "*?["):
         raise ProtocolProblem("CHANGE_PATH_INVALID", subject)
@@ -295,6 +294,15 @@ def _validate_locator(value: Any, subject: str, *, black_box: bool = False) -> s
     if black_box and not locator.startswith("blackbox://"):
         raise ProtocolProblem("BLACK_BOX_SOURCE_CONTEXT", subject)
     return locator
+
+
+def _path_matches_scope(path: str, patterns: list[str]) -> bool:
+    for pattern in patterns:
+        if path == pattern:
+            return True
+        if pattern.endswith("/**") and path.startswith(pattern[:-3] + "/"):
+            return True
+    return False
 
 
 def _validate_candidate(raw: Any, index: int, expected_parent: str) -> dict[str, Any]:
@@ -910,9 +918,9 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
         if message["role"] == "CHANGE_BUILDER" and assignment["agent_id"] != packet["orchestration"]["product_writer_agent_id"]:
             raise ProtocolProblem("WRITER_IDENTITY_MISMATCH", subject)
         for change in message["changes"]:
-            if not any(
-                fnmatch.fnmatchcase(change["path"], pattern)
-                for pattern in packet["scope"]["allowed_changed_paths"]
+            if not _path_matches_scope(
+                change["path"],
+                packet["scope"]["allowed_changed_paths"],
             ):
                 raise ProtocolProblem("CHANGE_PATH_OUT_OF_SCOPE", subject)
 

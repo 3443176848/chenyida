@@ -442,6 +442,34 @@ class ReadonlyControllerTest(unittest.TestCase):
 
         self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
 
+    def test_v2_rejects_non_recursive_and_equivalent_universal_globs(self) -> None:
+        base_packet = self.fixture.upgrade_packet_to_v2()
+        for pattern in ("*/*", "*/**", "**/**", "docs/*", "docs/[ab]/**"):
+            with self.subTest(pattern=pattern):
+                packet = json.loads(json.dumps(base_packet))
+                packet["scope"]["allowed_changed_paths"] = [pattern]
+                self.fixture.write_packet(packet)
+
+                report = self.inspect()
+
+                self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
+    def test_v2_rejects_nested_git_segments_in_scope_paths(self) -> None:
+        base_packet = self.fixture.upgrade_packet_to_v2()
+        mutations = (
+            ("allowed_changed_paths", ["tools/erp_agent_control/.git/**"]),
+            ("known_untracked_paths", ["docs/.git/config"]),
+        )
+        for key, value in mutations:
+            with self.subTest(key=key):
+                packet = json.loads(json.dumps(base_packet))
+                packet["scope"][key] = value
+                self.fixture.write_packet(packet)
+
+                report = self.inspect()
+
+                self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
     def test_v2_task_document_must_be_directly_under_tasks(self) -> None:
         packet = self.fixture.upgrade_packet_to_v2()
         packet["task"]["task_document"] = "docs/tasks/nested/AGENT-R1.md"

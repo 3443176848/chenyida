@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import subprocess
 import sys
@@ -122,6 +123,32 @@ class NativeMvpProtocolTest(unittest.TestCase):
         self.assertEqual(
             schema["properties"]["changes"]["items"]["properties"]["path"],
             {"$ref": "#/$defs/repositoryPath"},
+        )
+
+    def test_schema_path_rules_reject_nested_git_and_unbounded_globs(self) -> None:
+        task_schema = json.loads(
+            (SCHEMA_DIRECTORY / "task-packet-v2.schema.json").read_text(encoding="utf-8")
+        )
+        message_schema = json.loads(
+            (SCHEMA_DIRECTORY / "message-v1.schema.json").read_text(encoding="utf-8")
+        )
+        task_path_pattern = task_schema["$defs"]["repositoryPath"]["pattern"]
+        message_path_pattern = message_schema["$defs"]["repositoryPath"]["pattern"]
+        recursive_pattern = task_schema["$defs"]["repositoryRecursivePathPattern"]["pattern"]
+
+        self.assertIsNone(re.fullmatch(task_path_pattern, "docs/.git/config"))
+        self.assertIsNone(re.fullmatch(message_path_pattern, "docs/.git/config"))
+        self.assertIsNone(re.fullmatch(recursive_pattern, "*/*"))
+        self.assertIsNone(re.fullmatch(recursive_pattern, "*/**"))
+        self.assertIsNotNone(re.fullmatch(recursive_pattern, "docs/agent-control/**"))
+        self.assertEqual(
+            task_schema["$defs"]["repositoryPathPattern"],
+            {
+                "oneOf": [
+                    {"$ref": "#/$defs/repositoryPath"},
+                    {"$ref": "#/$defs/repositoryRecursivePathPattern"},
+                ]
+            },
         )
 
     def test_schema_and_manual_uat_marker_allowlists_are_identical(self) -> None:
@@ -288,6 +315,16 @@ class NativeMvpProtocolTest(unittest.TestCase):
         message(self.bundle, 1)["changes"][0]["path"] = "docs/agent-control/../forbidden.md"
 
         self.assertEqual(error_code(self.bundle), "CHANGE_PATH_INVALID")
+
+    def test_builder_change_nested_git_segment_fails_closed(self) -> None:
+        message(self.bundle, 1)["changes"][0]["path"] = "docs/agent-control/.git/config"
+
+        self.assertEqual(error_code(self.bundle), "CHANGE_PATH_INVALID")
+
+    def test_task_packet_equivalent_universal_glob_fails_closed(self) -> None:
+        self.bundle["task_packet"]["scope"]["allowed_changed_paths"] = ["*/*"]
+
+        self.assertEqual(error_code(self.bundle), "TASK_PACKET_INVALID")
 
     def test_uat_or_database_evidence_kind_is_forbidden_by_r1_5(self) -> None:
         message(self.bundle, 10)["evidence"][0]["kind"] = "DATABASE_ASSERTION"
