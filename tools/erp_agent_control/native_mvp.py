@@ -28,7 +28,7 @@ try:
 except ImportError:  # Direct script execution.
     from readonly_controller import validate_task_packet
 
-VALIDATOR_VERSION = "0.5.0"
+VALIDATOR_VERSION = "0.5.1"
 BUNDLE_SCHEMA = "chenyida-erp-native-pilot-bundle/v2"
 REPORT_SCHEMA = "chenyida-erp-native-pilot-report/v1"
 CONTEXT_SCHEMA = "erp-agent-context/v1"
@@ -898,7 +898,7 @@ def _validate_message_structure(
     declared_test_evidence = {
         item["id"] for item in evidence if item["kind"] == expected_test_kind
     }
-    if message["tests"] and test_artifacts != declared_test_evidence:
+    if declared_test_evidence and test_artifacts != declared_test_evidence:
         raise ProtocolProblem("TEST_EVIDENCE_BINDING_INVALID", subject)
 
     if not isinstance(message["risks"], list):
@@ -1007,14 +1007,26 @@ def _validate_message_structure(
         raise ProtocolProblem("MESSAGE_TYPE_BINDING_INVALID", subject)
     if message["message_type"] == "RECOVERY" and not resolves_message_ids:
         raise ProtocolProblem("RECOVERY_REFERENCE_REQUIRED", subject)
-    if message["role"] in {"INDEPENDENT_VERIFIER", "BLACK_BOX_VERIFIER"} and message["status"] == "PASS":
-        if not message["tests"] or any(
-            test["result"] != "PASS"
-            or test["exit_code"] != 0
-            or test["artifact"] is None
-            for test in message["tests"]
-        ):
-            raise ProtocolProblem("GATE_TESTS_NOT_PASSED", subject)
+    if message["status"] in {"PASS", "COMPLETE"} and any(
+        item["exit_code"] not in {None, 0} for item in evidence
+    ):
+        raise ProtocolProblem("EVIDENCE_STATUS_INCONSISTENT", subject)
+    if message["role"] in {"INDEPENDENT_VERIFIER", "BLACK_BOX_VERIFIER"}:
+        test_results = [test["result"] for test in message["tests"]]
+        valid_outcome = {
+            "PASS": bool(test_results) and set(test_results) == {"PASS"},
+            "FAIL": bool(test_results)
+            and "FAIL" in test_results
+            and set(test_results) <= {"PASS", "FAIL"},
+            "RESULT_UNKNOWN": bool(test_results)
+            and "RESULT_UNKNOWN" in test_results
+            and set(test_results) <= {"PASS", "RESULT_UNKNOWN"},
+            "VETOED": bool(test_results)
+            and "FAIL" in test_results
+            and set(test_results) <= {"PASS", "FAIL"},
+        }.get(message["status"], False)
+        if not valid_outcome:
+            raise ProtocolProblem("GATE_TEST_OUTCOME_INVALID", subject)
     return message
 
 
@@ -1278,6 +1290,8 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
                 or message["gate"] != "ADVERSARIAL"
                 or message["message_type"] != "VERIFICATION"
                 or message["status"] != "PASS"
+                or message["recommendation"]["decision"]
+                not in {"FIX_ACCEPTED", "RESOLVED_BY_EVIDENCE"}
             ):
                 raise ProtocolProblem("MINORITY_DISPOSITION_INVALID", subject)
             if claim_id in resolved_claims:

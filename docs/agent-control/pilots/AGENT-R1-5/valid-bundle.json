@@ -1530,7 +1530,7 @@
       "risks": [],
       "blockers": [],
       "recommendation": {
-        "decision": "DISPOSE_MR_001_AS_FIXED",
+        "decision": "FIX_ACCEPTED",
         "reason": "Synthetic protocol observation 09 is bound to the declared candidate.",
         "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
       },

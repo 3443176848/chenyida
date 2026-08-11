@@ -578,7 +578,7 @@ def build_valid_bundle() -> dict[str, Any]:
             "VERIFICATION",
             "ADVERSARIAL",
             "PASS",
-            "DISPOSE_MR_001_AS_FIXED",
+            "FIX_ACCEPTED",
             resolves_claim_ids=["MR-001"],
         ),
         _message(10, contexts[("SECURITY_BOUNDARY_EXAMINER", 2)], c2, "VERIFICATION", "SECURITY", "PASS", "PASS_CURRENT_GATE"),

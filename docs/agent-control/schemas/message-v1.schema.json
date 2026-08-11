@@ -150,7 +150,30 @@
           "result": {"enum": ["PASS", "FAIL", "NOT_RUN", "RESULT_UNKNOWN"]},
           "exit_code": {"type": ["integer", "null"], "minimum": -255, "maximum": 255},
           "artifact": {"type": ["string", "null"], "minLength": 1, "maxLength": 128}
-        }
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"result": {"const": "PASS"}}, "required": ["result"]},
+            "then": {"properties": {"exit_code": {"const": 0}, "artifact": {"type": "string"}}}
+          },
+          {
+            "if": {"properties": {"result": {"const": "FAIL"}}, "required": ["result"]},
+            "then": {
+              "properties": {
+                "exit_code": {"type": "integer", "not": {"const": 0}},
+                "artifact": {"type": "string"}
+              }
+            }
+          },
+          {
+            "if": {"properties": {"result": {"const": "NOT_RUN"}}, "required": ["result"]},
+            "then": {"properties": {"exit_code": {"type": "null"}, "artifact": {"type": "null"}}}
+          },
+          {
+            "if": {"properties": {"result": {"const": "RESULT_UNKNOWN"}}, "required": ["result"]},
+            "then": {"properties": {"exit_code": {"type": "null"}, "artifact": {"type": "string"}}}
+          }
+        ]
       }
     },
     "risks": {
@@ -378,7 +401,12 @@
           "message_type": {"const": "VERIFICATION"},
           "role": {"const": "ADVERSARIAL_EXAMINER"},
           "gate": {"const": "ADVERSARIAL"},
-          "status": {"const": "PASS"}
+          "status": {"const": "PASS"},
+          "recommendation": {
+            "properties": {
+              "decision": {"enum": ["FIX_ACCEPTED", "RESOLVED_BY_EVIDENCE"]}
+            }
+          }
         }
       }
     },
@@ -390,6 +418,90 @@
           "role": {"const": "CHANGE_BUILDER"},
           "gate": {"const": "RECOVERY"},
           "status": {"const": "PASS"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {"enum": ["INDEPENDENT_VERIFIER", "BLACK_BOX_VERIFIER"]},
+          "status": {"const": "PASS"}
+        },
+        "required": ["role", "status"]
+      },
+      "then": {
+        "properties": {
+          "tests": {
+            "minItems": 1,
+            "items": {"properties": {"result": {"const": "PASS"}}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {"enum": ["INDEPENDENT_VERIFIER", "BLACK_BOX_VERIFIER"]},
+          "status": {"const": "FAIL"}
+        },
+        "required": ["role", "status"]
+      },
+      "then": {
+        "properties": {
+          "tests": {
+            "minItems": 1,
+            "items": {"properties": {"result": {"enum": ["PASS", "FAIL"]}}},
+            "contains": {"properties": {"result": {"const": "FAIL"}}, "required": ["result"]}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {"enum": ["INDEPENDENT_VERIFIER", "BLACK_BOX_VERIFIER"]},
+          "status": {"const": "RESULT_UNKNOWN"}
+        },
+        "required": ["role", "status"]
+      },
+      "then": {
+        "properties": {
+          "tests": {
+            "minItems": 1,
+            "items": {"properties": {"result": {"enum": ["PASS", "RESULT_UNKNOWN"]}}},
+            "contains": {"properties": {"result": {"const": "RESULT_UNKNOWN"}}, "required": ["result"]}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {"enum": ["INDEPENDENT_VERIFIER", "BLACK_BOX_VERIFIER"]},
+          "status": {"const": "VETOED"}
+        },
+        "required": ["role", "status"]
+      },
+      "then": {
+        "properties": {
+          "tests": {
+            "minItems": 1,
+            "items": {"properties": {"result": {"enum": ["PASS", "FAIL"]}}},
+            "contains": {"properties": {"result": {"const": "FAIL"}}, "required": ["result"]}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"status": {"enum": ["PASS", "COMPLETE"]}},
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "evidence": {
+            "items": {"properties": {"exit_code": {"enum": [0, null]}}}
+          }
         }
       }
     }

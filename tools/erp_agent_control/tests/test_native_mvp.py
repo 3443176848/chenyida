@@ -361,6 +361,28 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "TEST_EVIDENCE_BINDING_INVALID")
 
+    def test_qa_fail_requires_a_failed_test_outcome(self) -> None:
+        qa_fail = message(self.bundle, 5)
+        qa_fail["tests"][0].update({"result": "PASS", "exit_code": 0})
+        qa_fail["evidence"][0]["exit_code"] = 0
+        rebind_message_evidence(self.bundle, qa_fail)
+
+        self.assertEqual(error_code(self.bundle), "GATE_TEST_OUTCOME_INVALID")
+
+    def test_qa_unknown_requires_an_unknown_test_outcome(self) -> None:
+        qa_unknown = message(self.bundle, 11)
+        qa_unknown["tests"][0].update({"result": "PASS", "exit_code": 0})
+        qa_unknown["evidence"][0]["exit_code"] = 0
+        rebind_message_evidence(self.bundle, qa_unknown)
+
+        self.assertEqual(error_code(self.bundle), "GATE_TEST_OUTCOME_INVALID")
+
+    def test_blackbox_fail_requires_a_failed_observation(self) -> None:
+        blackbox = message(self.bundle, 14)
+        blackbox["status"] = "FAIL"
+
+        self.assertEqual(error_code(self.bundle), "GATE_TEST_OUTCOME_INVALID")
+
     def test_test_result_and_exit_code_must_be_consistent(self) -> None:
         message(self.bundle, 13)["tests"][0]["exit_code"] = 1
 
@@ -591,6 +613,25 @@ class NativeMvpProtocolTest(unittest.TestCase):
         disposition["status"] = "FAIL"
 
         self.assertEqual(error_code(self.bundle), "MINORITY_DISPOSITION_INVALID")
+
+    def test_confirmed_veto_cannot_be_a_passing_minority_disposition(self) -> None:
+        message(self.bundle, 9)["recommendation"]["decision"] = "VETO_CONFIRMED"
+
+        self.assertEqual(error_code(self.bundle), "MINORITY_DISPOSITION_INVALID")
+
+    def test_unreferenced_failing_test_report_cannot_support_minority_pass(self) -> None:
+        disposition = message(self.bundle, 9)
+        disposition["evidence"][0].update({"kind": "TEST_REPORT", "exit_code": 7})
+        rebind_message_evidence(self.bundle, disposition)
+
+        self.assertEqual(error_code(self.bundle), "TEST_EVIDENCE_BINDING_INVALID")
+
+    def test_nonzero_command_evidence_cannot_support_passing_disposition(self) -> None:
+        disposition = message(self.bundle, 9)
+        disposition["evidence"][0].update({"kind": "COMMAND_RESULT", "exit_code": 7})
+        rebind_message_evidence(self.bundle, disposition)
+
+        self.assertEqual(error_code(self.bundle), "EVIDENCE_STATUS_INCONSISTENT")
 
     def test_unresolved_minority_report_fails_closed(self) -> None:
         message(self.bundle, 9)["resolves_claim_ids"] = []
