@@ -25,7 +25,7 @@ from typing import Any, Iterable
 
 sys.dont_write_bytecode = True
 
-CONTROLLER_VERSION = "0.2.0"
+CONTROLLER_VERSION = "0.2.1"
 REPORT_SCHEMA = "chenyida-erp-agent-readonly-report/v1"
 PACKET_SCHEMA_V1 = "chenyida-erp-agent-task/v1"
 PACKET_SCHEMA_V2 = "chenyida-erp-agent-task/v2"
@@ -151,7 +151,13 @@ def _safe_display(value: str) -> str:
 
 
 def _validate_relative_path(value: Any, *, allow_glob: bool = False) -> str:
-    if not isinstance(value, str) or not value or "\x00" in value or "\\" in value:
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > 512
+        or "\x00" in value
+        or "\\" in value
+    ):
         raise ValueError("invalid repository-relative path")
     if value.startswith("/") or value.endswith("/"):
         raise ValueError("invalid repository-relative path")
@@ -234,19 +240,28 @@ def _require_exact_keys(value: Any, expected: set[str]) -> dict[str, Any]:
     return value
 
 
-def _require_string(value: Any, *, choices: Iterable[str] | None = None) -> str:
+def _require_string(
+    value: Any,
+    *,
+    choices: Iterable[str] | None = None,
+    maximum: int | None = None,
+) -> str:
     if not isinstance(value, str) or not value:
         raise ValueError("string required")
+    if maximum is not None and len(value) > maximum:
+        raise ValueError("string too long")
     if choices is not None and value not in set(choices):
         raise ValueError("unexpected string value")
     return value
 
 
-def _require_string_list(value: Any) -> list[str]:
+def _require_string_list(value: Any, *, maximum: int | None = None) -> list[str]:
     if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
         raise ValueError("string list required")
     if len(value) != len(set(value)):
         raise ValueError("duplicate list item")
+    if maximum is not None and any(len(item) > maximum for item in value):
+        raise ValueError("list item too long")
     return list(value)
 
 
@@ -275,16 +290,15 @@ def _validate_task(packet: dict[str, Any], *, version: int) -> None:
         raise ValueError("invalid task id")
     _require_integer(task["revision"], minimum=1)
     _require_string(task["ledger_state"], choices=LEDGER_STATES)
-    _require_string(task["delivery_stage"])
-    _require_string_list(task["qualifiers"])
+    _require_string(task["delivery_stage"], maximum=128)
+    _require_string_list(task["qualifiers"], maximum=128)
     task_document = _validate_relative_path(task["task_document"])
     if not task_document.startswith("docs/tasks/") or not task_document.endswith(".md"):
         raise ValueError("task document must be a Markdown file in docs/tasks")
     if version == 2:
-        if len(_require_string(task["objective"])) > 1024:
-            raise ValueError("task objective too long")
-        non_goals = _require_string_list(task["non_goals"])
-        if not non_goals or any(len(item) > 512 for item in non_goals):
+        _require_string(task["objective"], maximum=1024)
+        non_goals = _require_string_list(task["non_goals"], maximum=512)
+        if not non_goals:
             raise ValueError("bounded non-goals required")
 
 
@@ -295,8 +309,8 @@ def _validate_baseline(packet: dict[str, Any]) -> None:
     )
     if not SHA1_RE.fullmatch(_require_string(baseline["base_sha"])):
         raise ValueError("invalid base SHA")
-    _require_string(baseline["expected_branch"])
-    _require_string(baseline["source_version"])
+    _require_string(baseline["expected_branch"], maximum=128)
+    _require_string(baseline["source_version"], maximum=128)
     source_migration = _require_exact_keys(
         baseline["source_migration"],
         {"first_number", "head_number", "head_filename", "head_sha256"},
@@ -310,8 +324,8 @@ def _validate_baseline(packet: dict[str, Any]) -> None:
     if not SHA256_RE.fullmatch(_require_string(source_migration["head_sha256"])):
         raise ValueError("invalid migration digest")
     uat = _require_exact_keys(baseline["uat"], {"version", "migration_head", "verification_scope"})
-    _require_string(uat["version"])
-    _require_string(uat["migration_head"])
+    _require_string(uat["version"], maximum=128)
+    _require_string(uat["migration_head"], maximum=32)
     if uat["verification_scope"] != "DOCUMENT_DECLARATION_ONLY_NO_CONNECTION":
         raise ValueError("R1 cannot claim live UAT verification")
 
@@ -327,6 +341,8 @@ def _validate_scope(packet: dict[str, Any], *, version: int) -> None:
         expected_keys.add("data_classification")
     scope = _require_exact_keys(packet["scope"], expected_keys)
     allowed_paths = _require_string_list(scope["allowed_changed_paths"])
+    if not allowed_paths:
+        raise ValueError("at least one allowed path is required")
     for pattern in allowed_paths:
         _validate_relative_path(pattern, allow_glob=True)
         if pattern in {"*", "**", "**/*"}:
@@ -384,8 +400,8 @@ def _validate_inspection(packet: dict[str, Any], *, version: int) -> None:
     for marker in markers:
         marker = _require_exact_keys(marker, {"path", "contains"})
         _validate_relative_path(marker["path"])
-        contains = _require_string_list(marker["contains"])
-        if not contains or any(len(item) > 128 for item in contains):
+        contains = _require_string_list(marker["contains"], maximum=128)
+        if not contains:
             raise ValueError("invalid UAT marker")
 
 

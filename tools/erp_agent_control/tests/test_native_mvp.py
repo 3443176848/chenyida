@@ -130,6 +130,25 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "UNKNOWN_FIELD")
 
+    def test_message_schema_max_length_is_enforced(self) -> None:
+        self.bundle["messages"][0]["evidence"][0]["locator"] = "x" * 513
+
+        self.assertEqual(error_code(self.bundle), "STRING_TOO_LONG")
+
+    def test_invalid_rfc3339_timestamp_fails_closed(self) -> None:
+        self.bundle["messages"][0]["created_at"] = "2026-08-11 06:00:00Z"
+
+        self.assertEqual(error_code(self.bundle), "FORMAT_INVALID")
+
+    def test_context_schema_max_length_is_enforced_with_fresh_digest(self) -> None:
+        manifest = self.bundle["contexts"][0]
+        manifest["documents"][0]["locator"] = "x" * 513
+        digest_input = copy.deepcopy(manifest)
+        digest_input.pop("manifest_digest")
+        manifest["manifest_digest"] = digest(digest_input)
+
+        self.assertEqual(error_code(self.bundle), "STRING_TOO_LONG")
+
     def test_wrong_candidate_digest_fails_closed(self) -> None:
         self.bundle["candidates"][0]["candidate_sha"] = "sha256:" + "0" * 64
 
@@ -162,6 +181,16 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "REVIEWER_WRITE_ATTEMPT")
 
+    def test_builder_change_outside_packet_scope_fails_closed(self) -> None:
+        message(self.bundle, 1)["changes"][0]["path"] = "chenyida_erp_site/app/forbidden.ts"
+
+        self.assertEqual(error_code(self.bundle), "CHANGE_PATH_OUT_OF_SCOPE")
+
+    def test_builder_change_path_traversal_fails_closed(self) -> None:
+        message(self.bundle, 1)["changes"][0]["path"] = "docs/agent-control/../forbidden.md"
+
+        self.assertEqual(error_code(self.bundle), "CHANGE_PATH_INVALID")
+
     def test_uat_or_database_evidence_kind_is_forbidden_by_r1_5(self) -> None:
         message(self.bundle, 10)["evidence"][0]["kind"] = "DATABASE_ASSERTION"
 
@@ -191,7 +220,22 @@ class NativeMvpProtocolTest(unittest.TestCase):
         old_qa["tests"][0]["exit_code"] = 0
         self.bundle["messages"].remove(message(self.bundle, 13))
 
-        self.assertEqual(error_code(self.bundle), "FINAL_GATE_NOT_PASSED")
+        self.assertEqual(error_code(self.bundle), "REJECTED_CANDIDATE_GATE_MISSING")
+
+    def test_pilot_cannot_omit_rejected_candidate(self) -> None:
+        self.bundle["candidates"] = [self.bundle["candidates"][1]]
+
+        self.assertEqual(error_code(self.bundle), "PILOT_TWO_CANDIDATES_REQUIRED")
+
+    def test_pilot_requires_adversarial_minority_exercise(self) -> None:
+        self.bundle["messages"].remove(message(self.bundle, 3))
+        message(self.bundle, 9)["resolves_claim_ids"] = []
+        message(self.bundle, 6)["checkpoint"]["completed_message_ids"].remove(
+            "00000000-0000-4000-8000-000000000003"
+        )
+        self.bundle["expected"]["minority_claims_resolved"] = []
+
+        self.assertEqual(error_code(self.bundle), "MINORITY_REPORT_MISSING")
 
     def test_unresolved_minority_report_fails_closed(self) -> None:
         message(self.bundle, 9)["resolves_claim_ids"] = []
@@ -213,6 +257,21 @@ class NativeMvpProtocolTest(unittest.TestCase):
         self.bundle["messages"].remove(message(self.bundle, 13))
 
         self.assertEqual(error_code(self.bundle), "RESULT_UNKNOWN_UNRESOLVED")
+
+    def test_pilot_requires_result_unknown_recovery_exercise(self) -> None:
+        self.bundle["messages"].remove(message(self.bundle, 11))
+        self.bundle["messages"].remove(message(self.bundle, 12))
+        self.bundle["expected"]["result_unknown_resolved"] = []
+
+        self.assertEqual(error_code(self.bundle), "RESULT_UNKNOWN_EXERCISE_MISSING")
+
+    def test_duplicate_json_key_is_rejected_before_protocol_validation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="agent-r1-5-duplicate-key-") as temporary:
+            bundle_path = Path(temporary) / "bundle.json"
+            bundle_path.write_text('{"schema_version":"a","schema_version":"b"}', encoding="utf-8")
+
+            with self.assertRaisesRegex(Exception, "DUPLICATE_JSON_KEY"):
+                load_bundle(bundle_path)
 
     def test_checkpoint_cannot_claim_future_message(self) -> None:
         message(self.bundle, 6)["checkpoint"]["completed_message_ids"].append(

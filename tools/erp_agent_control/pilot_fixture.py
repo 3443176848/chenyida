@@ -400,7 +400,7 @@ def build_valid_bundle() -> dict[str, Any]:
             "REQUEST_INDEPENDENT_GATES",
             changes=[
                 {
-                    "path": "docs/synthetic/contract.md",
+                    "path": "docs/agent-control/pilots/AGENT-R1-5/synthetic-contract.md",
                     "action": "MODIFY",
                     "purpose": "Expose the intentionally unsafe first synthetic candidate.",
                 }
@@ -471,7 +471,7 @@ def build_valid_bundle() -> dict[str, Any]:
             "REQUEST_FRESH_GATES",
             changes=[
                 {
-                    "path": "docs/synthetic/contract.md",
+                    "path": "docs/agent-control/pilots/AGENT-R1-5/synthetic-contract.md",
                     "action": "MODIFY",
                     "purpose": "Replace blind replay with reconcile-before-replay and idempotency.",
                 }

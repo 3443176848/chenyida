@@ -11,9 +11,10 @@ from __future__ import annotations
 import argparse
 import copy
 from datetime import datetime
+import fnmatch
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import stat
 import sys
@@ -27,7 +28,7 @@ try:
 except ImportError:  # Direct script execution.
     from readonly_controller import validate_task_packet
 
-VALIDATOR_VERSION = "0.1.0"
+VALIDATOR_VERSION = "0.2.0"
 BUNDLE_SCHEMA = "chenyida-erp-native-pilot-bundle/v1"
 REPORT_SCHEMA = "chenyida-erp-native-pilot-report/v1"
 CONTEXT_SCHEMA = "erp-agent-context/v1"
@@ -41,6 +42,10 @@ SHA256_REF_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 CANDIDATE_RE = re.compile(r"^(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$")
 UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
+RFC3339_RE = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
+    r"(?:\.[0-9]{1,6})?(?:Z|[+-][0-9]{2}:[0-9]{2})$"
 )
 IDENTIFIER_PATTERNS = {
     "assumption": re.compile(r"^A-[0-9]{3}$"),
@@ -166,6 +171,7 @@ def _string(
     *,
     choices: Iterable[str] | None = None,
     pattern: re.Pattern[str] | None = None,
+    maximum: int | None = None,
 ) -> str:
     if not isinstance(value, str) or not value:
         raise ProtocolProblem("STRING_REQUIRED", subject)
@@ -173,6 +179,8 @@ def _string(
         raise ProtocolProblem("ENUM_INVALID", subject)
     if pattern is not None and pattern.fullmatch(value) is None:
         raise ProtocolProblem("FORMAT_INVALID", subject)
+    if maximum is not None and len(value) > maximum:
+        raise ProtocolProblem("STRING_TOO_LONG", subject)
     return value
 
 
@@ -190,19 +198,28 @@ def _string_list(
     *,
     choices: Iterable[str] | None = None,
     pattern: re.Pattern[str] | None = None,
+    maximum: int | None = None,
 ) -> list[str]:
     if not isinstance(value, list):
         raise ProtocolProblem("ARRAY_REQUIRED", subject)
     result: list[str] = []
     for index, item in enumerate(value):
-        result.append(_string(item, f"{subject}[{index}]", choices=choices, pattern=pattern))
+        result.append(
+            _string(
+                item,
+                f"{subject}[{index}]",
+                choices=choices,
+                pattern=pattern,
+                maximum=maximum,
+            )
+        )
     if len(result) != len(set(result)):
         raise ProtocolProblem("DUPLICATE_ARRAY_ITEM", subject)
     return result
 
 
 def _timestamp(value: Any, subject: str) -> str:
-    timestamp = _string(value, subject)
+    timestamp = _string(value, subject, pattern=RFC3339_RE)
     try:
         parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
     except ValueError as exc:
@@ -224,6 +241,18 @@ def _uuid(value: Any, subject: str) -> str:
 
 def _identifier(value: Any, subject: str, kind: str) -> str:
     return _string(value, subject, pattern=IDENTIFIER_PATTERNS[kind])
+
+
+def _repository_path(value: Any, subject: str) -> str:
+    path = _string(value, subject, maximum=512)
+    if path.startswith("/") or path.endswith("/") or "\\" in path or "\x00" in path:
+        raise ProtocolProblem("CHANGE_PATH_INVALID", subject)
+    parsed = PurePosixPath(path)
+    if any(part in {"", ".", ".."} for part in parsed.parts) or parsed.parts[0] == ".git":
+        raise ProtocolProblem("CHANGE_PATH_INVALID", subject)
+    if any(character in path for character in "*?["):
+        raise ProtocolProblem("CHANGE_PATH_INVALID", subject)
+    return path
 
 
 def _validate_candidate(raw: Any, index: int, expected_parent: str) -> dict[str, Any]:
@@ -255,7 +284,7 @@ def _validate_candidate(raw: Any, index: int, expected_parent: str) -> dict[str,
         },
         f"{subject}.content",
     )
-    _string(content["contract_version"], f"{subject}.content.contract_version")
+    _string(content["contract_version"], f"{subject}.content.contract_version", maximum=128)
     _string(
         content["duplicate_request_behavior"],
         f"{subject}.content.duplicate_request_behavior",
@@ -344,7 +373,7 @@ def _validate_context(
     for document_index, raw_document in enumerate(documents):
         document_subject = f"{subject}.documents[{document_index}]"
         document = _object(raw_document, {"locator", "digest", "classification"}, document_subject)
-        locator = _string(document["locator"], f"{document_subject}.locator")
+        locator = _string(document["locator"], f"{document_subject}.locator", maximum=512)
         _string(document["digest"], f"{document_subject}.digest", pattern=SHA256_REF_RE)
         classification = _string(
             document["classification"],
@@ -395,12 +424,12 @@ def _validate_evidence(raw: Any, subject: str) -> dict[str, Any]:
     _string(evidence["kind"], f"{subject}.kind", choices=EVIDENCE_KINDS)
     if evidence["kind"] in {"DATABASE_ASSERTION", "HTTP_OBSERVATION"}:
         raise ProtocolProblem("FORBIDDEN_EVIDENCE_KIND", subject)
-    _string(evidence["locator"], f"{subject}.locator")
+    _string(evidence["locator"], f"{subject}.locator", maximum=512)
     _string(evidence["digest"], f"{subject}.digest", pattern=SHA256_REF_RE)
     if evidence["exit_code"] is not None:
         _integer(evidence["exit_code"], f"{subject}.exit_code", minimum=-255, maximum=255)
     _timestamp(evidence["observed_at"], f"{subject}.observed_at")
-    _string(evidence["redaction"], f"{subject}.redaction")
+    _string(evidence["redaction"], f"{subject}.redaction", maximum=512)
     return evidence
 
 
@@ -468,7 +497,7 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
     _integer(message_input["task_packet_revision"], f"{subject}.input.task_packet_revision", minimum=1)
     _integer(message_input["lease_generation"], f"{subject}.input.lease_generation", minimum=1)
     _integer(message_input["attempt"], f"{subject}.input.attempt", minimum=1)
-    _string_list(message_input["artifacts"], f"{subject}.input.artifacts")
+    _string_list(message_input["artifacts"], f"{subject}.input.artifacts", maximum=512)
 
     if not isinstance(message["assumptions"], list):
         raise ProtocolProblem("ARRAY_REQUIRED", f"{subject}.assumptions")
@@ -476,10 +505,10 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
         assumption_subject = f"{subject}.assumptions[{assumption_index}]"
         assumption = _object(raw_assumption, {"id", "statement", "status", "source"}, assumption_subject)
         _identifier(assumption["id"], f"{assumption_subject}.id", "assumption")
-        _string(assumption["statement"], f"{assumption_subject}.statement")
+        _string(assumption["statement"], f"{assumption_subject}.statement", maximum=1024)
         _string(assumption["status"], f"{assumption_subject}.status", choices={"VERIFIED", "PENDING"})
         if assumption["source"] is not None:
-            _string(assumption["source"], f"{assumption_subject}.source")
+            _string(assumption["source"], f"{assumption_subject}.source", maximum=512)
 
     if not isinstance(message["evidence"], list):
         raise ProtocolProblem("ARRAY_REQUIRED", f"{subject}.evidence")
@@ -496,9 +525,9 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
     for change_index, raw_change in enumerate(message["changes"]):
         change_subject = f"{subject}.changes[{change_index}]"
         change = _object(raw_change, {"path", "action", "purpose"}, change_subject)
-        _string(change["path"], f"{change_subject}.path")
+        _repository_path(change["path"], f"{change_subject}.path")
         _string(change["action"], f"{change_subject}.action", choices={"ADD", "MODIFY", "DELETE"})
-        _string(change["purpose"], f"{change_subject}.purpose")
+        _string(change["purpose"], f"{change_subject}.purpose", maximum=1024)
 
     if not isinstance(message["tests"], list):
         raise ProtocolProblem("ARRAY_REQUIRED", f"{subject}.tests")
@@ -510,13 +539,13 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
             test_subject,
         )
         _identifier(test["id"], f"{test_subject}.id", "test")
-        _string(test["command_id"], f"{test_subject}.command_id")
-        _string(test["environment"], f"{test_subject}.environment")
+        _string(test["command_id"], f"{test_subject}.command_id", maximum=128)
+        _string(test["environment"], f"{test_subject}.environment", maximum=256)
         _string(test["result"], f"{test_subject}.result", choices={"PASS", "FAIL", "NOT_RUN", "RESULT_UNKNOWN"})
         if test["exit_code"] is not None:
             _integer(test["exit_code"], f"{test_subject}.exit_code", minimum=-255, maximum=255)
         if test["artifact"] is not None:
-            artifact = _string(test["artifact"], f"{test_subject}.artifact")
+            artifact = _string(test["artifact"], f"{test_subject}.artifact", maximum=128)
             if artifact not in evidence_ids:
                 raise ProtocolProblem("TEST_EVIDENCE_UNKNOWN", test_subject)
 
@@ -533,7 +562,7 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
         _string(risk["severity"], f"{risk_subject}.severity", choices={"LOW", "MEDIUM", "HIGH", "CRITICAL"})
         _string(risk["probability"], f"{risk_subject}.probability", choices={"LOW", "MEDIUM", "HIGH"})
         for key in ("impact", "trigger", "mitigation", "residual_risk"):
-            _string(risk[key], f"{risk_subject}.{key}")
+            _string(risk[key], f"{risk_subject}.{key}", maximum=1024)
 
     if not isinstance(message["blockers"], list):
         raise ProtocolProblem("ARRAY_REQUIRED", f"{subject}.blockers")
@@ -545,22 +574,23 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
             blocker_subject,
         )
         _identifier(blocker["id"], f"{blocker_subject}.id", "blocker")
-        _string(blocker["category"], f"{blocker_subject}.category")
-        _string_list(blocker["attempted"], f"{blocker_subject}.attempted")
+        _string(blocker["category"], f"{blocker_subject}.category", maximum=128)
+        _string_list(blocker["attempted"], f"{blocker_subject}.attempted", maximum=512)
         references = _string_list(
             blocker["evidence_refs"], f"{blocker_subject}.evidence_refs", pattern=IDENTIFIER_PATTERNS["evidence"]
         )
         if any(reference not in evidence_ids for reference in references):
             raise ProtocolProblem("BLOCKER_EVIDENCE_UNKNOWN", blocker_subject)
-        _string(blocker["unblock_owner"], f"{blocker_subject}.unblock_owner")
+        _string(blocker["unblock_owner"], f"{blocker_subject}.unblock_owner", maximum=128)
 
     recommendation = _object(
         message["recommendation"],
         {"decision", "reason", "next_action"},
         f"{subject}.recommendation",
     )
-    for key in ("decision", "reason", "next_action"):
-        _string(recommendation[key], f"{subject}.recommendation.{key}")
+    _string(recommendation["decision"], f"{subject}.recommendation.decision", maximum=128)
+    _string(recommendation["reason"], f"{subject}.recommendation.reason", maximum=1024)
+    _string(recommendation["next_action"], f"{subject}.recommendation.next_action", maximum=256)
     _string(message["status"], f"{subject}.status", choices=STATUSES)
     _string_list(message["resolves_message_ids"], f"{subject}.resolves_message_ids", pattern=UUID_RE)
     _string_list(
@@ -578,7 +608,7 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
         )
         _identifier(minority["claim_id"], f"{subject}.minority_report.claim_id", "minority")
         for key in ("opposed_claim", "potential_harm", "falsification_test"):
-            _string(minority[key], f"{subject}.minority_report.{key}")
+            _string(minority[key], f"{subject}.minority_report.{key}", maximum=1024)
         references = _string_list(
             minority["evidence_refs"],
             f"{subject}.minority_report.evidence_refs",
@@ -633,6 +663,8 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
     maximum_candidates = packet["orchestration"]["retry_policy"]["max_candidate_revisions"]
     if len(raw_candidates) > maximum_candidates:
         raise ProtocolProblem("CANDIDATE_BUDGET_EXCEEDED", "bundle.candidates")
+    if len(raw_candidates) != 2:
+        raise ProtocolProblem("PILOT_TWO_CANDIDATES_REQUIRED", "bundle.candidates")
     candidates: list[dict[str, Any]] = []
     parent = packet["baseline"]["base_sha"]
     for index, raw_candidate in enumerate(raw_candidates):
@@ -646,6 +678,12 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
         raise ProtocolProblem("NONFINAL_CANDIDATE_NOT_REJECTED", "bundle.candidates")
     if candidates[-1]["disposition"] != "FINAL":
         raise ProtocolProblem("FINAL_CANDIDATE_MISSING", "bundle.candidates")
+    rejected_content = candidates[0]["content"]
+    if (
+        rejected_content["duplicate_request_behavior"] != "DOUBLE_APPLY"
+        or rejected_content["timeout_recovery_behavior"] != "BLIND_REPLAY"
+    ):
+        raise ProtocolProblem("REJECTED_CANDIDATE_SCENARIO_MISSING", candidates[0]["candidate_sha"])
     final_candidate = candidates[-1]
     final_content = final_candidate["content"]
     if (
@@ -729,6 +767,12 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
             raise ProtocolProblem("REVIEWER_WRITE_ATTEMPT", subject)
         if message["role"] == "CHANGE_BUILDER" and assignment["agent_id"] != packet["orchestration"]["product_writer_agent_id"]:
             raise ProtocolProblem("WRITER_IDENTITY_MISMATCH", subject)
+        for change in message["changes"]:
+            if not any(
+                fnmatch.fnmatchcase(change["path"], pattern)
+                for pattern in packet["scope"]["allowed_changed_paths"]
+            ):
+                raise ProtocolProblem("CHANGE_PATH_OUT_OF_SCOPE", subject)
 
         attempt_key = (
             agent["agent_id"],
@@ -800,7 +844,7 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
                 raise ProtocolProblem("DUPLICATE_MINORITY_CLAIM", subject)
             minority_claims[claim_id] = candidate_sha
 
-        if message["gate"] in REQUIRED_FINAL_GATES and message["status"] in {"PASS", "FAIL", "VETOED"}:
+        if message["gate"] in {*REQUIRED_FINAL_GATES, "ADVERSARIAL"} and message["status"] in {"PASS", "FAIL", "VETOED"}:
             gate_results[(candidate_sha, message["gate"])] = (
                 message["status"],
                 message_id,
@@ -810,12 +854,28 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
 
     if checkpoint_count == 0:
         raise ProtocolProblem("CHECKPOINT_MISSING", "bundle.messages")
+    if not minority_claims:
+        raise ProtocolProblem("MINORITY_REPORT_MISSING", "bundle.messages")
     unresolved_claims = sorted(set(minority_claims) - resolved_claims)
     if unresolved_claims:
         raise ProtocolProblem("MINORITY_REPORT_UNRESOLVED", unresolved_claims[0])
     unresolved_unknowns = sorted(set(unknown_messages) - set(resolved_unknowns))
     if unresolved_unknowns:
         raise ProtocolProblem("RESULT_UNKNOWN_UNRESOLVED", unresolved_unknowns[0])
+    if not unknown_messages:
+        raise ProtocolProblem("RESULT_UNKNOWN_EXERCISE_MISSING", "bundle.messages")
+
+    rejected_sha = candidates[0]["candidate_sha"]
+    expected_rejections = {
+        "ERP_CONTRACT": "FAIL",
+        "ADVERSARIAL": "VETOED",
+        "SECURITY": "VETOED",
+        "QA": "FAIL",
+    }
+    for gate, expected_status in expected_rejections.items():
+        result = gate_results.get((rejected_sha, gate))
+        if result is None or result[0] != expected_status:
+            raise ProtocolProblem("REJECTED_CANDIDATE_GATE_MISSING", gate)
 
     final_sha = final_candidate["candidate_sha"]
     final_gates: dict[str, str] = {}
@@ -874,11 +934,15 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
 def validate_bundle(bundle: Any) -> dict[str, Any]:
     """Validate an already parsed synthetic bundle and return a stable report."""
 
+    try:
+        bundle_digest = _sha256_ref(_canonical_json(bundle))
+    except (TypeError, ValueError, RecursionError):
+        bundle_digest = None
     report: dict[str, Any] = {
         "schema_version": REPORT_SCHEMA,
         "validator_version": VALIDATOR_VERSION,
         "status": "FAIL",
-        "bundle_digest": _sha256_ref(_canonical_json(bundle)),
+        "bundle_digest": bundle_digest,
         "task_id": None,
         "task_packet_revision": None,
         "final_candidate_sha": None,
@@ -889,10 +953,12 @@ def validate_bundle(bundle: Any) -> dict[str, Any]:
         "errors": [],
     }
     try:
+        if bundle_digest is None:
+            raise ProtocolProblem("BUNDLE_INVALID", "bundle")
         result = _validate_bundle(copy.deepcopy(bundle))
     except ProtocolProblem as problem:
         report["errors"] = [{"code": problem.code, "subject": problem.subject}]
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, RecursionError):
         report["errors"] = [{"code": "BUNDLE_INVALID", "subject": "bundle"}]
     else:
         report.update(
@@ -940,7 +1006,7 @@ def load_bundle(path: str | Path) -> Any:
         return json.loads(payload, object_pairs_hook=_pairs_without_duplicates)
     except ProtocolProblem:
         raise
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
         raise ProtocolProblem("BUNDLE_JSON_INVALID", "bundle") from exc
 
 

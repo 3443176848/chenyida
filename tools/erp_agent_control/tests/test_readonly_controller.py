@@ -393,6 +393,24 @@ class ReadonlyControllerTest(unittest.TestCase):
 
         self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
 
+    def test_v2_schema_string_bound_is_rejected(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        packet["task"]["qualifiers"] = ["x" * 129]
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
+    def test_v2_requires_at_least_one_allowed_path(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        packet["scope"]["allowed_changed_paths"] = []
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
     def test_idle_is_success_without_auto_start(self) -> None:
         tasks = self.fixture.read("docs/project/TASKS.md").replace(
             "| AGENT-R1 | Read-only controller | DOING | Test |\n",
