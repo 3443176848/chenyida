@@ -25,7 +25,7 @@ from typing import Any, Iterable
 
 sys.dont_write_bytecode = True
 
-CONTROLLER_VERSION = "0.2.2"
+CONTROLLER_VERSION = "0.2.3"
 REPORT_SCHEMA = "chenyida-erp-agent-readonly-report/v1"
 PACKET_SCHEMA_V1 = "chenyida-erp-agent-task/v1"
 PACKET_SCHEMA_V2 = "chenyida-erp-agent-task/v2"
@@ -49,6 +49,9 @@ CORE_DOCUMENTS = (
 )
 TASK_ID_RE = re.compile(r"^[A-Z][A-Z0-9-]{0,63}$")
 TASK_DOCUMENT_RE = re.compile(r"^docs/tasks/[A-Za-z0-9._-]+\.md$")
+UAT_DECLARATION_DOCUMENTS = frozenset(
+    {"docs/project/MASTER.md", "docs/project/PROJECT_CONTEXT.md"}
+)
 SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 MIGRATION_RE = re.compile(r"^(?P<number>[0-9]{4})_(?P<name>[a-z0-9_]+)\.sql$")
@@ -401,12 +404,22 @@ def _validate_inspection(packet: dict[str, Any], *, version: int) -> None:
     markers = inspection["uat_document_markers"]
     if not isinstance(markers, list) or not markers:
         raise ValueError("UAT document markers required")
+    marker_paths: set[str] = set()
     for marker in markers:
         marker = _require_exact_keys(marker, {"path", "contains"})
-        _validate_relative_path(marker["path"])
+        marker_path = _validate_relative_path(marker["path"])
+        if (
+            marker_path not in UAT_DECLARATION_DOCUMENTS
+            or marker_path not in packet["scope"]["required_documents"]
+            or marker_path in marker_paths
+        ):
+            raise ValueError("UAT markers are limited to approved required governance documents")
+        marker_paths.add(marker_path)
         contains = _require_string_list(marker["contains"], maximum=128)
         if not contains:
             raise ValueError("invalid UAT marker")
+    if marker_paths != set(UAT_DECLARATION_DOCUMENTS):
+        raise ValueError("both approved UAT declaration documents are required")
 
 
 def _validate_v2_orchestration(packet: dict[str, Any]) -> None:

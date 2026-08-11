@@ -14,6 +14,7 @@ from datetime import datetime
 import fnmatch
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
@@ -28,7 +29,7 @@ try:
 except ImportError:  # Direct script execution.
     from readonly_controller import validate_task_packet
 
-VALIDATOR_VERSION = "0.3.0"
+VALIDATOR_VERSION = "0.4.0"
 BUNDLE_SCHEMA = "chenyida-erp-native-pilot-bundle/v1"
 REPORT_SCHEMA = "chenyida-erp-native-pilot-report/v1"
 CONTEXT_SCHEMA = "erp-agent-context/v1"
@@ -121,6 +122,25 @@ ALL_CLASSIFICATIONS = PUBLIC_CLASSIFICATIONS | frozenset(
     {"SYNTHETIC_CONTRACT", "SYNTHETIC_CANDIDATE", "SYNTHETIC_TEST_EVIDENCE"}
 )
 REQUIRED_FINAL_GATES = ("ERP_CONTRACT", "SECURITY", "QA", "BLACK_BOX")
+REVIEW_GATES = frozenset({*REQUIRED_FINAL_GATES, "ADVERSARIAL"})
+FORBIDDEN_LOCATOR_PREFIXES = (
+    "http://",
+    "https://",
+    "mysql://",
+    "postgres://",
+    "postgresql://",
+    "prod://",
+    "production://",
+    "secret://",
+    "sqlite://",
+    "uat://",
+)
+FORBIDDEN_LOCATOR_FRAGMENTS = (
+    "chenyida_erp_app/",
+    "chenyida_erp_site/",
+    "erp_current_status_report",
+    "product-source",
+)
 
 
 class ProtocolProblem(Exception):
@@ -139,6 +159,10 @@ def _pairs_without_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
             raise ProtocolProblem("DUPLICATE_JSON_KEY", key)
         result[key] = value
     return result
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ProtocolProblem("BUNDLE_JSON_INVALID", "bundle")
 
 
 def _canonical_json(value: Any) -> bytes:
@@ -258,6 +282,21 @@ def _repository_path(value: Any, subject: str) -> str:
     return path
 
 
+def _validate_locator(value: Any, subject: str, *, black_box: bool = False) -> str:
+    locator = _string(value, subject, maximum=512)
+    lowered = locator.lower()
+    if (
+        any(lowered.startswith(prefix) for prefix in FORBIDDEN_LOCATOR_PREFIXES)
+        or any(fragment in lowered for fragment in FORBIDDEN_LOCATOR_FRAGMENTS)
+        or ".git/" in lowered
+        or lowered.endswith("/.git")
+    ):
+        raise ProtocolProblem("FORBIDDEN_CONTEXT_LOCATOR", subject)
+    if black_box and not locator.startswith("blackbox://"):
+        raise ProtocolProblem("BLACK_BOX_SOURCE_CONTEXT", subject)
+    return locator
+
+
 def _validate_candidate(raw: Any, index: int, expected_parent: str) -> dict[str, Any]:
     subject = f"candidates[{index}]"
     candidate = _object(
@@ -375,23 +414,26 @@ def _validate_context(
     documents = manifest["documents"]
     if not isinstance(documents, list) or not documents:
         raise ProtocolProblem("CONTEXT_DOCUMENTS_REQUIRED", subject)
+    document_locators: set[str] = set()
     for document_index, raw_document in enumerate(documents):
         document_subject = f"{subject}.documents[{document_index}]"
         document = _object(raw_document, {"locator", "digest", "classification"}, document_subject)
-        locator = _string(document["locator"], f"{document_subject}.locator", maximum=512)
+        locator = _validate_locator(document["locator"], f"{document_subject}.locator")
+        if locator in document_locators:
+            raise ProtocolProblem("DUPLICATE_CONTEXT_DOCUMENT", document_subject)
+        document_locators.add(locator)
         _string(document["digest"], f"{document_subject}.digest", pattern=SHA256_REF_RE)
         classification = _string(
             document["classification"],
             f"{document_subject}.classification",
             choices=ALL_CLASSIFICATIONS,
         )
-        lowered = locator.lower()
-        if any(fragment in lowered for fragment in (".git", "product-source", "erp_current_status")):
-            raise ProtocolProblem("FORBIDDEN_CONTEXT_LOCATOR", document_subject)
         if visibility == "BLACK_BOX_PUBLIC_ONLY" and (
             classification not in PUBLIC_CLASSIFICATIONS or not locator.startswith("blackbox://")
         ):
             raise ProtocolProblem("BLACK_BOX_SOURCE_CONTEXT", document_subject)
+        if visibility == "SYNTHETIC_PROTOCOL_ONLY" and not locator.startswith("bundle://"):
+            raise ProtocolProblem("NON_SYNTHETIC_LOCATOR", document_subject)
 
     forbidden_context = set(
         _string_list(
@@ -429,7 +471,7 @@ def _validate_evidence(raw: Any, subject: str) -> dict[str, Any]:
     _string(evidence["kind"], f"{subject}.kind", choices=EVIDENCE_KINDS)
     if evidence["kind"] in {"DATABASE_ASSERTION", "HTTP_OBSERVATION"}:
         raise ProtocolProblem("FORBIDDEN_EVIDENCE_KIND", subject)
-    _string(evidence["locator"], f"{subject}.locator", maximum=512)
+    _validate_locator(evidence["locator"], f"{subject}.locator")
     _string(evidence["digest"], f"{subject}.digest", pattern=SHA256_REF_RE)
     if evidence["exit_code"] is not None:
         _integer(evidence["exit_code"], f"{subject}.exit_code", minimum=-255, maximum=255)
@@ -502,14 +544,22 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
     _integer(message_input["task_packet_revision"], f"{subject}.input.task_packet_revision", minimum=1)
     _integer(message_input["lease_generation"], f"{subject}.input.lease_generation", minimum=1)
     _integer(message_input["attempt"], f"{subject}.input.attempt", minimum=1)
-    _string_list(message_input["artifacts"], f"{subject}.input.artifacts", maximum=512)
+    artifacts = _string_list(
+        message_input["artifacts"], f"{subject}.input.artifacts", maximum=512
+    )
+    for artifact_index, artifact in enumerate(artifacts):
+        _validate_locator(artifact, f"{subject}.input.artifacts[{artifact_index}]")
 
     if not isinstance(message["assumptions"], list):
         raise ProtocolProblem("ARRAY_REQUIRED", f"{subject}.assumptions")
+    assumption_ids: set[str] = set()
     for assumption_index, raw_assumption in enumerate(message["assumptions"]):
         assumption_subject = f"{subject}.assumptions[{assumption_index}]"
         assumption = _object(raw_assumption, {"id", "statement", "status", "source"}, assumption_subject)
-        _identifier(assumption["id"], f"{assumption_subject}.id", "assumption")
+        assumption_id = _identifier(assumption["id"], f"{assumption_subject}.id", "assumption")
+        if assumption_id in assumption_ids:
+            raise ProtocolProblem("DUPLICATE_ASSUMPTION_ID", assumption_subject)
+        assumption_ids.add(assumption_id)
         _string(assumption["statement"], f"{assumption_subject}.statement", maximum=1024)
         _string(assumption["status"], f"{assumption_subject}.status", choices={"VERIFIED", "PENDING"})
         if assumption["source"] is not None:
@@ -527,15 +577,20 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
 
     if not isinstance(message["changes"], list):
         raise ProtocolProblem("ARRAY_REQUIRED", f"{subject}.changes")
+    change_paths: set[str] = set()
     for change_index, raw_change in enumerate(message["changes"]):
         change_subject = f"{subject}.changes[{change_index}]"
         change = _object(raw_change, {"path", "action", "purpose"}, change_subject)
-        _repository_path(change["path"], f"{change_subject}.path")
+        change_path = _repository_path(change["path"], f"{change_subject}.path")
+        if change_path in change_paths:
+            raise ProtocolProblem("DUPLICATE_CHANGE_PATH", change_subject)
+        change_paths.add(change_path)
         _string(change["action"], f"{change_subject}.action", choices={"ADD", "MODIFY", "DELETE"})
         _string(change["purpose"], f"{change_subject}.purpose", maximum=1024)
 
     if not isinstance(message["tests"], list):
         raise ProtocolProblem("ARRAY_REQUIRED", f"{subject}.tests")
+    test_ids: set[str] = set()
     for test_index, raw_test in enumerate(message["tests"]):
         test_subject = f"{subject}.tests[{test_index}]"
         test = _object(
@@ -543,7 +598,10 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
             {"id", "command_id", "environment", "result", "exit_code", "artifact"},
             test_subject,
         )
-        _identifier(test["id"], f"{test_subject}.id", "test")
+        test_id = _identifier(test["id"], f"{test_subject}.id", "test")
+        if test_id in test_ids:
+            raise ProtocolProblem("DUPLICATE_TEST_ID", test_subject)
+        test_ids.add(test_id)
         _string(test["command_id"], f"{test_subject}.command_id", maximum=128)
         _string(test["environment"], f"{test_subject}.environment", maximum=256)
         _string(test["result"], f"{test_subject}.result", choices={"PASS", "FAIL", "NOT_RUN", "RESULT_UNKNOWN"})
@@ -553,9 +611,27 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
             artifact = _string(test["artifact"], f"{test_subject}.artifact", maximum=128)
             if artifact not in evidence_ids:
                 raise ProtocolProblem("TEST_EVIDENCE_UNKNOWN", test_subject)
+        if (
+            (test["result"] == "PASS" and (test["exit_code"] != 0 or test["artifact"] is None))
+            or (
+                test["result"] == "FAIL"
+                and (
+                    test["exit_code"] is None
+                    or test["exit_code"] == 0
+                    or test["artifact"] is None
+                )
+            )
+            or (
+                test["result"] == "NOT_RUN"
+                and (test["exit_code"] is not None or test["artifact"] is not None)
+            )
+            or (test["result"] == "RESULT_UNKNOWN" and test["exit_code"] is not None)
+        ):
+            raise ProtocolProblem("TEST_RESULT_INCONSISTENT", test_subject)
 
     if not isinstance(message["risks"], list):
         raise ProtocolProblem("ARRAY_REQUIRED", f"{subject}.risks")
+    risk_ids: set[str] = set()
     for risk_index, raw_risk in enumerate(message["risks"]):
         risk_subject = f"{subject}.risks[{risk_index}]"
         risk = _object(
@@ -563,7 +639,10 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
             {"id", "severity", "probability", "impact", "trigger", "mitigation", "residual_risk"},
             risk_subject,
         )
-        _identifier(risk["id"], f"{risk_subject}.id", "risk")
+        risk_id = _identifier(risk["id"], f"{risk_subject}.id", "risk")
+        if risk_id in risk_ids:
+            raise ProtocolProblem("DUPLICATE_RISK_ID", risk_subject)
+        risk_ids.add(risk_id)
         _string(risk["severity"], f"{risk_subject}.severity", choices={"LOW", "MEDIUM", "HIGH", "CRITICAL"})
         _string(risk["probability"], f"{risk_subject}.probability", choices={"LOW", "MEDIUM", "HIGH"})
         for key in ("impact", "trigger", "mitigation", "residual_risk"):
@@ -571,6 +650,7 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
 
     if not isinstance(message["blockers"], list):
         raise ProtocolProblem("ARRAY_REQUIRED", f"{subject}.blockers")
+    blocker_ids: set[str] = set()
     for blocker_index, raw_blocker in enumerate(message["blockers"]):
         blocker_subject = f"{subject}.blockers[{blocker_index}]"
         blocker = _object(
@@ -578,7 +658,10 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
             {"id", "category", "attempted", "evidence_refs", "unblock_owner"},
             blocker_subject,
         )
-        _identifier(blocker["id"], f"{blocker_subject}.id", "blocker")
+        blocker_id = _identifier(blocker["id"], f"{blocker_subject}.id", "blocker")
+        if blocker_id in blocker_ids:
+            raise ProtocolProblem("DUPLICATE_BLOCKER_ID", blocker_subject)
+        blocker_ids.add(blocker_id)
         _string(blocker["category"], f"{blocker_subject}.category", maximum=128)
         _string_list(blocker["attempted"], f"{blocker_subject}.attempted", maximum=512)
         references = _string_list(
@@ -642,6 +725,45 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
             f"{subject}.checkpoint.completed_message_ids",
             pattern=UUID_RE,
         )
+
+    if message["gate"] in REVIEW_GATES:
+        permitted_types = {
+            "PASS": {"VERIFICATION"},
+            "FAIL": {"FINDING", "VERIFICATION"},
+            "VETOED": {"MINORITY_REPORT", "VETO"},
+            "RESULT_UNKNOWN": {"VERIFICATION"},
+        }
+        allowed_types = permitted_types.get(message["status"])
+        if allowed_types is not None and message["message_type"] not in allowed_types:
+            raise ProtocolProblem("REVIEW_MESSAGE_TYPE_INVALID", subject)
+    if message["role"] in {"INDEPENDENT_VERIFIER", "BLACK_BOX_VERIFIER"} and message["status"] == "PASS":
+        if not message["tests"] or any(
+            test["result"] != "PASS"
+            or test["exit_code"] != 0
+            or test["artifact"] is None
+            for test in message["tests"]
+        ):
+            raise ProtocolProblem("GATE_TESTS_NOT_PASSED", subject)
+    if message["role"] == "BLACK_BOX_VERIFIER":
+        for artifact_index, artifact in enumerate(artifacts):
+            _validate_locator(
+                artifact,
+                f"{subject}.input.artifacts[{artifact_index}]",
+                black_box=True,
+            )
+        for evidence_index, item in enumerate(evidence):
+            if item["kind"] != "BLACK_BOX_OBSERVATION":
+                raise ProtocolProblem("BLACK_BOX_SOURCE_CONTEXT", subject)
+            _validate_locator(
+                item["locator"],
+                f"{subject}.evidence[{evidence_index}].locator",
+                black_box=True,
+            )
+    else:
+        if any(not artifact.startswith("bundle://") for artifact in artifacts):
+            raise ProtocolProblem("NON_SYNTHETIC_LOCATOR", subject)
+        if any(not item["locator"].startswith("bundle://") for item in evidence):
+            raise ProtocolProblem("NON_SYNTHETIC_LOCATOR", subject)
     return message
 
 
@@ -720,6 +842,9 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
     messages = [_validate_message_structure(item, index) for index, item in enumerate(raw_messages)]
     message_ids: set[str] = set()
     semantic_attempts: set[tuple[str, str, str, int]] = set()
+    latest_attempts: dict[tuple[str, str, str], int] = {}
+    passed_gate_attempts: set[tuple[str, str, str]] = set()
+    vetoed_gate_attempts: set[tuple[str, str, str]] = set()
     prior_message_ids: set[str] = set()
     minority_claims: dict[str, str] = {}
     resolved_claims: set[str] = set()
@@ -727,9 +852,14 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
     resolved_unknowns: dict[str, str] = {}
     gate_results: dict[tuple[str, str], tuple[str, str, int]] = {}
     checkpoint_count = 0
+    closure_count = 0
+    candidate_positions = {candidate_sha: index for index, candidate_sha in enumerate(candidate_shas)}
+    latest_candidate_position = -1
 
     for index, message in enumerate(messages):
         subject = f"messages[{index}]"
+        if closure_count:
+            raise ProtocolProblem("MESSAGE_AFTER_CLOSURE", subject)
         message_id = message["message_id"]
         if message_id in message_ids:
             raise ProtocolProblem("DUPLICATE_MESSAGE_ID", message_id)
@@ -742,6 +872,13 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
         candidate_sha = message_input["candidate_sha"]
         if candidate_sha not in set(candidate_shas):
             raise ProtocolProblem("MESSAGE_CANDIDATE_UNKNOWN", subject)
+        candidate_position = candidate_positions[candidate_sha]
+        if (
+            candidate_position < latest_candidate_position
+            or candidate_position > latest_candidate_position + 1
+        ):
+            raise ProtocolProblem("MESSAGE_CANDIDATE_SEQUENCE_INVALID", subject)
+        latest_candidate_position = candidate_position
         if message_input["task_packet_revision"] != packet["task"]["revision"]:
             raise ProtocolProblem("STALE_TASK_PACKET_REVISION", subject)
         if message_input["lease_generation"] != packet["orchestration"]["active_lease_generation"]:
@@ -790,6 +927,15 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
         semantic_attempts.add(attempt_key)
         if message_input["attempt"] > packet["orchestration"]["retry_policy"]["max_attempts_per_gate"]:
             raise ProtocolProblem("GATE_ATTEMPT_BUDGET_EXCEEDED", subject)
+        gate_key = attempt_key[:3]
+        expected_attempt = latest_attempts.get(gate_key, 0) + 1
+        if message_input["attempt"] != expected_attempt:
+            raise ProtocolProblem("GATE_ATTEMPT_SEQUENCE_INVALID", subject)
+        if gate_key in passed_gate_attempts:
+            raise ProtocolProblem("GATE_ALREADY_PASSED", subject)
+        if gate_key in vetoed_gate_attempts:
+            raise ProtocolProblem("VETO_REQUIRES_NEW_CANDIDATE", subject)
+        latest_attempts[gate_key] = message_input["attempt"]
 
         if message["status"] in {"PASS", "FAIL", "VETOED", "COMPLETE", "RESULT_UNKNOWN"} and not message["evidence"]:
             raise ProtocolProblem("EVIDENCE_REQUIRED", subject)
@@ -816,6 +962,15 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
             raise ProtocolProblem("CHECKPOINT_UNEXPECTED", subject)
         if message["message_type"] == "CLOSURE" and message["status"] != "COMPLETE":
             raise ProtocolProblem("CLOSURE_STATUS_INVALID", subject)
+        if message["message_type"] == "CLOSURE":
+            closure_count += 1
+            if candidate_sha != final_candidate["candidate_sha"]:
+                raise ProtocolProblem("CLOSURE_CANDIDATE_INVALID", subject)
+
+        if message["gate"] in REVIEW_GATES and message["status"] == "PASS":
+            passed_gate_attempts.add(gate_key)
+        if message["gate"] in REVIEW_GATES and message["status"] == "VETOED":
+            vetoed_gate_attempts.add(gate_key)
 
         for referenced_message in message["resolves_message_ids"]:
             if referenced_message not in unknown_messages:
@@ -825,11 +980,18 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
             decision = message["recommendation"]["decision"]
             if decision not in {"MARK_NOT_APPLIED_SAFE_TO_RETRY", "MARK_APPLIED_NO_REPLAY"}:
                 raise ProtocolProblem("UNKNOWN_RESULT_DISPOSITION_INVALID", subject)
+            if referenced_message in resolved_unknowns:
+                raise ProtocolProblem("RESULT_UNKNOWN_ALREADY_RESOLVED", subject)
             resolved_unknowns[referenced_message] = decision
         for claim_id in message["resolves_claim_ids"]:
             if claim_id not in minority_claims:
                 raise ProtocolProblem("MINORITY_DISPOSITION_INVALID", subject)
-            if candidate_sha == minority_claims[claim_id] or not message["evidence"]:
+            if (
+                candidate_sha == minority_claims[claim_id]
+                or not message["evidence"]
+                or message["role"] != "ADVERSARIAL_EXAMINER"
+                or message["gate"] != "ADVERSARIAL"
+            ):
                 raise ProtocolProblem("MINORITY_DISPOSITION_INVALID", subject)
             resolved_claims.add(claim_id)
 
@@ -859,6 +1021,8 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
 
     if checkpoint_count == 0:
         raise ProtocolProblem("CHECKPOINT_MISSING", "bundle.messages")
+    if checkpoint_count > 1:
+        raise ProtocolProblem("CHECKPOINT_COUNT_INVALID", "bundle.messages")
     if not minority_claims:
         raise ProtocolProblem("MINORITY_REPORT_MISSING", "bundle.messages")
     unresolved_claims = sorted(set(minority_claims) - resolved_claims)
@@ -889,11 +1053,10 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
         if result is None or result[0] != "PASS":
             raise ProtocolProblem("FINAL_GATE_NOT_PASSED", gate)
         final_gates[gate] = result[0]
-    if not any(
-        message["message_type"] == "CLOSURE"
-        and message["input"]["candidate_sha"] == final_sha
-        for message in messages
-    ):
+    adversarial_result = gate_results.get((final_sha, "ADVERSARIAL"))
+    if adversarial_result is None or adversarial_result[0] != "PASS":
+        raise ProtocolProblem("FINAL_ADVERSARIAL_NOT_PASSED", final_sha)
+    if closure_count != 1:
         raise ProtocolProblem("CLOSURE_MISSING", final_sha)
 
     expected = _object(
@@ -941,7 +1104,7 @@ def validate_bundle(bundle: Any) -> dict[str, Any]:
 
     try:
         bundle_digest = _sha256_ref(_canonical_json(bundle))
-    except (TypeError, ValueError, RecursionError):
+    except (TypeError, ValueError, UnicodeError, RecursionError):
         bundle_digest = None
     report: dict[str, Any] = {
         "schema_version": REPORT_SCHEMA,
@@ -963,7 +1126,7 @@ def validate_bundle(bundle: Any) -> dict[str, Any]:
         result = _validate_bundle(copy.deepcopy(bundle))
     except ProtocolProblem as problem:
         report["errors"] = [{"code": problem.code, "subject": problem.subject}]
-    except (TypeError, ValueError, RecursionError):
+    except (TypeError, ValueError, UnicodeError, RecursionError):
         report["errors"] = [{"code": "BUNDLE_INVALID", "subject": "bundle"}]
     else:
         report.update(
@@ -1006,13 +1169,53 @@ def load_bundle(path: str | Path) -> Any:
         raise ProtocolProblem("BUNDLE_FILE_UNSAFE", "bundle")
     if metadata.st_size > MAX_BUNDLE_BYTES:
         raise ProtocolProblem("BUNDLE_FILE_TOO_LARGE", "bundle")
+    descriptor: int | None = None
     try:
-        payload = bundle_path.read_bytes()
-        return json.loads(payload, object_pairs_hook=_pairs_without_duplicates)
+        flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(bundle_path, flags)
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or (opened.st_dev, opened.st_ino) != (metadata.st_dev, metadata.st_ino)
+            or opened.st_size != metadata.st_size
+            or opened.st_mtime_ns != metadata.st_mtime_ns
+            or opened.st_ctime_ns != metadata.st_ctime_ns
+        ):
+            raise ProtocolProblem("BUNDLE_FILE_UNSAFE", "bundle")
+        chunks: list[bytes] = []
+        observed_size = 0
+        while observed_size <= MAX_BUNDLE_BYTES:
+            chunk = os.read(descriptor, min(65536, MAX_BUNDLE_BYTES + 1 - observed_size))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            observed_size += len(chunk)
+        if observed_size > MAX_BUNDLE_BYTES:
+            raise ProtocolProblem("BUNDLE_FILE_TOO_LARGE", "bundle")
+        after_read = os.fstat(descriptor)
+        if (
+            after_read.st_size != opened.st_size
+            or after_read.st_mtime_ns != opened.st_mtime_ns
+            or after_read.st_ctime_ns != opened.st_ctime_ns
+            or after_read.st_nlink != 1
+        ):
+            raise ProtocolProblem("BUNDLE_FILE_UNSAFE", "bundle")
+        payload = b"".join(chunks)
+        return json.loads(
+            payload,
+            object_pairs_hook=_pairs_without_duplicates,
+            parse_constant=_reject_json_constant,
+        )
     except ProtocolProblem:
         raise
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
+    except OSError as exc:
+        raise ProtocolProblem("BUNDLE_FILE_UNREADABLE", "bundle") from exc
+    except (UnicodeError, ValueError, json.JSONDecodeError, RecursionError) as exc:
         raise ProtocolProblem("BUNDLE_JSON_INVALID", "bundle") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
 
 
 def _argument_parser() -> argparse.ArgumentParser:

@@ -149,13 +149,36 @@
         },
         "uat_document_markers": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "required": ["path"],
+                "properties": {"path": {"const": "docs/project/MASTER.md"}}
+              }
+            },
+            {
+              "contains": {
+                "type": "object",
+                "required": ["path"],
+                "properties": {"path": {"const": "docs/project/PROJECT_CONTEXT.md"}}
+              }
+            }
+          ],
           "items": {
             "type": "object",
             "additionalProperties": false,
             "required": ["path", "contains"],
             "properties": {
-              "path": {"$ref": "#/$defs/repositoryPath"},
+              "path": {
+                "enum": [
+                  "docs/project/MASTER.md",
+                  "docs/project/PROJECT_CONTEXT.md"
+                ]
+              },
               "contains": {
                 "type": "array",
                 "minItems": 1,

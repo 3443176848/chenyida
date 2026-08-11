@@ -13,7 +13,7 @@ import unittest
 
 from tools.erp_agent_control.native_mvp import RFC3339_RE, load_bundle, validate_bundle
 from tools.erp_agent_control.pilot_fixture import build_task_packet, build_valid_bundle, digest
-from tools.erp_agent_control.readonly_controller import TASK_DOCUMENT_RE
+from tools.erp_agent_control.readonly_controller import TASK_DOCUMENT_RE, UAT_DECLARATION_DOCUMENTS
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -124,6 +124,14 @@ class NativeMvpProtocolTest(unittest.TestCase):
             {"$ref": "#/$defs/repositoryPath"},
         )
 
+    def test_schema_and_manual_uat_marker_allowlists_are_identical(self) -> None:
+        schema = json.loads((SCHEMA_DIRECTORY / "task-packet-v2.schema.json").read_text(encoding="utf-8"))
+        path_rule = schema["properties"]["inspection"]["properties"]["uat_document_markers"]["items"][
+            "properties"
+        ]["path"]
+
+        self.assertEqual(set(path_rule["enum"]), set(UAT_DECLARATION_DOCUMENTS))
+
     def test_checked_in_blackbox_observation_matches_public_fixture(self) -> None:
         interface_contract = json.loads((BLACKBOX_DIRECTORY / "interface.json").read_text(encoding="utf-8"))
         personas = json.loads((BLACKBOX_DIRECTORY / "personas.json").read_text(encoding="utf-8"))
@@ -207,6 +215,58 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "DUPLICATE_MESSAGE_ID")
 
+    def test_gate_attempt_regression_fails_closed(self) -> None:
+        lower_attempt = message(self.bundle, 10)
+        higher_attempt = copy.deepcopy(lower_attempt)
+        higher_attempt["message_id"] = "10000000-0000-4000-8000-000000000010"
+        higher_attempt["message_type"] = "VETO"
+        higher_attempt["status"] = "VETOED"
+        higher_attempt["input"]["attempt"] = 2
+        self.bundle["messages"].insert(self.bundle["messages"].index(lower_attempt), higher_attempt)
+
+        self.assertEqual(error_code(self.bundle), "GATE_ATTEMPT_SEQUENCE_INVALID")
+
+    def test_message_stream_cannot_regress_to_old_candidate(self) -> None:
+        old_message = copy.deepcopy(message(self.bundle, 5))
+        old_message["message_id"] = "10000000-0000-4000-8000-000000000012"
+        old_message["input"]["attempt"] = 2
+        self.bundle["messages"].insert(-1, old_message)
+
+        self.assertEqual(error_code(self.bundle), "MESSAGE_CANDIDATE_SEQUENCE_INVALID")
+
+    def test_veto_cannot_be_overwritten_on_same_candidate(self) -> None:
+        veto = message(self.bundle, 10)
+        later_pass = copy.deepcopy(veto)
+        veto["message_type"] = "VETO"
+        veto["status"] = "VETOED"
+        later_pass["message_id"] = "10000000-0000-4000-8000-000000000011"
+        later_pass["input"]["attempt"] = 2
+        self.bundle["messages"].insert(self.bundle["messages"].index(veto) + 1, later_pass)
+
+        self.assertEqual(error_code(self.bundle), "VETO_REQUIRES_NEW_CANDIDATE")
+
+    def test_review_pass_requires_verification_message(self) -> None:
+        message(self.bundle, 10)["message_type"] = "PLAN"
+
+        self.assertEqual(error_code(self.bundle), "REVIEW_MESSAGE_TYPE_INVALID")
+
+    def test_qa_pass_requires_successful_test_evidence(self) -> None:
+        qa_pass = message(self.bundle, 13)
+        qa_pass["tests"][0].update({"result": "NOT_RUN", "exit_code": None, "artifact": None})
+
+        self.assertEqual(error_code(self.bundle), "GATE_TESTS_NOT_PASSED")
+
+    def test_test_result_and_exit_code_must_be_consistent(self) -> None:
+        message(self.bundle, 13)["tests"][0]["exit_code"] = 1
+
+        self.assertEqual(error_code(self.bundle), "TEST_RESULT_INCONSISTENT")
+
+    def test_duplicate_semantic_test_id_fails_closed(self) -> None:
+        qa_pass = message(self.bundle, 13)
+        qa_pass["tests"].append(copy.deepcopy(qa_pass["tests"][0]))
+
+        self.assertEqual(error_code(self.bundle), "DUPLICATE_TEST_ID")
+
     def test_role_or_capability_mismatch_fails_closed(self) -> None:
         message(self.bundle, 10)["agent"]["capability_profile"] = "ERP_READ_ONLY"
 
@@ -234,6 +294,16 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "FORBIDDEN_EVIDENCE_KIND")
 
+    def test_product_source_locator_is_forbidden(self) -> None:
+        message(self.bundle, 10)["evidence"][0]["locator"] = "workspace://chenyida_erp_site/app/private.ts"
+
+        self.assertEqual(error_code(self.bundle), "FORBIDDEN_CONTEXT_LOCATOR")
+
+    def test_non_synthetic_evidence_scheme_is_forbidden(self) -> None:
+        message(self.bundle, 10)["evidence"][0]["locator"] = "workspace://docs/synthetic.md"
+
+        self.assertEqual(error_code(self.bundle), "NON_SYNTHETIC_LOCATOR")
+
     def test_black_box_source_context_fails_closed_even_with_fresh_digest(self) -> None:
         final_sha = self.bundle["expected"]["final_candidate_sha"]
         manifest = context(self.bundle, "BLACK_BOX_VERIFIER", final_sha)
@@ -248,6 +318,12 @@ class NativeMvpProtocolTest(unittest.TestCase):
         manifest["manifest_digest"] = digest(digest_input)
         message(self.bundle, 14)["agent"]["context_manifest_digest"] = manifest["manifest_digest"]
         self.assertNotEqual(old_digest, manifest["manifest_digest"])
+
+        self.assertEqual(error_code(self.bundle), "BLACK_BOX_SOURCE_CONTEXT")
+
+    def test_black_box_source_evidence_fails_closed(self) -> None:
+        black_box = message(self.bundle, 14)
+        black_box["input"]["artifacts"] = ["git://private-source"]
 
         self.assertEqual(error_code(self.bundle), "BLACK_BOX_SOURCE_CONTEXT")
 
@@ -280,6 +356,11 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "MINORITY_REPORT_UNRESOLVED")
 
+    def test_final_adversarial_disposition_must_pass(self) -> None:
+        message(self.bundle, 9)["status"] = "FAIL"
+
+        self.assertEqual(error_code(self.bundle), "FINAL_ADVERSARIAL_NOT_PASSED")
+
     def test_stale_lease_generation_fails_closed(self) -> None:
         message(self.bundle, 10)["input"]["lease_generation"] = 2
 
@@ -296,9 +377,18 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "RESULT_UNKNOWN_UNRESOLVED")
 
+    def test_result_unknown_cannot_receive_duplicate_dispositions(self) -> None:
+        duplicate_recovery = copy.deepcopy(message(self.bundle, 12))
+        duplicate_recovery["message_id"] = "10000000-0000-4000-8000-000000000013"
+        duplicate_recovery["input"]["attempt"] = 2
+        self.bundle["messages"].insert(self.bundle["messages"].index(message(self.bundle, 13)), duplicate_recovery)
+
+        self.assertEqual(error_code(self.bundle), "RESULT_UNKNOWN_ALREADY_RESOLVED")
+
     def test_pilot_requires_result_unknown_recovery_exercise(self) -> None:
         self.bundle["messages"].remove(message(self.bundle, 11))
         self.bundle["messages"].remove(message(self.bundle, 12))
+        message(self.bundle, 13)["input"]["attempt"] = 1
         self.bundle["expected"]["result_unknown_resolved"] = []
 
         self.assertEqual(error_code(self.bundle), "RESULT_UNKNOWN_EXERCISE_MISSING")
@@ -311,12 +401,35 @@ class NativeMvpProtocolTest(unittest.TestCase):
             with self.assertRaisesRegex(Exception, "DUPLICATE_JSON_KEY"):
                 load_bundle(bundle_path)
 
+    def test_non_json_numeric_constant_is_rejected_before_validation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="agent-r1-5-non-json-number-") as temporary:
+            bundle_path = Path(temporary) / "bundle.json"
+            bundle_path.write_text('{"schema_version":NaN}', encoding="utf-8")
+
+            with self.assertRaisesRegex(Exception, "BUNDLE_JSON_INVALID"):
+                load_bundle(bundle_path)
+
+    def test_unpaired_unicode_surrogate_fails_without_exception_leak(self) -> None:
+        message(self.bundle, 1)["recommendation"]["reason"] = "\ud800"
+
+        report = validate_bundle(self.bundle)
+
+        self.assertEqual(report["status"], "FAIL")
+        self.assertEqual(report["errors"], [{"code": "BUNDLE_INVALID", "subject": "bundle"}])
+
     def test_checkpoint_cannot_claim_future_message(self) -> None:
         message(self.bundle, 6)["checkpoint"]["completed_message_ids"].append(
             "00000000-0000-4000-8000-000000000007"
         )
 
         self.assertEqual(error_code(self.bundle), "CHECKPOINT_BINDING_INVALID")
+
+    def test_closure_must_be_the_final_message(self) -> None:
+        closure = message(self.bundle, 15)
+        self.bundle["messages"].remove(closure)
+        self.bundle["messages"].insert(self.bundle["messages"].index(message(self.bundle, 14)), closure)
+
+        self.assertEqual(error_code(self.bundle), "MESSAGE_AFTER_CLOSURE")
 
     def test_cli_is_json_only_deterministic_and_read_only(self) -> None:
         with tempfile.TemporaryDirectory(prefix="agent-r1-5-cli-") as temporary:

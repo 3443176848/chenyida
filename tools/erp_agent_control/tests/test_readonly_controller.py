@@ -357,6 +357,24 @@ class ReadonlyControllerTest(unittest.TestCase):
 
         self.assertIn("DECISION_D114_ACCEPTED", finding_codes(report))
 
+    def test_uat_marker_cannot_redirect_read_to_product_path(self) -> None:
+        packet = self.fixture.load_packet()
+        packet["inspection"]["uat_document_markers"][0]["path"] = "chenyida_erp_site/package.json"
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
+    def test_uat_marker_requires_both_approved_governance_documents(self) -> None:
+        packet = self.fixture.load_packet()
+        packet["inspection"]["uat_document_markers"] = packet["inspection"]["uat_document_markers"][:1]
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
     def test_v2_reviewer_write_permission_is_rejected(self) -> None:
         packet = self.fixture.upgrade_packet_to_v2()
         packet["orchestration"]["roles"][1]["can_write"] = True
