@@ -14,6 +14,12 @@
 | Phase 5 | ERP融合 | 10 个已授权任务 | DONE（非生产并行验收） |
 | Phase 6 | 行业物料库 | 4 | PLANNED |
 
+## 投产准入主线（2026-08-12 基线）
+
+`SELFHOST-PRODUCTION-READINESS-40`已按实际 Git、运行版本、Migration、备份恢复、应用测试和运维安全证据建立[投产准入基线](PRODUCTION_READINESS.md)。当前判定为`PRODUCTION NO-GO`；既有 Phase 完成只表示非生产实现或历史验收，不代表真实数据、真实员工或正式切换已经具备。
+
+依赖顺序固定为：备份/恢复契约 V2 → 异机备份与隔离恢复 → 同一发布身份与强制测试门 → 应用 P0 安全修复 → 真实源只读分析 → 真实迁移/回滚演练 → 同候选端到端和运维演练 → 少量员工试运行 → 专项授权正式切换 → 上线观察。没有专项授权时，团队继续推进仓库内与隔离环境的安全任务，不执行真实数据、外传、部署或切流。
+
 ## Landing 灾备封存
 
 - `SELFHOST-LANDING-TASK01`：DONE / READY_FOR_OFFHOST_COPY。alpha.34 完整 Git 历史、clean-0034 PostgreSQL、uploads/attachments/backup-status 已形成 root-only 包并通过 Git clone、固定新空库和文件恢复验证。

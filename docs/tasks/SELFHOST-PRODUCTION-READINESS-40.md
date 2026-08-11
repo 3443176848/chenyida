@@ -1,6 +1,6 @@
 # SELFHOST-PRODUCTION-READINESS-40 投产事实基线与失败关闭准入门禁
 
-> 状态：`DOING / READ-ONLY GAP AUDIT / PRODUCTION NO-GO`
+> 状态：`DONE / PRODUCTION NO-GO BASELINE ESTABLISHED`
 > 日期：2026-08-12（Asia/Shanghai）
 > 起点：`main@bc14eb022528b8d0f242fec1d31ee41b9166b4cd`
 > 责任：Codex 主智能体负责唯一写入、证据归并、验收、文档和 Git 提交；数据迁移、应用测试、运维安全三个子智能体只读审计；项目负责人负责后续生产数据、异机目标、真实用户和正式切换专项授权
@@ -44,16 +44,25 @@
 
 ## 6. 验收标准
 
-- [ ] Git/source/image/Migration/runtime 身份差异均有精确证据且没有混称生产版本。
-- [ ] 数据迁入、核对、异机备份、隔离恢复、回滚和真实切换的缺口与依赖完整登记。
-- [ ] 核心服务端规则、权限、会话、安全、审计、错误处理、自动测试和人工验收缺口完整登记。
-- [ ] 监控、容量、告警、升级、回滚、故障手册和低资源稳定性缺口完整登记。
-- [ ] 每个阶段有进入条件、验收证据、失败处理、责任和专项授权边界。
-- [ ] 当前结论明确为`PRODUCTION NO-GO`，且只由证据解除，不因文档完成而升级。
-- [ ] 适用低资源测试、Markdown 链接、`git diff --check`、安全范围和敏感信息门禁通过。
-- [ ] 记录任务前后内存、Swap、磁盘、Load、OOM/restart及临时资源清理结果。
-- [ ] 更新`MASTER.md`、`TASKS.md`、`CHANGELOG.md`和`STATUS.md`并创建独立 Git 提交。
+- [x] Git/source/image/Migration/runtime 身份差异均有精确证据且没有混称生产版本。
+- [x] 数据迁入、核对、异机备份、隔离恢复、回滚和真实切换的缺口与依赖完整登记。
+- [x] 核心服务端规则、权限、会话、安全、审计、错误处理、自动测试和人工验收缺口完整登记。
+- [x] 监控、容量、告警、升级、回滚、故障手册和低资源稳定性缺口完整登记。
+- [x] 每个阶段有进入条件、验收证据、失败处理、责任和专项授权边界。
+- [x] 当前结论明确为`PRODUCTION NO-GO`，且只由证据解除，不因文档完成而升级。
+- [x] 适用低资源测试、Markdown 链接、`git diff --check`、安全范围和敏感信息门禁通过。
+- [x] 记录任务前后内存、Swap、磁盘、Load、OOM/restart及临时资源清理结果。
+- [x] 更新`MASTER.md`、`TASKS.md`、`CHANGELOG.md`和`STATUS.md`并创建独立 Git 提交。
 
 ## 7. 后续调度原则
 
 本任务完成后不等待重复“继续”指令。主智能体从已核验路线中选择最高优先级、未阻塞且不需要新增生产授权的任务继续推进；遇到生产数据、异机上传、部署、身份权限或正式切换边界时停止该动作并转向其他安全任务。只有全部安全任务均被阻塞时，才向项目负责人提出一个最小化问题。
+
+## 8. 完成证据
+
+- 三条只读审计均独立得出`NO-GO`，主智能体复核源码、运行版本、UAT Migration 元数据、备份/恢复脚本、默认测试门、导入 fallback、health、会话和备份状态投影。
+- 新增[投产准入基线](../project/PRODUCTION_READINESS.md)，记录十二项门禁、PR-001—PR-007 P0、P1、G0—G10依赖路线、逐阶段验收、失败处理和专项授权矩阵。
+- 验证通过：Markdown 本地链接 88 个、控制器/协议 unittest 134/134、R1 实况`IDLE`、Python self-test/smoke/go-live 3/3、断网只读 Node 默认测试 3/3；lint退出0并诚实保留11个既有warning。Compose ps因当前Shell未注入`DATABASE_URL`而失败关闭，未读取env重试，改以Docker inspect确认服务状态。
+- 起点/收口资源约为 available memory 2.0/2.0 GiB、Swap 386/389 MiB、根盘31/31 GiB，收口Load`2.09/0.98/0.50`且低于停止线；四服务restart 0、OOMKilled false，任务窗口内核OOM 0。
+- 没有创建临时容器、数据库、镜像、Volume或备份；没有访问业务行、凭据、备份正文、受保护卷正文或用户未跟踪报告。
+- 任务启动提交为`d890987`；完成提交消息固定为`docs: establish production readiness baseline`，实际 SHA 以`git log`为准。

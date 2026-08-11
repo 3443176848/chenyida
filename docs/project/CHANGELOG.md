@@ -2,6 +2,16 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-12
+
+### SELFHOST-PRODUCTION-READINESS-40 - `docs: establish production readiness baseline`
+
+- 现场：从`main@bc14eb022528b8d0f242fec1d31ee41b9166b4cd`启动并以`d890987`登记唯一DOING；源码 alpha.44/0041、UAT alpha.42/0040、运行镜像/revision、私有跟踪引用、四服务、Python旧运行面、四卷、本机备份和资源均以实际只读证据核验。
+- 结论：新增[投产准入基线](PRODUCTION_READINESS.md)，明确`PRODUCTION NO-GO`及十二项门禁。P0包括异机备份/当前隔离恢复缺失、备份恢复工具部分状态风险、发布身份断层、导入 fallback 幂等/文件/授权缺口、默认测试门不完整、真实迁移与员工验收缺失。
+- 路线：固化 G0—G10 依赖、逐阶段验收和失败处理；下一安全任务为不接触真实数据的备份/恢复契约 V2。异机目标、真实数据、UAT Migration/build/deploy、身份权限、员工试用和切换继续需要专项授权。
+- 数据库/API：没有修改 Schema、Migration、API或业务代码；UAT 数据库只在只读事务核验 Migration 元数据和表数，没有读取业务行或写入。
+- 验证/资源：三条子智能体只读审计、主智能体代码复核、Markdown链接88、控制器/协议134/134、Python三基线、断网只读Node默认测试3/3通过；lint退出0并保留11个既有warning。Compose ps因缺`DATABASE_URL`失败关闭且未读取env重试；Docker inspect确认四服务restart0/OOM false。收口available约2.0 GiB、Swap389 MiB、根盘31 GiB、Load`2.09/0.98/0.50`，无OOM或临时资源；`git diff --check`、范围和增量敏感信息门禁通过。
+
 ## 2026-08-11
 
 ### SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03 - `ops: reclaim docker cache space safely`

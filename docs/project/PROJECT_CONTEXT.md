@@ -6,6 +6,12 @@
 
 晨亿达ERP面向 PCB、FPC、SMT 行业，目标是用统一内部编码贯通物料、产品、BOM、采购、库存、生产、销售、品质和财务。未来唯一生产方向是用户自有 Linux 服务器上的 Node.js/PostgreSQL/本地持久化文件/独立 Worker；AI 必须受审核、审计和数据权限约束。
 
+## 2026-08-12 投产准入基线
+
+`SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论为`PRODUCTION NO-GO`：源码 alpha.44/0041 与非生产 UAT alpha.42/0040 不一致；PostgreSQL、uploads、attachments、backup-status 没有异机锚点或当前版本隔离恢复证据；默认`npm test`不是完整发布门；自托管物料导入 fallback 存在幂等、上传补偿、文件检查和 job 所有权缺口；真实数据迁移、完整跨岗位验收、员工试运行和正式切换均未完成。
+
+项目负责人已授权持续选择最高优先级且可安全执行的任务，不再要求每项后等待“继续”。该持续授权不包含生产数据访问、真实数据外传、正式备份恢复、UAT/生产 Migration、build/deploy、账号权限、systemd/网络/Swap、真实员工业务写或切换/回滚；这些动作仍须专项明确授权。
+
 ## 系统组成
 
 ### 本地 ERP
@@ -15,7 +21,7 @@
 - 入口：`server.py`；静态页面位于 `static/`。
 - 用途：当前实际常驻的开发运行面、历史业务行为参考和旧数据迁移来源；不再作为未来生产底座。
 - 数据：`chenyida_erp_app/data/erp.sqlite3`，运行数据被 Git 忽略。
-- 实际状态：2026-07-27 systemd `chenyida-erp.service` 保持 active、PID `13737`、restart 0，继续监听 `0.0.0.0:18888`。起点已存在的 installed unit 与仓库源一致，当前 CPU/Memory/Task/NOFILE cgroup 限额实际生效；本任务未复制 unit、daemon-reload 或重启。仓库 Python 新源码默认限制 16 个活跃请求线程，但当前进程保持原运行代码，须未来获准重启后生效。这仍是开发服务，不代表正式生产投用，停用必须另立任务。
+- 实际状态：2026-08-12 systemd `chenyida-erp.service`保持 enabled/active、MainPID `1119`、restart 0，只监听`127.0.0.1:18889`。它仍是开发运行面、行为参照和迁移来源，不是未来生产权威；本次未修改 unit、daemon-reload 或重启，正式切换前的停用/只读保留决定必须另立授权任务。
 
 ### 自托管 Node 应用
 

@@ -1,6 +1,21 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-11（Asia/Shanghai）
+最后更新时间：2026-08-12（Asia/Shanghai）
+
+## SELFHOST-PRODUCTION-READINESS-40（完成）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 最终状态 | DONE / PRODUCTION NO-GO BASELINE ESTABLISHED | 三条只读审计和主智能体复核已归并为[投产准入基线](PRODUCTION_READINESS.md)；文档完成不解除任何上线门禁 |
+| 版本身份 | FAIL / SOURCE-RUNTIME DRIFT | 源码 alpha.44/0041；UAT Web alpha.42/revision `569aa954…`、数据库 0040；private tracking ref 在起点少当前本地 1 commit，RELEASES 未形成 alpha.44/0041候选 |
+| 数据恢复 | FAIL / SINGLE FAILURE DOMAIN | PostgreSQL与三个文件数据域及历史备份都在本机；无当前版本异机副本、四域隔离恢复、RPO/RTO或自动调度证据 |
+| 应用边界 | FAIL / IMPORT P0 | 导入建批无持久幂等，上传先落盘后验权/入库且无补偿/CAS，文件状态虚报 BASIC_CHECK_PASSED，job查询未校验aggregate所有权 |
+| 测试门 | FAIL / NOT RELEASE-GRADE | 约221个Node测试文件，但默认`npm test`只执行单个文件存储测试；无强制`test:release`和完整浏览器/岗位验收门 |
+| 本任务验证 | PASS / SCOPED | Markdown链接88、控制器/协议134/134、Python三基线、断网只读Node默认测试3/3；lint退出0并保留11个既有warning。Compose ps缺`DATABASE_URL`失败关闭后未读env重试 |
+| 运行稳定 | PASS / IDLE SNAPSHOT ONLY | Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false；约2.0 GiB available、Swap389 MiB、根盘31 GiB，不等于负载容量验收 |
+| 安全边界 | ENFORCED | 未读业务行、凭据、备份正文、受保护卷正文或用户未跟踪报告；未build、Migration、备份恢复、上传、部署、重启、账号或业务写 |
+| 临时资源 | CLEAN | 未创建临时容器、数据库、镜像、Volume或备份，无任务临时资源待清理 |
+| 下一安全任务 | SELFHOST-OPS-BACKUP-RECOVERY-V2-41 | 先以合成/隔离数据加固四域manifest、凭据传递、原子恢复、故障注入和分层回执；不接触当前卷或外部目标 |
 
 ## SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03（完成）
 

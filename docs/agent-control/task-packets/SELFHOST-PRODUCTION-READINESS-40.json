@@ -3,8 +3,8 @@
   "task": {
     "id": "SELFHOST-PRODUCTION-READINESS-40",
     "revision": 1,
-    "ledger_state": "DOING",
-    "delivery_stage": "READ_ONLY_GAP_AUDIT",
+    "ledger_state": "DONE",
+    "delivery_stage": "VERIFIED",
     "qualifiers": [
       "PRODUCTION_NO_GO",
       "DOCUMENTATION_AND_READ_ONLY_EVIDENCE",

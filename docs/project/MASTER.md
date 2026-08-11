@@ -51,9 +51,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0041`，41/head`0041_ai_governance_suggestion_evidence.sql`且SHA-256为`676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2`；并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`，0035/0040及更早Migration未修改。0041只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / READ-ONLY GAP AUDIT / PRODUCTION NO-GO`。项目负责人已授权持续选择安全未阻塞任务，但生产数据、异机真实数据传输、Migration/部署、账号权限和正式切换仍须专项明确授权 |
-| 当前任务 | `SELFHOST-PRODUCTION-READINESS-40`为唯一`DOING`：建立事实基线、失败关闭准入门禁、依赖路线和授权矩阵。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED` |
-| 下一任务 | 本任务完成后按证据自动选择最高优先级且无需新增生产授权的任务；当前候选优先解决异机备份/恢复工具基础、版本可追溯和生产准入门禁。任何真实备份上传、正式恢复、UAT Migration/build/deploy、真实员工试用或切流均不从候选描述自动获权 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / PRODUCTION NO-GO BASELINE ESTABLISHED`。十二项门禁、PR-001—PR-007与G0—G10路线已建立；项目负责人已授权持续选择安全未阻塞任务，但生产数据、异机真实数据传输、Migration/部署、账号权限和正式切换仍须专项明确授权 |
+| 当前任务 | `SELFHOST-PRODUCTION-READINESS-40`已完成并暂时回到零`DOING`；完整结论见[投产准入基线](PRODUCTION_READINESS.md)。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED` |
+| 下一任务 | `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`：只用合成/隔离数据实现四域 manifest、安全凭据传递、原子恢复、故障注入和分层回执；不读取当前卷、不上传外部目标。真实异机备份、正式恢复、UAT Migration/build/deploy、员工试用和切流不自动获权 |
 
 ## 当前完成模块
 
@@ -243,6 +243,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前未完成模块
 
+- [投产准入基线](PRODUCTION_READINESS.md)当前十二项门禁中只有源码静态一致性和空闲运行健康具备局部证据；异机数据恢复、同一发布身份、强制测试门、真实迁移、完整E2E、员工试运行、正式切换和上线观察均未通过，系统保持`PRODUCTION NO-GO`
 - PM-001控制面设计、D-113接受、`AGENT-R1`只读控制器、PM-002执行设计及D-114限定的`AGENT-R1-5` R1.5合成MVP已完成。R2隔离身份/路径租约/能力代理、R3有界开发循环、R4受控UAT和R5生产候选仍未实施或授权，不得从路线表自动开始
 - PostgreSQL dump与uploads、attachments、backup-status文件卷的异机数据恢复锚点没有建立；TASK39已由项目负责人主动延期并行政关闭，单机数据恢复风险继续`OPEN`，未来必须重新立项和授权
 - 大批量流程的通用批次执行器、来源档案注册表、init/resume/validate/consolidate 命令和代表性试点尚未实现；当前 TASK07 脚本只能作为已知 8 份来源的参考，不得直接宣称支持所有公司资料
@@ -265,6 +266,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前风险
 
+- `SELFHOST-PRODUCTION-READINESS-40`已确认三类首要生产风险：PostgreSQL及三个文件数据域没有异机当前锚点/隔离恢复；源码alpha.44/0041与UAT alpha.42/0040没有闭合为同一候选；物料导入fallback和默认`npm test`不足以通过生产安全/发布门。详见[投产准入基线](PRODUCTION_READINESS.md)
 - Docker构建缓存不会自动受控清理，连续候选构建和保留回滚镜像仍会再次消耗根盘；本次只恢复到精确30.34 GiB并保留5.942 GB Docker标记的未用镜像空间，不授权自动prune。未来重任务仍须先检查根盘，清理必须另按精确对象和保护清单执行
 
 - D-113与D-114均已由项目负责人接受，`AGENT-R1`与PM-002已完成，`AGENT-R1-5`正在实现合成协议MVP；这些仍不提供R2运行时强制力。直到R2/R3以后通过越权、脑裂、租约失效、资源和恢复负测，角色权限仍依赖现有仓库规则与人工流程，不能宣称已由OS、容器、命令代理或短时凭据技术强制
@@ -327,7 +329,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- `SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`已完成并回到零`DOING`/`IDLE`：BuildKit cache 10.92 GB→0，四个无引用测试/旧任务镜像逐ID删除，根盘可用17→30.34 GiB；当前运行/回滚/被拒证据/恢复锚点镜像、Trae/MySQL、备份、Python/SQLite和四个ERP持久卷保持。该运维收口不恢复`PHASE4-TASK03`，也不授权build、Migration、部署、真实数据或生产动作。
+- `SELFHOST-PRODUCTION-READINESS-40`已完成并暂时回到零`DOING`：三条只读审计与主智能体复核建立`PRODUCTION NO-GO`基线、十二项门禁、PR-001—PR-007和G0—G10依赖路线。下一安全任务为`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`；它只允许合成/隔离数据和仓库内工具，不读取当前卷或连接异机目标。
+- 真实异机备份与恢复、UAT build/Migration/deploy、旧数据读取、员工试用、账号/权限、网络/systemd和正式切换仍须专项明确授权；持续交付授权不改变这些边界。
 
 - 项目负责人已接受D-113与D-114；`AGENT-R1`只读控制器、`PM-002`执行设计和`AGENT-R1-5`合成docs/test协议MVP均已完成。当前零`DOING`并回到`IDLE`，不自动启动R2或恢复TASK03。
 - `PHASE4-TASK03`的D-112五表及确定性候选Service/API仍为alpha.44/0041源码就绪，状态保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。外部AI禁用，正式holdout未重跑，源码未build/deploy，UAT仍alpha.42/0040，`PHASE4-TASK04`—`TASK05`保持`TODO`且不得自动开始。
