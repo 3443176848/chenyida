@@ -571,6 +571,13 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "BLACK_BOX_SOURCE_CONTEXT")
 
+    def test_non_blackbox_role_cannot_use_blackbox_observation(self) -> None:
+        disposition = message(self.bundle, 9)
+        disposition["evidence"][0]["kind"] = "BLACK_BOX_OBSERVATION"
+        rebind_message_evidence(self.bundle, disposition)
+
+        self.assertEqual(error_code(self.bundle), "BLACK_BOX_EVIDENCE_ROLE_INVALID")
+
     def test_old_candidate_pass_cannot_satisfy_final_gate(self) -> None:
         old_qa = message(self.bundle, 5)
         old_qa["status"] = "PASS"

@@ -504,6 +504,22 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence": {
+            "contains": {
+              "properties": {"kind": {"const": "BLACK_BOX_OBSERVATION"}},
+              "required": ["kind"]
+            }
+          }
+        },
+        "required": ["evidence"]
+      },
+      "then": {
+        "properties": {"role": {"const": "BLACK_BOX_VERIFIER"}}
+      }
     }
   ],
   "$defs": {

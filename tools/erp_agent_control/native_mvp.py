@@ -28,7 +28,7 @@ try:
 except ImportError:  # Direct script execution.
     from readonly_controller import validate_task_packet
 
-VALIDATOR_VERSION = "0.5.1"
+VALIDATOR_VERSION = "0.5.2"
 BUNDLE_SCHEMA = "chenyida-erp-native-pilot-bundle/v2"
 REPORT_SCHEMA = "chenyida-erp-native-pilot-report/v1"
 CONTEXT_SCHEMA = "erp-agent-context/v1"
@@ -799,6 +799,8 @@ def _validate_message_structure(
             raise ProtocolProblem("NON_SYNTHETIC_LOCATOR", subject)
         if any(not item["locator"].startswith("bundle://") for item in evidence):
             raise ProtocolProblem("NON_SYNTHETIC_LOCATOR", subject)
+        if any(item["kind"] == "BLACK_BOX_OBSERVATION" for item in evidence):
+            raise ProtocolProblem("BLACK_BOX_EVIDENCE_ROLE_INVALID", subject)
     if set(artifacts) != set(evidence_locators):
         raise ProtocolProblem("MESSAGE_ARTIFACT_BINDING_INVALID", subject)
     expected_classification = (
@@ -890,13 +892,10 @@ def _validate_message_structure(
                 raise ProtocolProblem("TEST_EVIDENCE_KIND_INVALID", test_subject)
             if test_evidence["exit_code"] != test["exit_code"]:
                 raise ProtocolProblem("TEST_EVIDENCE_EXIT_CODE_MISMATCH", test_subject)
-    expected_test_kind = (
-        "BLACK_BOX_OBSERVATION"
-        if message["role"] == "BLACK_BOX_VERIFIER"
-        else "TEST_REPORT"
-    )
     declared_test_evidence = {
-        item["id"] for item in evidence if item["kind"] == expected_test_kind
+        item["id"]
+        for item in evidence
+        if item["kind"] in {"TEST_REPORT", "BLACK_BOX_OBSERVATION"}
     }
     if declared_test_evidence and test_artifacts != declared_test_evidence:
         raise ProtocolProblem("TEST_EVIDENCE_BINDING_INVALID", subject)
