@@ -4,6 +4,15 @@
 
 ## 2026-08-11
 
+### SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03 - `ops: reclaim docker cache space safely`
+
+- 授权/边界：项目负责人在只读归因后明确回复“同意”。任务从唯一worktree、`main@1dcbf8de800410c0352a9a2c7cfb4b41b7e8bd37`、public behind0/ahead219起步；既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`不读、不改、不提交。只授权无引用BuildKit cache及达到30 GiB所需的逐ID历史candidate/test镜像清理；当前/alpha.41回滚/FIX38被拒证据/private GHCR本地锚点、Trae/MySQL、备份、Python/SQLite和四个ERP持久卷固定保护。
+- 起点：根盘60 GB中可用17 GiB/74% used，`/var/lib/containerd`24 GB；Images 58/active6/24.45 GB/reclaimable12.39 GB，Build Cache 105/10.92 GB，Buildx Shared/Private 2.647/8.273 GB，Volumes 13/733.3 MB。available约1.7 GiB、Swap382 MiB、Load`0.10/0.19/0.16`；四ERP服务restart0/OOM false。唯一`default*` builder running，未发现build、测试、Migration或临时重任务。
+- 清理：受控执行且只执行一次`docker buildx prune --all --force`，输出`Total: 10.92GB`且Build Cache归零；磁盘先恢复至25 GiB。随后分别确认并逐ID删除零容器引用的旧Playwright v1.51.1 `146d046a…cbbbd`（unique 3.551 GB）和alpha.37专用builder `72d489eb…d6ec5`（1.673 GB）。`df -h`此时显示30G，但精确检查只有31,345,692,672 bytes/29.19 GiB；因此继续逐ID删除alpha.37 migrate `24fcacdc…cf98f`（716 MB）和PostgreSQL 16测试基镜像`92620dad…dfc55`（504.8 MB），达到精确30 GiB阈值后停止。没有批量删除Web历史或其他tagged image。
+- 结果：根盘可用17→32,581,345,280 bytes/30.34 GiB（`df -h`为31G）、used 74%→50%，containerd 24→8.9 GB；Images 58→54/9.505 GB/reclaimable5.942 GB，Build Cache 0B。当前Web/Worker/PostgreSQL 17/Caddy容器ID与镜像不变，Web/PostgreSQL healthy、Worker/Caddy running；回环/公开health均为alpha.42。当前、alpha.41回滚、FIX38被拒证据、GHCR本地锚点、Trae/MySQL、全部13个Volume和四卷创建时间保持，备份仍89 MB。
+- 稳定/资源：最终60秒窗口available `2112798720→2102812672` bytes、Swap used `406355968→406355968` bytes（增长0）、Load1 `0.14→0.09`；四服务restart0/OOM false，窗口内核OOM记录0。最终available约2.0 GiB、Swap约388 MiB、根盘30.34 GiB，未触发资源停止线。
+- 验证/清理：断网只读临时Node容器串行完成`npm test`3/3、lint退出0和1,469文件credentials扫描；Python项目venv在自动清理的临时SQLite中通过self-test/smoke/go-live 3/3。临时Node容器、Python目录、数据库和Volume均无残留，Build Cache保持0B，`git diff --check`通过。未修改业务代码、Schema/Migration、Compose、package/version或部署配置，未连接业务数据库、停止/重启服务、部署、push或创建PR。
+
 ### AGENT-R1-5 - `feat: add native ERP agent protocol MVP` / repair series / `docs: record native agent review evidence` / `docs: close native agent MVP`
 
 - 实现：交付严格`chenyida-erp-agent-task/v2`、`erp-agent-message/v1`和`erp-agent-context/v1` Schema，扩展R1只读控制器支持v2，并新增Python标准库无状态validator。协议绑定单一写者、六角色唯一身份/能力/可见性、candidate/revision/lease、Context和artifact摘要、Evidence/Test、旧候选失效、VETO/Minority Report处置、checkpoint和`RESULT_UNKNOWN`恢复；Schema无法表达的跨数组身份关系由执行前标准库validator强制且文档明确披露。

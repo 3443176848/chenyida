@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前零`DOING`任务，控制面应返回`IDLE`且不得自动认领下一任务。`AGENT-R1-5`已按D-114完成`DONE / NATIVE_PROTOCOL_MVP_COMPLETE / SYNTHETIC_DOCS_TEST_ONLY / NO_RUNTIME_AUTHORITY`；`PHASE4-TASK03`继续保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，只有项目负责人另行明确指示才能恢复。
+当前零`DOING`任务，控制面应返回`IDLE`且不得自动认领下一任务。`SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`已按授权完成`DONE / DOCKER SPACE SAFELY RECLAIMED`；`AGENT-R1-5`保持`DONE / NATIVE_PROTOCOL_MVP_COMPLETE / SYNTHETIC_DOCS_TEST_ONLY / NO_RUNTIME_AUTHORITY`，`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，只有项目负责人另行明确指示才能恢复。
 
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
@@ -23,10 +23,13 @@
 
 2026-08-11第五次调度事件：`AGENT-R1-5`完成Task/Message/Context合同、无状态validator、合成故障/恢复试点和源盲黑盒验证，状态按`AGENT-R1-5 DOING → DONE`收口并回到零DOING/`IDLE`。最终同候选ERP/Security/Adversarial/QA/Black-box门禁均PASS，134项专项回归和本地Python三基线通过；没有自动启动R2—R5或恢复`PHASE4-TASK03`。
 
+2026-08-11第六次调度事件：项目负责人在只读磁盘归因后明确回复“同意”，`SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`按零DOING→唯一DOING→DONE顺序执行。只清理无引用BuildKit cache和四个逐ID核准的无容器引用测试/旧任务镜像；`df -h`显示30G后又以精确字节发现实际仅29.19 GiB，继续到32,581,345,280 bytes/30.34 GiB才停止。当前/回滚/被拒证据镜像、Trae/MySQL、备份、Python/SQLite和四卷保持。任务收口后回到零DOING，不恢复`PHASE4-TASK03`。
+
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03 | 受控清理Docker构建缓存与无引用测试镜像 | DONE | Codex（只读归因、资源/进程门禁、精确保护清单、受控cache prune、逐ID镜像核验、稳定观察、验证、文档与独立提交）、项目负责人（明确回复“同意”并授权清理） | 2026-08-11 | 2026-08-11 | SELFHOST-OPS-DOCKER-CACHE-CLEANUP-02、SELFHOST-OPS-RESOURCE-GUARD-01、SELFHOST-UAT-FIX-38 | `DONE / DOCKER SPACE SAFELY RECLAIMED`。Build Cache 105/10.92 GB→0；逐ID删除零引用的旧Playwright、alpha.37 builder/migrate和PostgreSQL 16测试基镜像，根盘17→32,581,345,280 bytes/30.34 GiB、containerd 24→8.9 GB。当前/回滚/被拒证据及历史Web镜像、Trae/MySQL、13卷/四受保护卷、备份和Python/SQLite保持；四服务restart0/OOM false，最终60秒Swap增长0。见[任务文档](../tasks/SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03.md)及[完成报告](../tasks/SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03-COMPLETION.md)。 |
 | AGENT-R1-5 | 实现Native-Orchestrated Design MVP | DONE | Codex主Agent（唯一实施写者/编排/收口）、临时原生Agent（ERP/对抗/安全/QA/黑盒只读门禁）、项目负责人（接受D-114并固定合成范围） | 2026-08-11 | 2026-08-11 | PM-001、PM-002、D-113、D-114、AGENT-R1、AGENTS.md | `DONE / NATIVE_PROTOCOL_MVP_COMPLETE / SYNTHETIC_DOCS_TEST_ONLY / NO_RUNTIME_AUTHORITY`。最终实现候选`25cbbfa`，ERP/Security/Adversarial/QA/Black-box五门同候选PASS，协议87/87、控制器47/47及本地Python三基线通过；审查证据提交`ace4dc5`。未修改ERP业务/测试、Schema/Migration或运行面，未访问UAT/生产、未部署或push；R2—R5未授权，TASK03继续冻结。见[任务文档](../tasks/AGENT-R1-5.md)及[审查证据](../agent-control/reviews/AGENT-R1-5/README.md)。 |
 | PM-002 | 补全晨亿达ERP多智能体研发系统执行设计 | DONE | Codex（现场核验、架构/角色/权限/消息/状态/真黑盒/恢复/资源/ERP边界/路线、验证与独立提交）、项目负责人（限定docs-only范围并负责D-114及后续阶段选择） | 2026-08-11 | 2026-08-11 | PM-001、D-113、AGENT-R1、AGENTS.md、当前项目权威文档与PHASE4合同 | `DONE / DESIGN COMPLETE / IMPLEMENTATION NOT STARTED`。新增[执行设计包](../ai-engineering/README.md)和[任务文档](../tasks/PM-002.md)，直接回答15项问题；推荐4个常驻逻辑职责由1个确定性进程承载、0常驻LLM、任务期动态角色/专家、单写者/独立门禁/真黑盒及native-first R1.5。D-114仍为PROPOSED；未修改业务/测试/Schema/Migration/API/package/部署，未访问UAT/生产、运行holdout/build/deploy或实现Runtime。 |
 | AGENT-R1 | 实现晨亿达ERP只读研发控制器 | DONE | Codex（只读控制器、机器可读Task Packet、错误注入/恢复测试、文档与独立提交）、项目负责人（接受D-113、固定owner priority hold及R1只读边界） | 2026-08-11 | 2026-08-11 | PM-001、D-113、AGENTS.md、项目权威文档链 | `DONE / READ_ONLY_CONTROLLER_COMPLETE / NO_RUNTIME_AUTHORITY`。标准库CLI只读取本地Git、治理Markdown、package与Migration文件并向stdout输出确定性JSON；24/24专项测试、仓库`READY`实况、重复输出/工作区不变及三项本地Python基线通过。完成后零DOING返回`IDLE`且不自动启动下一任务。未连接UAT/生产、运行Migration/build/deploy或修改ERP业务代码；R2—R5仍未实施或授权。见[任务文档](../tasks/AGENT-R1.md)。 |

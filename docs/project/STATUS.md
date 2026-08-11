@@ -2,6 +2,23 @@
 
 最后更新时间：2026-08-11（Asia/Shanghai）
 
+## SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03（完成）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 最终状态 | DONE / DOCKER SPACE SAFELY RECLAIMED | 项目负责人只读归因后明确回复“同意”；任务已从唯一DOING收口并回到零DOING/`IDLE`，未恢复PHASE4-TASK03 |
+| 起点 | PRESSURE / 17 GiB FREE | 根盘60 GB、used44 GB/74%、available17 GiB；containerd24 GB。Images58/24.45 GB，Build Cache105/10.92 GB，Volumes13/733.3 MB |
+| 构建缓存 | PASS / 10.92 GB → 0B | 唯一`default*` builder running且无build/test/Migration后，只执行一次`docker buildx prune --all --force`；输出Total10.92GB，Buildx和`docker system df`均为0B |
+| 精确镜像清理 | PASS / 4 IDS | cache清理后逐ID删除零引用的旧Playwright、alpha.37 builder/migrate和PostgreSQL 16测试基镜像；`df -h`显示30G时精确值仅29.19 GiB，继续至真正超过30 GiB后停止，未批量删除历史Web或其他tagged image |
+| 磁盘结果 | PASS / 30.34 GiB FREE | 根盘available17→32,581,345,280 bytes/30.34 GiB、used74%→50%，containerd24→8.9 GB；Images58→54/9.505 GB，Build Cache0B |
+| 服务/恢复镜像 | PASS / IDENTITIES UNCHANGED | Web`e7761e2c…f94964`、Worker`32d1ae33…96aa`、PostgreSQL`4f736ae2…f394`、Caddy`4c6e91c6…530d`及容器ID均不变；alpha.41回滚、FIX38被拒证据、GHCR本地锚点、Trae/MySQL保持 |
+| 健康 | PASS / ALPHA.42 | Web/PostgreSQL healthy，Worker/Caddy running；回环和公开HTTPS health均返回`0.1.0-alpha.42`，没有重启或部署 |
+| Volume/备份/Python | PASS / PROTECTED | 全部13个Volume不变，四个ERP卷仍为local/local且创建于`2026-07-25T21:05:58+08:00`；备份89 MB/mode700不变，Python active/PID1119/restart0，SQLite metadata保持 |
+| 60秒观察 | PASS / SWAP GROWTH 0 | 最终窗口available `2112798720→2102812672` bytes，Swap used固定`406355968` bytes，Load1`0.14→0.09`；四服务restart0/OOM false，内核OOM0 |
+| 自动验证 | PASS / READ-ONLY | 断网只读Node临时容器：npm3/3、lint退出0、credentials1,469文件；Python临时SQLite三基线3/3；`git diff --check`通过 |
+| 临时资源 | CLEAN | 三个`--rm` Node容器和Python临时目录/SQLite均已清理，无临时数据库、镜像、Volume或Build Cache残留 |
+| 排除事项 | ENFORCED | 未执行`system/image prune -a`或volume prune，未删除历史Web/当前/回滚/被拒证据镜像或任何Volume；未改业务代码、Schema/Migration、Compose、版本、数据库、备份、Swap、内核、systemd或部署 |
+
 ## AGENT-R1-5 Native-Orchestrated Design MVP（完成；无运行时权限）
 
 | 验证项 | 结果 | 说明 |

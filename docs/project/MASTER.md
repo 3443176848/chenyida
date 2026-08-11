@@ -41,7 +41,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前版本 | AI Suggestion/Evidence源码候选为`0.1.0-alpha.44`，源码Migration为41/head `0041_ai_governance_suggestion_evidence.sql`；并行非生产UAT Web仍为`0.1.0-alpha.42`原镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，运行source revision仍为`569aa954d764309e239d1f6c174e582596d33a24`，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。alpha.44/0041未build、未部署或应用到UAT；当前运行面仍是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
-| 当前根仓库运维基线 | `SELFHOST-UAT-FIX-38`已把通过候选Web-only部署到并行非生产UAT；本地/公开alpha.42 health、Caddy安全头、匿名保护、未来日期422、合法日期4次预览、四种返回修改、390×844和安全退出通过。唯一warehouse登录/退出各1，Business mutation及Receipt POST0；最终Session0、收货及全部下游0。独立收口提交消息为`ops: deploy warehouse receipt date guard`，实际SHA以Git log为准 |
+| 当前根仓库运维基线 | `SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`已在不停止或重建服务的前提下清理10.92 GB BuildKit cache和四个精确核准的无引用测试/旧任务镜像，根盘可用17→30.34 GiB（`df -h`为31G）；Build Cache为0B，四服务restart0/OOM false，当前/alpha.41回滚/FIX38被拒证据镜像、private GHCR本地锚点、Trae/MySQL、备份和四卷保持。运行面继续沿用`SELFHOST-UAT-FIX-38`的alpha.42/0040非生产UAT基线，未执行build、Migration、部署或业务写 |
 | Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。AGENT-R1-5从唯一worktree、`main@4dd4abea02fe876665c8721e57d81f300da94c0a`启动；最终实现候选为`25cbbfab87925a8601b844fe59c634ae0b651297`，审查证据提交为`ace4dc5`，治理收口提交消息为`docs: close native agent MVP`且实际SHA以Git log为准。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；本任务未fetch/push或改动远端，公开origin继续禁止接收内部历史 |
 | 镜像恢复锚点 | D-109的private GHCR镜像恢复锚点已建立：唯一目标/tag为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，一次push返回、认证registry与唯一tag package version三方digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association、无`latest`/额外tag；linux/amd64 child、attestation、config和9层均匹配预检，一次按digest pull完全匹配，匿名读取返回401。一次性本机凭据已logout并清理；项目负责人证明已通过GitHub网页撤销一次性PAT，本项目未读取或技术验证PAT正文/远端状态 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
@@ -52,12 +52,14 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
 | 当前阶段 | `IDLE / AGENT-R1-5 NATIVE PROTOCOL MVP COMPLETE / SYNTHETIC DOCS-TEST ONLY / NO RUNTIME AUTHORITY`。D-114限定实现已完成，但R1.5只验证Git内协议与临时角色协作，不建立R2强制隔离或后台运行能力 |
-| 当前任务 | 当前零`DOING`。`AGENT-R1-5`为`DONE / NATIVE_PROTOCOL_MVP_COMPLETE / NO_RUNTIME_AUTHORITY`；`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED` |
+| 当前任务 | 当前零`DOING`。`SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`为`DONE / DOCKER SPACE SAFELY RECLAIMED`；`AGENT-R1-5`保持`DONE / NATIVE_PROTOCOL_MVP_COMPLETE / NO_RUNTIME_AUTHORITY`，`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED` |
 | 下一任务 | 无自动下一任务。R2或`PHASE4-TASK03`恢复、holdout、build、UAT Migration、部署、TASK04/TASK05、外部模型、真实数据、真实Receipt、生产或切流均继续需要独立明确授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03已完成受控空间恢复：默认唯一`default*` builder无构建/测试/Migration后执行`docker buildx prune --all --force`，Build Cache 105/10.92 GB→0；逐ID核验并删除零容器引用的旧Playwright v1.51.1、alpha.37专用builder/migrate和PostgreSQL 16测试基镜像。发现`df -h`的30G仅为29.19 GiB舍入值后继续按精确字节门禁，最终达到30.34 GiB即停止。根盘17→30.34 GiB、containerd 24→8.9 GB；当前/回滚/被拒证据及历史Web镜像、Trae/MySQL、备份、Python/SQLite和四卷保持，四服务restart0/OOM false
 
 - AGENT-R1-5已交付[Native-Orchestrated Design MVP](../tasks/AGENT-R1-5.md)及[审查证据](../agent-control/reviews/AGENT-R1-5/README.md)：三份版本化Schema、R1 v2巡检、Python标准库无状态validator、确定性合成试点、单写者/角色/证据/候选/lease约束和源盲黑盒完成。最终候选`25cbbfa`的ERP/Security/Adversarial/QA/Black-box五门均PASS，专项87+47=134项及本地Python三基线通过；完成后零DOING/IDLE。它没有OS级身份、持久控制状态或运行时权限，也未修改ERP产品或访问UAT/生产
 
@@ -263,6 +265,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前风险
 
+- Docker构建缓存不会自动受控清理，连续候选构建和保留回滚镜像仍会再次消耗根盘；本次只恢复到精确30.34 GiB并保留5.942 GB Docker标记的未用镜像空间，不授权自动prune。未来重任务仍须先检查根盘，清理必须另按精确对象和保护清单执行
+
 - D-113与D-114均已由项目负责人接受，`AGENT-R1`与PM-002已完成，`AGENT-R1-5`正在实现合成协议MVP；这些仍不提供R2运行时强制力。直到R2/R3以后通过越权、脑裂、租约失效、资源和恢复负测，角色权限仍依赖现有仓库规则与人工流程，不能宣称已由OS、容器、命令代理或短时凭据技术强制
 - Git与private GHCR镜像锚点已建立，但PostgreSQL dump及uploads、attachments、backup-status异机锚点仍不存在；TASK39的行政关闭不消除该单机数据恢复风险，也不代表production ready
 - D-110关闭AI治理规格缺口，D-111只批准当前冻结本地确定性基线阈值，D-112只接受AI Suggestion/Evidence关系化合同；三者都不代表外部模型质量、供应商、隐私、地域、合同、凭据、真实数据、实现或试点获批。外部AI及候选层实现继续禁用，TASK03实施阶段与TASK04—TASK05仍须独立授权和验收
@@ -322,6 +326,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 51. D-088 已由 alpha.38/0037 在并行非生产 UAT 落地：工程修订回复采用追加式 Version 与 RETURN 事件专属 CAS Head，v2 固定引用源 v1、精确 RETURN、精确回复版本及 Product/BOM/Unit Resolution/物料快照；同 RETURN 只允许一个直接后继，摘要、事务、幂等、审计和数据库 guard 共同保护谱系。主 UAT 只读验收后仍为 v1 RETURNED、RETURN 1、Response 0、v2 0，未填写回复、未生成或提交 v2、未登录 planning；工程 v2 黑盒试用必须等待新的明确授权。
 
 ## 当前任务与下一任务
+
+- `SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`已完成并回到零`DOING`/`IDLE`：BuildKit cache 10.92 GB→0，四个无引用测试/旧任务镜像逐ID删除，根盘可用17→30.34 GiB；当前运行/回滚/被拒证据/恢复锚点镜像、Trae/MySQL、备份、Python/SQLite和四个ERP持久卷保持。该运维收口不恢复`PHASE4-TASK03`，也不授权build、Migration、部署、真实数据或生产动作。
 
 - 项目负责人已接受D-113与D-114；`AGENT-R1`只读控制器、`PM-002`执行设计和`AGENT-R1-5`合成docs/test协议MVP均已完成。当前零`DOING`并回到`IDLE`，不自动启动R2或恢复TASK03。
 - `PHASE4-TASK03`的D-112五表及确定性候选Service/API仍为alpha.44/0041源码就绪，状态保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。外部AI禁用，正式holdout未重跑，源码未build/deploy，UAT仍alpha.42/0040，`PHASE4-TASK04`—`TASK05`保持`TODO`且不得自动开始。
