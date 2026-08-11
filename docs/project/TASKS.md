@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前零`DOING`，任务 41 已完成 G1 合成/隔离工具证据。G2 因异机目标、RPO/RTO、加密/保留责任和真实数据专项授权阻塞；下一安全任务为 G3 发布身份、release manifest、Migration allowlist 与强制发布测试门。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
+`SELFHOST-OPS-RELEASE-GATE-42`是当前唯一`DOING`：在源码/隔离范围建立并发安全运行身份、不可变release manifest、Migration allowlist与低资源串行强制测试门，不build/deploy或连接UAT。G2仍因异机目标、RPO/RTO、加密/保留责任和真实数据专项授权阻塞；`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -20,6 +20,8 @@
 2026-08-12第三次调度事件：主智能体按持续交付授权从零`DOING`自动选择最高优先级安全任务，状态按`SELFHOST-OPS-BACKUP-RECOVERY-V2-41 TODO → DOING`切换唯一active slot。范围固定为仓库工具、合成/隔离测试和文档，不建立异机数据锚点，也不触碰当前运行数据或服务。
 
 2026-08-12第四次调度事件：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41 DOING → DONE`。四域V2、root-only凭据、数据库守卫及精确恢复、不可变本机/异机/恢复回执、不同机器/集群证明、prepared receipt补发和runtime release identity原语通过41/41合同与双集群PostgreSQL恢复测试；没有读取当前卷、外传、build/Migration/deploy。G2实际异机数据锚点保持阻塞，唯一active slot释放，下一步转入不依赖外部资源的G3。
+
+2026-08-12第五次调度事件：主智能体从零`DOING`自动选择G3最高优先级安全任务，状态按`SELFHOST-OPS-RELEASE-GATE-42 TODO → DOING`切换唯一active slot。范围固定为release身份/manifest、Migration allowlist、测试门、隔离测试和文档；候选build、UAT/生产连接、Migration/deploy及真实数据仍未授权。
 
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
@@ -37,6 +39,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-OPS-RELEASE-GATE-42 | 发布候选身份、Migration Allowlist与强制测试门 | DOING | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、应用测试/数据迁移/运维安全智能体（只读审计）、项目负责人（未来build/UAT/发布专项授权） | 2026-08-12 | — | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、PR-003、PR-005、D-115 | `SOURCE-AND-ISOLATED ONLY / NO BUILD OR DEPLOY / PRODUCTION NO-GO`。建立不可变release manifest、Migration allowlist、并发安全运行身份和低资源串行release suite；不生成伪候选。见[任务文档](../tasks/SELFHOST-OPS-RELEASE-GATE-42.md)。 |
 
 ## 已完成任务
 
