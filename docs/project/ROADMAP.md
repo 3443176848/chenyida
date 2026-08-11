@@ -140,17 +140,32 @@ Import Workspace UI 已由 `PHASE2-TASK08` 独立实施；Catalog 与 50×256 �
 - 评估集覆盖正例、反例、冲突和行业特殊场景。
 - 人工确认结果可形成质量指标，但不自动改变生产阈值。
 
-**预计任务数**：5。**当前状态**：PLANNED（TASK01治理基线DONE；TASK02为`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`；TASK03为`DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`；TASK04—TASK05未开始）。
+**预计任务数**：5。**当前状态**：PAUSED（TASK01治理基线DONE；TASK02为`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`；TASK03为`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`；TASK04—TASK05未开始）。
 
 **执行顺序**：
 
 - `PHASE4-TASK01`：建立AI治理评估与审批边界（DONE；D-110及V1合同已批准，AI仅建议、确定性门禁优先、关键安全违规允许值0；`IMPLEMENTATION NOT STARTED`）。
 - `PHASE4-TASK02`：建立版本化去敏评估集、固定holdout、确定性基线和离线Evaluator（DONE；`material-v1@1.0.0`共64条，固定holdout已从冻结提交`d69f6dff…194ec`测量且未重跑，关键安全违规0；D-111批准只绑定当前确定性身份的100%正确性/证据/复现、错误候选0和安全放弃coverage档案，治理层PASS但release仍未授权）。
-- `PHASE4-TASK03`：建立关系化AI Suggestion/Evidence候选层和完整追溯/过期合同（DOING；D-112五表、alpha.44/0041、确定性四能力Service及受保护生成/读取API源码已完成隔离验证；正式holdout须重验，未build/deploy或应用UAT Migration，不得写正式业务事实）。
+- `PHASE4-TASK03`：建立关系化AI Suggestion/Evidence候选层和完整追溯/过期合同（BLOCKED / OWNER_PRIORITY_HOLD；D-112五表、alpha.44/0041、确定性四能力Service及受保护生成/读取API源码已完成隔离验证；正式holdout须重验，未build/deploy或应用UAT Migration，不得写正式业务事实；只允许负责人明确恢复）。
 - `PHASE4-TASK04`：建立人工审核API/UI及与既有受控正式提交的衔接（TODO；人工决定与AI建议分离，不新增隐式权限）。
 - `PHASE4-TASK05`：验收非生产试点发布门禁、漂移监控、停用开关和回退（TODO；必须另获具体数据、模型、环境及时限授权）。
 
 D-110不授权模型调用、外部供应商、真实数据外发、生产试点或部署；D-111只批准当前冻结本地确定性阈值，不授权外部模型或发布；D-112现已单独获准并完成TASK03源码实施，但不授权正式holdout结论、构建、UAT Migration、部署、TASK04/TASK05或其他运行环境动作。
+
+## 多智能体研发控制面
+
+**目标**：用单任务、最小能力、独立验证和可恢复有界循环保护ERP研发，而不把Agent共识当作业务、发布或生产授权。
+
+**当前状态**：PM-001/D-113、AGENT-R1和PM-002设计已完成；D-114待负责人确认。R1.5及R2—R5均未授权。
+
+- `R1`：无状态只读控制器（DONE；只读巡检、READY/IDLE，不具备调度或强制权限）。
+- `R1.5`：Codex原生临时编排MVP（NEXT CANDIDATE / NOT AUTHORIZED；Task Packet v2、Message/Context合同、单写者、独立门禁和合成黑盒，不含daemon/数据库/UAT）。
+- `R2`：独立身份、worktree、路径租约、Control Store、命令/秘密代理和重任务锁（NOT AUTHORIZED）。
+- `R3`：有界开发循环、检查点、fencing、retry/deadlock和恢复负测（NOT AUTHORIZED）。
+- `R4`：逐动作授权的受控非生产UAT（NOT AUTHORIZED）。
+- `R5`：具备异机恢复、完整UAT、Runbook和人工双门的生产候选（NOT AUTHORIZED）。
+
+任何阶段必须另立任务，不得由路线表自动开始；研发控制状态不得使用D-112产品五表。
 
 ## Phase 5 ERP融合
 

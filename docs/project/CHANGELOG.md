@@ -4,6 +4,17 @@
 
 ## 2026-08-11
 
+### PM-002 - `docs: complete ERP multi-agent operating design`
+
+- 现场核验：输入中的`0d6b5961…`、clean/private同步及`PHASE4-TASK03 IMPLEMENTATION NOT STARTED`已被后续仓库事实取代；任务从`main@2c8f8b2…`、public ahead203、既有未跟踪状态报告、alpha.44/0041 source-ready且TASK03 owner-hold、PM-001/D-113/R1已完成的现场开始。冲突已显式记录，未fetch/push或读取用户未跟踪文件正文。
+- 设计：新增[多智能体执行设计包](../ai-engineering/README.md)和[PM-002任务合同](../tasks/PM-002.md)，覆盖4个常驻逻辑职责/单一确定性进程/0常驻LLM、动态核心角色/专家、单写者、七维能力、worktree/测试隔离、结构化消息、状态机、分层Context、Token/服务器资源门、有界持续运行、真BLOCKED和中断恢复。
+- 独立性：ERP合同、安全、QA及适用DB门禁不可由多数覆盖；实现者不能批准自己的候选，Reviewer/Security/QA/Black-box默认无产品写权限。Minority Report必须通过证据/修复/决定处理；真正Black-box要求全新Agent、无源码或`.git`、合成fixture及browser/HTTP-only通道。
+- ERP/AI边界：绑定Node/PostgreSQL唯一未来生产方向、Python/SQLite迁移来源和历史Sites/D1证据边界；明确研发Agent控制状态不得使用D-112五张产品`ai_governance_suggestion_*`表，也不能把Agent意见、敏感正文或产品AI建议混为研发事实。
+- 路线/决策：提出D-114，状态为`PROPOSED / OWNER DECISION REQUIRED / IMPLEMENTATION NOT STARTED`；推荐Codex原生临时编排优先的R1.5 docs/test-only合成MVP，再按独立授权进入R2隔离底座和R3有界循环。R1.5与R2—R5均未开始，TASK03保持BLOCKED。
+- 范围：仅新增/更新Markdown；未修改业务/测试代码、Schema/Migration、API/Service、package、版本或部署配置，未创建Runtime/Control Store/worktree/测试库，未执行holdout、模型、build、Migration、UAT/生产访问、deploy、restart或Compose动作。
+- 验证：13份设计文件、102个本地链接/断链0、指定Message字段、0035/0040/0041 checksum、alpha.44、docs-only范围、敏感模式及`git diff --check`通过。AGENT-R1专项24/24且仓库IDLE/errors空；Python self-test/smoke/loopback no-backup go-live通过；断网、源码只读、1 CPU、1,280 MiB/heap 768 MiB的单Node容器`npm test`3/3与lint退出0。
+- 资源/清理：起点/终态available约`2.3/2.2 GiB`、Swap`354/354 MiB`、根盘`17/17 GiB`、Load`0.17/0.17/0.16`→`2.35/1.04/0.44`；内核OOM0，四服务restart0/OOM false，临时Node容器清零。根目录Compose ps因无配置失败关闭，未读取env、启动/重启服务或执行prune；独立提交消息为本条标题，实际SHA以`git log`为准。
+
 ### AGENT-R1 - `feat: add read-only ERP agent controller` / `docs: complete read-only ERP agent controller`
 
 - 实现：新增Python标准库无状态CLI、版本化机器Task Packet和最小运行说明；固定检查D-113、零/唯一DOING、Task/Packet一致性、Git branch/base/worktree与允许路径、源码版本及Migration编号/head/checksum/snapshot/journal，只向stdout输出确定性JSON。实现提交为`903e2108bf71a1b4488a6b9d69da0e10aae07880`。

@@ -7,6 +7,7 @@
 > 输入依据：`ERP_CURRENT_STATUS_REPORT.md`、`AGENTS.md`、项目总控、任务台账、项目上下文及 D-040、D-110～D-112
 > 实施边界：本文只定义控制面，不创建 Agent 运行服务、不修改业务代码或 Migration，不连接 UAT/生产数据库，不授权部署、真实数据或外部 AI
 > 2026-08-11实施注记：项目负责人已接受D-113；`AGENT-R1`只读控制器已完成，`PHASE4-TASK03`继续按`OWNER_PRIORITY_HOLD`暂停，当前零DOING。R1实现不包含R2—R5、UAT/生产、Migration、build、部署或ERP业务变化。
+> 2026-08-11补充：`PM-002`新增[可执行设计文档包](ai-engineering/README.md)，补足结构化消息、真正黑盒Persona、动态专家、Minority Report及native-first MVP。本文件继续作为D-113历史设计基线，补充文档不授权R1.5或R2—R5。
 
 ## 1. 设计目标
 

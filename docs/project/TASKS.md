@@ -11,16 +11,19 @@
 
 ## 当前任务
 
-当前没有`DOING`任务。`AGENT-R1`已完成无状态只读巡检器、机器可读Task Packet、错误注入/恢复测试和治理收口；台账为空闲时控制器只返回可审计`IDLE`，不会自动认领任务。`PHASE4-TASK03`继续保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，只允许项目负责人另行明确恢复；R2—R5也未获启动授权。
+当前没有`DOING`任务。`PM-002`已完成多智能体执行协议设计，`AGENT-R1`已完成无状态只读巡检；台账为空闲时控制器只返回可审计`IDLE`，不会自动认领任务。D-114仍待项目负责人确认，R1.5与R2—R5未获启动授权；`PHASE4-TASK03`继续保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，只允许项目负责人另行明确恢复。
 
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
 
+2026-08-11第三次调度事件：项目负责人在零DOING状态下授权`PM-002`只分析并设计当前仓库专属多智能体研发系统，状态按`PM-002 TODO → DOING → DONE`顺序收口。任务记录输入中旧HEAD/clean/TASK03未实施与现场`main@2c8f8b2…`、既有未跟踪文件、alpha.44/0041源码已就绪及TASK03已BLOCKED的冲突，只新增设计Markdown并同步治理文档；未自动启动R1.5、R2—R5或恢复TASK03。
+
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| PM-002 | 补全晨亿达ERP多智能体研发系统执行设计 | DONE | Codex（现场核验、架构/角色/权限/消息/状态/真黑盒/恢复/资源/ERP边界/路线、验证与独立提交）、项目负责人（限定docs-only范围并负责D-114及后续阶段选择） | 2026-08-11 | 2026-08-11 | PM-001、D-113、AGENT-R1、AGENTS.md、当前项目权威文档与PHASE4合同 | `DONE / DESIGN COMPLETE / IMPLEMENTATION NOT STARTED`。新增[执行设计包](../ai-engineering/README.md)和[任务文档](../tasks/PM-002.md)，直接回答15项问题；推荐4个常驻逻辑职责由1个确定性进程承载、0常驻LLM、任务期动态角色/专家、单写者/独立门禁/真黑盒及native-first R1.5。D-114仍为PROPOSED；未修改业务/测试/Schema/Migration/API/package/部署，未访问UAT/生产、运行holdout/build/deploy或实现Runtime。 |
 | AGENT-R1 | 实现晨亿达ERP只读研发控制器 | DONE | Codex（只读控制器、机器可读Task Packet、错误注入/恢复测试、文档与独立提交）、项目负责人（接受D-113、固定owner priority hold及R1只读边界） | 2026-08-11 | 2026-08-11 | PM-001、D-113、AGENTS.md、项目权威文档链 | `DONE / READ_ONLY_CONTROLLER_COMPLETE / NO_RUNTIME_AUTHORITY`。标准库CLI只读取本地Git、治理Markdown、package与Migration文件并向stdout输出确定性JSON；24/24专项测试、仓库`READY`实况、重复输出/工作区不变及三项本地Python基线通过。完成后零DOING返回`IDLE`且不自动启动下一任务。未连接UAT/生产、运行Migration/build/deploy或修改ERP业务代码；R2—R5仍未实施或授权。见[任务文档](../tasks/AGENT-R1.md)。 |
 | PM-001 | 设计晨亿达ERP多智能体研发系统 | DONE | Codex（事实核验、角色/权限/流程/状态/循环/ERP门禁、三项独立终审、验证与提交）、项目负责人（明确设计范围并以本次指令切换优先级） | 2026-08-11 | 2026-08-11 | `ERP_CURRENT_STATUS_REPORT.md`、AGENTS.md、D-040、D-110—D-112、`PHASE4-TASK03` owner priority hold | `DESIGN COMPLETE`。新增[系统设计](../AI_AGENT_TEAM_DESIGN.md)，定义24个逻辑角色、能力权限、单一写者、Task Packet、三层状态、知识/决定/Bug/技术债、两阶段Git/状态协议、租约/fencing/预算/检查点和ERP硬门禁；PM-001收口时D-113仍为PROPOSED且运行控制面未实施，后续接受与R1完成由独立AGENT-R1任务记录。PM-001只改六份治理Markdown，未改代码/Schema/Migration/API/测试/版本/部署，未连接UAT/生产或写业务数据。 |
 | PHASE4-TASK01 | 建立AI治理评估与审批边界 | DONE | Codex（治理规格、评估合同、文档验证与独立提交）、项目负责人（范围、D-110及后续阈值/试点审批边界） | 2026-08-10 | 2026-08-10 | Material Import治理链路、Material Master V2既有权限/审核/审计合同、SELFHOST-OPS-RECOVERY-FOUNDATION-39行政收口 | `PHASE4-TASK01 AI GOVERNANCE BASELINE ACCEPTED — IMPLEMENTATION NOT STARTED`。D-110固定AI仅建议、确定性门禁优先、失败关闭、外部AI默认禁用、完整追溯、人工决定分离、四角色审批、版本重评、停用/回退/漂移边界；版本化去敏评估集、固定holdout、四类能力分评、最低指标及关键安全违规0门禁已定义。没有模型/API/UI/Schema/Migration/Evaluator、真实数据或试点；TASK02—TASK05未开始。见[任务文档](../tasks/PHASE4-TASK01.md)、[治理与评估合同](../material-master/ai-governance-evaluation-and-approval-v1.md)及[D-110](DECISIONS.md#d-110-ai治理评估审批与外部模型准入边界)。 |

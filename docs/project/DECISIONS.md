@@ -1588,6 +1588,52 @@
 - 拒绝无限自循环、自动降低断言、盲目重试结果未知的写动作，或在当前Task完成后自动启动下一Task。
 - 拒绝把多智能体系统的运行状态、秘密或真实ERP业务数据写入项目PostgreSQL或发送给外部模型。
 
+## D-114 研发多智能体采用原生编排优先、零常驻LLM与真黑盒隔离
+
+- 日期：2026-08-11
+- 状态：`PROPOSED / OWNER DECISION REQUIRED / IMPLEMENTATION NOT STARTED`
+- 提案人：Codex（按`PM-002`执行设计要求形成提案）
+- 确认人：待项目负责人确认
+
+### Context
+
+- D-113和PM-001已经接受单一正式任务、最小能力、单写者、独立否决、可恢复有界循环和人工发布；AGENT-R1只读观察器已完成，但R2—R5尚未实施或授权。
+- 当前仓库有三种运行面、41个PostgreSQL Migration、34个`app/lib`领域目录、31个Service、21个Repository、31个Handler、225个测试文件和11类业务身份。职责分离有价值，但2核、约4 GiB内存、1 GiB Swap不适合多个常驻模型、并行重任务或新的微服务群。
+- PM-001的24个逻辑角色是完整能力目录，不表示每项任务都应启动24个Agent。现有设计还需明确结构化消息、真正不读源码的Black-box Persona、动态专家退出、Minority Report和使用Codex原生编排与自研控制器的顺序。
+- 研发Agent Team与D-112产品AI Suggestion/Evidence属于不同信任域；产品五表不能作为研发Agent消息、记忆或控制状态存储。
+
+### Proposed Decision
+
+1. 保留D-113全部硬边界，将常驻控制职责折叠为Flow Steward、Boundary Sentinel、Evidence Registrar和Recovery Reconciler四个逻辑模块，由一个低资源确定性进程承载；常驻LLM数量固定为0。
+2. PM-001的24角色继续作为能力目录。每个Task只创建最小任务团队：实施、ERP合同、对抗、安全、独立QA、真黑盒及适用专家；任务完成即撤销能力并退出。
+3. 同一正式任务只允许一个产品写者；Reviewer、Security、QA和Black-box默认只读且不得修复被审候选。ERP、安全、QA及适用数据库门禁拥有不可由多数覆盖的否决权，项目负责人独占范围、UAT、发布和生产授权。
+4. Agent交接采用`erp-agent-message/v1`结构化合同，至少记录task_id、agent、role、input、assumptions、evidence、changes、tests、risks、blockers、recommendation和status；重要结论无Evidence即无效。
+5. 任何关键角色均可提交Minority Report。Orchestrator必须以新证据、修复、新决定或确认veto处置，不能以多数票关闭。
+6. 真Black-box必须使用未参与实现/审查的新Agent、无源码或`.git`挂载的隔离sandbox、合成身份/数据和browser/公开HTTP通道；条件不足只能标为GRAY_BOX或NOT_RUN。
+7. 第一实施候选定为`R1.5 Native-Orchestrated Design MVP`：优先使用Codex原生临时编排和现有R1，验证Task Packet v2、消息/上下文合同、单写者、独立门禁和合成黑盒。不先开发daemon、消息总线、控制数据库或常驻模型。
+8. R2以后只自研原生会话无法强制的确定性薄层：身份/路径/命令策略、lease/fencing、Capability Broker、追加事件、检查点、资源门和恢复对账。R2负测通过前不得声称Prompt边界等同技术隔离。
+9. 控制状态未来使用与ERP产品数据库分离的存储和命名空间；禁止使用`ai_governance_suggestion_runs`、`ai_governance_suggestions`、`ai_governance_suggestion_items`、`ai_governance_suggestion_evidence`和`ai_governance_suggestion_events`。
+10. 当前服务器最多并行两个轻量只读认知角色，产品写者一个，Docker build/全量测试/Migration/备份恢复/Compose/临时测试库全局串行；每阶段另立任务且完成后返回IDLE。
+
+### Consequences
+
+- [PM-002执行设计包](../ai-engineering/README.md)成为本提案的详细规范；D-113仍为已接受上位原则，若有冲突按更严格边界处理并提交新决策。
+- 提案减少常驻资源和新平台复杂度，同时承认R1.5仍主要依靠现有仓库规则与人工能力门，不是R2级技术强制。
+- 接受本提案也只批准架构选择，不自动授权R1.5实现、R2—R5、`PHASE4-TASK03`恢复、holdout、模型、业务/测试代码、Schema/Migration、UAT、部署或生产。
+- 在项目负责人确认前，本文状态保持PROPOSED，路线中的R1.5只能是`NEXT CANDIDATE / NOT AUTHORIZED`。
+
+### Acceptance criteria for a future decision
+
+- 项目负责人明确接受、修改或拒绝四逻辑职责、零常驻LLM、native-first R1.5、真黑盒和动态角色选择。
+- 若接受，应另立R1.5任务，固定允许路径、合成试点、资源预算和不触碰ERP业务/UAT的边界。
+
+### Rejected alternatives
+
+- 拒绝把PM-001的24个逻辑角色全部作为常驻Agent或容器运行。
+- 拒绝在验证协议前先建设高权限Orchestrator微服务、消息队列或模型集群。
+- 拒绝由同一Agent切换Prompt后完成实施、QA、安全和批准，或让看过源码的角色自称Black-box。
+- 拒绝复用D-112产品五表、ERP PostgreSQL或真实业务正文作为研发Agent长期记忆。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
