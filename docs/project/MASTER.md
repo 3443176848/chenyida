@@ -33,7 +33,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-08-11（Asia/Shanghai）
+快照时间：2026-08-12（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
@@ -51,9 +51,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0041`，41/head`0041_ai_governance_suggestion_evidence.sql`且SHA-256为`676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2`；并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`，0035/0040及更早Migration未修改。0041只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `IDLE / AGENT-R1-5 NATIVE PROTOCOL MVP COMPLETE / SYNTHETIC DOCS-TEST ONLY / NO RUNTIME AUTHORITY`。D-114限定实现已完成，但R1.5只验证Git内协议与临时角色协作，不建立R2强制隔离或后台运行能力 |
-| 当前任务 | 当前零`DOING`。`SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`为`DONE / DOCKER SPACE SAFELY RECLAIMED`；`AGENT-R1-5`保持`DONE / NATIVE_PROTOCOL_MVP_COMPLETE / NO_RUNTIME_AUTHORITY`，`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED` |
-| 下一任务 | 无自动下一任务。R2或`PHASE4-TASK03`恢复、holdout、build、UAT Migration、部署、TASK04/TASK05、外部模型、真实数据、真实Receipt、生产或切流均继续需要独立明确授权 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / READ-ONLY GAP AUDIT / PRODUCTION NO-GO`。项目负责人已授权持续选择安全未阻塞任务，但生产数据、异机真实数据传输、Migration/部署、账号权限和正式切换仍须专项明确授权 |
+| 当前任务 | `SELFHOST-PRODUCTION-READINESS-40`为唯一`DOING`：建立事实基线、失败关闭准入门禁、依赖路线和授权矩阵。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED` |
+| 下一任务 | 本任务完成后按证据自动选择最高优先级且无需新增生产授权的任务；当前候选优先解决异机备份/恢复工具基础、版本可追溯和生产准入门禁。任何真实备份上传、正式恢复、UAT Migration/build/deploy、真实员工试用或切流均不从候选描述自动获权 |
 
 ## 当前完成模块
 

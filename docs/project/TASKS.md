@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前零`DOING`任务，控制面应返回`IDLE`且不得自动认领下一任务。`SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`已按授权完成`DONE / DOCKER SPACE SAFELY RECLAIMED`；`AGENT-R1-5`保持`DONE / NATIVE_PROTOCOL_MVP_COMPLETE / SYNTHETIC_DOCS_TEST_ONLY / NO_RUNTIME_AUTHORITY`，`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，只有项目负责人另行明确指示才能恢复。
+`SELFHOST-PRODUCTION-READINESS-40`是当前唯一`DOING`任务，状态为`READ-ONLY GAP AUDIT / PRODUCTION NO-GO`。项目负责人已明确授权持续推进到真实员工可安全、稳定、可恢复使用；本任务只建立投产事实基线、失败关闭准入门禁、依赖路线和授权矩阵，不执行生产数据访问、异机上传、Migration、build、部署、账号权限变化或正式切换。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，不得从本任务恢复。
+
+2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
@@ -24,6 +26,12 @@
 2026-08-11第五次调度事件：`AGENT-R1-5`完成Task/Message/Context合同、无状态validator、合成故障/恢复试点和源盲黑盒验证，状态按`AGENT-R1-5 DOING → DONE`收口并回到零DOING/`IDLE`。最终同候选ERP/Security/Adversarial/QA/Black-box门禁均PASS，134项专项回归和本地Python三基线通过；没有自动启动R2—R5或恢复`PHASE4-TASK03`。
 
 2026-08-11第六次调度事件：项目负责人在只读磁盘归因后明确回复“同意”，`SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`按零DOING→唯一DOING→DONE顺序执行。只清理无引用BuildKit cache和四个逐ID核准的无容器引用测试/旧任务镜像；`df -h`显示30G后又以精确字节发现实际仅29.19 GiB，继续到32,581,345,280 bytes/30.34 GiB才停止。当前/回滚/被拒证据镜像、Trae/MySQL、备份、Python/SQLite和四卷保持。任务收口后回到零DOING，不恢复`PHASE4-TASK03`。
+
+## 执行中任务
+
+| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-PRODUCTION-READINESS-40 | 投产事实基线与失败关闭准入门禁 | DOING | Codex 主智能体（唯一写入、证据归并、验收、文档和提交）、数据迁移/应用测试/运维安全子智能体（只读审计）、项目负责人（生产与外部资源专项授权） | 2026-08-12 | — | AGENTS.md、D-040、SELFHOST-OPS-RECOVERY-FOUNDATION-39、SELFHOST-UAT-FIX-38 | `READ-ONLY GAP AUDIT / PRODUCTION NO-GO`。现场已确认源码 alpha.44/0041 与 UAT alpha.42/0040 漂移、本机备份无异机数据锚点、无近期隔离恢复证据；任务不得据此部署或读写生产。见[任务文档](../tasks/SELFHOST-PRODUCTION-READINESS-40.md)。 |
 
 ## 已完成任务
 
