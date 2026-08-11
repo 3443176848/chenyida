@@ -2,6 +2,19 @@
 
 最后更新时间：2026-08-11（Asia/Shanghai）
 
+## AGENT-R1 晨亿达ERP只读研发控制器（已立项并启动）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / READ_ONLY_CONTROLLER_IMPLEMENTING / NO_RUNTIME_AUTHORITY | `AGENT-R1`是唯一DOING；只实现本地仓库只读巡检和stdout清单，不建立控制状态或执行能力 |
+| D-113 | ACCEPTED / R1 ONLY | 项目负责人已接受D-113并单独授权R1；R2—R5、OS/容器隔离、Control Store、租约、Policy/Capability Broker和Agent Runtime仍未实施或授权 |
+| Owner优先级 | PASS / ORDERED | `PHASE4-TASK03 DOING→BLOCKED / OWNER_PRIORITY_HOLD`，随后`AGENT-R1 TODO→DOING`；TASK03原source-ready/holdout/release限定不变，无并行DOING |
+| 允许读取 | LOCAL REPOSITORY METADATA ONLY | Git、AGENTS/项目Markdown/Task Packet、package、Migration文件、journal和snapshot；不读取真实资料、秘密、业务正文或受保护Volume |
+| 禁止运行面 | NO UAT / NO PRODUCTION / NO DATABASE | 不访问网页/API/SSH/数据库，不登录，不执行Migration、build、deploy、restart、backup/restore或发布 |
+| ERP影响 | ZERO BUSINESS LOGIC CHANGE | 不修改Node/Python ERP业务代码、Schema/Migration、API/UI/Worker、版本或部署配置 |
+| 严格起点 | PASS WITH OWNER UNTRACKED INPUT | `main@fd5bf3f7ab1d710053c88aa460614ec79d77e66b`、唯一worktree；仅既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`，本任务不读取或纳入提交 |
+| 资源起点 | PASS / LIGHT ONLY | available约2.3 GiB、Swap354 MiB/1 GiB、根盘17 GiB、Load`0.30/0.19/0.13`；四容器running/restart0/OOM false。Compose因未注入受保护env失败关闭，不读取env补跑 |
+
 ## PM-001 晨亿达ERP多智能体研发系统设计（治理任务完成，控制面未实施）
 
 | 验证项 | 结果 | 说明 |
@@ -15,7 +28,7 @@
 | 状态/循环 | RECOVERABLE / BOUNDED | TASKS保持TODO/DOING/DONE/BLOCKED；Git TASKS blob与SQLite active slot以PREPARED→状态Commit→COMMITTED两阶段协议闭合，不一致全局失败关闭。lease token/version/fencing/hard deadline、CAS、修复预算、PARKED事件唤醒、完整检查点和全局heavy锁共同保护；每轮一个有界动作，DONE/BLOCKED终止且不自动启动下一任务 |
 | ERP硬门禁 | PASS / EXPLICIT | Migration不可破坏、生产数据默认拒绝、服务端权限优先、业务闭环优先、已过账事实只追加调整/冲销、历史逻辑不得删除且只能停写/冻结/废弃标记/追加替代；明确Material、BOM、采购、收货/IQC/AP、计划、生产、返工、销售/FQC/AR交接 |
 | 独立终审 | PASS / 3 OF 3 | ERP业务终审、权限/安全终审及状态机/持续循环终审均通过；终审前意见已补齐Planning/Production/Warehouse/Quality分工、真实单据状态、权限强制、三方Migration职责、等待/重试/恢复守卫和Git/Control Store两阶段状态协议 |
-| D-113 | PROPOSED / DESIGN BASELINE | 记录单一正式任务、最小能力、单一写者、隔离验证、独立否决和人工发布提案；项目负责人尚未将其接受为已实施控制面 |
+| D-113 | ACCEPTED / R1 AUTHORIZED | 设计决定已接受；仅`AGENT-R1`只读观察能力获准，不能据此声称完整控制面或技术隔离已实施 |
 | Python基线 | PASS | 系统Python self-test为`SELF_TEST_OK`；仓库既有`.venv`执行smoke为`SMOKE_TEST_OK`，`go_live_check.py --host 127.0.0.1 --port 18889 --require-running --no-backup`为`GO_LIVE_CHECK_OK`。首次系统Python smoke因缺`openpyxl`未启动测试，未安装或修改环境 |
 | Node基线 | PASS / ISOLATED | 宿主无npm，使用既有`node:22-bookworm-slim`，断网、源码只读、1 CPU、1,280 MiB、heap 768 MiB、串行临时容器；`npm test` 3/3通过，lint退出0。非特权首次探测因root-owned源码EACCES未启动测试，随后以容器root只读挂载完成 |
 | 资源/清理 | PASS / NO THRESHOLD BREACH | 起点/最终available `2.3/2.3 GiB`，Swap `354/354 MiB`，根盘可用`17/17 GiB`，Load `0.31/0.30/0.27`→`0.16/0.20/0.32`；内核OOM匹配0，四服务restart0/OOM false。两个命名临时容器最终清零，未创建数据库/目录/镜像/Volume，未prune |
@@ -25,7 +38,7 @@
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 最终状态 | DOING / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED | 最终判定`PHASE4-TASK03 AI SUGGESTION/EVIDENCE SOURCE READY — HOLDOUT REVALIDATION REQUIRED / NOT BUILT / NOT DEPLOYED`；源码与隔离验证完成，不等于D-111正式重验、构建、部署或发布 |
+| 最终状态 | BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED | 项目负责人为启动`AGENT-R1`暂停TASK03；源码与隔离验证事实不变，不等于D-111正式重验、构建、部署或发布。恢复须另获明确指示 |
 | 严格起点 | PASS | 唯一worktree、clean `main@0d6b5961b2ed280ca80b15678ac42665aad1b45e`、Parent`df254a6f…ac7`；public`39946f6b…5c0` behind0/ahead195，private等于起点且behind0/ahead0；源码alpha.43、UAT alpha.42/0040、0035/0040 checksum及四服务restart0/OOM false匹配 |
 | 持久层提交 | PASS / `8b839a64…6105` | 五表Drizzle Schema、expand-only 0041、snapshot/journal、Migration/升级测试及历史journal断言修正已提交；0041 SHA-256为`676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2`，0001—0040未修改 |
 | 五表/约束 | RELATIONAL / TYPED / IMMUTABLE | Run/Suggestion/Item/Evidence/Event具备真实/复合FK、RESTRICT、kind-specific/typed-value/digest/TTL/score/version CHECK、业务唯一/部分唯一索引、service-only INSERT门禁、五表UPDATE/DELETE拒绝及延迟完整性/版本/事件链触发器；无任意polymorphic ID或第六张AI业务表 |

@@ -6,6 +6,7 @@
 > 事实基线：`main@0d09cfef140e612d193b42d47497da6fbfa9205f`
 > 输入依据：`ERP_CURRENT_STATUS_REPORT.md`、`AGENTS.md`、项目总控、任务台账、项目上下文及 D-040、D-110～D-112
 > 实施边界：本文只定义控制面，不创建 Agent 运行服务、不修改业务代码或 Migration，不连接 UAT/生产数据库，不授权部署、真实数据或外部 AI
+> 2026-08-11实施注记：项目负责人已接受D-113并单独授权`AGENT-R1`只读控制器；`PHASE4-TASK03`按`OWNER_PRIORITY_HOLD`暂停。R1授权不包含R2—R5、UAT/生产、Migration、build、部署或ERP业务变化。
 
 ## 1. 设计目标
 

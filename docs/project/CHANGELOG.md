@@ -4,6 +4,14 @@
 
 ## 2026-08-11
 
+### AGENT-R1 - `docs: start read-only ERP agent controller`
+
+- 决策：项目负责人接受D-113；接受仅确立控制面设计权威，不代表OS/容器隔离、Control Store、租约、Policy Engine、Capability Broker、Agent Runtime或R2—R5已实施。
+- 调度：按`PHASE4-TASK03 DOING→BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO→DOING`切换唯一active task。TASK03的alpha.44/0041 source-ready、holdout待重验、release未授权和UAT alpha.42/0040边界原样保留，恢复须另获项目负责人明确指示。
+- R1范围：新增[AGENT-R1任务合同](../tasks/AGENT-R1.md)，只授权无状态只读控制器、机器可读Task Packet、错误注入/恢复测试和治理文档；目标是读取本地Git/文档/package/Migration文件并向stdout生成去敏清单。
+- 禁止事项：不连接UAT/生产或数据库，不运行holdout/Migration/build/deploy/restart/backup/restore，不读取真实资料、秘密、受保护Volume或用户未跟踪状态报告正文，不修改ERP业务逻辑、Schema/Migration、API、版本或部署配置。
+- 起点：唯一worktree、`main@fd5bf3f7ab1d710053c88aa460614ec79d77e66b`；既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交。available约2.3 GiB、Swap354 MiB、根盘17 GiB、Load`0.30/0.19/0.13`，四容器running/restart0/OOM false。
+
 ### PM-001 - `docs: design ERP multi-agent development system`
 
 - 设计：新增[晨亿达ERP多智能体研发系统设计](../AI_AGENT_TEAM_DESIGN.md)，不是通用Agent模板；绑定自托管Node/PostgreSQL唯一生产方向、Python/SQLite与历史Sites/D1边界、当前alpha.44/0041源码和alpha.42/0040 UAT差异、受控PO零下游及`PHASE4-TASK03`发布未授权事实。

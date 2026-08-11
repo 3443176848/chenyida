@@ -1538,8 +1538,9 @@
 ## D-113 晨亿达ERP多智能体研发控制面采用单一任务、最小能力与可恢复有界循环
 
 - 日期：2026-08-11
-- 状态：`PROPOSED / DESIGN BASELINE / IMPLEMENTATION NOT STARTED`
-- 提案人：Codex（按`PM-001`设计要求形成提案；项目负责人是否接受及后续实施均待单独确认）
+- 状态：`ACCEPTED / R1 AUTHORIZED / ENFORCEMENT NOT IMPLEMENTED`
+- 提案人：Codex（按`PM-001`设计要求形成提案）
+- 确认人：项目负责人（2026-08-11明确“接受 D-113”，并单独授权`AGENT-R1`只读控制器）
 
 ### Context
 
@@ -1566,6 +1567,13 @@
 - [多智能体研发系统设计](../AI_AGENT_TEAM_DESIGN.md)成为后续R1只读控制器、R2隔离底座、R3有界开发循环、R4受控UAT和R5生产候选的提案基线；每一阶段必须另立任务、验收和授权。
 - `PM-001`按owner priority hold顺序成为唯一DOING并完成，随后恢复`PHASE4-TASK03`原DOING状态；无并行DOING。控制面实施状态保持`NOT_STARTED`，不能声称角色已被OS、容器、凭据代理或策略技术隔离。
 - 本提案不修改业务代码、Schema/Migration、API、测试、版本或部署配置，不授权holdout、build、UAT Migration、部署、生产、TASK04或TASK05，也不改变`PHASE4-TASK03`状态。
+
+### Acceptance and R1 authorization
+
+- 2026-08-11，项目负责人接受D-113作为后续控制面实施的权威设计决定；接受设计不等于R2—R5、OS/容器隔离、控制库、租约、命令代理、Capability Broker或运行时已经实现。
+- 同一指令要求`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`并新建、启动`AGENT-R1`。TASK03的source-ready、holdout待重验和release未授权限定原样保留，恢复必须另获项目负责人明确指示。
+- `AGENT-R1`只授权R1无状态只读控制器、机器可读Task Packet、错误注入/恢复测试和项目文档；控制器只能读取本地仓库权威材料并向stdout输出清单，不得写控制状态、连接UAT/生产、运行Migration/build/deploy或修改ERP业务逻辑。
+- 原Consequences中“本提案不改变PHASE4-TASK03状态”是提案形成时点事实；本次状态变化来自项目负责人新的明确调度指令，不是D-113自动启动后续阶段。
 
 ### Rejected alternatives
 
