@@ -32,7 +32,7 @@ Agent之间只通过有界结构化消息交接。聊天记录、思维过程和
 | `resolves_claim_ids` | array | 新候选对Minority Report claim的显式处置引用 |
 | `checkpoint` | object/null | `CHECKPOINT`消息绑定candidate、packet revision、lease generation和此前完成消息；其他消息为`null` |
 
-机器合同是[`message-v1.schema.json`](../agent-control/schemas/message-v1.schema.json)。Schema只负责严格结构；[`native_mvp.py`](../../tools/erp_agent_control/native_mvp.py)继续验证角色/门禁、Context摘要、最新候选、lease/revision、Minority Report与不确定结果恢复语义。
+机器合同是[`message-v1.schema.json`](../agent-control/schemas/message-v1.schema.json)。Schema同时约束严格结构和`message_type / role / gate / status`矩阵；[`native_mvp.py`](../../tools/erp_agent_control/native_mvp.py)继续验证跨对象artifact、Context摘要、最新候选、lease/revision、Minority Report与不确定结果恢复语义。R1.5中`PLAN/HANDOFF/CHECKPOINT`只能属于Builder的`IMPLEMENTATION`，`RECOVERY`只能属于Builder的`RECOVERY`，`CLOSURE`只能是Builder的`CLOSURE/COMPLETE`；Reviewer消息必须绑定自身门禁，`MINORITY_REPORT`固定为对抗角色的`ADVERSARIAL/VETOED`。
 
 ## 3. 示例
 
@@ -57,14 +57,14 @@ Agent之间只通过有界结构化消息交接。聊天记录、思维过程和
     "task_packet_revision": 2,
     "lease_generation": 1,
     "attempt": 1,
-    "artifacts": ["artifact://EXAMPLE-TASK/qa/test-01.json"]
+    "artifacts": ["bundle://evidence/EXAMPLE-TASK/qa/test-01.json"]
   },
   "assumptions": [],
   "evidence": [
     {
       "id": "E-001",
-      "kind": "COMMAND_RESULT",
-      "locator": "artifact://EXAMPLE-TASK/qa/test-01.json",
+      "kind": "TEST_REPORT",
+      "locator": "bundle://evidence/EXAMPLE-TASK/qa/test-01.json",
       "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
       "exit_code": 0,
       "observed_at": "2026-08-11T12:00:00+08:00",
@@ -112,7 +112,7 @@ Agent之间只通过有界结构化消息交接。聊天记录、思维过程和
 - `HUMAN_AUTHORIZATION`：项目文档中可定位的决定/任务状态，不保存聊天秘密或凭据；
 - `RESOURCE_SNAPSHOT`：内存、Swap、磁盘、Load、容器restart/OOM和临时资源清单。
 
-Evidence必须可定位、绑定时间和候选SHA、能够由另一身份复核。Agent自然语言总结只能引用Evidence，不能替代Evidence。包含凭据、完整敏感正文、SQL错误堆栈或真实个人信息的工件必须拒绝进入控制存储。
+Evidence必须可定位、绑定时间和候选SHA、能够由另一身份复核。R1.5 Bundle还必须声明严格artifact注册表：每个record含classification、JSON payload及其重算SHA-256；所有Context和Message locator必须存在且不得有未引用record。Message的`input.artifacts`集合必须与Evidence locator集合相等，Evidence摘要和规范payload必须匹配注册表。测试引用只能指向本消息Evidence；普通测试必须是`TEST_REPORT`，源盲黑盒测试必须是`BLACK_BOX_OBSERVATION`，测试与Evidence的exit code必须完全相同。Agent自然语言总结只能引用Evidence，不能替代Evidence。包含凭据、完整敏感正文、SQL错误堆栈或真实个人信息的工件必须拒绝进入控制存储。
 
 ## 5. 消息验证与幂等
 
@@ -139,7 +139,7 @@ Evidence必须可定位、绑定时间和候选SHA、能够由另一身份复核
 }
 ```
 
-Orchestrator必须产生一条引用该`claim_id`的处置消息。没有处置证据时，相关门禁保持未完成。
+R1.5要求由对抗角色产生该报告；其他角色的`FINDING`或`VETO`不能替代必需的对抗练习。只有更新candidate上的最终对抗`PASS/VERIFICATION`可携带`resolves_claim_ids`，同一claim只能处置一次，并且处置消息必须是最终对抗签核本身。`FAIL/FINDING`、其他角色或普通未引用claim的PASS都不能关闭报告。没有处置证据时，相关门禁保持未完成。
 
 ## 7. 不保存推理历史
 

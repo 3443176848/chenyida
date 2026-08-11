@@ -88,7 +88,7 @@ G6中的角色可在资源允许时并行做**只读**工作，但执行测试�
 
 ### 5.2 Minority Report
 
-任何关键角色都可发出`MINORITY_REPORT`，即使它没有正式veto。报告必须指出候选SHA、被反对结论、证据、可能损害、可证伪实验和建议。Orchestrator必须选择并记录以下一种处置：
+R1.5 Message v1把`MINORITY_REPORT`固定给对抗角色，避免其他门禁替代必需的对抗练习；若未来要允许其他关键角色发出同类报告，必须新增合同版本并保留角色来源，不能在v1中静默扩权。报告必须指出候选SHA、被反对结论、证据、可能损害、可证伪实验和建议。Orchestrator必须选择并记录以下一种处置：
 
 - `RESOLVED_BY_EVIDENCE`：新证据否定担忧；
 - `FIX_ACCEPTED`：实施修复并在新SHA复核；
@@ -96,7 +96,7 @@ G6中的角色可在资源允许时并行做**只读**工作，但执行测试�
 - `DECISION_REQUIRED`：形成待确认决策并BLOCKED；
 - `VETO_CONFIRMED`：按门禁失败处理。
 
-不得以“其他Agent多数同意”关闭Minority Report。
+不得以“其他Agent多数同意”关闭Minority Report。R1.5只有新candidate上的最终对抗`PASS/VERIFICATION`可以显式关闭claim；失败消息、其他角色或与最终对抗签核分离的普通消息均无处置权。
 
 ## 6. 不自动启动下一任务
 

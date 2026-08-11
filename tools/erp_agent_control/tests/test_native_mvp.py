@@ -12,8 +12,18 @@ import sys
 import tempfile
 import unittest
 
-from tools.erp_agent_control.native_mvp import RFC3339_RE, load_bundle, validate_bundle
-from tools.erp_agent_control.pilot_fixture import build_task_packet, build_valid_bundle, digest
+from tools.erp_agent_control.native_mvp import (
+    MESSAGE_TYPE_BINDINGS,
+    RFC3339_RE,
+    load_bundle,
+    validate_bundle,
+)
+from tools.erp_agent_control.pilot_fixture import (
+    build_task_packet,
+    build_valid_bundle,
+    digest,
+    message_evidence_payload,
+)
 from tools.erp_agent_control.readonly_controller import (
     TASK_DOCUMENT_RE,
     UAT_DECLARATION_DOCUMENTS,
@@ -45,6 +55,30 @@ def context(bundle: dict, role: str, candidate_sha: str) -> dict:
         for item in bundle["contexts"]
         if item["role"] == role and item["candidate_sha"] == candidate_sha
     )
+
+
+def rebind_message_evidence(
+    bundle: dict,
+    item: dict,
+    *,
+    locator: str | None = None,
+) -> None:
+    for index, evidence in enumerate(item["evidence"]):
+        if locator is not None:
+            evidence["locator"] = locator if index == 0 else f"{locator}-{index + 1}"
+        payload = message_evidence_payload(item, evidence)
+        evidence["digest"] = digest(payload)
+        classification = (
+            "PUBLIC_OBSERVATION"
+            if item["role"] == "BLACK_BOX_VERIFIER"
+            else "SYNTHETIC_TEST_EVIDENCE"
+        )
+        bundle["artifacts"][evidence["locator"]] = {
+            "classification": classification,
+            "payload": payload,
+            "digest": evidence["digest"],
+        }
+    item["input"]["artifacts"] = [evidence["locator"] for evidence in item["evidence"]]
 
 
 def filesystem_snapshot(root: Path) -> dict[str, tuple]:
@@ -115,6 +149,16 @@ class NativeMvpProtocolTest(unittest.TestCase):
         schema = json.loads((SCHEMA_DIRECTORY / "message-v1.schema.json").read_text(encoding="utf-8"))
 
         self.assertEqual(schema["$defs"]["rfc3339"]["pattern"], RFC3339_RE.pattern)
+
+    def test_schema_conditions_cover_every_manual_message_type(self) -> None:
+        schema = json.loads((SCHEMA_DIRECTORY / "message-v1.schema.json").read_text(encoding="utf-8"))
+        conditioned_types = {
+            rule["if"]["properties"]["message_type"]["const"]
+            for rule in schema["allOf"]
+            if "message_type" in rule.get("if", {}).get("properties", {})
+        }
+
+        self.assertEqual(conditioned_types, set(MESSAGE_TYPE_BINDINGS))
 
     def test_schema_and_manual_task_document_patterns_are_identical(self) -> None:
         schema = json.loads((SCHEMA_DIRECTORY / "task-packet-v2.schema.json").read_text(encoding="utf-8"))
@@ -192,6 +236,11 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "REQUIRED_FIELD_MISSING")
 
+    def test_artifact_registry_bundle_requires_v2(self) -> None:
+        self.bundle["schema_version"] = "chenyida-erp-native-pilot-bundle/v1"
+
+        self.assertEqual(error_code(self.bundle), "BUNDLE_SCHEMA_UNSUPPORTED")
+
     def test_unknown_field_fails_closed(self) -> None:
         self.bundle["messages"][0]["authority"] = "invented"
 
@@ -252,6 +301,7 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
     def test_duplicate_message_id_fails_closed(self) -> None:
         self.bundle["messages"][1]["message_id"] = self.bundle["messages"][0]["message_id"]
+        rebind_message_evidence(self.bundle, self.bundle["messages"][1])
 
         self.assertEqual(error_code(self.bundle), "DUPLICATE_MESSAGE_ID")
 
@@ -262,6 +312,11 @@ class NativeMvpProtocolTest(unittest.TestCase):
         higher_attempt["message_type"] = "VETO"
         higher_attempt["status"] = "VETOED"
         higher_attempt["input"]["attempt"] = 2
+        rebind_message_evidence(
+            self.bundle,
+            higher_attempt,
+            locator="bundle://evidence/mutation-gate-regression",
+        )
         self.bundle["messages"].insert(self.bundle["messages"].index(lower_attempt), higher_attempt)
 
         self.assertEqual(error_code(self.bundle), "GATE_ATTEMPT_SEQUENCE_INVALID")
@@ -270,6 +325,11 @@ class NativeMvpProtocolTest(unittest.TestCase):
         old_message = copy.deepcopy(message(self.bundle, 5))
         old_message["message_id"] = "10000000-0000-4000-8000-000000000012"
         old_message["input"]["attempt"] = 2
+        rebind_message_evidence(
+            self.bundle,
+            old_message,
+            locator="bundle://evidence/mutation-old-candidate",
+        )
         self.bundle["messages"].insert(-1, old_message)
 
         self.assertEqual(error_code(self.bundle), "MESSAGE_CANDIDATE_SEQUENCE_INVALID")
@@ -281,6 +341,11 @@ class NativeMvpProtocolTest(unittest.TestCase):
         veto["status"] = "VETOED"
         later_pass["message_id"] = "10000000-0000-4000-8000-000000000011"
         later_pass["input"]["attempt"] = 2
+        rebind_message_evidence(
+            self.bundle,
+            later_pass,
+            locator="bundle://evidence/mutation-veto-overwrite",
+        )
         self.bundle["messages"].insert(self.bundle["messages"].index(veto) + 1, later_pass)
 
         self.assertEqual(error_code(self.bundle), "VETO_REQUIRES_NEW_CANDIDATE")
@@ -288,18 +353,68 @@ class NativeMvpProtocolTest(unittest.TestCase):
     def test_review_pass_requires_verification_message(self) -> None:
         message(self.bundle, 10)["message_type"] = "PLAN"
 
-        self.assertEqual(error_code(self.bundle), "REVIEW_MESSAGE_TYPE_INVALID")
+        self.assertEqual(error_code(self.bundle), "MESSAGE_TYPE_BINDING_INVALID")
 
     def test_qa_pass_requires_successful_test_evidence(self) -> None:
         qa_pass = message(self.bundle, 13)
         qa_pass["tests"][0].update({"result": "NOT_RUN", "exit_code": None, "artifact": None})
 
-        self.assertEqual(error_code(self.bundle), "GATE_TESTS_NOT_PASSED")
+        self.assertEqual(error_code(self.bundle), "TEST_EVIDENCE_BINDING_INVALID")
 
     def test_test_result_and_exit_code_must_be_consistent(self) -> None:
         message(self.bundle, 13)["tests"][0]["exit_code"] = 1
 
         self.assertEqual(error_code(self.bundle), "TEST_RESULT_INCONSISTENT")
+
+    def test_test_exit_code_must_match_bound_evidence(self) -> None:
+        qa_pass = message(self.bundle, 13)
+        qa_pass["evidence"][0]["exit_code"] = 7
+        rebind_message_evidence(self.bundle, qa_pass)
+
+        self.assertEqual(error_code(self.bundle), "TEST_EVIDENCE_EXIT_CODE_MISMATCH")
+
+    def test_test_artifact_must_be_test_evidence(self) -> None:
+        qa_pass = message(self.bundle, 13)
+        qa_pass["evidence"][0]["kind"] = "FILE_SNAPSHOT"
+        rebind_message_evidence(self.bundle, qa_pass)
+
+        self.assertEqual(error_code(self.bundle), "TEST_EVIDENCE_KIND_INVALID")
+
+    def test_result_unknown_test_still_requires_bound_evidence(self) -> None:
+        unknown = message(self.bundle, 11)
+        unknown["tests"][0]["artifact"] = None
+
+        self.assertEqual(error_code(self.bundle), "TEST_RESULT_INCONSISTENT")
+
+    def test_one_evidence_record_cannot_back_multiple_test_claims(self) -> None:
+        qa_pass = message(self.bundle, 13)
+        duplicate = copy.deepcopy(qa_pass["tests"][0])
+        duplicate["id"] = "T-002"
+        qa_pass["tests"].append(duplicate)
+
+        self.assertEqual(error_code(self.bundle), "TEST_EVIDENCE_REUSED")
+
+    def test_message_input_artifacts_must_equal_evidence_locators(self) -> None:
+        message(self.bundle, 13)["input"]["artifacts"] = [
+            "bundle://evidence/forged-input-only"
+        ]
+
+        self.assertEqual(error_code(self.bundle), "MESSAGE_ARTIFACT_BINDING_INVALID")
+
+    def test_evidence_digest_must_match_registered_artifact(self) -> None:
+        message(self.bundle, 13)["evidence"][0]["digest"] = "sha256:" + "0" * 64
+
+        self.assertEqual(error_code(self.bundle), "EVIDENCE_DIGEST_MISMATCH")
+
+    def test_unreferenced_artifact_registry_entry_fails_closed(self) -> None:
+        payload = {"artifact_type": "FORGED_EXTRA"}
+        self.bundle["artifacts"]["bundle://forged/extra"] = {
+            "classification": "SYNTHETIC_TEST_EVIDENCE",
+            "payload": payload,
+            "digest": digest(payload),
+        }
+
+        self.assertEqual(error_code(self.bundle), "ARTIFACT_SET_MISMATCH")
 
     def test_duplicate_semantic_test_id_fails_closed(self) -> None:
         qa_pass = message(self.bundle, 13)
@@ -386,6 +501,48 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "BLACK_BOX_SOURCE_CONTEXT")
 
+    def test_forged_context_artifact_fails_even_with_recomputed_digests(self) -> None:
+        final_sha = self.bundle["expected"]["final_candidate_sha"]
+        manifest = context(self.bundle, "ERP_CONTRACT_GUARDIAN", final_sha)
+        forged_locator = "bundle://forged/unlisted-context"
+        forged_payload = {"artifact_type": "SYNTHETIC_CONTRACT", "forged": True}
+        forged_digest = digest(forged_payload)
+        self.bundle["artifacts"][forged_locator] = {
+            "classification": "SYNTHETIC_CONTRACT",
+            "payload": forged_payload,
+            "digest": forged_digest,
+        }
+        manifest["documents"][0] = {
+            "locator": forged_locator,
+            "digest": forged_digest,
+            "classification": "SYNTHETIC_CONTRACT",
+        }
+        digest_input = copy.deepcopy(manifest)
+        digest_input.pop("manifest_digest")
+        manifest["manifest_digest"] = digest(digest_input)
+        message(self.bundle, 8)["agent"]["context_manifest_digest"] = manifest[
+            "manifest_digest"
+        ]
+
+        self.assertEqual(error_code(self.bundle), "CONTEXT_ARTIFACT_BINDING_INVALID")
+
+    def test_context_payload_is_bound_to_role_and_candidate(self) -> None:
+        final_sha = self.bundle["expected"]["final_candidate_sha"]
+        manifest = context(self.bundle, "ERP_CONTRACT_GUARDIAN", final_sha)
+        document = manifest["documents"][2]
+        artifact = self.bundle["artifacts"][document["locator"]]
+        artifact["payload"] = {"artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE", "forged": True}
+        artifact["digest"] = digest(artifact["payload"])
+        document["digest"] = artifact["digest"]
+        digest_input = copy.deepcopy(manifest)
+        digest_input.pop("manifest_digest")
+        manifest["manifest_digest"] = digest(digest_input)
+        message(self.bundle, 8)["agent"]["context_manifest_digest"] = manifest[
+            "manifest_digest"
+        ]
+
+        self.assertEqual(error_code(self.bundle), "CONTEXT_ARTIFACT_BINDING_INVALID")
+
     def test_black_box_source_evidence_fails_closed(self) -> None:
         black_box = message(self.bundle, 14)
         black_box["input"]["artifacts"] = ["git://private-source"]
@@ -397,6 +554,8 @@ class NativeMvpProtocolTest(unittest.TestCase):
         old_qa["status"] = "PASS"
         old_qa["tests"][0]["result"] = "PASS"
         old_qa["tests"][0]["exit_code"] = 0
+        old_qa["evidence"][0]["exit_code"] = 0
+        rebind_message_evidence(self.bundle, old_qa)
         self.bundle["messages"].remove(message(self.bundle, 13))
 
         self.assertEqual(error_code(self.bundle), "REJECTED_CANDIDATE_GATE_MISSING")
@@ -416,15 +575,32 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "MINORITY_REPORT_MISSING")
 
+    def test_security_role_cannot_substitute_for_required_minority_report(self) -> None:
+        minority = message(self.bundle, 3)
+        security = message(self.bundle, 4)
+        minority["agent"] = copy.deepcopy(security["agent"])
+        minority["role"] = "SECURITY_BOUNDARY_EXAMINER"
+        minority["gate"] = "SECURITY"
+        rebind_message_evidence(self.bundle, minority)
+
+        self.assertEqual(error_code(self.bundle), "MESSAGE_TYPE_BINDING_INVALID")
+
+    def test_failing_finding_cannot_resolve_minority_claim(self) -> None:
+        disposition = message(self.bundle, 9)
+        disposition["message_type"] = "FINDING"
+        disposition["status"] = "FAIL"
+
+        self.assertEqual(error_code(self.bundle), "MINORITY_DISPOSITION_INVALID")
+
     def test_unresolved_minority_report_fails_closed(self) -> None:
         message(self.bundle, 9)["resolves_claim_ids"] = []
 
         self.assertEqual(error_code(self.bundle), "MINORITY_REPORT_UNRESOLVED")
 
-    def test_final_adversarial_disposition_must_pass(self) -> None:
+    def test_minority_disposition_must_be_a_passing_verification(self) -> None:
         message(self.bundle, 9)["status"] = "FAIL"
 
-        self.assertEqual(error_code(self.bundle), "FINAL_ADVERSARIAL_NOT_PASSED")
+        self.assertEqual(error_code(self.bundle), "MINORITY_DISPOSITION_INVALID")
 
     def test_stale_lease_generation_fails_closed(self) -> None:
         message(self.bundle, 10)["input"]["lease_generation"] = 2
@@ -446,6 +622,11 @@ class NativeMvpProtocolTest(unittest.TestCase):
         duplicate_recovery = copy.deepcopy(message(self.bundle, 12))
         duplicate_recovery["message_id"] = "10000000-0000-4000-8000-000000000013"
         duplicate_recovery["input"]["attempt"] = 2
+        rebind_message_evidence(
+            self.bundle,
+            duplicate_recovery,
+            locator="bundle://evidence/mutation-duplicate-recovery",
+        )
         self.bundle["messages"].insert(self.bundle["messages"].index(message(self.bundle, 13)), duplicate_recovery)
 
         self.assertEqual(error_code(self.bundle), "RESULT_UNKNOWN_ALREADY_RESOLVED")
@@ -488,6 +669,23 @@ class NativeMvpProtocolTest(unittest.TestCase):
         )
 
         self.assertEqual(error_code(self.bundle), "CHECKPOINT_BINDING_INVALID")
+
+    def test_checkpoint_type_is_bound_to_implementation_gate(self) -> None:
+        message(self.bundle, 6)["gate"] = "RECOVERY"
+
+        self.assertEqual(error_code(self.bundle), "MESSAGE_TYPE_BINDING_INVALID")
+
+    def test_recovery_type_is_bound_to_recovery_gate(self) -> None:
+        message(self.bundle, 12)["gate"] = "IMPLEMENTATION"
+
+        self.assertEqual(error_code(self.bundle), "MESSAGE_TYPE_BINDING_INVALID")
+
+    def test_closure_type_is_bound_to_closure_gate_and_complete_status(self) -> None:
+        closure = message(self.bundle, 15)
+        closure["gate"] = "IMPLEMENTATION"
+        closure["input"]["attempt"] = 2
+
+        self.assertEqual(error_code(self.bundle), "MESSAGE_TYPE_BINDING_INVALID")
 
     def test_closure_must_be_the_final_message(self) -> None:
         closure = message(self.bundle, 15)

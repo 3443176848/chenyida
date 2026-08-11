@@ -1,5 +1,5 @@
 {
-  "schema_version": "chenyida-erp-native-pilot-bundle/v1",
+  "schema_version": "chenyida-erp-native-pilot-bundle/v2",
   "task_packet": {
     "schema_version": "chenyida-erp-agent-task/v2",
     "task": {
@@ -215,6 +215,410 @@
       }
     }
   ],
+  "artifacts": {
+    "bundle://synthetic-contract-v1": {
+      "classification": "SYNTHETIC_CONTRACT",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CONTRACT",
+        "schema_version": "synthetic-contract/v1",
+        "task_id": "AGENT-R1-5",
+        "task_packet_revision": 2,
+        "data_classification": "SYNTHETIC_DOCS_TEST_ONLY"
+      },
+      "digest": "sha256:521e9c4dc6b88bba166f4a4046ee2bc4f2a5be7a30e427d3430a296e96fc17b0"
+    },
+    "bundle://candidate/c1": {
+      "classification": "SYNTHETIC_CANDIDATE",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CANDIDATE",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "content": {
+          "contract_version": "synthetic-v1",
+          "duplicate_request_behavior": "DOUBLE_APPLY",
+          "timeout_recovery_behavior": "BLIND_REPLAY",
+          "data_classification": "SYNTHETIC_ONLY"
+        }
+      },
+      "digest": "sha256:a8020c2eb2c5699878570d8f560cf5bfecaf41fd1c90ef510b53fdba683361c9"
+    },
+    "bundle://evidence/builder-r1-5/c1": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE",
+        "task_id": "AGENT-R1-5",
+        "agent_id": "builder-r1-5",
+        "role": "CHANGE_BUILDER",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "visibility": "SYNTHETIC_PROTOCOL_ONLY"
+      },
+      "digest": "sha256:e2aa7913615eab2f499f4ab67b49fd2b6e94afa2366a4638b2a74455ae794f8c"
+    },
+    "bundle://evidence/erp-guardian-r1-5/c1": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE",
+        "task_id": "AGENT-R1-5",
+        "agent_id": "erp-guardian-r1-5",
+        "role": "ERP_CONTRACT_GUARDIAN",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "visibility": "SYNTHETIC_PROTOCOL_ONLY"
+      },
+      "digest": "sha256:552cdaac95191e557e04a846d84e09277c5321f39334ebb5c0a194ebc016a0aa"
+    },
+    "bundle://evidence/adversarial-r1-5/c1": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE",
+        "task_id": "AGENT-R1-5",
+        "agent_id": "adversarial-r1-5",
+        "role": "ADVERSARIAL_EXAMINER",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "visibility": "SYNTHETIC_PROTOCOL_ONLY"
+      },
+      "digest": "sha256:dc858309f35d14967a067d69c2b36a378a8f961ac584313756efce0c7db8cc8f"
+    },
+    "bundle://evidence/security-r1-5/c1": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE",
+        "task_id": "AGENT-R1-5",
+        "agent_id": "security-r1-5",
+        "role": "SECURITY_BOUNDARY_EXAMINER",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "visibility": "SYNTHETIC_PROTOCOL_ONLY"
+      },
+      "digest": "sha256:3842663716c25638b63d20b6d2e7a32a89f8ed84fdf5b79a10627a379afe1f05"
+    },
+    "bundle://evidence/qa-r1-5/c1": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE",
+        "task_id": "AGENT-R1-5",
+        "agent_id": "qa-r1-5",
+        "role": "INDEPENDENT_VERIFIER",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "visibility": "SYNTHETIC_PROTOCOL_ONLY"
+      },
+      "digest": "sha256:3d76a4a1172dd44e40e44cf3140bae26fd9e58f167cdf4127d59e42265253876"
+    },
+    "bundle://candidate/c2": {
+      "classification": "SYNTHETIC_CANDIDATE",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CANDIDATE",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "content": {
+          "contract_version": "synthetic-v2",
+          "duplicate_request_behavior": "IDEMPOTENT_REPLAY",
+          "timeout_recovery_behavior": "RECONCILE_BEFORE_REPLAY",
+          "data_classification": "SYNTHETIC_ONLY"
+        }
+      },
+      "digest": "sha256:230f355324858cb6f0fd4a3217cb61aadbe0a2603297d7b93b0ac7fcdc6081b2"
+    },
+    "bundle://evidence/builder-r1-5/c2": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE",
+        "task_id": "AGENT-R1-5",
+        "agent_id": "builder-r1-5",
+        "role": "CHANGE_BUILDER",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "visibility": "SYNTHETIC_PROTOCOL_ONLY"
+      },
+      "digest": "sha256:0391ec70975b7fbd3bc2e8ea589ae2fd4d0aec0934ecc010e8b88d30d90e5c58"
+    },
+    "bundle://evidence/erp-guardian-r1-5/c2": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE",
+        "task_id": "AGENT-R1-5",
+        "agent_id": "erp-guardian-r1-5",
+        "role": "ERP_CONTRACT_GUARDIAN",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "visibility": "SYNTHETIC_PROTOCOL_ONLY"
+      },
+      "digest": "sha256:cb020b30b4312c98833bcbefb5a844f3b687862444fd48484e7918fc81931905"
+    },
+    "bundle://evidence/adversarial-r1-5/c2": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE",
+        "task_id": "AGENT-R1-5",
+        "agent_id": "adversarial-r1-5",
+        "role": "ADVERSARIAL_EXAMINER",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "visibility": "SYNTHETIC_PROTOCOL_ONLY"
+      },
+      "digest": "sha256:d3ebbb70116a5158f301f89f39745027fb1ff03f08e07367db7da2a9be85e137"
+    },
+    "bundle://evidence/security-r1-5/c2": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE",
+        "task_id": "AGENT-R1-5",
+        "agent_id": "security-r1-5",
+        "role": "SECURITY_BOUNDARY_EXAMINER",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "visibility": "SYNTHETIC_PROTOCOL_ONLY"
+      },
+      "digest": "sha256:d1a5e6c1987e5203e6c8cfbe66e04982006f26496dba1d6a69888e31f0a73547"
+    },
+    "bundle://evidence/qa-r1-5/c2": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE",
+        "task_id": "AGENT-R1-5",
+        "agent_id": "qa-r1-5",
+        "role": "INDEPENDENT_VERIFIER",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "visibility": "SYNTHETIC_PROTOCOL_ONLY"
+      },
+      "digest": "sha256:b338f219483ed8ef079c0a0027e89afdd5df78b98c002f0b76d2dc193c46d53e"
+    },
+    "blackbox://interface-v2": {
+      "classification": "PUBLIC_INTERFACE",
+      "payload": {
+        "artifact_type": "PUBLIC_INTERFACE",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "version": "v2",
+        "source_visibility": "BLACK_BOX_PUBLIC_ONLY"
+      },
+      "digest": "sha256:ce3a28aad9e78040dbc7341fc2fba4efe16fbab4eaecd0ff2cf5e0a2bb6b5be4"
+    },
+    "blackbox://personas-v1": {
+      "classification": "PUBLIC_PERSONA",
+      "payload": {
+        "artifact_type": "PUBLIC_PERSONA",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "version": "v1",
+        "source_visibility": "BLACK_BOX_PUBLIC_ONLY"
+      },
+      "digest": "sha256:3782cca0a87b24c951b0da1a8a77207b0c8335706c3956a64e0b5d80acb68e6a"
+    },
+    "blackbox://observation-v2": {
+      "classification": "PUBLIC_OBSERVATION",
+      "payload": {
+        "artifact_type": "PUBLIC_OBSERVATION",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "version": "v2",
+        "source_visibility": "BLACK_BOX_PUBLIC_ONLY"
+      },
+      "digest": "sha256:95c136f69ad55c925cc48d0305577cf657942356bf9cc9e1c9f3b3a507e99ecf"
+    },
+    "bundle://evidence/message-01": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000001",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "agent_id": "builder-r1-5",
+        "kind": "FILE_SNAPSHOT",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:01:00Z"
+      },
+      "digest": "sha256:9739c0e779b45452192a72420b3822d4288b0024471184ba3025f817878ee77e"
+    },
+    "bundle://evidence/message-02": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000002",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "agent_id": "erp-guardian-r1-5",
+        "kind": "FILE_SNAPSHOT",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:02:00Z"
+      },
+      "digest": "sha256:3ae10aced0255fab2322818e3def24946cc440b3a6432104520603cb7d5c9e8b"
+    },
+    "bundle://evidence/message-03": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000003",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "agent_id": "adversarial-r1-5",
+        "kind": "FILE_SNAPSHOT",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:03:00Z"
+      },
+      "digest": "sha256:f4ce0c4cd6d30466885e2d52e74ce2ce7e782c514458b89a2f9769f9ec8d1122"
+    },
+    "bundle://evidence/message-04": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000004",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "agent_id": "security-r1-5",
+        "kind": "FILE_SNAPSHOT",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:04:00Z"
+      },
+      "digest": "sha256:588e24b091427df2fa8c525ca41c8c0a313b4cb42647a0067cbf80b709cab7c7"
+    },
+    "bundle://evidence/message-05": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000005",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "agent_id": "qa-r1-5",
+        "kind": "TEST_REPORT",
+        "exit_code": 1,
+        "observed_at": "2026-08-11T04:05:00Z"
+      },
+      "digest": "sha256:848bf45fe632f20b66a0f791a261deae7d78d2efce9f7c79f5157624b343b8ae"
+    },
+    "bundle://evidence/message-06": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000006",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:483717d537aae987038ba381999b4aba8a5a41074982856319d229855adf69a2",
+        "agent_id": "builder-r1-5",
+        "kind": "FILE_SNAPSHOT",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:06:00Z"
+      },
+      "digest": "sha256:d8bd02b789bad8b778d4ce8c438b22fe806725275231c74780f72a2c5ae4eb9b"
+    },
+    "bundle://evidence/message-07": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000007",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "agent_id": "builder-r1-5",
+        "kind": "FILE_SNAPSHOT",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:07:00Z"
+      },
+      "digest": "sha256:025d9e920de15d74e75e6d40ee7f069875782d0e1397ace438c66d5032364525"
+    },
+    "bundle://evidence/message-08": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000008",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "agent_id": "erp-guardian-r1-5",
+        "kind": "FILE_SNAPSHOT",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:08:00Z"
+      },
+      "digest": "sha256:b1819e455d9ebec0fcfc727b22f8a4a8a6d27740a8b69c61fcae4556a4b3de58"
+    },
+    "bundle://evidence/message-09": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000009",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "agent_id": "adversarial-r1-5",
+        "kind": "FILE_SNAPSHOT",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:09:00Z"
+      },
+      "digest": "sha256:ca4b3717d8460ba4c5803877e2094474698092c6737957e4c282f42cb7656245"
+    },
+    "bundle://evidence/message-10": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000010",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "agent_id": "security-r1-5",
+        "kind": "FILE_SNAPSHOT",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:10:00Z"
+      },
+      "digest": "sha256:71e7521a342f7b15e086d6a918f97f108a0817e97d45aa4e59aa2d3a1f8c5af1"
+    },
+    "bundle://evidence/message-11": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000011",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "agent_id": "qa-r1-5",
+        "kind": "TEST_REPORT",
+        "exit_code": null,
+        "observed_at": "2026-08-11T04:11:00Z"
+      },
+      "digest": "sha256:874ddcd6b7159a581a6a47c75ef1bdc5881b9066eeebb124e96d35c33c955e58"
+    },
+    "bundle://evidence/message-12": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000012",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "agent_id": "builder-r1-5",
+        "kind": "FILE_SNAPSHOT",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:12:00Z"
+      },
+      "digest": "sha256:1b61ff4c393348cf68706251df532f4974ce3fd6f21845b012d59d1dc8390af8"
+    },
+    "bundle://evidence/message-13": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000013",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "agent_id": "qa-r1-5",
+        "kind": "TEST_REPORT",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:13:00Z"
+      },
+      "digest": "sha256:4fd0b3e0286a98d6b87c8f11668ec7a269266ec5e503794fff0d5fec68e10ee0"
+    },
+    "blackbox://evidence/message-14": {
+      "classification": "PUBLIC_OBSERVATION",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000014",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "agent_id": "blackbox-r1-5",
+        "kind": "BLACK_BOX_OBSERVATION",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:14:00Z"
+      },
+      "digest": "sha256:1985d0ba14d43507b7fc9ea9673f372cb1967c2135c8b8b29e60f5b3d388adfb"
+    },
+    "bundle://evidence/message-15": {
+      "classification": "SYNTHETIC_TEST_EVIDENCE",
+      "payload": {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": "00000000-0000-4000-8000-000000000015",
+        "task_id": "AGENT-R1-5",
+        "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
+        "agent_id": "builder-r1-5",
+        "kind": "FILE_SNAPSHOT",
+        "exit_code": 0,
+        "observed_at": "2026-08-11T04:15:00Z"
+      },
+      "digest": "sha256:6ee5b24a6da2bc6706245397372147e0ade2f8d30794e511df819d6838775779"
+    }
+  },
   "contexts": [
     {
       "schema_version": "erp-agent-context/v1",
@@ -230,17 +634,17 @@
       "documents": [
         {
           "locator": "bundle://synthetic-contract-v1",
-          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "digest": "sha256:521e9c4dc6b88bba166f4a4046ee2bc4f2a5be7a30e427d3430a296e96fc17b0",
           "classification": "SYNTHETIC_CONTRACT"
         },
         {
           "locator": "bundle://candidate/c1",
-          "digest": "sha256:4864b8517efa91740d0f43952797c8b2d350ea5750c7c60ceff169e9a65f3233",
+          "digest": "sha256:a8020c2eb2c5699878570d8f560cf5bfecaf41fd1c90ef510b53fdba683361c9",
           "classification": "SYNTHETIC_CANDIDATE"
         },
         {
           "locator": "bundle://evidence/builder-r1-5/c1",
-          "digest": "sha256:edf82b321d516c0956eda58f87864e40e5c6f5a7f282a69874a28c18fab6cba2",
+          "digest": "sha256:e2aa7913615eab2f499f4ab67b49fd2b6e94afa2366a4638b2a74455ae794f8c",
           "classification": "SYNTHETIC_TEST_EVIDENCE"
         }
       ],
@@ -252,7 +656,7 @@
         "SECRETS",
         "UAT_OR_PRODUCTION"
       ],
-      "manifest_digest": "sha256:47c6bfd54dc97b4b0f0633189d680f1b3caea4e63d7428e6384b20acdc4f4930"
+      "manifest_digest": "sha256:e239cc47a90040d160f687f53bd20a9a60f2434f99fcbe9924fdb73b6258578e"
     },
     {
       "schema_version": "erp-agent-context/v1",
@@ -268,17 +672,17 @@
       "documents": [
         {
           "locator": "bundle://synthetic-contract-v1",
-          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "digest": "sha256:521e9c4dc6b88bba166f4a4046ee2bc4f2a5be7a30e427d3430a296e96fc17b0",
           "classification": "SYNTHETIC_CONTRACT"
         },
         {
           "locator": "bundle://candidate/c1",
-          "digest": "sha256:4864b8517efa91740d0f43952797c8b2d350ea5750c7c60ceff169e9a65f3233",
+          "digest": "sha256:a8020c2eb2c5699878570d8f560cf5bfecaf41fd1c90ef510b53fdba683361c9",
           "classification": "SYNTHETIC_CANDIDATE"
         },
         {
           "locator": "bundle://evidence/erp-guardian-r1-5/c1",
-          "digest": "sha256:6ee611401184636345125bcb950bd0dc78b5b954ae51b5a223ec47f9d9f14f18",
+          "digest": "sha256:552cdaac95191e557e04a846d84e09277c5321f39334ebb5c0a194ebc016a0aa",
           "classification": "SYNTHETIC_TEST_EVIDENCE"
         }
       ],
@@ -290,7 +694,7 @@
         "SECRETS",
         "UAT_OR_PRODUCTION"
       ],
-      "manifest_digest": "sha256:97e69233b8b11cdae699e829730a725c179e78fb0348710c024e664a12aeeecc"
+      "manifest_digest": "sha256:f81c093f0ad9817cd9dd232a185b23808d1d812ceeb6aed52747a255ede5bb1e"
     },
     {
       "schema_version": "erp-agent-context/v1",
@@ -306,17 +710,17 @@
       "documents": [
         {
           "locator": "bundle://synthetic-contract-v1",
-          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "digest": "sha256:521e9c4dc6b88bba166f4a4046ee2bc4f2a5be7a30e427d3430a296e96fc17b0",
           "classification": "SYNTHETIC_CONTRACT"
         },
         {
           "locator": "bundle://candidate/c1",
-          "digest": "sha256:4864b8517efa91740d0f43952797c8b2d350ea5750c7c60ceff169e9a65f3233",
+          "digest": "sha256:a8020c2eb2c5699878570d8f560cf5bfecaf41fd1c90ef510b53fdba683361c9",
           "classification": "SYNTHETIC_CANDIDATE"
         },
         {
           "locator": "bundle://evidence/adversarial-r1-5/c1",
-          "digest": "sha256:c580a6389f1c12f3e755f4c0d77362839328c78eb7bc64867eb2b91c68e21d38",
+          "digest": "sha256:dc858309f35d14967a067d69c2b36a378a8f961ac584313756efce0c7db8cc8f",
           "classification": "SYNTHETIC_TEST_EVIDENCE"
         }
       ],
@@ -328,7 +732,7 @@
         "SECRETS",
         "UAT_OR_PRODUCTION"
       ],
-      "manifest_digest": "sha256:5b064e6a887bb3b492b6c57f55054271774a6dcefe325829ce6c9b0bf48789b4"
+      "manifest_digest": "sha256:3480426599f3ec06b9eebcb672e3bc1285187a6ee8fe47f7926ab8a54945e8b7"
     },
     {
       "schema_version": "erp-agent-context/v1",
@@ -344,17 +748,17 @@
       "documents": [
         {
           "locator": "bundle://synthetic-contract-v1",
-          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "digest": "sha256:521e9c4dc6b88bba166f4a4046ee2bc4f2a5be7a30e427d3430a296e96fc17b0",
           "classification": "SYNTHETIC_CONTRACT"
         },
         {
           "locator": "bundle://candidate/c1",
-          "digest": "sha256:4864b8517efa91740d0f43952797c8b2d350ea5750c7c60ceff169e9a65f3233",
+          "digest": "sha256:a8020c2eb2c5699878570d8f560cf5bfecaf41fd1c90ef510b53fdba683361c9",
           "classification": "SYNTHETIC_CANDIDATE"
         },
         {
           "locator": "bundle://evidence/security-r1-5/c1",
-          "digest": "sha256:ce1f52b6582196e6c3c9aae65be07ada0c74e40fccb6493c8941180585509c19",
+          "digest": "sha256:3842663716c25638b63d20b6d2e7a32a89f8ed84fdf5b79a10627a379afe1f05",
           "classification": "SYNTHETIC_TEST_EVIDENCE"
         }
       ],
@@ -366,7 +770,7 @@
         "SECRETS",
         "UAT_OR_PRODUCTION"
       ],
-      "manifest_digest": "sha256:a4428cabf947ce11d87bb8f38509da80216b2142fcd711b5dec2efca83866f23"
+      "manifest_digest": "sha256:f9b90860327743f8dcb238b8b2611219488b043bebd910567c68b1f189a660e6"
     },
     {
       "schema_version": "erp-agent-context/v1",
@@ -382,17 +786,17 @@
       "documents": [
         {
           "locator": "bundle://synthetic-contract-v1",
-          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "digest": "sha256:521e9c4dc6b88bba166f4a4046ee2bc4f2a5be7a30e427d3430a296e96fc17b0",
           "classification": "SYNTHETIC_CONTRACT"
         },
         {
           "locator": "bundle://candidate/c1",
-          "digest": "sha256:4864b8517efa91740d0f43952797c8b2d350ea5750c7c60ceff169e9a65f3233",
+          "digest": "sha256:a8020c2eb2c5699878570d8f560cf5bfecaf41fd1c90ef510b53fdba683361c9",
           "classification": "SYNTHETIC_CANDIDATE"
         },
         {
           "locator": "bundle://evidence/qa-r1-5/c1",
-          "digest": "sha256:58f3964973749a83c46498d34c450ad9a04c9a14f6c9a227b9adce492d3fb453",
+          "digest": "sha256:3d76a4a1172dd44e40e44cf3140bae26fd9e58f167cdf4127d59e42265253876",
           "classification": "SYNTHETIC_TEST_EVIDENCE"
         }
       ],
@@ -404,7 +808,7 @@
         "SECRETS",
         "UAT_OR_PRODUCTION"
       ],
-      "manifest_digest": "sha256:e087064e06b55fb19c1ccd071b9f26c5150e671b99e5e40281e9f7e5015c5f5e"
+      "manifest_digest": "sha256:4e776c919b136fd981765c42fd007e83cf2dfb081c1a819860a7cf57d71ad611"
     },
     {
       "schema_version": "erp-agent-context/v1",
@@ -420,17 +824,17 @@
       "documents": [
         {
           "locator": "bundle://synthetic-contract-v1",
-          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "digest": "sha256:521e9c4dc6b88bba166f4a4046ee2bc4f2a5be7a30e427d3430a296e96fc17b0",
           "classification": "SYNTHETIC_CONTRACT"
         },
         {
           "locator": "bundle://candidate/c2",
-          "digest": "sha256:e88812fe46169ace30a731b63b571efdf6fc4a6bdbe3c8eaeeb843c58a04c5d1",
+          "digest": "sha256:230f355324858cb6f0fd4a3217cb61aadbe0a2603297d7b93b0ac7fcdc6081b2",
           "classification": "SYNTHETIC_CANDIDATE"
         },
         {
           "locator": "bundle://evidence/builder-r1-5/c2",
-          "digest": "sha256:bed4a327fbf9cbde882b69225c3de1fd75e69e0f6fe21bb9384d6d6c4eabbc2b",
+          "digest": "sha256:0391ec70975b7fbd3bc2e8ea589ae2fd4d0aec0934ecc010e8b88d30d90e5c58",
           "classification": "SYNTHETIC_TEST_EVIDENCE"
         }
       ],
@@ -442,7 +846,7 @@
         "SECRETS",
         "UAT_OR_PRODUCTION"
       ],
-      "manifest_digest": "sha256:b894183a5fb2bd83f99f2a808221a174d8626d173a6ad1ff92e73e8e57f6d4a8"
+      "manifest_digest": "sha256:eb91b4f8f89afa4d18d44838c4391bbf2e7337b61b4516eea8ed5528664bf2f4"
     },
     {
       "schema_version": "erp-agent-context/v1",
@@ -458,17 +862,17 @@
       "documents": [
         {
           "locator": "bundle://synthetic-contract-v1",
-          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "digest": "sha256:521e9c4dc6b88bba166f4a4046ee2bc4f2a5be7a30e427d3430a296e96fc17b0",
           "classification": "SYNTHETIC_CONTRACT"
         },
         {
           "locator": "bundle://candidate/c2",
-          "digest": "sha256:e88812fe46169ace30a731b63b571efdf6fc4a6bdbe3c8eaeeb843c58a04c5d1",
+          "digest": "sha256:230f355324858cb6f0fd4a3217cb61aadbe0a2603297d7b93b0ac7fcdc6081b2",
           "classification": "SYNTHETIC_CANDIDATE"
         },
         {
           "locator": "bundle://evidence/erp-guardian-r1-5/c2",
-          "digest": "sha256:17aa4e6656297e8d2992143cdd938ce31e7fc22c494431579ba06059f6d38bec",
+          "digest": "sha256:cb020b30b4312c98833bcbefb5a844f3b687862444fd48484e7918fc81931905",
           "classification": "SYNTHETIC_TEST_EVIDENCE"
         }
       ],
@@ -480,7 +884,7 @@
         "SECRETS",
         "UAT_OR_PRODUCTION"
       ],
-      "manifest_digest": "sha256:05e791c0e2eeb493b2adda909aeb16e4d6599bd1f32f3491e961b6db1e0b3178"
+      "manifest_digest": "sha256:60112e15f9ddae998de917e429691204d7d2b8557444961a62f5aa85d065e05d"
     },
     {
       "schema_version": "erp-agent-context/v1",
@@ -496,17 +900,17 @@
       "documents": [
         {
           "locator": "bundle://synthetic-contract-v1",
-          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "digest": "sha256:521e9c4dc6b88bba166f4a4046ee2bc4f2a5be7a30e427d3430a296e96fc17b0",
           "classification": "SYNTHETIC_CONTRACT"
         },
         {
           "locator": "bundle://candidate/c2",
-          "digest": "sha256:e88812fe46169ace30a731b63b571efdf6fc4a6bdbe3c8eaeeb843c58a04c5d1",
+          "digest": "sha256:230f355324858cb6f0fd4a3217cb61aadbe0a2603297d7b93b0ac7fcdc6081b2",
           "classification": "SYNTHETIC_CANDIDATE"
         },
         {
           "locator": "bundle://evidence/adversarial-r1-5/c2",
-          "digest": "sha256:b6b50f4d0f0479f4991abf55dec1b31c8b944f25314a6cecccbda44361c90eb1",
+          "digest": "sha256:d3ebbb70116a5158f301f89f39745027fb1ff03f08e07367db7da2a9be85e137",
           "classification": "SYNTHETIC_TEST_EVIDENCE"
         }
       ],
@@ -518,7 +922,7 @@
         "SECRETS",
         "UAT_OR_PRODUCTION"
       ],
-      "manifest_digest": "sha256:2b7496c92ae023b36acde8b3051c05672be0633d23713a3328a0e6780579a5c0"
+      "manifest_digest": "sha256:16bccfb5936552bfdaaccb39ee99f4b093eef7853e3ceb570f590c88f399d3ec"
     },
     {
       "schema_version": "erp-agent-context/v1",
@@ -534,17 +938,17 @@
       "documents": [
         {
           "locator": "bundle://synthetic-contract-v1",
-          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "digest": "sha256:521e9c4dc6b88bba166f4a4046ee2bc4f2a5be7a30e427d3430a296e96fc17b0",
           "classification": "SYNTHETIC_CONTRACT"
         },
         {
           "locator": "bundle://candidate/c2",
-          "digest": "sha256:e88812fe46169ace30a731b63b571efdf6fc4a6bdbe3c8eaeeb843c58a04c5d1",
+          "digest": "sha256:230f355324858cb6f0fd4a3217cb61aadbe0a2603297d7b93b0ac7fcdc6081b2",
           "classification": "SYNTHETIC_CANDIDATE"
         },
         {
           "locator": "bundle://evidence/security-r1-5/c2",
-          "digest": "sha256:15cc49350f213bf0016daff3a0366d3ebe84efd55efdefcc0fdcb6d82dc50c95",
+          "digest": "sha256:d1a5e6c1987e5203e6c8cfbe66e04982006f26496dba1d6a69888e31f0a73547",
           "classification": "SYNTHETIC_TEST_EVIDENCE"
         }
       ],
@@ -556,7 +960,7 @@
         "SECRETS",
         "UAT_OR_PRODUCTION"
       ],
-      "manifest_digest": "sha256:95b4b44e72d3c753ff40522d60952bd493433fed92220c6ac8ea9e3318b86add"
+      "manifest_digest": "sha256:12163667078ff5776ab7dbb77fa5f30dc1935d9039246d39a32c5182097a6e4b"
     },
     {
       "schema_version": "erp-agent-context/v1",
@@ -572,17 +976,17 @@
       "documents": [
         {
           "locator": "bundle://synthetic-contract-v1",
-          "digest": "sha256:d2911159fef9261e97a21d5dab02db89398b6c3a423bcdfb37f9ff0183732100",
+          "digest": "sha256:521e9c4dc6b88bba166f4a4046ee2bc4f2a5be7a30e427d3430a296e96fc17b0",
           "classification": "SYNTHETIC_CONTRACT"
         },
         {
           "locator": "bundle://candidate/c2",
-          "digest": "sha256:e88812fe46169ace30a731b63b571efdf6fc4a6bdbe3c8eaeeb843c58a04c5d1",
+          "digest": "sha256:230f355324858cb6f0fd4a3217cb61aadbe0a2603297d7b93b0ac7fcdc6081b2",
           "classification": "SYNTHETIC_CANDIDATE"
         },
         {
           "locator": "bundle://evidence/qa-r1-5/c2",
-          "digest": "sha256:757834f59b19a4ef064023ac6aea47593f253cb15c67fa86ad1cd52e22e22868",
+          "digest": "sha256:b338f219483ed8ef079c0a0027e89afdd5df78b98c002f0b76d2dc193c46d53e",
           "classification": "SYNTHETIC_TEST_EVIDENCE"
         }
       ],
@@ -594,7 +998,7 @@
         "SECRETS",
         "UAT_OR_PRODUCTION"
       ],
-      "manifest_digest": "sha256:1b522c8773fab244aba22994727a3630424381185b8950582d4c06d86e9dbe7c"
+      "manifest_digest": "sha256:2af8471c43bbf2a36614d43b2514d93d3ade4b3752da1ba80a39c0867fa2053d"
     },
     {
       "schema_version": "erp-agent-context/v1",
@@ -610,17 +1014,17 @@
       "documents": [
         {
           "locator": "blackbox://interface-v2",
-          "digest": "sha256:25b82b219a75e8b18d0c07092b425e270cbdd461ab18faa6c864433f3161a589",
+          "digest": "sha256:ce3a28aad9e78040dbc7341fc2fba4efe16fbab4eaecd0ff2cf5e0a2bb6b5be4",
           "classification": "PUBLIC_INTERFACE"
         },
         {
           "locator": "blackbox://personas-v1",
-          "digest": "sha256:d58739a5706fefaca733ffbbda41ff61d30138536b2c7d9dee19037f80589594",
+          "digest": "sha256:3782cca0a87b24c951b0da1a8a77207b0c8335706c3956a64e0b5d80acb68e6a",
           "classification": "PUBLIC_PERSONA"
         },
         {
           "locator": "blackbox://observation-v2",
-          "digest": "sha256:83e9d31d5544508c0f8e6b079a2a487e5c7943b122ade8bf6a0d20a3f7aa7cb0",
+          "digest": "sha256:95c136f69ad55c925cc48d0305577cf657942356bf9cc9e1c9f3b3a507e99ecf",
           "classification": "PUBLIC_OBSERVATION"
         }
       ],
@@ -632,7 +1036,7 @@
         "SECRETS",
         "UAT_OR_PRODUCTION"
       ],
-      "manifest_digest": "sha256:00b4cae7cf8e17a29554bc588090b07bf0c50361ceaa22dc4f00fc74faa8c033"
+      "manifest_digest": "sha256:4309a0cbd0543202270177a2239b049ac01aa93e9533451aad9aac009db7fabd"
     }
   ],
   "messages": [
@@ -646,7 +1050,7 @@
         "agent_id": "builder-r1-5",
         "instance_id": "builder-r1-5-c1",
         "capability_profile": "SYNTHETIC_BUILDER",
-        "context_manifest_digest": "sha256:47c6bfd54dc97b4b0f0633189d680f1b3caea4e63d7428e6384b20acdc4f4930"
+        "context_manifest_digest": "sha256:e239cc47a90040d160f687f53bd20a9a60f2434f99fcbe9924fdb73b6258578e"
       },
       "role": "CHANGE_BUILDER",
       "gate": "IMPLEMENTATION",
@@ -666,7 +1070,7 @@
           "id": "E-001",
           "kind": "FILE_SNAPSHOT",
           "locator": "bundle://evidence/message-01",
-          "digest": "sha256:f1883887ebde47aadee1c99d84ee2f8b056303285806d09ad7beb961ebf96b5c",
+          "digest": "sha256:9739c0e779b45452192a72420b3822d4288b0024471184ba3025f817878ee77e",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:01:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -703,7 +1107,7 @@
         "agent_id": "erp-guardian-r1-5",
         "instance_id": "erp-guardian-r1-5-c1",
         "capability_profile": "ERP_READ_ONLY",
-        "context_manifest_digest": "sha256:97e69233b8b11cdae699e829730a725c179e78fb0348710c024e664a12aeeecc"
+        "context_manifest_digest": "sha256:f81c093f0ad9817cd9dd232a185b23808d1d812ceeb6aed52747a255ede5bb1e"
       },
       "role": "ERP_CONTRACT_GUARDIAN",
       "gate": "ERP_CONTRACT",
@@ -723,7 +1127,7 @@
           "id": "E-001",
           "kind": "FILE_SNAPSHOT",
           "locator": "bundle://evidence/message-02",
-          "digest": "sha256:6c330ab0692d9bf9c42d6f6d93eb4123b8901af5e914c41fc3f1646a7d14a48c",
+          "digest": "sha256:3ae10aced0255fab2322818e3def24946cc440b3a6432104520603cb7d5c9e8b",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:02:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -754,7 +1158,7 @@
         "agent_id": "adversarial-r1-5",
         "instance_id": "adversarial-r1-5-c1",
         "capability_profile": "ADVERSARIAL_READ_ONLY",
-        "context_manifest_digest": "sha256:5b064e6a887bb3b492b6c57f55054271774a6dcefe325829ce6c9b0bf48789b4"
+        "context_manifest_digest": "sha256:3480426599f3ec06b9eebcb672e3bc1285187a6ee8fe47f7926ab8a54945e8b7"
       },
       "role": "ADVERSARIAL_EXAMINER",
       "gate": "ADVERSARIAL",
@@ -774,7 +1178,7 @@
           "id": "E-001",
           "kind": "FILE_SNAPSHOT",
           "locator": "bundle://evidence/message-03",
-          "digest": "sha256:946994d7efdef5df163f7c4f384e0bf910534feb3b69383c65f4fee02f81d0d9",
+          "digest": "sha256:f4ce0c4cd6d30466885e2d52e74ce2ce7e782c514458b89a2f9769f9ec8d1122",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:03:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -814,7 +1218,7 @@
         "agent_id": "security-r1-5",
         "instance_id": "security-r1-5-c1",
         "capability_profile": "SECURITY_READ_ONLY",
-        "context_manifest_digest": "sha256:a4428cabf947ce11d87bb8f38509da80216b2142fcd711b5dec2efca83866f23"
+        "context_manifest_digest": "sha256:f9b90860327743f8dcb238b8b2611219488b043bebd910567c68b1f189a660e6"
       },
       "role": "SECURITY_BOUNDARY_EXAMINER",
       "gate": "SECURITY",
@@ -834,7 +1238,7 @@
           "id": "E-001",
           "kind": "FILE_SNAPSHOT",
           "locator": "bundle://evidence/message-04",
-          "digest": "sha256:b6d5c1f4add6c8417c29746485e62a5382adec4f11755fbb09e9f9a2987bc682",
+          "digest": "sha256:588e24b091427df2fa8c525ca41c8c0a313b4cb42647a0067cbf80b709cab7c7",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:04:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -865,7 +1269,7 @@
         "agent_id": "qa-r1-5",
         "instance_id": "qa-r1-5-c1",
         "capability_profile": "QA_TEST_READ_ONLY",
-        "context_manifest_digest": "sha256:e087064e06b55fb19c1ccd071b9f26c5150e671b99e5e40281e9f7e5015c5f5e"
+        "context_manifest_digest": "sha256:4e776c919b136fd981765c42fd007e83cf2dfb081c1a819860a7cf57d71ad611"
       },
       "role": "INDEPENDENT_VERIFIER",
       "gate": "QA",
@@ -885,8 +1289,8 @@
           "id": "E-001",
           "kind": "TEST_REPORT",
           "locator": "bundle://evidence/message-05",
-          "digest": "sha256:418de962b7e9315b0259c8ffd2a58236dccf2a92b9edb76e80503281c411b44d",
-          "exit_code": 0,
+          "digest": "sha256:848bf45fe632f20b66a0f791a261deae7d78d2efce9f7c79f5157624b343b8ae",
+          "exit_code": 1,
           "observed_at": "2026-08-11T04:05:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
         }
@@ -925,7 +1329,7 @@
         "agent_id": "builder-r1-5",
         "instance_id": "builder-r1-5-c1",
         "capability_profile": "SYNTHETIC_BUILDER",
-        "context_manifest_digest": "sha256:47c6bfd54dc97b4b0f0633189d680f1b3caea4e63d7428e6384b20acdc4f4930"
+        "context_manifest_digest": "sha256:e239cc47a90040d160f687f53bd20a9a60f2434f99fcbe9924fdb73b6258578e"
       },
       "role": "CHANGE_BUILDER",
       "gate": "IMPLEMENTATION",
@@ -945,7 +1349,7 @@
           "id": "E-001",
           "kind": "FILE_SNAPSHOT",
           "locator": "bundle://evidence/message-06",
-          "digest": "sha256:e00a042352db432343d7a2de624785a41b10aedec21cf76804486989cd4cf9ca",
+          "digest": "sha256:d8bd02b789bad8b778d4ce8c438b22fe806725275231c74780f72a2c5ae4eb9b",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:06:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -987,7 +1391,7 @@
         "agent_id": "builder-r1-5",
         "instance_id": "builder-r1-5-c2",
         "capability_profile": "SYNTHETIC_BUILDER",
-        "context_manifest_digest": "sha256:b894183a5fb2bd83f99f2a808221a174d8626d173a6ad1ff92e73e8e57f6d4a8"
+        "context_manifest_digest": "sha256:eb91b4f8f89afa4d18d44838c4391bbf2e7337b61b4516eea8ed5528664bf2f4"
       },
       "role": "CHANGE_BUILDER",
       "gate": "IMPLEMENTATION",
@@ -1007,7 +1411,7 @@
           "id": "E-001",
           "kind": "FILE_SNAPSHOT",
           "locator": "bundle://evidence/message-07",
-          "digest": "sha256:39be2a4d0454de5b2a70d7843545c13a5195abe070d6b2234135f03d9b23a165",
+          "digest": "sha256:025d9e920de15d74e75e6d40ee7f069875782d0e1397ace438c66d5032364525",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:07:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -1044,7 +1448,7 @@
         "agent_id": "erp-guardian-r1-5",
         "instance_id": "erp-guardian-r1-5-c2",
         "capability_profile": "ERP_READ_ONLY",
-        "context_manifest_digest": "sha256:05e791c0e2eeb493b2adda909aeb16e4d6599bd1f32f3491e961b6db1e0b3178"
+        "context_manifest_digest": "sha256:60112e15f9ddae998de917e429691204d7d2b8557444961a62f5aa85d065e05d"
       },
       "role": "ERP_CONTRACT_GUARDIAN",
       "gate": "ERP_CONTRACT",
@@ -1064,7 +1468,7 @@
           "id": "E-001",
           "kind": "FILE_SNAPSHOT",
           "locator": "bundle://evidence/message-08",
-          "digest": "sha256:83359cc9296e9cb8815e57ea22631ffce0b5e4972cbbb7f85b0133ee8b4c8c4b",
+          "digest": "sha256:b1819e455d9ebec0fcfc727b22f8a4a8a6d27740a8b69c61fcae4556a4b3de58",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:08:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -1095,7 +1499,7 @@
         "agent_id": "adversarial-r1-5",
         "instance_id": "adversarial-r1-5-c2",
         "capability_profile": "ADVERSARIAL_READ_ONLY",
-        "context_manifest_digest": "sha256:2b7496c92ae023b36acde8b3051c05672be0633d23713a3328a0e6780579a5c0"
+        "context_manifest_digest": "sha256:16bccfb5936552bfdaaccb39ee99f4b093eef7853e3ceb570f590c88f399d3ec"
       },
       "role": "ADVERSARIAL_EXAMINER",
       "gate": "ADVERSARIAL",
@@ -1115,7 +1519,7 @@
           "id": "E-001",
           "kind": "FILE_SNAPSHOT",
           "locator": "bundle://evidence/message-09",
-          "digest": "sha256:97e9aeccf8574406b675be946907adb9737dac03677c4c05976836eedccfb8d0",
+          "digest": "sha256:ca4b3717d8460ba4c5803877e2094474698092c6737957e4c282f42cb7656245",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:09:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -1148,7 +1552,7 @@
         "agent_id": "security-r1-5",
         "instance_id": "security-r1-5-c2",
         "capability_profile": "SECURITY_READ_ONLY",
-        "context_manifest_digest": "sha256:95b4b44e72d3c753ff40522d60952bd493433fed92220c6ac8ea9e3318b86add"
+        "context_manifest_digest": "sha256:12163667078ff5776ab7dbb77fa5f30dc1935d9039246d39a32c5182097a6e4b"
       },
       "role": "SECURITY_BOUNDARY_EXAMINER",
       "gate": "SECURITY",
@@ -1168,7 +1572,7 @@
           "id": "E-001",
           "kind": "FILE_SNAPSHOT",
           "locator": "bundle://evidence/message-10",
-          "digest": "sha256:d97d08326bd89a68d80df98eeea6aa7f3dd1410d338efc51ff3c818c68ce645c",
+          "digest": "sha256:71e7521a342f7b15e086d6a918f97f108a0817e97d45aa4e59aa2d3a1f8c5af1",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:10:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -1199,7 +1603,7 @@
         "agent_id": "qa-r1-5",
         "instance_id": "qa-r1-5-c2",
         "capability_profile": "QA_TEST_READ_ONLY",
-        "context_manifest_digest": "sha256:1b522c8773fab244aba22994727a3630424381185b8950582d4c06d86e9dbe7c"
+        "context_manifest_digest": "sha256:2af8471c43bbf2a36614d43b2514d93d3ade4b3752da1ba80a39c0867fa2053d"
       },
       "role": "INDEPENDENT_VERIFIER",
       "gate": "QA",
@@ -1219,7 +1623,7 @@
           "id": "E-001",
           "kind": "TEST_REPORT",
           "locator": "bundle://evidence/message-11",
-          "digest": "sha256:4455124f8ccbc7f11bc082de564bd46258d41f988aa52ffed40df8c0d28c8ff8",
+          "digest": "sha256:874ddcd6b7159a581a6a47c75ef1bdc5881b9066eeebb124e96d35c33c955e58",
           "exit_code": null,
           "observed_at": "2026-08-11T04:11:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -1259,7 +1663,7 @@
         "agent_id": "builder-r1-5",
         "instance_id": "builder-r1-5-c2",
         "capability_profile": "SYNTHETIC_BUILDER",
-        "context_manifest_digest": "sha256:b894183a5fb2bd83f99f2a808221a174d8626d173a6ad1ff92e73e8e57f6d4a8"
+        "context_manifest_digest": "sha256:eb91b4f8f89afa4d18d44838c4391bbf2e7337b61b4516eea8ed5528664bf2f4"
       },
       "role": "CHANGE_BUILDER",
       "gate": "RECOVERY",
@@ -1279,7 +1683,7 @@
           "id": "E-001",
           "kind": "FILE_SNAPSHOT",
           "locator": "bundle://evidence/message-12",
-          "digest": "sha256:6adca3f6bb1fb67c8da92287ac2c5a0d0aa31253101e51b9c86a5348980bddef",
+          "digest": "sha256:1b61ff4c393348cf68706251df532f4974ce3fd6f21845b012d59d1dc8390af8",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:12:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -1312,7 +1716,7 @@
         "agent_id": "qa-r1-5",
         "instance_id": "qa-r1-5-c2",
         "capability_profile": "QA_TEST_READ_ONLY",
-        "context_manifest_digest": "sha256:1b522c8773fab244aba22994727a3630424381185b8950582d4c06d86e9dbe7c"
+        "context_manifest_digest": "sha256:2af8471c43bbf2a36614d43b2514d93d3ade4b3752da1ba80a39c0867fa2053d"
       },
       "role": "INDEPENDENT_VERIFIER",
       "gate": "QA",
@@ -1332,7 +1736,7 @@
           "id": "E-001",
           "kind": "TEST_REPORT",
           "locator": "bundle://evidence/message-13",
-          "digest": "sha256:ced9947c72f23b40d22acd1be7a8303652e0965e51c6b181d12c4bc18f190285",
+          "digest": "sha256:4fd0b3e0286a98d6b87c8f11668ec7a269266ec5e503794fff0d5fec68e10ee0",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:13:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -1372,7 +1776,7 @@
         "agent_id": "blackbox-r1-5",
         "instance_id": "blackbox-r1-5-c2",
         "capability_profile": "BLACK_BOX_PUBLIC_ONLY",
-        "context_manifest_digest": "sha256:00b4cae7cf8e17a29554bc588090b07bf0c50361ceaa22dc4f00fc74faa8c033"
+        "context_manifest_digest": "sha256:4309a0cbd0543202270177a2239b049ac01aa93e9533451aad9aac009db7fabd"
       },
       "role": "BLACK_BOX_VERIFIER",
       "gate": "BLACK_BOX",
@@ -1383,7 +1787,7 @@
         "lease_generation": 1,
         "attempt": 1,
         "artifacts": [
-          "blackbox://observation-v2"
+          "blackbox://evidence/message-14"
         ]
       },
       "assumptions": [],
@@ -1391,8 +1795,8 @@
         {
           "id": "E-001",
           "kind": "BLACK_BOX_OBSERVATION",
-          "locator": "blackbox://observation-v2",
-          "digest": "sha256:83e9d31d5544508c0f8e6b079a2a487e5c7943b122ade8bf6a0d20a3f7aa7cb0",
+          "locator": "blackbox://evidence/message-14",
+          "digest": "sha256:1985d0ba14d43507b7fc9ea9673f372cb1967c2135c8b8b29e60f5b3d388adfb",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:14:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
@@ -1432,7 +1836,7 @@
         "agent_id": "builder-r1-5",
         "instance_id": "builder-r1-5-c2",
         "capability_profile": "SYNTHETIC_BUILDER",
-        "context_manifest_digest": "sha256:b894183a5fb2bd83f99f2a808221a174d8626d173a6ad1ff92e73e8e57f6d4a8"
+        "context_manifest_digest": "sha256:eb91b4f8f89afa4d18d44838c4391bbf2e7337b61b4516eea8ed5528664bf2f4"
       },
       "role": "CHANGE_BUILDER",
       "gate": "CLOSURE",
@@ -1452,7 +1856,7 @@
           "id": "E-001",
           "kind": "FILE_SNAPSHOT",
           "locator": "bundle://evidence/message-15",
-          "digest": "sha256:8ddc8a8c6e46c6cca7bfed4075b2a3e18a39b8ee6404d4826fe8c87269465e3e",
+          "digest": "sha256:6ee5b24a6da2bc6706245397372147e0ade2f8d30794e511df819d6838775779",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:15:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"

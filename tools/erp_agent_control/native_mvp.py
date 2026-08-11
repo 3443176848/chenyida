@@ -28,8 +28,8 @@ try:
 except ImportError:  # Direct script execution.
     from readonly_controller import validate_task_packet
 
-VALIDATOR_VERSION = "0.4.2"
-BUNDLE_SCHEMA = "chenyida-erp-native-pilot-bundle/v1"
+VALIDATOR_VERSION = "0.5.0"
+BUNDLE_SCHEMA = "chenyida-erp-native-pilot-bundle/v2"
 REPORT_SCHEMA = "chenyida-erp-native-pilot-report/v1"
 CONTEXT_SCHEMA = "erp-agent-context/v1"
 MESSAGE_SCHEMA = "erp-agent-message/v1"
@@ -88,6 +88,56 @@ MESSAGE_TYPES = frozenset(
         "CLOSURE",
     }
 )
+MESSAGE_TYPE_BINDINGS: dict[str, frozenset[tuple[str, str, str]]] = {
+    "PLAN": frozenset({("CHANGE_BUILDER", "IMPLEMENTATION", "IN_PROGRESS")}),
+    "HANDOFF": frozenset({("CHANGE_BUILDER", "IMPLEMENTATION", "PASS")}),
+    "FINDING": frozenset(
+        {
+            ("ERP_CONTRACT_GUARDIAN", "ERP_CONTRACT", "FAIL"),
+            ("ADVERSARIAL_EXAMINER", "ADVERSARIAL", "FAIL"),
+            ("SECURITY_BOUNDARY_EXAMINER", "SECURITY", "FAIL"),
+            ("INDEPENDENT_VERIFIER", "QA", "FAIL"),
+            ("BLACK_BOX_VERIFIER", "BLACK_BOX", "FAIL"),
+        }
+    ),
+    "VERIFICATION": frozenset(
+        {
+            ("ERP_CONTRACT_GUARDIAN", "ERP_CONTRACT", status)
+            for status in ("PASS", "FAIL")
+        }
+        | {
+            ("ADVERSARIAL_EXAMINER", "ADVERSARIAL", status)
+            for status in ("PASS", "FAIL")
+        }
+        | {
+            ("SECURITY_BOUNDARY_EXAMINER", "SECURITY", status)
+            for status in ("PASS", "FAIL")
+        }
+        | {
+            ("INDEPENDENT_VERIFIER", "QA", status)
+            for status in ("PASS", "FAIL", "RESULT_UNKNOWN")
+        }
+        | {
+            ("BLACK_BOX_VERIFIER", "BLACK_BOX", status)
+            for status in ("PASS", "FAIL", "RESULT_UNKNOWN")
+        }
+    ),
+    "VETO": frozenset(
+        {
+            ("ERP_CONTRACT_GUARDIAN", "ERP_CONTRACT", "VETOED"),
+            ("ADVERSARIAL_EXAMINER", "ADVERSARIAL", "VETOED"),
+            ("SECURITY_BOUNDARY_EXAMINER", "SECURITY", "VETOED"),
+            ("INDEPENDENT_VERIFIER", "QA", "VETOED"),
+            ("BLACK_BOX_VERIFIER", "BLACK_BOX", "VETOED"),
+        }
+    ),
+    "MINORITY_REPORT": frozenset(
+        {("ADVERSARIAL_EXAMINER", "ADVERSARIAL", "VETOED")}
+    ),
+    "CHECKPOINT": frozenset({("CHANGE_BUILDER", "IMPLEMENTATION", "IN_PROGRESS")}),
+    "RECOVERY": frozenset({("CHANGE_BUILDER", "RECOVERY", "PASS")}),
+    "CLOSURE": frozenset({("CHANGE_BUILDER", "CLOSURE", "COMPLETE")}),
+}
 STATUSES = frozenset(
     {"IN_PROGRESS", "PASS", "FAIL", "VETOED", "BLOCKED", "COMPLETE", "RESULT_UNKNOWN"}
 )
@@ -358,12 +408,126 @@ def _validate_candidate(raw: Any, index: int, expected_parent: str) -> dict[str,
     }
 
 
+def _artifact_record(classification: str, payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "classification": classification,
+        "payload": payload,
+        "digest": _sha256_ref(_canonical_json(payload)),
+    }
+
+
+def _expected_context_artifacts(
+    packet: dict[str, Any], candidates: list[dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    artifacts: dict[str, dict[str, Any]] = {
+        "bundle://synthetic-contract-v1": _artifact_record(
+            "SYNTHETIC_CONTRACT",
+            {
+                "artifact_type": "SYNTHETIC_CONTRACT",
+                "schema_version": "synthetic-contract/v1",
+                "task_id": packet["task"]["id"],
+                "task_packet_revision": packet["task"]["revision"],
+                "data_classification": packet["scope"]["data_classification"],
+            },
+        )
+    }
+    for candidate_number, candidate in enumerate(candidates, start=1):
+        suffix = f"c{candidate_number}"
+        artifacts[f"bundle://candidate/{suffix}"] = _artifact_record(
+            "SYNTHETIC_CANDIDATE",
+            {
+                "artifact_type": "SYNTHETIC_CANDIDATE",
+                "candidate_sha": candidate["candidate_sha"],
+                "content": candidate["content"],
+            },
+        )
+        for assignment in packet["orchestration"]["roles"]:
+            if assignment["context_visibility"] == "BLACK_BOX_PUBLIC_ONLY":
+                continue
+            agent_id = assignment["agent_id"]
+            artifacts[f"bundle://evidence/{agent_id}/{suffix}"] = _artifact_record(
+                "SYNTHETIC_TEST_EVIDENCE",
+                {
+                    "artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE",
+                    "task_id": packet["task"]["id"],
+                    "agent_id": agent_id,
+                    "role": assignment["role"],
+                    "candidate_sha": candidate["candidate_sha"],
+                    "visibility": assignment["context_visibility"],
+                },
+            )
+    final_sha = candidates[-1]["candidate_sha"]
+    for locator, classification, artifact_type, version in (
+        ("blackbox://interface-v2", "PUBLIC_INTERFACE", "PUBLIC_INTERFACE", "v2"),
+        ("blackbox://personas-v1", "PUBLIC_PERSONA", "PUBLIC_PERSONA", "v1"),
+        ("blackbox://observation-v2", "PUBLIC_OBSERVATION", "PUBLIC_OBSERVATION", "v2"),
+    ):
+        artifacts[locator] = _artifact_record(
+            classification,
+            {
+                "artifact_type": artifact_type,
+                "task_id": packet["task"]["id"],
+                "candidate_sha": final_sha,
+                "version": version,
+                "source_visibility": "BLACK_BOX_PUBLIC_ONLY",
+            },
+        )
+    return artifacts
+
+
+def _validate_artifact_registry(raw: Any) -> dict[str, dict[str, Any]]:
+    if not isinstance(raw, dict) or not raw:
+        raise ProtocolProblem("ARTIFACT_REGISTRY_REQUIRED", "bundle.artifacts")
+    artifacts: dict[str, dict[str, Any]] = {}
+    for locator, raw_record in raw.items():
+        locator = _validate_locator(locator, "bundle.artifacts.locator")
+        subject = f"bundle.artifacts[{locator}]"
+        record = _object(raw_record, {"classification", "payload", "digest"}, subject)
+        classification = _string(
+            record["classification"],
+            f"{subject}.classification",
+            choices=ALL_CLASSIFICATIONS,
+        )
+        if not isinstance(record["payload"], dict):
+            raise ProtocolProblem("ARTIFACT_PAYLOAD_INVALID", f"{subject}.payload")
+        digest = _string(record["digest"], f"{subject}.digest", pattern=SHA256_REF_RE)
+        try:
+            expected_digest = _sha256_ref(_canonical_json(record["payload"]))
+        except (TypeError, ValueError, UnicodeError, RecursionError) as exc:
+            raise ProtocolProblem("ARTIFACT_PAYLOAD_INVALID", f"{subject}.payload") from exc
+        if digest != expected_digest:
+            raise ProtocolProblem("ARTIFACT_DIGEST_MISMATCH", subject)
+        artifacts[locator] = {
+            "classification": classification,
+            "payload": record["payload"],
+            "digest": digest,
+        }
+    return artifacts
+
+
+def _message_evidence_payload(
+    message: dict[str, Any], evidence: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": message["message_id"],
+        "task_id": message["task_id"],
+        "candidate_sha": message["input"]["candidate_sha"],
+        "agent_id": message["agent"]["agent_id"],
+        "kind": evidence["kind"],
+        "exit_code": evidence["exit_code"],
+        "observed_at": evidence["observed_at"],
+    }
+
+
 def _validate_context(
     raw: Any,
     index: int,
     packet: dict[str, Any],
-    candidates: set[str],
+    candidate_positions: dict[str, int],
     assignments: dict[str, dict[str, Any]],
+    artifact_registry: dict[str, dict[str, Any]],
+    expected_artifacts: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     subject = f"contexts[{index}]"
     manifest = _object(
@@ -413,7 +577,7 @@ def _validate_context(
     candidate_sha = _string(
         manifest["candidate_sha"], f"{subject}.candidate_sha", pattern=CANDIDATE_RE
     )
-    if candidate_sha not in candidates:
+    if candidate_sha not in candidate_positions:
         raise ProtocolProblem("CONTEXT_CANDIDATE_UNKNOWN", subject)
     _integer(manifest["lease_generation"], f"{subject}.lease_generation", minimum=1)
     if manifest["lease_generation"] != packet["orchestration"]["active_lease_generation"]:
@@ -442,6 +606,31 @@ def _validate_context(
             raise ProtocolProblem("BLACK_BOX_SOURCE_CONTEXT", document_subject)
         if visibility == "SYNTHETIC_PROTOCOL_ONLY" and not locator.startswith("bundle://"):
             raise ProtocolProblem("NON_SYNTHETIC_LOCATOR", document_subject)
+        artifact = artifact_registry.get(locator)
+        if artifact is None:
+            raise ProtocolProblem("CONTEXT_ARTIFACT_UNKNOWN", document_subject)
+        if (
+            artifact["digest"] != document["digest"]
+            or artifact["classification"] != classification
+            or expected_artifacts.get(locator) != artifact
+        ):
+            raise ProtocolProblem("CONTEXT_ARTIFACT_BINDING_INVALID", document_subject)
+
+    suffix = f"c{candidate_positions[candidate_sha] + 1}"
+    if visibility == "BLACK_BOX_PUBLIC_ONLY":
+        expected_locators = {
+            "blackbox://interface-v2",
+            "blackbox://personas-v1",
+            "blackbox://observation-v2",
+        }
+    else:
+        expected_locators = {
+            "bundle://synthetic-contract-v1",
+            f"bundle://candidate/{suffix}",
+            f"bundle://evidence/{agent_id}/{suffix}",
+        }
+    if document_locators != expected_locators:
+        raise ProtocolProblem("CONTEXT_DOCUMENT_SET_INVALID", subject)
 
     forbidden_context = set(
         _string_list(
@@ -466,6 +655,7 @@ def _validate_context(
         "profile": profile,
         "role": role,
         "visibility": visibility,
+        "document_locators": document_locators,
     }
 
 
@@ -488,7 +678,11 @@ def _validate_evidence(raw: Any, subject: str) -> dict[str, Any]:
     return evidence
 
 
-def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
+def _validate_message_structure(
+    raw: Any,
+    index: int,
+    artifact_registry: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
     subject = f"messages[{index}]"
     message = _object(
         raw,
@@ -582,6 +776,48 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
     evidence_ids = [item["id"] for item in evidence]
     if len(evidence_ids) != len(set(evidence_ids)):
         raise ProtocolProblem("DUPLICATE_EVIDENCE_ID", subject)
+    evidence_locators = [item["locator"] for item in evidence]
+    if len(evidence_locators) != len(set(evidence_locators)):
+        raise ProtocolProblem("DUPLICATE_EVIDENCE_LOCATOR", subject)
+    if message["role"] == "BLACK_BOX_VERIFIER":
+        for artifact_index, artifact in enumerate(artifacts):
+            _validate_locator(
+                artifact,
+                f"{subject}.input.artifacts[{artifact_index}]",
+                black_box=True,
+            )
+        for evidence_index, item in enumerate(evidence):
+            if item["kind"] != "BLACK_BOX_OBSERVATION":
+                raise ProtocolProblem("BLACK_BOX_SOURCE_CONTEXT", subject)
+            _validate_locator(
+                item["locator"],
+                f"{subject}.evidence[{evidence_index}].locator",
+                black_box=True,
+            )
+    else:
+        if any(not artifact.startswith("bundle://") for artifact in artifacts):
+            raise ProtocolProblem("NON_SYNTHETIC_LOCATOR", subject)
+        if any(not item["locator"].startswith("bundle://") for item in evidence):
+            raise ProtocolProblem("NON_SYNTHETIC_LOCATOR", subject)
+    if set(artifacts) != set(evidence_locators):
+        raise ProtocolProblem("MESSAGE_ARTIFACT_BINDING_INVALID", subject)
+    expected_classification = (
+        "PUBLIC_OBSERVATION"
+        if message["role"] == "BLACK_BOX_VERIFIER"
+        else "SYNTHETIC_TEST_EVIDENCE"
+    )
+    for evidence_index, item in enumerate(evidence):
+        evidence_subject = f"{subject}.evidence[{evidence_index}]"
+        artifact = artifact_registry.get(item["locator"])
+        if artifact is None:
+            raise ProtocolProblem("EVIDENCE_ARTIFACT_UNKNOWN", evidence_subject)
+        if artifact["classification"] != expected_classification:
+            raise ProtocolProblem("EVIDENCE_CLASSIFICATION_INVALID", evidence_subject)
+        if artifact["digest"] != item["digest"]:
+            raise ProtocolProblem("EVIDENCE_DIGEST_MISMATCH", evidence_subject)
+        if artifact["payload"] != _message_evidence_payload(message, item):
+            raise ProtocolProblem("EVIDENCE_PAYLOAD_MISMATCH", evidence_subject)
+    evidence_by_id = {item["id"]: item for item in evidence}
 
     if not isinstance(message["changes"], list):
         raise ProtocolProblem("ARRAY_REQUIRED", f"{subject}.changes")
@@ -599,6 +835,7 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
     if not isinstance(message["tests"], list):
         raise ProtocolProblem("ARRAY_REQUIRED", f"{subject}.tests")
     test_ids: set[str] = set()
+    test_artifacts: set[str] = set()
     for test_index, raw_test in enumerate(message["tests"]):
         test_subject = f"{subject}.tests[{test_index}]"
         test = _object(
@@ -616,9 +853,12 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
         if test["exit_code"] is not None:
             _integer(test["exit_code"], f"{test_subject}.exit_code", minimum=-255, maximum=255)
         if test["artifact"] is not None:
-            artifact = _string(test["artifact"], f"{test_subject}.artifact", maximum=128)
-            if artifact not in evidence_ids:
+            artifact_id = _string(test["artifact"], f"{test_subject}.artifact", maximum=128)
+            if artifact_id not in evidence_by_id:
                 raise ProtocolProblem("TEST_EVIDENCE_UNKNOWN", test_subject)
+            if artifact_id in test_artifacts:
+                raise ProtocolProblem("TEST_EVIDENCE_REUSED", test_subject)
+            test_artifacts.add(artifact_id)
         if (
             (test["result"] == "PASS" and (test["exit_code"] != 0 or test["artifact"] is None))
             or (
@@ -633,9 +873,33 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
                 test["result"] == "NOT_RUN"
                 and (test["exit_code"] is not None or test["artifact"] is not None)
             )
-            or (test["result"] == "RESULT_UNKNOWN" and test["exit_code"] is not None)
+            or (
+                test["result"] == "RESULT_UNKNOWN"
+                and (test["exit_code"] is not None or test["artifact"] is None)
+            )
         ):
             raise ProtocolProblem("TEST_RESULT_INCONSISTENT", test_subject)
+        if test["artifact"] is not None:
+            test_evidence = evidence_by_id[test["artifact"]]
+            expected_kind = (
+                "BLACK_BOX_OBSERVATION"
+                if message["role"] == "BLACK_BOX_VERIFIER"
+                else "TEST_REPORT"
+            )
+            if test_evidence["kind"] != expected_kind:
+                raise ProtocolProblem("TEST_EVIDENCE_KIND_INVALID", test_subject)
+            if test_evidence["exit_code"] != test["exit_code"]:
+                raise ProtocolProblem("TEST_EVIDENCE_EXIT_CODE_MISMATCH", test_subject)
+    expected_test_kind = (
+        "BLACK_BOX_OBSERVATION"
+        if message["role"] == "BLACK_BOX_VERIFIER"
+        else "TEST_REPORT"
+    )
+    declared_test_evidence = {
+        item["id"] for item in evidence if item["kind"] == expected_test_kind
+    }
+    if message["tests"] and test_artifacts != declared_test_evidence:
+        raise ProtocolProblem("TEST_EVIDENCE_BINDING_INVALID", subject)
 
     if not isinstance(message["risks"], list):
         raise ProtocolProblem("ARRAY_REQUIRED", f"{subject}.risks")
@@ -688,7 +952,11 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
     _string(recommendation["reason"], f"{subject}.recommendation.reason", maximum=1024)
     _string(recommendation["next_action"], f"{subject}.recommendation.next_action", maximum=256)
     _string(message["status"], f"{subject}.status", choices=STATUSES)
-    _string_list(message["resolves_message_ids"], f"{subject}.resolves_message_ids", pattern=UUID_RE)
+    resolves_message_ids = _string_list(
+        message["resolves_message_ids"],
+        f"{subject}.resolves_message_ids",
+        pattern=UUID_RE,
+    )
     _string_list(
         message["resolves_claim_ids"],
         f"{subject}.resolves_claim_ids",
@@ -734,16 +1002,11 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
             pattern=UUID_RE,
         )
 
-    if message["gate"] in REVIEW_GATES:
-        permitted_types = {
-            "PASS": {"VERIFICATION"},
-            "FAIL": {"FINDING", "VERIFICATION"},
-            "VETOED": {"MINORITY_REPORT", "VETO"},
-            "RESULT_UNKNOWN": {"VERIFICATION"},
-        }
-        allowed_types = permitted_types.get(message["status"])
-        if allowed_types is not None and message["message_type"] not in allowed_types:
-            raise ProtocolProblem("REVIEW_MESSAGE_TYPE_INVALID", subject)
+    binding = (message["role"], message["gate"], message["status"])
+    if binding not in MESSAGE_TYPE_BINDINGS[message["message_type"]]:
+        raise ProtocolProblem("MESSAGE_TYPE_BINDING_INVALID", subject)
+    if message["message_type"] == "RECOVERY" and not resolves_message_ids:
+        raise ProtocolProblem("RECOVERY_REFERENCE_REQUIRED", subject)
     if message["role"] in {"INDEPENDENT_VERIFIER", "BLACK_BOX_VERIFIER"} and message["status"] == "PASS":
         if not message["tests"] or any(
             test["result"] != "PASS"
@@ -752,33 +1015,21 @@ def _validate_message_structure(raw: Any, index: int) -> dict[str, Any]:
             for test in message["tests"]
         ):
             raise ProtocolProblem("GATE_TESTS_NOT_PASSED", subject)
-    if message["role"] == "BLACK_BOX_VERIFIER":
-        for artifact_index, artifact in enumerate(artifacts):
-            _validate_locator(
-                artifact,
-                f"{subject}.input.artifacts[{artifact_index}]",
-                black_box=True,
-            )
-        for evidence_index, item in enumerate(evidence):
-            if item["kind"] != "BLACK_BOX_OBSERVATION":
-                raise ProtocolProblem("BLACK_BOX_SOURCE_CONTEXT", subject)
-            _validate_locator(
-                item["locator"],
-                f"{subject}.evidence[{evidence_index}].locator",
-                black_box=True,
-            )
-    else:
-        if any(not artifact.startswith("bundle://") for artifact in artifacts):
-            raise ProtocolProblem("NON_SYNTHETIC_LOCATOR", subject)
-        if any(not item["locator"].startswith("bundle://") for item in evidence):
-            raise ProtocolProblem("NON_SYNTHETIC_LOCATOR", subject)
     return message
 
 
 def _validate_bundle(bundle: Any) -> dict[str, Any]:
     bundle = _object(
         bundle,
-        {"schema_version", "task_packet", "candidates", "contexts", "messages", "expected"},
+        {
+            "schema_version",
+            "task_packet",
+            "candidates",
+            "artifacts",
+            "contexts",
+            "messages",
+            "expected",
+        },
         "bundle",
     )
     if bundle["schema_version"] != BUNDLE_SCHEMA:
@@ -827,6 +1078,12 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
     ):
         raise ProtocolProblem("FINAL_CANDIDATE_UNSAFE", final_candidate["candidate_sha"])
 
+    artifact_registry = _validate_artifact_registry(bundle["artifacts"])
+    expected_context_artifacts = _expected_context_artifacts(packet, candidates)
+    candidate_positions = {
+        candidate_sha: index for index, candidate_sha in enumerate(candidate_shas)
+    }
+
     assignments = {
         role["agent_id"]: role for role in packet["orchestration"]["roles"]
     }
@@ -836,7 +1093,15 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
     contexts: dict[str, dict[str, Any]] = {}
     context_instances: set[str] = set()
     for index, raw_context in enumerate(raw_contexts):
-        context = _validate_context(raw_context, index, packet, set(candidate_shas), assignments)
+        context = _validate_context(
+            raw_context,
+            index,
+            packet,
+            candidate_positions,
+            assignments,
+            artifact_registry,
+            expected_context_artifacts,
+        )
         if context["digest"] in contexts:
             raise ProtocolProblem("DUPLICATE_CONTEXT_DIGEST", f"contexts[{index}]")
         if context["instance_id"] in context_instances:
@@ -847,7 +1112,19 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
     raw_messages = bundle["messages"]
     if not isinstance(raw_messages, list) or not raw_messages:
         raise ProtocolProblem("MESSAGES_REQUIRED", "bundle.messages")
-    messages = [_validate_message_structure(item, index) for index, item in enumerate(raw_messages)]
+    messages = [
+        _validate_message_structure(item, index, artifact_registry)
+        for index, item in enumerate(raw_messages)
+    ]
+    used_artifacts = {
+        locator
+        for context in contexts.values()
+        for locator in context["document_locators"]
+    } | {
+        item["locator"]
+        for message in messages
+        for item in message["evidence"]
+    }
     message_ids: set[str] = set()
     semantic_attempts: set[tuple[str, str, str, int]] = set()
     latest_attempts: dict[tuple[str, str, str], int] = {}
@@ -856,12 +1133,12 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
     prior_message_ids: set[str] = set()
     minority_claims: dict[str, str] = {}
     resolved_claims: set[str] = set()
+    resolved_claim_messages: dict[str, str] = {}
     unknown_messages: dict[str, tuple[str, str, str, int]] = {}
     resolved_unknowns: dict[str, str] = {}
     gate_results: dict[tuple[str, str], tuple[str, str, int]] = {}
     checkpoint_count = 0
     closure_count = 0
-    candidate_positions = {candidate_sha: index for index, candidate_sha in enumerate(candidate_shas)}
     latest_candidate_position = -1
 
     for index, message in enumerate(messages):
@@ -950,7 +1227,7 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
         if message["message_type"] == "VETO" and message["status"] != "VETOED":
             raise ProtocolProblem("VETO_STATUS_INVALID", subject)
         if message["message_type"] == "MINORITY_REPORT":
-            if message["minority_report"] is None or message["status"] not in {"FAIL", "VETOED"}:
+            if message["minority_report"] is None or message["status"] != "VETOED":
                 raise ProtocolProblem("MINORITY_MESSAGE_INVALID", subject)
         elif message["minority_report"] is not None:
             raise ProtocolProblem("MINORITY_MESSAGE_INVALID", subject)
@@ -999,9 +1276,14 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
                 or not message["evidence"]
                 or message["role"] != "ADVERSARIAL_EXAMINER"
                 or message["gate"] != "ADVERSARIAL"
+                or message["message_type"] != "VERIFICATION"
+                or message["status"] != "PASS"
             ):
                 raise ProtocolProblem("MINORITY_DISPOSITION_INVALID", subject)
+            if claim_id in resolved_claims:
+                raise ProtocolProblem("MINORITY_CLAIM_ALREADY_RESOLVED", subject)
             resolved_claims.add(claim_id)
+            resolved_claim_messages[claim_id] = message_id
 
         if message["status"] == "RESULT_UNKNOWN":
             unknown_messages[message_id] = attempt_key
@@ -1064,6 +1346,11 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
     adversarial_result = gate_results.get((final_sha, "ADVERSARIAL"))
     if adversarial_result is None or adversarial_result[0] != "PASS":
         raise ProtocolProblem("FINAL_ADVERSARIAL_NOT_PASSED", final_sha)
+    if any(
+        message_id != adversarial_result[1]
+        for message_id in resolved_claim_messages.values()
+    ):
+        raise ProtocolProblem("MINORITY_FINAL_DISPOSITION_INVALID", final_sha)
     if closure_count != 1:
         raise ProtocolProblem("CLOSURE_MISSING", final_sha)
 
@@ -1093,6 +1380,8 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
     )
     if expected_unknowns != sorted(resolved_unknowns):
         raise ProtocolProblem("EXPECTED_RECOVERY_MISMATCH", "bundle.expected.result_unknown_resolved")
+    if set(artifact_registry) != used_artifacts:
+        raise ProtocolProblem("ARTIFACT_SET_MISMATCH", "bundle.artifacts")
 
     return {
         "candidate_count": len(candidates),

@@ -247,6 +247,153 @@
       ]
     }
   },
+  "allOf": [
+    {
+      "if": {"properties": {"message_type": {"const": "PLAN"}}, "required": ["message_type"]},
+      "then": {
+        "properties": {
+          "role": {"const": "CHANGE_BUILDER"},
+          "gate": {"const": "IMPLEMENTATION"},
+          "status": {"const": "IN_PROGRESS"},
+          "minority_report": {"type": "null"},
+          "checkpoint": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"message_type": {"const": "HANDOFF"}}, "required": ["message_type"]},
+      "then": {
+        "properties": {
+          "role": {"const": "CHANGE_BUILDER"},
+          "gate": {"const": "IMPLEMENTATION"},
+          "status": {"const": "PASS"},
+          "minority_report": {"type": "null"},
+          "checkpoint": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"message_type": {"const": "FINDING"}}, "required": ["message_type"]},
+      "then": {
+        "properties": {
+          "status": {"const": "FAIL"},
+          "minority_report": {"type": "null"},
+          "checkpoint": {"type": "null"}
+        },
+        "oneOf": [
+          {"properties": {"role": {"const": "ERP_CONTRACT_GUARDIAN"}, "gate": {"const": "ERP_CONTRACT"}}},
+          {"properties": {"role": {"const": "ADVERSARIAL_EXAMINER"}, "gate": {"const": "ADVERSARIAL"}}},
+          {"properties": {"role": {"const": "SECURITY_BOUNDARY_EXAMINER"}, "gate": {"const": "SECURITY"}}},
+          {"properties": {"role": {"const": "INDEPENDENT_VERIFIER"}, "gate": {"const": "QA"}}},
+          {"properties": {"role": {"const": "BLACK_BOX_VERIFIER"}, "gate": {"const": "BLACK_BOX"}}}
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"message_type": {"const": "VERIFICATION"}}, "required": ["message_type"]},
+      "then": {
+        "properties": {
+          "minority_report": {"type": "null"},
+          "checkpoint": {"type": "null"}
+        },
+        "oneOf": [
+          {"properties": {"role": {"const": "ERP_CONTRACT_GUARDIAN"}, "gate": {"const": "ERP_CONTRACT"}, "status": {"enum": ["PASS", "FAIL"]}}},
+          {"properties": {"role": {"const": "ADVERSARIAL_EXAMINER"}, "gate": {"const": "ADVERSARIAL"}, "status": {"enum": ["PASS", "FAIL"]}}},
+          {"properties": {"role": {"const": "SECURITY_BOUNDARY_EXAMINER"}, "gate": {"const": "SECURITY"}, "status": {"enum": ["PASS", "FAIL"]}}},
+          {"properties": {"role": {"const": "INDEPENDENT_VERIFIER"}, "gate": {"const": "QA"}, "status": {"enum": ["PASS", "FAIL", "RESULT_UNKNOWN"]}}},
+          {"properties": {"role": {"const": "BLACK_BOX_VERIFIER"}, "gate": {"const": "BLACK_BOX"}, "status": {"enum": ["PASS", "FAIL", "RESULT_UNKNOWN"]}}}
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"message_type": {"const": "VETO"}}, "required": ["message_type"]},
+      "then": {
+        "properties": {
+          "status": {"const": "VETOED"},
+          "minority_report": {"type": "null"},
+          "checkpoint": {"type": "null"}
+        },
+        "oneOf": [
+          {"properties": {"role": {"const": "ERP_CONTRACT_GUARDIAN"}, "gate": {"const": "ERP_CONTRACT"}}},
+          {"properties": {"role": {"const": "ADVERSARIAL_EXAMINER"}, "gate": {"const": "ADVERSARIAL"}}},
+          {"properties": {"role": {"const": "SECURITY_BOUNDARY_EXAMINER"}, "gate": {"const": "SECURITY"}}},
+          {"properties": {"role": {"const": "INDEPENDENT_VERIFIER"}, "gate": {"const": "QA"}}},
+          {"properties": {"role": {"const": "BLACK_BOX_VERIFIER"}, "gate": {"const": "BLACK_BOX"}}}
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"message_type": {"const": "MINORITY_REPORT"}}, "required": ["message_type"]},
+      "then": {
+        "properties": {
+          "role": {"const": "ADVERSARIAL_EXAMINER"},
+          "gate": {"const": "ADVERSARIAL"},
+          "status": {"const": "VETOED"},
+          "minority_report": {"type": "object"},
+          "checkpoint": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"message_type": {"const": "CHECKPOINT"}}, "required": ["message_type"]},
+      "then": {
+        "properties": {
+          "role": {"const": "CHANGE_BUILDER"},
+          "gate": {"const": "IMPLEMENTATION"},
+          "status": {"const": "IN_PROGRESS"},
+          "minority_report": {"type": "null"},
+          "checkpoint": {"type": "object"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"message_type": {"const": "RECOVERY"}}, "required": ["message_type"]},
+      "then": {
+        "properties": {
+          "role": {"const": "CHANGE_BUILDER"},
+          "gate": {"const": "RECOVERY"},
+          "status": {"const": "PASS"},
+          "minority_report": {"type": "null"},
+          "resolves_message_ids": {"minItems": 1},
+          "checkpoint": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"message_type": {"const": "CLOSURE"}}, "required": ["message_type"]},
+      "then": {
+        "properties": {
+          "role": {"const": "CHANGE_BUILDER"},
+          "gate": {"const": "CLOSURE"},
+          "status": {"const": "COMPLETE"},
+          "minority_report": {"type": "null"},
+          "checkpoint": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"resolves_claim_ids": {"minItems": 1}}, "required": ["resolves_claim_ids"]},
+      "then": {
+        "properties": {
+          "message_type": {"const": "VERIFICATION"},
+          "role": {"const": "ADVERSARIAL_EXAMINER"},
+          "gate": {"const": "ADVERSARIAL"},
+          "status": {"const": "PASS"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"resolves_message_ids": {"minItems": 1}}, "required": ["resolves_message_ids"]},
+      "then": {
+        "properties": {
+          "message_type": {"const": "RECOVERY"},
+          "role": {"const": "CHANGE_BUILDER"},
+          "gate": {"const": "RECOVERY"},
+          "status": {"const": "PASS"}
+        }
+      }
+    }
+  ],
   "$defs": {
     "uuid": {
       "type": "string",

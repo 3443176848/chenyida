@@ -222,8 +222,80 @@ def _candidate(revision: int, parent_sha: str, content: dict[str, str], disposit
     }
 
 
-def _document(locator: str, classification: str) -> dict[str, str]:
-    return {"locator": locator, "digest": digest(locator.encode("utf-8")), "classification": classification}
+def _artifact_record(classification: str, payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "classification": classification,
+        "payload": payload,
+        "digest": digest(payload),
+    }
+
+
+def _build_context_artifacts(
+    packet: dict[str, Any], candidates: list[dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    artifacts: dict[str, dict[str, Any]] = {
+        "bundle://synthetic-contract-v1": _artifact_record(
+            "SYNTHETIC_CONTRACT",
+            {
+                "artifact_type": "SYNTHETIC_CONTRACT",
+                "schema_version": "synthetic-contract/v1",
+                "task_id": packet["task"]["id"],
+                "task_packet_revision": packet["task"]["revision"],
+                "data_classification": packet["scope"]["data_classification"],
+            },
+        )
+    }
+    for candidate_number, candidate in enumerate(candidates, start=1):
+        suffix = f"c{candidate_number}"
+        artifacts[f"bundle://candidate/{suffix}"] = _artifact_record(
+            "SYNTHETIC_CANDIDATE",
+            {
+                "artifact_type": "SYNTHETIC_CANDIDATE",
+                "candidate_sha": candidate["candidate_sha"],
+                "content": candidate["content"],
+            },
+        )
+        for assignment in packet["orchestration"]["roles"]:
+            if assignment["context_visibility"] == "BLACK_BOX_PUBLIC_ONLY":
+                continue
+            agent_id = assignment["agent_id"]
+            artifacts[f"bundle://evidence/{agent_id}/{suffix}"] = _artifact_record(
+                "SYNTHETIC_TEST_EVIDENCE",
+                {
+                    "artifact_type": "SYNTHETIC_CONTEXT_EVIDENCE",
+                    "task_id": packet["task"]["id"],
+                    "agent_id": agent_id,
+                    "role": assignment["role"],
+                    "candidate_sha": candidate["candidate_sha"],
+                    "visibility": assignment["context_visibility"],
+                },
+            )
+    final_sha = candidates[-1]["candidate_sha"]
+    for locator, classification, artifact_type, version in (
+        ("blackbox://interface-v2", "PUBLIC_INTERFACE", "PUBLIC_INTERFACE", "v2"),
+        ("blackbox://personas-v1", "PUBLIC_PERSONA", "PUBLIC_PERSONA", "v1"),
+        ("blackbox://observation-v2", "PUBLIC_OBSERVATION", "PUBLIC_OBSERVATION", "v2"),
+    ):
+        artifacts[locator] = _artifact_record(
+            classification,
+            {
+                "artifact_type": artifact_type,
+                "task_id": packet["task"]["id"],
+                "candidate_sha": final_sha,
+                "version": version,
+                "source_visibility": "BLACK_BOX_PUBLIC_ONLY",
+            },
+        )
+    return artifacts
+
+
+def _document(locator: str, artifacts: dict[str, dict[str, Any]]) -> dict[str, str]:
+    artifact = artifacts[locator]
+    return {
+        "locator": locator,
+        "digest": artifact["digest"],
+        "classification": artifact["classification"],
+    }
 
 
 def _context(
@@ -233,18 +305,19 @@ def _context(
     visibility: str,
     candidate_sha: str,
     suffix: str,
+    artifacts: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     if visibility == "BLACK_BOX_PUBLIC_ONLY":
         documents = [
-            _document("blackbox://interface-v2", "PUBLIC_INTERFACE"),
-            _document("blackbox://personas-v1", "PUBLIC_PERSONA"),
-            _document("blackbox://observation-v2", "PUBLIC_OBSERVATION"),
+            _document("blackbox://interface-v2", artifacts),
+            _document("blackbox://personas-v1", artifacts),
+            _document("blackbox://observation-v2", artifacts),
         ]
     else:
         documents = [
-            _document("bundle://synthetic-contract-v1", "SYNTHETIC_CONTRACT"),
-            _document(f"bundle://candidate/{suffix}", "SYNTHETIC_CANDIDATE"),
-            _document(f"bundle://evidence/{agent_id}/{suffix}", "SYNTHETIC_TEST_EVIDENCE"),
+            _document("bundle://synthetic-contract-v1", artifacts),
+            _document(f"bundle://candidate/{suffix}", artifacts),
+            _document(f"bundle://evidence/{agent_id}/{suffix}", artifacts),
         ]
     manifest: dict[str, Any] = {
         "schema_version": "erp-agent-context/v1",
@@ -264,12 +337,25 @@ def _context(
     return manifest
 
 
+def message_evidence_payload(message: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "artifact_type": "MESSAGE_EVIDENCE",
+        "message_id": message["message_id"],
+        "task_id": message["task_id"],
+        "candidate_sha": message["input"]["candidate_sha"],
+        "agent_id": message["agent"]["agent_id"],
+        "kind": evidence["kind"],
+        "exit_code": evidence["exit_code"],
+        "observed_at": evidence["observed_at"],
+    }
+
+
 def _evidence(sequence: int, kind: str, locator: str, exit_code: int | None = 0) -> dict[str, Any]:
     return {
         "id": "E-001",
         "kind": kind,
         "locator": locator,
-        "digest": digest(locator.encode("utf-8")),
+        "digest": "sha256:" + "0" * 64,
         "exit_code": exit_code,
         "observed_at": f"{FIXED_TIME_PREFIX}:{sequence:02d}:00Z",
         "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production",
@@ -297,7 +383,7 @@ def _message(
     checkpoint: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     locator = evidence_locator or f"bundle://evidence/message-{sequence:02d}"
-    return {
+    message = {
         "schema_version": "erp-agent-message/v1",
         "message_id": f"00000000-0000-4000-8000-{sequence:012d}",
         "message_type": message_type,
@@ -336,6 +422,9 @@ def _message(
         "resolves_claim_ids": resolves_claim_ids or [],
         "checkpoint": checkpoint,
     }
+    for item in message["evidence"]:
+        item["digest"] = digest(message_evidence_payload(message, item))
+    return message
 
 
 def build_valid_bundle() -> dict[str, Any]:
@@ -355,6 +444,7 @@ def build_valid_bundle() -> dict[str, Any]:
     }
     second = _candidate(2, first["candidate_sha"], safe_content, "FINAL")
     candidates = [first, second]
+    artifacts = _build_context_artifacts(packet, candidates)
 
     role_assignments = {item["role"]: item for item in packet["orchestration"]["roles"]}
     contexts: dict[tuple[str, int], dict[str, Any]] = {}
@@ -374,6 +464,7 @@ def build_valid_bundle() -> dict[str, Any]:
                 assignment["context_visibility"],
                 candidate["candidate_sha"],
                 f"c{candidate_number}",
+                artifacts,
             )
     blackbox_assignment = role_assignments["BLACK_BOX_VERIFIER"]
     contexts[("BLACK_BOX_VERIFIER", 2)] = _context(
@@ -383,6 +474,7 @@ def build_valid_bundle() -> dict[str, Any]:
         blackbox_assignment["context_visibility"],
         second["candidate_sha"],
         "c2",
+        artifacts,
     )
 
     c1 = first["candidate_sha"]
@@ -434,6 +526,7 @@ def build_valid_bundle() -> dict[str, Any]:
             "FAIL",
             "REJECT_FAILED_RETRY_TEST",
             evidence_kind="TEST_REPORT",
+            evidence_exit_code=1,
             tests=[
                 {
                     "id": "T-001",
@@ -550,7 +643,7 @@ def build_valid_bundle() -> dict[str, Any]:
             "PASS",
             "PASS_CURRENT_GATE",
             evidence_kind="BLACK_BOX_OBSERVATION",
-            evidence_locator="blackbox://observation-v2",
+            evidence_locator="blackbox://evidence/message-14",
             tests=[
                 {
                     "id": "T-001",
@@ -564,10 +657,25 @@ def build_valid_bundle() -> dict[str, Any]:
         ),
         _message(15, contexts[("CHANGE_BUILDER", 2)], c2, "CLOSURE", "CLOSURE", "COMPLETE", "CLOSE_SYNTHETIC_PILOT_ONLY"),
     ]
+    for item in messages:
+        for evidence in item["evidence"]:
+            classification = (
+                "PUBLIC_OBSERVATION"
+                if item["role"] == "BLACK_BOX_VERIFIER"
+                else "SYNTHETIC_TEST_EVIDENCE"
+            )
+            locator = evidence["locator"]
+            if locator in artifacts:
+                raise ValueError(f"duplicate artifact locator: {locator}")
+            artifacts[locator] = _artifact_record(
+                classification,
+                message_evidence_payload(item, evidence),
+            )
     return {
-        "schema_version": "chenyida-erp-native-pilot-bundle/v1",
+        "schema_version": "chenyida-erp-native-pilot-bundle/v2",
         "task_packet": packet,
         "candidates": candidates,
+        "artifacts": artifacts,
         "contexts": list(contexts.values()),
         "messages": messages,
         "expected": {
