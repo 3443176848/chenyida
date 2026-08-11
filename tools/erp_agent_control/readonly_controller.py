@@ -25,7 +25,7 @@ from typing import Any, Iterable
 
 sys.dont_write_bytecode = True
 
-CONTROLLER_VERSION = "0.2.3"
+CONTROLLER_VERSION = "0.2.4"
 REPORT_SCHEMA = "chenyida-erp-agent-readonly-report/v1"
 PACKET_SCHEMA_V1 = "chenyida-erp-agent-task/v1"
 PACKET_SCHEMA_V2 = "chenyida-erp-agent-task/v2"
@@ -178,46 +178,168 @@ def _validate_relative_path(value: Any, *, allow_glob: bool = False) -> str:
     return value
 
 
-def _checked_path(root: Path, relative_path: str, *, directory: bool = False) -> Path:
-    relative_path = _validate_relative_path(relative_path)
-    current = root
-    for part in PurePosixPath(relative_path).parts:
-        current = current / part
+def _metadata_fingerprint(metadata: os.stat_result) -> tuple[int, ...]:
+    """Return identity and change-version fields that cannot follow a pathname."""
+
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def _secure_open_flags(*, directory: bool) -> int:
+    required_flags = ("O_CLOEXEC", "O_NOFOLLOW")
+    if directory:
+        required_flags += ("O_DIRECTORY",)
+    if any(not hasattr(os, name) for name in required_flags):
+        raise InspectionProblem("SECURE_DESCRIPTOR_OPEN_UNAVAILABLE")
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    if directory:
+        flags |= os.O_DIRECTORY
+    return flags
+
+
+def _close_descriptor_chain(
+    descriptors: list[tuple[int, os.stat_result]],
+) -> None:
+    for descriptor, _ in reversed(descriptors):
         try:
-            metadata = current.lstat()
+            os.close(descriptor)
+        except OSError:
+            pass
+
+
+def _verify_descriptor_chain(
+    descriptors: list[tuple[int, os.stat_result]],
+    relative_path: str,
+) -> None:
+    for descriptor, expected_metadata in descriptors:
+        try:
+            actual_metadata = os.fstat(descriptor)
+        except OSError as exc:
+            raise InspectionProblem("PATH_CHANGED_DURING_READ", relative_path) from exc
+        if _metadata_fingerprint(actual_metadata) != _metadata_fingerprint(expected_metadata):
+            raise InspectionProblem("PATH_CHANGED_DURING_READ", relative_path)
+
+
+def _open_checked_descriptor_chain(
+    root: Path,
+    relative_path: str,
+    *,
+    directory: bool = False,
+) -> list[tuple[int, os.stat_result]]:
+    """Open every path component without following links and retain all ancestors.
+
+    Retaining the directory descriptors until the caller finishes lets the caller
+    detect replacement of an intermediate directory as well as replacement or
+    in-place mutation of the final file.
+    """
+
+    relative_path = _validate_relative_path(relative_path)
+    descriptors: list[tuple[int, os.stat_result]] = []
+    try:
+        try:
+            expected_root = os.stat(root, follow_symlinks=False)
         except FileNotFoundError as exc:
-            raise InspectionProblem("REQUIRED_PATH_MISSING", relative_path) from exc
+            raise InspectionProblem("PATH_CHANGED_DURING_READ", relative_path) from exc
         except OSError as exc:
             raise InspectionProblem("REQUIRED_PATH_UNREADABLE", relative_path) from exc
-        if stat.S_ISLNK(metadata.st_mode):
-            raise InspectionProblem("SYMLINK_PATH_REJECTED", relative_path)
-    try:
-        final_metadata = current.stat()
-    except OSError as exc:
-        raise InspectionProblem("REQUIRED_PATH_UNREADABLE", relative_path) from exc
-    required_type = stat.S_ISDIR if directory else stat.S_ISREG
-    if not required_type(final_metadata.st_mode):
-        raise InspectionProblem(
-            "REQUIRED_DIRECTORY_INVALID" if directory else "REQUIRED_FILE_INVALID",
-            relative_path,
-        )
-    if not directory and final_metadata.st_nlink != 1:
-        raise InspectionProblem("HARDLINK_PATH_REJECTED", relative_path)
-    return current
+        if stat.S_ISLNK(expected_root.st_mode) or not stat.S_ISDIR(expected_root.st_mode):
+            raise InspectionProblem("PATH_CHANGED_DURING_READ", relative_path)
+        try:
+            root_descriptor = os.open(root, _secure_open_flags(directory=True))
+        except OSError as exc:
+            raise InspectionProblem("PATH_CHANGED_DURING_READ", relative_path) from exc
+        try:
+            opened_root = os.fstat(root_descriptor)
+        except OSError as exc:
+            try:
+                os.close(root_descriptor)
+            except OSError:
+                pass
+            raise InspectionProblem("PATH_CHANGED_DURING_READ", relative_path) from exc
+        descriptors.append((root_descriptor, opened_root))
+        if _metadata_fingerprint(expected_root) != _metadata_fingerprint(opened_root):
+            raise InspectionProblem("PATH_CHANGED_DURING_READ", relative_path)
+
+        parts = PurePosixPath(relative_path).parts
+        for index, part in enumerate(parts):
+            parent_descriptor = descriptors[-1][0]
+            final_component = index == len(parts) - 1
+            requires_directory = not final_component or directory
+            try:
+                expected_metadata = os.stat(
+                    part,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+            except FileNotFoundError as exc:
+                raise InspectionProblem("REQUIRED_PATH_MISSING", relative_path) from exc
+            except OSError as exc:
+                raise InspectionProblem("REQUIRED_PATH_UNREADABLE", relative_path) from exc
+            if stat.S_ISLNK(expected_metadata.st_mode):
+                raise InspectionProblem("SYMLINK_PATH_REJECTED", relative_path)
+            if requires_directory and not stat.S_ISDIR(expected_metadata.st_mode):
+                raise InspectionProblem("REQUIRED_DIRECTORY_INVALID", relative_path)
+            if not requires_directory and not stat.S_ISREG(expected_metadata.st_mode):
+                raise InspectionProblem("REQUIRED_FILE_INVALID", relative_path)
+            if not requires_directory and expected_metadata.st_nlink != 1:
+                raise InspectionProblem("HARDLINK_PATH_REJECTED", relative_path)
+
+            try:
+                descriptor = os.open(
+                    part,
+                    _secure_open_flags(directory=requires_directory),
+                    dir_fd=parent_descriptor,
+                )
+            except OSError as exc:
+                raise InspectionProblem("PATH_CHANGED_DURING_READ", relative_path) from exc
+            try:
+                opened_metadata = os.fstat(descriptor)
+            except OSError as exc:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+                raise InspectionProblem("PATH_CHANGED_DURING_READ", relative_path) from exc
+            descriptors.append((descriptor, opened_metadata))
+            if _metadata_fingerprint(expected_metadata) != _metadata_fingerprint(opened_metadata):
+                raise InspectionProblem("PATH_CHANGED_DURING_READ", relative_path)
+
+        _verify_descriptor_chain(descriptors, relative_path)
+        return descriptors
+    except BaseException:
+        _close_descriptor_chain(descriptors)
+        raise
 
 
 def _read_bytes(root: Path, relative_path: str, *, maximum: int) -> bytes:
-    path = _checked_path(root, relative_path)
+    descriptors = _open_checked_descriptor_chain(root, relative_path)
     try:
-        size = path.stat().st_size
-        if size > maximum:
+        initial_metadata = descriptors[-1][1]
+        if initial_metadata.st_size > maximum:
             raise InspectionProblem("READ_SIZE_LIMIT_EXCEEDED", relative_path)
-        with path.open("rb") as handle:
-            value = handle.read(maximum + 1)
+        chunks: list[bytes] = []
+        remaining = maximum + 1
+        while remaining:
+            chunk = os.read(descriptors[-1][0], min(remaining, 64 * 1024))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        value = b"".join(chunks)
+        _verify_descriptor_chain(descriptors, relative_path)
     except InspectionProblem:
         raise
     except OSError as exc:
         raise InspectionProblem("REQUIRED_PATH_UNREADABLE", relative_path) from exc
+    finally:
+        _close_descriptor_chain(descriptors)
     if len(value) > maximum:
         raise InspectionProblem("READ_SIZE_LIMIT_EXCEEDED", relative_path)
     return value
@@ -816,25 +938,42 @@ def _inspect_migrations(
 ) -> dict[str, Any]:
     inspection = packet["inspection"]
     expected = packet["baseline"]["source_migration"]
-    migration_dir = _checked_path(root, inspection["migration_directory"], directory=True)
     migrations: list[tuple[int, str]] = []
     seen_numbers: set[int] = set()
+    directory_descriptors = _open_checked_descriptor_chain(
+        root,
+        inspection["migration_directory"],
+        directory=True,
+    )
     try:
-        directory_entries = sorted(os.scandir(migration_dir), key=lambda item: item.name)
+        with os.scandir(directory_descriptors[-1][0]) as iterator:
+            directory_entries = sorted(
+                (
+                    entry.name,
+                    entry.is_symlink(),
+                    entry.is_file(follow_symlinks=False),
+                )
+                for entry in iterator
+            )
+        _verify_descriptor_chain(directory_descriptors, inspection["migration_directory"])
+    except InspectionProblem:
+        raise
     except OSError as exc:
         raise InspectionProblem("REQUIRED_PATH_UNREADABLE", inspection["migration_directory"]) from exc
-    for entry in directory_entries:
-        match = MIGRATION_RE.fullmatch(entry.name)
+    finally:
+        _close_descriptor_chain(directory_descriptors)
+    for entry_name, entry_is_symlink, entry_is_file in directory_entries:
+        match = MIGRATION_RE.fullmatch(entry_name)
         if match is None:
             continue
-        if entry.is_symlink() or not entry.is_file(follow_symlinks=False):
-            findings.append(_finding("MIGRATION_FILE_INVALID", "FAIL", subject=entry.name))
+        if entry_is_symlink or not entry_is_file:
+            findings.append(_finding("MIGRATION_FILE_INVALID", "FAIL", subject=entry_name))
             continue
         number = int(match.group("number"))
         if number in seen_numbers:
             findings.append(_finding("MIGRATION_NUMBER_DUPLICATE", "FAIL", actual=number))
         seen_numbers.add(number)
-        migrations.append((number, entry.name))
+        migrations.append((number, entry_name))
 
     actual_numbers = sorted(number for number, _ in migrations)
     expected_numbers = list(range(expected["first_number"], expected["head_number"] + 1))

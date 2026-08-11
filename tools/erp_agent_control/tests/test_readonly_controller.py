@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 CONTROLLER_PATH = Path(__file__).resolve().parents[1] / "readonly_controller.py"
@@ -616,6 +617,46 @@ class ReadonlyControllerTest(unittest.TestCase):
         report = self.inspect()
 
         self.assertIn("HARDLINK_PATH_REJECTED", finding_codes(report))
+
+    def test_final_file_replacement_between_stat_and_open_fails_closed(self) -> None:
+        target = self.fixture.root / "docs/project/MASTER.md"
+        replacement = self.fixture.root / "docs/project/MASTER.replacement"
+        replacement.write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
+        real_open = os.open
+        replaced = False
+
+        def racing_open(path, flags, mode=0o777, *, dir_fd=None):
+            nonlocal replaced
+            if not replaced and path == "MASTER.md" and dir_fd is not None:
+                os.replace(replacement, target)
+                replaced = True
+            return real_open(path, flags, mode, dir_fd=dir_fd)
+
+        with mock.patch.object(CONTROLLER.os, "open", side_effect=racing_open):
+            report = self.inspect()
+
+        self.assertTrue(replaced)
+        self.assertIn("PATH_CHANGED_DURING_READ", finding_codes(report))
+
+    def test_intermediate_directory_replacement_during_open_fails_closed(self) -> None:
+        target = self.fixture.root / "docs/project"
+        moved = self.fixture.root / "docs/project-before-race"
+        real_open = os.open
+        replaced = False
+
+        def racing_open(path, flags, mode=0o777, *, dir_fd=None):
+            nonlocal replaced
+            if not replaced and path == "project" and dir_fd is not None:
+                target.rename(moved)
+                target.symlink_to(moved, target_is_directory=True)
+                replaced = True
+            return real_open(path, flags, mode, dir_fd=dir_fd)
+
+        with mock.patch.object(CONTROLLER.os, "open", side_effect=racing_open):
+            report = self.inspect()
+
+        self.assertTrue(replaced)
+        self.assertIn("PATH_CHANGED_DURING_READ", finding_codes(report))
 
     def test_corrupt_packet_recovers_without_persistent_state(self) -> None:
         packet_path = self.fixture.root / "docs/agent-control/task-packets/AGENT-R1.json"
