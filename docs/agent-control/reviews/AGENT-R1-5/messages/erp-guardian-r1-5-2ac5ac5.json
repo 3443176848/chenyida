@@ -1,0 +1,106 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "c8c4b8b7-60c2-4e42-8c55-89ac0ea7c719",
+  "message_type": "VERIFICATION",
+  "created_at": "2026-08-11T08:30:00+08:00",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "erp-guardian-r1-5",
+    "instance_id": "erp-guardian-r1-5-native8",
+    "capability_profile": "ERP_READ_ONLY",
+    "context_manifest_digest": "sha256:39f09855ac8671c5146390a409d4f8091fe320c02d90e1e5487b690d7731e14d"
+  },
+  "role": "ERP_CONTRACT_GUARDIAN",
+  "gate": "ERP_CONTRACT",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "2ac5ac5b1e400c095e5ee5152469f37be9de1a91",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/review/scope-boundary",
+      "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/review/manifest-digests",
+      "test://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/native-hardening-targets"
+    ]
+  },
+  "assumptions": [],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "TEST_REPORT",
+      "locator": "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/review/scope-boundary",
+      "digest": "sha256:c1aeff9f4e75ab460d8a74d65215273bf5fe4083c39eb876b974e33ae23110f7",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T08:30:00+08:00",
+      "redaction": "Git object IDs and synthetic paths only; no product contents or external systems accessed."
+    },
+    {
+      "id": "E-002",
+      "kind": "TEST_REPORT",
+      "locator": "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/review/manifest-digests",
+      "digest": "sha256:767bc22fbc0e6eb27ff52d893afad4cd5414cc03bb14bff4845e3d75944e1855",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T08:31:00+08:00",
+      "redaction": "Seven manifest-authorized synthetic blobs only; all declared SHA-256 digests matched."
+    },
+    {
+      "id": "E-003",
+      "kind": "TEST_REPORT",
+      "locator": "test://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/native-hardening-targets",
+      "digest": "sha256:2503b4013f4083bfb04a7b42e8fe7e7a581f1c318b2cf94b37cfc375b0fe8c6e",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T08:32:00+08:00",
+      "redaction": "In-memory, offline execution of manifest-authorized synthetic validator and fixture blobs."
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "git-object-boundary-check",
+      "environment": "Frozen Git objects; read-only; offline",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-001"
+    },
+    {
+      "id": "T-002",
+      "command_id": "manifest-blob-digest-check",
+      "environment": "Frozen candidate blobs; read-only; offline",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-002"
+    },
+    {
+      "id": "T-003",
+      "command_id": "native-hardening-targets",
+      "environment": "In-memory synthetic harness; no files, network, database, Docker, or product source",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-003"
+    }
+  ],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "MEDIUM",
+      "probability": "MEDIUM",
+      "impact": "The R1.5 protocol cannot enforce operating-system identity, leases, or production controls.",
+      "trigger": "Treating this synthetic validator as runtime authority.",
+      "mitigation": "Retain NO_RUNTIME_AUTHORITY and require separately authorized R2 controls before runtime use.",
+      "residual_risk": "Identity and isolation outside the black-box fixture remain process- and prompt-governed."
+    }
+  ],
+  "blockers": [],
+  "recommendation": {
+    "decision": "PASS_CURRENT_GATE",
+    "reason": "All seven authorized blob digests match. The 20-path baseline diff stays in synthetic docs/test agent-control scope. Site and Python product tree IDs are unchanged; db/schema.ts and drizzle-postgres IDs are unchanged. PHASE4/project status paths are unchanged and the authorized boundary keeps PHASE4-TASK03 frozen. Executable authorized blobs do not reuse D-112 product tables; the sole matching text is the declared 0041 migration filename. Task, README, fixture, and validator consistently disclaim database, UAT/production, deployment, daemon, and runtime authority. Targeted hardening checks passed and rejected wrong context digests, artifact mismatches, forged context artifacts, and reviewer writes.",
+    "next_action": "CONTINUE_REMAINING_INDEPENDENT_GATES_ONLY"
+  },
+  "status": "PASS",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

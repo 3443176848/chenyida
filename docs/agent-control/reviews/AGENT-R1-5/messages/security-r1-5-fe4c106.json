@@ -1,0 +1,233 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "1e4c1062-190a-4488-b6de-e055afb3b978",
+  "message_type": "VETO",
+  "created_at": "2026-08-11T09:27:18Z",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "security-r1-5",
+    "instance_id": "security-r1-5-native11",
+    "capability_profile": "SECURITY_READ_ONLY",
+    "context_manifest_digest": "sha256:75b1ccaf57c6968a5917b3fde502f559a38865b5f4c2c587db35c4f8acc64016"
+  },
+  "role": "SECURITY_BOUNDARY_EXAMINER",
+  "gate": "SECURITY",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "fe4c1062190ae488f6dee055afb3b978930d0911",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/tasks/AGENT-R1-5.md",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/ai-engineering/PERMISSIONS.md",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/README.md",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/schemas/task-packet-v2.schema.json",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/schemas/message-v1.schema.json",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/schemas/context-manifest-v1.schema.json",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/native_mvp.py",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/pilot_fixture.py",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/tests/test_native_mvp.py",
+      "git://1f55696b124c899d49f4505c9ad0cd238d910b24..fe4c1062190ae488f6dee055afb3b978930d0911?operation=diff-name-only",
+      "audit://AGENT-R1-5/messages/adversarial-r1-5-2ac5ac5.json",
+      "audit://AGENT-R1-5/messages/erp-guardian-r1-5-268cba9.json"
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "A-001",
+      "statement": "All 14 declared document digests and the canonical Context Manifest digest matched the frozen values.",
+      "status": "VERIFIED",
+      "source": null
+    },
+    {
+      "id": "A-002",
+      "statement": "The frozen 20-path baseline diff is confined to authorized R1.5 docs/control tooling and contains no ERP product, Schema/Migration, UAT, production, or deployment path.",
+      "status": "VERIFIED",
+      "source": "git://1f55696b124c899d49f4505c9ad0cd238d910b24..fe4c1062190ae488f6dee055afb3b978930d0911?operation=diff-name-only"
+    },
+    {
+      "id": "A-003",
+      "statement": "The active Task Packet explicitly denies database, deployment, push, model, network, production, daemon, and UAT capabilities and sets database/UAT/production/deploy/network resource flags false.",
+      "status": "VERIFIED",
+      "source": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/task-packets/AGENT-R1-5.json"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/tasks/AGENT-R1-5.md",
+      "digest": "sha256:529216694ce3bba396b0b0b94f81143f22a54364e129bc6e56474e2af87c7ac5",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-002",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "digest": "sha256:8f670f7099deec1cbbae7b0f145864e7c299f5e200223856f52ff119ff14edda",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-003",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/ai-engineering/PERMISSIONS.md",
+      "digest": "sha256:20f9af4cc838c2d4214dc1bce542c02018dd493baad2b2925b506a4b5dea80ed",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-004",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/README.md",
+      "digest": "sha256:d78338ee7de04296e35ff1f7e80a6d054d49379ba0c17ec0e478018771f4ef6c",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-005",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/schemas/task-packet-v2.schema.json",
+      "digest": "sha256:74037d60179b2b8eef811ddee700656a53d2844b64cb33d9bb2d414c67ecd05c",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-006",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/schemas/message-v1.schema.json",
+      "digest": "sha256:7f57eaa4ab1320b048ae50a4f01590148910e799245a904705bb0f7e6bd8552c",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-007",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/schemas/context-manifest-v1.schema.json",
+      "digest": "sha256:81a455b0357b4a4c520894d3fbf5f55c6919cad6d30850474d44dd3f145f7672",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-008",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "digest": "sha256:e8e2fceb666afacd586e983fc9c839c9f09b1343752e20a1b2db5d9936570585",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-009",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:cf2692be59d8a62f904ed3f62625bbdd24f1c7fbab3aa698f7639d0e92d0dac9",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-010",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/pilot_fixture.py",
+      "digest": "sha256:9e76dc2bdaa97b88d5d41f251ca6d7843063109c282347b9b58c96a79742e870",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-011",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:a4572d377ed7e6e7104019bcf9b11c0b3c0e5456b3b35d8d9df206c9e1ee2b53",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-012",
+      "kind": "GIT_OBJECT",
+      "locator": "git://1f55696b124c899d49f4505c9ad0cd238d910b24..fe4c1062190ae488f6dee055afb3b978930d0911?operation=diff-name-only",
+      "digest": "sha256:468edd5591e2311b3efad4dcf6a742b40d1f580551b226ffb4a641e8b6464579",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-013",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "audit://AGENT-R1-5/messages/adversarial-r1-5-2ac5ac5.json",
+      "digest": "sha256:4d470e246a73f442e2b5d003d4e6831d9fe7440158924825b9bc89f23a56d23a",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-014",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "audit://AGENT-R1-5/messages/erp-guardian-r1-5-268cba9.json",
+      "digest": "sha256:11efd9f1f0e667b673804dfe5e03e554f8f76cca2a14af99212b5dbbb8e0d429",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:27:18Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    }
+  ],
+  "changes": [],
+  "tests": [],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "CRITICAL",
+      "probability": "HIGH",
+      "impact": "A final adversarial VERIFICATION/PASS can close MR-001 while its only referenced TEST_REPORT and test are RESULT_UNKNOWN with null exit codes. The complete mutated bundle returns PASS with no errors, so an unresolved falsification result is represented as accepted evidence and permits closure.",
+      "trigger": "On final adversarial message 09, change E-001 to TEST_REPORT with exit_code null, add T-001 as RESULT_UNKNOWN with exit_code null and artifact E-001, and recompute the registered message-evidence payload and digest; both the manual bundle validator and message-v1 JSON Schema accept it.",
+      "mitigation": "For any adversarial PASS that resolves claims, require one or more uniquely bound tests and require every test and TEST_REPORT to be PASS with exit code 0; reject NOT_RUN, FAIL, and RESULT_UNKNOWN. Mirror the resolution-specific aggregate constraint in JSON Schema and add the exact negative regression.",
+      "residual_risk": "The prior aggregate, invalid-decision, unreferenced-failure, nonzero-evidence, and cross-role black-box variants now fail closed, but this unknown-result disposition remains sufficient to bypass the final adversarial gate."
+    },
+    {
+      "id": "R-002",
+      "severity": "HIGH",
+      "probability": "HIGH",
+      "impact": "The Draft 2020-12 Task Packet Schema accepts six duplicate builder assignments, a reviewer with can_write true, and an unassigned product_writer_agent_id. Schema-only validation therefore does not enforce the documented six-role separation and one-writer invariant.",
+      "trigger": "Validate three independently mutated copies of the frozen packet: duplicate the builder assignment six times; set the ERP reviewer can_write to true; or set product_writer_agent_id to unassigned-writer. All three instances pass task-packet-v2.schema.json.",
+      "mitigation": "Add representable role-assignment constraints: unique assignments, exactly one CHANGE_BUILDER with can_write true, all reviewer roles with can_write false, exact role/profile/visibility mappings, and product_writer_agent_id bound to that builder; add Schema/manual parity negatives.",
+      "residual_risk": "Manual validation may reject these variants, but the declared Schema remains a weaker contract until parity is demonstrated."
+    }
+  ],
+  "blockers": [
+    {
+      "id": "B-001",
+      "category": "CONTEXT_DEPENDENCY_OMITTED",
+      "attempted": [
+        "Verified every declared artifact and completed static inspection of the frozen candidate and schemas.",
+        "Injected an identity validator only at the unchanged valid Task Packet boundary to isolate the frozen message-validation logic; no undeclared dependency was read."
+      ],
+      "evidence_refs": [
+        "E-009",
+        "E-011"
+      ],
+      "unblock_owner": "delivery-conductor-r1-5"
+    }
+  ],
+  "recommendation": {
+    "decision": "REJECT_CANDIDATE",
+    "reason": "Candidate fe4c106 closes the previously reported evidence and cross-role variants, and its changed paths remain synthetic-only, but a referenced RESULT_UNKNOWN test still resolves the required Minority Report and yields an overall PASS in both implementations. The Task Packet Schema also lacks representable role/writer constraints, and the review context omits readonly_controller.py required by the candidate and tests.",
+    "next_action": "Require PASS/0 evidence for every claim-resolving adversarial test, bind role/writer invariants in Task Packet Schema, include readonly_controller.py in the frozen context, add regressions, and rerun all gates."
+  },
+  "status": "VETOED",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

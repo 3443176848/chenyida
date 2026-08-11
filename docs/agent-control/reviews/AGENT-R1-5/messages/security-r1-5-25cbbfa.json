@@ -1,0 +1,239 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "25cbbfab-8792-4a86-81b8-44fe59c634ae",
+  "message_type": "VERIFICATION",
+  "created_at": "2026-08-11T09:49:16Z",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "security-r1-5",
+    "instance_id": "security-r1-5-native12",
+    "capability_profile": "SECURITY_READ_ONLY",
+    "context_manifest_digest": "sha256:03220a1a5fcec9cd2082003f453f4cdbee5a0beb311683bb2700e44de7876332"
+  },
+  "role": "SECURITY_BOUNDARY_EXAMINER",
+  "gate": "SECURITY",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "25cbbfab87925a8601b844fe59c634ae0b651297",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/tasks/AGENT-R1-5.md",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/ai-engineering/PERMISSIONS.md",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/README.md",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/schemas/task-packet-v2.schema.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/schemas/message-v1.schema.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/schemas/context-manifest-v1.schema.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/native_mvp.py",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/pilot_fixture.py",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/readonly_controller.py",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/tests/test_native_mvp.py",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/tests/test_readonly_controller.py",
+      "git://1f55696b124c899d49f4505c9ad0cd238d910b24..25cbbfab87925a8601b844fe59c634ae0b651297?operation=diff-name-only",
+      "audit://AGENT-R1-5/messages/erp-guardian-r1-5-fe4c106.json",
+      "audit://AGENT-R1-5/messages/security-r1-5-fe4c106.json"
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "A-001",
+      "statement": "The Context Manifest is a valid Draft 2020-12 instance; its canonical digest and all 16 declared artifact digests exactly match the frozen values.",
+      "status": "VERIFIED",
+      "source": null
+    },
+    {
+      "id": "A-002",
+      "statement": "All attack probes executed in memory from only the declared frozen Git objects; no undeclared file, product source, owner input, database, network, UAT, production, or deployment surface was accessed.",
+      "status": "VERIFIED",
+      "source": "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/native_mvp.py"
+    },
+    {
+      "id": "A-003",
+      "statement": "The 20-path name-only diff is fully inside the Task Packet allowlist and contains zero ERP product, product-test, Schema/Migration, or deployment paths.",
+      "status": "VERIFIED",
+      "source": "git://1f55696b124c899d49f4505c9ad0cd238d910b24..25cbbfab87925a8601b844fe59c634ae0b651297?operation=diff-name-only"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/tasks/AGENT-R1-5.md",
+      "digest": "sha256:529216694ce3bba396b0b0b94f81143f22a54364e129bc6e56474e2af87c7ac5",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-002",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "digest": "sha256:8f670f7099deec1cbbae7b0f145864e7c299f5e200223856f52ff119ff14edda",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-003",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/ai-engineering/PERMISSIONS.md",
+      "digest": "sha256:d0f8e6de45dc89537ee91ae6eca9ba07424d5a7e260cd90745479640c3f43dcf",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-004",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/README.md",
+      "digest": "sha256:1be7b0ce8288fc5dec469b596739c259277f4c2540eade1f00375d7e24bfc28a",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-005",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/schemas/task-packet-v2.schema.json",
+      "digest": "sha256:449c57c194472e1075a3ac005c6e38db82e4bb0277eaec975e89491a3d271560",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-006",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/schemas/message-v1.schema.json",
+      "digest": "sha256:de6a5cba96fc87f5c57192c8b788f2356e3b9327f0dc8d9998d5c27f7d0ec7ac",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-007",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/schemas/context-manifest-v1.schema.json",
+      "digest": "sha256:81a455b0357b4a4c520894d3fbf5f55c6919cad6d30850474d44dd3f145f7672",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-008",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "digest": "sha256:2d84d6a9e1d523ac46a5947d0e556e9d4a0e30672fe3a1de72091572cb5024d3",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-009",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:8f5c7c0e0cc92c590eb45e02364725e0e0504983a91379d78e14b73c5ae5d26e",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-010",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/pilot_fixture.py",
+      "digest": "sha256:c380603af3263a55104eef048114495384fa50b540069bf97cb7b98f60a05617",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-011",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/readonly_controller.py",
+      "digest": "sha256:47d37f57c8e83804f65beb95ce2b06f72b88a56bec12edc5f0f7f5aab09e21d6",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-012",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:4007f1d74f5a92e52c60c303c65fdd14ce51916da2d4b9581a65ec8fa1733151",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-013",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/tests/test_readonly_controller.py",
+      "digest": "sha256:751ad839250e897202b57f7f9f7e421caea56053f0b9c5ed238ca787dc462ed7",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-014",
+      "kind": "GIT_OBJECT",
+      "locator": "git://1f55696b124c899d49f4505c9ad0cd238d910b24..25cbbfab87925a8601b844fe59c634ae0b651297?operation=diff-name-only",
+      "digest": "sha256:468edd5591e2311b3efad4dcf6a742b40d1f580551b226ffb4a641e8b6464579",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-015",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "audit://AGENT-R1-5/messages/erp-guardian-r1-5-fe4c106.json",
+      "digest": "sha256:b66b328272e7fc671ee0f524ae6f069f96b52280e1b71742fd1e1dd0c08337bc",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    },
+    {
+      "id": "E-016",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "audit://AGENT-R1-5/messages/security-r1-5-fe4c106.json",
+      "digest": "sha256:88165d074456636a361215f7d158ce96825dea6fb68991631a686ed06b2f5cf3",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:49:16Z",
+      "redaction": "Frozen manifest-listed synthetic artifact only; no owner input, product source, Git internals, real data, secrets, UAT, production, database, network, or deployment context."
+    }
+  ],
+  "changes": [],
+  "tests": [],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "LOW",
+      "probability": "MEDIUM",
+      "impact": "R1.5 remains a stateless synthetic protocol and native-agent workflow rather than OS-level identity, persistent leases, or runtime authority. A protocol PASS must not be interpreted as authorization for ERP, database, UAT, production, network, deployment, or R2 work.",
+      "trigger": "A later actor treats this synthetic SECURITY gate as a capability grant outside the frozen Task Packet.",
+      "mitigation": "Keep SYNTHETIC_DOCS_TEST_ONLY and NO_RUNTIME_AUTHORITY explicit, retain the forbidden-capability/resource ceilings, and require separate owner authorization plus R2 controls before any expanded action.",
+      "residual_risk": "Acceptable for this bounded docs/test MVP; runtime enforcement remains separately unauthorized."
+    },
+    {
+      "id": "R-002",
+      "severity": "LOW",
+      "probability": "LOW",
+      "impact": "Standard JSON Schema cannot bind product_writer_agent_id to an agent_id inside a different array item or enforce uniqueness by one nested field across otherwise different role objects. A Schema-only consumer could therefore accept an unassigned writer or duplicate agent identity.",
+      "trigger": "A consumer skips the mandatory standard-library cross-object validator after Schema validation.",
+      "mitigation": "Continue requiring both layers before execution. The frozen native validator calls validate_task_packet first, which rejects unassigned writers and duplicate agent identities as TASK_PACKET_INVALID; keep the exact regressions.",
+      "residual_risk": "Low while all executable entry points preserve the documented two-layer preflight; documentation accurately discloses the limitation and does not claim Schema-only enforcement."
+    }
+  ],
+  "blockers": [],
+  "recommendation": {
+    "decision": "PASS_CURRENT_GATE",
+    "reason": "Fresh review passes. Empty-test claim resolution is rejected by Message Schema and by the manual validator (MINORITY_DISPOSITION_INVALID or TEST_EVIDENCE_BINDING_INVALID); RESULT_UNKNOWN claim evidence is rejected by both (PASSING_MESSAGE_TEST_OUTCOME_INVALID manually). Duplicate builders and reviewer write permission fail both Task Schema and manual validation. Unassigned product writers and duplicate cross-role agent IDs pass Schema only where standard JSON Schema cannot express the equality/field-uniqueness relation, then fail the mandatory standard-library preflight and the full bundle as TASK_PACKET_INVALID. Resource and forbidden-capability mutations also fail closed. The two-layer documentation is accurate, readonly_controller.py and both regression suites are present in context, and all 20 changed paths remain synthetic-only.",
+    "next_action": "Continue fresh QA, adversarial, and source-blind black-box gates on this candidate; do not access ERP/UAT/production, deploy, expand authority, or unfreeze PHASE4-TASK03."
+  },
+  "status": "PASS",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

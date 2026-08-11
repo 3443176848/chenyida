@@ -1,0 +1,53 @@
+{
+  "schema_version": "erp-agent-context/v1",
+  "task_id": "AGENT-R1-5",
+  "task_packet_revision": 2,
+  "agent_id": "qa-r1-5",
+  "instance_id": "qa-r1-5-native2",
+  "role": "INDEPENDENT_VERIFIER",
+  "capability_profile": "QA_TEST_READ_ONLY",
+  "candidate_sha": "d68ae7488135a715818578a0179a91a6d43e67bd",
+  "lease_generation": 1,
+  "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+  "documents": [
+    {
+      "locator": "git://d68ae7488135a715818578a0179a91a6d43e67bd/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "digest": "sha256:41155ecc69239ef7966daa4b8a44053004c7a700cc7da983f5ddbc7632af04d1",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://d68ae7488135a715818578a0179a91a6d43e67bd/docs/agent-control/pilots/AGENT-R1-5/blackbox/observed-report.json",
+      "digest": "sha256:351a824a1c4ed4d53f35e9c3c80f90a6756e79cc3867206b6f6360697e5e577c",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "git://d68ae7488135a715818578a0179a91a6d43e67bd/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:7a771ab1b81adb2cbcbd88fe2330cd3c26eb78720d0c094d9acde39764074c9b",
+      "classification": "SYNTHETIC_CANDIDATE"
+    },
+    {
+      "locator": "git://d68ae7488135a715818578a0179a91a6d43e67bd/tools/erp_agent_control/pilot_fixture.py",
+      "digest": "sha256:ccfd824c446d1e8ea8ed3b8c9d438862f4703ef84f5971484445834c9b39df1f",
+      "classification": "SYNTHETIC_CANDIDATE"
+    },
+    {
+      "locator": "git://d68ae7488135a715818578a0179a91a6d43e67bd/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:7b2332c55ceb507688335ebbcf2a822e048be7fd28d47a0ebd23d1a6af91f652",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "git://d68ae7488135a715818578a0179a91a6d43e67bd/tools/erp_agent_control/tests/test_readonly_controller.py",
+      "digest": "sha256:ffa1204eb2ce848aa8109404759442e03180bb6f34fdd206a31606699addf7dc",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    }
+  ],
+  "forbidden_context": [
+    "OWNER_UNTRACKED_INPUT",
+    "PRODUCT_SOURCE",
+    "GIT_INTERNALS",
+    "REAL_BUSINESS_DATA",
+    "SECRETS",
+    "UAT_OR_PRODUCTION"
+  ],
+  "manifest_digest": "sha256:c17b36c324e63ca21468d358c000232b5974350b01a5b073b85cb599a4487af3"
+}

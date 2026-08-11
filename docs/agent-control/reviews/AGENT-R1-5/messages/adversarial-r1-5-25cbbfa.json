@@ -1,0 +1,70 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "35cbbfab-8792-4a86-81b8-44fe59c634ae",
+  "message_type": "VERIFICATION",
+  "created_at": "2026-08-11T18:08:00+08:00",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "adversarial-r1-5",
+    "instance_id": "adversarial-r1-5-native12",
+    "capability_profile": "ADVERSARIAL_READ_ONLY",
+    "context_manifest_digest": "sha256:89634a6152feb77c497fd8c8c574a1898c5d5b1654a17c1b595ce8329bd16a7a"
+  },
+  "role": "ADVERSARIAL_EXAMINER",
+  "gate": "ADVERSARIAL",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "25cbbfab87925a8601b844fe59c634ae0b651297",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "bundle://adversarial-r1-5-native12/attack-matrix-v1"
+    ]
+  },
+  "assumptions": [],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "TEST_REPORT",
+      "locator": "bundle://adversarial-r1-5-native12/attack-matrix-v1",
+      "digest": "sha256:fcee3b0fe0202cd348431c3079ee108958c9ddf068b681b01048a2488ddf0cc2",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T18:08:00+08:00",
+      "redaction": "Only frozen synthetic Git objects, declared name-only diff, two declared audit messages, and cleaned temporary synthetic replays; no product source, owner input, secrets, network, database, UAT, production, Docker, or deployment data."
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "native12-adversarial-matrix",
+      "environment": "cleaned-mktemp-declared-git-objects-only",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-001"
+    }
+  ],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "LOW",
+      "probability": "LOW",
+      "impact": "JSON Schema alone cannot express cross-array agent_id uniqueness or product_writer_agent_id equality, and R1.5 still has no OS-level identity or runtime authority.",
+      "trigger": "A caller bypasses the required standard-library Task Packet validator or treats this synthetic gate as product, UAT, production, deployment, or R2 authorization.",
+      "mitigation": "Require both Task Packet Schema and validate_task_packet before execution, preserve NO_RUNTIME_AUTHORITY and all denied capabilities, and require new owner authorization for later runtime work.",
+      "residual_risk": "Acceptable for this synthetic docs/test MVP only; it is not a runtime security boundary."
+    }
+  ],
+  "blockers": [],
+  "recommendation": {
+    "decision": "PASS_CURRENT_GATE",
+    "reason": "All 16 declared artifact digests and the canonical Context Manifest digest matched. I ran 85 authorized test_native_mvp.py cases plus all 47 test_readonly_controller.py cases (132 PASS). Two native cases were excluded because their context-schema inventory and checked-in black-box fixture objects were not among the 16 authorized locators. Empty, RESULT_UNKNOWN, NOT_RUN, FAIL, reused-evidence, unreferenced-TEST_REPORT, and wrong/mismatched-exit claim-resolution attacks all failed closed in Schema and/or the authoritative validator. Duplicate-role, reviewer-write, profile, and visibility attacks failed in both layers; unassigned-writer and cross-role duplicate-agent attacks failed in the documented standard-library pre-execution layer. Authorized regressions for old-candidate PASS, veto, lease/revision, artifact/context digests, cross-role black-box evidence, RESULT_UNKNOWN recovery, and closure also passed. No attack bypassed the combined contract.",
+    "next_action": "Proceed to same-candidate QA and source-blind black-box gates; keep PHASE4-TASK03 frozen and do not access product, database, UAT/production, network, or deployment."
+  },
+  "status": "PASS",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

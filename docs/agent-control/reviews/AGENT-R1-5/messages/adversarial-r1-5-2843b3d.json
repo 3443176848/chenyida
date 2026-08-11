@@ -1,0 +1,161 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "aba83097-c332-427b-975f-065eea6cac51",
+  "message_type": "VETO",
+  "created_at": "2026-08-11T07:59:55Z",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "adversarial-r1-5",
+    "instance_id": "adversarial-r1-5-native6",
+    "capability_profile": "ADVERSARIAL_READ_ONLY",
+    "context_manifest_digest": "sha256:0fe820a089c1099f57f65b3a1e904bbbb2b25cbd185e665d5023099856ccdb58"
+  },
+  "role": "ADVERSARIAL_EXAMINER",
+  "gate": "ADVERSARIAL",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "2843b3df8eeff05584a2b492ff028ca812674164",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://2843b3df8eeff05584a2b492ff028ca812674164/docs/tasks/AGENT-R1-5.md",
+      "git://2843b3df8eeff05584a2b492ff028ca812674164/docs/agent-control/schemas/message-v1.schema.json",
+      "git://2843b3df8eeff05584a2b492ff028ca812674164/docs/agent-control/schemas/context-manifest-v1.schema.json",
+      "git://2843b3df8eeff05584a2b492ff028ca812674164/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "git://2843b3df8eeff05584a2b492ff028ca812674164/tools/erp_agent_control/native_mvp.py",
+      "git://2843b3df8eeff05584a2b492ff028ca812674164/tools/erp_agent_control/tests/test_native_mvp.py",
+      "bundle://adversarial-r1-5/in-memory-probe-summary"
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "A-001",
+      "statement": "所有负例均从冻结 valid-bundle 深拷贝且未修改 task_packet；内存执行时仅将未列入清单的 task-packet 依赖替换为恒等桩，以隔离验证候选自身的 bundle/message/context 状态机。",
+      "status": "VERIFIED",
+      "source": "git://2843b3df8eeff05584a2b492ff028ca812674164/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "GIT_OBJECT",
+      "locator": "git://2843b3df8eeff05584a2b492ff028ca812674164/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:ed9471f4299185d3966a523eab45b91f1dbc2e789f4776934b58af6cdbe9be97",
+      "exit_code": null,
+      "observed_at": "2026-08-11T07:59:55Z",
+      "redaction": "冻结合成协议候选；未读取产品源码、真实数据、秘密、UAT或生产。"
+    },
+    {
+      "id": "E-002",
+      "kind": "GIT_OBJECT",
+      "locator": "git://2843b3df8eeff05584a2b492ff028ca812674164/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:dea966d05fb96d567a3164f89bf5ed48d5e7f226caaca2dbe2ff73d0a2074d86",
+      "exit_code": null,
+      "observed_at": "2026-08-11T07:59:55Z",
+      "redaction": "冻结合成测试证据；未读取未授权上下文。"
+    },
+    {
+      "id": "E-003",
+      "kind": "GIT_OBJECT",
+      "locator": "git://2843b3df8eeff05584a2b492ff028ca812674164/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "digest": "sha256:41155ecc69239ef7966daa4b8a44053004c7a700cc7da983f5ddbc7632af04d1",
+      "exit_code": null,
+      "observed_at": "2026-08-11T07:59:55Z",
+      "redaction": "冻结公开合成 bundle；未接触真实业务数据。"
+    },
+    {
+      "id": "E-004",
+      "kind": "COMMAND_RESULT",
+      "locator": "bundle://adversarial-r1-5/in-memory-probe-summary",
+      "digest": "sha256:964629438f2452aeb1c27d6e5d5eb7a1c5c48a0c550457a4d63f28196c8ceb64",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T07:59:55Z",
+      "redaction": "轻量离线内存负例汇总；七项基线及旁路探针均返回PASS；无文件、网络、数据库、容器或部署副作用。"
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "probe-qa-artifact-binding",
+      "environment": "冻结候选内存执行；task_packet不变；无网络、数据库或文件写入",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-004"
+    },
+    {
+      "id": "T-002",
+      "command_id": "probe-context-rebinding",
+      "environment": "冻结候选内存执行；重算合成manifest摘要；无外部资源",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-004"
+    },
+    {
+      "id": "T-003",
+      "command_id": "probe-minority-role-disposition",
+      "environment": "冻结候选内存执行；仅变更合成消息流",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-004"
+    },
+    {
+      "id": "T-004",
+      "command_id": "probe-closure-gate-binding",
+      "environment": "冻结候选内存执行；仅变更合成消息流",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-004"
+    }
+  ],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "CRITICAL",
+      "probability": "HIGH",
+      "impact": "最终QA门禁可在其唯一引用的TEST_REPORT证据exit_code为7时仍判定PASS，也可引用FILE_SNAPSHOT等非测试证据；因此失败或无关证据能够满足必需门禁并进入Closure。",
+      "trigger": "将最终QA消息的test保持PASS/exit_code=0，同时把其artifact所指Evidence改为exit_code=7或kind=FILE_SNAPSHOT；两项负例均得到整体PASS且errors为空。",
+      "mitigation": "在R1.5 bundle内强制测试artifact引用允许的测试证据类型，要求Evidence与Test的exit_code、locator及结果一致，并校验locator属于该消息声明的输入artifact。",
+      "residual_risk": "修复前QA签核和最终Closure没有可验证的证据一致性。"
+    },
+    {
+      "id": "R-002",
+      "severity": "HIGH",
+      "probability": "HIGH",
+      "impact": "Context Manifest摘要只校验可由bundle提交者自行重算的manifest正文，不校验document digest对应的合成载荷或角色/候选允许文档集合；角色上下文可被替换为未列出的伪造locator和全零摘要后继续PASS。",
+      "trigger": "把最终QA Context的documents替换为bundle://forged/unlisted-context及全零SHA-256，重算manifest_digest并同步两条QA消息的引用；整体仍PASS。",
+      "mitigation": "在现有合成bundle范围内加入可解析的不可歧义artifact映射，并将每个角色/候选允许的document集合绑定到Task Packet；逐项重算载荷摘要后再接受manifest。",
+      "residual_risk": "当前摘要仅能发现未同步修改，不能阻止上下文替换或伪造。"
+    },
+    {
+      "id": "R-003",
+      "severity": "HIGH",
+      "probability": "HIGH",
+      "impact": "Minority Report的角色和处置状态未形成闭合状态机：Security可替代Adversarial发起试点要求的MR；带resolves_claim_ids但status=FAIL且明确声明未证伪的FINDING也会立即把MR计为已解决，随后同候选普通PASS即可收口。",
+      "trigger": "分别执行Security发起MR的角色替换，以及插入FAIL/FINDING处置、清空后续PASS的resolves_claim_ids；两种消息流均整体PASS。",
+      "mitigation": "绑定MINORITY_REPORT的允许角色；采用结构化处置结果；仅允许满足规定状态的处置消息解决claim；拒绝重复或相互矛盾处置，并要求最终Adversarial PASS显式承接已解决claim。",
+      "residual_risk": "修复前MR存在角色越权和失败处置被当作成功处置的旁路。"
+    },
+    {
+      "id": "R-004",
+      "severity": "HIGH",
+      "probability": "HIGH",
+      "impact": "CLOSURE消息类型未绑定CLOSURE gate；将冻结bundle最终Closure改标为IMPLEMENTATION并调整attempt后，所有门禁及整体报告仍PASS，协议无法证明收口动作经过专属收口门。",
+      "trigger": "把最终消息gate从CLOSURE改为IMPLEMENTATION、attempt改为2；验证器返回PASS且errors为空。",
+      "mitigation": "建立并执行message_type、role、gate、status的完整矩阵，至少要求CLOSURE只能由CHANGE_BUILDER在CLOSURE gate以COMPLETE发出，CHECKPOINT和RECOVERY也应采用相同强绑定。",
+      "residual_risk": "修复前专属控制门可被其他Builder gate标签替代。"
+    }
+  ],
+  "blockers": [],
+  "recommendation": {
+    "decision": "REJECT_CANDIDATE",
+    "reason": "冻结候选存在可复现的必需QA证据旁路，以及Context、Minority Report和Closure状态绑定缺口；这些均在R1.5合成协议范围内直接导致不应接受的bundle返回PASS。",
+    "next_action": "修复证据交叉绑定及角色/消息/门禁状态矩阵，新增上述负例测试后提交新候选复核。"
+  },
+  "status": "VETOED",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

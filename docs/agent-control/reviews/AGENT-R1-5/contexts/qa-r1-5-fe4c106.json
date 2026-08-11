@@ -1,0 +1,30 @@
+{
+  "schema_version": "erp-agent-context/v1",
+  "task_id": "AGENT-R1-5",
+  "task_packet_revision": 2,
+  "agent_id": "qa-r1-5",
+  "instance_id": "qa-r1-5-native11",
+  "role": "INDEPENDENT_VERIFIER",
+  "capability_profile": "QA_TEST_READ_ONLY",
+  "candidate_sha": "fe4c1062190ae488f6dee055afb3b978930d0911",
+  "lease_generation": 1,
+  "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+  "documents": [
+    {"locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/tasks/AGENT-R1-5.md", "digest": "sha256:529216694ce3bba396b0b0b94f81143f22a54364e129bc6e56474e2af87c7ac5", "classification": "SYNTHETIC_CONTRACT"},
+    {"locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/task-packets/AGENT-R1-5.json", "digest": "sha256:8f670f7099deec1cbbae7b0f145864e7c299f5e200223856f52ff119ff14edda", "classification": "SYNTHETIC_CONTRACT"},
+    {"locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/README.md", "digest": "sha256:d78338ee7de04296e35ff1f7e80a6d054d49379ba0c17ec0e478018771f4ef6c", "classification": "SYNTHETIC_CONTRACT"},
+    {"locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/schemas/task-packet-v2.schema.json", "digest": "sha256:74037d60179b2b8eef811ddee700656a53d2844b64cb33d9bb2d414c67ecd05c", "classification": "SYNTHETIC_CONTRACT"},
+    {"locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/schemas/message-v1.schema.json", "digest": "sha256:7f57eaa4ab1320b048ae50a4f01590148910e799245a904705bb0f7e6bd8552c", "classification": "SYNTHETIC_CONTRACT"},
+    {"locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/schemas/context-manifest-v1.schema.json", "digest": "sha256:81a455b0357b4a4c520894d3fbf5f55c6919cad6d30850474d44dd3f145f7672", "classification": "SYNTHETIC_CONTRACT"},
+    {"locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json", "digest": "sha256:e8e2fceb666afacd586e983fc9c839c9f09b1343752e20a1b2db5d9936570585", "classification": "SYNTHETIC_TEST_EVIDENCE"},
+    {"locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/native_mvp.py", "digest": "sha256:cf2692be59d8a62f904ed3f62625bbdd24f1c7fbab3aa698f7639d0e92d0dac9", "classification": "SYNTHETIC_CANDIDATE"},
+    {"locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/readonly_controller.py", "digest": "sha256:1d54b6a69d451ea5d753072216b8233b1d30beba3fde4afdcceb9e2adf58c64d", "classification": "SYNTHETIC_CANDIDATE"},
+    {"locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/pilot_fixture.py", "digest": "sha256:9e76dc2bdaa97b88d5d41f251ca6d7843063109c282347b9b58c96a79742e870", "classification": "SYNTHETIC_CANDIDATE"},
+    {"locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/tests/test_native_mvp.py", "digest": "sha256:a4572d377ed7e6e7104019bcf9b11c0b3c0e5456b3b35d8d9df206c9e1ee2b53", "classification": "SYNTHETIC_TEST_EVIDENCE"},
+    {"locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/tests/test_readonly_controller.py", "digest": "sha256:6c0094603887ad6b23e09b6030d8a9c2c212711c872204dae39cb586115bc273", "classification": "SYNTHETIC_TEST_EVIDENCE"},
+    {"locator": "git://1f55696b124c899d49f4505c9ad0cd238d910b24..fe4c1062190ae488f6dee055afb3b978930d0911?operation=diff-name-only", "digest": "sha256:468edd5591e2311b3efad4dcf6a742b40d1f580551b226ffb4a641e8b6464579", "classification": "SYNTHETIC_TEST_EVIDENCE"},
+    {"locator": "audit://AGENT-R1-5/messages/erp-guardian-r1-5-268cba9.json", "digest": "sha256:11efd9f1f0e667b673804dfe5e03e554f8f76cca2a14af99212b5dbbb8e0d429", "classification": "SYNTHETIC_TEST_EVIDENCE"}
+  ],
+  "forbidden_context": ["OWNER_UNTRACKED_INPUT", "PRODUCT_SOURCE", "GIT_INTERNALS", "REAL_BUSINESS_DATA", "SECRETS", "UAT_OR_PRODUCTION"],
+  "manifest_digest": "sha256:748093c8f483024cad4eb929ea93d325b3ea87175105031bb8651f228cfd262a"
+}

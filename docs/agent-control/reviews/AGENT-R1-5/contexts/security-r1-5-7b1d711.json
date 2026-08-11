@@ -1,0 +1,63 @@
+{
+  "schema_version": "erp-agent-context/v1",
+  "task_id": "AGENT-R1-5",
+  "task_packet_revision": 2,
+  "agent_id": "security-r1-5",
+  "instance_id": "security-r1-5-native7",
+  "role": "SECURITY_BOUNDARY_EXAMINER",
+  "capability_profile": "SECURITY_READ_ONLY",
+  "candidate_sha": "7b1d711d8405f66f56fd3d12acfae3362349c37d",
+  "lease_generation": 1,
+  "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+  "documents": [
+    {
+      "locator": "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/docs/tasks/AGENT-R1-5.md",
+      "digest": "sha256:529216694ce3bba396b0b0b94f81143f22a54364e129bc6e56474e2af87c7ac5",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/docs/agent-control/schemas/task-packet-v2.schema.json",
+      "digest": "sha256:74037d60179b2b8eef811ddee700656a53d2844b64cb33d9bb2d414c67ecd05c",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/docs/agent-control/schemas/message-v1.schema.json",
+      "digest": "sha256:fd89cc0dd5fd8c9151da05a2f95d1585e258e17324ccb6de06333c007b605247",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/docs/agent-control/schemas/context-manifest-v1.schema.json",
+      "digest": "sha256:81a455b0357b4a4c520894d3fbf5f55c6919cad6d30850474d44dd3f145f7672",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:67334c777f6f6d13fe0c889564fe7bafef07a6bfd09645d0ae0ca996bd5fa19e",
+      "classification": "SYNTHETIC_CANDIDATE"
+    },
+    {
+      "locator": "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/tools/erp_agent_control/readonly_controller.py",
+      "digest": "sha256:bce8da059927e9674e206334c377ff3abd6549ba372e6eacadd018e8b91c9c17",
+      "classification": "SYNTHETIC_CANDIDATE"
+    },
+    {
+      "locator": "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:1853e88ea9ad608800712884b363cb18b06f8813e2a1674c602a7f3a148d7cef",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/tools/erp_agent_control/tests/test_readonly_controller.py",
+      "digest": "sha256:93d7d3fcc2070681f41e17d80b9b48e82d15d3fb142e48f2d63e2b9ff47eebec",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    }
+  ],
+  "forbidden_context": [
+    "OWNER_UNTRACKED_INPUT",
+    "PRODUCT_SOURCE",
+    "GIT_INTERNALS",
+    "REAL_BUSINESS_DATA",
+    "SECRETS",
+    "UAT_OR_PRODUCTION"
+  ],
+  "manifest_digest": "sha256:022b4b47be78b86c0c39f89491c77eb30f04e0323724c082dc9af5b438062dd6"
+}

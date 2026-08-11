@@ -1,0 +1,114 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "3b73ba10-c154-419c-9bc2-09b659c86ae3",
+  "message_type": "VERIFICATION",
+  "created_at": "2026-08-11T14:45:20+08:00",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "erp-guardian-r1-5",
+    "instance_id": "erp-guardian-r1-5-native3",
+    "capability_profile": "ERP_READ_ONLY",
+    "context_manifest_digest": "sha256:263eaa7e9f166b870df14a23a37adf61b81744fc61680e7cd38f694298c7ea7a"
+  },
+  "role": "ERP_CONTRACT_GUARDIAN",
+  "gate": "ERP_CONTRACT",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "6bf2b1faf205e64b1505779f211fb88d6c60696b",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "docs/tasks/AGENT-R1-5.md",
+      "docs/agent-control/task-packets/AGENT-R1-5.json",
+      "docs/ai-engineering/ERP_DOMAIN_BOUNDARIES.md",
+      "tools/erp_agent_control/native_mvp.py",
+      "tools/erp_agent_control/tests/test_native_mvp.py"
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "A-001",
+      "statement": "本门禁仅验证冻结候选的合成研发协议，不构成R2、ERP业务、数据库、UAT、生产或部署能力确认。",
+      "status": "VERIFIED",
+      "source": "docs/tasks/AGENT-R1-5.md"
+    },
+    {
+      "id": "A-002",
+      "statement": "Context Manifest摘要按移除manifest_digest字段后的规范化JSON计算。",
+      "status": "VERIFIED",
+      "source": "E-002"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "GIT_OBJECT",
+      "locator": "git-diff://1f55696b124c899d49f4505c9ad0cd238d910b24..6bf2b1faf205e64b1505779f211fb88d6c60696b?mode=name-only",
+      "digest": "sha256:39d4375a94cfc8c81ce82ce83453160eb2701948819cac572aad576f5f5be814",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T14:45:20+08:00",
+      "redaction": "NONE; path names only, no file bodies."
+    },
+    {
+      "id": "E-002",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "workspace://docs/agent-control/reviews/AGENT-R1-5/contexts/erp-guardian-r1-5-6bf2.json",
+      "digest": "sha256:263eaa7e9f166b870df14a23a37adf61b81744fc61680e7cd38f694298c7ea7a",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T14:45:20+08:00",
+      "redaction": "NONE; canonical digest excludes the manifest_digest field as required by the protocol."
+    },
+    {
+      "id": "E-003",
+      "kind": "TEST_REPORT",
+      "locator": "command://native-mvp-unittest",
+      "digest": "sha256:db4906b3235c75ba52cc4a121fa968203e7a02495b5a42a9f3d2c784222118f7",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T14:45:20+08:00",
+      "redaction": "NONE; digest covers canonical summary with exit_code 0, 40 tests run, result PASS; nondeterministic timing omitted."
+    },
+    {
+      "id": "E-004",
+      "kind": "COMMAND_RESULT",
+      "locator": "command://frozen-candidate-contract-audit",
+      "digest": "sha256:67d7e55e66de02ae3849a50828b948425f4b36ea6f4e478296213d22f0c62769",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T14:45:20+08:00",
+      "redaction": "NONE; digest covers base/candidate binding, 19 synthetic-scope paths, zero out-of-scope paths, zero product-AI table references in message validator/tests, and clean tracked/index state."
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "native-mvp-unittest",
+      "environment": "local /opt/erp venv; Python -B; no network, database, container, UAT, production, or deployment access",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-003"
+    }
+  ],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "LOW",
+      "probability": "LOW",
+      "impact": "误将本次协议门禁PASS解释为R2运行时身份、强制租约或生产拒绝能力已经实现。",
+      "trigger": "将R1.5合成协议证据用于授权数据库、UAT、生产、部署或后台控制面。",
+      "mitigation": "继续保持R2、运行时身份、数据库、UAT、生产和部署为NOT_IMPLEMENTED或NOT_AUTHORIZED，并要求独立任务与门禁。",
+      "residual_risk": "在R2另行实现并验证前，相关边界仍依赖Git协议、任务合同和人工流程。"
+    }
+  ],
+  "blockers": [],
+  "recommendation": {
+    "decision": "PASS_ERP_CONTRACT",
+    "reason": "冻结差异的19个路径全部属于合成agent-control、ai-engineering或erp_agent_control工具/测试范围；没有ERP业务树、产品Schema/Migration或部署变化。研发消息验证器和测试未复用D-112产品AI治理表，并对角色、Context、候选、Task revision、lease、失败关闭、旧候选签核失效、Minority Report与RESULT_UNKNOWN恢复实施绑定。指定40项单元测试以退出码0通过，R1.5非承诺边界明确。",
+    "next_action": "仅将本签核用于当前候选、revision 2、lease 1，并继续其余独立门禁；不得据此启动R2或ERP运行面动作。"
+  },
+  "status": "PASS",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

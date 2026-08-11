@@ -1,0 +1,221 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "2843b3df-8eef-4055-84a2-b492ff028ca8",
+  "message_type": "VERIFICATION",
+  "created_at": "2026-08-11T07:54:04Z",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "qa-r1-5",
+    "instance_id": "qa-r1-5-native7",
+    "capability_profile": "QA_TEST_READ_ONLY",
+    "context_manifest_digest": "sha256:8d7e2bf7d1726847e517e4c05a103315c7371a0fbc1ddeb1be27aa5bbc94a5cc"
+  },
+  "role": "INDEPENDENT_VERIFIER",
+  "gate": "QA",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "2843b3df8eeff05584a2b492ff028ca812674164",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "bundle://qa-native7/context-manifest-audit",
+      "bundle://qa-native7/frozen-artifact-digest-audit",
+      "bundle://qa-native7/native-mvp-unittest",
+      "bundle://qa-native7/readonly-controller-unittest",
+      "bundle://qa-native7/valid-bundle-cli-run-1",
+      "bundle://qa-native7/valid-bundle-cli-run-2",
+      "bundle://qa-native7/blackbox-observed-report-audit",
+      "bundle://qa-native7/fail-closed-mutation-audit",
+      "bundle://qa-native7/read-only-state-audit"
+    ]
+  },
+  "assumptions": [],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "TEST_REPORT",
+      "locator": "bundle://qa-native7/native-mvp-unittest",
+      "digest": "sha256:dea966d05fb96d567a3164f89bf5ed48d5e7f226caaca2dbe2ff73d0a2074d86",
+      "observed_at": "2026-08-11T07:54:04Z",
+      "redaction": "synthetic protocol only; no product source, secrets, business data, database, network, UAT, production, container, deployment, or owner-input access",
+      "exit_code": 0
+    },
+    {
+      "id": "E-002",
+      "kind": "TEST_REPORT",
+      "locator": "bundle://qa-native7/readonly-controller-unittest",
+      "digest": "sha256:6c0094603887ad6b23e09b6030d8a9c2c212711c872204dae39cb586115bc273",
+      "observed_at": "2026-08-11T07:54:04Z",
+      "redaction": "synthetic protocol only; no product source, secrets, business data, database, network, UAT, production, container, deployment, or owner-input access",
+      "exit_code": 0
+    },
+    {
+      "id": "E-003",
+      "kind": "COMMAND_RESULT",
+      "locator": "bundle://qa-native7/valid-bundle-cli-run-1",
+      "digest": "sha256:63645053286f53ba770398367676c40f5696b20b67aea41c327f3a82004349e3",
+      "observed_at": "2026-08-11T07:54:04Z",
+      "redaction": "synthetic protocol only; stdout JSON and no stderr",
+      "exit_code": 0
+    },
+    {
+      "id": "E-004",
+      "kind": "COMMAND_RESULT",
+      "locator": "bundle://qa-native7/valid-bundle-cli-run-2",
+      "digest": "sha256:63645053286f53ba770398367676c40f5696b20b67aea41c327f3a82004349e3",
+      "observed_at": "2026-08-11T07:54:04Z",
+      "redaction": "synthetic protocol only; stdout JSON and no stderr",
+      "exit_code": 0
+    },
+    {
+      "id": "E-005",
+      "kind": "GIT_OBJECT",
+      "locator": "bundle://qa-native7/frozen-artifact-digest-audit",
+      "digest": "sha256:41155ecc69239ef7966daa4b8a44053004c7a700cc7da983f5ddbc7632af04d1",
+      "observed_at": "2026-08-11T07:54:04Z",
+      "redaction": "seven manifest-listed frozen git objects only",
+      "exit_code": 0
+    },
+    {
+      "id": "E-006",
+      "kind": "TEST_REPORT",
+      "locator": "bundle://qa-native7/blackbox-observed-report-audit",
+      "digest": "sha256:351a824a1c4ed4d53f35e9c3c80f90a6756e79cc3867206b6f6360697e5e577c",
+      "observed_at": "2026-08-11T07:54:04Z",
+      "redaction": "public synthetic black-box observation only",
+      "exit_code": 0
+    },
+    {
+      "id": "E-007",
+      "kind": "TEST_REPORT",
+      "locator": "bundle://qa-native7/fail-closed-mutation-audit",
+      "digest": "sha256:ed9471f4299185d3966a523eab45b91f1dbc2e789f4776934b58af6cdbe9be97",
+      "observed_at": "2026-08-11T07:54:04Z",
+      "redaction": "ten in-memory synthetic protocol mutations only",
+      "exit_code": 0
+    },
+    {
+      "id": "E-008",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "bundle://qa-native7/context-manifest-audit",
+      "digest": "sha256:8d7e2bf7d1726847e517e4c05a103315c7371a0fbc1ddeb1be27aa5bbc94a5cc",
+      "observed_at": "2026-08-11T07:54:04Z",
+      "redaction": "unique QA context manifest only",
+      "exit_code": 0
+    },
+    {
+      "id": "E-009",
+      "kind": "COMMAND_RESULT",
+      "locator": "bundle://qa-native7/bundle-count-and-gate-audit",
+      "digest": "sha256:d6a155fdefd82804dde5a863513f3290e112334aec92d57fc7491c61ac01f9d7",
+      "observed_at": "2026-08-11T07:54:04Z",
+      "redaction": "synthetic valid bundle only",
+      "exit_code": 0
+    },
+    {
+      "id": "E-010",
+      "kind": "COMMAND_RESULT",
+      "locator": "bundle://qa-native7/read-only-state-audit",
+      "digest": "sha256:8d7e2bf7d1726847e517e4c05a103315c7371a0fbc1ddeb1be27aa5bbc94a5cc",
+      "observed_at": "2026-08-11T07:54:04Z",
+      "redaction": "HEAD and tracked/index state only; forbidden untracked content was not read",
+      "exit_code": 0
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "/opt/erp/.venv/bin/python -B -m unittest tools.erp_agent_control.tests.test_native_mvp",
+      "environment": "candidate HEAD; 60 tests in 0.325s; failures=0; errors=0; skipped=0; bare OK; exit=0",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-001"
+    },
+    {
+      "id": "T-002",
+      "command_id": "/opt/erp/.venv/bin/python -B -m unittest tools.erp_agent_control.tests.test_readonly_controller",
+      "environment": "candidate HEAD; 43 tests in 2.885s; failures=0; errors=0; skipped=0; bare OK; exit=0",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-002"
+    },
+    {
+      "id": "T-003",
+      "command_id": "native-mvp-valid-bundle-run-1",
+      "environment": "/opt/erp/.venv/bin/python -B tools/erp_agent_control/native_mvp.py --bundle docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json; status=PASS; stdout=677B; stderr=0B",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-003"
+    },
+    {
+      "id": "T-004",
+      "command_id": "native-mvp-valid-bundle-run-2",
+      "environment": "same frozen valid-bundle CLI command; status=PASS; stdout=677B; stderr=0B; byte-for-byte equal to run 1; SHA-256 equal; temporary files cleaned",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-004"
+    },
+    {
+      "id": "T-005",
+      "command_id": "git-show-frozen-artifact-digest-audit",
+      "environment": "HEAD=2843b3df8eeff05584a2b492ff028ca812674164; all 7 manifest-listed git:// object SHA-256 digests matched exactly",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-005"
+    },
+    {
+      "id": "T-006",
+      "command_id": "blackbox-observed-report-contract-audit",
+      "environment": "4 observations; persona_count=4; unique personas=4; every status PASS; expected equals observed; metric types valid; canonical report digest exact; fixture binding covered by T-001",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-006"
+    },
+    {
+      "id": "T-007",
+      "command_id": "in-memory-fail-closed-boundary-audit",
+      "environment": "10/10 exact fail-closed: missing/unknown/digest/reviewer-write/database-evidence/product-locator/stale-revision/stale-lease/QA-no-pass/result-unknown",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-007"
+    },
+    {
+      "id": "T-008",
+      "command_id": "context-manifest-canonical-digest-audit",
+      "environment": "canonical digest matched sha256:8d7e2bf7d1726847e517e4c05a103315c7371a0fbc1ddeb1be27aa5bbc94a5cc; candidate, revision=2, lease=1, identity, and 7 documents matched",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-008"
+    },
+    {
+      "id": "T-009",
+      "command_id": "native-mvp-bundle-count-and-gate-audit",
+      "environment": "actual counts candidates=2, contexts=11, messages=15; ERP_CONTRACT/SECURITY/QA/BLACK_BOX all PASS; errors=[]; validator=0.4.2",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-009"
+    },
+    {
+      "id": "T-010",
+      "command_id": "git-head-tracked-index-read-only-audit",
+      "environment": "pre/post tracked status empty; index unchanged; final HEAD remains candidate; CLI temporary resources cleaned; no repository writes, staging, commits, network, DB, UAT, production, containers, or deployment",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-010"
+    }
+  ],
+  "risks": [],
+  "blockers": [],
+  "recommendation": {
+    "decision": "PASS_CURRENT_GATE",
+    "reason": "The frozen candidate passed both complete Python suites without skips, deterministic valid-bundle execution, exact frozen-object and context digests, independent count and black-box contract checks, ten fail-closed mutations, and tracked/index read-only verification.",
+    "next_action": "CONTINUE_ONLY_WITHIN_ACTIVE_TASK_PACKET"
+  },
+  "status": "PASS",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

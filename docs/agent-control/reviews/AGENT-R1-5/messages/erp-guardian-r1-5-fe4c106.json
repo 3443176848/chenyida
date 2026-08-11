@@ -1,0 +1,151 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "fe4c1062-190a-4488-b6de-e055afb3b978",
+  "message_type": "VERIFICATION",
+  "created_at": "2026-08-11T17:24:38+08:00",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "erp-guardian-r1-5",
+    "instance_id": "erp-guardian-r1-5-native11",
+    "capability_profile": "ERP_READ_ONLY",
+    "context_manifest_digest": "sha256:7eeabe0ccb4c69ceb8c0d07c3a059f422653168c438e3b153ed7b5d8a5922bcd"
+  },
+  "role": "ERP_CONTRACT_GUARDIAN",
+  "gate": "ERP_CONTRACT",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "fe4c1062190ae488f6dee055afb3b978930d0911",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/tasks/AGENT-R1-5.md",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/ai-engineering/ERP_DOMAIN_BOUNDARIES.md",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/README.md",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/schemas/message-v1.schema.json",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/ai-engineering/MESSAGE_PROTOCOL.md",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/native_mvp.py",
+      "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/tests/test_native_mvp.py",
+      "git://1f55696b124c899d49f4505c9ad0cd238d910b24..fe4c1062190ae488f6dee055afb3b978930d0911?operation=diff-name-only",
+      "audit://AGENT-R1-5/messages/erp-guardian-r1-5-268cba9.json"
+    ]
+  },
+  "assumptions": [],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/tasks/AGENT-R1-5.md",
+      "digest": "sha256:529216694ce3bba396b0b0b94f81143f22a54364e129bc6e56474e2af87c7ac5",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:24:38+08:00",
+      "redaction": "Frozen synthetic contract object only; no product source, owner input, secrets, UAT, production, database, network, or deployment data."
+    },
+    {
+      "id": "E-002",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "digest": "sha256:8f670f7099deec1cbbae7b0f145864e7c299f5e200223856f52ff119ff14edda",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:24:38+08:00",
+      "redaction": "Frozen synthetic contract object only; no product source, owner input, secrets, UAT, production, database, network, or deployment data."
+    },
+    {
+      "id": "E-003",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/ai-engineering/ERP_DOMAIN_BOUNDARIES.md",
+      "digest": "sha256:c8a89a9d68bbee633b14c1fcd5f8a30d479c5d99532a3b4c3c58b59a67183504",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:24:38+08:00",
+      "redaction": "Frozen synthetic contract object only; no product source, owner input, secrets, UAT, production, database, network, or deployment data."
+    },
+    {
+      "id": "E-004",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/README.md",
+      "digest": "sha256:d78338ee7de04296e35ff1f7e80a6d054d49379ba0c17ec0e478018771f4ef6c",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:24:38+08:00",
+      "redaction": "Frozen synthetic contract object only; no product source, owner input, secrets, UAT, production, database, network, or deployment data."
+    },
+    {
+      "id": "E-005",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/agent-control/schemas/message-v1.schema.json",
+      "digest": "sha256:7f57eaa4ab1320b048ae50a4f01590148910e799245a904705bb0f7e6bd8552c",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:24:38+08:00",
+      "redaction": "Frozen synthetic contract object only; no product source, owner input, secrets, UAT, production, database, network, or deployment data."
+    },
+    {
+      "id": "E-006",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/docs/ai-engineering/MESSAGE_PROTOCOL.md",
+      "digest": "sha256:53f560e21f98cbc7a1faaf4478a825c43ee02c21ad20566a958a9023185c2089",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:24:38+08:00",
+      "redaction": "Frozen synthetic contract object only; no product source, owner input, secrets, UAT, production, database, network, or deployment data."
+    },
+    {
+      "id": "E-007",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:cf2692be59d8a62f904ed3f62625bbdd24f1c7fbab3aa698f7639d0e92d0dac9",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:24:38+08:00",
+      "redaction": "Frozen synthetic candidate object only; reviewed offline without product source, database, network, UAT, production, or deployment access."
+    },
+    {
+      "id": "E-008",
+      "kind": "GIT_OBJECT",
+      "locator": "git://fe4c1062190ae488f6dee055afb3b978930d0911/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:a4572d377ed7e6e7104019bcf9b11c0b3c0e5456b3b35d8d9df206c9e1ee2b53",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:24:38+08:00",
+      "redaction": "Frozen synthetic control-test object only; no ERP product tests, real data, database, network, UAT, production, or deployment access."
+    },
+    {
+      "id": "E-009",
+      "kind": "GIT_OBJECT",
+      "locator": "git://1f55696b124c899d49f4505c9ad0cd238d910b24..fe4c1062190ae488f6dee055afb3b978930d0911?operation=diff-name-only",
+      "digest": "sha256:468edd5591e2311b3efad4dcf6a742b40d1f580551b226ffb4a641e8b6464579",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:24:38+08:00",
+      "redaction": "Frozen 20-path synthetic name-only diff; no product source content, owner input, secrets, real data, UAT, production, database, network, or deployment data."
+    },
+    {
+      "id": "E-010",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "audit://AGENT-R1-5/messages/erp-guardian-r1-5-268cba9.json",
+      "digest": "sha256:11efd9f1f0e667b673804dfe5e03e554f8f76cca2a14af99212b5dbbb8e0d429",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:24:38+08:00",
+      "redaction": "Frozen prior synthetic audit message only; used to reconstruct the declared cross-role negative case without product or runtime access."
+    }
+  ],
+  "changes": [],
+  "tests": [],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "LOW",
+      "probability": "MEDIUM",
+      "impact": "R1.5 remains a stateless synthetic protocol and human/native-agent workflow; it does not provide OS-level identity or runtime authority.",
+      "trigger": "A synthetic gate PASS is incorrectly treated as permission for product, database, UAT, production, deployment, or R2 runtime work.",
+      "mitigation": "Keep NO_RUNTIME_AUTHORITY and SYNTHETIC_DOCS_TEST_ONLY boundaries explicit and require separate owner authorization for any later capability.",
+      "residual_risk": "Acceptable only for this docs/test MVP; runtime enforcement remains future, separately authorized work."
+    }
+  ],
+  "blockers": [],
+  "recommendation": {
+    "decision": "PASS_CURRENT_GATE",
+    "reason": "All ten declared artifact digests and the canonical Context Manifest digest verified. The frozen 20-path diff is confined to agent-control docs/tooling, with zero ERP product/business/product-test or Schema/Migration paths. The candidate validator has no D-112 table reuse or database, network, subprocess, or Git capability; the declared ERP boundary keeps PHASE4-TASK03 blocked. Reproducing the prior cross-role BLACK_BOX_OBSERVATION attack produced manual rejection BLACK_BOX_EVIDENCE_ROLE_INVALID and JSON Schema rejection requiring BLACK_BOX_VERIFIER. ERP_CONTRACT passes for the frozen candidate.",
+    "next_action": "Continue independent same-candidate gates; do not deploy, access UAT/production, expand authority, or unfreeze PHASE4-TASK03."
+  },
+  "status": "PASS",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

@@ -1,0 +1,128 @@
+{
+  "schema_version": "erp-agent-context/v1",
+  "task_id": "AGENT-R1-5",
+  "task_packet_revision": 2,
+  "agent_id": "adversarial-r1-5",
+  "instance_id": "adversarial-r1-5-native10",
+  "role": "ADVERSARIAL_EXAMINER",
+  "capability_profile": "ADVERSARIAL_READ_ONLY",
+  "candidate_sha": "268cba926c5b9380c1045fa12fa446b0113b430d",
+  "lease_generation": 1,
+  "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+  "documents": [
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/tasks/AGENT-R1-5.md",
+      "digest": "sha256:529216694ce3bba396b0b0b94f81143f22a54364e129bc6e56474e2af87c7ac5",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "digest": "sha256:8f670f7099deec1cbbae7b0f145864e7c299f5e200223856f52ff119ff14edda",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/README.md",
+      "digest": "sha256:84ff75176a2e19ffeb07d45419d5c44c322413667398092b98bc1da08afa2d9f",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/schemas/task-packet-v2.schema.json",
+      "digest": "sha256:74037d60179b2b8eef811ddee700656a53d2844b64cb33d9bb2d414c67ecd05c",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/schemas/message-v1.schema.json",
+      "digest": "sha256:f09e7e9187b63e3de89e681e35ab6fcbd8c7442a02aa23696c9c09b5ca46f220",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/schemas/context-manifest-v1.schema.json",
+      "digest": "sha256:81a455b0357b4a4c520894d3fbf5f55c6919cad6d30850474d44dd3f145f7672",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "digest": "sha256:e8e2fceb666afacd586e983fc9c839c9f09b1343752e20a1b2db5d9936570585",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/pilots/AGENT-R1-5/blackbox/README.md",
+      "digest": "sha256:04d15e6eb37e83773d33932e323b1340988ff9e4848e514bd18eef3598164609",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/pilots/AGENT-R1-5/blackbox/interface.json",
+      "digest": "sha256:e0668945eb3234545adbfa425d7b23adee2b120e777ba56d09e20f000cc7d87b",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/pilots/AGENT-R1-5/blackbox/personas.json",
+      "digest": "sha256:23729b61eef1f91de0f0523465a855877a3bdd4973e1bed78733a9534985ed0b",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/pilots/AGENT-R1-5/blackbox/observed-report.json",
+      "digest": "sha256:351a824a1c4ed4d53f35e9c3c80f90a6756e79cc3867206b6f6360697e5e577c",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/pilots/AGENT-R1-5/blackbox/runner.mjs",
+      "digest": "sha256:04a352d1cd55cbb667b5f431857d23f8d4bf51416758b67955ec08f28221efbe",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/ai-engineering/MESSAGE_PROTOCOL.md",
+      "digest": "sha256:b2daf87467e104c537b011aa50e56a08897ae0f539f1bfe62ee56ac67bcbcb6c",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/ai-engineering/ORCHESTRATION.md",
+      "digest": "sha256:6661152d51c96a4d40152286995f8d37a64ec4c21090c30fd1c4b6fef6e1928a",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:38862585a23e9c9ba2c3cc5c1d5be092d32cd727de0901a0583ca056a55a7094",
+      "classification": "SYNTHETIC_CANDIDATE"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/readonly_controller.py",
+      "digest": "sha256:1d54b6a69d451ea5d753072216b8233b1d30beba3fde4afdcceb9e2adf58c64d",
+      "classification": "SYNTHETIC_CANDIDATE"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/pilot_fixture.py",
+      "digest": "sha256:9e76dc2bdaa97b88d5d41f251ca6d7843063109c282347b9b58c96a79742e870",
+      "classification": "SYNTHETIC_CANDIDATE"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:d2cfa50ba87d1818455cc2b635dc7aa1858c01b635ae691516e86690eb7d1a04",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/tests/test_readonly_controller.py",
+      "digest": "sha256:6c0094603887ad6b23e09b6030d8a9c2c212711c872204dae39cb586115bc273",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "git://1f55696b124c899d49f4505c9ad0cd238d910b24..268cba926c5b9380c1045fa12fa446b0113b430d?operation=diff-name-only",
+      "digest": "sha256:468edd5591e2311b3efad4dcf6a742b40d1f580551b226ffb4a641e8b6464579",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "audit://AGENT-R1-5/messages/adversarial-r1-5-2ac5ac5.json",
+      "digest": "sha256:4d470e246a73f442e2b5d003d4e6831d9fe7440158924825b9bc89f23a56d23a",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    }
+  ],
+  "forbidden_context": [
+    "OWNER_UNTRACKED_INPUT",
+    "PRODUCT_SOURCE",
+    "GIT_INTERNALS",
+    "REAL_BUSINESS_DATA",
+    "SECRETS",
+    "UAT_OR_PRODUCTION"
+  ],
+  "manifest_digest": "sha256:ea40fb9dc0f30641cb41db7cdd02e3925c4a50a68c1f69d0ca61b05eef58fb53"
+}

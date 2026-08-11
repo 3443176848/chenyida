@@ -1,0 +1,80 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "8e5bd687-0d92-4f33-bae4-3b9e6a62b7c1",
+  "message_type": "VERIFICATION",
+  "created_at": "2026-08-11T10:13:00Z",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "blackbox-r1-5",
+    "instance_id": "blackbox-r1-5-native12",
+    "capability_profile": "BLACK_BOX_PUBLIC_ONLY",
+    "context_manifest_digest": "sha256:2c67021caa027f47a81587934c9eb74f714a9d8ffe0871d9c53992739e963fa5"
+  },
+  "role": "BLACK_BOX_VERIFIER",
+  "gate": "BLACK_BOX",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "25cbbfab87925a8601b844fe59c634ae0b651297",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/blackbox/interface.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/blackbox/personas.json",
+      "audit://AGENT-R1-5/blackbox/observed-report-25cbbfa.json"
+    ]
+  },
+  "assumptions": [],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/blackbox/interface.json",
+      "digest": "sha256:e0668945eb3234545adbfa425d7b23adee2b120e777ba56d09e20f000cc7d87b",
+      "observed_at": "2026-08-11T10:11:59Z",
+      "exit_code": null,
+      "redaction": "仅核验公开接口工件的字节摘要及其与观察报告中规范化摘要的绑定；未读取产品源码、Git 元数据、私有实现或真实业务数据。"
+    },
+    {
+      "id": "E-002",
+      "kind": "GIT_OBJECT",
+      "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/blackbox/personas.json",
+      "digest": "sha256:23729b61eef1f91de0f0523465a855877a3bdd4973e1bed78733a9534985ed0b",
+      "observed_at": "2026-08-11T10:11:59Z",
+      "exit_code": null,
+      "redaction": "仅核验公开 persona 工件的字节摘要、规范化摘要、四项可观察风险的一对一覆盖和 persona 数量；未读取任何私有实现。"
+    },
+    {
+      "id": "E-003",
+      "kind": "BLACK_BOX_OBSERVATION",
+      "locator": "audit://AGENT-R1-5/blackbox/observed-report-25cbbfa.json",
+      "digest": "sha256:0653f91f95a94be4057656d89e9473c5ff66033105171ed8873b5654a76f4678",
+      "observed_at": "2026-08-11T10:11:59Z",
+      "exit_code": 0,
+      "redaction": "仅离线核验公开观察报告的摘要绑定、四项 expected/observed 一致性、PASS 状态、隔离声明及报告自摘要；未运行 fixture，未重新观察私有实现。"
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "source-blind-public-artifact-verification",
+      "environment": "只读、离线且仅使用公开 interface、personas、observed-report 三工件；未运行 fixture，未使用网络、数据库、Docker、UAT、生产或部署。",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-003"
+    }
+  ],
+  "risks": [],
+  "blockers": [],
+  "recommendation": {
+    "decision": "PASS_CURRENT_GATE",
+    "reason": "Context Manifest 规范化摘要、三工件字节摘要、interface/persona 规范化摘要、四风险单一 persona 覆盖、观察一致性、隔离声明及报告自摘要均通过。",
+    "next_action": "关闭合成试点并继续冻结 PHASE4-TASK03；禁止扩大权限。"
+  },
+  "status": "PASS",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

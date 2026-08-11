@@ -1,0 +1,58 @@
+{
+  "schema_version": "erp-agent-context/v1",
+  "task_id": "AGENT-R1-5",
+  "task_packet_revision": 2,
+  "agent_id": "qa-r1-5",
+  "instance_id": "qa-r1-5-native5",
+  "role": "INDEPENDENT_VERIFIER",
+  "capability_profile": "QA_TEST_READ_ONLY",
+  "candidate_sha": "6d0a015f90b6f4d074e698505350c39f751511dd",
+  "lease_generation": 1,
+  "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+  "documents": [
+    {
+      "locator": "git://6d0a015f90b6f4d074e698505350c39f751511dd/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "digest": "sha256:41155ecc69239ef7966daa4b8a44053004c7a700cc7da983f5ddbc7632af04d1",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://6d0a015f90b6f4d074e698505350c39f751511dd/docs/agent-control/pilots/AGENT-R1-5/blackbox/observed-report.json",
+      "digest": "sha256:351a824a1c4ed4d53f35e9c3c80f90a6756e79cc3867206b6f6360697e5e577c",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "git://6d0a015f90b6f4d074e698505350c39f751511dd/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:0f30b9ff66edb240e63b276fac28d67537c1b746f7559dee6c50358edff7f693",
+      "classification": "SYNTHETIC_CANDIDATE"
+    },
+    {
+      "locator": "git://6d0a015f90b6f4d074e698505350c39f751511dd/tools/erp_agent_control/readonly_controller.py",
+      "digest": "sha256:e0723ae6221d691fdb7fed88c8e910c023ce8b0ba451a16148506473c9378b99",
+      "classification": "SYNTHETIC_CANDIDATE"
+    },
+    {
+      "locator": "git://6d0a015f90b6f4d074e698505350c39f751511dd/tools/erp_agent_control/pilot_fixture.py",
+      "digest": "sha256:ccfd824c446d1e8ea8ed3b8c9d438862f4703ef84f5971484445834c9b39df1f",
+      "classification": "SYNTHETIC_CANDIDATE"
+    },
+    {
+      "locator": "git://6d0a015f90b6f4d074e698505350c39f751511dd/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:7c74033b28ed13d0a62069e02a1e3abef737d3fd8beed8c3da1ad7cfcd3ea619",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    },
+    {
+      "locator": "git://6d0a015f90b6f4d074e698505350c39f751511dd/tools/erp_agent_control/tests/test_readonly_controller.py",
+      "digest": "sha256:1011e3e820114bad95097551ab824a0edc2efdb879be2491ffca7126767b25bf",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    }
+  ],
+  "forbidden_context": [
+    "OWNER_UNTRACKED_INPUT",
+    "PRODUCT_SOURCE",
+    "GIT_INTERNALS",
+    "REAL_BUSINESS_DATA",
+    "SECRETS",
+    "UAT_OR_PRODUCTION"
+  ],
+  "manifest_digest": "sha256:5d1c45929324fd1d8096a86e46f1b0d8ba0687b278a6d7fa655fbcb012a0a8b5"
+}

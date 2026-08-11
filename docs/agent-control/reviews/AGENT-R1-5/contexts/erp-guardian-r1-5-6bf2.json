@@ -1,0 +1,48 @@
+{
+  "schema_version": "erp-agent-context/v1",
+  "task_id": "AGENT-R1-5",
+  "task_packet_revision": 2,
+  "agent_id": "erp-guardian-r1-5",
+  "instance_id": "erp-guardian-r1-5-native3",
+  "role": "ERP_CONTRACT_GUARDIAN",
+  "capability_profile": "ERP_READ_ONLY",
+  "candidate_sha": "6bf2b1faf205e64b1505779f211fb88d6c60696b",
+  "lease_generation": 1,
+  "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+  "documents": [
+    {
+      "locator": "git://6bf2b1faf205e64b1505779f211fb88d6c60696b/docs/tasks/AGENT-R1-5.md",
+      "digest": "sha256:529216694ce3bba396b0b0b94f81143f22a54364e129bc6e56474e2af87c7ac5",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://6bf2b1faf205e64b1505779f211fb88d6c60696b/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "digest": "sha256:8f670f7099deec1cbbae7b0f145864e7c299f5e200223856f52ff119ff14edda",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://6bf2b1faf205e64b1505779f211fb88d6c60696b/docs/ai-engineering/ERP_DOMAIN_BOUNDARIES.md",
+      "digest": "sha256:c8a89a9d68bbee633b14c1fcd5f8a30d479c5d99532a3b4c3c58b59a67183504",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://6bf2b1faf205e64b1505779f211fb88d6c60696b/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:26bcd89f6e01be88e5b47210978d5ed7e662488bb5a1661c672f6525e6d26711",
+      "classification": "SYNTHETIC_CANDIDATE"
+    },
+    {
+      "locator": "git://6bf2b1faf205e64b1505779f211fb88d6c60696b/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:5178ab797be175275ca23daba441f247e119967b7346b0bccfb0e58755132c19",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    }
+  ],
+  "forbidden_context": [
+    "OWNER_UNTRACKED_INPUT",
+    "PRODUCT_SOURCE",
+    "GIT_INTERNALS",
+    "REAL_BUSINESS_DATA",
+    "SECRETS",
+    "UAT_OR_PRODUCTION"
+  ],
+  "manifest_digest": "sha256:263eaa7e9f166b870df14a23a37adf61b81744fc61680e7cd38f694298c7ea7a"
+}

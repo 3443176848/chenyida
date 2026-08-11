@@ -1,0 +1,38 @@
+{
+  "schema_version": "erp-agent-context/v1",
+  "task_id": "AGENT-R1-5",
+  "task_packet_revision": 2,
+  "agent_id": "blackbox-r1-5",
+  "instance_id": "blackbox-r1-5-native1",
+  "role": "BLACK_BOX_VERIFIER",
+  "capability_profile": "BLACK_BOX_PUBLIC_ONLY",
+  "candidate_sha": "470519c6bccddfc927362706a15be4a8ccdf2d0a",
+  "lease_generation": 1,
+  "visibility": "BLACK_BOX_PUBLIC_ONLY",
+  "documents": [
+    {
+      "locator": "blackbox://interface.json",
+      "digest": "sha256:e0668945eb3234545adbfa425d7b23adee2b120e777ba56d09e20f000cc7d87b",
+      "classification": "PUBLIC_INTERFACE"
+    },
+    {
+      "locator": "blackbox://personas.json",
+      "digest": "sha256:23729b61eef1f91de0f0523465a855877a3bdd4973e1bed78733a9534985ed0b",
+      "classification": "PUBLIC_PERSONA"
+    },
+    {
+      "locator": "blackbox://observed-report.json",
+      "digest": "sha256:351a824a1c4ed4d53f35e9c3c80f90a6756e79cc3867206b6f6360697e5e577c",
+      "classification": "PUBLIC_OBSERVATION"
+    }
+  ],
+  "forbidden_context": [
+    "OWNER_UNTRACKED_INPUT",
+    "PRODUCT_SOURCE",
+    "GIT_INTERNALS",
+    "REAL_BUSINESS_DATA",
+    "SECRETS",
+    "UAT_OR_PRODUCTION"
+  ],
+  "manifest_digest": "sha256:a845295cf197e2a31e6fc922182a90f93fb597e42dbcba06b261e8c59febd95c"
+}

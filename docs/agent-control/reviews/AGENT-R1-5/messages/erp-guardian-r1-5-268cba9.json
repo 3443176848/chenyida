@@ -1,0 +1,131 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "2a68cba9-6c5b-4380-9c10-45fa12fa446b",
+  "message_type": "FINDING",
+  "created_at": "2026-08-11T17:11:23+08:00",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "erp-guardian-r1-5",
+    "instance_id": "erp-guardian-r1-5-native10",
+    "capability_profile": "ERP_READ_ONLY",
+    "context_manifest_digest": "sha256:9ea1bde5f8cdab3adaf54384b0f18f9092017d58084feeca3efd882b2b83b90c"
+  },
+  "role": "ERP_CONTRACT_GUARDIAN",
+  "gate": "ERP_CONTRACT",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "268cba926c5b9380c1045fa12fa446b0113b430d",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://1f55696b124c899d49f4505c9ad0cd238d910b24..268cba926c5b9380c1045fa12fa446b0113b430d?operation=diff-name-only",
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/tasks/AGENT-R1-5.md",
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/ai-engineering/ERP_DOMAIN_BOUNDARIES.md",
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/native_mvp.py",
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/schemas/message-v1.schema.json",
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/ai-engineering/MESSAGE_PROTOCOL.md",
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/tests/test_native_mvp.py"
+    ]
+  },
+  "assumptions": [],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "GIT_OBJECT",
+      "locator": "git://1f55696b124c899d49f4505c9ad0cd238d910b24..268cba926c5b9380c1045fa12fa446b0113b430d?operation=diff-name-only",
+      "digest": "sha256:468edd5591e2311b3efad4dcf6a742b40d1f580551b226ffb4a641e8b6464579",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:11:23+08:00",
+      "redaction": "Frozen synthetic Git object only; no product source, owner input, secrets, UAT, production, or database data."
+    },
+    {
+      "id": "E-002",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/tasks/AGENT-R1-5.md",
+      "digest": "sha256:529216694ce3bba396b0b0b94f81143f22a54364e129bc6e56474e2af87c7ac5",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:11:23+08:00",
+      "redaction": "Frozen synthetic Git object only; no product source, owner input, secrets, UAT, production, or database data."
+    },
+    {
+      "id": "E-003",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "digest": "sha256:8f670f7099deec1cbbae7b0f145864e7c299f5e200223856f52ff119ff14edda",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:11:23+08:00",
+      "redaction": "Frozen synthetic Git object only; no product source, owner input, secrets, UAT, production, or database data."
+    },
+    {
+      "id": "E-004",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/ai-engineering/ERP_DOMAIN_BOUNDARIES.md",
+      "digest": "sha256:c8a89a9d68bbee633b14c1fcd5f8a30d479c5d99532a3b4c3c58b59a67183504",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:11:23+08:00",
+      "redaction": "Frozen synthetic Git object only; no product source, owner input, secrets, UAT, production, or database data."
+    },
+    {
+      "id": "E-005",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:38862585a23e9c9ba2c3cc5c1d5be092d32cd727de0901a0583ca056a55a7094",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:11:23+08:00",
+      "redaction": "Frozen synthetic Git object only; no product source, owner input, secrets, UAT, production, or database data."
+    },
+    {
+      "id": "E-006",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/schemas/message-v1.schema.json",
+      "digest": "sha256:f09e7e9187b63e3de89e681e35ab6fcbd8c7442a02aa23696c9c09b5ca46f220",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:11:23+08:00",
+      "redaction": "Frozen synthetic Git object only; no product source, owner input, secrets, UAT, production, or database data."
+    },
+    {
+      "id": "E-007",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/ai-engineering/MESSAGE_PROTOCOL.md",
+      "digest": "sha256:b2daf87467e104c537b011aa50e56a08897ae0f539f1bfe62ee56ac67bcbcb6c",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:11:23+08:00",
+      "redaction": "Frozen synthetic Git object only; no product source, owner input, secrets, UAT, production, or database data."
+    },
+    {
+      "id": "E-008",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:d2cfa50ba87d1818455cc2b635dc7aa1858c01b635ae691516e86690eb7d1a04",
+      "exit_code": null,
+      "observed_at": "2026-08-11T17:11:23+08:00",
+      "redaction": "Frozen synthetic Git object only; no product source, owner input, secrets, UAT, production, or database data."
+    }
+  ],
+  "changes": [],
+  "tests": [],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "HIGH",
+      "probability": "MEDIUM",
+      "impact": "A non-black-box final adversarial PASS can carry an unreferenced BLACK_BOX_OBSERVATION and use it as the evidence required to close a Minority Report, despite the documented all-test-evidence binding rule.",
+      "trigger": "Any non-BLACK_BOX_VERIFIER message supplies kind BLACK_BOX_OBSERVATION through a bundle:// locator; the validator only collects the role-expected test kind, so this evidence is omitted from declared_test_evidence.",
+      "mitigation": "Reject BLACK_BOX_OBSERVATION for non-black-box roles, or compute declared test evidence from both TEST_REPORT and BLACK_BOX_OBSERVATION and require exact unique test references; mirror the rule in JSON Schema and add a negative regression test.",
+      "residual_risk": "Low after both manual-validator and schema parity tests prove the cross-kind variant fails closed."
+    }
+  ],
+  "blockers": [],
+  "recommendation": {
+    "decision": "FAIL_CURRENT_GATE",
+    "reason": "The 20-path baseline diff is confined to AGENT-R1-5 docs/control tooling; no ERP business or product-test path, Schema/Migration, D-112 runtime table reuse, UAT/production/deployment change, or PHASE4-TASK03 unfreeze was observed. However native_mvp.py lines 893-902 only bind the role-expected test kind. A non-black-box role can therefore submit BLACK_BOX_OBSERVATION as bundle-classified evidence without a tests reference, contradicting MESSAGE_PROTOCOL.md line 115 and weakening evidence-backed Minority Report disposition.",
+    "next_action": "Fix the cross-kind evidence rule in validator and schema, add a non-black-box BLACK_BOX_OBSERVATION negative test, freeze a new candidate SHA, and rerun all independent gates."
+  },
+  "status": "FAIL",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

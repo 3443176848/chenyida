@@ -1,0 +1,166 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "4c862966-16d8-4cb9-a2ce-f2ac086540f9",
+  "message_type": "VETO",
+  "created_at": "2026-08-11T15:25:53+08:00",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "security-r1-5",
+    "instance_id": "security-r1-5-native6",
+    "capability_profile": "SECURITY_READ_ONLY",
+    "context_manifest_digest": "sha256:d5f27bfee4f16656ecbabd00783f2eedcdc549741b1a2b7dee9d5690df927a69"
+  },
+  "role": "SECURITY_BOUNDARY_EXAMINER",
+  "gate": "SECURITY",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "6d0a015f90b6f4d074e698505350c39f751511dd",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://6d0a015f90b6f4d074e698505350c39f751511dd/docs/agent-control/schemas/task-packet-v2.schema.json",
+      "git://6d0a015f90b6f4d074e698505350c39f751511dd/docs/agent-control/schemas/message-v1.schema.json",
+      "git://6d0a015f90b6f4d074e698505350c39f751511dd/tools/erp_agent_control/native_mvp.py",
+      "git://6d0a015f90b6f4d074e698505350c39f751511dd/tools/erp_agent_control/readonly_controller.py",
+      "git://6d0a015f90b6f4d074e698505350c39f751511dd/tools/erp_agent_control/tests/test_native_mvp.py",
+      "git://6d0a015f90b6f4d074e698505350c39f751511dd/tools/erp_agent_control/tests/test_readonly_controller.py"
+    ]
+  },
+  "assumptions": [],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "GIT_OBJECT",
+      "locator": "git://6d0a015f90b6f4d074e698505350c39f751511dd/tools/erp_agent_control/readonly_controller.py",
+      "digest": "sha256:e0723ae6221d691fdb7fed88c8e910c023ce8b0ba451a16148506473c9378b99",
+      "exit_code": null,
+      "observed_at": "2026-08-11T15:25:53+08:00",
+      "redaction": "none; frozen synthetic control-plane source"
+    },
+    {
+      "id": "E-002",
+      "kind": "GIT_OBJECT",
+      "locator": "git://6d0a015f90b6f4d074e698505350c39f751511dd/docs/agent-control/schemas/task-packet-v2.schema.json",
+      "digest": "sha256:cbbf3a79e2a5e1c69fa09c47b3ed2f59af80dbb41ead93a2c2349e58fc3c3812",
+      "exit_code": null,
+      "observed_at": "2026-08-11T15:25:53+08:00",
+      "redaction": "none; frozen synthetic contract"
+    },
+    {
+      "id": "E-003",
+      "kind": "GIT_OBJECT",
+      "locator": "git://6d0a015f90b6f4d074e698505350c39f751511dd/docs/agent-control/schemas/message-v1.schema.json",
+      "digest": "sha256:901177abc182074c9ba25e41b6b2b39436dff3517f726c0f1f8d4ba4bd621296",
+      "exit_code": null,
+      "observed_at": "2026-08-11T15:25:53+08:00",
+      "redaction": "none; frozen synthetic contract"
+    },
+    {
+      "id": "E-004",
+      "kind": "COMMAND_RESULT",
+      "locator": "command:///opt/erp/.venv/bin/python_-B_-m_unittest_tools.erp_agent_control.tests.test_native_mvp",
+      "digest": "sha256:c41e6994733bcd72778b05c73a8aee9b46b3cb94305cdbca3d4584f82991a501",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T15:25:53+08:00",
+      "redaction": "none; 56 tests passed"
+    },
+    {
+      "id": "E-005",
+      "kind": "COMMAND_RESULT",
+      "locator": "command:///opt/erp/.venv/bin/python_-B_-m_unittest_tools.erp_agent_control.tests.test_readonly_controller",
+      "digest": "sha256:75f5c84351c84181e03cc3d5b14a37de211c8318fef1731d438f0bf8fa4d2603",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T15:25:53+08:00",
+      "redaction": "none; 40 tests passed"
+    },
+    {
+      "id": "E-006",
+      "kind": "COMMAND_RESULT",
+      "locator": "command://frozen-security-path-scope-negative-check@6d0a015",
+      "digest": "sha256:9abc1417435422ccfb08fd458ead803f171d591ad0130bde96ec01970ebf44a6",
+      "exit_code": 1,
+      "observed_at": "2026-08-11T15:25:53+08:00",
+      "redaction": "none; negative check observed nested .git acceptance and unbounded fnmatch scope acceptance"
+    },
+    {
+      "id": "E-007",
+      "kind": "COMMAND_RESULT",
+      "locator": "command://frozen-schema-path-scope-observation@6d0a015",
+      "digest": "sha256:ad5cb50144003a3bfe66c791bde56704242db91f5bc7fc2820e0061d3014d262",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T15:25:53+08:00",
+      "redaction": "none; schemas accept nested .git path and equivalent unbounded pattern"
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "native-mvp-unit-suite",
+      "environment": "/opt/erp; HEAD 6d0a015f90b6f4d074e698505350c39f751511dd; offline read-only",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-004"
+    },
+    {
+      "id": "T-002",
+      "command_id": "readonly-controller-unit-suite",
+      "environment": "/opt/erp; HEAD 6d0a015f90b6f4d074e698505350c39f751511dd; offline read-only",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-005"
+    },
+    {
+      "id": "T-003",
+      "command_id": "security-path-scope-negative-check",
+      "environment": "Frozen readonly_controller object executed from git object; no repository writes or external access",
+      "result": "FAIL",
+      "exit_code": 1,
+      "artifact": "E-006"
+    }
+  ],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "CRITICAL",
+      "probability": "MEDIUM",
+      "impact": "A Task Packet can use an equivalent universal pattern such as */*, after which committed or worktree product paths satisfy the declared scope and the controller can report the path gate as passed.",
+      "trigger": "allowed_changed_paths contains */* or another fnmatch-equivalent broad pattern not covered by the three-value denylist.",
+      "mitigation": "Use a segment-aware bounded path grammar or an explicit approved-prefix allowlist and reject every pattern capable of matching outside authorized prefixes.",
+      "residual_risk": "The current exact-string denylist does not bound Python fnmatch semantics."
+    },
+    {
+      "id": "R-002",
+      "severity": "HIGH",
+      "probability": "MEDIUM",
+      "impact": "A builder change under an allowed subtree can target a nested .git segment, violating the forbidden Git-internals boundary and potentially hiding repository-control material from ordinary scope inspection.",
+      "trigger": "A change path such as tools/erp_agent_control/.git/config is supplied under the current tools/erp_agent_control/** scope.",
+      "mitigation": "Reject .git in every path segment in both schemas and manual validators, then add matching negative tests.",
+      "residual_risk": "Both the message schema and manual path validator currently accept the path, while the current scope pattern matches it."
+    }
+  ],
+  "blockers": [
+    {
+      "id": "B-001",
+      "category": "PATH_SCOPE_FAIL_OPEN",
+      "attempted": [
+        "Validated the frozen schemas against nested Git-internal and equivalent universal path patterns.",
+        "Executed the frozen manual path and scope functions against the same cases.",
+        "Ran both manifest-listed unit suites sequentially."
+      ],
+      "evidence_refs": ["E-001", "E-002", "E-003", "E-006", "E-007"],
+      "unblock_owner": "builder-r1-5"
+    }
+  ],
+  "recommendation": {
+    "decision": "VETO",
+    "reason": "The old TOCTOU VETO is substantively repaired: descriptor-relative component opens retain ancestor descriptors, require O_NOFOLLOW, compare identity/version metadata, and the final-file and intermediate-directory race regressions pass. A separate in-scope fail-open remains: */* is accepted as a bounded Task Packet pattern although Python fnmatch matches deep product paths, and nested .git segments are accepted by both message/manual path validation and match the current tools scope. This permits scope or Git-internals write-boundary bypass.",
+    "next_action": "Reject equivalent universal globs and every .git path segment, then add schema/manual regression cases before refreezing."
+  },
+  "status": "VETOED",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

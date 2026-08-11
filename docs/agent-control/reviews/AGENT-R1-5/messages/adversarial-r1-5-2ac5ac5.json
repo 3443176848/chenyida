@@ -1,0 +1,126 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "e97c405d-9ae6-4f9a-96f7-ef0915013ea2",
+  "message_type": "VETO",
+  "created_at": "2026-08-11T08:30:00Z",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "adversarial-r1-5",
+    "instance_id": "adversarial-r1-5-native9",
+    "capability_profile": "ADVERSARIAL_READ_ONLY",
+    "context_manifest_digest": "sha256:e57093c1735a4454cadc985eb7bcc4ed69ac93347dd9f706aae1a42fe2cb0aa4"
+  },
+  "role": "ADVERSARIAL_EXAMINER",
+  "gate": "ADVERSARIAL",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "2ac5ac5b1e400c095e5ee5152469f37be9de1a91",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/tools/erp_agent_control/native_mvp.py",
+      "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/tools/erp_agent_control/tests/test_native_mvp.py",
+      "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "audit://AGENT-R1-5/messages/adversarial-r1-5-2843b3d.json",
+      "bundle://adversarial-r1-5/in-memory-probe-summary-r2"
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "A-001",
+      "statement": "All protocol probes used deep copies of the frozen synthetic bundle and executed the frozen candidate validator from in-memory Git-object source.",
+      "status": "VERIFIED",
+      "source": "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "GIT_OBJECT",
+      "locator": "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:0baebde919852c72096efa905fbe9f889d6b2b40c337bd7e055b3c6dfee108fa",
+      "exit_code": null,
+      "observed_at": "2026-08-11T08:30:00Z",
+      "redaction": "Frozen synthetic candidate only; no product, owner, secret, UAT, or production context."
+    },
+    {
+      "id": "E-002",
+      "kind": "GIT_OBJECT",
+      "locator": "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:b4c904e26cebe05827dcde3d64d1c3de4d381ec500a9eb078e2e330ef1c32bca",
+      "exit_code": null,
+      "observed_at": "2026-08-11T08:30:00Z",
+      "redaction": "Frozen synthetic test evidence only."
+    },
+    {
+      "id": "E-003",
+      "kind": "GIT_OBJECT",
+      "locator": "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "digest": "sha256:481cc4e1ff15128dedb6eb86af3408285e3f76a19e8faad2e5989897262e8659",
+      "exit_code": null,
+      "observed_at": "2026-08-11T08:30:00Z",
+      "redaction": "Frozen public synthetic bundle."
+    },
+    {
+      "id": "E-004",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "audit://AGENT-R1-5/messages/adversarial-r1-5-2843b3d.json",
+      "digest": "sha256:e4fbec24f6755d6ee746e565eccd48e10dcb56517472965df175cc45dbd48c45",
+      "exit_code": null,
+      "observed_at": "2026-08-11T08:30:00Z",
+      "redaction": "Manifest-listed prior veto record."
+    },
+    {
+      "id": "E-005",
+      "kind": "COMMAND_RESULT",
+      "locator": "bundle://adversarial-r1-5/in-memory-probe-summary-r2",
+      "digest": "sha256:015d8c2ecaee70693b292850c8265d5ff056c9e004f2ffaf30487483366e80ed",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T08:30:00Z",
+      "redaction": "Offline in-memory summary: baseline PASS, 29 expected negative rejections, and three scoped invalid-bundle PASS bypasses."
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "in-memory-prior-veto-and-close-variant-probes",
+      "environment": "Frozen Git objects and deep-copied synthetic bundle; no writes, network, database, Docker, UAT, or production",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-005"
+    }
+  ],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "CRITICAL",
+      "probability": "HIGH",
+      "impact": "The rejected candidate's required QA failure can be satisfied by a VERIFICATION/FAIL message whose only test and TEST_REPORT both say PASS with exit code 0. The complete invalid bundle still returns PASS, so the pilot does not prove that QA actually observed a failure.",
+      "trigger": "Keep message 05 at QA/FAIL, change its only test to PASS/0, change its TEST_REPORT evidence to exit 0, recompute the registered evidence payload and digest, then validate; status is PASS with errors empty.",
+      "mitigation": "Bind reviewer message status to aggregate test outcomes: QA or black-box FAIL must contain supporting failed evidence, RESULT_UNKNOWN must contain unknown evidence, and contradictory all-PASS evidence must not satisfy a failed gate.",
+      "residual_risk": "Until fixed, required rejection exercises can be fabricated with successful evidence."
+    },
+    {
+      "id": "R-002",
+      "severity": "CRITICAL",
+      "probability": "HIGH",
+      "impact": "Minority Report disposition remains semantic-free. The final adversarial PASS can resolve MR-001 while recommendation.decision is VETO_CONFIRMED, or while its sole evidence is an unreferenced TEST_REPORT with exit code 7. Both invalid bundles return PASS with errors empty.",
+      "trigger": "On message 09, either set recommendation.decision to VETO_CONFIRMED, or change evidence kind/exit to TEST_REPORT/7 and recompute its registry payload and digest while leaving tests empty; validation still returns PASS.",
+      "mitigation": "Add a structured, enumerated disposition bound to each claim and its evidence; require a PASS-compatible disposition such as FIX_ACCEPTED or RESOLVED_BY_EVIDENCE, reject confirmed-veto dispositions, and require every TEST_REPORT evidence to be referenced by a consistent test.",
+      "residual_risk": "Until fixed, a confirmed or evidentially failing minority objection can be represented as resolved and permit closure."
+    }
+  ],
+  "blockers": [],
+  "recommendation": {
+    "decision": "REJECT_CANDIDATE",
+    "reason": "Most prior negative paths now fail closed, including artifact, Context, role, claim-reference, binding-matrix, and stale-artifact variants, but scoped QA-status and Minority Report disposition bypasses still make invalid synthetic bundles return PASS.",
+    "next_action": "Fix status-to-test aggregation and structured Minority Report disposition binding, add the three reproduced negative tests, and submit a new frozen candidate."
+  },
+  "status": "VETOED",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

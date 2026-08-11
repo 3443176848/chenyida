@@ -1,0 +1,132 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "8f5b9ce1-87fa-4db2-8b8f-2ac5ac500001",
+  "message_type": "VERIFICATION",
+  "created_at": "2026-08-11T16:52:08+08:00",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "qa-r1-5",
+    "instance_id": "qa-r1-5-native9",
+    "capability_profile": "QA_TEST_READ_ONLY",
+    "context_manifest_digest": "sha256:626f0f70092cc96aa2d2494694aa5f034a03aa1cab8d5ab4e78aec8d377947d9"
+  },
+  "role": "INDEPENDENT_VERIFIER",
+  "gate": "QA",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "2ac5ac5b1e400c095e5ee5152469f37be9de1a91",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "bundle://qa-r1-5-native9/test-report/native-76",
+      "bundle://qa-r1-5-native9/test-report/controller-43",
+      "bundle://qa-r1-5-native9/test-report/schema-instances",
+      "bundle://qa-r1-5-native9/test-report/cli-determinism",
+      "bundle://qa-r1-5-native9/test-report/fixture-negative-audit"
+    ]
+  },
+  "assumptions": [],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "TEST_REPORT",
+      "locator": "bundle://qa-r1-5-native9/test-report/native-76",
+      "digest": "sha256:43afc7c777a71c57a39e901bfd7ab351d7eb25bb64abfb52d50b74f8a3bc9b85",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T16:52:08+08:00",
+      "redaction": "none; synthetic manifest-scoped QA output only"
+    },
+    {
+      "id": "E-002",
+      "kind": "TEST_REPORT",
+      "locator": "bundle://qa-r1-5-native9/test-report/controller-43",
+      "digest": "sha256:4301bb71799e6a1e1d40711bc1e3f0c5c6aa6d6b8985a72efb5c6ac30e08211c",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T16:52:08+08:00",
+      "redaction": "none; synthetic manifest-scoped QA output only"
+    },
+    {
+      "id": "E-003",
+      "kind": "TEST_REPORT",
+      "locator": "bundle://qa-r1-5-native9/test-report/schema-instances",
+      "digest": "sha256:a5e5fa2601fa61482baead7c3c2fe383f9cabaa7d03576c78fdf251290c6c4d2",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T16:52:08+08:00",
+      "redaction": "none; synthetic manifest-scoped QA output only"
+    },
+    {
+      "id": "E-004",
+      "kind": "TEST_REPORT",
+      "locator": "bundle://qa-r1-5-native9/test-report/cli-determinism",
+      "digest": "sha256:dfc5759ce0352a9180b07081b545a003abb9c5a228841d971f7e7355125f113b",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T16:52:08+08:00",
+      "redaction": "none; synthetic manifest-scoped QA output only"
+    },
+    {
+      "id": "E-005",
+      "kind": "TEST_REPORT",
+      "locator": "bundle://qa-r1-5-native9/test-report/fixture-negative-audit",
+      "digest": "sha256:e33ae5770d918b5decc3ba45221d1f28ec5f7dc5dde52be83a8370b8edfe2aeb",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T16:52:08+08:00",
+      "redaction": "none; synthetic manifest-scoped QA output only"
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "native-protocol-unittest-76",
+      "environment": "temporary manifest-only archive; CPython; bytecode disabled; no network, DB, Docker, UAT, or production",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-001"
+    },
+    {
+      "id": "T-002",
+      "command_id": "readonly-controller-unittest-43",
+      "environment": "temporary manifest-only archive and synthetic temporary Git fixtures; bytecode disabled; isolated Git config",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-002"
+    },
+    {
+      "id": "T-003",
+      "command_id": "schema-instance-validation",
+      "environment": "read-only frozen Git objects and supplied QA context; standard-library Draft 2020-12 keyword checker",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-003"
+    },
+    {
+      "id": "T-004",
+      "command_id": "valid-bundle-cli-determinism-2x",
+      "environment": "temporary manifest-only archive; two serial CLI runs; bytecode disabled",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-004"
+    },
+    {
+      "id": "T-005",
+      "command_id": "fixture-negative-case-audit",
+      "environment": "frozen builder/test sources; deterministic comparison and AST assertion audit; read-only",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-005"
+    }
+  ],
+  "risks": [],
+  "blockers": [],
+  "recommendation": {
+    "decision": "PASS",
+    "reason": "Frozen candidate passed 76 native protocol and 43 read-only controller tests with no skips; all packet/context/message instances validated, deterministic CLI outputs matched, fixtures matched the builder, targeted negative cases asserted exact failures, and inputs remained unchanged.",
+    "next_action": "Accept the QA gate for candidate 2ac5ac5b1e400c095e5ee5152469f37be9de1a91."
+  },
+  "status": "PASS",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

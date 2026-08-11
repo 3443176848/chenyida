@@ -1,0 +1,119 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "34f87daa-e506-471a-b895-e04803989ed9",
+  "message_type": "VERIFICATION",
+  "created_at": "2026-08-11T15:36:11+08:00",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "erp-guardian-r1-5",
+    "instance_id": "erp-guardian-r1-5-native6",
+    "capability_profile": "ERP_READ_ONLY",
+    "context_manifest_digest": "sha256:964ea3839f45c47f4124403446e000afd182968c041e779d13bf2ddf8efc1bf1"
+  },
+  "role": "ERP_CONTRACT_GUARDIAN",
+  "gate": "ERP_CONTRACT",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "7b1d711d8405f66f56fd3d12acfae3362349c37d",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/docs/tasks/AGENT-R1-5.md",
+      "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/docs/ai-engineering/ERP_DOMAIN_BOUNDARIES.md",
+      "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/tools/erp_agent_control/native_mvp.py",
+      "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/tools/erp_agent_control/tests/test_native_mvp.py"
+    ]
+  },
+  "assumptions": [],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "COMMAND_RESULT",
+      "locator": "git://1f55696b124c899d49f4505c9ad0cd238d910b24..7b1d711d8405f66f56fd3d12acfae3362349c37d?operation=diff-name-only",
+      "digest": "sha256:39d4375a94cfc8c81ce82ce83453160eb2701948819cac572aad576f5f5be814",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T15:36:11+08:00",
+      "redaction": "NONE"
+    },
+    {
+      "id": "E-002",
+      "kind": "TEST_REPORT",
+      "locator": "command://opt/erp/.venv/bin/python?module=tools.erp_agent_control.tests.test_native_mvp",
+      "digest": "sha256:125991cc838262beb13e02b7e56b2a070ef948e47153c347e7c784eb96049c93",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T15:36:11+08:00",
+      "redaction": "NONE; stdout reported 59 tests, OK"
+    },
+    {
+      "id": "E-003",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/docs/tasks/AGENT-R1-5.md",
+      "digest": "sha256:529216694ce3bba396b0b0b94f81143f22a54364e129bc6e56474e2af87c7ac5",
+      "exit_code": null,
+      "observed_at": "2026-08-11T15:36:11+08:00",
+      "redaction": "NONE"
+    },
+    {
+      "id": "E-004",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/docs/ai-engineering/ERP_DOMAIN_BOUNDARIES.md",
+      "digest": "sha256:c8a89a9d68bbee633b14c1fcd5f8a30d479c5d99532a3b4c3c58b59a67183504",
+      "exit_code": null,
+      "observed_at": "2026-08-11T15:36:11+08:00",
+      "redaction": "NONE"
+    },
+    {
+      "id": "E-005",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:67334c777f6f6d13fe0c889564fe7bafef07a6bfd09645d0ae0ca996bd5fa19e",
+      "exit_code": null,
+      "observed_at": "2026-08-11T15:36:11+08:00",
+      "redaction": "NONE"
+    },
+    {
+      "id": "E-006",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "git://7b1d711d8405f66f56fd3d12acfae3362349c37d/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:1853e88ea9ad608800712884b363cb18b06f8813e2a1674c602a7f3a148d7cef",
+      "exit_code": null,
+      "observed_at": "2026-08-11T15:36:11+08:00",
+      "redaction": "NONE"
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "native-mvp-unittest",
+      "environment": "cwd=/opt/erp; /opt/erp/.venv/bin/python; bytecode disabled; offline and without database, UAT, production, container, or deployment access",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-002"
+    }
+  ],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "LOW",
+      "probability": "MEDIUM",
+      "impact": "Synthetic R1.5 evidence could be incorrectly represented as runtime-enforced isolation.",
+      "trigger": "The gate result is promoted beyond the documented docs/test protocol scope.",
+      "mitigation": "Retain NO_RUNTIME_AUTHORITY and NOT_IMPLEMENTED/NOT_AUTHORIZED declarations for R2, UAT, production, database, and deployment capabilities.",
+      "residual_risk": "Runtime enforcement remains unavailable until separately authorized and implemented."
+    }
+  ],
+  "blockers": [],
+  "recommendation": {
+    "decision": "PASS",
+    "reason": "All paths changed from the frozen baseline remain confined to synthetic agent-control documentation, schemas, fixtures, tooling, and tests. No ERP business tree, product Schema/Migration, package, runtime, or deployment path changed. The frozen task and ERP boundary artifacts keep PHASE4-TASK03 blocked and preserve prohibitions on UAT, production, database, deployment, D-112 product-table reuse, and R2 authority. The scoped offline suite passed all 59 tests, including bounded path-scope failures.",
+    "next_action": "Accept the ERP_CONTRACT gate for candidate 7b1d711d8405f66f56fd3d12acfae3362349c37d."
+  },
+  "status": "PASS",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

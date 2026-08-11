@@ -1,0 +1,128 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "8ddf1a34-5023-4db9-9bfe-d49f22f704d7",
+  "message_type": "VETO",
+  "created_at": "2026-08-11T15:07:53+08:00",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "security-r1-5",
+    "instance_id": "security-r1-5-native5",
+    "capability_profile": "SECURITY_READ_ONLY",
+    "context_manifest_digest": "sha256:31aaa1531cb790cec9d4f7e4983639c09ec0443c88e6f30f885783dff69eb937"
+  },
+  "role": "SECURITY_BOUNDARY_EXAMINER",
+  "gate": "SECURITY",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "3d395cc881784a78ff45841dacc1e8d48c805f0c",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://3d395cc881784a78ff45841dacc1e8d48c805f0c/tools/erp_agent_control/native_mvp.py",
+      "git://3d395cc881784a78ff45841dacc1e8d48c805f0c/tools/erp_agent_control/readonly_controller.py",
+      "git://3d395cc881784a78ff45841dacc1e8d48c805f0c/tools/erp_agent_control/tests/test_native_mvp.py",
+      "git://3d395cc881784a78ff45841dacc1e8d48c805f0c/tools/erp_agent_control/tests/test_readonly_controller.py"
+    ]
+  },
+  "assumptions": [],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "GIT_OBJECT",
+      "locator": "git://3d395cc881784a78ff45841dacc1e8d48c805f0c/tools/erp_agent_control/readonly_controller.py#L216-L235",
+      "digest": "sha256:0e4bbb6ed66bab5bb4d13538d4c821c4b7ee02a40ca7430b8d1ebf7762376558",
+      "exit_code": null,
+      "observed_at": "2026-08-11T15:07:53+08:00",
+      "redaction": "none; frozen synthetic control-plane source"
+    },
+    {
+      "id": "E-002",
+      "kind": "COMMAND_RESULT",
+      "locator": "command:///opt/erp/.venv/bin/python_-B_-m_unittest_tools.erp_agent_control.tests.test_native_mvp",
+      "digest": "sha256:2ced3648ae96376227cab52b097fbeb62b0a1046fbb3299a3b7ba4aef1ba443b",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T15:07:53+08:00",
+      "redaction": "none; 56 tests passed"
+    },
+    {
+      "id": "E-003",
+      "kind": "COMMAND_RESULT",
+      "locator": "command:///opt/erp/.venv/bin/python_-B_-m_unittest_tools.erp_agent_control.tests.test_readonly_controller",
+      "digest": "sha256:cff302d14ff56585c077383da439b5606f590812144cdc3bd2c189d691d4d34d",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T15:07:53+08:00",
+      "redaction": "none; 38 tests passed"
+    },
+    {
+      "id": "E-004",
+      "kind": "GIT_OBJECT",
+      "locator": "git://3d395cc881784a78ff45841dacc1e8d48c805f0c/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:7c74033b28ed13d0a62069e02a1e3abef737d3fd8beed8c3da1ad7cfcd3ea619",
+      "exit_code": null,
+      "observed_at": "2026-08-11T15:07:53+08:00",
+      "redaction": "none; frozen test evidence covers attempt regression and same-candidate veto override"
+    },
+    {
+      "id": "E-005",
+      "kind": "GIT_OBJECT",
+      "locator": "git://3d395cc881784a78ff45841dacc1e8d48c805f0c/tools/erp_agent_control/tests/test_readonly_controller.py",
+      "digest": "sha256:f1a80cd818c798b41ee00c787a1929e66e080aedfc49bdafc95be77f0452cb97",
+      "exit_code": null,
+      "observed_at": "2026-08-11T15:07:53+08:00",
+      "redaction": "none; frozen test evidence covers UAT marker path allowlisting"
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "/opt/erp/.venv/bin/python -B -m unittest tools.erp_agent_control.tests.test_native_mvp",
+      "environment": "/opt/erp; HEAD 3d395cc881784a78ff45841dacc1e8d48c805f0c; offline read-only review",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-002"
+    },
+    {
+      "id": "T-002",
+      "command_id": "/opt/erp/.venv/bin/python -B -m unittest tools.erp_agent_control.tests.test_readonly_controller",
+      "environment": "/opt/erp; HEAD 3d395cc881784a78ff45841dacc1e8d48c805f0c; offline read-only review",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-003"
+    }
+  ],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "CRITICAL",
+      "probability": "MEDIUM",
+      "impact": "A concurrent writer can make the controller read a different inode or follow a newly substituted symlink after validation, violating forbidden-context confidentiality and allowing a mixed-snapshot READY decision.",
+      "trigger": "A checked file or an intermediate directory is replaced between _checked_path/path.stat and Path.open in _read_bytes.",
+      "mitigation": "Open through verified directory/file descriptors with O_NOFOLLOW, compare inode/device/link/type metadata before and after reading, and fail closed on any change.",
+      "residual_risk": "Prompt-level single-writer discipline does not technically prevent a concurrent or compromised writer from winning the race."
+    }
+  ],
+  "blockers": [
+    {
+      "id": "B-001",
+      "category": "TOCTOU_READ_BOUNDARY",
+      "attempted": [
+        "Reviewed the frozen _checked_path and _read_bytes control flow.",
+        "Confirmed that symlink and hardlink checks occur before a separate path-based stat/open with no opened-descriptor identity comparison."
+      ],
+      "evidence_refs": ["E-001"],
+      "unblock_owner": "builder-r1-5"
+    }
+  ],
+  "recommendation": {
+    "decision": "VETO",
+    "reason": "The two prior exploits are closed by passing regressions: candidate/attempt rollback and same-candidate VETO replacement fail closed, and UAT marker paths are restricted to the two governance documents. However, readonly_controller._read_bytes validates pathname metadata and later re-resolves the pathname with Path.open without O_NOFOLLOW or fstat identity/stability checks. A concurrent substitution can bypass the symlink/hardlink boundary or produce a mixed trusted snapshot, which is a substantive R1.5 security defect.",
+    "next_action": "Harden descriptor-based reads against substitution and add deterministic TOCTOU regression tests before refreezing the candidate."
+  },
+  "status": "VETOED",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

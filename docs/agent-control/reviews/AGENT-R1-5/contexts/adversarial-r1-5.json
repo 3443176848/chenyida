@@ -1,0 +1,53 @@
+{
+  "schema_version": "erp-agent-context/v1",
+  "task_id": "AGENT-R1-5",
+  "task_packet_revision": 2,
+  "agent_id": "adversarial-r1-5",
+  "instance_id": "adversarial-r1-5-native1",
+  "role": "ADVERSARIAL_EXAMINER",
+  "capability_profile": "ADVERSARIAL_READ_ONLY",
+  "candidate_sha": "470519c6bccddfc927362706a15be4a8ccdf2d0a",
+  "lease_generation": 1,
+  "visibility": "SYNTHETIC_PROTOCOL_ONLY",
+  "documents": [
+    {
+      "locator": "git://470519c6bccddfc927362706a15be4a8ccdf2d0a/docs/tasks/AGENT-R1-5.md",
+      "digest": "sha256:529216694ce3bba396b0b0b94f81143f22a54364e129bc6e56474e2af87c7ac5",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://470519c6bccddfc927362706a15be4a8ccdf2d0a/docs/agent-control/schemas/message-v1.schema.json",
+      "digest": "sha256:e2441a1f608403ea5422ccfb382ded21bb2f2bc0c0eb99dd1b229f58dbae44a8",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://470519c6bccddfc927362706a15be4a8ccdf2d0a/docs/agent-control/schemas/context-manifest-v1.schema.json",
+      "digest": "sha256:13d219f93f16cbf5f725b45900d8959fab3df5785613565de5ced0ab12980e98",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://470519c6bccddfc927362706a15be4a8ccdf2d0a/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "digest": "sha256:962d17713a94752377be914a31c65fc2501896ad567a525b898be4f37a3528c3",
+      "classification": "SYNTHETIC_CONTRACT"
+    },
+    {
+      "locator": "git://470519c6bccddfc927362706a15be4a8ccdf2d0a/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:626771d3ae670b6ec0e33d61438276bc6f4311b2db25fe8b91559907ee5620b7",
+      "classification": "SYNTHETIC_CANDIDATE"
+    },
+    {
+      "locator": "git://470519c6bccddfc927362706a15be4a8ccdf2d0a/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:19d0e8f515016e1b6c827ad561faedad5fec8c63fa0cac02be1bdc4f21ea6572",
+      "classification": "SYNTHETIC_TEST_EVIDENCE"
+    }
+  ],
+  "forbidden_context": [
+    "OWNER_UNTRACKED_INPUT",
+    "PRODUCT_SOURCE",
+    "GIT_INTERNALS",
+    "REAL_BUSINESS_DATA",
+    "SECRETS",
+    "UAT_OR_PRODUCTION"
+  ],
+  "manifest_digest": "sha256:9821cdcb80beb26d3082e81da97da6ca7bda96fc17dd707c2bb595570b1d4949"
+}

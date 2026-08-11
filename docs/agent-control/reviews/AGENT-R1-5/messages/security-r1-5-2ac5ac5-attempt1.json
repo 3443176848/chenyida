@@ -1,0 +1,92 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "8d9702e5-1b0b-4d4e-8f95-8e6cb4a7f215",
+  "message_type": "FINDING",
+  "created_at": "2026-08-11T12:00:00+08:00",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "security-r1-5",
+    "instance_id": "security-r1-5-native8",
+    "capability_profile": "SECURITY_READ_ONLY",
+    "context_manifest_digest": "sha256:de1555bcfe166ea1adeb19fff8fb6edc922dbf8e29a45ab44b05618dba35a020"
+  },
+  "role": "SECURITY_BOUNDARY_EXAMINER",
+  "gate": "SECURITY",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "2ac5ac5b1e400c095e5ee5152469f37be9de1a91",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/tools/erp_agent_control/native_mvp.py",
+      "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/tools/erp_agent_control/tests/test_native_mvp.py"
+    ]
+  },
+  "assumptions": [],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:0baebde919852c72096efa905fbe9f889d6b2b40c337bd7e055b3c6dfee108fa",
+      "exit_code": null,
+      "observed_at": "2026-08-11T12:00:00+08:00",
+      "redaction": "Authorized synthetic candidate only."
+    },
+    {
+      "id": "E-002",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "git://2ac5ac5b1e400c095e5ee5152469f37be9de1a91/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:b4c904e26cebe05827dcde3d64d1c3de4d381ec500a9eb078e2e330ef1c32bca",
+      "exit_code": null,
+      "observed_at": "2026-08-11T12:00:00+08:00",
+      "redaction": "Authorized synthetic test source only."
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "protocol-unit-tests",
+      "environment": "restricted frozen-context review",
+      "result": "NOT_RUN",
+      "exit_code": null,
+      "artifact": null
+    },
+    {
+      "id": "T-002",
+      "command_id": "controller-unit-tests",
+      "environment": "restricted frozen-context review",
+      "result": "NOT_RUN",
+      "exit_code": null,
+      "artifact": null
+    }
+  ],
+  "risks": [],
+  "blockers": [
+    {
+      "id": "B-001",
+      "category": "CONTEXT_MANIFEST_INCOMPLETE",
+      "attempted": [
+        "Verified every authorized frozen object against its declared digest.",
+        "Inspected the authorized validator and protocol-test imports without following unauthorized paths."
+      ],
+      "evidence_refs": [
+        "E-001",
+        "E-002"
+      ],
+      "unblock_owner": "context-manifest-author"
+    }
+  ],
+  "recommendation": {
+    "decision": "FAIL_SECURITY_GATE",
+    "reason": "The authorized validator imports readonly_controller.py, and the authorized protocol test imports that unlisted module and reads additional unlisted schemas and black-box fixtures. The controller test module and commit-scope evidence are also absent. Running the required 76 protocol and 43 controller tests or confirming commit scope would therefore exceed the supplied context manifest, so the requested checks cannot all be confirmed.",
+    "next_action": "Issue a revised manifest containing every required dependency and commit-scope evidence."
+  },
+  "status": "FAIL",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

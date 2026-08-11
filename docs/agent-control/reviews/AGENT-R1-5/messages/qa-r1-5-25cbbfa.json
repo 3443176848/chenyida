@@ -1,0 +1,99 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "b6db7d06-0dbb-4991-9ab3-d86977e60496",
+  "message_type": "VERIFICATION",
+  "created_at": "2026-08-11T17:56:23+08:00",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "qa-r1-5",
+    "instance_id": "qa-r1-5-native12",
+    "capability_profile": "QA_TEST_READ_ONLY",
+    "context_manifest_digest": "sha256:a078d7a21269ec5eb38143702e6637845abc088e5fdaea0c1b4b764e449f49b0"
+  },
+  "role": "INDEPENDENT_VERIFIER",
+  "gate": "QA",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "25cbbfab87925a8601b844fe59c634ae0b651297",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/tasks/AGENT-R1-5.md",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/README.md",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/schemas/task-packet-v2.schema.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/schemas/message-v1.schema.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/schemas/context-manifest-v1.schema.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/blackbox/interface.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/blackbox/personas.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/blackbox/observed-report.json",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/native_mvp.py",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/pilot_fixture.py",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/readonly_controller.py",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/tests/test_native_mvp.py",
+      "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/tests/test_readonly_controller.py",
+      "git://1f55696b124c899d49f4505c9ad0cd238d910b24..25cbbfab87925a8601b844fe59c634ae0b651297?operation=diff-name-only",
+      "audit://AGENT-R1-5/messages/erp-guardian-r1-5-fe4c106.json",
+      "audit://AGENT-R1-5/messages/security-r1-5-fe4c106.json",
+      "bundle://qa-r1-5-native12/native-unit-tests-87",
+      "bundle://qa-r1-5-native12/controller-unit-tests-47",
+      "bundle://qa-r1-5-native12/native-cli-determinism-v0.5.4",
+      "bundle://qa-r1-5-native12/schema-attack-fixture-matrix",
+      "bundle://qa-r1-5-native12/read-only-tree-manifest"
+    ]
+  },
+  "assumptions": [
+    {"id": "A-001", "statement": "The Context Manifest passed its declared Schema; its canonical digest and all 18 declared artifact byte digests matched the frozen values.", "status": "VERIFIED", "source": null},
+    {"id": "A-002", "statement": "The baseline-to-candidate name-only diff contains exactly 20 synthetic docs/control-tool paths and no ERP business, product-test, Schema/Migration, UAT, production, or deployment path.", "status": "VERIFIED", "source": "git://1f55696b124c899d49f4505c9ad0cd238d910b24..25cbbfab87925a8601b844fe59c634ae0b651297?operation=diff-name-only"},
+    {"id": "A-003", "statement": "Every execution was serial, offline, python3 -B, confined to an isolated temporary tree built only from declared Git objects; no Docker, database, network, UAT, production, deployment, or repository write was used.", "status": "VERIFIED", "source": "bundle://qa-r1-5-native12/read-only-tree-manifest"}
+  ],
+  "evidence": [
+    {"id": "E-001", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/tasks/AGENT-R1-5.md", "digest": "sha256:529216694ce3bba396b0b0b94f81143f22a54364e129bc6e56474e2af87c7ac5", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-002", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/task-packets/AGENT-R1-5.json", "digest": "sha256:8f670f7099deec1cbbae7b0f145864e7c299f5e200223856f52ff119ff14edda", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-003", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/README.md", "digest": "sha256:1be7b0ce8288fc5dec469b596739c259277f4c2540eade1f00375d7e24bfc28a", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-004", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/schemas/task-packet-v2.schema.json", "digest": "sha256:449c57c194472e1075a3ac005c6e38db82e4bb0277eaec975e89491a3d271560", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-005", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/schemas/message-v1.schema.json", "digest": "sha256:de6a5cba96fc87f5c57192c8b788f2356e3b9327f0dc8d9998d5c27f7d0ec7ac", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-006", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/schemas/context-manifest-v1.schema.json", "digest": "sha256:81a455b0357b4a4c520894d3fbf5f55c6919cad6d30850474d44dd3f145f7672", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-007", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json", "digest": "sha256:2d84d6a9e1d523ac46a5947d0e556e9d4a0e30672fe3a1de72091572cb5024d3", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-008", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/blackbox/interface.json", "digest": "sha256:e0668945eb3234545adbfa425d7b23adee2b120e777ba56d09e20f000cc7d87b", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-009", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/blackbox/personas.json", "digest": "sha256:23729b61eef1f91de0f0523465a855877a3bdd4973e1bed78733a9534985ed0b", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-010", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/docs/agent-control/pilots/AGENT-R1-5/blackbox/observed-report.json", "digest": "sha256:351a824a1c4ed4d53f35e9c3c80f90a6756e79cc3867206b6f6360697e5e577c", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-011", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/native_mvp.py", "digest": "sha256:8f5c7c0e0cc92c590eb45e02364725e0e0504983a91379d78e14b73c5ae5d26e", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-012", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/pilot_fixture.py", "digest": "sha256:c380603af3263a55104eef048114495384fa50b540069bf97cb7b98f60a05617", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-013", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/readonly_controller.py", "digest": "sha256:47d37f57c8e83804f65beb95ce2b06f72b88a56bec12edc5f0f7f5aab09e21d6", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-014", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/tests/test_native_mvp.py", "digest": "sha256:4007f1d74f5a92e52c60c303c65fdd14ce51916da2d4b9581a65ec8fa1733151", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-015", "kind": "GIT_OBJECT", "locator": "git://25cbbfab87925a8601b844fe59c634ae0b651297/tools/erp_agent_control/tests/test_readonly_controller.py", "digest": "sha256:751ad839250e897202b57f7f9f7e421caea56053f0b9c5ed238ca787dc462ed7", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-016", "kind": "GIT_OBJECT", "locator": "git://1f55696b124c899d49f4505c9ad0cd238d910b24..25cbbfab87925a8601b844fe59c634ae0b651297?operation=diff-name-only", "digest": "sha256:468edd5591e2311b3efad4dcf6a742b40d1f580551b226ffb4a641e8b6464579", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-017", "kind": "FILE_SNAPSHOT", "locator": "audit://AGENT-R1-5/messages/erp-guardian-r1-5-fe4c106.json", "digest": "sha256:b66b328272e7fc671ee0f524ae6f069f96b52280e1b71742fd1e1dd0c08337bc", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-018", "kind": "FILE_SNAPSHOT", "locator": "audit://AGENT-R1-5/messages/security-r1-5-fe4c106.json", "digest": "sha256:88165d074456636a361215f7d158ce96825dea6fb68991631a686ed06b2f5cf3", "exit_code": null, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Frozen manifest-listed synthetic contract/test artifact only; no owner input, product source, Git internals, real business data, secrets, database, network, UAT, production, or deployment access."},
+    {"id": "E-019", "kind": "TEST_REPORT", "locator": "bundle://qa-r1-5-native12/native-unit-tests-87", "digest": "sha256:68828e53dd07c72789f1e3715e2537a24691f1b176b47db1f29cb9ca43b9ab29", "exit_code": 0, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Native protocol unittest output: 87 tests passed, zero failures/errors/skips."},
+    {"id": "E-020", "kind": "TEST_REPORT", "locator": "bundle://qa-r1-5-native12/controller-unit-tests-47", "digest": "sha256:74cec4ca1eda6e73b130ec9b2ac6af36d14798a9eb8919b96b207bec543696df", "exit_code": 0, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Read-only controller unittest output: 47 tests passed, zero failures/errors/skips."},
+    {"id": "E-021", "kind": "TEST_REPORT", "locator": "bundle://qa-r1-5-native12/native-cli-determinism-v0.5.4", "digest": "sha256:f9923bb07c39e0bf3d62fb1383b200551429a7a7678d3b33bbf0c6339dc235d2", "exit_code": 0, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "First valid-bundle CLI report; second run was byte-identical, PASS, validator 0.5.4."},
+    {"id": "E-022", "kind": "TEST_REPORT", "locator": "bundle://qa-r1-5-native12/schema-attack-fixture-matrix", "digest": "sha256:9190764da8e9a8e3f06b998dc6ee5f4e0cac9845a185acc861754c466ff48788", "exit_code": 0, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Three-schema instance, attack, and deterministic fixture matrix; all asserted outcomes passed."},
+    {"id": "E-023", "kind": "TEST_REPORT", "locator": "bundle://qa-r1-5-native12/read-only-tree-manifest", "digest": "sha256:2bdf171161c7986c8bc8bfc1d86e006e331427072882247301b0d8b13aca7c29", "exit_code": 0, "observed_at": "2026-08-11T17:56:23+08:00", "redaction": "Final 15-file extracted-tree checksum manifest; byte-identical to pre-run manifest, with no pycache."}
+  ],
+  "changes": [],
+  "tests": [
+    {"id": "T-001", "command_id": "native-unittest-87", "environment": "offline mktemp tree from 15 declared frozen Git objects; python3 -B; no DB/network/container", "result": "PASS", "exit_code": 0, "artifact": "E-019"},
+    {"id": "T-002", "command_id": "readonly-controller-unittest-47", "environment": "offline synthetic temporary repositories; python3 -B; no product/UAT/production access", "result": "PASS", "exit_code": 0, "artifact": "E-020"},
+    {"id": "T-003", "command_id": "valid-bundle-cli-twice", "environment": "offline mktemp tree; native_mvp.py v0.5.4; two serial reads of static synthetic fixture", "result": "PASS", "exit_code": 0, "artifact": "E-021"},
+    {"id": "T-004", "command_id": "schema-attack-fixture-matrix", "environment": "offline Draft 2020-12 plus standard-library validators over declared synthetic instances", "result": "PASS", "exit_code": 0, "artifact": "E-022"},
+    {"id": "T-005", "command_id": "readonly-tree-checksum", "environment": "offline mktemp tree; pre/post SHA-256 manifest comparison; python3 -B; no repository write", "result": "PASS", "exit_code": 0, "artifact": "E-023"}
+  ],
+  "risks": [
+    {"id": "R-001", "severity": "LOW", "probability": "MEDIUM", "impact": "A Schema-only Task Packet consumer could accept an unassigned product_writer_agent_id because standard JSON Schema cannot express that cross-array identity relation.", "trigger": "A future caller treats task-packet-v2.schema.json acceptance alone as executable authorization and bypasses validate_task_packet.", "mitigation": "Keep the documented two-layer contract mandatory; execute only after both Draft 2020-12 validation and the standard-library manual validator succeed.", "residual_risk": "Acceptable for this stateless synthetic MVP; runtime/OS enforcement remains outside R1.5 authority."}
+  ],
+  "blockers": [],
+  "recommendation": {
+    "decision": "PASS_CURRENT_GATE",
+    "reason": "Candidate 25cbbfa passes independent QA on the exact frozen inputs: 87 native tests and 47 controller tests passed; the valid bundle CLI v0.5.4 passed twice with byte-identical output; all three Schema instance classes validated; static packet/bundle equal their deterministic builders; claim resolution with empty or RESULT_UNKNOWN tests is rejected by both Schema and manual validation; duplicate-builder and reviewer-write packets are rejected by both layers; and an unassigned writer is rejected by the manual pre-execution validator. The extracted tree remained byte-identical and was removed after validation.",
+    "next_action": "Proceed only with the remaining same-candidate read-only gates and synthetic black-box pilot; keep PHASE4-TASK03 frozen and do not access UAT/production or deploy."
+  },
+  "status": "PASS",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

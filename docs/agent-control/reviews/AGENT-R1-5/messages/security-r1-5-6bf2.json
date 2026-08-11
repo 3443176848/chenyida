@@ -1,0 +1,126 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "6bf2b1fa-f205-45e6-8150-5779f211fb88",
+  "message_type": "VETO",
+  "created_at": "2026-08-11T06:47:18Z",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "security-r1-5",
+    "instance_id": "security-r1-5-native4",
+    "capability_profile": "SECURITY_READ_ONLY",
+    "context_manifest_digest": "sha256:d3ea569343050446d00bfbffc58ec4a9d38259a38dacff7bb1e38c12ef90dcea"
+  },
+  "role": "SECURITY_BOUNDARY_EXAMINER",
+  "gate": "SECURITY",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "6bf2b1faf205e64b1505779f211fb88d6c60696b",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "tools/erp_agent_control/native_mvp.py",
+      "tools/erp_agent_control/readonly_controller.py",
+      "tools/erp_agent_control/tests/test_native_mvp.py",
+      "tools/erp_agent_control/tests/test_readonly_controller.py"
+    ]
+  },
+  "assumptions": [],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "GIT_OBJECT",
+      "locator": "git://6bf2b1faf205e64b1505779f211fb88d6c60696b/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:26bcd89f6e01be88e5b47210978d5ed7e662488bb5a1661c672f6525e6d26711",
+      "exit_code": null,
+      "observed_at": "2026-08-11T06:47:18Z",
+      "redaction": "NONE; frozen governance source only"
+    },
+    {
+      "id": "E-002",
+      "kind": "GIT_OBJECT",
+      "locator": "git://6bf2b1faf205e64b1505779f211fb88d6c60696b/tools/erp_agent_control/readonly_controller.py",
+      "digest": "sha256:7d8891643f985efd6cd79467732529c9ab5db7781f081db4f82d0a7efd6f64ed",
+      "exit_code": null,
+      "observed_at": "2026-08-11T06:47:18Z",
+      "redaction": "NONE; frozen governance source only"
+    },
+    {
+      "id": "E-003",
+      "kind": "TEST_REPORT",
+      "locator": "command:///opt/erp/.venv/bin/python_-B_-m_unittest_tools.erp_agent_control.tests.test_native_mvp",
+      "digest": "sha256:e1eb35cd7b52311fb26cf6636b9884f7de61e55c9db46d6ef9a0b794299606a8",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T06:47:18Z",
+      "redaction": "NONE; raw stdout: 40 tests ran in 0.388s, OK; stderr empty"
+    },
+    {
+      "id": "E-004",
+      "kind": "TEST_REPORT",
+      "locator": "command:///opt/erp/.venv/bin/python_-B_-m_unittest_tools.erp_agent_control.tests.test_readonly_controller",
+      "digest": "sha256:52c50876d101b6510055fe6a91ae4e1c3769415e7d1d19127bae663e6439802c",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T06:47:18Z",
+      "redaction": "NONE; raw stdout: 36 tests ran in 2.260s, OK; stderr empty"
+    },
+    {
+      "id": "E-005",
+      "kind": "COMMAND_RESULT",
+      "locator": "audit://security-r1-5/static-control-flow-summary",
+      "digest": "sha256:de0a9807425f35c02215d72ed6b7e5445b2dd5dcc4c4e31feb701e73e0d3ec42",
+      "exit_code": 0,
+      "observed_at": "2026-08-11T06:47:18Z",
+      "redaction": "NONE; native_mvp permits attempt-number regression and message-order gate overwrite; readonly_controller reads arbitrary uat_document_markers paths"
+    }
+  ],
+  "changes": [],
+  "tests": [
+    {
+      "id": "T-001",
+      "command_id": "/opt/erp/.venv/bin/python -B -m unittest tools.erp_agent_control.tests.test_native_mvp",
+      "environment": "/opt/erp; HEAD verified as frozen candidate; serial read-only security gate",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-003"
+    },
+    {
+      "id": "T-002",
+      "command_id": "/opt/erp/.venv/bin/python -B -m unittest tools.erp_agent_control.tests.test_readonly_controller",
+      "environment": "/opt/erp; HEAD verified as frozen candidate; run after T-001",
+      "result": "PASS",
+      "exit_code": 0,
+      "artifact": "E-004"
+    }
+  ],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "CRITICAL",
+      "probability": "HIGH",
+      "impact": "A required SECURITY or QA veto, or a RESULT_UNKNOWN no-replay disposition, can be bypassed while the final report still records PASS.",
+      "trigger": "Messages place a higher-numbered VETOED or RESULT_UNKNOWN attempt before a lower-numbered PASS attempt for the same agent, gate and candidate.",
+      "mitigation": "Require strictly increasing contiguous attempts, reject attempt regression, retain the highest attempt deterministically, and make any substantive veto require a new candidate before PASS.",
+      "residual_risk": "None acceptable for closure; add adversarial regression tests before re-review."
+    },
+    {
+      "id": "R-002",
+      "severity": "HIGH",
+      "probability": "MEDIUM",
+      "impact": "A packet can cause the read-only controller to read product source or owner-controlled files and expose content through attacker-selected marker substring results.",
+      "trigger": "inspection.uat_document_markers.path is any repository-relative path and is later passed to the text reader without a document allowlist.",
+      "mitigation": "Restrict marker paths to an exact approved governance-document allowlist and bind them to required_documents; reject owner input and product paths before any read.",
+      "residual_risk": "Filesystem race protection should also use descriptor-based no-follow reads after allowlisting."
+    }
+  ],
+  "blockers": [],
+  "recommendation": {
+    "decision": "VETO",
+    "reason": "Although both required suites pass, frozen control flow overwrites gate results by message order without enforcing monotonic attempts, enabling veto and RESULT_UNKNOWN replay bypass. The controller also accepts arbitrary marker read paths.",
+    "next_action": "Fix both fail-closed boundaries, add exploit regressions, create a new candidate, and rerun all independent gates."
+  },
+  "status": "VETOED",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}

@@ -1,0 +1,144 @@
+{
+  "schema_version": "erp-agent-message/v1",
+  "message_id": "268cba92-6c5b-4380-8104-5fa12fa446b0",
+  "message_type": "VERIFICATION",
+  "created_at": "2026-08-11T09:15:00Z",
+  "task_id": "AGENT-R1-5",
+  "agent": {
+    "agent_id": "security-r1-5",
+    "instance_id": "security-r1-5-native10",
+    "capability_profile": "SECURITY_READ_ONLY",
+    "context_manifest_digest": "sha256:5204ca8b4b9fc5722f4a914a5989a52f8363323cf696916cef1c63c5f1935a97"
+  },
+  "role": "SECURITY_BOUNDARY_EXAMINER",
+  "gate": "SECURITY",
+  "input": {
+    "base_sha": "1f55696b124c899d49f4505c9ad0cd238d910b24",
+    "candidate_sha": "268cba926c5b9380c1045fa12fa446b0113b430d",
+    "task_packet_revision": 2,
+    "lease_generation": 1,
+    "attempt": 1,
+    "artifacts": [
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/native_mvp.py",
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/schemas/message-v1.schema.json",
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/tests/test_native_mvp.py",
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "git://1f55696b124c899d49f4505c9ad0cd238d910b24..268cba926c5b9380c1045fa12fa446b0113b430d?operation=diff-name-only",
+      "audit://AGENT-R1-5/messages/adversarial-r1-5-2ac5ac5.json",
+      "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/ai-engineering/PERMISSIONS.md"
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "A-001",
+      "statement": "All checks used only manifest-declared frozen synthetic Git objects and the declared prior adversarial audit artifact; no worktree product source or external runtime was inspected.",
+      "status": "VERIFIED",
+      "source": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/task-packets/AGENT-R1-5.json"
+    },
+    {
+      "id": "A-002",
+      "statement": "Cross-document artifact, context, and packet-scope semantics are enforced by the stateless manual validator; JSON Schema independently enforces representable per-message and packet constraints.",
+      "status": "VERIFIED",
+      "source": "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/native_mvp.py"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E-001",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/native_mvp.py",
+      "digest": "sha256:38862585a23e9c9ba2c3cc5c1d5be092d32cd727de0901a0583ca056a55a7094",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:15:00Z",
+      "redaction": "Frozen synthetic candidate validator; offline read-only inspection and in-memory execution only."
+    },
+    {
+      "id": "E-002",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/schemas/message-v1.schema.json",
+      "digest": "sha256:f09e7e9187b63e3de89e681e35ab6fcbd8c7442a02aa23696c9c09b5ca46f220",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:15:00Z",
+      "redaction": "Frozen strict message schema; no external references fetched."
+    },
+    {
+      "id": "E-003",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/pilots/AGENT-R1-5/valid-bundle.json",
+      "digest": "sha256:e8e2fceb666afacd586e983fc9c839c9f09b1343752e20a1b2db5d9936570585",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:15:00Z",
+      "redaction": "Frozen public synthetic pilot bundle; deep copies used only in memory."
+    },
+    {
+      "id": "E-004",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/tools/erp_agent_control/tests/test_native_mvp.py",
+      "digest": "sha256:d2cfa50ba87d1818455cc2b635dc7aa1858c01b635ae691516e86690eb7d1a04",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:15:00Z",
+      "redaction": "Frozen synthetic test source reviewed for boundary and regression coverage."
+    },
+    {
+      "id": "E-005",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/agent-control/task-packets/AGENT-R1-5.json",
+      "digest": "sha256:8f670f7099deec1cbbae7b0f145864e7c299f5e200223856f52ff119ff14edda",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:15:00Z",
+      "redaction": "Frozen synthetic task packet defining deny-by-default authority and allowed paths."
+    },
+    {
+      "id": "E-006",
+      "kind": "GIT_OBJECT",
+      "locator": "git://1f55696b124c899d49f4505c9ad0cd238d910b24..268cba926c5b9380c1045fa12fa446b0113b430d?operation=diff-name-only",
+      "digest": "sha256:468edd5591e2311b3efad4dcf6a742b40d1f580551b226ffb4a641e8b6464579",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:15:00Z",
+      "redaction": "Frozen name-only synthetic-scope diff; no product content read."
+    },
+    {
+      "id": "E-007",
+      "kind": "FILE_SNAPSHOT",
+      "locator": "audit://AGENT-R1-5/messages/adversarial-r1-5-2ac5ac5.json",
+      "digest": "sha256:4d470e246a73f442e2b5d003d4e6831d9fe7440158924825b9bc89f23a56d23a",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:15:00Z",
+      "redaction": "Manifest-declared prior adversarial veto used solely to reproduce its two attack classes."
+    },
+    {
+      "id": "E-008",
+      "kind": "GIT_OBJECT",
+      "locator": "git://268cba926c5b9380c1045fa12fa446b0113b430d/docs/ai-engineering/PERMISSIONS.md",
+      "digest": "sha256:20f9af4cc838c2d4214dc1bce542c02018dd493baad2b2925b506a4b5dea80ed",
+      "exit_code": null,
+      "observed_at": "2026-08-11T09:15:00Z",
+      "redaction": "Frozen synthetic permissions contract; runtime enforcement limitations remain explicit."
+    }
+  ],
+  "changes": [],
+  "tests": [],
+  "risks": [
+    {
+      "id": "R-001",
+      "severity": "MEDIUM",
+      "probability": "MEDIUM",
+      "impact": "R1.5 remains protocol and test enforcement rather than OS-level identity, lease, network, or capability enforcement.",
+      "trigger": "Treating this synthetic PASS as authority to access ERP runtime, databases, UAT, production, deployment, or network.",
+      "mitigation": "Keep the task packet capability ceiling, no-runtime-authority qualifier, reviewer read-only discipline, and defer technical enforcement to separately authorized R2 work.",
+      "residual_risk": "Prompt and process boundaries remain until R2 capabilities are explicitly authorized and implemented."
+    }
+  ],
+  "blockers": [],
+  "recommendation": {
+    "decision": "PASS_SECURITY_GATE",
+    "reason": "All 22 manifest documents and the manifest digest matched. Frozen baseline passed the manual validator and Draft 2020-12 schemas. Both prior adversarial classes now fail closed in manual and schema checks: contradictory QA/black-box aggregates, VETO_CONFIRMED minority closure, and unreferenced failing test evidence. Manual cross-document checks also rejected artifact-set mismatch, context swap, and product-path write; packet manual/schema checks rejected network and capability expansion. The frozen diff contains only synthetic governance/tool/test paths and no ERP product, database schema, or migration files.",
+    "next_action": "Proceed only to the remaining frozen-candidate gates and source-blind synthetic black-box check; keep PHASE4-TASK03 frozen and do not deploy."
+  },
+  "status": "PASS",
+  "minority_report": null,
+  "resolves_message_ids": [],
+  "resolves_claim_ids": [],
+  "checkpoint": null
+}
