@@ -406,6 +406,16 @@
             "properties": {
               "decision": {"enum": ["FIX_ACCEPTED", "RESOLVED_BY_EVIDENCE"]}
             }
+          },
+          "tests": {
+            "minItems": 1,
+            "items": {
+              "properties": {
+                "result": {"const": "PASS"},
+                "exit_code": {"const": 0},
+                "artifact": {"type": "string"}
+              }
+            }
           }
         }
       }

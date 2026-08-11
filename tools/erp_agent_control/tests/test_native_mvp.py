@@ -165,6 +165,55 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(schema["properties"]["task"]["properties"]["task_document"]["pattern"], TASK_DOCUMENT_RE.pattern)
 
+    def test_task_schema_declares_exact_role_contracts(self) -> None:
+        schema = json.loads((SCHEMA_DIRECTORY / "task-packet-v2.schema.json").read_text(encoding="utf-8"))
+        roles = schema["properties"]["orchestration"]["properties"]["roles"]
+        assignments = schema["$defs"]["roleAssignment"]["oneOf"]
+        expected = {
+            "CHANGE_BUILDER": ("SYNTHETIC_BUILDER", "SYNTHETIC_PROTOCOL_ONLY", True),
+            "ERP_CONTRACT_GUARDIAN": ("ERP_READ_ONLY", "SYNTHETIC_PROTOCOL_ONLY", False),
+            "ADVERSARIAL_EXAMINER": ("ADVERSARIAL_READ_ONLY", "SYNTHETIC_PROTOCOL_ONLY", False),
+            "SECURITY_BOUNDARY_EXAMINER": ("SECURITY_READ_ONLY", "SYNTHETIC_PROTOCOL_ONLY", False),
+            "INDEPENDENT_VERIFIER": ("QA_TEST_READ_ONLY", "SYNTHETIC_PROTOCOL_ONLY", False),
+            "BLACK_BOX_VERIFIER": ("BLACK_BOX_PUBLIC_ONLY", "BLACK_BOX_PUBLIC_ONLY", False),
+        }
+        observed = {
+            branch["properties"]["role"]["const"]: (
+                branch["properties"]["capability_profile"]["const"],
+                branch["properties"]["context_visibility"]["const"],
+                branch["properties"]["can_write"]["const"],
+            )
+            for branch in assignments
+        }
+        contained_roles = {
+            rule["contains"]["properties"]["role"]["const"]
+            for rule in roles["allOf"]
+            if rule.get("minContains") == 1 and rule.get("maxContains") == 1
+        }
+
+        self.assertIs(roles["uniqueItems"], True)
+        self.assertEqual(observed, expected)
+        self.assertEqual(contained_roles, set(expected))
+
+    def test_claim_resolution_schema_requires_a_passing_zero_exit_test(self) -> None:
+        schema = json.loads((SCHEMA_DIRECTORY / "message-v1.schema.json").read_text(encoding="utf-8"))
+        resolution_rule = next(
+            rule
+            for rule in schema["allOf"]
+            if "resolves_claim_ids" in rule.get("if", {}).get("properties", {})
+        )
+        tests_rule = resolution_rule["then"]["properties"]["tests"]
+
+        self.assertEqual(tests_rule["minItems"], 1)
+        self.assertEqual(
+            tests_rule["items"]["properties"],
+            {
+                "result": {"const": "PASS"},
+                "exit_code": {"const": 0},
+                "artifact": {"type": "string"},
+            },
+        )
+
     def test_message_change_path_uses_strict_repository_path_schema(self) -> None:
         schema = json.loads((SCHEMA_DIRECTORY / "message-v1.schema.json").read_text(encoding="utf-8"))
 
@@ -629,6 +678,7 @@ class NativeMvpProtocolTest(unittest.TestCase):
     def test_unreferenced_failing_test_report_cannot_support_minority_pass(self) -> None:
         disposition = message(self.bundle, 9)
         disposition["evidence"][0].update({"kind": "TEST_REPORT", "exit_code": 7})
+        disposition["tests"] = []
         rebind_message_evidence(self.bundle, disposition)
 
         self.assertEqual(error_code(self.bundle), "TEST_EVIDENCE_BINDING_INVALID")
@@ -636,9 +686,18 @@ class NativeMvpProtocolTest(unittest.TestCase):
     def test_nonzero_command_evidence_cannot_support_passing_disposition(self) -> None:
         disposition = message(self.bundle, 9)
         disposition["evidence"][0].update({"kind": "COMMAND_RESULT", "exit_code": 7})
+        disposition["tests"] = []
         rebind_message_evidence(self.bundle, disposition)
 
         self.assertEqual(error_code(self.bundle), "EVIDENCE_STATUS_INCONSISTENT")
+
+    def test_minority_disposition_requires_a_bound_test(self) -> None:
+        disposition = message(self.bundle, 9)
+        disposition["evidence"][0]["kind"] = "FILE_SNAPSHOT"
+        disposition["tests"] = []
+        rebind_message_evidence(self.bundle, disposition)
+
+        self.assertEqual(error_code(self.bundle), "MINORITY_DISPOSITION_INVALID")
 
     def test_unknown_test_result_cannot_support_passing_disposition(self) -> None:
         disposition = message(self.bundle, 9)

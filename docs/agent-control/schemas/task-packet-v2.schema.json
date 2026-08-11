@@ -203,13 +203,67 @@
         "retry_policy"
       ],
       "properties": {
-        "product_writer_agent_id": {"$ref": "#/$defs/agentId"},
+        "product_writer_agent_id": {
+          "$ref": "#/$defs/agentId",
+          "description": "Must equal the sole CHANGE_BUILDER agent_id; this cross-item equality is enforced by the standard-library validator."
+        },
         "active_lease_generation": {"type": "integer", "minimum": 1},
         "roles": {
           "type": "array",
           "minItems": 6,
           "maxItems": 6,
-          "items": {"$ref": "#/$defs/roleAssignment"}
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/roleAssignment"},
+          "allOf": [
+            {
+              "contains": {
+                "properties": {"role": {"const": "CHANGE_BUILDER"}},
+                "required": ["role"]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "properties": {"role": {"const": "ERP_CONTRACT_GUARDIAN"}},
+                "required": ["role"]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "properties": {"role": {"const": "ADVERSARIAL_EXAMINER"}},
+                "required": ["role"]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "properties": {"role": {"const": "SECURITY_BOUNDARY_EXAMINER"}},
+                "required": ["role"]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "properties": {"role": {"const": "INDEPENDENT_VERIFIER"}},
+                "required": ["role"]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "properties": {"role": {"const": "BLACK_BOX_VERIFIER"}},
+                "required": ["role"]
+              },
+              "minContains": 1,
+              "maxContains": 1
+            }
+          ]
         },
         "required_gates": {
           "type": "array",
@@ -334,7 +388,57 @@
         },
         "context_visibility": {"enum": ["SYNTHETIC_PROTOCOL_ONLY", "BLACK_BOX_PUBLIC_ONLY"]},
         "can_write": {"type": "boolean"}
-      }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "role": {"const": "CHANGE_BUILDER"},
+            "capability_profile": {"const": "SYNTHETIC_BUILDER"},
+            "context_visibility": {"const": "SYNTHETIC_PROTOCOL_ONLY"},
+            "can_write": {"const": true}
+          }
+        },
+        {
+          "properties": {
+            "role": {"const": "ERP_CONTRACT_GUARDIAN"},
+            "capability_profile": {"const": "ERP_READ_ONLY"},
+            "context_visibility": {"const": "SYNTHETIC_PROTOCOL_ONLY"},
+            "can_write": {"const": false}
+          }
+        },
+        {
+          "properties": {
+            "role": {"const": "ADVERSARIAL_EXAMINER"},
+            "capability_profile": {"const": "ADVERSARIAL_READ_ONLY"},
+            "context_visibility": {"const": "SYNTHETIC_PROTOCOL_ONLY"},
+            "can_write": {"const": false}
+          }
+        },
+        {
+          "properties": {
+            "role": {"const": "SECURITY_BOUNDARY_EXAMINER"},
+            "capability_profile": {"const": "SECURITY_READ_ONLY"},
+            "context_visibility": {"const": "SYNTHETIC_PROTOCOL_ONLY"},
+            "can_write": {"const": false}
+          }
+        },
+        {
+          "properties": {
+            "role": {"const": "INDEPENDENT_VERIFIER"},
+            "capability_profile": {"const": "QA_TEST_READ_ONLY"},
+            "context_visibility": {"const": "SYNTHETIC_PROTOCOL_ONLY"},
+            "can_write": {"const": false}
+          }
+        },
+        {
+          "properties": {
+            "role": {"const": "BLACK_BOX_VERIFIER"},
+            "capability_profile": {"const": "BLACK_BOX_PUBLIC_ONLY"},
+            "context_visibility": {"const": "BLACK_BOX_PUBLIC_ONLY"},
+            "can_write": {"const": false}
+          }
+        }
+      ]
     }
   }
 }

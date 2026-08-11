@@ -528,11 +528,11 @@
         "task_id": "AGENT-R1-5",
         "candidate_sha": "sha256:28c4f17989a0d92cfc93bdbaa68e7797469055cba46464921747d3693fbb1005",
         "agent_id": "adversarial-r1-5",
-        "kind": "FILE_SNAPSHOT",
+        "kind": "TEST_REPORT",
         "exit_code": 0,
         "observed_at": "2026-08-11T04:09:00Z"
       },
-      "digest": "sha256:ca4b3717d8460ba4c5803877e2094474698092c6737957e4c282f42cb7656245"
+      "digest": "sha256:ef8e2a6d29df98a7800ef12a2666692d3644af3df0cb6c29b205a4022cb8be48"
     },
     "bundle://evidence/message-10": {
       "classification": "SYNTHETIC_TEST_EVIDENCE",
@@ -1517,16 +1517,25 @@
       "evidence": [
         {
           "id": "E-001",
-          "kind": "FILE_SNAPSHOT",
+          "kind": "TEST_REPORT",
           "locator": "bundle://evidence/message-09",
-          "digest": "sha256:ca4b3717d8460ba4c5803877e2094474698092c6737957e4c282f42cb7656245",
+          "digest": "sha256:ef8e2a6d29df98a7800ef12a2666692d3644af3df0cb6c29b205a4022cb8be48",
           "exit_code": 0,
           "observed_at": "2026-08-11T04:09:00Z",
           "redaction": "synthetic only; no secrets, owner input, business data, UAT, or production"
         }
       ],
       "changes": [],
-      "tests": [],
+      "tests": [
+        {
+          "id": "T-001",
+          "command_id": "minority-disposition-probe",
+          "environment": "in-memory synthetic fixture after candidate repair",
+          "result": "PASS",
+          "exit_code": 0,
+          "artifact": "E-001"
+        }
+      ],
       "risks": [],
       "blockers": [],
       "recommendation": {

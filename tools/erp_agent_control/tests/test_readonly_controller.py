@@ -385,6 +385,36 @@ class ReadonlyControllerTest(unittest.TestCase):
 
         self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
 
+    def test_v2_duplicate_builder_roles_are_rejected(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        builder = packet["orchestration"]["roles"][0]
+        packet["orchestration"]["roles"] = [dict(builder) for _ in range(6)]
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
+    def test_v2_unassigned_product_writer_is_rejected(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        packet["orchestration"]["product_writer_agent_id"] = "unassigned-writer"
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
+    def test_v2_duplicate_agent_identity_is_rejected(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        packet["orchestration"]["roles"][1]["agent_id"] = packet["orchestration"]["roles"][0][
+            "agent_id"
+        ]
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
     def test_v2_forbidden_capability_cannot_be_allowed(self) -> None:
         packet = self.fixture.upgrade_packet_to_v2()
         packet["orchestration"]["allowed_capabilities"].append("NETWORK_ACCESS")
@@ -397,6 +427,15 @@ class ReadonlyControllerTest(unittest.TestCase):
     def test_v2_resource_ceiling_is_rejected(self) -> None:
         packet = self.fixture.upgrade_packet_to_v2()
         packet["resources"]["max_concurrent_light_agents"] = 3
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
+    def test_v2_negative_temporary_container_budget_is_rejected(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        packet["resources"]["max_temporary_containers"] = -1
         self.fixture.write_packet(packet)
 
         report = self.inspect()

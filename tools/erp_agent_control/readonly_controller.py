@@ -654,7 +654,7 @@ def _validate_v2_orchestration(packet: dict[str, Any]) -> None:
         or _require_integer(resources["max_heavy_actions"]) != 1
     ):
         raise ValueError("single writer and single heavy action are mandatory")
-    _require_integer(resources["max_temporary_containers"], maximum=1)
+    _require_integer(resources["max_temporary_containers"], minimum=0, maximum=1)
     if _require_integer(resources["max_temporary_databases"]) != 0:
         raise ValueError("R1.5 cannot create a database")
     for key in (

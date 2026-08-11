@@ -139,7 +139,7 @@ Evidence必须可定位、绑定时间和候选SHA、能够由另一身份复核
 }
 ```
 
-R1.5要求由对抗角色产生该报告；其他角色的`FINDING`或`VETO`不能替代必需的对抗练习。只有更新candidate上的最终对抗`PASS/VERIFICATION`可携带`resolves_claim_ids`，同一claim只能处置一次，并且处置消息必须是最终对抗签核本身。该消息的结构化`recommendation.decision`只接受`FIX_ACCEPTED`或`RESOLVED_BY_EVIDENCE`；`VETO_CONFIRMED`、风险接受、待决、自由文本、`FAIL/FINDING`、其他角色或普通未引用claim的PASS都不能关闭报告。没有处置证据时，相关门禁保持未完成。
+R1.5要求由对抗角色产生该报告；其他角色的`FINDING`或`VETO`不能替代必需的对抗练习。只有更新candidate上的最终对抗`PASS/VERIFICATION`可携带`resolves_claim_ids`，同一claim只能处置一次，并且处置消息必须是最终对抗签核本身。该消息的结构化`recommendation.decision`只接受`FIX_ACCEPTED`或`RESOLVED_BY_EVIDENCE`，还必须至少声明一项唯一绑定的`TEST_REPORT`测试，且所有测试均为`PASS`、exit code为`0`；空测试、`FAIL`、`NOT_RUN`或`RESULT_UNKNOWN`不得关闭claim。`VETO_CONFIRMED`、风险接受、待决、自由文本、`FAIL/FINDING`、其他角色或普通未引用claim的PASS也都不能关闭报告。没有合格处置证据时，相关门禁保持未完成。
 
 ## 7. 不保存推理历史
 

@@ -28,7 +28,7 @@ try:
 except ImportError:  # Direct script execution.
     from readonly_controller import validate_task_packet
 
-VALIDATOR_VERSION = "0.5.3"
+VALIDATOR_VERSION = "0.5.4"
 BUNDLE_SCHEMA = "chenyida-erp-native-pilot-bundle/v2"
 REPORT_SCHEMA = "chenyida-erp-native-pilot-report/v1"
 CONTEXT_SCHEMA = "erp-agent-context/v1"
@@ -1289,6 +1289,7 @@ def _validate_bundle(bundle: Any) -> dict[str, Any]:
             if (
                 candidate_sha == minority_claims[claim_id]
                 or not message["evidence"]
+                or not message["tests"]
                 or message["role"] != "ADVERSARIAL_EXAMINER"
                 or message["gate"] != "ADVERSARIAL"
                 or message["message_type"] != "VERIFICATION"

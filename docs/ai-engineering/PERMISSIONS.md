@@ -56,7 +56,7 @@
 
 现阶段MVP可以顺序模拟这些边界，但只有R2的真实身份、租约和命令代理完成负测后，才能宣称隔离被技术强制。
 
-R1.5已把上述模拟边界固化为Task Packet v2、严格Message/Context Schema和无状态验证器：唯一`CHANGE_BUILDER`可以报告非空`changes`，ERP/对抗/安全/QA/Black-box必须为空；Packet同时把网络、数据库、UAT、生产、push、deploy、模型调用和daemon列为禁止能力。这是协议拒绝和试点证据，不是R2 Capability Broker或OS身份强制。
+R1.5已把上述模拟边界固化为Task Packet v2、严格Message/Context Schema和无状态验证器：Schema逐角色固定profile、visibility和写权限且要求六角色各出现一次；标准库验证器额外强制跨数组`agent_id`唯一，以及`product_writer_agent_id`精确引用唯一`CHANGE_BUILDER`。唯一Builder可以报告非空`changes`，ERP/对抗/安全/QA/Black-box必须为空；Packet同时把网络、数据库、UAT、生产、push、deploy、模型调用和daemon列为禁止能力。Task Packet只有两层都通过才可执行。这是协议拒绝和试点证据，不是R2 Capability Broker或OS身份强制。
 
 ## 6. 数据库、网络和秘密
 

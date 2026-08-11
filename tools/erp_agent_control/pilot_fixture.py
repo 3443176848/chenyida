@@ -579,6 +579,17 @@ def build_valid_bundle() -> dict[str, Any]:
             "ADVERSARIAL",
             "PASS",
             "FIX_ACCEPTED",
+            evidence_kind="TEST_REPORT",
+            tests=[
+                {
+                    "id": "T-001",
+                    "command_id": "minority-disposition-probe",
+                    "environment": "in-memory synthetic fixture after candidate repair",
+                    "result": "PASS",
+                    "exit_code": 0,
+                    "artifact": "E-001",
+                }
+            ],
             resolves_claim_ids=["MR-001"],
         ),
         _message(10, contexts[("SECURITY_BOUNDARY_EXAMINER", 2)], c2, "VERIFICATION", "SECURITY", "PASS", "PASS_CURRENT_GATE"),

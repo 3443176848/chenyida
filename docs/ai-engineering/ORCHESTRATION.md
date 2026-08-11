@@ -96,7 +96,7 @@ R1.5 Message v1把`MINORITY_REPORT`固定给对抗角色，避免其他门禁替
 - `DECISION_REQUIRED`：形成待确认决策并BLOCKED；
 - `VETO_CONFIRMED`：按门禁失败处理。
 
-不得以“其他Agent多数同意”关闭Minority Report。R1.5只有新candidate上的最终对抗`PASS/VERIFICATION`可以显式关闭claim，且该消息只能以`FIX_ACCEPTED`或`RESOLVED_BY_EVIDENCE`作为机器处置值；`VETO_CONFIRMED`、风险接受、失败消息、其他角色或与最终对抗签核分离的普通消息均无处置权。
+不得以“其他Agent多数同意”关闭Minority Report。R1.5只有新candidate上的最终对抗`PASS/VERIFICATION`可以显式关闭claim，且该消息只能以`FIX_ACCEPTED`或`RESOLVED_BY_EVIDENCE`作为机器处置值，并至少绑定一项`PASS/0`测试报告；空测试、失败或未知测试结果不得结案。`VETO_CONFIRMED`、风险接受、失败消息、其他角色或与最终对抗签核分离的普通消息均无处置权。
 
 ## 6. 不自动启动下一任务
 
