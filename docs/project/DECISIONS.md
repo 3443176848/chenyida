@@ -1591,9 +1591,9 @@
 ## D-114 研发多智能体采用原生编排优先、零常驻LLM与真黑盒隔离
 
 - 日期：2026-08-11
-- 状态：`PROPOSED / OWNER DECISION REQUIRED / IMPLEMENTATION NOT STARTED`
+- 状态：`ACCEPTED / AGENT-R1-5 AUTHORIZED / R1.5 IMPLEMENTATION STARTED / R2-R5 NOT AUTHORIZED`
 - 提案人：Codex（按`PM-002`执行设计要求形成提案）
-- 确认人：待项目负责人确认
+- 确认人：项目负责人（2026-08-11明确接受D-114并授权`AGENT-R1-5`限定实施）
 
 ### Context
 
@@ -1602,7 +1602,7 @@
 - PM-001的24个逻辑角色是完整能力目录，不表示每项任务都应启动24个Agent。现有设计还需明确结构化消息、真正不读源码的Black-box Persona、动态专家退出、Minority Report和使用Codex原生编排与自研控制器的顺序。
 - 研发Agent Team与D-112产品AI Suggestion/Evidence属于不同信任域；产品五表不能作为研发Agent消息、记忆或控制状态存储。
 
-### Proposed Decision
+### Decision
 
 1. 保留D-113全部硬边界，将常驻控制职责折叠为Flow Steward、Boundary Sentinel、Evidence Registrar和Recovery Reconciler四个逻辑模块，由一个低资源确定性进程承载；常驻LLM数量固定为0。
 2. PM-001的24角色继续作为能力目录。每个Task只创建最小任务团队：实施、ERP合同、对抗、安全、独立QA、真黑盒及适用专家；任务完成即撤销能力并退出。
@@ -1620,12 +1620,13 @@
 - [PM-002执行设计包](../ai-engineering/README.md)成为本提案的详细规范；D-113仍为已接受上位原则，若有冲突按更严格边界处理并提交新决策。
 - 提案减少常驻资源和新平台复杂度，同时承认R1.5仍主要依靠现有仓库规则与人工能力门，不是R2级技术强制。
 - 接受本提案也只批准架构选择，不自动授权R1.5实现、R2—R5、`PHASE4-TASK03`恢复、holdout、模型、业务/测试代码、Schema/Migration、UAT、部署或生产。
-- 在项目负责人确认前，本文状态保持PROPOSED，路线中的R1.5只能是`NEXT CANDIDATE / NOT AUTHORIZED`。
+- D-114接受后只授权`AGENT-R1-5`的合成docs/test协议MVP；R2—R5、ERP产品任务和任何运行面能力仍保持`NOT AUTHORIZED`。
 
-### Acceptance criteria for a future decision
+### Acceptance and AGENT-R1-5 authorization
 
-- 项目负责人明确接受、修改或拒绝四逻辑职责、零常驻LLM、native-first R1.5、真黑盒和动态角色选择。
-- 若接受，应另立R1.5任务，固定允许路径、合成试点、资源预算和不触碰ERP业务/UAT的边界。
+- 2026-08-11，项目负责人明确“接受 D-114”，并要求创建、启动`AGENT-R1-5`，按R1.5 Native-Orchestrated Design MVP实施。
+- 授权精确限定为合成docs/test试点、版本化Task/Message/Context合同、无状态验证、原生临时角色和源盲黑盒fixture；不修改ERP业务、Schema/Migration，不访问UAT/生产，不部署，并继续冻结`PHASE4-TASK03`。
+- 接受决定不等于R1.5已经完成，也不授权Control Store、daemon、OS/容器身份、强制lease、Capability Broker、网络、数据库、Git push或R2—R5。
 
 ### Rejected alternatives
 

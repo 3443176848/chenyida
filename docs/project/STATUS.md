@@ -2,18 +2,32 @@
 
 最后更新时间：2026-08-11（Asia/Shanghai）
 
+## AGENT-R1-5 Native-Orchestrated Design MVP（已立项并启动）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / NATIVE_PROTOCOL_MVP_IMPLEMENTING / NO_RUNTIME_AUTHORITY | `AGENT-R1-5`是唯一DOING；只实施合成docs/test协议、无状态验证和临时角色门禁，不建立后台Runtime |
+| D-114 | ACCEPTED / AGENT-R1-5 ONLY | 项目负责人明确接受D-114；只授权R1.5限定范围，R2—R5、ERP产品任务和运行面能力未授权 |
+| 允许路径 | CONTROL DOCS/TOOLS ONLY | `tools/erp_agent_control/**`、`docs/agent-control/**`、`docs/ai-engineering/**`、任务和项目治理Markdown；主Agent唯一写者 |
+| 独立角色 | NATIVE / READ ONLY GATES | ERP、对抗、安全、QA及Black-box使用临时原生Agent；不得修改候选或代替负责人授权 |
+| 数据/运行面 | SYNTHETIC ONLY / NO CONNECTION | 不读真实资料，不连接UAT/生产/数据库/网络，不使用D-112产品五表，不部署 |
+| ERP影响 | ZERO PRODUCT CHANGE | 不修改Node/Python ERP业务或测试代码、Schema/Migration、API/UI/Worker、package、版本和部署配置 |
+| 严格起点 | PASS WITH OWNER UNTRACKED INPUT | `main@4dd4abea…94c0a`、唯一worktree、public本地ahead204；用户未跟踪状态报告保持不读、不改、不提交 |
+| 资源起点 | PASS / LIGHT ONLY | available约2.2 GiB、Swap354 MiB、根盘17 GiB、Load`0.07/0.16/0.24`，内核OOM0、四服务restart0/OOM false；Compose因缺DATABASE_URL失败关闭且不读取env |
+| TASK03 | BLOCKED / OWNER_PRIORITY_HOLD | alpha.44/0041 source-ready事实不变；holdout、build、UAT Migration、部署和TASK04/TASK05继续禁止 |
+
 ## PM-002 晨亿达ERP多智能体执行设计（完成；未实施）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 最终状态 | DONE / DESIGN COMPLETE / IMPLEMENTATION NOT STARTED | 新增[执行设计包](../ai-engineering/README.md)及[任务文档](../tasks/PM-002.md)；当前零DOING，完成后不得自动启动R1.5、R2或恢复TASK03 |
+| 最终状态 | DONE / DESIGN COMPLETE / IMPLEMENTATION NOT STARTED | 新增[执行设计包](../ai-engineering/README.md)及[任务文档](../tasks/PM-002.md)；PM-002收口时为零DOING。后续D-114接受与AGENT-R1-5启动由上方独立任务记录 |
 | 现场冲突 | RECORDED / REPOSITORY WINS | 输入旧HEAD、clean/private同步和TASK03未实施与现场`main@2c8f8b2…`、既有未跟踪文档、alpha.44/0041源码已就绪及TASK03已BLOCKED冲突；采用仓库权威事实且不改Git拓扑 |
 | 拓扑 | 4 LOGICAL CONTROL DUTIES / 1 DETERMINISTIC PROCESS / 0 RESIDENT LLM | 任务期按需创建实施、ERP、对抗、安全、QA、真黑盒及专家；最多2个轻量只读角色并发，单产品写者和单重任务 |
 | 权限与独立性 | DEFAULT DENY / SINGLE WRITER / INDEPENDENT VETO | 七维权限和8级能力；Reviewer/Security/QA/Black-box默认无产品写权，ERP/Security/QA及适用DB门禁不能被多数覆盖 |
 | 协议/状态/恢复 | STRUCTURED / BOUNDED / RECOVERABLE | `erp-agent-message/v1`覆盖指定12字段、Evidence和Minority Report；TASKS四态与交付阶段分层，含retry/failure、deadlock、checkpoint、fencing、RESULT_UNKNOWN和真BLOCKED |
 | 黑盒 | SOURCE-BLIND / DYNAMIC PERSONAS | 新Agent、无源码/`.git`、合成fixture、browser/HTTP-only；根据现有11业务身份及恶意/API/导入/AI使用者动态选择，否则诚实标GRAY_BOX/NOT_RUN |
 | AI边界 | SEPARATE TRUST DOMAINS | 研发Agent控制状态不得使用或改写D-112五张产品表，不访问真实业务正文或把Agent输出当产品治理事实 |
-| 路线 | D-114 PROPOSED / R1.5 NOT AUTHORIZED | 推荐Codex原生编排优先、只自研确定性薄控制层；D-114待负责人确认，接受设计也不授权实施 |
+| 路线 | PM-002 CLOSURE SNAPSHOT | PM-002收口时D-114仍为提案；现已由项目负责人另行接受并仅授权AGENT-R1-5，历史结论不追溯改写 |
 | 范围 | DOCS ONLY | 未修改业务/测试代码、Schema/Migration、API/Service、package、版本或部署配置；未运行holdout、build、Migration、模型、UAT/生产、deploy/restart或创建Runtime |
 | 验证 | PASS / LOW-RESOURCE DOCS-ONLY | 13份设计文件、102个本地链接/断链0、Message字段、diff/checksum/敏感/范围通过；R1专项24/24且实况IDLE，Python三基线、断网只读单Node容器`npm test`3/3和lint 0通过 |
 | Git | ONE FOCUSED DOCS COMMIT / NO PUSH | 起点`main@2c8f8b2…`；提交消息`docs: complete ERP multi-agent operating design`，实际SHA以`git log`为准；用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交 |
@@ -23,7 +37,7 @@
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 最终状态 | DONE / READ_ONLY_CONTROLLER_COMPLETE / NO_RUNTIME_AUTHORITY | 当前零DOING；控制器返回可审计`IDLE`并停止，不自动恢复TASK03或启动R2 |
+| 最终状态 | DONE / READ_ONLY_CONTROLLER_COMPLETE / NO_RUNTIME_AUTHORITY | AGENT-R1收口时零DOING并返回`IDLE`；现有AGENT-R1-5活动状态由上方记录，R1仍不会自动恢复TASK03或启动R2 |
 | D-113 | ACCEPTED / R1 COMPLETE | 项目负责人已接受D-113；R1观察型实现完成。R2—R5、OS/容器隔离、Control Store、租约、Policy/Capability Broker和Agent Runtime仍未实施或授权 |
 | Owner优先级 | PASS / ORDERED | `PHASE4-TASK03 DOING→BLOCKED / OWNER_PRIORITY_HOLD`，随后`AGENT-R1 TODO→DOING→DONE`；TASK03原source-ready/holdout/release限定不变，无并行DOING |
 | 实现 | PASS / STATELESS READ ONLY | Python标准库CLI、版本化Task Packet和说明文档；固定读取Git、治理Markdown、package及Migration文件，只向stdout输出确定性JSON，不创建控制库、缓存、日志、报告或锁 |

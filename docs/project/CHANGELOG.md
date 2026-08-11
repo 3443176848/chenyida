@@ -4,6 +4,13 @@
 
 ## 2026-08-11
 
+### AGENT-R1-5 - `docs: start native ERP agent MVP`
+
+- 决策/调度：项目负责人明确接受D-114并授权`AGENT-R1-5`，台账从零DOING按`AGENT-R1-5 TODO→DOING`切换唯一active task。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，不自动恢复。
+- 范围：新增[任务合同](../tasks/AGENT-R1-5.md)和引导Task Packet；只授权Task Packet v2、Message/Context Schema、Python标准库无状态验证器、合成docs/test候选与故障注入、Codex原生只读门禁角色及源盲黑盒fixture。
+- 边界：不修改ERP业务/测试代码、Schema/Migration、API/Service/UI、package或部署配置；不创建Control Store/daemon/R2身份或能力代理，不访问网络/UAT/生产/数据库/真实资料，不执行holdout/build/deploy/restart/backup/restore或Git push。
+- 起点：唯一worktree、`main@4dd4abea02fe876665c8721e57d81f300da94c0a`、public本地behind0/ahead204；既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交。available约2.2 GiB、Swap354 MiB、根盘17 GiB、Load`0.07/0.16/0.24`，内核OOM0、四服务restart0/OOM false；Compose因缺DATABASE_URL失败关闭且未读取env。
+
 ### PM-002 - `docs: complete ERP multi-agent operating design`
 
 - 现场核验：输入中的`0d6b5961…`、clean/private同步及`PHASE4-TASK03 IMPLEMENTATION NOT STARTED`已被后续仓库事实取代；任务从`main@2c8f8b2…`、public ahead203、既有未跟踪状态报告、alpha.44/0041 source-ready且TASK03 owner-hold、PM-001/D-113/R1已完成的现场开始。冲突已显式记录，未fetch/push或读取用户未跟踪文件正文。

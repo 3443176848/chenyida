@@ -1,0 +1,92 @@
+{
+  "schema_version": "chenyida-erp-agent-task/v1",
+  "task": {
+    "id": "AGENT-R1-5",
+    "revision": 1,
+    "ledger_state": "DOING",
+    "delivery_stage": "PLANNING",
+    "qualifiers": [
+      "NATIVE_PROTOCOL_MVP_BOOTSTRAP",
+      "SYNTHETIC_DOCS_TEST_ONLY",
+      "NO_RUNTIME_AUTHORITY",
+      "NO_UAT_OR_PRODUCTION_CONNECTION"
+    ],
+    "task_document": "docs/tasks/AGENT-R1-5.md"
+  },
+  "baseline": {
+    "base_sha": "4dd4abea02fe876665c8721e57d81f300da94c0a",
+    "expected_branch": "main",
+    "source_version": "0.1.0-alpha.44",
+    "source_migration": {
+      "first_number": 1,
+      "head_number": 41,
+      "head_filename": "0041_ai_governance_suggestion_evidence.sql",
+      "head_sha256": "676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2"
+    },
+    "uat": {
+      "version": "0.1.0-alpha.42",
+      "migration_head": "0040",
+      "verification_scope": "DOCUMENT_DECLARATION_ONLY_NO_CONNECTION"
+    }
+  },
+  "scope": {
+    "allowed_changed_paths": [
+      "docs/AI_AGENT_TEAM_DESIGN.md",
+      "docs/agent-control/**",
+      "docs/ai-engineering/**",
+      "docs/project/CHANGELOG.md",
+      "docs/project/DECISIONS.md",
+      "docs/project/MASTER.md",
+      "docs/project/PROJECT_CONTEXT.md",
+      "docs/project/ROADMAP.md",
+      "docs/project/STATUS.md",
+      "docs/project/TASKS.md",
+      "docs/tasks/AGENT-R1-5.md",
+      "tools/erp_agent_control/**"
+    ],
+    "known_untracked_paths": [
+      "docs/ERP_CURRENT_STATUS_REPORT.md"
+    ],
+    "required_documents": [
+      "AGENTS.md",
+      "docs/AI_AGENT_TEAM_DESIGN.md",
+      "docs/agent-control/README.md",
+      "docs/ai-engineering/AGENTS.md",
+      "docs/ai-engineering/IMPLEMENTATION_PLAN.md",
+      "docs/ai-engineering/MESSAGE_PROTOCOL.md",
+      "docs/ai-engineering/PERMISSIONS.md",
+      "docs/project/CHANGELOG.md",
+      "docs/project/DECISIONS.md",
+      "docs/project/MASTER.md",
+      "docs/project/PROJECT_CONTEXT.md",
+      "docs/project/ROADMAP.md",
+      "docs/project/STATUS.md",
+      "docs/project/TASKS.md",
+      "docs/tasks/AGENT-R1-5.md"
+    ],
+    "require_single_worktree": true
+  },
+  "inspection": {
+    "package_json": "chenyida_erp_site/package.json",
+    "migration_directory": "chenyida_erp_site/drizzle-postgres",
+    "migration_journal": "chenyida_erp_site/drizzle-postgres/meta/_journal.json",
+    "migration_snapshot_directory": "chenyida_erp_site/drizzle-postgres/meta",
+    "required_decision": "D-113",
+    "uat_document_markers": [
+      {
+        "path": "docs/project/MASTER.md",
+        "contains": [
+          "0.1.0-alpha.42",
+          "0040"
+        ]
+      },
+      {
+        "path": "docs/project/PROJECT_CONTEXT.md",
+        "contains": [
+          "0.1.0-alpha.42",
+          "0040"
+        ]
+      }
+    ]
+  }
+}

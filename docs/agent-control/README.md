@@ -13,3 +13,5 @@ R1没有输出文件参数，不创建数据库、缓存、日志、锁、租约
 机器可读Task Packet位于`docs/agent-control/task-packets/<TASK-ID>.json`。Packet只保存非敏感控制元数据，包括活动任务身份、Git基线、允许变更路径、必读文档、源码/Migration期望和文档声明的UAT边界。R1验证Packet但不写回；缺失、损坏、状态不一致或漂移均失败关闭。
 
 R1不实现D-113中的Control Store、active slot、两阶段状态转换、独立Unix/容器身份、路径租约、fencing、Policy Engine、命令/秘密代理、Capability Broker、Agent调度、UAT能力或生产能力。这些属于未授权的R2及以后阶段。
+
+2026-08-11：项目负责人已接受D-114并启动`AGENT-R1-5`。当前活动Packet先使用v1完成可恢复引导；任务范围只允许新增v2 Task/Message/Context合同、无状态验证器、合成docs/test原生角色试点和源盲黑盒fixture。R1.5不是daemon或R2强制隔离，不连接UAT/生产、数据库或网络，不部署。

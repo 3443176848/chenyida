@@ -8,6 +8,7 @@
 | PM-001总体设计 | 已完成 |
 | AGENT-R1只读巡检 | 已完成；24/24专项测试，当前空闲返回IDLE |
 | 本PM-002执行协议设计 | 已完成文档；没有运行时 |
+| D-114 / AGENT-R1-5 | D-114已接受；AGENT-R1-5限定合成R1.5实施中 |
 | 独立Agent身份/worktree强制 | 未实现、未授权 |
 | Control Store、lease/fencing、Policy/Capability Broker | 未实现、未授权 |
 | 有界自治循环、黑盒沙箱 | 未实现、未授权 |
@@ -23,7 +24,7 @@
 
 PM-001、D-113、AGENT-R1和本PM-002形成角色、权限、消息、状态、黑盒、恢复、资源及ERP边界。产物只有文档和只读巡检，不改变ERP业务运行面。
 
-### R1.5 — Native-Orchestrated Design MVP（NEXT CANDIDATE / NOT AUTHORIZED）
+### R1.5 — Native-Orchestrated Design MVP（DOING / AGENT-R1-5 / SYNTHETIC ONLY）
 
 目标是在不造daemon和控制数据库的前提下，用Codex原生临时编排验证协议是否可用：
 

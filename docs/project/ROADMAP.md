@@ -156,10 +156,10 @@ D-110不授权模型调用、外部供应商、真实数据外发、生产试点
 
 **目标**：用单任务、最小能力、独立验证和可恢复有界循环保护ERP研发，而不把Agent共识当作业务、发布或生产授权。
 
-**当前状态**：PM-001/D-113、AGENT-R1和PM-002设计已完成；D-114待负责人确认。R1.5及R2—R5均未授权。
+**当前状态**：PM-001/D-113、AGENT-R1和PM-002已完成；D-114已接受，`AGENT-R1-5`为唯一DOING。R2—R5均未授权。
 
 - `R1`：无状态只读控制器（DONE；只读巡检、READY/IDLE，不具备调度或强制权限）。
-- `R1.5`：Codex原生临时编排MVP（NEXT CANDIDATE / NOT AUTHORIZED；Task Packet v2、Message/Context合同、单写者、独立门禁和合成黑盒，不含daemon/数据库/UAT）。
+- `R1.5`：Codex原生临时编排MVP（DOING / AGENT-R1-5；Task Packet v2、Message/Context合同、单写者、独立门禁和合成黑盒，不含daemon/数据库/UAT/部署）。
 - `R2`：独立身份、worktree、路径租约、Control Store、命令/秘密代理和重任务锁（NOT AUTHORIZED）。
 - `R3`：有界开发循环、检查点、fencing、retry/deadlock和恢复负测（NOT AUTHORIZED）。
 - `R4`：逐动作授权的受控非生产UAT（NOT AUTHORIZED）。

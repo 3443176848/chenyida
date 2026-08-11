@@ -4,7 +4,7 @@
 > 状态：`DESIGN COMPLETE / IMPLEMENTATION NOT STARTED`
 > 日期：2026-08-11（Asia/Shanghai）
 > 基线：设计取证开始时为 `main@2c8f8b2e224e4a9b0a2ec9e01a5998898ff95aaf`
-> 决策：继承已接受的 [D-113](../project/DECISIONS.md#d-113-晨亿达erp多智能体研发控制面采用单一任务最小能力与可恢复有界循环)；新增选择见待负责人确认的 D-114
+> 决策：继承已接受的 [D-113](../project/DECISIONS.md#d-113-晨亿达erp多智能体研发控制面采用单一任务最小能力与可恢复有界循环)；D-114已于2026-08-11接受并仅授权AGENT-R1-5合成R1.5实施
 > 边界：本目录是研发控制面设计，不是 Agent Runtime，也不是 ERP 产品中的 AI Suggestion 功能
 
 ## 1. 结论
