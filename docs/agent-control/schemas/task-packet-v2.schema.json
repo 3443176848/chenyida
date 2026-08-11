@@ -42,6 +42,7 @@
         },
         "task_document": {
           "type": "string",
+          "maxLength": 512,
           "pattern": "^docs/tasks/[A-Za-z0-9._-]+\\.md$"
         },
         "objective": {"type": "string", "minLength": 1, "maxLength": 1024},
@@ -248,10 +249,10 @@
       ],
       "properties": {
         "max_concurrent_light_agents": {"type": "integer", "minimum": 1, "maximum": 2},
-        "max_product_writers": {"const": 1},
-        "max_heavy_actions": {"const": 1},
+        "max_product_writers": {"type": "integer", "const": 1},
+        "max_heavy_actions": {"type": "integer", "const": 1},
         "max_temporary_containers": {"type": "integer", "minimum": 0, "maximum": 1},
-        "max_temporary_databases": {"const": 0},
+        "max_temporary_databases": {"type": "integer", "const": 0},
         "network_allowed": {"const": false},
         "database_allowed": {"const": false},
         "uat_allowed": {"const": false},
@@ -268,14 +269,14 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 512,
-      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000\\\\]+$"
+      "pattern": "^(?!/)(?!.*\\/$)(?!.*//)(?!.*(?:^|/)\\.(?:/|$))(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000\\\\*?\\[]+$"
     },
     "repositoryPathPattern": {
       "type": "string",
       "minLength": 1,
       "maxLength": 512,
       "not": {"enum": ["*", "**", "**/*"]},
-      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000\\\\]+$"
+      "pattern": "^(?!/)(?!.*\\/$)(?!.*//)(?!.*(?:^|/)\\.(?:/|$))(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000\\\\]+$"
     },
     "roleAssignment": {
       "type": "object",

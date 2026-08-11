@@ -11,8 +11,9 @@ import sys
 import tempfile
 import unittest
 
-from tools.erp_agent_control.native_mvp import load_bundle, validate_bundle
+from tools.erp_agent_control.native_mvp import RFC3339_RE, load_bundle, validate_bundle
 from tools.erp_agent_control.pilot_fixture import build_task_packet, build_valid_bundle, digest
+from tools.erp_agent_control.readonly_controller import TASK_DOCUMENT_RE
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -105,6 +106,24 @@ class NativeMvpProtocolTest(unittest.TestCase):
             self.assertIs(schema["additionalProperties"], False)
             self.assertGreater(len(schema["required"]), 0)
 
+    def test_schema_and_manual_rfc3339_profiles_are_identical(self) -> None:
+        schema = json.loads((SCHEMA_DIRECTORY / "message-v1.schema.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(schema["$defs"]["rfc3339"]["pattern"], RFC3339_RE.pattern)
+
+    def test_schema_and_manual_task_document_patterns_are_identical(self) -> None:
+        schema = json.loads((SCHEMA_DIRECTORY / "task-packet-v2.schema.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(schema["properties"]["task"]["properties"]["task_document"]["pattern"], TASK_DOCUMENT_RE.pattern)
+
+    def test_message_change_path_uses_strict_repository_path_schema(self) -> None:
+        schema = json.loads((SCHEMA_DIRECTORY / "message-v1.schema.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            schema["properties"]["changes"]["items"]["properties"]["path"],
+            {"$ref": "#/$defs/repositoryPath"},
+        )
+
     def test_checked_in_blackbox_observation_matches_public_fixture(self) -> None:
         interface_contract = json.loads((BLACKBOX_DIRECTORY / "interface.json").read_text(encoding="utf-8"))
         personas = json.loads((BLACKBOX_DIRECTORY / "personas.json").read_text(encoding="utf-8"))
@@ -140,6 +159,16 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "FORMAT_INVALID")
 
+    def test_rfc3339_fractional_seconds_are_not_limited_to_microseconds(self) -> None:
+        self.bundle["messages"][0]["created_at"] = "2026-08-11T06:00:00.123456789Z"
+
+        self.assertEqual(validate_bundle(self.bundle)["status"], "PASS")
+
+    def test_exit_code_schema_bound_is_enforced(self) -> None:
+        self.bundle["messages"][0]["evidence"][0]["exit_code"] = 256
+
+        self.assertEqual(error_code(self.bundle), "INTEGER_INVALID")
+
     def test_context_schema_max_length_is_enforced_with_fresh_digest(self) -> None:
         manifest = self.bundle["contexts"][0]
         manifest["documents"][0]["locator"] = "x" * 513
@@ -158,6 +187,15 @@ class NativeMvpProtocolTest(unittest.TestCase):
         self.bundle["contexts"][0]["manifest_digest"] = "sha256:" + "0" * 64
 
         self.assertEqual(error_code(self.bundle), "CONTEXT_DIGEST_MISMATCH")
+
+    def test_context_integer_fields_reject_float_equivalents(self) -> None:
+        manifest = self.bundle["contexts"][0]
+        manifest["lease_generation"] = 1.0
+        digest_input = copy.deepcopy(manifest)
+        digest_input.pop("manifest_digest")
+        manifest["manifest_digest"] = digest(digest_input)
+
+        self.assertEqual(error_code(self.bundle), "INTEGER_INVALID")
 
     def test_stale_task_revision_fails_closed(self) -> None:
         self.bundle["messages"][0]["input"]["task_packet_revision"] = 1

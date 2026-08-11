@@ -28,7 +28,7 @@ try:
 except ImportError:  # Direct script execution.
     from readonly_controller import validate_task_packet
 
-VALIDATOR_VERSION = "0.2.0"
+VALIDATOR_VERSION = "0.3.0"
 BUNDLE_SCHEMA = "chenyida-erp-native-pilot-bundle/v1"
 REPORT_SCHEMA = "chenyida-erp-native-pilot-report/v1"
 CONTEXT_SCHEMA = "erp-agent-context/v1"
@@ -44,8 +44,9 @@ UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
 )
 RFC3339_RE = re.compile(
-    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
-    r"(?:\.[0-9]{1,6})?(?:Z|[+-][0-9]{2}:[0-9]{2})$"
+    r"^(?!0000-)[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])"
+    r"T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]"
+    r"(?:\.[0-9]+)?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$"
 )
 IDENTIFIER_PATTERNS = {
     "assumption": re.compile(r"^A-[0-9]{3}$"),
@@ -247,6 +248,8 @@ def _repository_path(value: Any, subject: str) -> str:
     path = _string(value, subject, maximum=512)
     if path.startswith("/") or path.endswith("/") or "\\" in path or "\x00" in path:
         raise ProtocolProblem("CHANGE_PATH_INVALID", subject)
+    if any(part in {"", ".", ".."} for part in path.split("/")):
+        raise ProtocolProblem("CHANGE_PATH_INVALID", subject)
     parsed = PurePosixPath(path)
     if any(part in {"", ".", ".."} for part in parsed.parts) or parsed.parts[0] == ".git":
         raise ProtocolProblem("CHANGE_PATH_INVALID", subject)
@@ -339,6 +342,7 @@ def _validate_context(
         raise ProtocolProblem("CONTEXT_SCHEMA_UNSUPPORTED", subject)
     if manifest["task_id"] != packet["task"]["id"]:
         raise ProtocolProblem("CONTEXT_TASK_MISMATCH", subject)
+    _integer(manifest["task_packet_revision"], f"{subject}.task_packet_revision", minimum=1)
     if manifest["task_packet_revision"] != packet["task"]["revision"]:
         raise ProtocolProblem("STALE_TASK_PACKET_REVISION", subject)
     agent_id = _string(manifest["agent_id"], f"{subject}.agent_id", pattern=AGENT_ID_RE)
@@ -364,6 +368,7 @@ def _validate_context(
     )
     if candidate_sha not in candidates:
         raise ProtocolProblem("CONTEXT_CANDIDATE_UNKNOWN", subject)
+    _integer(manifest["lease_generation"], f"{subject}.lease_generation", minimum=1)
     if manifest["lease_generation"] != packet["orchestration"]["active_lease_generation"]:
         raise ProtocolProblem("STALE_LEASE_GENERATION", subject)
 

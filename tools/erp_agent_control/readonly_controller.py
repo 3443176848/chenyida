@@ -25,7 +25,7 @@ from typing import Any, Iterable
 
 sys.dont_write_bytecode = True
 
-CONTROLLER_VERSION = "0.2.1"
+CONTROLLER_VERSION = "0.2.2"
 REPORT_SCHEMA = "chenyida-erp-agent-readonly-report/v1"
 PACKET_SCHEMA_V1 = "chenyida-erp-agent-task/v1"
 PACKET_SCHEMA_V2 = "chenyida-erp-agent-task/v2"
@@ -48,6 +48,7 @@ CORE_DOCUMENTS = (
     "docs/AI_AGENT_TEAM_DESIGN.md",
 )
 TASK_ID_RE = re.compile(r"^[A-Z][A-Z0-9-]{0,63}$")
+TASK_DOCUMENT_RE = re.compile(r"^docs/tasks/[A-Za-z0-9._-]+\.md$")
 SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 MIGRATION_RE = re.compile(r"^(?P<number>[0-9]{4})_(?P<name>[a-z0-9_]+)\.sql$")
@@ -160,6 +161,9 @@ def _validate_relative_path(value: Any, *, allow_glob: bool = False) -> str:
     ):
         raise ValueError("invalid repository-relative path")
     if value.startswith("/") or value.endswith("/"):
+        raise ValueError("invalid repository-relative path")
+    raw_parts = value.split("/")
+    if any(part in {"", ".", ".."} for part in raw_parts):
         raise ValueError("invalid repository-relative path")
     path = PurePosixPath(value)
     if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
@@ -293,7 +297,7 @@ def _validate_task(packet: dict[str, Any], *, version: int) -> None:
     _require_string(task["delivery_stage"], maximum=128)
     _require_string_list(task["qualifiers"], maximum=128)
     task_document = _validate_relative_path(task["task_document"])
-    if not task_document.startswith("docs/tasks/") or not task_document.endswith(".md"):
+    if TASK_DOCUMENT_RE.fullmatch(task_document) is None:
         raise ValueError("task document must be a Markdown file in docs/tasks")
     if version == 2:
         _require_string(task["objective"], maximum=1024)
@@ -501,10 +505,13 @@ def _validate_v2_orchestration(packet: dict[str, Any]) -> None:
         },
     )
     _require_integer(resources["max_concurrent_light_agents"], minimum=1, maximum=2)
-    if resources["max_product_writers"] != 1 or resources["max_heavy_actions"] != 1:
+    if (
+        _require_integer(resources["max_product_writers"]) != 1
+        or _require_integer(resources["max_heavy_actions"]) != 1
+    ):
         raise ValueError("single writer and single heavy action are mandatory")
     _require_integer(resources["max_temporary_containers"], maximum=1)
-    if resources["max_temporary_databases"] != 0:
+    if _require_integer(resources["max_temporary_databases"]) != 0:
         raise ValueError("R1.5 cannot create a database")
     for key in (
         "network_allowed",

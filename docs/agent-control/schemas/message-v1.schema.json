@@ -29,7 +29,7 @@
   ],
   "properties": {
     "schema_version": {"const": "erp-agent-message/v1"},
-    "message_id": {"type": "string", "format": "uuid"},
+    "message_id": {"$ref": "#/$defs/uuid"},
     "message_type": {
       "enum": [
         "PLAN",
@@ -43,7 +43,7 @@
         "CLOSURE"
       ]
     },
-    "created_at": {"type": "string", "format": "date-time"},
+    "created_at": {"$ref": "#/$defs/rfc3339"},
     "task_id": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]{0,63}$"},
     "agent": {
       "type": "object",
@@ -112,7 +112,7 @@
           "id": {"type": "string", "pattern": "^A-[0-9]{3}$"},
           "statement": {"type": "string", "minLength": 1, "maxLength": 1024},
           "status": {"enum": ["VERIFIED", "PENDING"]},
-          "source": {"type": ["string", "null"], "maxLength": 512}
+          "source": {"type": ["string", "null"], "minLength": 1, "maxLength": 512}
         }
       }
     },
@@ -127,7 +127,7 @@
         "additionalProperties": false,
         "required": ["path", "action", "purpose"],
         "properties": {
-          "path": {"type": "string", "minLength": 1, "maxLength": 512},
+          "path": {"$ref": "#/$defs/repositoryPath"},
           "action": {"enum": ["ADD", "MODIFY", "DELETE"]},
           "purpose": {"type": "string", "minLength": 1, "maxLength": 1024}
         }
@@ -144,8 +144,8 @@
           "command_id": {"type": "string", "minLength": 1, "maxLength": 128},
           "environment": {"type": "string", "minLength": 1, "maxLength": 256},
           "result": {"enum": ["PASS", "FAIL", "NOT_RUN", "RESULT_UNKNOWN"]},
-          "exit_code": {"type": ["integer", "null"]},
-          "artifact": {"type": ["string", "null"], "maxLength": 128}
+          "exit_code": {"type": ["integer", "null"], "minimum": -255, "maximum": 255},
+          "artifact": {"type": ["string", "null"], "minLength": 1, "maxLength": 128}
         }
       }
     },
@@ -175,8 +175,8 @@
         "properties": {
           "id": {"type": "string", "pattern": "^B-[0-9]{3}$"},
           "category": {"type": "string", "minLength": 1, "maxLength": 128},
-          "attempted": {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 512}},
-          "evidence_refs": {"type": "array", "items": {"type": "string", "pattern": "^E-[0-9]{3}$"}},
+          "attempted": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512}},
+          "evidence_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^E-[0-9]{3}$"}},
           "unblock_owner": {"type": "string", "minLength": 1, "maxLength": 128}
         }
       }
@@ -202,7 +202,7 @@
           "properties": {
             "claim_id": {"type": "string", "pattern": "^MR-[0-9]{3}$"},
             "opposed_claim": {"type": "string", "minLength": 1, "maxLength": 1024},
-            "evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^E-[0-9]{3}$"}},
+            "evidence_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^E-[0-9]{3}$"}},
             "potential_harm": {"type": "string", "minLength": 1, "maxLength": 1024},
             "falsification_test": {"type": "string", "minLength": 1, "maxLength": 1024},
             "requested_disposition": {"enum": ["FIX_OR_ESCALATE", "TEST_OR_ESCALATE", "OWNER_DECISION"]}
@@ -213,7 +213,7 @@
     "resolves_message_ids": {
       "type": "array",
       "uniqueItems": true,
-      "items": {"type": "string", "format": "uuid"}
+      "items": {"$ref": "#/$defs/uuid"}
     },
     "resolves_claim_ids": {
       "type": "array",
@@ -234,7 +234,7 @@
             "completed_message_ids": {
               "type": "array",
               "uniqueItems": true,
-              "items": {"type": "string", "format": "uuid"}
+              "items": {"$ref": "#/$defs/uuid"}
             }
           }
         }
@@ -242,6 +242,22 @@
     }
   },
   "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "rfc3339": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?!0000-)[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$"
+    },
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*\\/$)(?!.*//)(?!.*(?:^|/)\\.(?:/|$))(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.git(?:/|$))[^\\u0000\\\\*?\\[]+$"
+    },
     "evidence": {
       "type": "object",
       "additionalProperties": false,
@@ -263,8 +279,8 @@
         },
         "locator": {"type": "string", "minLength": 1, "maxLength": 512},
         "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
-        "exit_code": {"type": ["integer", "null"]},
-        "observed_at": {"type": "string", "format": "date-time"},
+        "exit_code": {"type": ["integer", "null"], "minimum": -255, "maximum": 255},
+        "observed_at": {"$ref": "#/$defs/rfc3339"},
         "redaction": {"type": "string", "minLength": 1, "maxLength": 512}
       }
     }

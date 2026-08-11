@@ -384,6 +384,18 @@ class ReadonlyControllerTest(unittest.TestCase):
 
         self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
 
+    def test_v2_integer_resource_constants_reject_float_equivalents(self) -> None:
+        base_packet = self.fixture.upgrade_packet_to_v2()
+        for key in ("max_product_writers", "max_heavy_actions", "max_temporary_databases"):
+            with self.subTest(key=key):
+                packet = json.loads(json.dumps(base_packet))
+                packet["resources"][key] = float(packet["resources"][key])
+                self.fixture.write_packet(packet)
+
+                report = self.inspect()
+
+                self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
     def test_v2_unknown_field_is_rejected(self) -> None:
         packet = self.fixture.upgrade_packet_to_v2()
         packet["runtime"] = {"enabled": True}
@@ -405,6 +417,34 @@ class ReadonlyControllerTest(unittest.TestCase):
     def test_v2_requires_at_least_one_allowed_path(self) -> None:
         packet = self.fixture.upgrade_packet_to_v2()
         packet["scope"]["allowed_changed_paths"] = []
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
+    def test_v2_task_document_must_be_directly_under_tasks(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        packet["task"]["task_document"] = "docs/tasks/nested/AGENT-R1.md"
+        packet["scope"]["required_documents"].append("docs/tasks/nested/AGENT-R1.md")
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
+    def test_v2_repository_path_rejects_empty_segment(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        packet["scope"]["known_untracked_paths"] = ["docs//owner.md"]
+        self.fixture.write_packet(packet)
+
+        report = self.inspect()
+
+        self.assertIn("TASK_PACKET_INVALID", finding_codes(report))
+
+    def test_v2_repository_file_path_rejects_wildcard(self) -> None:
+        packet = self.fixture.upgrade_packet_to_v2()
+        packet["scope"]["known_untracked_paths"] = ["docs/*.md"]
         self.fixture.write_packet(packet)
 
         report = self.inspect()
