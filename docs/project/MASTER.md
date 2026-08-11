@@ -52,8 +52,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
 | 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / PRODUCTION NO-GO BASELINE ESTABLISHED`。十二项门禁、PR-001—PR-007与G0—G10路线已建立；项目负责人已授权持续选择安全未阻塞任务，但生产数据、异机真实数据传输、Migration/部署、账号权限和正式切换仍须专项明确授权 |
-| 当前任务 | `SELFHOST-PRODUCTION-READINESS-40`已完成并暂时回到零`DOING`；完整结论见[投产准入基线](PRODUCTION_READINESS.md)。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED` |
-| 下一任务 | `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`：只用合成/隔离数据实现四域 manifest、安全凭据传递、原子恢复、故障注入和分层回执；不读取当前卷、不上传外部目标。真实异机备份、正式恢复、UAT Migration/build/deploy、员工试用和切流不自动获权 |
+| 当前任务 | `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`为唯一`DOING`：只用合成/隔离数据实现四域manifest、安全凭据传递、原子恢复、故障注入、分层回执和RPO过期门禁；不读取当前卷或连接外部目标 |
+| 下一任务 | 本任务完成后继续投产G1/G3中最高优先级安全项。真实异机备份、当前数据恢复、UAT Migration/build/deploy、员工试用和切流仍不自动获权 |
 
 ## 当前完成模块
 

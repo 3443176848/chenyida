@@ -11,11 +11,13 @@
 
 ## 当前任务
 
-`SELFHOST-PRODUCTION-READINESS-40`已完成`DONE / PRODUCTION NO-GO BASELINE ESTABLISHED`并暂时回到零`DOING`；下一步将按项目负责人本次持续交付授权另立`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`，只用合成/隔离数据加固备份恢复契约。生产数据、异机上传、Migration、build、部署、账号权限和正式切换仍未授权。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
+`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`是当前唯一`DOING`任务：只用合成/隔离数据实现四域manifest、安全凭据传递、原子恢复、故障注入和分层回执。它不读取当前PostgreSQL或四卷、不上传外部目标、不build/Migration/deploy/restart；生产数据、账号权限和正式切换仍未授权。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
 2026-08-12第二次调度事件：三条只读审计与主智能体复核完成，`SELFHOST-PRODUCTION-READINESS-40 DOING → DONE`。当前失败关闭结论为`PRODUCTION NO-GO`，P0固定为异机备份/当前恢复、发布身份、备份恢复原子性、物料导入边界、强制发布测试门、真实迁移和真实员工闭环。任务完成只建立证据基线，不构成上线批准；后续按G0—G10依赖继续安全任务。
+
+2026-08-12第三次调度事件：主智能体按持续交付授权从零`DOING`自动选择最高优先级安全任务，状态按`SELFHOST-OPS-BACKUP-RECOVERY-V2-41 TODO → DOING`切换唯一active slot。范围固定为仓库工具、合成/隔离测试和文档，不建立异机数据锚点，也不触碰当前运行数据或服务。
 
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
@@ -28,6 +30,12 @@
 2026-08-11第五次调度事件：`AGENT-R1-5`完成Task/Message/Context合同、无状态validator、合成故障/恢复试点和源盲黑盒验证，状态按`AGENT-R1-5 DOING → DONE`收口并回到零DOING/`IDLE`。最终同候选ERP/Security/Adversarial/QA/Black-box门禁均PASS，134项专项回归和本地Python三基线通过；没有自动启动R2—R5或恢复`PHASE4-TASK03`。
 
 2026-08-11第六次调度事件：项目负责人在只读磁盘归因后明确回复“同意”，`SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`按零DOING→唯一DOING→DONE顺序执行。只清理无引用BuildKit cache和四个逐ID核准的无容器引用测试/旧任务镜像；`df -h`显示30G后又以精确字节发现实际仅29.19 GiB，继续到32,581,345,280 bytes/30.34 GiB才停止。当前/回滚/被拒证据镜像、Trae/MySQL、备份、Python/SQLite和四卷保持。任务收口后回到零DOING，不恢复`PHASE4-TASK03`。
+
+## 执行中任务
+
+| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-OPS-BACKUP-RECOVERY-V2-41 | 备份恢复契约V2与隔离故障测试 | DOING | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、项目负责人（未来异机/真实数据专项授权） | 2026-08-12 | — | SELFHOST-PRODUCTION-READINESS-40、PR-001、PR-002 | `SYNTHETIC-ISOLATED ONLY / PRODUCTION NO-GO`。四域manifest、安全凭据、原子恢复、分层回执和RPO过期门禁；不读当前卷或外传。见[任务文档](../tasks/SELFHOST-OPS-BACKUP-RECOVERY-V2-41.md)。 |
 
 ## 已完成任务
 

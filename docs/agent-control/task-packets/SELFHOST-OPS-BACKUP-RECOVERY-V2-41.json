@@ -1,0 +1,97 @@
+{
+  "schema_version": "chenyida-erp-agent-task/v1",
+  "task": {
+    "id": "SELFHOST-OPS-BACKUP-RECOVERY-V2-41",
+    "revision": 1,
+    "ledger_state": "DOING",
+    "delivery_stage": "IMPLEMENTING",
+    "qualifiers": [
+      "SYNTHETIC_ISOLATED_ONLY",
+      "NO_CURRENT_VOLUME_ACCESS",
+      "NO_EXTERNAL_TRANSFER",
+      "PRODUCTION_NO_GO"
+    ],
+    "task_document": "docs/tasks/SELFHOST-OPS-BACKUP-RECOVERY-V2-41.md"
+  },
+  "baseline": {
+    "base_sha": "9156c9e5dea93bc1666b8c75d087a3950a3422e1",
+    "expected_branch": "main",
+    "source_version": "0.1.0-alpha.44",
+    "source_migration": {
+      "first_number": 1,
+      "head_number": 41,
+      "head_filename": "0041_ai_governance_suggestion_evidence.sql",
+      "head_sha256": "676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2"
+    },
+    "uat": {
+      "version": "0.1.0-alpha.42",
+      "migration_head": "0040",
+      "verification_scope": "DOCUMENT_DECLARATION_ONLY_NO_CONNECTION"
+    }
+  },
+  "scope": {
+    "allowed_changed_paths": [
+      "chenyida_erp_site/app/lib/dashboard-selfhost/backup-status.ts",
+      "chenyida_erp_site/app/lib/dashboard-selfhost/types.ts",
+      "chenyida_erp_site/package.json",
+      "chenyida_erp_site/scripts/backup-recovery-contract.mjs",
+      "chenyida_erp_site/scripts/backup-selfhost.sh",
+      "chenyida_erp_site/scripts/restore-selfhost.sh",
+      "chenyida_erp_site/scripts/verify-backup-selfhost.sh",
+      "chenyida_erp_site/tests/selfhost-backup-recovery-v2.test.mjs",
+      "chenyida_erp_site/tests/selfhost-dashboard-unit.test.mjs",
+      "docs/agent-control/task-packets/SELFHOST-OPS-BACKUP-RECOVERY-V2-41.json",
+      "docs/project/CHANGELOG.md",
+      "docs/project/MASTER.md",
+      "docs/project/PRODUCTION_READINESS.md",
+      "docs/project/PROJECT_CONTEXT.md",
+      "docs/project/ROADMAP.md",
+      "docs/project/STATUS.md",
+      "docs/project/TASKS.md",
+      "docs/self-hosting/backup-restore.md",
+      "docs/self-hosting/operations-runbook.md",
+      "docs/tasks/SELFHOST-OPS-BACKUP-RECOVERY-V2-41.md"
+    ],
+    "known_untracked_paths": [
+      "docs/ERP_CURRENT_STATUS_REPORT.md"
+    ],
+    "required_documents": [
+      "AGENTS.md",
+      "docs/agent-control/README.md",
+      "docs/project/CHANGELOG.md",
+      "docs/project/MASTER.md",
+      "docs/project/PRODUCTION_READINESS.md",
+      "docs/project/PROJECT_CONTEXT.md",
+      "docs/project/ROADMAP.md",
+      "docs/project/STATUS.md",
+      "docs/project/TASKS.md",
+      "docs/self-hosting/backup-restore.md",
+      "docs/self-hosting/operations-runbook.md",
+      "docs/tasks/SELFHOST-OPS-BACKUP-RECOVERY-V2-41.md"
+    ],
+    "require_single_worktree": true
+  },
+  "inspection": {
+    "package_json": "chenyida_erp_site/package.json",
+    "migration_directory": "chenyida_erp_site/drizzle-postgres",
+    "migration_journal": "chenyida_erp_site/drizzle-postgres/meta/_journal.json",
+    "migration_snapshot_directory": "chenyida_erp_site/drizzle-postgres/meta",
+    "required_decision": "D-113",
+    "uat_document_markers": [
+      {
+        "path": "docs/project/MASTER.md",
+        "contains": [
+          "0.1.0-alpha.42",
+          "0040"
+        ]
+      },
+      {
+        "path": "docs/project/PROJECT_CONTEXT.md",
+        "contains": [
+          "0.1.0-alpha.42",
+          "0040"
+        ]
+      }
+    ]
+  }
+}
