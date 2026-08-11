@@ -1,53 +1,85 @@
 # SELFHOST-OPS-BACKUP-RECOVERY-V2-41 备份恢复契约 V2 与隔离故障测试
 
-> 状态：`DOING / SYNTHETIC-ISOLATED ONLY / NO CURRENT VOLUME ACCESS`
+> 状态：`DONE / SYNTHETIC-ISOLATED COMPLETE / ACTUAL OFFHOST BLOCKED / PRODUCTION NO-GO`
 > 日期：2026-08-12（Asia/Shanghai）
-> 起点：`main@9156c9e5dea93bc1666b8c75d087a3950a3422e1`
-> 责任：Codex 主智能体为唯一写者、测试执行者和提交者；项目负责人负责未来异机目标、真实快照、真实恢复和生产动作专项授权
+> 严格起点：`main@9156c9e5dea93bc1666b8c75d087a3950a3422e1`；任务启动治理提交 `338a3d46dac97805a14e08dd451ff2dd032b01b7`
+> 责任：Codex 主智能体为唯一写者、测试执行者和提交者；数据迁移、应用测试、运维安全子智能体先行只读审计/独立实现建议；项目负责人负责未来异机目标、真实快照、真实恢复和生产动作专项授权
 
-## 1. 目标
+## 1. 目标与结论
 
-落实投产基线 PR-001/PR-002 的首个安全阶段：在不读取当前 PostgreSQL 或四个受保护卷、不连接外部目标的前提下，把备份、校验、恢复和 Dashboard 状态升级为版本化 V2 契约，并通过合成文件、伪造故障和隔离 PostgreSQL 证明失败关闭与可清理性。
+本任务在不读取当前 PostgreSQL 或四个受保护卷、不连接外部目标的前提下，把备份、校验、恢复和 Dashboard 状态升级为版本化 V2 契约，并用合成文件、故障注入和两个独立隔离 PostgreSQL 集群验证失败关闭、完整性和清理边界。
 
-## 2. 严格起点
+结论为：G1 仓库工具与隔离验证完成；PR-002 中旧工具的四域遗漏、URL argv、调用者自报静止、部分恢复和单级回执问题已在 V2 路径解决。PR-001 真实异故障域数据锚点仍不存在，真实数据、外传、恢复、部署和切换均未授权；系统继续 `PRODUCTION NO-GO`。
 
-- 源码 alpha.44/0041，UAT alpha.42/0040；本任务不 build、部署或迁移 UAT。
-- 既有`backup-selfhost.sh`只覆盖 PostgreSQL、uploads、attachments；数据库 URL 进入 argv；生产拒绝依赖环境/URL文本；服务静止只信任参数。
-- 既有`restore-selfhost.sh`数据库恢复后依次移动两个目录，最终核验失败可能留下部分目标。
-- Dashboard schema v1 的`VERIFIED`只表示三个本机 artifact 校验，不区分本地、异机、恢复或过期。
-- 四个受保护卷及`/var/backups/chenyida-erp`只允许元数据保护检查，不读取正文、不用于本任务测试。
-- 用户未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`继续不读、不改、不提交。
+## 2. 实施结果
 
-## 3. 允许范围
+### 四域备份与一致性
 
-- 修改自托管 backup/verify/restore 脚本及其独立合同 helper；
-- 修改 Dashboard backup status 类型/解析和直接相关测试；
-- 新增只使用临时目录、合成文件、假命令或一个串行隔离 PostgreSQL 的故障测试；
-- 更新 backup/restore、operations runbook、项目状态文档和独立 Git 提交；
-- 运行适用低资源测试、lint和静态安全检查。
+- 新增严格 `chenyida-erp-backup-manifest/v2`、`chenyida-erp-backup-verification/v2`、内容 reconciliation 和共享合同 helper。
+- manifest 绑定 deployment class/id、数据库 name/system identifier/OID/comment/profile/估算 bytes、应用版本、完整 Git SHA、实际 Web/Worker 容器 ID 与镜像 digest、完整 Migration manifest/head，以及 PostgreSQL、uploads、attachments、backup-status 四类制品。
+- PostgreSQL 使用 custom logical dump、`--no-owner --no-acl`；明确不包含集群角色/ACL。日期、时区、interval、bytea 和浮点输出固定为可复现设置。
+- 备份脚本不再接受数据库 URL；只接受 root-only、固定根内的 libpq service 文件，并验证 owner/mode/hardlink/ancestor、加共享锁和内容摘要防替换。秘密不进入 argv、stdout、manifest 或回执。
+- 精确 Compose Web/Worker 必须已停止，实际容器 ID/镜像/版本/revision 必须匹配；数据库另以持久 intent、connection limit、默认只读、连接清退和前后全关系内容摘要建立一致性边界。
 
-## 4. 禁止范围
+### 中断、异机与不可变证据
 
-- 不读取当前 UAT 数据库业务行、uploads、attachments、backup-status 或真实备份正文；
-- 不生成当前环境快照、不上传外部目标、不执行真实恢复；
-- 不 build 镜像、不运行 Migration、不部署、不重启/停止现有服务；
-- 不修改数据库 Schema/Migration、业务流程、账号、权限、网络、systemd、Swap、内核或 Docker daemon；
-- 不删除容器、镜像、Volume、备份或业务文件，不执行 prune；
-- 不把凭据、连接串、Token或密钥写入 Git、日志、manifest、receipt或聊天。
+- `.backup-fence-v2.json`在数据库变更前持久化；正常结束精确恢复原状态。`recover-backup-guard.sh`只在 deployment、system ID、OID、comment、原 connection limit、根 device/inode、零并发连接和 credential/intent 全部匹配时解除中断守卫。
+- 本机回执绑定 source machine identity 与 source root device/inode；异机回执要求接收机 machine identity 不同，并绑定 receiver root。测试 override 仅在 `NODE_ENV=test`、root-owned `0400/0600`文件下可用。
+- 每一代使用不可变 `<backup-id>.local.json`、`<backup-id>.offhost.json`、`<backup-id>.<restore-run-id>.restore.json`；别名和 `latest.json`只允许单调前进。同一语义重复验证复用原不可变证据，不覆盖历史。
 
-## 5. 验收标准
+### 隔离恢复与回执发布
 
-- [ ] V2 manifest绑定deployment identity、应用版本、Git SHA、镜像digest、精确Migration head/manifest和PostgreSQL、uploads、attachments、backup-status四类artifact。
-- [ ] 数据库认证只通过权限受限的libpq service文件或等价安全机制，秘密不进入argv、stdout、manifest或receipt；未知/宽松权限目标失败关闭。
-- [ ] 备份工具自行核验writer静止证据或采用经测试的一致性边界，不只信任`YES`参数。
-- [ ] verifier严格拒绝缺失/额外artifact、摘要/大小漂移、过期、路径穿越、链接、Migration/revision/digest不匹配和不完整传输。
-- [ ] receipt明确区分`LOCAL_VERIFIED`、`OFFHOST_VERIFIED`、`RESTORE_VERIFIED`；Dashboard对v2状态和RPO过期失败关闭，旧v1不冒充生产可恢复。
-- [ ] restore仅允许明确TEST部署和`_restore_test`新空数据库/新空文件目标；所有artifact先staging，任一注入失败后数据库与文件目标回到空状态。
-- [ ] 覆盖重复执行、第二阶段晋升/最终核验失败、凭据泄漏、危险路径和清理；测试不读取当前卷。
-- [ ] 串行运行适用单元、脚本故障、隔离PostgreSQL、Python基线、lint、链接、敏感信息和`git diff --check`。
-- [ ] 记录任务前后内存、Swap、磁盘、Load、OOM/restart和临时资源清理。
-- [ ] 更新`MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md`并创建独立提交。
+- 恢复只允许带 marker 的独立 TEST 集群、与源不同 system identifier、独占 superuser 管理边界、全新 `_restore_test`数据库和不存在的文件目标。
+- 异机源先复制为 private durable pinned bytes 并再验证；文件全在 staging 解包，数据库用单事务 `pg_restore`，随后核对 Migration、原子晋升文件并执行数据库/文件 reconciliation。
+- 故障点覆盖建库响应不确定、建库后、数据库恢复中/后、文件晋升后、最终核验和回执发布。普通失败只删除本任务精确创建且身份闭合的 TEST 数据库/文件；任何歧义隔离保留，不猜测删除。
+- active inspection 成功后先持久化 root-only prepared receipt。回执发布失败进入保全边界；新增 `publish-restore-receipt-selfhost.sh`只消费 prepared evidence 补发，不连接数据库或读取可变文件。
 
-## 6. 明确排除的后续阶段
+### Dashboard 与运行身份
 
-异机目标、RPO/RTO、加密接收方、root-only真实凭据、当前四卷快照、真实传输和真实隔离恢复仍需项目负责人专项授权。本任务通过只表示工具契约和隔离故障边界可进入下一阶段，不表示异机数据锚点已经建立或系统可投产。
+- Dashboard 严格区分 `LOCAL_VERIFIED`、`OFFHOST_VERIFIED`、`RESTORE_VERIFIED`、`STALE`、`INVALID`和旧 V1 `LEGACY_LOCAL_ONLY`，分离 identity/policy/assurance 状态。
+- 只有最新恢复回执、实际 runtime/database/Migration、策略/RPO、异机接收方和不同集群恢复目标全部匹配且未过期，`recovery_ready=true`；缺失、替换、伪造或配置不完整均失败关闭。
+- 新增 root 发布的 runtime release identity：绑定实际运行 Web/Worker 容器 ID、镜像 digest、Compose 身份、OCI version/revision和 baked runtime version/Git；Web 只读挂载。Dockerfile 从已验证 source `package.json`生成最小 runtime metadata，并把同一 build args 写入两个最终镜像的 OCI label 与 baked env。
+
+## 3. 验收结果
+
+- [x] V2 manifest 绑定 deployment identity、应用版本、Git SHA、实际镜像 digest、精确 Migration 和四类 artifact。
+- [x] 数据库认证只通过权限受限的 libpq service 文件；秘密不进入 argv、stdout、manifest 或 receipt，未知/宽松权限失败关闭。
+- [x] 备份工具核验 writer 实际停止，并以持久数据库 guard 和前后内容 reconciliation 提供纵深一致性。
+- [x] verifier 拒绝缺失/额外 artifact、摘要/大小漂移、过期、路径穿越、链接/特殊文件、Migration/revision/digest 不匹配和不完整传输。
+- [x] receipt 分离本机、异机和恢复证据；Dashboard 对 V2/RPO/运行身份失败关闭，旧 V1 不冒充生产可恢复。
+- [x] restore 仅接受明确 TEST、新空数据库/文件目标和不同集群；全部 artifact 先 staging，所有正常故障注入均回到空态，回执发布歧义则安全保全已验证目标。
+- [x] 覆盖重复执行、晋升/最终核验失败、凭据泄漏、危险路径、建库响应歧义、补发回执和精确清理；未读取当前卷。
+- [x] 串行完成合同、脚本故障、双集群 PostgreSQL、Dashboard typecheck、lint、Python适用基线、Compose config、链接、敏感信息和 `git diff --check`。
+- [x] 记录前后资源、OOM/restart 和临时资源清理。
+- [x] 同步项目治理文档并创建独立 Git 提交。
+
+## 4. 测试证据
+
+| 验证 | 结果 |
+| --- | --- |
+| `npm run test:backup-recovery`（断网、源码只读、1 CPU、768 MiB 临时 Node 容器） | `41/41 PASS` |
+| `scripts/run-backup-recovery-postgres-test.sh`（一个 768 MiB 临时 PostgreSQL 容器内两个独立集群） | `PASS`；Dashboard PostgreSQL `2/2 PASS` |
+| `npm run typecheck:dashboard` | `PASS` |
+| `npm run lint` | `0 error / 11 existing unrelated warnings` |
+| shell `sh -n`、Dockerfile/release identity/UI 合同 | `PASS` |
+| Compose 配置展开 | `PASS`；只使用占位必填值，不读取或输出凭据 |
+| Python `server.py --self-test` | `SELF_TEST_OK` |
+| Python `go_live_check.py --no-backup` | `GO_LIVE_CHECK_OK`；只检查本地开发面 |
+| Python `.venv/bin/python smoke_test.py` | `SMOKE_TEST_OK`；首次误用系统 Python 因缺少 `openpyxl`在启动前失败，改用项目既有虚拟环境后通过，未安装依赖或降低断言 |
+| 完整项目 typecheck | 既有一次在 512 MiB 自限 heap 下 exit 139；无宿主/UAT OOM。定向 Dashboard typecheck 通过，完整 release suite 留待 G3 |
+
+一次误用不带 `--no-backup`的本地 `go_live_check.py`生成了唯一开发 SQLite 备份 `erp-backup-20260812-043649.sqlite3`；发现后只删除该任务精确创建文件并以 `--no-backup`重跑通过，原本地开发数据库保持。该事件不涉及 UAT/生产或受保护卷。
+
+## 5. 资源、安全与清理
+
+- 重任务前 available memory 约 `2.2 GiB`、Swap `391 MiB / 1.0 GiB`、根盘 `31 GiB`、Load1 约 `0.15`；未触发停止线。
+- 任务测试全部串行，一次最多一个临时容器，Node heap `384/512 MiB`；没有 Docker build、Migration、Compose 变更或服务重启。
+- 收口为 available memory `2.2 GiB`、Swap `391 MiB / 1.0 GiB`、根盘 `31 GiB`、Load `0.35/0.28/0.32`；内核任务窗口 OOM匹配0，四个 UAT 服务持续 running/healthy、restart 0、OOM false。
+- 所有 `cyd-backup-v2-*`临时容器、两个测试集群、测试数据库和 `/tmp/cyd-backup-v2-runtime.*`目录均清理；未创建或删除 Volume/镜像，未 prune。
+- 未读取业务行、当前 uploads/attachments/backup-status 正文、真实备份正文、凭据或用户未跟踪 `docs/ERP_CURRENT_STATUS_REPORT.md`；未访问外部目标或公开 UAT。
+
+## 6. 后续阻断
+
+G2 需要项目负责人提供异机目标、RPO/RTO、加密与密钥边界、保留/删除策略、调度/告警责任人，并专项授权当前四域真实快照、传输和隔离恢复。在此之前 PR-001、异机备份和隔离恢复门禁保持 `FAIL/BLOCKED`。
+
+不依赖这些外部资源的下一安全任务转入 G3：建立并发安全的 release identity/不可变 release manifest、Migration allowlist 和低资源串行强制 `test:release`。本任务不授权 build、UAT Migration/deploy、真实数据、员工试用或正式切换。

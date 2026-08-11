@@ -20,6 +20,9 @@ test("shared status vocabulary localizes common ERP states without changing thei
     ACCEPTED: "已接收", RETURNED: "已退回", ISSUED: "已发出", INVITED: "待报价",
     RESPONDED: "已报价", REVERSED: "已冲销", SETTLED: "已结清", SUCCESS: "成功",
     VALID: "有效", WARNING: "警告", ERROR: "错误", VISIBLE: "可见",
+    UNVERIFIED: "未验证", LEGACY_LOCAL_ONLY: "旧版仅本机校验", LOCAL_VERIFIED: "本机备份已校验",
+    OFFHOST_VERIFIED: "异机接收已校验", RESTORE_VERIFIED: "隔离恢复证据有效",
+    MATCHED: "匹配", MISMATCH: "不匹配", UNCONFIGURED: "未配置", INVALID: "验证证据无效", STALE: "已失效",
   };
   for (const [code, label] of Object.entries(expected)) {
     assert.equal(STATUS_LABELS[code], label);

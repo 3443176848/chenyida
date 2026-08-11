@@ -11,13 +11,15 @@
 
 ## 当前任务
 
-`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`是当前唯一`DOING`任务：只用合成/隔离数据实现四域manifest、安全凭据传递、原子恢复、故障注入和分层回执。它不读取当前PostgreSQL或四卷、不上传外部目标、不build/Migration/deploy/restart；生产数据、账号权限和正式切换仍未授权。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
+当前零`DOING`，任务 41 已完成 G1 合成/隔离工具证据。G2 因异机目标、RPO/RTO、加密/保留责任和真实数据专项授权阻塞；下一安全任务为 G3 发布身份、release manifest、Migration allowlist 与强制发布测试门。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
 2026-08-12第二次调度事件：三条只读审计与主智能体复核完成，`SELFHOST-PRODUCTION-READINESS-40 DOING → DONE`。当前失败关闭结论为`PRODUCTION NO-GO`，P0固定为异机备份/当前恢复、发布身份、备份恢复原子性、物料导入边界、强制发布测试门、真实迁移和真实员工闭环。任务完成只建立证据基线，不构成上线批准；后续按G0—G10依赖继续安全任务。
 
 2026-08-12第三次调度事件：主智能体按持续交付授权从零`DOING`自动选择最高优先级安全任务，状态按`SELFHOST-OPS-BACKUP-RECOVERY-V2-41 TODO → DOING`切换唯一active slot。范围固定为仓库工具、合成/隔离测试和文档，不建立异机数据锚点，也不触碰当前运行数据或服务。
+
+2026-08-12第四次调度事件：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41 DOING → DONE`。四域V2、root-only凭据、数据库守卫及精确恢复、不可变本机/异机/恢复回执、不同机器/集群证明、prepared receipt补发和runtime release identity原语通过41/41合同与双集群PostgreSQL恢复测试；没有读取当前卷、外传、build/Migration/deploy。G2实际异机数据锚点保持阻塞，唯一active slot释放，下一步转入不依赖外部资源的G3。
 
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
@@ -35,12 +37,12 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-OPS-BACKUP-RECOVERY-V2-41 | 备份恢复契约V2与隔离故障测试 | DOING | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、项目负责人（未来异机/真实数据专项授权） | 2026-08-12 | — | SELFHOST-PRODUCTION-READINESS-40、PR-001、PR-002 | `SYNTHETIC-ISOLATED ONLY / PRODUCTION NO-GO`。四域manifest、安全凭据、原子恢复、分层回执和RPO过期门禁；不读当前卷或外传。见[任务文档](../tasks/SELFHOST-OPS-BACKUP-RECOVERY-V2-41.md)。 |
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-OPS-BACKUP-RECOVERY-V2-41 | 备份恢复契约V2与隔离故障测试 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计与独立建议）、项目负责人（未来异机/真实数据专项授权） | 2026-08-12 | 2026-08-12 | SELFHOST-PRODUCTION-READINESS-40、PR-001、PR-002、D-115 | `DONE / SYNTHETIC-ISOLATED COMPLETE / ACTUAL OFFHOST BLOCKED / PRODUCTION NO-GO`。四域manifest、root-only凭据、writer/数据库守卫、不可变三层回执、不同机器/集群、原子恢复/补偿、prepared补发和Dashboard失败关闭通过41/41合同及双集群恢复测试；未读当前卷、未外传或部署。见[任务文档](../tasks/SELFHOST-OPS-BACKUP-RECOVERY-V2-41.md)及[D-115](DECISIONS.md#d-115-备份恢复-v2-采用四域不可变证据链不同故障域集群证明与运行身份失败关闭)。 |
 | SELFHOST-PRODUCTION-READINESS-40 | 投产事实基线与失败关闭准入门禁 | DONE | Codex 主智能体（唯一写入、证据归并、验收、文档和提交）、数据迁移/应用测试/运维安全子智能体（只读审计）、项目负责人（生产与外部资源专项授权） | 2026-08-12 | 2026-08-12 | AGENTS.md、D-040、SELFHOST-OPS-RECOVERY-FOUNDATION-39、SELFHOST-UAT-FIX-38 | `DONE / PRODUCTION NO-GO BASELINE ESTABLISHED`。源码 alpha.44/0041 与 UAT alpha.42/0040 漂移；四域无异机数据锚点/当前恢复证据；导入 fallback 与默认测试门为P0。已建立十二项门禁、PR-001—007、G0—G10路线和授权矩阵；没有生产/业务写。见[任务文档](../tasks/SELFHOST-PRODUCTION-READINESS-40.md)及[投产准入基线](PRODUCTION_READINESS.md)。 |
 | SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03 | 受控清理Docker构建缓存与无引用测试镜像 | DONE | Codex（只读归因、资源/进程门禁、精确保护清单、受控cache prune、逐ID镜像核验、稳定观察、验证、文档与独立提交）、项目负责人（明确回复“同意”并授权清理） | 2026-08-11 | 2026-08-11 | SELFHOST-OPS-DOCKER-CACHE-CLEANUP-02、SELFHOST-OPS-RESOURCE-GUARD-01、SELFHOST-UAT-FIX-38 | `DONE / DOCKER SPACE SAFELY RECLAIMED`。Build Cache 105/10.92 GB→0；逐ID删除零引用的旧Playwright、alpha.37 builder/migrate和PostgreSQL 16测试基镜像，根盘17→32,581,345,280 bytes/30.34 GiB、containerd 24→8.9 GB。当前/回滚/被拒证据及历史Web镜像、Trae/MySQL、13卷/四受保护卷、备份和Python/SQLite保持；四服务restart0/OOM false，最终60秒Swap增长0。见[任务文档](../tasks/SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03.md)及[完成报告](../tasks/SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03-COMPLETION.md)。 |
 | AGENT-R1-5 | 实现Native-Orchestrated Design MVP | DONE | Codex主Agent（唯一实施写者/编排/收口）、临时原生Agent（ERP/对抗/安全/QA/黑盒只读门禁）、项目负责人（接受D-114并固定合成范围） | 2026-08-11 | 2026-08-11 | PM-001、PM-002、D-113、D-114、AGENT-R1、AGENTS.md | `DONE / NATIVE_PROTOCOL_MVP_COMPLETE / SYNTHETIC_DOCS_TEST_ONLY / NO_RUNTIME_AUTHORITY`。最终实现候选`25cbbfa`，ERP/Security/Adversarial/QA/Black-box五门同候选PASS，协议87/87、控制器47/47及本地Python三基线通过；审查证据提交`ace4dc5`。未修改ERP业务/测试、Schema/Migration或运行面，未访问UAT/生产、未部署或push；R2—R5未授权，TASK03继续冻结。见[任务文档](../tasks/AGENT-R1-5.md)及[审查证据](../agent-control/reviews/AGENT-R1-5/README.md)。 |

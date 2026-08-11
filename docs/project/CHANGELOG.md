@@ -4,6 +4,15 @@
 
 ## 2026-08-12
 
+### SELFHOST-OPS-BACKUP-RECOVERY-V2-41 - `feat: harden backup recovery evidence chain`
+
+- 合同：新增D-115与严格四域V2 manifest/reconciliation/verification合同，绑定deployment、数据库system ID/OID/comment/profile/bytes、alpha.44、完整Git、实际Web/Worker容器及镜像digest、完整Migration 0041 manifest/head和PostgreSQL/uploads/attachments/backup-status。数据库dump明确为完整应用逻辑范围且排除owner/ACL/集群角色。
+- 凭据/一致性：数据库URL退出argv，改为固定credential root内root-owned单硬链接`0400/0600` libpq service文件；凭据身份/摘要全程锁定。精确停止Compose writer、持久数据库fence intent、connection limit/默认只读/连接清退和前后全关系内容摘要共同形成一致性边界；中断恢复只接受精确稳定身份。
+- 证据/恢复：本机、异机、恢复回执按backup/run生成不可变历史并单调更新别名；异机要求不同machine identity，恢复要求不同PostgreSQL system identifier和带marker独占TEST集群。恢复先pin异机字节、全文件staging、单事务pg_restore、Migration/数据库/文件reconciliation；故障精确补偿，建库响应歧义不误删，prepared receipt先落盘后发布并支持无数据库/文件重读的安全补发。
+- Dashboard/镜像：旧V1固定`LEGACY_LOCAL_ONLY`；V2分离verification/identity/policy/assurance，只有未过期RESTORE证据与实际runtime/database/Migration/receiver/target全匹配才ready。新增root运行身份发布器、只读Compose挂载、Dockerfile source package一次验证、Web/Worker OCI+baked version/Git，以及legacy中文状态/cachebuster同步。
+- 验证：断网只读受限Node容器`test:backup-recovery` 41/41；一个768MiB临时PostgreSQL容器内两独立集群完整备份/恢复、故障注入、守卫恢复、回执补发与Dashboard 2/2通过；Dashboard typecheck通过，lint 0 error/11条既有warning，shell/Dockerfile/UI/Compose/链接/JSON/敏感/`git diff --check`通过。Python self-test、项目既有`.venv` smoke和no-backup go-live全部通过；首次系统Python因缺`openpyxl`在启动前失败，未安装依赖或降低断言。
+- 边界/资源：未读取当前PostgreSQL业务行或四卷正文，未生成/外传真实备份，未build、Migration、deploy、restart、登录或业务POST。收口available2.2GiB、Swap391MiB/1GiB、根盘31GiB、Load`0.35/0.28/0.32`，内核窗口OOM匹配0，四服务restart0/OOM false；任务容器、两测试集群/库和临时目录清零，未建删Volume/镜像或prune。G1合成隔离完成，G2仍等待异机目标/RPO/RTO/专项授权，系统继续production no-go。
+
 ### SELFHOST-PRODUCTION-READINESS-40 - `docs: establish production readiness baseline`
 
 - 现场：从`main@bc14eb022528b8d0f242fec1d31ee41b9166b4cd`启动并以`d890987`登记唯一DOING；源码 alpha.44/0041、UAT alpha.42/0040、运行镜像/revision、私有跟踪引用、四服务、Python旧运行面、四卷、本机备份和资源均以实际只读证据核验。

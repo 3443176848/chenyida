@@ -79,7 +79,7 @@ test("legacy shell uses the same identity and one cache-busted asset release", (
   assert.match(legacyStyles, /\.auth-shell/);
   assert.match(legacyStyles, /\.auth-brand/);
   assert.match(legacyStyles, /:focus-visible/);
-  const release = "20260806-status-localization-05";
+  const release = "20260812-backup-release-identity-v2-41";
   for (const source of [legacyHtml, legacyApp, dashboardService]) assert.ok(source.includes(release));
   assert.doesNotMatch(`${legacyHtml}\n${legacyStyles}`, /yonyou|用友|https?:\/\/.*\.(?:png|jpe?g|svg)/i);
 });

@@ -2,6 +2,27 @@
 
 最后更新时间：2026-08-12（Asia/Shanghai）
 
+## SELFHOST-OPS-BACKUP-RECOVERY-V2-41（完成；真实异机仍阻塞）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 最终状态 | DONE / SYNTHETIC-ISOLATED COMPLETE / ACTUAL OFFHOST BLOCKED / PRODUCTION NO-GO | D-115/G1工具和隔离证据完成；没有当前卷读取、真实备份/外传/恢复或部署，不能交给真实员工 |
+| 四域合同 | PASS / V2 | PostgreSQL、uploads、attachments、backup-status；绑定deployment、数据库稳定身份/profile/bytes、alpha.44、完整Git、实际Web/Worker容器/镜像和Migration 0041 manifest/head |
+| 凭据/一致性 | PASS / FAIL CLOSED | root-only libpq service文件，秘密不进argv/输出/manifest/receipt；精确停止writer、持久数据库fence、连接清退、默认只读和前后全关系内容reconciliation |
+| 中断恢复 | PASS | 守卫进程SIGKILL后数据库保持安全态；恢复器按system ID/OID/comment/root device+inode/原connlimit精确复原，不删除不明intent |
+| 证据链 | PASS / IMMUTABLE | 不可变LOCAL/OFFHOST/RESTORE历史与单调alias/latest；异机必须不同machine identity，恢复必须不同PostgreSQL cluster；旧V1固定`LEGACY_LOCAL_ONLY` |
+| 隔离恢复 | PASS / TWO CLUSTERS | durable pinned source、全文件staging、单事务pg_restore、Migration/数据库/文件reconciliation、建库响应歧义和普通故障精确清理通过 |
+| 回执不确定性 | PASS / PRESERVE THEN REPUBLISH | active inspection后先持久化prepared receipt；发布失败保留精确TEST目标，独立补发器只读prepared evidence，不重新连接数据库/读取可变文件 |
+| Dashboard/runtime | PASS / SOURCE ONLY | root发布实际运行容器/镜像/OCI/baked版本身份；只有RESTORE回执、runtime/database/Migration、策略/RPO、receiver/target全匹配且未过期才`recovery_ready=true`。UAT未部署该源码 |
+| 合同测试 | PASS 41/41 | 断网、源码只读、1 CPU、768 MiB临时Node容器；含V2、攻击/漂移/过期、守卫、release identity、Dockerfile和UI合同 |
+| PostgreSQL集成 | PASS | 一个768 MiB临时容器内两个独立PostgreSQL集群，完整schema/extension/publication/large object/sequence/日期/interval、故障注入与Dashboard 2/2通过 |
+| 静态验证 | PASS | Dashboard typecheck通过；lint 0 error/11条既有无关warning；shell语法、Compose config、JSON、链接、敏感信息和`git diff --check`通过 |
+| Python基线 | PASS / PROJECT VENV | `SELF_TEST_OK`、项目既有`.venv`中`SMOKE_TEST_OK`、`GO_LIVE_CHECK_OK --no-backup`；首次系统Python因缺`openpyxl`在启动前失败，未安装依赖或降低断言。误生成的唯一开发SQLite备份已精确删除，原库保持 |
+| 资源/稳定 | PASS / NO THRESHOLD BREACH | 收口available 2.2 GiB、Swap391 MiB/1 GiB、根盘31 GiB、Load`0.35/0.28/0.32`；内核窗口OOM匹配0，四个UAT服务running/healthy、restart0/OOM false |
+| 临时资源 | CLEAN | `cyd-backup-v2-*`容器、两个测试集群/库和`/tmp/cyd-backup-v2-runtime.*`均清零；未建删Volume/镜像，未prune |
+| 剩余最高风险 | OPEN / PR-001 PR-003 PR-004 PR-005 | 无真实异机副本/恢复/RTO；源码/UAT身份漂移；导入fallback安全缺口；无强制release suite |
+| 下一安全任务 | G3 RELEASE IDENTITY AND RELEASE GATE | G2等待异机目标/RPO/RTO/专项授权；先在仓库内完成并发安全身份、release manifest、Migration allowlist和低资源串行`test:release`，不build/deploy |
+
 ## SELFHOST-PRODUCTION-READINESS-40（完成）
 
 | 验证项 | 结果 | 说明 |

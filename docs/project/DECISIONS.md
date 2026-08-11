@@ -1643,6 +1643,45 @@
 - 拒绝由同一Agent切换Prompt后完成实施、QA、安全和批准，或让看过源码的角色自称Black-box。
 - 拒绝复用D-112产品五表、ERP PostgreSQL或真实业务正文作为研发Agent长期记忆。
 
+## D-115 备份恢复 V2 采用四域不可变证据链、不同故障域/集群证明与运行身份失败关闭
+
+- 日期：2026-08-12
+- 状态：`ACCEPTED AS G1 IMPLEMENTATION BASELINE / SYNTHETIC-ISOLATED VERIFIED / PRODUCTION USE NOT AUTHORIZED`
+- 提案与实施：Codex 持续交付负责人及数据迁移、应用测试、运维安全智能体
+- 确认边界：项目负责人已授权仓库内安全实施和隔离测试；真实四卷读取、异机传输、恢复、部署和生产使用仍需专项明确授权
+
+### Context
+
+- `SELFHOST-PRODUCTION-READINESS-40`确认旧工具把数据库 URL 放入 argv，只备份 PostgreSQL/uploads/attachments，只信任调用者声称 writer 已停止，恢复后顺序移动文件且最终失败可能留下部分目标；单个 `VERIFIED`也不能证明异机副本或恢复。
+- Git/private GHCR 锚点不能保护业务数据。PostgreSQL、uploads、attachments、backup-status 仍在单一服务器故障域，当前没有真实异机目标、RPO/RTO、加密、保留、调度或告警证据。
+- Dashboard 若只相信仓库期望值或静态环境变量，会把源码、运行镜像和数据库漂移误报为可恢复；恢复成功与回执发布之间也存在结果不确定窗口。
+
+### Decision
+
+1. 备份边界固定为 PostgreSQL、uploads、attachments、backup-status 四个数据域；manifest 同时绑定 deployment、数据库稳定身份/profile/bytes、应用版本、完整 Git SHA、实际 Web/Worker 容器与镜像 digest、完整 Migration manifest/head 和四制品摘要。
+2. 数据库认证只接受固定 credential root 内 root-owned、单硬链接、`0400/0600` libpq service 文件；秘密不得进入 argv、stdout、manifest、receipt、Git 或聊天。service 中外部 `passfile`/`sslkey`引用失败关闭。
+3. 一致性采用精确 Compose writer 已停止、持久数据库 fence intent、connection limit/默认只读/连接清退和备份前后全关系内容 reconciliation。该设计信任唯一串行 root/PostgreSQL superuser 运维边界，不声称抵御恶意并发 root。
+4. 证据分为不可变 `LOCAL_VERIFIED`、`OFFHOST_VERIFIED`和`RESTORE_VERIFIED`。本机回执绑定 source machine/root，异机回执必须来自不同 machine identity 并绑定 receiver root，恢复回执必须来自与源不同 system identifier 的带 marker 隔离 TEST 集群；别名和 latest 只能单调前进。
+5. 恢复只接受不存在的 `_restore_test`数据库和文件目标，异机字节先 private durable pin 再验证，数据库单事务恢复、文件 staging/原子晋升、最终数据库/文件 reconciliation。只清理本任务精确创建且身份闭合的目标；任何身份歧义隔离保留。
+6. active inspection 完成后先写 root-only prepared receipt，再进入保全边界。发布失败保留已验证 TEST 目标和 prepared evidence；独立补发器只消费 prepared evidence，不重新连接数据库或读取可变文件。
+7. Dashboard 只有在最新 `RESTORE_VERIFIED`、运行 release identity、数据库/Migration、policy/RPO、异机 receiver 和隔离恢复 target 全部匹配且未过期时才返回 `recovery_ready=true`。旧 V1 固定为 `LEGACY_LOCAL_ONLY`；缺失、伪造、替换、过期或不完整配置均失败关闭。
+8. Runtime release identity 必须由 root 从已经运行的实际 Compose Web/Worker ID、镜像 digest、OCI version/revision和 baked version/Git生成并以只读文件提供给 Web；发布器不得控制容器。并发发布锁、完整 release manifest、Migration allowlist 和强制 release suite 留给 G3 独立任务。
+9. PostgreSQL V2 使用 `--no-owner --no-acl`的完整应用数据库逻辑 dump；集群角色、角色密码、tablespace和集群级 ACL 明确排除，必须在正式灾备前另建恢复方案。
+
+### Consequences
+
+- `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`以 41/41 合同测试和双独立 PostgreSQL 集群恢复测试证明 G1 工具路径；守卫 SIGKILL 恢复、普通故障注入清理、建库响应歧义和 prepared receipt 补发均通过。该证据只使用合成/隔离数据。
+- PR-002 的旧工具缺口在 V2 仓库路径关闭，但 PR-001、真实异机备份、真实隔离恢复、角色/ACL恢复、调度/保留/告警和真实 RTO 仍保持阻断；`recovery_ready`当前不得被人工伪置为 true。
+- 不可捕获的恢复进程/宿主硬故障可能留下带任务 marker 的隔离 TEST 目标。工具选择隔离保留而非猜测删除；后续只能按精确身份另行处置。
+- 本决定不授权读取当前数据库或四卷、真实备份、外传、恢复、UAT build/Migration/deploy、账号权限、员工试用、生产切换或清理任何持久数据。
+
+### Rejected alternatives
+
+- 拒绝用同盘副本、Git/镜像锚点、单次 SHA 校验或本机 `VERIFIED`冒充异机可恢复。
+- 拒绝在命令行传递数据库 URL/密码，或仅凭调用者参数声明服务静止。
+- 拒绝原地恢复、覆盖已有数据库/目录、对身份不明目标执行 drop/delete，或在回执发布不确定时删除已验证恢复结果。
+- 拒绝把浏览器按钮、静态期望 env、旧 V1 回执或“测试通过”单独解释为生产就绪。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

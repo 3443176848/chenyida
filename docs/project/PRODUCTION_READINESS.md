@@ -11,6 +11,8 @@
 
 本文件是失败关闭的准入基线，不是上线批准。只有对应证据实际完成后，单项状态才能从`FAIL`或`PARTIAL`更新；文档完成、页面可访问或历史测试通过不会自动解除任何门禁。
 
+2026-08-12 增量：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成 G1 合成/隔离实现与验证。四域 V2 工具、分层不可变回执、数据库守卫/恢复、不同机器/集群证明、prepared receipt 补发和 runtime release identity 原语已通过 41/41 合同测试及双集群 PostgreSQL 恢复测试。没有读取当前卷、创建真实备份或连接异机目标，因此整体判定仍为 `PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -45,7 +47,7 @@
 | 自托管唯一权威 | `PARTIAL` | 生产运行只保留 Node/PostgreSQL 权威；Python/SQLite 有明确只读迁移、停用或隔离决定 |
 | 源码/提交/镜像/Migration一致 | `FAIL` | 一个不可变候选 manifest 同时绑定 Git SHA、版本、镜像 digest、Migration manifest/head；UAT 实况完全匹配 |
 | 异机备份 | `FAIL` | PostgreSQL及三个文件数据域加密传至异故障域，远端校验回执、保留策略、时效和责任人可核验 |
-| 隔离恢复 | `FAIL` | 从异机副本在新空隔离目标恢复四类数据，完成 Migration、数量、摘要、库存和关键金额核对并记录 RTO |
+| 隔离恢复 | `PARTIAL / SYNTHETIC-ISOLATED PASS` | 从真实异机副本在新空隔离目标恢复四类数据，完成 Migration、数量、摘要、库存和关键金额核对并记录真实 RTO；现有合成双集群证据不替代真实数据 |
 | 真实数据试迁移 | `FAIL` | 只读源快照、逐行结果、重复/孤儿/单位/文件处置、库存/金额核对和可重跑报告通过 |
 | 核心服务端规则 | `PARTIAL` | 物料/BOM/采购/收货/IQC/库存/生产/销售/财务关键链及异常路径在同一候选通过自动与人工验收 |
 | 权限/会话/安全/审计 | `PARTIAL` | 批准的岗位矩阵、职责分离、绝对会话时限、最小数据域、导入边界、审计和安全测试通过 |
@@ -65,14 +67,14 @@
 
 解除条件：先完成不接触真实数据的备份/恢复契约 V2 与故障测试，再由项目负责人指定异机目标并专项授权真实快照、传输和隔离恢复。
 
-### PR-002 当前备份/恢复工具不能作为生产恢复自动化
+### PR-002 V2 工具路径已完成，真实运用仍未授权
 
-- `backup-selfhost.sh`通过 argv 接收数据库 URL，只覆盖 PostgreSQL、uploads、attachments，遗漏 backup-status；生产拒绝依赖`ERP_ENV`和 URL 文本匹配，并只信任调用者声称服务已停止。
-- 工具没有客户端加密、异机传输回执、不可变保留、备份年龄/RPO或定期调度。
-- `restore-selfhost.sh`在恢复数据库后顺序晋升文件目录，最终才核验 Migration；第二次移动或最终核验失败时可能留下部分目标。
-- Dashboard 的`VERIFIED`只表示三个本机 artifact 的格式和 SHA 校验，不能区分`LOCAL_VERIFIED`、`OFFHOST_VERIFIED`和`RESTORE_VERIFIED`。
+- `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已使数据库秘密退出 argv，改为严格 root-only libpq service 文件；四域 manifest 绑定实际 runtime/database/Migration 身份、RPO、完整制品和前后内容 reconciliation。
+- 精确停止 writer、持久数据库 fence intent、SIGKILL 后精确恢复、不可变本机/异机/恢复回执、RPO 过期和不同 machine/cluster 证明均已实现并通过隔离测试。
+- restore 使用 durable pinned source、全文件 staging、单事务数据库恢复、精确补偿、建库响应歧义处理和 prepared receipt 保全/补发；Dashboard 旧 V1 失败关闭，V2 只有全身份/策略/assurance 匹配才显示 ready。
+- V2 仍不提供真实异机传输、客户端加密/密钥、保留删除、定时调度、告警、角色/ACL恢复或真实 RTO；不可捕获的恢复进程/宿主硬故障会隔离保留带 marker 的 TEST 目标，而不是猜测删除。
 
-解除条件：显式 deployment identity、root-only 凭据文件、四数据域 manifest、全量 staging/原子晋升/补偿、故障注入、分层回执与过期门禁均通过合成和隔离测试。
+状态：`G1 RESOLVED IN SYNTHETIC/ISOLATED TOOLING`。只有完成 PR-001/G2 的真实异机副本与恢复、补齐集群级对象和运行策略后，才能把该工具链作为生产灾备证据。
 
 ### PR-003 运行候选身份不闭合
 
@@ -131,7 +133,7 @@
 | 阶段 | 任务簇 | 前置依赖 | 完成证据 | 失败处理 |
 | --- | --- | --- | --- | --- |
 | G0 | 投产事实基线 | 无 | 本文件、三线审计、`PRODUCTION NO-GO` | 发现新事实即更新，不放宽门禁 |
-| G1 | 备份/恢复契约 V2 | G0 | 四域 manifest、凭据不进 argv、原子恢复、故障测试、分层回执 | 任一部分状态或泄漏立即拒绝 |
+| G1 | 备份/恢复契约 V2 | G0 | `DONE / SYNTHETIC-ISOLATED`：四域 manifest、凭据不进 argv、原子恢复、故障测试、分层回执 | 任一部分状态或泄漏立即拒绝 |
 | G2 | 异机备份与隔离恢复 | G1、异机目标/RPO/RTO/专项授权 | 远端回执、从远端恢复、数量/摘要/库存/金额、RTO | 保留源和旧备份，不覆盖运行面 |
 | G3 | 发布身份与强制测试门 | G0，可与 G1 串行推进 | release manifest、migration allowlist、`test:release`、SBOM/安全报告 | 候选不晋升，运行面不变 |
 | G4 | 导入与会话/权限 P0 修复 | G3 测试门基础 | 隔离 PostgreSQL/文件故障测试、岗位矩阵、安全验收 | 回退候选，不触碰 UAT |
@@ -146,8 +148,8 @@
 
 ## 8. 当前安全执行序列
 
-1. `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`：只用合成/隔离数据加固备份、验证、恢复和回执契约；不读当前卷、不上传外部目标。
-2. 建立 release manifest、Migration allowlist 和低资源串行`test:release`门。
+1. `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成 G1 合成/隔离证据；真实 G2 被异机目标、RPO/RTO和专项授权阻塞。
+2. 当前转入 G3：在不 build/deploy 的仓库范围建立并发安全 release identity、不可变 release manifest、Migration allowlist 和低资源串行`test:release`门。
 3. 修复物料导入 fallback 的幂等、上传原子性、文件检查和任务所有权。
 4. 修复健康、会话绝对时限和经业务批准的权限矩阵。
 5. 更新并演练监控、升级、回滚和故障手册。
@@ -172,3 +174,5 @@
 - 任务起点：available memory约 2.0 GiB，Swap约 386 MiB/1.0 GiB，根分区可用约 31 GiB，Load `0.12/0.17/0.13`。
 - 三线审计后、串行验证收口：available memory约 2.0 GiB，Swap约 389 MiB/1.0 GiB，根分区可用约 31 GiB，Load`2.09/0.98/0.50`且未触发停止线；四服务 restart 0、OOMKilled false，内核未发现本任务窗口 OOM。
 - 本任务没有创建临时容器、数据库、镜像、Volume或备份，没有需要清理的临时资源。
+
+G1 增量验证使用一次一个受限临时容器：合同 41/41、双独立 PostgreSQL 集群恢复和 Dashboard PostgreSQL 2/2 通过，容器/测试库/临时目录清零；任务前后 available memory约 2.2 GiB、Swap约391 MiB、根盘31 GiB，四个 UAT 服务 restart 0/OOM false。没有 build、Migration、Compose 变更、UAT/生产写或持久卷操作。

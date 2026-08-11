@@ -1,27 +1,74 @@
 # 自托管非生产运维基线
 
-当前 `chenyida-erp-parallel` 为运行中的 `PARALLEL HTTP ACCEPTANCE ONLY` 空环境；访问、状态、日志、重启和资源停止流程见 `parallel-http-acceptance.md`。它不是生产上线，不迁真实数据、不切流。
+> 当前判定：`PRODUCTION NO-GO`。本页描述运行中的非生产 UAT 及仓库已验证的运维工具；它不是生产运行手册批准，也不授权备份、恢复、Migration、部署、账号或网络变更。
 
-## TASK05 采购履约并行验收基线
+## 当前运行面
 
-- 当前应用版本为 `0.1.0-alpha.19`，PostgreSQL 已应用 `0001`—`0019`；Web 只监听 `127.0.0.1:3000`，PostgreSQL 不映射宿主端口。
-- 业务入口为采购 `/procurement/fulfillment`、仓库 `/warehouse/receiving`、财务 `/finance/payables`。操作必须使用对应角色，不能用页面隐藏代替服务端授权。
-- 到货计划不增加库存、不创建采购财务来源或 AP；warehouse 过账 Receipt 后才原子更新 PO/计划、Ledger/Balance 与 purchase source；finance 必须再次显式核对生成 AP。
-- 已过账 Receipt 不允许原地修改。冲销必须走原编排入口；若来源已经生成 AP，系统返回稳定冲突并保持全链不变。
-- TASK05 验收完成后的标准空态是：19 migrations、唯一启用管理员、零临时账号、零采购/库存/财务及 Phase 4 合成业务、空 uploads/attachments。恢复或清理后必须重新核对这些计数。
-- 本基线不授权真实数据迁移、生产部署、HTTPS、切流、付款/总账、生产制造或品质流程。
+- 唯一未来生产权威方向是 Node.js、PostgreSQL、本地持久文件和独立 Worker。
+- `chenyida-erp-parallel`仍是受控非生产 UAT：Web `0.1.0-alpha.42` / source revision `569aa954d764309e239d1f6c174e582596d33a24`，PostgreSQL 40/head `0040_warehouse_receipt_readiness.sql`。
+- 当前仓库候选仍为 `0.1.0-alpha.44` / 41/head `0041_ai_governance_suggestion_evidence.sql`；它未 build、未部署、未应用到 UAT。两者不得描述为同一候选。
+- Python/SQLite 常驻面仍是开发运行和迁移来源，不是未来生产底座；正式切换前必须另有停写、只读或隔离决定。
+- 入口、受控业务事实与历史操作见 `parallel-http-acceptance.md`；未经任务授权不得登录、发送业务 POST 或查询业务行。
 
-## Dashboard 与根工作台
+## 每次重任务的资源门禁
 
-- 根 `/` 是原生 Vinext 工作台，负责 setup/login/session/must-change/logout、权限裁剪的经营指标、风险和模块入口；不得重新嵌入 legacy iframe。
-- `/erp/index.html` 仅作为显式 legacy 业务工作区和回滚证据，`?tab=` 只接受源码白名单。
-- `/api/summary` 与 `/api/management-dashboard` 只读实时查询 TASK02—TASK09 PostgreSQL 权威关系表；不读取 `erp_records`，不跨单位相加库存。
-- 最近系统审计要求 `system.audit.read`；备份治理状态要求 admin 的 `system.backup.read`。
+Docker build、全量测试、Migration、备份、恢复和 Compose 变更必须串行，固定 `COMPOSE_PARALLEL_LIMIT=1`，一次只允许一个临时测试/构建容器。任务前后记录：
 
-## 备份治理状态
+```bash
+free -h
+df -h /
+uptime
+docker stats --no-stream
+COMPOSE_PARALLEL_LIMIT=1 docker compose -p chenyida-erp-parallel -f compose.yml ps
+docker inspect --format '{{.Name}} restart={{.RestartCount}} oom={{.State.OOMKilled}} status={{.State.Status}}' \
+  chenyida-erp-parallel-web-1 \
+  chenyida-erp-parallel-worker-1 \
+  chenyida-erp-parallel-postgres-1 \
+  chenyida-erp-parallel-caddy-1
+```
 
-Web 通过只读 `ERP_BACKUP_STATUS_FILE` 读取 `verify-backup-selfhost.sh` 生成的去敏状态。文件缺失、格式错误、权限不足或超限时接口 fail closed 为 `UNVERIFIED`/安全错误，不回显服务器路径或解析细节。创建、校验和恢复命令见 `backup-restore.md`。
+Compose 配置展开需要数据库和 setup 变量；只读状态检查可使用受控 root-only env 文件，不能把值写入日志或聊天。停止启动新重任务的硬阈值见仓库根 `AGENTS.md`：available memory `<768 MiB`、Swap 使用率 `>80%`、Swap 60 秒增长 `>256 MiB`、根盘 `<10 GiB`、Load1 持续高于 4、OOM、反复重启、SSH 卡顿或数据库失去健康。
 
-## 上线前最低门禁
+## Dashboard 与运行身份
 
-TASK10 只形成非生产开发基线。真实数据试迁移、生产备份、恢复演练、部署和切换必须另建任务并获得明确授权；执行前至少准备异故障域快照、迁移核对报告、恢复目标、回退条件、HTTPS/访问控制、凭证轮换和人工验收清单。
+- 根 `/` 是原生 Vinext 工作台；`/erp/index.html`只是显式 legacy 兼容工作区。
+- `/api/summary`和`/api/management-dashboard`只读查询 PostgreSQL 权威关系表；权限裁剪仍由服务端执行。
+- 最近系统审计要求 `system.audit.read`；备份治理要求 `system.backup.read`。
+- Web 通过只读 `ERP_RELEASE_IDENTITY_FILE`核对 root 发布的实际 Web/Worker 容器 ID、镜像 digest、版本和 Git SHA；缺失、过期、伪造或与 baked runtime/database/Migration 不符时身份为 `UNCONFIGURED/MISMATCH`。
+- Web 通过只读 `ERP_BACKUP_STATUS_FILE`读取 V2 回执；旧 V1 只能显示 `LEGACY_LOCAL_ONLY`。只有未过期的 `RESTORE_VERIFIED`同时匹配运行身份、策略、异机接收方和隔离恢复目标，`recovery_ready`才为 true。
+- 浏览器没有备份或恢复写能力。详细合同与命令见 `backup-restore.md`。
+
+## 受控变更顺序
+
+任何候选升级必须独立完成并保留证据：
+
+1. 冻结 Git SHA、应用版本、Migration manifest/head 和 Web/Worker 镜像 digest；
+2. 运行机器可读的串行 release suite，缺失、跳过、超时或失败均拒绝晋升；
+3. 取得精确 UAT/生产授权后，先建立可恢复快照并从异机副本完成隔离恢复；
+4. 执行 Migration 前核对 allowlist、当前 head、checksum、容量与回滚条件；
+5. 仅替换授权的服务，核对实际容器/镜像/runtime identity，发布 release identity；
+6. 执行匿名健康、权限、核心业务、数据汇总、Worker 和备份时效验收；
+7. 观察 restart/OOM、Load、内存、Swap、磁盘和错误率；触发回滚条件立即停止晋升。
+
+当前完整 release manifest、Migration allowlist、`test:release`、SBOM/漏洞报告和 UAT 对齐尚未完成，G3 仍为投产阻断。
+
+## 备份、恢复与故障处理
+
+- V2 已用合成数据和双独立 PostgreSQL 测试集群证明四域 manifest、数据库守卫、不可变本机/异机/恢复回执、故障注入清理及 prepared receipt 补发；没有读取当前四卷或生成真实备份。
+- 当前仍没有真实异故障域副本、加密传输/保留策略、自动调度、告警责任人或真实恢复 RTO；Dashboard 不得把本机回执冒充灾备。
+- 若备份进程中断且 `.backup-fence-v2.json`存在，数据库保持安全只读/连接受限。禁止手工删除 intent 或直接重跑；使用 `recover-backup-guard.sh`按精确稳定身份恢复。
+- 若隔离恢复在 prepared receipt 后发布失败，保留精确 TEST 数据库、文件目标和 prepared evidence；使用 `publish-restore-receipt-selfhost.sh`补发，不重跑恢复。
+- 若容器 OOM/反复重启、数据库不健康、身份漂移、回执过期/损坏、Migration 不符或关键数据核对失败，立即停止新写操作，保全日志/审计/证据，不清理持久卷或备份，按已批准的事故任务升级。
+
+## 监控、备份和上线缺口
+
+以下证据产生前，系统不能交给真实员工：
+
+- 实际指标采集、外部告警投递和值班升级演练；
+- 真实异机备份、隔离恢复、角色/ACL恢复、保留与过期告警；
+- 同候选低资源负载、备份/恢复和重启 soak；
+- 真实数据试迁移、表数/记录数/重复/孤儿/库存/金额/文件核对及回滚演练；
+- 完整岗位权限矩阵、安全验收、核心跨岗 E2E 和少量员工签字试用；
+- 正式切换窗口、责任人、验证清单、触发器和项目负责人专项授权。
+
+上述任一缺失时，结论保持 `PRODUCTION NO-GO / NOT READY FOR REAL EMPLOYEES`。

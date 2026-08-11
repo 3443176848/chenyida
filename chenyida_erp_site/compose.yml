@@ -1,5 +1,9 @@
 name: chenyida-erp
 
+x-release-build-args: &release-build-args
+  ERP_BUILD_VERSION: ${ERP_BUILD_VERSION:-}
+  ERP_BUILD_REVISION: ${ERP_BUILD_REVISION:-}
+
 x-app-environment: &app-environment
   ERP_ENV: ${ERP_ENV:-development}
   DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
@@ -10,6 +14,19 @@ x-app-environment: &app-environment
   ERP_UPLOAD_ROOT: /data/chenyida-erp/uploads
   ERP_ATTACHMENT_ROOT: /data/chenyida-erp/attachments
   ERP_BACKUP_STATUS_FILE: /data/chenyida-erp/backup-status/latest.json
+  ERP_RELEASE_EXPECTED_DEPLOYMENT_ID: ${ERP_RELEASE_EXPECTED_DEPLOYMENT_ID:-}
+  ERP_RELEASE_EXPECTED_VERSION: ${ERP_RELEASE_EXPECTED_VERSION:-}
+  ERP_RELEASE_EXPECTED_GIT_COMMIT: ${ERP_RELEASE_EXPECTED_GIT_COMMIT:-}
+  ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS: ${ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS:-}
+  ERP_BACKUP_POLICY_ID: ${ERP_BACKUP_POLICY_ID:-}
+  ERP_BACKUP_RPO_HOURS: ${ERP_BACKUP_RPO_HOURS:-}
+  ERP_BACKUP_EXPECTED_OFFHOST_LOCATION_ID: ${ERP_BACKUP_EXPECTED_OFFHOST_LOCATION_ID:-}
+  ERP_BACKUP_EXPECTED_OFFHOST_RECEIVER_IDENTITY_SHA256: ${ERP_BACKUP_EXPECTED_OFFHOST_RECEIVER_IDENTITY_SHA256:-}
+  ERP_BACKUP_EXPECTED_RESTORE_LOCATION_ID: ${ERP_BACKUP_EXPECTED_RESTORE_LOCATION_ID:-}
+  ERP_BACKUP_EXPECTED_RESTORE_TARGET_ID: ${ERP_BACKUP_EXPECTED_RESTORE_TARGET_ID:-}
+  ERP_BACKUP_EXPECTED_RESTORE_TARGET_SYSTEM_IDENTIFIER: ${ERP_BACKUP_EXPECTED_RESTORE_TARGET_SYSTEM_IDENTIFIER:-}
+  ERP_BACKUP_EXPECTED_RESTORE_TARGET_CLUSTER_MARKER_ID: ${ERP_BACKUP_EXPECTED_RESTORE_TARGET_CLUSTER_MARKER_ID:-}
+  ERP_BACKUP_EVIDENCE_TRUST_MODE: ${ERP_BACKUP_EVIDENCE_TRUST_MODE:-}
   ERP_MAX_UPLOAD_BYTES: ${ERP_MAX_UPLOAD_BYTES:-10485760}
   ERP_WORKER_POLL_MS: ${ERP_WORKER_POLL_MS:-1000}
   ERP_WORKER_LEASE_SECONDS: ${ERP_WORKER_LEASE_SECONDS:-60}
@@ -42,7 +59,7 @@ services:
       options: { max-size: "10m", max-file: "5" }
 
   migrate:
-    build: { context: ., target: worker }
+    build: { context: ., target: worker, args: *release-build-args }
     cpus: "0.75"
     mem_limit: 768m
     memswap_limit: 1g
@@ -54,7 +71,7 @@ services:
     restart: "no"
 
   web:
-    build: { context: ., target: web }
+    build: { context: ., target: web, args: *release-build-args }
     cpus: "0.75"
     mem_limit: 512m
     memswap_limit: 768m
@@ -68,6 +85,7 @@ services:
       - erp_uploads:/data/chenyida-erp/uploads
       - erp_attachments:/data/chenyida-erp/attachments
       - erp_backup_status:/data/chenyida-erp/backup-status:ro
+      - ${ERP_RELEASE_IDENTITY_HOST_ROOT:-/var/lib/chenyida-erp/release-identity}:/run/chenyida-erp-release:ro
     depends_on:
       migrate: { condition: service_completed_successfully }
     healthcheck:
@@ -84,7 +102,7 @@ services:
       options: { max-size: "10m", max-file: "5" }
 
   worker:
-    build: { context: ., target: worker }
+    build: { context: ., target: worker, args: *release-build-args }
     cpus: "0.50"
     mem_limit: 512m
     memswap_limit: 768m
@@ -103,7 +121,7 @@ services:
       options: { max-size: "10m", max-file: "5" }
 
   admin:
-    build: { context: ., target: worker }
+    build: { context: ., target: worker, args: *release-build-args }
     cpus: "0.50"
     mem_limit: 512m
     memswap_limit: 768m

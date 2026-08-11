@@ -1,5 +1,5 @@
-import { api, ErpApiError, isHistorySessionRestore, logoutSession, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "./api-client.js?v=20260806-status-localization-05";
-import { roleLabel, statusLabel, statusPairLabel } from "./status-localization.js?v=20260806-status-localization-05";
+import { api, ErpApiError, isHistorySessionRestore, logoutSession, safeMaterialReturnTo, setProtectedViewState, suspendProtectedViews } from "./api-client.js?v=20260812-backup-release-identity-v2-41";
+import { roleLabel, statusLabel, statusPairLabel } from "./status-localization.js?v=20260812-backup-release-identity-v2-41";
 
 const state = {
   summary: {},
@@ -355,19 +355,23 @@ function renderOperations() {
 
   const canManage = canManageSystem();
   $("#backupAdminHint").hidden = false;
-  $("#backupAdminHint").textContent = "备份创建和新空目标恢复只允许受控离线 CLI；浏览器不提供写操作。";
+  $("#backupAdminHint").textContent = "备份创建和任务自建的一次性 TEST 数据库恢复只允许受控离线 CLI；浏览器不提供写操作。";
   $("#userAdminHint").hidden = canManage;
   $("#createUserForm").hidden = !canManage;
   $("#backupTable").innerHTML = `
-    <thead><tr><th>验证标识</th><th>状态</th><th>验证时间</th><th>恢复边界</th></tr></thead>
+    <thead><tr><th>验证标识</th><th>证据</th><th>当前身份</th><th>策略</th><th>可信边界</th><th>恢复就绪</th><th>验证时间</th><th>恢复边界</th></tr></thead>
     <tbody>${state.backups.map((row) => `
       <tr>
         <td>${escapeHtml(row.name)}</td>
-        <td>${escapeHtml(statusLabel(row.status || "VERIFIED"))}</td>
+        <td>${escapeHtml(statusLabel(row.status || "UNVERIFIED"))}</td>
+        <td>${escapeHtml(statusLabel(row.identity_status || "UNCONFIGURED"))}</td>
+        <td>${escapeHtml(statusLabel(row.policy_status || "UNCONFIGURED"))}</td>
+        <td>${escapeHtml(statusLabel(row.assurance_status || "UNCONFIGURED"))}</td>
+        <td>${row.recovery_ready ? "是" : "否"}</td>
         <td>${escapeHtml(row.verified_at || row.created_at)}</td>
-        <td>仅新建空目标</td>
+        <td>仅任务自建一次性 TEST 数据库</td>
       </tr>
-    `).join("") || `<tr><td colspan="4">没有可信验证记录</td></tr>`}</tbody>
+    `).join("") || `<tr><td colspan="8">没有可信验证记录</td></tr>`}</tbody>
   `;
   $("#usersTable").innerHTML = `
     <thead><tr><th>账号</th><th>姓名</th><th>角色</th><th>状态</th><th>最近登录</th><th>操作</th></tr></thead>
@@ -1332,7 +1336,7 @@ async function refreshOperations() {
       return null;
     });
     state.operationsAvailability.backups = Boolean(backups);
-    state.backups = backups?.latest_verification ? [{ name: backups.latest_verification.backup_id, status: backups.verification_status, verified_at: backups.latest_verification.verified_at }] : [];
+    state.backups = backups ? [{ name: backups.latest_verification?.backup_id || "无可信回执", status: backups.verification_status || "UNVERIFIED", identity_status: backups.identity_status, policy_status: backups.policy_status, assurance_status: backups.assurance_status, recovery_ready: backups.recovery_ready, verified_at: backups.latest_verification?.verified_at || "-" }] : [];
   } else {
     state.backups = [];
     state.users = [];

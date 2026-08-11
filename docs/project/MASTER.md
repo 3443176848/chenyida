@@ -51,13 +51,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0041`，41/head`0041_ai_governance_suggestion_evidence.sql`且SHA-256为`676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2`；并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`，0035/0040及更早Migration未修改。0041只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / PRODUCTION NO-GO BASELINE ESTABLISHED`。十二项门禁、PR-001—PR-007与G0—G10路线已建立；项目负责人已授权持续选择安全未阻塞任务，但生产数据、异机真实数据传输、Migration/部署、账号权限和正式切换仍须专项明确授权 |
-| 当前任务 | `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`为唯一`DOING`：只用合成/隔离数据实现四域manifest、安全凭据传递、原子恢复、故障注入、分层回执和RPO过期门禁；不读取当前卷或连接外部目标 |
-| 下一任务 | 本任务完成后继续投产G1/G3中最高优先级安全项。真实异机备份、当前数据恢复、UAT Migration/build/deploy、员工试用和切流仍不自动获权 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / G1 SYNTHETIC-ISOLATED COMPLETE / PRODUCTION NO-GO`。十二项门禁、PR-001—PR-007与G0—G10路线保持；V2工具证据不能替代真实异机副本。生产数据、异机真实数据传输、Migration/部署、账号权限和正式切换仍须专项明确授权 |
+| 当前任务 | 任务41收口时零`DOING`；`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成41/41合同与双集群隔离恢复，未读取当前卷或连接外部目标 |
+| 下一任务 | G2因异机目标/RPO/RTO/专项授权阻塞，自动转入G3的发布身份、不可变release manifest、Migration allowlist和低资源串行强制测试门；真实备份恢复、UAT build/Migration/deploy、员工试用和切流仍不自动获权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-OPS-BACKUP-RECOVERY-V2-41已完成D-115/G1合成隔离基线：四域manifest与内容reconciliation、root-only libpq凭据、精确writer/数据库守卫及中断恢复、不可变LOCAL/OFFHOST/RESTORE回执、不同machine/cluster证明、全staging恢复/精确补偿、prepared receipt补发和Dashboard运行身份/RPO失败关闭均已实现。合同41/41、双独立PostgreSQL集群恢复及Dashboard 2/2通过；没有真实异机目标、当前卷读取、外传、build/Migration/deploy，系统仍为production no-go
 
 - SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03已完成受控空间恢复：默认唯一`default*` builder无构建/测试/Migration后执行`docker buildx prune --all --force`，Build Cache 105/10.92 GB→0；逐ID核验并删除零容器引用的旧Playwright v1.51.1、alpha.37专用builder/migrate和PostgreSQL 16测试基镜像。发现`df -h`的30G仅为29.19 GiB舍入值后继续按精确字节门禁，最终达到30.34 GiB即停止。根盘17→30.34 GiB、containerd 24→8.9 GB；当前/回滚/被拒证据及历史Web镜像、Trae/MySQL、备份、Python/SQLite和四卷保持，四服务restart0/OOM false
 
@@ -266,7 +268,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前风险
 
-- `SELFHOST-PRODUCTION-READINESS-40`已确认三类首要生产风险：PostgreSQL及三个文件数据域没有异机当前锚点/隔离恢复；源码alpha.44/0041与UAT alpha.42/0040没有闭合为同一候选；物料导入fallback和默认`npm test`不足以通过生产安全/发布门。详见[投产准入基线](PRODUCTION_READINESS.md)
+- `SELFHOST-PRODUCTION-READINESS-40`确认的首要风险继续开放。TASK41只关闭G1合成/隔离工具缺口：PostgreSQL及三个文件数据域仍没有真实异机当前锚点/恢复/RTO；源码alpha.44/0041与UAT alpha.42/0040仍未闭合；物料导入fallback和默认`npm test`仍不足以通过生产安全/发布门。详见[投产准入基线](PRODUCTION_READINESS.md)
 - Docker构建缓存不会自动受控清理，连续候选构建和保留回滚镜像仍会再次消耗根盘；本次只恢复到精确30.34 GiB并保留5.942 GB Docker标记的未用镜像空间，不授权自动prune。未来重任务仍须先检查根盘，清理必须另按精确对象和保护清单执行
 
 - D-113与D-114均已由项目负责人接受，`AGENT-R1`与PM-002已完成，`AGENT-R1-5`正在实现合成协议MVP；这些仍不提供R2运行时强制力。直到R2/R3以后通过越权、脑裂、租约失效、资源和恢复负测，角色权限仍依赖现有仓库规则与人工流程，不能宣称已由OS、容器、命令代理或短时凭据技术强制
@@ -329,7 +331,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- `SELFHOST-PRODUCTION-READINESS-40`已完成并暂时回到零`DOING`：三条只读审计与主智能体复核建立`PRODUCTION NO-GO`基线、十二项门禁、PR-001—PR-007和G0—G10依赖路线。下一安全任务为`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`；它只允许合成/隔离数据和仓库内工具，不读取当前卷或连接异机目标。
+- `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成并暂时回到零`DOING`：D-115四域V2工具与41/41合同、双集群隔离恢复通过。G2真实异机备份/恢复因外部目标与专项授权阻塞；下一安全任务转入G3发布身份闭合、release manifest、Migration allowlist和强制`test:release`，仍不build/deploy或读取当前卷。
 - 真实异机备份与恢复、UAT build/Migration/deploy、旧数据读取、员工试用、账号/权限、网络/systemd和正式切换仍须专项明确授权；持续交付授权不改变这些边界。
 
 - 项目负责人已接受D-113与D-114；`AGENT-R1`只读控制器、`PM-002`执行设计和`AGENT-R1-5`合成docs/test协议MVP均已完成。当前零`DOING`并回到`IDLE`，不自动启动R2或恢复TASK03。
