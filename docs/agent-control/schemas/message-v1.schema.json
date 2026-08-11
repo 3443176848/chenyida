@@ -501,6 +501,9 @@
         "properties": {
           "evidence": {
             "items": {"properties": {"exit_code": {"enum": [0, null]}}}
+          },
+          "tests": {
+            "items": {"properties": {"result": {"const": "PASS"}}}
           }
         }
       }

@@ -640,6 +640,26 @@ class NativeMvpProtocolTest(unittest.TestCase):
 
         self.assertEqual(error_code(self.bundle), "EVIDENCE_STATUS_INCONSISTENT")
 
+    def test_unknown_test_result_cannot_support_passing_disposition(self) -> None:
+        disposition = message(self.bundle, 9)
+        disposition["evidence"][0].update({"kind": "TEST_REPORT", "exit_code": None})
+        disposition["tests"] = [
+            {
+                "id": "T-001",
+                "command_id": "minority-disposition-probe",
+                "environment": "in-memory synthetic fixture",
+                "result": "RESULT_UNKNOWN",
+                "exit_code": None,
+                "artifact": "E-001",
+            }
+        ]
+        rebind_message_evidence(self.bundle, disposition)
+
+        self.assertEqual(
+            error_code(self.bundle),
+            "PASSING_MESSAGE_TEST_OUTCOME_INVALID",
+        )
+
     def test_unresolved_minority_report_fails_closed(self) -> None:
         message(self.bundle, 9)["resolves_claim_ids"] = []
 

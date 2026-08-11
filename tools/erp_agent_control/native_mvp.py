@@ -28,7 +28,7 @@ try:
 except ImportError:  # Direct script execution.
     from readonly_controller import validate_task_packet
 
-VALIDATOR_VERSION = "0.5.2"
+VALIDATOR_VERSION = "0.5.3"
 BUNDLE_SCHEMA = "chenyida-erp-native-pilot-bundle/v2"
 REPORT_SCHEMA = "chenyida-erp-native-pilot-report/v1"
 CONTEXT_SCHEMA = "erp-agent-context/v1"
@@ -1010,6 +1010,10 @@ def _validate_message_structure(
         item["exit_code"] not in {None, 0} for item in evidence
     ):
         raise ProtocolProblem("EVIDENCE_STATUS_INCONSISTENT", subject)
+    if message["status"] in {"PASS", "COMPLETE"} and any(
+        test["result"] != "PASS" for test in message["tests"]
+    ):
+        raise ProtocolProblem("PASSING_MESSAGE_TEST_OUTCOME_INVALID", subject)
     if message["role"] in {"INDEPENDENT_VERIFIER", "BLACK_BOX_VERIFIER"}:
         test_results = [test["result"] for test in message["tests"]]
         valid_outcome = {

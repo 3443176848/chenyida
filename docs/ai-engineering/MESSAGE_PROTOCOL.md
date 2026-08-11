@@ -112,7 +112,7 @@ Agent之间只通过有界结构化消息交接。聊天记录、思维过程和
 - `HUMAN_AUTHORIZATION`：项目文档中可定位的决定/任务状态，不保存聊天秘密或凭据；
 - `RESOURCE_SNAPSHOT`：内存、Swap、磁盘、Load、容器restart/OOM和临时资源清单。
 
-Evidence必须可定位、绑定时间和候选SHA、能够由另一身份复核。R1.5 Bundle还必须声明严格artifact注册表：每个record含classification、JSON payload及其重算SHA-256；所有Context和Message locator必须存在且不得有未引用record。Message的`input.artifacts`集合必须与Evidence locator集合相等，Evidence摘要和规范payload必须匹配注册表。测试引用只能指向本消息Evidence且一个Evidence不能重复支撑多个Test；所有`TEST_REPORT`/`BLACK_BOX_OBSERVATION`都必须被引用。普通测试必须是`TEST_REPORT`；`BLACK_BOX_OBSERVATION`只能由`BLACK_BOX_VERIFIER`使用并必须来自公开黑盒locator，任何其他角色携带该类型都失败关闭。测试与Evidence的exit code必须完全相同。QA/黑盒`PASS`要求全体测试PASS；`FAIL`/`VETOED`至少一个FAIL且不得混入unknown；`RESULT_UNKNOWN`至少一个unknown且不得混入FAIL。`PASS/COMPLETE`消息也不得携带非零exit code的Evidence。Agent自然语言总结只能引用Evidence，不能替代Evidence。包含凭据、完整敏感正文、SQL错误堆栈或真实个人信息的工件必须拒绝进入控制存储。
+Evidence必须可定位、绑定时间和候选SHA、能够由另一身份复核。R1.5 Bundle还必须声明严格artifact注册表：每个record含classification、JSON payload及其重算SHA-256；所有Context和Message locator必须存在且不得有未引用record。Message的`input.artifacts`集合必须与Evidence locator集合相等，Evidence摘要和规范payload必须匹配注册表。测试引用只能指向本消息Evidence且一个Evidence不能重复支撑多个Test；所有`TEST_REPORT`/`BLACK_BOX_OBSERVATION`都必须被引用。普通测试必须是`TEST_REPORT`；`BLACK_BOX_OBSERVATION`只能由`BLACK_BOX_VERIFIER`使用并必须来自公开黑盒locator，任何其他角色携带该类型都失败关闭。测试与Evidence的exit code必须完全相同。QA/黑盒`PASS`要求全体测试PASS；`FAIL`/`VETOED`至少一个FAIL且不得混入unknown；`RESULT_UNKNOWN`至少一个unknown且不得混入FAIL。任何`PASS/COMPLETE`消息携带的测试都必须全部为`PASS`，并且不得携带非零exit code的Evidence；`FAIL`、`RESULT_UNKNOWN`或`NOT_RUN`测试不能作为少数意见处置或收口证据。Agent自然语言总结只能引用Evidence，不能替代Evidence。包含凭据、完整敏感正文、SQL错误堆栈或真实个人信息的工件必须拒绝进入控制存储。
 
 ## 5. 消息验证与幂等
 
