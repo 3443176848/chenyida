@@ -10,7 +10,7 @@
 | Phase 1 | 物料主数据 | 6 | PLANNED |
 | Phase 2 | 导入采集与 Mapping | 8 | DONE（非生产） |
 | Phase 3 | 导入规范化、暂存与审阅 | 4 | DONE（非生产实现完成） |
-| Phase 4 | AI治理 | 5 | PLANNED（TASK01 DONE；TASK02 DONE / DETERMINISTIC THRESHOLDS APPROVED / RELEASE NOT AUTHORIZED；TASK03 DOING / SOURCE READY / HOLDOUT REVALIDATION REQUIRED / RELEASE NOT AUTHORIZED；TASK04—TASK05 TODO） |
+| Phase 4 | AI治理 | 5 | PAUSED（TASK01 DONE；TASK02 DONE / DETERMINISTIC THRESHOLDS APPROVED / RELEASE NOT AUTHORIZED；TASK03 BLOCKED / OWNER PRIORITY HOLD / SOURCE READY / HOLDOUT REVALIDATION REQUIRED / RELEASE NOT AUTHORIZED；TASK04—TASK05 TODO） |
 | Phase 5 | ERP融合 | 10 个已授权任务 | DONE（非生产并行验收） |
 | Phase 6 | 行业物料库 | 4 | PLANNED |
 
@@ -156,10 +156,10 @@ D-110不授权模型调用、外部供应商、真实数据外发、生产试点
 
 **目标**：用单任务、最小能力、独立验证和可恢复有界循环保护ERP研发，而不把Agent共识当作业务、发布或生产授权。
 
-**当前状态**：PM-001/D-113、AGENT-R1和PM-002已完成；D-114已接受，`AGENT-R1-5`为唯一DOING。R2—R5均未授权。
+**当前状态**：PM-001/D-113、AGENT-R1、PM-002及D-114限定的`AGENT-R1-5`均已完成；当前零DOING/`IDLE`。R2—R5均未授权。
 
 - `R1`：无状态只读控制器（DONE；只读巡检、READY/IDLE，不具备调度或强制权限）。
-- `R1.5`：Codex原生临时编排MVP（DOING / AGENT-R1-5；Task Packet v2、Message/Context合同、单写者、独立门禁和合成黑盒，不含daemon/数据库/UAT/部署）。
+- `R1.5`：Codex原生临时编排MVP（DONE / AGENT-R1-5；Task Packet v2、Message/Context合同、单写者、独立门禁和合成黑盒已验证；仍不含daemon、Control Store、OS级身份、数据库、UAT或部署能力）。
 - `R2`：独立身份、worktree、路径租约、Control Store、命令/秘密代理和重任务锁（NOT AUTHORIZED）。
 - `R3`：有界开发循环、检查点、fencing、retry/deadlock和恢复负测（NOT AUTHORIZED）。
 - `R4`：逐动作授权的受控非生产UAT（NOT AUTHORIZED）。

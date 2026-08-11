@@ -2,19 +2,24 @@
 
 最后更新时间：2026-08-11（Asia/Shanghai）
 
-## AGENT-R1-5 Native-Orchestrated Design MVP（已立项并启动）
+## AGENT-R1-5 Native-Orchestrated Design MVP（完成；无运行时权限）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / NATIVE_PROTOCOL_MVP_IMPLEMENTING / NO_RUNTIME_AUTHORITY | `AGENT-R1-5`是唯一DOING；只实施合成docs/test协议、无状态验证和临时角色门禁，不建立后台Runtime |
-| D-114 | ACCEPTED / AGENT-R1-5 ONLY | 项目负责人明确接受D-114；只授权R1.5限定范围，R2—R5、ERP产品任务和运行面能力未授权 |
-| 允许路径 | CONTROL DOCS/TOOLS ONLY | `tools/erp_agent_control/**`、`docs/agent-control/**`、`docs/ai-engineering/**`、任务和项目治理Markdown；主Agent唯一写者 |
-| 独立角色 | NATIVE / READ ONLY GATES | ERP、对抗、安全、QA及Black-box使用临时原生Agent；不得修改候选或代替负责人授权 |
-| 数据/运行面 | SYNTHETIC ONLY / NO CONNECTION | 不读真实资料，不连接UAT/生产/数据库/网络，不使用D-112产品五表，不部署 |
-| ERP影响 | ZERO PRODUCT CHANGE | 不修改Node/Python ERP业务或测试代码、Schema/Migration、API/UI/Worker、package、版本和部署配置 |
-| 严格起点 | PASS WITH OWNER UNTRACKED INPUT | `main@4dd4abea…94c0a`、唯一worktree、public本地ahead204；用户未跟踪状态报告保持不读、不改、不提交 |
-| 资源起点 | PASS / LIGHT ONLY | available约2.2 GiB、Swap354 MiB、根盘17 GiB、Load`0.07/0.16/0.24`，内核OOM0、四服务restart0/OOM false；Compose因缺DATABASE_URL失败关闭且不读取env |
-| TASK03 | BLOCKED / OWNER_PRIORITY_HOLD | alpha.44/0041 source-ready事实不变；holdout、build、UAT Migration、部署和TASK04/TASK05继续禁止 |
+| 最终状态 | DONE / NATIVE_PROTOCOL_MVP_COMPLETE / SYNTHETIC_DOCS_TEST_ONLY / NO_RUNTIME_AUTHORITY | `AGENT-R1-5`已完成并回到零DOING/`IDLE`；没有自动启动下一任务 |
+| D-114 | ACCEPTED / IMPLEMENTED WITHIN AGENT-R1-5 ONLY | 项目负责人明确接受并授权R1.5限定范围；R2—R5、ERP产品任务和运行面能力仍未授权 |
+| 协议实现 | PASS / STRICT VERSIONED CONTRACTS | Task Packet v2、Message v1、Context Manifest v1严格Schema，R1 v2巡检和Python标准库无状态validator已交付；不引入依赖或持久控制状态 |
+| 最终候选 | PASS / `25cbbfa` | 最终实现`25cbbfab87925a8601b844fe59c634ae0b651297`；从协议起点到候选恰好20条控制文档/工具允许路径，无ERP产品、产品测试、Schema/Migration或部署路径 |
+| 独立门禁 | PASS / 5 OF 5 SAME CANDIDATE | ERP、Security、Adversarial、QA及全新Source-blind Black-box均绑定同一candidate、revision 2、lease 1和Context摘要；Reviewer未修改候选 |
+| Schema/摘要 | PASS / FINAL SET BOUND | 最终五份Message通过最终Schema；Context canonical digest、声明工件byte digest、input/evidence locator逐项绑定，26个Message ID唯一。历史收据不可变且不冒充最终接受集 |
+| 专项测试 | PASS / 134 | 协议87/87、只读控制器47/47；validator `0.5.4`有效bundle双跑逐字节一致，stdout SHA-256为`f9923bb0…35d2`；DOING时R1实况`READY`且errors空 |
+| 黑盒 | PASS / PUBLIC FIXTURE ONLY | 四个风险派生Persona全部expected=observed；隔离容器禁网、只读rootfs、cap-drop ALL、no-new-privileges、单一只读fixture、256 MiB/1 CPU/64 PID。首次权限失败关闭，第二次PASS，两容器均删除；新Agent仅读三个公开工件独立PASS |
+| Python基线 | PASS / LOCAL ONLY | `SELF_TEST_OK`、`SMOKE_TEST_OK`、127.0.0.1:18889且`--no-backup`的`GO_LIVE_CHECK_OK`；未连接UAT/生产 |
+| ERP/数据影响 | ZERO PRODUCT CHANGE / NO RUNTIME ACCESS | 未修改Node/Python ERP业务/测试、产品Schema/Migration、API/UI/Worker、package、版本或部署配置；未使用D-112产品五表，未访问UAT/生产、网络或业务数据库 |
+| Git/审计 | FOCUSED COMMITS / NO PUSH | 实现与十一个修复提交至`25cbbfa`，84份审查证据提交`ace4dc5`，治理以`docs: close native agent MVP`独立收口；owner未跟踪状态报告不读、不改、不提交，未fetch/push |
+| 资源/清理 | PASS / NO THRESHOLD BREACH | 起点/最终available约`2.2/2.2 GiB`、Swap`354/357 MiB`、根盘`17/17 GiB`、Load`0.07/0.16/0.24`→`0.05/0.13/0.20`；内核OOM0、四服务restart0/OOM false、四卷完整，任务容器和Python缓存清零，无数据库/镜像/Volume/prune |
+| 未实现能力 | EXPLICIT / R2 NOT AUTHORIZED | R1.5不具备OS级Agent身份、强制路径租约、持久Control Store、daemon、Capability Broker、秘密代理、后台循环、UAT或生产拒绝权；Prompt边界不宣称技术强制 |
+| TASK03 | BLOCKED / OWNER_PRIORITY_HOLD | alpha.44/0041 source-ready事实不变；`PHASE4-TASK03`继续`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，holdout、build、UAT Migration、部署和TASK04/TASK05继续禁止 |
 
 ## PM-002 晨亿达ERP多智能体执行设计（完成；未实施）
 
@@ -37,7 +42,7 @@
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 最终状态 | DONE / READ_ONLY_CONTROLLER_COMPLETE / NO_RUNTIME_AUTHORITY | AGENT-R1收口时零DOING并返回`IDLE`；现有AGENT-R1-5活动状态由上方记录，R1仍不会自动恢复TASK03或启动R2 |
+| 最终状态 | DONE / READ_ONLY_CONTROLLER_COMPLETE / NO_RUNTIME_AUTHORITY | AGENT-R1收口时零DOING并返回`IDLE`；后续AGENT-R1-5完成状态由上方记录，R1仍不会自动恢复TASK03或启动R2 |
 | D-113 | ACCEPTED / R1 COMPLETE | 项目负责人已接受D-113；R1观察型实现完成。R2—R5、OS/容器隔离、Control Store、租约、Policy/Capability Broker和Agent Runtime仍未实施或授权 |
 | Owner优先级 | PASS / ORDERED | `PHASE4-TASK03 DOING→BLOCKED / OWNER_PRIORITY_HOLD`，随后`AGENT-R1 TODO→DOING→DONE`；TASK03原source-ready/holdout/release限定不变，无并行DOING |
 | 实现 | PASS / STATELESS READ ONLY | Python标准库CLI、版本化Task Packet和说明文档；固定读取Git、治理Markdown、package及Migration文件，只向stdout输出确定性JSON，不创建控制库、缓存、日志、报告或锁 |

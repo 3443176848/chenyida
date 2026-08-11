@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-`AGENT-R1-5`是唯一`DOING`任务，状态为`DOING / NATIVE_PROTOCOL_MVP_IMPLEMENTING / SYNTHETIC_DOCS_TEST_ONLY / NO_RUNTIME_AUTHORITY`。项目负责人已接受D-114；本任务只实现Task Packet v2、Message/Context Schema、无状态验证、合成原生角色试点和源盲黑盒fixture，不修改ERP业务/Schema/Migration，不访问UAT/生产，不部署。`PHASE4-TASK03`继续保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
+当前零`DOING`任务，控制面应返回`IDLE`且不得自动认领下一任务。`AGENT-R1-5`已按D-114完成`DONE / NATIVE_PROTOCOL_MVP_COMPLETE / SYNTHETIC_DOCS_TEST_ONLY / NO_RUNTIME_AUTHORITY`；`PHASE4-TASK03`继续保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，只有项目负责人另行明确指示才能恢复。
 
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
@@ -21,11 +21,13 @@
 
 2026-08-11第四次调度事件：项目负责人明确接受D-114并授权`AGENT-R1-5`，状态按`AGENT-R1-5 TODO → DOING`切换唯一active slot。范围固定为合成docs/test协议MVP和Codex原生临时角色验证；R2—R5、ERP业务、Schema/Migration、UAT/生产、网络、模型、部署及Git push均未授权，TASK03的owner hold保持。
 
+2026-08-11第五次调度事件：`AGENT-R1-5`完成Task/Message/Context合同、无状态validator、合成故障/恢复试点和源盲黑盒验证，状态按`AGENT-R1-5 DOING → DONE`收口并回到零DOING/`IDLE`。最终同候选ERP/Security/Adversarial/QA/Black-box门禁均PASS，134项专项回归和本地Python三基线通过；没有自动启动R2—R5或恢复`PHASE4-TASK03`。
+
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| AGENT-R1-5 | 实现Native-Orchestrated Design MVP | DOING | Codex主Agent（唯一实施写者/编排/收口）、临时原生Agent（ERP/对抗/安全/QA/黑盒只读门禁）、项目负责人（接受D-114并固定合成范围） | 2026-08-11 | - | PM-001、PM-002、D-113、D-114、AGENT-R1、AGENTS.md | `DOING / NATIVE_PROTOCOL_MVP_IMPLEMENTING / SYNTHETIC_DOCS_TEST_ONLY / NO_RUNTIME_AUTHORITY`。只允许Task Packet v2、Message/Context Schema、无状态验证器、合成候选/失败恢复/Minority Report及源盲黑盒fixture；不修改ERP业务/测试、Schema/Migration或运行面，不访问UAT/生产、不部署、不push。见[任务文档](../tasks/AGENT-R1-5.md)。 |
+| AGENT-R1-5 | 实现Native-Orchestrated Design MVP | DONE | Codex主Agent（唯一实施写者/编排/收口）、临时原生Agent（ERP/对抗/安全/QA/黑盒只读门禁）、项目负责人（接受D-114并固定合成范围） | 2026-08-11 | 2026-08-11 | PM-001、PM-002、D-113、D-114、AGENT-R1、AGENTS.md | `DONE / NATIVE_PROTOCOL_MVP_COMPLETE / SYNTHETIC_DOCS_TEST_ONLY / NO_RUNTIME_AUTHORITY`。最终实现候选`25cbbfa`，ERP/Security/Adversarial/QA/Black-box五门同候选PASS，协议87/87、控制器47/47及本地Python三基线通过；审查证据提交`ace4dc5`。未修改ERP业务/测试、Schema/Migration或运行面，未访问UAT/生产、未部署或push；R2—R5未授权，TASK03继续冻结。见[任务文档](../tasks/AGENT-R1-5.md)及[审查证据](../agent-control/reviews/AGENT-R1-5/README.md)。 |
 | PM-002 | 补全晨亿达ERP多智能体研发系统执行设计 | DONE | Codex（现场核验、架构/角色/权限/消息/状态/真黑盒/恢复/资源/ERP边界/路线、验证与独立提交）、项目负责人（限定docs-only范围并负责D-114及后续阶段选择） | 2026-08-11 | 2026-08-11 | PM-001、D-113、AGENT-R1、AGENTS.md、当前项目权威文档与PHASE4合同 | `DONE / DESIGN COMPLETE / IMPLEMENTATION NOT STARTED`。新增[执行设计包](../ai-engineering/README.md)和[任务文档](../tasks/PM-002.md)，直接回答15项问题；推荐4个常驻逻辑职责由1个确定性进程承载、0常驻LLM、任务期动态角色/专家、单写者/独立门禁/真黑盒及native-first R1.5。D-114仍为PROPOSED；未修改业务/测试/Schema/Migration/API/package/部署，未访问UAT/生产、运行holdout/build/deploy或实现Runtime。 |
 | AGENT-R1 | 实现晨亿达ERP只读研发控制器 | DONE | Codex（只读控制器、机器可读Task Packet、错误注入/恢复测试、文档与独立提交）、项目负责人（接受D-113、固定owner priority hold及R1只读边界） | 2026-08-11 | 2026-08-11 | PM-001、D-113、AGENTS.md、项目权威文档链 | `DONE / READ_ONLY_CONTROLLER_COMPLETE / NO_RUNTIME_AUTHORITY`。标准库CLI只读取本地Git、治理Markdown、package与Migration文件并向stdout输出确定性JSON；24/24专项测试、仓库`READY`实况、重复输出/工作区不变及三项本地Python基线通过。完成后零DOING返回`IDLE`且不自动启动下一任务。未连接UAT/生产、运行Migration/build/deploy或修改ERP业务代码；R2—R5仍未实施或授权。见[任务文档](../tasks/AGENT-R1.md)。 |
 | PM-001 | 设计晨亿达ERP多智能体研发系统 | DONE | Codex（事实核验、角色/权限/流程/状态/循环/ERP门禁、三项独立终审、验证与提交）、项目负责人（明确设计范围并以本次指令切换优先级） | 2026-08-11 | 2026-08-11 | `ERP_CURRENT_STATUS_REPORT.md`、AGENTS.md、D-040、D-110—D-112、`PHASE4-TASK03` owner priority hold | `DESIGN COMPLETE`。新增[系统设计](../AI_AGENT_TEAM_DESIGN.md)，定义24个逻辑角色、能力权限、单一写者、Task Packet、三层状态、知识/决定/Bug/技术债、两阶段Git/状态协议、租约/fencing/预算/检查点和ERP硬门禁；PM-001收口时D-113仍为PROPOSED且运行控制面未实施，后续接受与R1完成由独立AGENT-R1任务记录。PM-001只改六份治理Markdown，未改代码/Schema/Migration/API/测试/版本/部署，未连接UAT/生产或写业务数据。 |

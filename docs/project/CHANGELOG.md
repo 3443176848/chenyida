@@ -4,6 +4,17 @@
 
 ## 2026-08-11
 
+### AGENT-R1-5 - `feat: add native ERP agent protocol MVP` / repair series / `docs: record native agent review evidence` / `docs: close native agent MVP`
+
+- 实现：交付严格`chenyida-erp-agent-task/v2`、`erp-agent-message/v1`和`erp-agent-context/v1` Schema，扩展R1只读控制器支持v2，并新增Python标准库无状态validator。协议绑定单一写者、六角色唯一身份/能力/可见性、candidate/revision/lease、Context和artifact摘要、Evidence/Test、旧候选失效、VETO/Minority Report处置、checkpoint和`RESULT_UNKNOWN`恢复；Schema无法表达的跨数组身份关系由执行前标准库validator强制且文档明确披露。
+- 合成试点：确定性bundle覆盖候选拒绝→修复、ERP/安全/对抗/QA门禁、旧PASS失效、Reviewer写入、路径/文件读取、重复/未知/错误摘要、Minority Report及恢复边界。最终候选固定为`25cbbfab87925a8601b844fe59c634ae0b651297`；从协议起点`1f55696b…d2f`到候选恰好20条允许控制文档/工具路径，无ERP产品、产品测试、Schema/Migration或部署路径。
+- 独立门禁：ERP、Security、Adversarial、QA及全新源码盲审Black-box五份最终Message均绑定candidate `25cbbfa`、revision 2、lease 1和各自Context Manifest摘要并PASS。最终Message Schema、Context canonical digest、声明工件byte digest、input/evidence locator对应及26个Message ID唯一性通过；历史旧候选收据保留不可变，已知旧Security收据按最终Schema预期失败。
+- 黑盒：只公开合成retry接口及按四类observable risk派生的四个Persona。第一次受限容器因UID 65534无权读取root-owned mode-0600 fixture而在执行前失败关闭；第二次在network none、只读rootfs、cap-drop ALL、no-new-privileges、单一只读fixture挂载、256 MiB、1 CPU、64 PID下返回四Persona PASS。两次均无OOM且仅见`/fixture`挂载，容器精确删除；随后全新Blind-box Agent只读三份公开工件独立PASS。
+- 验证：协议unittest 87/87、控制器unittest 47/47，共134项通过；validator `0.5.4`对有效bundle双跑逐字节一致，stdout SHA-256为`f9923bb07c39e0bf3d62fb1383b200551429a7a7678d3b33bbf0c6339dc235d2`。R1在DOING时`READY`/errors空；本地Python `SELF_TEST_OK`、`SMOKE_TEST_OK`和127.0.0.1:18889/no-backup `GO_LIVE_CHECK_OK`通过。产品Node lint/build不适用于本控制面增量且未运行；公开Node黑盒runner已在隔离容器实际通过。
+- Git/审计：起始状态提交`1f55696`，实现`470519c`，随后十一个聚焦失败关闭修复至最终候选`25cbbfa`；84份历史/最终审查证据由`ace4dc5`独立提交。治理收口使用本条标题中的独立`docs: close native agent MVP`提交，实际SHA以`git log`为准。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，未fetch/push或修改远端。
+- 资源/清理：起点/最终available约`2.2/2.2 GiB`、Swap`354/357 MiB`、根盘`17/17 GiB`、Load`0.07/0.16/0.24`→`0.05/0.13/0.20`；内核OOM0，四服务restart0/OOM false，四个受保护Volume保持。Compose状态检查因必需env缺失而失败关闭且未读取env重试；任务容器及五个任务期Python缓存文件清零，无测试数据库/镜像/Volume，未prune。
+- 收口/边界：`AGENT-R1-5 DOING→DONE`后零DOING/`IDLE`，不自动启动下一任务。未修改ERP业务/测试、产品Schema/Migration、API/UI/Worker、package、版本或部署配置，未执行holdout、模型、数据库、网络、UAT/生产、build、Migration、备份恢复、Compose变更、部署或发布。`PHASE4-TASK03`继续冻结，R2—R5、OS级身份、Control Store、强制lease和Capability Broker仍未授权。
+
 ### AGENT-R1-5 - `docs: start native ERP agent MVP`
 
 - 决策/调度：项目负责人明确接受D-114并授权`AGENT-R1-5`，台账从零DOING按`AGENT-R1-5 TODO→DOING`切换唯一active task。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，不自动恢复。

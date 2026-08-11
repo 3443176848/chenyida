@@ -1591,7 +1591,7 @@
 ## D-114 研发多智能体采用原生编排优先、零常驻LLM与真黑盒隔离
 
 - 日期：2026-08-11
-- 状态：`ACCEPTED / AGENT-R1-5 AUTHORIZED / R1.5 IMPLEMENTATION STARTED / R2-R5 NOT AUTHORIZED`
+- 状态：`ACCEPTED / AGENT-R1-5 COMPLETE / R1.5 NATIVE PROTOCOL MVP COMPLETE / R2-R5 NOT AUTHORIZED`
 - 提案人：Codex（按`PM-002`执行设计要求形成提案）
 - 确认人：项目负责人（2026-08-11明确接受D-114并授权`AGENT-R1-5`限定实施）
 
@@ -1626,7 +1626,15 @@
 
 - 2026-08-11，项目负责人明确“接受 D-114”，并要求创建、启动`AGENT-R1-5`，按R1.5 Native-Orchestrated Design MVP实施。
 - 授权精确限定为合成docs/test试点、版本化Task/Message/Context合同、无状态验证、原生临时角色和源盲黑盒fixture；不修改ERP业务、Schema/Migration，不访问UAT/生产，不部署，并继续冻结`PHASE4-TASK03`。
-- 接受决定不等于R1.5已经完成，也不授权Control Store、daemon、OS/容器身份、强制lease、Capability Broker、网络、数据库、Git push或R2—R5。
+- 在授权时点，接受决定不等于R1.5已经完成；它也不授权Control Store、daemon、OS/容器身份、强制lease、Capability Broker、网络、数据库、Git push或R2—R5。后续完成事实由下节独立记录。
+
+### R1.5 implementation record
+
+- `AGENT-R1-5`已于2026-08-11按精确授权完成。Task Packet v2、Message v1、Context Manifest v1三份严格Schema，R1 v2只读巡检，Python标准库无状态validator，确定性合成候选/拒绝/修复/Minority Report/RESULT_UNKNOWN试点及公开源盲黑盒fixture均已交付。
+- 最终实现候选为`25cbbfab87925a8601b844fe59c634ae0b651297`。ERP合同、安全、对抗、QA与全新Black-box Agent五道独立门禁都绑定该候选、revision 2、lease 1及各自Context摘要并PASS；审查证据由独立提交`ace4dc5`固化，历史失败/VETO收据保持不可变。
+- 协议专项87/87、控制器专项47/47通过；validator `0.5.4`双跑stdout逐字节一致。本地Python `SELF_TEST_OK`、`SMOKE_TEST_OK`、loopback/no-backup `GO_LIVE_CHECK_OK`通过。黑盒只挂载公开合成fixture、断网、只读rootfs且资源受限；首次权限错误在执行前失败关闭，修正后的第二次运行PASS，两个临时容器均删除。
+- R1.5完成只证明Git内协议、证据绑定和原生临时角色流程可在合成范围运行；Prompt/会话边界不等于OS强制身份或运行时授权。Control Store、daemon、持久lease/fencing、Capability Broker、秘密/命令代理、UAT/生产和R2—R5继续为`NOT_IMPLEMENTED / NOT_AUTHORIZED`。
+- 实施未修改ERP业务/测试、产品Schema/Migration、package、版本或部署配置，未访问UAT/生产、网络或业务数据库，未执行holdout、模型、build、Migration、备份恢复、Compose变更、部署或Git push。完成后零DOING/`IDLE`，`PHASE4-TASK03`继续原`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
 
 ### Rejected alternatives
 

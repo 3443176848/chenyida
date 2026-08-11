@@ -37,12 +37,12 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`及`PM-002`已完成；项目负责人现已接受D-114并创建、启动`AGENT-R1-5`作为唯一DOING。R1.5只实现Task/Message/Context合同、无状态验证、合成docs/test原生角色试点和源盲黑盒fixture；OS/容器身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT_AUTHORIZED` |
+| 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成，当前零DOING/`IDLE`。R1.5已交付Task/Message/Context合同、无状态验证、合成docs/test原生角色试点和源盲黑盒fixture；OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT_AUTHORIZED` |
 | 当前版本 | AI Suggestion/Evidence源码候选为`0.1.0-alpha.44`，源码Migration为41/head `0041_ai_governance_suggestion_evidence.sql`；并行非生产UAT Web仍为`0.1.0-alpha.42`原镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，运行source revision仍为`569aa954d764309e239d1f6c174e582596d33a24`，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。alpha.44/0041未build、未部署或应用到UAT；当前运行面仍是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
 | 当前根仓库运维基线 | `SELFHOST-UAT-FIX-38`已把通过候选Web-only部署到并行非生产UAT；本地/公开alpha.42 health、Caddy安全头、匿名保护、未来日期422、合法日期4次预览、四种返回修改、390×844和安全退出通过。唯一warehouse登录/退出各1，Business mutation及Receipt POST0；最终Session0、收货及全部下游0。独立收口提交消息为`ops: deploy warehouse receipt date guard`，实际SHA以Git log为准 |
-| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。AGENT-R1与PM-002提交事实不变；AGENT-R1-5从唯一worktree、`main@4dd4abea02fe876665c8721e57d81f300da94c0a`启动，public本地跟踪behind0/ahead204。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；本任务不fetch/push或改动远端，公开origin继续禁止接收内部历史 |
+| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。AGENT-R1-5从唯一worktree、`main@4dd4abea02fe876665c8721e57d81f300da94c0a`启动；最终实现候选为`25cbbfab87925a8601b844fe59c634ae0b651297`，审查证据提交为`ace4dc5`，治理收口提交消息为`docs: close native agent MVP`且实际SHA以Git log为准。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；本任务未fetch/push或改动远端，公开origin继续禁止接收内部历史 |
 | 镜像恢复锚点 | D-109的private GHCR镜像恢复锚点已建立：唯一目标/tag为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，一次push返回、认证registry与唯一tag package version三方digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association、无`latest`/额外tag；linux/amd64 child、attestation、config和9层均匹配预检，一次按digest pull完全匹配，匿名读取返回401。一次性本机凭据已logout并清理；项目负责人证明已通过GitHub网页撤销一次性PAT，本项目未读取或技术验证PAT正文/远端状态 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
@@ -51,15 +51,17 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0041`，41/head`0041_ai_governance_suggestion_evidence.sql`且SHA-256为`676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2`；并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`，0035/0040及更早Migration未修改。0041只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `AGENT-R1-5 NATIVE PROTOCOL MVP IMPLEMENTATION / SYNTHETIC DOCS-TEST ONLY / NO RUNTIME AUTHORITY`。D-114已接受，但R1.5只验证Git内协议与临时角色协作，不建立R2强制隔离或后台运行能力 |
-| 当前任务 | `AGENT-R1-5`是唯一`DOING`，状态为`DOING / NATIVE_PROTOCOL_MVP_IMPLEMENTING / NO_RUNTIME_AUTHORITY`。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED` |
-| 下一任务 | 只完成并验收`AGENT-R1-5`；完成后回到`IDLE`，不自动启动R2或恢复`PHASE4-TASK03`。任何holdout、build、UAT Migration、部署、TASK04/TASK05、外部模型、真实数据、真实Receipt、生产或切流继续需要独立明确授权 |
+| 当前阶段 | `IDLE / AGENT-R1-5 NATIVE PROTOCOL MVP COMPLETE / SYNTHETIC DOCS-TEST ONLY / NO RUNTIME AUTHORITY`。D-114限定实现已完成，但R1.5只验证Git内协议与临时角色协作，不建立R2强制隔离或后台运行能力 |
+| 当前任务 | 当前零`DOING`。`AGENT-R1-5`为`DONE / NATIVE_PROTOCOL_MVP_COMPLETE / NO_RUNTIME_AUTHORITY`；`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED` |
+| 下一任务 | 无自动下一任务。R2或`PHASE4-TASK03`恢复、holdout、build、UAT Migration、部署、TASK04/TASK05、外部模型、真实数据、真实Receipt、生产或切流均继续需要独立明确授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
-- PM-002已交付[多智能体研发系统执行设计包](../ai-engineering/README.md)：基于alpha.44/0041源码、alpha.42/0040 UAT、三运行面、11业务身份、测试/权限/服务结构和低资源实况，定义4个常驻逻辑职责/0常驻LLM、任务期动态角色/专家、七维能力、结构化消息、真黑盒、Minority Report及native-first路线。PM-002收口时D-114仍为提案；项目负责人现已另行接受并启动限定`AGENT-R1-5`，不追溯改写PM-002历史
+- AGENT-R1-5已交付[Native-Orchestrated Design MVP](../tasks/AGENT-R1-5.md)及[审查证据](../agent-control/reviews/AGENT-R1-5/README.md)：三份版本化Schema、R1 v2巡检、Python标准库无状态validator、确定性合成试点、单写者/角色/证据/候选/lease约束和源盲黑盒完成。最终候选`25cbbfa`的ERP/Security/Adversarial/QA/Black-box五门均PASS，专项87+47=134项及本地Python三基线通过；完成后零DOING/IDLE。它没有OS级身份、持久控制状态或运行时权限，也未修改ERP产品或访问UAT/生产
+
+- PM-002已交付[多智能体研发系统执行设计包](../ai-engineering/README.md)：基于alpha.44/0041源码、alpha.42/0040 UAT、三运行面、11业务身份、测试/权限/服务结构和低资源实况，定义4个常驻逻辑职责/0常驻LLM、任务期动态角色/专家、七维能力、结构化消息、真黑盒、Minority Report及native-first路线。PM-002收口时D-114仍为提案；项目负责人随后另行接受并完成限定`AGENT-R1-5`，不追溯改写PM-002历史
 
 - AGENT-R1已交付[无状态只读控制器](../../tools/erp_agent_control/readonly_controller.py)与[机器可读Task Packet](../agent-control/task-packets/AGENT-R1.json)：固定读取本地Git、治理文档、package与Migration文件，验证D-113、零/唯一DOING、任务/路径/基线/版本/Migration漂移并只向stdout输出确定性JSON。24/24专项测试、仓库`READY`实况、重复输出/工作区不变、收口后`IDLE`及三项本地Python基线通过；R1没有Control Store、租约、调度、网络、数据库或执行能力
 
@@ -239,7 +241,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前未完成模块
 
-- PM-001控制面设计、D-113接受、`AGENT-R1`只读控制器和PM-002执行设计已完成；D-114现已接受且`AGENT-R1-5`限定R1.5实施中。R2隔离身份/路径租约/能力代理、R3有界开发循环、R4受控UAT和R5生产候选仍未实施或授权，不得从路线表自动开始
+- PM-001控制面设计、D-113接受、`AGENT-R1`只读控制器、PM-002执行设计及D-114限定的`AGENT-R1-5` R1.5合成MVP已完成。R2隔离身份/路径租约/能力代理、R3有界开发循环、R4受控UAT和R5生产候选仍未实施或授权，不得从路线表自动开始
 - PostgreSQL dump与uploads、attachments、backup-status文件卷的异机数据恢复锚点没有建立；TASK39已由项目负责人主动延期并行政关闭，单机数据恢复风险继续`OPEN`，未来必须重新立项和授权
 - 大批量流程的通用批次执行器、来源档案注册表、init/resume/validate/consolidate 命令和代表性试点尚未实现；当前 TASK07 脚本只能作为已知 8 份来源的参考，不得直接宣称支持所有公司资料
 - LANDING-TASK07 工作簿仍有 57 行单机用量和 21 行板型待人工补充，A200 4 处模板/旧版差异与 J587 标题版本冲突待业务确认；正式去重、内部编码、审核、数据库导入和下游 BOM 引用均未执行
@@ -321,7 +323,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 项目负责人已接受D-113与D-114；`AGENT-R1`只读控制器和`PM-002`执行设计已完成，`AGENT-R1-5`现为唯一`DOING`。本任务只实施合成docs/test协议MVP；完成后回到IDLE，不自动启动R2或恢复TASK03。
+- 项目负责人已接受D-113与D-114；`AGENT-R1`只读控制器、`PM-002`执行设计和`AGENT-R1-5`合成docs/test协议MVP均已完成。当前零`DOING`并回到`IDLE`，不自动启动R2或恢复TASK03。
 - `PHASE4-TASK03`的D-112五表及确定性候选Service/API仍为alpha.44/0041源码就绪，状态保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。外部AI禁用，正式holdout未重跑，源码未build/deploy，UAT仍alpha.42/0040，`PHASE4-TASK04`—`TASK05`保持`TODO`且不得自动开始。
 - `SELFHOST-UAT-FIX-37`已完成：功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`及语义修正`20a9123741862d81ac18af9e6bdee896674fe95c`；alpha.41/0040关系化收货证据、最小权限谱系、权威GET预览、最终POST事务门禁、提前到货保护和按inspection mode分流已Web-only部署为`sha256:0cf98937…5f19`。正式备份/第二库恢复/0039→0040及warehouse-only桌面/390×844取消UAT通过；business POST0、Session0，PO/Line/Plan/queue `1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。这是FIX38前置历史；真实收货及后续部门动作均须另获授权。
 - `SELFHOST-UAT-FIX-36`已完成：功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`；通用受限读模型、数据域403、PO聚合及完整上游谱系、四Line、四Plan/queue、Event/Audit/Idempotency最小投影和响应式只读详情已Web-only部署为`sha256:664e0ac6…a4ec89`。正式备份恢复、purchase-only桌面/390×844刷新重开和Session失效通过；business POST0，PO/Line/Plan/queue `1/4/4/4`及下游全0。这是FIX37的前置历史，不是当前执行指令。
