@@ -162,17 +162,46 @@ export const materialVersions = pgTable("material_versions", {
 
 export const materialImportBatches = pgTable("material_import_batches", {
   id: bigserial("id", { mode: "number" }).primaryKey(), batchNo: text("batch_no").notNull(), sourceKind: text("source_kind").notNull(), status: text("status").notNull().default("CREATED"),
-  retryOfBatchId: bigint("retry_of_batch_id", { mode: "number" }), createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
+  retryOfBatchId: bigint("retry_of_batch_id", { mode: "number" }).references((): AnyPgColumn => materialImportBatches.id, { onDelete: "restrict" }), createdBy: text("created_by").notNull().references(() => appUsers.username, { onDelete: "restrict" }),
   currentVersion: integer("current_version").notNull().default(1), currentParseRunId: bigint("current_parse_run_id", { mode: "number" }), currentNormalizationRunId: bigint("current_normalization_run_id", { mode: "number" }),
   fileCount: integer("file_count").notNull().default(0), totalRows: integer("total_rows").notNull().default(0), acceptedRows: integer("accepted_rows").notNull().default(0), rejectedRows: integer("rejected_rows").notNull().default(0),
   failureStage: text("failure_stage"), failureCode: text("failure_code"), failureMessage: text("failure_message"), createdAt: timestamptz("created_at").notNull().defaultNow(), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
-}, (t) => [uniqueIndex("material_import_batches_no_uq").on(t.batchNo), index("material_import_batches_owner_created_idx").on(t.createdBy, t.createdAt), index("material_import_batches_status_created_idx").on(t.status, t.createdAt), check("material_import_batches_version_ck", sql`${t.currentVersion} > 0`)]);
+}, (t) => [uniqueIndex("material_import_batches_no_uq").on(t.batchNo), index("material_import_batches_owner_created_idx").on(t.createdBy, t.createdAt), index("material_import_batches_status_created_idx").on(t.status, t.createdAt), index("material_import_batches_retry_idx").on(t.retryOfBatchId).where(sql`${t.retryOfBatchId} is not null`), check("material_import_batches_version_ck", sql`${t.currentVersion} > 0`), check("material_import_batches_retry_not_self_ck", sql`${t.retryOfBatchId} is null or ${t.retryOfBatchId} <> ${t.id}`), check("material_import_batches_counts_ck", sql`${t.fileCount} between 0 and 1 and ${t.totalRows} >= 0 and ${t.acceptedRows} >= 0 and ${t.rejectedRows} >= 0 and ${t.acceptedRows}+${t.rejectedRows} <= ${t.totalRows}`)]);
 
 export const materialImportFiles = pgTable("material_import_files", {
   id: bigserial("id", { mode: "number" }).primaryKey(), batchId: bigint("batch_id", { mode: "number" }).notNull().references(() => materialImportBatches.id, { onDelete: "restrict" }),
   storageName: uuid("storage_name").notNull(), relativePath: text("relative_path").notNull(), originalFilename: text("original_filename").notNull(), mimeType: text("mime_type").notNull(), sha256: text("sha256").notNull(), sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
-  storageStatus: text("storage_status").notNull().default("STORED"), createdAt: timestamptz("created_at").notNull().defaultNow(), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
-}, (t) => [uniqueIndex("material_import_files_batch_uq").on(t.batchId), uniqueIndex("material_import_files_path_uq").on(t.relativePath), index("material_import_files_sha_idx").on(t.sha256), check("material_import_files_sha_ck", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`), check("material_import_files_size_ck", sql`${t.sizeBytes} > 0`)]);
+  stagingRelativePath: text("staging_relative_path"), filenameExtension: text("filename_extension"), declaredMimeType: text("declared_mime_type"), declaredSha256: text("declared_sha256"), declaredSizeBytes: bigint("declared_size_bytes", { mode: "number" }),
+  detectedFileType: text("detected_file_type"), actualSha256: text("actual_sha256"), actualSizeBytes: bigint("actual_size_bytes", { mode: "number" }),
+  storageStatus: text("storage_status").notNull().default("STORED"), securityCheckStatus: text("security_check_status").notNull().default("NOT_APPLICABLE"), securityFailureCode: text("security_failure_code"), securityFailureMessage: text("security_failure_message"), securityWarningCodes: jsonb("security_warning_codes").notNull().default([]),
+  uploadedAt: timestamptz("uploaded_at"), promotedAt: timestamptz("promoted_at"), createdAt: timestamptz("created_at").notNull().defaultNow(), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("material_import_files_batch_uq").on(t.batchId),
+  uniqueIndex("material_import_files_id_batch_uq").on(t.id, t.batchId),
+  uniqueIndex("material_import_files_storage_name_uq").on(t.storageName),
+  uniqueIndex("material_import_files_path_uq").on(t.relativePath),
+  uniqueIndex("material_import_files_staging_path_uq").on(t.stagingRelativePath).where(sql`${t.stagingRelativePath} is not null`),
+  index("material_import_files_sha_idx").on(t.sha256),
+  index("material_import_files_actual_sha_idx").on(t.actualSha256).where(sql`${t.actualSha256} is not null`),
+  index("material_import_files_recovery_idx").on(t.storageStatus, t.updatedAt).where(sql`${t.storageStatus} in ('STAGING','STAGED','RECONCILIATION_REQUIRED','DELETE_PENDING')`),
+  check("material_import_files_sha_ck", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
+  check("material_import_files_size_ck", sql`${t.sizeBytes} > 0`),
+  check("material_import_files_declared_sha_ck", sql`${t.declaredSha256} is null or ${t.declaredSha256} ~ '^[0-9a-f]{64}$'`),
+  check("material_import_files_declared_size_ck", sql`${t.declaredSizeBytes} is null or ${t.declaredSizeBytes} between 1 and 10485760`),
+  check("material_import_files_actual_sha_ck", sql`${t.actualSha256} is null or ${t.actualSha256} ~ '^[0-9a-f]{64}$'`),
+  check("material_import_files_actual_size_ck", sql`${t.actualSizeBytes} is null or ${t.actualSizeBytes} > 0`),
+  check("material_import_files_extension_ck", sql`${t.filenameExtension} is null or ${t.filenameExtension} in ('.csv','.xls','.xlsx')`),
+  check("material_import_files_detected_type_ck", sql`${t.detectedFileType} is null or ${t.detectedFileType} in ('CSV','XLS','XLSX')`),
+  check("material_import_files_storage_status_ck", sql`${t.storageStatus} in ('STAGING','STAGED','STORED','RECONCILIATION_REQUIRED','STORAGE_FAILED','DELETE_PENDING','DELETED')`),
+  check("material_import_files_security_status_ck", sql`${t.securityCheckStatus} in ('NOT_APPLICABLE','NOT_STARTED','PENDING','BASIC_CHECK_PASSED','REJECTED','LEGACY_UNVERIFIED')`),
+  check("material_import_files_warning_codes_ck", sql`jsonb_typeof(${t.securityWarningCodes})='array' and pg_column_size(${t.securityWarningCodes})<=4096`),
+  check("material_import_files_actual_facts_ck", sql`(${t.actualSha256} is null) = (${t.actualSizeBytes} is null)`),
+  check("material_import_files_declared_facts_ck", sql`(${t.declaredSha256} is null) = (${t.declaredSizeBytes} is null)`),
+  check("material_import_files_metadata_bounds_ck", sql`(${t.stagingRelativePath} is null or ${t.stagingRelativePath} ~ '^material-import/\\.staging/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.ready$') and (${t.declaredMimeType} is null or (length(btrim(${t.declaredMimeType})) between 1 and 255 and ${t.declaredMimeType} !~ '[[:cntrl:]]')) and (${t.securityFailureCode} is null or ${t.securityFailureCode} ~ '^[A-Z][A-Z0-9_]{0,99}$') and (${t.securityFailureMessage} is null or length(${t.securityFailureMessage}) between 1 and 500)`),
+  check("material_import_files_security_failure_ck", sql`(${t.securityCheckStatus}='REJECTED' and ${t.securityFailureCode} is not null) or (${t.securityCheckStatus}<>'REJECTED' and ${t.securityFailureCode} is null and ${t.securityFailureMessage} is null)`),
+  check("material_import_files_timestamps_ck", sql`${t.promotedAt} is null or (${t.uploadedAt} is not null and ${t.promotedAt}>=${t.uploadedAt})`),
+  check("material_import_files_passed_facts_ck", sql`${t.securityCheckStatus} <> 'BASIC_CHECK_PASSED' or (${t.storageStatus} in ('STORED','DELETE_PENDING','DELETED') and ${t.actualSha256} is not null and ${t.actualSizeBytes} is not null and ${t.declaredSha256} is not null and ${t.declaredSizeBytes} is not null and ${t.filenameExtension} is not null and ${t.detectedFileType} is not null and ${t.declaredSha256}=${t.actualSha256} and ${t.declaredSizeBytes}=${t.actualSizeBytes} and ${t.sha256}=${t.actualSha256} and ${t.sizeBytes}=${t.actualSizeBytes} and ${t.uploadedAt} is not null and ${t.promotedAt} is not null and ((${t.filenameExtension}='.csv' and ${t.detectedFileType}='CSV') or (${t.filenameExtension}='.xls' and ${t.detectedFileType}='XLS') or (${t.filenameExtension}='.xlsx' and ${t.detectedFileType}='XLSX')))`),
+]);
 
 export const materialImportRows = pgTable("material_import_rows", {
   id: bigserial("id", { mode: "number" }).primaryKey(), batchId: bigint("batch_id", { mode: "number" }).notNull().references(() => materialImportBatches.id, { onDelete: "restrict" }),
@@ -1492,7 +1521,70 @@ export const materialDuplicateCandidates = pgTable("material_duplicate_candidate
 
 export const materialImportIdempotency = pgTable("material_import_idempotency", {
   id: bigserial("id", { mode: "number" }).primaryKey(), username: text("username").notNull().references(() => appUsers.username, { onDelete: "restrict" }), method: text("method").notNull(), routeScope: text("route_scope").notNull(), keyDigest: text("key_digest").notNull(), requestDigest: text("request_digest").notNull(), operationId: uuid("operation_id").notNull(), state: text("state").notNull(), batchId: bigint("batch_id", { mode: "number" }).references(() => materialImportBatches.id, { onDelete: "restrict" }), fileId: bigint("file_id", { mode: "number" }).references(() => materialImportFiles.id, { onDelete: "restrict" }), response: jsonb("response"), statusCode: integer("status_code"), leaseToken: uuid("lease_token"), leaseExpiresAt: timestamptz("lease_expires_at"), expiresAt: timestamptz("expires_at"), recoveryUntil: timestamptz("recovery_until").notNull(), createdAt: timestamptz("created_at").notNull().defaultNow(), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
-}, (t) => [uniqueIndex("material_import_idempotency_scope_uq").on(t.username, t.method, t.routeScope, t.keyDigest), uniqueIndex("material_import_idempotency_operation_uq").on(t.operationId)]);
+}, (t) => [
+  uniqueIndex("material_import_idempotency_scope_uq").on(t.username, t.method, t.routeScope, t.keyDigest),
+  uniqueIndex("material_import_idempotency_operation_uq").on(t.operationId),
+  index("material_import_idempotency_lease_idx").on(t.state, t.leaseExpiresAt).where(sql`${t.state}='PENDING'`),
+  index("material_import_idempotency_recovery_idx").on(t.state, t.recoveryUntil, t.id).where(sql`${t.state}='PENDING'`),
+  check("material_import_idempotency_method_ck", sql`${t.method} in ('POST','PUT','DELETE')`),
+  check("material_import_idempotency_state_ck", sql`${t.state} in ('PENDING','COMPLETED')`),
+  check("material_import_idempotency_key_digest_ck", sql`${t.keyDigest} ~ '^[0-9a-f]{64}$'`),
+  check("material_import_idempotency_request_digest_ck", sql`${t.requestDigest} ~ '^[0-9a-f]{64}$'`),
+  check("material_import_idempotency_lease_ck", sql`(${t.leaseToken} is null) = (${t.leaseExpiresAt} is null)`),
+  check("material_import_idempotency_completion_ck", sql`(${t.state}='PENDING' and ${t.response} is null and ${t.statusCode} is null and ${t.leaseToken} is not null) or (${t.state}='COMPLETED' and ${t.response} is not null and ${t.statusCode} between 200 and 599 and ${t.leaseToken} is null and ${t.expiresAt} is not null)`),
+  check("material_import_idempotency_response_ck", sql`${t.response} is null or (jsonb_typeof(${t.response})='object' and pg_column_size(${t.response})<=65536)`),
+  check("material_import_idempotency_route_ck", sql`length(btrim(${t.routeScope})) between 1 and 255`),
+  check("material_import_idempotency_recovery_ck", sql`${t.recoveryUntil} > ${t.createdAt} and (${t.expiresAt} is null or (${t.expiresAt}>${t.createdAt} and ${t.recoveryUntil}>=${t.expiresAt})) and (${t.leaseExpiresAt} is null or ${t.leaseExpiresAt}>${t.createdAt})`),
+  check("material_import_idempotency_file_batch_ck", sql`${t.fileId} is null or ${t.batchId} is not null`),
+  foreignKey({
+    columns: [t.fileId, t.batchId],
+    foreignColumns: [materialImportFiles.id, materialImportFiles.batchId],
+    name: "material_import_idempotency_file_batch_fk",
+  }).onDelete("restrict"),
+]);
+
+export const materialImportUploadOperations = pgTable("material_import_upload_operations", {
+  operationId: uuid("operation_id").primaryKey().references(() => materialImportIdempotency.operationId, { onDelete: "restrict" }),
+  batchId: bigint("batch_id", { mode: "number" }).notNull().references(() => materialImportBatches.id, { onDelete: "restrict" }),
+  expectedBatchVersion: integer("expected_batch_version").notNull(),
+  declaredFilename: text("declared_filename").notNull(),
+  filenameExtension: text("filename_extension").notNull(),
+  declaredMimeType: text("declared_mime_type").notNull().default(""),
+  declaredSha256: text("declared_sha256").notNull(),
+  declaredSizeBytes: bigint("declared_size_bytes", { mode: "number" }).notNull(),
+  duplicateAction: text("duplicate_action").notNull(),
+  stagingRelativePath: text("staging_relative_path").notNull(),
+  finalRelativePath: text("final_relative_path").notNull(),
+  phase: text("phase").notNull().default("PREPARED"),
+  failureCode: text("failure_code"),
+  failureMessage: text("failure_message"),
+  stagedAt: timestamptz("staged_at"),
+  checkedAt: timestamptz("checked_at"),
+  promotedAt: timestamptz("promoted_at"),
+  completedAt: timestamptz("completed_at"),
+  requestId: uuid("request_id").notNull(),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("material_import_upload_operations_batch_uq").on(t.batchId),
+  uniqueIndex("material_import_upload_operations_staging_path_uq").on(t.stagingRelativePath),
+  uniqueIndex("material_import_upload_operations_final_path_uq").on(t.finalRelativePath),
+  index("material_import_upload_operations_recovery_idx").on(t.phase, t.updatedAt, t.operationId).where(sql`${t.phase} in ('PREPARED','STAGED','SECURITY_PASSED','PROMOTED','RECONCILIATION_REQUIRED')`),
+  check("material_import_upload_operations_version_ck", sql`${t.expectedBatchVersion} > 0`),
+  check("material_import_upload_operations_filename_ck", sql`length(btrim(${t.declaredFilename})) between 1 and 255 and position('/' in ${t.declaredFilename})=0 and position(chr(92) in ${t.declaredFilename})=0 and ${t.declaredFilename} !~ '[[:cntrl:]]'`),
+  check("material_import_upload_operations_extension_ck", sql`${t.filenameExtension} in ('.csv','.xls','.xlsx')`),
+  check("material_import_upload_operations_mime_ck", sql`length(${t.declaredMimeType}) <= 255 and ${t.declaredMimeType} !~ '[[:cntrl:]]'`),
+  check("material_import_upload_operations_sha_ck", sql`${t.declaredSha256} ~ '^[0-9a-f]{64}$'`),
+  check("material_import_upload_operations_size_ck", sql`${t.declaredSizeBytes} between 1 and 10485760`),
+  check("material_import_upload_operations_duplicate_action_ck", sql`${t.duplicateAction} in ('REJECT','ALLOW_DUPLICATE')`),
+  check("material_import_upload_operations_staging_path_ck", sql`${t.stagingRelativePath}='material-import/.staging/'||${t.operationId}::text||'.ready'`),
+  check("material_import_upload_operations_final_path_ck", sql`${t.finalRelativePath}='material-import/'||${t.batchId}::text||'/'||${t.operationId}::text||${t.filenameExtension}`),
+  check("material_import_upload_operations_phase_ck", sql`${t.phase} in ('PREPARED','STAGED','SECURITY_PASSED','PROMOTED','PUBLISHED','FAILED','RECONCILIATION_REQUIRED')`),
+  check("material_import_upload_operations_failure_ck", sql`(${t.phase} in ('FAILED','RECONCILIATION_REQUIRED') and ${t.failureCode} is not null) or (${t.phase} not in ('FAILED','RECONCILIATION_REQUIRED') and ${t.failureCode} is null and ${t.failureMessage} is null)`),
+  check("material_import_upload_operations_failure_bounds_ck", sql`(${t.failureCode} is null or ${t.failureCode} ~ '^[A-Z][A-Z0-9_]{0,99}$') and (${t.failureMessage} is null or length(${t.failureMessage}) between 1 and 500)`),
+  check("material_import_upload_operations_lifecycle_ck", sql`(${t.stagedAt} is null or ${t.stagedAt}>=${t.createdAt}) and (${t.checkedAt} is null or (${t.stagedAt} is not null and ${t.checkedAt}>=${t.stagedAt})) and (${t.promotedAt} is null or (${t.checkedAt} is not null and ${t.promotedAt}>=${t.checkedAt})) and (${t.completedAt} is null or (${t.completedAt}>=${t.createdAt} and (${t.phase} in ('PUBLISHED','FAILED') or ${t.phase}='RECONCILIATION_REQUIRED')))`),
+  check("material_import_upload_operations_phase_facts_ck", sql`(${t.phase}='PREPARED' and ${t.stagedAt} is null and ${t.checkedAt} is null and ${t.promotedAt} is null and ${t.completedAt} is null) or (${t.phase}='STAGED' and ${t.stagedAt} is not null and ${t.checkedAt} is null and ${t.promotedAt} is null and ${t.completedAt} is null) or (${t.phase}='SECURITY_PASSED' and ${t.stagedAt} is not null and ${t.checkedAt} is not null and ${t.promotedAt} is null and ${t.completedAt} is null) or (${t.phase}='PROMOTED' and ${t.stagedAt} is not null and ${t.checkedAt} is not null and ${t.promotedAt} is not null and ${t.completedAt} is null) or (${t.phase}='PUBLISHED' and ${t.stagedAt} is not null and ${t.checkedAt} is not null and ${t.promotedAt} is not null and ${t.completedAt} is not null) or (${t.phase}='FAILED' and ${t.completedAt} is not null) or ${t.phase}='RECONCILIATION_REQUIRED'`),
+]);
 
 export const supplierMappings = pgTable("supplier_mappings", {
   id: bigserial("id", { mode: "number" }).primaryKey(), materialId: bigint("material_id", { mode: "number" }).notNull().references(() => materialMaster.id, { onDelete: "restrict" }),

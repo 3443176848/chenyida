@@ -288,6 +288,13 @@
       "when": 1786377930102,
       "tag": "0041_ai_governance_suggestion_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1786519714980,
+      "tag": "0042_material_import_fallback_safety",
+      "breakpoints": true
     }
   ]
 }

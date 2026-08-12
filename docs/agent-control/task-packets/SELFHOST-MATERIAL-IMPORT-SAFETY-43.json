@@ -2,7 +2,7 @@
   "schema_version": "chenyida-erp-agent-task/v1",
   "task": {
     "id": "SELFHOST-MATERIAL-IMPORT-SAFETY-43",
-    "revision": 2,
+    "revision": 5,
     "ledger_state": "DOING",
     "delivery_stage": "IMPLEMENTATION",
     "qualifiers": [
@@ -19,9 +19,9 @@
     "source_version": "0.1.0-alpha.44",
     "source_migration": {
       "first_number": 1,
-      "head_number": 41,
-      "head_filename": "0041_ai_governance_suggestion_evidence.sql",
-      "head_sha256": "676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2"
+      "head_number": 42,
+      "head_filename": "0042_material_import_fallback_safety.sql",
+      "head_sha256": "c0eeab63bc51f1d1dd96805b43e78c83c5ef5e0a5d5712a08a0308c95b9385bf"
     },
     "uat": {
       "version": "0.1.0-alpha.42",
@@ -41,6 +41,7 @@
       "chenyida_erp_site/app/lib/material-import-fallback/handler.ts",
       "chenyida_erp_site/app/lib/material-import-fallback/local-file-store.ts",
       "chenyida_erp_site/app/lib/material-import/multipart.ts",
+      "chenyida_erp_site/app/lib/material-import/file-security.ts",
       "chenyida_erp_site/app/materials/_components/material-import-create-page.tsx",
       "chenyida_erp_site/app/materials/_lib/material-import.ts",
       "chenyida_erp_site/db/schema.ts",
@@ -57,6 +58,7 @@
       "chenyida_erp_site/tests/selfhost-material-import-fallback-handler.test.mjs",
       "chenyida_erp_site/tests/selfhost-material-import-fallback-postgres.test.mjs",
       "chenyida_erp_site/tests/selfhost-material-import-fallback-migration.test.mjs",
+      "chenyida_erp_site/tests/selfhost-material-import-fallback-postgres.sh",
       "chenyida_erp_site/tests/selfhost-worker-resilience.test.mjs",
       "chenyida_erp_site/tests/material-import-ui.test.mjs",
       "chenyida_erp_site/worker/selfhost.ts",
