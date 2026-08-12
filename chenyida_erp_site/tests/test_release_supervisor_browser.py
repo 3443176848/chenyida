@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 SITE_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_POLICY_SHA256 = "84d14eed19d12df6a0d0e0dfa03c3b6096e2643cbc86371db782fa705a6901c9"
+EXPECTED_POLICY_SHA256 = "2ac6f4f38dc6a63c18a1beff5e287e1e074b5c9f1e8545b9f8fc09a1a7b9e775"
 EXPECTED_BROWSER_IMAGE = "mcr.microsoft.com/playwright@sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961"
 EXPECTED_EXECUTABLE_SHA256 = "efb2bece6f2f5bc00dc270162d2241c86d509ca4f4297b1eb0f5cd8894d050be"
 
@@ -81,6 +81,35 @@ class ReleaseSupervisorBrowserTest(unittest.TestCase):
         self.assertIn("summary.skipped !== 0 || summary.todo !== 0", source)
         self.assertIn("await verifyReleaseTestInventory", source)
         self.assertNotIn("...process.env", source)
+
+    def test_required_browser_flows_use_current_workbench_auth_contract(self):
+        paths = [
+            "tests/selfhost-planning-revision-response-browser.test.mjs",
+            "tests/selfhost-purchase-traceability-browser.test.mjs",
+            "tests/selfhost-requirement-unit-resolution-browser.test.mjs",
+            "tests/selfhost-rfq-binding-fix19-browser.test.mjs",
+            "tests/selfhost-rfq-traceability-fix22-browser.test.mjs",
+            "tests/selfhost-supplier-mapping-browser.test.mjs",
+        ]
+        obsolete_locators = (
+            'name: "登录晨亿达 ERP"',
+            'name:"登录晨亿达 ERP"',
+            'name: "登录", exact: true',
+            'name:"登录",exact:true',
+            'name: "经营工作台", exact: true',
+            'name:"经营工作台",exact:true',
+            'name: "退出", exact: true',
+            'name:"退出",exact:true',
+        )
+        for path in paths:
+            source = (SITE_ROOT / path).read_text(encoding="utf-8")
+            with self.subTest(path=path):
+                self.assertIn("欢迎使用晨亿达 ERP", source)
+                self.assertIn("登录工作台", source)
+                self.assertIn("角色工作台", source)
+                self.assertIn("安全退出", source)
+                for locator in obsolete_locators:
+                    self.assertNotIn(locator, source)
 
     def test_node_gate_dispatches_browser_action_without_unavailable_marker(self):
         source = (SITE_ROOT / "scripts" / "run-release-node-sandbox.sh").read_text(encoding="utf-8")

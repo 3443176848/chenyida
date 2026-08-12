@@ -1117,7 +1117,7 @@
     },
     {
       "path": "tests/selfhost-planning-revision-response-browser.test.mjs",
-      "sha256": "96b634e8e84327f29ed12dcb07698320d5b1f454d90fe858ad6fcc9d3b5f6069",
+      "sha256": "94406d5840636fd964a122c0823bbb2a872ef4ff09375e8e2c74e9883ea28b3c",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -1684,7 +1684,7 @@
     },
     {
       "path": "tests/selfhost-purchase-traceability-browser.test.mjs",
-      "sha256": "0e717f11fa57e6df3a2409b927173a66eea7a373d138d80ea423182cbc5e6c67",
+      "sha256": "13788f7c33c79d489f120fc282729559f85b293600dc0ab5c2066bbc12dd7af3",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -1792,7 +1792,7 @@
     },
     {
       "path": "tests/selfhost-requirement-unit-resolution-browser.test.mjs",
-      "sha256": "e62925637104a1a569b2efb6ddacd0b2d26c58c3c93ec16d02f5b5002a0983b8",
+      "sha256": "b9faee740b4aef64002526fe09658a1be6195ca77de23d071b080e7987177340",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -1846,7 +1846,7 @@
     },
     {
       "path": "tests/selfhost-rfq-binding-fix19-browser.test.mjs",
-      "sha256": "1b080bac56a311ed41db3ad7d491b3d6cfe1b6c6dcb2c826c355282886cb2cc0",
+      "sha256": "3f2a5694a166b14e06dc5209a0f9b1f4c39b31c3df6f7065055583d0ddb19be9",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -2008,7 +2008,7 @@
     },
     {
       "path": "tests/selfhost-supplier-mapping-browser.test.mjs",
-      "sha256": "9d07e9346947575091e98f0e86407d6c41418a5fd77fe1259acc126065658094",
+      "sha256": "a3d3ddaba73287d9620754dbacd4c49a207bd70fcd77f370485ff1b3aca7e428",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",

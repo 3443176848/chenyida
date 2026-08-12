@@ -146,21 +146,21 @@ async function seedSyntheticFixture() {
 
 async function login(page, credentials) {
   await page.goto(`${browserOrigin}/`, { waitUntil: "domcontentloaded" });
-  await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "欢迎使用晨亿达 ERP", exact: true }).waitFor();
   await page.getByLabel("账号", { exact: true }).fill(credentials.username);
   await page.getByLabel("密码", { exact: true }).fill(credentials.password);
   const responsePromise = page.waitForResponse((response) => response.url() === `${browserOrigin}/api/login` && response.request().method() === "POST");
-  await page.getByRole("button", { name: "登录", exact: true }).click();
+  await page.getByRole("button", { name: "登录工作台", exact: true }).click();
   const response = await responsePromise;
   assert.equal(response.status(), 200, "synthetic browser user login must succeed");
-  await page.getByRole("heading", { name: "经营工作台", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "角色工作台", exact: true }).waitFor();
 }
 
 async function logout(page) {
   await page.goto(`${browserOrigin}/`, { waitUntil: "domcontentloaded" });
-  await page.getByRole("heading", { name: "经营工作台", exact: true }).waitFor();
-  await page.getByRole("button", { name: "退出", exact: true }).click();
-  await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "角色工作台", exact: true }).waitFor();
+  await page.getByRole("button", { name: "安全退出", exact: true }).click();
+  await page.getByRole("heading", { name: "欢迎使用晨亿达 ERP", exact: true }).waitFor();
 }
 
 async function assertNoPageOverflow(page, stage) {

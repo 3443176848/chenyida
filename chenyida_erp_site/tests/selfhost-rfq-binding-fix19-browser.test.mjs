@@ -264,15 +264,15 @@ async function stopServer() {
 
 async function login(page, credentials) {
   await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" });
-  await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "欢迎使用晨亿达 ERP", exact: true }).waitFor();
   await page.getByLabel("账号", { exact: true }).fill(credentials.username);
   await page.getByLabel("密码", { exact: true }).fill(credentials.password);
   const response = page.waitForResponse(
     (item) => item.url() === `${REQUIRED_ORIGIN}/api/login` && item.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "登录", exact: true }).click();
+  await page.getByRole("button", { name: "登录工作台", exact: true }).click();
   assert.equal((await response).status(), 200);
-  await page.getByRole("heading", { name: "经营工作台", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "角色工作台", exact: true }).waitFor();
 }
 
 async function noOverflow(page, stage) {
@@ -460,8 +460,8 @@ test("isolated Chromium creates one stable-ID RFQ draft and no downstream record
     await noOverflow(page, "RFQ detail after refresh 390x844");
 
     await page.goto(`${REQUIRED_ORIGIN}/`, { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: "退出", exact: true }).click();
-    await page.getByRole("heading", { name: "登录晨亿达 ERP", exact: true }).waitFor();
+    await page.getByRole("button", { name: "安全退出", exact: true }).click();
+    await page.getByRole("heading", { name: "欢迎使用晨亿达 ERP", exact: true }).waitFor();
     assert.deepEqual(authPosts, ["/api/login", "/api/logout"]);
     assert.equal(Number((await pool.query(
       "select count(*) count from app_sessions where username=$1 and revoked_at is null and expires_at>now()",
