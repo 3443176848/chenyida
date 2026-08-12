@@ -43,7 +43,7 @@ test("versioned test inventory accounts for every top-level test and only exclud
   assert.equal(inventory.total_tests, RELEASE_TEST_INVENTORY_TOTAL);
   assert.equal(inventory.required_tests, RELEASE_TEST_INVENTORY_REQUIRED);
   assert.equal(inventory.not_applicable_tests, RELEASE_TEST_INVENTORY_NOT_APPLICABLE);
-  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 83, POSTGRES_ALIAS: 2, PURE_NODE: 112, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 4 });
+  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 83, POSTGRES_ALIAS: 2, PURE_NODE: 113, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 4 });
   assert.deepEqual(inventory.tests.filter((entry) => entry.category === "RELEASE_CONTRACT").map((entry) => entry.path), [
     "tests/selfhost-file-storage.test.mjs",
     "tests/selfhost-release-gate-contract.test.mjs",
@@ -106,6 +106,10 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.match(runner, /\.RepoDigests/);
   assert.match(runner, /expectedRepoDigest/);
   assert.match(runner, /expectedConfigDigest/);
+  assert.equal((runner.match(/\{\{with \(index \.State \\"Health\\"\)\}\}/g) || []).length, 2);
+  assert.doesNotMatch(runner, /\{\{if \.State\.Health\}\}/);
+  assert.doesNotMatch(runner, /\{\{if \.Config\.Healthcheck\}\}/);
+  assert.match(runner, /\["worker", new Set\(\["healthy"\]\)\]/);
   assert.doesNotMatch(runner, /const runEnvironment = \{ \.\.\.environment/);
   assert.doesNotMatch(runner, /process\.(?:stdout|stderr)\.write\(chunk\)/);
   assert.match(nodeSandbox, /--network none/);

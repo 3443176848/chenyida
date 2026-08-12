@@ -189,7 +189,9 @@ Dashboard 对旧 schema v1 只显示 `LEGACY_LOCAL_ONLY`，绝不视为可恢复
 - `assurance_status`：是否为预期异机接收方和预期不同集群上的恢复证据；
 - `recovery_ready`：仅当最新 `RESTORE_VERIFIED`、身份/策略/assurance 全匹配且未过期时为 true。
 
-缺少、损坏、过期、替换、伪造或配置不完整均失败关闭。即便 `recovery_ready=true`，也只证明指定回执链与当前运行身份匹配，不能替代真实迁移核对、业务 UAT、监控、员工试用或正式切换授权。
+Dashboard只读取固定名`latest.json`，并要求回执根解析为真实目录、root-owned、与Web reader同组且精确`2750`；marker必须是同一根内root-owned单硬链接普通文件并为`0400`或`0440`，回执必须是同一根内root-owned、reader组、单硬链接普通文件并精确`0640`。读取前后路径、device/inode、size、mtime、ctime、owner、mode或link count任一变化都失败关闭；符号链接、硬链接替换、group/world writable根和非法当前时间均为`INVALID`。
+
+浏览器/API只得到`backup_id`、结果枚举、验证时间、恢复点和过期时间的最小`latest_verification`投影，以及上列治理状态；不得返回数据库名、system identifier、OID、机器/集群/位置、文件路径、传输标识、原始摘要或完整回执。缺少、损坏、过期、替换、伪造或配置不完整均失败关闭。即便 `recovery_ready=true`，也只证明指定回执链与当前运行身份匹配，不能替代真实迁移核对、业务 UAT、监控、员工试用或正式切换授权。
 
 ## 9. 已验证与仍未完成
 

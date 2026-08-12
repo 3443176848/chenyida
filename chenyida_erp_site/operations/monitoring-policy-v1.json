@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-operations-monitoring-policy/v1",
+  "policy_id": "chenyida-erp-production-monitoring-v1",
+  "resource_policy_source": {
+    "path": "release/release-gate-plan-v1.json",
+    "sha256": "e51b4fdaf5870a7927af68b7f6e4fe1b014fb9e425bfc24330e1e64c7387aed2"
+  },
+  "observation_max_age_seconds": 120,
+  "max_clock_skew_seconds": 300,
+  "monitor_interval_seconds": 60,
+  "max_sample_gap_seconds": 90,
+  "reminder_interval_seconds": 3600,
+  "release_identity_max_age_seconds": 3600,
+  "max_active_alerts": 128,
+  "max_pending_events": 1024,
+  "service_health": [
+    {
+      "service": "caddy",
+      "health_required": false
+    },
+    {
+      "service": "postgres",
+      "health_required": true
+    },
+    {
+      "service": "web",
+      "health_required": true
+    },
+    {
+      "service": "worker",
+      "health_required": true
+    }
+  ],
+  "backup": {
+    "required_verification_status": "RESTORE_VERIFIED",
+    "require_identity_match": true,
+    "require_policy_match": true,
+    "require_assurance_match": true,
+    "require_recovery_ready": true
+  }
+}

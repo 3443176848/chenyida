@@ -37,6 +37,8 @@ docker compose -f compose.yml --profile tools run --rm admin
 
 Caddy持久化证书数据。只开放经批准的HTTP/HTTPS入口，不要暴露PostgreSQL。alpha.46候选的`web`和`worker`使用数值非root身份`65532:65532`，容器日志轮转、`unless-stopped`、Web/Worker健康检查和30秒Worker停机窗口已配置。0045部署编排必须等待旧Worker停止或租约过期，禁止手工改租约绕过排他。
 
+生产部署还必须安装与候选精确绑定的监控策略、root-only配置、受保护状态目录和真实值班通知target，并完成首次窗口预热及投递/恢复演练。监控的Docker模板必须安全处理不存在的health key：Caddy允许`none`，PostgreSQL/Web/Worker必须`healthy`；任何tag镜像、身份不一致、缺失证据或pending通知均不能作为上线绿色证据。当前仓库仅验证了监控合同，尚未授权host安装或真实通知，具体见[监控、告警与值班处置](operations-runbook.md#监控告警与值班处置)。
+
 ## 验证与升级
 
 ```bash

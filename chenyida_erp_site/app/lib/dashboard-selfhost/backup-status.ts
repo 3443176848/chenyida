@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type { BackupVerification, LegacyBackupVerification, RuntimeReleaseIdentity } from "./types.ts";
 
 const SHA=/^[0-9a-f]{64}$/,IMAGE=/^sha256:[0-9a-f]{64}$/,IDENTIFIER=/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
@@ -13,6 +13,7 @@ const FILES={postgresql_dump:"postgresql.dump",uploads:"uploads.tar.gz",attachme
 const LEGACY_FILES={postgresql_dump:"postgresql.dump",uploads:"uploads.tar.gz",attachments:"attachments.tar.gz"} as const;
 export const RUNTIME_RELEASE_IDENTITY_FILE="/run/chenyida-erp-release/release-identity.json";
 const RELEASE_IDENTITY_CONTRACT="chenyida-erp-runtime-release-identity/v2",RELEASE_ROOT_MARKER=".chenyida-erp-release-identity-root-v1",RELEASE_ROOT_MARKER_VALUE="chenyida-erp-release-identity-root/v1\n";
+const RECEIPT_ROOT_MARKER=".chenyida-erp-receipt-root-v2",RECEIPT_ROOT_MARKER_VALUE="chenyida-erp-receipt-root/v2\n";
 
 const iso=(value:unknown)=>typeof value==="string"&&ISO_UTC.test(value)&&!Number.isNaN(Date.parse(value));
 const record=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==="object"&&!Array.isArray(value);
@@ -98,23 +99,30 @@ async function configuredIdentity(runtime:RuntimeIdentity,releaseIdentityFile:st
 }
 
 async function safeStatusText(statusFile:string){
-  const before=await lstat(statusFile);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.size<2||before.size>512*1024||(before.mode&0o7022)!==0)throw new Error("unsafe");
-  const handle=await open(statusFile,constants.O_RDONLY|constants.O_NOFOLLOW);try{const opened=await handle.stat();if(opened.dev!==before.dev||opened.ino!==before.ino)throw new Error("replaced");const text=await handle.readFile("utf8");const after=await handle.stat();if(after.size!==opened.size||after.mtimeMs!==opened.mtimeMs)throw new Error("changed");return text;}finally{await handle.close();}
+  const gid=typeof process.getgid==="function"?process.getgid():-1,root=dirname(statusFile);if(gid<0||basename(statusFile)!=="latest.json"||await realpath(root)!==root)throw new Error("unsafe receipt path");
+  const rootStat=await lstat(root);if(!rootStat.isDirectory()||rootStat.isSymbolicLink()||rootStat.uid!==0||rootStat.gid!==gid||(rootStat.mode&0o7777)!==0o2750)throw new Error("unsafe receipt root");
+  const markerPath=join(root,RECEIPT_ROOT_MARKER),marker=await lstat(markerPath),markerMode=marker.mode&0o7777;if(!marker.isFile()||marker.isSymbolicLink()||marker.nlink!==1||marker.uid!==0||marker.gid!==gid||![0o400,0o440].includes(markerMode)||marker.size<2||marker.size>128||await trustedReleaseText(markerPath,gid,markerMode,128)!==RECEIPT_ROOT_MARKER_VALUE)throw new Error("unsafe receipt marker");
+  const before=await lstat(statusFile);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.uid!==0||before.gid!==gid||(before.mode&0o7777)!==0o640||before.size<2||before.size>512*1024)throw new Error("unsafe receipt");
+  const handle=await open(statusFile,constants.O_RDONLY|constants.O_NOFOLLOW);try{const opened=await handle.stat();if(opened.dev!==before.dev||opened.ino!==before.ino||opened.size!==before.size||opened.mtimeMs!==before.mtimeMs||opened.ctimeMs!==before.ctimeMs)throw new Error("receipt replaced");const text=await handle.readFile("utf8"),after=await handle.stat(),pathAfter=await lstat(statusFile);if(after.dev!==opened.dev||after.ino!==opened.ino||after.size!==opened.size||after.mtimeMs!==opened.mtimeMs||after.ctimeMs!==opened.ctimeMs||pathAfter.dev!==opened.dev||pathAfter.ino!==opened.ino||pathAfter.nlink!==1||pathAfter.uid!==0||pathAfter.gid!==gid||(pathAfter.mode&0o7777)!==0o640)throw new Error("receipt changed");return text;}finally{await handle.close();}
 }
 
+type SafeBackupVerification=Readonly<{backup_id:string;result:string;verified_at:string;recovery_point_at:string|null;expires_at:string|null}>;
+const safeVerification=(value:BackupVerification|LegacyBackupVerification):SafeBackupVerification=>"expires_at" in value?{backup_id:value.backup_id,result:value.result,verified_at:value.verified_at,recovery_point_at:value.consistency.recovery_point_at,expires_at:value.expires_at}:{backup_id:value.backup_id,result:"LEGACY_LOCAL_ONLY",verified_at:value.verified_at,recovery_point_at:null,expires_at:null};
+
 export async function backupGovernance(statusFile:string,options:{now?:Date;expectedIdentity?:BackupExpectedIdentity;runtimeIdentity?:RuntimeIdentity;releaseIdentityFile?:string}={}){
-  const base={mode:"OFFLINE_ONLY",browser_create_enabled:false,browser_restore_enabled:false,restore_target:"TASK_CREATED_DISPOSABLE_TEST_DATABASE_ONLY",cross_failure_domain_required:true,consistency:"QUIESCED_APPLICATION_AND_SNAPSHOT_WITH_CONTENT_RECONCILIATION",verification_status:"UNVERIFIED",identity_status:"UNCONFIGURED",policy_status:"UNCONFIGURED",assurance_status:"UNCONFIGURED",recovery_ready:false,latest_verification:null as BackupVerification|LegacyBackupVerification|null};
+  const base={mode:"OFFLINE_ONLY",browser_create_enabled:false,browser_restore_enabled:false,restore_target:"TASK_CREATED_DISPOSABLE_TEST_DATABASE_ONLY",cross_failure_domain_required:true,consistency:"QUIESCED_APPLICATION_AND_SNAPSHOT_WITH_CONTENT_RECONCILIATION",verification_status:"UNVERIFIED",identity_status:"UNCONFIGURED",policy_status:"UNCONFIGURED",assurance_status:"UNCONFIGURED",recovery_ready:false,latest_verification:null as SafeBackupVerification|null};
   try{
-    const raw=new StrictJson(await safeStatusText(statusFile)).parse(),legacy=parseLegacy(raw);if(legacy)return{...base,verification_status:"LEGACY_LOCAL_ONLY",latest_verification:legacy};
+    const suppliedNow=options.now||new Date(),now=suppliedNow instanceof Date?suppliedNow.getTime():Number.NaN;if(!Number.isFinite(now))return{...base,verification_status:"INVALID"};
+    const raw=new StrictJson(await safeStatusText(statusFile)).parse(),legacy=parseLegacy(raw);if(legacy)return{...base,verification_status:"LEGACY_LOCAL_ONLY",latest_verification:safeVerification(legacy)};
     const parsed=parseBackupVerification(raw);if(!parsed)return{...base,verification_status:"INVALID"};
-    const now=(options.now||new Date()).getTime(),created=Date.parse(parsed.created_at),verified=Date.parse(parsed.verified_at),recoveryPoint=Date.parse(parsed.consistency.recovery_point_at);if(created>now+5*60*1000||verified>now+5*60*1000||recoveryPoint>now+5*60*1000)return{...base,verification_status:"INVALID"};
+    const created=Date.parse(parsed.created_at),verified=Date.parse(parsed.verified_at),recoveryPoint=Date.parse(parsed.consistency.recovery_point_at);if(created>now+5*60*1000||verified>now+5*60*1000||recoveryPoint>now+5*60*1000)return{...base,verification_status:"INVALID"};
     const expected=options.expectedIdentity??await configuredIdentity(options.runtimeIdentity||{},options.releaseIdentityFile||RUNTIME_RELEASE_IDENTITY_FILE,now);
     const identityMatch=!!expected&&parsed.deployment.class===expected.deploymentClass&&parsed.deployment.id===expected.deploymentId&&parsed.deployment.database===expected.databaseName&&parsed.deployment.database_system_identifier===expected.databaseSystemIdentifier&&parsed.deployment.database_oid===expected.databaseOid&&parsed.deployment.database_marker===expected.databaseMarker&&parsed.deployment.database_server_major===expected.databaseServerMajor&&parsed.deployment.database_encoding===expected.databaseEncoding&&parsed.deployment.database_collate===expected.databaseCollate&&parsed.deployment.database_ctype===expected.databaseCtype&&parsed.deployment.database_locale_provider===expected.databaseLocaleProvider&&parsed.deployment.database_collation_version===expected.databaseCollationVersion&&parsed.application.version===expected.applicationVersion&&parsed.application.git_commit===expected.gitCommit&&parsed.application.web_image_digest===expected.webImageDigest&&parsed.application.worker_image_digest===expected.workerImageDigest&&parsed.migration.head===expected.migrationHead&&parsed.migration.manifest_sha256===expected.migrationManifestSha256;
     const policyMatch=!!expected&&parsed.policy.id===expected.policyId&&parsed.policy.rpo_hours===expected.rpoHours;
     const assuranceMatch=!!expected&&parsed.result==="RESTORE_VERIFIED"&&parsed.location_id===expected.restoreLocationId&&parsed.evidence.kind==="ISOLATED_RESTORE_VERIFICATION"&&parsed.evidence.offhost_location_id===expected.offhostLocationId&&parsed.evidence.offhost_receiver_identity_sha256===expected.offhostReceiverIdentitySha256&&parsed.evidence.target.deployment_id===expected.restoreTargetDeploymentId&&parsed.evidence.target.database_system_identifier===expected.restoreTargetSystemIdentifier&&parsed.evidence.target.cluster_marker_id===expected.restoreTargetClusterMarkerId&&expected.trustMode==="TRUSTED_ROOT_EXECUTOR";
     const policyExpiry=expected?recoveryPoint+expected.rpoHours*60*60*1000:Date.parse(parsed.expires_at),stale=now>Math.min(Date.parse(parsed.expires_at),policyExpiry);
     const identityStatus=expected?(identityMatch?"MATCHED":"MISMATCH"):"UNCONFIGURED",policyStatus=expected?(policyMatch?"MATCHED":"MISMATCH"):"UNCONFIGURED",assuranceStatus=expected?(assuranceMatch?"MATCHED":"MISMATCH"):"UNCONFIGURED";
-    if(stale)return{...base,verification_status:"STALE",identity_status:identityStatus,policy_status:policyStatus,assurance_status:assuranceStatus,latest_verification:parsed};
-    return{...base,verification_status:parsed.result,identity_status:identityStatus,policy_status:policyStatus,assurance_status:assuranceStatus,recovery_ready:parsed.result==="RESTORE_VERIFIED"&&identityMatch&&policyMatch&&assuranceMatch,latest_verification:parsed};
+    if(stale)return{...base,verification_status:"STALE",identity_status:identityStatus,policy_status:policyStatus,assurance_status:assuranceStatus,latest_verification:safeVerification(parsed)};
+    return{...base,verification_status:parsed.result,identity_status:identityStatus,policy_status:policyStatus,assurance_status:assuranceStatus,recovery_ready:parsed.result==="RESTORE_VERIFIED"&&identityMatch&&policyMatch&&assuranceMatch,latest_verification:safeVerification(parsed)};
   }catch(error){return{...base,verification_status:(error as NodeJS.ErrnoException)?.code==="ENOENT"?"UNVERIFIED":"INVALID"};}
 }

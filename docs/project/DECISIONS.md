@@ -2058,6 +2058,46 @@
 - 拒绝切换到浮动Wolfi/Chainguard tag、Node 26或未经固定版本/摘要的包；也拒绝把在线APK安装描述为完全离线或可复现构建。
 - 拒绝未经运行图证明直接删除整个 Vinext依赖，或在本次安全修复中同时升级到 Vinext beta 并扩大兼容范围。
 
+## D-126 运行监控采用最小去敏快照、单调原子状态和失败关闭告警交付
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / REPOSITORY CONTRACT IMPLEMENTED / HOST INSTALL AND REAL DELIVERY NOT AUTHORIZED`
+- 提案与实施：Codex 持续交付负责人，依据 TASK49 三条只读投产差距审计及现行资源、发布、运行健康与恢复治理合同
+- 确认边界：只授权仓库工具、合成/隔离测试和宿主 Docker/`/proc` 去敏 metadata 只读诊断；不授权安装宿主服务、读取日志/环境/卷/数据库/业务数据、访问 UAT API、配置真实通知或执行部署
+
+### Context
+
+- 仓库已经分别具备低资源停止线、Docker health、应用 liveness/readiness、Worker 租约、发布身份、Migration allowlist 和备份恢复回执，但此前没有统一快照、持续窗口、告警生命周期、交付状态和可恢复状态文件。单次绿色检查不能证明监控持续工作，也不能证明事件已通知值班人。
+- 低资源阈值同时出现在仓库治理、发布门和运维文档中。若监控复制一份可独立漂移的数值，边界条件可能在构建门与运行告警间产生相反结论。
+- Docker metadata、应用响应、发布 manifest 和备份回执包含不同敏感面。采集运行所需的 Docker socket/root 能力不得下放给 Web 或普通通知进程；原始环境、挂载、网络、日志、SQL、异常、备份位置和机器身份不应进入监控事件。
+- UAT 当前 Worker/Caddy 没有 Docker health，且镜像仍是 alpha.42 tag；alpha.46 合同要求 PostgreSQL/Web/Worker healthy，Caddy 可无 health。缺失键在不同 Docker 版本的 Go template 中会报错，不能将报错或 `none` 静默映射为健康。
+
+### Decision
+
+1. `operations/monitoring-policy-v1.json`是监控时间窗、服务健康和恢复证据要求的版本化合同；宿主资源数值不在其中复制，而是按精确 SHA-256 绑定唯一`release/release-gate-plan-v1.json.resource_policy`。摘要、字段或边界漂移均拒绝评估。
+2. 监控输入使用严格、未知字段拒绝、确定性排序的去敏 observation。宿主仅采集`/proc`资源、boot identity摘要和根分区可用字节；Docker仅采集固定Compose project/service、容器/镜像身份、running/health/restart/OOM。禁止读取或输出容器环境、日志、挂载、网络、数据库、业务行、秘密、完整URL、备份位置、机器ID正文或原始异常。
+3. Docker health使用`{{with (index .State "Health")}}...{{else}}none{{end}}`安全处理不存在的key。Caddy允许`none`；PostgreSQL、Web和alpha.46 Worker必须`healthy`。未知服务、缺失服务、tag与受控digest不符或无法采集一律失败关闭。
+4. 应用readiness只证明其公开的version、revision和Migration head；完整Migration manifest摘要必须由受控release evidence独立提供并与配置交叉核对，不从HTTP响应猜测。备份只投影verification、identity、policy、assurance、recovery-ready及必要时间/RPO枚举，不暴露原始回执正文。
+5. 每60秒采样，最大间隔90秒；Swap增长必须形成真实60秒窗口，Load必须连续3分钟高于4。间隔、重启或boot变化重建窗口并产生显式warning，绝不以缺样本推断健康。快照最长120秒、允许300秒时钟偏差，release identity最长3600秒。
+6. 告警状态机固定为首次`FIRING`、有界去重、3600秒`REMINDER`、严重性`ESCALATED`和证据恢复后的`RECOVERED`。损坏、倒退、过期、UNKNOWN或缺失证据不能关闭既有告警；事件使用稳定code、中文摘要、去重键、观测时间和固定runbook引用。
+7. 状态根必须同一运行身份所有、`0700`并带`0400`marker，`current.json`为`0600`；单调sequence、previous hash与integrity hash形成链。非阻塞目录锁、`O_EXCL`临时文件、file/directory fsync和原子rename把样本、活动告警和pending事件作为一个事务写入。锁、临时项、权限、链接或hash异常均失败关闭，禁止自动猜测清理。
+8. TEST可显式采用`EVENT_FILE_ONLY`；UAT/PRODUCTION配置必须要求固定通知target。未配置或尚未投递的事件以`NOT_CONFIGURED/PENDING`保留并返回非零，不得写成delivered。未来通知器只能以最小权限、至少一次语义读取有界pending队列并做幂等确认；真实渠道、root-only凭据、值班人、升级表和投递演练属于专项授权。
+9. 未来host部署采用root采集、非特权评估/通知和root-only配置分离；不得把Docker group/socket授予应用用户。systemd/调度安装、状态目录创建、通知渠道和回滚必须有精确版本、责任人及项目负责人授权，仓库验证不得冒充已安装生产监控。
+
+### Consequences
+
+- TASK49能够在不触碰UAT API、数据库、卷或秘密的情况下形成真实宿主metadata快照，并对旧UAT正确产生关键告警；这只证明合同和失败关闭行为，不证明生产告警已经送达。
+- 首次样本必然产生Swap/Load窗口未完成；已有非零OOM/restart也必须人工核验并建立新的可信基线，不能为了绿色状态重置计数或删状态。
+- 监控状态损坏、遗留锁或超限pending队列会让任务非零退出并停止覆盖旧状态。处置必须保全证据、确认无并发任务和精确身份后另行恢复，不能在定时任务里自动删除。
+- 生产就绪仍依赖host安装、真实通知和值班演练、异机备份与隔离恢复、同候选UAT、真实迁移、跨岗验收和受控试用；本决定不改变`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝让Prometheus/脚本各自硬编码另一套资源阈值、只检查瞬时值，或把缺失数据视为零/健康。
+- 拒绝让Web进程读取Docker socket、root状态或通知凭据，也拒绝把`docker inspect`完整对象、API/回执原文或异常正文写入事件。
+- 拒绝仅靠HTTP readiness推导完整release/Migration身份，或把Caddy与alpha.46 Worker的health要求混为同一规则。
+- 拒绝把写到stdout或本机文件等同于外部通知成功，拒绝无界重试/无界队列，也拒绝状态损坏后自动清空并恢复绿色。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

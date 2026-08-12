@@ -44,7 +44,7 @@ const DEFAULT_SUPERVISOR_SITE_ROOT = path.resolve(fileURLToPath(new URL("..", im
 const RELEASE_GATE_LOCK_FILE = "/var/lock/chenyida-erp-release-gate-v1.lock";
 const SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const RELEASE_TEMPORARY_LABELS = ["chenyida.erp.release-node-bootstrap", "chenyida.erp.release-manifest-node-bootstrap", "chenyida.erp.release-node-test", "chenyida.erp.release-browser-test", "chenyida.erp.release-postgres-regression", "chenyida.erp.release-migration-test", "chenyida.erp.backup-recovery-test", "chenyida.erp.release-identity-publisher", "chenyida.erp.release-image-evidence"];
-const REQUIRED_RUNTIME_SERVICES = new Map([["caddy", new Set(["none"])], ["postgres", new Set(["healthy"])], ["web", new Set(["healthy"])], ["worker", new Set(["none", "healthy"])]]);
+const REQUIRED_RUNTIME_SERVICES = new Map([["caddy", new Set(["none", "healthy"])], ["postgres", new Set(["healthy"])], ["web", new Set(["healthy"])], ["worker", new Set(["healthy"])]]);
 const TREE_DIGEST_COMMAND = "{ /usr/bin/find -P . -xdev -printf '%y|%m|%P|%l\\n' | LC_ALL=C /usr/bin/sort; /usr/bin/find -P . -xdev -type f -print0 | LC_ALL=C /usr/bin/sort -z | /usr/bin/xargs -0 /usr/bin/sha256sum; } | /usr/bin/sha256sum";
 const OFFICIAL_EXECUTOR_COMMANDS = new Map([
   ["NODE_CANDIDATE_TEST:CONTRACTS", ["scripts/run-release-node-sandbox.sh", "contracts"]],
@@ -152,7 +152,7 @@ function verifySource(repositoryRoot, candidate) {
 
 function dockerStates(ids, environment = process.env) {
   if (ids.size === 0) return new Map();
-  const result = spawnSync("/usr/bin/docker", ["inspect", "--format", "{{.Id}}|{{.RestartCount}}|{{.State.OOMKilled}}|{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}", ...ids], { encoding: "utf8", timeout: 30_000, env: environment });
+  const result = spawnSync("/usr/bin/docker", ["inspect", "--format", "{{.Id}}|{{.RestartCount}}|{{.State.OOMKilled}}|{{.State.Status}}|{{with (index .State \"Health\")}}{{.Status}}{{else}}none{{end}}", ...ids], { encoding: "utf8", timeout: 30_000, env: environment });
   if (result.status !== 0) fail("GATE_DOCKER_STATE_FAILED");
   const states = new Map();
   for (const line of result.stdout.trim().split("\n").filter(Boolean)) {
@@ -169,7 +169,7 @@ function runtimeServiceInventory(environment) {
   if (listed.status !== 0) fail("GATE_RUNTIME_INVENTORY_FAILED");
   const ids = listed.stdout.split(/\s+/).filter(Boolean);
   if (ids.length === 0) return { states: [], failure: "GATE_REQUIRED_RUNTIME_MISSING" };
-  const inspected = spawnSync("/usr/bin/docker", ["inspect", "--format", "{{.Id}}|{{index .Config.Labels \"com.docker.compose.service\"}}|{{.RestartCount}}|{{.State.OOMKilled}}|{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}", ...ids], { encoding: "utf8", timeout: 30_000, env: environment });
+  const inspected = spawnSync("/usr/bin/docker", ["inspect", "--format", "{{.Id}}|{{index .Config.Labels \"com.docker.compose.service\"}}|{{.RestartCount}}|{{.State.OOMKilled}}|{{.State.Status}}|{{with (index .State \"Health\")}}{{.Status}}{{else}}none{{end}}", ...ids], { encoding: "utf8", timeout: 30_000, env: environment });
   if (inspected.status !== 0) fail("GATE_RUNTIME_STATE_FAILED");
   const states = inspected.stdout.trim().split("\n").filter(Boolean).map((line) => {
     const [container_id, service, restart, oom, status, health] = line.split("|");

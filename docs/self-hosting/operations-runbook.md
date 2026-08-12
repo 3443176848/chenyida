@@ -106,11 +106,79 @@ alpha.46/0045源码已按D-119实现下列合同，但当前alpha.42/0040 UAT仍
 
 完整合同和隔离证据见[任务45记录](../tasks/SELFHOST-RUNTIME-HEALTH-TRUTH-45.md)及[D-119](../project/DECISIONS.md#d-119-运行健康采用完整-migration-manifestworker-数据库租约与双侧文件卷探针)。
 
+## 监控、告警与值班处置
+
+TASK49提供仓库级`chenyida-erp-operations-monitoring/v1`合同、去敏采集器、纯函数评估器、原子状态存储和CLI。当前状态仅为`REPOSITORY MONITORING CONTRACT VERIFIED`：没有在宿主安装服务或定时器，没有真实通知target、凭据、值班表、外送确认或演练记录。以下是未来获专项授权后的安装/运行合同，不是当前已经启用的生产监控。
+
+### 信任边界与输入
+
+- root采集器只读`/proc/meminfo`、`/proc/vmstat`、`/proc/loadavg`、`/proc/uptime`、boot ID和根分区`statfs`，boot ID只保留SHA-256；Docker只读取固定Compose project/service、容器名/ID、配置镜像引用、本地image ID、running、health、RestartCount和OOMKilled。
+- 禁止采集`docker inspect`完整结果、`Config.Env`、日志、挂载、网络、API token、数据库、业务行、卷正文、机器ID正文、SQL、堆栈、完整URL、原始异常、备份位置或完整回执。Docker必须使用固定`/usr/bin/docker`、去敏环境、30秒超时和有界输出。
+- Docker health取值固定使用`{{with (index .State "Health")}}{{.Status}}{{else}}none{{end}}`语义；直接读取`.State.Health.Status`或`.Config.Healthcheck`会在现行Docker上因缺失key失败。Caddy允许`none`，PostgreSQL/Web/Worker必须`healthy`。
+- `operations/monitoring-policy-v1.json`只定义时间窗、服务健康和恢复要求；资源阈值唯一来自`release/release-gate-plan-v1.json.resource_policy`并由SHA-256绑定：available memory `<768 MiB`、Swap使用率`>80%`、60秒Swap增长`>256 MiB`、根盘可用`<10 GiB`、Load1连续3分钟`>4`。等于边界不触发，越过边界才触发。
+- root受控配置必须从同一未过期`ELIGIBLE`release manifest及已发布runtime/backup身份生成，固定deployment/project、四个精确容器名、四个digest引用、版本、40位Git commit、release/supervisor/Migration manifest摘要、Migration head、backup policy/RPO和通知target。UAT/PRODUCTION的`notification.required`必须为true；不得使用tag或手填另一套摘要。
+- 应用、release、backup和notification组件通过独立root控制的去敏JSON适配层交给`--components`。readiness只提供version/revision/head，完整Migration manifest摘要来自release evidence；backup只提供状态枚举、恢复点/过期时间、policy/RPO和`recovery_ready`。省略组件文件会明确生成`NOT_COLLECTED`并告警，不能得到绿色结果。
+
+### 初始化与周期执行
+
+安装时应把精确候选中的`tools/ops-monitoring/`、policy和release resource plan复制到root-owned只读版本目录，把配置放入root-only配置目录；运行时状态根建议为`/var/lib/chenyida-erp/monitoring-v1`。以下占位路径必须替换为安装回执中的绝对固定路径，不能直接让定时任务跟随可变Git checkout：
+
+```bash
+sudo <installed-node> <installed-cli> init \
+  --state-root /var/lib/chenyida-erp/monitoring-v1
+
+sudo <installed-node> <installed-cli> run \
+  --policy <installed-monitoring-policy-v1.json> \
+  --resource-plan <installed-release-gate-plan-v1.json> \
+  --config <root-only-monitoring-config-v1.json> \
+  --components <root-generated-safe-components-v1.json> \
+  --state-root /var/lib/chenyida-erp/monitoring-v1
+
+sudo <installed-node> <installed-cli> status \
+  --policy <installed-monitoring-policy-v1.json> \
+  --config <root-only-monitoring-config-v1.json> \
+  --state-root /var/lib/chenyida-erp/monitoring-v1
+```
+
+`collect`只生成严格observation，`evaluate`只评估一个已落盘observation，`run`串行完成两者和状态提交，`status`只返回去敏活动告警。常规调度为每60秒一个前台、非重入任务；不得后台重叠。exit code固定为：`0`无活动/待投递；`1`有活动告警但无pending；`2`存在未配置或待投递事件；`3`未初始化、输入/采集/合同错误；`4`状态、hash或回退错误；`5`已有锁。任何非零都必须由外层supervisor记录为失败并升级，不能用shell的`|| true`吞掉。
+
+状态根必须与运行CLI的同一uid/gid一致并精确`0700`，marker`.chenyida-erp-monitoring-state-root-v1`为`0400`，`current.json`为`0600`。每次写入用非阻塞`0700`目录锁、单调sequence、previous/integrity SHA-256、`O_EXCL`临时文件、fsync、原子rename和目录fsync把样本、活动告警及pending事件一起提交。目录出现任何未知条目、链接、owner/mode漂移、hash断链、sequence/时间倒退或超限队列都会失败关闭。
+
+进程异常后遗留`.monitor.lock`或临时项时，先停止调度、保全整个状态根及supervisor evidence，确认没有存活/卡住任务，再由受控事故任务核对owner、pid上下文、最后完整state和文件身份。当前实现不会自动清理未知项；不得在timer里`rm -rf`、重建状态或修改JSON来恢复绿色。若确需新基线，必须记录旧状态摘要、原因、责任人和时间，并先解决OOM/restart/通知积压等原始问题。
+
+### 告警生命周期与投递
+
+- 新问题产生`FIRING`；相同dedupe key持续期间不重复刷屏，满3600秒才产生`REMINDER`；严重性提高产生`ESCALATED`；只有有效新快照证明问题消失才产生`RECOVERED`。
+- 快照过期、时钟偏差、采样间隔超过90秒、重启、boot变化或持续窗口未形成均显式告警/重建窗口。UNKNOWN、NOT_COLLECTED、损坏输入和状态错误不能恢复旧告警。首次60秒Swap窗口和3分钟Load窗口预热期间出现warning属于预期，但在窗口完整且其余证据健康前不得宣布监控绿色。
+- TEST可明确使用`EVENT_FILE_ONLY`；它只证明事件进入本地状态。UAT/PRODUCTION事件必须为`NOT_CONFIGURED`或`PENDING`直到未来最小权限通知器按event ID至少一次、幂等送达并留下受控确认。当前仓库没有真实通知器/ack通道，任何人不得手改pending或写成delivered。
+- pending上限1024、活动告警上限128；达到上限会拒绝覆盖旧状态并要求人工升级。通知器不得读取Docker socket、root配置或完整状态之外的敏感源；渠道凭据只放root-only文件，不进入参数、环境输出、Git或聊天。
+
+### 告警处置矩阵
+
+| 稳定code范围 | 立即动作 | 禁止动作与恢复条件 |
+|---|---|---|
+| `MONITOR_*`、exit 3/4/5 | 停止依赖该监控的晋升，核对宿主UTC、timer间隔、安装摘要、状态链和是否有真实并发；保全失败输出与状态根 | 不自动删锁/状态、不把缺样本补零；连续有效样本重建窗口且状态链通过后才恢复 |
+| `HOST_MEMORY_*`、`HOST_SWAP_*`、`HOST_ROOT_*`、`HOST_LOAD_*` | 立即停止启动build/test/Migration/备份/恢复等新重任务，执行本页资源门禁只读检查并升级值班 | 未获专项授权不改Swap、内核、Docker daemon或删业务数据；资源回到门限内且持续窗口完整后才恢复 |
+| `HOST_OOM_*`、`SERVICE_OOM_KILLED`、`SERVICE_RESTARTED` | 停止晋升和新写入风险动作，保全监控/发布证据，核对OOM/restart计数与受控变更时间 | 不清零计数、不盲目重启；原因、影响和新可信基线经事故记录确认后才能恢复 |
+| `SERVICE_*` | 核对四个精确project/service/container/digest、running和health；实例变化必须与批准发布journal一致 | 不接受tag、未知容器、Worker `none`或手工跳过health；精确身份和必需health恢复后才关闭 |
+| `APPLICATION_*` | 按“Liveness、Readiness与Worker租约处置”停止候选晋升，使用稳定code/request ID核对Web、Worker、Migration和双卷探针 | 不记录响应原文/堆栈，不改租约/healthcheck绕过；live/readiness新鲜且身份一致才恢复 |
+| `RELEASE_*` | 按“Dashboard与运行身份”核对已安装supervisor、manifest摘要、运行容器与Migration；阻止切换 | 不从tag/API猜Git或manifest摘要，不手写identity；重新受控发布匹配且新鲜的identity后恢复 |
+| `BACKUP_*` | 阻止上线/切换及风险写操作，保全回执，按`backup-restore.md`核对异机、隔离恢复、policy/RPO和过期时间 | 不把本机副本当异机、不改回执；新的真实`RESTORE_VERIFIED`链与当前运行身份完全匹配后恢复 |
+| `ALERT_DELIVERY_NOT_CONFIGURED`、exit 2 | 保留pending，按既定紧急联系路径人工升级并记录event ID；修复target/凭据/网络后做测试告警、恢复告警和重复投递演练 | 不把stdout/本机文件/人工口头通知标成delivered；确认幂等送达和ack证据后才清积压 |
+
+### 安装、验证与回滚门
+
+host安装必须另立专项任务并获项目负责人授权，至少固定：源commit/tree和bundle摘要、Node绝对路径及版本、运行uid/gid、root采集器与非特权通知器边界、配置/状态/事件目录、60秒timer、真实渠道target与root-only凭据、值班/升级责任人、保留周期、安装journal和卸载/回滚命令。不得把应用账号加入Docker组，也不得给Web挂Docker socket。
+
+安装验收需依次证明：配置与`ELIGIBLE`manifest闭合；权限和内容摘要无漂移；四服务和完整组件形成健康窗口；逐类合成故障产生预期FIRING/REMINDER/ESCALATED/RECOVERED；真实渠道收到测试事件且重复event ID幂等；停止/重启monitor不会丢状态；损坏/锁/时间倒退失败关闭；重启宿主后timer恢复；资源开销符合低资源门限。回滚只停止/禁用精确monitor单元并恢复前一已验版本；状态和pending事件默认保留，不删除Docker服务、卷、备份或业务数据。
+
+2026-08-13只读宿主metadata诊断使用修正后的安全health模板，结果为`CRITICAL`且没有读取API、数据库、日志、环境或卷：available memory约2214 MiB、Swap约715.8 MiB/69.8%、根盘约17.3 GiB、Load1约0.25、宿主OOM计数0；四服务restart 0/OOM false，PostgreSQL/Web healthy，Caddy/Worker health `none`，四个运行镜像均与候选digest配置不一致；应用、release和backup组件未采集也被明确告警。一次性诊断容器和临时目录已精确清理，现行四服务未修改。这是“旧UAT正确失败关闭”的证据，不是生产监控绿色证据。
+
 ## 监控、备份和上线缺口
 
 以下证据产生前，系统不能交给真实员工：
 
-- 实际指标采集、外部告警投递和值班升级演练；
+- 已安装的持续指标采集、真实外部告警投递、pending确认和值班升级/恢复演练；
 - 真实异机备份、隔离恢复、角色/ACL恢复、保留与过期告警；
 - 同候选低资源负载、备份/恢复和重启 soak；
 - 真实数据试迁移、表数/记录数/重复/孤儿/库存/金额/文件核对及回滚演练；

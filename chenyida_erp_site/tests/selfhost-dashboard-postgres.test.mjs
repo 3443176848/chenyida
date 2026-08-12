@@ -21,6 +21,9 @@ process.env.ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS ||= "3600";
 const pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "dashboard-integration-test" });
 const actor = (role) => ({ username: `${role}01`, role, permissions: permissionsForRole(role) });
 const directory = await mkdtemp(path.join(os.tmpdir(), "cyd-dashboard-pg-"));
+await chmod(directory, 0o2750);
+await writeFile(path.join(directory, ".chenyida-erp-receipt-root-v2"), "chenyida-erp-receipt-root/v2\n", { mode: 0o400 });
+await chmod(path.join(directory, ".chenyida-erp-receipt-root-v2"), 0o400);
 const statusFile = path.join(directory, "latest.json");
 const releaseRoot = path.join(directory, "release");
 const releaseFile = path.join(releaseRoot, "release-identity.json");
@@ -120,7 +123,8 @@ test("trusted verification file is independent from PostgreSQL business facts", 
       backup_status: { file: "backup-status.tar.gz", sha256: hash, bytes: 10, entries: 0 },
     },
     evidence: { kind: "ISOLATED_RESTORE_VERIFICATION", source_location_id: "dashboard-source", offhost_location_id: "dashboard-offhost", offhost_receiver_identity_sha256: receiverHash, offhost_receipt_sha256: hash, restore_run_id: "dashboard-restore", restored_at: verifiedAt, target: { deployment_class: "TEST", deployment_id: "dashboard-restore-target", database_name: "dashboard_restore_test", database_system_identifier: process.env.ERP_BACKUP_EXPECTED_RESTORE_TARGET_SYSTEM_IDENTIFIER, database_oid: "99999", marker_id: "dashboard-target", cluster_marker_id: process.env.ERP_BACKUP_EXPECTED_RESTORE_TARGET_CLUSTER_MARKER_ID, database_server_major: databaseIdentity.server_major, database_encoding: databaseIdentity.encoding, database_collate: databaseIdentity.collate, database_ctype: databaseIdentity.ctype, database_locale_provider: databaseIdentity.locale_provider, database_collation_version: databaseIdentity.collation_version, file_root_name: "dashboard_restore_test" }, reconciliation: restoreReconciliation, reconciliation_sha256: createHash("sha256").update(JSON.stringify(restoreReconciliation)).digest("hex"), attestation: "TRUSTED_EXECUTION_UID_AND_DISTINCT_CLUSTER_ACTIVE_INSPECTION" },
-  }));
+  }), { mode: 0o640 });
+  await chmod(statusFile, 0o640);
   const result = await service.backup(actor("admin"));
   assert.equal(result.verification_status, "RESTORE_VERIFIED");
   assert.equal(result.identity_status, "MATCHED");

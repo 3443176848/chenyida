@@ -49,7 +49,7 @@ export const FIXTURE_RUNTIME_SERVICES = [
   { service: "caddy", container_id: "1".repeat(64), restart_count: 0, oom_killed: false, status: "running", health: "none" },
   { service: "postgres", container_id: "2".repeat(64), restart_count: 0, oom_killed: false, status: "running", health: "healthy" },
   { service: "web", container_id: "3".repeat(64), restart_count: 0, oom_killed: false, status: "running", health: "healthy" },
-  { service: "worker", container_id: "4".repeat(64), restart_count: 0, oom_killed: false, status: "running", health: "none" },
+  { service: "worker", container_id: "4".repeat(64), restart_count: 0, oom_killed: false, status: "running", health: "healthy" },
 ];
 export const FIXTURE_CONTROL = {
   supervisor_bundle_sha256: "6".repeat(64),
