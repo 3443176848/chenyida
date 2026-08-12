@@ -4,6 +4,14 @@
 
 ## 2026-08-13
 
+### SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50 - `docs: start container runtime hardening`
+
+- 调度/范围：TASK49治理收口`1a4bd16e3428fded7cd5569595fa47df82831f7c`后的零`DOING`自动切换为TASK50唯一active task；严格起点tree为`518cbdd9001e933c6577ccbed499eb8287ec5666`、alpha.46/0045，UAT仍alpha.42/0040。
+- 实际风险：只读Docker metadata显示现行PostgreSQL/Web/Worker/Caddy均`ReadonlyRootfs=false`、无显式`CapDrop`/`CapAdd`/`SecurityOpt`；Web/Worker user为`node`，PostgreSQL/Caddy未声明user。Compose只对migrate/admin形成部分加固，当前四服务没有统一失败关闭合同。
+- 目标：建立版本化逐服务最小权限策略，收紧只读rootfs、capability、no-new-privileges、tmpfs与精确可写挂载；禁止privileged、Docker socket、host namespace/device和任意host root bind，并用负向合同及一次一个临时容器的隔离运行证据验证必要例外。
+- 边界：不修改/重建/重启现行UAT，不读取业务表、`.env`、容器环境、日志、四卷/备份正文或未跟踪状态报告，不运行真实Migration/deploy，不修改账号、网络、systemd、Swap、kernel或Docker daemon。只读事务确认UAT为40/head0040；所有后续build/测试串行且只清理TASK50精确创建的临时资源。
+- 起点资源：available约2.2GiB、Swap718MiB/1GiB、根盘18GiB、Load`0.05/0.21/0.71`；四服务restart0/OOM false，Web/PostgreSQL healthy、旧Worker/Caddy health none。系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-OPS-MONITORING-ALERTING-49 - `docs: start monitoring and alerting closure` / `feat: add fail-closed operations monitoring` / focused contract and regression fixes / `docs: close monitoring and alerting closure`
 
 - 调度/范围：TASK48治理收口`d5df673c602fdc4e558c2799b31dbf1b208316e8`后的零`DOING`自动切换为TASK49唯一active task；严格起点tree为`62c8feb425c7546db2afc7b2dc78f0050bf615e2`、alpha.46/0045，UAT仍alpha.42/0040。

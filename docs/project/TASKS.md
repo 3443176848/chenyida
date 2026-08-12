@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前没有`DOING`任务。`SELFHOST-OPS-MONITORING-ALERTING-49`已完成仓库级监控合同与隔离验证并释放 active slot；host 安装、真实渠道/值班人、异机真实备份、UAT/生产 Migration/deploy、账号、员工试用和切流仍需专项授权，系统继续`PRODUCTION NO-GO`。下一安全任务将从不依赖上述外部资源的容器运行时最小权限缺口中建立独立任务编号后开始。
+当前唯一`DOING`为`SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50`。范围固定为仓库和隔离环境中的版本化容器最小权限策略、Compose/Dockerfile加固、负向合同与一次一个临时容器的运行验证；不修改现行UAT/生产，不读取业务数据、日志、凭据或受保护Volume。host安装、真实渠道/值班人、异机真实备份、UAT/生产Migration/deploy、账号、员工试用和切流仍需专项授权，系统继续`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -53,6 +53,8 @@
 
 2026-08-13第二十次调度事件：`SELFHOST-OPS-MONITORING-ALERTING-49 DOING → DONE`。D-126统一资源、服务、应用、发布/Migration和备份恢复证据的严格去敏快照与告警生命周期；最终源码`7debd4d`/tree`315276e`与manifest-only子提交`56535a0`形成内容寻址链，bundle SHA-256为`76b919cd…6a95`。监控14/14、release 6文件/48项及直接45/45、supervisor20/20、Node113文件/964项、PostgreSQL83文件/396项、typecheck38/38、SPECIAL POSIX4文件/29项、lint和credentials通过。只读宿主metadata诊断因旧UAT身份和缺失应用/发布/备份证据如实为CRITICAL；没有host安装、真实投递、UAT连接或数据操作，active slot释放且系统继续`PRODUCTION NO-GO`。
 
+2026-08-13第二十一次调度事件：主智能体从TASK49收口后的零`DOING`自动选择未阻塞的容器运行时风险，状态按`SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50 TODO → DOING`切换唯一active slot。起点实际metadata显示现行PostgreSQL/Web/Worker/Caddy均`ReadonlyRootfs=false`且无显式cap drop/security option；任务仅加固仓库未来候选并以隔离容器验证，不重建或修改UAT，不触碰业务数据、账号、网络或四个受保护Volume。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -69,7 +71,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| — | 当前无执行中任务 | — | — | — | — | TASK49已释放active slot；下一任务须先建立任务文档和验收标准。 |
+| SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50 | 容器运行时最小权限加固 | DOING | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来UAT/生产/网络/host专项授权） | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48、SELFHOST-OPS-MONITORING-ALERTING-49 | `DOING / REPOSITORY AND ISOLATED ONLY / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`。见[任务文档](../tasks/SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50.md)。 |
 
 ## 已完成任务
 

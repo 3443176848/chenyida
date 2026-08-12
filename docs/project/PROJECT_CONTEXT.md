@@ -16,7 +16,9 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 2026-08-13，`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`已按D-122—D-125完成并释放active slot。最终候选精确绑定`8952a815`/tree`1ac73360`、alpha.46/0045、两镜像manifest/config及构建回执；新鲜Trivy数据库树在扫描前后不变，Web/Worker全部severity为0。host supervisor仍未安装，正式镜像证据与18步门分别在任何制品变更前退出1，未用环境变量或直接脚本旁路。
 
-`SELFHOST-OPS-MONITORING-ALERTING-49`已在严格起点`d5df673c…16e8`后完成并释放active slot。最终内容寻址源码`7debd4d`/tree`315276e`与manifest-only子提交`56535a0`形成bundle SHA-256`76b919cd…6a95`；去敏快照、资源/服务/应用/发布/Migration/备份恢复证据评估、告警生命周期、原子状态、CLI、测试和运行手册已通过完整Node/PostgreSQL/typecheck等适用门。只读宿主metadata诊断对旧UAT镜像与缺失证据如实为CRITICAL；没有host安装、真实通知、UAT/生产网络/数据库访问、日志/卷正文或真实数据读取。TASK49包含Dashboard源码加固但未重建Web/Worker镜像，因此TASK48的`8952a815`零发现候选只是先前提交证据，不是当前HEAD候选。当前零`DOING`，下一安全任务将独立登记容器运行时最小权限加固。
+`SELFHOST-OPS-MONITORING-ALERTING-49`已在严格起点`d5df673c…16e8`后完成并释放active slot。最终内容寻址源码`7debd4d`/tree`315276e`与manifest-only子提交`56535a0`形成bundle SHA-256`76b919cd…6a95`；去敏快照、资源/服务/应用/发布/Migration/备份恢复证据评估、告警生命周期、原子状态、CLI、测试和运行手册已通过完整Node/PostgreSQL/typecheck等适用门。只读宿主metadata诊断对旧UAT镜像与缺失证据如实为CRITICAL；没有host安装、真实通知、UAT/生产网络/数据库访问、日志/卷正文或真实数据读取。TASK49包含Dashboard源码加固但未重建Web/Worker镜像，因此TASK48的`8952a815`零发现候选只是先前提交证据，不是当前HEAD候选。
+
+`SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50`现为唯一`DOING`，严格起点`1a4bd16e…f7c`/tree`518cbdd9…5666`。实际只读metadata显示现行UAT四服务均为可写rootfs、无显式cap drop/no-new-privileges；任务在仓库和隔离环境建立逐服务最小权限策略、精确可写路径、必要例外、Compose/Dockerfile加固及负向/runtime测试。不修改现行UAT，不读取业务数据、日志、环境或受保护Volume；完成后才评估重建当前源码候选。
 
 ## 系统组成
 

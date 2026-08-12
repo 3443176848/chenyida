@@ -35,6 +35,8 @@
 
 2026-08-13 第十二次增量：`SELFHOST-OPS-MONITORING-ALERTING-49`已完成。D-126固定严格去敏observation、单一资源阈值权威、服务/应用/release/Migration/备份恢复证据新鲜度和告警生命周期；最终源码`7debd4d`/tree`315276e`与manifest-only子提交`56535a0`形成bundle SHA-256`76b919cd…6a95`。Node113/964、PostgreSQL83/396、typecheck38/38及适用发布门通过；只读宿主诊断对旧UAT身份和缺失证据如实CRITICAL。没有host安装、真实渠道/值班人或投递演练，因此只把监控门从`FAIL`更新为仓库层`PARTIAL`，整体判定继续`PRODUCTION NO-GO`。
 
+2026-08-13 第十三次增量：`SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50`启动为唯一`DOING`。起点实际Docker metadata显示现行UAT PostgreSQL/Web/Worker/Caddy均`ReadonlyRootfs=false`且无显式cap drop/security option；TASK48镜像又因TASK49 Dashboard源码变化不再代表当前HEAD。任务范围固定为仓库策略、Compose/Dockerfile及隔离运行验证，不修改UAT/生产、业务数据、账号、网络或受保护Volume；启动不改变整体`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。

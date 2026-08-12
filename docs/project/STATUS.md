@@ -2,6 +2,20 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
+## SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50（执行中；仓库与隔离环境）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / REPOSITORY AND ISOLATED ONLY / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO | 唯一active slot；主智能体唯一写入，三条智能体线只读审计 |
+| 严格起点 | PASS / CONTROLLED | `main@1a4bd16e3428fded7cd5569595fa47df82831f7c`、tree`518cbdd9…5666`、alpha.46/0045；未跟踪状态报告不读不改不提交 |
+| UAT Migration | VERIFIED READ ONLY / UNCHANGED | read-only事务确认40/head`0040_warehouse_receipt_readiness.sql`、checksum`b6781c94…a5a93`；未读业务表或写入 |
+| 运行时风险 | OPEN / ACTUAL METADATA | 四服务均ReadonlyRootfs=false、无显式CapDrop/CapAdd/SecurityOpt；Web/Worker user=node，PostgreSQL/Caddy未声明user，privileged均false |
+| 目标 | IN PROGRESS | 逐服务版本化最小权限、精确可写路径/必要例外、Compose/Dockerfile加固、负向合同和一次一个隔离容器的运行验证 |
+| 候选身份 | STALE | TASK48镜像绑定`8952a815`；TASK49 Dashboard源码变化后当前应用源码无对应镜像，TASK50完成前不重复构建候选 |
+| 授权边界 | REPOSITORY / ISOLATED | 不修改UAT/生产、业务数据、账号、网络、host配置或四卷；不push，不运行真实Migration/deploy |
+| 起点资源 | PASS / BELOW STOP LINES | available约2.2GiB、Swap718MiB/1GiB、根盘18GiB、Load`0.05/0.21/0.71`；四服务restart0/OOM false |
+| 系统是否可用 | NO | 异机恢复、当前候选正式门、host监控投递、UAT对齐、真实迁移和员工试用仍未完成 |
+
 ## SELFHOST-OPS-MONITORING-ALERTING-49（完成；仓库监控合同已验证，host投递未配置）
 
 | 验证项 | 结果 | 说明 |
