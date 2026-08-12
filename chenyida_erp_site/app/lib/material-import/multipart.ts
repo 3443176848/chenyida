@@ -100,7 +100,7 @@ export async function readSingleFilePart(
   const encoder = new TextEncoder();
   const initialPrefix = encoder.encode(`--${boundary}\r\n`);
   const headerTerminator = encoder.encode("\r\n\r\n");
-  let pending = new Uint8Array(0);
+  let pending: Uint8Array = new Uint8Array(0);
   while (pending.byteLength <= MAX_MULTIPART_HEADER_BYTES) {
     const { value, done } = await reader.read();
     if (done) break;

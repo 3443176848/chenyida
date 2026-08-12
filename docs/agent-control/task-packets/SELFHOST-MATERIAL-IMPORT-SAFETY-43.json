@@ -2,7 +2,7 @@
   "schema_version": "chenyida-erp-agent-task/v1",
   "task": {
     "id": "SELFHOST-MATERIAL-IMPORT-SAFETY-43",
-    "revision": 1,
+    "revision": 2,
     "ledger_state": "DOING",
     "delivery_stage": "IMPLEMENTATION",
     "qualifiers": [
@@ -32,6 +32,7 @@
   "scope": {
     "allowed_changed_paths": [
       "chenyida_erp_site/app/lib/selfhost-api.ts",
+      "chenyida_erp_site/app/lib/selfhost-worker.ts",
       "chenyida_erp_site/app/lib/infrastructure/file-storage.ts",
       "chenyida_erp_site/app/lib/infrastructure/background-jobs.ts",
       "chenyida_erp_site/app/lib/material-import-fallback/types.ts",
@@ -39,6 +40,7 @@
       "chenyida_erp_site/app/lib/material-import-fallback/service.ts",
       "chenyida_erp_site/app/lib/material-import-fallback/handler.ts",
       "chenyida_erp_site/app/lib/material-import-fallback/local-file-store.ts",
+      "chenyida_erp_site/app/lib/material-import/multipart.ts",
       "chenyida_erp_site/app/materials/_components/material-import-create-page.tsx",
       "chenyida_erp_site/app/materials/_lib/material-import.ts",
       "chenyida_erp_site/db/schema.ts",
@@ -49,12 +51,15 @@
       "chenyida_erp_site/release/release-gate-plan-v1.json",
       "chenyida_erp_site/release/release-test-inventory-v1.json",
       "chenyida_erp_site/scripts/run-material-import-fallback-postgres-test.sh",
+      "chenyida_erp_site/tsconfig.task43.json",
       "chenyida_erp_site/tests/selfhost-file-storage.test.mjs",
       "chenyida_erp_site/tests/selfhost-material-import-fallback-unit.test.mjs",
       "chenyida_erp_site/tests/selfhost-material-import-fallback-handler.test.mjs",
       "chenyida_erp_site/tests/selfhost-material-import-fallback-postgres.test.mjs",
       "chenyida_erp_site/tests/selfhost-material-import-fallback-migration.test.mjs",
+      "chenyida_erp_site/tests/selfhost-worker-resilience.test.mjs",
       "chenyida_erp_site/tests/material-import-ui.test.mjs",
+      "chenyida_erp_site/worker/selfhost.ts",
       "docs/agent-control/task-packets/SELFHOST-MATERIAL-IMPORT-SAFETY-43.json",
       "docs/material-master/material-import-batch-v1.md",
       "docs/material-master/material-import-batch-v1.openapi.yaml",

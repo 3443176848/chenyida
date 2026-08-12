@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "incremental": false,
+    "plugins": []
+  },
+  "include": [
+    "app/lib/infrastructure/background-jobs.ts",
+    "app/lib/infrastructure/file-storage.ts",
+    "app/lib/material-import-fallback/**/*.ts",
+    "app/lib/material-import/file-security.ts",
+    "app/lib/material-import/multipart.ts",
+    "app/lib/material-import/object-store.ts",
+    "app/lib/material-import/xls-parser.ts",
+    "app/lib/selfhost-worker.ts",
+    "db/**/*.ts",
+    "worker/selfhost.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "examples",
+    "app/api/erp-api.ts",
+    "scripts/seed-material-categories.ts"
+  ]
+}
