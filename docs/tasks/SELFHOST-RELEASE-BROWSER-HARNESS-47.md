@@ -1,7 +1,7 @@
 # SELFHOST-RELEASE-BROWSER-HARNESS-47 固定浏览器运行时与发布 E2E 门闭环
 
-> 状态：`DOING / SOURCE IMPLEMENTED / 9 OF 11 OBSERVED PASS / RESOURCE THRESHOLD PAUSE / PRODUCTION NO-GO`
-> 日期：2026-08-12（Asia/Shanghai）
+> 状态：`DONE / REPOSITORY BROWSER GATE VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`
+> 日期：2026-08-12—2026-08-13（Asia/Shanghai）
 > 严格起点：`main@fbbf2a5d034d11d8a50f823a55ef78d2d32d682d`
 > 责任：Codex 主智能体为唯一写者、串行构建/测试执行者、文档维护者和提交者；项目负责人负责未来候选 Web/Worker 镜像、UAT/生产 Migration/deploy、真实数据、账号权限、员工试用和正式切换专项授权
 
@@ -23,15 +23,15 @@
 
 ## 3. 验收标准
 
-- [ ] 固定 Browser 镜像的完整仓库 digest、config digest、`linux/amd64`平台和 Playwright/Chromium 版本；包锁与镜像任一漂移均失败关闭。
-- [ ] 固定并核对 6 个 REQUIRED Browser 文件的精确顺序、摘要、数据库名、目标 Migration head、服务端口和确认变量；新增、删除、漏跑、跳过或提前成功均失败关闭。
-- [ ] 在干净已提交源码快照中使用固定 Node 镜像生成仅供测试的 standalone build；执行和构建均不使用工作区未提交内容或网络依赖。
-- [ ] 使用固定 PostgreSQL 17 rootfs 和单一 Browser 容器在同一隔离网络命名空间运行；任何时刻最多一个临时容器，不连接 UAT、不挂载受保护 Volume。
-- [ ] 六个 Browser 文件及其全部嵌套测试串行通过；测试只写合成隔离数据库，服务、数据库、浏览器和临时目录均在成功或失败后清理。
-- [ ] `browser-e2e`发布动作从明确缺失改为真实失败关闭执行；运行策略、清单、supervisor bundle 和机器报告能绑定并核验 Browser runtime 证据。
-- [ ] 适用 release 合同、负向漂移测试、typecheck、lint、凭据扫描、Markdown 链接、控制协议和`git diff --check`通过；不降低断言、不增加 skip/todo。
-- [ ] 记录重任务前后 memory/Swap/disk/load、OOM/restart及清理；未触发项目停止阈值。
-- [ ] 更新`MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md`、`PROJECT_CONTEXT.md`、`PRODUCTION_READINESS.md`、`ROADMAP.md`及发布测试文档，并形成聚焦源码、bundle和治理提交链。
+- [x] 固定 Browser 镜像的完整仓库 digest、config digest、`linux/amd64`平台和 Playwright/Chromium 版本；包锁与镜像任一漂移均失败关闭。
+- [x] 固定并核对 6 个 REQUIRED Browser 文件的精确顺序、摘要、数据库名、目标 Migration head、服务端口和确认变量；新增、删除、漏跑、跳过或提前成功均失败关闭。
+- [x] 在干净已提交源码快照中使用固定 Node 镜像生成仅供测试的 standalone build；执行和构建均不使用工作区未提交内容或网络依赖。
+- [x] 使用固定 PostgreSQL 17 rootfs 和单一 Browser 容器在同一隔离网络命名空间运行；任何时刻最多一个临时容器，不连接 UAT、不挂载受保护 Volume。
+- [x] 六个 Browser 文件及其全部嵌套测试串行通过；测试只写合成隔离数据库，服务、数据库、浏览器和临时目录均在成功或失败后清理。
+- [x] `browser-e2e`发布动作从明确缺失改为真实失败关闭执行；运行策略、清单、supervisor bundle 和机器报告能绑定并核验 Browser runtime 证据。
+- [x] 适用 release 合同、负向漂移测试、typecheck、lint、凭据扫描、Markdown 链接、控制协议和`git diff --check`通过；不降低断言、不增加 skip/todo。
+- [x] 记录重任务前后 memory/Swap/disk/load、OOM/restart及清理；停止阈值触发时暂停，恢复到阈值内后才继续。
+- [x] 更新`MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md`、`PROJECT_CONTEXT.md`、`PRODUCTION_READINESS.md`、`ROADMAP.md`及发布测试文档，并形成聚焦源码、bundle和治理提交链。
 
 ## 4. 精确 Browser 文件
 
@@ -63,9 +63,11 @@
 
 本任务完成只关闭固定 Browser runtime 与 6 项 Browser E2E 子门。候选 Web/Worker 镜像 build、镜像级 SBOM/新鲜漏洞 PASS、完整 18 步同候选门、UAT 对齐、真实异机恢复、岗位权限批准、真实迁移、员工试用和正式切换仍分别保持失败关闭并需要适用资源或专项授权。
 
-## 8. 当前执行证据（尚未收口）
+## 8. 完成证据
 
-- 固定 Browser 镜像、Chromium 可执行身份、精确依赖树、6 文件 inventory、历史模板升级到当前 0045、同容器 PostgreSQL/standalone Web/Chromium、真实 `browser-e2e` 分发及 supervisor 合同均已落入源码；执行器保持断网、只读 rootfs、最小 capability、单临时容器与失败清理。
-- 十二次串行干净提交快照执行用于逐项关闭运行时和历史测试漂移；最近一次执行中 planning revision、purchase traceability、requirement unit resolution、RFQ binding 及 RFQ traceability 前五项共 9/11 已实际通过。第 10 项 Award→PO 的失败路径因测试替身使用非 UUID `request_id` 被当前安全客户端正确升级为 `RESULT_UNKNOWN`；测试现已改为合法固定 UUID，并继续断言错误消息、请求号、无自动重试和数据库零写。第 10 项修正及第 11 项 Supplier Mapping 尚待整套重跑验证，不能标记完成。
-- 最近一次重任务后 available memory 约 2.3 GiB、根盘可用 27 GiB、Load 低于阈值，内核 OOM 0、四服务 restart 0/OOM false，TASK47 临时容器和目录均为 0；但 Swap 为约 831 MiB/1 GiB，超过全仓库 80% 停止阈值。当前只允许轻量检查和文档，禁止启动新的 build、Browser、全量测试或数据库重任务；未修改 Swap、服务或 daemon。
-- 当前最新聚焦修正提交为 `2a230a919ab0e7555ede1b0316b6f2dacaeef9ef`；完整 6 文件/11 测试 PASS、最终 bundle、typecheck、lint及治理收口仍是本任务未完成验收项。
+- 固定官方 Playwright `1.51.1` Browser 镜像完整 Repo/config digest、`linux/amd64`平台、Chromium revision 1161/version `134.0.6998.35`、可执行路径及 SHA-256；包锁、依赖树、inventory、runtime policy、机器报告和 supervisor 负向合同对任一漂移失败关闭。
+- 第十三次完整干净快照运行以`task47-thirteenth-clean`串行执行6个文件/11项，planning revision response、purchase traceability、requirement unit resolution、RFQ binding、RFQ traceability和supplier mapping全部PASS；测试文件路径集SHA-256为`71742177a734c12b1a53f63a93f8a68344c68c9400a7c3e0d9a9f9a4ad08ac86`，无skip/todo、服务和合成数据库均清理。
+- 最终源码提交为`9a18a0f307348c974a6f341565e7d16d76df184c`，tree为`8c182d38f1acbcebe10d46e3a09f73c9ec612f22`；manifest-only直接子提交`614ef7ac2aea5ec23029c81b17b8c21adc0935dd`绑定39个文件，bundle SHA-256为`e54019dfde0af7a9a8367b5ade53976b1ffc4b24f9b36e46ae3778ed963a7192`。
+- 最终bundle快照通过release合同6文件/45项、supervisor Python 20项、完整typecheck 38/38和lint 0 error/11条既有warning；inventory保持235/211/24。治理收口另核验JSON、Shell、Markdown链接、控制协议、凭据模式、范围与`git diff --check`。
+- Browser前资源为available 2,424,572 KiB、Swap 801,036/1,049,596 KiB、根盘27 GiB、Load`0.23/0.34/0.56`；Browser后Swap短暂到841,112 KiB（80.14%）时停止新重任务，未修改Swap或服务。其自然回落到阈值内后才继续typecheck/lint；最终available 2,481,228 KiB、Swap771,176 KiB（73.47%）、根盘27 GiB、Load`0.98/1.91/1.62`，内核OOM 0、四服务restart 0/OOM false，TASK47临时容器和目录为0。
+- 全程只使用Git快照、固定镜像与合成隔离数据库；未连接或修改UAT/生产，未读取四个受保护Volume正文、凭据或业务数据，未build/push Web/Worker候选镜像，未部署、运行真实Migration或生成`ELIGIBLE`候选。系统继续`PRODUCTION NO-GO`。

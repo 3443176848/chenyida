@@ -1,6 +1,6 @@
 # 自托管发布门 V1
 
-> 当前状态：`REPOSITORY TOOLING VERIFIED / SUPERVISOR NOT INSTALLED / NO ELIGIBLE CANDIDATE / PRODUCTION NO-GO`。本页描述发布门合同和未来受控操作；它不授权镜像 build/pull/push、联网扫描、UAT/生产 Migration、部署、runtime identity 发布或切换。
+> 当前状态：`TYPECHECK AND BROWSER SUBGATES VERIFIED / SUPERVISOR NOT INSTALLED / NO ELIGIBLE CANDIDATE / PRODUCTION NO-GO`。本页描述发布门合同和未来受控操作；它不授权候选镜像 push、UAT/生产 Migration、部署、runtime identity 发布或切换。
 
 ## 目的与信任边界
 
@@ -21,7 +21,8 @@
 - Migration隔离测试：`npm run test:release:migration-postgres`。
 - Node源码门：`npm run test:release:node-source`，先 build，再按冻结清单串行运行112个纯Node测试文件；数据库、浏览器和专用POSIX文件由各自独立门负责。
 - PostgreSQL清单门：`npm run test:release:postgres-regression`，在一个断网、只读、资源受限的PostgreSQL容器内，按冻结清单串行执行83个文件并为每个文件创建/销毁隔离数据库。
-- POSIX专用门：`npm run test:release:special-posix`，使用内容寻址的完整Node/Python/Git镜像，在只读同路径快照和有界tmpfs内串行执行4个文件；Browser门入口为`npm run test:release:browser-e2e`，在受控运行时补齐前必须失败关闭。
+- POSIX专用门：`npm run test:release:special-posix`，使用内容寻址的完整Node/Python/Git镜像，在只读同路径快照和有界tmpfs内串行执行4个文件。
+- Browser门：`npm run test:release:browser-e2e`调用固定执行器；D-121将官方Playwright 1.51.1/Chromium 134镜像、Chromium可执行SHA、PostgreSQL 17 rootfs、6文件清单、历史Migration模板、loopback端口和确认变量全部内容寻址。Git archive源码只读、构建/运行断网、同一时刻一个Browser容器，6文件/11项、无skip/todo及清理均失败关闭。
 - 全TypeScript门：`npm run typecheck:release`，按D-120精确排序清单逐个执行38份`tsconfig*.json`并在前后复核集合/内容摘要；每份使用`--incremental false`，任一配置失败、漂移、漏跑或集合变化即停止。
 
 `test-runtime-policy-v1.json`中的 RepoDigest 仅证明当前 Docker engine 对精确本地引用的不可变解析；它不是候选 Web/Worker 的 registry provenance，也不能替代发布镜像的 registry digest、OCI identity、SBOM或漏洞报告。
@@ -62,12 +63,12 @@ Supervisor bundle manifest 必须引用一个已经提交且不再修改的 sour
 
 ## 当前事实与未验证范围
 
-- TASK42候选快照曾通过完整Node 107文件/886、PostgreSQL 80文件/367、POSIX 4文件/29等仓库门。TASK43/TASK44依次把inventory扩展为230/206/24和232/208/24；TASK45现扩展为235/211/24（Pure Node112、PostgreSQL83、Browser6、历史22、PG alias2、release contract6、special4），增加完整Migration/Worker租约/双卷/readiness合同。TASK45已通过定向42/42、隔离PG5/5、官方Migration harness、release44/44及supervisor15/15；完整112文件Node-source、83文件PostgreSQL、Browser或18步正式候选门仍须由已提交候选和受控supervisor执行。
+- TASK42候选快照曾通过完整Node 107文件/886、PostgreSQL 80文件/367、POSIX 4文件/29等仓库门。TASK43/TASK44依次把inventory扩展为230/206/24和232/208/24；TASK45现扩展为235/211/24（Pure Node112、PostgreSQL83、Browser6、历史22、PG alias2、release contract6、special4），增加完整Migration/Worker租约/双卷/readiness合同。TASK45已通过定向42/42、隔离PG5/5、官方Migration harness、release44/44及supervisor15/15；完整112文件Node-source、83文件PostgreSQL和18步正式候选门仍须由已提交候选和受控supervisor执行。
 - TASK46已按D-120把根运行合同对齐为Node 22/ES2022，固定精确38配置集合/摘要双重核验并修复真实类型债；源码`f3bac028…`和bundle`3d1243e…`两个连续干净快照均38/38。该证据关闭TypeScript子门，但不替代Node-source、PostgreSQL、Browser、镜像安全或完整18步同候选门。
+- TASK47已按D-121固定Playwright 1.51.1/Chromium 134内容寻址运行时、历史Migration模板和断网只读单容器执行器；源码`9a18a0f…`干净快照6文件/11项全部PASS，manifest-only直接子提交`614ef7ac…`绑定39文件bundle。该证据关闭Browser子门，但不替代候选镜像安全、Node/PostgreSQL重跑或完整18步同候选门。
 - 当前没有安装 host supervisor，也没有修改 systemd、权限、网络、Docker daemon 或运行中的 Compose。
-- alpha.46/0045尚未 build；不存在同候选 Web/Worker 镜像、真实 Trivy image evidence、完整 gate `PASS`或`ELIGIBLE`manifest。
-- 本机没有获准拉取 Trivy镜像或漏洞库，因此当前只能验证合同和合成 fixture，不能声称漏洞状态已评估。
-- 本机及已缓存镜像均不存在Chromium、Playwright模块或浏览器测试镜像；Browser 6尚未运行，正式Browser步骤会以`RELEASE_TEST_REQUIRED_HARNESS_NOT_AVAILABLE:browser-e2e`失败关闭。
+- alpha.46/0045尚未构建为候选Web/Worker镜像；不存在同候选镜像、真实Trivy image evidence、完整gate `PASS`或`ELIGIBLE`manifest。
+- 本机尚无候选镜像级SBOM及不超过72小时的新鲜漏洞零发现证据，因此不能声称候选漏洞状态已评估。
 - 完整多配置typecheck的既有ES2017/真实类型/示例边界问题已由TASK46修复，当前仓库合同38/38可重复通过；未来任何配置集合或内容漂移仍会失败关闭，不能把定向合同typecheck代替它。
 - UAT继续运行 alpha.42/0040；没有执行 UAT/生产 Migration、deploy、runtime identity发布或真实用户验收。
 

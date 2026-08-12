@@ -1,7 +1,7 @@
 # 晨亿达 ERP 投产准入基线
 
 > 基线任务：`SELFHOST-PRODUCTION-READINESS-40`
-> 核验时间：2026-08-12（Asia/Shanghai）
+> 核验时间：2026-08-13（Asia/Shanghai）
 > 当前判定：`PRODUCTION NO-GO / NOT READY FOR REAL EMPLOYEES`
 > 唯一未来生产权威：自托管 Node.js、PostgreSQL、本地持久化文件与独立 Worker
 
@@ -23,7 +23,9 @@
 
 2026-08-12 第六次增量：`SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已完成仓库实现与重复验证。D-120固定Node 22/ES2022、精确38配置集合/摘要核验和`--incremental false`只读执行；源码`f3bac028…`与manifest-only直接子提交`3d1243e…`的两个干净快照均38/38通过。该证据只关闭完整typecheck子门，不包含Browser、候选build、SBOM、漏洞扫描、UAT部署或真实数据；整体判定继续`PRODUCTION NO-GO`。
 
-2026-08-12 第七次增量：`SELFHOST-RELEASE-BROWSER-HARNESS-47`已启动为唯一`DOING`。只读审计确认发布清单的6个REQUIRED Browser文件存在且没有skip，但现有动作因缺少固定Chromium/Playwright运行时而失败关闭。任务将只在干净提交快照、固定Browser/Node/PostgreSQL运行时和隔离合成数据库中串行执行；完成前Browser门仍为`FAIL`，且本任务不授权候选Web/Worker镜像、UAT/生产或真实数据，整体判定继续`PRODUCTION NO-GO`。
+2026-08-12 第七次增量：`SELFHOST-RELEASE-BROWSER-HARNESS-47`启动为唯一`DOING`。只读审计确认发布清单的6个REQUIRED Browser文件存在且没有skip，但原动作因缺少固定Chromium/Playwright运行时而失败关闭；任务范围固定为干净提交快照、固定Browser/Node/PostgreSQL运行时和隔离合成数据库。
+
+2026-08-13 第八次增量：`SELFHOST-RELEASE-BROWSER-HARNESS-47`已完成。D-121固定的Playwright 1.51.1/Chromium 134内容寻址运行时、历史Migration模板、断网只读单容器执行器及真实`browser-e2e`动作落地；源码`9a18a0f…`与manifest-only直接子提交`614ef7ac…`形成39文件bundle，干净快照6文件/11项全部PASS，typecheck38/38及适用合同通过。该证据只关闭Browser仓库子门；没有候选Web/Worker镜像、镜像级SBOM/新鲜漏洞PASS或完整18步同候选报告，运行UAT仍为alpha.42/0040，整体判定继续`PRODUCTION NO-GO`。
 
 ## 2. 证据范围与未执行事项
 
@@ -31,13 +33,13 @@
 - 数据迁移、应用测试、运维安全三个子智能体分别完成只读审计；主智能体复核关键代码路径并归并结论。
 - UAT 数据库只在`transaction read only`中读取`schema_migrations`和 public 表数量；没有读取业务行或执行写入。
 - 没有读取凭据、备份正文、受保护卷业务正文或用户未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`。
-- 没有 build、Migration、备份、恢复、上传、部署、服务重启、账号权限变化、真实员工登录或业务 POST。
+- TASK47只生成隔离测试用standalone build；没有候选Web/Worker镜像build/push、真实Migration、备份、恢复、上传、部署、服务重启、账号权限变化、真实员工登录或业务POST。
 
 ## 3. 当前身份与运行事实
 
 | 证据项 | 当前事实 | 判定 |
 | --- | --- | --- |
-| 根仓库 | TASK46源码`f3bac028bdb9ccf4c79be279ea7c4f698cbdd4f5`/tree`87fb1340bc1b7067e67be29677960546b0f8cd5c`与manifest-only直接子提交`3d1243e294236602975d3beb29e8f991b84db96d`形成已复核链；未fetch/push | 本地可追踪；当前完整历史的异机锚点待更新 |
+| 根仓库 | TASK47源码`9a18a0f307348c974a6f341565e7d16d76df184c`/tree`8c182d38f1acbcebe10d46e3a09f73c9ec612f22`与manifest-only直接子提交`614ef7ac2aea5ec23029c81b17b8c21adc0935dd`形成已复核39文件bundle链，SHA-256为`e54019df…a7192`；未fetch/push | 本地可追踪；当前完整历史的异机锚点待更新 |
 | 私有源码锚点 | 本机最后已知跟踪引用为`recovery-private/main@1dcbf8d`；本任务未fetch、调用远端API或push，因此未声称其为远端实时状态，也未用本地提交差值冒充异机证明 | `FAIL`，当前完整历史未证明异机存在 |
 | 源码 | `0.1.0-alpha.46`，Migration 45/head `0045_runtime_worker_readiness.sql`；0045 SHA-256为`cc4685a0…80fc`，0001—0044未修改 | source-verified，不等于运行候选 |
 | 源码 Schema | 45 个 SQL、journal 和 snapshot 顺序一致；`db/schema.ts`与 0045 snapshot 为 233 张 public 表且列集合一致 | 静态及隔离Migration一致性`PASS` |
@@ -63,7 +65,7 @@
 | 真实数据试迁移 | `FAIL` | 只读源快照、逐行结果、重复/孤儿/单位/文件处置、库存/金额核对和可重跑报告通过 |
 | 核心服务端规则 | `PARTIAL` | 物料/BOM/采购/收货/IQC/库存/生产/销售/财务关键链及异常路径在同一候选通过自动与人工验收 |
 | 权限/会话/安全/审计 | `PARTIAL / SOURCE SESSION AND RUNTIME HEALTH REMEDIATED` | 批准的岗位矩阵、职责分离、最小数据域、导入/会话/运行健康边界和审计安全测试在同候选及运行面通过；TASK43—TASK45源码完成不替代部署验收 |
-| 强制发布测试门 | `PARTIAL / TYPECHECK VERIFIED / OTHER CANDIDATE EVIDENCE OPEN` | 18步失败关闭suite及清单已实现，完整typecheck已在两个干净快照38/38；固定Browser、候选镜像SBOM/漏洞PASS及同候选完整报告尚未通过 |
+| 强制发布测试门 | `PARTIAL / TYPECHECK AND BROWSER VERIFIED / IMAGE EVIDENCE OPEN` | 18步失败关闭suite及清单已实现；完整typecheck38/38与固定Browser 6文件/11项已在干净快照通过，候选镜像SBOM/新鲜漏洞PASS及同候选完整报告尚未通过 |
 | 监控/容量/告警/手册 | `FAIL` | 指标、告警投递和值班升级演练；低资源负载/备份/恢复 soak；升级/回滚/故障手册通过演练 |
 | 真实员工受控试用 | `FAIL` | 少量真实岗位用户按脚本完成跨岗正常/异常流程并签字，问题闭环后重验 |
 | 正式切换与回滚授权 | `FAIL` | 明确窗口、冻结点、负责人、验证清单、回滚触发器与项目负责人专项授权 |
@@ -113,9 +115,10 @@
 - 当前清单经TASK45扩展为235文件（211 REQUIRED、24有明确别名/历史N/A）、18步`test:release`、固定执行器、资源/timeout/无skip、机器报告及候选manifest绑定；其中Pure Node112、PostgreSQL83、Browser6、历史D1 22、PG alias2、release contract6、POSIX special4。
 - TASK42最终源码快照曾通过Node 107文件/886、PostgreSQL 80文件/367等完整仓库门；TASK43—TASK45随后通过各自定向、隔离PostgreSQL、release contract及supervisor验证，但没有在当前源码提交上重跑完整112文件Node-source、83文件PostgreSQL或18步候选门。
 - TASK46已按D-120修复真实类型债，固定精确38配置集合/摘要合同，并在源码与bundle两个连续干净快照38/38通过；该子门不再是仓库候选阻断。
-- Browser 6项仍无固定Chromium/Playwright运行时；没有候选镜像级SBOM和新鲜漏洞PASS，也没有在当前源码上完成其余同候选18步门。因此完整候选门按设计保持阻断，不能把typecheck通过解释为候选通过。
+- TASK47已按D-121固定Playwright 1.51.1/Chromium 134内容寻址运行时，并在源码`9a18a0f…`干净快照完成Browser 6文件/11项；该子门不再是仓库候选阻断。
+- 仍没有候选Web/Worker镜像级SBOM和新鲜漏洞PASS，也没有在同一候选上完成18步全门。因此完整候选门按设计保持阻断，不能把typecheck或Browser子门通过解释为候选通过。
 
-解除条件：固定并验证Browser运行时，在获准候选镜像上生成镜像SBOM/新鲜漏洞PASS并运行完整18步门；任何缺失、跳过或失败继续阻止候选晋升。
+解除条件：在隔离候选镜像上生成镜像级SBOM/新鲜漏洞PASS并运行完整18步门；任何缺失、跳过或失败继续阻止候选晋升。
 
 ### PR-006 真实数据迁移与核对未闭环
 
@@ -164,10 +167,10 @@
 ## 8. 当前安全执行序列
 
 1. `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成 G1 合成/隔离证据；真实 G2 被异机目标、RPO/RTO和专项授权阻塞。
-2. G3仓库工具已由TASK42完成，完整typecheck已由TASK46关闭；候选build、Browser、镜像SBOM/漏洞PASS和UAT对齐仍保持失败关闭并需后续适用授权/资源。
+2. G3仓库工具已由TASK42完成，完整typecheck和Browser分别由TASK46/TASK47关闭；候选Web/Worker镜像、镜像SBOM/新鲜漏洞PASS、完整18步同候选报告和UAT对齐仍保持失败关闭并需后续适用授权/资源。
 3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
 4. TASK44/TASK45已完成会话绝对时限和health/Worker/storage/Migration真实性仓库修复；运行面验证等待同候选完整gate及专项部署授权。
-5. 下一安全任务固定Browser运行时并实际执行6项Browser E2E；岗位权限矩阵等待业务负责人确认，并继续更新/演练监控、升级、回滚和故障手册。
+5. 下一安全任务建立隔离候选Web/Worker镜像、OCI身份、镜像级SBOM/新鲜漏洞证据并执行完整18步同候选门；岗位权限矩阵等待业务负责人确认，并继续更新/演练监控、升级、回滚和故障手册。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。
 
@@ -199,3 +202,5 @@ TASK44增量验证保持串行且一次一个临时重任务：定向/release合
 TASK45增量验证同样串行且一次一个临时重任务：runtime readiness定向42/42、隔离PostgreSQL5/5、官方release Migration harness、release44/44、supervisor15/15、TASK45/release-contract定向typecheck和inventory235/211/24通过；治理收口另通过1,564文件凭据扫描、109个本地Markdown链接与134项控制协议。任务容器、测试库和临时文件清零；验证期间available约1.9—2.0 GiB、Swap449→453 MiB、根盘约30 GiB、Load1低于1，四服务restart0/OOM false。没有build、UAT/生产Migration、部署、当前卷读取或真实数据操作。
 
 TASK46增量验证保持串行且一次一个临时重任务：首次完整门如实失败后修复真实类型/执行器问题，源码`f3bac028`及bundle`3d1243e2`两个干净快照分别38/38；定向287/287、release合同45/45、supervisor15/15、inventory235/211/24、干净快照lint和1,566文件credentials通过。一次错误包含`.wrangler/work`的直接lint发生V8 heap OOM退出139，但宿主/容器OOM为0、Swap增长约27 MiB，正式快照重跑通过。起点/收口available约1.9/2.0 GiB、Swap453/484 MiB、根盘30/31 GiB、Load1低于4，四服务restart0/OOM false，任务容器/目录清零；没有build、UAT/生产Migration、部署、当前卷读取或真实数据操作。
+
+TASK47增量验证保持串行且任何时刻最多一个临时容器：第十三次干净快照Browser运行6文件/11项全部PASS，release合同45、supervisor20、完整typecheck38/38、lint和inventory235/211/24通过。Browser前available2,424,572KiB、Swap76.32%、根盘27GiB；Browser后Swap短暂80.14%即按规则暂停，未修改Swap或服务，自然回落到阈值内后才继续；最终available2,481,228KiB、Swap73.47%、根盘27GiB、Load`0.98/1.91/1.62`，内核OOM0、四服务restart0/OOM false，任务容器/目录清零。没有候选镜像build/push、UAT/生产Migration、部署、当前卷读取或真实数据操作。

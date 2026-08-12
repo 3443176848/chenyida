@@ -2,6 +2,18 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-13
+
+### SELFHOST-RELEASE-BROWSER-HARNESS-47 - `docs: start release browser harness closure` / focused runtime and test fixes / `docs: record browser gate validation pause` / `build: bind release browser supervisor bundle` / `docs: close release browser gate`
+
+- 调度/范围：TASK46治理收口`fbbf2a5d034d11d8a50f823a55ef78d2d32d682d`后的零DOING自动切换为TASK47唯一active task，完成后按`DOING→DONE`释放active slot。任务只关闭发布清单中的6个REQUIRED Browser E2E；不把历史手工Chromium、宿主偶然依赖或定向Node测试冒充发布Browser门。
+- 运行时/执行器：固定官方Playwright `1.51.1`镜像完整Repo/config digest、`linux/amd64`、Chromium revision 1161/version `134.0.6998.35`、可执行路径/SHA和精确依赖树；Git archive干净快照在固定Node镜像断网生成测试standalone，PostgreSQL 17 rootfs与Web/Chromium在唯一Browser容器内运行，保持只读rootfs、最小capability、资源限制和失败清理。
+- 历史数据库/合同：6文件inventory固定路径、摘要、数据库、loopback端口、确认变量和历史目标head；0036—0039模板先按正式不可变Migration事务性升级到0045，再逐库逐文件执行。`browser-e2e`从运行时不可用占位改为真实失败关闭动作，runtime policy、gate report和supervisor负向合同绑定Browser身份。
+- Browser证据：第十三次完整干净快照运行`task47-thirteenth-clean`实际通过6文件/11项，覆盖planning revision response、purchase traceability、requirement unit resolution、RFQ binding、RFQ traceability和supplier mapping；无skip/todo，路径集SHA-256为`71742177a734c12b1a53f63a93f8a68344c68c9400a7c3e0d9a9f9a4ad08ac86`，服务、合成数据库和临时资源全部清理。
+- Git/证据：最终源码`9a18a0f307348c974a6f341565e7d16d76df184c`/tree`8c182d38f1acbcebe10d46e3a09f73c9ec612f22`与manifest-only直接子提交`614ef7ac2aea5ec23029c81b17b8c21adc0935dd`形成39文件证据链；bundle SHA-256为`e54019dfde0af7a9a8367b5ade53976b1ffc4b24f9b36e46ae3778ed963a7192`。
+- 最终验证：release合同6文件/45项、supervisor Python20项、完整typecheck38/38、lint0 error/11条既有warning及inventory235/211/24通过；治理收口另通过JSON、Shell、Markdown链接、控制协议、凭据模式、范围和`git diff --check`。
+- 资源/安全：Browser前available2,424,572KiB、Swap76.32%、根盘27GiB；Browser后Swap短暂80.14%时按规则停止新重任务且未修改Swap或服务，自然回落后才继续；最终available2,481,228KiB、Swap73.47%、Load`0.98/1.91/1.62`、内核OOM0、四服务restart0/OOM false、任务临时资源0。未连接UAT/生产、读取四卷正文/凭据/业务数据、build/push候选镜像、运行真实Migration或deploy，系统继续`PRODUCTION NO-GO`。
+
 ## 2026-08-12
 
 ### SELFHOST-RELEASE-BROWSER-HARNESS-47 - `docs: start release browser harness closure`

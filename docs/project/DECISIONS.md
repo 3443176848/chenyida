@@ -1877,7 +1877,7 @@
 ## D-121 Browser 发布门采用内容寻址 Playwright、同容器 PostgreSQL 与历史精确 Migration 模板
 
 - 日期：2026-08-12
-- 状态：`ACCEPTED / IMPLEMENTED IN SOURCE / 9 OF 11 OBSERVED PASS / RESOURCE THRESHOLD PAUSE / RUNTIME NOT AUTHORIZED`
+- 状态：`ACCEPTED / IMPLEMENTED / 6 FILES 11 TESTS VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`
 - 提案与实施：Codex 持续交付负责人，依据项目负责人持续推进、智能体团队组织和隔离测试授权
 - 确认边界：只适用于仓库发布测试运行时和合成隔离数据库；候选镜像、UAT/生产 Migration/deploy、真实数据、账号、员工试用和正式晋升仍须分别满足证据或专项授权
 
@@ -1900,9 +1900,9 @@
 
 ### Consequences
 
-- 仓库具备可重放、无外网、历史Migration精确且不接触UAT的Browser门实现；静态supervisor合同与release合同已验证，正式6文件/11项干净快照执行和bundle重生成仍是本任务关闭前必需证据。
+- 仓库具备可重放、无外网、历史Migration精确且不接触UAT的Browser门实现；正式6文件/11项已在干净提交快照全部通过，supervisor合同、release合同和最终39文件bundle也已验证并固化。
 - Browser镜像和导出的PostgreSQL rootfs增加临时磁盘占用，故执行前后必须检查至少10 GiB根盘、available memory、Swap、Load、OOM/restart并确认精确临时目录/容器清零。
-- 本决定不证明候选Web/Worker镜像安全，也不授权联网漏洞库更新、镜像build/push、UAT/生产运行面变更、真实数据或员工使用；系统继续`PRODUCTION NO-GO`。
+- 本决定只关闭Browser子门，不证明候选Web/Worker镜像安全，也不授权镜像push、UAT/生产运行面变更、真实数据或员工使用；候选镜像级SBOM、新鲜漏洞PASS及完整18步同候选门仍失败关闭，系统继续`PRODUCTION NO-GO`。
 
 ### Rejected alternatives
 

@@ -33,16 +33,16 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-08-12（Asia/Shanghai）
+快照时间：2026-08-13（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
-| 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成；TASK47由主智能体保持单写者并串行执行重任务。OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT AUTHORIZED` |
+| 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成；TASK47由主智能体保持单写者并已串行完成。OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT AUTHORIZED` |
 | 当前版本 | 自托管源码为`0.1.0-alpha.46`，源码Migration为45/head `0045_runtime_worker_readiness.sql`；并行非生产UAT Web仍为`0.1.0-alpha.42`原镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，运行source revision仍为`569aa954d764309e239d1f6c174e582596d33a24`，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。alpha.43—alpha.46/0041—0045未build、未部署或应用到UAT；当前运行面仍是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
 | 当前根仓库运维基线 | `SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`已在不停止或重建服务的前提下清理10.92 GB BuildKit cache和四个精确核准的无引用测试/旧任务镜像，根盘可用17→30.34 GiB（`df -h`为31G）；Build Cache为0B，四服务restart0/OOM false，当前/alpha.41回滚/FIX38被拒证据镜像、private GHCR本地锚点、Trae/MySQL、备份和四卷保持。运行面继续沿用`SELFHOST-UAT-FIX-38`的alpha.42/0040非生产UAT基线，未执行build、Migration、部署或业务写 |
-| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。TASK46源码为`f3bac028bdb9ccf4c79be279ea7c4f698cbdd4f5`/tree`87fb1340bc1b7067e67be29677960546b0f8cd5c`，其直接子提交`3d1243e294236602975d3beb29e8f991b84db96d`只更新canonical supervisor bundle manifest，SHA-256为`a92c0a4088693b7bd23493a4820457b3f9dae4e2807e416f20218cb0e1d3b97b`；完整typecheck已在两个干净提交快照38/38通过。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；未fetch/push或改动远端，公开origin继续禁止接收内部历史 |
+| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。TASK47最终源码为`9a18a0f307348c974a6f341565e7d16d76df184c`/tree`8c182d38f1acbcebe10d46e3a09f73c9ec612f22`，其直接子提交`614ef7ac2aea5ec23029c81b17b8c21adc0935dd`只更新canonical supervisor bundle manifest，39文件bundle SHA-256为`e54019dfde0af7a9a8367b5ade53976b1ffc4b24f9b36e46ae3778ed963a7192`；Browser 6文件/11项及完整typecheck38/38均在干净快照通过。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；未fetch/push或改动远端，公开origin继续禁止接收内部历史 |
 | 镜像恢复锚点 | D-109的private GHCR镜像恢复锚点已建立：唯一目标/tag为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，一次push返回、认证registry与唯一tag package version三方digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association、无`latest`/额外tag；linux/amd64 child、attestation、config和9层均匹配预检，一次按digest pull完全匹配，匿名读取返回401。一次性本机凭据已logout并清理；项目负责人证明已通过GitHub网页撤销一次性PAT，本项目未读取或技术验证PAT正文/远端状态 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
@@ -51,13 +51,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0045`，45/head`0045_runtime_worker_readiness.sql`，0045 SHA-256为`cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc`；0001—0044未修改，Schema/233表snapshot/journal/allowlist一致。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0045只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / G3 RELEASE CANDIDATE GAP CLOSURE / PRODUCTION NO-GO`。G1合成恢复与G3发布工具已完成，TASK43—TASK46已在仓库层关闭导入fallback、会话绝对寿命、health/Worker/storage误报和完整TypeScript门；但运行面仍是旧版本，且真实异机副本、Browser/镜像安全/完整候选PASS、UAT部署、岗位权限和员工验收均未完成 |
-| 当前任务 | `SELFHOST-RELEASE-BROWSER-HARNESS-47`为唯一`DOING`：固定Browser运行时、隔离PostgreSQL与6项Browser E2E失败关闭执行器；当前为设计已核验、实施与执行待完成 |
-| 下一任务 | TASK47完成后继续评估候选镜像/SBOM/漏洞与完整18步门；G2真实备份恢复、候选Web/Worker镜像、UAT Migration/deploy、员工试用和切流均不自动获权 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / G3 RELEASE CANDIDATE GAP CLOSURE / PRODUCTION NO-GO`。G1合成恢复与G3发布工具已完成，TASK43—TASK47已在仓库层关闭导入fallback、会话绝对寿命、health/Worker/storage误报、完整TypeScript门和Browser门；但运行面仍是旧版本，且真实异机副本、候选镜像安全/完整18步候选PASS、UAT部署、岗位权限和员工验收均未完成 |
+| 当前任务 | TASK47已完成并释放active slot；当前暂为零`DOING`，等待同一持续交付链启动下一安全任务 |
+| 下一任务 | 建立隔离候选Web/Worker镜像、OCI身份、镜像级SBOM/新鲜漏洞证据并尝试完整18步同候选门；G2真实备份恢复、UAT Migration/deploy、员工试用和切流均不自动获权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-RELEASE-BROWSER-HARNESS-47已按D-121完成固定Browser发布门：官方Playwright 1.51.1/Chromium 134.0.6998.35内容寻址运行时、历史Migration模板升级、断网只读单容器执行器和真实`browser-e2e`分发均已落地。源码`9a18a0f`/tree`8c182d38`与manifest-only直接子提交`614ef7ac`形成39文件证据链，bundle SHA-256为`e54019df…a7192`；干净快照6文件/11项、release合同45、supervisor20、typecheck38/38和lint通过。没有候选镜像build/push、UAT/生产或真实数据动作，系统仍production no-go
 
 - SELFHOST-RELEASE-TYPECHECK-CLOSURE-46已按D-120完成完整发布TypeScript门：Node 22/ES2022运行合同、精确38配置集合/摘要双重核验和`--incremental false`只读快照执行器已落地；真实源码类型债已修复。源码`f3bac028`/tree`87fb1340`与manifest-only直接子提交`3d1243e2`形成证据链，两个干净提交快照均38/38通过；定向287/287、release合同45/45、supervisor15/15、inventory235/211/24和lint/凭据/治理门通过。没有build、Browser、UAT或生产动作，系统仍production no-go
 
@@ -67,7 +69,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 - SELFHOST-MATERIAL-IMPORT-SAFETY-43已在源码提交`5767c92`及manifest-only直接子提交`dad7468`完成D-117/PR-004仓库修复：建批/上传持久幂等、正文前owner/状态/CAS、私有staging/实际文件检查/无覆盖原子提升、reconciliation、job所有权和worker终态事务已落地，Migration以不可变0042加append-only 0043收口。定向/隔离PostgreSQL、typecheck、lint、release合同与230项inventory通过；没有build、UAT Migration/deploy或真实数据验收，运行UAT仍alpha.42/0040，系统仍production no-go
 
-- SELFHOST-OPS-RELEASE-GATE-42已完成D-116/G3仓库工具：严格release manifest与镜像级SBOM/安全证据合同、精确Migration allowlist/专用角色/数据库稳定身份、18步低资源串行门、content-addressed root supervisor两提交安装链和并发安全runtime identity已实现。TASK42收口时最终提交快照通过合同6文件/44、Node 107文件/886、PostgreSQL 80文件/367、POSIX 4文件/29、supervisor 15/15、Migration/恢复/Compose/Python/lint/凭证门；当时缺失的完整typecheck后来由TASK46关闭，固定Browser、候选镜像和新鲜漏洞PASS仍缺失，故候选尚未晋升、UAT未变、系统仍production no-go
+- SELFHOST-OPS-RELEASE-GATE-42已完成D-116/G3仓库工具：严格release manifest与镜像级SBOM/安全证据合同、精确Migration allowlist/专用角色/数据库稳定身份、18步低资源串行门、content-addressed root supervisor两提交安装链和并发安全runtime identity已实现。TASK42收口时最终提交快照通过合同6文件/44、Node 107文件/886、PostgreSQL 80文件/367、POSIX 4文件/29、supervisor 15/15、Migration/恢复/Compose/Python/lint/凭证门；当时缺失的完整typecheck和固定Browser后来分别由TASK46/TASK47关闭，候选镜像、镜像级SBOM/新鲜漏洞PASS及完整同候选门仍缺失，故候选尚未晋升、UAT未变、系统仍production no-go
 
 - SELFHOST-OPS-BACKUP-RECOVERY-V2-41已完成D-115/G1合成隔离基线：四域manifest与内容reconciliation、root-only libpq凭据、精确writer/数据库守卫及中断恢复、不可变LOCAL/OFFHOST/RESTORE回执、不同machine/cluster证明、全staging恢复/精确补偿、prepared receipt补发和Dashboard运行身份/RPO失败关闭均已实现。合同41/41、双独立PostgreSQL集群恢复及Dashboard 2/2通过；没有真实异机目标、当前卷读取、外传、build/Migration/deploy，系统仍为production no-go
 
@@ -278,7 +280,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前风险
 
-- `SELFHOST-PRODUCTION-READINESS-40`确认的首要风险继续开放。TASK41只关闭G1合成/隔离工具缺口：PostgreSQL及三个文件数据域仍没有真实异机当前锚点/恢复/RTO；源码alpha.46/0045与UAT alpha.42/0040仍未闭合。TASK43—TASK46已关闭导入fallback、会话绝对寿命、health/Worker/storage和完整typecheck的仓库风险，但运行UAT尚未部署；Browser、候选镜像/SBOM/漏洞证据和完整release gate仍阻止发布。详见[投产准入基线](PRODUCTION_READINESS.md)
+- `SELFHOST-PRODUCTION-READINESS-40`确认的首要风险继续开放。TASK41只关闭G1合成/隔离工具缺口：PostgreSQL及三个文件数据域仍没有真实异机当前锚点/恢复/RTO；源码alpha.46/0045与UAT alpha.42/0040仍未闭合。TASK43—TASK47已关闭导入fallback、会话绝对寿命、health/Worker/storage、完整typecheck和Browser的仓库风险，但运行UAT尚未部署；候选镜像/SBOM/漏洞证据和完整18步同候选release gate仍阻止发布。详见[投产准入基线](PRODUCTION_READINESS.md)
 - Docker构建缓存不会自动受控清理，连续候选构建和保留回滚镜像仍会再次消耗根盘；本次只恢复到精确30.34 GiB并保留5.942 GB Docker标记的未用镜像空间，不授权自动prune。未来重任务仍须先检查根盘，清理必须另按精确对象和保护清单执行
 
 - D-113与D-114均已由项目负责人接受，`AGENT-R1`、PM-002与`AGENT-R1-5`均已完成；这些仍不提供R2运行时强制力。直到R2/R3以后通过越权、脑裂、租约失效、资源和恢复负测，角色权限仍依赖现有仓库规则与人工流程，不能宣称已由OS、容器、命令代理或短时凭据技术强制
@@ -342,7 +344,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 ## 当前任务与下一任务
 
 - `SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已按D-120完成并释放active slot：精确38配置、ES2022合同和只读干净快照执行器已在两个提交快照38/38通过；一次错误纳入`.wrangler/work`的直接lint发生V8 heap OOM，正式干净快照lint随后0 error通过，宿主/容器OOM与restart均为0。
-- `SELFHOST-RELEASE-BROWSER-HARNESS-47`现为唯一`DOING`：已确认6个REQUIRED Browser文件、历史Migration head 0036—0039、独立合成数据库和现有缺失运行时失败；正在建立固定Playwright/Chromium镜像、固定依赖与串行单容器执行器。它不授权候选Web/Worker镜像、UAT/生产连接、Migration/deploy或真实数据。岗位权限矩阵须业务负责人批准后另立任务；真实异机备份/恢复、账号变化、员工试用和切换仍须专项明确授权。
+- `SELFHOST-RELEASE-BROWSER-HARNESS-47`已完成并释放active slot：固定Playwright/Chromium镜像、固定依赖、历史Migration模板和串行单容器执行器已在干净源码快照6文件/11项通过。下一安全任务是隔离候选Web/Worker镜像、镜像级SBOM/新鲜漏洞证据及完整18步门；它不授权push、UAT/生产连接、Migration/deploy或真实数据。岗位权限矩阵须业务负责人批准后另立任务；真实异机备份/恢复、账号变化、员工试用和切换仍须专项明确授权。
 
 - `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成并暂时回到零`DOING`：D-115四域V2工具与41/41合同、双集群隔离恢复通过。G2真实异机备份/恢复因外部目标与专项授权阻塞；下一安全任务转入G3发布身份闭合、release manifest、Migration allowlist和强制`test:release`，仍不build/deploy或读取当前卷。
 - 真实异机备份与恢复、UAT build/Migration/deploy、旧数据读取、员工试用、账号/权限、网络/systemd和正式切换仍须专项明确授权；持续交付授权不改变这些边界。
