@@ -2,6 +2,26 @@
 
 最后更新时间：2026-08-12（Asia/Shanghai）
 
+## SELFHOST-OPS-RELEASE-GATE-42（完成；真实候选证据仍阻塞）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 最终状态 | DONE / REPOSITORY TOOLING VERIFIED / CANDIDATE EVIDENCE BLOCKED / PRODUCTION NO-GO | D-116/G3仓库工具及隔离证据完成；没有build、UAT/生产Migration/deploy、runtime identity发布或`ELIGIBLE`候选 |
+| 两提交身份 | PASS / CONTENT ADDRESSED | 源码`d022f2c`/tree`f90048c…`；直接子提交`f67cc41`只新增canonical bundle manifest；bundle SHA-256 `2ea4e4c…`，36个逐blob条目及父/唯一diff已验证 |
+| 发布合同 | PASS / FAIL CLOSED | release manifest绑定Git/tree、package、镜像OCI+baked identity、完整Migration、测试、SBOM和安全证据；重复/未知/漂移/过期/缺失拒绝，prepared制品不可提前消费 |
+| Supervisor | PASS / NOT INSTALLED | content-addressed bundle、一次性root授权、固定动作、PREPARED/COMMITTED journal、可恢复launcher切换；去capability沙箱15/15通过，未执行host安装 |
+| Migration | PASS / ISOLATED | UAT/PRODUCTION精确allowlist、专用非superuser owner、deployment/database system ID/OID/comment/head/checksum及锁前后复核；隔离allowlist演练通过，未连接UAT |
+| 强制测试门 | PASS / TOOLING ONLY | 18个必需步骤、固定执行器、串行资源门、全局锁、timeout、无skip/todo、临时容器/既有服务restart/OOM核验、去敏机器报告 |
+| Node/合同 | PASS | release inventory合同6文件/44；二次合同41/41；源码清单107文件/886并完成Vinext隔离build；0 skip/todo |
+| PostgreSQL/恢复 | PASS | PostgreSQL清单80文件/367；Migration allowlist隔离演练；不同集群备份恢复及Dashboard 2/2复验，全部使用任务临时数据 |
+| POSIX/Python/Compose | PASS | POSIX 4文件/29；supervisor 15/15；Python self-test/smoke/go-live；Compose config以合成候选摘要解析通过 |
+| 静态/安全 | PASS WITH KNOWN WARNINGS | lint 0 error/11既有warning；credentials 1,521文件、shell语法、`git diff --check`通过。完整多tsconfig仍因既有ES2017 BigInt/历史类型债失败 |
+| 候选门 | NOT RUN / CORRECTLY BLOCKED | 无固定Chromium/Playwright运行时、获准Web/Worker候选镜像、镜像SBOM和新鲜Trivy PASS；Browser 6项保持必需且失败关闭，未伪造报告或release |
+| 运行面影响 | NONE | UAT保持alpha.42/0040；四服务未重建/重启，未读取业务行、四卷、凭据或受保护未跟踪报告 |
+| 资源/清理 | PASS / NO THRESHOLD BREACH | 最终验证前后available约2.2 GiB、Swap约427 MiB且无增长、根盘31 GiB、Load1低于4；四服务restart0/OOM false，任务容器/数据库/临时目录清零 |
+| 剩余最高风险 | OPEN / PR-001 PR-003 PR-004 PR-005 | 真实异机恢复、同候选镜像/UAT对齐、导入fallback安全、Browser/typecheck/镜像安全候选PASS均未完成 |
+| 下一安全任务 | G4 IMPORT FALLBACK SAFETY | 在仓库和隔离环境修复持久幂等、上传staging/补偿、CAS与job所有权；不build/deploy或连接UAT |
+
 ## SELFHOST-OPS-BACKUP-RECOVERY-V2-41（完成；真实异机仍阻塞）
 
 | 验证项 | 结果 | 说明 |

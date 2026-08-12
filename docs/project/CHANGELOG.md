@@ -4,6 +4,16 @@
 
 ## 2026-08-12
 
+### SELFHOST-OPS-RELEASE-GATE-42 - `feat: enforce immutable release candidate gate` / focused hardening / `chore: bind release supervisor bundle`
+
+- 发布身份：新增严格release manifest、镜像SBOM/漏洞证据、测试计划/报告和完整Migration allowlist合同；prepared证据在外层二次核验Git/镜像身份后才不可变发布，runtime identity以root锁、两阶段prepare/commit/abort、单调及同证据幂等防止并发旧证据覆盖。
+- Root边界：高权限动作改由content-addressed supervisor、短时一次性root授权和四个固定动作映射执行；安装器使用全局锁、不可变launcher/installer store、PREPARED/COMMITTED journal和可恢复授权消费。去capability测试发现并修复冻结目录跨父rename依赖DAC override；最终源码`d022f2c`及manifest-only `f67cc41`形成36文件bundle，SHA-256 `2ea4e4c…`。
+- Migration/门禁：UAT/PRODUCTION只接受合格manifest、精确deployment/database稳定身份、专用非superuser数据库owner、当前/目标head和逐文件checksum；锁前后重验且空库拒绝未知public对象。18步低资源串行门固定执行器、资源阈值/timeout、无skip/todo、临时容器清理、既有服务restart/OOM及去敏机器报告。
+- 隔离缺陷修复：所有发布Git调用禁用replace refs并固定archive `tar.umask=0022`；PostgreSQL快照预创建只读依赖挂载点；只读盘点PII扫描仅对白名单字段中的规范SHA/Git摘要和不透明引用豁免，普通文本手机号继续拒绝。上述缺陷均由正式提交快照门禁发现并新增回归。
+- 验证：最终快照合同6文件/44及二次41/41、Node 107文件/886并隔离build、PostgreSQL 80文件/367、POSIX 4文件/29、supervisor 15/15、Migration allowlist、异集群备份恢复及Dashboard 2/2、Python三基线、Compose config和credentials 1,521文件通过；lint 0 error/11既有warning，`git diff --check`通过。完整多tsconfig仍因既有ES2017 BigInt/历史类型债失败，固定Browser运行时不可用。
+- 边界/结论：没有build/pull/push候选镜像、联网扫描、host supervisor安装、UAT/生产连接、Migration/deploy、runtime identity发布、账号/服务/数据/四卷变更。没有候选镜像、Browser、镜像SBOM或新鲜Trivy PASS，故真实18步候选门未运行、未生成`ELIGIBLE`manifest；UAT保持alpha.42/0040，系统继续`PRODUCTION NO-GO`。
+- 资源/清理：最终验证前后available约2.2GiB、Swap约427MiB/1GiB且无增长、根盘31GiB、Load1低于4；四服务restart0/OOM false。任务容器、隔离数据库和临时目录清零，未建删Volume/镜像或prune；用户既有未跟踪状态报告保持不读、不改、不提交。
+
 ### SELFHOST-OPS-BACKUP-RECOVERY-V2-41 - `feat: harden backup recovery evidence chain`
 
 - 合同：新增D-115与严格四域V2 manifest/reconciliation/verification合同，绑定deployment、数据库system ID/OID/comment/profile/bytes、alpha.44、完整Git、实际Web/Worker容器及镜像digest、完整Migration 0041 manifest/head和PostgreSQL/uploads/attachments/backup-status。数据库dump明确为完整应用逻辑范围且排除owner/ACL/集群角色。

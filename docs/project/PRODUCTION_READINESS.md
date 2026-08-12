@@ -13,6 +13,8 @@
 
 2026-08-12 增量：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成 G1 合成/隔离实现与验证。四域 V2 工具、分层不可变回执、数据库守卫/恢复、不同机器/集群证明、prepared receipt 补发和 runtime release identity 原语已通过 41/41 合同测试及双集群 PostgreSQL 恢复测试。没有读取当前卷、创建真实备份或连接异机目标，因此整体判定仍为 `PRODUCTION NO-GO`。
 
+2026-08-12 第二次增量：`SELFHOST-OPS-RELEASE-GATE-42`已完成 G3 仓库工具和隔离验证。不可变release manifest/镜像安全证据合同、精确Migration allowlist、18步低资源串行门、content-addressed root supervisor及并发安全runtime identity已落地；最终提交快照通过Node、PostgreSQL、POSIX、Migration、恢复、Python、Compose、lint和凭证门。没有固定Browser运行时、通过完整typecheck的候选、获准Web/Worker镜像、镜像SBOM或新鲜漏洞PASS，故没有运行真实候选门或生成`ELIGIBLE`manifest，整体判定仍为`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -51,7 +53,7 @@
 | 真实数据试迁移 | `FAIL` | 只读源快照、逐行结果、重复/孤儿/单位/文件处置、库存/金额核对和可重跑报告通过 |
 | 核心服务端规则 | `PARTIAL` | 物料/BOM/采购/收货/IQC/库存/生产/销售/财务关键链及异常路径在同一候选通过自动与人工验收 |
 | 权限/会话/安全/审计 | `PARTIAL` | 批准的岗位矩阵、职责分离、绝对会话时限、最小数据域、导入边界、审计和安全测试通过 |
-| 强制发布测试门 | `FAIL` | 串行、机器可读、失败关闭的 release suite 覆盖全部适用领域、Migration、浏览器和安全门禁 |
+| 强制发布测试门 | `PARTIAL / REPOSITORY TOOLING VERIFIED` | 18步失败关闭suite及清单已实现；固定Browser、完整typecheck、候选镜像SBOM/漏洞PASS及同候选完整报告尚未通过 |
 | 监控/容量/告警/手册 | `FAIL` | 指标、告警投递和值班升级演练；低资源负载/备份/恢复 soak；升级/回滚/故障手册通过演练 |
 | 真实员工受控试用 | `FAIL` | 少量真实岗位用户按脚本完成跨岗正常/异常流程并签字，问题闭环后重验 |
 | 正式切换与回滚授权 | `FAIL` | 明确窗口、冻结点、负责人、验证清单、回滚触发器与项目负责人专项授权 |
@@ -78,8 +80,8 @@
 
 ### PR-003 运行候选身份不闭合
 
-- 源码 alpha.44/0041、UAT alpha.42/0040、当前 GHCR alpha.42 锚点和不完整的发布台账不是同一个候选。
-- Migration runner 会排序执行目录内全部匹配 SQL；虽有 advisory lock、checksum 与逐项事务，但没有绑定预期 release head、完整 manifest、Git revision或镜像 digest。
+- TASK42已实现严格release manifest、content-addressed supervisor两提交链及精确Migration allowlist/目标数据库身份，仓库工具不再允许靠tag或目录排序冒充候选。
+- 源码 alpha.44/0041、UAT alpha.42/0040和当前 GHCR alpha.42 锚点仍不是同一个已通过门禁的候选；没有获准alpha.44 Web/Worker镜像、镜像安全证据或`ELIGIBLE`manifest。
 - 当前不能证明“拟投产代码＝已验收代码＝运行镜像＝数据库版本”。
 
 解除条件：建立不可变 release manifest 与 migration allowlist；隔离 build/升级/回退通过后，经专项授权把 UAT 对齐到同一候选并重新验收。
@@ -94,13 +96,13 @@
 
 解除条件：持久幂等、staging 原子晋升、补偿与 reconciliation、所有权/404门禁、真实类型/签名校验、并发/CAS及隔离 PostgreSQL 故障测试通过。
 
-### PR-005 没有可信的强制发布测试门
+### PR-005 强制发布测试门工具已建立，但没有候选PASS
 
-- 仓库跟踪约 221 个`*.test.mjs`，但默认`npm test`只执行`selfhost-file-storage.test.mjs`。
-- 没有`test:release`或等价机器 manifest，也没有已跟踪 CI workflow 强制所有投产领域。
-- 多个 UI contract 测试是源码静态匹配，不能替代浏览器端到端与真实岗位验收。
+- TASK42建立了227文件清单（203 REQUIRED、24有明确别名/历史N/A）、18步`test:release`、固定执行器、资源/timeout/无skip、机器报告及候选manifest绑定。
+- 最终源码快照已通过合同6文件/44、Node 107文件/886、PostgreSQL 80文件/367和POSIX 4文件/29，以及Migration/恢复/Python/Compose/lint/凭证门。
+- Browser 6项仍无固定Chromium/Playwright运行时；完整多tsconfig因既有ES2017 BigInt/历史声明债失败；没有候选镜像级SBOM和新鲜漏洞PASS。因此完整18步候选门按设计保持阻断，不能把仓库工具验证解释为候选通过。
 
-解除条件：建立低资源串行 release suite，明确每类测试、超时、资源、数据库隔离、报告摘要与不适用理由；任何缺失、跳过或失败均阻止候选晋升。
+解除条件：固定并验证Browser运行时、修复完整typecheck、在获准候选镜像上生成镜像SBOM/新鲜漏洞PASS并运行完整18步门；任何缺失、跳过或失败继续阻止候选晋升。
 
 ### PR-006 真实数据迁移与核对未闭环
 
@@ -149,8 +151,8 @@
 ## 8. 当前安全执行序列
 
 1. `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成 G1 合成/隔离证据；真实 G2 被异机目标、RPO/RTO和专项授权阻塞。
-2. 当前转入 G3：在不 build/deploy 的仓库范围建立并发安全 release identity、不可变 release manifest、Migration allowlist 和低资源串行`test:release`门。
-3. 修复物料导入 fallback 的幂等、上传原子性、文件检查和任务所有权。
+2. G3仓库工具已由TASK42完成；候选build、Browser、完整typecheck、镜像SBOM/漏洞PASS和UAT对齐仍保持失败关闭并需后续适用授权/资源。
+3. 当前转入G4，修复物料导入 fallback 的幂等、上传原子性、文件检查和任务所有权。
 4. 修复健康、会话绝对时限和经业务批准的权限矩阵。
 5. 更新并演练监控、升级、回滚和故障手册。
 

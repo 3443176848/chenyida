@@ -2,14 +2,15 @@
   "schema_version": "chenyida-erp-agent-task/v1",
   "task": {
     "id": "SELFHOST-OPS-RELEASE-GATE-42",
-    "revision": 22,
-    "ledger_state": "DOING",
-    "delivery_stage": "FINAL_ISOLATED_VERIFICATION",
+    "revision": 24,
+    "ledger_state": "DONE",
+    "delivery_stage": "REPOSITORY_TOOLING_VERIFIED",
     "qualifiers": [
-      "READ_ONLY_AUDIT_FOUND_FAIL_CLOSED_GAPS",
-      "REPOSITORY_FIXES_IMPLEMENTED",
+      "REPOSITORY_TOOLING_VERIFIED",
+      "ISOLATED_GATES_PASS",
       "NO_BUILD_OR_DEPLOY",
       "NO_UAT_OR_PRODUCTION_ACCESS",
+      "CANDIDATE_EVIDENCE_BLOCKED",
       "CANDIDATE_GATE_NOT_RUN",
       "PRODUCTION_NO_GO"
     ],
