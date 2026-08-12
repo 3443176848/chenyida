@@ -104,6 +104,12 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
     def test_content_addressed_bundle_rejects_tampering_and_extra_files(self):
         root, digest, launcher, manifest = self.bundle()
         self.assertEqual(supervisor.verify_bundle(root, digest, launcher), manifest)
+        staged = self.temporary / f".{digest}.staging-abcdefgh"
+        root.rename(staged)
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_BUNDLE_PATH_INVALID"):
+            supervisor.verify_bundle(staged, digest, launcher)
+        self.assertEqual(supervisor.verify_staged_bundle(staged, digest, launcher), manifest)
+        staged.rename(root)
         target = root / next(iter(supervisor.BUNDLE_FILES))
         target.chmod(0o644)
         target.write_bytes(b"tampered\n")

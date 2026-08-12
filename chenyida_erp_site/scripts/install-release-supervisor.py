@@ -522,7 +522,13 @@ def validate_bundle_payload(repository: Path, authorization: dict[str, Any], man
 
 
 def stage_bundle(bundle: Path, manifest_raw: bytes, payloads: list[tuple[str, bytes, int]]) -> None:
-    bundle.mkdir(mode=0o755)
+    if bundle.exists():
+        trusted_directory(bundle, 0o700, "SUPERVISOR_INSTALL_STAGING_INVALID")
+        if any(bundle.iterdir()):
+            reject("SUPERVISOR_INSTALL_STAGING_INVALID")
+        bundle.chmod(0o755)
+    else:
+        bundle.mkdir(mode=0o755)
     for relative, raw, mode in payloads:
         target = bundle / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -636,15 +642,15 @@ def install(repository: Path, authorization: dict[str, Any], authorization_path:
     elif authorization_path is not None and authorization_path.exists() and trusted_file(authorization_path, 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_AUTHORIZATION_FILE_INVALID") != authorization_raw:
         reject("SUPERVISOR_INSTALL_AUTHORIZATION_FILE_INVALID")
 
-    staging_parent = Path(tempfile.mkdtemp(prefix=f".{authorization['bundle_manifest_sha256']}.", dir=BUNDLES_ROOT))
-    bundle_staging = staging_parent / authorization["bundle_manifest_sha256"]
-    launcher_staging = staging_parent / "launcher"
+    bundle_staging = Path(tempfile.mkdtemp(prefix=f".{authorization['bundle_manifest_sha256']}.staging-", dir=BUNDLES_ROOT))
+    launcher_staging_parent = Path(tempfile.mkdtemp(prefix=f".launcher-{authorization['bundle_manifest_sha256']}.", dir=BUNDLES_ROOT))
+    launcher_staging = launcher_staging_parent / "launcher"
     launcher_temporary = LAUNCHER_PATH.parent / f".{LAUNCHER_PATH.name}.{os.getpid()}.tmp"
     try:
         stage_bundle(bundle_staging, manifest_raw, payloads)
         write_root_file(launcher_staging, launcher_raw, 0o555)
         launcher_module = load_launcher_module(launcher_staging)
-        launcher_module.verify_bundle(bundle_staging, authorization["bundle_manifest_sha256"], launcher_staging)
+        launcher_module.verify_staged_bundle(bundle_staging, authorization["bundle_manifest_sha256"], launcher_staging)
         target_bundle = BUNDLES_ROOT / authorization["bundle_manifest_sha256"]
         if target_bundle.exists():
             launcher_module.verify_bundle(target_bundle, authorization["bundle_manifest_sha256"], launcher_staging)
@@ -658,7 +664,8 @@ def install(repository: Path, authorization: dict[str, Any], authorization_path:
         if launcher_temporary.exists():
             reject("SUPERVISOR_INSTALL_LAUNCHER_TEMP_EXISTS")
     finally:
-        remove_staging_tree(staging_parent)
+        remove_staging_tree(bundle_staging)
+        remove_staging_tree(launcher_staging_parent)
 
     if not prepared_exists:
         write_root_file(prepared_file, canonical_json(prepared), 0o400)

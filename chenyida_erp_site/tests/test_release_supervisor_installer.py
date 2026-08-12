@@ -334,7 +334,16 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
             patchers = [patch.object(installer, key, value) for key, value in patches.items()]
             for active in patchers: active.start()
             try:
-                with patch.object(installer.os, "chown"), patch.object(installer.os, "fchown"):
+                real_rename = os.rename
+
+                def capability_safe_rename(source, destination):
+                    source_path = Path(source)
+                    destination_path = Path(destination)
+                    if source_path.is_dir() and (source_path.stat().st_mode & 0o200) == 0 and source_path.parent != destination_path.parent:
+                        raise PermissionError("immutable directory move requires DAC override")
+                    return real_rename(source, destination)
+
+                with patch.object(installer.os, "chown"), patch.object(installer.os, "fchown"), patch.object(installer.os, "rename", side_effect=capability_safe_rename):
                     with patch.object(installer.os, "replace", side_effect=OSError("injected launcher switch failure")):
                         with self.assertRaisesRegex(OSError, "injected launcher switch failure"):
                             installer.install(repository, authorization, authorization_file, authorization_digest, MODULE_PATH)

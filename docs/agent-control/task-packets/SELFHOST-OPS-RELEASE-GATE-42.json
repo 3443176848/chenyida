@@ -2,7 +2,7 @@
   "schema_version": "chenyida-erp-agent-task/v1",
   "task": {
     "id": "SELFHOST-OPS-RELEASE-GATE-42",
-    "revision": 19,
+    "revision": 21,
     "ledger_state": "DOING",
     "delivery_stage": "FINAL_ISOLATED_VERIFICATION",
     "qualifiers": [

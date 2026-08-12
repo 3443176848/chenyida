@@ -225,8 +225,13 @@ def validate_bundle_manifest(value: Any) -> dict[str, Any]:
     return value
 
 
-def verify_bundle(bundle_root: Path, expected_digest: str, launcher_path: Path = LAUNCHER_PATH) -> dict[str, Any]:
-    if not SHA256.fullmatch(expected_digest) or bundle_root.name != expected_digest:
+def _verify_bundle(bundle_root: Path, expected_digest: str, launcher_path: Path, staging: bool) -> dict[str, Any]:
+    if not SHA256.fullmatch(expected_digest):
+        reject("SUPERVISOR_BUNDLE_PATH_INVALID")
+    if staging:
+        if not re.fullmatch(rf"\.{expected_digest}\.staging-[a-z0-9_]{{8}}", bundle_root.name):
+            reject("SUPERVISOR_BUNDLE_PATH_INVALID")
+    elif bundle_root.name != expected_digest:
         reject("SUPERVISOR_BUNDLE_PATH_INVALID")
     trusted_directory(bundle_root, {0o555}, "SUPERVISOR_BUNDLE_ROOT_INVALID")
     manifest_path = bundle_root / "bundle-manifest.json"
@@ -260,6 +265,14 @@ def verify_bundle(bundle_root: Path, expected_digest: str, launcher_path: Path =
         if len(raw_file) != entry["bytes"] or sha256(raw_file) != entry["sha256"] or stat.S_IMODE(file_stat.st_mode) != int(entry["mode"], 8):
             reject("SUPERVISOR_BUNDLE_FILE_DIGEST_MISMATCH")
     return manifest
+
+
+def verify_bundle(bundle_root: Path, expected_digest: str, launcher_path: Path = LAUNCHER_PATH) -> dict[str, Any]:
+    return _verify_bundle(bundle_root, expected_digest, launcher_path, False)
+
+
+def verify_staged_bundle(bundle_root: Path, expected_digest: str, launcher_path: Path = LAUNCHER_PATH) -> dict[str, Any]:
+    return _verify_bundle(bundle_root, expected_digest, launcher_path, True)
 
 
 def parse_time(value: Any, code: str) -> datetime:
