@@ -4,12 +4,17 @@
 
 ## 2026-08-12
 
-### SELFHOST-RELEASE-TYPECHECK-CLOSURE-46 - `docs: start release typecheck closure`
+### SELFHOST-RELEASE-TYPECHECK-CLOSURE-46 - `docs: start release typecheck closure` / `fix: close release typecheck gate` / `build: bind release typecheck supervisor bundle` / `docs: close release typecheck gate`
 
 - 调度/范围：TASK45治理收口`ffd0ba6e705f79d4c0bef06952d725d7510b8782`后的零DOING自动切换为TASK46唯一active task。目标只关闭固定离线Node沙箱中的全部38份`tsconfig*.json`发布门，不以TASK43—TASK45定向typecheck替代。
 - 保护：不build/pull/push镜像，不连接或修改UAT/生产、当前四卷、账号或业务数据，不运行真实Migration/deploy/restart；用户未跟踪状态报告及`shujvbiao/`不读、不改、不提交。
 - 起点：源码alpha.46/0045；现场只读核验UAT仍为Web alpha.42/source revision`569aa954…d33a24`和数据库40/head0040，四服务restart0/OOM false、四卷metadata存在。资源约available1.9GiB、Swap453MiB/1GiB、根盘30GiB、Load`0.93/0.61/0.38`，当日内核OOM匹配0。
 - 验收：完整门必须在干净提交快照、固定Node镜像、断网和资源限制内38/38通过；禁止降低strict/noEmit/isolatedModules、跳过配置、用ignore或扩大exclude隐藏可发布源码。Browser、候选build/SBOM/漏洞、UAT对齐及production readiness仍不在本任务授权内。
+- 类型合同：D-120把自托管运行边界对齐到Node 22/ES2022；根配置只排除历史D1示例和废弃本地D1 seed，不隐藏自托管可发布源码。真实类型修复覆盖Material查询/Validation、导入/Normalization、文件大小、Material UI判别联合、API泛型、离线身份、Browser evidence和rehearsal模块边界，没有修改业务规则、Schema/Migration、权限、事务或API语义。
+- 失败关闭执行器：`release-test-inventory.mjs`固定精确排序的38配置清单，执行前后核对集合、普通文件与内容摘要；每个配置使用`--incremental false`，新增、删除、重命名、漏跑、执行中漂移或提前成功均拒绝。`npm run typecheck:release`和release sandbox复用同一入口，清单/运行策略摘要及漂移负测同步更新。
+- Git/证据：源码`f3bac028bdb9ccf4c79be279ea7c4f698cbdd4f5`/tree`87fb1340bc1b7067e67be29677960546b0f8cd5c`与manifest-only直接子提交`3d1243e294236602975d3beb29e8f991b84db96d`形成证据链；bundle manifest SHA-256为`a92c0a4088693b7bd23493a4820457b3f9dae4e2807e416f20218cb0e1d3b97b`。
+- 验证：首次完整门如实记录ES2017/真实类型/历史示例/只读增量失败；修复后源码和bundle两个连续干净提交快照均38/38并输出`TYPECHECK SET PASS configs=38`。定向Node287/287、release合同6文件45/45、supervisor15/15、inventory235/211/24、干净快照lint 0 error/11既有warning、credentials 1,566文件以及JSON/Shell/Markdown链接/控制协议/敏感/范围/`git diff --check`通过。
+- 资源/边界：一次错误包含`.wrangler/work`的直接工作区lint在768 MiB V8 heap内存耗尽退出139；宿主内核与容器OOM均为0、Swap只约增加27 MiB，随后正式干净快照lint通过。起点/收口available约1.9/2.0 GiB、Swap453/484 MiB、根盘30/31 GiB、Load1低于4，四服务restart0/OOM false，任务容器/目录清零。未build、连接UAT/生产、运行Migration/deploy、读取当前四卷正文或业务数据；UAT保持alpha.42/0040，系统继续`PRODUCTION NO-GO`。
 
 ### SELFHOST-RUNTIME-HEALTH-TRUTH-45 - `fix: enforce truthful runtime readiness` / `build: bind runtime readiness supervisor bundle` / `docs: close runtime readiness hardening`
 

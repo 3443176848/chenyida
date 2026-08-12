@@ -8,11 +8,11 @@
 
 ## 2026-08-12 投产准入基线
 
-`SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成四域V2工具和合成/双集群隔离恢复证据，但没有真实异机锚点、当前数据恢复或RTO；源码 alpha.46/0045 与非生产 UAT alpha.42/0040 仍不一致；发布候选的Browser、完整typecheck、镜像/SBOM/漏洞证据和完整18步门仍未通过。TASK43—TASK45已关闭导入fallback、会话绝对寿命及health/Worker/storage误报的仓库风险，但运行UAT未部署；真实数据迁移、完整跨岗位验收、员工试运行和正式切换均未完成。
+`SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成四域V2工具和合成/双集群隔离恢复证据，但没有真实异机锚点、当前数据恢复或RTO；源码 alpha.46/0045 与非生产 UAT alpha.42/0040 仍不一致；TASK46已关闭完整typecheck子门，但发布候选的Browser、镜像/SBOM/漏洞证据和完整18步门仍未通过。TASK43—TASK45已关闭导入fallback、会话绝对寿命及health/Worker/storage误报的仓库风险，但运行UAT未部署；真实数据迁移、完整跨岗位验收、员工试运行和正式切换均未完成。
 
 项目负责人已授权持续选择最高优先级且可安全执行的任务，不再要求每项后等待“继续”。该持续授权不包含生产数据访问、真实数据外传、正式备份恢复、UAT/生产 Migration、build/deploy、账号权限、systemd/网络/Swap、真实员工业务写或切换/回滚；这些动作仍须专项明确授权。
 
-TASK45已在源码`7494086`与manifest-only `dcef6f6`完成alpha.46/0045运行健康加固：完整Migration manifest、数据库时钟Worker租约、Web/Worker双侧文件卷探针、live/readiness分离和Worker Docker healthcheck已通过仓库/隔离验证。当前唯一`DOING`为`SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`，从治理提交`ffd0ba6`起步，固定在断网资源受限Node沙箱逐个关闭38份`tsconfig*.json`完整发布门；不连接UAT/生产或build/deploy。
+TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门：Node 22/ES2022、精确38配置集合/摘要核验和只读提交快照执行器已在两个干净快照38/38通过，bundle SHA-256为`a92c0a40…b97b`。当前零`DOING`，下一安全任务固定Browser运行时并执行6项Browser E2E；不连接UAT/生产或自动授权候选build/deploy。
 
 ## 系统组成
 
@@ -304,7 +304,7 @@ TASK45已在源码`7494086`与manifest-only `dcef6f6`完成alpha.46/0045运行�
 
 ## 当前路线
 
-`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭；TASK41已完成D-115/G1合成隔离工具，但真实数据锚点延期风险继续开放。TASK42已完成D-116/G3仓库工具：最终源码`d022f2c`与manifest-only `f67cc41`形成content-addressed supervisor链，release manifest、Migration allowlist和强制串行门通过隔离验证；真实候选仍因Browser/typecheck/候选镜像/SBOM/新鲜漏洞证据阻塞。TASK43—TASK45已分别按D-117—D-119完成导入fallback、会话和运行健康仓库加固，当前源码alpha.46/0045，运行UAT仍未部署。TASK46现为唯一DOING并先关闭完整typecheck；权限矩阵等待业务批准，系统继续production no-go。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API是0041引入且已通过隔离验证。项目负责人已接受D-113和D-114，`AGENT-R1`、PM-002及`AGENT-R1-5`均已完成。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，TASK04—TASK05保持TODO；正式holdout未重跑，0041—0045未build、部署或应用UAT。外部AI禁用，UAT继续alpha.42/0040且没有真实V2回执；任何R2、模型/真实数据、真实收货、迁移、部署、生产或切流仍须独立授权。
+`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭；TASK41已完成D-115/G1合成隔离工具，但真实数据锚点延期风险继续开放。TASK42已完成D-116/G3仓库工具；TASK46又按D-120关闭完整typecheck，源码`f3bac028`与manifest-only `3d1243e2`的两个干净快照均38/38。真实候选仍因Browser、候选镜像/SBOM/新鲜漏洞证据阻塞。TASK43—TASK45已分别按D-117—D-119完成导入fallback、会话和运行健康仓库加固，当前源码alpha.46/0045，运行UAT仍未部署。当前零DOING，下一安全任务处理固定Browser运行时；权限矩阵等待业务批准，系统继续production no-go。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API是0041引入且已通过隔离验证。项目负责人已接受D-113和D-114，`AGENT-R1`、PM-002及`AGENT-R1-5`均已完成。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，TASK04—TASK05保持TODO；正式holdout未重跑，0041—0045未build、部署或应用UAT。外部AI禁用，UAT继续alpha.42/0040且没有真实V2回执；任何R2、模型/真实数据、真实收货、迁移、部署、生产或切流仍须独立授权。
 
 ## 恢复上下文检查清单
 

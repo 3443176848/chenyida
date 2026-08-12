@@ -1841,6 +1841,39 @@
 - 拒绝只比较Migration count/head而忽略每个checksum，或只相信环境变量而不比对package、数据库和Worker写入身份。
 - 拒绝把liveness、readiness、备份恢复和岗位权限合并为一个公开端点，或用备份过期把仍可服务的Web主动下线。
 
+## D-120 发布TypeScript门采用Node 22 / ES2022与精确38配置失败关闭清单
+
+- 日期：2026-08-12
+- 状态：`ACCEPTED / IMPLEMENTED / SOURCE ONLY / RUNTIME NOT AUTHORIZED`
+- 提案与实施：Codex持续交付负责人，依据项目负责人持续推进、仓库安全实施和隔离测试授权
+- 确认边界：只适用于仓库TypeScript编译合同；Browser、候选镜像、UAT/生产Migration/deploy、真实数据和正式晋升仍须各自证据或专项授权
+
+### Context
+
+- D-116要求完整发布门逐个执行全部TypeScript配置，但既有根配置仍以ES2017为target，不能表达项目已经依赖的BigInt、现代正则和Node 22运行能力。
+- 仓库有38份`tsconfig*.json`，历史上只有任务定向配置通过；动态glob如果没有精确集合合同，会允许新增、删除、重命名或漏跑后仍提前成功。
+- 干净Git快照为只读，TypeScript默认增量写入会尝试生成`tsconfig.tsbuildinfo`，这属于执行器副作用而非源码错误。
+
+### Decision
+
+1. 自托管发布TypeScript运行合同固定为Node 22和ES2022；根配置采用ES2022 target，任务级配置继续继承或保持等价的现代运行边界。
+2. 发布门维护精确、排序的38份配置清单，并在执行前后核对配置集合、普通文件身份与内容SHA-256；新增、删除、重命名、漏跑、执行中漂移或提前成功全部失败关闭。
+3. 每份配置固定以`--incremental false`执行，使干净只读提交快照不产生build info，同时保留`strict`、`noEmit`和`isolatedModules`等既有严格性。
+4. 只允许从根配置排除历史D1示例和已经废弃的本地D1 seed脚本；不得排除任何自托管可发布源码，不得用`skip`、ignore、空声明或弱化类型掩盖失败。
+5. 完整门必须在固定离线Node镜像和资源限制中对干净已提交快照38/38通过，并至少重复一次证明执行器和集合合同稳定；定向typecheck不能替代该证据。
+
+### Consequences
+
+- TASK46已修复真实类型问题并在源码`f3bac028bdb9ccf4c79be279ea7c4f698cbdd4f5`/tree`87fb1340bc1b7067e67be29677960546b0f8cd5c`及bundle直接子提交`3d1243e294236602975d3beb29e8f991b84db96d`的两个干净快照分别完成38/38；bundle manifest SHA-256为`a92c0a4088693b7bd23493a4820457b3f9dae4e2807e416f20218cb0e1d3b97b`。
+- PR-005中的完整TypeScript子门在仓库候选层关闭；固定Browser运行时、候选镜像、镜像SBOM/新鲜漏洞PASS和完整18步同候选门仍开放，不能据此生成`ELIGIBLE`manifest或部署UAT。
+- 本决定没有修改Schema/Migration、业务规则、权限、事务、API、版本或运行面；UAT继续alpha.42/0040，系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝仅运行根配置或任务定向配置、动态发现后不锁集合、跳过失败配置或把配置移出清单。
+- 拒绝继续用ES2017再为BigInt/正则添加伪声明，也拒绝用`skipLibCheck`、`@ts-ignore`、空声明或扩大exclude隐藏自托管源码。
+- 拒绝让类型检查在只读候选快照写入增量制品，或把工作区缓存当作可重复发布证据。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

@@ -2,12 +2,12 @@
   "schema_version": "chenyida-erp-agent-task/v1",
   "task": {
     "id": "SELFHOST-RELEASE-TYPECHECK-CLOSURE-46",
-    "revision": 1,
-    "ledger_state": "DOING",
-    "delivery_stage": "IMPLEMENTATION",
+    "revision": 2,
+    "ledger_state": "DONE",
+    "delivery_stage": "COMPLETE",
     "qualifiers": [
-      "REPOSITORY_TYPECHECK_CLOSURE",
-      "NO_BUILD_OR_DEPLOY",
+      "REPOSITORY_TYPECHECK_VERIFIED",
+      "RUNTIME_NOT_DEPLOYED",
       "NO_UAT_OR_PRODUCTION_ACCESS",
       "PRODUCTION_NO_GO"
     ],

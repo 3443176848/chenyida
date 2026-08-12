@@ -2,17 +2,22 @@
 
 最后更新时间：2026-08-12（Asia/Shanghai）
 
-## SELFHOST-RELEASE-TYPECHECK-CLOSURE-46（执行中；完整发布类型门）
+## SELFHOST-RELEASE-TYPECHECK-CLOSURE-46（完成；完整发布类型门）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / REPOSITORY TYPECHECK CLOSURE / PRODUCTION NO-GO | 唯一active task；未取得完整门PASS，系统不能交给真实员工 |
+| 最终状态 | DONE / REPOSITORY TYPECHECK VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO | 完整TypeScript子门已关闭并释放active slot；系统仍不能交给真实员工 |
 | 严格起点 | PASS / CONTROLLED | `main@ffd0ba6e705f79d4c0bef06952d725d7510b8782`、alpha.46/0045；唯一既有未跟踪状态报告保持不读不改不提交 |
 | 运行面基线 | VERIFIED READ ONLY / UNCHANGED | Web alpha.42/revision`569aa954…d33a24`、UAT 40/head0040；四服务restart0/OOM false，受保护四卷存在；本任务不修改运行面 |
-| 类型门范围 | OPEN / 38 CONFIGS | 固定Node 22 digest、断网、1 CPU、1 GiB memory、768 MiB heap，逐个执行全部38份`tsconfig*.json`；定向typecheck不得替代 |
-| 资源起点 | PASS | available约1.9GiB、Swap453MiB/1GiB、根盘30GiB、Load`0.93/0.61/0.38`、当日内核OOM匹配0 |
+| Git身份 | PASS / TWO-COMMIT BUNDLE | 源码`f3bac028bdb9ccf4c79be279ea7c4f698cbdd4f5`/tree`87fb1340bc1b7067e67be29677960546b0f8cd5c`；manifest-only直接子提交`3d1243e294236602975d3beb29e8f991b84db96d`，bundle SHA-256 `a92c0a40…b97b` |
+| 类型门合同 | PASS / EXACT 38 | D-120固定Node 22/ES2022、精确排序配置集合/摘要前后核验与`--incremental false`；新增、删除、重命名、漏跑、漂移或提前成功均失败关闭 |
+| 完整类型门 | PASS / REPEATABLE | 源码提交和bundle提交两个连续干净快照均38/38，固定Node digest、断网、1 CPU、1 GiB memory、768 MiB heap；定向typecheck不能替代 |
+| 实现边界 | PASS / NO BUSINESS SEMANTIC CHANGE | 修复真实源码类型和历史/废弃工具边界；strict/noEmit/isolatedModules未放宽，可发布源码未被exclude，Schema/Migration/权限/事务/API语义不变 |
+| 自动验证 | PASS / SCOPED | 定向287/287、release合同45/45、supervisor15/15、inventory235/211/24、干净快照lint0 error/11既有warning、credentials1,566及治理/链接/diff门通过 |
+| 诚实失败记录 | RECORDED / RECOVERED | 一次错误包含`.wrangler/work`的直接lint因768 MiB V8 heap OOM退出139；宿主/容器OOM为0，正式干净快照lint随后通过，未降低规则或把失败记为PASS |
+| 资源/清理 | PASS | available约1.9→2.0GiB、Swap453→484MiB/1GiB、根盘30→31GiB、Load1低于4、内核OOM0；四服务restart0/OOM false，任务容器/目录清零 |
 | 禁止范围 | ENFORCED | 不build/deploy，不连接UAT/生产业务数据，不运行真实Migration，不读取当前卷正文或改变账号/系统配置 |
-| 剩余最高风险 | OPEN | Browser、候选镜像/SBOM/漏洞PASS、完整18步门、真实异机恢复、UAT对齐、员工试用与切换均未完成 |
+| 下一安全任务 | BROWSER HARNESS | 固定Browser运行时并实际执行6项Browser E2E；候选镜像/SBOM/漏洞PASS、完整18步门、真实异机恢复、UAT对齐、员工试用与切换仍未完成 |
 
 ## SELFHOST-RUNTIME-HEALTH-TRUTH-45（完成；仓库与隔离验证，运行面未部署）
 
