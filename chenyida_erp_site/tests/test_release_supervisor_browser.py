@@ -46,6 +46,7 @@ class ReleaseSupervisorBrowserTest(unittest.TestCase):
         self.assertIn("--network none", source)
         self.assertIn("--read-only --cap-drop ALL --cap-add SYS_CHROOT --cap-add SETUID --cap-add SETGID", source)
         self.assertIn("--memory 1536m --memory-swap 1792m --cpus 1 --pids-limit 384", source)
+        self.assertIn("--tmpfs /workspace/node_modules/.vite-temp:rw,exec,nosuid,nodev,size=32m,mode=1777", source)
         self.assertIn('chenyida.erp.release-browser-test=$RUN_ID', source)
         self.assertIn("setpriv --reuid=1000 --regid=1000 --clear-groups env -i", source)
         self.assertIn("git_candidate archive --format=tar", source)

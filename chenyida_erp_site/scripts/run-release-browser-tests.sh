@@ -146,7 +146,7 @@ CURRENT_CONTAINER_ID=$(/usr/bin/docker create \
   --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
   --user 1000:1000 --memory 1024m --memory-swap 1280m --cpus 1 --pids-limit 256 \
   --tmpfs /tmp:rw,nosuid,nodev,noexec,size=256m \
-  --tmpfs /workspace/node_modules/.vite-temp:rw,exec,nosuid,nodev,size=32m \
+  --tmpfs /workspace/node_modules/.vite-temp:rw,exec,nosuid,nodev,size=32m,mode=1777 \
   -e PATH=/usr/local/bin:/usr/bin:/bin -e HOME=/tmp -e LC_ALL=C -e LANG=C -e TZ=UTC -e TMPDIR=/tmp \
   -e NODE_ENV=production -e NODE_OPTIONS=--max-old-space-size=768 \
   -e ERP_RUNTIME_BUILD_VERSION="$PACKAGE_VERSION" -e ERP_RUNTIME_GIT_COMMIT="$GIT_COMMIT" \
