@@ -1,6 +1,6 @@
 # Linux 自托管部署
 
-当前 Compose 项目`chenyida-erp-parallel`是受控非生产UAT，不是production部署：Web只绑定`127.0.0.1:3000`，Caddy另在公网18888提供受控TLS入口，PostgreSQL无宿主端口。运行面仍为alpha.42/0040；仓库alpha.46/0045未build或部署。固定命令、安全边界和停止条件见`parallel-http-acceptance.md`。
+当前Compose项目`chenyida-erp-parallel`是受控非生产UAT，不是production部署：Web只绑定`127.0.0.1:3000`，Caddy另在公网18888提供受控TLS入口，PostgreSQL无宿主端口。运行面仍为alpha.42/0040；仓库alpha.46/0045已形成仅本机隔离零发现诊断候选，但没有正式supervisor gate、`ELIGIBLE`manifest或部署。固定命令、安全边界和停止条件见`parallel-http-acceptance.md`。
 
 ## 本地开发首次启动
 
@@ -35,7 +35,7 @@ docker compose -f compose.yml --profile tools run --rm admin
 
 生产不得使用本页的本地`--build`或直接`up`命令。必须先取得同一Git/tree、alpha.46或后续版本、Web/Worker registry digest、完整Migration allowlist、镜像SBOM/漏洞证据和18步gate PASS形成的`ELIGIBLE`manifest，再按[发布门](../testing/selfhost-release-gate.md)、[Migration说明](postgresql-migration.md)和[运维基线](operations-runbook.md)取得分别的build、Migration、部署和runtime identity专项授权。真实执行同时加载`compose.yml`与`compose.release.yml`，只接受已核验digest且`--pull never`。
 
-Caddy持久化证书数据。只开放经批准的HTTP/HTTPS入口，不要暴露PostgreSQL。`web`和`worker`使用非root `node`用户，容器日志轮转、`unless-stopped`、Web/Worker健康检查和30秒Worker停机窗口已配置。0045部署编排必须等待旧Worker停止或租约过期，禁止手工改租约绕过排他。
+Caddy持久化证书数据。只开放经批准的HTTP/HTTPS入口，不要暴露PostgreSQL。alpha.46候选的`web`和`worker`使用数值非root身份`65532:65532`，容器日志轮转、`unless-stopped`、Web/Worker健康检查和30秒Worker停机窗口已配置。0045部署编排必须等待旧Worker停止或租约过期，禁止手工改租约绕过排他。
 
 ## 验证与升级
 

@@ -6,7 +6,7 @@
 
 - 唯一未来生产权威方向是 Node.js、PostgreSQL、本地持久文件和独立 Worker。
 - `chenyida-erp-parallel`仍是受控非生产 UAT：Web `0.1.0-alpha.42` / source revision `569aa954d764309e239d1f6c174e582596d33a24`，PostgreSQL 40/head `0040_warehouse_receipt_readiness.sql`。
-- 当前仓库源码为 `0.1.0-alpha.46` / 45/head `0045_runtime_worker_readiness.sql`；0041—0045均未 build、未部署或应用到 UAT。源码与运行面不得描述为同一候选。
+- 当前仓库源码为`0.1.0-alpha.46`/45/head`0045_runtime_worker_readiness.sql`；TASK48已从精确`8952a815`/tree`1ac73360`构建仅本机隔离候选并完成零发现诊断，但0041—0045仍未部署或应用到UAT。无正式supervisor gate或`ELIGIBLE`manifest，源码/诊断候选/运行面不得描述为同一发布。
 - Python/SQLite 常驻面仍是开发运行和迁移来源，不是未来生产底座；正式切换前必须另有停写、只读或隔离决定。
 - 入口、受控业务事实与历史操作见 `parallel-http-acceptance.md`；未经任务授权不得登录、发送业务 POST 或查询业务行。
 
@@ -50,7 +50,7 @@ Compose 配置展开需要数据库和 setup 变量；只读状态检查可使�
 6. 执行匿名健康、权限、核心业务、数据汇总、Worker 和备份时效验收；
 7. 观察 restart/OOM、Load、内存、Swap、磁盘和错误率；触发回滚条件立即停止晋升。
 
-TASK42已形成release manifest、Migration allowlist、content-addressed supervisor和`test:release`仓库工具；TASK46/TASK47已分别关闭38配置TypeScript和6文件Browser子门，TASK48的D-123源码合同又补上精确Git archive构建回执及installed Migration路径，见[自托管发布门V1](../testing/selfhost-release-gate.md)。host supervisor仍未安装；候选镜像级SBOM、新鲜漏洞PASS和完整gate PASS仍不存在，UAT仍为alpha.42/0040。因此G3为`REPOSITORY SUBGATES VERIFIED / INSTALLATION AND CANDIDATE EVIDENCE BLOCKED`，仍是投产阻断。
+TASK42已形成release manifest、Migration allowlist、content-addressed supervisor和`test:release`仓库工具；TASK46/TASK47分别关闭38配置TypeScript和6文件Browser子门，TASK48又按D-123—D-125完成精确Git archive构建回执、manifest/config身份、固定Wolfi/Node运行层及本机新鲜零发现诊断，见[自托管发布门V1](../testing/selfhost-release-gate.md)。host supervisor仍未安装；正式scan provenance/SBOM/security evidence和完整gate PASS仍不存在，UAT仍为alpha.42/0040。因此G3为`LOCAL CANDIDATE DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED`，仍是投产阻断。
 
 ## 发布制品和Migration操作保护
 

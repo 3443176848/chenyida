@@ -1948,7 +1948,7 @@
 ## D-123 候选构建采用精确 Git archive、内容寻址构建输入与强绑定本地构建回执
 
 - 日期：2026-08-13
-- 状态：`ACCEPTED / SOURCE IMPLEMENTED / ISOLATED CONTRACTS VERIFIED / CANDIDATE BUILD PENDING`
+- 状态：`ACCEPTED / SOURCE IMPLEMENTED / ISOLATED CONTRACTS VERIFIED / EXACT CANDIDATE BUILD VERIFIED / FORMAL GATE PENDING`
 - 提案与实施：Codex 持续交付负责人，依据 D-122 的本机隔离构建授权及三条只读审计结论
 - 确认边界：只适用于本机隔离候选构建、回执和发布证据合同；不构成外部镜像恢复锚点、可复现构建证明、host supervisor 安装、UAT/生产 Migration/deploy 或正式晋升授权
 
@@ -1987,7 +1987,7 @@
 ## D-124 发布镜像身份分离 registry manifest、运行时本地身份与 OCI config digest
 
 - 日期：2026-08-13
-- 状态：`ACCEPTED / SOURCE IMPLEMENTED / ISOLATED CONTRACTS VERIFIED / CANDIDATE REBUILD PENDING`
+- 状态：`ACCEPTED / SOURCE IMPLEMENTED / ISOLATED CONTRACTS VERIFIED / EXACT CANDIDATE REBUILD VERIFIED / FORMAL GATE PENDING`
 - 提案与实施：Codex 持续交付负责人，依据 TASK48 首次真实候选归档核验结果
 - 确认边界：只修正本机候选构建、扫描和发布证据的镜像身份语义；不授权外部推送、host supervisor 安装、UAT/生产 Migration/deploy 或正式晋升
 
@@ -2021,7 +2021,7 @@
 ## D-125 最终运行层采用固定 Wolfi Node 22 最小包并删除可证明仅构建使用的 image-size
 
 - 日期：2026-08-13
-- 状态：`ACCEPTED / SOURCE IMPLEMENTED / 6 FILES 48 CONTRACT TESTS VERIFIED / PREDECESSOR DIAGNOSTIC ZERO / CURRENT CANDIDATE REBUILD PENDING`
+- 状态：`ACCEPTED / CURRENT 8952a81 CANDIDATE BUILT / 6 FILES 48 CONTRACT TESTS VERIFIED / DIAGNOSTIC ZERO / FORMAL SUPERVISOR GATE BLOCKED`
 - 提案与实施：Codex 持续交付负责人，依据 TASK48 两镜像首次新鲜 Trivy 诊断结果和 D-122 隔离构建授权
 - 确认边界：只修改候选源码、依赖锁、最终运行层和本机构建回执；不授权外部推送、host supervisor 安装、UAT/生产 Migration/deploy、真实数据或正式晋升
 
@@ -2048,8 +2048,8 @@
 - Wolfi APK是在线、签名且精确版本的输入，但包仓库可滚动，现阶段仍缺离线包镜像和外部可恢复候选锚点；回执必须保留无可复现attestation及无外部registry锚点限制。
 - `image-size`裁剪依赖 Vinext 0.0.50当前输出结构，未来 Vinext升级或引用图变化会主动阻断build并要求重新审阅，而不会静默删除潜在运行依赖。
 - 精确`cc9ebbf`前序候选已用新鲜Trivy数据库完成无Docker socket、无网络的归档诊断：Web覆盖25个Wolfi包和63个npm包，Worker覆盖25个Wolfi包和60个npm包，两镜像全部severity均为零发现；非root、Node版本、无npm、Web live与Worker失败关闭也已通过。该候选早于本条严格覆盖合同提交，只能作为诊断证据，不能冒充当前正式候选。
-- 修正后的6文件发布合同共48项、release typecheck及lint（0 error，11项既有warning）通过，并直接接受上述两份真实诊断报告；当前仍须从新的干净精确提交重建和重扫，才可生成同候选证据。
-- 本决定尚未证明新候选零漏洞或完整18步门PASS，也未改变 UAT alpha.42/0040；系统继续`PRODUCTION NO-GO`。
+- 修正后的6文件发布合同共48项、release typecheck及lint（0 error，11项既有warning）通过，并直接接受真实诊断报告。最终`8952a81`候选已从干净精确tree重建：Web/Worker registry manifest分别为`sha256:278688…92288`/`sha256:e85ce2…ee77c`，config分别为`sha256:161ea6…f6c53`/`sha256:f8dc4a…817c1`；Web 25+63、Worker 25+60包在新鲜数据库下全部severity零发现，扫描前后数据库树摘要一致。
+- 本决定已在隔离诊断层证明当前精确候选零发现，但尚无installed supervisor生成的正式provenance/SBOM/security evidence或完整18步PASS，也未改变UAT alpha.42/0040；系统继续`PRODUCTION NO-GO`。
 
 ### Rejected alternatives
 

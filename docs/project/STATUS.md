@@ -2,17 +2,24 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
-## SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48（执行中；隔离候选证据）
+## SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48（完成；隔离候选零发现诊断，正式门失败关闭）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / ISOLATED CANDIDATE EVIDENCE / PRODUCTION NO-GO | 当前唯一active task；不构成部署或发布授权 |
+| 最终状态 | DONE / EXACT LOCAL CANDIDATE BUILT / ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / PRODUCTION NO-GO | 已释放active slot；不构成部署或发布授权 |
 | 严格起点 | PASS / CONTROLLED | `main@d554a150a2f9cb4b672dc49785ed63bf3e0edfc8`、alpha.46/0045、唯一worktree；既有未跟踪状态报告不读不改不提交 |
-| 运行面基线 | VERIFIED READ ONLY / UNCHANGED | UAT Migration 40/head0040、227表，Web image ID `sha256:e7761e2c…f94964`；四服务restart0/OOM false，Python旧面active/restart0 |
+| Git身份 | PASS / CONTENT-ADDRESSED CHAIN | 运行层源码`864789c8…b42c`/bundle子提交`cc9ebbf4…5a44`；严格扫描合同`13c42294…2a18`与最终bundle直接子提交`8952a815…11c4`，tree`1ac73360…faf4`、bundle SHA-256`53729db3…61f9` |
 | 授权边界 | LOCAL ISOLATED BUILD ONLY | 可本机构建、公共只下载固定工具/漏洞库、临时loopback registry及隔离测试；禁止外部push、host supervisor安装、UAT/生产Migration/deploy、四卷/真实数据访问 |
-| 当前缺口 | OPEN | 固定Trivy镜像/新鲜数据库、Web/Worker候选registry digest、镜像级SBOM/零漏洞证据和完整18步同候选报告尚未产生；host supervisor当前未安装 |
+| 构建身份 | PASS / LOCAL ENGINE ONLY | Web manifest/config`sha256:27868850…92288`/`sha256:161ea63b…f6c53`；Worker`sha256:e85ce236…ee77c`/`sha256:f8dc4ac7…817c1`；回执`dc24889d…34d9`，loopback registry已删除且无外部恢复锚点 |
+| 最小运行层 | PASS | 两镜像为固定Wolfi `20230201`+Node22.23.2、UID/GID65532、无npm；Web无`image-size`且Migration只读、live为alpha.46，Worker仅production依赖且错误去敏失败关闭 |
+| 漏洞/SBOM诊断 | PASS / ZERO FINDINGS | 固定Trivy0.70.0、数据库UpdatedAt距扫描7.5h，断网无socket归档扫描；Web Wolfi25+npm63、Worker25+60，全部severity0。数据库树前后`def6b023…86b`，四份root:root0440诊断制品摘要已记录 |
+| 正式门 | BLOCKED / FAIL CLOSED | host supervisor未安装；正式镜像证据与18步入口均在制品写入前退出1，artifact root不变。无正式provenance/SBOM/security evidence、gate PASS或`ELIGIBLE`manifest |
+| 自动验证 | PASS / SCOPED | release合同48/48、supervisor Python20/20、release typecheck、lint0 error/11既有warning、credentials1,575及diff检查通过 |
+| 运行面基线 | VERIFIED READ ONLY / UNCHANGED | UAT Web image`sha256:e7761e2c…f94964`及四服务image不变，restart0/OOM false，Web/PostgreSQL healthy、Worker/Caddy health none；未读业务行/日志/卷正文 |
 | 起点资源 | PASS / BELOW STOP LINES | available约2.4GiB、Swap744MiB/1GiB（约72.7%）、根盘27GiB、Load`0.05/0.49/0.88`、内核OOM0；BuildKit cache0B |
+| 收口资源/清理 | PASS | available约2.2GiB、Swap734MiB/1GiB（72%）、根盘18GiB、Load`0.31/0.32/0.37`、`oom_kill=0`；临时registry/容器/tar/目录0，成功候选/数据库/只读证据保留，未prune |
 | 系统是否可用 | NO | 真实异机恢复、同候选UAT、权限矩阵、真实迁移、员工试用和切换均未完成 |
+| 下一安全任务 | MONITORING AND ALERTING | 仓库/隔离环境补齐运行健康、容量、备份证据新鲜度、告警及排障合同；host安装、真实数据、UAT/生产仍须专项授权 |
 
 ## SELFHOST-RELEASE-BROWSER-HARNESS-47（完成；仓库浏览器门已验证）
 

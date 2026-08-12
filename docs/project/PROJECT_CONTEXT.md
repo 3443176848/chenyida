@@ -8,13 +8,13 @@
 
 ## 2026-08-13 投产准入基线
 
-`SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成四域V2工具和合成/双集群隔离恢复证据，但没有真实异机锚点、当前数据恢复或RTO；源码 alpha.46/0045 与非生产 UAT alpha.42/0040 仍不一致；TASK46/TASK47已关闭完整typecheck和Browser子门，但候选镜像、镜像级SBOM/新鲜漏洞证据和完整18步同候选门仍未通过。TASK43—TASK45已关闭导入fallback、会话绝对寿命及health/Worker/storage误报的仓库风险，但运行UAT未部署；真实数据迁移、完整跨岗位验收、员工试运行和正式切换均未完成。
+`SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成四域V2工具和合成/双集群隔离恢复证据，但没有真实异机锚点、当前数据恢复或RTO；源码alpha.46/0045与非生产UAT alpha.42/0040仍不一致。TASK46/TASK47已关闭完整typecheck和Browser子门，TASK48又形成精确本机Web/Worker候选并以新鲜数据库证明全部severity零发现；但正式镜像证据和18步同候选门仍因host supervisor未获安装授权失败关闭。TASK43—TASK45已关闭导入fallback、会话绝对寿命及health/Worker/storage误报的仓库风险，但运行UAT未部署；真实数据迁移、完整跨岗位验收、员工试运行和正式切换均未完成。
 
 项目负责人已授权持续选择最高优先级且可安全执行的任务，不再要求每项后等待“继续”。该持续授权不包含生产数据访问、真实数据外传、正式备份恢复、UAT/生产 Migration、build/deploy、账号权限、systemd/网络/Swap、真实员工业务写或切换/回滚；这些动作仍须专项明确授权。
 
-TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门：Node 22/ES2022、精确38配置集合/摘要核验和只读提交快照执行器已在两个干净快照38/38通过。TASK47又在源码`9a18a0f`与manifest-only直接子提交`614ef7ac`完成D-121固定Browser门：官方Playwright/Chromium内容寻址运行时下6文件/11项全部通过，39文件bundle SHA-256为`e54019df…a7192`。两项都只关闭仓库子门，不连接UAT/生产或自动授权候选Web/Worker镜像build/deploy；下一安全任务处理候选镜像/SBOM/漏洞及完整同候选门。
+TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门；TASK47又在源码`9a18a0f`与manifest-only直接子提交`614ef7ac`完成D-121固定Browser门。TASK48随后以运行层源码`864789c8`、严格扫描合同`13c42294`和最终bundle子提交`8952a815`闭合本机候选：Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，固定Wolfi/Node层为非root且无npm，断网无socket扫描覆盖Web 25+63、Worker 25+60包且全部severity为0。三项都不连接或修改UAT/生产；TASK48的诊断不能替代正式supervisor provenance、18步PASS或部署授权。
 
-2026-08-13，`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`按D-122启动为唯一`DOING`。项目负责人本轮明确允许隔离测试、构建和Migration演练，因此本任务可本机构建精确候选、只下载固定公共工具/漏洞库并使用临时loopback registry；不得外部push、安装host supervisor、修改UAT/生产、读取当前四卷或真实业务数据。起点host supervisor未安装，正式18步门不得以环境变量或直接脚本旁路。
+2026-08-13，`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`已按D-122—D-125完成并释放active slot。最终候选精确绑定`8952a815`/tree`1ac73360`、alpha.46/0045、两镜像manifest/config及构建回执；新鲜Trivy数据库树在扫描前后不变，Web/Worker全部severity为0。host supervisor仍未安装，正式镜像证据与18步门分别在任何制品变更前退出1，未用环境变量或直接脚本旁路。下一安全任务转入仓库级监控、容量、备份证据新鲜度、告警与排障闭环。
 
 ## 系统组成
 
@@ -39,7 +39,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为`chenyida-erp-selfhosted`；当前源码为`0.1.0-alpha.46`并演进到head 0045，受控公网并行UAT Web仍运行`0.1.0-alpha.42`原镜像，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。0041—0045均未build或部署到UAT；alpha.42仍只是Web-only非生产UAT记录，不是生产release。
+- 发布标识：包名为`chenyida-erp-selfhosted`；当前源码为`0.1.0-alpha.46`并演进到head 0045，`8952a815`已形成仅本机隔离候选且诊断零发现，但未通过正式gate或部署。受控公网并行UAT Web仍运行`0.1.0-alpha.42`原镜像，UAT PostgreSQL仍为40/head`0040_warehouse_receipt_readiness.sql`；0041—0045均未部署到UAT。alpha.42仍只是Web-only非生产UAT记录，不是production release。
 - 恢复任务收口：private Git与private GHCR镜像锚点已经建立并验证；项目负责人证明已在GitHub网页撤销一次性PAT，并主动延期PostgreSQL dump与uploads、attachments、backup-status异机锚点。TASK39据此按`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`行政收口；数据锚点未建立、单机数据恢复风险继续`OPEN`，不构成production ready。
 - 备份恢复V2：D-115/TASK41已实现四域manifest、root-only libpq凭据、精确writer与数据库guard、全关系内容reconciliation、不可变LOCAL/OFFHOST/RESTORE回执、不同machine/cluster证明、staging/单事务恢复/精确补偿、prepared receipt补发和Dashboard runtime/RPO失败关闭。合同41/41、两个独立PostgreSQL集群恢复及Dashboard 2/2通过；只使用合成/隔离数据，未读取当前四卷、外传、build/Migration/deploy。真实异机目标、加密、调度/保留/告警、角色/ACL、真实恢复/RTO继续阻塞G2。
 - AI治理基线：D-110和`PHASE4-TASK01`继续约束AI仅建议、确定性门禁优先、失败关闭、外部模型默认禁用、完整建议追溯、人工决定分离、四角色审批、版本化去敏评估及停用/回退/漂移。`PHASE4-TASK02`已在独立工具边界交付64条静态合成/去敏数据、四项确定性基线、严格Schema/manifest/CLI/指标与一次冻结holdout报告；D-111只批准冻结本地确定性身份的正确性/证据/复现100%、安全和错误候选0及分能力最低coverage，状态仍为`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`。D-112五表合同在0041实现为独立`LOCAL_DETERMINISTIC`四能力Service和受保护POST/GET；仓库总head现为0045。项目负责人将`PHASE4-TASK03`保持为`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。与产品AI严格分离的`AGENT-R1-5`合成研发协议MVP已完成；TASK45收口提交边界为零DOING/`IDLE`。TASK02数据集、holdout、manifest、标签和机器报告不变且正式holdout未重跑，TASK04—TASK05仍为TODO。
@@ -306,7 +306,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 ## 当前路线
 
-`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭；TASK41已完成D-115/G1合成隔离工具，但真实数据锚点延期风险继续开放。TASK42已完成D-116/G3仓库工具；TASK46/TASK47又分别按D-120/D-121关闭完整typecheck与Browser门，TASK47源码`9a18a0f`与manifest-only `614ef7ac`形成39文件bundle且6文件/11项通过。TASK48现按D-122处理本地候选镜像、SBOM/新鲜漏洞证据及不旁路supervisor的完整同候选门尝试。TASK43—TASK45已分别按D-117—D-119完成导入fallback、会话和运行健康仓库加固，当前源码alpha.46/0045，运行UAT仍未部署。权限矩阵等待业务批准，系统继续production no-go。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API是0041引入且已通过隔离验证。项目负责人已接受D-113和D-114，`AGENT-R1`、PM-002及`AGENT-R1-5`均已完成。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，TASK04—TASK05保持TODO；正式holdout未重跑，0041—0045未build、部署或应用UAT。外部AI禁用，UAT继续alpha.42/0040且没有真实V2回执；任何R2、模型/真实数据、真实收货、迁移、部署、生产或切流仍须独立授权。
+`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭；TASK41已完成D-115/G1合成隔离工具，但真实数据锚点延期风险继续开放。TASK42已完成D-116/G3仓库工具；TASK46/TASK47分别按D-120/D-121关闭完整typecheck与Browser门，TASK48再按D-122—D-125完成精确本机候选与新鲜零发现诊断，正式supervisor证据/18步门仍失败关闭。下一安全任务补齐仓库级监控、容量、备份证据新鲜度、告警与排障合同。TASK43—TASK45已分别完成导入fallback、会话和运行健康仓库加固，当前源码alpha.46/0045，运行UAT仍未部署。权限矩阵等待业务批准，系统继续production no-go。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API是0041引入且已通过隔离验证。项目负责人已接受D-113和D-114，`AGENT-R1`、PM-002及`AGENT-R1-5`均已完成。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，TASK04—TASK05保持TODO；正式holdout未重跑，0041—0045未部署或应用UAT。外部AI禁用，UAT继续alpha.42/0040且没有真实V2回执；任何R2、模型/真实数据、真实收货、迁移、部署、生产或切流仍须独立授权。
 
 ## 恢复上下文检查清单
 

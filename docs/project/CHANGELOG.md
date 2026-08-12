@@ -4,7 +4,7 @@
 
 ## 2026-08-13
 
-### SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 - `docs: start isolated release candidate evidence` / `fix: bind isolated candidate build provenance`
+### SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 - staged source hardening / `fix: validate Wolfi candidate package coverage` / `build: bind Wolfi scan coverage supervisor bundle` / `docs: close isolated candidate evidence`
 
 - 调度/范围：TASK47释放active slot后，按持续交付目标把TASK48登记为唯一`DOING`。严格起点为`main@d554a150a2f9cb4b672dc49785ed63bf3e0edfc8`、alpha.46/0045；UAT只读仍为alpha.42/0040、227表，当前服务不变。
 - 授权边界：依据项目负责人本轮明确允许的“隔离环境中的测试、构建和迁移演练”，D-122允许本地候选build、固定公共工具/漏洞库只下载和临时loopback registry；禁止外部push、host supervisor安装、UAT/生产Migration/deploy、当前四卷或真实数据访问。
@@ -13,6 +13,12 @@
 - 起点资源/安全：available约2.4GiB、Swap744MiB/1GiB、根盘27GiB、Load`0.05/0.49/0.88`、内核OOM0，四服务restart0/OOM false、BuildKit cache0B；唯一未跟踪状态报告继续不读、不改、不提交。
 - 源码审计/修复：D-123固定Dockerfile frontend和三个Node阶段完整digest；新增clean HEAD精确Git archive、Web/Worker串行build、Registry 2.8.3 loopback digest回拉及不可变`candidate-build-provenance/v1`。scan provenance升级v2并强绑同run/candidate/reference回执；installed supervisor从可信bundle加载合同代码但显式哈希候选仓库Migration目录。依赖安装诚实记录为公共npm+lockfile integrity，应用build断网；本地digest明确不是外部恢复锚点或可复现attestation。
 - 源码验证：固定Node单容器定向38/38、官方release-contract 6文件/48项、inventory235/211/24及lint 0 error/11条既有warning通过；Shell语法和`git diff --check`通过。每次临时容器精确清理，OOM0、四服务restart0/OOM false及health元数据不变。本阶段尚未build候选、准备Trivy数据库、扫描或运行正式18步门。
+- 漏洞驱动加固：首批候选被新鲜Trivy严格拒绝后，最终运行层从Debian/完整Node改为固定Wolfi manifest加精确`nodejs-22-minimal=22.23.2-r1`；Next升级16.3.0、React族19.2.8，Worker只复制离线prune后的production依赖，Web在完整运行图证明后删除仅构建可达的`image-size@2.0.2`。最终两镜像均以`65532:65532`运行、无npm，公共npm/APK输入及不可复现/无外部锚点局限写入v3构建回执。
+- 身份合同：D-124把registry manifest、本机inspect identity与OCI config digest分开绑定；D-125把Trivy原生/CycloneDX覆盖严格固定为唯一`wolfi 20230201`、`os-pkgs/wolfi`、`lang-pkgs/node-pkg`及`pkg:apk/wolfi`+`pkg:npm`双清单，Debian、未知生态、缺包或重复OS失败关闭。6文件48/48、supervisor20/20、release typecheck、lint0 error/11既有warning及1,575文件credentials通过。
+- Git/构建：运行层源码`864789c80b0bf7bca10df1b6a4067deb5154b42c`与bundle子提交`cc9ebbf48bc16da5b685fc919bb0f55e8f6e5a44`，严格覆盖合同`13c422944c1eb7c4de83ac0b40414b7b1b822a18`与最终bundle直接子提交`8952a815cac837d201ff821df16d4a21b61711c4`形成链；bundle SHA-256为`53729db3…61f9`。最终精确tree`1ac73360…faf4`的Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，config为`sha256:161ea63b…f6c53`/`sha256:f8dc4ac7…817c1`；构建回执SHA-256为`dc24889d…34d9`。
+- 运行与安全诊断：Web/Worker均为Wolfi/Node22.23.2、非root、无npm；Web Migration为只读且`/api/live`返回alpha.46，Worker无数据库配置时只返回净化失败码。固定Trivy 0.70.0、7.5小时内数据库、断网、无Docker socket归档扫描覆盖Web 25+63、Worker 25+60包，`UNKNOWN/LOW/MEDIUM/HIGH/CRITICAL`全部为0；数据库树摘要前后均为`def6b023…86b`，四份root-only诊断制品按SHA保存于仓库外。
+- 正式门/结论：`create-release-image-evidence.sh`与`run-release-gate.sh`在任何制品写入前分别以“必须由installed supervisor启动”退出1，artifact root不变；未安装、旁路或伪造host supervisor。TASK48按授权内完成收口，但没有正式provenance/SBOM/security evidence、18步PASS、`ELIGIBLE`manifest、外部registry锚点或UAT部署，系统继续`PRODUCTION NO-GO`。
+- 资源/保护：起点available约2.4GiB/Swap744MiB/根盘27GiB，最终2.2GiB/734MiB/18GiB/Load`0.31/0.32/0.37`，`oom_kill=0`；四服务image/restart/OOM/health未漂移，临时registry、容器、tar和目录清零，成功候选及审计证据保留。未读未跟踪状态报告、`.env`、业务数据、日志或四卷正文，未prune、部署、Migration、账号或系统变更。
 
 ### SELFHOST-RELEASE-BROWSER-HARNESS-47 - `docs: start release browser harness closure` / focused runtime and test fixes / `docs: record browser gate validation pause` / `build: bind release browser supervisor bundle` / `docs: close release browser gate`
 

@@ -29,25 +29,28 @@
 
 2026-08-13 第九次增量：`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`已按D-122启动为唯一`DOING`。范围是精确已提交源码的本地Web/Worker候选build、临时loopback registry digest、固定Trivy与新鲜漏洞数据库、镜像级SBOM/零漏洞证据及不旁路supervisor的18步门尝试；不外部push、不安装host supervisor、不修改UAT/生产或读取当前四卷/真实数据。任务启动不改变整体`PRODUCTION NO-GO`。
 
+2026-08-13 第十次增量：`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`已完成授权内工作。D-123—D-125形成精确Git archive构建回执、manifest/config身份分离、固定Wolfi/Node最小非root运行层及严格Wolfi+Node SBOM覆盖合同；`8952a815`/tree`1ac73360`的Web/Worker候选manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`。固定Trivy与7.5小时内数据库在断网、无Docker socket扫描中覆盖Web25+63、Worker25+60包，全部severity为0且数据库树前后一致。host supervisor未安装，正式镜像证据与18步门均在任何制品变更前失败关闭；因此没有正式PASS、`ELIGIBLE`manifest或UAT部署，整体判定继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
 - 数据迁移、应用测试、运维安全三个子智能体分别完成只读审计；主智能体复核关键代码路径并归并结论。
 - UAT 数据库只在`transaction read only`中读取`schema_migrations`和 public 表数量；没有读取业务行或执行写入。
 - 没有读取凭据、备份正文、受保护卷业务正文或用户未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`。
-- TASK47只生成隔离测试用standalone build；没有候选Web/Worker镜像build/push、真实Migration、备份、恢复、上传、部署、服务重启、账号权限变化、真实员工登录或业务POST。
+- TASK48已在本机Docker engine建立精确Web/Worker隔离候选及root-only诊断制品，但没有外部push、真实Migration、备份、恢复、上传、部署、服务重启、账号权限变化、真实员工登录或业务POST；当前四卷、业务数据库和日志正文均未读取。
 
 ## 3. 当前身份与运行事实
 
 | 证据项 | 当前事实 | 判定 |
 | --- | --- | --- |
-| 根仓库 | TASK47源码`9a18a0f307348c974a6f341565e7d16d76df184c`/tree`8c182d38f1acbcebe10d46e3a09f73c9ec612f22`与manifest-only直接子提交`614ef7ac2aea5ec23029c81b17b8c21adc0935dd`形成已复核39文件bundle链，SHA-256为`e54019df…a7192`；未fetch/push | 本地可追踪；当前完整历史的异机锚点待更新 |
+| 根仓库 | TASK48运行层源码`864789c8…b42c`/bundle子提交`cc9ebbf4…5a44`，严格扫描合同`13c42294…2a18`与最终bundle直接子提交`8952a815…11c4`形成可复核链；tree`1ac73360…faf4`、bundle SHA-256`53729db3…61f9`，未fetch/push | 本地可追踪；当前完整历史的异机锚点待更新 |
 | 私有源码锚点 | 本机最后已知跟踪引用为`recovery-private/main@1dcbf8d`；本任务未fetch、调用远端API或push，因此未声称其为远端实时状态，也未用本地提交差值冒充异机证明 | `FAIL`，当前完整历史未证明异机存在 |
-| 源码 | `0.1.0-alpha.46`，Migration 45/head `0045_runtime_worker_readiness.sql`；0045 SHA-256为`cc4685a0…80fc`，0001—0044未修改 | source-verified，不等于运行候选 |
+| 源码 | `0.1.0-alpha.46`，Migration45/head`0045_runtime_worker_readiness.sql`；0045 SHA-256为`cc4685a0…80fc`，0001—0044未修改；精确`8952a815`本机候选已构建 | source/candidate diagnostic verified，不等于合格或已部署候选 |
 | 源码 Schema | 45 个 SQL、journal 和 snapshot 顺序一致；`db/schema.ts`与 0045 snapshot 为 233 张 public 表且列集合一致 | 静态及隔离Migration一致性`PASS` |
 | UAT Web | `0.1.0-alpha.42`，revision `569aa954…d33a24`，Image ID `sha256:e7761e2c…f94964` | 与源码不一致 |
 | UAT PostgreSQL | 40/head `0040_warehouse_receipt_readiness.sql`，0040 checksum `b6781c94…a5a93`，227 张 public 表 | 与源码不一致 |
-| 发布台账 | `RELEASES.md`尚未形成 alpha.46/0045 候选记录；没有`ELIGIBLE`manifest | `FAIL` |
+| 隔离候选 | Web manifest/config`sha256:27868850…92288`/`sha256:161ea63b…f6c53`，Worker`sha256:e85ce236…ee77c`/`sha256:f8dc4ac7…817c1`；Wolfi/Node22.23.2、非root、无npm，断网全severity零发现 | `PARTIAL / LOCAL DIAGNOSTIC ONLY`；无外部镜像锚点或正式supervisor evidence |
+| 发布台账 | `RELEASES.md`记录alpha.46本机隔离候选但明确`NOT_RELEASED/NOT_ELIGIBLE`；没有正式gate report或`ELIGIBLE`manifest | `FAIL` |
 | 运行健康 | Web/PostgreSQL healthy，Worker/Caddy running，restart 0、OOMKilled false；回环与公开 health仍来自alpha.42旧实现，Worker health为none | 仅证明当前空闲存活；TASK45源码真实性未部署 |
 | Python 旧运行面 | `chenyida-erp.service` enabled/active、restart 0，当前监听`127.0.0.1:18889` | 开发/迁移来源；正式切换前须明确处置 |
 | 数据卷 | PostgreSQL、uploads、attachments、backup-status 四卷存在 | 单机持久化，不是灾备 |
@@ -67,7 +70,7 @@
 | 真实数据试迁移 | `FAIL` | 只读源快照、逐行结果、重复/孤儿/单位/文件处置、库存/金额核对和可重跑报告通过 |
 | 核心服务端规则 | `PARTIAL` | 物料/BOM/采购/收货/IQC/库存/生产/销售/财务关键链及异常路径在同一候选通过自动与人工验收 |
 | 权限/会话/安全/审计 | `PARTIAL / SOURCE SESSION AND RUNTIME HEALTH REMEDIATED` | 批准的岗位矩阵、职责分离、最小数据域、导入/会话/运行健康边界和审计安全测试在同候选及运行面通过；TASK43—TASK45源码完成不替代部署验收 |
-| 强制发布测试门 | `PARTIAL / TYPECHECK AND BROWSER VERIFIED / IMAGE EVIDENCE OPEN` | 18步失败关闭suite及清单已实现；完整typecheck38/38与固定Browser 6文件/11项已在干净快照通过，候选镜像SBOM/新鲜漏洞PASS及同候选完整报告尚未通过 |
+| 强制发布测试门 | `PARTIAL / TYPECHECK+BROWSER+LOCAL ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL GATE BLOCKED` | 18步失败关闭suite及清单已实现；完整typecheck38/38、固定Browser6文件/11项及当前候选新鲜零发现诊断通过，但host supervisor未安装，正式镜像provenance/SBOM/security evidence和同候选18步报告仍不存在 |
 | 监控/容量/告警/手册 | `FAIL` | 指标、告警投递和值班升级演练；低资源负载/备份/恢复 soak；升级/回滚/故障手册通过演练 |
 | 真实员工受控试用 | `FAIL` | 少量真实岗位用户按脚本完成跨岗正常/异常流程并签字，问题闭环后重验 |
 | 正式切换与回滚授权 | `FAIL` | 明确窗口、冻结点、负责人、验证清单、回滚触发器与项目负责人专项授权 |
@@ -95,7 +98,7 @@
 ### PR-003 运行候选身份不闭合
 
 - TASK42已实现严格release manifest、content-addressed supervisor两提交链及精确Migration allowlist/目标数据库身份，仓库工具不再允许靠tag或目录排序冒充候选。
-- 源码 alpha.46/0045、UAT alpha.42/0040和当前 GHCR alpha.42 锚点仍不是同一个已通过门禁的候选；没有获准alpha.46 Web/Worker镜像、镜像安全证据或`ELIGIBLE`manifest。
+- 源码alpha.46/0045已有仅本机可解析的精确Web/Worker候选与零发现诊断，但UAT仍alpha.42/0040、当前GHCR锚点仍alpha.42；本机loopback digest在registry删除后不是外部恢复锚点，也没有正式supervisor安全证据或`ELIGIBLE`manifest。
 - 当前不能证明“拟投产代码＝已验收代码＝运行镜像＝数据库版本”。
 
 解除条件：建立不可变 release manifest 与 migration allowlist；隔离 build/升级/回退通过后，经专项授权把 UAT 对齐到同一候选并重新验收。
@@ -118,9 +121,10 @@
 - TASK42最终源码快照曾通过Node 107文件/886、PostgreSQL 80文件/367等完整仓库门；TASK43—TASK45随后通过各自定向、隔离PostgreSQL、release contract及supervisor验证，但没有在当前源码提交上重跑完整112文件Node-source、83文件PostgreSQL或18步候选门。
 - TASK46已按D-120修复真实类型债，固定精确38配置集合/摘要合同，并在源码与bundle两个连续干净快照38/38通过；该子门不再是仓库候选阻断。
 - TASK47已按D-121固定Playwright 1.51.1/Chromium 134内容寻址运行时，并在源码`9a18a0f…`干净快照完成Browser 6文件/11项；该子门不再是仓库候选阻断。
-- 仍没有候选Web/Worker镜像级SBOM和新鲜漏洞PASS，也没有在同一候选上完成18步全门。因此完整候选门按设计保持阻断，不能把typecheck或Browser子门通过解释为候选通过。
+- TASK48已在精确`8952a815`候选上以固定Trivy和新鲜数据库完成断网无socket的Web/Worker原生JSON与CycloneDX诊断，全部severity为0；严格合同要求Wolfi与Node双包清单并拒绝Debian/未知生态。该结果关闭“漏洞是否已诊断”的本机缺口，但没有installed supervisor签发的正式scan provenance/SBOM/security evidence。
+- 同一候选18步全门仍未执行：两个正式入口都在制品写入前因host supervisor未安装退出1。因此完整候选门按设计保持阻断，不能把诊断零发现或typecheck/Browser子门通过解释为候选PASS。
 
-解除条件：在隔离候选镜像上生成镜像级SBOM/新鲜漏洞PASS并运行完整18步门；任何缺失、跳过或失败继续阻止候选晋升。
+解除条件：专项授权安装精确content-addressed supervisor，分别签发root-only一次性授权，在当前或后续精确候选上生成正式镜像provenance/SBOM/security evidence并运行完整18步门；任何缺失、跳过或失败继续阻止候选晋升。
 
 ### PR-006 真实数据迁移与核对未闭环
 
@@ -142,7 +146,7 @@
 - health仓库实现已由TASK45改为完整Migration、同候选Worker数据库租约和双文件卷真实探针，并把liveness/readiness分离；运行UAT仍为alpha.42旧实现，故运行风险保持`OPEN / REPOSITORY REMEDIATED`。备份过期继续由独立recovery governance阻止晋升而不混入公开readiness。
 - 会话仓库实现已由TASK44补齐8小时idle、固定24小时absolute、数据库时钟原子认证与单次超时审计，并通过0044/并发/Migration隔离验证；运行UAT仍为alpha.42/0040旧实现，故运行风险保持`OPEN / REPOSITORY REMEDIATED`。
 - 权限矩阵硬编码且多个业务角色可读取财务域；尚无岗位负责人批准的最小权限/职责分离矩阵。
-- 容器基础镜像未全部锁定 digest；Compose 尚未全面使用`read_only`、`no-new-privileges`和`cap_drop`；没有当前候选 SBOM、漏洞扫描、签名验证证据。
+- TASK48候选的build/runtime/frontend/registry/Trivy输入已锁定digest且当前候选诊断零发现；Compose服务仍未全面使用`read_only`、`no-new-privileges`和`cap_drop`，也没有外部镜像锚点、签名/attestation或正式supervisor SBOM/安全证据。
 - 公网入口仍为 nip.io 和非标准端口；没有公司域名、正式边缘策略、CSP、MFA或 break-glass 演练证据。
 - 没有指标采集、外部告警、值班升级和告警演练；运维手册仍含旧版本/旧入口事实。
 - 空闲资源稳定不等于真实负载稳定；没有低资源业务负载、备份、恢复、数据库增长和重启 soak。
@@ -169,10 +173,10 @@
 ## 8. 当前安全执行序列
 
 1. `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成 G1 合成/隔离证据；真实 G2 被异机目标、RPO/RTO和专项授权阻塞。
-2. G3仓库工具已由TASK42完成，完整typecheck和Browser分别由TASK46/TASK47关闭；候选Web/Worker镜像、镜像SBOM/新鲜漏洞PASS、完整18步同候选报告和UAT对齐仍保持失败关闭并需后续适用授权/资源。
+2. G3仓库工具已由TASK42完成，完整typecheck和Browser分别由TASK46/TASK47关闭，TASK48又完成精确本机候选与新鲜零发现诊断；正式supervisor镜像证据、完整18步同候选报告、外部镜像锚点和UAT对齐仍保持失败关闭并需后续适用授权/资源。
 3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
 4. TASK44/TASK45已完成会话绝对时限和health/Worker/storage/Migration真实性仓库修复；运行面验证等待同候选完整gate及专项部署授权。
-5. `SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`正建立隔离候选Web/Worker镜像、OCI/baked身份、镜像级SBOM/新鲜漏洞证据并在不旁路host supervisor的前提下尝试完整18步同候选门；岗位权限矩阵等待业务负责人确认，并继续更新/演练监控、升级、回滚和故障手册。
+5. `SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`已完成并证明正式supervisor边界失败关闭；下一安全任务补齐仓库级监控、容量、备份/恢复证据新鲜度、告警及排障合同。岗位权限矩阵等待业务负责人确认；正式外部告警投递仍需渠道和值班责任人。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。
 
@@ -206,3 +210,5 @@ TASK45增量验证同样串行且一次一个临时重任务：runtime readiness
 TASK46增量验证保持串行且一次一个临时重任务：首次完整门如实失败后修复真实类型/执行器问题，源码`f3bac028`及bundle`3d1243e2`两个干净快照分别38/38；定向287/287、release合同45/45、supervisor15/15、inventory235/211/24、干净快照lint和1,566文件credentials通过。一次错误包含`.wrangler/work`的直接lint发生V8 heap OOM退出139，但宿主/容器OOM为0、Swap增长约27 MiB，正式快照重跑通过。起点/收口available约1.9/2.0 GiB、Swap453/484 MiB、根盘30/31 GiB、Load1低于4，四服务restart0/OOM false，任务容器/目录清零；没有build、UAT/生产Migration、部署、当前卷读取或真实数据操作。
 
 TASK47增量验证保持串行且任何时刻最多一个临时容器：第十三次干净快照Browser运行6文件/11项全部PASS，release合同45、supervisor20、完整typecheck38/38、lint和inventory235/211/24通过。Browser前available2,424,572KiB、Swap76.32%、根盘27GiB；Browser后Swap短暂80.14%即按规则暂停，未修改Swap或服务，自然回落到阈值内后才继续；最终available2,481,228KiB、Swap73.47%、根盘27GiB、Load`0.98/1.91/1.62`，内核OOM0、四服务restart0/OOM false，任务容器/目录清零。没有候选镜像build/push、UAT/生产Migration、部署、当前卷读取或真实数据操作。
+
+TASK48增量验证严格串行且任何时刻最多一个临时容器：最终`8952a815`候选构建、运行时验证和两镜像四次扫描完成；release合同48/48、supervisor20/20、release typecheck、lint及1,575文件credentials通过。起点available约2.4GiB、Swap744MiB、根盘27GiB；收口约2.2GiB/734MiB/18GiB/Load`0.31/0.32/0.37`，`oom_kill=0`，四服务image/restart/OOM/health不变。临时registry、容器、tar和目录清零；成功候选、固定Trivy数据库与root-only只读证据按审计需要保留，未prune。没有外部push、正式supervisor动作、UAT/生产Migration/deploy、当前卷正文或真实数据访问。

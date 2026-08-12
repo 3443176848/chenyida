@@ -1,7 +1,7 @@
 # 晨亿达 ERP 发布、迁移与回退追踪
 
-最后核验：2026-08-09（Asia/Shanghai）
-适用任务：最新功能与并行非生产部署验收为 `SELFHOST-UAT-FIX-38`；历史发布/恢复记录保留下文
+最后核验：2026-08-13（Asia/Shanghai）
+适用任务：最新本机隔离候选证据为`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`；最新并行非生产部署验收仍为`SELFHOST-UAT-FIX-38`，历史发布/恢复记录保留下文
 
 ## 1. 使用规则
 
@@ -17,6 +17,7 @@
 
 | 运行面 | 版本/标识 | Git 基线 | 数据库基线 | 测试状态 | 部署状态 | 真实数据迁移 | 回退基线 | 批准状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Node.js / PostgreSQL alpha.46本机隔离候选 | `0.1.0-alpha.46`；Web`sha256:27868850dacca381ab28c2c12c32504d8df21dad851f0784c60f60c2a7592288`；Worker`sha256:e85ce23673cda8b5107f167731859b4a05bb921b1d8af499e7ba87dad1dee77c` | 精确commit`8952a815cac837d201ff821df16d4a21b61711c4`/tree`1ac733601c26564347a5bd5cabeda0e42142faf4`；bundle绑定父源码`13c42294…2a18`，SHA-256`53729db3…61f9` | 源码/镜像含45/head`0045_runtime_worker_readiness.sql`与allowlist`09d34ac7…504a1`；未应用任何运行数据库 | 构建回执`dc24889…34d9`；Wolfi/Node非root无npm；固定Trivy/新鲜DB断网无socket扫描Web25+63、Worker25+60包，全部severity0；release合同48/48、supervisor20/20、typecheck/lint/credentials通过。正式证据/18步门因supervisor未安装退出1 | `LOCAL_ENGINE_ONLY / NOT_RELEASED / NOT_DEPLOYED`；loopback registry已删除，无外部registry锚点；UAT未变 | `NOT_MIGRATED`；未读取或迁移真实数据 | 现行alpha.42 UAT及其既有回退未改变；该候选若本机镜像删除则构建回执不能自行恢复 | `DIAGNOSTIC ZERO / NOT_ELIGIBLE / NOT_APPROVED`；无正式scan provenance/SBOM/security evidence、18步PASS或release manifest |
 | Node.js / PostgreSQL Warehouse Receipt Date Guard并行UAT | `0.1.0-alpha.42` / Web `sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964` | 收货预检`401e16b04e3b8cb70ddfd3508661353ff758fdec`、health/version`13f72b5f7aa51905af597733356420cc7b017b74`、Docker metadata`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`；镜像source revision`569aa954d764309e239d1f6c174e582596d33a24`；运维/文档提交消息`ops: deploy warehouse receipt date guard`，SHA以Git log为准 | 40/head`0040_warehouse_receipt_readiness.sql`不变；PO/Line/Plan/queue`1/4/4/4`，已收0，Receipt/Evidence/Lot/IQC/Ledger/Purchase Source/AP/Payment/Work Order/生产全0 | alpha.42 package/OCI/health、Caddy安全头和匿名保护；唯一warehouse Chromium中未来日期422 `1`、合法preview200/Dialog `4/4`、四种返回修改、桌面/390×844、logout历史保护通过；Business mutation及Receipt POST0 | Web-only`DEPLOYED`到受控非生产UAT；只recreate Web，新容器`f0066fe6…a35f`，PostgreSQL/Worker/Caddy未重建或重启，Migration未运行；`NOT_RELEASED`到生产 | `NOT_MIGRATED`；唯一login/logout各1，仅产生授权Session/Audit，UAT Receipt及全部业务数据前后不变 | 旧alpha.41`sha256:0cf98937…d5f19`精确tag`0.1.0-alpha.41-fix38-rollback`；被拒`sha256:81126136…278e`保留；FIX37 root-only dump保留但未异机复制 | `SELFHOST-UAT-FIX-38 DEPLOYED AND REVALIDATED — NO UAT RECEIPT`；`NON-PRODUCTION UAT ONLY / NOT PRODUCTION READY`，真实Receipt和生产须新授权 |
 | Node.js / PostgreSQL PO History Traceability并行UAT | `0.1.0-alpha.40` | 功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`；运维/文档提交消息`ops: deploy PO history traceability fix`，SHA以Git log为准 | 39/head0039且无0040；PO/Line/Plan/queue`1/4/4/4`，Receipt/Warehouse Receipt/Ledger/Lot/IQC/AP/Payment/Work Order/生产报告/完工记录全0 | PO Unit/UI9、Fulfillment PG6+偏移ID1、Sourcing/Binding PG20、Migration`3+5+6`、安全/Identity/Origin、typecheck/lint/build/npm/Python/credentials；隔离及主UAT桌面/390×844、刷新重开通过 | Web-only`DEPLOYED`到受控非生产UAT；Web`664e0ac6…`，只recreate Web，PostgreSQL/Worker/Caddy未重建，Migration未运行；`NOT_RELEASED`到生产 | `NOT_MIGRATED`；purchase-only主UAT business POST0、Session0，PO及全部业务数据前后不变 | root:root0600 dump SHA`0e6f8215…38f1`已list/第二新库恢复；旧Web`83c1bff3…`精确tag保留 | `PO HISTORY TRACEABILITY FIXED — UAT DOWNSTREAM UNCHANGED`；D-105只前向且不追溯，下游试用须独立授权 |
 | Node.js / PostgreSQL Award→PO Supplier Mapping资格并行UAT | `0.1.0-alpha.40` | 功能提交`1f205af0bf81379345a09353d9d32ab5c7545971`；运维/文档提交消息`ops: deploy Award to PO mapping validation fix`，SHA以Git log为准 | 39/head0039且无0040；RFQ CLOSED v7、Award/Line`1/4`、四条固定Binding/Mapping qualified、PO/Line/Plan/queue全0 | 无DB93、Unit22、Fulfillment PG5、Mapping PG10、0038/0039`5+6`、Sourcing PG9、Binding PG18、upgrade3、npm/Python/typecheck/lint/build/credentials；隔离`1/4/4/4`及主UAT桌面/390×844取消通过 | Web-only`DEPLOYED`到受控非生产UAT；Web`83c1bff3…`，PostgreSQL/Worker/Caddy未重建，Migration未运行；`NOT_RELEASED`到生产 | `NOT_MIGRATED`；主UAT只预览、核验、填本地备注并取消，`business_post=0`，未创建PO/Plan | root:root0600 dump SHA`d3cf053f…c5c2`已list/第二新库恢复；旧Web`2396c8bc…`精确tag保留 | `AWARD TO PO SUPPLIER MAPPING VALIDATION FIXED — UAT PO NOT CREATED`；正式转换须新授权并重验资格/CAS/摘要/PO0 |
@@ -46,7 +47,7 @@ Git 同步状态以2026-08-09 FIX38部署严格起点计：唯一worktree、clea
 
 ## 3. Migration 文件与 SHA-256 基线
 
-当前源码与并行非生产 UAT head：`0040_warehouse_receipt_readiness.sql`，SHA-256 `b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。FIX37已完成0039→0040升级与恢复门禁；FIX38未新增、修改或运行Migration。完整运行库 checksum 与文件一致。下表保留历史值并追加0040。
+当前源码head为`0045_runtime_worker_readiness.sql`，SHA-256`cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc`；并行非生产UAT仍为`0040_warehouse_receipt_readiness.sql`，SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0045已在隔离Migration测试及alpha.46候选中绑定，未应用UAT或production；0001—0044未修改。
 
 ### PostgreSQL 自托管
 
@@ -92,8 +93,13 @@ Git 同步状态以2026-08-09 FIX38部署严格起点计：唯一worktree、clea
 | `0038` | `0038_supplier_mapping_governance.sql` | `2da259364151af098641795da55604dc3012b6adf92aec67038c0554e0592941` |
 | `0039` | `0039_rfq_traceability.sql` | `3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37` |
 | `0040` | `0040_warehouse_receipt_readiness.sql` | `b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93` |
+| `0041` | `0041_ai_governance_suggestion_evidence.sql` | `676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2` |
+| `0042` | `0042_material_import_fallback_safety.sql` | `c0eeab63bc51f1d1dd96805b43e78c83c5ef5e0a5d5712a08a0308c95b9385bf` |
+| `0043` | `0043_material_import_terminal_integrity.sql` | `0fdb3d4b92d999a5dede5a36a08bd99ea054879ebb6857341e08f0f0e07852d9` |
+| `0044` | `0044_identity_session_absolute_lifetime.sql` | `a24df94474403c4f235933d4450626ce65b40416264393db400cef08e7fcaa7e` |
+| `0045` | `0045_runtime_worker_readiness.sql` | `cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc` |
 
-当前源码与并行 PostgreSQL 均为 `0001 -> 0040`；0039→0040已通过隔离升级、重复执行、失败回滚、第二新库恢复和并行非生产UAT串行部署验收。FIX38仅替换Web，没有运行Migration。没有生产PostgreSQL部署或真实公司数据迁移。
+当前源码为`0001 -> 0045`，并行UAT为`0001 -> 0040`。0039→0040已通过隔离升级、重复执行、失败回滚、第二新库恢复和并行非生产UAT串行部署验收；0041—0045已通过各自隔离测试但未部署。没有production PostgreSQL部署或真实公司数据迁移。
 
 ### 历史 Cloudflare D1 / Drizzle
 

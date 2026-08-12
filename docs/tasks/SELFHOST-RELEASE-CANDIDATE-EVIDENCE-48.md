@@ -1,6 +1,6 @@
 # SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 隔离候选镜像与安全证据闭环
 
-> 状态：`DOING / ISOLATED CANDIDATE EVIDENCE / NO DEPLOYMENT / PRODUCTION NO-GO`
+> 状态：`DONE / ISOLATED CANDIDATE BUILT AND ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / NO DEPLOYMENT / PRODUCTION NO-GO`
 > 日期：2026-08-13（Asia/Shanghai）
 > 严格起点：`main@d554a150a2f9cb4b672dc49785ed63bf3e0edfc8`
 > 责任：Codex 主智能体为唯一写者、重任务调度者、证据集成者和 Git 提交者；数据迁移、应用测试、运维安全智能体只读审计；项目负责人负责未来 host supervisor 安装、UAT/生产 Migration/deploy、真实数据、账号权限、员工试用和正式切换专项授权
@@ -21,17 +21,17 @@
 
 ## 3. 验收标准
 
-- [ ] 候选构建只使用精确已提交、tracked-clean 的 Git commit/tree；Web 与 Worker 均从该身份构建，版本为 `0.1.0-alpha.46`，OCI version/revision 与 baked runtime env 精确一致且两镜像 config digest 不同。
-- [ ] 构建、临时 loopback registry、工具拉取、漏洞数据库准备、扫描和全门测试严格串行；任一时刻最多一个本任务临时容器，绝不挂载 UAT/生产数据库或四个受保护 Volume。
-- [ ] 候选只推送到任务专用 loopback registry 以取得 registry digest，随后按 digest 回拉并核验；不得登录或推送任何外部 registry，不得创建 `latest` 或模糊候选 tag。
-- [ ] 固定 Trivy 0.70.0 镜像的完整 digest/config/platform/binary身份；漏洞数据库 metadata 与 payload tree digest 在扫描前后相同且数据库年龄不超过 72 小时。
-- [ ] Web/Worker 分别生成镜像级 CycloneDX SBOM 和漏洞报告；`CRITICAL/HIGH/MEDIUM/LOW/UNKNOWN` 任一发现均拒绝候选，不使用 ignore、severity 降级、过期数据库或 lockfile 清单冒充 PASS。
-- [ ] 证据文件位于仓库外任务专用 root-owned 目录，采用无覆盖、只读、单硬链接合同；不提交大制品、扫描数据库、镜像、日志、凭据或潜在敏感输出。
-- [ ] 仅通过 D-116 的 installed content-addressed supervisor 与一次性授权执行正式镜像证据/18 步门；若 host supervisor 仍未获授权，则证明失败关闭并不得直接设置 supervisor 环境变量或把等价脚本运行写成正式 PASS。
-- [ ] 官方门对现行`chenyida-erp-parallel`四服务只允许读取Docker容器名称、状态、restart、OOM和health元数据并核对前后一致；不得连接容器网络/API/数据库、读取日志或卷正文，也不得启动、停止、重建或修改服务。若运行面元数据发生变化，候选门失败关闭。
-- [ ] 在可安全执行范围内完成全部仓库/隔离验证；任何测试失败须修复或诚实拒绝候选，不降低断言、不跳过 REQUIRED 步骤。
-- [ ] 每项重任务前后记录 memory、Swap、disk、Load、OOM/restart与临时资源；Swap 超过 80%等停止线触发时立即暂停新重任务。
-- [ ] 更新`MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md`、`PROJECT_CONTEXT.md`、`PRODUCTION_READINESS.md`及相关发布/运维文档，并形成独立聚焦提交。
+- [x] 候选构建只使用精确已提交、tracked-clean 的 Git commit/tree；Web 与 Worker 均从该身份构建，版本为 `0.1.0-alpha.46`，OCI version/revision 与 baked runtime env 精确一致且两镜像 config digest不同。
+- [x] 构建、临时 loopback registry、工具拉取、漏洞数据库准备、扫描和全门测试严格串行；任一时刻最多一个本任务临时容器，绝不挂载 UAT/生产数据库或四个受保护 Volume。
+- [x] 候选只推送到任务专用 loopback registry以取得registry digest，随后按digest回拉并核验；未登录或推送任何外部registry，未创建`latest`或模糊候选tag。
+- [x] 固定 Trivy 0.70.0 镜像的完整digest/config/platform/binary身份；漏洞数据库metadata与payload tree digest在扫描前后相同且数据库年龄不超过72小时。
+- [x] Web/Worker分别生成镜像级CycloneDX SBOM和漏洞报告；`CRITICAL/HIGH/MEDIUM/LOW/UNKNOWN`均为0，未使用ignore、severity降级、过期数据库或lockfile清单冒充PASS。
+- [x] 证据文件位于仓库外任务专用root-owned目录，采用无覆盖、只读、单硬链接合同；大制品、扫描数据库、镜像、日志、凭据和潜在敏感输出均未提交。
+- [x] 正式镜像证据/18步门仍只允许D-116 installed content-addressed supervisor与一次性授权；host supervisor未获授权，两个仓库入口均已证明在任何制品变更前失败关闭，未设置或伪造supervisor环境变量，诊断结果未写成正式PASS。
+- [x] 全程只读取现行`chenyida-erp-parallel`四服务Docker名称、状态、restart、OOM、health和image元数据并核对前后一致；未连接容器网络/API/数据库、读取日志/卷正文或修改服务。
+- [x] 在可安全执行范围内完成仓库/隔离验证；发现的Debian SBOM合同漂移已以严格Wolfi+Node双覆盖修复并重建，没有降低断言或跳过REQUIRED步骤。
+- [x] 每项重任务前后均记录memory、Swap、disk、Load、OOM/restart与临时资源；未触发本轮停止线。
+- [x] 已同步更新项目、发布和运维文档，并准备独立聚焦治理提交。
 
 ## 4. 执行阶段
 
@@ -61,3 +61,24 @@
 - 依赖安装会按`package-lock.json`访问公共npm；只有应用build阶段断网。回执明确记录`PUBLIC_NPM_FETCH_WITH_LOCKFILE_INTEGRITY`、无外部registry锚点、无可复现build attestation及本机engine局限，未夸大为完全离线或可恢复镜像。
 - 固定Node单容器定向38/38、官方release-contract 6文件/48项、lint 0 error/11条既有warning及Shell/差异检查通过；临时容器均精确删除，available约2.3—2.4 GiB、Swap约72%、根盘27 GiB、OOM0，四个UAT服务restart0/OOM false且health元数据不变。
 - 仍未执行候选build、Trivy数据库准备/扫描、正式supervisor动作或18步门；上述验证只证明仓库合同可进入精确已提交候选阶段。
+
+## 8. 最终候选与不可变证据
+
+- Git链：运行层/依赖加固源码提交`864789c80b0bf7bca10df1b6a4067deb5154b42c`，其bundle直接子提交`cc9ebbf48bc16da5b685fc919bb0f55e8f6e5a44`；严格Wolfi扫描覆盖合同提交`13c422944c1eb7c4de83ac0b40414b7b1b822a18`，最终canonical bundle直接子提交`8952a815cac837d201ff821df16d4a21b61711c4`。最终候选精确tree为`1ac733601c26564347a5bd5cabeda0e42142faf4`，bundle manifest绑定父源码且SHA-256为`53729db38bd6515f3508422f1f23973a7901c2cd840dfe2d34b2046aa21561f9`。
+- 构建回执：`/var/lib/chenyida-erp/release-artifacts/task48-alpha46-8952a815cac8/task48-alpha46-8952a815cac8.build-provenance.json`为root:root `0440`、单硬链接，SHA-256为`dc24889dbfe986def5b61f6d02cc0df9b573579e16eb4f58860937b3987b34d9`；合同为`candidate-build-provenance/v3`，绑定精确Git archive、Dockerfile/lockfile/producer、构建/运行基础镜像、Wolfi APK和Migration allowlist。
+- Web：本机digest引用`127.0.0.1:32772/chenyida-erp/web@sha256:27868850dacca381ab28c2c12c32504d8df21dad851f0784c60f60c2a7592288`，config digest`sha256:161ea63b6242b9d6bffc6535890a3db20805a3121e1516e7d2bf6dbd537f6c53`；Worker引用`127.0.0.1:32772/chenyida-erp/worker@sha256:e85ce23673cda8b5107f167731859b4a05bb921b1d8af499e7ba87dad1dee77c`，config digest`sha256:f8dc4ac7b20a12f09aa1036f6dfb76152d4e345d16f94a51e39a5349566817c1`。loopback registry已删除；这些引用只在当前本机engine可解析，不是外部恢复锚点。
+- 运行层：两镜像均为Wolfi `20230201`、`nodejs-22-minimal=22.23.2-r1`、UID/GID`65532:65532`且无npm。Web不含`image-size`、Migration目录/文件分别为`0555/0444`，无数据库配置时`/api/live`返回`200/LIVE/alpha.46`；Worker保留精确生产依赖、剔除开发依赖，缺少数据库配置时以状态1和净化`RUNTIME_READINESS_FAILED`失败关闭。
+
+## 9. 扫描、测试与资源结果
+
+- 固定Trivy镜像为`ghcr.io/aquasecurity/trivy@sha256:85e87be1a96459c38a4eea47dc64eb2d342bb14cd4b4cef96adcf6ff03378b7c`。数据库schema 2，UpdatedAt`2026-08-12T13:01:58.90781992Z`、DownloadedAt`2026-08-12T19:13:44.99203311Z`；扫描开始时分别距今7.5小时和1.3小时，payload tree在扫描前后均为`def6b0231ddeedfecbeff0d8d9ce2d1663905f722189915fbd3e8fead254986b`。
+- 扫描使用`docker image save`归档、断网、无Docker socket、只读rootfs、固定Trivy、全部pkg type/severity、无ignore。Web归档config与回执一致，覆盖25个Wolfi包+63个npm包；Worker覆盖25+60。两镜像`UNKNOWN/LOW/MEDIUM/HIGH/CRITICAL`全部为0，当前严格原生JSON与CycloneDX合同均直接接受。
+- 四份root:root`0440`单硬链接诊断制品位于上述artifact root：Web CycloneDX/Trivy SHA-256分别为`622ffbdf273e2b5ff883d621e042dd4aaa77916bf035028b63d436be15da2d4f`/`17821da06332caa44bddb231ffc6b1de4471d143b0a93a9384440c8dd649c74a`；Worker分别为`588569d59f3a76079850e7898acc5f2c504e5fa39bb50c6d3f1680be8070edd5`/`32751ea379d7a432516c1abd1af94ca65bce0c238fcdec0d47595ec78e619c93`。它们明确标记`diagnostic`，不替代正式supervisor provenance/SBOM/security evidence。
+- 仓库验证：6文件发布合同48/48、supervisor Python 20/20、release typecheck、lint 0 error/11项既有warning、1,575文件credentials和`git diff --check`通过；真实前序扫描报告也被修正后的严格合同直接接受。
+- 起点约available 2.4GiB、Swap744MiB/1GiB、根盘27GiB；最终available 2.2GiB、Swap734MiB（72%）、根盘18GiB、Load`0.31/0.32/0.37`、内核`oom_kill=0`。四个UAT服务全过程restart0/OOM false、Web/PostgreSQL health仍healthy、Worker/Caddy仍无health且image ID不变；任务临时registry、容器、tar和目录已清零。成功候选镜像、Trivy数据库与只读证据按审计需要保留，未prune或删除其他资源。
+
+## 10. 完成结论与外部阻断
+
+- 直接调用正式镜像证据入口在制品变更前以`release image evidence must be launched by the installed supervisor`退出1；18步入口同样以`release gate must be launched by the installed supervisor`退出1，artifact root摘要前后完全一致。`/usr/local/libexec/chenyida-erp-release-supervisor`不存在，未安装、旁路或伪造授权。
+- TASK48因此按“完成全部可安全隔离工作并证明正式边界失败关闭”收口。当前候选是本机隔离零发现诊断候选，不是`ELIGIBLE`、UAT或production release；源码/UAT仍为alpha.46/0045对alpha.42/0040。
+- 正式镜像证据与18步门的最小解除条件是：项目负责人专项授权安装当前content-addressed host supervisor并生成两份root-only一次性授权。外部registry不可变锚点、UAT Migration/deploy、真实数据、账号、员工试用和切换仍分别需要后续资源或专项授权。
