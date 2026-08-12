@@ -181,8 +181,8 @@ WEB_CONFIG_DIGEST=$(build_target_config_digest web)
 WORKER_CONFIG_DIGEST=$(build_target_config_digest worker)
 [ "$WEB_CONFIG_DIGEST" != "$WORKER_CONFIG_DIGEST" ] || { echo "Web and Worker image configurations must be distinct" >&2; exit 1; }
 
-archive_config_digest() {
-  /usr/bin/tar -xOf "$1" manifest.json | "$NODE_RUNTIME" --input-type=module -e 'const chunks=[];for await(const chunk of process.stdin)chunks.push(chunk);const rows=JSON.parse(Buffer.concat(chunks).toString("utf8"));if(!Array.isArray(rows)||rows.length!==1||typeof rows[0].Config!=="string"||!/^[0-9a-f]{64}\.json$/.test(rows[0].Config))process.exit(1);process.stdout.write(`sha256:${rows[0].Config.slice(0,64)}`)'
+archive_config_identity() {
+  /usr/bin/tar -xOf "$1" manifest.json | "$NODE_RUNTIME" --input-type=module -e 'const chunks=[];for await(const chunk of process.stdin)chunks.push(chunk);const rows=JSON.parse(Buffer.concat(chunks).toString("utf8"));if(!Array.isArray(rows)||rows.length!==1||typeof rows[0].Config!=="string")process.exit(1);const file=rows[0].Config,match=/^([0-9a-f]{64})\.json$/.exec(file)||/^blobs\/sha256\/([0-9a-f]{64})$/.exec(file);if(!match)process.exit(1);process.stdout.write(`${file}|sha256:${match[1]}`)'
 }
 
 run_trivy_scan() {
@@ -217,7 +217,10 @@ for service in web worker; do
   chmod 0400 "$archive"
   archive_sha256=$(sha256sum "$archive" | cut -d ' ' -f 1)
   archive_bytes=$(stat -c '%s' "$archive")
-  archive_config=$(archive_config_digest "$archive")
+  archive_config_identity=$(archive_config_identity "$archive")
+  archive_config_path=${archive_config_identity%%|*}
+  archive_config=${archive_config_identity#*|}
+  [ "sha256:$(/usr/bin/tar -xOf "$archive" "$archive_config_path" | sha256sum | cut -d ' ' -f 1)" = "$archive_config" ] || { echo "$service archive configuration blob digest mismatch" >&2; exit 1; }
   [ "$archive_config" = "$expected_config" ] || { echo "$service archive configuration does not match the inspected image" >&2; exit 1; }
   run_trivy_scan "$archive" "$service.trivy.json" json 1
   run_trivy_scan "$archive" "$service.cdx.json" cyclonedx 0

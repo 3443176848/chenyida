@@ -2001,7 +2001,7 @@
 
 1. 候选、release manifest、运行identity和安全报告中的`web_image_digest`/`worker_image_digest`统一表示镜像引用中的registry manifest digest；必须等于`image_reference`的`@sha256:`值。
 2. 构建回执每个target继续同时保存`registry_manifest_digest`和`image_config_digest`。前者来自精确digest reference并与Docker本地manifest身份核对；后者来自该已构建manifest的`Descriptor.annotations["config.digest"]`，缺失或格式错误即拒绝候选。
-3. 扫描前必须按精确manifest reference执行`docker image save`，从归档`manifest.json.Config`独立取得config digest，并与构建回执target逐项相等；扫描前后manifest inspect必须稳定。任何manifest/config/reference不闭合都不生成SBOM或安全PASS。
+3. 扫描前必须按精确manifest reference执行`docker image save`，从归档`manifest.json.Config`独立取得config digest；严格兼容传统`<digest>.json`与Docker 29 containerd store的`blobs/sha256/<digest>`布局，并实际重算配置blob SHA-256。结果必须与构建回执target逐项相等，扫描前后manifest inspect必须稳定；任何manifest/config/reference不闭合都不生成SBOM或安全PASS。
 4. Trivy原生漏洞报告和CycloneDX中的`ImageID`绑定config digest；规范化安全报告的target `image_digest`仍绑定registry manifest digest。可信bundle复核时同时交叉验证构建回执、扫描provenance、归档config、原生报告和digest reference。
 5. 固定Trivy自身以完整registry manifest digest、linux/amd64、本地inspect身份、版本及二进制SHA-256联合识别，不再把Docker `.Id`误命名为scanner config digest。
 6. `candidate-build-provenance`升为v2，`image-scan-provenance`升为v3；v1/v2旧语义回执失败关闭，不兼容接受或静默改写。D-123中把manifest/config视为同一值的表述由本决定取代。
@@ -2010,7 +2010,7 @@
 
 - 首个`5ba0e43`候选的存活、入口和Migration内容检查仍是有效诊断，但其v1构建回执不能进入正式镜像证据，必须从修正后的新提交重新构建。
 - 修正不降低零漏洞策略，也不把本地ID、tag或config digest冒充可恢复registry锚点；外部不可变镜像锚点仍是独立未满足条件。
-- 定向release合同31/31已证明manifest/config使用不同fixture时仍能闭合，并会拒绝归档config与构建回执漂移；完整inventory、supervisor bundle刷新和真实候选重建仍须继续完成。
+- 定向release合同会证明manifest/config使用不同fixture时仍能闭合，并会拒绝归档config与构建回执漂移；真实Docker 29归档另证明containerd blob路径和blob内容摘要均受约束。完整inventory、supervisor bundle刷新和真实候选重建仍须继续完成。
 
 ### Rejected alternatives
 

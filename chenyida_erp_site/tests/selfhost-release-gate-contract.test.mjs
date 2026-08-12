@@ -277,6 +277,8 @@ test("native image evidence is digest-pinned, offline, socketless and scans each
   assert.match(producer, /TRIVY_IMAGE='ghcr\.io\/aquasecurity\/trivy@sha256:85e87be1a96459c38a4eea47dc64eb2d342bb14cd4b4cef96adcf6ff03378b7c'/);
   assert.match(producer, /ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256/);
   assert.match(producer, /docker image save --output "\$archive" "\$image"/);
+  assert.match(producer, /\^blobs\\\/sha256\\\/\(\[0-9a-f\]\{64\}\)\$/);
+  assert.match(producer, /archive configuration blob digest mismatch/);
   assert.match(producer, /--network none --read-only --cap-drop ALL --security-opt no-new-privileges/);
   assert.match(producer, /--input \/input\/image\.tar/);
   assert.match(producer, /--scanners vuln --pkg-types os,library --list-all-pkgs/);
