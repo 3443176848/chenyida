@@ -54,6 +54,8 @@ class ReleaseSupervisorBrowserTest(unittest.TestCase):
         self.assertIn('chenyida.erp.release-browser-test=$RUN_ID', source)
         self.assertIn("setpriv --reuid=1000 --regid=1000 --clear-groups env -i", source)
         self.assertIn("git_candidate archive --format=tar", source)
+        self.assertIn('if [ "$SUPERVISOR_SITE_ROOT" = "$SITE_ROOT" ]', source)
+        self.assertIn('-v "$BROWSER_SUPERVISOR_ROOT:/supervisor:ro"', source)
         self.assertIn("remove_task_container", source)
         self.assertIn("trap cleanup EXIT", source)
 

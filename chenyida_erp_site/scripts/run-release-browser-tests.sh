@@ -137,6 +137,10 @@ mkdir -m 0555 "$SNAPSHOT/chenyida_erp_site/node_modules"
 chmod -R a-w "$SNAPSHOT"
 mkdir -m 0755 "$SNAPSHOT/chenyida_erp_site/.vinext" "$SNAPSHOT/chenyida_erp_site/dist"
 chown -R 1000:1000 "$SNAPSHOT/chenyida_erp_site/.vinext" "$SNAPSHOT/chenyida_erp_site/dist"
+BROWSER_SUPERVISOR_ROOT=$SUPERVISOR_SITE_ROOT
+if [ "$SUPERVISOR_SITE_ROOT" = "$SITE_ROOT" ]; then
+  BROWSER_SUPERVISOR_ROOT="$SNAPSHOT/chenyida_erp_site"
+fi
 
 CURRENT_CONTAINER_NAME="cyd-release-browser-build-$RUN_ID"
 CURRENT_CONTAINER_ID=$(/usr/bin/docker create \
@@ -182,7 +186,7 @@ CURRENT_CONTAINER_ID=$(/usr/bin/docker create \
   -v "$SNAPSHOT/chenyida_erp_site:/workspace:ro" \
   -v "$NODE_MODULES:/workspace/node_modules:ro" \
   -v "$PG_ROOTFS:/postgres-rootfs:rw" \
-  -v "$SUPERVISOR_SITE_ROOT:/supervisor:ro" \
+  -v "$BROWSER_SUPERVISOR_ROOT:/supervisor:ro" \
   -w /workspace --entrypoint /bin/sh "$BROWSER_IMAGE" \
   /supervisor/scripts/run-release-browser-tests.sh)
 /usr/bin/docker start --attach "$CURRENT_CONTAINER_ID"
