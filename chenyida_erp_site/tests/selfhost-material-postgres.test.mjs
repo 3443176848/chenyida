@@ -121,6 +121,12 @@ test("migration exposes workflow tables and constraints", async () => {
     "0033_finished_goods_lot_fqc_shipment.sql",
     "0034_supplier_receipt_lot_iqc.sql",
     "0035_bom_material_governance.sql",
+    "0036_project_requirement_unit_resolution.sql",
+    "0037_project_planning_revision_response_lineage.sql",
+    "0038_supplier_mapping_governance.sql",
+    "0039_rfq_traceability.sql",
+    "0040_warehouse_receipt_readiness.sql",
+    "0041_ai_governance_suggestion_evidence.sql",
   ]);
   await assert.rejects(pool.query("insert into material_code_sequences(category_id,category_code,next_value) values(9004,'bad',1)"), /material_code_sequences_category_code_ck/);
 });

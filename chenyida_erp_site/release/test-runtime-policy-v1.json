@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-release-test-runtime-policy/v1",
+  "platform": "linux/amd64",
+  "node_image": {
+    "reference": "node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3",
+    "repo_digest": "sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3",
+    "config_digest": "sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3"
+  },
+  "postgres_image": {
+    "reference": "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394",
+    "repo_digest": "sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394",
+    "config_digest": "sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394"
+  },
+  "posix_image": {
+    "reference": "node@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37",
+    "repo_digest": "sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37",
+    "config_digest": "sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37"
+  },
+  "node_dependencies": {
+    "path": "chenyida_erp_site/node_modules",
+    "tree_sha256": "9ab3e889df4519ecbdfa6cce524e96edbe17ce9d3d9780e9487d59cfc8960663",
+    "package_lock_sha256": "e14783a505c3f033ee62ba5442d4edf32a083efd45e07be99edd1540df507053"
+  },
+  "python_runtime": {
+    "venv_path": ".venv",
+    "venv_tree_sha256": "c67b68ec9436f4a13f41df0eff9b552ca3f1d8b9e759113ebd23eefbe9419041",
+    "interpreter_path": "/usr/bin/python3.11",
+    "interpreter_sha256": "c3d7aaf77a0fe9486380e2b551b9aa7c37f76f46ebe627d4dcad0c38e6485d98",
+    "requirements_sha256": "702687ef5d857d239673a911520c2cbe805fd2578b7708b16a547234a8274d5d",
+    "requirements_dev_sha256": "2fa82fddabeb9ed6fb4390790479a81d9affeb5533a79e658cec4c44e5d1270b"
+  },
+  "test_inventory": {
+    "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
+    "sha256": "eb6ed06dc5388a0cc76ae07bbd08f994d28717066c25b80fe4827b176a19f98a",
+    "total_tests": 227,
+    "required_tests": 203,
+    "not_applicable_tests": 24,
+    "category_counts": {
+      "BROWSER": 6,
+      "HISTORICAL_D1_SITES": 22,
+      "POSTGRES": 80,
+      "POSTGRES_ALIAS": 2,
+      "PURE_NODE": 107,
+      "RELEASE_CONTRACT": 6,
+      "SPECIAL_HARNESS": 4
+    }
+  }
+}

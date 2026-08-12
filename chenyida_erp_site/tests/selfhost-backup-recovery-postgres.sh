@@ -10,7 +10,7 @@ TASK_ROOT=$(mktemp -d /tmp/cyd-backup-v2-postgres.XXXXXX)
 chmod 0711 "$TASK_ROOT"
 SOURCE_PGDATA="$TASK_ROOT/source-pgdata"; SOURCE_SOCKET="$TASK_ROOT/source-socket"; SOURCE_LOG="$SOURCE_PGDATA/postgres.log"
 TARGET_PGDATA="$TASK_ROOT/target-pgdata"; TARGET_SOCKET="$TASK_ROOT/target-socket"; TARGET_LOG="$TARGET_PGDATA/postgres.log"
-SOURCE_RUNNING=0; TARGET_RUNNING=0
+SOURCE_RUNNING=0; TARGET_RUNNING=0; GUARD_PID=""
 
 stop_cluster() {
   data=$1
@@ -19,12 +19,17 @@ stop_cluster() {
 }
 cleanup() {
   cleanup_status=0
+  if [ -n "$GUARD_PID" ]; then kill -9 "$GUARD_PID" >/dev/null 2>&1 || true; wait "$GUARD_PID" >/dev/null 2>&1 || true; fi
   [ "$TARGET_RUNNING" = 0 ] || stop_cluster "$TARGET_PGDATA" || cleanup_status=1
   [ "$SOURCE_RUNNING" = 0 ] || stop_cluster "$SOURCE_PGDATA" || cleanup_status=1
   case "$TASK_ROOT" in /tmp/cyd-backup-v2-postgres.*) rm -rf -- "$TASK_ROOT" || cleanup_status=1 ;; *) echo "refusing unsafe PostgreSQL cleanup" >&2; cleanup_status=1 ;; esac
   [ "$cleanup_status" = 0 ] || exit 1
 }
-trap cleanup EXIT HUP INT TERM
+on_signal() { signal_status=$1; trap - EXIT HUP INT TERM; cleanup; exit "$signal_status"; }
+trap cleanup EXIT
+trap 'on_signal 129' HUP
+trap 'on_signal 130' INT
+trap 'on_signal 143' TERM
 
 initialize_cluster() {
   data=$1; socket=$2
@@ -137,10 +142,12 @@ while [ ! -f "$BACKUP_ROOT/.backup-fence-v2.json" ]; do
 done
 [ "$(psql -d guard_test -Atc 'show default_transaction_read_only')" = on ]
 [ "$(psql -d postgres -Atc "select datconnlimit from pg_database where datname='guard_test'")" = 0 ]
-kill -9 "$GUARD_PID"; wait "$GUARD_PID" 2>/dev/null || true
-# The test-only sleep may briefly retain inherited lock descriptors after its
-# parent is killed; it exits after the bounded three-second hold.
-sleep 4
+kill -9 "$GUARD_PID"; wait "$GUARD_PID" 2>/dev/null || true; GUARD_PID=""
+attempt=0
+while ! flock -n "$BACKUP_ROOT/.backup-v2.lock" -c true; do
+  attempt=$((attempt + 1)); [ "$attempt" -le 50 ] || { echo "backup lock remained held after guard crash" >&2; exit 1; }
+  sleep 0.1
+done
 "$SITE_ROOT/scripts/recover-backup-guard.sh" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$SERVICE_FILE" --db-service guard --backup-root "$BACKUP_ROOT" --deployment-class TEST --deployment-id guard-source --expected-database guard_test --expected-database-system-identifier "$SOURCE_SYSTEM_ID" --expected-database-oid "$GUARD_DATABASE_OID" --expected-database-marker TEST.guard-source --confirm RECOVER_EXACT_STALE_BACKUP_GUARD >/dev/null
 [ "$(psql -d guard_test -Atc 'show default_transaction_read_only')" = off ]
 [ "$(psql -d postgres -Atc "select datconnlimit from pg_database where datname='guard_test'")" = -1 ]
@@ -266,13 +273,17 @@ prepare_success >/dev/null
 dropdb "$SUCCESS_DATABASE"
 rm -rf -- "$RESTORE_ROOT/success_restore_test"
 
-createdb dashboard_test
-psql -d postgres -v ON_ERROR_STOP=1 -c "comment on database dashboard_test is 'chenyida-erp-deployment/v2:TEST:dashboard-test'" >/dev/null
-DATABASE_URL="postgresql://postgres@/dashboard_test?host=$TARGET_SOCKET" ERP_ENV=test ERP_DEPLOYMENT_CLASS=test ERP_SETUP_TOKEN=fixture-only-setup-token-123456 NODE_OPTIONS=--max-old-space-size=384 node --experimental-strip-types "$SITE_ROOT/scripts/migrate-postgres.ts" >/dev/null
-TEST_DASHBOARD_DATABASE_URL="postgresql://postgres@/dashboard_test?host=$TARGET_SOCKET" ERP_ENV=test ERP_DEPLOYMENT_CLASS=test ERP_RELEASE_EXPECTED_DEPLOYMENT_ID=dashboard-test ERP_RELEASE_EXPECTED_VERSION=0.1.0-alpha.44 ERP_RELEASE_EXPECTED_GIT_COMMIT=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS=3600 \
+DASHBOARD_DATABASE=cyd_backup_dashboard_test_release_test
+DASHBOARD_RUN_ID=backup-dashboard-${TASK_ROOT##*.}
+createdb "$DASHBOARD_DATABASE"
+psql -d postgres -v ON_ERROR_STOP=1 -c "comment on database $DASHBOARD_DATABASE is 'chenyida-erp-isolated-migration-test/v1:$DASHBOARD_RUN_ID'" >/dev/null
+DASHBOARD_DATABASE_OID=$(psql -d "$DASHBOARD_DATABASE" -Atc "select oid from pg_database where datname=current_database()")
+DATABASE_URL="postgresql://postgres@/$DASHBOARD_DATABASE?host=$TARGET_SOCKET" ERP_ENV=test ERP_DEPLOYMENT_CLASS=test ERP_SETUP_TOKEN=fixture-only-setup-token-123456 ERP_ALLOW_ISOLATED_MIGRATION=YES ERP_RELEASE_TEST_MODE=YES ERP_MIGRATION_TEST_HARNESS=BACKUP_RECOVERY ERP_MIGRATION_CONFIRM=MIGRATE_EXACT_ISOLATED_TEST_DATABASE ERP_MIGRATION_TEST_RUN_ID="$DASHBOARD_RUN_ID" ERP_MIGRATION_EXPECTED_DATABASE="$DASHBOARD_DATABASE" ERP_MIGRATION_EXPECTED_SYSTEM_IDENTIFIER="$TARGET_SYSTEM_ID" ERP_MIGRATION_EXPECTED_DATABASE_OID="$DASHBOARD_DATABASE_OID" ERP_MIGRATION_EXPECTED_DATABASE_MARKER="chenyida-erp-isolated-migration-test/v1:$DASHBOARD_RUN_ID" NODE_OPTIONS=--max-old-space-size=384 node --experimental-strip-types "$SITE_ROOT/scripts/migrate-postgres.ts" >/dev/null
+psql -d postgres -v ON_ERROR_STOP=1 -c "comment on database $DASHBOARD_DATABASE is 'chenyida-erp-deployment/v2:TEST:dashboard-test'" >/dev/null
+TEST_DASHBOARD_DATABASE_URL="postgresql://postgres@/$DASHBOARD_DATABASE?host=$TARGET_SOCKET" ERP_ENV=test ERP_DEPLOYMENT_CLASS=test ERP_RELEASE_EXPECTED_DEPLOYMENT_ID=dashboard-test ERP_RELEASE_EXPECTED_VERSION=0.1.0-alpha.44 ERP_RELEASE_EXPECTED_GIT_COMMIT=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ERP_RELEASE_EXPECTED_MANIFEST_SHA256=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS=3600 \
   ERP_RUNTIME_BUILD_VERSION=0.1.0-alpha.44 ERP_RUNTIME_GIT_COMMIT=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
   ERP_BACKUP_POLICY_ID=daily-rpo-v1 ERP_BACKUP_RPO_HOURS=24 ERP_BACKUP_EXPECTED_OFFHOST_LOCATION_ID=dashboard-offhost ERP_BACKUP_EXPECTED_OFFHOST_RECEIVER_IDENTITY_SHA256=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd \
   ERP_BACKUP_EXPECTED_RESTORE_LOCATION_ID=dashboard-restore-location ERP_BACKUP_EXPECTED_RESTORE_TARGET_ID=dashboard-restore-target ERP_BACKUP_EXPECTED_RESTORE_TARGET_SYSTEM_IDENTIFIER="$SOURCE_SYSTEM_ID" ERP_BACKUP_EXPECTED_RESTORE_TARGET_CLUSTER_MARKER_ID=dashboard-cluster \
   ERP_BACKUP_EVIDENCE_TRUST_MODE=TRUSTED_ROOT_EXECUTOR NODE_OPTIONS=--max-old-space-size=384 node --experimental-strip-types --test --test-concurrency=1 "$SITE_ROOT/tests/selfhost-dashboard-postgres.test.mjs"
-dropdb dashboard_test
+dropdb "$DASHBOARD_DATABASE"
 printf 'distinct-cluster PostgreSQL backup/restore integration passed\n'

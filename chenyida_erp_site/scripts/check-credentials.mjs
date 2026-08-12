@@ -1,9 +1,12 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { lstat, readFile } from "node:fs/promises";
+import { posix, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
-const repoRoot = resolve(siteRoot, "..");
+const sourceSiteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
+const requestedRepoRoot = process.env.ERP_CREDENTIAL_SCAN_ROOT || "";
+const invalidRequestedRepoRoot = requestedRepoRoot && (process.env.ERP_CREDENTIAL_SCAN_SCOPE !== "COMMITTED_TREE" || requestedRepoRoot !== resolve(requestedRepoRoot));
+const repoRoot = requestedRepoRoot || resolve(sourceSiteRoot, "..");
+const siteRoot = requestedRepoRoot ? resolve(repoRoot, "chenyida_erp_site") : sourceSiteRoot;
 const allowedHostingKeys = new Set(["project_id", "d1", "r2"]);
 const blockedPathPatterns = [
   /(^|\/)\.env(?:\.|$)/,
@@ -21,7 +24,7 @@ const secretPatterns = [
 const placeholderPattern = /^(?:replace|example|placeholder|changeme|local-|test-|<|\$\{|required)/i;
 // Real operator data is intentionally kept outside Git. Credential scanning must
 // still inspect every tracked file, but must not open this protected untracked tree.
-const protectedUntrackedPathPrefixes = ["shujvbiao/"];
+const protectedUntrackedPathPrefixes = ["shujvbiao/", "docs/ERP_CURRENT_STATUS_REPORT.md"];
 
 function gitFiles(args) {
   const result = spawnSync("git", ["ls-files", "-z", ...args], { cwd: repoRoot, encoding: "utf8", windowsHide: true });
@@ -29,7 +32,31 @@ function gitFiles(args) {
   return result.stdout.split("\0").filter(Boolean).map((path) => path.replaceAll("\\", "/"));
 }
 
-function repositoryFiles() {
+function validateExplicitFileList(raw) {
+  if (process.env.ERP_CREDENTIAL_SCAN_SCOPE !== "COMMITTED_TREE") {
+    throw new Error("explicit credential scan file list requires COMMITTED_TREE scope");
+  }
+  const files = raw.split("\0");
+  if (files.at(-1) === "") files.pop();
+  if (files.length < 1) throw new Error("explicit credential scan file list is empty");
+  for (const path of files) {
+    if (!path || path.startsWith("/") || path.includes("\\") || posix.normalize(path) !== path || path.split("/").includes("..")) {
+      throw new Error("explicit credential scan file list contains an unsafe path");
+    }
+  }
+  if (new Set(files).size !== files.length || files.some((path, index) => index > 0 && files[index - 1] >= path)) {
+    throw new Error("explicit credential scan file list must be unique and sorted");
+  }
+  return files;
+}
+
+async function repositoryFiles() {
+  if (invalidRequestedRepoRoot) throw new Error("explicit credential scan root requires an absolute COMMITTED_TREE path");
+  const explicitList = process.env.ERP_CREDENTIAL_SCAN_FILE_LIST || "";
+  if (explicitList) {
+    if (explicitList !== resolve(explicitList)) throw new Error("explicit credential scan file list path must be absolute");
+    return validateExplicitFileList(await readFile(explicitList, "utf8"));
+  }
   const tracked = gitFiles(["--cached"]);
   const untracked = gitFiles(["--others", "--exclude-standard"]).filter(
     (path) => !protectedUntrackedPathPrefixes.some((prefix) => path.startsWith(prefix)),
@@ -39,7 +66,7 @@ function repositoryFiles() {
 
 async function main() {
   const issues = [];
-  const files = repositoryFiles();
+  const files = await repositoryFiles();
   for (const path of files) {
     if (blockedPathPatterns.some((pattern) => pattern.test(path)) && !path.endsWith(".env.example")) {
       issues.push(`${path}: sensitive or runtime-generated file type is tracked`);
@@ -47,8 +74,14 @@ async function main() {
     }
     let contents;
     try {
+      const metadata = await lstat(resolve(repoRoot, path));
+      if (!metadata.isFile()) {
+        issues.push(`${path}: repository entry is not a regular file`);
+        continue;
+      }
       contents = await readFile(resolve(repoRoot, path), "utf8");
     } catch {
+      issues.push(`${path}: repository entry is missing or unreadable`);
       continue;
     }
     if (contents.includes("\0")) continue;

@@ -35,7 +35,7 @@ test("stable identity errors and must-change flow coexist with read-only operati
   assert.match(app, /result\.user\.must_change_password/);
   assert.match(app, /session\.user\.must_change_password/);
   assert.match(app, /api\("\/api\/management-dashboard"\)/);
-  assert.match(app, /备份创建和新空目标恢复只允许受控离线 CLI；浏览器不提供写操作/);
+  assert.match(app, /备份创建和任务自建的一次性 TEST 数据库恢复只允许受控离线 CLI；浏览器不提供写操作/);
   assert.doesNotMatch(app, /function (?:createBackup|restoreBackup)/);
 });
 

@@ -17,6 +17,8 @@ x-app-environment: &app-environment
   ERP_RELEASE_EXPECTED_DEPLOYMENT_ID: ${ERP_RELEASE_EXPECTED_DEPLOYMENT_ID:-}
   ERP_RELEASE_EXPECTED_VERSION: ${ERP_RELEASE_EXPECTED_VERSION:-}
   ERP_RELEASE_EXPECTED_GIT_COMMIT: ${ERP_RELEASE_EXPECTED_GIT_COMMIT:-}
+  ERP_RELEASE_EXPECTED_MANIFEST_SHA256: ${ERP_RELEASE_EXPECTED_MANIFEST_SHA256:-}
+  ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256: ${ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256:-}
   ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS: ${ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS:-}
   ERP_BACKUP_POLICY_ID: ${ERP_BACKUP_POLICY_ID:-}
   ERP_BACKUP_RPO_HOURS: ${ERP_BACKUP_RPO_HOURS:-}
@@ -60,12 +62,38 @@ services:
 
   migrate:
     build: { context: ., target: worker, args: *release-build-args }
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     cpus: "0.75"
     mem_limit: 768m
     memswap_limit: 1g
     pids_limit: 128
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m
     command: ["node", "--experimental-strip-types", "scripts/migrate-postgres.ts"]
-    environment: *app-environment
+    environment:
+      <<: *app-environment
+      DATABASE_URL: ${ERP_MIGRATION_DATABASE_URL:?ERP_MIGRATION_DATABASE_URL is required}
+      ERP_ALLOW_PRODUCTION_MIGRATION: ${ERP_ALLOW_PRODUCTION_MIGRATION:-}
+      ERP_RELEASE_MANIFEST_FILE: /run/chenyida-erp-release-candidate/release-manifest.json
+      ERP_RELEASE_MANIFEST_SHA256: ${ERP_RELEASE_MANIFEST_SHA256:-}
+      ERP_MIGRATION_CONFIRM: ${ERP_MIGRATION_CONFIRM:-}
+      ERP_MIGRATION_EXPECTED_DATABASE: ${ERP_MIGRATION_EXPECTED_DATABASE:-}
+      ERP_MIGRATION_EXPECTED_SYSTEM_IDENTIFIER: ${ERP_MIGRATION_EXPECTED_SYSTEM_IDENTIFIER:-}
+      ERP_MIGRATION_EXPECTED_DATABASE_OID: ${ERP_MIGRATION_EXPECTED_DATABASE_OID:-}
+      ERP_MIGRATION_EXPECTED_DATABASE_MARKER: ${ERP_MIGRATION_EXPECTED_DATABASE_MARKER:-}
+      ERP_MIGRATION_EXPECTED_ROLE: ${ERP_MIGRATION_EXPECTED_ROLE:-}
+      ERP_MIGRATION_EXPECTED_CURRENT_HEAD: ${ERP_MIGRATION_EXPECTED_CURRENT_HEAD:-}
+      ERP_MIGRATION_EXPECTED_TARGET_HEAD: ${ERP_MIGRATION_EXPECTED_TARGET_HEAD:-}
+    volumes:
+      - type: bind
+        source: ${ERP_RELEASE_ARTIFACT_HOST_ROOT:-/var/lib/chenyida-erp/release-candidate}
+        target: /run/chenyida-erp-release-candidate
+        read_only: true
+        bind:
+          create_host_path: false
     depends_on:
       postgres: { condition: service_healthy }
     restart: "no"

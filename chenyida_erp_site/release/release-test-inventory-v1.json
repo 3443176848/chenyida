@@ -1,0 +1,2064 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-release-test-inventory/v1",
+  "root": "chenyida_erp_site",
+  "test_pattern": "tests/*.test.mjs",
+  "max_test_bytes": 1048576,
+  "total_tests": 227,
+  "required_tests": 203,
+  "not_applicable_tests": 24,
+  "category_counts": {
+    "BROWSER": 6,
+    "HISTORICAL_D1_SITES": 22,
+    "POSTGRES": 80,
+    "POSTGRES_ALIAS": 2,
+    "PURE_NODE": 107,
+    "RELEASE_CONTRACT": 6,
+    "SPECIAL_HARNESS": 4
+  },
+  "tests": [
+    {
+      "path": "tests/ai-governance-evaluation-cli.test.mjs",
+      "sha256": "ba946e64b5abb8d92da80ffd64b3535c41194106964630f51587de84e1b97755",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/ai-governance-evaluation.test.mjs",
+      "sha256": "3807ddd790c1c55dd3fa044f7e460485c5738edef268284ec1e80ead9e9390e1",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/ai-governance-suggestion-layer-cli.test.mjs",
+      "sha256": "c962bc83ba413769db35f4c24c5ebf14386b06a2394153ec4319aa749fa2e61f",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/ai-governance-suggestion-layer.test.mjs",
+      "sha256": "9f5f1732dcc82eec4e5070f0779b8a554bebaafa5bda629622e7ad0f1b0fec16",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/d1-migration-statements.test.mjs",
+      "sha256": "6cca9feb0f4da8a325f2f30bc5b16441b4ac02a5d9c5c54514aff005fb7340ae",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/environment-guard.test.mjs",
+      "sha256": "23bb29c977a41e4cc25d8eff11e554b54a50bf10b1cde619b7c72e18c1da34c4",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-category-seed.test.mjs",
+      "sha256": "7c63d41b1ec27bb1495b2ad9f83a8ac0acb4bd8f39419b1000d7c5c21289043b",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-draft-lifecycle-migration.test.mjs",
+      "sha256": "c8522e9e5e9c951be388bc45abf974d80d833ee34270ab423bc388edb62d70dc",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-draft-review-api-migration.test.mjs",
+      "sha256": "1ce0cb1481b8615482479bd70a200a81c7a38fc2d60d7a88dc5ecae1d2cd2fdc",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-draft-review-api.test.mjs",
+      "sha256": "355e34c4a605d0082fdaffb107f19a727202d7246a51976db07caef8c4adf302",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-draft-ui.test.mjs",
+      "sha256": "c867d72c1dae985f0f9b4b9e084db0e93ede639e48ca8548df2e60df13fc90a0",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-file-inspector.test.mjs",
+      "sha256": "d369849a482255cf1e5bc629c13bfa4255647b7678ca3e662e036c1b904b82dd",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-adaptive-migration.test.mjs",
+      "sha256": "46b0d7c97f5568765e7f908fc799b6346aa5c62818443e42d4a9296db83d0f06",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-adaptive-runtime.test.mjs",
+      "sha256": "a98d33a1374279c50fbf265fba6632f8e4fc3ce665c2495c442d31dfc4c3880a",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-adaptive-supplier.test.mjs",
+      "sha256": "571a747f5be2c6dd7c198dbcf826e829788dfc3b2875654b00802a1a1535bf34",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-batch-api.test.mjs",
+      "sha256": "718f7d447f69f02813dc053b267a56045c5d706a9f226bd09f04f467bd8eee27",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-batch-migration.test.mjs",
+      "sha256": "d0b93feb823eab9ad3206eccaa0642c2a1cb03523824a0cd56d8f3eeb942e6a8",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-draft-generation.test.mjs",
+      "sha256": "6517dfd8b9b0d48d571c5a45ae645e6ca9c586643155a7ea5052679fd0e2ff10",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-mapping-target-catalog.test.mjs",
+      "sha256": "3368c3ea222a6ef838f8429ba8ecc61a34a0ac2fe15104cf59d9d4ed105b852e",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-normalization-migration.test.mjs",
+      "sha256": "bdcafd7d7f82e06ac09d65adeef672fcd389b37c3d41d353606276c6663a7568",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-normalization-ui.test.mjs",
+      "sha256": "48e2a0c76f92c6cf97d3317d9a10ff76a34d8dbf27e02db3f1520e6454c6f1e4",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-normalization.test.mjs",
+      "sha256": "2229e8379d6bad96afc38d3b84790c5afd62c5d9020f7b68f7df8597fb1f8ff2",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-parser-compatibility.test.mjs",
+      "sha256": "c12ddbc35249bd4e14549b5ef99345ba2449d8fb5b6cb33d62f722d566d6a289",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-parser-integration.test.mjs",
+      "sha256": "99c211e2c3960f9d9b8d23720919ed879a1742acd46758cdc7faf3ed87c183cb",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-parser-migration.test.mjs",
+      "sha256": "926d286a66bd3b2597656b6079282bbc3076d6e4650f60f1d7b386f94b39ce55",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-parser-v1.test.mjs",
+      "sha256": "de774f8f61db1c2a1dfdc612abcce439b7112b76057428f7f2de9eb2c0fda42e",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-import-ui.test.mjs",
+      "sha256": "3de8675956a276fd37189aaffd457d60d63aafc3e864787a418bdf8f659275e1",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-library-migration.test.mjs",
+      "sha256": "24bddbe32928a6deda81fe2cedcab150381e90d311a19e97c25eada0a86cdf08",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-master-migration.test.mjs",
+      "sha256": "6836da56105350efbd4f30fd06a15ea9264ecb6d5b9810d229f205778bb95379",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-master-service.test.mjs",
+      "sha256": "fa27b99d90d6d4c8f5ad0447e42a86e92b1d703926bb1584d81e885a9bce6397",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-read-ui.test.mjs",
+      "sha256": "ab5769a44f28683c12f70d60a34dff4e212b7663a7f9b8b3ecf3981ebc07e4fd",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-review-ui.test.mjs",
+      "sha256": "136f90fe4aea49e45ae01ad282d3d94ac6fcee054c0c926213a52d963c9ae4a6",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-validation-metadata.test.mjs",
+      "sha256": "55480c2744935bca0816fc24f6a8f0d437d4cfcf8af5d0ef27ee5f51f9c19d99",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/material-validation.test.mjs",
+      "sha256": "e4256ca06deba96c94f0ecc11de73321c9219f7e49a4fa33318678afbede949d",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/rendered-html.test.mjs",
+      "sha256": "8f9de19939cdea45ec16f5bc1b5be71c25236be6a2cbc65d96135ee5ebfca17b",
+      "category": "HISTORICAL_D1_SITES",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "LEGACY_EVIDENCE",
+      "reason": "HISTORICAL_D1_SITES_NOT_SELFHOST_AUTHORITY",
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-adaptive-import-unit.test.mjs",
+      "sha256": "89cabadc4456e44ad0203389e9724b4eb29fad5f937a0a06f90ff1c568709963",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-ai-governance-suggestion-handler.test.mjs",
+      "sha256": "9d64fc63e59c22713a99ed8e0c2a9dd4a57e4a99c66702a5513eff25b12d3c5c",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-ai-governance-suggestion-migration-contract.test.mjs",
+      "sha256": "9eede7dcd849180b704f331872da7f5e10d595e2f9a18908f9f6455c7f2cd65d",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-ai-governance-suggestion-migration-upgrade.test.mjs",
+      "sha256": "010942050c6c30194d21bb76a37de224c0cd475c0d11c245203196cde2ce2d66",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-ai-governance-suggestion-postgres.test.mjs",
+      "sha256": "35dffe3da70fe6a72024044785b940be38cecacc0e5cde6e95c2db5eba5d0875",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-ai-governance-suggestion-unit.test.mjs",
+      "sha256": "24b4723c0e8cc74927cd4c3280338d2e30b6ee6d6a590b8d4ee5a275335f9cfd",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-api-client-csrf.test.mjs",
+      "sha256": "6cdc8dc82703c3d585b45db0c8bf2d2ef83b265b10a127e0049337e058ced5e2",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-api-coverage.test.mjs",
+      "sha256": "76f786147b87f513afc408ff8ce3e87df476844fead6e5b6ce7a3e1c229408d5",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-application-version.test.mjs",
+      "sha256": "702b49936d9343773d391ed829e93f45d672e4ae3c36bed077e5cf8f1dd0f0a6",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-award-mapping-qualification-unit.test.mjs",
+      "sha256": "e2aba528e41b2e049f31221579c4804e4f30f5b24ab4a03fb50245ceb8c33e77",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-backup-recovery-v2.test.mjs",
+      "sha256": "1d763cba1ce97859c837be3d59d6bff0218c38aea50381264c751bae4c76d6af",
+      "category": "SPECIAL_HARNESS",
+      "applicability": "REQUIRED",
+      "harness": "SPECIAL_POSIX",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-build-assets-unit.test.mjs",
+      "sha256": "a44412710dcc233141e9a941cb3f6b5b5aabaade424786c5f331823064ef9f56",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-dashboard-postgres.test.mjs",
+      "sha256": "bf40cb17314bbc224a8e40e1ce0b8a3e24108090437e04d50dab27c9cb25901f",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-dashboard-ui-contract.test.mjs",
+      "sha256": "03f1efcd411a4e6b75a0181b606c62909273f4f7e4a1691c4059430bc10a4cb8",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-dashboard-unit.test.mjs",
+      "sha256": "1096600614ad81cb4a97c6a475a6acf01dfe4880653d2bc3d485c88f4bc4b55c",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-dockerfile-version-contract.test.mjs",
+      "sha256": "19cd4ed1caec68132183a4696528b226ce9e3ef6f9ad5f52aec28e7e5f504e3d",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-enterprise-ui-contract.test.mjs",
+      "sha256": "ba393ba77dfbe9858b6b028fc883e45a2be351504e8e0cc88aed930b27f5a652",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-file-storage.test.mjs",
+      "sha256": "0b67e6827500c702444fb5b7139ecf5341663bfaaa6bb5cff2d15200e7a7e23c",
+      "category": "RELEASE_CONTRACT",
+      "applicability": "REQUIRED",
+      "harness": "NODE_RELEASE_CONTRACT",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finance-migration-upgrade.test.mjs",
+      "sha256": "5e740b9f670efcfc64373f09b5851c547d2300d951f99c3079e33867588e291a",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finance-postgres.test.mjs",
+      "sha256": "21bf0163446e9a5d6345628c186a80d61c41be84297479014284d25b45d8d697",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finance-project-migration-upgrade.test.mjs",
+      "sha256": "05b9465ba7174a350e6cbe34c1b23f936e17b733639bf92ae1657a37e5e298a4",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finance-ui-contract.test.mjs",
+      "sha256": "094b44abdb9569dc7288ce398ad6abe1ed402831def534b839f62a3e09625e3d",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finance-unit.test.mjs",
+      "sha256": "68f77fd4baee02c0283156352f846447a8fe63fc18a2c2573c8f5eebc78eb296",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finished-goods-inventory-lot-migration-upgrade.test.mjs",
+      "sha256": "bf9bee0b329389dbc424caaa8c60171900b9b6f286ca27558c0f0775dcd7d6c2",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finished-goods-inventory-lot-postgres.test.mjs",
+      "sha256": "e35c09bb191574f2fc09cf7485d17db38e63ab76fd5138df0144755cae3884bc",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finished-goods-inventory-lot-ui-contract.test.mjs",
+      "sha256": "bde71736c50c15a1af2763456ff9434dbd7846ca74668498730950b143f4b871",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finished-goods-inventory-lot-unit.test.mjs",
+      "sha256": "2eea794f45479cefe91f7492300ff768742f9e9606a6132f07565c0326a304c8",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finished-goods-lot-shipment-migration-upgrade.test.mjs",
+      "sha256": "74156e2c00598e704be27bad6c37dd1da00b56af8c7839065b0e6d461a6d49a7",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finished-goods-lot-shipment-postgres.test.mjs",
+      "sha256": "e0359d9c0c2c3d8b751b5b72cb30e13c17869f080eb4c7a067364ecc8e0d03b9",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finished-goods-lot-shipment-ui-contract.test.mjs",
+      "sha256": "28b1a73a9b71805586c9edc48b9a13f6985941a98d31cc4fe5e92d536492d01a",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-finished-goods-lot-shipment-unit.test.mjs",
+      "sha256": "0d892a949f0306c108c15fde5f407a3c9f32dc80829a9cad4c55dfe865c7a30f",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-health-contract.test.mjs",
+      "sha256": "8378f516758afdcad0fe1341b95d3e39aca9ef0ac314d59176144bcdf7a73019",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-identity-migration-upgrade.test.mjs",
+      "sha256": "be910f61c8852f0700136bf6feabebc977e06da82d49447d06a74a37b668f8dd",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-identity-postgres.test.mjs",
+      "sha256": "27677405cc557517c94be05c9943072d554f561a505005a24ba708b78563b1ed",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-identity-ui-contract.test.mjs",
+      "sha256": "33bf577e5e81e26574d58a27eef1fad73ac081deffd06f9a38c79d10f4857a5e",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-identity-unit.test.mjs",
+      "sha256": "f99e361262ace69c8f1242884514e51e2bbc13e494030667500806da39f20a59",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-import-worker-postgres.test.mjs",
+      "sha256": "8f811976162353406ccba97a739da2eeb8c4395e66bf81e61c9d51eafcd0e5cb",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-inventory-migration-upgrade.test.mjs",
+      "sha256": "e10411c86dddba1c025028630336e8f9e0499879f6f7657e5c7def94931bdfe6",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-inventory-postgres.test.mjs",
+      "sha256": "28605a23d05117d912b88ddfe76e8e08de86184c2176a0535bf6f68b75bb9af0",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-inventory-ui-contract.test.mjs",
+      "sha256": "e786aae97d9c3ebc4c093576aae693972e1b3a16b3520a9fa1d0814dc7870e98",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-inventory-unit.test.mjs",
+      "sha256": "47fa03c8504a9f5a628ebebcddb8a9d2de497f74560f0650c4b5ab254a7271c9",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-mapping-migration-upgrade.test.mjs",
+      "sha256": "3276155890b07583332f38afd189d63502361765125d41bcfac45b45e94be363",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-mapping-postgres.test.mjs",
+      "sha256": "8eaf090a05fc0a617a3ba58dd9dbbd272523f0786dfe651cdfd147fecd45bee8",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-mapping-ui-contract.test.mjs",
+      "sha256": "a4096d909468ddff9f2ed710ba2f0cb649a7ac252c99fe8ddd92e464bdf2842e",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-mapping-unit.test.mjs",
+      "sha256": "a20db9bed1f38fa98f2c502bc7eeef42cc386f14ee867f7e560c59c3f517b71c",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-master-data-migration-upgrade.test.mjs",
+      "sha256": "fd1fee67cd6a24162894a5325579dadac7537dc4eab35a05f02886958637f14f",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-master-data-postgres.test.mjs",
+      "sha256": "98e41e2da21b0989ebdee3fb9a2c3caa70ce647f079652a836cedfcc3d97c911",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-master-data-ui-contract.test.mjs",
+      "sha256": "edd9753fe3cf076670908f90af906e6b4046fd53750b9191e5b19eb12fbf5dce",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-master-data-unit.test.mjs",
+      "sha256": "8c8626a7a13be120128437fe7f3038cfdb6411ff042c9e871a38ce34889d861f",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-governance-handler.test.mjs",
+      "sha256": "3269c049b10709f5ab0ccb3bb461d654e7eeb9d2075e1cf46e76e7e6edec7726",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-governance-metadata.test.mjs",
+      "sha256": "e2cffb97a30e015703888bd8d4361c11d65d4ffc6f5a48db8ab14b47986adeb1",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-governance-migration-contract.test.mjs",
+      "sha256": "590bdb36abdd78c19cafce0453d662a1a6f90d9853520d78fbb23c058df25c33",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-governance-migration-upgrade.test.mjs",
+      "sha256": "bd66a96e16b7749f250a71c2bcf5efd19208fdbb38445ce3610f535f62ae5a0b",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-governance-postgres.test.mjs",
+      "sha256": "7d24b4dafe057652bdb8c4e4dc8e88896d042adebfab4b3b9cb6a892c84bc206",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-governance-source-adapter.test.mjs",
+      "sha256": "326070a2adfaede8cbcedaa71266bbcf885fc19030bb64eaaa9b82b4913b3678",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-governance-unit.test.mjs",
+      "sha256": "b113183b99c4d92750e887c75b5b0a38f3ea439844c0f4289b8ca9029915f808",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-postgres.test.mjs",
+      "sha256": "4eeb5c17373cbee8954c67bdfe27a2b2be9fa73349cfa3b08e2c222f26cdf329",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-requirement-migration-upgrade.test.mjs",
+      "sha256": "f49b5e83e52e70e426c16e58e67f2a796e9e9b802bf996f7873bbcfc7b987296",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-requirement-postgres.test.mjs",
+      "sha256": "ae65c4af802e4a44e1835b775ff2c2355e890e8338b26ba963ad632aa0a119ba",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-requirement-ui-contract.test.mjs",
+      "sha256": "484c24c3cde45a1f7a2312059afea838cd48b33a82d969a98d9e5d3bbf9ef221",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-requirement-unit.test.mjs",
+      "sha256": "ed147e3e7687b2a436cc463ecc4c85b2e4c7f352c0d2df7255db2dcb78435a0d",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-review-dashboard-unit.test.mjs",
+      "sha256": "479908f3e45a1b5713aaa129a99cb566dd0918d8af83e622c88e2dc493b35741",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-standardization-handler.test.mjs",
+      "sha256": "a96a9eebe542d72d4de1ec21b42ecc0203b395c8575e8404b9a80709b03907c3",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-standardization-ui-contract.test.mjs",
+      "sha256": "08e9851943f3dbca018da226282e0901890c40185096697e72b574e3ecfd011b",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-standardization-unit.test.mjs",
+      "sha256": "c7e7bca9ceee830cedee321e8a8325395a14ffd5d4f7268fa61fdd1a844826af",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-ui-contract.test.mjs",
+      "sha256": "6bfbb9af8eabc09a98516472816e9233cab32d2335b1d07e2d1019cf2c0cca32",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-material-unit.test.mjs",
+      "sha256": "2340060fac95300d2a8c7672fc1be3de15312d3a1a8d956d2098de042a40403f",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-migration-materializer-postgres.test.mjs",
+      "sha256": "7ecee0f578bdc5f405a069189c62deda0b64a31273e56b74efee58a69e1ead15",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-migration-openings-migration-upgrade.test.mjs",
+      "sha256": "b345a4fb94c3e24b522e2c601991ab1219768425f55d7ec97578dd7f8e40be20",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-migration-openings-postgres.test.mjs",
+      "sha256": "78b8f2d615d38e22ebde30f6cd7b28046d6fa17d5664de689ba53ed340bc404a",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-migration-openings-unit.test.mjs",
+      "sha256": "280385c0e53584e8b63ab394802d500f0399df0f80adb3313a46c271dee4e0dd",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-migration-postgres.test.mjs",
+      "sha256": "a0b5bc873376c1351e478d5c5fc2fb77a62428ca6d1fbc34837089fc2f537c08",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-migration-tool.test.mjs",
+      "sha256": "4ea3723b758b8aae87f34d4ae965cb01731232cada6c83267830c71fea28b965",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-normalization-migration-upgrade.test.mjs",
+      "sha256": "af80ff26c9e3ffa0124358f27b76dfaa1323dd9efe495d9f4098159352d61036",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-normalization-postgres.test.mjs",
+      "sha256": "3b72e81b21746cc70936ebc8e73c2eaaf029d1bbabb1bd798b9f0495702923ad",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-normalization-ui-contract.test.mjs",
+      "sha256": "15054c2d7373375a227270a860dc397f5afecfcc1cf70b14ba64fd8d83e3c735",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-normalization-unit.test.mjs",
+      "sha256": "5583ab39446b3168639ae628056f167121b315f25ff9af0436e869b956f1700b",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-offline-identity-recovery-postgres.test.mjs",
+      "sha256": "f13c787f87403cde30c87f4a78b88a6bc5615f75211d8fbe97ee0d3e35cf9bcc",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-offline-identity-recovery-unit.test.mjs",
+      "sha256": "fab2df90ca891d1bf9aed64654df28731de73432aa12c8dbfadc99dbda217c11",
+      "category": "SPECIAL_HARNESS",
+      "applicability": "REQUIRED",
+      "harness": "SPECIAL_POSIX",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-operations-material-review-postgres.test.mjs",
+      "sha256": "97d0a301edc6a92fdf517a09d0669b1cdf9d15dadc24cd1aa70a215c0095e68b",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-planning-handoff-migration-upgrade.test.mjs",
+      "sha256": "31a8077545a75bfe7f3ddbc2a99f2d186f805be5d3295d112c6dc12e00be7c95",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-planning-handoff-postgres.test.mjs",
+      "sha256": "5a13304d44983f5f944c04ad2ef39b086a63f7ffa3b28e2d93e13a462689bab3",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-planning-handoff-ui-contract.test.mjs",
+      "sha256": "8cc47ea59e26eb9462a2da3224139a761d82f0b9bdea8104770246dcbbe6eb64",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-planning-handoff-unit.test.mjs",
+      "sha256": "829eba54170077f42f2587b7432aab306fcf6b885609ee171b57f01636d5c5cf",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-planning-revision-response-browser.test.mjs",
+      "sha256": "96b634e8e84327f29ed12dcb07698320d5b1f454d90fe858ad6fcc9d3b5f6069",
+      "category": "BROWSER",
+      "applicability": "REQUIRED",
+      "harness": "BROWSER_E2E",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-planning-revision-response-migration.test.mjs",
+      "sha256": "60e231d67d9371317f06c4e07f82ac926886249eea80fbf22c0ab7d31bd8e426",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-postgres.test.mjs",
+      "sha256": "9e6d6739faf393a1451115e2851458d066a41852e3d14f6e7a22043cb5a2487d",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-procurement-fulfillment-migration-upgrade.test.mjs",
+      "sha256": "2844a99a6f51724454f5704a7a1fc68c0d839955387e44fe83d2d08da5ffb97d",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-procurement-fulfillment-postgres.test.mjs",
+      "sha256": "d6874a3d50392eef485527ba09f097abd686aade9d3e05ab3b0a95448bf799e2",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-procurement-fulfillment-ui-contract.test.mjs",
+      "sha256": "a92e21b19915c1eaf3a352d41eda30e8d614ab21f16d946aecd97ff4e9a1ccd2",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-procurement-fulfillment-unit.test.mjs",
+      "sha256": "28fb599798d3a87e62716e84c01d12674b9782a6cebcc8ddaa4e4b6a5499a53c",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-procurement-migration-upgrade.test.mjs",
+      "sha256": "2e39744018ab99abf7b092ae76f5b616973c7c3e8120c80e7948c4353d8ae177",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-procurement-postgres.test.mjs",
+      "sha256": "e70fb006b0b216f58c5cbdcd16e0746cd4322451af28d064412dca5ff02ce0bd",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-procurement-sourcing-migration-upgrade.test.mjs",
+      "sha256": "e50cc79ebad600e0abed545641de41645f7497fe6f9c116f6848b60050d0a45d",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-procurement-sourcing-postgres.test.mjs",
+      "sha256": "902197ed9a61285cacae9e4b25a7818e6c3b11e33e5b5f0366fc445eb893019f",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-procurement-sourcing-ui-contract.test.mjs",
+      "sha256": "7365f251cd2780ff569c09b6df11999eb923c1ea95529028c32c2cfd89b3fc0e",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-procurement-sourcing-unit.test.mjs",
+      "sha256": "2b2aab4c7fa5f5281dc18cbd1312f96710173f2a838efbc9cd4d0716ca0b9c96",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-procurement-ui-contract.test.mjs",
+      "sha256": "1402f01151123dead3b444e2dec49fd97e53cc9b245c7be8730effb3f233a233",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-procurement-unit.test.mjs",
+      "sha256": "9d6eec1e45d824cf3a9efb6dfdac6d8df392b7619d78a80462c6f029e9be4c61",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-batch-migration-upgrade.test.mjs",
+      "sha256": "461853d76223cb2ae2b1c9cb578b065facea6e3490a96e604fb32f93be87ede2",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-batch-postgres.test.mjs",
+      "sha256": "1ab8e90a1247b1de66493ca75109090eebcd15bca983ba4ab05c139f77758292",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-batch-ui-contract.test.mjs",
+      "sha256": "9fcff328fa52e20a8c928686f47cdb974fb3624029603b0bb7f524503d339d7b",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-batch-unit.test.mjs",
+      "sha256": "ee66d21adaa73d4d6d08efde53f1dc12e6664ce1ebe40bd7f896579870181aa6",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-completion-migration-upgrade.test.mjs",
+      "sha256": "459b866ac90078f869b8716fda0450c06cc5b93e9775a156b65df999bcad2a28",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-completion-postgres.test.mjs",
+      "sha256": "8aed00e790082b5734b62dce1a8a9d8a3c1a82b0bd3af93898fa0f2dfbacedb0",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-completion-ui-contract.test.mjs",
+      "sha256": "ca4b4641bb593b1fca6da89115febbd2fb213314473943c40b0e8a97d314f854",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-completion-unit.test.mjs",
+      "sha256": "82db72039a1d54cbff0a65878627f00a3095f5732825c65b1eaea7ca149f3e92",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-final-output-migration-upgrade.test.mjs",
+      "sha256": "cfaf702ac63ba7ac631c672312550d2ae6a9af53b87593719ae57dd04bf0a4be",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-final-output-postgres.test.mjs",
+      "sha256": "8a015f44952062bbd05d90ce43141949f4e24139c6b5b3c07fc7f02c895a1f6a",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-final-output-ui-contract.test.mjs",
+      "sha256": "88fe8cb708969cbe4e98ab67b929f37bcd78af807e417e1e07278a5a1716a529",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-final-output-unit.test.mjs",
+      "sha256": "d8ef24934d58c82f8dd539900bf443da92e6858cfaa5e59e4dbdb20baf046b71",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-handoff-migration-upgrade.test.mjs",
+      "sha256": "55463d57a708bac6d4d8da58c47259c54e329d3fce34cb23735f74f5376ebbde",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-handoff-postgres.test.mjs",
+      "sha256": "15f657457bdf58b2cd92e3430ef3e6fc08ceabe2aa9d07a278733dafa7faff8b",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-handoff-ui-contract.test.mjs",
+      "sha256": "e9c15508bcd306e3ef79c217389b4a74b3b5b85f852dffe9ea8d590d42820924",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-handoff-unit.test.mjs",
+      "sha256": "82a1f6967eab8f5e93f203a3a81595f225e2e21fed35ffd47102d1e76ab27aed",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-migration-upgrade.test.mjs",
+      "sha256": "9379e02c9cf903e2a8ebb43261e6a2d1f1e2639be1a700e442cfc1c289f6498f",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-nonconformance-migration-upgrade.test.mjs",
+      "sha256": "c10989d88ee49123043d0fbd983be855e25817ae8584054c118074eaabbcf943",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-nonconformance-postgres.test.mjs",
+      "sha256": "183d200e349651f1bcf7229260dc5d6fe7937934f6d874b7a7fcfb6e5afbb6f1",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-nonconformance-ui-contract.test.mjs",
+      "sha256": "f17e7fef3732d4660b72e81fb2adbc0d332dc90adf8c1cdd2d4d3b65c3d66e04",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-nonconformance-unit.test.mjs",
+      "sha256": "89be447cc383cade48fd94bc4dd30211c004b302af2a464a1c0d67806b8f84ec",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-operation-migration-upgrade.test.mjs",
+      "sha256": "dd670339f5e627bff908c1848e7a5393def95953f1deae3658910c97e6f6b7e0",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-operation-postgres.test.mjs",
+      "sha256": "fecd7515a9ba7f34d0661e19ef839f0eb926c9e7cecdb4397da44874fd566de4",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-operation-quality-gate-migration-upgrade.test.mjs",
+      "sha256": "bf3861f56a04a2b34fd30a826772e6ca49bf97bd3137f07fc443948f5403ba52",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-operation-quality-gate-postgres.test.mjs",
+      "sha256": "42d59adc10952bf2a822ff93cc6e313057745f55a55c32164a2351d75fb19ccd",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-operation-quality-gate-ui-contract.test.mjs",
+      "sha256": "5dd992af17b9bba09902b02211d9e7e0b274ec925664b5cdd8c743df43d4929c",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-operation-quality-gate-unit.test.mjs",
+      "sha256": "e96b3b243c7d4e357692514cd49f0fc7123ae1a720d50da978148a45069d6850",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-operation-ui-contract.test.mjs",
+      "sha256": "b4e0cd125acb0233dc89fe6470b50395a3636cb20f472e46bd5d95aa33cac382",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-operation-unit.test.mjs",
+      "sha256": "ead005cc595e8e92c3131608d786825e33315a9c6ea6c3e0af05fa64094e6f9f",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-postgres.test.mjs",
+      "sha256": "2acd509dda26ea1292c55e3b1adcf5d0296934ebff78ba41cb2b8f2160c42551",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-quality-release-migration-upgrade.test.mjs",
+      "sha256": "031440931b973e5ad595cc83ff26b05b4b89cebb75ead7e556935bd8a2f51904",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-quality-release-postgres.test.mjs",
+      "sha256": "c940bbbe9f8f0f415cf0194a6c3c2458c0d024a9b2f8eb56bd7227f27e04dc56",
+      "category": "POSTGRES_ALIAS",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "POSTGRES_ALIAS",
+      "reason": "ALIAS_ONLY_CANONICAL_SUITE_REQUIRED",
+      "canonical_path": "tests/selfhost-quality-postgres.test.mjs"
+    },
+    {
+      "path": "tests/selfhost-production-quality-release-ui-contract.test.mjs",
+      "sha256": "bfa5f316e6ff017df58c2be05b57f01f2361694b39f709120222ce51741bb64d",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-quality-release-unit.test.mjs",
+      "sha256": "3f44eb9e5f19b894bd4c7f56db64ef198ae69fd1310c80be1d849c04bbfd8cc9",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-rework-execution-migration-upgrade.test.mjs",
+      "sha256": "dc5da977ed445f4204df9e1fd6749c7ccd4043650599c8ada488dc750545fab4",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-rework-execution-postgres.test.mjs",
+      "sha256": "2ca46c29a3beb1e7730a7c73e952d528afa25245c77f7568d1bd309ba78b3031",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-rework-execution-ui-contract.test.mjs",
+      "sha256": "995c85aa72c5310b1029fcdc22247a5ad3e9606baad3eed6a9db99c3f7477d2a",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-rework-execution-unit.test.mjs",
+      "sha256": "b366b8aea5db042879fbce7447f5369a94ca3ed3dd08bdfb7b1a02ddc905beaa",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-routing-migration-upgrade.test.mjs",
+      "sha256": "140d6a3548f024f9bcd4eaebaa90bcf1c92591d06aad5f8359d6aa3d143aa9c4",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-routing-postgres.test.mjs",
+      "sha256": "07460ef1f6e5bdd5746b34566c03aefdf5a3096556f0fbba613cb33e816b7d98",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-routing-ui-contract.test.mjs",
+      "sha256": "3c4a25d809fe450bb367b031052c903abe69fa85eb9bb8f6377fb54b7f0d0a29",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-routing-unit.test.mjs",
+      "sha256": "49f3ec5213b0c93aa102f74c71e4e37d1711e3c3b9b5b6551d635f2880aac1bf",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-ui-contract.test.mjs",
+      "sha256": "37989e7f0b1e19f185a8f0d11236ca318dabfdbeb0256ed63e046c4c2bd32304",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-production-unit.test.mjs",
+      "sha256": "a70384d72e783e0569cc1a02570c07a9196fab8a23738cd781741a3ac62a0a52",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-project-migration-upgrade.test.mjs",
+      "sha256": "80bdf3ccec473b5de66380a1b2b878535d2eb74cc6bd4141b1d13ecabd59322f",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-project-postgres.test.mjs",
+      "sha256": "284690d8ab6542d52e1113f1cc4d9c3b9bf63f2835c0d668cb7b612fed35bcfc",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-project-ui-contract.test.mjs",
+      "sha256": "7b92be99356aa08e33b286fc7d3d4beea6c6e51acc0567ec60215392cce65c83",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-project-unit.test.mjs",
+      "sha256": "45b8c3c9fe756f6c830353999b3faa2ab2b5fda6935d79a841f518c395571860",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-purchase-traceability-browser.test.mjs",
+      "sha256": "bbd73cdd36090b7e594eabe967a77616e72c59ba828ff13a063788b658dfda4b",
+      "category": "BROWSER",
+      "applicability": "REQUIRED",
+      "harness": "BROWSER_E2E",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-quality-migration-upgrade.test.mjs",
+      "sha256": "6f07f0c5bc6437b21fe9959e576de7caa73931e53320b3541d6a4652c6faf7cd",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-quality-postgres.test.mjs",
+      "sha256": "48764b5e6a0c96ca2e1fc9964c3af65f319e552c79242b95d79af0e861e6ece0",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-quality-ui-contract.test.mjs",
+      "sha256": "c630f9f4007e347b33b203fcbb48cc6b379329bb27c037a766cbc7412e3246d9",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-quality-unit.test.mjs",
+      "sha256": "ff81b8fa850be628c611b0912e5e9af8ac170ba0b564620857e0bd7334435a7a",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-readonly-inventory.test.mjs",
+      "sha256": "6497f569e7e5b9373cc3de6c985997f7145cd71a220330240656c446c1870239",
+      "category": "SPECIAL_HARNESS",
+      "applicability": "REQUIRED",
+      "harness": "SPECIAL_POSIX",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-release-gate-contract.test.mjs",
+      "sha256": "17ef0cd972e606512accf0e219afa5f07a44aff53a2b3d93a79c601103e32507",
+      "category": "RELEASE_CONTRACT",
+      "applicability": "REQUIRED",
+      "harness": "NODE_RELEASE_CONTRACT",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-release-identity-contract.test.mjs",
+      "sha256": "d209ac1fee572d148552aa271ba9ba96b28553e7934f5cb3a6e84552cecaefdb",
+      "category": "RELEASE_CONTRACT",
+      "applicability": "REQUIRED",
+      "harness": "NODE_RELEASE_CONTRACT",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-release-image-evidence-producer.test.mjs",
+      "sha256": "7e5d3f25bc2dafc54ac423b1e977a5743840edac968c80aca2891500befe2309",
+      "category": "RELEASE_CONTRACT",
+      "applicability": "REQUIRED",
+      "harness": "NODE_RELEASE_CONTRACT",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-release-manifest-contract.test.mjs",
+      "sha256": "a808b780453800d6324437beaaabf1aaa133abf4331df695405348017bf9de09",
+      "category": "RELEASE_CONTRACT",
+      "applicability": "REQUIRED",
+      "harness": "NODE_RELEASE_CONTRACT",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-release-migration-allowlist.test.mjs",
+      "sha256": "0f0eb61b93149556753223441d06f835959a664824c8d17024bddcecd897c809",
+      "category": "RELEASE_CONTRACT",
+      "applicability": "REQUIRED",
+      "harness": "NODE_RELEASE_CONTRACT",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-request-origin-unit.test.mjs",
+      "sha256": "54fe5a5ebed2610cf4a1ba5ff621b632d4c3bb4172be21bf08c61ef0052f7a6b",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-requirement-unit-resolution-browser.test.mjs",
+      "sha256": "e62925637104a1a569b2efb6ddacd0b2d26c58c3c93ec16d02f5b5002a0983b8",
+      "category": "BROWSER",
+      "applicability": "REQUIRED",
+      "harness": "BROWSER_E2E",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-requirement-unit-resolution-migration-contract.test.mjs",
+      "sha256": "b8e830005588a88ac33962d2830e14cb2967fe7c91181519c40a459be749ba48",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-requirement-unit-resolution-migration-upgrade.test.mjs",
+      "sha256": "bd248fc7ed14ccdd8570d3b4c131afd5011489bd6df7c13d347a036291e619d7",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-review-postgres.test.mjs",
+      "sha256": "4bf51ec0b10566deabde764d8cbfcd09c1c562579b20906f6a5943d450a9acc5",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-review-ui-contract.test.mjs",
+      "sha256": "6c4248b26a357809bc12101e0a100ea7ad80081800d0e3c5bc2d3991f0965930",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-review-unit.test.mjs",
+      "sha256": "4549c8cd7c9be283a445f56f077198cf16270443c3690dad7017b385b6b92a1c",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-rfq-binding-fix19-browser.test.mjs",
+      "sha256": "0066b4ead930371920bf95f62604cb9b4e6e7494f715caec12b4cbace3b670eb",
+      "category": "BROWSER",
+      "applicability": "REQUIRED",
+      "harness": "BROWSER_E2E",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-rfq-binding-fix19-postgres.test.mjs",
+      "sha256": "aca3d595e816194740c4cca282609ed60f4d18eef9aa97d3c0b1af3d4d535329",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-rfq-traceability-fix22-browser.test.mjs",
+      "sha256": "105861712994cbda54ee51cc0f6386b7e5f256061dd09c7ad477db17b70675dd",
+      "category": "BROWSER",
+      "applicability": "REQUIRED",
+      "harness": "BROWSER_E2E",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-rfq-traceability-fix22-migration.test.mjs",
+      "sha256": "191502784a010306b3e4b38cbb9fa8fe6667cabec275bdb176b61f939642d51e",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-sales-delivery-receivable-migration-upgrade.test.mjs",
+      "sha256": "7c6f258b973f920e9740b25e3b8fe32e14fd0b1f5ba795a7f72050a0a5858b7d",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-sales-delivery-receivable-postgres.test.mjs",
+      "sha256": "dc4169737e4ed67558216e06d5a5e6343d27d1ebc8a400e28543ea98e323d8d2",
+      "category": "POSTGRES_ALIAS",
+      "applicability": "NOT_APPLICABLE",
+      "harness": "POSTGRES_ALIAS",
+      "reason": "ALIAS_ONLY_CANONICAL_SUITE_REQUIRED",
+      "canonical_path": "tests/selfhost-sales-postgres.test.mjs"
+    },
+    {
+      "path": "tests/selfhost-sales-delivery-receivable-ui-contract.test.mjs",
+      "sha256": "6ad5c04df5c2845528c9a7404075d6207ba8e1de6c3e5dc1c9a44b5d5cb129eb",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-sales-delivery-receivable-unit.test.mjs",
+      "sha256": "ce7cf106fb2614ee01a0b4f4f2c660ee74a7743881e85d809947eac2bf2e8c11",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-sales-migration-upgrade.test.mjs",
+      "sha256": "a0435e4a0fc37e19b6eb72939c55872721eb8685d922a779ed6c792daeabffa8",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-sales-postgres.test.mjs",
+      "sha256": "67a0f71c3433c70fd57773f9672c71b8eb2ba5337a251f8b67a587eed0024153",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-sales-ui-contract.test.mjs",
+      "sha256": "d7db133feafbf9dac587746da8252e155b8aa68fe9503a9a519fec282de63030",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-sales-unit.test.mjs",
+      "sha256": "fb18e150275d8bf8b816e088aeae11c03626fc37912ff3b27091171ced43ee4e",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-status-localization.test.mjs",
+      "sha256": "68bf8f99891a6c7b8518eddc6232e47555c1e8b6e44479b3cd4f0c545ff868c1",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-supplier-mapping-browser.test.mjs",
+      "sha256": "98ddee28acbd038ae01c60621f7227d1e851c6b5d8acc9b5010ceee59bc803ce",
+      "category": "BROWSER",
+      "applicability": "REQUIRED",
+      "harness": "BROWSER_E2E",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-supplier-mapping-migration.test.mjs",
+      "sha256": "1ee342b2208740d6c77c406899a410d59bf1c6322e2e31b2c090b0a78a3416ed",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-supplier-mapping-postgres.test.mjs",
+      "sha256": "27a1040df062cc8724d49c575d92ba4cf0c9ec7925fd17f0eab1c2fa7959fe98",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-supplier-mapping-ui-contract.test.mjs",
+      "sha256": "fc2cf071a391e49195edd7e6b48cd993972a192b6485cd04638c379895d6fb48",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-supplier-mapping-unit.test.mjs",
+      "sha256": "d63fb0d064e6ad651dd9df8c2de005602cf449b060cf17c2c22c1f69f30cd58a",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-supplier-receipt-lot-iqc-migration-upgrade.test.mjs",
+      "sha256": "9a5397d44c134cf6050e2de5efd51b2103705a3696c1cf863c1d772042ce126a",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-supplier-receipt-lot-iqc-postgres.test.mjs",
+      "sha256": "af67ae321cf14339fb23da89c9f4142aa6cc9946540b0c137b8fedc5da9ce717",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-supplier-receipt-lot-iqc-ui-contract.test.mjs",
+      "sha256": "29a5c6054088c1ba1a60b97f1fab298ed609016cc5f87bacb35a753c58ff560b",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-supplier-receipt-lot-iqc-unit.test.mjs",
+      "sha256": "59dda8c1ab18479bbb959688383ebf9408bc59b7387f3e63d3ac1cc655a92426",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-targeted-browser-verifier.test.mjs",
+      "sha256": "d47478b044a1c3704acb6b30eddf827df0416df1ebafcf935bad8d9afd443aa2",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-targeted-offline-identity-recovery-postgres.test.mjs",
+      "sha256": "1ae5612e04a2d69bbf3a0c8b06da370a19be4ef5c4362b250588d4d0b89f1cfe",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-targeted-offline-identity-recovery-unit.test.mjs",
+      "sha256": "79a7c2cdd8814ae9767f34ab8c3767a3a49c02f8c9cd0aabc3dbda311aa52112",
+      "category": "SPECIAL_HARNESS",
+      "applicability": "REQUIRED",
+      "harness": "SPECIAL_POSIX",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-warehouse-receipt-readiness-migration.test.mjs",
+      "sha256": "237f6363a2ea5ab0e73df1ea031a4a6a228d159f9fa1dbefcce9e75031ce93ac",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-worker-resilience.test.mjs",
+      "sha256": "13b25dea53f1950b18bb928fae614e5d0f5b79fd10d4ba25777123557b30f153",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    }
+  ]
+}

@@ -33,8 +33,10 @@ function digest(value) {
 async function migrate() {
   await pool.query("drop schema public cascade; create schema public; create table schema_migrations(version text primary key,checksum text not null,applied_at timestamptz not null default now())");
   const directory = new URL("../drizzle-postgres/", import.meta.url);
-  const names = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/.test(name)).sort();
+  const targetMigration = "0038_supplier_mapping_governance.sql";
+  const names = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/.test(name) && name <= targetMigration).sort();
   assert.equal(names.length, 38);
+  assert.equal(names.at(-1), targetMigration);
   for (const name of names) {
     const source = await readFile(new URL(name, directory), "utf8");
     const checksum = digest(source);

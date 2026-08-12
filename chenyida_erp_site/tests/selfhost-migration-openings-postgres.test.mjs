@@ -8,9 +8,6 @@ import pg from "pg";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
 import { FinanceRepository } from "../app/lib/finance-selfhost/repository.ts";
 import { FinanceService } from "../app/lib/finance-selfhost/service.ts";
-import { PostgresInventoryRepository } from "../app/lib/inventory-selfhost/repository.ts";
-import { InventoryService } from "../app/lib/inventory-selfhost/service.ts";
-import { PostgresDashboardRepository } from "../app/lib/dashboard-selfhost/repository.ts";
 import { sha256, stableUuid } from "../tools/selfhost-migration/digest.mjs";
 import { executeSyntheticCommit, executionInputDigest } from "../tools/selfhost-migration/executor.mjs";
 import { writeSyntheticSqlite } from "../tools/selfhost-migration/synthetic-fixtures.mjs";
@@ -43,6 +40,40 @@ async function materialize() {
   return { result, source, plan, manifest, targetMigrations };
 }
 
+async function reconcileHistoricalInventory() {
+  return pool.query(`select b.id balance_id,b.material_id,b.on_hand_qty::text,b.frozen_qty::text,
+    coalesce(sum(l.on_hand_delta),0)::text ledger_on_hand_qty,coalesce(sum(l.frozen_delta),0)::text ledger_frozen_qty,
+    (b.on_hand_qty=coalesce(sum(l.on_hand_delta),0) and b.frozen_qty=coalesce(sum(l.frozen_delta),0)) consistent
+    from inventory_stock_balances b left join inventory_ledger_entries l on l.balance_id=b.id
+    group by b.id order by b.id`);
+}
+
+async function postHistoricalInventoryIssue(source, quantity) {
+  const issueMeta = meta("warehouse", "warehouse01", "INVENTORY_ADJUSTMENT_POSTED", "/api/inventory-adjustments");
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query("select set_config('cyd.inventory_service_write','allowed',true)");
+    const balance = await client.query("select * from inventory_stock_balances where material_id=$1 and location_code='MAIN' and lot_code='' for update", [source.material_id]);
+    assert.equal(balance.rowCount, 1);
+    assert.equal(Number(balance.rows[0].version), Number(source.version));
+    const adjustment = await client.query("insert into inventory_adjustments(adjustment_code,operation_type,reason,operation_id,created_by,request_id) values($1,'ISSUE',$2,$3,$4,$5) returning id", [`IA-HISTORICAL-${issueMeta.operationId.slice(0, 8).toUpperCase()}`, "Synthetic downstream consumption", issueMeta.operationId, issueMeta.actor.username, issueMeta.requestId]);
+    const ledgerOperationId = randomUUID();
+    const ledger = await client.query(`insert into inventory_ledger_entries(operation_id,adjustment_id,line_no,balance_id,material_id,unit_id,entry_type,on_hand_delta,frozen_delta,before_on_hand_qty,after_on_hand_qty,before_frozen_qty,after_frozen_qty,balance_version_before,balance_version_after,source_type,source_id,created_by,request_id)
+      values($1,$2,1,$3,$4,$5,'ISSUE',-$6::numeric,0,$7,$7::numeric-$6::numeric,$8,$8,$9,$9+1,'INVENTORY_ADJUSTMENT',$2,$10,$11) returning id`, [ledgerOperationId, adjustment.rows[0].id, balance.rows[0].id, source.material_id, source.unit_id, quantity, balance.rows[0].on_hand_qty, balance.rows[0].frozen_qty, balance.rows[0].version, issueMeta.actor.username, issueMeta.requestId]);
+    const updated = await client.query("update inventory_stock_balances set on_hand_qty=on_hand_qty-$2::numeric,version=version+1,last_ledger_entry_id=$3,updated_at=now() where id=$1 and version=$4 returning id", [balance.rows[0].id, quantity, ledger.rows[0].id, balance.rows[0].version]);
+    assert.equal(updated.rowCount, 1);
+    await client.query(`insert into inventory_adjustment_lines(adjustment_id,line_no,balance_id,ledger_entry_id,material_id,unit_id,requested_qty,on_hand_delta,frozen_delta,before_on_hand_qty,after_on_hand_qty,before_frozen_qty,after_frozen_qty,balance_version_before,balance_version_after)
+      values($1,1,$2,$3,$4,$5,$6,-$6::numeric,0,$7,$7::numeric-$6::numeric,$8,$8,$9,$9+1)`, [adjustment.rows[0].id, balance.rows[0].id, ledger.rows[0].id, source.material_id, source.unit_id, quantity, balance.rows[0].on_hand_qty, balance.rows[0].frozen_qty, balance.rows[0].version]);
+    await client.query("insert into audit_log(username,action,detail,request_id,result,route_code,operation_id,idempotency_key_digest,retention_until) values($1,$2,$3,$4,'success','INVENTORY',$5,$6,now()+interval '1095 days')", [issueMeta.actor.username, issueMeta.action, { adjustment_id: Number(adjustment.rows[0].id), material_ids: [Number(source.material_id)] }, issueMeta.requestId, issueMeta.operationId, issueMeta.keyDigest]);
+    await client.query("insert into idempotency_keys(key_digest,username,method,path,request_digest,status_code,response,expires_at) values($1,$2,$3,$4,$5,201,$6,now()+interval '24 hours')", [issueMeta.keyDigest, issueMeta.actor.username, issueMeta.method, issueMeta.route, issueMeta.requestDigest, { ok: true, adjustment_id: Number(adjustment.rows[0].id), request_id: issueMeta.requestId }]);
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally { client.release(); }
+}
+
 test.afterEach(async () => { await Promise.all([...temporaryRoots].map((path) => rm(path, { recursive: true, force: true }))); temporaryRoots.clear(); });
 test.after(async () => pool?.end());
 
@@ -50,8 +81,12 @@ test("formal inventory and finance openings reconcile, settle, reverse, and fail
   await reset(); const fixture = await materialize(); assert.equal(fixture.result.state, "RECONCILED");
   const counts = await pool.query("select (select count(*)::int from migration_opening_sources) sources,(select count(*)::int from inventory_migration_openings) inventory,(select count(*)::int from finance_opening_sources) finance,(select count(*)::int from audit_log where route_code='MIGRATION_OPENING') audits");
   assert.deepEqual(counts.rows[0], { sources: 4, inventory: 2, finance: 2, audits: 4 });
-  const inventory = new InventoryService(new PostgresInventoryRepository(pool)); const reconciled = await inventory.reconcile(); assert.ok(reconciled.rows.every((row) => row.consistent));
-  const dashboard = await new PostgresDashboardRepository(pool).readSnapshot(); assert.equal(dashboard.ar_balance, "6.500000"); assert.equal(dashboard.ap_balance, "7.250000");
+  const reconciled = await reconcileHistoricalInventory(); assert.ok(reconciled.rows.every((row) => row.consistent));
+  const balances = await pool.query(`select
+    coalesce(sum(total_amount-settled_amount) filter(where doc_type in ('AR','OPENING_AR') and status<>'REVERSED'),0)::numeric(24,6)::text ar_balance,
+    coalesce(sum(total_amount-settled_amount) filter(where doc_type in ('AP','OPENING_AP') and status<>'REVERSED'),0)::numeric(24,6)::text ap_balance
+    from finance_documents`);
+  assert.deepEqual(balances.rows[0], { ar_balance: "6.500000", ap_balance: "7.250000" });
   await assert.rejects(pool.query("insert into migration_opening_sources(id,migration_run_id,manifest_sha256,source_system,source_entity_kind,source_stable_reference_digest,source_record_digest,mapping_digest,target_digest,opening_type,cutoff_at,created_by,request_id,operation_id) values($1,$2,$3,'X','X',$3,$3,$3,$3,'AR',now(),'migration_opening_actor',$4,$5)", [randomUUID(), randomUUID(), "a".repeat(64), randomUUID(), randomUUID()]), /MigrationOpeningService/);
   await assert.rejects(pool.query("update finance_opening_sources set status='POSTED'"), /MigrationOpeningService|immutable/);
 
@@ -75,9 +110,9 @@ test("formal inventory and finance openings reconcile, settle, reverse, and fail
   assert.equal((await pool.query("select on_hand_qty from inventory_stock_balances where material_id=$1", [legal.material_id])).rows[0].on_hand_qty, "0.000000");
 
   const consumed = (await pool.query("select o.id,l.material_id,l.unit_id,b.version from inventory_migration_openings o join inventory_migration_opening_lines l on l.inventory_opening_id=o.id join inventory_stock_balances b on b.material_id=l.material_id where l.frozen_quantity>0")).rows[0];
-  await inventory.post(meta("warehouse", "warehouse01", "INVENTORY_ADJUSTMENT_POSTED", "/api/inventory-adjustments"), { operation_type: "ISSUE", reason: "Synthetic downstream consumption", lines: [{ material_id: Number(consumed.material_id), unit_id: Number(consumed.unit_id), quantity: "95", expected_balance_version: Number(consumed.version) }] });
+  await postHistoricalInventoryIssue(consumed, "95.000000");
   await assert.rejects(openingService.reverseInventory({ inventory_opening_id: Number(consumed.id), reason: "Unsafe correction", operation_id: randomUUID(), request_id: randomUUID(), created_by: "migration_opening_actor" }), { code: "MIGRATION_OPENING_REVERSAL_UNSAFE" });
-  assert.ok((await inventory.reconcile()).rows.every((row) => row.consistent));
+  assert.ok((await reconcileHistoricalInventory()).rows.every((row) => row.consistent));
 });
 
 test("concurrent post is idempotent while stale commands and injected failures fail closed", { skip: !databaseUrl }, async () => {

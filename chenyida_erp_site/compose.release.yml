@@ -1,0 +1,28 @@
+services:
+  migrate:
+    image: ${ERP_WORKER_IMAGE:?ERP_WORKER_IMAGE registry digest is required}
+    build: !reset null
+    environment:
+      ERP_RUNTIME_IMAGE_REFERENCE: ${ERP_WORKER_IMAGE:?ERP_WORKER_IMAGE registry digest is required}
+      ERP_RUNTIME_IMAGE_CONFIG_DIGEST: ${ERP_WORKER_IMAGE_CONFIG_DIGEST:?ERP_WORKER_IMAGE_CONFIG_DIGEST is required}
+
+  web:
+    image: ${ERP_WEB_IMAGE:?ERP_WEB_IMAGE registry digest is required}
+    build: !reset null
+    environment:
+      ERP_RUNTIME_IMAGE_REFERENCE: ${ERP_WEB_IMAGE:?ERP_WEB_IMAGE registry digest is required}
+      ERP_RUNTIME_IMAGE_CONFIG_DIGEST: ${ERP_WEB_IMAGE_CONFIG_DIGEST:?ERP_WEB_IMAGE_CONFIG_DIGEST is required}
+
+  worker:
+    image: ${ERP_WORKER_IMAGE:?ERP_WORKER_IMAGE registry digest is required}
+    build: !reset null
+    environment:
+      ERP_RUNTIME_IMAGE_REFERENCE: ${ERP_WORKER_IMAGE:?ERP_WORKER_IMAGE registry digest is required}
+      ERP_RUNTIME_IMAGE_CONFIG_DIGEST: ${ERP_WORKER_IMAGE_CONFIG_DIGEST:?ERP_WORKER_IMAGE_CONFIG_DIGEST is required}
+
+  admin:
+    image: ${ERP_WORKER_IMAGE:?ERP_WORKER_IMAGE registry digest is required}
+    build: !reset null
+    environment:
+      ERP_RUNTIME_IMAGE_REFERENCE: ${ERP_WORKER_IMAGE:?ERP_WORKER_IMAGE registry digest is required}
+      ERP_RUNTIME_IMAGE_CONFIG_DIGEST: ${ERP_WORKER_IMAGE_CONFIG_DIGEST:?ERP_WORKER_IMAGE_CONFIG_DIGEST is required}

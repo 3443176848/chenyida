@@ -47,22 +47,30 @@ password=REDACTED_IN_ROOT_ONLY_FILE
 
 ## 3. 运行发布身份
 
-Dashboard 只有在运行身份与数据库、Migration、备份策略和恢复回执全部匹配时才显示 `recovery_ready=true`。候选部署后，由 root 对已经运行且健康的精确 Web/Worker 容器发布身份：
+Dashboard 只有在运行身份与数据库、Migration、备份策略和恢复回执全部匹配时才显示 `recovery_ready=true`。候选部署后，不得直接运行仓库中的`write-release-identity.sh`，也不得再使用旧的`--application-version`、`--git-commit`或`PUBLISH_RUNTIME_RELEASE_IDENTITY`命令；这些参数不能证明运行容器来自同一个已验候选。
 
-```bash
-sudo scripts/write-release-identity.sh \
-  --identity-root /var/lib/chenyida-erp/release-identity \
-  --reader-gid "$ERP_WEB_READER_GID" \
-  --deployment-class UAT \
-  --deployment-id chenyida-erp-parallel \
-  --application-version "$APP_VERSION" \
-  --git-commit "$FULL_GIT_COMMIT" \
-  --web-container chenyida-erp-parallel-web-1 \
-  --worker-container chenyida-erp-parallel-worker-1 \
-  --confirm PUBLISH_RUNTIME_RELEASE_IDENTITY
+当前唯一受控入口是已安装的 content-addressed supervisor。项目负责人须针对精确的`ELIGIBLE` manifest、manifest SHA、bundle SHA、deployment class/ID、reader GID 和实际 Web/Worker 容器签发 root-only、规范 JSON、短时一次性`PUBLISH_RELEASE_IDENTITY`授权。授权参数固定为：
+
+```text
+release_manifest
+release_manifest_sha256
+identity_root
+reader_gid
+deployment_class
+deployment_id
+web_container
+worker_container
 ```
 
-发布器只读检查容器实际 ID、运行/OOM 状态、Compose project/service、OCI version/revision、镜像 digest 和 baked runtime 环境；它不启动、停止或替换容器。当前实现尚未形成完整 release manifest、Migration allowlist 或强制 `test:release`，这些由 G3 后续任务完成。
+授权文件只能位于`/var/lib/chenyida-erp/release-authorizations/pending/<authorization-id>.json`，owner/mode 固定为`root:root 0400`；不得把 nonce、凭据或授权正文放入聊天、Git 或普通 shell history。取得独立专项授权并核对安装回执后，调用形态为：
+
+```bash
+sudo /usr/local/sbin/chenyida-erp-release-supervisor-v1 \
+  --bundle-sha256 "$SUPERVISOR_BUNDLE_SHA256" \
+  --authorization-file "/var/lib/chenyida-erp/release-authorizations/pending/$AUTHORIZATION_ID.json"
+```
+
+launcher 在执行前消费一次性授权并只映射到固定发布动作。发布器只读检查容器实际 ID、运行/OOM/restart/health、唯一 Compose project/service、registry digest reference、config digest、OCI version/revision 和 baked runtime 环境；随后先暂存新 identity，再次检查同一容器快照，只有完全未漂移才原子替换`release-identity.json`。中断暂存可安全清理；已提交但清理中断可按精确 transaction 自动收敛。它不启动、停止或替换容器。当前 host supervisor 尚未获授权安装，UAT 也仍是 alpha.42/0040，因此本节只是未来受控操作合同，不是已执行记录。
 
 ## 4. 创建本机一致性备份
 

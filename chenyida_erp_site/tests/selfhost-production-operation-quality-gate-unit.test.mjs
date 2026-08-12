@@ -18,7 +18,8 @@ test("department permissions preserve quality creation and duty separation",()=>
   assert.ok(permissionsForRole("production").includes("production.execute"));
   assert.ok(!permissionsForRole("production").includes("quality.inspect"));
   assert.ok(permissionsForRole("quality").includes("quality.inspect"));
-  assert.ok(!permissionsForRole("quality").includes("quality.disposition"));
+  assert.ok(permissionsForRole("quality").includes("quality.disposition"));
+  assert.ok(!permissionsForRole("quality").includes("quality.reopen"));
   for(const role of ["manager","admin"]){assert.ok(permissionsForRole(role).includes("quality.disposition"));assert.ok(permissionsForRole(role).includes("quality.reopen"));}
   for(const role of ["warehouse","sales","finance","purchase"]){assert.ok(!permissionsForRole(role).includes("production.execute"));assert.ok(!permissionsForRole(role).includes("quality.inspect"));}
 });

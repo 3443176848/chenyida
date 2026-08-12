@@ -27,7 +27,7 @@ const item = (source, namespace, code, mode = "SOURCE") => ({ source_column_inde
 
 test("UI-001 有 read 时列表请求真实 cursor API", () => assert.match(listSource, /importListApiQuery\(query\)/));
 test("UI-002 无 read 不请求正文", () => assert.match(listSource, /if \(!canRead\) return <MaterialImportErrorState[^]*页面不会请求批次正文/));
-test("UI-003 无 create 时新建入口不存在", () => assert.match(listSource, /canCreate \? <Link[^]*新建导入批次/));
+test("UI-003 无 create 时新建入口不存在", () => assert.match(listSource, /canCreate \? <Link[^]*新建供应商导入/));
 test("UI-004 create read-own 不做客户端行级过滤", () => assert.doesNotMatch(listSource, /\.filter\([^]*(?:created_by|username)/));
 test("UI-005 read_any 不隐含 parse", () => assert.match(workspaceSource, /canParse = permissions\.includes\("material\.import\.parse"\)/));
 test("UI-006 parse 不隐含 map", () => assert.match(workspaceSource, /canMap = permissions\.includes\("material\.import\.map"\)/));

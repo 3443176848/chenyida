@@ -28,11 +28,11 @@ const add = (id, name, fn) => tests.push([id, name, fn]);
 add("NUI-RS-001", "未启动默认 normalize", () => assert.equal(query("", "MAPPING_CONFIRMED", null).view, "normalize"));
 add("NUI-RS-002", "已发布默认 normalized", () => assert.equal(query().view, "normalized"));
 add("NUI-RS-003", "无 Current 修正结果 view", () => assert.equal(query("view=normalized", "NORMALIZING", null).view, "normalize"));
-add("NUI-RS-004", "重跑保留旧结果入口", () => assert.match(component, /current \? <><button[^]*结果行/));
+add("NUI-RS-004", "重跑保留旧结果入口", () => assert.match(component, /selected \? <><button[^]*结果行/));
 add("NUI-RS-005", "无 Current 移除 row", () => assert.equal(query("view=normalized&row=9", "MAPPING_CONFIRMED", null).row, null));
 add("NUI-RS-006", "normalize 视图移除 row", () => assert.equal(query("view=normalize&row=9").row, null));
 add("NUI-RS-007", "未知 view 走 allowlist", () => assert.equal(query("view=drop").view, "normalized"));
-add("NUI-RS-008", "七步 Stepper 映射确认后第六当前", () => assert.match(primitives, /MAPPING_CONFIRMED[^]*return 5/));
+add("NUI-RS-008", "八步 Stepper 映射确认后第七当前", () => assert.match(primitives, /MAPPING_CONFIRMED[^]*return 6/));
 add("NUI-RS-009", "Stepper 有失败文字语义", () => assert.match(primitives, /terminalFailure[^]*failed/));
 add("NUI-RS-010", "重跑失败保留结果横幅", () => assert.match(component, /最近一次重新运行未成功[^]*当前仍展示上一次已发布结果/));
 add("NUI-RS-011", "1366 七步可读布局", () => assert.match(styles, /grid-template-columns:\s*repeat\(7/));
@@ -42,7 +42,7 @@ add("NUI-ID-001", "启动前复合读取 B M S", () => assert.match(component, /
 add("NUI-ID-002", "Mapping 状态必须 CONFIRMED", () => assert.match(component, /mapping\.mapping\.mapping_status !== "CONFIRMED"/));
 add("NUI-ID-003", "首次 Body 仅 Version 与 Processor", () => assert.match(component, /expected_version: batch\.current_version, processor_version: MATERIAL_IMPORT_NORMALIZATION_PROCESSOR_VERSION/));
 add("NUI-ID-004", "Processor 使用共享常量", () => assert.equal(MATERIAL_IMPORT_NORMALIZATION_PROCESSOR_VERSION, "material-import-normalizer-v1"));
-add("NUI-ID-005", "业务重试入口独立", () => assert.match(component, /canRetry[^]*重试规范化/));
+add("NUI-ID-005", "业务重试入口独立", () => assert.match(component, /canRetry[^]*重试同一运行/));
 add("NUI-ID-006", "Unknown 重放冻结 Body", () => assert.match(component, /existing\?\.frozen_body[^]*body: next\.frozen_body/));
 add("NUI-ID-007", "Unknown 锁全部冲突写", () => assert.match(component, /const unknown = Boolean\(unknownOperation\)[^]*!unknown/));
 add("NUI-ID-008", "明确响应不由前端改写 Unknown", () => assert.match(component, /normalized\.resultUnknown \? "RESULT_UNKNOWN" : "FAILED"/));
@@ -63,7 +63,7 @@ add("NUI-PC-009", "合法进度 Floor", () => assert.equal(rowProgress(run({ run
 add("NUI-PC-010", "Verify 百分百不称任务完成", () => assert.equal(rowProgress(run({ run_status: "RUNNING", current_stage: "VERIFY_RESULT" })).label, "行处理已完成，正在核对"));
 add("NUI-PC-011", "非法计数隐藏进度", () => assert.equal(rowProgress(run({ run_status: "RUNNING", processed_rows: 3 })), null));
 add("NUI-PC-012", "终态停止继续轮询", () => assert.match(component, /continuePolling: activeNormalizationRun/));
-add("NUI-PC-013", "取消 Body 只有 Version Reason", () => assert.match(component, /expected_version: batch\.current_version, reason_code: "USER_CANCELLED"/));
+add("NUI-PC-013", "取消 Body 只提交权威 Attempt Version", () => assert.match(component, /execute\("CANCEL", \{ expected_version: latest\?\.expected_version \}\)/));
 add("NUI-PC-014", "取消竞争文案保留旧结果", () => assert.match(component, /重跑取消胜出时保留上一次已发布结果/));
 
 add("NUI-SM-001", "Current Latest 同 ID 不双渲染", () => assert.equal((component.match(/<SummaryPanel/g) || []).length, 1));
@@ -110,7 +110,7 @@ add("NUI-IS-008", "Column 0 不按 Falsy 隐藏", () => assert.match(component, 
 add("NUI-IS-009", "18 Code 与未知 Code", () => { assert.equal(Object.keys(NORMALIZATION_ISSUE_LABELS).length, 18); assert.equal(issueLabel("UNKNOWN"), "规范化问题"); });
 add("NUI-IS-010", "Safe Details 五键 Allowlist", () => assert.deepEqual(safeIssueDetails({ expected_type: "string", allowed_values: ["A"], decimal_scale: 2, max_length: 5, max_bytes: 9, secret: "x" }).map(([key]) => key), ["expected_type","allowed_values","decimal_scale","max_length","max_bytes"]));
 add("NUI-IS-011", "Issue 打开同一 Drawer", () => assert.match(component, /openRow\(issue\.normalized_row_id, event\.currentTarget, issue\)/));
-add("NUI-IS-012", "局部门禁不伪造全部 Issues", () => { assert.match(component, /V1 不显示“该行全部 Issues”/); assert.doesNotMatch(component, /normalized_row_id=.*normalization-issues/); });
+add("NUI-IS-012", "局部门禁不伪造全部 Issues", () => { assert.match(component, /刷新或直接访问链接不会恢复所选问题正文/); assert.match(component, /issue_row: detail\.row\.source_row_number/); assert.doesNotMatch(component, /normalization-issues[^"\n]*normalized_row_id/); });
 
 add("NUI-SA-001", "无 Read 不渲染受保护工作区", () => assert.match(workspace, /if \(!canRead\) return <MaterialImportErrorState/));
 add("NUI-SA-002", "Read Any 不授写权限", () => assert.match(workspace, /canRead = permissions\.includes\("material\.import\.read"\) \|\| permissions\.includes\("material\.import\.read_any"\)[^]*canMap = permissions\.includes/));
@@ -122,7 +122,7 @@ add("NUI-SA-007", "无 HTML Markdown 自动链接", () => { assert.doesNotMatch(
 add("NUI-SA-008", "长内容 Focus Trap Escape", () => assert.match(component, /event\.key === "Escape"[^]*event\.key !== "Tab"/));
 add("NUI-SA-009", "History 不保存正文", () => assert.match(component, /\{ marker, batchId, runId \}/));
 add("NUI-SA-010", "不日志记录敏感正文", () => assert.doesNotMatch(all, /console\.(log|error|warn)/));
-add("NUI-SA-011", "状态文字不只颜色", () => assert.match(component, />\{row\.row_status\}<\/span>/));
+add("NUI-SA-011", "状态文字本地化且不只依赖颜色", () => { assert.match(component, /min-level-\$\{row\.row_status\.toLowerCase\(\)\}/); assert.match(component, />\{statusLabel\(row\.row_status\)\}<\/span>/); });
 add("NUI-SA-012", "Live Region 只播阶段终态", () => assert.match(component, /aria-live="polite"[^]*latest\.run_status/));
 add("NUI-SA-013", "Rows Issues Caption Headers Label", () => { assert.equal((component.match(/<caption>/g) || []).length, 2); assert.match(component, /<th scope="col">/); assert.match(component, /<label>/); });
 add("NUI-SA-014", "Issue 字段使用安全 ID", () => assert.match(component, /cryptoSafeId\(candidate\.target_code\)/));

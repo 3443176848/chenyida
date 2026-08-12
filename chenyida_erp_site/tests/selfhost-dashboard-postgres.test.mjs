@@ -15,6 +15,8 @@ if (!databaseUrl || !/dashboard_test/i.test(databaseUrl)) throw new Error("isola
 process.env.ERP_RELEASE_EXPECTED_DEPLOYMENT_ID ||= "dashboard-test";
 process.env.ERP_RELEASE_EXPECTED_VERSION ||= "0.1.0-alpha.44";
 process.env.ERP_RELEASE_EXPECTED_GIT_COMMIT ||= "b".repeat(40);
+process.env.ERP_RELEASE_EXPECTED_MANIFEST_SHA256 ||= "d".repeat(64);
+process.env.ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256 ||= "e".repeat(64);
 process.env.ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS ||= "3600";
 const pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "dashboard-integration-test" });
 const actor = (role) => ({ username: `${role}01`, role, permissions: permissionsForRole(role) });
@@ -28,7 +30,7 @@ await mkdir(releaseRoot, { mode: 0o750 });
 await chmod(releaseRoot, 0o750);
 await writeFile(path.join(releaseRoot, ".chenyida-erp-release-identity-root-v1"), "chenyida-erp-release-identity-root/v1\n", { mode: 0o440 });
 await chmod(path.join(releaseRoot, ".chenyida-erp-release-identity-root-v1"), 0o440);
-await writeFile(releaseFile, JSON.stringify({ schema_version: 1, contract: "chenyida-erp-runtime-release-identity/v1", deployment_class: "TEST", deployment_id: "dashboard-test", application_version: "0.1.0-alpha.44", git_commit: "b".repeat(40), web_container_id: runtimeHostname.padEnd(64, "a"), web_image_digest: `sha256:${"b".repeat(64)}`, worker_container_id: "c".repeat(64), worker_image_digest: `sha256:${"c".repeat(64)}`, generated_at: new Date().toISOString() }), { mode: 0o440 });
+await writeFile(releaseFile, JSON.stringify({ schema_version: 2, contract: "chenyida-erp-runtime-release-identity/v2", deployment_class: "TEST", deployment_id: "dashboard-test", release_id: "dashboard-release", release_manifest_sha256: process.env.ERP_RELEASE_EXPECTED_MANIFEST_SHA256, supervisor_bundle_sha256: process.env.ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256, authorization_sha256: "f".repeat(64), application_version: "0.1.0-alpha.44", git_commit: "b".repeat(40), web_container_id: runtimeHostname.padEnd(64, "a"), web_image_digest: `sha256:${"b".repeat(64)}`, worker_container_id: "c".repeat(64), worker_image_digest: `sha256:${"c".repeat(64)}`, generated_at: new Date().toISOString() }), { mode: 0o440 });
 await chmod(releaseFile, 0o440);
 const service = new DashboardService(new PostgresDashboardRepository(pool), statusFile, releaseFile);
 

@@ -8,7 +8,7 @@ import test from "node:test";
 const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
 const compose = await readFile(new URL("../compose.yml", import.meta.url), "utf8");
 const sourcePackage = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
-const runtimePackagePath = join(tmpdir(), "chenyida-runtime-package.json");
+const runtimePackagePath = "/tmp/chenyida-runtime-package.json";
 
 function generatorScript() {
   const match = dockerfile.match(/^RUN node --input-type=module -e '([^']+)'$/m);
@@ -140,6 +140,7 @@ RUN NODE_OPTIONS=--max-old-space-size=1024 npm ci --omit=dev --ignore-scripts &&
 COPY --chown=node:node app ./app
 COPY --chown=node:node db ./db
 COPY --chown=node:node drizzle-postgres ./drizzle-postgres
+COPY --chown=node:node release ./release
 COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node seeds ./seeds
 COPY --chown=node:node tests ./tests

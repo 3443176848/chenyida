@@ -38,6 +38,7 @@ RUN NODE_OPTIONS=--max-old-space-size=1024 npm ci --omit=dev --ignore-scripts &&
 COPY --chown=node:node app ./app
 COPY --chown=node:node db ./db
 COPY --chown=node:node drizzle-postgres ./drizzle-postgres
+COPY --chown=node:node release ./release
 COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node seeds ./seeds
 COPY --chown=node:node tests ./tests

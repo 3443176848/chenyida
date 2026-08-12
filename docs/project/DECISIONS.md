@@ -1682,6 +1682,45 @@
 - 拒绝原地恢复、覆盖已有数据库/目录、对身份不明目标执行 drop/delete，或在回执发布不确定时删除已验证恢复结果。
 - 拒绝把浏览器按钮、静态期望 env、旧 V1 回执或“测试通过”单独解释为生产就绪。
 
+## D-116 发布候选采用不可变证据包、精确 Migration Allowlist 与失败关闭串行门
+
+- 日期：2026-08-12
+- 状态：`ACCEPTED / REPOSITORY TOOLING VERIFIED / CANDIDATE EVIDENCE BLOCKED`
+- 提案与实施：Codex 持续交付负责人及数据迁移、应用测试、运维安全智能体
+- 确认边界：项目负责人已授权仓库内安全实施和隔离测试；镜像build、联网漏洞评估、UAT/生产Migration或部署、runtime identity发布和正式晋升仍须专项明确授权
+
+### Context
+
+- 源码alpha.44/0041、非生产UAT alpha.42/0040、历史GHCR锚点和发布台账不是同一候选，不能证明已验代码、镜像、Migration和运行面一致。
+- 旧Migration runner会排序执行目录内全部SQL，虽有checksum和advisory lock，但没有冻结完整发布allowlist、目标数据库稳定身份或预期当前/目标head。
+- 默认`npm test`只覆盖单一文件存储测试；没有固定资源阈值、全局锁、无skip、timeout、容器残留、SBOM和漏洞证据约束，也没有机器可审计的最终报告。
+
+### Decision
+
+1. 候选身份由一个严格、不可变release manifest定义，同时绑定完整Git commit/tree及clean源码、package版本、Dockerfile/Compose摘要、实际Web/Worker镜像digest与OCI/baked版本身份、完整有序Migration allowlist/head、版本化gate plan/report、镜像级SBOM和新鲜漏洞评估。未知字段、重复key、替换、过期、不完整或摘要漂移全部失败关闭。
+2. manifest只能由root在仓库外固定权限证据根中创建；证据根和marker必须root-owned，制品必须普通文件、单硬链接、只读且采用无覆盖原子发布。创建器只读检查已经存在的精确镜像，不负责build、pull、run或deploy。
+3. `test:release`使用固定root全局锁和版本化18步计划串行运行，其中独立包含安装后supervisor Python合同、80文件PostgreSQL回归、6文件Browser E2E和4文件POSIX专用门。必需步骤不能省略或以无理由N/A代替；缺失、skip/todo、失败、超时、命令输出禁用模式、资源越线、临时容器残留、既有容器restart/OOM或证据不新鲜都阻止晋升。计划和报告先写入不可消费的隐藏prepared文件，只有外层再次核验Git和镜像身份后才按精确摘要发布正式文件；报告仅持久化stdout/stderr摘要，不传播测试输出中的潜在秘密。
+4. 资源门固定执行`COMPOSE_PARALLEL_LIMIT=1`和Node heap上限，并检查available memory、Swap使用率、60秒Swap增长、根盘、Load和临时容器数；一次只允许一个临时容器，失败后后续必需步骤记录为BLOCKED。
+5. UAT/PRODUCTION Migration只接受`promotion_status=ELIGIBLE`的精确manifest及摘要、明确permission/confirmation、允许的deployment class、部署ID、数据库名/system identifier/OID/database comment marker、预期当前head和manifest目标head。应用运行连接和Migration连接必须分别由`DATABASE_URL`与必填`ERP_MIGRATION_DATABASE_URL`提供；Migration会话必须使用精确命名、可登录但非superuser/createrole/createdb/replication/bypassrls/pg_monitor、无任何角色成员关系和role/database级配置的专用数据库owner。进入advisory lock前后都重验目标与历史，目录外文件、重排、checksum漂移、历史越界或身份不符均在业务SQL前拒绝。
+6. 离线lockfile清单只能标记`SOURCE_LOCKFILE`，漏洞状态必须为`NOT_EVALUATED`；它可证明合同失败关闭，但不能生成合格候选。只有实际Web/Worker镜像级SBOM和新鲜漏洞库PASS可以满足发布门。
+7. `npm test`改为快速release合同门；实际候选还必须执行`test:release:all-node`的build+全部Node测试、全部tsconfig、lint、隔离Migration、备份恢复、Python三基线、Compose和安全证据。仓库既有完整typecheck失败不得被忽略、降级或改写为通过。
+8. runtime release identity发布采用固定root锁、严格单调和同一证据幂等；先把新身份写入事务目录，外层第二次读取实际容器并精确比对后才commit，漂移则abort且旧正式身份保持不变。并发旧证据不得覆盖新证据，发布器仍只观察/写入身份文件，不控制运行容器。
+9. 高权限发布动作不得直接信任候选仓库脚本；采用两提交生成的content-addressed supervisor bundle、root-only短时一次性授权和固定动作映射。安装器以全局锁、PREPARED/COMMITTED journal、不可变launcher store、receipt v2和明确previous launcher identity提供可恢复安装；PREPARED会完整保存规范授权且立即归档原授权，授权随后过期或pending文件消失也能按journal精确恢复，journal/receipt均采用同目录临时文件加原子rename。首次执行installer仍只允许来自root-owned、不可由group/world写的审阅路径，并须专项授权。
+
+### Consequences
+
+- `SELFHOST-OPS-RELEASE-GATE-42`的早期合同和隔离测试曾被三名只读审计智能体判定存在证据替换/过期、弱计划、宿主环境继承、高权限候选代码、Migration隔离旁路与并发锁等失败关闭缺口；这些缺口已经按上述合同修复，并以第二轮只读复核、合同测试、定向typecheck和隔离PostgreSQL/备份恢复验证收口。早期测试不作为最终证据。
+- 完整多配置typecheck已实际运行并因既有ES2017 BigInt、历史声明和示例依赖等错误失败；没有候选镜像、镜像SBOM或联网漏洞PASS，因此真实release gate未运行且alpha.44/0041没有获得`ELIGIBLE`manifest。PR-003/PR-005只能记为`TOOLING READY / CANDIDATE EVIDENCE BLOCKED`，不能记为通过。
+- `RELEASES.md`不新增虚假release；UAT继续alpha.42/0040。G3仓库工具通过本任务范围验收后，候选build、镜像级SBOM/漏洞评估、host supervisor安装和UAT对齐仍作为后续受控阶段，分别等待适用专项授权。
+- 本决定不授权访问当前业务数据或四卷、构建/推送镜像、联网扫描、UAT/生产Migration/deploy、账号权限、员工试用、正式切换或清理持久数据。
+
+### Rejected alternatives
+
+- 拒绝用Git tag、package版本、镜像tag、单个测试PASS或手工清单代替同一候选manifest。
+- 拒绝让Migration自动执行目录新增文件、仅凭数据库URL或调用者声明识别目标，或在锁后不复核历史。
+- 拒绝把lockfile依赖清单称为镜像SBOM，把离线未评估称为零漏洞，或为完成任务跳过既有typecheck失败。
+- 拒绝由release gate隐式build、pull、deploy或输出完整命令日志，也拒绝并发运行重型门禁。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

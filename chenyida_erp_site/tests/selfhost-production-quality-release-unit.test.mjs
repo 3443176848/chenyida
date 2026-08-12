@@ -6,7 +6,8 @@ import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts"
 test("TASK08 permissions separate sales allocation, quality execution and manager disposition",()=>{
   for(const permission of ["quality.finished_goods_allocation.create","quality.finished_goods_allocation.cancel"])assert.ok(permissionsForRole("sales").includes(permission));
   for(const permission of ["quality.inspect","quality.defect","quality.close"])assert.ok(permissionsForRole("quality").includes(permission));
-  for(const permission of ["quality.disposition","quality.reopen"])assert.ok(!permissionsForRole("quality").includes(permission));
+  assert.ok(permissionsForRole("quality").includes("quality.disposition"));
+  assert.ok(!permissionsForRole("quality").includes("quality.reopen"));
   for(const permission of ["quality.disposition","quality.reopen"])assert.ok(permissionsForRole("manager").includes(permission));
   for(const role of ["production","warehouse"])assert.ok(permissionsForRole(role).includes("quality.finished_goods_allocation.read"));
   for(const role of ["purchase","finance","operations"])for(const permission of ["quality.finished_goods_allocation.create","quality.finished_goods_allocation.cancel"])assert.ok(!permissionsForRole(role).includes(permission));
