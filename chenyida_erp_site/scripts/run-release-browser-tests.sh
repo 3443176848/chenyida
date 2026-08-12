@@ -25,7 +25,8 @@ container_main() {
   [ "$(node --version)" = v22.14.0 ] || { echo "release Browser Node version mismatch" >&2; exit 1; }
   [ -x "$BROWSER_EXECUTABLE" ] || { echo "pinned Chromium executable is unavailable" >&2; exit 1; }
   [ "$(sha256sum "$BROWSER_EXECUTABLE" | cut -d ' ' -f 1)" = "$BROWSER_EXECUTABLE_SHA256" ] || { echo "pinned Chromium executable digest mismatch" >&2; exit 1; }
-  [ "$("$BROWSER_EXECUTABLE" --version)" = "$BROWSER_VERSION" ] || { echo "pinned Chromium version mismatch" >&2; exit 1; }
+  BROWSER_VERSION_OUTPUT=$("$BROWSER_EXECUTABLE" --version)
+  [ "$(printf '%s' "$BROWSER_VERSION_OUTPUT" | sed 's/[[:space:]]*$//')" = "$BROWSER_VERSION" ] || { echo "pinned Chromium version mismatch" >&2; exit 1; }
   [ "$(node -p "require('/workspace/node_modules/playwright-core/package.json').name + '@' + require('/workspace/node_modules/playwright-core/package.json').version")" = playwright-core@1.51.1 ] || { echo "pinned Playwright package mismatch" >&2; exit 1; }
   [ -f /workspace/dist/standalone/server.js ] || { echo "release Browser standalone build is unavailable" >&2; exit 1; }
   [ -d /postgres-rootfs ] && [ ! -L /postgres-rootfs ] || { echo "release Browser PostgreSQL root is invalid" >&2; exit 1; }

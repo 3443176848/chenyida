@@ -39,6 +39,7 @@ class ReleaseSupervisorBrowserTest(unittest.TestCase):
         source = shell.read_text(encoding="utf-8")
         self.assertIn(f"BROWSER_IMAGE='{EXPECTED_BROWSER_IMAGE}'", source)
         self.assertIn(f"BROWSER_EXECUTABLE_SHA256='{EXPECTED_EXECUTABLE_SHA256}'", source)
+        self.assertIn("sed 's/[[:space:]]*$//'", source)
         self.assertEqual(source.count("/usr/bin/docker create"), 3)
         self.assertNotIn("/usr/bin/docker run", source)
         self.assertNotIn("docker pull", source)
