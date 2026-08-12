@@ -41,7 +41,7 @@ test("versioned test inventory accounts for every top-level test and only exclud
   assert.equal(inventory.total_tests, RELEASE_TEST_INVENTORY_TOTAL);
   assert.equal(inventory.required_tests, RELEASE_TEST_INVENTORY_REQUIRED);
   assert.equal(inventory.not_applicable_tests, RELEASE_TEST_INVENTORY_NOT_APPLICABLE);
-  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 81, POSTGRES_ALIAS: 2, PURE_NODE: 109, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 4 });
+  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 82, POSTGRES_ALIAS: 2, PURE_NODE: 110, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 4 });
   assert.deepEqual(inventory.tests.filter((entry) => entry.category === "RELEASE_CONTRACT").map((entry) => entry.path), [
     "tests/selfhost-file-storage.test.mjs",
     "tests/selfhost-release-gate-contract.test.mjs",
@@ -127,9 +127,9 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   }
   assert.match(postgresSandbox, /if \[ "\$\{ERP_RELEASE_POSTGRES_CONTAINER_MODE:-\}" = YES \]; then\s+container_main\s+exit 0\s+fi/);
   assert.ok(postgresSandbox.indexOf('remove_task_container "$NODE_ID" "$NODE_CONTAINER"') < postgresSandbox.indexOf("POSTGRES_ID=$(/usr/bin/docker create"));
-  assert.match(postgresRunner, /EXPECTED_POSTGRES_TESTS = 81/);
-  assert.match(postgresRunner, /migrations\.length !== 43/);
-  assert.match(postgresRunner, /0043_material_import_terminal_integrity\.sql/);
+  assert.match(postgresRunner, /EXPECTED_POSTGRES_TESTS = 82/);
+  assert.match(postgresRunner, /migrations\.length !== 44/);
+  assert.match(postgresRunner, /0044_identity_session_absolute_lifetime\.sql/);
   assert.match(postgresRunner, /harness === "POSTGRES_REGRESSION"/);
   assert.match(postgresRunner, /postgresql:\/\/chenyida_erp:x@postgres:5432\/chenyida_erp/);
   assert.match(postgresRunner, /create role chenyida_erp login nosuperuser nocreatedb nocreaterole noinherit/);
@@ -138,7 +138,7 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.doesNotMatch(postgresRunner, /env:\s*process\.env/);
   assert.doesNotMatch(postgresRunner, /\.\.\.process\.env/);
   assert.match(postgresRunner, /summary\.skipped !== 0 \|\| summary\.todo !== 0/);
-  assert.match(postgresRunner, /for \(const head of \[17, 36, 43\]\)/);
+  assert.match(postgresRunner, /for \(const head of \[17, 36, 44\]\)/);
   assert.match(postgresRunner, /verifyReleaseTestInventory/);
   assert.match(wrapper, /\.release-gate-report\.prepared\.json/);
   assert.match(creator, /\.release-manifest\.\$AUTHORIZATION_SHA256\.prepared\.json/);

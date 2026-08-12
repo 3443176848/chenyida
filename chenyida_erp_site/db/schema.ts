@@ -63,12 +63,15 @@ export const migrationOpeningSources = pgTable("migration_opening_sources", {
 
 export const appSessions = pgTable("app_sessions", {
   tokenHash: text("token_hash").primaryKey(), username: text("username").notNull().references(() => appUsers.username, { onDelete: "cascade" }),
-  expiresAt: timestamptz("expires_at").notNull(), revokedAt: timestamptz("revoked_at"), revokedReason: text("revoked_reason"), createdAt: timestamptz("created_at").notNull().defaultNow(),
+  expiresAt: timestamptz("expires_at").notNull(), absoluteExpiresAt: timestamptz("absolute_expires_at").notNull().default(sql`now()+interval '24 hours'`),
+  revokedAt: timestamptz("revoked_at"), revokedReason: text("revoked_reason"), createdAt: timestamptz("created_at").notNull().defaultNow(),
 }, (t) => [
   index("app_sessions_username_idx").on(t.username),
   index("app_sessions_expiry_idx").on(t.expiresAt),
   index("app_sessions_active_user_idx").on(t.username, t.expiresAt).where(sql`${t.revokedAt} is null`),
-  check("app_sessions_revocation_ck", sql`(${t.revokedAt} is null and ${t.revokedReason} is null) or (${t.revokedAt} is not null and ${t.revokedReason} in ('LOGOUT','USER_INACTIVE','USER_DEACTIVATED','PASSWORD_RESET','PASSWORD_CHANGED'))`),
+  index("app_sessions_active_absolute_expiry_idx").on(t.absoluteExpiresAt).where(sql`${t.revokedAt} is null`),
+  check("app_sessions_revocation_ck", sql`(${t.revokedAt} is null and ${t.revokedReason} is null) or (${t.revokedAt} is not null and ${t.revokedReason} in ('LOGOUT','USER_INACTIVE','USER_DEACTIVATED','PASSWORD_RESET','PASSWORD_CHANGED','IDLE_TIMEOUT','ABSOLUTE_TIMEOUT'))`),
+  check("app_sessions_deadline_ck", sql`${t.absoluteExpiresAt} = ${t.createdAt}+interval '24 hours' and ${t.expiresAt} <= ${t.absoluteExpiresAt}`),
 ]);
 
 export const auditLog = pgTable("audit_log", {

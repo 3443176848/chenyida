@@ -302,6 +302,13 @@
       "when": 1786528451390,
       "tag": "0043_material_import_terminal_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1786534490384,
+      "tag": "0044_identity_session_absolute_lifetime",
+      "breakpoints": true
     }
   ]
 }

@@ -86,6 +86,7 @@ test("self-deactivation, self-reset and last active admin are blocked", () => {
 test("must-change gate allows identity handler to run first and blocks all later protected modules", () => {
   const actor = { username: "buyer01", display_name: "采购员", role: "purchase", is_active: true, must_change_password: true, version: 1, last_login_at: null, permissions: ["material.read"] };
   assert.throws(() => assertProtectedIdentityGate({ state: "AUTHENTICATED", actor, token_hash: "a".repeat(64) }), (error) => error.code === "PASSWORD_CHANGE_REQUIRED" && error.status === 403);
+  assert.throws(() => assertProtectedIdentityGate({ state: "EXPIRED", actor: null, token_hash: "a".repeat(64), revoked_reason: "IDLE_TIMEOUT" }), (error) => error.code === "SESSION_EXPIRED" && error.message === "当前会话已过期，请重新登录" && error.status === 401);
   assert.throws(() => assertProtectedIdentityGate({ state: "REVOKED", actor: null, token_hash: "a".repeat(64) }), (error) => error.code === "SESSION_REVOKED" && error.status === 401);
 });
 
@@ -117,4 +118,19 @@ test("stable error mapping never exposes internal exceptions", async () => {
   assert.equal(known.status, 409); assert.equal((await known.json()).code, "VERSION_CONFLICT");
   const unknown = identityFailureResponse(new Error("select secret from app_users"), "11111111-1111-4111-8111-111111111111");
   const body = await unknown.text(); assert.equal(unknown.status, 500); assert.doesNotMatch(body, /select secret|app_users|stack/i);
+});
+
+test("identity failures preserve retry metadata and both invalid-session cookie clears", async () => {
+  const request = new Request("https://erp.example.test/api/users");
+  const response = identityFailureResponse(
+    new IdentityError("RATE_LIMITED", "身份写操作过于频繁，请稍后重试", 429, 17),
+    "11111111-1111-4111-8111-111111111111",
+    buildClearCookieHeaders(request, "production"),
+  );
+  assert.equal(response.headers.get("Retry-After"), "17");
+  const cleared = response.headers.getSetCookie();
+  assert.equal(cleared.length, 2);
+  assert.ok(cleared.some((value) => value.startsWith("CYD_ERP_SESSION=") && /HttpOnly/.test(value) && /Max-Age=0/.test(value) && /Secure/.test(value)));
+  assert.ok(cleared.some((value) => value.startsWith("CYD_ERP_CSRF=") && !/HttpOnly/.test(value) && /Max-Age=0/.test(value) && /Secure/.test(value)));
+  assert.doesNotMatch(await response.text(), /CYD_ERP_SESSION|CYD_ERP_CSRF|token_hash/i);
 });

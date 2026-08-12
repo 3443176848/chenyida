@@ -76,7 +76,7 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
             "git_commit": "a" * 40,
             "git_tree": "b" * 40,
             "artifact_root": "/var/lib/chenyida-erp/releases/fixture",
-            "run_id": "fixture-alpha44",
+            "run_id": "fixture-alpha45",
             "web_image": f"registry.example.invalid/chenyida/web@sha256:{'c' * 64}",
             "worker_image": f"registry.example.invalid/chenyida/worker@sha256:{'d' * 64}",
             "sbom_evidence": "/var/lib/chenyida-erp/releases/fixture/fixture.sbom.json",
@@ -151,14 +151,14 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         for operation, parameters in (
             ("CREATE_IMAGE_EVIDENCE", {
                 "repository_root": "/opt/erp", "git_commit": "a" * 40, "git_tree": "b" * 40,
-                "artifact_root": "/var/lib/chenyida-erp/releases/fixture", "run_id": "fixture-alpha44",
+                "artifact_root": "/var/lib/chenyida-erp/releases/fixture", "run_id": "fixture-alpha45",
                 "web_image": f"registry.example.invalid/chenyida/web@sha256:{'c' * 64}",
                 "worker_image": f"registry.example.invalid/chenyida/worker@sha256:{'d' * 64}",
                 "trivy_db_directory": "/var/lib/chenyida-erp/trivy-db",
             }),
             ("CREATE_RELEASE_MANIFEST", {
                 "repository_root": "/opt/erp", "git_commit": "a" * 40, "git_tree": "b" * 40,
-                "artifact_root": "/var/lib/chenyida-erp/releases/fixture", "release_id": "fixture-alpha44",
+                "artifact_root": "/var/lib/chenyida-erp/releases/fixture", "release_id": "fixture-alpha45",
                 "deployment_class": "UAT",
                 "web_image": f"registry.example.invalid/chenyida/web@sha256:{'c' * 64}",
                 "worker_image": f"registry.example.invalid/chenyida/worker@sha256:{'d' * 64}",

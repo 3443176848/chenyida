@@ -1,8 +1,8 @@
 # 自托管身份安全边界
 
-状态：`IMPLEMENTED IN NON-PRODUCTION`
+状态：`IMPLEMENTED IN SOURCE / ISOLATED TESTS VERIFIED / RUNTIME NOT DEPLOYED`
 
-适用版本：身份基线始于 `chenyida-erp-selfhosted@0.1.0-alpha.2`；既有 Origin/CSRF/logout、operations 物料审核与 no-store 修复保持。当前非生产并行环境为 alpha.39/0038，并由 `SELFHOST-UAT-FIX-20` 增加 Supplier Mapping 的 purchase/operations 精确权限和职责分离；这不是生产发布。
+适用版本：身份基线始于 `chenyida-erp-selfhosted@0.1.0-alpha.2`；会话绝对寿命与原子认证从源码 `0.1.0-alpha.45` / PostgreSQL `0044_identity_session_absolute_lifetime.sql`开始。当前非生产并行 UAT 仍是 alpha.42/0040，未获得部署或 Migration 授权；源码能力不等于运行能力或生产发布。
 
 ## 1. 运行边界
 
@@ -49,7 +49,11 @@ Supplier Mapping 的精确增量为：purchase 获得 `supplier_mapping.read/cre
 
 ## 4. Session、Cookie 与门禁
 
-随机 Session Token 仅送入 HttpOnly Cookie；数据库只保存 SHA-256 摘要。`app_sessions.revoked_at/revoked_reason` 明确区分 logout、inactive、deactivation、reset 和 own-password-change。过期/不存在返回认证失败，已撤销旧 Cookie 对受保护 API 返回 `SESSION_REVOKED`。
+随机 Session Token 仅送入 HttpOnly Cookie；数据库只保存 SHA-256 摘要。新会话使用同一 PostgreSQL `now()`写入 8 小时 idle deadline 和创建后固定 24 小时 absolute deadline。有效访问只能把 idle deadline 推进到`least(now()+8 hours, absolute_expires_at)`；`token_hash`、`username`、`created_at`和`absolute_expires_at`受数据库 guard 保护，absolute deadline 不得滑动或改写。Node wall clock 不参与授权。
+
+认证事务先按 Token 摘要定位稳定 username，再按“用户共享锁 → Session 排他锁”的固定顺序复核 active、撤销和两个 deadline。停用、密码重置/修改和认证因此与既有“用户 → Session”写锁序一致；更新或状态复核没有命中时不得返回旧 actor。首次观察到超时的事务把 Session 终态化为`IDLE_TIMEOUT`或`ABSOLUTE_TIMEOUT`，并在同一事务写入唯一一条`SESSION_EXPIRED`审计；审计 detail 只含稳定 reason，不含 Token、摘要、Cookie、SQL或截止时间。并发或重复请求读取已有终态，不重复审计。
+
+`app_sessions.revoked_at/revoked_reason`区分 logout、inactive、deactivation、reset、own-password-change、idle timeout 和 absolute timeout。普通受保护 API 对超时返回`401 SESSION_EXPIRED / 当前会话已过期，请重新登录`，对其他撤销返回`401 SESSION_REVOKED`，带未知 Token 返回`401 AUTH_REQUIRED`。`/api/session`以 200 返回最小`authenticated=false`与稳定 session state。三类带 Token 的失效响应都对称清除 Session/CSRF Cookie；真正无 Cookie 的匿名探测不写审计、不设置 Cookie。
 
 Session Cookie 为 `HttpOnly; SameSite=Lax`；CSRF Cookie 为 `SameSite=Lax` 且可由浏览器读取。`ERP_ENV=production` 时，即使内部 Request URL 为 HTTP，两类 Cookie 都强制 `Secure`。有效 session 的 logout 和所有身份写执行严格同源 Origin 与双提交 CSRF。
 
@@ -71,12 +75,14 @@ must-change 账号只允许 `GET /api/session`、`POST /api/logout`、`POST /api
 
 创建、启停、重置和本人改密的业务变化、版本、会话撤销、审计和幂等响应在同一事务提交或回滚。审计记录 actor、action、target、result、request/operation ID、old/new version、error code 和时间；不记录密码、Token、Cookie、hash、原 Idempotency-Key 或请求正文。查询只返回最小 DTO，并支持 actor、target、action、result、from/to 服务端筛选。
 
-## 6. PostgreSQL `0006`
+## 6. PostgreSQL `0006` 与 `0044`
 
 `0006_identity_security.sql` 是 expand-only migration：增加登录失败窗口表、身份写分钟桶、session 撤销字段与约束、audit target username、身份查询索引及用户格式/角色约束。复用既有 `app_users`、`app_sessions`、`audit_log` 和 `idempotency_keys`，不重建表、不自动回填或迁移真实身份数据。
 
 SHA-256：`6e185d01a69c4bd132c577793ae72baceaa075e5beecc738bcdf4310430d7079`。历史 PostgreSQL `0001`—`0005` checksum 保持不变。
 
+`0044_identity_session_absolute_lifetime.sql`是 append-only expand/backfill/constraint Migration，SHA-256为`a24df94474403c4f235933d4450626ce65b40416264393db400cef08e7fcaa7e`：先增加可空 absolute deadline，以`created_at+24 hours`回填并向下夹紧 idle deadline，再设置 default/not-null、扩展 timeout reason、增加 deadline check、未撤销 absolute 索引和不可变 trigger。旧会话若创建已超过 24 小时，升级后会在下一次认证被安全终态化；这属于明确的安全切换结果。`0001`—`0043`校验和由专项契约冻结，0044 失败由单事务整体回滚，不允许修改历史 Migration。
+
 ## 7. 运维与后续限制
 
-身份基线、来源/退出修复、历史恢复缓存保护、operations 人工物料审核、Planning 当前 CSRF 客户端及 Supplier Mapping 精确权限已部署到当前 `chenyida-erp-parallel` 非生产环境；这不是生产发布。运行面为 alpha.39/0038，0038 只扩展 Supplier Mapping 治理，不改写既有身份表或 Canonical 凭据。任何生产 migration、域名/Origin 切换或正式投用仍需快照、真实旧角色预检、受控试迁移、容量/安全验收和明确授权。身份模块不解决 Dashboard、备份、客户、供应商、产品、BOM、库存、采购、生产、销售、品质或财务；这些域不得通过扩展身份模块绕过独立任务。
+身份基线和既有来源/退出修复已存在于非生产 UAT，但 alpha.45/0044 会话加固尚未 build、Migration 或部署。未来授权升级前必须先取得可恢复快照，核对 0043 精确前缀和 app_sessions 回填影响，在隔离副本验证超过 24 小时旧会话按预期失效，并准备要求全部用户重新登录的通知；不得直接在运行库试验。任何生产 Migration、域名/Origin 切换、账号操作或正式投用仍需专项授权。身份模块不解决 Dashboard、备份、客户、供应商、产品、BOM、库存、采购、生产、销售、品质或财务；这些域不得通过扩展身份模块绕过独立任务。

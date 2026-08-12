@@ -525,13 +525,13 @@ function comparisonToAlpha43(
   alpha43: Record<string, unknown>,
   alpha43Sha256: string,
 ): Record<string, unknown> {
-  const comparisons: Array<Readonly<{ metric: string; alpha43: string; alpha44: string; delta: string }>> = [];
+  const comparisons: Array<Readonly<{ metric: string; alpha43: string; alpha45: string; delta: string }>> = [];
   const addRatioComparison = (code: string, previousValue: unknown, currentValue: unknown) => {
     if (typeof previousValue !== "string" || typeof currentValue !== "string") throw new Error("COMPARISON_METRIC_INVALID");
     comparisons.push(Object.freeze({
       metric: code,
       alpha43: previousValue,
-      alpha44: currentValue,
+      alpha45: currentValue,
       delta: decimalDelta(previousValue, currentValue),
     }));
   };
@@ -595,7 +595,7 @@ export function resultDigestForSuggestionLayerReport(report: Record<string, unkn
 function assertMetadata(metadata: SuggestionLayerEvaluationMetadata, selection: "calibration" | "all"): void {
   if (metadata.candidate_source_revision !== APPROVED_CANDIDATE_SOURCE_REVISION) throw new Error("CANDIDATE_SOURCE_REVISION_INVALID");
   if (!/^[0-9a-f]{40}$/.test(metadata.harness_revision)) throw new Error("HARNESS_REVISION_INVALID");
-  if (metadata.package_version !== "0.1.0-alpha.44") throw new Error("PACKAGE_VERSION_INVALID");
+  if (metadata.package_version !== "0.1.0-alpha.45") throw new Error("PACKAGE_VERSION_INVALID");
   if (metadata.migration_0041_sha256 !== FROZEN_MIGRATION_0041_SHA256) throw new Error("MIGRATION_0041_IDENTITY_INVALID");
   if (AI_SUGGESTION_SOURCE_REVISION !== UNDERLYING_EVALUATOR_SOURCE_REVISION) throw new Error("UNDERLYING_EVALUATOR_IDENTITY_INVALID");
   if (selection === "all" && (!metadata.alpha43_report || metadata.alpha43_report_sha256 !== FROZEN_ALPHA43_REPORT_SHA256)) {

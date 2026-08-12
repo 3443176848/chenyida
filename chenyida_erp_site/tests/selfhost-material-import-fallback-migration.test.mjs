@@ -9,30 +9,33 @@ const schemaFile = new URL("../db/schema.ts", import.meta.url);
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
-test("0043 is append-only and preserves the published 0041/0042 checksums", async () => {
+test("0043 remains immutable after the append-only 0044 migration", async () => {
   const names = (await readdir(migrationDirectory))
     .filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/.test(name))
     .sort();
-  assert.equal(names.length, 43);
-  assert.equal(names.at(-1), "0043_material_import_terminal_integrity.sql");
-  await assert.rejects(access(new URL("0044_material_import_terminal_integrity.sql", migrationDirectory)));
+  assert.equal(names.length, 44);
+  assert.equal(names.at(-1), "0044_identity_session_absolute_lifetime.sql");
+  await assert.rejects(access(new URL("0045_material_import_terminal_integrity.sql", migrationDirectory)));
   const previous = await readFile(new URL("0041_ai_governance_suggestion_evidence.sql", migrationDirectory));
   assert.equal(sha256(previous), "676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2");
   const fallback = await readFile(new URL("0042_material_import_fallback_safety.sql", migrationDirectory));
   assert.equal(sha256(fallback), "c0eeab63bc51f1d1dd96805b43e78c83c5ef5e0a5d5712a08a0308c95b9385bf");
+  const terminal = await readFile(new URL("0043_material_import_terminal_integrity.sql", migrationDirectory));
+  assert.equal(sha256(terminal), "0fdb3d4b92d999a5dede5a36a08bd99ea054879ebb6857341e08f0f0e07852d9");
 });
 
 test("0043 journal and snapshot form one consistent three-table correction", async () => {
   const journal = JSON.parse(await readFile(new URL("_journal.json", metadataDirectory), "utf8"));
-  assert.equal(journal.entries.length, 43);
-  assert.deepEqual(journal.entries.at(-1), {
+  assert.equal(journal.entries.length, 44);
+  const entry = journal.entries.find((item) => item.idx === 43);
+  assert.deepEqual(entry, {
     idx: 43,
     version: "7",
-    when: journal.entries.at(-1).when,
+    when: entry.when,
     tag: "0043_material_import_terminal_integrity",
     breakpoints: true,
   });
-  assert.ok(Number.isSafeInteger(journal.entries.at(-1).when));
+  assert.ok(Number.isSafeInteger(entry.when));
 
   const previous = JSON.parse(await readFile(new URL("0042_snapshot.json", metadataDirectory), "utf8"));
   const current = JSON.parse(await readFile(new URL("0043_snapshot.json", metadataDirectory), "utf8"));

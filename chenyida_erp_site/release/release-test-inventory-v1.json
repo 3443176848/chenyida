@@ -4,22 +4,22 @@
   "root": "chenyida_erp_site",
   "test_pattern": "tests/*.test.mjs",
   "max_test_bytes": 1048576,
-  "total_tests": 230,
-  "required_tests": 206,
+  "total_tests": 232,
+  "required_tests": 208,
   "not_applicable_tests": 24,
   "category_counts": {
     "BROWSER": 6,
     "HISTORICAL_D1_SITES": 22,
-    "POSTGRES": 81,
+    "POSTGRES": 82,
     "POSTGRES_ALIAS": 2,
-    "PURE_NODE": 109,
+    "PURE_NODE": 110,
     "RELEASE_CONTRACT": 6,
     "SPECIAL_HARNESS": 4
   },
   "tests": [
     {
       "path": "tests/ai-governance-evaluation-cli.test.mjs",
-      "sha256": "ba946e64b5abb8d92da80ffd64b3535c41194106964630f51587de84e1b97755",
+      "sha256": "8929585858f4eb477748d80b2672478466d31c8ed1d30aef33b1b1a7703ac5db",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -46,7 +46,7 @@
     },
     {
       "path": "tests/ai-governance-suggestion-layer.test.mjs",
-      "sha256": "9f5f1732dcc82eec4e5070f0779b8a554bebaafa5bda629622e7ad0f1b0fec16",
+      "sha256": "0f57a6f710418d3e003c19b0976639ac56f84ccca45b47de39b5991f66756d37",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -406,7 +406,7 @@
     },
     {
       "path": "tests/selfhost-application-version.test.mjs",
-      "sha256": "702b49936d9343773d391ed829e93f45d672e4ae3c36bed077e5cf8f1dd0f0a6",
+      "sha256": "8ff9242e09f107b641706230d774b7b1f3733e1d1c80f8ad5f16d2783381dfc1",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -424,7 +424,7 @@
     },
     {
       "path": "tests/selfhost-backup-recovery-v2.test.mjs",
-      "sha256": "1d763cba1ce97859c837be3d59d6bff0218c38aea50381264c751bae4c76d6af",
+      "sha256": "84c9fc37002439920e697043a97e3ab20b60516c28a95dea52b85dce9b4ef48e",
       "category": "SPECIAL_HARNESS",
       "applicability": "REQUIRED",
       "harness": "SPECIAL_POSIX",
@@ -442,7 +442,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-postgres.test.mjs",
-      "sha256": "4da7fff45f560aade41e89bb74bfaf6a1989de14b1f3678444f58f0c652dfff2",
+      "sha256": "0302fae7114562c982de525cbdf1543cc996bd02f2ebce0d4f10c37505431fee",
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",
@@ -460,7 +460,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-unit.test.mjs",
-      "sha256": "1096600614ad81cb4a97c6a475a6acf01dfe4880653d2bc3d485c88f4bc4b55c",
+      "sha256": "cc3e9325c627d3f9668ea68f2f7125191ecb81975b2cf5b699917c698f6ca149",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -613,7 +613,7 @@
     },
     {
       "path": "tests/selfhost-health-contract.test.mjs",
-      "sha256": "8378f516758afdcad0fe1341b95d3e39aca9ef0ac314d59176144bcdf7a73019",
+      "sha256": "e643e53fa5341536ab25b204b1fff799e3de1714ab7c21b63b47ee466501946d",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -649,7 +649,7 @@
     },
     {
       "path": "tests/selfhost-identity-unit.test.mjs",
-      "sha256": "f99e361262ace69c8f1242884514e51e2bbc13e494030667500806da39f20a59",
+      "sha256": "658a0b64b57111c1554ca8be4cc123fc10ce0c4ea0279e4d74ae086958b9c8f2",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -712,7 +712,7 @@
     },
     {
       "path": "tests/selfhost-mapping-postgres.test.mjs",
-      "sha256": "8cf361bbf6a32d18df2de42fbb1a5424845cb3703b02cffa7cfe4e96c27dacf4",
+      "sha256": "12abdc0ba8503c8857b708cf2797cdbb452db5f0ddd35d72a3e11d4b2f94cd0b",
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",
@@ -838,7 +838,7 @@
     },
     {
       "path": "tests/selfhost-material-import-fallback-migration.test.mjs",
-      "sha256": "80f075898879d7a6e147ee5a17cfd711adc279775a5d14f74c9d3a726d5cfbc7",
+      "sha256": "74dcd8755f4939c2714afd16251adeb1f998bfd119bf6eb84acdade8904eba88",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -865,7 +865,7 @@
     },
     {
       "path": "tests/selfhost-material-postgres.test.mjs",
-      "sha256": "9ea73084c7a50f6f977e1467066435703adbdf299203d9e11687cba60e8ddcba",
+      "sha256": "a2b6d8996386a38402693223e6e536b5ad856f66e3d04809ee3ddef348073b5c",
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",
@@ -1738,7 +1738,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "adcb76cf10498cd8565bfd005efce1bed136c9f4c5c006ed858780bd3cf22666",
+      "sha256": "8ee09b889da3230b43fd9d4c48cb0dd5a9457803ecdf3995fedaa68b7fc96faa",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -1747,7 +1747,7 @@
     },
     {
       "path": "tests/selfhost-release-identity-contract.test.mjs",
-      "sha256": "d209ac1fee572d148552aa271ba9ba96b28553e7934f5cb3a6e84552cecaefdb",
+      "sha256": "71f20e7883091b2d00cac749a3cb869bb540a5fe62ad7f1072e811dcf6fc197b",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -1756,7 +1756,7 @@
     },
     {
       "path": "tests/selfhost-release-image-evidence-producer.test.mjs",
-      "sha256": "7e5d3f25bc2dafc54ac423b1e977a5743840edac968c80aca2891500befe2309",
+      "sha256": "eee8a6365460ab4515103dac94d9a99646e725c02741a0bdafffa0460f6e8dfa",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -1949,6 +1949,24 @@
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-session-safety-migration.test.mjs",
+      "sha256": "a26435e95f0af10bf185976ff04854b1d438d7459f4cbd47d0aaf304be17c099",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-session-safety-postgres.test.mjs",
+      "sha256": "3f174b1ba0dd0b4675b91ec523ef861c9b34464464a0d389d2dcb17bdde904f6",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
       "reason": null,
       "canonical_path": null
     },

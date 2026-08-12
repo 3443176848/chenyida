@@ -28,7 +28,7 @@ test("health reports the validated runtime version and retains the existing fiel
     version: sourceVersion,
     time: "2026-08-09T12:34:56.000Z",
   });
-  assert.equal(payload.version, "0.1.0-alpha.44");
+  assert.equal(payload.version, "0.1.0-alpha.45");
 });
 
 test("missing or damaged runtime metadata makes health fail closed without response leaks", async () => {

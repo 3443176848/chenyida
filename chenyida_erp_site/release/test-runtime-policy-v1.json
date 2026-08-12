@@ -20,7 +20,7 @@
   "node_dependencies": {
     "path": "chenyida_erp_site/node_modules",
     "tree_sha256": "9ab3e889df4519ecbdfa6cce524e96edbe17ce9d3d9780e9487d59cfc8960663",
-    "package_lock_sha256": "e14783a505c3f033ee62ba5442d4edf32a083efd45e07be99edd1540df507053"
+    "package_lock_sha256": "fa3042927c06da05762edad9a2a75b49835cb791f2fc9d86904497185be4cd71"
   },
   "python_runtime": {
     "venv_path": ".venv",
@@ -32,16 +32,16 @@
   },
   "test_inventory": {
     "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-    "sha256": "88d67a1119340ec39e75c04228e8d12da8c84eb11bfd176c060eb46f85ac4282",
-    "total_tests": 230,
-    "required_tests": 206,
+    "sha256": "0592a4ddf70450914901eb9f43bb1e85a3d8e0ac7d2f14e42ad0cfcc98fa8a31",
+    "total_tests": 232,
+    "required_tests": 208,
     "not_applicable_tests": 24,
     "category_counts": {
       "BROWSER": 6,
       "HISTORICAL_D1_SITES": 22,
-      "POSTGRES": 81,
+      "POSTGRES": 82,
       "POSTGRES_ALIAS": 2,
-      "PURE_NODE": 109,
+      "PURE_NODE": 110,
       "RELEASE_CONTRACT": 6,
       "SPECIAL_HARNESS": 4
     }

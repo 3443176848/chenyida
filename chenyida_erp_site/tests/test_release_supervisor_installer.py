@@ -43,7 +43,7 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
         return {
             "schema_version": 1,
             "contract": installer.INSTALL_CONTRACT,
-            "authorization_id": "install-alpha44",
+            "authorization_id": "install-alpha45",
             "created_at": utc(now - timedelta(minutes=1)),
             "expires_at": utc(now + timedelta(minutes=10)),
             "repository_root": "/opt/erp",

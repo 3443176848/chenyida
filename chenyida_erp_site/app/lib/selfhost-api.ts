@@ -36,6 +36,7 @@ import { handleProductionNonconformanceApi } from "./production-nonconformance-s
 import { handleProductionBatchApi } from "./production-batch-selfhost/handler.ts";
 import {
   assertProtectedIdentityGate,
+  buildClearCookieHeaders,
   CSRF_COOKIE,
   handleSelfhostIdentityApi,
   identityFailureResponse,
@@ -87,9 +88,14 @@ export async function handleSelfhostApi(request: Request): Promise<Response> {
     const identityResponse = await handleSelfhostIdentityApi(request, { pool, requestId });
     if (identityResponse) return identityResponse;
     const identityRepository = new PostgresIdentityRepository(pool);
-    const identityContext = await resolveIdentitySession(request, identityRepository);
+    const identityContext = await resolveIdentitySession(request, identityRepository, requestId);
     let user: IdentityActor;
-    try { user = assertProtectedIdentityGate(identityContext); } catch (error) { return identityFailureResponse(error, requestId); }
+    try {
+      user = assertProtectedIdentityGate(identityContext);
+    } catch (error) {
+      const headers = identityContext.token_hash && identityContext.state !== "AUTHENTICATED" ? buildClearCookieHeaders(request) : undefined;
+      return identityFailureResponse(error, requestId, headers);
+    }
     const config = runtimeConfig();
     const fallbackQueue = new PostgresBackgroundJobQueue(pool, systemClock, uuidGenerator, config.workerLeaseSeconds);
     const fallbackResponse = await handleSelfhostMaterialImportFallbackApi(request, {

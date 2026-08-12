@@ -6,7 +6,7 @@
 
 - 唯一未来生产权威方向是 Node.js、PostgreSQL、本地持久文件和独立 Worker。
 - `chenyida-erp-parallel`仍是受控非生产 UAT：Web `0.1.0-alpha.42` / source revision `569aa954d764309e239d1f6c174e582596d33a24`，PostgreSQL 40/head `0040_warehouse_receipt_readiness.sql`。
-- 当前仓库源码为 `0.1.0-alpha.44` / 43/head `0043_material_import_terminal_integrity.sql`；0041—0043均未 build、未部署或应用到 UAT。源码与运行面不得描述为同一候选。
+- 当前仓库源码为 `0.1.0-alpha.45` / 44/head `0044_identity_session_absolute_lifetime.sql`；0041—0044均未 build、未部署或应用到 UAT。源码与运行面不得描述为同一候选。
 - Python/SQLite 常驻面仍是开发运行和迁移来源，不是未来生产底座；正式切换前必须另有停写、只读或隔离决定。
 - 入口、受控业务事实与历史操作见 `parallel-http-acceptance.md`；未经任务授权不得登录、发送业务 POST 或查询业务行。
 
@@ -50,7 +50,7 @@ Compose 配置展开需要数据库和 setup 变量；只读状态检查可使�
 6. 执行匿名健康、权限、核心业务、数据汇总、Worker 和备份时效验收；
 7. 观察 restart/OOM、Load、内存、Swap、磁盘和错误率；触发回滚条件立即停止晋升。
 
-TASK42已形成并验证release manifest、Migration allowlist、content-addressed supervisor和`test:release`仓库工具，见[自托管发布门V1](../testing/selfhost-release-gate.md)。host supervisor尚未安装；没有获准构建的alpha.44 Web/Worker精确镜像、镜像级SBOM、新鲜漏洞PASS或完整gate PASS，完整多配置typecheck还有既有失败，UAT仍为alpha.42/0040。因此G3为`REPOSITORY TOOLING VERIFIED / INSTALLATION AND CANDIDATE EVIDENCE BLOCKED`，仍是投产阻断。
+TASK42已形成并验证release manifest、Migration allowlist、content-addressed supervisor和`test:release`仓库工具，见[自托管发布门V1](../testing/selfhost-release-gate.md)。host supervisor尚未安装；没有获准构建的alpha.45 Web/Worker精确镜像、镜像级SBOM、新鲜漏洞PASS或完整gate PASS，完整多配置typecheck还有既有失败，UAT仍为alpha.42/0040。因此G3为`REPOSITORY TOOLING VERIFIED / INSTALLATION AND CANDIDATE EVIDENCE BLOCKED`，仍是投产阻断。
 
 ## 发布制品和Migration操作保护
 
@@ -79,6 +79,18 @@ TASK43已在源码实现D-117安全合同，但当前alpha.42/0040 UAT未部署�
 4. 确需人工处置时，先固定可恢复数据库/文件快照并另立受控事故任务；处置后核对终态、Audit、无可消费孤儿文件和资源清理。
 
 详细状态机和安全边界见[自托管物料导入安全与恢复合同V1](../material-master/material-import-selfhost-safety-v1.md)。
+
+## 会话超时与撤销处置
+
+alpha.45/0044源码采用8小时 idle、24小时 absolute和一次性超时终态；当前UAT未部署。未来获准部署后，运维只按稳定响应和审计排障：
+
+1. `SESSION_EXPIRED`表示`IDLE_TIMEOUT`或`ABSOLUTE_TIMEOUT`，用户应重新登录；不得手工延长`expires_at`或`absolute_expires_at`。
+2. `SESSION_REVOKED`表示logout、停用、密码重置/修改等明确撤销；先核对受控账号操作和对应Identity Audit，不得恢复旧Token。
+3. `AUTH_REQUIRED`可能是无Cookie或未知Token；接口会清理客户端Cookie，但服务端不会记录Token正文或摘要。排障只使用request ID、稳定错误码、目标username和审计时间。
+4. 同一Session超时只能有一条`SESSION_EXPIRED`成功审计。出现重复审计、超时后仍返回actor、absolute deadline漂移、Cookie未清理或数据库时钟异常时，立即停止候选晋升并保全去敏日志。
+5. 0043→0044升级会让创建超过24小时的旧Session失效。受控Migration前应统计受影响Session数量但不得导出Token摘要；升级通知应明确要求用户重新登录。
+
+完整安全合同和隔离测试范围见[自托管身份安全边界](identity-security.md)。
 
 ## 监控、备份和上线缺口
 

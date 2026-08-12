@@ -57,11 +57,11 @@ function jsonResponse(data: unknown, status: number, requestId: string, headers?
   return Response.json(data, { status, headers: responseHeaders });
 }
 
-export function identityFailureResponse(error: unknown, requestId: string): Response {
+export function identityFailureResponse(error: unknown, requestId: string, headers?: HeadersInit): Response {
   const known = error instanceof IdentityError ? error : internalIdentityError();
-  const headers = new Headers();
-  if (known.retryAfter) headers.set("Retry-After", String(known.retryAfter));
-  return jsonResponse(identityErrorBody(known, requestId), known.status, requestId, headers);
+  const responseHeaders = new Headers(headers);
+  if (known.retryAfter) responseHeaders.set("Retry-After", String(known.retryAfter));
+  return jsonResponse(identityErrorBody(known, requestId), known.status, requestId, responseHeaders);
 }
 
 function secureCookie(request: Request, environment: "development" | "test" | "production"): string {
@@ -118,6 +118,7 @@ function requireCsrf(request: Request): void {
 }
 
 function requireAuthenticated(context: IdentitySessionContext): asserts context is IdentitySessionContext & { actor: IdentityActor; token_hash: string } {
+  if (context.state === "EXPIRED") throw new IdentityError("SESSION_EXPIRED", "当前会话已过期，请重新登录", 401);
   if (context.state === "REVOKED") throw new IdentityError("SESSION_REVOKED", "当前会话已撤销，请重新登录", 401);
   if (context.state !== "AUTHENTICATED" || !context.actor || !context.token_hash) throw new IdentityError("AUTH_REQUIRED", "请先登录", 401);
 }
@@ -144,9 +145,9 @@ function routeTarget(path: string, body: Record<string, unknown>, actor?: Identi
   return normalizeUsername(body.username).slice(0, 32);
 }
 
-export async function resolveIdentitySession(request: Request, repository: PostgresIdentityRepository): Promise<IdentitySessionContext> {
+export async function resolveIdentitySession(request: Request, repository: PostgresIdentityRepository, requestId: string): Promise<IdentitySessionContext> {
   const token = cookies(request)[SESSION_COOKIE] || "";
-  return repository.authenticate(token ? digest(token) : null);
+  return repository.authenticate(token ? digest(token) : null, requestId);
 }
 
 export async function handleSelfhostIdentityApi(request: Request, dependencies: { pool: Pool; requestId: string }): Promise<Response | null> {
@@ -177,12 +178,12 @@ export async function handleSelfhostIdentityApi(request: Request, dependencies: 
       const csrf = randomBytes(32).toString("base64url");
       return jsonResponse({ ok: true, user: result.user, setup_required: false, csrf_token: csrf }, 200, requestId, buildAuthCookieHeaders(request, result.token, csrf));
     }
-    context = await resolveIdentitySession(request, repository);
+    context = await resolveIdentitySession(request, repository, requestId);
     if (path === "/api/session") {
       if (request.method !== "GET") throw new IdentityError("METHOD_NOT_ALLOWED", "请求方法不允许", 405);
       const setupRequired = await repository.setupRequired();
       if (context.state !== "AUTHENTICATED" || !context.actor) {
-        const headers = context.state === "REVOKED" ? buildClearCookieHeaders(request) : undefined;
+        const headers = context.token_hash ? buildClearCookieHeaders(request) : undefined;
         return jsonResponse({ authenticated: false, user: null, setup_required: setupRequired, session_state: context.state }, 200, requestId, headers);
       }
       let csrf = cookies(request)[CSRF_COOKIE] || "";
@@ -244,7 +245,8 @@ export async function handleSelfhostIdentityApi(request: Request, dependencies: 
   } catch (error) {
     const known = error instanceof IdentityError ? error : internalIdentityError();
     const loginAlreadyAudited = path === "/api/login" && ["LOGIN_FAILED", "RATE_LIMITED"].includes(known.code);
-    if (!loginAlreadyAudited && path !== "/api/session" && path !== "/api/system/audit-logs") {
+    const sessionGateFailure = Boolean(context.token_hash) && ["AUTH_REQUIRED", "SESSION_EXPIRED", "SESSION_REVOKED"].includes(known.code);
+    if (!loginAlreadyAudited && !sessionGateFailure && path !== "/api/session" && path !== "/api/system/audit-logs") {
       const target = routeTarget(path, parsedBody, context.actor);
       await repository.recordFailure({
         actor: context.actor?.username || "",
@@ -258,7 +260,8 @@ export async function handleSelfhostIdentityApi(request: Request, dependencies: 
       }).catch(() => undefined);
     }
     console.error(JSON.stringify({ level: "error", event: "identity_request_failed", request_id: requestId, code: known.code }));
-    return identityFailureResponse(known, requestId);
+    const headers = context.token_hash && context.state !== "AUTHENTICATED" ? buildClearCookieHeaders(request) : undefined;
+    return identityFailureResponse(known, requestId, headers);
   }
 }
 

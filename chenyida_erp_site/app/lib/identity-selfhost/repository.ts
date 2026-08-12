@@ -14,6 +14,7 @@ import type {
 } from "./types.ts";
 
 const SESSION_HOURS = 8;
+const SESSION_ABSOLUTE_HOURS = 24;
 const IDEMPOTENCY_HOURS = 24;
 const WRITE_ATTEMPT_LIMIT = 60;
 const WRITE_NEW_KEY_LIMIT = 20;
@@ -64,31 +65,110 @@ export class PostgresIdentityRepository {
     return result.rows[0] || null;
   }
 
-  async authenticate(tokenHash: string | null): Promise<IdentitySessionContext> {
+  async authenticate(tokenHash: string | null, requestId: string): Promise<IdentitySessionContext> {
     if (!tokenHash) return { state: "ANONYMOUS", actor: null, token_hash: null };
-    const result = await this.pool.query<IdentityUserRow & {
-      session_expires_at: Date | string;
-      revoked_at: Date | string | null;
-      revoked_reason: string | null;
-    }>(`
-      select u.*,s.expires_at session_expires_at,s.revoked_at,s.revoked_reason
-      from app_sessions s left join app_users u on u.username=s.username
-      where s.token_hash=$1
-    `, [tokenHash]);
-    const row = result.rows[0];
-    if (!row) return { state: "ANONYMOUS", actor: null, token_hash: tokenHash };
-    if (row.revoked_at) return { state: "REVOKED", actor: null, token_hash: tokenHash, revoked_reason: row.revoked_reason };
-    if (new Date(row.session_expires_at).getTime() <= Date.now()) return { state: "EXPIRED", actor: null, token_hash: tokenHash };
-    if (!row.username || !row.is_active) {
-      await this.pool.query("update app_sessions set revoked_at=now(),revoked_reason='USER_INACTIVE' where token_hash=$1 and revoked_at is null", [tokenHash]);
-      return { state: "REVOKED", actor: null, token_hash: tokenHash, revoked_reason: "USER_INACTIVE" };
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      const lookup = await client.query<{ username: string }>("select username from app_sessions where token_hash=$1", [tokenHash]);
+      const username = lookup.rows[0]?.username;
+      if (!username) {
+        await client.query("commit");
+        return { state: "ANONYMOUS", actor: null, token_hash: tokenHash };
+      }
+
+      // Identity mutations lock the user before its sessions. Authentication uses
+      // the same order so a committed deactivation/reset cannot race past this gate.
+      const userResult = await client.query<IdentityUserRow>("select * from app_users where username=$1 for share", [username]);
+      const sessionResult = await client.query<{
+        username: string;
+        revoked_at: Date | string | null;
+        revoked_reason: string | null;
+        idle_expired: boolean;
+        absolute_expired: boolean;
+      }>(`
+        select username,revoked_at,revoked_reason,
+          expires_at<=now() idle_expired,
+          absolute_expires_at<=now() absolute_expired
+        from app_sessions
+        where token_hash=$1 and username=$2
+        for update
+      `, [tokenHash, username]);
+      const session = sessionResult.rows[0];
+      if (!session) {
+        await client.query("commit");
+        return { state: "ANONYMOUS", actor: null, token_hash: tokenHash };
+      }
+
+      if (session.revoked_at) {
+        const state = session.revoked_reason === "IDLE_TIMEOUT" || session.revoked_reason === "ABSOLUTE_TIMEOUT" ? "EXPIRED" : "REVOKED";
+        await client.query("commit");
+        return { state, actor: null, token_hash: tokenHash, revoked_reason: session.revoked_reason };
+      }
+
+      const user = userResult.rows[0];
+      if (!user || !user.is_active) {
+        const terminalized = await client.query(`
+          update app_sessions set revoked_at=now(),revoked_reason='USER_INACTIVE'
+          where token_hash=$1 and revoked_at is null
+          returning username
+        `, [tokenHash]);
+        if (terminalized.rowCount !== 1) throw new Error("identity session inactive terminalization lost");
+        await this.recordAudit(client, {
+          actor: "",
+          action: "SESSION_REVOKED",
+          targetUsername: username,
+          requestId,
+          safeDetails: { reason: "USER_INACTIVE" },
+        });
+        await client.query("commit");
+        return { state: "REVOKED", actor: null, token_hash: tokenHash, revoked_reason: "USER_INACTIVE" };
+      }
+
+      if (session.absolute_expired || session.idle_expired) {
+        const reason = session.absolute_expired ? "ABSOLUTE_TIMEOUT" : "IDLE_TIMEOUT";
+        const terminalized = await client.query(`
+          update app_sessions set revoked_at=now(),revoked_reason=$2
+          where token_hash=$1 and revoked_at is null
+          returning username
+        `, [tokenHash, reason]);
+        if (terminalized.rowCount !== 1) throw new Error("identity session timeout terminalization lost");
+        await this.recordAudit(client, {
+          actor: "",
+          action: "SESSION_EXPIRED",
+          targetUsername: username,
+          requestId,
+          safeDetails: { reason },
+        });
+        await client.query("commit");
+        return { state: "EXPIRED", actor: null, token_hash: tokenHash, revoked_reason: reason };
+      }
+
+      const renewed = await client.query(`
+        update app_sessions
+        set expires_at=least(absolute_expires_at,now()+interval '${SESSION_HOURS} hours')
+        where token_hash=$1 and revoked_at is null and expires_at>now() and absolute_expires_at>now()
+        returning token_hash
+      `, [tokenHash]);
+      if (renewed.rowCount !== 1) throw new Error("identity session renewal lost");
+      const actor = identityActor(user);
+      await client.query("commit");
+      return { state: "AUTHENTICATED", actor, token_hash: tokenHash };
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
     }
-    await this.pool.query(`update app_sessions set expires_at=now()+interval '${SESSION_HOURS} hours' where token_hash=$1 and revoked_at is null`, [tokenHash]);
-    return { state: "AUTHENTICATED", actor: identityActor(row), token_hash: tokenHash };
   }
 
   async createSession(client: PoolClient, username: string, tokenHash: string): Promise<void> {
-    await client.query(`insert into app_sessions(token_hash,username,expires_at) values($1,$2,now()+interval '${SESSION_HOURS} hours')`, [tokenHash, username]);
+    const user = await client.query("select username from app_users where username=$1 and is_active=true for share", [username]);
+    if (user.rowCount !== 1) throw new IdentityError("AUTH_REQUIRED", "请先登录", 401);
+    await client.query(`
+      insert into app_sessions(token_hash,username,expires_at,absolute_expires_at,created_at)
+      values($1,$2,now()+interval '${SESSION_HOURS} hours',now()+interval '${SESSION_ABSOLUTE_HOURS} hours',now())
+    `, [tokenHash, username]);
   }
 
   async revokeCurrentSession(client: PoolClient, tokenHash: string, reason: string): Promise<void> {

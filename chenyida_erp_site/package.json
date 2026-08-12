@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.44",
+  "version": "0.1.0-alpha.45",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -54,6 +54,9 @@
     "test:identity:ui": "node --experimental-strip-types --test tests/selfhost-identity-ui-contract.test.mjs",
     "test:identity:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-identity-postgres.test.mjs",
     "test:identity:migration-upgrade": "node --experimental-strip-types --test tests/selfhost-identity-migration-upgrade.test.mjs",
+    "test:identity:session-safety": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-identity-unit.test.mjs tests/selfhost-identity-ui-contract.test.mjs tests/selfhost-session-safety-migration.test.mjs",
+    "test:identity:session-safety:postgres": "scripts/run-session-safety-postgres-test.sh",
+    "typecheck:identity-session-safety": "tsc -p tsconfig.task44.json --pretty false",
     "test:identity:compose": "node scripts/selfhost-identity-compose-smoke.mjs",
     "test:identity-recovery-targeted:unit": "node --experimental-strip-types --test tests/selfhost-targeted-offline-identity-recovery-unit.test.mjs",
     "test:identity-browser-verifier:unit": "node --test tests/selfhost-targeted-browser-verifier.test.mjs",

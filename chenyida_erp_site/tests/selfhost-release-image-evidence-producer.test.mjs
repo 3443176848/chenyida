@@ -59,7 +59,7 @@ async function producerFixture(root, { vulnerable = false, archiveConfigDigest =
     fixture,
     input: {
       artifactRoot,
-      runId: "producer-alpha44",
+      runId: "producer-alpha45",
       candidate: fixture.candidate,
       supervisorBundleSha256: "6".repeat(64),
       authorizationSha256: "7".repeat(64),

@@ -207,6 +207,7 @@ test("migration applies the mapping model and immutable guards", async () => {
     "0041_ai_governance_suggestion_evidence.sql",
     "0042_material_import_fallback_safety.sql",
     "0043_material_import_terminal_integrity.sql",
+    "0044_identity_session_absolute_lifetime.sql",
   ]);
   const columns = await pool.query(`
     select column_name from information_schema.columns
