@@ -1,0 +1,116 @@
+{
+  "schema_version": "chenyida-erp-agent-task/v1",
+  "task": {
+    "id": "SELFHOST-RUNTIME-HEALTH-TRUTH-45",
+    "revision": 1,
+    "ledger_state": "DOING",
+    "delivery_stage": "IMPLEMENTATION",
+    "qualifiers": [
+      "REPOSITORY_AND_ISOLATED_TESTS_ONLY",
+      "NO_BUILD_OR_DEPLOY",
+      "NO_UAT_OR_PRODUCTION_ACCESS",
+      "PRODUCTION_NO_GO"
+    ],
+    "task_document": "docs/tasks/SELFHOST-RUNTIME-HEALTH-TRUTH-45.md"
+  },
+  "baseline": {
+    "base_sha": "43b6d81d21a9c5cecd567893b1ab6cf320afff05",
+    "expected_branch": "main",
+    "source_version": "0.1.0-alpha.45",
+    "source_migration": {
+      "first_number": 1,
+      "head_number": 44,
+      "head_filename": "0044_identity_session_absolute_lifetime.sql",
+      "head_sha256": "a24df94474403c4f235933d4450626ce65b40416264393db400cef08e7fcaa7e"
+    },
+    "uat": {
+      "version": "0.1.0-alpha.42",
+      "migration_head": "0040",
+      "verification_scope": "DOCUMENT_DECLARATION_ONLY_NO_CONNECTION"
+    }
+  },
+  "scope": {
+    "allowed_changed_paths": [
+      "chenyida_erp_site/app/lib/runtime-readiness/identity.ts",
+      "chenyida_erp_site/app/lib/runtime-readiness/migration.ts",
+      "chenyida_erp_site/app/lib/runtime-readiness/service.ts",
+      "chenyida_erp_site/app/lib/runtime-readiness/storage.ts",
+      "chenyida_erp_site/app/lib/runtime-readiness/worker-lease.ts",
+      "chenyida_erp_site/app/lib/infrastructure/config.ts",
+      "chenyida_erp_site/app/lib/selfhost-api.ts",
+      "chenyida_erp_site/worker/selfhost.ts",
+      "chenyida_erp_site/Dockerfile",
+      "chenyida_erp_site/db/schema.ts",
+      "chenyida_erp_site/drizzle-postgres/0045_runtime_worker_readiness.sql",
+      "chenyida_erp_site/drizzle-postgres/meta/0045_snapshot.json",
+      "chenyida_erp_site/drizzle-postgres/meta/_journal.json",
+      "chenyida_erp_site/compose.yml",
+      "chenyida_erp_site/package.json",
+      "chenyida_erp_site/package-lock.json",
+      "chenyida_erp_site/release/release-gate-plan-v1.json",
+      "chenyida_erp_site/release/release-supervisor-bundle-v1.json",
+      "chenyida_erp_site/release/release-test-inventory-v1.json",
+      "chenyida_erp_site/release/test-runtime-policy-v1.json",
+      "chenyida_erp_site/scripts/release-manifest-contract.mjs",
+      "chenyida_erp_site/scripts/release-postgres-regression-runner.mjs",
+      "chenyida_erp_site/scripts/release-test-inventory.mjs",
+      "chenyida_erp_site/scripts/run-runtime-readiness-postgres-test.sh",
+      "chenyida_erp_site/scripts/runtime-readiness-postgres-test.sh",
+      "chenyida_erp_site/scripts/worker-readiness-check.ts",
+      "chenyida_erp_site/scripts/write-release-identity.sh",
+      "chenyida_erp_site/tsconfig.task45.json",
+      "chenyida_erp_site/tests/selfhost-health-contract.test.mjs",
+      "chenyida_erp_site/tests/selfhost-runtime-readiness-migration.test.mjs",
+      "chenyida_erp_site/tests/selfhost-runtime-readiness-postgres.test.mjs",
+      "chenyida_erp_site/tests/selfhost-runtime-readiness-unit.test.mjs",
+      "chenyida_erp_site/tests/selfhost-worker-resilience.test.mjs",
+      "chenyida_erp_site/tests/selfhost-release-identity-contract.test.mjs",
+      "chenyida_erp_site/tests/selfhost-dockerfile-version-contract.test.mjs",
+      "docs/agent-control/task-packets/SELFHOST-RUNTIME-HEALTH-TRUTH-45.json",
+      "docs/project/CHANGELOG.md",
+      "docs/project/DECISIONS.md",
+      "docs/project/MASTER.md",
+      "docs/project/PRODUCTION_READINESS.md",
+      "docs/project/PROJECT_CONTEXT.md",
+      "docs/project/ROADMAP.md",
+      "docs/project/STATUS.md",
+      "docs/project/TASKS.md",
+      "docs/self-hosting/deployment.md",
+      "docs/self-hosting/operations-runbook.md",
+      "docs/self-hosting/parallel-http-acceptance.md",
+      "docs/self-hosting/postgresql-migration.md",
+      "docs/tasks/SELFHOST-RUNTIME-HEALTH-TRUTH-45.md",
+      "docs/testing/selfhost-release-gate.md"
+    ],
+    "known_untracked_paths": [
+      "docs/ERP_CURRENT_STATUS_REPORT.md"
+    ],
+    "required_documents": [
+      "AGENTS.md",
+      "docs/project/MASTER.md",
+      "docs/project/TASKS.md",
+      "docs/project/PROJECT_CONTEXT.md",
+      "docs/tasks/SELFHOST-RUNTIME-HEALTH-TRUTH-45.md",
+      "docs/project/DECISIONS.md",
+      "docs/project/PRODUCTION_READINESS.md"
+    ],
+    "require_single_worktree": true
+  },
+  "inspection": {
+    "package_json": "chenyida_erp_site/package.json",
+    "migration_directory": "chenyida_erp_site/drizzle-postgres",
+    "migration_journal": "chenyida_erp_site/drizzle-postgres/meta/_journal.json",
+    "migration_snapshot_directory": "chenyida_erp_site/drizzle-postgres/meta",
+    "required_decision": "D-119",
+    "uat_document_markers": [
+      {
+        "path": "docs/project/MASTER.md",
+        "contains": ["0.1.0-alpha.42", "0040"]
+      },
+      {
+        "path": "docs/project/PROJECT_CONTEXT.md",
+        "contains": ["0.1.0-alpha.42", "0040"]
+      }
+    ]
+  }
+}

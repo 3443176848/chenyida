@@ -17,6 +17,8 @@
 
 2026-08-12 第三次增量：`SELFHOST-MATERIAL-IMPORT-SAFETY-43`已完成仓库实现与隔离验证。D-117要求的建批/上传持久幂等、批次owner/状态/CAS、私有staging、服务端实际文件检查、同根无覆盖原子提升、跨数据库/文件系统故障协调、job所有权和worker终态事务已在源码`5767c92…`与manifest-only直接子提交`dad7468`落地；0042发布后保持不可变，0043以append-only方式修正终态约束。运行UAT未部署该实现，因此PR-004只在仓库层关闭，整体判定仍为`PRODUCTION NO-GO`。
 
+2026-08-12 第五次增量：`SELFHOST-RUNTIME-HEALTH-TRUTH-45`已作为唯一`DOING`启动。D-119要求以完整Migration manifest、数据库时钟Worker排他租约/CAS、Web/Worker双侧uploads/attachments可写探针、live/readiness分离和Worker Docker healthcheck关闭当前固定成功误报；只允许仓库、合成目录和隔离PostgreSQL，运行UAT仍保持alpha.42/0040。实现、测试和提交尚未完成，整体判定仍为`PRODUCTION NO-GO`。
+
 2026-08-12 第四次增量：`SELFHOST-IDENTITY-SESSION-SAFETY-44`已完成仓库实现与隔离验证。D-118要求的8小时idle、创建时不可延长的24小时absolute、PostgreSQL时钟和用户→会话锁序、首次超时单次终态/去敏审计以及失效Cookie对称清理已在源码`e7b0298…`与manifest-only直接子提交`c730fef`落地；append-only 0044及官方Migration harness通过。运行UAT仍是旧会话实现，因此只关闭仓库风险，整体判定继续`PRODUCTION NO-GO`。
 
 ## 2. 证据范围与未执行事项
@@ -159,7 +161,7 @@
 1. `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成 G1 合成/隔离证据；真实 G2 被异机目标、RPO/RTO和专项授权阻塞。
 2. G3仓库工具已由TASK42完成；候选build、Browser、完整typecheck、镜像SBOM/漏洞PASS和UAT对齐仍保持失败关闭并需后续适用授权/资源。
 3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
-4. TASK44已完成会话绝对时限仓库修复；下一步修复health/Worker/storage真实性，再处理经业务批准的权限矩阵。
+4. TASK44已完成会话绝对时限仓库修复；TASK45正在修复health/Worker/storage/Migration真实性，之后再处理经业务批准的权限矩阵。
 5. 更新并演练监控、升级、回滚和故障手册。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。

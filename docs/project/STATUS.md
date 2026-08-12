@@ -2,6 +2,19 @@
 
 最后更新时间：2026-08-12（Asia/Shanghai）
 
+## SELFHOST-RUNTIME-HEALTH-TRUTH-45（执行中；仓库与隔离测试）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / IMPLEMENTATION IN PROGRESS / PRODUCTION NO-GO | 唯一active task；尚未完成实现或验收，系统不能交给真实员工 |
+| 严格起点 | PASS / CONTROLLED | `main@43b6d81d21a9c5cecd567893b1ab6cf320afff05`、tree`c034ac2…`、alpha.45/0044；UAT仍按文档为alpha.42/0040且未连接 |
+| 已确认缺口 | OPEN / REPRODUCIBLE IN SOURCE | health仅`select 1`后固定返回storage/worker正常；Worker无进程租约和Docker healthcheck；双文件卷无可写探针；完整Migration与Web/Worker身份未比对 |
+| D-119目标 | ACCEPTED IMPLEMENTATION BASELINE | 完整Migration manifest、DB时钟Worker排他租约/CAS、Web/Worker双侧写入+fsync+清理探针、live/readiness分离、append-only 0045 |
+| 当前范围 | CONTROLLED | 只改仓库源码、0045、合成文件目录、隔离PostgreSQL测试和文档；备份/RPO、岗位权限和运行面另行治理 |
+| 运行面影响 | NONE | 不连接或修改UAT/生产，不build/deploy/restart，不读取当前四卷正文或业务数据 |
+| 起点资源 | PASS | available约2.0GiB、Swap442MiB/1GiB、根盘31GiB、Load`0.14/0.22/0.30`；Web/PostgreSQL healthy、Worker/Caddy running、restart0/OOM false |
+| 外部资源 | NOT REQUIRED FOR CURRENT IMPLEMENTATION | build、UAT/生产Migration/deploy、监控凭据、账号权限和员工试用仍须专项明确授权 |
+
 ## SELFHOST-IDENTITY-SESSION-SAFETY-44（完成；仓库与隔离验证，运行面未部署）
 
 | 验证项 | 结果 | 说明 |

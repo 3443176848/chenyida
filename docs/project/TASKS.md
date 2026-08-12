@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-TASK44已收口，当前为零`DOING`/`IDLE`的提交边界；主智能体将按持续交付授权在下一独立治理提交中启动health/Worker/storage真实性任务。自托管源码已推进到alpha.45/0044，非生产UAT仍为alpha.42/0040，系统继续`PRODUCTION NO-GO`。G2仍因异机目标、RPO/RTO、加密/保留责任和真实数据专项授权阻塞；岗位权限矩阵等待业务负责人确认，`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
+当前唯一`DOING`为`SELFHOST-RUNTIME-HEALTH-TRUTH-45`。任务从`main@43b6d81d21a9c5cecd567893b1ab6cf320afff05`、alpha.45/0044严格起步，只在仓库、合成文件目录和隔离PostgreSQL中实现完整Migration manifest、Worker运行租约、Web/Worker双侧文件卷探针及失败关闭health；不连接UAT/生产，不读取当前四卷正文，不build/deploy。非生产UAT仍为alpha.42/0040，系统继续`PRODUCTION NO-GO`。G2仍因异机目标、RPO/RTO、加密/保留责任和真实数据专项授权阻塞；岗位权限矩阵等待业务负责人确认，`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -33,6 +33,8 @@ TASK44已收口，当前为零`DOING`/`IDLE`的提交边界；主智能体将按
 
 2026-08-12第十次调度事件：`SELFHOST-IDENTITY-SESSION-SAFETY-44 DOING → DONE`。源码`e7b0298f90ba85a5018709be1360a40dacbbaa59`/tree`43aa32601c8cd5a953de41e48c19f6e9860ed87c`与manifest-only直接子提交`c730fefe0857d2e4546f28364ca53d5e6506d099`形成可追溯链，bundle SHA-256为`ad1a66d3e1c30a4ac18fbdeff1e7d23d70488187826ecbc3ae9ebdf2cc961c86`。alpha.45/0044、8h idle+24h absolute、数据库时钟原子认证、单次超时终态/审计和失效Cookie清理通过定向、21项隔离PostgreSQL、官方Migration harness及release合同验证；没有build、UAT Migration/deploy或运行面访问，系统继续`PRODUCTION NO-GO`。
 
+2026-08-12第十一次调度事件：主智能体从TASK44收口后的零`DOING`自动选择G4剩余最高优先级仓库任务，状态按`SELFHOST-RUNTIME-HEALTH-TRUTH-45 TODO → DOING`切换唯一active slot。D-119固定完整Migration manifest、数据库时钟Worker排他租约、Web/Worker双侧uploads/attachments可写探针、`/api/live`与readiness分离及Worker Docker healthcheck；范围只含源码、append-only 0045、合成目录和隔离PostgreSQL，不连接UAT/生产、读取当前卷正文或执行build/deploy。数据、应用、运维三个子智能体只读审计，主智能体保持唯一写者。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -49,7 +51,7 @@ TASK44已收口，当前为零`DOING`/`IDLE`的提交边界；主智能体将按
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| - | 当前无执行中任务；下一独立提交将启动health/Worker/storage真实性任务 | IDLE | Codex主智能体 | - | - | TASK44已收口 | 零`DOING`提交边界；不表示投产就绪。 |
+| SELFHOST-RUNTIME-HEALTH-TRUTH-45 | 运行健康、Worker租约与文件卷真实性加固 | DOING | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来build/UAT/生产Migration/deploy/监控凭据专项授权） | 2026-08-12 | - | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-IDENTITY-SESSION-SAFETY-44、D-119 | `DOING / REPOSITORY AND ISOLATED TESTS ONLY / PRODUCTION NO-GO`。实现完整Migration manifest、Worker运行租约、Web/Worker双侧文件卷探针、失败关闭health及Worker healthcheck；不访问运行面。见[任务文档](../tasks/SELFHOST-RUNTIME-HEALTH-TRUTH-45.md)及[D-119](DECISIONS.md#d-119-运行健康采用完整-migration-manifestworker-数据库租约与双侧文件卷探针)。 |
 
 ## 已完成任务
 

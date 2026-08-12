@@ -1800,6 +1800,45 @@
 - 拒绝每次过期请求重复写审计、把未知token细分给客户端，或只在`/api/session`清Cookie而让普通受保护API继续携带失效凭据。
 - 拒绝回写已发布Migration或把岗位权限、health和会话安全混成同一任务。
 
+## D-119 运行健康采用完整 Migration Manifest、Worker 数据库租约与双侧文件卷探针
+
+- 日期：2026-08-12
+- 状态：`ACCEPTED AS IMPLEMENTATION BASELINE / IMPLEMENTATION IN PROGRESS / RUNTIME NOT AUTHORIZED`
+- 提案与实施：Codex 持续交付负责人及数据迁移、应用测试、运维安全只读智能体，依据项目负责人持续推进G4和仓库内安全实施授权
+- 确认边界：只授权源码、append-only Migration、合成文件目录和隔离PostgreSQL测试；build、UAT/生产Migration、部署、当前卷读取、监控凭据、账号权限和员工试用仍须专项明确授权
+
+### Context
+
+- 当前`/api/health`读取package version后只执行`select 1`，随后固定声明`storage=local`和`worker=postgresql-jobs`；Worker停止、数据库Migration漂移或本地卷不可写时仍可能HTTP 200。
+- `background_jobs.heartbeat_at`只证明某一运行任务的租约，不证明空闲Worker进程存活；Compose Worker没有healthcheck，`running`不能代表能够安全消费任务。
+- Web和Worker都挂载uploads/attachments，但没有启动/运行探针；权限、只读挂载、路径替换、容量或fsync故障只能在真实业务写入后暴露。
+- TASK41已经为备份、RPO、异机回执和隔离恢复建立独立带权限治理。备份过期必须阻止投产并告警，但不应通过公开HTTP readiness主动下线仍可服务的应用；本任务不复制或弱化该边界。
+
+### Decision
+
+1. 新增append-only 0045运行租约表，以固定service key、instance UUID、application version、Git commit、Migration head/manifest digest、started/heartbeat/lease/stopped时间、状态和CAS version保存Worker运行事实；有效租约不得被第二实例覆盖，只有过期或已停止租约可由数据库时钟受控接管。
+2. Worker启动前验证package与baked version/Git、数据库完整有序Migration manifest以及自身uploads/attachments挂载可写；运行期间单飞续租。每次启动原子生成容器内`0600` instance UUID文件，Docker healthcheck只认可该进程精确租约；续租CAS失败、租约已过期、身份漂移或文件卷持续不可用时不得继续伪报健康。
+3. Web readiness从`ONLY public.schema_migrations`完整有序行生成规范manifest并与镜像内root-owned不可变allowlist精确比对，拒绝缺失、额外、重排、重复或checksum漂移；Worker租约必须新鲜且版本/Git/Migration身份与Web一致。统一digest算法为release合同的`sha256(canonicalJson([{ordinal,filename,sha256},...]))`，不得与备份合同的文本digest同名混用。
+4. 文件卷探针必须在配置根内创建随机私有临时目录和文件，执行有界写、文件fsync、unlink/rmdir及目录fsync；成功和失败都只清理本次明确创建的路径，不扫描、覆盖或删除业务文件，不把路径或原始错误返回客户端。匿名Web health采用模块级single-flight和短TTL缓存，缓存不得越过租约有效期，防止公开请求写放大。
+5. `/api/live`在初始化数据库Pool前分流，只证明Web进程和版本元数据可读取；`/api/health`作为readiness保留既有兼容字段并新增有界revision、Migration head和component结果。任何数据库、Migration、Worker、Web文件卷或生产runtime identity失败返回503、稳定中文代码、request ID和`no-store`；客户端与日志都不返回SQL、连接串、路径、instance ID、堆栈或原始异常。
+6. Compose Web继续使用readiness healthcheck；Worker新增独立脚本查询同一运行租约并形成Docker health。runtime release identity publisher必须看到Web和Worker都`healthy`，不再把Worker `running/health=none`当作可发布事实。
+7. 0045发布后不可修改；Schema、snapshot、journal、运行查询、release allowlist和空库/0044升级/重放/失败回滚测试必须一致，0001—0044保持不可变。
+8. 备份/RPO/隔离恢复继续由TASK41 Dashboard/recovery governance和外部运维告警负责；公开readiness不返回备份ID、位置或回执，也不因备份过期直接让Web退出服务，但正式投产/切换门必须继续要求`recovery_ready=true`。
+
+### Consequences
+
+- TASK45计划把源码推进到alpha.46/head 0045，并增加health、Worker、文件卷、Migration、Compose和release publisher合同测试；在实现、隔离验证和独立提交完成前，本决定不构成风险关闭。
+- 每个Web health周期和Worker heartbeat都会产生极小、可清理的文件元数据I/O与数据库写；探针频率必须有界，低资源测试需串行并验证无残留、无Swap/OOM/restart异常。
+- 新Worker在有效旧租约存在时失败关闭；部署编排必须等待旧实例停止或租约自然过期，不得人工篡改运行租约来绕过排他。
+- 本决定不授权读取当前持久卷正文、真实数据、build、UAT/生产Migration/deploy、账号权限、监控外发、员工试用、正式切换或清理任何持久对象。
+
+### Rejected alternatives
+
+- 拒绝继续使用`select 1`、Docker `running`、业务Job heartbeat或固定字符串冒充完整readiness。
+- 拒绝只检查Unix mode、目录存在或可读而不实际写入/fsync/清理，也拒绝用固定探针文件覆盖或扫描业务目录。
+- 拒绝只比较Migration count/head而忽略每个checksum，或只相信环境变量而不比对package、数据库和Worker写入身份。
+- 拒绝把liveness、readiness、备份恢复和岗位权限合并为一个公开端点，或用备份过期把仍可服务的Web主动下线。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

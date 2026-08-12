@@ -4,6 +4,14 @@
 
 ## 2026-08-12
 
+### SELFHOST-RUNTIME-HEALTH-TRUTH-45 - `docs: start runtime health truth hardening`（执行中）
+
+- 调度/边界：TASK44收口后的零DOING按持续交付路线切换为TASK45唯一active task。严格起点为`main@43b6d81d21a9c5cecd567893b1ab6cf320afff05`、tree`c034ac2…`、alpha.45/0044；UAT只引用既有文档事实alpha.42/0040，本任务不连接复核。
+- 缺口：当前health只执行`select 1`后固定声明storage/worker正常；Worker没有空闲进程心跳或Docker healthcheck，Web/Worker没有文件卷可写探针，数据库完整Migration与Web/Worker运行身份也未比对。
+- 决策：D-119采用append-only 0045单服务Worker排他租约、数据库时钟与CAS、完整Migration manifest、Web/Worker双侧uploads/attachments写入+fsync+清理探针，并把`/api/live`与失败关闭readiness分离。备份/RPO继续由TASK41 recovery governance负责，不复制进公开health。
+- 计划：覆盖空库/0044升级/重放/回滚、活租约拒绝/过期接管、Worker空闲心跳/丢租、Migration缺失/额外/checksum漂移、文件权限/只读/替换/清理失败、HTTP503稳定错误与无泄漏、Compose和release publisher Worker healthy合同。
+- 安全/资源：只允许仓库源码、合成目录和隔离PostgreSQL；不build/deploy，不访问UAT/生产、当前四卷正文、账号或业务数据。起点available约2.0GiB、Swap442MiB/1GiB、根盘31GiB、Load`0.14/0.22/0.30`；四服务restart0/OOM false。
+
 ### SELFHOST-IDENTITY-SESSION-SAFETY-44 - `fix: enforce absolute session lifetime` / `build: bind session safety supervisor bundle` / `docs: close session lifetime hardening`
 
 - 调度/边界：TASK43收口后的零DOING按持续交付路线切换为TASK44唯一active task，再按`DOING→DONE`释放active slot。严格起点为`main@0caa565f3954bade15526bbef1e3c3b742b44a17`、alpha.44/0043；UAT只引用既有文档事实alpha.42/0040，本任务未连接复核。
