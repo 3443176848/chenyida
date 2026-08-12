@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createD1MaterialValidationRepository,
   MemoryMaterialValidationRepository,
   createMaterialValidationService,
 } from "../app/lib/material-validation/index.ts";
@@ -342,6 +343,26 @@ test("repository failures become sanitized metadata errors", async () => {
   const result = await service.validateForCreate(input(101, fr4Attributes()));
   assert.deepEqual(codes(result), ["MATERIAL_VALIDATION_METADATA_UNAVAILABLE"]);
   assert.doesNotMatch(JSON.stringify(result), /SELECT|secret_table/);
+});
+
+test("D1 validation repository accepts an empty optional result set", async () => {
+  const database = {
+    prepare() {
+      return {
+        bind() { return this; },
+        async first() { return { id: 501, category_code: "EMPTY_D1", category_level: 4, status: "ACTIVE" }; },
+        async all() { return { success: true }; },
+      };
+    },
+  };
+  const repository = createD1MaterialValidationRepository(database);
+  assert.deepEqual(await repository.getCategoryRules(501), {
+    id: 501,
+    code: "EMPTY_D1",
+    level: 4,
+    status: "ACTIVE",
+    attributes: [],
+  });
 });
 
 test("memory repository metadata replacement is visible on the next validation", async () => {

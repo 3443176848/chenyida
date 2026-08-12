@@ -155,7 +155,7 @@ case "$ACTION" in
     exit 0
     ;;
   typecheck)
-    set -- /bin/sh -c 'set -eu; found=0; for config in tsconfig*.json; do found=1; ./node_modules/.bin/tsc -p "$config" --pretty false; done; [ "$found" -eq 1 ]' release-typecheck
+    set -- node /supervisor/scripts/release-test-inventory.mjs typecheck
     ;;
   lint)
     set -- ./node_modules/.bin/eslint .

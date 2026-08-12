@@ -17,6 +17,7 @@ type View = "detail" | "versions" | "change-logs" | "audit-logs";
 type VersionItem = { version: number; event_type: string; change_reason?: string; changed_fields?: string[]; snapshot?: Record<string, unknown>; changed_by?: string; reviewed_by?: string; created_at?: string; operation_id?: string };
 type ChangeItem = { change_type: string; field_name?: string; change_reason?: string; old_value?: unknown; new_value?: unknown; changed_by?: string; created_at?: string; operation_id?: string };
 type AuditItem = { id: number; username?: string; action?: string; result?: string; route_code?: string; request_id?: string; operation_id?: string; old_version?: number | null; new_version?: number | null; error_code?: string | null; created_at?: string };
+type HistoryItem = VersionItem | ChangeItem | AuditItem;
 type HistoryResponse<T> = { data: T[]; pagination: PaginationValue; request_id?: string };
 type UiError = { status?: number; code?: string; requestId?: string };
 
@@ -25,6 +26,9 @@ function routeFor(view: View, id: number): string { return view === "detail" ? `
 function viewTitle(view: View): string { return view === "detail" ? "物料详情" : view === "versions" ? "版本历史" : view === "change-logs" ? "变更日志" : "审计历史"; }
 function actor(value: unknown): string { return displayValue(value); }
 function valueVersion(value: unknown): string { return Number.isInteger(value) && Number(value) > 0 ? `V${value}` : "—"; }
+function isVersionItem(item: HistoryItem): item is VersionItem { return "version" in item && "event_type" in item; }
+function isChangeItem(item: HistoryItem): item is ChangeItem { return "change_type" in item; }
+function isAuditItem(item: HistoryItem): item is AuditItem { return "id" in item; }
 function summaryText(item: ChangeItem): string {
   const field = item.field_name ? `${item.field_name}：` : "";
   if (item.old_value !== undefined || item.new_value !== undefined) return `${field}${displayValue(item.old_value)} → ${displayValue(item.new_value)}`;
@@ -36,7 +40,7 @@ export function MaterialDetailWorkspace({ materialId, view }: { materialId: numb
   const [detail, setDetail] = useState<MaterialDetail | null>(null);
   const [detailError, setDetailError] = useState<UiError | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(true);
-  const [history, setHistory] = useState<HistoryResponse<VersionItem | ChangeItem> | null>(null);
+  const [history, setHistory] = useState<HistoryResponse<HistoryItem> | null>(null);
   const [historyError, setHistoryError] = useState<UiError | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(view !== "detail");
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -88,7 +92,7 @@ export function MaterialDetailWorkspace({ materialId, view }: { materialId: numb
     if (view === "detail") return;
     setLoadingHistory(true); setHistoryError(null);
     try {
-      const response = await api(`/api/material-master/materials/${materialId}/${view}?page=${historyQuery.page}&page_size=${historyQuery.page_size}`, { signal }) as HistoryResponse<VersionItem | ChangeItem>;
+      const response = await api<HistoryResponse<HistoryItem>>(`/api/material-master/materials/${materialId}/${view}?page=${historyQuery.page}&page_size=${historyQuery.page_size}`, { signal });
       setHistory(response);
       if (response.pagination.total_pages > 0 && historyQuery.page > response.pagination.total_pages) {
         const next = { ...historyQuery, page: response.pagination.total_pages };
@@ -120,6 +124,9 @@ export function MaterialDetailWorkspace({ materialId, view }: { materialId: numb
   const logsTotal = detail?.history_summary.change_logs.total ?? 0;
   const auditsTotal = detail?.history_summary.audit_logs?.total ?? 0;
   const canReadAudit = Boolean(session.user?.permissions?.includes("*") || session.user?.permissions?.includes("material.audit.read"));
+  const versionItems = (history?.data ?? []).filter(isVersionItem);
+  const changeItems = (history?.data ?? []).filter(isChangeItem);
+  const auditItems = (history?.data ?? []).filter(isAuditItem);
 
   if (loadingDetail && !detail) return <section className="mm-detail-loading" role="status"><div className="mm-skeleton-title" /><div className="mm-card-skeletons">正在加载物料详情…</div></section>;
   if (detailError || !detail) return <MaterialErrorState error={detailError} onRetry={detailError?.status === 404 ? undefined : () => loadDetail()} />;
@@ -140,9 +147,9 @@ export function MaterialDetailWorkspace({ materialId, view }: { materialId: numb
 
       {view === "detail" ? <MaterialDetailSections detail={detail} materialId={materialId} returnParam={returnParam} /> : null}
       {view !== "detail" && historyError ? <MaterialErrorState error={historyError} onRetry={() => loadHistory()} /> : null}
-      {view === "versions" && !historyError ? <VersionHistory data={(history?.data || []) as VersionItem[]} loading={loadingHistory} expanded={expanded} onExpand={setExpanded} /> : null}
-      {view === "change-logs" && !historyError ? <ChangeHistory data={(history?.data || []) as ChangeItem[]} loading={loadingHistory} expanded={expanded} onExpand={setExpanded} copied={copied} onCopy={(id) => { navigator.clipboard?.writeText(id); setCopied(id); }} /> : null}
-      {view === "audit-logs" && !historyError ? <AuditHistory data={(history?.data || []) as AuditItem[]} loading={loadingHistory} copied={copied} onCopy={(id) => { navigator.clipboard?.writeText(id); setCopied(id); }} /> : null}
+      {view === "versions" && !historyError ? <VersionHistory data={versionItems} loading={loadingHistory} expanded={expanded} onExpand={setExpanded} /> : null}
+      {view === "change-logs" && !historyError ? <ChangeHistory data={changeItems} loading={loadingHistory} expanded={expanded} onExpand={setExpanded} copied={copied} onCopy={(id) => { navigator.clipboard?.writeText(id); setCopied(id); }} /> : null}
+      {view === "audit-logs" && !historyError ? <AuditHistory data={auditItems} loading={loadingHistory} copied={copied} onCopy={(id) => { navigator.clipboard?.writeText(id); setCopied(id); }} /> : null}
       {view !== "detail" && history && !historyError ? <MaterialPagination value={history.pagination} pageSizes={[20, 50]} disabled={loadingHistory} onChange={navigateHistory} /> : null}
     </section>
   );

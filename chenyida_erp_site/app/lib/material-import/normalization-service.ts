@@ -355,9 +355,9 @@ export async function listMaterialImportNormalizationIssues(
   if (context.targetCode) { clauses.push("target_code=?"); params.push(context.targetCode); }
   if (context.sourceRowNumber !== undefined) { clauses.push("source_row_number=?"); params.push(context.sourceRowNumber); }
   params.push(context.limit + 1);
-  const rows = (await database.prepare(`SELECT id,normalized_row_id,issue_level,issue_code,target_code,source_sheet_index,source_row_number,source_column_index,safe_message,safe_details_json,created_at FROM material_import_normalization_issues WHERE ${clauses.join(" AND ")} ORDER BY id LIMIT ?`).bind(...params).all<Record<string, unknown> & { safe_details_json: string }>()).results ?? [];
+  const rows = (await database.prepare(`SELECT id,normalized_row_id,issue_level,issue_code,target_code,source_sheet_index,source_row_number,source_column_index,safe_message,safe_details_json,created_at FROM material_import_normalization_issues WHERE ${clauses.join(" AND ")} ORDER BY id LIMIT ?`).bind(...params).all<Record<string, unknown> & { id: number; safe_details_json: string }>()).results ?? [];
   const page = rows.slice(0, context.limit).map(({ safe_details_json: details, ...row }) => ({ ...row, safe_details: JSON.parse(details) }));
-  const last = page.at(-1);
+  const last = rows.slice(0, context.limit).at(-1);
   return { status: 200, payload: { batch_id: batch.id, normalization_run_id: run.id, items: page, next_cursor: rows.length > context.limit && last ? await encodeCursor(run.id, Number(last.id), filter) : null } };
 }
 

@@ -14,6 +14,46 @@ export const RELEASE_TEST_INVENTORY_TOTAL = 235;
 export const RELEASE_TEST_INVENTORY_REQUIRED = 211;
 export const RELEASE_TEST_INVENTORY_NOT_APPLICABLE = 24;
 export const RELEASE_TEST_MAX_BYTES = 1024 * 1024;
+export const RELEASE_TYPESCRIPT_CONFIGS = Object.freeze([
+  "tsconfig.ai-governance-evaluation.json",
+  "tsconfig.ai-governance-suggestion-layer.json",
+  "tsconfig.ai-governance-suggestion.json",
+  "tsconfig.json",
+  "tsconfig.material-standardization.json",
+  "tsconfig.phase4-task01.json",
+  "tsconfig.phase4-task02.json",
+  "tsconfig.phase4-task03.json",
+  "tsconfig.phase4-task04.json",
+  "tsconfig.phase4-task05.json",
+  "tsconfig.phase4-task06.json",
+  "tsconfig.phase4-task07.json",
+  "tsconfig.phase4-task08.json",
+  "tsconfig.phase4-task09.json",
+  "tsconfig.phase4-task10.json",
+  "tsconfig.phase5-task01.json",
+  "tsconfig.phase5-task02.json",
+  "tsconfig.phase5-task03.json",
+  "tsconfig.phase5-task04.json",
+  "tsconfig.phase5-task05.json",
+  "tsconfig.phase5-task06.json",
+  "tsconfig.phase5-task07.json",
+  "tsconfig.phase5-task08.json",
+  "tsconfig.phase5-task09.json",
+  "tsconfig.phase5-task10.json",
+  "tsconfig.phase6-task01.json",
+  "tsconfig.release-gate.json",
+  "tsconfig.task03.json",
+  "tsconfig.task04.json",
+  "tsconfig.task05.json",
+  "tsconfig.task06.json",
+  "tsconfig.task07.json",
+  "tsconfig.task08.json",
+  "tsconfig.task09.json",
+  "tsconfig.task10.json",
+  "tsconfig.task43.json",
+  "tsconfig.task44.json",
+  "tsconfig.task45.json",
+]);
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const TEST_PATH = /^tests\/[A-Za-z0-9][A-Za-z0-9._-]*\.test\.mjs$/;
@@ -213,6 +253,48 @@ export async function loadOfficialReleaseTestInventory({ root = process.cwd(), s
   return verifyReleaseTestInventory({ root, inventory });
 }
 
+export async function verifyReleaseTypeScriptConfigSet({ root = process.cwd() } = {}) {
+  const candidateRoot = path.resolve(root);
+  if (await realpath(candidateRoot) !== candidateRoot) reject("RELEASE_TYPESCRIPT_ROOT_INVALID");
+  const entries = await readdir(candidateRoot, { withFileTypes: true });
+  const matching = entries.filter((entry) => entry.name.startsWith("tsconfig") && entry.name.endsWith(".json"));
+  if (matching.some((entry) => !entry.isFile())) reject("RELEASE_TYPESCRIPT_CONFIG_METADATA_INVALID");
+  const actual = matching.map((entry) => entry.name).sort();
+  if (actual.length !== RELEASE_TYPESCRIPT_CONFIGS.length || actual.some((item, index) => item !== RELEASE_TYPESCRIPT_CONFIGS[index])) {
+    reject("RELEASE_TYPESCRIPT_CONFIG_SET_MISMATCH");
+  }
+  const configs = [];
+  for (const config of actual) {
+    const raw = await readBoundedRegularFile(path.join(candidateRoot, config));
+    configs.push({ path: config, sha256: sha256(raw) });
+  }
+  return configs;
+}
+
+export async function runReleaseTypecheck({ root = process.cwd() } = {}) {
+  const candidateRoot = path.resolve(root);
+  const before = await verifyReleaseTypeScriptConfigSet({ root: candidateRoot });
+  const compiler = path.join(candidateRoot, "node_modules", ".bin", "tsc");
+  for (let index = 0; index < before.length; index += 1) {
+    const config = before[index];
+    process.stdout.write(`TYPECHECK START ${index + 1}/${before.length} ${config.path}\n`);
+    const result = spawnSync(compiler, ["-p", config.path, "--pretty", "false", "--incremental", "false"], {
+      cwd: candidateRoot,
+      env: process.env,
+      stdio: "inherit",
+      timeout: 15 * 60 * 1000,
+    });
+    if (result.error || result.signal || result.status !== 0) reject(result.error?.code === "ETIMEDOUT" ? "RELEASE_TYPESCRIPT_CONFIG_TIMEOUT" : "RELEASE_TYPESCRIPT_CONFIG_FAILED");
+    const after = await readBoundedRegularFile(path.join(candidateRoot, config.path));
+    if (sha256(after) !== config.sha256) reject("RELEASE_TYPESCRIPT_CONFIG_CHANGED");
+    process.stdout.write(`TYPECHECK PASS ${index + 1}/${before.length} ${config.path} sha256=${config.sha256}\n`);
+  }
+  const after = await verifyReleaseTypeScriptConfigSet({ root: candidateRoot });
+  if (after.some((config, index) => config.sha256 !== before[index].sha256)) reject("RELEASE_TYPESCRIPT_CONFIG_CHANGED");
+  process.stdout.write(`TYPECHECK SET PASS configs=${before.length}\n`);
+  return { configs: before.length };
+}
+
 function parseTapSummary(stdout) {
   const values = new Map();
   for (const match of stdout.matchAll(/^# (tests|pass|fail|cancelled|skipped|todo) (\d+)\s*$/gm)) {
@@ -271,7 +353,11 @@ async function main(args) {
     await runReleaseTestHarness({ harness: args[1] });
     return;
   }
-  process.stderr.write("usage: release-test-inventory.mjs verify|run NODE_SOURCE|run NODE_RELEASE_CONTRACT|run SPECIAL_POSIX\n");
+  if (command === "typecheck" && args.length === 1) {
+    await runReleaseTypecheck();
+    return;
+  }
+  process.stderr.write("usage: release-test-inventory.mjs verify|typecheck|run NODE_SOURCE|run NODE_RELEASE_CONTRACT|run SPECIAL_POSIX\n");
   process.exitCode = 2;
 }
 

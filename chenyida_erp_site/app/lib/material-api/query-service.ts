@@ -590,7 +590,7 @@ class D1MaterialMasterQueryService implements MaterialMasterQueryService {
     const base = await this.loadBaseDetail(materialId);
     if (!base) return null;
     const material = base.material_record as MaterialRecord;
-    const hasImportTrace = material.sourceType === "MATERIAL_IMPORT";
+    const hasImportTrace = material.fields.sourceType === "MATERIAL_IMPORT";
     const publicBase = Object.fromEntries(Object.entries(base).filter(([key]) => key !== "material_record"));
     publicBase.attributes = (base.attributes as Row[]).map((attribute) => Object.fromEntries(
       Object.entries(attribute).filter(([key]) => key !== "source_ref"),
@@ -618,7 +618,7 @@ class D1MaterialMasterQueryService implements MaterialMasterQueryService {
     const base = await this.loadBaseDetail(materialId, true);
     if (!base) return null;
     const material = base.material_record as MaterialRecord;
-    const hasImportTrace = material.sourceType === "MATERIAL_IMPORT";
+    const hasImportTrace = material.fields.sourceType === "MATERIAL_IMPORT";
     const [versions, changeLogs, lastRejection, importTrace, duplicateCandidates] = await Promise.all([
       this.versions(materialId, { page: query.versionPage, pageSize: query.versionPageSize }),
       this.changeLogs(materialId, { page: query.changeLogPage, pageSize: query.changeLogPageSize }),

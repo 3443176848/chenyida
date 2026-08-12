@@ -1,5 +1,7 @@
 Error.stackTraceLimit = 0;
 
+export {};
+
 function fail(): never {
   process.stderr.write("STAGE PRECHECK FAIL RECOVERY_REHEARSAL_BOOTSTRAP_REJECTED\n");
   process.exit(2);

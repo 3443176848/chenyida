@@ -97,8 +97,8 @@ export function MaterialListPage() {
   useEffect(() => {
     if (!ready) return;
     const controller = new AbortController();
-    api("/api/material-master/categories?view=tree", { signal: controller.signal })
-      .then((response: { data?: Parameters<typeof flattenCategories>[0] }) => {
+    api<{ data?: Parameters<typeof flattenCategories>[0] }>("/api/material-master/categories?view=tree", { signal: controller.signal })
+      .then((response) => {
         setCategories(flattenCategories(Array.isArray(response.data) ? response.data : []));
         setCategoryError(false);
       })

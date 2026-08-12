@@ -5,7 +5,7 @@ import type {
 } from "./types.ts";
 
 export interface MaterialValidationD1Result<T> {
-  results: T[];
+  results?: T[] | null;
 }
 
 export interface MaterialValidationD1Statement {
@@ -89,7 +89,7 @@ export class D1MaterialValidationRepository implements MaterialValidationReposit
       .bind(categoryId)
       .all<AttributeRuleRow>();
 
-    const attributes: MaterialAttributeRule[] = result.results.map((row) => ({
+    const attributes: MaterialAttributeRule[] = (result.results ?? []).map((row) => ({
       code: row.attribute_code,
       name: row.attribute_name_cn,
       dataType: row.data_type,

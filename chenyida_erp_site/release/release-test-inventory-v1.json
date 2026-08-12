@@ -316,7 +316,7 @@
     },
     {
       "path": "tests/material-validation.test.mjs",
-      "sha256": "e4256ca06deba96c94f0ecc11de73321c9219f7e49a4fa33318678afbede949d",
+      "sha256": "b5e81173ddf33a48ffbd5b4290dce20bb1bbc3f524e1553e0aa8c9c3da2ee58b",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1738,7 +1738,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "dcaddf50f794b9cfd7a4735970cd54efcf0db2a99cbcdf4294ad440ea85049f0",
+      "sha256": "4db883636f7fe04867398ab2fc4e7ef8b4c29a693efc7cd10e8718586bedd779",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",

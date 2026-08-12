@@ -223,7 +223,8 @@ async function main(): Promise<number> {
     if ((process.geteuid?.() ?? -1) !== 0) throw new EvidenceFailure("RECOVERY_ROOT_REQUIRED");
     const args = parseArguments(process.argv.slice(2));
     const expectedClass = args.environment === "parallel-uat" ? "uat" : "test";
-    if (process.env.ERP_DEPLOYMENT_CLASS !== expectedClass || process.env.ERP_DEPLOYMENT_CLASS === "production") {
+    const deploymentClass = process.env.ERP_DEPLOYMENT_CLASS;
+    if (deploymentClass === "production" || deploymentClass !== expectedClass) {
       throw new EvidenceFailure("RECOVERY_DEPLOYMENT_CLASS_INVALID");
     }
     await promote(args.environment, args.runId);

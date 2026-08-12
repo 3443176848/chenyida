@@ -215,6 +215,7 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
     user = await dependencies.currentUser(request);
     if (!user) throw new MaterialImportServiceError(isMappingTargetsRequest || isNormalizationRequest ? "AUTH_REQUIRED" : "AUTHENTICATION_REQUIRED", "请先登录", 401);
     if (user.must_change_password) throw new MaterialImportServiceError(isMappingTargetsRequest || isNormalizationRequest ? "FORBIDDEN" : "PERMISSION_DENIED", "请先修改临时密码", 403);
+    const username = user.username;
     const root = url.pathname === "/api/material-master/import-batches";
     const detailMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)$/);
     const fileMatch = url.pathname.match(/^\/api\/material-master\/import-batches\/([1-9][0-9]*)\/file$/);
@@ -252,7 +253,7 @@ export async function handleMaterialImportApi(request: Request, dependencies: Ma
     if (!normalizeMatch && !dependencies.userCan(user, permission)) throw new MaterialImportServiceError(mappingTargetsMatch || isNormalizationRequest ? "FORBIDDEN" : "PERMISSION_DENIED", "没有执行此操作的权限", 403);
     const canReadAny = dependencies.userCan(user, "material.import.read_any");
     const normalizationRateLimiter = dependencies.importReadRateLimiter ?? new D1MaterialImportReadRateLimiter(dependencies.database);
-    const consumeNormalizationRateLimit = (routeCode: string, limit: number) => () => normalizationRateLimiter.consume({ username: user.username, limit, now: (dependencies.clock ?? (() => new Date()))(), routeCode });
+    const consumeNormalizationRateLimit = (routeCode: string, limit: number) => () => normalizationRateLimiter.consume({ username, limit, now: (dependencies.clock ?? (() => new Date()))(), routeCode });
     const serviceDependencies = {
       database: dependencies.database,
       objectStore: dependencies.objectStore ?? unavailableStore,

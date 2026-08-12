@@ -89,7 +89,7 @@ async function main(): Promise<number> {
         const users = await client.query<{ username: string; role: string; is_active: boolean }>(`
           select username,role,is_active from app_users where username=any($1::text[])
         `, [RECOVERY_ACCOUNTS.map((account) => account.username)]);
-        const expected = new Map(RECOVERY_ACCOUNTS.map((account) => [account.username, account.role]));
+        const expected = new Map<string, string>(RECOVERY_ACCOUNTS.map((account) => [account.username, account.role]));
         const matching = users.rows.filter((row) => expected.get(row.username) === row.role && row.is_active === true).length;
         await client.query("commit");
         process.stdout.write("MIGRATIONS PASS 36 HEAD 0036\n");

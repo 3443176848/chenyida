@@ -520,9 +520,13 @@ export async function uploadMaterialImportFile(
   const declaredSha256 = (input.request.headers.get("X-File-SHA256") ?? "").toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(declaredSha256)) throw new MaterialImportServiceError("INVALID_REQUEST", "X-File-SHA256 必须是 64 位小写十六进制", 400);
   const sizeHeader = input.request.headers.get("X-File-Size");
-  const declaredSize = sizeHeader === null ? null : Number(sizeHeader);
-  if (sizeHeader !== null && (!/^\d+$/.test(sizeHeader) || !Number.isSafeInteger(declaredSize) || declaredSize < 0)) {
-    throw new MaterialImportServiceError("INVALID_REQUEST", "X-File-Size 必须是非负整数", 400);
+  let declaredSize: number | null = null;
+  if (sizeHeader !== null) {
+    const parsedSize = Number(sizeHeader);
+    if (!/^\d+$/.test(sizeHeader) || !Number.isSafeInteger(parsedSize) || parsedSize < 0) {
+      throw new MaterialImportServiceError("INVALID_REQUEST", "X-File-Size 必须是非负整数", 400);
+    }
+    declaredSize = parsedSize;
   }
   const duplicateAction = (input.request.headers.get("X-Duplicate-Action") ?? "REJECT").toUpperCase();
   if (duplicateAction !== "REJECT" && duplicateAction !== "ALLOW_DUPLICATE") {

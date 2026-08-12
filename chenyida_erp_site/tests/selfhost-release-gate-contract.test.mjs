@@ -11,7 +11,9 @@ import {
   RELEASE_TEST_INVENTORY_NOT_APPLICABLE,
   RELEASE_TEST_INVENTORY_REQUIRED,
   RELEASE_TEST_INVENTORY_TOTAL,
+  RELEASE_TYPESCRIPT_CONFIGS,
   validateReleaseTestInventoryDocument,
+  verifyReleaseTypeScriptConfigSet,
 } from "../scripts/release-test-inventory.mjs";
 import { buildEligibleReleaseFixture, initializeReleaseArtifactRoot } from "./release-gate-fixture.mjs";
 
@@ -55,6 +57,26 @@ test("versioned test inventory accounts for every top-level test and only exclud
   assert.throws(() => validateReleaseTestInventoryDocument({ ...inventory, unexpected: true }), (error) => error.code === "RELEASE_TEST_INVENTORY_FIELDS_INVALID");
   assert.throws(() => validateReleaseTestInventoryDocument({ ...inventory, tests: inventory.tests.slice(1) }), (error) => error.code === "RELEASE_TEST_INVENTORY_TESTS_INVALID");
   assert.throws(() => validateReleaseTestInventoryDocument({ ...inventory, tests: inventory.tests.map((entry, index) => index === 0 ? { ...entry, applicability: "NOT_APPLICABLE" } : entry) }), (error) => error.code === "RELEASE_TEST_ENTRY_POLICY_INVALID");
+});
+
+test("release typecheck inventory pins all 38 top-level configs and rejects set drift", async () => {
+  const siteRoot = path.resolve(new URL("..", import.meta.url).pathname);
+  const actual = await verifyReleaseTypeScriptConfigSet({ root: siteRoot });
+  assert.equal(actual.length, 38);
+  assert.deepEqual(actual.map((entry) => entry.path), RELEASE_TYPESCRIPT_CONFIGS);
+
+  const root = await mkdtemp(path.join(os.tmpdir(), "cyd-release-typecheck-inventory-"));
+  try {
+    await Promise.all(RELEASE_TYPESCRIPT_CONFIGS.map((config) => writeFile(path.join(root, config), "{}\n")));
+    assert.equal((await verifyReleaseTypeScriptConfigSet({ root })).length, 38);
+    await writeFile(path.join(root, "tsconfig.unreviewed.json"), "{}\n");
+    await assert.rejects(verifyReleaseTypeScriptConfigSet({ root }), (error) => error.code === "RELEASE_TYPESCRIPT_CONFIG_SET_MISMATCH");
+    await rm(path.join(root, "tsconfig.unreviewed.json"), { force: true });
+    await rm(path.join(root, RELEASE_TYPESCRIPT_CONFIGS[0]), { force: true });
+    await assert.rejects(verifyReleaseTypeScriptConfigSet({ root }), (error) => error.code === "RELEASE_TYPESCRIPT_CONFIG_SET_MISMATCH");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("operator wrappers use a fixed real lock, trusted artifact root and sanitized child environment", async () => {
@@ -108,6 +130,7 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.match(nodeSandbox, /release-test-inventory\.mjs run NODE_RELEASE_CONTRACT/);
   assert.match(nodeSandbox, /release-test-inventory\.mjs run NODE_SOURCE/);
   assert.match(nodeSandbox, /release-test-inventory\.mjs run SPECIAL_POSIX/);
+  assert.match(nodeSandbox, /release-test-inventory\.mjs typecheck/);
   assert.match(nodeSandbox, /-v "\$SNAPSHOT:\/opt\/erp:ro"/);
   assert.match(nodeSandbox, /-v "\$SNAPSHOT\/chenyida_erp_site:\/app:ro"/);
   assert.match(nodeSandbox, /-v "\$SNAPSHOT\/chenyida_erp_site:\/workspace:ro"/);
