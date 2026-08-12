@@ -37,7 +37,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成；TASK46已由主智能体单写者串行收口，当前零DOING。OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT AUTHORIZED` |
+| 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成；TASK47由主智能体保持单写者并串行执行重任务。OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT AUTHORIZED` |
 | 当前版本 | 自托管源码为`0.1.0-alpha.46`，源码Migration为45/head `0045_runtime_worker_readiness.sql`；并行非生产UAT Web仍为`0.1.0-alpha.42`原镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，运行source revision仍为`569aa954d764309e239d1f6c174e582596d33a24`，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。alpha.43—alpha.46/0041—0045未build、未部署或应用到UAT；当前运行面仍是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
@@ -52,8 +52,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
 | 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / G3 RELEASE CANDIDATE GAP CLOSURE / PRODUCTION NO-GO`。G1合成恢复与G3发布工具已完成，TASK43—TASK46已在仓库层关闭导入fallback、会话绝对寿命、health/Worker/storage误报和完整TypeScript门；但运行面仍是旧版本，且真实异机副本、Browser/镜像安全/完整候选PASS、UAT部署、岗位权限和员工验收均未完成 |
-| 当前任务 | 当前零`DOING`；`SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已完成并释放active slot |
-| 下一任务 | 立即建立固定Browser运行时与6项Browser E2E的失败关闭基线；G2真实备份恢复、候选build、UAT Migration/deploy、员工试用和切流均不自动获权 |
+| 当前任务 | `SELFHOST-RELEASE-BROWSER-HARNESS-47`为唯一`DOING`：固定Browser运行时、隔离PostgreSQL与6项Browser E2E失败关闭执行器；当前为设计已核验、实施与执行待完成 |
+| 下一任务 | TASK47完成后继续评估候选镜像/SBOM/漏洞与完整18步门；G2真实备份恢复、候选Web/Worker镜像、UAT Migration/deploy、员工试用和切流均不自动获权 |
 
 ## 当前完成模块
 
@@ -342,7 +342,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 ## 当前任务与下一任务
 
 - `SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已按D-120完成并释放active slot：精确38配置、ES2022合同和只读干净快照执行器已在两个提交快照38/38通过；一次错误纳入`.wrangler/work`的直接lint发生V8 heap OOM，正式干净快照lint随后0 error通过，宿主/容器OOM与restart均为0。
-- 当前零`DOING`；下一项将建立固定Browser运行时并实际执行6项Browser E2E。它不自动授权候选build、UAT/生产连接、Migration/deploy或真实数据。岗位权限矩阵须业务负责人批准后另立任务；真实异机备份/恢复、候选build、账号变化、员工试用和切换仍须专项明确授权。
+- `SELFHOST-RELEASE-BROWSER-HARNESS-47`现为唯一`DOING`：已确认6个REQUIRED Browser文件、历史Migration head 0036—0039、独立合成数据库和现有缺失运行时失败；正在建立固定Playwright/Chromium镜像、固定依赖与串行单容器执行器。它不授权候选Web/Worker镜像、UAT/生产连接、Migration/deploy或真实数据。岗位权限矩阵须业务负责人批准后另立任务；真实异机备份/恢复、账号变化、员工试用和切换仍须专项明确授权。
 
 - `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成并暂时回到零`DOING`：D-115四域V2工具与41/41合同、双集群隔离恢复通过。G2真实异机备份/恢复因外部目标与专项授权阻塞；下一安全任务转入G3发布身份闭合、release manifest、Migration allowlist和强制`test:release`，仍不build/deploy或读取当前卷。
 - 真实异机备份与恢复、UAT build/Migration/deploy、旧数据读取、员工试用、账号/权限、网络/systemd和正式切换仍须专项明确授权；持续交付授权不改变这些边界。

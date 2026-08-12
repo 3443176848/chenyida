@@ -2,6 +2,19 @@
 
 最后更新时间：2026-08-12（Asia/Shanghai）
 
+## SELFHOST-RELEASE-BROWSER-HARNESS-47（执行中；固定浏览器发布门）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / RUNTIME DESIGN VERIFIED / EXECUTION PENDING / PRODUCTION NO-GO | TASK47为唯一active slot；尚未把Browser子门记为通过，系统仍不能交给真实员工 |
+| 严格起点 | PASS / CONTROLLED | `main@fbbf2a5d034d11d8a50f823a55ef78d2d32d682d`、alpha.46/0045；唯一既有未跟踪状态报告保持不读不改不提交 |
+| 清单审计 | PASS / EXACT SIX | 6个REQUIRED Browser文件全部存在、无skip；覆盖planning revision、purchase traceability、unit resolution、RFQ binding/traceability和supplier mapping |
+| 当前阻断 | CONFIRMED / FAIL CLOSED | `browser-e2e`当前固定返回运行时不可用；宿主、当前Web/Worker镜像和仓库依赖均无可执行Chromium/Playwright runtime |
+| 隔离设计 | VERIFIED / NOT YET EXECUTED | 固定Browser镜像+包锁、固定PostgreSQL 17 rootfs、只读提交快照、历史精确Migration head、断网且串行单容器；只允许合成数据库 |
+| 运行面边界 | UNCHANGED | UAT保持alpha.42/0040，四服务restart0/OOM false；不连接业务数据库、不挂载四卷、不build/push候选或deploy |
+| 资源起点 | PASS | available约2.0GiB、Swap484MiB/1GiB、根盘31GiB、Load`0.06/0.22/0.71`、内核OOM0；未触发停止线 |
+| 下一证据 | PENDING | 实现运行时/执行器/合同后，在干净提交快照实际串行执行全部6文件并验证失败清理与重复可复现性 |
+
 ## SELFHOST-RELEASE-TYPECHECK-CLOSURE-46（完成；完整发布类型门）
 
 | 验证项 | 结果 | 说明 |

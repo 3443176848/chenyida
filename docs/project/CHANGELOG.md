@@ -4,6 +4,13 @@
 
 ## 2026-08-12
 
+### SELFHOST-RELEASE-BROWSER-HARNESS-47 - `docs: start release browser harness closure`
+
+- 调度/范围：TASK46治理收口`fbbf2a5d034d11d8a50f823a55ef78d2d32d682d`后的零DOING自动切换为TASK47唯一active task。目标只关闭发布清单中的6个REQUIRED Browser E2E，不把历史手工Chromium、宿主偶然依赖或定向Node测试冒充发布Browser门。
+- 起点事实：6个文件全部存在且无skip，分别需要隔离合成PostgreSQL、历史Migration head 0036—0039和standalone Web；现有`browser-e2e`动作明确返回运行时不可用。UAT保持Web alpha.42/数据库0040，四服务restart0/OOM false，本任务不连接运行面。
+- 设计边界：固定官方Playwright/Chromium镜像的digest/config/platform、精确包锁、固定PostgreSQL 17 rootfs和只读Git快照；构建、数据库导出、Browser测试串行且任何时刻最多一个临时容器。允许仅为隔离测试拉取固定Browser runtime和生成测试build，不build/push Web/Worker候选镜像。
+- 保护/资源：不访问UAT/生产业务数据、凭据或四卷正文，不运行真实Migration/deploy/restart，不改变账号或宿主配置，不prune。起点available约2.0GiB、Swap484MiB/1GiB、根盘31GiB、Load`0.06/0.22/0.71`，内核OOM0；用户未跟踪状态报告保持不读不改不提交。
+
 ### SELFHOST-RELEASE-TYPECHECK-CLOSURE-46 - `docs: start release typecheck closure` / `fix: close release typecheck gate` / `build: bind release typecheck supervisor bundle` / `docs: close release typecheck gate`
 
 - 调度/范围：TASK45治理收口`ffd0ba6e705f79d4c0bef06952d725d7510b8782`后的零DOING自动切换为TASK46唯一active task。目标只关闭固定离线Node沙箱中的全部38份`tsconfig*.json`发布门，不以TASK43—TASK45定向typecheck替代。

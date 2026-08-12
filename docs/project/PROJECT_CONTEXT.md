@@ -12,7 +12,7 @@
 
 项目负责人已授权持续选择最高优先级且可安全执行的任务，不再要求每项后等待“继续”。该持续授权不包含生产数据访问、真实数据外传、正式备份恢复、UAT/生产 Migration、build/deploy、账号权限、systemd/网络/Swap、真实员工业务写或切换/回滚；这些动作仍须专项明确授权。
 
-TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门：Node 22/ES2022、精确38配置集合/摘要核验和只读提交快照执行器已在两个干净快照38/38通过，bundle SHA-256为`a92c0a40…b97b`。当前零`DOING`，下一安全任务固定Browser运行时并执行6项Browser E2E；不连接UAT/生产或自动授权候选build/deploy。
+TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门：Node 22/ES2022、精确38配置集合/摘要核验和只读提交快照执行器已在两个干净快照38/38通过，bundle SHA-256为`a92c0a40…b97b`。`SELFHOST-RELEASE-BROWSER-HARNESS-47`现为唯一`DOING`：只读审计已固定6个REQUIRED Browser文件及其历史Migration/合成数据库边界，正在建立固定Playwright/Chromium运行时和串行失败关闭执行器；不连接UAT/生产或自动授权候选Web/Worker镜像build/deploy。
 
 ## 系统组成
 

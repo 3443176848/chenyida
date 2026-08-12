@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前零`DOING`。`SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已完成并释放active slot：精确38配置、Node 22/ES2022合同和只读干净快照执行器在源码`f3bac028`及bundle提交`3d1243e2`两个快照均38/38通过。下一安全任务是固定Browser运行时并执行6项Browser E2E；运行UAT仍为alpha.42/0040旧实现，系统继续`PRODUCTION NO-GO`，候选镜像/SBOM/漏洞PASS、G2异机恢复和岗位权限矩阵仍分别开放或阻塞。
+`SELFHOST-RELEASE-BROWSER-HARNESS-47`为唯一`DOING`。范围固定为精确6个REQUIRED Browser文件、固定Playwright/Chromium运行时、隔离PostgreSQL、只读提交快照构建与失败关闭发布执行器；所有重任务串行且一次最多一个临时容器。运行UAT仍为alpha.42/0040旧实现且不连接，系统继续`PRODUCTION NO-GO`；候选Web/Worker镜像/SBOM/漏洞PASS、G2异机恢复和岗位权限矩阵仍分别开放或阻塞。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -41,6 +41,8 @@
 
 2026-08-12第十四次调度事件：`SELFHOST-RELEASE-TYPECHECK-CLOSURE-46 DOING → DONE`。D-120固定Node 22/ES2022、精确38配置集合/摘要双重核验和`--incremental false`只读执行；源码`f3bac028bdb9ccf4c79be279ea7c4f698cbdd4f5`/tree`87fb1340bc1b7067e67be29677960546b0f8cd5c`与manifest-only直接子提交`3d1243e294236602975d3beb29e8f991b84db96d`形成可追溯链，bundle SHA-256为`a92c0a4088693b7bd23493a4820457b3f9dae4e2807e416f20218cb0e1d3b97b`。两个干净提交快照均38/38通过，定向287/287、release合同45/45、supervisor15/15及inventory235/211/24通过；没有build、Browser、UAT/生产或真实数据动作，系统继续`PRODUCTION NO-GO`。
 
+2026-08-12第十五次调度事件：主智能体从TASK46收口后的零`DOING`自动选择G3下一最高优先级安全任务，状态按`SELFHOST-RELEASE-BROWSER-HARNESS-47 TODO → DOING`切换唯一active slot。只读审计确认清单中6个REQUIRED Browser文件存在且无skip，但发布动作因没有固定Chromium/Playwright runtime而明确失败；范围固定为仓库测试运行时、隔离合成PostgreSQL、串行单容器执行和合同测试，不连接UAT/生产、不挂载受保护卷，也不build/push Web或Worker候选镜像。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -55,7 +57,9 @@
 
 ## 执行中任务
 
-当前无执行中任务；TASK46关闭提交完成后立即启动固定Browser运行时任务。
+| 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
+| --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-RELEASE-BROWSER-HARNESS-47 | 固定浏览器运行时与发布E2E门闭环 | DOING | Codex主智能体（唯一写入、串行构建/测试、文档和提交）、项目负责人（未来候选镜像/UAT/生产专项授权） | 2026-08-12 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-TYPECHECK-CLOSURE-46、D-116 | `DOING / RUNTIME DESIGN VERIFIED / EXECUTION PENDING / PRODUCTION NO-GO`。固定6文件、历史Migration head、合成数据库及一个临时容器边界；正在实现固定Playwright/Chromium runtime和失败关闭执行器。见[任务文档](../tasks/SELFHOST-RELEASE-BROWSER-HARNESS-47.md)。 |
 
 ## 已完成任务
 

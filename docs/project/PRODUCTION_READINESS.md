@@ -23,6 +23,8 @@
 
 2026-08-12 第六次增量：`SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已完成仓库实现与重复验证。D-120固定Node 22/ES2022、精确38配置集合/摘要核验和`--incremental false`只读执行；源码`f3bac028…`与manifest-only直接子提交`3d1243e…`的两个干净快照均38/38通过。该证据只关闭完整typecheck子门，不包含Browser、候选build、SBOM、漏洞扫描、UAT部署或真实数据；整体判定继续`PRODUCTION NO-GO`。
 
+2026-08-12 第七次增量：`SELFHOST-RELEASE-BROWSER-HARNESS-47`已启动为唯一`DOING`。只读审计确认发布清单的6个REQUIRED Browser文件存在且没有skip，但现有动作因缺少固定Chromium/Playwright运行时而失败关闭。任务将只在干净提交快照、固定Browser/Node/PostgreSQL运行时和隔离合成数据库中串行执行；完成前Browser门仍为`FAIL`，且本任务不授权候选Web/Worker镜像、UAT/生产或真实数据，整体判定继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
