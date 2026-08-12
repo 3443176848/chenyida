@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 SITE_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_POLICY_SHA256 = "0d02214e2a116761e8310827768d8a18e66a00b760ba0198cb0b81318fd91625"
+EXPECTED_POLICY_SHA256 = "62bd6cdd8c17883b774d8ea70ceb6a2c05ad0cac2910939f49d26e64c552e2d2"
 EXPECTED_BROWSER_IMAGE = "mcr.microsoft.com/playwright@sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961"
 EXPECTED_EXECUTABLE_SHA256 = "efb2bece6f2f5bc00dc270162d2241c86d509ca4f4297b1eb0f5cd8894d050be"
 
@@ -119,6 +119,12 @@ class ReleaseSupervisorBrowserTest(unittest.TestCase):
                 self.assertIn("安全退出", source)
                 for locator in obsolete_locators:
                     self.assertNotIn(locator, source)
+
+        rfq_source = (SITE_ROOT / "tests" / "selfhost-rfq-traceability-fix22-browser.test.mjs").read_text(encoding="utf-8")
+        synthetic_request_id = "f32f32f3-2f32-4f32-8f32-f32f32f32f32"
+        self.assertIn(f'request_id: "{synthetic_request_id}"', rfq_source)
+        self.assertIn(f"模拟最终转换失败（请求 {synthetic_request_id}）", rfq_source)
+        self.assertNotIn("req-fix32-synthetic-failure", rfq_source)
 
     def test_node_gate_dispatches_browser_action_without_unavailable_marker(self):
         source = (SITE_ROOT / "scripts" / "run-release-node-sandbox.sh").read_text(encoding="utf-8")

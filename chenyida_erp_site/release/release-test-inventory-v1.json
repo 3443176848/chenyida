@@ -1864,7 +1864,7 @@
     },
     {
       "path": "tests/selfhost-rfq-traceability-fix22-browser.test.mjs",
-      "sha256": "94275860e4e97fb6b328d46cae48c04da30ae813f77150544420fdb98aaf4048",
+      "sha256": "a863c4c6a33dd6f41e0d7b1aa4de6c2b86d98703e2bc6181b274c7f68df5065f",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",

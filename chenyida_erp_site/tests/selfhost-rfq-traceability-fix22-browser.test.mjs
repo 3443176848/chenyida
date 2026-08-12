@@ -2497,7 +2497,7 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
             body: JSON.stringify({ error: {
               code: "FIX32_SYNTHETIC_CONVERSION_FAILURE",
               message: "模拟最终转换失败",
-              request_id: "req-fix32-synthetic-failure",
+              request_id: "f32f32f3-2f32-4f32-8f32-f32f32f32f32",
             } }),
           });
         }
@@ -2627,7 +2627,7 @@ test("isolated Chromium enforces the FIX-32 Award to PO two-stage confirmation c
     const failureAlert = dialog.getByRole("alert");
     await failureAlert.waitFor();
     const failureText = await failureAlert.innerText();
-    assert.ok(failureText.includes("模拟最终转换失败（请求 req-fix32-synthetic-failure）"));
+    assert.ok(failureText.includes("模拟最终转换失败（请求 f32f32f3-2f32-4f32-8f32-f32f32f32f32）"));
     assert.ok(failureText.includes("系统不会自动重试；请关闭窗口后重新读取权威数据，再决定是否重新确认。"));
     assert.equal(await finalButton.innerText(), "本次确认已锁定");
     assert.equal(await finalButton.isDisabled(), true, "the failed final action must remain locked");
