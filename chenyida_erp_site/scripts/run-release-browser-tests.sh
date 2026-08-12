@@ -33,10 +33,7 @@ container_main() {
 
   PGDATA=/var/lib/postgresql/data
   PG_BIN=/usr/lib/postgresql/17/bin
-  mkdir -p "/postgres-rootfs$PGDATA" /tmp/browser-home
-  chown -R 999:999 "/postgres-rootfs$PGDATA"
-  chown 1000:1000 /tmp/browser-home /test-tmp
-  chmod 0700 "/postgres-rootfs$PGDATA" /tmp/browser-home
+  [ -d "/postgres-rootfs$PGDATA" ] || { echo "release Browser PostgreSQL data directory is unavailable" >&2; exit 1; }
   chroot --userspec=999:999 /postgres-rootfs "$PG_BIN/initdb" -D "$PGDATA" --auth-local=trust --auth-host=trust --locale=C --encoding=UTF8 >/tmp/release-browser-initdb.log
   chroot --userspec=999:999 /postgres-rootfs "$PG_BIN/pg_ctl" -D "$PGDATA" -l "$PGDATA/postgresql.log" -o "-h 127.0.0.1 -p 5432 -c shared_buffers=32MB -c max_connections=40 -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c unix_socket_directories=/tmp" -w start
   pg_started=YES
@@ -54,13 +51,13 @@ container_main() {
 
   setpriv --reuid=1000 --regid=1000 --clear-groups env -i \
     PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin \
-    HOME=/tmp/browser-home LC_ALL=C LANG=C TZ=UTC TMPDIR=/test-tmp CI=1 \
+    HOME=/test-tmp/browser-home LC_ALL=C LANG=C TZ=UTC TMPDIR=/test-tmp CI=1 \
     NODE_ENV=test NODE_OPTIONS=--max-old-space-size=512 ERP_ENV=test ERP_DEPLOYMENT_CLASS=test \
     PLAYWRIGHT_MODULE_PATH=playwright-core PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="$BROWSER_EXECUTABLE" \
     ERP_RELEASE_BROWSER_PACKAGE_VERSION="$ERP_RELEASE_BROWSER_PACKAGE_VERSION" \
     ERP_RELEASE_BROWSER_GIT_COMMIT="$ERP_RELEASE_BROWSER_GIT_COMMIT" \
-    node --experimental-strip-types /supervisor/scripts/release-browser-e2e-runner.mjs
+    /bin/sh -c 'set -eu; mkdir -m 0700 "$HOME"; exec node --experimental-strip-types /supervisor/scripts/release-browser-e2e-runner.mjs'
   stop_postgres
   trap - EXIT HUP INT TERM
 }
@@ -176,9 +173,9 @@ CURRENT_CONTAINER_ID=$(/usr/bin/docker create \
   --pull=never --name "$CURRENT_CONTAINER_NAME" --label "chenyida.erp.release-browser-test=$RUN_ID" \
   --network none --read-only --cap-drop ALL --cap-add SYS_CHROOT --cap-add SETUID --cap-add SETGID --security-opt no-new-privileges \
   --memory 1536m --memory-swap 1792m --cpus 1 --pids-limit 384 \
-  --tmpfs /tmp:rw,nosuid,nodev,noexec,size=384m \
-  --tmpfs /test-tmp:rw,exec,nosuid,nodev,size=512m \
-  --tmpfs /dev/shm:rw,nosuid,nodev,noexec,size=512m \
+  --tmpfs /tmp:rw,nosuid,nodev,noexec,size=384m,mode=1777 \
+  --tmpfs /test-tmp:rw,exec,nosuid,nodev,size=512m,mode=1777 \
+  --tmpfs /dev/shm:rw,nosuid,nodev,noexec,size=512m,mode=1777 \
   -e ERP_RELEASE_BROWSER_CONTAINER_MODE=YES \
   -e ERP_RELEASE_BROWSER_PACKAGE_VERSION="$PACKAGE_VERSION" \
   -e ERP_RELEASE_BROWSER_GIT_COMMIT="$GIT_COMMIT" \
