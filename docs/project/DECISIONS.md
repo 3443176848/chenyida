@@ -1724,7 +1724,7 @@
 ## D-117 物料导入 fallback 采用持久幂等、staging 原子提升与可恢复协调
 
 - 日期：2026-08-12
-- 状态：`ACCEPTED AS TASK43 IMPLEMENTATION BASELINE / REPOSITORY AND ISOLATED TESTS ONLY / PRODUCTION USE NOT AUTHORIZED`
+- 状态：`ACCEPTED / IMPLEMENTED AND ISOLATED-VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION USE NOT AUTHORIZED`
 - 提案与实施：Codex 持续交付负责人，依据项目负责人持续推进G4和仓库内安全实施授权
 - 确认边界：该技术决定只授权源码、expand-only Migration和隔离测试；UAT/生产Migration、部署、真实数据、账号与正式使用仍须专项明确授权
 
@@ -1745,11 +1745,12 @@
 6. 跨数据库/文件系统采用saga而非虚假ACID。每一阶段持久化operation/file状态；重试或协调器按确定性路径和摘要安全继续、补偿已知staging，或把批次标为`RECONCILIATION_REQUIRED`。身份不明、摘要不符或可能已发布的文件不得猜测删除。
 7. 单批次只允许一个有效文件；状态机、唯一索引和CAS共同阻止并发双上传。重复内容默认拒绝；只有明确`ALLOW_DUPLICATE`且`retry_of_batch_id`关系闭合时允许新批次继续，原失败批次不改写。
 8. `/api/jobs/:id`必须把`background_jobs`经material import outbox aggregate关联到batch，再执行owner或`material.import.read_any`可见性；无记录和不可见统一404。响应只提供有界状态字段，不返回payload、原始错误正文或未经允许的跨批次结果。
-9. 数据模型只通过0042扩展，保留0001—0041不可变；Schema、snapshot、journal、运行查询和空库/升级/重放/回滚测试必须一致。
+9. 数据模型先由0042扩展；0042发布后保持不可变。发现终态完整性约束需修正时，只能追加0043，不得回写0042；因此0001—0042全部不可变，Schema、0042/0043 snapshot、journal、运行查询和空库/升级/重放/回滚测试必须一致。
 
 ### Consequences
 
-- TASK43会新增独立fallback服务边界，缩小`selfhost-api.ts`单文件逻辑，并在隔离PostgreSQL/临时文件根中覆盖幂等、并发、权限、文件安全和故障协调。
+- TASK43已新增独立fallback服务边界并缩小`selfhost-api.ts`职责；源码提交`5767c92e51e4f25ba49fa4431299f265ef4cb7aa`及manifest-only直接子提交`dad7468`绑定最终实现和证据包，bundle SHA-256为`b948e08861e5114660650e21faa9374cef879b354cb59c6c0d0bdb62960228e9`。
+- 0042建立关系化fallback安全模型，0043以append-only方式修正终态约束；fallback unit/handler 20/20、worker resilience 8/8、UI 107/107、Migration 4/4、parser/API client 45/45、隔离PostgreSQL fallback 17/17与真实XLSX worker 1/1通过。release inventory现为230/206/24。
 - 成功关闭PR-004仍只代表源码候选安全边界通过；在同候选build、UAT Migration/deploy、真实源分析和人工验收完成前，运行UAT仍保留旧风险且系统继续`PRODUCTION NO-GO`。
 - 协调记录和私有staging会增加受控运维对象；必须提供只处理身份闭合任务的reconcile/reaper入口和运行手册，不允许无界扫描或删除未知文件。
 - 本决定不授权真实供应商文件、当前uploads/数据库读取、UAT/生产Migration、部署、员工试用、正式切换或清理任何持久数据。

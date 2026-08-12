@@ -4,11 +4,16 @@
 
 ## 2026-08-12
 
-### SELFHOST-MATERIAL-IMPORT-SAFETY-43 - `docs: start material import fallback hardening`
+### SELFHOST-MATERIAL-IMPORT-SAFETY-43 - `feat: complete recoverable material import fallback` / `chore: bind material import release supervisor bundle` / `docs: close material import fallback hardening`
 
-- 调度/决策：TASK42收口后的零DOING按持续交付路线自动切换为`SELFHOST-MATERIAL-IMPORT-SAFETY-43 TODO→DOING`唯一active task；D-117固定数据库意图、私有staging、服务端实际检查、同根原子提升、最终发布和可恢复协调，不把PostgreSQL与文件系统误称为单一ACID事务。
-- 事实：客户端已发送幂等键、预期版本、SHA-256、大小和重复策略；现有fallback未消费这些合同，建批可重复、上传先永久落盘后验权/入库、DTO无条件虚报基础检查通过、job只按UUID查询且未校验批次所有权。
-- 范围：只授权仓库源码、expand-only 0042、合成文件、隔离PostgreSQL和文档；不连接UAT/生产或当前四卷，不build/deploy/restart，不使用真实数据。起点`main@70bfb8b…`、alpha.44/0041；available约2.2 GiB、Swap425 MiB、根盘31 GiB、Load低，四服务restart0/OOM false。
+- 调度/决策：TASK42收口后的零DOING按持续交付路线切换为TASK43唯一active task；D-117固定数据库意图、私有staging、服务端实际检查、同根无覆盖原子提升、最终发布和可恢复协调，不把PostgreSQL与文件系统误称为单一ACID事务。任务现已`DOING→DONE`并释放active slot。
+- API/幂等：建批、上传、取消和解析均使用持久幂等；上传在读取正文前完成认证、权限、CSRF、必填头、owner/状态/CAS与幂等意图校验。不可见统一404；错误使用稳定code、中文message、request ID和no-store。保护写响应不确定时，UI保留精确operation/key/payload并阻止替代或依赖写入。
+- 文件/saga：新增私有staging、服务端确定性受限路径、有界写入、实际SHA/大小/签名/MIME/安全检查、`fsync`与无覆盖hard-link promotion；XLS CFB、XLM/VBA/宏和伪装输入失败关闭。promotion、reconciliation、过期、取消、delete-pending及显式retry lineage持久化，未知身份文件不猜测删除。
+- Job/Worker：job通过outbox aggregate关联批次并复核owner或`material.import.read_any`，只返回有界DTO；worker消费前重新哈希文件，并在单事务发布job terminal和parse/normalization/review终态，过期或失去lease的worker不能终态化。
+- Migration：0042建立fallback安全模型并在发布后保持不可变；追加0043修正终态约束，0001—0042未回写。源码head为43，0041/0042/0043 SHA-256分别为`676626b9…bf2`、`c0eeab63…85bf`、`0fdb3d4b…52d9`，Schema/snapshot/journal/运行查询与release allowlist一致。
+- Git/证据：源码提交`5767c92e51e4f25ba49fa4431299f265ef4cb7aa`/tree`bb4ef005cc9d9eb858e553d6a1825298845352bb`与manifest-only直接子提交`dad7468`形成两提交链，bundle SHA-256为`b948e08861e5114660650e21faa9374cef879b354cb59c6c0d0bdb62960228e9`。
+- 验证：fallback unit/handler20/20、worker8/8、UI107/107、Migration4/4、parser/API client45/45、隔离PostgreSQL fallback17/17与真实XLSX worker1/1、相关组合176/176、TASK43 typecheck、lint 0 error/11既有warning、release contract44/44和supervisor15/15通过。inventory为230/206/24（Node109、PostgreSQL81、Browser6等）；凭据扫描在源码/收口阶段分别覆盖1,538/1,539文件，源码stage 43文件、任务累计61路径均在白名单，`git diff --check`通过。
+- 边界/资源：完整Node-source/Browser/typecheck/候选镜像/SBOM/漏洞及18步候选门未运行；未连接UAT/生产、读取当前四卷、build/deploy/restart、运行真实Migration或使用真实数据。UAT保持alpha.42/0040。起点/收口available约2.2/2.0GiB、Swap425/439MiB、根盘31GiB、Load1低于4，四服务restart0/OOM false；任务容器、数据库和临时目录清零。系统继续`PRODUCTION NO-GO`。
 
 ### SELFHOST-OPS-RELEASE-GATE-42 - `feat: enforce immutable release candidate gate` / focused hardening / `chore: bind release supervisor bundle`
 

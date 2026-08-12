@@ -6,7 +6,7 @@
 
 - 唯一未来生产权威方向是 Node.js、PostgreSQL、本地持久文件和独立 Worker。
 - `chenyida-erp-parallel`仍是受控非生产 UAT：Web `0.1.0-alpha.42` / source revision `569aa954d764309e239d1f6c174e582596d33a24`，PostgreSQL 40/head `0040_warehouse_receipt_readiness.sql`。
-- 当前仓库候选仍为 `0.1.0-alpha.44` / 41/head `0041_ai_governance_suggestion_evidence.sql`；它未 build、未部署、未应用到 UAT。两者不得描述为同一候选。
+- 当前仓库源码为 `0.1.0-alpha.44` / 43/head `0043_material_import_terminal_integrity.sql`；0041—0043均未 build、未部署或应用到 UAT。源码与运行面不得描述为同一候选。
 - Python/SQLite 常驻面仍是开发运行和迁移来源，不是未来生产底座；正式切换前必须另有停写、只读或隔离决定。
 - 入口、受控业务事实与历史操作见 `parallel-http-acceptance.md`；未经任务授权不得登录、发送业务 POST 或查询业务行。
 
@@ -68,6 +68,17 @@ TASK42已形成并验证release manifest、Migration allowlist、content-address
 - 若备份进程中断且 `.backup-fence-v2.json`存在，数据库保持安全只读/连接受限。禁止手工删除 intent 或直接重跑；使用 `recover-backup-guard.sh`按精确稳定身份恢复。
 - 若隔离恢复在 prepared receipt 后发布失败，保留精确 TEST 数据库、文件目标和 prepared evidence；使用 `publish-restore-receipt-selfhost.sh`补发，不重跑恢复。
 - 若容器 OOM/反复重启、数据库不健康、身份漂移、回执过期/损坏、Migration 不符或关键数据核对失败，立即停止新写操作，保全日志/审计/证据，不清理持久卷或备份，按已批准的事故任务升级。
+
+## 物料导入恢复处置
+
+TASK43已在源码实现D-117安全合同，但当前alpha.42/0040 UAT未部署。未来同候选部署后，出现`RESULT_UNKNOWN`、`RECONCILIATION_REQUIRED`或长期`DELETE_PENDING`时：
+
+1. 停止为同一批次生成新幂等键或执行依赖写入，只记录request ID、batch ID、operation ID和预期version，不记录文件正文、路径、Cookie或Token。
+2. 只读核对幂等、batch、file、outbox/job及协调状态，并按确定性身份核对staging/正式文件存在性与SHA-256；不得靠文件名猜测归属。
+3. 优先让有界reconciler复用同一operation恢复。不得覆盖正式文件、直接改业务终态、手工删除intent，或清理身份不明文件。
+4. 确需人工处置时，先固定可恢复数据库/文件快照并另立受控事故任务；处置后核对终态、Audit、无可消费孤儿文件和资源清理。
+
+详细状态机和安全边界见[自托管物料导入安全与恢复合同V1](../material-master/material-import-selfhost-safety-v1.md)。
 
 ## 监控、备份和上线缺口
 

@@ -15,7 +15,7 @@
 
 2026-08-12 第二次增量：`SELFHOST-OPS-RELEASE-GATE-42`已完成 G3 仓库工具和隔离验证。不可变release manifest/镜像安全证据合同、精确Migration allowlist、18步低资源串行门、content-addressed root supervisor及并发安全runtime identity已落地；最终提交快照通过Node、PostgreSQL、POSIX、Migration、恢复、Python、Compose、lint和凭证门。没有固定Browser运行时、通过完整typecheck的候选、获准Web/Worker镜像、镜像SBOM或新鲜漏洞PASS，故没有运行真实候选门或生成`ELIGIBLE`manifest，整体判定仍为`PRODUCTION NO-GO`。
 
-2026-08-12 第三次增量：`SELFHOST-MATERIAL-IMPORT-SAFETY-43`已登记为G4唯一执行任务。D-117要求把建批/上传持久幂等、批次owner/状态/CAS、私有staging、服务端实际文件检查、同根原子提升、跨数据库/文件系统故障协调及job所有权作为一个失败关闭边界实现。当前只是实施开始，不解除PR-004或任何投产门禁。
+2026-08-12 第三次增量：`SELFHOST-MATERIAL-IMPORT-SAFETY-43`已完成仓库实现与隔离验证。D-117要求的建批/上传持久幂等、批次owner/状态/CAS、私有staging、服务端实际文件检查、同根无覆盖原子提升、跨数据库/文件系统故障协调、job所有权和worker终态事务已在源码`5767c92…`与manifest-only直接子提交`dad7468`落地；0042发布后保持不可变，0043以append-only方式修正终态约束。运行UAT未部署该实现，因此PR-004只在仓库层关闭，整体判定仍为`PRODUCTION NO-GO`。
 
 ## 2. 证据范围与未执行事项
 
@@ -29,13 +29,13 @@
 
 | 证据项 | 当前事实 | 判定 |
 | --- | --- | --- |
-| 根仓库 | `main@d890987`为本任务启动提交；起点`bc14eb022528b8d0f242fec1d31ee41b9166b4cd`，启动前相对 public `origin/main` ahead 220 | 本地可追踪；远端锚点待更新 |
+| 根仓库 | TASK43源码`5767c92e51e4f25ba49fa4431299f265ef4cb7aa`/tree`bb4ef005…`与manifest-only直接子提交`dad7468`形成已复核链；未fetch/push | 本地可追踪；当前完整历史的异机锚点待更新 |
 | 私有源码锚点 | 启动前`recovery-private/main`比本地 HEAD 少 1 个提交；未 fetch/push | `FAIL`，当前完整历史未证明异机存在 |
-| 源码 | `0.1.0-alpha.44`，Migration 41/head `0041_ai_governance_suggestion_evidence.sql`，0041 SHA-256 `676626b9…71bf2` | source-ready，不等于运行候选 |
-| 源码 Schema | 41 个 SQL、journal 和 snapshot 顺序一致；`db/schema.ts`与 0041 snapshot 均为 231 张 public 表且列集合一致 | 静态一致性`PASS` |
+| 源码 | `0.1.0-alpha.44`，Migration 43/head `0043_material_import_terminal_integrity.sql`；0041/0042/0043 SHA-256为`676626b9…bf2`/`c0eeab63…85bf`/`0fdb3d4b…52d9` | source-verified，不等于运行候选 |
+| 源码 Schema | 43 个 SQL、journal 和 snapshot 顺序一致；`db/schema.ts`与 0043 snapshot 为 232 张 public 表且列集合一致 | 静态及隔离Migration一致性`PASS` |
 | UAT Web | `0.1.0-alpha.42`，revision `569aa954…d33a24`，Image ID `sha256:e7761e2c…f94964` | 与源码不一致 |
 | UAT PostgreSQL | 40/head `0040_warehouse_receipt_readiness.sql`，0040 checksum `b6781c94…a5a93`，227 张 public 表 | 与源码不一致 |
-| 发布台账 | `RELEASES.md`尚未形成 alpha.44/0041 候选记录 | `FAIL` |
+| 发布台账 | `RELEASES.md`尚未形成 alpha.44/0043 候选记录；没有`ELIGIBLE`manifest | `FAIL` |
 | 运行健康 | Web/PostgreSQL healthy，Worker/Caddy running，restart 0、OOMKilled false；回环与公开 health 返回 alpha.42 | 仅证明当前空闲存活 |
 | Python 旧运行面 | `chenyida-erp.service` enabled/active、restart 0，当前监听`127.0.0.1:18889` | 开发/迁移来源；正式切换前须明确处置 |
 | 数据卷 | PostgreSQL、uploads、attachments、backup-status 四卷存在 | 单机持久化，不是灾备 |
@@ -83,27 +83,27 @@
 ### PR-003 运行候选身份不闭合
 
 - TASK42已实现严格release manifest、content-addressed supervisor两提交链及精确Migration allowlist/目标数据库身份，仓库工具不再允许靠tag或目录排序冒充候选。
-- 源码 alpha.44/0041、UAT alpha.42/0040和当前 GHCR alpha.42 锚点仍不是同一个已通过门禁的候选；没有获准alpha.44 Web/Worker镜像、镜像安全证据或`ELIGIBLE`manifest。
+- 源码 alpha.44/0043、UAT alpha.42/0040和当前 GHCR alpha.42 锚点仍不是同一个已通过门禁的候选；没有获准alpha.44 Web/Worker镜像、镜像安全证据或`ELIGIBLE`manifest。
 - 当前不能证明“拟投产代码＝已验收代码＝运行镜像＝数据库版本”。
 
 解除条件：建立不可变 release manifest 与 migration allowlist；隔离 build/升级/回退通过后，经专项授权把 UAT 对齐到同一候选并重新验收。
 
-### PR-004 物料导入 fallback 存在服务端安全与一致性缺口
+### PR-004 物料导入 fallback 仓库缺口已修复，运行面尚未对齐
 
-状态：`DOING / SELFHOST-MATERIAL-IMPORT-SAFETY-43 / NOT YET REMEDIATED`
+状态：`REPOSITORY REMEDIATED / ISOLATED VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`
 
-- 创建批次不要求持久幂等键；重试可重复建批。
-- 上传先永久写盘，再核验批次所有权/状态并写数据库；越权或数据库失败可留下孤儿文件。
-- 上传缺少`expected_version`、允许状态、重复上传和并发保护。
-- `fileDto`只按扩展名和大小投影类型，却无条件返回`BASIC_CHECK_PASSED`。
-- `/api/jobs/:id`只按 UUID 查询，不验证 aggregate 所有权或`read_any`，可能跨用户暴露结果/错误。
+- TASK43已实现建批/上传/取消/解析持久幂等，以及正文读取前owner、状态、CAS、权限、CSRF和幂等意图门禁。
+- 文件使用私有staging、受限确定性路径、实际SHA/大小/签名/MIME/安全检查、`fsync`与同根无覆盖原子提升；失败由持久saga与reconciler处理，未知身份文件不猜测删除。
+- job经outbox aggregate关联批次并复核owner/`material.import.read_any`；worker重新哈希并以单事务发布job和业务终态，过期lease不能提交。
+- 0042与append-only 0043、Schema/snapshot/journal及隔离PostgreSQL升级/回滚/故障测试通过。源码/manifest提交链和证据摘要已固定。
+- 当前非生产UAT仍为alpha.42/0040，未执行build、0040→0043 Migration、部署或端到端岗位验收，故运行面仍可能表现为旧缺口。
 
-解除条件：持久幂等、staging 原子晋升、补偿与 reconciliation、所有权/404门禁、真实类型/签名校验、并发/CAS及隔离 PostgreSQL 故障测试通过。
+运行解除条件：在同一合格候选上通过完整release gate，取得专项授权后完成备份、0040→0043升级、部署，以及上传/恢复/越权/并发/故障端到端验收；此前不得把PR-004写成运行环境已解决。
 
 ### PR-005 强制发布测试门工具已建立，但没有候选PASS
 
-- TASK42建立了227文件清单（203 REQUIRED、24有明确别名/历史N/A）、18步`test:release`、固定执行器、资源/timeout/无skip、机器报告及候选manifest绑定。
-- 最终源码快照已通过合同6文件/44、Node 107文件/886、PostgreSQL 80文件/367和POSIX 4文件/29，以及Migration/恢复/Python/Compose/lint/凭证门。
+- 当前清单经TASK43扩展为230文件（206 REQUIRED、24有明确别名/历史N/A）、18步`test:release`、固定执行器、资源/timeout/无skip、机器报告及候选manifest绑定；其中Node 109、PostgreSQL 81、Browser 6、历史D1 22、PG alias 2、release contract 6、POSIX 4。
+- TASK42最终源码快照曾通过Node 107文件/886、PostgreSQL 80文件/367等完整仓库门；TASK43随后通过新增定向/隔离测试及release contract44/44、supervisor15/15，但没有在当前源码提交上重跑完整Node-source、81文件PostgreSQL或18步候选门。
 - Browser 6项仍无固定Chromium/Playwright运行时；完整多tsconfig因既有ES2017 BigInt/历史声明债失败；没有候选镜像级SBOM和新鲜漏洞PASS。因此完整18步候选门按设计保持阻断，不能把仓库工具验证解释为候选通过。
 
 解除条件：固定并验证Browser运行时、修复完整typecheck、在获准候选镜像上生成镜像SBOM/新鲜漏洞PASS并运行完整18步门；任何缺失、跳过或失败继续阻止候选晋升。
@@ -156,8 +156,8 @@
 
 1. `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成 G1 合成/隔离证据；真实 G2 被异机目标、RPO/RTO和专项授权阻塞。
 2. G3仓库工具已由TASK42完成；候选build、Browser、完整typecheck、镜像SBOM/漏洞PASS和UAT对齐仍保持失败关闭并需后续适用授权/资源。
-3. 当前转入G4，修复物料导入 fallback 的幂等、上传原子性、文件检查和任务所有权。
-4. 修复健康、会话绝对时限和经业务批准的权限矩阵。
+3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
+4. 下一步修复健康、会话绝对时限和经业务批准的权限矩阵；优先选择不依赖外部资源的仓库安全项。
 5. 更新并演练监控、升级、回滚和故障手册。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。
@@ -182,3 +182,5 @@
 - 本任务没有创建临时容器、数据库、镜像、Volume或备份，没有需要清理的临时资源。
 
 G1 增量验证使用一次一个受限临时容器：合同 41/41、双独立 PostgreSQL 集群恢复和 Dashboard PostgreSQL 2/2 通过，容器/测试库/临时目录清零；任务前后 available memory约 2.2 GiB、Swap约391 MiB、根盘31 GiB，四个 UAT 服务 restart 0/OOM false。没有 build、Migration、Compose 变更、UAT/生产写或持久卷操作。
+
+TASK43增量验证同样串行且一次一个临时重任务：fallback unit/handler20/20、worker8/8、UI107/107、Migration4/4、parser/API client45/45、隔离PostgreSQL fallback17/17及真实XLSX worker1/1通过；release inventory为230/206/24。任务容器、测试库和临时目录清零；起点/收口available约2.2/2.0 GiB、Swap425/439 MiB、根盘31 GiB、Load1低于4，四服务restart0/OOM false。没有build、UAT/生产Migration、部署、当前卷读取或真实数据操作。

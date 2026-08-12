@@ -2,18 +2,21 @@
 
 最后更新时间：2026-08-12（Asia/Shanghai）
 
-## SELFHOST-MATERIAL-IMPORT-SAFETY-43（执行中；仅仓库与隔离测试）
+## SELFHOST-MATERIAL-IMPORT-SAFETY-43（完成；仓库与隔离验证，运行面未部署）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / IMPLEMENTATION IN PROGRESS / PRODUCTION NO-GO | G4/PR-004为唯一active task；系统仍不能交给真实员工 |
-| 起点 | PASS / CONTROLLED | `main@70bfb8b…`、源码alpha.44/0041；唯一既有未跟踪状态报告保持不读不改不提交 |
-| 已核验缺口 | FAIL / P0 | 建批无持久幂等；上传先永久落盘后验权/入库、无CAS/补偿；DTO虚报安全通过；job查询无aggregate owner隔离 |
-| 实现合同 | D-117 / SAGA | 数据库意图→私有staging→服务端实际检查→同根原子提升→最终发布；失败进入可重放/明确失败/有证据协调状态 |
-| 运行面影响 | NONE AUTHORIZED | 不连接UAT/生产、不读取当前四卷、不build/deploy/restart或运行真实Migration |
-| 起点资源 | PASS | available约2.2 GiB、Swap425 MiB、根盘31 GiB、Load低；四服务restart0/OOM false |
-| 当前动作 | IMPLEMENTATION | 先落关系化0042与独立服务边界，再执行文件故障、并发、岗位和隔离PostgreSQL/Migration测试 |
-| 外部资源 | NOT REQUIRED FOR CURRENT STAGE | 当前仓库与隔离阶段不需用户授权；未来UAT/生产/真实数据仍须专项授权 |
+| 最终状态 | DONE / REPOSITORY AND ISOLATED TESTS VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO | G4/PR-004仓库缺口关闭；运行UAT仍旧实现，系统仍不能交给真实员工 |
+| 起点/源码 | PASS / CONTROLLED | `main@70bfb8b…`、alpha.44/0041起步；最终源码alpha.44/0043，唯一既有未跟踪状态报告保持不读不改不提交 |
+| Git身份 | PASS / TWO-COMMIT BUNDLE | 源码`5767c92e51e4f25ba49fa4431299f265ef4cb7aa`/tree`bb4ef005…`，manifest-only直接子提交`dad7468`；bundle SHA-256 `b948e088…28e9` |
+| 实现合同 | PASS / D-117 SAGA | 持久幂等→正文前owner/状态/CAS→私有staging→服务端实际检查→同根无覆盖原子提升→最终发布；失败可重放、明确失败或有证据协调 |
+| 文件/任务 | PASS | SHA/大小/签名/MIME/宏与XLS检查、受限路径/fsync、retry/reconcile/delete-pending；job aggregate owner隔离，worker重哈希并单事务发布终态 |
+| Migration | PASS / APPEND ONLY | 0042建立模型并保持不可变，0043修正终态约束；Schema/snapshot/journal/查询/allowlist一致，0001—0042未回写 |
+| 自动验证 | PASS / SCOPED | unit/handler20、worker8、UI107、Migration4、parser/client45、PG17+XLSX worker1、组合176、typecheck/lint、release44、supervisor15及230/206/24 inventory通过 |
+| 运行面影响 | NONE | 未连接UAT/生产、读取当前四卷、build/deploy/restart或运行真实Migration；UAT保持alpha.42/0040 |
+| 资源/清理 | PASS | 起点/收口available约2.2/2.0 GiB、Swap425/439 MiB、根盘31 GiB、Load1低于4；四服务restart0/OOM false，任务容器/库/目录清零 |
+| 剩余门禁 | OPEN | 完整候选gate、同候选镜像、0040→0043 UAT升级/部署、真实数据和岗位验收均未完成；下一步处理G4会话/权限/健康风险 |
+| 外部资源 | NOT REQUIRED FOR NEXT REPOSITORY TASK | UAT/生产/真实数据/员工试用仍须专项授权；当前可继续仓库安全加固 |
 
 ## SELFHOST-OPS-RELEASE-GATE-42（完成；真实候选证据仍阻塞）
 

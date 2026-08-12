@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-MATERIAL-IMPORT-SAFETY-43`，状态为`IMPLEMENTATION IN PROGRESS / REPOSITORY AND ISOLATED TESTS ONLY / PRODUCTION NO-GO`。任务按G4/D-117修复物料导入fallback的持久幂等、文件staging/原子提升、服务端真实文件检查、CAS/并发与job所有权；不连接UAT/生产、不读取当前四卷、不build/deploy。G2仍因异机目标、RPO/RTO、加密/保留责任和真实数据专项授权阻塞；`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
+当前零`DOING`，active slot 为`IDLE`。`SELFHOST-MATERIAL-IMPORT-SAFETY-43`已完成仓库实现与隔离验证，但未部署到运行面；源码为alpha.44/0043，非生产UAT仍为alpha.42/0040，系统继续`PRODUCTION NO-GO`。G2仍因异机目标、RPO/RTO、加密/保留责任和真实数据专项授权阻塞；下一调度将从G4未关闭的会话、权限、安全与健康门中选择不依赖外部资源的最高优先级任务。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -26,6 +26,8 @@
 2026-08-12第六次调度事件：`SELFHOST-OPS-RELEASE-GATE-42 DOING → DONE`。不可变候选合同、精确Migration allowlist、18步串行门、content-addressed root supervisor、并发安全runtime identity及隔离测试工具完成；最终源码`d022f2c`和manifest-only提交`f67cc41`形成可验证两提交链。合同6文件/44测试、Node 107文件/886、PostgreSQL 80文件/367、POSIX 4文件/29、supervisor 15/15、隔离Migration、异集群恢复、Python三基线、Compose、lint和凭证扫描通过。没有候选镜像、Browser运行时、镜像SBOM/新鲜漏洞PASS，完整typecheck仍失败，因此未运行真实18步候选门、未产生`ELIGIBLE`manifest，UAT保持alpha.42/0040且系统仍为`PRODUCTION NO-GO`。
 
 2026-08-12第七次调度事件：主智能体从TASK42收口后的零`DOING`自动选择G4最高优先级安全任务，状态按`SELFHOST-MATERIAL-IMPORT-SAFETY-43 TODO → DOING`切换唯一active slot。D-117固定数据库意图、私有staging、服务端检查、同根原子提升和可恢复协调边界；范围只含仓库源码、扩展式0042、合成文件与隔离PostgreSQL测试，不访问UAT/生产或当前四卷，不build/deploy。
+
+2026-08-12第八次调度事件：`SELFHOST-MATERIAL-IMPORT-SAFETY-43 DOING → DONE`。源码提交`5767c92e51e4f25ba49fa4431299f265ef4cb7aa`与manifest-only直接子提交`dad7468`形成可复核证据链，bundle SHA-256为`b948e08861e5114660650e21faa9374cef879b354cb59c6c0d0bdb62960228e9`。持久幂等、正文前owner/状态/CAS门禁、私有staging/无覆盖原子提升、实际文件检查、可恢复协调、job所有权、worker终态事务和append-only 0042→0043通过定向与隔离PostgreSQL验证；release inventory更新为230/206/24。未运行完整候选门、build、UAT Migration/deploy或真实数据，运行UAT仍为alpha.42/0040，系统继续`PRODUCTION NO-GO`。
 
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
@@ -43,12 +45,13 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-MATERIAL-IMPORT-SAFETY-43 | 物料导入fallback幂等、文件原子性与任务所有权加固 | DOING | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、既有三条只读审计证据、项目负责人（未来UAT/生产Migration/deploy/真实数据专项授权） | 2026-08-12 | - | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-RELEASE-GATE-42、PR-004、D-117 | `IMPLEMENTATION IN PROGRESS / REPOSITORY AND ISOLATED TESTS ONLY / PRODUCTION NO-GO`。验收覆盖建批/上传持久幂等、owner/状态/CAS、staging与原子提升、实际类型/摘要/基础安全、故障协调和job所有权；不触碰运行面。见[任务文档](../tasks/SELFHOST-MATERIAL-IMPORT-SAFETY-43.md)及[D-117](DECISIONS.md#d-117-物料导入-fallback-采用持久幂等staging-原子提升与可恢复协调)。 |
+| - | 当前无执行中任务 | IDLE | - | - | - | - | TASK43收口后active slot已释放；下一任务必须另行登记为唯一DOING。 |
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-MATERIAL-IMPORT-SAFETY-43 | 物料导入fallback幂等、文件原子性与任务所有权加固 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、既有三条只读审计证据、项目负责人（未来UAT/生产Migration/deploy/真实数据专项授权） | 2026-08-12 | 2026-08-12 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-RELEASE-GATE-42、PR-004、D-117 | `DONE / REPOSITORY AND ISOLATED TESTS VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`。源码`5767c92`与manifest-only `dad7468`形成证据链；持久幂等、正文前owner/状态/CAS、私有staging/无覆盖原子提升、真实文件检查、协调恢复、job所有权和worker终态事务通过，append-only head为0043。UAT仍alpha.42/0040。见[任务文档](../tasks/SELFHOST-MATERIAL-IMPORT-SAFETY-43.md)、[自托管安全合同](../material-master/material-import-selfhost-safety-v1.md)及[D-117](DECISIONS.md#d-117-物料导入-fallback-采用持久幂等staging-原子提升与可恢复协调)。 |
 | SELFHOST-OPS-RELEASE-GATE-42 | 发布候选身份、Migration Allowlist与强制测试门 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、应用测试/数据迁移/运维安全智能体（只读审计）、项目负责人（未来build/UAT/发布专项授权） | 2026-08-12 | 2026-08-12 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、PR-003、PR-005、D-115、D-116 | `DONE / REPOSITORY TOOLING VERIFIED / CANDIDATE EVIDENCE BLOCKED / PRODUCTION NO-GO`。源码`d022f2c`与manifest-only `f67cc41`形成36文件content-addressed supervisor链；18步门、Migration allowlist及隔离回归已验证。Browser、完整typecheck、候选镜像/SBOM/新鲜漏洞PASS仍阻止真实候选晋升，未build/deploy或连接UAT。见[任务文档](../tasks/SELFHOST-OPS-RELEASE-GATE-42.md)及[D-116](DECISIONS.md#d-116-发布候选采用不可变证据包精确-migration-allowlist-与失败关闭串行门)。 |
 | SELFHOST-OPS-BACKUP-RECOVERY-V2-41 | 备份恢复契约V2与隔离故障测试 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计与独立建议）、项目负责人（未来异机/真实数据专项授权） | 2026-08-12 | 2026-08-12 | SELFHOST-PRODUCTION-READINESS-40、PR-001、PR-002、D-115 | `DONE / SYNTHETIC-ISOLATED COMPLETE / ACTUAL OFFHOST BLOCKED / PRODUCTION NO-GO`。四域manifest、root-only凭据、writer/数据库守卫、不可变三层回执、不同机器/集群、原子恢复/补偿、prepared补发和Dashboard失败关闭通过41/41合同及双集群恢复测试；未读当前卷、未外传或部署。见[任务文档](../tasks/SELFHOST-OPS-BACKUP-RECOVERY-V2-41.md)及[D-115](DECISIONS.md#d-115-备份恢复-v2-采用四域不可变证据链不同故障域集群证明与运行身份失败关闭)。 |
 | SELFHOST-PRODUCTION-READINESS-40 | 投产事实基线与失败关闭准入门禁 | DONE | Codex 主智能体（唯一写入、证据归并、验收、文档和提交）、数据迁移/应用测试/运维安全子智能体（只读审计）、项目负责人（生产与外部资源专项授权） | 2026-08-12 | 2026-08-12 | AGENTS.md、D-040、SELFHOST-OPS-RECOVERY-FOUNDATION-39、SELFHOST-UAT-FIX-38 | `DONE / PRODUCTION NO-GO BASELINE ESTABLISHED`。源码 alpha.44/0041 与 UAT alpha.42/0040 漂移；四域无异机数据锚点/当前恢复证据；导入 fallback 与默认测试门为P0。已建立十二项门禁、PR-001—007、G0—G10路线和授权矩阵；没有生产/业务写。见[任务文档](../tasks/SELFHOST-PRODUCTION-READINESS-40.md)及[投产准入基线](PRODUCTION_READINESS.md)。 |
