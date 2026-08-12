@@ -1874,6 +1874,42 @@
 - 拒绝继续用ES2017再为BigInt/正则添加伪声明，也拒绝用`skipLibCheck`、`@ts-ignore`、空声明或扩大exclude隐藏自托管源码。
 - 拒绝让类型检查在只读候选快照写入增量制品，或把工作区缓存当作可重复发布证据。
 
+## D-121 Browser 发布门采用内容寻址 Playwright、同容器 PostgreSQL 与历史精确 Migration 模板
+
+- 日期：2026-08-12
+- 状态：`ACCEPTED / IMPLEMENTED IN SOURCE / FULL CLEAN-SNAPSHOT EXECUTION PENDING / RUNTIME NOT AUTHORIZED`
+- 提案与实施：Codex 持续交付负责人，依据项目负责人持续推进、智能体团队组织和隔离测试授权
+- 确认边界：只适用于仓库发布测试运行时和合成隔离数据库；候选镜像、UAT/生产 Migration/deploy、真实数据、账号、员工试用和正式晋升仍须分别满足证据或专项授权
+
+### Context
+
+- D-116 的官方发布清单已经把 6 个 Browser 文件标为 REQUIRED，但执行器固定返回运行时不可用；因此任何候选都不可能完成 18 步发布门。
+- 六个文件需要真实 Chromium、standalone Web 和 PostgreSQL 17，并分别断言历史 Migration head 0036—0039；把它们改跑当前 head 会弱化既有迁移边界，而连接 UAT 则违反隔离和生产保护规则。
+- 宿主没有 Node/Chromium，当前依赖也没有 Playwright。动态下载浏览器、使用浮动tag或从工作区未提交源码构建都会让发布证据不可重放。
+- 低资源规则只允许一个临时容器；独立 Web、Browser、PostgreSQL 三容器并行会突破资源和临时容器合同。
+
+### Decision
+
+1. Browser runtime 固定为官方 Playwright `linux/amd64`镜像完整Repo/config digest，固定`playwright-core 1.51.1`、Chromium revision 1161/version `134.0.6998.35`以及实际可执行文件路径和SHA-256；依赖树、lock、镜像或可执行文件任一漂移均失败关闭且不得隐式pull。
+2. 发布动作只接受干净HEAD。源码通过Git archive进入不可变快照，在已固定Node 22镜像、无网络和受限资源下以非root用户生成测试专用standalone；源码文件只读，只允许`.vinext`、`dist`和明确tmpfs写入。
+3. PostgreSQL使用既有内容寻址17镜像。执行器先创建、导出并删除唯一临时容器，再把rootfs作为本任务私有可写目录挂入唯一Browser容器；同一网络命名空间仅启用loopback，外部网络为`none`，不挂载Docker socket、UAT或四个持久卷。
+4. Browser容器仅增加`SYS_CHROOT`、`SETUID`、`SETGID`以用UID 999启动隔离PostgreSQL并降权到UID 1000运行Node/Chromium；保持只读rootfs、`no-new-privileges`、memory/swap/CPU/PID限制和有界tmpfs。成功、失败和信号路径都按精确label/name停止数据库、终止进程组并清理本任务资源。
+5. 执行器从官方inventory复核恰好6个`BROWSER_E2E` REQUIRED文件及摘要，并固定每项数据库名、确认变量、loopback端口和Migration head。先事务性建立0036/0037/0038/0039模板，再逐库创建、逐文件串行执行和删除；新增、删除、重排、skip/todo、超时、端口/进程泄漏或总计不是11项全部失败关闭。
+6. 发布runtime policy和gate report必须绑定Browser镜像digest及Chromium可执行SHA；supervisor bundle必须包含Browser shell、runner与Python负向合同。Browser动作不再允许“运行时不可用”占位成功或人工替代。
+7. npm报告的既有依赖漏洞不因加入测试运行时而降级或隐藏；镜像级SBOM与新鲜漏洞零发现仍由后续候选安全门独立失败关闭。
+
+### Consequences
+
+- 仓库具备可重放、无外网、历史Migration精确且不接触UAT的Browser门实现；静态supervisor合同与release合同已验证，正式6文件/11项干净快照执行和bundle重生成仍是本任务关闭前必需证据。
+- Browser镜像和导出的PostgreSQL rootfs增加临时磁盘占用，故执行前后必须检查至少10 GiB根盘、available memory、Swap、Load、OOM/restart并确认精确临时目录/容器清零。
+- 本决定不证明候选Web/Worker镜像安全，也不授权联网漏洞库更新、镜像build/push、UAT/生产运行面变更、真实数据或员工使用；系统继续`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝动态`npx playwright install`、浮动镜像tag、宿主浏览器或未锁定可执行文件，也拒绝把缺失运行时标为N/A/PASS。
+- 拒绝把六个历史数据库断言改到当前head、共享一个污染数据库、连接UAT，或以mock/HTTP桩替代真实浏览器和服务端流程。
+- 拒绝并行启动独立数据库/Web/Browser容器、挂载Docker socket或为方便扩大capability，也拒绝在失败时按模糊名称批量删除容器和目录。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

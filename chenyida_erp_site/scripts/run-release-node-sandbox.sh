@@ -24,6 +24,9 @@ SUPERVISOR_SITE_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 [ "${ERP_RELEASE_SUPERVISOR_SITE_ROOT:-$SUPERVISOR_SITE_ROOT}" = "$SUPERVISOR_SITE_ROOT" ] || { echo "release supervisor root mismatch" >&2; exit 1; }
 REPOSITORY_ROOT=${ERP_RELEASE_REPOSITORY_ROOT:-$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd -P)}
 REPOSITORY_ROOT=$(readlink -f "$REPOSITORY_ROOT")
+if [ "$ACTION" = browser-e2e ]; then
+  exec "$SCRIPT_DIR/run-release-browser-tests.sh"
+fi
 git_candidate() { /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.useReplaceRefs=false -c tar.umask=0022 -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" "$@"; }
 [ "$(git_candidate rev-parse --show-toplevel)" = "$REPOSITORY_ROOT" ] || { echo "release repository root is invalid" >&2; exit 1; }
 SITE_ROOT="$REPOSITORY_ROOT/chenyida_erp_site"
@@ -146,9 +149,6 @@ case "$ACTION" in
     ;;
   node-source)
     set -- /bin/sh -c 'set -eu; ./node_modules/.bin/vinext build; node scripts/ensure-vinext-client-assets.mjs; node /supervisor/scripts/release-test-inventory.mjs run NODE_SOURCE' release-node-source
-    ;;
-  browser-e2e)
-    set -- /bin/sh -c 'set -eu; node /supervisor/scripts/release-test-inventory.mjs verify; echo "RELEASE_TEST_REQUIRED_HARNESS_NOT_AVAILABLE:$1" >&2; exit 1' release-required-harness "$ACTION"
     ;;
   special-posix)
     run_special_posix_container

@@ -17,10 +17,24 @@
     "repo_digest": "sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37",
     "config_digest": "sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37"
   },
+  "browser_image": {
+    "reference": "mcr.microsoft.com/playwright@sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961",
+    "repo_digest": "sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961",
+    "config_digest": "sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961"
+  },
+  "browser_runtime": {
+    "package_name": "playwright-core",
+    "package_version": "1.51.1",
+    "browser_name": "chromium",
+    "browser_revision": "1161",
+    "browser_version": "134.0.6998.35",
+    "executable_path": "/ms-playwright/chromium-1161/chrome-linux/chrome",
+    "executable_sha256": "efb2bece6f2f5bc00dc270162d2241c86d509ca4f4297b1eb0f5cd8894d050be"
+  },
   "node_dependencies": {
     "path": "chenyida_erp_site/node_modules",
-    "tree_sha256": "9ab3e889df4519ecbdfa6cce524e96edbe17ce9d3d9780e9487d59cfc8960663",
-    "package_lock_sha256": "94b1005f3231f9c0e62741b40108263e8a6ffb705671b6e83bea9a17bd404869"
+    "tree_sha256": "3d727122206562df4ebfe24139bfd7b2ae16a299ef2e62b6d55b19e61c2db819",
+    "package_lock_sha256": "3c0522f9ea75cc6c0bfa4c3c92e232f47ce326e73054e070a03bea8320a91815"
   },
   "python_runtime": {
     "venv_path": ".venv",

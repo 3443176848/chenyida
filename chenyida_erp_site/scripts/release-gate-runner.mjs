@@ -43,7 +43,7 @@ const EMPTY_SHA256 = sha256("");
 const DEFAULT_SUPERVISOR_SITE_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const RELEASE_GATE_LOCK_FILE = "/var/lock/chenyida-erp-release-gate-v1.lock";
 const SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
-const RELEASE_TEMPORARY_LABELS = ["chenyida.erp.release-node-bootstrap", "chenyida.erp.release-manifest-node-bootstrap", "chenyida.erp.release-node-test", "chenyida.erp.release-postgres-regression", "chenyida.erp.release-migration-test", "chenyida.erp.backup-recovery-test", "chenyida.erp.release-identity-publisher", "chenyida.erp.release-image-evidence"];
+const RELEASE_TEMPORARY_LABELS = ["chenyida.erp.release-node-bootstrap", "chenyida.erp.release-manifest-node-bootstrap", "chenyida.erp.release-node-test", "chenyida.erp.release-browser-test", "chenyida.erp.release-postgres-regression", "chenyida.erp.release-migration-test", "chenyida.erp.backup-recovery-test", "chenyida.erp.release-identity-publisher", "chenyida.erp.release-image-evidence"];
 const REQUIRED_RUNTIME_SERVICES = new Map([["caddy", new Set(["none"])], ["postgres", new Set(["healthy"])], ["web", new Set(["healthy"])], ["worker", new Set(["none", "healthy"])]]);
 const TREE_DIGEST_COMMAND = "{ /usr/bin/find -P . -xdev -printf '%y|%m|%P|%l\\n' | LC_ALL=C /usr/bin/sort; /usr/bin/find -P . -xdev -type f -print0 | LC_ALL=C /usr/bin/sort -z | /usr/bin/xargs -0 /usr/bin/sha256sum; } | /usr/bin/sha256sum";
 const OFFICIAL_EXECUTOR_COMMANDS = new Map([
@@ -217,11 +217,15 @@ export async function verifyTestRuntimePolicy(repositoryRoot, environment = proc
   if (sha256(await readFile(policy.python_runtime.interpreter_path)) !== policy.python_runtime.interpreter_sha256) fail("GATE_TEST_RUNTIME_INTERPRETER_MISMATCH");
   const nodeModulesDigest = runtimeTreeDigest(nodeModules); const pythonVenvDigest = runtimeTreeDigest(pythonVenv);
   if (nodeModulesDigest !== policy.node_dependencies.tree_sha256 || pythonVenvDigest !== policy.python_runtime.venv_tree_sha256) fail("GATE_TEST_RUNTIME_TREE_MISMATCH");
+  const playwrightPackage = parseStrictJson(await readFile(path.join(nodeModules, policy.browser_runtime.package_name, "package.json"), "utf8"));
+  if (playwrightPackage.name !== policy.browser_runtime.package_name || playwrightPackage.version !== policy.browser_runtime.package_version) fail("GATE_TEST_RUNTIME_BROWSER_PACKAGE_MISMATCH");
   return {
     policy_sha256: RELEASE_TEST_RUNTIME_POLICY_SHA256,
     node_image_digest: inspectPinnedRuntimeImage(policy.node_image.reference, policy.node_image.repo_digest, policy.node_image.config_digest, policy.platform, environment),
     postgres_image_digest: inspectPinnedRuntimeImage(policy.postgres_image.reference, policy.postgres_image.repo_digest, policy.postgres_image.config_digest, policy.platform, environment),
     posix_image_digest: inspectPinnedRuntimeImage(policy.posix_image.reference, policy.posix_image.repo_digest, policy.posix_image.config_digest, policy.platform, environment),
+    browser_image_digest: inspectPinnedRuntimeImage(policy.browser_image.reference, policy.browser_image.repo_digest, policy.browser_image.config_digest, policy.platform, environment),
+    browser_executable_sha256: policy.browser_runtime.executable_sha256,
     node_modules_tree_sha256: nodeModulesDigest,
     python_venv_tree_sha256: pythonVenvDigest,
   };

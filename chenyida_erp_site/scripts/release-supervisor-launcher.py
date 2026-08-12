@@ -44,6 +44,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/create-release-supervisor-bundle-manifest.py": "0555",
     "chenyida_erp_site/scripts/install-release-supervisor.py": "0444",
     "chenyida_erp_site/scripts/publish-release-identity-from-manifest.mjs": "0444",
+    "chenyida_erp_site/scripts/release-browser-e2e-runner.mjs": "0444",
     "chenyida_erp_site/scripts/release-gate-runner.mjs": "0444",
     "chenyida_erp_site/scripts/release-identity-contract.mjs": "0444",
     "chenyida_erp_site/scripts/release-image-evidence-contract.mjs": "0444",
@@ -56,6 +57,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/run-backup-recovery-postgres-test.sh": "0555",
     "chenyida_erp_site/scripts/run-compose-config-test.sh": "0555",
     "chenyida_erp_site/scripts/run-python-baseline-test.sh": "0555",
+    "chenyida_erp_site/scripts/run-release-browser-tests.sh": "0555",
     "chenyida_erp_site/scripts/run-release-gate.sh": "0555",
     "chenyida_erp_site/scripts/run-release-migration-postgres-test.sh": "0555",
     "chenyida_erp_site/scripts/run-release-node-sandbox.sh": "0555",
@@ -68,6 +70,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-release-image-evidence-producer.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-release-manifest-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-release-migration-allowlist.test.mjs": "0444",
+    "chenyida_erp_site/tests/test_release_supervisor_browser.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_installer.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_launcher.py": "0444",
 }

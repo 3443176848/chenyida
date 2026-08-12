@@ -34,7 +34,7 @@ export const RELEASE_GATE_PLAN_REPOSITORY_PATH = "chenyida_erp_site/release/rele
 export const RELEASE_VULNERABILITY_POLICY_ID = "chenyida-erp-zero-known-vulnerabilities-v1";
 export const RELEASE_VULNERABILITY_POLICY_SHA256 = "042cd1bb1185923a8f186319d90194911beba78f761938f42937c5fd0e463ab9";
 export const RELEASE_TEST_RUNTIME_POLICY_CONTRACT = "chenyida-erp-release-test-runtime-policy/v1";
-export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "d98d0750c5c91d1373642ffc2e5fa2555fd708abbc4e3051c1c6279837f4d628";
+export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "84d14eed19d12df6a0d0e0dfa03c3b6096e2643cbc86371db782fa705a6901c9";
 export const RELEASE_TEST_INVENTORY_SHA256 = "606723c16317e654c45fbe08b24b46eabab54fd78a812ff8309e780fed0e0890";
 export const RELEASE_GATE_REQUIRED_STEP_IDS = [
   "release-contracts",
@@ -264,21 +264,25 @@ export function validateOfficialVulnerabilityPolicy(value, raw = null) {
 
 /** @param {unknown} value @param {string | null} [raw] */
 export function validateOfficialTestRuntimePolicy(value, raw = null) {
-  exactKeys(value, ["schema_version", "contract", "platform", "node_image", "postgres_image", "posix_image", "node_dependencies", "python_runtime", "test_inventory"], "TEST_RUNTIME_POLICY_FIELDS_INVALID");
+  exactKeys(value, ["schema_version", "contract", "platform", "node_image", "postgres_image", "posix_image", "browser_image", "browser_runtime", "node_dependencies", "python_runtime", "test_inventory"], "TEST_RUNTIME_POLICY_FIELDS_INVALID");
   if (value.schema_version !== 1 || value.contract !== RELEASE_TEST_RUNTIME_POLICY_CONTRACT || value.platform !== "linux/amd64") reject("TEST_RUNTIME_POLICY_IDENTITY_INVALID");
   exactKeys(value.node_image, ["reference", "repo_digest", "config_digest"], "TEST_RUNTIME_NODE_IMAGE_FIELDS_INVALID");
   exactKeys(value.postgres_image, ["reference", "repo_digest", "config_digest"], "TEST_RUNTIME_POSTGRES_IMAGE_FIELDS_INVALID");
   exactKeys(value.posix_image, ["reference", "repo_digest", "config_digest"], "TEST_RUNTIME_POSIX_IMAGE_FIELDS_INVALID");
+  exactKeys(value.browser_image, ["reference", "repo_digest", "config_digest"], "TEST_RUNTIME_BROWSER_IMAGE_FIELDS_INVALID");
   if (value.node_image.reference !== "node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3" || value.node_image.repo_digest !== "sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3" || value.node_image.config_digest !== "sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3") reject("TEST_RUNTIME_NODE_IMAGE_INVALID");
   if (value.postgres_image.reference !== "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394" || value.postgres_image.repo_digest !== "sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394" || value.postgres_image.config_digest !== "sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394") reject("TEST_RUNTIME_POSTGRES_IMAGE_INVALID");
   if (value.posix_image.reference !== "node@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37" || value.posix_image.repo_digest !== "sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37" || value.posix_image.config_digest !== "sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37") reject("TEST_RUNTIME_POSIX_IMAGE_INVALID");
-  for (const image of [value.node_image, value.postgres_image, value.posix_image]) {
+  if (value.browser_image.reference !== "mcr.microsoft.com/playwright@sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961" || value.browser_image.repo_digest !== "sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961" || value.browser_image.config_digest !== "sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961") reject("TEST_RUNTIME_BROWSER_IMAGE_INVALID");
+  for (const image of [value.node_image, value.postgres_image, value.posix_image, value.browser_image]) {
     string(image.repo_digest, DIGEST, "TEST_RUNTIME_REPO_DIGEST_INVALID");
     string(image.config_digest, DIGEST, "TEST_RUNTIME_CONFIG_DIGEST_INVALID");
     if (!image.reference.endsWith(`@${image.repo_digest}`)) reject("TEST_RUNTIME_REPO_REFERENCE_MISMATCH");
   }
+  exactKeys(value.browser_runtime, ["package_name", "package_version", "browser_name", "browser_revision", "browser_version", "executable_path", "executable_sha256"], "TEST_RUNTIME_BROWSER_FIELDS_INVALID");
+  if (value.browser_runtime.package_name !== "playwright-core" || value.browser_runtime.package_version !== "1.51.1" || value.browser_runtime.browser_name !== "chromium" || value.browser_runtime.browser_revision !== "1161" || value.browser_runtime.browser_version !== "134.0.6998.35" || value.browser_runtime.executable_path !== "/ms-playwright/chromium-1161/chrome-linux/chrome" || value.browser_runtime.executable_sha256 !== "efb2bece6f2f5bc00dc270162d2241c86d509ca4f4297b1eb0f5cd8894d050be") reject("TEST_RUNTIME_BROWSER_INVALID");
   exactKeys(value.node_dependencies, ["path", "tree_sha256", "package_lock_sha256"], "TEST_RUNTIME_NODE_FIELDS_INVALID");
-  if (value.node_dependencies.path !== "chenyida_erp_site/node_modules" || value.node_dependencies.tree_sha256 !== "9ab3e889df4519ecbdfa6cce524e96edbe17ce9d3d9780e9487d59cfc8960663" || value.node_dependencies.package_lock_sha256 !== "94b1005f3231f9c0e62741b40108263e8a6ffb705671b6e83bea9a17bd404869") reject("TEST_RUNTIME_NODE_INVALID");
+  if (value.node_dependencies.path !== "chenyida_erp_site/node_modules" || value.node_dependencies.tree_sha256 !== "3d727122206562df4ebfe24139bfd7b2ae16a299ef2e62b6d55b19e61c2db819" || value.node_dependencies.package_lock_sha256 !== "3c0522f9ea75cc6c0bfa4c3c92e232f47ce326e73054e070a03bea8320a91815") reject("TEST_RUNTIME_NODE_INVALID");
   exactKeys(value.python_runtime, ["venv_path", "venv_tree_sha256", "interpreter_path", "interpreter_sha256", "requirements_sha256", "requirements_dev_sha256"], "TEST_RUNTIME_PYTHON_FIELDS_INVALID");
   if (value.python_runtime.venv_path !== ".venv" || value.python_runtime.venv_tree_sha256 !== "c67b68ec9436f4a13f41df0eff9b552ca3f1d8b9e759113ebd23eefbe9419041" || value.python_runtime.interpreter_path !== "/usr/bin/python3.11" || value.python_runtime.interpreter_sha256 !== "c3d7aaf77a0fe9486380e2b551b9aa7c37f76f46ebe627d4dcad0c38e6485d98" || value.python_runtime.requirements_sha256 !== "702687ef5d857d239673a911520c2cbe805fd2578b7708b16a547234a8274d5d" || value.python_runtime.requirements_dev_sha256 !== "2fa82fddabeb9ed6fb4390790479a81d9affeb5533a79e658cec4c44e5d1270b") reject("TEST_RUNTIME_PYTHON_INVALID");
   exactKeys(value.test_inventory, ["path", "sha256", "total_tests", "required_tests", "not_applicable_tests", "category_counts"], "TEST_RUNTIME_INVENTORY_FIELDS_INVALID");
@@ -537,7 +541,7 @@ export function validateReleaseGateReport(value) {
   exactKeys(value.resources, ["initial", "final", "test_runtime", "baseline_runtime_services", "final_runtime_services", "baseline_container_count", "preexisting_temporary_container_ids", "minimum_available_memory_mib", "maximum_swap_used_percent", "maximum_swap_growth_mib_60s", "minimum_root_free_gib", "maximum_load_1m", "maximum_temporary_containers", "residual_container_ids", "baseline_runtime_failure", "final_resource_failure"], "GATE_REPORT_RESOURCES_FIELDS_INVALID");
   validateResourceSnapshot(value.resources.initial, "GATE_REPORT_INITIAL_RESOURCE");
   validateResourceSnapshot(value.resources.final, "GATE_REPORT_FINAL_RESOURCE");
-  exactKeys(value.resources.test_runtime, ["policy_sha256", "node_image_digest", "postgres_image_digest", "posix_image_digest", "node_modules_tree_sha256", "python_venv_tree_sha256"], "GATE_REPORT_TEST_RUNTIME_FIELDS_INVALID");
+  exactKeys(value.resources.test_runtime, ["policy_sha256", "node_image_digest", "postgres_image_digest", "posix_image_digest", "browser_image_digest", "browser_executable_sha256", "node_modules_tree_sha256", "python_venv_tree_sha256"], "GATE_REPORT_TEST_RUNTIME_FIELDS_INVALID");
   for (const key of Object.keys(value.resources.test_runtime)) string(value.resources.test_runtime[key], key.endsWith("_digest") ? DIGEST : SHA256, "GATE_REPORT_TEST_RUNTIME_VALUE_INVALID");
   if (value.resources.test_runtime.policy_sha256 !== RELEASE_TEST_RUNTIME_POLICY_SHA256) reject("GATE_REPORT_TEST_RUNTIME_POLICY_INVALID");
   const baselineRuntimePassed = validateRuntimeServiceStates(value.resources.baseline_runtime_services, "GATE_REPORT_BASELINE_RUNTIME");
