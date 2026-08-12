@@ -51,9 +51,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0041`，41/head`0041_ai_governance_suggestion_evidence.sql`且SHA-256为`676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2`；并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`，0035/0040及更早Migration未修改。0041只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / G1 SYNTHETIC-ISOLATED COMPLETE / G3 REPOSITORY TOOLING VERIFIED / PRODUCTION NO-GO`。十二项门禁、PR-001—PR-007与G0—G10路线保持；G1/G3工具证据不能替代真实异机副本、候选PASS或员工验收。生产数据、异机真实数据传输、Migration/部署、账号权限和正式切换仍须专项明确授权 |
-| 当前任务 | 零`DOING / IDLE`；`SELFHOST-OPS-RELEASE-GATE-42`已完成仓库工具和隔离验证，但没有真实候选门PASS或`ELIGIBLE`manifest |
-| 下一任务 | 持续交付按G4选择物料导入fallback的持久幂等、文件staging/补偿、CAS和job所有权安全修复。G2真实备份恢复、候选build、UAT Migration/deploy、员工试用和切流仍不自动获权 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / G4 APPLICATION P0 HARDENING / PRODUCTION NO-GO`。G1合成恢复与G3发布工具已完成但不能替代真实异机副本、同候选PASS或员工验收；G4正在关闭PR-004。生产数据、异机真实数据传输、Migration/部署、账号权限和正式切换仍须专项明确授权 |
+| 当前任务 | 唯一`DOING`为`SELFHOST-MATERIAL-IMPORT-SAFETY-43`：按D-117实现建批/上传持久幂等、文件staging/实际安全检查/原子提升、故障协调、CAS和job所有权；只允许仓库与隔离测试 |
+| 下一任务 | TASK43完成后按实证重新排序G4其他会话/权限P0或G5真实源只读分析；G2真实备份恢复、候选build、UAT Migration/deploy、员工试用和切流均不自动获权 |
 
 ## 当前完成模块
 

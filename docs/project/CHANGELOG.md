@@ -4,6 +4,12 @@
 
 ## 2026-08-12
 
+### SELFHOST-MATERIAL-IMPORT-SAFETY-43 - `docs: start material import fallback hardening`
+
+- 调度/决策：TASK42收口后的零DOING按持续交付路线自动切换为`SELFHOST-MATERIAL-IMPORT-SAFETY-43 TODO→DOING`唯一active task；D-117固定数据库意图、私有staging、服务端实际检查、同根原子提升、最终发布和可恢复协调，不把PostgreSQL与文件系统误称为单一ACID事务。
+- 事实：客户端已发送幂等键、预期版本、SHA-256、大小和重复策略；现有fallback未消费这些合同，建批可重复、上传先永久落盘后验权/入库、DTO无条件虚报基础检查通过、job只按UUID查询且未校验批次所有权。
+- 范围：只授权仓库源码、expand-only 0042、合成文件、隔离PostgreSQL和文档；不连接UAT/生产或当前四卷，不build/deploy/restart，不使用真实数据。起点`main@70bfb8b…`、alpha.44/0041；available约2.2 GiB、Swap425 MiB、根盘31 GiB、Load低，四服务restart0/OOM false。
+
 ### SELFHOST-OPS-RELEASE-GATE-42 - `feat: enforce immutable release candidate gate` / focused hardening / `chore: bind release supervisor bundle`
 
 - 发布身份：新增严格release manifest、镜像SBOM/漏洞证据、测试计划/报告和完整Migration allowlist合同；prepared证据在外层二次核验Git/镜像身份后才不可变发布，runtime identity以root锁、两阶段prepare/commit/abort、单调及同证据幂等防止并发旧证据覆盖。

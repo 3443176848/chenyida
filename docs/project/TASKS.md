@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前零`DOING`，状态为`IDLE / PRODUCTION NO-GO`。`SELFHOST-OPS-RELEASE-GATE-42`已完成仓库工具和隔离验证，但真实候选仍因固定Browser运行时、完整typecheck、候选Web/Worker镜像、镜像SBOM及新鲜漏洞扫描证据缺失而失败关闭；G2仍因异机目标、RPO/RTO、加密/保留责任和真实数据专项授权阻塞。持续交付下一安全项按G4转向物料导入fallback的幂等、文件原子性和任务所有权修复；`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
+当前唯一`DOING`为`SELFHOST-MATERIAL-IMPORT-SAFETY-43`，状态为`IMPLEMENTATION IN PROGRESS / REPOSITORY AND ISOLATED TESTS ONLY / PRODUCTION NO-GO`。任务按G4/D-117修复物料导入fallback的持久幂等、文件staging/原子提升、服务端真实文件检查、CAS/并发与job所有权；不连接UAT/生产、不读取当前四卷、不build/deploy。G2仍因异机目标、RPO/RTO、加密/保留责任和真实数据专项授权阻塞；`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -24,6 +24,8 @@
 2026-08-12第五次调度事件：主智能体从零`DOING`自动选择G3最高优先级安全任务，状态按`SELFHOST-OPS-RELEASE-GATE-42 TODO → DOING`切换唯一active slot。范围固定为release身份/manifest、Migration allowlist、测试门、隔离测试和文档；候选build、UAT/生产连接、Migration/deploy及真实数据仍未授权。
 
 2026-08-12第六次调度事件：`SELFHOST-OPS-RELEASE-GATE-42 DOING → DONE`。不可变候选合同、精确Migration allowlist、18步串行门、content-addressed root supervisor、并发安全runtime identity及隔离测试工具完成；最终源码`d022f2c`和manifest-only提交`f67cc41`形成可验证两提交链。合同6文件/44测试、Node 107文件/886、PostgreSQL 80文件/367、POSIX 4文件/29、supervisor 15/15、隔离Migration、异集群恢复、Python三基线、Compose、lint和凭证扫描通过。没有候选镜像、Browser运行时、镜像SBOM/新鲜漏洞PASS，完整typecheck仍失败，因此未运行真实18步候选门、未产生`ELIGIBLE`manifest，UAT保持alpha.42/0040且系统仍为`PRODUCTION NO-GO`。
+
+2026-08-12第七次调度事件：主智能体从TASK42收口后的零`DOING`自动选择G4最高优先级安全任务，状态按`SELFHOST-MATERIAL-IMPORT-SAFETY-43 TODO → DOING`切换唯一active slot。D-117固定数据库意图、私有staging、服务端检查、同根原子提升和可恢复协调边界；范围只含仓库源码、扩展式0042、合成文件与隔离PostgreSQL测试，不访问UAT/生产或当前四卷，不build/deploy。
 
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
@@ -41,7 +43,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| — | — | — | — | — | — | — | 当前零DOING；TASK42完成后短暂回到IDLE，下一任务由持续交付循环另行登记。 |
+| SELFHOST-MATERIAL-IMPORT-SAFETY-43 | 物料导入fallback幂等、文件原子性与任务所有权加固 | DOING | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、既有三条只读审计证据、项目负责人（未来UAT/生产Migration/deploy/真实数据专项授权） | 2026-08-12 | - | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-RELEASE-GATE-42、PR-004、D-117 | `IMPLEMENTATION IN PROGRESS / REPOSITORY AND ISOLATED TESTS ONLY / PRODUCTION NO-GO`。验收覆盖建批/上传持久幂等、owner/状态/CAS、staging与原子提升、实际类型/摘要/基础安全、故障协调和job所有权；不触碰运行面。见[任务文档](../tasks/SELFHOST-MATERIAL-IMPORT-SAFETY-43.md)及[D-117](DECISIONS.md#d-117-物料导入-fallback-采用持久幂等staging-原子提升与可恢复协调)。 |
 
 ## 已完成任务
 

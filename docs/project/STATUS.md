@@ -2,6 +2,19 @@
 
 最后更新时间：2026-08-12（Asia/Shanghai）
 
+## SELFHOST-MATERIAL-IMPORT-SAFETY-43（执行中；仅仓库与隔离测试）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / IMPLEMENTATION IN PROGRESS / PRODUCTION NO-GO | G4/PR-004为唯一active task；系统仍不能交给真实员工 |
+| 起点 | PASS / CONTROLLED | `main@70bfb8b…`、源码alpha.44/0041；唯一既有未跟踪状态报告保持不读不改不提交 |
+| 已核验缺口 | FAIL / P0 | 建批无持久幂等；上传先永久落盘后验权/入库、无CAS/补偿；DTO虚报安全通过；job查询无aggregate owner隔离 |
+| 实现合同 | D-117 / SAGA | 数据库意图→私有staging→服务端实际检查→同根原子提升→最终发布；失败进入可重放/明确失败/有证据协调状态 |
+| 运行面影响 | NONE AUTHORIZED | 不连接UAT/生产、不读取当前四卷、不build/deploy/restart或运行真实Migration |
+| 起点资源 | PASS | available约2.2 GiB、Swap425 MiB、根盘31 GiB、Load低；四服务restart0/OOM false |
+| 当前动作 | IMPLEMENTATION | 先落关系化0042与独立服务边界，再执行文件故障、并发、岗位和隔离PostgreSQL/Migration测试 |
+| 外部资源 | NOT REQUIRED FOR CURRENT STAGE | 当前仓库与隔离阶段不需用户授权；未来UAT/生产/真实数据仍须专项授权 |
+
 ## SELFHOST-OPS-RELEASE-GATE-42（完成；真实候选证据仍阻塞）
 
 | 验证项 | 结果 | 说明 |

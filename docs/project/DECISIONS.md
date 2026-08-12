@@ -1721,6 +1721,46 @@
 - 拒绝把lockfile依赖清单称为镜像SBOM，把离线未评估称为零漏洞，或为完成任务跳过既有typecheck失败。
 - 拒绝由release gate隐式build、pull、deploy或输出完整命令日志，也拒绝并发运行重型门禁。
 
+## D-117 物料导入 fallback 采用持久幂等、staging 原子提升与可恢复协调
+
+- 日期：2026-08-12
+- 状态：`ACCEPTED AS TASK43 IMPLEMENTATION BASELINE / REPOSITORY AND ISOLATED TESTS ONLY / PRODUCTION USE NOT AUTHORIZED`
+- 提案与实施：Codex 持续交付负责人，依据项目负责人持续推进G4和仓库内安全实施授权
+- 确认边界：该技术决定只授权源码、expand-only Migration和隔离测试；UAT/生产Migration、部署、真实数据、账号与正式使用仍须专项明确授权
+
+### Context
+
+- 客户端导入流程已经生成可重用操作标识，并发送预期批次版本、客户端SHA-256、大小和重复策略；自托管fallback却忽略这些字段，建批没有持久幂等。
+- 上传当前先把multipart文件写进永久uploads，再在数据库核验批次owner并写文件行；越权、状态冲突、数据库失败或进程中断可能留下孤儿文件，且单批次可重复上传。
+- 文件DTO只按扩展名推断类型并无条件声称`BASIC_CHECK_PASSED`；后台job读取也没有通过aggregate批次复核行级可见性。
+- PostgreSQL事务无法与普通本地文件系统rename组成真正分布式ACID。安全设计必须承认结果未知窗口，持久化意图和事实，并支持确定性协调。
+
+### Decision
+
+1. 建批和上传都使用既有`material_import_idempotency`作为持久操作记录，唯一作用域绑定username、method、精确route scope和key digest，请求摘要绑定业务载荷；同请求重放原状态/响应，异请求409，并发只有一个执行者。
+2. 上传在读取大请求体前先完成认证、权限、CSRF、必填元数据头、owner、允许状态、CAS和幂等意图检查。不可见批次统一404，失败前不得创建任何staging或正式文件。
+3. 文件先写入同一uploads根下不可由业务读取的私有staging命名空间；路径由服务端operation identity决定，禁止使用原始文件名作为路径。写入采用临时文件、fsync、无覆盖发布和目录fsync。
+4. 服务端独立计算实际SHA-256和大小，检测文件签名，并把扩展名、声明MIME/摘要/大小、检测类型、实际摘要/大小及基础安全检查状态持久化。声明与实际不一致、危险签名、宏/压缩包限制、二进制伪CSV等全部失败关闭，不再由DTO推断通过。
+5. 通过检查后，只能把已验证staging文件在同一文件系统无覆盖原子提升到确定性正式路径；最终数据库事务再次锁定幂等记录、batch和file，验证版本/状态/事实后才发布`FILE_READY`及成功响应。
+6. 跨数据库/文件系统采用saga而非虚假ACID。每一阶段持久化operation/file状态；重试或协调器按确定性路径和摘要安全继续、补偿已知staging，或把批次标为`RECONCILIATION_REQUIRED`。身份不明、摘要不符或可能已发布的文件不得猜测删除。
+7. 单批次只允许一个有效文件；状态机、唯一索引和CAS共同阻止并发双上传。重复内容默认拒绝；只有明确`ALLOW_DUPLICATE`且`retry_of_batch_id`关系闭合时允许新批次继续，原失败批次不改写。
+8. `/api/jobs/:id`必须把`background_jobs`经material import outbox aggregate关联到batch，再执行owner或`material.import.read_any`可见性；无记录和不可见统一404。响应只提供有界状态字段，不返回payload、原始错误正文或未经允许的跨批次结果。
+9. 数据模型只通过0042扩展，保留0001—0041不可变；Schema、snapshot、journal、运行查询和空库/升级/重放/回滚测试必须一致。
+
+### Consequences
+
+- TASK43会新增独立fallback服务边界，缩小`selfhost-api.ts`单文件逻辑，并在隔离PostgreSQL/临时文件根中覆盖幂等、并发、权限、文件安全和故障协调。
+- 成功关闭PR-004仍只代表源码候选安全边界通过；在同候选build、UAT Migration/deploy、真实源分析和人工验收完成前，运行UAT仍保留旧风险且系统继续`PRODUCTION NO-GO`。
+- 协调记录和私有staging会增加受控运维对象；必须提供只处理身份闭合任务的reconcile/reaper入口和运行手册，不允许无界扫描或删除未知文件。
+- 本决定不授权真实供应商文件、当前uploads/数据库读取、UAT/生产Migration、部署、员工试用、正式切换或清理任何持久数据。
+
+### Rejected alternatives
+
+- 拒绝继续把客户端摘要、扩展名或MIME当作服务端安全事实。
+- 拒绝先写永久文件再验权，或仅在异常catch中best-effort删除而没有持久意图/协调状态。
+- 拒绝用数据库事务包装文件rename后声称跨介质原子，也拒绝遇到不确定状态时覆盖、重复创建或猜测删除。
+- 拒绝只隐藏job按钮或按UUID存在性授权读取。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

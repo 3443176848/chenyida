@@ -15,6 +15,8 @@
 
 2026-08-12 第二次增量：`SELFHOST-OPS-RELEASE-GATE-42`已完成 G3 仓库工具和隔离验证。不可变release manifest/镜像安全证据合同、精确Migration allowlist、18步低资源串行门、content-addressed root supervisor及并发安全runtime identity已落地；最终提交快照通过Node、PostgreSQL、POSIX、Migration、恢复、Python、Compose、lint和凭证门。没有固定Browser运行时、通过完整typecheck的候选、获准Web/Worker镜像、镜像SBOM或新鲜漏洞PASS，故没有运行真实候选门或生成`ELIGIBLE`manifest，整体判定仍为`PRODUCTION NO-GO`。
 
+2026-08-12 第三次增量：`SELFHOST-MATERIAL-IMPORT-SAFETY-43`已登记为G4唯一执行任务。D-117要求把建批/上传持久幂等、批次owner/状态/CAS、私有staging、服务端实际文件检查、同根原子提升、跨数据库/文件系统故障协调及job所有权作为一个失败关闭边界实现。当前只是实施开始，不解除PR-004或任何投产门禁。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -87,6 +89,8 @@
 解除条件：建立不可变 release manifest 与 migration allowlist；隔离 build/升级/回退通过后，经专项授权把 UAT 对齐到同一候选并重新验收。
 
 ### PR-004 物料导入 fallback 存在服务端安全与一致性缺口
+
+状态：`DOING / SELFHOST-MATERIAL-IMPORT-SAFETY-43 / NOT YET REMEDIATED`
 
 - 创建批次不要求持久幂等键；重试可重复建批。
 - 上传先永久写盘，再核验批次所有权/状态并写数据库；越权或数据库失败可留下孤儿文件。
