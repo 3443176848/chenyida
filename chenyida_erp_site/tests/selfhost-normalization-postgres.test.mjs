@@ -196,7 +196,11 @@ async function createMappedBatch({ adaptiveMultiRowHeader = false } = {}) {
     update material_import_mappings set status='CONFIRMED',mapping_snapshot=$2,confirmed_by='normalizer1',confirmed_at=now(),updated_at=now()
     where id=$1
   `, [mappingId, snapshot]);
-  await pool.query("update material_import_batches set current_parse_run_id=$2 where id=$1", [batchId, parseRunId]);
+  await pool.query(`
+    update material_import_batches set
+      current_parse_run_id=$2,total_rows=$3,accepted_rows=$3,rejected_rows=0
+    where id=$1
+  `, [batchId, parseRunId, values.length]);
   return { batchId, parseRunId, fileId: Number(file.rows[0].id), sheetId: Number(sheet.rows[0].id), mappingId };
 }
 
@@ -266,6 +270,14 @@ test("PostgreSQL API and worker publish complete candidates, lineage, issues, hi
   assert.equal(summary.current_run.error_rows, 2);
   assert.equal(summary.current_run.issue_count, 3);
   assert.match(summary.current_run.result_digest, /^[a-f0-9]{64}$/);
+  assert.deepEqual(
+    await pool.query("select total_rows,accepted_rows,rejected_rows from material_import_batches where id=$1", [batchId]).then((result) => ({
+      total_rows: Number(result.rows[0].total_rows),
+      accepted_rows: Number(result.rows[0].accepted_rows),
+      rejected_rows: Number(result.rows[0].rejected_rows),
+    })),
+    { total_rows: 5, accepted_rows: 2, rejected_rows: 2 },
+  );
 
   const rowsResponse = await api(actor, `/api/material-master/import-batches/${batchId}/normalized-rows?run_id=${runId}&limit=50`);
   const rows = await rowsResponse.json();
@@ -372,6 +384,14 @@ test("create-run and worker honor the adaptive data boundary after a preamble an
     [runId],
   );
   assert.deepEqual(sourceRows.rows.map((row) => Number(row.source_row_number)), [4, 5, 6, 7]);
+  assert.deepEqual(
+    await pool.query("select total_rows,accepted_rows,rejected_rows from material_import_batches where id=$1", [batchId]).then((result) => ({
+      total_rows: Number(result.rows[0].total_rows),
+      accepted_rows: Number(result.rows[0].accepted_rows),
+      rejected_rows: Number(result.rows[0].rejected_rows),
+    })),
+    { total_rows: 7, accepted_rows: 2, rejected_rows: 2 },
+  );
 });
 
 test("database constraints and immutable publication reject inconsistent or duplicate result writes", async () => {
