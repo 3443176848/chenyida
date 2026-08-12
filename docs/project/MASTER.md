@@ -37,7 +37,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成；TASK48由主智能体保持单写者并在三条子智能体只读审计后串行完成。OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT AUTHORIZED` |
+| 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成；TASK49由主智能体保持单写者，数据迁移、应用测试、运维安全三条智能体线只读审计。OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT AUTHORIZED` |
 | 当前版本 | 自托管源码为`0.1.0-alpha.46`，源码Migration为45/head `0045_runtime_worker_readiness.sql`；精确`8952a815…11c4`/tree`1ac73360…faf4`已形成仅本机可解析的Web/Worker隔离候选并通过零发现诊断，但未获正式supervisor gate或部署。并行非生产UAT Web仍为`0.1.0-alpha.42`原镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，运行source revision仍为`569aa954d764309e239d1f6c174e582596d33a24`，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`；0041—0045未应用到UAT。当前运行面仍是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
@@ -51,9 +51,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0045`，45/head`0045_runtime_worker_readiness.sql`，0045 SHA-256为`cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc`；0001—0044未修改，Schema/233表snapshot/journal/allowlist一致。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0045只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / G3 ISOLATED CANDIDATE VERIFIED / FORMAL GATE BLOCKED / PRODUCTION NO-GO`。TASK48已关闭本机精确候选构建、最小Wolfi运行层及零漏洞诊断缺口；正式镜像证据与18步门仍因host supervisor未获安装授权失败关闭。运行面仍是旧版本，真实异机副本、UAT部署、岗位权限、真实迁移和员工验收均未完成 |
-| 当前任务 | `IDLE / ZERO DOING`：TASK48已完成全部可安全隔离工作并释放active slot；正式supervisor、UAT/生产与真实数据边界均未越过 |
-| 下一任务 | 自动启动`SELFHOST-OPS-MONITORING-ALERTING-49`，在仓库和隔离环境补齐运行健康采集、容量阈值、备份/恢复证据新鲜度、告警与运维排障合同；host supervisor安装、G2真实备份恢复、UAT Migration/deploy、员工试用和切流仍须专项授权或外部资源 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / G5 OPERATIONS MONITORING GAP CLOSURE / PRODUCTION NO-GO`。TASK48已关闭本机精确候选与零发现诊断缺口；TASK49正补齐统一运行快照、资源/服务/证据阈值、告警生命周期和排障合同。正式supervisor、真实通知渠道、异机副本、UAT部署、岗位权限、真实迁移和员工验收仍未完成 |
+| 当前任务 | `SELFHOST-OPS-MONITORING-ALERTING-49`是唯一`DOING`：仅在仓库和隔离环境实现失败关闭监控快照、告警状态机、CLI、测试和运行手册；不安装host服务、不发送真实通知、不访问UAT数据库/网络/日志/卷正文或真实数据 |
+| 下一任务 | TASK49完成后按投产门禁选择最高优先级安全缺口；host supervisor安装、真实告警渠道与值班人、G2真实异机备份恢复、UAT Migration/deploy、员工试用和切流仍须专项授权或外部资源 |
 
 ## 当前完成模块
 

@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前为`IDLE / ZERO DOING`瞬时收口点。`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`已完成全部授权内隔离工作；下一安全任务将自动切换到`SELFHOST-OPS-MONITORING-ALERTING-49`。host supervisor安装、真实异机备份恢复、UAT/生产Migration/deploy、账号、真实数据、员工试用和切流仍需专项授权，系统继续`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-OPS-MONITORING-ALERTING-49`。范围固定为仓库和隔离环境中的版本化运行快照、资源/服务/身份/Migration/备份恢复证据阈值、告警状态机、去敏CLI、自动化测试与运行手册；不安装host服务、不发送真实通知、不连接UAT/生产数据库或网络、不读取日志/卷正文/真实数据。host supervisor、真实渠道/值班人、异机真实备份、UAT/生产Migration/deploy、账号、员工试用和切流仍需专项授权，系统继续`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -49,6 +49,8 @@
 
 2026-08-13第十八次调度事件：`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 DOING → DONE`。最终`8952a815`/tree`1ac73360`候选绑定alpha.46/0045，Web/Worker本机registry manifest分别为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`；Wolfi/Node最小层为非root、无npm。固定Trivy与新鲜数据库的断网无socket归档扫描覆盖Web 25+63、Worker 25+60包，全部severity为0且数据库树前后一致。正式镜像证据和18步门均因host supervisor未安装在制品写入前退出1，未旁路或伪造PASS；UAT、四卷和服务未变。active slot释放后按持续交付路线自动转入仓库级监控与告警闭环。
 
+2026-08-13第十九次调度事件：主智能体从TASK48收口后的零`DOING`自动选择G5最高优先级安全任务，状态按`SELFHOST-OPS-MONITORING-ALERTING-49 TODO → DOING`切换唯一active slot。三条子智能体仅做现有数据源、应用健康语义、运维安全和测试缺口的只读审计，主智能体保持唯一写者；仓库实现不构成host安装、真实通知、UAT/生产或真实数据授权。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -65,7 +67,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| — | — | — | — | — | — | 当前无执行中任务；下一安全任务将自动登记。 |
+| SELFHOST-OPS-MONITORING-ALERTING-49 | 运行监控、告警与排障证据闭环 | DOING | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来host安装、真实渠道/值班人、UAT/生产专项授权） | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RUNTIME-HEALTH-TRUTH-45、SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 | `DOING / REPOSITORY AND ISOLATED ONLY / NO HOST INSTALL / PRODUCTION NO-GO`。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-ALERTING-49.md)。 |
 
 ## 已完成任务
 

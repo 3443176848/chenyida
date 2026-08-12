@@ -2,6 +2,18 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
+## SELFHOST-OPS-MONITORING-ALERTING-49（执行中；仓库监控与告警合同）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / REPOSITORY AND ISOLATED ONLY / PRODUCTION NO-GO | 唯一active slot；主智能体唯一写入，三条子智能体只读审计 |
+| 严格起点 | PASS / CONTROLLED | `main@d5df673c602fdc4e558c2799b31dbf1b208316e8`、tree`62c8feb4…05e2`、alpha.46/0045；用户未跟踪状态报告不读不改不提交 |
+| 目标 | IN PROGRESS | 版本化去敏运行快照、资源/服务/身份/Migration/备份恢复证据阈值、告警状态机、CLI、测试和排障手册 |
+| 授权边界 | REPOSITORY / ISOLATED | 不安装host服务、不发送真实通知、不连接UAT/生产数据库或网络、不读日志/卷正文/真实数据，不修改四服务或受保护Volume |
+| 起点运行面 | VERIFIED READ ONLY / UNCHANGED | UAT alpha.42/0040；四服务restart0/OOM false，Web/PostgreSQL healthy、Worker/Caddy health none；只读取Docker metadata |
+| 起点资源 | PASS / BELOW STOP LINES | available约2.2GiB、Swap734MiB/1GiB（72%）、根盘18GiB、Load`0.31/0.32/0.37`、`oom_kill=0` |
+| 系统是否可用 | NO | 真实告警渠道/值班人、host安装、异机恢复、UAT部署、真实迁移和员工试用均未完成 |
+
 ## SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48（完成；隔离候选零发现诊断，正式门失败关闭）
 
 | 验证项 | 结果 | 说明 |

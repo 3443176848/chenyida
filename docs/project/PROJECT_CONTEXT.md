@@ -14,7 +14,9 @@
 
 TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门；TASK47又在源码`9a18a0f`与manifest-only直接子提交`614ef7ac`完成D-121固定Browser门。TASK48随后以运行层源码`864789c8`、严格扫描合同`13c42294`和最终bundle子提交`8952a815`闭合本机候选：Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，固定Wolfi/Node层为非root且无npm，断网无socket扫描覆盖Web 25+63、Worker 25+60包且全部severity为0。三项都不连接或修改UAT/生产；TASK48的诊断不能替代正式supervisor provenance、18步PASS或部署授权。
 
-2026-08-13，`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`已按D-122—D-125完成并释放active slot。最终候选精确绑定`8952a815`/tree`1ac73360`、alpha.46/0045、两镜像manifest/config及构建回执；新鲜Trivy数据库树在扫描前后不变，Web/Worker全部severity为0。host supervisor仍未安装，正式镜像证据与18步门分别在任何制品变更前退出1，未用环境变量或直接脚本旁路。下一安全任务转入仓库级监控、容量、备份证据新鲜度、告警与排障闭环。
+2026-08-13，`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`已按D-122—D-125完成并释放active slot。最终候选精确绑定`8952a815`/tree`1ac73360`、alpha.46/0045、两镜像manifest/config及构建回执；新鲜Trivy数据库树在扫描前后不变，Web/Worker全部severity为0。host supervisor仍未安装，正式镜像证据与18步门分别在任何制品变更前退出1，未用环境变量或直接脚本旁路。
+
+`SELFHOST-OPS-MONITORING-ALERTING-49`现为唯一`DOING`，严格起点`d5df673c…16e8`/tree`62c8feb4…05e2`。任务只在仓库和隔离环境统一运行资源、Compose metadata、live/readiness、发布/Migration身份及备份恢复证据的新鲜度评估，形成去敏快照、告警生命周期、CLI、测试和运行手册；不安装host服务、不发送真实通知、不连接UAT/生产数据库或网络，也不读取日志、卷正文和真实数据。
 
 ## 系统组成
 

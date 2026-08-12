@@ -31,6 +31,8 @@
 
 2026-08-13 第十次增量：`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`已完成授权内工作。D-123—D-125形成精确Git archive构建回执、manifest/config身份分离、固定Wolfi/Node最小非root运行层及严格Wolfi+Node SBOM覆盖合同；`8952a815`/tree`1ac73360`的Web/Worker候选manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`。固定Trivy与7.5小时内数据库在断网、无Docker socket扫描中覆盖Web25+63、Worker25+60包，全部severity为0且数据库树前后一致。host supervisor未安装，正式镜像证据与18步门均在任何制品变更前失败关闭；因此没有正式PASS、`ELIGIBLE`manifest或UAT部署，整体判定继续`PRODUCTION NO-GO`。
 
+2026-08-13 第十一次增量：`SELFHOST-OPS-MONITORING-ALERTING-49`启动为唯一`DOING`。范围固定为仓库和隔离环境中的统一去敏运行快照、资源/服务/身份/Migration/备份恢复证据阈值、告警状态生命周期、CLI、测试和运行手册；三条智能体线只读审计，主智能体唯一写入。没有host安装、真实通知渠道/值班人、UAT/生产连接或真实数据授权，任务启动不改变整体`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。

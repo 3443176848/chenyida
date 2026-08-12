@@ -4,6 +4,13 @@
 
 ## 2026-08-13
 
+### SELFHOST-OPS-MONITORING-ALERTING-49 - `docs: start monitoring and alerting closure`
+
+- 调度/范围：TASK48治理收口`d5df673c602fdc4e558c2799b31dbf1b208316e8`后的零`DOING`自动切换为TASK49唯一active task；严格起点tree为`62c8feb425c7546db2afc7b2dc78f0050bf615e2`、alpha.46/0045，UAT仍alpha.42/0040。
+- 目标：把既有live/readiness、Worker租约、Docker metadata、低资源阈值、release/Migration身份及备份恢复证据统一为严格版本化、确定性、去敏的运行快照和告警生命周期，并交付可运行CLI、合成/隔离测试与排障手册。
+- 边界：主智能体唯一写入，数据迁移、应用测试、运维安全三线只读审计；不安装systemd/cron/supervisor，不发送真实通知，不连接UAT/生产数据库或网络，不读取日志、环境、卷正文、备份正文、凭据、业务数据或用户未跟踪状态报告。
+- 起点资源/运行：available约2.2GiB、Swap734MiB/1GiB、根盘18GiB、Load`0.31/0.32/0.37`、`oom_kill=0`；四服务restart0/OOM false，Web/PostgreSQL healthy、Worker/Caddy health none。仅观察Docker metadata，未修改服务或受保护Volume，系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 - staged source hardening / `fix: validate Wolfi candidate package coverage` / `build: bind Wolfi scan coverage supervisor bundle` / `docs: close isolated candidate evidence`
 
 - 调度/范围：TASK47释放active slot后，按持续交付目标把TASK48登记为唯一`DOING`。严格起点为`main@d554a150a2f9cb4b672dc49785ed63bf3e0edfc8`、alpha.46/0045；UAT只读仍为alpha.42/0040、227表，当前服务不变。
