@@ -21,6 +21,8 @@
 
 2026-08-12 第五次增量：`SELFHOST-RUNTIME-HEALTH-TRUTH-45`已完成仓库实现与隔离验证。D-119要求的完整Migration manifest、数据库时钟Worker排他租约/CAS、Web/Worker双侧uploads/attachments写入+fsync+清理、live/readiness分离和Worker Docker healthcheck已在源码`7494086…`与manifest-only直接子提交`dcef6f6`落地；append-only 0045、官方Migration harness及发布合同通过。运行UAT仍是旧health实现，因此只关闭仓库风险，整体判定继续`PRODUCTION NO-GO`。
 
+2026-08-12 第六次增量（执行中）：`SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已从`ffd0ba6`建立为唯一DOING，范围只含38份`tsconfig*.json`完整门、必要源码/发布执行器/测试和文档。尚未取得完整typecheck PASS证据，也不包含Browser、候选build、SBOM、漏洞扫描、UAT部署或真实数据；整体判定继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。

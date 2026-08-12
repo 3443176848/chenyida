@@ -2,6 +2,18 @@
 
 最后更新时间：2026-08-12（Asia/Shanghai）
 
+## SELFHOST-RELEASE-TYPECHECK-CLOSURE-46（执行中；完整发布类型门）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / REPOSITORY TYPECHECK CLOSURE / PRODUCTION NO-GO | 唯一active task；未取得完整门PASS，系统不能交给真实员工 |
+| 严格起点 | PASS / CONTROLLED | `main@ffd0ba6e705f79d4c0bef06952d725d7510b8782`、alpha.46/0045；唯一既有未跟踪状态报告保持不读不改不提交 |
+| 运行面基线 | VERIFIED READ ONLY / UNCHANGED | Web alpha.42/revision`569aa954…d33a24`、UAT 40/head0040；四服务restart0/OOM false，受保护四卷存在；本任务不修改运行面 |
+| 类型门范围 | OPEN / 38 CONFIGS | 固定Node 22 digest、断网、1 CPU、1 GiB memory、768 MiB heap，逐个执行全部38份`tsconfig*.json`；定向typecheck不得替代 |
+| 资源起点 | PASS | available约1.9GiB、Swap453MiB/1GiB、根盘30GiB、Load`0.93/0.61/0.38`、当日内核OOM匹配0 |
+| 禁止范围 | ENFORCED | 不build/deploy，不连接UAT/生产业务数据，不运行真实Migration，不读取当前卷正文或改变账号/系统配置 |
+| 剩余最高风险 | OPEN | Browser、候选镜像/SBOM/漏洞PASS、完整18步门、真实异机恢复、UAT对齐、员工试用与切换均未完成 |
+
 ## SELFHOST-RUNTIME-HEALTH-TRUTH-45（完成；仓库与隔离验证，运行面未部署）
 
 | 验证项 | 结果 | 说明 |

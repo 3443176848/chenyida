@@ -18,7 +18,7 @@
 
 `SELFHOST-PRODUCTION-READINESS-40`已按实际 Git、运行版本、Migration、备份恢复、应用测试和运维安全证据建立[投产准入基线](PRODUCTION_READINESS.md)。当前判定为`PRODUCTION NO-GO`；既有 Phase 完成只表示非生产实现或历史验收，不代表真实数据、真实员工或正式切换已经具备。
 
-依赖顺序固定为：备份/恢复契约 V2 → 异机备份与隔离恢复 → 同一发布身份与强制测试门 → 应用 P0 安全修复 → 真实源只读分析 → 真实迁移/回滚演练 → 同候选端到端和运维演练 → 少量员工试运行 → 专项授权正式切换 → 上线观察。`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成第一项的合成/隔离实现；异机目标、RPO/RTO和真实数据专项授权仍阻塞第二项。`SELFHOST-OPS-RELEASE-GATE-42`已完成G3仓库工具，但Browser/typecheck/候选镜像及镜像安全证据仍阻止候选PASS；TASK43—TASK45已在仓库与隔离环境关闭导入fallback、会话absolute deadline/DB时钟/竞态/Cookie及health/Worker/storage/Migration误报，运行UAT仍未部署。当前零DOING，下一调度优先处理完整typecheck与固定Browser运行时的可安全仓库缺口；权限矩阵等待业务负责人批准。没有专项授权时不执行真实数据、外传、部署或切流。
+依赖顺序固定为：备份/恢复契约 V2 → 异机备份与隔离恢复 → 同一发布身份与强制测试门 → 应用 P0 安全修复 → 真实源只读分析 → 真实迁移/回滚演练 → 同候选端到端和运维演练 → 少量员工试运行 → 专项授权正式切换 → 上线观察。`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成第一项的合成/隔离实现；异机目标、RPO/RTO和真实数据专项授权仍阻塞第二项。`SELFHOST-OPS-RELEASE-GATE-42`已完成G3仓库工具，但Browser/typecheck/候选镜像及镜像安全证据仍阻止候选PASS；TASK43—TASK45已在仓库与隔离环境关闭导入fallback、会话absolute deadline/DB时钟/竞态/Cookie及health/Worker/storage/Migration误报，运行UAT仍未部署。当前TASK46唯一DOING，先在固定离线沙箱关闭全部38份TypeScript配置；随后再处理固定Browser运行时。权限矩阵等待业务负责人批准；没有专项授权时不执行真实数据、外传、部署或切流。
 
 ## Landing 灾备封存
 

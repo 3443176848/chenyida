@@ -1,0 +1,136 @@
+{
+  "schema_version": "chenyida-erp-agent-task/v1",
+  "task": {
+    "id": "SELFHOST-RELEASE-TYPECHECK-CLOSURE-46",
+    "revision": 1,
+    "ledger_state": "DOING",
+    "delivery_stage": "IMPLEMENTATION",
+    "qualifiers": [
+      "REPOSITORY_TYPECHECK_CLOSURE",
+      "NO_BUILD_OR_DEPLOY",
+      "NO_UAT_OR_PRODUCTION_ACCESS",
+      "PRODUCTION_NO_GO"
+    ],
+    "task_document": "docs/tasks/SELFHOST-RELEASE-TYPECHECK-CLOSURE-46.md"
+  },
+  "baseline": {
+    "base_sha": "ffd0ba6e705f79d4c0bef06952d725d7510b8782",
+    "expected_branch": "main",
+    "source_version": "0.1.0-alpha.46",
+    "source_migration": {
+      "first_number": 1,
+      "head_number": 45,
+      "head_filename": "0045_runtime_worker_readiness.sql",
+      "head_sha256": "cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc"
+    },
+    "uat": {
+      "version": "0.1.0-alpha.42",
+      "migration_head": "0040",
+      "verification_scope": "DOCUMENT_DECLARATION_ONLY_NO_CONNECTION"
+    }
+  },
+  "scope": {
+    "allowed_changed_paths": [
+      "chenyida_erp_site/app/**",
+      "chenyida_erp_site/build/**",
+      "chenyida_erp_site/db/**",
+      "chenyida_erp_site/examples/**",
+      "chenyida_erp_site/public/**",
+      "chenyida_erp_site/scripts/**",
+      "chenyida_erp_site/seeds/**",
+      "chenyida_erp_site/tests/**",
+      "chenyida_erp_site/tools/**",
+      "chenyida_erp_site/worker/**",
+      "chenyida_erp_site/cloudflare-workers.d.ts",
+      "chenyida_erp_site/drizzle.config.ts",
+      "chenyida_erp_site/next.config.ts",
+      "chenyida_erp_site/proxy.ts",
+      "chenyida_erp_site/vite.config.ts",
+      "chenyida_erp_site/package.json",
+      "chenyida_erp_site/package-lock.json",
+      "chenyida_erp_site/tsconfig.ai-governance-evaluation.json",
+      "chenyida_erp_site/tsconfig.ai-governance-suggestion-layer.json",
+      "chenyida_erp_site/tsconfig.ai-governance-suggestion.json",
+      "chenyida_erp_site/tsconfig.json",
+      "chenyida_erp_site/tsconfig.material-standardization.json",
+      "chenyida_erp_site/tsconfig.phase4-task01.json",
+      "chenyida_erp_site/tsconfig.phase4-task02.json",
+      "chenyida_erp_site/tsconfig.phase4-task03.json",
+      "chenyida_erp_site/tsconfig.phase4-task04.json",
+      "chenyida_erp_site/tsconfig.phase4-task05.json",
+      "chenyida_erp_site/tsconfig.phase4-task06.json",
+      "chenyida_erp_site/tsconfig.phase4-task07.json",
+      "chenyida_erp_site/tsconfig.phase4-task08.json",
+      "chenyida_erp_site/tsconfig.phase4-task09.json",
+      "chenyida_erp_site/tsconfig.phase4-task10.json",
+      "chenyida_erp_site/tsconfig.phase5-task01.json",
+      "chenyida_erp_site/tsconfig.phase5-task02.json",
+      "chenyida_erp_site/tsconfig.phase5-task03.json",
+      "chenyida_erp_site/tsconfig.phase5-task04.json",
+      "chenyida_erp_site/tsconfig.phase5-task05.json",
+      "chenyida_erp_site/tsconfig.phase5-task06.json",
+      "chenyida_erp_site/tsconfig.phase5-task07.json",
+      "chenyida_erp_site/tsconfig.phase5-task08.json",
+      "chenyida_erp_site/tsconfig.phase5-task09.json",
+      "chenyida_erp_site/tsconfig.phase5-task10.json",
+      "chenyida_erp_site/tsconfig.phase6-task01.json",
+      "chenyida_erp_site/tsconfig.release-gate.json",
+      "chenyida_erp_site/tsconfig.task03.json",
+      "chenyida_erp_site/tsconfig.task04.json",
+      "chenyida_erp_site/tsconfig.task05.json",
+      "chenyida_erp_site/tsconfig.task06.json",
+      "chenyida_erp_site/tsconfig.task07.json",
+      "chenyida_erp_site/tsconfig.task08.json",
+      "chenyida_erp_site/tsconfig.task09.json",
+      "chenyida_erp_site/tsconfig.task10.json",
+      "chenyida_erp_site/tsconfig.task43.json",
+      "chenyida_erp_site/tsconfig.task44.json",
+      "chenyida_erp_site/tsconfig.task45.json",
+      "chenyida_erp_site/release/release-gate-plan-v1.json",
+      "chenyida_erp_site/release/release-supervisor-bundle-v1.json",
+      "chenyida_erp_site/release/release-test-inventory-v1.json",
+      "chenyida_erp_site/release/test-runtime-policy-v1.json",
+      "docs/agent-control/task-packets/SELFHOST-RELEASE-TYPECHECK-CLOSURE-46.json",
+      "docs/project/CHANGELOG.md",
+      "docs/project/DECISIONS.md",
+      "docs/project/MASTER.md",
+      "docs/project/PRODUCTION_READINESS.md",
+      "docs/project/PROJECT_CONTEXT.md",
+      "docs/project/ROADMAP.md",
+      "docs/project/STATUS.md",
+      "docs/project/TASKS.md",
+      "docs/tasks/SELFHOST-RELEASE-TYPECHECK-CLOSURE-46.md",
+      "docs/testing/selfhost-release-gate.md"
+    ],
+    "known_untracked_paths": [
+      "docs/ERP_CURRENT_STATUS_REPORT.md"
+    ],
+    "required_documents": [
+      "AGENTS.md",
+      "docs/project/MASTER.md",
+      "docs/project/TASKS.md",
+      "docs/project/PROJECT_CONTEXT.md",
+      "docs/tasks/SELFHOST-RELEASE-TYPECHECK-CLOSURE-46.md",
+      "docs/project/DECISIONS.md",
+      "docs/project/PRODUCTION_READINESS.md"
+    ],
+    "require_single_worktree": true
+  },
+  "inspection": {
+    "package_json": "chenyida_erp_site/package.json",
+    "migration_directory": "chenyida_erp_site/drizzle-postgres",
+    "migration_journal": "chenyida_erp_site/drizzle-postgres/meta/_journal.json",
+    "migration_snapshot_directory": "chenyida_erp_site/drizzle-postgres/meta",
+    "required_decision": "D-113",
+    "uat_document_markers": [
+      {
+        "path": "docs/project/MASTER.md",
+        "contains": ["0.1.0-alpha.42", "0040"]
+      },
+      {
+        "path": "docs/project/PROJECT_CONTEXT.md",
+        "contains": ["0.1.0-alpha.42", "0040"]
+      }
+    ]
+  }
+}

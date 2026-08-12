@@ -4,6 +4,13 @@
 
 ## 2026-08-12
 
+### SELFHOST-RELEASE-TYPECHECK-CLOSURE-46 - `docs: start release typecheck closure`
+
+- 调度/范围：TASK45治理收口`ffd0ba6e705f79d4c0bef06952d725d7510b8782`后的零DOING自动切换为TASK46唯一active task。目标只关闭固定离线Node沙箱中的全部38份`tsconfig*.json`发布门，不以TASK43—TASK45定向typecheck替代。
+- 保护：不build/pull/push镜像，不连接或修改UAT/生产、当前四卷、账号或业务数据，不运行真实Migration/deploy/restart；用户未跟踪状态报告及`shujvbiao/`不读、不改、不提交。
+- 起点：源码alpha.46/0045；现场只读核验UAT仍为Web alpha.42/source revision`569aa954…d33a24`和数据库40/head0040，四服务restart0/OOM false、四卷metadata存在。资源约available1.9GiB、Swap453MiB/1GiB、根盘30GiB、Load`0.93/0.61/0.38`，当日内核OOM匹配0。
+- 验收：完整门必须在干净提交快照、固定Node镜像、断网和资源限制内38/38通过；禁止降低strict/noEmit/isolatedModules、跳过配置、用ignore或扩大exclude隐藏可发布源码。Browser、候选build/SBOM/漏洞、UAT对齐及production readiness仍不在本任务授权内。
+
 ### SELFHOST-RUNTIME-HEALTH-TRUTH-45 - `fix: enforce truthful runtime readiness` / `build: bind runtime readiness supervisor bundle` / `docs: close runtime readiness hardening`
 
 - 调度/边界：TASK44收口后的零DOING按持续交付路线切换为TASK45唯一active task，再按`DOING→DONE`释放active slot。严格起点为`main@43b6d81d21a9c5cecd567893b1ab6cf320afff05`、alpha.45/0044；UAT只引用既有文档事实alpha.42/0040，本任务未连接复核。
