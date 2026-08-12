@@ -7,7 +7,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 HOME=/nonexistent
 GIT_CONFIG_NOSYSTEM=1
 GIT_CONFIG_GLOBAL=/dev/null
-export LC_ALL PATH HOME GIT_CONFIG_NOSYSTEM GIT_CONFIG_GLOBAL
+GIT_NO_REPLACE_OBJECTS=1
+export LC_ALL PATH HOME GIT_CONFIG_NOSYSTEM GIT_CONFIG_GLOBAL GIT_NO_REPLACE_OBJECTS
 
 TRIVY_IMAGE='ghcr.io/aquasecurity/trivy@sha256:85e87be1a96459c38a4eea47dc64eb2d342bb14cd4b4cef96adcf6ff03378b7c'
 NODE_IMAGE='node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3'
@@ -81,7 +82,7 @@ REPOSITORY_ROOT=$(readlink -f "$REPOSITORY_ROOT")
 ARTIFACT_PARENT=$(readlink -f "$(dirname -- "$ARTIFACT_ROOT")")
 ARTIFACT_ROOT="$ARTIFACT_PARENT/$(basename -- "$ARTIFACT_ROOT")"
 TRIVY_DB_DIRECTORY=$(readlink -f "$TRIVY_DB_DIRECTORY")
-[ "$(/usr/bin/git -C "$REPOSITORY_ROOT" rev-parse --show-toplevel)" = "$REPOSITORY_ROOT" ] || { echo "release repository root is invalid" >&2; exit 1; }
+[ "$(/usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.useReplaceRefs=false -c tar.umask=0022 -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" rev-parse --show-toplevel)" = "$REPOSITORY_ROOT" ] || { echo "release repository root is invalid" >&2; exit 1; }
 case "$ARTIFACT_ROOT" in /*) : ;; *) echo "artifact root must be absolute" >&2; exit 1 ;; esac
 [ -d "$TRIVY_DB_DIRECTORY" ] && [ ! -L "$TRIVY_DB_DIRECTORY" ] || { echo "trusted Trivy database directory is invalid" >&2; exit 1; }
 case "$ARTIFACT_ROOT/" in "$REPOSITORY_ROOT/"*) echo "release artifacts must be outside the repository" >&2; exit 1 ;; esac
@@ -98,7 +99,7 @@ done
 
 case "$GIT_COMMIT$GIT_TREE" in *[!0-9a-f]*|'') echo "authorized Git identity is invalid" >&2; exit 1 ;; esac
 [ "${#GIT_COMMIT}" -eq 40 ] && [ "${#GIT_TREE}" -eq 40 ] || { echo "authorized Git identity is invalid" >&2; exit 1; }
-git_candidate() { /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" "$@"; }
+git_candidate() { /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.useReplaceRefs=false -c tar.umask=0022 -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" "$@"; }
 [ "$(git_candidate rev-parse --verify HEAD^{commit})" = "$GIT_COMMIT" ] && [ "$(git_candidate rev-parse --verify HEAD^{tree})" = "$GIT_TREE" ] || { echo "release source does not match the authorized Git identity" >&2; exit 1; }
 git_candidate diff --quiet --no-ext-diff --no-textconv --
 git_candidate diff --cached --quiet --no-ext-diff --no-textconv --

@@ -12,8 +12,8 @@ REPOSITORY_ROOT=${ERP_RELEASE_REPOSITORY_ROOT:-$(CDPATH= cd -- "$SCRIPT_DIR/../.
 REPOSITORY_ROOT=$(readlink -f "$REPOSITORY_ROOT")
 
 run_git() {
-  /usr/bin/env -i PATH=/usr/bin:/bin HOME=/nonexistent LC_ALL=C LANG=C GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_OPTIONAL_LOCKS=0 \
-    /usr/bin/git -c "safe.directory=$REPOSITORY_ROOT" -c core.hooksPath=/dev/null -c core.fsmonitor=false -c pager.branch=false -c pager.diff=false -C "$REPOSITORY_ROOT" "$@"
+  /usr/bin/env -i PATH=/usr/bin:/bin HOME=/nonexistent LC_ALL=C LANG=C GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_OPTIONAL_LOCKS=0 GIT_NO_REPLACE_OBJECTS=1 \
+    /usr/bin/git -c "safe.directory=$REPOSITORY_ROOT" -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.useReplaceRefs=false -c tar.umask=0022 -c pager.branch=false -c pager.diff=false -C "$REPOSITORY_ROOT" "$@"
 }
 
 [ "$(run_git rev-parse --show-toplevel)" = "$REPOSITORY_ROOT" ] || { echo "release repository root is invalid" >&2; exit 1; }

@@ -6,7 +6,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 HOME=/nonexistent
 GIT_CONFIG_NOSYSTEM=1
 GIT_CONFIG_GLOBAL=/dev/null
-export LC_ALL PATH HOME GIT_CONFIG_NOSYSTEM GIT_CONFIG_GLOBAL
+GIT_NO_REPLACE_OBJECTS=1
+export LC_ALL PATH HOME GIT_CONFIG_NOSYSTEM GIT_CONFIG_GLOBAL GIT_NO_REPLACE_OBJECTS
 
 usage() {
   echo "usage: $0 --repository-root DIR --git-commit COMMIT --git-tree TREE --artifact-root DIR --run-id ID --web-image REF --worker-image REF --sbom-evidence FILE --security-evidence FILE --confirm RUN_EXACT_RELEASE_GATE" >&2
@@ -94,12 +95,12 @@ for digest in "$SUPERVISOR_BUNDLE_SHA256" "$AUTHORIZATION_SHA256"; do case "$dig
 [ "$(basename "$BUNDLE_ROOT")" = "$SUPERVISOR_BUNDLE_SHA256" ] || { echo "release supervisor bundle path is invalid" >&2; exit 1; }
 case "$BUNDLE_ROOT" in /usr/local/libexec/chenyida-erp-release-supervisor/bundles/*) : ;; *) echo "release supervisor is not installed in the trusted root" >&2; exit 1 ;; esac
 REPOSITORY_ROOT=$(readlink -f "$REPOSITORY_ROOT")
-[ "$(/usr/bin/git -C "$REPOSITORY_ROOT" rev-parse --show-toplevel)" = "$REPOSITORY_ROOT" ] || { echo "release repository root is ambiguous" >&2; exit 1; }
+[ "$(/usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.useReplaceRefs=false -c tar.umask=0022 -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" rev-parse --show-toplevel)" = "$REPOSITORY_ROOT" ] || { echo "release repository root is ambiguous" >&2; exit 1; }
 PLAN="$SCRIPT_DIR/../release/release-gate-plan-v1.json"
 [ -f "$PLAN" ] && [ ! -L "$PLAN" ] || { echo "release gate plan is missing or untrusted" >&2; exit 1; }
 case "$GIT_COMMIT$GIT_TREE" in *[!0-9a-f]*|'') echo "authorized Git identity is invalid" >&2; exit 1 ;; esac
 [ "${#GIT_COMMIT}" -eq 40 ] && [ "${#GIT_TREE}" -eq 40 ] || { echo "authorized Git identity is invalid" >&2; exit 1; }
-git_candidate() { /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" "$@"; }
+git_candidate() { /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.useReplaceRefs=false -c tar.umask=0022 -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" "$@"; }
 [ "$(git_candidate rev-parse --verify HEAD^{commit})" = "$GIT_COMMIT" ] && [ "$(git_candidate rev-parse --verify HEAD^{tree})" = "$GIT_TREE" ] || { echo "release source does not match the authorized Git identity" >&2; exit 1; }
 git_candidate diff --quiet --no-ext-diff --no-textconv -- || { echo "tracked worktree changes block release gate" >&2; exit 1; }
 git_candidate diff --cached --quiet --no-ext-diff --no-textconv -- || { echo "staged changes block release gate" >&2; exit 1; }

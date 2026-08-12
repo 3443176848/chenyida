@@ -141,6 +141,28 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.equal((launcher.match(/--no-textconv/g) || []).length, 2);
 });
 
+test("release shell wrappers reject replace refs and normalize Git archive modes", async () => {
+  const files = [
+    "create-release-image-evidence.sh",
+    "create-release-manifest.sh",
+    "run-backup-recovery-postgres-test.sh",
+    "run-compose-config-test.sh",
+    "run-python-baseline-test.sh",
+    "run-release-gate.sh",
+    "run-release-migration-postgres-test.sh",
+    "run-release-node-sandbox.sh",
+    "run-release-postgres-regression-tests.sh",
+    "run-source-diff-check.sh",
+  ];
+  for (const file of files) {
+    const source = await readFile(new URL(`../scripts/${file}`, import.meta.url), "utf8");
+    assert.match(source, /GIT_NO_REPLACE_OBJECTS=1/, `${file} must disable Git replacement objects`);
+    assert.match(source, /-c core\.useReplaceRefs=false/, `${file} must disable replace refs in Git configuration`);
+    assert.match(source, /-c tar\.umask=0022/, `${file} must produce non-group-writable Git archives`);
+    assert.doesNotMatch(source, /\/usr\/bin\/git -C /, `${file} must not bypass the sanitized Git invocation`);
+  }
+});
+
 test("gate plan and report publish only from exact prepared bytes", { skip: !rootCapable }, async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "cyd-release-gate-publish-"));
   try {
