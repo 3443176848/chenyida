@@ -1,11 +1,19 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdtemp, readdir, readFile, rm, symlink } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 import { LocalMaterialImportFileStore } from "../app/lib/material-import-fallback/local-file-store.ts";
+import {
+  MaterialImportFileSecurityError,
+  runMaterialImportBasicSecurityCheck,
+} from "../app/lib/material-import/file-security.ts";
+import {
+  readSingleFilePart,
+  validateSingleFileMultipartHeaders,
+} from "../app/lib/material-import/multipart.ts";
 
 function bytes(value) {
   return new TextEncoder().encode(value);
@@ -23,6 +31,12 @@ function stream(value) {
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+async function collect(readable) {
+  const chunks = [];
+  for await (const chunk of readable) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks);
 }
 
 async function fixture(run) {
@@ -62,6 +76,7 @@ test("staging is durable, bounded and never overwrites an existing operation obj
     assert.equal(second.kind, "exists");
     assert.equal(second.facts.sha256, sha256(content));
     assert.deepEqual(await readFile(join(root, paths.stagingRelativePath)), Buffer.from(content));
+    assert.equal((await stat(join(root, paths.stagingRelativePath))).mode & 0o777, 0o440);
     const stagingEntries = await readdir(join(root, "material-import/.staging"));
     assert.deepEqual(stagingEntries, [`${operationId}.ready`]);
   });
@@ -97,9 +112,27 @@ test("promotion uses no-overwrite hard-link publication and is idempotent after 
     assert.equal(first.kind, "promoted");
     assert.equal(await store.inspectOptional(paths.stagingRelativePath), null);
     assert.deepEqual(await readFile(join(root, paths.finalRelativePath)), Buffer.from(content));
+    assert.equal((await stat(join(root, paths.finalRelativePath))).mode & 0o777, 0o440);
     const second = await store.promote({ ...paths, expectedSha256, expectedSizeBytes: content.byteLength });
     assert.equal(second.kind, "already_promoted");
     assert.deepEqual(await readFile(join(root, paths.finalRelativePath)), Buffer.from(content));
+  });
+});
+
+test("temporary cleanup requires the exact operation and lease without scanning siblings", async () => {
+  await fixture(async (root, store) => {
+    const operationId = randomUUID();
+    const lease = randomUUID();
+    const otherLease = randomUUID();
+    const directory = join(root, "material-import/.staging");
+    await store.stage({ relativePath: `material-import/.staging/${randomUUID()}.ready`, leaseToken: randomUUID(), body: stream("keep") });
+    const exact = join(directory, `${operationId}.ready.part.${lease}`);
+    const sibling = join(directory, `${operationId}.ready.part.${otherLease}`);
+    await writeFile(exact, "remove");
+    await writeFile(sibling, "keep");
+    assert.equal(await store.cleanupOperationTemp(operationId, lease), true);
+    assert.equal(await store.cleanupOperationTemp(operationId, lease), false);
+    assert.deepEqual(await readFile(sibling), Buffer.from("keep"));
   });
 });
 
@@ -147,4 +180,140 @@ test("symlinked storage directories fail closed without writing outside the root
   } finally {
     await rm(outside, { recursive: true, force: true });
   }
+});
+
+test("multipart preflight is body-free and parser returns independently verified facts", async () => {
+  const boundary = "cyd-safe-boundary";
+  const content = bytes("code,name\nR-1,Resistor\n");
+  const raw = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="safe.csv"\r\nContent-Type: text/csv\r\n\r\n`),
+    Buffer.from(content),
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  ]);
+  let pulls = 0;
+  const body = new ReadableStream({
+    pull(controller) {
+      pulls += 1;
+      controller.enqueue(raw);
+      controller.close();
+    },
+  });
+  const request = new Request("http://localhost/upload", {
+    method: "POST",
+    headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
+    body,
+    duplex: "half",
+  });
+  assert.equal(validateSingleFileMultipartHeaders(request).boundary, boundary);
+  assert.equal(pulls, 0);
+  const part = await readSingleFilePart(request);
+  assert.equal(part.filename, "safe.csv");
+  assert.equal(part.declaredMimeType, "text/csv");
+  assert.deepEqual(await collect(part.stream), Buffer.from(content));
+  assert.deepEqual(await part.completion, {
+    actualSizeBytes: content.byteLength,
+    actualSha256: sha256(content),
+    prefix: content,
+  });
+});
+
+test("multipart parser cancels oversized headers and rejects trailing or additional parts", async () => {
+  const boundary = "cyd-malformed-boundary";
+  let cancelled = 0;
+  const oversized = new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes(`--${boundary}\r\nX-Fill: ${"x".repeat(17 * 1024)}`));
+    },
+    cancel() { cancelled += 1; },
+  });
+  const oversizedRequest = new Request("http://localhost/upload", {
+    method: "POST",
+    headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
+    body: oversized,
+    duplex: "half",
+  });
+  await assert.rejects(readSingleFilePart(oversizedRequest), /multipart header 过大或不完整/);
+  assert.equal(cancelled, 1);
+
+  for (const suffix of [
+    `\r\n--${boundary}--\r\nEXTRA`,
+    `\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="second.csv"\r\n\r\nsecond\r\n--${boundary}--\r\n`,
+  ]) {
+    const raw = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="first.csv"\r\nContent-Type: text/csv\r\n\r\nfirst${suffix}`;
+    const part = await readSingleFilePart(new Request("http://localhost/upload", {
+      method: "POST",
+      headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
+      body: raw,
+    }));
+    const completion = assert.rejects(part.completion, /multipart|只允许上传一个文件 part/);
+    await assert.rejects(collect(part.stream), /multipart|只允许上传一个文件 part/);
+    await completion;
+  }
+});
+
+test("security checks enforce strict extension/type binding and cancel failed range reads", async () => {
+  let opened = 0;
+  const unopenedStore = {
+    async open() { opened += 1; return null; },
+  };
+  await assert.rejects(runMaterialImportBasicSecurityCheck({
+    store: unopenedStore,
+    objectKey: "unused",
+    actualSizeBytes: 4,
+    detectedType: "CSV",
+    filenameExtension: ".xlsx",
+    declaredMimeType: "application/octet-stream",
+  }), (error) => error instanceof MaterialImportFileSecurityError && error.code === "IMPORT_FILE_TYPE_UNSUPPORTED");
+  assert.equal(opened, 0);
+
+  let cancelled = 0;
+  const maliciousRangeStore = {
+    async open() {
+      return new ReadableStream({
+        pull(controller) { controller.enqueue(new Uint8Array(101)); },
+        cancel() { cancelled += 1; },
+      });
+    },
+  };
+  await assert.rejects(runMaterialImportBasicSecurityCheck({
+    store: maliciousRangeStore,
+    objectKey: "oversized-range",
+    actualSizeBytes: 100,
+    detectedType: "XLSX",
+    filenameExtension: ".xlsx",
+    declaredMimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  }), (error) => error instanceof MaterialImportFileSecurityError && error.code === "IMPORT_FILE_SECURITY_CHECK_FAILED");
+  assert.equal(cancelled, 1);
+});
+
+test("CSV security failures cancel their stream and preserve storage error identity", async () => {
+  let cancelled = 0;
+  const nulStore = {
+    async open() {
+      return new ReadableStream({
+        pull(controller) { controller.enqueue(Uint8Array.of(65, 0, 66)); },
+        cancel() { cancelled += 1; },
+      });
+    },
+  };
+  await assert.rejects(runMaterialImportBasicSecurityCheck({
+    store: nulStore,
+    objectKey: "nul.csv",
+    actualSizeBytes: 3,
+    detectedType: "CSV",
+    filenameExtension: ".csv",
+    declaredMimeType: "text/csv",
+  }), (error) => error instanceof MaterialImportFileSecurityError && error.code === "IMPORT_FILE_SECURITY_CHECK_FAILED");
+  assert.equal(cancelled, 1);
+
+  const storageFailure = new Error("SYNTHETIC_STORAGE_FAILURE");
+  const brokenStore = { async open() { throw storageFailure; } };
+  await assert.rejects(runMaterialImportBasicSecurityCheck({
+    store: brokenStore,
+    objectKey: "broken.csv",
+    actualSizeBytes: 3,
+    detectedType: "CSV",
+    filenameExtension: ".csv",
+    declaredMimeType: "text/csv",
+  }), (error) => error === storageFailure);
 });

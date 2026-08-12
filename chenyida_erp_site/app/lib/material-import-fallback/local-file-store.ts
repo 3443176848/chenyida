@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { link, lstat, mkdir, open, readdir, unlink } from "node:fs/promises";
+import { chmod, link, lstat, mkdir, open, unlink } from "node:fs/promises";
 import { dirname, relative, resolve, sep } from "node:path";
 
 import type {
@@ -159,6 +159,7 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
     };
     try {
       await link(temporary, destination);
+      await chmod(destination, 0o440);
       await this.fsyncDirectory(dirname(destination));
       return { kind: "stored", facts };
     } catch (error) {
@@ -202,6 +203,15 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
         position += read.bytesRead;
       }
       if (sizeBytes !== metadata.size) throw new Error("IMPORT_FILE_STORAGE_READ_INCOMPLETE");
+      const finalMetadata = await handle.stat();
+      if (
+        finalMetadata.dev !== metadata.dev
+        || finalMetadata.ino !== metadata.ino
+        || finalMetadata.size !== metadata.size
+        || finalMetadata.mtimeMs !== metadata.mtimeMs
+        || finalMetadata.ctimeMs !== metadata.ctimeMs
+        || finalMetadata.nlink > 2
+      ) throw new Error("IMPORT_FILE_STORAGE_CHANGED_DURING_READ");
     } finally {
       await handle.close();
     }
@@ -241,6 +251,7 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
     const finalPath = this.safePath(input.finalRelativePath);
     try {
       await link(this.safePath(input.stagingRelativePath), finalPath);
+      await chmod(finalPath, 0o440);
       await this.fsyncDirectory(dirname(finalPath));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
@@ -251,27 +262,21 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
     return { kind: "promoted", facts: promoted };
   }
 
-  async cleanupOperationTemps(operationId: string): Promise<number> {
+  async cleanupOperationTemp(operationId: string, leaseToken: string): Promise<boolean> {
     const operation = safeUuid(operationId, "IMPORT_OPERATION_ID");
-    const directoryRelativePath = "material-import/.staging";
-    const directory = this.safePath(directoryRelativePath);
-    let entries: string[];
+    const lease = safeUuid(leaseToken, "IMPORT_UPLOAD_LEASE");
+    const relativePath = `material-import/.staging/${operation}.ready.part.${lease}`;
+    const absolute = this.safePath(relativePath);
     try {
-      entries = await readdir(directory);
+      const metadata = await lstat(absolute);
+      if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("IMPORT_FILE_DELETE_TARGET_INVALID");
+      await unlink(absolute);
+      await this.fsyncDirectory(dirname(absolute));
+      return true;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0;
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
       throw error;
     }
-    const prefix = `${operation}.ready.part.`;
-    let removed = 0;
-    for (const entry of entries.sort()) {
-      if (!entry.startsWith(prefix)) continue;
-      const lease = entry.slice(prefix.length);
-      if (!UUID.test(lease)) continue;
-      await this.delete(`${directoryRelativePath}/${entry}`);
-      removed += 1;
-    }
-    return removed;
   }
 
   async putIfAbsent(input: Readonly<{
@@ -395,11 +400,13 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
     let current = this.root;
     for (const segment of fromRoot.split(sep).filter(Boolean)) {
       current = resolve(current, segment);
-      await mkdir(current, { mode: 0o750 }).catch((error: NodeJS.ErrnoException) => {
+      let created = false;
+      await mkdir(current, { mode: 0o750 }).then(() => { created = true; }).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== "EEXIST") throw error;
       });
       const metadata = await lstat(current);
       if (!metadata.isDirectory() || metadata.isSymbolicLink()) throw new Error("IMPORT_FILE_DIRECTORY_INVALID");
+      if (created) await this.fsyncDirectory(dirname(current));
     }
   }
 

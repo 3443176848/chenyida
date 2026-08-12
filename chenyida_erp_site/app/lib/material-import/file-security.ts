@@ -60,6 +60,9 @@ async function readBounded(
       if (size > maximum) throw new MaterialImportFileSecurityError("IMPORT_FILE_SECURITY_CHECK_FAILED", "安全检查读取范围超限");
       chunks.push(value);
     }
+  } catch (error) {
+    await reader.cancel(error).catch(() => undefined);
+    throw error;
   } finally {
     reader.releaseLock();
   }
@@ -95,18 +98,6 @@ function validateDeclaredMetadata(
     return ["XLS_LEGACY_BINARY"];
   }
   const neutral = new Set(["", "application/octet-stream"]);
-  if (type === "XLSX" && extension === ".csv") {
-    const mislabeledAllowed = new Set([
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "text/csv",
-      "application/csv",
-      "text/plain",
-    ]);
-    if (!neutral.has(declaredMimeType) && !mislabeledAllowed.has(declaredMimeType)) {
-      throw new MaterialImportFileSecurityError("IMPORT_FILE_TYPE_UNSUPPORTED", "客户端 MIME 与检测类型不一致");
-    }
-    return ["XLSX_CONTENT_WITH_CSV_EXTENSION"];
-  }
   if ((type === "XLSX" && extension !== ".xlsx") || (type === "CSV" && extension !== ".csv")) {
     throw new MaterialImportFileSecurityError("IMPORT_FILE_TYPE_UNSUPPORTED", "文件扩展名与检测类型不一致");
   }
@@ -212,14 +203,14 @@ async function validateCsvEncoding(
   key: string,
   encoding: "utf-8" | "gb18030",
 ): Promise<{ prefix: string; suffix: string }> {
-  const stream = await store.open(key);
-  if (!stream) throw new MaterialImportFileSecurityError("IMPORT_FILE_STORAGE_FAILED", "已存储文件不可读取");
   let decoder: TextDecoder;
   try {
     decoder = new TextDecoder(encoding, { fatal: true });
   } catch {
     throw new MaterialImportFileSecurityError("IMPORT_FILE_SECURITY_CHECK_FAILED", "运行环境不支持文件编码检查");
   }
+  const stream = await store.open(key);
+  if (!stream) throw new MaterialImportFileSecurityError("IMPORT_FILE_STORAGE_FAILED", "已存储文件不可读取");
   const reader = stream.getReader();
   let prefix = "";
   let suffix = "";
@@ -231,7 +222,9 @@ async function validateCsvEncoding(
       if (done) break;
       if (!value?.byteLength) continue;
       if (value.includes(0)) throw new MaterialImportFileSecurityError("IMPORT_FILE_SECURITY_CHECK_FAILED", "CSV 包含 NUL 二进制特征");
-      const text = decoder.decode(value, { stream: true });
+      let text: string;
+      try { text = decoder.decode(value, { stream: true }); }
+      catch { throw new MaterialImportFileSecurityError("IMPORT_FILE_ENCODING_INVALID", "CSV 文本编码无效"); }
       if (prefix.length < 8192) prefix += text.slice(0, 8192 - prefix.length);
       suffix = (suffix + text).slice(-8192);
       characters += text.length;
@@ -240,10 +233,15 @@ async function validateCsvEncoding(
         if ((code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) || code === 0x7f) controls += 1;
       }
     }
-    const final = decoder.decode();
+    let final: string;
+    try { final = decoder.decode(); }
+    catch { throw new MaterialImportFileSecurityError("IMPORT_FILE_ENCODING_INVALID", "CSV 文本编码无效"); }
     if (prefix.length < 8192) prefix += final.slice(0, 8192 - prefix.length);
     suffix = (suffix + final).slice(-8192);
     characters += final.length;
+  } catch (error) {
+    await reader.cancel(error).catch(() => undefined);
+    throw error;
   } finally {
     reader.releaseLock();
   }
@@ -258,10 +256,11 @@ async function validateCsv(store: MaterialImportObjectStore, key: string): Promi
   try {
     decoded = await validateCsvEncoding(store, key, "utf-8");
   } catch (error) {
-    if (error instanceof MaterialImportFileSecurityError && error.message.includes("NUL")) throw error;
+    if (!(error instanceof MaterialImportFileSecurityError) || error.code !== "IMPORT_FILE_ENCODING_INVALID") throw error;
     try {
       decoded = await validateCsvEncoding(store, key, "gb18030");
-    } catch {
+    } catch (fallbackError) {
+      if (!(fallbackError instanceof MaterialImportFileSecurityError) || fallbackError.code !== "IMPORT_FILE_ENCODING_INVALID") throw fallbackError;
       throw new MaterialImportFileSecurityError("IMPORT_FILE_SECURITY_CHECK_FAILED", "CSV 文本编码无效，仅支持 UTF-8 或 GB18030");
     }
   }
