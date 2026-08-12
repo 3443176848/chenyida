@@ -134,13 +134,41 @@ async function readAll(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> 
   const bytes = new Uint8Array(size); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; } return bytes;
 }
 
-export function validateMaterialImportXlsContainer(bytes: Uint8Array): void { readCfb(bytes); }
+export function validateMaterialImportXlsContainer(bytes: Uint8Array): void {
+  const container = readCfb(bytes);
+  const forbidden = /^(?:_?vba_project(?:_cur)?|vba|project|projectwm|macros?|xlm)$/i;
+  if (container.entries.some((entry) => forbidden.test(entry.name.trim()))) {
+    fail("XLS 包含不允许的宏或 VBA 结构");
+  }
+  validateMaterialImportXlsWorkbookStream(container.stream);
+}
 
 type BiffRecord = Readonly<{ id: number; payload: Uint8Array; offset: number }>;
 function records(bytes: Uint8Array): BiffRecord[] {
   const result: BiffRecord[] = []; let offset = 0;
   while (offset + 4 <= bytes.length) { const id = u16(bytes, offset); const length = u16(bytes, offset + 2); const next = offset + 4 + length; if (next > bytes.length) fail("XLS BIFF 记录长度无效"); result.push({ id, payload: bytes.subarray(offset + 4, next), offset }); offset = next; if (result.length > 2_000_000) fail("XLS 记录数量超过限制"); if (id === 0x000a) break; }
   return result;
+}
+
+const BIFF_BOF_RECORDS = new Set([0x0009, 0x0209, 0x0409, 0x0809]);
+
+export function validateMaterialImportXlsWorkbookStream(workbookStream: Uint8Array): void {
+  const workbookRecords = records(workbookStream);
+  const bounds = workbookRecords.filter((record) => record.id === 0x0085);
+  if (!bounds.length) fail("XLS 没有可识别的工作表");
+  for (const bound of bounds) {
+    if (bound.payload.length < 8) fail("XLS BOUNDSHEET 记录无效");
+    const boundSheetType = bound.payload[5];
+    if (boundSheetType !== 0x00) fail("XLS 包含不允许的宏或非工作表子流");
+    const sheetOffset = u32(bound.payload, 0);
+    if (sheetOffset >= workbookStream.length) fail("XLS 工作表偏移无效");
+    const first = records(workbookStream.subarray(sheetOffset))[0];
+    if (!first || !BIFF_BOF_RECORDS.has(first.id) || first.payload.length < 4) {
+      fail("XLS 工作表 BOF 记录无效");
+    }
+    const substreamType = u16(first.payload, 2);
+    if (substreamType !== 0x0010) fail("XLS 包含不允许的宏或非工作表子流");
+  }
 }
 
 class SegmentReader {
@@ -191,7 +219,7 @@ export type MaterialImportXlsSheet = Readonly<{ sheetIndex: number; sheetName: s
 export type MaterialImportXlsResult = Readonly<{ dateSystem: "1900"; workbookSheetCount: number; visibleSheetCount: number; hiddenSheetCount: number; veryHiddenSheetCount: number; parsedSheetCount: number; skippedSheetCount: number; parsedRowCount: number; normalizedJsonBytes: number; decodedTextBytes: number; nonEmptyCells: number; sheets: readonly MaterialImportXlsSheet[]; warnings: readonly MaterialImportParserWarning[] }>;
 
 export async function parseMaterialImportXls(stream: ReadableStream<Uint8Array>, onRow: (row: MaterialImportParsedRow) => Promise<void>, options: Readonly<{ signal?: AbortSignal; onProgress?: (rows: number) => Promise<void> }> = {}): Promise<MaterialImportXlsResult> {
-  const bytes = await readAll(stream); const cfb = readCfb(bytes); const all = records(cfb.stream); const bounds: Array<{ offset: number; name: string; visibility: "VISIBLE" | "HIDDEN" | "VERY_HIDDEN" }> = [];
+  const bytes = await readAll(stream); const cfb = readCfb(bytes); validateMaterialImportXlsWorkbookStream(cfb.stream); const all = records(cfb.stream); const bounds: Array<{ offset: number; name: string; visibility: "VISIBLE" | "HIDDEN" | "VERY_HIDDEN" }> = [];
   let sst: string[] = []; let compressedEncoding: "gb18030" | "windows-1252" = "windows-1252";
   all.forEach((record, index) => { if (record.id === 0x002f) fail("XLS 加密或密码保护工作簿不受支持"); if (record.id === 0x0042 && record.payload.length >= 2) compressedEncoding = u16(record.payload, 0) === 0x3a8 ? "gb18030" : "windows-1252"; if (record.id === 0x0085 && record.payload.length >= 8) { const visibility = record.payload[4] === 1 ? "HIDDEN" : record.payload[4] === 2 ? "VERY_HIDDEN" : "VISIBLE"; const count = record.payload[6]; const unicode = (record.payload[7] & 1) !== 0; const chars = record.payload.subarray(8, 8 + (unicode ? count * 2 : count)); bounds.push({ offset: u32(record.payload, 0), visibility, name: unicode ? decodeUtf16(chars) : decodeCompressed(chars, compressedEncoding) }); } if (record.id === 0x00fc) sst = parseSst(all, index, compressedEncoding); });
   if (!bounds.length) fail("XLS 没有可识别的工作表");

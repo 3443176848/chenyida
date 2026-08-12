@@ -50,3 +50,6 @@ cd /workspace
 TEST_MATERIAL_IMPORT_FALLBACK_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/material_import_fallback_test \
   NODE_OPTIONS=--max-old-space-size=384 \
   node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-material-import-fallback-postgres.test.mjs
+TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/material_import_fallback_test \
+  NODE_OPTIONS=--max-old-space-size=384 \
+  node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-import-worker-postgres.test.mjs

@@ -46,6 +46,12 @@ function errorBody(data) {
   };
 }
 
+function validErpErrorContract(data) {
+  const error = data && typeof data === "object" && data.error && typeof data.error === "object" ? data.error : null;
+  return Boolean(error && /^[A-Z][A-Z0-9_]{0,99}$/.test(String(error.code || ""))
+    && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(String(error.request_id || data.request_id || "")));
+}
+
 export function currentCsrfToken(fallback = "") {
   if (typeof document === "undefined") return String(fallback || "");
   const pair = String(document.cookie || "").split(";").map((entry) => entry.trim()).find((entry) => entry.startsWith("CYD_ERP_CSRF="));
@@ -140,8 +146,23 @@ export async function api(path, options = {}) {
   }
 
   const contentType = response.headers.get("Content-Type") || "";
-  const data = contentType.includes("application/json") ? await response.json() : await response.text();
+  let data;
+  try {
+    data = contentType.includes("application/json") ? await response.json() : await response.text();
+  } catch {
+    if (protectedWriteRequest) {
+      throw new ErpApiError("操作结果尚未确认，请使用原操作标识安全恢复", { code: "RESULT_UNKNOWN", resultUnknown: true });
+    }
+    throw new ErpApiError("服务器响应无法读取", { status: response.status, code: "RESPONSE_INVALID" });
+  }
+  if (protectedWriteRequest && response.ok
+    && (!contentType.includes("application/json") || !data || typeof data !== "object" || Array.isArray(data))) {
+    throw new ErpApiError("操作结果尚未确认，请使用原操作标识安全恢复", { code: "RESULT_UNKNOWN", resultUnknown: true });
+  }
   if (!response.ok) {
+    if (protectedWriteRequest && !validErpErrorContract(data)) {
+      throw new ErpApiError("操作结果尚未确认，请使用原操作标识安全恢复", { code: "RESULT_UNKNOWN", resultUnknown: true });
+    }
     const parsed = errorBody(data);
     if (response.status === 401 && !["/api/session", "/api/login"].includes(path)) {
       window.dispatchEvent(new CustomEvent("cyd-erp-auth-required", { detail: { path } }));
@@ -165,7 +186,7 @@ function parseXhrBody(xhr) {
   const contentType = xhr.getResponseHeader("Content-Type") || "";
   const text = String(xhr.responseText || "");
   if (!contentType.includes("application/json")) return text;
-  try { return JSON.parse(text); } catch { return ""; }
+  try { return { valid: true, data: JSON.parse(text) }; } catch { return { valid: false, data: "" }; }
 }
 
 export function materialMultipart(path, options = {}) {
@@ -202,9 +223,13 @@ export function materialMultipart(path, options = {}) {
       onProgress?.({ loaded: event.loaded, total: event.total, lengthComputable: event.lengthComputable });
     });
     xhr.addEventListener("load", () => {
-      const data = parseXhrBody(xhr);
-      if (xhr.status >= 200 && xhr.status < 300) { finish(() => resolve(data)); return; }
-      const parsed = errorBody(data);
+      const parsedBody = parseXhrBody(xhr);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        if (!parsedBody.valid || !parsedBody.data || typeof parsedBody.data !== "object") { unknown(); return; }
+        finish(() => resolve(parsedBody.data)); return;
+      }
+      const parsed = errorBody(parsedBody.data);
+      if (!validErpErrorContract(parsedBody.data)) { unknown(); return; }
       if (xhr.status === 401) window.dispatchEvent(new CustomEvent("cyd-erp-auth-required", { detail: { path } }));
       finish(() => reject(new ErpApiError(parsed.message, {
         status: xhr.status,

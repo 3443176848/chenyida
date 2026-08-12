@@ -295,6 +295,13 @@
       "when": 1786519714980,
       "tag": "0042_material_import_fallback_safety",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1786528451390,
+      "tag": "0043_material_import_terminal_integrity",
+      "breakpoints": true
     }
   ]
 }

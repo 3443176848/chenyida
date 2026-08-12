@@ -8,9 +8,19 @@ import { systemClock, uuidGenerator } from "../app/lib/infrastructure/primitives
 import { SelfHostedWorker } from "../app/lib/selfhost-worker.ts";
 import { PostgresMaterialImportNormalizationWorker } from "../app/lib/material-import-normalization-selfhost/worker.ts";
 import { PostgresMaterialImportReviewWorker } from "../app/lib/material-import-review-selfhost/worker.ts";
+import { LocalMaterialImportFileStore } from "../app/lib/material-import-fallback/local-file-store.ts";
+import { PostgresMaterialImportFallbackRepository } from "../app/lib/material-import-fallback/repository.ts";
+import { MaterialImportFallbackService } from "../app/lib/material-import-fallback/service.ts";
 
 const config = runtimeConfig(); const pool = getPool();
 const queue = new PostgresBackgroundJobQueue(pool, systemClock, uuidGenerator, config.workerLeaseSeconds);
+const importStore = new LocalMaterialImportFileStore(config.uploadRoot);
+const importFallback = new MaterialImportFallbackService(
+  new PostgresMaterialImportFallbackRepository(pool),
+  importStore,
+  queue,
+  { maximumBytes: config.maxUploadBytes, leaseSeconds: config.workerLeaseSeconds },
+);
 const worker = new SelfHostedWorker(
   queue,
   new LocalFileStorage(config.uploadRoot),
@@ -19,6 +29,9 @@ const worker = new SelfHostedWorker(
   new PostgresMaterialImportNormalizationWorker(pool),
   new PostgresMaterialImportReviewWorker(pool),
   Math.max(1_000, Math.min(20_000, Math.floor(config.workerLeaseSeconds * 1_000 / 3))),
+  undefined,
+  importStore,
+  importFallback,
 );
 let stopping = false;
 async function shutdown(signal: string) { if (stopping) return; stopping = true; console.info(JSON.stringify({ level: "info", event: "worker_shutdown", signal })); worker.stop(); setTimeout(() => process.exit(1), 25_000).unref(); }

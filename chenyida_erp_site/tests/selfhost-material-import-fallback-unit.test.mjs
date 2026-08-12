@@ -1,11 +1,18 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 import { LocalMaterialImportFileStore } from "../app/lib/material-import-fallback/local-file-store.ts";
+import {
+  decodeMaterialImportFallbackCursor,
+  encodeMaterialImportFallbackCursor,
+  handleSelfhostMaterialImportFallbackApi,
+} from "../app/lib/material-import-fallback/handler.ts";
+import { normalizeMaterialImportUploadHeaders } from "../app/lib/material-import-fallback/service.ts";
+import { MaterialImportFallbackError } from "../app/lib/material-import-fallback/types.ts";
 import {
   MaterialImportFileSecurityError,
   runMaterialImportBasicSecurityCheck,
@@ -43,6 +50,59 @@ async function fixture(run) {
   const root = await mkdtemp(join(tmpdir(), "cyd-import-fallback-store-"));
   try { await run(root, new LocalMaterialImportFileStore(root)); }
   finally { await rm(root, { recursive: true, force: true }); }
+}
+
+function fallbackService(overrides = {}) {
+  const unexpected = async () => { throw new Error("UNEXPECTED_SERVICE_CALL"); };
+  return {
+    createBatch: unexpected,
+    listBatches: unexpected,
+    batchDetail: unexpected,
+    cancelBatch: unexpected,
+    prepareUpload: unexpected,
+    heartbeatUpload: async () => true,
+    executeUpload: unexpected,
+    failPreparedUpload: unexpected,
+    queueParse: unexpected,
+    job: unexpected,
+    failureAudit: async () => undefined,
+    ...overrides,
+  };
+}
+
+function fallbackDependencies(service, overrides = {}) {
+  return {
+    pool: {},
+    queue: {},
+    actor: { username: "owner", permissions: ["material.import.read", "material.import.create", "material.import.parse", "material.import.cancel"] },
+    requestId: randomUUID(),
+    requireCsrf: () => undefined,
+    uploadRoot: "/synthetic-unused",
+    maximumBytes: 10 * 1024 * 1024,
+    leaseSeconds: 60,
+    service,
+    ...overrides,
+  };
+}
+
+function trackedMultipartRequest(path, headers = {}, method = "POST") {
+  let pulls = 0;
+  let cancellations = 0;
+  const body = new ReadableStream({
+    pull(controller) {
+      pulls += 1;
+      controller.enqueue(bytes("synthetic-body-that-must-not-be-read"));
+      controller.close();
+    },
+    cancel() { cancellations += 1; },
+  }, { highWaterMark: 0 });
+  const request = new Request(`http://localhost${path}`, {
+    method,
+    headers: { "Content-Type": "multipart/form-data; boundary=cyd-handler-test", ...headers },
+    body: method === "GET" || method === "HEAD" ? undefined : body,
+    duplex: "half",
+  });
+  return { request, facts: () => ({ pulls, cancellations }) };
 }
 
 test("local import store derives private deterministic paths and rejects unsafe identities", async () => {
@@ -182,6 +242,31 @@ test("symlinked storage directories fail closed without writing outside the root
   }
 });
 
+test("symlinked storage ancestors cannot expose, delete or reuse an outside file", async () => {
+  await fixture(async (root) => {
+    const outside = await mkdtemp(join(tmpdir(), "cyd-import-outside-"));
+    try {
+      const operationId = randomUUID();
+      const relativePath = `material-import/.staging/${operationId}.ready`;
+      await mkdir(join(root, "material-import"), { recursive: true });
+      await symlink(outside, join(root, "material-import", ".staging"));
+      await writeFile(join(outside, `${operationId}.ready`), "outside-evidence");
+      const store = new LocalMaterialImportFileStore(root);
+      await assert.rejects(store.inspect(relativePath), /IMPORT_FILE_DIRECTORY_INVALID/);
+      await assert.rejects(store.open(relativePath), /IMPORT_FILE_DIRECTORY_INVALID/);
+      await assert.rejects(store.delete(relativePath), /IMPORT_FILE_DIRECTORY_INVALID/);
+      await assert.rejects(store.stage({
+        relativePath,
+        leaseToken: randomUUID(),
+        body: stream("replacement"),
+      }), /IMPORT_FILE_DIRECTORY_INVALID/);
+      assert.equal(await readFile(join(outside, `${operationId}.ready`), "utf8"), "outside-evidence");
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+});
+
 test("multipart preflight is body-free and parser returns independently verified facts", async () => {
   const boundary = "cyd-safe-boundary";
   const content = bytes("code,name\nR-1,Resistor\n");
@@ -316,4 +401,218 @@ test("CSV security failures cancel their stream and preserve storage error ident
     filenameExtension: ".csv",
     declaredMimeType: "text/csv",
   }), (error) => error === storageFailure);
+});
+
+test("upload header normalization binds filename, type, digest, size and the schema maximum", () => {
+  const hash = "a".repeat(64);
+  assert.deepEqual(normalizeMaterialImportUploadHeaders({
+    expectedVersion: "3",
+    declaredFilename: "供应商清单.CSV",
+    declaredMimeType: " TEXT/CSV ",
+    declaredSha256: hash.toUpperCase(),
+    declaredSizeBytes: "42",
+    duplicateAction: "REJECT",
+  }), {
+    expectedVersion: 3,
+    declaredFilename: "供应商清单.CSV",
+    filenameExtension: ".csv",
+    declaredMimeType: "text/csv",
+    declaredSha256: hash,
+    declaredSizeBytes: 42,
+    duplicateAction: "REJECT",
+  });
+  assert.throws(() => normalizeMaterialImportUploadHeaders({
+    expectedVersion: 1,
+    declaredFilename: "unsafe.csv",
+    filenameExtension: ".xlsx",
+    declaredMimeType: "text/csv",
+    declaredSha256: hash,
+    declaredSizeBytes: 1,
+    duplicateAction: "REJECT",
+  }), (error) => error instanceof MaterialImportFallbackError && error.code === "IMPORT_FILE_NAME_INVALID");
+  assert.throws(() => normalizeMaterialImportUploadHeaders({
+    expectedVersion: 1,
+    declaredFilename: "large.csv",
+    declaredMimeType: "text/csv",
+    declaredSha256: hash,
+    declaredSizeBytes: 10 * 1024 * 1024 + 1,
+    duplicateAction: "REJECT",
+  }, 20 * 1024 * 1024), (error) => error instanceof MaterialImportFallbackError && error.code === "IMPORT_FILE_TOO_LARGE");
+});
+
+test("fallback cursors are opaque, query-bound and reject tampering", () => {
+  const scope = { actor: "owner", status: "CREATED", source_kind: "CSV", sort: "created_at_desc", limit: 20 };
+  const facts = { createdAt: "2026-08-12T08:00:00.000Z", id: 42 };
+  const cursor = encodeMaterialImportFallbackCursor(facts, scope);
+  assert.deepEqual(decodeMaterialImportFallbackCursor(cursor, scope), facts);
+  assert.throws(() => decodeMaterialImportFallbackCursor(cursor, { ...scope, status: "FAILED" }), /cursor 无效或已失效/);
+  const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+  parsed.id = 43;
+  assert.throws(() => decodeMaterialImportFallbackCursor(Buffer.from(JSON.stringify(parsed)).toString("base64url"), scope), /cursor 无效或已失效/);
+});
+
+test("fallback upload rejects permission, CSRF and owner failures before pulling the body", async () => {
+  const route = "/api/material-master/import-batches/7/file";
+  const denied = trackedMultipartRequest(route);
+  const deniedResponse = await handleSelfhostMaterialImportFallbackApi(denied.request, fallbackDependencies(
+    fallbackService(),
+    { actor: { username: "reader", permissions: ["material.import.read"] } },
+  ));
+  assert.equal(deniedResponse.status, 403);
+  assert.equal((await deniedResponse.json()).code, "PERMISSION_DENIED");
+  assert.deepEqual(denied.facts(), { pulls: 0, cancellations: 1 });
+
+  const csrf = trackedMultipartRequest(route);
+  const csrfResponse = await handleSelfhostMaterialImportFallbackApi(csrf.request, fallbackDependencies(
+    fallbackService(),
+    { requireCsrf: () => { throw new Error("opaque upstream CSRF failure"); } },
+  ));
+  assert.equal(csrfResponse.status, 403);
+  assert.equal((await csrfResponse.json()).code, "CSRF_INVALID");
+  assert.deepEqual(csrf.facts(), { pulls: 0, cancellations: 1 });
+
+  const headers = {
+    "Idempotency-Key": `upload-${randomUUID()}`,
+    "X-Expected-Version": "1",
+    "X-File-Name": encodeURIComponent("safe.csv"),
+    "X-File-Mime": "text/csv",
+    "X-File-SHA256": "b".repeat(64),
+    "X-File-Size": "7",
+    "X-Duplicate-Action": "REJECT",
+  };
+  const invisible = trackedMultipartRequest(route, headers);
+  const invisibleResponse = await handleSelfhostMaterialImportFallbackApi(invisible.request, fallbackDependencies(
+    fallbackService({
+      prepareUpload: async () => { throw new MaterialImportFallbackError("IMPORT_BATCH_NOT_FOUND", "导入批次不存在", 404); },
+    }),
+  ));
+  assert.equal(invisibleResponse.status, 404);
+  assert.equal((await invisibleResponse.json()).code, "IMPORT_BATCH_NOT_FOUND");
+  assert.deepEqual(invisible.facts(), { pulls: 0, cancellations: 1 });
+});
+
+test("fallback replay cancels the unneeded upload and returns safe idempotency headers", async () => {
+  const operationId = randomUUID();
+  const tracked = trackedMultipartRequest("/api/material-master/import-batches/7/file", {
+    "Idempotency-Key": `upload-${randomUUID()}`,
+    "X-Expected-Version": "1",
+    "X-File-Name": encodeURIComponent("safe.csv"),
+    "X-File-Mime": "text/csv",
+    "X-File-SHA256": "c".repeat(64),
+    "X-File-Size": "7",
+    "X-Duplicate-Action": "REJECT",
+  });
+  const response = await handleSelfhostMaterialImportFallbackApi(tracked.request, fallbackDependencies(fallbackService({
+    prepareUpload: async () => ({
+      data: { batch: { id: 7, status: "FILE_READY" } },
+      statusCode: 201,
+      operationId,
+      replayed: true,
+    }),
+  })));
+  assert.equal(response.status, 201);
+  assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+  assert.equal(response.headers.get("Idempotency-Replayed"), "true");
+  assert.equal(response.headers.get("X-Operation-ID"), operationId);
+  assert.deepEqual(tracked.facts(), { pulls: 0, cancellations: 1 });
+  const payload = await response.json();
+  assert.equal(payload.data.batch.status, "FILE_READY");
+  assert.equal(payload.request_id.length, 36);
+});
+
+test("fallback upload dispatches the parser only after a durable prepared operation", async () => {
+  const operationId = randomUUID();
+  const leaseToken = randomUUID();
+  const prepared = {
+    kind: "PREPARED",
+    operationId,
+    leaseToken,
+    batchId: 7,
+    expectedBatchVersion: 2,
+    declaredFilename: "safe.csv",
+    filenameExtension: ".csv",
+    declaredMimeType: "text/csv",
+    declaredSha256: "d".repeat(64),
+    declaredSizeBytes: 7,
+    duplicateAction: "REJECT",
+    stagingRelativePath: `material-import/.staging/${operationId}.ready`,
+    finalRelativePath: `material-import/7/${operationId}.csv`,
+    resumed: false,
+  };
+  const calls = [];
+  const tracked = trackedMultipartRequest("/api/material-master/import-batches/7/file", {
+    "Idempotency-Key": `upload-${randomUUID()}`,
+    "X-Expected-Version": "2",
+    "X-File-Name": encodeURIComponent("safe.csv"),
+    "X-File-Mime": "text/csv",
+    "X-File-SHA256": "d".repeat(64),
+    "X-File-Size": "7",
+    "X-Duplicate-Action": "REJECT",
+  });
+  const part = {
+    filename: "safe.csv",
+    declaredMimeType: "text/csv",
+    stream: stream("a,b\n1\n"),
+    completion: Promise.resolve({ actualSizeBytes: 7, actualSha256: "d".repeat(64), prefix: bytes("a,b\n1\n") }),
+  };
+  const service = fallbackService({
+    prepareUpload: async (input) => { calls.push(["prepare", input.headers]); return prepared; },
+    executeUpload: async (input) => {
+      calls.push(["execute", input.preparation.operationId, input.part.filename]);
+      return { data: { batch: { id: 7, status: "FILE_READY" } }, statusCode: 201, operationId, replayed: false };
+    },
+  });
+  const response = await handleSelfhostMaterialImportFallbackApi(tracked.request, fallbackDependencies(service, {
+    readFilePart: async () => { calls.push(["multipart"]); return part; },
+  }));
+  assert.equal(response.status, 201);
+  assert.deepEqual(calls.map((call) => call[0]), ["prepare", "multipart", "execute"]);
+  assert.equal(calls[0][1].declaredFilename, "safe.csv");
+  assert.equal(calls[1][0], "multipart");
+  assert.equal(calls[2][1], operationId);
+});
+
+test("fallback cancel route enforces its independent capability and immutable request contract", async () => {
+  const operationId = randomUUID();
+  let captured;
+  const request = new Request("http://localhost/api/material-master/import-batches/7/cancel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Idempotency-Key": `cancel-${randomUUID()}` },
+    body: JSON.stringify({ expected_version: 4, reason_code: "USER_CANCELLED" }),
+  });
+  const response = await handleSelfhostMaterialImportFallbackApi(request, fallbackDependencies(fallbackService({
+    cancelBatch: async (input) => {
+      captured = input;
+      return { data: { id: 7, status: "CANCELLED", current_version: 5 }, statusCode: 200, operationId };
+    },
+  })));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("X-Operation-ID"), operationId);
+  assert.deepEqual(
+    { batchId: captured.batchId, expectedVersion: captured.expectedVersion, reasonCode: captured.reasonCode },
+    { batchId: 7, expectedVersion: 4, reasonCode: "USER_CANCELLED" },
+  );
+
+  const denied = await handleSelfhostMaterialImportFallbackApi(new Request(
+    "http://localhost/api/material-master/import-batches/7/cancel",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": `cancel-${randomUUID()}` },
+      body: JSON.stringify({ expected_version: 4, reason_code: "USER_CANCELLED" }),
+    },
+  ), fallbackDependencies(fallbackService(), {
+    actor: { username: "owner", permissions: ["material.import.read", "material.import.parse"] },
+  }));
+  assert.equal(denied.status, 403);
+  assert.equal((await denied.json()).code, "PERMISSION_DENIED");
+});
+
+test("fallback routes return explicit 405 without dispatching a service operation", async () => {
+  const response = await handleSelfhostMaterialImportFallbackApi(
+    new Request("http://localhost/api/material-master/import-batches", { method: "DELETE" }),
+    fallbackDependencies(fallbackService()),
+  );
+  assert.equal(response.status, 405);
+  assert.equal(response.headers.get("Allow"), "GET, POST");
+  assert.equal((await response.json()).code, "METHOD_NOT_ALLOWED");
 });

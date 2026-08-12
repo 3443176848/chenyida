@@ -9,6 +9,7 @@ import { detectCsvDelimiter, parseMaterialImportCsv } from "../app/lib/material-
 import { detectMaterialImportFileType } from "../app/lib/material-import/file-security.ts";
 import { MATERIAL_IMPORT_PARSER_LIMITS, MaterialImportParserError, columnIndex, columnReference, normalizeRawRow } from "../app/lib/material-import/parser-model.ts";
 import { MemoryMaterialImportSharedStringStore, parseMaterialImportXlsx } from "../app/lib/material-import/xlsx-parser.ts";
+import { validateMaterialImportXlsWorkbookStream } from "../app/lib/material-import/xls-parser.ts";
 
 const encoder = new TextEncoder();
 const siteRoot = resolve(new URL("../", import.meta.url).pathname.replace(/^\/(?:([A-Za-z]:))/, "$1"));
@@ -19,6 +20,35 @@ function chunks(text, size = 3) {
   return new ReadableStream({ start(controller) { for (let offset = 0; offset < bytes.length; offset += size) controller.enqueue(bytes.slice(offset, offset + size)); controller.close(); } });
 }
 
+function biffRecord(id, payload = new Uint8Array()) {
+  const result = new Uint8Array(4 + payload.length);
+  const view = new DataView(result.buffer);
+  view.setUint16(0, id, true);
+  view.setUint16(2, payload.length, true);
+  result.set(payload, 4);
+  return result;
+}
+
+function legacyWorkbookStream(boundSheetType = 0x00, substreamType = 0x0010) {
+  const globalBof = biffRecord(0x0809, Uint8Array.of(0x00, 0x06, 0x05, 0x00));
+  const name = encoder.encode("Data");
+  const boundPayload = new Uint8Array(8 + name.length);
+  boundPayload[4] = 0;
+  boundPayload[5] = boundSheetType;
+  boundPayload[6] = name.length;
+  boundPayload[7] = 0;
+  boundPayload.set(name, 8);
+  const bound = biffRecord(0x0085, boundPayload);
+  const eof = biffRecord(0x000a);
+  const sheetOffset = globalBof.length + bound.length + eof.length;
+  new DataView(bound.buffer).setUint32(4, sheetOffset, true);
+  const sheetBof = biffRecord(0x0809, Uint8Array.of(0x00, 0x06, substreamType & 0xff, substreamType >>> 8));
+  const result = new Uint8Array(sheetOffset + sheetBof.length + eof.length);
+  let offset = 0;
+  for (const part of [globalBof, bound, eof, sheetBof, eof]) { result.set(part, offset); offset += part.length; }
+  return result;
+}
+
 async function csv(text, chunkSize = 3) {
   const rows = [];
   const result = await parseMaterialImportCsv(chunks(text, chunkSize), async (row) => { rows.push(row); });
@@ -27,6 +57,14 @@ async function csv(text, chunkSize = 3) {
 
 test("legacy XLS OLE signature is recognized as an Excel workbook category", () => {
   assert.equal(detectMaterialImportFileType(new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])), "XLSX");
+});
+
+test("legacy XLS accepts worksheet substreams and rejects XLM, VB module and disguised macro BOFs", () => {
+  assert.doesNotThrow(() => validateMaterialImportXlsWorkbookStream(legacyWorkbookStream()));
+  for (const sheetType of [0x01, 0x06]) {
+    assert.throws(() => validateMaterialImportXlsWorkbookStream(legacyWorkbookStream(sheetType)), /宏或非工作表/);
+  }
+  assert.throws(() => validateMaterialImportXlsWorkbookStream(legacyWorkbookStream(0x00, 0x0040)), /宏或非工作表/);
 });
 
 async function workbook({ sheets, sharedStrings, styles, date1904 = false, externalRelationship = false, doctype = false }) {

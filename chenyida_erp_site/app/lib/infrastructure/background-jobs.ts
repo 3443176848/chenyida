@@ -2,7 +2,8 @@ import type { Pool, PoolClient } from "pg";
 import type { Clock, IdGenerator } from "./primitives.ts";
 
 export type JobPayload = Record<string, unknown>;
-export type JobLease = { id: string; type: string; payload: JobPayload; attemptCount: number; maxAttempts: number; leaseToken: string; version: number };
+export type JobLease = { id: string; type: string; payload: JobPayload; attemptCount: number; maxAttempts: number; leaseToken: string; version: number; aggregateType?: string; aggregateId?: string };
+export type JobTerminalPublication = (client: PoolClient, job: JobLease, code: string) => Promise<void>;
 
 export interface BackgroundJobQueue {
   enqueue(client: PoolClient, input: { type: string; payload: JobPayload; idempotencyKey: string; aggregateType: string; aggregateId: string }): Promise<string>;
@@ -10,8 +11,8 @@ export interface BackgroundJobQueue {
   claim(workerId: string): Promise<JobLease | null>;
   heartbeat(job: JobLease, workerId: string): Promise<boolean>;
   complete(job: JobLease, workerId: string, result: JobPayload, publish?: (client: PoolClient) => Promise<void>): Promise<boolean>;
-  fail(job: JobLease, workerId: string, code: string, message: string, forceTerminal?: boolean): Promise<boolean>;
-  recoverExpired(): Promise<number>;
+  fail(job: JobLease, workerId: string, code: string, message: string, forceTerminal?: boolean, publishTerminal?: JobTerminalPublication): Promise<boolean>;
+  recoverExpired(publishTerminal?: JobTerminalPublication): Promise<number>;
 }
 
 export class PostgresBackgroundJobQueue implements BackgroundJobQueue {
@@ -55,9 +56,10 @@ export class PostgresBackgroundJobQueue implements BackgroundJobQueue {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const selected = await client.query<{ id: string; type: string; payload: JobPayload; attempt_count: number; max_attempts: number; version: number }>(
-        `select id,type,payload,attempt_count,max_attempts,version from background_jobs
-         where status='QUEUED' and available_at <= $1 order by priority,created_at,id for update skip locked limit 1`, [this.clock.now()]);
+      const selected = await client.query<{ id: string; type: string; payload: JobPayload; attempt_count: number; max_attempts: number; version: number; aggregate_type: string | null; aggregate_id: string | null }>(
+        `select j.id,j.type,j.payload,j.attempt_count,j.max_attempts,j.version,o.aggregate_type,o.aggregate_id
+         from background_jobs j left join material_import_job_outbox o on o.id=j.id
+         where j.status='QUEUED' and j.available_at <= $1 order by j.priority,j.created_at,j.id for update of j skip locked limit 1`, [this.clock.now()]);
       const row = selected.rows[0]; if (!row) { await client.query("COMMIT"); return null; }
       const leaseToken = this.ids.uuid(); const expires = new Date(this.clock.now().getTime() + this.leaseSeconds * 1000);
       const updated = await client.query(`update background_jobs set status='RUNNING',attempt_count=attempt_count+1,lease_owner=$2,lease_token=$3,
@@ -65,7 +67,8 @@ export class PostgresBackgroundJobQueue implements BackgroundJobQueue {
         [row.id, workerId, leaseToken, expires, this.clock.now(), row.version]);
       if (updated.rowCount !== 1) throw new Error("JOB_CLAIM_CAS_FAILED");
       await client.query("COMMIT");
-      return { id: row.id, type: row.type, payload: row.payload, attemptCount: row.attempt_count + 1, maxAttempts: row.max_attempts, leaseToken, version: row.version + 1 };
+      return { id: row.id, type: row.type, payload: row.payload, attemptCount: row.attempt_count + 1, maxAttempts: row.max_attempts, leaseToken, version: row.version + 1,
+        ...(row.aggregate_type == null ? {} : { aggregateType: row.aggregate_type }), ...(row.aggregate_id == null ? {} : { aggregateId: row.aggregate_id }) };
     } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
   }
 
@@ -79,7 +82,12 @@ export class PostgresBackgroundJobQueue implements BackgroundJobQueue {
   async complete(job: JobLease, workerId: string, result: JobPayload, publish?: (client: PoolClient) => Promise<void>): Promise<boolean> {
     const client = await this.pool.connect();
     try {
-      await client.query("BEGIN"); if (publish) await publish(client);
+      await client.query("BEGIN");
+      const active = await client.query(`select id from background_jobs
+        where id=$1 and status='RUNNING' and lease_owner=$2 and lease_token=$3 and lease_expires_at>$4
+        for update`, [job.id, workerId, job.leaseToken, this.clock.now()]);
+      if (active.rowCount !== 1) { await client.query("ROLLBACK"); return false; }
+      if (publish) await publish(client);
       const updated = await client.query(`update background_jobs set status='SUCCEEDED',result=$4,completed_at=$5,updated_at=$5,
         lease_owner=null,lease_token=null,lease_expires_at=null,heartbeat_at=null,version=version+1
         where id=$1 and status='RUNNING' and lease_owner=$2 and lease_token=$3`, [job.id, workerId, job.leaseToken, result, this.clock.now()]);
@@ -88,19 +96,60 @@ export class PostgresBackgroundJobQueue implements BackgroundJobQueue {
     } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
   }
 
-  async fail(job: JobLease, workerId: string, code: string, message: string, forceTerminal = false): Promise<boolean> {
-    const terminal = forceTerminal || job.attemptCount >= job.maxAttempts; const delay = Math.min(300, 2 ** Math.min(job.attemptCount, 8));
-    const available = new Date(this.clock.now().getTime() + delay * 1000);
-    const result = await this.pool.query(`update background_jobs set status=$4,available_at=$5,last_error_code=$6,last_error_message=$7,
-      completed_at=case when $4::text='DEAD' then $8::timestamptz else null end,updated_at=$8::timestamptz,lease_owner=null,lease_token=null,lease_expires_at=null,heartbeat_at=null,version=version+1
-      where id=$1 and status='RUNNING' and lease_owner=$2 and lease_token=$3`, [job.id, workerId, job.leaseToken, terminal ? "DEAD" : "QUEUED", available, code.slice(0, 100), message.slice(0, 500), this.clock.now()]);
-    return result.rowCount === 1;
+  async fail(job: JobLease, workerId: string, code: string, message: string, forceTerminal = false, publishTerminal?: JobTerminalPublication): Promise<boolean> {
+    const client = await this.pool.connect(); const now = this.clock.now();
+    try {
+      await client.query("BEGIN");
+      const active = await client.query<{ id: string; type: string; payload: JobPayload; attempt_count: number; max_attempts: number; version: number; aggregate_type: string | null; aggregate_id: string | null }>(`
+        select j.id,j.type,j.payload,j.attempt_count,j.max_attempts,j.version,o.aggregate_type,o.aggregate_id
+        from background_jobs j left join material_import_job_outbox o on o.id=j.id
+        where j.id=$1 and j.status='RUNNING' and j.lease_owner=$2 and j.lease_token=$3
+          and j.lease_expires_at>$4 for update of j
+      `, [job.id, workerId, job.leaseToken, now]);
+      const row = active.rows[0];
+      if (!row) { await client.query("ROLLBACK"); return false; }
+      const terminal = forceTerminal || Number(row.attempt_count) >= Number(row.max_attempts);
+      const authoritative: JobLease = {
+        id: row.id, type: row.type, payload: row.payload, attemptCount: Number(row.attempt_count), maxAttempts: Number(row.max_attempts),
+        leaseToken: job.leaseToken, version: Number(row.version),
+        ...(row.aggregate_type == null ? {} : { aggregateType: row.aggregate_type }), ...(row.aggregate_id == null ? {} : { aggregateId: row.aggregate_id }),
+      };
+      if (terminal && publishTerminal) await publishTerminal(client, authoritative, code.slice(0, 100));
+      const delay = Math.min(300, 2 ** Math.min(authoritative.attemptCount, 8));
+      const available = new Date(now.getTime() + delay * 1000);
+      const updated = await client.query(`update background_jobs set status=$4,available_at=$5,last_error_code=$6,last_error_message=$7,
+        completed_at=case when $4::text='DEAD' then $8::timestamptz else null end,updated_at=$8::timestamptz,lease_owner=null,lease_token=null,lease_expires_at=null,heartbeat_at=null,version=version+1
+        where id=$1 and status='RUNNING' and lease_owner=$2 and lease_token=$3 and lease_expires_at>$8`, [job.id, workerId, job.leaseToken, terminal ? "DEAD" : "QUEUED", available, code.slice(0, 100), message.slice(0, 500), now]);
+      if (updated.rowCount !== 1) { await client.query("ROLLBACK"); return false; }
+      await client.query("COMMIT"); return true;
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
   }
 
-  async recoverExpired(): Promise<number> {
-    const result = await this.pool.query(`update background_jobs set status=case when attempt_count>=max_attempts then 'DEAD' else 'QUEUED' end,
-      available_at=$1,last_error_code='LEASE_EXPIRED',last_error_message='任务租约超时，已由恢复器处理',completed_at=case when attempt_count>=max_attempts then $1 else null end,
-      lease_owner=null,lease_token=null,lease_expires_at=null,heartbeat_at=null,updated_at=$1,version=version+1 where status='RUNNING' and lease_expires_at <= $1`, [this.clock.now()]);
-    return result.rowCount || 0;
+  async recoverExpired(publishTerminal?: JobTerminalPublication): Promise<number> {
+    const client = await this.pool.connect(); const now = this.clock.now();
+    try {
+      await client.query("BEGIN");
+      const expired = await client.query<{ id: string; type: string; payload: JobPayload; attempt_count: number; max_attempts: number; lease_token: string; version: number; aggregate_type: string | null; aggregate_id: string | null }>(`
+        select j.id,j.type,j.payload,j.attempt_count,j.max_attempts,j.lease_token,j.version,o.aggregate_type,o.aggregate_id
+        from background_jobs j left join material_import_job_outbox o on o.id=j.id
+        where j.status='RUNNING' and j.lease_expires_at <= $1
+        order by j.lease_expires_at,j.id for update of j skip locked limit 50
+      `, [now]);
+      for (const row of expired.rows) {
+        const terminal = Number(row.attempt_count) >= Number(row.max_attempts);
+        const job: JobLease = {
+          id: row.id, type: row.type, payload: row.payload, attemptCount: Number(row.attempt_count), maxAttempts: Number(row.max_attempts),
+          leaseToken: row.lease_token, version: Number(row.version),
+          ...(row.aggregate_type == null ? {} : { aggregateType: row.aggregate_type }), ...(row.aggregate_id == null ? {} : { aggregateId: row.aggregate_id }),
+        };
+        if (terminal && publishTerminal) await publishTerminal(client, job, "LEASE_EXPIRED");
+        const updated = await client.query(`update background_jobs set status=$2,available_at=$3,last_error_code='LEASE_EXPIRED',
+          last_error_message='任务租约超时，已由恢复器处理',completed_at=case when $2::text='DEAD' then $3 else null end,
+          lease_owner=null,lease_token=null,lease_expires_at=null,heartbeat_at=null,updated_at=$3,version=version+1
+          where id=$1 and status='RUNNING' and lease_token=$4 and lease_expires_at<=$3`, [row.id, terminal ? "DEAD" : "QUEUED", now, row.lease_token]);
+        if (updated.rowCount !== 1) throw new Error("JOB_RECOVERY_CAS_FAILED");
+      }
+      await client.query("COMMIT"); return expired.rowCount || 0;
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
   }
 }

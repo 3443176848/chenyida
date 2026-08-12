@@ -13,7 +13,9 @@
     "app/lib/material-import/multipart.ts",
     "app/lib/material-import/object-store.ts",
     "app/lib/material-import/xls-parser.ts",
+    "app/lib/selfhost-api.ts",
     "app/lib/selfhost-worker.ts",
+    "app/materials/_components/material-import-create-page.tsx",
     "db/**/*.ts",
     "worker/selfhost.ts"
   ],

@@ -166,6 +166,26 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
     }
   };
 
+  const recoverUnknownWrite = async () => {
+    const operation = Object.values(operations).find((item) => item.state === "RESULT_UNKNOWN");
+    if (!operation || busy) return;
+    setBusy(true); setError(null);
+    try {
+      await api(operation.endpoint, {
+        method: operation.method,
+        body: JSON.stringify(operation.payload),
+        protectedWrite: { idempotencyKey: operation.key, csrfToken: session.csrf_token || "" },
+      });
+      setOperations((current) => ({ ...current, [operation.type]: { ...operation, state: "COMPLETED" } }));
+      setNotice(`${operation.type} 操作已使用原 Key 与原载荷恢复。`);
+      setDialog(null); setPreview(null); await initialLoad();
+    } catch (reason) {
+      const normalized = normalizeImportUiError(reason);
+      setOperations((current) => ({ ...current, [operation.type]: { ...operation, state: normalized.resultUnknown ? "RESULT_UNKNOWN" : "FAILED" } }));
+      handleError(reason);
+    } finally { setBusy(false); }
+  };
+
   const startParse = async () => {
     if (!batch || !canParse || busy || resultUnknown) return; setBusy(true); setNotice("");
     try { const latest = await readDetail(); if (latest.batch.status !== "FILE_READY" || latest.file?.security_check_status !== "BASIC_CHECK_PASSED") throw new Error("STALE"); applyBatch(latest); setDialog("PARSE"); }
@@ -247,6 +267,7 @@ export function MaterialImportWorkspace({ batchId }: { batchId: number }) {
     <header className="mi-workspace-head"><div><h2>{batch.batch_no}</h2><p>{statusLabel(batch.source_kind)} · 创建人 {batch.created_by} · 最近更新 {formatShanghaiDate(batch.updated_at, true)}</p></div><div><MaterialImportStatusBadge value={batch.status} /><button disabled={busy} onClick={() => void initialLoad()}>手动刷新</button>{canCancel && CANCEL_STATES.has(batch.status) && !resultUnknown ? <button className="danger" disabled={busy} onClick={() => setDialog("CANCEL")}>取消批次</button> : null}</div></header>
     <MaterialImportStepper status={batch.status} view={query.view} canMap={canMap} onView={(view: MaterialImportView) => navigate({ view })} />
     {notice ? <div className="mi-notice" role="status">{notice}</div> : null}{error && batch ? <div className="mi-inline-error" role="alert">{error.message}{error.requestId ? `（请求编号：${error.requestId}）` : ""}</div> : null}
+    {resultUnknown ? <div className="mi-inline-error" role="alert">操作结果尚未确认；依赖操作保持锁定。<button disabled={busy} onClick={() => void recoverUnknownWrite()}>使用原操作标识安全恢复</button></div> : null}
     {statusPage ? <section className="mi-disposition"><h3>{batch.status === "FAILED" ? "导入批次失败" : batch.status === "CANCELLED" ? "批次已取消" : "当前批次需要后台协调"}</h3><p>{batch.failure_message || (batch.status === "RECONCILIATION_REQUIRED" ? "普通用户暂时不能继续上传或解析，请刷新或联系管理员。" : "该批次不能继续执行后续写操作。")}</p>{batch.failure_code ? <p>安全错误代码：{batch.failure_code}</p> : null}</section> : null}
     {!statusPage && ["CREATED", "UPLOAD_PENDING"].includes(batch.status) ? <section><h3>文件</h3>{batch.status === "CREATED" ? <><p>重新打开的 CREATED 批次不会恢复浏览器 File；请重新选择、预检并计算 SHA。</p><MaterialImportUploadFlow existingBatch={batch} /></> : <p>文件上传或服务端处理正在进行。若此前上传结果未知，只能在原页面使用原操作标识恢复。</p>}</section> : null}
     {!statusPage && ["FILE_READY", "QUEUED_FOR_PARSING", "PARSING"].includes(batch.status) ? <section className="mi-parse-panel"><h3>解析</h3><p>{batch.status === "FILE_READY" ? "文件已通过服务端基础安全检查，可启动解析。" : batch.status === "QUEUED_FOR_PARSING" ? "解析请求排队中；不提供 Queue 位置或预计完成时间。" : "服务端正在解析；当前 API 不公开百分比、阶段、行数或 ETA。"}</p><p>最近更新时间：{formatShanghaiDate(batch.updated_at, true)}</p>{batch.status === "FILE_READY" && canParse ? <button className="mi-primary" disabled={busy || file?.security_check_status !== "BASIC_CHECK_PASSED" || resultUnknown} onClick={() => void startParse()}>启动解析</button> : null}</section> : null}

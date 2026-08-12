@@ -276,6 +276,8 @@ export function normalizeImportUiError(reason: unknown): ImportUiError {
   return {
     status: Number(error?.status || 0), code: String(error?.code || "NETWORK_ERROR"), message: String(error?.message || "网络连接失败"),
     requestId: String(error?.requestId || error?.request_id || ""), details: Array.isArray(error?.details) ? error.details : [],
-    retryAfter: String(error?.retryAfter || ""), resultUnknown: error?.resultUnknown === true || error?.code === "RESULT_UNKNOWN",
+    retryAfter: String(error?.retryAfter || ""),
+    resultUnknown: error?.resultUnknown === true
+      || ["RESULT_UNKNOWN", "IDEMPOTENCY_IN_PROGRESS", "IMPORT_RECONCILIATION_REQUIRED"].includes(String(error?.code || "")),
   };
 }

@@ -105,6 +105,53 @@ export type MaterialImportFallbackIdempotencyRow = Readonly<{
   updated_at: Date | string;
 }>;
 
+export type MaterialImportFallbackUploadOperationRow = Readonly<{
+  operation_id: string;
+  batch_id: string | number;
+  expected_batch_version: number;
+  declared_filename: string;
+  filename_extension: ".csv" | ".xls" | ".xlsx";
+  declared_mime_type: string;
+  declared_sha256: string;
+  declared_size_bytes: string | number;
+  duplicate_action: "REJECT" | "ALLOW_DUPLICATE";
+  staging_relative_path: string;
+  final_relative_path: string;
+  phase: "PREPARED" | "STAGED" | "SECURITY_PASSED" | "PROMOTED" | "PUBLISHED" | "FAILED" | "RECONCILIATION_REQUIRED";
+  failure_code: string | null;
+  failure_message: string | null;
+  staged_at: Date | string | null;
+  checked_at: Date | string | null;
+  promoted_at: Date | string | null;
+  completed_at: Date | string | null;
+  request_id: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+}>;
+
+export type MaterialImportFallbackStoredResponse = Readonly<{
+  ok: boolean;
+  data?: Record<string, unknown>;
+  error?: Readonly<{ code: string; message: string; current_version?: number }>;
+}>;
+
+export type MaterialImportFallbackPreparedUpload = Readonly<{
+  kind: "PREPARED";
+  operationId: string;
+  leaseToken: string;
+  batchId: number;
+  expectedBatchVersion: number;
+  declaredFilename: string;
+  filenameExtension: ".csv" | ".xls" | ".xlsx";
+  declaredMimeType: string;
+  declaredSha256: string;
+  declaredSizeBytes: number;
+  duplicateAction: "REJECT" | "ALLOW_DUPLICATE";
+  stagingRelativePath: string;
+  finalRelativePath: string;
+  resumed: boolean;
+}>;
+
 export type MaterialImportFallbackResult<T = Record<string, unknown>> = Readonly<{
   data: T;
   statusCode: number;
@@ -117,17 +164,21 @@ export class MaterialImportFallbackError extends Error {
   readonly status: number;
   readonly currentVersion?: number;
   readonly retryAfterSeconds?: number;
+  readonly operationId?: string;
+  readonly replayed: boolean;
 
   constructor(
     code: string,
     message: string,
     status = 400,
-    options: Readonly<{ currentVersion?: number; retryAfterSeconds?: number }> = {},
+    options: Readonly<{ currentVersion?: number; retryAfterSeconds?: number; operationId?: string; replayed?: boolean }> = {},
   ) {
     super(message);
     this.code = code;
     this.status = status;
     this.currentVersion = options.currentVersion;
     this.retryAfterSeconds = options.retryAfterSeconds;
+    this.operationId = options.operationId;
+    this.replayed = options.replayed === true;
   }
 }

@@ -34,8 +34,8 @@ export const RELEASE_GATE_PLAN_REPOSITORY_PATH = "chenyida_erp_site/release/rele
 export const RELEASE_VULNERABILITY_POLICY_ID = "chenyida-erp-zero-known-vulnerabilities-v1";
 export const RELEASE_VULNERABILITY_POLICY_SHA256 = "042cd1bb1185923a8f186319d90194911beba78f761938f42937c5fd0e463ab9";
 export const RELEASE_TEST_RUNTIME_POLICY_CONTRACT = "chenyida-erp-release-test-runtime-policy/v1";
-export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "7f64c131cb2a8b3e54d062b45e3d8c813d355225e9c0f1d4d479dd9340c8e450";
-export const RELEASE_TEST_INVENTORY_SHA256 = "9c165e7519b3f1d6e364ab2c9ba63b9b40d580e3d4ae945c1d9cefb541e39633";
+export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "d8cb15dc2c8d27cb0b0edcea70e19057c2bde7fc735a6cd0b4021f11671db14f";
+export const RELEASE_TEST_INVENTORY_SHA256 = "88d67a1119340ec39e75c04228e8d12da8c84eb11bfd176c060eb46f85ac4282";
 export const RELEASE_GATE_REQUIRED_STEP_IDS = [
   "release-contracts",
   "supervisor-python-contracts",
@@ -283,7 +283,7 @@ export function validateOfficialTestRuntimePolicy(value, raw = null) {
   if (value.python_runtime.venv_path !== ".venv" || value.python_runtime.venv_tree_sha256 !== "c67b68ec9436f4a13f41df0eff9b552ca3f1d8b9e759113ebd23eefbe9419041" || value.python_runtime.interpreter_path !== "/usr/bin/python3.11" || value.python_runtime.interpreter_sha256 !== "c3d7aaf77a0fe9486380e2b551b9aa7c37f76f46ebe627d4dcad0c38e6485d98" || value.python_runtime.requirements_sha256 !== "702687ef5d857d239673a911520c2cbe805fd2578b7708b16a547234a8274d5d" || value.python_runtime.requirements_dev_sha256 !== "2fa82fddabeb9ed6fb4390790479a81d9affeb5533a79e658cec4c44e5d1270b") reject("TEST_RUNTIME_PYTHON_INVALID");
   exactKeys(value.test_inventory, ["path", "sha256", "total_tests", "required_tests", "not_applicable_tests", "category_counts"], "TEST_RUNTIME_INVENTORY_FIELDS_INVALID");
   exactKeys(value.test_inventory.category_counts, ["BROWSER", "HISTORICAL_D1_SITES", "POSTGRES", "POSTGRES_ALIAS", "PURE_NODE", "RELEASE_CONTRACT", "SPECIAL_HARNESS"], "TEST_RUNTIME_INVENTORY_CATEGORY_FIELDS_INVALID");
-  if (value.test_inventory.path !== "chenyida_erp_site/release/release-test-inventory-v1.json" || value.test_inventory.sha256 !== RELEASE_TEST_INVENTORY_SHA256 || value.test_inventory.total_tests !== 227 || value.test_inventory.required_tests !== 203 || value.test_inventory.not_applicable_tests !== 24 || canonicalJson(value.test_inventory.category_counts) !== canonicalJson({ BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 80, POSTGRES_ALIAS: 2, PURE_NODE: 107, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 4 })) reject("TEST_RUNTIME_INVENTORY_INVALID");
+  if (value.test_inventory.path !== "chenyida_erp_site/release/release-test-inventory-v1.json" || value.test_inventory.sha256 !== RELEASE_TEST_INVENTORY_SHA256 || value.test_inventory.total_tests !== 230 || value.test_inventory.required_tests !== 206 || value.test_inventory.not_applicable_tests !== 24 || canonicalJson(value.test_inventory.category_counts) !== canonicalJson({ BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 81, POSTGRES_ALIAS: 2, PURE_NODE: 109, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 4 })) reject("TEST_RUNTIME_INVENTORY_INVALID");
   if (raw !== null && sha256(raw) !== RELEASE_TEST_RUNTIME_POLICY_SHA256) reject("TEST_RUNTIME_POLICY_SHA256_MISMATCH");
   return value;
 }

@@ -22,6 +22,12 @@ function positiveInteger(name: string, fallback: number): number {
   return value;
 }
 
+function workerLeaseSeconds(): number {
+  const value = positiveInteger("ERP_WORKER_LEASE_SECONDS", 60);
+  if (value < 15 || value > 300) throw new Error("ERP_WORKER_LEASE_SECONDS must be between 15 and 300 seconds");
+  return value;
+}
+
 export function resolveOriginPolicy(
   environment: RuntimeConfig["environment"],
   deploymentClassValue: string | undefined,
@@ -64,6 +70,6 @@ export function runtimeConfig(): RuntimeConfig {
     backupStatusFile: resolve(process.env.ERP_BACKUP_STATUS_FILE || "/data/chenyida-erp/backup-status/latest.json"),
     maxUploadBytes: positiveInteger("ERP_MAX_UPLOAD_BYTES", 10 * 1024 * 1024),
     workerPollMs: positiveInteger("ERP_WORKER_POLL_MS", 1_000),
-    workerLeaseSeconds: positiveInteger("ERP_WORKER_LEASE_SECONDS", 60),
+    workerLeaseSeconds: workerLeaseSeconds(),
   };
 }

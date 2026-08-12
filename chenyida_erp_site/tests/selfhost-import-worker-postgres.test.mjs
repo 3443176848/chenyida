@@ -76,11 +76,12 @@ test.after(async () => pool.end());
 
 test("real XLSX worker preserves sheet metadata and propagates merged multi-row headers into the initial mapping", async () => {
   const bytes = await mergedHeaderWorkbook();
-  const relativePath = "task01/merged-header.xlsx";
   const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const storageName = randomUUID();
   const queue = new PostgresBackgroundJobQueue(pool, { now: () => new Date() }, { uuid: randomUUID }, 60);
   const client = await pool.connect();
   let batchId;
+  let relativePath;
   try {
     await client.query("begin");
     const batch = await client.query(`
@@ -88,14 +89,19 @@ test("real XLSX worker preserves sheet metadata and propagates merged multi-row 
       values($1,'XLSX','QUEUED_FOR_PARSING','mapper1',1,1) returning id
     `, [`IMP-WORKER-${randomUUID().slice(0, 8)}`]);
     batchId = Number(batch.rows[0].id);
+    relativePath = `material-import/${batchId}/${storageName}.xlsx`;
     await client.query(`
       insert into material_import_files(
-        batch_id,storage_name,relative_path,original_filename,mime_type,sha256,size_bytes
-      ) values($1,$2,$3,'merged-header.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',$4,$5)
-    `, [batchId, randomUUID(), relativePath, sha256, bytes.byteLength]);
+        batch_id,storage_name,relative_path,original_filename,mime_type,sha256,size_bytes,
+        filename_extension,declared_mime_type,declared_sha256,declared_size_bytes,detected_file_type,
+        actual_sha256,actual_size_bytes,storage_status,security_check_status,uploaded_at,promoted_at
+      ) values($1,$2,$3,'merged-header.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',$4,$5,
+        '.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',$4,$5,'XLSX',$4,$5,
+        'STORED','BASIC_CHECK_PASSED',now(),now())
+    `, [batchId, storageName, relativePath, sha256, bytes.byteLength]);
     await queue.enqueue(client, {
       type: "material.import.parse",
-      payload: { batch_id: batchId, relative_path: relativePath },
+      payload: { batch_id: batchId, relative_path: relativePath, actual_sha256: sha256, actual_size_bytes: bytes.byteLength },
       idempotencyKey: `parse-import:${batchId}`,
       aggregateType: "material_import_batch",
       aggregateId: String(batchId),

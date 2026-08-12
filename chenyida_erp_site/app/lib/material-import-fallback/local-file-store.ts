@@ -82,19 +82,20 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
     leaseToken: string;
     body: ReadableStream<Uint8Array>;
     maximumBytes?: number;
+    beforePublish?: () => Promise<void>;
   }>): Promise<Readonly<{ kind: "stored" | "exists"; facts: LocalMaterialImportFileFacts }>> {
     const maximum = positiveSafeInteger(input.maximumBytes ?? DEFAULT_MAX_BYTES, "IMPORT_FILE_MAXIMUM");
     const lease = safeUuid(input.leaseToken, "IMPORT_UPLOAD_LEASE");
-    const existing = await this.inspectOptional(input.relativePath, maximum);
-    if (existing) {
-      await input.body.cancel().catch(() => undefined);
-      return { kind: "exists", facts: existing };
-    }
     try {
       await this.ensureParent(input.relativePath);
     } catch (error) {
       await input.body.cancel(error).catch(() => undefined);
       throw error;
+    }
+    const existing = await this.inspectOptional(input.relativePath, maximum);
+    if (existing) {
+      await input.body.cancel().catch(() => undefined);
+      return { kind: "exists", facts: existing };
     }
     const destination = this.safePath(input.relativePath);
     const temporaryRelativePath = `${input.relativePath}.part.${lease}`;
@@ -158,6 +159,7 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
       prefix: prefixFrom(prefixChunks, prefixSize),
     };
     try {
+      await input.beforePublish?.();
       await link(temporary, destination);
       await chmod(destination, 0o440);
       await this.fsyncDirectory(dirname(destination));
@@ -176,6 +178,7 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
 
   async inspect(relativePath: string, maximumBytes = DEFAULT_MAX_BYTES): Promise<LocalMaterialImportFileFacts> {
     const maximum = positiveSafeInteger(maximumBytes, "IMPORT_FILE_MAXIMUM");
+    await this.assertSafeAncestors(relativePath, true);
     const absolute = this.safePath(relativePath);
     const handle = await open(absolute, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
     const hash = createHash("sha256");
@@ -233,6 +236,7 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
     expectedSha256: string;
     expectedSizeBytes: number;
     maximumBytes?: number;
+    beforePublish?: () => Promise<void>;
   }>): Promise<LocalMaterialImportPromotion> {
     if (!/^[0-9a-f]{64}$/.test(input.expectedSha256)) throw new Error("IMPORT_FILE_SHA256_INVALID");
     positiveSafeInteger(input.expectedSizeBytes, "IMPORT_FILE_SIZE");
@@ -250,6 +254,7 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
     await this.ensureParent(input.finalRelativePath);
     const finalPath = this.safePath(input.finalRelativePath);
     try {
+      await input.beforePublish?.();
       await link(this.safePath(input.stagingRelativePath), finalPath);
       await chmod(finalPath, 0o440);
       await this.fsyncDirectory(dirname(finalPath));
@@ -266,6 +271,7 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
     const operation = safeUuid(operationId, "IMPORT_OPERATION_ID");
     const lease = safeUuid(leaseToken, "IMPORT_UPLOAD_LEASE");
     const relativePath = `material-import/.staging/${operation}.ready.part.${lease}`;
+    await this.assertSafeAncestors(relativePath, true);
     const absolute = this.safePath(relativePath);
     try {
       const metadata = await lstat(absolute);
@@ -294,6 +300,7 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
   }
 
   async head(key: string): Promise<MaterialImportObjectMetadata | null> {
+    await this.assertSafeAncestors(key, true);
     const absolute = this.safePath(key);
     let metadata;
     try {
@@ -315,6 +322,7 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
   }
 
   async open(key: string, range?: MaterialImportObjectRange): Promise<ReadableStream<Uint8Array> | null> {
+    await this.assertSafeAncestors(key, true);
     const absolute = this.safePath(key);
     let handle;
     try {
@@ -367,6 +375,7 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
   }
 
   async delete(relativePath: string): Promise<void> {
+    await this.assertSafeAncestors(relativePath, true);
     const absolute = this.safePath(relativePath);
     try {
       const metadata = await lstat(absolute);
@@ -407,6 +416,27 @@ export class LocalMaterialImportFileStore implements MaterialImportObjectStore {
       const metadata = await lstat(current);
       if (!metadata.isDirectory() || metadata.isSymbolicLink()) throw new Error("IMPORT_FILE_DIRECTORY_INVALID");
       if (created) await this.fsyncDirectory(dirname(current));
+    }
+  }
+
+  private async assertSafeAncestors(relativePath: string, allowMissing = false): Promise<void> {
+    const absolute = this.safePath(relativePath);
+    let current = this.root;
+    const rootMetadata = await lstat(current).catch((error: NodeJS.ErrnoException) => {
+      if (allowMissing && error.code === "ENOENT") return null;
+      throw error;
+    });
+    if (!rootMetadata) return;
+    if (!rootMetadata.isDirectory() || rootMetadata.isSymbolicLink()) throw new Error("IMPORT_FILE_ROOT_INVALID");
+    const fromRoot = relative(this.root, dirname(absolute));
+    for (const segment of fromRoot.split(sep).filter(Boolean)) {
+      current = resolve(current, segment);
+      const metadata = await lstat(current).catch((error: NodeJS.ErrnoException) => {
+        if (allowMissing && error.code === "ENOENT") return null;
+        throw error;
+      });
+      if (!metadata) return;
+      if (!metadata.isDirectory() || metadata.isSymbolicLink()) throw new Error("IMPORT_FILE_DIRECTORY_INVALID");
     }
   }
 

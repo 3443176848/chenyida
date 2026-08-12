@@ -83,7 +83,7 @@ test("read-only repeatable-read snapshot aggregates exact material-review work",
   });
   assert.ok(result.risks.some((item) => item.code === "MATERIAL_REVIEW_PENDING"));
   assert.ok(!result.risks.some((item) => item.code === "NO_VISIBLE_RISK"));
-  assert.equal(result.summary.groups.operations.migrations[0].version, "0041_ai_governance_suggestion_evidence.sql");
+  assert.equal(result.summary.groups.operations.migrations[0].version, "0043_material_import_terminal_integrity.sql");
   assert.equal(result.recent_activity.length, 0);
 });
 
@@ -108,7 +108,7 @@ test("trusted verification file is independent from PostgreSQL business facts", 
     location_id: "dashboard-restore-location",
     deployment: { class: "TEST", id: "dashboard-test", database: databaseIdentity.name, database_system_identifier: databaseIdentity.system_identifier, database_oid: databaseIdentity.oid, database_marker: "TEST.dashboard-test", database_bytes: 16777216, database_server_major: databaseIdentity.server_major, database_encoding: databaseIdentity.encoding, database_collate: databaseIdentity.collate, database_ctype: databaseIdentity.ctype, database_locale_provider: databaseIdentity.locale_provider, database_collation_version: databaseIdentity.collation_version },
     application: { version: "0.1.0-alpha.44", git_commit: "b".repeat(40), web_image_digest: `sha256:${hash}`, worker_image_digest: `sha256:${"c".repeat(64)}` },
-    migration: { head: "0041_ai_governance_suggestion_evidence.sql", manifest_file: "migrations.txt", manifest_sha256: migrationManifestSha },
+    migration: { head: "0043_material_import_terminal_integrity.sql", manifest_file: "migrations.txt", manifest_sha256: migrationManifestSha },
     policy: { id: "daily-rpo-v1", rpo_hours: 24 },
     consistency: { method: "QUIESCED_APPLICATION_AND_SNAPSHOT_WITH_CONTENT_RECONCILIATION", database_snapshot: "PG_DUMP_CONSISTENT_SNAPSHOT", database_guard: "DEFAULT_TRANSACTION_READ_ONLY_DEFENSE_IN_DEPTH", writer_boundary: "EXACT_COMPOSE_WEB_WORKER_STOPPED", content_reconciliation: "BEFORE_AFTER_FULL_RELATION_CONTENT_DIGESTS", dump_scope: "COMPLETE_APPLICATION_DATABASE_LOGICAL_DUMP_NO_OWNER_OR_ACL", web_container: "web-test", web_container_id: hash, worker_container: "worker-test", worker_container_id: "c".repeat(64), recovery_point_at: new Date(Date.parse(createdAt) - 120_000).toISOString(), verified_after: new Date(Date.parse(createdAt) - 60_000).toISOString() },
     reconciliation: { contract: "chenyida-erp-backup-reconciliation/v1", file: "reconciliation.json", sha256: hash },
@@ -127,5 +127,5 @@ test("trusted verification file is independent from PostgreSQL business facts", 
   assert.equal(result.policy_status, "MATCHED");
   assert.equal(result.assurance_status, "MATCHED");
   assert.equal(result.recovery_ready, true);
-  assert.equal(result.current_migration.version, "0041_ai_governance_suggestion_evidence.sql");
+  assert.equal(result.current_migration.version, "0043_material_import_terminal_integrity.sql");
 });

@@ -156,18 +156,21 @@ export class PostgresMaterialImportNormalizationWorker {
     };
   }
 
-  async markTerminalFailure(job: JobLease, safeCode: string): Promise<void> {
-    const batchId = Number(job.payload.batch_id);
-    const runId = Number(job.payload.normalization_run_id);
-    if (!Number.isSafeInteger(batchId) || !Number.isSafeInteger(runId)) return;
-    await this.#repository.transaction(async (client) => {
-      const result = await client.query<NormalizationRunRow>("select * from material_import_normalization_runs where id=$1 and batch_id=$2 for update", [runId, batchId]);
+  async publishTerminalFailure(client: PoolClient, job: JobLease, safeCode: string, executor: string): Promise<void> {
+      const result = await client.query<NormalizationRunRow>(`
+        select r.* from material_import_job_outbox o
+        join material_import_normalization_runs r
+          on o.aggregate_type='material_import_normalization' and r.id::text=o.aggregate_id
+        where o.id=$1 and o.job_type='material.import.normalize' for update of r
+      `, [job.id]);
       const run = result.rows[0];
       if (!run || ["SUCCEEDED", "SUPERSEDED", "FAILED", "CANCELLED"].includes(run.run_status)) return;
       if (run.run_status === "CANCEL_REQUESTED") {
         await this.#finalizeCancellation(client, run);
         return;
       }
+      const batchId = numberValue(run.batch_id); const runId = numberValue(run.id);
+      const code = /^[A-Z][A-Z0-9_]{0,99}$/.test(safeCode) ? safeCode : "IMPORT_NORMALIZATION_FAILED";
       const batch = await client.query("select current_normalization_run_id from material_import_batches where id=$1 for update", [batchId]);
       const restore = batch.rows[0]?.current_normalization_run_id ? "NORMALIZED" : "MAPPING_CONFIRMED";
       await client.query(`
@@ -176,17 +179,16 @@ export class PostgresMaterialImportNormalizationWorker {
           lease_token=null,lease_expires_at=null,heartbeat_at=null,completed_at=now(),
           failure_code=$2,safe_failure_message='规范化任务处理失败，请检查 Mapping 或重试',updated_at=now()
         where id=$1
-      `, [runId, safeCode.slice(0, 100)]);
+      `, [runId, code]);
       await client.query("update material_import_batches set status=$2,current_version=current_version+1,updated_at=now() where id=$1 and status in ('QUEUED_FOR_NORMALIZATION','NORMALIZING')", [batchId, restore]);
       await client.query(`
-        insert into material_import_events(batch_id,event_type,actor_type,previous_status,new_status,request_id,safe_details)
-        values($1,'NORMALIZATION_FAILED','WORKER',null,$2,$3,$4)
-      `, [batchId, restore, randomUUID(), { normalization_run_id: runId, code: safeCode.slice(0, 100) }]);
+        insert into material_import_events(batch_id,event_type,actor_type,actor_identifier,previous_status,new_status,request_id,safe_details)
+        values($1,'NORMALIZATION_FAILED','WORKER',$2,null,$3,$4,$5)
+      `, [batchId, executor.slice(0, 200), restore, job.id, { normalization_run_id: runId, code, job_id: job.id }]);
       await client.query(`
         insert into audit_log(username,action,detail,request_id,result,route_code,error_code,retention_until)
         values('system','IMPORT_NORMALIZATION_FAILED',$1,$2,'failed','MATERIAL_IMPORT_NORMALIZATION',$3,now()+interval '1095 days')
-      `, [{ batch_id: batchId, normalization_run_id: runId }, randomUUID(), safeCode.slice(0, 100)]);
-    }).catch(() => undefined);
+      `, [{ batch_id: batchId, normalization_run_id: runId, job_id: job.id, executor: executor.slice(0, 200) }, job.id, code]);
   }
 
   async #claim(job: JobLease, batchId: number, runId: number): Promise<NormalizationRunRow> {

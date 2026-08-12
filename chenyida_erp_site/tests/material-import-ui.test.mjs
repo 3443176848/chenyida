@@ -7,7 +7,7 @@ import {
   changeImportListQuery, DEFAULT_IMPORT_LIST_QUERY, duplicateMappingSources,
   importCellText, importColumnReference, importFileIdentity, importListApiQuery, importStatusNeedsPolling,
   parseImportListQuery, pollingDelay,
-  preflightImportFile, requiredMappingTargetsMissing, retryAfterMilliseconds, safeImportFilename,
+  preflightImportFile, requiredMappingTargetsMissing, retryAfterMilliseconds, safeImportFilename, normalizeImportUiError,
   serializeImportListQuery,
 } from "../app/materials/_lib/material-import.ts";
 import { api, ErpApiError } from "../public/erp/api-client.js";
@@ -64,11 +64,11 @@ test("UI-030 重选会 reset 旧 Worker 和状态", () => assert.match(createSou
 test("UI-031 同名不同 File 身份含 size type lastModified", () => assert.notEqual(importFileIdentity(file()), importFileIdentity(file({ lastModified: 2 }))));
 test("UI-032 SHA-256 标准向量和 10 MiB 分块边界正确", () => { const hash = sha256.create(); hash.update(new TextEncoder().encode("a")); hash.update(new TextEncoder().encode("bc")); assert.equal(bytesToHex(hash.digest()), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"); const payload = new Uint8Array(10 * 1024 * 1024); for (let index = 0; index < payload.length; index += 1) payload[index] = index % 251; const chunked = sha256.create(); for (let offset = 0; offset < payload.length; offset += 1024 * 1024) chunked.update(payload.subarray(offset, offset + 1024 * 1024)); assert.equal(bytesToHex(chunked.digest()), bytesToHex(sha256(payload))); });
 test("UI-033 哈希失败不创建批次", () => assert.match(createSource, /snapshot\.state === "FAILED"[^]*setStage\("摘要计算失败"\)/));
-test("UI-034 预检 SHA 未完成时确认禁用", () => assert.match(createSource, /disabled=\{busy \|\| hash\.state !== "COMPLETED"\}/));
+test("UI-034 预检 SHA 未完成时确认禁用", () => assert.match(createSource, /disabled=\{busy \|\| unresolved \|\| hash\.state !== "COMPLETED"\}/));
 test("UI-035 创建与上传成功采用服务端 id version", () => { assert.match(createSource, /return response\.data[^]*upload\(batch/); assert.match(createSource, /uploadedBatchId = response\.data\.batch\.id[^]*catch \{[^]*进入工作区后由共享读取流程继续恢复[^]*window\.location\.assign/); });
 test("UI-036 创建 unknown 只用原 Key 载荷恢复", () => assert.match(createSource, /operation\.type === "CREATE"[^]*idempotencyKey: operation\.key[^]*operation\.payload/));
-test("UI-037 创建 unknown 禁止第二批次", () => assert.match(createSource, /operationRef\.current[^]*state: "RESULT_UNKNOWN"[^]*使用原操作标识安全恢复/));
-test("UI-038 XHR 只 append 一个 file 且不手设 boundary", () => { assert.equal((clientSource.match(/form\.append\("file"/g) || []).length, 1); assert.match(clientSource, /name\.toLowerCase\(\) !== "content-type"/); });
+test("UI-037 创建 unknown 禁止第二批次", () => { assert.match(createSource, /operationRef\.current\?\.state === "RESULT_UNKNOWN"[^]*return/); assert.match(createSource, /\[unresolved, setUnresolved\] = useState\(false\)[^]*setUnresolved\(unknown\)[^]*disabled=\{busy \|\| unresolved/); });
+test("UI-038 XHR 只 append 一个 file、不手设 boundary，并发送服务端预检文件名/MIME", () => { assert.equal((clientSource.match(/form\.append\("file"/g) || []).length, 1); assert.match(clientSource, /name\.toLowerCase\(\) !== "content-type"/); assert.match(createSource, /"X-File-Name": encodeURIComponent\(preflight\.filename\)/); assert.match(createSource, /"X-File-Mime": selected\.type \|\| "application\/octet-stream"/); });
 test("UI-039 lengthComputable 才显示百分比", () => assert.match(createSource, /progress\.lengthComputable \?[^]*仅网络发送/));
 test("UI-040 lengthComputable false 只显示正在上传", () => assert.match(createSource, /setStage\("正在上传"\)/));
 
@@ -76,6 +76,11 @@ test("UI-041 100% 后切服务端存储安全文案", () => assert.match(createS
 test("UI-042 send 前取消不进 unknown", () => assert.match(clientSource, /if \(!sent\)[^]*AbortError/));
 test("UI-043 send 后 abort 进入 RESULT_UNKNOWN", () => assert.match(clientSource, /addEventListener\("abort"[^]*if \(sent\) unknown/));
 test("UI-044 上传恢复复用原 File Key action version", () => { assert.match(createSource, /operation\.type === "UPLOAD"/); assert.match(createSource, /payload\.duplicate_action/); assert.match(createSource, /upload\(batch, payload\.duplicate_action, operation\)/); });
+test("UI-044A 上传处理中保留原 Key 并进入恢复入口", () => assert.equal(normalizeImportUiError({ code: "IDEMPOTENCY_IN_PROGRESS" }).resultUnknown, true));
+test("UI-044B 上传待协调时保留原 Key 并进入恢复入口", () => assert.equal(normalizeImportUiError({ code: "IMPORT_RECONCILIATION_REQUIRED" }).resultUnknown, true));
+test("UI-044C CREATE 恢复保留同批次并从 retry 事实恢复上传策略", () => {
+  assert.match(createSource, /operation\.type === "CREATE"[^]*createdBatchRef\.current = response\.data[^]*retryPayload\.retry_of_batch_id == null \? "REJECT" : "ALLOW_DUPLICATE"/);
+});
 test("UI-045 REJECT 重复显示 FAILED 处置", () => assert.match(createSource, /IMPORT_FILE_DUPLICATE[^]*重复文件，上传未完成[^]*原批次已失败/));
 test("UI-046 允许重复创建 retry_of 新批次和新 keys", () => assert.match(createSource, /execute\("ALLOW_DUPLICATE", duplicateBatch\.id\)/));
 test("UI-047 File 变化清重复确认并重新 SHA", () => assert.match(createSource, /setDuplicateBatch\(null\)[^]*start\(selected/));
@@ -91,7 +96,16 @@ test("UI-056 UPLOAD_PENDING 取消不承诺立即删对象", () => assert.match(
 test("UI-057 QUEUED 取消不承诺删 Queue 消息", () => assert.match(workspaceSource, /不承诺物理删除 Queue 消息/));
 test("UI-058 PARSING 取消说明协作式", () => assert.match(workspaceSource, /这是协作式取消/));
 test("UI-059 取消冲突由重读权威状态恢复", () => assert.match(workspaceSource, /cancelBatch[^]*await initialLoad\(\)/));
+test("UI-060 RESULT_UNKNOWN 时重选文件不能丢弃原操作标识", () => {
+  assert.match(createSource, /if \(operationRef\.current\?\.state === "RESULT_UNKNOWN"\) return/);
+  assert.match(createSource, /type="file"[^>]+disabled=\{busy \|\| unresolved\}/);
+});
 test("UI-060 cancel unknown 阻断 parse", () => assert.match(workspaceSource, /resultUnknown[^]*启动解析/));
+test("UI-060A 工作区 unknown 只用原 method endpoint key payload 恢复", () => {
+  assert.match(workspaceSource, /recoverUnknownWrite[^]*operation\.endpoint[^]*operation\.method[^]*JSON\.stringify\(operation\.payload\)[^]*idempotencyKey: operation\.key/);
+  assert.match(workspaceSource, /resultUnknown \? <div[^]*依赖操作保持锁定[^]*recoverUnknownWrite/);
+  assert.match(workspaceSource, /applyBatch[^]*setError\(null\)[^]*resultUnknown \? <div[^]*recoverUnknownWrite/);
+});
 
 test("UI-061 轮询 2 5 10 秒分段", () => { assert.equal(pollingDelay(0), 2000); assert.equal(pollingDelay(10000), 5000); assert.equal(pollingDelay(60000), 10000); });
 test("UI-062 网络退避 5 10 30 30 秒", () => assert.deepEqual([1,2,3,4].map((n) => pollingDelay(0,n)), [5000,10000,30000,30000]));

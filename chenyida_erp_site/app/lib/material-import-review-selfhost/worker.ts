@@ -44,20 +44,36 @@ export class PostgresMaterialImportReviewWorker {
     return { result };
   }
 
-  async markTerminalFailure(job: JobLease, safeCode: string): Promise<void> {
-    const sessionId = number(job.payload.review_session_id);
-    if (!Number.isSafeInteger(sessionId)) return;
-    await this.pool.query(`
+  async publishTerminalFailure(client: PoolClient, job: JobLease, safeCode: string, executor: string): Promise<void> {
+    const selected = await client.query(`
+      select s.id,s.batch_id,s.status from material_import_job_outbox o
+      join material_import_review_sessions s
+        on o.aggregate_type='material_import_review_session' and s.id::text=o.aggregate_id
+      where o.id=$1 and o.job_type='material.import.review.finalize' for update of s
+    `, [job.id]);
+    const session = selected.rows[0]; if (!session || session.status !== "FINALIZING") return;
+    const sessionId = number(session.id); const batchId = number(session.batch_id); const code = this.safeCode(safeCode);
+    await client.query(`
       update material_import_review_finalizations
       set status='FAILED',failure_code=$3,failure_message_safe='最终处理任务失败，可安全重试',updated_at=now()
       where review_session_id=$1 and job_id=$2 and status<>'COMPLETED'
-    `, [sessionId, job.id, this.safeCode(safeCode)]).catch(() => undefined);
-    await this.pool.query(`
+    `, [sessionId, job.id, code]);
+    const updated = await client.query(`
       update material_import_review_sessions
       set status='FINALIZE_FAILED',failure_code=$3,failure_message_safe='最终处理任务失败，可安全重试',
           expected_version=expected_version+1,updated_at=now()
       where id=$1 and finalization_job_id=$2 and status='FINALIZING'
-    `, [sessionId, job.id, this.safeCode(safeCode)]).catch(() => undefined);
+    `, [sessionId, job.id, code]);
+    if (updated.rowCount === 1) {
+      await client.query(`
+        insert into material_import_events(batch_id,event_type,actor_type,actor_identifier,previous_status,new_status,request_id,safe_details)
+        values($1,'REVIEW_FINALIZATION_FAILED','WORKER',$2,null,null,$3,$4)
+      `, [batchId, executor.slice(0, 200), job.id, { review_session_id: sessionId, code, job_id: job.id }]);
+      await client.query(`
+        insert into audit_log(username,action,detail,request_id,result,route_code,error_code,retention_until)
+        values('system','IMPORT_REVIEW_FINALIZATION_FAILED',$1,$2,'failed','MATERIAL_IMPORT_REVIEW',$3,now()+interval '1095 days')
+      `, [{ batch_id: batchId, review_session_id: sessionId, job_id: job.id, executor: executor.slice(0, 200) }, job.id, code]);
+    }
   }
 
   private async prepareSnapshot(job: JobLease, sessionId: number): Promise<void> {

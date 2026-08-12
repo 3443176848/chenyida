@@ -103,3 +103,21 @@ test("page-memory idempotency keys bind to the current session and canonical req
   assert.notEqual(requests.at(-2).headers["Idempotency-Key"], requests.at(-1).headers["Idempotency-Key"]);
   assert.equal(registry.size, 2);
 });
+
+test("protected writes treat malformed JSON on success and gateway failure as an unknown result", async () => {
+  cookie("session-result-unknown");
+  for (const status of [200, 502, 504]) {
+    globalThis.fetch = async () => new Response("{not-json", {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+    await assert.rejects(
+      api("/api/projects/1/requirement-resolutions", {
+        method: "POST",
+        body: "{}",
+        protectedWrite: { csrfToken: "stale", idempotencyKey: `malformed-${status}` },
+      }),
+      (error) => error instanceof ErpApiError && error.code === "RESULT_UNKNOWN" && error.resultUnknown,
+    );
+  }
+});
