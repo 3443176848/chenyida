@@ -380,8 +380,8 @@ test("isolated Chromium creates one stable-ID RFQ draft and no downstream record
       { value: "", text: "请选择" },
       { value: "1", text: "PRQ-00000001 · PRJ-00000001" },
     ]);
-    const supplierA = page.getByLabel("SUP-000001 · FIX-19 快速交付供应商 A", { exact: true });
-    const supplierB = page.getByLabel("SUP-000002 · FIX-19 低价供应商 B", { exact: true });
+    const supplierA = page.getByLabel("Supplier 1 / SUP-000001 / FIX-19 快速交付供应商 A", { exact: true });
+    const supplierB = page.getByLabel("Supplier 2 / SUP-000002 / FIX-19 低价供应商 B", { exact: true });
     await supplierA.waitFor();
     await supplierB.waitFor();
     assert.equal(await supplierA.count(), 1);

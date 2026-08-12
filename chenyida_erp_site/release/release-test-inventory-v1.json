@@ -1846,7 +1846,7 @@
     },
     {
       "path": "tests/selfhost-rfq-binding-fix19-browser.test.mjs",
-      "sha256": "ca157954290c808460122ae631569437db27861f3c757cfcfc19ac33f4e1889c",
+      "sha256": "67783640454838b5adc94e862bd7d25db70dd857c0be61f9960af1a08b4083a1",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
