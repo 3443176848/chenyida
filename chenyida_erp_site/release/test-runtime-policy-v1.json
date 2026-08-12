@@ -46,7 +46,7 @@
   },
   "test_inventory": {
     "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-    "sha256": "d3124d54aa5a7ae623a0734466d5538da313526ce5cd8320c2c4a0e3ec961f0e",
+    "sha256": "1f83d06d7a3f979780c2217ef3c76a6c704f3172340bcf5369bf0591498488e2",
     "total_tests": 235,
     "required_tests": 211,
     "not_applicable_tests": 24,

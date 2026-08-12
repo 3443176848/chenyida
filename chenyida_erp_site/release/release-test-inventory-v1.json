@@ -1117,7 +1117,7 @@
     },
     {
       "path": "tests/selfhost-planning-revision-response-browser.test.mjs",
-      "sha256": "c0d388f9109c0057f1e4c6fdcec4c87c9e749e9decc552faa3656e8364161ea8",
+      "sha256": "bebb936b03959a45a3e7114226a879efbe9a2ae65bda5df06034ca7ad7183a9e",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",

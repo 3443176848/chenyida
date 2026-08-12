@@ -191,7 +191,7 @@ test("isolated Chromium completes v1 RETURN response fixed v2 lineage and Planni
     assert.equal(await reloadedReply.count(), 1);
     assert.equal(await reloadedReply.inputValue(), expectedResponse); assert.equal(await reloadedGenerateV2.isDisabled(), false);
     await reloadedGenerateV2.click(); const successorDialog = page.getByRole("dialog", { name: "确认生成 v2", exact: true }); await successorDialog.waitFor();
-    await successorDialog.getByText(expectedResponse, { exact: true }).waitFor(); await successorDialog.getByText(/Product A0 · BOM V1 · Unit Resolution v1/).waitFor(); await noOverflow(page, "successor confirmation");
+    await successorDialog.getByText(expectedResponse, { exact: true }).waitFor(); await successorDialog.getByText("产品 A0 · BOM V1 · 单位解析 v1", { exact: true }).waitFor(); await noOverflow(page, "successor confirmation");
     const successorResponsePromise = page.waitForResponse((response) => response.url() === `${browserOrigin}/api/planning-packages/${v1Id}/successor` && response.request().method() === "POST");
     await successorDialog.getByRole("button", { name: "确认生成 v2", exact: true }).click();
     const successorResponse = await successorResponsePromise; assert.equal(successorResponse.status(), 201);
