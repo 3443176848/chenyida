@@ -73,8 +73,15 @@ async function trustedJson(file, code) {
 function imageInspect(value, reference, code) {
   if (!Array.isArray(value) || value.length !== 1) reject(code);
   const row = value[0];
-  if (!row || typeof row !== "object" || Array.isArray(row) || !/^sha256:[0-9a-f]{64}$/.test(row.Id || "") || row.Os !== "linux" || row.Architecture !== "amd64" || !Array.isArray(row.RepoDigests) || !row.RepoDigests.includes(reference)) reject(code);
+  const manifestDigest = reference.slice(reference.lastIndexOf("@") + 1);
+  if (!row || typeof row !== "object" || Array.isArray(row) || !/^sha256:[0-9a-f]{64}$/.test(manifestDigest) || row.Id !== manifestDigest || row.Descriptor?.digest !== manifestDigest || row.Os !== "linux" || row.Architecture !== "amd64" || !Array.isArray(row.RepoDigests) || !row.RepoDigests.includes(reference)) reject(code);
   return row;
+}
+
+function imageConfigDigest(row, code) {
+  const digest = row.Descriptor?.annotations?.["config.digest"];
+  if (!/^sha256:[0-9a-f]{64}$/.test(digest || "")) reject(code);
+  return digest;
 }
 
 function targetIdentity(row, service, reference, version, commit) {
@@ -94,7 +101,7 @@ function targetIdentity(row, service, reference, version, commit) {
     docker_target: service,
     image_reference: reference,
     registry_manifest_digest: reference.slice(reference.lastIndexOf("@") + 1),
-    image_config_digest: row.Id,
+    image_config_digest: imageConfigDigest(row, "CANDIDATE_BUILD_TARGET_CONFIG_INVALID"),
     oci_version: version,
     oci_revision: commit,
     baked_version: version,
@@ -133,10 +140,12 @@ async function create(options) {
   const workerReference = options["--worker-image-reference"];
   const web = imageInspect(await trustedJson(options["--web-inspect"], "CANDIDATE_BUILD_WEB_INSPECT_INVALID"), webReference, "CANDIDATE_BUILD_WEB_INSPECT_INVALID");
   const worker = imageInspect(await trustedJson(options["--worker-inspect"], "CANDIDATE_BUILD_WORKER_INSPECT_INVALID"), workerReference, "CANDIDATE_BUILD_WORKER_INSPECT_INVALID");
-  if (web.Id === worker.Id) reject("CANDIDATE_BUILD_TARGET_COLLISION");
-  const candidate = { git_commit: commit, git_tree: tree, package_version: packageVersion, web_image_digest: web.Id, worker_image_digest: worker.Id, migration_allowlist_sha256: migrationDigest };
+  const webManifestDigest = webReference.slice(webReference.lastIndexOf("@") + 1);
+  const workerManifestDigest = workerReference.slice(workerReference.lastIndexOf("@") + 1);
+  if (webManifestDigest === workerManifestDigest) reject("CANDIDATE_BUILD_TARGET_COLLISION");
+  const candidate = { git_commit: commit, git_tree: tree, package_version: packageVersion, web_image_digest: webManifestDigest, worker_image_digest: workerManifestDigest, migration_allowlist_sha256: migrationDigest };
   const value = validateCandidateBuildProvenance({
-    schema_version: 1,
+    schema_version: 2,
     contract: RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT,
     generated_at: new Date().toISOString(),
     run_id: runId,
@@ -166,10 +175,10 @@ async function create(options) {
       frontend_manifest_digest: RELEASE_DOCKERFILE_FRONTEND_REFERENCE.slice(RELEASE_DOCKERFILE_FRONTEND_REFERENCE.indexOf("@") + 1),
       base_image_reference: RELEASE_NODE_BASE_IMAGE_REFERENCE,
       base_registry_manifest_digest: RELEASE_NODE_BASE_IMAGE_REFERENCE.slice(RELEASE_NODE_BASE_IMAGE_REFERENCE.indexOf("@") + 1),
-      base_config_digest: base.Id,
+      base_local_identity_digest: base.Id,
       registry_image_reference: RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE,
       registry_manifest_digest: RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.slice(RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.indexOf("@") + 1),
-      registry_config_digest: registry.Id,
+      registry_local_identity_digest: registry.Id,
       registry_state: "EPHEMERAL_LOOPBACK_REMOVED",
     },
     targets: [targetIdentity(web, "web", webReference, packageVersion, commit), targetIdentity(worker, "worker", workerReference, packageVersion, commit)],

@@ -20,11 +20,11 @@ import {
 import { parseStrictJson } from "../scripts/release-identity-contract.mjs";
 import { createReleaseImageEvidence, hashTrustedDatabaseTree } from "../scripts/release-image-evidence-producer.mjs";
 import { validateCandidateBuildProvenance, validateImageScanProvenance, validateTrivyCycloneDxDocument } from "../scripts/release-image-evidence-contract.mjs";
-import { FIXTURE_GIT, FIXTURE_TREE, FIXTURE_VERSION, FIXTURE_WEB, FIXTURE_WORKER, buildEligibleReleaseFixture, initializeReleaseArtifactRoot } from "./release-gate-fixture.mjs";
+import { FIXTURE_GIT, FIXTURE_TREE, FIXTURE_VERSION, FIXTURE_WEB, FIXTURE_WEB_CONFIG, FIXTURE_WORKER, FIXTURE_WORKER_CONFIG, buildEligibleReleaseFixture, initializeReleaseArtifactRoot } from "./release-gate-fixture.mjs";
 
 const rootCapable = typeof process.getuid === "function" && process.getuid() === 0;
 const GENERATED_AT = "2026-08-12T01:00:00.000Z";
-const SCANNER_CONFIG_DIGEST = `sha256:${"9".repeat(64)}`;
+const SCANNER_IMAGE_DIGEST = RELEASE_TRIVY_IMAGE_REFERENCE.slice(RELEASE_TRIVY_IMAGE_REFERENCE.lastIndexOf("@") + 1);
 
 async function writeTrustedInput(directory, filename, value) {
   const file = path.join(directory, filename);
@@ -48,11 +48,11 @@ async function producerFixture(root, { vulnerable = false, archiveConfigDigest =
     await chmod(buildProvenanceFile, 0o440);
   }
 
-  const scannerInspectFile = await writeTrustedInput(inputRoot, "scanner-inspect.json", [{ Id: SCANNER_CONFIG_DIGEST, Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_TRIVY_IMAGE_REFERENCE] }]);
-  const scannerVersionFile = await writeTrustedInput(inputRoot, "scanner-version.json", { Version: RELEASE_TRIVY_VERSION, ScannerImageConfigDigest: SCANNER_CONFIG_DIGEST });
+  const scannerInspectFile = await writeTrustedInput(inputRoot, "scanner-inspect.json", [{ Id: SCANNER_IMAGE_DIGEST, Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_TRIVY_IMAGE_REFERENCE] }]);
+  const scannerVersionFile = await writeTrustedInput(inputRoot, "scanner-version.json", { Version: RELEASE_TRIVY_VERSION });
   const databaseMetadataFile = await writeTrustedInput(inputRoot, "database-metadata.json", { Version: 2, UpdatedAt: GENERATED_AT, DownloadedAt: GENERATED_AT, NextUpdate: "2026-08-13T01:00:00.000Z" });
   const targets = {};
-  for (const [service, digest, archiveSha256] of [["web", fixture.candidate.web_image_digest, "e".repeat(64)], ["worker", fixture.candidate.worker_image_digest, "f".repeat(64)]]) {
+  for (const [service, configDigest, archiveSha256] of [["web", fixture.targetConfigs.web, "e".repeat(64)], ["worker", fixture.targetConfigs.worker, "f".repeat(64)]]) {
     const raw = fixture.targetArtifacts[service];
     const vulnerability = vulnerable && service === "web"
       ? { ...raw.vulnerability, Results: raw.vulnerability.Results.map((result) => ({ ...result, Vulnerabilities: [{ VulnerabilityID: "CVE-fixture", Severity: "HIGH" }] })) }
@@ -62,7 +62,7 @@ async function producerFixture(root, { vulnerable = false, archiveConfigDigest =
       inspectFile: await writeTrustedInput(inputRoot, `${service}-inspect.json`, raw.inspect),
       archiveSha256,
       archiveBytes: "1024",
-      archiveConfigDigest: archiveConfigDigest && service === "web" ? archiveConfigDigest : digest,
+      archiveConfigDigest: archiveConfigDigest && service === "web" ? archiveConfigDigest : configDigest,
       vulnerabilityFile: await writeTrustedInput(inputRoot, `${service}-vulnerability.json`, vulnerability),
       cyclonedxFile: await writeTrustedInput(inputRoot, `${service}-cyclonedx.json`, raw.cyclonedx),
     };
@@ -77,7 +77,7 @@ async function producerFixture(root, { vulnerable = false, archiveConfigDigest =
       buildProvenanceFile,
       supervisorBundleSha256: "6".repeat(64),
       authorizationSha256: "7".repeat(64),
-      scannerConfigDigest: SCANNER_CONFIG_DIGEST,
+      scannerImageDigest: SCANNER_IMAGE_DIGEST,
       scannerBinarySha256: "8".repeat(64),
       scannerInspectFile,
       scannerVersionFile,
@@ -115,7 +115,7 @@ test("producer refuses findings, archive drift and noncanonical build provenance
     const root = await mkdtemp(path.join(os.tmpdir(), "cyd-image-producer-reject-"));
     try {
       const { artifactRoot, input } = await producerFixture(root, variant);
-      await assert.rejects(createReleaseImageEvidence(input), (error) => ["IMAGE_EVIDENCE_VULNERABILITIES_FOUND", "IMAGE_PROVENANCE_TARGET_INVALID", "IMAGE_EVIDENCE_BUILD_PROVENANCE_INPUT_INVALID"].includes(error.code));
+      await assert.rejects(createReleaseImageEvidence(input), (error) => ["IMAGE_EVIDENCE_VULNERABILITIES_FOUND", "IMAGE_EVIDENCE_BUILD_TARGET_MISMATCH", "IMAGE_EVIDENCE_BUILD_PROVENANCE_INPUT_INVALID"].includes(error.code));
       assert.deepEqual((await readdir(artifactRoot)).sort(), [RELEASE_ARTIFACT_ROOT_MARKER, "producer-alpha45.build-provenance.json"].sort());
     } finally { await rm(root, { recursive: true, force: true }); }
   }
@@ -131,16 +131,18 @@ test("candidate build producer binds the exact snapshot inputs and loopback dige
     const siteRoot = path.resolve(new URL("..", import.meta.url).pathname);
     const migrations = await buildMigrationAllowlist(path.join(siteRoot, "drizzle-postgres"));
     const migrationDigest = migrationAllowlistDigest(migrations);
-    const webReference = `127.0.0.1:5000/chenyida-erp/web@sha256:${"1".repeat(64)}`;
-    const workerReference = `127.0.0.1:5000/chenyida-erp/worker@sha256:${"2".repeat(64)}`;
-    const targetInspect = (id, reference, cmd) => [{
-      Id: id, Os: "linux", Architecture: "amd64", RepoDigests: [reference],
+    const webReference = `127.0.0.1:5000/chenyida-erp/web@${FIXTURE_WEB}`;
+    const workerReference = `127.0.0.1:5000/chenyida-erp/worker@${FIXTURE_WORKER}`;
+    const targetInspect = (manifestDigest, configDigest, reference, cmd) => [{
+      Id: manifestDigest, Descriptor: { digest: manifestDigest, annotations: { "config.digest": configDigest } }, Os: "linux", Architecture: "amd64", RepoDigests: [reference],
       Config: { Labels: { "org.opencontainers.image.version": FIXTURE_VERSION, "org.opencontainers.image.revision": FIXTURE_GIT }, Env: [`ERP_RUNTIME_BUILD_VERSION=${FIXTURE_VERSION}`, `ERP_RUNTIME_GIT_COMMIT=${FIXTURE_GIT}`], User: "node", Cmd: cmd },
     }];
-    const baseInspect = await writeTrustedInput(inputRoot, "base.json", [{ Id: RELEASE_NODE_BASE_IMAGE_REFERENCE.split("@")[1], Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_NODE_BASE_IMAGE_REFERENCE] }]);
-    const registryInspect = await writeTrustedInput(inputRoot, "registry.json", [{ Id: RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.split("@")[1], Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE] }]);
-    const webInspect = await writeTrustedInput(inputRoot, "web.json", targetInspect(FIXTURE_WEB, webReference, ["node", "server.js"]));
-    const workerInspect = await writeTrustedInput(inputRoot, "worker.json", targetInspect(FIXTURE_WORKER, workerReference, ["node", "--experimental-strip-types", "worker/selfhost.ts"]));
+    const baseDigest = RELEASE_NODE_BASE_IMAGE_REFERENCE.split("@")[1];
+    const registryDigest = RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.split("@")[1];
+    const baseInspect = await writeTrustedInput(inputRoot, "base.json", [{ Id: baseDigest, Descriptor: { digest: baseDigest }, Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_NODE_BASE_IMAGE_REFERENCE] }]);
+    const registryInspect = await writeTrustedInput(inputRoot, "registry.json", [{ Id: registryDigest, Descriptor: { digest: registryDigest }, Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE] }]);
+    const webInspect = await writeTrustedInput(inputRoot, "web.json", targetInspect(FIXTURE_WEB, FIXTURE_WEB_CONFIG, webReference, ["node", "server.js"]));
+    const workerInspect = await writeTrustedInput(inputRoot, "worker.json", targetInspect(FIXTURE_WORKER, FIXTURE_WORKER_CONFIG, workerReference, ["node", "--experimental-strip-types", "worker/selfhost.ts"]));
     const runId = "candidate-build-fixture";
     const result = spawnSync(process.execPath, [
       path.join(siteRoot, "scripts", "release-candidate-build-producer.mjs"), "create",
@@ -154,6 +156,7 @@ test("candidate build producer binds the exact snapshot inputs and loopback dige
     const value = parseStrictJson(await readFile(path.join(artifactRoot, `${runId}.build-provenance.json`), "utf8"));
     assert.equal(validateCandidateBuildProvenance(value, { runId, candidate: value.candidate, imageReferences: { web: webReference, worker: workerReference } }), value);
     assert.equal(value.candidate.migration_allowlist_sha256, migrationDigest);
+    assert.deepEqual(value.targets.map((target) => [target.registry_manifest_digest, target.image_config_digest]), [[FIXTURE_WEB, FIXTURE_WEB_CONFIG], [FIXTURE_WORKER, FIXTURE_WORKER_CONFIG]]);
     assert.deepEqual([value.builder.builder_name, value.builder.builder_driver, value.builder.buildkit_version], ["default", "docker", "v0.30.0"]);
     assert.equal(value.source.producer_sha256, sha256(await readFile(path.join(siteRoot, "scripts", "release-candidate-build-producer.mjs"))));
   } finally { await rm(root, { recursive: true, force: true }); }
@@ -162,7 +165,7 @@ test("candidate build producer binds the exact snapshot inputs and loopback dige
 test("Trivy 0.70 native CycloneDX contract accepts structural components and rejects identity or finding drift", async () => {
   const fixture = await buildEligibleReleaseFixture({ entries: [{ ordinal: 1, filename: "0001_fixture.sql", sha256: "1".repeat(64) }] });
   const document = fixture.targetArtifacts.web.cyclonedx;
-  const expected = { imageConfigDigest: fixture.candidate.web_image_digest, imageReference: fixture.images.web.image_reference };
+  const expected = { imageConfigDigest: fixture.targetConfigs.web, imageReference: fixture.images.web.image_reference };
   assert.equal(validateTrivyCycloneDxDocument(document, expected), document);
 
   const mutate = (callback) => {

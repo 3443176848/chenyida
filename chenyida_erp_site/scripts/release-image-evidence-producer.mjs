@@ -141,7 +141,7 @@ export async function hashTrustedDatabaseTree(root) {
 export async function createReleaseImageEvidence(input) {
   const runId = required(input.runId, IDENTIFIER, "IMAGE_EVIDENCE_RUN_ID_INVALID");
   const candidate = validateCandidate(input.candidate);
-  const scannerConfigDigest = required(input.scannerConfigDigest, DIGEST, "IMAGE_EVIDENCE_SCANNER_CONFIG_INVALID");
+  const scannerImageDigest = required(input.scannerImageDigest, DIGEST, "IMAGE_EVIDENCE_SCANNER_IDENTITY_INVALID");
   const scannerBinarySha256 = required(input.scannerBinarySha256, SHA256, "IMAGE_EVIDENCE_SCANNER_BINARY_INVALID");
   const supervisorBundleSha256 = required(input.supervisorBundleSha256, SHA256, "IMAGE_EVIDENCE_SUPERVISOR_INVALID");
   const authorizationSha256 = required(input.authorizationSha256, SHA256, "IMAGE_EVIDENCE_AUTHORIZATION_INVALID");
@@ -149,14 +149,14 @@ export async function createReleaseImageEvidence(input) {
   const buildProvenancePath = path.resolve(input.buildProvenanceFile);
   if (path.dirname(buildProvenancePath) !== path.resolve(input.artifactRoot) || path.basename(buildProvenancePath) !== `${runId}.build-provenance.json`) reject("IMAGE_EVIDENCE_BUILD_PROVENANCE_INPUT_INVALID");
   const buildProvenance = await nativeJson(buildProvenancePath, "IMAGE_EVIDENCE_BUILD_PROVENANCE_INPUT_INVALID");
-  validateCandidateBuildProvenance(buildProvenance.value, { runId, candidate, imageReferences: { web: input.targets.web?.imageReference, worker: input.targets.worker?.imageReference } });
+  const validatedBuildProvenance = validateCandidateBuildProvenance(buildProvenance.value, { runId, candidate, imageReferences: { web: input.targets.web?.imageReference, worker: input.targets.worker?.imageReference } });
   const buildProvenanceRaw = canonicalJson(buildProvenance.value);
   if (!buildProvenance.raw.equals(Buffer.from(buildProvenanceRaw, "utf8"))) reject("IMAGE_EVIDENCE_BUILD_PROVENANCE_INPUT_INVALID");
 
   const scannerInspect = await nativeJson(input.scannerInspectFile, "IMAGE_EVIDENCE_SCANNER_INSPECT_INPUT_INVALID");
-  validateDockerImageInspect(scannerInspect.value, { configDigest: scannerConfigDigest, imageReference: RELEASE_TRIVY_IMAGE_REFERENCE });
+  validateDockerImageInspect(scannerInspect.value, { imageDigest: scannerImageDigest, imageReference: RELEASE_TRIVY_IMAGE_REFERENCE });
   const scannerVersion = await nativeJson(input.scannerVersionFile, "IMAGE_EVIDENCE_SCANNER_VERSION_INPUT_INVALID");
-  validateTrivyVersionReport(scannerVersion.value, scannerConfigDigest);
+  validateTrivyVersionReport(scannerVersion.value);
   const databaseMetadata = await nativeJson(input.databaseMetadataFile, "IMAGE_EVIDENCE_DATABASE_METADATA_INPUT_INVALID");
   const databaseSchemaVersion = metadataField(databaseMetadata.value, "Version", "version");
   if (!Number.isSafeInteger(databaseSchemaVersion) || databaseSchemaVersion < 1 || databaseSchemaVersion > 99) reject("IMAGE_EVIDENCE_DATABASE_METADATA_INVALID");
@@ -169,15 +169,18 @@ export async function createReleaseImageEvidence(input) {
   for (const service of ["web", "worker"]) {
     const target = input.targets[service];
     if (!target) reject("IMAGE_EVIDENCE_TARGET_INPUT_INVALID");
-    const expectedDigest = candidate[`${service}_image_digest`];
+    const expectedManifestDigest = candidate[`${service}_image_digest`];
+    const expectedConfigDigest = required(target.archiveConfigDigest, DIGEST, "IMAGE_EVIDENCE_TARGET_ARCHIVE_INVALID");
+    const buildTarget = validatedBuildProvenance.targets.find((entry) => entry.service === service);
+    if (!buildTarget || buildTarget.image_reference !== target.imageReference || buildTarget.registry_manifest_digest !== expectedManifestDigest || buildTarget.image_config_digest !== expectedConfigDigest) reject("IMAGE_EVIDENCE_BUILD_TARGET_MISMATCH");
     const inspect = await nativeJson(target.inspectFile, "IMAGE_EVIDENCE_TARGET_INSPECT_INPUT_INVALID");
-    validateDockerImageInspect(inspect.value, { configDigest: expectedDigest, imageReference: target.imageReference });
+    validateDockerImageInspect(inspect.value, { imageDigest: expectedManifestDigest, imageReference: target.imageReference });
     const vulnerability = await nativeJson(target.vulnerabilityFile, "IMAGE_EVIDENCE_TARGET_VULNERABILITY_INPUT_INVALID");
-    const counts = validateTrivyNativeVulnerabilityReport(vulnerability.value, { imageConfigDigest: expectedDigest, imageReference: target.imageReference });
+    const counts = validateTrivyNativeVulnerabilityReport(vulnerability.value, { imageConfigDigest: expectedConfigDigest, imageReference: target.imageReference });
     const cyclonedx = await nativeJson(target.cyclonedxFile, "IMAGE_EVIDENCE_TARGET_CYCLONEDX_INPUT_INVALID");
-    validateTrivyCycloneDxDocument(cyclonedx.value, { imageConfigDigest: expectedDigest, imageReference: target.imageReference });
+    validateTrivyCycloneDxDocument(cyclonedx.value, { imageConfigDigest: expectedConfigDigest, imageReference: target.imageReference });
     for (const key of Object.keys(total)) total[key] += counts[key];
-    targetData.push({ service, expectedDigest, target, inspect, vulnerability, cyclonedx, counts });
+    targetData.push({ service, expectedManifestDigest, expectedConfigDigest, target, inspect, vulnerability, cyclonedx, counts });
   }
   if (Object.values(total).some((count) => count !== 0)) reject("IMAGE_EVIDENCE_VULNERABILITIES_FOUND");
 
@@ -187,7 +190,7 @@ export async function createReleaseImageEvidence(input) {
   const targetNames = Object.fromEntries(targetData.map(({ service }) => [service, { inspect: `${runId}.${service}.inspect.json`, vulnerability: `${runId}.${service}.trivy.json`, cyclonedx: `${runId}.${service}.cdx.json` }]));
   const scannerInspectRaw = canonicalJson(scannerInspect.value), scannerVersionRaw = canonicalJson(scannerVersion.value), databaseMetadataRaw = canonicalJson(databaseMetadata.value);
   const provenance = validateImageScanProvenance({
-    schema_version: 2,
+    schema_version: 3,
     contract: RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT,
     generated_at: generatedAt,
     run_id: runId,
@@ -197,17 +200,17 @@ export async function createReleaseImageEvidence(input) {
     scanner: {
       name: "trivy", version: RELEASE_TRIVY_VERSION, image_reference: RELEASE_TRIVY_IMAGE_REFERENCE,
       registry_manifest_digest: RELEASE_TRIVY_IMAGE_REFERENCE.slice(RELEASE_TRIVY_IMAGE_REFERENCE.lastIndexOf("@") + 1),
-      config_digest: scannerConfigDigest, binary_sha256: scannerBinarySha256, platform: "linux/amd64",
+      local_identity_digest: scannerImageDigest, binary_sha256: scannerBinarySha256, platform: "linux/amd64",
       inspect: { file: scannerInspectName, sha256: sha256(scannerInspectRaw) }, version_report: { file: scannerVersionName, sha256: sha256(scannerVersionRaw) },
     },
     database: {
       schema_version: databaseSchemaVersion, updated_at: databaseUpdatedAt, downloaded_at: databaseDownloadedAt, next_update: databaseNextUpdate,
       metadata: { file: databaseMetadataName, sha256: sha256(databaseMetadataRaw) }, payload_tree_sha256: databasePayloadTreeSha256,
     },
-    targets: targetData.map(({ service, expectedDigest, target, inspect, vulnerability, cyclonedx }) => ({
+    targets: targetData.map(({ service, expectedConfigDigest, target, inspect, vulnerability, cyclonedx }) => ({
       service, image_reference: target.imageReference, registry_manifest_digest: target.imageReference.slice(target.imageReference.lastIndexOf("@") + 1),
-      image_config_digest: expectedDigest, platform: "linux/amd64", inspect: { file: targetNames[service].inspect, sha256: sha256(canonicalJson(inspect.value)) },
-      archive_sha256: required(target.archiveSha256, SHA256, "IMAGE_EVIDENCE_TARGET_ARCHIVE_INVALID"), archive_bytes: positiveInteger(target.archiveBytes, "IMAGE_EVIDENCE_TARGET_ARCHIVE_INVALID"), archive_config_digest: required(target.archiveConfigDigest, DIGEST, "IMAGE_EVIDENCE_TARGET_ARCHIVE_INVALID"),
+      image_config_digest: expectedConfigDigest, platform: "linux/amd64", inspect: { file: targetNames[service].inspect, sha256: sha256(canonicalJson(inspect.value)) },
+      archive_sha256: required(target.archiveSha256, SHA256, "IMAGE_EVIDENCE_TARGET_ARCHIVE_INVALID"), archive_bytes: positiveInteger(target.archiveBytes, "IMAGE_EVIDENCE_TARGET_ARCHIVE_INVALID"), archive_config_digest: expectedConfigDigest,
       native_vulnerability: { file: targetNames[service].vulnerability, sha256: sha256(canonicalJson(vulnerability.value)) },
       native_cyclonedx: { file: targetNames[service].cyclonedx, sha256: sha256(canonicalJson(cyclonedx.value)) },
     })),
@@ -215,7 +218,7 @@ export async function createReleaseImageEvidence(input) {
   const provenanceRaw = canonicalJson(provenance);
   const sbom = validateSbomEvidence({ schema_version: 1, contract: RELEASE_SBOM_EVIDENCE_CONTRACT, generated_at: generatedAt, scope: "WEB_AND_WORKER_IMAGES", candidate, format: "TRIVY_CYCLONEDX_1_6_JSON_SET", documents: targetData.map(({ service, cyclonedx }) => ({ service, file: targetNames[service].cyclonedx, sha256: sha256(canonicalJson(cyclonedx.value)) })), provenance_file: provenanceName, provenance_sha256: sha256(provenanceRaw), result: "VERIFIED" });
   const sbomRaw = canonicalJson(sbom);
-  const normalizedReport = validateSecurityScanReport({ schema_version: 1, contract: RELEASE_SECURITY_SCAN_REPORT_CONTRACT, generated_at: generatedAt, candidate, scanner: { name: "trivy", version: RELEASE_TRIVY_VERSION, image_reference: RELEASE_TRIVY_IMAGE_REFERENCE, binary_sha256: scannerBinarySha256 }, policy: { id: RELEASE_VULNERABILITY_POLICY_ID, sha256: RELEASE_VULNERABILITY_POLICY_SHA256 }, vulnerability_database_updated_at: databaseUpdatedAt, targets: targetData.map(({ service, expectedDigest, counts }) => ({ service, image_digest: expectedDigest, counts, result: "PASS" })), counts: total, result: "PASS" }, { generated_at: generatedAt, candidate, scanner: "trivy", scanner_version: RELEASE_TRIVY_VERSION, scanner_image_reference: RELEASE_TRIVY_IMAGE_REFERENCE, scanner_binary_sha256: scannerBinarySha256, policy_id: RELEASE_VULNERABILITY_POLICY_ID, policy_sha256: RELEASE_VULNERABILITY_POLICY_SHA256, vulnerability_database_updated_at: databaseUpdatedAt, counts: total, result: "PASS" });
+  const normalizedReport = validateSecurityScanReport({ schema_version: 1, contract: RELEASE_SECURITY_SCAN_REPORT_CONTRACT, generated_at: generatedAt, candidate, scanner: { name: "trivy", version: RELEASE_TRIVY_VERSION, image_reference: RELEASE_TRIVY_IMAGE_REFERENCE, binary_sha256: scannerBinarySha256 }, policy: { id: RELEASE_VULNERABILITY_POLICY_ID, sha256: RELEASE_VULNERABILITY_POLICY_SHA256 }, vulnerability_database_updated_at: databaseUpdatedAt, targets: targetData.map(({ service, expectedManifestDigest, counts }) => ({ service, image_digest: expectedManifestDigest, counts, result: "PASS" })), counts: total, result: "PASS" }, { generated_at: generatedAt, candidate, scanner: "trivy", scanner_version: RELEASE_TRIVY_VERSION, scanner_image_reference: RELEASE_TRIVY_IMAGE_REFERENCE, scanner_binary_sha256: scannerBinarySha256, policy_id: RELEASE_VULNERABILITY_POLICY_ID, policy_sha256: RELEASE_VULNERABILITY_POLICY_SHA256, vulnerability_database_updated_at: databaseUpdatedAt, counts: total, result: "PASS" });
   const normalizedReportRaw = canonicalJson(normalizedReport);
   const security = validateSecurityEvidence({ schema_version: 1, contract: RELEASE_SECURITY_EVIDENCE_CONTRACT, generated_at: generatedAt, candidate, sbom_evidence_sha256: sha256(sbomRaw), provenance_file: provenanceName, provenance_sha256: sha256(provenanceRaw), scanner: "trivy", scanner_version: RELEASE_TRIVY_VERSION, scanner_image_reference: RELEASE_TRIVY_IMAGE_REFERENCE, scanner_binary_sha256: scannerBinarySha256, policy_id: RELEASE_VULNERABILITY_POLICY_ID, policy_sha256: RELEASE_VULNERABILITY_POLICY_SHA256, raw_report_file: normalizedReportName, raw_report_sha256: sha256(normalizedReportRaw), vulnerability_database_updated_at: databaseUpdatedAt, counts: total, result: "PASS", reason: null });
 
@@ -235,13 +238,13 @@ async function main() {
     return;
   }
   if (command !== "create") reject("IMAGE_EVIDENCE_CLI_COMMAND_INVALID");
-  const common = ["--artifact-root", "--run-id", "--git-commit", "--git-tree", "--package-version", "--migration-allowlist-sha256", "--web-image-reference", "--web-image-digest", "--worker-image-reference", "--worker-image-digest", "--build-provenance", "--supervisor-bundle-sha256", "--authorization-sha256", "--scanner-config-digest", "--scanner-binary-sha256", "--scanner-inspect", "--scanner-version", "--database-metadata", "--database-payload-tree-sha256", "--confirm"];
+  const common = ["--artifact-root", "--run-id", "--git-commit", "--git-tree", "--package-version", "--migration-allowlist-sha256", "--web-image-reference", "--web-image-digest", "--worker-image-reference", "--worker-image-digest", "--build-provenance", "--supervisor-bundle-sha256", "--authorization-sha256", "--scanner-image-digest", "--scanner-binary-sha256", "--scanner-inspect", "--scanner-version", "--database-metadata", "--database-payload-tree-sha256", "--confirm"];
   const perTarget = ["inspect", "archive-sha256", "archive-bytes", "archive-config-digest", "vulnerability", "cyclonedx"];
   const expected = [...common, ...["web", "worker"].flatMap((service) => perTarget.map((suffix) => `--${service}-${suffix}`))];
   exactOptions(options, expected);
   if (options["--confirm"] !== "CREATE_TRIVY_IMAGE_EVIDENCE") reject("IMAGE_EVIDENCE_CLI_CONFIRMATION_INVALID");
   const target = (service) => ({ imageReference: options[`--${service}-image-reference`], inspectFile: options[`--${service}-inspect`], archiveSha256: options[`--${service}-archive-sha256`], archiveBytes: options[`--${service}-archive-bytes`], archiveConfigDigest: options[`--${service}-archive-config-digest`], vulnerabilityFile: options[`--${service}-vulnerability`], cyclonedxFile: options[`--${service}-cyclonedx`] });
-  const output = await createReleaseImageEvidence({ artifactRoot: options["--artifact-root"], runId: options["--run-id"], candidate: { git_commit: options["--git-commit"], git_tree: options["--git-tree"], package_version: options["--package-version"], web_image_digest: options["--web-image-digest"], worker_image_digest: options["--worker-image-digest"], migration_allowlist_sha256: options["--migration-allowlist-sha256"] }, buildProvenanceFile: options["--build-provenance"], supervisorBundleSha256: options["--supervisor-bundle-sha256"], authorizationSha256: options["--authorization-sha256"], scannerConfigDigest: options["--scanner-config-digest"], scannerBinarySha256: options["--scanner-binary-sha256"], scannerInspectFile: options["--scanner-inspect"], scannerVersionFile: options["--scanner-version"], databaseMetadataFile: options["--database-metadata"], databasePayloadTreeSha256: options["--database-payload-tree-sha256"], targets: { web: target("web"), worker: target("worker") } });
+  const output = await createReleaseImageEvidence({ artifactRoot: options["--artifact-root"], runId: options["--run-id"], candidate: { git_commit: options["--git-commit"], git_tree: options["--git-tree"], package_version: options["--package-version"], web_image_digest: options["--web-image-digest"], worker_image_digest: options["--worker-image-digest"], migration_allowlist_sha256: options["--migration-allowlist-sha256"] }, buildProvenanceFile: options["--build-provenance"], supervisorBundleSha256: options["--supervisor-bundle-sha256"], authorizationSha256: options["--authorization-sha256"], scannerImageDigest: options["--scanner-image-digest"], scannerBinarySha256: options["--scanner-binary-sha256"], scannerInspectFile: options["--scanner-inspect"], scannerVersionFile: options["--scanner-version"], databaseMetadataFile: options["--database-metadata"], databasePayloadTreeSha256: options["--database-payload-tree-sha256"], targets: { web: target("web"), worker: target("worker") } });
   process.stdout.write(`${JSON.stringify(output)}\n`);
 }
 

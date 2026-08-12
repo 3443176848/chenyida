@@ -1984,6 +1984,40 @@
 - 拒绝让扫描证据只绑定最终image ID而不绑定构建来源，也拒绝使用手工JSON回执或可覆盖文件。
 - 拒绝把Migration复制进supervisor bundle，或让installed可信代码从自身缺失的相对业务目录计算候选allowlist。
 
+## D-124 发布镜像身份分离 registry manifest、运行时本地身份与 OCI config digest
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / SOURCE IMPLEMENTED / ISOLATED CONTRACTS VERIFIED / CANDIDATE REBUILD PENDING`
+- 提案与实施：Codex 持续交付负责人，依据 TASK48 首次真实候选归档核验结果
+- 确认边界：只修正本机候选构建、扫描和发布证据的镜像身份语义；不授权外部推送、host supervisor 安装、UAT/生产 Migration/deploy 或正式晋升
+
+### Context
+
+- Docker 29 的 containerd image store 对按 registry digest 拉取的镜像把 `docker image inspect .Id` 和容器 `.Image`报告为 registry manifest digest；它不再保证该值是 OCI image config digest。
+- TASK48 首个候选的 Web 引用/`.Id`为`sha256:fbff…`，但`docker image save`内 `manifest.json.Config` 为`sha256:ddfb…`；Worker 同样分别为`sha256:ec84…`与`sha256:f471…`。既有回执和扫描合同把两者强制相等，正式证据会在归档核验处确定性失败。
+- registry manifest 对应可拉取、可部署和容器运行时引用；config digest 对应归档内配置对象及 Trivy `ImageID`。二者都是必要身份，但不能共用一个字段或名称。
+
+### Decision
+
+1. 候选、release manifest、运行identity和安全报告中的`web_image_digest`/`worker_image_digest`统一表示镜像引用中的registry manifest digest；必须等于`image_reference`的`@sha256:`值。
+2. 构建回执每个target继续同时保存`registry_manifest_digest`和`image_config_digest`。前者来自精确digest reference并与Docker本地manifest身份核对；后者来自该已构建manifest的`Descriptor.annotations["config.digest"]`，缺失或格式错误即拒绝候选。
+3. 扫描前必须按精确manifest reference执行`docker image save`，从归档`manifest.json.Config`独立取得config digest，并与构建回执target逐项相等；扫描前后manifest inspect必须稳定。任何manifest/config/reference不闭合都不生成SBOM或安全PASS。
+4. Trivy原生漏洞报告和CycloneDX中的`ImageID`绑定config digest；规范化安全报告的target `image_digest`仍绑定registry manifest digest。可信bundle复核时同时交叉验证构建回执、扫描provenance、归档config、原生报告和digest reference。
+5. 固定Trivy自身以完整registry manifest digest、linux/amd64、本地inspect身份、版本及二进制SHA-256联合识别，不再把Docker `.Id`误命名为scanner config digest。
+6. `candidate-build-provenance`升为v2，`image-scan-provenance`升为v3；v1/v2旧语义回执失败关闭，不兼容接受或静默改写。D-123中把manifest/config视为同一值的表述由本决定取代。
+
+### Consequences
+
+- 首个`5ba0e43`候选的存活、入口和Migration内容检查仍是有效诊断，但其v1构建回执不能进入正式镜像证据，必须从修正后的新提交重新构建。
+- 修正不降低零漏洞策略，也不把本地ID、tag或config digest冒充可恢复registry锚点；外部不可变镜像锚点仍是独立未满足条件。
+- 定向release合同31/31已证明manifest/config使用不同fixture时仍能闭合，并会拒绝归档config与构建回执漂移；完整inventory、supervisor bundle刷新和真实候选重建仍须继续完成。
+
+### Rejected alternatives
+
+- 拒绝为迁就Docker版本继续把`.Id`命名为config digest，或跳过归档config核验后直接扫描。
+- 拒绝只使用config digest作为部署引用，因为它不是现有本地registry回执中的可拉取manifest reference；也拒绝只使用manifest digest而不约束Trivy实际扫描到的config。
+- 拒绝兼容接受旧回执、手工修改既有不可变回执或把首次失败检查记为漏洞扫描PASS。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

@@ -769,10 +769,10 @@ export async function verifyTrustedImageEvidence({ root, sbom, security, imageRe
 
   const companionNames = [sbom.provenance_file];
   const buildProvenance = await readImageEvidenceJson(root, provenance.build_provenance, (value) => validateCandidateBuildProvenance(value, { runId: provenance.run_id, candidate: provenance.candidate, imageReferences }), "IMAGE_EVIDENCE_BUILD_PROVENANCE_INVALID");
-  void buildProvenance;
+  const buildTargets = new Map(buildProvenance.value.targets.map((target) => [target.service, target]));
   companionNames.push(provenance.build_provenance.file);
-  const scannerInspect = await readImageEvidenceJson(root, provenance.scanner.inspect, (value) => validateDockerImageInspect(value, { configDigest: provenance.scanner.config_digest, imageReference: provenance.scanner.image_reference }), "IMAGE_EVIDENCE_SCANNER_INSPECT_INVALID");
-  const scannerVersion = await readImageEvidenceJson(root, provenance.scanner.version_report, (value) => validateTrivyVersionReport(value, provenance.scanner.config_digest), "IMAGE_EVIDENCE_SCANNER_VERSION_INVALID");
+  const scannerInspect = await readImageEvidenceJson(root, provenance.scanner.inspect, (value) => validateDockerImageInspect(value, { imageDigest: provenance.scanner.local_identity_digest, imageReference: provenance.scanner.image_reference }), "IMAGE_EVIDENCE_SCANNER_INSPECT_INVALID");
+  const scannerVersion = await readImageEvidenceJson(root, provenance.scanner.version_report, (value) => validateTrivyVersionReport(value), "IMAGE_EVIDENCE_SCANNER_VERSION_INVALID");
   const databaseMetadata = await readImageEvidenceJson(root, provenance.database.metadata, (value) => validateTrivyDatabaseMetadata(value, { schemaVersion: provenance.database.schema_version, updatedAt: provenance.database.updated_at, downloadedAt: provenance.database.downloaded_at, nextUpdate: provenance.database.next_update }), "IMAGE_EVIDENCE_DATABASE_METADATA_INVALID");
   void scannerInspect; void scannerVersion; void databaseMetadata;
   companionNames.push(provenance.scanner.inspect.file, provenance.scanner.version_report.file, provenance.database.metadata.file);
@@ -782,9 +782,11 @@ export async function verifyTrustedImageEvidence({ root, sbom, security, imageRe
   const total = { critical: 0, high: 0, medium: 0, low: 0, unknown: 0 };
   for (const target of provenance.targets) {
     if (imageReferences && target.image_reference !== imageReferences[target.service]) reject("IMAGE_EVIDENCE_TARGET_REFERENCE_MISMATCH");
+    const buildTarget = buildTargets.get(target.service);
+    if (!buildTarget || buildTarget.image_reference !== target.image_reference || buildTarget.registry_manifest_digest !== target.registry_manifest_digest || buildTarget.image_config_digest !== target.image_config_digest) reject("IMAGE_EVIDENCE_BUILD_TARGET_MISMATCH");
     const expectedDocument = sbomByService.get(target.service);
     if (!expectedDocument || expectedDocument.file !== target.native_cyclonedx.file || expectedDocument.sha256 !== target.native_cyclonedx.sha256) reject("IMAGE_EVIDENCE_SBOM_TARGET_MISMATCH");
-    await readImageEvidenceJson(root, target.inspect, (value) => validateDockerImageInspect(value, { configDigest: target.image_config_digest, imageReference: target.image_reference }), "IMAGE_EVIDENCE_TARGET_INSPECT_INVALID");
+    await readImageEvidenceJson(root, target.inspect, (value) => validateDockerImageInspect(value, { imageDigest: target.registry_manifest_digest, imageReference: target.image_reference }), "IMAGE_EVIDENCE_TARGET_INSPECT_INVALID");
     const vulnerability = await readImageEvidenceJson(root, target.native_vulnerability, (value) => value, "IMAGE_EVIDENCE_NATIVE_VULNERABILITY_INVALID");
     const counts = validateTrivyNativeVulnerabilityReport(vulnerability.value, { imageConfigDigest: target.image_config_digest, imageReference: target.image_reference });
     await readImageEvidenceJson(root, target.native_cyclonedx, (value) => validateTrivyCycloneDxDocument(value, { imageConfigDigest: target.image_config_digest, imageReference: target.image_reference }), "IMAGE_EVIDENCE_NATIVE_CYCLONEDX_INVALID");

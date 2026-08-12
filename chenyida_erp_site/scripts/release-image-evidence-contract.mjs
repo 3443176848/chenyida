@@ -1,7 +1,7 @@
 import path from "node:path";
 
-export const RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT = "chenyida-erp-candidate-build-provenance/v1";
-export const RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT = "chenyida-erp-image-scan-provenance/v2";
+export const RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT = "chenyida-erp-candidate-build-provenance/v2";
+export const RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT = "chenyida-erp-image-scan-provenance/v3";
 export const RELEASE_TRIVY_VERSION = "0.70.0";
 export const RELEASE_TRIVY_IMAGE_REFERENCE = "ghcr.io/aquasecurity/trivy@sha256:85e87be1a96459c38a4eea47dc64eb2d342bb14cd4b4cef96adcf6ff03378b7c";
 export const RELEASE_NODE_BASE_IMAGE_REFERENCE = "node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3";
@@ -86,7 +86,7 @@ function exactStringArray(value, expected, code) {
 
 export function validateCandidateBuildProvenance(value, expected = {}) {
   exactKeys(value, ["schema_version", "contract", "generated_at", "run_id", "scope", "candidate", "source", "builder", "targets", "limitations", "result"], "CANDIDATE_BUILD_FIELDS_INVALID");
-  if (value.schema_version !== 1 || value.contract !== RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT) reject("CANDIDATE_BUILD_VERSION_INVALID");
+  if (value.schema_version !== 2 || value.contract !== RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT) reject("CANDIDATE_BUILD_VERSION_INVALID");
   iso(value.generated_at, "CANDIDATE_BUILD_TIME_INVALID");
   string(value.run_id, IDENTIFIER, "CANDIDATE_BUILD_RUN_ID_INVALID");
   if (value.scope !== "LOCAL_ISOLATED_CANDIDATE") reject("CANDIDATE_BUILD_SCOPE_INVALID");
@@ -102,14 +102,14 @@ export function validateCandidateBuildProvenance(value, expected = {}) {
   for (const field of ["archive_sha256", "dockerfile_sha256", "dockerignore_sha256", "package_lock_sha256", "orchestrator_sha256", "producer_sha256"]) string(value.source[field], SHA256, "CANDIDATE_BUILD_SOURCE_INVALID");
   if (!Number.isSafeInteger(value.source.archive_bytes) || value.source.archive_bytes < 1) reject("CANDIDATE_BUILD_SOURCE_INVALID");
 
-  exactKeys(value.builder, ["docker_server_version", "buildx_version", "builder_name", "builder_driver", "buildkit_version", "platform", "context", "base_pull_policy", "dependency_network", "application_build_network", "frontend_reference", "frontend_manifest_digest", "base_image_reference", "base_registry_manifest_digest", "base_config_digest", "registry_image_reference", "registry_manifest_digest", "registry_config_digest", "registry_state"], "CANDIDATE_BUILD_BUILDER_FIELDS_INVALID");
+  exactKeys(value.builder, ["docker_server_version", "buildx_version", "builder_name", "builder_driver", "buildkit_version", "platform", "context", "base_pull_policy", "dependency_network", "application_build_network", "frontend_reference", "frontend_manifest_digest", "base_image_reference", "base_registry_manifest_digest", "base_local_identity_digest", "registry_image_reference", "registry_manifest_digest", "registry_local_identity_digest", "registry_state"], "CANDIDATE_BUILD_BUILDER_FIELDS_INVALID");
   for (const field of ["docker_server_version", "buildx_version", "buildkit_version"]) string(value.builder[field], /^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/, "CANDIDATE_BUILD_TOOL_VERSION_INVALID");
   if (value.builder.builder_name !== "default" || value.builder.builder_driver !== "docker" || value.builder.platform !== "linux/amd64" || value.builder.context !== "GIT_ARCHIVE" || value.builder.base_pull_policy !== "LOCAL_REQUIRED_PULL_FALSE" || value.builder.dependency_network !== "PUBLIC_NPM_LOCKFILE_INTEGRITY" || value.builder.application_build_network !== "NONE") reject("CANDIDATE_BUILD_POLICY_INVALID");
   if (value.builder.frontend_reference !== RELEASE_DOCKERFILE_FRONTEND_REFERENCE || value.builder.frontend_manifest_digest !== RELEASE_DOCKERFILE_FRONTEND_REFERENCE.slice(RELEASE_DOCKERFILE_FRONTEND_REFERENCE.indexOf("@") + 1)) reject("CANDIDATE_BUILD_FRONTEND_INVALID");
   if (value.builder.base_image_reference !== RELEASE_NODE_BASE_IMAGE_REFERENCE || value.builder.base_registry_manifest_digest !== RELEASE_NODE_BASE_IMAGE_REFERENCE.slice(RELEASE_NODE_BASE_IMAGE_REFERENCE.indexOf("@") + 1)) reject("CANDIDATE_BUILD_BASE_IMAGE_INVALID");
   if (value.builder.registry_image_reference !== RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE || value.builder.registry_manifest_digest !== RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.slice(RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.indexOf("@") + 1) || value.builder.registry_state !== "EPHEMERAL_LOOPBACK_REMOVED") reject("CANDIDATE_BUILD_REGISTRY_INVALID");
-  string(value.builder.base_config_digest, DIGEST, "CANDIDATE_BUILD_BASE_IMAGE_INVALID");
-  string(value.builder.registry_config_digest, DIGEST, "CANDIDATE_BUILD_REGISTRY_INVALID");
+  if (string(value.builder.base_local_identity_digest, DIGEST, "CANDIDATE_BUILD_BASE_IMAGE_INVALID") !== value.builder.base_registry_manifest_digest) reject("CANDIDATE_BUILD_BASE_IMAGE_INVALID");
+  if (string(value.builder.registry_local_identity_digest, DIGEST, "CANDIDATE_BUILD_REGISTRY_INVALID") !== value.builder.registry_manifest_digest) reject("CANDIDATE_BUILD_REGISTRY_INVALID");
 
   if (!Array.isArray(value.targets) || value.targets.length !== 2) reject("CANDIDATE_BUILD_TARGETS_INVALID");
   const targetDigests = new Set(); const targetReferences = new Set();
@@ -120,7 +120,7 @@ export function validateCandidateBuildProvenance(value, expected = {}) {
     const match = string(target.image_reference, REGISTRY_REFERENCE, "CANDIDATE_BUILD_TARGET_REFERENCE_INVALID").match(/^127\.0\.0\.1:([1-9][0-9]{0,4})\/chenyida-erp\/(web|worker)@sha256:[0-9a-f]{64}$/);
     if (!match || Number(match[1]) > 65535 || match[2] !== service || target.registry_manifest_digest !== registryDigest(target.image_reference, "CANDIDATE_BUILD_TARGET_REFERENCE_INVALID")) reject("CANDIDATE_BUILD_TARGET_REFERENCE_INVALID");
     const expectedDigest = value.candidate[`${service}_image_digest`];
-    if (target.image_config_digest !== expectedDigest || target.oci_version !== value.candidate.package_version || target.oci_revision !== value.candidate.git_commit || target.baked_version !== value.candidate.package_version || target.baked_revision !== value.candidate.git_commit || target.user !== "node") reject("CANDIDATE_BUILD_TARGET_IDENTITY_INVALID");
+    if (target.registry_manifest_digest !== expectedDigest || target.oci_version !== value.candidate.package_version || target.oci_revision !== value.candidate.git_commit || target.baked_version !== value.candidate.package_version || target.baked_revision !== value.candidate.git_commit || target.user !== "node") reject("CANDIDATE_BUILD_TARGET_IDENTITY_INVALID");
     string(target.image_config_digest, DIGEST, "CANDIDATE_BUILD_TARGET_IDENTITY_INVALID");
     const expectedCommand = service === "web" ? ["node", "server.js"] : ["node", "--experimental-strip-types", "worker/selfhost.ts"];
     exactStringArray(target.cmd, expectedCommand, "CANDIDATE_BUILD_TARGET_COMMAND_INVALID");
@@ -135,7 +135,7 @@ export function validateCandidateBuildProvenance(value, expected = {}) {
 
 export function validateImageScanProvenance(value) {
   exactKeys(value, ["schema_version", "contract", "generated_at", "run_id", "producer", "candidate", "build_provenance", "scanner", "database", "targets"], "IMAGE_PROVENANCE_FIELDS_INVALID");
-  if (value.schema_version !== 2 || value.contract !== RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT) reject("IMAGE_PROVENANCE_VERSION_INVALID");
+  if (value.schema_version !== 3 || value.contract !== RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT) reject("IMAGE_PROVENANCE_VERSION_INVALID");
   iso(value.generated_at, "IMAGE_PROVENANCE_TIME_INVALID");
   string(value.run_id, IDENTIFIER, "IMAGE_PROVENANCE_RUN_ID_INVALID");
   exactKeys(value.producer, ["supervisor_bundle_sha256", "authorization_sha256"], "IMAGE_PROVENANCE_PRODUCER_FIELDS_INVALID");
@@ -145,9 +145,9 @@ export function validateImageScanProvenance(value) {
   validateInspectDescriptor(value.build_provenance, "IMAGE_PROVENANCE_BUILD");
   if (value.build_provenance.file !== `${value.run_id}.build-provenance.json`) reject("IMAGE_PROVENANCE_BUILD_FILE_INVALID");
 
-  exactKeys(value.scanner, ["name", "version", "image_reference", "registry_manifest_digest", "config_digest", "binary_sha256", "platform", "inspect", "version_report"], "IMAGE_PROVENANCE_SCANNER_FIELDS_INVALID");
+  exactKeys(value.scanner, ["name", "version", "image_reference", "registry_manifest_digest", "local_identity_digest", "binary_sha256", "platform", "inspect", "version_report"], "IMAGE_PROVENANCE_SCANNER_FIELDS_INVALID");
   if (value.scanner.name !== "trivy" || value.scanner.version !== RELEASE_TRIVY_VERSION || value.scanner.image_reference !== RELEASE_TRIVY_IMAGE_REFERENCE || value.scanner.registry_manifest_digest !== registryDigest(value.scanner.image_reference, "IMAGE_PROVENANCE_SCANNER_REFERENCE_INVALID") || value.scanner.platform !== "linux/amd64") reject("IMAGE_PROVENANCE_SCANNER_INVALID");
-  string(value.scanner.config_digest, DIGEST, "IMAGE_PROVENANCE_SCANNER_CONFIG_INVALID");
+  if (string(value.scanner.local_identity_digest, DIGEST, "IMAGE_PROVENANCE_SCANNER_IDENTITY_INVALID") !== value.scanner.registry_manifest_digest) reject("IMAGE_PROVENANCE_SCANNER_IDENTITY_INVALID");
   string(value.scanner.binary_sha256, SHA256, "IMAGE_PROVENANCE_SCANNER_BINARY_INVALID");
   validateInspectDescriptor(value.scanner.inspect, "IMAGE_PROVENANCE_SCANNER_INSPECT");
   validateInspectDescriptor(value.scanner.version_report, "IMAGE_PROVENANCE_SCANNER_VERSION_REPORT");
@@ -166,8 +166,8 @@ export function validateImageScanProvenance(value) {
   value.targets.forEach((target, index) => {
     exactKeys(target, ["service", "image_reference", "registry_manifest_digest", "image_config_digest", "platform", "inspect", "archive_sha256", "archive_bytes", "archive_config_digest", "native_vulnerability", "native_cyclonedx"], "IMAGE_PROVENANCE_TARGET_FIELDS_INVALID");
     const service = index === 0 ? "web" : "worker";
-    if (target.service !== service || target.image_config_digest !== expected.get(service) || target.archive_config_digest !== target.image_config_digest || target.platform !== "linux/amd64") reject("IMAGE_PROVENANCE_TARGET_INVALID");
-    if (target.registry_manifest_digest !== registryDigest(target.image_reference, "IMAGE_PROVENANCE_TARGET_REFERENCE_INVALID")) reject("IMAGE_PROVENANCE_TARGET_REFERENCE_INVALID");
+    if (target.service !== service || target.archive_config_digest !== target.image_config_digest || target.platform !== "linux/amd64") reject("IMAGE_PROVENANCE_TARGET_INVALID");
+    if (target.registry_manifest_digest !== registryDigest(target.image_reference, "IMAGE_PROVENANCE_TARGET_REFERENCE_INVALID") || target.registry_manifest_digest !== expected.get(service)) reject("IMAGE_PROVENANCE_TARGET_REFERENCE_INVALID");
     string(target.image_config_digest, DIGEST, "IMAGE_PROVENANCE_TARGET_CONFIG_INVALID");
     string(target.archive_config_digest, DIGEST, "IMAGE_PROVENANCE_TARGET_ARCHIVE_CONFIG_INVALID");
     string(target.archive_sha256, SHA256, "IMAGE_PROVENANCE_TARGET_ARCHIVE_INVALID");
@@ -183,7 +183,7 @@ export function validateImageScanProvenance(value) {
 export function validateDockerImageInspect(value, expected) {
   if (!Array.isArray(value) || value.length !== 1) reject("IMAGE_INSPECT_ROWS_INVALID");
   const row = record(value[0], "IMAGE_INSPECT_ROW_INVALID");
-  if (row.Id !== expected.configDigest || row.Os !== "linux" || row.Architecture !== "amd64" || !Array.isArray(row.RepoDigests) || !row.RepoDigests.includes(expected.imageReference)) reject("IMAGE_INSPECT_IDENTITY_MISMATCH");
+  if (row.Id !== expected.imageDigest || row.Os !== "linux" || row.Architecture !== "amd64" || !Array.isArray(row.RepoDigests) || !row.RepoDigests.includes(expected.imageReference)) reject("IMAGE_INSPECT_IDENTITY_MISMATCH");
   return row;
 }
 

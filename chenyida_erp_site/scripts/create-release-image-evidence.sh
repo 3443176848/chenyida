@@ -143,17 +143,17 @@ NODE_RUNTIME="$TEMP_ROOT/node"
 
 sanitize_inspect() {
   image=$1; output=$2
-  IMAGE_REFERENCE="$image" /usr/bin/docker image inspect -- "$image" | IMAGE_REFERENCE="$image" "$NODE_RUNTIME" --input-type=module -e 'const chunks=[];for await(const chunk of process.stdin)chunks.push(chunk);const rows=JSON.parse(Buffer.concat(chunks).toString("utf8"));if(!Array.isArray(rows)||rows.length!==1)process.exit(1);const row=rows[0];if(!/^sha256:[0-9a-f]{64}$/.test(row.Id||"")||row.Os!=="linux"||row.Architecture!=="amd64"||!Array.isArray(row.RepoDigests)||!row.RepoDigests.includes(process.env.IMAGE_REFERENCE))process.exit(1);process.stdout.write(JSON.stringify([{Id:row.Id,Os:row.Os,Architecture:row.Architecture,RepoDigests:[process.env.IMAGE_REFERENCE]}])+"\n");' > "$output"
+  IMAGE_REFERENCE="$image" /usr/bin/docker image inspect -- "$image" | IMAGE_REFERENCE="$image" "$NODE_RUNTIME" --input-type=module -e 'const chunks=[];for await(const chunk of process.stdin)chunks.push(chunk);const rows=JSON.parse(Buffer.concat(chunks).toString("utf8"));if(!Array.isArray(rows)||rows.length!==1)process.exit(1);const row=rows[0],manifest=process.env.IMAGE_REFERENCE.slice(process.env.IMAGE_REFERENCE.lastIndexOf("@")+1);if(!/^sha256:[0-9a-f]{64}$/.test(manifest)||row.Id!==manifest||row?.Descriptor?.digest!==manifest||row.Os!=="linux"||row.Architecture!=="amd64"||!Array.isArray(row.RepoDigests)||!row.RepoDigests.includes(process.env.IMAGE_REFERENCE))process.exit(1);process.stdout.write(JSON.stringify([{Id:row.Id,Os:row.Os,Architecture:row.Architecture,RepoDigests:[process.env.IMAGE_REFERENCE]}])+"\n");' > "$output"
   chmod 0440 "$output"
 }
 
 sanitize_inspect "$TRIVY_IMAGE" "$INPUT_ROOT/trivy.inspect.json"
 sanitize_inspect "$WEB_IMAGE" "$INPUT_ROOT/web.inspect.json"
 sanitize_inspect "$WORKER_IMAGE" "$INPUT_ROOT/worker.inspect.json"
-SCANNER_CONFIG_DIGEST=$(IMAGE_FILE="$INPUT_ROOT/trivy.inspect.json" "$NODE_RUNTIME" --input-type=module -e 'import{readFileSync}from"node:fs";process.stdout.write(JSON.parse(readFileSync(process.env.IMAGE_FILE,"utf8"))[0].Id)')
-WEB_CONFIG_DIGEST=$(IMAGE_FILE="$INPUT_ROOT/web.inspect.json" "$NODE_RUNTIME" --input-type=module -e 'import{readFileSync}from"node:fs";process.stdout.write(JSON.parse(readFileSync(process.env.IMAGE_FILE,"utf8"))[0].Id)')
-WORKER_CONFIG_DIGEST=$(IMAGE_FILE="$INPUT_ROOT/worker.inspect.json" "$NODE_RUNTIME" --input-type=module -e 'import{readFileSync}from"node:fs";process.stdout.write(JSON.parse(readFileSync(process.env.IMAGE_FILE,"utf8"))[0].Id)')
-[ "$WEB_CONFIG_DIGEST" != "$WORKER_CONFIG_DIGEST" ] || { echo "Web and Worker image configurations must be distinct" >&2; exit 1; }
+SCANNER_IMAGE_DIGEST=$(IMAGE_FILE="$INPUT_ROOT/trivy.inspect.json" "$NODE_RUNTIME" --input-type=module -e 'import{readFileSync}from"node:fs";process.stdout.write(JSON.parse(readFileSync(process.env.IMAGE_FILE,"utf8"))[0].Id)')
+WEB_IMAGE_DIGEST=$(IMAGE_FILE="$INPUT_ROOT/web.inspect.json" "$NODE_RUNTIME" --input-type=module -e 'import{readFileSync}from"node:fs";process.stdout.write(JSON.parse(readFileSync(process.env.IMAGE_FILE,"utf8"))[0].Id)')
+WORKER_IMAGE_DIGEST=$(IMAGE_FILE="$INPUT_ROOT/worker.inspect.json" "$NODE_RUNTIME" --input-type=module -e 'import{readFileSync}from"node:fs";process.stdout.write(JSON.parse(readFileSync(process.env.IMAGE_FILE,"utf8"))[0].Id)')
+[ "$WEB_IMAGE_DIGEST" != "$WORKER_IMAGE_DIGEST" ] || { echo "Web and Worker image manifests must be distinct" >&2; exit 1; }
 
 CONTAINER_ID=$(/usr/bin/docker create --pull=never --name "$CONTAINER_NAME" --label "chenyida.erp.release-image-evidence=$RUN_ID" --label "chenyida.erp.release-authorization=$AUTHORIZATION_SHA256" --network none --entrypoint /bin/true "$TRIVY_IMAGE")
 /usr/bin/docker cp "$CONTAINER_ID:/usr/local/bin/trivy" "$TEMP_ROOT/trivy"
@@ -174,6 +174,12 @@ install -m 0440 -o root -g root "$TRIVY_DB_DIRECTORY/metadata.json" "$INPUT_ROOT
 
 PACKAGE_VERSION=$(PACKAGE_FILE="$REPOSITORY_ROOT/chenyida_erp_site/package.json" "$NODE_RUNTIME" --input-type=module -e 'import{readFileSync}from"node:fs";const value=JSON.parse(readFileSync(process.env.PACKAGE_FILE,"utf8"));if(typeof value.version!=="string")process.exit(1);process.stdout.write(value.version)')
 MIGRATION_ALLOWLIST_SHA256=$(CDPATH= cd -- "$SUPERVISOR_SITE_ROOT" && env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC "$NODE_RUNTIME" --input-type=module -e 'import{buildMigrationAllowlist,migrationAllowlistDigest}from"./scripts/release-manifest-contract.mjs";process.stdout.write(migrationAllowlistDigest(await buildMigrationAllowlist(process.argv[1])))' "$REPOSITORY_ROOT/chenyida_erp_site/drizzle-postgres")
+build_target_config_digest() {
+  SERVICE="$1" BUILD_PROVENANCE="$BUILD_PROVENANCE" "$NODE_RUNTIME" --input-type=module -e 'import{readFileSync}from"node:fs";const value=JSON.parse(readFileSync(process.env.BUILD_PROVENANCE,"utf8")),targets=value?.targets?.filter((target)=>target?.service===process.env.SERVICE);if(!targets||targets.length!==1||!/^sha256:[0-9a-f]{64}$/.test(targets[0].image_config_digest||""))process.exit(1);process.stdout.write(targets[0].image_config_digest)'
+}
+WEB_CONFIG_DIGEST=$(build_target_config_digest web)
+WORKER_CONFIG_DIGEST=$(build_target_config_digest worker)
+[ "$WEB_CONFIG_DIGEST" != "$WORKER_CONFIG_DIGEST" ] || { echo "Web and Worker image configurations must be distinct" >&2; exit 1; }
 
 archive_config_digest() {
   /usr/bin/tar -xOf "$1" manifest.json | "$NODE_RUNTIME" --input-type=module -e 'const chunks=[];for await(const chunk of process.stdin)chunks.push(chunk);const rows=JSON.parse(Buffer.concat(chunks).toString("utf8"));if(!Array.isArray(rows)||rows.length!==1||typeof rows[0].Config!=="string"||!/^[0-9a-f]{64}\.json$/.test(rows[0].Config))process.exit(1);process.stdout.write(`sha256:${rows[0].Config.slice(0,64)}`)'
@@ -235,10 +241,10 @@ git_candidate diff --cached --quiet --no-ext-diff --no-textconv --
 
 env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC "$NODE_RUNTIME" "$SCRIPT_DIR/release-image-evidence-producer.mjs" create \
   --artifact-root "$ARTIFACT_ROOT" --run-id "$RUN_ID" --git-commit "$GIT_COMMIT" --git-tree "$GIT_TREE" --package-version "$PACKAGE_VERSION" --migration-allowlist-sha256 "$MIGRATION_ALLOWLIST_SHA256" \
-  --web-image-reference "$WEB_IMAGE" --web-image-digest "$WEB_CONFIG_DIGEST" --worker-image-reference "$WORKER_IMAGE" --worker-image-digest "$WORKER_CONFIG_DIGEST" \
+  --web-image-reference "$WEB_IMAGE" --web-image-digest "$WEB_IMAGE_DIGEST" --worker-image-reference "$WORKER_IMAGE" --worker-image-digest "$WORKER_IMAGE_DIGEST" \
   --build-provenance "$BUILD_PROVENANCE" \
   --supervisor-bundle-sha256 "$SUPERVISOR_BUNDLE_SHA256" --authorization-sha256 "$AUTHORIZATION_SHA256" \
-  --scanner-config-digest "$SCANNER_CONFIG_DIGEST" --scanner-binary-sha256 "$SCANNER_BINARY_SHA256" --scanner-inspect "$INPUT_ROOT/trivy.inspect.json" --scanner-version "$INPUT_ROOT/trivy.version.json" \
+  --scanner-image-digest "$SCANNER_IMAGE_DIGEST" --scanner-binary-sha256 "$SCANNER_BINARY_SHA256" --scanner-inspect "$INPUT_ROOT/trivy.inspect.json" --scanner-version "$INPUT_ROOT/trivy.version.json" \
   --database-metadata "$INPUT_ROOT/trivy-db.metadata.json" --database-payload-tree-sha256 "$DATABASE_TREE_SHA256" \
   --web-inspect "$INPUT_ROOT/web.inspect.json" --web-archive-sha256 "$web_archive_sha256" --web-archive-bytes "$web_archive_bytes" --web-archive-config-digest "$web_archive_config" --web-vulnerability "$OUTPUT_ROOT/web.trivy.json" --web-cyclonedx "$OUTPUT_ROOT/web.cdx.json" \
   --worker-inspect "$INPUT_ROOT/worker.inspect.json" --worker-archive-sha256 "$worker_archive_sha256" --worker-archive-bytes "$worker_archive_bytes" --worker-archive-config-digest "$worker_archive_config" --worker-vulnerability "$OUTPUT_ROOT/worker.trivy.json" --worker-cyclonedx "$OUTPUT_ROOT/worker.cdx.json" \

@@ -76,11 +76,11 @@ test("security PASS requires scanner, policy, raw report binding and zero unknow
     assert.throws(() => validateSecurityEvidence({ ...fixture.security, scanner_version: "0.69.4" }), (error) => error.code === "SECURITY_PASS_EVIDENCE_INVALID");
     assert.throws(() => validateSecurityEvidence({ ...fixture.security, scanner_image_reference: "ghcr.io/aquasecurity/trivy@sha256:" + "1".repeat(64) }), (error) => error.code === "SECURITY_PASS_EVIDENCE_INVALID");
     const webReport = fixture.targetArtifacts.web.vulnerability;
-    assert.deepEqual(validateTrivyNativeVulnerabilityReport(webReport, { imageConfigDigest: fixture.candidate.web_image_digest, imageReference: fixture.images.web.image_reference }), fixture.security.counts);
+    assert.deepEqual(validateTrivyNativeVulnerabilityReport(webReport, { imageConfigDigest: fixture.targetConfigs.web, imageReference: fixture.images.web.image_reference }), fixture.security.counts);
     const vulnerable = { ...webReport, Results: [{ ...webReport.Results[0], Vulnerabilities: [{ VulnerabilityID: "CVE-fixture", Severity: "HIGH" }, { VulnerabilityID: "CVE-unknown" }] }] };
-    assert.deepEqual(validateTrivyNativeVulnerabilityReport(vulnerable, { imageConfigDigest: fixture.candidate.web_image_digest, imageReference: fixture.images.web.image_reference }), { critical: 0, high: 1, medium: 0, low: 0, unknown: 1 });
-    assert.throws(() => validateTrivyNativeVulnerabilityReport({ ...webReport, Metadata: { ImageID: fixture.candidate.worker_image_digest } }, { imageConfigDigest: fixture.candidate.web_image_digest, imageReference: fixture.images.web.image_reference }), (error) => error.code === "TRIVY_NATIVE_REPORT_IMAGE_MISMATCH");
-    assert.throws(() => validateTrivyNativeVulnerabilityReport({ ...webReport, Results: webReport.Results.map((result) => ({ ...result, Packages: [] })) }, { imageConfigDigest: fixture.candidate.web_image_digest, imageReference: fixture.images.web.image_reference }), (error) => error.code === "TRIVY_NATIVE_PACKAGE_INVENTORY_MISSING");
+    assert.deepEqual(validateTrivyNativeVulnerabilityReport(vulnerable, { imageConfigDigest: fixture.targetConfigs.web, imageReference: fixture.images.web.image_reference }), { critical: 0, high: 1, medium: 0, low: 0, unknown: 1 });
+    assert.throws(() => validateTrivyNativeVulnerabilityReport({ ...webReport, Metadata: { ImageID: fixture.targetConfigs.worker } }, { imageConfigDigest: fixture.targetConfigs.web, imageReference: fixture.images.web.image_reference }), (error) => error.code === "TRIVY_NATIVE_REPORT_IMAGE_MISMATCH");
+    assert.throws(() => validateTrivyNativeVulnerabilityReport({ ...webReport, Results: webReport.Results.map((result) => ({ ...result, Packages: [] })) }, { imageConfigDigest: fixture.targetConfigs.web, imageReference: fixture.images.web.image_reference }), (error) => error.code === "TRIVY_NATIVE_PACKAGE_INVENTORY_MISSING");
     assert.throws(() => validateTrivyCycloneDxDocument({ ...fixture.targetArtifacts.web.cyclonedx, components: [] }), (error) => error.code === "TRIVY_CYCLONEDX_COMPONENTS_INVALID");
   } finally { await rm(f.root, { recursive: true, force: true }); }
 });
