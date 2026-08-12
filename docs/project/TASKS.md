@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-OPS-MONITORING-ALERTING-49`。范围固定为仓库和隔离环境中的版本化运行快照、资源/服务/身份/Migration/备份恢复证据阈值、告警状态机、去敏CLI、自动化测试与运行手册；不安装host服务、不发送真实通知、不连接UAT/生产数据库或网络、不读取日志/卷正文/真实数据。host supervisor、真实渠道/值班人、异机真实备份、UAT/生产Migration/deploy、账号、员工试用和切流仍需专项授权，系统继续`PRODUCTION NO-GO`。
+当前没有`DOING`任务。`SELFHOST-OPS-MONITORING-ALERTING-49`已完成仓库级监控合同与隔离验证并释放 active slot；host 安装、真实渠道/值班人、异机真实备份、UAT/生产 Migration/deploy、账号、员工试用和切流仍需专项授权，系统继续`PRODUCTION NO-GO`。下一安全任务将从不依赖上述外部资源的容器运行时最小权限缺口中建立独立任务编号后开始。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -51,6 +51,8 @@
 
 2026-08-13第十九次调度事件：主智能体从TASK48收口后的零`DOING`自动选择G5最高优先级安全任务，状态按`SELFHOST-OPS-MONITORING-ALERTING-49 TODO → DOING`切换唯一active slot。三条子智能体仅做现有数据源、应用健康语义、运维安全和测试缺口的只读审计，主智能体保持唯一写者；仓库实现不构成host安装、真实通知、UAT/生产或真实数据授权。
 
+2026-08-13第二十次调度事件：`SELFHOST-OPS-MONITORING-ALERTING-49 DOING → DONE`。D-126统一资源、服务、应用、发布/Migration和备份恢复证据的严格去敏快照与告警生命周期；最终源码`7debd4d`/tree`315276e`与manifest-only子提交`56535a0`形成内容寻址链，bundle SHA-256为`76b919cd…6a95`。监控14/14、release 6文件/48项及直接45/45、supervisor20/20、Node113文件/964项、PostgreSQL83文件/396项、typecheck38/38、SPECIAL POSIX4文件/29项、lint和credentials通过。只读宿主metadata诊断因旧UAT身份和缺失应用/发布/备份证据如实为CRITICAL；没有host安装、真实投递、UAT连接或数据操作，active slot释放且系统继续`PRODUCTION NO-GO`。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -67,12 +69,13 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-OPS-MONITORING-ALERTING-49 | 运行监控、告警与排障证据闭环 | DOING | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来host安装、真实渠道/值班人、UAT/生产专项授权） | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RUNTIME-HEALTH-TRUTH-45、SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 | `DOING / REPOSITORY AND ISOLATED ONLY / NO HOST INSTALL / PRODUCTION NO-GO`。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-ALERTING-49.md)。 |
+| — | 当前无执行中任务 | — | — | — | — | TASK49已释放active slot；下一任务须先建立任务文档和验收标准。 |
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-OPS-MONITORING-ALERTING-49 | 运行监控、告警与排障证据闭环 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来host安装、真实渠道/值班人、UAT/生产专项授权） | 2026-08-13 | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RUNTIME-HEALTH-TRUTH-45、SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48、D-126 | `DONE / REPOSITORY MONITORING CONTRACT VERIFIED / HOST DELIVERY NOT CONFIGURED / PRODUCTION NO-GO`。严格快照、单一阈值、去敏采集、FIRING/REMINDER/ESCALATED/RECOVERED、原子hash-chain状态及pending delivery落地；最终Node113/964、PG83/396、typecheck38/38和适用发布门通过。未安装host服务或发送真实告警。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-ALERTING-49.md)及[D-126](DECISIONS.md#d-126-运行监控采用最小去敏快照单调原子状态和失败关闭告警交付)。 |
 | SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 | 隔离候选镜像、SBOM、漏洞与完整发布门证据 | DONE | Codex主智能体（唯一写入、重任务串行、证据与提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来host supervisor/UAT/生产专项授权） | 2026-08-13 | 2026-08-13 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-TYPECHECK-CLOSURE-46、SELFHOST-RELEASE-BROWSER-HARNESS-47、D-116、D-122—D-125 | `DONE / EXACT LOCAL CANDIDATE BUILT / ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / PRODUCTION NO-GO`。精确`8952a815`候选、两镜像digest/config、root-only构建回执及四份诊断制品已闭合；48/48合同、20/20 supervisor、typecheck、lint0 error和credentials通过。正式证据/18步门在写入前失败关闭，未部署UAT。见[任务文档](../tasks/SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48.md)及[D-125](DECISIONS.md#d-125-最终运行层采用固定-wolfi-node-22-最小包并删除可证明仅构建使用的-image-size)。 |
 | SELFHOST-RELEASE-BROWSER-HARNESS-47 | 固定浏览器运行时与发布E2E门闭环 | DONE | Codex主智能体（唯一写入、串行构建/测试、文档和提交）、项目负责人（未来候选镜像/UAT/生产专项授权） | 2026-08-12 | 2026-08-13 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-TYPECHECK-CLOSURE-46、D-116、D-121 | `DONE / REPOSITORY BROWSER GATE VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`。源码`9a18a0f`与manifest-only `614ef7ac`形成39文件证据链，bundle SHA-256为`e54019df…a7192`；固定Playwright 1.51.1/Chromium 134运行时下6文件/11项全部PASS，typecheck38/38及适用合同通过。候选镜像/SBOM/漏洞与完整18步门仍开放。见[任务文档](../tasks/SELFHOST-RELEASE-BROWSER-HARNESS-47.md)及[D-121](DECISIONS.md#d-121-browser-发布门采用内容寻址-playwright同容器-postgresql-与历史精确-migration-模板)。 |
 | SELFHOST-RELEASE-TYPECHECK-CLOSURE-46 | 完整发布TypeScript类型门闭环 | DONE | Codex主智能体（唯一写入、串行诊断/修复/测试、文档和提交）、项目负责人（未来build/UAT/生产/真实数据专项授权） | 2026-08-12 | 2026-08-12 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RUNTIME-HEALTH-TRUTH-45、D-116、D-120 | `DONE / REPOSITORY TYPECHECK VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`。源码`f3bac028`与manifest-only `3d1243e2`形成证据链；Node 22/ES2022、精确38配置失败关闭执行器和真实类型修复在两个干净快照38/38通过。Browser、候选镜像/SBOM/漏洞及完整18步门仍开放。见[任务文档](../tasks/SELFHOST-RELEASE-TYPECHECK-CLOSURE-46.md)及[D-120](DECISIONS.md#d-120-发布typescript门采用node-22--es2022与精确38配置失败关闭清单)。 |

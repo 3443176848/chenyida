@@ -8,7 +8,7 @@
 
 ## 2026-08-13 投产准入基线
 
-`SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成四域V2工具和合成/双集群隔离恢复证据，但没有真实异机锚点、当前数据恢复或RTO；源码alpha.46/0045与非生产UAT alpha.42/0040仍不一致。TASK46/TASK47已关闭完整typecheck和Browser子门，TASK48又形成精确本机Web/Worker候选并以新鲜数据库证明全部severity零发现；但正式镜像证据和18步同候选门仍因host supervisor未获安装授权失败关闭。TASK43—TASK45已关闭导入fallback、会话绝对寿命及health/Worker/storage误报的仓库风险，但运行UAT未部署；真实数据迁移、完整跨岗位验收、员工试运行和正式切换均未完成。
+`SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成四域V2工具和合成/双集群隔离恢复证据，但没有真实异机锚点、当前数据恢复或RTO；源码alpha.46/0045与非生产UAT alpha.42/0040仍不一致。TASK46/TASK47已关闭完整typecheck和Browser子门，TASK48又形成精确本机Web/Worker候选并以新鲜数据库证明全部severity零发现；但正式镜像证据和18步同候选门仍因host supervisor未获安装授权失败关闭。TASK49已关闭仓库级监控快照、阈值、告警状态与排障合同，但没有host安装、真实通知或值班演练。TASK43—TASK45已关闭导入fallback、会话绝对寿命及health/Worker/storage误报的仓库风险，但运行UAT未部署；真实数据迁移、完整跨岗位验收、员工试运行和正式切换均未完成。
 
 项目负责人已授权持续选择最高优先级且可安全执行的任务，不再要求每项后等待“继续”。该持续授权不包含生产数据访问、真实数据外传、正式备份恢复、UAT/生产 Migration、build/deploy、账号权限、systemd/网络/Swap、真实员工业务写或切换/回滚；这些动作仍须专项明确授权。
 
@@ -16,7 +16,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 2026-08-13，`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`已按D-122—D-125完成并释放active slot。最终候选精确绑定`8952a815`/tree`1ac73360`、alpha.46/0045、两镜像manifest/config及构建回执；新鲜Trivy数据库树在扫描前后不变，Web/Worker全部severity为0。host supervisor仍未安装，正式镜像证据与18步门分别在任何制品变更前退出1，未用环境变量或直接脚本旁路。
 
-`SELFHOST-OPS-MONITORING-ALERTING-49`现为唯一`DOING`，严格起点`d5df673c…16e8`/tree`62c8feb4…05e2`。任务只在仓库和隔离环境统一运行资源、Compose metadata、live/readiness、发布/Migration身份及备份恢复证据的新鲜度评估，形成去敏快照、告警生命周期、CLI、测试和运行手册；不安装host服务、不发送真实通知、不连接UAT/生产数据库或网络，也不读取日志、卷正文和真实数据。
+`SELFHOST-OPS-MONITORING-ALERTING-49`已在严格起点`d5df673c…16e8`后完成并释放active slot。最终内容寻址源码`7debd4d`/tree`315276e`与manifest-only子提交`56535a0`形成bundle SHA-256`76b919cd…6a95`；去敏快照、资源/服务/应用/发布/Migration/备份恢复证据评估、告警生命周期、原子状态、CLI、测试和运行手册已通过完整Node/PostgreSQL/typecheck等适用门。只读宿主metadata诊断对旧UAT镜像与缺失证据如实为CRITICAL；没有host安装、真实通知、UAT/生产网络/数据库访问、日志/卷正文或真实数据读取。TASK49包含Dashboard源码加固但未重建Web/Worker镜像，因此TASK48的`8952a815`零发现候选只是先前提交证据，不是当前HEAD候选。当前零`DOING`，下一安全任务将独立登记容器运行时最小权限加固。
 
 ## 系统组成
 
@@ -41,13 +41,14 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为`chenyida-erp-selfhosted`；当前源码为`0.1.0-alpha.46`并演进到head 0045，`8952a815`已形成仅本机隔离候选且诊断零发现，但未通过正式gate或部署。受控公网并行UAT Web仍运行`0.1.0-alpha.42`原镜像，UAT PostgreSQL仍为40/head`0040_warehouse_receipt_readiness.sql`；0041—0045均未部署到UAT。alpha.42仍只是Web-only非生产UAT记录，不是production release。
+- 发布标识：包名为`chenyida-erp-selfhosted`；当前源码为`0.1.0-alpha.46`并演进到head 0045及TASK49源码`7debd4d`。较早的`8952a815`已形成仅本机隔离候选且诊断零发现，但TASK49后未重建，因此不是当前HEAD候选，也未通过正式gate或部署。受控公网并行UAT Web仍运行`0.1.0-alpha.42`原镜像，UAT PostgreSQL仍为40/head`0040_warehouse_receipt_readiness.sql`；0041—0045均未部署到UAT。alpha.42仍只是Web-only非生产UAT记录，不是production release。
 - 恢复任务收口：private Git与private GHCR镜像锚点已经建立并验证；项目负责人证明已在GitHub网页撤销一次性PAT，并主动延期PostgreSQL dump与uploads、attachments、backup-status异机锚点。TASK39据此按`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`行政收口；数据锚点未建立、单机数据恢复风险继续`OPEN`，不构成production ready。
 - 备份恢复V2：D-115/TASK41已实现四域manifest、root-only libpq凭据、精确writer与数据库guard、全关系内容reconciliation、不可变LOCAL/OFFHOST/RESTORE回执、不同machine/cluster证明、staging/单事务恢复/精确补偿、prepared receipt补发和Dashboard runtime/RPO失败关闭。合同41/41、两个独立PostgreSQL集群恢复及Dashboard 2/2通过；只使用合成/隔离数据，未读取当前四卷、外传、build/Migration/deploy。真实异机目标、加密、调度/保留/告警、角色/ACL、真实恢复/RTO继续阻塞G2。
 - AI治理基线：D-110和`PHASE4-TASK01`继续约束AI仅建议、确定性门禁优先、失败关闭、外部模型默认禁用、完整建议追溯、人工决定分离、四角色审批、版本化去敏评估及停用/回退/漂移。`PHASE4-TASK02`已在独立工具边界交付64条静态合成/去敏数据、四项确定性基线、严格Schema/manifest/CLI/指标与一次冻结holdout报告；D-111只批准冻结本地确定性身份的正确性/证据/复现100%、安全和错误候选0及分能力最低coverage，状态仍为`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`。D-112五表合同在0041实现为独立`LOCAL_DETERMINISTIC`四能力Service和受保护POST/GET；仓库总head现为0045。项目负责人将`PHASE4-TASK03`保持为`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。与产品AI严格分离的`AGENT-R1-5`合成研发协议MVP已完成；TASK45收口提交边界为零DOING/`IDLE`。TASK02数据集、holdout、manifest、标签和机器报告不变且正式holdout未重跑，TASK04—TASK05仍为TODO。
 - 物料导入安全基线：D-117/TASK43在源码提交`5767c92e51e4f25ba49fa4431299f265ef4cb7aa`与manifest-only直接子提交`dad7468`完成持久幂等、正文前owner/状态/CAS、私有staging、实际文件检查、同根无覆盖原子提升、协调恢复、job所有权和worker终态事务；0042发布后不可变，0043以append-only方式修正终态约束。定向与隔离PostgreSQL证据通过，release inventory为230/206/24；运行UAT没有部署这些变化。
 - 会话安全基线：D-118/TASK44在源码提交`e7b0298f90ba85a5018709be1360a40dacbbaa59`与manifest-only直接子提交`c730fefe0857d2e4546f28364ca53d5e6506d099`完成8小时idle、固定24小时absolute、PostgreSQL时钟原子认证、超时单次终态/审计和失效Cookie清理；append-only 0044 SHA-256为`a24df944…aa7e`，0001—0043未修改。定向55/55、隔离PostgreSQL 21/21、官方Migration harness与release inventory 232/208/24通过；运行UAT没有部署这些变化。
 - 运行健康基线：D-119/TASK45在源码提交`74940866f7deac7b2751278479e8cefb4df35c1c`与manifest-only直接子提交`dcef6f67c75d771ad3a3dd9fe6f5aa385fc81f92`完成完整Migration manifest、数据库时钟Worker排他租约/CAS、双侧双卷写/fsync/清理、`/api/live`与readiness分离和Worker Docker healthcheck；append-only 0045 SHA-256为`cc4685a0…80fc`，0001—0044未修改。定向42/42、隔离PostgreSQL5/5、官方Migration harness与release inventory235/211/24通过；运行UAT没有部署这些变化。
+- 监控告警基线：D-126/TASK49以`operations/monitoring-policy-v1.json`和`tools/ops-monitoring/`统一严格去敏 observation、单一资源阈值、四服务与应用/发布/Migration/备份恢复证据、FIRING/REMINDER/ESCALATED/RECOVERED和原子hash-chain状态；无真实渠道时只保留pending并失败关闭。最终Node113/964、PostgreSQL83/396、typecheck38/38、release/supervisor/SPECIAL POSIX/lint/credentials通过；运行UAT没有安装或调度该工具，也没有真实投递。
 - 控制面基线：D-113已接受，`AGENT-R1`无状态只读控制器、PM-002执行设计及D-114限定的`AGENT-R1-5`均已完成。R1.5已交付Task/Message/Context合同、无状态验证、合成docs/test原生临时角色和源盲黑盒fixture；最终候选`25cbbfa`五道门禁PASS，协议/控制器专项共134项通过，完成后R1返回`IDLE`。Control Store、强制租约、能力代理、daemon、OS级Agent身份、UAT/生产能力及R2—R5仍未实施或授权。
 - 原始发布基线：PHASE0-TASK03 于 `39946f6` 上定义 `0.1.0-alpha.1` / PostgreSQL `0001`—`0005`，并由 `12d3ea3` 提交。该历史定义不改写；当前源码包已演进到`alpha.46`，运行UAT仍为alpha.42。
 - Git 复核：FIX-08 从 clean `main@a254bca5d59dd3f17047c9d6495dfdf2df1a798e`、Parent `91c0fd29d534246c55ddd669e894cdde9b774e52`、behind 0/ahead 109 起步；功能提交为 `682e79378660ef7859617655836f02e2112df244`，安全停止/运维文档由独立 `ops: record blocked planning traceability rollout` 提交收口。未 push/PR/amend/rebase/reset/stash/restore，既有提交未改写；未读取、修改或提交 `shujvbiao/`。

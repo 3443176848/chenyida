@@ -4,12 +4,19 @@
 
 ## 2026-08-13
 
-### SELFHOST-OPS-MONITORING-ALERTING-49 - `docs: start monitoring and alerting closure`
+### SELFHOST-OPS-MONITORING-ALERTING-49 - `docs: start monitoring and alerting closure` / `feat: add fail-closed operations monitoring` / focused contract and regression fixes / `docs: close monitoring and alerting closure`
 
 - 调度/范围：TASK48治理收口`d5df673c602fdc4e558c2799b31dbf1b208316e8`后的零`DOING`自动切换为TASK49唯一active task；严格起点tree为`62c8feb425c7546db2afc7b2dc78f0050bf615e2`、alpha.46/0045，UAT仍alpha.42/0040。
 - 目标：把既有live/readiness、Worker租约、Docker metadata、低资源阈值、release/Migration身份及备份恢复证据统一为严格版本化、确定性、去敏的运行快照和告警生命周期，并交付可运行CLI、合成/隔离测试与排障手册。
 - 边界：主智能体唯一写入，数据迁移、应用测试、运维安全三线只读审计；不安装systemd/cron/supervisor，不发送真实通知，不连接UAT/生产数据库或网络，不读取日志、环境、卷正文、备份正文、凭据、业务数据或用户未跟踪状态报告。
 - 起点资源/运行：available约2.2GiB、Swap734MiB/1GiB、根盘18GiB、Load`0.31/0.32/0.37`、`oom_kill=0`；四服务restart0/OOM false，Web/PostgreSQL healthy、Worker/Caddy health none。仅观察Docker metadata，未修改服务或受保护Volume，系统继续`PRODUCTION NO-GO`。
+- 决策/实现：D-126固定最小去敏observation、单一资源阈值权威、严格字段/时间与四服务集合、应用/release/Migration/备份恢复证据新鲜度、稳定中文告警和FIRING/REMINDER/ESCALATED/RECOVERED。`operations/monitoring-policy-v1.json`绑定既有资源策略，`tools/ops-monitoring/`交付contract、collector、原子hash-chain state store和CLI；无外部渠道时只写pending且非零退出。
+- 安全加固：Dashboard backup-status读取增加可信root/marker、owner/mode、稳定`O_NOFOLLOW`读取和有界安全投影；采集器只接受显式去敏事实，不输出SQL、堆栈、完整URL、环境变量、卷正文或原始异常。Caddy可为running/none，PostgreSQL/Web/Worker必须healthy的发布健康语义与TASK45保持一致。
+- 宿主诊断：只读Docker/资源metadata采集对现行alpha.42/0040旧镜像、Worker health none及缺失的应用/release/Migration/备份证据如实生成CRITICAL；Caddy `running/none`按其无healthcheck合同接受。没有连接UAT API/网络/数据库、读取日志、`.env`、四卷或业务数据，也没有用缺失证据伪造健康。
+- 测试驱动修正：完整Node门发现AI建议Migration测试仍把0041误作当前head；完整PostgreSQL门发现Normalization夹具没有模拟parser写入batch counters，且底层queue过期lease按接口返回`false`而旧断言要求直接抛错。三处均按当前生产契约最小修正并更新内容摘要，未改写Migration、放宽约束、跳过测试或把失败记为环境问题。
+- Git/证据：监控主实现提交`08f89c6174e887ef03eae2b98b66f0f3cac1c0f5`；最终内容寻址源码/测试提交`7debd4dbb0126be57796651921298846f7699027`、tree`315276e04ab4ab28db5a4f6a720b42430167429c`，manifest-only子提交`56535a06600ce2fece2152d06d3597dfd0e470d9`，bundle SHA-256`76b919cd412af0438f9fedd34cb0ba7e8a3ff244bb7d276e6af8867a2fca6a95`。
+- 最终验证：监控14/14；release合同6文件/48项及直接45/45；supervisor Python20/20；Vinext build与Node113文件/964项；隔离PostgreSQL83文件/396项；typecheck38/38；SPECIAL POSIX4文件/29项；lint0 error/11个既有warning；credentials扫描1,582个版本化文件及`git diff --check`通过。
+- 资源/结论：所有重任务串行。起点/收口available约2.2/2.2GiB、Swap734/719MiB、根盘18/18GiB、最终Load`0.64/1.16/1.35`；四服务restart0/OOM false，本任务临时容器/测试数据库清零。未安装host服务、发送真实通知、运行真实Migration/deploy或修改持久数据；结论为`REPOSITORY MONITORING CONTRACT VERIFIED / HOST DELIVERY NOT CONFIGURED / PRODUCTION NO-GO`。
 
 ### SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 - staged source hardening / `fix: validate Wolfi candidate package coverage` / `build: bind Wolfi scan coverage supervisor bundle` / `docs: close isolated candidate evidence`
 

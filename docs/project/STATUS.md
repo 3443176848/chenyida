@@ -2,17 +2,23 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
-## SELFHOST-OPS-MONITORING-ALERTING-49（执行中；仓库监控与告警合同）
+## SELFHOST-OPS-MONITORING-ALERTING-49（完成；仓库监控合同已验证，host投递未配置）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / REPOSITORY AND ISOLATED ONLY / PRODUCTION NO-GO | 唯一active slot；主智能体唯一写入，三条子智能体只读审计 |
+| 最终状态 | DONE / REPOSITORY MONITORING CONTRACT VERIFIED / HOST DELIVERY NOT CONFIGURED / PRODUCTION NO-GO | 已释放active slot；主智能体唯一写入，三条子智能体完成只读审计 |
 | 严格起点 | PASS / CONTROLLED | `main@d5df673c602fdc4e558c2799b31dbf1b208316e8`、tree`62c8feb4…05e2`、alpha.46/0045；用户未跟踪状态报告不读不改不提交 |
-| 目标 | IN PROGRESS | 版本化去敏运行快照、资源/服务/身份/Migration/备份恢复证据阈值、告警状态机、CLI、测试和排障手册 |
+| Git身份 | PASS / CONTENT-ADDRESSED CHAIN | 实现主提交`08f89c6`；最终源码/测试`7debd4dbb0126be57796651921298846f7699027`、tree`315276e0…429c`；manifest-only子提交`56535a06600ce2fece2152d06d3597dfd0e470d9`，bundle SHA-256`76b919cd…6a95` |
+| 镜像候选 | STALE FOR CURRENT HEAD | TASK48零发现镜像绑定较早`8952a815`；TASK49包含Dashboard源码加固且未重建，因此当前`7debd4d`没有对应Web/Worker候选镜像或扫描证据 |
+| 监控合同 | PASS / FAIL CLOSED | 严格去敏快照覆盖资源、四服务、应用、release/Migration及备份恢复证据；缺失/过期/不一致失败关闭，D-126为权威决策 |
+| 告警状态 | PASS / DELIVERY HONEST | FIRING、REMINDER、ESCALATED、RECOVERED及原子hash-chain状态已验证；无外部渠道时只保留pending且非零退出，不冒充delivered |
+| 宿主只读诊断 | CRITICAL / EXPECTED | 旧UAT镜像、Worker health none及未采集的应用/发布/Migration/备份证据被告警；Caddy running/none按合同接受。不以缺失事实冒充健康，未连接API/数据库或读取日志/卷正文 |
 | 授权边界 | REPOSITORY / ISOLATED | 不安装host服务、不发送真实通知、不连接UAT/生产数据库或网络、不读日志/卷正文/真实数据，不修改四服务或受保护Volume |
-| 起点运行面 | VERIFIED READ ONLY / UNCHANGED | UAT alpha.42/0040；四服务restart0/OOM false，Web/PostgreSQL healthy、Worker/Caddy health none；只读取Docker metadata |
-| 起点资源 | PASS / BELOW STOP LINES | available约2.2GiB、Swap734MiB/1GiB（72%）、根盘18GiB、Load`0.31/0.32/0.37`、`oom_kill=0` |
+| 自动验证 | PASS | 监控14/14；release 6文件/48项及直接45/45；supervisor20/20；Node build+113文件/964项；PostgreSQL83文件/396项；typecheck38/38；SPECIAL POSIX4文件/29项；lint0 error/11既有warning；credentials1,582及diff检查通过 |
+| 诚实失败记录 | RECORDED / RESOLVED | 完整门发现并修正AI Migration当前head、parser batch counters及底层queue lease返回值三类陈旧测试夹具；未改写Migration、降低断言或跳过测试，最终全量回归通过 |
+| 资源/清理 | PASS | 起点/收口available约2.2/2.2GiB、Swap734/719MiB、根盘18/18GiB、最终Load`0.64/1.16/1.35`；四服务restart0/OOM false，本任务临时容器和测试数据库清零 |
 | 系统是否可用 | NO | 真实告警渠道/值班人、host安装、异机恢复、UAT部署、真实迁移和员工试用均未完成 |
+| 下一安全任务 | CONTAINER RUNTIME HARDENING | 建立独立任务后验证Web/Worker等容器的只读根、capability和no-new-privileges边界；不触碰现行UAT或持久卷 |
 
 ## SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48（完成；隔离候选零发现诊断，正式门失败关闭）
 
