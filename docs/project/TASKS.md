@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-TASK47已完成并释放active slot，当前暂为零`DOING`。固定Browser运行时、6文件/11项E2E和最终supervisor bundle已在干净提交快照验证；运行UAT仍为alpha.42/0040旧实现且本任务未连接，系统继续`PRODUCTION NO-GO`。下一安全任务将处理隔离候选Web/Worker镜像、镜像级SBOM/漏洞证据与完整18步门；G2真实异机恢复和岗位权限矩阵仍分别需要外部资源或业务批准。
+`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`是当前唯一`DOING`。项目负责人已明确授权隔离环境中的测试、构建和Migration演练，因此本任务串行建立本地候选Web/Worker镜像、loopback registry digest、镜像级SBOM/新鲜漏洞证据并在不绕过host supervisor的前提下尝试完整18步门；不push外部registry、不部署或修改UAT/生产，系统继续`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -45,6 +45,8 @@ TASK47已完成并释放active slot，当前暂为零`DOING`。固定Browser运�
 
 2026-08-13第十六次调度事件：`SELFHOST-RELEASE-BROWSER-HARNESS-47 DOING → DONE`。官方Playwright/Chromium内容寻址运行时、历史Migration模板升级、断网只读单容器执行器和真实`browser-e2e`发布动作落地；第十三次完整干净快照运行6文件/11项全部PASS。源码`9a18a0f307348c974a6f341565e7d16d76df184c`/tree`8c182d38f1acbcebe10d46e3a09f73c9ec612f22`与manifest-only直接子提交`614ef7ac2aea5ec23029c81b17b8c21adc0935dd`形成39文件证据链，bundle SHA-256为`e54019dfde0af7a9a8367b5ade53976b1ffc4b24f9b36e46ae3778ed963a7192`；release合同45、supervisor20、typecheck38/38和lint通过。Swap短暂越过80%时按规则暂停，回落后才继续；未修改Swap、UAT/生产、四卷或服务，系统继续`PRODUCTION NO-GO`。
 
+2026-08-13第十七次调度事件：主智能体从TASK47收口后的零`DOING`自动选择G3剩余最高优先级安全任务，状态按`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 TODO → DOING`切换唯一active slot。D-122把本轮明确的隔离构建授权限制为本机候选、公共只下载依赖、临时loopback registry及隔离测试；外部push、host supervisor安装、UAT/生产Migration/deploy、当前四卷和真实数据仍未授权。三名子智能体只读审计，主智能体保持唯一写者和重任务串行调度者。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -61,7 +63,7 @@ TASK47已完成并释放active slot，当前暂为零`DOING`。固定Browser运�
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 无 | 当前暂为零DOING，等待同一治理链启动下一安全任务 | — | — | — | — | TASK47已完成；系统仍`PRODUCTION NO-GO`。 |
+| SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 | 隔离候选镜像、SBOM、漏洞与完整发布门证据 | DOING | Codex主智能体（唯一写入、重任务串行、证据与提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来host supervisor/UAT/生产专项授权） | 2026-08-13 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-TYPECHECK-CLOSURE-46、SELFHOST-RELEASE-BROWSER-HARNESS-47、D-116、D-122 | `DOING / LOCAL ISOLATED BUILD AUTHORIZED / NO EXTERNAL PUSH OR DEPLOYMENT / PRODUCTION NO-GO`。见[任务文档](../tasks/SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48.md)。 |
 
 ## 已完成任务
 

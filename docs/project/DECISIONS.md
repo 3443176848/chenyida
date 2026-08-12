@@ -1910,6 +1910,41 @@
 - 拒绝把六个历史数据库断言改到当前head、共享一个污染数据库、连接UAT，或以mock/HTTP桩替代真实浏览器和服务端流程。
 - 拒绝并行启动独立数据库/Web/Browser容器、挂载Docker socket或为方便扩大capability，也拒绝在失败时按模糊名称批量删除容器和目录。
 
+## D-122 隔离候选构建只授权本机证据链，不授权外部推送、宿主发布能力或运行面变更
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / TASK48 IN PROGRESS / PRODUCTION NO-GO`
+- 提案与实施：Codex 持续交付负责人，依据项目负责人本轮持续目标和明确隔离构建授权
+- 确认边界：本机隔离测试、构建和Migration演练已授权；生产数据、外部上传、正式备份恢复、host supervisor、UAT/生产Migration/deploy、账号权限、系统配置、员工写入和切换仍须专项明确授权
+
+### Context
+
+- D-116最初明确把候选镜像build、联网漏洞评估和host supervisor安装留给后续专项授权；本轮项目负责人随后明确允许仓库内安全修改以及“隔离环境中的测试、构建和迁移演练”。
+- TASK47已关闭Browser子门，但PR-003/PR-005仍缺精确Web/Worker候选、registry digest、镜像级SBOM、新鲜漏洞数据库PASS和完整同候选18步报告。
+- 发布脚本只接受registry digest并要求installed content-addressed supervisor；当前host上没有launcher、bundle、安装回执或release authorization目录。直接设置内部环境变量会破坏D-116高权限边界。
+
+### Decision
+
+1. TASK48可从精确已提交Git commit/tree在本机串行build Web/Worker，允许只下载内容寻址的公共基础/工具镜像及漏洞数据库；所有下载仅为输入，不上传仓库、业务数据、凭据或候选制品。
+2. 为取得严格registry digest，可使用仅绑定loopback、任务专用且完成后精确清理的临时registry。候选不得推送到GHCR或其他外部registry，不创建`latest`、浮动tag或对现行Compose可解析的部署tag。
+3. Trivy必须固定到D-116策略的0.70.0完整镜像digest；数据库和证据均不超过72小时，扫描覆盖Web/Worker全部severity。任一已知漏洞或未知状态拒绝候选，不使用ignore、waiver、严重度降级或lockfile替代。
+4. 构建、registry、数据库准备、扫描和测试遵守一次一个临时容器及低资源停止线；不挂载UAT/生产数据库或四个受保护Volume，不读取真实业务数据。
+5. 正式镜像证据和18步门仍只允许installed content-addressed supervisor与一次性root授权调用。当前授权不包含把launcher/bundle/authorization持久写入`/usr/local`或`/var/lib`；未安装时必须记录失败关闭，不得直接调用脚本并伪造正式PASS。
+6. TASK48可先完成不依赖host安装的候选build、身份核验、漏洞发现/修复和隔离测试；若最终只剩host supervisor安装，则记录精确影响与最小专项授权需求，并自动转向其他安全未阻塞任务。
+7. 18步门可按既有D-116合同只读观察`chenyida-erp-parallel`四服务的Docker状态、restart、OOM和health元数据，并要求前后完全一致；这不授权访问UAT网络、API、数据库、日志、卷正文或执行任何服务变更。元数据漂移直接拒绝候选。
+
+### Consequences
+
+- 本机候选镜像、loopback registry digest和扫描制品仍只是隔离证据，不是UAT/生产release，不得更新运行identity或把`RELEASES.md`写成已部署版本。
+- 新鲜漏洞数据库需要公共网络下载，但不会向外部发送真实数据、仓库源码或候选镜像；下载来源、digest、时间和数据库payload必须可复核。
+- host supervisor安装、UAT对齐、真实异机恢复、岗位矩阵、真实迁移、员工试用和切换继续保持独立门禁。
+
+### Rejected alternatives
+
+- 拒绝把本地image ID、浮动tag、lockfile清单或过期扫描当作registry digest/SBOM/漏洞PASS。
+- 拒绝向外部registry推送未晋升候选，或为取得RepoDigest修改Docker daemon配置。
+- 拒绝直接设置`ERP_RELEASE_SUPERVISOR_LAUNCHED=YES`、复制候选脚本到可信路径或持久安装host supervisor来绕过专项授权。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

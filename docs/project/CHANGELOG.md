@@ -4,6 +4,14 @@
 
 ## 2026-08-13
 
+### SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 - `docs: start isolated release candidate evidence`
+
+- 调度/范围：TASK47释放active slot后，按持续交付目标把TASK48登记为唯一`DOING`。严格起点为`main@d554a150a2f9cb4b672dc49785ed63bf3e0edfc8`、alpha.46/0045；UAT只读仍为alpha.42/0040、227表，当前服务不变。
+- 授权边界：依据项目负责人本轮明确允许的“隔离环境中的测试、构建和迁移演练”，D-122允许本地候选build、固定公共工具/漏洞库只下载和临时loopback registry；禁止外部push、host supervisor安装、UAT/生产Migration/deploy、当前四卷或真实数据访问。
+- 验收方向：精确Git commit/tree构建Web/Worker、固定registry digest及OCI/baked身份、Trivy 0.70.0与72小时内数据库、两镜像CycloneDX SBOM、全severity零发现，并只通过正式supervisor路径尝试18步同候选门。host supervisor未安装时必须失败关闭，不得旁路冒充PASS。
+- 运行观察：官方18步门会只读记录现行四服务Docker status/restart/OOM/health并要求前后一致；本任务将其限定为元数据观察，禁止连接UAT网络/API/数据库、读取日志/卷正文或修改服务。
+- 起点资源/安全：available约2.4GiB、Swap744MiB/1GiB、根盘27GiB、Load`0.05/0.49/0.88`、内核OOM0，四服务restart0/OOM false、BuildKit cache0B；唯一未跟踪状态报告继续不读、不改、不提交。
+
 ### SELFHOST-RELEASE-BROWSER-HARNESS-47 - `docs: start release browser harness closure` / focused runtime and test fixes / `docs: record browser gate validation pause` / `build: bind release browser supervisor bundle` / `docs: close release browser gate`
 
 - 调度/范围：TASK46治理收口`fbbf2a5d034d11d8a50f823a55ef78d2d32d682d`后的零DOING自动切换为TASK47唯一active task，完成后按`DOING→DONE`释放active slot。任务只关闭发布清单中的6个REQUIRED Browser E2E；不把历史手工Chromium、宿主偶然依赖或定向Node测试冒充发布Browser门。

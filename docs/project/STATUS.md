@@ -2,6 +2,18 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
+## SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48（执行中；隔离候选证据）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / ISOLATED CANDIDATE EVIDENCE / PRODUCTION NO-GO | 当前唯一active task；不构成部署或发布授权 |
+| 严格起点 | PASS / CONTROLLED | `main@d554a150a2f9cb4b672dc49785ed63bf3e0edfc8`、alpha.46/0045、唯一worktree；既有未跟踪状态报告不读不改不提交 |
+| 运行面基线 | VERIFIED READ ONLY / UNCHANGED | UAT Migration 40/head0040、227表，Web image ID `sha256:e7761e2c…f94964`；四服务restart0/OOM false，Python旧面active/restart0 |
+| 授权边界 | LOCAL ISOLATED BUILD ONLY | 可本机构建、公共只下载固定工具/漏洞库、临时loopback registry及隔离测试；禁止外部push、host supervisor安装、UAT/生产Migration/deploy、四卷/真实数据访问 |
+| 当前缺口 | OPEN | 固定Trivy镜像/新鲜数据库、Web/Worker候选registry digest、镜像级SBOM/零漏洞证据和完整18步同候选报告尚未产生；host supervisor当前未安装 |
+| 起点资源 | PASS / BELOW STOP LINES | available约2.4GiB、Swap744MiB/1GiB（约72.7%）、根盘27GiB、Load`0.05/0.49/0.88`、内核OOM0；BuildKit cache0B |
+| 系统是否可用 | NO | 真实异机恢复、同候选UAT、权限矩阵、真实迁移、员工试用和切换均未完成 |
+
 ## SELFHOST-RELEASE-BROWSER-HARNESS-47（完成；仓库浏览器门已验证）
 
 | 验证项 | 结果 | 说明 |

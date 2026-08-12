@@ -1,0 +1,86 @@
+{
+  "schema_version": "chenyida-erp-agent-task/v1",
+  "task": {
+    "id": "SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48",
+    "revision": 1,
+    "ledger_state": "DOING",
+    "delivery_stage": "ISOLATED_CANDIDATE_EVIDENCE",
+    "qualifiers": [
+      "LOCAL_BUILD_AUTHORIZED",
+      "NO_EXTERNAL_PUSH",
+      "NO_HOST_SUPERVISOR_INSTALL",
+      "NO_UAT_OR_PRODUCTION_MUTATION",
+      "PRODUCTION_NO_GO"
+    ],
+    "task_document": "docs/tasks/SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48.md"
+  },
+  "baseline": {
+    "base_sha": "d554a150a2f9cb4b672dc49785ed63bf3e0edfc8",
+    "expected_branch": "main",
+    "source_version": "0.1.0-alpha.46",
+    "source_migration": {
+      "first_number": 1,
+      "head_number": 45,
+      "head_filename": "0045_runtime_worker_readiness.sql",
+      "head_sha256": "cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc"
+    },
+    "uat": {
+      "version": "0.1.0-alpha.42",
+      "migration_head": "0040",
+      "verification_scope": "DOCUMENT_DECLARATION_ONLY_NO_CONNECTION"
+    }
+  },
+  "scope": {
+    "allowed_changed_paths": [
+      "chenyida_erp_site/Dockerfile",
+      "chenyida_erp_site/compose.yml",
+      "chenyida_erp_site/package.json",
+      "chenyida_erp_site/package-lock.json",
+      "chenyida_erp_site/release/**",
+      "chenyida_erp_site/scripts/**",
+      "chenyida_erp_site/tests/**",
+      "docs/agent-control/task-packets/SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48.json",
+      "docs/project/CHANGELOG.md",
+      "docs/project/DECISIONS.md",
+      "docs/project/MASTER.md",
+      "docs/project/PRODUCTION_READINESS.md",
+      "docs/project/PROJECT_CONTEXT.md",
+      "docs/project/ROADMAP.md",
+      "docs/project/STATUS.md",
+      "docs/project/TASKS.md",
+      "docs/tasks/SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48.md",
+      "docs/testing/selfhost-release-gate.md",
+      "docs/self-hosting/**"
+    ],
+    "known_untracked_paths": [
+      "docs/ERP_CURRENT_STATUS_REPORT.md"
+    ],
+    "required_documents": [
+      "AGENTS.md",
+      "docs/project/MASTER.md",
+      "docs/project/TASKS.md",
+      "docs/project/PROJECT_CONTEXT.md",
+      "docs/tasks/SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48.md",
+      "docs/project/DECISIONS.md",
+      "docs/project/PRODUCTION_READINESS.md"
+    ],
+    "require_single_worktree": true
+  },
+  "inspection": {
+    "package_json": "chenyida_erp_site/package.json",
+    "migration_directory": "chenyida_erp_site/drizzle-postgres",
+    "migration_journal": "chenyida_erp_site/drizzle-postgres/meta/_journal.json",
+    "migration_snapshot_directory": "chenyida_erp_site/drizzle-postgres/meta",
+    "required_decision": "D-113",
+    "uat_document_markers": [
+      {
+        "path": "docs/project/MASTER.md",
+        "contains": ["0.1.0-alpha.42", "0040"]
+      },
+      {
+        "path": "docs/project/PROJECT_CONTEXT.md",
+        "contains": ["0.1.0-alpha.42", "0040"]
+      }
+    ]
+  }
+}

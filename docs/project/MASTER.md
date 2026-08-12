@@ -52,8 +52,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
 | 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / G3 RELEASE CANDIDATE GAP CLOSURE / PRODUCTION NO-GO`。G1合成恢复与G3发布工具已完成，TASK43—TASK47已在仓库层关闭导入fallback、会话绝对寿命、health/Worker/storage误报、完整TypeScript门和Browser门；但运行面仍是旧版本，且真实异机副本、候选镜像安全/完整18步候选PASS、UAT部署、岗位权限和员工验收均未完成 |
-| 当前任务 | TASK47已完成并释放active slot；当前暂为零`DOING`，等待同一持续交付链启动下一安全任务 |
-| 下一任务 | 建立隔离候选Web/Worker镜像、OCI身份、镜像级SBOM/新鲜漏洞证据并尝试完整18步同候选门；G2真实备份恢复、UAT Migration/deploy、员工试用和切流均不自动获权 |
+| 当前任务 | `SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`是唯一`DOING`：隔离构建Web/Worker、固定registry digest与OCI/baked身份、生成镜像级SBOM/新鲜漏洞证据，并在不绕过host supervisor的前提下尝试同候选18步门 |
+| 下一任务 | TASK48完成可安全证据后继续处理其发现的候选缺陷或转入监控/运维仓库缺口；host supervisor安装、G2真实备份恢复、UAT Migration/deploy、员工试用和切流均须专项授权或外部资源 |
 
 ## 当前完成模块
 
@@ -345,6 +345,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 - `SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已按D-120完成并释放active slot：精确38配置、ES2022合同和只读干净快照执行器已在两个提交快照38/38通过；一次错误纳入`.wrangler/work`的直接lint发生V8 heap OOM，正式干净快照lint随后0 error通过，宿主/容器OOM与restart均为0。
 - `SELFHOST-RELEASE-BROWSER-HARNESS-47`已完成并释放active slot：固定Playwright/Chromium镜像、固定依赖、历史Migration模板和串行单容器执行器已在干净源码快照6文件/11项通过。下一安全任务是隔离候选Web/Worker镜像、镜像级SBOM/新鲜漏洞证据及完整18步门；它不授权push、UAT/生产连接、Migration/deploy或真实数据。岗位权限矩阵须业务负责人批准后另立任务；真实异机备份/恢复、账号变化、员工试用和切换仍须专项明确授权。
+
+- `SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`已按D-122启动为唯一`DOING`：项目负责人对隔离测试/构建/Migration演练的明确授权允许本机构建候选、只下载固定公共工具/漏洞库和使用临时loopback registry，不允许外部push、host supervisor安装、UAT/生产变更、当前四卷或真实数据访问。起点源码alpha.46/0045、UAT只读为alpha.42/0040，系统继续production no-go。
 
 - `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成并暂时回到零`DOING`：D-115四域V2工具与41/41合同、双集群隔离恢复通过。G2真实异机备份/恢复因外部目标与专项授权阻塞；下一安全任务转入G3发布身份闭合、release manifest、Migration allowlist和强制`test:release`，仍不build/deploy或读取当前卷。
 - 真实异机备份与恢复、UAT build/Migration/deploy、旧数据读取、员工试用、账号/权限、网络/systemd和正式切换仍须专项明确授权；持续交付授权不改变这些边界。

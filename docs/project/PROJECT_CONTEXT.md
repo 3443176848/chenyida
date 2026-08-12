@@ -14,6 +14,8 @@
 
 TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门：Node 22/ES2022、精确38配置集合/摘要核验和只读提交快照执行器已在两个干净快照38/38通过。TASK47又在源码`9a18a0f`与manifest-only直接子提交`614ef7ac`完成D-121固定Browser门：官方Playwright/Chromium内容寻址运行时下6文件/11项全部通过，39文件bundle SHA-256为`e54019df…a7192`。两项都只关闭仓库子门，不连接UAT/生产或自动授权候选Web/Worker镜像build/deploy；下一安全任务处理候选镜像/SBOM/漏洞及完整同候选门。
 
+2026-08-13，`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`按D-122启动为唯一`DOING`。项目负责人本轮明确允许隔离测试、构建和Migration演练，因此本任务可本机构建精确候选、只下载固定公共工具/漏洞库并使用临时loopback registry；不得外部push、安装host supervisor、修改UAT/生产、读取当前四卷或真实业务数据。起点host supervisor未安装，正式18步门不得以环境变量或直接脚本旁路。
+
 ## 系统组成
 
 ### 本地 ERP
@@ -304,7 +306,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 ## 当前路线
 
-`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭；TASK41已完成D-115/G1合成隔离工具，但真实数据锚点延期风险继续开放。TASK42已完成D-116/G3仓库工具；TASK46/TASK47又分别按D-120/D-121关闭完整typecheck与Browser门，TASK47源码`9a18a0f`与manifest-only `614ef7ac`形成39文件bundle且6文件/11项通过。真实候选仍因候选镜像/SBOM/新鲜漏洞证据和完整18步同候选门阻塞。TASK43—TASK45已分别按D-117—D-119完成导入fallback、会话和运行健康仓库加固，当前源码alpha.46/0045，运行UAT仍未部署。当前零DOING，下一安全任务处理隔离候选镜像与安全证据；权限矩阵等待业务批准，系统继续production no-go。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API是0041引入且已通过隔离验证。项目负责人已接受D-113和D-114，`AGENT-R1`、PM-002及`AGENT-R1-5`均已完成。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，TASK04—TASK05保持TODO；正式holdout未重跑，0041—0045未build、部署或应用UAT。外部AI禁用，UAT继续alpha.42/0040且没有真实V2回执；任何R2、模型/真实数据、真实收货、迁移、部署、生产或切流仍须独立授权。
+`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭；TASK41已完成D-115/G1合成隔离工具，但真实数据锚点延期风险继续开放。TASK42已完成D-116/G3仓库工具；TASK46/TASK47又分别按D-120/D-121关闭完整typecheck与Browser门，TASK47源码`9a18a0f`与manifest-only `614ef7ac`形成39文件bundle且6文件/11项通过。TASK48现按D-122处理本地候选镜像、SBOM/新鲜漏洞证据及不旁路supervisor的完整同候选门尝试。TASK43—TASK45已分别按D-117—D-119完成导入fallback、会话和运行健康仓库加固，当前源码alpha.46/0045，运行UAT仍未部署。权限矩阵等待业务批准，系统继续production no-go。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API是0041引入且已通过隔离验证。项目负责人已接受D-113和D-114，`AGENT-R1`、PM-002及`AGENT-R1-5`均已完成。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，TASK04—TASK05保持TODO；正式holdout未重跑，0041—0045未build、部署或应用UAT。外部AI禁用，UAT继续alpha.42/0040且没有真实V2回执；任何R2、模型/真实数据、真实收货、迁移、部署、生产或切流仍须独立授权。
 
 ## 恢复上下文检查清单
 

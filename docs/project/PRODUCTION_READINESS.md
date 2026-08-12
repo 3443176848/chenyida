@@ -27,6 +27,8 @@
 
 2026-08-13 第八次增量：`SELFHOST-RELEASE-BROWSER-HARNESS-47`已完成。D-121固定的Playwright 1.51.1/Chromium 134内容寻址运行时、历史Migration模板、断网只读单容器执行器及真实`browser-e2e`动作落地；源码`9a18a0f…`与manifest-only直接子提交`614ef7ac…`形成39文件bundle，干净快照6文件/11项全部PASS，typecheck38/38及适用合同通过。该证据只关闭Browser仓库子门；没有候选Web/Worker镜像、镜像级SBOM/新鲜漏洞PASS或完整18步同候选报告，运行UAT仍为alpha.42/0040，整体判定继续`PRODUCTION NO-GO`。
 
+2026-08-13 第九次增量：`SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`已按D-122启动为唯一`DOING`。范围是精确已提交源码的本地Web/Worker候选build、临时loopback registry digest、固定Trivy与新鲜漏洞数据库、镜像级SBOM/零漏洞证据及不旁路supervisor的18步门尝试；不外部push、不安装host supervisor、不修改UAT/生产或读取当前四卷/真实数据。任务启动不改变整体`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -170,7 +172,7 @@
 2. G3仓库工具已由TASK42完成，完整typecheck和Browser分别由TASK46/TASK47关闭；候选Web/Worker镜像、镜像SBOM/新鲜漏洞PASS、完整18步同候选报告和UAT对齐仍保持失败关闭并需后续适用授权/资源。
 3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
 4. TASK44/TASK45已完成会话绝对时限和health/Worker/storage/Migration真实性仓库修复；运行面验证等待同候选完整gate及专项部署授权。
-5. 下一安全任务建立隔离候选Web/Worker镜像、OCI身份、镜像级SBOM/新鲜漏洞证据并执行完整18步同候选门；岗位权限矩阵等待业务负责人确认，并继续更新/演练监控、升级、回滚和故障手册。
+5. `SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48`正建立隔离候选Web/Worker镜像、OCI/baked身份、镜像级SBOM/新鲜漏洞证据并在不旁路host supervisor的前提下尝试完整18步同候选门；岗位权限矩阵等待业务负责人确认，并继续更新/演练监控、升级、回滚和故障手册。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。
 
