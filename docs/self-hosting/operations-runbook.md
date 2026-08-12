@@ -50,13 +50,14 @@ Compose 配置展开需要数据库和 setup 变量；只读状态检查可使�
 6. 执行匿名健康、权限、核心业务、数据汇总、Worker 和备份时效验收；
 7. 观察 restart/OOM、Load、内存、Swap、磁盘和错误率；触发回滚条件立即停止晋升。
 
-TASK42已形成并验证release manifest、Migration allowlist、content-addressed supervisor和`test:release`仓库工具，见[自托管发布门V1](../testing/selfhost-release-gate.md)。host supervisor尚未安装；没有获准构建的alpha.46 Web/Worker精确镜像、镜像级SBOM、新鲜漏洞PASS或完整gate PASS，完整多配置typecheck还有既有失败，UAT仍为alpha.42/0040。因此G3为`REPOSITORY TOOLING VERIFIED / INSTALLATION AND CANDIDATE EVIDENCE BLOCKED`，仍是投产阻断。
+TASK42已形成release manifest、Migration allowlist、content-addressed supervisor和`test:release`仓库工具；TASK46/TASK47已分别关闭38配置TypeScript和6文件Browser子门，TASK48的D-123源码合同又补上精确Git archive构建回执及installed Migration路径，见[自托管发布门V1](../testing/selfhost-release-gate.md)。host supervisor仍未安装；候选镜像级SBOM、新鲜漏洞PASS和完整gate PASS仍不存在，UAT仍为alpha.42/0040。因此G3为`REPOSITORY SUBGATES VERIFIED / INSTALLATION AND CANDIDATE EVIDENCE BLOCKED`，仍是投产阻断。
 
 ## 发布制品和Migration操作保护
 
 - release gate只能由root通过固定`/var/lock/chenyida-erp-release-gate-v1.lock`运行；run ID最多80字符，证据根必须在仓库外且为root-owned `0750`，禁止环境变量改写锁路径。
 - 高权限脚本只能由已安装、内容寻址的release supervisor凭root-only一次性授权调用；禁止直接执行仓库脚本绕过bundle/授权校验。首次安装或升级supervisor属于主机变更，必须专项授权并使用两提交bundle manifest、安装journal和receipt。
 - Gate只检查已存在的精确Web/Worker镜像，不负责build、pull、push、run或deploy；运行前必须clean commit/tree，运行后再次确认源码和镜像身份未漂移。
+- 经D-122同等专项授权的本机隔离build必须使用D-123构建器：clean HEAD→`git archive`→固定frontend/base→串行Web/Worker→仅loopback registry→按digest回拉→不可变构建回执→精确清理registry。依赖`npm ci`会访问公共源并由lockfile完整性约束，不能描述为全离线或可复现attestation；loopback digest也不是异机镜像恢复锚点。
 - Manifest必须为`ELIGIBLE`且未过期；离线`SOURCE_LOCKFILE/NOT_EVALUATED`证据只能用于证明失败关闭，不能用于Migration或晋升。
 - UAT/PRODUCTION Migration必须通过只读挂载的`release-manifest.json`及其SHA，显式确认精确deployment、数据库名、system identifier、OID、database comment marker、当前head和目标head。不得把秘密放入manifest或命令行。
 - Migration前必须另行取得专项授权和可恢复快照；工具通过并不授权连接数据库、替换镜像、重启服务或发布runtime identity。

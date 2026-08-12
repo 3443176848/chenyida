@@ -1945,6 +1945,45 @@
 - 拒绝向外部registry推送未晋升候选，或为取得RepoDigest修改Docker daemon配置。
 - 拒绝直接设置`ERP_RELEASE_SUPERVISOR_LAUNCHED=YES`、复制候选脚本到可信路径或持久安装host supervisor来绕过专项授权。
 
+## D-123 候选构建采用精确 Git archive、内容寻址构建输入与强绑定本地构建回执
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / SOURCE IMPLEMENTED / ISOLATED CONTRACTS VERIFIED / CANDIDATE BUILD PENDING`
+- 提案与实施：Codex 持续交付负责人，依据 D-122 的本机隔离构建授权及三条只读审计结论
+- 确认边界：只适用于本机隔离候选构建、回执和发布证据合同；不构成外部镜像恢复锚点、可复现构建证明、host supervisor 安装、UAT/生产 Migration/deploy 或正式晋升授权
+
+### Context
+
+- 既有 Dockerfile 使用浮动 Node tag 和浮动 Dockerfile frontend；没有单一受控构建入口证明镜像来自精确已提交 tree，普通 worktree build 可能把未跟踪文件带入上下文。
+- 严格发布证据原先能证明“扫描了哪个镜像”，但不能证明该镜像由哪个 Git archive、Dockerfile、lockfile、builder/frontend/base 和构建策略产生。
+- TASK42 supervisor bundle有意不携带业务 Migration 正文。既有 gate wrapper却从installed bundle相对路径计算allowlist，正式installed布局会在开始测试前确定性失败。
+- D-122只允许临时loopback registry。本地registry digest在registry清理后仍可由当前Docker engine解析和保存，但不是异机或外部恢复锚点，必须显式披露。
+
+### Decision
+
+1. 候选构建入口只接受当前clean HEAD的精确commit/tree，并用禁用replace refs、hooks、fsmonitor、外部Git配置和textconv的`git archive`生成唯一构建上下文；Site下任何未跟踪文件都会在构建前后阻断。
+2. Dockerfile frontend固定为linux/amd64 manifest digest，三个Node阶段固定同一完整Node 22 digest；构建前要求固定Node与registry镜像已在本机，buildx使用固定`default`/`docker` driver、`--pull=false --provenance=false --platform linux/amd64`并记录Docker/buildx/BuildKit版本。Web和Worker按目标严格串行构建且OCI/baked version/revision绑定同一commit。
+3. 依赖安装仍需访问公共npm registry，完整性由已提交`package-lock.json`和`npm ci --ignore-scripts --no-audit --no-fund`约束；应用`npm run build`阶段显式`--network=none`。回执必须写明`PUBLIC_NPM_FETCH_WITH_LOCKFILE_INTEGRITY`，不得把本流程称为完全离线或可复现构建证明。
+4. 临时registry只绑定随机loopback端口、使用固定Registry 2.8.3 digest和任务私有存储；Web/Worker只以精确commit tag推入该registry，随后解析registry manifest digest、按digest回拉并核对config identity。registry容器和私有数据必须在生成“已移除”回执前精确删除；不创建`latest`、不登录或推送外部registry。
+5. root在仓库外受信制品根无覆盖写入`candidate-build-provenance/v1`：绑定Git commit/tree、archive摘要/字节数、Dockerfile/.dockerignore/lockfile/构建器/producer摘要、frontend/base/registry身份、Docker/buildx版本、两目标registry/config digest、OCI/baked身份、USER/CMD、策略和局限。失败路径只删除本任务明确拥有的tag/digest引用、容器和临时目录。
+6. 镜像扫描provenance升级为v2并强制引用同run ID、同candidate、同Web/Worker digest reference的root-owned `0440`构建回执；回执缺失、替换、摘要漂移、候选不符或本地digest引用不符都在发布证据产生前失败关闭。
+7. 正式installed gate继续从content-addressed supervisor bundle加载合同代码，但Migration allowlist必须显式读取精确候选仓库的`chenyida_erp_site/drizzle-postgres`。语义回归必须构造“不含Migration正文的installed bundle + 独立候选目录”，证明可信代码/候选数据边界没有混淆。
+8. 本地回执和digest只可标记`LOCAL_ISOLATED_CANDIDATE / NO_EXTERNAL_REGISTRY_ANCHOR / NO_REPRODUCIBLE_BUILD_ATTESTATION / LOCAL_ENGINE_ONLY`。只有未来建立经授权的外部不可变镜像锚点并完成正式supervisor证据与18步门后，候选才可能晋升。
+
+### Consequences
+
+- TASK48源码层已固定Dockerfile frontend/Node基础镜像、候选构建器、构建回执和scan provenance v2，并修复installed supervisor Migration目录缺陷；定向固定Node 38/38、官方release-contract 6文件/48项及lint 0 error通过。
+- 构建器会访问公共npm依赖源并把候选层写入本机Docker engine；它不上传源码、候选或业务数据。运行前后仍须执行低资源和UAT元数据核验，且不得挂载四个受保护Volume。
+- 回执中的loopback digest reference在临时registry删除后不具备外部可恢复性。若本机镜像被删除，现有回执不能自行恢复镜像；这会阻止正式`ELIGIBLE`和任何部署。
+- host supervisor仍未安装。仓库脚本或等价手工测试不能被记为正式镜像证据、18步PASS或release manifest；最小解除条件仍是项目负责人对精确bundle安装和一次性发布动作另行专项授权。
+
+### Rejected alternatives
+
+- 拒绝从脏worktree、目录复制、浮动tag/frontend/base或未记录的builder直接构建候选。
+- 拒绝把`package-lock.json`称为完全离线依赖来源，或把BuildKit cache命中称为可复现构建证明。
+- 拒绝让扫描证据只绑定最终image ID而不绑定构建来源，也拒绝使用手工JSON回执或可覆盖文件。
+- 拒绝把Migration复制进supervisor bundle，或让installed可信代码从自身缺失的相对业务目录计算候选allowlist。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

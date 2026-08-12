@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -6,15 +7,20 @@ import test from "node:test";
 
 import {
   RELEASE_ARTIFACT_ROOT_MARKER,
+  RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE,
+  RELEASE_NODE_BASE_IMAGE_REFERENCE,
   RELEASE_TRIVY_IMAGE_REFERENCE,
   RELEASE_TRIVY_VERSION,
+  buildMigrationAllowlist,
   canonicalJson,
+  migrationAllowlistDigest,
+  sha256,
   verifyTrustedImageEvidence,
 } from "../scripts/release-manifest-contract.mjs";
 import { parseStrictJson } from "../scripts/release-identity-contract.mjs";
 import { createReleaseImageEvidence, hashTrustedDatabaseTree } from "../scripts/release-image-evidence-producer.mjs";
-import { validateTrivyCycloneDxDocument } from "../scripts/release-image-evidence-contract.mjs";
-import { buildEligibleReleaseFixture, initializeReleaseArtifactRoot } from "./release-gate-fixture.mjs";
+import { validateCandidateBuildProvenance, validateImageScanProvenance, validateTrivyCycloneDxDocument } from "../scripts/release-image-evidence-contract.mjs";
+import { FIXTURE_GIT, FIXTURE_TREE, FIXTURE_VERSION, FIXTURE_WEB, FIXTURE_WORKER, buildEligibleReleaseFixture, initializeReleaseArtifactRoot } from "./release-gate-fixture.mjs";
 
 const rootCapable = typeof process.getuid === "function" && process.getuid() === 0;
 const GENERATED_AT = "2026-08-12T01:00:00.000Z";
@@ -27,13 +33,20 @@ async function writeTrustedInput(directory, filename, value) {
   return file;
 }
 
-async function producerFixture(root, { vulnerable = false, archiveConfigDigest = null } = {}) {
+async function producerFixture(root, { vulnerable = false, archiveConfigDigest = null, noncanonicalBuildProvenance = false } = {}) {
   const migrationEntries = [{ ordinal: 1, filename: "0001_fixture.sql", sha256: "1".repeat(64) }];
-  const fixture = await buildEligibleReleaseFixture({ entries: migrationEntries, generatedAt: GENERATED_AT });
+  const fixture = await buildEligibleReleaseFixture({ entries: migrationEntries, releaseId: "producer-alpha45", generatedAt: GENERATED_AT });
   const inputRoot = path.join(root, "inputs");
   const artifactRoot = path.join(root, "artifacts");
   await initializeReleaseArtifactRoot(inputRoot);
   await initializeReleaseArtifactRoot(artifactRoot);
+  const buildProvenanceFile = await writeTrustedInput(artifactRoot, fixture.filenames.buildProvenanceFile, fixture.buildProvenance);
+  if (noncanonicalBuildProvenance) {
+    const raw = await readFile(buildProvenanceFile, "utf8");
+    await chmod(buildProvenanceFile, 0o640);
+    await writeFile(buildProvenanceFile, ` ${raw}`);
+    await chmod(buildProvenanceFile, 0o440);
+  }
 
   const scannerInspectFile = await writeTrustedInput(inputRoot, "scanner-inspect.json", [{ Id: SCANNER_CONFIG_DIGEST, Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_TRIVY_IMAGE_REFERENCE] }]);
   const scannerVersionFile = await writeTrustedInput(inputRoot, "scanner-version.json", { Version: RELEASE_TRIVY_VERSION, ScannerImageConfigDigest: SCANNER_CONFIG_DIGEST });
@@ -61,6 +74,7 @@ async function producerFixture(root, { vulnerable = false, archiveConfigDigest =
       artifactRoot,
       runId: "producer-alpha45",
       candidate: fixture.candidate,
+      buildProvenanceFile,
       supervisorBundleSha256: "6".repeat(64),
       authorizationSha256: "7".repeat(64),
       scannerConfigDigest: SCANNER_CONFIG_DIGEST,
@@ -91,18 +105,58 @@ test("producer preserves validated native image evidence and emits a trusted zer
     });
     assert.deepEqual(verified.total, { critical: 0, high: 0, medium: 0, low: 0, unknown: 0 });
     assert.equal(verified.provenance.scanner.version, RELEASE_TRIVY_VERSION);
+    assert.equal(verified.provenance.run_id, input.runId);
+    assert.throws(() => validateImageScanProvenance({ ...verified.provenance, run_id: "different-run" }), (error) => error.code === "IMAGE_PROVENANCE_BUILD_FILE_INVALID");
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("producer refuses findings and archive identity drift before writing evidence", { skip: !rootCapable }, async () => {
-  for (const variant of [{ vulnerable: true }, { archiveConfigDigest: `sha256:${"0".repeat(64)}` }]) {
+test("producer refuses findings, archive drift and noncanonical build provenance before writing evidence", { skip: !rootCapable }, async () => {
+  for (const variant of [{ vulnerable: true }, { archiveConfigDigest: `sha256:${"0".repeat(64)}` }, { noncanonicalBuildProvenance: true }]) {
     const root = await mkdtemp(path.join(os.tmpdir(), "cyd-image-producer-reject-"));
     try {
       const { artifactRoot, input } = await producerFixture(root, variant);
-      await assert.rejects(createReleaseImageEvidence(input), (error) => ["IMAGE_EVIDENCE_VULNERABILITIES_FOUND", "IMAGE_PROVENANCE_TARGET_INVALID"].includes(error.code));
-      assert.deepEqual(await readdir(artifactRoot), [RELEASE_ARTIFACT_ROOT_MARKER]);
+      await assert.rejects(createReleaseImageEvidence(input), (error) => ["IMAGE_EVIDENCE_VULNERABILITIES_FOUND", "IMAGE_PROVENANCE_TARGET_INVALID", "IMAGE_EVIDENCE_BUILD_PROVENANCE_INPUT_INVALID"].includes(error.code));
+      assert.deepEqual((await readdir(artifactRoot)).sort(), [RELEASE_ARTIFACT_ROOT_MARKER, "producer-alpha45.build-provenance.json"].sort());
     } finally { await rm(root, { recursive: true, force: true }); }
   }
+});
+
+test("candidate build producer binds the exact snapshot inputs and loopback digest identities", { skip: !rootCapable }, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "cyd-candidate-build-producer-"));
+  try {
+    const artifactRoot = path.join(root, "artifacts");
+    const inputRoot = path.join(root, "inputs");
+    await initializeReleaseArtifactRoot(artifactRoot);
+    await mkdir(inputRoot, { mode: 0o700 });
+    const siteRoot = path.resolve(new URL("..", import.meta.url).pathname);
+    const migrations = await buildMigrationAllowlist(path.join(siteRoot, "drizzle-postgres"));
+    const migrationDigest = migrationAllowlistDigest(migrations);
+    const webReference = `127.0.0.1:5000/chenyida-erp/web@sha256:${"1".repeat(64)}`;
+    const workerReference = `127.0.0.1:5000/chenyida-erp/worker@sha256:${"2".repeat(64)}`;
+    const targetInspect = (id, reference, cmd) => [{
+      Id: id, Os: "linux", Architecture: "amd64", RepoDigests: [reference],
+      Config: { Labels: { "org.opencontainers.image.version": FIXTURE_VERSION, "org.opencontainers.image.revision": FIXTURE_GIT }, Env: [`ERP_RUNTIME_BUILD_VERSION=${FIXTURE_VERSION}`, `ERP_RUNTIME_GIT_COMMIT=${FIXTURE_GIT}`], User: "node", Cmd: cmd },
+    }];
+    const baseInspect = await writeTrustedInput(inputRoot, "base.json", [{ Id: RELEASE_NODE_BASE_IMAGE_REFERENCE.split("@")[1], Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_NODE_BASE_IMAGE_REFERENCE] }]);
+    const registryInspect = await writeTrustedInput(inputRoot, "registry.json", [{ Id: RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.split("@")[1], Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE] }]);
+    const webInspect = await writeTrustedInput(inputRoot, "web.json", targetInspect(FIXTURE_WEB, webReference, ["node", "server.js"]));
+    const workerInspect = await writeTrustedInput(inputRoot, "worker.json", targetInspect(FIXTURE_WORKER, workerReference, ["node", "--experimental-strip-types", "worker/selfhost.ts"]));
+    const runId = "candidate-build-fixture";
+    const result = spawnSync(process.execPath, [
+      path.join(siteRoot, "scripts", "release-candidate-build-producer.mjs"), "create",
+      "--site-root", siteRoot, "--artifact-root", artifactRoot, "--run-id", runId, "--git-commit", FIXTURE_GIT, "--git-tree", FIXTURE_TREE,
+      "--archive-sha256", "3".repeat(64), "--archive-bytes", "1024", "--migration-allowlist-sha256", migrationDigest,
+      "--base-inspect", baseInspect, "--registry-inspect", registryInspect, "--web-inspect", webInspect, "--worker-inspect", workerInspect,
+      "--web-image-reference", webReference, "--worker-image-reference", workerReference, "--docker-server-version", "29.5.2", "--buildx-version", "v0.34.1", "--builder-driver", "docker", "--buildkit-version", "v0.30.0",
+      "--confirm", "CREATE_LOCAL_CANDIDATE_BUILD_PROVENANCE",
+    ], { encoding: "utf8", env: { PATH: process.env.PATH, LC_ALL: "C", LANG: "C", TZ: "UTC" } });
+    assert.equal(result.status, 0, result.stderr);
+    const value = parseStrictJson(await readFile(path.join(artifactRoot, `${runId}.build-provenance.json`), "utf8"));
+    assert.equal(validateCandidateBuildProvenance(value, { runId, candidate: value.candidate, imageReferences: { web: webReference, worker: workerReference } }), value);
+    assert.equal(value.candidate.migration_allowlist_sha256, migrationDigest);
+    assert.deepEqual([value.builder.builder_name, value.builder.builder_driver, value.builder.buildkit_version], ["default", "docker", "v0.30.0"]);
+    assert.equal(value.source.producer_sha256, sha256(await readFile(path.join(siteRoot, "scripts", "release-candidate-build-producer.mjs"))));
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test("Trivy 0.70 native CycloneDX contract accepts structural components and rejects identity or finding drift", async () => {

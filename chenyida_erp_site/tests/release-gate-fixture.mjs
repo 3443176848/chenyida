@@ -5,7 +5,11 @@ import path from "node:path";
 import {
   RELEASE_ARTIFACT_ROOT_MARKER,
   RELEASE_ARTIFACT_ROOT_MARKER_VALUE,
+  RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT,
+  RELEASE_DOCKERFILE_FRONTEND_REFERENCE,
   RELEASE_GATE_REPORT_CONTRACT,
+  RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE,
+  RELEASE_NODE_BASE_IMAGE_REFERENCE,
   RELEASE_SBOM_EVIDENCE_CONTRACT,
   RELEASE_SECURITY_EVIDENCE_CONTRACT,
   RELEASE_SECURITY_SCAN_REPORT_CONTRACT,
@@ -18,6 +22,7 @@ import {
   canonicalJson,
   migrationAllowlistDigest,
   sha256,
+  validateCandidateBuildProvenance,
   validateImageScanProvenance,
   validateOfficialReleaseGatePlan,
   validateReleaseGateReport,
@@ -58,10 +63,30 @@ export async function buildEligibleReleaseFixture({ entries, root = null, releas
   const plan = validateOfficialReleaseGatePlan(JSON.parse(await readFile(new URL("../release/release-gate-plan-v1.json", import.meta.url), "utf8")));
   const planRaw = canonicalJson(plan);
   const candidate = { git_commit: FIXTURE_GIT, git_tree: FIXTURE_TREE, package_version: FIXTURE_VERSION, web_image_digest: FIXTURE_WEB, worker_image_digest: FIXTURE_WORKER, migration_allowlist_sha256: migrationAllowlistDigest(entries) };
-  const image = (service, digest) => ({ service, image_reference: `registry.example.invalid/chenyida/${service}@${digest}`, image_digest: digest, oci_version: FIXTURE_VERSION, oci_revision: FIXTURE_GIT, baked_version: FIXTURE_VERSION, baked_revision: FIXTURE_GIT });
+  const image = (service, digest) => ({ service, image_reference: `127.0.0.1:5000/chenyida-erp/${service}@${digest}`, image_digest: digest, oci_version: FIXTURE_VERSION, oci_revision: FIXTURE_GIT, baked_version: FIXTURE_VERSION, baked_revision: FIXTURE_GIT });
   const images = { web: image("web", FIXTURE_WEB), worker: image("worker", FIXTURE_WORKER) };
   const source = { git_commit: FIXTURE_GIT, git_tree: FIXTURE_TREE, worktree_clean: true, package_path: "chenyida_erp_site/package.json", package_version: FIXTURE_VERSION, package_sha256: "1".repeat(64), dockerfile_path: "chenyida_erp_site/Dockerfile", dockerfile_sha256: "2".repeat(64), compose_path: "chenyida_erp_site/compose.yml", compose_sha256: "3".repeat(64), release_compose_path: "chenyida_erp_site/compose.release.yml", release_compose_sha256: "4".repeat(64) };
-  const planFile = `${releaseId}.plan.json`, reportFile = `${releaseId}.report.json`, sbomFile = `${releaseId}.sbom.json`, rawReportFile = `${releaseId}.security-report.json`, securityFile = `${releaseId}.security.json`, provenanceFile = `${releaseId}.scan-provenance.json`;
+  const planFile = `${releaseId}.plan.json`, reportFile = `${releaseId}.report.json`, sbomFile = `${releaseId}.sbom.json`, rawReportFile = `${releaseId}.security-report.json`, securityFile = `${releaseId}.security.json`, provenanceFile = `${releaseId}.scan-provenance.json`, buildProvenanceFile = `${releaseId}.build-provenance.json`;
+  const buildProvenance = validateCandidateBuildProvenance({
+    schema_version: 1,
+    contract: RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT,
+    generated_at: generatedAt,
+    run_id: releaseId,
+    scope: "LOCAL_ISOLATED_CANDIDATE",
+    candidate,
+    source: { archive_sha256: "0".repeat(64), archive_bytes: 1024, dockerfile_sha256: "1".repeat(64), dockerignore_sha256: "2".repeat(64), package_lock_sha256: "3".repeat(64), orchestrator_sha256: "4".repeat(64), producer_sha256: "5".repeat(64) },
+    builder: {
+      docker_server_version: "29.5.2", buildx_version: "v0.34.1", builder_name: "default", builder_driver: "docker", buildkit_version: "v0.30.0", platform: "linux/amd64", context: "GIT_ARCHIVE",
+      base_pull_policy: "LOCAL_REQUIRED_PULL_FALSE", dependency_network: "PUBLIC_NPM_LOCKFILE_INTEGRITY", application_build_network: "NONE",
+      frontend_reference: RELEASE_DOCKERFILE_FRONTEND_REFERENCE, frontend_manifest_digest: RELEASE_DOCKERFILE_FRONTEND_REFERENCE.slice(RELEASE_DOCKERFILE_FRONTEND_REFERENCE.indexOf("@") + 1),
+      base_image_reference: RELEASE_NODE_BASE_IMAGE_REFERENCE, base_registry_manifest_digest: RELEASE_NODE_BASE_IMAGE_REFERENCE.slice(RELEASE_NODE_BASE_IMAGE_REFERENCE.indexOf("@") + 1), base_config_digest: `sha256:${"6".repeat(64)}`,
+      registry_image_reference: RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE, registry_manifest_digest: RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.slice(RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.indexOf("@") + 1), registry_config_digest: `sha256:${"7".repeat(64)}`, registry_state: "EPHEMERAL_LOOPBACK_REMOVED",
+    },
+    targets: [["web", ["node", "server.js"]], ["worker", ["node", "--experimental-strip-types", "worker/selfhost.ts"]]].map(([service, cmd]) => ({ service, docker_target: service, image_reference: images[service].image_reference, registry_manifest_digest: images[service].image_reference.slice(images[service].image_reference.lastIndexOf("@") + 1), image_config_digest: images[service].image_digest, oci_version: FIXTURE_VERSION, oci_revision: FIXTURE_GIT, baked_version: FIXTURE_VERSION, baked_revision: FIXTURE_GIT, user: "node", cmd })),
+    limitations: ["NO_EXTERNAL_REGISTRY_ANCHOR", "NO_REPRODUCIBLE_BUILD_ATTESTATION", "LOCAL_ENGINE_ONLY", "PUBLIC_NPM_FETCH_WITH_LOCKFILE_INTEGRITY"],
+    result: "LOCAL_LOOPBACK_DIGEST_VERIFIED",
+  }, { runId: releaseId, candidate, imageReferences: { web: images.web.image_reference, worker: images.worker.image_reference } });
+  const buildProvenanceRaw = canonicalJson(buildProvenance);
   const targetInputs = [["web", FIXTURE_WEB, images.web.image_reference], ["worker", FIXTURE_WORKER, images.worker.image_reference]];
   const nativeCycloneDx = Object.fromEntries(targetInputs.map(([service, digest]) => {
     const rootReference = `urn:uuid:${randomUUID()}`;
@@ -92,7 +117,7 @@ export async function buildEligibleReleaseFixture({ entries, root = null, releas
   const scannerConfigDigest = `sha256:${"9".repeat(64)}`, scannerInspectFile = `${releaseId}.trivy.inspect.json`, scannerVersionFile = `${releaseId}.trivy.version.json`, databaseMetadataFile = `${releaseId}.trivy-db.metadata.json`;
   const scannerInspect = [{ Id: scannerConfigDigest, Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_TRIVY_IMAGE_REFERENCE] }], scannerVersionReport = { Version: RELEASE_TRIVY_VERSION }, databaseMetadata = { Version: 2, UpdatedAt: generatedAt, DownloadedAt: generatedAt, NextUpdate: new Date(Date.parse(generatedAt) + 24 * 60 * 60 * 1000).toISOString() };
   const scanner = "trivy", scannerVersion = RELEASE_TRIVY_VERSION, scannerImageReference = RELEASE_TRIVY_IMAGE_REFERENCE, scannerSha = "8".repeat(64), policyId = RELEASE_VULNERABILITY_POLICY_ID, policySha = RELEASE_VULNERABILITY_POLICY_SHA256, counts = { critical: 0, high: 0, medium: 0, low: 0, unknown: 0 };
-  const provenance = validateImageScanProvenance({ schema_version: 1, contract: "chenyida-erp-image-scan-provenance/v1", generated_at: generatedAt, producer: { supervisor_bundle_sha256: "6".repeat(64), authorization_sha256: "7".repeat(64) }, candidate, scanner: { name: scanner, version: scannerVersion, image_reference: scannerImageReference, registry_manifest_digest: scannerImageReference.slice(scannerImageReference.lastIndexOf("@") + 1), config_digest: scannerConfigDigest, binary_sha256: scannerSha, platform: "linux/amd64", inspect: { file: scannerInspectFile, sha256: sha256(canonicalJson(scannerInspect)) }, version_report: { file: scannerVersionFile, sha256: sha256(canonicalJson(scannerVersionReport)) } }, database: { schema_version: 2, updated_at: generatedAt, downloaded_at: generatedAt, next_update: databaseMetadata.NextUpdate, metadata: { file: databaseMetadataFile, sha256: sha256(canonicalJson(databaseMetadata)) }, payload_tree_sha256: "a".repeat(64) }, targets: targetInputs.map(([service, digest, imageReference]) => ({ service, image_reference: imageReference, registry_manifest_digest: imageReference.slice(imageReference.lastIndexOf("@") + 1), image_config_digest: digest, platform: "linux/amd64", inspect: { file: targetFiles[service].inspect, sha256: sha256(targetArtifacts[service].inspectRaw) }, archive_sha256: targetArtifacts[service].archiveSha256, archive_bytes: 1024, archive_config_digest: digest, native_vulnerability: { file: targetFiles[service].vulnerability, sha256: sha256(targetArtifacts[service].vulnerabilityRaw) }, native_cyclonedx: { file: targetFiles[service].cyclonedx, sha256: sha256(targetArtifacts[service].cyclonedxRaw) } })) });
+  const provenance = validateImageScanProvenance({ schema_version: 2, contract: "chenyida-erp-image-scan-provenance/v2", generated_at: generatedAt, run_id: releaseId, producer: { supervisor_bundle_sha256: "6".repeat(64), authorization_sha256: "7".repeat(64) }, candidate, build_provenance: { file: buildProvenanceFile, sha256: sha256(buildProvenanceRaw) }, scanner: { name: scanner, version: scannerVersion, image_reference: scannerImageReference, registry_manifest_digest: scannerImageReference.slice(scannerImageReference.lastIndexOf("@") + 1), config_digest: scannerConfigDigest, binary_sha256: scannerSha, platform: "linux/amd64", inspect: { file: scannerInspectFile, sha256: sha256(canonicalJson(scannerInspect)) }, version_report: { file: scannerVersionFile, sha256: sha256(canonicalJson(scannerVersionReport)) } }, database: { schema_version: 2, updated_at: generatedAt, downloaded_at: generatedAt, next_update: databaseMetadata.NextUpdate, metadata: { file: databaseMetadataFile, sha256: sha256(canonicalJson(databaseMetadata)) }, payload_tree_sha256: "a".repeat(64) }, targets: targetInputs.map(([service, digest, imageReference]) => ({ service, image_reference: imageReference, registry_manifest_digest: imageReference.slice(imageReference.lastIndexOf("@") + 1), image_config_digest: digest, platform: "linux/amd64", inspect: { file: targetFiles[service].inspect, sha256: sha256(targetArtifacts[service].inspectRaw) }, archive_sha256: targetArtifacts[service].archiveSha256, archive_bytes: 1024, archive_config_digest: digest, native_vulnerability: { file: targetFiles[service].vulnerability, sha256: sha256(targetArtifacts[service].vulnerabilityRaw) }, native_cyclonedx: { file: targetFiles[service].cyclonedx, sha256: sha256(targetArtifacts[service].cyclonedxRaw) } })) });
   const provenanceRaw = canonicalJson(provenance);
   const sbom = validateSbomEvidence({ schema_version: 1, contract: RELEASE_SBOM_EVIDENCE_CONTRACT, generated_at: generatedAt, scope: "WEB_AND_WORKER_IMAGES", candidate, format: "TRIVY_CYCLONEDX_1_6_JSON_SET", documents: targetInputs.map(([service]) => ({ service, file: targetFiles[service].cyclonedx, sha256: sha256(targetArtifacts[service].cyclonedxRaw) })), provenance_file: provenanceFile, provenance_sha256: sha256(provenanceRaw), result: "VERIFIED" });
   const sbomRaw = canonicalJson(sbom);
@@ -105,10 +130,10 @@ export async function buildEligibleReleaseFixture({ entries, root = null, releas
   const reportRaw = canonicalJson(report);
   const manifest = assembleReleaseManifest({ releaseId, generatedAt, expiresAt, deploymentClass, source, images, migrations: entries, planFile, planRaw, plan, reportFile, reportRaw, report, sbomFile, sbomRaw, sbom, securityFile, securityRaw, security, control: FIXTURE_CONTROL });
   if (root) {
-    const artifacts = [[planFile, plan], [scannerInspectFile, scannerInspect], [scannerVersionFile, scannerVersionReport], [databaseMetadataFile, databaseMetadata], [provenanceFile, provenance], [sbomFile, sbom], [rawReportFile, rawReport], [securityFile, security], [reportFile, report]];
+    const artifacts = [[planFile, plan], [buildProvenanceFile, buildProvenance], [scannerInspectFile, scannerInspect], [scannerVersionFile, scannerVersionReport], [databaseMetadataFile, databaseMetadata], [provenanceFile, provenance], [sbomFile, sbom], [rawReportFile, rawReport], [securityFile, security], [reportFile, report]];
     for (const [service] of targetInputs) artifacts.push([targetFiles[service].inspect, targetArtifacts[service].inspect], [targetFiles[service].vulnerability, targetArtifacts[service].vulnerability], [targetFiles[service].cyclonedx, targetArtifacts[service].cyclonedx]);
     for (const [filename, value] of artifacts) await writeImmutableJsonArtifact({ root, filename, value });
     await writeImmutableJsonArtifact({ root, filename: "release-manifest.json", value: manifest });
   }
-  return { plan, planRaw, candidate, source, images, provenance, provenanceRaw, targetArtifacts, sbom, sbomRaw, rawReport, rawReportRaw, security, securityRaw, report, reportRaw, manifest, filenames: { planFile, reportFile, provenanceFile, sbomFile, rawReportFile, securityFile } };
+  return { plan, planRaw, candidate, source, images, buildProvenance, buildProvenanceRaw, provenance, provenanceRaw, targetArtifacts, sbom, sbomRaw, rawReport, rawReportRaw, security, securityRaw, report, reportRaw, manifest, filenames: { planFile, reportFile, buildProvenanceFile, provenanceFile, sbomFile, rawReportFile, securityFile } };
 }

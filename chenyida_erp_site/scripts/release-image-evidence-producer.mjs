@@ -10,6 +10,7 @@ import {
   RELEASE_TRIVY_VERSION,
   RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT,
   ReleaseImageEvidenceError,
+  validateCandidateBuildProvenance,
   validateDockerImageInspect,
   validateImageScanProvenance,
   validateTrivyCycloneDxDocument,
@@ -145,6 +146,12 @@ export async function createReleaseImageEvidence(input) {
   const supervisorBundleSha256 = required(input.supervisorBundleSha256, SHA256, "IMAGE_EVIDENCE_SUPERVISOR_INVALID");
   const authorizationSha256 = required(input.authorizationSha256, SHA256, "IMAGE_EVIDENCE_AUTHORIZATION_INVALID");
   const databasePayloadTreeSha256 = required(input.databasePayloadTreeSha256, SHA256, "IMAGE_EVIDENCE_DATABASE_PAYLOAD_INVALID");
+  const buildProvenancePath = path.resolve(input.buildProvenanceFile);
+  if (path.dirname(buildProvenancePath) !== path.resolve(input.artifactRoot) || path.basename(buildProvenancePath) !== `${runId}.build-provenance.json`) reject("IMAGE_EVIDENCE_BUILD_PROVENANCE_INPUT_INVALID");
+  const buildProvenance = await nativeJson(buildProvenancePath, "IMAGE_EVIDENCE_BUILD_PROVENANCE_INPUT_INVALID");
+  validateCandidateBuildProvenance(buildProvenance.value, { runId, candidate, imageReferences: { web: input.targets.web?.imageReference, worker: input.targets.worker?.imageReference } });
+  const buildProvenanceRaw = canonicalJson(buildProvenance.value);
+  if (!buildProvenance.raw.equals(Buffer.from(buildProvenanceRaw, "utf8"))) reject("IMAGE_EVIDENCE_BUILD_PROVENANCE_INPUT_INVALID");
 
   const scannerInspect = await nativeJson(input.scannerInspectFile, "IMAGE_EVIDENCE_SCANNER_INSPECT_INPUT_INVALID");
   validateDockerImageInspect(scannerInspect.value, { configDigest: scannerConfigDigest, imageReference: RELEASE_TRIVY_IMAGE_REFERENCE });
@@ -180,11 +187,13 @@ export async function createReleaseImageEvidence(input) {
   const targetNames = Object.fromEntries(targetData.map(({ service }) => [service, { inspect: `${runId}.${service}.inspect.json`, vulnerability: `${runId}.${service}.trivy.json`, cyclonedx: `${runId}.${service}.cdx.json` }]));
   const scannerInspectRaw = canonicalJson(scannerInspect.value), scannerVersionRaw = canonicalJson(scannerVersion.value), databaseMetadataRaw = canonicalJson(databaseMetadata.value);
   const provenance = validateImageScanProvenance({
-    schema_version: 1,
+    schema_version: 2,
     contract: RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT,
     generated_at: generatedAt,
+    run_id: runId,
     producer: { supervisor_bundle_sha256: supervisorBundleSha256, authorization_sha256: authorizationSha256 },
     candidate,
+    build_provenance: { file: path.basename(buildProvenancePath), sha256: sha256(buildProvenanceRaw) },
     scanner: {
       name: "trivy", version: RELEASE_TRIVY_VERSION, image_reference: RELEASE_TRIVY_IMAGE_REFERENCE,
       registry_manifest_digest: RELEASE_TRIVY_IMAGE_REFERENCE.slice(RELEASE_TRIVY_IMAGE_REFERENCE.lastIndexOf("@") + 1),
@@ -226,13 +235,13 @@ async function main() {
     return;
   }
   if (command !== "create") reject("IMAGE_EVIDENCE_CLI_COMMAND_INVALID");
-  const common = ["--artifact-root", "--run-id", "--git-commit", "--git-tree", "--package-version", "--migration-allowlist-sha256", "--web-image-reference", "--web-image-digest", "--worker-image-reference", "--worker-image-digest", "--supervisor-bundle-sha256", "--authorization-sha256", "--scanner-config-digest", "--scanner-binary-sha256", "--scanner-inspect", "--scanner-version", "--database-metadata", "--database-payload-tree-sha256", "--confirm"];
+  const common = ["--artifact-root", "--run-id", "--git-commit", "--git-tree", "--package-version", "--migration-allowlist-sha256", "--web-image-reference", "--web-image-digest", "--worker-image-reference", "--worker-image-digest", "--build-provenance", "--supervisor-bundle-sha256", "--authorization-sha256", "--scanner-config-digest", "--scanner-binary-sha256", "--scanner-inspect", "--scanner-version", "--database-metadata", "--database-payload-tree-sha256", "--confirm"];
   const perTarget = ["inspect", "archive-sha256", "archive-bytes", "archive-config-digest", "vulnerability", "cyclonedx"];
   const expected = [...common, ...["web", "worker"].flatMap((service) => perTarget.map((suffix) => `--${service}-${suffix}`))];
   exactOptions(options, expected);
   if (options["--confirm"] !== "CREATE_TRIVY_IMAGE_EVIDENCE") reject("IMAGE_EVIDENCE_CLI_CONFIRMATION_INVALID");
   const target = (service) => ({ imageReference: options[`--${service}-image-reference`], inspectFile: options[`--${service}-inspect`], archiveSha256: options[`--${service}-archive-sha256`], archiveBytes: options[`--${service}-archive-bytes`], archiveConfigDigest: options[`--${service}-archive-config-digest`], vulnerabilityFile: options[`--${service}-vulnerability`], cyclonedxFile: options[`--${service}-cyclonedx`] });
-  const output = await createReleaseImageEvidence({ artifactRoot: options["--artifact-root"], runId: options["--run-id"], candidate: { git_commit: options["--git-commit"], git_tree: options["--git-tree"], package_version: options["--package-version"], web_image_digest: options["--web-image-digest"], worker_image_digest: options["--worker-image-digest"], migration_allowlist_sha256: options["--migration-allowlist-sha256"] }, supervisorBundleSha256: options["--supervisor-bundle-sha256"], authorizationSha256: options["--authorization-sha256"], scannerConfigDigest: options["--scanner-config-digest"], scannerBinarySha256: options["--scanner-binary-sha256"], scannerInspectFile: options["--scanner-inspect"], scannerVersionFile: options["--scanner-version"], databaseMetadataFile: options["--database-metadata"], databasePayloadTreeSha256: options["--database-payload-tree-sha256"], targets: { web: target("web"), worker: target("worker") } });
+  const output = await createReleaseImageEvidence({ artifactRoot: options["--artifact-root"], runId: options["--run-id"], candidate: { git_commit: options["--git-commit"], git_tree: options["--git-tree"], package_version: options["--package-version"], web_image_digest: options["--web-image-digest"], worker_image_digest: options["--worker-image-digest"], migration_allowlist_sha256: options["--migration-allowlist-sha256"] }, buildProvenanceFile: options["--build-provenance"], supervisorBundleSha256: options["--supervisor-bundle-sha256"], authorizationSha256: options["--authorization-sha256"], scannerConfigDigest: options["--scanner-config-digest"], scannerBinarySha256: options["--scanner-binary-sha256"], scannerInspectFile: options["--scanner-inspect"], scannerVersionFile: options["--scanner-version"], databaseMetadataFile: options["--database-metadata"], databasePayloadTreeSha256: options["--database-payload-tree-sha256"], targets: { web: target("web"), worker: target("worker") } });
   process.stdout.write(`${JSON.stringify(output)}\n`);
 }
 

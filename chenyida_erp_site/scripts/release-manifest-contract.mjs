@@ -7,10 +7,15 @@ import { fileURLToPath } from "node:url";
 
 import { parseStrictJson } from "./release-identity-contract.mjs";
 import {
+  RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT,
+  RELEASE_DOCKERFILE_FRONTEND_REFERENCE,
   RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT,
+  RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE,
+  RELEASE_NODE_BASE_IMAGE_REFERENCE,
   RELEASE_TRIVY_IMAGE_REFERENCE,
   RELEASE_TRIVY_VERSION,
   validateDockerImageInspect,
+  validateCandidateBuildProvenance,
   validateImageScanProvenance,
   validateTrivyCycloneDxDocument,
   validateTrivyDatabaseMetadata,
@@ -18,7 +23,7 @@ import {
   validateTrivyVersionReport,
 } from "./release-image-evidence-contract.mjs";
 
-export { RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT, RELEASE_TRIVY_IMAGE_REFERENCE, RELEASE_TRIVY_VERSION, validateImageScanProvenance, validateTrivyCycloneDxDocument, validateTrivyNativeVulnerabilityReport };
+export { RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT, RELEASE_DOCKERFILE_FRONTEND_REFERENCE, RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT, RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE, RELEASE_NODE_BASE_IMAGE_REFERENCE, RELEASE_TRIVY_IMAGE_REFERENCE, RELEASE_TRIVY_VERSION, validateCandidateBuildProvenance, validateImageScanProvenance, validateTrivyCycloneDxDocument, validateTrivyNativeVulnerabilityReport };
 
 export const RELEASE_MANIFEST_CONTRACT = "chenyida-erp-release-manifest/v1";
 export const RELEASE_GATE_PLAN_CONTRACT = "chenyida-erp-release-gate-plan/v1";
@@ -34,8 +39,8 @@ export const RELEASE_GATE_PLAN_REPOSITORY_PATH = "chenyida_erp_site/release/rele
 export const RELEASE_VULNERABILITY_POLICY_ID = "chenyida-erp-zero-known-vulnerabilities-v1";
 export const RELEASE_VULNERABILITY_POLICY_SHA256 = "042cd1bb1185923a8f186319d90194911beba78f761938f42937c5fd0e463ab9";
 export const RELEASE_TEST_RUNTIME_POLICY_CONTRACT = "chenyida-erp-release-test-runtime-policy/v1";
-export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "62bd6cdd8c17883b774d8ea70ceb6a2c05ad0cac2910939f49d26e64c552e2d2";
-export const RELEASE_TEST_INVENTORY_SHA256 = "2396feeb5034b907630ceaeba12350ac4689129e37c8502d0f50a432c7543df2";
+export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "55692254a212791b753a0ea105bae8631c06d6faf37ff79599f6001ce1b7dda1";
+export const RELEASE_TEST_INVENTORY_SHA256 = "3f23c7622b99a2147e6b8caf4bba11baadf5b997026a3eef909f687f09b22a77";
 export const RELEASE_GATE_REQUIRED_STEP_IDS = [
   "release-contracts",
   "supervisor-python-contracts",
@@ -763,6 +768,9 @@ export async function verifyTrustedImageEvidence({ root, sbom, security, imageRe
   if (expectedProducer?.authorizationSha256 && provenance.producer.authorization_sha256 !== expectedProducer.authorizationSha256) reject("IMAGE_EVIDENCE_PRODUCER_MISMATCH");
 
   const companionNames = [sbom.provenance_file];
+  const buildProvenance = await readImageEvidenceJson(root, provenance.build_provenance, (value) => validateCandidateBuildProvenance(value, { runId: provenance.run_id, candidate: provenance.candidate, imageReferences }), "IMAGE_EVIDENCE_BUILD_PROVENANCE_INVALID");
+  void buildProvenance;
+  companionNames.push(provenance.build_provenance.file);
   const scannerInspect = await readImageEvidenceJson(root, provenance.scanner.inspect, (value) => validateDockerImageInspect(value, { configDigest: provenance.scanner.config_digest, imageReference: provenance.scanner.image_reference }), "IMAGE_EVIDENCE_SCANNER_INSPECT_INVALID");
   const scannerVersion = await readImageEvidenceJson(root, provenance.scanner.version_report, (value) => validateTrivyVersionReport(value, provenance.scanner.config_digest), "IMAGE_EVIDENCE_SCANNER_VERSION_INVALID");
   const databaseMetadata = await readImageEvidenceJson(root, provenance.database.metadata, (value) => validateTrivyDatabaseMetadata(value, { schemaVersion: provenance.database.schema_version, updatedAt: provenance.database.updated_at, downloadedAt: provenance.database.downloaded_at, nextUpdate: provenance.database.next_update }), "IMAGE_EVIDENCE_DATABASE_METADATA_INVALID");

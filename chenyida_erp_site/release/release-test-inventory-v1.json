@@ -469,7 +469,7 @@
     },
     {
       "path": "tests/selfhost-dockerfile-version-contract.test.mjs",
-      "sha256": "88f373ca0ae76078c3dabe216e472af4d0c23af7f4843c673bb16b909cda1bb5",
+      "sha256": "18e5f7a9a0c824f3c967d40b6a9bddb14275c0a2ad586cbddc94c7fa34434e2e",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1738,7 +1738,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "4db883636f7fe04867398ab2fc4e7ef8b4c29a693efc7cd10e8718586bedd779",
+      "sha256": "b1bed76c9a14da6acc1768dee474dd41fa7d9a04ae6f3dc0d5bf8d5f42fea77a",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -1756,7 +1756,7 @@
     },
     {
       "path": "tests/selfhost-release-image-evidence-producer.test.mjs",
-      "sha256": "eee8a6365460ab4515103dac94d9a99646e725c02741a0bdafffa0460f6e8dfa",
+      "sha256": "55b8f2f08cb22cb0b4929b1b596461b8b543108aadefe64d28cb7db92c69254d",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",

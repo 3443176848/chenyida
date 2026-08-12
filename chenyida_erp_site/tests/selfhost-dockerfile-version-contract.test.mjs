@@ -9,6 +9,8 @@ const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "ut
 const compose = await readFile(new URL("../compose.yml", import.meta.url), "utf8");
 const sourcePackage = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 const runtimePackagePath = "/tmp/chenyida-runtime-package.json";
+const nodeBase = "node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3";
+const dockerfileFrontend = "docker.io/docker/dockerfile:1.7@sha256:b5f3b260a9678e1d83d2fce86eeddf79420b79147eaba2a25986f47133d73720";
 
 function generatorScript() {
   const match = dockerfile.match(/^RUN node --input-type=module -e '([^']+)'$/m);
@@ -74,7 +76,7 @@ test("shared Dockerfile generator fails for invalid source metadata even when an
 });
 
 test("final Web stage installs generated metadata without version substitutions or hardcoding", () => {
-  const webStage = dockerfile.slice(dockerfile.indexOf("FROM node:22-bookworm-slim AS web"), dockerfile.indexOf("FROM node:22-bookworm-slim AS worker"));
+  const webStage = dockerfile.slice(dockerfile.indexOf(`FROM ${nodeBase} AS web`), dockerfile.indexOf(`FROM ${nodeBase} AS worker`));
   const standaloneCopy = webStage.indexOf("COPY --from=builder --chown=node:node /app/dist/standalone ./");
   const metadataCopy = webStage.indexOf("COPY --from=dependencies --chown=node:node /tmp/chenyida-runtime-package.json ./package.json");
 
@@ -102,7 +104,7 @@ test("build args fail closed and become OCI plus baked runtime identity in both 
   assert.match(compose, /x-release-build-args: &release-build-args/);
   assert.equal((compose.match(/build: \{ context: \., target: (?:web|worker), args: \*release-build-args \}/g) || []).length, 4);
   assert.match(dockerfile, /FROM dependencies AS builder/);
-  assert.match(dockerfile, /FROM node:22-bookworm-slim AS worker[\s\S]*COPY --from=dependencies \/tmp\/chenyida-runtime-package\.json \/tmp\/chenyida-runtime-package\.json/);
+  assert.match(dockerfile, new RegExp(`FROM ${nodeBase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} AS worker[\\s\\S]*COPY --from=dependencies \\/tmp\\/chenyida-runtime-package\\.json \\/tmp\\/chenyida-runtime-package\\.json`));
   assert.match(dockerfile, /keys=\["name","version","private","type"\]/);
   assert.match(compose, /ERP_RELEASE_EXPECTED_VERSION: \$\{ERP_RELEASE_EXPECTED_VERSION:-\}/);
   assert.match(compose, /ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS: \$\{ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS:-\}/);
@@ -114,14 +116,14 @@ test("base images and final stages keep migrations root-owned and read-only to t
   assert.deepEqual(
     [...dockerfile.matchAll(/^FROM (.+)$/gm)].map((match) => match[1]),
     [
-      "node:22-bookworm-slim AS dependencies",
+      `${nodeBase} AS dependencies`,
       "dependencies AS builder",
-      "node:22-bookworm-slim AS web",
-      "node:22-bookworm-slim AS worker",
+      `${nodeBase} AS web`,
+      `${nodeBase} AS worker`,
     ],
   );
 
-  const webStage = dockerfile.slice(dockerfile.indexOf("FROM node:22-bookworm-slim AS web"), dockerfile.indexOf("FROM node:22-bookworm-slim AS worker"));
+  const webStage = dockerfile.slice(dockerfile.indexOf(`FROM ${nodeBase} AS web`), dockerfile.indexOf(`FROM ${nodeBase} AS worker`));
   assert.match(webStage, /^USER node$/m);
   assert.match(webStage, /^EXPOSE 3000$/m);
   assert.match(webStage, /^CMD \["node", "server\.js"\]$/m);
@@ -129,8 +131,8 @@ test("base images and final stages keep migrations root-owned and read-only to t
   assert.match(webStage, /find \.\/drizzle-postgres -type d -exec chmod 0555/);
   assert.match(webStage, /find \.\/drizzle-postgres -type f -exec chmod 0444/);
 
-  const workerStage = dockerfile.slice(dockerfile.indexOf("FROM node:22-bookworm-slim AS worker"));
-  assert.equal(workerStage, `FROM node:22-bookworm-slim AS worker
+  const workerStage = dockerfile.slice(dockerfile.indexOf(`FROM ${nodeBase} AS worker`));
+  assert.equal(workerStage, `FROM ${nodeBase} AS worker
 ARG ERP_BUILD_VERSION
 ARG ERP_BUILD_REVISION
 LABEL org.opencontainers.image.version=$ERP_BUILD_VERSION org.opencontainers.image.revision=$ERP_BUILD_REVISION
@@ -139,7 +141,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY --from=dependencies /tmp/chenyida-runtime-package.json /tmp/chenyida-runtime-package.json
 RUN node --input-type=module -e 'import { readFileSync, unlinkSync } from "node:fs"; const source=JSON.parse(readFileSync("package.json","utf8")); const validated=JSON.parse(readFileSync("/tmp/chenyida-runtime-package.json","utf8")); const keys=["name","version","private","type"]; if(Object.keys(validated).length!==keys.length||keys.some((key)=>source[key]!==validated[key])) throw new Error("source package metadata was not validated by the shared release stage"); unlinkSync("/tmp/chenyida-runtime-package.json");'
-RUN NODE_OPTIONS=--max-old-space-size=1024 npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN NODE_OPTIONS=--max-old-space-size=1024 npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
 COPY --chown=node:node app ./app
 COPY --chown=node:node db ./db
 COPY --chown=root:root drizzle-postgres ./drizzle-postgres
@@ -154,6 +156,14 @@ USER node
 CMD ["node", "--experimental-strip-types", "worker/selfhost.ts"]
 `);
   assert.doesNotMatch(dockerfile, /db:migrate|migrate-postgres|drizzle-kit/);
+});
+
+test("candidate build pins its frontend and base while isolating the application build", () => {
+  assert.equal(dockerfile.split("\n", 1)[0], `# syntax=${dockerfileFrontend}`);
+  assert.equal((dockerfile.match(new RegExp(`^FROM ${nodeBase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} AS `, "gm")) || []).length, 3);
+  assert.equal((dockerfile.match(/npm ci .*--no-audit --no-fund/g) || []).length, 2);
+  assert.match(dockerfile, /^RUN --network=none NODE_OPTIONS=--max-old-space-size=1024 npm run build$/m);
+  assert.doesNotMatch(dockerfile, /FROM node:22-bookworm-slim(?:\s|$)/);
 });
 
 test("Compose uses readiness for Web and the exact process lease check for Worker", () => {

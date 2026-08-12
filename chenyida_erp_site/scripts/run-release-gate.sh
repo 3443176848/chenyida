@@ -155,7 +155,7 @@ PACKAGE_VERSION=$("$NODE_RUNTIME" --input-type=module -e 'import {readFileSync} 
 WEB_DIGEST=$(verify_image "$WEB_IMAGE" "$PACKAGE_VERSION" "$GIT_COMMIT") || { echo "Web image does not match the committed source" >&2; exit 1; }
 WORKER_DIGEST=$(verify_image "$WORKER_IMAGE" "$PACKAGE_VERSION" "$GIT_COMMIT") || { echo "Worker image does not match the committed source" >&2; exit 1; }
 [ "$WEB_DIGEST" != "$WORKER_DIGEST" ] || { echo "Web and Worker images must be distinct" >&2; exit 1; }
-MIGRATION_ALLOWLIST_SHA256=$(CDPATH= cd -- "$SCRIPT_DIR/.." && "$NODE_RUNTIME" --input-type=module -e 'import {buildMigrationAllowlist,migrationAllowlistDigest} from "./scripts/release-manifest-contract.mjs";process.stdout.write(migrationAllowlistDigest(await buildMigrationAllowlist("./drizzle-postgres")))')
+MIGRATION_ALLOWLIST_SHA256=$(CDPATH= cd -- "$SUPERVISOR_SITE_ROOT" && env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC "$NODE_RUNTIME" --input-type=module -e 'import {buildMigrationAllowlist,migrationAllowlistDigest} from "./scripts/release-manifest-contract.mjs";process.stdout.write(migrationAllowlistDigest(await buildMigrationAllowlist(process.argv[1])))' "$REPOSITORY_ROOT/chenyida_erp_site/drizzle-postgres")
 
 GATE_STAGE_CREATION_STARTED=YES
 set +e

@@ -1,6 +1,6 @@
 # 自托管发布门 V1
 
-> 当前状态：`TYPECHECK AND BROWSER SUBGATES VERIFIED / SUPERVISOR NOT INSTALLED / NO ELIGIBLE CANDIDATE / PRODUCTION NO-GO`。本页描述发布门合同和未来受控操作；它不授权候选镜像 push、UAT/生产 Migration、部署、runtime identity 发布或切换。
+> 当前状态：`TYPECHECK/BROWSER/BUILD-PROVENANCE REPOSITORY CONTRACTS VERIFIED / SUPERVISOR NOT INSTALLED / NO ELIGIBLE CANDIDATE / PRODUCTION NO-GO`。本页描述发布门合同和未来受控操作；它不授权候选镜像外部push、UAT/生产 Migration、部署、runtime identity 发布或切换。
 
 ## 目的与信任边界
 
@@ -24,6 +24,7 @@
 - POSIX专用门：`npm run test:release:special-posix`，使用内容寻址的完整Node/Python/Git镜像，在只读同路径快照和有界tmpfs内串行执行4个文件。
 - Browser门：`npm run test:release:browser-e2e`调用固定执行器；D-121将官方Playwright 1.51.1/Chromium 134镜像、Chromium可执行SHA、PostgreSQL 17 rootfs、6文件清单、历史Migration模板、loopback端口和确认变量全部内容寻址。Git archive源码只读、构建/运行断网、同一时刻一个Browser容器，6文件/11项、无skip/todo及清理均失败关闭。
 - 全TypeScript门：`npm run typecheck:release`，按D-120精确排序清单逐个执行38份`tsconfig*.json`并在前后复核集合/内容摘要；每份使用`--incremental false`，任一配置失败、漂移、漏跑或集合变化即停止。
+- 隔离候选构建器：`scripts/build-release-candidate-images.sh`，只接受clean HEAD的精确commit/tree，从`git archive`构建Web/Worker并生成仓库外不可变构建回执。它不是supervisor高权限动作，不生成正式PASS或manifest，且只能在D-122同等的明确隔离构建授权下使用。
 
 `test-runtime-policy-v1.json`中的 RepoDigest 仅证明当前 Docker engine 对精确本地引用的不可变解析；它不是候选 Web/Worker 的 registry provenance，也不能替代发布镜像的 registry digest、OCI identity、SBOM或漏洞报告。
 
@@ -44,8 +45,8 @@ Supervisor bundle manifest 必须引用一个已经提交且不再修改的 sour
 
 候选任务必须先获得 build、联网漏洞库准备及相应主机操作授权，然后按以下顺序执行：
 
-1. 从 clean、已提交的精确 Git SHA 串行构建不同的 Web 与 Worker 镜像，并得到 registry digest reference、Docker image config digest、平台和 OCI/baked version/revision；禁止用浮动 tag 作为身份。
-2. 准备固定 Trivy `0.70.0`镜像和不超过72小时的本地漏洞库。证据生产器使用`docker image save`后的离线 archive，断网、无 Docker socket、`--pull=never`运行 Trivy，为 Web/Worker分别生成原生 JSON 和 CycloneDX；不得使用源码 lockfile 清单冒充镜像 SBOM。
+1. 从 clean、已提交的精确 Git SHA 串行构建不同的 Web 与 Worker 镜像，并得到 registry digest reference、Docker image config digest、平台和 OCI/baked version/revision；禁止用浮动 tag 作为身份。D-123要求Dockerfile frontend与Node base内容寻址，依赖安装按lockfile访问公共npm、应用build断网，并生成`candidate-build-provenance/v1`。该回执必须诚实标记本机/无外部锚点/无可复现attestation局限。
+2. 准备固定 Trivy `0.70.0`镜像和不超过72小时的本地漏洞库。证据生产器先强制读取同run/candidate/image reference的root-owned构建回执，再使用`docker image save`后的离线 archive，断网、无 Docker socket、`--pull=never`运行 Trivy，为 Web/Worker分别生成原生 JSON 和 CycloneDX；不得使用源码 lockfile 清单冒充镜像 SBOM。每个镜像完成两次扫描后立即删除临时archive，避免同时保留两份大镜像tar。
 3. 在仓库外创建唯一候选制品根；由项目负责人生成 root-owned、canonical、`0400`、24小时内有效且一次性的`CREATE_IMAGE_EVIDENCE`授权，调用已安装 launcher。完成后核对 producer/bundle/authorization摘要和全部原始证据摘要。
 4. 生成新的`RUN_RELEASE_GATE`授权并调用 launcher。18步依次覆盖 release 合同、supervisor Python合同、凭证扫描、build+全部Node测试、83文件PostgreSQL回归、Browser E2E、POSIX专用测试、全部tsconfig、ESLint、隔离Migration、备份恢复、Python三基线、Compose config、`git diff --check`、镜像SBOM和漏洞证据。
 5. 只有 gate report 为`PASS`且所有证据仍新鲜，才生成`CREATE_RELEASE_MANIFEST`授权。manifest同时绑定同一 commit/tree、镜像、Migration、plan/report、SBOM/security和允许的 deployment class。
@@ -66,8 +67,9 @@ Supervisor bundle manifest 必须引用一个已经提交且不再修改的 sour
 - TASK42候选快照曾通过完整Node 107文件/886、PostgreSQL 80文件/367、POSIX 4文件/29等仓库门。TASK43/TASK44依次把inventory扩展为230/206/24和232/208/24；TASK45现扩展为235/211/24（Pure Node112、PostgreSQL83、Browser6、历史22、PG alias2、release contract6、special4），增加完整Migration/Worker租约/双卷/readiness合同。TASK45已通过定向42/42、隔离PG5/5、官方Migration harness、release44/44及supervisor15/15；完整112文件Node-source、83文件PostgreSQL和18步正式候选门仍须由已提交候选和受控supervisor执行。
 - TASK46已按D-120把根运行合同对齐为Node 22/ES2022，固定精确38配置集合/摘要双重核验并修复真实类型债；源码`f3bac028…`和bundle`3d1243e…`两个连续干净快照均38/38。该证据关闭TypeScript子门，但不替代Node-source、PostgreSQL、Browser、镜像安全或完整18步同候选门。
 - TASK47已按D-121固定Playwright 1.51.1/Chromium 134内容寻址运行时、历史Migration模板和断网只读单容器执行器；源码`9a18a0f…`干净快照6文件/11项全部PASS，manifest-only直接子提交`614ef7ac…`绑定39文件bundle。该证据关闭Browser子门，但不替代候选镜像安全、Node/PostgreSQL重跑或完整18步同候选门。
+- TASK48按D-123在源码层增加精确Git archive构建器、内容寻址Dockerfile frontend/Node base、临时loopback registry digest核验、不可变构建回执及scan provenance v2，并修复installed bundle缺Migration正文时的allowlist路径；固定Node定向38/38与官方release-contract 6文件/48项通过。候选镜像、Trivy数据库/扫描、正式supervisor证据及18步门仍未在本段事实时点完成。
 - 当前没有安装 host supervisor，也没有修改 systemd、权限、网络、Docker daemon 或运行中的 Compose。
-- alpha.46/0045尚未构建为候选Web/Worker镜像；不存在同候选镜像、真实Trivy image evidence、完整gate `PASS`或`ELIGIBLE`manifest。
+- alpha.46/0045在本段事实时点尚未由D-123构建器形成最终候选Web/Worker镜像；不存在正式supervisor生成的真实Trivy image evidence、完整gate `PASS`或`ELIGIBLE`manifest。
 - 本机尚无候选镜像级SBOM及不超过72小时的新鲜漏洞零发现证据，因此不能声称候选漏洞状态已评估。
 - 完整多配置typecheck的既有ES2017/真实类型/示例边界问题已由TASK46修复，当前仓库合同38/38可重复通过；未来任何配置集合或内容漂移仍会失败关闭，不能把定向合同typecheck代替它。
 - UAT继续运行 alpha.42/0040；没有执行 UAT/生产 Migration、deploy、runtime identity发布或真实用户验收。

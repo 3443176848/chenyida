@@ -53,3 +53,11 @@
 ## 6. 失败关闭与后续边界
 
 本任务即使生成本地候选镜像和零漏洞证据，也不等于 UAT 或生产候选已晋升。只有正式 18 步同候选报告、不可变 release manifest、UAT 对齐与后续验收全部完成后，PR-003/PR-005 才能解除。host supervisor 安装、UAT Migration/deploy、真实异机恢复、岗位矩阵、真实迁移、员工试用和正式切换继续分别需要外部资源、业务批准或专项授权。
+
+## 7. 阶段一至二证据（源码提交前）
+
+- 三条只读审计与主智能体复核确认：正式installed bundle不含`drizzle-postgres`，原gate相对目录allowlist会确定性失败；Dockerfile的frontend/Node基线仍浮动；扫描证据没有构建来源回执；loopback digest只能作为当前Docker engine本地身份，不能冒充外部恢复锚点。
+- D-123已在源码层修复：固定linux/amd64 Dockerfile frontend及Node完整digest；新增只从clean HEAD精确Git archive构建Web/Worker的串行入口、固定Registry 2.8.3 loopback回拉和不可变构建回执；scan provenance升级v2并强绑同run/candidate/reference构建回执；installed supervisor从可信bundle加载代码但显式读取候选仓库Migration目录。
+- 依赖安装会按`package-lock.json`访问公共npm；只有应用build阶段断网。回执明确记录`PUBLIC_NPM_FETCH_WITH_LOCKFILE_INTEGRITY`、无外部registry锚点、无可复现build attestation及本机engine局限，未夸大为完全离线或可恢复镜像。
+- 固定Node单容器定向38/38、官方release-contract 6文件/48项、lint 0 error/11条既有warning及Shell/差异检查通过；临时容器均精确删除，available约2.3—2.4 GiB、Swap约72%、根盘27 GiB、OOM0，四个UAT服务restart0/OOM false且health元数据不变。
+- 仍未执行候选build、Trivy数据库准备/扫描、正式supervisor动作或18步门；上述验证只证明仓库合同可进入精确已提交候选阶段。

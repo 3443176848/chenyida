@@ -116,6 +116,8 @@ fi
 for suffix in trivy.inspect trivy.version trivy-db.metadata web.inspect web.trivy web.cdx worker.inspect worker.trivy worker.cdx image-scan-provenance sbom-evidence security-report security-evidence; do
   [ ! -e "$ARTIFACT_ROOT/$RUN_ID.$suffix.json" ] || { echo "release image evidence artifact already exists" >&2; exit 1; }
 done
+BUILD_PROVENANCE="$ARTIFACT_ROOT/$RUN_ID.build-provenance.json"
+[ -f "$BUILD_PROVENANCE" ] && [ ! -L "$BUILD_PROVENANCE" ] && [ "$(readlink -f "$(dirname -- "$BUILD_PROVENANCE")")" = "$ARTIFACT_ROOT" ] && [ "$(readlink -f "$BUILD_PROVENANCE")" = "$BUILD_PROVENANCE" ] && [ "$(stat -c '%u:%g:%a:%h' "$BUILD_PROVENANCE")" = "0:0:440:1" ] || { echo "candidate build provenance is missing or untrusted" >&2; exit 1; }
 
 LOCK_FILE=/var/lock/chenyida-erp-release-gate-v1.lock
 if [ ! -e "$LOCK_FILE" ]; then (umask 077; set -C; : > "$LOCK_FILE"); fi
@@ -218,6 +220,7 @@ for service in web worker; do
   else
     worker_archive_sha256=$archive_sha256; worker_archive_bytes=$archive_bytes; worker_archive_config=$archive_config
   fi
+  rm -f -- "$archive"
 done
 
 [ "$(env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC "$NODE_RUNTIME" "$SCRIPT_DIR/release-image-evidence-producer.mjs" hash-database-tree --root "$TRIVY_DB_DIRECTORY")" = "$DATABASE_TREE_SHA256" ] || { echo "Trivy database changed during the scan" >&2; exit 1; }
@@ -233,6 +236,7 @@ git_candidate diff --cached --quiet --no-ext-diff --no-textconv --
 env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC "$NODE_RUNTIME" "$SCRIPT_DIR/release-image-evidence-producer.mjs" create \
   --artifact-root "$ARTIFACT_ROOT" --run-id "$RUN_ID" --git-commit "$GIT_COMMIT" --git-tree "$GIT_TREE" --package-version "$PACKAGE_VERSION" --migration-allowlist-sha256 "$MIGRATION_ALLOWLIST_SHA256" \
   --web-image-reference "$WEB_IMAGE" --web-image-digest "$WEB_CONFIG_DIGEST" --worker-image-reference "$WORKER_IMAGE" --worker-image-digest "$WORKER_CONFIG_DIGEST" \
+  --build-provenance "$BUILD_PROVENANCE" \
   --supervisor-bundle-sha256 "$SUPERVISOR_BUNDLE_SHA256" --authorization-sha256 "$AUTHORIZATION_SHA256" \
   --scanner-config-digest "$SCANNER_CONFIG_DIGEST" --scanner-binary-sha256 "$SCANNER_BINARY_SHA256" --scanner-inspect "$INPUT_ROOT/trivy.inspect.json" --scanner-version "$INPUT_ROOT/trivy.version.json" \
   --database-metadata "$INPUT_ROOT/trivy-db.metadata.json" --database-payload-tree-sha256 "$DATABASE_TREE_SHA256" \

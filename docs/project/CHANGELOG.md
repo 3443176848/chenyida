@@ -4,13 +4,15 @@
 
 ## 2026-08-13
 
-### SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 - `docs: start isolated release candidate evidence`
+### SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 - `docs: start isolated release candidate evidence` / `fix: bind isolated candidate build provenance`
 
 - 调度/范围：TASK47释放active slot后，按持续交付目标把TASK48登记为唯一`DOING`。严格起点为`main@d554a150a2f9cb4b672dc49785ed63bf3e0edfc8`、alpha.46/0045；UAT只读仍为alpha.42/0040、227表，当前服务不变。
 - 授权边界：依据项目负责人本轮明确允许的“隔离环境中的测试、构建和迁移演练”，D-122允许本地候选build、固定公共工具/漏洞库只下载和临时loopback registry；禁止外部push、host supervisor安装、UAT/生产Migration/deploy、当前四卷或真实数据访问。
 - 验收方向：精确Git commit/tree构建Web/Worker、固定registry digest及OCI/baked身份、Trivy 0.70.0与72小时内数据库、两镜像CycloneDX SBOM、全severity零发现，并只通过正式supervisor路径尝试18步同候选门。host supervisor未安装时必须失败关闭，不得旁路冒充PASS。
 - 运行观察：官方18步门会只读记录现行四服务Docker status/restart/OOM/health并要求前后一致；本任务将其限定为元数据观察，禁止连接UAT网络/API/数据库、读取日志/卷正文或修改服务。
 - 起点资源/安全：available约2.4GiB、Swap744MiB/1GiB、根盘27GiB、Load`0.05/0.49/0.88`、内核OOM0，四服务restart0/OOM false、BuildKit cache0B；唯一未跟踪状态报告继续不读、不改、不提交。
+- 源码审计/修复：D-123固定Dockerfile frontend和三个Node阶段完整digest；新增clean HEAD精确Git archive、Web/Worker串行build、Registry 2.8.3 loopback digest回拉及不可变`candidate-build-provenance/v1`。scan provenance升级v2并强绑同run/candidate/reference回执；installed supervisor从可信bundle加载合同代码但显式哈希候选仓库Migration目录。依赖安装诚实记录为公共npm+lockfile integrity，应用build断网；本地digest明确不是外部恢复锚点或可复现attestation。
+- 源码验证：固定Node单容器定向38/38、官方release-contract 6文件/48项、inventory235/211/24及lint 0 error/11条既有warning通过；Shell语法和`git diff --check`通过。每次临时容器精确清理，OOM0、四服务restart0/OOM false及health元数据不变。本阶段尚未build候选、准备Trivy数据库、扫描或运行正式18步门。
 
 ### SELFHOST-RELEASE-BROWSER-HARNESS-47 - `docs: start release browser harness closure` / focused runtime and test fixes / `docs: record browser gate validation pause` / `build: bind release browser supervisor bundle` / `docs: close release browser gate`
 

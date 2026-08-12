@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import { executeStep, officialExecutorCommand, publishReleaseGateArtifacts, resourceViolation, runReleaseGate } from "../scripts/release-gate-runner.mjs";
-import { RELEASE_GATE_REPORT_CONTRACT, canonicalJson, sha256, validateOfficialReleaseGatePlan, validateReleaseGateReport, writePreparedJsonArtifact } from "../scripts/release-manifest-contract.mjs";
+import { RELEASE_GATE_REPORT_CONTRACT, buildMigrationAllowlist, canonicalJson, migrationAllowlistDigest, sha256, validateOfficialReleaseGatePlan, validateReleaseGateReport, writePreparedJsonArtifact } from "../scripts/release-manifest-contract.mjs";
 import {
   RELEASE_TEST_INVENTORY_NOT_APPLICABLE,
   RELEASE_TEST_INVENTORY_REQUIRED,
@@ -97,6 +97,9 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.match(wrapper, /release gate must be launched by the installed supervisor/);
   assert.match(creator, /release manifest creation must be launched by the installed supervisor/);
   assert.match(wrapper, /env -i PATH=/);
+  assert.match(wrapper, /buildMigrationAllowlist\(process\.argv\[1\]\)/);
+  assert.match(wrapper, /"\$REPOSITORY_ROOT\/chenyida_erp_site\/drizzle-postgres"/);
+  assert.doesNotMatch(wrapper, /buildMigrationAllowlist\("\.\/drizzle-postgres"\)/);
   assert.match(runner, /GATE_GLOBAL_LOCK_NOT_HELD/);
   assert.match(runner, /safeCommandEnvironment/);
   assert.match(runner, /OFFICIAL_EXECUTOR_COMMANDS/);
@@ -172,8 +175,59 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.equal((launcher.match(/--no-textconv/g) || []).length, 2);
 });
 
+test("installed supervisor layout loads trusted code while hashing the explicit candidate migration directory", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "cyd-installed-migration-layout-"));
+  try {
+    const bundleSite = path.join(root, "bundle", "chenyida_erp_site");
+    const bundleScripts = path.join(bundleSite, "scripts");
+    const candidateMigrations = path.join(root, "candidate", "chenyida_erp_site", "drizzle-postgres");
+    await mkdir(bundleScripts, { recursive: true });
+    await mkdir(candidateMigrations, { recursive: true });
+    for (const file of ["release-manifest-contract.mjs", "release-identity-contract.mjs", "release-image-evidence-contract.mjs"]) {
+      await copyFile(new URL(`../scripts/${file}`, import.meta.url), path.join(bundleScripts, file));
+    }
+    await writeFile(path.join(candidateMigrations, "0001_fixture.sql"), "select 1;\n");
+    await assert.rejects(readFile(path.join(bundleSite, "drizzle-postgres", "0001_fixture.sql")), (error) => error.code === "ENOENT");
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e", 'import {buildMigrationAllowlist,migrationAllowlistDigest} from "./scripts/release-manifest-contract.mjs";process.stdout.write(migrationAllowlistDigest(await buildMigrationAllowlist(process.argv[1])))', candidateMigrations], {
+      cwd: bundleSite,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH, LC_ALL: "C", LANG: "C", TZ: "UTC" },
+    });
+    assert.equal(child.status, 0, child.stderr);
+    assert.equal(child.stdout, migrationAllowlistDigest(await buildMigrationAllowlist(candidateMigrations)));
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("candidate image builder uses an exact Git archive, pinned inputs and an ephemeral loopback registry", async () => {
+  const builderPath = new URL("../scripts/build-release-candidate-images.sh", import.meta.url);
+  const builder = await readFile(builderPath, "utf8");
+  const producer = await readFile(new URL("../scripts/release-candidate-build-producer.mjs", import.meta.url), "utf8");
+  const syntax = spawnSync("/bin/sh", ["-n", builderPath.pathname], { encoding: "utf8" });
+  assert.equal(syntax.status, 0, syntax.stderr);
+  assert.match(builder, /git_candidate archive --format=tar "\$GIT_COMMIT" chenyida_erp_site/);
+  assert.match(builder, /DOCKERFILE_FRONTEND='docker\.io\/docker\/dockerfile:1\.7@sha256:b5f3b260a9678e1d83d2fce86eeddf79420b79147eaba2a25986f47133d73720'/);
+  assert.match(builder, /NODE_IMAGE='node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3'/);
+  assert.match(builder, /REGISTRY_IMAGE='registry@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373'/);
+  assert.match(builder, /docker buildx build --builder default --load --pull=false --provenance=false --platform linux\/amd64/);
+  assert.match(builder, /docker buildx inspect default --bootstrap=false/);
+  assert.match(builder, /--build-arg "ERP_BUILD_VERSION=\$PACKAGE_VERSION" --build-arg "ERP_BUILD_REVISION=\$GIT_COMMIT"/);
+  assert.match(builder, /--publish 127\.0\.0\.1::5000/);
+  assert.match(builder, /REGISTRY_WEB_TAG="127\.0\.0\.1:\$REGISTRY_PORT\/chenyida-erp\/web:\$GIT_COMMIT"/);
+  assert.match(builder, /docker pull "\$WEB_IMAGE_REF"/);
+  assert.match(builder, /rm -rf -- "\$REGISTRY_DATA"/);
+  assert.ok(builder.indexOf('remove_container\n[ -d "$REGISTRY_DATA" ]') < builder.indexOf('rm -rf -- "$REGISTRY_DATA"'));
+  assert.ok(builder.indexOf('rm -rf -- "$REGISTRY_DATA"') < builder.indexOf('[ "$(/usr/bin/docker image inspect --format \'{{.Id}}\' "$WEB_IMAGE_REF")"'));
+  assert.match(builder, /--network none --read-only --cap-drop ALL --security-opt no-new-privileges/);
+  assert.match(producer, /CANDIDATE_BUILD_PRODUCER_PATH_INVALID/);
+  assert.match(producer, /context: "GIT_ARCHIVE"/);
+  assert.match(producer, /dependency_network: "PUBLIC_NPM_LOCKFILE_INTEGRITY"/);
+  assert.doesNotMatch(builder, /\blatest\b|ghcr\.io\/3443176848/);
+  assert.doesNotMatch(builder, /\/usr\/bin\/docker run\b/);
+});
+
 test("release shell wrappers reject replace refs and normalize Git archive modes", async () => {
   const files = [
+    "build-release-candidate-images.sh",
     "create-release-image-evidence.sh",
     "create-release-manifest.sh",
     "run-backup-recovery-postgres-test.sh",
@@ -228,12 +282,14 @@ test("native image evidence is digest-pinned, offline, socketless and scans each
   assert.match(producer, /--skip-db-update --skip-java-db-update --skip-check-update --skip-vex-repo-update --skip-version-check/);
   assert.match(producer, /--offline-scan --disable-telemetry --no-progress --config \/dev\/null --ignorefile \/dev\/null/);
   assert.match(producer, /hash-database-tree/);
+  assert.match(producer, /rm -f -- "\$archive"/);
   assert.doesNotMatch(producer, /\/var\/run\/docker\.sock/);
   assert.doesNotMatch(producer, /--ignore-unfixed|--vex|--ignore-policy|--skip-files|--skip-dirs/);
 });
 
 test("release wrappers never pull implicitly when creating task containers", async () => {
   const files = [
+    "build-release-candidate-images.sh",
     "create-release-image-evidence.sh",
     "create-release-manifest.sh",
     "run-release-gate.sh",
@@ -259,6 +315,7 @@ test("release wrappers never pull implicitly when creating task containers", asy
 
 test("release wrappers terminate on signals and standalone container ownership is unique", async () => {
   const files = [
+    "build-release-candidate-images.sh",
     "create-release-image-evidence.sh",
     "create-release-manifest.sh",
     "run-compose-config-test.sh",
