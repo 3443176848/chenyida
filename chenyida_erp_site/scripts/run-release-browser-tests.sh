@@ -154,7 +154,7 @@ CURRENT_CONTAINER_ID=$(/usr/bin/docker create \
   -e ERP_RUNTIME_BUILD_VERSION="$PACKAGE_VERSION" -e ERP_RUNTIME_GIT_COMMIT="$GIT_COMMIT" \
   -v "$SNAPSHOT/chenyida_erp_site:/workspace:rw" -v "$NODE_MODULES:/workspace/node_modules:ro" \
   -w /workspace --entrypoint /bin/sh "$NODE_IMAGE" \
-  -c 'set -eu; ./node_modules/.bin/vinext build; node scripts/ensure-vinext-client-assets.mjs')
+  -c 'set -eu; ./node_modules/.bin/vinext build; node scripts/ensure-vinext-client-assets.mjs; node --input-type=module -e "import { readFileSync, writeFileSync } from \"node:fs\"; const source=JSON.parse(readFileSync(\"package.json\",\"utf8\")); const runtime={name:source.name,version:source.version,private:source.private,type:source.type}; if(runtime.version!==process.env.ERP_RUNTIME_BUILD_VERSION||typeof runtime.name!==\"string\"||runtime.name.length===0||runtime.private!==true||![\"module\",\"commonjs\"].includes(runtime.type)) throw new Error(\"invalid release Browser runtime package metadata\"); writeFileSync(\"dist/standalone/package.json\",JSON.stringify(runtime,null,2)+\"\\n\")"')
 /usr/bin/docker start --attach "$CURRENT_CONTAINER_ID"
 remove_task_container
 [ -f "$SNAPSHOT/chenyida_erp_site/dist/standalone/server.js" ] || { echo "release Browser standalone build failed" >&2; exit 1; }
