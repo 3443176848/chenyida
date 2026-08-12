@@ -2018,6 +2018,43 @@
 - 拒绝只使用config digest作为部署引用，因为它不是现有本地registry回执中的可拉取manifest reference；也拒绝只使用manifest digest而不约束Trivy实际扫描到的config。
 - 拒绝兼容接受旧回执、手工修改既有不可变回执或把首次失败检查记为漏洞扫描PASS。
 
+## D-125 最终运行层采用固定 Wolfi Node 22 最小包并删除可证明仅构建使用的 image-size
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / SOURCE IMPLEMENTED / 6 FILES 49 CONTRACT TESTS VERIFIED / CANDIDATE REBUILD PENDING`
+- 提案与实施：Codex 持续交付负责人，依据 TASK48 两镜像首次新鲜 Trivy 诊断结果和 D-122 隔离构建授权
+- 确认边界：只修改候选源码、依赖锁、最终运行层和本机构建回执；不授权外部推送、host supervisor 安装、UAT/生产 Migration/deploy、真实数据或正式晋升
+
+### Context
+
+- `c42d802`候选在新鲜 Trivy 数据库下被严格拒绝：Web 186项、Worker 200项，主要来自 Debian 最终层、随官方 Node 镜像进入运行层的 npm CLI 包，以及 Next 16.2.6 带入的旧 PostCSS/Sharp/Nanoid；继续使用同一完整开发镜像作为最终层无法满足零已知漏洞门。
+- 官方 Node 22 bookworm-slim 当前诊断仍有大量 OS 发现，distroless Debian 12 Node 22 仍有40项；固定 Wolfi 基础镜像的 linux/amd64 manifest 诊断为零发现，公开签名 APK 仓库提供精确 `nodejs-22-minimal=22.23.2-r1`，且已隔离验证 Node 22 TypeScript stripping、crypto 和 fs 能力。
+- Vinext 0.0.50 把 `image-size@2.0.2`复制进 Web standalone。该版本存在无修复版本的已知高危问题；实际 standalone 中只有 Vinext build plugin 和 metadata build-data 两个源码文件引用它，生产入口 `vinext/server/prod-server`的静态运行图不可达这两个文件，生成的运行 bundle也不引用该包。
+- Next 16.3.0、React/React DOM/React Server DOM 19.2.8 已发布并保持现有 Vinext peer 范围；Next 16.3.0把相关运行依赖提升到 PostCSS 8.5.23和Sharp 0.35.3。升级固定版本比对旧运行包做扫描豁免更可审阅。
+
+### Decision
+
+1. 依赖安装、应用构建和发布工具继续使用既有固定官方 Node 22 digest；Web/Worker最终层改为固定 Wolfi `linux/amd64` manifest digest，仅从基础镜像内已信任密钥的`https://apk.cgr.dev/chainguard`安装精确`nodejs-22-minimal=22.23.2-r1`，并在层内核对`v22.23.2`。最终进程统一使用数值身份`65532:65532`。
+2. Worker production `node_modules`在固定 build stage中由同一 lockfile离线`npm prune --omit=dev`产生，再复制到最终层；最终 Worker 不携带 npm、完整 package-lock或源码 package metadata，只携带共享验证后生成的最小 runtime package。Web继续只复制 Vinext standalone。
+3. 固定升级 Next至16.3.0、React/React DOM/React Server DOM至19.2.8、eslint-config-next至16.3.0并提交机械生成的 lockfile；不在本任务升级 Vinext到beta主版本。
+4. postbuild删除`image-size`前必须同时证明 lock entry仍为`2.0.2/dev-only`、目标包身份精确、目标及父目录均为非符号链接真实目录、全 standalone引用集合恰为两个已知 Vinext构建文件，且二者不在生产入口静态运行图中。任一事实漂移立即失败，删除后再次确认目录不存在；不得只改包版本标签、保留易受攻击代码或添加扫描ignore。
+5. `candidate-build-provenance`升为v3，分别绑定固定 build base与runtime base manifest/local identity、精确 APK仓库/包/Node版本，并披露`PUBLIC_WOLFI_APK_FETCH_WITH_SIGNED_EXACT_PACKAGE`。公共 APK和npm下载仍使构建不具备完整离线或可复现证明。
+6. 候选必须重新从干净新提交构建，并重新执行运行身份、Node版本、Migration只读属性、Web live/核心浏览器流程、Worker入口及新鲜完整severity扫描；只有两镜像零发现才可能继续正式证据门。
+
+### Consequences
+
+- 最终镜像不再继承 Debian/npm CLI 的运行攻击面，仍保持 D-120 的 Node 22/ES2022合同；构建和测试镜像不等于生产运行层，必须在回执中分开识别。
+- Wolfi APK是在线、签名且精确版本的输入，但包仓库可滚动，现阶段仍缺离线包镜像和外部可恢复候选锚点；回执必须保留无可复现attestation及无外部registry锚点限制。
+- `image-size`裁剪依赖 Vinext 0.0.50当前输出结构，未来 Vinext升级或引用图变化会主动阻断build并要求重新审阅，而不会静默删除潜在运行依赖。
+- 本决定尚未证明新候选零漏洞或完整18步门PASS，也未改变 UAT alpha.42/0040；系统继续`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝对现有漏洞使用 ignore、waiver、severity过滤、只扫HIGH/CRITICAL或把无修复版本写成接受风险来绕过D-122零发现合同。
+- 拒绝在最终镜像保留完整npm、编译工具、package-lock和无运行需要的构建依赖，也拒绝仅删除`image-size/package.json`来欺骗SBOM识别。
+- 拒绝切换到浮动Wolfi/Chainguard tag、Node 26或未经固定版本/摘要的包；也拒绝把在线APK安装描述为完全离线或可复现构建。
+- 拒绝未经运行图证明直接删除整个 Vinext依赖，或在本次安全修复中同时升级到 Vinext beta 并扩大兼容范围。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

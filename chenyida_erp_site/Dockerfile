@@ -12,40 +12,45 @@ FROM dependencies AS builder
 COPY . .
 RUN --network=none NODE_OPTIONS=--max-old-space-size=1024 npm run build
 
-FROM node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 AS web
+FROM dependencies AS worker-dependencies
+RUN --network=none NODE_OPTIONS=--max-old-space-size=1024 npm prune --omit=dev --ignore-scripts --no-audit --no-fund
+
+FROM cgr.dev/chainguard/wolfi-base@sha256:5f3cb6adc6057b4084b8a1844ea16069d5d6be5a48da5a4856495b9a44bce4ed AS web
+RUN apk add --no-cache --repository=https://apk.cgr.dev/chainguard nodejs-22-minimal=22.23.2-r1 \
+    && [ "$(node --version)" = "v22.23.2" ]
 ARG ERP_BUILD_VERSION
 ARG ERP_BUILD_REVISION
 LABEL org.opencontainers.image.version=$ERP_BUILD_VERSION org.opencontainers.image.revision=$ERP_BUILD_REVISION
 ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0 ERP_RUNTIME_BUILD_VERSION=$ERP_BUILD_VERSION ERP_RUNTIME_GIT_COMMIT=$ERP_BUILD_REVISION
 WORKDIR /app
-COPY --from=builder --chown=node:node /app/dist/standalone ./
-COPY --from=dependencies --chown=node:node /tmp/chenyida-runtime-package.json ./package.json
+COPY --from=builder --chown=65532:65532 /app/dist/standalone ./
+COPY --from=dependencies --chown=65532:65532 /tmp/chenyida-runtime-package.json ./package.json
 COPY --from=builder --chown=root:root /app/drizzle-postgres ./drizzle-postgres
 RUN find ./drizzle-postgres -type d -exec chmod 0555 {} + && find ./drizzle-postgres -type f -exec chmod 0444 {} +
-RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments && chown -R node:node /data/chenyida-erp
-USER node
+RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments && chown -R 65532:65532 /data/chenyida-erp
+USER 65532:65532
 EXPOSE 3000
 CMD ["node", "server.js"]
 
-FROM node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3 AS worker
+FROM cgr.dev/chainguard/wolfi-base@sha256:5f3cb6adc6057b4084b8a1844ea16069d5d6be5a48da5a4856495b9a44bce4ed AS worker
+RUN apk add --no-cache --repository=https://apk.cgr.dev/chainguard nodejs-22-minimal=22.23.2-r1 \
+    && [ "$(node --version)" = "v22.23.2" ]
 ARG ERP_BUILD_VERSION
 ARG ERP_BUILD_REVISION
 LABEL org.opencontainers.image.version=$ERP_BUILD_VERSION org.opencontainers.image.revision=$ERP_BUILD_REVISION
 ENV NODE_ENV=production ERP_RUNTIME_BUILD_VERSION=$ERP_BUILD_VERSION ERP_RUNTIME_GIT_COMMIT=$ERP_BUILD_REVISION
 WORKDIR /app
-COPY package.json package-lock.json ./
-COPY --from=dependencies /tmp/chenyida-runtime-package.json /tmp/chenyida-runtime-package.json
-RUN node --input-type=module -e 'import { readFileSync, unlinkSync } from "node:fs"; const source=JSON.parse(readFileSync("package.json","utf8")); const validated=JSON.parse(readFileSync("/tmp/chenyida-runtime-package.json","utf8")); const keys=["name","version","private","type"]; if(Object.keys(validated).length!==keys.length||keys.some((key)=>source[key]!==validated[key])) throw new Error("source package metadata was not validated by the shared release stage"); unlinkSync("/tmp/chenyida-runtime-package.json");'
-RUN NODE_OPTIONS=--max-old-space-size=1024 npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
-COPY --chown=node:node app ./app
-COPY --chown=node:node db ./db
+COPY --from=worker-dependencies --chown=65532:65532 /app/node_modules ./node_modules
+COPY --from=dependencies --chown=65532:65532 /tmp/chenyida-runtime-package.json ./package.json
+COPY --chown=65532:65532 app ./app
+COPY --chown=65532:65532 db ./db
 COPY --chown=root:root drizzle-postgres ./drizzle-postgres
-COPY --chown=node:node release ./release
-COPY --chown=node:node scripts ./scripts
-COPY --chown=node:node seeds ./seeds
-COPY --chown=node:node tests ./tests
-COPY --chown=node:node worker ./worker
+COPY --chown=65532:65532 release ./release
+COPY --chown=65532:65532 scripts ./scripts
+COPY --chown=65532:65532 seeds ./seeds
+COPY --chown=65532:65532 tests ./tests
+COPY --chown=65532:65532 worker ./worker
 RUN find ./drizzle-postgres -type d -exec chmod 0555 {} + && find ./drizzle-postgres -type f -exec chmod 0444 {} +
-RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments && chown -R node:node /data/chenyida-erp
-USER node
+RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments && chown -R 65532:65532 /data/chenyida-erp
+USER 65532:65532
 CMD ["node", "--experimental-strip-types", "worker/selfhost.ts"]

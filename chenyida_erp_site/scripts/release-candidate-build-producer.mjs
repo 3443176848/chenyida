@@ -8,6 +8,10 @@ import {
   RELEASE_DOCKERFILE_FRONTEND_REFERENCE,
   RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE,
   RELEASE_NODE_BASE_IMAGE_REFERENCE,
+  RELEASE_RUNTIME_APK_REPOSITORY,
+  RELEASE_RUNTIME_BASE_IMAGE_REFERENCE,
+  RELEASE_RUNTIME_NODE_PACKAGE,
+  RELEASE_RUNTIME_NODE_VERSION,
   validateCandidateBuildProvenance,
 } from "./release-image-evidence-contract.mjs";
 import {
@@ -95,7 +99,7 @@ function targetIdentity(row, service, reference, version, commit) {
     environment.set(item.slice(0, separator), item.slice(separator + 1));
   }
   const command = service === "web" ? ["node", "server.js"] : ["node", "--experimental-strip-types", "worker/selfhost.ts"];
-  if (labels["org.opencontainers.image.version"] !== version || labels["org.opencontainers.image.revision"] !== commit || environment.get("ERP_RUNTIME_BUILD_VERSION") !== version || environment.get("ERP_RUNTIME_GIT_COMMIT") !== commit || row.Config.User !== "node" || canonicalJson(row.Config.Cmd) !== canonicalJson(command)) reject("CANDIDATE_BUILD_TARGET_IDENTITY_INVALID");
+  if (labels["org.opencontainers.image.version"] !== version || labels["org.opencontainers.image.revision"] !== commit || environment.get("ERP_RUNTIME_BUILD_VERSION") !== version || environment.get("ERP_RUNTIME_GIT_COMMIT") !== commit || row.Config.User !== "65532:65532" || canonicalJson(row.Config.Cmd) !== canonicalJson(command)) reject("CANDIDATE_BUILD_TARGET_IDENTITY_INVALID");
   return {
     service,
     docker_target: service,
@@ -134,7 +138,8 @@ async function create(options) {
   const migrationDigest = migrationAllowlistDigest(migrations);
   if (migrationDigest !== required(options["--migration-allowlist-sha256"], SHA256, "CANDIDATE_BUILD_MIGRATION_INVALID")) reject("CANDIDATE_BUILD_MIGRATION_INVALID");
 
-  const base = imageInspect(await trustedJson(options["--base-inspect"], "CANDIDATE_BUILD_BASE_INSPECT_INVALID"), RELEASE_NODE_BASE_IMAGE_REFERENCE, "CANDIDATE_BUILD_BASE_INSPECT_INVALID");
+  const buildBase = imageInspect(await trustedJson(options["--build-base-inspect"], "CANDIDATE_BUILD_BASE_INSPECT_INVALID"), RELEASE_NODE_BASE_IMAGE_REFERENCE, "CANDIDATE_BUILD_BASE_INSPECT_INVALID");
+  const runtimeBase = imageInspect(await trustedJson(options["--runtime-base-inspect"], "CANDIDATE_BUILD_RUNTIME_INSPECT_INVALID"), RELEASE_RUNTIME_BASE_IMAGE_REFERENCE, "CANDIDATE_BUILD_RUNTIME_INSPECT_INVALID");
   const registry = imageInspect(await trustedJson(options["--registry-inspect"], "CANDIDATE_BUILD_REGISTRY_INSPECT_INVALID"), RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE, "CANDIDATE_BUILD_REGISTRY_INSPECT_INVALID");
   const webReference = options["--web-image-reference"];
   const workerReference = options["--worker-image-reference"];
@@ -145,7 +150,7 @@ async function create(options) {
   if (webManifestDigest === workerManifestDigest) reject("CANDIDATE_BUILD_TARGET_COLLISION");
   const candidate = { git_commit: commit, git_tree: tree, package_version: packageVersion, web_image_digest: webManifestDigest, worker_image_digest: workerManifestDigest, migration_allowlist_sha256: migrationDigest };
   const value = validateCandidateBuildProvenance({
-    schema_version: 2,
+    schema_version: 3,
     contract: RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT,
     generated_at: new Date().toISOString(),
     run_id: runId,
@@ -170,19 +175,26 @@ async function create(options) {
       context: "GIT_ARCHIVE",
       base_pull_policy: "LOCAL_REQUIRED_PULL_FALSE",
       dependency_network: "PUBLIC_NPM_LOCKFILE_INTEGRITY",
+      runtime_dependency_network: "PUBLIC_WOLFI_APK_FETCH_WITH_SIGNED_EXACT_PACKAGE",
       application_build_network: "NONE",
       frontend_reference: RELEASE_DOCKERFILE_FRONTEND_REFERENCE,
       frontend_manifest_digest: RELEASE_DOCKERFILE_FRONTEND_REFERENCE.slice(RELEASE_DOCKERFILE_FRONTEND_REFERENCE.indexOf("@") + 1),
-      base_image_reference: RELEASE_NODE_BASE_IMAGE_REFERENCE,
-      base_registry_manifest_digest: RELEASE_NODE_BASE_IMAGE_REFERENCE.slice(RELEASE_NODE_BASE_IMAGE_REFERENCE.indexOf("@") + 1),
-      base_local_identity_digest: base.Id,
+      build_base_image_reference: RELEASE_NODE_BASE_IMAGE_REFERENCE,
+      build_base_registry_manifest_digest: RELEASE_NODE_BASE_IMAGE_REFERENCE.slice(RELEASE_NODE_BASE_IMAGE_REFERENCE.indexOf("@") + 1),
+      build_base_local_identity_digest: buildBase.Id,
+      runtime_base_image_reference: RELEASE_RUNTIME_BASE_IMAGE_REFERENCE,
+      runtime_base_registry_manifest_digest: RELEASE_RUNTIME_BASE_IMAGE_REFERENCE.slice(RELEASE_RUNTIME_BASE_IMAGE_REFERENCE.indexOf("@") + 1),
+      runtime_base_local_identity_digest: runtimeBase.Id,
+      runtime_apk_repository: RELEASE_RUNTIME_APK_REPOSITORY,
+      runtime_node_package: RELEASE_RUNTIME_NODE_PACKAGE,
+      runtime_node_version: RELEASE_RUNTIME_NODE_VERSION,
       registry_image_reference: RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE,
       registry_manifest_digest: RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.slice(RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.indexOf("@") + 1),
       registry_local_identity_digest: registry.Id,
       registry_state: "EPHEMERAL_LOOPBACK_REMOVED",
     },
     targets: [targetIdentity(web, "web", webReference, packageVersion, commit), targetIdentity(worker, "worker", workerReference, packageVersion, commit)],
-    limitations: ["NO_EXTERNAL_REGISTRY_ANCHOR", "NO_REPRODUCIBLE_BUILD_ATTESTATION", "LOCAL_ENGINE_ONLY", "PUBLIC_NPM_FETCH_WITH_LOCKFILE_INTEGRITY"],
+    limitations: ["NO_EXTERNAL_REGISTRY_ANCHOR", "NO_REPRODUCIBLE_BUILD_ATTESTATION", "LOCAL_ENGINE_ONLY", "PUBLIC_NPM_FETCH_WITH_LOCKFILE_INTEGRITY", "PUBLIC_WOLFI_APK_FETCH_WITH_SIGNED_EXACT_PACKAGE"],
     result: "LOCAL_LOOPBACK_DIGEST_VERIFIED",
   });
   const filename = `${runId}.build-provenance.json`;
@@ -194,7 +206,7 @@ async function main() {
   const [command, ...args] = process.argv.slice(2);
   const options = cliOptions(args);
   if (command !== "create") reject("CANDIDATE_BUILD_CLI_COMMAND_INVALID");
-  exactOptions(options, ["--site-root", "--artifact-root", "--run-id", "--git-commit", "--git-tree", "--archive-sha256", "--archive-bytes", "--migration-allowlist-sha256", "--base-inspect", "--registry-inspect", "--web-inspect", "--worker-inspect", "--web-image-reference", "--worker-image-reference", "--docker-server-version", "--buildx-version", "--builder-driver", "--buildkit-version", "--confirm"]);
+  exactOptions(options, ["--site-root", "--artifact-root", "--run-id", "--git-commit", "--git-tree", "--archive-sha256", "--archive-bytes", "--migration-allowlist-sha256", "--build-base-inspect", "--runtime-base-inspect", "--registry-inspect", "--web-inspect", "--worker-inspect", "--web-image-reference", "--worker-image-reference", "--docker-server-version", "--buildx-version", "--builder-driver", "--buildkit-version", "--confirm"]);
   if (options["--confirm"] !== "CREATE_LOCAL_CANDIDATE_BUILD_PROVENANCE") reject("CANDIDATE_BUILD_CLI_CONFIRMATION_INVALID");
   await create(options);
 }

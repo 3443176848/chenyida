@@ -11,6 +11,10 @@ import {
   RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT,
   RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE,
   RELEASE_NODE_BASE_IMAGE_REFERENCE,
+  RELEASE_RUNTIME_APK_REPOSITORY,
+  RELEASE_RUNTIME_BASE_IMAGE_REFERENCE,
+  RELEASE_RUNTIME_NODE_PACKAGE,
+  RELEASE_RUNTIME_NODE_VERSION,
   RELEASE_SBOM_EVIDENCE_CONTRACT,
   RELEASE_SECURITY_EVIDENCE_CONTRACT,
   RELEASE_SECURITY_SCAN_REPORT_CONTRACT,
@@ -72,7 +76,7 @@ export async function buildEligibleReleaseFixture({ entries, root = null, releas
   const source = { git_commit: FIXTURE_GIT, git_tree: FIXTURE_TREE, worktree_clean: true, package_path: "chenyida_erp_site/package.json", package_version: FIXTURE_VERSION, package_sha256: "1".repeat(64), dockerfile_path: "chenyida_erp_site/Dockerfile", dockerfile_sha256: "2".repeat(64), compose_path: "chenyida_erp_site/compose.yml", compose_sha256: "3".repeat(64), release_compose_path: "chenyida_erp_site/compose.release.yml", release_compose_sha256: "4".repeat(64) };
   const planFile = `${releaseId}.plan.json`, reportFile = `${releaseId}.report.json`, sbomFile = `${releaseId}.sbom.json`, rawReportFile = `${releaseId}.security-report.json`, securityFile = `${releaseId}.security.json`, provenanceFile = `${releaseId}.scan-provenance.json`, buildProvenanceFile = `${releaseId}.build-provenance.json`;
   const buildProvenance = validateCandidateBuildProvenance({
-    schema_version: 2,
+    schema_version: 3,
     contract: RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT,
     generated_at: generatedAt,
     run_id: releaseId,
@@ -81,13 +85,15 @@ export async function buildEligibleReleaseFixture({ entries, root = null, releas
     source: { archive_sha256: "0".repeat(64), archive_bytes: 1024, dockerfile_sha256: "1".repeat(64), dockerignore_sha256: "2".repeat(64), package_lock_sha256: "3".repeat(64), orchestrator_sha256: "4".repeat(64), producer_sha256: "5".repeat(64) },
     builder: {
       docker_server_version: "29.5.2", buildx_version: "v0.34.1", builder_name: "default", builder_driver: "docker", buildkit_version: "v0.30.0", platform: "linux/amd64", context: "GIT_ARCHIVE",
-      base_pull_policy: "LOCAL_REQUIRED_PULL_FALSE", dependency_network: "PUBLIC_NPM_LOCKFILE_INTEGRITY", application_build_network: "NONE",
+      base_pull_policy: "LOCAL_REQUIRED_PULL_FALSE", dependency_network: "PUBLIC_NPM_LOCKFILE_INTEGRITY", runtime_dependency_network: "PUBLIC_WOLFI_APK_FETCH_WITH_SIGNED_EXACT_PACKAGE", application_build_network: "NONE",
       frontend_reference: RELEASE_DOCKERFILE_FRONTEND_REFERENCE, frontend_manifest_digest: RELEASE_DOCKERFILE_FRONTEND_REFERENCE.slice(RELEASE_DOCKERFILE_FRONTEND_REFERENCE.indexOf("@") + 1),
-      base_image_reference: RELEASE_NODE_BASE_IMAGE_REFERENCE, base_registry_manifest_digest: RELEASE_NODE_BASE_IMAGE_REFERENCE.slice(RELEASE_NODE_BASE_IMAGE_REFERENCE.indexOf("@") + 1), base_local_identity_digest: RELEASE_NODE_BASE_IMAGE_REFERENCE.slice(RELEASE_NODE_BASE_IMAGE_REFERENCE.indexOf("@") + 1),
+      build_base_image_reference: RELEASE_NODE_BASE_IMAGE_REFERENCE, build_base_registry_manifest_digest: RELEASE_NODE_BASE_IMAGE_REFERENCE.slice(RELEASE_NODE_BASE_IMAGE_REFERENCE.indexOf("@") + 1), build_base_local_identity_digest: RELEASE_NODE_BASE_IMAGE_REFERENCE.slice(RELEASE_NODE_BASE_IMAGE_REFERENCE.indexOf("@") + 1),
+      runtime_base_image_reference: RELEASE_RUNTIME_BASE_IMAGE_REFERENCE, runtime_base_registry_manifest_digest: RELEASE_RUNTIME_BASE_IMAGE_REFERENCE.slice(RELEASE_RUNTIME_BASE_IMAGE_REFERENCE.indexOf("@") + 1), runtime_base_local_identity_digest: RELEASE_RUNTIME_BASE_IMAGE_REFERENCE.slice(RELEASE_RUNTIME_BASE_IMAGE_REFERENCE.indexOf("@") + 1),
+      runtime_apk_repository: RELEASE_RUNTIME_APK_REPOSITORY, runtime_node_package: RELEASE_RUNTIME_NODE_PACKAGE, runtime_node_version: RELEASE_RUNTIME_NODE_VERSION,
       registry_image_reference: RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE, registry_manifest_digest: RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.slice(RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.indexOf("@") + 1), registry_local_identity_digest: RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.slice(RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.indexOf("@") + 1), registry_state: "EPHEMERAL_LOOPBACK_REMOVED",
     },
-    targets: [["web", ["node", "server.js"]], ["worker", ["node", "--experimental-strip-types", "worker/selfhost.ts"]]].map(([service, cmd]) => ({ service, docker_target: service, image_reference: images[service].image_reference, registry_manifest_digest: images[service].image_reference.slice(images[service].image_reference.lastIndexOf("@") + 1), image_config_digest: targetConfigs[service], oci_version: FIXTURE_VERSION, oci_revision: FIXTURE_GIT, baked_version: FIXTURE_VERSION, baked_revision: FIXTURE_GIT, user: "node", cmd })),
-    limitations: ["NO_EXTERNAL_REGISTRY_ANCHOR", "NO_REPRODUCIBLE_BUILD_ATTESTATION", "LOCAL_ENGINE_ONLY", "PUBLIC_NPM_FETCH_WITH_LOCKFILE_INTEGRITY"],
+    targets: [["web", ["node", "server.js"]], ["worker", ["node", "--experimental-strip-types", "worker/selfhost.ts"]]].map(([service, cmd]) => ({ service, docker_target: service, image_reference: images[service].image_reference, registry_manifest_digest: images[service].image_reference.slice(images[service].image_reference.lastIndexOf("@") + 1), image_config_digest: targetConfigs[service], oci_version: FIXTURE_VERSION, oci_revision: FIXTURE_GIT, baked_version: FIXTURE_VERSION, baked_revision: FIXTURE_GIT, user: "65532:65532", cmd })),
+    limitations: ["NO_EXTERNAL_REGISTRY_ANCHOR", "NO_REPRODUCIBLE_BUILD_ATTESTATION", "LOCAL_ENGINE_ONLY", "PUBLIC_NPM_FETCH_WITH_LOCKFILE_INTEGRITY", "PUBLIC_WOLFI_APK_FETCH_WITH_SIGNED_EXACT_PACKAGE"],
     result: "LOCAL_LOOPBACK_DIGEST_VERIFIED",
   }, { runId: releaseId, candidate, imageReferences: { web: images.web.image_reference, worker: images.worker.image_reference } });
   const buildProvenanceRaw = canonicalJson(buildProvenance);

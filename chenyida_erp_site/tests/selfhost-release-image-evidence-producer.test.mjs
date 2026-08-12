@@ -9,6 +9,7 @@ import {
   RELEASE_ARTIFACT_ROOT_MARKER,
   RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE,
   RELEASE_NODE_BASE_IMAGE_REFERENCE,
+  RELEASE_RUNTIME_BASE_IMAGE_REFERENCE,
   RELEASE_TRIVY_IMAGE_REFERENCE,
   RELEASE_TRIVY_VERSION,
   buildMigrationAllowlist,
@@ -135,11 +136,13 @@ test("candidate build producer binds the exact snapshot inputs and loopback dige
     const workerReference = `127.0.0.1:5000/chenyida-erp/worker@${FIXTURE_WORKER}`;
     const targetInspect = (manifestDigest, configDigest, reference, cmd) => [{
       Id: manifestDigest, Descriptor: { digest: manifestDigest, annotations: { "config.digest": configDigest } }, Os: "linux", Architecture: "amd64", RepoDigests: [reference],
-      Config: { Labels: { "org.opencontainers.image.version": FIXTURE_VERSION, "org.opencontainers.image.revision": FIXTURE_GIT }, Env: [`ERP_RUNTIME_BUILD_VERSION=${FIXTURE_VERSION}`, `ERP_RUNTIME_GIT_COMMIT=${FIXTURE_GIT}`], User: "node", Cmd: cmd },
+      Config: { Labels: { "org.opencontainers.image.version": FIXTURE_VERSION, "org.opencontainers.image.revision": FIXTURE_GIT }, Env: [`ERP_RUNTIME_BUILD_VERSION=${FIXTURE_VERSION}`, `ERP_RUNTIME_GIT_COMMIT=${FIXTURE_GIT}`], User: "65532:65532", Cmd: cmd },
     }];
     const baseDigest = RELEASE_NODE_BASE_IMAGE_REFERENCE.split("@")[1];
+    const runtimeBaseDigest = RELEASE_RUNTIME_BASE_IMAGE_REFERENCE.split("@")[1];
     const registryDigest = RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.split("@")[1];
     const baseInspect = await writeTrustedInput(inputRoot, "base.json", [{ Id: baseDigest, Descriptor: { digest: baseDigest }, Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_NODE_BASE_IMAGE_REFERENCE] }]);
+    const runtimeBaseInspect = await writeTrustedInput(inputRoot, "runtime-base.json", [{ Id: runtimeBaseDigest, Descriptor: { digest: runtimeBaseDigest }, Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_RUNTIME_BASE_IMAGE_REFERENCE] }]);
     const registryInspect = await writeTrustedInput(inputRoot, "registry.json", [{ Id: registryDigest, Descriptor: { digest: registryDigest }, Os: "linux", Architecture: "amd64", RepoDigests: [RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE] }]);
     const webInspect = await writeTrustedInput(inputRoot, "web.json", targetInspect(FIXTURE_WEB, FIXTURE_WEB_CONFIG, webReference, ["node", "server.js"]));
     const workerInspect = await writeTrustedInput(inputRoot, "worker.json", targetInspect(FIXTURE_WORKER, FIXTURE_WORKER_CONFIG, workerReference, ["node", "--experimental-strip-types", "worker/selfhost.ts"]));
@@ -148,7 +151,7 @@ test("candidate build producer binds the exact snapshot inputs and loopback dige
       path.join(siteRoot, "scripts", "release-candidate-build-producer.mjs"), "create",
       "--site-root", siteRoot, "--artifact-root", artifactRoot, "--run-id", runId, "--git-commit", FIXTURE_GIT, "--git-tree", FIXTURE_TREE,
       "--archive-sha256", "3".repeat(64), "--archive-bytes", "1024", "--migration-allowlist-sha256", migrationDigest,
-      "--base-inspect", baseInspect, "--registry-inspect", registryInspect, "--web-inspect", webInspect, "--worker-inspect", workerInspect,
+      "--build-base-inspect", baseInspect, "--runtime-base-inspect", runtimeBaseInspect, "--registry-inspect", registryInspect, "--web-inspect", webInspect, "--worker-inspect", workerInspect,
       "--web-image-reference", webReference, "--worker-image-reference", workerReference, "--docker-server-version", "29.5.2", "--buildx-version", "v0.34.1", "--builder-driver", "docker", "--buildkit-version", "v0.30.0",
       "--confirm", "CREATE_LOCAL_CANDIDATE_BUILD_PROVENANCE",
     ], { encoding: "utf8", env: { PATH: process.env.PATH, LC_ALL: "C", LANG: "C", TZ: "UTC" } });

@@ -1,10 +1,14 @@
 import path from "node:path";
 
-export const RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT = "chenyida-erp-candidate-build-provenance/v2";
+export const RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT = "chenyida-erp-candidate-build-provenance/v3";
 export const RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT = "chenyida-erp-image-scan-provenance/v3";
 export const RELEASE_TRIVY_VERSION = "0.70.0";
 export const RELEASE_TRIVY_IMAGE_REFERENCE = "ghcr.io/aquasecurity/trivy@sha256:85e87be1a96459c38a4eea47dc64eb2d342bb14cd4b4cef96adcf6ff03378b7c";
 export const RELEASE_NODE_BASE_IMAGE_REFERENCE = "node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3";
+export const RELEASE_RUNTIME_BASE_IMAGE_REFERENCE = "cgr.dev/chainguard/wolfi-base@sha256:5f3cb6adc6057b4084b8a1844ea16069d5d6be5a48da5a4856495b9a44bce4ed";
+export const RELEASE_RUNTIME_APK_REPOSITORY = "https://apk.cgr.dev/chainguard";
+export const RELEASE_RUNTIME_NODE_PACKAGE = "nodejs-22-minimal=22.23.2-r1";
+export const RELEASE_RUNTIME_NODE_VERSION = "v22.23.2";
 export const RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE = "registry@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373";
 export const RELEASE_DOCKERFILE_FRONTEND_REFERENCE = "docker.io/docker/dockerfile:1.7@sha256:b5f3b260a9678e1d83d2fce86eeddf79420b79147eaba2a25986f47133d73720";
 
@@ -86,7 +90,7 @@ function exactStringArray(value, expected, code) {
 
 export function validateCandidateBuildProvenance(value, expected = {}) {
   exactKeys(value, ["schema_version", "contract", "generated_at", "run_id", "scope", "candidate", "source", "builder", "targets", "limitations", "result"], "CANDIDATE_BUILD_FIELDS_INVALID");
-  if (value.schema_version !== 2 || value.contract !== RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT) reject("CANDIDATE_BUILD_VERSION_INVALID");
+  if (value.schema_version !== 3 || value.contract !== RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT) reject("CANDIDATE_BUILD_VERSION_INVALID");
   iso(value.generated_at, "CANDIDATE_BUILD_TIME_INVALID");
   string(value.run_id, IDENTIFIER, "CANDIDATE_BUILD_RUN_ID_INVALID");
   if (value.scope !== "LOCAL_ISOLATED_CANDIDATE") reject("CANDIDATE_BUILD_SCOPE_INVALID");
@@ -102,13 +106,15 @@ export function validateCandidateBuildProvenance(value, expected = {}) {
   for (const field of ["archive_sha256", "dockerfile_sha256", "dockerignore_sha256", "package_lock_sha256", "orchestrator_sha256", "producer_sha256"]) string(value.source[field], SHA256, "CANDIDATE_BUILD_SOURCE_INVALID");
   if (!Number.isSafeInteger(value.source.archive_bytes) || value.source.archive_bytes < 1) reject("CANDIDATE_BUILD_SOURCE_INVALID");
 
-  exactKeys(value.builder, ["docker_server_version", "buildx_version", "builder_name", "builder_driver", "buildkit_version", "platform", "context", "base_pull_policy", "dependency_network", "application_build_network", "frontend_reference", "frontend_manifest_digest", "base_image_reference", "base_registry_manifest_digest", "base_local_identity_digest", "registry_image_reference", "registry_manifest_digest", "registry_local_identity_digest", "registry_state"], "CANDIDATE_BUILD_BUILDER_FIELDS_INVALID");
+  exactKeys(value.builder, ["docker_server_version", "buildx_version", "builder_name", "builder_driver", "buildkit_version", "platform", "context", "base_pull_policy", "dependency_network", "runtime_dependency_network", "application_build_network", "frontend_reference", "frontend_manifest_digest", "build_base_image_reference", "build_base_registry_manifest_digest", "build_base_local_identity_digest", "runtime_base_image_reference", "runtime_base_registry_manifest_digest", "runtime_base_local_identity_digest", "runtime_apk_repository", "runtime_node_package", "runtime_node_version", "registry_image_reference", "registry_manifest_digest", "registry_local_identity_digest", "registry_state"], "CANDIDATE_BUILD_BUILDER_FIELDS_INVALID");
   for (const field of ["docker_server_version", "buildx_version", "buildkit_version"]) string(value.builder[field], /^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/, "CANDIDATE_BUILD_TOOL_VERSION_INVALID");
-  if (value.builder.builder_name !== "default" || value.builder.builder_driver !== "docker" || value.builder.platform !== "linux/amd64" || value.builder.context !== "GIT_ARCHIVE" || value.builder.base_pull_policy !== "LOCAL_REQUIRED_PULL_FALSE" || value.builder.dependency_network !== "PUBLIC_NPM_LOCKFILE_INTEGRITY" || value.builder.application_build_network !== "NONE") reject("CANDIDATE_BUILD_POLICY_INVALID");
+  if (value.builder.builder_name !== "default" || value.builder.builder_driver !== "docker" || value.builder.platform !== "linux/amd64" || value.builder.context !== "GIT_ARCHIVE" || value.builder.base_pull_policy !== "LOCAL_REQUIRED_PULL_FALSE" || value.builder.dependency_network !== "PUBLIC_NPM_LOCKFILE_INTEGRITY" || value.builder.runtime_dependency_network !== "PUBLIC_WOLFI_APK_FETCH_WITH_SIGNED_EXACT_PACKAGE" || value.builder.application_build_network !== "NONE") reject("CANDIDATE_BUILD_POLICY_INVALID");
   if (value.builder.frontend_reference !== RELEASE_DOCKERFILE_FRONTEND_REFERENCE || value.builder.frontend_manifest_digest !== RELEASE_DOCKERFILE_FRONTEND_REFERENCE.slice(RELEASE_DOCKERFILE_FRONTEND_REFERENCE.indexOf("@") + 1)) reject("CANDIDATE_BUILD_FRONTEND_INVALID");
-  if (value.builder.base_image_reference !== RELEASE_NODE_BASE_IMAGE_REFERENCE || value.builder.base_registry_manifest_digest !== RELEASE_NODE_BASE_IMAGE_REFERENCE.slice(RELEASE_NODE_BASE_IMAGE_REFERENCE.indexOf("@") + 1)) reject("CANDIDATE_BUILD_BASE_IMAGE_INVALID");
+  if (value.builder.build_base_image_reference !== RELEASE_NODE_BASE_IMAGE_REFERENCE || value.builder.build_base_registry_manifest_digest !== RELEASE_NODE_BASE_IMAGE_REFERENCE.slice(RELEASE_NODE_BASE_IMAGE_REFERENCE.indexOf("@") + 1)) reject("CANDIDATE_BUILD_BASE_IMAGE_INVALID");
+  if (value.builder.runtime_base_image_reference !== RELEASE_RUNTIME_BASE_IMAGE_REFERENCE || value.builder.runtime_base_registry_manifest_digest !== RELEASE_RUNTIME_BASE_IMAGE_REFERENCE.slice(RELEASE_RUNTIME_BASE_IMAGE_REFERENCE.indexOf("@") + 1) || value.builder.runtime_apk_repository !== RELEASE_RUNTIME_APK_REPOSITORY || value.builder.runtime_node_package !== RELEASE_RUNTIME_NODE_PACKAGE || value.builder.runtime_node_version !== RELEASE_RUNTIME_NODE_VERSION) reject("CANDIDATE_BUILD_RUNTIME_IMAGE_INVALID");
   if (value.builder.registry_image_reference !== RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE || value.builder.registry_manifest_digest !== RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.slice(RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE.indexOf("@") + 1) || value.builder.registry_state !== "EPHEMERAL_LOOPBACK_REMOVED") reject("CANDIDATE_BUILD_REGISTRY_INVALID");
-  if (string(value.builder.base_local_identity_digest, DIGEST, "CANDIDATE_BUILD_BASE_IMAGE_INVALID") !== value.builder.base_registry_manifest_digest) reject("CANDIDATE_BUILD_BASE_IMAGE_INVALID");
+  if (string(value.builder.build_base_local_identity_digest, DIGEST, "CANDIDATE_BUILD_BASE_IMAGE_INVALID") !== value.builder.build_base_registry_manifest_digest) reject("CANDIDATE_BUILD_BASE_IMAGE_INVALID");
+  if (string(value.builder.runtime_base_local_identity_digest, DIGEST, "CANDIDATE_BUILD_RUNTIME_IMAGE_INVALID") !== value.builder.runtime_base_registry_manifest_digest) reject("CANDIDATE_BUILD_RUNTIME_IMAGE_INVALID");
   if (string(value.builder.registry_local_identity_digest, DIGEST, "CANDIDATE_BUILD_REGISTRY_INVALID") !== value.builder.registry_manifest_digest) reject("CANDIDATE_BUILD_REGISTRY_INVALID");
 
   if (!Array.isArray(value.targets) || value.targets.length !== 2) reject("CANDIDATE_BUILD_TARGETS_INVALID");
@@ -120,7 +126,7 @@ export function validateCandidateBuildProvenance(value, expected = {}) {
     const match = string(target.image_reference, REGISTRY_REFERENCE, "CANDIDATE_BUILD_TARGET_REFERENCE_INVALID").match(/^127\.0\.0\.1:([1-9][0-9]{0,4})\/chenyida-erp\/(web|worker)@sha256:[0-9a-f]{64}$/);
     if (!match || Number(match[1]) > 65535 || match[2] !== service || target.registry_manifest_digest !== registryDigest(target.image_reference, "CANDIDATE_BUILD_TARGET_REFERENCE_INVALID")) reject("CANDIDATE_BUILD_TARGET_REFERENCE_INVALID");
     const expectedDigest = value.candidate[`${service}_image_digest`];
-    if (target.registry_manifest_digest !== expectedDigest || target.oci_version !== value.candidate.package_version || target.oci_revision !== value.candidate.git_commit || target.baked_version !== value.candidate.package_version || target.baked_revision !== value.candidate.git_commit || target.user !== "node") reject("CANDIDATE_BUILD_TARGET_IDENTITY_INVALID");
+    if (target.registry_manifest_digest !== expectedDigest || target.oci_version !== value.candidate.package_version || target.oci_revision !== value.candidate.git_commit || target.baked_version !== value.candidate.package_version || target.baked_revision !== value.candidate.git_commit || target.user !== "65532:65532") reject("CANDIDATE_BUILD_TARGET_IDENTITY_INVALID");
     string(target.image_config_digest, DIGEST, "CANDIDATE_BUILD_TARGET_IDENTITY_INVALID");
     const expectedCommand = service === "web" ? ["node", "server.js"] : ["node", "--experimental-strip-types", "worker/selfhost.ts"];
     exactStringArray(target.cmd, expectedCommand, "CANDIDATE_BUILD_TARGET_COMMAND_INVALID");
@@ -128,7 +134,7 @@ export function validateCandidateBuildProvenance(value, expected = {}) {
     targetDigests.add(target.image_config_digest); targetReferences.add(target.image_reference);
   });
   if (targetDigests.size !== 2 || targetReferences.size !== 2) reject("CANDIDATE_BUILD_TARGET_COLLISION");
-  exactStringArray(value.limitations, ["NO_EXTERNAL_REGISTRY_ANCHOR", "NO_REPRODUCIBLE_BUILD_ATTESTATION", "LOCAL_ENGINE_ONLY", "PUBLIC_NPM_FETCH_WITH_LOCKFILE_INTEGRITY"], "CANDIDATE_BUILD_LIMITATIONS_INVALID");
+  exactStringArray(value.limitations, ["NO_EXTERNAL_REGISTRY_ANCHOR", "NO_REPRODUCIBLE_BUILD_ATTESTATION", "LOCAL_ENGINE_ONLY", "PUBLIC_NPM_FETCH_WITH_LOCKFILE_INTEGRITY", "PUBLIC_WOLFI_APK_FETCH_WITH_SIGNED_EXACT_PACKAGE"], "CANDIDATE_BUILD_LIMITATIONS_INVALID");
   if (value.result !== "LOCAL_LOOPBACK_DIGEST_VERIFIED") reject("CANDIDATE_BUILD_RESULT_INVALID");
   return value;
 }

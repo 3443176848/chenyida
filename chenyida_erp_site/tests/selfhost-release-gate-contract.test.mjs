@@ -207,6 +207,7 @@ test("candidate image builder uses an exact Git archive, pinned inputs and an ep
   assert.match(builder, /git_candidate archive --format=tar "\$GIT_COMMIT" chenyida_erp_site/);
   assert.match(builder, /DOCKERFILE_FRONTEND='docker\.io\/docker\/dockerfile:1\.7@sha256:b5f3b260a9678e1d83d2fce86eeddf79420b79147eaba2a25986f47133d73720'/);
   assert.match(builder, /NODE_IMAGE='node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3'/);
+  assert.match(builder, /RUNTIME_BASE_IMAGE='cgr\.dev\/chainguard\/wolfi-base@sha256:5f3cb6adc6057b4084b8a1844ea16069d5d6be5a48da5a4856495b9a44bce4ed'/);
   assert.match(builder, /REGISTRY_IMAGE='registry@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373'/);
   assert.match(builder, /docker buildx build --builder default --load --pull=false --provenance=false --platform linux\/amd64/);
   assert.match(builder, /docker buildx inspect default --bootstrap=false/);
@@ -215,7 +216,8 @@ test("candidate image builder uses an exact Git archive, pinned inputs and an ep
   assert.match(builder, /REGISTRY_WEB_TAG="127\.0\.0\.1:\$REGISTRY_PORT\/chenyida-erp\/web:\$GIT_COMMIT"/);
   assert.match(builder, /docker pull "\$WEB_IMAGE_REF"/);
   assert.match(builder, /rm -rf -- "\$REGISTRY_DATA"/);
-  assert.match(builder, /chmod 0400 "\$INPUT_ROOT\/base\.inspect\.json" "\$INPUT_ROOT\/registry\.inspect\.json" "\$INPUT_ROOT\/web\.inspect\.json" "\$INPUT_ROOT\/worker\.inspect\.json"/);
+  assert.match(builder, /chmod 0400 "\$INPUT_ROOT\/build-base\.inspect\.json" "\$INPUT_ROOT\/runtime-base\.inspect\.json" "\$INPUT_ROOT\/registry\.inspect\.json" "\$INPUT_ROOT\/web\.inspect\.json" "\$INPUT_ROOT\/worker\.inspect\.json"/);
+  assert.match(builder, /--build-base-inspect \/input\/build-base\.inspect\.json --runtime-base-inspect \/input\/runtime-base\.inspect\.json/);
   assert.doesNotMatch(builder, /"\$INPUT_ROOT"\/\*\.json/);
   assert.ok(builder.indexOf('remove_container\n[ -d "$REGISTRY_DATA" ]') < builder.indexOf('rm -rf -- "$REGISTRY_DATA"'));
   assert.ok(builder.indexOf('rm -rf -- "$REGISTRY_DATA"') < builder.indexOf('[ "$(/usr/bin/docker image inspect --format \'{{.Id}}\' "$WEB_IMAGE_REF")"'));
@@ -223,6 +225,7 @@ test("candidate image builder uses an exact Git archive, pinned inputs and an ep
   assert.match(producer, /CANDIDATE_BUILD_PRODUCER_PATH_INVALID/);
   assert.match(producer, /context: "GIT_ARCHIVE"/);
   assert.match(producer, /dependency_network: "PUBLIC_NPM_LOCKFILE_INTEGRITY"/);
+  assert.match(producer, /runtime_dependency_network: "PUBLIC_WOLFI_APK_FETCH_WITH_SIGNED_EXACT_PACKAGE"/);
   assert.doesNotMatch(builder, /\blatest\b|ghcr\.io\/3443176848/);
   assert.doesNotMatch(builder, /\/usr\/bin\/docker run\b/);
 });

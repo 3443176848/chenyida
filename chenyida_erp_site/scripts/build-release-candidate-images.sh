@@ -13,6 +13,7 @@ GIT_NO_REPLACE_OBJECTS=1
 export LC_ALL LANG TZ PATH HOME GIT_CONFIG_NOSYSTEM GIT_CONFIG_GLOBAL GIT_NO_REPLACE_OBJECTS
 
 NODE_IMAGE='node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3'
+RUNTIME_BASE_IMAGE='cgr.dev/chainguard/wolfi-base@sha256:5f3cb6adc6057b4084b8a1844ea16069d5d6be5a48da5a4856495b9a44bce4ed'
 REGISTRY_IMAGE='registry@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373'
 DOCKERFILE_FRONTEND='docker.io/docker/dockerfile:1.7@sha256:b5f3b260a9678e1d83d2fce86eeddf79420b79147eaba2a25986f47133d73720'
 
@@ -104,6 +105,7 @@ fi
 [ ! -e "$ARTIFACT_ROOT/$RUN_ID.build-provenance.json" ] || { echo "candidate build provenance already exists" >&2; exit 1; }
 
 /usr/bin/docker image inspect "$NODE_IMAGE" >/dev/null 2>&1 || { echo "pinned Node base image is unavailable; pulling during build is forbidden" >&2; exit 1; }
+/usr/bin/docker image inspect "$RUNTIME_BASE_IMAGE" >/dev/null 2>&1 || { echo "pinned runtime base image is unavailable; pulling during build is forbidden" >&2; exit 1; }
 /usr/bin/docker image inspect "$REGISTRY_IMAGE" >/dev/null 2>&1 || { echo "pinned loopback registry image is unavailable; pulling during build is forbidden" >&2; exit 1; }
 LOCAL_WEB_TAG="cyd-release-candidate-web:$GIT_COMMIT"
 LOCAL_WORKER_TAG="cyd-release-candidate-worker:$GIT_COMMIT"
@@ -173,11 +175,12 @@ OWN_WEB_DIGEST=YES; OWN_WORKER_DIGEST=YES
 /usr/bin/docker pull "$WEB_IMAGE_REF" >/dev/null
 /usr/bin/docker pull "$WORKER_IMAGE_REF" >/dev/null
 
-/usr/bin/docker image inspect "$NODE_IMAGE" > "$INPUT_ROOT/base.inspect.json"
+/usr/bin/docker image inspect "$NODE_IMAGE" > "$INPUT_ROOT/build-base.inspect.json"
+/usr/bin/docker image inspect "$RUNTIME_BASE_IMAGE" > "$INPUT_ROOT/runtime-base.inspect.json"
 /usr/bin/docker image inspect "$REGISTRY_IMAGE" > "$INPUT_ROOT/registry.inspect.json"
 /usr/bin/docker image inspect "$WEB_IMAGE_REF" > "$INPUT_ROOT/web.inspect.json"
 /usr/bin/docker image inspect "$WORKER_IMAGE_REF" > "$INPUT_ROOT/worker.inspect.json"
-chmod 0400 "$INPUT_ROOT/base.inspect.json" "$INPUT_ROOT/registry.inspect.json" "$INPUT_ROOT/web.inspect.json" "$INPUT_ROOT/worker.inspect.json"
+chmod 0400 "$INPUT_ROOT/build-base.inspect.json" "$INPUT_ROOT/runtime-base.inspect.json" "$INPUT_ROOT/registry.inspect.json" "$INPUT_ROOT/web.inspect.json" "$INPUT_ROOT/worker.inspect.json"
 remove_container
 [ -d "$REGISTRY_DATA" ] && [ ! -L "$REGISTRY_DATA" ] && [ "$(readlink -f "$REGISTRY_DATA")" = "$TEMP_ROOT/registry-data" ] || { echo "candidate registry storage path is invalid" >&2; exit 1; }
 rm -rf -- "$REGISTRY_DATA"
@@ -190,7 +193,7 @@ CONTAINER_ID=$(/usr/bin/docker create --pull=never --name "$CONTAINER_NAME" --la
   -v "$SITE_ROOT:/workspace:ro" -v "$INPUT_ROOT:/input:ro" -v "$ARTIFACT_ROOT:/artifact:rw" --entrypoint /usr/local/bin/node "$NODE_IMAGE" \
   /workspace/scripts/release-candidate-build-producer.mjs create --site-root /workspace --artifact-root /artifact --run-id "$RUN_ID" --git-commit "$GIT_COMMIT" --git-tree "$GIT_TREE" \
   --archive-sha256 "$ARCHIVE_SHA256" --archive-bytes "$ARCHIVE_BYTES" --migration-allowlist-sha256 "$MIGRATION_ALLOWLIST_SHA256" \
-  --base-inspect /input/base.inspect.json --registry-inspect /input/registry.inspect.json --web-inspect /input/web.inspect.json --worker-inspect /input/worker.inspect.json \
+  --build-base-inspect /input/build-base.inspect.json --runtime-base-inspect /input/runtime-base.inspect.json --registry-inspect /input/registry.inspect.json --web-inspect /input/web.inspect.json --worker-inspect /input/worker.inspect.json \
   --web-image-reference "$WEB_IMAGE_REF" --worker-image-reference "$WORKER_IMAGE_REF" --docker-server-version "$DOCKER_SERVER_VERSION" --buildx-version "$BUILDX_VERSION" --builder-driver "$BUILDER_DRIVER" --buildkit-version "$BUILDKIT_VERSION" --confirm CREATE_LOCAL_CANDIDATE_BUILD_PROVENANCE)
 set +e
 PRODUCER_OUTPUT=$(/usr/bin/docker start --attach "$CONTAINER_ID")
