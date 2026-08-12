@@ -179,6 +179,9 @@ test("Trivy 0.70 native CycloneDX contract accepts structural components and rej
   assert.throws(() => validateTrivyCycloneDxDocument(mutate((value) => { delete value.$schema; }), expected), (error) => error.code === "TRIVY_CYCLONEDX_FIELDS_INVALID");
   assert.throws(() => validateTrivyCycloneDxDocument(mutate((value) => { value.metadata.tools.components[0].version = "0.69.3"; }), expected), (error) => error.code === "TRIVY_CYCLONEDX_TOOL_INVALID");
   assert.throws(() => validateTrivyCycloneDxDocument(mutate((value) => { value.metadata.component.properties[0].value = `sha256:${"0".repeat(64)}`; }), expected), (error) => error.code === "TRIVY_CYCLONEDX_IMAGE_MISMATCH");
+  assert.throws(() => validateTrivyCycloneDxDocument(mutate((value) => { const os = value.components.find((component) => component.type === "operating-system"); os.name = "debian"; os.version = "12"; }), expected), (error) => error.code === "TRIVY_CYCLONEDX_OS_IDENTITY_INVALID");
+  assert.throws(() => validateTrivyCycloneDxDocument(mutate((value) => { const osPackage = value.components.find((component) => component.purl?.startsWith("pkg:apk/wolfi/")); osPackage.purl = osPackage.purl.replace("pkg:apk/wolfi/", "pkg:deb/debian/"); }), expected), (error) => error.code === "TRIVY_CYCLONEDX_PACKAGE_COVERAGE_INVALID");
+  assert.throws(() => validateTrivyCycloneDxDocument(mutate((value) => { value.components = value.components.filter((component) => !component.purl?.startsWith("pkg:npm/")); }), expected), (error) => error.code === "TRIVY_CYCLONEDX_PACKAGE_COVERAGE_INVALID");
   assert.throws(() => validateTrivyCycloneDxDocument(mutate((value) => { value.vulnerabilities.push({ id: "CVE-fixture" }); }), expected), (error) => error.code === "TRIVY_CYCLONEDX_VULNERABILITIES_FOUND");
 });
 

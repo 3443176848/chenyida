@@ -2021,7 +2021,7 @@
 ## D-125 最终运行层采用固定 Wolfi Node 22 最小包并删除可证明仅构建使用的 image-size
 
 - 日期：2026-08-13
-- 状态：`ACCEPTED / SOURCE IMPLEMENTED / 6 FILES 49 CONTRACT TESTS VERIFIED / CANDIDATE REBUILD PENDING`
+- 状态：`ACCEPTED / SOURCE IMPLEMENTED / 6 FILES 48 CONTRACT TESTS VERIFIED / PREDECESSOR DIAGNOSTIC ZERO / CURRENT CANDIDATE REBUILD PENDING`
 - 提案与实施：Codex 持续交付负责人，依据 TASK48 两镜像首次新鲜 Trivy 诊断结果和 D-122 隔离构建授权
 - 确认边界：只修改候选源码、依赖锁、最终运行层和本机构建回执；不授权外部推送、host supervisor 安装、UAT/生产 Migration/deploy、真实数据或正式晋升
 
@@ -2040,12 +2040,15 @@
 4. postbuild删除`image-size`前必须同时证明 lock entry仍为`2.0.2/dev-only`、目标包身份精确、目标及父目录均为非符号链接真实目录、全 standalone引用集合恰为两个已知 Vinext构建文件，且二者不在生产入口静态运行图中。任一事实漂移立即失败，删除后再次确认目录不存在；不得只改包版本标签、保留易受攻击代码或添加扫描ignore。
 5. `candidate-build-provenance`升为v3，分别绑定固定 build base与runtime base manifest/local identity、精确 APK仓库/包/Node版本，并披露`PUBLIC_WOLFI_APK_FETCH_WITH_SIGNED_EXACT_PACKAGE`。公共 APK和npm下载仍使构建不具备完整离线或可复现证明。
 6. 候选必须重新从干净新提交构建，并重新执行运行身份、Node版本、Migration只读属性、Web live/核心浏览器流程、Worker入口及新鲜完整severity扫描；只有两镜像零发现才可能继续正式证据门。
+7. Trivy原生报告必须恰好同时覆盖`os-pkgs/wolfi`与`lang-pkgs/node-pkg`且两组均有包清单，Metadata OS必须为`wolfi 20230201`；CycloneDX必须有唯一同身份操作系统组件，并至少包含一个`pkg:apk/wolfi/`和一个`pkg:npm/`。Debian、未知生态、缺少任一清单或重复OS组件一律失败关闭。
 
 ### Consequences
 
 - 最终镜像不再继承 Debian/npm CLI 的运行攻击面，仍保持 D-120 的 Node 22/ES2022合同；构建和测试镜像不等于生产运行层，必须在回执中分开识别。
 - Wolfi APK是在线、签名且精确版本的输入，但包仓库可滚动，现阶段仍缺离线包镜像和外部可恢复候选锚点；回执必须保留无可复现attestation及无外部registry锚点限制。
 - `image-size`裁剪依赖 Vinext 0.0.50当前输出结构，未来 Vinext升级或引用图变化会主动阻断build并要求重新审阅，而不会静默删除潜在运行依赖。
+- 精确`cc9ebbf`前序候选已用新鲜Trivy数据库完成无Docker socket、无网络的归档诊断：Web覆盖25个Wolfi包和63个npm包，Worker覆盖25个Wolfi包和60个npm包，两镜像全部severity均为零发现；非root、Node版本、无npm、Web live与Worker失败关闭也已通过。该候选早于本条严格覆盖合同提交，只能作为诊断证据，不能冒充当前正式候选。
+- 修正后的6文件发布合同共48项、release typecheck及lint（0 error，11项既有warning）通过，并直接接受上述两份真实诊断报告；当前仍须从新的干净精确提交重建和重扫，才可生成同候选证据。
 - 本决定尚未证明新候选零漏洞或完整18步门PASS，也未改变 UAT alpha.42/0040；系统继续`PRODUCTION NO-GO`。
 
 ### Rejected alternatives

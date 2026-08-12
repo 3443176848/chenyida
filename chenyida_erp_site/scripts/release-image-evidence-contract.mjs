@@ -219,16 +219,26 @@ export function validateTrivyDatabaseMetadata(value, expected) {
 
 export function validateTrivyNativeVulnerabilityReport(value, expected) {
   record(value, "TRIVY_NATIVE_REPORT_INVALID");
-  if (value.SchemaVersion !== 2 || value.ArtifactType !== "container_image" || !Array.isArray(value.Results) || value.Results.length < 1) reject("TRIVY_NATIVE_REPORT_IDENTITY_INVALID");
+  if (value.SchemaVersion !== 2 || value.ArtifactType !== "container_image" || !Array.isArray(value.Results) || value.Results.length !== 2) reject("TRIVY_NATIVE_REPORT_IDENTITY_INVALID");
   const metadata = value.Metadata === undefined ? {} : record(value.Metadata, "TRIVY_NATIVE_REPORT_METADATA_INVALID");
   if (metadata.ImageID !== undefined && metadata.ImageID !== expected.imageConfigDigest) reject("TRIVY_NATIVE_REPORT_IMAGE_MISMATCH");
   if (metadata.RepoDigests !== undefined && (!Array.isArray(metadata.RepoDigests) || (metadata.RepoDigests.length > 0 && !metadata.RepoDigests.includes(expected.imageReference)))) reject("TRIVY_NATIVE_REPORT_IMAGE_MISMATCH");
+  exactKeys(metadata.OS, ["Family", "Name"], "TRIVY_NATIVE_OS_IDENTITY_INVALID");
+  if (metadata.OS.Family !== "wolfi" || metadata.OS.Name !== "20230201") reject("TRIVY_NATIVE_OS_IDENTITY_INVALID");
   const counts = { critical: 0, high: 0, medium: 0, low: 0, unknown: 0 };
-  let packages = 0;
+  let wolfiResults = 0; let wolfiPackages = 0; let nodeResults = 0; let nodePackages = 0;
   for (const result of value.Results) {
     record(result, "TRIVY_NATIVE_RESULT_INVALID");
-    if (Array.isArray(result.Packages)) packages += result.Packages.length;
-    else if (result.Packages !== undefined) reject("TRIVY_NATIVE_PACKAGES_INVALID");
+    if (!Array.isArray(result.Packages)) reject("TRIVY_NATIVE_PACKAGES_INVALID");
+    if (result.Class === "os-pkgs" && result.Type === "wolfi") {
+      wolfiResults += 1;
+      wolfiPackages += result.Packages.length;
+    } else if (result.Class === "lang-pkgs" && result.Type === "node-pkg") {
+      nodeResults += 1;
+      nodePackages += result.Packages.length;
+    } else {
+      reject("TRIVY_NATIVE_PACKAGE_ECOSYSTEM_INVALID");
+    }
     const vulnerabilities = result.Vulnerabilities === undefined || result.Vulnerabilities === null ? [] : result.Vulnerabilities;
     if (!Array.isArray(vulnerabilities)) reject("TRIVY_NATIVE_VULNERABILITIES_INVALID");
     for (const vulnerability of vulnerabilities) {
@@ -238,7 +248,7 @@ export function validateTrivyNativeVulnerabilityReport(value, expected) {
       counts[key] += 1;
     }
   }
-  if (packages < 1) reject("TRIVY_NATIVE_PACKAGE_INVENTORY_MISSING");
+  if (wolfiResults !== 1 || nodeResults !== 1 || wolfiPackages < 1 || nodePackages < 1) reject("TRIVY_NATIVE_PACKAGE_INVENTORY_MISSING");
   return counts;
 }
 
@@ -269,19 +279,33 @@ export function validateTrivyCycloneDxDocument(value, expected = {}) {
     if (repoDigests.length > 1 || (repoDigests.length === 1 && expected.imageReference !== undefined && !repoDigests[0].endsWith(`@${registryDigest(expected.imageReference, "TRIVY_CYCLONEDX_IMAGE_MISMATCH")}`))) reject("TRIVY_CYCLONEDX_IMAGE_MISMATCH");
   }
   if (!Array.isArray(value.components) || value.components.length < 1 || value.components.length > 200_000) reject("TRIVY_CYCLONEDX_COMPONENTS_INVALID");
-  const references = new Set([root["bom-ref"]]); let debian = 0; let npm = 0;
+  const references = new Set([root["bom-ref"]]); let operatingSystem = null; let wolfi = 0; let npm = 0;
   for (const component of value.components) {
     record(component, "TRIVY_CYCLONEDX_COMPONENT_INVALID");
     if (typeof component["bom-ref"] !== "string" || component["bom-ref"].length < 1 || references.has(component["bom-ref"])) reject("TRIVY_CYCLONEDX_COMPONENT_REFERENCE_INVALID");
     references.add(component["bom-ref"]);
     if (typeof component.name !== "string" || component.name.length < 1 || typeof component.type !== "string" || component.type.length < 1) reject("TRIVY_CYCLONEDX_COMPONENT_INVALID");
+    if (component.type === "operating-system") {
+      if (operatingSystem !== null) reject("TRIVY_CYCLONEDX_OS_IDENTITY_INVALID");
+      exactKeys(component, ["bom-ref", "type", "name", "version", "properties"], "TRIVY_CYCLONEDX_OS_IDENTITY_INVALID");
+      if (component.name !== "wolfi" || component.version !== "20230201" || !Array.isArray(component.properties) || component.properties.length !== 2) reject("TRIVY_CYCLONEDX_OS_IDENTITY_INVALID");
+      const properties = new Map();
+      for (const property of component.properties) {
+        exactKeys(property, ["name", "value"], "TRIVY_CYCLONEDX_OS_IDENTITY_INVALID");
+        if (properties.has(property.name)) reject("TRIVY_CYCLONEDX_OS_IDENTITY_INVALID");
+        properties.set(property.name, property.value);
+      }
+      if (properties.get("aquasecurity:trivy:Class") !== "os-pkgs" || properties.get("aquasecurity:trivy:Type") !== "wolfi") reject("TRIVY_CYCLONEDX_OS_IDENTITY_INVALID");
+      operatingSystem = component;
+    }
     if (component.purl !== undefined) {
       if (typeof component.purl !== "string" || !component.purl.startsWith("pkg:") || typeof component.version !== "string" || component.version.length < 1) reject("TRIVY_CYCLONEDX_COMPONENT_INVALID");
-      if (component.purl.startsWith("pkg:deb/")) debian += 1;
-      if (component.purl.startsWith("pkg:npm/")) npm += 1;
+      if (component.purl.startsWith("pkg:apk/wolfi/")) wolfi += 1;
+      else if (component.purl.startsWith("pkg:npm/")) npm += 1;
+      else reject("TRIVY_CYCLONEDX_PACKAGE_COVERAGE_INVALID");
     }
   }
-  if (debian < 1 || npm < 1) reject("TRIVY_CYCLONEDX_PACKAGE_COVERAGE_INVALID");
+  if (operatingSystem === null || wolfi < 1 || npm < 1) reject("TRIVY_CYCLONEDX_PACKAGE_COVERAGE_INVALID");
   if (!Array.isArray(value.dependencies)) reject("TRIVY_CYCLONEDX_DEPENDENCIES_INVALID");
   const dependencyReferences = new Set();
   for (const dependency of value.dependencies) {

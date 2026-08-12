@@ -100,7 +100,7 @@ export async function buildEligibleReleaseFixture({ entries, root = null, releas
   const targetInputs = [["web", FIXTURE_WEB, FIXTURE_WEB_CONFIG, images.web.image_reference], ["worker", FIXTURE_WORKER, FIXTURE_WORKER_CONFIG, images.worker.image_reference]];
   const nativeCycloneDx = Object.fromEntries(targetInputs.map(([service, , configDigest]) => {
     const rootReference = `urn:uuid:${randomUUID()}`;
-    const osReference = `pkg:deb/debian/fixture-${service}@1.0.0`;
+    const osReference = `pkg:apk/wolfi/fixture-${service}@1.0.0`;
     const npmReference = `pkg:npm/fixture-${service}@1.0.0`;
     return [service, {
     $schema: "http://cyclonedx.org/schema/bom-1.6.schema.json", bomFormat: "CycloneDX", specVersion: "1.6", serialNumber: `urn:uuid:${randomUUID()}`, version: 1,
@@ -110,7 +110,7 @@ export async function buildEligibleReleaseFixture({ entries, root = null, releas
       component: { type: "container", "bom-ref": rootReference, name: `${service}.tar`, properties: [{ name: "aquasecurity:trivy:ImageID", value: configDigest }] },
     },
     components: [
-      { type: "operating-system", "bom-ref": `urn:uuid:${randomUUID()}`, name: "debian", version: "12" },
+      { type: "operating-system", "bom-ref": `urn:uuid:${randomUUID()}`, name: "wolfi", version: "20230201", properties: [{ name: "aquasecurity:trivy:Class", value: "os-pkgs" }, { name: "aquasecurity:trivy:Type", value: "wolfi" }] },
       { type: "library", "bom-ref": osReference, name: `fixture-${service}-os`, version: "1.0.0", purl: osReference },
       { type: "library", "bom-ref": npmReference, name: `fixture-${service}`, version: "1.0.0", purl: npmReference },
     ],
@@ -118,7 +118,7 @@ export async function buildEligibleReleaseFixture({ entries, root = null, releas
     vulnerabilities: [],
   }];
   }));
-  const nativeVulnerability = Object.fromEntries(targetInputs.map(([service, , configDigest]) => [service, { SchemaVersion: 2, ArtifactName: `${service}.tar`, ArtifactType: "container_image", Metadata: { ImageID: configDigest }, Results: [{ Target: `${service}.tar`, Class: "os-pkgs", Type: "debian", Packages: [{ ID: `fixture-${service}@1.0.0` }] }] }]));
+  const nativeVulnerability = Object.fromEntries(targetInputs.map(([service, , configDigest]) => [service, { SchemaVersion: 2, ArtifactName: `${service}.tar`, ArtifactType: "container_image", Metadata: { ImageID: configDigest, OS: { Family: "wolfi", Name: "20230201" } }, Results: [{ Target: `${service}.tar (wolfi 20230201)`, Class: "os-pkgs", Type: "wolfi", Packages: [{ ID: `fixture-${service}@1.0.0` }] }, { Target: "Node.js", Class: "lang-pkgs", Type: "node-pkg", Packages: [{ ID: `fixture-${service}-node@1.0.0` }] }] }]));
   const targetFiles = Object.fromEntries(targetInputs.map(([service]) => [service, { inspect: `${releaseId}.${service}.inspect.json`, vulnerability: `${releaseId}.${service}.trivy.json`, cyclonedx: `${releaseId}.${service}.cdx.json` }]));
   const targetArtifacts = Object.fromEntries(targetInputs.map(([service, manifestDigest, , imageReference], index) => {
     const inspect = [{ Id: manifestDigest, Os: "linux", Architecture: "amd64", RepoDigests: [imageReference] }];
