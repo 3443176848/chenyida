@@ -177,7 +177,7 @@ OWN_WEB_DIGEST=YES; OWN_WORKER_DIGEST=YES
 /usr/bin/docker image inspect "$REGISTRY_IMAGE" > "$INPUT_ROOT/registry.inspect.json"
 /usr/bin/docker image inspect "$WEB_IMAGE_REF" > "$INPUT_ROOT/web.inspect.json"
 /usr/bin/docker image inspect "$WORKER_IMAGE_REF" > "$INPUT_ROOT/worker.inspect.json"
-chmod 0400 "$INPUT_ROOT"/*.json
+chmod 0400 "$INPUT_ROOT/base.inspect.json" "$INPUT_ROOT/registry.inspect.json" "$INPUT_ROOT/web.inspect.json" "$INPUT_ROOT/worker.inspect.json"
 remove_container
 [ -d "$REGISTRY_DATA" ] && [ ! -L "$REGISTRY_DATA" ] && [ "$(readlink -f "$REGISTRY_DATA")" = "$TEMP_ROOT/registry-data" ] || { echo "candidate registry storage path is invalid" >&2; exit 1; }
 rm -rf -- "$REGISTRY_DATA"

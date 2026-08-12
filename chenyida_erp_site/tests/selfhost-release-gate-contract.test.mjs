@@ -215,6 +215,8 @@ test("candidate image builder uses an exact Git archive, pinned inputs and an ep
   assert.match(builder, /REGISTRY_WEB_TAG="127\.0\.0\.1:\$REGISTRY_PORT\/chenyida-erp\/web:\$GIT_COMMIT"/);
   assert.match(builder, /docker pull "\$WEB_IMAGE_REF"/);
   assert.match(builder, /rm -rf -- "\$REGISTRY_DATA"/);
+  assert.match(builder, /chmod 0400 "\$INPUT_ROOT\/base\.inspect\.json" "\$INPUT_ROOT\/registry\.inspect\.json" "\$INPUT_ROOT\/web\.inspect\.json" "\$INPUT_ROOT\/worker\.inspect\.json"/);
+  assert.doesNotMatch(builder, /"\$INPUT_ROOT"\/\*\.json/);
   assert.ok(builder.indexOf('remove_container\n[ -d "$REGISTRY_DATA" ]') < builder.indexOf('rm -rf -- "$REGISTRY_DATA"'));
   assert.ok(builder.indexOf('rm -rf -- "$REGISTRY_DATA"') < builder.indexOf('[ "$(/usr/bin/docker image inspect --format \'{{.Id}}\' "$WEB_IMAGE_REF")"'));
   assert.match(builder, /--network none --read-only --cap-drop ALL --security-opt no-new-privileges/);
