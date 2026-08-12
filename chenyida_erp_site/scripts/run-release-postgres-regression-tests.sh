@@ -96,6 +96,7 @@ mkdir -m 0755 "$TEMP_ROOT/source"
 git_candidate archive --format=tar "$GIT_COMMIT" chenyida_erp_site | /usr/bin/tar -xf - -C "$TEMP_ROOT/source"
 SITE_ROOT="$TEMP_ROOT/source/chenyida_erp_site"
 [ -f "$SITE_ROOT/release/release-test-inventory-v1.json" ] && [ -f "$SITE_ROOT/tests/selfhost-postgres.test.mjs" ] || { echo "release PostgreSQL regression snapshot is incomplete" >&2; exit 1; }
+mkdir -m 0555 "$SITE_ROOT/node_modules"
 
 /usr/bin/docker image inspect "$NODE_IMAGE" >/dev/null 2>&1 || { echo "pinned Node bootstrap image is unavailable; pulling is forbidden" >&2; exit 1; }
 /usr/bin/docker image inspect "$POSTGRES_IMAGE" >/dev/null 2>&1 || { echo "pinned PostgreSQL image is unavailable; pulling is forbidden" >&2; exit 1; }

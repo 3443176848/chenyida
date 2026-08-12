@@ -58,6 +58,7 @@ mkdir -m 0755 "$TEMP_ROOT/source"
 git_candidate archive --format=tar "$GIT_COMMIT" chenyida_erp_site | /usr/bin/tar -xf - -C "$TEMP_ROOT/source"
 SITE_ROOT="$TEMP_ROOT/source/chenyida_erp_site"
 [ -f "$SITE_ROOT/tests/selfhost-backup-recovery-postgres.sh" ] || { echo "backup recovery snapshot is incomplete" >&2; exit 1; }
+mkdir -m 0555 "$SITE_ROOT/node_modules"
 
 /usr/bin/docker image inspect "$NODE_IMAGE" >/dev/null
 /usr/bin/docker image inspect "$POSTGRES_IMAGE" >/dev/null

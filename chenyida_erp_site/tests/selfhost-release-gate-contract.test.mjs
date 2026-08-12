@@ -63,6 +63,8 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   const runner = await readFile(new URL("../scripts/release-gate-runner.mjs", import.meta.url), "utf8");
   const nodeSandbox = await readFile(new URL("../scripts/run-release-node-sandbox.sh", import.meta.url), "utf8");
   const postgresSandbox = await readFile(new URL("../scripts/run-release-postgres-regression-tests.sh", import.meta.url), "utf8");
+  const migrationSandbox = await readFile(new URL("../scripts/run-release-migration-postgres-test.sh", import.meta.url), "utf8");
+  const recoverySandbox = await readFile(new URL("../scripts/run-backup-recovery-postgres-test.sh", import.meta.url), "utf8");
   const postgresRunner = await readFile(new URL("../scripts/release-postgres-regression-runner.mjs", import.meta.url), "utf8");
   const pythonSandbox = await readFile(new URL("../scripts/run-python-baseline-test.sh", import.meta.url), "utf8");
   for (const script of [wrapper, creator]) {
@@ -119,6 +121,10 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.match(postgresSandbox, /--memory 1024m --memory-swap 1280m --cpus 1 --pids-limit 256/);
   assert.match(postgresSandbox, /--tmpfs \/tmp:rw,exec,nosuid,nodev,size=1536m/);
   assert.match(postgresSandbox, /git_candidate archive --format=tar/);
+  for (const script of [postgresSandbox, migrationSandbox, recoverySandbox]) {
+    assert.match(script, /mkdir -m 0555 "\$SITE_ROOT\/node_modules"/);
+    assert.ok(script.indexOf('mkdir -m 0555 "$SITE_ROOT/node_modules"') < script.indexOf('-v "$NODE_MODULES:/workspace/node_modules:ro"'));
+  }
   assert.match(postgresSandbox, /if \[ "\$\{ERP_RELEASE_POSTGRES_CONTAINER_MODE:-\}" = YES \]; then\s+container_main\s+exit 0\s+fi/);
   assert.ok(postgresSandbox.indexOf('remove_task_container "$NODE_ID" "$NODE_CONTAINER"') < postgresSandbox.indexOf("POSTGRES_ID=$(/usr/bin/docker create"));
   assert.match(postgresRunner, /EXPECTED_POSTGRES_TESTS = 80/);
