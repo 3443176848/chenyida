@@ -1027,7 +1027,7 @@
     },
     {
       "path": "tests/selfhost-normalization-postgres.test.mjs",
-      "sha256": "024e84e3f448ab90dc18c42a11621eb68c791173143bd416473840e787cd4776",
+      "sha256": "ffb7da7b5d9427f811ef78972d19d014eb7f23ca4525e12dbf6df4a112779f63",
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",

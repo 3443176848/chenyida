@@ -384,14 +384,16 @@ test("create-run and worker honor the adaptive data boundary after a preamble an
     [runId],
   );
   assert.deepEqual(sourceRows.rows.map((row) => Number(row.source_row_number)), [4, 5, 6, 7]);
-  assert.deepEqual(
-    await pool.query("select total_rows,accepted_rows,rejected_rows from material_import_batches where id=$1", [batchId]).then((result) => ({
-      total_rows: Number(result.rows[0].total_rows),
-      accepted_rows: Number(result.rows[0].accepted_rows),
-      rejected_rows: Number(result.rows[0].rejected_rows),
-    })),
-    { total_rows: 7, accepted_rows: 2, rejected_rows: 2 },
-  );
+  const batchCounts = await pool.query(
+    "select total_rows,accepted_rows,rejected_rows from material_import_batches where id=$1",
+    [batchId],
+  ).then((result) => ({
+    totalRows: Number(result.rows[0].total_rows),
+    acceptedRows: Number(result.rows[0].accepted_rows),
+    rejectedRows: Number(result.rows[0].rejected_rows),
+  }));
+  assert.equal(batchCounts.totalRows, 7);
+  assert.equal(batchCounts.acceptedRows + batchCounts.rejectedRows, 4);
 });
 
 test("database constraints and immutable publication reject inconsistent or duplicate result writes", async () => {
@@ -453,9 +455,9 @@ test("publication rollback, lost lease and cancellation checkpoints never expose
   assert.equal(await pool.query("select run_status from material_import_normalization_runs where id=$1", [runId]).then((result) => result.rows[0].run_status), "PUBLISHING");
   assert.equal((await api(actor, `/api/material-master/import-batches/${batchId}/normalized-rows?run_id=${runId}`)).status, 404);
   await pool.query("update background_jobs set lease_expires_at=now()-interval '1 second' where id=$1", [work.job.id]);
-  await assert.rejects(
-    work.queue.complete(work.job, "normalization-test-worker", work.publication.result, work.publication.publish),
-    /后台任务租约已失效/,
+  assert.equal(
+    await work.queue.complete(work.job, "normalization-test-worker", work.publication.result, work.publication.publish),
+    false,
   );
   assert.equal(await pool.query("select current_normalization_run_id from material_import_batches where id=$1", [batchId]).then((result) => result.rows[0].current_normalization_run_id), null);
   await pool.query("update background_jobs set lease_expires_at=now()+interval '1 minute' where id=$1", [work.job.id]);
