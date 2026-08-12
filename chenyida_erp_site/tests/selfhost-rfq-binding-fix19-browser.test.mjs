@@ -446,7 +446,7 @@ test("isolated Chromium creates one stable-ID RFQ draft and no downstream record
       work_orders: 0,
     });
 
-    const sourcePanel = page.locator("section.sourcing-panel", { has: page.getByRole("heading", { name: "采购申请来源", exact: true }) });
+    const sourcePanel = page.locator("section.sourcing-panel", { has: page.getByRole("heading", { name: "RFQ 与采购申请来源", exact: true }) });
     assert.equal(await sourcePanel.locator("tbody tr").count(), 4);
     for (const materialId of fixture.materialIds) await sourcePanel.getByText(`CYD-FIX19-${String(materialId).padStart(6, "0")}`, { exact: true }).waitFor();
     const suppliersPanel = page.locator("section.sourcing-panel", { has: page.getByRole("heading", { name: "候选供应商与报价版本", exact: true }) });
