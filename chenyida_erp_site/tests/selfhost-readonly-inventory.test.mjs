@@ -133,3 +133,22 @@ test("inventory source contains no free-text DISTINCT query and rejects incomple
   const result = spawnSync("python3", [inventoryScript, "--mode", REAL_READONLY_MODE], { encoding: "utf8" });
   assert.notEqual(result.status, 0);
 });
+
+test("report PII scan accepts typed cryptographic identifiers without weakening phone detection", () => {
+  const probe = spawnSync("python3", ["-c", `
+import runpy
+import sys
+
+scan = runpy.run_path(sys.argv[1])["safe_leaf_scan"]
+phone = "13800000000"
+scan({"source_snapshot_sha256": "a" * 10 + phone + "b" * 43})
+scan({"opaque_reference": "ref_" + "a" * 10 + phone + "b" * 11})
+try:
+    scan({"note": "phone=" + phone})
+except Exception as error:
+    if getattr(error, "code", None) == "READONLY_REPORT_PII":
+        raise SystemExit(0)
+raise SystemExit(1)
+`, inventoryScript], { encoding: "utf8" });
+  assert.equal(probe.status, 0, probe.stderr);
+});

@@ -2,7 +2,7 @@
   "schema_version": "chenyida-erp-agent-task/v1",
   "task": {
     "id": "SELFHOST-OPS-RELEASE-GATE-42",
-    "revision": 18,
+    "revision": 19,
     "ledger_state": "DOING",
     "delivery_stage": "FINAL_ISOLATED_VERIFICATION",
     "qualifiers": [
@@ -70,12 +70,14 @@
       "chenyida_erp_site/scripts/run-release-migration-postgres-test.sh",
       "chenyida_erp_site/scripts/run-backup-recovery-postgres-test.sh",
       "chenyida_erp_site/scripts/run-source-diff-check.sh",
+      "chenyida_erp_site/tools/selfhost-migration/readonly-inventory.py",
       "chenyida_erp_site/tests/selfhost-release-identity-contract.test.mjs",
       "chenyida_erp_site/tests/selfhost-release-image-evidence-producer.test.mjs",
       "chenyida_erp_site/tests/selfhost-release-manifest-contract.test.mjs",
       "chenyida_erp_site/tests/selfhost-release-gate-contract.test.mjs",
       "chenyida_erp_site/tests/selfhost-release-migration-allowlist.test.mjs",
       "chenyida_erp_site/tests/selfhost-release-migration-postgres.sh",
+      "chenyida_erp_site/tests/selfhost-readonly-inventory.test.mjs",
       "chenyida_erp_site/tests/material-import-normalization-ui.test.mjs",
       "chenyida_erp_site/tests/material-import-ui.test.mjs",
       "chenyida_erp_site/tests/selfhost-application-version.test.mjs",

@@ -1702,7 +1702,7 @@
     },
     {
       "path": "tests/selfhost-readonly-inventory.test.mjs",
-      "sha256": "6497f569e7e5b9373cc3de6c985997f7145cd71a220330240656c446c1870239",
+      "sha256": "65884acaaab0059428cc097492931d60f950d530672655257368abd018f700ca",
       "category": "SPECIAL_HARNESS",
       "applicability": "REQUIRED",
       "harness": "SPECIAL_POSIX",

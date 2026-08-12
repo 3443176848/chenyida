@@ -457,16 +457,21 @@ def build_reports(connection: sqlite3.Connection, actual: dict[str, dict[str, ob
 
 def safe_leaf_scan(value: object) -> None:
     allowed_absolute = set()
-    strings: list[str] = []
-    def walk(item: object) -> None:
+    strings: list[tuple[str | None, str]] = []
+    def walk(item: object, field_name: str | None = None) -> None:
         if isinstance(item, dict):
-            for child in item.values(): walk(child)
+            for name, child in item.items(): walk(child, str(name))
         elif isinstance(item, list):
-            for child in item: walk(child)
-        elif isinstance(item, str): strings.append(item)
+            for child in item: walk(child, field_name)
+        elif isinstance(item, str): strings.append((field_name, item))
     walk(value)
-    for text in strings:
+    for field_name, text in strings:
         if text in allowed_absolute:
+            continue
+        digest_field = field_name == "git_commit" or field_name == "digest" or bool(field_name and field_name.endswith(("_sha256", "_digest", "_fingerprint")))
+        if digest_field and re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", text):
+            continue
+        if field_name == "opaque_reference" and re.fullmatch(r"ref_[0-9a-f]{32}", text):
             continue
         if "/opt/erp/chenyida_erp_app/data" in text or re.search(r"postgres(?:ql)?://|https?://", text, re.I):
             fail("READONLY_REPORT_SENSITIVE", "报告包含绝对源路径或远程 URL")
