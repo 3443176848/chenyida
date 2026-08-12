@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-`SELFHOST-RELEASE-BROWSER-HARNESS-47`为唯一`DOING`。范围固定为精确6个REQUIRED Browser文件、固定Playwright/Chromium运行时、隔离PostgreSQL、只读提交快照构建与失败关闭发布执行器；所有重任务串行且一次最多一个临时容器。运行UAT仍为alpha.42/0040旧实现且不连接，系统继续`PRODUCTION NO-GO`；候选Web/Worker镜像/SBOM/漏洞PASS、G2异机恢复和岗位权限矩阵仍分别开放或阻塞。
+`SELFHOST-RELEASE-BROWSER-HARNESS-47`为唯一`DOING`。固定运行时与执行器已落入源码；最近一次干净提交快照执行实际通过9/11项，第10项的非UUID合成错误合同已修正但尚未重跑，第11项尚未执行。Swap约831 MiB/1 GiB超过80%停止阈值，当前暂停启动新重任务且只做轻量核验；没有修改Swap或运行服务。运行UAT仍为alpha.42/0040旧实现且不连接，系统继续`PRODUCTION NO-GO`；候选Web/Worker镜像/SBOM/漏洞PASS、G2异机恢复和岗位权限矩阵仍分别开放或阻塞。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -59,7 +59,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-RELEASE-BROWSER-HARNESS-47 | 固定浏览器运行时与发布E2E门闭环 | DOING | Codex主智能体（唯一写入、串行构建/测试、文档和提交）、项目负责人（未来候选镜像/UAT/生产专项授权） | 2026-08-12 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-TYPECHECK-CLOSURE-46、D-116 | `DOING / RUNTIME DESIGN VERIFIED / EXECUTION PENDING / PRODUCTION NO-GO`。固定6文件、历史Migration head、合成数据库及一个临时容器边界；正在实现固定Playwright/Chromium runtime和失败关闭执行器。见[任务文档](../tasks/SELFHOST-RELEASE-BROWSER-HARNESS-47.md)。 |
+| SELFHOST-RELEASE-BROWSER-HARNESS-47 | 固定浏览器运行时与发布E2E门闭环 | DOING | Codex主智能体（唯一写入、串行构建/测试、文档和提交）、项目负责人（未来候选镜像/UAT/生产专项授权） | 2026-08-12 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-TYPECHECK-CLOSURE-46、D-116 | `DOING / SOURCE IMPLEMENTED / 9 OF 11 OBSERVED PASS / RESOURCE THRESHOLD PAUSE / PRODUCTION NO-GO`。第10项错误合同已修正、11项完整重跑待资源回到阈值内；不连接UAT/生产。见[任务文档](../tasks/SELFHOST-RELEASE-BROWSER-HARNESS-47.md)。 |
 
 ## 已完成任务
 

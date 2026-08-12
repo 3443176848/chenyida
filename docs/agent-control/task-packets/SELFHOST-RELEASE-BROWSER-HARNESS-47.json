@@ -2,12 +2,13 @@
   "schema_version": "chenyida-erp-agent-task/v1",
   "task": {
     "id": "SELFHOST-RELEASE-BROWSER-HARNESS-47",
-    "revision": 1,
+    "revision": 2,
     "ledger_state": "DOING",
-    "delivery_stage": "IMPLEMENTATION",
+    "delivery_stage": "VALIDATION",
     "qualifiers": [
-      "BROWSER_RUNTIME_DESIGN_VERIFIED",
-      "EXECUTION_PENDING",
+      "BROWSER_RUNTIME_SOURCE_IMPLEMENTED",
+      "NINE_OF_ELEVEN_OBSERVED_PASS",
+      "RESOURCE_THRESHOLD_PAUSE",
       "NO_UAT_OR_PRODUCTION_ACCESS",
       "PRODUCTION_NO_GO"
     ],

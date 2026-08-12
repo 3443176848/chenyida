@@ -1,6 +1,6 @@
 # SELFHOST-RELEASE-BROWSER-HARNESS-47 固定浏览器运行时与发布 E2E 门闭环
 
-> 状态：`DOING / RUNTIME DESIGN VERIFIED / EXECUTION PENDING / PRODUCTION NO-GO`
+> 状态：`DOING / SOURCE IMPLEMENTED / 9 OF 11 OBSERVED PASS / RESOURCE THRESHOLD PAUSE / PRODUCTION NO-GO`
 > 日期：2026-08-12（Asia/Shanghai）
 > 严格起点：`main@fbbf2a5d034d11d8a50f823a55ef78d2d32d682d`
 > 责任：Codex 主智能体为唯一写者、串行构建/测试执行者、文档维护者和提交者；项目负责人负责未来候选 Web/Worker 镜像、UAT/生产 Migration/deploy、真实数据、账号权限、员工试用和正式切换专项授权
@@ -62,3 +62,10 @@
 ## 7. 后续边界
 
 本任务完成只关闭固定 Browser runtime 与 6 项 Browser E2E 子门。候选 Web/Worker 镜像 build、镜像级 SBOM/新鲜漏洞 PASS、完整 18 步同候选门、UAT 对齐、真实异机恢复、岗位权限批准、真实迁移、员工试用和正式切换仍分别保持失败关闭并需要适用资源或专项授权。
+
+## 8. 当前执行证据（尚未收口）
+
+- 固定 Browser 镜像、Chromium 可执行身份、精确依赖树、6 文件 inventory、历史模板升级到当前 0045、同容器 PostgreSQL/standalone Web/Chromium、真实 `browser-e2e` 分发及 supervisor 合同均已落入源码；执行器保持断网、只读 rootfs、最小 capability、单临时容器与失败清理。
+- 十二次串行干净提交快照执行用于逐项关闭运行时和历史测试漂移；最近一次执行中 planning revision、purchase traceability、requirement unit resolution、RFQ binding 及 RFQ traceability 前五项共 9/11 已实际通过。第 10 项 Award→PO 的失败路径因测试替身使用非 UUID `request_id` 被当前安全客户端正确升级为 `RESULT_UNKNOWN`；测试现已改为合法固定 UUID，并继续断言错误消息、请求号、无自动重试和数据库零写。第 10 项修正及第 11 项 Supplier Mapping 尚待整套重跑验证，不能标记完成。
+- 最近一次重任务后 available memory 约 2.3 GiB、根盘可用 27 GiB、Load 低于阈值，内核 OOM 0、四服务 restart 0/OOM false，TASK47 临时容器和目录均为 0；但 Swap 为约 831 MiB/1 GiB，超过全仓库 80% 停止阈值。当前只允许轻量检查和文档，禁止启动新的 build、Browser、全量测试或数据库重任务；未修改 Swap、服务或 daemon。
+- 当前最新聚焦修正提交为 `2a230a919ab0e7555ede1b0316b6f2dacaeef9ef`；完整 6 文件/11 测试 PASS、最终 bundle、typecheck、lint及治理收口仍是本任务未完成验收项。
