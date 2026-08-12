@@ -352,7 +352,7 @@
     },
     {
       "path": "tests/selfhost-ai-governance-suggestion-migration-contract.test.mjs",
-      "sha256": "9eede7dcd849180b704f331872da7f5e10d595e2f9a18908f9f6455c7f2cd65d",
+      "sha256": "18c7978c16c5d8e508a36070fa8d155891b2a65f0c2ad10d3b205471613afcd3",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
