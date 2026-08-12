@@ -1803,7 +1803,7 @@
 ## D-119 运行健康采用完整 Migration Manifest、Worker 数据库租约与双侧文件卷探针
 
 - 日期：2026-08-12
-- 状态：`ACCEPTED AS IMPLEMENTATION BASELINE / IMPLEMENTATION IN PROGRESS / RUNTIME NOT AUTHORIZED`
+- 状态：`ACCEPTED AND IMPLEMENTED IN SOURCE / ISOLATED TESTS VERIFIED / RUNTIME NOT AUTHORIZED`
 - 提案与实施：Codex 持续交付负责人及数据迁移、应用测试、运维安全只读智能体，依据项目负责人持续推进G4和仓库内安全实施授权
 - 确认边界：只授权源码、append-only Migration、合成文件目录和隔离PostgreSQL测试；build、UAT/生产Migration、部署、当前卷读取、监控凭据、账号权限和员工试用仍须专项明确授权
 
@@ -1827,7 +1827,9 @@
 
 ### Consequences
 
-- TASK45计划把源码推进到alpha.46/head 0045，并增加health、Worker、文件卷、Migration、Compose和release publisher合同测试；在实现、隔离验证和独立提交完成前，本决定不构成风险关闭。
+- TASK45已把源码推进到alpha.46/head 0045。源码`74940866f7deac7b2751278479e8cefb4df35c1c`/tree`d4673e36b6822deb0f6d2d6058b36c6ffb3cf2f1`与manifest-only直接子提交`dcef6f67c75d771ad3a3dd9fe6f5aa385fc81f92`形成证据链，bundle SHA-256为`090f72189bab8c61fec11810550da4426f123adac6d3d4391da5d49b62028606`。
+- 0045 SHA-256为`cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc`；0001—0044未修改，Schema/233表snapshot/journal/运行查询/release allowlist一致。runtime readiness定向42/42、隔离PostgreSQL5/5、官方Migration harness、release合同44/44、supervisor15/15、TASK45/release-contract定向typecheck及235项inventory通过。
+- 这些证据只关闭仓库与隔离环境风险。当前非生产UAT仍为alpha.42/0040、Worker health=none且运行旧health逻辑；在同候选完整gate、获准build、Migration/deploy和运行验收前，不能声明运行面已修复或允许真实使用。
 - 每个Web health周期和Worker heartbeat都会产生极小、可清理的文件元数据I/O与数据库写；探针频率必须有界，低资源测试需串行并验证无残留、无Swap/OOM/restart异常。
 - 新Worker在有效旧租约存在时失败关闭；部署编排必须等待旧实例停止或租约自然过期，不得人工篡改运行租约来绕过排他。
 - 本决定不授权读取当前持久卷正文、真实数据、build、UAT/生产Migration/deploy、账号权限、监控外发、员工试用、正式切换或清理任何持久对象。

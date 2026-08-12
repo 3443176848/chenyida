@@ -6,7 +6,7 @@
 
 - 唯一未来生产权威方向是 Node.js、PostgreSQL、本地持久文件和独立 Worker。
 - `chenyida-erp-parallel`仍是受控非生产 UAT：Web `0.1.0-alpha.42` / source revision `569aa954d764309e239d1f6c174e582596d33a24`，PostgreSQL 40/head `0040_warehouse_receipt_readiness.sql`。
-- 当前仓库源码为 `0.1.0-alpha.45` / 44/head `0044_identity_session_absolute_lifetime.sql`；0041—0044均未 build、未部署或应用到 UAT。源码与运行面不得描述为同一候选。
+- 当前仓库源码为 `0.1.0-alpha.46` / 45/head `0045_runtime_worker_readiness.sql`；0041—0045均未 build、未部署或应用到 UAT。源码与运行面不得描述为同一候选。
 - Python/SQLite 常驻面仍是开发运行和迁移来源，不是未来生产底座；正式切换前必须另有停写、只读或隔离决定。
 - 入口、受控业务事实与历史操作见 `parallel-http-acceptance.md`；未经任务授权不得登录、发送业务 POST 或查询业务行。
 
@@ -50,7 +50,7 @@ Compose 配置展开需要数据库和 setup 变量；只读状态检查可使�
 6. 执行匿名健康、权限、核心业务、数据汇总、Worker 和备份时效验收；
 7. 观察 restart/OOM、Load、内存、Swap、磁盘和错误率；触发回滚条件立即停止晋升。
 
-TASK42已形成并验证release manifest、Migration allowlist、content-addressed supervisor和`test:release`仓库工具，见[自托管发布门V1](../testing/selfhost-release-gate.md)。host supervisor尚未安装；没有获准构建的alpha.45 Web/Worker精确镜像、镜像级SBOM、新鲜漏洞PASS或完整gate PASS，完整多配置typecheck还有既有失败，UAT仍为alpha.42/0040。因此G3为`REPOSITORY TOOLING VERIFIED / INSTALLATION AND CANDIDATE EVIDENCE BLOCKED`，仍是投产阻断。
+TASK42已形成并验证release manifest、Migration allowlist、content-addressed supervisor和`test:release`仓库工具，见[自托管发布门V1](../testing/selfhost-release-gate.md)。host supervisor尚未安装；没有获准构建的alpha.46 Web/Worker精确镜像、镜像级SBOM、新鲜漏洞PASS或完整gate PASS，完整多配置typecheck还有既有失败，UAT仍为alpha.42/0040。因此G3为`REPOSITORY TOOLING VERIFIED / INSTALLATION AND CANDIDATE EVIDENCE BLOCKED`，仍是投产阻断。
 
 ## 发布制品和Migration操作保护
 
@@ -82,7 +82,7 @@ TASK43已在源码实现D-117安全合同，但当前alpha.42/0040 UAT未部署�
 
 ## 会话超时与撤销处置
 
-alpha.45/0044源码采用8小时 idle、24小时 absolute和一次性超时终态；当前UAT未部署。未来获准部署后，运维只按稳定响应和审计排障：
+alpha.46源码继承0044的8小时 idle、24小时 absolute和一次性超时终态；当前UAT未部署。未来获准部署后，运维只按稳定响应和审计排障：
 
 1. `SESSION_EXPIRED`表示`IDLE_TIMEOUT`或`ABSOLUTE_TIMEOUT`，用户应重新登录；不得手工延长`expires_at`或`absolute_expires_at`。
 2. `SESSION_REVOKED`表示logout、停用、密码重置/修改等明确撤销；先核对受控账号操作和对应Identity Audit，不得恢复旧Token。
@@ -91,6 +91,19 @@ alpha.45/0044源码采用8小时 idle、24小时 absolute和一次性超时终�
 5. 0043→0044升级会让创建超过24小时的旧Session失效。受控Migration前应统计受影响Session数量但不得导出Token摘要；升级通知应明确要求用户重新登录。
 
 完整安全合同和隔离测试范围见[自托管身份安全边界](identity-security.md)。
+
+## Liveness、Readiness与Worker租约处置
+
+alpha.46/0045源码已按D-119实现下列合同，但当前alpha.42/0040 UAT仍未部署；当前Worker显示`running/health=none`只能记录为旧运行事实，不能冒充新合同通过：
+
+1. `/api/live`必须在PostgreSQL Pool初始化前返回，只证明Web进程和版本元数据可读取；它不能用于接流或发布身份。
+2. `/api/health`是readiness。HTTP 200要求Web运行version/Git有效、镜像内root-owned只读Migration allowlist与数据库完整history/checksum一致、数据库时钟下同候选Worker租约新鲜，并且Web实际完成uploads与attachments的随机私有写入、fsync和清理。
+3. Worker启动前执行同一Migration/身份和双卷探针，随后以数据库时钟、generation和CAS version单飞续租；Docker healthcheck还必须读取本进程node-owned `0600` UUID文件并核对同一实例。有效旧租约存在时新实例失败关闭，只能等待旧实例停止或租约过期，禁止手工UPDATE/DELETE租约绕过排他。
+4. `RUNTIME_DATABASE_UNAVAILABLE`、`RUNTIME_MIGRATION_MISMATCH`、`RUNTIME_WORKER_UNAVAILABLE`、`RUNTIME_UPLOADS_UNAVAILABLE`、`RUNTIME_ATTACHMENTS_UNAVAILABLE`或身份/超时类稳定代码出现时，先停止候选晋升，记录request ID、时间和component状态；不得记录连接串、SQL、路径、instance ID、堆栈或原始异常。
+5. 检查Worker日志中的`worker_runtime_lease_lost`、`worker_runtime_stop_failed`和`worker_instance_cleanup_failed`稳定事件，再核对Docker health、数据库Migration及挂载权限。不得通过改healthcheck、延长陈旧租约或删除业务文件恢复绿色状态。
+6. 发布runtime identity前必须同时看到精确Web与Worker容器为`healthy`；Web ready但Worker非healthy、版本/Migration身份不同或探针失败均拒绝发布。备份时效仍由独立Dashboard/recovery governance判断，不混入公开readiness。
+
+完整合同和隔离证据见[任务45记录](../tasks/SELFHOST-RUNTIME-HEALTH-TRUTH-45.md)及[D-119](../project/DECISIONS.md#d-119-运行健康采用完整-migration-manifestworker-数据库租约与双侧文件卷探针)。
 
 ## 监控、备份和上线缺口
 

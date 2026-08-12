@@ -19,8 +19,8 @@
 - 安装器合同：`npm run test:release:supervisor-python`。
 - 完整候选门：`npm run test:release`，但只能由已安装 supervisor 调用。
 - Migration隔离测试：`npm run test:release:migration-postgres`。
-- Node源码门：`npm run test:release:node-source`，先 build，再按冻结清单串行运行110个纯Node测试文件；数据库、浏览器和专用POSIX文件由各自独立门负责。
-- PostgreSQL清单门：`npm run test:release:postgres-regression`，在一个断网、只读、资源受限的PostgreSQL容器内，按冻结清单串行执行82个文件并为每个文件创建/销毁隔离数据库。
+- Node源码门：`npm run test:release:node-source`，先 build，再按冻结清单串行运行112个纯Node测试文件；数据库、浏览器和专用POSIX文件由各自独立门负责。
+- PostgreSQL清单门：`npm run test:release:postgres-regression`，在一个断网、只读、资源受限的PostgreSQL容器内，按冻结清单串行执行83个文件并为每个文件创建/销毁隔离数据库。
 - POSIX专用门：`npm run test:release:special-posix`，使用内容寻址的完整Node/Python/Git镜像，在只读同路径快照和有界tmpfs内串行执行4个文件；Browser门入口为`npm run test:release:browser-e2e`，在受控运行时补齐前必须失败关闭。
 - 全TypeScript门：`npm run typecheck:release`，逐个执行所有`tsconfig*.json`；任一失败即停止。
 
@@ -46,7 +46,7 @@ Supervisor bundle manifest 必须引用一个已经提交且不再修改的 sour
 1. 从 clean、已提交的精确 Git SHA 串行构建不同的 Web 与 Worker 镜像，并得到 registry digest reference、Docker image config digest、平台和 OCI/baked version/revision；禁止用浮动 tag 作为身份。
 2. 准备固定 Trivy `0.70.0`镜像和不超过72小时的本地漏洞库。证据生产器使用`docker image save`后的离线 archive，断网、无 Docker socket、`--pull=never`运行 Trivy，为 Web/Worker分别生成原生 JSON 和 CycloneDX；不得使用源码 lockfile 清单冒充镜像 SBOM。
 3. 在仓库外创建唯一候选制品根；由项目负责人生成 root-owned、canonical、`0400`、24小时内有效且一次性的`CREATE_IMAGE_EVIDENCE`授权，调用已安装 launcher。完成后核对 producer/bundle/authorization摘要和全部原始证据摘要。
-4. 生成新的`RUN_RELEASE_GATE`授权并调用 launcher。18步依次覆盖 release 合同、supervisor Python合同、凭证扫描、build+全部Node测试、82文件PostgreSQL回归、Browser E2E、POSIX专用测试、全部tsconfig、ESLint、隔离Migration、备份恢复、Python三基线、Compose config、`git diff --check`、镜像SBOM和漏洞证据。
+4. 生成新的`RUN_RELEASE_GATE`授权并调用 launcher。18步依次覆盖 release 合同、supervisor Python合同、凭证扫描、build+全部Node测试、83文件PostgreSQL回归、Browser E2E、POSIX专用测试、全部tsconfig、ESLint、隔离Migration、备份恢复、Python三基线、Compose config、`git diff --check`、镜像SBOM和漏洞证据。
 5. 只有 gate report 为`PASS`且所有证据仍新鲜，才生成`CREATE_RELEASE_MANIFEST`授权。manifest同时绑定同一 commit/tree、镜像、Migration、plan/report、SBOM/security和允许的 deployment class。
 6. 独立复核 manifest SHA、有效期和`promotion_status=ELIGIBLE`。UAT Migration/deploy、runtime identity发布、登录式验收和正式晋升仍分别需要新的专项授权；gate通过不会修改运行面。
 
@@ -62,9 +62,9 @@ Supervisor bundle manifest 必须引用一个已经提交且不再修改的 sour
 
 ## 当前事实与未验证范围
 
-- TASK42候选快照曾通过完整Node 107文件/886、PostgreSQL 80文件/367、POSIX 4文件/29等仓库门。TASK43把inventory扩展为230/206/24；TASK44进一步扩展为232/208/24（Node110、PostgreSQL82、Browser6等），增加会话deadline静态契约与PostgreSQL并发测试。TASK44已通过身份定向、0044空库/升级/回滚和并发测试；完整110文件Node-source、82文件PostgreSQL、Browser或18步正式候选门仍须由已提交候选和受控supervisor执行。
+- TASK42候选快照曾通过完整Node 107文件/886、PostgreSQL 80文件/367、POSIX 4文件/29等仓库门。TASK43/TASK44依次把inventory扩展为230/206/24和232/208/24；TASK45现扩展为235/211/24（Pure Node112、PostgreSQL83、Browser6、历史22、PG alias2、release contract6、special4），增加完整Migration/Worker租约/双卷/readiness合同。TASK45已通过定向42/42、隔离PG5/5、官方Migration harness、release44/44及supervisor15/15；完整112文件Node-source、83文件PostgreSQL、Browser或18步正式候选门仍须由已提交候选和受控supervisor执行。
 - 当前没有安装 host supervisor，也没有修改 systemd、权限、网络、Docker daemon 或运行中的 Compose。
-- alpha.45/0044尚未 build；不存在同候选 Web/Worker 镜像、真实 Trivy image evidence、完整 gate `PASS`或`ELIGIBLE`manifest。
+- alpha.46/0045尚未 build；不存在同候选 Web/Worker 镜像、真实 Trivy image evidence、完整 gate `PASS`或`ELIGIBLE`manifest。
 - 本机没有获准拉取 Trivy镜像或漏洞库，因此当前只能验证合同和合成 fixture，不能声称漏洞状态已评估。
 - 本机及已缓存镜像均不存在Chromium、Playwright模块或浏览器测试镜像；Browser 6尚未运行，正式Browser步骤会以`RELEASE_TEST_REQUIRED_HARNESS_NOT_AVAILABLE:browser-e2e`失败关闭。
 - 完整多配置 typecheck 已暴露仓库既有 ES2017 BigInt/历史类型与示例依赖错误；发布门会如实拒绝该候选，不能把定向合同 typecheck 代替它。

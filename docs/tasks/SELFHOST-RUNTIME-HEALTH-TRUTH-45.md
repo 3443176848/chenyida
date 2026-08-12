@@ -1,6 +1,6 @@
 # SELFHOST-RUNTIME-HEALTH-TRUTH-45 运行健康、Worker 租约与文件卷真实性加固
 
-> 状态：`DOING / REPOSITORY AND ISOLATED TESTS ONLY / PRODUCTION NO-GO`
+> 状态：`DONE / REPOSITORY AND ISOLATED TESTS VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`
 > 日期：2026-08-12（Asia/Shanghai）
 > 严格起点：`main@43b6d81d21a9c5cecd567893b1ab6cf320afff05`
 > 责任：Codex 主智能体为唯一写者、测试执行者、文档维护者和提交者；数据迁移、应用测试、运维安全三个子智能体只读审计；项目负责人负责未来 build、UAT/生产 Migration、部署、监控凭据、员工试用和正式切换专项授权
@@ -32,17 +32,17 @@
 
 ## 4. 验收标准
 
-- [ ] 0045 单服务租约具备有效实例排他、数据库时钟、过期接管、同实例CAS续租、幂等停止、格式/时序约束和待健康查询索引；0001—0044 checksum不变。
-- [ ] Worker 启动时验证 runtime version/Git、完整Migration manifest、uploads和attachments双卷可写；空闲时仍持续单飞heartbeat，丢失租约后停止新轮询并最终非健康。
-- [ ] Web readiness 精确拒绝缺失/额外/重排/checksum漂移Migration，拒绝缺失/过期/STOPPED/身份漂移Worker，并使用PostgreSQL时间判断新鲜度。
-- [ ] Web与Worker文件卷探针覆盖成功、只读/权限失败、非目录、symlink/替换、写入/fsync/清理失败；只删除本次随机探针，不接触业务正文或返回路径。
-- [ ] 匿名并发health共享single-flight短TTL结果，不造成按请求次数写盘；缓存不掩盖已到期Worker租约或持续存储失败。
-- [ ] `/api/live`与`/api/health`语义分离；ready响应保留兼容字段且新增有界事实，失败统一503/稳定代码/中文提示/request ID/no-store且无敏感泄露。
-- [ ] Compose为Worker增加healthcheck，Web healthcheck继续消费readiness；release identity publisher要求Worker `healthy`，配置合同和回退说明一致。
-- [ ] `/api/live`在Pool初始化前可用；Worker healthcheck读取本次进程`0600` UUID并只查询同一实例，Docker restart不能在旧租约窗口假健康。
-- [ ] 0045覆盖空库、0044已有数据升级、重复执行、活租约拒绝、过期接管、约束、失败回滚、Schema/snapshot/journal一致性；隔离PostgreSQL验证不接触UAT。
-- [ ] 定向unit/handler/Worker/Storage/Migration/PostgreSQL、相关回归、TASK45 typecheck、lint、release inventory、敏感信息和`git diff --check`通过。
-- [ ] 更新`MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md`、`PROJECT_CONTEXT.md`、`PRODUCTION_READINESS.md`、`ROADMAP.md`、D-119及运维/部署/测试文档，形成源码、manifest-only和治理独立提交链。
+- [x] 0045 单服务租约具备有效实例排他、数据库时钟、过期接管、同实例CAS续租、幂等停止、格式/时序约束和主键健康查询索引；0001—0044 checksum不变。
+- [x] Worker 启动时验证 runtime version/Git、完整Migration manifest、uploads和attachments双卷可写；空闲时仍持续单飞heartbeat，丢失租约后停止新轮询并最终非健康。
+- [x] Web readiness 精确拒绝缺失/额外/重排/checksum漂移Migration，拒绝缺失/过期/STOPPED/身份漂移Worker，并使用PostgreSQL时间判断新鲜度。
+- [x] Web与Worker文件卷探针覆盖成功、只读/权限失败、非目录、symlink/替换、写入/fsync/清理失败；只删除本次随机探针，不接触业务正文或返回路径。
+- [x] 匿名并发health共享single-flight短TTL结果，不造成按请求次数写盘；缓存不掩盖已到期Worker租约或持续存储失败。
+- [x] `/api/live`与`/api/health`语义分离；ready响应保留兼容字段且新增有界事实，失败统一503/稳定代码/中文提示/request ID/no-store且无敏感泄露。
+- [x] Compose为Worker增加healthcheck，Web healthcheck继续消费readiness；release identity publisher要求Worker `healthy`，配置合同和回退说明一致。
+- [x] `/api/live`在Pool初始化前可用；Worker healthcheck读取本次进程`0600` UUID并只查询同一实例，Docker restart不能在旧租约窗口假健康。
+- [x] 0045覆盖空库、0044已有数据升级、重复执行、活租约拒绝、过期接管、约束、失败回滚、Schema/snapshot/journal一致性；隔离PostgreSQL验证不接触UAT。
+- [x] 定向unit/handler/Worker/Storage/Migration/PostgreSQL、相关回归、TASK45 typecheck、lint、release inventory、敏感信息和`git diff --check`通过。
+- [x] 更新`MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md`、`PROJECT_CONTEXT.md`、`PRODUCTION_READINESS.md`、`ROADMAP.md`、D-119及运维/部署/测试文档，形成源码、manifest-only和治理独立提交链。
 
 ## 5. 禁止范围
 
@@ -63,4 +63,12 @@
 
 ## 7. 完成证据
 
-执行中；只有源码、隔离测试、文档与独立提交全部完成后填写。运行UAT在获得专项授权并完成同候选build/Migration/deploy前仍保留旧误报行为，系统继续`PRODUCTION NO-GO`。
+任务已在仓库与隔离环境完成，运行UAT未部署，系统继续`PRODUCTION NO-GO`：
+
+- 源码提交`74940866f7deac7b2751278479e8cefb4df35c1c`、tree`d4673e36b6822deb0f6d2d6058b36c6ffb3cf2f1`把版本推进到alpha.46/head 0045；0045 SHA-256为`cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc`，0001—0044规范前缀digest仍为`16d9b3169e58dc010b6061d3f1299b9f1a3582ae2430cf119d931204efdd34d8`。
+- manifest-only直接子提交`dcef6f67c75d771ad3a3dd9fe6f5aa385fc81f92`只更新canonical supervisor bundle；bundle SHA-256为`090f72189bab8c61fec11810550da4426f123adac6d3d4391da5d49b62028606`。
+- 定向runtime readiness 42/42、隔离PostgreSQL 5/5、官方release Migration harness、release合同44/44、supervisor Python 15/15、TASK45与release-contract定向typecheck、Compose config和lint 0 error/11条既有warning通过；release inventory为235/211/24。
+- 治理收口已重跑1,564个仓库文件的凭据扫描、109个本地Markdown链接、134项控制协议测试和只读控制器；Shell/JSON、任务路径白名单、资源门禁与`git diff --check`均通过。
+- 测试期间available约1.9—2.0 GiB，Swap约449→453 MiB/1 GiB，根盘约30 GiB，Load1低于1；收口终检为available约2.0 GiB、Swap453 MiB、根盘30 GiB、Load`0.08/0.20/0.22`，当日内核OOM 0，四服务restart0/OOM false。四个受保护Volume只核验metadata存在，任务容器、隔离数据库和临时文件均清零。没有build、UAT/生产Migration/deploy、当前卷正文读取、账号或业务写。
+
+当前非生产UAT仍为alpha.42/0040且Worker没有Docker health状态；只有未来同候选build、完整release gate、专项授权Migration/deploy及运行验收后，才能证明该运行面关闭误报。

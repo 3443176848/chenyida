@@ -1,6 +1,6 @@
 # 同机并行 HTTP 验收环境运维说明
 
-本说明只适用于 Compose 项目 `chenyida-erp-parallel`。环境标识为 `PARALLEL HTTP ACCEPTANCE ONLY`，不是生产环境；不得迁入真实数据、切流、双写、启动 Caddy、开放 PostgreSQL、占用 80/443、修改 DNS 或防火墙。
+本说明只适用于 Compose 项目`chenyida-erp-parallel`。环境标识为`CONTROLLED NON-PRODUCTION UAT`，不是生产环境；当前Caddy已按历史受控任务在公网18888终止TLS，但不得据此迁入真实数据、切生产流量、双写、开放PostgreSQL、修改DNS或防火墙。
 
 ## 固定边界
 
@@ -10,7 +10,8 @@
 - 管理员临时凭据：`/etc/chenyida-erp/parallel-admin.txt`，`root:root`、`0600`
 - Web：宿主机仅 `127.0.0.1:3000`
 - PostgreSQL：只在 Compose 网络暴露 `5432/tcp`，无宿主机映射
-- 旧 Python：继续独立监听 `0.0.0.0:18888`，不得由本环境操作
+- Caddy：历史受控公网入口为`https://43.135.148.43.nip.io:18888`，不得由普通验收任务修改
+- 旧 Python：继续独立监听`127.0.0.1:18889`，不得由本环境操作
 
 所有 Compose 命令都必须显式带项目名、env 文件和 compose 文件：
 
@@ -48,13 +49,13 @@ docker compose --project-name chenyida-erp-parallel \
   --env-file /etc/chenyida-erp/parallel.env \
   -f compose.yml ps -a
 curl --fail http://127.0.0.1:3000/api/health
-curl --fail http://127.0.0.1:18888/
+curl --fail http://127.0.0.1:18889/
 free -h
 df -h /opt/erp
-ss -lntp '( sport = :3000 or sport = :5432 or sport = :18888 )'
+ss -lntp '( sport = :3000 or sport = :5432 or sport = :18888 or sport = :18889 )'
 ```
 
-正常状态为 PostgreSQL healthy、migrate exited 0、Web healthy、Worker running；Web 只显示 `127.0.0.1:3000->3000/tcp`，PostgreSQL 不显示宿主端口。
+当前alpha.42/0040旧运行面的事实为PostgreSQL/Web healthy、Worker/Caddy running且Worker `health=none`；这不是D-119通过。只有未来alpha.46/0045或后续同候选获准部署后，正常状态才要求PostgreSQL、Web、Worker全部healthy，`/api/live`返回LIVE、`/api/health`返回READY且version/revision/Migration head与候选一致。Web仍只显示`127.0.0.1:3000->3000/tcp`，PostgreSQL不得显示宿主端口。
 
 ## 日志与重启
 
@@ -68,11 +69,11 @@ docker compose --project-name chenyida-erp-parallel \
   -f compose.yml restart postgres web worker
 ```
 
-PostgreSQL 短暂重启时 Worker 会记录去敏的 `postgres_idle_client_error` / `worker_poll_failed` 并重试；日志不得包含密码、token 或数据库 URL。当前 TASK05 基线重启后必须重新确认 19 个 migration、唯一管理员、零临时账号和零 Phase 4 验收业务、Web healthy 和 Worker running；历史 TASK01 的 15 migration 结论只保留在当时验收记录中。
+PostgreSQL短暂重启时旧Worker会记录去敏的`postgres_idle_client_error`/`worker_poll_failed`并重试；0045候选还必须让运行租约失效并使Worker health失败，恢复后重新验证精确实例。日志不得包含密码、token、数据库URL、SQL、文件路径或instance UUID。当前UAT重启后必须只读确认40/head0040、既有受控业务基线、Web/PostgreSQL healthy、Worker/Caddy running及restart/OOM；未来0045部署后改为核对完整45行checksum和Web/Worker双healthy。历史TASK01/TASK05的15/19 migration只保留在各自验收记录中。
 
 ## 资源停止条件
 
-若可用内存持续低于 500MB、swap 快速增长、load 持续异常、磁盘低于 15GB，或 Python PID/18888 异常，只停止新项目并保留 Volume：
+若available memory低于768MiB、Swap使用率超过80%、60秒增长超过256MiB、根盘低于10GiB、Load1持续3分钟高于4，或出现OOM、反复重启、数据库失去健康、SSH卡顿、Python/18889异常，只停止新任务并保留Volume：
 
 ```bash
 cd /opt/erp/chenyida_erp_site

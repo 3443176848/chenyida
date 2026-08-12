@@ -4,13 +4,15 @@
 
 ## 2026-08-12
 
-### SELFHOST-RUNTIME-HEALTH-TRUTH-45 - `docs: start runtime health truth hardening`（执行中）
+### SELFHOST-RUNTIME-HEALTH-TRUTH-45 - `fix: enforce truthful runtime readiness` / `build: bind runtime readiness supervisor bundle` / `docs: close runtime readiness hardening`
 
-- 调度/边界：TASK44收口后的零DOING按持续交付路线切换为TASK45唯一active task。严格起点为`main@43b6d81d21a9c5cecd567893b1ab6cf320afff05`、tree`c034ac2…`、alpha.45/0044；UAT只引用既有文档事实alpha.42/0040，本任务不连接复核。
-- 缺口：当前health只执行`select 1`后固定声明storage/worker正常；Worker没有空闲进程心跳或Docker healthcheck，Web/Worker没有文件卷可写探针，数据库完整Migration与Web/Worker运行身份也未比对。
-- 决策：D-119采用append-only 0045单服务Worker排他租约、数据库时钟与CAS、完整Migration manifest、Web/Worker双侧uploads/attachments写入+fsync+清理探针，并把`/api/live`与失败关闭readiness分离。备份/RPO继续由TASK41 recovery governance负责，不复制进公开health。
-- 计划：覆盖空库/0044升级/重放/回滚、活租约拒绝/过期接管、Worker空闲心跳/丢租、Migration缺失/额外/checksum漂移、文件权限/只读/替换/清理失败、HTTP503稳定错误与无泄漏、Compose和release publisher Worker healthy合同。
-- 安全/资源：只允许仓库源码、合成目录和隔离PostgreSQL；不build/deploy，不访问UAT/生产、当前四卷正文、账号或业务数据。起点available约2.0GiB、Swap442MiB/1GiB、根盘31GiB、Load`0.14/0.22/0.30`；四服务restart0/OOM false。
+- 调度/边界：TASK44收口后的零DOING按持续交付路线切换为TASK45唯一active task，再按`DOING→DONE`释放active slot。严格起点为`main@43b6d81d21a9c5cecd567893b1ab6cf320afff05`、alpha.45/0044；UAT只引用既有文档事实alpha.42/0040，本任务未连接复核。
+- 健康语义：新增数据库初始化前的`/api/live`；`/api/health`改为失败关闭readiness，精确核对Web运行身份、源码root-owned只读Migration清单、数据库完整history/checksum、同候选Worker新鲜租约及uploads/attachments真实写入、fsync与清理。公开失败只返回稳定代码、中文提示、request ID和component状态，不返回SQL、路径、instance ID或原始异常。
+- Worker/文件：0045建立固定service slot、UUID、generation、CAS version、数据库时钟和RUNNING/STOPPED租约；有效租约排斥第二实例，过期或停止后才能接管。Worker启动前核验身份/Migration/双卷，运行期单飞续租并在轮询/发布前核对精确实例；容器内`0600` UUID文件使Docker healthcheck不能借旧租约假健康。随机私有探针只清理本次inode闭合对象。
+- Migration/发布：新增append-only`0045_runtime_worker_readiness.sql`，SHA-256为`cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc`；0001—0044前缀digest保持`16d9b316…34d8`，Schema/snapshot/journal/运行查询/release allowlist一致。发布身份工具要求Web与Worker同时healthy，源码版本为alpha.46/head0045。
+- Git/证据：源码`74940866f7deac7b2751278479e8cefb4df35c1c`/tree`d4673e36b6822deb0f6d2d6058b36c6ffb3cf2f1`与manifest-only直接子提交`dcef6f67c75d771ad3a3dd9fe6f5aa385fc81f92`形成证据链；bundle SHA-256为`090f72189bab8c61fec11810550da4426f123adac6d3d4391da5d49b62028606`。
+- 验证：runtime readiness定向42/42、隔离PostgreSQL5/5、官方release Migration harness、release合同44/44、supervisor Python15/15、TASK45/release-contract定向typecheck、Compose config和lint 0 error/11既有warning通过；inventory为235/211/24（Pure Node112、PostgreSQL83、Browser6、历史22、PG alias2、release contract6、special4）。治理收口再通过1,564文件凭据扫描、109个本地Markdown链接、134项控制协议、只读控制器、Shell/JSON、范围与`git diff --check`。
+- 安全/资源：未运行完整候选Node/PostgreSQL/Browser/全部tsconfig、build/SBOM/漏洞或18步候选门；未访问UAT/生产、当前卷正文、账号或业务数据。验证期间available约1.9—2.0GiB、Swap449→453MiB/1GiB、根盘约30GiB、Load1低于1；四服务restart0/OOM false，临时容器/数据库/文件清零。UAT仍alpha.42/0040旧实现，系统继续`PRODUCTION NO-GO`。
 
 ### SELFHOST-IDENTITY-SESSION-SAFETY-44 - `fix: enforce absolute session lifetime` / `build: bind session safety supervisor bundle` / `docs: close session lifetime hardening`
 

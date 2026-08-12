@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-RUNTIME-HEALTH-TRUTH-45`。任务从`main@43b6d81d21a9c5cecd567893b1ab6cf320afff05`、alpha.45/0044严格起步，只在仓库、合成文件目录和隔离PostgreSQL中实现完整Migration manifest、Worker运行租约、Web/Worker双侧文件卷探针及失败关闭health；不连接UAT/生产，不读取当前四卷正文，不build/deploy。非生产UAT仍为alpha.42/0040，系统继续`PRODUCTION NO-GO`。G2仍因异机目标、RPO/RTO、加密/保留责任和真实数据专项授权阻塞；岗位权限矩阵等待业务负责人确认，`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
+当前没有`DOING`任务。`SELFHOST-RUNTIME-HEALTH-TRUTH-45`已在alpha.46/0045源码提交`7494086`、manifest-only直接子提交`dcef6f6`和本治理提交中完成仓库/隔离验证；运行UAT仍为alpha.42/0040旧实现，系统继续`PRODUCTION NO-GO`。下一调度将优先关闭当前候选完整typecheck与Browser运行时等发布门缺口；G2仍因异机目标、RPO/RTO、加密/保留责任和真实数据专项授权阻塞，岗位权限矩阵等待业务负责人确认，`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -35,6 +35,8 @@
 
 2026-08-12第十一次调度事件：主智能体从TASK44收口后的零`DOING`自动选择G4剩余最高优先级仓库任务，状态按`SELFHOST-RUNTIME-HEALTH-TRUTH-45 TODO → DOING`切换唯一active slot。D-119固定完整Migration manifest、数据库时钟Worker排他租约、Web/Worker双侧uploads/attachments可写探针、`/api/live`与readiness分离及Worker Docker healthcheck；范围只含源码、append-only 0045、合成目录和隔离PostgreSQL，不连接UAT/生产、读取当前卷正文或执行build/deploy。数据、应用、运维三个子智能体只读审计，主智能体保持唯一写者。
 
+2026-08-12第十二次调度事件：`SELFHOST-RUNTIME-HEALTH-TRUTH-45 DOING → DONE`。源码`74940866f7deac7b2751278479e8cefb4df35c1c`/tree`d4673e36b6822deb0f6d2d6058b36c6ffb3cf2f1`与manifest-only直接子提交`dcef6f67c75d771ad3a3dd9fe6f5aa385fc81f92`形成可追溯链，bundle SHA-256为`090f72189bab8c61fec11810550da4426f123adac6d3d4391da5d49b62028606`。alpha.46/0045、完整Migration核验、数据库时钟Worker排他租约、双卷真实探针、live/readiness分离及Web/Worker双healthy发布合同通过定向42项、隔离PG5项、官方Migration harness、release44项及supervisor15项验证；没有build、UAT Migration/deploy或运行面访问，系统继续`PRODUCTION NO-GO`。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -51,12 +53,14 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-RUNTIME-HEALTH-TRUTH-45 | 运行健康、Worker租约与文件卷真实性加固 | DOING | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来build/UAT/生产Migration/deploy/监控凭据专项授权） | 2026-08-12 | - | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-IDENTITY-SESSION-SAFETY-44、D-119 | `DOING / REPOSITORY AND ISOLATED TESTS ONLY / PRODUCTION NO-GO`。实现完整Migration manifest、Worker运行租约、Web/Worker双侧文件卷探针、失败关闭health及Worker healthcheck；不访问运行面。见[任务文档](../tasks/SELFHOST-RUNTIME-HEALTH-TRUTH-45.md)及[D-119](DECISIONS.md#d-119-运行健康采用完整-migration-manifestworker-数据库租约与双侧文件卷探针)。 |
+
+当前无执行中任务；TASK45收口后由持续交付调度自动创建下一唯一任务。
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-RUNTIME-HEALTH-TRUTH-45 | 运行健康、Worker租约与文件卷真实性加固 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来build/UAT/生产Migration/deploy/监控凭据专项授权） | 2026-08-12 | 2026-08-12 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-IDENTITY-SESSION-SAFETY-44、D-119 | `DONE / REPOSITORY AND ISOLATED TESTS VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`。源码`7494086`与manifest-only `dcef6f6`形成证据链；alpha.46/0045实现完整Migration manifest、DB时钟Worker租约、双卷探针、live/readiness分离和Worker healthcheck。定向42/42、隔离PG5/5、官方Migration harness、release44/44及inventory235/211/24通过；UAT仍alpha.42/0040。见[任务文档](../tasks/SELFHOST-RUNTIME-HEALTH-TRUTH-45.md)及[D-119](DECISIONS.md#d-119-运行健康采用完整-migration-manifestworker-数据库租约与双侧文件卷探针)。 |
 | SELFHOST-IDENTITY-SESSION-SAFETY-44 | 会话绝对寿命、原子认证与超时审计加固 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、既有三线只读投产审计（风险输入）、项目负责人（未来UAT/生产Migration/deploy/账号专项授权） | 2026-08-12 | 2026-08-12 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-MATERIAL-IMPORT-SAFETY-43、D-118 | `DONE / REPOSITORY AND ISOLATED TESTS VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`。源码`e7b0298`与manifest-only `c730fef`形成证据链；alpha.45/0044实现8h idle+24h absolute、DB时钟原子认证、超时单次终态/审计和失效Cookie清理。定向55/55、隔离PG21/21、官方Migration harness及inventory232/208/24通过；UAT仍alpha.42/0040。见[任务文档](../tasks/SELFHOST-IDENTITY-SESSION-SAFETY-44.md)及[D-118](DECISIONS.md#d-118-会话采用8小时-idle24小时-absolute数据库时钟原子认证与单次超时审计)。 |
 | SELFHOST-MATERIAL-IMPORT-SAFETY-43 | 物料导入fallback幂等、文件原子性与任务所有权加固 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、既有三条只读审计证据、项目负责人（未来UAT/生产Migration/deploy/真实数据专项授权） | 2026-08-12 | 2026-08-12 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-RELEASE-GATE-42、PR-004、D-117 | `DONE / REPOSITORY AND ISOLATED TESTS VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`。源码`5767c92`与manifest-only `dad7468`形成证据链；持久幂等、正文前owner/状态/CAS、私有staging/无覆盖原子提升、真实文件检查、协调恢复、job所有权和worker终态事务通过，append-only head为0043。UAT仍alpha.42/0040。见[任务文档](../tasks/SELFHOST-MATERIAL-IMPORT-SAFETY-43.md)、[自托管安全合同](../material-master/material-import-selfhost-safety-v1.md)及[D-117](DECISIONS.md#d-117-物料导入-fallback-采用持久幂等staging-原子提升与可恢复协调)。 |
 | SELFHOST-OPS-RELEASE-GATE-42 | 发布候选身份、Migration Allowlist与强制测试门 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、应用测试/数据迁移/运维安全智能体（只读审计）、项目负责人（未来build/UAT/发布专项授权） | 2026-08-12 | 2026-08-12 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、PR-003、PR-005、D-115、D-116 | `DONE / REPOSITORY TOOLING VERIFIED / CANDIDATE EVIDENCE BLOCKED / PRODUCTION NO-GO`。源码`d022f2c`与manifest-only `f67cc41`形成36文件content-addressed supervisor链；18步门、Migration allowlist及隔离回归已验证。Browser、完整typecheck、候选镜像/SBOM/新鲜漏洞PASS仍阻止真实候选晋升，未build/deploy或连接UAT。见[任务文档](../tasks/SELFHOST-OPS-RELEASE-GATE-42.md)及[D-116](DECISIONS.md#d-116-发布候选采用不可变证据包精确-migration-allowlist-与失败关闭串行门)。 |

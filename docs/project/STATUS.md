@@ -2,18 +2,21 @@
 
 最后更新时间：2026-08-12（Asia/Shanghai）
 
-## SELFHOST-RUNTIME-HEALTH-TRUTH-45（执行中；仓库与隔离测试）
+## SELFHOST-RUNTIME-HEALTH-TRUTH-45（完成；仓库与隔离验证，运行面未部署）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / IMPLEMENTATION IN PROGRESS / PRODUCTION NO-GO | 唯一active task；尚未完成实现或验收，系统不能交给真实员工 |
-| 严格起点 | PASS / CONTROLLED | `main@43b6d81d21a9c5cecd567893b1ab6cf320afff05`、tree`c034ac2…`、alpha.45/0044；UAT仍按文档为alpha.42/0040且未连接 |
-| 已确认缺口 | OPEN / REPRODUCIBLE IN SOURCE | health仅`select 1`后固定返回storage/worker正常；Worker无进程租约和Docker healthcheck；双文件卷无可写探针；完整Migration与Web/Worker身份未比对 |
-| D-119目标 | ACCEPTED IMPLEMENTATION BASELINE | 完整Migration manifest、DB时钟Worker排他租约/CAS、Web/Worker双侧写入+fsync+清理探针、live/readiness分离、append-only 0045 |
-| 当前范围 | CONTROLLED | 只改仓库源码、0045、合成文件目录、隔离PostgreSQL测试和文档；备份/RPO、岗位权限和运行面另行治理 |
-| 运行面影响 | NONE | 不连接或修改UAT/生产，不build/deploy/restart，不读取当前四卷正文或业务数据 |
-| 起点资源 | PASS | available约2.0GiB、Swap442MiB/1GiB、根盘31GiB、Load`0.14/0.22/0.30`；Web/PostgreSQL healthy、Worker/Caddy running、restart0/OOM false |
-| 外部资源 | NOT REQUIRED FOR CURRENT IMPLEMENTATION | build、UAT/生产Migration/deploy、监控凭据、账号权限和员工试用仍须专项明确授权 |
+| 最终状态 | DONE / REPOSITORY AND ISOLATED TESTS VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO | D-119仓库缺口关闭；运行UAT仍是旧实现，系统不能交给真实员工 |
+| 严格起点/最终源码 | PASS / CONTROLLED | 从`main@43b6d81d…`、alpha.45/0044起步；最终源码为alpha.46/0045，UAT仍按文档为alpha.42/0040且未连接 |
+| Git身份 | PASS / TWO-COMMIT BUNDLE | 源码`74940866f7deac7b2751278479e8cefb4df35c1c`/tree`d4673e36b6822deb0f6d2d6058b36c6ffb3cf2f1`，manifest-only直接子提交`dcef6f67c75d771ad3a3dd9fe6f5aa385fc81f92`；bundle SHA-256 `090f7218…8606` |
+| D-119实现 | PASS | 完整Migration manifest、DB时钟Worker排他租约/CAS、双侧双卷写/fsync/清理探针、`/api/live`与readiness分离、Web/Worker双healthy发布合同均已落地 |
+| Migration | PASS / APPEND ONLY | 0045 SHA-256 `cc4685a0…80fc`；0001—0044未修改，Schema/233表snapshot/journal/查询/allowlist一致，官方release Migration harness退出0 |
+| API/去敏 | PASS / FAIL CLOSED | 数据库、Migration、Worker、uploads、attachments或运行身份失败返回503、稳定中文代码/request ID/no-store；不返回SQL、路径、连接串、instance UUID、堆栈或原始异常 |
+| 自动验证 | PASS / SCOPED | 定向42/42、隔离PG5/5、release44/44、supervisor15/15、TASK45/release-contract定向typecheck、Compose config、inventory235/211/24、lint 0 error/11既有warning通过；凭据扫描1,564文件、本地链接109、控制协议134及Shell/JSON/diff/范围门通过 |
+| 未运行门禁 | OPEN / HONEST | 未运行完整112文件Node-source、83文件PostgreSQL、Browser6、全部tsconfig、候选build/SBOM/漏洞或18步候选门 |
+| 运行面影响 | NONE | 不连接或修改UAT/生产，不build/deploy/restart，不读取当前四卷正文或业务数据；当前Worker仍是旧镜像且health=none |
+| 资源/清理 | PASS | 验证期间available约1.9—2.0GiB、Swap449→453MiB/1GiB、根盘约30GiB、Load1低于1；四服务restart0/OOM false，任务容器/测试库/临时文件清零 |
+| 外部资源 | STILL REQUIRED FOR RUNTIME | 同候选完整gate、build、UAT/生产Migration/deploy、监控告警、账号权限和员工试用仍须专项明确授权 |
 
 ## SELFHOST-IDENTITY-SESSION-SAFETY-44（完成；仓库与隔离验证，运行面未部署）
 

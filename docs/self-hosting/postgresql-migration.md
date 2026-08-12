@@ -4,7 +4,7 @@
 
 ## 数据库基线
 
-`drizzle-postgres/0001_selfhost_baseline.sql`是自托管 PostgreSQL 空库 baseline，共46张表：45张业务/治理表加`background_jobs`。它不是历史 D1 `0000`—`0008`的机械翻译。当前源码 Migration 为`0001`—`0041`，head 是`0041_ai_governance_suggestion_evidence.sql`；运行中的非生产 UAT 仍停留在`0040`。
+`drizzle-postgres/0001_selfhost_baseline.sql`是自托管 PostgreSQL 空库 baseline，共46张表：45张业务/治理表加`background_jobs`。它不是历史 D1 `0000`—`0008`的机械翻译。当前源码 Migration 为`0001`—`0045`，head 是`0045_runtime_worker_readiness.sql`，0045 SHA-256为`cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc`；运行中的非生产 UAT 仍停留在`0040`。0045 snapshot为233张public表，0001—0044不得修改。
 
 主业务行使用`bigserial/bigint`保持既有数值 ID API；任务、请求、操作和租约使用 UUID；时间使用`timestamptz`；结构化快照使用 JSONB；数量和金额使用明确精度 numeric；状态、version、唯一性、外键和高频队列查询均有关系约束或索引。
 
@@ -70,9 +70,10 @@ COMPOSE_PARALLEL_LIMIT=1 docker compose \
 - 已有 history 必须是专用角色所有、永久且非分区的固定三列表，列/表无 ACL，`version`为唯一有效主键，`applied_at`只能使用无副作用的`now()`默认值，并且无用户 rule/trigger、无 RLS；任一结构或权限漂移都会拒绝。
 - 工具在 advisory lock 前后复核目标身份和 history。每个 migration 与 history 写入使用同一事务；第一条失败时连 history 表创建一起回滚，已执行文件 checksum 不符时拒绝。
 - 已过账业务数据不得通过 Migration 原地改写；需要更正时使用扩展、回填、切换、收缩和业务调整/冲销流程。
+- 0045新增固定`background-jobs`单服务Worker运行租约。升级完成但旧alpha.42 Worker仍运行时，Web readiness不会通过；部署顺序必须使旧Worker停止、等待其旧租约停止或过期，再启动同候选Worker获取新租约。禁止人工修改或删除租约来绕过排他，也不得把Migration成功单独解释为应用ready。
 
 ## 执行后与失败处置
 
-成功后必须核对目标 head、全部 checksum、表/记录数、孤儿引用、库存和关键金额，再核对 Web/Worker实际容器、镜像、健康、restart/OOM和 runtime identity。任何不一致都停止晋升，不继续启动 Web/Worker。
+成功后必须核对目标 head、全部 checksum、表/记录数、孤儿引用、库存和关键金额，再核对Web/Worker实际容器、镜像、restart/OOM和runtime identity。0045及以后还必须确认Worker精确实例租约新鲜、Web与Worker均为`healthy`、`/api/live`为LIVE且`/api/health`为READY并返回同候选version/revision/Migration head；任何不一致都停止晋升，不继续接流或发布runtime identity。
 
 失败时保留 manifest、门禁报告、快照和安全错误码；不要修改既有 Migration、手工补 history 行、删除持久卷或把失败断言改成通过。DDL已提交的历史升级通常不能依赖数据库原地“降级”；按批准的快照恢复或新建前向修复 Migration 执行。旧 SQLite/D1 数据迁移仍须独立按扩展、回填、切换、收缩和逐行核对实施。

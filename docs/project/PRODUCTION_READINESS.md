@@ -17,9 +17,9 @@
 
 2026-08-12 第三次增量：`SELFHOST-MATERIAL-IMPORT-SAFETY-43`已完成仓库实现与隔离验证。D-117要求的建批/上传持久幂等、批次owner/状态/CAS、私有staging、服务端实际文件检查、同根无覆盖原子提升、跨数据库/文件系统故障协调、job所有权和worker终态事务已在源码`5767c92…`与manifest-only直接子提交`dad7468`落地；0042发布后保持不可变，0043以append-only方式修正终态约束。运行UAT未部署该实现，因此PR-004只在仓库层关闭，整体判定仍为`PRODUCTION NO-GO`。
 
-2026-08-12 第五次增量：`SELFHOST-RUNTIME-HEALTH-TRUTH-45`已作为唯一`DOING`启动。D-119要求以完整Migration manifest、数据库时钟Worker排他租约/CAS、Web/Worker双侧uploads/attachments可写探针、live/readiness分离和Worker Docker healthcheck关闭当前固定成功误报；只允许仓库、合成目录和隔离PostgreSQL，运行UAT仍保持alpha.42/0040。实现、测试和提交尚未完成，整体判定仍为`PRODUCTION NO-GO`。
-
 2026-08-12 第四次增量：`SELFHOST-IDENTITY-SESSION-SAFETY-44`已完成仓库实现与隔离验证。D-118要求的8小时idle、创建时不可延长的24小时absolute、PostgreSQL时钟和用户→会话锁序、首次超时单次终态/去敏审计以及失效Cookie对称清理已在源码`e7b0298…`与manifest-only直接子提交`c730fef`落地；append-only 0044及官方Migration harness通过。运行UAT仍是旧会话实现，因此只关闭仓库风险，整体判定继续`PRODUCTION NO-GO`。
+
+2026-08-12 第五次增量：`SELFHOST-RUNTIME-HEALTH-TRUTH-45`已完成仓库实现与隔离验证。D-119要求的完整Migration manifest、数据库时钟Worker排他租约/CAS、Web/Worker双侧uploads/attachments写入+fsync+清理、live/readiness分离和Worker Docker healthcheck已在源码`7494086…`与manifest-only直接子提交`dcef6f6`落地；append-only 0045、官方Migration harness及发布合同通过。运行UAT仍是旧health实现，因此只关闭仓库风险，整体判定继续`PRODUCTION NO-GO`。
 
 ## 2. 证据范围与未执行事项
 
@@ -33,14 +33,14 @@
 
 | 证据项 | 当前事实 | 判定 |
 | --- | --- | --- |
-| 根仓库 | TASK43源码`5767c92e51e4f25ba49fa4431299f265ef4cb7aa`/tree`bb4ef005…`与manifest-only直接子提交`dad7468`形成已复核链；未fetch/push | 本地可追踪；当前完整历史的异机锚点待更新 |
-| 私有源码锚点 | 启动前`recovery-private/main`比本地 HEAD 少 1 个提交；未 fetch/push | `FAIL`，当前完整历史未证明异机存在 |
-| 源码 | `0.1.0-alpha.45`，Migration 44/head `0044_identity_session_absolute_lifetime.sql`；0044 SHA-256为`a24df944…aa7e`，0001—0043未修改 | source-verified，不等于运行候选 |
-| 源码 Schema | 44 个 SQL、journal 和 snapshot 顺序一致；`db/schema.ts`与 0044 snapshot 为 232 张 public 表且列集合一致 | 静态及隔离Migration一致性`PASS` |
+| 根仓库 | TASK45源码`74940866f7deac7b2751278479e8cefb4df35c1c`/tree`d4673e36b6822deb0f6d2d6058b36c6ffb3cf2f1`与manifest-only直接子提交`dcef6f67c75d771ad3a3dd9fe6f5aa385fc81f92`形成已复核链；未fetch/push | 本地可追踪；当前完整历史的异机锚点待更新 |
+| 私有源码锚点 | 本机最后已知跟踪引用为`recovery-private/main@1dcbf8d`；本任务未fetch、调用远端API或push，因此未声称其为远端实时状态，也未用本地提交差值冒充异机证明 | `FAIL`，当前完整历史未证明异机存在 |
+| 源码 | `0.1.0-alpha.46`，Migration 45/head `0045_runtime_worker_readiness.sql`；0045 SHA-256为`cc4685a0…80fc`，0001—0044未修改 | source-verified，不等于运行候选 |
+| 源码 Schema | 45 个 SQL、journal 和 snapshot 顺序一致；`db/schema.ts`与 0045 snapshot 为 233 张 public 表且列集合一致 | 静态及隔离Migration一致性`PASS` |
 | UAT Web | `0.1.0-alpha.42`，revision `569aa954…d33a24`，Image ID `sha256:e7761e2c…f94964` | 与源码不一致 |
 | UAT PostgreSQL | 40/head `0040_warehouse_receipt_readiness.sql`，0040 checksum `b6781c94…a5a93`，227 张 public 表 | 与源码不一致 |
-| 发布台账 | `RELEASES.md`尚未形成 alpha.45/0044 候选记录；没有`ELIGIBLE`manifest | `FAIL` |
-| 运行健康 | Web/PostgreSQL healthy，Worker/Caddy running，restart 0、OOMKilled false；回环与公开 health 返回 alpha.42 | 仅证明当前空闲存活 |
+| 发布台账 | `RELEASES.md`尚未形成 alpha.46/0045 候选记录；没有`ELIGIBLE`manifest | `FAIL` |
+| 运行健康 | Web/PostgreSQL healthy，Worker/Caddy running，restart 0、OOMKilled false；回环与公开 health仍来自alpha.42旧实现，Worker health为none | 仅证明当前空闲存活；TASK45源码真实性未部署 |
 | Python 旧运行面 | `chenyida-erp.service` enabled/active、restart 0，当前监听`127.0.0.1:18889` | 开发/迁移来源；正式切换前须明确处置 |
 | 数据卷 | PostgreSQL、uploads、attachments、backup-status 四卷存在 | 单机持久化，不是灾备 |
 | 本机备份 | `/var/backups/chenyida-erp`存在 root-only 历史文件；与运行卷同在`/dev/vda1`，未发现自动 backup timer | `FAIL`，同一故障域 |
@@ -58,7 +58,7 @@
 | 隔离恢复 | `PARTIAL / SYNTHETIC-ISOLATED PASS` | 从真实异机副本在新空隔离目标恢复四类数据，完成 Migration、数量、摘要、库存和关键金额核对并记录真实 RTO；现有合成双集群证据不替代真实数据 |
 | 真实数据试迁移 | `FAIL` | 只读源快照、逐行结果、重复/孤儿/单位/文件处置、库存/金额核对和可重跑报告通过 |
 | 核心服务端规则 | `PARTIAL` | 物料/BOM/采购/收货/IQC/库存/生产/销售/财务关键链及异常路径在同一候选通过自动与人工验收 |
-| 权限/会话/安全/审计 | `PARTIAL` | 批准的岗位矩阵、职责分离、绝对会话时限、最小数据域、导入边界、审计和安全测试通过 |
+| 权限/会话/安全/审计 | `PARTIAL / SOURCE SESSION AND RUNTIME HEALTH REMEDIATED` | 批准的岗位矩阵、职责分离、最小数据域、导入/会话/运行健康边界和审计安全测试在同候选及运行面通过；TASK43—TASK45源码完成不替代部署验收 |
 | 强制发布测试门 | `PARTIAL / REPOSITORY TOOLING VERIFIED` | 18步失败关闭suite及清单已实现；固定Browser、完整typecheck、候选镜像SBOM/漏洞PASS及同候选完整报告尚未通过 |
 | 监控/容量/告警/手册 | `FAIL` | 指标、告警投递和值班升级演练；低资源负载/备份/恢复 soak；升级/回滚/故障手册通过演练 |
 | 真实员工受控试用 | `FAIL` | 少量真实岗位用户按脚本完成跨岗正常/异常流程并签字，问题闭环后重验 |
@@ -87,7 +87,7 @@
 ### PR-003 运行候选身份不闭合
 
 - TASK42已实现严格release manifest、content-addressed supervisor两提交链及精确Migration allowlist/目标数据库身份，仓库工具不再允许靠tag或目录排序冒充候选。
-- 源码 alpha.45/0044、UAT alpha.42/0040和当前 GHCR alpha.42 锚点仍不是同一个已通过门禁的候选；没有获准alpha.45 Web/Worker镜像、镜像安全证据或`ELIGIBLE`manifest。
+- 源码 alpha.46/0045、UAT alpha.42/0040和当前 GHCR alpha.42 锚点仍不是同一个已通过门禁的候选；没有获准alpha.46 Web/Worker镜像、镜像安全证据或`ELIGIBLE`manifest。
 - 当前不能证明“拟投产代码＝已验收代码＝运行镜像＝数据库版本”。
 
 解除条件：建立不可变 release manifest 与 migration allowlist；隔离 build/升级/回退通过后，经专项授权把 UAT 对齐到同一候选并重新验收。
@@ -100,14 +100,14 @@
 - 文件使用私有staging、受限确定性路径、实际SHA/大小/签名/MIME/安全检查、`fsync`与同根无覆盖原子提升；失败由持久saga与reconciler处理，未知身份文件不猜测删除。
 - job经outbox aggregate关联批次并复核owner/`material.import.read_any`；worker重新哈希并以单事务发布job和业务终态，过期lease不能提交。
 - 0042与append-only 0043、Schema/snapshot/journal及隔离PostgreSQL升级/回滚/故障测试通过。源码/manifest提交链和证据摘要已固定。
-- 当前非生产UAT仍为alpha.42/0040，未执行build、0040→0044 Migration、部署或端到端岗位验收，故运行面仍可能表现为旧缺口。
+- 当前非生产UAT仍为alpha.42/0040，未执行build、0040→0045 Migration、部署或端到端岗位验收，故运行面仍可能表现为旧缺口。
 
 运行解除条件：在同一合格候选上通过完整release gate，取得专项授权后完成备份、0040→候选head升级、部署，以及上传/恢复/越权/并发/故障端到端验收；此前不得把PR-004写成运行环境已解决。
 
 ### PR-005 强制发布测试门工具已建立，但没有候选PASS
 
-- 当前清单经TASK44扩展为232文件（208 REQUIRED、24有明确别名/历史N/A）、18步`test:release`、固定执行器、资源/timeout/无skip、机器报告及候选manifest绑定；其中Node 110、PostgreSQL 82、Browser 6、历史D1 22、PG alias 2、release contract 6、POSIX 4。
-- TASK42最终源码快照曾通过Node 107文件/886、PostgreSQL 80文件/367等完整仓库门；TASK43/TASK44随后通过各自定向、隔离PostgreSQL、release contract及supervisor验证，但没有在当前源码提交上重跑完整110文件Node-source、82文件PostgreSQL或18步候选门。
+- 当前清单经TASK45扩展为235文件（211 REQUIRED、24有明确别名/历史N/A）、18步`test:release`、固定执行器、资源/timeout/无skip、机器报告及候选manifest绑定；其中Pure Node112、PostgreSQL83、Browser6、历史D1 22、PG alias2、release contract6、POSIX special4。
+- TASK42最终源码快照曾通过Node 107文件/886、PostgreSQL 80文件/367等完整仓库门；TASK43—TASK45随后通过各自定向、隔离PostgreSQL、release contract及supervisor验证，但没有在当前源码提交上重跑完整112文件Node-source、83文件PostgreSQL或18步候选门。
 - Browser 6项仍无固定Chromium/Playwright运行时；完整多tsconfig因既有ES2017 BigInt/历史声明债失败；没有候选镜像级SBOM和新鲜漏洞PASS。因此完整18步候选门按设计保持阻断，不能把仓库工具验证解释为候选通过。
 
 解除条件：固定并验证Browser运行时、修复完整typecheck、在获准候选镜像上生成镜像SBOM/新鲜漏洞PASS并运行完整18步门；任何缺失、跳过或失败继续阻止候选晋升。
@@ -129,7 +129,7 @@
 
 ## 6. P1 高风险
 
-- health 只执行`select 1`，却固定返回 storage 和 worker 正常，不能发现 Worker 停止、上传目录不可写、Migration 漂移或备份过期。
+- health仓库实现已由TASK45改为完整Migration、同候选Worker数据库租约和双文件卷真实探针，并把liveness/readiness分离；运行UAT仍为alpha.42旧实现，故运行风险保持`OPEN / REPOSITORY REMEDIATED`。备份过期继续由独立recovery governance阻止晋升而不混入公开readiness。
 - 会话仓库实现已由TASK44补齐8小时idle、固定24小时absolute、数据库时钟原子认证与单次超时审计，并通过0044/并发/Migration隔离验证；运行UAT仍为alpha.42/0040旧实现，故运行风险保持`OPEN / REPOSITORY REMEDIATED`。
 - 权限矩阵硬编码且多个业务角色可读取财务域；尚无岗位负责人批准的最小权限/职责分离矩阵。
 - 容器基础镜像未全部锁定 digest；Compose 尚未全面使用`read_only`、`no-new-privileges`和`cap_drop`；没有当前候选 SBOM、漏洞扫描、签名验证证据。
@@ -161,8 +161,8 @@
 1. `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成 G1 合成/隔离证据；真实 G2 被异机目标、RPO/RTO和专项授权阻塞。
 2. G3仓库工具已由TASK42完成；候选build、Browser、完整typecheck、镜像SBOM/漏洞PASS和UAT对齐仍保持失败关闭并需后续适用授权/资源。
 3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
-4. TASK44已完成会话绝对时限仓库修复；TASK45正在修复health/Worker/storage/Migration真实性，之后再处理经业务批准的权限矩阵。
-5. 更新并演练监控、升级、回滚和故障手册。
+4. TASK44/TASK45已完成会话绝对时限和health/Worker/storage/Migration真实性仓库修复；运行面验证等待同候选完整gate及专项部署授权。
+5. 下一安全任务优先关闭完整typecheck和固定Browser运行时等候选门缺口；岗位权限矩阵等待业务负责人确认，并继续更新/演练监控、升级、回滚和故障手册。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。
 
@@ -190,3 +190,5 @@ G1 增量验证使用一次一个受限临时容器：合同 41/41、双独立 P
 TASK43增量验证同样串行且一次一个临时重任务：fallback unit/handler20/20、worker8/8、UI107/107、Migration4/4、parser/API client45/45、隔离PostgreSQL fallback17/17及真实XLSX worker1/1通过；release inventory为230/206/24。任务容器、测试库和临时目录清零；起点/收口available约2.2/2.0 GiB、Swap425/439 MiB、根盘31 GiB、Load1低于4，四服务restart0/OOM false。没有build、UAT/生产Migration、部署、当前卷读取或真实数据操作。
 
 TASK44增量验证保持串行且一次一个临时重任务：定向/release合同55/55、隔离PostgreSQL会话/身份/升级21/21、官方release Migration harness、supervisor15/15和inventory232/208/24通过。任务容器、测试库和进程清零；起点/收口available约2.1/2.0 GiB、Swap439/442 MiB、根盘31 GiB、最终Load`0.21/0.21/0.33`，四服务restart0/OOM false、当日内核OOM 0。没有build、UAT/生产Migration、部署、当前卷读取或真实数据操作。
+
+TASK45增量验证同样串行且一次一个临时重任务：runtime readiness定向42/42、隔离PostgreSQL5/5、官方release Migration harness、release44/44、supervisor15/15、TASK45/release-contract定向typecheck和inventory235/211/24通过；治理收口另通过1,564文件凭据扫描、109个本地Markdown链接与134项控制协议。任务容器、测试库和临时文件清零；验证期间available约1.9—2.0 GiB、Swap449→453 MiB、根盘约30 GiB、Load1低于1，四服务restart0/OOM false。没有build、UAT/生产Migration、部署、当前卷读取或真实数据操作。
