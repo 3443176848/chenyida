@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 SITE_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_POLICY_SHA256 = "2ac6f4f38dc6a63c18a1beff5e287e1e074b5c9f1e8545b9f8fc09a1a7b9e775"
+EXPECTED_POLICY_SHA256 = "34bc70e4ae15086d9aad91b30b1b9a895053dd46b2f03ebfae275392e1c8e4dd"
 EXPECTED_BROWSER_IMAGE = "mcr.microsoft.com/playwright@sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961"
 EXPECTED_EXECUTABLE_SHA256 = "efb2bece6f2f5bc00dc270162d2241c86d509ca4f4297b1eb0f5cd8894d050be"
 
@@ -80,6 +80,12 @@ class ReleaseSupervisorBrowserTest(unittest.TestCase):
         self.assertIn('entry.harness === "BROWSER_E2E"', source)
         self.assertIn("summary.skipped !== 0 || summary.todo !== 0", source)
         self.assertIn("await verifyReleaseTestInventory", source)
+        self.assertIn("await verifyAppliedMigrations(pool, migrations.slice(0, sourceHead)", source)
+        self.assertIn("await applyMigrations(pool, migrations.slice(sourceHead))", source)
+        self.assertIn("await verifyAppliedMigrations(pool, migrations, \"BROWSER_E2E_UPGRADE_TARGET_MIGRATIONS_INVALID\")", source)
+        self.assertIn("template_head=${configuration.migration} runtime_head=${EXPECTED_MIGRATION_HEAD}", source)
+        self.assertIn('environment: ["ERP_PLANNING_TRACEABILITY_BROWSER_MODE", "TRACEABILITY_RETURN_ONLY"]', source)
+        self.assertIn("if (configuration.environment) environment[configuration.environment[0]] = configuration.environment[1]", source)
         self.assertNotIn("...process.env", source)
 
     def test_required_browser_flows_use_current_workbench_auth_contract(self):

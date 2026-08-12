@@ -1117,7 +1117,7 @@
     },
     {
       "path": "tests/selfhost-planning-revision-response-browser.test.mjs",
-      "sha256": "94406d5840636fd964a122c0823bbb2a872ef4ff09375e8e2c74e9883ea28b3c",
+      "sha256": "c0d388f9109c0057f1e4c6fdcec4c87c9e749e9decc552faa3656e8364161ea8",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -1684,7 +1684,7 @@
     },
     {
       "path": "tests/selfhost-purchase-traceability-browser.test.mjs",
-      "sha256": "13788f7c33c79d489f120fc282729559f85b293600dc0ab5c2066bbc12dd7af3",
+      "sha256": "7303d6517dfbae7d6e34c7b6ada5b77baa57541668f7f6f6ffe8d418b9197b52",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -1792,7 +1792,7 @@
     },
     {
       "path": "tests/selfhost-requirement-unit-resolution-browser.test.mjs",
-      "sha256": "b9faee740b4aef64002526fe09658a1be6195ca77de23d071b080e7987177340",
+      "sha256": "a3bcbc9a6e0beee5e21e19e2a3146f9b14eb0e067a53d9df9e3109b7ffb814fd",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -1846,7 +1846,7 @@
     },
     {
       "path": "tests/selfhost-rfq-binding-fix19-browser.test.mjs",
-      "sha256": "3f2a5694a166b14e06dc5209a0f9b1f4c39b31c3df6f7065055583d0ddb19be9",
+      "sha256": "ca157954290c808460122ae631569437db27861f3c757cfcfc19ac33f4e1889c",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -1864,7 +1864,7 @@
     },
     {
       "path": "tests/selfhost-rfq-traceability-fix22-browser.test.mjs",
-      "sha256": "ae27909b5b0614f254ee24d8942abf6e17d1cc6b6860c6122ab760746ba64930",
+      "sha256": "94275860e4e97fb6b328d46cae48c04da30ae813f77150544420fdb98aaf4048",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -2008,7 +2008,7 @@
     },
     {
       "path": "tests/selfhost-supplier-mapping-browser.test.mjs",
-      "sha256": "a3d3ddaba73287d9620754dbacd4c49a207bd70fcd77f370485ff1b3aca7e428",
+      "sha256": "b5607932440e80f5ceab82c7f8a5f9c951607aead01ac729af8b7752c978b9f2",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",

@@ -42,6 +42,7 @@ const CONFIGURATIONS = Object.freeze([
     migration: "0036_project_requirement_unit_resolution.sql",
     port: 43136,
     confirmation: ["ERP_REQUIREMENT_UNIT_BROWSER_CONFIRM", "ISOLATED_0036_SYNTHETIC_ONLY"],
+    environment: ["ERP_PLANNING_TRACEABILITY_BROWSER_MODE", "TRACEABILITY_RETURN_ONLY"],
     externalServer: true,
   },
   {
@@ -191,30 +192,41 @@ async function dropDatabase(admin, database) {
   await admin.query(`drop database if exists ${quoteIdentifier(database)}`);
 }
 
+async function verifyAppliedMigrations(pool, migrations, code) {
+  const applied = await pool.query("select version,checksum from schema_migrations order by version");
+  if (
+    applied.rowCount !== migrations.length
+    || applied.rows.some((row, index) => row.version !== migrations[index].filename || row.checksum !== migrations[index].sha256)
+  ) reject(code);
+}
+
+async function applyMigrations(pool, migrations) {
+  for (const migration of migrations) {
+    const source = await readFile(path.join(CANDIDATE_ROOT, "drizzle-postgres", migration.filename), "utf8");
+    if (sha256(source) !== migration.sha256) reject("BROWSER_E2E_MIGRATION_SHA256_MISMATCH");
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      await client.query(source);
+      await client.query("insert into schema_migrations(version,checksum) values($1,$2)", [migration.filename, migration.sha256]);
+      await client.query("commit");
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+}
+
 async function buildTemplate({ Pool, admin, name, migrations }) {
   await createDatabase(admin, name, "template0");
   const pool = new Pool({ connectionString: `postgresql://postgres@127.0.0.1:5432/${name}`, max: 1, application_name: "release-browser-template" });
   let failure = null;
   try {
     await pool.query("create table schema_migrations(version text primary key,checksum text not null,applied_at timestamptz not null default now())");
-    for (const migration of migrations) {
-      const source = await readFile(path.join(CANDIDATE_ROOT, "drizzle-postgres", migration.filename), "utf8");
-      if (sha256(source) !== migration.sha256) reject("BROWSER_E2E_MIGRATION_SHA256_MISMATCH");
-      const client = await pool.connect();
-      try {
-        await client.query("begin");
-        await client.query(source);
-        await client.query("insert into schema_migrations(version,checksum) values($1,$2)", [migration.filename, migration.sha256]);
-        await client.query("commit");
-      } catch (error) {
-        await client.query("rollback").catch(() => undefined);
-        throw error;
-      } finally {
-        client.release();
-      }
-    }
-    const applied = await pool.query("select version,checksum from schema_migrations order by version");
-    if (applied.rowCount !== migrations.length || applied.rows.some((row, index) => row.version !== migrations[index].filename || row.checksum !== migrations[index].sha256)) reject("BROWSER_E2E_TEMPLATE_MIGRATIONS_INVALID");
+    await applyMigrations(pool, migrations);
+    await verifyAppliedMigrations(pool, migrations, "BROWSER_E2E_TEMPLATE_MIGRATIONS_INVALID");
   } catch (error) {
     failure = error;
   } finally {
@@ -229,6 +241,17 @@ async function buildTemplate({ Pool, admin, name, migrations }) {
   } catch (error) {
     await dropDatabase(admin, name).catch(() => undefined);
     throw error;
+  }
+}
+
+async function upgradeDatabaseToCandidate({ Pool, database, migrations, sourceHead }) {
+  const pool = new Pool({ connectionString: `postgresql://postgres@127.0.0.1:5432/${database}`, max: 1, application_name: "release-browser-upgrade" });
+  try {
+    await verifyAppliedMigrations(pool, migrations.slice(0, sourceHead), "BROWSER_E2E_UPGRADE_SOURCE_MIGRATIONS_INVALID");
+    await applyMigrations(pool, migrations.slice(sourceHead));
+    await verifyAppliedMigrations(pool, migrations, "BROWSER_E2E_UPGRADE_TARGET_MIGRATIONS_INVALID");
+  } finally {
+    await pool.end();
   }
 }
 
@@ -265,6 +288,7 @@ function testEnvironment(configuration) {
     PGUSER: "postgres",
     [configuration.confirmation[0]]: configuration.confirmation[1],
   };
+  if (configuration.environment) environment[configuration.environment[0]] = configuration.environment[1];
   if (Object.values(environment).some((value) => typeof value !== "string" || value.length === 0)) reject("BROWSER_E2E_ENVIRONMENT_INVALID");
   return environment;
 }
@@ -333,6 +357,7 @@ async function main() {
       await requirePortAvailable(configuration.port, "BROWSER_E2E_PORT_PREEXISTING");
       await createDatabase(admin, configuration.database, `cyd_release_browser_template_${configuration.head}`);
       created.push(configuration.database);
+      await upgradeDatabaseToCandidate({ Pool, database: configuration.database, migrations, sourceHead: configuration.head });
       const environment = testEnvironment(configuration);
       let externalServer = null;
       let result;
@@ -358,7 +383,7 @@ async function main() {
       const summary = parseTapSummary(result.stdout);
       if (summary.tests < 1 || summary.pass !== summary.tests || summary.fail !== 0 || summary.cancelled !== 0 || summary.skipped !== 0 || summary.todo !== 0) reject("BROWSER_E2E_TEST_RESULT_INVALID");
       testCount += summary.tests;
-      process.stdout.write(`BROWSER TEST PASS ${entry.path} tests=${summary.tests} sha256=${entry.sha256} migration_head=${configuration.migration}\n`);
+      process.stdout.write(`BROWSER TEST PASS ${entry.path} tests=${summary.tests} sha256=${entry.sha256} template_head=${configuration.migration} runtime_head=${EXPECTED_MIGRATION_HEAD}\n`);
     }
     if (testCount !== EXPECTED_BROWSER_TESTS) reject("BROWSER_E2E_TEST_COUNT_INVALID");
     await verifyReleaseTestInventory({ root: CANDIDATE_ROOT, inventory });

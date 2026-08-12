@@ -56,7 +56,7 @@ async function assertIsolatedSchema() {
   const current = await pool.query("select current_database() database_name");
   assert.equal(current.rows[0].database_name, REQUIRED_DATABASE);
   const migrations = await pool.query("select count(*)::integer count,max(version) latest from schema_migrations");
-  assert.deepEqual(migrations.rows[0], { count: 36, latest: "0036_project_requirement_unit_resolution.sql" });
+  assert.deepEqual(migrations.rows[0], { count: 45, latest: "0045_runtime_worker_readiness.sql" });
   const relations = await pool.query("select to_regclass('public.project_requirement_unit_resolution_versions') versions,to_regclass('public.project_requirement_unit_resolution_heads') heads");
   assert.deepEqual(relations.rows[0], { versions: "project_requirement_unit_resolution_versions", heads: "project_requirement_unit_resolution_heads" });
 }
@@ -183,7 +183,7 @@ async function openPlanningWorkspace(page) {
   await page.getByRole("heading", { name: "计划部门交接工作台", exact: true }).waitFor();
 }
 
-test("real browser completes versioned requirement Unit Resolution handoff on an isolated 0036 database", { timeout: 240_000 }, async () => {
+test("real browser completes versioned requirement Unit Resolution handoff after an isolated 0036-to-current upgrade", { timeout: 240_000 }, async () => {
   await assertIsolatedSchema();
   const chromium = await loadChromium();
   await clearSyntheticData();

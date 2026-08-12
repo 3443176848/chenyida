@@ -316,8 +316,8 @@ test.before(async () => {
     )).rows[0],
     {
       name: REQUIRED_DATABASE,
-      migration_count: 37,
-      head: "0037_project_planning_revision_response_lineage.sql",
+      migration_count: 45,
+      head: "0045_runtime_worker_readiness.sql",
     },
   );
   await clearSyntheticData();

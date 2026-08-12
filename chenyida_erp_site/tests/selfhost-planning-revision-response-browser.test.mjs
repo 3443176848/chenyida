@@ -35,7 +35,7 @@ async function loadChromium() {
 
 async function assertIsolatedSchema() {
   assert.equal((await pool.query("select current_database() name")).rows[0].name, REQUIRED_DATABASE);
-  assert.deepEqual((await pool.query("select count(*)::integer count,max(version) latest from schema_migrations")).rows[0], { count: 37, latest: "0037_project_planning_revision_response_lineage.sql" });
+  assert.deepEqual((await pool.query("select count(*)::integer count,max(version) latest from schema_migrations")).rows[0], { count: 45, latest: "0045_runtime_worker_readiness.sql" });
   assert.deepEqual((await pool.query("select to_regclass('project_planning_revision_response_versions') versions,to_regclass('project_planning_revision_response_heads') heads")).rows[0], { versions: "project_planning_revision_response_versions", heads: "project_planning_revision_response_heads" });
 }
 
