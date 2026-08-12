@@ -193,7 +193,7 @@ async function dropDatabase(admin, database) {
 }
 
 async function verifyAppliedMigrations(pool, migrations, code) {
-  const applied = await pool.query("select version,checksum from schema_migrations order by version");
+  const applied = await pool.query("select version,checksum from only public.schema_migrations order by version");
   if (
     applied.rowCount !== migrations.length
     || applied.rows.some((row, index) => row.version !== migrations[index].filename || row.checksum !== migrations[index].sha256)
@@ -207,8 +207,9 @@ async function applyMigrations(pool, migrations) {
     const client = await pool.connect();
     try {
       await client.query("begin");
+      await client.query("select pg_catalog.set_config('search_path','public',true)");
       await client.query(source);
-      await client.query("insert into schema_migrations(version,checksum) values($1,$2)", [migration.filename, migration.sha256]);
+      await client.query("insert into public.schema_migrations(version,checksum) values($1,$2)", [migration.filename, migration.sha256]);
       await client.query("commit");
     } catch (error) {
       await client.query("rollback").catch(() => undefined);
@@ -224,7 +225,7 @@ async function buildTemplate({ Pool, admin, name, migrations }) {
   const pool = new Pool({ connectionString: `postgresql://postgres@127.0.0.1:5432/${name}`, max: 1, application_name: "release-browser-template" });
   let failure = null;
   try {
-    await pool.query("create table schema_migrations(version text primary key,checksum text not null,applied_at timestamptz not null default now())");
+    await pool.query("create table public.schema_migrations(version text primary key,checksum text not null,applied_at timestamptz not null default pg_catalog.now())");
     await applyMigrations(pool, migrations);
     await verifyAppliedMigrations(pool, migrations, "BROWSER_E2E_TEMPLATE_MIGRATIONS_INVALID");
   } catch (error) {
@@ -275,6 +276,7 @@ function testEnvironment(configuration) {
     ERP_UPLOAD_ROOT: `/test-tmp/browser-${configuration.port}-uploads`,
     ERP_ATTACHMENT_ROOT: `/test-tmp/browser-${configuration.port}-attachments`,
     ERP_BACKUP_STATUS_FILE: `/test-tmp/browser-${configuration.port}-backup-status.json`,
+    ERP_MIGRATION_ROOT: "/workspace/drizzle-postgres",
     ERP_RUNTIME_BUILD_VERSION: process.env.ERP_RELEASE_BROWSER_PACKAGE_VERSION,
     ERP_RUNTIME_GIT_COMMIT: process.env.ERP_RELEASE_BROWSER_GIT_COMMIT,
     ERP_BROWSER_SERVER_ENTRY: SERVER_ENTRY,
