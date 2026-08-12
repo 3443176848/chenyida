@@ -21,8 +21,8 @@ async function withTemporaryDirectory(run) {
   }
 }
 
-test("the current project package exposes the alpha.45 source version", () => {
-  assert.equal(readApplicationVersion(projectPackagePath), "0.1.0-alpha.45");
+test("the current project package exposes the alpha.46 source version", () => {
+  assert.equal(readApplicationVersion(projectPackagePath), "0.1.0-alpha.46");
 });
 
 test("runtime version is cached after validation", async () => {

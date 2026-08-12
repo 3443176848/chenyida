@@ -263,7 +263,7 @@ async function waitForServer() {
   for (let attempt = 0; attempt < 120; attempt += 1) {
     if (server?.exitCode !== null) throw new Error("isolated FIX-22 standalone server exited before health check");
     try {
-      const response = await fetch(`${REQUIRED_ORIGIN}/api/health`);
+      const response = await fetch(`${REQUIRED_ORIGIN}/api/live`);
       if (response.ok) return;
     } catch { /* bounded readiness polling */ }
     await new Promise((resolve) => setTimeout(resolve, 250));

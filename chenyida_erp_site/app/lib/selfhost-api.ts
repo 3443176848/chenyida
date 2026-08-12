@@ -44,6 +44,8 @@ import {
 } from "./identity-selfhost/handler.ts";
 import { PostgresIdentityRepository } from "./identity-selfhost/repository.ts";
 import type { IdentityActor } from "./identity-selfhost/types.ts";
+import { RuntimeReadinessError, runtimeReadinessErrorCode } from "./runtime-readiness/identity.ts";
+import { getDefaultRuntimeReadinessService, type RuntimeReadinessResult } from "./runtime-readiness/service.ts";
 
 export { initializeAdmin } from "./identity-selfhost/service.ts";
 
@@ -63,26 +65,119 @@ function logFailure(error: unknown, requestId: string, event = "api_request_fail
 function requirePermission(user: IdentityActor, permission: string) { if (!user.permissions.includes("*") && !user.permissions.includes(permission)) throw new ApiError("PERMISSION_DENIED", "没有权限执行此操作", 403); }
 function requireCsrf(request: Request) { const config = runtimeConfig(); if (!requestOriginMatches(request, config.publicOrigin, config.allowUatLoopbackOrigin)) throw new ApiError("CSRF_INVALID", "请求来源校验失败", 403); const token = request.headers.get("x-csrf-token") || ""; const cookie = cookies(request)[CSRF_COOKIE] || ""; if (!token || !cookie || !constantEqual(token, cookie)) throw new ApiError("CSRF_INVALID", "CSRF Token 无效", 403); }
 
-type HealthDatabase = { query(sql: string): Promise<unknown> };
+type HealthDatabase = {
+  query(sql: string, values?: unknown[]): Promise<{ rows?: unknown[]; rowCount?: number | null }>;
+};
 
-export async function handleSelfhostHealth(input: {
-  database: HealthDatabase;
+type HealthComponentStatus = "READY" | "NOT_READY" | "UNKNOWN";
+
+function healthFailureComponents(code: string): Record<string, HealthComponentStatus> {
+  const value: Record<string, HealthComponentStatus> = {
+    postgresql: "UNKNOWN", migration: "UNKNOWN", worker: "UNKNOWN",
+    uploads: "UNKNOWN", attachments: "UNKNOWN", runtime: "READY",
+  };
+  if (code === "RUNTIME_IDENTITY_INVALID") value.runtime = "NOT_READY";
+  else if (code === "RUNTIME_DATABASE_UNAVAILABLE") value.postgresql = "NOT_READY";
+  else if (code === "RUNTIME_MIGRATION_SOURCE_INVALID") value.migration = "NOT_READY";
+  else if (code === "RUNTIME_MIGRATION_MISMATCH") { value.postgresql = "READY"; value.migration = "NOT_READY"; }
+  else if (code === "RUNTIME_WORKER_UNAVAILABLE") { value.postgresql = "READY"; value.migration = "READY"; value.worker = "NOT_READY"; }
+  else if (code === "RUNTIME_UPLOADS_UNAVAILABLE") {
+    Object.assign(value, { postgresql: "READY", migration: "READY", worker: "READY", uploads: "NOT_READY" });
+  } else if (code === "RUNTIME_ATTACHMENTS_UNAVAILABLE") {
+    Object.assign(value, { postgresql: "READY", migration: "READY", worker: "READY", uploads: "READY", attachments: "NOT_READY" });
+  }
+  return value;
+}
+
+function logRuntimeCheckFailure(error: unknown, requestId: string, event: string): void {
+  console.error(JSON.stringify({ level: "error", event, request_id: requestId, code: runtimeReadinessErrorCode(error) }));
+}
+
+async function readinessWithTimeout(
+  readiness: Readonly<{ check(): Promise<RuntimeReadinessResult> }>,
+  timeoutMs: number,
+): Promise<RuntimeReadinessResult> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      readiness.check(),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new RuntimeReadinessError("RUNTIME_HEALTH_TIMEOUT")), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+export async function handleSelfhostLive(input: {
   requestId: string;
   applicationVersion?: () => string;
   now?: () => Date;
 }): Promise<Response> {
   try {
     const version = (input.applicationVersion || getApplicationVersion)();
-    await input.database.query("select 1");
-    return json({ ok: true, database: "postgresql", storage: "local", worker: "postgresql-jobs", version, time: (input.now || (() => new Date()))().toISOString() }, 200, input.requestId);
+    return json({ ok: true, status: "LIVE", version, time: (input.now || (() => new Date()))().toISOString() }, 200, input.requestId);
   } catch (error) {
-    logFailure(error, input.requestId, "api_health_failed");
-    return failure(error, input.requestId);
+    logRuntimeCheckFailure(error, input.requestId, "api_live_failed");
+    return json({
+      ok: false,
+      status: "NOT_LIVE",
+      error: { code: "INTERNAL_ERROR", message: "服务器暂时无法处理请求", request_id: input.requestId },
+      code: "INTERNAL_ERROR",
+      message: "服务器暂时无法处理请求",
+      request_id: input.requestId,
+    }, 500, input.requestId);
   }
 }
 
-export async function handleSelfhostApi(request: Request): Promise<Response> {
-  const suppliedRequestId = request.headers.get("x-request-id") || ""; const requestId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(suppliedRequestId) ? suppliedRequestId : randomUUID(); const url = new URL(request.url); const path = url.pathname; const pool = getPool();
+export async function handleSelfhostHealth(input: {
+  database: HealthDatabase;
+  requestId: string;
+  readiness?: Readonly<{ check(): Promise<RuntimeReadinessResult> }>;
+  timeoutMs?: number;
+}): Promise<Response> {
+  try {
+    const readiness = input.readiness || await getDefaultRuntimeReadinessService(input.database);
+    const result = await readinessWithTimeout(readiness, input.timeoutMs ?? 4_000);
+    return json({
+      ok: true,
+      status: "READY",
+      database: "postgresql",
+      storage: "local",
+      worker: "postgresql-jobs",
+      version: result.version,
+      revision: result.revision,
+      migration_head: result.migrationHead,
+      components: result.components,
+      time: result.databaseTime.toISOString(),
+    }, 200, input.requestId);
+  } catch (error) {
+    const known = error instanceof RuntimeReadinessError;
+    const safe = known ? error : new RuntimeReadinessError("RUNTIME_READINESS_FAILED");
+    const status = known ? 503 : 500;
+    const code = known ? safe.code : "INTERNAL_ERROR";
+    const message = known ? safe.message : "服务器暂时无法处理请求";
+    logRuntimeCheckFailure(safe, input.requestId, "api_health_failed");
+    return json({
+      ok: false,
+      status: "NOT_READY",
+      code,
+      message,
+      request_id: input.requestId,
+      components: healthFailureComponents(code),
+      error: { code, message, request_id: input.requestId },
+    }, status, input.requestId);
+  }
+}
+
+export async function handleSelfhostApi(
+  request: Request,
+  dependencies: Readonly<{ poolFactory?: typeof getPool }> = {},
+): Promise<Response> {
+  const suppliedRequestId = request.headers.get("x-request-id") || ""; const requestId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(suppliedRequestId) ? suppliedRequestId : randomUUID(); const url = new URL(request.url); const path = url.pathname;
+  if (path === "/api/live") return handleSelfhostLive({ requestId });
+  const pool = (dependencies.poolFactory || getPool)();
   try {
     if (path === "/api/health") return handleSelfhostHealth({ database: pool, requestId });
     const identityResponse = await handleSelfhostIdentityApi(request, { pool, requestId });

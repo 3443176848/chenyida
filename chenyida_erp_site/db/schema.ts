@@ -32,6 +32,40 @@ export const appMeta = pgTable("app_meta", {
   key: text("key").primaryKey(), value: text("value").notNull(), updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 });
 
+export const workerRuntimeLeases = pgTable("worker_runtime_leases", {
+  serviceSlot: text("service_slot").primaryKey(),
+  instanceId: uuid("instance_id").notNull(),
+  generation: bigint("generation", { mode: "number" }).notNull().default(1),
+  status: text("status").notNull().default("RUNNING"),
+  deploymentClass: text("deployment_class").notNull(),
+  deploymentId: text("deployment_id").notNull(),
+  applicationVersion: text("application_version").notNull(),
+  gitCommit: text("git_commit").notNull(),
+  migrationHead: text("migration_head").notNull(),
+  migrationManifestSha256: text("migration_manifest_sha256").notNull(),
+  startedAt: timestamptz("started_at").notNull(),
+  heartbeatAt: timestamptz("heartbeat_at").notNull(),
+  leaseExpiresAt: timestamptz("lease_expires_at").notNull(),
+  stoppedAt: timestamptz("stopped_at"),
+  version: integer("version").notNull().default(1),
+}, (t) => [
+  check("worker_runtime_leases_slot_ck", sql`${t.serviceSlot} = 'background-jobs'`),
+  check("worker_runtime_leases_generation_version_ck", sql`${t.generation} > 0 and ${t.version} > 0`),
+  check("worker_runtime_leases_status_ck", sql`${t.status} in ('RUNNING','STOPPED')`),
+  check("worker_runtime_leases_deployment_class_ck", sql`${t.deploymentClass} in ('development','test','uat','production')`),
+  check("worker_runtime_leases_deployment_id_ck", sql`${t.deploymentId} ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$'`),
+  check("worker_runtime_leases_application_version_ck", sql`${t.applicationVersion} ~ '^0\\.1\\.0-alpha\\.[0-9]+$'`),
+  check("worker_runtime_leases_git_commit_ck", sql`${t.gitCommit} ~ '^[0-9a-f]{40}$'`),
+  check("worker_runtime_leases_migration_identity_ck", sql`${t.migrationHead} ~ '^[0-9]{4}_[a-z0-9_]+\\.sql$' and ${t.migrationManifestSha256} ~ '^[0-9a-f]{64}$'`),
+  check("worker_runtime_leases_time_ck", sql`
+    (${t.status}='RUNNING' and ${t.stoppedAt} is null and ${t.startedAt}<=${t.heartbeatAt}
+      and ${t.heartbeatAt}<${t.leaseExpiresAt} and ${t.leaseExpiresAt}<=${t.heartbeatAt}+interval '5 minutes')
+    or
+    (${t.status}='STOPPED' and ${t.stoppedAt} is not null and ${t.startedAt}<=${t.heartbeatAt}
+      and ${t.heartbeatAt}=${t.stoppedAt} and ${t.leaseExpiresAt}=${t.stoppedAt})
+  `),
+]);
+
 export const appUsers = pgTable("app_users", {
   username: text("username").primaryKey(), displayName: text("display_name").notNull(), role: text("role").notNull(),
   passwordHash: text("password_hash").notNull(), isActive: boolean("is_active").notNull().default(true),

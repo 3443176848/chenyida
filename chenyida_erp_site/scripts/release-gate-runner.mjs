@@ -44,7 +44,7 @@ const DEFAULT_SUPERVISOR_SITE_ROOT = path.resolve(fileURLToPath(new URL("..", im
 const RELEASE_GATE_LOCK_FILE = "/var/lock/chenyida-erp-release-gate-v1.lock";
 const SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const RELEASE_TEMPORARY_LABELS = ["chenyida.erp.release-node-bootstrap", "chenyida.erp.release-manifest-node-bootstrap", "chenyida.erp.release-node-test", "chenyida.erp.release-postgres-regression", "chenyida.erp.release-migration-test", "chenyida.erp.backup-recovery-test", "chenyida.erp.release-identity-publisher", "chenyida.erp.release-image-evidence"];
-const REQUIRED_RUNTIME_SERVICES = new Map([["caddy", "none"], ["postgres", "healthy"], ["web", "healthy"], ["worker", "none"]]);
+const REQUIRED_RUNTIME_SERVICES = new Map([["caddy", new Set(["none"])], ["postgres", new Set(["healthy"])], ["web", new Set(["healthy"])], ["worker", new Set(["none", "healthy"])]]);
 const TREE_DIGEST_COMMAND = "{ /usr/bin/find -P . -xdev -printf '%y|%m|%P|%l\\n' | LC_ALL=C /usr/bin/sort; /usr/bin/find -P . -xdev -type f -print0 | LC_ALL=C /usr/bin/sort -z | /usr/bin/xargs -0 /usr/bin/sha256sum; } | /usr/bin/sha256sum";
 const OFFICIAL_EXECUTOR_COMMANDS = new Map([
   ["NODE_CANDIDATE_TEST:CONTRACTS", ["scripts/run-release-node-sandbox.sh", "contracts"]],
@@ -179,7 +179,7 @@ function runtimeServiceInventory(environment) {
   const services = states.map((state) => state.service);
   const expected = [...REQUIRED_RUNTIME_SERVICES.keys()];
   if (states.length !== expected.length || services.some((service, index) => service !== expected[index])) return { states, failure: "GATE_REQUIRED_RUNTIME_SET_INVALID" };
-  const unhealthy = states.some((state) => state.restart_count !== 0 || state.oom_killed || state.status !== "running" || state.health !== REQUIRED_RUNTIME_SERVICES.get(state.service));
+  const unhealthy = states.some((state) => state.restart_count !== 0 || state.oom_killed || state.status !== "running" || !REQUIRED_RUNTIME_SERVICES.get(state.service).has(state.health));
   return { states, failure: unhealthy ? "GATE_REQUIRED_RUNTIME_UNHEALTHY" : null };
 }
 

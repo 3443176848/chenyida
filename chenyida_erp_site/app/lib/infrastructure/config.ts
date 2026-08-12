@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 import { normalizePublicOrigin } from "./request-origin.ts";
 
 export type RuntimeConfig = {
@@ -59,14 +59,23 @@ export function runtimeConfig(): RuntimeConfig {
   const publicOrigin = normalizePublicOrigin(process.env.ERP_PUBLIC_ORIGIN);
   if (environment === "production" && publicOrigin?.startsWith("http://")) throw new Error("ERP_PUBLIC_ORIGIN must use HTTPS in production");
   const originPolicy = resolveOriginPolicy(environment, process.env.ERP_DEPLOYMENT_CLASS, process.env.ERP_UAT_ALLOW_LOOPBACK_ORIGIN);
+  const uploadRoot = resolve(process.env.ERP_UPLOAD_ROOT || "/data/chenyida-erp/uploads");
+  const attachmentRoot = resolve(process.env.ERP_ATTACHMENT_ROOT || "/data/chenyida-erp/attachments");
+  const uploadToAttachment = relative(uploadRoot, attachmentRoot);
+  const attachmentToUpload = relative(attachmentRoot, uploadRoot);
+  if (!uploadToAttachment || !attachmentToUpload
+    || (!uploadToAttachment.startsWith("..") && !isAbsolute(uploadToAttachment))
+    || (!attachmentToUpload.startsWith("..") && !isAbsolute(attachmentToUpload))) {
+    throw new Error("ERP_UPLOAD_ROOT and ERP_ATTACHMENT_ROOT must be separate storage boundaries");
+  }
   return {
     environment,
     ...originPolicy,
     databaseUrl,
     setupToken,
     publicOrigin,
-    uploadRoot: resolve(process.env.ERP_UPLOAD_ROOT || "/data/chenyida-erp/uploads"),
-    attachmentRoot: resolve(process.env.ERP_ATTACHMENT_ROOT || "/data/chenyida-erp/attachments"),
+    uploadRoot,
+    attachmentRoot,
     backupStatusFile: resolve(process.env.ERP_BACKUP_STATUS_FILE || "/data/chenyida-erp/backup-status/latest.json"),
     maxUploadBytes: positiveInteger("ERP_MAX_UPLOAD_BYTES", 10 * 1024 * 1024),
     workerPollMs: positiveInteger("ERP_WORKER_POLL_MS", 1_000),

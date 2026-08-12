@@ -31,7 +31,7 @@ export const FIXTURE_GIT = "a".repeat(40);
 export const FIXTURE_TREE = "b".repeat(40);
 export const FIXTURE_WEB = `sha256:${"c".repeat(64)}`;
 export const FIXTURE_WORKER = `sha256:${"d".repeat(64)}`;
-export const FIXTURE_VERSION = "0.1.0-alpha.45";
+export const FIXTURE_VERSION = "0.1.0-alpha.46";
 export const FIXTURE_TEST_RUNTIME = { policy_sha256: RELEASE_TEST_RUNTIME_POLICY_SHA256, node_image_digest: "sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3", postgres_image_digest: "sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394", posix_image_digest: "sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37", node_modules_tree_sha256: "9ab3e889df4519ecbdfa6cce524e96edbe17ce9d3d9780e9487d59cfc8960663", python_venv_tree_sha256: "c67b68ec9436f4a13f41df0eff9b552ca3f1d8b9e759113ebd23eefbe9419041" };
 export const FIXTURE_RUNTIME_SERVICES = [
   { service: "caddy", container_id: "1".repeat(64), restart_count: 0, oom_killed: false, status: "running", health: "none" },

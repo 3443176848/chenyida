@@ -191,7 +191,7 @@ async function seedFixture() {
 async function waitForServer() {
   for (let attempt = 0; attempt < 120; attempt += 1) {
     if (server?.exitCode !== null) throw new Error("isolated FIX-21 standalone server exited before health check");
-    try { if ((await fetch(`${REQUIRED_ORIGIN}/api/health`)).ok) return; } catch { /* bounded readiness polling */ }
+    try { if ((await fetch(`${REQUIRED_ORIGIN}/api/live`)).ok) return; } catch { /* bounded liveness polling */ }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error("isolated FIX-21 standalone server did not become healthy");

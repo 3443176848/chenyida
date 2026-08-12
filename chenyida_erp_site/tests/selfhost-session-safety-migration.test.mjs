@@ -36,23 +36,25 @@ const frozenPrefixChecksums = [
   "0fdb3d4b92d999a5dede5a36a08bd99ea054879ebb6857341e08f0f0e07852d9",
 ];
 
-test("0044 is the sole append-only migration and freezes every published predecessor", async () => {
+test("0044 remains immutable after append-only 0045 and freezes every published predecessor", async () => {
   const names = (await readdir(migrationDirectory)).filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/.test(name)).sort();
-  assert.equal(names.length, 44);
-  assert.equal(names.at(-1), "0044_identity_session_absolute_lifetime.sql");
-  await assert.rejects(access(new URL("0045_identity_session_absolute_lifetime.sql", migrationDirectory)));
+  assert.equal(names.length, 45);
+  assert.equal(names.at(-1), "0045_runtime_worker_readiness.sql");
+  await assert.rejects(access(new URL("0046_identity_session_absolute_lifetime.sql", migrationDirectory)));
   const actual = await Promise.all(names.slice(0, 43).map(async (name) => sha256(await readFile(new URL(name, migrationDirectory)))));
   assert.deepEqual(actual, frozenPrefixChecksums);
+  assert.equal(sha256(await readFile(new URL("0044_identity_session_absolute_lifetime.sql", migrationDirectory))), "a24df94474403c4f235933d4450626ce65b40416264393db400cef08e7fcaa7e");
 });
 
 test("0044 journal and snapshot change only app_sessions", async () => {
   const journal = JSON.parse(await readFile(new URL("_journal.json", metadataDirectory), "utf8"));
-  assert.equal(journal.entries.length, 44);
-  assert.deepEqual(journal.entries.at(-1), {
-    idx: 44, version: "7", when: journal.entries.at(-1).when,
+  assert.equal(journal.entries.length, 45);
+  const entry = journal.entries.find((item) => item.idx === 44);
+  assert.deepEqual(entry, {
+    idx: 44, version: "7", when: entry.when,
     tag: "0044_identity_session_absolute_lifetime", breakpoints: true,
   });
-  assert.ok(Number.isSafeInteger(journal.entries.at(-1).when));
+  assert.ok(Number.isSafeInteger(entry.when));
   const previous = JSON.parse(await readFile(new URL("0043_snapshot.json", metadataDirectory), "utf8"));
   const current = JSON.parse(await readFile(new URL("0044_snapshot.json", metadataDirectory), "utf8"));
   assert.equal(current.prevId, previous.id);

@@ -110,7 +110,7 @@ test("build args fail closed and become OCI plus baked runtime identity in both 
   assert.doesNotMatch(compose, /ERP_BACKUP_EXPECTED_(?:WEB|WORKER)_IMAGE_DIGEST/);
 });
 
-test("base images, Web runtime, Worker stage, and migration behavior remain unchanged", () => {
+test("base images and final stages keep migrations root-owned and read-only to the node user", () => {
   assert.deepEqual(
     [...dockerfile.matchAll(/^FROM (.+)$/gm)].map((match) => match[1]),
     [
@@ -125,6 +125,9 @@ test("base images, Web runtime, Worker stage, and migration behavior remain unch
   assert.match(webStage, /^USER node$/m);
   assert.match(webStage, /^EXPOSE 3000$/m);
   assert.match(webStage, /^CMD \["node", "server\.js"\]$/m);
+  assert.match(webStage, /COPY --from=builder --chown=root:root \/app\/drizzle-postgres \.\/drizzle-postgres/);
+  assert.match(webStage, /find \.\/drizzle-postgres -type d -exec chmod 0555/);
+  assert.match(webStage, /find \.\/drizzle-postgres -type f -exec chmod 0444/);
 
   const workerStage = dockerfile.slice(dockerfile.indexOf("FROM node:22-bookworm-slim AS worker"));
   assert.equal(workerStage, `FROM node:22-bookworm-slim AS worker
@@ -139,15 +142,25 @@ RUN node --input-type=module -e 'import { readFileSync, unlinkSync } from "node:
 RUN NODE_OPTIONS=--max-old-space-size=1024 npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --chown=node:node app ./app
 COPY --chown=node:node db ./db
-COPY --chown=node:node drizzle-postgres ./drizzle-postgres
+COPY --chown=root:root drizzle-postgres ./drizzle-postgres
 COPY --chown=node:node release ./release
 COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node seeds ./seeds
 COPY --chown=node:node tests ./tests
 COPY --chown=node:node worker ./worker
+RUN find ./drizzle-postgres -type d -exec chmod 0555 {} + && find ./drizzle-postgres -type f -exec chmod 0444 {} +
 RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments && chown -R node:node /data/chenyida-erp
 USER node
 CMD ["node", "--experimental-strip-types", "worker/selfhost.ts"]
 `);
   assert.doesNotMatch(dockerfile, /db:migrate|migrate-postgres|drizzle-kit/);
+});
+
+test("Compose uses readiness for Web and the exact process lease check for Worker", () => {
+  const web = compose.slice(compose.indexOf("  web:"), compose.indexOf("  worker:"));
+  const worker = compose.slice(compose.indexOf("  worker:"), compose.indexOf("  admin:"));
+  assert.match(web, /fetch\('http:\/\/127\.0\.0\.1:3000\/api\/health'\)/);
+  assert.match(worker, /ERP_WORKER_INSTANCE_FILE: \/tmp\/chenyida-erp-worker-instance-id/);
+  assert.match(worker, /test: \["CMD", "node", "--experimental-strip-types", "scripts\/worker-readiness-check\.ts"\]/);
+  assert.match(worker, /interval: 10s[\s\S]*timeout: 5s[\s\S]*retries: 6/);
 });

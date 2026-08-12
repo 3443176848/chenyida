@@ -191,3 +191,44 @@ test("worker heartbeats are single-flight even when the timer is faster than the
   assert.equal(maximumActive, 1);
   assert.equal(active, 0);
 });
+
+test("runtime lease guard is checked before polling and immediately before atomic publication", async () => {
+  const content = Buffer.from("code,name\nA-1,Resistor\n");
+  const job = parseJob(content);
+  let guards = 0;
+  let completes = 0;
+  const queue = parseQueue(job, { async complete() { completes += 1; return true; } });
+  const guard = { async assertCurrent() { guards += 1; } };
+  const worker = new SelfHostedWorker(
+    queue, parseStorage(content), "runtime-guard", 1,
+    undefined, undefined, 1_000, undefined, undefined, undefined, guard,
+  );
+  assert.equal(await worker.runOnce(), true);
+  assert.equal(guards, 2);
+  assert.equal(completes, 1);
+});
+
+test("runtime lease loss before publication leaves the job for lease recovery instead of terminalizing it", async () => {
+  const content = Buffer.from("code,name\nA-1,Resistor\n");
+  const job = parseJob(content);
+  let guards = 0;
+  let completes = 0;
+  let failures = 0;
+  const queue = parseQueue(job, {
+    async complete() { completes += 1; return true; },
+    async fail() { failures += 1; return true; },
+  });
+  const guard = {
+    async assertCurrent() {
+      guards += 1;
+      if (guards === 2) throw Object.assign(new Error("private database detail"), { code: "RUNTIME_LEASE_LOST" });
+    },
+  };
+  const worker = new SelfHostedWorker(
+    queue, parseStorage(content), "runtime-lease-loss", 1,
+    undefined, undefined, 1_000, undefined, undefined, undefined, guard,
+  );
+  await assert.rejects(worker.runOnce(), (error) => error.code === "RUNTIME_LEASE_LOST");
+  assert.equal(completes, 0);
+  assert.equal(failures, 0);
+});

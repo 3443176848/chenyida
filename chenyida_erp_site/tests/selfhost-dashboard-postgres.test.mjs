@@ -13,7 +13,7 @@ import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts"
 const databaseUrl = process.env.TEST_DASHBOARD_DATABASE_URL;
 if (!databaseUrl || !/dashboard_test/i.test(databaseUrl)) throw new Error("isolated TEST_DASHBOARD_DATABASE_URL containing dashboard_test is required");
 process.env.ERP_RELEASE_EXPECTED_DEPLOYMENT_ID ||= "dashboard-test";
-process.env.ERP_RELEASE_EXPECTED_VERSION ||= "0.1.0-alpha.45";
+process.env.ERP_RELEASE_EXPECTED_VERSION ||= "0.1.0-alpha.46";
 process.env.ERP_RELEASE_EXPECTED_GIT_COMMIT ||= "b".repeat(40);
 process.env.ERP_RELEASE_EXPECTED_MANIFEST_SHA256 ||= "d".repeat(64);
 process.env.ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256 ||= "e".repeat(64);
@@ -30,7 +30,7 @@ await mkdir(releaseRoot, { mode: 0o750 });
 await chmod(releaseRoot, 0o750);
 await writeFile(path.join(releaseRoot, ".chenyida-erp-release-identity-root-v1"), "chenyida-erp-release-identity-root/v1\n", { mode: 0o440 });
 await chmod(path.join(releaseRoot, ".chenyida-erp-release-identity-root-v1"), 0o440);
-await writeFile(releaseFile, JSON.stringify({ schema_version: 2, contract: "chenyida-erp-runtime-release-identity/v2", deployment_class: "TEST", deployment_id: "dashboard-test", release_id: "dashboard-release", release_manifest_sha256: process.env.ERP_RELEASE_EXPECTED_MANIFEST_SHA256, supervisor_bundle_sha256: process.env.ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256, authorization_sha256: "f".repeat(64), application_version: "0.1.0-alpha.45", git_commit: "b".repeat(40), web_container_id: runtimeHostname.padEnd(64, "a"), web_image_digest: `sha256:${"b".repeat(64)}`, worker_container_id: "c".repeat(64), worker_image_digest: `sha256:${"c".repeat(64)}`, generated_at: new Date().toISOString() }), { mode: 0o440 });
+await writeFile(releaseFile, JSON.stringify({ schema_version: 2, contract: "chenyida-erp-runtime-release-identity/v2", deployment_class: "TEST", deployment_id: "dashboard-test", release_id: "dashboard-release", release_manifest_sha256: process.env.ERP_RELEASE_EXPECTED_MANIFEST_SHA256, supervisor_bundle_sha256: process.env.ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256, authorization_sha256: "f".repeat(64), application_version: "0.1.0-alpha.46", git_commit: "b".repeat(40), web_container_id: runtimeHostname.padEnd(64, "a"), web_image_digest: `sha256:${"b".repeat(64)}`, worker_container_id: "c".repeat(64), worker_image_digest: `sha256:${"c".repeat(64)}`, generated_at: new Date().toISOString() }), { mode: 0o440 });
 await chmod(releaseFile, 0o440);
 const service = new DashboardService(new PostgresDashboardRepository(pool), statusFile, releaseFile);
 
@@ -107,7 +107,7 @@ test("trusted verification file is independent from PostgreSQL business facts", 
     expires_at: new Date(Date.parse(createdAt) - 120_000 + 24 * 60 * 60 * 1000).toISOString(),
     location_id: "dashboard-restore-location",
     deployment: { class: "TEST", id: "dashboard-test", database: databaseIdentity.name, database_system_identifier: databaseIdentity.system_identifier, database_oid: databaseIdentity.oid, database_marker: "TEST.dashboard-test", database_bytes: 16777216, database_server_major: databaseIdentity.server_major, database_encoding: databaseIdentity.encoding, database_collate: databaseIdentity.collate, database_ctype: databaseIdentity.ctype, database_locale_provider: databaseIdentity.locale_provider, database_collation_version: databaseIdentity.collation_version },
-    application: { version: "0.1.0-alpha.45", git_commit: "b".repeat(40), web_image_digest: `sha256:${hash}`, worker_image_digest: `sha256:${"c".repeat(64)}` },
+    application: { version: "0.1.0-alpha.46", git_commit: "b".repeat(40), web_image_digest: `sha256:${hash}`, worker_image_digest: `sha256:${"c".repeat(64)}` },
     migration: { head: "0044_identity_session_absolute_lifetime.sql", manifest_file: "migrations.txt", manifest_sha256: migrationManifestSha },
     policy: { id: "daily-rpo-v1", rpo_hours: 24 },
     consistency: { method: "QUIESCED_APPLICATION_AND_SNAPSHOT_WITH_CONTENT_RECONCILIATION", database_snapshot: "PG_DUMP_CONSISTENT_SNAPSHOT", database_guard: "DEFAULT_TRANSACTION_READ_ONLY_DEFENSE_IN_DEPTH", writer_boundary: "EXACT_COMPOSE_WEB_WORKER_STOPPED", content_reconciliation: "BEFORE_AFTER_FULL_RELATION_CONTENT_DIGESTS", dump_scope: "COMPLETE_APPLICATION_DATABASE_LOGICAL_DUMP_NO_OWNER_OR_ACL", web_container: "web-test", web_container_id: hash, worker_container: "worker-test", worker_container_id: "c".repeat(64), recovery_point_at: new Date(Date.parse(createdAt) - 120_000).toISOString(), verified_after: new Date(Date.parse(createdAt) - 60_000).toISOString() },

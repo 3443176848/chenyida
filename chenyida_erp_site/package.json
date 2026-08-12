@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.45",
+  "version": "0.1.0-alpha.46",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -57,6 +57,9 @@
     "test:identity:session-safety": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-identity-unit.test.mjs tests/selfhost-identity-ui-contract.test.mjs tests/selfhost-session-safety-migration.test.mjs",
     "test:identity:session-safety:postgres": "scripts/run-session-safety-postgres-test.sh",
     "typecheck:identity-session-safety": "tsc -p tsconfig.task44.json --pretty false",
+    "test:runtime-readiness": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-runtime-readiness-unit.test.mjs tests/selfhost-health-contract.test.mjs tests/selfhost-runtime-readiness-migration.test.mjs tests/selfhost-worker-resilience.test.mjs tests/selfhost-dockerfile-version-contract.test.mjs tests/selfhost-release-identity-contract.test.mjs",
+    "test:runtime-readiness:postgres": "scripts/run-runtime-readiness-postgres-test.sh",
+    "typecheck:runtime-readiness": "tsc -p tsconfig.task45.json --pretty false",
     "test:identity:compose": "node scripts/selfhost-identity-compose-smoke.mjs",
     "test:identity-recovery-targeted:unit": "node --experimental-strip-types --test tests/selfhost-targeted-offline-identity-recovery-unit.test.mjs",
     "test:identity-browser-verifier:unit": "node --test tests/selfhost-targeted-browser-verifier.test.mjs",

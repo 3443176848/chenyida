@@ -141,12 +141,12 @@ test("supplier projection preserves inactive fact and lifecycle abstention bound
   assert.equal(frozen.context.lifecycle_blocked_candidate_ids.length, 1);
 });
 
-test("calibration-only alpha.45 candidate passes frozen D-111 verifier without sample bodies", async () => {
+test("calibration-only alpha.46 candidate passes frozen D-111 verifier without sample bodies", async () => {
   const dataset = await calibrationDataset();
   const report = await evaluateSuggestionLayerDataset(dataset, {
     candidate_source_revision: APPROVED_CANDIDATE_SOURCE_REVISION,
     harness_revision: "a".repeat(40),
-    package_version: "0.1.0-alpha.45",
+    package_version: "0.1.0-alpha.46",
     migration_0041_sha256: FROZEN_MIGRATION_0041_SHA256,
     source_artifacts: Object.freeze({ fixture: "b".repeat(64) }),
     evaluation_run_id: "00000000-0000-4000-a000-000000000001",

@@ -33,7 +33,7 @@ import {
 
 const rootCapable=typeof process.getuid==="function"&&process.getuid()===0;
 const readerGid=typeof process.getgid==="function"?process.getgid():0;
-const identity=(generated_at="2026-08-12T01:00:00.000Z")=>({schema_version:2,contract:RELEASE_IDENTITY_CONTRACT,deployment_class:"UAT",deployment_id:"erp-uat",release_id:"fixture-alpha45",release_manifest_sha256:"1".repeat(64),supervisor_bundle_sha256:FIXTURE_CONTROL.supervisor_bundle_sha256,authorization_sha256:"4".repeat(64),application_version:"0.1.0-alpha.45",git_commit:"b".repeat(40),web_container_id:"a".repeat(64),web_image_digest:`sha256:${"b".repeat(64)}`,worker_container_id:"c".repeat(64),worker_image_digest:`sha256:${"d".repeat(64)}`,generated_at});
+const identity=(generated_at="2026-08-12T01:00:00.000Z")=>({schema_version:2,contract:RELEASE_IDENTITY_CONTRACT,deployment_class:"UAT",deployment_id:"erp-uat",release_id:"fixture-alpha46",release_manifest_sha256:"1".repeat(64),supervisor_bundle_sha256:FIXTURE_CONTROL.supervisor_bundle_sha256,authorization_sha256:"4".repeat(64),application_version:"0.1.0-alpha.46",git_commit:"b".repeat(40),web_container_id:"a".repeat(64),web_image_digest:`sha256:${"b".repeat(64)}`,worker_container_id:"c".repeat(64),worker_image_digest:`sha256:${"d".repeat(64)}`,generated_at});
 
 async function trustedRoot(parent,name="release"){
   const root=path.join(parent,name);await mkdir(root,{mode:0o750});await chmod(root,0o750);const marker=path.join(root,RELEASE_IDENTITY_ROOT_MARKER);await writeFile(marker,RELEASE_IDENTITY_ROOT_MARKER_VALUE,{mode:0o440});await chmod(marker,0o440);return root;
@@ -86,7 +86,8 @@ test("writer pins trusted tools, only observes application containers, and isola
   assert.match(writer,/NODE_IMAGE='node@sha256:[0-9a-f]{64}'/);
   assert.match(writer,/--network none --read-only --cap-drop ALL --cap-add CHOWN --security-opt no-new-privileges/);
   assert.match(writer,/\.RestartCount/);
-  assert.match(writer,/expected_health=none/);
+  assert.match(writer,/expected_health=healthy/);
+  assert.doesNotMatch(writer,/expected_health=none/);
   assert.match(writer,/\.RepoDigests/);
   assert.match(writer,/flock -n 9/);
   assert.match(writer,/--pull=never/);

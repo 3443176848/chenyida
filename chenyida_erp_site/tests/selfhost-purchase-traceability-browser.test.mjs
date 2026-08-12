@@ -96,7 +96,7 @@ async function seedFixture() {
 async function waitForServer() {
   for (let attempt = 0; attempt < 120; attempt += 1) {
     if (server?.exitCode !== null) throw new Error("isolated standalone server exited before health check");
-    try { const response = await fetch(`${REQUIRED_ORIGIN}/api/health`); if (response.ok) return; } catch { /* continue bounded readiness polling */ }
+    try { const response = await fetch(`${REQUIRED_ORIGIN}/api/live`); if (response.ok) return; } catch { /* continue bounded liveness polling */ }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error("isolated standalone server did not become healthy");

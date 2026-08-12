@@ -13,7 +13,7 @@ const ADMIN_DATABASE_URL = "postgresql://postgres@127.0.0.1:5432/postgres";
 // The isolated PostgreSQL server uses trust auth; the non-secret placeholder only
 // satisfies the recovery tools' requirement that a credential-bearing URL was supplied.
 const SOURCE_DATABASE_URL = "postgresql://chenyida_erp:x@postgres:5432/chenyida_erp";
-const EXPECTED_POSTGRES_TESTS = 82;
+const EXPECTED_POSTGRES_TESTS = 83;
 const DATABASE_ENVIRONMENT = /^(?:DATABASE_URL|MIGRATION_TEST_DATABASE_URL|TEST_DATABASE_URL|TEST_[A-Z0-9_]+_DATABASE_URL)$/;
 const DATABASE_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
 const TEMPLATE_NAMES = Object.freeze({
@@ -140,7 +140,7 @@ function databaseConfiguration(entry, source) {
     extras.ERP_BACKUP_EXPECTED_RESTORE_LOCATION_ID = "dashboard-restore-location";
     extras.ERP_BACKUP_EXPECTED_RESTORE_TARGET_ID = "dashboard-restore-target";
     extras.ERP_BACKUP_EVIDENCE_TRUST_MODE = "TRUSTED_ROOT_EXECUTOR";
-    extras.ERP_RUNTIME_BUILD_VERSION = "0.1.0-alpha.45";
+    extras.ERP_RUNTIME_BUILD_VERSION = "0.1.0-alpha.46";
     extras.ERP_RUNTIME_GIT_COMMIT = "b".repeat(40);
   }
   return { database, template, owner: "postgres", variables, extras, sourceUrl: false, databaseComment: entry.path === "tests/selfhost-dashboard-postgres.test.mjs" ? "chenyida-erp-deployment/v2:TEST:dashboard-test" : null };
@@ -224,7 +224,7 @@ async function main() {
   const selected = inventory.tests.filter((entry) => entry.applicability === "REQUIRED" && entry.harness === "POSTGRES_REGRESSION");
   if (selected.length !== EXPECTED_POSTGRES_TESTS) reject("POSTGRES_REGRESSION_TEST_SET_INVALID");
   const migrations = await buildMigrationAllowlist(path.join(CANDIDATE_ROOT, "drizzle-postgres"));
-  if (migrations.length !== 44 || migrations.at(-1)?.filename !== "0044_identity_session_absolute_lifetime.sql") reject("POSTGRES_REGRESSION_MIGRATION_SET_INVALID");
+  if (migrations.length !== 45 || migrations.at(-1)?.filename !== "0045_runtime_worker_readiness.sql") reject("POSTGRES_REGRESSION_MIGRATION_SET_INVALID");
   const admin = new Pool({ connectionString: ADMIN_DATABASE_URL, max: 1, application_name: "release-postgres-regression-admin" });
   const created = [];
   let testCount = 0;

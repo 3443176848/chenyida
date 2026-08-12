@@ -20,6 +20,8 @@ ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0 ERP_RUNTIME_BUILD_VERSION=$ER
 WORKDIR /app
 COPY --from=builder --chown=node:node /app/dist/standalone ./
 COPY --from=dependencies --chown=node:node /tmp/chenyida-runtime-package.json ./package.json
+COPY --from=builder --chown=root:root /app/drizzle-postgres ./drizzle-postgres
+RUN find ./drizzle-postgres -type d -exec chmod 0555 {} + && find ./drizzle-postgres -type f -exec chmod 0444 {} +
 RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments && chown -R node:node /data/chenyida-erp
 USER node
 EXPOSE 3000
@@ -37,12 +39,13 @@ RUN node --input-type=module -e 'import { readFileSync, unlinkSync } from "node:
 RUN NODE_OPTIONS=--max-old-space-size=1024 npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --chown=node:node app ./app
 COPY --chown=node:node db ./db
-COPY --chown=node:node drizzle-postgres ./drizzle-postgres
+COPY --chown=root:root drizzle-postgres ./drizzle-postgres
 COPY --chown=node:node release ./release
 COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node seeds ./seeds
 COPY --chown=node:node tests ./tests
 COPY --chown=node:node worker ./worker
+RUN find ./drizzle-postgres -type d -exec chmod 0555 {} + && find ./drizzle-postgres -type f -exec chmod 0444 {} +
 RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments && chown -R node:node /data/chenyida-erp
 USER node
 CMD ["node", "--experimental-strip-types", "worker/selfhost.ts"]

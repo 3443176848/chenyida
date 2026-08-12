@@ -70,7 +70,7 @@ inspect_runtime_container() {
   name=$1; expected_service=$2
   snapshot=$(/usr/bin/docker inspect --format '{{.Id}}|{{.State.Running}}|{{.State.Restarting}}|{{.State.Paused}}|{{.State.Dead}}|{{.State.OOMKilled}}|{{.RestartCount}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}|{{.Image}}|{{.Config.Image}}|{{index .Config.Labels "com.docker.compose.project"}}|{{index .Config.Labels "com.docker.compose.service"}}|{{index .Config.Labels "org.opencontainers.image.version"}}|{{index .Config.Labels "org.opencontainers.image.revision"}}' "$name" 2>/dev/null) || { echo "runtime container inspection failed" >&2; exit 1; }
   old_ifs=$IFS; IFS='|'; set -- $snapshot; IFS=$old_ifs
-  expected_health=none; [ "$expected_service" = web ] && expected_health=healthy
+  expected_health=healthy
   [ "$#" -eq 14 ] && [ "$2" = true ] && [ "$3" = false ] && [ "$4" = false ] && [ "$5" = false ] && [ "$6" = false ] && [ "$7" = 0 ] && [ "$8" = "$expected_health" ] \
     && [ "${11}" = "$DEPLOYMENT_ID" ] && [ "${12}" = "$expected_service" ] \
     || { echo "runtime container state, Compose identity, or OCI release labels are invalid" >&2; exit 1; }

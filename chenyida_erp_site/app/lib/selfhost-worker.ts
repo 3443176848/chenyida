@@ -28,6 +28,7 @@ type Publication = {
 type Handler = (job: JobLease) => Promise<Publication>;
 type PollErrorLogger = (code: string) => void;
 type UploadReconciler = Readonly<{ reconcileOneUpload(workerId: string): Promise<boolean> }>;
+type RuntimeLeaseGuard = Readonly<{ assertCurrent(): Promise<void> }>;
 type ParsedSheetMetadata = Readonly<{
   sheetIndex: number;
   sheetName: string;
@@ -364,6 +365,7 @@ export class SelfHostedWorker {
   private review?: PostgresMaterialImportReviewWorker;
   private secureImportStore?: SecureImportStore;
   private uploadReconciler?: UploadReconciler;
+  private runtimeLeaseGuard?: RuntimeLeaseGuard;
   constructor(
     jobs: BackgroundJobQueue,
     storage: FileStorage,
@@ -375,6 +377,7 @@ export class SelfHostedWorker {
     pollErrorLogger: PollErrorLogger = defaultPollErrorLogger,
     secureImportStore?: SecureImportStore,
     uploadReconciler?: UploadReconciler,
+    runtimeLeaseGuard?: RuntimeLeaseGuard,
   ) {
     this.jobs = jobs; this.storage = storage; this.workerId = workerId; this.pollMs = pollMs;
     this.heartbeatMs = heartbeatMs;
@@ -383,6 +386,7 @@ export class SelfHostedWorker {
     this.review = review;
     this.secureImportStore = secureImportStore;
     this.uploadReconciler = uploadReconciler;
+    this.runtimeLeaseGuard = runtimeLeaseGuard;
     this.handlers = {
       "material.import.parse": (job) => parseImport(this.storage, job, this.workerId, this.secureImportStore),
       "material.import.normalize": (job) => {
@@ -408,6 +412,7 @@ export class SelfHostedWorker {
   }
   stop() { this.stopping = true; }
   async runOnce(): Promise<boolean> {
+    await this.runtimeLeaseGuard?.assertCurrent();
     await this.jobs.recoverExpired((client, job, code) => this.publishTerminalFailure(client, job, code));
     let reconciledUpload = false;
     if (this.uploadReconciler) {
@@ -421,8 +426,10 @@ export class SelfHostedWorker {
       await heartbeat.renew();
       if (publication.verify) await publication.verify();
       await heartbeat.renew();
+      await this.runtimeLeaseGuard?.assertCurrent();
       if (!(await this.jobs.complete(job, this.workerId, publication.result, publication.publish))) throw new Error("JOB_LEASE_LOST"); return true;
     } catch (error) {
+      if (error && typeof error === "object" && "code" in error && String(error.code).startsWith("RUNTIME_")) throw error;
       const code = workerInfrastructureErrorCode(error);
       const forceTerminal = job.type === "material.import.normalize"
         ? !isRetryableNormalizationError(error)

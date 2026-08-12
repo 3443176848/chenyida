@@ -138,10 +138,17 @@ services:
     environment:
       <<: *app-environment
       ERP_PROCESS_NAME: chenyida-erp-worker
+      ERP_WORKER_INSTANCE_FILE: /tmp/chenyida-erp-worker-instance-id
       NODE_OPTIONS: --max-old-space-size=384
     volumes: *app-volumes
     depends_on:
       migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "--experimental-strip-types", "scripts/worker-readiness-check.ts"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
     restart: unless-stopped
     init: true
     stop_grace_period: 30s

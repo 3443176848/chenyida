@@ -9,12 +9,12 @@ const schemaFile = new URL("../db/schema.ts", import.meta.url);
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
-test("0043 remains immutable after the append-only 0044 migration", async () => {
+test("0043 remains immutable after the append-only 0044 and 0045 migrations", async () => {
   const names = (await readdir(migrationDirectory))
     .filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/.test(name))
     .sort();
-  assert.equal(names.length, 44);
-  assert.equal(names.at(-1), "0044_identity_session_absolute_lifetime.sql");
+  assert.equal(names.length, 45);
+  assert.equal(names.at(-1), "0045_runtime_worker_readiness.sql");
   await assert.rejects(access(new URL("0045_material_import_terminal_integrity.sql", migrationDirectory)));
   const previous = await readFile(new URL("0041_ai_governance_suggestion_evidence.sql", migrationDirectory));
   assert.equal(sha256(previous), "676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2");
@@ -26,7 +26,7 @@ test("0043 remains immutable after the append-only 0044 migration", async () => 
 
 test("0043 journal and snapshot form one consistent three-table correction", async () => {
   const journal = JSON.parse(await readFile(new URL("_journal.json", metadataDirectory), "utf8"));
-  assert.equal(journal.entries.length, 44);
+  assert.equal(journal.entries.length, 45);
   const entry = journal.entries.find((item) => item.idx === 43);
   assert.deepEqual(entry, {
     idx: 43,

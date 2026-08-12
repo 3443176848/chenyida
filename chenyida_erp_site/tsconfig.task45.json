@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "incremental": false,
+    "plugins": []
+  },
+  "include": [
+    "app/lib/runtime-readiness/**/*.ts",
+    "app/lib/infrastructure/config.ts",
+    "app/lib/selfhost-api.ts",
+    "app/lib/selfhost-worker.ts",
+    "db/**/*.ts",
+    "scripts/worker-readiness-check.ts",
+    "worker/selfhost.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "examples",
+    "app/api/erp-api.ts",
+    "scripts/seed-material-categories.ts"
+  ]
+}
