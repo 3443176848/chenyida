@@ -37,7 +37,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成，当前零DOING/`IDLE`。R1.5已交付Task/Message/Context合同、无状态验证、合成docs/test原生角色试点和源盲黑盒fixture；OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT_AUTHORIZED` |
+| 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成；当前唯一DOING为TASK44且主智能体保持单一写者。新一轮只读子智能体调度因运行器`agent thread limit reached`未创建，既有数据/应用/运维三线审计继续作为风险输入；OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT_AUTHORIZED` |
 | 当前版本 | 自托管源码为`0.1.0-alpha.44`，源码Migration为43/head `0043_material_import_terminal_integrity.sql`；并行非生产UAT Web仍为`0.1.0-alpha.42`原镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，运行source revision仍为`569aa954d764309e239d1f6c174e582596d33a24`，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。alpha.44/0041—0043未build、未部署或应用到UAT；当前运行面仍是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
@@ -52,8 +52,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
 | 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / G4 APPLICATION P0 HARDENING / PRODUCTION NO-GO`。G1合成恢复与G3发布工具已完成；TASK43在仓库层关闭PR-004，但这些成果不能替代真实异机副本、同候选完整PASS、UAT部署或员工验收。生产数据、异机真实数据传输、Migration/部署、账号权限和正式切换仍须专项明确授权 |
-| 当前任务 | 当前零`DOING`、active slot为`IDLE`；TASK43已`DONE / REPOSITORY AND ISOLATED TESTS VERIFIED / RUNTIME NOT DEPLOYED` |
-| 下一任务 | 从G4尚未关闭的会话绝对时限、权限矩阵与健康/监控P0中选择不依赖外部资源的最高优先级仓库任务；G2真实备份恢复、候选build、UAT Migration/deploy、员工试用和切流均不自动获权 |
+| 当前任务 | `SELFHOST-IDENTITY-SESSION-SAFETY-44`为唯一`DOING`：从`0caa565f…`严格起步，在仓库与隔离PostgreSQL实现8小时idle、24小时absolute、数据库时钟原子认证、一次性超时终态/审计和失效Cookie清理；不改岗位权限/health，不连接运行面 |
+| 下一任务 | TASK44通过并独立收口后，从G4未关闭的health/Worker/storage真实性或需业务负责人确认的最小权限矩阵中选择最高优先级未阻塞项；G2真实备份恢复、候选build、UAT Migration/deploy、员工试用和切流均不自动获权 |
 
 ## 当前完成模块
 
@@ -334,6 +334,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 51. D-088 已由 alpha.38/0037 在并行非生产 UAT 落地：工程修订回复采用追加式 Version 与 RETURN 事件专属 CAS Head，v2 固定引用源 v1、精确 RETURN、精确回复版本及 Product/BOM/Unit Resolution/物料快照；同 RETURN 只允许一个直接后继，摘要、事务、幂等、审计和数据库 guard 共同保护谱系。主 UAT 只读验收后仍为 v1 RETURNED、RETURN 1、Response 0、v2 0，未填写回复、未生成或提交 v2、未登录 planning；工程 v2 黑盒试用必须等待新的明确授权。
 
 ## 当前任务与下一任务
+
+- `SELFHOST-IDENTITY-SESSION-SAFETY-44`已从TASK43收口后的零DOING切换为唯一执行任务。D-118把会话安全边界固定为8小时idle、创建时不可延长的24小时absolute、PostgreSQL时钟和用户→会话一致锁序、超时单次终态/去敏审计及失效Cookie对称清理；只允许源码、append-only 0044和隔离测试，不修改岗位权限/health或运行UAT。
+- TASK44收口后继续G4的health/Worker/storage真实性；岗位权限矩阵须业务负责人批准后另立任务。真实异机备份/恢复、候选build、UAT/生产Migration/deploy、账号变化、员工试用和切换仍须专项明确授权。
 
 - `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成并暂时回到零`DOING`：D-115四域V2工具与41/41合同、双集群隔离恢复通过。G2真实异机备份/恢复因外部目标与专项授权阻塞；下一安全任务转入G3发布身份闭合、release manifest、Migration allowlist和强制`test:release`，仍不build/deploy或读取当前卷。
 - 真实异机备份与恢复、UAT build/Migration/deploy、旧数据读取、员工试用、账号/权限、网络/systemd和正式切换仍须专项明确授权；持续交付授权不改变这些边界。

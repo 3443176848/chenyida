@@ -17,6 +17,8 @@
 
 2026-08-12 第三次增量：`SELFHOST-MATERIAL-IMPORT-SAFETY-43`已完成仓库实现与隔离验证。D-117要求的建批/上传持久幂等、批次owner/状态/CAS、私有staging、服务端实际文件检查、同根无覆盖原子提升、跨数据库/文件系统故障协调、job所有权和worker终态事务已在源码`5767c92…`与manifest-only直接子提交`dad7468`落地；0042发布后保持不可变，0043以append-only方式修正终态约束。运行UAT未部署该实现，因此PR-004只在仓库层关闭，整体判定仍为`PRODUCTION NO-GO`。
 
+2026-08-12 第四次增量：`SELFHOST-IDENTITY-SESSION-SAFETY-44`已作为唯一DOING启动。D-118固定8小时idle、创建时不可延长的24小时absolute、PostgreSQL时钟和用户→会话锁序、首次超时单次终态/去敏审计以及失效Cookie对称清理；计划以append-only 0044落地并只在合成/隔离环境验证。当前实现与测试尚未完成，运行UAT仍是旧会话实现，整体判定继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -126,7 +128,7 @@
 ## 6. P1 高风险
 
 - health 只执行`select 1`，却固定返回 storage 和 worker 正常，不能发现 Worker 停止、上传目录不可写、Migration 漂移或备份过期。
-- 会话每次访问都会把过期时间续到未来 8 小时，没有独立绝对最长生命周期。
+- 会话每次访问都会把过期时间续到未来 8 小时，没有独立绝对最长生命周期；TASK44已开始仓库修复，但在0044、并发/迁移测试和运行候选部署前保持`OPEN`。
 - 权限矩阵硬编码且多个业务角色可读取财务域；尚无岗位负责人批准的最小权限/职责分离矩阵。
 - 容器基础镜像未全部锁定 digest；Compose 尚未全面使用`read_only`、`no-new-privileges`和`cap_drop`；没有当前候选 SBOM、漏洞扫描、签名验证证据。
 - 公网入口仍为 nip.io 和非标准端口；没有公司域名、正式边缘策略、CSP、MFA或 break-glass 演练证据。

@@ -4,6 +4,13 @@
 
 ## 2026-08-12
 
+### SELFHOST-IDENTITY-SESSION-SAFETY-44 - `docs: start session lifetime hardening`（执行中）
+
+- 调度/边界：TASK43收口后的零DOING按持续交付路线切换为TASK44唯一active task。严格起点为`main@0caa565f3954bade15526bbef1e3c3b742b44a17`、tree`ae2592f…`、alpha.44/0043；UAT只引用既有文档事实alpha.42/0040，本任务不连接复核。
+- 决策：D-118固定8小时idle、创建时不可延长的24小时absolute、PostgreSQL时钟与用户→会话一致锁序、首次超时单次终态/去敏审计，以及EXPIRED/REVOKED/未知token的Session+CSRF Cookie对称清理。岗位权限矩阵和health/Worker/storage真实性明确排除。
+- 计划：新增append-only 0044，保持0001—0043不可变；同步Schema/snapshot/journal和release allowlist，并覆盖空库/0043升级/重放/回滚、deadline约束、并发撤销/超时、Handler/API与相关回归。
+- 安全/资源：只允许仓库源码、合成身份与隔离PostgreSQL；不build/deploy，不访问UAT/生产、账号、当前四卷或业务数据。起点available约2.1GiB、Swap439MiB/1GiB、根盘31GiB、Load`0.30/0.33/0.41`；四服务restart0/OOM false。
+
 ### SELFHOST-MATERIAL-IMPORT-SAFETY-43 - `feat: complete recoverable material import fallback` / `chore: bind material import release supervisor bundle` / `docs: close material import fallback hardening`
 
 - 调度/决策：TASK42收口后的零DOING按持续交付路线切换为TASK43唯一active task；D-117固定数据库意图、私有staging、服务端实际检查、同根无覆盖原子提升、最终发布和可恢复协调，不把PostgreSQL与文件系统误称为单一ACID事务。任务现已`DOING→DONE`并释放active slot。

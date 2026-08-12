@@ -2,6 +2,19 @@
 
 最后更新时间：2026-08-12（Asia/Shanghai）
 
+## SELFHOST-IDENTITY-SESSION-SAFETY-44（执行中；仓库与隔离测试）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / IMPLEMENTATION IN PROGRESS / PRODUCTION NO-GO | 唯一active task；尚未完成实现或验收，系统不能交给真实员工 |
+| 严格起点 | PASS / CONTROLLED | `main@0caa565f3954bade15526bbef1e3c3b742b44a17`、tree`ae2592f…`、alpha.44/0043；UAT仍按文档为alpha.42/0040且未连接 |
+| 已确认缺口 | OPEN / REPRODUCIBLE IN SOURCE | 会话仅有滑动8小时期限；认证使用Node时钟且SELECT后独立UPDATE不核对rowCount；并发撤销仍可能返回旧actor，过期/未知token Cookie不完整清理 |
+| D-118目标 | ACCEPTED IMPLEMENTATION BASELINE | 8h idle+24h absolute、DB时钟、用户→会话锁序、首次超时单次终态/去敏审计、失效Cookie对称清理、append-only 0044 |
+| 当前范围 | CONTROLLED | 只改仓库源码、0044、合成/隔离测试与文档；岗位权限和health另立任务 |
+| 运行面影响 | NONE | 不连接或修改UAT/生产，不build/deploy/restart，不读取当前四卷或业务数据 |
+| 起点资源 | PASS | available约2.1GiB、Swap439MiB/1GiB、根盘31GiB、Load`0.30/0.33/0.41`；Web/PostgreSQL healthy、Worker/Caddy running、restart0/OOM false |
+| 外部资源 | NOT REQUIRED FOR CURRENT IMPLEMENTATION | UAT/生产Migration/deploy、账号/权限、员工试用仍须专项明确授权 |
+
 ## SELFHOST-MATERIAL-IMPORT-SAFETY-43（完成；仓库与隔离验证，运行面未部署）
 
 | 验证项 | 结果 | 说明 |

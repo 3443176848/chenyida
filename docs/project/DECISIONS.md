@@ -1762,6 +1762,44 @@
 - 拒绝用数据库事务包装文件rename后声称跨介质原子，也拒绝遇到不确定状态时覆盖、重复创建或猜测删除。
 - 拒绝只隐藏job按钮或按UUID存在性授权读取。
 
+## D-118 会话采用8小时 idle、24小时 absolute、数据库时钟原子认证与单次超时审计
+
+- 日期：2026-08-12
+- 状态：`ACCEPTED AS IMPLEMENTATION BASELINE / IMPLEMENTATION IN PROGRESS / RUNTIME NOT AUTHORIZED`
+- 提案与实施：Codex 持续交付负责人，依据项目负责人持续推进G4和仓库内安全实施授权
+- 确认边界：只授权源码、append-only Migration和合成/隔离测试；UAT/生产Migration、部署、账号权限、员工试用和正式使用仍须专项明确授权
+
+### Context
+
+- `app_sessions`只有可滑动的`expires_at`，没有创建时固定且不可延长的绝对截止；持续访问可无限续期。
+- 当前认证先SELECT、用Node `Date.now()`判断，再单独UPDATE延期且不核对row count；并发撤销或用户停用可能已经生效，但旧actor仍被返回，应用与数据库时钟漂移也会改变安全判定。
+- 过期没有持久终态原因或一次性Audit；`/api/session`及通用受保护API对expired/unknown token没有一致清除Session和CSRF Cookie。
+- 岗位权限矩阵需要业务负责人确认，health/Worker/storage真实性属于独立运维边界；两者不并入本任务。
+
+### Decision
+
+1. 会话保留8小时idle期限，并在创建时增加固定24小时`absolute_expires_at`；续期只能取`least(now()+8 hours, absolute_expires_at)`，absolute deadline不可改写或延长。
+2. 0044按expand/backfill/constraint实施：已有会话回填`created_at+24 hours`并向下夹紧idle deadline。升级时已经超过24小时的旧会话失效，这是明确安全结果；0001—0043保持不可变。
+3. 认证授权使用PostgreSQL `now()`，并遵循用户→会话一致锁序，在一个事务内判定用户active、撤销、idle与absolute期限及续期。状态已变化或续期未生效时不得返回AUTHENTICATED actor。
+4. 首次观察到idle或absolute超时的请求分别原子写入`IDLE_TIMEOUT`或`ABSOLUTE_TIMEOUT`终态，并写一条不含token、摘要或时间细节的Identity Audit；并发重复请求不得重复终态化或重复审计。
+5. 已撤销保持`SESSION_REVOKED`；超时返回稳定`SESSION_EXPIRED`和中文提示；携带expired、revoked或unknown token的`/api/session`及通用受保护API都清除Session与CSRF Cookie。无Cookie匿名请求不产生副作用。
+6. 0044增加deadline约束、不可变guard和待过期索引；Schema、snapshot、journal、运行查询、release allowlist及空库/0043升级/重放/回滚测试必须一致。
+7. API不暴露absolute/idle内部时间、撤销原因、token摘要、SQL、堆栈或敏感审计正文。request ID、`no-store`和既有Cookie安全属性保持。
+
+### Consequences
+
+- TASK44会把源码版本推进到alpha.45、Migration head推进到0044，并新增并发、Migration、Handler及隔离PostgreSQL证据；在实现和验收完成前，本决定不构成风险关闭。
+- 0044应用后，创建已超过24小时的历史会话会在下次认证时终态化；升级/部署计划必须提前告知受影响用户重新登录，不得静默延长旧会话。
+- 每次有效访问仍有受控数据库写入；后续容量任务应验证真实会话并发，但不得以性能理由绕过锁、deadline或审计。
+- 本决定不修改岗位角色、业务权限、MFA、密码策略、登录失败阈值、并发会话数、health/Worker/storage探针，也不授权运行面变更。
+
+### Rejected alternatives
+
+- 拒绝只依赖Cookie `Max-Age`、浏览器过期或Node应用时钟承担服务端授权。
+- 拒绝继续SELECT后独立UPDATE并忽略row count，或通过重试把absolute deadline滑动延长。
+- 拒绝每次过期请求重复写审计、把未知token细分给客户端，或只在`/api/session`清Cookie而让普通受保护API继续携带失效凭据。
+- 拒绝回写已发布Migration或把岗位权限、health和会话安全混成同一任务。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
