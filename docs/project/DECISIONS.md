@@ -1765,7 +1765,7 @@
 ## D-118 会话采用8小时 idle、24小时 absolute、数据库时钟原子认证与单次超时审计
 
 - 日期：2026-08-12
-- 状态：`ACCEPTED AS IMPLEMENTATION BASELINE / IMPLEMENTATION IN PROGRESS / RUNTIME NOT AUTHORIZED`
+- 状态：`ACCEPTED AND IMPLEMENTED IN SOURCE / ISOLATED TESTS VERIFIED / RUNTIME NOT AUTHORIZED`
 - 提案与实施：Codex 持续交付负责人，依据项目负责人持续推进G4和仓库内安全实施授权
 - 确认边界：只授权源码、append-only Migration和合成/隔离测试；UAT/生产Migration、部署、账号权限、员工试用和正式使用仍须专项明确授权
 
@@ -1788,7 +1788,7 @@
 
 ### Consequences
 
-- TASK44会把源码版本推进到alpha.45、Migration head推进到0044，并新增并发、Migration、Handler及隔离PostgreSQL证据；在实现和验收完成前，本决定不构成风险关闭。
+- TASK44已把源码推进到alpha.45/head 0044：源码`e7b0298f90ba85a5018709be1360a40dacbbaa59`与manifest-only直接子提交`c730fefe0857d2e4546f28364ca53d5e6506d099`形成证据链，0044 SHA-256为`a24df944…aa7e`。定向55/55、隔离PostgreSQL 21/21、官方Migration harness、release合同与232项inventory通过；因此仓库风险已关闭，但运行UAT未部署，不能据此批准真实使用。
 - 0044应用后，创建已超过24小时的历史会话会在下次认证时终态化；升级/部署计划必须提前告知受影响用户重新登录，不得静默延长旧会话。
 - 每次有效访问仍有受控数据库写入；后续容量任务应验证真实会话并发，但不得以性能理由绕过锁、deadline或审计。
 - 本决定不修改岗位角色、业务权限、MFA、密码策略、登录失败阈值、并发会话数、health/Worker/storage探针，也不授权运行面变更。

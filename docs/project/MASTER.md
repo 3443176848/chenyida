@@ -37,27 +37,29 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 | 项目 | 当前值 |
 | --- | --- |
-| 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成；当前唯一DOING为TASK44且主智能体保持单一写者。新一轮只读子智能体调度因运行器`agent thread limit reached`未创建，既有数据/应用/运维三线审计继续作为风险输入；OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT_AUTHORIZED` |
-| 当前版本 | 自托管源码为`0.1.0-alpha.44`，源码Migration为43/head `0043_material_import_terminal_integrity.sql`；并行非生产UAT Web仍为`0.1.0-alpha.42`原镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，运行source revision仍为`569aa954d764309e239d1f6c174e582596d33a24`，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。alpha.44/0041—0043未build、未部署或应用到UAT；当前运行面仍是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
+| 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成；TASK44收口提交边界为零DOING/IDLE且主智能体保持单一写者。新一轮只读子智能体调度因运行器`agent thread limit reached`未创建，既有数据/应用/运维三线审计继续作为风险输入；OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT_AUTHORIZED` |
+| 当前版本 | 自托管源码为`0.1.0-alpha.45`，源码Migration为44/head `0044_identity_session_absolute_lifetime.sql`；并行非生产UAT Web仍为`0.1.0-alpha.42`原镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，运行source revision仍为`569aa954d764309e239d1f6c174e582596d33a24`，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`。alpha.45/0041—0044未build、未部署或应用到UAT；当前运行面仍是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
 | 当前根仓库运维基线 | `SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`已在不停止或重建服务的前提下清理10.92 GB BuildKit cache和四个精确核准的无引用测试/旧任务镜像，根盘可用17→30.34 GiB（`df -h`为31G）；Build Cache为0B，四服务restart0/OOM false，当前/alpha.41回滚/FIX38被拒证据镜像、private GHCR本地锚点、Trae/MySQL、备份和四卷保持。运行面继续沿用`SELFHOST-UAT-FIX-38`的alpha.42/0040非生产UAT基线，未执行build、Migration、部署或业务写 |
-| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。TASK43源码为`5767c92e51e4f25ba49fa4431299f265ef4cb7aa`/tree `bb4ef005cc9d9eb858e553d6a1825298845352bb`；其直接子提交`dad7468`只更新content-addressed bundle manifest，SHA-256为`b948e08861e5114660650e21faa9374cef879b354cb59c6c0d0bdb62960228e9`。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；本任务未fetch/push或改动远端，公开origin继续禁止接收内部历史 |
+| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。TASK44源码为`e7b0298f90ba85a5018709be1360a40dacbbaa59`/tree`43aa32601c8cd5a953de41e48c19f6e9860ed87c`；其直接子提交`c730fefe0857d2e4546f28364ca53d5e6506d099`只更新36文件content-addressed bundle manifest，SHA-256为`ad1a66d3e1c30a4ac18fbdeff1e7d23d70488187826ecbc3ae9ebdf2cc961c86`。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；本任务未fetch/push或改动远端，公开origin继续禁止接收内部历史 |
 | 镜像恢复锚点 | D-109的private GHCR镜像恢复锚点已建立：唯一目标/tag为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，一次push返回、认证registry与唯一tag package version三方digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association、无`latest`/额外tag；linux/amd64 child、attestation、config和9层均匹配预检，一次按digest pull完全匹配，匿名读取返回401。一次性本机凭据已logout并清理；项目负责人证明已通过GitHub网页撤销一次性PAT，本项目未读取或技术验证PAT正文/远端状态 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
 | 历史 Site 源码版本 | 历史发布对应提交 `2b4f178`；纳入根仓库前的开发提交为 `9f2c2dc`；根仓库直接跟踪其完整源码 |
 | 历史 Site 地址 | 文档保留原地址仅作历史追踪；本任务禁止且未访问 |
-| 当前数据库 | 源码为`0001`—`0043`，43/head`0043_material_import_terminal_integrity.sql`，0041/0042/0043 SHA-256依次为`676626b9…bf2`、`c0eeab63…85bf`、`0fdb3d4b…52d9`；0042发布后不可变，0043为append-only终态约束修正。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0043只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
+| 当前数据库 | 源码为`0001`—`0044`，44/head`0044_identity_session_absolute_lifetime.sql`，0044 SHA-256为`a24df94474403c4f235933d4450626ce65b40416264393db400cef08e7fcaa7e`；0001—0043未修改，Schema/snapshot/journal/allowlist一致。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0044只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / G4 APPLICATION P0 HARDENING / PRODUCTION NO-GO`。G1合成恢复与G3发布工具已完成；TASK43在仓库层关闭PR-004，但这些成果不能替代真实异机副本、同候选完整PASS、UAT部署或员工验收。生产数据、异机真实数据传输、Migration/部署、账号权限和正式切换仍须专项明确授权 |
-| 当前任务 | `SELFHOST-IDENTITY-SESSION-SAFETY-44`为唯一`DOING`：从`0caa565f…`严格起步，在仓库与隔离PostgreSQL实现8小时idle、24小时absolute、数据库时钟原子认证、一次性超时终态/审计和失效Cookie清理；不改岗位权限/health，不连接运行面 |
-| 下一任务 | TASK44通过并独立收口后，从G4未关闭的health/Worker/storage真实性或需业务负责人确认的最小权限矩阵中选择最高优先级未阻塞项；G2真实备份恢复、候选build、UAT Migration/deploy、员工试用和切流均不自动获权 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / G4 APPLICATION P0 HARDENING / PRODUCTION NO-GO`。G1合成恢复与G3发布工具已完成；TASK43和TASK44分别在仓库层关闭导入fallback与会话绝对寿命缺口，但这些成果不能替代真实异机副本、同候选完整PASS、UAT部署或员工验收。生产数据、异机真实数据传输、Migration/部署、账号权限和正式切换仍须专项明确授权 |
+| 当前任务 | TASK44治理收口提交边界为零`DOING`/`IDLE`；alpha.45/0044仓库与隔离验证完成，运行UAT仍是alpha.42/0040旧实现 |
+| 下一任务 | 按持续交付授权立即启动G4未关闭的health/Worker/storage真实性任务；岗位权限矩阵等待业务负责人确认。G2真实备份恢复、候选build、UAT Migration/deploy、员工试用和切流均不自动获权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-IDENTITY-SESSION-SAFETY-44已在源码`e7b0298`及manifest-only直接子提交`c730fef`完成D-118会话仓库加固：alpha.45/0044增加8小时idle、固定24小时absolute、PostgreSQL时钟和用户→会话锁序、单次超时终态/去敏审计及失效Cookie清理。定向55/55、隔离PostgreSQL 21/21、官方Migration harness、release合同和232项inventory通过；未运行完整候选门、build或UAT Migration/deploy，运行UAT仍alpha.42/0040，系统仍production no-go
 
 - SELFHOST-MATERIAL-IMPORT-SAFETY-43已在源码提交`5767c92`及manifest-only直接子提交`dad7468`完成D-117/PR-004仓库修复：建批/上传持久幂等、正文前owner/状态/CAS、私有staging/实际文件检查/无覆盖原子提升、reconciliation、job所有权和worker终态事务已落地，Migration以不可变0042加append-only 0043收口。定向/隔离PostgreSQL、typecheck、lint、release合同与230项inventory通过；没有build、UAT Migration/deploy或真实数据验收，运行UAT仍alpha.42/0040，系统仍production no-go
 
@@ -272,10 +274,10 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前风险
 
-- `SELFHOST-PRODUCTION-READINESS-40`确认的首要风险继续开放。TASK41只关闭G1合成/隔离工具缺口：PostgreSQL及三个文件数据域仍没有真实异机当前锚点/恢复/RTO；源码alpha.44/0043与UAT alpha.42/0040仍未闭合。TASK43已关闭物料导入fallback的仓库P0，但运行UAT尚未部署；Browser、完整typecheck、候选镜像/SBOM/漏洞证据和完整release gate仍阻止发布。详见[投产准入基线](PRODUCTION_READINESS.md)
+- `SELFHOST-PRODUCTION-READINESS-40`确认的首要风险继续开放。TASK41只关闭G1合成/隔离工具缺口：PostgreSQL及三个文件数据域仍没有真实异机当前锚点/恢复/RTO；源码alpha.45/0044与UAT alpha.42/0040仍未闭合。TASK43/TASK44已关闭导入fallback和会话绝对寿命的仓库P0，但运行UAT尚未部署；health/Worker/storage仍会误报，Browser、完整typecheck、候选镜像/SBOM/漏洞证据和完整release gate仍阻止发布。详见[投产准入基线](PRODUCTION_READINESS.md)
 - Docker构建缓存不会自动受控清理，连续候选构建和保留回滚镜像仍会再次消耗根盘；本次只恢复到精确30.34 GiB并保留5.942 GB Docker标记的未用镜像空间，不授权自动prune。未来重任务仍须先检查根盘，清理必须另按精确对象和保护清单执行
 
-- D-113与D-114均已由项目负责人接受，`AGENT-R1`与PM-002已完成，`AGENT-R1-5`正在实现合成协议MVP；这些仍不提供R2运行时强制力。直到R2/R3以后通过越权、脑裂、租约失效、资源和恢复负测，角色权限仍依赖现有仓库规则与人工流程，不能宣称已由OS、容器、命令代理或短时凭据技术强制
+- D-113与D-114均已由项目负责人接受，`AGENT-R1`、PM-002与`AGENT-R1-5`均已完成；这些仍不提供R2运行时强制力。直到R2/R3以后通过越权、脑裂、租约失效、资源和恢复负测，角色权限仍依赖现有仓库规则与人工流程，不能宣称已由OS、容器、命令代理或短时凭据技术强制
 - Git与private GHCR镜像锚点已建立，但PostgreSQL dump及uploads、attachments、backup-status异机锚点仍不存在；TASK39的行政关闭不消除该单机数据恢复风险，也不代表production ready
 - D-110关闭AI治理规格缺口，D-111只批准当前冻结本地确定性基线阈值，D-112只接受AI Suggestion/Evidence关系化合同；三者都不代表外部模型质量、供应商、隐私、地域、合同、凭据、真实数据、实现或试点获批。外部AI及候选层实现继续禁用，TASK03实施阶段与TASK04—TASK05仍须独立授权和验收
 - UAT 临时 manager 已通过页面停用且未用于业务试用。首次浏览器验收脚本在停用后的刷新检查处提前结束，遗留一个已丢失令牌、等待正常 8 小时 TTL 的会话；按不可变审计和禁止直接 SQL 删除边界保留。两个目标 logout 与完整复验的旧 Session 均已立即撤销，不得把该脚本残留误述为 logout 失败。
@@ -335,14 +337,14 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- `SELFHOST-IDENTITY-SESSION-SAFETY-44`已从TASK43收口后的零DOING切换为唯一执行任务。D-118把会话安全边界固定为8小时idle、创建时不可延长的24小时absolute、PostgreSQL时钟和用户→会话一致锁序、超时单次终态/去敏审计及失效Cookie对称清理；只允许源码、append-only 0044和隔离测试，不修改岗位权限/health或运行UAT。
-- TASK44收口后继续G4的health/Worker/storage真实性；岗位权限矩阵须业务负责人批准后另立任务。真实异机备份/恢复、候选build、UAT/生产Migration/deploy、账号变化、员工试用和切换仍须专项明确授权。
+- `SELFHOST-IDENTITY-SESSION-SAFETY-44`已完成：源码`e7b0298`与manifest-only `c730fef`把alpha.45/0044、8小时idle、固定24小时absolute、PostgreSQL时钟原子认证、超时单次终态/去敏审计及失效Cookie对称清理落地并通过隔离验证；没有修改运行UAT。
+- 当前提交边界零`DOING`；下一独立任务继续G4的health/Worker/storage真实性。岗位权限矩阵须业务负责人批准后另立任务。真实异机备份/恢复、候选build、UAT/生产Migration/deploy、账号变化、员工试用和切换仍须专项明确授权。
 
 - `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成并暂时回到零`DOING`：D-115四域V2工具与41/41合同、双集群隔离恢复通过。G2真实异机备份/恢复因外部目标与专项授权阻塞；下一安全任务转入G3发布身份闭合、release manifest、Migration allowlist和强制`test:release`，仍不build/deploy或读取当前卷。
 - 真实异机备份与恢复、UAT build/Migration/deploy、旧数据读取、员工试用、账号/权限、网络/systemd和正式切换仍须专项明确授权；持续交付授权不改变这些边界。
 
 - 项目负责人已接受D-113与D-114；`AGENT-R1`只读控制器、`PM-002`执行设计和`AGENT-R1-5`合成docs/test协议MVP均已完成。当前零`DOING`并回到`IDLE`，不自动启动R2或恢复TASK03。
-- `PHASE4-TASK03`的D-112五表及确定性候选Service/API仍是0041引入的源码就绪模块；仓库总head现为alpha.44/0043。TASK03状态保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。外部AI禁用，正式holdout未重跑，源码未build/deploy，UAT仍alpha.42/0040，`PHASE4-TASK04`—`TASK05`保持`TODO`且不得自动开始。
+- `PHASE4-TASK03`的D-112五表及确定性候选Service/API仍是0041引入的源码就绪模块；仓库总head现为alpha.45/0044。TASK03状态保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。外部AI禁用，正式holdout未重跑，源码未build/deploy，UAT仍alpha.42/0040，`PHASE4-TASK04`—`TASK05`保持`TODO`且不得自动开始。
 - `SELFHOST-UAT-FIX-37`已完成：功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`及语义修正`20a9123741862d81ac18af9e6bdee896674fe95c`；alpha.41/0040关系化收货证据、最小权限谱系、权威GET预览、最终POST事务门禁、提前到货保护和按inspection mode分流已Web-only部署为`sha256:0cf98937…5f19`。正式备份/第二库恢复/0039→0040及warehouse-only桌面/390×844取消UAT通过；business POST0、Session0，PO/Line/Plan/queue `1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。这是FIX38前置历史；真实收货及后续部门动作均须另获授权。
 - `SELFHOST-UAT-FIX-36`已完成：功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`；通用受限读模型、数据域403、PO聚合及完整上游谱系、四Line、四Plan/queue、Event/Audit/Idempotency最小投影和响应式只读详情已Web-only部署为`sha256:664e0ac6…a4ec89`。正式备份恢复、purchase-only桌面/390×844刷新重开和Session失效通过；business POST0，PO/Line/Plan/queue `1/4/4/4`及下游全0。这是FIX37的前置历史，不是当前执行指令。
 - `SELFHOST-UAT-DECISION-35`已完成：D-105将未经事前授权的`PO-00000001`置于受控保留状态；它是控制事件，只提供前向授权并明确“不追溯性授权”。PO/Line/Plan/queue `1/4/4/4`及Event/Audit/Idempotency证据不得改动，Award→PO不再重试；FIX36只读验收不改变该判断或授权边界。
@@ -387,7 +389,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - `SELFHOST-LANDING-TASK02` 经用户澄清“不依赖逐行人工分类”后连续执行：离线确定性规则按来源编码/MPN/严格规格组合、类别、位号和可数件单位完成 532 Material、6 Product、6 个 DRAFT BOM 与 316 行主库导入；438 条真正歧义来源隔离。migration_tool 来源链接承载逐行 provenance，0034 不变，同批次重放新增 0，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`。
 - 后续必须为 197 行提供显式单位；若需要 BOM，还必须另提供产品编码/版本、BOM 版本、行数量、位号和单位契约。完成前不得执行已生成的拟删除计划。本轮停止；LANDING-TASK01 的 offhost copy 仍是独立未完成用户动作。
 
-- 当前源码为`0.1.0-alpha.44`/head 0043且未build/deploy；并行非生产UAT Web仍为原`0.1.0-alpha.42`镜像，UAT PostgreSQL保持`0001`—`0040`。生产版本仍不存在，不得把源码候选、隔离测试或并行UAT写成D-111正式重验、生产发布或真实数据迁移。
+- 当前源码为`0.1.0-alpha.45`/head 0044且未build/deploy；并行非生产UAT Web仍为原`0.1.0-alpha.42`镜像，UAT PostgreSQL保持`0001`—`0040`。生产版本仍不存在，不得把源码候选、隔离测试或并行UAT写成D-111正式重验、生产发布或真实数据迁移。
 - LANDING-TASK04 部署前后只读核对均为 Audit 876 条、Session 2 条（ACTIVE 1 条）；不可变审计和合法会话不得为追求“零记录”而删除。
 - TASK09 已以保存的非敏感基线摘要执行 delta 验收，并在清理后返回完全相同的合法 Audit/Session 记录集与计数；未来任务仍须遵守相同规则。
 - 2026-07-27 服务器重启/不可用的根因保持 `UNKNOWN`，不得无证据归因 OOM；资源保护不等于生产上线。

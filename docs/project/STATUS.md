@@ -2,18 +2,20 @@
 
 最后更新时间：2026-08-12（Asia/Shanghai）
 
-## SELFHOST-IDENTITY-SESSION-SAFETY-44（执行中；仓库与隔离测试）
+## SELFHOST-IDENTITY-SESSION-SAFETY-44（完成；仓库与隔离验证，运行面未部署）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / IMPLEMENTATION IN PROGRESS / PRODUCTION NO-GO | 唯一active task；尚未完成实现或验收，系统不能交给真实员工 |
-| 严格起点 | PASS / CONTROLLED | `main@0caa565f3954bade15526bbef1e3c3b742b44a17`、tree`ae2592f…`、alpha.44/0043；UAT仍按文档为alpha.42/0040且未连接 |
-| 已确认缺口 | OPEN / REPRODUCIBLE IN SOURCE | 会话仅有滑动8小时期限；认证使用Node时钟且SELECT后独立UPDATE不核对rowCount；并发撤销仍可能返回旧actor，过期/未知token Cookie不完整清理 |
-| D-118目标 | ACCEPTED IMPLEMENTATION BASELINE | 8h idle+24h absolute、DB时钟、用户→会话锁序、首次超时单次终态/去敏审计、失效Cookie对称清理、append-only 0044 |
-| 当前范围 | CONTROLLED | 只改仓库源码、0044、合成/隔离测试与文档；岗位权限和health另立任务 |
-| 运行面影响 | NONE | 不连接或修改UAT/生产，不build/deploy/restart，不读取当前四卷或业务数据 |
-| 起点资源 | PASS | available约2.1GiB、Swap439MiB/1GiB、根盘31GiB、Load`0.30/0.33/0.41`；Web/PostgreSQL healthy、Worker/Caddy running、restart0/OOM false |
-| 外部资源 | NOT REQUIRED FOR CURRENT IMPLEMENTATION | UAT/生产Migration/deploy、账号/权限、员工试用仍须专项明确授权 |
+| 最终状态 | DONE / REPOSITORY AND ISOLATED TESTS VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO | 会话仓库缺口关闭；运行UAT仍是旧实现，系统不能交给真实员工 |
+| 严格起点/最终源码 | PASS / CONTROLLED | 从`main@0caa565f…`、alpha.44/0043起步；最终为alpha.45/0044，UAT仍按文档为alpha.42/0040且未连接 |
+| Git身份 | PASS / TWO-COMMIT BUNDLE | 源码`e7b0298f90ba85a5018709be1360a40dacbbaa59`/tree`43aa32601c8cd5a953de41e48c19f6e9860ed87c`，manifest-only直接子提交`c730fefe0857d2e4546f28364ca53d5e6506d099`；bundle SHA-256 `ad1a66d…61c86` |
+| D-118实现 | PASS | 8h idle+24h absolute、PostgreSQL时钟、用户→会话锁序、首次超时单次终态/去敏审计、失效Cookie对称清理、append-only 0044均已落地 |
+| Migration | PASS / APPEND ONLY | 0044 SHA-256 `a24df944…aa7e`；0001—0043未修改，Schema/snapshot/journal/查询/allowlist一致，官方release Migration harness退出0 |
+| 自动验证 | PASS / SCOPED | 定向与release合同55/55；隔离PG 7+10+4=21/21；inventory232/208/24；supervisor15/15、TASK44 typecheck、lint 0 error/11既有warning；治理控制器134/134、Python三基线、Markdown链接99、credentials1,548与diff门通过 |
+| 未运行门禁 | OPEN / HONEST | 未运行完整110文件Node、82文件PostgreSQL、Browser、完整typecheck、候选build/SBOM/漏洞或18步候选门 |
+| 运行面影响 | NONE | 不连接或修改UAT/生产，不build/deploy/restart，不读取当前四卷或业务数据；UAT保持alpha.42/0040 |
+| 资源/清理 | PASS | 收口available约2.0GiB、Swap442MiB/1GiB、根盘31GiB、Load`0.21/0.21/0.33`；四服务restart0/OOM false、内核OOM 0；任务临时容器/测试库/进程清零 |
+| 外部资源 | STILL REQUIRED FOR RUNTIME | UAT/生产Migration/deploy、账号/权限、员工试用仍须专项明确授权 |
 
 ## SELFHOST-MATERIAL-IMPORT-SAFETY-43（完成；仓库与隔离验证，运行面未部署）
 

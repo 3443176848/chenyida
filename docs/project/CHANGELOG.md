@@ -4,12 +4,15 @@
 
 ## 2026-08-12
 
-### SELFHOST-IDENTITY-SESSION-SAFETY-44 - `docs: start session lifetime hardening`（执行中）
+### SELFHOST-IDENTITY-SESSION-SAFETY-44 - `fix: enforce absolute session lifetime` / `build: bind session safety supervisor bundle` / `docs: close session lifetime hardening`
 
-- 调度/边界：TASK43收口后的零DOING按持续交付路线切换为TASK44唯一active task。严格起点为`main@0caa565f3954bade15526bbef1e3c3b742b44a17`、tree`ae2592f…`、alpha.44/0043；UAT只引用既有文档事实alpha.42/0040，本任务不连接复核。
-- 决策：D-118固定8小时idle、创建时不可延长的24小时absolute、PostgreSQL时钟与用户→会话一致锁序、首次超时单次终态/去敏审计，以及EXPIRED/REVOKED/未知token的Session+CSRF Cookie对称清理。岗位权限矩阵和health/Worker/storage真实性明确排除。
-- 计划：新增append-only 0044，保持0001—0043不可变；同步Schema/snapshot/journal和release allowlist，并覆盖空库/0043升级/重放/回滚、deadline约束、并发撤销/超时、Handler/API与相关回归。
-- 安全/资源：只允许仓库源码、合成身份与隔离PostgreSQL；不build/deploy，不访问UAT/生产、账号、当前四卷或业务数据。起点available约2.1GiB、Swap439MiB/1GiB、根盘31GiB、Load`0.30/0.33/0.41`；四服务restart0/OOM false。
+- 调度/边界：TASK43收口后的零DOING按持续交付路线切换为TASK44唯一active task，再按`DOING→DONE`释放active slot。严格起点为`main@0caa565f3954bade15526bbef1e3c3b742b44a17`、alpha.44/0043；UAT只引用既有文档事实alpha.42/0040，本任务未连接复核。
+- 身份/会话：D-118的8小时idle、创建时固定24小时absolute、PostgreSQL `now()`和用户→会话锁序已落地。创建与续期受`least(now()+8 hours, absolute)`约束；并发撤销、停用、重置或超时后不得返回旧actor，idle/absolute只终态化并去敏审计一次。
+- API/Cookie：`/api/session`与普通受保护API稳定区分`SESSION_EXPIRED`、`SESSION_REVOKED`和`AUTH_REQUIRED`，携带expired/revoked/unknown token时对称清除Session/CSRF Cookie；request ID、中文提示与`no-store`保持，匿名无Cookie不产生副作用。
+- Migration：新增append-only `0044_identity_session_absolute_lifetime.sql`，SHA-256为`a24df94474403c4f235933d4450626ce65b40416264393db400cef08e7fcaa7e`；0001—0043未修改，Schema/snapshot/journal/运行查询/release allowlist一致，源码为alpha.45/head 0044。
+- Git/证据：源码`e7b0298f90ba85a5018709be1360a40dacbbaa59`/tree`43aa32601c8cd5a953de41e48c19f6e9860ed87c`与manifest-only直接子提交`c730fefe0857d2e4546f28364ca53d5e6506d099`形成36文件证据链；bundle SHA-256为`ad1a66d3e1c30a4ac18fbdeff1e7d23d70488187826ecbc3ae9ebdf2cc961c86`。
+- 验证：最终定向与release合同55/55；会话专项PG7/7、既有身份PG10/10、身份升级4/4共21/21；官方release Migration harness在已提交源码上退出0；inventory为232/208/24，supervisor15/15、TASK44 typecheck、lint 0 error/11既有warning通过。治理收口另通过只读控制器`IDLE`及134/134回归、Python三基线、99个本地Markdown链接、1,548文件凭据扫描与`git diff --check`。
+- 安全/资源：未运行完整Node/PostgreSQL/Browser/typecheck、候选build/SBOM/漏洞或18步候选门；未访问UAT/生产、账号、当前四卷或业务数据。收口available约2.0GiB、Swap442MiB/1GiB、根盘31GiB、Load`0.21/0.21/0.33`，四服务restart0/OOM false、内核当日OOM 0；任务临时容器/测试库/进程清零。运行UAT仍alpha.42/0040，系统继续`PRODUCTION NO-GO`。
 
 ### SELFHOST-MATERIAL-IMPORT-SAFETY-43 - `feat: complete recoverable material import fallback` / `chore: bind material import release supervisor bundle` / `docs: close material import fallback hardening`
 

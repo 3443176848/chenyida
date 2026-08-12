@@ -1,6 +1,6 @@
 # SELFHOST-IDENTITY-SESSION-SAFETY-44 会话绝对寿命、原子认证与超时审计加固
 
-> 状态：`DOING / IMPLEMENTATION IN PROGRESS / REPOSITORY AND ISOLATED TESTS ONLY / PRODUCTION NO-GO`
+> 状态：`DONE / REPOSITORY AND ISOLATED TESTS VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`
 > 日期：2026-08-12（Asia/Shanghai）
 > 严格起点：`main@0caa565f3954bade15526bbef1e3c3b742b44a17`
 > 责任：Codex 主智能体为唯一写者、测试执行者、文档维护者和提交者；既有投产三线审计作为风险输入；项目负责人负责未来 UAT/生产 Migration、部署、账号和员工试用专项授权
@@ -30,14 +30,14 @@
 
 ## 4. 验收标准
 
-- [ ] 新会话以同一数据库时间写入8小时idle与24小时absolute deadline，数据库约束及不可变guard阻止absolute deadline、identity或created_at被延长/改写。
-- [ ] 有效访问只把idle deadline续到`min(now+8h, absolute)`；Node时钟不参与授权，absolute deadline永不滑动。
-- [ ] 认证以用户→会话一致锁序原子核验active/revoked/deadline；并发logout、停用、重置或超时不能在撤销已生效后返回AUTHENTICATED。
-- [ ] idle与absolute超时分别持久化稳定原因，最多写一条去敏Audit；并发重复请求结果稳定且不重复终态化。
-- [ ] `/api/session`及普通受保护API对失效/未知token清除两类Cookie；EXPIRED/REVOKED错误码、中文提示、request ID与`no-store`保持稳定，匿名无Cookie不产生副作用。
-- [ ] 0044覆盖空库升级、0043已有会话升级、老于24小时会话失效、近期会话保留、重复执行、约束、失败回滚、Schema/snapshot/journal一致性；0001—0043 checksum不变。
-- [ ] Identity unit、handler/UI、隔离PostgreSQL、并发、Migration、相关回归、TASK44 typecheck、lint、release inventory、敏感信息和`git diff --check`通过。
-- [ ] 更新`MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md`、`PROJECT_CONTEXT.md`、`PRODUCTION_READINESS.md`、`ROADMAP.md`、D-118及身份/运维/测试文档，形成源码、manifest-only和治理独立提交链。
+- [x] 新会话以同一数据库时间写入8小时idle与24小时absolute deadline，数据库约束及不可变guard阻止absolute deadline、identity或created_at被延长/改写。
+- [x] 有效访问只把idle deadline续到`min(now+8h, absolute)`；Node时钟不参与授权，absolute deadline永不滑动。
+- [x] 认证以用户→会话一致锁序原子核验active/revoked/deadline；并发logout、停用、重置或超时不能在撤销已生效后返回AUTHENTICATED。
+- [x] idle与absolute超时分别持久化稳定原因，最多写一条去敏Audit；并发重复请求结果稳定且不重复终态化。
+- [x] `/api/session`及普通受保护API对失效/未知token清除两类Cookie；EXPIRED/REVOKED错误码、中文提示、request ID与`no-store`保持稳定，匿名无Cookie不产生副作用。
+- [x] 0044覆盖空库升级、0043已有会话升级、老于24小时会话失效、近期会话保留、重复执行、约束、失败回滚、Schema/snapshot/journal一致性；0001—0043 checksum不变。
+- [x] Identity unit、handler/UI、隔离PostgreSQL、并发、Migration、相关回归、TASK44 typecheck、lint、release inventory、敏感信息和`git diff --check`通过。
+- [x] 更新`MASTER.md`、`TASKS.md`、`CHANGELOG.md`、`STATUS.md`、`PROJECT_CONTEXT.md`、`PRODUCTION_READINESS.md`、`ROADMAP.md`、D-118及身份/运维/测试文档，形成源码、manifest-only和治理独立提交链。
 
 ## 5. 禁止范围
 
@@ -55,3 +55,12 @@
 - 会话实现：idle常量8小时；SELECT后用`Date.now()`判断，再执行不核对rowCount的独立延期UPDATE；数据库无absolute deadline。
 - 主机：available约2.0 GiB、Swap439 MiB/1 GiB、根盘31 GiB、Load`1.00/0.60/0.53`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false，内核当日OOM计数0。
 - 团队：新一轮只读子智能体调度因运行器返回`agent thread limit reached`未创建；主智能体基于既有三线投产审计和当前源码只读复核继续，单写者边界不变。
+
+## 7. 完成证据
+
+- Git：源码提交`e7b0298f90ba85a5018709be1360a40dacbbaa59`/tree`43aa32601c8cd5a953de41e48c19f6e9860ed87c`将版本推进到`0.1.0-alpha.45`和0044；其直接子提交`c730fefe0857d2e4546f28364ca53d5e6506d099`只绑定36文件content-addressed supervisor bundle，manifest SHA-256为`ad1a66d3e1c30a4ac18fbdeff1e7d23d70488187826ecbc3ae9ebdf2cc961c86`。本治理收口是第三个独立提交。
+- 数据库：append-only `0044_identity_session_absolute_lifetime.sql` SHA-256为`a24df94474403c4f235933d4450626ce65b40416264393db400cef08e7fcaa7e`；0001—0043未修改，Schema/snapshot/journal/allowlist与运行查询一致。
+- 验证：最终定向与release合同组合55/55；会话专项PostgreSQL 7/7、既有身份PostgreSQL 10/10、身份升级4/4，合计21/21；官方release Migration harness在已提交源码上退出0；release inventory为232/208/24；supervisor 15/15、TASK44 typecheck、lint 0 error/11个既有warning通过。治理收口另通过只读控制器`IDLE`及134/134回归、Python三基线、99个本地Markdown链接、1,548文件凭据扫描和`git diff --check`。
+- 能力结果：会话创建、续期、撤销、停用、重置和超时均使用PostgreSQL时钟及用户→会话锁序；24小时absolute不可滑动，超时只终态化/审计一次；身份与普通受保护API稳定返回错误并对称清除Session/CSRF Cookie。
+- 边界：未运行完整110文件Node、82文件PostgreSQL、Browser、完整typecheck、候选build/SBOM/漏洞扫描或18步候选门；未连接或修改UAT/生产、账号、当前四卷、镜像或服务。运行UAT仍为alpha.42/0040，故任务只关闭仓库风险，系统继续`PRODUCTION NO-GO`。
+- 资源/清理：最终available约2.0GiB、Swap约442MiB/1GiB、根盘31GiB、Load`0.21/0.21/0.33`；四服务restart0/OOM false、当日内核OOM 0。任务临时容器、测试库和进程清零，四个受保护卷保持。
