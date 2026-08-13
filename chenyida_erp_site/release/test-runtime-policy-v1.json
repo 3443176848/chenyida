@@ -46,16 +46,16 @@
   },
   "test_inventory": {
     "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-    "sha256": "48bcaff7177ef9115609721a32cc8d204340969b8d3676c4a70cbf723498b1a3",
-    "total_tests": 237,
-    "required_tests": 213,
+    "sha256": "c3e599b5c83c88ee03afa58869a578336d2429e776008e932654a89762c0b1a5",
+    "total_tests": 239,
+    "required_tests": 215,
     "not_applicable_tests": 24,
     "category_counts": {
       "BROWSER": 6,
       "HISTORICAL_D1_SITES": 22,
       "POSTGRES": 83,
       "POSTGRES_ALIAS": 2,
-      "PURE_NODE": 113,
+      "PURE_NODE": 115,
       "RELEASE_CONTRACT": 6,
       "SPECIAL_HARNESS": 5
     }

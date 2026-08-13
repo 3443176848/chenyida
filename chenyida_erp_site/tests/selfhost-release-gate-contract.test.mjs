@@ -74,7 +74,7 @@ test("versioned test inventory accounts for every top-level test and only exclud
   assert.equal(inventory.total_tests, RELEASE_TEST_INVENTORY_TOTAL);
   assert.equal(inventory.required_tests, RELEASE_TEST_INVENTORY_REQUIRED);
   assert.equal(inventory.not_applicable_tests, RELEASE_TEST_INVENTORY_NOT_APPLICABLE);
-  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 83, POSTGRES_ALIAS: 2, PURE_NODE: 113, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 5 });
+  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 83, POSTGRES_ALIAS: 2, PURE_NODE: 115, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 5 });
   assert.deepEqual(inventory.tests.filter((entry) => entry.category === "RELEASE_CONTRACT").map((entry) => entry.path), [
     "tests/selfhost-file-storage.test.mjs",
     "tests/selfhost-release-gate-contract.test.mjs",
@@ -199,6 +199,10 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
     assert.match(script, /mkdir -m 0555 "\$SITE_ROOT\/node_modules"/);
     assert.ok(script.indexOf('mkdir -m 0555 "$SITE_ROOT/node_modules"') < script.indexOf('-v "$NODE_MODULES:/workspace/node_modules:ro"'));
   }
+  assert.match(recoverySandbox, /selfhost-postgresql-cluster-recovery-postgres\.sh/);
+  assert.match(recoverySandbox, /selfhost-backup-recovery-postgres\.sh; \/workspace\/tests\/selfhost-postgresql-cluster-recovery-postgres\.sh/);
+  assert.match(recoverySandbox, /--tmpfs \/tmp:rw,exec,nosuid,nodev,size=1280m/);
+  assert.equal((recoverySandbox.match(/POSTGRES_ID=\$\(\/usr\/bin\/docker create/g) || []).length, 1);
   assert.match(postgresSandbox, /if \[ "\$\{ERP_RELEASE_POSTGRES_CONTAINER_MODE:-\}" = YES \]; then\s+container_main\s+exit 0\s+fi/);
   assert.ok(postgresSandbox.indexOf('remove_task_container "$NODE_ID" "$NODE_CONTAINER"') < postgresSandbox.indexOf("POSTGRES_ID=$(/usr/bin/docker create"));
   assert.match(postgresRunner, /EXPECTED_POSTGRES_TESTS = 83/);

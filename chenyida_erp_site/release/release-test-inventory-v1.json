@@ -4,15 +4,15 @@
   "root": "chenyida_erp_site",
   "test_pattern": "tests/*.test.mjs",
   "max_test_bytes": 1048576,
-  "total_tests": 237,
-  "required_tests": 213,
+  "total_tests": 239,
+  "required_tests": 215,
   "not_applicable_tests": 24,
   "category_counts": {
     "BROWSER": 6,
     "HISTORICAL_D1_SITES": 22,
     "POSTGRES": 83,
     "POSTGRES_ALIAS": 2,
-    "PURE_NODE": 113,
+    "PURE_NODE": 115,
     "RELEASE_CONTRACT": 6,
     "SPECIAL_HARNESS": 5
   },
@@ -442,7 +442,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-postgres.test.mjs",
-      "sha256": "cf2c9ff532c606b95bb5ef92c5f81e1c1a44f9dbb5a2ebba2ee1413da6a10d4c",
+      "sha256": "b2c2e1fc4a58c9892ad584c29a6da0c7ff719e0e0c82c5b5bbdeb69031f5e7ef",
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",
@@ -451,7 +451,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-ui-contract.test.mjs",
-      "sha256": "e3a45ffc14ce5c8166790010a67ede2a864913e231088816c5c3f50554f11534",
+      "sha256": "bd137ede52effbbaa6aed2b8fe4efcde7265a15d3b546da98e069ff8142001a8",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -460,7 +460,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-unit.test.mjs",
-      "sha256": "111ff5c0b8fc102d6bc385b1a638b515989955ae82d7c6a761ed61ea2d9e53eb",
+      "sha256": "0fae90827ae497810b7027e24ab4df36b1e8b46aaaadd4ffa846bb503941bb25",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1090,7 +1090,7 @@
     },
     {
       "path": "tests/selfhost-ops-monitoring.test.mjs",
-      "sha256": "3f36ea3b8452c8412025067435ba6db806f5671555972443f78e8b4f1d2f532e",
+      "sha256": "3a74621b9b987ee198371abf8b8adcda5d698cf6f320d3f6b2f88017f9bd293f",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1157,6 +1157,24 @@
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-postgresql-cluster-recovery-v1.test.mjs",
+      "sha256": "de9ce130bb7b8c1b8650a1e62886656cab1a7c41eeebee0cb0650bbfc77f7f3a",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-postgresql-cluster-transfer-v1.test.mjs",
+      "sha256": "9dbe43ecac777b4e108d2bd38970692d407f197c9ede3d59653355a92bb0fc66",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
       "reason": null,
       "canonical_path": null
     },
@@ -1756,7 +1774,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "344dc871e4119a0559a08969bbe0a2f22fd0ba943e7989edcb73561a884cec0c",
+      "sha256": "75319ae6ddfac71c13af3906c543e0d64ede28ef74437c83fc0053decefd181b",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -2017,7 +2035,7 @@
     },
     {
       "path": "tests/selfhost-status-localization.test.mjs",
-      "sha256": "5e88f8768ed0be1d73963c065b7b9fd86513de5eec9c9566587f917f25ac966d",
+      "sha256": "a419e4e8ce9855ec7a59dfaf7f32a6bb2d903d9933d4b4a70536ef87e4de8540",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",

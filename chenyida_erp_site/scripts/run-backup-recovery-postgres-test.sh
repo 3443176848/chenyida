@@ -58,6 +58,7 @@ mkdir -m 0755 "$TEMP_ROOT/source"
 git_candidate archive --format=tar "$GIT_COMMIT" chenyida_erp_site | /usr/bin/tar -xf - -C "$TEMP_ROOT/source"
 SITE_ROOT="$TEMP_ROOT/source/chenyida_erp_site"
 [ -f "$SITE_ROOT/tests/selfhost-backup-recovery-postgres.sh" ] || { echo "backup recovery snapshot is incomplete" >&2; exit 1; }
+[ -f "$SITE_ROOT/tests/selfhost-postgresql-cluster-recovery-postgres.sh" ] || { echo "PostgreSQL cluster recovery snapshot is incomplete" >&2; exit 1; }
 mkdir -m 0555 "$SITE_ROOT/node_modules"
 
 /usr/bin/docker image inspect "$NODE_IMAGE" >/dev/null
@@ -69,9 +70,9 @@ chmod 0755 "$TEMP_ROOT/node"
 
 POSTGRES_ID=$(/usr/bin/docker create --pull=never --label "$TASK_LABEL" --name "$POSTGRES_CONTAINER" \
   --network none --read-only --cap-drop ALL --cap-add SETUID --cap-add SETGID --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --security-opt no-new-privileges --memory 768m --memory-swap 1g --cpus 1.0 --pids-limit 256 \
-  --tmpfs /tmp:rw,exec,nosuid,size=1280m \
+  --tmpfs /tmp:rw,exec,nosuid,nodev,size=1280m \
   -e NODE_OPTIONS=--max-old-space-size=384 \
   -v "$SITE_ROOT:/workspace:ro" -v "$NODE_MODULES:/workspace/node_modules:ro" -v "$TEMP_ROOT/node:/usr/local/bin/node:ro" \
-  --entrypoint /bin/sh "$POSTGRES_IMAGE" /workspace/tests/selfhost-backup-recovery-postgres.sh)
+  --entrypoint /bin/sh "$POSTGRES_IMAGE" -c 'set -eu; /workspace/tests/selfhost-backup-recovery-postgres.sh; /workspace/tests/selfhost-postgresql-cluster-recovery-postgres.sh')
 /usr/bin/docker start --attach "$POSTGRES_ID"
 remove_task_container "$POSTGRES_ID" "$POSTGRES_CONTAINER"; POSTGRES_ID=""
