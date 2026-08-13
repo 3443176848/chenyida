@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-`SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50`已完成并释放active slot；下一任务登记前暂为零`DOING`。TASK50只关闭未来候选的仓库/隔离运行时合同，现行UAT仍未部署。host安装、真实渠道/值班人、异机真实备份、UAT/生产Migration/deploy、账号、员工试用和切流仍需专项授权，系统继续`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-RELEASE-CANDIDATE-REFRESH-51`。范围固定为当前clean Git snapshot的本机Web/Worker候选重建、任务loopback registry digest、TASK50六服务runtime policy、固定Trivy镜像级零发现诊断和正式19步入口失败关闭复核；不安装host supervisor、不修改现行UAT/生产、不读取业务数据、日志、凭据或受保护Volume。系统继续`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -57,6 +57,8 @@
 
 2026-08-13第二十二次调度事件：`SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50 DOING → DONE`。D-127固定六服务完整集合、精确写路径和内核态最小权限复核；实现`375869f7d1544fa6fe437e2603af78a4021c4c91`/tree`ac5a5bfa68d3a76c7a6121a0a8d204e8169f3644`与manifest-only直接子提交`f119c8f6d99f98778975ad83df2b736de148e69f`形成44文件bundle，SHA-256为`ab6b708e9cfe74f0902296f0a32e74620cf3368e883ba536326789e0b7828cbe`。六服务隔离runtime、supervisor30/30、release48/48、lint和1,588文件凭据门通过；现行UAT、业务数据、账号、网络及四卷未变，系统继续`PRODUCTION NO-GO`。
 
+2026-08-13第二十三次调度事件：主智能体从TASK50收口后的零`DOING`自动选择当前候选身份缺口，状态按`SELFHOST-RELEASE-CANDIDATE-REFRESH-51 TODO → DOING`切换唯一active slot。严格起点为`11785d4dac3e1afeb936f7a7a0626a25443fa371`/tree`91a6e752c3265e98208f4ae18a2e8437ecffe2fa`、alpha.46/0045；TASK48镜像绑定旧`8952a815`，TASK49/TASK50后不能代表当前HEAD。任务仅在本机隔离重建/扫描并从正式入口复核19步失败关闭，不安装host supervisor、不修改UAT、账号、网络或四个受保护Volume。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -73,7 +75,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| （无） | 下一任务登记前暂为空 | — | — | — | — | TASK50已释放active slot；系统继续`PRODUCTION NO-GO`。 |
+| SELFHOST-RELEASE-CANDIDATE-REFRESH-51 | 当前精确候选重建与发布门复核 | DOING | Codex主智能体（唯一写入、构建/扫描串行、证据与提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来host supervisor/UAT/生产专项授权） | 2026-08-13 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50 | `DOING / LOCAL ISOLATED CANDIDATE ONLY / NO HOST INSTALL / NO DEPLOYMENT / PRODUCTION NO-GO`。见[任务文档](../tasks/SELFHOST-RELEASE-CANDIDATE-REFRESH-51.md)。 |
 
 ## 已完成任务
 

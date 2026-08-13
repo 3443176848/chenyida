@@ -39,6 +39,8 @@
 
 2026-08-13 第十四次增量：`SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50`已完成。D-127固定六服务完整集合、精确写路径和内核态最小权限复核；实现`375869f…`/tree`ac5a5bfa…`与manifest-only直接子提交`f119c8f…`形成44文件bundle，SHA-256为`ab6b708e…8cbe`。六服务均采用只读rootfs、drop all及禁止提权，PostgreSQL零cap，Caddy仅保留`NET_BIND_SERVICE`；Compose静态门和一次一个容器的隔离runtime均通过。现行UAT未部署该配置，当前HEAD也尚无重建镜像/正式19步报告，整体继续`PRODUCTION NO-GO`。
 
+2026-08-13 第十五次增量：`SELFHOST-RELEASE-CANDIDATE-REFRESH-51`启动为唯一`DOING`。TASK48镜像仍在本机但绑定旧`8952a815`，TASK49/TASK50后的当前HEAD没有对应镜像/扫描证据。任务范围固定为clean Git snapshot的本机串行构建、loopback digest、当前runtime policy、固定Trivy零发现诊断及正式19步入口失败关闭复核；不安装host supervisor、不外部push、不修改UAT/生产、账号、网络或受保护Volume。启动不改变整体`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -187,7 +189,7 @@
 3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
 4. TASK44/TASK45已完成会话绝对时限和health/Worker/storage/Migration真实性仓库修复；运行面验证等待同候选完整gate及专项部署授权。
 5. `SELFHOST-OPS-MONITORING-ALERTING-49`已完成仓库级监控、容量阈值、备份/恢复证据新鲜度、告警状态和排障合同；host安装、真实外部投递、值班责任人和演练仍需专项授权/资源。
-6. TASK50已完成容器运行时最小权限加固；下一安全任务从其内容寻址提交链重建当前Web/Worker候选、生成新鲜镜像安全证据并尝试19步门。不安装host supervisor、不修改现行UAT或受保护Volume；岗位权限矩阵仍等待业务负责人确认。
+6. TASK50已完成容器运行时最小权限加固；TASK51现从其内容寻址提交链重建当前Web/Worker本机候选、生成新鲜镜像安全证据并只从正式入口尝试19步门。不安装host supervisor、不修改现行UAT或受保护Volume；岗位权限矩阵仍等待业务负责人确认。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。
 

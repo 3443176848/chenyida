@@ -4,6 +4,14 @@
 
 ## 2026-08-13
 
+### SELFHOST-RELEASE-CANDIDATE-REFRESH-51 - `docs: start current candidate refresh`
+
+- 调度/范围：TASK50收口`11785d4dac3e1afeb936f7a7a0626a25443fa371`后的零`DOING`自动切换为TASK51唯一active task；严格起点tree为`91a6e752c3265e98208f4ae18a2e8437ecffe2fa`、alpha.46/0045，UAT仍alpha.42/0040。
+- 事实：TASK48 Web/Worker本机manifest仍可解析但绑定旧`8952a815`；TASK49/TASK50改变候选输入，不能复用历史零发现为当前HEAD结论。TASK50 policy SHA-256`8c9f9fd0…f444`、六服务隔离probe和19步计划已验证但尚无当前镜像。
+- 目标：从clean Git snapshot串行重建Web/Worker，在任务loopback registry取得digest，复核TASK50 runtime policy，以固定Trivy/72小时内数据库生成当前镜像CycloneDX与全部severity零发现，并只从正式入口尝试19步门。
+- 边界：不安装host supervisor、不外部push、不修改/重启UAT或运行真实Migration/deploy，不读取业务数据、`.env`、容器环境、日志、四卷/备份正文或未跟踪状态报告，不prune或删除既有资源。
+- 起点资源：available约2.2GiB、Swap714MiB/1GiB、根盘18GiB、Load`0.23/0.35/0.43`；Docker images23.09GB、Build Cache6.977GB，四服务restart0/OOM false。所有build/扫描串行，一次最多一个TASK51临时容器。
+
 ### SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50 - `docs: start container runtime hardening` / `feat: harden container runtime policy` / `build: bind container runtime supervisor bundle` / `docs: close container runtime hardening`
 
 - 调度/范围：TASK49治理收口`1a4bd16e3428fded7cd5569595fa47df82831f7c`后的零`DOING`自动切换为TASK50唯一active task；严格起点tree为`518cbdd9001e933c6577ccbed499eb8287ec5666`、alpha.46/0045，UAT仍alpha.42/0040。

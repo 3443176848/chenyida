@@ -2,6 +2,19 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
+## SELFHOST-RELEASE-CANDIDATE-REFRESH-51（执行中；本机隔离候选）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / LOCAL ISOLATED CANDIDATE ONLY / NO HOST INSTALL / NO DEPLOYMENT / PRODUCTION NO-GO | 唯一active slot；主智能体唯一写入，三条智能体线只读审计 |
+| 严格起点 | PASS / CONTROLLED | `main@11785d4dac3e1afeb936f7a7a0626a25443fa371`、tree`91a6e752…ffe2fa`、alpha.46/0045；未跟踪状态报告不读不改不提交 |
+| 历史候选 | STALE FOR CURRENT HEAD | TASK48 Web/Worker manifest仍可在本机解析但绑定`8952a815`；TASK49/TASK50后的当前HEAD需重建及新鲜扫描 |
+| runtime基线 | PASS / REPOSITORY AND ISOLATED | TASK50 policy SHA-256`8c9f9fd0…f444`、六服务probe、19步计划和44文件supervisor bundle已验证；未部署UAT |
+| 目标 | IN PROGRESS | clean Git snapshot候选build、loopback digest、当前runtime probe、固定Trivy双镜像零发现及正式19步入口失败关闭复核 |
+| 授权边界 | LOCAL ISOLATED ONLY | 不安装host supervisor、不push外部registry、不修改UAT/生产/账号/网络/四卷，不读取业务数据/日志/环境/卷正文 |
+| 起点资源 | PASS / BELOW STOP LINES | available约2.2GiB、Swap714MiB/1GiB、根盘18GiB、Load`0.23/0.35/0.43`；Docker images23.09GB、Build Cache6.977GB，四服务restart0/OOM false |
+| 系统是否可用 | NO | 异机恢复、正式同候选门、host监控投递、UAT对齐、真实迁移和员工试用仍未完成 |
+
 ## SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50（完成；仓库与隔离验证，运行面未部署）
 
 | 验证项 | 结果 | 说明 |
