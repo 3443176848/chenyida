@@ -290,6 +290,9 @@ export function validateClusterRecoveryPolicy(value) {
   }
   if (!value.acl.grantable_roles.includes(value.identities.migration_owner)
     || value.acl.grantable_roles.some((role) => role !== value.identities.migration_owner)) reject("CLUSTER_POLICY_GRANTABLE_ROLE_INVALID");
+  const expectedGrantors = [value.identities.migration_owner, "pg_database_owner"].sort();
+  if (value.acl.allowed_grantors.length !== expectedGrantors.length
+    || value.acl.allowed_grantors.some((role, index) => role !== expectedGrantors[index])) reject("CLUSTER_POLICY_ACL_GRANTORS_INVALID");
   validateAclRuleMap(value.acl.public_allowed_privileges, "CLUSTER_POLICY_PUBLIC_ACL_INVALID");
   validateAclRuleMap(value.acl.non_owner_allowed_privileges, "CLUSTER_POLICY_NON_OWNER_ACL_INVALID");
   if (!value.database.public_connect && value.acl.public_allowed_privileges.DATABASE.includes("CONNECT")) reject("CLUSTER_POLICY_PUBLIC_CONNECT_INVALID");
@@ -340,6 +343,7 @@ function validatePrivilegeTuple(value, kind, owner, policy, code) {
   boolean(value.is_grantable, code);
   if (!KNOWN_PRIVILEGES[kind]?.has(value.privilege_type)) reject("CLUSTER_ACL_PRIVILEGE_UNKNOWN");
   if (!policy.acl.allowed_grantors.includes(value.grantor) || !policy.acl.allowed_grantees.includes(value.grantee)) reject("CLUSTER_ACL_ENDPOINT_NOT_ALLOWED");
+  if (value.grantor !== owner) reject("CLUSTER_ACL_GRANTOR_NOT_OWNER");
   if (value.grantor.startsWith("pg_") && value.grantor !== "pg_database_owner") reject("CLUSTER_ACL_BUILTIN_ENDPOINT_FORBIDDEN");
   if (value.grantee.startsWith("pg_") && value.grantee !== "pg_database_owner") reject("CLUSTER_ACL_BUILTIN_ENDPOINT_FORBIDDEN");
   if ((value.grantor === "pg_database_owner" || value.grantee === "pg_database_owner") && owner !== "pg_database_owner") reject("CLUSTER_ACL_DATABASE_OWNER_REFERENCE_INVALID");
@@ -396,7 +400,6 @@ function validateObject(value, policy) {
   if (!policy.supported_object_kinds.includes(value.kind)) reject("CLUSTER_OBJECT_KIND_UNSUPPORTED");
   nullableString(value.schema, "CLUSTER_OBJECT_INVALID");
   pgText(value.name, "CLUSTER_OBJECT_INVALID");
-  nullableString(value.identity_arguments, "CLUSTER_OBJECT_INVALID");
   nullableString(value.parent_identity, "CLUSTER_OBJECT_INVALID");
   pgText(value.owner, "CLUSTER_OBJECT_INVALID");
   nullableString(value.tablespace, "CLUSTER_OBJECT_INVALID");
@@ -405,8 +408,16 @@ function validateObject(value, policy) {
   const expectedOwner = publicSchema ? "pg_database_owner" : policy.identities.migration_owner;
   if (value.owner !== expectedOwner || value.owner === policy.identities.runtime_login) reject("CLUSTER_OBJECT_OWNER_POLICY_MISMATCH");
   if (value.kind === "SCHEMA" && value.schema !== null || value.kind !== "SCHEMA" && value.schema === null && value.kind !== "LARGE_OBJECT") reject("CLUSTER_OBJECT_IDENTITY_INVALID");
-  if (value.kind === "ROUTINE" && value.identity_arguments === null || value.kind !== "ROUTINE" && value.identity_arguments !== null) reject("CLUSTER_OBJECT_ROUTINE_IDENTITY_INVALID");
+  if (value.kind === "ROUTINE") {
+    if (!Array.isArray(value.identity_arguments) || value.identity_arguments.length > 100) reject("CLUSTER_OBJECT_ROUTINE_IDENTITY_INVALID");
+    for (const argument of value.identity_arguments) {
+      exactKeys(argument, ["schema", "name"], "CLUSTER_OBJECT_ROUTINE_IDENTITY_INVALID");
+      pgText(argument.schema, "CLUSTER_OBJECT_ROUTINE_IDENTITY_INVALID");
+      pgText(argument.name, "CLUSTER_OBJECT_ROUTINE_IDENTITY_INVALID");
+    }
+  } else if (value.identity_arguments !== null) reject("CLUSTER_OBJECT_ROUTINE_IDENTITY_INVALID");
   if ((value.kind === "COLUMN" || INDEX_KINDS.has(value.kind)) !== (value.parent_identity !== null)) reject("CLUSTER_OBJECT_PARENT_IDENTITY_INVALID");
+  if (value.kind === "LARGE_OBJECT" && !/^lo:[1-9][0-9]{0,19}$/u.test(value.name)) reject("CLUSTER_OBJECT_LARGE_OBJECT_IDENTITY_INVALID");
   if (INDEX_KINDS.has(value.kind)) {
     if (value.acl_state !== "NULL" || value.explicit_privileges.length !== 0 || value.effective_privileges.length !== 0) reject("CLUSTER_INDEX_ACL_INVALID");
   } else {
@@ -430,6 +441,7 @@ function validateTablespace(value, policy) {
   if (new Set(["pg_default", "pg_global"]).has(value.name) || value.name.startsWith("pg_")) reject("CLUSTER_TABLESPACE_NAME_FORBIDDEN");
   if (!policy.tablespaces.allow_custom || value.owner !== policy.tablespaces.owner) reject("CLUSTER_TABLESPACE_POLICY_MISMATCH");
   validateStringList(value.options, "CLUSTER_TABLESPACE_OPTIONS_INVALID");
+  if (value.options.length !== 0) reject("CLUSTER_TABLESPACE_OPTIONS_UNSUPPORTED");
   string(value.source_location_sha256, SHA256, "CLUSTER_TABLESPACE_LOCATION_SHA256_INVALID");
   validateAcl({ acl_state: value.acl_state, explicit_privileges: value.explicit_privileges, effective_privileges: value.effective_privileges }, "TABLESPACE", value.owner, policy, "CLUSTER_TABLESPACE_ACL_INVALID");
   return value;
@@ -652,6 +664,15 @@ function validateMapDocument(value, snapshot, expectedScope) {
   return value;
 }
 
+export function validateTablespaceMapDocument({ map: mapInput, snapshot: snapshotInput, policy: policyInput, evidenceScope = "SYNTHETIC_TEST_ONLY" }) {
+  const policy = validateClusterRecoveryPolicy(policyInput);
+  const snapshot = validateClusterSnapshot(snapshotInput, policy);
+  const map = validateMapDocument(mapInput, snapshot, evidenceScope);
+  const expectedNames = snapshot.catalog.tablespaces.map((item) => item.name);
+  if (map.entries.length !== expectedNames.length || map.entries.some((entry, index) => entry.name !== expectedNames[index])) reject("TABLESPACE_MAP_NAME_SET_MISMATCH");
+  return map;
+}
+
 export async function validateTablespaceMap({
   map: mapInput,
   snapshot: snapshotInput,
@@ -664,7 +685,7 @@ export async function validateTablespaceMap({
 }) {
   const policy = validateClusterRecoveryPolicy(policyInput);
   const snapshot = validateClusterSnapshot(snapshotInput, policy);
-  const map = validateMapDocument(mapInput, snapshot, evidenceScope);
+  const map = validateTablespaceMapDocument({ map: mapInput, snapshot, policy, evidenceScope });
   integer(expectedUid, 0, 2 ** 31 - 1, "TABLESPACE_EXPECTED_UID_INVALID");
   integer(expectedGid, 0, 2 ** 31 - 1, "TABLESPACE_EXPECTED_GID_INVALID");
   if (!Array.isArray(prohibitedRoots) || prohibitedRoots.some((root) => typeof root !== "string" || !path.isAbsolute(root))) reject("TABLESPACE_PROHIBITED_ROOT_INVALID");
@@ -681,8 +702,6 @@ export async function validateTablespaceMap({
   if (await realpath(hostRoot) !== hostRoot) reject("TABLESPACE_ROOT_REALPATH_MISMATCH");
   for (const prohibitedRoot of prohibitedRoots.map((item) => path.resolve(item))) if (pathsOverlap(hostRoot, prohibitedRoot)) reject("TABLESPACE_ROOT_PROHIBITED");
 
-  const expectedNames = snapshot.catalog.tablespaces.map((item) => item.name);
-  if (map.entries.length !== expectedNames.length || map.entries.some((entry, index) => entry.name !== expectedNames[index])) reject("TABLESPACE_MAP_NAME_SET_MISMATCH");
   const seenRealpaths = new Set();
   const identities = [];
   for (const entry of map.entries) {
@@ -709,6 +728,7 @@ export async function validateTablespaceMap({
   await revalidatePathComponents(rootComponents, "TABLESPACE_ROOT_CHANGED");
   const entrySetSha256 = clusterSha256(identities);
   return Object.freeze({
+    phase: "PREFLIGHT_EMPTY",
     evidenceScope,
     mapId: map.map_id,
     mapSha256: clusterSha256(map),
@@ -717,6 +737,70 @@ export async function validateTablespaceMap({
     entrySetSha256,
     identities: Object.freeze(identities.map((item) => Object.freeze(item))),
     rootIdentitySha256: clusterSha256(pathIdentity(rootMetadata)),
+  });
+}
+
+export async function verifyTablespaceMapAfterCreate({
+  map: mapInput,
+  snapshot: snapshotInput,
+  policy: policyInput,
+  preflightValidation,
+  targetCatalog: targetCatalogInput,
+  expectedUid,
+  expectedGid,
+  prohibitedRoots = [],
+  expectedNamespaceIdentitySha256,
+  evidenceScope = "SYNTHETIC_TEST_ONLY",
+}) {
+  const policy = validateClusterRecoveryPolicy(policyInput);
+  const snapshot = validateClusterSnapshot(snapshotInput, policy);
+  const map = validateTablespaceMapDocument({ map: mapInput, snapshot, policy, evidenceScope });
+  integer(expectedUid, 0, 2 ** 31 - 1, "TABLESPACE_EXPECTED_UID_INVALID");
+  integer(expectedGid, 0, 2 ** 31 - 1, "TABLESPACE_EXPECTED_GID_INVALID");
+  if (!Array.isArray(prohibitedRoots) || prohibitedRoots.some((root) => typeof root !== "string" || !path.isAbsolute(root))) reject("TABLESPACE_PROHIBITED_ROOT_INVALID");
+  string(expectedNamespaceIdentitySha256, SHA256, "TABLESPACE_NAMESPACE_IDENTITY_INVALID");
+  if (!preflightValidation || preflightValidation.phase !== "PREFLIGHT_EMPTY" || preflightValidation.evidenceScope !== evidenceScope
+    || preflightValidation.mapId !== map.map_id || preflightValidation.mapSha256 !== clusterSha256(map)
+    || preflightValidation.namespaceIdentitySha256 !== expectedNamespaceIdentitySha256
+    || preflightValidation.entryCount !== map.entries.length || !Array.isArray(preflightValidation.identities)
+    || preflightValidation.identities.length !== map.entries.length) reject("TABLESPACE_PREFLIGHT_BINDING_INVALID");
+  const targetCatalog = normalizeClusterCatalog(targetCatalogInput);
+  validateClusterCatalog(targetCatalog, policy);
+  if (targetCatalog.tablespaces.length !== map.entries.length) reject("TABLESPACE_TARGET_CATALOG_MISMATCH");
+  const synthetic = evidenceScope === "SYNTHETIC_TEST_ONLY";
+  if (!synthetic && (process.getuid?.() !== 0 || isInside(map.approved_host_root, os.tmpdir()))) reject("TABLESPACE_ACTUAL_ROOT_REQUIRED");
+  const hostRoot = path.resolve(map.approved_host_root);
+  const serverRoot = path.resolve(map.approved_server_root);
+  const prohibited = prohibitedRoots.map((item) => path.resolve(item));
+  const rootComponents = await noFollowPathComponents(hostRoot, { syntheticTmpAllowed: synthetic, code: "TABLESPACE_ROOT_UNSAFE" });
+  const rootMetadata = rootComponents.at(-1).metadata;
+  if (rootMetadata.uid !== expectedUid || rootMetadata.gid !== expectedGid || (rootMetadata.mode & 0o777) !== 0o700
+    || clusterSha256(pathIdentity(rootMetadata)) !== preflightValidation.rootIdentitySha256 || await realpath(hostRoot) !== hostRoot) reject("TABLESPACE_ROOT_CHANGED");
+  for (const prohibitedRoot of prohibited) if (pathsOverlap(hostRoot, prohibitedRoot)) reject("TABLESPACE_ROOT_PROHIBITED");
+  const postCreateIdentities = [];
+  for (const [index, entry] of map.entries.entries()) {
+    const hostPath = path.resolve(entry.host_path), serverPath = path.resolve(entry.server_path);
+    if (path.dirname(hostPath) !== hostRoot || path.dirname(serverPath) !== serverRoot
+      || path.basename(hostPath) !== entry.name || path.basename(serverPath) !== entry.name) reject("TABLESPACE_MAP_ENTRY_BOUNDARY_INVALID");
+    for (const prohibitedRoot of prohibited) if (pathsOverlap(hostPath, prohibitedRoot)) reject("TABLESPACE_PATH_PROHIBITED");
+    const components = await noFollowPathComponents(hostPath, { syntheticTmpAllowed: synthetic, code: "TABLESPACE_PATH_UNSAFE" });
+    const metadata = components.at(-1).metadata;
+    const identity = preflightValidation.identities[index];
+    const targetTablespace = targetCatalog.tablespaces[index];
+    if (metadata.uid !== expectedUid || metadata.gid !== expectedGid || (metadata.mode & 0o777) !== 0o700
+      || await realpath(hostPath) !== hostPath || (await readdir(hostPath)).length === 0
+      || identity.name !== entry.name || identity.host_identity_sha256 !== clusterSha256(pathIdentity(metadata))
+      || identity.server_path_sha256 !== clusterSha256(serverPath) || targetTablespace.name !== entry.name
+      || targetTablespace.source_location_sha256 !== clusterSha256(serverPath)) reject("TABLESPACE_POST_CREATE_IDENTITY_MISMATCH");
+    await revalidatePathComponents(components, "TABLESPACE_PATH_CHANGED");
+    postCreateIdentities.push({ name: entry.name, host_identity_sha256: identity.host_identity_sha256, server_path_sha256: identity.server_path_sha256, target_location_sha256: targetTablespace.source_location_sha256 });
+  }
+  await revalidatePathComponents(rootComponents, "TABLESPACE_ROOT_CHANGED");
+  return Object.freeze({
+    ...preflightValidation,
+    phase: "POST_CREATE_VERIFIED",
+    targetTablespaceCatalogSha256: clusterSha256(targetCatalog.tablespaces),
+    postCreateEntrySetSha256: clusterSha256(postCreateIdentities),
   });
 }
 
@@ -1061,15 +1145,44 @@ export async function writeRecoveryState({ stateRoot, state: stateInput, intent:
   return file;
 }
 
-export function createClusterSecurityReceipt({ snapshot: snapshotInput, targetCatalog: targetInput, policy: policyInput, restoreRunId, verifiedAt, evidenceScope, targetSystemIdentifierSha256 }) {
+export function createClusterSecurityReceipt({
+  snapshot: snapshotInput,
+  targetCatalog: targetInput,
+  policy: policyInput,
+  tablespaceMap: mapInput,
+  tablespaceReceipt: tablespaceReceiptInput,
+  credentialReceipt: credentialReceiptInput,
+  restoreRunId,
+  verifiedAt,
+  evidenceScope,
+  targetSystemIdentifierSha256,
+}) {
   const policy = validateClusterRecoveryPolicy(policyInput);
   const snapshot = validateClusterSnapshot(snapshotInput, policy);
   string(restoreRunId, IDENTIFIER, "CLUSTER_RECEIPT_RUN_ID_INVALID");
   iso(verifiedAt, "CLUSTER_RECEIPT_VERIFIED_AT_INVALID");
   enumValue(evidenceScope, EVIDENCE_SCOPES, "CLUSTER_RECEIPT_SCOPE_INVALID");
   string(targetSystemIdentifierSha256, SHA256, "CLUSTER_RECEIPT_TARGET_ID_INVALID");
-  const target = normalizeClusterCatalog(targetInput);
-  validateClusterCatalog(target, policy);
+  const targetRaw = normalizeClusterCatalog(targetInput);
+  validateClusterCatalog(targetRaw, policy);
+  const tablespaceReceipt = validateTablespaceReceipt(tablespaceReceiptInput);
+  const credentialReceipt = validateCredentialBindingReceipt(credentialReceiptInput);
+  const tablespaceMap = validateTablespaceMapDocument({ map: mapInput, snapshot, policy, evidenceScope });
+  if (targetRaw.tablespaces.length !== snapshot.catalog.tablespaces.length) reject("CLUSTER_RECEIPT_TABLESPACE_TARGET_MISMATCH");
+  const target = canonicalClone(targetRaw);
+  for (const [index, sourceTablespace] of snapshot.catalog.tablespaces.entries()) {
+    const targetTablespace = target.tablespaces[index], mapEntry = tablespaceMap.entries[index];
+    if (targetTablespace.name !== sourceTablespace.name || mapEntry.name !== sourceTablespace.name
+      || targetTablespace.source_location_sha256 !== clusterSha256(mapEntry.server_path)) reject("CLUSTER_RECEIPT_TABLESPACE_TARGET_MISMATCH");
+    targetTablespace.source_location_sha256 = sourceTablespace.source_location_sha256;
+  }
+  if (tablespaceReceipt.backup_id !== snapshot.binding.backup_id || tablespaceReceipt.restore_run_id !== restoreRunId
+    || tablespaceReceipt.map_sha256 !== clusterSha256(tablespaceMap) || tablespaceReceipt.evidence_scope !== evidenceScope
+    || tablespaceReceipt.custom_tablespace_count !== snapshot.catalog.tablespaces.length
+    || tablespaceReceipt.target_tablespace_catalog_sha256 !== clusterSha256(targetRaw.tablespaces)) reject("CLUSTER_RECEIPT_TABLESPACE_BINDING_MISMATCH");
+  if (credentialReceipt.backup_id !== snapshot.binding.backup_id || credentialReceipt.restore_run_id !== restoreRunId
+    || credentialReceipt.evidence_scope !== evidenceScope || credentialReceipt.role_set_sha256 !== clusterSha256(policy.credential_binding.login_roles)
+    || credentialReceipt.role_count !== policy.credential_binding.login_roles.length) reject("CLUSTER_RECEIPT_CREDENTIAL_BINDING_MISMATCH");
   const targetSha256 = clusterSha256(target);
   if (targetSha256 !== snapshot.catalog_sha256) reject("CLUSTER_RECEIPT_SOURCE_TARGET_MISMATCH");
   const body = {
@@ -1081,7 +1194,12 @@ export function createClusterSecurityReceipt({ snapshot: snapshotInput, targetCa
     policy_id: policy.policy_id,
     policy_sha256: clusterPolicySha256(policy),
     source_catalog_sha256: snapshot.catalog_sha256,
+    target_raw_catalog_sha256: clusterSha256(targetRaw),
     target_catalog_sha256: targetSha256,
+    tablespace_map_sha256: clusterSha256(tablespaceMap),
+    tablespace_receipt_sha256: tablespaceReceipt.receipt_sha256,
+    credential_receipt_sha256: credentialReceipt.receipt_sha256,
+    credential_role_set_sha256: credentialReceipt.role_set_sha256,
     target_system_identifier_sha256: targetSystemIdentifierSha256,
     verified_at: verifiedAt,
     evidence_scope: evidenceScope,
@@ -1094,13 +1212,22 @@ export function createClusterSecurityReceipt({ snapshot: snapshotInput, targetCa
 
 export function validateClusterSecurityReceipt(value, policyInput) {
   const policy = validateClusterRecoveryPolicy(policyInput);
-  exactKeys(value, ["schema_version", "contract", "backup_id", "restore_run_id", "snapshot_sha256", "policy_id", "policy_sha256", "source_catalog_sha256", "target_catalog_sha256", "target_system_identifier_sha256", "verified_at", "evidence_scope", "policy_status", "source_equivalence_status", "result", "receipt_sha256"], "CLUSTER_RECEIPT_INVALID");
+  exactKeys(value, [
+    "schema_version", "contract", "backup_id", "restore_run_id", "snapshot_sha256", "policy_id", "policy_sha256", "source_catalog_sha256",
+    "target_raw_catalog_sha256", "target_catalog_sha256", "tablespace_map_sha256", "tablespace_receipt_sha256", "credential_receipt_sha256",
+    "credential_role_set_sha256", "target_system_identifier_sha256", "verified_at", "evidence_scope", "policy_status", "source_equivalence_status",
+    "result", "receipt_sha256",
+  ], "CLUSTER_RECEIPT_INVALID");
   if (value.schema_version !== 1 || value.contract !== CLUSTER_SECURITY_RECEIPT_CONTRACT) reject("CLUSTER_RECEIPT_CONTRACT_INVALID");
   string(value.backup_id, IDENTIFIER, "CLUSTER_RECEIPT_INVALID");
   string(value.restore_run_id, IDENTIFIER, "CLUSTER_RECEIPT_INVALID");
-  for (const key of ["snapshot_sha256", "policy_sha256", "source_catalog_sha256", "target_catalog_sha256", "target_system_identifier_sha256", "receipt_sha256"]) string(value[key], SHA256, "CLUSTER_RECEIPT_INVALID");
+  for (const key of [
+    "snapshot_sha256", "policy_sha256", "source_catalog_sha256", "target_raw_catalog_sha256", "target_catalog_sha256", "tablespace_map_sha256",
+    "tablespace_receipt_sha256", "credential_receipt_sha256", "credential_role_set_sha256", "target_system_identifier_sha256", "receipt_sha256",
+  ]) string(value[key], SHA256, "CLUSTER_RECEIPT_INVALID");
   if (value.policy_id !== policy.policy_id || value.policy_sha256 !== clusterPolicySha256(policy)) reject("CLUSTER_RECEIPT_POLICY_MISMATCH");
   if (value.source_catalog_sha256 !== value.target_catalog_sha256 || value.policy_status !== "VERIFIED" || value.source_equivalence_status !== "VERIFIED") reject("CLUSTER_RECEIPT_NOT_VERIFIED");
+  if (value.credential_role_set_sha256 !== clusterSha256(policy.credential_binding.login_roles)) reject("CLUSTER_RECEIPT_CREDENTIAL_BINDING_MISMATCH");
   iso(value.verified_at, "CLUSTER_RECEIPT_INVALID");
   enumValue(value.evidence_scope, EVIDENCE_SCOPES, "CLUSTER_RECEIPT_INVALID");
   const expectedResult = value.evidence_scope === "ACTUAL_CONTROLLED" ? "VERIFIED" : "SYNTHETIC_ISOLATED_VERIFIED";
@@ -1116,7 +1243,8 @@ export function createTablespaceReceipt({ validation, backupId, restoreRunId, ve
   iso(verifiedAt, "TABLESPACE_RECEIPT_VERIFIED_AT_INVALID");
   if (!validation || !EVIDENCE_SCOPES.has(validation.evidenceScope) || !SHA256.test(validation.mapSha256)
     || !SHA256.test(validation.entrySetSha256) || !SHA256.test(validation.namespaceIdentitySha256)
-    || !Number.isSafeInteger(validation.entryCount)) reject("TABLESPACE_VALIDATION_INVALID");
+    || !SHA256.test(validation.targetTablespaceCatalogSha256) || !SHA256.test(validation.postCreateEntrySetSha256)
+    || validation.phase !== "POST_CREATE_VERIFIED" || !Number.isSafeInteger(validation.entryCount)) reject("TABLESPACE_VALIDATION_INVALID");
   const body = {
     schema_version: 1,
     contract: TABLESPACE_RECEIPT_CONTRACT,
@@ -1124,27 +1252,30 @@ export function createTablespaceReceipt({ validation, backupId, restoreRunId, ve
     restore_run_id: restoreRunId,
     map_sha256: validation.mapSha256,
     entry_set_sha256: validation.entrySetSha256,
+    post_create_entry_set_sha256: validation.postCreateEntrySetSha256,
+    target_tablespace_catalog_sha256: validation.targetTablespaceCatalogSha256,
     namespace_identity_sha256: validation.namespaceIdentitySha256,
     custom_tablespace_count: validation.entryCount,
     verified_at: verifiedAt,
     evidence_scope: validation.evidenceScope,
     namespace_status: "VERIFIED",
     path_identity_status: "VERIFIED",
+    post_create_status: "VERIFIED",
     result: validation.evidenceScope === "ACTUAL_CONTROLLED" ? "VERIFIED" : "SYNTHETIC_ISOLATED_VERIFIED",
   };
   return validateTablespaceReceipt({ ...body, receipt_sha256: clusterSha256(body) });
 }
 
 export function validateTablespaceReceipt(value) {
-  exactKeys(value, ["schema_version", "contract", "backup_id", "restore_run_id", "map_sha256", "entry_set_sha256", "namespace_identity_sha256", "custom_tablespace_count", "verified_at", "evidence_scope", "namespace_status", "path_identity_status", "result", "receipt_sha256"], "TABLESPACE_RECEIPT_INVALID");
+  exactKeys(value, ["schema_version", "contract", "backup_id", "restore_run_id", "map_sha256", "entry_set_sha256", "post_create_entry_set_sha256", "target_tablespace_catalog_sha256", "namespace_identity_sha256", "custom_tablespace_count", "verified_at", "evidence_scope", "namespace_status", "path_identity_status", "post_create_status", "result", "receipt_sha256"], "TABLESPACE_RECEIPT_INVALID");
   if (value.schema_version !== 1 || value.contract !== TABLESPACE_RECEIPT_CONTRACT) reject("TABLESPACE_RECEIPT_CONTRACT_INVALID");
   string(value.backup_id, IDENTIFIER, "TABLESPACE_RECEIPT_INVALID");
   string(value.restore_run_id, IDENTIFIER, "TABLESPACE_RECEIPT_INVALID");
-  for (const key of ["map_sha256", "entry_set_sha256", "namespace_identity_sha256", "receipt_sha256"]) string(value[key], SHA256, "TABLESPACE_RECEIPT_INVALID");
+  for (const key of ["map_sha256", "entry_set_sha256", "post_create_entry_set_sha256", "target_tablespace_catalog_sha256", "namespace_identity_sha256", "receipt_sha256"]) string(value[key], SHA256, "TABLESPACE_RECEIPT_INVALID");
   integer(value.custom_tablespace_count, 0, 64, "TABLESPACE_RECEIPT_INVALID");
   iso(value.verified_at, "TABLESPACE_RECEIPT_INVALID");
   enumValue(value.evidence_scope, EVIDENCE_SCOPES, "TABLESPACE_RECEIPT_INVALID");
-  if (value.namespace_status !== "VERIFIED" || value.path_identity_status !== "VERIFIED") reject("TABLESPACE_RECEIPT_NOT_VERIFIED");
+  if (value.namespace_status !== "VERIFIED" || value.path_identity_status !== "VERIFIED" || value.post_create_status !== "VERIFIED") reject("TABLESPACE_RECEIPT_NOT_VERIFIED");
   const expected = value.evidence_scope === "ACTUAL_CONTROLLED" ? "VERIFIED" : "SYNTHETIC_ISOLATED_VERIFIED";
   if (value.result !== expected) reject("TABLESPACE_RECEIPT_RESULT_INVALID");
   const body = withoutKeys(value, ["receipt_sha256"]);

@@ -74,12 +74,12 @@
 
 - [x] 三条智能体线完成只读审计，主智能体复核实际 backup/restore、catalog、Dashboard/monitor、release inventory 和安全边界。
 - [x] 记录单一架构决策：稳定 V2 数据核心与签名密文外层继续保留，cluster security/tablespace 和新的恢复就绪证据采用独立版本；明确秘密分离与旧证据降级语义。
-- [ ] 严格快照覆盖 allowlisted roles、memberships/options、四种role/database settings、数据库属性、owner、对象/列 ACL、default privileges、large object、extension/publication owner、parameter ACL门禁和tablespace owner/CREATE privilege；危险属性、非法内置引用、未知/重复/漂移及未支持对象类全部负测失败。
-- [ ] 恢复角色骨架默认 NOLOGIN；root-only 合成凭据绑定、错误权限/symlink/hardlink/缺角色/重复秘密和输出泄漏负测通过，秘密/verifier 不进入制品或日志。
-- [ ] 数据恢复后 owner/ACL/default privileges 与源一致；运行角色、迁移角色和未授权角色的正/负权限探针通过，未知 privilege escalation 为零。
+- [x] 严格快照覆盖 allowlisted roles、memberships/options、四种role/database settings、数据库属性、owner、对象/列 ACL、default privileges、large object、extension/publication owner、parameter ACL门禁和tablespace owner/CREATE privilege；危险属性、非法内置引用、未知/重复/漂移及未支持对象类全部负测失败。
+- [x] 恢复角色骨架默认 NOLOGIN；root-only 合成凭据绑定、错误权限/symlink/hardlink/缺角色/重复秘密和输出泄漏负测通过，秘密/verifier 不进入制品或日志。
+- [x] 数据恢复后 owner/ACL/default privileges 与源一致；运行角色、迁移角色和未授权角色的正/负权限探针通过，未知 privilege escalation 为零。
 - [ ] `pg_default`与显式 custom tablespace map 通过；缺失/重复/非空/越界/PGDATA重叠/symlink/错误 owner-mode/崩溃负测不改变受信目标。
 - [ ] 非事务 cluster 步骤具备 durable intent、幂等续跑和精确补偿；各中断点不留下可登录半角色、错误 membership 或可用的半恢复数据库。
-- [ ] 单容器双 PostgreSQL cluster 合成恢复通过，包含角色、ACL/default privileges、custom tablespace、凭据重新绑定和最小权限运行连接；错误 snapshot/secret/map/target identity 不改变目标。
+- [x] 单容器双 PostgreSQL cluster 合成恢复通过，包含角色、ACL/default privileges、custom tablespace、凭据重新绑定和最小权限运行连接；错误 snapshot/secret/map/target identity 不改变目标。
 - [ ] Dashboard/监控对旧 readiness 失败关闭并独立显示 cluster security、credential binding、tablespace 状态；浏览器不暴露角色清单、路径或秘密。
 - [ ] 既有 backup/offhost/readiness、Dashboard/monitor、release inventory/contract、typecheck/lint 不降级；新增测试进入正式 inventory，所有重型验证串行且最多一个临时容器。
 - [ ] 源码提交后重建 canonical manifest-only 直接子提交，TASK54 bundle 与全部旧候选标记`STALE / NOT AUTHORIZABLE`。
@@ -126,3 +126,15 @@
 - 最新专项测试8/8通过，targeted ESLint零error/零warning，`git diff --check`通过；credential scan为`CREDENTIAL_CHECK_OK (1610 repository files scanned)`。探针和检查均未连接当前常驻 PostgreSQL，未读取环境、凭据、日志、业务数据、备份或受保护Volume正文。
 - 检查后available memory约1.8 GiB、Swap 521 MiB、根盘可用16 GiB、Load 0.43/0.48/0.41；常驻四服务仍运行，PostgreSQL/Web healthy。所有`cyd-task55-*`临时容器已`--rm`，两份临时 catalog 文件逐项 unlink、目录 rmdir，无测试数据库、容器或目录遗留。
 - 本批只关闭“去敏、严格、真实 PG17 可执行的源 catalog 捕获”子边界；restore plan/apply、双 cluster 等价与权限探针、凭据 stdin 绑定、custom tablespace 实际恢复、cluster capsule/joint transfer v2、readiness v4、Dashboard/monitor和inventory仍未实现，系统继续`PRODUCTION NO-GO`。
+
+## 12. 第三批实现证据：私有恢复计划与单容器双集群
+
+- 新增严格、content-addressed 的`chenyida-erp-postgresql-cluster-restore-plan/v1`私有运维计划。计划由已验证 snapshot、policy、database profile 和 tablespace map 唯一派生，分成事务内 NOLOGIN/PASSWORD NULL 角色骨架、逐 tablespace 非事务命令、CONNECTION LIMIT 0 数据库、固定`pg_restore --role=<migration owner> --no-owner --no-acl --exit-on-error --single-transaction`、事务内 ACL/default privileges/membership/settings、stdin 凭据绑定、原子激活和 quarantine；任何 plan/SQL/hash 漂移拒绝。
+- routine 不再保存或重放`pg_get_function_identity_arguments`可执行文本，而以有序`{schema,name}`类型身份重建安全引用；schema/table/view/materialized view/partition/index/sequence/column/routine/type/large object/database/tablespace 均使用独立 identifier quoting。ACL grantor进一步收紧为对象 owner 或`pg_database_owner`，custom tablespace options当前明确不支持并失败关闭。
+- 凭据绑定只通过 psql `\\password`的 stdin 交互；child argv、environment、stdout/stderr和公开返回值不含口令，输入 Buffer在成功或失败路径均清零。真实合成测试用运行时随机生成的两份32-byte口令，通过 SCRAM 登录证明 owner/runtime 已绑定；错误口令失败，未读取`pg_authid`或 verifier。文件 mode、替换、symlink、hardlink、缺角色、重复角色、口令复用和公开泄漏负测均失败关闭。
+- tablespace preflight 固定空目录 dev/ino/uid/gid/mode、server path与namespace；CREATE后再次逐组件 no-follow，要求同一 inode、非空 PostgreSQL目录、target catalog location hash匹配。tablespace receipt只绑定 tablespace catalog 子集，cluster security receipt再交叉绑定 map、post-create receipt、credential receipt、raw target catalog、规范源等价和目标system identifier，不允许调用方手工替换路径摘要。
+- 新增单容器双 PostgreSQL 17 合成演练：源/目标使用不同 system identifier；fixture覆盖3个策略角色、PG16+ membership options、public/app schema、custom tablespace、表/分区/视图/物化视图/序列/列ACL、结构化routine、enum、large object、default privileges、`pgcrypto`/`btree_gist`/`plpgsql`和publication。目标先用角色冲突证明骨架事务回滚，再完成 tablespace、受限数据库、dump restore、安全状态应用、随机凭据绑定、激活、再采集及源等价回执。
+- 实际权限探针证明 runtime 可SELECT/INSERT/UPDATE/DELETE、调用routine，但不能DDL或`SET ROLE` owner；owner可执行受控DDL；错误密码失败；无授权角色没有CONNECT且在`SET ROLE`后不能读取业务表。随后 quarantine将两个登录角色恢复NOLOGIN且数据库limit0，再次原子激活成功。
+- 首次真实 custom tablespace采集暴露零维空ACL不能直接传给`aclexplode`，第二次暴露`pg_restore`必须显式提供`--dbname`；均修复根因且未降低断言。最终工作区单容器双集群输出`single-container dual-cluster PostgreSQL security recovery passed`，专项单测9/9、targeted ESLint、`sh -n`、`git diff --check`及`CREDENTIAL_CHECK_OK (1613 repository files scanned)`通过。
+- 所有`cyd-task55-live-*`容器均自动或按精确身份删除，4次Node临时提取文件逐项unlink、临时目录rmdir；PostgreSQL fixture、随机口令、dump、catalog、SQL plan与测试日志都只存在于容器tmpfs并随容器删除。最终检查available memory约1.8 GiB、Swap 520 MiB、根盘可用16 GiB、Load 0.46/0.27/0.22；四个常驻服务restart 0、OOM false，PostgreSQL/Web healthy、Worker/Caddy health none，无任务容器或host临时目录遗留。
+- 当前仍未把 durable state 与实际非事务 executor/响应丢失 reconciliation联成生产 CLI，也未实现 cluster capsule、joint transfer v2、readiness v4、Dashboard/monitor、release inventory或真实custom tablespace持久mount；这些继续保持`PRODUCTION NO-GO`。

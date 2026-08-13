@@ -71,7 +71,6 @@
       "pg_database_owner"
     ],
     "allowed_grantors": [
-      "RESTORE_ADMIN",
       "chenyida_erp_owner",
       "pg_database_owner"
     ],

@@ -55,13 +55,15 @@ CREATE OR REPLACE FUNCTION pg_temp.cyd_acl_json(value aclitem[])
 RETURNS jsonb
 LANGUAGE sql STABLE PARALLEL SAFE
 AS $$
-  SELECT coalesce(jsonb_agg(jsonb_build_object(
-    'grantor',pg_temp.cyd_role_name(grantor),
-    'grantee',pg_temp.cyd_role_name(grantee),
-    'privilege_type',privilege_type,
-    'is_grantable',is_grantable
-  ) ORDER BY pg_temp.cyd_role_name(grantor),pg_temp.cyd_role_name(grantee),privilege_type,is_grantable),'[]'::jsonb)
-  FROM aclexplode(value)
+  SELECT CASE WHEN coalesce(cardinality(value),0)=0 THEN '[]'::jsonb ELSE (
+    SELECT coalesce(jsonb_agg(jsonb_build_object(
+      'grantor',pg_temp.cyd_role_name(grantor),
+      'grantee',pg_temp.cyd_role_name(grantee),
+      'privilege_type',privilege_type,
+      'is_grantable',is_grantable
+    ) ORDER BY pg_temp.cyd_role_name(grantor),pg_temp.cyd_role_name(grantee),privilege_type,is_grantable),'[]'::jsonb)
+    FROM aclexplode(value)
+  ) END
 $$;
 
 CREATE OR REPLACE FUNCTION pg_temp.cyd_sha256(value text)
@@ -76,7 +78,7 @@ CREATE TEMP TABLE cyd_objects(
   kind text NOT NULL,
   schema_name text,
   object_name text NOT NULL,
-  identity_arguments text,
+  identity_arguments jsonb,
   parent_identity text,
   owner_oid oid NOT NULL,
   tablespace_name text,
@@ -144,7 +146,12 @@ WHERE n.nspname NOT LIKE 'pg\_%' ESCAPE '\' AND n.nspname<>'information_schema'
   AND em.objid IS NULL AND parent_em.objid IS NULL;
 
 INSERT INTO cyd_objects
-SELECT 'pg_proc'::regclass,p.oid,0,'ROUTINE',n.nspname,p.proname,pg_get_function_identity_arguments(p.oid),NULL,
+SELECT 'pg_proc'::regclass,p.oid,0,'ROUTINE',n.nspname,p.proname,coalesce((
+    SELECT jsonb_agg(jsonb_build_object('schema',tn.nspname,'name',t.typname) ORDER BY argument_position)
+    FROM unnest(p.proargtypes::oid[]) WITH ORDINALITY argument(type_oid,argument_position)
+    JOIN pg_type t ON t.oid=argument.type_oid
+    JOIN pg_namespace tn ON tn.oid=t.typnamespace
+  ),'[]'::jsonb),NULL,
   p.proowner,NULL,em.extname,pg_temp.cyd_acl_state(p.proacl),
   pg_temp.cyd_acl_json(coalesce(p.proacl,'{}'::aclitem[])),
   pg_temp.cyd_acl_json(coalesce(p.proacl,acldefault('f',p.proowner)))
