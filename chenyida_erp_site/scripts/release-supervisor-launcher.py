@@ -84,6 +84,8 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-release-image-evidence-producer.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-release-manifest-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-release-migration-allowlist.test.mjs": "0444",
+    "chenyida_erp_site/tests/selfhost-backup-recovery-postgres.sh": "0555",
+    "chenyida_erp_site/tests/selfhost-postgresql-cluster-recovery-postgres.sh": "0555",
     "chenyida_erp_site/tests/test_release_supervisor_browser.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_container_runtime.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_installer.py": "0444",

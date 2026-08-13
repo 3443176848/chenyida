@@ -200,7 +200,10 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
     assert.ok(script.indexOf('mkdir -m 0555 "$SITE_ROOT/node_modules"') < script.indexOf('-v "$NODE_MODULES:/workspace/node_modules:ro"'));
   }
   assert.match(recoverySandbox, /selfhost-postgresql-cluster-recovery-postgres\.sh/);
-  assert.match(recoverySandbox, /selfhost-backup-recovery-postgres\.sh; \/workspace\/tests\/selfhost-postgresql-cluster-recovery-postgres\.sh/);
+  assert.match(recoverySandbox, /TRUSTED_TEST_ROOT="\$SUPERVISOR_SITE_ROOT\/tests"/);
+  assert.match(recoverySandbox, /-v "\$TRUSTED_TEST_ROOT:\/supervisor-tests:ro"/);
+  assert.match(recoverySandbox, /\/supervisor-tests\/selfhost-backup-recovery-postgres\.sh; \/supervisor-tests\/selfhost-postgresql-cluster-recovery-postgres\.sh/);
+  assert.doesNotMatch(recoverySandbox, /\/workspace\/tests\/selfhost-(?:backup|postgresql-cluster)-recovery-postgres\.sh/);
   assert.match(recoverySandbox, /--tmpfs \/tmp:rw,exec,nosuid,nodev,size=1280m/);
   assert.equal((recoverySandbox.match(/POSTGRES_ID=\$\(\/usr\/bin\/docker create/g) || []).length, 1);
   assert.match(postgresSandbox, /if \[ "\$\{ERP_RELEASE_POSTGRES_CONTAINER_MODE:-\}" = YES \]; then\s+container_main\s+exit 0\s+fi/);

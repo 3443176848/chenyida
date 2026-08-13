@@ -197,13 +197,19 @@ NODE_ENV=test FAKE_WRITER_CLASS=test FAKE_WRITER_DEPLOYMENT_ID=guard-source SELF
 GUARD_PID=$!
 attempt=0
 while :; do
-  guard_read_only=$(psql -d guard_test -Atc 'show default_transaction_read_only' 2>/dev/null || true)
+  guard_read_only=$(psql -d postgres -Atc "select count(*) from pg_db_role_setting s cross join lateral unnest(s.setconfig) as cfg(setting) where s.setdatabase=(select oid from pg_database where datname='guard_test') and s.setrole=0 and setting='default_transaction_read_only=on'" 2>/dev/null || true)
   guard_connection_limit=$(psql -d postgres -Atc "select datconnlimit from pg_database where datname='guard_test'" 2>/dev/null || true)
-  [ -f "$BACKUP_ROOT/.backup-fence-v2.json" ] && [ "$guard_read_only" = on ] && [ "$guard_connection_limit" = 0 ] && break
-  attempt=$((attempt + 1)); [ "$attempt" -le 100 ] || { echo "backup guard intent was not published" >&2; exit 1; }
+  [ -f "$BACKUP_ROOT/.backup-fence-v2.json" ] && [ "$guard_read_only" = 1 ] && [ "$guard_connection_limit" = 0 ] && break
+  if ! kill -0 "$GUARD_PID" 2>/dev/null; then
+    if wait "$GUARD_PID"; then guard_status=0; else guard_status=$?; fi
+    GUARD_PID=""
+    echo "backup guard process exited before durable publication (status=$guard_status)" >&2
+    exit 1
+  fi
+  attempt=$((attempt + 1)); [ "$attempt" -le 300 ] || { echo "backup guard intent was not published" >&2; exit 1; }
   sleep 0.1
 done
-[ "$(psql -d guard_test -Atc 'show default_transaction_read_only')" = on ]
+[ "$(psql -d postgres -Atc "select count(*) from pg_db_role_setting s cross join lateral unnest(s.setconfig) as cfg(setting) where s.setdatabase=(select oid from pg_database where datname='guard_test') and s.setrole=0 and setting='default_transaction_read_only=on'")" = 1 ]
 [ "$(psql -d postgres -Atc "select datconnlimit from pg_database where datname='guard_test'")" = 0 ]
 kill -9 "$GUARD_PID"; wait "$GUARD_PID" 2>/dev/null || true; GUARD_PID=""
 attempt=0
