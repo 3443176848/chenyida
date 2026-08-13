@@ -5,7 +5,14 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { executeStep, officialExecutorCommand, publishReleaseGateArtifacts, resourceViolation, runReleaseGate } from "../scripts/release-gate-runner.mjs";
+import { evaluateRuntimeServiceInventory, executeStep, officialExecutorCommand, publishReleaseGateArtifacts, resourceViolation, runReleaseGate } from "../scripts/release-gate-runner.mjs";
+import {
+  ISOLATED_CANDIDATE_RUNTIME_GUARD_MODE,
+  OFFICIAL_ISOLATED_CANDIDATE_RUNTIME_GUARD,
+  OFFICIAL_PRE_DEPLOY_RUNTIME_GUARD,
+  PRE_DEPLOY_RUNTIME_GUARD_MODE,
+  assertPreDeployRuntimeStable,
+} from "../scripts/release-lifecycle-contract.mjs";
 import { RELEASE_GATE_REPORT_CONTRACT, buildMigrationAllowlist, canonicalJson, migrationAllowlistDigest, sha256, validateOfficialReleaseGatePlan, validateReleaseGateReport, writePreparedJsonArtifact } from "../scripts/release-manifest-contract.mjs";
 import {
   RELEASE_TEST_INVENTORY_NOT_APPLICABLE,
@@ -19,11 +26,33 @@ import { buildEligibleReleaseFixture, initializeReleaseArtifactRoot } from "./re
 
 const rootCapable = typeof process.getuid === "function" && process.getuid() === 0;
 
+function preDeployRuntimeFixture() {
+  const common = {
+    restart_count: 0,
+    oom_killed: false,
+    running: true,
+    restarting: false,
+    paused: false,
+    dead: false,
+    status: "running",
+  };
+  return [
+    { ...common, service: "caddy", container_id: "1".repeat(64), image_id: `sha256:${"a".repeat(64)}`, image_reference: "caddy:2.10-alpine", health: "none", healthcheck_present: false },
+    { ...common, service: "postgres", container_id: "2".repeat(64), image_id: `sha256:${"b".repeat(64)}`, image_reference: "postgres:17-bookworm", health: "healthy", healthcheck_present: true },
+    { ...common, service: "web", container_id: "3".repeat(64), image_id: `sha256:${"c".repeat(64)}`, image_reference: "chenyida-erp-parallel-web", health: "healthy", healthcheck_present: true },
+    { ...common, service: "worker", container_id: "4".repeat(64), image_id: `sha256:${"d".repeat(64)}`, image_reference: "chenyida-erp-parallel-worker", health: "none", healthcheck_present: false },
+  ];
+}
+
 test("versioned repository release plan is the exact fail-closed official plan", async () => {
-  const raw = await readFile(new URL("../release/release-gate-plan-v1.json", import.meta.url), "utf8");
+  const raw = await readFile(new URL("../release/release-gate-plan-v2.json", import.meta.url), "utf8");
   const value = validateOfficialReleaseGatePlan(JSON.parse(raw));
   assert.equal(value.resource_policy.compose_parallel_limit, 1);
   assert.equal(value.resource_policy.max_temporary_containers, 1);
+  assert.deepEqual(value.runtime_guard, OFFICIAL_PRE_DEPLOY_RUNTIME_GUARD);
+  assert.deepEqual(value.candidate_runtime_guard, OFFICIAL_ISOLATED_CANDIDATE_RUNTIME_GUARD);
+  assert.equal(value.runtime_guard.mode, PRE_DEPLOY_RUNTIME_GUARD_MODE);
+  assert.equal(value.candidate_runtime_guard.mode, ISOLATED_CANDIDATE_RUNTIME_GUARD_MODE);
   assert.equal(value.steps.length, 19);
   assert.ok(value.steps.every((step) => step.applicability === "REQUIRED" && step.timeout_seconds <= 14400));
   assert.equal(value.steps.find((step) => step.id === "supervisor-python-contracts").executor_id, "PYTHON_CANDIDATE_TEST");
@@ -112,8 +141,10 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.match(runner, /expectedConfigDigest/);
   assert.equal((runner.match(/\{\{with \(index \.State \\"Health\\"\)\}\}/g) || []).length, 2);
   assert.doesNotMatch(runner, /\{\{if \.State\.Health\}\}/);
-  assert.doesNotMatch(runner, /\{\{if \.Config\.Healthcheck\}\}/);
-  assert.match(runner, /\["worker", new Set\(\["healthy"\]\)\]/);
+  assert.equal((runner.match(/\{\{if \.Config\.Healthcheck\}\}/g) || []).length, 2);
+  assert.match(runner, /runtimeServiceInventory/);
+  assert.match(runner, /assertPreDeployRuntimeStable/);
+  assert.match(runner, /GATE_REQUIRED_RUNTIME_CHANGED/);
   assert.doesNotMatch(runner, /const runEnvironment = \{ \.\.\.environment/);
   assert.doesNotMatch(runner, /process\.(?:stdout|stderr)\.write\(chunk\)/);
   assert.match(nodeSandbox, /--network none/);
@@ -200,7 +231,7 @@ test("installed supervisor layout loads trusted code while hashing the explicit 
     const candidateMigrations = path.join(root, "candidate", "chenyida_erp_site", "drizzle-postgres");
     await mkdir(bundleScripts, { recursive: true });
     await mkdir(candidateMigrations, { recursive: true });
-    for (const file of ["release-manifest-contract.mjs", "release-identity-contract.mjs", "release-image-evidence-contract.mjs"]) {
+    for (const file of ["release-manifest-contract.mjs", "release-identity-contract.mjs", "release-image-evidence-contract.mjs", "release-lifecycle-contract.mjs"]) {
       await copyFile(new URL(`../scripts/${file}`, import.meta.url), path.join(bundleScripts, file));
     }
     await writeFile(path.join(candidateMigrations, "0001_fixture.sql"), "select 1;\n");
@@ -399,13 +430,45 @@ test("invalid release run IDs fail before lock, source, Docker or command work",
 });
 
 test("resource policy stops on 60-second swap growth and absolute thresholds", async () => {
-  const plan = validateOfficialReleaseGatePlan(JSON.parse(await readFile(new URL("../release/release-gate-plan-v1.json", import.meta.url), "utf8")));
+  const plan = validateOfficialReleaseGatePlan(JSON.parse(await readFile(new URL("../release/release-gate-plan-v2.json", import.meta.url), "utf8")));
   const base = { available_memory_mib: 2048, swap_used_mib: 100, swap_used_percent: 10, root_free_gib: 30, load_1m: 0.5, temporary_containers: 0 };
   const state = { swapSamples: [], aggregate: { maximum_swap_growth_mib_60s: 0 } };
   assert.equal(resourceViolation(base, plan.resource_policy, state, 0), null);
   assert.equal(resourceViolation({ ...base, swap_used_mib: 357 }, plan.resource_policy, state, 59_000), "GATE_SWAP_GROWTH_ABOVE_LIMIT");
   assert.equal(state.aggregate.maximum_swap_growth_mib_60s, 257);
   assert.equal(resourceViolation({ ...base, swap_used_percent: 80.1 }, plan.resource_policy, { swapSamples: [], aggregate: { maximum_swap_growth_mib_60s: 0 } }, 0), "GATE_SWAP_ABOVE_LIMIT");
+});
+
+test("pre-deploy runtime guard accepts stable legacy Worker and rejects every identity or state transition", () => {
+  const baseline = preDeployRuntimeFixture();
+  assert.equal(evaluateRuntimeServiceInventory(baseline, OFFICIAL_PRE_DEPLOY_RUNTIME_GUARD).failure, null);
+  assert.deepEqual(assertPreDeployRuntimeStable(baseline, structuredClone(baseline), OFFICIAL_PRE_DEPLOY_RUNTIME_GUARD), baseline);
+
+  for (const current of [
+    baseline.slice(0, 3),
+    [...baseline, { ...baseline[3], service: "extra", container_id: "5".repeat(64) }],
+    baseline.map((entry) => entry.service === "worker" ? { ...entry, health: "unhealthy" } : entry),
+    baseline.map((entry) => entry.service === "worker" ? { ...entry, healthcheck_present: true } : entry),
+    baseline.map((entry) => entry.service === "web" ? { ...entry, health: "none", healthcheck_present: false } : entry),
+    baseline.map((entry) => entry.service === "postgres" ? { ...entry, restart_count: 1 } : entry),
+    baseline.map((entry) => entry.service === "caddy" ? { ...entry, oom_killed: true } : entry),
+  ]) {
+    assert.notEqual(evaluateRuntimeServiceInventory(current, OFFICIAL_PRE_DEPLOY_RUNTIME_GUARD).failure, null);
+  }
+
+  const stableButDrifted = [
+    baseline.map((entry) => entry.service === "worker" ? { ...entry, health: "healthy", healthcheck_present: true } : entry),
+    baseline.map((entry) => entry.service === "worker" ? { ...entry, container_id: "5".repeat(64) } : entry),
+    baseline.map((entry) => entry.service === "worker" ? { ...entry, image_id: `sha256:${"e".repeat(64)}` } : entry),
+    baseline.map((entry) => entry.service === "worker" ? { ...entry, image_reference: "chenyida-erp-parallel-worker:changed" } : entry),
+  ];
+  for (const current of stableButDrifted) {
+    assert.equal(evaluateRuntimeServiceInventory(current, OFFICIAL_PRE_DEPLOY_RUNTIME_GUARD).failure, null);
+    assert.throws(
+      () => assertPreDeployRuntimeStable(baseline, current, OFFICIAL_PRE_DEPLOY_RUNTIME_GUARD),
+      (error) => error.code === "PRE_DEPLOY_RUNTIME_DRIFT",
+    );
+  }
 });
 
 test("step timeout and resource abort escalate to SIGKILL for TERM-resistant process groups", async () => {
@@ -435,6 +498,10 @@ test("a stale PASS report or a report with system/container failure cannot valid
   assert.throws(() => validateReleaseGateReport(failedSystem), (error) => error.code === "GATE_REPORT_RESULT_INCONSISTENT");
   const failedStep = { ...fixture.report, steps: fixture.report.steps.map((step, index) => index === 0 ? { ...step, result: "FAIL", exit_code: 1, reason: "GATE_STEP_EXIT_NONZERO" } : step) };
   assert.throws(() => validateReleaseGateReport(failedStep), (error) => error.code === "GATE_REPORT_RESULT_INCONSISTENT");
+  const unhealthyFinal = fixture.report.resources.final_runtime_services.map((service) => service.service === "worker" ? { ...service, health: "unhealthy" } : service);
+  const recordedFailure = { ...fixture.report, result: "FAIL", resources: { ...fixture.report.resources, final_runtime_services: unhealthyFinal, runtime_transition_failure: "GATE_REQUIRED_RUNTIME_STATE_INVALID", final_runtime_failure: "GATE_REQUIRED_RUNTIME_STATE_INVALID" } };
+  assert.deepEqual(validateReleaseGateReport(recordedFailure), recordedFailure);
+  assert.throws(() => validateReleaseGateReport({ ...recordedFailure, resources: { ...recordedFailure.resources, runtime_transition_failure: null, final_runtime_failure: null } }), (error) => error.code === "GATE_REPORT_FAILURE_REASON_MISSING");
   assert.equal(fixture.report.contract, RELEASE_GATE_REPORT_CONTRACT);
   assert.equal(fixture.report.plan_sha256, sha256(canonicalJson(fixture.plan)));
 });
@@ -443,7 +510,8 @@ test("runner source contains awaited monitoring and final status/health comparis
   const runner = await readFile(new URL("../scripts/release-gate-runner.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(runner, /setInterval\(async/);
   assert.match(runner, /await monitor/);
-  assert.match(runner, /after\.status !== before\.status \|\| after\.health !== before\.health/);
+  assert.match(runner, /canonicalJson\(after\) !== canonicalJson\(before\)/);
+  assert.match(runner, /assertPreDeployRuntimeStable/);
   assert.match(runner, /GATE_PREEXISTING_TASK_CONTAINER/);
   assert.match(runner, /verifySecurityReport/);
 });

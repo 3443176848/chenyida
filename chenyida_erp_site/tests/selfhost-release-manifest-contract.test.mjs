@@ -5,12 +5,19 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+  ISOLATED_CANDIDATE_RUNTIME_GUARD_MODE,
+  POST_DEPLOY_RUNTIME_GUARD_MODE,
+  PRE_DEPLOY_RUNTIME_GUARD_MODE,
+  officialReleaseLifecycle,
+} from "../scripts/release-lifecycle-contract.mjs";
+import {
   assembleReleaseManifest,
   buildMigrationAllowlist,
   canonicalJson,
   discardPreparedJsonArtifact,
   loadReleaseManifest,
   publishPreparedJsonArtifact,
+  readRecoverableJsonPublication,
   sha256,
   validateOfficialReleaseGatePlan,
   validateReleaseManifest,
@@ -40,6 +47,10 @@ test("eligible manifest binds one deployment class, official plan, images, migra
     assert.equal(fixture.manifest.promotion_status, "ELIGIBLE");
     assert.deepEqual(fixture.manifest.allowed_deployment_classes, ["UAT"]);
     assert.equal(fixture.manifest.migrations.head, "0002_second.sql");
+    assert.deepEqual(fixture.manifest.lifecycle, officialReleaseLifecycle());
+    assert.equal(fixture.manifest.gate.runtime_guard_mode, PRE_DEPLOY_RUNTIME_GUARD_MODE);
+    assert.equal(fixture.manifest.lifecycle.isolated_candidate.mode, ISOLATED_CANDIDATE_RUNTIME_GUARD_MODE);
+    assert.equal(fixture.manifest.lifecycle.post_deploy_identity.mode, POST_DEPLOY_RUNTIME_GUARD_MODE);
     assert.deepEqual(validateReleaseManifest(fixture.manifest, { now: new Date("2026-08-12T01:30:00.000Z"), requireEligible: true }), fixture.manifest);
   } finally { await rm(f.root, { recursive: true, force: true }); }
 });
@@ -49,6 +60,13 @@ test("manifest fails closed for extra fields, cross-class reuse, image drift, re
   try {
     const { manifest } = await buildEligibleReleaseFixture({ entries: f.entries });
     assert.throws(() => validateReleaseManifest({ ...manifest, unexpected: true }), (error) => error.code === "RELEASE_MANIFEST_FIELDS_INVALID");
+    const withoutLifecycle = { ...manifest };
+    delete withoutLifecycle.lifecycle;
+    assert.throws(() => validateReleaseManifest(withoutLifecycle), (error) => error.code === "RELEASE_MANIFEST_FIELDS_INVALID");
+    assert.throws(() => validateReleaseManifest({ ...manifest, schema_version: 1, contract: "chenyida-erp-release-manifest/v1" }), (error) => error.code === "RELEASE_MANIFEST_VERSION_INVALID");
+    assert.throws(() => validateReleaseManifest({ ...manifest, lifecycle: { ...manifest.lifecycle, pre_deploy_gate: manifest.lifecycle.post_deploy_identity } }), (error) => error.code === "RELEASE_PRE_DEPLOY_MODE_INVALID");
+    assert.throws(() => validateReleaseManifest({ ...manifest, lifecycle: { ...manifest.lifecycle, post_deploy_identity: manifest.lifecycle.pre_deploy_gate } }), (error) => error.code === "RELEASE_POST_DEPLOY_MODE_INVALID");
+    assert.throws(() => validateReleaseManifest({ ...manifest, gate: { ...manifest.gate, runtime_guard_mode: POST_DEPLOY_RUNTIME_GUARD_MODE } }), (error) => error.code === "RELEASE_GATE_RUNTIME_GUARD_INVALID");
     assert.throws(() => validateReleaseManifest({ ...manifest, allowed_deployment_classes: ["UAT", "PRODUCTION"] }), (error) => error.code === "RELEASE_DEPLOYMENT_CLASSES_INVALID");
     assert.throws(() => validateReleaseManifest({ ...manifest, images: { ...manifest.images, web: { ...manifest.images.web, oci_revision: "e".repeat(40) } } }), (error) => error.code === "RELEASE_IMAGE_SOURCE_MISMATCH");
     assert.throws(() => validateReleaseManifest({ ...manifest, control: { ...manifest.control, image_evidence_authorization_sha256: null } }), (error) => error.code === "RELEASE_CONTROL_IMAGE_AUTHORIZATION_REQUIRED");
@@ -58,8 +76,10 @@ test("manifest fails closed for extra fields, cross-class reuse, image drift, re
 });
 
 test("official plan rejects a weak command, removed skip detector or relaxed resource policy", async () => {
-  const raw = JSON.parse(await readFile(new URL("../release/release-gate-plan-v1.json", import.meta.url), "utf8"));
+  const raw = JSON.parse(await readFile(new URL("../release/release-gate-plan-v2.json", import.meta.url), "utf8"));
   assert.equal(validateOfficialReleaseGatePlan(raw), raw);
+  assert.throws(() => validateOfficialReleaseGatePlan({ ...raw, runtime_guard: { ...raw.runtime_guard, mode: POST_DEPLOY_RUNTIME_GUARD_MODE } }), (error) => error.code === "RUNTIME_GUARD_MODE_INVALID");
+  assert.throws(() => validateOfficialReleaseGatePlan({ ...raw, candidate_runtime_guard: { ...raw.candidate_runtime_guard, mode: PRE_DEPLOY_RUNTIME_GUARD_MODE } }), (error) => error.code === "CANDIDATE_RUNTIME_GUARD_MODE_INVALID");
   assert.throws(() => validateOfficialReleaseGatePlan({ ...raw, steps: raw.steps.map((step, index) => index === 0 ? { ...step, executor_id: "UNTRUSTED_COMMAND" } : step) }), (error) => error.code === "GATE_OFFICIAL_PLAN_STEPS_INVALID");
   assert.throws(() => validateOfficialReleaseGatePlan({ ...raw, steps: raw.steps.map((step) => step.id === "build-and-node-source-tests" ? { ...step, forbid_output_patterns: [] } : step) }), (error) => error.code === "GATE_OFFICIAL_PLAN_STEPS_INVALID");
   assert.throws(() => validateOfficialReleaseGatePlan({ ...raw, resource_policy: { ...raw.resource_policy, min_available_memory_mib: 1 } }), (error) => ["GATE_MEMORY_THRESHOLD_INVALID", "GATE_OFFICIAL_PLAN_RESOURCE_POLICY_INVALID"].includes(error.code));
@@ -173,5 +193,24 @@ test("prepared artifacts remain non-consumable until an exact postcheck publicat
     await writePreparedJsonArtifact({ root: artifacts, filename: discard, value });
     await discardPreparedJsonArtifact({ root: artifacts, preparedFilename: discard, expectedSha256: digest, validator: (item) => item });
     await assert.rejects(readFile(path.join(artifacts, discard)), (error) => error.code === "ENOENT");
+
+    const recoverPrepared = ".recover.prepared.json";
+    const recoverPublished = "recover.json";
+    await writePreparedJsonArtifact({ root: artifacts, filename: recoverPrepared, value });
+    assert.deepEqual(await readRecoverableJsonPublication({ root: artifacts, preparedFilename: recoverPrepared, filename: recoverPublished, validator: (item) => item }), {
+      safeRoot: artifacts, state: "PREPARED", sha256: digest, value,
+    });
+    await link(path.join(artifacts, recoverPrepared), path.join(artifacts, recoverPublished));
+    assert.equal((await stat(path.join(artifacts, recoverPublished))).nlink, 2);
+    const recovered = await readRecoverableJsonPublication({ root: artifacts, preparedFilename: recoverPrepared, filename: recoverPublished, validator: (item) => item });
+    assert.equal(recovered.state, "PUBLISHED");
+    assert.equal(recovered.sha256, digest);
+    assert.deepEqual(recovered.value, value);
+    assert.equal((await stat(path.join(artifacts, recoverPublished))).nlink, 1);
+    await assert.rejects(readFile(path.join(artifacts, recoverPrepared)), (error) => error.code === "ENOENT");
+
+    await writePreparedJsonArtifact({ root: artifacts, filename: ".collision.prepared.json", value });
+    await writeImmutableJsonArtifact({ root: artifacts, filename: "collision.json", value: { result: "FAIL" } });
+    await assert.rejects(readRecoverableJsonPublication({ root: artifacts, preparedFilename: ".collision.prepared.json", filename: "collision.json", validator: (item) => item }), (error) => error.code === "RELEASE_JSON_PUBLICATION_INVALID_COLLISION");
   } finally { await rm(root, { recursive: true, force: true }); }
 });

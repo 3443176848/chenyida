@@ -3,7 +3,7 @@
   "contract": "chenyida-erp-operations-monitoring-policy/v1",
   "policy_id": "chenyida-erp-production-monitoring-v1",
   "resource_policy_source": {
-    "path": "release/release-gate-plan-v1.json",
+    "path": "release/release-gate-plan-v2.json",
     "sha256": "e51b4fdaf5870a7927af68b7f6e4fe1b014fb9e425bfc24330e1e64c7387aed2"
   },
   "observation_max_age_seconds": 120,

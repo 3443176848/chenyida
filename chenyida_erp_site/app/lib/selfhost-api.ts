@@ -146,9 +146,12 @@ export async function handleSelfhostHealth(input: {
       database: "postgresql",
       storage: "local",
       worker: "postgresql-jobs",
+      deployment_class: result.deploymentClass.toUpperCase(),
+      deployment_id: result.deploymentId,
       version: result.version,
       revision: result.revision,
       migration_head: result.migrationHead,
+      migration_manifest_sha256: result.migrationManifestSha256,
       components: result.components,
       time: result.databaseTime.toISOString(),
     }, 200, input.requestId);

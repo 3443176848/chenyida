@@ -7,6 +7,8 @@ import { handleSelfhostApi, handleSelfhostHealth, handleSelfhostLive } from "../
 const requestId = "123e4567-e89b-42d3-a456-426614174000";
 const database = { async query() { throw new Error("not used"); } };
 const ready = Object.freeze({
+  deploymentClass: "uat",
+  deploymentId: "chenyida-erp-uat",
   version: "0.1.0-alpha.46",
   revision: "a".repeat(12),
   migrationHead: "0045_runtime_worker_readiness.sql",
@@ -30,9 +32,12 @@ test("readiness reports bounded database, Migration, Worker, storage and runtime
     database: "postgresql",
     storage: "local",
     worker: "postgresql-jobs",
+    deployment_class: "UAT",
+    deployment_id: "chenyida-erp-uat",
     version: "0.1.0-alpha.46",
     revision: "a".repeat(12),
     migration_head: "0045_runtime_worker_readiness.sql",
+    migration_manifest_sha256: "b".repeat(64),
     components: ready.components,
     time: "2026-08-12T12:34:56.000Z",
   });

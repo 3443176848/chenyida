@@ -4,7 +4,13 @@ import { lstat, mkdir, open, readdir, realpath, rename, rmdir, unlink } from "no
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const RELEASE_IDENTITY_CONTRACT = "chenyida-erp-runtime-release-identity/v2";
+import {
+  POST_DEPLOY_RUNTIME_GUARD_MODE,
+  RELEASE_RUNTIME_POLICY_SHA256,
+  validateRuntimeGuardBinding,
+} from "./release-lifecycle-contract.mjs";
+
+export const RELEASE_IDENTITY_CONTRACT = "chenyida-erp-runtime-release-identity/v3";
 export const RELEASE_IDENTITY_FILE = "release-identity.json";
 export const RELEASE_IDENTITY_ROOT_MARKER = ".chenyida-erp-release-identity-root-v1";
 export const RELEASE_IDENTITY_ROOT_MARKER_VALUE = "chenyida-erp-release-identity-root/v1\n";
@@ -164,20 +170,24 @@ export function parseStrictJson(source, maximumBytes = MAX_IDENTITY_BYTES) {
 
 export function validateReleaseIdentity(value) {
   exactKeys(value, [
-    "schema_version", "contract", "deployment_class", "deployment_id", "release_id", "release_manifest_sha256", "supervisor_bundle_sha256", "authorization_sha256", "application_version", "git_commit",
-    "web_container_id", "web_image_digest", "worker_container_id", "worker_image_digest", "generated_at",
+    "schema_version", "contract", "deployment_class", "deployment_id", "release_id", "release_manifest_sha256", "postdeploy_receipt_sha256", "supervisor_bundle_sha256", "authorization_sha256", "runtime_guard", "runtime_policy_sha256", "application_version", "git_commit", "git_tree", "migration_head", "migration_manifest_sha256",
+    "caddy_container_id", "caddy_image_digest", "postgres_container_id", "postgres_image_digest", "web_container_id", "web_image_digest", "worker_container_id", "worker_image_digest", "generated_at",
   ], "RELEASE_IDENTITY_FIELDS_INVALID");
-  if (value.schema_version !== 2 || value.contract !== RELEASE_IDENTITY_CONTRACT) reject("RELEASE_IDENTITY_VERSION_INVALID");
+  if (value.schema_version !== 3 || value.contract !== RELEASE_IDENTITY_CONTRACT) reject("RELEASE_IDENTITY_VERSION_INVALID");
   if (!DEPLOYMENT_CLASSES.has(value.deployment_class)) reject("RELEASE_DEPLOYMENT_CLASS_INVALID");
   if (typeof value.deployment_id !== "string" || !IDENTIFIER.test(value.deployment_id)) reject("RELEASE_DEPLOYMENT_ID_INVALID");
   if (typeof value.release_id !== "string" || !IDENTIFIER.test(value.release_id)) reject("RELEASE_ID_INVALID");
-  for (const field of ["release_manifest_sha256", "supervisor_bundle_sha256", "authorization_sha256"]) if (typeof value[field] !== "string" || !SHA256.test(value[field])) reject("RELEASE_CONTROL_DIGEST_INVALID");
+  for (const field of ["release_manifest_sha256", "postdeploy_receipt_sha256", "supervisor_bundle_sha256", "authorization_sha256", "runtime_policy_sha256", "migration_manifest_sha256"]) if (typeof value[field] !== "string" || !SHA256.test(value[field])) reject("RELEASE_CONTROL_DIGEST_INVALID");
+  if (value.runtime_policy_sha256 !== RELEASE_RUNTIME_POLICY_SHA256) reject("RELEASE_RUNTIME_POLICY_INVALID");
+  try { validateRuntimeGuardBinding(value.runtime_guard, POST_DEPLOY_RUNTIME_GUARD_MODE, "RELEASE_RUNTIME_GUARD_INVALID"); } catch (error) { reject(error?.code || "RELEASE_RUNTIME_GUARD_INVALID"); }
   if (typeof value.application_version !== "string" || !VERSION.test(value.application_version)) reject("RELEASE_VERSION_INVALID");
   if (typeof value.git_commit !== "string" || !COMMIT.test(value.git_commit)) reject("RELEASE_GIT_COMMIT_INVALID");
-  if (typeof value.web_container_id !== "string" || !CONTAINER_ID.test(value.web_container_id)) reject("RELEASE_WEB_CONTAINER_INVALID");
-  if (typeof value.worker_container_id !== "string" || !CONTAINER_ID.test(value.worker_container_id) || value.worker_container_id === value.web_container_id) reject("RELEASE_WORKER_CONTAINER_INVALID");
-  if (typeof value.web_image_digest !== "string" || !IMAGE_DIGEST.test(value.web_image_digest)) reject("RELEASE_WEB_IMAGE_INVALID");
-  if (typeof value.worker_image_digest !== "string" || !IMAGE_DIGEST.test(value.worker_image_digest)) reject("RELEASE_WORKER_IMAGE_INVALID");
+  if (typeof value.git_tree !== "string" || !COMMIT.test(value.git_tree)) reject("RELEASE_GIT_TREE_INVALID");
+  if (typeof value.migration_head !== "string" || !/^\d{4}_[a-z0-9_]+\.sql$/.test(value.migration_head)) reject("RELEASE_MIGRATION_HEAD_INVALID");
+  const containerIds = ["caddy", "postgres", "web", "worker"].map((service) => value[`${service}_container_id`]);
+  if (containerIds.some((item) => typeof item !== "string" || !CONTAINER_ID.test(item)) || new Set(containerIds).size !== containerIds.length) reject("RELEASE_CONTAINER_SET_INVALID");
+  const imageDigests = ["caddy", "postgres", "web", "worker"].map((service) => value[`${service}_image_digest`]);
+  if (imageDigests.some((item) => typeof item !== "string" || !IMAGE_DIGEST.test(item)) || new Set(imageDigests).size !== imageDigests.length) reject("RELEASE_IMAGE_SET_INVALID");
   if (typeof value.generated_at !== "string" || !ISO_UTC.test(value.generated_at) || Number.isNaN(Date.parse(value.generated_at))) reject("RELEASE_GENERATED_AT_INVALID");
   return value;
 }
@@ -246,10 +256,11 @@ function canonicalIdentity(identity) {
 }
 
 function sameReleaseEvidence(left, right) {
-  return [
-    "schema_version", "contract", "deployment_class", "deployment_id", "release_id", "release_manifest_sha256", "supervisor_bundle_sha256", "authorization_sha256", "application_version", "git_commit",
-    "web_container_id", "web_image_digest", "worker_container_id", "worker_image_digest",
-  ].every((key) => left[key] === right[key]);
+  const keys = [
+    "schema_version", "contract", "deployment_class", "deployment_id", "release_id", "release_manifest_sha256", "postdeploy_receipt_sha256", "supervisor_bundle_sha256", "authorization_sha256", "runtime_policy_sha256", "application_version", "git_commit", "git_tree", "migration_head", "migration_manifest_sha256",
+    "caddy_container_id", "caddy_image_digest", "postgres_container_id", "postgres_image_digest", "web_container_id", "web_image_digest", "worker_container_id", "worker_image_digest",
+  ];
+  return keys.every((key) => left[key] === right[key]) && JSON.stringify(left.runtime_guard) === JSON.stringify(right.runtime_guard);
 }
 
 const TRANSACTION_FILE = "transaction.json";

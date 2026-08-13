@@ -30,7 +30,7 @@ import {
 } from "../tools/ops-monitoring/state-store.mjs";
 
 const policy = validateMonitoringPolicy(parseMonitoringJson(await readFile(new URL("../operations/monitoring-policy-v1.json", import.meta.url), "utf8")));
-const resourcePlan = parseMonitoringJson(await readFile(new URL("../release/release-gate-plan-v1.json", import.meta.url), "utf8"));
+const resourcePlan = parseMonitoringJson(await readFile(new URL("../release/release-gate-plan-v2.json", import.meta.url), "utf8"));
 const MiB = 1024 ** 2;
 const GiB = 1024 ** 3;
 const originMs = Date.parse("2026-08-13T00:00:00.000Z");
@@ -421,7 +421,7 @@ test("CLI emits only canonical reports or a stable redacted error", async () => 
   try {
     await initializeMonitoringStateRoot(stateRoot);
     for (const [file, value] of [[files.policy, policy], [files.plan, resourcePlan], [files.config, config], [files.observation, observationFixture()]]) {
-      const serialized = file === files.plan ? await readFile(new URL("../release/release-gate-plan-v1.json", import.meta.url), "utf8") : canonicalMonitoringJson(value);
+      const serialized = file === files.plan ? await readFile(new URL("../release/release-gate-plan-v2.json", import.meta.url), "utf8") : canonicalMonitoringJson(value);
       await writeFile(file, serialized, { mode: 0o600 });
       await chmod(file, 0o600);
     }

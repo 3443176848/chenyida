@@ -10,11 +10,11 @@ GIT_NO_REPLACE_OBJECTS=1
 export LC_ALL PATH HOME GIT_CONFIG_NOSYSTEM GIT_CONFIG_GLOBAL GIT_NO_REPLACE_OBJECTS
 
 usage() {
-  echo "usage: $0 --repository-root DIR --git-commit COMMIT --git-tree TREE --artifact-root DIR --release-id ID --deployment-class UAT|PRODUCTION --web-image REF --worker-image REF --gate-plan FILE --gate-report FILE --sbom-evidence FILE --security-evidence FILE --expires-at UTC --confirm CREATE_IMMUTABLE_RELEASE_MANIFEST" >&2
+  echo "usage: $0 --repository-root DIR --git-commit COMMIT --git-tree TREE --artifact-root DIR --release-id ID --deployment-class UAT|PRODUCTION --runtime-guard-contract chenyida-erp-release-runtime-guard/v1 --runtime-guard-mode PRE_DEPLOY_EXISTING_RUNTIME_STABILITY --gate-plan-sha256 SHA256 --web-image REF --worker-image REF --gate-plan FILE --gate-report FILE --sbom-evidence FILE --security-evidence FILE --expires-at UTC --confirm CREATE_IMMUTABLE_RELEASE_MANIFEST" >&2
   exit 2
 }
 
-REPOSITORY_ROOT=""; GIT_COMMIT=""; GIT_TREE=""; ARTIFACT_ROOT=""; RELEASE_ID=""; DEPLOYMENT_CLASS=""; WEB_IMAGE=""; WORKER_IMAGE=""; GATE_PLAN=""; GATE_REPORT=""; SBOM_EVIDENCE=""; SECURITY_EVIDENCE=""; EXPIRES_AT=""; CONFIRM=""
+REPOSITORY_ROOT=""; GIT_COMMIT=""; GIT_TREE=""; ARTIFACT_ROOT=""; RELEASE_ID=""; DEPLOYMENT_CLASS=""; RUNTIME_GUARD_CONTRACT=""; RUNTIME_GUARD_MODE=""; GATE_PLAN_SHA256=""; WEB_IMAGE=""; WORKER_IMAGE=""; GATE_PLAN=""; GATE_REPORT=""; SBOM_EVIDENCE=""; SECURITY_EVIDENCE=""; EXPIRES_AT=""; CONFIRM=""
 NODE_RUNTIME_ROOT=""; NODE_BOOTSTRAP_ID=""; NODE_BOOTSTRAP_NAME=""; NODE_RUNTIME=""
 PREPARED_MANIFEST=""; PREPARED_MANIFEST_SHA256=""
 
@@ -55,6 +55,9 @@ while [ "$#" -gt 0 ]; do
     --artifact-root) ARTIFACT_ROOT=${2:-}; shift 2 ;;
     --release-id) RELEASE_ID=${2:-}; shift 2 ;;
     --deployment-class) DEPLOYMENT_CLASS=${2:-}; shift 2 ;;
+    --runtime-guard-contract) RUNTIME_GUARD_CONTRACT=${2:-}; shift 2 ;;
+    --runtime-guard-mode) RUNTIME_GUARD_MODE=${2:-}; shift 2 ;;
+    --gate-plan-sha256) GATE_PLAN_SHA256=${2:-}; shift 2 ;;
     --web-image) WEB_IMAGE=${2:-}; shift 2 ;;
     --worker-image) WORKER_IMAGE=${2:-}; shift 2 ;;
     --gate-plan) GATE_PLAN=${2:-}; shift 2 ;;
@@ -66,10 +69,13 @@ while [ "$#" -gt 0 ]; do
     *) usage ;;
   esac
 done
-for value in "$REPOSITORY_ROOT" "$GIT_COMMIT" "$GIT_TREE" "$ARTIFACT_ROOT" "$RELEASE_ID" "$DEPLOYMENT_CLASS" "$WEB_IMAGE" "$WORKER_IMAGE" "$GATE_PLAN" "$GATE_REPORT" "$SBOM_EVIDENCE" "$SECURITY_EVIDENCE" "$EXPIRES_AT" "$CONFIRM"; do [ -n "$value" ] || usage; done
+for value in "$REPOSITORY_ROOT" "$GIT_COMMIT" "$GIT_TREE" "$ARTIFACT_ROOT" "$RELEASE_ID" "$DEPLOYMENT_CLASS" "$RUNTIME_GUARD_CONTRACT" "$RUNTIME_GUARD_MODE" "$GATE_PLAN_SHA256" "$WEB_IMAGE" "$WORKER_IMAGE" "$GATE_PLAN" "$GATE_REPORT" "$SBOM_EVIDENCE" "$SECURITY_EVIDENCE" "$EXPIRES_AT" "$CONFIRM"; do [ -n "$value" ] || usage; done
 [ "$(id -u)" = 0 ] || { echo "release manifest creation requires root" >&2; exit 1; }
 [ "${ERP_RELEASE_SUPERVISOR_LAUNCHED:-}" = YES ] || { echo "release manifest creation must be launched by the installed supervisor" >&2; exit 1; }
 [ "$CONFIRM" = CREATE_IMMUTABLE_RELEASE_MANIFEST ] || { echo "release manifest confirmation is invalid" >&2; exit 1; }
+[ "$RUNTIME_GUARD_CONTRACT" = chenyida-erp-release-runtime-guard/v1 ] && [ "$RUNTIME_GUARD_MODE" = PRE_DEPLOY_EXISTING_RUNTIME_STABILITY ] || { echo "release manifest runtime guard is invalid" >&2; exit 1; }
+case "$GATE_PLAN_SHA256" in *[!0-9a-f]*|'') echo "release gate plan digest is invalid" >&2; exit 1 ;; esac
+[ "${#GATE_PLAN_SHA256}" -eq 64 ] || { echo "release gate plan digest is invalid" >&2; exit 1; }
 case "$DEPLOYMENT_CLASS" in UAT|PRODUCTION) : ;; *) echo "deployment class is invalid" >&2; exit 1 ;; esac
 case "$RELEASE_ID" in [A-Za-z0-9]*) : ;; *) echo "release ID is invalid" >&2; exit 1 ;; esac
 case "$RELEASE_ID" in *[!A-Za-z0-9._-]*) echo "release ID is invalid" >&2; exit 1 ;; esac
@@ -116,6 +122,7 @@ fi
 for file in "$GATE_PLAN" "$GATE_REPORT" "$SBOM_EVIDENCE" "$SECURITY_EVIDENCE"; do
   [ -f "$file" ] && [ ! -L "$file" ] && [ "$(readlink -f "$(dirname -- "$file")")" = "$ARTIFACT_ROOT" ] && [ "$(readlink -f "$file")" = "$file" ] && [ "$(stat -c '%u:%g:%a:%h' "$file")" = "0:0:440:1" ] || { echo "release evidence file is outside the trusted root or has unsafe metadata" >&2; exit 1; }
 done
+[ "$(sha256sum -- "$GATE_PLAN" | cut -d ' ' -f 1)" = "$GATE_PLAN_SHA256" ] || { echo "gate plan does not match the authorization" >&2; exit 1; }
 [ ! -e "$ARTIFACT_ROOT/release-manifest.json" ] || { echo "release manifest already exists" >&2; exit 1; }
 PREPARED_MANIFEST="$ARTIFACT_ROOT/.release-manifest.$AUTHORIZATION_SHA256.prepared.json"
 [ ! -e "$PREPARED_MANIFEST" ] || { echo "prepared release manifest already exists" >&2; PREPARED_MANIFEST=""; exit 1; }

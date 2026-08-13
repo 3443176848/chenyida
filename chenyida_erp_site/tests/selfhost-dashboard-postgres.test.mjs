@@ -19,6 +19,10 @@ process.env.ERP_RELEASE_EXPECTED_MANIFEST_SHA256 ||= "d".repeat(64);
 process.env.ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256 ||= "e".repeat(64);
 process.env.ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS ||= "3600";
 const pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "dashboard-integration-test" });
+const runtimeMigrations = (await pool.query("select version,checksum from schema_migrations order by version")).rows;
+const runtimeMigrationHead = runtimeMigrations.at(-1)?.version;
+if (typeof runtimeMigrationHead !== "string") throw new Error("dashboard integration requires an applied migration head");
+const runtimeMigrationManifestSha = createHash("sha256").update(`${runtimeMigrations.map((item) => `${item.checksum}  ${item.version}`).join("\n")}\n`).digest("hex");
 const actor = (role) => ({ username: `${role}01`, role, permissions: permissionsForRole(role) });
 const directory = await mkdtemp(path.join(os.tmpdir(), "cyd-dashboard-pg-"));
 await chmod(directory, 0o2750);
@@ -33,7 +37,7 @@ await mkdir(releaseRoot, { mode: 0o750 });
 await chmod(releaseRoot, 0o750);
 await writeFile(path.join(releaseRoot, ".chenyida-erp-release-identity-root-v1"), "chenyida-erp-release-identity-root/v1\n", { mode: 0o440 });
 await chmod(path.join(releaseRoot, ".chenyida-erp-release-identity-root-v1"), 0o440);
-await writeFile(releaseFile, JSON.stringify({ schema_version: 2, contract: "chenyida-erp-runtime-release-identity/v2", deployment_class: "TEST", deployment_id: "dashboard-test", release_id: "dashboard-release", release_manifest_sha256: process.env.ERP_RELEASE_EXPECTED_MANIFEST_SHA256, supervisor_bundle_sha256: process.env.ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256, authorization_sha256: "f".repeat(64), application_version: "0.1.0-alpha.46", git_commit: "b".repeat(40), web_container_id: runtimeHostname.padEnd(64, "a"), web_image_digest: `sha256:${"b".repeat(64)}`, worker_container_id: "c".repeat(64), worker_image_digest: `sha256:${"c".repeat(64)}`, generated_at: new Date().toISOString() }), { mode: 0o440 });
+await writeFile(releaseFile, JSON.stringify({ schema_version: 3, contract: "chenyida-erp-runtime-release-identity/v3", deployment_class: "TEST", deployment_id: "dashboard-test", release_id: "dashboard-release", release_manifest_sha256: process.env.ERP_RELEASE_EXPECTED_MANIFEST_SHA256, postdeploy_receipt_sha256: "9".repeat(64), supervisor_bundle_sha256: process.env.ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256, authorization_sha256: "f".repeat(64), runtime_guard: { contract: "chenyida-erp-release-runtime-guard/v1", mode: "POST_DEPLOY_CURRENT_RUNTIME_STRICT" }, runtime_policy_sha256: "8c9f9fd06eb4533faeeed4c316eb93568c38b3a42ac8c48dd081fbb4e7a2f444", application_version: "0.1.0-alpha.46", git_commit: "b".repeat(40), git_tree: "c".repeat(40), migration_head: runtimeMigrationHead, migration_manifest_sha256: runtimeMigrationManifestSha, caddy_container_id: "1".repeat(64), caddy_image_digest: `sha256:${"1".repeat(64)}`, postgres_container_id: "2".repeat(64), postgres_image_digest: `sha256:${"2".repeat(64)}`, web_container_id: runtimeHostname.padEnd(64, "a"), web_image_digest: `sha256:${"b".repeat(64)}`, worker_container_id: "c".repeat(64), worker_image_digest: `sha256:${"c".repeat(64)}`, generated_at: new Date().toISOString() }), { mode: 0o440 });
 await chmod(releaseFile, 0o440);
 const service = new DashboardService(new PostgresDashboardRepository(pool), statusFile, releaseFile);
 
@@ -86,7 +90,7 @@ test("read-only repeatable-read snapshot aggregates exact material-review work",
   });
   assert.ok(result.risks.some((item) => item.code === "MATERIAL_REVIEW_PENDING"));
   assert.ok(!result.risks.some((item) => item.code === "NO_VISIBLE_RISK"));
-  assert.equal(result.summary.groups.operations.migrations[0].version, "0044_identity_session_absolute_lifetime.sql");
+  assert.equal(result.summary.groups.operations.migrations[0].version, runtimeMigrationHead);
   assert.equal(result.recent_activity.length, 0);
 });
 
@@ -95,8 +99,6 @@ test("trusted verification file is independent from PostgreSQL business facts", 
   const hash = "b".repeat(64);
   const receiverHash = "d".repeat(64);
   const databaseIdentity = (await pool.query("select current_database() name,system_identifier::text,d.oid::text oid,coalesce(shobj_description(d.oid,'pg_database'),'') marker,((current_setting('server_version_num')::integer/10000)::text) server_major,pg_encoding_to_char(d.encoding) encoding,d.datcollate collate,d.datctype ctype,case d.datlocprovider when 'c' then 'libc' when 'i' then 'icu' when 'b' then 'builtin' else 'unknown' end locale_provider,coalesce(d.datcollversion,'NONE') collation_version from pg_control_system() cross join pg_database d where d.datname=current_database()")).rows[0];
-  const migrations = (await pool.query("select version,checksum from schema_migrations order by version")).rows;
-  const migrationManifestSha = createHash("sha256").update(`${migrations.map((item) => `${item.checksum}  ${item.version}`).join("\n")}\n`).digest("hex");
   const restoreReconciliation = { contract: "chenyida-erp-restore-reconciliation/v1", source_sha256: hash, target_database_report_sha256: "e".repeat(64), target_file_trees_sha256: "f".repeat(64), result: "MATCHED" };
   const createdAt = new Date(Date.now() - 60_000).toISOString();
   const verifiedAt = new Date().toISOString();
@@ -111,7 +113,7 @@ test("trusted verification file is independent from PostgreSQL business facts", 
     location_id: "dashboard-restore-location",
     deployment: { class: "TEST", id: "dashboard-test", database: databaseIdentity.name, database_system_identifier: databaseIdentity.system_identifier, database_oid: databaseIdentity.oid, database_marker: "TEST.dashboard-test", database_bytes: 16777216, database_server_major: databaseIdentity.server_major, database_encoding: databaseIdentity.encoding, database_collate: databaseIdentity.collate, database_ctype: databaseIdentity.ctype, database_locale_provider: databaseIdentity.locale_provider, database_collation_version: databaseIdentity.collation_version },
     application: { version: "0.1.0-alpha.46", git_commit: "b".repeat(40), web_image_digest: `sha256:${hash}`, worker_image_digest: `sha256:${"c".repeat(64)}` },
-    migration: { head: "0044_identity_session_absolute_lifetime.sql", manifest_file: "migrations.txt", manifest_sha256: migrationManifestSha },
+    migration: { head: runtimeMigrationHead, manifest_file: "migrations.txt", manifest_sha256: runtimeMigrationManifestSha },
     policy: { id: "daily-rpo-v1", rpo_hours: 24 },
     consistency: { method: "QUIESCED_APPLICATION_AND_SNAPSHOT_WITH_CONTENT_RECONCILIATION", database_snapshot: "PG_DUMP_CONSISTENT_SNAPSHOT", database_guard: "DEFAULT_TRANSACTION_READ_ONLY_DEFENSE_IN_DEPTH", writer_boundary: "EXACT_COMPOSE_WEB_WORKER_STOPPED", content_reconciliation: "BEFORE_AFTER_FULL_RELATION_CONTENT_DIGESTS", dump_scope: "COMPLETE_APPLICATION_DATABASE_LOGICAL_DUMP_NO_OWNER_OR_ACL", web_container: "web-test", web_container_id: hash, worker_container: "worker-test", worker_container_id: "c".repeat(64), recovery_point_at: new Date(Date.parse(createdAt) - 120_000).toISOString(), verified_after: new Date(Date.parse(createdAt) - 60_000).toISOString() },
     reconciliation: { contract: "chenyida-erp-backup-reconciliation/v1", file: "reconciliation.json", sha256: hash },
@@ -131,5 +133,5 @@ test("trusted verification file is independent from PostgreSQL business facts", 
   assert.equal(result.policy_status, "MATCHED");
   assert.equal(result.assurance_status, "MATCHED");
   assert.equal(result.recovery_ready, true);
-  assert.equal(result.current_migration.version, "0044_identity_session_absolute_lifetime.sql");
+  assert.equal(result.current_migration.version, runtimeMigrationHead);
 });

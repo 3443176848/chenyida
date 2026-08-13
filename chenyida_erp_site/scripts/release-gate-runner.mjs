@@ -7,6 +7,14 @@ import { fileURLToPath } from "node:url";
 
 import { parseStrictJson } from "./release-identity-contract.mjs";
 import {
+  PRE_DEPLOY_RUNTIME_GUARD_MODE,
+  assertPreDeployRuntimeStable,
+  runtimeGuardBinding,
+  validatePreDeployRuntimeGuard,
+  validatePreDeployRuntimeSnapshot,
+  validateRuntimeGuardBinding,
+} from "./release-lifecycle-contract.mjs";
+import {
   RELEASE_GATE_REPORT_CONTRACT,
   RELEASE_GATE_ATTEMPT_CONTRACT,
   RELEASE_MAX_SBOM_BYTES,
@@ -43,8 +51,7 @@ const EMPTY_SHA256 = sha256("");
 const DEFAULT_SUPERVISOR_SITE_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const RELEASE_GATE_LOCK_FILE = "/var/lock/chenyida-erp-release-gate-v1.lock";
 const SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
-const RELEASE_TEMPORARY_LABELS = ["chenyida.erp.release-node-bootstrap", "chenyida.erp.release-manifest-node-bootstrap", "chenyida.erp.release-node-test", "chenyida.erp.release-browser-test", "chenyida.erp.release-postgres-regression", "chenyida.erp.release-migration-test", "chenyida.erp.backup-recovery-test", "chenyida.erp.container-runtime-policy-test", "chenyida.erp.release-identity-publisher", "chenyida.erp.release-image-evidence"];
-const REQUIRED_RUNTIME_SERVICES = new Map([["caddy", new Set(["none", "healthy"])], ["postgres", new Set(["healthy"])], ["web", new Set(["healthy"])], ["worker", new Set(["healthy"])]]);
+const RELEASE_TEMPORARY_LABELS = ["chenyida.erp.release-node-bootstrap", "chenyida.erp.release-manifest-node-bootstrap", "chenyida.erp.release-node-test", "chenyida.erp.release-browser-test", "chenyida.erp.release-postgres-regression", "chenyida.erp.release-migration-test", "chenyida.erp.backup-recovery-test", "chenyida.erp.container-runtime-policy-test", "chenyida.erp.release-identity-publisher", "chenyida.erp.postdeploy-verifier", "chenyida.erp.release-image-evidence"];
 const TREE_DIGEST_COMMAND = "{ /usr/bin/find -P . -xdev -printf '%y|%m|%P|%l\\n' | LC_ALL=C /usr/bin/sort; /usr/bin/find -P . -xdev -type f -print0 | LC_ALL=C /usr/bin/sort -z | /usr/bin/xargs -0 /usr/bin/sha256sum; } | /usr/bin/sha256sum";
 const OFFICIAL_EXECUTOR_COMMANDS = new Map([
   ["NODE_CANDIDATE_TEST:CONTRACTS", ["scripts/run-release-node-sandbox.sh", "contracts"]],
@@ -153,35 +160,42 @@ function verifySource(repositoryRoot, candidate) {
 
 function dockerStates(ids, environment = process.env) {
   if (ids.size === 0) return new Map();
-  const result = spawnSync("/usr/bin/docker", ["inspect", "--format", "{{.Id}}|{{.RestartCount}}|{{.State.OOMKilled}}|{{.State.Status}}|{{with (index .State \"Health\")}}{{.Status}}{{else}}none{{end}}", ...ids], { encoding: "utf8", timeout: 30_000, env: environment });
+  const result = spawnSync("/usr/bin/docker", ["inspect", "--format", "{{.Id}}|{{.Image}}|{{.Config.Image}}|{{.RestartCount}}|{{.State.OOMKilled}}|{{.State.Running}}|{{.State.Restarting}}|{{.State.Paused}}|{{.State.Dead}}|{{.State.Status}}|{{with (index .State \"Health\")}}{{.Status}}{{else}}none{{end}}|{{if .Config.Healthcheck}}true{{else}}false{{end}}", ...ids], { encoding: "utf8", timeout: 30_000, env: environment });
   if (result.status !== 0) fail("GATE_DOCKER_STATE_FAILED");
   const states = new Map();
   for (const line of result.stdout.trim().split("\n").filter(Boolean)) {
-    const [id, restart, oom, status, health] = line.split("|");
-    if (!/^[0-9a-f]{64}$/.test(id || "") || !/^\d+$/.test(restart || "") || !["true", "false"].includes(oom) || !status || !health) fail("GATE_DOCKER_STATE_INVALID");
-    states.set(id, { restart: Number(restart), oom: oom === "true", status, health });
+    const [id, image_id, image_reference, restart, oom, running, restarting, paused, dead, status, health, healthcheck] = line.split("|");
+    if (!/^[0-9a-f]{64}$/.test(id || "") || !/^sha256:[0-9a-f]{64}$/.test(image_id || "") || !image_reference || image_reference.includes("|") || !/^\d+$/.test(restart || "") || ![oom, running, restarting, paused, dead, healthcheck].every((item) => ["true", "false"].includes(item)) || !status || !health) fail("GATE_DOCKER_STATE_INVALID");
+    states.set(id, { image_id, image_reference, restart: Number(restart), oom: oom === "true", running: running === "true", restarting: restarting === "true", paused: paused === "true", dead: dead === "true", status, health, healthcheck_present: healthcheck === "true" });
   }
   if (states.size !== ids.size) fail("GATE_DOCKER_STATE_INCOMPLETE");
   return states;
 }
 
-function runtimeServiceInventory(environment) {
-  const listed = spawnSync("/usr/bin/docker", ["ps", "-aq", "--no-trunc", "--filter", "label=com.docker.compose.project=chenyida-erp-parallel"], { encoding: "utf8", timeout: 30_000, env: environment });
+export function evaluateRuntimeServiceInventory(states, runtimeGuard) {
+  try {
+    validatePreDeployRuntimeGuard(runtimeGuard);
+    validatePreDeployRuntimeSnapshot(states, runtimeGuard, "GATE_REQUIRED_RUNTIME");
+    return { states, failure: null };
+  } catch (error) {
+    return { states, failure: error?.code || "GATE_REQUIRED_RUNTIME_INVALID" };
+  }
+}
+
+export function runtimeServiceInventory(environment, runtimeGuard) {
+  try { validatePreDeployRuntimeGuard(runtimeGuard); } catch (error) { fail(error?.code || "GATE_RUNTIME_GUARD_INVALID"); }
+  const listed = spawnSync("/usr/bin/docker", ["ps", "-aq", "--no-trunc", "--filter", `label=com.docker.compose.project=${runtimeGuard.compose_project}`], { encoding: "utf8", timeout: 30_000, env: environment });
   if (listed.status !== 0) fail("GATE_RUNTIME_INVENTORY_FAILED");
   const ids = listed.stdout.split(/\s+/).filter(Boolean);
   if (ids.length === 0) return { states: [], failure: "GATE_REQUIRED_RUNTIME_MISSING" };
-  const inspected = spawnSync("/usr/bin/docker", ["inspect", "--format", "{{.Id}}|{{index .Config.Labels \"com.docker.compose.service\"}}|{{.RestartCount}}|{{.State.OOMKilled}}|{{.State.Status}}|{{with (index .State \"Health\")}}{{.Status}}{{else}}none{{end}}", ...ids], { encoding: "utf8", timeout: 30_000, env: environment });
+  const inspected = spawnSync("/usr/bin/docker", ["inspect", "--format", "{{.Id}}|{{index .Config.Labels \"com.docker.compose.service\"}}|{{.Image}}|{{.Config.Image}}|{{.RestartCount}}|{{.State.OOMKilled}}|{{.State.Running}}|{{.State.Restarting}}|{{.State.Paused}}|{{.State.Dead}}|{{.State.Status}}|{{with (index .State \"Health\")}}{{.Status}}{{else}}none{{end}}|{{if .Config.Healthcheck}}true{{else}}false{{end}}", ...ids], { encoding: "utf8", timeout: 30_000, env: environment });
   if (inspected.status !== 0) fail("GATE_RUNTIME_STATE_FAILED");
   const states = inspected.stdout.trim().split("\n").filter(Boolean).map((line) => {
-    const [container_id, service, restart, oom, status, health] = line.split("|");
-    if (!/^[0-9a-f]{64}$/.test(container_id || "") || !/^[a-z][a-z0-9_-]*$/.test(service || "") || !/^\d+$/.test(restart || "") || !["true", "false"].includes(oom) || !status || !health) fail("GATE_RUNTIME_STATE_INVALID");
-    return { service, container_id, restart_count: Number(restart), oom_killed: oom === "true", status, health };
+    const [container_id, service, image_id, image_reference, restart, oom, running, restarting, paused, dead, status, health, healthcheck] = line.split("|");
+    if (!/^[0-9a-f]{64}$/.test(container_id || "") || !/^[a-z][a-z0-9_-]*$/.test(service || "") || !/^sha256:[0-9a-f]{64}$/.test(image_id || "") || !image_reference || image_reference.includes("|") || !/^\d+$/.test(restart || "") || ![oom, running, restarting, paused, dead, healthcheck].every((item) => ["true", "false"].includes(item)) || !status || !health) fail("GATE_RUNTIME_STATE_INVALID");
+    return { service, container_id, image_id, image_reference, restart_count: Number(restart), oom_killed: oom === "true", running: running === "true", restarting: restarting === "true", paused: paused === "true", dead: dead === "true", status, health, healthcheck_present: healthcheck === "true" };
   }).sort((left, right) => left.service.localeCompare(right.service));
-  const services = states.map((state) => state.service);
-  const expected = [...REQUIRED_RUNTIME_SERVICES.keys()];
-  if (states.length !== expected.length || services.some((service, index) => service !== expected[index])) return { states, failure: "GATE_REQUIRED_RUNTIME_SET_INVALID" };
-  const unhealthy = states.some((state) => state.restart_count !== 0 || state.oom_killed || state.status !== "running" || !REQUIRED_RUNTIME_SERVICES.get(state.service).has(state.health));
-  return { states, failure: unhealthy ? "GATE_REQUIRED_RUNTIME_UNHEALTHY" : null };
+  return evaluateRuntimeServiceInventory(states, runtimeGuard);
 }
 
 function runtimeTreeDigest(directory) {
@@ -324,7 +338,7 @@ function killProcessGroup(child, signal) {
   try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== "ESRCH") throw error; }
 }
 
-export async function executeStep({ step, cwd, environment, baselineContainers, policy, aggregate, monitorState, clock, inventory = dockerContainerIds, readResources = systemResources, monitorIntervalMs = 1000, killGraceMs = 5000 }) {
+export async function executeStep({ step, cwd, environment, baselineContainers, policy, aggregate, monitorState, clock, inventory = dockerContainerIds, readResources = systemResources, runtimeStabilityCheck = null, monitorIntervalMs = 1000, killGraceMs = 5000 }) {
   const startedAt = isoNow(clock); const start = Date.now();
   const stdoutHash = createHash("sha256"); const stderrHash = createHash("sha256");
   let forbidden = null; let resourceFailure = null; let timedOut = false; let tail = "";
@@ -359,6 +373,7 @@ export async function executeStep({ step, cwd, environment, baselineContainers, 
         const snapshot = await readResources(temporaryIds(baselineContainers, current).length);
         observeAggregate(aggregate, snapshot);
         resourceFailure = resourceViolation(snapshot, policy, monitorState);
+        if (!resourceFailure && runtimeStabilityCheck) resourceFailure = runtimeStabilityCheck();
         if (resourceFailure) requestStop();
       } catch (error) {
         resourceFailure = error.code || "GATE_RESOURCE_MONITOR_FAILED";
@@ -378,6 +393,9 @@ export async function executeStep({ step, cwd, environment, baselineContainers, 
     await monitor;
   });
   const finishedAt = isoNow(clock);
+  if (!resourceFailure && runtimeStabilityCheck) {
+    try { resourceFailure = runtimeStabilityCheck(); } catch (error) { resourceFailure = error?.code || "GATE_RUNTIME_MONITOR_FAILED"; }
+  }
   const reason = timedOut ? "GATE_STEP_TIMEOUT" : resourceFailure || (forbidden ? `GATE_FORBIDDEN_OUTPUT:${forbidden}` : exit.spawnError ? `GATE_STEP_SPAWN_ERROR:${exit.spawnError}` : exit.signal ? `GATE_STEP_SIGNAL:${exit.signal}` : exit.code === 0 ? null : "GATE_STEP_EXIT_NONZERO");
   return {
     ordinal: step.ordinal, id: step.id, result: reason === null ? "PASS" : "FAIL", started_at: startedAt, finished_at: finishedAt,
@@ -436,8 +454,9 @@ function assertCandidateMatches(expected, actual, code) {
   if (canonicalJson(expected) !== canonicalJson(actual)) fail(code);
 }
 
-export async function runReleaseGate({ planPath, repositoryRoot, artifactRoot, runId, candidate, webImageReference, workerImageReference, sbomEvidencePath, securityEvidencePath, environment = process.env, clock = () => new Date(), requireOfficialPlan = true, lockVerifier = verifyGlobalLock, supervisorSiteRoot = DEFAULT_SUPERVISOR_SITE_ROOT, control = null }) {
+export async function runReleaseGate({ planPath, repositoryRoot, artifactRoot, runId, runtimeGuardMode, candidate, webImageReference, workerImageReference, sbomEvidencePath, securityEvidencePath, environment = process.env, clock = () => new Date(), requireOfficialPlan = true, lockVerifier = verifyGlobalLock, supervisorSiteRoot = DEFAULT_SUPERVISOR_SITE_ROOT, control = null }) {
   if (typeof runId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(runId)) fail("GATE_RUN_ID_INVALID");
+  try { validateRuntimeGuardBinding(runtimeGuardBinding(runtimeGuardMode), PRE_DEPLOY_RUNTIME_GUARD_MODE, "GATE_RUNTIME_GUARD_MODE_INVALID"); } catch (error) { fail(error?.code || "GATE_RUNTIME_GUARD_MODE_INVALID"); }
   const trustedControl = control || supervisorControl(environment);
   lockVerifier(environment);
   validateCandidate(candidate);
@@ -446,10 +465,11 @@ export async function runReleaseGate({ planPath, repositoryRoot, artifactRoot, r
   verifySource(repositoryRoot, candidate);
   const siteRoot = path.join(path.resolve(repositoryRoot), "chenyida_erp_site");
   const trustedSupervisorSiteRoot = path.resolve(supervisorSiteRoot);
-  const officialPlanPath = path.join(trustedSupervisorSiteRoot, "release", "release-gate-plan-v1.json");
+  const officialPlanPath = path.join(trustedSupervisorSiteRoot, "release", "release-gate-plan-v2.json");
   if (requireOfficialPlan && path.resolve(planPath) !== officialPlanPath) fail("GATE_PLAN_PATH_NOT_OFFICIAL");
   const { raw: sourcePlanRaw } = await readStrictJsonFile(planPath);
   const plan = requireOfficialPlan ? validateOfficialReleaseGatePlan(parseStrictJson(sourcePlanRaw)) : validateReleaseGatePlan(parseStrictJson(sourcePlanRaw));
+  if (plan.runtime_guard.mode !== runtimeGuardMode) fail("GATE_RUNTIME_GUARD_MODE_MISMATCH");
   if (requireOfficialPlan) {
     const policyRaw = await readFile(path.join(trustedSupervisorSiteRoot, "release", "vulnerability-policy-v1.json"), "utf8");
     validateOfficialVulnerabilityPolicy(parseStrictJson(policyRaw), policyRaw);
@@ -474,12 +494,23 @@ export async function runReleaseGate({ planPath, repositoryRoot, artifactRoot, r
   const migrations = await buildMigrationAllowlist(path.join(siteRoot, "drizzle-postgres"));
   if (migrationAllowlistDigest(migrations) !== candidate.migration_allowlist_sha256) fail("GATE_MIGRATION_ALLOWLIST_MISMATCH");
   const runEnvironment = safeCommandEnvironment(candidate, runId, plan.resource_policy.node_max_old_space_size_mib, { web: webImageReference, worker: workerImageReference }, repositoryRoot, trustedSupervisorSiteRoot);
-  const baselineContainers = dockerContainerIds(runEnvironment); const baselineStates = dockerStates(baselineContainers, runEnvironment); const baselineRuntime = runtimeServiceInventory(runEnvironment);
+  const baselineContainers = dockerContainerIds(runEnvironment); const baselineStates = dockerStates(baselineContainers, runEnvironment); const baselineRuntime = runtimeServiceInventory(runEnvironment, plan.runtime_guard);
   const preexistingTemporaryContainerIds = releaseTemporaryContainerIds(runEnvironment);
   const baselineRuntimeFailure = preexistingTemporaryContainerIds.length > 0 ? "GATE_PREEXISTING_TASK_CONTAINER" : baselineRuntime.failure;
   const initial = await systemResources(preexistingTemporaryContainerIds.length); const aggregate = aggregates(initial); const monitorState = { swapSamples: [], aggregate }; const initialViolation = resourceViolation(initial, plan.resource_policy, monitorState);
-  const startedAt = isoNow(clock); const results = []; let blocked = baselineRuntimeFailure || initialViolation;
+  const startedAt = isoNow(clock); const results = []; let runtimeTransitionFailure = null; let blocked = baselineRuntimeFailure || initialViolation;
+  const runtimeStabilityCheck = () => {
+    if (runtimeTransitionFailure) return runtimeTransitionFailure;
+    const current = runtimeServiceInventory(runEnvironment, plan.runtime_guard);
+    if (current.failure) runtimeTransitionFailure = current.failure;
+    else {
+      try { assertPreDeployRuntimeStable(baselineRuntime.states, current.states, plan.runtime_guard, "GATE_REQUIRED_RUNTIME_CHANGED"); }
+      catch (error) { runtimeTransitionFailure = error?.code || "GATE_REQUIRED_RUNTIME_CHANGED"; }
+    }
+    return runtimeTransitionFailure;
+  };
   for (const step of plan.steps) {
+    if (!blocked) blocked = runtimeStabilityCheck();
     if (step.applicability === "NOT_APPLICABLE") { results.push(notApplicableStep(step)); continue; }
     if (blocked) { results.push(blockedStep(step, blocked)); continue; }
     if (step.kind === "EVIDENCE") {
@@ -487,40 +518,42 @@ export async function runReleaseGate({ planPath, repositoryRoot, artifactRoot, r
       if (result.result !== "PASS") blocked = result.reason;
       continue;
     }
-    const result = await executeStep({ step: { ...step, command: officialExecutorCommand(step, trustedSupervisorSiteRoot) }, cwd: siteRoot, environment: runEnvironment, baselineContainers, policy: plan.resource_policy, aggregate, monitorState, clock });
+    const result = await executeStep({ step: { ...step, command: officialExecutorCommand(step, trustedSupervisorSiteRoot) }, cwd: siteRoot, environment: runEnvironment, baselineContainers, policy: plan.resource_policy, aggregate, monitorState, clock, runtimeStabilityCheck });
     const postContainers = dockerContainerIds(runEnvironment); const postSnapshot = await systemResources(temporaryIds(baselineContainers, postContainers).length); observeAggregate(aggregate, postSnapshot);
     const postViolation = resourceViolation(postSnapshot, plan.resource_policy, monitorState);
     if (result.result === "PASS" && postViolation) { result.result = "FAIL"; result.reason = postViolation; }
     results.push(result); if (result.result !== "PASS") blocked = result.reason;
   }
   verifySource(repositoryRoot, candidate);
-  const finalContainers = dockerContainerIds(runEnvironment); const residual = temporaryIds(baselineContainers, finalContainers); const finalRuntime = runtimeServiceInventory(runEnvironment);
+  const finalContainers = dockerContainerIds(runEnvironment); const residual = temporaryIds(baselineContainers, finalContainers); const finalRuntime = runtimeServiceInventory(runEnvironment, plan.runtime_guard);
   const finalStates = dockerStates(new Set([...baselineContainers].filter((id) => finalContainers.has(id))), runEnvironment);
-  let runtimeFailure = baselineRuntimeFailure;
+  let finalRuntimeFailure = null;
   for (const [id, before] of baselineStates) {
     const after = finalStates.get(id);
-    if (!after) { runtimeFailure = "GATE_BASELINE_CONTAINER_DISAPPEARED"; break; }
-    if ((after.oom && !before.oom) || after.restart > before.restart) { runtimeFailure = "GATE_BASELINE_CONTAINER_OOM_OR_RESTART"; break; }
-    if (after.status !== before.status || after.health !== before.health) { runtimeFailure = "GATE_BASELINE_CONTAINER_STATE_CHANGED"; break; }
+    if (!after) { finalRuntimeFailure = "GATE_BASELINE_CONTAINER_DISAPPEARED"; break; }
+    if (canonicalJson(after) !== canonicalJson(before)) { finalRuntimeFailure = "GATE_BASELINE_CONTAINER_STATE_CHANGED"; break; }
   }
-  if (finalRuntime.failure) runtimeFailure = finalRuntime.failure;
-  else if (canonicalJson(finalRuntime.states) !== canonicalJson(baselineRuntime.states)) runtimeFailure = "GATE_REQUIRED_RUNTIME_CHANGED";
+  if (finalRuntime.failure) finalRuntimeFailure = finalRuntime.failure;
+  else {
+    try { assertPreDeployRuntimeStable(baselineRuntime.states, finalRuntime.states, plan.runtime_guard, "GATE_REQUIRED_RUNTIME_CHANGED"); }
+    catch (error) { finalRuntimeFailure = error?.code || "GATE_REQUIRED_RUNTIME_CHANGED"; }
+  }
   try {
     const finalTestRuntime = await verifyTestRuntimePolicy(repositoryRoot, runEnvironment, trustedSupervisorSiteRoot);
-    if (canonicalJson(finalTestRuntime) !== canonicalJson(testRuntime)) runtimeFailure = "GATE_TEST_RUNTIME_CHANGED";
+    if (canonicalJson(finalTestRuntime) !== canonicalJson(testRuntime)) finalRuntimeFailure = "GATE_TEST_RUNTIME_CHANGED";
   } catch (error) {
-    runtimeFailure = error instanceof ReleaseManifestError ? error.code : "GATE_TEST_RUNTIME_RECHECK_FAILED";
+    finalRuntimeFailure = typeof error?.code === "string" ? error.code : "GATE_TEST_RUNTIME_RECHECK_FAILED";
   }
   const final = await systemResources(residual.length); observeAggregate(aggregate, final);
   const finalViolation = resourceViolation(final, plan.resource_policy, monitorState);
   const finalResourceFailure = residual.length > 0 ? "GATE_RESIDUAL_TASK_CONTAINER" : finalViolation;
-  let result = results.some((step) => step.result === "FAIL") || runtimeFailure || finalResourceFailure ? "FAIL" : results.every((step) => ["PASS", "NOT_APPLICABLE"].includes(step.result)) ? "PASS" : "BLOCKED";
+  let result = results.some((step) => step.result === "FAIL") || baselineRuntimeFailure || runtimeTransitionFailure || finalRuntimeFailure || finalResourceFailure ? "FAIL" : results.every((step) => ["PASS", "NOT_APPLICABLE"].includes(step.result)) ? "PASS" : "BLOCKED";
   if (sbomLoaded.value.scope !== "WEB_AND_WORKER_IMAGES" || securityLoaded.value.result !== "PASS") result = result === "FAIL" ? "FAIL" : "BLOCKED";
   const report = {
-    schema_version: 1, contract: RELEASE_GATE_REPORT_CONTRACT, plan_id: plan.plan_id, plan_sha256: sha256(planRaw), run_id: runId,
-    generated_at: startedAt, completed_at: isoNow(clock), control: trustedControl, candidate, steps: results,
+    schema_version: 2, contract: RELEASE_GATE_REPORT_CONTRACT, plan_id: plan.plan_id, plan_sha256: sha256(planRaw), run_id: runId,
+    generated_at: startedAt, completed_at: isoNow(clock), runtime_guard: plan.runtime_guard, control: trustedControl, candidate, steps: results,
     evidence: { sbom_file: path.basename(sbomEvidencePath), sbom_sha256: sha256(sbomLoaded.raw), sbom_scope: sbomLoaded.value.scope, security_file: path.basename(securityEvidencePath), security_sha256: sha256(securityLoaded.raw), security_result: securityLoaded.value.result },
-    resources: { initial, final, test_runtime: testRuntime, baseline_runtime_services: baselineRuntime.states, final_runtime_services: finalRuntime.states, baseline_container_count: baselineContainers.size, preexisting_temporary_container_ids: preexistingTemporaryContainerIds, ...aggregate, residual_container_ids: residual, baseline_runtime_failure: runtimeFailure, final_resource_failure: finalResourceFailure }, result,
+    resources: { initial, final, test_runtime: testRuntime, baseline_runtime_services: baselineRuntime.states, final_runtime_services: finalRuntime.states, baseline_container_count: baselineContainers.size, preexisting_temporary_container_ids: preexistingTemporaryContainerIds, ...aggregate, residual_container_ids: residual, baseline_runtime_failure: baselineRuntimeFailure, runtime_transition_failure: runtimeTransitionFailure, final_runtime_failure: finalRuntimeFailure, final_resource_failure: finalResourceFailure }, result,
   };
   validateReleaseGateReport(report);
   const filename = `${runId}.release-gate-report.json`;
@@ -563,17 +596,20 @@ async function main() {
     return;
   }
   if (command !== "run") fail("GATE_CLI_COMMAND_INVALID");
-  exactKeys(options, ["--plan", "--repository-root", "--artifact-root", "--run-id", "--git-commit", "--git-tree", "--package-version", "--web-image-reference", "--worker-image-reference", "--web-image-digest", "--worker-image-digest", "--migration-allowlist-sha256", "--sbom-evidence", "--security-evidence", "--confirm"], "GATE_CLI_ARGUMENT_INVALID");
+  exactKeys(options, ["--plan", "--repository-root", "--artifact-root", "--run-id", "--runtime-guard-mode", "--git-commit", "--git-tree", "--package-version", "--web-image-reference", "--worker-image-reference", "--web-image-digest", "--worker-image-digest", "--migration-allowlist-sha256", "--sbom-evidence", "--security-evidence", "--confirm"], "GATE_CLI_ARGUMENT_INVALID");
   if (options["--confirm"] !== "RUN_EXACT_RELEASE_GATE") fail("GATE_CLI_CONFIRMATION_INVALID");
   const candidate = { git_commit: options["--git-commit"], git_tree: options["--git-tree"], package_version: options["--package-version"], web_image_digest: options["--web-image-digest"], worker_image_digest: options["--worker-image-digest"], migration_allowlist_sha256: options["--migration-allowlist-sha256"] };
   const startedAt = new Date().toISOString();
   const control = supervisorControl(process.env);
   let outcome;
   try {
-    outcome = await runReleaseGate({ planPath: options["--plan"], repositoryRoot: options["--repository-root"], artifactRoot: options["--artifact-root"], runId: options["--run-id"], candidate, webImageReference: options["--web-image-reference"], workerImageReference: options["--worker-image-reference"], sbomEvidencePath: options["--sbom-evidence"], securityEvidencePath: options["--security-evidence"], control });
+    outcome = await runReleaseGate({ planPath: options["--plan"], repositoryRoot: options["--repository-root"], artifactRoot: options["--artifact-root"], runId: options["--run-id"], runtimeGuardMode: options["--runtime-guard-mode"], candidate, webImageReference: options["--web-image-reference"], workerImageReference: options["--worker-image-reference"], sbomEvidencePath: options["--sbom-evidence"], securityEvidencePath: options["--security-evidence"], control });
   } catch (error) {
-    const failureCode = error instanceof ReleaseManifestError ? error.code : "RELEASE_GATE_INTERNAL_ERROR";
-    const attempt = validateReleaseGateAttempt({ schema_version: 1, contract: RELEASE_GATE_ATTEMPT_CONTRACT, run_id: options["--run-id"], generated_at: startedAt, completed_at: new Date().toISOString(), control, candidate, result: "FAIL", failure_code: failureCode });
+    const failureCode = typeof error?.code === "string" ? error.code : "RELEASE_GATE_INTERNAL_ERROR";
+    let runtimeGuard;
+    try { runtimeGuard = runtimeGuardBinding(options["--runtime-guard-mode"]); }
+    catch { runtimeGuard = runtimeGuardBinding(PRE_DEPLOY_RUNTIME_GUARD_MODE); }
+    const attempt = validateReleaseGateAttempt({ schema_version: 2, contract: RELEASE_GATE_ATTEMPT_CONTRACT, run_id: options["--run-id"], generated_at: startedAt, completed_at: new Date().toISOString(), runtime_guard: runtimeGuard, control, candidate, result: "FAIL", failure_code: failureCode });
     await writeImmutableJsonArtifact({ root: options["--artifact-root"], filename: `${options["--run-id"]}.release-gate-attempt.json`, value: attempt });
     throw error;
   }
@@ -583,5 +619,5 @@ async function main() {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  main().catch((error) => { process.stderr.write(`${error instanceof ReleaseManifestError ? error.code : "RELEASE_GATE_INTERNAL_ERROR"}\n`); process.exitCode = 1; });
+  main().catch((error) => { process.stderr.write(`${typeof error?.code === "string" ? error.code : "RELEASE_GATE_INTERNAL_ERROR"}\n`); process.exitCode = 1; });
 }

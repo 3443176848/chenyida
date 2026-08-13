@@ -10,7 +10,7 @@ export const MONITORING_STATE_CONTRACT = "chenyida-erp-operations-monitoring-sta
 export const MONITORING_REPORT_CONTRACT = "chenyida-erp-operations-monitoring-report/v1";
 export const MONITORING_EVENT_CONTRACT = "chenyida-erp-operations-alert-event/v1";
 export const OFFICIAL_MONITORING_POLICY_PATH = "operations/monitoring-policy-v1.json";
-export const OFFICIAL_RESOURCE_PLAN_PATH = "release/release-gate-plan-v1.json";
+export const OFFICIAL_RESOURCE_PLAN_PATH = "release/release-gate-plan-v2.json";
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 const VERSION = /^0\.1\.0-alpha\.\d+$/;

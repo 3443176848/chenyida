@@ -1,0 +1,263 @@
+{
+  "schema_version": 2,
+  "contract": "chenyida-erp-release-gate-plan/v2",
+  "plan_id": "selfhost-release-gate-v2",
+  "plan_version": 2,
+  "working_directory": "chenyida_erp_site",
+  "runtime_guard": {
+    "contract": "chenyida-erp-release-runtime-guard/v1",
+    "mode": "PRE_DEPLOY_EXISTING_RUNTIME_STABILITY",
+    "compose_project": "chenyida-erp-parallel",
+    "services": [
+      {"service": "caddy", "allowed_health": ["none"], "healthcheck_policy": "VERSIONED_POLICY_ABSENT"},
+      {"service": "postgres", "allowed_health": ["healthy"], "healthcheck_policy": "PRESENT_REQUIRED"},
+      {"service": "web", "allowed_health": ["healthy"], "healthcheck_policy": "PRESENT_REQUIRED"},
+      {"service": "worker", "allowed_health": ["none", "healthy"], "healthcheck_policy": "LEGACY_ABSENT_OR_PRESENT_HEALTHY"}
+    ]
+  },
+  "candidate_runtime_guard": {
+    "contract": "chenyida-erp-release-runtime-guard/v1",
+    "mode": "ISOLATED_CANDIDATE_STRICT",
+    "runtime_policy_sha256": "8c9f9fd06eb4533faeeed4c316eb93568c38b3a42ac8c48dd081fbb4e7a2f444"
+  },
+  "resource_policy": {
+    "compose_parallel_limit": 1,
+    "node_max_old_space_size_mib": 768,
+    "min_available_memory_mib": 768,
+    "max_swap_used_percent": 80,
+    "max_swap_growth_mib_60s": 256,
+    "min_root_free_gib": 10,
+    "max_load_1m": 4,
+    "max_temporary_containers": 1
+  },
+  "steps": [
+    {
+      "ordinal": 1,
+      "id": "release-contracts",
+      "kind": "COMMAND",
+      "resource_class": "LIGHT",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 600,
+      "executor_id": "NODE_CANDIDATE_TEST",
+      "action": "CONTRACTS",
+      "forbid_output_patterns": ["# skipped [1-9]"]
+    },
+    {
+      "ordinal": 2,
+      "id": "supervisor-python-contracts",
+      "kind": "COMMAND",
+      "resource_class": "LIGHT",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 600,
+      "executor_id": "PYTHON_CANDIDATE_TEST",
+      "action": "SUPERVISOR_CONTRACTS",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 3,
+      "id": "credential-scan",
+      "kind": "COMMAND",
+      "resource_class": "LIGHT",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 600,
+      "executor_id": "NODE_CANDIDATE_TEST",
+      "action": "CREDENTIALS",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 4,
+      "id": "build-and-node-source-tests",
+      "kind": "COMMAND",
+      "resource_class": "HEAVY",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 14400,
+      "executor_id": "NODE_CANDIDATE_TEST",
+      "action": "NODE_SOURCE",
+      "forbid_output_patterns": ["# skipped [1-9]", "# todo [1-9]"]
+    },
+    {
+      "ordinal": 5,
+      "id": "postgres-regression-tests",
+      "kind": "COMMAND",
+      "resource_class": "HEAVY",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 14400,
+      "executor_id": "POSTGRES_CANDIDATE_TEST",
+      "action": "POSTGRES_REGRESSION",
+      "forbid_output_patterns": ["# skipped [1-9]", "# todo [1-9]"]
+    },
+    {
+      "ordinal": 6,
+      "id": "browser-end-to-end-tests",
+      "kind": "COMMAND",
+      "resource_class": "HEAVY",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 14400,
+      "executor_id": "NODE_CANDIDATE_TEST",
+      "action": "BROWSER_E2E",
+      "forbid_output_patterns": ["# skipped [1-9]", "# todo [1-9]"]
+    },
+    {
+      "ordinal": 7,
+      "id": "special-posix-tests",
+      "kind": "COMMAND",
+      "resource_class": "HEAVY",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 7200,
+      "executor_id": "NODE_CANDIDATE_TEST",
+      "action": "SPECIAL_POSIX",
+      "forbid_output_patterns": ["# skipped [1-9]", "# todo [1-9]"]
+    },
+    {
+      "ordinal": 8,
+      "id": "all-typescript-configs",
+      "kind": "COMMAND",
+      "resource_class": "HEAVY",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 7200,
+      "executor_id": "NODE_CANDIDATE_TEST",
+      "action": "TYPECHECK",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 9,
+      "id": "eslint",
+      "kind": "COMMAND",
+      "resource_class": "HEAVY",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 3600,
+      "executor_id": "NODE_CANDIDATE_TEST",
+      "action": "LINT",
+      "forbid_output_patterns": ["[1-9][0-9]* error"]
+    },
+    {
+      "ordinal": 10,
+      "id": "release-migration-postgres",
+      "kind": "COMMAND",
+      "resource_class": "HEAVY",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 7200,
+      "executor_id": "MIGRATION_POSTGRES_TEST",
+      "action": "RELEASE_MIGRATION",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 11,
+      "id": "backup-recovery-postgres",
+      "kind": "COMMAND",
+      "resource_class": "HEAVY",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 7200,
+      "executor_id": "BACKUP_RECOVERY_POSTGRES_TEST",
+      "action": "BACKUP_RECOVERY",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 12,
+      "id": "python-self-test",
+      "kind": "COMMAND",
+      "resource_class": "LIGHT",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 600,
+      "executor_id": "PYTHON_CANDIDATE_TEST",
+      "action": "SELF_TEST",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 13,
+      "id": "python-smoke",
+      "kind": "COMMAND",
+      "resource_class": "LIGHT",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 900,
+      "executor_id": "PYTHON_CANDIDATE_TEST",
+      "action": "SMOKE",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 14,
+      "id": "python-go-live-no-backup",
+      "kind": "COMMAND",
+      "resource_class": "LIGHT",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 900,
+      "executor_id": "PYTHON_CANDIDATE_TEST",
+      "action": "GO_LIVE",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 15,
+      "id": "compose-config",
+      "kind": "COMMAND",
+      "resource_class": "LIGHT",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 300,
+      "executor_id": "COMPOSE_CONFIG_TEST",
+      "action": "VALIDATE",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 16,
+      "id": "container-runtime-policy",
+      "kind": "COMMAND",
+      "resource_class": "HEAVY",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 600,
+      "executor_id": "CONTAINER_RUNTIME_TEST",
+      "action": "RUNTIME_POLICY",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 17,
+      "id": "git-diff-check",
+      "kind": "COMMAND",
+      "resource_class": "LIGHT",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 300,
+      "executor_id": "SOURCE_CHECK",
+      "action": "DIFF_CHECK",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 18,
+      "id": "image-sbom-evidence",
+      "kind": "EVIDENCE",
+      "resource_class": "LIGHT",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 60,
+      "executor_id": "EVIDENCE_CHECK",
+      "action": "IMAGE_SBOM",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 19,
+      "id": "vulnerability-assessment-evidence",
+      "kind": "EVIDENCE",
+      "resource_class": "LIGHT",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 60,
+      "executor_id": "EVIDENCE_CHECK",
+      "action": "VULNERABILITY_ASSESSMENT",
+      "forbid_output_patterns": []
+    }
+  ]
+}

@@ -217,6 +217,7 @@ test("concurrent anonymous readiness shares one double-volume probe and cache ne
   });
   const results = await Promise.all(Array.from({ length: 20 }, () => service.check()));
   assert.ok(results.every((result) => result.version === applicationVersion));
+  assert.ok(results.every((result) => result.deploymentClass === identity.deploymentClass && result.deploymentId === identity.deploymentId));
   assert.equal(probes, 2);
   assert.equal(databaseChecks, 1);
   monotonic += 700;

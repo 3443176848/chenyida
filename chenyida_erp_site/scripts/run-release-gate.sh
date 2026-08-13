@@ -10,11 +10,11 @@ GIT_NO_REPLACE_OBJECTS=1
 export LC_ALL PATH HOME GIT_CONFIG_NOSYSTEM GIT_CONFIG_GLOBAL GIT_NO_REPLACE_OBJECTS
 
 usage() {
-  echo "usage: $0 --repository-root DIR --git-commit COMMIT --git-tree TREE --artifact-root DIR --run-id ID --web-image REF --worker-image REF --sbom-evidence FILE --security-evidence FILE --confirm RUN_EXACT_RELEASE_GATE" >&2
+  echo "usage: $0 --repository-root DIR --git-commit COMMIT --git-tree TREE --artifact-root DIR --run-id ID --runtime-guard-contract chenyida-erp-release-runtime-guard/v1 --runtime-guard-mode PRE_DEPLOY_EXISTING_RUNTIME_STABILITY --gate-plan-sha256 SHA256 --web-image REF --worker-image REF --sbom-evidence FILE --security-evidence FILE --confirm RUN_EXACT_RELEASE_GATE" >&2
   exit 2
 }
 
-REPOSITORY_ROOT=""; GIT_COMMIT=""; GIT_TREE=""; ARTIFACT_ROOT=""; RUN_ID=""; WEB_IMAGE=""; WORKER_IMAGE=""; SBOM_EVIDENCE=""; SECURITY_EVIDENCE=""; CONFIRM=""
+REPOSITORY_ROOT=""; GIT_COMMIT=""; GIT_TREE=""; ARTIFACT_ROOT=""; RUN_ID=""; RUNTIME_GUARD_CONTRACT=""; RUNTIME_GUARD_MODE=""; GATE_PLAN_SHA256=""; WEB_IMAGE=""; WORKER_IMAGE=""; SBOM_EVIDENCE=""; SECURITY_EVIDENCE=""; CONFIRM=""
 NODE_RUNTIME_ROOT=""; NODE_BOOTSTRAP_ID=""; NODE_BOOTSTRAP_NAME=""; NODE_RUNTIME=""
 PREPARED_PLAN=""; PREPARED_REPORT=""; GATE_STAGE_CREATION_STARTED=NO
 
@@ -60,6 +60,9 @@ while [ "$#" -gt 0 ]; do
     --git-tree) GIT_TREE=${2:-}; shift 2 ;;
     --artifact-root) ARTIFACT_ROOT=${2:-}; shift 2 ;;
     --run-id) RUN_ID=${2:-}; shift 2 ;;
+    --runtime-guard-contract) RUNTIME_GUARD_CONTRACT=${2:-}; shift 2 ;;
+    --runtime-guard-mode) RUNTIME_GUARD_MODE=${2:-}; shift 2 ;;
+    --gate-plan-sha256) GATE_PLAN_SHA256=${2:-}; shift 2 ;;
     --web-image) WEB_IMAGE=${2:-}; shift 2 ;;
     --worker-image) WORKER_IMAGE=${2:-}; shift 2 ;;
     --sbom-evidence) SBOM_EVIDENCE=${2:-}; shift 2 ;;
@@ -68,10 +71,13 @@ while [ "$#" -gt 0 ]; do
     *) usage ;;
   esac
 done
-for value in "$REPOSITORY_ROOT" "$GIT_COMMIT" "$GIT_TREE" "$ARTIFACT_ROOT" "$RUN_ID" "$WEB_IMAGE" "$WORKER_IMAGE" "$SBOM_EVIDENCE" "$SECURITY_EVIDENCE" "$CONFIRM"; do [ -n "$value" ] || usage; done
+for value in "$REPOSITORY_ROOT" "$GIT_COMMIT" "$GIT_TREE" "$ARTIFACT_ROOT" "$RUN_ID" "$RUNTIME_GUARD_CONTRACT" "$RUNTIME_GUARD_MODE" "$GATE_PLAN_SHA256" "$WEB_IMAGE" "$WORKER_IMAGE" "$SBOM_EVIDENCE" "$SECURITY_EVIDENCE" "$CONFIRM"; do [ -n "$value" ] || usage; done
 [ "$(id -u)" = 0 ] || { echo "release gate requires root" >&2; exit 1; }
 [ "${ERP_RELEASE_SUPERVISOR_LAUNCHED:-}" = YES ] || { echo "release gate must be launched by the installed supervisor" >&2; exit 1; }
 [ "$CONFIRM" = RUN_EXACT_RELEASE_GATE ] || { echo "release gate confirmation is invalid" >&2; exit 1; }
+[ "$RUNTIME_GUARD_CONTRACT" = chenyida-erp-release-runtime-guard/v1 ] && [ "$RUNTIME_GUARD_MODE" = PRE_DEPLOY_EXISTING_RUNTIME_STABILITY ] || { echo "release gate runtime guard is invalid" >&2; exit 1; }
+case "$GATE_PLAN_SHA256" in *[!0-9a-f]*|'') echo "release gate plan digest is invalid" >&2; exit 1 ;; esac
+[ "${#GATE_PLAN_SHA256}" -eq 64 ] || { echo "release gate plan digest is invalid" >&2; exit 1; }
 case "$RUN_ID" in [A-Za-z0-9]*) : ;; *) echo "release gate run ID is invalid" >&2; exit 1 ;; esac
 case "$RUN_ID" in *[!A-Za-z0-9._-]*) echo "release gate run ID is invalid" >&2; exit 1 ;; esac
 [ "${#RUN_ID}" -le 80 ] || { echo "release gate run ID is invalid" >&2; exit 1; }
@@ -96,8 +102,9 @@ for digest in "$SUPERVISOR_BUNDLE_SHA256" "$AUTHORIZATION_SHA256"; do case "$dig
 case "$BUNDLE_ROOT" in /usr/local/libexec/chenyida-erp-release-supervisor/bundles/*) : ;; *) echo "release supervisor is not installed in the trusted root" >&2; exit 1 ;; esac
 REPOSITORY_ROOT=$(readlink -f "$REPOSITORY_ROOT")
 [ "$(/usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.useReplaceRefs=false -c tar.umask=0022 -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" rev-parse --show-toplevel)" = "$REPOSITORY_ROOT" ] || { echo "release repository root is ambiguous" >&2; exit 1; }
-PLAN="$SCRIPT_DIR/../release/release-gate-plan-v1.json"
+PLAN="$SCRIPT_DIR/../release/release-gate-plan-v2.json"
 [ -f "$PLAN" ] && [ ! -L "$PLAN" ] || { echo "release gate plan is missing or untrusted" >&2; exit 1; }
+[ "$(sha256sum -- "$PLAN" | cut -d ' ' -f 1)" = "$GATE_PLAN_SHA256" ] || { echo "release gate plan does not match the authorization" >&2; exit 1; }
 case "$GIT_COMMIT$GIT_TREE" in *[!0-9a-f]*|'') echo "authorized Git identity is invalid" >&2; exit 1 ;; esac
 [ "${#GIT_COMMIT}" -eq 40 ] && [ "${#GIT_TREE}" -eq 40 ] || { echo "authorized Git identity is invalid" >&2; exit 1; }
 git_candidate() { /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.useReplaceRefs=false -c tar.umask=0022 -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" "$@"; }
@@ -159,7 +166,7 @@ MIGRATION_ALLOWLIST_SHA256=$(CDPATH= cd -- "$SUPERVISOR_SITE_ROOT" && env -i PAT
 
 GATE_STAGE_CREATION_STARTED=YES
 set +e
-RUNNER_OUTPUT=$(env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC ERP_RELEASE_GATE_LOCK_HELD=YES ERP_RELEASE_SUPERVISOR_LAUNCHED=YES ERP_RELEASE_SUPERVISOR_SITE_ROOT="$SUPERVISOR_SITE_ROOT" ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256="$SUPERVISOR_BUNDLE_SHA256" ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256="$AUTHORIZATION_SHA256" "$NODE_RUNTIME" "$SCRIPT_DIR/release-gate-runner.mjs" run --plan "$PLAN" --repository-root "$REPOSITORY_ROOT" --artifact-root "$ARTIFACT_ROOT" --run-id "$RUN_ID" \
+RUNNER_OUTPUT=$(env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC ERP_RELEASE_GATE_LOCK_HELD=YES ERP_RELEASE_SUPERVISOR_LAUNCHED=YES ERP_RELEASE_SUPERVISOR_SITE_ROOT="$SUPERVISOR_SITE_ROOT" ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256="$SUPERVISOR_BUNDLE_SHA256" ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256="$AUTHORIZATION_SHA256" "$NODE_RUNTIME" "$SCRIPT_DIR/release-gate-runner.mjs" run --plan "$PLAN" --repository-root "$REPOSITORY_ROOT" --artifact-root "$ARTIFACT_ROOT" --run-id "$RUN_ID" --runtime-guard-mode "$RUNTIME_GUARD_MODE" \
   --git-commit "$GIT_COMMIT" --git-tree "$GIT_TREE" --package-version "$PACKAGE_VERSION" --web-image-digest "$WEB_DIGEST" --worker-image-digest "$WORKER_DIGEST" --migration-allowlist-sha256 "$MIGRATION_ALLOWLIST_SHA256" \
   --web-image-reference "$WEB_IMAGE" --worker-image-reference "$WORKER_IMAGE" \
   --sbom-evidence "$SBOM_EVIDENCE" --security-evidence "$SECURITY_EVIDENCE" --confirm RUN_EXACT_RELEASE_GATE)

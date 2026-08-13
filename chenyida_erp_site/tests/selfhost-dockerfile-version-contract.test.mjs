@@ -111,7 +111,10 @@ test("build args fail closed and become OCI plus baked runtime identity in both 
   assert.equal((dockerfile.match(/COPY --from=dependencies --chown=65532:65532 \/tmp\/chenyida-runtime-package\.json \.\/package\.json/g) || []).length, 2);
   assert.match(compose, /ERP_RELEASE_EXPECTED_VERSION: \$\{ERP_RELEASE_EXPECTED_VERSION:-\}/);
   assert.match(compose, /ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS: \$\{ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS:-\}/);
-  assert.match(compose, /\$\{ERP_RELEASE_IDENTITY_HOST_ROOT:-\/var\/lib\/chenyida-erp\/release-identity\}:\/run\/chenyida-erp-release:ro/);
+  assert.match(
+    compose,
+    /source: \/var\/lib\/chenyida-erp\/release-identity\s+target: \/run\/chenyida-erp-release\s+read_only: true\s+bind:\s+create_host_path: false/,
+  );
   assert.doesNotMatch(compose, /ERP_BACKUP_EXPECTED_(?:WEB|WORKER)_IMAGE_DIGEST/);
 });
 

@@ -18,6 +18,8 @@ import {
 } from "./worker-lease.ts";
 
 export type RuntimeReadinessResult = Readonly<{
+  deploymentClass: RuntimeConfig["deploymentClass"];
+  deploymentId: string;
   version: string;
   revision: string;
   migrationHead: string;
@@ -96,6 +98,8 @@ export class RuntimeReadinessService {
     try { await this.storageProbe(this.attachmentRoot); }
     catch { throw new RuntimeReadinessError("RUNTIME_ATTACHMENTS_UNAVAILABLE"); }
     return Object.freeze({
+      deploymentClass: this.identity.deploymentClass,
+      deploymentId: this.identity.deploymentId,
       version: this.identity.applicationVersion,
       revision: this.identity.gitCommit.slice(0, 12),
       migrationHead: this.migrations.head,

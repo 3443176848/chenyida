@@ -41,6 +41,7 @@ export type BackupVerification = Readonly<{
 }>;
 export type LegacyBackupVerification = Readonly<{schema_version:1;result:"VERIFIED";backup_id:string;created_at:string;verified_at:string;application_version:string;git_commit:string;migration_head:string;artifacts:Readonly<{postgresql_dump:BackupArtifact;uploads:BackupArtifact;attachments:BackupArtifact}>}>;
 export type RuntimeReleaseIdentity = Readonly<{
-  schema_version:2;contract:"chenyida-erp-runtime-release-identity/v2";deployment_class:"TEST"|"UAT"|"PRODUCTION";deployment_id:string;release_id:string;release_manifest_sha256:string;supervisor_bundle_sha256:string;authorization_sha256:string;
-  application_version:string;git_commit:string;web_container_id:string;web_image_digest:string;worker_container_id:string;worker_image_digest:string;generated_at:string;
+  schema_version:3;contract:"chenyida-erp-runtime-release-identity/v3";deployment_class:"TEST"|"UAT"|"PRODUCTION";deployment_id:string;release_id:string;release_manifest_sha256:string;postdeploy_receipt_sha256:string;supervisor_bundle_sha256:string;authorization_sha256:string;
+  runtime_guard:Readonly<{contract:"chenyida-erp-release-runtime-guard/v1";mode:"POST_DEPLOY_CURRENT_RUNTIME_STRICT"}>;runtime_policy_sha256:string;application_version:string;git_commit:string;git_tree:string;migration_head:string;migration_manifest_sha256:string;
+  caddy_container_id:string;caddy_image_digest:string;postgres_container_id:string;postgres_image_digest:string;web_container_id:string;web_image_digest:string;worker_container_id:string;worker_image_digest:string;generated_at:string;
 }>;

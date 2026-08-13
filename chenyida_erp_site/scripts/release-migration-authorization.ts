@@ -84,7 +84,7 @@ export async function loadReleaseAuthorization(config: MigrationRuntimeConfig, d
   if (manifestFile !== resolve(manifestFile) || manifestFile === "/") reject("MIGRATION_RELEASE_MANIFEST_PATH_INVALID");
   const manifestSha256 = required("ERP_RELEASE_MANIFEST_SHA256", SHA256, "MIGRATION_RELEASE_MANIFEST_SHA256_INVALID");
   const manifest = await loadReleaseManifest({ file: manifestFile, expectedSha256: manifestSha256, requireEligible: true, trusted: true });
-  const bakedPlanPath = fileURLToPath(new URL("../release/release-gate-plan-v1.json", import.meta.url));
+  const bakedPlanPath = fileURLToPath(new URL("../release/release-gate-plan-v2.json", import.meta.url));
   const bakedPlan = validateOfficialReleaseGatePlan(parseStrictJson(await readFile(bakedPlanPath, "utf8")));
   if (sha256(canonicalJson(bakedPlan)) !== manifest.gate.plan_sha256) reject("MIGRATION_RELEASE_GATE_PLAN_MISMATCH");
   const bakedPolicyPath = fileURLToPath(new URL("../release/vulnerability-policy-v1.json", import.meta.url));

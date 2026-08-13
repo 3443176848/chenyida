@@ -21,8 +21,15 @@ LAUNCHER_PATH = Path("/usr/local/sbin/chenyida-erp-release-supervisor-v1")
 AUTHORIZATION_ROOT = Path("/var/lib/chenyida-erp/release-authorizations")
 AUTHORIZATION_PENDING_ROOT = AUTHORIZATION_ROOT / "pending"
 AUTHORIZATION_CONSUMED_ROOT = AUTHORIZATION_ROOT / "consumed"
+RELEASE_ARTIFACT_ROOT_BASE = Path("/var/lib/chenyida-erp/release-artifacts")
+POSTDEPLOY_ROOT_BASE = Path("/var/lib/chenyida-erp/postdeploy")
+RELEASE_IDENTITY_ROOT = Path("/var/lib/chenyida-erp/release-identity")
 BUNDLE_CONTRACT = "chenyida-erp-release-supervisor-bundle/v1"
-AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v1"
+AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v2"
+RUNTIME_GUARD_CONTRACT = "chenyida-erp-release-runtime-guard/v1"
+PRE_DEPLOY_RUNTIME_GUARD_MODE = "PRE_DEPLOY_EXISTING_RUNTIME_STABILITY"
+POST_DEPLOY_RUNTIME_GUARD_MODE = "POST_DEPLOY_CURRENT_RUNTIME_STRICT"
+RUNTIME_POLICY_SHA256 = "8c9f9fd06eb4533faeeed4c316eb93568c38b3a42ac8c48dd081fbb4e7a2f444"
 SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 MAX_JSON_BYTES = 1024 * 1024
 MAX_BUNDLE_FILE_BYTES = 8 * 1024 * 1024
@@ -35,7 +42,7 @@ ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 
 BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/operations/container-runtime-policy-v1.json": "0444",
-    "chenyida_erp_site/release/release-gate-plan-v1.json": "0444",
+    "chenyida_erp_site/release/release-gate-plan-v2.json": "0444",
     "chenyida_erp_site/release/release-test-inventory-v1.json": "0444",
     "chenyida_erp_site/release/test-runtime-policy-v1.json": "0444",
     "chenyida_erp_site/release/vulnerability-policy-v1.json": "0444",
@@ -46,12 +53,15 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/create-release-manifest.sh": "0555",
     "chenyida_erp_site/scripts/create-release-supervisor-bundle-manifest.py": "0555",
     "chenyida_erp_site/scripts/install-release-supervisor.py": "0444",
+    "chenyida_erp_site/scripts/postdeploy-release-contract.mjs": "0444",
+    "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs": "0444",
     "chenyida_erp_site/scripts/publish-release-identity-from-manifest.mjs": "0444",
     "chenyida_erp_site/scripts/release-browser-e2e-runner.mjs": "0444",
     "chenyida_erp_site/scripts/release-gate-runner.mjs": "0444",
     "chenyida_erp_site/scripts/release-identity-contract.mjs": "0444",
     "chenyida_erp_site/scripts/release-image-evidence-contract.mjs": "0444",
     "chenyida_erp_site/scripts/release-image-evidence-producer.mjs": "0444",
+    "chenyida_erp_site/scripts/release-lifecycle-contract.mjs": "0444",
     "chenyida_erp_site/scripts/release-manifest-contract.mjs": "0444",
     "chenyida_erp_site/scripts/release-migration-authorization.ts": "0444",
     "chenyida_erp_site/scripts/release-postgres-regression-runner.mjs": "0444",
@@ -84,14 +94,14 @@ ENTRYPOINTS = {
     "CREATE_IMAGE_EVIDENCE": "chenyida_erp_site/scripts/create-release-image-evidence.sh",
     "RUN_RELEASE_GATE": "chenyida_erp_site/scripts/run-release-gate.sh",
     "CREATE_RELEASE_MANIFEST": "chenyida_erp_site/scripts/create-release-manifest.sh",
-    "PUBLISH_RELEASE_IDENTITY": "chenyida_erp_site/scripts/write-release-identity.sh",
+    "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY": "chenyida_erp_site/scripts/write-release-identity.sh",
 }
 
 CONFIRMATIONS = {
     "CREATE_IMAGE_EVIDENCE": "AUTHORIZE_CREATE_TRIVY_IMAGE_EVIDENCE",
     "RUN_RELEASE_GATE": "AUTHORIZE_RUN_EXACT_RELEASE_GATE",
     "CREATE_RELEASE_MANIFEST": "AUTHORIZE_CREATE_IMMUTABLE_RELEASE_MANIFEST",
-    "PUBLISH_RELEASE_IDENTITY": "AUTHORIZE_PUBLISH_EXACT_RELEASE_IDENTITY",
+    "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY": "AUTHORIZE_VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY",
 }
 
 PARAMETER_FIELDS = {
@@ -101,16 +111,19 @@ PARAMETER_FIELDS = {
     },
     "RUN_RELEASE_GATE": {
         "repository_root", "git_commit", "git_tree", "artifact_root", "run_id",
+        "runtime_guard_contract", "runtime_guard_mode", "gate_plan_sha256",
         "web_image", "worker_image", "sbom_evidence", "security_evidence",
     },
     "CREATE_RELEASE_MANIFEST": {
         "repository_root", "git_commit", "git_tree", "artifact_root", "release_id",
         "deployment_class", "web_image", "worker_image", "gate_plan", "gate_report",
-        "sbom_evidence", "security_evidence", "expires_at",
+        "sbom_evidence", "security_evidence", "expires_at", "runtime_guard_contract",
+        "runtime_guard_mode", "gate_plan_sha256",
     },
-    "PUBLISH_RELEASE_IDENTITY": {
-        "release_manifest", "release_manifest_sha256", "identity_root", "reader_gid",
-        "deployment_class", "deployment_id", "web_container", "worker_container",
+    "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY": {
+        "release_manifest", "release_manifest_sha256", "postdeploy_root", "identity_root", "reader_gid", "run_id",
+        "runtime_guard_contract", "runtime_guard_mode", "runtime_policy_sha256", "deployment_class", "deployment_id", "compose_project",
+        "caddy_container", "postgres_container", "web_container", "worker_container",
     },
 }
 
@@ -300,10 +313,10 @@ def absolute_path(value: Any, code: str) -> str:
 
 def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
     parameters = exact_fields(parameters, PARAMETER_FIELDS[operation], "SUPERVISOR_AUTHORIZATION_PARAMETERS_INVALID")
-    for key in ("artifact_root", "identity_root", "release_manifest", "gate_plan", "gate_report", "sbom_evidence", "security_evidence", "trivy_db_directory", "repository_root"):
+    for key in ("artifact_root", "postdeploy_root", "identity_root", "release_manifest", "gate_plan", "gate_report", "sbom_evidence", "security_evidence", "trivy_db_directory", "repository_root"):
         if key in parameters:
             absolute_path(parameters[key], "SUPERVISOR_AUTHORIZATION_PATH_INVALID")
-    for key in ("run_id", "release_id", "deployment_id", "web_container", "worker_container"):
+    for key in ("run_id", "release_id", "deployment_id", "compose_project", "caddy_container", "postgres_container", "web_container", "worker_container"):
         if key in parameters and (not isinstance(parameters[key], str) or not IDENTIFIER.fullmatch(parameters[key])):
             reject("SUPERVISOR_AUTHORIZATION_IDENTIFIER_INVALID")
     for key in ("web_image", "worker_image"):
@@ -314,20 +327,36 @@ def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
     for key in ("git_commit", "git_tree"):
         if key in parameters and (not isinstance(parameters[key], str) or not GIT_OBJECT.fullmatch(parameters[key])):
             reject("SUPERVISOR_AUTHORIZATION_GIT_INVALID")
-    if "release_manifest_sha256" in parameters and (not isinstance(parameters["release_manifest_sha256"], str) or not SHA256.fullmatch(parameters["release_manifest_sha256"])):
-        reject("SUPERVISOR_AUTHORIZATION_DIGEST_INVALID")
+    for key in ("release_manifest_sha256", "gate_plan_sha256", "runtime_policy_sha256"):
+        if key in parameters and (not isinstance(parameters[key], str) or not SHA256.fullmatch(parameters[key])):
+            reject("SUPERVISOR_AUTHORIZATION_DIGEST_INVALID")
     if "reader_gid" in parameters and (not isinstance(parameters["reader_gid"], int) or isinstance(parameters["reader_gid"], bool) or parameters["reader_gid"] < 1 or parameters["reader_gid"] > 2**31 - 1):
         reject("SUPERVISOR_AUTHORIZATION_GID_INVALID")
     if "deployment_class" in parameters and parameters["deployment_class"] not in ("UAT", "PRODUCTION"):
         reject("SUPERVISOR_AUTHORIZATION_DEPLOYMENT_CLASS_INVALID")
     if "expires_at" in parameters:
         parse_time(parameters["expires_at"], "SUPERVISOR_AUTHORIZATION_RELEASE_EXPIRY_INVALID")
+    if "runtime_guard_contract" in parameters and parameters["runtime_guard_contract"] != RUNTIME_GUARD_CONTRACT:
+        reject("SUPERVISOR_AUTHORIZATION_RUNTIME_GUARD_INVALID")
+    if operation in ("RUN_RELEASE_GATE", "CREATE_RELEASE_MANIFEST") and parameters.get("runtime_guard_mode") != PRE_DEPLOY_RUNTIME_GUARD_MODE:
+        reject("SUPERVISOR_AUTHORIZATION_RUNTIME_GUARD_INVALID")
+    if operation == "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY":
+        if len(parameters["run_id"]) > 101:
+            reject("SUPERVISOR_AUTHORIZATION_IDENTIFIER_INVALID")
+        if parameters.get("runtime_guard_mode") != POST_DEPLOY_RUNTIME_GUARD_MODE or parameters.get("runtime_policy_sha256") != RUNTIME_POLICY_SHA256:
+            reject("SUPERVISOR_AUTHORIZATION_RUNTIME_GUARD_INVALID")
+        if parameters["deployment_id"] != parameters["compose_project"] or len({parameters["caddy_container"], parameters["postgres_container"], parameters["web_container"], parameters["worker_container"]}) != 4:
+            reject("SUPERVISOR_AUTHORIZATION_DEPLOYMENT_IDENTITY_INVALID")
+        manifest = Path(parameters["release_manifest"])
+        postdeploy = Path(parameters["postdeploy_root"])
+        if manifest.parent.parent != RELEASE_ARTIFACT_ROOT_BASE or postdeploy.parent != POSTDEPLOY_ROOT_BASE or postdeploy.name != parameters["run_id"] or Path(parameters["identity_root"]) != RELEASE_IDENTITY_ROOT:
+            reject("SUPERVISOR_AUTHORIZATION_POSTDEPLOY_PATH_INVALID")
     return parameters
 
 
 def validate_authorization(value: Any, expected_bundle_digest: str, now: datetime) -> dict[str, Any]:
     value = exact_fields(value, {"schema_version", "contract", "authorization_id", "created_at", "expires_at", "supervisor_bundle_sha256", "operation", "parameters", "nonce", "confirmation"}, "SUPERVISOR_AUTHORIZATION_FIELDS_INVALID")
-    if value["schema_version"] != 1 or value["contract"] != AUTHORIZATION_CONTRACT:
+    if value["schema_version"] != 2 or value["contract"] != AUTHORIZATION_CONTRACT:
         reject("SUPERVISOR_AUTHORIZATION_VERSION_INVALID")
     if not isinstance(value["authorization_id"], str) or not IDENTIFIER.fullmatch(value["authorization_id"]):
         reject("SUPERVISOR_AUTHORIZATION_ID_INVALID")
@@ -398,11 +427,11 @@ def command_for(bundle_root: Path, authorization: dict[str, Any]) -> list[str]:
     if operation == "CREATE_IMAGE_EVIDENCE":
         command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--trivy-db-directory", parameters["trivy_db_directory"], "--confirm", "CREATE_TRIVY_IMAGE_EVIDENCE"]
     elif operation == "RUN_RELEASE_GATE":
-        command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--confirm", "RUN_EXACT_RELEASE_GATE"]
+        command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--gate-plan-sha256", parameters["gate_plan_sha256"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--confirm", "RUN_EXACT_RELEASE_GATE"]
     elif operation == "CREATE_RELEASE_MANIFEST":
-        command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--artifact-root", parameters["artifact_root"], "--release-id", parameters["release_id"], "--deployment-class", parameters["deployment_class"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--gate-plan", parameters["gate_plan"], "--gate-report", parameters["gate_report"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--expires-at", parameters["expires_at"], "--confirm", "CREATE_IMMUTABLE_RELEASE_MANIFEST"]
+        command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--artifact-root", parameters["artifact_root"], "--release-id", parameters["release_id"], "--deployment-class", parameters["deployment_class"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--gate-plan-sha256", parameters["gate_plan_sha256"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--gate-plan", parameters["gate_plan"], "--gate-report", parameters["gate_report"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--expires-at", parameters["expires_at"], "--confirm", "CREATE_IMMUTABLE_RELEASE_MANIFEST"]
     else:
-        command += ["--release-manifest", parameters["release_manifest"], "--release-manifest-sha256", parameters["release_manifest_sha256"], "--identity-root", parameters["identity_root"], "--reader-gid", str(parameters["reader_gid"]), "--deployment-class", parameters["deployment_class"], "--deployment-id", parameters["deployment_id"], "--web-container", parameters["web_container"], "--worker-container", parameters["worker_container"], "--confirm", "PUBLISH_EXACT_RELEASE_MANIFEST_IDENTITY"]
+        command += ["--release-manifest", parameters["release_manifest"], "--release-manifest-sha256", parameters["release_manifest_sha256"], "--postdeploy-root", parameters["postdeploy_root"], "--identity-root", parameters["identity_root"], "--reader-gid", str(parameters["reader_gid"]), "--run-id", parameters["run_id"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--runtime-policy-sha256", parameters["runtime_policy_sha256"], "--deployment-class", parameters["deployment_class"], "--deployment-id", parameters["deployment_id"], "--compose-project", parameters["compose_project"], "--caddy-container", parameters["caddy_container"], "--postgres-container", parameters["postgres_container"], "--web-container", parameters["web_container"], "--worker-container", parameters["worker_container"], "--confirm", "VERIFY_AND_PUBLISH_EXACT_POSTDEPLOY_IDENTITY"]
     return command
 
 

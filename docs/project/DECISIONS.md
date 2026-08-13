@@ -2213,6 +2213,46 @@
 - 拒绝复用升级前备份回执作为部署后current identity恢复证据，或把pending/stdout当作真实告警已送达。
 - 拒绝将数据盘点、冲突处置、试迁移、权限批准、账号创建和员工业务写合并授权。
 
+## D-130 发布证据按部署前、隔离候选和部署后三阶段闭合
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / SOURCE IMPLEMENTED / ISOLATED CONTRACTS VERIFIED / CONTENT-ADDRESSED BUNDLE REFRESH PENDING / NO HOST OR UAT ACTION`
+- 提案与实施：Codex 持续交付负责人，依据 TASK53 三线只读审计、D-129 首次晋升依赖环和现行 alpha.42 UAT 运行元数据
+- 确认边界：只修改仓库发布合同、受限 supervisor 动作、自动化测试和治理资料；不授权安装 host supervisor、生成可消费授权、推送镜像、执行 UAT/生产 Migration 或部署、读取真实数据或发布 runtime identity
+
+### Context
+
+- 现行非生产 UAT 的 PostgreSQL/Web 为 `healthy`，Worker/Caddy 没有 Docker health；旧发布门却在候选测试前无条件要求 Worker `healthy`，使首次晋升在验证候选之前确定性自锁。
+- 候选隔离运行合同已经要求 PostgreSQL/Web/Worker `healthy`。为兼容旧运行面而放宽同一合同会把历史缺口传播到新候选和部署后运行面，无法证明实际切换结果。
+- 既有 release manifest PASS 只证明候选获准部署，旧 runtime identity v2 又直接从 manifest 与一次容器 inspect 生成；两者都不能独立证明部署后的四服务集合、运行策略、完整 Migration 身份和 readiness 与获准候选一致。
+- 发布后回执和 runtime identity 需要两个原子发布边界。进程可能在回执发布后、身份提交前中断；若该状态既不幂等恢复又不显式拒绝冲突，操作员只能手工删除受信证据或永久更换运行 ID。
+
+### Decision
+
+1. 发布生命周期固定为 `chenyida-erp-release-lifecycle/v1` 的三个互不替代模式：`PRE_DEPLOY_EXISTING_RUNTIME_STABILITY`、`ISOLATED_CANDIDATE_STRICT`、`POST_DEPLOY_CURRENT_RUNTIME_STRICT`。authorization、版本化计划、gate report、release manifest、supervisor action、部署后回执和 runtime identity 必须显式绑定适用模式；缺失、未知或跨阶段复用失败关闭。
+2. 部署前门只接受版本化计划列出的现行四服务，并在整个门禁期间逐项冻结服务集合、容器 ID、镜像 ID/引用、running/restarting/paused/dead、restart、OOM、healthcheck 是否存在及当前健康语义。PostgreSQL/Web 必须持续 `healthy`；Caddy 必须保持版本化的无 healthcheck 状态；旧 Worker 只允许保持“无 healthcheck + health none”，任何状态或身份转换均阻断。
+3. 隔离候选继续由内容寻址运行策略验证完整候选，不继承 legacy 例外；PostgreSQL/Web/Worker 必须存在 healthcheck 且为 `healthy`，Caddy 按固定策略验证。正式 REQUIRED 测试、类型检查、lint、Migration、备份恢复和安全证据步骤不得减少或改为可选。
+4. release gate plan/report、release manifest 和 supervisor authorization 分别升级为 v2；manifest 必须同时保存完整三阶段 lifecycle，且 eligibility 仍只来自部署前 gate PASS、两镜像原生 SBOM/零发现安全证据及完整受信 companion 重组。部署前 PASS 不生成或暗示部署后身份。
+5. 部署后只允许受限动作 `VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY`。它必须在同一全局发布锁内读取 eligible manifest、固定 runtime policy、精确 Compose project 及 Caddy/PostgreSQL/Web/Worker 四个不同容器；禁止记录容器环境、日志、挂载、网络或数据库正文。
+6. 部署后回执必须独立闭合：四服务唯一集合、running、restart 0、OOM false、Caddy 版本化无 healthcheck、其余三服务 `healthy`；固定基础镜像引用和候选 Web/Worker 外部完整 registry digest；OCI version/revision；应用 deployment class/id、版本、提交前 12 位、Migration head、完整 allowlist 摘要和全部 readiness components。local-only/loopback Web 或 Worker 引用、第五个残留 Compose 容器、时钟差超过 5 分钟或两次复核漂移均失败。
+7. runtime identity 升为 `chenyida-erp-runtime-release-identity/v3`，只能由规范化部署后 PASS 回执及其真实 SHA-256 派生，并新增 git tree、完整 Migration 身份、runtime policy、Caddy/PostgreSQL 容器与镜像身份。旧 direct CLI 和 manifest-to-identity publisher 保留为稳定失败入口，不兼容生成 v3。
+8. 回执与身份使用受信 root、严格 mode/owner、无覆盖硬链接和 fsync 的两阶段发布。重试必须验证并恢复 `PREPARED`、同 inode 发布中断或已 `PUBLISHED` 状态；同一回执可在重新严格复核当前运行面后继续身份提交或幂等返回，两个不同 payload 同时存在、摘要伪造、授权变化或运行漂移一律拒绝。已发布回执不因后续身份失败而删除。
+9. canonical supervisor bundle 必须在 TASK53 源码提交之后，由只修改 bundle manifest 的直接子提交重建。TASK51 候选、测试证据、bundle 和任何基于 v1/v2 旧生命周期的授权输入均标记 `STALE / NOT AUTHORIZABLE`；A1/A2 只能引用新内容寻址链。
+
+### Consequences
+
+- 首次正式 gate 可以在不美化旧 Worker 健康缺口的前提下证明现行 UAT 在长门禁期间没有退化；候选及部署后 Worker 健康要求仍保持严格。
+- 运维人员能够区分“候选可部署”与“当前部署已严格验证”，并在发布后中断时通过同一授权和运行 ID 安全续跑，而不手工覆盖受信证据。
+- release plan、test inventory、test runtime policy、runtime policy、authorization、manifest、receipt 和 identity 的版本/摘要构成更长的内容寻址链；任何源文件或测试变化都必须刷新下游摘要、bundle 和候选。
+- 本决定没有安装 supervisor、生成正式 PASS、修改现行 UAT 或恢复其 Worker health。新 bundle、干净快照全回归和治理收口完成前 TASK53 仍为 DOING；A1、A2、A3 及所有真实数据/部署授权继续未授予，系统保持 `PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝把现行 Worker `none`全局解释为健康、删除 Worker health 要求或让操作员用环境变量临时切换模式。
+- 拒绝把部署前 gate report 或 release manifest 直接写成当前 runtime identity，也拒绝只检查 Web/Worker 而遗漏 Caddy、PostgreSQL、完整 Compose inventory 和 Migration allowlist。
+- 拒绝接受 local-only registry 引用作为部署后可恢复身份、从容器环境读取秘密来证明版本，或在回执/身份不一致时手工编辑、覆盖或删除不可变证据。
+- 拒绝让一次宽泛授权同时执行 gate、manifest、部署和身份发布；三个阶段必须分别受版本化动作和专项授权控制。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

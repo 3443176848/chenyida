@@ -77,6 +77,9 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
             "git_tree": "b" * 40,
             "artifact_root": "/var/lib/chenyida-erp/releases/fixture",
             "run_id": "fixture-alpha45",
+            "runtime_guard_contract": supervisor.RUNTIME_GUARD_CONTRACT,
+            "runtime_guard_mode": supervisor.PRE_DEPLOY_RUNTIME_GUARD_MODE,
+            "gate_plan_sha256": "1" * 64,
             "web_image": f"registry.example.invalid/chenyida/web@sha256:{'c' * 64}",
             "worker_image": f"registry.example.invalid/chenyida/worker@sha256:{'d' * 64}",
             "sbom_evidence": "/var/lib/chenyida-erp/releases/fixture/fixture.sbom.json",
@@ -85,7 +88,7 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         if extra_parameter:
             parameters["command"] = "/bin/sh"
         value = {
-            "schema_version": 1,
+            "schema_version": 2,
             "contract": supervisor.AUTHORIZATION_CONTRACT,
             "authorization_id": "fixture-run",
             "created_at": utc(now - timedelta(minutes=1)),
@@ -165,11 +168,44 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
                 "gate_plan": "/trusted/plan.json", "gate_report": "/trusted/report.json",
                 "sbom_evidence": "/trusted/sbom.json", "security_evidence": "/trusted/security.json",
                 "expires_at": "2026-08-12T02:00:00.000Z",
+                "runtime_guard_contract": supervisor.RUNTIME_GUARD_CONTRACT,
+                "runtime_guard_mode": supervisor.PRE_DEPLOY_RUNTIME_GUARD_MODE,
+                "gate_plan_sha256": "1" * 64,
             }),
         ):
             operation_command = supervisor.command_for(Path("/trusted/bundle"), {"operation": operation, "parameters": parameters})
             self.assertEqual(operation_command[operation_command.index("--git-commit") + 1], "a" * 40)
             self.assertEqual(operation_command[operation_command.index("--git-tree") + 1], "b" * 40)
+        postdeploy_parameters = {
+            "release_manifest": "/var/lib/chenyida-erp/release-artifacts/fixture/release-manifest.json",
+            "release_manifest_sha256": "2" * 64,
+            "postdeploy_root": "/var/lib/chenyida-erp/postdeploy/postdeploy-fixture",
+            "identity_root": "/var/lib/chenyida-erp/release-identity",
+            "reader_gid": 1234,
+            "run_id": "postdeploy-fixture",
+            "runtime_guard_contract": supervisor.RUNTIME_GUARD_CONTRACT,
+            "runtime_guard_mode": supervisor.POST_DEPLOY_RUNTIME_GUARD_MODE,
+            "runtime_policy_sha256": supervisor.RUNTIME_POLICY_SHA256,
+            "deployment_class": "UAT",
+            "deployment_id": "erp-uat",
+            "compose_project": "erp-uat",
+            "caddy_container": "erp-uat-caddy-1",
+            "postgres_container": "erp-uat-postgres-1",
+            "web_container": "erp-uat-web-1",
+            "worker_container": "erp-uat-worker-1",
+        }
+        supervisor.validate_parameters("VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", postdeploy_parameters)
+        postdeploy_command = supervisor.command_for(Path("/trusted/bundle"), {"operation": "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", "parameters": postdeploy_parameters})
+        self.assertEqual(postdeploy_command[0], "/trusted/bundle/chenyida_erp_site/scripts/write-release-identity.sh")
+        self.assertEqual(postdeploy_command[postdeploy_command.index("--runtime-guard-mode") + 1], supervisor.POST_DEPLOY_RUNTIME_GUARD_MODE)
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_RUNTIME_GUARD_INVALID"):
+            supervisor.validate_parameters("VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", {**postdeploy_parameters, "runtime_guard_mode": supervisor.PRE_DEPLOY_RUNTIME_GUARD_MODE})
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_IDENTIFIER_INVALID"):
+            supervisor.validate_parameters("VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", {**postdeploy_parameters, "run_id": "r" * 102})
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_POSTDEPLOY_PATH_INVALID"):
+            supervisor.validate_parameters("VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", {**postdeploy_parameters, "identity_root": "/tmp/release-identity"})
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_POSTDEPLOY_PATH_INVALID"):
+            supervisor.validate_parameters("VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", {**postdeploy_parameters, "postdeploy_root": "/var/lib/chenyida-erp/postdeploy/other-run"})
         destination = supervisor.consume_authorization(file, loaded, authorization_digest, pending, consumed)
         self.assertTrue(destination.is_file())
         self.assertFalse(file.exists())

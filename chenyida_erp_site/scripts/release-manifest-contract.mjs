@@ -7,6 +7,16 @@ import { fileURLToPath } from "node:url";
 
 import { parseStrictJson } from "./release-identity-contract.mjs";
 import {
+  PRE_DEPLOY_RUNTIME_GUARD_MODE,
+  officialReleaseLifecycle,
+  validateIsolatedCandidateRuntimeGuard,
+  validatePreDeployRuntimeGuard,
+  validatePreDeployRuntimeSnapshot,
+  validatePreDeployRuntimeSnapshotShape,
+  validateReleaseLifecycle,
+  validateRuntimeGuardBinding,
+} from "./release-lifecycle-contract.mjs";
+import {
   RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT,
   RELEASE_DOCKERFILE_FRONTEND_REFERENCE,
   RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT,
@@ -29,22 +39,22 @@ import {
 
 export { RELEASE_CANDIDATE_BUILD_PROVENANCE_CONTRACT, RELEASE_DOCKERFILE_FRONTEND_REFERENCE, RELEASE_IMAGE_SCAN_PROVENANCE_CONTRACT, RELEASE_LOOPBACK_REGISTRY_IMAGE_REFERENCE, RELEASE_NODE_BASE_IMAGE_REFERENCE, RELEASE_RUNTIME_APK_REPOSITORY, RELEASE_RUNTIME_BASE_IMAGE_REFERENCE, RELEASE_RUNTIME_NODE_PACKAGE, RELEASE_RUNTIME_NODE_VERSION, RELEASE_TRIVY_IMAGE_REFERENCE, RELEASE_TRIVY_VERSION, validateCandidateBuildProvenance, validateImageScanProvenance, validateTrivyCycloneDxDocument, validateTrivyNativeVulnerabilityReport };
 
-export const RELEASE_MANIFEST_CONTRACT = "chenyida-erp-release-manifest/v1";
-export const RELEASE_GATE_PLAN_CONTRACT = "chenyida-erp-release-gate-plan/v1";
-export const RELEASE_GATE_REPORT_CONTRACT = "chenyida-erp-release-gate-report/v1";
-export const RELEASE_GATE_ATTEMPT_CONTRACT = "chenyida-erp-release-gate-attempt/v1";
+export const RELEASE_MANIFEST_CONTRACT = "chenyida-erp-release-manifest/v2";
+export const RELEASE_GATE_PLAN_CONTRACT = "chenyida-erp-release-gate-plan/v2";
+export const RELEASE_GATE_REPORT_CONTRACT = "chenyida-erp-release-gate-report/v2";
+export const RELEASE_GATE_ATTEMPT_CONTRACT = "chenyida-erp-release-gate-attempt/v2";
 export const RELEASE_SBOM_EVIDENCE_CONTRACT = "chenyida-erp-release-sbom-evidence/v1";
 export const RELEASE_SECURITY_EVIDENCE_CONTRACT = "chenyida-erp-release-security-evidence/v1";
 export const RELEASE_SECURITY_SCAN_REPORT_CONTRACT = "chenyida-erp-vulnerability-scan-report/v1";
 export const RELEASE_ARTIFACT_ROOT_MARKER = ".chenyida-erp-release-artifact-root-v1";
 export const RELEASE_ARTIFACT_ROOT_MARKER_VALUE = "chenyida-erp-release-artifact-root/v1\n";
-export const RELEASE_GATE_PLAN_ID = "selfhost-release-gate-v1";
-export const RELEASE_GATE_PLAN_REPOSITORY_PATH = "chenyida_erp_site/release/release-gate-plan-v1.json";
+export const RELEASE_GATE_PLAN_ID = "selfhost-release-gate-v2";
+export const RELEASE_GATE_PLAN_REPOSITORY_PATH = "chenyida_erp_site/release/release-gate-plan-v2.json";
 export const RELEASE_VULNERABILITY_POLICY_ID = "chenyida-erp-zero-known-vulnerabilities-v1";
 export const RELEASE_VULNERABILITY_POLICY_SHA256 = "042cd1bb1185923a8f186319d90194911beba78f761938f42937c5fd0e463ab9";
 export const RELEASE_TEST_RUNTIME_POLICY_CONTRACT = "chenyida-erp-release-test-runtime-policy/v1";
-export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "0919d50a7c2bbb2888bd25b126b8aefa115f2f28d1b4944e40eaff2e0cf98c2f";
-export const RELEASE_TEST_INVENTORY_SHA256 = "91c335760151d019d26b40620ffd8fb8947cbec6692b58f71e6ce5c78f07bbd5";
+export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "d84b084a872f599703a0b33f9fb2589ed79d42775d1ef623248057d9ddb99d05";
+export const RELEASE_TEST_INVENTORY_SHA256 = "13d1ae18259940c9bdc8e917427bba6e984f975dcba75ca09a3cb970c500da9c";
 export const RELEASE_GATE_REQUIRED_STEP_IDS = [
   "release-contracts",
   "supervisor-python-contracts",
@@ -205,11 +215,13 @@ export async function buildMigrationAllowlist(directory) {
 }
 
 export function validateReleaseGatePlan(value) {
-  exactKeys(value, ["schema_version", "contract", "plan_id", "plan_version", "working_directory", "resource_policy", "steps"], "GATE_PLAN_FIELDS_INVALID");
-  if (value.schema_version !== 1 || value.contract !== RELEASE_GATE_PLAN_CONTRACT) reject("GATE_PLAN_VERSION_INVALID");
+  exactKeys(value, ["schema_version", "contract", "plan_id", "plan_version", "working_directory", "runtime_guard", "candidate_runtime_guard", "resource_policy", "steps"], "GATE_PLAN_FIELDS_INVALID");
+  if (value.schema_version !== 2 || value.contract !== RELEASE_GATE_PLAN_CONTRACT) reject("GATE_PLAN_VERSION_INVALID");
   string(value.plan_id, IDENTIFIER, "GATE_PLAN_ID_INVALID");
   integer(value.plan_version, 1, 999, "GATE_PLAN_REVISION_INVALID");
   safePath(value.working_directory, "GATE_PLAN_WORKDIR_INVALID");
+  try { validatePreDeployRuntimeGuard(value.runtime_guard); } catch (error) { reject(error?.code || "RUNTIME_GUARD_INVALID"); }
+  try { validateIsolatedCandidateRuntimeGuard(value.candidate_runtime_guard); } catch (error) { reject(error?.code || "CANDIDATE_RUNTIME_GUARD_INVALID"); }
   exactKeys(value.resource_policy, ["compose_parallel_limit", "node_max_old_space_size_mib", "min_available_memory_mib", "max_swap_used_percent", "max_swap_growth_mib_60s", "min_root_free_gib", "max_load_1m", "max_temporary_containers"], "GATE_RESOURCE_POLICY_FIELDS_INVALID");
   if (value.resource_policy.compose_parallel_limit !== 1 || value.resource_policy.max_temporary_containers !== 1) reject("GATE_SERIAL_POLICY_INVALID");
   integer(value.resource_policy.node_max_old_space_size_mib, 128, 1024, "GATE_NODE_HEAP_INVALID");
@@ -246,7 +258,9 @@ export function validateReleaseGatePlan(value) {
 
 export function validateOfficialReleaseGatePlan(value) {
   validateReleaseGatePlan(value);
-  if (value.plan_id !== RELEASE_GATE_PLAN_ID || value.plan_version !== 1 || value.working_directory !== "chenyida_erp_site") reject("GATE_OFFICIAL_PLAN_IDENTITY_INVALID");
+  if (value.plan_id !== RELEASE_GATE_PLAN_ID || value.plan_version !== 2 || value.working_directory !== "chenyida_erp_site") reject("GATE_OFFICIAL_PLAN_IDENTITY_INVALID");
+  try { validatePreDeployRuntimeGuard(value.runtime_guard); } catch (error) { reject(error?.code || "RUNTIME_GUARD_INVALID"); }
+  try { validateIsolatedCandidateRuntimeGuard(value.candidate_runtime_guard); } catch (error) { reject(error?.code || "CANDIDATE_RUNTIME_GUARD_INVALID"); }
   const expectedPolicy = { compose_parallel_limit: 1, node_max_old_space_size_mib: 768, min_available_memory_mib: 768, max_swap_used_percent: 80, max_swap_growth_mib_60s: 256, min_root_free_gib: 10, max_load_1m: 4, max_temporary_containers: 1 };
   if (canonicalJson(value.resource_policy) !== canonicalJson(expectedPolicy)) reject("GATE_OFFICIAL_PLAN_RESOURCE_POLICY_INVALID");
   if (value.steps.length !== RELEASE_GATE_REQUIRED_STEP_IDS.length || value.steps.some((step, index) => {
@@ -494,32 +508,16 @@ function validateResourceSnapshot(value, prefix) {
   return value;
 }
 
-function validateRuntimeServiceStates(value, prefix) {
-  if (!Array.isArray(value) || value.length > 16) reject(`${prefix}_INVALID`);
-  const expected = new Map([["caddy", new Set(["none"])], ["postgres", new Set(["healthy"])], ["web", new Set(["healthy"])], ["worker", new Set(["none", "healthy"])]]);
-  const services = new Set();
-  for (const state of value) {
-    exactKeys(state, ["service", "container_id", "restart_count", "oom_killed", "status", "health"], `${prefix}_FIELDS_INVALID`);
-    string(state.service, /^[a-z][a-z0-9_-]*$/, `${prefix}_SERVICE_INVALID`);
-    string(state.container_id, /^[0-9a-f]{64}$/, `${prefix}_CONTAINER_INVALID`);
-    integer(state.restart_count, 0, 1_000_000, `${prefix}_RESTART_INVALID`);
-    if (typeof state.oom_killed !== "boolean" || typeof state.status !== "string" || typeof state.health !== "string" || services.has(state.service)) reject(`${prefix}_STATE_INVALID`);
-    services.add(state.service);
-  }
-  const sorted = [...value].sort((left, right) => left.service.localeCompare(right.service));
-  if (canonicalJson(sorted) !== canonicalJson(value)) reject(`${prefix}_ORDER_INVALID`);
-  return value.length === expected.size && value.every((state) => expected.has(state.service) && state.restart_count === 0 && state.oom_killed === false && state.status === "running" && expected.get(state.service).has(state.health));
-}
-
 export function validateReleaseGateReport(value) {
-  exactKeys(value, ["schema_version", "contract", "plan_id", "plan_sha256", "run_id", "generated_at", "completed_at", "control", "candidate", "steps", "evidence", "resources", "result"], "GATE_REPORT_FIELDS_INVALID");
-  if (value.schema_version !== 1 || value.contract !== RELEASE_GATE_REPORT_CONTRACT) reject("GATE_REPORT_VERSION_INVALID");
+  exactKeys(value, ["schema_version", "contract", "plan_id", "plan_sha256", "run_id", "generated_at", "completed_at", "runtime_guard", "control", "candidate", "steps", "evidence", "resources", "result"], "GATE_REPORT_FIELDS_INVALID");
+  if (value.schema_version !== 2 || value.contract !== RELEASE_GATE_REPORT_CONTRACT) reject("GATE_REPORT_VERSION_INVALID");
   string(value.plan_id, IDENTIFIER, "GATE_REPORT_PLAN_ID_INVALID");
   string(value.plan_sha256, SHA256, "GATE_REPORT_PLAN_SHA256_INVALID");
   string(value.run_id, IDENTIFIER, "GATE_REPORT_RUN_ID_INVALID");
   iso(value.generated_at, "GATE_REPORT_STARTED_AT_INVALID");
   iso(value.completed_at, "GATE_REPORT_COMPLETED_AT_INVALID");
   if (Date.parse(value.completed_at) < Date.parse(value.generated_at)) reject("GATE_REPORT_TIME_ORDER_INVALID");
+  try { validatePreDeployRuntimeGuard(value.runtime_guard); } catch (error) { reject(error?.code || "GATE_REPORT_RUNTIME_GUARD_INVALID"); }
   validateControl(value.control, ["supervisor_bundle_sha256", "authorization_sha256"], "GATE_REPORT_CONTROL");
   validateCandidate(value.candidate, "GATE_REPORT_CANDIDATE");
   if (!Array.isArray(value.steps) || value.steps.length < 1 || value.steps.length > 100) reject("GATE_REPORT_STEPS_INVALID");
@@ -548,14 +546,19 @@ export function validateReleaseGateReport(value) {
   artifactFilename(value.evidence.security_file, "GATE_REPORT_SECURITY_PATH_INVALID");
   string(value.evidence.security_sha256, SHA256, "GATE_REPORT_SECURITY_SHA256_INVALID");
   if (!["PASS", "NOT_EVALUATED"].includes(value.evidence.security_result)) reject("GATE_REPORT_SECURITY_RESULT_INVALID");
-  exactKeys(value.resources, ["initial", "final", "test_runtime", "baseline_runtime_services", "final_runtime_services", "baseline_container_count", "preexisting_temporary_container_ids", "minimum_available_memory_mib", "maximum_swap_used_percent", "maximum_swap_growth_mib_60s", "minimum_root_free_gib", "maximum_load_1m", "maximum_temporary_containers", "residual_container_ids", "baseline_runtime_failure", "final_resource_failure"], "GATE_REPORT_RESOURCES_FIELDS_INVALID");
+  exactKeys(value.resources, ["initial", "final", "test_runtime", "baseline_runtime_services", "final_runtime_services", "baseline_container_count", "preexisting_temporary_container_ids", "minimum_available_memory_mib", "maximum_swap_used_percent", "maximum_swap_growth_mib_60s", "minimum_root_free_gib", "maximum_load_1m", "maximum_temporary_containers", "residual_container_ids", "baseline_runtime_failure", "runtime_transition_failure", "final_runtime_failure", "final_resource_failure"], "GATE_REPORT_RESOURCES_FIELDS_INVALID");
   validateResourceSnapshot(value.resources.initial, "GATE_REPORT_INITIAL_RESOURCE");
   validateResourceSnapshot(value.resources.final, "GATE_REPORT_FINAL_RESOURCE");
   exactKeys(value.resources.test_runtime, ["policy_sha256", "node_image_digest", "postgres_image_digest", "posix_image_digest", "browser_image_digest", "browser_executable_sha256", "node_modules_tree_sha256", "python_venv_tree_sha256"], "GATE_REPORT_TEST_RUNTIME_FIELDS_INVALID");
   for (const key of Object.keys(value.resources.test_runtime)) string(value.resources.test_runtime[key], key.endsWith("_digest") ? DIGEST : SHA256, "GATE_REPORT_TEST_RUNTIME_VALUE_INVALID");
   if (value.resources.test_runtime.policy_sha256 !== RELEASE_TEST_RUNTIME_POLICY_SHA256) reject("GATE_REPORT_TEST_RUNTIME_POLICY_INVALID");
-  const baselineRuntimePassed = validateRuntimeServiceStates(value.resources.baseline_runtime_services, "GATE_REPORT_BASELINE_RUNTIME");
-  const finalRuntimePassed = validateRuntimeServiceStates(value.resources.final_runtime_services, "GATE_REPORT_FINAL_RUNTIME");
+  try {
+    validatePreDeployRuntimeSnapshotShape(value.resources.baseline_runtime_services, "GATE_REPORT_BASELINE_RUNTIME");
+    validatePreDeployRuntimeSnapshotShape(value.resources.final_runtime_services, "GATE_REPORT_FINAL_RUNTIME");
+  } catch (error) { reject(error?.code || "GATE_REPORT_RUNTIME_INVALID"); }
+  let baselineRuntimePassed = true; let finalRuntimePassed = true;
+  try { validatePreDeployRuntimeSnapshot(value.resources.baseline_runtime_services, value.runtime_guard, "GATE_REPORT_BASELINE_RUNTIME"); } catch { baselineRuntimePassed = false; }
+  try { validatePreDeployRuntimeSnapshot(value.resources.final_runtime_services, value.runtime_guard, "GATE_REPORT_FINAL_RUNTIME"); } catch { finalRuntimePassed = false; }
   integer(value.resources.baseline_container_count, 0, 10000, "GATE_REPORT_RESOURCE_VALUE_INVALID");
   if (value.resources.baseline_container_count < value.resources.baseline_runtime_services.length) reject("GATE_REPORT_BASELINE_CONTAINER_COUNT_INVALID");
   for (const key of ["minimum_available_memory_mib", "maximum_swap_used_percent", "maximum_swap_growth_mib_60s", "minimum_root_free_gib", "maximum_load_1m"]) {
@@ -565,23 +568,24 @@ export function validateReleaseGateReport(value) {
   for (const key of ["preexisting_temporary_container_ids", "residual_container_ids"]) {
     if (!Array.isArray(value.resources[key]) || value.resources[key].some((item) => typeof item !== "string" || !/^[0-9a-f]{12,64}$/.test(item))) reject("GATE_REPORT_RESIDUAL_CONTAINERS_INVALID");
   }
-  nullableString(value.resources.baseline_runtime_failure, "GATE_REPORT_RUNTIME_FAILURE_INVALID");
+  for (const key of ["baseline_runtime_failure", "runtime_transition_failure", "final_runtime_failure"]) nullableString(value.resources[key], "GATE_REPORT_RUNTIME_FAILURE_INVALID");
   nullableString(value.resources.final_resource_failure, "GATE_REPORT_RESOURCE_FAILURE_INVALID");
   if (!["PASS", "FAIL", "BLOCKED"].includes(value.result)) reject("GATE_REPORT_RESULT_INVALID");
   const allPassed = value.steps.every((step) => ["PASS", "NOT_APPLICABLE"].includes(step.result));
   const evidencePassed = value.evidence.sbom_scope === "WEB_AND_WORKER_IMAGES" && value.evidence.security_result === "PASS";
-  const systemPassed = baselineRuntimePassed && finalRuntimePassed && canonicalJson(value.resources.baseline_runtime_services) === canonicalJson(value.resources.final_runtime_services) && value.resources.preexisting_temporary_container_ids.length === 0 && value.resources.residual_container_ids.length === 0 && value.resources.baseline_runtime_failure === null && value.resources.final_resource_failure === null;
+  const systemPassed = baselineRuntimePassed && finalRuntimePassed && canonicalJson(value.resources.baseline_runtime_services) === canonicalJson(value.resources.final_runtime_services) && value.resources.preexisting_temporary_container_ids.length === 0 && value.resources.residual_container_ids.length === 0 && value.resources.baseline_runtime_failure === null && value.resources.runtime_transition_failure === null && value.resources.final_runtime_failure === null && value.resources.final_resource_failure === null;
   if ((value.result === "PASS") !== (allPassed && evidencePassed && systemPassed)) reject("GATE_REPORT_RESULT_INCONSISTENT");
-  if (value.result === "FAIL" && !value.steps.some((step) => step.result === "FAIL") && value.resources.baseline_runtime_failure === null && value.resources.final_resource_failure === null) reject("GATE_REPORT_FAILURE_REASON_MISSING");
+  if (value.result === "FAIL" && !value.steps.some((step) => step.result === "FAIL") && [value.resources.baseline_runtime_failure, value.resources.runtime_transition_failure, value.resources.final_runtime_failure, value.resources.final_resource_failure].every((failure) => failure === null)) reject("GATE_REPORT_FAILURE_REASON_MISSING");
   return value;
 }
 
 export function validateReleaseGateAttempt(value) {
-  exactKeys(value, ["schema_version", "contract", "run_id", "generated_at", "completed_at", "control", "candidate", "result", "failure_code"], "GATE_ATTEMPT_FIELDS_INVALID");
-  if (value.schema_version !== 1 || value.contract !== RELEASE_GATE_ATTEMPT_CONTRACT || value.result !== "FAIL") reject("GATE_ATTEMPT_IDENTITY_INVALID");
+  exactKeys(value, ["schema_version", "contract", "run_id", "generated_at", "completed_at", "runtime_guard", "control", "candidate", "result", "failure_code"], "GATE_ATTEMPT_FIELDS_INVALID");
+  if (value.schema_version !== 2 || value.contract !== RELEASE_GATE_ATTEMPT_CONTRACT || value.result !== "FAIL") reject("GATE_ATTEMPT_IDENTITY_INVALID");
   string(value.run_id, IDENTIFIER, "GATE_ATTEMPT_RUN_ID_INVALID");
   iso(value.generated_at, "GATE_ATTEMPT_TIME_INVALID"); iso(value.completed_at, "GATE_ATTEMPT_TIME_INVALID");
   if (Date.parse(value.completed_at) < Date.parse(value.generated_at)) reject("GATE_ATTEMPT_TIME_ORDER_INVALID");
+  try { validateRuntimeGuardBinding(value.runtime_guard, PRE_DEPLOY_RUNTIME_GUARD_MODE, "GATE_ATTEMPT_RUNTIME_GUARD_INVALID"); } catch (error) { reject(error?.code || "GATE_ATTEMPT_RUNTIME_GUARD_INVALID"); }
   validateControl(value.control, ["supervisor_bundle_sha256", "authorization_sha256"], "GATE_ATTEMPT_CONTROL");
   validateCandidate(value.candidate, "GATE_ATTEMPT_CANDIDATE");
   string(value.failure_code, /^[A-Z][A-Z0-9_]{2,119}$/, "GATE_ATTEMPT_FAILURE_CODE_INVALID");
@@ -601,14 +605,15 @@ function validateImage(value, service) {
 }
 
 export function validateReleaseManifest(value, { now = new Date(), requireEligible = false } = {}) {
-  exactKeys(value, ["schema_version", "contract", "release_id", "generated_at", "expires_at", "promotion_status", "control", "source", "images", "migrations", "gate", "evidence", "allowed_deployment_classes"], "RELEASE_MANIFEST_FIELDS_INVALID");
-  if (value.schema_version !== 1 || value.contract !== RELEASE_MANIFEST_CONTRACT) reject("RELEASE_MANIFEST_VERSION_INVALID");
+  exactKeys(value, ["schema_version", "contract", "release_id", "generated_at", "expires_at", "promotion_status", "lifecycle", "control", "source", "images", "migrations", "gate", "evidence", "allowed_deployment_classes"], "RELEASE_MANIFEST_FIELDS_INVALID");
+  if (value.schema_version !== 2 || value.contract !== RELEASE_MANIFEST_CONTRACT) reject("RELEASE_MANIFEST_VERSION_INVALID");
   string(value.release_id, IDENTIFIER, "RELEASE_ID_INVALID");
   iso(value.generated_at, "RELEASE_GENERATED_AT_INVALID");
   iso(value.expires_at, "RELEASE_EXPIRES_AT_INVALID");
   const lifetime = Date.parse(value.expires_at) - Date.parse(value.generated_at);
   if (lifetime <= 0 || lifetime > 7 * 24 * 60 * 60 * 1000) reject("RELEASE_LIFETIME_INVALID");
   if (!["ELIGIBLE", "BLOCKED"].includes(value.promotion_status)) reject("RELEASE_PROMOTION_STATUS_INVALID");
+  try { validateReleaseLifecycle(value.lifecycle); } catch (error) { reject(error?.code || "RELEASE_LIFECYCLE_INVALID"); }
   validateManifestControl(value.control, value.promotion_status === "ELIGIBLE");
   exactKeys(value.source, ["git_commit", "git_tree", "worktree_clean", "package_path", "package_version", "package_sha256", "dockerfile_path", "dockerfile_sha256", "compose_path", "compose_sha256", "release_compose_path", "release_compose_sha256"], "RELEASE_SOURCE_FIELDS_INVALID");
   string(value.source.git_commit, COMMIT, "RELEASE_SOURCE_COMMIT_INVALID");
@@ -634,13 +639,14 @@ export function validateReleaseManifest(value, { now = new Date(), requireEligib
   safePath(value.migrations.directory, "RELEASE_MIGRATION_DIRECTORY_INVALID");
   validateMigrationAllowlist(value.migrations.entries, value.migrations.allowlist_sha256);
   if (value.migrations.head !== value.migrations.entries.at(-1).filename) reject("RELEASE_MIGRATION_HEAD_INVALID");
-  exactKeys(value.gate, ["plan_id", "plan_file", "plan_sha256", "report_file", "report_sha256", "result"], "RELEASE_GATE_FIELDS_INVALID");
+  exactKeys(value.gate, ["plan_id", "plan_file", "plan_sha256", "report_file", "report_sha256", "runtime_guard_mode", "result"], "RELEASE_GATE_FIELDS_INVALID");
   string(value.gate.plan_id, IDENTIFIER, "RELEASE_GATE_PLAN_ID_INVALID");
   if (value.gate.plan_id !== RELEASE_GATE_PLAN_ID) reject("RELEASE_GATE_PLAN_ID_INVALID");
   artifactFilename(value.gate.plan_file, "RELEASE_GATE_PLAN_PATH_INVALID");
   string(value.gate.plan_sha256, SHA256, "RELEASE_GATE_PLAN_SHA256_INVALID");
   artifactFilename(value.gate.report_file, "RELEASE_GATE_REPORT_PATH_INVALID");
   string(value.gate.report_sha256, SHA256, "RELEASE_GATE_REPORT_SHA256_INVALID");
+  if (value.gate.runtime_guard_mode !== PRE_DEPLOY_RUNTIME_GUARD_MODE || value.gate.runtime_guard_mode !== value.lifecycle.pre_deploy_gate.mode) reject("RELEASE_GATE_RUNTIME_GUARD_INVALID");
   if (!["PASS", "FAIL", "BLOCKED"].includes(value.gate.result)) reject("RELEASE_GATE_RESULT_INVALID");
   exactKeys(value.evidence, ["sbom_file", "sbom_sha256", "sbom_scope", "security_file", "security_sha256", "security_result"], "RELEASE_EVIDENCE_FIELDS_INVALID");
   artifactFilename(value.evidence.sbom_file, "RELEASE_SBOM_PATH_INVALID");
@@ -1019,6 +1025,31 @@ export async function discardPreparedJsonArtifact({ root, preparedFilename, expe
   await syncDirectory(safeRoot);
 }
 
+export async function readRecoverableJsonPublication({ root, preparedFilename, filename, validator, code = "RELEASE_JSON_PUBLICATION_INVALID" }) {
+  if (typeof process.getuid !== "function" || process.getuid() !== 0) reject("RELEASE_ARTIFACT_ROOT_REQUIRED");
+  if (typeof validator !== "function") reject(`${code}_VALIDATOR_INVALID`);
+  const safeRoot = await trustedArtifactRoot(root);
+  preparedArtifactFilename(preparedFilename, `${code}_PREPARED_FILENAME_INVALID`);
+  artifactFilename(filename, `${code}_FILENAME_INVALID`);
+  const prepared = path.join(safeRoot, preparedFilename);
+  const published = path.join(safeRoot, filename);
+
+  // A crash may leave either the random publish temporary linked to its target,
+  // or the prepared and published names linked to the same inode. Reconcile only
+  // those exact root-owned link shapes; two different payloads always fail closed.
+  await recoverLinkedPublication({ source: prepared, target: published, root: safeRoot });
+  await recoverRandomLinkedPublication({ root: safeRoot, filename: preparedFilename, target: prepared });
+  await recoverRandomLinkedPublication({ root: safeRoot, filename, target: published });
+  const [preparedStat, publishedStat] = await Promise.all([optionalLstat(prepared), optionalLstat(published)]);
+  if (preparedStat !== null && publishedStat !== null) reject(`${code}_COLLISION`);
+  if (preparedStat === null && publishedStat === null) return null;
+  const state = publishedStat === null ? "PREPARED" : "PUBLISHED";
+  const target = state === "PUBLISHED" ? published : prepared;
+  const { raw, stat } = await readStableFile(target, { minimumBytes: 2, maximumBytes: MAX_JSON_BYTES, code });
+  if (stat.uid !== 0 || stat.gid !== 0 || stat.nlink !== 1 || (stat.mode & 0o7777) !== ARTIFACT_FILE_MODE) reject(code);
+  return { safeRoot, state, sha256: sha256(raw), value: validator(parseStrictJson(raw.toString("utf8"))) };
+}
+
 function candidateMatches(left, right) {
   return ["git_commit", "git_tree", "package_version", "web_image_digest", "worker_image_digest", "migration_allowlist_sha256"].every((key) => left[key] === right[key]);
 }
@@ -1045,6 +1076,7 @@ export function assembleReleaseManifest({ releaseId, generatedAt, expiresAt, dep
   validateSbomEvidence(sbom);
   validateSecurityEvidence(security);
   validateManifestControl(control, sbom.scope === "WEB_AND_WORKER_IMAGES" && security.result === "PASS" && report.result === "PASS");
+  if (canonicalJson(report.runtime_guard) !== canonicalJson(plan.runtime_guard)) reject("RELEASE_GATE_RUNTIME_GUARD_MISMATCH");
   const candidate = {
     git_commit: source.git_commit,
     git_tree: source.git_tree,
@@ -1071,17 +1103,18 @@ export function assembleReleaseManifest({ releaseId, generatedAt, expiresAt, dep
   assertReleaseEvidenceFreshness({ generatedAt, expiresAt, report, sbom, security });
   const promotionStatus = report.result === "PASS" && sbom.scope === "WEB_AND_WORKER_IMAGES" && security.result === "PASS" ? "ELIGIBLE" : "BLOCKED";
   return validateReleaseManifest({
-    schema_version: 1,
+    schema_version: 2,
     contract: RELEASE_MANIFEST_CONTRACT,
     release_id: releaseId,
     generated_at: generatedAt,
     expires_at: expiresAt,
     promotion_status: promotionStatus,
+    lifecycle: officialReleaseLifecycle(),
     control,
     source,
     images,
     migrations: { directory: "chenyida_erp_site/drizzle-postgres", head: migrations.at(-1).filename, allowlist_sha256: migrationAllowlistDigest(migrations), entries: migrations },
-    gate: { plan_id: plan.plan_id, plan_file: planFile, plan_sha256: sha256(planRaw), report_file: reportFile, report_sha256: sha256(reportRaw), result: report.result },
+    gate: { plan_id: plan.plan_id, plan_file: planFile, plan_sha256: sha256(planRaw), report_file: reportFile, report_sha256: sha256(reportRaw), runtime_guard_mode: report.runtime_guard.mode, result: report.result },
     evidence: { sbom_file: sbomFile, sbom_sha256: sha256(sbomRaw), sbom_scope: sbom.scope, security_file: securityFile, security_sha256: sha256(securityRaw), security_result: security.result },
     allowed_deployment_classes: [deploymentClass],
   });
