@@ -20,6 +20,14 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { backupOperationsSha256 } from "../scripts/backup-operations-policy.mjs";
+import { validateBackupRecoveryReadiness } from "../scripts/backup-recovery-readiness-v3.mjs";
+import {
+  BACKUP_RECOVERY_READINESS_V4_ATTESTATION,
+  createBackupRecoveryReadinessV4,
+  publishBackupRecoveryReadinessV4,
+  validateBackupRecoveryReadinessV4,
+} from "../scripts/backup-recovery-readiness-v4.mjs";
 import {
   KEY_ROOT_MARKER,
   KEY_ROOT_MARKER_VALUE,
@@ -52,8 +60,16 @@ import {
   writeJointTransferV2,
 } from "../scripts/postgresql-cluster-transfer-contract.mjs";
 import {
+  CREDENTIAL_RECEIPT_CONTRACT,
+  CLUSTER_SECURITY_RECEIPT_CONTRACT,
+  TABLESPACE_RECEIPT_CONTRACT,
+  clusterPolicySha256,
+  clusterSha256,
+  createInitialRecoveryState,
+  createRecoveryIntent,
   createClusterSnapshot,
   normalizeClusterCatalog,
+  transitionRecoveryState,
 } from "../scripts/postgresql-cluster-recovery-contract.mjs";
 
 process.env.NODE_ENV = "test";
@@ -67,6 +83,8 @@ const receivedAt = "2026-08-13T06:02:00.000Z";
 const acceptedAt = "2026-08-13T06:03:00.000Z";
 const jointAcceptedAt = "2026-08-13T06:04:00.000Z";
 const expiresAt = "2026-08-14T06:00:00.000Z";
+const restoreRunId = "restore-run-1";
+const targetSystemIdentifier = "8612345678901234567";
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function expectCode(...codes) { return (error) => codes.includes(error?.code); }
@@ -89,6 +107,16 @@ async function privateRoot(parent, name, marker, markerValue) {
   await chmod(root, 0o700);
   await writeFile(path.join(root, marker), markerValue, { mode: 0o400 });
   await chmod(path.join(root, marker), 0o400);
+  return root;
+}
+
+async function readinessRoot(parent) {
+  const root = path.join(parent, "readiness");
+  await mkdir(root, { mode: 0o2750 });
+  await chmod(root, 0o2750);
+  const marker = path.join(root, ".chenyida-erp-receipt-root-v2");
+  await writeFile(marker, "chenyida-erp-receipt-root/v2\n", { mode: 0o400 });
+  await chmod(marker, 0o400);
   return root;
 }
 async function writeKey(file, key, type) {
@@ -288,6 +316,257 @@ function dataEvidenceFixture(keys, binding) {
   };
   const acceptance = validateTransferAcceptance(signed(acceptanceBody, keys.source.privateKey, sourceFingerprint));
   return { envelope, receiverReceipt, acceptance };
+}
+
+function syntheticDataReadiness(context, dataEvidence) {
+  const restoreReconciliation = {
+    contract: "chenyida-erp-restore-reconciliation/v1",
+    source_sha256: context.binding.application.migration_manifest_sha256,
+    target_database_report_sha256: "8".repeat(64),
+    target_file_trees_sha256: "9".repeat(64),
+    result: "MATCHED",
+  };
+  const restore = {
+    schema_version: 2,
+    contract: "chenyida-erp-backup-verification/v2",
+    result: "RESTORE_VERIFIED",
+    backup_id: context.binding.backup_id,
+    created_at: createdAt,
+    verified_at: "2026-08-13T06:06:00.000Z",
+    expires_at: expiresAt,
+    location_id: "isolated-restore",
+    deployment: {
+      class: "TEST",
+      id: "synthetic-test",
+      database: "chenyida_erp_test",
+      database_system_identifier: context.binding.source.system_identifier,
+      database_oid: context.binding.source.database_oid,
+      database_marker: context.binding.source.database_marker,
+      database_bytes: 16_777_216,
+      database_server_major: context.binding.source.postgresql_major,
+      database_encoding: "UTF8",
+      database_collate: "C.UTF-8",
+      database_ctype: "C.UTF-8",
+      database_locale_provider: "libc",
+      database_collation_version: "NONE",
+    },
+    application: {
+      version: context.binding.application.version,
+      git_commit: context.binding.application.git_commit,
+      web_image_digest: `sha256:${"a".repeat(64)}`,
+      worker_image_digest: `sha256:${"b".repeat(64)}`,
+    },
+    migration: {
+      head: context.binding.application.migration_head,
+      manifest_file: "migrations.txt",
+      manifest_sha256: context.binding.application.migration_manifest_sha256,
+    },
+    policy: { id: "synthetic-backup-policy", rpo_hours: 24 },
+    consistency: {
+      method: "QUIESCED_APPLICATION_AND_SNAPSHOT_WITH_CONTENT_RECONCILIATION",
+      database_snapshot: "PG_DUMP_CONSISTENT_SNAPSHOT",
+      database_guard: "DEFAULT_TRANSACTION_READ_ONLY_DEFENSE_IN_DEPTH",
+      writer_boundary: "EXACT_COMPOSE_WEB_WORKER_STOPPED",
+      content_reconciliation: "BEFORE_AFTER_FULL_RELATION_CONTENT_DIGESTS",
+      dump_scope: "COMPLETE_APPLICATION_DATABASE_LOGICAL_DUMP_NO_OWNER_OR_ACL",
+      web_container: "web-test",
+      web_container_id: "a".repeat(64),
+      worker_container: "worker-test",
+      worker_container_id: "b".repeat(64),
+      recovery_point_at: recoveryPoint,
+      verified_after: "2026-08-13T06:00:30.000Z",
+    },
+    reconciliation: {
+      contract: "chenyida-erp-backup-reconciliation/v1",
+      file: "reconciliation.json",
+      sha256: context.binding.application.migration_manifest_sha256,
+    },
+    manifest_sha256: context.binding.manifest_sha256,
+    artifacts: {
+      postgresql_dump: { file: "postgresql.dump", sha256: one, bytes: 1024 },
+      uploads: { file: "uploads.tar.gz", sha256: two, bytes: 1024, entries: 0 },
+      attachments: { file: "attachments.tar.gz", sha256: three, bytes: 1024, entries: 0 },
+      backup_status: { file: "backup-status.tar.gz", sha256: zero, bytes: 1024, entries: 0 },
+    },
+    evidence: {
+      kind: "ISOLATED_RESTORE_VERIFICATION",
+      source_location_id: dataEvidence.envelope.source.location_id,
+      offhost_location_id: dataEvidence.envelope.receiver.location_id,
+      offhost_receiver_identity_sha256: "7".repeat(64),
+      offhost_receipt_sha256: dataEvidence.receiverReceipt.offhost_receipt_sha256,
+      restore_run_id: restoreRunId,
+      restored_at: "2026-08-13T06:06:00.000Z",
+      target: {
+        deployment_class: "TEST",
+        deployment_id: "synthetic-restore",
+        database_name: "chenyida_erp_restore_test",
+        database_system_identifier: targetSystemIdentifier,
+        database_oid: "16385",
+        marker_id: "synthetic-target",
+        cluster_marker_id: "synthetic-cluster",
+        database_server_major: context.binding.source.postgresql_major,
+        database_encoding: "UTF8",
+        database_collate: "C.UTF-8",
+        database_ctype: "C.UTF-8",
+        database_locale_provider: "libc",
+        database_collation_version: "NONE",
+        file_root_name: "synthetic_restore_test",
+      },
+      reconciliation: restoreReconciliation,
+      reconciliation_sha256: createHash("sha256").update(JSON.stringify(restoreReconciliation)).digest("hex"),
+      attestation: "TRUSTED_EXECUTION_UID_AND_DISTINCT_CLUSTER_ACTIVE_INSPECTION",
+    },
+  };
+  const body = {
+    schema_version: 3,
+    contract: "chenyida-erp-backup-verification/v3",
+    result: "SYNTHETIC_ISOLATED_VERIFIED",
+    evidence_scope: "SYNTHETIC_ISOLATED",
+    backup_id: context.binding.backup_id,
+    created_at: createdAt,
+    verified_at: "2026-08-13T06:07:00.000Z",
+    expires_at: expiresAt,
+    inner_restore: {
+      receipt_file_sha256: "8".repeat(64),
+      receipt_canonical_sha256: backupOperationsSha256(restore),
+      receipt: restore,
+    },
+    transfer: {
+      transfer_id: dataEvidence.envelope.transfer_id,
+      envelope_sha256: transferSha256(dataEvidence.envelope),
+      receiver_receipt_sha256: transferSha256(dataEvidence.receiverReceipt),
+      acceptance_sha256: transferSha256(dataEvidence.acceptance),
+      offhost_receipt_sha256: dataEvidence.receiverReceipt.offhost_receipt_sha256,
+      payload_algorithm: dataEvidence.envelope.encryption.payload_algorithm,
+      key_agreement: dataEvidence.envelope.encryption.key_agreement,
+      key_derivation: dataEvidence.envelope.encryption.key_derivation,
+      signature_algorithm: "Ed25519",
+      source_location_id: dataEvidence.envelope.source.location_id,
+      source_machine_identity_sha256: dataEvidence.envelope.source.machine_identity_sha256,
+      receiver_location_id: dataEvidence.envelope.receiver.location_id,
+      receiver_machine_identity_sha256: "6".repeat(64),
+      receiver_identity_sha256: restore.evidence.offhost_receiver_identity_sha256,
+      source_signing_key_fingerprint: dataEvidence.envelope.source.signing_key_fingerprint,
+      receiver_encryption_key_fingerprint: dataEvidence.envelope.receiver.encryption_key_fingerprint,
+      receiver_receipt_key_fingerprint: dataEvidence.envelope.receiver.receipt_key_fingerprint,
+    },
+    operations: {
+      policy_id: "synthetic-operations-policy",
+      policy_sha256: one,
+      policy_scope: "TEST",
+      schedule_observation_sha256: two,
+      schedule_status: "ON_TIME",
+      rpo_status: "WITHIN_RPO",
+      scheduler_installation_status: "REPOSITORY_EVALUATOR_ONLY",
+      retention_plan_sha256: three,
+      retention_status: "POLICY_VALID_DRY_RUN",
+      retention_execution: "DRY_RUN_DELETION_FORBIDDEN",
+    },
+    attestation: "ROOT_PUBLISHED_INNER_V2_RESTORE_SIGNED_ENCRYPTED_OFFHOST_AND_OPERATIONS_POLICY_VERIFIED",
+  };
+  return validateBackupRecoveryReadiness({ ...body, readiness_sha256: transferSha256(body) });
+}
+
+function syntheticClusterRecovery(context, joint) {
+  const tablespaceIdentity = clusterSha256("synthetic-tablespace-target-identity");
+  const targetSystemIdentifierSha256 = clusterSha256(targetSystemIdentifier);
+  const roleSetSha256 = clusterSha256(context.policy.credential_binding.login_roles);
+  const tablespaceMapSha256 = clusterSha256("synthetic-tablespace-map");
+  const tablespaceBody = {
+    schema_version: 1,
+    contract: TABLESPACE_RECEIPT_CONTRACT,
+    backup_id: context.binding.backup_id,
+    restore_run_id: restoreRunId,
+    map_sha256: tablespaceMapSha256,
+    entry_set_sha256: one,
+    post_create_entry_set_sha256: two,
+    target_tablespace_catalog_sha256: three,
+    namespace_identity_sha256: zero,
+    custom_tablespace_count: context.snapshot.catalog.tablespaces.length,
+    verified_at: "2026-08-13T06:09:00.000Z",
+    evidence_scope: "SYNTHETIC_TEST_ONLY",
+    namespace_status: "VERIFIED",
+    path_identity_status: "VERIFIED",
+    post_create_status: "VERIFIED",
+    result: "SYNTHETIC_ISOLATED_VERIFIED",
+  };
+  const tablespaceReceipt = { ...tablespaceBody, receipt_sha256: clusterSha256(tablespaceBody) };
+  const credentialBody = {
+    schema_version: 1,
+    contract: CREDENTIAL_RECEIPT_CONTRACT,
+    backup_id: context.binding.backup_id,
+    restore_run_id: restoreRunId,
+    credential_generation_id: "synthetic-generation-1",
+    role_set_sha256: roleSetSha256,
+    role_count: context.policy.credential_binding.login_roles.length,
+    bound_at: "2026-08-13T06:10:00.000Z",
+    evidence_scope: "SYNTHETIC_TEST_ONLY",
+    root_enforced: false,
+    result: "SYNTHETIC_ISOLATED_VERIFIED",
+  };
+  const credentialReceipt = { ...credentialBody, receipt_sha256: clusterSha256(credentialBody) };
+  const clusterBody = {
+    schema_version: 1,
+    contract: CLUSTER_SECURITY_RECEIPT_CONTRACT,
+    backup_id: context.binding.backup_id,
+    restore_run_id: restoreRunId,
+    snapshot_sha256: context.snapshot.snapshot_sha256,
+    policy_id: context.policy.policy_id,
+    policy_sha256: clusterPolicySha256(context.policy),
+    source_catalog_sha256: context.snapshot.catalog_sha256,
+    target_raw_catalog_sha256: "8".repeat(64),
+    target_catalog_sha256: context.snapshot.catalog_sha256,
+    tablespace_map_sha256: tablespaceMapSha256,
+    tablespace_receipt_sha256: tablespaceReceipt.receipt_sha256,
+    credential_receipt_sha256: credentialReceipt.receipt_sha256,
+    credential_role_set_sha256: roleSetSha256,
+    target_system_identifier_sha256: targetSystemIdentifierSha256,
+    verified_at: "2026-08-13T06:11:00.000Z",
+    evidence_scope: "SYNTHETIC_TEST_ONLY",
+    policy_status: "VERIFIED",
+    source_equivalence_status: "VERIFIED",
+    result: "SYNTHETIC_ISOLATED_VERIFIED",
+  };
+  const clusterSecurityReceipt = { ...clusterBody, receipt_sha256: clusterSha256(clusterBody) };
+  const recoveryIntent = createRecoveryIntent({
+    restore_run_id: restoreRunId,
+    backup_id: context.binding.backup_id,
+    created_at: "2026-08-13T06:05:00.000Z",
+    evidence_scope: "SYNTHETIC_TEST_ONLY",
+    policy_sha256: clusterPolicySha256(context.policy),
+    snapshot_sha256: context.snapshot.snapshot_sha256,
+    data_transfer_acceptance_sha256: joint.data.acceptance_sha256,
+    cluster_transfer_acceptance_sha256: joint.cluster.acceptance_sha256,
+    joint_transfer_sha256: transferSha256(joint),
+    target_system_identifier_sha256: targetSystemIdentifierSha256,
+    target_empty_state_sha256: "9".repeat(64),
+    credential_generation_id: credentialReceipt.credential_generation_id,
+    credential_role_set_sha256: roleSetSha256,
+    tablespace_map_sha256: tablespaceMapSha256,
+    custom_tablespace_identity_sha256: [tablespaceIdentity],
+  });
+  const states = [createInitialRecoveryState(recoveryIntent, recoveryIntent.created_at)];
+  const advance = (phase, minute, operation = null) => states.push(transitionRecoveryState(states.at(-1), recoveryIntent, {
+    phase,
+    operation,
+    recordedAt: `2026-08-13T06:${String(minute).padStart(2, "0")}:00.000Z`,
+  }));
+  const tablespaceOperation = { kind: "TABLESPACE", resource_identity_sha256: tablespaceIdentity, payload_sha256: one };
+  const databaseOperation = { kind: "DATABASE", resource_identity_sha256: targetSystemIdentifierSha256, payload_sha256: two };
+  advance("ROLE_SKELETON_APPLIED", 6);
+  advance("TABLESPACE_COMMAND_DISPATCHED", 7, tablespaceOperation);
+  advance("TABLESPACE_RECONCILED_APPLIED", 8, tablespaceOperation);
+  advance("TABLESPACE_VERIFIED", 9, tablespaceOperation);
+  advance("DATABASE_COMMAND_DISPATCHED", 10, databaseOperation);
+  advance("DATABASE_RECONCILED_APPLIED", 11, databaseOperation);
+  advance("DATABASE_VERIFIED", 12, databaseOperation);
+  advance("DATA_APPLIED", 13);
+  advance("SECURITY_VERIFIED", 14);
+  advance("CREDENTIALS_VERIFIED", 15);
+  advance("ACTIVATE_PREPARED", 16);
+  advance("PREPARED", 17);
+  advance("PUBLISHED", 18);
+  return { tablespaceReceipt, credentialReceipt, clusterSecurityReceipt, recoveryIntent, recoveryStates: states };
 }
 
 async function fixture(callback) {
@@ -548,4 +827,120 @@ test("joint transfer v2 cross-binds verified data v1 and cluster capsule chains"
     sourceSigningPublicKey: context.keys.source.publicKey,
     receiverReceiptPublicKey: context.keys.receipt.publicKey,
   }), expectCode("JOINT_TRANSFER_BINDING_INVALID", "JOINT_TRANSFER_SIGNATURE_INVALID"));
+}));
+
+test("readiness v4 requires the published recovery state and every cluster-security proof", async () => fixture(async (context) => {
+  const clusterChain = await runClusterChain(context);
+  const dataEvidence = dataEvidenceFixture(context.keys, {
+    backup_id: context.binding.backup_id,
+    manifest_sha256: context.binding.manifest_sha256,
+    local_receipt_sha256: context.binding.local_receipt_sha256,
+    machine_identity_sha256: zero,
+  });
+  const clusterEvidence = {
+    capsule: clusterChain.verified.capsule,
+    receiverReceipt: clusterChain.verified.receiverReceipt,
+    acceptance: clusterChain.verified.acceptance,
+  };
+  const joint = createJointTransferV2({
+    dataEvidence,
+    clusterEvidence,
+    sourceSigningPrivateKey: context.keys.source.privateKey,
+    receiverReceiptPublicKey: context.keys.receipt.publicKey,
+    acceptedAt: jointAcceptedAt,
+    evidenceScope: "SYNTHETIC_TEST_ONLY",
+  });
+  const dataReadiness = syntheticDataReadiness(context, dataEvidence);
+  const recovery = syntheticClusterRecovery(context, joint);
+  const options = {
+    policy: context.policy,
+    dataReadiness,
+    jointTransfer: joint,
+    dataEvidence,
+    clusterEvidence,
+    sourceSigningPublicKey: context.keys.source.publicKey,
+    receiverReceiptPublicKey: context.keys.receipt.publicKey,
+    recoveryIntent: recovery.recoveryIntent,
+    recoveryStates: recovery.recoveryStates,
+    clusterSecurityReceipt: recovery.clusterSecurityReceipt,
+    credentialBindingReceipt: recovery.credentialReceipt,
+    tablespaceReceipt: recovery.tablespaceReceipt,
+    verifiedAt: "2026-08-13T06:19:00.000Z",
+  };
+  const readiness = createBackupRecoveryReadinessV4(options);
+  assert.equal(validateBackupRecoveryReadinessV4(readiness, context.policy), readiness);
+  assert.equal(readiness.attestation, BACKUP_RECOVERY_READINESS_V4_ATTESTATION);
+  assert.equal(readiness.status.recovery_execution, "PUBLISHED");
+  assert.equal(readiness.status.cluster_security, "VERIFIED");
+
+  const publicEvidence = canonicalTransferJson(readiness);
+  for (const sensitive of [
+    ...context.policy.roles.map((role) => role.name),
+    ...Object.values(context.policy.identities),
+    "erp_secret_ts",
+    "/synthetic/credential",
+  ]) assert.equal(publicEvidence.includes(sensitive), false, sensitive);
+
+  const incomplete = clone(readiness);
+  incomplete.recovery_execution.states.pop();
+  incomplete.recovery_execution.state_count -= 1;
+  incomplete.recovery_execution.state_chain_sha256 = clusterSha256(incomplete.recovery_execution.states.map((state) => state.state_sha256));
+  delete incomplete.readiness_sha256;
+  incomplete.readiness_sha256 = clusterSha256(incomplete);
+  assert.throws(() => validateBackupRecoveryReadinessV4(incomplete, context.policy), expectCode("READINESS_V4_RECOVERY_NOT_PUBLISHED"));
+
+  const wrongTarget = clone(readiness);
+  wrongTarget.cluster_security.receipt.target_system_identifier_sha256 = zero;
+  const clusterBody = { ...wrongTarget.cluster_security.receipt };
+  delete clusterBody.receipt_sha256;
+  wrongTarget.cluster_security.receipt.receipt_sha256 = clusterSha256(clusterBody);
+  wrongTarget.cluster_security.receipt_sha256 = wrongTarget.cluster_security.receipt.receipt_sha256;
+  wrongTarget.cluster_security.target_system_identifier_sha256 = zero;
+  delete wrongTarget.readiness_sha256;
+  wrongTarget.readiness_sha256 = clusterSha256(wrongTarget);
+  assert.throws(() => validateBackupRecoveryReadinessV4(wrongTarget, context.policy), expectCode("READINESS_V4_CLUSTER_CHAIN_MISMATCH"));
+
+  const earlyCluster = clone(readiness);
+  earlyCluster.cluster_security.receipt.verified_at = "2026-08-13T06:09:30.000Z";
+  const earlyBody = { ...earlyCluster.cluster_security.receipt };
+  delete earlyBody.receipt_sha256;
+  earlyCluster.cluster_security.receipt.receipt_sha256 = clusterSha256(earlyBody);
+  earlyCluster.cluster_security.receipt_sha256 = earlyCluster.cluster_security.receipt.receipt_sha256;
+  delete earlyCluster.readiness_sha256;
+  earlyCluster.readiness_sha256 = clusterSha256(earlyCluster);
+  assert.throws(() => validateBackupRecoveryReadinessV4(earlyCluster, context.policy), expectCode("READINESS_V4_TIME_CHAIN_INVALID"));
+  assert.throws(() => createBackupRecoveryReadinessV4({ ...options, verifiedAt: "not-a-time" }), expectCode("READINESS_V4_TIME_INVALID"));
+
+  const receiptRoot = await readinessRoot(context.root);
+  const aliasFile = path.join(receiptRoot, "recovery-readiness.json");
+  await writeFile(aliasFile, canonicalTransferJson(dataReadiness), { mode: 0o640 });
+  await chmod(aliasFile, 0o640);
+  await assert.rejects(publishBackupRecoveryReadinessV4({
+    readiness,
+    policy: context.policy,
+    verification: {
+      dataEvidence,
+      clusterEvidence,
+      sourceSigningPublicKey: context.keys.source.publicKey,
+      receiverReceiptPublicKey: context.keys.receipt.publicKey,
+    },
+    receiptRoot,
+    receiptReaderGid: process.getgid(),
+    confirm: "wrong-confirmation",
+  }), expectCode("READINESS_V4_PUBLICATION_CONFIRMATION_REQUIRED"));
+  const published = await publishBackupRecoveryReadinessV4({
+    readiness,
+    policy: context.policy,
+    verification: {
+      dataEvidence,
+      clusterEvidence,
+      sourceSigningPublicKey: context.keys.source.publicKey,
+      receiverReceiptPublicKey: context.keys.receipt.publicKey,
+    },
+    receiptRoot,
+    receiptReaderGid: process.getgid(),
+    confirm: "PUBLISH_SYNTHETIC_CLUSTER_COMPLETE_RECOVERY_EVIDENCE_V4",
+  });
+  assert.equal(await readFile(published.aliasFile, "utf8"), canonicalTransferJson(readiness));
+  assert.equal(await readFile(published.immutableFile, "utf8"), canonicalTransferJson(readiness));
 }));
