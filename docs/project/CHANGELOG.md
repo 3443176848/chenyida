@@ -4,13 +4,19 @@
 
 ## 2026-08-13
 
-### SELFHOST-RELEASE-CANDIDATE-REFRESH-51 - `docs: start current candidate refresh`
+### SELFHOST-RELEASE-CANDIDATE-REFRESH-51 - `docs: start current candidate refresh` / `fix: separate candidate manifest and config identity` / `build: bind candidate identity supervisor bundle` / `docs: close current candidate refresh`
 
 - 调度/范围：TASK50收口`11785d4dac3e1afeb936f7a7a0626a25443fa371`后的零`DOING`自动切换为TASK51唯一active task；严格起点tree为`91a6e752c3265e98208f4ae18a2e8437ecffe2fa`、alpha.46/0045，UAT仍alpha.42/0040。
 - 事实：TASK48 Web/Worker本机manifest仍可解析但绑定旧`8952a815`；TASK49/TASK50改变候选输入，不能复用历史零发现为当前HEAD结论。TASK50 policy SHA-256`8c9f9fd0…f444`、六服务隔离probe和19步计划已验证但尚无当前镜像。
 - 目标：从clean Git snapshot串行重建Web/Worker，在任务loopback registry取得digest，复核TASK50 runtime policy，以固定Trivy/72小时内数据库生成当前镜像CycloneDX与全部severity零发现，并只从正式入口尝试19步门。
 - 边界：不安装host supervisor、不外部push、不修改/重启UAT或运行真实Migration/deploy，不读取业务数据、`.env`、容器环境、日志、四卷/备份正文或未跟踪状态报告，不prune或删除既有资源。
 - 起点资源：available约2.2GiB、Swap714MiB/1GiB、根盘18GiB、Load`0.23/0.35/0.43`；Docker images23.09GB、Build Cache6.977GB，四服务restart0/OOM false。所有build/扫描串行，一次最多一个TASK51临时容器。
+- 真实失败/修复：首个`79f8dee`候选使静态Compose合同通过，但旧runtime probe将Docker29 `.Id`的manifest语义误作OCI config而失败；TASK50又曾误传manifest为config并掩盖该断言。D-128与`12beccf0`分别闭合精确RepoDigest manifest和descriptor annotation config，错误manifest/config均有负向测试；`8084d6c3`作为唯一直接子提交只更新44文件bundle，SHA-256`f4481316…5ce6`。
+- 最终候选：从clean `8084d6c3`/tree`a54473f6`精确重建。Web manifest/config为`sha256:249d0ce4…5b7f`/`sha256:7c7b0d38…3de5`，Worker为`sha256:0e07fded…8370`/`sha256:af000408…4e88`；root-only构建回执SHA-256`f490b969…c1b2`，Compose和六服务runtime probe均通过且`max_containers=1`。loopback registry已删除，本机引用不是外部恢复锚点。
+- 安全诊断：固定Trivy0.70.0及UpdatedAt距扫描11.8小时的schema2数据库，断网无socket逐archive扫描；数据库树前后均为`def6b023…86b`。Web覆盖Wolfi25+npm63、Worker25+60，全部severity0、CycloneDX漏洞0；四份root:root0440 diagnostic制品摘要已写入任务记录。
+- 正式边界：镜像证据与19步门入口均在制品变化前因installed supervisor缺失退出1，6制品指纹`d1136173…6b4f`不变；没有伪造授权、正式SBOM/security evidence、gate PASS或`ELIGIBLE`manifest。
+- 最终验证/资源：release48/48及直接45/45、supervisor31/31、lint0 error/11既有warning、credentials1,589、35个Shell、211个JSON、211个本地Markdown链接、bundle重生成和diff门通过。起点/收口available约2.2/2.2GiB、Swap714/730MiB、根盘18/16GiB、收口Load`1.38/1.23/0.81`，内核OOM0；四服务restart0/OOM false，任务临时容器/网络/Volume/tar/目录清零，UAT和四卷未变。
+- 结论：`DONE / CURRENT EXACT LOCAL CANDIDATE BUILT / ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / PRODUCTION NO-GO`。host supervisor、外部镜像锚点、异机恢复、UAT部署、真实迁移、员工试用和切换继续需要专项授权或外部资源。
 
 ### SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50 - `docs: start container runtime hardening` / `feat: harden container runtime policy` / `build: bind container runtime supervisor bundle` / `docs: close container runtime hardening`
 

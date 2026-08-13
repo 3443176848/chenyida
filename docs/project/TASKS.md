@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-RELEASE-CANDIDATE-REFRESH-51`。范围固定为当前clean Git snapshot的本机Web/Worker候选重建、任务loopback registry digest、TASK50六服务runtime policy、固定Trivy镜像级零发现诊断和正式19步入口失败关闭复核；不安装host supervisor、不修改现行UAT/生产、不读取业务数据、日志、凭据或受保护Volume。系统继续`PRODUCTION NO-GO`。
+当前无`DOING`，active slot为`IDLE`。`SELFHOST-RELEASE-CANDIDATE-REFRESH-51`已完成当前精确本机候选、六服务runtime及零发现诊断，并证明正式19步入口因host supervisor未安装而在制品变化前失败关闭。系统继续`PRODUCTION NO-GO`；下一项先建立最小外部授权/资源执行包，不自行安装host supervisor或修改UAT/生产。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -59,6 +59,8 @@
 
 2026-08-13第二十三次调度事件：主智能体从TASK50收口后的零`DOING`自动选择当前候选身份缺口，状态按`SELFHOST-RELEASE-CANDIDATE-REFRESH-51 TODO → DOING`切换唯一active slot。严格起点为`11785d4dac3e1afeb936f7a7a0626a25443fa371`/tree`91a6e752c3265e98208f4ae18a2e8437ecffe2fa`、alpha.46/0045；TASK48镜像绑定旧`8952a815`，TASK49/TASK50后不能代表当前HEAD。任务仅在本机隔离重建/扫描并从正式入口复核19步失败关闭，不安装host supervisor、不修改UAT、账号、网络或四个受保护Volume。
 
+2026-08-13第二十四次调度事件：`SELFHOST-RELEASE-CANDIDATE-REFRESH-51 DOING → DONE`。首个候选暴露Docker29 manifest/config探针语义缺陷，D-128及`12beccf0`修复后由manifest-only直接子提交`8084d6c3`形成44文件bundle SHA-256`f4481316…5ce6`。最终Web/Worker manifest为`sha256:249d0ce4…5b7f`/`sha256:0e07fded…8370`，当前六服务runtime通过；固定Trivy扫描Web25+63、Worker25+60包且全部severity0。正式镜像证据和19步门在制品变化前因installed supervisor缺失退出1；UAT、四卷和业务数据未变，active slot释放且系统继续`PRODUCTION NO-GO`。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -75,12 +77,13 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-RELEASE-CANDIDATE-REFRESH-51 | 当前精确候选重建与发布门复核 | DOING | Codex主智能体（唯一写入、构建/扫描串行、证据与提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来host supervisor/UAT/生产专项授权） | 2026-08-13 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50 | `DOING / LOCAL ISOLATED CANDIDATE ONLY / NO HOST INSTALL / NO DEPLOYMENT / PRODUCTION NO-GO`。见[任务文档](../tasks/SELFHOST-RELEASE-CANDIDATE-REFRESH-51.md)。 |
+| — | 当前无执行中任务 | IDLE | — | — | — | TASK51已释放active slot；等待下一安全任务登记。 |
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-RELEASE-CANDIDATE-REFRESH-51 | 当前精确候选重建与发布门复核 | DONE | Codex主智能体（唯一写入、构建/扫描串行、证据与提交）、既有数据迁移/应用测试/运维安全只读审计输入、项目负责人（未来host supervisor/UAT/生产专项授权） | 2026-08-13 | 2026-08-13 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50、D-128 | `DONE / CURRENT EXACT LOCAL CANDIDATE BUILT / ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / PRODUCTION NO-GO`。修复`12beccf0`与manifest-only `8084d6c3`形成44文件bundle；最终Web/Worker当前候选六服务runtime及零发现诊断通过，正式证据/19步门因host supervisor未安装在写入前失败关闭，UAT未变。见[任务文档](../tasks/SELFHOST-RELEASE-CANDIDATE-REFRESH-51.md)及[D-128](DECISIONS.md#d-128-docker-29运行探针必须分别闭合manifest引用与oci-config身份)。 |
 | SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50 | 容器运行时最小权限加固 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来UAT/生产/网络/host专项授权） | 2026-08-13 | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48、SELFHOST-OPS-MONITORING-ALERTING-49、D-127 | `DONE / REPOSITORY AND ISOLATED VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`。六服务严格策略、Compose加固、负向合同及一次一个隔离容器验证通过；实现`375869f`与manifest-only `f119c8f`形成44文件bundle，SHA-256为`ab6b708e…8cbe`。现行UAT未改变。见[任务文档](../tasks/SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50.md)及[D-127](DECISIONS.md#d-127-容器运行合同采用完整服务集合精确写路径和内核态最小权限复核)。 |
 | SELFHOST-OPS-MONITORING-ALERTING-49 | 运行监控、告警与排障证据闭环 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来host安装、真实渠道/值班人、UAT/生产专项授权） | 2026-08-13 | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RUNTIME-HEALTH-TRUTH-45、SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48、D-126 | `DONE / REPOSITORY MONITORING CONTRACT VERIFIED / HOST DELIVERY NOT CONFIGURED / PRODUCTION NO-GO`。严格快照、单一阈值、去敏采集、FIRING/REMINDER/ESCALATED/RECOVERED、原子hash-chain状态及pending delivery落地；最终Node113/964、PG83/396、typecheck38/38和适用发布门通过。未安装host服务或发送真实告警。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-ALERTING-49.md)及[D-126](DECISIONS.md#d-126-运行监控采用最小去敏快照单调原子状态和失败关闭告警交付)。 |
 | SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48 | 隔离候选镜像、SBOM、漏洞与完整发布门证据 | DONE | Codex主智能体（唯一写入、重任务串行、证据与提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来host supervisor/UAT/生产专项授权） | 2026-08-13 | 2026-08-13 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-TYPECHECK-CLOSURE-46、SELFHOST-RELEASE-BROWSER-HARNESS-47、D-116、D-122—D-125 | `DONE / EXACT LOCAL CANDIDATE BUILT / ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / PRODUCTION NO-GO`。精确`8952a815`候选、两镜像digest/config、root-only构建回执及四份诊断制品已闭合；48/48合同、20/20 supervisor、typecheck、lint0 error和credentials通过。正式证据/18步门在写入前失败关闭，未部署UAT。见[任务文档](../tasks/SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48.md)及[D-125](DECISIONS.md#d-125-最终运行层采用固定-wolfi-node-22-最小包并删除可证明仅构建使用的-image-size)。 |

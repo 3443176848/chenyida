@@ -8,7 +8,7 @@
 
 ## 2026-08-13 投产准入基线
 
-`SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成四域V2工具和合成/双集群隔离恢复证据，但没有真实异机锚点、当前数据恢复或RTO；源码alpha.46/0045与非生产UAT alpha.42/0040仍不一致。TASK46/TASK47已关闭完整typecheck和Browser子门，TASK48形成过精确本机Web/Worker候选并以新鲜数据库证明全部severity零发现；但TASK49/TASK50又改变候选输入，当前HEAD尚无对应镜像。TASK49已关闭仓库级监控合同，TASK50已关闭未来候选的容器最小权限合同；两者都未安装或部署到host/UAT。TASK43—TASK45已关闭导入fallback、会话绝对寿命及health/Worker/storage误报的仓库风险，但运行UAT未部署；真实数据迁移、完整跨岗位验收、员工试运行和正式切换均未完成。
+`SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成四域V2工具和合成/双集群隔离恢复证据，但没有真实异机锚点、当前数据恢复或RTO；源码alpha.46/0045与非生产UAT alpha.42/0040仍不一致。TASK46/TASK47已关闭完整typecheck和Browser子门，TASK49/TASK50关闭仓库监控及未来候选容器最小权限合同；TASK51又从当前精确`8084d6c3`构建Web/Worker本机候选，六服务runtime与新鲜Trivy零发现诊断通过。由于host supervisor未安装，正式镜像证据与19步门仍在写入前失败关闭；这些合同/候选都未部署到UAT。TASK43—TASK45已关闭导入fallback、会话绝对寿命及health/Worker/storage误报的仓库风险，但运行UAT未部署；真实数据迁移、完整跨岗位验收、员工试运行和正式切换均未完成。
 
 项目负责人已授权持续选择最高优先级且可安全执行的任务，不再要求每项后等待“继续”。该持续授权不包含生产数据访问、真实数据外传、正式备份恢复、UAT/生产 Migration、build/deploy、账号权限、systemd/网络/Swap、真实员工业务写或切换/回滚；这些动作仍须专项明确授权。
 
@@ -18,9 +18,9 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 `SELFHOST-OPS-MONITORING-ALERTING-49`已在严格起点`d5df673c…16e8`后完成并释放active slot。最终内容寻址源码`7debd4d`/tree`315276e`与manifest-only子提交`56535a0`形成bundle SHA-256`76b919cd…6a95`；去敏快照、资源/服务/应用/发布/Migration/备份恢复证据评估、告警生命周期、原子状态、CLI、测试和运行手册已通过完整Node/PostgreSQL/typecheck等适用门。只读宿主metadata诊断对旧UAT镜像与缺失证据如实为CRITICAL；没有host安装、真实通知、UAT/生产网络/数据库访问、日志/卷正文或真实数据读取。TASK49包含Dashboard源码加固但未重建Web/Worker镜像，因此TASK48的`8952a815`零发现候选只是先前提交证据，不是当前HEAD候选。
 
-`SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50`已完成并释放active slot。实现`375869f`/tree`ac5a5bfa`与manifest-only直接子提交`f119c8f`形成44文件bundle，SHA-256为`ab6b708e…8cbe`；D-127策略、六服务Compose加固、内核态负向合同及一次一个隔离runtime验证通过。实际UAT四服务仍为旧的可写rootfs配置且没有显式cap drop/no-new-privileges，本任务未部署、重启或读取其业务数据/日志/环境/受保护Volume。下一安全任务重建当前源码候选并生成新鲜安全/19步发布门证据。
+`SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50`已完成并释放active slot。实现`375869f`/tree`ac5a5bfa`与manifest-only直接子提交`f119c8f`形成44文件bundle，SHA-256为`ab6b708e…8cbe`；D-127策略、六服务Compose加固、内核态负向合同及一次一个隔离runtime验证通过。实际UAT四服务仍为旧的可写rootfs配置且没有显式cap drop/no-new-privileges，本任务未部署、重启或读取其业务数据/日志/环境/受保护Volume。
 
-`SELFHOST-RELEASE-CANDIDATE-REFRESH-51`现为唯一`DOING`，严格起点`11785d4…fa371`/tree`91a6e752…ffe2fa`。TASK48 Web/Worker镜像仍在本机但绑定旧`8952a815`，不能代表TASK49/TASK50后的当前HEAD。本任务只允许clean Git snapshot的本机构建、任务loopback registry、TASK50 runtime policy、固定Trivy诊断和正式19步入口失败关闭复核；不安装host supervisor、不修改UAT/生产、账号、网络或四个受保护Volume。
+`SELFHOST-RELEASE-CANDIDATE-REFRESH-51`已完成并释放active slot。D-128修正Docker29 manifest/config身份探针，`12beccf0`与manifest-only直接子提交`8084d6c3`形成44文件bundle SHA-256`f4481316…5ce6`。最终候选精确绑定`8084d6c3`/tree`a54473f6`：Web manifest/config为`sha256:249d0ce4…5b7f`/`sha256:7c7b0d38…3de5`，Worker为`sha256:0e07fded…8370`/`sha256:af000408…4e88`；六服务runtime通过，固定Trivy以11.8小时内数据库覆盖Web25+63、Worker25+60包且全部severity0。正式镜像证据与19步门均因installed supervisor缺失在6个制品变化前退出1，无正式PASS或`ELIGIBLE`manifest；UAT/四卷未变。
 
 ## 系统组成
 
@@ -45,7 +45,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 - 历史公网验证地址仅作记录；PHASE0-TASK03 未访问公网地址，长期公网运行仍需 HTTPS 和访问控制。
 - 开发常驻服务：systemd `chenyida-erp.service`，服务定义源码位于 `deployment/chenyida-erp.service`。
 - 源码管理：`PHASE0-TASK01-B` 已将原 gitlink 转为根仓库直接跟踪的普通目录；新克隆可恢复完整源码。生产提交为 `2b4f178`，纳管前开发提交为 `9f2c2dc`。
-- 发布标识：包名为`chenyida-erp-selfhosted`；当前源码为`0.1.0-alpha.46`并演进到head 0045及TASK49源码`7debd4d`。较早的`8952a815`已形成仅本机隔离候选且诊断零发现，但TASK49后未重建，因此不是当前HEAD候选，也未通过正式gate或部署。受控公网并行UAT Web仍运行`0.1.0-alpha.42`原镜像，UAT PostgreSQL仍为40/head`0040_warehouse_receipt_readiness.sql`；0041—0045均未部署到UAT。alpha.42仍只是Web-only非生产UAT记录，不是production release。
+- 发布标识：包名为`chenyida-erp-selfhosted`；当前源码为`0.1.0-alpha.46`、head 0045及TASK51最终本机候选提交`8084d6c3`。Web/Worker当前manifest为`sha256:249d0ce4…5b7f`/`sha256:0e07fded…8370`且本机诊断零发现，但loopback registry已删除、无外部锚点、正式supervisor gate或部署。受控公网并行UAT Web仍运行`0.1.0-alpha.42`原镜像，UAT PostgreSQL仍为40/head`0040_warehouse_receipt_readiness.sql`；0041—0045均未部署到UAT。alpha.42仍只是Web-only非生产UAT记录，不是production release。
 - 恢复任务收口：private Git与private GHCR镜像锚点已经建立并验证；项目负责人证明已在GitHub网页撤销一次性PAT，并主动延期PostgreSQL dump与uploads、attachments、backup-status异机锚点。TASK39据此按`DONE / OWNER-CLOSED AFTER GIT AND IMAGE ANCHORS / DATA ANCHOR DEFERRED`行政收口；数据锚点未建立、单机数据恢复风险继续`OPEN`，不构成production ready。
 - 备份恢复V2：D-115/TASK41已实现四域manifest、root-only libpq凭据、精确writer与数据库guard、全关系内容reconciliation、不可变LOCAL/OFFHOST/RESTORE回执、不同machine/cluster证明、staging/单事务恢复/精确补偿、prepared receipt补发和Dashboard runtime/RPO失败关闭。合同41/41、两个独立PostgreSQL集群恢复及Dashboard 2/2通过；只使用合成/隔离数据，未读取当前四卷、外传、build/Migration/deploy。真实异机目标、加密、调度/保留/告警、角色/ACL、真实恢复/RTO继续阻塞G2。
 - AI治理基线：D-110和`PHASE4-TASK01`继续约束AI仅建议、确定性门禁优先、失败关闭、外部模型默认禁用、完整建议追溯、人工决定分离、四角色审批、版本化去敏评估及停用/回退/漂移。`PHASE4-TASK02`已在独立工具边界交付64条静态合成/去敏数据、四项确定性基线、严格Schema/manifest/CLI/指标与一次冻结holdout报告；D-111只批准冻结本地确定性身份的正确性/证据/复现100%、安全和错误候选0及分能力最低coverage，状态仍为`DONE / DETERMINISTIC_THRESHOLDS_APPROVED / RELEASE_NOT_AUTHORIZED`。D-112五表合同在0041实现为独立`LOCAL_DETERMINISTIC`四能力Service和受保护POST/GET；仓库总head现为0045。项目负责人将`PHASE4-TASK03`保持为`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。与产品AI严格分离的`AGENT-R1-5`合成研发协议MVP已完成；TASK45收口提交边界为零DOING/`IDLE`。TASK02数据集、holdout、manifest、标签和机器报告不变且正式holdout未重跑，TASK04—TASK05仍为TODO。
@@ -313,7 +313,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 ## 当前路线
 
-`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭；TASK41已完成D-115/G1合成隔离工具，但真实数据锚点延期风险继续开放。TASK42已完成D-116/G3仓库工具；TASK46/TASK47分别按D-120/D-121关闭完整typecheck与Browser门，TASK48按D-122—D-125完成过精确本机候选与新鲜零发现诊断，TASK49/TASK50又分别关闭监控及容器运行时仓库合同。由于后两任务改变当前源码/候选输入，TASK51现从TASK50内容寻址链重建精确候选并取得新鲜镜像安全/19步门证据；host supervisor安装或UAT动作仍不在授权内。TASK43—TASK45已分别完成导入fallback、会话和运行健康仓库加固，当前源码alpha.46/0045，运行UAT仍未部署。权限矩阵等待业务批准，系统继续production no-go。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API是0041引入且已通过隔离验证。项目负责人已接受D-113和D-114，`AGENT-R1`、PM-002及`AGENT-R1-5`均已完成。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，TASK04—TASK05保持TODO；正式holdout未重跑，0041—0045未部署或应用UAT。外部AI禁用，UAT继续alpha.42/0040且没有真实V2回执；任何R2、模型/真实数据、真实收货、迁移、部署、生产或切流仍须独立授权。
+`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭；TASK41已完成D-115/G1合成隔离工具，但真实数据锚点延期风险继续开放。TASK42已完成D-116/G3仓库工具；TASK46/TASK47分别按D-120/D-121关闭完整typecheck与Browser门，TASK49/TASK50关闭监控及容器运行时仓库合同，TASK51按D-128从当前精确提交重建六服务兼容且零发现的本机候选。host supervisor未安装，正式镜像证据/19步PASS仍不存在；UAT动作也不在授权内。TASK43—TASK45已分别完成导入fallback、会话和运行健康仓库加固，当前源码alpha.46/0045，运行UAT仍未部署。权限矩阵等待业务批准，系统继续production no-go。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API是0041引入且已通过隔离验证。项目负责人已接受D-113和D-114，`AGENT-R1`、PM-002及`AGENT-R1-5`均已完成。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，TASK04—TASK05保持TODO；正式holdout未重跑，0041—0045未部署或应用UAT。外部AI禁用，UAT继续alpha.42/0040且没有真实V2回执；任何R2、模型/真实数据、真实收货、迁移、部署、生产或切流仍须独立授权。
 
 ## 恢复上下文检查清单
 

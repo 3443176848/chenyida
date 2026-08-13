@@ -2141,7 +2141,7 @@
 ## D-128 Docker 29运行探针必须分别闭合manifest引用与OCI config身份
 
 - 日期：2026-08-13
-- 状态：`ACCEPTED / RUNTIME IDENTITY FIX IMPLEMENTED / CURRENT CANDIDATE REVALIDATION REQUIRED / UAT NOT DEPLOYED`
+- 状态：`ACCEPTED / RUNTIME IDENTITY FIX IMPLEMENTED / CURRENT CANDIDATE REVALIDATED / UAT NOT DEPLOYED`
 - 提案与实施：Codex 持续交付负责人，依据 TASK51 当前候选的真实 Docker 29.5.2/containerd image store inspect结果及D-124既有身份分离原则
 - 确认边界：只修正仓库运行探针、自动化测试和运维说明，并在任务私有隔离容器中重验；不授权安装host supervisor、修改UAT、访问持久卷正文、执行Migration或部署
 

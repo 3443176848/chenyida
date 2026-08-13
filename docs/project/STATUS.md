@@ -2,17 +2,21 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
-## SELFHOST-RELEASE-CANDIDATE-REFRESH-51（执行中；本机隔离候选）
+## SELFHOST-RELEASE-CANDIDATE-REFRESH-51（完成；当前精确本机候选零发现，正式门阻塞）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / LOCAL ISOLATED CANDIDATE ONLY / NO HOST INSTALL / NO DEPLOYMENT / PRODUCTION NO-GO | 唯一active slot；主智能体唯一写入，三条智能体线只读审计 |
+| 最终状态 | DONE / CURRENT EXACT LOCAL CANDIDATE BUILT / ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / PRODUCTION NO-GO | active slot已释放；主智能体唯一写入，平台线程上限导致TASK51新三线未启动并已如实记录 |
 | 严格起点 | PASS / CONTROLLED | `main@11785d4dac3e1afeb936f7a7a0626a25443fa371`、tree`91a6e752…ffe2fa`、alpha.46/0045；未跟踪状态报告不读不改不提交 |
-| 历史候选 | STALE FOR CURRENT HEAD | TASK48 Web/Worker manifest仍可在本机解析但绑定`8952a815`；TASK49/TASK50后的当前HEAD需重建及新鲜扫描 |
-| runtime基线 | PASS / REPOSITORY AND ISOLATED | TASK50 policy SHA-256`8c9f9fd0…f444`、六服务probe、19步计划和44文件supervisor bundle已验证；未部署UAT |
-| 目标 | IN PROGRESS | clean Git snapshot候选build、loopback digest、当前runtime probe、固定Trivy双镜像零发现及正式19步入口失败关闭复核 |
+| Git身份 | PASS / CONTENT-ADDRESSED CHAIN | manifest/config修复`12beccf0…390e`/tree`a195669a…5b07`；唯一直接子bundle提交`8084d6c3…a8f8`/tree`a54473f6…7fe`，44文件bundle SHA-256`f4481316…5ce6` |
+| 真实失败修复 | PASS / D-128 | Docker29把`.Id`报告为manifest；旧探针错误按config比较且TASK50调用曾误传manifest。现分别闭合RepoDigest manifest与descriptor annotation config，错误manifest/config均有负向测试 |
+| 当前候选 | PASS / LOCAL ENGINE ONLY | Web manifest/config`sha256:249d0ce4…5b7f`/`sha256:7c7b0d38…3de5`；Worker`sha256:0e07fded…8370`/`sha256:af000408…4e88`；精确绑定`8084d6c3`、alpha.46/0045及构建回执`f490b969…c1b2` |
+| runtime | PASS / MAX ONE CONTAINER | 当前候选Compose policy及实际六服务probe通过，policy`8c9f9fd0…f444`、`max_containers=1`；只读rootfs/capability/NNP/用户/写路径与PostgreSQL/Caddy例外无回退 |
+| 漏洞/SBOM诊断 | PASS / ZERO FINDINGS | 固定Trivy0.70.0；数据库UpdatedAt距扫描11.8h，树摘要前后`def6b023…86b`；Web Wolfi25+npm63、Worker25+60，全部severity0且CycloneDX漏洞0；四份root-only diagnostic已保存 |
+| 正式门 | BLOCKED / FAIL CLOSED | 镜像证据和19步入口均因installed supervisor缺失在制品写入前退出1；6文件指纹`d1136173…6b4f`不变，无正式SBOM/security/gate PASS或`ELIGIBLE`manifest |
 | 授权边界 | LOCAL ISOLATED ONLY | 不安装host supervisor、不push外部registry、不修改UAT/生产/账号/网络/四卷，不读取业务数据/日志/环境/卷正文 |
-| 起点资源 | PASS / BELOW STOP LINES | available约2.2GiB、Swap714MiB/1GiB、根盘18GiB、Load`0.23/0.35/0.43`；Docker images23.09GB、Build Cache6.977GB，四服务restart0/OOM false |
+| 自动验证 | PASS / SCOPED | release48/48及直接45/45、supervisor31/31、lint0 error/11既有warning、credentials1,589、Shell35/JSON211/Markdown本地链接210、bundle重生成及diff检查通过 |
+| 资源/清理 | PASS / BELOW STOP LINES | 起点/收口available约2.2/2.2GiB、Swap714/730MiB、根盘18/16GiB、收口Load`1.38/1.23/0.81`；`oom_kill=0`、四服务restart0/OOM false，临时容器/网络/Volume/tar/目录清零 |
 | 系统是否可用 | NO | 异机恢复、正式同候选门、host监控投递、UAT对齐、真实迁移和员工试用仍未完成 |
 
 ## SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50（完成；仓库与隔离验证，运行面未部署）

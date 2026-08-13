@@ -68,9 +68,10 @@ Supervisor bundle manifest 必须引用一个已经提交且不再修改的 sour
 - TASK46已按D-120把根运行合同对齐为Node 22/ES2022，固定精确38配置集合/摘要双重核验并修复真实类型债；源码`f3bac028…`和bundle`3d1243e…`两个连续干净快照均38/38。该证据关闭TypeScript子门，但不替代Node-source、PostgreSQL、Browser、镜像安全或完整18步同候选门。
 - TASK47已按D-121固定Playwright 1.51.1/Chromium 134内容寻址运行时、历史Migration模板和断网只读单容器执行器；源码`9a18a0f…`干净快照6文件/11项全部PASS，manifest-only直接子提交`614ef7ac…`绑定39文件bundle。该证据关闭Browser子门，但不替代候选镜像安全、Node/PostgreSQL重跑或完整18步同候选门。
 - TASK48已按D-123—D-125完成授权内工作：精确Git archive构建器、manifest/config身份分离、固定Wolfi/Node最小非root运行层、v3构建回执和严格双生态扫描合同均已落地。最终`8952a815`/tree`1ac73360`的Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，config为`sha256:161ea63b…f6c53`/`sha256:f8dc4ac7…817c1`；6文件48/48、supervisor20/20、release typecheck和lint0 error通过。
+- TASK51按D-128修正Docker29运行探针后，从当前精确`8084d6c3`/tree`a54473f6`重建Web/Worker；manifest为`sha256:249d0ce4…5b7f`/`sha256:0e07fded…8370`，config为`sha256:7c7b0d38…3de5`/`sha256:af000408…4e88`。Compose与六服务runtime通过，release48/48、直接45/45及supervisor31/31通过。
 - 当前没有安装 host supervisor，也没有修改 systemd、权限、网络、Docker daemon 或运行中的 Compose。
-- alpha.46/0045已形成仅本机engine可解析的精确隔离候选。固定Trivy、7.5小时内数据库、断网无socket归档诊断覆盖Web25个Wolfi+63个npm包、Worker25+60，全部severity为0且数据库树前后一致；四份root-only诊断制品保存在仓库外。
-- 上述制品明确是`diagnostic`而非正式证据。镜像证据入口与18步入口均在任何制品写入前因installed supervisor缺失退出1；不存在正式scan provenance/SBOM/security evidence、完整gate`PASS`或`ELIGIBLE`manifest。
+- alpha.46/0045当前候选仅在本机engine可解析。固定Trivy、UpdatedAt距扫描11.8小时的数据库、断网无socket归档诊断覆盖Web25个Wolfi+63个npm包、Worker25+60，全部severity为0且数据库树前后一致；四份root-only诊断制品保存在仓库外。
+- 上述制品明确是`diagnostic`而非正式证据。镜像证据入口与19步入口均在6个制品变化前因installed supervisor缺失退出1；不存在正式scan provenance/SBOM/security evidence、完整gate`PASS`或`ELIGIBLE`manifest。
 - 完整多配置typecheck的既有ES2017/真实类型/示例边界问题已由TASK46修复，当前仓库合同38/38可重复通过；未来任何配置集合或内容漂移仍会失败关闭，不能把定向合同typecheck代替它。
 - UAT继续运行 alpha.42/0040；没有执行 UAT/生产 Migration、deploy、runtime identity发布或真实用户验收。
 
