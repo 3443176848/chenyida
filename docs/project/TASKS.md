@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前无`DOING`，active slot为`IDLE`。`SELFHOST-RELEASE-CANDIDATE-REFRESH-51`已完成当前精确本机候选、六服务runtime及零发现诊断，并证明正式19步入口因host supervisor未安装而在制品变化前失败关闭。系统继续`PRODUCTION NO-GO`；下一项先建立最小外部授权/资源执行包，不自行安装host supervisor或修改UAT/生产。
+`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52`是当前唯一`DOING`：只读核验host supervisor、异机备份、监控、UAT晋升、数据/权限/试运行和切换边界，并编制逐项最小、可回滚的外部资源与专项授权执行包。不得创建真实授权文件、安装host组件、连接UAT/生产或读取真实数据；系统继续`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -61,6 +61,8 @@
 
 2026-08-13第二十四次调度事件：`SELFHOST-RELEASE-CANDIDATE-REFRESH-51 DOING → DONE`。首个候选暴露Docker29 manifest/config探针语义缺陷，D-128及`12beccf0`修复后由manifest-only直接子提交`8084d6c3`形成44文件bundle SHA-256`f4481316…5ce6`。最终Web/Worker manifest为`sha256:249d0ce4…5b7f`/`sha256:0e07fded…8370`，当前六服务runtime通过；固定Trivy扫描Web25+63、Worker25+60包且全部severity0。正式镜像证据和19步门在制品变化前因installed supervisor缺失退出1；UAT、四卷和业务数据未变，active slot释放且系统继续`PRODUCTION NO-GO`。
 
+2026-08-13第二十五次调度事件：主智能体从TASK51收口后的零`DOING`自动选择外部边界消歧任务，状态按`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52 TODO → DOING`切换唯一active slot。三条智能体线仅做数据迁移、应用测试、运维安全只读审计；主智能体编制`A1`—`A8`逐项授权、影响、验收、停止和回滚执行包。任务不创建可消费授权、不安装host组件、不连接或修改UAT/生产、账号、网络、四卷或真实数据。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -77,7 +79,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| — | 当前无执行中任务 | IDLE | — | — | — | TASK51已释放active slot；等待下一安全任务登记。 |
+| SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52 | 外部资源与专项授权执行包 | DOING | Codex主智能体（唯一写入与集成）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来逐项专项授权） | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-RELEASE-CANDIDATE-REFRESH-51 | 只读固定`A1`—`A8`授权梯级；不执行任何host/UAT/生产/真实数据动作。见[任务文档](../tasks/SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52.md)。 |
 
 ## 已完成任务
 

@@ -43,6 +43,8 @@
 
 2026-08-13 第十六次增量：`SELFHOST-RELEASE-CANDIDATE-REFRESH-51`已完成。D-128修正Docker29 manifest/config探针，`12beccf0`与manifest-only直接子提交`8084d6c3`形成44文件bundle；当前Web/Worker候选manifest为`sha256:249d0ce4…5b7f`/`sha256:0e07fded…8370`，六服务runtime通过。固定Trivy与11.8小时内数据库覆盖Web25+63、Worker25+60包，全部severity0且数据库树前后一致。正式镜像证据及19步门因installed supervisor缺失在6个制品变化前失败关闭；没有正式PASS、`ELIGIBLE`manifest或UAT部署，整体继续`PRODUCTION NO-GO`。
 
+2026-08-13 第十七次增量：`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52`启动为唯一`DOING`。任务只读核验现有控制面，把host supervisor、正式门、外部锚点、异机备份恢复、监控投递、UAT晋升、数据/岗位/员工试运行和正式切换拆成`A1`—`A8`独立授权；不创建可消费授权、不安装host组件、不连接或修改UAT/生产/真实数据。启动不改变整体`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。

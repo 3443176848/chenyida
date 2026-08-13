@@ -22,6 +22,8 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 `SELFHOST-RELEASE-CANDIDATE-REFRESH-51`已完成并释放active slot。D-128修正Docker29 manifest/config身份探针，`12beccf0`与manifest-only直接子提交`8084d6c3`形成44文件bundle SHA-256`f4481316…5ce6`。最终候选精确绑定`8084d6c3`/tree`a54473f6`：Web manifest/config为`sha256:249d0ce4…5b7f`/`sha256:7c7b0d38…3de5`，Worker为`sha256:0e07fded…8370`/`sha256:af000408…4e88`；六服务runtime通过，固定Trivy以11.8小时内数据库覆盖Web25+63、Worker25+60包且全部severity0。正式镜像证据与19步门均因installed supervisor缺失在6个制品变化前退出1，无正式PASS或`ELIGIBLE`manifest；UAT/四卷未变。
 
+`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52`现为唯一`DOING`。它只读核验上述发布边界及异机备份、监控、UAT晋升、真实数据/岗位/员工试运行和切换依赖，并把后续动作拆为`A1`—`A8`逐项最小授权执行包。任务不创建真实授权文件、不安装host组件、不连接或修改UAT/生产，也不读取真实数据；启动不改变`PRODUCTION NO-GO`。
+
 ## 系统组成
 
 ### 本地 ERP

@@ -2,6 +2,16 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
+## SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52（执行中；只读授权控制面）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / READ-ONLY CONTROL PLANE / PRODUCTION NO-GO | 唯一active task；主智能体唯一写入，数据迁移/应用测试/运维安全三线只读审计 |
+| 严格起点 | PASS / CONTROLLED | `main@cbc219490fd88eda4edb6f0e54ad0ba933438ab4`、tree`216e08ee…ab5de`；未跟踪状态报告不读不改不提交 |
+| supervisor现场 | BLOCKED / ABSENT | bundle`f4481316…5ce6`、installer`f7ace184…ba0`、launcher`3e72a81d…c4e0`已固定；installed路径及授权/回执/journal根均不存在 |
+| 当前范围 | DOCS / READ ONLY | 编制`A1`—`A8`逐项授权、依赖、影响、停止、验收、失败和回滚执行包；不生成真实授权或执行下游动作 |
+| 系统是否可用 | NO | 正式门、异机恢复、监控投递、UAT对齐、真实迁移、员工试用和切换仍未完成 |
+
 ## SELFHOST-RELEASE-CANDIDATE-REFRESH-51（完成；当前精确本机候选零发现，正式门阻塞）
 
 | 验证项 | 结果 | 说明 |
@@ -15,7 +25,7 @@
 | 漏洞/SBOM诊断 | PASS / ZERO FINDINGS | 固定Trivy0.70.0；数据库UpdatedAt距扫描11.8h，树摘要前后`def6b023…86b`；Web Wolfi25+npm63、Worker25+60，全部severity0且CycloneDX漏洞0；四份root-only diagnostic已保存 |
 | 正式门 | BLOCKED / FAIL CLOSED | 镜像证据和19步入口均因installed supervisor缺失在制品写入前退出1；6文件指纹`d1136173…6b4f`不变，无正式SBOM/security/gate PASS或`ELIGIBLE`manifest |
 | 授权边界 | LOCAL ISOLATED ONLY | 不安装host supervisor、不push外部registry、不修改UAT/生产/账号/网络/四卷，不读取业务数据/日志/环境/卷正文 |
-| 自动验证 | PASS / SCOPED | release48/48及直接45/45、supervisor31/31、lint0 error/11既有warning、credentials1,589、Shell35/JSON211/Markdown本地链接210、bundle重生成及diff检查通过 |
+| 自动验证 | PASS / SCOPED | release48/48及直接45/45、supervisor31/31、lint0 error/11既有warning、credentials1,589、Shell35/JSON211/Markdown本地链接211、bundle重生成及diff检查通过 |
 | 资源/清理 | PASS / BELOW STOP LINES | 起点/收口available约2.2/2.2GiB、Swap714/730MiB、根盘18/16GiB、收口Load`1.38/1.23/0.81`；`oom_kill=0`、四服务restart0/OOM false，临时容器/网络/Volume/tar/目录清零 |
 | 系统是否可用 | NO | 异机恢复、正式同候选门、host监控投递、UAT对齐、真实迁移和员工试用仍未完成 |
 
