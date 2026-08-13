@@ -34,7 +34,7 @@
   "node_dependencies": {
     "path": "chenyida_erp_site/node_modules",
     "tree_sha256": "3d727122206562df4ebfe24139bfd7b2ae16a299ef2e62b6d55b19e61c2db819",
-    "package_lock_sha256": "3c0522f9ea75cc6c0bfa4c3c92e232f47ce326e73054e070a03bea8320a91815"
+    "package_lock_sha256": "ac79bbe843ca56ac756ffc80f723691b193dbb6a8cbb2b2ccc9d48470a63a68b"
   },
   "python_runtime": {
     "venv_path": ".venv",

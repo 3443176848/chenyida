@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 SITE_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_POLICY_SHA256 = "e6e241312da06406ba7bbb72f3882a36837baebca950f731f1e9c29f0e003777"
+EXPECTED_POLICY_SHA256 = "a6e6452d6e0abe2a9ac0598eb635164a732c016dc90569e8b02515d18f7692ee"
 EXPECTED_BROWSER_IMAGE = "mcr.microsoft.com/playwright@sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961"
 EXPECTED_EXECUTABLE_SHA256 = "efb2bece6f2f5bc00dc270162d2241c86d509ca4f4297b1eb0f5cd8894d050be"
 
@@ -30,7 +30,7 @@ class ReleaseSupervisorBrowserTest(unittest.TestCase):
             "executable_path": "/ms-playwright/chromium-1161/chrome-linux/chrome",
             "executable_sha256": EXPECTED_EXECUTABLE_SHA256,
         })
-        self.assertEqual(policy["node_dependencies"]["package_lock_sha256"], "3c0522f9ea75cc6c0bfa4c3c92e232f47ce326e73054e070a03bea8320a91815")
+        self.assertEqual(policy["node_dependencies"]["package_lock_sha256"], "ac79bbe843ca56ac756ffc80f723691b193dbb6a8cbb2b2ccc9d48470a63a68b")
         self.assertEqual(policy["node_dependencies"]["tree_sha256"], "3d727122206562df4ebfe24139bfd7b2ae16a299ef2e62b6d55b19e61c2db819")
 
     def test_browser_shell_is_offline_serial_bounded_and_owned(self):
