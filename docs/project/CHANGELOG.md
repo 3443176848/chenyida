@@ -4,7 +4,7 @@
 
 ## 2026-08-13
 
-### SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 - `docs: start PostgreSQL runtime privilege closure` / `feat: close Web runtime lock privilege boundary`
+### SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 - `docs: start PostgreSQL runtime privilege closure` / `feat: close Web runtime lock privilege boundary` / `feat: split backup control and capture privileges`
 
 - 调度/范围：从TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`启动TASK56为唯一`DOING`；主智能体唯一写入，数据迁移、应用测试、运维安全三线只读审计。
 - 起点事实：只读UAT catalog摘要确认PostgreSQL 17当前只有1个非内置LOGIN，且该角色同时为superuser、数据库owner和全部433个public relation owner；Web/Worker活动连接共用1个数据库角色。源码为45/head`0045_runtime_worker_readiness.sql`，UAT仍为40/head`0040_warehouse_receipt_readiness.sql`。
@@ -14,7 +14,10 @@
 - 边界：不创建或修改真实角色、凭据、Volume，不读取`.env`、真实秘密、业务行、备份/卷正文或未跟踪状态报告，不修改/重启UAT/生产，不执行真实Migration、备份、恢复、host安装、部署或网络动作。系统继续`PRODUCTION NO-GO`。
 - Web锁边界：append-only 0046新增16个owner控制、固定`search_path`、无PUBLIC EXECUTE的窄锁函数，替代Finance/Production/Quality/Sales的19个直接行锁；20个关联trigger函数固定owner安全执行路径，Web对全部锁目标保持零table/column UPDATE。
 - 版本/门禁：源码同步为alpha.47/0046，release inventory为244/220/24；隔离PG17完整回归84文件/401项、专项5/5、typecheck38/38、发布/版本契约、凭据1631与clean-candidate等价lint 0 error通过。首次live workspace lint因未跟踪构建产物触发V8 heap OOM，容器未OOMKill；排除Git快照不存在的构建目录后同限额通过，未降低规则。
-- 当前阻塞：access intent只剩Backup large-object capture边界和PG17编译catalog；本检查点不代表角色/ACL reconcile、Compose/tablespace、候选bundle、UAT部署或真实运行加固完成，TASK56继续`DOING`。
+- Backup最小权限：备份入口强制两个物理和逻辑身份均独立的root-only libpq service文件；高权限control只负责稳定身份、零large-object、只读/CONNECT围栏与恢复控制，固定非superuser `chenyida_erp_backup`只执行关系reconciliation、Migration读取和`pg_dump --no-large-objects --no-owner --no-acl`。PUBLIC/额外LOGIN CONNECT、TEMP、危险角色属性或错误ACL均失败关闭。
+- 崩溃/恢复：持久intent升级为v3但保留兼容文件名；数据库connection limit全过程不变，owner/Web/Worker/Admin的CONNECT和默认只读在事务中精确切换，capture保持连接。隔离PG17验证未知LOGIN/NOLOGIN grantee漂移拒绝且不解除围栏、capture越权拒绝、意外large object拒绝/清理及零large-object备份到新空库恢复，下游Dashboard PostgreSQL 2/2通过。
+- 内容寻址/验证：access intent SHA-256为`218d7ff7…2561f`，release inventory保持`244/220/24`且SHA-256更新为`cecbbbaf…7f67`，test runtime policy为`a90e07ae…4c8a`；Backup/source合同13/13、release合同51/51及inventory verify通过。
+- 当前阻塞：access intent只剩`POSTGRESQL17_COMPILED_CATALOG_REQUIRED`；本检查点不代表角色/ACL reconcile、secret-file Compose集成、tablespace、候选bundle、UAT部署或真实运行加固完成，TASK56继续`DOING`。
 
 ### SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 - `docs: start PostgreSQL cluster recovery closure` / `docs: record PostgreSQL cluster recovery decision` / `feat: add PostgreSQL cluster recovery contract` / `feat: capture PostgreSQL cluster recovery catalog` / `feat: secure PostgreSQL cluster restore` / `feat: encrypt PostgreSQL cluster transfer` / `feat: enforce PostgreSQL cluster recovery readiness` / `feat: expose cluster recovery operations status` / `feat: execute crash-safe PostgreSQL cluster recovery` / `test: bind cluster recovery release gate` / `test: execute trusted recovery fixtures` / `build: bind exact release dependencies` / `test: make recovery gate deterministic and trusted` / `release: bind task55 supervisor bundle` / `docs: close PostgreSQL cluster recovery`
 

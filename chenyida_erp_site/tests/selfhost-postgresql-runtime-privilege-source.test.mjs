@@ -47,7 +47,6 @@ test("runtime privilege source intent is exact, stale-detecting and explicitly n
   assert.equal(document.artifact_class, "SOURCE_ACCESS_INTENT");
   assert.equal(document.authorization_status, "BLOCKED");
   assert.deepEqual(document.blocking_reasons.map((item) => [item.code, item.objects.length]), [
-    ["BACKUP_LARGE_OBJECT_CAPTURE_BOUNDARY_UNRESOLVED", 1],
     ["POSTGRESQL17_COMPILED_CATALOG_REQUIRED", 0],
   ]);
   assert.equal(document.source.migration_count, 46);
@@ -75,6 +74,7 @@ test("runtime privilege source intent is exact, stale-detecting and explicitly n
   assert.equal(document.services.WEB.routine_execute.APPLICATION.every((routine) => document.catalog.application_routines.includes(routine)), true);
   assert.deepEqual(document.services.WEB.routine_execute.EXTENSION, ["public.digest(bytea,text)"]);
   assert.deepEqual(document.services.BACKUP.routine_execute.EXTENSION, ["public.digest(bytea,text)"]);
+  assert.equal(document.services.BACKUP.derivation, "REVIEWED_ZERO_LARGE_OBJECT_LOGICAL_CAPTURE_SOURCE_INTENT");
 
   const raw = await readFile(path.join(siteRoot, RUNTIME_PRIVILEGE_ACCESS_PATH), "utf8");
   assert.equal(raw, `${JSON.stringify(document, null, 2)}\n`);

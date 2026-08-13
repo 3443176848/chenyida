@@ -11,12 +11,15 @@
 | UAT catalog | VERIFIED READ ONLY / HIGH RISK OPEN | PostgreSQL 17只有1个非内置LOGIN且为superuser、数据库owner和全部433个public relation owner；Web/Worker活动连接共用1个角色；未输出角色名、连接串或密码，未读业务行或写入 |
 | 源码/运行差距 | OPEN / SOURCE ADVANCED | 源码alpha.47、46/head`0046_runtime_lock_privilege_boundary.sql`，UAT仍alpha.42、40/head`0040_warehouse_receipt_readiness.sql`；本任务不授权Migration或部署 |
 | 秘密边界 | PARTIAL / REPOSITORY LOADER IMPLEMENTED | 已实现严格secret-file读取和服务独立连接/实际身份断言；Compose与release集成尚未闭合，当前运行面仍通过环境交付数据库、初始化、Setup和Admin秘密 |
-| 角色边界 | PARTIAL / SOURCE INTENT BLOCKED | 精确源码access intent已覆盖Admin/Backup/Web/Worker；仍须拆分Backup control/capture并生成PG17编译catalog，当前UAT角色/ACL未改变 |
+| 角色边界 | PARTIAL / SOURCE INTENT ONE BLOCKER | 精确源码access intent已覆盖Admin/Backup/Web/Worker；Backup control/capture和零large-object边界已闭合，当前仅剩PG17编译catalog，UAT角色/ACL未改变 |
 | Web锁权限 | PASS / ISOLATED CURRENT HEAD | 19个锁目标经16个owner控制窄函数访问，Web保持零table/column UPDATE；20个locking trigger固定安全owner路径，PG17专项5/5及完整回归84文件/401项通过 |
+| Backup权限 | PASS / REPOSITORY AND SYNTHETIC-ISOLATED | control/capture双service、精确CONNECT围栏、v3中断intent和零large-object dump合同已闭合；PG17崩溃恢复、意外large object拒绝、非superuser dump及新空恢复通过，未执行真实备份/恢复或角色变更 |
+| Backup检查点验证 | PASS | 定向13/13、release合同51/51、inventory `244/220/24`、access intent verify、PG17双cluster/未知grantee漂移/新空恢复、Dashboard PG2/2、Shell/JSON/Markdown231链接、credentials1631和diff检查通过 |
 | Tablespace | OPEN / REPOSITORY TARGET DEFINED | 当前PostgreSQL仅有PGDATA持久卷；未来声明独立`erp_postgres_tablespaces`固定mount，不创建或改动真实Volume |
-| 验收范围 | IN PROGRESS | Web锁权限与alpha.47/0046已闭合；Backup大对象边界、PG17精确catalog、角色/ACL reconcile、Compose/tablespace、完整release与新bundle仍待完成 |
+| 验收范围 | IN PROGRESS | Web锁权限、alpha.47/0046与Backup最小权限已闭合；PG17精确catalog、角色/ACL reconcile、Compose/tablespace、完整release与新bundle仍待完成 |
 | 启动验证 | PASS / LIGHTWEIGHT | Markdown394/229链接、JSON214、Shell38、credentials1618、release contract51/51及Python三基线通过；宿主工具缺失改用既有隔离运行时，不安装依赖或降低断言 |
 | 起点资源 | PASS / BELOW STOP LINES | available约2.0GiB、Swap603MiB/1.0GiB、根盘16GiB、Load`0.10/0.17/0.52`，内核`oom_kill=0`；四服务restart0/OOM false |
+| 当前资源/清理 | PASS / BELOW STOP LINES | 最终available约1.9GiB、Swap567MiB/1.0GiB、根盘16GiB、Load`0.19/0.25/0.26`、`oom_kill=0`；四个UAT容器restart0/OOM false，Web/PostgreSQL healthy且Worker/Caddy运行不变，任务PostgreSQL/Node容器、双cluster和临时目录清零 |
 | 外部边界 | BLOCKED / NOT AUTHORIZED | 无真实角色/凭据/Volume、UAT/生产变更、host安装、Migration/deploy、备份恢复、数据读取或账号/网络动作 |
 | 系统是否可用 | NO | 当前高权限共享数据库身份和环境变量秘密尚未改变，且异机恢复、候选门、真实迁移、岗位/员工验收与切换仍缺证据 |
 

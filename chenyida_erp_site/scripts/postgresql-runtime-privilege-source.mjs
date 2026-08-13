@@ -106,10 +106,6 @@ const WEB_APPLICATION_ROUTINE_EXECUTE = Object.freeze([
 const WEB_EXTENSION_ROUTINE_EXECUTE = Object.freeze(["public.digest(bytea,text)"]);
 const BLOCKING_REASONS = Object.freeze([
   Object.freeze({
-    code: "BACKUP_LARGE_OBJECT_CAPTURE_BOUNDARY_UNRESOLVED",
-    objects: Object.freeze(["pg_catalog.pg_largeobject"]),
-  }),
-  Object.freeze({
     code: "POSTGRESQL17_COMPILED_CATALOG_REQUIRED",
     objects: Object.freeze([]),
   }),
@@ -638,7 +634,7 @@ export async function createRuntimePrivilegeAccessDocument({ siteRoot = SITE_ROO
     services: {
       ADMIN: serviceDocument(adminMap, catalog, adminEvidence, "USAGE", { derivation: "REVIEWED_ONE_SHOT_ADMIN_PATH" }),
       BACKUP: serviceDocument(backupMap, catalog, backupEvidence, "SELECT", {
-        derivation: "REVIEWED_LOGICAL_CAPTURE_SOURCE_INTENT",
+        derivation: "REVIEWED_ZERO_LARGE_OBJECT_LOGICAL_CAPTURE_SOURCE_INTENT",
         extensionRoutineExecute: WEB_EXTENSION_ROUTINE_EXECUTE,
       }),
       WEB: serviceDocument(web.operations, catalog, web.evidence, "USAGE", {

@@ -96,13 +96,15 @@ launcher在执行前消费一次性授权并只映射到固定动作。验证器
 4. 检查内存、Swap、磁盘、Load、容器 restart/OOM 与目标容量；
 5. 确认没有残留 `.backup-fence-v2.json`。存在时不得重跑，必须按第 5 节恢复守卫。
 
-入口为 `scripts/backup-selfhost.sh`。它要求显式 deployment class/token、专用根、root-only service 文件、四个源目录、精确已停止 Web/Worker、策略/RPO 和目标 reader GID。示意：
+入口为 `scripts/backup-selfhost.sh`。它要求显式 deployment class/token、专用根、两个物理独立的 root-only service 文件、四个源目录、精确已停止 Web/Worker、策略/RPO 和目标 reader GID。control 文件只供离线高权限围栏身份使用，capture 文件必须连接固定的非 superuser、非 owner `chenyida_erp_backup`；两者路径、inode 和 service name 都必须不同。示意：
 
 ```bash
 sudo scripts/backup-selfhost.sh \
   --credential-root /run/chenyida-erp/credentials \
-  --db-service-file /run/chenyida-erp/credentials/pg_service.conf \
-  --db-service erp_backup \
+  --control-db-service-file /run/chenyida-erp/credentials/pg_backup_control_service.conf \
+  --control-db-service erp_backup_control \
+  --capture-db-service-file /run/chenyida-erp/credentials/pg_backup_capture_service.conf \
+  --capture-db-service erp_backup_capture \
   --deployment-class UAT \
   --deployment-id chenyida-erp-parallel \
   --expected-database chenyida_erp \
@@ -121,21 +123,23 @@ sudo scripts/backup-selfhost.sh \
   --confirm UAT_BACKUP_V2_AUTHORIZED
 ```
 
-生产 token 为 `PRODUCTION_BACKUP_V2_AUTHORIZED`，且必须由 root 执行。脚本会先持久化数据库守卫意图，再设置只读/连接边界并清退连接；随后计算数据库和三个文件树的前后内容摘要、生成 custom dump 与三个 tar、绑定完整 Migration 清单、应用/提交/两个实际镜像和容器 ID，最后发布不可变 `<backup-id>.local.json` 及单调别名。只有成功释放数据库守卫后才发布 `LOCAL_VERIFIED`。
+生产 token 为 `PRODUCTION_BACKUP_V2_AUTHORIZED`，且必须由 root 执行。脚本先核对 PUBLIC 无 CONNECT/TEMP、固定九角色存在、五个登录身份可连接、四个被围栏职责和Backup权限组具有精确直接 CONNECT，且不存在额外LOGIN有效CONNECT或额外LOGIN/NOLOGIN直接CONNECT grantee。它在数据库变更前持久化 v3 守卫意图，然后原子撤销 owner/Migration、Web、Worker、Admin 的 CONNECT、设置数据库默认只读，并终止 control/Backup capture allowlist 之外的 backend；数据库 connection limit 保持原值，普通 Backup capture 因而仍可逐次连接。围栏期间、释放前后和中断恢复都会复核同一精确ACL签名；任一grantee漂移均保留intent并失败关闭。释放时在一个事务中恢复同一 CONNECT 集合和 writable default，再核对精确状态后删除 intent。
+
+所有关系/sequence reconciliation、Migration 清单读取和 `pg_dump` 都只通过 capture 文件执行；control 不读取业务关系。capture 必须为 `chenyida_erp_backup`、connection limit 2、无 superuser/owner/CREATEDB/CREATEROLE/REPLICATION/BYPASSRLS/TEMP/Schema CREATE/owner membership。当前0046源码合同声明零 large object：control 在围栏内核对 `pg_largeobject_metadata=0`，reconciliation 只核对该零边界，dump 显式使用 `--no-large-objects --no-owner --no-acl`；出现任一 large object 时在生成备份前失败关闭并恢复围栏，不能靠给 capture 授 `pg_largeobject`读取权绕过。随后才计算数据库和三个文件树的前后内容摘要、生成 custom dump 与三个 tar、绑定完整 Migration 清单、应用/提交/两个实际镜像和容器 ID。只有成功释放守卫后才发布不可变 `<backup-id>.local.json`及单调别名。
 
 manifest 的一致性声明固定为 `QUIESCED_APPLICATION_AND_SNAPSHOT_WITH_CONTENT_RECONCILIATION`，dump 范围固定为 `COMPLETE_APPLICATION_DATABASE_LOGICAL_DUMP_NO_OWNER_OR_ACL`。目录和制品使用 no-clobber、fsync、严格文件集合、大小与 SHA-256；本机回执还绑定 `/etc/machine-id` 摘要及备份根 device/inode。
 
 ## 5. 守卫中断恢复
 
-若备份进程在守卫建立后异常终止，数据库会故意保持拒绝新连接/默认只读，且 `.backup-fence-v2.json` 保留。此时不要删除 intent、不要手工放开数据库、不要直接重跑备份。
+若备份进程在守卫建立后异常终止，数据库会故意保持 Web/Worker/Admin/Migration CONNECT 被撤销、默认只读，Backup capture CONNECT 保留，且 `.backup-fence-v2.json`保留v3 intent。此时不要删除 intent、不要手工放开数据库、不要直接重跑备份。
 
 在核对精确 deployment、数据库 system identifier/OID/comment、源 marker、原 connection limit、备份根 device/inode、零其他连接和凭据未变化后，运行：
 
 ```bash
 sudo scripts/recover-backup-guard.sh \
   --credential-root /run/chenyida-erp/credentials \
-  --db-service-file /run/chenyida-erp/credentials/pg_service.conf \
-  --db-service erp_backup \
+  --control-db-service-file /run/chenyida-erp/credentials/pg_backup_control_service.conf \
+  --control-db-service erp_backup_control \
   --backup-root /var/backups/chenyida-erp-v2 \
   --deployment-class UAT \
   --deployment-id chenyida-erp-parallel \
@@ -146,7 +150,7 @@ sudo scripts/recover-backup-guard.sh \
   --confirm RECOVER_EXACT_STALE_BACKUP_GUARD
 ```
 
-恢复器只在 live 状态仍属于该精确守卫转换时复原原 connection limit 和 writable default，最终验证后才 fsync 删除 intent。身份或状态有歧义时失败关闭并要求人工隔离调查。
+恢复器只接受v3 intent，并只在 live 状态仍严格属于“原始四职责可CONNECT/无只读设置”或“围栏四职责不可CONNECT/默认只读”之一时，在单一事务恢复四职责CONNECT与writable default；原 connection limit必须始终未变。最终验证数据库稳定身份、四职责有效CONNECT、零非allowlist backend及credential/intent未替换后才fsync删除intent。身份或状态有歧义时失败关闭并要求人工隔离调查。
 
 ## 6. 签名密文异机链与 `OFFHOST_VERIFIED`
 

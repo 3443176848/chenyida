@@ -51,7 +51,7 @@
 - [ ] 版本化权限策略使用exact set与稳定摘要覆盖角色属性、membership options、数据库/Schema/表/序列/routine/type/大对象/默认权限和custom tablespace；未知、额外、危险或漂移状态失败关闭。
 - [ ] 在线Web/Worker使用不同LOGIN和不同凭据，均非owner/non-superuser且不能DDL、SET ROLE owner、创建角色/数据库、绕过RLS、读取系统秘密或访问对方未获准对象；连接后实际身份断言与正反权限测试通过。
 - [ ] Migration使用独立、非superuser、低连接数身份并满足精确数据库owner/对象owner合同；只有Migration可执行版本化DDL，应用与backup身份不能写Migration历史或改变owner/ACL/default privileges。
-- [ ] Backup capture不再依赖superuser且只获得完整逻辑备份所需的精确读取权限；需要ALTER DATABASE/terminate backend/CREATE TABLESPACE/CREATEROLE的控制动作与常驻读取身份分离，并由root-only一次性授权、固定目标和去敏回执约束。
+- [x] Backup capture不再依赖superuser且只获得当前零large-object完整逻辑备份所需的精确读取权限；ALTER DATABASE/terminate backend控制动作与常驻读取身份分离，并由root-only双service、固定目标、v3 intent和去敏输出约束。CREATE TABLESPACE/CREATEROLE仍只属于后续离线bootstrap/restore控制面，不进入本备份入口。
 - [ ] UAT/PRODUCTION配置拒绝`DATABASE_URL`、`ERP_MIGRATION_DATABASE_URL`、`POSTGRES_PASSWORD`、`ERP_ADMIN_PASSWORD`、`ERP_SETUP_TOKEN`等秘密环境值；每服务secret文件具有独立路径、owner/group/mode/no-follow/单硬链接和内容边界，缺失、复用、错权限、symlink、hardlink、替换或泄漏负测通过。
 - [ ] 开发/测试兼容入口只接受显式隔离身份，不能在UAT/PRODUCTION或release candidate中降级；错误不得回显连接串、口令、文件路径或角色清单。
 - [ ] Compose声明独立`erp_postgres_tablespaces`持久Volume和固定容器namespace；runtime policy、恢复map与release gate验证精确mount、只读/读写边界、owner/mode和禁止与PGDATA/应用卷重叠，当前运行面未创建该Volume。
@@ -85,6 +85,16 @@
 
 - `0046_runtime_lock_privilege_boundary.sql`以append-only方式新增16个窄锁函数，并把20个既有locking trigger函数固定为migration owner执行、`pg_catalog, public, pg_temp`搜索路径和无PUBLIC EXECUTE；关系Schema不变，0046 SQL/Snapshot SHA-256分别为`ad68aaa4…6d66b`/`c8fe259a…f60d`。
 - Finance、Production、Quality与Sales的19个原始`SELECT ... FOR UPDATE/SHARE`调用已改经受控函数；正式access intent中`LOCK_TARGETS_REQUIRING_UPDATE`全部为空，Web无需为行锁取得任何table/column UPDATE。
-- 源码候选同步为`0.1.0-alpha.47`、46/head`0046_runtime_lock_privilege_boundary.sql`；release inventory为`244/220/24`，SHA-256`dd097081…d1fcf`，test runtime policy SHA-256`02b8e0e2…adca7`。UAT仍为alpha.42/0040，本检查点没有Migration、build或deploy授权。
+- 源码候选同步为`0.1.0-alpha.47`、46/head`0046_runtime_lock_privilege_boundary.sql`；release inventory保持`244/220/24`，当前SHA-256为`cecbbbaf…7f67`，test runtime policy SHA-256为`a90e07ae…4c8a`。UAT仍为alpha.42/0040，本检查点没有Migration、build或deploy授权。
 - 隔离PostgreSQL 17完整回归通过84文件/401项，专项权限测试5/5、迁移/源意图/版本11/11、发布/版本契约31/31、typecheck38/38、凭据扫描1631文件及clean-candidate等价lint 0 error/17条既有warning通过。首次直接`eslint .`因扫描未跟踪构建产物触发V8 heap OOM；容器未OOMKill、Swap仅小幅增长，排除不会进入Git快照的`dist/.wrangler/.task-tmp`后在同一1 GiB上限通过，未增加并发或降低规则。
-- 权限源仍明确`BLOCKED`，仅剩`BACKUP_LARGE_OBJECT_CAPTURE_BOUNDARY_UNRESOLVED`与`POSTGRESQL17_COMPILED_CATALOG_REQUIRED`两个blocker；下一步先拆分Backup control/capture并闭合零large-object边界，再生成PG17精确catalog并执行完整角色/ACL reconcile。当前UAT共享superuser、环境变量秘密和运行服务均未改变，系统继续`PRODUCTION NO-GO`。
+- 权限源仍明确`BLOCKED`，Backup边界闭合后仅剩`POSTGRESQL17_COMPILED_CATALOG_REQUIRED`；下一步生成PG17精确catalog并执行完整角色/ACL reconcile。当前UAT共享superuser、环境变量秘密和运行服务均未改变，系统继续`PRODUCTION NO-GO`。
+
+## 10. Backup control/capture 检查点
+
+- `backup-selfhost.sh`不再接受单一数据库service：必须提供路径、inode和service name均独立的control/capture root-only文件。control会话仍要求superuser，只执行稳定身份/零large-object核验、数据库只读与`CONNECT`围栏、backend清退及守卫释放；relation reconciliation、Migration只读核对和dump均由固定非superuser `chenyida_erp_backup`执行。
+- 围栏从修改`datconnlimit`升级为`chenyida-erp-backup-connect-fence/v1`：在一个事务中撤销owner、Web、Worker与Admin权限组的数据库`CONNECT`并设置默认只读，保留capture和当前control；释放/中断恢复也在一个事务中恢复固定四职责`CONNECT`和writable default。原connection limit在全过程必须不变，九角色/五登录/四围栏grantee/Backup grantee、PUBLIC CONNECT/TEMP、额外LOGIN或NOLOGIN CONNECT、错误角色属性或ACL均失败关闭。
+- 守卫intent升级为`chenyida-erp-backup-fence/v3`，为中断发现兼容继续使用`.backup-fence-v2.json`文件名。`recover-backup-guard.sh`只接受同一control service和精确v3 intent；capture身份不能解除守卫，原始/围栏状态之外的任何漂移都拒绝自动恢复。
+- 当前应用Migration/恢复catalog明确`large_objects: []`。control在创建WORK或发布artifact前要求`pg_largeobject_metadata`计数为零；capture不读取原始`pg_largeobject`，reconciliation只验证零metadata，dump固定`--no-large-objects --no-owner --no-acl`。隔离负测证明意外large object会拒绝备份并精确释放围栏，零large-object路径可完成备份、新空库恢复与业务reconciliation。
+- PG17单容器双集群测试通过：普通capture可完整dump但无法读取`pg_largeobject`正文、写业务表或创建TEMP；崩溃守卫中capture保持可连接而owner被围栏，未知NOLOGIN CONNECT漂移会阻断恢复且保留intent，清除漂移后固定四职责CONNECT精确复原；意外large object拒绝和零large-object备份/恢复均通过，下游Dashboard PostgreSQL 2/2通过，临时集群/容器/目录清零。
+- 更新后的access intent SHA-256为`218d7ff7e17124c6ff45b39f25a104016538d4a6e23f50ed8be3f6b500a2561f`，只剩PG17编译catalog blocker。Backup/source定向合同13/13、release合同51/51和inventory `244/220/24`验证通过；本检查点没有真实凭据、角色/ACL、备份、恢复、Volume、Migration、部署或服务变化。
+- ACL签名收紧后的首次定向复跑因已生成access JSON按设计变成stale而12/13，重新生成后13/13；凭据扫描首次在不含Git的固定Node镜像中于文件扫描前退出，改用扫描器原生`COMMITTED_TREE`显式排序清单后1631文件通过。没有跳过文件、读取未跟踪报告或降低断言；PG17只出现既有合成publication `wal_level`与`PGPASSFILE=/dev/null`告警，不影响本次断言。

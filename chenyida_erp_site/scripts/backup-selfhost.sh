@@ -5,19 +5,22 @@ LC_ALL=C
 export LC_ALL
 
 usage() {
-  echo "usage: $0 --credential-root DIR --db-service-file FILE --db-service NAME --deployment-class TEST|UAT|PRODUCTION --deployment-id ID --expected-database NAME --uploads DIR --attachments DIR --backup-status DIR --migrations DIR --backup-root DIR --receipt-root DIR --receipt-reader-gid GID --web-container NAME --worker-container NAME --location-id ID --policy-id ID --rpo-hours 1..168 [--machine-identity-file FILE (NODE_ENV=test only)] --confirm TOKEN" >&2
+  echo "usage: $0 --credential-root DIR --control-db-service-file FILE --control-db-service NAME --capture-db-service-file FILE --capture-db-service NAME --deployment-class TEST|UAT|PRODUCTION --deployment-id ID --expected-database NAME --uploads DIR --attachments DIR --backup-status DIR --migrations DIR --backup-root DIR --receipt-root DIR --receipt-reader-gid GID --web-container NAME --worker-container NAME --location-id ID --policy-id ID --rpo-hours 1..168 [--machine-identity-file FILE (NODE_ENV=test only)] --confirm TOKEN" >&2
   exit 2
 }
 
-CREDENTIAL_ROOT=""; SERVICE_FILE=""; DB_SERVICE=""; DEPLOYMENT_CLASS=""; DEPLOYMENT_ID=""; EXPECTED_DATABASE=""
+CREDENTIAL_ROOT=""; CONTROL_SERVICE_FILE=""; CONTROL_DB_SERVICE=""; CAPTURE_SERVICE_FILE=""; CAPTURE_DB_SERVICE=""
+DEPLOYMENT_CLASS=""; DEPLOYMENT_ID=""; EXPECTED_DATABASE=""
 UPLOADS=""; ATTACHMENTS=""; BACKUP_STATUS=""; MIGRATIONS=""; BACKUP_ROOT=""; RECEIPT_ROOT=""; RECEIPT_READER_GID=""
 WEB_CONTAINER=""; WORKER_CONTAINER=""; LOCATION_ID=""; POLICY_ID=""; RPO_HOURS=""; MACHINE_IDENTITY_FILE=""; CONFIRM=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --credential-root) CREDENTIAL_ROOT=${2:-}; shift 2 ;;
-    --db-service-file) SERVICE_FILE=${2:-}; shift 2 ;;
-    --db-service) DB_SERVICE=${2:-}; shift 2 ;;
+    --control-db-service-file) CONTROL_SERVICE_FILE=${2:-}; shift 2 ;;
+    --control-db-service) CONTROL_DB_SERVICE=${2:-}; shift 2 ;;
+    --capture-db-service-file) CAPTURE_SERVICE_FILE=${2:-}; shift 2 ;;
+    --capture-db-service) CAPTURE_DB_SERVICE=${2:-}; shift 2 ;;
     --deployment-class) DEPLOYMENT_CLASS=${2:-}; shift 2 ;;
     --deployment-id) DEPLOYMENT_ID=${2:-}; shift 2 ;;
     --expected-database) EXPECTED_DATABASE=${2:-}; shift 2 ;;
@@ -39,11 +42,12 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-for value in "$CREDENTIAL_ROOT" "$SERVICE_FILE" "$DB_SERVICE" "$DEPLOYMENT_CLASS" "$DEPLOYMENT_ID" "$EXPECTED_DATABASE" "$UPLOADS" "$ATTACHMENTS" "$BACKUP_STATUS" "$MIGRATIONS" "$BACKUP_ROOT" "$RECEIPT_ROOT" "$RECEIPT_READER_GID" "$WEB_CONTAINER" "$WORKER_CONTAINER" "$LOCATION_ID" "$POLICY_ID" "$RPO_HOURS" "$CONFIRM"; do [ -n "$value" ] || usage; done
+for value in "$CREDENTIAL_ROOT" "$CONTROL_SERVICE_FILE" "$CONTROL_DB_SERVICE" "$CAPTURE_SERVICE_FILE" "$CAPTURE_DB_SERVICE" "$DEPLOYMENT_CLASS" "$DEPLOYMENT_ID" "$EXPECTED_DATABASE" "$UPLOADS" "$ATTACHMENTS" "$BACKUP_STATUS" "$MIGRATIONS" "$BACKUP_ROOT" "$RECEIPT_ROOT" "$RECEIPT_READER_GID" "$WEB_CONTAINER" "$WORKER_CONTAINER" "$LOCATION_ID" "$POLICY_ID" "$RPO_HOURS" "$CONFIRM"; do [ -n "$value" ] || usage; done
 case "$DEPLOYMENT_CLASS:$CONFIRM" in TEST:TEST_BACKUP_V2|UAT:UAT_BACKUP_V2_AUTHORIZED|PRODUCTION:PRODUCTION_BACKUP_V2_AUTHORIZED) : ;; *) echo "deployment class and confirmation do not match" >&2; exit 1 ;; esac
 case "$RPO_HOURS:$RECEIPT_READER_GID" in *[!0-9:]*|:*|*:) echo "RPO and receipt reader GID must be decimal integers" >&2; exit 1 ;; esac
 [ "$RPO_HOURS" -ge 1 ] && [ "$RPO_HOURS" -le 168 ] || { echo "RPO must be between 1 and 168 hours" >&2; exit 1; }
-for value in "$DB_SERVICE" "$DEPLOYMENT_ID" "$EXPECTED_DATABASE" "$WEB_CONTAINER" "$WORKER_CONTAINER" "$LOCATION_ID" "$POLICY_ID"; do case "$value" in *[!A-Za-z0-9_.-]*|'') echo "invalid bounded identifier" >&2; exit 1 ;; esac; [ "${#value}" -le 120 ] || { echo "identifier is too long" >&2; exit 1; }; done
+for value in "$CONTROL_DB_SERVICE" "$CAPTURE_DB_SERVICE" "$DEPLOYMENT_ID" "$EXPECTED_DATABASE" "$WEB_CONTAINER" "$WORKER_CONTAINER" "$LOCATION_ID" "$POLICY_ID"; do case "$value" in *[!A-Za-z0-9_.-]*|'') echo "invalid bounded identifier" >&2; exit 1 ;; esac; [ "${#value}" -le 120 ] || { echo "identifier is too long" >&2; exit 1; }; done
+[ "$CONTROL_DB_SERVICE" != "$CAPTURE_DB_SERVICE" ] || { echo "database control and capture services must be distinct" >&2; exit 1; }
 [ "$DEPLOYMENT_CLASS" != "PRODUCTION" ] || [ "$(id -u)" = 0 ] || { echo "production backup requires root" >&2; exit 1; }
 if [ -n "$MACHINE_IDENTITY_FILE" ] && [ "${NODE_ENV:-}" != test ]; then echo "machine identity override is restricted to NODE_ENV=test" >&2; exit 1; fi
 TEST_HOLD_SECONDS=${SELFHOST_BACKUP_TEST_HOLD_AFTER_GUARD:-}
@@ -75,14 +79,21 @@ CREDENTIAL_ROOT=$(validate_root "$CREDENTIAL_ROOT" .chenyida-erp-credential-root
 [ "$(stat -c %g "$RECEIPT_ROOT")" = "$RECEIPT_READER_GID" ] || { echo "receipt root reader GID mismatch" >&2; exit 1; }
 [ "$(stat -c %a "$RECEIPT_ROOT")" = 2750 ] || { echo "receipt root must be setgid 2750 for the Web reader group" >&2; exit 1; }
 
-[ -f "$SERVICE_FILE" ] && [ ! -L "$SERVICE_FILE" ] || { echo "database service file is missing or unsafe" >&2; exit 1; }
-SERVICE_FILE=$(readlink -f "$SERVICE_FILE")
-inside "$SERVICE_FILE" "$CREDENTIAL_ROOT" && [ "$SERVICE_FILE" != "$CREDENTIAL_ROOT/.chenyida-erp-credential-root-v2" ] || { echo "database service file must be inside the credential root" >&2; exit 1; }
-[ "$(stat -c %h "$SERVICE_FILE")" = 1 ] && [ "$(stat -c %u "$SERVICE_FILE")" = "$(id -u)" ] || { echo "database service file identity is unsafe" >&2; exit 1; }
-case "$(stat -c %a "$SERVICE_FILE")" in 400|600) : ;; *) echo "database service file mode must be 0400 or 0600" >&2; exit 1 ;; esac
-cursor=$(dirname "$SERVICE_FILE")
-while :; do [ "$(stat -c %u "$cursor")" = "$(id -u)" ] && [ $((0$(stat -c %a "$cursor") & 0022)) -eq 0 ] || { echo "credential ancestor is unsafe" >&2; exit 1; }; [ "$cursor" = "$CREDENTIAL_ROOT" ] && break; parent=$(dirname "$cursor"); [ "$parent" != "$cursor" ] && inside "$parent" "$CREDENTIAL_ROOT" || { echo "credential path escapes its root" >&2; exit 1; }; cursor=$parent; done
-if grep -Eiq '^[[:space:]]*(passfile|sslkey)[[:space:]]*=' "$SERVICE_FILE"; then echo "external libpq secret references are not accepted" >&2; exit 1; fi
+validate_service_file() {
+  candidate=$1
+  [ -f "$candidate" ] && [ ! -L "$candidate" ] || { echo "database service file is missing or unsafe" >&2; exit 1; }
+  candidate=$(readlink -f "$candidate")
+  inside "$candidate" "$CREDENTIAL_ROOT" && [ "$candidate" != "$CREDENTIAL_ROOT/.chenyida-erp-credential-root-v2" ] || { echo "database service file must be inside the credential root" >&2; exit 1; }
+  [ "$(stat -c %h "$candidate")" = 1 ] && [ "$(stat -c %u "$candidate")" = "$(id -u)" ] || { echo "database service file identity is unsafe" >&2; exit 1; }
+  case "$(stat -c %a "$candidate")" in 400|600) : ;; *) echo "database service file mode must be 0400 or 0600" >&2; exit 1 ;; esac
+  cursor=$(dirname "$candidate")
+  while :; do [ "$(stat -c %u "$cursor")" = "$(id -u)" ] && [ $((0$(stat -c %a "$cursor") & 0022)) -eq 0 ] || { echo "credential ancestor is unsafe" >&2; exit 1; }; [ "$cursor" = "$CREDENTIAL_ROOT" ] && break; parent=$(dirname "$cursor"); [ "$parent" != "$cursor" ] && inside "$parent" "$CREDENTIAL_ROOT" || { echo "credential path escapes its root" >&2; exit 1; }; cursor=$parent; done
+  if grep -Eiq '^[[:space:]]*(passfile|sslkey)[[:space:]]*=' "$candidate"; then echo "external libpq secret references are not accepted" >&2; exit 1; fi
+  printf '%s\n' "$candidate"
+}
+CONTROL_SERVICE_FILE=$(validate_service_file "$CONTROL_SERVICE_FILE")
+CAPTURE_SERVICE_FILE=$(validate_service_file "$CAPTURE_SERVICE_FILE")
+[ "$CONTROL_SERVICE_FILE" != "$CAPTURE_SERVICE_FILE" ] && [ "$(stat -Lc '%d:%i' "$CONTROL_SERVICE_FILE")" != "$(stat -Lc '%d:%i' "$CAPTURE_SERVICE_FILE")" ] || { echo "database control and capture credential files must be physically distinct" >&2; exit 1; }
 
 for source in "$UPLOADS" "$ATTACHMENTS" "$BACKUP_STATUS" "$MIGRATIONS"; do [ -d "$source" ] && [ ! -L "$source" ] || { echo "backup source is missing or unsafe" >&2; exit 1; }; done
 UPLOADS=$(readlink -f "$UPLOADS"); ATTACHMENTS=$(readlink -f "$ATTACHMENTS"); BACKUP_STATUS=$(readlink -f "$BACKUP_STATUS"); MIGRATIONS=$(readlink -f "$MIGRATIONS")
@@ -123,15 +134,25 @@ for lock_file in "$BACKUP_ROOT/.selfhost-ops-v2.lock" "$BACKUP_ROOT/.backup-v2.l
   chmod 0600 "$lock_file"
 done
 exec 6>"$RECEIPT_ROOT/.receipt-v2.lock"; flock -n 6 || { echo "verification receipt root is busy" >&2; exit 1; }
-exec 8<"$SERVICE_FILE"; flock -s -n 8 || { echo "database credential file is being modified" >&2; exit 1; }
-SERVICE_FILE_IDENTITY=$(stat -Lc '%d:%i:%s:%Y:%u:%g:%a' "$SERVICE_FILE")
-SERVICE_FILE_SHA256=$(sha256sum "$SERVICE_FILE" | awk '{print $1}')
-credential_unchanged() {
-  [ "$(stat -Lc '%d:%i:%s:%Y:%u:%g:%a' "$SERVICE_FILE" 2>/dev/null)" = "$SERVICE_FILE_IDENTITY" ] && [ "$(sha256sum "$SERVICE_FILE" 2>/dev/null | awk '{print $1}')" = "$SERVICE_FILE_SHA256" ] || { echo "database credential file changed during backup" >&2; return 1; }
+exec 8<"$CONTROL_SERVICE_FILE"; flock -s -n 8 || { echo "database control credential file is being modified" >&2; exit 1; }
+exec 7<"$CAPTURE_SERVICE_FILE"; flock -s -n 7 || { echo "database capture credential file is being modified" >&2; exit 1; }
+CONTROL_SERVICE_FILE_IDENTITY=$(stat -Lc '%d:%i:%s:%Y:%u:%g:%a' "$CONTROL_SERVICE_FILE")
+CONTROL_SERVICE_FILE_SHA256=$(sha256sum "$CONTROL_SERVICE_FILE" | awk '{print $1}')
+CAPTURE_SERVICE_FILE_IDENTITY=$(stat -Lc '%d:%i:%s:%Y:%u:%g:%a' "$CAPTURE_SERVICE_FILE")
+CAPTURE_SERVICE_FILE_SHA256=$(sha256sum "$CAPTURE_SERVICE_FILE" | awk '{print $1}')
+control_credential_unchanged() {
+  [ "$(stat -Lc '%d:%i:%s:%Y:%u:%g:%a' "$CONTROL_SERVICE_FILE" 2>/dev/null)" = "$CONTROL_SERVICE_FILE_IDENTITY" ] && [ "$(sha256sum "$CONTROL_SERVICE_FILE" 2>/dev/null | awk '{print $1}')" = "$CONTROL_SERVICE_FILE_SHA256" ] || { echo "database control credential file changed during backup" >&2; return 1; }
+}
+capture_credential_unchanged() {
+  [ "$(stat -Lc '%d:%i:%s:%Y:%u:%g:%a' "$CAPTURE_SERVICE_FILE" 2>/dev/null)" = "$CAPTURE_SERVICE_FILE_IDENTITY" ] && [ "$(sha256sum "$CAPTURE_SERVICE_FILE" 2>/dev/null | awk '{print $1}')" = "$CAPTURE_SERVICE_FILE_SHA256" ] || { echo "database capture credential file changed during backup" >&2; return 1; }
+}
+credentials_unchanged() {
+  control_credential_unchanged && capture_credential_unchanged
 }
 SAFE_PATH=${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}
-db_env() { env -i PATH="$SAFE_PATH" LANG=C LC_ALL=C PGSERVICEFILE="$SERVICE_FILE" PGPASSFILE=/dev/null PGSSLKEY=/dev/null PGSSLCERT=/dev/null PGCONNECT_TIMEOUT=15 "$@"; }
-db_env_override() { env -i PATH="$SAFE_PATH" LANG=C LC_ALL=C PGSERVICEFILE="$SERVICE_FILE" PGPASSFILE=/dev/null PGSSLKEY=/dev/null PGSSLCERT=/dev/null PGCONNECT_TIMEOUT=15 PGOPTIONS='-c default_transaction_read_only=off' "$@"; }
+control_db_env() { env -i PATH="$SAFE_PATH" LANG=C LC_ALL=C PGSERVICEFILE="$CONTROL_SERVICE_FILE" PGPASSFILE=/dev/null PGSSLKEY=/dev/null PGSSLCERT=/dev/null PGCONNECT_TIMEOUT=15 "$@"; }
+control_db_env_override() { env -i PATH="$SAFE_PATH" LANG=C LC_ALL=C PGSERVICEFILE="$CONTROL_SERVICE_FILE" PGPASSFILE=/dev/null PGSSLKEY=/dev/null PGSSLCERT=/dev/null PGCONNECT_TIMEOUT=15 PGOPTIONS='-c default_transaction_read_only=off' "$@"; }
+capture_db_env() { env -i PATH="$SAFE_PATH" LANG=C LC_ALL=C PGSERVICEFILE="$CAPTURE_SERVICE_FILE" PGPASSFILE=/dev/null PGSSLKEY=/dev/null PGSSLCERT=/dev/null PGCONNECT_TIMEOUT=15 "$@"; }
 
 host_resource_gate() {
   mem_available_kib=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
@@ -192,10 +213,10 @@ case "$WORKER_IMAGE_DIGEST" in sha256:[0-9a-f][0-9a-f]*) : ;; *) echo "worker im
 [ "$WORKER_APP_VERSION" = "$APP_VERSION" ] && [ "$WORKER_GIT_COMMIT" = "$GIT_COMMIT" ] || { echo "Web and Worker release version/revision do not match" >&2; exit 1; }
 
 DB_MARKER_ID="$DEPLOYMENT_CLASS.$DEPLOYMENT_ID"
-credential_unchanged
-DB_PROBE=$(db_env psql --no-psqlrc --quiet --dbname="service=$DB_SERVICE" -v ON_ERROR_STOP=1 -At -F '|' -c "select current_database(),system_identifier::text,(select oid::text from pg_database where datname=current_database()),coalesce(shobj_description((select oid from pg_database where datname=current_database()),'pg_database'),''),(select rolsuper::text from pg_roles where rolname=current_user),current_setting('default_transaction_read_only'),(select count(*)::text from pg_db_role_setting s join pg_database d on d.oid=s.setdatabase where d.datname=current_database() and s.setrole=0 and exists(select 1 from unnest(s.setconfig) v where v like 'default_transaction_read_only=%')),(select count(*)::text from pg_db_role_setting s where (s.setdatabase=0 or s.setdatabase=(select oid from pg_database where datname=current_database())) and exists(select 1 from unnest(s.setconfig) v where v='default_transaction_read_only=off')),((current_setting('server_version_num')::integer/10000)::text),(select pg_encoding_to_char(encoding) from pg_database where datname=current_database()),(select datcollate from pg_database where datname=current_database()),(select datctype from pg_database where datname=current_database()),(select case datlocprovider when 'c' then 'libc' when 'i' then 'icu' when 'b' then 'builtin' else 'unknown' end from pg_database where datname=current_database()),(select coalesce(datcollversion,'NONE') from pg_database where datname=current_database()),(select datconnlimit::text from pg_database where datname=current_database()),pg_database_size(current_database())::text,(select count(*)::text from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid()) from pg_control_system()")
+credentials_unchanged
+DB_PROBE=$(control_db_env psql --no-psqlrc --quiet --dbname="service=$CONTROL_DB_SERVICE" -v ON_ERROR_STOP=1 -At -F '|' -c "select current_database(),system_identifier::text,(select oid::text from pg_database where datname=current_database()),coalesce(shobj_description((select oid from pg_database where datname=current_database()),'pg_database'),''),(select rolsuper::text from pg_roles where rolname=current_user),current_setting('default_transaction_read_only'),(select count(*)::text from pg_db_role_setting s join pg_database d on d.oid=s.setdatabase where d.datname=current_database() and s.setrole=0 and exists(select 1 from unnest(s.setconfig) v where v like 'default_transaction_read_only=%')),(select count(*)::text from pg_db_role_setting s where (s.setdatabase=0 or s.setdatabase=(select oid from pg_database where datname=current_database())) and exists(select 1 from unnest(s.setconfig) v where v='default_transaction_read_only=off')),((current_setting('server_version_num')::integer/10000)::text),(select pg_encoding_to_char(encoding) from pg_database where datname=current_database()),(select datcollate from pg_database where datname=current_database()),(select datctype from pg_database where datname=current_database()),(select case datlocprovider when 'c' then 'libc' when 'i' then 'icu' when 'b' then 'builtin' else 'unknown' end from pg_database where datname=current_database()),(select coalesce(datcollversion,'NONE') from pg_database where datname=current_database()),(select datconnlimit::text from pg_database where datname=current_database()),pg_database_size(current_database())::text,(select count(*)::text from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid()) from pg_control_system()")
 old_ifs=$IFS; IFS='|'; set -- $DB_PROBE; IFS=$old_ifs
-[ "$#" -eq 17 ] && [ "$1" = "$EXPECTED_DATABASE" ] && [ "$4" = "chenyida-erp-deployment/v2:$DEPLOYMENT_CLASS:$DEPLOYMENT_ID" ] && { [ "$5" = true ] || [ "$5" = t ]; } && [ "$6" = off ] && [ "$7" = 0 ] && [ "$8" = 0 ] && [ "${17}" = 0 ] || { echo "database stable identity, deployment marker, backup role, or initial writer boundary is invalid" >&2; exit 1; }
+[ "$#" -eq 17 ] && [ "$1" = "$EXPECTED_DATABASE" ] && [ "$4" = "chenyida-erp-deployment/v2:$DEPLOYMENT_CLASS:$DEPLOYMENT_ID" ] && { [ "$5" = true ] || [ "$5" = t ]; } && [ "$6" = off ] && [ "$7" = 0 ] && [ "$8" = 0 ] && [ "${17}" = 0 ] || { echo "database stable identity, deployment marker, control role, or initial writer boundary is invalid" >&2; exit 1; }
 DATABASE_SYSTEM_IDENTIFIER=$2; DATABASE_OID=$3
 DATABASE_SERVER_MAJOR=$9; DATABASE_ENCODING=${10}; DATABASE_COLLATE=${11}; DATABASE_CTYPE=${12}; DATABASE_LOCALE_PROVIDER=${13}; DATABASE_COLLATION_VERSION=${14}
 ORIGINAL_CONNECTION_LIMIT=${15}; DATABASE_BYTES=${16}
@@ -204,6 +225,18 @@ for value in "$DATABASE_SYSTEM_IDENTIFIER" "$DATABASE_OID" "$DATABASE_SERVER_MAJ
 case "$ORIGINAL_CONNECTION_LIMIT" in -1) : ;; ''|*[!0-9]*) echo "database connection limit is invalid" >&2; exit 1 ;; *) : ;; esac
 for value in "$DATABASE_ENCODING" "$DATABASE_COLLATE" "$DATABASE_CTYPE" "$DATABASE_LOCALE_PROVIDER" "$DATABASE_COLLATION_VERSION"; do case "$value" in *[!A-Za-z0-9_.-]*|'') echo "database locale profile is unsupported" >&2; exit 1 ;; esac; done
 [ "$DATABASE_LOCALE_PROVIDER" = libc ] || { echo "backup recovery v2 currently supports only an explicitly bound libc database locale" >&2; exit 1; }
+
+CAPTURE_PROBE=$(capture_db_env psql --no-psqlrc --quiet --dbname="service=$CAPTURE_DB_SERVICE" -v ON_ERROR_STOP=1 -At -F '|' -c "select current_database(),d.oid::text,coalesce(shobj_description(d.oid,'pg_database'),''),current_user,session_user,case when r.rolsuper then '1' else '0' end,case when r.rolcreatedb then '1' else '0' end,case when r.rolcreaterole then '1' else '0' end,case when r.rolreplication then '1' else '0' end,case when r.rolbypassrls then '1' else '0' end,case when r.rolinherit then '1' else '0' end,case when r.rolcanlogin then '1' else '0' end,r.rolconnlimit::text,case when d.datdba=r.oid then '1' else '0' end,current_setting('default_transaction_read_only'),case when has_database_privilege(r.oid,d.oid,'CONNECT') then '1' else '0' end,case when has_database_privilege(r.oid,d.oid,'TEMPORARY') then '1' else '0' end,case when has_schema_privilege(r.oid,'public','USAGE') then '1' else '0' end,case when has_schema_privilege(r.oid,'public','CREATE') then '1' else '0' end,case when pg_has_role(r.oid,'chenyida_erp_backup_priv','MEMBER') then '1' else '0' end,case when pg_has_role(r.oid,'chenyida_erp_owner','MEMBER') then '1' else '0' end from pg_database d join pg_roles r on r.rolname=current_user where d.datname=current_database()")
+old_ifs=$IFS; IFS='|'; set -- $CAPTURE_PROBE; IFS=$old_ifs
+[ "$#" -eq 21 ] && [ "$1" = "$EXPECTED_DATABASE" ] && [ "$2" = "$DATABASE_OID" ] && [ "$3" = "chenyida-erp-deployment/v2:$DEPLOYMENT_CLASS:$DEPLOYMENT_ID" ] && [ "$4" = chenyida_erp_backup ] && [ "$5" = chenyida_erp_backup ] \
+  && [ "$6:$7:$8:$9:${10}" = 0:0:0:0:0 ] && [ "${11}:${12}:${13}:${14}:${15}" = 1:1:2:0:off ] \
+  && [ "${16}:${17}:${18}:${19}:${20}:${21}" = 1:0:1:0:1:0 ] || { echo "database capture identity or capability boundary is invalid" >&2; exit 1; }
+
+CONNECT_STATE_RELEASED='9:5:0:0:4:1:0:0'
+CONNECT_STATE_FENCED='9:1:0:0:0:1:0:0'
+CONNECT_BASELINE=$(control_db_env psql --no-psqlrc --quiet --dbname="service=$CONTROL_DB_SERVICE" -v ON_ERROR_STOP=1 -At -c "with target as (select oid,datacl,datdba from pg_database where datname=current_database()),expected_roles as (select oid,rolname from pg_roles where rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin','chenyida_erp_backup','chenyida_erp_web_priv','chenyida_erp_worker_priv','chenyida_erp_admin_priv','chenyida_erp_backup_priv')),expanded as (select a.grantee,a.privilege_type from target t cross join lateral aclexplode(coalesce(t.datacl,acldefault('d',t.datdba))) a) select concat_ws(':',(select count(*) from expected_roles),(select count(*) from expected_roles r,target t where r.rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin','chenyida_erp_backup') and has_database_privilege(r.oid,t.oid,'CONNECT')),(select count(*) from expanded where grantee=0 and privilege_type='CONNECT'),(select count(*) from expanded where grantee=0 and privilege_type='TEMPORARY'),(select count(distinct r.rolname) from expanded e join expected_roles r on r.oid=e.grantee where e.privilege_type='CONNECT' and r.rolname in ('chenyida_erp_owner','chenyida_erp_web_priv','chenyida_erp_worker_priv','chenyida_erp_admin_priv')),(select count(*) from expanded e join expected_roles r on r.oid=e.grantee where e.privilege_type='CONNECT' and r.rolname='chenyida_erp_backup_priv'),(select count(*) from expanded e where e.privilege_type='CONNECT' and e.grantee<>0 and not exists(select 1 from expected_roles r where r.oid=e.grantee and r.rolname in ('chenyida_erp_owner','chenyida_erp_web_priv','chenyida_erp_worker_priv','chenyida_erp_admin_priv','chenyida_erp_backup_priv'))),(select count(*) from pg_roles r,target t where r.rolcanlogin and r.rolname<>current_user and r.rolname not in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin','chenyida_erp_backup') and has_database_privilege(r.oid,t.oid,'CONNECT')))")
+[ "$CONNECT_BASELINE" = "$CONNECT_STATE_RELEASED" ] || { echo "database CONNECT fence baseline is invalid" >&2; exit 1; }
+credentials_unchanged
 
 BACKUP_AVAILABLE_KIB=$(df -Pk "$BACKUP_ROOT" | awk 'END {print $4}')
 case "$BACKUP_AVAILABLE_KIB" in ''|*[!0-9]*) echo "backup root capacity is unavailable" >&2; exit 1 ;; esac
@@ -223,22 +256,21 @@ intent_unchanged() {
   [ -n "$INTENT_IDENTITY" ] && [ "$(stat -Lc '%d:%i:%s:%Y:%u:%g:%a:%h' "$INTENT_FILE" 2>/dev/null)" = "$INTENT_IDENTITY" ] && [ "$(sha256sum "$INTENT_FILE" 2>/dev/null | awk '{print $1}')" = "$INTENT_SHA256" ] || { echo "durable backup guard intent changed unexpectedly" >&2; return 1; }
 }
 database_guard_state() {
-  db_env_override psql --no-psqlrc --quiet --dbname="service=$DB_SERVICE" -v ON_ERROR_STOP=1 -At -F '|' -c "select current_database(),system_identifier::text,d.oid::text,coalesce(shobj_description(d.oid,'pg_database'),''),(select count(*)::text from pg_db_role_setting s cross join lateral unnest(s.setconfig) v where s.setdatabase=d.oid and s.setrole=0 and v like 'default_transaction_read_only=%'),coalesce((select max(split_part(v,'=',2)) from pg_db_role_setting s cross join lateral unnest(s.setconfig) v where s.setdatabase=d.oid and s.setrole=0 and v like 'default_transaction_read_only=%'),'RESET'),d.datconnlimit::text,(select count(*)::text from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid()) from pg_control_system(),pg_database d where d.datname=current_database()"
+  control_db_env_override psql --no-psqlrc --quiet --dbname="service=$CONTROL_DB_SERVICE" -v ON_ERROR_STOP=1 -At -F '|' -c "select current_database(),system_identifier::text,d.oid::text,coalesce(shobj_description(d.oid,'pg_database'),''),(select count(*)::text from pg_db_role_setting s cross join lateral unnest(s.setconfig) v where s.setdatabase=d.oid and s.setrole=0 and v like 'default_transaction_read_only=%'),coalesce((select max(split_part(v,'=',2)) from pg_db_role_setting s cross join lateral unnest(s.setconfig) v where s.setdatabase=d.oid and s.setrole=0 and v like 'default_transaction_read_only=%'),'RESET'),d.datconnlimit::text,(select count(*)::text from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid() and usename not in (current_user,'chenyida_erp_backup')),(select count(*)::text from pg_roles r where r.rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin') and has_database_privilege(r.oid,d.oid,'CONNECT')),(with target as (select oid,datacl,datdba from pg_database where datname=current_database()),expected_roles as (select oid,rolname from pg_roles where rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin','chenyida_erp_backup','chenyida_erp_web_priv','chenyida_erp_worker_priv','chenyida_erp_admin_priv','chenyida_erp_backup_priv')),expanded as (select a.grantee,a.privilege_type from target t cross join lateral aclexplode(coalesce(t.datacl,acldefault('d',t.datdba))) a) select concat_ws(':',(select count(*) from expected_roles),(select count(*) from expected_roles r,target t where r.rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin','chenyida_erp_backup') and has_database_privilege(r.oid,t.oid,'CONNECT')),(select count(*) from expanded where grantee=0 and privilege_type='CONNECT'),(select count(*) from expanded where grantee=0 and privilege_type='TEMPORARY'),(select count(distinct r.rolname) from expanded e join expected_roles r on r.oid=e.grantee where e.privilege_type='CONNECT' and r.rolname in ('chenyida_erp_owner','chenyida_erp_web_priv','chenyida_erp_worker_priv','chenyida_erp_admin_priv')),(select count(*) from expanded e join expected_roles r on r.oid=e.grantee where e.privilege_type='CONNECT' and r.rolname='chenyida_erp_backup_priv'),(select count(*) from expanded e where e.privilege_type='CONNECT' and e.grantee<>0 and not exists(select 1 from expected_roles r where r.oid=e.grantee and r.rolname in ('chenyida_erp_owner','chenyida_erp_web_priv','chenyida_erp_worker_priv','chenyida_erp_admin_priv','chenyida_erp_backup_priv'))),(select count(*) from pg_roles r,target t where r.rolcanlogin and r.rolname<>current_user and r.rolname not in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin','chenyida_erp_backup') and has_database_privilege(r.oid,t.oid,'CONNECT')))) from pg_control_system(),pg_database d where d.datname=current_database()"
 }
 database_guard_transition_probe() {
   probe=$(database_guard_state) || return 1
   old_ifs=$IFS; IFS='|'; set -- $probe; IFS=$old_ifs
-  [ "$#" -eq 8 ] && [ "$1" = "$EXPECTED_DATABASE" ] && [ "$2" = "$DATABASE_SYSTEM_IDENTIFIER" ] && [ "$3" = "$DATABASE_OID" ] && [ "$4" = "$DATABASE_COMMENT" ] && [ "$8" = 0 ] || { echo "database identity or guard connection boundary changed" >&2; return 1; }
-  case "$5:$6" in 0:RESET|1:on) : ;; *) echo "database read-only guard is outside the recoverable transition" >&2; return 1 ;; esac
-  [ "$7" = 0 ] || [ "$7" = "$ORIGINAL_CONNECTION_LIMIT" ] || { echo "database connection limit is outside the recoverable transition" >&2; return 1; }
+  [ "$#" -eq 10 ] && [ "$1" = "$EXPECTED_DATABASE" ] && [ "$2" = "$DATABASE_SYSTEM_IDENTIFIER" ] && [ "$3" = "$DATABASE_OID" ] && [ "$4" = "$DATABASE_COMMENT" ] && [ "$7" = "$ORIGINAL_CONNECTION_LIMIT" ] || { echo "database identity or guard connection boundary changed" >&2; return 1; }
+  case "$5:$6:$9:${10}" in "0:RESET:4:$CONNECT_STATE_RELEASED"|"1:on:0:$CONNECT_STATE_FENCED") : ;; *) echo "database read-only or CONNECT fence is outside the recoverable transition" >&2; return 1 ;; esac
 }
 database_guard_probe() {
   probe=$(database_guard_state) || return 1
-  [ "$probe" = "$EXPECTED_DATABASE|$DATABASE_SYSTEM_IDENTIFIER|$DATABASE_OID|$DATABASE_COMMENT|1|on|0|0" ] || { echo "database read-only, connection-limit, or quiesced guard is not active" >&2; return 1; }
+  [ "$probe" = "$EXPECTED_DATABASE|$DATABASE_SYSTEM_IDENTIFIER|$DATABASE_OID|$DATABASE_COMMENT|1|on|$ORIGINAL_CONNECTION_LIMIT|0|0|$CONNECT_STATE_FENCED" ] || { echo "database read-only, CONNECT, or quiesced guard is not active" >&2; return 1; }
 }
 database_released_probe() {
-  probe=$(db_env psql --no-psqlrc --quiet --dbname="service=$DB_SERVICE" -v ON_ERROR_STOP=1 -At -F '|' -c "select current_database(),system_identifier::text,d.oid::text,coalesce(shobj_description(d.oid,'pg_database'),''),(select count(*)::text from pg_db_role_setting s cross join lateral unnest(s.setconfig) v where s.setdatabase=d.oid and s.setrole=0 and v like 'default_transaction_read_only=%'),d.datconnlimit::text,(select count(*)::text from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid()),current_setting('default_transaction_read_only') from pg_control_system(),pg_database d where d.datname=current_database()") || return 1
-  [ "$probe" = "$EXPECTED_DATABASE|$DATABASE_SYSTEM_IDENTIFIER|$DATABASE_OID|$DATABASE_COMMENT|0|$ORIGINAL_CONNECTION_LIMIT|0|off" ] || { echo "database guard did not restore the exact original writable state" >&2; return 1; }
+  probe=$(control_db_env psql --no-psqlrc --quiet --dbname="service=$CONTROL_DB_SERVICE" -v ON_ERROR_STOP=1 -At -F '|' -c "select current_database(),system_identifier::text,d.oid::text,coalesce(shobj_description(d.oid,'pg_database'),''),(select count(*)::text from pg_db_role_setting s cross join lateral unnest(s.setconfig) v where s.setdatabase=d.oid and s.setrole=0 and v like 'default_transaction_read_only=%'),d.datconnlimit::text,(select count(*)::text from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid() and usename not in (current_user,'chenyida_erp_backup')),current_setting('default_transaction_read_only'),(select count(*)::text from pg_roles r where r.rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin') and has_database_privilege(r.oid,d.oid,'CONNECT')),(with target as (select oid,datacl,datdba from pg_database where datname=current_database()),expected_roles as (select oid,rolname from pg_roles where rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin','chenyida_erp_backup','chenyida_erp_web_priv','chenyida_erp_worker_priv','chenyida_erp_admin_priv','chenyida_erp_backup_priv')),expanded as (select a.grantee,a.privilege_type from target t cross join lateral aclexplode(coalesce(t.datacl,acldefault('d',t.datdba))) a) select concat_ws(':',(select count(*) from expected_roles),(select count(*) from expected_roles r,target t where r.rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin','chenyida_erp_backup') and has_database_privilege(r.oid,t.oid,'CONNECT')),(select count(*) from expanded where grantee=0 and privilege_type='CONNECT'),(select count(*) from expanded where grantee=0 and privilege_type='TEMPORARY'),(select count(distinct r.rolname) from expanded e join expected_roles r on r.oid=e.grantee where e.privilege_type='CONNECT' and r.rolname in ('chenyida_erp_owner','chenyida_erp_web_priv','chenyida_erp_worker_priv','chenyida_erp_admin_priv')),(select count(*) from expanded e join expected_roles r on r.oid=e.grantee where e.privilege_type='CONNECT' and r.rolname='chenyida_erp_backup_priv'),(select count(*) from expanded e where e.privilege_type='CONNECT' and e.grantee<>0 and not exists(select 1 from expected_roles r where r.oid=e.grantee and r.rolname in ('chenyida_erp_owner','chenyida_erp_web_priv','chenyida_erp_worker_priv','chenyida_erp_admin_priv','chenyida_erp_backup_priv'))),(select count(*) from pg_roles r,target t where r.rolcanlogin and r.rolname<>current_user and r.rolname not in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin','chenyida_erp_backup') and has_database_privilege(r.oid,t.oid,'CONNECT')))) from pg_control_system(),pg_database d where d.datname=current_database()") || return 1
+  [ "$probe" = "$EXPECTED_DATABASE|$DATABASE_SYSTEM_IDENTIFIER|$DATABASE_OID|$DATABASE_COMMENT|0|$ORIGINAL_CONNECTION_LIMIT|0|off|4|$CONNECT_STATE_RELEASED" ] || { echo "database guard did not restore the exact original writable and CONNECT state" >&2; return 1; }
 }
 remove_guard_intent() {
   intent_unchanged || return 1
@@ -248,12 +280,14 @@ remove_guard_intent() {
 }
 release_fence() {
   [ "$FENCE_ACTIVE" = 1 ] || return 0
-  credential_unchanged && intent_unchanged && database_guard_transition_probe || return 1
-  db_env_override psql --no-psqlrc --quiet --dbname="service=$DB_SERVICE" -v ON_ERROR_STOP=1 --set=database_name="$EXPECTED_DATABASE" --set=original_connection_limit="$ORIGINAL_CONNECTION_LIMIT" <<'SQL' >/dev/null || return 1
+  credentials_unchanged && intent_unchanged && database_guard_transition_probe || return 1
+  control_db_env_override psql --no-psqlrc --quiet --dbname="service=$CONTROL_DB_SERVICE" -v ON_ERROR_STOP=1 --set=database_name="$EXPECTED_DATABASE" <<'SQL' >/dev/null || return 1
+BEGIN;
 SELECT format('ALTER DATABASE %I RESET default_transaction_read_only', :'database_name') \gexec
-SELECT format('ALTER DATABASE %I CONNECTION LIMIT %s', :'database_name', :'original_connection_limit') \gexec
+SELECT format('GRANT CONNECT ON DATABASE %I TO chenyida_erp_owner, chenyida_erp_web_priv, chenyida_erp_worker_priv, chenyida_erp_admin_priv', :'database_name') \gexec
+COMMIT;
 SQL
-  database_released_probe && credential_unchanged && intent_unchanged && remove_guard_intent || return 1
+  database_released_probe && credentials_unchanged && intent_unchanged && remove_guard_intent || return 1
   FENCE_ACTIVE=0
 }
 cleanup() {
@@ -271,8 +305,8 @@ write_guard_intent() {
   created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   root_device=$(stat -c %d "$BACKUP_ROOT"); root_inode=$(stat -c %i "$BACKUP_ROOT")
   INTENT_TEMP=$(mktemp "$BACKUP_ROOT/.backup-fence-v2.json.tmp.XXXXXX")
-  printf '{"schema_version":2,"contract":"chenyida-erp-backup-fence/v2","state":"ACTIVE","deployment_class":"%s","deployment_id":"%s","database_service":"%s","database_name":"%s","database_system_identifier":"%s","database_oid":"%s","database_marker":"%s","database_comment":"%s","original_connection_limit":%s,"original_default_transaction_read_only":"off","backup_root_device":"%s","backup_root_inode":"%s","created_at":"%s"}\n' \
-    "$DEPLOYMENT_CLASS" "$DEPLOYMENT_ID" "$DB_SERVICE" "$EXPECTED_DATABASE" "$DATABASE_SYSTEM_IDENTIFIER" "$DATABASE_OID" "$DB_MARKER_ID" "$DATABASE_COMMENT" "$ORIGINAL_CONNECTION_LIMIT" "$root_device" "$root_inode" "$created_at" > "$INTENT_TEMP"
+  printf '{"schema_version":3,"contract":"chenyida-erp-backup-fence/v3","state":"ACTIVE","deployment_class":"%s","deployment_id":"%s","control_database_service":"%s","capture_database_service":"%s","capture_database_role":"chenyida_erp_backup","connect_fence_contract":"chenyida-erp-backup-connect-fence/v1","database_name":"%s","database_system_identifier":"%s","database_oid":"%s","database_marker":"%s","database_comment":"%s","original_connection_limit":%s,"original_default_transaction_read_only":"off","backup_root_device":"%s","backup_root_inode":"%s","created_at":"%s"}\n' \
+    "$DEPLOYMENT_CLASS" "$DEPLOYMENT_ID" "$CONTROL_DB_SERVICE" "$CAPTURE_DB_SERVICE" "$EXPECTED_DATABASE" "$DATABASE_SYSTEM_IDENTIFIER" "$DATABASE_OID" "$DB_MARKER_ID" "$DATABASE_COMMENT" "$ORIGINAL_CONNECTION_LIMIT" "$root_device" "$root_inode" "$created_at" > "$INTENT_TEMP"
   chmod 0400 "$INTENT_TEMP"
   contract durably-sync-file --file "$INTENT_TEMP" >/dev/null
   mv -T -n -- "$INTENT_TEMP" "$INTENT_FILE"
@@ -286,23 +320,29 @@ write_guard_intent() {
   intent_unchanged
 }
 
-credential_unchanged
+credentials_unchanged
 write_guard_intent
-db_env_override psql --no-psqlrc --quiet --dbname="service=$DB_SERVICE" -v ON_ERROR_STOP=1 --set=database_name="$EXPECTED_DATABASE" <<'SQL' >/dev/null
-SELECT format('ALTER DATABASE %I CONNECTION LIMIT 0', :'database_name') \gexec
+control_db_env_override psql --no-psqlrc --quiet --dbname="service=$CONTROL_DB_SERVICE" -v ON_ERROR_STOP=1 --set=database_name="$EXPECTED_DATABASE" <<'SQL' >/dev/null
+BEGIN;
+SELECT format('REVOKE CONNECT ON DATABASE %I FROM chenyida_erp_owner, chenyida_erp_web_priv, chenyida_erp_worker_priv, chenyida_erp_admin_priv', :'database_name') \gexec
 SELECT format('ALTER DATABASE %I SET default_transaction_read_only TO on', :'database_name') \gexec
+COMMIT;
 SQL
-db_env_override psql --no-psqlrc --quiet --dbname="service=$DB_SERVICE" -v ON_ERROR_STOP=1 -c "select pg_terminate_backend(pid) from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid()" >/dev/null
-database_guard_probe; credential_unchanged; intent_unchanged; running_application_writers_absent
-if [ -n "$TEST_HOLD_SECONDS" ]; then sleep "$TEST_HOLD_SECONDS"; database_guard_probe; credential_unchanged; intent_unchanged; fi
+control_db_env_override psql --no-psqlrc --quiet --dbname="service=$CONTROL_DB_SERVICE" -v ON_ERROR_STOP=1 -c "select pg_terminate_backend(pid) from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid() and usename not in (current_user,'chenyida_erp_backup')" >/dev/null
+database_guard_probe; credentials_unchanged; intent_unchanged; running_application_writers_absent
+if [ -n "$TEST_HOLD_SECONDS" ]; then sleep "$TEST_HOLD_SECONDS"; database_guard_probe; credentials_unchanged; intent_unchanged; fi
+LARGE_OBJECT_COUNT=$(control_db_env_override psql --no-psqlrc --quiet --dbname="service=$CONTROL_DB_SERVICE" -v ON_ERROR_STOP=1 -Atc "select count(*)::text from pg_largeobject_metadata")
+case "$LARGE_OBJECT_COUNT" in ''|*[!0-9]*) echo "large object inventory is invalid" >&2; exit 1 ;; esac
+[ "$LARGE_OBJECT_COUNT" = 0 ] || { echo "unexpected large objects block the zero-large-object backup contract" >&2; exit 1; }
+credentials_unchanged; database_guard_probe
 CONSISTENCY_BEFORE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 BACKUP_ID="backup-$(date -u +%Y%m%dT%H%M%SZ)-$(printf '%.12s' "$GIT_COMMIT")"; OUTPUT="$BACKUP_ROOT/$BACKUP_ID"; [ ! -e "$OUTPUT" ] || { echo "backup output already exists" >&2; exit 1; }
 WORK=$(mktemp -d "$BACKUP_ROOT/.erp-backup-v2.XXXXXX")
 RECONCILIATION_SQL="$(dirname "$0")/backup-reconciliation.sql"
 
-db_env psql --no-psqlrc --quiet --dbname="service=$DB_SERVICE" -v ON_ERROR_STOP=1 -f "$RECONCILIATION_SQL" > "$WORK/database-reconciliation-before.txt"
+capture_db_env psql --no-psqlrc --quiet --dbname="service=$CAPTURE_DB_SERVICE" -v ON_ERROR_STOP=1 -f "$RECONCILIATION_SQL" > "$WORK/database-reconciliation-before.txt"
 contract create-reconciliation --backup "$WORK" --database-report "$WORK/database-reconciliation-before.txt" --uploads "$UPLOADS" --attachments "$ATTACHMENTS" --backup-status "$BACKUP_STATUS" >/dev/null
-db_env pg_dump --dbname="service=$DB_SERVICE" --format=custom --no-owner --no-acl --file="$WORK/postgresql.dump"
+capture_db_env pg_dump --dbname="service=$CAPTURE_DB_SERVICE" --format=custom --no-owner --no-acl --no-large-objects --file="$WORK/postgresql.dump"
 tar -C "$UPLOADS" -czf "$WORK/uploads.tar.gz" .; tar -C "$ATTACHMENTS" -czf "$WORK/attachments.tar.gz" .; tar -C "$BACKUP_STATUS" -czf "$WORK/backup-status.tar.gz" .
 for artifact in postgresql.dump uploads.tar.gz attachments.tar.gz backup-status.tar.gz; do [ -s "$WORK/$artifact" ] || { echo "zero-byte backup component" >&2; exit 1; }; done
 
@@ -311,9 +351,9 @@ set +f
 for migration in "$MIGRATIONS"/[0-9][0-9][0-9][0-9]_*.sql; do [ -f "$migration" ] && [ ! -L "$migration" ] || { echo "migration files missing or unsafe" >&2; exit 1; }; printf '%s  %s\n' "$(sha256sum "$migration" | awk '{print $1}')" "$(basename "$migration")" >> "$WORK/migrations.txt"; done
 set -f
 MIGRATION_HEAD=$(tail -n 1 "$WORK/migrations.txt" | awk '{print $2}'); [ -n "$MIGRATION_HEAD" ] || { echo "migration head missing" >&2; exit 1; }
-db_env psql --no-psqlrc --quiet --dbname="service=$DB_SERVICE" -v ON_ERROR_STOP=1 -Atc "select checksum||'  '||version from schema_migrations order by version" > "$WORK/database-migrations.txt"
+capture_db_env psql --no-psqlrc --quiet --dbname="service=$CAPTURE_DB_SERVICE" -v ON_ERROR_STOP=1 -Atc "select checksum||'  '||version from schema_migrations order by version" > "$WORK/database-migrations.txt"
 cmp -s "$WORK/migrations.txt" "$WORK/database-migrations.txt" || { echo "database migration list does not match source" >&2; exit 1; }; rm -f "$WORK/database-migrations.txt"
-db_env psql --no-psqlrc --quiet --dbname="service=$DB_SERVICE" -v ON_ERROR_STOP=1 -f "$RECONCILIATION_SQL" > "$WORK/database-reconciliation-after.txt"
+capture_db_env psql --no-psqlrc --quiet --dbname="service=$CAPTURE_DB_SERVICE" -v ON_ERROR_STOP=1 -f "$RECONCILIATION_SQL" > "$WORK/database-reconciliation-after.txt"
 contract verify-source-reconciliation --backup "$WORK" --database-report "$WORK/database-reconciliation-after.txt" --uploads "$UPLOADS" --attachments "$ATTACHMENTS" --backup-status "$BACKUP_STATUS" >/dev/null
 rm -f "$WORK/database-reconciliation-before.txt" "$WORK/database-reconciliation-after.txt"
 
@@ -328,7 +368,7 @@ contract create-manifest --backup "$WORK" --migrations "$MIGRATIONS" --backup-id
   --app-version "$APP_VERSION" --git-commit "$GIT_COMMIT" --web-image-digest "$IMAGE_DIGEST" --worker-image-digest "$WORKER_IMAGE_DIGEST" --policy-id "$POLICY_ID" --rpo-hours "$RPO_HOURS" \
   --web-container "$WEB_CONTAINER" --web-container-id "$WEB_ID" --worker-container "$WORKER_CONTAINER" --worker-container-id "$WORKER_ID" \
   --recovery-point-at "$CONSISTENCY_BEFORE" --consistency-verified-after "$CONSISTENCY_AFTER" --uploads-entries "$UPLOAD_COUNT" --attachments-entries "$ATTACHMENT_COUNT" --backup-status-entries "$BACKUP_STATUS_COUNT" >/dev/null
-credential_unchanged
+credentials_unchanged
 contract durably-sync-tree --root "$WORK" >/dev/null
 mv -T -n -- "$WORK" "$OUTPUT"
 [ ! -e "$WORK" ] && [ -d "$OUTPUT" ] && [ ! -L "$OUTPUT" ] || { echo "backup promotion lost the no-clobber race" >&2; exit 1; }

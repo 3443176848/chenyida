@@ -57,13 +57,37 @@ start_cluster "$SOURCE_PGDATA" "$SOURCE_SOCKET" "$SOURCE_LOG"
 SOURCE_RUNNING=1
 export PGHOST="$SOURCE_SOCKET" PGUSER=postgres
 
-createdb source_test
+psql -d postgres -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
+create role chenyida_erp_owner login noinherit connection limit 1;
+create role chenyida_erp_web_priv nologin;
+create role chenyida_erp_worker_priv nologin;
+create role chenyida_erp_admin_priv nologin;
+create role chenyida_erp_backup_priv nologin;
+create role chenyida_erp_web login inherit connection limit 12;
+create role chenyida_erp_worker login inherit connection limit 6;
+create role chenyida_erp_admin login inherit connection limit 1;
+create role chenyida_erp_backup login inherit connection limit 2;
+grant chenyida_erp_web_priv to chenyida_erp_web with inherit true, set false;
+grant chenyida_erp_worker_priv to chenyida_erp_worker with inherit true, set false;
+grant chenyida_erp_admin_priv to chenyida_erp_admin with inherit true, set false;
+grant chenyida_erp_backup_priv to chenyida_erp_backup with inherit true, set false;
+SQL
+createdb -O chenyida_erp_owner source_test
 psql -d postgres -v ON_ERROR_STOP=1 -c "comment on database source_test is 'chenyida-erp-deployment/v2:TEST:erp-test-source'" >/dev/null
-createdb guard_test
+createdb -O chenyida_erp_owner guard_test
 psql -d postgres -v ON_ERROR_STOP=1 -c "comment on database guard_test is 'chenyida-erp-deployment/v2:TEST:guard-source'" >/dev/null
+psql -d postgres -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
+revoke connect,temporary on database source_test from public;
+revoke connect,temporary on database guard_test from public;
+grant connect on database source_test to chenyida_erp_owner,chenyida_erp_web_priv,chenyida_erp_worker_priv,chenyida_erp_admin_priv,chenyida_erp_backup_priv;
+grant connect on database guard_test to chenyida_erp_owner,chenyida_erp_web_priv,chenyida_erp_worker_priv,chenyida_erp_admin_priv,chenyida_erp_backup_priv;
+SQL
+for database in source_test guard_test; do
+  psql -U chenyida_erp_owner -d "$database" -v ON_ERROR_STOP=1 -c "revoke create,usage on schema public from public; grant usage on schema public to chenyida_erp_backup_priv" >/dev/null
+done
 GUARD_DATABASE_OID=$(psql -d postgres -Atc "select oid from pg_database where datname='guard_test'")
 MIGRATIONS="$TASK_ROOT/migrations"; mkdir -m 0700 "$MIGRATIONS"; printf 'select 1;\n' > "$MIGRATIONS/0001_test.sql"; MIGRATION_SHA=$(sha256sum "$MIGRATIONS/0001_test.sql" | awk '{print $1}')
-psql -d source_test -v ON_ERROR_STOP=1 <<SQL >/dev/null
+psql -U chenyida_erp_owner -d source_test -v ON_ERROR_STOP=1 <<SQL >/dev/null
 create extension pgcrypto;
 create extension btree_gist;
 create table schema_migrations(version text primary key,checksum text not null,applied_at timestamptz not null default now());
@@ -83,8 +107,11 @@ select setval('restored_sequence',42,true);
 create table restore_fault_probe(id integer primary key check(current_setting('erp.restore_fault',true) is distinct from 'on'));
 insert into restore_fault_probe values(1);
 create publication restore_publication for table restored_probe;
-select lo_from_bytea(0,decode('73796e7468657469632d6c617267652d6f626a656374','hex'));
+grant usage on schema private_domain to chenyida_erp_backup_priv;
+grant select on all tables in schema public,private_domain to chenyida_erp_backup_priv;
+grant select on all sequences in schema public,private_domain to chenyida_erp_backup_priv;
 SQL
+psql -U postgres -d source_test -v ON_ERROR_STOP=1 -c "revoke execute on function digest(bytea,text) from public; grant execute on function digest(bytea,text) to chenyida_erp_backup_priv" >/dev/null
 
 SOURCE_SYSTEM_ID=$(psql -d source_test -Atc 'select system_identifier from pg_control_system()')
 SOURCE_DATABASE_OID=$(psql -d source_test -Atc "select oid from pg_database where datname=current_database()")
@@ -109,9 +136,11 @@ marker_root "$OUTBOX_ROOT" .chenyida-erp-transfer-outbox-v1 chenyida-erp-transfe
 marker_root "$RECEIVER_ROOT" .chenyida-erp-transfer-receiver-v1 chenyida-erp-transfer-receiver/v1
 marker_root "$SOURCE_KEY_ROOT" .chenyida-erp-offhost-key-root-v1 chenyida-erp-offhost-key-root/v1
 marker_root "$RECEIVER_KEY_ROOT" .chenyida-erp-offhost-key-root-v1 chenyida-erp-offhost-key-root/v1
-SERVICE_FILE="$CREDENTIAL_ROOT/pg_service.conf"
-printf '[backup]\nhost=%s\ndbname=source_test\nuser=postgres\n[guard]\nhost=%s\ndbname=guard_test\nuser=postgres\n[restore_admin]\nhost=%s\ndbname=postgres\nuser=postgres\n' "$SOURCE_SOCKET" "$SOURCE_SOCKET" "$TARGET_SOCKET" > "$SERVICE_FILE"
-chmod 0600 "$SERVICE_FILE"
+CONTROL_SERVICE_FILE="$CREDENTIAL_ROOT/pg_control_service.conf"
+CAPTURE_SERVICE_FILE="$CREDENTIAL_ROOT/pg_capture_service.conf"
+printf '[backup_control]\nhost=%s\ndbname=source_test\nuser=postgres\n[guard_control]\nhost=%s\ndbname=guard_test\nuser=postgres\n[restore_admin]\nhost=%s\ndbname=postgres\nuser=postgres\n' "$SOURCE_SOCKET" "$SOURCE_SOCKET" "$TARGET_SOCKET" > "$CONTROL_SERVICE_FILE"
+printf '[backup_capture]\nhost=%s\ndbname=source_test\nuser=chenyida_erp_backup\n[guard_capture]\nhost=%s\ndbname=guard_test\nuser=chenyida_erp_backup\n' "$SOURCE_SOCKET" "$SOURCE_SOCKET" > "$CAPTURE_SERVICE_FILE"
+chmod 0600 "$CONTROL_SERVICE_FILE" "$CAPTURE_SERVICE_FILE"
 SOURCE_MACHINE_ID="$TASK_ROOT/source-machine-id"; RECEIVER_MACHINE_ID="$TASK_ROOT/receiver-machine-id"
 printf '11111111111111111111111111111111\n' > "$SOURCE_MACHINE_ID"
 printf '22222222222222222222222222222222\n' > "$RECEIVER_MACHINE_ID"
@@ -191,15 +220,15 @@ PATH="$FAKE_BIN:$PATH"; export PATH
 
 # A SIGKILL after the durable database fence must be recoverable through an
 # exact-identity protocol before another backup is allowed to start.
-NODE_ENV=test FAKE_WRITER_CLASS=test FAKE_WRITER_DEPLOYMENT_ID=guard-source SELFHOST_BACKUP_TEST_HOLD_AFTER_GUARD=3 "$SITE_ROOT/scripts/backup-selfhost.sh" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$SERVICE_FILE" --db-service guard --deployment-class TEST --deployment-id guard-source --expected-database guard_test \
+NODE_ENV=test FAKE_WRITER_CLASS=test FAKE_WRITER_DEPLOYMENT_ID=guard-source SELFHOST_BACKUP_TEST_HOLD_AFTER_GUARD=3 "$SITE_ROOT/scripts/backup-selfhost.sh" --credential-root "$CREDENTIAL_ROOT" --control-db-service-file "$CONTROL_SERVICE_FILE" --control-db-service guard_control --capture-db-service-file "$CAPTURE_SERVICE_FILE" --capture-db-service guard_capture --deployment-class TEST --deployment-id guard-source --expected-database guard_test \
   --uploads "$UPLOADS" --attachments "$ATTACHMENTS" --backup-status "$RECEIPT_ROOT" --migrations "$MIGRATIONS" --backup-root "$BACKUP_ROOT" --receipt-root "$RECEIPT_ROOT" --receipt-reader-gid "$RECEIPT_GID" --web-container web-test --worker-container worker-test \
   --location-id source-host --policy-id daily-rpo-v1 --rpo-hours 24 --machine-identity-file "$SOURCE_MACHINE_ID" --confirm TEST_BACKUP_V2 >"$TASK_ROOT/guard-kill.log" 2>&1 &
 GUARD_PID=$!
 attempt=0
 while :; do
   guard_read_only=$(psql -d postgres -Atc "select count(*) from pg_db_role_setting s cross join lateral unnest(s.setconfig) as cfg(setting) where s.setdatabase=(select oid from pg_database where datname='guard_test') and s.setrole=0 and setting='default_transaction_read_only=on'" 2>/dev/null || true)
-  guard_connection_limit=$(psql -d postgres -Atc "select datconnlimit from pg_database where datname='guard_test'" 2>/dev/null || true)
-  [ -f "$BACKUP_ROOT/.backup-fence-v2.json" ] && [ "$guard_read_only" = 1 ] && [ "$guard_connection_limit" = 0 ] && break
+  guard_connect_count=$(psql -d postgres -Atc "select count(*) from pg_roles r where r.rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin') and has_database_privilege(r.oid,'guard_test','CONNECT')" 2>/dev/null || true)
+  [ -f "$BACKUP_ROOT/.backup-fence-v2.json" ] && [ "$guard_read_only" = 1 ] && [ "$guard_connect_count" = 0 ] && break
   if ! kill -0 "$GUARD_PID" 2>/dev/null; then
     if wait "$GUARD_PID"; then guard_status=0; else guard_status=$?; fi
     GUARD_PID=""
@@ -210,24 +239,51 @@ while :; do
   sleep 0.1
 done
 [ "$(psql -d postgres -Atc "select count(*) from pg_db_role_setting s cross join lateral unnest(s.setconfig) as cfg(setting) where s.setdatabase=(select oid from pg_database where datname='guard_test') and s.setrole=0 and setting='default_transaction_read_only=on'")" = 1 ]
-[ "$(psql -d postgres -Atc "select datconnlimit from pg_database where datname='guard_test'")" = 0 ]
+[ "$(psql -d postgres -Atc "select datconnlimit from pg_database where datname='guard_test'")" = -1 ]
+[ "$(psql -U chenyida_erp_backup -d guard_test -Atc 'select 1')" = 1 ]
+if psql -U chenyida_erp_owner -d guard_test -Atc 'select 1' >/dev/null 2>&1; then echo "fenced migration owner unexpectedly connected" >&2; exit 1; fi
 kill -9 "$GUARD_PID"; wait "$GUARD_PID" 2>/dev/null || true; GUARD_PID=""
 attempt=0
 while ! flock -n "$BACKUP_ROOT/.backup-v2.lock" -c true; do
   attempt=$((attempt + 1)); [ "$attempt" -le 50 ] || { echo "backup lock remained held after guard crash" >&2; exit 1; }
   sleep 0.1
 done
-"$SITE_ROOT/scripts/recover-backup-guard.sh" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$SERVICE_FILE" --db-service guard --backup-root "$BACKUP_ROOT" --deployment-class TEST --deployment-id guard-source --expected-database guard_test --expected-database-system-identifier "$SOURCE_SYSTEM_ID" --expected-database-oid "$GUARD_DATABASE_OID" --expected-database-marker TEST.guard-source --confirm RECOVER_EXACT_STALE_BACKUP_GUARD >/dev/null
+recover_guard() {
+  "$SITE_ROOT/scripts/recover-backup-guard.sh" --credential-root "$CREDENTIAL_ROOT" --control-db-service-file "$CONTROL_SERVICE_FILE" --control-db-service guard_control --backup-root "$BACKUP_ROOT" --deployment-class TEST --deployment-id guard-source --expected-database guard_test --expected-database-system-identifier "$SOURCE_SYSTEM_ID" --expected-database-oid "$GUARD_DATABASE_OID" --expected-database-marker TEST.guard-source --confirm RECOVER_EXACT_STALE_BACKUP_GUARD
+}
+psql -d postgres -v ON_ERROR_STOP=1 -c "create role backup_guard_unexpected nologin; grant connect on database guard_test to backup_guard_unexpected" >/dev/null
+if recover_guard >"$TASK_ROOT/guard-acl-drift.log" 2>&1; then echo "guard recovery accepted an unexpected CONNECT grantee" >&2; exit 1; fi
+[ -f "$BACKUP_ROOT/.backup-fence-v2.json" ]
+[ "$(psql -d postgres -Atc "select count(*) from pg_roles r where r.rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin') and has_database_privilege(r.oid,'guard_test','CONNECT')")" = 0 ]
+psql -d postgres -v ON_ERROR_STOP=1 -c "revoke connect on database guard_test from backup_guard_unexpected; drop role backup_guard_unexpected" >/dev/null
+recover_guard >/dev/null
 [ "$(psql -d guard_test -Atc 'show default_transaction_read_only')" = off ]
 [ "$(psql -d postgres -Atc "select datconnlimit from pg_database where datname='guard_test'")" = -1 ]
+[ "$(psql -d postgres -Atc "select count(*) from pg_roles r where r.rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin') and has_database_privilege(r.oid,'guard_test','CONNECT')")" = 4 ]
 [ ! -e "$BACKUP_ROOT/.backup-fence-v2.json" ]
 
-NODE_ENV=test "$SITE_ROOT/scripts/backup-selfhost.sh" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$SERVICE_FILE" --db-service backup --deployment-class TEST --deployment-id erp-test-source --expected-database source_test \
+if psql -U chenyida_erp_backup -d source_test -v ON_ERROR_STOP=1 -c 'select count(*) from pg_largeobject' >/dev/null 2>&1; then echo "backup capture unexpectedly read large-object pages" >&2; exit 1; fi
+if psql -U chenyida_erp_backup -d source_test -v ON_ERROR_STOP=1 -c 'update restored_probe set payload=payload' >/dev/null 2>&1; then echo "backup capture unexpectedly changed an application row" >&2; exit 1; fi
+if psql -U chenyida_erp_backup -d source_test -v ON_ERROR_STOP=1 -c 'create temporary table capture_temp_forbidden(id integer)' >/dev/null 2>&1; then echo "backup capture unexpectedly created a temporary table" >&2; exit 1; fi
+
+UNEXPECTED_LARGE_OBJECT=$(psql -U chenyida_erp_owner -d source_test -Atc 'select lo_from_bytea(0,int4send(1))')
+if NODE_ENV=test "$SITE_ROOT/scripts/backup-selfhost.sh" --credential-root "$CREDENTIAL_ROOT" --control-db-service-file "$CONTROL_SERVICE_FILE" --control-db-service backup_control --capture-db-service-file "$CAPTURE_SERVICE_FILE" --capture-db-service backup_capture --deployment-class TEST --deployment-id erp-test-source --expected-database source_test \
+  --uploads "$UPLOADS" --attachments "$ATTACHMENTS" --backup-status "$RECEIPT_ROOT" --migrations "$MIGRATIONS" --backup-root "$BACKUP_ROOT" --receipt-root "$RECEIPT_ROOT" --receipt-reader-gid "$RECEIPT_GID" --web-container web-test --worker-container worker-test \
+  --location-id source-host --policy-id daily-rpo-v1 --rpo-hours 24 --machine-identity-file "$SOURCE_MACHINE_ID" --confirm TEST_BACKUP_V2 >"$TASK_ROOT/large-object-rejection.log" 2>&1; then echo "unexpected large object backup was not rejected" >&2; exit 1; fi
+grep -q 'unexpected large objects block the zero-large-object backup contract' "$TASK_ROOT/large-object-rejection.log"
+[ ! -e "$BACKUP_ROOT/.backup-fence-v2.json" ]
+[ -z "$(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name 'backup-*' -print -quit)" ]
+[ "$(psql -d source_test -Atc 'show default_transaction_read_only')" = off ]
+[ "$(psql -d postgres -Atc "select count(*) from pg_roles r where r.rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin') and has_database_privilege(r.oid,'source_test','CONNECT')")" = 4 ]
+[ "$(psql -U chenyida_erp_owner -d source_test -Atc "select lo_unlink($UNEXPECTED_LARGE_OBJECT)")" = 1 ]
+
+NODE_ENV=test "$SITE_ROOT/scripts/backup-selfhost.sh" --credential-root "$CREDENTIAL_ROOT" --control-db-service-file "$CONTROL_SERVICE_FILE" --control-db-service backup_control --capture-db-service-file "$CAPTURE_SERVICE_FILE" --capture-db-service backup_capture --deployment-class TEST --deployment-id erp-test-source --expected-database source_test \
   --uploads "$UPLOADS" --attachments "$ATTACHMENTS" --backup-status "$RECEIPT_ROOT" --migrations "$MIGRATIONS" --backup-root "$BACKUP_ROOT" --receipt-root "$RECEIPT_ROOT" --receipt-reader-gid "$RECEIPT_GID" --web-container web-test --worker-container worker-test \
   --location-id source-host --policy-id daily-rpo-v1 --rpo-hours 24 --machine-identity-file "$SOURCE_MACHINE_ID" --confirm TEST_BACKUP_V2 >/dev/null
 [ "$(psql -d source_test -Atc 'show default_transaction_read_only')" = off ]
 [ "$(psql -d source_test -Atc "select count(*) from pg_db_role_setting s join pg_database d on d.oid=s.setdatabase where d.datname=current_database() and exists(select 1 from unnest(s.setconfig) v where v like 'default_transaction_read_only=%')")" = 0 ]
 [ "$(psql -d postgres -Atc "select datconnlimit from pg_database where datname='source_test'")" = -1 ]
+[ "$(psql -d postgres -Atc "select count(*) from pg_roles r where r.rolname in ('chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin') and has_database_privilege(r.oid,'source_test','CONNECT')")" = 4 ]
 [ ! -e "$BACKUP_ROOT/.backup-fence-v2.json" ]
 BACKUP_ID=$(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name 'backup-*' -printf '%f\n')
 [ -n "$BACKUP_ID" ] && [ "$(printf '%s\n' "$BACKUP_ID" | wc -l)" = 1 ]
@@ -264,7 +320,7 @@ psql -d postgres -v ON_ERROR_STOP=1 -c "alter role postgres set timezone='Asia/S
 
 restore_once() {
   target_database=$1; run_id=$2
-  "$SITE_ROOT/scripts/restore-selfhost.sh" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$SERVICE_FILE" --db-admin-service restore_admin --source-deployment-class TEST --source-deployment-id erp-test-source --source-database-name source_test \
+  "$SITE_ROOT/scripts/restore-selfhost.sh" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$CONTROL_SERVICE_FILE" --db-admin-service restore_admin --source-deployment-class TEST --source-deployment-id erp-test-source --source-database-name source_test \
     --source-database-system-identifier "$SOURCE_SYSTEM_ID" --source-database-oid "$SOURCE_DATABASE_OID" --source-database-marker TEST.erp-test-source --source-database-bytes "$SOURCE_DATABASE_BYTES" --source-database-server-major "$SOURCE_SERVER_MAJOR" --source-database-encoding "$SOURCE_ENCODING" --source-database-collate "$SOURCE_COLLATE" --source-database-ctype "$SOURCE_CTYPE" --source-database-locale-provider "$SOURCE_LOCALE_PROVIDER" --source-database-collation-version "$SOURCE_COLLATION_VERSION" \
     --offhost-root "$OFFHOST_ROOT" --receiver-package "$RECEIVER_ROOT/$TRANSFER_ID" --source-acceptance "$SOURCE_ACCEPTANCE" --receiver-key-root "$RECEIVER_KEY_ROOT" --receiver-encryption-private-key "$RECEIVER_ENCRYPTION_PRIVATE_KEY" --trusted-source-signing-public-key "$TRUSTED_SOURCE_SIGNING_PUBLIC_KEY" --receiver-receipt-public-key "$RECEIVER_RECEIPT_PUBLIC_KEY" --operations-policy "$OPERATIONS_POLICY" --transfer-id "$TRANSFER_ID" \
     --backup-id "$BACKUP_ID" --migrations "$MIGRATIONS" --receipt-root "$RECEIPT_ROOT" --restore-root "$RESTORE_ROOT" --target-database-capacity-path "$TARGET_PGDATA" --receipt-reader-gid "$RECEIPT_GID" \
@@ -320,7 +376,7 @@ restore_once "$SUCCESS_DATABASE" success >/dev/null
 [ "$(psql -d "$SUCCESS_DATABASE" -Atc 'select payload from private_domain.private_probe where id=1')" = non-public-schema-proof ]
 [ "$(psql -d "$SUCCESS_DATABASE" -Atc "select count(*) from pg_extension where extname in ('pgcrypto','btree_gist')")" = 2 ]
 [ "$(psql -d "$SUCCESS_DATABASE" -Atc "select count(*) from pg_publication where pubname='restore_publication'")" = 1 ]
-[ "$(psql -d "$SUCCESS_DATABASE" -Atc 'select coalesce(sum(octet_length(data)),0) from pg_largeobject')" -gt 0 ]
+[ "$(psql -d "$SUCCESS_DATABASE" -Atc 'select count(*) from pg_largeobject_metadata')" = 0 ]
 [ "$(psql -d "$SUCCESS_DATABASE" -Atc 'select last_value from restored_sequence')" = 42 ]
 [ "$(psql -d "$SUCCESS_DATABASE" -Atc "select to_char(happened_at at time zone 'UTC','YYYY-MM-DD HH24:MI:SS.US')||'|'||extract(epoch from duration)::text from canonical_session_probe where id=1")" = "2026-08-12 08:34:56.123456|273906.789000" ]
 if psql -d "$SUCCESS_DATABASE" -v ON_ERROR_STOP=1 -c "insert into extension_probe values(2,'[2,3)')" >/dev/null 2>&1; then echo "GiST exclusion constraint was not restored" >&2; exit 1; fi
@@ -349,7 +405,7 @@ node "$SITE_ROOT/scripts/offhost-transfer-contract.mjs" materialize-for-restore 
   --transfer-id "$TRANSFER_ID" --backup-id "$BACKUP_ID" --policy "$OPERATIONS_POLICY" >/dev/null
 
 prepare_success() {
-  NODE_OPTIONS=--max-old-space-size=384 node "$SITE_ROOT/scripts/backup-recovery-contract.mjs" prepare-restore --backup "$OFFHOST_ROOT/$BACKUP_ID" --migrations "$MIGRATIONS" --offhost-receipt "$RECEIVER_ROOT/$TRANSFER_ID/offhost-receipt.json" --prepared-receipt "$RESTORE_ROOT/.prepared-$BACKUP_ID-success.json" --location-id restore-host --restore-run-id success --target-deployment-id isolated-test --target-admin-database postgres --target-database-name "$SUCCESS_DATABASE" --target-marker-id target-marker --target-cluster-marker-id target-cluster --expected-target-system-identifier "$TARGET_SYSTEM_ID" --file-root "$RESTORE_ROOT/success_restore_test" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$SERVICE_FILE" --db-service restore_admin \
+  NODE_OPTIONS=--max-old-space-size=384 node "$SITE_ROOT/scripts/backup-recovery-contract.mjs" prepare-restore --backup "$OFFHOST_ROOT/$BACKUP_ID" --migrations "$MIGRATIONS" --offhost-receipt "$RECEIVER_ROOT/$TRANSFER_ID/offhost-receipt.json" --prepared-receipt "$RESTORE_ROOT/.prepared-$BACKUP_ID-success.json" --location-id restore-host --restore-run-id success --target-deployment-id isolated-test --target-admin-database postgres --target-database-name "$SUCCESS_DATABASE" --target-marker-id target-marker --target-cluster-marker-id target-cluster --expected-target-system-identifier "$TARGET_SYSTEM_ID" --file-root "$RESTORE_ROOT/success_restore_test" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$CONTROL_SERVICE_FILE" --db-service restore_admin \
     --expected-deployment-class TEST --expected-deployment-id erp-test-source --expected-database-name source_test --expected-database-system-identifier "$SOURCE_SYSTEM_ID" --expected-database-oid "$SOURCE_DATABASE_OID" --expected-database-marker TEST.erp-test-source --expected-database-bytes "$SOURCE_DATABASE_BYTES" --expected-database-server-major "$SOURCE_SERVER_MAJOR" --expected-database-encoding "$SOURCE_ENCODING" --expected-database-collate "$SOURCE_COLLATE" --expected-database-ctype "$SOURCE_CTYPE" --expected-database-locale-provider "$SOURCE_LOCALE_PROVIDER" --expected-database-collation-version "$SOURCE_COLLATION_VERSION" \
     --expected-app-version 0.1.0-alpha.47 --expected-git-commit bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb --expected-web-image-digest sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc --expected-worker-image-digest sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee --expected-migration-head 0001_test.sql --expected-policy-id daily-rpo-v1 --expected-rpo-hours 24
 }

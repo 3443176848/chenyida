@@ -83,3 +83,9 @@
 G2 需要项目负责人提供异机目标、RPO/RTO、加密与密钥边界、保留/删除策略、调度/告警责任人，并专项授权当前四域真实快照、传输和隔离恢复。在此之前 PR-001、异机备份和隔离恢复门禁保持 `FAIL/BLOCKED`。
 
 不依赖这些外部资源的下一安全任务转入 G3：建立并发安全的 release identity/不可变 release manifest、Migration allowlist 和低资源串行强制 `test:release`。本任务不授权 build、UAT Migration/deploy、真实数据、员工试用或正式切换。
+
+## 7. TASK56 后续替代说明（2026-08-13）
+
+本页保留 TASK41 当时的合成验证事实，不回写历史结论。后续 [TASK56](SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56.md) 已替代其中“单一superuser同时负责数据库guard和logical capture”及“以connection limit构成fence”的运行合同：未来候选使用物理与逻辑身份均分离的root-only control/capture service文件，control只持有一次性高权限控制面，固定非superuser `chenyida_erp_backup`只执行已批准读取、reconciliation、Migration只读核对和`pg_dump`。
+
+TASK56的fence改为数据库默认只读加精确`CONNECT`撤销/恢复，不再改写原`datconnlimit`；持久intent升级为`chenyida-erp-backup-fence/v3`，但为中断发现兼容继续使用`.backup-fence-v2.json`文件名。当前应用合同声明零PostgreSQL large object，备份在生成WORK或发布artifact前强制核对metadata计数为零，并用`--no-large-objects`执行dump；非零即失败关闭并恢复本次fence，capture身份不会获授读取原始`pg_largeobject`内容的能力。TASK41旧脚本、旧intent语义和旧测试证据不得作为TASK56之后候选的授权依据。

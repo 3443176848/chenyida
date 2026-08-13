@@ -5,12 +5,6 @@
   "authorization_status": "BLOCKED",
   "blocking_reasons": [
     {
-      "code": "BACKUP_LARGE_OBJECT_CAPTURE_BOUNDARY_UNRESOLVED",
-      "objects": [
-        "pg_catalog.pg_largeobject"
-      ]
-    },
-    {
       "code": "POSTGRESQL17_COMPILED_CATALOG_REQUIRED",
       "objects": []
     }
@@ -1782,8 +1776,8 @@
       }
     },
     "BACKUP": {
-      "derivation": "REVIEWED_LOGICAL_CAPTURE_SOURCE_INTENT",
-      "source_evidence_sha256": "a9e9e0d0c33c876cef72a5a822acd4484248448efe587ebbb509340cae4ab204",
+      "derivation": "REVIEWED_ZERO_LARGE_OBJECT_LOGICAL_CAPTURE_SOURCE_INTENT",
+      "source_evidence_sha256": "bb737fcef1e4bbe19fd8b13ed4e84b00e3b1d8902f2b27a69c70229f3fc1b986",
       "source_files": [
         "scripts/backup-reconciliation.sql",
         "scripts/backup-recovery-contract.mjs",
@@ -4266,5 +4260,5 @@
       }
     }
   },
-  "access_sha256": "bdd05ba0870cf2143f26b7c9a33ec9d597319447d5898af2f11400990287f6ab"
+  "access_sha256": "218d7ff7e17124c6ff45b39f25a104016538d4a6e23f50ed8be3f6b500a2561f"
 }

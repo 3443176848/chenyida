@@ -86,7 +86,8 @@ TASK50已经在仓库和任务私有隔离容器中验证[D-127](../project/DECI
 
 - V2已用合成数据和双独立PostgreSQL测试集群证明四域manifest、数据库守卫、内层回执、故障注入清理及prepared receipt补发；TASK54又以合成密文链证明Ed25519/X25519/HKDF/AES-GCM、双向ACK、恢复强绑定、调度评估和dry-run保留。两者都没有读取当前四卷或生成真实备份。
 - 当前仍没有真实异故障域副本、真实密钥托管/WORM/timer/保留删除、告警责任人、cluster roles/ACL/default privileges/tablespace恢复或真实RTO；Dashboard不得把本机、旧V2或synthetic回执冒充灾备。
-- 若备份进程中断且 `.backup-fence-v2.json`存在，数据库保持安全只读/连接受限。禁止手工删除 intent 或直接重跑；使用 `recover-backup-guard.sh`按精确稳定身份恢复。
+- 若备份进程中断且 `.backup-fence-v2.json`存在，数据库保持安全只读，且`CONNECT`只保留给固定的非superuser `chenyida_erp_backup`采集身份和当前一次性control身份；Web、Worker、Admin与Migration owner均被数据库级deny。禁止手工删除intent、手工补GRANT或直接重跑；只能由root调度的同一control service使用`recover-backup-guard.sh`核对v3 intent、稳定数据库/部署身份和精确ACL后，在一个事务中恢复默认读写与固定四个在线/owner角色的`CONNECT`。capture service不能执行恢复。
+- TASK56之后，`backup-selfhost.sh`必须同时收到物理文件、libpq service名和登录角色都相互独立的control/capture凭据。control只做fence、backend终止、身份核验和恢复控制；所有业务relation reconciliation、Migration只读核对和`pg_dump --no-large-objects --no-owner --no-acl`都由`chenyida_erp_backup`执行。当前应用数据模型声明零large object，control在写入WORK/发布制品前按metadata强制计数为零；发现任一large object即失败关闭并精确解除本次fence，禁止临时给capture读取`pg_largeobject`正文的能力。
 - 若隔离恢复在 prepared receipt 后发布失败，保留精确 TEST 数据库、文件目标和 prepared evidence；使用 `publish-restore-receipt-selfhost.sh`补发，不重跑恢复。
 - 若容器 OOM/反复重启、数据库不健康、身份漂移、回执过期/损坏、Migration 不符或关键数据核对失败，立即停止新写操作，保全日志/审计/证据，不清理持久卷或备份，按已批准的事故任务升级。
 

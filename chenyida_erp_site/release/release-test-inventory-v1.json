@@ -424,7 +424,7 @@
     },
     {
       "path": "tests/selfhost-backup-recovery-v2.test.mjs",
-      "sha256": "5b7b77cc7bf51a2560cebf69608c4d2bb426e133da3ff9fd6b91ebd06664fabc",
+      "sha256": "b5be0b81a43665b1b6120e98dda1c2833b6bee47df019a8d5bf817f376993464",
       "category": "SPECIAL_HARNESS",
       "applicability": "REQUIRED",
       "harness": "SPECIAL_POSIX",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "tests/selfhost-postgresql-runtime-privilege-source.test.mjs",
-      "sha256": "ef0a45c1da3ca66793fdfd1e2d17f28bff7f0c1dee367dc72ef8f780c737e513",
+      "sha256": "6c9b8ff38b06f26f1c6544d80ad6ae97b716907022be8429e3835ad2a6e25354",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
