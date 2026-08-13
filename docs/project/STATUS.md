@@ -2,19 +2,23 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
-## SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50（执行中；仓库与隔离环境）
+## SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50（完成；仓库与隔离验证，运行面未部署）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / REPOSITORY AND ISOLATED ONLY / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO | 唯一active slot；主智能体唯一写入，三条智能体线只读审计 |
+| 最终状态 | DONE / REPOSITORY AND ISOLATED VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO | 已释放active slot；主智能体唯一写入，三条智能体线完成只读审计 |
 | 严格起点 | PASS / CONTROLLED | `main@1a4bd16e3428fded7cd5569595fa47df82831f7c`、tree`518cbdd9…5666`、alpha.46/0045；未跟踪状态报告不读不改不提交 |
 | UAT Migration | VERIFIED READ ONLY / UNCHANGED | read-only事务确认40/head`0040_warehouse_receipt_readiness.sql`、checksum`b6781c94…a5a93`；未读业务表或写入 |
-| 运行时风险 | OPEN / ACTUAL METADATA | 四服务均ReadonlyRootfs=false、无显式CapDrop/CapAdd/SecurityOpt；Web/Worker user=node，PostgreSQL/Caddy未声明user，privileged均false |
-| 目标 | IN PROGRESS | 逐服务版本化最小权限、精确可写路径/必要例外、Compose/Dockerfile加固、负向合同和一次一个隔离容器的运行验证 |
-| 候选身份 | STALE | TASK48镜像绑定`8952a815`；TASK49 Dashboard源码变化后当前应用源码无对应镜像，TASK50完成前不重复构建候选 |
+| Git身份 | PASS / CONTENT-ADDRESSED CHAIN | 实现`375869f7d1544fa6fe437e2603af78a4021c4c91`/tree`ac5a5bfa…3644`；manifest-only直接子提交`f119c8f6d99f98778975ad83df2b736de148e69f`；44文件bundle SHA-256`ab6b708e…8cbe` |
+| 策略/Compose | PASS / FAIL CLOSED | D-127与policy SHA-256`8c9f9fd0…f444`固定六服务、用户/组、只读rootfs、capability/NNP、精确mount/tmpfs/port/network/resource/logging；未知profile/服务/字段或弱化失败关闭 |
+| 隔离runtime | PASS / MAX ONE CONTAINER | 六服务逐一验证；PostgreSQL以999:999零cap完成SQL/热重启，Caddy仅保留`NET_BIND_SERVICE`并完成80/443监听/热重启；应用/工具验证内核身份、禁止写入和唯一允许路径 |
+| 自动验证 | PASS / SCOPED | Compose policy；runtime policy10/10及实际六服务；supervisor30/30；release 6文件/48项及直接45/45；lint0 error/11既有warning；credentials1,588、Shell/JSON、Markdown链接和diff检查通过 |
+| 现行UAT风险 | OPEN / UNCHANGED | 四服务仍ReadonlyRootfs=false、无显式CapDrop/CapAdd/SecurityOpt；本任务只加固未来候选，未部署或重启UAT |
+| 候选身份 | STALE FOR CURRENT HEAD | TASK48镜像绑定`8952a815`；TASK49/TASK50改变当前输入，当前源码需另行精确重建与新鲜扫描 |
 | 授权边界 | REPOSITORY / ISOLATED | 不修改UAT/生产、业务数据、账号、网络、host配置或四卷；不push，不运行真实Migration/deploy |
-| 起点资源 | PASS / BELOW STOP LINES | available约2.2GiB、Swap718MiB/1GiB、根盘18GiB、Load`0.05/0.21/0.71`；四服务restart0/OOM false |
+| 资源/清理 | PASS / BELOW STOP LINES | 起点/收口available约2.2/2.2GiB、Swap718/714MiB、根盘18/18GiB、收口Load`0.16/0.41/0.45`；四服务restart0/OOM false，任务容器/网络/Volume清零 |
 | 系统是否可用 | NO | 异机恢复、当前候选正式门、host监控投递、UAT对齐、真实迁移和员工试用仍未完成 |
+| 下一安全任务 | CURRENT CANDIDATE REFRESH | 从TASK50内容寻址链重建Web/Worker候选，生成新鲜安全证据并尝试19步门；host安装/UAT部署仍须专项授权 |
 
 ## SELFHOST-OPS-MONITORING-ALERTING-49（完成；仓库监控合同已验证，host投递未配置）
 

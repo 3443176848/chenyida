@@ -4,13 +4,19 @@
 
 ## 2026-08-13
 
-### SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50 - `docs: start container runtime hardening`
+### SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50 - `docs: start container runtime hardening` / `feat: harden container runtime policy` / `build: bind container runtime supervisor bundle` / `docs: close container runtime hardening`
 
 - 调度/范围：TASK49治理收口`1a4bd16e3428fded7cd5569595fa47df82831f7c`后的零`DOING`自动切换为TASK50唯一active task；严格起点tree为`518cbdd9001e933c6577ccbed499eb8287ec5666`、alpha.46/0045，UAT仍alpha.42/0040。
-- 实际风险：只读Docker metadata显示现行PostgreSQL/Web/Worker/Caddy均`ReadonlyRootfs=false`、无显式`CapDrop`/`CapAdd`/`SecurityOpt`；Web/Worker user为`node`，PostgreSQL/Caddy未声明user。Compose只对migrate/admin形成部分加固，当前四服务没有统一失败关闭合同。
+- 实际风险：只读Docker metadata显示现行PostgreSQL/Web/Worker/Caddy均`ReadonlyRootfs=false`、无显式`CapDrop`/`CapAdd`/`SecurityOpt`；Web/Worker user为`node`，PostgreSQL/Caddy未声明user。Compose起点只对migrate形成部分加固，admin和当前四服务都没有统一失败关闭合同。
 - 目标：建立版本化逐服务最小权限策略，收紧只读rootfs、capability、no-new-privileges、tmpfs与精确可写挂载；禁止privileged、Docker socket、host namespace/device和任意host root bind，并用负向合同及一次一个临时容器的隔离运行证据验证必要例外。
 - 边界：不修改/重建/重启现行UAT，不读取业务表、`.env`、容器环境、日志、四卷/备份正文或未跟踪状态报告，不运行真实Migration/deploy，不修改账号、网络、systemd、Swap、kernel或Docker daemon。只读事务确认UAT为40/head0040；所有后续build/测试串行且只清理TASK50精确创建的临时资源。
 - 起点资源：available约2.2GiB、Swap718MiB/1GiB、根盘18GiB、Load`0.05/0.21/0.71`；四服务restart0/OOM false，Web/PostgreSQL healthy、旧Worker/Caddy health none。系统继续`PRODUCTION NO-GO`。
+- 决策/实现：D-127固定完整六服务/profile集合、精确写路径和内核态复核。版本化policy及标准库validator绑定Docker Engine29.5.2/Compose5.1.4、源码hash、用户/组、只读rootfs、capability/NNP、mount/tmpfs/port/network/resource/logging/lifecycle/process/health/environment；未知服务/字段、变量host bind或弱化失败关闭。六服务均drop all/NNP/read-only，PostgreSQL为999:999零cap，Caddy仅保留`NET_BIND_SERVICE`。
+- 发布门：新增第19步`CONTAINER_RUNTIME_TEST:RUNTIME_POLICY`，由content-addressed supervisor在只读Git快照中串行执行；runtime probe使用固定标签/名称、无host端口、最多一个临时容器，明确拒绝四个受保护Volume并验证应用、工具、PostgreSQL和Caddy的内核身份、允许/拒绝写入及热重启。
+- Git/证据：实现提交`375869f7d1544fa6fe437e2603af78a4021c4c91`/tree`ac5a5bfa68d3a76c7a6121a0a8d204e8169f3644`；只改canonical manifest的直接子提交`f119c8f6d99f98778975ad83df2b736de148e69f`形成44文件bundle，SHA-256`ab6b708e9cfe74f0902296f0a32e74620cf3368e883ba536326789e0b7828cbe`；policy SHA-256`8c9f9fd06eb4533faeeed4c316eb93568c38b3a42ac8c48dd081fbb4e7a2f444`。
+- 最终验证：干净HEAD Compose policy和六服务实际runtime probe通过，`max_containers=1`；runtime合同10/10、supervisor30/30、release6文件/48项及直接45/45、lint0 error/11既有warning、1,588文件凭据扫描、Shell/JSON/Markdown链接和diff检查通过。Schema/TypeScript未改，故不重复运行完整PG业务回归/typecheck；PostgreSQL镜像已完成隔离init/SQL/负向写入/热重启。
+- 诚实失败/资源：一次漏传reader GID在建容器前失败关闭，补齐GID1000后通过；一次ad-hoc凭据容器因host bind不可见在读文件前退出，官方Git archive固定Node沙箱随后全仓通过，均无残留。起点/收口available约2.2/2.2GiB、Swap718/714MiB、根盘18/18GiB、收口Load`0.16/0.41/0.45`；UAT四服务restart0/OOM false，任务容器/网络/Volume清零，四个受保护Volume未触碰。
+- 结论：`DONE / REPOSITORY AND ISOLATED VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`。现行UAT仍为alpha.42/0040和旧运行配置；下一安全任务重建当前精确候选并取得新鲜镜像安全/19步门证据。
 
 ### SELFHOST-OPS-MONITORING-ALERTING-49 - `docs: start monitoring and alerting closure` / `feat: add fail-closed operations monitoring` / focused contract and regression fixes / `docs: close monitoring and alerting closure`
 

@@ -8,7 +8,7 @@
 
 ## 2026-08-13 投产准入基线
 
-`SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成四域V2工具和合成/双集群隔离恢复证据，但没有真实异机锚点、当前数据恢复或RTO；源码alpha.46/0045与非生产UAT alpha.42/0040仍不一致。TASK46/TASK47已关闭完整typecheck和Browser子门，TASK48又形成精确本机Web/Worker候选并以新鲜数据库证明全部severity零发现；但正式镜像证据和18步同候选门仍因host supervisor未获安装授权失败关闭。TASK49已关闭仓库级监控快照、阈值、告警状态与排障合同，但没有host安装、真实通知或值班演练。TASK43—TASK45已关闭导入fallback、会话绝对寿命及health/Worker/storage误报的仓库风险，但运行UAT未部署；真实数据迁移、完整跨岗位验收、员工试运行和正式切换均未完成。
+`SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：`SELFHOST-OPS-BACKUP-RECOVERY-V2-41`已完成四域V2工具和合成/双集群隔离恢复证据，但没有真实异机锚点、当前数据恢复或RTO；源码alpha.46/0045与非生产UAT alpha.42/0040仍不一致。TASK46/TASK47已关闭完整typecheck和Browser子门，TASK48形成过精确本机Web/Worker候选并以新鲜数据库证明全部severity零发现；但TASK49/TASK50又改变候选输入，当前HEAD尚无对应镜像。TASK49已关闭仓库级监控合同，TASK50已关闭未来候选的容器最小权限合同；两者都未安装或部署到host/UAT。TASK43—TASK45已关闭导入fallback、会话绝对寿命及health/Worker/storage误报的仓库风险，但运行UAT未部署；真实数据迁移、完整跨岗位验收、员工试运行和正式切换均未完成。
 
 项目负责人已授权持续选择最高优先级且可安全执行的任务，不再要求每项后等待“继续”。该持续授权不包含生产数据访问、真实数据外传、正式备份恢复、UAT/生产 Migration、build/deploy、账号权限、systemd/网络/Swap、真实员工业务写或切换/回滚；这些动作仍须专项明确授权。
 
@@ -18,7 +18,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 `SELFHOST-OPS-MONITORING-ALERTING-49`已在严格起点`d5df673c…16e8`后完成并释放active slot。最终内容寻址源码`7debd4d`/tree`315276e`与manifest-only子提交`56535a0`形成bundle SHA-256`76b919cd…6a95`；去敏快照、资源/服务/应用/发布/Migration/备份恢复证据评估、告警生命周期、原子状态、CLI、测试和运行手册已通过完整Node/PostgreSQL/typecheck等适用门。只读宿主metadata诊断对旧UAT镜像与缺失证据如实为CRITICAL；没有host安装、真实通知、UAT/生产网络/数据库访问、日志/卷正文或真实数据读取。TASK49包含Dashboard源码加固但未重建Web/Worker镜像，因此TASK48的`8952a815`零发现候选只是先前提交证据，不是当前HEAD候选。
 
-`SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50`现为唯一`DOING`，严格起点`1a4bd16e…f7c`/tree`518cbdd9…5666`。实际只读metadata显示现行UAT四服务均为可写rootfs、无显式cap drop/no-new-privileges；任务在仓库和隔离环境建立逐服务最小权限策略、精确可写路径、必要例外、Compose/Dockerfile加固及负向/runtime测试。不修改现行UAT，不读取业务数据、日志、环境或受保护Volume；完成后才评估重建当前源码候选。
+`SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50`已完成并释放active slot。实现`375869f`/tree`ac5a5bfa`与manifest-only直接子提交`f119c8f`形成44文件bundle，SHA-256为`ab6b708e…8cbe`；D-127策略、六服务Compose加固、内核态负向合同及一次一个隔离runtime验证通过。实际UAT四服务仍为旧的可写rootfs配置且没有显式cap drop/no-new-privileges，本任务未部署、重启或读取其业务数据/日志/环境/受保护Volume。下一安全任务重建当前源码候选并生成新鲜安全/19步发布门证据。
 
 ## 系统组成
 
@@ -311,7 +311,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 ## 当前路线
 
-`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭；TASK41已完成D-115/G1合成隔离工具，但真实数据锚点延期风险继续开放。TASK42已完成D-116/G3仓库工具；TASK46/TASK47分别按D-120/D-121关闭完整typecheck与Browser门，TASK48再按D-122—D-125完成精确本机候选与新鲜零发现诊断，正式supervisor证据/18步门仍失败关闭。下一安全任务补齐仓库级监控、容量、备份证据新鲜度、告警与排障合同。TASK43—TASK45已分别完成导入fallback、会话和运行健康仓库加固，当前源码alpha.46/0045，运行UAT仍未部署。权限矩阵等待业务批准，系统继续production no-go。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API是0041引入且已通过隔离验证。项目负责人已接受D-113和D-114，`AGENT-R1`、PM-002及`AGENT-R1-5`均已完成。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，TASK04—TASK05保持TODO；正式holdout未重跑，0041—0045未部署或应用UAT。外部AI禁用，UAT继续alpha.42/0040且没有真实V2回执；任何R2、模型/真实数据、真实收货、迁移、部署、生产或切流仍须独立授权。
+`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭；TASK41已完成D-115/G1合成隔离工具，但真实数据锚点延期风险继续开放。TASK42已完成D-116/G3仓库工具；TASK46/TASK47分别按D-120/D-121关闭完整typecheck与Browser门，TASK48按D-122—D-125完成过精确本机候选与新鲜零发现诊断，TASK49/TASK50又分别关闭监控及容器运行时仓库合同。由于后两任务改变当前源码/候选输入，下一安全任务是从TASK50内容寻址链重建精确候选并取得新鲜镜像安全/19步门证据；host supervisor安装或UAT动作仍不在授权内。TASK43—TASK45已分别完成导入fallback、会话和运行健康仓库加固，当前源码alpha.46/0045，运行UAT仍未部署。权限矩阵等待业务批准，系统继续production no-go。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API是0041引入且已通过隔离验证。项目负责人已接受D-113和D-114，`AGENT-R1`、PM-002及`AGENT-R1-5`均已完成。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，TASK04—TASK05保持TODO；正式holdout未重跑，0041—0045未部署或应用UAT。外部AI禁用，UAT继续alpha.42/0040且没有真实V2回执；任何R2、模型/真实数据、真实收货、迁移、部署、生产或切流仍须独立授权。
 
 ## 恢复上下文检查清单
 
