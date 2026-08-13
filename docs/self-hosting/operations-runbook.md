@@ -69,6 +69,7 @@ TASK50已经在仓库和任务私有隔离容器中验证[D-127](../project/DECI
 - `operations/container-runtime-policy-v1.json`内容寻址绑定Dockerfile、Compose release overlay、Caddyfile、Engine 29.5.2和Compose 5.1.4。任何版本、源摘要或策略漂移都会失败；升级Engine/Compose或基础镜像前先另立审阅任务，不能改成宽松版本范围。
 - `compose-config`必须解析`--profile '*'`的六个服务，并在隔离bwrap中把JSON直接通过stdin交给策略解析器。解析结果可能含凭据，禁止写临时文件、执行`tee`、复制到工单/聊天或在失败时打印；合法输出只有`CONTAINER_RUNTIME_POLICY_OK ...`，失败只有`CONTAINER_RUNTIME_POLICY_FAILED:<CODE>`。
 - `container-runtime-policy`使用精确候选Web/Worker digest及config digest，串行演练Admin、Migrate、Web、Worker、PostgreSQL、Caddy；每次最多一个临时容器，不发布宿主端口。合法输出为`CONTAINER_RUNTIME_POLICY_TEST_OK services=6 ... max_containers=1`。任何失败、超时、中断或残留都阻止后续gate步骤。
+- Docker 29.5.2/containerd image store中，按digest拉取镜像的`.Id`与`.Descriptor.digest`是registry manifest digest，OCI config digest位于`.Descriptor.annotations["config.digest"]`。运行探针必须用候选引用分别闭合前者、用不可变构建回执中的config digest闭合后者；严禁把manifest值当作config参数、从`.Id`猜config，或省略任一身份核验。
 - 运行合同要求全部服务只读rootfs、drop ALL和`NoNewPrivs=1`。Caddy只允许`0:0 + NET_BIND_SERVICE`，Migrate只允许`65532:0`读取root-owned制品，Web只允许一个发布身份reader GID；其他额外group、capability或root身份都不是排障手段。
 - PostgreSQL只写`erp_postgres`、`/tmp`和`/var/run/postgresql`；Caddy只写`caddy_data`/`caddy_config`；Web/Worker只写uploads/attachments，backup/release挂载只读。不得通过增加rootfs写权限、bind宿主目录、关闭`noexec`或挂Docker socket修复启动失败。
 - Backend网络必须为internal；PostgreSQL、Migrate、Worker、Admin只接backend，Caddy只接edge，Web接两者。Web宿主IP固定loopback，Caddy宿主IP固定公开入口，容器目标端口固定3000/80/443。端口或网络变化必须更新策略并重做隔离证据。

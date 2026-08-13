@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -293,6 +294,33 @@ class ContainerRuntimePolicyTest(unittest.TestCase):
 
 
 class ContainerRuntimeProbeContractTest(unittest.TestCase):
+    def test_image_identity_separates_manifest_and_config_digests(self):
+        manifest = f"sha256:{'a' * 64}"
+        config = f"sha256:{'b' * 64}"
+        reference = f"registry.invalid/chenyida/web@{manifest}"
+        image = {
+            "Id": manifest,
+            "Os": "linux",
+            "Architecture": "amd64",
+            "RepoDigests": [reference],
+            "Descriptor": {"digest": manifest, "annotations": {"config.digest": config}},
+            "Config": {"Volumes": {}},
+        }
+        with mock.patch.object(runtime_probe, "docker_json", return_value=[image]):
+            runtime_probe.inspect_image(reference, config, [])
+
+        wrong_config = copy.deepcopy(image)
+        wrong_config["Descriptor"]["annotations"]["config.digest"] = f"sha256:{'c' * 64}"
+        with mock.patch.object(runtime_probe, "docker_json", return_value=[wrong_config]):
+            with self.assertRaisesRegex(runtime_probe.RuntimeTestError, "^IMAGE_CONFIG_DIGEST_MISMATCH$"):
+                runtime_probe.inspect_image(reference, config, [])
+
+        wrong_manifest = copy.deepcopy(image)
+        wrong_manifest["Descriptor"]["digest"] = f"sha256:{'d' * 64}"
+        with mock.patch.object(runtime_probe, "docker_json", return_value=[wrong_manifest]):
+            with self.assertRaisesRegex(runtime_probe.RuntimeTestError, "^IMAGE_MANIFEST_DIGEST_MISMATCH$"):
+                runtime_probe.inspect_image(reference, config, [])
+
     def test_proc_status_parser_requires_complete_numeric_security_state(self):
         value = runtime_probe.parse_status(
             "Uid:\t65532\t65532\t65532\t65532\n"

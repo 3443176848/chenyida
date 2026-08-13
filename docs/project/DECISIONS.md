@@ -2138,6 +2138,39 @@
 - 拒绝在隔离测试中挂载现行四个持久卷、读取业务数据/日志/环境，或在未来部署时用启动脚本自动递归chown生产数据。
 - 拒绝把本次隔离成功写成UAT已加固、正式发布门已PASS或系统可供员工使用。
 
+## D-128 Docker 29运行探针必须分别闭合manifest引用与OCI config身份
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / RUNTIME IDENTITY FIX IMPLEMENTED / CURRENT CANDIDATE REVALIDATION REQUIRED / UAT NOT DEPLOYED`
+- 提案与实施：Codex 持续交付负责人，依据 TASK51 当前候选的真实 Docker 29.5.2/containerd image store inspect结果及D-124既有身份分离原则
+- 确认边界：只修正仓库运行探针、自动化测试和运维说明，并在任务私有隔离容器中重验；不授权安装host supervisor、修改UAT、访问持久卷正文、执行Migration或部署
+
+### Context
+
+- TASK51从精确源码构建Web/Worker候选后，静态Compose合同通过，但实际运行探针以`IMAGE_CONFIG_DIGEST_MISMATCH`失败。只读inspect证明Docker Engine 29.5.2的containerd image store对按digest拉取的镜像将`.Id`和`.Descriptor.digest`报告为registry manifest digest；真实OCI config digest位于`.Descriptor.annotations["config.digest"]`。
+- TASK50探针仍把`.Id`与候选config digest比较。TASK50调用时又错误地把manifest digest作为config参数，因此旧候选隔离演练掩盖了探针语义错误；该次证据不能证明manifest/config双身份闭合，必须由修正后的当前候选重验取代。
+- D-124已经规定可部署引用的manifest digest与归档/扫描身份的config digest不得混用。运行探针若继续依赖旧Docker graphdriver时代的`.Id == config`假设，会让正确候选失败，也可能让错误参数伪装成成功。
+
+### Decision
+
+1. 运行探针从精确`name@sha256:<64hex>`引用取得期望manifest digest，并要求Docker inspect的`.Id`、`.Descriptor.digest`和`.RepoDigests`中的精确引用同时闭合；任一不符返回稳定错误`IMAGE_MANIFEST_DIGEST_MISMATCH`。
+2. 候选构建回执中的Web/Worker config digest必须作为独立参数传给运行探针，并只与`.Descriptor.annotations["config.digest"]`比较；缺失、类型错误或不符返回`IMAGE_CONFIG_DIGEST_MISMATCH`。不得把manifest值填入config参数，也不得从`.Id`猜测config。
+3. 自动化测试必须分别覆盖正确双身份、错误config和错误manifest，防止两个摘要再次被合并。最终候选还必须由修正后clean HEAD重新构建，并以真实构建回执中的两个config digest完成六服务隔离演练。
+4. TASK51首次从`79f8dee0cadc`构建的候选只保留为发现此缺陷的中间诊断，不得成为正式release evidence或晋升依据；修正后的候选、扫描诊断和失败关闭gate入口必须重新建立同一源码链。
+5. 本修正不降低零漏洞、最小权限、内容寻址或supervisor授权要求。host supervisor未安装时，正式scan/gate仍必须在任何制品写入前失败关闭。
+
+### Consequences
+
+- 镜像可拉取manifest、Docker运行对象和OCI config分别获得可审计身份，Docker 29行为不再被错误映射到旧`.Id`语义；未来Engine/store变化会因稳定字段不闭合而显式失败。
+- TASK50的静态Compose、最小权限字段与六服务行为结果仍可作为问题定位参考，但其镜像双身份断言被撤销；TASK51修正后重验成功前，容器运行候选状态保持失败关闭。
+- 该决定只关闭仓库探针缺陷，不代表当前UAT已加固、正式release gate已通过或系统可投入使用，整体继续`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝把TASK51候选的config参数改成manifest digest以继续取得绿色结果，或删除config核验只保留`.Id`。
+- 拒绝仅检查tag/本地短ID、接受任意`RepoDigests`成员，或在manifest/config不一致时继续启动六服务。
+- 拒绝修改既有构建回执来迎合探针；身份来源必须保持构建时不可变，错误应在消费端修正并重新构建、重验。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

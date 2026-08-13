@@ -214,8 +214,24 @@ def inspect_image(reference: str, expected_config: str | None, declared_volumes:
     image = value[0]
     if image.get("Os") != "linux" or image.get("Architecture") != "amd64":
         fail("IMAGE_PLATFORM_MISMATCH")
-    if expected_config is not None and image.get("Id") != expected_config:
-        fail("IMAGE_CONFIG_DIGEST_MISMATCH")
+    if not runtime_policy.IMAGE_DIGEST_RE.fullmatch(reference):
+        fail("IMAGE_REFERENCE_INVALID")
+    manifest_digest = f"sha256:{reference.rsplit('@sha256:', 1)[1]}"
+    descriptor = image.get("Descriptor")
+    repo_digests = image.get("RepoDigests")
+    if (
+        image.get("Id") != manifest_digest
+        or not isinstance(descriptor, dict)
+        or descriptor.get("digest") != manifest_digest
+        or not isinstance(repo_digests, list)
+        or any(not isinstance(item, str) for item in repo_digests)
+        or reference not in repo_digests
+    ):
+        fail("IMAGE_MANIFEST_DIGEST_MISMATCH")
+    if expected_config is not None:
+        annotations = descriptor.get("annotations")
+        if not isinstance(annotations, dict) or annotations.get("config.digest") != expected_config:
+            fail("IMAGE_CONFIG_DIGEST_MISMATCH")
     volumes = image.get("Config", {}).get("Volumes") or {}
     if not isinstance(volumes, dict) or sorted(volumes) != declared_volumes or any(value != {} for value in volumes.values()):
         fail("IMAGE_DECLARED_VOLUMES_MISMATCH")
