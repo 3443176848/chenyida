@@ -4,6 +4,14 @@
 
 ## 2026-08-13
 
+### SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54 - `docs: start offhost backup provenance closure`
+
+- 调度/范围：TASK53收口`61b752e2ad05e2b2a273a01ffba6a87cc77e6a4c`/tree`800bd1f3caa0c43695008c044e507ac17c582884`后的零`DOING`自动切换为TASK54唯一active task；主智能体唯一写入，数据迁移/应用测试/运维安全三线完成只读审计。
+- 起点事实：TASK41已证明四域V2一致性、回执和双集群隔离恢复，但当前异机步骤实际为明文`cp -a`后人工声明`transfer_id`；没有源/接收签名、客户端加密、接收状态机、统一调度锁或保留计划，旧V2仍可能被Dashboard误判ready。
+- 目标：保持内层V2稳定，新增Ed25519来源与接收回执、X25519/HKDF-SHA256/AES-256-GCM密文 envelope、私有staging/原子晋升/幂等恢复、外层恢复绑定、UTC单飞调度和dry-run retention planner；Dashboard/监控对旧人工复制链失败关闭。
+- 验收：严格schema、密钥文件边界、篡改/截断/错误key/混代/重放/冲突与每阶段中断负测，合成密文链到单容器双PostgreSQL cluster恢复，Dashboard/监控与release inventory/bundle回归全部通过；不得降低内层V2断言。
+- 边界：不创建真实密钥或异机目标，不读取/复制/上传/恢复真实数据，不安装host timer/supervisor/notifier，不执行保留删除，不修改UAT/生产/账号/网络/四卷，不把合成验证称为真实异机、WORM或RPO/RTO完成。系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-RELEASE-GATE-LIFECYCLE-53 - `docs: start release gate lifecycle closure` / `fix: close release gate lifecycle` / `build: bind release lifecycle supervisor bundle` / `docs: close release gate lifecycle`
 
 - 调度/范围：TASK52收口`e9d27eebb21a9f52c941f389ef7800508c0402e5`/tree`e3263230340ae5fc4e9346f366afcb025d478a51`后的零`DOING`自动切换为TASK53唯一active task；主智能体唯一写入，应用测试/数据迁移/运维安全三线只读审计。

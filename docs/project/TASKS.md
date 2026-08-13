@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前零`DOING`。`SELFHOST-RELEASE-GATE-LIFECYCLE-53`已完成仓库/隔离实现、全量适用回归、content-addressed两提交链和治理收口并释放唯一active slot；系统继续`PRODUCTION NO-GO`。下一任务自动选择`SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`，其正式启动须另行建立任务文档和起点提交。
+当前唯一`DOING`为`SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`。严格起点为`main@61b752e2ad05e2b2a273a01ffba6a87cc77e6a4c`/tree`800bd1f3caa0c43695008c044e507ac17c582884`；范围只含仓库密文传输/provenance、合成接收与恢复、调度/保留策略、Dashboard/监控和正式测试链。主智能体唯一写入，三条智能体线只读审计；不创建真实密钥、不连接真实异机、不读取/外传真实数据或修改运行面，系统继续`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -69,6 +69,8 @@
 
 2026-08-13第二十八次调度事件：`SELFHOST-RELEASE-GATE-LIFECYCLE-53 DOING → DONE`。D-130与源码`08608eb1`、manifest-only直接子提交`d246cbde`形成47文件bundle；release候选侧51/51、supervisor侧48/48、Python31/31、Node113/964、PostgreSQL83/396和typecheck38/38通过。TASK51候选/bundle标记`STALE / NOT AUTHORIZABLE`；未生成正式PASS/manifest/identity，未安装host或修改UAT/真实数据，active slot释放且系统继续`PRODUCTION NO-GO`。
 
+2026-08-13第二十九次调度事件：主智能体从TASK53收口后的零`DOING`自动选择PR-001最高优先级未阻塞仓库前置，状态按`SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54 TODO → DOING`切换唯一active slot。三线审计确认TASK41只证明人工明文复制后的内容一致，不证明发送来源、密文传输、ACK、调度或保留；TASK54只实现仓库/合成隔离合同，不创建真实密钥/目标、不接触当前数据、不安装host timer或执行删除。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -85,7 +87,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 无 | — | — | — | — | — | TASK53已释放唯一active slot；TASK54尚未正式启动。 |
+| SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54 | 异机备份加密与来源证明闭环 | DOING | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52、D-129 | `REPOSITORY AND SYNTHETIC-ISOLATED ONLY / ACTUAL OFFHOST BLOCKED / PRODUCTION NO-GO`。保留内层V2，新增密文封包、源/接收签名、恢复绑定、调度单飞和dry-run保留；旧V2人工复制链降级为legacy/not-ready。不连接真实目标或数据。见[任务文档](../tasks/SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54.md)。 |
 
 ## 已完成任务
 

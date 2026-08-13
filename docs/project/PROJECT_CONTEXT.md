@@ -26,6 +26,8 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 `SELFHOST-RELEASE-GATE-LIFECYCLE-53`已完成并释放active slot。D-130固定`PRE_DEPLOY_EXISTING_RUNTIME_STABILITY`、`ISOLATED_CANDIDATE_STRICT`和`POST_DEPLOY_CURRENT_RUNTIME_STRICT`：旧UAT Worker只能保持无healthcheck且不退化，候选及部署后Worker仍必须healthy；部署后runtime identity v3只能从独立严格回执派生。源码`08608eb1`与manifest-only直接子提交`d246cbde`形成47文件bundle；release候选侧51/51、supervisor侧48/48、Python31/31、Node113/964、PostgreSQL83/396和typecheck38/38通过。没有host安装、正式PASS、UAT/生产或真实数据动作；下一安全任务回到异机备份provenance合同。
 
+`SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`已从严格起点`61b752e2ad05e2b2a273a01ffba6a87cc77e6a4c`/tree`800bd1f3caa0c43695008c044e507ac17c582884`启动为唯一`DOING`。三线只读审计确认TASK41的内层四域V2和隔离恢复核心可复用，但现有`cp -a`加人工`transfer_id`只能证明接收后内容一致，不能证明源签名、客户端加密、原子接收、ACK、调度或保留。TASK54只在仓库/合成隔离环境实现外层密文provenance、接收签名、恢复强制绑定、单飞调度、只读保留计划及Dashboard/监控失败关闭；不创建真实密钥/异机目标，不读取或外传当前数据，不安装timer或执行删除。
+
 ## 系统组成
 
 ### 本地 ERP

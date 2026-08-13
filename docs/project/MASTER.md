@@ -51,9 +51,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0045`，45/head`0045_runtime_worker_readiness.sql`，0045 SHA-256为`cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc`；0001—0044未修改，Schema/233表snapshot/journal/allowlist一致。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0045只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / RELEASE LIFECYCLE REPOSITORY CLOSED / PRODUCTION NO-GO`。TASK53已完成仓库和隔离验证，首次晋升不再因旧Worker缺少healthcheck而在候选测试前自锁；现行UAT、正式发布与真实恢复事实未改变 |
-| 当前任务 | 当前零`DOING`；`SELFHOST-RELEASE-GATE-LIFECYCLE-53`已完成并释放唯一active slot。A1—A8均未自动获权，当前系统不能投入真实员工使用 |
-| 下一任务 | 自动转入`SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`：先在仓库/合成隔离环境补齐四域异机副本的传输provenance、加密/保留/调度及失败恢复合同，不读取当前数据、不连接真实异机目标；TASK53候选重建与A3外部锚点仍需后续独立任务/资源门禁 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / OFFHOST BACKUP PROVENANCE IN PROGRESS / PRODUCTION NO-GO`。TASK54已作为唯一`DOING`启动；只在仓库和合成隔离环境补齐密文封包、双向签名来源、失败恢复、调度与只读保留合同 |
+| 当前任务 | `SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`：严格起点`61b752e2ad05e2b2a273a01ffba6a87cc77e6a4c`/tree`800bd1f3caa0c43695008c044e507ac17c582884`；主智能体唯一写入，三条智能体线只读审计已完成；不创建真实密钥、不读取/外传真实数据、不连接异机或修改运行面 |
+| 下一任务 | 先完成TASK54外层加密来源链、恢复强制绑定、Dashboard/监控失败关闭、调度单飞、dry-run保留计划和content-addressed bundle重建；真实目标/密钥托管/timer/数据动作仍按A4逐项专项授权，候选重建与A3另行推进 |
 
 ## 当前完成模块
 

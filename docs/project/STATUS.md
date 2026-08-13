@@ -2,6 +2,20 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
+## SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54（执行中；仓库与合成隔离密文链）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / REPOSITORY AND SYNTHETIC-ISOLATED ONLY / ACTUAL OFFHOST BLOCKED / PRODUCTION NO-GO | TASK54为唯一active task；主智能体唯一写入，三条智能体线已完成只读审计 |
+| 严格起点 | PASS / CONTROLLED | `main@61b752e2ad05e2b2a273a01ffba6a87cc77e6a4c`、tree`800bd1f3…2884`；未跟踪状态报告不读不改不提交 |
+| 已有内层 | PASS / TASK41 V2 REUSED | 四域一致性、数据库fence、严格manifest、不可变回执和双集群隔离恢复保持；不重写稳定恢复核心 |
+| 精确缺口 | CONFIRMED | 当前offhost为明文人工复制+caller transfer_id；没有源/接收签名、密文、原子接收ACK、统一调度或保留计划 |
+| 目标合同 | IN PROGRESS | Ed25519双向签名、X25519/HKDF/AES-GCM envelope、私有staging/幂等恢复、恢复强制provenance、UTC单飞与dry-run retention |
+| 应用/监控 | FAIL CLOSED REQUIRED | 旧V2人工复制链只作legacy历史，不得ready；监控须区分transfer/encryption/schedule/retention风险 |
+| 外部边界 | BLOCKED / NOT AUTHORIZED | 无真实密钥、异机目标、网络传输、WORM、timer、删除、当前数据恢复或真实RPO/RTO；cluster roles/ACL/tablespace另行处理 |
+| 运行面 | VERIFIED READ ONLY / UNCHANGED | UAT仍alpha.42/0040；四服务running/restart0/OOM false，PostgreSQL/Web healthy、Worker/Caddy health none |
+| 系统是否可用 | NO | 正式异机恢复、当前候选/门、监控投递、UAT对齐、真实迁移、岗位/员工验收和切换仍未完成 |
+
 ## SELFHOST-RELEASE-GATE-LIFECYCLE-53（完成；三阶段仓库合同闭环，运行面未部署）
 
 | 验证项 | 结果 | 说明 |
