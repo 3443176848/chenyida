@@ -2377,6 +2377,7 @@
 
 - Web/Worker 的数据库身份、凭据和无关业务域访问被分离；共享导入对象仍按必要操作授权，不能用本决策冒充行级职责分离。
 - 源权限artifact必须同时保存文件图候选和经过复核的显式排除；只由Worker触发的lease写入、dispatch、初始表头发布和normalization暂存替换必须通过单向模块边界从Web候选图中消失，不得依赖长期dormant exclusion静默剔除。当前唯一reviewed exclusion为既有`app_meta INSERT`。
+- D-132 v1 policy只保留legacy/synthetic解释：V4 validate/create/publish及Dashboard消费端必须拒绝v1 `ACTUAL_OFFHOST/RECOVERY_READY`并返回稳定去敏错误，v1 synthetic永不ready；只有新v2 policy及完整正负权限重验后才可产生实际ready。既有alias必须先验证再写immutable history，防止无效alias制造孤儿证据。
 - 运行 Compose、runtime policy、release inventory、D-132恢复、backup fence和Migration ACL断言必须同时升级；只改应用连接串或只增 GRANT 都不能通过。
 - 旧 TASK55 bundle和TASK51候选在TASK56源码变化后为`STALE / NOT AUTHORIZABLE`。完成仓库与隔离测试仍不等于当前UAT已加固，真实角色/秘密/ACL、候选、部署和运行复核继续需要专项授权。
 - 当前系统继续`PRODUCTION NO-GO`；本决策没有生成真实密码、创建Volume、连接/修改数据库、运行Migration、备份恢复或部署。

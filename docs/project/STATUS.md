@@ -16,11 +16,13 @@
 | Web锁权限 | PASS / ISOLATED CURRENT HEAD | 19个锁目标经16个owner控制窄函数访问，Web保持零table/column UPDATE；20个locking trigger固定安全owner路径，PG17专项5/5及完整回归84文件/401项通过 |
 | Backup权限 | PASS / REPOSITORY AND SYNTHETIC-ISOLATED | control/capture双service、精确CONNECT围栏、v3中断intent和零large-object dump合同已闭合；PG17崩溃恢复、意外large object拒绝、非superuser dump及新空恢复通过，未执行真实备份/恢复或角色变更 |
 | Backup检查点验证 | PASS | 定向13/13、release合同51/51、inventory `244/220/24`、access intent verify、PG17双cluster/未知grantee漂移/新空恢复、Dashboard PG2/2、Shell/JSON/Markdown231链接、credentials1631和diff检查通过 |
+| D-132 v1实际readiness | PASS / FAIL CLOSED | V4 validate/create/publish与Dashboard均拒绝legacy v1 `ACTUAL_OFFHOST/RECOVERY_READY`，稳定错误为`READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN`；v1 synthetic只作历史解析且永不ready，十份v1核心文件摘要冻结 |
+| 当前测试绑定 | PASS / CONTENT ADDRESSED | inventory仍为`244/220/24`、SHA-256`1a84dcd0…f4496ab`，runtime policy SHA-256`a20718ef…d59358`；Dashboard9/9、release manifest/gate27/27、inventory、定向lint、typecheck、credentials1637、JSON216及Markdown394/231链接通过 |
 | Tablespace | OPEN / REPOSITORY TARGET DEFINED | 当前PostgreSQL仅有PGDATA持久卷；未来声明独立`erp_postgres_tablespaces`固定mount，不创建或改动真实Volume |
-| 验收范围 | IN PROGRESS | Web锁权限、alpha.47/0046、Backup最小权限、Web候选/调用路径误权及职责组命名已闭合；v1实际恢复readiness门禁、PG17精确catalog、角色/ACL reconcile、Compose/tablespace、完整release与新bundle仍待完成 |
+| 验收范围 | IN PROGRESS | Web锁权限、alpha.47/0046、Backup最小权限、Web候选/调用路径误权、职责组命名及v1实际恢复readiness门禁已闭合；PG17精确catalog、角色/ACL reconcile、Compose/tablespace、完整release与新bundle仍待完成 |
 | 启动验证 | PASS / LIGHTWEIGHT | Markdown394/229链接、JSON214、Shell38、credentials1618、release contract51/51及Python三基线通过；宿主工具缺失改用既有隔离运行时，不安装依赖或降低断言 |
 | 起点资源 | PASS / BELOW STOP LINES | available约2.0GiB、Swap603MiB/1.0GiB、根盘16GiB、Load`0.10/0.17/0.52`，内核`oom_kill=0`；四服务restart0/OOM false |
-| 当前资源/清理 | PASS / BELOW STOP LINES | 本检查点available约1.7—1.8GiB、Swap568—574MiB/1.0GiB、根盘16GiB、Load低于停止线、`oom_kill=0`；四个UAT容器restart0/OOM false，Web/PostgreSQL healthy且Worker/Caddy运行不变，TypeScript、Node 36/36及runtime-readiness PG17 5/5通过，任务容器清零 |
+| 当前资源/清理 | PASS / BELOW STOP LINES | 本检查点available约1.8GiB、Swap590MiB/1.0GiB、根盘16GiB、Load低于停止线、`oom_kill=0`；四服务restart0/OOM false。typecheck首次384 MiB V8 heap内不足，资源复核后以640/896 MiB同断言通过；P0定向容器及凭据临时清单清零 |
 | 外部边界 | BLOCKED / NOT AUTHORIZED | 无真实角色/凭据/Volume、UAT/生产变更、host安装、Migration/deploy、备份恢复、数据读取或账号/网络动作 |
 | 系统是否可用 | NO | 当前高权限共享数据库身份和环境变量秘密尚未改变，且异机恢复、候选门、真实迁移、岗位/员工验收与切换仍缺证据 |
 

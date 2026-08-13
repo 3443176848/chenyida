@@ -115,3 +115,12 @@
 - 应用审计确认Web lease canary要求`SELECT=true`且`INSERT/UPDATE/DELETE=false`，此前文件图意图却包含INSERT/UPDATE；本检查点已从源合同消除该自相矛盾，完整物理登录正负探针仍须在v2 reconciler完成后执行。
 - 数据审计确认PG17编译catalog必须把可寻址关系/sequence/routine与列、约束、索引、非内部trigger等稳定surface分开，并显式建模extension成员及owner对table/sequence/routine/type的有效未来default privileges；零`pg_default_acl`行不得被解释为安全。
 - 运维安全审计确认`backup-recovery-readiness-v4.mjs`及Dashboard仍可能把D-132 v1 `ACTUAL_OFFHOST/RECOVERY_READY`解释为ready，与D-133“v1只作legacy/synthetic”的固定边界冲突。下一安全动作先在validate/create/publish/Dashboard外层失败关闭v1 actual，保留v1 synthetic历史解析，再进入PG17 catalog/reconcile。
+
+## 13. D-132 v1 实际就绪失败关闭检查点
+
+- `validateBackupRecoveryReadinessV4`、`createBackupRecoveryReadinessV4`和`publishBackupRecoveryReadinessV4`现在都在D-132 v1 policy与`ACTUAL_OFFHOST/RECOVERY_READY`组合进入深层验证或写入前，以稳定错误码`READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN`失败关闭；result/scope错配仍优先返回既有scope错误，不改变错误分类。
+- Dashboard消费端另加独立外层守卫；即使未来调用路径意外绕过validator，v1 actual也只会投影为`INVALID / NONE / UNVERIFIED / recovery_ready=false`。D-132 v1 synthetic fixture仍可验证和解析，但assurance保持`MISMATCH`且永远不能ready。
+- 发布顺序改为先验证现有权威alias，再写不可变history；坏alias不会留下孤儿history。同payload幂等发布仍复核/补齐同名history后返回，实际发布的root/确认词要求保持不变。
+- 十份D-132 v1核心policy/catalog/restore/executor/transfer/test文件由精确SHA-256负向门冻结，禁止借本修复修改legacy实现。正式inventory保持`244/220/24`，SHA-256为`1a84dcd0cf10afbc4e14fd809d8b98877d5bedcad6fdd24d8229c9100f4496ab`；test runtime policy SHA-256为`a20718ef88702373e64283e0607aa1412fd6060eaf23b67733af68b4e7d59358`。
+- 固定Node断网/只读/单容器验证中Dashboard 9/9、release manifest/gate 27/27、inventory verify、定向lint和`tsconfig.task10` typecheck通过；1637个显式tracked文件凭据扫描、216个JSON及394份Markdown/231个本地链接检查通过。typecheck首次在384 MiB V8 heap下进程内不足，确认宿主`oom_kill=0`、四服务restart0/OOM false及资源低于停止线后，以640 MiB heap/896 MiB容器同断言复跑通过；未跳过或降低检查。此前同源码边界的release/v1 transfer 31/31、v1 recovery 16/16保持通过。没有创建真实回执、角色、凭据、Volume或运行面资源，没有读取真实数据、备份、卷正文或未跟踪状态报告。
+- 该P0入口已关闭，TASK56继续唯一`DOING`并进入PG17精确编译catalog与v2角色/ACL reconcile；当前UAT仍共享superuser且没有真实V4证据，系统继续`PRODUCTION NO-GO`。

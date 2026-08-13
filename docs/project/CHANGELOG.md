@@ -4,7 +4,7 @@
 
 ## 2026-08-13
 
-### SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 - `docs: start PostgreSQL runtime privilege closure` / `feat: close Web runtime lock privilege boundary` / `feat: split backup control and capture privileges` / `fix: align runtime privilege source boundaries`
+### SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 - `docs: start PostgreSQL runtime privilege closure` / `feat: close Web runtime lock privilege boundary` / `feat: split backup control and capture privileges` / `fix: align runtime privilege source boundaries` / `fix: reject legacy actual recovery readiness`
 
 - 调度/范围：从TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`启动TASK56为唯一`DOING`；主智能体唯一写入，数据迁移、应用测试、运维安全三线只读审计。
 - 起点事实：只读UAT catalog摘要确认PostgreSQL 17当前只有1个非内置LOGIN，且该角色同时为superuser、数据库owner和全部433个public relation owner；Web/Worker活动连接共用1个数据库角色。源码为45/head`0045_runtime_worker_readiness.sql`，UAT仍为40/head`0040_warehouse_receipt_readiness.sql`。
@@ -24,6 +24,9 @@
 - 本检查点验证：新access intent SHA-256为`b2defe953c59a6b37858ee90af1ae08fbd444486a814ebb1c10f7f0f4ee83aa1`；固定Node隔离TypeScript、六文件Node 36/36及runtime-readiness PG17 5/5通过。三线审计另确认readiness v4可能接受D-132 v1实际恢复证据，已将fail-closed门禁调到PG17 catalog之前；检查前后available约1.7—1.8GiB、Swap568—574MiB、根盘16GiB、`oom_kill=0`，四服务restart0/OOM false，任务容器清零；未读取未跟踪报告、`.env`、真实数据/备份/卷正文。
 
 - 正式测试绑定：本检查点影响的8份正式测试SHA-256、test inventory与runtime policy已同步重绑；inventory保持`244/220/24`，新SHA-256为`79b1c8126ce5a934b38f7c70ed0af9dcd582edf52babc2406f07dcc974b328db`，inventory verify、release/v1 transfer合同31/31及v1 recovery合同16/16通过。
+- D-132实际readiness门禁：V4 validate/create/publish在legacy v1 policy与`ACTUAL_OFFHOST/RECOVERY_READY`组合进入深层逻辑或文件系统前统一返回`READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN`；Dashboard另有独立消费端守卫并投影为`INVALID / recovery_ready=false`。result/scope错配继续保留原错误，v1 synthetic仍可解析但assurance不匹配且永不ready。
+- 发布原子性：既有权威alias现在必须先通过安全元数据和完整证据校验，之后才允许写immutable history；恶意、损坏或回退alias不会留下孤儿history，同payload幂等路径仍补齐/验证相同history。actual入口的root与精确确认词要求未放宽。
+- Legacy冻结/发布绑定：十份D-132 v1 policy/catalog/restore/executor/transfer/test文件以精确SHA-256冻结；正式inventory仍为`244/220/24`，SHA-256更新为`1a84dcd0cf10afbc4e14fd809d8b98877d5bedcad6fdd24d8229c9100f4496ab`，test runtime policy为`a20718ef88702373e64283e0607aa1412fd6060eaf23b67733af68b4e7d59358`。Dashboard 9/9、release manifest/gate 27/27、inventory verify、定向lint、`tsconfig.task10` typecheck、credentials1637、JSON216及Markdown394/231链接通过；此前release/v1 transfer31/31与v1 recovery16/16保持。typecheck首次在384 MiB V8 heap内不足，确认宿主`oom_kill=0`、四服务restart0/OOM false后以640/896 MiB同断言复跑通过，未降级。本检查点未创建真实回执、读取真实数据或修改UAT/生产。
 
 ### SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 - `docs: start PostgreSQL cluster recovery closure` / `docs: record PostgreSQL cluster recovery decision` / `feat: add PostgreSQL cluster recovery contract` / `feat: capture PostgreSQL cluster recovery catalog` / `feat: secure PostgreSQL cluster restore` / `feat: encrypt PostgreSQL cluster transfer` / `feat: enforce PostgreSQL cluster recovery readiness` / `feat: expose cluster recovery operations status` / `feat: execute crash-safe PostgreSQL cluster recovery` / `test: bind cluster recovery release gate` / `test: execute trusted recovery fixtures` / `build: bind exact release dependencies` / `test: make recovery gate deterministic and trusted` / `release: bind task55 supervisor bundle` / `docs: close PostgreSQL cluster recovery`
 

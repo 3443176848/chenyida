@@ -4,6 +4,7 @@ import { lstat, open, realpath } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import clusterRecoveryPolicy from "../../../operations/postgresql-cluster-recovery-policy-v1.json" with { type:"json" };
 import { validateBackupRecoveryReadinessV4 } from "../../../scripts/backup-recovery-readiness-v4.mjs";
+import { CLUSTER_POLICY_CONTRACT } from "../../../scripts/postgresql-cluster-recovery-contract.mjs";
 import type { BackupRecoveryReadiness, BackupRecoveryReadinessV3, BackupVerification, LegacyBackupVerification, RuntimeReleaseIdentity } from "./types.ts";
 
 const SHA=/^[0-9a-f]{64}$/,IMAGE=/^sha256:[0-9a-f]{64}$/,IDENTIFIER=/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
@@ -85,6 +86,7 @@ export function parseBackupRecoveryReadinessV3(value:unknown):BackupRecoveryRead
 }
 
 export function parseBackupRecoveryReadiness(value:unknown):BackupRecoveryReadiness|null{
+  if(clusterRecoveryPolicy.schema_version===1&&clusterRecoveryPolicy.contract===CLUSTER_POLICY_CONTRACT&&record(value)&&value.result==="RECOVERY_READY"&&value.evidence_scope==="ACTUAL_OFFHOST")return null;
   try{return validateBackupRecoveryReadinessV4(value,clusterRecoveryPolicy) as BackupRecoveryReadiness;}catch{return null;}
 }
 

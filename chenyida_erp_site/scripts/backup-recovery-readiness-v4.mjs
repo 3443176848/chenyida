@@ -15,6 +15,7 @@ import {
 } from "./backup-recovery-readiness-v3.mjs";
 import { canonicalTransferJson } from "./offhost-transfer-contract.mjs";
 import {
+  CLUSTER_POLICY_CONTRACT,
   clusterPolicySha256,
   clusterSha256,
   validateClusterRecoveryPolicy,
@@ -126,6 +127,15 @@ function assertJointEvidence(value, verification) {
   return joint;
 }
 
+function rejectLegacyPolicyActual(policy, evidence) {
+  const actual = evidence && typeof evidence === "object" && !Array.isArray(evidence)
+    && evidence.result === BACKUP_RECOVERY_READY_RESULT
+    && evidence.evidence_scope === "ACTUAL_OFFHOST";
+  if (actual && policy.schema_version === 1 && policy.contract === CLUSTER_POLICY_CONTRACT) {
+    reject("READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN");
+  }
+}
+
 export function validateBackupRecoveryReadinessV4(value, policyInput) {
   const policy = validateClusterRecoveryPolicy(policyInput);
   exactKeys(value, [
@@ -137,6 +147,7 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
     || !new Set([BACKUP_RECOVERY_READY_RESULT, BACKUP_RECOVERY_SYNTHETIC_RESULT]).has(value.result)
     || !new Set(["ACTUAL_OFFHOST", "SYNTHETIC_ISOLATED"]).has(value.evidence_scope)) reject("READINESS_V4_VERSION_INVALID");
   if ((value.result === BACKUP_RECOVERY_READY_RESULT) !== (value.evidence_scope === "ACTUAL_OFFHOST")) reject("READINESS_V4_SCOPE_INVALID");
+  rejectLegacyPolicyActual(policy, value);
   text(value.backup_id, IDENTIFIER, "READINESS_V4_IDENTITY_INVALID");
   text(value.restore_run_id, IDENTIFIER, "READINESS_V4_IDENTITY_INVALID");
   iso(value.created_at, "READINESS_V4_TIME_INVALID");
@@ -257,6 +268,7 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
 
 export function createBackupRecoveryReadinessV4(options) {
   const policy = validateClusterRecoveryPolicy(options.policy);
+  rejectLegacyPolicyActual(policy, options.dataReadiness);
   const data = validateBackupRecoveryReadiness(options.dataReadiness);
   const joint = verifyJointTransferV2({
     joint: options.jointTransfer,
@@ -436,7 +448,9 @@ async function readPublishedReadiness(file, readerGid, policy) {
 }
 
 export async function publishBackupRecoveryReadinessV4({ readiness, policy, verification, receiptRoot, receiptReaderGid, confirm }) {
-  const validated = validateBackupRecoveryReadinessV4(readiness, policy);
+  const validatedPolicy = validateClusterRecoveryPolicy(policy);
+  rejectLegacyPolicyActual(validatedPolicy, readiness);
+  const validated = validateBackupRecoveryReadinessV4(readiness, validatedPolicy);
   assertJointEvidence(validated, verification);
   if (validated.result === BACKUP_RECOVERY_READY_RESULT && process.getuid?.() !== 0) reject("READINESS_V4_ACTUAL_ROOT_REQUIRED");
   const requiredConfirmation = validated.result === BACKUP_RECOVERY_READY_RESULT
@@ -449,18 +463,22 @@ export async function publishBackupRecoveryReadinessV4({ readiness, policy, veri
   const aliasFile = path.join(root, BACKUP_RECOVERY_READINESS_FILE);
   const temporary = path.join(root, `.recovery-readiness-v4.${process.pid}.${Date.now()}.tmp`);
   try {
-    await writeReadinessFile(immutableFile, source, receiptReaderGid, "READINESS_V4_HISTORY_CONFLICT");
     const existingMetadata = await lstat(aliasFile).catch((error) => error?.code === "ENOENT" ? null : reject("READINESS_V4_ALIAS_UNSAFE"));
+    let idempotent = false;
     if (existingMetadata) {
-      const existing = await readPublishedReadiness(aliasFile, receiptReaderGid, policy);
-      if (existing.version === 4 && existing.value.readiness_sha256 === validated.readiness_sha256) return { immutableFile, aliasFile };
-      if (existing.value.result === BACKUP_RECOVERY_READY_RESULT && validated.result !== BACKUP_RECOVERY_READY_RESULT) reject("READINESS_V4_ALIAS_DOWNGRADE_FORBIDDEN");
-      if (Date.parse(existing.value.verified_at) >= Date.parse(validated.verified_at)) reject("READINESS_V4_ALIAS_REGRESSION");
+      const existing = await readPublishedReadiness(aliasFile, receiptReaderGid, validatedPolicy);
+      idempotent = existing.version === 4 && existing.value.readiness_sha256 === validated.readiness_sha256;
+      if (!idempotent) {
+        if (existing.value.result === BACKUP_RECOVERY_READY_RESULT && validated.result !== BACKUP_RECOVERY_READY_RESULT) reject("READINESS_V4_ALIAS_DOWNGRADE_FORBIDDEN");
+        if (Date.parse(existing.value.verified_at) >= Date.parse(validated.verified_at)) reject("READINESS_V4_ALIAS_REGRESSION");
+      }
     }
+    await writeReadinessFile(immutableFile, source, receiptReaderGid, "READINESS_V4_HISTORY_CONFLICT");
+    if (idempotent) return { immutableFile, aliasFile };
     await writeReadinessFile(temporary, source, receiptReaderGid, "READINESS_V4_TEMP_CONFLICT");
     await rename(temporary, aliasFile);
     await syncDirectory(root);
-    const published = await readPublishedReadiness(aliasFile, receiptReaderGid, policy);
+    const published = await readPublishedReadiness(aliasFile, receiptReaderGid, validatedPolicy);
     if (published.version !== 4 || published.value.readiness_sha256 !== validated.readiness_sha256) reject("READINESS_V4_PUBLICATION_FAILED");
     return { immutableFile, aliasFile };
   } finally {

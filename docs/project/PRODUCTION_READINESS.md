@@ -63,6 +63,8 @@
 
 2026-08-13 第二十六次增量：TASK56的Backup control/capture检查点完成。未来入口必须使用两个物理/逻辑身份独立的root-only service文件；高权限control只做稳定身份、零large-object、默认只读/精确CONNECT围栏和恢复控制，固定非superuser `chenyida_erp_backup`执行relation reconciliation、Migration只读核对和`pg_dump --no-large-objects --no-owner --no-acl`。隔离PG17验证崩溃中断恢复、capture越权拒绝、意外large object拒绝与零large-object新空恢复；access intent只剩PG17编译catalog blocker。没有真实角色、凭据、备份/恢复、Volume、Migration、部署或UAT变化，整体继续`PRODUCTION NO-GO`。
 
+2026-08-13 第二十七次增量：TASK56关闭D-132 v1实际readiness误放行。V4 validate/create/publish与Dashboard消费端都拒绝legacy v1 `ACTUAL_OFFHOST/RECOVERY_READY`，稳定错误为`READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN`；v1 synthetic保持可解析但永不ready。发布先验证既有alias再写immutable history，十份D-132 v1核心文件摘要冻结。inventory保持`244/220/24`且SHA-256更新为`1a84dcd0…f4496ab`，Dashboard9/9、release合同27/27、inventory、定向lint、typecheck、credentials及文档/JSON门通过；未创建真实回执或修改运行面，整体继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -78,6 +80,7 @@
 - TASK55只在clean Git snapshot、合成角色/ACL/tablespace/凭据fixture和隔离双PostgreSQL集群中验证恢复；组合恢复执行的是supervisor bundle内受信fixture，不执行候选archive中的任意脚本。没有读取真实凭据、业务行、备份/卷正文或日志，没有连接异机、安装host组件、修改UAT/生产或执行正式恢复；任务容器、数据库、网络、Volume和临时目录清零。
 - TASK56启动审计只读取去敏的UAT PostgreSQL角色属性、对象owner计数、Migration元数据和活动连接角色去重计数，以及Docker/Compose mount与服务状态metadata；没有输出角色名/连接串/密码，没有读取`.env`、业务行、日志、备份/卷正文或未跟踪状态报告，也没有执行写入、重启或创建资源。
 - TASK56 Backup检查点只在仓库和一个临时PostgreSQL 17容器的合成双cluster中验证独立control/capture、CONNECT围栏、零large-object及恢复；没有读取当前数据库/卷/备份/凭据，没有创建或修改UAT角色/ACL，临时容器、cluster和目录全部清理。
+- TASK56 D-132兼容检查点只在固定Node断网/只读临时容器与合成fixture中验证v1 actual失败关闭、v1 synthetic兼容、alias写入顺序及摘要冻结；没有访问PostgreSQL、创建真实readiness文件或触碰当前运行面。
 
 ## 3. 当前身份与运行事实
 
@@ -109,7 +112,7 @@
 | 隔离恢复 | `PARTIAL / DATA + CLUSTER SECURITY SYNTHETIC-ISOLATED PASS` | 从真实异机副本在新空隔离目标恢复四类数据及集群级对象，完成Migration、角色/ACL/默认权限/表空间/凭据正反权限、数量、摘要、库存和关键金额核对并记录真实RTO；现有合成密文双集群证据不替代真实数据 |
 | 真实数据试迁移 | `FAIL` | 只读源快照、逐行结果、重复/孤儿/单位/文件处置、库存/金额核对和可重跑报告通过 |
 | 核心服务端规则 | `PARTIAL` | 物料/BOM/采购/收货/IQC/库存/生产/销售/财务关键链及异常路径在同一候选通过自动与人工验收 |
-| 权限/会话/安全/审计 | `PARTIAL / TASK56 DATABASE PRIVILEGE CLOSURE DOING / CURRENT UAT SUPERUSER` | TASK56须在仓库闭合独立Web/Worker/migration/backup身份、secret-file和正负权限；随后还需批准岗位矩阵、职责分离、最小数据域及同候选运行验收。当前UAT共享superuser身份不满足投产要求 |
+| 权限/会话/安全/审计 | `PARTIAL / TASK56 DATABASE PRIVILEGE CLOSURE DOING / CURRENT UAT SUPERUSER` | Web锁、Backup control/capture、源码职责边界及D-132 v1 actual readiness门禁已闭合；TASK56仍须完成PG17精确catalog、独立Web/Worker/migration/backup身份、secret-file和正负权限。随后还需批准岗位矩阵、职责分离、最小数据域及同候选运行验收。当前UAT共享superuser身份不满足投产要求 |
 | 强制发布测试门 | `PARTIAL / TASK55 BUNDLE REPOSITORY VERIFIED / NO CURRENT CANDIDATE PASS` | TASK55的49文件bundle、release inventory51/51、直接合同48/48、supervisor31/31、Node113/965、PostgreSQL83/396、Browser6/11、SPECIAL POSIX7/57及typecheck38/38通过；但TASK51候选已失效，host supervisor未安装，正式provenance/SBOM/security evidence和同候选19步报告仍不存在 |
 | 监控/容量/告警/手册 | `PARTIAL / REPOSITORY CONTRACT VERIFIED / HOST DELIVERY NOT CONFIGURED` | TASK49已验证严格快照、阈值、状态机、pending delivery及排障合同；仍须host安装/调度、真实渠道和值班升级演练，以及低资源负载/备份/恢复soak和升级/回滚演练 |
 | 真实员工受控试用 | `FAIL` | 少量真实岗位用户按脚本完成跨岗正常/异常流程并签字，问题闭环后重验 |
@@ -132,7 +135,7 @@
 - 精确停止 writer、持久数据库 fence intent、SIGKILL 后精确恢复、不可变本机/异机/恢复回执、RPO 过期和不同 machine/cluster 证明均已实现并通过隔离测试。
 - restore 使用 durable pinned source、全文件 staging、单事务数据库恢复、精确补偿、建库响应歧义处理和 prepared receipt 保全/补发；TASK54要求先验证签名密文外层后再短暂物化内层V2，并把全部摘要链写入V3 readiness。
 - D-131/TASK54已实现Ed25519双向签名、X25519/HKDF-SHA256/AES-256-GCM、原子接收/ACK、中断续跑、UTC单飞和dry-run retention。Dashboard的V1/V2都为legacy/not-ready，synthetic evidence永远false；只有真实外层链、已安装调度、有效保留计划及当前身份全匹配才可能ready。
-- D-132/TASK55已实现cluster catalog allowlist、NOLOGIN/PASSWORD NULL骨架、角色/成员/设置、owner/ACL/default privileges、custom tablespace显式映射、root-only标准输入凭据重新绑定、正反权限探针和崩溃安全恢复执行器；V4 readiness同时绑定数据链、集群链、恢复机器消费与安全回执，V1—V3及synthetic都不能ready。
+- D-132/TASK55已实现cluster catalog allowlist、NOLOGIN/PASSWORD NULL骨架、角色/成员/设置、owner/ACL/default privileges、custom tablespace显式映射、root-only标准输入凭据重新绑定、正反权限探针和崩溃安全恢复执行器；V4 readiness同时绑定数据链、集群链、恢复机器消费与安全回执。TASK56进一步在生产者、验证器、发布器和Dashboard四处拒绝D-132 v1 actual；V1—V3及synthetic都不能ready。
 - 工具仍不提供真实异机/密钥托管、WORM、timer安装、保留删除执行、外部告警、真实凭据重绑或真实RTO；不可捕获的恢复进程/宿主硬故障会隔离保留带marker的TEST目标，而不是猜测删除。
 
 状态：`G1 + OFFHOST PROVENANCE + CLUSTER SECURITY REPOSITORY RESOLVED / SYNTHETIC-ISOLATED VERIFIED`。只有完成PR-001/G2的真实异机副本与恢复、实际凭据重新绑定和权限核验，并部署调度/保留/告警后，才能把该工具链作为生产灾备证据。
@@ -224,7 +227,7 @@
 3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
 4. TASK44/TASK45已完成会话绝对时限和health/Worker/storage/Migration真实性仓库修复；运行面验证等待同候选完整gate及专项部署授权。
 5. `SELFHOST-OPS-MONITORING-ALERTING-49`已完成仓库级监控、容量阈值、备份/恢复证据新鲜度、告警状态和排障合同；host安装、真实外部投递、值班责任人和演练仍需专项授权/资源。
-6. TASK50已完成容器运行时最小权限加固；TASK53已完成三阶段发布生命周期，TASK54已完成异机provenance、加密、调度/保留和V3 readiness仓库合同，TASK55已完成PostgreSQL集群安全恢复与V4 readiness合同。当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`；Web锁和Backup control/capture边界已闭合，现进入PG17精确catalog、完整角色/ACL、secret-file与tablespace合同。完成后再重建精确候选，A3外部锚点及A1/A2另按资源和授权依赖推进。岗位权限矩阵仍等待业务负责人确认。
+6. TASK50已完成容器运行时最小权限加固；TASK53已完成三阶段发布生命周期，TASK54已完成异机provenance、加密、调度/保留和V3 readiness仓库合同，TASK55已完成PostgreSQL集群安全恢复与V4 readiness合同。当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`；Web锁、Backup control/capture及D-132 v1 actual readiness边界已闭合，现进入PG17精确catalog、完整角色/ACL、secret-file与tablespace合同。完成后再重建精确候选，A3外部锚点及A1/A2另按资源和授权依赖推进。岗位权限矩阵仍等待业务负责人确认。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。
 

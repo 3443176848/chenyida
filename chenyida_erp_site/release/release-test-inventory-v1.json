@@ -460,7 +460,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-unit.test.mjs",
-      "sha256": "f6443b958c214bb5a2f4b59f1e5affe57f58f07c086ba2f5d5f2f0d44a05c0ef",
+      "sha256": "b84bff6fdf14fcd27b340c2ca0b526ae3914bdccd7f678b876250fdfceb62ad5",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
