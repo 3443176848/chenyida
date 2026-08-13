@@ -1,6 +1,6 @@
 # SELFHOST-RELEASE-GATE-LIFECYCLE-53 发布门禁生命周期闭环
 
-> 状态：`DOING / REPOSITORY AND ISOLATED TEST ONLY / NO HOST INSTALL / NO UAT OR PRODUCTION ACTION / PRODUCTION NO-GO`
+> 状态：`DONE / REPOSITORY AND ISOLATED VERIFIED / NO HOST INSTALL / NO UAT OR PRODUCTION ACTION / PRODUCTION NO-GO`
 > 日期：2026-08-13（Asia/Shanghai）
 > 严格起点：`main@e9d27eebb21a9f52c941f389ef7800508c0402e5` / tree `e3263230340ae5fc4e9346f366afcb025d478a51`
 > 责任：Codex 主智能体为唯一写者、测试调度者和 Git 提交者；应用测试、数据迁移、运维安全智能体只读审计；项目负责人继续保留 host、外部目标、UAT、真实数据、账号、员工试用和切换的专项授权权力
@@ -64,17 +64,44 @@
 
 ## 6. 验收标准
 
-- [ ] 三条智能体线完成只读审计，主智能体逐项复核当前 runner/launcher/manifest/runtime identity 实现与测试。
-- [ ] 形成并记录单一生命周期决策；部署前、隔离候选、部署后语义及允许/禁止的转换明确且机器可验证。
-- [ ] 发布计划、authorization、runner 报告、release manifest eligibility 与 runtime identity 的模式/版本绑定闭合，缺失或错配失败关闭。
-- [ ] 现行 alpha.42 Worker health `none`的合成部署前 fixture 可在不退化时通过；身份变化、服务集合变化、health 恶化、restart 或 OOM 必须失败。
-- [ ] 候选 Worker health `none/unhealthy`、缺失 healthcheck、错误镜像/Migration/运行策略必须继续失败；部署后使用 legacy 模式必须失败。
-- [ ] 定向 release contract、supervisor launcher、manifest 和负向测试全部通过；不降低断言、不跳过既有 REQUIRED 步骤。
-- [ ] TASK53 源码提交后，以 canonical manifest-only 直接子提交重建 supervisor bundle；旧 TASK51 bundle/候选明确标记`STALE / NOT AUTHORIZABLE`。
-- [ ] 不产生正式授权、正式 gate PASS、`ELIGIBLE`manifest、外部 push、host 安装、UAT/生产/真实数据动作。
-- [ ] 资源、UAT四服务restart/OOM和受保护 Volume 集合前后不变；任务临时容器、网络、Volume和目录精确清理。
-- [ ] 同步`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`和`PRODUCTION_READINESS.md`，通过凭据/JSON/Shell/Markdown/差异检查并创建独立 Git 提交。
+- [x] 三条智能体线完成只读审计，主智能体逐项复核当前 runner/launcher/manifest/runtime identity 实现与测试。
+- [x] 形成并记录单一生命周期决策；部署前、隔离候选、部署后语义及允许/禁止的转换明确且机器可验证。
+- [x] 发布计划、authorization、runner 报告、release manifest eligibility 与 runtime identity 的模式/版本绑定闭合，缺失或错配失败关闭。
+- [x] 现行 alpha.42 Worker health `none`的合成部署前 fixture 可在不退化时通过；身份变化、服务集合变化、health 恶化、restart 或 OOM 必须失败。
+- [x] 候选 Worker health `none/unhealthy`、缺失 healthcheck、错误镜像/Migration/运行策略必须继续失败；部署后使用 legacy 模式必须失败。
+- [x] 定向 release contract、supervisor launcher、manifest 和负向测试全部通过；不降低断言、不跳过既有 REQUIRED 步骤。
+- [x] TASK53 源码提交后，以 canonical manifest-only 直接子提交重建 supervisor bundle；旧 TASK51 bundle/候选明确标记`STALE / NOT AUTHORIZABLE`。
+- [x] 不产生正式授权、正式 gate PASS、`ELIGIBLE`manifest、外部 push、host 安装、UAT/生产/真实数据动作。
+- [x] 资源、UAT四服务restart/OOM和受保护 Volume 集合前后不变；任务临时容器、网络、Volume和目录精确清理。
+- [x] 同步`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`和`PRODUCTION_READINESS.md`，通过凭据/JSON/Shell/Markdown/差异检查并创建独立 Git 提交。
 
 ## 7. 当前判定
 
-`DOING / PRODUCTION NO-GO`。本任务开始不意味着现行 UAT 健康契约已经修复、候选已经合格或任何部署已获授权；在实现、负向测试、bundle 重建和治理收口前，A1/A2继续不得请求。
+`DONE / REPOSITORY AND ISOLATED VERIFIED / PRODUCTION NO-GO`。D-130固定三阶段生命周期；仓库合同已关闭首次晋升自锁，但现行UAT没有部署新Worker health或部署后严格身份，且不存在外部镜像锚点、正式supervisor、正式gate PASS、`ELIGIBLE`manifest或真实恢复证据。TASK51候选及44文件bundle为`STALE / NOT AUTHORIZABLE`，不得用于A1/A2。
+
+## 8. 实现与提交证据
+
+- 源码提交：`08608eb19ba0d82d60b248e2a0759dfc70fa2125`，tree `1a750f8587aae2dd0749547f0d02a8a1e92e81c8`，父提交为任务启动治理提交`9b580c2b3d9ffd4aaf035133bd999aebd9661b8e`。
+- canonical manifest-only直接子提交：`d246cbde0bc559bb3555da65a82d49727b33a938`，tree `a93adc152a7d19058ad5899b8cac137a3281a544`；只更新`release-supervisor-bundle-v1.json`，其SHA-256为`94027198d2000b9eea1376489c8684593e38b2037d603f621aa2a5bb21f11c87`，绑定47个文件、源码提交/tree及launcher SHA-256 `b91595000a7b1a93dd60f405880465b9873b11f3ac0b803baeb5166279b8e7c5`。
+- `release-gate-plan/v2`固定`PRE_DEPLOY_EXISTING_RUNTIME_STABILITY`、`ISOLATED_CANDIDATE_STRICT`、`POST_DEPLOY_CURRENT_RUNTIME_STRICT`；authorization、plan/report、release manifest v2与runtime identity v3逐层绑定模式、版本、运行策略和Migration身份。
+- 部署后只接受独立严格回执：四服务、deployment class/id、完整Migration head/manifest SHA、镜像/容器身份和运行策略必须匹配；Web/Worker loopback-only引用、legacy模式、第五个Migration容器或非精确证据路径均失败。
+- `VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY`采用prepared/published两阶段、canonical SHA和精确硬链接残留恢复；重试会重新验证当前运行面，已发布回执不会被后续identity失败伪装为未发布。旧的直接/manifest转identity入口保持失败关闭。
+
+## 9. 测试与质量证据
+
+- content-addressed两个连续提交链的干净快照：release contract候选侧51/51、supervisor信任侧48/48、Python supervisor 31/31全部通过；正式合同路径集SHA-256为`b42a442bee05bdd9b3c7b2ebad8004502161180128b771d7d8f8e1ab2cfd92bc`。
+- 完整Node源码门113文件/964项通过，路径集SHA-256为`5464d29459d92c347436236d97bf2d3d05ce7c6b13c53b13adc2a23063b3da5f`；Vinext build、standalone资产一致性和裁剪合同一并通过。
+- 隔离PostgreSQL全量回归83文件/396项通过，路径集SHA-256为`102253a0af4454f5ccbd63af27c2b998cb40d6b565d27d19cd6ede1fb4a1c366`；其中Dashboard实际45个Migration后的身份绑定2/2通过。
+- 官方TypeScript配置38/38通过；第一次受控执行在512 MiB V8 heap下内存不足，未发生宿主或容器OOM，按资源门禁把heap/容器上限调至640/896 MiB后全量通过。ESLint为0 error、11个既有warning；生成器输出与已提交manifest逐字节一致。
+- 凭据扫描通过，共1596个仓库文件；JSON、Shell、Python compile、Markdown链接、`git diff --check`和敏感信息差异检查在治理提交前再次执行。
+
+## 10. 资源、安全与清理
+
+- 起点约available 2.1 GiB、Swap 715—716 MiB/1 GiB、根盘可用16 GiB、Load低于4；收口采样为available 2.2 GiB、Swap 719 MiB/1 GiB、根盘可用16 GiB、Load `0.91/1.23/1.25`。
+- 所有Docker build、Node、TypeScript和PostgreSQL重任务串行；任何时刻最多一个临时容器。任务隔离容器、数据库、网络、Volume、tar和目录均精确清零，没有prune或受保护Volume操作。
+- UAT PostgreSQL/Web仍为healthy，Worker/Caddy仍为running且health `none`；四服务restart均为0、OOM均为false。没有读取容器环境、日志、业务数据库行、备份正文或受保护Volume正文。
+- 未生成可消费授权、正式PASS、`ELIGIBLE`manifest或runtime identity；未安装host组件、外部push、build/deploy UAT、运行UAT Migration、重启服务、修改账号/网络/systemd/Swap或接触真实数据。
+
+## 11. 后续依赖
+
+仓库自锁已经关闭，但A1/A2仍不能直接执行：必须先从本任务精确提交链重建候选，并取得A3可异机解析的不可变源码/镜像锚点；host安装、正式门、UAT晋升及真实数据动作仍分别需要专项授权。持续交付下一安全优先级回到PR-001：在不读取当前数据的前提下补齐四域备份V2的异机传输provenance、加密/保留/调度与失败恢复合同，为A4a最小化外部输入做准备。

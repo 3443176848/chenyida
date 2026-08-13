@@ -4,13 +4,18 @@
 
 ## 2026-08-13
 
-### SELFHOST-RELEASE-GATE-LIFECYCLE-53 - `docs: start release gate lifecycle closure`
+### SELFHOST-RELEASE-GATE-LIFECYCLE-53 - `docs: start release gate lifecycle closure` / `fix: close release gate lifecycle` / `build: bind release lifecycle supervisor bundle` / `docs: close release gate lifecycle`
 
 - 调度/范围：TASK52收口`e9d27eebb21a9f52c941f389ef7800508c0402e5`/tree`e3263230340ae5fc4e9346f366afcb025d478a51`后的零`DOING`自动切换为TASK53唯一active task；主智能体唯一写入，应用测试/数据迁移/运维安全三线只读审计。
 - 起点事实：现行UAT PostgreSQL/Web为healthy，Worker/Caddy health为none，四服务running、restart0/OOM false；旧runner在第1步前要求Worker healthy，导致首次晋升在候选测试前自锁。TASK51 bundle/候选已落后当前治理HEAD，不能签发A1/A2。
 - 目标：显式绑定部署前既有运行面稳定、隔离候选严格health和部署后当前运行面严格身份三种生命周期语义；兼容旧Worker无health只能用于不退化比较，不得弱化候选Worker或部署后严格门。
 - 验收：模式/版本须进入计划、authorization、报告、manifest eligibility和runtime identity；缺失/错配、服务或身份漂移、health退化、restart/OOM、候选Worker非healthy及部署后复用legacy模式都有负向测试；实现后重建canonical bundle两提交链并标记旧候选过期。
 - 边界：不安装host supervisor、不生成可消费授权或正式PASS、不外部push、不连接或修改UAT/生产/账号/网络/四卷/真实数据，不读取凭据、日志、环境、卷/备份正文或未跟踪状态报告。系统继续`PRODUCTION NO-GO`。
+- 决策/实现：D-130固定`chenyida-erp-release-lifecycle/v1`三模式。plan/report/manifest升级v2；部署后由受限`VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY`动作严格复核四服务、外部镜像引用、deployment、完整Migration/runtime policy/readiness，发布独立回执后再派生runtime identity v3。模式错配、legacy跨阶段、loopback引用、第五个容器、证据路径/摘要或运行漂移均失败关闭。
+- 崩溃一致性：回执和identity采用prepared/published两阶段、canonical SHA、无覆盖硬链接、fsync与全局锁；重试重新验证当前运行面并可恢复精确同inode残留，冲突payload或伪摘要拒绝，已发布回执不因identity后续失败而删除。旧direct/manifest-to-identity入口保留为稳定失败入口。
+- Git/证据：源码`08608eb19ba0d82d60b248e2a0759dfc70fa2125`/tree`1a750f8587aae2dd0749547f0d02a8a1e92e81c8`；manifest-only直接子提交`d246cbde0bc559bb3555da65a82d49727b33a938`/tree`a93adc152a7d19058ad5899b8cac137a3281a544`形成47文件bundle，manifest SHA-256为`94027198d2000b9eea1376489c8684593e38b2037d603f621aa2a5bb21f11c87`。TASK51候选、诊断和44文件bundle均为`STALE / NOT AUTHORIZABLE`。
+- 验证：连续干净快照release候选侧51/51、supervisor侧48/48、Python31/31；完整Node113文件/964项、PostgreSQL83文件/396项、typecheck38/38、lint0 error/11既有warning和credentials1596通过。首次512 MiB V8 heap不足如实失败，未发生宿主/容器OOM；改为640 MiB heap/896 MiB容器后38/38通过，未降低断言。
+- 资源/结论：所有重任务串行且最多一个临时容器；起点/收口available约2.1/2.2GiB、Swap715—716/719MiB、根盘16/16GiB、最终Load`0.91/1.23/1.25`。四服务restart0/OOM false，临时容器/数据库/网络/Volume/tar/目录清零；无host、UAT/生产、真实数据或正式证据动作。结论为`DONE / REPOSITORY AND ISOLATED VERIFIED / PRODUCTION NO-GO`。
 
 ### SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52 - `docs: start external authorization readiness` / `docs: close external authorization readiness`
 

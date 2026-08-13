@@ -1,18 +1,18 @@
-# 自托管发布门 V1
+# 自托管发布门 V2
 
-> 当前状态：`TYPECHECK/BROWSER/EXACT LOCAL CANDIDATE/ZERO-FINDING DIAGNOSTIC VERIFIED / SUPERVISOR NOT INSTALLED / NO ELIGIBLE CANDIDATE / PRODUCTION NO-GO`。本页描述发布门合同和未来受控操作；它不授权候选镜像外部push、UAT/生产 Migration、部署、runtime identity 发布或切换。
+> 当前状态：`THREE-STAGE LIFECYCLE REPOSITORY VERIFIED / TASK51 CANDIDATE STALE / SUPERVISOR NOT INSTALLED / NO ELIGIBLE CANDIDATE / PRODUCTION NO-GO`。本页描述发布门合同和未来受控操作；它不授权候选镜像外部push、UAT/生产 Migration、部署、runtime identity 发布或切换。
 
 ## 目的与信任边界
 
 发布门把同一候选的已提交 Git tree、包版本、Web/Worker 镜像、完整 Migration allowlist、测试计划/结果、镜像 SBOM 和漏洞评估绑定为不可变证据。未知字段、重复 JSON key、证据替换/过期、步骤缺失/跳过/失败、资源越线或临时容器残留都会阻止晋升。
 
-候选源码本身不能决定“自己已经通过”。高权限入口由 root-owned、content-addressed release supervisor 提供；一次性授权只能映射到四个固定动作：创建镜像证据、运行 release gate、创建 release manifest、发布 runtime identity。授权不能携带 shell 命令或任意环境变量。工具会在授权消费前核验 bundle、授权文件、候选 commit/tree 和 clean worktree。
+候选源码本身不能决定“自己已经通过”。高权限入口由 root-owned、content-addressed release supervisor 提供；一次性授权只能映射到四个固定动作：创建镜像证据、运行 release gate、创建 release manifest、严格验证并发布部署后 runtime identity。授权不能携带 shell 命令或任意环境变量。工具会在授权消费前核验 bundle、授权文件、候选 commit/tree 和 clean worktree。
 
 候选制品根必须位于仓库外、root-owned `0750`。工具创建并核验 root-owned `0440` marker；JSON 制品采用无覆盖原子发布、`0440`和单硬链接。gate plan/report与release manifest先写入隐藏、不可被普通消费者接受的prepared文件，外层完成最后一次Git/镜像核验后再按精确SHA-256原子发布。密码、Token、数据库 URL、扫描器凭据和完整命令输出不得进入制品、命令行、聊天或 Git。
 
 ## 已跟踪入口
 
-- 计划：`release/release-gate-plan-v1.json`，19项全部为`REQUIRED`。
+- 计划：`release/release-gate-plan-v2.json`，19项全部为`REQUIRED`，并固定`chenyida-erp-release-lifecycle/v1`三阶段。
 - 测试运行策略：`release/test-runtime-policy-v1.json`；Node/PostgreSQL引用、Docker RepoDigest、config digest、平台、依赖树和 Python runtime 分别固定。
 - 漏洞策略：`release/vulnerability-policy-v1.json`，固定 Trivy `0.70.0`及其镜像引用，Web/Worker全部严重级别零已知漏洞。
 - 快速合同：`npm test` / `npm run test:release:contracts`。
@@ -27,6 +27,14 @@
 - 隔离候选构建器：`scripts/build-release-candidate-images.sh`，只接受clean HEAD的精确commit/tree，从`git archive`构建Web/Worker并生成仓库外不可变构建回执。它不是supervisor高权限动作，不生成正式PASS或manifest，且只能在D-122同等的明确隔离构建授权下使用。
 
 `test-runtime-policy-v1.json`中的 RepoDigest 仅证明当前 Docker engine 对精确本地引用的不可变解析；它不是候选 Web/Worker 的 registry provenance，也不能替代发布镜像的 registry digest、OCI identity、SBOM或漏洞报告。
+
+## 三阶段生命周期
+
+1. `PRE_DEPLOY_EXISTING_RUNTIME_STABILITY`只证明发布门期间现行四服务没有退化。计划冻结服务集合、容器/镜像身份、状态、restart/OOM以及healthcheck是否存在；PostgreSQL/Web必须持续healthy，Caddy必须保持既有无healthcheck，旧Worker只能保持“无healthcheck且health none”。新增/缺失服务、身份或状态变化、none变unhealthy、restart增长或OOM均失败。
+2. `ISOLATED_CANDIDATE_STRICT`验证拟部署候选，不继承旧Worker例外。PostgreSQL/Web/Worker必须都有healthcheck并为healthy，Caddy按内容寻址runtime policy验证；镜像、完整Migration、测试、安全证据和资源策略均须匹配。
+3. `POST_DEPLOY_CURRENT_RUNTIME_STRICT`只能在专项部署后执行。受限动作`VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY`从同一`ELIGIBLE`manifest严格复核当前Caddy/PostgreSQL/Web/Worker、deployment class/id、外部完整Web/Worker registry digest、完整Migration head/manifest SHA、runtime policy和两次稳定readiness；PASS回执独立发布后才能派生runtime identity v3。
+
+authorization、plan/report、release manifest和supervisor action必须显式绑定允许的模式。部署前PASS只说明候选允许部署，不说明已经部署；禁止把legacy模式用于候选或部署后，禁止以环境变量切换语义，禁止用manifest直接生成identity。部署后回执与identity使用prepared/published两阶段；中断重试会重新严格验证运行面，只恢复规范SHA与同inode残留，任何冲突或漂移失败关闭。
 
 ## Supervisor 两提交安装协议
 
@@ -49,8 +57,8 @@ Supervisor bundle manifest 必须引用一个已经提交且不再修改的 sour
 2. 准备固定 Trivy `0.70.0`镜像和不超过72小时的本地漏洞库。证据生产器先强制读取同run/candidate/image reference的root-owned构建回执，再使用`docker image save`后的离线archive，断网、无Docker socket、`--pull=never`运行Trivy，为Web/Worker分别生成原生JSON和CycloneDX；不得使用源码lockfile清单冒充镜像SBOM。D-125要求原生报告恰有`os-pkgs/wolfi`与`lang-pkgs/node-pkg`双包清单，CycloneDX要求唯一`wolfi 20230201`OS及`pkg:apk/wolfi`+`pkg:npm`覆盖，Debian/未知生态/缺包失败关闭。每个镜像两次扫描后立即删除临时archive。
 3. 在仓库外创建唯一候选制品根；由项目负责人生成 root-owned、canonical、`0400`、24小时内有效且一次性的`CREATE_IMAGE_EVIDENCE`授权，调用已安装 launcher。完成后核对 producer/bundle/authorization摘要和全部原始证据摘要。
 4. 生成新的`RUN_RELEASE_GATE`授权并调用 launcher。19步依次覆盖 release 合同、supervisor Python合同、凭证扫描、build+全部Node测试、83文件PostgreSQL回归、Browser E2E、POSIX专用测试、全部tsconfig、ESLint、隔离Migration、备份恢复、Python三基线、Compose config、`git diff --check`、镜像SBOM/漏洞证据和六服务container runtime policy。
-5. 只有 gate report 为`PASS`且所有证据仍新鲜，才生成`CREATE_RELEASE_MANIFEST`授权。manifest同时绑定同一 commit/tree、镜像、Migration、plan/report、SBOM/security和允许的 deployment class。
-6. 独立复核 manifest SHA、有效期和`promotion_status=ELIGIBLE`。UAT Migration/deploy、runtime identity发布、登录式验收和正式晋升仍分别需要新的专项授权；gate通过不会修改运行面。
+5. 只有`PRE_DEPLOY_EXISTING_RUNTIME_STABILITY` gate report为`PASS`且所有候选证据仍新鲜，才生成`CREATE_RELEASE_MANIFEST`授权。manifest同时绑定同一commit/tree、镜像、Migration、plan/report、SBOM/security、完整三阶段lifecycle和允许的deployment class。
+6. 独立复核manifest SHA、有效期和`promotion_status=ELIGIBLE`。UAT Migration/deploy、`POST_DEPLOY_CURRENT_RUNTIME_STRICT`验证与identity发布、登录式验收和正式晋升仍分别需要新的专项授权；gate通过不会修改运行面。
 
 所有 supervisor 授权字段由`release-supervisor-launcher.py`严格 allowlist；操作员不得直接调用 bundle 中的 shell 脚本来绕过 supervisor。launcher 在`execve`前消费一次性授权；若进程未成功启动，该授权保持已消费，必须调查回执/日志并签发新授权，不能复用或手工移回 pending。
 
@@ -68,10 +76,11 @@ Supervisor bundle manifest 必须引用一个已经提交且不再修改的 sour
 - TASK46已按D-120把根运行合同对齐为Node 22/ES2022，固定精确38配置集合/摘要双重核验并修复真实类型债；源码`f3bac028…`和bundle`3d1243e…`两个连续干净快照均38/38。该证据关闭TypeScript子门，但不替代Node-source、PostgreSQL、Browser、镜像安全或当前完整19步同候选门。
 - TASK47已按D-121固定Playwright 1.51.1/Chromium 134内容寻址运行时、历史Migration模板和断网只读单容器执行器；源码`9a18a0f…`干净快照6文件/11项全部PASS，manifest-only直接子提交`614ef7ac…`绑定39文件bundle。该证据关闭Browser子门，但不替代候选镜像安全、Node/PostgreSQL重跑或当前完整19步同候选门。
 - TASK48已按D-123—D-125完成授权内工作：精确Git archive构建器、manifest/config身份分离、固定Wolfi/Node最小非root运行层、v3构建回执和严格双生态扫描合同均已落地。最终`8952a815`/tree`1ac73360`的Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，config为`sha256:161ea63b…f6c53`/`sha256:f8dc4ac7…817c1`；6文件48/48、supervisor20/20、release typecheck和lint0 error通过。
-- TASK51按D-128修正Docker29运行探针后，从当前精确`8084d6c3`/tree`a54473f6`重建Web/Worker；manifest为`sha256:249d0ce4…5b7f`/`sha256:0e07fded…8370`，config为`sha256:7c7b0d38…3de5`/`sha256:af000408…4e88`。Compose与六服务runtime通过，release48/48、直接45/45及supervisor31/31通过。
+- TASK51按D-128修正Docker29运行探针后，曾从`8084d6c3`/tree`a54473f6`重建Web/Worker并完成零发现诊断；TASK53已改变源码与发布合同，该候选、诊断及44文件bundle现为`STALE / NOT AUTHORIZABLE`。
+- TASK53按D-130实现三阶段lifecycle、plan/report/manifest v2、独立postdeploy receipt与runtime identity v3。源码`08608eb1`与manifest-only直接子提交`d246cbde`形成47文件bundle；release候选侧51/51、supervisor侧48/48、Python31/31、Node113/964、PostgreSQL83/396及typecheck38/38通过。
 - 当前没有安装 host supervisor，也没有修改 systemd、权限、网络、Docker daemon 或运行中的 Compose。
-- alpha.46/0045当前候选仅在本机engine可解析。固定Trivy、UpdatedAt距扫描11.8小时的数据库、断网无socket归档诊断覆盖Web25个Wolfi+63个npm包、Worker25+60，全部severity为0且数据库树前后一致；四份root-only诊断制品保存在仓库外。
-- 上述制品明确是`diagnostic`而非正式证据。镜像证据入口与19步入口均在6个制品变化前因installed supervisor缺失退出1；不存在正式scan provenance/SBOM/security evidence、完整gate`PASS`或`ELIGIBLE`manifest。
+- TASK51的alpha.46/0045镜像只曾在本机engine可解析；固定Trivy诊断覆盖Web25个Wolfi+63个npm包、Worker25+60且全部severity为0，但这些制品只作历史审计，不能代表TASK53源码。
+- 当前不存在与TASK53源码一致的正式scan provenance/SBOM/security evidence、完整gate`PASS`或`ELIGIBLE`manifest；installed supervisor也不存在。
 - 完整多配置typecheck的既有ES2017/真实类型/示例边界问题已由TASK46修复，当前仓库合同38/38可重复通过；未来任何配置集合或内容漂移仍会失败关闭，不能把定向合同typecheck代替它。
 - UAT继续运行 alpha.42/0040；没有执行 UAT/生产 Migration、deploy、runtime identity发布或真实用户验收。
 

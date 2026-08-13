@@ -2,17 +2,22 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
-## SELFHOST-RELEASE-GATE-LIFECYCLE-53（执行中；发布前/候选/部署后生命周期拆分）
+## SELFHOST-RELEASE-GATE-LIFECYCLE-53（完成；三阶段仓库合同闭环，运行面未部署）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / REPOSITORY AND ISOLATED TEST ONLY / PRODUCTION NO-GO | TASK53为唯一active task；主智能体唯一写入，三条智能体线只读审计 |
+| 最终状态 | DONE / REPOSITORY AND ISOLATED VERIFIED / PRODUCTION NO-GO | active slot已释放；主智能体唯一写入，三条智能体线完成只读审计 |
 | 严格起点 | PASS / CONTROLLED | `main@e9d27eebb21a9f52c941f389ef7800508c0402e5`、tree`e3263230340ae5fc4e9346f366afcb025d478a51`；未跟踪状态报告不读不改不提交 |
 | 现场触发 | CONFIRMED / FAIL CLOSED | PostgreSQL/Web healthy，Worker/Caddy health none，四服务running/restart0/OOM false；旧runner在19步前要求Worker healthy而自锁 |
-| 目标合同 | IN PROGRESS | 部署前既有运行面只允许基线既有health不退化；隔离候选和部署后当前运行面保持完整身份、Migration及Worker healthy严格门 |
-| 证据绑定 | IN PROGRESS | 生命周期模式/版本必须贯穿计划、authorization、gate report、manifest eligibility和runtime identity；环境变量或隐式猜测不得旁路 |
-| 候选/bundle | STALE / NOT AUTHORIZABLE | TASK51仅作历史审计快照；TASK53实现后须重建canonical manifest-only直接子提交，候选镜像另行精确重建 |
+| 生命周期合同 | PASS / D-130 | 部署前只允许既有四服务身份/状态/既有health不退化；隔离候选继续强制Web/PostgreSQL/Worker healthy；部署后严格复核四服务、Migration、runtime policy及外部镜像身份 |
+| 证据绑定 | PASS / FAIL CLOSED | lifecycle v1、plan/report/manifest v2、独立postdeploy receipt和runtime identity v3闭合；模式缺失/错配/跨阶段复用、loopback引用或证据漂移均拒绝 |
+| Git/bundle | PASS / CONTENT ADDRESSED | 源码`08608eb19ba0d82d60b248e2a0759dfc70fa2125`/tree`1a750f85…81c8`；manifest-only直接子提交`d246cbde0bc559bb3555da65a82d49727b33a938`，47文件manifest SHA-256`94027198…1c87` |
+| 崩溃恢复 | PASS / IDEMPOTENT | 部署后回执与identity两阶段发布；精确恢复prepared/同inode published残留，重试重新验证运行面，冲突或伪摘要失败关闭，已发布回执不因后续identity失败删除 |
+| 自动验证 | PASS / FULL APPLICABLE REGRESSION | release候选侧51/51、supervisor侧48/48、Python31/31；Node113文件/964项、PostgreSQL83文件/396项、typecheck38/38、lint0 error/11既有warning、credentials1596通过 |
+| 候选/bundle | STALE / NOT AUTHORIZABLE | TASK51候选、诊断及44文件bundle仅作历史审计快照；须从TASK53精确链重建Web/Worker候选并建立A3外部锚点 |
 | 授权边界 | REPOSITORY / ISOLATED ONLY | 不安装host组件、不修改UAT/生产/账号/网络/四卷，不读取真实数据或生成正式PASS |
+| 资源/清理 | PASS / BELOW STOP LINES | 起点/收口available约2.1/2.2GiB、Swap715—716/719MiB、根盘16/16GiB、最终Load`0.91/1.23/1.25`；四服务restart0/OOM false，任务临时资源清零 |
+| 下一安全任务 | BACKUP OFFHOST PROVENANCE | 仓库/合成隔离环境补齐四域异机传输provenance、加密/保留/调度及失败恢复合同；不读取当前数据或连接真实异机目标 |
 | 系统是否可用 | NO | 正式门、异机恢复、监控投递、UAT对齐、真实迁移、岗位/员工验收和切换仍未完成 |
 
 ## SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52（完成；授权控制面闭合，仓库前置仍开放）
@@ -29,7 +34,7 @@
 | 下一安全任务 | SELFHOST-RELEASE-GATE-LIFECYCLE-53 | 先闭合部署前legacy稳定门与部署后current runtime严格门；不等待A1/A2或修改UAT |
 | 系统是否可用 | NO | 正式门、异机恢复、监控投递、UAT对齐、真实迁移、员工试用和切换仍未完成 |
 
-## SELFHOST-RELEASE-CANDIDATE-REFRESH-51（完成；当前精确本机候选零发现，正式门阻塞）
+## SELFHOST-RELEASE-CANDIDATE-REFRESH-51（历史完成；该本机候选已被TASK53源码变化失效）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
@@ -37,7 +42,7 @@
 | 严格起点 | PASS / CONTROLLED | `main@11785d4dac3e1afeb936f7a7a0626a25443fa371`、tree`91a6e752…ffe2fa`、alpha.46/0045；未跟踪状态报告不读不改不提交 |
 | Git身份 | PASS / CONTENT-ADDRESSED CHAIN | manifest/config修复`12beccf0…390e`/tree`a195669a…5b07`；唯一直接子bundle提交`8084d6c3…a8f8`/tree`a54473f6…7fe`，44文件bundle SHA-256`f4481316…5ce6` |
 | 真实失败修复 | PASS / D-128 | Docker29把`.Id`报告为manifest；旧探针错误按config比较且TASK50调用曾误传manifest。现分别闭合RepoDigest manifest与descriptor annotation config，错误manifest/config均有负向测试 |
-| 当前候选 | PASS / LOCAL ENGINE ONLY | Web manifest/config`sha256:249d0ce4…5b7f`/`sha256:7c7b0d38…3de5`；Worker`sha256:0e07fded…8370`/`sha256:af000408…4e88`；精确绑定`8084d6c3`、alpha.46/0045及构建回执`f490b969…c1b2` |
+| 历史候选 | STALE / NOT AUTHORIZABLE | 当时Web manifest/config`sha256:249d0ce4…5b7f`/`sha256:7c7b0d38…3de5`、Worker`sha256:0e07fded…8370`/`sha256:af000408…4e88`精确绑定`8084d6c3`；TASK53源码与生命周期合同已改变发布输入，现不得授权或部署 |
 | runtime | PASS / MAX ONE CONTAINER | 当前候选Compose policy及实际六服务probe通过，policy`8c9f9fd0…f444`、`max_containers=1`；只读rootfs/capability/NNP/用户/写路径与PostgreSQL/Caddy例外无回退 |
 | 漏洞/SBOM诊断 | PASS / ZERO FINDINGS | 固定Trivy0.70.0；数据库UpdatedAt距扫描11.8h，树摘要前后`def6b023…86b`；Web Wolfi25+npm63、Worker25+60，全部severity0且CycloneDX漏洞0；四份root-only diagnostic已保存 |
 | 正式门 | BLOCKED / FAIL CLOSED | 镜像证据和19步入口均因installed supervisor缺失在制品写入前退出1；6文件指纹`d1136173…6b4f`不变，无正式SBOM/security/gate PASS或`ELIGIBLE`manifest |

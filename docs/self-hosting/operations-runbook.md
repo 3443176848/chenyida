@@ -6,7 +6,7 @@
 
 - 唯一未来生产权威方向是 Node.js、PostgreSQL、本地持久文件和独立 Worker。
 - `chenyida-erp-parallel`仍是受控非生产 UAT：Web `0.1.0-alpha.42` / source revision `569aa954d764309e239d1f6c174e582596d33a24`，PostgreSQL 40/head `0040_warehouse_receipt_readiness.sql`。
-- 当前仓库源码为`0.1.0-alpha.46`/45/head`0045_runtime_worker_readiness.sql`；TASK51已从精确`8084d6c3`/tree`a54473f6`构建当前仅本机隔离候选并完成六服务runtime与零发现诊断，但0041—0045仍未部署或应用到UAT。无正式supervisor gate或`ELIGIBLE`manifest，源码/诊断候选/运行面不得描述为同一发布。
+- 当前仓库源码为`0.1.0-alpha.46`/45/head`0045_runtime_worker_readiness.sql`及TASK53链`08608eb1`→`d246cbde`；TASK51的`8084d6c3`本机候选、六服务runtime和零发现诊断已为`STALE / NOT AUTHORIZABLE`，0041—0045仍未部署或应用到UAT。无当前候选、正式supervisor gate或`ELIGIBLE`manifest，源码/历史诊断/运行面不得描述为同一发布。
 - Python/SQLite 常驻面仍是开发运行和迁移来源，不是未来生产底座；正式切换前必须另有停写、只读或隔离决定。
 - 入口、受控业务事实与历史操作见 `parallel-http-acceptance.md`；未经任务授权不得登录、发送业务 POST 或查询业务行。
 
@@ -46,11 +46,11 @@ Compose 配置展开需要数据库和 setup 变量；只读状态检查可使�
 2. 运行机器可读的串行 release suite，缺失、跳过、超时或失败均拒绝晋升；
 3. 取得精确 UAT/生产授权后，先建立可恢复快照并从异机副本完成隔离恢复；
 4. 执行 Migration 前核对 allowlist、当前 head、checksum、容量与回滚条件；
-5. 仅替换授权的服务，核对实际容器/镜像/runtime identity，发布 release identity；
+5. 仅替换授权的服务；通过`POST_DEPLOY_CURRENT_RUNTIME_STRICT`独立复核实际四服务、镜像、Migration、runtime policy和readiness，先发布严格回执，再派生runtime identity v3；
 6. 执行匿名健康、权限、核心业务、数据汇总、Worker 和备份时效验收；
 7. 观察 restart/OOM、Load、内存、Swap、磁盘和错误率；触发回滚条件立即停止晋升。
 
-TASK42已形成release manifest、Migration allowlist、content-addressed supervisor和`test:release`仓库工具；TASK46/TASK47分别关闭38配置TypeScript和6文件Browser子门，TASK51又按D-128从当前精确Git archive重建候选并完成manifest/config双身份、六服务runtime及新鲜零发现诊断，见[自托管发布门V1](../testing/selfhost-release-gate.md)。host supervisor仍未安装；正式scan provenance/SBOM/security evidence和完整gate PASS仍不存在，UAT仍为alpha.42/0040。因此G3为`CURRENT LOCAL CANDIDATE DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED`，仍是投产阻断。
+TASK42已形成release manifest、Migration allowlist、content-addressed supervisor和`test:release`仓库工具；TASK46/TASK47分别关闭38配置TypeScript和6文件Browser子门；TASK53按D-130完成部署前/隔离候选/部署后三阶段合同及47文件bundle，见[自托管发布门V2](../testing/selfhost-release-gate.md)。TASK51本机候选与诊断已因源码变化成为`STALE / NOT AUTHORIZABLE`；host supervisor、当前精确候选、正式scan provenance/SBOM/security evidence和完整gate PASS仍不存在，UAT仍为alpha.42/0040。因此G3为`LIFECYCLE REPOSITORY VERIFIED / NO CURRENT ELIGIBLE CANDIDATE`，仍是投产阻断。
 
 ## 发布制品和Migration操作保护
 
@@ -61,6 +61,10 @@ TASK42已形成release manifest、Migration allowlist、content-addressed superv
 - Manifest必须为`ELIGIBLE`且未过期；离线`SOURCE_LOCKFILE/NOT_EVALUATED`证据只能用于证明失败关闭，不能用于Migration或晋升。
 - UAT/PRODUCTION Migration必须通过只读挂载的`release-manifest.json`及其SHA，显式确认精确deployment、数据库名、system identifier、OID、database comment marker、当前head和目标head。不得把秘密放入manifest或命令行。
 - Migration前必须另行取得专项授权和可恢复快照；工具通过并不授权连接数据库、替换镜像、重启服务或发布runtime identity。
+
+发布门生命周期不得混用：`PRE_DEPLOY_EXISTING_RUNTIME_STABILITY`只冻结并比较现行四服务，允许旧Worker在整个门期间保持“无healthcheck且health none”，但不把它标为健康；`ISOLATED_CANDIDATE_STRICT`仍要求候选Worker healthy。部署完成后只能使用`VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY`，`POST_DEPLOY_CURRENT_RUNTIME_STRICT`要求PostgreSQL/Web/Worker healthy、Caddy满足固定无healthcheck合同，并拒绝loopback Web/Worker引用、第五个Compose容器、完整Migration/runtime policy漂移。部署前PASS或`ELIGIBLE`manifest都不能冒充部署后回执。
+
+部署后动作发生中断时，不删除、覆盖或手工编辑prepared/published回执或identity。使用同一授权和run ID重试前先确认没有存活进程；工具会重新复核当前运行面，只恢复canonical SHA与精确同inode残留。两个payload冲突、授权/manifest改变或运行漂移必须保全证据并停止晋升。
 
 ## 容器运行时最小权限门
 
@@ -118,7 +122,7 @@ alpha.46/0045源码已按D-119实现下列合同，但当前alpha.42/0040 UAT仍
 3. Worker启动前执行同一Migration/身份和双卷探针，随后以数据库时钟、generation和CAS version单飞续租；Docker healthcheck还必须读取本进程node-owned `0600` UUID文件并核对同一实例。有效旧租约存在时新实例失败关闭，只能等待旧实例停止或租约过期，禁止手工UPDATE/DELETE租约绕过排他。
 4. `RUNTIME_DATABASE_UNAVAILABLE`、`RUNTIME_MIGRATION_MISMATCH`、`RUNTIME_WORKER_UNAVAILABLE`、`RUNTIME_UPLOADS_UNAVAILABLE`、`RUNTIME_ATTACHMENTS_UNAVAILABLE`或身份/超时类稳定代码出现时，先停止候选晋升，记录request ID、时间和component状态；不得记录连接串、SQL、路径、instance ID、堆栈或原始异常。
 5. 检查Worker日志中的`worker_runtime_lease_lost`、`worker_runtime_stop_failed`和`worker_instance_cleanup_failed`稳定事件，再核对Docker health、数据库Migration及挂载权限。不得通过改healthcheck、延长陈旧租约或删除业务文件恢复绿色状态。
-6. 发布runtime identity前必须同时看到精确Web与Worker容器为`healthy`；Web ready但Worker非healthy、版本/Migration身份不同或探针失败均拒绝发布。备份时效仍由独立Dashboard/recovery governance判断，不混入公开readiness。
+6. 发布runtime identity前必须通过`POST_DEPLOY_CURRENT_RUNTIME_STRICT`，同时看到精确PostgreSQL/Web/Worker容器为`healthy`、Caddy符合固定策略，并闭合四服务、deployment、完整Migration/runtime policy与稳定readiness；Web ready但Worker非healthy、版本/Migration身份不同或探针失败均拒绝。备份时效仍由独立Dashboard/recovery governance判断，不混入公开readiness。
 
 完整合同和隔离证据见[任务45记录](../tasks/SELFHOST-RUNTIME-HEALTH-TRUTH-45.md)及[D-119](../project/DECISIONS.md#d-119-运行健康采用完整-migration-manifestworker-数据库租约与双侧文件卷探针)。
 
@@ -130,8 +134,8 @@ TASK49提供仓库级`chenyida-erp-operations-monitoring/v1`合同、去敏采�
 
 - root采集器只读`/proc/meminfo`、`/proc/vmstat`、`/proc/loadavg`、`/proc/uptime`、boot ID和根分区`statfs`，boot ID只保留SHA-256；Docker只读取固定Compose project/service、容器名/ID、配置镜像引用、本地image ID、running、health、RestartCount和OOMKilled。
 - 禁止采集`docker inspect`完整结果、`Config.Env`、日志、挂载、网络、API token、数据库、业务行、卷正文、机器ID正文、SQL、堆栈、完整URL、原始异常、备份位置或完整回执。Docker必须使用固定`/usr/bin/docker`、去敏环境、30秒超时和有界输出。
-- Docker health取值固定使用`{{with (index .State "Health")}}{{.Status}}{{else}}none{{end}}`语义；直接读取`.State.Health.Status`或`.Config.Healthcheck`会在现行Docker上因缺失key失败。Caddy允许`none`，PostgreSQL/Web/Worker必须`healthy`。
-- `operations/monitoring-policy-v1.json`只定义时间窗、服务健康和恢复要求；资源阈值唯一来自`release/release-gate-plan-v1.json.resource_policy`并由SHA-256绑定：available memory `<768 MiB`、Swap使用率`>80%`、60秒Swap增长`>256 MiB`、根盘可用`<10 GiB`、Load1连续3分钟`>4`。等于边界不触发，越过边界才触发。
+- Docker health取值固定使用`{{with (index .State "Health")}}{{.Status}}{{else}}none{{end}}`语义；直接读取`.State.Health.Status`或`.Config.Healthcheck`会在现行Docker上因缺失key失败。Caddy允许`none`，部署后/常态监控的PostgreSQL/Web/Worker必须`healthy`；部署前旧运行面稳定门的Worker例外不能复用于监控绿色判断。
+- `operations/monitoring-policy-v1.json`只定义时间窗、服务健康和恢复要求；资源阈值唯一来自`release/release-gate-plan-v2.json.resource_policy`并由SHA-256绑定：available memory `<768 MiB`、Swap使用率`>80%`、60秒Swap增长`>256 MiB`、根盘可用`<10 GiB`、Load1连续3分钟`>4`。等于边界不触发，越过边界才触发。
 - root受控配置必须从同一未过期`ELIGIBLE`release manifest及已发布runtime/backup身份生成，固定deployment/project、四个精确容器名、四个digest引用、版本、40位Git commit、release/supervisor/Migration manifest摘要、Migration head、backup policy/RPO和通知target。UAT/PRODUCTION的`notification.required`必须为true；不得使用tag或手填另一套摘要。
 - 应用、release、backup和notification组件通过独立root控制的去敏JSON适配层交给`--components`。readiness只提供version/revision/head，完整Migration manifest摘要来自release evidence；backup只提供状态枚举、恢复点/过期时间、policy/RPO和`recovery_ready`。省略组件文件会明确生成`NOT_COLLECTED`并告警，不能得到绿色结果。
 
@@ -145,7 +149,7 @@ sudo <installed-node> <installed-cli> init \
 
 sudo <installed-node> <installed-cli> run \
   --policy <installed-monitoring-policy-v1.json> \
-  --resource-plan <installed-release-gate-plan-v1.json> \
+  --resource-plan <installed-release-gate-plan-v2.json> \
   --config <root-only-monitoring-config-v1.json> \
   --components <root-generated-safe-components-v1.json> \
   --state-root /var/lib/chenyida-erp/monitoring-v1

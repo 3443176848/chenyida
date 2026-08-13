@@ -74,6 +74,6 @@ COMPOSE_PARALLEL_LIMIT=1 docker compose \
 
 ## 执行后与失败处置
 
-成功后必须核对目标 head、全部 checksum、表/记录数、孤儿引用、库存和关键金额，再核对Web/Worker实际容器、镜像、restart/OOM和runtime identity。0045及以后还必须确认Worker精确实例租约新鲜、Web与Worker均为`healthy`、`/api/live`为LIVE且`/api/health`为READY并返回同候选version/revision/Migration head；任何不一致都停止晋升，不继续接流或发布runtime identity。
+成功后必须核对目标head、全部checksum、表/记录数、孤儿引用、库存和关键金额，再通过`POST_DEPLOY_CURRENT_RUNTIME_STRICT`核对Caddy/PostgreSQL/Web/Worker实际容器、镜像、restart/OOM、完整Migration/runtime policy和runtime identity v3。0045及以后还必须确认Worker精确实例租约新鲜、PostgreSQL/Web/Worker均为`healthy`、`/api/live`为LIVE且`/api/health`为READY并返回同候选version/revision/Migration head；任何不一致都停止晋升，不继续接流或发布部署后回执/identity。
 
 失败时保留 manifest、门禁报告、快照和安全错误码；不要修改既有 Migration、手工补 history 行、删除持久卷或把失败断言改成通过。DDL已提交的历史升级通常不能依赖数据库原地“降级”；按批准的快照恢复或新建前向修复 Migration 执行。旧 SQLite/D1 数据迁移仍须独立按扩展、回填、切换、收缩和逐行核对实施。

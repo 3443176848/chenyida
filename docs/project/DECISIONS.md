@@ -2216,7 +2216,7 @@
 ## D-130 发布证据按部署前、隔离候选和部署后三阶段闭合
 
 - 日期：2026-08-13
-- 状态：`ACCEPTED / SOURCE IMPLEMENTED / ISOLATED CONTRACTS VERIFIED / CONTENT-ADDRESSED BUNDLE REFRESH PENDING / NO HOST OR UAT ACTION`
+- 状态：`ACCEPTED / SOURCE IMPLEMENTED / ISOLATED CONTRACTS VERIFIED / CONTENT-ADDRESSED BUNDLE REFRESHED / NO HOST OR UAT ACTION`
 - 提案与实施：Codex 持续交付负责人，依据 TASK53 三线只读审计、D-129 首次晋升依赖环和现行 alpha.42 UAT 运行元数据
 - 确认边界：只修改仓库发布合同、受限 supervisor 动作、自动化测试和治理资料；不授权安装 host supervisor、生成可消费授权、推送镜像、执行 UAT/生产 Migration 或部署、读取真实数据或发布 runtime identity
 
@@ -2244,7 +2244,7 @@
 - 首次正式 gate 可以在不美化旧 Worker 健康缺口的前提下证明现行 UAT 在长门禁期间没有退化；候选及部署后 Worker 健康要求仍保持严格。
 - 运维人员能够区分“候选可部署”与“当前部署已严格验证”，并在发布后中断时通过同一授权和运行 ID 安全续跑，而不手工覆盖受信证据。
 - release plan、test inventory、test runtime policy、runtime policy、authorization、manifest、receipt 和 identity 的版本/摘要构成更长的内容寻址链；任何源文件或测试变化都必须刷新下游摘要、bundle 和候选。
-- 本决定没有安装 supervisor、生成正式 PASS、修改现行 UAT 或恢复其 Worker health。新 bundle、干净快照全回归和治理收口完成前 TASK53 仍为 DOING；A1、A2、A3 及所有真实数据/部署授权继续未授予，系统保持 `PRODUCTION NO-GO`。
+- 本决定没有安装 supervisor、生成正式 PASS、修改现行 UAT 或恢复其 Worker health。源码`08608eb19ba0d82d60b248e2a0759dfc70fa2125`与manifest-only直接子提交`d246cbde0bc559bb3555da65a82d49727b33a938`已形成47文件bundle；A1、A2、A3及所有真实数据/部署授权继续未授予，系统保持`PRODUCTION NO-GO`。
 
 ### Rejected alternatives
 

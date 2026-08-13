@@ -47,19 +47,27 @@ password=REDACTED_IN_ROOT_ONLY_FILE
 
 ## 3. 运行发布身份
 
-Dashboard 只有在运行身份与数据库、Migration、备份策略和恢复回执全部匹配时才显示 `recovery_ready=true`。候选部署后，不得直接运行仓库中的`write-release-identity.sh`，也不得再使用旧的`--application-version`、`--git-commit`或`PUBLISH_RUNTIME_RELEASE_IDENTITY`命令；这些参数不能证明运行容器来自同一个已验候选。
+Dashboard 只有在runtime identity v3与独立postdeploy PASS回执、数据库、完整Migration、runtime policy、备份策略和恢复回执全部匹配时才显示`recovery_ready=true`。候选部署后，不得直接运行仓库中的`write-release-identity.sh`，也不得使用旧的`--application-version`、`--git-commit`、`PUBLISH_RUNTIME_RELEASE_IDENTITY`或manifest-to-identity命令；这些入口不能证明四服务实际来自同一个已验候选。
 
-当前唯一受控入口是已安装的 content-addressed supervisor。项目负责人须针对精确的`ELIGIBLE` manifest、manifest SHA、bundle SHA、deployment class/ID、reader GID 和实际 Web/Worker 容器签发 root-only、规范 JSON、短时一次性`PUBLISH_RELEASE_IDENTITY`授权。授权参数固定为：
+当前唯一受控入口是已安装的content-addressed supervisor。项目负责人须针对精确的`ELIGIBLE`manifest、manifest SHA、bundle SHA、`POST_DEPLOY_CURRENT_RUNTIME_STRICT`、固定runtime policy、deployment/Compose project、reader GID和实际Caddy/PostgreSQL/Web/Worker四容器签发root-only、规范JSON、短时一次性`VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY`授权。授权参数固定为：
 
 ```text
 release_manifest
 release_manifest_sha256
+postdeploy_root
 identity_root
 reader_gid
+run_id
+runtime_guard_contract
+runtime_guard_mode
+runtime_policy_sha256
 deployment_class
 deployment_id
+caddy_container
+postgres_container
 web_container
 worker_container
+compose_project
 ```
 
 授权文件只能位于`/var/lib/chenyida-erp/release-authorizations/pending/<authorization-id>.json`，owner/mode 固定为`root:root 0400`；不得把 nonce、凭据或授权正文放入聊天、Git 或普通 shell history。取得独立专项授权并核对安装回执后，调用形态为：
@@ -70,7 +78,9 @@ sudo /usr/local/sbin/chenyida-erp-release-supervisor-v1 \
   --authorization-file "/var/lib/chenyida-erp/release-authorizations/pending/$AUTHORIZATION_ID.json"
 ```
 
-launcher 在执行前消费一次性授权并只映射到固定发布动作。发布器只读检查容器实际 ID、运行/OOM/restart/health、唯一 Compose project/service、registry digest reference、config digest、OCI version/revision 和 baked runtime 环境；随后先暂存新 identity，再次检查同一容器快照，只有完全未漂移才原子替换`release-identity.json`。中断暂存可安全清理；已提交但清理中断可按精确 transaction 自动收敛。它不启动、停止或替换容器。当前 host supervisor 尚未获授权安装，UAT 也仍是 alpha.42/0040，因此本节只是未来受控操作合同，不是已执行记录。
+launcher在执行前消费一次性授权并只映射到固定动作。验证器只读检查四个不同容器的实际ID、运行/OOM/restart/health、唯一Compose project/service、registry manifest/config、OCI version/revision、deployment class/id、完整Migration head/manifest SHA、runtime policy以及两次稳定readiness；Web/Worker loopback引用、第五个Compose容器或任一漂移均拒绝。它先以两阶段无覆盖方式发布规范postdeploy PASS回执，再只从该回执及其真实SHA派生`release-identity.json` v3。
+
+回执已发布而identity提交中断时，不删除或手工覆盖回执；用同一授权/run ID重试，工具会重新严格验证当前运行面并恢复精确prepared/同inode published状态。payload冲突、伪摘要、授权或运行变化均失败关闭。动作不启动、停止或替换容器。当前host supervisor尚未获授权安装，UAT也仍是alpha.42/0040，因此本节只是未来受控操作合同，不是已执行记录。
 
 ## 4. 创建本机一致性备份
 
@@ -204,6 +214,6 @@ Dashboard只读取固定名`latest.json`，并要求回执根解析为真实目�
 - 尚未核对真实记录数、重复、孤儿、库存、关键金额和文件摘要，也未测得真实 RTO；
 - 尚无集群角色/ACL 的独立备份恢复方案；
 - 不可捕获的恢复进程/宿主硬故障可能留下带任务 marker 的隔离 TEST 目标，需要人工按精确身份处置；工具不会猜测删除；
-- 发布身份并发发布锁、完整 release manifest、Migration allowlist 与强制 release suite 由 G3 后续任务完成。
+- 发布身份三阶段锁、完整release manifest、Migration allowlist与强制release suite已由TASK42/TASK53在仓库/隔离环境实现；尚无installed supervisor、正式PASS、部署后回执或runtime identity v3实况。
 
 因此当前结论仍为 `PRODUCTION NO-GO`。
