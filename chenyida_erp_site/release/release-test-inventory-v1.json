@@ -12,9 +12,9 @@
     "HISTORICAL_D1_SITES": 22,
     "POSTGRES": 83,
     "POSTGRES_ALIAS": 2,
-    "PURE_NODE": 115,
+    "PURE_NODE": 113,
     "RELEASE_CONTRACT": 6,
-    "SPECIAL_HARNESS": 5
+    "SPECIAL_HARNESS": 7
   },
   "tests": [
     {
@@ -1163,18 +1163,18 @@
     {
       "path": "tests/selfhost-postgresql-cluster-recovery-v1.test.mjs",
       "sha256": "de9ce130bb7b8c1b8650a1e62886656cab1a7c41eeebee0cb0650bbfc77f7f3a",
-      "category": "PURE_NODE",
+      "category": "SPECIAL_HARNESS",
       "applicability": "REQUIRED",
-      "harness": "NODE_SOURCE",
+      "harness": "SPECIAL_POSIX",
       "reason": null,
       "canonical_path": null
     },
     {
       "path": "tests/selfhost-postgresql-cluster-transfer-v1.test.mjs",
       "sha256": "9dbe43ecac777b4e108d2bd38970692d407f197c9ede3d59653355a92bb0fc66",
-      "category": "PURE_NODE",
+      "category": "SPECIAL_HARNESS",
       "applicability": "REQUIRED",
-      "harness": "NODE_SOURCE",
+      "harness": "SPECIAL_POSIX",
       "reason": null,
       "canonical_path": null
     },
@@ -1774,7 +1774,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "75319ae6ddfac71c13af3906c543e0d64ede28ef74437c83fc0053decefd181b",
+      "sha256": "8dbfc9cef1fdfa0b2a900f06382f3480cfe0c5107e0a4a29c170fffa5252175b",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",

@@ -62,9 +62,9 @@ const OFFICIAL_CATEGORY_COUNTS = Object.freeze({
   HISTORICAL_D1_SITES: 22,
   POSTGRES: 83,
   POSTGRES_ALIAS: 2,
-  PURE_NODE: 115,
+  PURE_NODE: 113,
   RELEASE_CONTRACT: 6,
-  SPECIAL_HARNESS: 5,
+  SPECIAL_HARNESS: 7,
 });
 const CATEGORY_POLICY = Object.freeze({
   BROWSER: { applicability: "REQUIRED", harness: "BROWSER_E2E", reason: null },
@@ -115,6 +115,8 @@ const SPECIAL_HARNESS_TESTS = new Set([
   "tests/selfhost-backup-recovery-v2.test.mjs",
   "tests/selfhost-offhost-transfer-v1.test.mjs",
   "tests/selfhost-offline-identity-recovery-unit.test.mjs",
+  "tests/selfhost-postgresql-cluster-recovery-v1.test.mjs",
+  "tests/selfhost-postgresql-cluster-transfer-v1.test.mjs",
   "tests/selfhost-readonly-inventory.test.mjs",
   "tests/selfhost-targeted-offline-identity-recovery-unit.test.mjs",
 ]);
