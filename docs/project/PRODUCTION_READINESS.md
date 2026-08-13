@@ -67,6 +67,8 @@
 
 2026-08-13 第二十八次增量：TASK56固定PG17.10/libc C/UTF8精确结构编译器，从46个Migration与access intent v2冻结234表、211序列、394 routine、6独立type、3 extension及3132列/1709约束/957索引/285非内部trigger；31类unsupported全零，同owner漂移、用户rule、TOAST、routine配置、extension指纹/owner/未知成员class等负测失败关闭。两次独立新空PG17运行逐字节重现，目录文件/制品/逻辑SHA-256为`4ca22dfa…1162`/`93af15b7…7674`/`40c8c620…7f8f`；inventory为`245/221/24`。该证据不创建角色或授予ACL，TASK56继续v2 policy/reconciler，运行UAT仍共享superuser，整体继续`PRODUCTION NO-GO`。
 
+2026-08-13 第二十九次增量：TASK56 catalog检查点已形成可追溯两提交链。源码`8675efd28ed8b61900fb49f7644541103f5f60b0`/tree`21556c6695b5b49a62959797b1adcb3b116387ef`在干净归档上通过固定PG17正式84文件/401项及独立第二cluster目录重建；manifest-only直接子提交`633b42dca48393d7f24d48808c9046e0d2bd8fc4`/tree`241f808e73464275fc8472a92f35e9254ef9522b`绑定50文件，bundle SHA-256为`baf820f4d1647e427cae1409c5a3797edc4b38fa8eefa2d56c669c4c2094ddc1`。Supervisor31/31、官方凭据扫描1643文件和Python三基线通过。该bundle只冻结catalog检查点，完整角色/ACL、secret-file、operator、tablespace、源码匹配候选和最终bundle仍开放；UAT仍共享superuser且没有运行变化，整体继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -277,7 +279,7 @@ TASK56起点只读核验未创建临时容器、数据库、镜像、Volume或�
 
 TASK56 Backup检查点验证保持串行且任何时刻最多一个临时容器：Backup/source定向13/13、release合同51/51、inventory `244/220/24`、access intent verify及PG17双cluster备份/恢复通过；PG17覆盖未知LOGIN/NOLOGIN CONNECT漂移拒绝、崩溃intent保留/恢复、非superuser采集越权拒绝、意外large object拒绝和零large-object新空恢复，Dashboard PostgreSQL 2/2通过。最终available约1.9GiB、Swap567MiB/1.0GiB、根盘16GiB、Load`0.19/0.25/0.26`，`oom_kill=0`；四服务restart0/OOM false，Web/PostgreSQL healthy且Worker/Caddy运行不变，任务容器、cluster和临时目录清零。Shell/JSON、394个Markdown/231本地链接、1631文件credentials和diff检查通过；没有真实角色/ACL/凭据、备份/恢复、Volume、Migration、部署或数据动作。
 
-TASK56 catalog检查点验证保持串行且任何时刻最多一个临时容器：一次refresh及一次独立test均在新空PG17.10 cluster应用46个Migration，目录逐字节相同；真实extension TABLE成员未知class、extension owner/fingerprint、用户rule、TOAST/reloptions、routine配置、对象/owner及ACL/RLS负测均通过。inventory `245/221/24`、目录/发布/Dashboard33/33、release52/52、Supervisor31/31、typecheck38/38、lint0 error/17既有warning、credentials1643及Shell/JSON/Markdown/inventory/diff门通过；完整typecheck首次640 MiB进程堆不足后按正式768 MiB heap/1 GiB容器完整复跑通过。最终available约1.7GiB、Swap555MiB/1.0GiB、根盘16GiB、Load`0.69/1.43/1.34`，`oom_kill=0`，四服务restart0/OOM false，任务容器/cluster/目录清零。没有真实角色/ACL/凭据、UAT/生产连接、Migration/deploy、备份恢复、Volume或数据动作。
+TASK56 catalog检查点验证保持串行且任何时刻最多一个临时容器：一次refresh及一次独立test均在新空PG17.10 cluster应用46个Migration，目录逐字节相同；真实extension TABLE成员未知class、extension owner/fingerprint、用户rule、TOAST/reloptions、routine配置、对象/owner及ACL/RLS负测均通过。inventory `245/221/24`、目录/发布/Dashboard33/33、release52/52、Supervisor31/31、typecheck38/38、lint0 error/17既有warning、credentials1643及Shell/JSON/Markdown/inventory/diff门通过；完整typecheck首次640 MiB进程堆不足后按正式768 MiB heap/1 GiB容器完整复跑通过。随后源码`8675efd…`的干净归档正式PG17门84文件/401项及独立catalog cluster通过，manifest-only直接子提交`633b42d…`绑定50文件、SHA-256`baf820f4…ddc1`；该提交上的Supervisor31/31、官方credentials1643和隔离Python三基线通过。最终available约1.8GiB、Swap543MiB/1.0GiB、根盘16GiB、Load`0.56/0.91/1.07`，`oom_kill=0`，四服务restart0/OOM false，任务容器/cluster/目录清零。`docker compose ps`因无secret shell而缺必需setup token并失败关闭，未读取或伪造凭据，改用四个精确容器inspect核验。没有真实角色/ACL/凭据、UAT/生产连接、Migration/deploy、备份恢复、Volume或数据动作。
 
 TASK46增量验证保持串行且一次一个临时重任务：首次完整门如实失败后修复真实类型/执行器问题，源码`f3bac028`及bundle`3d1243e2`两个干净快照分别38/38；定向287/287、release合同45/45、supervisor15/15、inventory235/211/24、干净快照lint和1,566文件credentials通过。一次错误包含`.wrangler/work`的直接lint发生V8 heap OOM退出139，但宿主/容器OOM为0、Swap增长约27 MiB，正式快照重跑通过。起点/收口available约1.9/2.0 GiB、Swap453/484 MiB、根盘30/31 GiB、Load1低于4，四服务restart0/OOM false，任务容器/目录清零；没有build、UAT/生产Migration、部署、当前卷读取或真实数据操作。
 
