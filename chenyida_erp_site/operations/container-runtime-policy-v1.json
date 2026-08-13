@@ -10,7 +10,7 @@
   "sources": [
     {
       "path": "Dockerfile",
-      "sha256": "1fa2f338a6f549a7a27996f788aeefe8d3ae76465b861dc2c00189501b0c6a0e"
+      "sha256": "e60cb1fdf47be48303a9f4c89a36257cd424aa36829d86f51c3df2b6b38195a1"
     },
     {
       "path": "compose.release.yml",

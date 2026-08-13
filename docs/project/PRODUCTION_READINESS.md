@@ -65,6 +65,8 @@
 
 2026-08-13 第二十七次增量：TASK56关闭D-132 v1实际readiness误放行。V4 validate/create/publish与Dashboard消费端都拒绝legacy v1 `ACTUAL_OFFHOST/RECOVERY_READY`，稳定错误为`READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN`；v1 synthetic保持可解析但永不ready。发布先验证既有alias再写immutable history，十份D-132 v1核心文件摘要冻结。inventory保持`244/220/24`且SHA-256更新为`1a84dcd0…f4496ab`，Dashboard9/9、release合同27/27、inventory、定向lint、typecheck、credentials及文档/JSON门通过；未创建真实回执或修改运行面，整体继续`PRODUCTION NO-GO`。
 
+2026-08-13 第二十八次增量：TASK56固定PG17.10/libc C/UTF8精确结构编译器，从46个Migration与access intent v2冻结234表、211序列、394 routine、6独立type、3 extension及3132列/1709约束/957索引/285非内部trigger；31类unsupported全零，同owner漂移、用户rule、TOAST、routine配置、extension指纹/owner/未知成员class等负测失败关闭。两次独立新空PG17运行逐字节重现，目录文件/制品/逻辑SHA-256为`4ca22dfa…1162`/`93af15b7…7674`/`40c8c620…7f8f`；inventory为`245/221/24`。该证据不创建角色或授予ACL，TASK56继续v2 policy/reconciler，运行UAT仍共享superuser，整体继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -80,6 +82,7 @@
 - TASK55只在clean Git snapshot、合成角色/ACL/tablespace/凭据fixture和隔离双PostgreSQL集群中验证恢复；组合恢复执行的是supervisor bundle内受信fixture，不执行候选archive中的任意脚本。没有读取真实凭据、业务行、备份/卷正文或日志，没有连接异机、安装host组件、修改UAT/生产或执行正式恢复；任务容器、数据库、网络、Volume和临时目录清零。
 - TASK56启动审计只读取去敏的UAT PostgreSQL角色属性、对象owner计数、Migration元数据和活动连接角色去重计数，以及Docker/Compose mount与服务状态metadata；没有输出角色名/连接串/密码，没有读取`.env`、业务行、日志、备份/卷正文或未跟踪状态报告，也没有执行写入、重启或创建资源。
 - TASK56 Backup检查点只在仓库和一个临时PostgreSQL 17容器的合成双cluster中验证独立control/capture、CONNECT围栏、零large-object及恢复；没有读取当前数据库/卷/备份/凭据，没有创建或修改UAT角色/ACL，临时容器、cluster和目录全部清理。
+- TASK56 catalog检查点只在仓库和一次一个临时PostgreSQL 17容器的新空合成cluster中应用46个Migration、捕获只读结构并执行负测；没有连接UAT数据库、读取业务行/秘密/日志/备份/卷正文、创建真实角色/ACL或修改运行面，临时容器、cluster和目录全部清理。
 - TASK56 D-132兼容检查点只在固定Node断网/只读临时容器与合成fixture中验证v1 actual失败关闭、v1 synthetic兼容、alias写入顺序及摘要冻结；没有访问PostgreSQL、创建真实readiness文件或触碰当前运行面。
 
 ## 3. 当前身份与运行事实
@@ -112,7 +115,7 @@
 | 隔离恢复 | `PARTIAL / DATA + CLUSTER SECURITY SYNTHETIC-ISOLATED PASS` | 从真实异机副本在新空隔离目标恢复四类数据及集群级对象，完成Migration、角色/ACL/默认权限/表空间/凭据正反权限、数量、摘要、库存和关键金额核对并记录真实RTO；现有合成密文双集群证据不替代真实数据 |
 | 真实数据试迁移 | `FAIL` | 只读源快照、逐行结果、重复/孤儿/单位/文件处置、库存/金额核对和可重跑报告通过 |
 | 核心服务端规则 | `PARTIAL` | 物料/BOM/采购/收货/IQC/库存/生产/销售/财务关键链及异常路径在同一候选通过自动与人工验收 |
-| 权限/会话/安全/审计 | `PARTIAL / TASK56 DATABASE PRIVILEGE CLOSURE DOING / CURRENT UAT SUPERUSER` | Web锁、Backup control/capture、源码职责边界及D-132 v1 actual readiness门禁已闭合；TASK56仍须完成PG17精确catalog、独立Web/Worker/migration/backup身份、secret-file和正负权限。随后还需批准岗位矩阵、职责分离、最小数据域及同候选运行验收。当前UAT共享superuser身份不满足投产要求 |
+| 权限/会话/安全/审计 | `PARTIAL / TASK56 DATABASE PRIVILEGE CLOSURE DOING / CURRENT UAT SUPERUSER` | Web锁、Backup control/capture、源码职责边界、D-132 v1 actual readiness门禁及PG17精确结构catalog已闭合；TASK56仍须完成v2角色/ACL reconciler、独立Web/Worker/migration/backup身份、secret-file和正负权限。随后还需批准岗位矩阵、职责分离、最小数据域及同候选运行验收。当前UAT共享superuser身份不满足投产要求 |
 | 强制发布测试门 | `PARTIAL / TASK55 BUNDLE REPOSITORY VERIFIED / NO CURRENT CANDIDATE PASS` | TASK55的49文件bundle、release inventory51/51、直接合同48/48、supervisor31/31、Node113/965、PostgreSQL83/396、Browser6/11、SPECIAL POSIX7/57及typecheck38/38通过；但TASK51候选已失效，host supervisor未安装，正式provenance/SBOM/security evidence和同候选19步报告仍不存在 |
 | 监控/容量/告警/手册 | `PARTIAL / REPOSITORY CONTRACT VERIFIED / HOST DELIVERY NOT CONFIGURED` | TASK49已验证严格快照、阈值、状态机、pending delivery及排障合同；仍须host安装/调度、真实渠道和值班升级演练，以及低资源负载/备份/恢复soak和升级/回滚演练 |
 | 真实员工受控试用 | `FAIL` | 少量真实岗位用户按脚本完成跨岗正常/异常流程并签字，问题闭环后重验 |
@@ -227,7 +230,7 @@
 3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
 4. TASK44/TASK45已完成会话绝对时限和health/Worker/storage/Migration真实性仓库修复；运行面验证等待同候选完整gate及专项部署授权。
 5. `SELFHOST-OPS-MONITORING-ALERTING-49`已完成仓库级监控、容量阈值、备份/恢复证据新鲜度、告警状态和排障合同；host安装、真实外部投递、值班责任人和演练仍需专项授权/资源。
-6. TASK50已完成容器运行时最小权限加固；TASK53已完成三阶段发布生命周期，TASK54已完成异机provenance、加密、调度/保留和V3 readiness仓库合同，TASK55已完成PostgreSQL集群安全恢复与V4 readiness合同。当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`；Web锁、Backup control/capture及D-132 v1 actual readiness边界已闭合，现进入PG17精确catalog、完整角色/ACL、secret-file与tablespace合同。完成后再重建精确候选，A3外部锚点及A1/A2另按资源和授权依赖推进。岗位权限矩阵仍等待业务负责人确认。
+6. TASK50已完成容器运行时最小权限加固；TASK53已完成三阶段发布生命周期，TASK54已完成异机provenance、加密、调度/保留和V3 readiness仓库合同，TASK55已完成PostgreSQL集群安全恢复与V4 readiness合同。当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`；Web锁、Backup control/capture、D-132 v1 actual readiness边界及PG17精确结构catalog已闭合，现进入完整v2角色/ACL、secret-file与tablespace合同。完成后再重建精确候选，A3外部锚点及A1/A2另按资源和授权依赖推进。岗位权限矩阵仍等待业务负责人确认。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。
 
@@ -273,6 +276,8 @@ TASK55增量验证保持串行且任何时刻最多一个临时容器：release 
 TASK56起点只读核验未创建临时容器、数据库、镜像、Volume或文件：available约2.0GiB、Swap603MiB/1.0GiB、根盘16GiB、Load`0.10/0.17/0.52`，`oom_kill=0`；四服务restart0/OOM false。没有读取`.env`、秘密、业务行、日志、备份/卷正文或未跟踪状态报告，没有真实角色、凭据、Migration、部署、重启或数据动作。
 
 TASK56 Backup检查点验证保持串行且任何时刻最多一个临时容器：Backup/source定向13/13、release合同51/51、inventory `244/220/24`、access intent verify及PG17双cluster备份/恢复通过；PG17覆盖未知LOGIN/NOLOGIN CONNECT漂移拒绝、崩溃intent保留/恢复、非superuser采集越权拒绝、意外large object拒绝和零large-object新空恢复，Dashboard PostgreSQL 2/2通过。最终available约1.9GiB、Swap567MiB/1.0GiB、根盘16GiB、Load`0.19/0.25/0.26`，`oom_kill=0`；四服务restart0/OOM false，Web/PostgreSQL healthy且Worker/Caddy运行不变，任务容器、cluster和临时目录清零。Shell/JSON、394个Markdown/231本地链接、1631文件credentials和diff检查通过；没有真实角色/ACL/凭据、备份/恢复、Volume、Migration、部署或数据动作。
+
+TASK56 catalog检查点验证保持串行且任何时刻最多一个临时容器：一次refresh及一次独立test均在新空PG17.10 cluster应用46个Migration，目录逐字节相同；真实extension TABLE成员未知class、extension owner/fingerprint、用户rule、TOAST/reloptions、routine配置、对象/owner及ACL/RLS负测均通过。inventory `245/221/24`、目录/发布/Dashboard33/33、release52/52、Supervisor31/31、typecheck38/38、lint0 error/17既有warning、credentials1643及Shell/JSON/Markdown/inventory/diff门通过；完整typecheck首次640 MiB进程堆不足后按正式768 MiB heap/1 GiB容器完整复跑通过。最终available约1.7GiB、Swap555MiB/1.0GiB、根盘16GiB、Load`0.69/1.43/1.34`，`oom_kill=0`，四服务restart0/OOM false，任务容器/cluster/目录清零。没有真实角色/ACL/凭据、UAT/生产连接、Migration/deploy、备份恢复、Volume或数据动作。
 
 TASK46增量验证保持串行且一次一个临时重任务：首次完整门如实失败后修复真实类型/执行器问题，源码`f3bac028`及bundle`3d1243e2`两个干净快照分别38/38；定向287/287、release合同45/45、supervisor15/15、inventory235/211/24、干净快照lint和1,566文件credentials通过。一次错误包含`.wrangler/work`的直接lint发生V8 heap OOM退出139，但宿主/容器OOM为0、Swap增长约27 MiB，正式快照重跑通过。起点/收口available约1.9/2.0 GiB、Swap453/484 MiB、根盘30/31 GiB、Load1低于4，四服务restart0/OOM false，任务容器/目录清零；没有build、UAT/生产Migration、部署、当前卷读取或真实数据操作。
 

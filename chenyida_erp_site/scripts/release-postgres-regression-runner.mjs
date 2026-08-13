@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { buildMigrationAllowlist } from "./release-manifest-contract.mjs";
+import { buildMigrationAllowlist, validateOfficialTestRuntimePolicy } from "./release-manifest-contract.mjs";
 import { loadOfficialReleaseTestInventory, verifyReleaseTestInventory } from "./release-test-inventory.mjs";
 
 const CANDIDATE_ROOT = "/workspace";
@@ -77,6 +77,33 @@ function reject(code) {
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+async function verifyCandidateRuntimePrivilegeCatalog() {
+  const policyRaw = await readFile(path.join(SUPERVISOR_ROOT, "release", "test-runtime-policy-v1.json"), "utf8");
+  let policy;
+  try { policy = validateOfficialTestRuntimePolicy(JSON.parse(policyRaw), policyRaw); }
+  catch { reject("POSTGRES_RUNTIME_CATALOG_POLICY_INVALID"); }
+  const catalogPath = path.join(CANDIDATE_ROOT, policy.postgres_runtime_catalog.path);
+  const metadata = await lstat(catalogPath).catch(() => null);
+  if (!metadata?.isFile() || metadata.isSymbolicLink() || metadata.nlink !== 1 || metadata.size < 1
+    || metadata.size > 512 * 1024 || (metadata.mode & 0o022) !== 0) reject("POSTGRES_RUNTIME_CATALOG_FILE_INVALID");
+  const raw = await readFile(catalogPath);
+  if (sha256(raw) !== policy.postgres_runtime_catalog.file_sha256) reject("POSTGRES_RUNTIME_CATALOG_FILE_SHA256_MISMATCH");
+  let catalog;
+  try { catalog = JSON.parse(raw.toString("utf8")); }
+  catch { reject("POSTGRES_RUNTIME_CATALOG_JSON_INVALID"); }
+  if (catalog?.artifact_sha256 !== policy.postgres_runtime_catalog.artifact_sha256
+    || catalog?.engine_binding?.image_reference !== policy.postgres_runtime_catalog.image_reference
+    || !Array.isArray(catalog?.source_binding?.compiler) || catalog.source_binding.compiler.length < 1) {
+    reject("POSTGRES_RUNTIME_CATALOG_IDENTITY_INVALID");
+  }
+  for (const entry of catalog.source_binding.compiler) {
+    if (!entry || typeof entry.path !== "string" || !/^(?:scripts|tests)\/[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(entry.path)
+      || entry.path.includes("..") || !/^[0-9a-f]{64}$/.test(entry.sha256)) reject("POSTGRES_RUNTIME_CATALOG_COMPILER_BINDING_INVALID");
+    const source = await readFile(path.join(CANDIDATE_ROOT, entry.path)).catch(() => null);
+    if (!source || sha256(source) !== entry.sha256) reject("POSTGRES_RUNTIME_CATALOG_COMPILER_SHA256_MISMATCH");
+  }
 }
 
 function quoteIdentifier(value) {
@@ -242,6 +269,7 @@ async function main() {
   const require = createRequire(path.join(CANDIDATE_ROOT, "package.json"));
   const { Pool } = require("pg");
   const inventory = await loadOfficialReleaseTestInventory({ root: CANDIDATE_ROOT, supervisorRoot: SUPERVISOR_ROOT });
+  await verifyCandidateRuntimePrivilegeCatalog();
   const selected = inventory.tests.filter((entry) => entry.applicability === "REQUIRED" && entry.harness === "POSTGRES_REGRESSION");
   if (selected.length !== EXPECTED_POSTGRES_TESTS) reject("POSTGRES_REGRESSION_TEST_SET_INVALID");
   const migrations = await buildMigrationAllowlist(path.join(CANDIDATE_ROOT, "drizzle-postgres"));

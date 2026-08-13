@@ -70,7 +70,7 @@ for value in "$RELEASE_MANIFEST" "$RELEASE_MANIFEST_SHA256" "$POSTDEPLOY_ROOT" "
 [ "${ERP_RELEASE_SUPERVISOR_LAUNCHED:-}" = YES ] || { echo "postdeploy verification must be launched by the installed supervisor" >&2; exit 1; }
 [ "$CONFIRM" = VERIFY_AND_PUBLISH_EXACT_POSTDEPLOY_IDENTITY ] || { echo "postdeploy confirmation is invalid" >&2; exit 1; }
 [ "$RUNTIME_GUARD_CONTRACT" = chenyida-erp-release-runtime-guard/v1 ] && [ "$RUNTIME_GUARD_MODE" = POST_DEPLOY_CURRENT_RUNTIME_STRICT ] || { echo "postdeploy runtime guard is invalid" >&2; exit 1; }
-[ "$RUNTIME_POLICY_SHA256" = 163ccf002f083d8818b90f67e3fe8a584bf25beee4a05d1448121eb5c530c77e ] || { echo "postdeploy runtime policy authorization is invalid" >&2; exit 1; }
+[ "$RUNTIME_POLICY_SHA256" = 74d3f8d24e7b15f0cc5ce4e0e21c963b0e95735c502a471666c02165c7e53c1b ] || { echo "postdeploy runtime policy authorization is invalid" >&2; exit 1; }
 case "$DEPLOYMENT_CLASS" in UAT|PRODUCTION) : ;; *) echo "deployment class is invalid" >&2; exit 1 ;; esac
 [ "$DEPLOYMENT_ID" = "$COMPOSE_PROJECT" ] || { echo "deployment and Compose identities must match" >&2; exit 1; }
 for value in "$RUN_ID" "$DEPLOYMENT_ID" "$COMPOSE_PROJECT" "$CADDY_CONTAINER" "$POSTGRES_CONTAINER" "$WEB_CONTAINER" "$WORKER_CONTAINER"; do case "$value" in ''|[!A-Za-z0-9]*|*[!A-Za-z0-9._-]*) echo "postdeploy identifier is invalid" >&2; exit 1 ;; esac; [ "${#value}" -le 120 ] || { echo "postdeploy identifier is too long" >&2; exit 1; }; done

@@ -4,15 +4,15 @@
   "root": "chenyida_erp_site",
   "test_pattern": "tests/*.test.mjs",
   "max_test_bytes": 1048576,
-  "total_tests": 244,
-  "required_tests": 220,
+  "total_tests": 245,
+  "required_tests": 221,
   "not_applicable_tests": 24,
   "category_counts": {
     "BROWSER": 6,
     "HISTORICAL_D1_SITES": 22,
     "POSTGRES": 84,
     "POSTGRES_ALIAS": 2,
-    "PURE_NODE": 117,
+    "PURE_NODE": 118,
     "RELEASE_CONTRACT": 6,
     "SPECIAL_HARNESS": 7
   },
@@ -442,7 +442,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-postgres.test.mjs",
-      "sha256": "20bba898ed771ed5ba3692a64fc200165a5a06929938c4ce618e2dce52688c12",
+      "sha256": "eedd0ff205c87cec7edf36e19f1cf9e45509ac977c737814f085dd1495f148f1",
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",
@@ -460,7 +460,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-unit.test.mjs",
-      "sha256": "b84bff6fdf14fcd27b340c2ca0b526ae3914bdccd7f678b876250fdfceb62ad5",
+      "sha256": "6df56344232272ba0b864a32674630d599d7b32eb60310f68c535edd9f1a6645",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1188,6 +1188,15 @@
       "canonical_path": null
     },
     {
+      "path": "tests/selfhost-postgresql-runtime-privilege-catalog.test.mjs",
+      "sha256": "254db68c9a538a09dd1e93e491499d9c05f2482799c055b10ce7ce975c9906f6",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
       "path": "tests/selfhost-postgresql-runtime-privilege-source.test.mjs",
       "sha256": "d8ed28767d04c7f7972cd33dc5cb1cc3d8cd4cf1e034ffce8fcfb14f794d3216",
       "category": "PURE_NODE",
@@ -1792,7 +1801,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "04c3b70569a48d6533f21e2037242e8948a29ad9ab637c14cf504f95cdee3699",
+      "sha256": "a309948a2762a7a6774bf944093ca93cbc4046260c6885ef6b2204e893013b14",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",

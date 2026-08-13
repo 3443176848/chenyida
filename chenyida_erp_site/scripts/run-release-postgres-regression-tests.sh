@@ -37,6 +37,20 @@ container_main() {
   RUNNING=1
   cd /workspace
   node --experimental-strip-types /supervisor/scripts/release-postgres-regression-runner.mjs
+  gosu postgres pg_ctl -D "$PGDATA" -m fast -w stop >/dev/null
+  RUNNING=0
+  CATALOG_EXPORT_ROOT="$TASK_ROOT/catalog-export"
+  CATALOG_OUTPUT="$TASK_ROOT/catalog-output"
+  install -d -m 0700 "$CATALOG_EXPORT_ROOT"
+  if ! ERP_RUNTIME_PRIVILEGE_CATALOG_POSTGRES_CONTAINER_MODE=YES \
+    ERP_RUNTIME_PRIVILEGE_CATALOG_REPOSITORY_MODE=test \
+    ERP_RUNTIME_PRIVILEGE_CATALOG_EXPORT_ROOT="$CATALOG_EXPORT_ROOT" \
+    /bin/sh /supervisor/tests/selfhost-postgresql-runtime-privilege-catalog-postgres.sh >"$CATALOG_OUTPUT" 2>&1; then
+    echo "POSTGRES_RUNTIME_PRIVILEGE_CATALOG_FAILED" >&2
+    exit 1
+  fi
+  [ "$(cat "$CATALOG_OUTPUT")" = "runtime privilege PG17 compiled catalog integration passed" ] || { echo "POSTGRES_RUNTIME_PRIVILEGE_CATALOG_OUTPUT_INVALID" >&2; exit 1; }
+  printf 'POSTGRES RUNTIME PRIVILEGE CATALOG PASS\n'
 }
 
 if [ "${ERP_RELEASE_POSTGRES_CONTAINER_MODE:-}" = YES ]; then

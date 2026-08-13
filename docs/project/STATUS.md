@@ -11,18 +11,19 @@
 | UAT catalog | VERIFIED READ ONLY / HIGH RISK OPEN | PostgreSQL 17只有1个非内置LOGIN且为superuser、数据库owner和全部433个public relation owner；Web/Worker活动连接共用1个角色；未输出角色名、连接串或密码，未读业务行或写入 |
 | 源码/运行差距 | OPEN / SOURCE ADVANCED | 源码alpha.47、46/head`0046_runtime_lock_privilege_boundary.sql`，UAT仍alpha.42、40/head`0040_warehouse_receipt_readiness.sql`；本任务不授权Migration或部署 |
 | 秘密边界 | PARTIAL / REPOSITORY LOADER IMPLEMENTED | 已实现严格secret-file读取和服务独立连接/实际身份断言；Compose与release集成尚未闭合，当前运行面仍通过环境交付数据库、初始化、Setup和Admin秘密 |
-| 角色边界 | PARTIAL / SOURCE INTENT BLOCKED | 精确源码access intent已覆盖Admin/Backup/Web/Worker；职责组统一为`*_priv`，Backup control/capture和零large-object边界已闭合，PG17编译catalog及完整reconcile仍缺失，UAT角色/ACL未改变 |
+| 角色边界 | PARTIAL / COMPILED CATALOG PASS / RECONCILER OPEN | 精确源码access intent已覆盖Admin/Backup/Web/Worker；职责组统一为`*_priv`，Backup control/capture、零large-object及PG17精确结构catalog已闭合，完整v2角色/ACL policy与reconciler仍缺失，UAT角色/ACL未改变 |
 | Web权限意图 | PASS / STRUCTURAL SOURCE BOUNDARIES | 共享Parser错误合同及四类Worker-only写实现已与Web模块结构分离；raw candidate为`9/191/205/79`且reviewed exclusion只剩`app_meta INSERT`，最终表操作`18/201/211/82`→`9/190/209/79`、sequence USAGE 182→173。Web不可达五个Worker-only模块，25个表操作/9个序列有精确拒绝断言 |
 | Web锁权限 | PASS / ISOLATED CURRENT HEAD | 19个锁目标经16个owner控制窄函数访问，Web保持零table/column UPDATE；20个locking trigger固定安全owner路径，PG17专项5/5及完整回归84文件/401项通过 |
 | Backup权限 | PASS / REPOSITORY AND SYNTHETIC-ISOLATED | control/capture双service、精确CONNECT围栏、v3中断intent和零large-object dump合同已闭合；PG17崩溃恢复、意外large object拒绝、非superuser dump及新空恢复通过，未执行真实备份/恢复或角色变更 |
 | Backup检查点验证 | PASS | 定向13/13、release合同51/51、inventory `244/220/24`、access intent verify、PG17双cluster/未知grantee漂移/新空恢复、Dashboard PG2/2、Shell/JSON/Markdown231链接、credentials1631和diff检查通过 |
 | D-132 v1实际readiness | PASS / FAIL CLOSED | V4 validate/create/publish与Dashboard均拒绝legacy v1 `ACTUAL_OFFHOST/RECOVERY_READY`，稳定错误为`READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN`；v1 synthetic只作历史解析且永不ready，十份v1核心文件摘要冻结 |
-| 当前测试绑定 | PASS / CONTENT ADDRESSED | inventory仍为`244/220/24`、SHA-256`1a84dcd0…f4496ab`，runtime policy SHA-256`a20718ef…d59358`；Dashboard9/9、release manifest/gate27/27、inventory、定向lint、typecheck、credentials1637、JSON216及Markdown394/231链接通过 |
+| PG17编译catalog | PASS / SYNTHETIC-ISOLATED / CONTENT ADDRESSED | 固定PG17.10/libc C/UTF8、46个Migration及access intent v2；234表、211序列、394 routine、6独立type、3 extension，3132列/1709约束/957索引/285非内部trigger，31类unsupported全零。两次独立新空编译字节一致；catalog文件/制品/逻辑SHA-256为`4ca22dfa…1162`/`93af15b7…7674`/`40c8c620…7f8f` |
+| 当前测试绑定 | PASS / CONTENT ADDRESSED | inventory为`245/221/24`、SHA-256`1a7253b4…ee9e`，test/container runtime policy SHA-256为`7ac07e93…e3a`/`74d3f8d2…3c1b`；目录/发布/Dashboard33/33、release52/52、Supervisor31/31、typecheck38/38、lint0 error/17既有warning、credentials1643、Shell42、JSON216、Markdown394/231、inventory及两次PG17新空目录执行通过；完整PG门在干净源码提交上继续执行 |
 | Tablespace | OPEN / REPOSITORY TARGET DEFINED | 当前PostgreSQL仅有PGDATA持久卷；未来声明独立`erp_postgres_tablespaces`固定mount，不创建或改动真实Volume |
-| 验收范围 | IN PROGRESS | Web锁权限、alpha.47/0046、Backup最小权限、Web候选/调用路径误权、职责组命名及v1实际恢复readiness门禁已闭合；PG17精确catalog、角色/ACL reconcile、Compose/tablespace、完整release与新bundle仍待完成 |
+| 验收范围 | IN PROGRESS | Web锁权限、alpha.47/0046、Backup最小权限、Web候选/调用路径误权、职责组命名、v1实际恢复readiness门禁及PG17精确catalog已闭合；角色/ACL reconcile、Compose/tablespace、完整release与新bundle仍待完成 |
 | 启动验证 | PASS / LIGHTWEIGHT | Markdown394/229链接、JSON214、Shell38、credentials1618、release contract51/51及Python三基线通过；宿主工具缺失改用既有隔离运行时，不安装依赖或降低断言 |
 | 起点资源 | PASS / BELOW STOP LINES | available约2.0GiB、Swap603MiB/1.0GiB、根盘16GiB、Load`0.10/0.17/0.52`，内核`oom_kill=0`；四服务restart0/OOM false |
-| 当前资源/清理 | PASS / BELOW STOP LINES | 本检查点available约1.8GiB、Swap590MiB/1.0GiB、根盘16GiB、Load低于停止线、`oom_kill=0`；四服务restart0/OOM false。typecheck首次384 MiB V8 heap内不足，资源复核后以640/896 MiB同断言通过；P0定向容器及凭据临时清单清零 |
+| 当前资源/清理 | PASS / BELOW STOP LINES | 目录、typecheck与lint收口后available约1.7GiB、Swap555MiB/1.0GiB、根盘16GiB、Load`0.69/1.43/1.34`、`oom_kill=0`；四服务restart0/OOM false，临时目录/容器清零。本轮完整typecheck首次在640 MiB V8 heap内不足且宿主/容器无OOM，随后按正式策略以768 MiB heap/1 GiB容器完整38/38通过；未跳过或降低断言 |
 | 外部边界 | BLOCKED / NOT AUTHORIZED | 无真实角色/凭据/Volume、UAT/生产变更、host安装、Migration/deploy、备份恢复、数据读取或账号/网络动作 |
 | 系统是否可用 | NO | 当前高权限共享数据库身份和环境变量秘密尚未改变，且异机恢复、候选门、真实迁移、岗位/员工验收与切换仍缺证据 |
 

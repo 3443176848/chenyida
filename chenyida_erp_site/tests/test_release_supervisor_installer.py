@@ -120,6 +120,7 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
         files = generator.parse_bundle_files(launcher_raw)
         self.assertIn("chenyida_erp_site/scripts/release-migration-authorization.ts", files)
         self.assertIn("chenyida_erp_site/tests/test_release_supervisor_installer.py", files)
+        self.assertEqual(files["chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-catalog-postgres.sh"], "0555")
         blobs = {relative: f"blob:{relative}\n".encode() for relative in files}
         blobs[generator.LAUNCHER_REPOSITORY_PATH] = launcher_raw
         manifest = generator.build_manifest("a" * 40, "b" * 40, launcher_raw, blobs.__getitem__)

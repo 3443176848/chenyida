@@ -48,6 +48,7 @@
 - [x] 三条智能体线完成只读审计，主智能体复核当前Compose/连接池、UAT去敏catalog摘要、Migration身份合同、backup/restore能力、对象访问面和custom tablespace边界。
 - [x] D-133固定owner/Migration、Web、Worker、Admin、backup capture、受控operator和恢复身份的登录性、membership、连接上限、对象权限、秘密生命周期及旧D-132/V4兼容升级方式。
 - [x] Web原有19个需行锁目标全部改经16个owner控制、固定`search_path`且撤销PUBLIC EXECUTE的`SECURITY DEFINER`窄函数访问；Web对这些表保持零table/column UPDATE权限，20个关联trigger函数以owner安全路径执行。
+- [x] 固定PG17.10/libc C/UTF8的新空隔离编译器以精确Migration/access/source binding生成完整结构catalog；两次独立运行逐字节一致，未知对象、结构/owner/extension/rule/ACL等负测失败关闭，且目录自身内容寻址。
 - [ ] 版本化权限策略使用exact set与稳定摘要覆盖角色属性、membership options、数据库/Schema/表/序列/routine/type/大对象/默认权限和custom tablespace；未知、额外、危险或漂移状态失败关闭。
 - [ ] 在线Web/Worker使用不同LOGIN和不同凭据，均非owner/non-superuser且不能DDL、SET ROLE owner、创建角色/数据库、绕过RLS、读取系统秘密或访问对方未获准对象；连接后实际身份断言与正反权限测试通过。
 - [ ] Migration使用独立、非superuser、低连接数身份并满足精确数据库owner/对象owner合同；只有Migration可执行版本化DDL，应用与backup身份不能写Migration历史或改变owner/ACL/default privileges。
@@ -124,3 +125,12 @@
 - 十份D-132 v1核心policy/catalog/restore/executor/transfer/test文件由精确SHA-256负向门冻结，禁止借本修复修改legacy实现。正式inventory保持`244/220/24`，SHA-256为`1a84dcd0cf10afbc4e14fd809d8b98877d5bedcad6fdd24d8229c9100f4496ab`；test runtime policy SHA-256为`a20718ef88702373e64283e0607aa1412fd6060eaf23b67733af68b4e7d59358`。
 - 固定Node断网/只读/单容器验证中Dashboard 9/9、release manifest/gate 27/27、inventory verify、定向lint和`tsconfig.task10` typecheck通过；1637个显式tracked文件凭据扫描、216个JSON及394份Markdown/231个本地链接检查通过。typecheck首次在384 MiB V8 heap下进程内不足，确认宿主`oom_kill=0`、四服务restart0/OOM false及资源低于停止线后，以640 MiB heap/896 MiB容器同断言复跑通过；未跳过或降低检查。此前同源码边界的release/v1 transfer 31/31、v1 recovery 16/16保持通过。没有创建真实回执、角色、凭据、Volume或运行面资源，没有读取真实数据、备份、卷正文或未跟踪状态报告。
 - 该P0入口已关闭，TASK56继续唯一`DOING`并进入PG17精确编译catalog与v2角色/ACL reconcile；当前UAT仍共享superuser且没有真实V4证据，系统继续`PRODUCTION NO-GO`。
+
+## 14. PostgreSQL 17 精确结构编译catalog检查点
+
+- 新增只读目录SQL、严格编译/验证器、单容器外层资源守卫和内层PG17测试。引擎固定`postgres@sha256:4f736ae2…b394`、server 17.10、libc/C/UTF8；46个Migration、drizzle snapshot/journal、access intent v2、数据库marker/system identifier及8份compiler source逐项内容寻址，任何输入漂移都拒绝复用制品。
+- 最终catalog冻结234表、211序列、394 routine（170应用、224 extension）、6独立type、3 extension，以及3132列、1709约束、957索引和285个非内部trigger；31类unsupported surface计数全零。目录文件、artifact和逻辑catalog SHA-256分别为`4ca22dfa949a897a32296b392b6c1c396996a6c9e5bc0a94c35ae42f7d581162`、`93af15b7aa0ca0eec5c4bc0d67f0d8dc248ca335837d17ca466a46c8f3157674`、`40c8c620dc8b434798716270d5aecbfedb19499618a2fc792c31e529f63c7f8f`。
+- 负测覆盖同owner rogue table、sequence/routine/type、owner、relation/TOAST options、合法用户rule、routine不安全`search_path`、extension成员指纹和operator owner、未知extension成员class、large object、column/default ACL及RLS policy。只读审计指出未知extension class最初只有字段而无非零触发后，已增加真实`ALTER EXTENSION ... ADD TABLE`和纯合同counter=1断言，再重新生成目录及下游摘要；未降低或跳过断言。
+- 一次refresh与一次独立test都从新空PG17 cluster应用46个Migration并逐字节重现最终目录；目录/发布/Dashboard33/33、release52/52、Supervisor31/31、typecheck38/38、lint0 error/17既有warning、credentials1643、Shell42、JSON216、Markdown394/231、inventory及diff门通过。完整typecheck首次在640 MiB V8 heap内不足但没有宿主/容器OOM，按正式768 MiB heap/1 GiB容器上限完整重跑38/38，未跳过配置。正式inventory为`245/221/24`、SHA-256`1a7253b48894a4f6be9ffd4065b9246fb00fe61e9281d60bb4eb67c6201aee9e`，test/container runtime policy分别为`7ac07e933736eb0d38e85b3d8153824063c2bcffc6000753cf06f408cb3dae3a`和`74d3f8d24e7b15f0cc5ce4e0e21c963b0e95735c502a471666c02165c7e53c1b`。
+- 该制品只闭合结构证据前置条件，不创建角色、不授予ACL、不改变UAT。TASK56保持唯一`DOING`，下一步以该catalog实现v2 exact role/ACL policy、幂等reconciler、default/extension ACL和五个物理身份正负探针，再闭合secret-file、operator、tablespace mount及新Supervisor bundle。
+- 重任务收口available约1.7GiB、Swap555MiB/1.0GiB、根盘16GiB，最终Load`0.69/1.43/1.34`、`oom_kill=0`；四服务restart0/OOM false，临时容器/cluster/目录清零。未读取`.env`、真实秘密、业务行、日志、备份/卷正文或未跟踪状态报告，未修改真实角色/ACL/Volume、UAT/生产或服务。

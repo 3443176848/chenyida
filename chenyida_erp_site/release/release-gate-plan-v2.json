@@ -18,7 +18,7 @@
   "candidate_runtime_guard": {
     "contract": "chenyida-erp-release-runtime-guard/v1",
     "mode": "ISOLATED_CANDIDATE_STRICT",
-    "runtime_policy_sha256": "163ccf002f083d8818b90f67e3fe8a584bf25beee4a05d1448121eb5c530c77e"
+    "runtime_policy_sha256": "74d3f8d24e7b15f0cc5ce4e0e21c963b0e95735c502a471666c02165c7e53c1b"
   },
   "resource_policy": {
     "compose_parallel_limit": 1,

@@ -10,8 +10,8 @@ import { validateOfficialTestRuntimePolicy } from "./release-manifest-contract.m
 
 export const RELEASE_TEST_INVENTORY_CONTRACT = "chenyida-erp-release-test-inventory/v1";
 export const RELEASE_TEST_INVENTORY_REPOSITORY_PATH = "chenyida_erp_site/release/release-test-inventory-v1.json";
-export const RELEASE_TEST_INVENTORY_TOTAL = 244;
-export const RELEASE_TEST_INVENTORY_REQUIRED = 220;
+export const RELEASE_TEST_INVENTORY_TOTAL = 245;
+export const RELEASE_TEST_INVENTORY_REQUIRED = 221;
 export const RELEASE_TEST_INVENTORY_NOT_APPLICABLE = 24;
 export const RELEASE_TEST_MAX_BYTES = 1024 * 1024;
 export const RELEASE_TYPESCRIPT_CONFIGS = Object.freeze([
@@ -62,7 +62,7 @@ const OFFICIAL_CATEGORY_COUNTS = Object.freeze({
   HISTORICAL_D1_SITES: 22,
   POSTGRES: 84,
   POSTGRES_ALIAS: 2,
-  PURE_NODE: 117,
+  PURE_NODE: 118,
   RELEASE_CONTRACT: 6,
   SPECIAL_HARNESS: 7,
 });
@@ -200,7 +200,7 @@ export function validateReleaseTestInventoryDocument(value) {
 
 async function readBoundedRegularFile(file, maxBytes = RELEASE_TEST_MAX_BYTES) {
   const before = await lstat(file);
-  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 || before.size < 1 || before.size > maxBytes) reject("RELEASE_TEST_FILE_METADATA_INVALID");
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 || before.size < 1 || before.size > maxBytes || (before.mode & 0o022) !== 0) reject("RELEASE_TEST_FILE_METADATA_INVALID");
   const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const opened = await handle.stat();
@@ -212,6 +212,15 @@ async function readBoundedRegularFile(file, maxBytes = RELEASE_TEST_MAX_BYTES) {
   } finally {
     await handle.close();
   }
+}
+
+export async function verifyTrustedPostgresRuntimeCatalog({ root, policy }) {
+  const catalogRaw = await readBoundedRegularFile(path.join(path.resolve(root), policy.postgres_runtime_catalog.path), 512 * 1024);
+  if (sha256(catalogRaw) !== policy.postgres_runtime_catalog.file_sha256) reject("RELEASE_POSTGRES_RUNTIME_CATALOG_SHA256_MISMATCH");
+  const catalog = parseStrictJson(catalogRaw.toString("utf8"), 512 * 1024);
+  if (catalog?.artifact_sha256 !== policy.postgres_runtime_catalog.artifact_sha256
+    || catalog?.engine_binding?.image_reference !== policy.postgres_runtime_catalog.image_reference) reject("RELEASE_POSTGRES_RUNTIME_CATALOG_IDENTITY_MISMATCH");
+  return catalog;
 }
 
 async function actualTopLevelTests(root) {
@@ -248,6 +257,7 @@ export async function loadOfficialReleaseTestInventory({ root = process.cwd(), s
   const resolvedSupervisorRoot = path.resolve(supervisorRoot);
   const policyRaw = await readFile(path.join(resolvedSupervisorRoot, "release", "test-runtime-policy-v1.json"), "utf8");
   const policy = validateOfficialTestRuntimePolicy(parseStrictJson(policyRaw), policyRaw);
+  await verifyTrustedPostgresRuntimeCatalog({ root, policy });
   const inventoryRaw = await readFile(path.join(resolvedSupervisorRoot, "release", "release-test-inventory-v1.json"), "utf8");
   if (sha256(inventoryRaw) !== policy.test_inventory.sha256) reject("RELEASE_TEST_INVENTORY_SHA256_MISMATCH");
   const inventory = validateReleaseTestInventoryDocument(parseStrictJson(inventoryRaw, 4 * 1024 * 1024));

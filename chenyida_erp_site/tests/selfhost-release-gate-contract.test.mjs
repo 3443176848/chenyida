@@ -13,15 +13,18 @@ import {
   PRE_DEPLOY_RUNTIME_GUARD_MODE,
   assertPreDeployRuntimeStable,
 } from "../scripts/release-lifecycle-contract.mjs";
-import { RELEASE_GATE_REPORT_CONTRACT, buildMigrationAllowlist, canonicalJson, migrationAllowlistDigest, sha256, validateOfficialReleaseGatePlan, validateReleaseGateReport, writePreparedJsonArtifact } from "../scripts/release-manifest-contract.mjs";
+import { RELEASE_GATE_REPORT_CONTRACT, buildMigrationAllowlist, canonicalJson, migrationAllowlistDigest, sha256, validateOfficialReleaseGatePlan, validateOfficialTestRuntimePolicy, validateReleaseGateReport, writePreparedJsonArtifact } from "../scripts/release-manifest-contract.mjs";
 import {
   RELEASE_TEST_INVENTORY_NOT_APPLICABLE,
   RELEASE_TEST_INVENTORY_REQUIRED,
   RELEASE_TEST_INVENTORY_TOTAL,
   RELEASE_TYPESCRIPT_CONFIGS,
   validateReleaseTestInventoryDocument,
+  verifyTrustedPostgresRuntimeCatalog,
   verifyReleaseTypeScriptConfigSet,
 } from "../scripts/release-test-inventory.mjs";
+import { parseStrictJson } from "../scripts/release-identity-contract.mjs";
+import { clusterSha256 } from "../scripts/postgresql-cluster-recovery-contract.mjs";
 import { buildEligibleReleaseFixture, initializeReleaseArtifactRoot } from "./release-gate-fixture.mjs";
 
 const rootCapable = typeof process.getuid === "function" && process.getuid() === 0;
@@ -74,7 +77,7 @@ test("versioned test inventory accounts for every top-level test and only exclud
   assert.equal(inventory.total_tests, RELEASE_TEST_INVENTORY_TOTAL);
   assert.equal(inventory.required_tests, RELEASE_TEST_INVENTORY_REQUIRED);
   assert.equal(inventory.not_applicable_tests, RELEASE_TEST_INVENTORY_NOT_APPLICABLE);
-  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 84, POSTGRES_ALIAS: 2, PURE_NODE: 117, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 7 });
+  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 84, POSTGRES_ALIAS: 2, PURE_NODE: 118, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 7 });
   assert.deepEqual(inventory.tests.filter((entry) => entry.category === "RELEASE_CONTRACT").map((entry) => entry.path), [
     "tests/selfhost-file-storage.test.mjs",
     "tests/selfhost-release-gate-contract.test.mjs",
@@ -88,6 +91,27 @@ test("versioned test inventory accounts for every top-level test and only exclud
   assert.throws(() => validateReleaseTestInventoryDocument({ ...inventory, unexpected: true }), (error) => error.code === "RELEASE_TEST_INVENTORY_FIELDS_INVALID");
   assert.throws(() => validateReleaseTestInventoryDocument({ ...inventory, tests: inventory.tests.slice(1) }), (error) => error.code === "RELEASE_TEST_INVENTORY_TESTS_INVALID");
   assert.throws(() => validateReleaseTestInventoryDocument({ ...inventory, tests: inventory.tests.map((entry, index) => index === 0 ? { ...entry, applicability: "NOT_APPLICABLE" } : entry) }), (error) => error.code === "RELEASE_TEST_ENTRY_POLICY_INVALID");
+});
+
+test("trusted runtime policy rejects a semantically valid re-signed catalog replacement", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "cyd-runtime-catalog-anchor-"));
+  try {
+    const policyRaw = await readFile(new URL("../release/test-runtime-policy-v1.json", import.meta.url), "utf8");
+    const policy = validateOfficialTestRuntimePolicy(parseStrictJson(policyRaw), policyRaw);
+    const source = parseStrictJson(await readFile(new URL("../operations/postgresql-runtime-privilege-compiled-catalog-v1.json", import.meta.url), "utf8"), 512 * 1024);
+    const altered = structuredClone(source);
+    altered.catalog.routines.find((item) => item.extension === null).definition_sha256 = "f".repeat(64);
+    altered.catalog_sha256 = clusterSha256(altered.catalog);
+    const { artifact_sha256: ignored, ...body } = altered;
+    void ignored;
+    altered.artifact_sha256 = clusterSha256(body);
+    const target = path.join(root, policy.postgres_runtime_catalog.path);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, `${JSON.stringify(altered, null, 2)}\n`, { mode: 0o644 });
+    await assert.rejects(verifyTrustedPostgresRuntimeCatalog({ root, policy }), (error) => error.code === "RELEASE_POSTGRES_RUNTIME_CATALOG_SHA256_MISMATCH");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test("release typecheck inventory pins all 38 top-level configs and rejects set drift", async () => {
@@ -213,6 +237,10 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.match(postgresRunner, /migrations\.length !== 46/);
   assert.match(postgresRunner, /0046_runtime_lock_privilege_boundary\.sql/);
   assert.match(postgresRunner, /harness === "POSTGRES_REGRESSION"/);
+  assert.match(postgresRunner, /verifyCandidateRuntimePrivilegeCatalog/);
+  assert.match(postgresRunner, /postgres_runtime_catalog\.file_sha256/);
+  assert.match(postgresSandbox, /\/supervisor\/tests\/selfhost-postgresql-runtime-privilege-catalog-postgres\.sh/);
+  assert.match(postgresSandbox, /POSTGRES RUNTIME PRIVILEGE CATALOG PASS/);
   assert.match(postgresRunner, /postgresql:\/\/chenyida_erp:x@postgres:5432\/chenyida_erp/);
   assert.match(postgresRunner, /create role chenyida_erp login nosuperuser nocreatedb nocreaterole noinherit/);
   assert.match(postgresRunner, /owner: "chenyida_erp"/);

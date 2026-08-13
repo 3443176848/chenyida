@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`。严格起点为TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`；Web锁与Backup control/capture检查点已闭合，Parser及四类Worker-only写实现已从Web模块结构拆出，raw candidate自然收敛并最终撤销25个表操作/9个序列权限，职责组统一为`*_priv`。D-132 v1实际恢复证据现已在V4 validate/create/publish和Dashboard消费端以稳定错误失败关闭，v1 synthetic只保留历史解析且永不ready；当前进入PG17精确catalog和完整角色/ACL reconcile。后续仍包括secret-file delivery、受控operator与custom tablespace持久mount合同。真实角色/凭据/Volume、UAT/生产、host安装、Migration/deploy、真实备份恢复及WAL/PITR继续阻塞，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`。严格起点为TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`；Web锁与Backup control/capture检查点已闭合，Parser及四类Worker-only写实现已从Web模块结构拆出，raw candidate自然收敛并最终撤销25个表操作/9个序列权限，职责组统一为`*_priv`。D-132 v1实际恢复证据现已在V4 validate/create/publish和Dashboard消费端以稳定错误失败关闭，v1 synthetic只保留历史解析且永不ready；PG17精确编译catalog检查点也已完成，当前进入完整v2角色/ACL policy与reconciler。后续仍包括secret-file delivery、受控operator与custom tablespace持久mount合同。真实角色/凭据/Volume、UAT/生产、host安装、Migration/deploy、真实备份恢复及WAL/PITR继续阻塞，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -91,6 +91,8 @@
 
 2026-08-13第三十九次调度事件：TASK56保持唯一`DOING`。D-132 v1 `ACTUAL_OFFHOST/RECOVERY_READY`现于V4 validate/create/publish和Dashboard外层以`READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN`失败关闭，v1 synthetic仍可历史解析但永不ready；发布先验证现有alias再写immutable history，坏alias不再留下孤儿history。十份v1核心文件由精确SHA冻结，inventory保持`244/220/24`并更新为`1a84dcd0…f4496ab`，Dashboard 9/9、release合同27/27和inventory verify通过；当前自动进入PG17精确catalog与v2角色/ACL reconcile，未创建真实回执或修改运行面。
 
+2026-08-13第四十次调度事件：TASK56保持唯一`DOING`。固定digest的PostgreSQL 17.10/libc C/UTF8隔离编译器从46个Migration及access intent v2生成精确结构catalog：234表、211序列、394 routine（170应用、224 extension）、6独立type、3 extension，以及3132列、1709约束、957索引和285个非内部trigger；31类不支持surface计数全部为零。两次独立新空编译得到字节相同结果，identity/source verify通过；同owner rogue table、真实用户rule、view `_RETURN`、TOAST reloptions、extension同地址owner漂移、未知extension成员class及不安全`search_path`等负测均在制品发布前失败关闭。catalog文件/制品/逻辑SHA-256分别为`4ca22dfa…1162`、`93af15b7…7674`、`40c8c620…7f8f`。inventory更新为`245/221/24`，SHA-256为`1a7253b4…ee9e`；test/container runtime policy SHA-256分别为`7ac07e93…e3a`、`74d3f8d2…3c1b`。目录/发布/Dashboard33/33、release52/52、Supervisor31/31、typecheck38/38、lint0 error、credentials1643及静态门通过；完整PG门在干净源码提交上继续执行。该检查点只解除结构证据前置条件，不建立或授权任何角色/ACL；当前自动进入v2角色/ACL policy与reconciler，UAT/生产未改变。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -107,7 +109,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 | PostgreSQL运行时最小权限与凭据边界闭环 | DOING | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50、SELFHOST-OPS-RELEASE-GATE-42、D-132 | `READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`。Web锁、Backup control/capture、Web候选/调用路径误权、`*_priv`命名冲突及D-132 v1实际readiness误放行已关闭；当前继续PG17编译catalog、完整角色/ACL、secret-file、受控operator与custom tablespace持久mount。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56.md)。 |
+| SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 | PostgreSQL运行时最小权限与凭据边界闭环 | DOING | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50、SELFHOST-OPS-RELEASE-GATE-42、D-132 | `READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`。Web锁、Backup control/capture、Web候选/调用路径误权、`*_priv`命名冲突、D-132 v1实际readiness误放行及PG17精确结构catalog已关闭；当前继续v2完整角色/ACL、secret-file、受控operator与custom tablespace持久mount。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56.md)。 |
 
 ## 已完成任务
 
