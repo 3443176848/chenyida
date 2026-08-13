@@ -469,7 +469,7 @@
     },
     {
       "path": "tests/selfhost-database-runtime-identity.test.mjs",
-      "sha256": "8eb89e7fd4c679d17536069a6c133a5b899a61662d71529257f41aacd4d28c00",
+      "sha256": "d7791e55d0b4024c7a9103b517fd69add77181e463627100028c468a99830126",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -793,7 +793,7 @@
     },
     {
       "path": "tests/selfhost-material-governance-metadata.test.mjs",
-      "sha256": "e2cffb97a30e015703888bd8d4361c11d65d4ffc6f5a48db8ab14b47986adeb1",
+      "sha256": "4152eb5138853f58b71745476ce82a118f0a2df6cfefb7cdbead1a9eb4794efb",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1018,7 +1018,7 @@
     },
     {
       "path": "tests/selfhost-migration-tool.test.mjs",
-      "sha256": "4ea3723b758b8aae87f34d4ae965cb01731232cada6c83267830c71fea28b965",
+      "sha256": "e6b856e2ab240ce5194f9d56a84b06ac74ea89c3e756af8dac050f19ede743af",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1954,7 +1954,7 @@
     },
     {
       "path": "tests/selfhost-runtime-secret-file.test.mjs",
-      "sha256": "6289c94e9fdccd5541ff96c767cc0d8a376316845ede4aa3ba93634da01bc37c",
+      "sha256": "92b9c288b2045b2862d6c661909a9f934c8b72528ff2d121d52c2426bd4dc736",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -2179,7 +2179,7 @@
     },
     {
       "path": "tests/selfhost-worker-resilience.test.mjs",
-      "sha256": "53fbd7d23c854f99c1295ceae43d4ebe6906bbffae8ff1e4f00596a5ced80a79",
+      "sha256": "426efbf3467aca8758201f8c147ba97c9d606e54b33be7b39b9edc8f970f81d3",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",

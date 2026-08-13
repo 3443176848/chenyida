@@ -6,6 +6,7 @@ import {
   isolatedEnvironmentSecret,
   readControlledRuntimeSecret,
   runtimeServiceKind,
+  type ControlledDeploymentClass,
   type RuntimeServiceKind,
 } from "../app/lib/infrastructure/runtime-secret.ts";
 
@@ -64,22 +65,22 @@ function reject(code: string): never {
   throw new DatabaseRuntimeError(code);
 }
 
-function controlledPolicy(config: Pick<RuntimeConfig, "deploymentClass">): DatabaseRuntimePolicy {
-  const service = runtimeServiceKind(config.deploymentClass);
+function controlledPolicy(deploymentClass: ControlledDeploymentClass): DatabaseRuntimePolicy {
+  const service = runtimeServiceKind(deploymentClass);
   if (!service) reject("DATABASE_RUNTIME_SERVICE_INVALID");
   const deploymentId = process.env.ERP_RELEASE_EXPECTED_DEPLOYMENT_ID || "";
   if (!DEPLOYMENT_ID.test(deploymentId)) reject("DATABASE_RUNTIME_DEPLOYMENT_ID_INVALID");
   const template = POLICY_TEMPLATES[service];
   return Object.freeze({
     ...template,
-    marker: `chenyida-erp-deployment/v2:${config.deploymentClass.toUpperCase()}:${deploymentId}`,
+    marker: `chenyida-erp-deployment/v2:${deploymentClass.toUpperCase()}:${deploymentId}`,
   });
 }
 
 export function databaseRuntimePolicy(
   config: Pick<RuntimeConfig, "deploymentClass">,
 ): DatabaseRuntimePolicy | null {
-  return isControlledDeployment(config.deploymentClass) ? controlledPolicy(config) : null;
+  return isControlledDeployment(config.deploymentClass) ? controlledPolicy(config.deploymentClass) : null;
 }
 
 export function databasePoolConfiguration(
@@ -104,6 +105,7 @@ export function databasePoolConfiguration(
       }),
     });
   }
+  if (!isControlledDeployment(config.deploymentClass)) reject("DATABASE_RUNTIME_POLICY_INVALID");
   const password = readControlledRuntimeSecret(config.deploymentClass, policy.service, "DATABASE_PASSWORD");
   return Object.freeze({
     policy,
@@ -164,7 +166,10 @@ type IdentityRow = {
 
 function expectedCanaries(policy: DatabaseRuntimePolicy, row: IdentityRow): boolean {
   if (policy.service === "MIGRATION") return true;
-  if (!row.migration_select || row.migration_insert || row.migration_update || row.migration_delete) return false;
+  const migrationCanaryValid = policy.service === "ADMIN"
+    ? !row.migration_select && !row.migration_insert && !row.migration_update && !row.migration_delete
+    : row.migration_select && !row.migration_insert && !row.migration_update && !row.migration_delete;
+  if (!migrationCanaryValid) return false;
   if (policy.service === "WEB") {
     return row.lease_select && !row.lease_insert && !row.lease_update && !row.lease_delete
       && row.users_select && row.users_insert && row.users_update && !row.users_delete;

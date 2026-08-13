@@ -24,6 +24,9 @@ import {
 
 const MIGRATION_FILE = /^\d{4}_[a-z0-9_]+\.sql$/;
 
+type MigrationTransactionClient = Pick<PoolClient, "query">;
+type MigrationLifecycleClient = Pick<PoolClient, "query" | "release">;
+
 function reject(code: string): never {
   throw new MigrationGuardError(code);
 }
@@ -32,6 +35,33 @@ async function migrationFiles(directory: string): Promise<string[]> {
   const allSql = (await readdir(directory)).filter((name) => name.endsWith(".sql")).sort();
   if (allSql.length < 1 || allSql.some((name) => !MIGRATION_FILE.test(name))) reject("MIGRATION_DIRECTORY_CONTENT_INVALID");
   return allSql;
+}
+
+export async function runMigrationTransaction<T>(
+  client: MigrationTransactionClient,
+  work: (client: MigrationTransactionClient) => Promise<T>,
+): Promise<T> {
+  await client.query("BEGIN");
+  try {
+    const result = await work(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  }
+}
+
+export async function closeMigrationRuntime(
+  client: MigrationLifecycleClient | undefined,
+  locked: boolean,
+  close: () => Promise<void> = closeDb,
+): Promise<void> {
+  if (locked && client) {
+    await client.query("select pg_catalog.pg_advisory_unlock(pg_catalog.hashtext('chenyida_erp_schema_migration')::bigint)").catch(() => undefined);
+  }
+  try { client?.release(); } catch { /* Do not replace the migration result with cleanup detail. */ }
+  await close().catch(() => undefined);
 }
 
 export async function runMigrations(): Promise<void> {
@@ -63,26 +93,21 @@ export async function runMigrations(): Promise<void> {
         const approved = authorization.value.manifest.migrations.entries.find((entry: { filename: string; sha256: string }) => entry.filename === file);
         if (!approved || approved.sha256 !== checksum) reject("MIGRATION_FILE_NOT_APPROVED");
       }
-      await client.query("BEGIN");
-      try {
-        await client.query("select pg_catalog.set_config('search_path','public',true)");
-        await client.query("create table if not exists public.schema_migrations (version text primary key, checksum text not null, applied_at timestamptz not null default pg_catalog.now())");
-        const existing = await client.query<{ checksum: string }>("select checksum from only public.schema_migrations where version=$1", [file]);
+      const applied = await runMigrationTransaction(client, async (transaction) => {
+        await transaction.query("select pg_catalog.set_config('search_path','public',true)");
+        await transaction.query("create table if not exists public.schema_migrations (version text primary key, checksum text not null, applied_at timestamptz not null default pg_catalog.now())");
+        const existing = await transaction.query<{ checksum: string }>("select checksum from only public.schema_migrations where version=$1", [file]);
         if (existing.rows[0]) {
           if (existing.rows[0].checksum !== checksum) reject("MIGRATION_APPLIED_CHECKSUM_MISMATCH");
-          await client.query("COMMIT");
-          continue;
+          return false;
         }
-        await client.query(sql);
-        await client.query("insert into public.schema_migrations (version,checksum) values ($1,$2)", [file, checksum]);
-        const recorded = await client.query<{ checksum: string }>("select checksum from only public.schema_migrations where version=$1", [file]);
+        await transaction.query(sql);
+        await transaction.query("insert into public.schema_migrations (version,checksum) values ($1,$2)", [file, checksum]);
+        const recorded = await transaction.query<{ checksum: string }>("select checksum from only public.schema_migrations where version=$1", [file]);
         if (recorded.rows.length !== 1 || recorded.rows[0].checksum !== checksum) reject("MIGRATION_HISTORY_WRITE_NOT_DURABLE");
-        await client.query("COMMIT");
-        console.info(`applied ${file}`);
-      } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-      }
+        return true;
+      });
+      if (applied) console.info(`applied ${file}`);
     }
     if (authorization.kind === "RELEASE") {
       await assertTargetIdentity(client, authorization.value);
@@ -90,21 +115,33 @@ export async function runMigrations(): Promise<void> {
       validateAppliedMigrationRows(applied, authorization.value.manifest.migrations.entries, authorization.value.manifest.migrations.head);
     } else await assertIsolatedTargetIdentity(client, authorization.value);
   } finally {
-    if (locked && client) await client.query("select pg_catalog.pg_advisory_unlock(pg_catalog.hashtext('chenyida_erp_schema_migration')::bigint)").catch(() => undefined);
-    client?.release();
-    await closeDb();
+    await closeMigrationRuntime(client, locked);
   }
 }
 
-function safeErrorCode(error: unknown): string {
+export function safeMigrationErrorCode(error: unknown): string {
   if (error instanceof MigrationGuardError || error instanceof ReleaseManifestError) return error.code;
   const candidate = error && typeof error === "object" && "code" in error ? String(error.code || "") : "";
-  return /^[0-9A-Z_]{1,64}$/.test(candidate) ? `MIGRATION_DATABASE_${candidate}` : "MIGRATION_INTERNAL_ERROR";
+  const known: Readonly<Record<string, string>> = Object.freeze({
+    "08000": "MIGRATION_DATABASE_CONNECTION_ERROR",
+    "08001": "MIGRATION_DATABASE_CONNECTION_ERROR",
+    "08003": "MIGRATION_DATABASE_CONNECTION_ERROR",
+    "08004": "MIGRATION_DATABASE_CONNECTION_REJECTED",
+    "08006": "MIGRATION_DATABASE_CONNECTION_ERROR",
+    "08007": "MIGRATION_DATABASE_CONNECTION_ERROR",
+    "08P01": "MIGRATION_DATABASE_PROTOCOL_ERROR",
+    "53300": "MIGRATION_DATABASE_CONNECTION_LIMIT_REACHED",
+    "57P01": "MIGRATION_DATABASE_SERVER_SHUTDOWN",
+    "57P02": "MIGRATION_DATABASE_SERVER_SHUTDOWN",
+    "57P03": "MIGRATION_DATABASE_SERVER_UNAVAILABLE",
+    "57P04": "MIGRATION_DATABASE_SERVER_UNAVAILABLE",
+  });
+  return known[candidate] || "MIGRATION_INTERNAL_ERROR";
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   runMigrations().catch((error) => {
-    process.stderr.write(`${safeErrorCode(error)}\n`);
+    process.stderr.write(`${safeMigrationErrorCode(error)}\n`);
     process.exitCode = 1;
   });
 }

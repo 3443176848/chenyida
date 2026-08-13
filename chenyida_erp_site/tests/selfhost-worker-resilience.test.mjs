@@ -15,8 +15,24 @@ test("idle PostgreSQL client errors are handled and logged without sensitive det
     code: "57P01",
     connectionParameters: { password: "must-not-be-logged" },
   })));
-  assert.deepEqual(JSON.parse(lines[0]), { level: "error", event: "postgres_idle_client_error", code: "57P01" });
+  assert.deepEqual(JSON.parse(lines[0]), { level: "error", event: "postgres_idle_client_error", code: "DATABASE_SERVER_SHUTDOWN" });
   assert.doesNotMatch(lines[0], /secret|password|must-not-be-logged/i);
+
+  const sentinel = "TOP_SECRET_SENTINEL";
+  assert.doesNotThrow(() => pool.emit("error", {
+    code: sentinel,
+    message: sentinel,
+    detail: sentinel,
+    hint: sentinel,
+    context: sentinel,
+    schema: sentinel,
+    table: sentinel,
+    constraint: sentinel,
+    connectionParameters: { password: sentinel, connectionString: `postgresql://${sentinel}` },
+    path: `/run/${sentinel}`,
+  }));
+  assert.deepEqual(JSON.parse(lines[1]), { level: "error", event: "postgres_idle_client_error", code: "DATABASE_CONNECTION_ERROR" });
+  assert.doesNotMatch(lines.join("\n"), new RegExp(sentinel, "i"));
 });
 
 test("worker retries a transient polling failure instead of exiting", async () => {

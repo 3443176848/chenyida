@@ -17,7 +17,21 @@ type PoolErrorSource = {
 
 function safeDatabaseErrorCode(error: unknown): string {
   const candidate = error && typeof error === "object" && "code" in error ? String(error.code || "") : "";
-  return /^[0-9A-Z_]{1,32}$/.test(candidate) ? candidate : "DATABASE_CONNECTION_ERROR";
+  const known: Readonly<Record<string, string>> = Object.freeze({
+    "08000": "DATABASE_CONNECTION_ERROR",
+    "08001": "DATABASE_CONNECTION_ERROR",
+    "08003": "DATABASE_CONNECTION_ERROR",
+    "08004": "DATABASE_CONNECTION_REJECTED",
+    "08006": "DATABASE_CONNECTION_ERROR",
+    "08007": "DATABASE_CONNECTION_ERROR",
+    "08P01": "DATABASE_PROTOCOL_ERROR",
+    "53300": "DATABASE_CONNECTION_LIMIT_REACHED",
+    "57P01": "DATABASE_SERVER_SHUTDOWN",
+    "57P02": "DATABASE_SERVER_SHUTDOWN",
+    "57P03": "DATABASE_SERVER_UNAVAILABLE",
+    "57P04": "DATABASE_SERVER_UNAVAILABLE",
+  });
+  return known[candidate] || "DATABASE_CONNECTION_ERROR";
 }
 
 export function attachPostgresPoolErrorHandler(

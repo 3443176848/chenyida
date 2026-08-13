@@ -30,6 +30,10 @@ function policy(input) {
   return {
     path: input.file,
     expectedParent: input.root,
+    trustedAncestor: os.tmpdir(),
+    expectedParentUid: process.getuid(),
+    expectedParentGid: process.getgid(),
+    expectedParentMode: 0o700,
     expectedUid: process.getuid(),
     expectedGid: process.getgid(),
     expectedMode: 0o440,
@@ -69,6 +73,28 @@ test("secure secret reader rejects symlinks, hardlinks, directories and weak mod
   const modeInput = await fixture();
   await chmod(modeInput.file, 0o640);
   assert.throws(() => readSecureSingleValueFile(policy(modeInput)), secretError("RUNTIME_SECRET_FILE_METADATA_INVALID"));
+});
+
+test("secure secret reader anchors every parent component and rejects writable or symlinked secret directories", async () => {
+  const writableInput = await fixture();
+  await chmod(writableInput.root, 0o770);
+  assert.throws(() => readSecureSingleValueFile(policy(writableInput)), secretError("RUNTIME_SECRET_DIRECTORY_INVALID"));
+
+  const outer = await mkdtemp(path.join(os.tmpdir(), "cyd-runtime-secret-parent-test-"));
+  roots.push(outer);
+  const realParent = path.join(outer, "real");
+  const aliasParent = path.join(outer, "alias");
+  await mkdir(realParent, { mode: 0o700 });
+  const secret = path.join(realParent, "secret");
+  await writeFile(secret, "synthetic-runtime-secret-value-0001\n", { encoding: "utf8", mode: 0o440 });
+  await symlink(realParent, aliasParent);
+  assert.throws(() => readSecureSingleValueFile({
+    ...policy({ root: aliasParent, file: path.join(aliasParent, "secret") }),
+  }), (error) => {
+    assert.ok(secretError("RUNTIME_SECRET_DIRECTORY_INVALID")(error));
+    assert.equal(error.message.includes(aliasParent), false);
+    return true;
+  });
 });
 
 test("secure secret reader rejects malformed content", async () => {

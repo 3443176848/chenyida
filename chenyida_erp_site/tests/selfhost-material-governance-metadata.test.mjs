@@ -15,6 +15,11 @@ import {
   MATERIAL_CATEGORY_SEED_VERSION,
   validateMaterialCategorySeed,
 } from "../seeds/material-category-v2.ts";
+import {
+  AdminInitializationError,
+  closeAdminRuntime,
+  runAdminInitializationTransaction,
+} from "../scripts/init-admin.ts";
 
 const byCode = (items) => new Map(items.map((item) => [item.code, item]));
 const byCategory = (items) => new Map(items.map((item) => [item.categoryCode, item]));
@@ -146,4 +151,39 @@ test("self-hosted admin initialization consumes v2 while the historical v1 seed 
   assert.doesNotMatch(source, /from "\.\.\/seeds\/material-category-v1\.ts"/);
   assert.match(source, /validateMaterialCategorySeed\(\)/);
   assert.match(source, /seed_version: MATERIAL_CATEGORY_SEED_VERSION/);
+});
+
+test("admin initialization converts database and rollback failures to one stable non-leaking error", async () => {
+  const sentinel = "TOP_SECRET_ADMIN_SENTINEL";
+  const queries = [];
+  const client = {
+    async query(sql) {
+      queries.push(sql);
+      if (sql === "ROLLBACK") throw Object.assign(new Error(sentinel), { code: sentinel, detail: sentinel, path: `/run/${sentinel}` });
+      return { rows: [] };
+    },
+  };
+  await assert.rejects(
+    runAdminInitializationTransaction(client, async () => {
+      throw Object.assign(new Error(sentinel), { code: sentinel, detail: sentinel, password: sentinel });
+    }),
+    (error) => error instanceof AdminInitializationError
+      && error.code === "ADMIN_INITIALIZATION_FAILED"
+      && error.message === "ADMIN_INITIALIZATION_FAILED"
+      && !JSON.stringify(error).includes(sentinel)
+      && !error.stack.includes(sentinel),
+  );
+  assert.deepEqual(queries, ["BEGIN", "ROLLBACK"]);
+
+  let released = 0;
+  let closed = 0;
+  await assert.doesNotReject(closeAdminRuntime({ release() {
+    released += 1;
+    throw Object.assign(new Error(sentinel), { path: `/run/${sentinel}` });
+  } }, async () => {
+    closed += 1;
+    throw Object.assign(new Error(sentinel), { password: sentinel });
+  }));
+  assert.equal(released, 1);
+  assert.equal(closed, 1);
 });

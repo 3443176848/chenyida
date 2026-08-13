@@ -14,6 +14,11 @@ import { CheckpointStore } from "../tools/selfhost-migration/checkpoint.mjs";
 import { InMemoryIdMap } from "../tools/selfhost-migration/id-map.mjs";
 import { executeDryRun, executionInputDigest } from "../tools/selfhost-migration/executor.mjs";
 import { buildSafeReport } from "../tools/selfhost-migration/report.mjs";
+import {
+  closeMigrationRuntime,
+  runMigrationTransaction,
+  safeMigrationErrorCode,
+} from "../scripts/migrate-postgres.ts";
 
 const env = { ERP_ENV: "test" };
 const siteRoot = resolve(import.meta.dirname, "..");
@@ -109,4 +114,41 @@ test("dry-run writes only safe workspace checkpoints and never a target", async 
 test("workspace guard requires generated marker and can require empty", async () => {
   const root = await tempRoot("workspace"); assert.equal(assertWorkspace(root, { requireEmpty: true }), root);
   await writeFile(resolve(root, "x"), "x"); assert.throws(() => assertWorkspace(root, { requireEmpty: true }), { code: "MIGRATION_WORKSPACE_NOT_EMPTY" });
+});
+
+test("migration transaction and cleanup preserve the primary failure without leaking database details", async () => {
+  const sentinel = "TOP_SECRET_MIGRATION_SENTINEL";
+  const primary = Object.assign(new Error(sentinel), {
+    code: sentinel,
+    detail: sentinel,
+    hint: sentinel,
+    path: `/run/${sentinel}`,
+    password: sentinel,
+    connectionString: `postgresql://user:${sentinel}@database.invalid/app`,
+  });
+  const queries = [];
+  const transactionClient = {
+    async query(sql) {
+      queries.push(sql);
+      if (sql === "ROLLBACK") throw Object.assign(new Error(sentinel), { code: sentinel, detail: sentinel });
+      return { rows: [] };
+    },
+  };
+  await assert.rejects(
+    runMigrationTransaction(transactionClient, async () => { throw primary; }),
+    (error) => error === primary,
+  );
+  assert.deepEqual(queries, ["BEGIN", "ROLLBACK"]);
+  assert.equal(safeMigrationErrorCode(primary), "MIGRATION_INTERNAL_ERROR");
+  assert.equal(safeMigrationErrorCode({ code: "57P03", detail: sentinel }), "MIGRATION_DATABASE_SERVER_UNAVAILABLE");
+  assert.doesNotMatch(`${safeMigrationErrorCode(primary)}\n${safeMigrationErrorCode({ code: "57P03", detail: sentinel })}`, new RegExp(sentinel, "i"));
+
+  let released = 0;
+  let closed = 0;
+  await assert.doesNotReject(closeMigrationRuntime({
+    async query() { throw Object.assign(new Error(sentinel), { detail: sentinel }); },
+    release() { released += 1; throw Object.assign(new Error(sentinel), { path: `/run/${sentinel}` }); },
+  }, true, async () => { closed += 1; throw Object.assign(new Error(sentinel), { password: sentinel }); }));
+  assert.equal(released, 1);
+  assert.equal(closed, 1);
 });

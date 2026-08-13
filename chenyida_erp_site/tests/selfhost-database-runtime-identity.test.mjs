@@ -17,16 +17,18 @@ function runtimeError(error) {
     && error.message === "DATABASE_RUNTIME_IDENTITY_INVALID";
 }
 
-function webPolicy() {
+function servicePolicy(service = "WEB") {
   const saved = { ...process.env };
   try {
-    process.env.ERP_SERVICE_KIND = "WEB";
+    process.env.ERP_SERVICE_KIND = service;
     process.env.ERP_RELEASE_EXPECTED_DEPLOYMENT_ID = "runtime-identity-test";
     return databaseRuntimePolicy({ deploymentClass: "production" });
   } finally {
     process.env = saved;
   }
 }
+
+const webPolicy = () => servicePolicy("WEB");
 
 function validWebRow(policy) {
   return {
@@ -79,6 +81,24 @@ test("runtime database identity accepts the exact web role and canary boundary",
     },
   };
   await assert.doesNotReject(assertDatabaseRuntimeIdentity(client, policy));
+});
+
+test("runtime database identity keeps the one-shot admin away from migration history", async () => {
+  const policy = servicePolicy("ADMIN");
+  assert.ok(policy);
+  const row = {
+    ...validWebRow(policy),
+    role_connection_limit: 1,
+    migration_select: false,
+    lease_select: false,
+    users_update: false,
+  };
+  const client = { async query() { return { rows: [row] }; } };
+  await assert.doesNotReject(assertDatabaseRuntimeIdentity(client, policy));
+  await assert.rejects(
+    assertDatabaseRuntimeIdentity({ async query() { return { rows: [{ ...row, migration_select: true }] }; } }, policy),
+    runtimeError,
+  );
 });
 
 test("runtime database identity rejects role swaps, dangerous capabilities and canary drift", async () => {
