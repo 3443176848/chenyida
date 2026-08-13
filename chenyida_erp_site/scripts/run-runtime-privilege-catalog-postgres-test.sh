@@ -181,6 +181,10 @@ if [ "$command_status" -ne 0 ]; then
   elif [ "$command_status" = 124 ] || [ "$command_status" = 137 ]; then echo "RUNTIME_PRIVILEGE_CATALOG_CONTAINER_TIMEOUT" >&2
   else
     case "$exit_code" in *[!0-9]*|'') exit_code=unknown ;; esac
+    diagnostic=$(sed -n '/^RUNTIME_PRIVILEGE_[A-Z0-9_]*$/p' "$CONTAINER_OUTPUT" | tail -n 1)
+    [ -z "$diagnostic" ] || echo "$diagnostic" >&2
+    sql_diagnostic=$(sed -n '/^psql:[A-Za-z0-9_\/:. -]*$/p' "$CONTAINER_OUTPUT" | tail -n 1)
+    [ -z "$sql_diagnostic" ] || echo "$sql_diagnostic" >&2
     stage=$(sed -n 's/^RUNTIME_PRIVILEGE_CATALOG_STAGE_FAILED stage=\([A-Z_]*\)$/\1/p' "$CONTAINER_OUTPUT" | tail -n 1)
     case "$stage" in "") echo "RUNTIME_PRIVILEGE_CATALOG_CONTAINER_FAILED exit=$exit_code" >&2 ;; *) echo "RUNTIME_PRIVILEGE_CATALOG_CONTAINER_FAILED exit=$exit_code stage=$stage" >&2 ;; esac
   fi

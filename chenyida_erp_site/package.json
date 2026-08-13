@@ -63,6 +63,8 @@
     "test:ops-monitoring": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-ops-monitoring.test.mjs tests/selfhost-dashboard-unit.test.mjs tests/selfhost-release-gate-contract.test.mjs",
     "test:runtime-readiness:postgres": "scripts/run-runtime-readiness-postgres-test.sh",
     "test:runtime-lock-privilege:postgres": "scripts/run-runtime-lock-privilege-postgres-test.sh",
+    "test:runtime-privilege-policy": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-postgresql-runtime-privilege-policy.test.mjs",
+    "test:runtime-privilege-policy:postgres": "scripts/run-runtime-privilege-catalog-postgres-test.sh test",
     "typecheck:runtime-readiness": "tsc -p tsconfig.task45.json --pretty false",
     "test:identity:compose": "node scripts/selfhost-identity-compose-smoke.mjs",
     "test:identity-recovery-targeted:unit": "node --experimental-strip-types --test tests/selfhost-targeted-offline-identity-recovery-unit.test.mjs",

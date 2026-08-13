@@ -45,11 +45,11 @@
       },
       {
         "path": "scripts/run-runtime-privilege-catalog-postgres-test.sh",
-        "sha256": "69ddde4a0f155aab3dbfe26fc7e36dd342dbf2729db3c8832c02aeb754104ad1"
+        "sha256": "c4ebe4ac0fe0867d91cda24ef4706ccedec9a51544d63ee062b1ed7703aac8a9"
       },
       {
         "path": "tests/selfhost-postgresql-runtime-privilege-catalog-postgres.sh",
-        "sha256": "481317ad330410d16d2d14728f71a859029b5e8328eefa2329194aefe1c2cd17"
+        "sha256": "b6622bac3e90800faa5a8627fab2562ceae262196d8a23894407ce1d4637c859"
       },
       {
         "path": "scripts/backup-recovery-contract.mjs",
@@ -13688,5 +13688,5 @@
     }
   },
   "catalog_sha256": "40c8c620dc8b434798716270d5aecbfedb19499618a2fc792c31e529f63c7f8f",
-  "artifact_sha256": "93af15b7aa0ca0eec5c4bc0d67f0d8dc248ca335837d17ca466a46c8f3157674"
+  "artifact_sha256": "c35f4920b05c17901cb45e431980d494f18764ad7241d62f4f72aedcef8cd4e6"
 }

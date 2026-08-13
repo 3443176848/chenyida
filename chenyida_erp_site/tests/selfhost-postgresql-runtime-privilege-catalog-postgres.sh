@@ -125,24 +125,31 @@ capture() {
   chmod 0600 "$output"
 }
 
-STAGE=BASELINE
+STAGE=BASELINE_CAPTURE_ONE
 capture "$REPORT_ONE"
+STAGE=BASELINE_CAPTURE_TWO
 capture "$REPORT_TWO"
+STAGE=BASELINE_REPORT_COMPARE
 cmp -s "$REPORT_ONE" "$REPORT_TWO"
 
 CATALOG_ONE="$TASK_ROOT/catalog-one.json"
 CATALOG_TWO="$TASK_ROOT/catalog-two.json"
+STAGE=BASELINE_COMPILE_ONE
 node "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.mjs" compile \
   --access "$SITE_ROOT/operations/postgresql-runtime-privilege-access-v2.json" \
   --expected-database "$DATABASE" --output "$CATALOG_ONE" --report "$REPORT_ONE" >/dev/null
+STAGE=BASELINE_COMPILE_TWO
 node "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.mjs" compile \
   --access "$SITE_ROOT/operations/postgresql-runtime-privilege-access-v2.json" \
   --expected-database "$DATABASE" --output "$CATALOG_TWO" --report "$REPORT_TWO" >/dev/null
+STAGE=BASELINE_CATALOG_COMPARE
 cmp -s "$CATALOG_ONE" "$CATALOG_TWO"
+STAGE=BASELINE_CATALOG_VERIFY
 node "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.mjs" verify \
   --access "$SITE_ROOT/operations/postgresql-runtime-privilege-access-v2.json" \
   --catalog "$CATALOG_ONE" --expected-database "$DATABASE" --report "$REPORT_ONE" >/dev/null
 if [ "${ERP_RUNTIME_PRIVILEGE_CATALOG_REPOSITORY_MODE:-test}" = test ]; then
+  STAGE=BASELINE_REPOSITORY_VERIFY
   node "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.mjs" verify \
     --access "$SITE_ROOT/operations/postgresql-runtime-privilege-access-v2.json" \
     --catalog "$SITE_ROOT/operations/postgresql-runtime-privilege-compiled-catalog-v1.json" --expected-database "$DATABASE" --report "$REPORT_ONE" >/dev/null
@@ -277,6 +284,176 @@ capture "$TASK_ROOT/catalog-final.tsv"
 node "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.mjs" verify \
   --access "$SITE_ROOT/operations/postgresql-runtime-privilege-access-v2.json" \
   --catalog "$CATALOG_ONE" --expected-database "$DATABASE" --report "$TASK_ROOT/catalog-final.tsv" >/dev/null
+
+if [ "${ERP_RUNTIME_PRIVILEGE_CATALOG_REPOSITORY_MODE:-test}" = test ]; then
+STAGE=RUNTIME_PRIVILEGE_DATABASE_RENAME
+PGDATABASE=postgres psql -X -v ON_ERROR_STOP=1 -v old_database="$DATABASE" -v new_database=chenyida_erp <<'SQL' >/dev/null
+SELECT format('ALTER DATABASE %I RENAME TO %I', :'old_database', :'new_database')
+\gexec
+SQL
+DATABASE=chenyida_erp
+export PGDATABASE="$DATABASE"
+STAGE=RUNTIME_PRIVILEGE_DATABASE_MARKER
+psql -X -v ON_ERROR_STOP=1 -v database_name="$DATABASE" -v marker="$MARKER" <<'SQL' >/dev/null
+COMMENT ON DATABASE :"database_name" IS :'marker';
+SQL
+
+STAGE=RUNTIME_PRIVILEGE_STRUCTURE_PREFLIGHT
+PRIVILEGE_STRUCTURE_BEFORE="$TASK_ROOT/runtime-privilege-structure-before.tsv"
+capture "$PRIVILEGE_STRUCTURE_BEFORE"
+NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
+  node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" verify-isolated-structure-baseline "$PRIVILEGE_STRUCTURE_BEFORE" >/dev/null
+
+capture_state() {
+  output=$1
+  error_log=$2
+  if ! psql -X -A -t -v ON_ERROR_STOP=1 \
+    -v expected_database="$DATABASE" -v migration_owner="$OWNER" -v expected_marker="$MARKER" -v expected_system_identifier="$SYSTEM_IDENTIFIER" \
+    -f "$SITE_ROOT/scripts/postgresql-runtime-privilege-state.sql" >"$output" 2>"$error_log"; then
+    chmod 0600 "$output" "$error_log"
+    return 1
+  fi
+  chmod 0600 "$output"
+  chmod 0600 "$error_log"
+}
+
+STAGE=RUNTIME_PRIVILEGE_BASELINE_CAPTURE
+PRIVILEGE_BASELINE="$TASK_ROOT/runtime-privilege-baseline.json"
+PRIVILEGE_BASELINE_ERROR="$TASK_ROOT/runtime-privilege-baseline.error"
+capture_state "$PRIVILEGE_BASELINE" "$PRIVILEGE_BASELINE_ERROR" || {
+  sed -n '1p' "$PRIVILEGE_BASELINE_ERROR" | sed 's/[^A-Za-z0-9_:. -]/_/g' >&2
+  exit 1
+}
+
+STAGE=RUNTIME_PRIVILEGE_PLAN
+PRIVILEGE_PLAN="$TASK_ROOT/runtime-privilege-bootstrap.sql"
+PRIVILEGE_PLAN_ERROR="$TASK_ROOT/runtime-privilege-plan.error"
+if ! NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
+  node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" render-isolated-bootstrap-psql "$PRIVILEGE_BASELINE" > "$PRIVILEGE_PLAN" 2>"$PRIVILEGE_PLAN_ERROR"; then
+  sed -n '1p' "$PRIVILEGE_PLAN_ERROR" | sed 's/[^A-Za-z0-9_:. -]/_/g' >&2
+  exit 1
+fi
+chmod 0600 "$PRIVILEGE_PLAN"
+chmod 0600 "$PRIVILEGE_PLAN_ERROR"
+
+STAGE=RUNTIME_PRIVILEGE_RECONCILE
+PRIVILEGE_RECONCILE_ERROR="$TASK_ROOT/runtime-privilege-reconcile.error"
+if ! psql -X -v ON_ERROR_STOP=1 -f "$PRIVILEGE_PLAN" >/dev/null 2>"$PRIVILEGE_RECONCILE_ERROR"; then
+  chmod 0600 "$PRIVILEGE_RECONCILE_ERROR"
+  sed -n '1p' "$PRIVILEGE_RECONCILE_ERROR" | sed 's/[^A-Za-z0-9_:. -]/_/g' >&2
+  exit 1
+fi
+chmod 0600 "$PRIVILEGE_RECONCILE_ERROR"
+
+STAGE=RUNTIME_PRIVILEGE_POST_CAPTURE
+PRIVILEGE_FINAL="$TASK_ROOT/runtime-privilege-final.json"
+PRIVILEGE_FINAL_ERROR="$TASK_ROOT/runtime-privilege-final.error"
+capture_state "$PRIVILEGE_FINAL" "$PRIVILEGE_FINAL_ERROR" || {
+  sed -n '1p' "$PRIVILEGE_FINAL_ERROR" | sed 's/[^A-Za-z0-9_:. -]/_/g' >&2
+  exit 1
+}
+NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
+  node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" verify-isolated-state "$PRIVILEGE_FINAL" >/dev/null
+NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
+  node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" assert-isolated-noop "$PRIVILEGE_FINAL" >/dev/null
+
+expect_role_success() {
+  role=$1
+  sql=$2
+  PGUSER="$role" psql -X -q -v ON_ERROR_STOP=1 -c "$sql" >/dev/null 2>&1
+}
+
+expect_role_failure() {
+  role=$1
+  sql=$2
+  if PGUSER="$role" psql -X -q -v ON_ERROR_STOP=1 -c "$sql" >/dev/null 2>&1; then return 1; fi
+}
+
+STAGE=RUNTIME_PRIVILEGE_FIVE_IDENTITY_PROBES
+for role in chenyida_erp_owner chenyida_erp_web chenyida_erp_worker chenyida_erp_admin chenyida_erp_backup; do
+  case "$role" in
+    chenyida_erp_owner) STAGE=RUNTIME_PRIVILEGE_IDENTITY_OWNER ;;
+    chenyida_erp_web) STAGE=RUNTIME_PRIVILEGE_IDENTITY_WEB ;;
+    chenyida_erp_worker) STAGE=RUNTIME_PRIVILEGE_IDENTITY_WORKER ;;
+    chenyida_erp_admin) STAGE=RUNTIME_PRIVILEGE_IDENTITY_ADMIN ;;
+    chenyida_erp_backup) STAGE=RUNTIME_PRIVILEGE_IDENTITY_BACKUP ;;
+  esac
+  IDENTITY_ERROR="$TASK_ROOT/runtime-privilege-identity-$role.error"
+  if ! observed=$(PGUSER="$role" psql -X -q -A -t -v ON_ERROR_STOP=1 -c 'select current_user||chr(58)||session_user' 2>"$IDENTITY_ERROR"); then
+    chmod 0600 "$IDENTITY_ERROR"
+    sed -n '1p' "$IDENTITY_ERROR" | sed 's/[^A-Za-z0-9_:. -]/_/g' >&2
+    exit 1
+  fi
+  chmod 0600 "$IDENTITY_ERROR"
+  [ "$observed" = "$role:$role" ] || exit 1
+done
+
+STAGE=RUNTIME_PRIVILEGE_OWNER_PROBES
+expect_role_success chenyida_erp_owner 'BEGIN; CREATE TABLE public.cyd_runtime_privilege_owner_canary(id integer); ROLLBACK;'
+expect_role_failure chenyida_erp_owner 'CREATE ROLE cyd_runtime_privilege_owner_forbidden'
+STAGE=RUNTIME_PRIVILEGE_WEB_PROBES
+expect_role_success chenyida_erp_web 'SELECT 1 FROM public.audit_log LIMIT 0'
+expect_role_success chenyida_erp_web "SELECT public.digest(convert_to('x','UTF8'),'sha256') IS NOT NULL"
+expect_role_failure chenyida_erp_web 'SELECT 1 FROM public.app_meta LIMIT 0'
+expect_role_failure chenyida_erp_web 'CREATE TABLE public.cyd_runtime_privilege_web_forbidden(id integer)'
+STAGE=RUNTIME_PRIVILEGE_WORKER_PROBES
+expect_role_success chenyida_erp_worker 'SELECT 1 FROM public.background_jobs LIMIT 0'
+expect_role_failure chenyida_erp_worker 'SELECT 1 FROM public.app_meta LIMIT 0'
+expect_role_failure chenyida_erp_worker "SELECT public.digest(convert_to('x','UTF8'),'sha256')"
+expect_role_failure chenyida_erp_worker 'CREATE TABLE public.cyd_runtime_privilege_worker_forbidden(id integer)'
+STAGE=RUNTIME_PRIVILEGE_ADMIN_PROBES
+expect_role_success chenyida_erp_admin 'SELECT 1 FROM public.app_meta LIMIT 0'
+expect_role_failure chenyida_erp_admin 'SELECT 1 FROM public.background_jobs LIMIT 0'
+expect_role_failure chenyida_erp_admin "SELECT public.digest(convert_to('x','UTF8'),'sha256')"
+expect_role_failure chenyida_erp_admin 'CREATE TABLE public.cyd_runtime_privilege_admin_forbidden(id integer)'
+STAGE=RUNTIME_PRIVILEGE_BACKUP_PROBES
+expect_role_success chenyida_erp_backup 'SELECT 1 FROM public.app_meta LIMIT 0'
+expect_role_success chenyida_erp_backup "SELECT public.digest(convert_to('x','UTF8'),'sha256') IS NOT NULL"
+expect_role_failure chenyida_erp_backup 'DELETE FROM public.app_meta WHERE false'
+expect_role_failure chenyida_erp_backup 'CREATE TABLE public.cyd_runtime_privilege_backup_forbidden(id integer)'
+
+STAGE=RUNTIME_PRIVILEGE_NEGATIVE_SURFACE_PROBES
+NEGATIVE_SURFACE=$(psql -X -q -A -t -v ON_ERROR_STOP=1 <<'SQL'
+WITH service_roles AS (
+  SELECT oid FROM pg_roles WHERE rolname IN ('chenyida_erp_web','chenyida_erp_worker','chenyida_erp_admin','chenyida_erp_backup')
+)
+SELECT concat_ws(':',
+  (SELECT count(*) FROM service_roles role CROSS JOIN pg_class relation JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace
+    WHERE namespace.nspname='public' AND relation.relkind='r'
+      AND (has_table_privilege(role.oid,relation.oid,'TRUNCATE') OR has_table_privilege(role.oid,relation.oid,'REFERENCES')
+        OR has_table_privilege(role.oid,relation.oid,'TRIGGER') OR has_table_privilege(role.oid,relation.oid,'MAINTAIN'))),
+  (SELECT count(*) FROM service_roles role CROSS JOIN pg_class relation JOIN pg_namespace namespace ON namespace.oid=relation.relnamespace
+    WHERE namespace.nspname='public' AND relation.relkind='S' AND has_sequence_privilege(role.oid,relation.oid,'UPDATE')),
+  (SELECT count(*) FROM service_roles role CROSS JOIN pg_attribute attribute
+    WHERE attribute.attnum>0 AND NOT attribute.attisdropped AND has_column_privilege(role.oid,attribute.attrelid,attribute.attnum,'REFERENCES')),
+  (SELECT count(*) FROM service_roles role CROSS JOIN pg_type type JOIN pg_namespace namespace ON namespace.oid=type.typnamespace
+    LEFT JOIN pg_class relation ON relation.oid=type.typrelid
+    WHERE namespace.nspname='public'
+      AND ((type.typtype='b' AND type.typelem=0) OR type.typtype IN ('d','e','r','m') OR (type.typtype='c' AND type.typrelid<>0 AND relation.relkind='c'))
+      AND has_type_privilege(role.oid,type.oid,'USAGE')),
+  (SELECT count(*) FROM service_roles role CROSS JOIN pg_tablespace tablespace WHERE has_tablespace_privilege(role.oid,tablespace.oid,'CREATE')),
+  (SELECT count(*) FROM service_roles role CROSS JOIN pg_database database
+    WHERE database.datname=current_database() AND has_database_privilege(role.oid,database.oid,'TEMPORARY')),
+  (SELECT count(*) FROM service_roles role WHERE has_schema_privilege(role.oid,'public','CREATE')),
+  (SELECT count(*) FROM service_roles role
+    WHERE has_parameter_privilege(role.oid,'session_replication_role','SET') OR has_parameter_privilege(role.oid,'session_replication_role','ALTER SYSTEM'))
+);
+SQL
+)
+[ "$NEGATIVE_SURFACE" = '0:0:0:0:0:0:0:0' ] || exit 1
+
+STAGE=RUNTIME_PRIVILEGE_BACKUP_IDENTITY_DUMP
+BACKUP_CANARY="$TASK_ROOT/runtime-privilege-backup-canary.dump"
+PGUSER=chenyida_erp_backup pg_dump -Fc -f "$BACKUP_CANARY" "$DATABASE"
+[ -s "$BACKUP_CANARY" ] || exit 1
+chmod 0600 "$BACKUP_CANARY"
+
+STAGE=RUNTIME_PRIVILEGE_STRUCTURE
+PRIVILEGE_STRUCTURE="$TASK_ROOT/runtime-privilege-structure.tsv"
+capture "$PRIVILEGE_STRUCTURE"
+NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
+  node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" verify-isolated-structure "$PRIVILEGE_STRUCTURE" >/dev/null
+fi
 
 STAGE=COMPLETE
 printf 'runtime privilege PG17 compiled catalog integration passed\n'
