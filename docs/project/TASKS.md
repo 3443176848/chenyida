@@ -79,6 +79,8 @@
 
 2026-08-13第三十三次调度事件：主智能体从TASK55收口后的零`DOING`自动选择其明确保留的运行权限P0，状态按`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 TODO → DOING`切换唯一active slot。只读UAT catalog确认单一非内置LOGIN同时为superuser、数据库owner和全部public relation owner，Web/Worker连接共用该角色；Compose的数据库/初始化/Setup/Admin秘密仍在环境且没有custom tablespace持久mount。任务只实现未来仓库/合成隔离合同，不创建或修改真实角色、凭据、Volume、UAT/生产、host或业务数据。
 
+2026-08-13第三十四次调度事件：TASK56保持唯一`DOING`。alpha.47/0046已用16个owner控制窄函数消除Web对19个行锁目标的UPDATE需求，并固定20个locking trigger的owner安全执行路径；隔离PostgreSQL 17完整回归84文件/401项、专项5/5、typecheck38/38、发布契约和凭据门通过。源码access intent只剩Backup large-object capture边界与PG17编译catalog两个blocker；当前自动进入Backup control/capture拆分，不等待新的“继续”。UAT/生产角色、ACL、凭据、Migration、镜像、服务和四卷均未改变，系统继续`PRODUCTION NO-GO`。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。

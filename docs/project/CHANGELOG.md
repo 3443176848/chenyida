@@ -4,7 +4,7 @@
 
 ## 2026-08-13
 
-### SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 - `docs: start PostgreSQL runtime privilege closure`
+### SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 - `docs: start PostgreSQL runtime privilege closure` / `feat: close Web runtime lock privilege boundary`
 
 - 调度/范围：从TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`启动TASK56为唯一`DOING`；主智能体唯一写入，数据迁移、应用测试、运维安全三线只读审计。
 - 起点事实：只读UAT catalog摘要确认PostgreSQL 17当前只有1个非内置LOGIN，且该角色同时为superuser、数据库owner和全部433个public relation owner；Web/Worker活动连接共用1个数据库角色。源码为45/head`0045_runtime_worker_readiness.sql`，UAT仍为40/head`0040_warehouse_receipt_readiness.sql`。
@@ -12,6 +12,9 @@
 - 验收：D-133、版本化角色/权限引导、应用安全secret-file加载、Compose/runtime/release合同、单容器PostgreSQL 17全量Migration及角色正反向测试、适用回归和新内容寻址bundle全部通过；不得降低现有D-132恢复合同。
 - 启动验证：394个Markdown/229个本地链接、214个JSON、38个Shell、1618文件凭据扫描、release contract 51/51及Python三基线通过；固定Node镜像断网/只读/零capability运行，临时容器与SQLite自动清理。宿主工具/依赖缺失在业务断言前如实失败，改用项目既有隔离运行时后通过，未安装依赖或降低断言。
 - 边界：不创建或修改真实角色、凭据、Volume，不读取`.env`、真实秘密、业务行、备份/卷正文或未跟踪状态报告，不修改/重启UAT/生产，不执行真实Migration、备份、恢复、host安装、部署或网络动作。系统继续`PRODUCTION NO-GO`。
+- Web锁边界：append-only 0046新增16个owner控制、固定`search_path`、无PUBLIC EXECUTE的窄锁函数，替代Finance/Production/Quality/Sales的19个直接行锁；20个关联trigger函数固定owner安全执行路径，Web对全部锁目标保持零table/column UPDATE。
+- 版本/门禁：源码同步为alpha.47/0046，release inventory为244/220/24；隔离PG17完整回归84文件/401项、专项5/5、typecheck38/38、发布/版本契约、凭据1631与clean-candidate等价lint 0 error通过。首次live workspace lint因未跟踪构建产物触发V8 heap OOM，容器未OOMKill；排除Git快照不存在的构建目录后同限额通过，未降低规则。
+- 当前阻塞：access intent只剩Backup large-object capture边界和PG17编译catalog；本检查点不代表角色/ACL reconcile、Compose/tablespace、候选bundle、UAT部署或真实运行加固完成，TASK56继续`DOING`。
 
 ### SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 - `docs: start PostgreSQL cluster recovery closure` / `docs: record PostgreSQL cluster recovery decision` / `feat: add PostgreSQL cluster recovery contract` / `feat: capture PostgreSQL cluster recovery catalog` / `feat: secure PostgreSQL cluster restore` / `feat: encrypt PostgreSQL cluster transfer` / `feat: enforce PostgreSQL cluster recovery readiness` / `feat: expose cluster recovery operations status` / `feat: execute crash-safe PostgreSQL cluster recovery` / `test: bind cluster recovery release gate` / `test: execute trusted recovery fixtures` / `build: bind exact release dependencies` / `test: make recovery gate deterministic and trusted` / `release: bind task55 supervisor bundle` / `docs: close PostgreSQL cluster recovery`
 

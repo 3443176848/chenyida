@@ -316,6 +316,13 @@
       "when": 1786538885099,
       "tag": "0045_runtime_worker_readiness",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1786632307392,
+      "tag": "0046_runtime_lock_privilege_boundary",
+      "breakpoints": true
     }
   ]
 }

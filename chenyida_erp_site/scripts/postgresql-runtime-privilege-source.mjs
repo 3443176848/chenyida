@@ -72,14 +72,7 @@ const WEB_ROUTINE_DEPENDENCIES = Object.freeze({
     "finance_opening_reversals", "finance_opening_sources", "inventory_migration_opening_reversals",
     "inventory_migration_openings", "production_operation_run_events",
   ]),
-  LOCK_TARGETS_REQUIRING_UPDATE: Object.freeze([
-    "finance_opening_sources", "finance_settlements", "inventory_ledger_entries", "production_bom_snapshots",
-    "production_completion_batches", "production_completion_lines", "production_completions", "production_operation_run_reports",
-    "production_reports", "production_scrap_dispositions", "production_work_order_routing_snapshot_operations",
-    "production_work_order_routing_snapshots", "purchase_financial_source_entries", "purchase_receipt_delivery_allocations",
-    "sales_delivery_execution_lines", "sales_financial_source_entries", "sales_shipment_line_fqc_allocations",
-    "sales_shipment_lines", "sales_shipments",
-  ]),
+  LOCK_TARGETS_REQUIRING_UPDATE: Object.freeze([]),
 });
 const WEB_APPLICATION_ROUTINE_EXECUTE = Object.freeze([
   "public.cyd_ai_governance_suggestion_assert_complete(bigint)",
@@ -93,6 +86,22 @@ const WEB_APPLICATION_ROUTINE_EXECUTE = Object.freeze([
   "public.cyd_validate_purchase_receipt_posting(bigint)",
   "public.cyd_validate_shipment_line_lot(bigint)",
   "public.cyd_validate_supplier_receipt_lot(bigint)",
+  "public.cyd_web_lock_final_output_sources(bigint[])",
+  "public.cyd_web_lock_finance_ar_source(bigint)",
+  "public.cyd_web_lock_finance_settlement_reversal(bigint,bigint)",
+  "public.cyd_web_lock_ncr_source(bigint)",
+  "public.cyd_web_lock_operation_upstream_sources(bigint,bigint)",
+  "public.cyd_web_lock_production_completion(bigint)",
+  "public.cyd_web_lock_production_completion_lines(bigint)",
+  "public.cyd_web_lock_production_reports(bigint[])",
+  "public.cyd_web_lock_quality_completion_allocation_source(bigint)",
+  "public.cyd_web_lock_quality_completion_capacity(bigint)",
+  "public.cyd_web_lock_quality_fqc_source(bigint)",
+  "public.cyd_web_lock_quality_legacy_report_source(bigint)",
+  "public.cyd_web_lock_quality_operation_source(bigint)",
+  "public.cyd_web_lock_report_operation_sources(bigint)",
+  "public.cyd_web_lock_sales_fqc_reversal_sources(bigint[])",
+  "public.cyd_web_lock_sales_shipment_reversal(bigint)",
 ]);
 const WEB_EXTENSION_ROUTINE_EXECUTE = Object.freeze(["public.digest(bytea,text)"]);
 const BLOCKING_REASONS = Object.freeze([
@@ -103,10 +112,6 @@ const BLOCKING_REASONS = Object.freeze([
   Object.freeze({
     code: "POSTGRESQL17_COMPILED_CATALOG_REQUIRED",
     objects: Object.freeze([]),
-  }),
-  Object.freeze({
-    code: "WEB_LOCK_TARGET_PRIVILEGE_BOUNDARY_UNRESOLVED",
-    objects: WEB_ROUTINE_DEPENDENCIES.LOCK_TARGETS_REQUIRING_UPDATE,
   }),
 ]);
 const DYNAMIC_RELATION_OVERRIDES = Object.freeze({
@@ -278,9 +283,9 @@ export function validateRuntimePrivilegeAccessDocument(value) {
   }
   exactKeys(value.source, ["migration_head", "migration_set_sha256", "migration_count", "drizzle_snapshot"], "RUNTIME_PRIVILEGE_SOURCE_BINDING_INVALID");
   exactKeys(value.source.drizzle_snapshot, ["path", "sha256"], "RUNTIME_PRIVILEGE_SOURCE_BINDING_INVALID");
-  if (value.source.migration_count !== 45 || value.source.migration_head !== "0045_runtime_worker_readiness.sql"
+  if (value.source.migration_count !== 46 || value.source.migration_head !== "0046_runtime_lock_privilege_boundary.sql"
     || !SHA256.test(value.source.migration_set_sha256)
-    || value.source.drizzle_snapshot.path !== "drizzle-postgres/meta/0045_snapshot.json"
+    || value.source.drizzle_snapshot.path !== "drizzle-postgres/meta/0046_snapshot.json"
     || !SHA256.test(value.source.drizzle_snapshot.sha256)) {
     reject("RUNTIME_PRIVILEGE_SOURCE_BINDING_INVALID");
   }
@@ -289,7 +294,7 @@ export function validateRuntimePrivilegeAccessDocument(value) {
     "views", "materialized_views", "large_objects", "required_extensions",
   ], "RUNTIME_PRIVILEGE_CATALOG_FIELDS_INVALID");
   if (value.catalog.schema !== "public") reject("RUNTIME_PRIVILEGE_CATALOG_INVALID");
-  for (const [field, expectedCount] of [["tables", 234], ["sequences", 211], ["application_routines", 154]]) {
+  for (const [field, expectedCount] of [["tables", 234], ["sequences", 211], ["application_routines", 170]]) {
     strictSortedUniqueStrings(value.catalog[field], "RUNTIME_PRIVILEGE_CATALOG_INVALID");
     if (value.catalog[field].length !== expectedCount) reject("RUNTIME_PRIVILEGE_CATALOG_INVALID");
   }
@@ -318,7 +323,7 @@ export function validateRuntimePrivilegeAccessDocument(value) {
 async function migrationSource(siteRoot) {
   const root = path.join(siteRoot, "drizzle-postgres");
   const files = (await readdir(root)).filter((name) => name.endsWith(".sql")).sort();
-  if (files.length !== 45 || files.some((name) => !MIGRATION.test(name))) reject("RUNTIME_PRIVILEGE_MIGRATION_SET_INVALID");
+  if (files.length !== 46 || files.some((name) => !MIGRATION.test(name))) reject("RUNTIME_PRIVILEGE_MIGRATION_SET_INVALID");
   const entries = [];
   let combined = "";
   for (const filename of files) {
@@ -485,7 +490,7 @@ function normalizeRoutineArguments(value) {
 }
 
 async function sourceCatalog(siteRoot, migration) {
-  const snapshotPath = path.join(siteRoot, "drizzle-postgres", "meta", "0045_snapshot.json");
+  const snapshotPath = path.join(siteRoot, "drizzle-postgres", "meta", "0046_snapshot.json");
   const snapshotRaw = await readFile(snapshotPath, "utf8");
   const snapshot = JSON.parse(snapshotRaw);
   if (!snapshot || snapshot.dialect !== "postgresql" || typeof snapshot.tables !== "object" || Array.isArray(snapshot.tables)) reject("RUNTIME_PRIVILEGE_SNAPSHOT_INVALID");
@@ -508,13 +513,13 @@ async function sourceCatalog(siteRoot, migration) {
   const extensions = new Set();
   for (const entry of migration.entries) {
     const source = await readFile(path.join(siteRoot, "drizzle-postgres", entry.filename), "utf8");
-    for (const match of source.matchAll(/\bcreate\s+(?:or\s+replace\s+)?function\s+(?:public\.)?"?([a-z_][a-z0-9_]*)"?\s*\(([^)]*)\)/giu)) {
+    for (const match of source.matchAll(/\bcreate\s+(?:or\s+replace\s+)?function\s+(?:(?:"public"|public)\.)?"?([a-z_][a-z0-9_]*)"?\s*\(([^)]*)\)/giu)) {
       routines.add(`public.${match[1].toLowerCase()}(${normalizeRoutineArguments(match[2])})`);
     }
     for (const match of source.matchAll(/\bcreate\s+extension\s+(?:if\s+not\s+exists\s+)?"?([a-z_][a-z0-9_]*)"?/giu)) extensions.add(match[1].toLowerCase());
   }
   const applicationRoutines = [...routines].sort();
-  if (applicationRoutines.length !== 154) reject("RUNTIME_PRIVILEGE_ROUTINE_SET_INVALID");
+  if (applicationRoutines.length !== 170) reject("RUNTIME_PRIVILEGE_ROUTINE_SET_INVALID");
   const requiredExtensions = [...extensions].sort();
   if (JSON.stringify(requiredExtensions) !== JSON.stringify(["btree_gist", "pgcrypto"])) reject("RUNTIME_PRIVILEGE_EXTENSION_SET_INVALID");
   return Object.freeze({
@@ -527,7 +532,7 @@ async function sourceCatalog(siteRoot, migration) {
     sequences: sequenceOwners.map((item) => item.sequence),
     tables,
     views: [],
-    drizzle_snapshot: { path: "drizzle-postgres/meta/0045_snapshot.json", sha256: sha256(snapshotRaw) },
+    drizzle_snapshot: { path: "drizzle-postgres/meta/0046_snapshot.json", sha256: sha256(snapshotRaw) },
   });
 }
 

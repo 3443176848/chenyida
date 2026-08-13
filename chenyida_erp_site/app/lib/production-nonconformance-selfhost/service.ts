@@ -102,10 +102,7 @@ export class ProductionNonconformanceService {
   async createNcr(inspectionId: number, meta: QualityMeta, input: Record<string, unknown>): Promise<QualityResult> {
     const expected = version(input.expected_version);
     return this.repository.execute(meta, async (client) => {
-      const source = await client.query(`select qi.*,rr.id run_report_id,run.work_order_id,rr.snapshot_operation_id,op.work_center_id,op.work_center_code,op.work_center_name,wo.finished_material_id material_id,wo.finished_unit_id unit_id
-        from quality_inspections qi join production_operation_run_reports rr on rr.id=qi.production_operation_run_report_id
-        join production_operation_runs run on run.id=rr.run_id join production_work_order_routing_snapshot_operations op on op.id=rr.snapshot_operation_id
-        join production_work_orders wo on wo.id=run.work_order_id where qi.id=$1 for update of qi,rr,run,op,wo`, [inspectionId]);
+      const source = await client.query("select * from public.cyd_web_lock_ncr_source($1)", [inspectionId]);
       const row = source.rows[0];
       if (!row) throw new QualityError("NONCONFORMANCE_SOURCE_INVALID", "只有结构化工序 IPQC 可建立不合格记录", 422);
       if (Number(row.version) !== expected) throw new QualityError("NONCONFORMANCE_VERSION_CONFLICT", "检验版本已变化，请刷新后重试", 409);

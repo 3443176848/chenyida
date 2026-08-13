@@ -90,7 +90,7 @@ test("0045 constraints reject invalid singleton, identity and lifecycle facts", 
   await resetSchema();
   await migrateThrough(45);
   const valid = [
-    "background-jobs", randomUUID(), "test", "task45-test", "0.1.0-alpha.46", "a".repeat(40),
+    "background-jobs", randomUUID(), "test", "task45-test", "0.1.0-alpha.47", "a".repeat(40),
     "0045_runtime_worker_readiness.sql", "b".repeat(64),
   ];
   const statement = `
@@ -112,10 +112,10 @@ test("0045 constraints reject invalid singleton, identity and lifecycle facts", 
 
 test("Worker lease uses database time, rejects live peers, CAS-renews and permits expired or stopped takeover", async () => {
   await resetSchema();
-  await migrateThrough(45);
+  await migrateThrough(46);
   const migrations = await loadRuntimeMigrationManifest({ directory: new URL("../drizzle-postgres/", import.meta.url).pathname, requireImmutable: false });
   const identity = workerRuntimeIdentity({
-    deploymentClass: "test", deploymentId: "task45-test", applicationVersion: "0.1.0-alpha.46", gitCommit: "a".repeat(40),
+    deploymentClass: "test", deploymentId: "task45-test", applicationVersion: "0.1.0-alpha.47", gitCommit: "a".repeat(40),
   }, migrations);
   const repository = new PostgresWorkerRuntimeLease(pool, 60);
   const firstId = randomUUID();
@@ -163,7 +163,7 @@ test("Worker lease uses database time, rejects live peers, CAS-renews and permit
 
 test("runtime manifest verification rejects a restored or drifted database ledger", async () => {
   await resetSchema();
-  await migrateThrough(45);
+  await migrateThrough(46);
   const migrations = await loadRuntimeMigrationManifest({ directory: new URL("../drizzle-postgres/", import.meta.url).pathname, requireImmutable: false });
   await verifyDatabaseMigrationManifest(pool, migrations);
   const original = (await pool.query("select checksum from schema_migrations where version='0044_identity_session_absolute_lifetime.sql'")).rows[0].checksum;

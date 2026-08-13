@@ -4,22 +4,22 @@
   "root": "chenyida_erp_site",
   "test_pattern": "tests/*.test.mjs",
   "max_test_bytes": 1048576,
-  "total_tests": 242,
-  "required_tests": 218,
+  "total_tests": 244,
+  "required_tests": 220,
   "not_applicable_tests": 24,
   "category_counts": {
     "BROWSER": 6,
     "HISTORICAL_D1_SITES": 22,
-    "POSTGRES": 83,
+    "POSTGRES": 84,
     "POSTGRES_ALIAS": 2,
-    "PURE_NODE": 116,
+    "PURE_NODE": 117,
     "RELEASE_CONTRACT": 6,
     "SPECIAL_HARNESS": 7
   },
   "tests": [
     {
       "path": "tests/ai-governance-evaluation-cli.test.mjs",
-      "sha256": "acd6284269e4f379e0f7f3d26d53f147c6f9b30aea0cca9ae0fbef27c2debdcf",
+      "sha256": "5d49ef5152fad1733c9ef3b751d5eca65d06e4c3d13756b0f3414e1ce3a724ec",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -46,7 +46,7 @@
     },
     {
       "path": "tests/ai-governance-suggestion-layer.test.mjs",
-      "sha256": "ff86b7e1b4d6cb349901b191d5fea8ec322f9205420a7e98fc1c06a6f10a1314",
+      "sha256": "a5f419ee110a006b6ef5ee4552aebeaf46402dcc4778e94055bdc42e181103b3",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -352,7 +352,7 @@
     },
     {
       "path": "tests/selfhost-ai-governance-suggestion-migration-contract.test.mjs",
-      "sha256": "18c7978c16c5d8e508a36070fa8d155891b2a65f0c2ad10d3b205471613afcd3",
+      "sha256": "0ec3fee2956f0027f6ea0303460a77b127c14eec69079b6251b3ddd4e6e3bcb3",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -406,7 +406,7 @@
     },
     {
       "path": "tests/selfhost-application-version.test.mjs",
-      "sha256": "e742dc890800ea52b6eebdb2a3fd29fc31d93fcc7484bf02d3e02eebed5700bb",
+      "sha256": "b72cb9336bb6956b610e32cc30a0f79052e9ffd3e727e8118e34621f6c719a8e",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -424,7 +424,7 @@
     },
     {
       "path": "tests/selfhost-backup-recovery-v2.test.mjs",
-      "sha256": "92c06e35775f73a84bd9ac19dfbb0cbef29a67c4bd40a32b8ac796565aa5748a",
+      "sha256": "5b7b77cc7bf51a2560cebf69608c4d2bb426e133da3ff9fd6b91ebd06664fabc",
       "category": "SPECIAL_HARNESS",
       "applicability": "REQUIRED",
       "harness": "SPECIAL_POSIX",
@@ -442,7 +442,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-postgres.test.mjs",
-      "sha256": "b2c2e1fc4a58c9892ad584c29a6da0c7ff719e0e0c82c5b5bbdeb69031f5e7ef",
+      "sha256": "20bba898ed771ed5ba3692a64fc200165a5a06929938c4ce618e2dce52688c12",
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",
@@ -460,7 +460,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-unit.test.mjs",
-      "sha256": "0fae90827ae497810b7027e24ab4df36b1e8b46aaaadd4ffa846bb503941bb25",
+      "sha256": "f6443b958c214bb5a2f4b59f1e5affe57f58f07c086ba2f5d5f2f0d44a05c0ef",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -622,7 +622,7 @@
     },
     {
       "path": "tests/selfhost-health-contract.test.mjs",
-      "sha256": "85c595091e45e6528c13820d1f2bc96e0c78836bb364d6c7cc9c7af5ef200285",
+      "sha256": "df7f768be5d66ab2bc2db6506bd40585280dc34e1166c286c7344d08a5d0a30c",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -640,7 +640,7 @@
     },
     {
       "path": "tests/selfhost-identity-postgres.test.mjs",
-      "sha256": "27677405cc557517c94be05c9943072d554f561a505005a24ba708b78563b1ed",
+      "sha256": "16b039376c077abc61861f594bcc37237cc0e5de05b899df74bfcaf68ce9887a",
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",
@@ -847,7 +847,7 @@
     },
     {
       "path": "tests/selfhost-material-import-fallback-migration.test.mjs",
-      "sha256": "5c1c744772aa821216d49a4cd57a3276d0949cc6dbcf31e0b723884145a54148",
+      "sha256": "7aa3dc8f7118329bf218605bcfeafcddb90dfc56b69f75eebcb537fd71936769",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -991,7 +991,7 @@
     },
     {
       "path": "tests/selfhost-migration-openings-postgres.test.mjs",
-      "sha256": "78b8f2d615d38e22ebde30f6cd7b28046d6fa17d5664de689ba53ed340bc404a",
+      "sha256": "277a8dbccb2c617eecea6e533e27ebfbc97299351282add05d1c519f94004d5f",
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",
@@ -1063,7 +1063,7 @@
     },
     {
       "path": "tests/selfhost-offhost-transfer-v1.test.mjs",
-      "sha256": "78fe441b4456f651e88414080edd76f769629e82ffad195e6b271221e3608bd1",
+      "sha256": "ecd8758c5158d6e4588e1dea089ec5a5c073ccf6fc413749250a9d5aeeacb540",
       "category": "SPECIAL_HARNESS",
       "applicability": "REQUIRED",
       "harness": "SPECIAL_POSIX",
@@ -1099,7 +1099,7 @@
     },
     {
       "path": "tests/selfhost-ops-monitoring.test.mjs",
-      "sha256": "3a74621b9b987ee198371abf8b8adcda5d698cf6f320d3f6b2f88017f9bd293f",
+      "sha256": "d141d7c1435f65834dbcf57de530e168cae057ec8d52fef64a602faa45e9a743",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1144,7 +1144,7 @@
     },
     {
       "path": "tests/selfhost-planning-revision-response-browser.test.mjs",
-      "sha256": "bebb936b03959a45a3e7114226a879efbe9a2ae65bda5df06034ca7ad7183a9e",
+      "sha256": "29baf922ac0b4be2000eba9378cd558b793141c8c4acdca736f8e135b83b6c9b",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -1171,7 +1171,7 @@
     },
     {
       "path": "tests/selfhost-postgresql-cluster-recovery-v1.test.mjs",
-      "sha256": "de9ce130bb7b8c1b8650a1e62886656cab1a7c41eeebee0cb0650bbfc77f7f3a",
+      "sha256": "4ed494efbd80e811c04ca189cf6a97e7b5cc8da152c4df6f88f15ee1b8a31e3c",
       "category": "SPECIAL_HARNESS",
       "applicability": "REQUIRED",
       "harness": "SPECIAL_POSIX",
@@ -1180,7 +1180,7 @@
     },
     {
       "path": "tests/selfhost-postgresql-cluster-transfer-v1.test.mjs",
-      "sha256": "9dbe43ecac777b4e108d2bd38970692d407f197c9ede3d59653355a92bb0fc66",
+      "sha256": "884e637462339cecf8c97b3550c103dc2fae1b27e88f187cf70bcd534dae0cdf",
       "category": "SPECIAL_HARNESS",
       "applicability": "REQUIRED",
       "harness": "SPECIAL_POSIX",
@@ -1189,7 +1189,7 @@
     },
     {
       "path": "tests/selfhost-postgresql-runtime-privilege-source.test.mjs",
-      "sha256": "185c129648fa2cd2811b0e6709e0d9b97d503072a926cef4d20a2d53f26f89fb",
+      "sha256": "ef0a45c1da3ca66793fdfd1e2d17f28bff7f0c1dee367dc72ef8f780c737e513",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1738,7 +1738,7 @@
     },
     {
       "path": "tests/selfhost-purchase-traceability-browser.test.mjs",
-      "sha256": "7303d6517dfbae7d6e34c7b6ada5b77baa57541668f7f6f6ffe8d418b9197b52",
+      "sha256": "c38e1b383a5fa4786878e98d51f06ded0079d881772eae6be681ee1d5d674085",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -1792,7 +1792,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "6e188059e6dab2d8eaf5d41e4ee3c056d81724cb46f4ce9a4fc749cd20d668cf",
+      "sha256": "04c3b70569a48d6533f21e2037242e8948a29ad9ab637c14cf504f95cdee3699",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -1801,7 +1801,7 @@
     },
     {
       "path": "tests/selfhost-release-identity-contract.test.mjs",
-      "sha256": "10a7f15a150006e2d6edfb9b965cec5fe61b392bfa3ad012ae7ee5a22688f46b",
+      "sha256": "f0a285e07cfdf2be86a28aa023ee74fd150e49067934956155ee8b0c97a44af2",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -1846,7 +1846,7 @@
     },
     {
       "path": "tests/selfhost-requirement-unit-resolution-browser.test.mjs",
-      "sha256": "a3bcbc9a6e0beee5e21e19e2a3146f9b14eb0e067a53d9df9e3109b7ffb814fd",
+      "sha256": "f5eec7f7bce01568c49a740a3c74d12b14f67aa516563d494c82d957b0c0c488",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -1900,7 +1900,7 @@
     },
     {
       "path": "tests/selfhost-rfq-binding-fix19-browser.test.mjs",
-      "sha256": "3098a281588d8a58928b3279542020be0353c57a7c0317f35b5092669f766194",
+      "sha256": "ceeb29e33ceb3398a83d0f6021b5e2a34e016d9bcd69e0a0c547f26f412287af",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -1918,7 +1918,7 @@
     },
     {
       "path": "tests/selfhost-rfq-traceability-fix22-browser.test.mjs",
-      "sha256": "a863c4c6a33dd6f41e0d7b1aa4de6c2b86d98703e2bc6181b274c7f68df5065f",
+      "sha256": "9b4aac6d39fbd6641812c7dec1a0bd9c1fded5f64483e5c8949bc66bb391740f",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",
@@ -1935,8 +1935,26 @@
       "canonical_path": null
     },
     {
+      "path": "tests/selfhost-runtime-lock-privilege-migration.test.mjs",
+      "sha256": "ebc69f92d35a16606bde5d5a9bb686cb01c6584c62b046ac0d4f25714a43278d",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-runtime-lock-privilege-postgres.test.mjs",
+      "sha256": "cb534549a14244e75e8e102add1f6f3aab67a3000b7e2e28cb402b6de9892c8c",
+      "category": "POSTGRES",
+      "applicability": "REQUIRED",
+      "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
       "path": "tests/selfhost-runtime-readiness-migration.test.mjs",
-      "sha256": "bf8abd38c83838541e69a20964a1511ebe002c840b67962fc258bfb9fc8a1fea",
+      "sha256": "e28d7e9e0455ebc1b05a8880995fa37dbb24018f8fb115d645b834045fa55eb0",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1945,7 +1963,7 @@
     },
     {
       "path": "tests/selfhost-runtime-readiness-postgres.test.mjs",
-      "sha256": "a75927dca67ed964c66f40d09eee870e7944bfdb36dfeb839be11fa3dd66a0e3",
+      "sha256": "46f397ebdac92f6b22d6e8935efb8673125ce059cce62e14cc1c34857afc7403",
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",
@@ -1954,7 +1972,7 @@
     },
     {
       "path": "tests/selfhost-runtime-readiness-unit.test.mjs",
-      "sha256": "ee211b19a7ee0fad9a1cbb7a484a28d132de4fba6c81ea51de5ebacf4b8fbbb2",
+      "sha256": "10321d19f67060a2bff48efaf7dcf9add1a6b7bd307921495365ab5c1119d034",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -2044,7 +2062,7 @@
     },
     {
       "path": "tests/selfhost-session-safety-migration.test.mjs",
-      "sha256": "b2389a864c11a7cac520ade39d9cf42e8e93ab66064f802e3841af94562395bf",
+      "sha256": "f41396c8215945a1f0a737a254484936b2a3adc880c75da49ed81e3407064641",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -2071,7 +2089,7 @@
     },
     {
       "path": "tests/selfhost-supplier-mapping-browser.test.mjs",
-      "sha256": "b5607932440e80f5ceab82c7f8a5f9c951607aead01ac729af8b7752c978b9f2",
+      "sha256": "79fb82e09acfaa608ebd460d675475536ee24cb9dd62612e0dded1322203f3a1",
       "category": "BROWSER",
       "applicability": "REQUIRED",
       "harness": "BROWSER_E2E",

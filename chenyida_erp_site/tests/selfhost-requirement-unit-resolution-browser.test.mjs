@@ -56,7 +56,7 @@ async function assertIsolatedSchema() {
   const current = await pool.query("select current_database() database_name");
   assert.equal(current.rows[0].database_name, REQUIRED_DATABASE);
   const migrations = await pool.query("select count(*)::integer count,max(version) latest from schema_migrations");
-  assert.deepEqual(migrations.rows[0], { count: 45, latest: "0045_runtime_worker_readiness.sql" });
+  assert.deepEqual(migrations.rows[0], { count: 46, latest: "0046_runtime_lock_privilege_boundary.sql" });
   const relations = await pool.query("select to_regclass('public.project_requirement_unit_resolution_versions') versions,to_regclass('public.project_requirement_unit_resolution_heads') heads");
   assert.deepEqual(relations.rows[0], { versions: "project_requirement_unit_resolution_versions", heads: "project_requirement_unit_resolution_heads" });
 }

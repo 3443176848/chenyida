@@ -265,7 +265,7 @@ function bindingFixture() {
     backup_id: "backup-20260813-0001", manifest_sha256: one, local_receipt_sha256: two,
     recovery_point_at: now,
     source: { system_identifier: "7612345678901234567", database_oid: "16384", database_marker: "source-cluster-marker", postgresql_major: "17" },
-    application: { git_commit: "a".repeat(40), version: "0.1.0-alpha.46", migration_head: "0045_selfhost_release_gate.sql", migration_manifest_sha256: three },
+    application: { git_commit: "a".repeat(40), version: "0.1.0-alpha.47", migration_head: "0045_selfhost_release_gate.sql", migration_manifest_sha256: three },
   };
 }
 

@@ -149,17 +149,28 @@ test("explicit TLS public origin fixes proxy termination without weakening first
 
 test("explicit UAT loopback origin supports admin user creation and logout without widening CSRF", async () => {
   const previous = {
+    environment: process.env.ERP_ENV,
     publicOrigin: process.env.ERP_PUBLIC_ORIGIN,
     deploymentClass: process.env.ERP_DEPLOYMENT_CLASS,
     loopback: process.env.ERP_UAT_ALLOW_LOOPBACK_ORIGIN,
+    databaseUrl: process.env.DATABASE_URL,
+    setupToken: process.env.ERP_SETUP_TOKEN,
   };
   const requestOrigin = "http://127.0.0.1:3000";
   const browserOrigin = "http://127.0.0.1:43127";
   try {
+    const admin = await setupAdmin();
+    process.env.ERP_ENV = "production";
     process.env.ERP_PUBLIC_ORIGIN = "https://erp.example.test:18888";
     process.env.ERP_DEPLOYMENT_CLASS = "uat";
     process.env.ERP_UAT_ALLOW_LOOPBACK_ORIGIN = "true";
-    const admin = await setupAdmin();
+    delete process.env.DATABASE_URL;
+    delete process.env.ERP_SETUP_TOKEN;
+    const disabledSetup = await api("/api/setup", {
+      method: "POST", requestOrigin,
+      body: { setup_token: "not-consumed", username: "forbidden", display_name: "禁止初始化", password: passwords.admin },
+    });
+    assert.equal(disabledSetup.response.status, 403); assert.equal(disabledSetup.payload.code, "SETUP_DISABLED");
     const body = { username: "uatloop01", display_name: "UAT 经营负责人", role: "manager", temporary_password: "Quartz!5729Lake" };
 
     const unknownOrigin = await api("/api/users", {
@@ -222,9 +233,12 @@ test("explicit UAT loopback origin supports admin user creation and logout witho
     assert.ok(audit.rows.some((row) => row.action === "LOGOUT" && row.result === "success" && row.target_username === "rootadmin"));
   } finally {
     for (const [key, value] of [
+      ["ERP_ENV", previous.environment],
       ["ERP_PUBLIC_ORIGIN", previous.publicOrigin],
       ["ERP_DEPLOYMENT_CLASS", previous.deploymentClass],
       ["ERP_UAT_ALLOW_LOOPBACK_ORIGIN", previous.loopback],
+      ["DATABASE_URL", previous.databaseUrl],
+      ["ERP_SETUP_TOKEN", previous.setupToken],
     ]) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;

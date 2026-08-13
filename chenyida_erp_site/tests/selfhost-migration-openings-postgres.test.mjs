@@ -40,6 +40,27 @@ async function materialize() {
   return { result, source, plan, manifest, targetMigrations };
 }
 
+async function installCurrentFinanceLockAdapterOnFrozenBaseline() {
+  // The migration tool intentionally targets the immutable 0001-0017 baseline,
+  // while the current FinanceService delegates this lock to the 0046 boundary.
+  // Keep this compatibility object test-only; 0046 itself is exercised against
+  // the current migration head by the runtime privilege and finance suites.
+  await pool.query(`
+    create or replace function public.cyd_web_lock_finance_settlement_reversal(target_settlement_id bigint,target_document_id bigint)
+    returns table(id bigint,original_settlement_id bigint,settlement_type text,amount numeric(24,6),account_name text)
+    language sql
+    security definer
+    set search_path to 'pg_catalog','public','pg_temp'
+    as $function$
+      select settlement.id,settlement.original_settlement_id,settlement.settlement_type,settlement.amount,settlement.account_name
+      from public.finance_settlements as settlement
+      where settlement.id=target_settlement_id and settlement.document_id=target_document_id
+      for update of settlement
+    $function$
+  `);
+  await pool.query("revoke all on function public.cyd_web_lock_finance_settlement_reversal(bigint,bigint) from public");
+}
+
 async function reconcileHistoricalInventory() {
   return pool.query(`select b.id balance_id,b.material_id,b.on_hand_qty::text,b.frozen_qty::text,
     coalesce(sum(l.on_hand_delta),0)::text ledger_on_hand_qty,coalesce(sum(l.frozen_delta),0)::text ledger_frozen_qty,
@@ -90,6 +111,7 @@ test("formal inventory and finance openings reconcile, settle, reverse, and fail
   await assert.rejects(pool.query("insert into migration_opening_sources(id,migration_run_id,manifest_sha256,source_system,source_entity_kind,source_stable_reference_digest,source_record_digest,mapping_digest,target_digest,opening_type,cutoff_at,created_by,request_id,operation_id) values($1,$2,$3,'X','X',$3,$3,$3,$3,'AR',now(),'migration_opening_actor',$4,$5)", [randomUUID(), randomUUID(), "a".repeat(64), randomUUID(), randomUUID()]), /MigrationOpeningService/);
   await assert.rejects(pool.query("update finance_opening_sources set status='POSTED'"), /MigrationOpeningService|immutable/);
 
+  await installCurrentFinanceLockAdapterOnFrozenBaseline();
   await pool.query("insert into app_users(username,display_name,role,password_hash) values('finance01','Synthetic finance','finance','test-only'),('warehouse01','Synthetic warehouse','warehouse','test-only')");
   const finance = new FinanceService(new FinanceRepository(pool)); const ar = (await pool.query("select * from finance_documents where doc_type='OPENING_AR'")).rows[0];
   const ap = (await pool.query("select * from finance_documents where doc_type='OPENING_AP'")).rows[0]; const openingService = new MigrationOpeningService(pool, { environment: { ERP_ENV: "test" } });

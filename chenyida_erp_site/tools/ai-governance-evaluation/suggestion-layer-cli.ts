@@ -106,7 +106,7 @@ async function jsonFile(file: string, errorCode: string): Promise<Readonly<{ val
 async function packageVersion(): Promise<string> {
   const metadata = await jsonFile(path.join(PROJECT_ROOT, "package.json"), "PACKAGE_METADATA_INVALID");
   const version = metadata.value.version;
-  if (version !== "0.1.0-alpha.46") throw new Error("PACKAGE_VERSION_INVALID");
+  if (version !== "0.1.0-alpha.47") throw new Error("PACKAGE_VERSION_INVALID");
   return version;
 }
 

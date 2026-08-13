@@ -7,7 +7,7 @@ const migration = await readFile(new URL("drizzle-postgres/0041_ai_governance_su
 const schema = await readFile(new URL("db/schema.ts", siteRoot), "utf8");
 const snapshot = JSON.parse(await readFile(new URL("drizzle-postgres/meta/0041_snapshot.json", siteRoot), "utf8"));
 const previousSnapshot = JSON.parse(await readFile(new URL("drizzle-postgres/meta/0040_snapshot.json", siteRoot), "utf8"));
-const currentSnapshot = JSON.parse(await readFile(new URL("drizzle-postgres/meta/0045_snapshot.json", siteRoot), "utf8"));
+const currentSnapshot = JSON.parse(await readFile(new URL("drizzle-postgres/meta/0046_snapshot.json", siteRoot), "utf8"));
 const journal = JSON.parse(await readFile(new URL("drizzle-postgres/meta/_journal.json", siteRoot), "utf8"));
 
 const tables = [
@@ -46,12 +46,12 @@ function schemaColumns(tableName) {
   return [...schemaTableBlock(tableName).matchAll(factories)].map((match) => match[1]);
 }
 
-test("0041 remains an immutable journal link while 0045 is the current head", () => {
+test("0041 remains an immutable journal link while 0046 is the current head", () => {
   const entry = journal.entries.find((candidate) => candidate.idx === 41);
   const head = journal.entries.at(-1);
   assert.equal(entry?.tag, "0041_ai_governance_suggestion_evidence");
-  assert.equal(head?.idx, 45);
-  assert.equal(head?.tag, "0045_runtime_worker_readiness");
+  assert.equal(head?.idx, 46);
+  assert.equal(head?.tag, "0046_runtime_lock_privilege_boundary");
   assert.equal(snapshot.prevId, previousSnapshot.id);
   assert.match(snapshot.id, /^[0-9a-f-]{36}$/);
   assert.match(currentSnapshot.id, /^[0-9a-f-]{36}$/);

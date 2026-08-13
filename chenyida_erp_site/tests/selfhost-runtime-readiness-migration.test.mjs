@@ -10,30 +10,31 @@ const metadataDirectory = new URL("../drizzle-postgres/meta/", import.meta.url);
 const schemaFile = new URL("../db/schema.ts", import.meta.url);
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
-test("0045 is the sole append-only migration and freezes 0001 through 0044", async () => {
+test("0045 remains immutable after append-only 0046 and freezes 0001 through 0044", async () => {
   const names = (await readdir(migrationDirectory)).filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/.test(name)).sort();
-  assert.equal(names.length, 45);
-  assert.equal(names.at(-1), "0045_runtime_worker_readiness.sql");
+  assert.equal(names.length, 46);
+  assert.equal(names.at(-1), "0046_runtime_lock_privilege_boundary.sql");
   const prefix = await Promise.all(names.slice(0, 44).map(async (filename, index) => ({
     ordinal: index + 1,
     filename,
     sha256: sha256(await readFile(new URL(filename, migrationDirectory))),
   })));
   assert.equal(migrationAllowlistSha256(prefix), "16d9b3169e58dc010b6061d3f1299b9f1a3582ae2430cf119d931204efdd34d8");
-  assert.equal(sha256(await readFile(new URL(names.at(-1), migrationDirectory))), "cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc");
+  assert.equal(sha256(await readFile(new URL("0045_runtime_worker_readiness.sql", migrationDirectory))), "cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc");
 });
 
 test("0045 journal and snapshot add only the Worker runtime lease table", async () => {
   const journal = JSON.parse(await readFile(new URL("_journal.json", metadataDirectory), "utf8"));
-  assert.equal(journal.entries.length, 45);
-  assert.deepEqual(journal.entries.at(-1), {
+  assert.equal(journal.entries.length, 46);
+  const entry = journal.entries.find((item) => item.idx === 45);
+  assert.deepEqual(entry, {
     idx: 45,
     version: "7",
-    when: journal.entries.at(-1).when,
+    when: entry.when,
     tag: "0045_runtime_worker_readiness",
     breakpoints: true,
   });
-  assert.ok(Number.isSafeInteger(journal.entries.at(-1).when));
+  assert.ok(Number.isSafeInteger(entry.when));
 
   const previous = JSON.parse(await readFile(new URL("0044_snapshot.json", metadataDirectory), "utf8"));
   const current = JSON.parse(await readFile(new URL("0045_snapshot.json", metadataDirectory), "utf8"));

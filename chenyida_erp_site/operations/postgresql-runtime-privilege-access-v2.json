@@ -13,39 +13,15 @@
     {
       "code": "POSTGRESQL17_COMPILED_CATALOG_REQUIRED",
       "objects": []
-    },
-    {
-      "code": "WEB_LOCK_TARGET_PRIVILEGE_BOUNDARY_UNRESOLVED",
-      "objects": [
-        "finance_opening_sources",
-        "finance_settlements",
-        "inventory_ledger_entries",
-        "production_bom_snapshots",
-        "production_completion_batches",
-        "production_completion_lines",
-        "production_completions",
-        "production_operation_run_reports",
-        "production_reports",
-        "production_scrap_dispositions",
-        "production_work_order_routing_snapshot_operations",
-        "production_work_order_routing_snapshots",
-        "purchase_financial_source_entries",
-        "purchase_receipt_delivery_allocations",
-        "sales_delivery_execution_lines",
-        "sales_financial_source_entries",
-        "sales_shipment_line_fqc_allocations",
-        "sales_shipment_lines",
-        "sales_shipments"
-      ]
     }
   ],
   "source": {
-    "migration_head": "0045_runtime_worker_readiness.sql",
-    "migration_set_sha256": "3f862c23fc8544f0647fdf03fa6fd25dc5c6d20031be10cd6f25d991f25de875",
-    "migration_count": 45,
+    "migration_head": "0046_runtime_lock_privilege_boundary.sql",
+    "migration_set_sha256": "c3392d8d8e8a0e63acead47c7a4b48b305c7eba456fa7511851494312d255a8f",
+    "migration_count": 46,
     "drizzle_snapshot": {
-      "path": "drizzle-postgres/meta/0045_snapshot.json",
-      "sha256": "48288692a6db2f5323ab77ef40d73268285815798561a959abc3ea4266d4b729"
+      "path": "drizzle-postgres/meta/0046_snapshot.json",
+      "sha256": "c8fe259a7838475bc41ffaf0e843ba9ca69a8ca0c5688d42275a81ea8b21f60d"
     }
   },
   "catalog": {
@@ -1689,6 +1665,22 @@
       "public.cyd_validate_shipment_line_lot(bigint)",
       "public.cyd_validate_supplier_receipt_lot(bigint)",
       "public.cyd_warehouse_receipt_evidence_guard()",
+      "public.cyd_web_lock_final_output_sources(bigint[])",
+      "public.cyd_web_lock_finance_ar_source(bigint)",
+      "public.cyd_web_lock_finance_settlement_reversal(bigint,bigint)",
+      "public.cyd_web_lock_ncr_source(bigint)",
+      "public.cyd_web_lock_operation_upstream_sources(bigint,bigint)",
+      "public.cyd_web_lock_production_completion(bigint)",
+      "public.cyd_web_lock_production_completion_lines(bigint)",
+      "public.cyd_web_lock_production_reports(bigint[])",
+      "public.cyd_web_lock_quality_completion_allocation_source(bigint)",
+      "public.cyd_web_lock_quality_completion_capacity(bigint)",
+      "public.cyd_web_lock_quality_fqc_source(bigint)",
+      "public.cyd_web_lock_quality_legacy_report_source(bigint)",
+      "public.cyd_web_lock_quality_operation_source(bigint)",
+      "public.cyd_web_lock_report_operation_sources(bigint)",
+      "public.cyd_web_lock_sales_fqc_reversal_sources(bigint[])",
+      "public.cyd_web_lock_sales_shipment_reversal(bigint)",
       "public.cyd_work_order_routing_snapshot_guard()",
       "public.inventory_posted_record_immutable()",
       "public.inventory_require_service_write()",
@@ -2510,7 +2502,7 @@
     },
     "WEB": {
       "derivation": "SOURCE_GRAPH_CANDIDATE_REVIEWED",
-      "source_evidence_sha256": "e9d4a3759069560320225c2c80f959bf92059a6310368cee11ab7246858332ba",
+      "source_evidence_sha256": "8b4cb65f8ad2aa6368d5c101934b6604eae765182572417810200de9404a50b3",
       "source_files": [
         "app/lib/ai-governance-suggestion-selfhost/adapter.ts",
         "app/lib/ai-governance-suggestion-selfhost/canonical.ts",
@@ -3212,27 +3204,7 @@
           "inventory_migration_openings",
           "production_operation_run_events"
         ],
-        "LOCK_TARGETS_REQUIRING_UPDATE": [
-          "finance_opening_sources",
-          "finance_settlements",
-          "inventory_ledger_entries",
-          "production_bom_snapshots",
-          "production_completion_batches",
-          "production_completion_lines",
-          "production_completions",
-          "production_operation_run_reports",
-          "production_reports",
-          "production_scrap_dispositions",
-          "production_work_order_routing_snapshot_operations",
-          "production_work_order_routing_snapshots",
-          "purchase_financial_source_entries",
-          "purchase_receipt_delivery_allocations",
-          "sales_delivery_execution_lines",
-          "sales_financial_source_entries",
-          "sales_shipment_line_fqc_allocations",
-          "sales_shipment_lines",
-          "sales_shipments"
-        ]
+        "LOCK_TARGETS_REQUIRING_UPDATE": []
       },
       "column_privileges": {},
       "table_privileges": {
@@ -3957,7 +3929,23 @@
           "public.cyd_validate_production_operation_projection(bigint)",
           "public.cyd_validate_purchase_receipt_posting(bigint)",
           "public.cyd_validate_shipment_line_lot(bigint)",
-          "public.cyd_validate_supplier_receipt_lot(bigint)"
+          "public.cyd_validate_supplier_receipt_lot(bigint)",
+          "public.cyd_web_lock_final_output_sources(bigint[])",
+          "public.cyd_web_lock_finance_ar_source(bigint)",
+          "public.cyd_web_lock_finance_settlement_reversal(bigint,bigint)",
+          "public.cyd_web_lock_ncr_source(bigint)",
+          "public.cyd_web_lock_operation_upstream_sources(bigint,bigint)",
+          "public.cyd_web_lock_production_completion(bigint)",
+          "public.cyd_web_lock_production_completion_lines(bigint)",
+          "public.cyd_web_lock_production_reports(bigint[])",
+          "public.cyd_web_lock_quality_completion_allocation_source(bigint)",
+          "public.cyd_web_lock_quality_completion_capacity(bigint)",
+          "public.cyd_web_lock_quality_fqc_source(bigint)",
+          "public.cyd_web_lock_quality_legacy_report_source(bigint)",
+          "public.cyd_web_lock_quality_operation_source(bigint)",
+          "public.cyd_web_lock_report_operation_sources(bigint)",
+          "public.cyd_web_lock_sales_fqc_reversal_sources(bigint[])",
+          "public.cyd_web_lock_sales_shipment_reversal(bigint)"
         ],
         "EXTENSION": [
           "public.digest(bytea,text)"
@@ -4278,5 +4266,5 @@
       }
     }
   },
-  "access_sha256": "52d8274ff2ce794c03d516b04aa8ef842c2d03b4637ac45dbf58225afe8955e3"
+  "access_sha256": "bdd05ba0870cf2143f26b7c9a33ec9d597319447d5898af2f11400990287f6ab"
 }

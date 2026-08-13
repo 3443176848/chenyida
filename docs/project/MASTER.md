@@ -38,7 +38,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 项目 | 当前值 |
 | --- | --- |
 | 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成；持续交付总目标启动时数据迁移、应用测试、运维安全三条智能体线完成只读审计，TASK52、TASK54和TASK55又分别完成授权依赖、异机备份及集群恢复边界复核，主智能体始终保持唯一写者并形成D-129、D-131和D-132。OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT AUTHORIZED` |
-| 当前版本 | 自托管源码为`0.1.0-alpha.46`，源码Migration为45/head `0045_runtime_worker_readiness.sql`。TASK55冻结源码`b93d838067f3a463f80de04811a11a1dbb5e1848`/tree`269165d4fe054915fe3de77be0eee49ad38b8049`与manifest-only直接子提交`2136aa3c4178135a834b5a6e003e64948f78b5d3`/tree`c5b78dabe9ec2bea60c84b7109b5a4c11b35bfea`形成49文件Supervisor bundle，加入PostgreSQL cluster security/tablespace、加密capsule/joint transfer v2、readiness v4和崩溃安全executor。TASK54 bundle、TASK51本机候选/诊断及全部更早候选均为`STALE / NOT AUTHORIZABLE`；当前没有与TASK55源码一致的Web/Worker候选、外部镜像锚点、正式Supervisor evidence、19步PASS或部署。并行非生产UAT Web仍为`0.1.0-alpha.42`原镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，source revision仍为`569aa954d764309e239d1f6c174e582596d33a24`，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`；0041—0045未应用到UAT。当前运行面仍是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
+| 当前版本 | 自托管源码为`0.1.0-alpha.47`，源码Migration为46/head `0046_runtime_lock_privilege_boundary.sql`。TASK56已闭合Web行锁权限边界，但完整角色/ACL合同仍有Backup large-object与PG17 catalog两个blocker；尚未建立本次源码的内容寻址bundle或候选镜像。TASK55冻结源码`b93d838067f3a463f80de04811a11a1dbb5e1848`及其49文件Supervisor bundle、TASK54 bundle、TASK51本机候选/诊断及全部更早候选均为`STALE / NOT AUTHORIZABLE`。并行非生产UAT Web仍为`0.1.0-alpha.42`原镜像`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`，source revision仍为`569aa954d764309e239d1f6c174e582596d33a24`，UAT PostgreSQL仍为40/head `0040_warehouse_receipt_readiness.sql`；0041—0046未应用到UAT。当前运行面仍是受控非生产UAT，不是生产发布、真实公司数据迁移或切流 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
 | 当前根仓库运维基线 | `SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`已在不停止或重建服务的前提下清理10.92 GB BuildKit cache和四个精确核准的无引用测试/旧任务镜像，根盘可用17→30.34 GiB（`df -h`为31G）；Build Cache为0B，四服务restart0/OOM false，当前/alpha.41回滚/FIX38被拒证据镜像、private GHCR本地锚点、Trae/MySQL、备份和四卷保持。运行面继续沿用`SELFHOST-UAT-FIX-38`的alpha.42/0040非生产UAT基线，未执行build、Migration、部署或业务写 |
@@ -359,7 +359,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- `SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`已从TASK55收口提交`fb1f7e8`/tree`13fe6ce3`启动为唯一`DOING`。只读UAT catalog确认仅1个非内置LOGIN且为superuser、拥有数据库和全部433个public relation，Web/Worker活动连接也使用同一角色；Compose仍以环境变量交付数据库、初始化、Setup与Admin秘密且没有custom tablespace持久mount。任务只在仓库和合成隔离环境闭合未来角色、secret-file、operator与mount合同，不修改当前UAT/生产。
+- `SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`是唯一`DOING`。源码已推进到alpha.47/0046：16个owner控制窄函数覆盖Web原有19个锁目标，Web保持零table/column UPDATE，20个locking trigger固定owner安全执行路径；PG17完整回归84文件/401项及专项5/5通过。access intent仍因Backup large-object capture边界与PG17编译catalog两个blocker保持`BLOCKED`，下一步先处理Backup拆分。只读UAT仍是共享superuser、alpha.42/0040与环境变量秘密，任务未修改当前UAT/生产。
 - `SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`已按D-132完成并释放active slot：冻结源码`b93d838`/tree`269165d4`与manifest-only直接子提交`2136aa3`/tree`c5b78dab`形成49文件bundle，manifest SHA-256`699cdd2a…7dd6`。cluster catalog/security/tablespace、秘密分离、加密传输、V4 readiness、Dashboard/monitor与崩溃安全executor均通过合成双PostgreSQL cluster及完整适用回归；没有真实恢复或部署。
 - `SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`已按D-131完成并释放active slot：源码`fd0a9cff`与manifest-only直接子提交`315b1f3d`形成47文件bundle；签名密文来源、双向ACK、恢复强绑定、调度/保留和V3 readiness通过合成密文双集群恢复及适用回归。真实异机、密钥托管、timer/WORM、真实数据与RPO/RTO均未执行。
 - `SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已按D-120完成并释放active slot：精确38配置、ES2022合同和只读干净快照执行器已在两个提交快照38/38通过；一次错误纳入`.wrangler/work`的直接lint发生V8 heap OOM，正式干净快照lint随后0 error通过，宿主/容器OOM与restart均为0。
@@ -371,7 +371,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - 真实异机备份与恢复、UAT build/Migration/deploy、旧数据读取、员工试用、账号/权限、网络/systemd和正式切换仍须专项明确授权；持续交付授权不改变这些边界。
 
 - 项目负责人已接受D-113与D-114；`AGENT-R1`只读控制器、`PM-002`执行设计和`AGENT-R1-5`合成docs/test协议MVP均已完成。该治理任务链收口时回到`IDLE`，未自动启动R2或恢复TASK03；当前正式active slot仅为TASK56。
-- `PHASE4-TASK03`的D-112五表及确定性候选Service/API仍是0041引入的源码就绪模块；仓库总head现为alpha.46/0045。TASK03状态保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。外部AI禁用，正式holdout未重跑，源码未build/deploy，UAT仍alpha.42/0040，`PHASE4-TASK04`—`TASK05`保持`TODO`且不得自动开始。
+- `PHASE4-TASK03`的D-112五表及确定性候选Service/API仍是0041引入的源码就绪模块；仓库总head现为alpha.47/0046。TASK03状态保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。外部AI禁用，正式holdout未重跑，源码未build/deploy，UAT仍alpha.42/0040，`PHASE4-TASK04`—`TASK05`保持`TODO`且不得自动开始。
 - `SELFHOST-UAT-FIX-37`已完成：功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`及语义修正`20a9123741862d81ac18af9e6bdee896674fe95c`；alpha.41/0040关系化收货证据、最小权限谱系、权威GET预览、最终POST事务门禁、提前到货保护和按inspection mode分流已Web-only部署为`sha256:0cf98937…5f19`。正式备份/第二库恢复/0039→0040及warehouse-only桌面/390×844取消UAT通过；business POST0、Session0，PO/Line/Plan/queue `1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。这是FIX38前置历史；真实收货及后续部门动作均须另获授权。
 - `SELFHOST-UAT-FIX-36`已完成：功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`；通用受限读模型、数据域403、PO聚合及完整上游谱系、四Line、四Plan/queue、Event/Audit/Idempotency最小投影和响应式只读详情已Web-only部署为`sha256:664e0ac6…a4ec89`。正式备份恢复、purchase-only桌面/390×844刷新重开和Session失效通过；business POST0，PO/Line/Plan/queue `1/4/4/4`及下游全0。这是FIX37的前置历史，不是当前执行指令。
 - `SELFHOST-UAT-DECISION-35`已完成：D-105将未经事前授权的`PO-00000001`置于受控保留状态；它是控制事件，只提供前向授权并明确“不追溯性授权”。PO/Line/Plan/queue `1/4/4/4`及Event/Audit/Idempotency证据不得改动，Award→PO不再重试；FIX36只读验收不改变该判断或授权边界。
@@ -416,7 +416,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - `SELFHOST-LANDING-TASK02` 经用户澄清“不依赖逐行人工分类”后连续执行：离线确定性规则按来源编码/MPN/严格规格组合、类别、位号和可数件单位完成 532 Material、6 Product、6 个 DRAFT BOM 与 316 行主库导入；438 条真正歧义来源隔离。migration_tool 来源链接承载逐行 provenance，0034 不变，同批次重放新增 0，结论 `PARTIAL REAL BOM IMPORT COMPLETED — REVIEW REQUIRED`。
 - 后续必须为 197 行提供显式单位；若需要 BOM，还必须另提供产品编码/版本、BOM 版本、行数量、位号和单位契约。完成前不得执行已生成的拟删除计划。本轮停止；LANDING-TASK01 的 offhost copy 仍是独立未完成用户动作。
 
-- 当前源码为`0.1.0-alpha.46`/head 0045且未build/deploy；并行非生产UAT Web仍为原`0.1.0-alpha.42`镜像，UAT PostgreSQL保持`0001`—`0040`。生产版本仍不存在，不得把源码候选、隔离测试或并行UAT写成D-111正式重验、生产发布或真实数据迁移。
+- 当前源码为`0.1.0-alpha.47`/head 0046且未build/deploy；并行非生产UAT Web仍为原`0.1.0-alpha.42`镜像，UAT PostgreSQL保持`0001`—`0040`。生产版本仍不存在，不得把源码候选、隔离测试或并行UAT写成D-111正式重验、生产发布或真实数据迁移。
 - LANDING-TASK04 部署前后只读核对均为 Audit 876 条、Session 2 条（ACTIVE 1 条）；不可变审计和合法会话不得为追求“零记录”而删除。
 - TASK09 已以保存的非敏感基线摘要执行 delta 验收，并在清理后返回完全相同的合法 Audit/Session 记录集与计数；未来任务仍须遵守相同规则。
 - 2026-07-27 服务器重启/不可用的根因保持 `UNKNOWN`，不得无证据归因 OOM；资源保护不等于生产上线。

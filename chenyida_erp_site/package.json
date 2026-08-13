@@ -1,6 +1,6 @@
 {
   "name": "chenyida-erp-selfhosted",
-  "version": "0.1.0-alpha.46",
+  "version": "0.1.0-alpha.47",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -62,6 +62,7 @@
     "test:runtime-readiness": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-runtime-readiness-unit.test.mjs tests/selfhost-health-contract.test.mjs tests/selfhost-runtime-readiness-migration.test.mjs tests/selfhost-worker-resilience.test.mjs tests/selfhost-dockerfile-version-contract.test.mjs tests/selfhost-release-identity-contract.test.mjs",
     "test:ops-monitoring": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-ops-monitoring.test.mjs tests/selfhost-dashboard-unit.test.mjs tests/selfhost-release-gate-contract.test.mjs",
     "test:runtime-readiness:postgres": "scripts/run-runtime-readiness-postgres-test.sh",
+    "test:runtime-lock-privilege:postgres": "scripts/run-runtime-lock-privilege-postgres-test.sh",
     "typecheck:runtime-readiness": "tsc -p tsconfig.task45.json --pretty false",
     "test:identity:compose": "node scripts/selfhost-identity-compose-smoke.mjs",
     "test:identity-recovery-targeted:unit": "node --experimental-strip-types --test tests/selfhost-targeted-offline-identity-recovery-unit.test.mjs",

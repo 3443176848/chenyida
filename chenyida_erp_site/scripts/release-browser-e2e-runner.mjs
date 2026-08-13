@@ -14,7 +14,7 @@ const ADMIN_DATABASE_URL = "postgresql://postgres@127.0.0.1:5432/postgres";
 const SERVER_ENTRY = "/workspace/dist/standalone/server.js";
 const EXPECTED_BROWSER_FILES = 6;
 const EXPECTED_BROWSER_TESTS = 11;
-const EXPECTED_MIGRATION_HEAD = "0045_runtime_worker_readiness.sql";
+const EXPECTED_MIGRATION_HEAD = "0046_runtime_lock_privilege_boundary.sql";
 const DATABASE_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
 const CONFIGURATIONS = Object.freeze([
   {
@@ -337,7 +337,7 @@ async function main() {
   const selected = inventory.tests.filter((entry) => entry.applicability === "REQUIRED" && entry.harness === "BROWSER_E2E");
   if (selected.length !== EXPECTED_BROWSER_FILES || selected.some((entry, index) => entry.path !== CONFIGURATIONS[index]?.path || entry.category !== "BROWSER")) reject("BROWSER_E2E_TEST_SET_INVALID");
   const migrations = await buildMigrationAllowlist(path.join(CANDIDATE_ROOT, "drizzle-postgres"));
-  if (migrations.length !== 45 || migrations.at(-1)?.filename !== EXPECTED_MIGRATION_HEAD) reject("BROWSER_E2E_MIGRATION_SET_INVALID");
+  if (migrations.length !== 46 || migrations.at(-1)?.filename !== EXPECTED_MIGRATION_HEAD) reject("BROWSER_E2E_MIGRATION_SET_INVALID");
   for (const configuration of CONFIGURATIONS) {
     if (migrations[configuration.head - 1]?.filename !== configuration.migration) reject("BROWSER_E2E_MIGRATION_HEAD_INVALID");
   }

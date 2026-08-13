@@ -21,7 +21,7 @@ import {
 } from "../app/lib/runtime-readiness/worker-lease.ts";
 import { buildMigrationAllowlist, migrationAllowlistDigest } from "../scripts/release-manifest-contract.mjs";
 
-const applicationVersion = "0.1.0-alpha.46";
+const applicationVersion = "0.1.0-alpha.47";
 const gitCommit = "a".repeat(40);
 const requestIdentity = Object.freeze({
   deploymentClass: "test",
@@ -68,7 +68,7 @@ test("runtime Migration digest stays byte-for-byte compatible with the release a
   assert.deepEqual(runtime.entries, release);
   assert.equal(runtime.allowlistSha256, migrationAllowlistDigest(release));
   assert.equal(runtime.allowlistSha256, migrationAllowlistSha256(runtime.entries));
-  assert.equal(runtime.head, "0045_runtime_worker_readiness.sql");
+  assert.equal(runtime.head, "0046_runtime_lock_privilege_boundary.sql");
 });
 
 test("database Migration rows must exactly match count, order, filename and checksum", () => {

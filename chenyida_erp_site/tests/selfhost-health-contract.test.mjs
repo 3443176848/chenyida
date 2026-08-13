@@ -9,9 +9,9 @@ const database = { async query() { throw new Error("not used"); } };
 const ready = Object.freeze({
   deploymentClass: "uat",
   deploymentId: "chenyida-erp-uat",
-  version: "0.1.0-alpha.46",
+  version: "0.1.0-alpha.47",
   revision: "a".repeat(12),
-  migrationHead: "0045_runtime_worker_readiness.sql",
+  migrationHead: "0046_runtime_lock_privilege_boundary.sql",
   migrationManifestSha256: "b".repeat(64),
   databaseTime: new Date("2026-08-12T12:34:56.000Z"),
   leaseExpiresAt: new Date("2026-08-12T12:35:56.000Z"),
@@ -34,9 +34,9 @@ test("readiness reports bounded database, Migration, Worker, storage and runtime
     worker: "postgresql-jobs",
     deployment_class: "UAT",
     deployment_id: "chenyida-erp-uat",
-    version: "0.1.0-alpha.46",
+    version: "0.1.0-alpha.47",
     revision: "a".repeat(12),
-    migration_head: "0045_runtime_worker_readiness.sql",
+    migration_head: "0046_runtime_lock_privilege_boundary.sql",
     migration_manifest_sha256: "b".repeat(64),
     components: ready.components,
     time: "2026-08-12T12:34:56.000Z",
@@ -128,7 +128,7 @@ test("liveness validates only process version metadata and is independent of Pos
   assert.equal(poolCalls, 0);
   const payload = await response.json();
   assert.deepEqual({ ok: payload.ok, status: payload.status, version: payload.version }, {
-    ok: true, status: "LIVE", version: "0.1.0-alpha.46",
+    ok: true, status: "LIVE", version: "0.1.0-alpha.47",
   });
 });
 

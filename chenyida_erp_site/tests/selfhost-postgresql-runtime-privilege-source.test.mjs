@@ -16,7 +16,7 @@ const siteRoot = path.resolve(import.meta.dirname, "..");
 const expectedServiceCounts = Object.freeze({
   ADMIN: Object.freeze({ files: 2, table: [0, 6, 4, 1], sequence: [0, 4, 0], routine: [0, 0] }),
   BACKUP: Object.freeze({ files: 3, table: [0, 0, 234, 0], sequence: [211, 0, 0], routine: [0, 1] }),
-  WEB: Object.freeze({ files: 173, table: [18, 201, 211, 82], sequence: [0, 182, 0], routine: [11, 1] }),
+  WEB: Object.freeze({ files: 173, table: [18, 201, 211, 82], sequence: [0, 182, 0], routine: [27, 1] }),
   WORKER: Object.freeze({ files: 54, table: [7, 25, 33, 16], sequence: [0, 23, 0], routine: [0, 0] }),
 });
 
@@ -49,13 +49,12 @@ test("runtime privilege source intent is exact, stale-detecting and explicitly n
   assert.deepEqual(document.blocking_reasons.map((item) => [item.code, item.objects.length]), [
     ["BACKUP_LARGE_OBJECT_CAPTURE_BOUNDARY_UNRESOLVED", 1],
     ["POSTGRESQL17_COMPILED_CATALOG_REQUIRED", 0],
-    ["WEB_LOCK_TARGET_PRIVILEGE_BOUNDARY_UNRESOLVED", 19],
   ]);
-  assert.equal(document.source.migration_count, 45);
-  assert.equal(document.source.migration_head, "0045_runtime_worker_readiness.sql");
+  assert.equal(document.source.migration_count, 46);
+  assert.equal(document.source.migration_head, "0046_runtime_lock_privilege_boundary.sql");
   assert.deepEqual(
     [document.catalog.tables.length, document.catalog.sequences.length, document.catalog.application_routines.length],
-    [234, 211, 154],
+    [234, 211, 170],
   );
   assert.deepEqual(document.catalog.required_extensions, ["btree_gist", "pgcrypto"]);
   assert.deepEqual(document.catalog.large_objects, []);
@@ -72,10 +71,7 @@ test("runtime privilege source intent is exact, stale-detecting and explicitly n
     document.services.WEB.table_privileges.UPDATE,
     document.services.WEB.source_candidate_table_privileges.UPDATE,
   );
-  assert.deepEqual(
-    document.services.WEB.reviewed_dependency_operations.LOCK_TARGETS_REQUIRING_UPDATE,
-    document.blocking_reasons[2].objects,
-  );
+  assert.deepEqual(document.services.WEB.reviewed_dependency_operations.LOCK_TARGETS_REQUIRING_UPDATE, []);
   assert.equal(document.services.WEB.routine_execute.APPLICATION.every((routine) => document.catalog.application_routines.includes(routine)), true);
   assert.deepEqual(document.services.WEB.routine_execute.EXTENSION, ["public.digest(bytea,text)"]);
   assert.deepEqual(document.services.BACKUP.routine_execute.EXTENSION, ["public.digest(bytea,text)"]);
@@ -113,10 +109,9 @@ test("runtime privilege source intent rejects authorization, provenance, routine
     {
       code: "RUNTIME_PRIVILEGE_WEB_LOCK_SCOPE_UNRESOLVED",
       mutate(value) {
-        const unresolved = value.services.WEB.reviewed_dependency_operations.LOCK_TARGETS_REQUIRING_UPDATE
-          .find((table) => !value.services.WEB.source_candidate_table_privileges.UPDATE.includes(table));
-        assert.ok(unresolved);
-        value.services.WEB.table_privileges.UPDATE.push(unresolved);
+        const unauthorized = "finance_opening_sources";
+        assert.ok(!value.services.WEB.source_candidate_table_privileges.UPDATE.includes(unauthorized));
+        value.services.WEB.table_privileges.UPDATE.push(unauthorized);
         value.services.WEB.table_privileges.UPDATE.sort();
       },
     },

@@ -36,10 +36,10 @@ const frozenPrefixChecksums = [
   "0fdb3d4b92d999a5dede5a36a08bd99ea054879ebb6857341e08f0f0e07852d9",
 ];
 
-test("0044 remains immutable after append-only 0045 and freezes every published predecessor", async () => {
+test("0044 remains immutable after append-only 0045 and 0046 and freezes every published predecessor", async () => {
   const names = (await readdir(migrationDirectory)).filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/.test(name)).sort();
-  assert.equal(names.length, 45);
-  assert.equal(names.at(-1), "0045_runtime_worker_readiness.sql");
+  assert.equal(names.length, 46);
+  assert.equal(names.at(-1), "0046_runtime_lock_privilege_boundary.sql");
   await assert.rejects(access(new URL("0046_identity_session_absolute_lifetime.sql", migrationDirectory)));
   const actual = await Promise.all(names.slice(0, 43).map(async (name) => sha256(await readFile(new URL(name, migrationDirectory)))));
   assert.deepEqual(actual, frozenPrefixChecksums);
@@ -48,7 +48,7 @@ test("0044 remains immutable after append-only 0045 and freezes every published 
 
 test("0044 journal and snapshot change only app_sessions", async () => {
   const journal = JSON.parse(await readFile(new URL("_journal.json", metadataDirectory), "utf8"));
-  assert.equal(journal.entries.length, 45);
+  assert.equal(journal.entries.length, 46);
   const entry = journal.entries.find((item) => item.idx === 44);
   assert.deepEqual(entry, {
     idx: 44, version: "7", when: entry.when,

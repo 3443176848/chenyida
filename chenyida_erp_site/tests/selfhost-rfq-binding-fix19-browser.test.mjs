@@ -316,8 +316,8 @@ test.before(async () => {
     )).rows[0],
     {
       name: REQUIRED_DATABASE,
-      migration_count: 45,
-      head: "0045_runtime_worker_readiness.sql",
+      migration_count: 46,
+      head: "0046_runtime_lock_privilege_boundary.sql",
     },
   );
   await clearSyntheticData();

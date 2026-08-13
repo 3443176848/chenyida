@@ -146,7 +146,7 @@ test("calibration-only alpha.46 candidate passes frozen D-111 verifier without s
   const report = await evaluateSuggestionLayerDataset(dataset, {
     candidate_source_revision: APPROVED_CANDIDATE_SOURCE_REVISION,
     harness_revision: "a".repeat(40),
-    package_version: "0.1.0-alpha.46",
+    package_version: "0.1.0-alpha.47",
     migration_0041_sha256: FROZEN_MIGRATION_0041_SHA256,
     source_artifacts: Object.freeze({ fixture: "b".repeat(64) }),
     evaluation_run_id: "00000000-0000-4000-a000-000000000001",

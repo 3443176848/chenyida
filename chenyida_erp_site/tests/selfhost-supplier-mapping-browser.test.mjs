@@ -283,7 +283,7 @@ test.before(async () => {
     (await pool.query(
       "select current_database() name,(select count(*)::int from schema_migrations) migration_count,max(version) over() head,exists(select 1 from information_schema.columns where table_schema='public' and table_name='schema_migrations' and column_name='applied_at') ledger_applied_at from schema_migrations order by version desc limit 1",
     )).rows[0],
-    { name: REQUIRED_DATABASE, migration_count: 45, head: "0045_runtime_worker_readiness.sql", ledger_applied_at: true },
+    { name: REQUIRED_DATABASE, migration_count: 46, head: "0046_runtime_lock_privilege_boundary.sql", ledger_applied_at: true },
   );
   await clearSyntheticData();
   await startServer();

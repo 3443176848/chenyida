@@ -52,11 +52,11 @@ function configFixture({ deploymentClass = "TEST", notificationRequired = false 
       image_reference: image(service, serviceCharacters[service]),
     })),
     release_expectation: {
-      application_version: "0.1.0-alpha.46",
+      application_version: "0.1.0-alpha.47",
       git_commit: "3".repeat(40),
       release_manifest_sha256: "4".repeat(64),
       supervisor_bundle_sha256: "5".repeat(64),
-      migration_head: "0045_runtime_worker_readiness.sql",
+      migration_head: "0046_runtime_lock_privilege_boundary.sql",
       migration_manifest_sha256: "6".repeat(64),
       web_image_digest: digest("a"),
       worker_image_digest: digest("b"),
@@ -83,8 +83,8 @@ function serviceFixture(service, index) {
 function componentsFixture(observedAt, notification = { status: "UNCONFIGURED", target_id: null }) {
   return {
     application: {
-      live: { status: "PASS", observed_at: observedAt, version: "0.1.0-alpha.46", code: null },
-      readiness: { status: "READY", observed_at: observedAt, version: "0.1.0-alpha.46", revision: "3".repeat(12), migration_head: "0045_runtime_worker_readiness.sql", code: null },
+      live: { status: "PASS", observed_at: observedAt, version: "0.1.0-alpha.47", code: null },
+      readiness: { status: "READY", observed_at: observedAt, version: "0.1.0-alpha.47", revision: "3".repeat(12), migration_head: "0046_runtime_lock_privilege_boundary.sql", code: null },
     },
     release: {
       status: "MATCHED",
@@ -92,9 +92,9 @@ function componentsFixture(observedAt, notification = { status: "UNCONFIGURED", 
       generated_at: new Date(originMs).toISOString(),
       release_manifest_sha256: "4".repeat(64),
       supervisor_bundle_sha256: "5".repeat(64),
-      application_version: "0.1.0-alpha.46",
+      application_version: "0.1.0-alpha.47",
       git_commit: "3".repeat(40),
-      migration_head: "0045_runtime_worker_readiness.sql",
+      migration_head: "0046_runtime_lock_privilege_boundary.sql",
       migration_manifest_sha256: "6".repeat(64),
       web_image_digest: digest("a"),
       worker_image_digest: digest("b"),

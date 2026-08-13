@@ -135,7 +135,7 @@ async function state(requestId) {
 }
 
 test.before(async () => {
-  assert.deepEqual((await pool.query("select current_database() name,(select count(*)::int from schema_migrations) migration_count")).rows[0], { name: REQUIRED_DATABASE, migration_count: 45 });
+  assert.deepEqual((await pool.query("select current_database() name,(select count(*)::int from schema_migrations) migration_count")).rows[0], { name: REQUIRED_DATABASE, migration_count: 46 });
   await clearSyntheticData();
   await startServer();
 });

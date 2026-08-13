@@ -588,8 +588,8 @@ async function fixture(callback) {
       },
       application: {
         git_commit: "a".repeat(40),
-        version: "0.1.0-alpha.46",
-        migration_head: "0045_runtime_worker_readiness.sql",
+        version: "0.1.0-alpha.47",
+        migration_head: "0046_runtime_lock_privilege_boundary.sql",
         migration_manifest_sha256: three,
       },
     };

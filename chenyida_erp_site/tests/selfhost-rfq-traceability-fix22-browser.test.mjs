@@ -53,7 +53,7 @@ const mappingContentDigest = (supplierCode, materialId, mappingUid) => sha256(JS
   mappingUid,
 ]));
 const expectedRuntimeMigrationChecksum = createHash("sha256")
-  .update(await readFile(new URL("../drizzle-postgres/0045_runtime_worker_readiness.sql", import.meta.url)))
+  .update(await readFile(new URL("../drizzle-postgres/0046_runtime_lock_privilege_boundary.sql", import.meta.url)))
   .digest("hex");
 const serverEntry = process.env.ERP_BROWSER_SERVER_ENTRY || "/standalone/server.js";
 let server;
@@ -682,8 +682,8 @@ test.before(async () => {
     )).rows[0],
     {
       name: REQUIRED_DATABASE,
-      migration_count: 45,
-      head: "0045_runtime_worker_readiness.sql",
+      migration_count: 46,
+      head: "0046_runtime_lock_privilege_boundary.sql",
       checksum: expectedRuntimeMigrationChecksum,
     },
   );

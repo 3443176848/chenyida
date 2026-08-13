@@ -9,11 +9,12 @@
 | 当前状态 | DOING / READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / ISOLATED-ONLY / PRODUCTION NO-GO | 当前唯一active slot；主智能体唯一写入，三条智能体线只读审计 |
 | 严格起点 | PASS / CONTROLLED | `main@fb1f7e8893b2affba0ca07ecd9629ae2726adca9`、tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`；未跟踪状态报告不读不改不提交 |
 | UAT catalog | VERIFIED READ ONLY / HIGH RISK OPEN | PostgreSQL 17只有1个非内置LOGIN且为superuser、数据库owner和全部433个public relation owner；Web/Worker活动连接共用1个角色；未输出角色名、连接串或密码，未读业务行或写入 |
-| 源码/运行差距 | OPEN / UNCHANGED | 源码45/head`0045_runtime_worker_readiness.sql`，UAT仍40/head`0040_warehouse_receipt_readiness.sql`；本任务不授权Migration或部署 |
-| 秘密边界 | OPEN / REPOSITORY TARGET DEFINED | Compose仍通过环境交付数据库、初始化、Setup和Admin秘密；目标为UAT/生产只接受root控制的独立文件并严格校验路径、owner、mode、大小和换行 |
-| 角色边界 | OPEN / REPOSITORY TARGET DEFINED | 分离非superuser owner/migration、Web、Worker、backup capture及离线受控operator；运行身份不得拥有DDL、owner、SET ROLE或跨服务凭据 |
+| 源码/运行差距 | OPEN / SOURCE ADVANCED | 源码alpha.47、46/head`0046_runtime_lock_privilege_boundary.sql`，UAT仍alpha.42、40/head`0040_warehouse_receipt_readiness.sql`；本任务不授权Migration或部署 |
+| 秘密边界 | PARTIAL / REPOSITORY LOADER IMPLEMENTED | 已实现严格secret-file读取和服务独立连接/实际身份断言；Compose与release集成尚未闭合，当前运行面仍通过环境交付数据库、初始化、Setup和Admin秘密 |
+| 角色边界 | PARTIAL / SOURCE INTENT BLOCKED | 精确源码access intent已覆盖Admin/Backup/Web/Worker；仍须拆分Backup control/capture并生成PG17编译catalog，当前UAT角色/ACL未改变 |
+| Web锁权限 | PASS / ISOLATED CURRENT HEAD | 19个锁目标经16个owner控制窄函数访问，Web保持零table/column UPDATE；20个locking trigger固定安全owner路径，PG17专项5/5及完整回归84文件/401项通过 |
 | Tablespace | OPEN / REPOSITORY TARGET DEFINED | 当前PostgreSQL仅有PGDATA持久卷；未来声明独立`erp_postgres_tablespaces`固定mount，不创建或改动真实Volume |
-| 验收范围 | PENDING | D-133、版本化角色/ACL、secret-file loader、Compose/runtime/release合同、PostgreSQL 17全量Migration及正负权限、回归与新bundle |
+| 验收范围 | IN PROGRESS | Web锁权限与alpha.47/0046已闭合；Backup大对象边界、PG17精确catalog、角色/ACL reconcile、Compose/tablespace、完整release与新bundle仍待完成 |
 | 启动验证 | PASS / LIGHTWEIGHT | Markdown394/229链接、JSON214、Shell38、credentials1618、release contract51/51及Python三基线通过；宿主工具缺失改用既有隔离运行时，不安装依赖或降低断言 |
 | 起点资源 | PASS / BELOW STOP LINES | available约2.0GiB、Swap603MiB/1.0GiB、根盘16GiB、Load`0.10/0.17/0.52`，内核`oom_kill=0`；四服务restart0/OOM false |
 | 外部边界 | BLOCKED / NOT AUTHORIZED | 无真实角色/凭据/Volume、UAT/生产变更、host安装、Migration/deploy、备份恢复、数据读取或账号/网络动作 |

@@ -30,7 +30,7 @@ container_main() {
   trap 'container_signal 143' TERM
   install -d -m 0700 -o postgres -g postgres "$PGDATA"
   gosu postgres initdb -D "$PGDATA" --auth-local=trust --auth-host=trust --locale=C --encoding=UTF8 >/dev/null
-  if ! gosu postgres pg_ctl -D "$PGDATA" -l "$PGLOG" -o "-h 127.0.0.1 -p 5432 -c unix_socket_directories='$TASK_ROOT' -c max_connections=64 -c shared_buffers=64MB -c work_mem=2MB -c maintenance_work_mem=32MB -c fsync=off -c synchronous_commit=off -c full_page_writes=off" -w start >/dev/null; then
+  if ! gosu postgres pg_ctl -D "$PGDATA" -l "$PGLOG" -o "-h 127.0.0.1 -p 5432 -c unix_socket_directories='$TASK_ROOT' -c max_connections=64 -c max_locks_per_transaction=1024 -c shared_buffers=64MB -c work_mem=2MB -c maintenance_work_mem=32MB -c fsync=off -c synchronous_commit=off -c full_page_writes=off" -w start >/dev/null; then
     [ ! -f "$PGLOG" ] || tail -n 80 "$PGLOG" >&2
     exit 1
   fi
