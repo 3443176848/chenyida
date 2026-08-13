@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, link, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, link, lstat, mkdir, mkdtemp, readFile, rm, rmdir, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -33,6 +33,7 @@ import {
   createTablespaceReceipt,
   credentialPassword,
   normalizeClusterCatalog,
+  readRecoveryExecution,
   readCredentialBindingFile,
   transitionRecoveryState,
   validateClusterCatalog,
@@ -42,11 +43,23 @@ import {
   validateCredentialBindingReceipt,
   validateRecoveryIntent,
   validateTablespaceMap,
+  validateTablespacePreflightEvidence,
   validateTablespaceReceipt,
   verifyTablespaceMapAfterCreate,
+  verifyTablespacePathAfterCreate,
+  verifyTablespacePathAfterDrop,
   writeRecoveryIntent,
   writeRecoveryState,
 } from "../scripts/postgresql-cluster-recovery-contract.mjs";
+import {
+  RECOVERY_COMPENSATION_CONFIRMATION,
+  RECOVERY_EXECUTOR_CONFIRMATION,
+  compensateQuarantinedRecovery,
+  executeNextNontransactionalRecoveryStep,
+  expectedRecoveryIntentBindings,
+  nontransactionalRecoveryOperations,
+  runRecoveryExecutorCli,
+} from "../scripts/postgresql-cluster-recovery-executor.mjs";
 
 const siteRoot = path.resolve(new URL("..", import.meta.url).pathname);
 const policyFile = path.join(siteRoot, "operations", "postgresql-cluster-recovery-policy-v1.json");
@@ -118,6 +131,133 @@ function catalogFixture() {
       subscriptions: 0, text_search_objects: 0, transforms: 0, unapproved_languages: 0, unapproved_settings: 0, unsupported_relations: 0, user_mappings: 0,
     },
   });
+}
+
+class SyntheticRecoveryAdapter {
+  constructor(targetIdentity) {
+    this.targetIdentity = targetIdentity;
+    this.resources = new Map();
+    this.dispatches = new Map();
+    this.markerFinalizations = new Map();
+    this.dependencies = new Map();
+    this.activeSessions = new Map();
+    this.rolesPresent = true;
+    this.contained = true;
+    this.quarantined = false;
+    this.dispatchResult = "APPLIED";
+  }
+
+  key(resource) { return `${resource.kind}:${resource.operationResourceIdentitySha256}`; }
+
+  async assertTargetIdentity(expected) {
+    if (expected !== this.targetIdentity) throw new Error("target identity mismatch");
+  }
+
+  async assertContainment() {
+    if (!this.rolesPresent || !this.contained) throw new Error("containment failed");
+    return true;
+  }
+
+  async inspect(resource) {
+    const key = this.key(resource);
+    return {
+      status: this.resources.get(key) ?? "ABSENT",
+      dependencyCount: this.dependencies.get(key) ?? 0,
+      activeSessions: this.activeSessions.get(key) ?? 0,
+    };
+  }
+
+  async verifyTablespacePath() {
+    if (this.pathUnsafe) throw new Error("tablespace path drift");
+    return true;
+  }
+
+  async dispatch(resource) {
+    const key = this.key(resource);
+    this.dispatches.set(key, (this.dispatches.get(key) ?? 0) + 1);
+    this.resources.set(key, this.dispatchResult);
+  }
+
+  async finalizeMarker(resource) {
+    const key = this.key(resource);
+    this.markerFinalizations.set(key, (this.markerFinalizations.get(key) ?? 0) + 1);
+    if (this.resources.get(key) === "PARTIAL_CREATED") this.resources.set(key, "APPLIED");
+  }
+
+  async quarantine() { this.quarantined = true; this.contained = true; }
+
+  async assertCompensationSafe() {
+    if (this.compensationUnsafe) throw Object.assign(new Error("unsafe compensation"), { code: "RECOVERY_COMPENSATION_ROLE_UNSAFE" });
+    return true;
+  }
+
+  async compensate(resource) { this.resources.set(this.key(resource), "ABSENT"); }
+
+  async compensateRoles() { this.rolesPresent = false; }
+
+  async assertResourcesAbsent(context) {
+    if (this.rolesPresent || [context.database, ...context.tablespaces].some((resource) => this.resources.get(this.key(resource)) !== undefined && this.resources.get(this.key(resource)) !== "ABSENT")) throw new Error("resources remain");
+  }
+}
+
+function recoveryClock(start = Date.parse("2026-08-13T09:00:00.000Z")) {
+  let current = start;
+  return () => new Date(current += 1000).toISOString();
+}
+
+async function recoveryExecutorFixture(root) {
+  const { recoveryPolicy, snapshot } = await snapshotFixture();
+  const approvedRoot = path.join(root, "executor-tablespaces"); await mkdir(approvedRoot, { mode: 0o700 }); await chmod(approvedRoot, 0o700);
+  const targetPath = path.join(approvedRoot, "erp_ts"); await mkdir(targetPath, { mode: 0o700 }); await chmod(targetPath, 0o700);
+  const namespaceIdentitySha256 = clusterSha256("executor-namespace");
+  const tablespaceMap = {
+    schema_version: 1,
+    contract: TABLESPACE_MAP_CONTRACT,
+    map_id: "executor-map-1",
+    snapshot_sha256: snapshot.snapshot_sha256,
+    evidence_scope: "SYNTHETIC_TEST_ONLY",
+    approved_host_root: approvedRoot,
+    approved_server_root: approvedRoot,
+    namespace_identity_sha256: namespaceIdentitySha256,
+    entries: [{ name: "erp_ts", host_path: targetPath, server_path: targetPath }],
+  };
+  const tablespacePreflight = await validateTablespaceMap({
+    map: tablespaceMap,
+    snapshot,
+    policy: recoveryPolicy,
+    expectedUid: process.getuid(),
+    expectedGid: process.getgid(),
+    expectedNamespaceIdentitySha256: namespaceIdentitySha256,
+  });
+  const databaseProfile = { server_major: "17", encoding: "UTF8", locale_provider: "libc", collate: "C", ctype: "C", collation_version: null };
+  const plan = createClusterRestorePlan({ snapshot, policy: recoveryPolicy, tablespaceMap, databaseProfile });
+  const bindings = expectedRecoveryIntentBindings({ plan, snapshot, policy: recoveryPolicy, tablespaceMap, databaseProfile });
+  const targetIdentity = clusterSha256("executor-target-system-identifier");
+  const intent = createRecoveryIntent({
+    restore_run_id: "executor-restore-1",
+    backup_id: bindings.backup_id,
+    created_at: "2026-08-13T09:00:00.000Z",
+    evidence_scope: bindings.evidence_scope,
+    policy_sha256: bindings.policy_sha256,
+    snapshot_sha256: bindings.snapshot_sha256,
+    data_transfer_acceptance_sha256: one,
+    cluster_transfer_acceptance_sha256: two,
+    joint_transfer_sha256: three,
+    target_system_identifier_sha256: targetIdentity,
+    target_empty_state_sha256: zero,
+    credential_generation_id: "executor-generation-1",
+    credential_role_set_sha256: bindings.credential_role_set_sha256,
+    tablespace_map_sha256: bindings.tablespace_map_sha256,
+    custom_tablespace_identity_sha256: [...bindings.custom_tablespace_identity_sha256],
+  });
+  const stateRoot = await privateRoot(root, "executor-state", RECOVERY_STATE_ROOT_MARKER, RECOVERY_STATE_ROOT_MARKER_VALUE);
+  await writeRecoveryIntent({ stateRoot, intent });
+  let state = createInitialRecoveryState(intent, intent.created_at);
+  await writeRecoveryState({ stateRoot, state, intent });
+  state = transitionRecoveryState(state, intent, { phase: "ROLE_SKELETON_APPLIED", recordedAt: "2026-08-13T09:00:01.000Z" });
+  await writeRecoveryState({ stateRoot, state, intent });
+  const options = { stateRoot, intent, plan, snapshot, policy: recoveryPolicy, tablespaceMap, tablespacePreflight, databaseProfile };
+  return { ...options, targetIdentity, operations: nontransactionalRecoveryOperations(options) };
 }
 
 function bindingFixture() {
@@ -246,6 +386,9 @@ test("tablespace map requires exact names, private empty direct children and sta
   const map = { schema_version: 1, contract: TABLESPACE_MAP_CONTRACT, map_id: "map-1", snapshot_sha256: snapshot.snapshot_sha256, evidence_scope: "SYNTHETIC_TEST_ONLY", approved_host_root: approvedRoot, approved_server_root: approvedRoot, namespace_identity_sha256: namespace, entries: [{ name: "erp_ts", host_path: target, server_path: target }] };
   const validation = await validateTablespaceMap({ map, snapshot, policy: recoveryPolicy, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace, prohibitedRoots: [path.join(root, "pgdata")] });
   assert.equal(validation.entryCount, 1);
+  assert.equal(validateTablespacePreflightEvidence({ preflightValidation: validation, map, snapshot, policy: recoveryPolicy }).mapSha256, clusterSha256(map));
+  const forgedPreflight = clone(validation); forgedPreflight.rootIdentitySha256 = zero;
+  await assert.rejects(verifyTablespacePathAfterDrop({ preflightValidation: forgedPreflight, map, snapshot, policy: recoveryPolicy, entryName: "erp_ts", targetLocationSha256: clusterSha256(target) }), expectCode("TABLESPACE_POST_DROP_IDENTITY_MISMATCH"));
   await writeFile(path.join(target, "not-empty"), "x");
   await assert.rejects(validateTablespaceMap({ map, snapshot, policy: recoveryPolicy, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace }), expectCode("TABLESPACE_PATH_NOT_EMPTY"));
   await rm(path.join(target, "not-empty"));
@@ -265,8 +408,12 @@ test("tablespace map requires exact names, private empty direct children and sta
   const targetCatalog = clone(snapshot.catalog); targetCatalog.tablespaces[0].source_location_sha256 = clusterSha256(target);
   const postCreate = await verifyTablespaceMapAfterCreate({ map, snapshot, policy: recoveryPolicy, preflightValidation: validation, targetCatalog, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace, prohibitedRoots: [path.join(root, "pgdata")] });
   validateTablespaceReceipt(createTablespaceReceipt({ validation: postCreate, backupId: snapshot.binding.backup_id, restoreRunId: "restore-1", verifiedAt: now }));
+  assert.equal(await verifyTablespacePathAfterCreate({ preflightValidation: validation, map, snapshot, policy: recoveryPolicy, entryName: "erp_ts", targetLocationSha256: clusterSha256(target) }), true);
   await chmod(target, 0o755);
   await assert.rejects(verifyTablespaceMapAfterCreate({ map, snapshot, policy: recoveryPolicy, preflightValidation: validation, targetCatalog, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace }), (error) => ["TABLESPACE_POST_CREATE_IDENTITY_MISMATCH", "TABLESPACE_PATH_CHANGED"].includes(error?.code));
+  await chmod(target, 0o700);
+  await rmdir(path.join(target, "PG_17_fixture"));
+  assert.equal(await verifyTablespacePathAfterDrop({ preflightValidation: validation, map, snapshot, policy: recoveryPolicy, entryName: "erp_ts", targetLocationSha256: clusterSha256(target) }), true);
 }));
 
 test("root-owned credential binding keeps secrets private and detects unsafe files and replacement", async () => withRoot(async (root) => {
@@ -339,6 +486,167 @@ test("durable recovery state enforces intent-first dispatch, reconciliation and 
     await writeRecoveryState({ stateRoot, state, intent });
   }
   assert.equal(state.phase, "PUBLISHED");
+}));
+
+test("restore plan binds every created cluster resource to a content-addressed recovery marker", async () => {
+  const { recoveryPolicy, snapshot } = await snapshotFixture();
+  const tablespaceMap = {
+    schema_version: 1,
+    contract: TABLESPACE_MAP_CONTRACT,
+    map_id: "marked-plan-map",
+    snapshot_sha256: snapshot.snapshot_sha256,
+    evidence_scope: "SYNTHETIC_TEST_ONLY",
+    approved_host_root: "/synthetic/host/tablespaces",
+    approved_server_root: "/synthetic/server/tablespaces",
+    namespace_identity_sha256: zero,
+    entries: [{ name: "erp_ts", host_path: "/synthetic/host/tablespaces/erp_ts", server_path: "/synthetic/server/tablespaces/erp_ts" }],
+  };
+  const databaseProfile = { server_major: "17", encoding: "UTF8", locale_provider: "libc", collate: "C", ctype: "C", collation_version: null };
+  const plan = createClusterRestorePlan({ snapshot, policy: recoveryPolicy, tablespaceMap, databaseProfile });
+  for (const role of plan.roles) {
+    assert.match(role.resource_identity_sha256, /^[0-9a-f]{64}$/u);
+    assert.equal(role.recovery_marker, `chenyida-erp-postgresql-recovery/v1:ROLE:${role.resource_identity_sha256}`);
+    assert.match(plan.role_skeleton.sql, new RegExp(role.recovery_marker.replaceAll("/", "\\/"), "u"));
+  }
+  assert.equal(plan.tablespaces[0].recovery_marker, `chenyida-erp-postgresql-recovery/v1:TABLESPACE:${plan.tablespaces[0].resource_identity_sha256}`);
+  assert.match(plan.tablespaces[0].sql, /COMMENT ON TABLESPACE/u);
+  assert.equal(plan.database.recovery_marker, `chenyida-erp-postgresql-recovery/v1:DATABASE:${plan.database.resource_identity_sha256}`);
+  assert.match(plan.database.sql, /CONNECTION LIMIT 0/u);
+  assert.match(plan.database.sql, /COMMENT ON DATABASE/u);
+});
+
+test("nontransactional executor persists dispatch before mutation and resumes exactly once", async () => withRoot(async (root) => {
+  const fixture = await recoveryExecutorFixture(root), adapter = new SyntheticRecoveryAdapter(fixture.targetIdentity), clock = recoveryClock();
+  let injected = false;
+  await assert.rejects(executeNextNontransactionalRecoveryStep({
+    ...fixture,
+    adapter,
+    confirmation: RECOVERY_EXECUTOR_CONFIRMATION,
+    clock,
+    faultInjector(stage) {
+      if (!injected && stage === "AFTER_DISPATCH_DURABLE") { injected = true; throw new Error("synthetic crash after durable dispatch"); }
+    },
+  }), /synthetic crash after durable dispatch/u);
+  let execution = await readRecoveryExecution({ stateRoot: fixture.stateRoot, restoreRunId: fixture.intent.restore_run_id });
+  assert.equal(execution.current.phase, "TABLESPACE_COMMAND_DISPATCHED");
+  assert.equal(adapter.dispatches.size, 0);
+  const tableResult = await executeNextNontransactionalRecoveryStep({ ...fixture, adapter, confirmation: RECOVERY_EXECUTOR_CONFIRMATION, clock });
+  assert.equal(tableResult.state.phase, "TABLESPACE_VERIFIED");
+  assert.equal([...adapter.dispatches.values()][0], 1);
+  const databaseResult = await executeNextNontransactionalRecoveryStep({ ...fixture, adapter, confirmation: RECOVERY_EXECUTOR_CONFIRMATION, clock });
+  assert.equal(databaseResult.status, "NONTRANSACTIONAL_COMPLETE");
+  assert.equal(databaseResult.state.phase, "DATABASE_VERIFIED");
+  const counts = [...adapter.dispatches.values()];
+  assert.deepEqual(counts, [1, 1]);
+  const repeated = await executeNextNontransactionalRecoveryStep({ ...fixture, adapter, confirmation: RECOVERY_EXECUTOR_CONFIRMATION, clock });
+  assert.equal(repeated.status, "NONTRANSACTIONAL_COMPLETE");
+  assert.deepEqual([...adapter.dispatches.values()], counts);
+  execution = await readRecoveryExecution({ stateRoot: fixture.stateRoot, restoreRunId: fixture.intent.restore_run_id });
+  assert.equal(execution.states.length, 8);
+  assert.match(execution.chain_sha256, /^[0-9a-f]{64}$/u);
+}));
+
+test("response-loss reconciliation distinguishes applied, partial-marker and retry-safe absent outcomes", async () => withRoot(async (root) => {
+  const fixture = await recoveryExecutorFixture(root), adapter = new SyntheticRecoveryAdapter(fixture.targetIdentity), clock = recoveryClock();
+  let injected = false;
+  await assert.rejects(executeNextNontransactionalRecoveryStep({
+    ...fixture,
+    adapter,
+    confirmation: RECOVERY_EXECUTOR_CONFIRMATION,
+    clock,
+    faultInjector(stage) {
+      if (!injected && stage === "AFTER_INITIAL_COMMAND") { injected = true; throw new Error("synthetic response loss"); }
+    },
+  }), /synthetic response loss/u);
+  assert.equal((await readRecoveryExecution({ stateRoot: fixture.stateRoot, restoreRunId: fixture.intent.restore_run_id })).current.phase, "TABLESPACE_COMMAND_DISPATCHED");
+  await executeNextNontransactionalRecoveryStep({ ...fixture, adapter, confirmation: RECOVERY_EXECUTOR_CONFIRMATION, clock });
+  assert.deepEqual([...adapter.dispatches.values()], [1]);
+
+  const secondRoot = path.join(root, "partial-fixture"); await mkdir(secondRoot, { mode: 0o700 }); await chmod(secondRoot, 0o700);
+  const partial = await recoveryExecutorFixture(secondRoot), partialAdapter = new SyntheticRecoveryAdapter(partial.targetIdentity), partialClock = recoveryClock();
+  partialAdapter.dispatchResult = "PARTIAL_CREATED";
+  let markerInjected = false;
+  await assert.rejects(executeNextNontransactionalRecoveryStep({
+    ...partial,
+    adapter: partialAdapter,
+    confirmation: RECOVERY_EXECUTOR_CONFIRMATION,
+    clock: partialClock,
+    faultInjector(stage) {
+      if (!markerInjected && stage === "AFTER_MARKER_COMMAND") { markerInjected = true; throw new Error("synthetic marker response loss"); }
+    },
+  }), /synthetic marker response loss/u);
+  await executeNextNontransactionalRecoveryStep({ ...partial, adapter: partialAdapter, confirmation: RECOVERY_EXECUTOR_CONFIRMATION, clock: partialClock });
+  assert.deepEqual([...partialAdapter.dispatches.values()], [1]);
+  assert.deepEqual([...partialAdapter.markerFinalizations.values()], [1]);
+}));
+
+test("verified tablespace path drift quarantines before the next mutation", async () => withRoot(async (root) => {
+  const fixture = await recoveryExecutorFixture(root), adapter = new SyntheticRecoveryAdapter(fixture.targetIdentity), clock = recoveryClock();
+  await executeNextNontransactionalRecoveryStep({ ...fixture, adapter, confirmation: RECOVERY_EXECUTOR_CONFIRMATION, clock });
+  adapter.pathUnsafe = true;
+  await assert.rejects(executeNextNontransactionalRecoveryStep({ ...fixture, adapter, confirmation: RECOVERY_EXECUTOR_CONFIRMATION, clock }), expectCode("RECOVERY_EXECUTOR_VERIFIED_TABLESPACE_PATH_DRIFT_QUARANTINED"));
+  assert.equal(adapter.dispatches.size, 1);
+  assert.equal((await readRecoveryExecution({ stateRoot: fixture.stateRoot, restoreRunId: fixture.intent.restore_run_id })).current.phase, "QUARANTINED");
+}));
+
+test("ambiguous nontransactional resources quarantine and exact compensation refuses dependencies", async () => withRoot(async (root) => {
+  const fixture = await recoveryExecutorFixture(root), adapter = new SyntheticRecoveryAdapter(fixture.targetIdentity), clock = recoveryClock();
+  adapter.dispatchResult = "CONFLICT";
+  await assert.rejects(executeNextNontransactionalRecoveryStep({ ...fixture, adapter, confirmation: RECOVERY_EXECUTOR_CONFIRMATION, clock }), expectCode("RECOVERY_EXECUTOR_RESOURCE_CONFLICT_QUARANTINED"));
+  let execution = await readRecoveryExecution({ stateRoot: fixture.stateRoot, restoreRunId: fixture.intent.restore_run_id });
+  assert.equal(execution.current.phase, "QUARANTINED");
+  assert.equal(execution.current.operation.kind, "TABLESPACE");
+  assert.equal(adapter.quarantined, true);
+  const key = [...adapter.resources.keys()][0];
+  await assert.rejects(compensateQuarantinedRecovery({ ...fixture, adapter, confirmation: RECOVERY_COMPENSATION_CONFIRMATION, clock }), expectCode("RECOVERY_COMPENSATION_TABLESPACE_UNSAFE"));
+  adapter.resources.set(key, "APPLIED");
+  adapter.dependencies.set(key, 1);
+  await assert.rejects(compensateQuarantinedRecovery({ ...fixture, adapter, confirmation: RECOVERY_COMPENSATION_CONFIRMATION, clock }), expectCode("RECOVERY_COMPENSATION_TABLESPACE_UNSAFE"));
+  adapter.dependencies.set(key, 0);
+  adapter.compensationUnsafe = true;
+  await assert.rejects(compensateQuarantinedRecovery({ ...fixture, adapter, confirmation: RECOVERY_COMPENSATION_CONFIRMATION, clock }), expectCode("RECOVERY_COMPENSATION_ROLE_UNSAFE"));
+  assert.equal(adapter.resources.get(key), "APPLIED");
+  adapter.compensationUnsafe = false;
+  const compensated = await compensateQuarantinedRecovery({ ...fixture, adapter, confirmation: RECOVERY_COMPENSATION_CONFIRMATION, clock });
+  assert.equal(compensated.status, "COMPENSATED");
+  assert.equal(adapter.rolesPresent, false);
+  execution = await readRecoveryExecution({ stateRoot: fixture.stateRoot, restoreRunId: fixture.intent.restore_run_id });
+  assert.equal(execution.current.phase, "COMPENSATED");
+}));
+
+test("executor lock rejects concurrent writers and persisted state files are no-follow immutable evidence", async () => withRoot(async (root) => {
+  const fixture = await recoveryExecutorFixture(root), adapter = new SyntheticRecoveryAdapter(fixture.targetIdentity), clock = recoveryClock();
+  let releaseDispatch, enteredDispatch;
+  const entered = new Promise((resolve) => { enteredDispatch = resolve; });
+  const release = new Promise((resolve) => { releaseDispatch = resolve; });
+  const originalDispatch = adapter.dispatch.bind(adapter);
+  adapter.dispatch = async (resource) => { enteredDispatch(); await release; await originalDispatch(resource); };
+  const first = executeNextNontransactionalRecoveryStep({ ...fixture, adapter, confirmation: RECOVERY_EXECUTOR_CONFIRMATION, clock });
+  await entered;
+  await assert.rejects(executeNextNontransactionalRecoveryStep({ ...fixture, adapter, confirmation: RECOVERY_EXECUTOR_CONFIRMATION, clock }), expectCode("RECOVERY_EXECUTOR_LOCK_BUSY"));
+  releaseDispatch();
+  assert.equal((await first).state.phase, "TABLESPACE_VERIFIED");
+  const evidenceFile = path.join(fixture.stateRoot, "state-executor-restore-1-00000004.json");
+  const committedOrphan = path.join(fixture.stateRoot, ".state-executor-restore-1-00000004.json.123.456.tmp");
+  await link(evidenceFile, committedOrphan);
+  assert.equal((await lstat(evidenceFile)).nlink, 2);
+  assert.equal((await readRecoveryExecution({ stateRoot: fixture.stateRoot, restoreRunId: fixture.intent.restore_run_id })).current.phase, "TABLESPACE_VERIFIED");
+  assert.equal((await lstat(evidenceFile)).nlink, 1);
+  await assert.rejects(lstat(committedOrphan), (error) => error?.code === "ENOENT");
+  await chmod(evidenceFile, 0o600);
+  await assert.rejects(readRecoveryExecution({ stateRoot: fixture.stateRoot, restoreRunId: fixture.intent.restore_run_id }), expectCode("RECOVERY_STATE_FILE_INVALID"));
+}));
+
+test("executor CLI status is strict and publishes only bounded recovery state", async () => withRoot(async (root) => {
+  const fixture = await recoveryExecutorFixture(root);
+  let output = "";
+  const stdout = { write(chunk) { output += chunk; } };
+  const result = await runRecoveryExecutorCli(["status", "--state-root", fixture.stateRoot, "--restore-run-id", fixture.intent.restore_run_id], { stdout });
+  assert.equal(result.phase, "ROLE_SKELETON_APPLIED");
+  assert.equal(JSON.parse(output).state_sha256, result.state_sha256);
+  assert.equal(output.includes("chenyida_erp_runtime"), false);
+  assert.equal(output.includes("/synthetic/"), false);
+  await assert.rejects(runRecoveryExecutorCli(["status", "--state-root", fixture.stateRoot, "--restore-run-id", fixture.intent.restore_run_id, "--extra", "unsafe"], { stdout }), expectCode("RECOVERY_EXECUTOR_CLI_INVALID"));
 }));
 
 test("cluster receipt cross-binds mapped tablespace and credential evidence before source equivalence", async () => withRoot(async (root) => {

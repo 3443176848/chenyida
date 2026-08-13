@@ -740,6 +740,81 @@ export async function validateTablespaceMap({
   });
 }
 
+export function validateTablespacePreflightEvidence({
+  preflightValidation,
+  map: mapInput,
+  snapshot: snapshotInput,
+  policy: policyInput,
+  evidenceScope = "SYNTHETIC_TEST_ONLY",
+}) {
+  const policy = validateClusterRecoveryPolicy(policyInput);
+  const snapshot = validateClusterSnapshot(snapshotInput, policy);
+  const map = validateTablespaceMapDocument({ map: mapInput, snapshot, policy, evidenceScope });
+  exactKeys(preflightValidation, [
+    "phase", "evidenceScope", "mapId", "mapSha256", "namespaceIdentitySha256", "entryCount",
+    "entrySetSha256", "identities", "rootIdentitySha256",
+  ], "TABLESPACE_PREFLIGHT_INVALID");
+  if (preflightValidation.phase !== "PREFLIGHT_EMPTY" || preflightValidation.evidenceScope !== evidenceScope
+    || preflightValidation.mapId !== map.map_id || preflightValidation.mapSha256 !== clusterSha256(map)
+    || preflightValidation.namespaceIdentitySha256 !== map.namespace_identity_sha256
+    || preflightValidation.entryCount !== map.entries.length) reject("TABLESPACE_PREFLIGHT_BINDING_INVALID");
+  string(preflightValidation.entrySetSha256, SHA256, "TABLESPACE_PREFLIGHT_INVALID");
+  string(preflightValidation.rootIdentitySha256, SHA256, "TABLESPACE_PREFLIGHT_INVALID");
+  if (!Array.isArray(preflightValidation.identities) || preflightValidation.identities.length !== map.entries.length) reject("TABLESPACE_PREFLIGHT_INVALID");
+  for (const [index, identity] of preflightValidation.identities.entries()) {
+    exactKeys(identity, ["name", "host_identity_sha256", "server_path_sha256"], "TABLESPACE_PREFLIGHT_IDENTITY_INVALID");
+    if (identity.name !== map.entries[index].name || identity.server_path_sha256 !== clusterSha256(map.entries[index].server_path)) reject("TABLESPACE_PREFLIGHT_IDENTITY_INVALID");
+    string(identity.host_identity_sha256, SHA256, "TABLESPACE_PREFLIGHT_IDENTITY_INVALID");
+  }
+  if (preflightValidation.entrySetSha256 !== clusterSha256(preflightValidation.identities)) reject("TABLESPACE_PREFLIGHT_SHA256_MISMATCH");
+  return preflightValidation;
+}
+
+async function verifyTablespacePathPhase({
+  preflightValidation,
+  map: mapInput,
+  snapshot: snapshotInput,
+  policy: policyInput,
+  entryName,
+  targetLocationSha256,
+  expectedEmpty,
+  evidenceScope = "SYNTHETIC_TEST_ONLY",
+}) {
+  const policy = validateClusterRecoveryPolicy(policyInput);
+  const snapshot = validateClusterSnapshot(snapshotInput, policy);
+  const map = validateTablespaceMapDocument({ map: mapInput, snapshot, policy, evidenceScope });
+  const preflight = validateTablespacePreflightEvidence({ preflightValidation, map, snapshot, policy, evidenceScope });
+  pgText(entryName, "TABLESPACE_PATH_ENTRY_NAME_INVALID");
+  string(targetLocationSha256, SHA256, "TABLESPACE_TARGET_LOCATION_INVALID");
+  boolean(expectedEmpty, "TABLESPACE_PATH_PHASE_INVALID");
+  const index = map.entries.findIndex((entry) => entry.name === entryName);
+  if (index < 0) reject("TABLESPACE_PATH_ENTRY_NAME_INVALID");
+  const synthetic = evidenceScope === "SYNTHETIC_TEST_ONLY";
+  if (!synthetic && (process.getuid?.() !== 0 || isInside(map.approved_host_root, os.tmpdir()))) reject("TABLESPACE_ACTUAL_ROOT_REQUIRED");
+  const root = path.resolve(map.approved_host_root), entry = map.entries[index], hostPath = path.resolve(entry.host_path), serverPath = path.resolve(entry.server_path);
+  const rootComponents = await noFollowPathComponents(root, { syntheticTmpAllowed: synthetic, code: "TABLESPACE_ROOT_UNSAFE" });
+  const pathComponents = await noFollowPathComponents(hostPath, { syntheticTmpAllowed: synthetic, code: "TABLESPACE_PATH_UNSAFE" });
+  const rootMetadata = rootComponents.at(-1).metadata, metadata = pathComponents.at(-1).metadata, identity = preflight.identities[index];
+  const empty = (await readdir(hostPath)).length === 0;
+  if (path.dirname(hostPath) !== root || path.basename(hostPath) !== entryName
+    || await realpath(root) !== root || await realpath(hostPath) !== hostPath
+    || clusterSha256(pathIdentity(rootMetadata)) !== preflight.rootIdentitySha256
+    || clusterSha256(pathIdentity(metadata)) !== identity.host_identity_sha256
+    || clusterSha256(serverPath) !== identity.server_path_sha256 || clusterSha256(serverPath) !== targetLocationSha256
+    || empty !== expectedEmpty) reject(expectedEmpty ? "TABLESPACE_POST_DROP_IDENTITY_MISMATCH" : "TABLESPACE_POST_CREATE_IDENTITY_MISMATCH");
+  await revalidatePathComponents(pathComponents, "TABLESPACE_PATH_CHANGED");
+  await revalidatePathComponents(rootComponents, "TABLESPACE_ROOT_CHANGED");
+  return true;
+}
+
+export async function verifyTablespacePathAfterCreate(options) {
+  return verifyTablespacePathPhase({ ...options, expectedEmpty: false });
+}
+
+export async function verifyTablespacePathAfterDrop(options) {
+  return verifyTablespacePathPhase({ ...options, expectedEmpty: true });
+}
+
 export async function verifyTablespaceMapAfterCreate({
   map: mapInput,
   snapshot: snapshotInput,
@@ -759,11 +834,8 @@ export async function verifyTablespaceMapAfterCreate({
   integer(expectedGid, 0, 2 ** 31 - 1, "TABLESPACE_EXPECTED_GID_INVALID");
   if (!Array.isArray(prohibitedRoots) || prohibitedRoots.some((root) => typeof root !== "string" || !path.isAbsolute(root))) reject("TABLESPACE_PROHIBITED_ROOT_INVALID");
   string(expectedNamespaceIdentitySha256, SHA256, "TABLESPACE_NAMESPACE_IDENTITY_INVALID");
-  if (!preflightValidation || preflightValidation.phase !== "PREFLIGHT_EMPTY" || preflightValidation.evidenceScope !== evidenceScope
-    || preflightValidation.mapId !== map.map_id || preflightValidation.mapSha256 !== clusterSha256(map)
-    || preflightValidation.namespaceIdentitySha256 !== expectedNamespaceIdentitySha256
-    || preflightValidation.entryCount !== map.entries.length || !Array.isArray(preflightValidation.identities)
-    || preflightValidation.identities.length !== map.entries.length) reject("TABLESPACE_PREFLIGHT_BINDING_INVALID");
+  const preflight = validateTablespacePreflightEvidence({ preflightValidation, map, snapshot, policy, evidenceScope });
+  if (preflight.namespaceIdentitySha256 !== expectedNamespaceIdentitySha256) reject("TABLESPACE_PREFLIGHT_BINDING_INVALID");
   const targetCatalog = normalizeClusterCatalog(targetCatalogInput);
   validateClusterCatalog(targetCatalog, policy);
   if (targetCatalog.tablespaces.length !== map.entries.length) reject("TABLESPACE_TARGET_CATALOG_MISMATCH");
@@ -775,7 +847,7 @@ export async function verifyTablespaceMapAfterCreate({
   const rootComponents = await noFollowPathComponents(hostRoot, { syntheticTmpAllowed: synthetic, code: "TABLESPACE_ROOT_UNSAFE" });
   const rootMetadata = rootComponents.at(-1).metadata;
   if (rootMetadata.uid !== expectedUid || rootMetadata.gid !== expectedGid || (rootMetadata.mode & 0o777) !== 0o700
-    || clusterSha256(pathIdentity(rootMetadata)) !== preflightValidation.rootIdentitySha256 || await realpath(hostRoot) !== hostRoot) reject("TABLESPACE_ROOT_CHANGED");
+    || clusterSha256(pathIdentity(rootMetadata)) !== preflight.rootIdentitySha256 || await realpath(hostRoot) !== hostRoot) reject("TABLESPACE_ROOT_CHANGED");
   for (const prohibitedRoot of prohibited) if (pathsOverlap(hostRoot, prohibitedRoot)) reject("TABLESPACE_ROOT_PROHIBITED");
   const postCreateIdentities = [];
   for (const [index, entry] of map.entries.entries()) {
@@ -785,7 +857,7 @@ export async function verifyTablespaceMapAfterCreate({
     for (const prohibitedRoot of prohibited) if (pathsOverlap(hostPath, prohibitedRoot)) reject("TABLESPACE_PATH_PROHIBITED");
     const components = await noFollowPathComponents(hostPath, { syntheticTmpAllowed: synthetic, code: "TABLESPACE_PATH_UNSAFE" });
     const metadata = components.at(-1).metadata;
-    const identity = preflightValidation.identities[index];
+    const identity = preflight.identities[index];
     const targetTablespace = targetCatalog.tablespaces[index];
     if (metadata.uid !== expectedUid || metadata.gid !== expectedGid || (metadata.mode & 0o777) !== 0o700
       || await realpath(hostPath) !== hostPath || (await readdir(hostPath)).length === 0
@@ -797,7 +869,7 @@ export async function verifyTablespaceMapAfterCreate({
   }
   await revalidatePathComponents(rootComponents, "TABLESPACE_ROOT_CHANGED");
   return Object.freeze({
-    ...preflightValidation,
+    ...preflight,
     phase: "POST_CREATE_VERIFIED",
     targetTablespaceCatalogSha256: clusterSha256(targetCatalog.tablespaces),
     postCreateEntrySetSha256: clusterSha256(postCreateIdentities),
@@ -967,7 +1039,9 @@ function validateRecoveryOperation(value, phase) {
   if (!new Set(["TABLESPACE", "DATABASE"]).has(value.kind)) reject("RECOVERY_STATE_OPERATION_INVALID");
   string(value.resource_identity_sha256, SHA256, "RECOVERY_STATE_OPERATION_INVALID");
   string(value.payload_sha256, SHA256, "RECOVERY_STATE_OPERATION_INVALID");
-  if (phase.startsWith("TABLESPACE_") !== (value.kind === "TABLESPACE") || phase.startsWith("DATABASE_") !== (value.kind === "DATABASE")) reject("RECOVERY_STATE_OPERATION_KIND_MISMATCH");
+  if (!new Set(["QUARANTINED", "COMPENSATED"]).has(phase)
+    && (phase.startsWith("TABLESPACE_") !== (value.kind === "TABLESPACE")
+      || phase.startsWith("DATABASE_") !== (value.kind === "DATABASE"))) reject("RECOVERY_STATE_OPERATION_KIND_MISMATCH");
   return value;
 }
 
@@ -1021,9 +1095,12 @@ export function transitionRecoveryState(previousInput, intentInput, { phase, ope
   const previous = validateRecoveryState(previousInput, intent);
   enumValue(phase, RECOVERY_PHASES, "RECOVERY_STATE_PHASE_INVALID");
   iso(recordedAt, "RECOVERY_STATE_RECORDED_AT_INVALID");
-  validateRecoveryOperation(operation, phase);
+  const nextOperation = new Set(["QUARANTINED", "COMPENSATED"]).has(phase) && operation === null
+    ? previous.operation
+    : operation;
+  validateRecoveryOperation(nextOperation, phase);
   if (phase === previous.phase) {
-    if (sameOperation(operation, previous.operation)) return previous;
+    if (sameOperation(nextOperation, previous.operation)) return previous;
     reject("RECOVERY_STATE_IDEMPOTENCY_CONFLICT");
   }
   if (Date.parse(recordedAt) < Date.parse(previous.recorded_at)) reject("RECOVERY_STATE_CLOCK_ROLLBACK");
@@ -1031,8 +1108,8 @@ export function transitionRecoveryState(previousInput, intentInput, { phase, ope
   const allTablespacesVerified = () => verified.length === intent.custom_tablespace_identity_sha256.length
     && verified.every((identity, index) => identity === intent.custom_tablespace_identity_sha256[index]);
   let allowed = false;
-  if (phase === "QUARANTINED" && !new Set(["PUBLISHED", "COMPENSATED"]).has(previous.phase)) allowed = true;
-  else if (previous.phase === "QUARANTINED" && phase === "COMPENSATED") allowed = true;
+  if (phase === "QUARANTINED" && !new Set(["PUBLISHED", "COMPENSATED"]).has(previous.phase)) allowed = sameOperation(nextOperation, previous.operation);
+  else if (previous.phase === "QUARANTINED" && phase === "COMPENSATED") allowed = sameOperation(nextOperation, previous.operation);
   else if (previous.phase === "INTENT_DURABLE" && phase === "ROLE_SKELETON_APPLIED") allowed = true;
   else if (new Set(["ROLE_SKELETON_APPLIED", "TABLESPACE_VERIFIED"]).has(previous.phase) && phase === "TABLESPACE_COMMAND_DISPATCHED") {
     allowed = !verified.includes(operation.resource_identity_sha256)
@@ -1058,7 +1135,7 @@ export function transitionRecoveryState(previousInput, intentInput, { phase, ope
       ["ACTIVATE_PREPARED", "PREPARED"],
       ["PREPARED", "PUBLISHED"],
     ]);
-    allowed = linear.get(previous.phase) === phase && operation === null;
+    allowed = linear.get(previous.phase) === phase && nextOperation === null;
   }
   if (!allowed) reject("RECOVERY_STATE_TRANSITION_INVALID");
   const body = {
@@ -1068,7 +1145,7 @@ export function transitionRecoveryState(previousInput, intentInput, { phase, ope
     intent_sha256: intent.intent_sha256,
     sequence: previous.sequence + 1,
     phase,
-    operation: operation === null ? null : canonicalClone(operation),
+    operation: nextOperation === null ? null : canonicalClone(nextOperation),
     verified_tablespaces: verified,
     previous_state_sha256: previous.state_sha256,
     recorded_at: recordedAt,
@@ -1099,12 +1176,14 @@ async function atomicNoClobberCanonical(file, value, mode, conflictCode) {
     if (handle) await handle.close().catch(() => {});
     await unlink(temporary).catch(() => {});
   }
+  await reconcileCommittedRecoveryLink(file, conflictCode);
   const existing = await readStableFile(file, { maxBytes: 1024 * 1024, expectedUid: process.getuid?.() ?? 0, allowedModes: [mode], code: conflictCode });
   if (existing.bytes.toString("utf8") !== source) reject(conflictCode);
   return file;
 }
 
 async function readCanonicalRecoveryFile(file, validator, code) {
+  await reconcileCommittedRecoveryLink(file, code);
   const loaded = await readStableFile(file, { maxBytes: 1024 * 1024, expectedUid: process.getuid?.() ?? 0, allowedModes: [0o400], code });
   let parsed;
   try { parsed = parseStrictJson(loaded.bytes.toString("utf8")); } catch { reject(code); }
@@ -1112,17 +1191,39 @@ async function readCanonicalRecoveryFile(file, validator, code) {
   return validator(parsed);
 }
 
-async function recoveryStateRoot(root) {
+async function reconcileCommittedRecoveryLink(file, code) {
+  const target = await lstat(file).catch((error) => error?.code === "ENOENT" ? null : reject(code));
+  if (target === null || target.nlink === 1) return;
+  if (!target.isFile() || target.isSymbolicLink() || target.nlink !== 2 || target.uid !== (process.getuid?.() ?? 0)
+    || (target.mode & 0o777) !== 0o400) reject(code);
+  const directory = path.dirname(file), basename = path.basename(file);
+  const escaped = basename.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const pattern = new RegExp(`^\\.${escaped}\\.[0-9]+\\.[0-9]+\\.tmp$`, "u"), candidates = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) if (pattern.test(entry.name)) candidates.push(entry);
+  if (candidates.length !== 1 || !candidates[0].isFile()) reject(code);
+  const temporary = path.join(directory, candidates[0].name), metadata = await lstat(temporary).catch(() => reject(code));
+  if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.nlink !== 2 || metadata.dev !== target.dev || metadata.ino !== target.ino
+    || metadata.uid !== target.uid || metadata.gid !== target.gid || metadata.mode !== target.mode) reject(code);
+  await unlink(temporary).catch(() => reject(code));
+  await syncDirectory(directory);
+  const reconciled = await lstat(file).catch(() => reject(code));
+  if (reconciled.dev !== target.dev || reconciled.ino !== target.ino || reconciled.nlink !== 1) reject(code);
+}
+
+async function recoveryStateRoot(root, evidenceScope) {
+  enumValue(evidenceScope, EVIDENCE_SCOPES, "RECOVERY_STATE_SCOPE_INVALID");
+  const synthetic = evidenceScope === "SYNTHETIC_TEST_ONLY";
+  if (!synthetic && process.getuid?.() !== 0) reject("RECOVERY_STATE_ROOT_PRIVILEGE_REQUIRED");
   return validatePrivateRoot(root, RECOVERY_STATE_ROOT_MARKER, RECOVERY_STATE_ROOT_MARKER_VALUE, {
-    syntheticTmpAllowed: true,
-    expectedUid: process.getuid?.() ?? 0,
+    syntheticTmpAllowed: synthetic,
+    expectedUid: synthetic ? (process.getuid?.() ?? 0) : 0,
     code: "RECOVERY_STATE_ROOT_UNSAFE",
   });
 }
 
 export async function writeRecoveryIntent({ stateRoot, intent: intentInput }) {
   const intent = validateRecoveryIntent(intentInput);
-  const root = await recoveryStateRoot(stateRoot);
+  const root = await recoveryStateRoot(stateRoot, intent.evidence_scope);
   const file = path.join(root.root, `intent-${intent.restore_run_id}.json`);
   await atomicNoClobberCanonical(file, intent, 0o400, "RECOVERY_INTENT_CONFLICT");
   return file;
@@ -1131,7 +1232,7 @@ export async function writeRecoveryIntent({ stateRoot, intent: intentInput }) {
 export async function writeRecoveryState({ stateRoot, state: stateInput, intent: intentInput }) {
   const intent = validateRecoveryIntent(intentInput);
   const state = validateRecoveryState(stateInput, intent);
-  const root = await recoveryStateRoot(stateRoot);
+  const root = await recoveryStateRoot(stateRoot, intent.evidence_scope);
   const intentFile = path.join(root.root, `intent-${intent.restore_run_id}.json`);
   const persistedIntent = await readCanonicalRecoveryFile(intentFile, validateRecoveryIntent, "RECOVERY_INTENT_NOT_DURABLE");
   if (persistedIntent.intent_sha256 !== intent.intent_sha256) reject("RECOVERY_INTENT_CONFLICT");
@@ -1143,6 +1244,54 @@ export async function writeRecoveryState({ stateRoot, state: stateInput, intent:
   const file = path.join(root.root, `state-${state.restore_run_id}-${String(state.sequence).padStart(8, "0")}.json`);
   await atomicNoClobberCanonical(file, state, 0o400, "RECOVERY_STATE_CONFLICT");
   return file;
+}
+
+export async function readRecoveryExecution({ stateRoot, restoreRunId }) {
+  string(restoreRunId, IDENTIFIER, "RECOVERY_STATE_RUN_ID_INVALID");
+  const provisionalRoot = await validatePrivateRoot(stateRoot, RECOVERY_STATE_ROOT_MARKER, RECOVERY_STATE_ROOT_MARKER_VALUE, {
+    syntheticTmpAllowed: true,
+    expectedUid: process.getuid?.() ?? 0,
+    code: "RECOVERY_STATE_ROOT_UNSAFE",
+  });
+  const intentFile = path.join(provisionalRoot.root, `intent-${restoreRunId}.json`);
+  const intent = await readCanonicalRecoveryFile(intentFile, validateRecoveryIntent, "RECOVERY_INTENT_NOT_DURABLE");
+  const root = await recoveryStateRoot(stateRoot, intent.evidence_scope);
+  if (root.root !== provisionalRoot.root) reject("RECOVERY_STATE_ROOT_CHANGED");
+  const prefix = `state-${restoreRunId}-`;
+  const names = [];
+  for (const entry of await readdir(root.root, { withFileTypes: true })) {
+    if (!entry.name.startsWith(prefix)) continue;
+    if (!entry.isFile() || !new RegExp(`^state-${restoreRunId.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}-[0-9]{8}\\.json$`, "u").test(entry.name)) reject("RECOVERY_STATE_ENTRY_INVALID");
+    names.push(entry.name);
+  }
+  names.sort();
+  if (names.length === 0 || names.length > 1_000_001) reject("RECOVERY_STATE_CHAIN_INCOMPLETE");
+  const states = [];
+  for (const [index, name] of names.entries()) {
+    const expectedName = `state-${restoreRunId}-${String(index).padStart(8, "0")}.json`;
+    if (name !== expectedName) reject("RECOVERY_STATE_CHAIN_INCOMPLETE");
+    const state = await readCanonicalRecoveryFile(path.join(root.root, name), (value) => validateRecoveryState(value, intent), "RECOVERY_STATE_FILE_INVALID");
+    if (state.sequence !== index) reject("RECOVERY_STATE_CHAIN_INCOMPLETE");
+    if (index === 0) {
+      const expected = createInitialRecoveryState(intent, state.recorded_at);
+      if (canonicalClusterJson(state) !== canonicalClusterJson(expected)) reject("RECOVERY_STATE_CHAIN_INVALID");
+    } else {
+      const expected = transitionRecoveryState(states[index - 1], intent, {
+        phase: state.phase,
+        operation: state.operation,
+        recordedAt: state.recorded_at,
+      });
+      if (canonicalClusterJson(state) !== canonicalClusterJson(expected)) reject("RECOVERY_STATE_CHAIN_INVALID");
+    }
+    states.push(state);
+  }
+  return Object.freeze({
+    root: root.root,
+    intent,
+    states: Object.freeze(states),
+    current: states.at(-1),
+    chain_sha256: clusterSha256(states),
+  });
 }
 
 export function createClusterSecurityReceipt({

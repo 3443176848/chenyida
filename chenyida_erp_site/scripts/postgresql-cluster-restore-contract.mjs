@@ -16,6 +16,7 @@ import {
 export const CLUSTER_RESTORE_PLAN_CONTRACT = "chenyida-erp-postgresql-cluster-restore-plan/v1";
 
 const PLAN_CLASSIFICATION = "PRIVATE_OPERATOR_PLAN";
+const RECOVERY_MARKER_PREFIX = "chenyida-erp-postgresql-recovery/v1";
 const DATA_RESTORE_ARGUMENTS = Object.freeze(["--no-owner", "--no-acl", "--exit-on-error", "--single-transaction"]);
 const TABLE_KINDS = new Set(["TABLE", "PARTITIONED_TABLE", "VIEW", "MATERIALIZED_VIEW"]);
 const SAFE_CONNECTION_ENVIRONMENT = new Set([
@@ -81,9 +82,23 @@ function validateDatabaseProfile(value, policy) {
   return value;
 }
 
-function roleSkeletonSql(snapshot) {
+function recoveryResource({ kind, snapshot, policy, discriminator }) {
+  const resourceIdentitySha256 = clusterSha256({
+    contract: RECOVERY_MARKER_PREFIX,
+    kind,
+    snapshot_sha256: snapshot.snapshot_sha256,
+    policy_sha256: clusterPolicySha256(policy),
+    discriminator,
+  });
+  return Object.freeze({
+    resource_identity_sha256: resourceIdentitySha256,
+    recovery_marker: `${RECOVERY_MARKER_PREFIX}:${kind}:${resourceIdentitySha256}`,
+  });
+}
+
+function roleSkeletonSql(snapshot, roles) {
   const lines = ["BEGIN;", "SET LOCAL lock_timeout = '5s';", "SET LOCAL statement_timeout = '60s';"];
-  for (const role of snapshot.catalog.roles) {
+  for (const [index, role] of snapshot.catalog.roles.entries()) {
     const attributes = [
       "NOSUPERUSER",
       role.inherit ? "INHERIT" : "NOINHERIT",
@@ -97,19 +112,23 @@ function roleSkeletonSql(snapshot) {
       "NOBYPASSRLS",
     ];
     lines.push(`CREATE ROLE ${quotePostgresIdentifier(role.name)} WITH ${attributes.join(" ")};`);
+    lines.push(`COMMENT ON ROLE ${quotePostgresIdentifier(role.name)} IS ${quotePostgresLiteral(roles[index].recovery_marker)};`);
   }
   lines.push("COMMIT;");
   return sqlDocument(lines);
 }
 
-function tablespaceSql(tablespace, entry) {
+function tablespaceSql(tablespace, entry, recoveryMarker) {
   if (tablespace.options.length !== 0) reject("CLUSTER_RESTORE_TABLESPACE_OPTIONS_UNSUPPORTED");
   return sqlDocument([
+    "SET lock_timeout = '5s';",
+    "SET statement_timeout = '120s';",
     `CREATE TABLESPACE ${quotePostgresIdentifier(tablespace.name)} OWNER ${quotePostgresIdentifier(tablespace.owner)} LOCATION ${quotePostgresLiteral(entry.server_path)};`,
+    `COMMENT ON TABLESPACE ${quotePostgresIdentifier(tablespace.name)} IS ${quotePostgresLiteral(recoveryMarker)};`,
   ]);
 }
 
-function databaseSql(snapshot, profile) {
+function databaseSql(snapshot, profile, recoveryMarker) {
   const database = snapshot.catalog.database;
   const options = [
     `OWNER ${quotePostgresIdentifier(database.owner)}`,
@@ -124,7 +143,12 @@ function databaseSql(snapshot, profile) {
   if (profile.collation_version !== null && profile.collation_version !== "NONE") {
     options.push(`COLLATION_VERSION ${quotePostgresLiteral(profile.collation_version)}`);
   }
-  return sqlDocument([`CREATE DATABASE ${quotePostgresIdentifier(database.name)} WITH ${options.join(" ")};`]);
+  return sqlDocument([
+    "SET lock_timeout = '5s';",
+    "SET statement_timeout = '120s';",
+    `CREATE DATABASE ${quotePostgresIdentifier(database.name)} WITH ${options.join(" ")};`,
+    `COMMENT ON DATABASE ${quotePostgresIdentifier(database.name)} IS ${quotePostgresLiteral(recoveryMarker)};`,
+  ]);
 }
 
 function routineReference(objectValue) {
@@ -239,19 +263,47 @@ function quarantineSql(snapshot) {
 }
 
 function buildPlanBody({ snapshot, policy, tablespaceMap, databaseProfile }) {
-  const roleSql = roleSkeletonSql(snapshot);
+  const roles = snapshot.catalog.roles.map((role) => ({
+    name: role.name,
+    purpose: role.purpose,
+    ...recoveryResource({ kind: "ROLE", snapshot, policy, discriminator: { name: role.name, purpose: role.purpose } }),
+  }));
+  const roleSql = roleSkeletonSql(snapshot, roles);
   const tableSpaces = snapshot.catalog.tablespaces.map((tablespace, index) => {
-    const entry = tablespaceMap.entries[index], sql = tablespaceSql(tablespace, entry);
+    const entry = tablespaceMap.entries[index];
+    const resource = recoveryResource({
+      kind: "TABLESPACE",
+      snapshot,
+      policy,
+      discriminator: {
+        name: tablespace.name,
+        source_location_sha256: tablespace.source_location_sha256,
+        target_server_path_sha256: clusterSha256(entry.server_path),
+        tablespace_map_sha256: clusterSha256(tablespaceMap),
+      },
+    });
+    const sql = tablespaceSql(tablespace, entry, resource.recovery_marker);
     return {
       name: tablespace.name,
       source_location_sha256: tablespace.source_location_sha256,
       target_server_path_sha256: clusterSha256(entry.server_path),
+      ...resource,
       transactional: false,
       sql,
       sql_sha256: clusterSha256(sql),
     };
   });
-  const createDatabase = databaseSql(snapshot, databaseProfile);
+  const databaseResource = recoveryResource({
+    kind: "DATABASE",
+    snapshot,
+    policy,
+    discriminator: {
+      name: snapshot.catalog.database.name,
+      database_profile_sha256: clusterSha256(databaseProfile),
+      default_tablespace: snapshot.catalog.database.default_tablespace,
+    },
+  });
+  const createDatabase = databaseSql(snapshot, databaseProfile, databaseResource.recovery_marker);
   const applySecurity = securitySql(snapshot, policy);
   const activate = activationSql(snapshot);
   const quarantine = quarantineSql(snapshot);
@@ -267,9 +319,10 @@ function buildPlanBody({ snapshot, policy, tablespaceMap, databaseProfile }) {
     tablespace_map_sha256: clusterSha256(tablespaceMap),
     database_profile_sha256: clusterSha256(databaseProfile),
     restore_role: policy.identities.migration_owner,
+    roles,
     role_skeleton: { transactional: true, ...sqlArtifact(roleSql) },
     tablespaces: tableSpaces,
-    database: { name: snapshot.catalog.database.name, transactional: false, ...sqlArtifact(createDatabase) },
+    database: { name: snapshot.catalog.database.name, ...databaseResource, transactional: false, ...sqlArtifact(createDatabase) },
     data_restore: { role: policy.identities.migration_owner, required_arguments: [...DATA_RESTORE_ARGUMENTS] },
     security: { transactional: true, ...sqlArtifact(applySecurity) },
     credential_binding: { transport: "PSQL_META_PASSWORD_STDIN", role_set_sha256: clusterSha256(policy.credential_binding.login_roles), role_count: policy.credential_binding.login_roles.length },
@@ -284,6 +337,11 @@ function validateSqlArtifact(value, code, transactional) {
     || value.sql_sha256 !== clusterSha256(value.sql)) reject(code);
 }
 
+function validateRecoveryResource(value, kind, code) {
+  if (typeof value.resource_identity_sha256 !== "string" || !/^[0-9a-f]{64}$/u.test(value.resource_identity_sha256)
+    || value.recovery_marker !== `${RECOVERY_MARKER_PREFIX}:${kind}:${value.resource_identity_sha256}`) reject(code);
+}
+
 export function validateClusterRestorePlan(plan, { snapshot: snapshotInput, policy: policyInput, tablespaceMap: mapInput, databaseProfile: profileInput } = {}) {
   const policy = validateClusterRecoveryPolicy(policyInput);
   const snapshot = validateClusterSnapshot(snapshotInput, policy);
@@ -291,7 +349,7 @@ export function validateClusterRestorePlan(plan, { snapshot: snapshotInput, poli
   const databaseProfile = validateDatabaseProfile(profileInput, policy);
   exactKeys(plan, [
     "schema_version", "contract", "classification", "backup_id", "snapshot_sha256", "source_catalog_sha256", "policy_id", "policy_sha256",
-    "tablespace_map_sha256", "database_profile_sha256", "restore_role", "role_skeleton", "tablespaces", "database", "data_restore",
+    "tablespace_map_sha256", "database_profile_sha256", "restore_role", "roles", "role_skeleton", "tablespaces", "database", "data_restore",
     "security", "credential_binding", "activation", "quarantine", "plan_sha256",
   ], "CLUSTER_RESTORE_PLAN_INVALID");
   if (plan.schema_version !== 1 || plan.contract !== CLUSTER_RESTORE_PLAN_CONTRACT || plan.classification !== PLAN_CLASSIFICATION
@@ -299,16 +357,24 @@ export function validateClusterRestorePlan(plan, { snapshot: snapshotInput, poli
     || plan.source_catalog_sha256 !== snapshot.catalog_sha256 || plan.policy_id !== policy.policy_id
     || plan.policy_sha256 !== clusterPolicySha256(policy) || plan.tablespace_map_sha256 !== clusterSha256(tablespaceMap)
     || plan.database_profile_sha256 !== clusterSha256(databaseProfile) || plan.restore_role !== policy.identities.migration_owner) reject("CLUSTER_RESTORE_PLAN_BINDING_MISMATCH");
+  if (!Array.isArray(plan.roles) || plan.roles.length !== snapshot.catalog.roles.length) reject("CLUSTER_RESTORE_ROLE_PLAN_INVALID");
+  for (const [index, value] of plan.roles.entries()) {
+    exactKeys(value, ["name", "purpose", "resource_identity_sha256", "recovery_marker"], "CLUSTER_RESTORE_ROLE_PLAN_INVALID");
+    if (value.name !== snapshot.catalog.roles[index].name || value.purpose !== snapshot.catalog.roles[index].purpose) reject("CLUSTER_RESTORE_ROLE_PLAN_INVALID");
+    validateRecoveryResource(value, "ROLE", "CLUSTER_RESTORE_ROLE_PLAN_INVALID");
+  }
   validateSqlArtifact(plan.role_skeleton, "CLUSTER_RESTORE_ROLE_PLAN_INVALID", true);
   if (!Array.isArray(plan.tablespaces) || plan.tablespaces.length !== snapshot.catalog.tablespaces.length) reject("CLUSTER_RESTORE_TABLESPACE_PLAN_INVALID");
   for (const [index, value] of plan.tablespaces.entries()) {
-    exactKeys(value, ["name", "source_location_sha256", "target_server_path_sha256", "transactional", "sql", "sql_sha256"], "CLUSTER_RESTORE_TABLESPACE_PLAN_INVALID");
+    exactKeys(value, ["name", "source_location_sha256", "target_server_path_sha256", "resource_identity_sha256", "recovery_marker", "transactional", "sql", "sql_sha256"], "CLUSTER_RESTORE_TABLESPACE_PLAN_INVALID");
     if (value.name !== snapshot.catalog.tablespaces[index].name || value.source_location_sha256 !== snapshot.catalog.tablespaces[index].source_location_sha256
       || value.target_server_path_sha256 !== clusterSha256(tablespaceMap.entries[index].server_path)) reject("CLUSTER_RESTORE_TABLESPACE_PLAN_INVALID");
+    validateRecoveryResource(value, "TABLESPACE", "CLUSTER_RESTORE_TABLESPACE_PLAN_INVALID");
     validateSqlArtifact({ transactional: value.transactional, sql: value.sql, sql_sha256: value.sql_sha256 }, "CLUSTER_RESTORE_TABLESPACE_PLAN_INVALID", false);
   }
-  exactKeys(plan.database, ["name", "transactional", "sql", "sql_sha256"], "CLUSTER_RESTORE_DATABASE_PLAN_INVALID");
+  exactKeys(plan.database, ["name", "resource_identity_sha256", "recovery_marker", "transactional", "sql", "sql_sha256"], "CLUSTER_RESTORE_DATABASE_PLAN_INVALID");
   if (plan.database.name !== snapshot.catalog.database.name) reject("CLUSTER_RESTORE_DATABASE_PLAN_INVALID");
+  validateRecoveryResource(plan.database, "DATABASE", "CLUSTER_RESTORE_DATABASE_PLAN_INVALID");
   validateSqlArtifact({ transactional: plan.database.transactional, sql: plan.database.sql, sql_sha256: plan.database.sql_sha256 }, "CLUSTER_RESTORE_DATABASE_PLAN_INVALID", false);
   exactKeys(plan.data_restore, ["role", "required_arguments"], "CLUSTER_RESTORE_DATA_PLAN_INVALID");
   if (plan.data_restore.role !== policy.identities.migration_owner || canonicalClusterJson(plan.data_restore.required_arguments) !== canonicalClusterJson(DATA_RESTORE_ARGUMENTS)) reject("CLUSTER_RESTORE_DATA_PLAN_INVALID");

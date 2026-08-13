@@ -234,6 +234,7 @@ const write = (name, value) => writeFileSync(`${env.TASK_ROOT}/${name}`, typeof 
 write("snapshot.json", snapshot);
 write("tablespace-map.json", tablespaceMap);
 write("tablespace-preflight.json", validation);
+write("database-profile.json", profile);
 write("plan.json", plan);
 write("role-skeleton.sql", plan.role_skeleton.sql);
 write("tablespace.sql", plan.tablespaces[0].sql);
@@ -260,12 +261,193 @@ if psql -X -v ON_ERROR_STOP=1 -f "$TASK_ROOT/role-skeleton.sql" >"$TASK_ROOT/rol
 fi
 [ "$(psql -X -Atc "select count(*) from pg_roles where rolname in ('chenyida_erp_owner','chenyida_erp_runtime','chenyida_erp_rw')")" = 1 ]
 psql -X -v ON_ERROR_STOP=1 -c 'DROP ROLE chenyida_erp_owner' >/dev/null
+
+STATE_ROOT="$TASK_ROOT/recovery-state"
+mkdir -m 0700 "$STATE_ROOT"
+printf 'chenyida-erp-postgresql-recovery-state-root/v1\n' > "$STATE_ROOT/.chenyida-erp-postgresql-recovery-state-root-v1"
+chmod 0400 "$STATE_ROOT/.chenyida-erp-postgresql-recovery-state-root-v1"
+PSQL_EXECUTOR=/usr/lib/postgresql/17/bin/psql
+[ -x "$PSQL_EXECUTOR" ] && [ ! -L "$PSQL_EXECUTOR" ] || { echo "trusted psql executable is unavailable" >&2; exit 1; }
+
+initialize_recovery_state() {
+  recovery_run_id=$1
+  recovery_created_at=$2
+  TASK_ROOT="$TASK_ROOT" STATE_ROOT="$STATE_ROOT" RUN_ID="$recovery_run_id" CREATED_AT="$recovery_created_at" TARGET_SYSTEM_ID="$TARGET_SYSTEM_ID" \
+  node --input-type=module <<'NODE'
+import { readFileSync } from "node:fs";
+import {
+  clusterSha256,
+  createInitialRecoveryState,
+  createRecoveryIntent,
+  writeRecoveryIntent,
+  writeRecoveryState,
+} from "/workspace/scripts/postgresql-cluster-recovery-contract.mjs";
+import { expectedRecoveryIntentBindings } from "/workspace/scripts/postgresql-cluster-recovery-executor.mjs";
+const env = process.env;
+const read = (name) => JSON.parse(readFileSync(`${env.TASK_ROOT}/${name}`, "utf8"));
+const snapshot = read("snapshot.json"), plan = read("plan.json"), tablespaceMap = read("tablespace-map.json"), databaseProfile = read("database-profile.json");
+const policy = JSON.parse(readFileSync("/workspace/operations/postgresql-cluster-recovery-policy-v1.json", "utf8"));
+const bindings = expectedRecoveryIntentBindings({ plan, snapshot, policy, tablespaceMap, databaseProfile });
+const intent = createRecoveryIntent({
+  restore_run_id: env.RUN_ID,
+  backup_id: bindings.backup_id,
+  created_at: env.CREATED_AT,
+  evidence_scope: bindings.evidence_scope,
+  policy_sha256: bindings.policy_sha256,
+  snapshot_sha256: bindings.snapshot_sha256,
+  data_transfer_acceptance_sha256: "4".repeat(64),
+  cluster_transfer_acceptance_sha256: "5".repeat(64),
+  joint_transfer_sha256: "6".repeat(64),
+  target_system_identifier_sha256: clusterSha256(env.TARGET_SYSTEM_ID),
+  target_empty_state_sha256: clusterSha256(`synthetic-empty-target:${env.RUN_ID}`),
+  credential_generation_id: `generation-${env.RUN_ID}`,
+  credential_role_set_sha256: bindings.credential_role_set_sha256,
+  tablespace_map_sha256: bindings.tablespace_map_sha256,
+  custom_tablespace_identity_sha256: [...bindings.custom_tablespace_identity_sha256],
+});
+await writeRecoveryIntent({ stateRoot: env.STATE_ROOT, intent });
+await writeRecoveryState({ stateRoot: env.STATE_ROOT, intent, state: createInitialRecoveryState(intent, env.CREATED_AT) });
+NODE
+}
+
+record_role_skeleton_state() {
+  recovery_run_id=$1
+  TASK_ROOT="$TASK_ROOT" STATE_ROOT="$STATE_ROOT" RUN_ID="$recovery_run_id" \
+  node --input-type=module <<'NODE'
+import {
+  readRecoveryExecution,
+  transitionRecoveryState,
+  writeRecoveryState,
+} from "/workspace/scripts/postgresql-cluster-recovery-contract.mjs";
+const env = process.env, execution = await readRecoveryExecution({ stateRoot: env.STATE_ROOT, restoreRunId: env.RUN_ID });
+const state = transitionRecoveryState(execution.current, execution.intent, {
+  phase: "ROLE_SKELETON_APPLIED",
+  recordedAt: new Date(Date.parse(execution.current.recorded_at) + 1000).toISOString(),
+});
+await writeRecoveryState({ stateRoot: env.STATE_ROOT, intent: execution.intent, state });
+NODE
+}
+
+run_recovery_cli() {
+  recovery_command=$1
+  recovery_run_id=$2
+  recovery_confirmation=$3
+  node "$SITE_ROOT/scripts/postgresql-cluster-recovery-executor.mjs" "$recovery_command" \
+    --state-root "$STATE_ROOT" \
+    --restore-run-id "$recovery_run_id" \
+    --plan "$TASK_ROOT/plan.json" \
+    --snapshot "$TASK_ROOT/snapshot.json" \
+    --policy "$POLICY_FILE" \
+    --tablespace-map "$TASK_ROOT/tablespace-map.json" \
+    --tablespace-preflight "$TASK_ROOT/tablespace-preflight.json" \
+    --database-profile "$TASK_ROOT/database-profile.json" \
+    --psql "$PSQL_EXECUTOR" \
+    --pg-host "$TARGET_SOCKET" \
+    --pg-port 5432 \
+    --pg-user postgres \
+    --confirm "$recovery_confirmation" >/dev/null
+}
+
+COMPENSATION_RUN=cluster-compensation-synthetic-1
+initialize_recovery_state "$COMPENSATION_RUN" 2026-08-13T08:02:00.000Z
 psql -X -v ON_ERROR_STOP=1 -f "$TASK_ROOT/role-skeleton.sql" >/dev/null
 [ "$(psql -X -Atc "select count(*) from pg_roles where rolname in ('chenyida_erp_owner','chenyida_erp_runtime','chenyida_erp_rw') and not rolcanlogin and not rolsuper and not rolcreaterole and not rolcreatedb and not rolreplication and not rolbypassrls")" = 3 ]
+record_role_skeleton_state "$COMPENSATION_RUN"
 
-psql -X -v ON_ERROR_STOP=1 -f "$TASK_ROOT/tablespace.sql" >/dev/null
+TASK_ROOT="$TASK_ROOT" STATE_ROOT="$STATE_ROOT" RUN_ID="$COMPENSATION_RUN" TARGET_SOCKET="$TARGET_SOCKET" PSQL_EXECUTOR="$PSQL_EXECUTOR" \
+node --input-type=module <<'NODE'
+import { readFileSync } from "node:fs";
+import { readRecoveryExecution } from "/workspace/scripts/postgresql-cluster-recovery-contract.mjs";
+import {
+  PsqlClusterRecoveryAdapter,
+  RECOVERY_EXECUTOR_CONFIRMATION,
+  executeNextNontransactionalRecoveryStep,
+} from "/workspace/scripts/postgresql-cluster-recovery-executor.mjs";
+const env = process.env, read = (name) => JSON.parse(readFileSync(`${env.TASK_ROOT}/${name}`, "utf8"));
+const execution = await readRecoveryExecution({ stateRoot: env.STATE_ROOT, restoreRunId: env.RUN_ID });
+const input = {
+  stateRoot: env.STATE_ROOT,
+  intent: execution.intent,
+  plan: read("plan.json"),
+  snapshot: read("snapshot.json"),
+  policy: JSON.parse(readFileSync("/workspace/operations/postgresql-cluster-recovery-policy-v1.json", "utf8")),
+  tablespaceMap: read("tablespace-map.json"),
+  tablespacePreflight: read("tablespace-preflight.json"),
+  databaseProfile: read("database-profile.json"),
+  adapter: new PsqlClusterRecoveryAdapter({ psqlPath: env.PSQL_EXECUTOR, connectionEnvironment: { PGHOST: env.TARGET_SOCKET, PGPORT: "5432", PGUSER: "postgres" } }),
+  confirmation: RECOVERY_EXECUTOR_CONFIRMATION,
+  faultInjector(stage) { if (stage === "AFTER_INITIAL_COMMAND") throw new Error("EXPECTED_TABLESPACE_RESPONSE_LOSS"); },
+};
+let observed = false;
+try { await executeNextNontransactionalRecoveryStep(input); } catch (error) {
+  observed = error?.message === "EXPECTED_TABLESPACE_RESPONSE_LOSS";
+  if (!observed) throw new Error(`tablespace executor failed before injection: ${error?.code ?? "UNKNOWN"}`);
+}
+if (!observed) throw new Error("tablespace response-loss crash was not observed");
+NODE
+
+run_recovery_cli next "$COMPENSATION_RUN" EXECUTE_EXACT_POSTGRESQL_CLUSTER_RECOVERY_V1
 [ "$(psql -X -Atc "select pg_tablespace_location(oid) from pg_tablespace where spcname='erp_ts'")" = "$TARGET_TABLESPACE" ]
-psql -X -v ON_ERROR_STOP=1 -f "$TASK_ROOT/database.sql" >/dev/null
+
+TASK_ROOT="$TASK_ROOT" STATE_ROOT="$STATE_ROOT" RUN_ID="$COMPENSATION_RUN" TARGET_SOCKET="$TARGET_SOCKET" PSQL_EXECUTOR="$PSQL_EXECUTOR" \
+node --input-type=module <<'NODE'
+import { readFileSync } from "node:fs";
+import { readRecoveryExecution } from "/workspace/scripts/postgresql-cluster-recovery-contract.mjs";
+import {
+  PsqlClusterRecoveryAdapter,
+  RECOVERY_EXECUTOR_CONFIRMATION,
+  executeNextNontransactionalRecoveryStep,
+} from "/workspace/scripts/postgresql-cluster-recovery-executor.mjs";
+const env = process.env, read = (name) => JSON.parse(readFileSync(`${env.TASK_ROOT}/${name}`, "utf8"));
+const execution = await readRecoveryExecution({ stateRoot: env.STATE_ROOT, restoreRunId: env.RUN_ID });
+const input = {
+  stateRoot: env.STATE_ROOT,
+  intent: execution.intent,
+  plan: read("plan.json"),
+  snapshot: read("snapshot.json"),
+  policy: JSON.parse(readFileSync("/workspace/operations/postgresql-cluster-recovery-policy-v1.json", "utf8")),
+  tablespaceMap: read("tablespace-map.json"),
+  tablespacePreflight: read("tablespace-preflight.json"),
+  databaseProfile: read("database-profile.json"),
+  adapter: new PsqlClusterRecoveryAdapter({ psqlPath: env.PSQL_EXECUTOR, connectionEnvironment: { PGHOST: env.TARGET_SOCKET, PGPORT: "5432", PGUSER: "postgres" } }),
+  confirmation: RECOVERY_EXECUTOR_CONFIRMATION,
+  faultInjector(stage) { if (stage === "AFTER_DISPATCH_DURABLE") throw new Error("EXPECTED_DATABASE_PRE_DISPATCH_CRASH"); },
+};
+let observed = false;
+try { await executeNextNontransactionalRecoveryStep(input); } catch (error) {
+  observed = error?.message === "EXPECTED_DATABASE_PRE_DISPATCH_CRASH";
+  if (!observed) throw new Error(`database executor failed before injection: ${error?.code ?? "UNKNOWN"}`);
+}
+if (!observed) throw new Error("database pre-dispatch crash was not observed");
+NODE
+
+run_recovery_cli next "$COMPENSATION_RUN" EXECUTE_EXACT_POSTGRESQL_CLUSTER_RECOVERY_V1
+[ "$(psql -X -Atc "select datconnlimit from pg_database where datname='chenyida_erp'")" = 0 ]
+
+PGDATABASE=chenyida_erp psql -X -v ON_ERROR_STOP=1 -f "$TASK_ROOT/quarantine.sql" >/dev/null
+STATE_ROOT="$STATE_ROOT" RUN_ID="$COMPENSATION_RUN" node --input-type=module <<'NODE'
+import { readRecoveryExecution, transitionRecoveryState, writeRecoveryState } from "/workspace/scripts/postgresql-cluster-recovery-contract.mjs";
+const env = process.env, execution = await readRecoveryExecution({ stateRoot: env.STATE_ROOT, restoreRunId: env.RUN_ID });
+const state = transitionRecoveryState(execution.current, execution.intent, {
+  phase: "QUARANTINED",
+  operation: execution.current.operation,
+  recordedAt: execution.current.recorded_at,
+});
+await writeRecoveryState({ stateRoot: env.STATE_ROOT, intent: execution.intent, state });
+NODE
+run_recovery_cli compensate "$COMPENSATION_RUN" COMPENSATE_EXACT_POSTGRESQL_CLUSTER_RECOVERY_V1
+[ "$(psql -X -Atc "select count(*) from pg_database where datname='chenyida_erp'")" = 0 ]
+[ "$(psql -X -Atc "select count(*) from pg_tablespace where spcname='erp_ts'")" = 0 ]
+[ "$(psql -X -Atc "select count(*) from pg_roles where rolname in ('chenyida_erp_owner','chenyida_erp_runtime','chenyida_erp_rw')")" = 0 ]
+[ -z "$(ls -A "$TARGET_TABLESPACE")" ]
+
+RECOVERY_RUN=cluster-restore-synthetic-1
+initialize_recovery_state "$RECOVERY_RUN" 2026-08-13T08:10:00.000Z
+psql -X -v ON_ERROR_STOP=1 -f "$TASK_ROOT/role-skeleton.sql" >/dev/null
+record_role_skeleton_state "$RECOVERY_RUN"
+run_recovery_cli next "$RECOVERY_RUN" EXECUTE_EXACT_POSTGRESQL_CLUSTER_RECOVERY_V1
+run_recovery_cli next "$RECOVERY_RUN" EXECUTE_EXACT_POSTGRESQL_CLUSTER_RECOVERY_V1
+[ "$(psql -X -Atc "select pg_tablespace_location(oid) from pg_tablespace where spcname='erp_ts'")" = "$TARGET_TABLESPACE" ]
 [ "$(psql -X -Atc "select datconnlimit from pg_database where datname='chenyida_erp'")" = 0 ]
 
 pg_restore --dbname=chenyida_erp --role=chenyida_erp_owner --no-owner --no-acl --exit-on-error --single-transaction "$TASK_ROOT/postgresql.dump"
