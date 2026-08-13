@@ -35,7 +35,7 @@ Compose 配置展开需要数据库和 setup 变量；只读状态检查可使�
 - `/api/summary`和`/api/management-dashboard`只读查询 PostgreSQL 权威关系表；权限裁剪仍由服务端执行。
 - 最近系统审计要求 `system.audit.read`；备份治理要求 `system.backup.read`。
 - Web 通过只读 `ERP_RELEASE_IDENTITY_FILE`核对 root 发布的实际 Web/Worker 容器 ID、镜像 digest、版本和 Git SHA；缺失、过期、伪造或与 baked runtime/database/Migration 不符时身份为 `UNCONFIGURED/MISMATCH`。
-- Web 通过只读 `ERP_BACKUP_STATUS_FILE`读取 V2 回执；旧 V1 只能显示 `LEGACY_LOCAL_ONLY`。只有未过期的 `RESTORE_VERIFIED`同时匹配运行身份、策略、异机接收方和隔离恢复目标，`recovery_ready`才为 true。
+- Web 通过只读 `ERP_BACKUP_STATUS_FILE`读取root发布的V3 `recovery-readiness.json`；旧V1显示`LEGACY_LOCAL_ONLY`，任意V2显示`LEGACY_V2_INNER_ONLY`，synthetic evidence永远不ready。只有`ACTUAL_OFFHOST + RECOVERY_READY`且签名密文transfer、加密、已安装/观察到的调度、dry-run保留、内层恢复和当前运行身份全部匹配且新鲜，`recovery_ready`才为true。
 - 浏览器没有备份或恢复写能力。详细合同与命令见 `backup-restore.md`。
 
 ## 受控变更顺序
@@ -84,8 +84,8 @@ TASK50已经在仓库和任务私有隔离容器中验证[D-127](../project/DECI
 
 ## 备份、恢复与故障处理
 
-- V2 已用合成数据和双独立 PostgreSQL 测试集群证明四域 manifest、数据库守卫、不可变本机/异机/恢复回执、故障注入清理及 prepared receipt 补发；没有读取当前四卷或生成真实备份。
-- 当前仍没有真实异故障域副本、加密传输/保留策略、自动调度、告警责任人或真实恢复 RTO；Dashboard 不得把本机回执冒充灾备。
+- V2已用合成数据和双独立PostgreSQL测试集群证明四域manifest、数据库守卫、内层回执、故障注入清理及prepared receipt补发；TASK54又以合成密文链证明Ed25519/X25519/HKDF/AES-GCM、双向ACK、恢复强绑定、调度评估和dry-run保留。两者都没有读取当前四卷或生成真实备份。
+- 当前仍没有真实异故障域副本、真实密钥托管/WORM/timer/保留删除、告警责任人、cluster roles/ACL/default privileges/tablespace恢复或真实RTO；Dashboard不得把本机、旧V2或synthetic回执冒充灾备。
 - 若备份进程中断且 `.backup-fence-v2.json`存在，数据库保持安全只读/连接受限。禁止手工删除 intent 或直接重跑；使用 `recover-backup-guard.sh`按精确稳定身份恢复。
 - 若隔离恢复在 prepared receipt 后发布失败，保留精确 TEST 数据库、文件目标和 prepared evidence；使用 `publish-restore-receipt-selfhost.sh`补发，不重跑恢复。
 - 若容器 OOM/反复重启、数据库不健康、身份漂移、回执过期/损坏、Migration 不符或关键数据核对失败，立即停止新写操作，保全日志/审计/证据，不清理持久卷或备份，按已批准的事故任务升级。
@@ -137,7 +137,7 @@ TASK49提供仓库级`chenyida-erp-operations-monitoring/v1`合同、去敏采�
 - Docker health取值固定使用`{{with (index .State "Health")}}{{.Status}}{{else}}none{{end}}`语义；直接读取`.State.Health.Status`或`.Config.Healthcheck`会在现行Docker上因缺失key失败。Caddy允许`none`，部署后/常态监控的PostgreSQL/Web/Worker必须`healthy`；部署前旧运行面稳定门的Worker例外不能复用于监控绿色判断。
 - `operations/monitoring-policy-v1.json`只定义时间窗、服务健康和恢复要求；资源阈值唯一来自`release/release-gate-plan-v2.json.resource_policy`并由SHA-256绑定：available memory `<768 MiB`、Swap使用率`>80%`、60秒Swap增长`>256 MiB`、根盘可用`<10 GiB`、Load1连续3分钟`>4`。等于边界不触发，越过边界才触发。
 - root受控配置必须从同一未过期`ELIGIBLE`release manifest及已发布runtime/backup身份生成，固定deployment/project、四个精确容器名、四个digest引用、版本、40位Git commit、release/supervisor/Migration manifest摘要、Migration head、backup policy/RPO和通知target。UAT/PRODUCTION的`notification.required`必须为true；不得使用tag或手填另一套摘要。
-- 应用、release、backup和notification组件通过独立root控制的去敏JSON适配层交给`--components`。readiness只提供version/revision/head，完整Migration manifest摘要来自release evidence；backup只提供状态枚举、恢复点/过期时间、policy/RPO和`recovery_ready`。省略组件文件会明确生成`NOT_COLLECTED`并告警，不能得到绿色结果。
+- 应用、release、backup和notification组件通过独立root控制的去敏JSON适配层交给`--components`。readiness只提供version/revision/head，完整Migration manifest摘要来自release evidence；backup只提供scope、transfer/encryption/schedule/retention/identity/policy/assurance状态、恢复点/过期时间和`recovery_ready`。省略组件文件会明确生成`NOT_COLLECTED`并告警，不能得到绿色结果。
 
 ### 初始化与周期执行
 
@@ -183,7 +183,7 @@ sudo <installed-node> <installed-cli> status \
 | `SERVICE_*` | 核对四个精确project/service/container/digest、running和health；实例变化必须与批准发布journal一致 | 不接受tag、未知容器、Worker `none`或手工跳过health；精确身份和必需health恢复后才关闭 |
 | `APPLICATION_*` | 按“Liveness、Readiness与Worker租约处置”停止候选晋升，使用稳定code/request ID核对Web、Worker、Migration和双卷探针 | 不记录响应原文/堆栈，不改租约/healthcheck绕过；live/readiness新鲜且身份一致才恢复 |
 | `RELEASE_*` | 按“Dashboard与运行身份”核对已安装supervisor、manifest摘要、运行容器与Migration；阻止切换 | 不从tag/API猜Git或manifest摘要，不手写identity；重新受控发布匹配且新鲜的identity后恢复 |
-| `BACKUP_*` | 阻止上线/切换及风险写操作，保全回执，按`backup-restore.md`核对异机、隔离恢复、policy/RPO和过期时间 | 不把本机副本当异机、不改回执；新的真实`RESTORE_VERIFIED`链与当前运行身份完全匹配后恢复 |
+| `BACKUP_*` | 阻止上线/切换及风险写操作，保全回执，按`backup-restore.md`分别核对legacy/synthetic、transfer、encryption、schedule、retention、隔离恢复、policy/RPO和过期时间 | 不把本机/V2/synthetic副本当真实异机、不改回执；新的真实V3 `ACTUAL_OFFHOST + RECOVERY_READY`链与当前运行身份完全匹配后恢复 |
 | `ALERT_DELIVERY_NOT_CONFIGURED`、exit 2 | 保留pending，按既定紧急联系路径人工升级并记录event ID；修复target/凭据/网络后做测试告警、恢复告警和重复投递演练 | 不把stdout/本机文件/人工口头通知标成delivered；确认幂等送达和ack证据后才清积压 |
 
 ### 安装、验证与回滚门

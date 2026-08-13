@@ -2253,6 +2253,46 @@
 - 拒绝接受 local-only registry 引用作为部署后可恢复身份、从容器环境读取秘密来证明版本，或在回执/身份不一致时手工编辑、覆盖或删除不可变证据。
 - 拒绝让一次宽泛授权同时执行 gate、manifest、部署和身份发布；三个阶段必须分别受版本化动作和专项授权控制。
 
+## D-131 备份恢复保持内层 V2，并以签名密文来源和 V3 就绪回执闭合
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL OFFHOST BLOCKED / PRODUCTION NO-GO`
+- 提案与实施：Codex 持续交付负责人，依据 TASK54 三线只读审计、TASK41 四域恢复基线及合成密文双集群恢复证据
+- 确认边界：只修改仓库合同、Dashboard、监控、测试和运行手册，并在任务私有合成目录/隔离 PostgreSQL 中验证；不授权真实密钥、异机目标、数据读取或外传、host 调度、删除、UAT/生产恢复或部署
+
+### Context
+
+- TASK41 的 V2 已稳定证明 PostgreSQL、uploads、attachments、backup-status 四域一致性捕获、数据库 fence、严格 manifest、不可变分层回执和不同集群恢复；重写内层会扩大已经通过故障测试的恢复面。
+- V2 的“异机”步骤仍是明文人工复制后由调用者提供 `transfer_id`。攻击者若能替换制品、manifest 和回执，仍可制造内部一致但来源不可信的副本；同时没有客户端加密、接收 ACK、重放边界或失败恢复状态。
+- 旧 Dashboard 可把完整 V2 恢复链解释为 ready，但它不能证明密文跨故障域、真实接收方、调度准时或保留策略安全。仓库也没有统一的 backup/export/import/restore 单飞合同、漏跑状态或可审阅保留计划。
+- 本任务没有真实异机、密钥托管、timer、WORM 或删除授权。仓库机制必须能证明其自身边界，并阻止合成证据或旧人工复制回执被误写成真实灾备。
+
+### Decision
+
+1. 保持 `chenyida-erp-backup/v2` 与既有 V2 恢复核心稳定；外层另行版本化为 `chenyida-erp-offhost-transfer/v1`、receiver receipt、source acceptance 和 materialization receipt。任何外层变化不得降低内层文件集合、Migration、内容 reconciliation 或恢复故障断言。
+2. 源端只接受仍新鲜且完整复验的 `LOCAL_VERIFIED`。四域以随机 content key 做 AES-256-GCM；接收方 X25519 公钥与临时 X25519 密钥经 HKDF-SHA256 包装 content key；源端和接收端分别用 Ed25519 对 canonical evidence 签名。私钥只允许来自 owner/mode/link/ancestor 均通过检查的专用文件，禁止进入 argv、环境、回执或日志。
+3. 发送、接收和确认采用 `PREPARED → SEALED/VERIFIED/ACCEPTED` 的 durable intent、私有 staging、fsync、无覆盖原子晋升和 payload 冲突检测。相同 ID/相同 payload 可幂等续跑；截断、tag/AAD/signature/key/recipient 篡改、跨代混合、重放、错误 key 或相同 ID/不同 payload 一律失败关闭。
+4. 恢复入口必须先验证 envelope、源签名、接收签名回执、源端 acceptance、策略与精确摘要链，再在专用私有根短暂物化内层 V2；恢复回执绑定 envelope/receiver/acceptance/offhost receipt。成功或失败后的明文 staging 必须按精确身份清理或显式隔离，旧 V2 人工复制链只能标为 `LEGACY_V2_INNER_ONLY`，不能产生当前就绪状态。
+5. `chenyida-erp-backup-operations-policy/v1`固定 UTC anchor、cadence/RPO/grace、最大运行时间、最少成功/恢复代次、hold、受保护代次和 key allowlist。状态以 flock、CAS、单调历史和完整性链推进；锁忙、漏跑、未来时间或时钟倒退不算成功。retention 只生成 canonical `DRY_RUN_DELETION_FORBIDDEN` 计划，latest、inflight、hold、RPO 内及最低恢复代次永不列为可删对象；本版本没有删除执行器。
+6. Dashboard 权威别名升级为 root 发布的 `recovery-readiness.json`，合同为 `chenyida-erp-backup-verification/v3`。只有 `ACTUAL_OFFHOST + RECOVERY_READY`、完整内层恢复/外层传输/操作策略交叉绑定、实际安装且观察到的调度、有效 dry-run 保留以及当前 runtime/database/Migration/trust 全匹配且新鲜时，才允许 `recovery_ready=true`。`SYNTHETIC_ISOLATED`只能发布合成证据且永远 false；V1/V2 均保持历史解析但失败关闭。
+7. 浏览器只接收去敏的 evidence scope、transfer、encryption、schedule、retention、identity、policy、assurance 和 ready 枚举，不暴露路径、密钥指纹或内部摘要。监控分别发出 legacy、synthetic-only、transfer、encryption、schedule、retention 告警，并仅在各自证据恢复后写 `RECOVERED`。
+8. 实际 `RECOVERY_READY` 发布必须由 root 使用精确确认词；真实密钥托管/轮换、异故障域/WORM、timer 安装、真实保留删除、当前数据快照/外传/第三域恢复、cluster roles/ACL/default privileges/tablespace 和真实 RPO/RTO 继续按 A4 分项授权。仓库 PASS 不得替代这些外部证据。
+
+### Consequences
+
+- TASK54 在不触碰当前数据或运行面的前提下，关闭了异机传输来源、静态机密性、双向 ACK、重试、调度评估、只读保留计划及 Dashboard/监控误报的仓库缺口；合成密文链已在不同 PostgreSQL 集群恢复成功。
+- 旧 V2 回执仍可审计和执行内层兼容验证，但升级后不会再使 Dashboard 变绿。操作员必须看到外层链、调度、保留和证据范围的独立状态，不能把缺字段当作默认健康。
+- 源码 `fd0a9cff751ad3e6619600066693403b7ace0655` 与只改 canonical manifest 的直接子提交 `315b1f3dac21a9d8cd634ba9d3dcdcbff4fe0806`形成 47 文件 bundle；TASK53 bundle及TASK51候选均为`STALE / NOT AUTHORIZABLE`。
+- 真实 G2 仍为阻断项。系统在外部异机恢复、集群级对象恢复、正式候选/门、监控投递、真实迁移、岗位/员工验收和切换完成前继续 `PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝修改稳定内层 V2 来承载网络信任，也拒绝继续把 `cp -a`、调用者声明的 transfer ID 或单一 SHA 校验称为异机来源证明。
+- 拒绝服务端传输明文后再由存储端加密、把长期明文 materialization 当作加密备份，或把私钥/口令放入环境、命令行和 JSON。
+- 拒绝只由源端自签“接收成功”、只由接收端自称来源可信，或允许同一 transfer ID 覆盖不同 payload；双向独立证据和 no-clobber 是强制边界。
+- 拒绝把 synthetic receipt、仓库 evaluator、逻辑 no-clobber 或 dry-run retention 写成真实异机、已安装 timer、WORM、执行过删除或达到 RPO/RTO。
+- 拒绝为了兼容旧 Dashboard 继续让 V2 `RESTORE_VERIFIED`直接 ready，或在缺少任一 transfer/encryption/schedule/retention 维度时合并成笼统绿色状态。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

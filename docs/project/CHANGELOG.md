@@ -4,13 +4,19 @@
 
 ## 2026-08-13
 
-### SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54 - `docs: start offhost backup provenance closure`
+### SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54 - `docs: start offhost backup provenance closure` / `feat: add signed encrypted offhost backup provenance` / `test: stabilize backup guard crash rehearsal` / `test: bind synthetic offhost receiver identity` / `feat: enforce encrypted offhost recovery readiness` / `chore: refresh release supervisor bundle` / `docs: close offhost backup provenance`
 
 - 调度/范围：TASK53收口`61b752e2ad05e2b2a273a01ffba6a87cc77e6a4c`/tree`800bd1f3caa0c43695008c044e507ac17c582884`后的零`DOING`自动切换为TASK54唯一active task；主智能体唯一写入，数据迁移/应用测试/运维安全三线完成只读审计。
 - 起点事实：TASK41已证明四域V2一致性、回执和双集群隔离恢复，但当前异机步骤实际为明文`cp -a`后人工声明`transfer_id`；没有源/接收签名、客户端加密、接收状态机、统一调度锁或保留计划，旧V2仍可能被Dashboard误判ready。
 - 目标：保持内层V2稳定，新增Ed25519来源与接收回执、X25519/HKDF-SHA256/AES-256-GCM密文 envelope、私有staging/原子晋升/幂等恢复、外层恢复绑定、UTC单飞调度和dry-run retention planner；Dashboard/监控对旧人工复制链失败关闭。
 - 验收：严格schema、密钥文件边界、篡改/截断/错误key/混代/重放/冲突与每阶段中断负测，合成密文链到单容器双PostgreSQL cluster恢复，Dashboard/监控与release inventory/bundle回归全部通过；不得降低内层V2断言。
 - 边界：不创建真实密钥或异机目标，不读取/复制/上传/恢复真实数据，不安装host timer/supervisor/notifier，不执行保留删除，不修改UAT/生产/账号/网络/四卷，不把合成验证称为真实异机、WORM或RPO/RTO完成。系统继续`PRODUCTION NO-GO`。
+- 决策/实现：D-131固定“稳定内层V2 + 签名密文外层v1 + root发布V3 readiness”。Ed25519源/接收签名、X25519/HKDF-SHA256、AES-256-GCM、receiver receipt/source acceptance、私有staging、fsync/no-clobber、冲突检测和中断续跑闭合；restore必须验证外层链后短暂物化内层V2，旧V2和synthetic evidence均不能ready。
+- 调度/保留：`chenyida-erp-backup-operations-policy/v1`固定UTC cadence/RPO/grace、全局锁、CAS单调状态、漏跑/时钟异常和key allowlist；retention planner只生成`DRY_RUN_DELETION_FORBIDDEN`，保护latest/inflight/hold/RPO/min generations/recovery generations。本任务未安装timer、创建WORM或执行删除。
+- Dashboard/监控：权威别名改为`recovery-readiness.json`；只有`ACTUAL_OFFHOST + RECOVERY_READY`且transfer/encryption/schedule/retention/runtime/database/Migration/trust全部匹配才可`recovery_ready=true`。浏览器只得到去敏状态；legacy、synthetic-only、transfer、encryption、schedule和retention分别告警并独立恢复。
+- Git/证据：源码`fd0a9cff751ad3e6619600066693403b7ace0655`/tree`b7c3849daacc7b8aa58328b0a939ddc8317eb520`；manifest-only直接子提交`315b1f3dac21a9d8cd634ba9d3dcdcbff4fe0806`/tree`2031fcf5ea3d0f729b0b56ea3835576dd3a35c72`形成47文件bundle，manifest SHA-256为`ae6e2bd7fd1bd1b6655238503b1914aa96f43988a9816601db116303b43282b8`。runtime policy SHA-256为`163ccf00…c77e`；inventory为`237/213/24`、SHA-256`48bcaff7…b1a3`。
+- 验证：offhost/readiness8/8、备份/Dashboard58/58、监控/release41/41、release contract51/51、runtime Python11/11、supervisor Python31/31、typecheck、inventory、Compose policy及六服务runtime通过；单容器双PostgreSQL cluster密文恢复和2个业务一致性子测通过。发现并修复V2 reconciliation序列化受对象插入顺序影响的真实兼容缺陷，未降低断言。
+- 资源/结论：重任务串行且runtime实测`max_containers=1`；收口available约1.8GiB、Swap`543→545MiB`、根盘16GiB、Load低于1。四服务restart0/OOM false，临时容器/数据库/网络/Volume清零，1603文件凭据扫描和diff门通过。未读取未跟踪状态报告、`.env`、真实数据/备份/卷正文，未push、host安装、UAT/生产或数据动作；结论为`DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL OFFHOST BLOCKED / PRODUCTION NO-GO`。
 
 ### SELFHOST-RELEASE-GATE-LIFECYCLE-53 - `docs: start release gate lifecycle closure` / `fix: close release gate lifecycle` / `build: bind release lifecycle supervisor bundle` / `docs: close release gate lifecycle`
 

@@ -1,6 +1,6 @@
 # SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54 异机备份加密与来源证明闭环
 
-> 状态：`DOING / REPOSITORY AND SYNTHETIC-ISOLATED ONLY / ACTUAL OFFHOST BLOCKED / NO DATA ACTION / PRODUCTION NO-GO`
+> 状态：`DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL OFFHOST BLOCKED / NO DATA ACTION / PRODUCTION NO-GO`
 > 日期：2026-08-13（Asia/Shanghai）
 > 严格起点：`main@61b752e2ad05e2b2a273a01ffba6a87cc77e6a4c` / tree `800bd1f3caa0c43695008c044e507ac17c582884`
 > 责任：Codex 主智能体为唯一写者、测试调度者和 Git 提交者；数据迁移、应用测试、运维安全智能体只读审计；项目负责人继续保留真实密钥、异机目标、数据读取/外传/恢复、host 安装、删除、UAT/生产和切换的专项授权权力
@@ -73,17 +73,27 @@
 ## 6. 验收标准
 
 - [x] 三条智能体线完成只读审计，主智能体复核 TASK41、恢复入口、Dashboard、监控和 release inventory 实现边界。
-- [ ] 记录单一架构决策：内层 V2 保持稳定，外层 transfer/provenance 与当前恢复就绪证据版本化升级；旧人工复制链明确降级为 legacy/not-ready。
-- [ ] 合成密文发送/接收完整链通过；源/接收签名、X25519/HKDF/AES-GCM、严格 schema、key 文件安全和所有篡改/重放/混代/错误 key 负向测试通过。
-- [ ] 所有关键中断点、同 payload 幂等重试、冲突 payload、partial inbox、晋升/receipt 模糊失败和临时明文清理/隔离通过自动测试。
-- [ ] 恢复只能消费已验证外层 provenance；单容器双 PostgreSQL cluster 以合成密文链恢复成功，wrong key/tamper/接收崩溃不改变目标。
-- [ ] UTC 调度/单飞/漏跑/时钟异常与 dry-run retention planner 的 hold/min generations/recovery generation/inflight 保护通过正负测试；没有安装 timer 或执行删除。
-- [ ] Dashboard 对 legacy V2 失败关闭，只有完整新链才 ready；监控能区分并恢复 schedule/transfer/encryption/retention 告警。
-- [ ] 既有备份恢复、Dashboard、监控、release inventory/contract 和适用 typecheck/lint 不降级；新增测试进入正式 inventory，所有重型验证串行且最多一个临时容器。
-- [ ] TASK54 源码提交后重建 canonical manifest-only 直接子提交；TASK53 bundle 和全部旧候选明确标记`STALE / NOT AUTHORIZABLE`。
-- [ ] 不产生真实密钥、真实异机回执、真实 RPO/RTO、WORM、host 调度、数据删除、正式授权/PASS、外部 push、UAT/生产/真实数据动作。
-- [ ] 同步`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`和`PRODUCTION_READINESS.md`，通过凭据/JSON/Shell/Markdown/差异检查并创建独立 Git 提交。
+- [x] 记录单一架构决策：内层 V2 保持稳定，外层 transfer/provenance 与当前恢复就绪证据版本化升级；旧人工复制链明确降级为 legacy/not-ready。
+- [x] 合成密文发送/接收完整链通过；源/接收签名、X25519/HKDF/AES-GCM、严格 schema、key 文件安全和所有篡改/重放/混代/错误 key 负向测试通过。
+- [x] 所有关键中断点、同 payload 幂等重试、冲突 payload、partial inbox、晋升/receipt 模糊失败和临时明文清理/隔离通过自动测试。
+- [x] 恢复只能消费已验证外层 provenance；单容器双 PostgreSQL cluster 以合成密文链恢复成功，wrong key/tamper/接收崩溃不改变目标。
+- [x] UTC 调度/单飞/漏跑/时钟异常与 dry-run retention planner 的 hold/min generations/recovery generation/inflight 保护通过正负测试；没有安装 timer 或执行删除。
+- [x] Dashboard 对 legacy V2 失败关闭，只有完整新链才 ready；监控能区分并恢复 schedule/transfer/encryption/retention 告警。
+- [x] 既有备份恢复、Dashboard、监控、release inventory/contract 和适用 typecheck/lint 不降级；新增测试进入正式 inventory，所有重型验证串行且最多一个临时容器。
+- [x] TASK54 源码提交后重建 canonical manifest-only 直接子提交；TASK53 bundle 和全部旧候选明确标记`STALE / NOT AUTHORIZABLE`。
+- [x] 不产生真实密钥、真实异机回执、真实 RPO/RTO、WORM、host 调度、数据删除、正式授权/PASS、外部 push、UAT/生产/真实数据动作。
+- [x] 同步`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`和`PRODUCTION_READINESS.md`，通过凭据/JSON/Shell/Markdown/差异检查并创建独立 Git 提交。
 
 ## 7. 当前判定
 
-`DOING / PRODUCTION NO-GO`。本任务完成最多证明仓库与合成隔离机制具备密码学来源、机密性和可恢复状态机；真实故障域、密钥托管/轮换、实际传输、WORM、timer 安装、真实删除、当前数据恢复及 RPO/RTO 仍需外部资源与专项明确授权。
+`DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL OFFHOST BLOCKED / PRODUCTION NO-GO`。本任务只证明仓库与合成隔离机制具备密码学来源、机密性、双向回执、可恢复状态机、调度评估和只读保留计划；真实故障域、密钥托管/轮换、实际传输、WORM、timer 安装、真实删除、当前数据恢复及 RPO/RTO 仍需外部资源与专项明确授权。
+
+## 8. 完成证据
+
+- 决策：D-131 固定“稳定内层 V2 + 签名密文外层 v1 + root 发布恢复就绪 v3”。V1/V2 历史回执继续可解析，但当前策略下一律不 ready；`SYNTHETIC_ISOLATED`也不会被提升为真实恢复就绪。
+- 实现：外层链使用 Ed25519、X25519、HKDF-SHA256、AES-256-GCM，严格绑定 envelope、receiver receipt、source acceptance、内层 manifest/local/offhost receipt、策略和接收身份；私有 staging、fsync、no-clobber、状态冲突、中断续跑及临时明文精确清理均进入合同。
+- 操作策略：UTC cadence/RPO/grace、全局重任务锁、CAS 单调状态、漏跑/时钟异常和 deterministic retention dry-run 已闭合；不存在 timer 安装或删除执行器。Dashboard 与监控新增 evidence scope、transfer、encryption、schedule、retention 独立失败关闭状态。
+- Git：源码提交为 `fd0a9cff751ad3e6619600066693403b7ace0655` / tree `b7c3849daacc7b8aa58328b0a939ddc8317eb520`；canonical manifest-only 直接子提交为 `315b1f3dac21a9d8cd634ba9d3dcdcbff4fe0806` / tree `2031fcf5ea3d0f729b0b56ea3835576dd3a35c72`。47 文件 manifest SHA-256 为 `ae6e2bd7fd1bd1b6655238503b1914aa96f43988a9816601db116303b43282b8`。
+- 自动验证：offhost/readiness 8/8、备份/Dashboard 58/58、监控/release 41/41、release contract 51/51、runtime Python 11/11、supervisor Python 31/31、inventory `237/213/24`、TypeScript release typecheck、Compose policy 和六服务隔离 runtime 均通过；单容器双 PostgreSQL cluster 密文恢复及 2 个业务一致性子测通过。
+- 资源与清理：重任务全部串行，运行时 probe 实测 `max_containers=1`；收口窗口 available memory 约 1.8 GiB、Swap `543→545 MiB`、根盘可用 16 GiB、Load 低于 1。现有四服务 restart 0/OOM false，Web/PostgreSQL healthy；任务临时容器、数据库、网络和 Volume 清零。
+- 安全边界：1603 个仓库文件凭据扫描、差异检查通过；未读取或暂存项目负责人未跟踪状态报告，未读取 `.env`、真实凭据、日志、业务数据、备份或受保护卷正文；未 build 当前候选、push、安装 host 组件、修改 UAT/生产或执行数据动作。

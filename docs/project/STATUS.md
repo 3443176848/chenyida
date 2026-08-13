@@ -2,18 +2,23 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
-## SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54（执行中；仓库与合成隔离密文链）
+## SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54（完成；仓库与合成隔离密文链，真实异机仍阻塞）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / REPOSITORY AND SYNTHETIC-ISOLATED ONLY / ACTUAL OFFHOST BLOCKED / PRODUCTION NO-GO | TASK54为唯一active task；主智能体唯一写入，三条智能体线已完成只读审计 |
+| 最终状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL OFFHOST BLOCKED / PRODUCTION NO-GO | active slot已释放；主智能体唯一写入，三条智能体线完成只读审计 |
 | 严格起点 | PASS / CONTROLLED | `main@61b752e2ad05e2b2a273a01ffba6a87cc77e6a4c`、tree`800bd1f3…2884`；未跟踪状态报告不读不改不提交 |
 | 已有内层 | PASS / TASK41 V2 REUSED | 四域一致性、数据库fence、严格manifest、不可变回执和双集群隔离恢复保持；不重写稳定恢复核心 |
 | 精确缺口 | CONFIRMED | 当前offhost为明文人工复制+caller transfer_id；没有源/接收签名、密文、原子接收ACK、统一调度或保留计划 |
-| 目标合同 | IN PROGRESS | Ed25519双向签名、X25519/HKDF/AES-GCM envelope、私有staging/幂等恢复、恢复强制provenance、UTC单飞与dry-run retention |
-| 应用/监控 | FAIL CLOSED REQUIRED | 旧V2人工复制链只作legacy历史，不得ready；监控须区分transfer/encryption/schedule/retention风险 |
+| D-131合同 | PASS / FAIL CLOSED | 稳定内层V2；Ed25519双向签名、X25519/HKDF-SHA256/AES-256-GCM envelope、私有staging/no-clobber、恢复强制provenance、UTC单飞与dry-run retention已闭合 |
+| V3 readiness | PASS / SCOPE HONEST | `ACTUAL_OFFHOST + RECOVERY_READY`且外层/内层/调度/保留/当前身份全匹配才可ready；V1/V2显示legacy，synthetic永远false，实际ready发布要求root |
+| 应用/监控 | PASS / FAIL CLOSED | Dashboard去敏显示scope/transfer/encryption/schedule/retention；监控分别产生legacy、synthetic、transfer、encryption、schedule、retention告警并验证RECOVERED |
+| Git/bundle | PASS / CONTENT ADDRESSED | 源码`fd0a9cff751ad3e6619600066693403b7ace0655`/tree`b7c3849d…b520`；manifest-only直接子提交`315b1f3dac21a9d8cd634ba9d3dcdcbff4fe0806`，47文件manifest SHA-256`ae6e2bd7…82b8` |
+| 自动验证 | PASS / APPLICABLE REGRESSION | offhost/readiness8/8、备份/Dashboard58/58、监控/release41/41、release51/51、runtime Python11/11、supervisor31/31、inventory237/213/24、typecheck、Compose及六服务runtime通过；密文双集群PG恢复和业务子测2/2通过 |
+| 资源/清理 | PASS / BELOW STOP LINES | 收口available约1.8GiB、Swap`543→545MiB`、根盘16GiB、Load低于1；四服务restart0/OOM false，runtime `max_containers=1`，任务容器/库/网络/Volume清零 |
 | 外部边界 | BLOCKED / NOT AUTHORIZED | 无真实密钥、异机目标、网络传输、WORM、timer、删除、当前数据恢复或真实RPO/RTO；cluster roles/ACL/tablespace另行处理 |
 | 运行面 | VERIFIED READ ONLY / UNCHANGED | UAT仍alpha.42/0040；四服务running/restart0/OOM false，PostgreSQL/Web healthy、Worker/Caddy health none |
+| 下一安全任务 | POSTGRES CLUSTER RECOVERY CONTRACT | 独立补齐roles/ACL/default privileges/tablespace恢复合同；真实数据、host、异机和部署继续需要专项授权 |
 | 系统是否可用 | NO | 正式异机恢复、当前候选/门、监控投递、UAT对齐、真实迁移、岗位/员工验收和切换仍未完成 |
 
 ## SELFHOST-RELEASE-GATE-LIFECYCLE-53（完成；三阶段仓库合同闭环，运行面未部署）
