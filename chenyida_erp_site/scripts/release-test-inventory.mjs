@@ -10,8 +10,8 @@ import { validateOfficialTestRuntimePolicy } from "./release-manifest-contract.m
 
 export const RELEASE_TEST_INVENTORY_CONTRACT = "chenyida-erp-release-test-inventory/v1";
 export const RELEASE_TEST_INVENTORY_REPOSITORY_PATH = "chenyida_erp_site/release/release-test-inventory-v1.json";
-export const RELEASE_TEST_INVENTORY_TOTAL = 236;
-export const RELEASE_TEST_INVENTORY_REQUIRED = 212;
+export const RELEASE_TEST_INVENTORY_TOTAL = 237;
+export const RELEASE_TEST_INVENTORY_REQUIRED = 213;
 export const RELEASE_TEST_INVENTORY_NOT_APPLICABLE = 24;
 export const RELEASE_TEST_MAX_BYTES = 1024 * 1024;
 export const RELEASE_TYPESCRIPT_CONFIGS = Object.freeze([
@@ -64,7 +64,7 @@ const OFFICIAL_CATEGORY_COUNTS = Object.freeze({
   POSTGRES_ALIAS: 2,
   PURE_NODE: 113,
   RELEASE_CONTRACT: 6,
-  SPECIAL_HARNESS: 4,
+  SPECIAL_HARNESS: 5,
 });
 const CATEGORY_POLICY = Object.freeze({
   BROWSER: { applicability: "REQUIRED", harness: "BROWSER_E2E", reason: null },
@@ -113,6 +113,7 @@ const POSTGRES_ALIASES = new Map([
 ]);
 const SPECIAL_HARNESS_TESTS = new Set([
   "tests/selfhost-backup-recovery-v2.test.mjs",
+  "tests/selfhost-offhost-transfer-v1.test.mjs",
   "tests/selfhost-offline-identity-recovery-unit.test.mjs",
   "tests/selfhost-readonly-inventory.test.mjs",
   "tests/selfhost-targeted-offline-identity-recovery-unit.test.mjs",

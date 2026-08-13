@@ -40,6 +40,14 @@ export type BackupVerification = Readonly<{
   evidence:BackupEvidence;
 }>;
 export type LegacyBackupVerification = Readonly<{schema_version:1;result:"VERIFIED";backup_id:string;created_at:string;verified_at:string;application_version:string;git_commit:string;migration_head:string;artifacts:Readonly<{postgresql_dump:BackupArtifact;uploads:BackupArtifact;attachments:BackupArtifact}>}>;
+export type BackupRecoveryReadiness = Readonly<{
+  schema_version:3;contract:"chenyida-erp-backup-verification/v3";result:"RECOVERY_READY"|"SYNTHETIC_ISOLATED_VERIFIED";evidence_scope:"ACTUAL_OFFHOST"|"SYNTHETIC_ISOLATED";
+  backup_id:string;created_at:string;verified_at:string;expires_at:string;
+  inner_restore:Readonly<{receipt_file_sha256:string;receipt_canonical_sha256:string;receipt:BackupVerification}>;
+  transfer:Readonly<{transfer_id:string;envelope_sha256:string;receiver_receipt_sha256:string;acceptance_sha256:string;offhost_receipt_sha256:string;payload_algorithm:"AES-256-GCM";key_agreement:"X25519";key_derivation:"HKDF-SHA256";signature_algorithm:"Ed25519";source_location_id:string;source_machine_identity_sha256:string;receiver_location_id:string;receiver_machine_identity_sha256:string;receiver_identity_sha256:string;source_signing_key_fingerprint:string;receiver_encryption_key_fingerprint:string;receiver_receipt_key_fingerprint:string}>;
+  operations:Readonly<{policy_id:string;policy_sha256:string;policy_scope:"SYNTHETIC_TEST_ONLY"|"TEST"|"UAT"|"PRODUCTION";schedule_observation_sha256:string;schedule_status:"ON_TIME";rpo_status:"WITHIN_RPO";scheduler_installation_status:"REPOSITORY_EVALUATOR_ONLY"|"INSTALLED_AND_OBSERVED";retention_plan_sha256:string;retention_status:"POLICY_VALID_DRY_RUN";retention_execution:"DRY_RUN_DELETION_FORBIDDEN"}>;
+  attestation:"ROOT_PUBLISHED_INNER_V2_RESTORE_SIGNED_ENCRYPTED_OFFHOST_AND_OPERATIONS_POLICY_VERIFIED";readiness_sha256:string;
+}>;
 export type RuntimeReleaseIdentity = Readonly<{
   schema_version:3;contract:"chenyida-erp-runtime-release-identity/v3";deployment_class:"TEST"|"UAT"|"PRODUCTION";deployment_id:string;release_id:string;release_manifest_sha256:string;postdeploy_receipt_sha256:string;supervisor_bundle_sha256:string;authorization_sha256:string;
   runtime_guard:Readonly<{contract:"chenyida-erp-release-runtime-guard/v1";mode:"POST_DEPLOY_CURRENT_RUNTIME_STRICT"}>;runtime_policy_sha256:string;application_version:string;git_commit:string;git_tree:string;migration_head:string;migration_manifest_sha256:string;

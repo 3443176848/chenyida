@@ -65,6 +65,7 @@ import {
 import {
   BACKUP_RECOVERY_SYNTHETIC_RESULT,
   createBackupRecoveryReadiness,
+  publishBackupRecoveryReadiness,
   validateBackupRecoveryReadiness,
 } from "../scripts/backup-recovery-readiness-v3.mjs";
 
@@ -313,6 +314,7 @@ async function roots(root) {
     outboxRoot: await markerRoot(root, "outbox", OUTBOX_ROOT_MARKER, OUTBOX_ROOT_MARKER_VALUE),
     receiverRoot: await markerRoot(root, "receiver", RECEIVER_ROOT_MARKER, RECEIVER_ROOT_MARKER_VALUE),
     materializationRoot: await markerRoot(root, "materialized", OFFHOST_MATERIALIZATION_ROOT_MARKER, OFFHOST_MATERIALIZATION_ROOT_MARKER_VALUE),
+    readinessRoot: await markerRoot(root, "readiness", ".chenyida-erp-receipt-root-v2", "chenyida-erp-receipt-root/v2\n", 0o2750),
   };
 }
 
@@ -533,6 +535,21 @@ test("signed encrypted transfer, receiver acknowledgement, and transient restore
     assert.equal(validateBackupRecoveryReadiness(readiness).result, BACKUP_RECOVERY_SYNTHETIC_RESULT);
     assert.equal(readiness.evidence_scope, "SYNTHETIC_ISOLATED");
     assert.equal(JSON.stringify(readiness).includes("PRIVATE KEY"), false);
+    const actualRestore = { ...readiness.inner_restore.receipt, deployment: { ...readiness.inner_restore.receipt.deployment, class: "UAT" } };
+    const { readiness_sha256: _syntheticReadinessSha, ...actualBase } = readiness;
+    const actualBody = { ...actualBase, result: "RECOVERY_READY", evidence_scope: "ACTUAL_OFFHOST", inner_restore: { ...readiness.inner_restore, receipt_canonical_sha256: createHash("sha256").update(canonicalTransferJson(actualRestore)).digest("hex"), receipt: actualRestore }, operations: { ...readiness.operations, policy_scope: "UAT", scheduler_installation_status: "INSTALLED_AND_OBSERVED" } };
+    const actualReadiness = validateBackupRecoveryReadiness({ ...actualBody, readiness_sha256: createHash("sha256").update(canonicalTransferJson(actualBody)).digest("hex") });
+    const originalGetuid = process.getuid;
+    try {
+      process.getuid = () => 65534;
+      await assert.rejects(publishBackupRecoveryReadiness({ readiness: actualReadiness, receiptRoot: rootSet.readinessRoot, receiptReaderGid: process.getgid(), confirm: "PUBLISH_ACTUAL_OFFHOST_RECOVERY_READINESS" }), (error) => error.code === "READINESS_ACTUAL_ROOT_REQUIRED");
+    } finally { process.getuid = originalGetuid; }
+    await assert.rejects(publishBackupRecoveryReadiness({ readiness, receiptRoot: rootSet.readinessRoot, receiptReaderGid: process.getgid(), confirm: "WRONG" }), (error) => error.code === "READINESS_PUBLICATION_CONFIRMATION_REQUIRED");
+    const published = await publishBackupRecoveryReadiness({ readiness, receiptRoot: rootSet.readinessRoot, receiptReaderGid: process.getgid(), confirm: "PUBLISH_SYNTHETIC_ISOLATED_RECOVERY_EVIDENCE" });
+    assert.equal(path.basename(published.aliasFile), "recovery-readiness.json");
+    assert.equal((await stat(published.aliasFile)).mode & 0o777, 0o640);
+    assert.equal(await readFile(published.aliasFile, "utf8"), canonicalTransferJson(readiness));
+    assert.deepEqual(await publishBackupRecoveryReadiness({ readiness, receiptRoot: rootSet.readinessRoot, receiptReaderGid: process.getgid(), confirm: "PUBLISH_SYNTHETIC_ISOLATED_RECOVERY_EVIDENCE" }), published);
     const cleanupOptions = {
       receiverPackageDirectory: received.packageDirectory,
       acceptanceFile: accepted.acceptanceFile,

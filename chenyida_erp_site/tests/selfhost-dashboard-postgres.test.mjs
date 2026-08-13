@@ -18,6 +18,9 @@ process.env.ERP_RELEASE_EXPECTED_GIT_COMMIT ||= "b".repeat(40);
 process.env.ERP_RELEASE_EXPECTED_MANIFEST_SHA256 ||= "d".repeat(64);
 process.env.ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256 ||= "e".repeat(64);
 process.env.ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS ||= "3600";
+process.env.ERP_BACKUP_OPERATIONS_POLICY_ID ||= "offhost-test-v1";
+process.env.ERP_BACKUP_OPERATIONS_POLICY_SHA256 ||= "7".repeat(64);
+process.env.ERP_BACKUP_OPERATIONS_POLICY_SCOPE ||= "TEST";
 const pool = new Pool({ connectionString: databaseUrl, max: 2, application_name: "dashboard-integration-test" });
 const runtimeMigrations = (await pool.query("select version,checksum from schema_migrations order by version")).rows;
 const runtimeMigrationHead = runtimeMigrations.at(-1)?.version;
@@ -28,7 +31,7 @@ const directory = await mkdtemp(path.join(os.tmpdir(), "cyd-dashboard-pg-"));
 await chmod(directory, 0o2750);
 await writeFile(path.join(directory, ".chenyida-erp-receipt-root-v2"), "chenyida-erp-receipt-root/v2\n", { mode: 0o400 });
 await chmod(path.join(directory, ".chenyida-erp-receipt-root-v2"), 0o400);
-const statusFile = path.join(directory, "latest.json");
+const statusFile = path.join(directory, "recovery-readiness.json");
 const releaseRoot = path.join(directory, "release");
 const releaseFile = path.join(releaseRoot, "release-identity.json");
 const runtimeHostname = os.hostname();
@@ -37,9 +40,15 @@ await mkdir(releaseRoot, { mode: 0o750 });
 await chmod(releaseRoot, 0o750);
 await writeFile(path.join(releaseRoot, ".chenyida-erp-release-identity-root-v1"), "chenyida-erp-release-identity-root/v1\n", { mode: 0o440 });
 await chmod(path.join(releaseRoot, ".chenyida-erp-release-identity-root-v1"), 0o440);
-await writeFile(releaseFile, JSON.stringify({ schema_version: 3, contract: "chenyida-erp-runtime-release-identity/v3", deployment_class: "TEST", deployment_id: "dashboard-test", release_id: "dashboard-release", release_manifest_sha256: process.env.ERP_RELEASE_EXPECTED_MANIFEST_SHA256, postdeploy_receipt_sha256: "9".repeat(64), supervisor_bundle_sha256: process.env.ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256, authorization_sha256: "f".repeat(64), runtime_guard: { contract: "chenyida-erp-release-runtime-guard/v1", mode: "POST_DEPLOY_CURRENT_RUNTIME_STRICT" }, runtime_policy_sha256: "8c9f9fd06eb4533faeeed4c316eb93568c38b3a42ac8c48dd081fbb4e7a2f444", application_version: "0.1.0-alpha.46", git_commit: "b".repeat(40), git_tree: "c".repeat(40), migration_head: runtimeMigrationHead, migration_manifest_sha256: runtimeMigrationManifestSha, caddy_container_id: "1".repeat(64), caddy_image_digest: `sha256:${"1".repeat(64)}`, postgres_container_id: "2".repeat(64), postgres_image_digest: `sha256:${"2".repeat(64)}`, web_container_id: runtimeHostname.padEnd(64, "a"), web_image_digest: `sha256:${"b".repeat(64)}`, worker_container_id: "c".repeat(64), worker_image_digest: `sha256:${"c".repeat(64)}`, generated_at: new Date().toISOString() }), { mode: 0o440 });
+await writeFile(releaseFile, JSON.stringify({ schema_version: 3, contract: "chenyida-erp-runtime-release-identity/v3", deployment_class: "TEST", deployment_id: "dashboard-test", release_id: "dashboard-release", release_manifest_sha256: process.env.ERP_RELEASE_EXPECTED_MANIFEST_SHA256, postdeploy_receipt_sha256: "9".repeat(64), supervisor_bundle_sha256: process.env.ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256, authorization_sha256: "f".repeat(64), runtime_guard: { contract: "chenyida-erp-release-runtime-guard/v1", mode: "POST_DEPLOY_CURRENT_RUNTIME_STRICT" }, runtime_policy_sha256: "163ccf002f083d8818b90f67e3fe8a584bf25beee4a05d1448121eb5c530c77e", application_version: "0.1.0-alpha.46", git_commit: "b".repeat(40), git_tree: "c".repeat(40), migration_head: runtimeMigrationHead, migration_manifest_sha256: runtimeMigrationManifestSha, caddy_container_id: "1".repeat(64), caddy_image_digest: `sha256:${"1".repeat(64)}`, postgres_container_id: "2".repeat(64), postgres_image_digest: `sha256:${"2".repeat(64)}`, web_container_id: runtimeHostname.padEnd(64, "a"), web_image_digest: `sha256:${"b".repeat(64)}`, worker_container_id: "c".repeat(64), worker_image_digest: `sha256:${"c".repeat(64)}`, generated_at: new Date().toISOString() }), { mode: 0o440 });
 await chmod(releaseFile, 0o440);
 const service = new DashboardService(new PostgresDashboardRepository(pool), statusFile, releaseFile);
+const canonicalValue = (value) => {
+  if (value === null || typeof value === "boolean" || typeof value === "string" || typeof value === "number") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalValue).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalValue(value[key])}`).join(",")}}`;
+};
+const canonicalSha = (value) => createHash("sha256").update(`${canonicalValue(value)}\n`).digest("hex");
 
 test.beforeEach(async () => {
   await pool.query("truncate material_master,material_categories,background_jobs restart identity cascade");
@@ -102,7 +111,7 @@ test("trusted verification file is independent from PostgreSQL business facts", 
   const restoreReconciliation = { contract: "chenyida-erp-restore-reconciliation/v1", source_sha256: hash, target_database_report_sha256: "e".repeat(64), target_file_trees_sha256: "f".repeat(64), result: "MATCHED" };
   const createdAt = new Date(Date.now() - 60_000).toISOString();
   const verifiedAt = new Date().toISOString();
-  await writeFile(statusFile, JSON.stringify({
+  const restoreReceipt = {
     schema_version: 2,
     contract: "chenyida-erp-backup-verification/v2",
     result: "RESTORE_VERIFIED",
@@ -125,13 +134,26 @@ test("trusted verification file is independent from PostgreSQL business facts", 
       backup_status: { file: "backup-status.tar.gz", sha256: hash, bytes: 10, entries: 0 },
     },
     evidence: { kind: "ISOLATED_RESTORE_VERIFICATION", source_location_id: "dashboard-source", offhost_location_id: "dashboard-offhost", offhost_receiver_identity_sha256: receiverHash, offhost_receipt_sha256: hash, restore_run_id: "dashboard-restore", restored_at: verifiedAt, target: { deployment_class: "TEST", deployment_id: "dashboard-restore-target", database_name: "dashboard_restore_test", database_system_identifier: process.env.ERP_BACKUP_EXPECTED_RESTORE_TARGET_SYSTEM_IDENTIFIER, database_oid: "99999", marker_id: "dashboard-target", cluster_marker_id: process.env.ERP_BACKUP_EXPECTED_RESTORE_TARGET_CLUSTER_MARKER_ID, database_server_major: databaseIdentity.server_major, database_encoding: databaseIdentity.encoding, database_collate: databaseIdentity.collate, database_ctype: databaseIdentity.ctype, database_locale_provider: databaseIdentity.locale_provider, database_collation_version: databaseIdentity.collation_version, file_root_name: "dashboard_restore_test" }, reconciliation: restoreReconciliation, reconciliation_sha256: createHash("sha256").update(JSON.stringify(restoreReconciliation)).digest("hex"), attestation: "TRUSTED_EXECUTION_UID_AND_DISTINCT_CLUSTER_ACTIVE_INSPECTION" },
-  }), { mode: 0o640 });
+  };
+  await writeFile(statusFile, JSON.stringify(restoreReceipt), { mode: 0o640 });
   await chmod(statusFile, 0o640);
+  const legacy = await service.backup(actor("admin"));
+  assert.equal(legacy.verification_status, "LEGACY_V2_INNER_ONLY");
+  assert.equal(legacy.recovery_ready, false);
+  const readinessBody = {
+    schema_version: 3, contract: "chenyida-erp-backup-verification/v3", result: "SYNTHETIC_ISOLATED_VERIFIED", evidence_scope: "SYNTHETIC_ISOLATED",
+    backup_id: restoreReceipt.backup_id, created_at: restoreReceipt.created_at, verified_at: verifiedAt, expires_at: restoreReceipt.expires_at,
+    inner_restore: { receipt_file_sha256: "8".repeat(64), receipt_canonical_sha256: canonicalSha(restoreReceipt), receipt: restoreReceipt },
+    transfer: { transfer_id: "dashboard-transfer", envelope_sha256: "1".repeat(64), receiver_receipt_sha256: "2".repeat(64), acceptance_sha256: "3".repeat(64), offhost_receipt_sha256: hash, payload_algorithm: "AES-256-GCM", key_agreement: "X25519", key_derivation: "HKDF-SHA256", signature_algorithm: "Ed25519", source_location_id: "dashboard-source", source_machine_identity_sha256: "4".repeat(64), receiver_location_id: "dashboard-offhost", receiver_machine_identity_sha256: "5".repeat(64), receiver_identity_sha256: receiverHash, source_signing_key_fingerprint: "6".repeat(64), receiver_encryption_key_fingerprint: "8".repeat(64), receiver_receipt_key_fingerprint: "9".repeat(64) },
+    operations: { policy_id: process.env.ERP_BACKUP_OPERATIONS_POLICY_ID, policy_sha256: process.env.ERP_BACKUP_OPERATIONS_POLICY_SHA256, policy_scope: "TEST", schedule_observation_sha256: "1".repeat(64), schedule_status: "ON_TIME", rpo_status: "WITHIN_RPO", scheduler_installation_status: "REPOSITORY_EVALUATOR_ONLY", retention_plan_sha256: "2".repeat(64), retention_status: "POLICY_VALID_DRY_RUN", retention_execution: "DRY_RUN_DELETION_FORBIDDEN" },
+    attestation: "ROOT_PUBLISHED_INNER_V2_RESTORE_SIGNED_ENCRYPTED_OFFHOST_AND_OPERATIONS_POLICY_VERIFIED",
+  };
+  await writeFile(statusFile, JSON.stringify({ ...readinessBody, readiness_sha256: canonicalSha(readinessBody) }));
   const result = await service.backup(actor("admin"));
-  assert.equal(result.verification_status, "RESTORE_VERIFIED");
+  assert.equal(result.verification_status, "SYNTHETIC_ISOLATED_VERIFIED");
   assert.equal(result.identity_status, "MATCHED");
   assert.equal(result.policy_status, "MATCHED");
-  assert.equal(result.assurance_status, "MATCHED");
-  assert.equal(result.recovery_ready, true);
+  assert.equal(result.assurance_status, "MISMATCH");
+  assert.equal(result.recovery_ready, false);
   assert.equal(result.current_migration.version, runtimeMigrationHead);
 });

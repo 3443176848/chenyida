@@ -33,7 +33,12 @@
     }
   ],
   "backup": {
-    "required_verification_status": "RESTORE_VERIFIED",
+    "required_verification_status": "RECOVERY_READY",
+    "required_evidence_scope": "ACTUAL_OFFHOST",
+    "required_transfer_status": "VERIFIED",
+    "required_encryption_status": "VERIFIED",
+    "required_schedule_status": "ON_TIME",
+    "required_retention_status": "POLICY_VALID_DRY_RUN",
     "require_identity_match": true,
     "require_policy_match": true,
     "require_assurance_match": true,

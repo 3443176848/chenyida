@@ -19,7 +19,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 
-EXPECTED_POLICY_SHA256 = "8c9f9fd06eb4533faeeed4c316eb93568c38b3a42ac8c48dd081fbb4e7a2f444"
+EXPECTED_POLICY_SHA256 = "163ccf002f083d8818b90f67e3fe8a584bf25beee4a05d1448121eb5c530c77e"
 POLICY_CONTRACT = "chenyida-erp-container-runtime-policy/v1"
 MAX_POLICY_BYTES = 131_072
 MAX_COMPOSE_BYTES = 2_097_152
@@ -78,7 +78,7 @@ COMPOSE_TOP_KEYS = {
 ENVIRONMENT_CONSTANTS = {
     "ERP_UPLOAD_ROOT": "/data/chenyida-erp/uploads",
     "ERP_ATTACHMENT_ROOT": "/data/chenyida-erp/attachments",
-    "ERP_BACKUP_STATUS_FILE": "/data/chenyida-erp/backup-status/latest.json",
+    "ERP_BACKUP_STATUS_FILE": "/data/chenyida-erp/backup-status/recovery-readiness.json",
 }
 SERVICE_ENVIRONMENT_CONSTANTS = {
     "caddy": {"ERP_HTTPS_PORT": "443"},

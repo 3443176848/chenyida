@@ -44,7 +44,12 @@ const RUNTIME_CODES = new Set([
   "RUNTIME_UPLOADS_UNAVAILABLE",
   "RUNTIME_WORKER_UNAVAILABLE",
 ]);
-const BACKUP_VERIFICATION = new Set(["UNVERIFIED", "INVALID", "STALE", "LEGACY_LOCAL_ONLY", "LOCAL_VERIFIED", "OFFHOST_VERIFIED", "RESTORE_VERIFIED"]);
+const BACKUP_VERIFICATION = new Set(["UNVERIFIED", "INVALID", "STALE", "LEGACY_LOCAL_ONLY", "LEGACY_V2_INNER_ONLY", "LOCAL_VERIFIED", "OFFHOST_VERIFIED", "RESTORE_VERIFIED", "RECOVERY_READY", "SYNTHETIC_ISOLATED_VERIFIED"]);
+const BACKUP_EVIDENCE_SCOPE = new Set(["NONE", "LEGACY_V1_LOCAL_ONLY", "LEGACY_V2_INNER_ONLY", "ACTUAL_OFFHOST", "SYNTHETIC_ISOLATED"]);
+const BACKUP_TRANSFER_STATUS = new Set(["UNVERIFIED", "VERIFIED"]);
+const BACKUP_ENCRYPTION_STATUS = new Set(["UNVERIFIED", "VERIFIED"]);
+const BACKUP_SCHEDULE_STATUS = new Set(["UNCONFIGURED", "ON_TIME"]);
+const BACKUP_RETENTION_STATUS = new Set(["UNCONFIGURED", "POLICY_VALID_DRY_RUN"]);
 const MATCH_STATUS = new Set(["UNCONFIGURED", "MISMATCH", "MATCHED"]);
 const ZERO_SHA256 = "0".repeat(64);
 
@@ -86,6 +91,12 @@ const ALERT_DEFINITIONS = Object.freeze({
   BACKUP_EVIDENCE_UNAVAILABLE: ["CRITICAL", "备份恢复治理证据不可用", "backup-restore.md#dashboard-判定", "backup"],
   BACKUP_EVIDENCE_INVALID: ["CRITICAL", "备份恢复治理证据损坏或无效", "backup-restore.md#dashboard-判定", "backup"],
   BACKUP_EVIDENCE_STALE: ["CRITICAL", "备份恢复治理证据已过期", "backup-restore.md#dashboard-判定", "backup"],
+  BACKUP_LEGACY_EVIDENCE: ["CRITICAL", "备份证据仍为旧版本机或 V2 内层收据", "backup-restore.md#dashboard-判定", "backup.evidence.version"],
+  BACKUP_SYNTHETIC_ONLY: ["CRITICAL", "仅有合成隔离证据，未证明真实异机恢复", "backup-restore.md#dashboard-判定", "backup.evidence.scope"],
+  BACKUP_TRANSFER_UNVERIFIED: ["CRITICAL", "异机传输证据未验证", "backup-restore.md#dashboard-判定", "backup.transfer"],
+  BACKUP_ENCRYPTION_UNVERIFIED: ["CRITICAL", "异机备份加密证据未验证", "backup-restore.md#dashboard-判定", "backup.encryption"],
+  BACKUP_SCHEDULE_NOT_READY: ["CRITICAL", "备份调度未安装观测或未按时", "backup-restore.md#dashboard-判定", "backup.schedule"],
+  BACKUP_RETENTION_NOT_READY: ["CRITICAL", "备份保留策略证据未就绪", "backup-restore.md#dashboard-判定", "backup.retention"],
   BACKUP_IDENTITY_MISMATCH: ["CRITICAL", "备份证据与运行身份不一致", "backup-restore.md#dashboard-判定", "backup"],
   BACKUP_POLICY_MISMATCH: ["CRITICAL", "备份策略或 RPO 与受控配置不一致", "backup-restore.md#dashboard-判定", "backup"],
   BACKUP_ASSURANCE_MISMATCH: ["CRITICAL", "备份证据未证明预期异机与隔离恢复", "backup-restore.md#dashboard-判定", "backup"],
@@ -188,8 +199,8 @@ export function validateMonitoringPolicy(value) {
     if (entry.service !== SERVICES[index] || typeof entry.health_required !== "boolean") reject("MONITOR_POLICY_SERVICE_SET_INVALID");
     if ((entry.service === "caddy") === entry.health_required) reject("MONITOR_POLICY_SERVICE_SET_INVALID");
   });
-  exactKeys(value.backup, ["required_verification_status", "require_identity_match", "require_policy_match", "require_assurance_match", "require_recovery_ready"], "MONITOR_POLICY_BACKUP_FIELDS_INVALID");
-  if (value.backup.required_verification_status !== "RESTORE_VERIFIED" || value.backup.require_identity_match !== true || value.backup.require_policy_match !== true || value.backup.require_assurance_match !== true || value.backup.require_recovery_ready !== true) reject("MONITOR_POLICY_BACKUP_INVALID");
+  exactKeys(value.backup, ["required_verification_status", "required_evidence_scope", "required_transfer_status", "required_encryption_status", "required_schedule_status", "required_retention_status", "require_identity_match", "require_policy_match", "require_assurance_match", "require_recovery_ready"], "MONITOR_POLICY_BACKUP_FIELDS_INVALID");
+  if (value.backup.required_verification_status !== "RECOVERY_READY" || value.backup.required_evidence_scope !== "ACTUAL_OFFHOST" || value.backup.required_transfer_status !== "VERIFIED" || value.backup.required_encryption_status !== "VERIFIED" || value.backup.required_schedule_status !== "ON_TIME" || value.backup.required_retention_status !== "POLICY_VALID_DRY_RUN" || value.backup.require_identity_match !== true || value.backup.require_policy_match !== true || value.backup.require_assurance_match !== true || value.backup.require_recovery_ready !== true) reject("MONITOR_POLICY_BACKUP_INVALID");
   return value;
 }
 
@@ -265,14 +276,19 @@ function validateReleaseObservation(value) {
 }
 
 function validateBackupObservation(value) {
-  exactKeys(value, ["status", "observed_at", "verification_status", "identity_status", "policy_status", "assurance_status", "recovery_ready", "recovery_point_at", "expires_at", "policy_id", "rpo_hours"], "MONITOR_OBSERVATION_BACKUP_FIELDS_INVALID");
+  exactKeys(value, ["status", "observed_at", "verification_status", "evidence_scope", "transfer_status", "encryption_status", "schedule_status", "retention_status", "identity_status", "policy_status", "assurance_status", "recovery_ready", "recovery_point_at", "expires_at", "policy_id", "rpo_hours"], "MONITOR_OBSERVATION_BACKUP_FIELDS_INVALID");
   if (!new Set(["NOT_COLLECTED", "AVAILABLE"]).has(value.status)) reject("MONITOR_OBSERVATION_BACKUP_INVALID");
   if (value.status === "NOT_COLLECTED") {
-    if ([value.observed_at, value.verification_status, value.identity_status, value.policy_status, value.assurance_status, value.recovery_point_at, value.expires_at, value.policy_id, value.rpo_hours].some((item) => item !== null) || value.recovery_ready !== false) reject("MONITOR_OBSERVATION_BACKUP_INVALID");
+    if ([value.observed_at, value.verification_status, value.evidence_scope, value.transfer_status, value.encryption_status, value.schedule_status, value.retention_status, value.identity_status, value.policy_status, value.assurance_status, value.recovery_point_at, value.expires_at, value.policy_id, value.rpo_hours].some((item) => item !== null) || value.recovery_ready !== false) reject("MONITOR_OBSERVATION_BACKUP_INVALID");
     return;
   }
   iso(value.observed_at, "MONITOR_OBSERVATION_BACKUP_INVALID");
   oneOf(value.verification_status, BACKUP_VERIFICATION, "MONITOR_OBSERVATION_BACKUP_INVALID");
+  oneOf(value.evidence_scope, BACKUP_EVIDENCE_SCOPE, "MONITOR_OBSERVATION_BACKUP_INVALID");
+  oneOf(value.transfer_status, BACKUP_TRANSFER_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
+  oneOf(value.encryption_status, BACKUP_ENCRYPTION_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
+  oneOf(value.schedule_status, BACKUP_SCHEDULE_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
+  oneOf(value.retention_status, BACKUP_RETENTION_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
   oneOf(value.identity_status, MATCH_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
   oneOf(value.policy_status, MATCH_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
   oneOf(value.assurance_status, MATCH_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
@@ -281,7 +297,7 @@ function validateBackupObservation(value) {
   nullable(value.recovery_point_at, iso, "MONITOR_OBSERVATION_BACKUP_INVALID");
   nullable(value.expires_at, iso, "MONITOR_OBSERVATION_BACKUP_INVALID");
   if ((value.recovery_point_at === null) !== (value.expires_at === null)) reject("MONITOR_OBSERVATION_BACKUP_INVALID");
-  if (value.recovery_ready && (value.verification_status !== "RESTORE_VERIFIED" || value.identity_status !== "MATCHED" || value.policy_status !== "MATCHED" || value.assurance_status !== "MATCHED" || value.recovery_point_at === null)) reject("MONITOR_OBSERVATION_BACKUP_INVALID");
+  if (value.recovery_ready && (value.verification_status !== "RECOVERY_READY" || value.evidence_scope !== "ACTUAL_OFFHOST" || value.transfer_status !== "VERIFIED" || value.encryption_status !== "VERIFIED" || value.schedule_status !== "ON_TIME" || value.retention_status !== "POLICY_VALID_DRY_RUN" || value.identity_status !== "MATCHED" || value.policy_status !== "MATCHED" || value.assurance_status !== "MATCHED" || value.recovery_point_at === null)) reject("MONITOR_OBSERVATION_BACKUP_INVALID");
 }
 
 function validateNotificationObservation(value) {
@@ -607,15 +623,23 @@ export function evaluateMonitoringObservation({ policy, resourcePlan, config, ob
     unresolvedScopes.add("backup");
     addIssue(issues, "BACKUP_EVIDENCE_UNAVAILABLE", "backup.evidence.missing");
   } else {
-    const backupInvalid = ["INVALID", "UNVERIFIED", "LEGACY_LOCAL_ONLY"].includes(observation.backup.verification_status);
+    const backupLegacy = ["LEGACY_LOCAL_ONLY", "LEGACY_V2_INNER_ONLY", "LOCAL_VERIFIED", "OFFHOST_VERIFIED", "RESTORE_VERIFIED"].includes(observation.backup.verification_status);
+    const backupSynthetic = observation.backup.verification_status === "SYNTHETIC_ISOLATED_VERIFIED" || observation.backup.evidence_scope === "SYNTHETIC_ISOLATED";
+    const backupInvalid = ["INVALID", "UNVERIFIED"].includes(observation.backup.verification_status);
     const backupStale = componentStale(observation.backup.observed_at, observedMs, policy) || observation.backup.verification_status === "STALE" || (observation.backup.expires_at && nowMs > Date.parse(observation.backup.expires_at)) || (observation.backup.recovery_point_at && nowMs > Date.parse(observation.backup.recovery_point_at) + config.backup_expectation.rpo_hours * 3_600_000);
-    if (backupInvalid || backupStale) unresolvedScopes.add("backup");
+    if (backupInvalid || backupLegacy || backupSynthetic || backupStale) unresolvedScopes.add("backup");
     if (backupInvalid) addIssue(issues, "BACKUP_EVIDENCE_INVALID", "backup.evidence");
+    if (backupLegacy) addIssue(issues, "BACKUP_LEGACY_EVIDENCE", "backup.evidence.version");
+    if (backupSynthetic) addIssue(issues, "BACKUP_SYNTHETIC_ONLY", "backup.evidence.scope");
     if (backupStale) addIssue(issues, "BACKUP_EVIDENCE_STALE", "backup.evidence.age");
+    if (observation.backup.transfer_status !== policy.backup.required_transfer_status) addIssue(issues, "BACKUP_TRANSFER_UNVERIFIED", "backup.transfer");
+    if (observation.backup.encryption_status !== policy.backup.required_encryption_status) addIssue(issues, "BACKUP_ENCRYPTION_UNVERIFIED", "backup.encryption");
+    if (observation.backup.schedule_status !== policy.backup.required_schedule_status) addIssue(issues, "BACKUP_SCHEDULE_NOT_READY", "backup.schedule");
+    if (observation.backup.retention_status !== policy.backup.required_retention_status) addIssue(issues, "BACKUP_RETENTION_NOT_READY", "backup.retention");
     if (observation.backup.identity_status !== "MATCHED") addIssue(issues, "BACKUP_IDENTITY_MISMATCH", "backup.identity");
     if (observation.backup.policy_status !== "MATCHED" || observation.backup.policy_id !== config.backup_expectation.policy_id || observation.backup.rpo_hours !== config.backup_expectation.rpo_hours) addIssue(issues, "BACKUP_POLICY_MISMATCH", "backup.policy");
     if (observation.backup.assurance_status !== "MATCHED") addIssue(issues, "BACKUP_ASSURANCE_MISMATCH", "backup.assurance");
-    if (observation.backup.verification_status !== policy.backup.required_verification_status || observation.backup.recovery_ready !== true) addIssue(issues, "BACKUP_RECOVERY_NOT_READY", "backup.recovery");
+    if (observation.backup.verification_status !== policy.backup.required_verification_status || observation.backup.evidence_scope !== policy.backup.required_evidence_scope || observation.backup.recovery_ready !== true) addIssue(issues, "BACKUP_RECOVERY_NOT_READY", "backup.recovery");
   }
   if (config.notification.required && (observation.notification.status !== "READY" || observation.notification.target_id !== config.notification.target_id)) addIssue(issues, "ALERT_DELIVERY_NOT_CONFIGURED", "alert.delivery");
   if (issues.size > policy.max_active_alerts) reject("MONITOR_ACTIVE_ALERT_LIMIT_EXCEEDED");
@@ -714,7 +738,7 @@ export function emptyComponentObservation() {
       readiness: Object.freeze({ status: "NOT_COLLECTED", observed_at: null, version: null, revision: null, migration_head: null, code: null }),
     }),
     release: Object.freeze({ status: "NOT_COLLECTED", observed_at: null, generated_at: null, release_manifest_sha256: null, supervisor_bundle_sha256: null, application_version: null, git_commit: null, migration_head: null, migration_manifest_sha256: null, web_image_digest: null, worker_image_digest: null }),
-    backup: Object.freeze({ status: "NOT_COLLECTED", observed_at: null, verification_status: null, identity_status: null, policy_status: null, assurance_status: null, recovery_ready: false, recovery_point_at: null, expires_at: null, policy_id: null, rpo_hours: null }),
+    backup: Object.freeze({ status: "NOT_COLLECTED", observed_at: null, verification_status: null, evidence_scope: null, transfer_status: null, encryption_status: null, schedule_status: null, retention_status: null, identity_status: null, policy_status: null, assurance_status: null, recovery_ready: false, recovery_point_at: null, expires_at: null, policy_id: null, rpo_hours: null }),
     notification: Object.freeze({ status: "UNCONFIGURED", target_id: null }),
   });
 }

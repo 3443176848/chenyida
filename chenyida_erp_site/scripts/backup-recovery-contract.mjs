@@ -852,7 +852,8 @@ export function validateReceipt(value) {
     for (const [targetKey, sourceKey] of [["database_server_major", "database_server_major"], ["database_encoding", "database_encoding"], ["database_collate", "database_collate"], ["database_ctype", "database_ctype"], ["database_locale_provider", "database_locale_provider"], ["database_collation_version", "database_collation_version"]]) expectEqual(evidence.target[targetKey], value.deployment[sourceKey], "RESTORE_TARGET_DATABASE_PROFILE_MISMATCH");
     if (evidence.restored_at !== value.verified_at) reject("RESTORED_AT_INVALID");
     if (new Set([evidence.source_location_id, evidence.offhost_location_id, value.location_id]).size !== 3) reject("RESTORE_LOCATION_NOT_DISTINCT");
-    expectEqual(createHash("sha256").update(JSON.stringify(evidence.reconciliation)).digest("hex"), evidence.reconciliation_sha256, "RESTORE_RECONCILIATION_SHA_MISMATCH");
+    const reconciliationDigestInput = { contract: evidence.reconciliation.contract, source_sha256: evidence.reconciliation.source_sha256, target_database_report_sha256: evidence.reconciliation.target_database_report_sha256, target_file_trees_sha256: evidence.reconciliation.target_file_trees_sha256, result: evidence.reconciliation.result };
+    expectEqual(createHash("sha256").update(JSON.stringify(reconciliationDigestInput)).digest("hex"), evidence.reconciliation_sha256, "RESTORE_RECONCILIATION_SHA_MISMATCH");
   }
   return value;
 }

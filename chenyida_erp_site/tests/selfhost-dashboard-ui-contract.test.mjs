@@ -84,11 +84,14 @@ test("legacy backup governance renders missing or invalid evidence without inven
   assert.match(legacy, /latest_verification\?\.backup_id \|\| "无可信回执"/);
   assert.match(legacy, /status: backups\.verification_status \|\| "UNVERIFIED"/);
   assert.match(legacy, /statusLabel\(row\.status \|\| "UNVERIFIED"\)/);
+  for (const field of ["evidence_scope", "transfer_status", "encryption_status", "schedule_status", "retention_status"]) {
+    assert.match(legacy, new RegExp(`statusLabel\\(row\\.${field}`));
+  }
   for (const field of ["identity_status", "policy_status", "assurance_status"]) {
     assert.match(legacy, new RegExp(`statusLabel\\(row\\.${field} \\|\\| "UNCONFIGURED"\\)`));
   }
   assert.match(legacy, /row\.recovery_ready \? "是" : "否"/);
-  assert.match(legacy, /<td colspan="8">没有可信验证记录<\/td>/);
+  assert.match(legacy, /<td colspan="13">没有可信验证记录<\/td>/);
   assert.match(dashboardService, /import \{createHash\} from "node:crypto";import \{hostname\} from "node:os"/);
   assert.match(dashboardService, /hostname:hostname\(\)/);
   assert.doesNotMatch(dashboardService, /process\.env\.HOSTNAME/);

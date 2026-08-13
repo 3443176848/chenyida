@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
+import { spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { lstat, open } from "node:fs/promises";
+import { lstat, open, rename, unlink } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   parseStrictJson,
@@ -22,11 +25,15 @@ import {
 export const BACKUP_RECOVERY_READINESS_CONTRACT = "chenyida-erp-backup-verification/v3";
 export const BACKUP_RECOVERY_READY_RESULT = "RECOVERY_READY";
 export const BACKUP_RECOVERY_SYNTHETIC_RESULT = "SYNTHETIC_ISOLATED_VERIFIED";
+export const BACKUP_RECOVERY_READINESS_FILE = "recovery-readiness.json";
+export const BACKUP_RECOVERY_READINESS_ROOT_MARKER = ".chenyida-erp-receipt-root-v2";
+export const BACKUP_RECOVERY_READINESS_ROOT_MARKER_VALUE = "chenyida-erp-receipt-root/v2\n";
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const MAX_JSON_BYTES = 1024 * 1024;
+const SAFE_PATH = "/usr/bin:/bin";
 
 export class BackupRecoveryReadinessError extends Error {
   constructor(code) {
@@ -81,6 +88,20 @@ async function safeJson(file, code) {
   } finally { await handle.close(); }
 }
 
+async function safeText(file, code, maxBytes = MAX_JSON_BYTES) {
+  const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => reject(code));
+  try {
+    const before = await handle.stat();
+    if (!before.isFile() || before.nlink !== 1 || before.uid !== process.getuid?.() || before.size < 1 || before.size > maxBytes || (before.mode & 0o022) !== 0) reject(code);
+    const source = await handle.readFile("utf8");
+    const after = await handle.stat();
+    const pointed = await lstat(file).catch(() => reject(code));
+    if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs
+      || pointed.dev !== after.dev || pointed.ino !== after.ino || pointed.nlink !== 1) reject(code);
+    return source;
+  } finally { await handle.close(); }
+}
+
 export function validateBackupRecoveryReadiness(value) {
   exactKeys(value, ["schema_version", "contract", "result", "evidence_scope", "backup_id", "created_at", "verified_at", "expires_at", "inner_restore", "transfer", "operations", "attestation", "readiness_sha256"], "READINESS_FIELDS_INVALID");
   if (value.schema_version !== 3 || value.contract !== BACKUP_RECOVERY_READINESS_CONTRACT
@@ -115,6 +136,13 @@ export function validateBackupRecoveryReadiness(value) {
   if (value.evidence_scope === "ACTUAL_OFFHOST") {
     if (!new Set(["UAT", "PRODUCTION"]).has(value.operations.policy_scope) || value.operations.scheduler_installation_status !== "INSTALLED_AND_OBSERVED") reject("READINESS_OPERATIONS_INVALID");
   } else if (!new Set(["SYNTHETIC_TEST_ONLY", "TEST"]).has(value.operations.policy_scope) || value.operations.scheduler_installation_status !== "REPOSITORY_EVALUATOR_ONLY") reject("READINESS_OPERATIONS_INVALID");
+  if (value.transfer.source_location_id !== restore.evidence.source_location_id
+    || value.transfer.receiver_location_id !== restore.evidence.offhost_location_id
+    || value.transfer.receiver_identity_sha256 !== restore.evidence.offhost_receiver_identity_sha256
+    || value.transfer.offhost_receipt_sha256 !== restore.evidence.offhost_receipt_sha256) reject("READINESS_TRANSFER_RESTORE_MISMATCH");
+  if (value.evidence_scope === "ACTUAL_OFFHOST") {
+    if (value.operations.policy_scope !== restore.deployment.class) reject("READINESS_POLICY_DEPLOYMENT_MISMATCH");
+  } else if (restore.deployment.class !== "TEST") reject("READINESS_POLICY_DEPLOYMENT_MISMATCH");
   if (value.attestation !== "ROOT_PUBLISHED_INNER_V2_RESTORE_SIGNED_ENCRYPTED_OFFHOST_AND_OPERATIONS_POLICY_VERIFIED") reject("READINESS_ATTESTATION_INVALID");
   text(value.readiness_sha256, SHA256, "READINESS_INTEGRITY_INVALID");
   if (createHash("sha256").update(canonicalTransferJson(readinessBody(value))).digest("hex") !== value.readiness_sha256) reject("READINESS_INTEGRITY_INVALID");
@@ -144,6 +172,7 @@ export async function createBackupRecoveryReadiness(options) {
     .some((value) => Date.parse(value) > now.getTime())) reject("READINESS_TIME_INVALID");
   if (restore.result !== "RESTORE_VERIFIED" || restore.backup_id !== chain.envelope.backup_id
     || restore.manifest_sha256 !== chain.envelope.inner.manifest_sha256 || restore.expires_at !== chain.envelope.inner.expires_at
+    || restore.deployment.class !== chain.envelope.inner.deployment_class || restore.deployment.id !== chain.envelope.inner.deployment_id
     || restore.consistency.recovery_point_at !== chain.envelope.inner.recovery_point_at
     || restore.evidence.source_location_id !== chain.envelope.source.location_id
     || restore.evidence.offhost_location_id !== chain.envelope.receiver.location_id
@@ -205,5 +234,147 @@ export async function createBackupRecoveryReadiness(options) {
   return validateBackupRecoveryReadiness({
     ...body,
     readiness_sha256: createHash("sha256").update(canonicalTransferJson(body)).digest("hex"),
+  });
+}
+
+async function syncDirectory(directory) {
+  const handle = await open(directory, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW).catch(() => reject("READINESS_ROOT_UNSAFE"));
+  try { await handle.sync(); } finally { await handle.close(); }
+}
+
+async function validateReadinessRoot(root, readerGid) {
+  if (!Number.isSafeInteger(readerGid) || readerGid < 0) reject("READINESS_READER_GID_INVALID");
+  const resolved = path.resolve(root);
+  const metadata = await lstat(resolved).catch(() => reject("READINESS_ROOT_UNSAFE"));
+  if (!metadata.isDirectory() || metadata.isSymbolicLink() || metadata.uid !== process.getuid?.() || metadata.gid !== readerGid || (metadata.mode & 0o7777) !== 0o2750) reject("READINESS_ROOT_UNSAFE");
+  const marker = path.join(resolved, BACKUP_RECOVERY_READINESS_ROOT_MARKER);
+  const markerMetadata = await lstat(marker).catch(() => reject("READINESS_ROOT_UNSAFE"));
+  if (!markerMetadata.isFile() || markerMetadata.isSymbolicLink() || markerMetadata.nlink !== 1 || markerMetadata.uid !== metadata.uid
+    || markerMetadata.gid !== readerGid || ![0o400, 0o440].includes(markerMetadata.mode & 0o7777)
+    || await safeText(marker, "READINESS_ROOT_UNSAFE", 256) !== BACKUP_RECOVERY_READINESS_ROOT_MARKER_VALUE) reject("READINESS_ROOT_UNSAFE");
+  return resolved;
+}
+
+async function acquireReadinessLock(root) {
+  const lockFile = path.join(root, ".recovery-readiness-v3.lock");
+  try {
+    const handle = await open(lockFile, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
+    try {
+      await handle.writeFile("chenyida-erp-recovery-readiness-lock/v3\n", "utf8");
+      await handle.chmod(0o600);
+      await handle.sync();
+    } finally { await handle.close(); }
+    await syncDirectory(root);
+  } catch (error) {
+    if (error?.code !== "EEXIST") reject("READINESS_LOCK_UNSAFE");
+  }
+  const before = await lstat(lockFile).catch(() => reject("READINESS_LOCK_UNSAFE"));
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 || before.uid !== process.getuid?.() || (before.mode & 0o7777) !== 0o600 || before.size < 1 || before.size > 256) reject("READINESS_LOCK_UNSAFE");
+  const child = spawn("flock", ["-n", lockFile, "sh", "-c", "printf 'LOCKED\\n'; IFS= read -r release"], {
+    env: { PATH: SAFE_PATH, LANG: "C", LC_ALL: "C" },
+    stdio: ["pipe", "pipe", "ignore"],
+  });
+  const acquired = await new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => { if (!settled) { settled = true; resolve(value); } };
+    child.once("error", () => finish(false));
+    child.once("close", () => finish(false));
+    child.stdout.once("data", (chunk) => finish(chunk.toString("utf8") === "LOCKED\n"));
+  });
+  if (!acquired) { child.kill("SIGKILL"); reject("READINESS_LOCK_BUSY"); }
+  return async () => {
+    child.stdin.end("release\n");
+    if (child.exitCode === null && child.signalCode === null) await new Promise((resolve) => child.once("close", resolve));
+    const after = await lstat(lockFile).catch(() => reject("READINESS_LOCK_UNSAFE"));
+    if (after.dev !== before.dev || after.ino !== before.ino || after.nlink !== 1 || after.uid !== before.uid || (after.mode & 0o7777) !== 0o600) reject("READINESS_LOCK_CHANGED");
+  };
+}
+
+async function writeReadinessFile(file, source, readerGid, conflictCode) {
+  try {
+    const handle = await open(file, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o640);
+    try {
+      await handle.writeFile(source, "utf8");
+      await handle.chown(process.getuid?.() ?? 0, readerGid);
+      await handle.chmod(0o640);
+      await handle.sync();
+    } finally { await handle.close(); }
+  } catch (error) {
+    if (error?.code !== "EEXIST") reject("READINESS_PUBLICATION_FAILED");
+    const metadata = await lstat(file).catch(() => reject(conflictCode));
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.nlink !== 1 || metadata.uid !== process.getuid?.() || metadata.gid !== readerGid || (metadata.mode & 0o7777) !== 0o640) reject(conflictCode);
+    if (await safeText(file, conflictCode) !== source) reject(conflictCode);
+  }
+}
+
+async function readPublishedReadiness(file, readerGid) {
+  const metadata = await lstat(file).catch(() => reject("READINESS_ALIAS_UNSAFE"));
+  if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.nlink !== 1 || metadata.uid !== process.getuid?.() || metadata.gid !== readerGid || (metadata.mode & 0o7777) !== 0o640) reject("READINESS_ALIAS_UNSAFE");
+  const source = await safeText(file, "READINESS_ALIAS_UNSAFE");
+  let value;
+  try { value = validateBackupRecoveryReadiness(parseStrictJson(source)); } catch { reject("READINESS_ALIAS_INVALID"); }
+  if (source !== canonicalTransferJson(value)) reject("READINESS_ALIAS_INVALID");
+  return value;
+}
+
+export async function publishBackupRecoveryReadiness({ readiness, receiptRoot, receiptReaderGid, confirm }) {
+  const validated = validateBackupRecoveryReadiness(readiness);
+  if (validated.result === BACKUP_RECOVERY_READY_RESULT && process.getuid?.() !== 0) reject("READINESS_ACTUAL_ROOT_REQUIRED");
+  const requiredConfirmation = validated.result === BACKUP_RECOVERY_READY_RESULT
+    ? "PUBLISH_ACTUAL_OFFHOST_RECOVERY_READINESS"
+    : "PUBLISH_SYNTHETIC_ISOLATED_RECOVERY_EVIDENCE";
+  if (confirm !== requiredConfirmation) reject("READINESS_PUBLICATION_CONFIRMATION_REQUIRED");
+  const root = await validateReadinessRoot(receiptRoot, receiptReaderGid);
+  const release = await acquireReadinessLock(root);
+  const source = canonicalTransferJson(validated);
+  const immutableFile = path.join(root, `${validated.backup_id}.${validated.transfer.transfer_id}.recovery-readiness-v3.json`);
+  const aliasFile = path.join(root, BACKUP_RECOVERY_READINESS_FILE);
+  const temporary = path.join(root, `.recovery-readiness.${process.pid}.${Date.now()}.tmp`);
+  try {
+    await writeReadinessFile(immutableFile, source, receiptReaderGid, "READINESS_HISTORY_CONFLICT");
+    const existingMetadata = await lstat(aliasFile).catch((error) => error?.code === "ENOENT" ? null : reject("READINESS_ALIAS_UNSAFE"));
+    if (existingMetadata) {
+      const existing = await readPublishedReadiness(aliasFile, receiptReaderGid);
+      if (existing.readiness_sha256 === validated.readiness_sha256) return { immutableFile, aliasFile };
+      if (existing.result === BACKUP_RECOVERY_READY_RESULT && validated.result !== BACKUP_RECOVERY_READY_RESULT) reject("READINESS_ALIAS_DOWNGRADE_FORBIDDEN");
+      if (Date.parse(existing.verified_at) >= Date.parse(validated.verified_at)) reject("READINESS_ALIAS_REGRESSION");
+    }
+    await writeReadinessFile(temporary, source, receiptReaderGid, "READINESS_TEMP_CONFLICT");
+    await rename(temporary, aliasFile);
+    await syncDirectory(root);
+    const published = await readPublishedReadiness(aliasFile, receiptReaderGid);
+    if (published.readiness_sha256 !== validated.readiness_sha256) reject("READINESS_PUBLICATION_FAILED");
+    return { immutableFile, aliasFile };
+  } finally {
+    await unlink(temporary).catch(() => {});
+    await release();
+  }
+}
+
+function cliArgs(argv) {
+  const result = {};
+  for (let index = 0; index < argv.length; index += 2) {
+    if (!argv[index]?.startsWith("--") || index + 1 >= argv.length || result[argv[index].slice(2)] !== undefined) reject("ARGUMENT_INVALID");
+    result[argv[index].slice(2)] = argv[index + 1];
+  }
+  return result;
+}
+
+async function main(argv) {
+  const [command, ...rest] = argv;
+  const input = cliArgs(rest);
+  if (command !== "publish" || Object.keys(input).sort().join(",") !== ["confirm", "readiness", "receipt-reader-gid", "receipt-root"].sort().join(",")) reject("ARGUMENT_SET_INVALID");
+  const readiness = validateBackupRecoveryReadiness(await safeJson(path.resolve(input.readiness), "READINESS_INPUT_INVALID"));
+  const readerGid = Number(input["receipt-reader-gid"]);
+  await publishBackupRecoveryReadiness({ readiness, receiptRoot: input["receipt-root"], receiptReaderGid: readerGid, confirm: input.confirm });
+  process.stdout.write(`${readiness.backup_id} ${readiness.result}\n`);
+}
+
+const isCli = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isCli) {
+  main(process.argv.slice(2)).catch((error) => {
+    const code = error instanceof BackupRecoveryReadinessError && /^[A-Z0-9_]+$/.test(error.code) ? error.code : "INTERNAL_ERROR";
+    process.stderr.write(`backup recovery readiness rejected: ${code}\n`);
+    process.exitCode = 1;
   });
 }

@@ -3,7 +3,7 @@ export const RELEASE_LIFECYCLE_CONTRACT = "chenyida-erp-release-lifecycle/v1";
 export const PRE_DEPLOY_RUNTIME_GUARD_MODE = "PRE_DEPLOY_EXISTING_RUNTIME_STABILITY";
 export const ISOLATED_CANDIDATE_RUNTIME_GUARD_MODE = "ISOLATED_CANDIDATE_STRICT";
 export const POST_DEPLOY_RUNTIME_GUARD_MODE = "POST_DEPLOY_CURRENT_RUNTIME_STRICT";
-export const RELEASE_RUNTIME_POLICY_SHA256 = "8c9f9fd06eb4533faeeed4c316eb93568c38b3a42ac8c48dd081fbb4e7a2f444";
+export const RELEASE_RUNTIME_POLICY_SHA256 = "163ccf002f083d8818b90f67e3fe8a584bf25beee4a05d1448121eb5c530c77e";
 
 const OFFICIAL_PRE_DEPLOY_SERVICES = Object.freeze([
   Object.freeze({ service: "caddy", allowed_health: Object.freeze(["none"]), healthcheck_policy: "VERSIONED_POLICY_ABSENT" }),

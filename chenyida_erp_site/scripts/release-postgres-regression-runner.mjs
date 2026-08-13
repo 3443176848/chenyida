@@ -135,6 +135,9 @@ function databaseConfiguration(entry, source) {
     extras.ERP_BACKUP_EXPECTED_RESTORE_TARGET_CLUSTER_MARKER_ID = "dashboard-isolated-target-cluster";
     extras.ERP_BACKUP_POLICY_ID = "daily-rpo-v1";
     extras.ERP_BACKUP_RPO_HOURS = "24";
+    extras.ERP_BACKUP_OPERATIONS_POLICY_ID = "offhost-test-v1";
+    extras.ERP_BACKUP_OPERATIONS_POLICY_SHA256 = "7".repeat(64);
+    extras.ERP_BACKUP_OPERATIONS_POLICY_SCOPE = "TEST";
     extras.ERP_BACKUP_EXPECTED_OFFHOST_LOCATION_ID = "dashboard-offhost";
     extras.ERP_BACKUP_EXPECTED_OFFHOST_RECEIVER_IDENTITY_SHA256 = "d".repeat(64);
     extras.ERP_BACKUP_EXPECTED_RESTORE_LOCATION_ID = "dashboard-restore-location";
