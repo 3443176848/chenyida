@@ -21,6 +21,12 @@ import type { MaterialImportTask, MaterialImportTaskDisposition, MaterialImportT
 import { parseMaterialImportXlsx, type MaterialImportSharedStringStore, type MaterialImportXlsxSheet } from "./xlsx-parser.ts";
 import { parseMaterialImportXls, type MaterialImportXlsSheet } from "./xls-parser.ts";
 import { MaterialImportMappingMetadataSnapshotService } from "./mapping-target-registry.ts";
+import {
+  MaterialImportParserServiceError,
+  type MaterialImportParserServiceResult,
+} from "./parser-service-contract.ts";
+
+export { MaterialImportParserServiceError, type MaterialImportParserServiceResult } from "./parser-service-contract.ts";
 
 const LEASE_SECONDS = 120;
 const IDEMPOTENCY_TTL_SECONDS = 86_400;
@@ -42,15 +48,6 @@ export type QueueMaterialImportParseInput = Readonly<{
   idempotencyKey: string;
   requestId: string;
 }>;
-
-export type MaterialImportParserServiceResult = Readonly<{ status: number; payload: Record<string, unknown>; replayed?: boolean }>;
-
-export class MaterialImportParserServiceError extends Error {
-  readonly code: string;
-  readonly status: number;
-  readonly expectedVersion?: number;
-  constructor(code: string, message: string, status: number, expectedVersion?: number) { super(message); this.code = code; this.status = status; this.expectedVersion = expectedVersion; }
-}
 
 async function sha256Text(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));

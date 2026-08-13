@@ -1,12 +1,16 @@
 import type { Pool, PoolClient } from "pg";
 import type { Clock, IdGenerator } from "./primitives.ts";
+import {
+  PostgresBackgroundJobEnqueuer,
+  type BackgroundJobEnqueuer,
+  type JobPayload,
+} from "./background-job-enqueuer.ts";
 
-export type JobPayload = Record<string, unknown>;
+export type { BackgroundJobEnqueuer, JobPayload } from "./background-job-enqueuer.ts";
 export type JobLease = { id: string; type: string; payload: JobPayload; attemptCount: number; maxAttempts: number; leaseToken: string; version: number; aggregateType?: string; aggregateId?: string };
 export type JobTerminalPublication = (client: PoolClient, job: JobLease, code: string) => Promise<void>;
 
-export interface BackgroundJobQueue {
-  enqueue(client: PoolClient, input: { type: string; payload: JobPayload; idempotencyKey: string; aggregateType: string; aggregateId: string }): Promise<string>;
+export interface BackgroundJobQueue extends BackgroundJobEnqueuer {
   dispatchOutbox(limit?: number): Promise<number>;
   claim(workerId: string): Promise<JobLease | null>;
   heartbeat(job: JobLease, workerId: string): Promise<boolean>;
@@ -15,23 +19,11 @@ export interface BackgroundJobQueue {
   recoverExpired(publishTerminal?: JobTerminalPublication): Promise<number>;
 }
 
-export class PostgresBackgroundJobQueue implements BackgroundJobQueue {
-  private pool: Pool;
-  private clock: Clock;
-  private ids: IdGenerator;
+export class PostgresBackgroundJobQueue extends PostgresBackgroundJobEnqueuer implements BackgroundJobQueue {
   private leaseSeconds: number;
   constructor(pool: Pool, clock: Clock, ids: IdGenerator, leaseSeconds = 60) {
-    this.pool = pool; this.clock = clock; this.ids = ids; this.leaseSeconds = leaseSeconds;
-  }
-
-  async enqueue(client: PoolClient, input: { type: string; payload: JobPayload; idempotencyKey: string; aggregateType: string; aggregateId: string }): Promise<string> {
-    const id = this.ids.uuid();
-    const found = await client.query<{ id: string }>(`insert into material_import_job_outbox
-      (id, aggregate_type, aggregate_id, job_type, idempotency_key, payload, status, available_at, created_at, updated_at)
-      values ($1,$2,$3,$4,$5,$6,'PENDING',$7,$7,$7)
-      on conflict (idempotency_key) do update set idempotency_key=excluded.idempotency_key returning id`,
-      [id, input.aggregateType, input.aggregateId, input.type, input.idempotencyKey, input.payload, this.clock.now()]);
-    return found.rows[0].id;
+    super(pool, clock, ids);
+    this.leaseSeconds = leaseSeconds;
   }
 
   async dispatchOutbox(limit = 50): Promise<number> {

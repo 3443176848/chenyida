@@ -1735,6 +1735,12 @@
           "app_meta"
         ]
       },
+      "reviewed_excluded_operations": {
+        "DELETE": [],
+        "INSERT": [],
+        "SELECT": [],
+        "UPDATE": []
+      },
       "reviewed_dependency_operations": {
         "LOCK_TARGETS_REQUIRING_UPDATE": [],
         "SELECT": []
@@ -2022,6 +2028,12 @@
           "warehouse_receiving_queue_entries",
           "worker_runtime_leases"
         ],
+        "UPDATE": []
+      },
+      "reviewed_excluded_operations": {
+        "DELETE": [],
+        "INSERT": [],
+        "SELECT": [],
         "UPDATE": []
       },
       "reviewed_dependency_operations": {
@@ -2496,7 +2508,7 @@
     },
     "WEB": {
       "derivation": "SOURCE_GRAPH_CANDIDATE_REVIEWED",
-      "source_evidence_sha256": "8b4cb65f8ad2aa6368d5c101934b6604eae765182572417810200de9404a50b3",
+      "source_evidence_sha256": "db67860f8ff036d5a6ad6added17a8dbb8b1017007e1c07fb833dacbb6641aa8",
       "source_files": [
         "app/lib/ai-governance-suggestion-selfhost/adapter.ts",
         "app/lib/ai-governance-suggestion-selfhost/canonical.ts",
@@ -2523,7 +2535,7 @@
         "app/lib/identity-selfhost/repository.ts",
         "app/lib/identity-selfhost/service.ts",
         "app/lib/identity-selfhost/types.ts",
-        "app/lib/infrastructure/background-jobs.ts",
+        "app/lib/infrastructure/background-job-enqueuer.ts",
         "app/lib/infrastructure/config.ts",
         "app/lib/infrastructure/primitives.ts",
         "app/lib/infrastructure/request-origin.ts",
@@ -2571,15 +2583,13 @@
         "app/lib/material-import-selfhost/rules.ts",
         "app/lib/material-import-selfhost/service.ts",
         "app/lib/material-import/adaptive-import.ts",
-        "app/lib/material-import/csv-parser.ts",
         "app/lib/material-import/file-security.ts",
         "app/lib/material-import/mapping-target-registry.ts",
         "app/lib/material-import/multipart.ts",
         "app/lib/material-import/normalization-model.ts",
         "app/lib/material-import/parser-model.ts",
-        "app/lib/material-import/parser-service.ts",
+        "app/lib/material-import/parser-service-contract.ts",
         "app/lib/material-import/xls-parser.ts",
-        "app/lib/material-import/xlsx-parser.ts",
         "app/lib/material-requirement-selfhost/calculation.ts",
         "app/lib/material-requirement-selfhost/current-supply.ts",
         "app/lib/material-requirement-selfhost/errors.ts",
@@ -2655,7 +2665,7 @@
         "app/lib/runtime-readiness/migration.ts",
         "app/lib/runtime-readiness/service.ts",
         "app/lib/runtime-readiness/storage.ts",
-        "app/lib/runtime-readiness/worker-lease.ts",
+        "app/lib/runtime-readiness/worker-lease-reader.ts",
         "app/lib/sales-selfhost/errors.ts",
         "app/lib/sales-selfhost/handler.ts",
         "app/lib/sales-selfhost/repository.ts",
@@ -2678,16 +2688,7 @@
           "idempotency_keys",
           "identity_login_failures",
           "material_attribute_values",
-          "material_import_header_suggestions",
           "material_import_mapping_items",
-          "material_import_normalization_issues",
-          "material_import_normalization_lineage",
-          "material_import_normalized_attribute_candidates",
-          "material_import_normalized_field_candidates",
-          "material_import_normalized_rows",
-          "material_import_parse_sheets",
-          "material_import_rows",
-          "material_import_shared_string_chunks",
           "production_batches",
           "production_routing_operations",
           "project_document_links",
@@ -2699,10 +2700,10 @@
           "ai_governance_suggestion_items",
           "ai_governance_suggestion_runs",
           "ai_governance_suggestions",
+          "app_meta",
           "app_sessions",
           "app_users",
           "audit_log",
-          "background_jobs",
           "bom_headers",
           "bom_lines",
           "bom_versions",
@@ -2740,19 +2741,11 @@
           "material_import_batches",
           "material_import_events",
           "material_import_files",
-          "material_import_header_suggestions",
           "material_import_idempotency",
           "material_import_job_outbox",
           "material_import_mapping_items",
           "material_import_mappings",
-          "material_import_normalization_issues",
-          "material_import_normalization_lineage",
           "material_import_normalization_runs",
-          "material_import_normalized_attribute_candidates",
-          "material_import_normalized_field_candidates",
-          "material_import_normalized_rows",
-          "material_import_parse_runs",
-          "material_import_parse_sheets",
           "material_import_review_attribute_overrides",
           "material_import_review_field_overrides",
           "material_import_review_finalizations",
@@ -2760,7 +2753,6 @@
           "material_import_review_issue_resolutions",
           "material_import_review_rows",
           "material_import_review_sessions",
-          "material_import_shared_string_chunks",
           "material_import_upload_operations",
           "material_master",
           "material_versions",
@@ -2893,8 +2885,7 @@
           "supplier_mappings",
           "suppliers",
           "warehouse_receipt_evidence",
-          "warehouse_receiving_queue_entries",
-          "worker_runtime_leases"
+          "warehouse_receiving_queue_entries"
         ],
         "SELECT": [
           "ai_governance_suggestion_events",
@@ -2968,8 +2959,6 @@
           "material_import_review_sessions",
           "material_import_review_validation_issues",
           "material_import_rows",
-          "material_import_shared_string_chunks",
-          "material_import_supplier_profiles",
           "material_import_upload_operations",
           "material_master",
           "material_versions",
@@ -3131,12 +3120,10 @@
           "material_import_mappings",
           "material_import_normalization_runs",
           "material_import_parse_runs",
-          "material_import_parse_sheets",
           "material_import_review_finalization_rows",
           "material_import_review_finalizations",
           "material_import_review_rows",
           "material_import_review_sessions",
-          "material_import_shared_string_chunks",
           "material_import_upload_operations",
           "material_master",
           "planning_material_allocations",
@@ -3186,9 +3173,16 @@
           "sales_quotations",
           "supplier_mappings",
           "suppliers",
-          "warehouse_receiving_queue_entries",
-          "worker_runtime_leases"
+          "warehouse_receiving_queue_entries"
         ]
+      },
+      "reviewed_excluded_operations": {
+        "DELETE": [],
+        "INSERT": [
+          "app_meta"
+        ],
+        "SELECT": [],
+        "UPDATE": []
       },
       "reviewed_dependency_operations": {
         "SELECT": [
@@ -3207,16 +3201,7 @@
           "idempotency_keys",
           "identity_login_failures",
           "material_attribute_values",
-          "material_import_header_suggestions",
           "material_import_mapping_items",
-          "material_import_normalization_issues",
-          "material_import_normalization_lineage",
-          "material_import_normalized_attribute_candidates",
-          "material_import_normalized_field_candidates",
-          "material_import_normalized_rows",
-          "material_import_parse_sheets",
-          "material_import_rows",
-          "material_import_shared_string_chunks",
           "production_batches",
           "production_routing_operations",
           "project_document_links",
@@ -3231,7 +3216,6 @@
           "app_sessions",
           "app_users",
           "audit_log",
-          "background_jobs",
           "bom_headers",
           "bom_lines",
           "bom_versions",
@@ -3269,19 +3253,11 @@
           "material_import_batches",
           "material_import_events",
           "material_import_files",
-          "material_import_header_suggestions",
           "material_import_idempotency",
           "material_import_job_outbox",
           "material_import_mapping_items",
           "material_import_mappings",
-          "material_import_normalization_issues",
-          "material_import_normalization_lineage",
           "material_import_normalization_runs",
-          "material_import_normalized_attribute_candidates",
-          "material_import_normalized_field_candidates",
-          "material_import_normalized_rows",
-          "material_import_parse_runs",
-          "material_import_parse_sheets",
           "material_import_review_attribute_overrides",
           "material_import_review_field_overrides",
           "material_import_review_finalizations",
@@ -3289,7 +3265,6 @@
           "material_import_review_issue_resolutions",
           "material_import_review_rows",
           "material_import_review_sessions",
-          "material_import_shared_string_chunks",
           "material_import_upload_operations",
           "material_master",
           "material_versions",
@@ -3422,8 +3397,7 @@
           "supplier_mappings",
           "suppliers",
           "warehouse_receipt_evidence",
-          "warehouse_receiving_queue_entries",
-          "worker_runtime_leases"
+          "warehouse_receiving_queue_entries"
         ],
         "SELECT": [
           "ai_governance_suggestion_events",
@@ -3501,8 +3475,6 @@
           "material_import_review_sessions",
           "material_import_review_validation_issues",
           "material_import_rows",
-          "material_import_shared_string_chunks",
-          "material_import_supplier_profiles",
           "material_import_upload_operations",
           "material_master",
           "material_versions",
@@ -3664,12 +3636,10 @@
           "material_import_mappings",
           "material_import_normalization_runs",
           "material_import_parse_runs",
-          "material_import_parse_sheets",
           "material_import_review_finalization_rows",
           "material_import_review_finalizations",
           "material_import_review_rows",
           "material_import_review_sessions",
-          "material_import_shared_string_chunks",
           "material_import_upload_operations",
           "material_master",
           "planning_material_allocations",
@@ -3719,8 +3689,7 @@
           "sales_quotations",
           "supplier_mappings",
           "suppliers",
-          "warehouse_receiving_queue_entries",
-          "worker_runtime_leases"
+          "warehouse_receiving_queue_entries"
         ]
       },
       "sequence_privileges": {
@@ -3764,18 +3733,10 @@
           "material_import_batches_id_seq",
           "material_import_events_id_seq",
           "material_import_files_id_seq",
-          "material_import_header_suggestions_id_seq",
           "material_import_idempotency_id_seq",
           "material_import_mapping_items_id_seq",
           "material_import_mappings_id_seq",
-          "material_import_normalization_issues_id_seq",
-          "material_import_normalization_lineage_id_seq",
           "material_import_normalization_runs_id_seq",
-          "material_import_normalized_attribute_candidates_id_seq",
-          "material_import_normalized_field_candidates_id_seq",
-          "material_import_normalized_rows_id_seq",
-          "material_import_parse_runs_id_seq",
-          "material_import_parse_sheets_id_seq",
           "material_import_review_attribute_overrides_id_seq",
           "material_import_review_field_overrides_id_seq",
           "material_import_review_finalizations_id_seq",
@@ -3783,7 +3744,6 @@
           "material_import_review_issue_resolutions_id_seq",
           "material_import_review_rows_id_seq",
           "material_import_review_sessions_id_seq",
-          "material_import_shared_string_chunks_id_seq",
           "material_master_id_seq",
           "material_versions_id_seq",
           "planning_material_allocations_id_seq",
@@ -3948,10 +3908,11 @@
     },
     "WORKER": {
       "derivation": "REVIEWED_WORKER_CALL_GRAPH",
-      "source_evidence_sha256": "bd4dc1b1381c5e83edc04ed2dd300957817fc9ab7bf458f5ce1d3fa93294254e",
+      "source_evidence_sha256": "407412aa293efb4f9caae9eb6647f4887bbb85d63d48b83a32bd85b188500a2d",
       "source_files": [
         "app/lib/application-version.ts",
         "app/lib/exact-decimal.ts",
+        "app/lib/infrastructure/background-job-enqueuer.ts",
         "app/lib/infrastructure/background-jobs.ts",
         "app/lib/infrastructure/config.ts",
         "app/lib/infrastructure/file-storage.ts",
@@ -3968,6 +3929,7 @@
         "app/lib/material-import-fallback/service.ts",
         "app/lib/material-import-fallback/types.ts",
         "app/lib/material-import-normalization-selfhost/errors.ts",
+        "app/lib/material-import-normalization-selfhost/normalization-staging-writer.ts",
         "app/lib/material-import-normalization-selfhost/normalizer.ts",
         "app/lib/material-import-normalization-selfhost/repository.ts",
         "app/lib/material-import-normalization-selfhost/worker.ts",
@@ -3977,6 +3939,7 @@
         "app/lib/material-import-review-selfhost/worker.ts",
         "app/lib/material-import-selfhost/catalog.ts",
         "app/lib/material-import-selfhost/errors.ts",
+        "app/lib/material-import-selfhost/initial-mapping-publisher.ts",
         "app/lib/material-import-selfhost/rules.ts",
         "app/lib/material-import-selfhost/service.ts",
         "app/lib/material-import/adaptive-import.ts",
@@ -3986,7 +3949,7 @@
         "app/lib/material-import/multipart.ts",
         "app/lib/material-import/normalization-model.ts",
         "app/lib/material-import/parser-model.ts",
-        "app/lib/material-import/parser-service.ts",
+        "app/lib/material-import/parser-service-contract.ts",
         "app/lib/material-import/xls-parser.ts",
         "app/lib/material-import/xlsx-parser.ts",
         "app/lib/material-selfhost/errors.ts",
@@ -3996,9 +3959,10 @@
         "app/lib/material-selfhost/validation.ts",
         "app/lib/runtime-readiness/identity.ts",
         "app/lib/runtime-readiness/migration.ts",
-        "app/lib/runtime-readiness/service.ts",
         "app/lib/runtime-readiness/storage.ts",
+        "app/lib/runtime-readiness/worker-lease-reader.ts",
         "app/lib/runtime-readiness/worker-lease.ts",
+        "app/lib/runtime-readiness/worker-runtime-service.ts",
         "app/lib/selfhost-worker.ts",
         "db/index.ts",
         "db/runtime-connection.ts",
@@ -4008,17 +3972,13 @@
       "source_candidate_table_privileges": {
         "DELETE": [
           "material_attribute_values",
-          "material_import_header_suggestions",
           "material_import_mapping_items",
           "material_import_mappings",
           "material_import_normalization_issues",
           "material_import_normalization_lineage",
           "material_import_normalized_attribute_candidates",
           "material_import_normalized_field_candidates",
-          "material_import_normalized_rows",
-          "material_import_parse_sheets",
-          "material_import_rows",
-          "material_import_shared_string_chunks"
+          "material_import_normalized_rows"
         ],
         "INSERT": [
           "audit_log",
@@ -4051,7 +4011,6 @@
           "material_import_review_sessions",
           "material_import_review_validation_issues",
           "material_import_rows",
-          "material_import_shared_string_chunks",
           "material_import_upload_operations",
           "material_master",
           "material_versions",
@@ -4097,8 +4056,6 @@
           "material_import_review_sessions",
           "material_import_review_validation_issues",
           "material_import_rows",
-          "material_import_shared_string_chunks",
-          "material_import_supplier_profiles",
           "material_import_upload_operations",
           "material_master",
           "material_versions",
@@ -4116,18 +4073,22 @@
           "material_import_mappings",
           "material_import_normalization_runs",
           "material_import_parse_runs",
-          "material_import_parse_sheets",
           "material_import_review_finalization_rows",
           "material_import_review_finalizations",
           "material_import_review_material_bindings",
           "material_import_review_rows",
           "material_import_review_sessions",
           "material_import_review_validation_issues",
-          "material_import_shared_string_chunks",
           "material_import_upload_operations",
           "material_master",
           "worker_runtime_leases"
         ]
+      },
+      "reviewed_excluded_operations": {
+        "DELETE": [],
+        "INSERT": [],
+        "SELECT": [],
+        "UPDATE": []
       },
       "reviewed_dependency_operations": {
         "LOCK_TARGETS_REQUIRING_UPDATE": [],
@@ -4260,5 +4221,5 @@
       }
     }
   },
-  "access_sha256": "218d7ff7e17124c6ff45b39f25a104016538d4a6e23f50ed8be3f6b500a2561f"
+  "access_sha256": "b2defe953c59a6b37858ee90af1ae08fbd444486a814ebb1c10f7f0f4ee83aa1"
 }

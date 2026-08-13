@@ -12,7 +12,8 @@ import {
   migrationAllowlistSha256,
   verifyDatabaseMigrationManifest,
 } from "../app/lib/runtime-readiness/migration.ts";
-import { RuntimeReadinessService, WorkerRuntimeLeaseSupervisor } from "../app/lib/runtime-readiness/service.ts";
+import { RuntimeReadinessService } from "../app/lib/runtime-readiness/service.ts";
+import { WorkerRuntimeLeaseSupervisor } from "../app/lib/runtime-readiness/worker-runtime-service.ts";
 import { probeStorageRoot } from "../app/lib/runtime-readiness/storage.ts";
 import {
   readWorkerInstanceFile,
@@ -211,7 +212,7 @@ test("concurrent anonymous readiness shares one double-volume probe and cache ne
     };
   });
   const service = new RuntimeReadinessService({
-    database, identity, migrations, uploadRoot: "/uploads", attachmentRoot: "/attachments", leaseSeconds: 60,
+    database, identity, migrations, uploadRoot: "/uploads", attachmentRoot: "/attachments",
     nowMilliseconds: () => monotonic,
     storageProbe: async () => { probes += 1; await new Promise((resolve) => setTimeout(resolve, 5)); },
   });

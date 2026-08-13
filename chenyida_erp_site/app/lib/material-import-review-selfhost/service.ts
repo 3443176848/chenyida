@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from "pg";
-import type { BackgroundJobQueue } from "../infrastructure/background-jobs.ts";
+import type { BackgroundJobEnqueuer } from "../infrastructure/background-job-enqueuer.ts";
 import { reviewFailure } from "./errors.ts";
 import { PostgresMaterialImportReviewRepository, mapReviewDatabaseError, reviewRowDto, reviewSessionDto } from "./repository.ts";
 import { assertReviewEditable } from "./state-machine.ts";
@@ -50,9 +50,9 @@ export function reviewRequestDigest(body: unknown): string {
 
 export class MaterialImportReviewService {
   readonly repository: PostgresMaterialImportReviewRepository;
-  readonly queue: BackgroundJobQueue;
+  readonly queue: BackgroundJobEnqueuer;
 
-  constructor(repository: PostgresMaterialImportReviewRepository, queue: BackgroundJobQueue) {
+  constructor(repository: PostgresMaterialImportReviewRepository, queue: BackgroundJobEnqueuer) {
     this.repository = repository;
     this.queue = queue;
   }

@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`。严格起点为TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`；Web锁与Backup control/capture检查点已闭合，当前进入PG17精确catalog和完整角色/ACL reconcile，后续仍包括secret-file delivery、受控operator与custom tablespace持久mount合同。真实角色/凭据/Volume、UAT/生产、host安装、Migration/deploy、真实备份恢复及WAL/PITR继续阻塞，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`。严格起点为TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`；Web锁与Backup control/capture检查点已闭合，Parser及四类Worker-only写实现已从Web模块结构拆出，raw candidate自然收敛并最终撤销25个表操作/9个序列权限，职责组统一为`*_priv`。三线审计发现D-132 v1实际恢复证据仍可能被readiness v4放行，当前先失败关闭该P0入口，再进入PG17精确catalog和完整角色/ACL reconcile。后续仍包括secret-file delivery、受控operator与custom tablespace持久mount合同。真实角色/凭据/Volume、UAT/生产、host安装、Migration/deploy、真实备份恢复及WAL/PITR继续阻塞，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -83,6 +83,12 @@
 
 2026-08-13第三十五次调度事件：TASK56保持唯一`DOING`。Backup已强制独立control/capture service，高权限control只做稳定身份、零large-object、只读/CONNECT围栏及恢复控制，固定非superuser `chenyida_erp_backup`执行reconciliation、Migration读取和无large-object dump；v3 intent崩溃恢复、意外large object拒绝、越权负测及新空库恢复在隔离PG17通过。access intent现只剩`POSTGRESQL17_COMPILED_CATALOG_REQUIRED`，当前自动进入精确catalog与角色/ACL reconcile。没有真实角色、凭据、备份/恢复、Volume、Migration、部署或UAT变化，系统继续`PRODUCTION NO-GO`。
 
+2026-08-13第三十六次调度事件：TASK56保持唯一`DOING`。编译catalog前复核发现`mapping-target-registry.ts`只需共享错误类型，却通过`parser-service.ts`把legacy D1 CSV/XLSX Parser SQL误纳入Web源码图；现抽出无数据库依赖的contract，Web权限精确减少11个表操作及3个sequence USAGE。运行身份职责组统一采用D-133/Backup已固定的`*_priv`，`*_acl`成为后续catalog禁止漂移；D-132 v1三处fixture恢复alpha.46及各自原始0045 head的不可变语义。新access SHA-256为`d1dbd6de…6f3`，定向Node 9/9与diff门通过；当前继续PG17编译catalog，未修改UAT/生产或真实数据。
+
+2026-08-13第三十七次调度事件：TASK56保持唯一`DOING`。应用审计确认文件级Web图仍含只由Worker调用的lease INSERT/UPDATE、background job dispatch INSERT、初始header suggestion INSERT及五张normalization暂存表INSERT/DELETE；现拆分lease reader/writer与Worker supervisor、Web enqueuer/Worker queue、初始Mapping publisher和normalization staging writer，raw candidate由`14/199/205/80`收敛为`9/191/205/79`，reviewed exclusion只剩既有`app_meta INSERT`。Web最终为`9/190/209/79`、sequence USAGE 173，access SHA-256 `b2defe95…3aa1`；TypeScript、Node 36/36及runtime-readiness PG17 5/5通过。运维安全审计另确认V4会接受v1 `ACTUAL_OFFHOST`，故优先级调整为先加fail-closed门禁，再编译catalog；未执行真实恢复、角色/ACL或运行面变更。
+
+2026-08-13第三十八次调度事件：TASK56保持唯一`DOING`。独立复核发现8份已改正式测试会使旧inventory在harness前失败关闭；现已同步重绑测试SHA-256、`244/220/24` inventory及runtime policy，inventory SHA-256为`79b1c812…b328db`。D-132三份v1 fixture已恢复原始alpha.46/0045语义，inventory verify、release/v1 transfer合同31/31及v1 recovery合同16/16通过。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -99,7 +105,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 | PostgreSQL运行时最小权限与凭据边界闭环 | DOING | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50、SELFHOST-OPS-RELEASE-GATE-42、D-132 | `READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`。Web锁与Backup control/capture已闭合；当前只剩PG17编译catalog blocker，随后继续完整角色/ACL、secret-file、受控operator与custom tablespace持久mount。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56.md)。 |
+| SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 | PostgreSQL运行时最小权限与凭据边界闭环 | DOING | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50、SELFHOST-OPS-RELEASE-GATE-42、D-132 | `READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`。Web锁、Backup control/capture、Web候选/调用路径误权和`*_priv`命名冲突已关闭；当前先阻断v1实际恢复证据被V4误判ready，再继续PG17编译catalog、完整角色/ACL、secret-file、受控operator与custom tablespace持久mount。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56.md)。 |
 
 ## 已完成任务
 

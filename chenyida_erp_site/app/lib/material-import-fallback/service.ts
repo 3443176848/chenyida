@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 
-import type { BackgroundJobQueue } from "../infrastructure/background-jobs.ts";
+import type { BackgroundJobEnqueuer } from "../infrastructure/background-job-enqueuer.ts";
 import {
   detectMaterialImportFileType,
   MaterialImportFileSecurityError,
@@ -397,14 +397,14 @@ export class UploadLeaseHeartbeat {
 export class MaterialImportFallbackService {
   readonly repository: PostgresMaterialImportFallbackRepository;
   readonly store: LocalMaterialImportFileStore;
-  readonly queue: BackgroundJobQueue;
+  readonly queue: BackgroundJobEnqueuer;
   readonly maximumBytes: number;
   readonly leaseSeconds: number;
 
   constructor(
     repository: PostgresMaterialImportFallbackRepository,
     store: LocalMaterialImportFileStore,
-    queue: BackgroundJobQueue,
+    queue: BackgroundJobEnqueuer,
     options: Readonly<{ maximumBytes?: number; leaseSeconds?: number }> = {},
   ) {
     this.repository = repository;

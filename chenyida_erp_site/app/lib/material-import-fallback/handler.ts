@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 
-import type { BackgroundJobQueue } from "../infrastructure/background-jobs.ts";
+import type { BackgroundJobEnqueuer } from "../infrastructure/background-job-enqueuer.ts";
 import { readSingleFilePart, validateSingleFileMultipartHeaders, MaterialImportMultipartError } from "../material-import/multipart.ts";
 import { LocalMaterialImportFileStore } from "./local-file-store.ts";
 import { MaterialImportTransactionOutcomeUnknownError, PostgresMaterialImportFallbackRepository } from "./repository.ts";
@@ -40,7 +40,7 @@ type MaterialImportFallbackServicePort = Pick<MaterialImportFallbackService,
 
 export type MaterialImportFallbackApiDependencies = Readonly<{
   pool: Pool;
-  queue: BackgroundJobQueue;
+  queue: BackgroundJobEnqueuer;
   actor: MaterialImportFallbackActor;
   requestId: string;
   requireCsrf: () => void;

@@ -5,7 +5,7 @@ import { Pool } from "pg";
 
 import { MaterialImportMappingError } from "../app/lib/material-import-selfhost/errors.ts";
 import { handleSelfhostMaterialImportMappingApi } from "../app/lib/material-import-selfhost/handler.ts";
-import { publishInitialMapping } from "../app/lib/material-import-selfhost/service.ts";
+import { publishInitialMapping } from "../app/lib/material-import-selfhost/initial-mapping-publisher.ts";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl || !/(test|localhost|127\.0\.0\.1|erp-task02-test-pg)/i.test(databaseUrl)) throw new Error("isolated TEST_DATABASE_URL is required");

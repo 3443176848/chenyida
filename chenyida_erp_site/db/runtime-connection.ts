@@ -30,12 +30,12 @@ type RuntimePolicyTemplate = Omit<DatabaseRuntimePolicy, "marker">;
 
 const POLICY_TEMPLATES: Readonly<Record<RuntimeServiceKind, RuntimePolicyTemplate>> = Object.freeze({
   WEB: Object.freeze({
-    service: "WEB", role: "chenyida_erp_web", privilegeGroup: "chenyida_erp_web_acl",
+    service: "WEB", role: "chenyida_erp_web", privilegeGroup: "chenyida_erp_web_priv",
     ownerRole: "chenyida_erp_owner", database: "chenyida_erp", applicationName: "chenyida-erp-web",
     poolMaximum: 10, roleConnectionLimit: 12, roleInherit: true,
   }),
   WORKER: Object.freeze({
-    service: "WORKER", role: "chenyida_erp_worker", privilegeGroup: "chenyida_erp_worker_acl",
+    service: "WORKER", role: "chenyida_erp_worker", privilegeGroup: "chenyida_erp_worker_priv",
     ownerRole: "chenyida_erp_owner", database: "chenyida_erp", applicationName: "chenyida-erp-worker",
     poolMaximum: 4, roleConnectionLimit: 6, roleInherit: true,
   }),
@@ -45,7 +45,7 @@ const POLICY_TEMPLATES: Readonly<Record<RuntimeServiceKind, RuntimePolicyTemplat
     poolMaximum: 1, roleConnectionLimit: 1, roleInherit: false,
   }),
   ADMIN: Object.freeze({
-    service: "ADMIN", role: "chenyida_erp_admin", privilegeGroup: "chenyida_erp_admin_acl",
+    service: "ADMIN", role: "chenyida_erp_admin", privilegeGroup: "chenyida_erp_admin_priv",
     ownerRole: "chenyida_erp_owner", database: "chenyida_erp", applicationName: "chenyida-erp-admin",
     poolMaximum: 1, roleConnectionLimit: 1, roleInherit: true,
   }),

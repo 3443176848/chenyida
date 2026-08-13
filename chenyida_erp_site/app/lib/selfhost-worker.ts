@@ -10,7 +10,7 @@ import { parseMaterialImportCsv } from "./material-import/csv-parser.ts";
 import { parseMaterialImportXls } from "./material-import/xls-parser.ts";
 import { MemoryMaterialImportSharedStringStore, parseMaterialImportXlsx } from "./material-import/xlsx-parser.ts";
 import type { MaterialImportParsedRow, MaterialImportParserWarning } from "./material-import/parser-model.ts";
-import { publishInitialMapping } from "./material-import-selfhost/service.ts";
+import { publishInitialMapping } from "./material-import-selfhost/initial-mapping-publisher.ts";
 import {
   PostgresMaterialImportNormalizationWorker,
   isRetryableNormalizationError,

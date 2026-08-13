@@ -6,6 +6,7 @@ import type { MaterialImportRawRow } from "../material-import/parser-model.ts";
 import { MaterialImportNormalizationError, normalizationFailure } from "./errors.ts";
 import { SELFHOST_NORMALIZATION_CHUNK_ROWS, SelfhostMaterialImportRowNormalizer } from "./normalizer.ts";
 import { PostgresNormalizationRepository, type NormalizationRunRow } from "./repository.ts";
+import { replaceStagedNormalizationRow } from "./normalization-staging-writer.ts";
 import type { NormalizedRowBundle } from "./types.ts";
 
 type WorkerPublication = Readonly<{
@@ -115,7 +116,7 @@ export class PostgresMaterialImportNormalizationWorker {
           return { cancelled: true, totals: await aggregate(client, runId) };
         }
         if (locked.run_status !== "RUNNING" || locked.lease_token !== job.leaseToken) normalizationFailure("IMPORT_NORMALIZATION_LEASE_LOST", "Normalizer 运行租约已失效", 409, { retryable: true });
-        for (const item of bundles) await this.#repository.replaceStagedRow(client, locked, mapping, item.source, item.bundle);
+        for (const item of bundles) await replaceStagedNormalizationRow(client, locked, mapping, item.source, item.bundle);
         const totals = await aggregate(client, runId);
         if (totals.issueCount > 200_000 || totals.normalizedJsonBytes > 256 * 1024 * 1024) normalizationFailure("IMPORT_NORMALIZATION_LIMIT_EXCEEDED", "规范化暂存结果超过资源限制", 422);
         await client.query(`

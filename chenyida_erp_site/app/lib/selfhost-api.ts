@@ -3,7 +3,7 @@ import { getPool } from "../../db/index.ts";
 import { getApplicationVersion } from "./application-version.ts";
 import { runtimeConfig } from "./infrastructure/config.ts";
 import { requestOriginMatches } from "./infrastructure/request-origin.ts";
-import { PostgresBackgroundJobQueue } from "./infrastructure/background-jobs.ts";
+import { PostgresBackgroundJobEnqueuer } from "./infrastructure/background-job-enqueuer.ts";
 import { systemClock, uuidGenerator } from "./infrastructure/primitives.ts";
 import { handleSelfhostMaterialApi } from "./material-selfhost/handler.ts";
 import { handleSelfhostMaterialImportMappingApi } from "./material-import-selfhost/handler.ts";
@@ -203,7 +203,7 @@ export async function handleSelfhostApi(
       return identityFailureResponse(error, requestId, headers);
     }
     const config = runtimeConfig();
-    const fallbackQueue = new PostgresBackgroundJobQueue(pool, systemClock, uuidGenerator, config.workerLeaseSeconds);
+    const fallbackQueue = new PostgresBackgroundJobEnqueuer(pool, systemClock, uuidGenerator);
     const fallbackResponse = await handleSelfhostMaterialImportFallbackApi(request, {
       pool,
       queue: fallbackQueue,
@@ -270,7 +270,7 @@ export async function handleSelfhostApi(
     if (aiSuggestionResponse) return aiSuggestionResponse;
     const governanceResponse = await handleSelfhostMaterialGovernanceApi(request, { pool, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (governanceResponse) return governanceResponse;
-    const reviewQueue = new PostgresBackgroundJobQueue(pool, systemClock, uuidGenerator, runtimeConfig().workerLeaseSeconds);
+    const reviewQueue = new PostgresBackgroundJobEnqueuer(pool, systemClock, uuidGenerator);
     const reviewResponse = await handleSelfhostMaterialImportReviewApi(request, { pool, queue: reviewQueue, actor: user, requestId, requireCsrf: () => requireCsrf(request) });
     if (reviewResponse) return reviewResponse;
     throw new ApiError("NOT_FOUND", "接口不存在", 404);

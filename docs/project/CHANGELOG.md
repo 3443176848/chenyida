@@ -4,7 +4,7 @@
 
 ## 2026-08-13
 
-### SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 - `docs: start PostgreSQL runtime privilege closure` / `feat: close Web runtime lock privilege boundary` / `feat: split backup control and capture privileges`
+### SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 - `docs: start PostgreSQL runtime privilege closure` / `feat: close Web runtime lock privilege boundary` / `feat: split backup control and capture privileges` / `fix: align runtime privilege source boundaries`
 
 - 调度/范围：从TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`启动TASK56为唯一`DOING`；主智能体唯一写入，数据迁移、应用测试、运维安全三线只读审计。
 - 起点事实：只读UAT catalog摘要确认PostgreSQL 17当前只有1个非内置LOGIN，且该角色同时为superuser、数据库owner和全部433个public relation owner；Web/Worker活动连接共用1个数据库角色。源码为45/head`0045_runtime_worker_readiness.sql`，UAT仍为40/head`0040_warehouse_receipt_readiness.sql`。
@@ -18,6 +18,12 @@
 - 崩溃/恢复：持久intent升级为v3但保留兼容文件名；数据库connection limit全过程不变，owner/Web/Worker/Admin的CONNECT和默认只读在事务中精确切换，capture保持连接。隔离PG17验证未知LOGIN/NOLOGIN grantee漂移拒绝且不解除围栏、capture越权拒绝、意外large object拒绝/清理及零large-object备份到新空库恢复，下游Dashboard PostgreSQL 2/2通过。
 - 内容寻址/验证：access intent SHA-256为`218d7ff7…2561f`，release inventory保持`244/220/24`且SHA-256更新为`cecbbbaf…7f67`，test runtime policy为`a90e07ae…4c8a`；Backup/source合同13/13、release合同51/51及inventory verify通过。
 - 当前阻塞：access intent只剩`POSTGRESQL17_COMPILED_CATALOG_REQUIRED`；本检查点不代表角色/ACL reconcile、secret-file Compose集成、tablespace、候选bundle、UAT部署或真实运行加固完成，TASK56继续`DOING`。
+- 源图修正：`mapping-target-registry.ts`改为只依赖新拆出的无数据库Parser contract，不再通过legacy D1 `parser-service.ts`把CSV/XLSX Parser SQL纳入Web图；Web从173降至171个源文件，先撤销11个表操作和3个sequence USAGE。
+- 调用路径修正：应用审计又确认共享文件内的Worker lease写入、background job dispatch、初始header suggestion发布及五张normalization暂存表替换只由Worker调用。现拆分lease reader/writer与Worker supervisor、Web enqueuer/Worker queue、初始Mapping publisher和normalization staging writer，使Web raw candidate由`14/199/205/80`自然收敛为`9/191/205/79`；reviewed exclusion只剩既有`app_meta INSERT`，额外撤销Web 14个表操作与6个sequence USAGE，最终为`9/190/209/79`和173个sequence USAGE，同时保留Web lease SELECT及Worker正向权限。
+- 角色/v1兼容：runtime identity职责组统一为D-133及Backup fence已使用的`*_priv`，后续v2 catalog将`*_acl`视为禁止漂移；D-132 v1三份fixture恢复为alpha.46及各自原始0045 head，保持policy/fixture/snapshot/digest不可变，alpha.47/current语义只进入v2。
+- 本检查点验证：新access intent SHA-256为`b2defe953c59a6b37858ee90af1ae08fbd444486a814ebb1c10f7f0f4ee83aa1`；固定Node隔离TypeScript、六文件Node 36/36及runtime-readiness PG17 5/5通过。三线审计另确认readiness v4可能接受D-132 v1实际恢复证据，已将fail-closed门禁调到PG17 catalog之前；检查前后available约1.7—1.8GiB、Swap568—574MiB、根盘16GiB、`oom_kill=0`，四服务restart0/OOM false，任务容器清零；未读取未跟踪报告、`.env`、真实数据/备份/卷正文。
+
+- 正式测试绑定：本检查点影响的8份正式测试SHA-256、test inventory与runtime policy已同步重绑；inventory保持`244/220/24`，新SHA-256为`79b1c8126ce5a934b38f7c70ed0af9dcd582edf52babc2406f07dcc974b328db`，inventory verify、release/v1 transfer合同31/31及v1 recovery合同16/16通过。
 
 ### SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 - `docs: start PostgreSQL cluster recovery closure` / `docs: record PostgreSQL cluster recovery decision` / `feat: add PostgreSQL cluster recovery contract` / `feat: capture PostgreSQL cluster recovery catalog` / `feat: secure PostgreSQL cluster restore` / `feat: encrypt PostgreSQL cluster transfer` / `feat: enforce PostgreSQL cluster recovery readiness` / `feat: expose cluster recovery operations status` / `feat: execute crash-safe PostgreSQL cluster recovery` / `test: bind cluster recovery release gate` / `test: execute trusted recovery fixtures` / `build: bind exact release dependencies` / `test: make recovery gate deterministic and trusted` / `release: bind task55 supervisor bundle` / `docs: close PostgreSQL cluster recovery`
 

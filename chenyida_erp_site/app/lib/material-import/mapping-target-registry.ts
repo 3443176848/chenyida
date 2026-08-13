@@ -1,5 +1,5 @@
 import type { MaterialMasterD1Database } from "../material-master/index.ts";
-import { MaterialImportParserServiceError } from "./parser-service.ts";
+import { MaterialImportParserServiceError } from "./parser-service-contract.ts";
 
 export type MaterialImportMappingTargetNamespace = "basic" | "attribute" | "category_hint" | "supplier_reference" | "ignore";
 export type MaterialImportMappingTargetGroup = "BASIC" | "ATTRIBUTE" | "SPECIAL";

@@ -73,6 +73,7 @@ function validWebRow(policy) {
 test("runtime database identity accepts the exact web role and canary boundary", async () => {
   const policy = webPolicy();
   assert.ok(policy);
+  assert.equal(policy.privilegeGroup, "chenyida_erp_web_priv");
   const client = {
     async query(sql, values) {
       assert.match(sql, /pg_catalog\.pg_auth_members/);
@@ -81,6 +82,13 @@ test("runtime database identity accepts the exact web role and canary boundary",
     },
   };
   await assert.doesNotReject(assertDatabaseRuntimeIdentity(client, policy));
+});
+
+test("runtime database identity uses the single D-133 privilege-group namespace", () => {
+  assert.deepEqual(
+    ["WEB", "WORKER", "ADMIN"].map((service) => servicePolicy(service)?.privilegeGroup),
+    ["chenyida_erp_web_priv", "chenyida_erp_worker_priv", "chenyida_erp_admin_priv"],
+  );
 });
 
 test("runtime database identity keeps the one-shot admin away from migration history", async () => {

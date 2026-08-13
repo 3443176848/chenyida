@@ -26,11 +26,8 @@ const ADMIN_OPERATIONS = Object.freeze({
   material_category_attributes: ["INSERT"],
 });
 const ADMIN_SEMANTIC_SELECT = Object.freeze(["app_meta", "material_attribute_definitions", "material_categories"]);
-const CONTROLLED_WEB_OPERATION_EXCLUSIONS = Object.freeze({
-  app_meta: Object.freeze(["DELETE", "INSERT", "SELECT", "UPDATE"]),
-  material_attribute_definitions: Object.freeze(["INSERT", "UPDATE", "DELETE"]),
-  material_categories: Object.freeze(["INSERT", "UPDATE", "DELETE"]),
-  material_category_attributes: Object.freeze(["INSERT", "UPDATE", "DELETE"]),
+const REVIEWED_WEB_OPERATION_EXCLUSIONS = Object.freeze({
+  app_meta: Object.freeze(["INSERT"]),
 });
 const REVIEWED_WORKER_OPERATIONS = Object.freeze({
   SELECT: Object.freeze([
@@ -193,7 +190,7 @@ function expectedAdminOperations() {
 function validateServiceDocument(service, value, catalog) {
   exactKeys(value, [
     "derivation", "source_evidence_sha256", "source_files", "source_candidate_table_privileges",
-    "reviewed_dependency_operations", "column_privileges", "table_privileges", "sequence_privileges",
+    "reviewed_excluded_operations", "reviewed_dependency_operations", "column_privileges", "table_privileges", "sequence_privileges",
     "routine_execute",
   ], "RUNTIME_PRIVILEGE_SERVICE_FIELDS_INVALID");
   if (typeof value.derivation !== "string" || !value.derivation || !SHA256.test(value.source_evidence_sha256)) {
@@ -202,6 +199,7 @@ function validateServiceDocument(service, value, catalog) {
   strictSortedUniqueStrings(value.source_files, "RUNTIME_PRIVILEGE_SERVICE_EVIDENCE_INVALID");
   if (value.source_files.length < 1) reject("RUNTIME_PRIVILEGE_SERVICE_EVIDENCE_INVALID");
   validateObjectPrivilegeMap(value.source_candidate_table_privileges, catalog.tables, "RUNTIME_PRIVILEGE_TABLE_PRIVILEGES_INVALID");
+  validateObjectPrivilegeMap(value.reviewed_excluded_operations, catalog.tables, "RUNTIME_PRIVILEGE_TABLE_PRIVILEGES_INVALID");
   validateObjectPrivilegeMap(value.table_privileges, catalog.tables, "RUNTIME_PRIVILEGE_TABLE_PRIVILEGES_INVALID");
   exactKeys(value.reviewed_dependency_operations, ["LOCK_TARGETS_REQUIRING_UPDATE", "SELECT"], "RUNTIME_PRIVILEGE_DEPENDENCY_OPERATIONS_INVALID");
   for (const operation of ["LOCK_TARGETS_REQUIRING_UPDATE", "SELECT"]) {
@@ -234,18 +232,23 @@ function validateServiceDocument(service, value, catalog) {
   if (!exactJson(value.routine_execute, expectedRoutines)) reject("RUNTIME_PRIVILEGE_ROUTINE_EXECUTE_INVALID");
   if (service === "WEB") {
     if (!exactJson(value.reviewed_dependency_operations, WEB_ROUTINE_DEPENDENCIES)) reject("RUNTIME_PRIVILEGE_DEPENDENCY_OPERATIONS_INVALID");
-    for (const operation of ["DELETE", "INSERT", "UPDATE"]) {
-      if (!exactJson(value.table_privileges[operation], value.source_candidate_table_privileges[operation])) {
-        reject("RUNTIME_PRIVILEGE_WEB_LOCK_SCOPE_UNRESOLVED");
-      }
+    const sourceCandidate = reviewedOperations(value.source_candidate_table_privileges, new Set(catalog.tables));
+    const reviewedExclusions = intersectOperations(sourceCandidate, REVIEWED_WEB_OPERATION_EXCLUSIONS);
+    if (!exactJson(value.reviewed_excluded_operations, groupedOperations(reviewedExclusions, catalog.tables))) {
+      reject("RUNTIME_PRIVILEGE_WEB_EXCLUSIONS_INVALID");
     }
-    const expectedSelect = sortedUnique([
-      ...value.source_candidate_table_privileges.SELECT,
-      ...WEB_ROUTINE_DEPENDENCIES.SELECT,
-    ], "RUNTIME_PRIVILEGE_DEPENDENCY_OPERATIONS_INVALID");
-    if (!exactJson(value.table_privileges.SELECT, expectedSelect)) reject("RUNTIME_PRIVILEGE_DEPENDENCY_OPERATIONS_INVALID");
+    excludeOperations(sourceCandidate, REVIEWED_WEB_OPERATION_EXCLUSIONS);
+    for (const table of WEB_ROUTINE_DEPENDENCIES.SELECT) {
+      if (!sourceCandidate.has(table)) sourceCandidate.set(table, new Set());
+      sourceCandidate.get(table).add("SELECT");
+    }
+    if (!exactJson(value.table_privileges, groupedOperations(sourceCandidate, catalog.tables))) {
+      reject("RUNTIME_PRIVILEGE_WEB_LOCK_SCOPE_UNRESOLVED");
+    }
   } else if (!exactJson(value.reviewed_dependency_operations, { LOCK_TARGETS_REQUIRING_UPDATE: [], SELECT: [] })) {
     reject("RUNTIME_PRIVILEGE_DEPENDENCY_OPERATIONS_INVALID");
+  } else if (!exactJson(value.reviewed_excluded_operations, { DELETE: [], INSERT: [], SELECT: [], UPDATE: [] })) {
+    reject("RUNTIME_PRIVILEGE_SERVICE_EXCLUSIONS_INVALID");
   }
   if (service === "BACKUP" && !exactJson(value.source_files, BACKUP_EVIDENCE_FILES)) {
     reject("RUNTIME_PRIVILEGE_BACKUP_EVIDENCE_INVALID");
@@ -457,6 +460,20 @@ function excludeOperations(target, exclusions) {
   }
 }
 
+function intersectOperations(source, exclusions) {
+  const result = new Map();
+  for (const [table, operations] of Object.entries(exclusions)) {
+    const sourceOperations = source.get(table);
+    if (!sourceOperations) continue;
+    for (const operation of operations) {
+      if (!sourceOperations.has(operation)) continue;
+      if (!result.has(table)) result.set(table, new Set());
+      result.get(table).add(operation);
+    }
+  }
+  return result;
+}
+
 function groupedOperations(operationMap, tables) {
   const result = Object.fromEntries(OPERATIONS.map((operation) => [operation, []]));
   for (const table of tables) {
@@ -544,7 +561,6 @@ async function serviceSource(siteRoot, service, tableSet) {
     mergeOperations(operations, detected);
   }
   operations.set("schema_migrations", new Set(["SELECT"]));
-  if (service === "WEB") excludeOperations(operations, CONTROLLED_WEB_OPERATION_EXCLUSIONS);
   evidence.sort((left, right) => left.path.localeCompare(right.path));
   return { evidence, operations };
 }
@@ -571,6 +587,7 @@ function serviceDocument(operations, catalog, evidence, sequencePrivilege, optio
     source_evidence_sha256: sha256(evidence.map((item) => `${item.path}\0${item.sha256}\n`).join("")),
     source_files: evidence.map((item) => item.path),
     source_candidate_table_privileges: options.sourceCandidate ? groupedOperations(options.sourceCandidate, catalog.tables) : tablePrivileges,
+    reviewed_excluded_operations: options.reviewedExclusions ? groupedOperations(options.reviewedExclusions, catalog.tables) : Object.freeze({ DELETE: [], INSERT: [], SELECT: [], UPDATE: [] }),
     reviewed_dependency_operations: options.reviewedDependencies || Object.freeze({ LOCK_TARGETS_REQUIRING_UPDATE: [], SELECT: [] }),
     column_privileges: {},
     table_privileges: tablePrivileges,
@@ -593,6 +610,8 @@ export async function createRuntimePrivilegeAccessDocument({ siteRoot = SITE_ROO
   const tableSet = new Set(catalog.tables);
   const web = await serviceSource(root, "WEB", tableSet);
   const webSourceCandidate = copyOperations(web.operations);
+  const webReviewedExclusions = intersectOperations(webSourceCandidate, REVIEWED_WEB_OPERATION_EXCLUSIONS);
+  excludeOperations(web.operations, REVIEWED_WEB_OPERATION_EXCLUSIONS);
   const worker = await serviceSource(root, "WORKER", tableSet);
   for (const table of WEB_ROUTINE_DEPENDENCIES.SELECT) {
     if (!tableSet.has(table)) reject("RUNTIME_PRIVILEGE_ROUTINE_DEPENDENCY_INVALID");
@@ -640,6 +659,7 @@ export async function createRuntimePrivilegeAccessDocument({ siteRoot = SITE_ROO
       WEB: serviceDocument(web.operations, catalog, web.evidence, "USAGE", {
         reviewedDependencies: WEB_ROUTINE_DEPENDENCIES,
         sourceCandidate: webSourceCandidate,
+        reviewedExclusions: webReviewedExclusions,
         applicationRoutineExecute: WEB_APPLICATION_ROUTINE_EXECUTE,
         extensionRoutineExecute: WEB_EXTENSION_ROUTINE_EXECUTE,
       }),

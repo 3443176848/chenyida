@@ -199,7 +199,7 @@ const binding = {
   local_receipt_sha256: "2".repeat(64),
   recovery_point_at: "2026-08-13T08:00:00.000Z",
   source: { system_identifier: env.SOURCE_SYSTEM_ID, database_oid: env.SOURCE_DATABASE_OID, database_marker: "synthetic-cluster-source", postgresql_major: env.SOURCE_MAJOR },
-  application: { git_commit: "a".repeat(40), version: "0.1.0-alpha.47", migration_head: "0045_selfhost_release_gate.sql", migration_manifest_sha256: "3".repeat(64) },
+  application: { git_commit: "a".repeat(40), version: "0.1.0-alpha.46", migration_head: "0045_selfhost_release_gate.sql", migration_manifest_sha256: "3".repeat(64) },
 };
 const snapshot = createClusterSnapshot({ snapshotId: "cluster-snapshot-synthetic-1", capturedAt: "2026-08-13T08:01:00.000Z", binding, policy, beforeCatalog: before, afterCatalog: after });
 const namespace = clusterSha256("single-container-dual-cluster-namespace");

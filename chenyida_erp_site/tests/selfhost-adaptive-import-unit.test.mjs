@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { analyzeAdaptiveImportStructure, classifyAdaptiveDataRow } from "../app/lib/material-import/adaptive-import.ts";
-import { adaptiveSuggestedItems, publishInitialMapping } from "../app/lib/material-import-selfhost/service.ts";
+import { publishInitialMapping } from "../app/lib/material-import-selfhost/initial-mapping-publisher.ts";
+import { adaptiveSuggestedItems } from "../app/lib/material-import-selfhost/service.ts";
 
 function row(rowNumber, values) {
   return {

@@ -7,6 +7,7 @@ const client = await readFile(new URL("../app/materials/_lib/material-import-nor
 const handler = await readFile(new URL("../app/lib/material-import-normalization-selfhost/handler.ts", import.meta.url), "utf8");
 const worker = await readFile(new URL("../app/lib/material-import-normalization-selfhost/worker.ts", import.meta.url), "utf8");
 const repository = await readFile(new URL("../app/lib/material-import-normalization-selfhost/repository.ts", import.meta.url), "utf8");
+const stagingWriter = await readFile(new URL("../app/lib/material-import-normalization-selfhost/normalization-staging-writer.ts", import.meta.url), "utf8");
 
 test("normalization review exposes run history, rerun/retry/cancel, filters and immutable row evidence", () => {
   for (const fragment of [
@@ -42,13 +43,13 @@ test("self-host API uses run-specific reads, bounded cursor pagination and serve
 test("worker stages then publishes through the queue completion transaction without mutating material master", () => {
   for (const fragment of [
     "prepare(",
-    "replaceStagedRow",
+    "replaceStagedNormalizationRow",
     "verifyStaged",
     "PUBLISHING",
     "publish:",
     "SUPERSEDED",
   ]) assert.ok(worker.includes(fragment), fragment);
-  for (const source of [handler, worker, repository]) {
+  for (const source of [handler, worker, repository, stagingWriter]) {
     assert.doesNotMatch(source, /material_master\s+(set|insert|update|delete)/i);
     assert.doesNotMatch(source, /\b(D1Database|miniflare|cloudflare:workers)\b/i);
   }

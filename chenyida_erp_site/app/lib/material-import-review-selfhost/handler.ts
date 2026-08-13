@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import type { BackgroundJobQueue } from "../infrastructure/background-jobs.ts";
+import type { BackgroundJobEnqueuer } from "../infrastructure/background-job-enqueuer.ts";
 import { MaterialImportReviewError } from "./errors.ts";
 import { PostgresMaterialImportReviewRepository } from "./repository.ts";
 import { MaterialImportReviewService, reviewRequestDigest } from "./service.ts";
@@ -7,7 +7,7 @@ import type { ReviewActor } from "./types.ts";
 
 type Dependencies = Readonly<{
   pool: Pool;
-  queue: BackgroundJobQueue;
+  queue: BackgroundJobEnqueuer;
   actor: ReviewActor;
   requestId: string;
   requireCsrf: () => void;

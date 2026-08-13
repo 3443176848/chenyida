@@ -11,7 +11,7 @@ import { LocalMaterialImportFileStore } from "../app/lib/material-import-fallbac
 import { PostgresMaterialImportFallbackRepository } from "../app/lib/material-import-fallback/repository.ts";
 import { MaterialImportFallbackService } from "../app/lib/material-import-fallback/service.ts";
 import { runtimeReadinessErrorCode, RuntimeReadinessError } from "../app/lib/runtime-readiness/identity.ts";
-import { prepareWorkerRuntime, WorkerRuntimeLeaseSupervisor } from "../app/lib/runtime-readiness/service.ts";
+import { prepareWorkerRuntime, WorkerRuntimeLeaseSupervisor } from "../app/lib/runtime-readiness/worker-runtime-service.ts";
 import {
   removeWorkerInstanceFile,
   writeWorkerInstanceFile,

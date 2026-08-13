@@ -3,35 +3,27 @@ import { constants } from "node:fs";
 import { lstat, open, realpath, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { FileHandle } from "node:fs/promises";
-import { RuntimeReadinessError, type RuntimeIdentity } from "./identity.ts";
-import type { RuntimeMigrationManifest } from "./migration.ts";
+import { RuntimeReadinessError } from "./identity.ts";
+import {
+  PostgresWorkerRuntimeLeaseReader,
+  WORKER_SERVICE_SLOT,
+  type LeaseDatabase,
+  type WorkerLeaseState,
+  type WorkerRuntimeIdentity,
+} from "./worker-lease-reader.ts";
 
-export const WORKER_SERVICE_SLOT = "background-jobs";
+export { WORKER_SERVICE_SLOT, workerRuntimeIdentity } from "./worker-lease-reader.ts";
+export type {
+  FreshWorkerLease,
+  LeaseDatabase,
+  WorkerLeaseState,
+  WorkerRuntimeIdentity,
+} from "./worker-lease-reader.ts";
+
 export const DEFAULT_WORKER_INSTANCE_FILE = "/tmp/chenyida-erp-worker-instance-id";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const POSITIVE_INTEGER = /^[1-9][0-9]*$/;
 type FileIdentity = Readonly<{ dev: number | bigint; ino: number | bigint }>;
-
-export type WorkerRuntimeIdentity = RuntimeIdentity & Readonly<{
-  migrationHead: string;
-  migrationManifestSha256: string;
-}>;
-
-export type WorkerLeaseState = Readonly<{
-  instanceId: string;
-  generation: string;
-  version: number;
-  leaseExpiresAt: Date;
-}>;
-
-export type FreshWorkerLease = WorkerLeaseState & WorkerRuntimeIdentity & Readonly<{
-  databaseNow: Date;
-  heartbeatAt: Date;
-}>;
-
-export type LeaseDatabase = Readonly<{
-  query(sql: string, values?: unknown[]): Promise<{ rows?: unknown[]; rowCount?: number | null }>;
-}>;
 
 function date(value: unknown): Date {
   const parsed = value instanceof Date ? value : new Date(String(value || ""));
@@ -59,23 +51,14 @@ function identityValues(identity: WorkerRuntimeIdentity): unknown[] {
   ];
 }
 
-export function workerRuntimeIdentity(identity: RuntimeIdentity, migrations: RuntimeMigrationManifest): WorkerRuntimeIdentity {
-  return Object.freeze({
-    ...identity,
-    migrationHead: migrations.head,
-    migrationManifestSha256: migrations.allowlistSha256,
-  });
-}
-
-export class PostgresWorkerRuntimeLease {
-  private readonly database: LeaseDatabase;
+export class PostgresWorkerRuntimeLease extends PostgresWorkerRuntimeLeaseReader {
   private readonly leaseSeconds: number;
 
   constructor(database: LeaseDatabase, leaseSeconds: number) {
+    super(database);
     if (!Number.isSafeInteger(leaseSeconds) || leaseSeconds < 15 || leaseSeconds > 300) {
       throw new RuntimeReadinessError("RUNTIME_LEASE_LOST");
     }
-    this.database = database;
     this.leaseSeconds = leaseSeconds;
   }
 
@@ -172,56 +155,6 @@ export class PostgresWorkerRuntimeLease {
     }
   }
 
-  async readFresh(): Promise<FreshWorkerLease> {
-    try {
-      const result = await this.database.query(`
-        select clock_timestamp() as database_now,
-               lease.instance_id,lease.generation::text,lease.version,lease.status,
-               lease.deployment_class,lease.deployment_id,lease.application_version,lease.git_commit,
-               lease.migration_head,lease.migration_manifest_sha256,
-               lease.heartbeat_at,lease.lease_expires_at
-        from (select 1) as singleton
-        left join only public.worker_runtime_leases as lease on lease.service_slot=$1
-      `, [WORKER_SERVICE_SLOT]);
-      const row = (result.rows || [])[0] as Record<string, unknown> | undefined;
-      if (!row || row.status !== "RUNNING") throw new RuntimeReadinessError("RUNTIME_WORKER_UNAVAILABLE");
-      const databaseNow = date(row.database_now);
-      const heartbeatAt = date(row.heartbeat_at);
-      const state = leaseState(row, String(row.instance_id || ""));
-      if (heartbeatAt.getTime() > databaseNow.getTime()
-        || state.leaseExpiresAt.getTime() <= databaseNow.getTime()) {
-        throw new RuntimeReadinessError("RUNTIME_WORKER_UNAVAILABLE");
-      }
-      return Object.freeze({
-        ...state,
-        databaseNow,
-        heartbeatAt,
-        deploymentClass: String(row.deployment_class || "") as RuntimeIdentity["deploymentClass"],
-        deploymentId: String(row.deployment_id || ""),
-        applicationVersion: String(row.application_version || ""),
-        gitCommit: String(row.git_commit || ""),
-        migrationHead: String(row.migration_head || ""),
-        migrationManifestSha256: String(row.migration_manifest_sha256 || ""),
-      });
-    } catch (error) {
-      if (error instanceof RuntimeReadinessError) throw error;
-      throw new RuntimeReadinessError("RUNTIME_DATABASE_UNAVAILABLE");
-    }
-  }
-
-  async assertExactInstance(instanceId: string, identity: WorkerRuntimeIdentity): Promise<FreshWorkerLease> {
-    const lease = await this.readFresh();
-    if (lease.instanceId !== instanceId
-      || lease.deploymentClass !== identity.deploymentClass
-      || lease.deploymentId !== identity.deploymentId
-      || lease.applicationVersion !== identity.applicationVersion
-      || lease.gitCommit !== identity.gitCommit
-      || lease.migrationHead !== identity.migrationHead
-      || lease.migrationManifestSha256 !== identity.migrationManifestSha256) {
-      throw new RuntimeReadinessError("RUNTIME_WORKER_UNAVAILABLE");
-    }
-    return lease;
-  }
 }
 
 function safeInstanceFile(file: string): string {

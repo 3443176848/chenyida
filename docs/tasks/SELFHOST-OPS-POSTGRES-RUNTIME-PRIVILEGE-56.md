@@ -98,3 +98,20 @@
 - PG17单容器双集群测试通过：普通capture可完整dump但无法读取`pg_largeobject`正文、写业务表或创建TEMP；崩溃守卫中capture保持可连接而owner被围栏，未知NOLOGIN CONNECT漂移会阻断恢复且保留intent，清除漂移后固定四职责CONNECT精确复原；意外large object拒绝和零large-object备份/恢复均通过，下游Dashboard PostgreSQL 2/2通过，临时集群/容器/目录清零。
 - 更新后的access intent SHA-256为`218d7ff7e17124c6ff45b39f25a104016538d4a6e23f50ed8be3f6b500a2561f`，只剩PG17编译catalog blocker。Backup/source定向合同13/13、release合同51/51和inventory `244/220/24`验证通过；本检查点没有真实凭据、角色/ACL、备份、恢复、Volume、Migration、部署或服务变化。
 - ACL签名收紧后的首次定向复跑因已生成access JSON按设计变成stale而12/13，重新生成后13/13；凭据扫描首次在不含Git的固定Node镜像中于文件扫描前退出，改用扫描器原生`COMMITTED_TREE`显式排序清单后1631文件通过。没有跳过文件、读取未跟踪报告或降低断言；PG17只出现既有合成publication `wal_level`与`PGPASSFILE=/dev/null`告警，不影响本次断言。
+
+## 11. 权限源图与D-132兼容检查点
+
+- 编译catalog前审计发现`mapping-target-registry.ts`只需要`MaterialImportParserServiceError`，却从legacy D1 `parser-service.ts`导入，因而把CSV/XLSX Parser及旧D1 SQL错误纳入Web可达图。现新增无数据库依赖的`parser-service-contract.ts`，legacy Service保持兼容re-export，Web图不再触达三个Parser实现文件。
+- Web精确减少11个表操作：DELETE 4、INSERT 3、SELECT 2、UPDATE 2；同时撤销`material_import_parse_runs_id_seq`、`material_import_parse_sheets_id_seq`和`material_import_shared_string_chunks_id_seq`三个非Web INSERT所需USAGE。源文件173→171，表权限`18/201/211/82`→`14/198/209/80`，序列USAGE 182→179；完整移除集合由测试固定。
+- 运行身份此前使用`*_acl`，而D-133及Backup围栏已固定`*_priv`。现统一Web/Worker/Admin职责组为`chenyida_erp_{web,worker,admin}_priv`，与`chenyida_erp_backup_priv`组成唯一四组命名；后续v2 catalog必须拒绝任何`*_acl`持久角色。
+- D-132 v1 policy、fixture、snapshot与摘要按D-133不可变；三处误随当前包版本升级的fixture已恢复alpha.46及各自原始0045 head。alpha.47、九角色及完整ACL只进入新v2合同，不回写legacy v1。
+- Parser拆分后又完成调用路径复核：将lease reader与writer/Worker supervisor、Web outbox enqueuer与完整Worker queue、初始Mapping publisher及normalization staging writer拆成单向模块。Web raw candidate由`14/199/205/80`收敛为`9/191/205/79`，只保留既有`app_meta INSERT`这一项显式reviewed exclusion；额外撤销14个表操作及6个sequence USAGE，Web最终表权限`9/190/209/79`、sequence USAGE 173，Web lease SELECT与Worker所需正向权限保持。
+- 新access intent SHA-256为`b2defe953c59a6b37858ee90af1ae08fbd444486a814ebb1c10f7f0f4ee83aa1`。固定Node断网/只读/零cap TypeScript及六文件Node 36/36通过，隔离PG17 runtime-readiness 5/5验证writer acquire/renew/stop和reader行为不变；临时容器清零，UAT/生产角色、ACL、凭据、服务、Migration和数据均未改变。
+
+- 正式测试绑定复核发现8份已改测试与旧inventory不一致。已同步更新每文件SHA-256、test inventory及runtime policy固定摘要；inventory保持`244/220/24`，SHA-256为`79b1c8126ce5a934b38f7c70ed0af9dcd582edf52babc2406f07dcc974b328db`；inventory verify、release/v1 transfer合同31/31及v1 recovery合同16/16通过。
+
+## 12. 三线审计后的优先级调整
+
+- 应用审计确认Web lease canary要求`SELECT=true`且`INSERT/UPDATE/DELETE=false`，此前文件图意图却包含INSERT/UPDATE；本检查点已从源合同消除该自相矛盾，完整物理登录正负探针仍须在v2 reconciler完成后执行。
+- 数据审计确认PG17编译catalog必须把可寻址关系/sequence/routine与列、约束、索引、非内部trigger等稳定surface分开，并显式建模extension成员及owner对table/sequence/routine/type的有效未来default privileges；零`pg_default_acl`行不得被解释为安全。
+- 运维安全审计确认`backup-recovery-readiness-v4.mjs`及Dashboard仍可能把D-132 v1 `ACTUAL_OFFHOST/RECOVERY_READY`解释为ready，与D-133“v1只作legacy/synthetic”的固定边界冲突。下一安全动作先在validate/create/publish/Dashboard外层失败关闭v1 actual，保留v1 synthetic历史解析，再进入PG17 catalog/reconcile。
