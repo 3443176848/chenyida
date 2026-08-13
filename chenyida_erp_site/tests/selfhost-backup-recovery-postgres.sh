@@ -112,9 +112,10 @@ marker_root "$RECEIVER_KEY_ROOT" .chenyida-erp-offhost-key-root-v1 chenyida-erp-
 SERVICE_FILE="$CREDENTIAL_ROOT/pg_service.conf"
 printf '[backup]\nhost=%s\ndbname=source_test\nuser=postgres\n[guard]\nhost=%s\ndbname=guard_test\nuser=postgres\n[restore_admin]\nhost=%s\ndbname=postgres\nuser=postgres\n' "$SOURCE_SOCKET" "$SOURCE_SOCKET" "$TARGET_SOCKET" > "$SERVICE_FILE"
 chmod 0600 "$SERVICE_FILE"
-SOURCE_MACHINE_ID="$TASK_ROOT/source-machine-id"
+SOURCE_MACHINE_ID="$TASK_ROOT/source-machine-id"; RECEIVER_MACHINE_ID="$TASK_ROOT/receiver-machine-id"
 printf '11111111111111111111111111111111\n' > "$SOURCE_MACHINE_ID"
-chmod 0400 "$SOURCE_MACHINE_ID"
+printf '22222222222222222222222222222222\n' > "$RECEIVER_MACHINE_ID"
+chmod 0400 "$SOURCE_MACHINE_ID" "$RECEIVER_MACHINE_ID"
 
 SOURCE_KEY_ROOT="$SOURCE_KEY_ROOT" RECEIVER_KEY_ROOT="$RECEIVER_KEY_ROOT" OPERATIONS_POLICY="$OPERATIONS_POLICY" node <<'NODE'
 const { createHash, generateKeyPairSync } = require("node:crypto");
@@ -236,7 +237,7 @@ node "$SITE_ROOT/scripts/offhost-transfer-contract.mjs" seal \
 node "$SITE_ROOT/scripts/offhost-transfer-contract.mjs" receive \
   --incoming-package "$OUTBOX_ROOT/$TRANSFER_ID" --receiver-root "$RECEIVER_ROOT" --receiver-key-root "$RECEIVER_KEY_ROOT" --receiver-encryption-private-key "$RECEIVER_ENCRYPTION_PRIVATE_KEY" \
   --trusted-source-signing-public-key "$TRUSTED_SOURCE_SIGNING_PUBLIC_KEY" --receiver-receipt-private-key "$RECEIVER_RECEIPT_PRIVATE_KEY" --migrations "$MIGRATIONS" \
-  --receiver-location-id offhost-a --retention-policy-id synthetic-retention-v1 --policy "$OPERATIONS_POLICY" >/dev/null
+  --receiver-location-id offhost-a --retention-policy-id synthetic-retention-v1 --machine-identity-file "$RECEIVER_MACHINE_ID" --policy "$OPERATIONS_POLICY" >/dev/null
 ACCEPTED_AT=$(node -e 'const fs=require("fs"),r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(r.received_at)' "$RECEIVER_ROOT/$TRANSFER_ID/receiver-receipt.json")
 node "$SITE_ROOT/scripts/offhost-transfer-contract.mjs" accept-receipt \
   --source-package "$OUTBOX_ROOT/$TRANSFER_ID" --receiver-receipt "$RECEIVER_ROOT/$TRANSFER_ID/receiver-receipt.json" --source-key-root "$SOURCE_KEY_ROOT" \
