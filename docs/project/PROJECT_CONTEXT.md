@@ -24,6 +24,8 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 `SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52`已完成并释放active slot。D-129及[投产专项授权执行包](../self-hosting/production-authorization-packet.md)把host supervisor、外部锚点、正式门、四域备份恢复、监控、UAT晋升、数据/岗位/员工试运行和切换拆为`A1`—`A8`及子检查点。三线审计与主智能体复核发现：现行Worker health none会让正式gate在19步前自锁；TASK51 loopback完整镜像引用不可异机恢复；监控尚无host delivery；真实恢复、0017→当前head迁移、岗位批准与员工验收仍缺证据。因此下一安全任务固定为`SELFHOST-RELEASE-GATE-LIFECYCLE-53`，先在仓库/隔离环境闭合部署前legacy稳定与部署后current runtime严格模式；不安装host组件、不连接或修改UAT/生产，也不读取真实数据。
 
+`SELFHOST-RELEASE-GATE-LIFECYCLE-53`已从严格起点`e9d27eebb21a9f52c941f389ef7800508c0402e5`/tree`e3263230340ae5fc4e9346f366afcb025d478a51`启动为唯一`DOING`。目标是让发布前只要求既有UAT运行面保持服务/身份/状态/既有health不退化，隔离候选继续强制Web/PostgreSQL/Worker healthy，部署后再按获准manifest严格绑定当前运行身份；模式缺失、错配或跨阶段复用必须失败关闭。TASK51候选和bundle只保留审计价值，TASK53实现后必须重建内容寻址链；本任务不安装host组件、不修改UAT/生产或读取真实数据。
+
 ## 系统组成
 
 ### 本地 ERP

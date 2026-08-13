@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前零`DOING`：`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52`已完成并释放active slot；持续交付负责人将紧接着以独立启动提交切换到`SELFHOST-RELEASE-GATE-LIFECYCLE-53`。该瞬时零槽不表示暂停，也不授权host、UAT、生产或真实数据动作；系统继续`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-RELEASE-GATE-LIFECYCLE-53`。严格起点为`main@e9d27eebb21a9f52c941f389ef7800508c0402e5`/tree`e3263230340ae5fc4e9346f366afcb025d478a51`；范围只含仓库生命周期合同、合成/隔离测试、content-addressed bundle重建和治理文档。主智能体唯一写入，三条智能体线只读审计；不安装host组件、不修改UAT/生产或真实数据，系统继续`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -65,6 +65,8 @@
 
 2026-08-13第二十六次调度事件：`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52 DOING → DONE`。D-129与[投产专项授权执行包](../self-hosting/production-authorization-packet.md)把A1—A8及真实数据/外传/host/UAT/账号/员工/切换动作拆成独立检查点；三线和主智能体复核又发现现行Worker health none会让正式gate在19步前自锁、loopback完整引用不可异机恢复、监控host delivery及0017→当前head升级证据仍缺失。当前不索取注定失败的A1/A2，active slot先释放，下一安全任务固定为`SELFHOST-RELEASE-GATE-LIFECYCLE-53`。
 
+2026-08-13第二十七次调度事件：主智能体从TASK52收口后的零`DOING`自动选择首次晋升自锁这一最高优先级仓库前置，状态按`SELFHOST-RELEASE-GATE-LIFECYCLE-53 TODO → DOING`切换唯一active slot。任务显式区分部署前既有运行面不退化、隔离候选严格health及部署后当前运行面严格身份；不以兼容旧Worker为由弱化候选，不安装host组件、不连接或修改UAT/生产、账号、网络、四卷或真实数据。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -81,7 +83,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| （无） | TASK52收口与TASK53启动提交之间的瞬时零槽 | — | — | — | — | 下一项已固定，不等待项目负责人重复发送“继续”。 |
+| SELFHOST-RELEASE-GATE-LIFECYCLE-53 | 发布门禁生命周期闭环 | DOING | Codex主智能体（唯一写入、测试调度与集成）、应用测试/数据迁移/运维安全智能体（只读审计） | 2026-08-13 | SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RUNTIME-HEALTH-TRUTH-45、SELFHOST-RELEASE-CANDIDATE-REFRESH-51、D-129 | `REPOSITORY AND ISOLATED TEST ONLY / PRODUCTION NO-GO`。建立部署前legacy稳定门、隔离候选严格门和部署后current runtime严格门；旧bundle/候选将失效，不执行host/UAT/生产/真实数据动作。见[任务文档](../tasks/SELFHOST-RELEASE-GATE-LIFECYCLE-53.md)。 |
 
 ## 已完成任务
 

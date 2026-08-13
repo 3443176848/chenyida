@@ -51,9 +51,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0045`，45/head`0045_runtime_worker_readiness.sql`，0045 SHA-256为`cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc`；0001—0044未修改，Schema/233表snapshot/journal/allowlist一致。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0045只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / AUTHORIZATION CONTROL PLANE COMPLETE / REPOSITORY PREREQUISITES OPEN / PRODUCTION NO-GO`。TASK52已形成D-129和逐项授权执行包，但发现首次晋升gate对旧Worker健康状态自锁；当前不请求会注定失败或绑定旧bundle的host/正式门授权 |
-| 当前任务 | TASK52已完成并释放active slot；当前零`DOING`，等待紧接的`SELFHOST-RELEASE-GATE-LIFECYCLE-53`启动提交。该瞬时零槽不是暂停持续交付 |
-| 下一任务 | `SELFHOST-RELEASE-GATE-LIFECYCLE-53`：在仓库和隔离测试中建立显式部署前legacy稳定门与部署后current runtime严格门，保持候选隔离Worker health强制和失败关闭；不安装host supervisor、不修改UAT/生产或真实数据。实现改变候选输入后必须重建bundle和候选 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / RELEASE GATE LIFECYCLE FIX IN PROGRESS / PRODUCTION NO-GO`。TASK53已作为唯一`DOING`启动；只在仓库和隔离测试中拆分部署前既有运行面稳定门、隔离候选严格门和部署后当前运行面严格门 |
+| 当前任务 | `SELFHOST-RELEASE-GATE-LIFECYCLE-53`：严格起点`e9d27eebb21a9f52c941f389ef7800508c0402e5`/tree`e3263230340ae5fc4e9346f366afcb025d478a51`；主智能体唯一写入，三条智能体线只读审计；不安装host supervisor、不修改UAT/生产或真实数据 |
+| 下一任务 | 完成TASK53的生命周期合同、负向测试和content-addressed bundle两提交链；源码变化后TASK51候选失效，后续必须从新的精确提交重建候选及安全证据，仍需单独任务和资源门禁 |
 
 ## 当前完成模块
 

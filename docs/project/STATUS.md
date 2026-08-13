@@ -2,6 +2,19 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
+## SELFHOST-RELEASE-GATE-LIFECYCLE-53（执行中；发布前/候选/部署后生命周期拆分）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / REPOSITORY AND ISOLATED TEST ONLY / PRODUCTION NO-GO | TASK53为唯一active task；主智能体唯一写入，三条智能体线只读审计 |
+| 严格起点 | PASS / CONTROLLED | `main@e9d27eebb21a9f52c941f389ef7800508c0402e5`、tree`e3263230340ae5fc4e9346f366afcb025d478a51`；未跟踪状态报告不读不改不提交 |
+| 现场触发 | CONFIRMED / FAIL CLOSED | PostgreSQL/Web healthy，Worker/Caddy health none，四服务running/restart0/OOM false；旧runner在19步前要求Worker healthy而自锁 |
+| 目标合同 | IN PROGRESS | 部署前既有运行面只允许基线既有health不退化；隔离候选和部署后当前运行面保持完整身份、Migration及Worker healthy严格门 |
+| 证据绑定 | IN PROGRESS | 生命周期模式/版本必须贯穿计划、authorization、gate report、manifest eligibility和runtime identity；环境变量或隐式猜测不得旁路 |
+| 候选/bundle | STALE / NOT AUTHORIZABLE | TASK51仅作历史审计快照；TASK53实现后须重建canonical manifest-only直接子提交，候选镜像另行精确重建 |
+| 授权边界 | REPOSITORY / ISOLATED ONLY | 不安装host组件、不修改UAT/生产/账号/网络/四卷，不读取真实数据或生成正式PASS |
+| 系统是否可用 | NO | 正式门、异机恢复、监控投递、UAT对齐、真实迁移、岗位/员工验收和切换仍未完成 |
+
 ## SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52（完成；授权控制面闭合，仓库前置仍开放）
 
 | 验证项 | 结果 | 说明 |

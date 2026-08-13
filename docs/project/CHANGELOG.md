@@ -4,6 +4,14 @@
 
 ## 2026-08-13
 
+### SELFHOST-RELEASE-GATE-LIFECYCLE-53 - `docs: start release gate lifecycle closure`
+
+- 调度/范围：TASK52收口`e9d27eebb21a9f52c941f389ef7800508c0402e5`/tree`e3263230340ae5fc4e9346f366afcb025d478a51`后的零`DOING`自动切换为TASK53唯一active task；主智能体唯一写入，应用测试/数据迁移/运维安全三线只读审计。
+- 起点事实：现行UAT PostgreSQL/Web为healthy，Worker/Caddy health为none，四服务running、restart0/OOM false；旧runner在第1步前要求Worker healthy，导致首次晋升在候选测试前自锁。TASK51 bundle/候选已落后当前治理HEAD，不能签发A1/A2。
+- 目标：显式绑定部署前既有运行面稳定、隔离候选严格health和部署后当前运行面严格身份三种生命周期语义；兼容旧Worker无health只能用于不退化比较，不得弱化候选Worker或部署后严格门。
+- 验收：模式/版本须进入计划、authorization、报告、manifest eligibility和runtime identity；缺失/错配、服务或身份漂移、health退化、restart/OOM、候选Worker非healthy及部署后复用legacy模式都有负向测试；实现后重建canonical bundle两提交链并标记旧候选过期。
+- 边界：不安装host supervisor、不生成可消费授权或正式PASS、不外部push、不连接或修改UAT/生产/账号/网络/四卷/真实数据，不读取凭据、日志、环境、卷/备份正文或未跟踪状态报告。系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52 - `docs: start external authorization readiness` / `docs: close external authorization readiness`
 
 - 调度/范围：TASK51闭环提交`cbc219490fd88eda4edb6f0e54ad0ba933438ab4`/tree`216e08ee176406d5df01c6976f74c826a6cab5de`后的零`DOING`自动切换为TASK52唯一active task。三条智能体线只读审计，主智能体保持唯一写者。
