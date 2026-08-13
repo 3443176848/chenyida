@@ -150,6 +150,7 @@ export const STATUS_LABELS = Object.freeze({
   UNVERIFIED: "未验证",
   LEGACY_LOCAL_ONLY: "旧版仅本机校验",
   LEGACY_V2_INNER_ONLY: "旧版 V2 仅内层恢复证据",
+  LEGACY_V3_NO_CLUSTER_SECURITY: "旧版 V3 缺少集群安全恢复证据",
   LOCAL_VERIFIED: "本机备份已校验",
   OFFHOST_VERIFIED: "异机接收已校验",
   RESTORE_VERIFIED: "隔离恢复证据有效",

@@ -150,10 +150,12 @@ test("trusted verification file is independent from PostgreSQL business facts", 
   };
   await writeFile(statusFile, JSON.stringify({ ...readinessBody, readiness_sha256: canonicalSha(readinessBody) }));
   const result = await service.backup(actor("admin"));
-  assert.equal(result.verification_status, "SYNTHETIC_ISOLATED_VERIFIED");
-  assert.equal(result.identity_status, "MATCHED");
-  assert.equal(result.policy_status, "MATCHED");
-  assert.equal(result.assurance_status, "MISMATCH");
+  assert.equal(result.verification_status, "LEGACY_V3_NO_CLUSTER_SECURITY");
+  assert.equal(result.evidence_scope, "LEGACY_V3_NO_CLUSTER_SECURITY");
+  assert.equal(result.cluster_security_status, "UNVERIFIED");
+  assert.equal(result.identity_status, "UNCONFIGURED");
+  assert.equal(result.policy_status, "UNCONFIGURED");
+  assert.equal(result.assurance_status, "UNCONFIGURED");
   assert.equal(result.recovery_ready, false);
   assert.equal(result.current_migration.version, runtimeMigrationHead);
 });

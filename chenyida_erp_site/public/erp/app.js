@@ -359,7 +359,7 @@ function renderOperations() {
   $("#userAdminHint").hidden = canManage;
   $("#createUserForm").hidden = !canManage;
   $("#backupTable").innerHTML = `
-    <thead><tr><th>验证标识</th><th>证据</th><th>证据范围</th><th>传输</th><th>加密</th><th>调度</th><th>保留</th><th>当前身份</th><th>策略</th><th>可信边界</th><th>恢复就绪</th><th>验证时间</th><th>恢复边界</th></tr></thead>
+    <thead><tr><th>验证标识</th><th>证据</th><th>证据范围</th><th>数据传输</th><th>加密</th><th>集群传输</th><th>集群安全</th><th>凭据绑定</th><th>表空间</th><th>恢复执行</th><th>调度</th><th>保留</th><th>当前身份</th><th>策略</th><th>可信边界</th><th>恢复就绪</th><th>验证时间</th><th>恢复边界</th></tr></thead>
     <tbody>${state.backups.map((row) => `
       <tr>
         <td>${escapeHtml(row.name)}</td>
@@ -367,6 +367,11 @@ function renderOperations() {
         <td>${escapeHtml(statusLabel(row.evidence_scope || "NONE"))}</td>
         <td>${escapeHtml(statusLabel(row.transfer_status || "UNVERIFIED"))}</td>
         <td>${escapeHtml(statusLabel(row.encryption_status || "UNVERIFIED"))}</td>
+        <td>${escapeHtml(statusLabel(row.cluster_transfer_status || "UNVERIFIED"))}</td>
+        <td>${escapeHtml(statusLabel(row.cluster_security_status || "UNVERIFIED"))}</td>
+        <td>${escapeHtml(statusLabel(row.credential_binding_status || "UNVERIFIED"))}</td>
+        <td>${escapeHtml(statusLabel(row.tablespace_status || "UNVERIFIED"))}</td>
+        <td>${escapeHtml(statusLabel(row.recovery_execution_status || "UNVERIFIED"))}</td>
         <td>${escapeHtml(statusLabel(row.schedule_status || "UNCONFIGURED"))}</td>
         <td>${escapeHtml(statusLabel(row.retention_status || "UNCONFIGURED"))}</td>
         <td>${escapeHtml(statusLabel(row.identity_status || "UNCONFIGURED"))}</td>
@@ -376,7 +381,7 @@ function renderOperations() {
         <td>${escapeHtml(row.verified_at || row.created_at)}</td>
         <td>仅任务自建一次性 TEST 数据库</td>
       </tr>
-    `).join("") || `<tr><td colspan="13">没有可信验证记录</td></tr>`}</tbody>
+    `).join("") || `<tr><td colspan="18">没有可信验证记录</td></tr>`}</tbody>
   `;
   $("#usersTable").innerHTML = `
     <thead><tr><th>账号</th><th>姓名</th><th>角色</th><th>状态</th><th>最近登录</th><th>操作</th></tr></thead>
@@ -1341,7 +1346,7 @@ async function refreshOperations() {
       return null;
     });
     state.operationsAvailability.backups = Boolean(backups);
-    state.backups = backups ? [{ name: backups.latest_verification?.backup_id || "无可信回执", status: backups.verification_status || "UNVERIFIED", evidence_scope: backups.evidence_scope, transfer_status: backups.transfer_status, encryption_status: backups.encryption_status, schedule_status: backups.schedule_status, retention_status: backups.retention_status, identity_status: backups.identity_status, policy_status: backups.policy_status, assurance_status: backups.assurance_status, recovery_ready: backups.recovery_ready, verified_at: backups.latest_verification?.verified_at || "-" }] : [];
+    state.backups = backups ? [{ name: backups.latest_verification?.backup_id || "无可信回执", status: backups.verification_status || "UNVERIFIED", evidence_scope: backups.evidence_scope, transfer_status: backups.transfer_status, encryption_status: backups.encryption_status, cluster_transfer_status: backups.cluster_transfer_status, cluster_security_status: backups.cluster_security_status, credential_binding_status: backups.credential_binding_status, tablespace_status: backups.tablespace_status, recovery_execution_status: backups.recovery_execution_status, schedule_status: backups.schedule_status, retention_status: backups.retention_status, identity_status: backups.identity_status, policy_status: backups.policy_status, assurance_status: backups.assurance_status, recovery_ready: backups.recovery_ready, verified_at: backups.latest_verification?.verified_at || "-" }] : [];
   } else {
     state.backups = [];
     state.users = [];

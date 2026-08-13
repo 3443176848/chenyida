@@ -40,13 +40,25 @@ export type BackupVerification = Readonly<{
   evidence:BackupEvidence;
 }>;
 export type LegacyBackupVerification = Readonly<{schema_version:1;result:"VERIFIED";backup_id:string;created_at:string;verified_at:string;application_version:string;git_commit:string;migration_head:string;artifacts:Readonly<{postgresql_dump:BackupArtifact;uploads:BackupArtifact;attachments:BackupArtifact}>}>;
-export type BackupRecoveryReadiness = Readonly<{
+export type BackupRecoveryReadinessV3 = Readonly<{
   schema_version:3;contract:"chenyida-erp-backup-verification/v3";result:"RECOVERY_READY"|"SYNTHETIC_ISOLATED_VERIFIED";evidence_scope:"ACTUAL_OFFHOST"|"SYNTHETIC_ISOLATED";
   backup_id:string;created_at:string;verified_at:string;expires_at:string;
   inner_restore:Readonly<{receipt_file_sha256:string;receipt_canonical_sha256:string;receipt:BackupVerification}>;
   transfer:Readonly<{transfer_id:string;envelope_sha256:string;receiver_receipt_sha256:string;acceptance_sha256:string;offhost_receipt_sha256:string;payload_algorithm:"AES-256-GCM";key_agreement:"X25519";key_derivation:"HKDF-SHA256";signature_algorithm:"Ed25519";source_location_id:string;source_machine_identity_sha256:string;receiver_location_id:string;receiver_machine_identity_sha256:string;receiver_identity_sha256:string;source_signing_key_fingerprint:string;receiver_encryption_key_fingerprint:string;receiver_receipt_key_fingerprint:string}>;
   operations:Readonly<{policy_id:string;policy_sha256:string;policy_scope:"SYNTHETIC_TEST_ONLY"|"TEST"|"UAT"|"PRODUCTION";schedule_observation_sha256:string;schedule_status:"ON_TIME";rpo_status:"WITHIN_RPO";scheduler_installation_status:"REPOSITORY_EVALUATOR_ONLY"|"INSTALLED_AND_OBSERVED";retention_plan_sha256:string;retention_status:"POLICY_VALID_DRY_RUN";retention_execution:"DRY_RUN_DELETION_FORBIDDEN"}>;
   attestation:"ROOT_PUBLISHED_INNER_V2_RESTORE_SIGNED_ENCRYPTED_OFFHOST_AND_OPERATIONS_POLICY_VERIFIED";readiness_sha256:string;
+}>;
+export type BackupRecoveryReadiness = Readonly<{
+  schema_version:4;contract:"chenyida-erp-backup-verification/v4";result:"RECOVERY_READY"|"SYNTHETIC_ISOLATED_VERIFIED";evidence_scope:"ACTUAL_OFFHOST"|"SYNTHETIC_ISOLATED";
+  backup_id:string;restore_run_id:string;created_at:string;verified_at:string;expires_at:string;
+  data_readiness:Readonly<{readiness_v3_sha256:string;receipt:BackupRecoveryReadinessV3}>;
+  joint_transfer:Readonly<{receipt_sha256:string;receipt:Readonly<{evidence_scope:"ACTUAL_CONTROLLED"|"SYNTHETIC_TEST_ONLY";receiver_location_id:string}>}>;
+  recovery_execution:Readonly<{intent_sha256:string;state_chain_sha256:string;state_count:number;intent:Readonly<Record<string,unknown>>;states:readonly Readonly<Record<string,unknown>>[]}>;
+  cluster_security:Readonly<{receipt_sha256:string;snapshot_sha256:string;policy_id:string;policy_sha256:string;target_system_identifier_sha256:string;status:"VERIFIED";receipt:Readonly<Record<string,unknown>>}>;
+  credential_binding:Readonly<{receipt_sha256:string;role_set_sha256:string;role_count:number;root_enforced:boolean;status:"VERIFIED";receipt:Readonly<Record<string,unknown>>}>;
+  tablespace:Readonly<{receipt_sha256:string;custom_tablespace_count:number;status:"VERIFIED";receipt:Readonly<Record<string,unknown>>}>;
+  status:Readonly<{data_restore:"VERIFIED";data_transfer:"VERIFIED";cluster_transfer:"VERIFIED";cluster_security:"VERIFIED";credential_binding:"VERIFIED";tablespace:"VERIFIED";recovery_execution:"PUBLISHED";schedule:"ON_TIME";retention:"POLICY_VALID_DRY_RUN"}>;
+  attestation:"ROOT_PUBLISHED_DATA_V3_JOINT_TRANSFER_V2_CLUSTER_SECURITY_CREDENTIAL_TABLESPACE_AND_RECOVERY_STATE_VERIFIED";readiness_sha256:string;
 }>;
 export type RuntimeReleaseIdentity = Readonly<{
   schema_version:3;contract:"chenyida-erp-runtime-release-identity/v3";deployment_class:"TEST"|"UAT"|"PRODUCTION";deployment_id:string;release_id:string;release_manifest_sha256:string;postdeploy_receipt_sha256:string;supervisor_bundle_sha256:string;authorization_sha256:string;

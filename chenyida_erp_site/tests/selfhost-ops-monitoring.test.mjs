@@ -106,6 +106,11 @@ function componentsFixture(observedAt, notification = { status: "UNCONFIGURED", 
       evidence_scope: "ACTUAL_OFFHOST",
       transfer_status: "VERIFIED",
       encryption_status: "VERIFIED",
+      cluster_transfer_status: "VERIFIED",
+      cluster_security_status: "VERIFIED",
+      credential_binding_status: "VERIFIED",
+      tablespace_status: "VERIFIED",
+      recovery_execution_status: "PUBLISHED",
       schedule_status: "ON_TIME",
       retention_status: "POLICY_VALID_DRY_RUN",
       identity_status: "MATCHED",
@@ -310,15 +315,22 @@ test("application, release, migration, backup, and assurance mismatches fail tog
   for (const code of ["APPLICATION_LIVENESS_FAILED", "APPLICATION_MIGRATION_MISMATCH", "RELEASE_IDENTITY_MISMATCH", "BACKUP_IDENTITY_MISMATCH", "BACKUP_POLICY_MISMATCH", "BACKUP_ASSURANCE_MISMATCH", "BACKUP_RECOVERY_NOT_READY"]) assert.ok(codes(result).includes(code), code);
 });
 
-test("legacy, synthetic, transfer, encryption, schedule, and retention backup gaps alert independently", () => {
+test("legacy V1-V3, cluster recovery, transfer, encryption, schedule, and retention gaps alert independently", () => {
   const at = new Date(originMs).toISOString();
   const legacyComponents = componentsFixture(at, { status: "READY", target_id: "primary-oncall" });
-  legacyComponents.backup = { ...legacyComponents.backup, verification_status: "LEGACY_V2_INNER_ONLY", evidence_scope: "LEGACY_V2_INNER_ONLY", transfer_status: "UNVERIFIED", encryption_status: "UNVERIFIED", schedule_status: "UNCONFIGURED", retention_status: "UNCONFIGURED", assurance_status: "MISMATCH", recovery_ready: false };
+  legacyComponents.backup = { ...legacyComponents.backup, verification_status: "LEGACY_V2_INNER_ONLY", evidence_scope: "LEGACY_V2_INNER_ONLY", transfer_status: "UNVERIFIED", encryption_status: "UNVERIFIED", cluster_transfer_status: "UNVERIFIED", cluster_security_status: "UNVERIFIED", credential_binding_status: "UNVERIFIED", tablespace_status: "UNVERIFIED", recovery_execution_status: "UNVERIFIED", schedule_status: "UNCONFIGURED", retention_status: "UNCONFIGURED", assurance_status: "MISMATCH", recovery_ready: false };
   const legacy = evaluate(observationFixture({ id: "legacy-backup", components: legacyComponents }));
-  for (const code of ["BACKUP_LEGACY_EVIDENCE", "BACKUP_TRANSFER_UNVERIFIED", "BACKUP_ENCRYPTION_UNVERIFIED", "BACKUP_SCHEDULE_NOT_READY", "BACKUP_RETENTION_NOT_READY", "BACKUP_RECOVERY_NOT_READY"]) assert.ok(codes(legacy).includes(code), code);
+  const legacyCodes = ["BACKUP_LEGACY_EVIDENCE", "BACKUP_TRANSFER_UNVERIFIED", "BACKUP_ENCRYPTION_UNVERIFIED", "BACKUP_CLUSTER_TRANSFER_UNVERIFIED", "BACKUP_CLUSTER_SECURITY_UNVERIFIED", "BACKUP_CREDENTIAL_BINDING_UNVERIFIED", "BACKUP_TABLESPACE_UNVERIFIED", "BACKUP_RECOVERY_EXECUTION_UNPUBLISHED", "BACKUP_SCHEDULE_NOT_READY", "BACKUP_RETENTION_NOT_READY", "BACKUP_RECOVERY_NOT_READY"];
+  for (const code of legacyCodes) assert.ok(codes(legacy).includes(code), code);
   const recoveredAt = new Date(originMs + 60_000).toISOString();
   const recovered = evaluate(observationFixture({ seconds: 60, id: "recovered-backup", components: componentsFixture(recoveredAt, { status: "READY", target_id: "primary-oncall" }) }), legacy.nextState);
-  for (const code of ["BACKUP_LEGACY_EVIDENCE", "BACKUP_TRANSFER_UNVERIFIED", "BACKUP_ENCRYPTION_UNVERIFIED", "BACKUP_SCHEDULE_NOT_READY", "BACKUP_RETENTION_NOT_READY", "BACKUP_RECOVERY_NOT_READY"]) assert.ok(recovered.report.events.some((event) => event.code === code && event.event_type === "RECOVERED"), code);
+  for (const code of legacyCodes) assert.ok(recovered.report.events.some((event) => event.code === code && event.event_type === "RECOVERED"), code);
+  const legacyV3Components = componentsFixture(at, { status: "READY", target_id: "primary-oncall" });
+  legacyV3Components.backup = { ...legacyV3Components.backup, verification_status: "LEGACY_V3_NO_CLUSTER_SECURITY", evidence_scope: "LEGACY_V3_NO_CLUSTER_SECURITY", cluster_transfer_status: "UNVERIFIED", cluster_security_status: "UNVERIFIED", credential_binding_status: "UNVERIFIED", tablespace_status: "UNVERIFIED", recovery_execution_status: "UNVERIFIED", recovery_ready: false };
+  const legacyV3 = evaluate(observationFixture({ id: "legacy-v3-backup", components: legacyV3Components }));
+  for (const code of ["BACKUP_LEGACY_EVIDENCE", "BACKUP_CLUSTER_TRANSFER_UNVERIFIED", "BACKUP_CLUSTER_SECURITY_UNVERIFIED", "BACKUP_CREDENTIAL_BINDING_UNVERIFIED", "BACKUP_TABLESPACE_UNVERIFIED", "BACKUP_RECOVERY_EXECUTION_UNPUBLISHED", "BACKUP_RECOVERY_NOT_READY"]) assert.ok(codes(legacyV3).includes(code), code);
+  assert.equal(codes(legacyV3).includes("BACKUP_TRANSFER_UNVERIFIED"), false);
+  assert.equal(codes(legacyV3).includes("BACKUP_ENCRYPTION_UNVERIFIED"), false);
   const syntheticComponents = componentsFixture(at, { status: "READY", target_id: "primary-oncall" });
   syntheticComponents.backup = { ...syntheticComponents.backup, verification_status: "SYNTHETIC_ISOLATED_VERIFIED", evidence_scope: "SYNTHETIC_ISOLATED", assurance_status: "MISMATCH", recovery_ready: false };
   const synthetic = evaluate(observationFixture({ id: "synthetic-backup", components: syntheticComponents }));

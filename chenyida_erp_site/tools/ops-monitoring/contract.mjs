@@ -44,10 +44,12 @@ const RUNTIME_CODES = new Set([
   "RUNTIME_UPLOADS_UNAVAILABLE",
   "RUNTIME_WORKER_UNAVAILABLE",
 ]);
-const BACKUP_VERIFICATION = new Set(["UNVERIFIED", "INVALID", "STALE", "LEGACY_LOCAL_ONLY", "LEGACY_V2_INNER_ONLY", "LOCAL_VERIFIED", "OFFHOST_VERIFIED", "RESTORE_VERIFIED", "RECOVERY_READY", "SYNTHETIC_ISOLATED_VERIFIED"]);
-const BACKUP_EVIDENCE_SCOPE = new Set(["NONE", "LEGACY_V1_LOCAL_ONLY", "LEGACY_V2_INNER_ONLY", "ACTUAL_OFFHOST", "SYNTHETIC_ISOLATED"]);
+const BACKUP_VERIFICATION = new Set(["UNVERIFIED", "INVALID", "STALE", "LEGACY_LOCAL_ONLY", "LEGACY_V2_INNER_ONLY", "LEGACY_V3_NO_CLUSTER_SECURITY", "LOCAL_VERIFIED", "OFFHOST_VERIFIED", "RESTORE_VERIFIED", "RECOVERY_READY", "SYNTHETIC_ISOLATED_VERIFIED"]);
+const BACKUP_EVIDENCE_SCOPE = new Set(["NONE", "LEGACY_V1_LOCAL_ONLY", "LEGACY_V2_INNER_ONLY", "LEGACY_V3_NO_CLUSTER_SECURITY", "ACTUAL_OFFHOST", "SYNTHETIC_ISOLATED"]);
 const BACKUP_TRANSFER_STATUS = new Set(["UNVERIFIED", "VERIFIED"]);
 const BACKUP_ENCRYPTION_STATUS = new Set(["UNVERIFIED", "VERIFIED"]);
+const BACKUP_CLUSTER_STATUS = new Set(["UNVERIFIED", "VERIFIED"]);
+const BACKUP_RECOVERY_EXECUTION_STATUS = new Set(["UNVERIFIED", "PUBLISHED"]);
 const BACKUP_SCHEDULE_STATUS = new Set(["UNCONFIGURED", "ON_TIME"]);
 const BACKUP_RETENTION_STATUS = new Set(["UNCONFIGURED", "POLICY_VALID_DRY_RUN"]);
 const MATCH_STATUS = new Set(["UNCONFIGURED", "MISMATCH", "MATCHED"]);
@@ -91,10 +93,15 @@ const ALERT_DEFINITIONS = Object.freeze({
   BACKUP_EVIDENCE_UNAVAILABLE: ["CRITICAL", "备份恢复治理证据不可用", "backup-restore.md#dashboard-判定", "backup"],
   BACKUP_EVIDENCE_INVALID: ["CRITICAL", "备份恢复治理证据损坏或无效", "backup-restore.md#dashboard-判定", "backup"],
   BACKUP_EVIDENCE_STALE: ["CRITICAL", "备份恢复治理证据已过期", "backup-restore.md#dashboard-判定", "backup"],
-  BACKUP_LEGACY_EVIDENCE: ["CRITICAL", "备份证据仍为旧版本机或 V2 内层收据", "backup-restore.md#dashboard-判定", "backup.evidence.version"],
+  BACKUP_LEGACY_EVIDENCE: ["CRITICAL", "备份证据仍为旧版本机、V2 内层收据或缺少集群安全证据的 V3", "backup-restore.md#dashboard-判定", "backup.evidence.version"],
   BACKUP_SYNTHETIC_ONLY: ["CRITICAL", "仅有合成隔离证据，未证明真实异机恢复", "backup-restore.md#dashboard-判定", "backup.evidence.scope"],
   BACKUP_TRANSFER_UNVERIFIED: ["CRITICAL", "异机传输证据未验证", "backup-restore.md#dashboard-判定", "backup.transfer"],
   BACKUP_ENCRYPTION_UNVERIFIED: ["CRITICAL", "异机备份加密证据未验证", "backup-restore.md#dashboard-判定", "backup.encryption"],
+  BACKUP_CLUSTER_TRANSFER_UNVERIFIED: ["CRITICAL", "PostgreSQL 集群安全胶囊未完成受控传输", "backup-restore.md#dashboard-判定", "backup.cluster.transfer"],
+  BACKUP_CLUSTER_SECURITY_UNVERIFIED: ["CRITICAL", "PostgreSQL 集群角色、权限与全局对象恢复未验证", "backup-restore.md#dashboard-判定", "backup.cluster.security"],
+  BACKUP_CREDENTIAL_BINDING_UNVERIFIED: ["CRITICAL", "恢复目标登录角色凭据未完成受控绑定", "backup-restore.md#dashboard-判定", "backup.cluster.credentials"],
+  BACKUP_TABLESPACE_UNVERIFIED: ["CRITICAL", "恢复目标表空间映射与创建后身份未验证", "backup-restore.md#dashboard-判定", "backup.cluster.tablespaces"],
+  BACKUP_RECOVERY_EXECUTION_UNPUBLISHED: ["CRITICAL", "恢复执行状态尚未安全推进至 PUBLISHED", "backup-restore.md#dashboard-判定", "backup.cluster.execution"],
   BACKUP_SCHEDULE_NOT_READY: ["CRITICAL", "备份调度未安装观测或未按时", "backup-restore.md#dashboard-判定", "backup.schedule"],
   BACKUP_RETENTION_NOT_READY: ["CRITICAL", "备份保留策略证据未就绪", "backup-restore.md#dashboard-判定", "backup.retention"],
   BACKUP_IDENTITY_MISMATCH: ["CRITICAL", "备份证据与运行身份不一致", "backup-restore.md#dashboard-判定", "backup"],
@@ -199,8 +206,8 @@ export function validateMonitoringPolicy(value) {
     if (entry.service !== SERVICES[index] || typeof entry.health_required !== "boolean") reject("MONITOR_POLICY_SERVICE_SET_INVALID");
     if ((entry.service === "caddy") === entry.health_required) reject("MONITOR_POLICY_SERVICE_SET_INVALID");
   });
-  exactKeys(value.backup, ["required_verification_status", "required_evidence_scope", "required_transfer_status", "required_encryption_status", "required_schedule_status", "required_retention_status", "require_identity_match", "require_policy_match", "require_assurance_match", "require_recovery_ready"], "MONITOR_POLICY_BACKUP_FIELDS_INVALID");
-  if (value.backup.required_verification_status !== "RECOVERY_READY" || value.backup.required_evidence_scope !== "ACTUAL_OFFHOST" || value.backup.required_transfer_status !== "VERIFIED" || value.backup.required_encryption_status !== "VERIFIED" || value.backup.required_schedule_status !== "ON_TIME" || value.backup.required_retention_status !== "POLICY_VALID_DRY_RUN" || value.backup.require_identity_match !== true || value.backup.require_policy_match !== true || value.backup.require_assurance_match !== true || value.backup.require_recovery_ready !== true) reject("MONITOR_POLICY_BACKUP_INVALID");
+  exactKeys(value.backup, ["required_verification_status", "required_evidence_scope", "required_transfer_status", "required_encryption_status", "required_cluster_transfer_status", "required_cluster_security_status", "required_credential_binding_status", "required_tablespace_status", "required_recovery_execution_status", "required_schedule_status", "required_retention_status", "require_identity_match", "require_policy_match", "require_assurance_match", "require_recovery_ready"], "MONITOR_POLICY_BACKUP_FIELDS_INVALID");
+  if (value.backup.required_verification_status !== "RECOVERY_READY" || value.backup.required_evidence_scope !== "ACTUAL_OFFHOST" || value.backup.required_transfer_status !== "VERIFIED" || value.backup.required_encryption_status !== "VERIFIED" || value.backup.required_cluster_transfer_status !== "VERIFIED" || value.backup.required_cluster_security_status !== "VERIFIED" || value.backup.required_credential_binding_status !== "VERIFIED" || value.backup.required_tablespace_status !== "VERIFIED" || value.backup.required_recovery_execution_status !== "PUBLISHED" || value.backup.required_schedule_status !== "ON_TIME" || value.backup.required_retention_status !== "POLICY_VALID_DRY_RUN" || value.backup.require_identity_match !== true || value.backup.require_policy_match !== true || value.backup.require_assurance_match !== true || value.backup.require_recovery_ready !== true) reject("MONITOR_POLICY_BACKUP_INVALID");
   return value;
 }
 
@@ -276,10 +283,10 @@ function validateReleaseObservation(value) {
 }
 
 function validateBackupObservation(value) {
-  exactKeys(value, ["status", "observed_at", "verification_status", "evidence_scope", "transfer_status", "encryption_status", "schedule_status", "retention_status", "identity_status", "policy_status", "assurance_status", "recovery_ready", "recovery_point_at", "expires_at", "policy_id", "rpo_hours"], "MONITOR_OBSERVATION_BACKUP_FIELDS_INVALID");
+  exactKeys(value, ["status", "observed_at", "verification_status", "evidence_scope", "transfer_status", "encryption_status", "cluster_transfer_status", "cluster_security_status", "credential_binding_status", "tablespace_status", "recovery_execution_status", "schedule_status", "retention_status", "identity_status", "policy_status", "assurance_status", "recovery_ready", "recovery_point_at", "expires_at", "policy_id", "rpo_hours"], "MONITOR_OBSERVATION_BACKUP_FIELDS_INVALID");
   if (!new Set(["NOT_COLLECTED", "AVAILABLE"]).has(value.status)) reject("MONITOR_OBSERVATION_BACKUP_INVALID");
   if (value.status === "NOT_COLLECTED") {
-    if ([value.observed_at, value.verification_status, value.evidence_scope, value.transfer_status, value.encryption_status, value.schedule_status, value.retention_status, value.identity_status, value.policy_status, value.assurance_status, value.recovery_point_at, value.expires_at, value.policy_id, value.rpo_hours].some((item) => item !== null) || value.recovery_ready !== false) reject("MONITOR_OBSERVATION_BACKUP_INVALID");
+    if ([value.observed_at, value.verification_status, value.evidence_scope, value.transfer_status, value.encryption_status, value.cluster_transfer_status, value.cluster_security_status, value.credential_binding_status, value.tablespace_status, value.recovery_execution_status, value.schedule_status, value.retention_status, value.identity_status, value.policy_status, value.assurance_status, value.recovery_point_at, value.expires_at, value.policy_id, value.rpo_hours].some((item) => item !== null) || value.recovery_ready !== false) reject("MONITOR_OBSERVATION_BACKUP_INVALID");
     return;
   }
   iso(value.observed_at, "MONITOR_OBSERVATION_BACKUP_INVALID");
@@ -287,6 +294,11 @@ function validateBackupObservation(value) {
   oneOf(value.evidence_scope, BACKUP_EVIDENCE_SCOPE, "MONITOR_OBSERVATION_BACKUP_INVALID");
   oneOf(value.transfer_status, BACKUP_TRANSFER_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
   oneOf(value.encryption_status, BACKUP_ENCRYPTION_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
+  oneOf(value.cluster_transfer_status, BACKUP_CLUSTER_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
+  oneOf(value.cluster_security_status, BACKUP_CLUSTER_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
+  oneOf(value.credential_binding_status, BACKUP_CLUSTER_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
+  oneOf(value.tablespace_status, BACKUP_CLUSTER_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
+  oneOf(value.recovery_execution_status, BACKUP_RECOVERY_EXECUTION_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
   oneOf(value.schedule_status, BACKUP_SCHEDULE_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
   oneOf(value.retention_status, BACKUP_RETENTION_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
   oneOf(value.identity_status, MATCH_STATUS, "MONITOR_OBSERVATION_BACKUP_INVALID");
@@ -297,7 +309,7 @@ function validateBackupObservation(value) {
   nullable(value.recovery_point_at, iso, "MONITOR_OBSERVATION_BACKUP_INVALID");
   nullable(value.expires_at, iso, "MONITOR_OBSERVATION_BACKUP_INVALID");
   if ((value.recovery_point_at === null) !== (value.expires_at === null)) reject("MONITOR_OBSERVATION_BACKUP_INVALID");
-  if (value.recovery_ready && (value.verification_status !== "RECOVERY_READY" || value.evidence_scope !== "ACTUAL_OFFHOST" || value.transfer_status !== "VERIFIED" || value.encryption_status !== "VERIFIED" || value.schedule_status !== "ON_TIME" || value.retention_status !== "POLICY_VALID_DRY_RUN" || value.identity_status !== "MATCHED" || value.policy_status !== "MATCHED" || value.assurance_status !== "MATCHED" || value.recovery_point_at === null)) reject("MONITOR_OBSERVATION_BACKUP_INVALID");
+  if (value.recovery_ready && (value.verification_status !== "RECOVERY_READY" || value.evidence_scope !== "ACTUAL_OFFHOST" || value.transfer_status !== "VERIFIED" || value.encryption_status !== "VERIFIED" || value.cluster_transfer_status !== "VERIFIED" || value.cluster_security_status !== "VERIFIED" || value.credential_binding_status !== "VERIFIED" || value.tablespace_status !== "VERIFIED" || value.recovery_execution_status !== "PUBLISHED" || value.schedule_status !== "ON_TIME" || value.retention_status !== "POLICY_VALID_DRY_RUN" || value.identity_status !== "MATCHED" || value.policy_status !== "MATCHED" || value.assurance_status !== "MATCHED" || value.recovery_point_at === null)) reject("MONITOR_OBSERVATION_BACKUP_INVALID");
 }
 
 function validateNotificationObservation(value) {
@@ -623,7 +635,7 @@ export function evaluateMonitoringObservation({ policy, resourcePlan, config, ob
     unresolvedScopes.add("backup");
     addIssue(issues, "BACKUP_EVIDENCE_UNAVAILABLE", "backup.evidence.missing");
   } else {
-    const backupLegacy = ["LEGACY_LOCAL_ONLY", "LEGACY_V2_INNER_ONLY", "LOCAL_VERIFIED", "OFFHOST_VERIFIED", "RESTORE_VERIFIED"].includes(observation.backup.verification_status);
+    const backupLegacy = ["LEGACY_LOCAL_ONLY", "LEGACY_V2_INNER_ONLY", "LEGACY_V3_NO_CLUSTER_SECURITY", "LOCAL_VERIFIED", "OFFHOST_VERIFIED", "RESTORE_VERIFIED"].includes(observation.backup.verification_status);
     const backupSynthetic = observation.backup.verification_status === "SYNTHETIC_ISOLATED_VERIFIED" || observation.backup.evidence_scope === "SYNTHETIC_ISOLATED";
     const backupInvalid = ["INVALID", "UNVERIFIED"].includes(observation.backup.verification_status);
     const backupStale = componentStale(observation.backup.observed_at, observedMs, policy) || observation.backup.verification_status === "STALE" || (observation.backup.expires_at && nowMs > Date.parse(observation.backup.expires_at)) || (observation.backup.recovery_point_at && nowMs > Date.parse(observation.backup.recovery_point_at) + config.backup_expectation.rpo_hours * 3_600_000);
@@ -634,6 +646,11 @@ export function evaluateMonitoringObservation({ policy, resourcePlan, config, ob
     if (backupStale) addIssue(issues, "BACKUP_EVIDENCE_STALE", "backup.evidence.age");
     if (observation.backup.transfer_status !== policy.backup.required_transfer_status) addIssue(issues, "BACKUP_TRANSFER_UNVERIFIED", "backup.transfer");
     if (observation.backup.encryption_status !== policy.backup.required_encryption_status) addIssue(issues, "BACKUP_ENCRYPTION_UNVERIFIED", "backup.encryption");
+    if (observation.backup.cluster_transfer_status !== policy.backup.required_cluster_transfer_status) addIssue(issues, "BACKUP_CLUSTER_TRANSFER_UNVERIFIED", "backup.cluster.transfer");
+    if (observation.backup.cluster_security_status !== policy.backup.required_cluster_security_status) addIssue(issues, "BACKUP_CLUSTER_SECURITY_UNVERIFIED", "backup.cluster.security");
+    if (observation.backup.credential_binding_status !== policy.backup.required_credential_binding_status) addIssue(issues, "BACKUP_CREDENTIAL_BINDING_UNVERIFIED", "backup.cluster.credentials");
+    if (observation.backup.tablespace_status !== policy.backup.required_tablespace_status) addIssue(issues, "BACKUP_TABLESPACE_UNVERIFIED", "backup.cluster.tablespaces");
+    if (observation.backup.recovery_execution_status !== policy.backup.required_recovery_execution_status) addIssue(issues, "BACKUP_RECOVERY_EXECUTION_UNPUBLISHED", "backup.cluster.execution");
     if (observation.backup.schedule_status !== policy.backup.required_schedule_status) addIssue(issues, "BACKUP_SCHEDULE_NOT_READY", "backup.schedule");
     if (observation.backup.retention_status !== policy.backup.required_retention_status) addIssue(issues, "BACKUP_RETENTION_NOT_READY", "backup.retention");
     if (observation.backup.identity_status !== "MATCHED") addIssue(issues, "BACKUP_IDENTITY_MISMATCH", "backup.identity");
@@ -738,7 +755,7 @@ export function emptyComponentObservation() {
       readiness: Object.freeze({ status: "NOT_COLLECTED", observed_at: null, version: null, revision: null, migration_head: null, code: null }),
     }),
     release: Object.freeze({ status: "NOT_COLLECTED", observed_at: null, generated_at: null, release_manifest_sha256: null, supervisor_bundle_sha256: null, application_version: null, git_commit: null, migration_head: null, migration_manifest_sha256: null, web_image_digest: null, worker_image_digest: null }),
-    backup: Object.freeze({ status: "NOT_COLLECTED", observed_at: null, verification_status: null, evidence_scope: null, transfer_status: null, encryption_status: null, schedule_status: null, retention_status: null, identity_status: null, policy_status: null, assurance_status: null, recovery_ready: false, recovery_point_at: null, expires_at: null, policy_id: null, rpo_hours: null }),
+    backup: Object.freeze({ status: "NOT_COLLECTED", observed_at: null, verification_status: null, evidence_scope: null, transfer_status: null, encryption_status: null, cluster_transfer_status: null, cluster_security_status: null, credential_binding_status: null, tablespace_status: null, recovery_execution_status: null, schedule_status: null, retention_status: null, identity_status: null, policy_status: null, assurance_status: null, recovery_ready: false, recovery_point_at: null, expires_at: null, policy_id: null, rpo_hours: null }),
     notification: Object.freeze({ status: "UNCONFIGURED", target_id: null }),
   });
 }

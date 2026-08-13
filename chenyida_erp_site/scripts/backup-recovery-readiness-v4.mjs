@@ -227,7 +227,9 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
     || cluster.target_system_identifier_sha256 !== targetSystemIdentifierSha256
     || intent.credential_generation_id !== credential.credential_generation_id
     || intent.credential_role_set_sha256 !== credential.role_set_sha256
+    || credential.role_count !== policy.credential_binding.login_roles.length
     || intent.tablespace_map_sha256 !== tablespace.map_sha256
+    || intent.custom_tablespace_identity_sha256.length !== tablespace.custom_tablespace_count
     || cluster.tablespace_map_sha256 !== tablespace.map_sha256
     || cluster.tablespace_receipt_sha256 !== tablespace.receipt_sha256
     || cluster.credential_receipt_sha256 !== credential.receipt_sha256

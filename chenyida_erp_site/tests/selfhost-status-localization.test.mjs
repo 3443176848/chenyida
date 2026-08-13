@@ -22,7 +22,7 @@ test("shared status vocabulary localizes common ERP states without changing thei
     VALID: "有效", WARNING: "警告", ERROR: "错误", VISIBLE: "可见",
     UNVERIFIED: "未验证", LEGACY_LOCAL_ONLY: "旧版仅本机校验", LOCAL_VERIFIED: "本机备份已校验",
     OFFHOST_VERIFIED: "异机接收已校验", RESTORE_VERIFIED: "隔离恢复证据有效",
-    LEGACY_V2_INNER_ONLY: "旧版 V2 仅内层恢复证据", RECOVERY_READY: "真实异机恢复已就绪",
+    LEGACY_V2_INNER_ONLY: "旧版 V2 仅内层恢复证据", LEGACY_V3_NO_CLUSTER_SECURITY: "旧版 V3 缺少集群安全恢复证据", RECOVERY_READY: "真实异机恢复已就绪",
     SYNTHETIC_ISOLATED_VERIFIED: "仅合成隔离恢复已验证", ACTUAL_OFFHOST: "真实异机证据",
     SYNTHETIC_ISOLATED: "合成隔离证据", VERIFIED: "已验证", POLICY_VALID_DRY_RUN: "保留策略干运行有效",
     MATCHED: "匹配", MISMATCH: "不匹配", UNCONFIGURED: "未配置", INVALID: "验证证据无效", STALE: "已失效",
