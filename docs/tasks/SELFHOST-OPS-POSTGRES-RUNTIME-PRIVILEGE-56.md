@@ -45,8 +45,8 @@
 
 ## 5. 验收标准
 
-- [ ] 三条智能体线完成只读审计，主智能体复核当前Compose/连接池、UAT去敏catalog摘要、Migration身份合同、backup/restore能力、对象访问面和custom tablespace边界。
-- [ ] 记录单一架构决策，明确owner/migration、Web、Worker、backup capture、受控operator和恢复角色的登录性、membership、连接上限、对象权限、秘密生命周期及旧D-132/V4兼容升级方式。
+- [x] 三条智能体线完成只读审计，主智能体复核当前Compose/连接池、UAT去敏catalog摘要、Migration身份合同、backup/restore能力、对象访问面和custom tablespace边界。
+- [x] D-133固定owner/Migration、Web、Worker、Admin、backup capture、受控operator和恢复身份的登录性、membership、连接上限、对象权限、秘密生命周期及旧D-132/V4兼容升级方式。
 - [ ] 版本化权限策略使用exact set与稳定摘要覆盖角色属性、membership options、数据库/Schema/表/序列/routine/type/大对象/默认权限和custom tablespace；未知、额外、危险或漂移状态失败关闭。
 - [ ] 在线Web/Worker使用不同LOGIN和不同凭据，均非owner/non-superuser且不能DDL、SET ROLE owner、创建角色/数据库、绕过RLS、读取系统秘密或访问对方未获准对象；连接后实际身份断言与正反权限测试通过。
 - [ ] Migration使用独立、非superuser、低连接数身份并满足精确数据库owner/对象owner合同；只有Migration可执行版本化DDL，应用与backup身份不能写Migration历史或改变owner/ACL/default privileges。
@@ -72,3 +72,10 @@
 ## 7. 当前判定
 
 `DOING / READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`。当前系统仍由单一superuser承担数据库owner、全部对象owner和Web/Worker连接，且秘密通过环境变量交付；在TASK56仓库闭环、源码匹配候选、正式门、专项授权部署与运行复核完成前，不得投入真实员工使用。
+
+## 8. 三线审计结论与 D-133
+
+- 数据与迁移线确认现有Migration gate要求`current_user=session_user=database owner`且无membership，故D-133保留owner/Migration合一而与常驻身份分离；D-132 v1不得改写，v2升级后才可激活。现有backup单一superuser同时做fence与capture，且`CONNECTION LIMIT 0`会阻断普通capture，必须升级为CONNECT allowlist fence。
+- 应用与测试线确认Web覆盖全部业务域且会enqueue，Worker实际执行parse、normalize、review-finalize、上传恢复和DRAFT物料创建；两者需独立LOGIN与逐对象操作ACL，但部分导入/队列/物料对象必然共享，表ACL不能冒充行/状态隔离。现有Pool没有任何阻塞式session/capability断言，Worker还被迫加载Setup Token。
+- 运维与安全线确认Compose、runtime policy和release合同仍把数据库、Setup、PostgreSQL及Admin秘密列为环境键，且无tablespace持久mount；受控部署还必须关闭浏览器Setup并改用root调度Admin工具。secret-file、逐服务mount、runtime exact set和release摘要必须同批升级，不能只改Compose文本。
+- 主智能体据此记录[D-133](../project/DECISIONS.md#d-133-postgresql-运行权限采用独立登录nologin-权限组文件秘密与离线控制面)，当前进入版本化role/ACL、secret-file consumer与runtime identity实现；没有创建真实角色、凭据、host目录或Volume，也没有修改UAT/生产。

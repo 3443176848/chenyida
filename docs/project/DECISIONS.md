@@ -2339,6 +2339,56 @@
 - 拒绝在SIGKILL后依赖trap清理、手工DROP提示或把不确定对象当作本任务创建；恢复必须resume/inspect/compensate且歧义隔离。
 - 拒绝为了让当前Compose通过而接受superuser runtime、环境秘密或PUBLIC越权，也拒绝把合成角色fixture写成真实最小权限已完成。
 
+## D-133 PostgreSQL 运行权限采用独立登录、NOLOGIN 权限组、文件秘密与离线控制面
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / DESIGN FIXED / REPOSITORY IMPLEMENTATION IN PROGRESS / NO RUNTIME CHANGE / PRODUCTION NO-GO`
+- 提案与实施：Codex 持续交付负责人，依据 TASK56 数据迁移、应用测试、运维安全三线只读审计和现有 PostgreSQL 17、Compose、Migration、backup/restore、release/runtime 合同复核
+- 确认边界：只授权仓库内版本化策略、运行时消费者、Compose/release 合同、合成秘密和隔离 PostgreSQL 测试；不授权当前 UAT/生产角色、密码、ACL、数据库、Volume、host 目录、备份恢复、Migration、部署或切换
+
+### Context
+
+- 当前 Web、Worker 和 Admin 继承同一个环境 `DATABASE_URL` 与 Setup Token，Migration 只替换另一条环境 DSN；PostgreSQL 初始化口令和管理员临时口令也在环境中。连接池没有核对 `session_user/current_user`、数据库 owner、危险能力、membership 或对象权限。
+- 当前 UAT 只有一个非内置 LOGIN，且同时是 superuser、数据库 owner、全部 433 个 public relation owner 和 Web/Worker 活动连接身份；源码 45 个 Migration，UAT 仍为 40 个。本任务不得借权限修复升级 UAT。
+- D-132 v1 只有 owner、单 runtime login 与单 RW group，且非 owner 可获全表 DML、序列 UPDATE/USAGE、routine EXECUTE 和 large object UPDATE；它是 TASK55 合成恢复证据，不能表达 Web/Worker/Admin/Backup 的实际边界。
+- Web 覆盖全部业务域并参与导入 enqueue；Worker 处理 parse、normalize、review-finalize、上传恢复和 DRAFT 物料创建。两者必然共享部分队列、导入、物料和审计对象，表级 ACL 不能进一步约束“只改某状态、某列或自己领取的行”。
+- 当前 backup 由同一 superuser service file 完成 `ALTER DATABASE`、终止连接、reconciliation、Migration 历史读取和 `pg_dump`。把该用户名直接替换成普通读取角色会在 `CONNECTION LIMIT 0` 后阻断 capture 自身，并不构成职责分离。
+
+### Decision
+
+1. 保留“数据库/对象 owner 与 Migration 登录合一”的现有 release 不变量，不静默改成 `SET ROLE owner`。`chenyida_erp_owner`是只供一次性 Migration 使用的 LOGIN、数据库及应用对象 owner，连接上限 1，固定 `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOINHERIT`，无 membership；角色骨架只能由离线 bootstrap 控制面创建。
+2. 稳态应用角色图使用五个互不复用凭据的 LOGIN：owner/Migration、`chenyida_erp_web`、`chenyida_erp_worker`、`chenyida_erp_admin`和`chenyida_erp_backup`；Web、Worker、Admin、Backup 各自只继承一个同名职责的 NOLOGIN privilege group。membership exact 为`ADMIN FALSE / INHERIT TRUE / SET FALSE`，禁止通往 owner、运维或内置危险角色的直接、间接 membership。
+3. Web pool/role 上限分别为 10/12，Worker 为 4/6，Migration、Admin 和 Backup pool 均为 1、role 上限分别为 1/1/2。全部 LOGIN 都是 `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`；Admin 是 root 调度的一次性工具身份，Backup 由 root-only service file 消费，二者不挂入常驻 Web/Worker 容器。
+4. 从 PUBLIC 撤销业务数据库 `CONNECT,TEMPORARY` 以及 public Schema `CREATE,USAGE`。各 privilege group 只获数据库 CONNECT、Schema USAGE 和版本化对象/操作清单；不授 TEMP、`pg_read_all_data`、`pg_write_all_data`、`GRANT ... ON ALL`、通配 routine/type、未批准 large object 或 tablespace 权限。
+5. `schema_migrations`对 Web、Worker、Backup 仅 SELECT，只有 owner/Migration 可写；`worker_runtime_leases`对 Web 仅 SELECT、对 Worker 为 SELECT/INSERT/UPDATE。Worker 的队列、解析、标准化、复核和 DRAFT 建立权限按实际 SQL 精确列举；Web、Admin 和 Backup 也按实际对象/操作列举，INSERT 所需 sequence 只授 USAGE，Backup sequence 只授 SELECT。
+6. owner 的 default privileges 明确撤销 PUBLIC 对 tables、sequences、routines 和 types 的隐式权限，不向应用组设置宽泛未来默认授权。每次 Migration 后、服务启动前由同版本 reconciler 原子应用 exact ACL；未知角色、membership、对象、ACL、default privilege、routine/type/sequence/large-object 或策略摘要漂移均失败关闭。
+7. TASK56 先关闭数据库对象/操作级边界，不声称已经实现共享表的行、列或状态级隔离。若受控试用证明该边界不足，queue transition、review finalization、upload reconciliation 和 DRAFT 创建必须改为 owner-owned、固定 `search_path`、参数化、可审计的 `SECURITY DEFINER` 命令接口，或拆分 command/result 表后再撤销 Worker 底表 DML。
+8. Web、Worker、Migration 和 Admin 的 Pool 在每个新物理连接交付前阻塞式核验：`session_user=current_user=预期 LOGIN`、目标数据库/owner、application name、精确 role flags/connection limit/membership，以及数据库、Schema、`schema_migrations`和服务 canary 权限。角色互换、owner/superuser、错误数据库、可 `SET ROLE owner`、危险内置 membership 或 ACL 摘要漂移均以稳定去敏错误失败。
+9. UAT/PRODUCTION 不再接受 `DATABASE_URL`、`ERP_MIGRATION_DATABASE_URL`、`POSTGRES_PASSWORD`、`ERP_ADMIN_PASSWORD`或`ERP_SETUP_TOKEN`值。数据库 host/port/name/user 是受合同约束的非秘密配置，独立文件只保存 password/token；消费者使用固定绝对目标、`O_NOFOLLOW`、regular/single-link、root owner、精确 group/mode、有限单值 UTF-8和打开前后 inode/metadata 一致性检查，错误不包含值、路径、DSN或角色清单。
+10. Compose 使用逐服务、只读、`create_host_path:false`的固定 bind file，而不把 Compose `secrets`误称为加密保险库。Web只挂Web DB password，Worker只挂Worker DB password，Migration只挂owner password，Admin只挂Admin DB password与管理员临时password，PostgreSQL只挂bootstrap password并用`POSTGRES_PASSWORD_FILE`；source path、target path和inode必须互异。受控部署不创建或挂载Setup Token。
+11. UAT/PRODUCTION关闭浏览器`/api/setup`，初始化只允许root调度的一次性Admin工具从独立文件读取临时密码并写审计；Setup Token不得进入浏览器或Web容器。Development/test的环境秘密兼容只允许显式非生产部署类别与隔离目标防护；UAT/PRODUCTION无fallback。Worker不再加载Setup Token，非秘密`RuntimeConfig`不再返回数据库连接串；Pool/secret初始化错误进入统一安全错误边界，日志只保留稳定code。
+12. Backup 升级为两个独立 root-only service file：控制身份只写 durable fence intent、核对固定目标、暂时撤销 Web/Worker/Admin/Migration CONNECT、终止非 allowlist backend并精确恢复原状态；非 superuser、非 owner的`chenyida_erp_backup`保留 CONNECT，只执行批准关系/sequence/large object SELECT、reconciliation、Migration SELECT和`pg_dump --no-owner --no-acl`。capture 无 DML/DDL/TEMP/`pg_signal_backend`/SET ROLE/BYPASSRLS。
+13. Backup control、restore/bootstrap和unauthorized probe是策略中的离线语义身份，不是常驻应用 privilege group。需要 superuser/ALTER DATABASE/terminate/CREATE TABLESPACE/CREATEROLE 的会话只能由UID0、root-only独立凭据、固定目标/命令和一次性授权窗口执行；其凭据不得挂入应用容器，完成后必须撤销并发布去敏回执。
+14. D-132 v1 policy、fixture、snapshot和摘要保持不可变、只作 legacy/synthetic 解析。新增 cluster/runtime policy v2表达完整角色图与逐对象 ACL；v1恢复结果保持 NOLOGIN/connlimit0且标记`LEGACY_TASK55_SINGLE_RUNTIME`，必须经独立批准的v2升级事务、正负探针和v2重捕获后才能激活，禁止把旧 runtime 自动映射成 Web+Worker或复用旧凭据。
+15. Compose仅声明未来 named volume `erp_postgres_tablespaces`，只读写挂载给PostgreSQL的`/var/lib/postgresql/tablespaces`；其他服务不得挂载。每个custom tablespace只能映射到该namespace下新空、999:999/0700、逐组件no-follow且与PGDATA/uploads/attachments/backup-status不重叠的子目录，CREATE只由离线operator执行。本任务不创建或chown当前Volume。
+16. 实际切换遵循扩展、回填、切换、收缩：先在隔离PG17证明角色/ACL和秘密消费者，受控环境再由专项授权创建角色/凭据及reconcile，逐服务验证后切换连接，最后才撤销共享superuser运行身份。任何一步失败都保持旧服务与数据不变并回滚到已核验凭据/ACL快照。
+
+### Consequences
+
+- Web/Worker 的数据库身份、凭据和无关业务域访问被分离；共享导入对象仍按必要操作授权，不能用本决策冒充行级职责分离。
+- 运行 Compose、runtime policy、release inventory、D-132恢复、backup fence和Migration ACL断言必须同时升级；只改应用连接串或只增 GRANT 都不能通过。
+- 旧 TASK55 bundle和TASK51候选在TASK56源码变化后为`STALE / NOT AUTHORIZABLE`。完成仓库与隔离测试仍不等于当前UAT已加固，真实角色/秘密/ACL、候选、部署和运行复核继续需要专项授权。
+- 当前系统继续`PRODUCTION NO-GO`；本决策没有生成真实密码、创建Volume、连接/修改数据库、运行Migration、备份恢复或部署。
+
+### Rejected alternatives
+
+- 拒绝继续让单一superuser承担Web、Worker、Migration、backup capture和owner，也拒绝把同一密码复制到不同文件后称为身份分离。
+- 拒绝修改已发布D-132 v1、允许额外角色来兼容v2、自动角色映射，或把legacy恢复结果直接激活。
+- 拒绝让Web/Worker获得owner、数据库/Schema CREATE、TEMP、通配全表DML、`pg_read_all_data`、危险membership、SET ROLE owner或未批准large object/routine权限。
+- 拒绝只把backup用户名改成普通角色却保留`CONNECTION LIMIT 0`，也拒绝让non-superuser capture承担ALTER DATABASE/terminate。
+- 拒绝把环境fallback、Compose渲染值、argv、日志、回执或浏览器当作秘密交付渠道，也拒绝把bind file或Compose secret描述为静态加密保险库。
+- 拒绝在本任务自动创建host secret目录、tablespace Volume/子目录、修改当前角色/ACL、升级UAT Migration或触发任何真实数据动作。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
