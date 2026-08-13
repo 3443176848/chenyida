@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`。严格起点为TASK54收口文档提交`812ec2f0a5c2710c73e7c0e3cbd207f977e6256b`/tree`f4cc747a63ad9979e85ca91e407b3854f56e5149`；范围仅为仓库和合成隔离环境中的PostgreSQL roles/memberships/settings、owner/ACL/default privileges、tablespace与凭据分离恢复合同。真实数据库、真实凭据、UAT/生产、host安装、数据恢复及WAL/PITR继续阻塞，系统保持`PRODUCTION NO-GO`。
+当前没有`DOING`。`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`已完成仓库与合成隔离集群恢复闭环并释放active slot；下一安全任务固定为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`，须以独立任务文档和启动提交切换为唯一`DOING`。真实数据库、真实凭据、UAT/生产、host安装、数据恢复及WAL/PITR继续阻塞，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -75,6 +75,8 @@
 
 2026-08-13第三十一次调度事件：主智能体从TASK54收口后的零`DOING`自动选择其明确排除的最高优先级恢复缺口，状态按`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 TODO → DOING`切换唯一active slot。只读核验确认backup/restore都使用`--no-owner --no-acl`且没有cluster globals；任务只实现allowlist快照、NOLOGIN骨架、秘密分离、owner/ACL/default privileges、显式tablespace map和新readiness证据，不连接或修改UAT/生产、真实数据、账号、host或受保护Volume。
 
+2026-08-13第三十二次调度事件：`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 DOING → DONE`。D-132下的catalog/策略、NOLOGIN骨架、owner/ACL/default privileges、root-only凭据重新绑定、custom tablespace显式映射、加密cluster capsule/joint transfer v2、readiness v4、Dashboard/监控和崩溃安全executor全部在合成双PostgreSQL cluster闭合。冻结源码`b93d838067f3a463f80de04811a11a1dbb5e1848`与manifest-only直接子提交`2136aa3c4178135a834b5a6e003e64948f78b5d3`形成49文件bundle，SHA-256为`699cdd2a55058a38152718a09036255373757191b83d143bd501f995e6d47dd6`；完整适用回归通过。未生成真实角色/凭据、真实恢复、源码匹配镜像、正式19步PASS或部署；active slot释放，下一安全任务为TASK56，系统继续`PRODUCTION NO-GO`。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -91,12 +93,13 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 | PostgreSQL集群安全状态与Tablespace恢复闭环 | DOING | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-OPS-RELEASE-GATE-42、D-115、D-131 | `READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / SYNTHETIC-ISOLATED ONLY / NO DATA ACTION / PRODUCTION NO-GO`。规范化恢复roles/memberships/settings、owners/ACL/default privileges与tablespace；登录秘密独立root-only重新绑定。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55.md)。 |
+| — | 当前无执行中任务；TASK56尚未正式启动 | — | — | — | — | TASK55收口后active slot为空；下一启动提交将建立唯一`DOING`。 |
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 | PostgreSQL集群安全状态与Tablespace恢复闭环 | DONE | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | 2026-08-13 | SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-OPS-RELEASE-GATE-42、D-115、D-131、D-132 | `DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL RECOVERY AND RUNTIME PRIVILEGE BLOCKED / PRODUCTION NO-GO`。严格cluster catalog/恢复、secret分离、custom tablespace、crash-safe executor、加密联合传输、V4 readiness及Dashboard/监控通过；源码`b93d838`与manifest-only `2136aa3`形成49文件bundle。真实异机/凭据/数据恢复、最小运行角色、源码匹配候选与正式门未执行。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55.md)及[D-132](DECISIONS.md#d-132-postgresql-集群安全恢复采用独立加密-capsule联合-transfer-v2-与-readiness-v4)。 |
 | SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54 | 异机备份加密与来源证明闭环 | DONE | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52、D-129、D-131 | `DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL OFFHOST BLOCKED / PRODUCTION NO-GO`。稳定内层V2，新增Ed25519/X25519/HKDF/AES-GCM外层、双向回执、恢复强绑定、UTC单飞、dry-run保留和V3 readiness；源码`fd0a9cff`与manifest-only `315b1f3d`形成47文件bundle。真实异机/密钥/timer/WORM/数据恢复未执行。见[任务文档](../tasks/SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54.md)及[D-131](DECISIONS.md#d-131-备份恢复保持内层-v2并以签名密文来源和-v3-就绪回执闭合)。 |
 | SELFHOST-RELEASE-GATE-LIFECYCLE-53 | 发布门禁生命周期闭环 | DONE | Codex主智能体（唯一写入、测试调度与集成）、应用测试/数据迁移/运维安全智能体（只读审计） | 2026-08-13 | 2026-08-13 | SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RUNTIME-HEALTH-TRUTH-45、SELFHOST-RELEASE-CANDIDATE-REFRESH-51、D-129、D-130 | `DONE / REPOSITORY AND ISOLATED VERIFIED / PRODUCTION NO-GO`。三阶段lifecycle v1、plan/report/manifest v2、独立postdeploy receipt与runtime identity v3已闭合；`08608eb1`与manifest-only `d246cbde`形成47文件bundle。适用干净快照全回归通过，旧TASK51候选/bundle失效；未安装host、生成正式证据或修改UAT/真实数据。见[任务文档](../tasks/SELFHOST-RELEASE-GATE-LIFECYCLE-53.md)及[D-130](DECISIONS.md#d-130-发布证据按部署前隔离候选和部署后三阶段闭合)。 |
 | SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52 | 外部资源与专项授权执行包 | DONE | Codex主智能体（唯一写入与集成）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来逐项专项授权） | 2026-08-13 | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-RELEASE-CANDIDATE-REFRESH-51、D-129 | `DONE / AUTHORIZATION CONTROL PLANE COMPLETE / REPOSITORY PREREQUISITES OPEN / PRODUCTION NO-GO`。A1—A8影响/依赖/验收/回退已固定；首次晋升gate自锁、外部锚点、监控host delivery、真实恢复/迁移/岗位/员工证据仍开放。下一安全任务为TASK53，未执行任何host/UAT/生产/真实数据动作。见[任务文档](../tasks/SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52.md)、[执行包](../self-hosting/production-authorization-packet.md)及[D-129](DECISIONS.md#d-129-投产外部动作采用逐项授权并先闭合首次晋升依赖环)。 |

@@ -1,6 +1,6 @@
 # SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 PostgreSQL 集群安全状态与 Tablespace 恢复闭环
 
-> 状态：`DOING / READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / SYNTHETIC-ISOLATED ONLY / NO DATA ACTION / PRODUCTION NO-GO`
+> 状态：`DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL RECOVERY AND RUNTIME PRIVILEGE BLOCKED / PRODUCTION NO-GO`
 > 日期：2026-08-13（Asia/Shanghai）
 > 严格起点：`main@812ec2f0a5c2710c73e7c0e3cbd207f977e6256b` / tree `f4cc747a63ad9979e85ca91e407b3854f56e5149`
 > 责任：Codex 主智能体为唯一写者、测试调度者和 Git 提交者；数据迁移、应用测试、运维安全智能体只读审计；项目负责人继续保留真实数据库/凭据、UAT/生产、host 安装、备份恢复、账号权限、文件系统和切换的专项授权权力
@@ -77,15 +77,15 @@
 - [x] 严格快照覆盖 allowlisted roles、memberships/options、四种role/database settings、数据库属性、owner、对象/列 ACL、default privileges、large object、extension/publication owner、parameter ACL门禁和tablespace owner/CREATE privilege；危险属性、非法内置引用、未知/重复/漂移及未支持对象类全部负测失败。
 - [x] 恢复角色骨架默认 NOLOGIN；root-only 合成凭据绑定、错误权限/symlink/hardlink/缺角色/重复秘密和输出泄漏负测通过，秘密/verifier 不进入制品或日志。
 - [x] 数据恢复后 owner/ACL/default privileges 与源一致；运行角色、迁移角色和未授权角色的正/负权限探针通过，未知 privilege escalation 为零。
-- [ ] `pg_default`与显式 custom tablespace map 通过；缺失/重复/非空/越界/PGDATA重叠/symlink/错误 owner-mode/崩溃负测不改变受信目标。
-- [ ] 非事务 cluster 步骤具备 durable intent、幂等续跑和精确补偿；各中断点不留下可登录半角色、错误 membership 或可用的半恢复数据库。
+- [x] `pg_default`与显式 custom tablespace map 通过；缺失/重复/非空/越界/PGDATA重叠/symlink/错误 owner-mode/崩溃负测不改变受信目标。
+- [x] 非事务 cluster 步骤具备 durable intent、幂等续跑和精确补偿；各中断点不留下可登录半角色、错误 membership 或可用的半恢复数据库。
 - [x] 单容器双 PostgreSQL cluster 合成恢复通过，包含角色、ACL/default privileges、custom tablespace、凭据重新绑定和最小权限运行连接；错误 snapshot/secret/map/target identity 不改变目标。
-- [ ] Dashboard/监控对旧 readiness 失败关闭并独立显示 cluster security、credential binding、tablespace 状态；浏览器不暴露角色清单、路径或秘密。
-- [ ] 既有 backup/offhost/readiness、Dashboard/monitor、release inventory/contract、typecheck/lint 不降级；新增测试进入正式 inventory，所有重型验证串行且最多一个临时容器。
-- [ ] 源码提交后重建 canonical manifest-only 直接子提交，TASK54 bundle 与全部旧候选标记`STALE / NOT AUTHORIZABLE`。
-- [ ] 不产生真实角色/凭据、真实 cluster receipt、host 安装、外部 push、UAT/生产/真实数据动作，不声称 WAL/PITR/HA/RPO/RTO 已完成。
-- [ ] 当前高权限共享角色、环境变量秘密、superuser operator与custom tablespace持久mount缺口形成明确后续P0；TASK55完成不解除这些实际运行面阻断。
-- [ ] 同步`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`和`PRODUCTION_READINESS.md`，通过凭据/JSON/Shell/Markdown/差异检查并创建独立 Git 提交。
+- [x] Dashboard/监控对旧 readiness 失败关闭并独立显示 cluster security、credential binding、tablespace 状态；浏览器不暴露角色清单、路径或秘密。
+- [x] 既有 backup/offhost/readiness、Dashboard/monitor、release inventory/contract、typecheck/lint 不降级；新增测试进入正式 inventory，所有重型验证串行且最多一个临时容器。
+- [x] 源码提交后重建 canonical manifest-only 直接子提交，TASK54 bundle 与全部旧候选标记`STALE / NOT AUTHORIZABLE`。
+- [x] 不产生真实角色/凭据、真实 cluster receipt、host 安装、外部 push、UAT/生产/真实数据动作，不声称 WAL/PITR/HA/RPO/RTO 已完成。
+- [x] 当前高权限共享角色、环境变量秘密、superuser operator与custom tablespace持久mount缺口形成明确后续P0；TASK55完成不解除这些实际运行面阻断。
+- [x] 同步`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`和`PRODUCTION_READINESS.md`，通过凭据/JSON/Shell/Markdown/差异检查并创建独立 Git 提交。
 
 ## 7. 启动登记验证
 
@@ -96,7 +96,7 @@
 
 ## 8. 当前判定
 
-`DOING / READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / SYNTHETIC-ISOLATED ONLY / PRODUCTION NO-GO`。TASK55只关闭仓库和合成隔离层的 PostgreSQL logical cluster security/tablespace 恢复缺口；真实目标、真实凭据、当前数据恢复、host 安装、WAL/PITR、RPO/RTO、UAT/生产与切换继续需要独立资源及专项明确授权。
+`DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL RECOVERY AND RUNTIME PRIVILEGE BLOCKED / PRODUCTION NO-GO`。TASK55只关闭仓库和合成隔离层的 PostgreSQL logical cluster security/tablespace 恢复缺口；真实目标、真实凭据、当前数据恢复、host 安装、WAL/PITR、RPO/RTO、UAT/生产与切换继续需要独立资源及专项明确授权。
 
 ## 9. 三线只读审计收敛
 
@@ -147,3 +147,29 @@
 - 合成测试在独立source key/outbox、receiver key/root和joint root中运行时生成Ed25519/X25519密钥，覆盖完整seal→receive→accept→verify→joint链、幂等重试与冲突、错误解密key、ciphertext篡改、extra file、stale evidence、data/cluster恢复点与签名篡改、公开制品无敏感目录；所有临时key、snapshot、ciphertext与目录均由fixture精确删除，未读取任何现有密钥、凭据、备份、数据库或受保护Volume。
 - 新传输专项3/3、原cluster恢复与传输组合12/12、包含稳定backup/offhost/Dashboard/release identity的完整备份恢复回归70/70通过；targeted ESLint零error/零warning。首次专项执行发现已解析Ed25519 public `KeyObject`被重复解析而拒绝，修复为仍严格校验KeyObject visibility/type/fingerprint后原样全过，没有降低断言。
 - 本批只关闭仓库和synthetic隔离层的cluster snapshot异机密文链及joint receipt子边界。尚未实现readiness v4、恢复机持久消费回执、Dashboard/monitor、release inventory、实际非事务executor或任何真实异机传输；因此旧V1—V3仍不得ready，系统继续`PRODUCTION NO-GO`。
+
+## 14. 第五批实现证据：Readiness V4、Dashboard 与监控
+
+- 新增`chenyida-erp-backup-verification/v4`恢复就绪合同。V4同时绑定稳定数据V2、签名密文data envelope、加密cluster capsule、joint transfer v2、恢复机消费回执、cluster security receipt、credential binding、tablespace receipt、当前runtime/database/Migration和操作策略；任一链缺失、过期、混代、摘要或身份漂移均失败关闭。V1—V3继续可解析但固定为legacy，所有`SYNTHETIC_TEST_ONLY`结果永远不能成为实际ready。
+- Dashboard只公开去敏的scope/status/time和cluster security、credential binding、tablespace三项状态，不返回角色、对象、路径、口令、verifier或连接串。监控策略新增对应独立告警与恢复事件；旧readiness、缺消费回执或任一cluster子证据均保持CRITICAL，不以数据恢复成功掩盖安全状态缺失。
+- V4与Dashboard/monitor专项、旧readiness兼容和泄漏负测通过；仓库未生成任何真实V4回执，也未将当前UAT标记ready。
+
+## 15. 第六批实现证据：崩溃安全 Executor、Reconciliation 与补偿
+
+- 新增实际`postgresql-cluster-recovery-executor.mjs`，把content-addressed restore plan与durable hash-chain state联成受控执行器。每个非事务命令在派发前持久化意图与命令指纹，响应成功或丢失后都从目标catalog重新核对；相同输入可幂等续跑，不同输入、越序、catalog漂移或伪造状态拒绝。
+- tablespace/database创建、数据恢复、安全状态应用、凭据绑定、激活、quarantine和精确补偿分别有固定阶段。中断或不确定结果不会开放数据库：登录角色保持`NOLOGIN`、目标数据库保持`CONNECTION LIMIT 0`；只删除能够由本次intent、catalog身份和映射共同证明属于本任务的合成目标，未知对象不猜测清理。
+- 故障注入覆盖命令前后、响应丢失、重复执行、状态损坏、目标身份变化、补偿中断和重新激活。单容器双PostgreSQL 17最终同时通过logical backup/restore与cluster security/tablespace恢复，输出`distinct-cluster PostgreSQL backup/restore integration passed`和`single-container dual-cluster PostgreSQL security recovery passed`。
+
+## 16. 发布库存、可信执行与内容寻址证据
+
+- 正式test inventory更新为`239 total / 215 required / 24 not applicable`：`PURE_NODE 113`、`POSTGRES 83`、`BROWSER 6`、`SPECIAL_POSIX 7`、`RELEASE_CONTRACT 6`、`POSTGRES_ALIAS 2`、`HISTORICAL 22`。cluster恢复测试进入SPECIAL POSIX及联合PostgreSQL恢复门，不再是仓库外专项证据。
+- 联合恢复wrapper不再从候选archive执行可被候选修改的shell fixture；两份恢复fixture被纳入Supervisor bundle并从只读`/supervisor-tests`执行。备份guard轮询改为从`postgres`数据库读取`pg_db_role_setting`和连接限制，避免为观察只读设置而连接目标数据库、与零连接fence形成竞态；后台进程提前退出会立即报告真实状态。
+- `package-lock.json`依赖身份漂移被精确刷新；没有删除依赖、跳过测试或降低断言。源码冻结提交为`b93d838067f3a463f80de04811a11a1dbb5e1848`/tree`269165d4fe054915fe3de77be0eee49ad38b8049`。其直接子提交`2136aa3c4178135a834b5a6e003e64948f78b5d3`/tree`c5b78dabe9ec2bea60c84b7109b5a4c11b35bfea`只修改canonical manifest；bundle含49文件，manifest SHA-256为`699cdd2a55058a38152718a09036255373757191b83d143bd501f995e6d47dd6`。TASK54 bundle、TASK51镜像/诊断和全部更早候选均为`STALE / NOT AUTHORIZABLE`。
+
+## 17. 最终验证、资源与剩余阻断
+
+- 精确源码提交`b93d838`通过：release inventory 6文件/51项及直接合同48/48、Supervisor Python31/31、Vinext build+Node 113文件/965项、PostgreSQL 83文件/396项、Browser 6文件/11项、SPECIAL POSIX 7文件/57项、TypeScript 38/38、release Migration PostgreSQL、联合backup/cluster recovery、Python self-test/smoke/go-live、Compose 6服务策略、六服务隔离runtime、凭据扫描1617文件及`git diff --check`。ESLint为0 error/17条既有warning。
+- manifest-only最终HEAD`2136aa3`又复跑release 51+48、Supervisor31和凭据1617文件并通过。Compose独立调用首次因缺候选镜像身份按合同失败关闭；config-only确定性摘要验证通过。runtime实测使用本机已缓存的TASK51历史镜像只验证六服务内核策略，明确不作为`b93d838`源码匹配镜像或正式发布证据。
+- 起点available约1.9GiB、Swap541MiB、根盘16GiB、Load低于1；最终检查available约2.0GiB、Swap632MiB、根盘16GiB、Load`0.08/0.43/0.92`、内核`oom_kill=0`，未达到资源停止线。四个常驻服务restart0/OOM false；任务临时容器、数据库、网络、Volume和host临时文件均清零，四个受保护Volume未读取正文、未删除或修改。
+- 本任务没有生成与`b93d838`匹配的Web/Worker镜像、正式SBOM/漏洞证据、installed Supervisor或19步正式PASS；没有真实异机、真实密钥/凭据、当前数据恢复、custom tablespace持久mount、host调度/告警、UAT Migration/deploy、岗位验收、员工试用或切换。当前Compose仍以共享初始化superuser和环境变量传递数据库/管理员秘密，backup/restore operator仍依赖superuser，Web/Worker尚未使用独立最小runtime role。
+- 下一项最高优先级、无需生产授权的安全任务是独立关闭未来Compose/PostgreSQL最小运行角色、secret-file delivery、受控operator与custom tablespace持久mount仓库合同；真实目标、真实数据和host/UAT动作继续按A1—A8专项授权执行。

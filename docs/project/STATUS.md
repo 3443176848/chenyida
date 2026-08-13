@@ -2,19 +2,26 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
-## SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55（执行中；仓库与合成隔离集群恢复）
+## SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55（完成；仓库与合成隔离集群恢复，真实恢复仍阻塞）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / SYNTHETIC-ISOLATED ONLY / PRODUCTION NO-GO | TASK55为唯一active slot；主智能体唯一写入，三条智能体线只读审计 |
+| 最终状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL RECOVERY AND RUNTIME PRIVILEGE BLOCKED / PRODUCTION NO-GO | TASK55已释放active slot；主智能体唯一写入，三条智能体线完成只读审计 |
 | 严格起点 | PASS / CONTROLLED | `main@812ec2f0a5c2710c73e7c0e3cbd207f977e6256b`、tree`f4cc747a63ad9979e85ca91e407b3854f56e5149`；未跟踪状态报告不读不改不提交 |
-| 精确缺口 | CONFIRMED / FAIL CLOSED | backup为`pg_dump --no-owner --no-acl`且没有cluster globals，restore为`pg_restore --no-owner --no-acl`；当前链不恢复roles/memberships/settings、owner/ACL/default privileges或custom tablespace |
-| 目标合同 | IN PROGRESS | 版本化规范快照、严格allowlist、NOLOGIN骨架、owner/ACL/default privileges应用与验证、不可变cluster receipt及当前readiness升级 |
-| 秘密边界 | SYNTHETIC ROOT-ONLY ONLY | 登录密码只允许由独立root-only合成输入重新绑定，不读取`pg_authid.rolpassword`，秘密/verifier不进入Git、manifest、回执、argv、环境或输出 |
-| Tablespace边界 | EXPLICIT MAP / FAIL CLOSED | custom tablespace必须一对一映射至已批准的新空no-follow路径；缺失、重复、重叠、symlink、非空或目标身份漂移均拒绝 |
-| 运行面 | VERIFIED READ ONLY / UNCHANGED | 起点available约1.9GiB、Swap541MiB、根盘16GiB、Load低于1；四服务restart0/OOM false，PostgreSQL/Web healthy，Worker/Caddy health none |
-| 外部边界 | NOT AUTHORIZED / NOT EXECUTED | 不连接UAT/生产或真实数据库，不创建真实角色/凭据，不读取备份/四卷正文，不安装host、不build/deploy、不执行真实恢复或外传 |
-| 系统是否可用 | NO | 正式异机恢复、当前候选/门、监控投递、UAT对齐、真实迁移、岗位/员工验收和切换仍未完成 |
+| D-132/catalog | PASS / FAIL CLOSED | 关系化捕获roles、memberships/options、settings、数据库/Schema/对象/列/routine/type/large object ACL、default privileges、extension/publication和tablespace；危险/未知/重复/漂移及unsupported对象拒绝 |
+| 恢复与秘密 | PASS / SYNTHETIC ROOT-ONLY | NOLOGIN/PASSWORD NULL骨架、owner/ACL/default privileges、root-only文件/FD/stdin凭据重新绑定、正负权限探针与原子激活通过；未读`pg_authid`或真实秘密 |
+| Tablespace | PASS / SYNTHETIC NAMESPACE | `pg_default`固定语义与custom exact-map、空目录/no-follow/owner-mode/dev-ino/location核对通过；缺失、重复、越界、重叠、symlink、非空及身份漂移均拒绝。实际Compose持久mount仍缺失 |
+| 崩溃恢复 | PASS / DURABLE EXECUTOR | intent→dispatch→reconcile→verify hash-chain、响应丢失、幂等续跑、quarantine与精确补偿通过；不确定状态保持NOLOGIN和数据库limit0 |
+| 加密联合传输 | PASS / SYNTHETIC ONLY | Ed25519+X25519/HKDF/AES-GCM cluster capsule、receiver/source ACK和joint transfer v2通过篡改/错key/重放/冲突/过期负测；没有真实异机或密钥 |
+| Readiness/Dashboard/监控 | PASS / FAIL CLOSED | V4同时要求data与cluster链、恢复机消费、security/credential/tablespace回执及当前身份；旧V1—V3和synthetic永不ready，浏览器只得到去敏状态，监控独立告警/恢复 |
+| Git/bundle | PASS / CONTENT ADDRESSED | 源码`b93d838067f3a463f80de04811a11a1dbb5e1848`/tree`269165d4…8049`；manifest-only直接子提交`2136aa3c4178135a834b5a6e003e64948f78b5d3`/tree`c5b78dab…bfea`，49文件manifest SHA-256`699cdd2a…7dd6` |
+| 自动验证 | PASS / FULL APPLICABLE REGRESSION | release51+48、Supervisor31、Node113/965、PostgreSQL83/396、Browser6/11、POSIX7/57、typecheck38/38、Migration、联合双cluster恢复、Python三基线、Compose/runtime、credentials1617和diff通过；lint0 error/17既有warning |
+| 诚实失败记录 | RESOLVED / ASSERTIONS PRESERVED | 修正真实PG17 temp/catalog/ACL/restore细节、依赖锁身份、恢复fixture信任边界及backup guard观察连接竞态；未跳过、降低断言或写死结果。Compose缺镜像身份与虚构镜像inspect均按合同失败关闭 |
+| 候选/正式门 | STALE / NOT AUTHORIZABLE | TASK54 bundle、TASK51镜像/诊断和全部旧候选均过期；没有`b93d838`源码匹配镜像、正式SBOM/漏洞证据、installed Supervisor或19步PASS |
+| 资源/清理 | PASS / BELOW STOP LINES | 起点/最终检查available约1.9/2.0GiB、Swap541/632MiB、根盘16/16GiB、Load`0.08/0.43/0.92`、内核`oom_kill=0`；四服务restart0/OOM false，任务容器/库/网络/Volume/临时文件清零 |
+| 运行P0 | OPEN / NEXT REPOSITORY TASK | 当前Compose仍共享初始化superuser、环境变量数据库/管理员秘密、superuser backup/restore operator且无custom tablespace持久mount；下一安全任务为TASK56 |
+| 外部边界 | BLOCKED / NOT AUTHORIZED | 无真实异机、真实凭据/数据恢复、host安装/调度/告警、UAT Migration/deploy、岗位/员工试用、WAL/PITR/RPO/RTO或切换 |
+| 系统是否可用 | NO | 正式异机恢复、同源码候选门、最小数据库权限、监控投递、UAT对齐、真实迁移、岗位/员工验收和切换仍未完成 |
 
 ## SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54（完成；仓库与合成隔离密文链，真实异机仍阻塞）
 
