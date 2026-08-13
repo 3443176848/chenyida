@@ -33,7 +33,7 @@ docker compose -f compose.yml --profile tools run --rm admin
 
 开发默认只把 Web 绑定到 `127.0.0.1:3000`。直接 Node 开发需要 Node >=22.13、可用 PostgreSQL、`npm ci`、`npm run db:migrate`、`npm run dev`；Worker 另开终端运行 `npm run worker`。
 
-生产不得使用本页的本地`--build`或直接`up`命令。必须先取得同一Git/tree、alpha.46或后续版本、Web/Worker registry digest、完整Migration allowlist、镜像SBOM/漏洞证据和18步gate PASS形成的`ELIGIBLE`manifest，再按[发布门](../testing/selfhost-release-gate.md)、[Migration说明](postgresql-migration.md)和[运维基线](operations-runbook.md)取得分别的build、Migration、部署和runtime identity专项授权。真实执行同时加载`compose.yml`与`compose.release.yml`，只接受已核验digest且`--pull never`。
+生产不得使用本页的本地`--build`或直接`up`命令。必须先取得同一Git/tree、alpha.46或后续版本、Web/Worker registry digest、完整Migration allowlist、镜像SBOM/漏洞证据和当前19步gate PASS形成的`ELIGIBLE`manifest，再按[发布门](../testing/selfhost-release-gate.md)、[Migration说明](postgresql-migration.md)和[运维基线](operations-runbook.md)取得分别的build、Migration、部署和runtime identity专项授权。真实执行同时加载`compose.yml`与`compose.release.yml`，只接受已核验digest且`--pull never`。
 
 Caddy持久化证书数据。只开放经批准的HTTP/HTTPS入口，不要暴露PostgreSQL。alpha.46候选的`web`和`worker`使用数值非root身份`65532:65532`，容器日志轮转、`unless-stopped`、Web/Worker健康检查和30秒Worker停机窗口已配置。0045部署编排必须等待旧Worker停止或租约过期，禁止手工改租约绕过排他。
 

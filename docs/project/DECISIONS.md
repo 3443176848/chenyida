@@ -2171,6 +2171,48 @@
 - 拒绝仅检查tag/本地短ID、接受任意`RepoDigests`成员，或在manifest/config不一致时继续启动六服务。
 - 拒绝修改既有构建回执来迎合探针；身份来源必须保持构建时不可变，错误应在消费端修正并重新构建、重验。
 
+## D-129 投产外部动作采用逐项授权并先闭合首次晋升依赖环
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / AUTHORIZATION CONTROL PLANE DOCUMENTED / REPOSITORY PREREQUISITES OPEN / NO EXTERNAL ACTION AUTHORIZED`
+- 提案与实施：Codex 持续交付负责人，依据 TASK52 数据迁移、应用测试、运维安全三线只读审计及主智能体对supervisor、release gate、manifest、备份恢复、监控和权限源码的复核
+- 确认边界：只记录授权依赖、影响、停止、验收和回滚控制面并修正当前文档漂移；不创建可消费授权/nonce，不安装host组件、不push、不连接或修改UAT/生产/真实数据/账号/网络
+
+### Context
+
+- TASK51形成了本机候选和零发现诊断，但installed supervisor不存在。若只笼统请求“安装并跑门”，项目负责人无法分辨host文件变化、正式证据、外部push、UAT部署和真实数据动作的不同影响。
+- installer在读取授权前要求install authorization根与`pending`已由root建立为`0700`；安装本身又会创建content-addressed bundle/launcher、receipt/journal和release authorization根。首次安装没有previous launcher，物理卸载不能被冒充为自动回滚。
+- 正式gate runner当前在19步前要求现行Worker `healthy`，而alpha.42 UAT实际health为`none`；因此A1成功后直接A2也会以`GATE_REQUIRED_RUNTIME_UNHEALTHY`阻断。候选隔离runtime已经能够强制新Worker health，legacy运行面保护和候选要求不应形成首次晋升自锁。
+- 正式image evidence及manifest绑定完整registry digest reference。TASK51删除后的loopback registry引用只在当前engine可解析；先以该引用签发manifest、后推相同digest到私有registry不能改变既有证据绑定，必须重新签发。
+- V2备份在部署前提供回滚恢复点，但部署后runtime/Migration身份变化会使旧回执不再证明当前运行面可恢复；监控同样需要先具备真实投递能力，再在部署和新恢复回执后取得绿色窗口。
+- 数据物化仍绑定0017基线而候选为0045；11角色权限存在服务端事实但没有业务负责人批准。把数据、权限、跨岗写和员工试用合在一次授权会扩大权限并掩盖未决项。
+
+### Decision
+
+1. 采用[投产专项授权执行包](../self-hosting/production-authorization-packet.md)为唯一当前授权控制面。任何文档中的“需要授权”必须映射到`A1`—`A8`及其子检查点；计划、代码存在或上游PASS不得自动批准下游。
+2. A1只安装固定source/manifest/bundle/installer/launcher。root可在安装前bootstrap install authorization根和`pending`两个`0700`目录并放置短时`0400`canonical授权；其余bundle、launcher、receipt、journal及consumed根必须由固定installer管理。回退首先停止签发后续授权，物理清理或切换另行批准。
+3. 首次正式发布链固定为：先修release gate legacy runtime自锁；A1安装supervisor；A3把同一候选源码/镜像锚定到批准的私有Git/registry；A2只用外部完整digest引用生成正式evidence、19步gate和UAT-class manifest。loopback引用不得形成可部署manifest。
+4. A4拆成三故障域设计、本机四域备份、加密异机传输、第三域恢复及部署后同身份/常态重验。真实数据读取、外传和第三位置写入分别批准；cluster roles/ACL/tablespace另有合同前不得宣称完整集群可恢复。
+5. A5拆成旧UAT上的安装/真实投递能力和A6/A4e后的当前身份绿色窗口。旧运行面CRITICAL可以证明告警诚实送达；不能为了先变绿而隐藏Worker、release或backup缺口。
+6. A6只在正式候选、升级前真实恢复回执和告警交付能力存在时执行技术晋升；部署后必须再做A4e/A5b。跨岗业务写不包含在技术部署授权内。
+7. A7拆为当前源只读盘点、业务处置、隔离试迁移、岗位矩阵批准、跨岗UAT写和员工试运行。0017→当前head合成升级合同及岗位批准分别是试迁移/真实账号的前置；不得用一次“同意A7”扩权。
+8. 在仍有安全仓库任务时继续自动推进，不提前索取注定失败或会绑定错误身份的外部授权。每次实现改变`chenyida_erp_site`候选输入后，旧候选、扫描和manifest状态必须诚实标为stale并重建。
+
+### Consequences
+
+- 当前不向项目负责人请求A1/A2；先立独立仓库任务修复首次晋升gate自锁并生成新bundle。新bundle重新核验后，A1仍可作为独立host安装授权，且不会自动运行四个supervisor动作。
+- A3必须提供私有目标和root-only短时凭据；其成功只证明恢复锚点，不代表候选已通过正式门。A4a的非秘密三故障域/RPO/RTO/责任决策也可提前准备。
+- 真实备份要至少执行升级前和部署后两个身份阶段；监控也至少有投递能力和当前身份绿色两个阶段。这增加操作次数，但避免旧证据冒充当前可恢复/可观测。
+- 系统在A2、A4、A5、A6、A7和A8证据完成前继续`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝把持续交付总授权解释为host安装、真实数据、UAT部署、账号或切换授权，也拒绝一次“全部同意”跨越多个故障域。
+- 拒绝在现行Worker health不满足时消耗A2授权只为生成预知BLOCKED报告，或简单删除运行面保护而不增加legacy稳定与候选health负向合同。
+- 拒绝先用loopback引用生成`ELIGIBLE`再把digest推到外部registry，或手改既有evidence/manifest引用。
+- 拒绝复用升级前备份回执作为部署后current identity恢复证据，或把pending/stdout当作真实告警已送达。
+- 拒绝将数据盘点、冲突处置、试迁移、权限批准、账号创建和员工业务写合并授权。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

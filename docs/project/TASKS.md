@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52`是当前唯一`DOING`：只读核验host supervisor、异机备份、监控、UAT晋升、数据/权限/试运行和切换边界，并编制逐项最小、可回滚的外部资源与专项授权执行包。不得创建真实授权文件、安装host组件、连接UAT/生产或读取真实数据；系统继续`PRODUCTION NO-GO`。
+当前零`DOING`：`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52`已完成并释放active slot；持续交付负责人将紧接着以独立启动提交切换到`SELFHOST-RELEASE-GATE-LIFECYCLE-53`。该瞬时零槽不表示暂停，也不授权host、UAT、生产或真实数据动作；系统继续`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -63,6 +63,8 @@
 
 2026-08-13第二十五次调度事件：主智能体从TASK51收口后的零`DOING`自动选择外部边界消歧任务，状态按`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52 TODO → DOING`切换唯一active slot。三条智能体线仅做数据迁移、应用测试、运维安全只读审计；主智能体编制`A1`—`A8`逐项授权、影响、验收、停止和回滚执行包。任务不创建可消费授权、不安装host组件、不连接或修改UAT/生产、账号、网络、四卷或真实数据。
 
+2026-08-13第二十六次调度事件：`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52 DOING → DONE`。D-129与[投产专项授权执行包](../self-hosting/production-authorization-packet.md)把A1—A8及真实数据/外传/host/UAT/账号/员工/切换动作拆成独立检查点；三线和主智能体复核又发现现行Worker health none会让正式gate在19步前自锁、loopback完整引用不可异机恢复、监控host delivery及0017→当前head升级证据仍缺失。当前不索取注定失败的A1/A2，active slot先释放，下一安全任务固定为`SELFHOST-RELEASE-GATE-LIFECYCLE-53`。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -79,12 +81,13 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52 | 外部资源与专项授权执行包 | DOING | Codex主智能体（唯一写入与集成）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来逐项专项授权） | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-RELEASE-CANDIDATE-REFRESH-51 | 只读固定`A1`—`A8`授权梯级；不执行任何host/UAT/生产/真实数据动作。见[任务文档](../tasks/SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52.md)。 |
+| （无） | TASK52收口与TASK53启动提交之间的瞬时零槽 | — | — | — | — | 下一项已固定，不等待项目负责人重复发送“继续”。 |
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52 | 外部资源与专项授权执行包 | DONE | Codex主智能体（唯一写入与集成）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来逐项专项授权） | 2026-08-13 | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-RELEASE-CANDIDATE-REFRESH-51、D-129 | `DONE / AUTHORIZATION CONTROL PLANE COMPLETE / REPOSITORY PREREQUISITES OPEN / PRODUCTION NO-GO`。A1—A8影响/依赖/验收/回退已固定；首次晋升gate自锁、外部锚点、监控host delivery、真实恢复/迁移/岗位/员工证据仍开放。下一安全任务为TASK53，未执行任何host/UAT/生产/真实数据动作。见[任务文档](../tasks/SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52.md)、[执行包](../self-hosting/production-authorization-packet.md)及[D-129](DECISIONS.md#d-129-投产外部动作采用逐项授权并先闭合首次晋升依赖环)。 |
 | SELFHOST-RELEASE-CANDIDATE-REFRESH-51 | 当前精确候选重建与发布门复核 | DONE | Codex主智能体（唯一写入、构建/扫描串行、证据与提交）、既有数据迁移/应用测试/运维安全只读审计输入、项目负责人（未来host supervisor/UAT/生产专项授权） | 2026-08-13 | 2026-08-13 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50、D-128 | `DONE / CURRENT EXACT LOCAL CANDIDATE BUILT / ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / PRODUCTION NO-GO`。修复`12beccf0`与manifest-only `8084d6c3`形成44文件bundle；最终Web/Worker当前候选六服务runtime及零发现诊断通过，正式证据/19步门因host supervisor未安装在写入前失败关闭，UAT未变。见[任务文档](../tasks/SELFHOST-RELEASE-CANDIDATE-REFRESH-51.md)及[D-128](DECISIONS.md#d-128-docker-29运行探针必须分别闭合manifest引用与oci-config身份)。 |
 | SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50 | 容器运行时最小权限加固 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来UAT/生产/网络/host专项授权） | 2026-08-13 | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48、SELFHOST-OPS-MONITORING-ALERTING-49、D-127 | `DONE / REPOSITORY AND ISOLATED VERIFIED / RUNTIME NOT DEPLOYED / PRODUCTION NO-GO`。六服务严格策略、Compose加固、负向合同及一次一个隔离容器验证通过；实现`375869f`与manifest-only `f119c8f`形成44文件bundle，SHA-256为`ab6b708e…8cbe`。现行UAT未改变。见[任务文档](../tasks/SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50.md)及[D-127](DECISIONS.md#d-127-容器运行合同采用完整服务集合精确写路径和内核态最小权限复核)。 |
 | SELFHOST-OPS-MONITORING-ALERTING-49 | 运行监控、告警与排障证据闭环 | DONE | Codex主智能体（唯一写入、实现、串行测试、文档和提交）、数据迁移/应用测试/运维安全智能体（只读审计）、项目负责人（未来host安装、真实渠道/值班人、UAT/生产专项授权） | 2026-08-13 | 2026-08-13 | SELFHOST-PRODUCTION-READINESS-40、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RUNTIME-HEALTH-TRUTH-45、SELFHOST-RELEASE-CANDIDATE-EVIDENCE-48、D-126 | `DONE / REPOSITORY MONITORING CONTRACT VERIFIED / HOST DELIVERY NOT CONFIGURED / PRODUCTION NO-GO`。严格快照、单一阈值、去敏采集、FIRING/REMINDER/ESCALATED/RECOVERED、原子hash-chain状态及pending delivery落地；最终Node113/964、PG83/396、typecheck38/38和适用发布门通过。未安装host服务或发送真实告警。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-ALERTING-49.md)及[D-126](DECISIONS.md#d-126-运行监控采用最小去敏快照单调原子状态和失败关闭告警交付)。 |

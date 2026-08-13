@@ -4,12 +4,17 @@
 
 ## 2026-08-13
 
-### SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52 - `docs: start external authorization readiness`
+### SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52 - `docs: start external authorization readiness` / `docs: close external authorization readiness`
 
 - 调度/范围：TASK51闭环提交`cbc219490fd88eda4edb6f0e54ad0ba933438ab4`/tree`216e08ee176406d5df01c6976f74c826a6cab5de`后的零`DOING`自动切换为TASK52唯一active task。三条智能体线只读审计，主智能体保持唯一写者。
 - 起点事实：当前bundle/installer/launcher摘要分别为`f4481316…5ce6`/`f7ace184…ba0`/`3e72a81d…c4e0`；`/usr/local` installed supervisor及install/release authorization、receipt、journal根全部不存在，正式证据和19步门继续失败关闭。
 - 目标：把host supervisor、正式门、外部镜像/源码锚点、异机备份恢复、监控投递、UAT晋升、数据/岗位/员工试运行和正式切换拆成`A1`—`A8`逐项最小授权，明确影响、前置、停止、验收、失败和回滚边界。
 - 边界：只改`docs/`控制面，不创建可消费授权或nonce，不读取凭据/环境/日志/卷/备份/业务数据，不安装host组件、不push、不连接或修改UAT/生产/账号/网络/四卷，不运行重任务。系统继续`PRODUCTION NO-GO`。
+- 三线审计：应用线对齐当前236/212/24、Pure Node113和19步机器合同，并确认11角色尚无业务批准矩阵；数据线确认四域V2仅为合成/隔离证据、logical dump排除cluster roles/ACL/tablespace且历史物化停在0017；运维线发现旧Worker health none会让正式gate在19步前自锁，完整loopback镜像引用不能作外部锚点，监控也缺host delivery与真实通知/ack。
+- 控制面：D-129与[投产专项授权执行包](../self-hosting/production-authorization-packet.md)把A1—A8拆到host安装、外部源码/镜像、三份正式门动作、四域五阶段备份恢复、监控投递/绿色窗口、UAT技术晋升、数据/岗位/跨岗/员工及正式切换。每步都固定影响、排除、root-only输入、停止线、验收和回退；A6还区分Web/Worker晋升与PostgreSQL/Caddy/`chenyida-erp.service`显式动作。
+- 调度结论：当前TASK51摘要只保留审计快照；TASK53会修改候选输入，A1必须等待新bundle，A3必须先于A2的完整外部digest引用。当前不索取会注定失败或绑定旧身份的授权，下一安全任务固定为`SELFHOST-RELEASE-GATE-LIFECYCLE-53`。
+- 验证/资源：Markdown389文件/222本地链接、JSON211、断网只读容器credentials1,591及`git diff --check`通过；范围仅docs。收口available约2.0GiB、Swap724MiB/1GiB、根盘16GiB、Load低于1、内核OOM0；四服务restart0/OOM false、受保护Volume集合不变，临时扫描容器/清单清零。
+- 结论：`DONE / AUTHORIZATION CONTROL PLANE COMPLETE / REPOSITORY PREREQUISITES OPEN / PRODUCTION NO-GO`。没有安装host组件、创建可消费授权、连接或修改UAT/生产、读取真实数据、外传、账号或切换动作。
 
 ### SELFHOST-RELEASE-CANDIDATE-REFRESH-51 - `docs: start current candidate refresh` / `fix: separate candidate manifest and config identity` / `build: bind candidate identity supervisor bundle` / `docs: close current candidate refresh`
 

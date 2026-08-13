@@ -12,14 +12,14 @@
 
 ## 已跟踪入口
 
-- 计划：`release/release-gate-plan-v1.json`，18项全部为`REQUIRED`。
+- 计划：`release/release-gate-plan-v1.json`，19项全部为`REQUIRED`。
 - 测试运行策略：`release/test-runtime-policy-v1.json`；Node/PostgreSQL引用、Docker RepoDigest、config digest、平台、依赖树和 Python runtime 分别固定。
 - 漏洞策略：`release/vulnerability-policy-v1.json`，固定 Trivy `0.70.0`及其镜像引用，Web/Worker全部严重级别零已知漏洞。
 - 快速合同：`npm test` / `npm run test:release:contracts`。
 - 安装器合同：`npm run test:release:supervisor-python`。
 - 完整候选门：`npm run test:release`，但只能由已安装 supervisor 调用。
 - Migration隔离测试：`npm run test:release:migration-postgres`。
-- Node源码门：`npm run test:release:node-source`，先 build，再按冻结清单串行运行112个纯Node测试文件；数据库、浏览器和专用POSIX文件由各自独立门负责。
+- Node源码门：`npm run test:release:node-source`，先 build，再按当前冻结清单串行运行113个纯Node测试文件；数据库、浏览器和专用POSIX文件由各自独立门负责。数量变化必须来自机器inventory更新，不能手改清单结果。
 - PostgreSQL清单门：`npm run test:release:postgres-regression`，在一个断网、只读、资源受限的PostgreSQL容器内，按冻结清单串行执行83个文件并为每个文件创建/销毁隔离数据库。
 - POSIX专用门：`npm run test:release:special-posix`，使用内容寻址的完整Node/Python/Git镜像，在只读同路径快照和有界tmpfs内串行执行4个文件。
 - Browser门：`npm run test:release:browser-e2e`调用固定执行器；D-121将官方Playwright 1.51.1/Chromium 134镜像、Chromium可执行SHA、PostgreSQL 17 rootfs、6文件清单、历史Migration模板、loopback端口和确认变量全部内容寻址。Git archive源码只读、构建/运行断网、同一时刻一个Browser容器，6文件/11项、无skip/todo及清理均失败关闭。
@@ -48,7 +48,7 @@ Supervisor bundle manifest 必须引用一个已经提交且不再修改的 sour
 1. 从 clean、已提交的精确 Git SHA 串行构建不同的 Web 与 Worker 镜像，并得到 registry manifest digest reference、Docker image config digest、平台和 OCI/baked version/revision；禁止用浮动 tag 作为身份。D-123要求Dockerfile frontend与build base内容寻址，D-124分离manifest/config语义，D-125进一步固定Wolfi runtime base与精确Node APK；依赖安装按lockfile访问公共npm、应用build断网，并生成`candidate-build-provenance/v3`。该回执必须诚实标记本机/无外部锚点/无可复现attestation局限。
 2. 准备固定 Trivy `0.70.0`镜像和不超过72小时的本地漏洞库。证据生产器先强制读取同run/candidate/image reference的root-owned构建回执，再使用`docker image save`后的离线archive，断网、无Docker socket、`--pull=never`运行Trivy，为Web/Worker分别生成原生JSON和CycloneDX；不得使用源码lockfile清单冒充镜像SBOM。D-125要求原生报告恰有`os-pkgs/wolfi`与`lang-pkgs/node-pkg`双包清单，CycloneDX要求唯一`wolfi 20230201`OS及`pkg:apk/wolfi`+`pkg:npm`覆盖，Debian/未知生态/缺包失败关闭。每个镜像两次扫描后立即删除临时archive。
 3. 在仓库外创建唯一候选制品根；由项目负责人生成 root-owned、canonical、`0400`、24小时内有效且一次性的`CREATE_IMAGE_EVIDENCE`授权，调用已安装 launcher。完成后核对 producer/bundle/authorization摘要和全部原始证据摘要。
-4. 生成新的`RUN_RELEASE_GATE`授权并调用 launcher。18步依次覆盖 release 合同、supervisor Python合同、凭证扫描、build+全部Node测试、83文件PostgreSQL回归、Browser E2E、POSIX专用测试、全部tsconfig、ESLint、隔离Migration、备份恢复、Python三基线、Compose config、`git diff --check`、镜像SBOM和漏洞证据。
+4. 生成新的`RUN_RELEASE_GATE`授权并调用 launcher。19步依次覆盖 release 合同、supervisor Python合同、凭证扫描、build+全部Node测试、83文件PostgreSQL回归、Browser E2E、POSIX专用测试、全部tsconfig、ESLint、隔离Migration、备份恢复、Python三基线、Compose config、`git diff --check`、镜像SBOM/漏洞证据和六服务container runtime policy。
 5. 只有 gate report 为`PASS`且所有证据仍新鲜，才生成`CREATE_RELEASE_MANIFEST`授权。manifest同时绑定同一 commit/tree、镜像、Migration、plan/report、SBOM/security和允许的 deployment class。
 6. 独立复核 manifest SHA、有效期和`promotion_status=ELIGIBLE`。UAT Migration/deploy、runtime identity发布、登录式验收和正式晋升仍分别需要新的专项授权；gate通过不会修改运行面。
 
@@ -64,9 +64,9 @@ Supervisor bundle manifest 必须引用一个已经提交且不再修改的 sour
 
 ## 当前事实与未验证范围
 
-- TASK42候选快照曾通过完整Node 107文件/886、PostgreSQL 80文件/367、POSIX 4文件/29等仓库门。TASK43/TASK44依次把inventory扩展为230/206/24和232/208/24；TASK45现扩展为235/211/24（Pure Node112、PostgreSQL83、Browser6、历史22、PG alias2、release contract6、special4），增加完整Migration/Worker租约/双卷/readiness合同。TASK45已通过定向42/42、隔离PG5/5、官方Migration harness、release44/44及supervisor15/15；完整112文件Node-source、83文件PostgreSQL和18步正式候选门仍须由已提交候选和受控supervisor执行。
-- TASK46已按D-120把根运行合同对齐为Node 22/ES2022，固定精确38配置集合/摘要双重核验并修复真实类型债；源码`f3bac028…`和bundle`3d1243e…`两个连续干净快照均38/38。该证据关闭TypeScript子门，但不替代Node-source、PostgreSQL、Browser、镜像安全或完整18步同候选门。
-- TASK47已按D-121固定Playwright 1.51.1/Chromium 134内容寻址运行时、历史Migration模板和断网只读单容器执行器；源码`9a18a0f…`干净快照6文件/11项全部PASS，manifest-only直接子提交`614ef7ac…`绑定39文件bundle。该证据关闭Browser子门，但不替代候选镜像安全、Node/PostgreSQL重跑或完整18步同候选门。
+- TASK42候选快照曾通过完整Node 107文件/886、PostgreSQL 80文件/367、POSIX 4文件/29等仓库门。TASK43/TASK44依次把inventory扩展为230/206/24和232/208/24；TASK45历史快照扩展为235/211/24（Pure Node112、PostgreSQL83、Browser6、历史22、PG alias2、release contract6、special4），增加完整Migration/Worker租约/双卷/readiness合同。TASK49/TASK50后当前机器清单为236/212/24（Pure Node113，其余分类不变），正式计划为19步并包含六服务runtime policy；这些当前值以版本化JSON为权威。
+- TASK46已按D-120把根运行合同对齐为Node 22/ES2022，固定精确38配置集合/摘要双重核验并修复真实类型债；源码`f3bac028…`和bundle`3d1243e…`两个连续干净快照均38/38。该证据关闭TypeScript子门，但不替代Node-source、PostgreSQL、Browser、镜像安全或当前完整19步同候选门。
+- TASK47已按D-121固定Playwright 1.51.1/Chromium 134内容寻址运行时、历史Migration模板和断网只读单容器执行器；源码`9a18a0f…`干净快照6文件/11项全部PASS，manifest-only直接子提交`614ef7ac…`绑定39文件bundle。该证据关闭Browser子门，但不替代候选镜像安全、Node/PostgreSQL重跑或当前完整19步同候选门。
 - TASK48已按D-123—D-125完成授权内工作：精确Git archive构建器、manifest/config身份分离、固定Wolfi/Node最小非root运行层、v3构建回执和严格双生态扫描合同均已落地。最终`8952a815`/tree`1ac73360`的Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，config为`sha256:161ea63b…f6c53`/`sha256:f8dc4ac7…817c1`；6文件48/48、supervisor20/20、release typecheck和lint0 error通过。
 - TASK51按D-128修正Docker29运行探针后，从当前精确`8084d6c3`/tree`a54473f6`重建Web/Worker；manifest为`sha256:249d0ce4…5b7f`/`sha256:0e07fded…8370`，config为`sha256:7c7b0d38…3de5`/`sha256:af000408…4e88`。Compose与六服务runtime通过，release48/48、直接45/45及supervisor31/31通过。
 - 当前没有安装 host supervisor，也没有修改 systemd、权限、网络、Docker daemon 或运行中的 Compose。

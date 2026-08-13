@@ -1,0 +1,291 @@
+# 晨亿达 ERP 投产专项授权执行包
+
+> 权威任务：`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52`
+> 事实快照：2026-08-13（Asia/Shanghai）
+> 当前结论：`PRODUCTION NO-GO / CONTROL PLANE ONLY / NO AUTHORIZATION GRANTED`
+
+## 1. 使用规则
+
+本文件把后续投产动作拆成`A1`—`A8`八个授权域。它是影响、依赖、验收和回滚控制面，不是任何一项动作的授权书，也不包含可消费 nonce、密码、Token、私钥、数据库连接串或业务数据。
+
+执行时固定以下规则：
+
+1. 项目负责人只批准一个明确授权域；上游成功不会自动批准下游。一个授权域内如有多个写检查点，必须按本文件顺序执行，前一检查点失败即停止。
+2. 每次授权前重新核对 Git、镜像、Migration、UAT、资源和外部目标；任一摘要、容器、数据库身份、窗口或责任人漂移都使旧授权范围失效。
+3. 密码、Token、私钥、数据库 service/env 文件和一次性 canonical authorization 只由 root 在批准路径创建，固定为单硬链接、root-owned、`0400`或合同要求的更严格权限；不得粘贴到聊天、Git、命令参数或普通日志。
+4. 主智能体负责执行集成和证据；项目负责人是批准者；每个会影响运行面的动作还须有一名明确观察人。执行人不能用“工具通过”替代批准者或业务验收人。
+5. 正式动作一律串行，`COMPOSE_PARALLEL_LIMIT=1`，一次最多一个临时测试/构建容器。达到资源停止线或出现身份歧义时立即停止，不以删除、重试或放宽断言猜测收敛。
+6. 证据默认保留，失败证据不得改写为成功。删除外部对象、备份、恢复目标、持久目录或审计证据始终是新的破坏性授权，不属于本执行包的隐含回滚。
+
+## 2. 当前不可变事实
+
+| 项目 | 当前事实 | 含义 |
+| --- | --- | --- |
+| 候选源码 | `8084d6c3e38e4246b79791414e84bfe2da4ea8f8` / tree `a54473f6b05cdfaa014f286149a740b90d5067fe` | alpha.46 / Migration 0045 的当前本机候选基线 |
+| Web | manifest `sha256:249d0ce44a595f306e6423219d530bcf3d017e5c87bcd4da13d103def8b75b7f`；config `sha256:7c7b0d388ce74747c1bcaef4b2d18118ee0d56789870bf403f12ba2e53c63de5` | 仅当前 Docker engine 可解析；不是异机恢复锚点 |
+| Worker | manifest `sha256:0e07fded39ce07122246752a29a2960493811b55f9aa9059e7d674bf90eb8370`；config `sha256:af000408278ce6e7c2db822a4151a523a2b39c6f2a01b217ff4001c679484e88` | 与 Web 绑定同一 commit/version；仍未正式签发 |
+| supervisor source | `12beccf0d1c49ec9c67c77e128849d807f52390e` / tree `a195669a8e251addf9f9f367df9c095994945b07` | installer、launcher和44个固定文件的权威源码提交 |
+| supervisor manifest | `8084d6c3e38e4246b79791414e84bfe2da4ea8f8` / tree `a54473f6b05cdfaa014f286149a740b90d5067fe` | source 的唯一直接子提交，只更新 canonical bundle manifest |
+| bundle | `f4481316abb5e3c69e5fd8cb92891f9a2880a2f2375e2611cda3628cf84f5ce6` | 44文件、840,012 bytes，已逐 blob 验证 |
+| installer | `f7ace18453016f6ea09d2a3060016c7c16a4f2366583315dba1c147cee6a8ba0` | 只接受固定安装动作和短时 root-only 授权 |
+| launcher | `3e72a81dc02226792a1d3681ef475d18267ffb3582d41d93d4d4d301b306c4e0` | 只映射四个固定发布动作，不提供任意命令执行 |
+| 构建回执 | `f490b96984579b0b99fd9cdcc0f7dd70726dd68f7c6b7d226939415ed972c1b2` | 本机 diagnostic 候选来源；不是正式 release evidence |
+| UAT | Web alpha.42 / source `569aa954…d33a24`；PostgreSQL 0040；四服务旧运行配置 | 与候选不一致，且现行容器仍非只读 rootfs |
+| installed supervisor | launcher、bundle根、install/release authorization、receipt、journal 路径全部不存在 | 正式镜像证据和19步门按设计失败关闭 |
+| 恢复能力 | V2 合成/双集群隔离合同已通过；真实异机目标、当前四域副本和真实恢复回执不存在 | 不能宣称故障后可恢复 |
+| 监控 | 仓库采集/评估/状态工具存在；无host installer/unit/timer、真实通知渠道和值班演练 | 不能宣称持续监控或告警已启用 |
+
+TASK52启动只读资源快照：available memory约2.1 GiB、Swap约729 MiB/1 GiB、根盘可用16 GiB、Load`0.20/0.23/0.45`；四个UAT容器restart 0/OOM false。该快照只证明当时未触发停止线，不替代执行窗口预检。
+
+本节摘要是TASK52审计快照，不是待签发A1/A2的最终身份。第13节的首次晋升修复会修改`chenyida_erp_site`并刷新bundle/候选；因此不得批准当前`f448…`作为最终安装版本。实际A1/A3/A2必须由后续独立任务把新的完整commit/tree、bundle、installer/launcher和镜像digest写入当次执行单，本文件保留旧值用于解释为何未执行。
+
+## 3. 全局执行前门禁
+
+每个授权域执行前必须同时满足：
+
+- 当前任务文档状态、唯一`DOING`和项目负责人授权编号一致；工作区仅允许已登记的用户未跟踪文件，不能有未知代码或候选输入漂移。
+- `free -h`、`df -h /`、`uptime`、`docker stats --no-stream`、精确`docker compose ps`和内核 OOM 计数已记录；四个受保护 Volume 集合已只读核对。
+- available memory不少于768 MiB、Swap使用率不超过80%、60秒增长不超过256 MiB、根盘可用不少于10 GiB、Load1未持续三分钟高于4；没有 OOM、反复重启、SSH卡顿或数据库失去健康。
+- 执行目标、来源、时间窗、执行人、观察人、业务验收人、停止条件、证据目录和回滚责任人均已填入当次任务文档。
+- 所有 root-only 输入只记录路径、owner/mode、摘要和用途；任何输出先做敏感信息检查，再决定是否进入治理文档。
+- 当前候选与授权所绑定的 commit/tree、bundle、镜像、Migration、数据库/部署身份完全一致。只要一项变化，停止并重新生成执行清单。
+
+## 4. 授权依赖与当前状态
+
+| 授权域 | 动作 | 当前状态 | 关键依赖 | 成功后仍未获权 |
+| --- | --- | --- | --- | --- |
+| `A1` | 安装 content-addressed host supervisor | `WAITING FOR POST-FIX BUNDLE + EXPLICIT HOST AUTHORIZATION` | TASK53后重新固定的精确source/manifest/bundle/installer/launcher；先由root bootstrap两个install authorization目录 | `A2`—`A8`全部仍未授权 |
+| `A2` | 正式镜像证据、19步门、UAT-class manifest | `BLOCKED BY REPOSITORY FIX + A1 + A3` | 首次晋升runtime门禁闭环修复、A1回执、A3不可变registry引用、精确候选worktree、新鲜Trivy DB | UAT部署、真实数据仍未授权 |
+| `A3` | 私有异机源码与镜像锚点 | `BLOCKED BY TARGET/CREDENTIAL AUTHORIZATION` | TASK51精确候选身份、批准的私有Git/registry、root-only短时凭据 | 正式门、数据备份、UAT部署仍未授权 |
+| `A4a` | 三故障域/RPO/RTO/加密/保留设计与空目标准备 | `READY FOR NON-SECRET OWNER INPUT` | source/offhost/restore位置、责任人和策略；不复制数据 | A4b—A4e及UAT动作仍未授权 |
+| `A4b`—`A4d` | 当前四域本机备份、异机接收、第三域恢复 | `BLOCKED BY A4a AND DATA AUTHORIZATION` | 精确数据源/窗口、root-only凭据、三个故障域 | UAT Migration/deploy仍未授权 |
+| `A4e` | 部署后同身份恢复再验证与常态调度 | `NOT EXECUTION READY` | 先补调度/保留/角色ACL合同；A6后需新备份/恢复身份 | 生产切换仍未授权 |
+| `A5a` | 安装监控/投递能力并在旧UAT验证告警交付 | `NOT EXECUTION READY` | 先补版本化host installer/unit/timer/notifier/uninstall包；再提供渠道和值班责任人 | 旧UAT允许保持CRITICAL；UAT部署仍未授权 |
+| `A5b` | A6/A4e后绑定新runtime/backup身份并验证绿色窗口 | `BLOCKED BY A5a+A6+A4e` | 新身份、真实恢复回执、真实通知与ack | 员工试运行仍未授权 |
+| `A6` | 同候选UAT Migration/deploy/回滚演练 | `BLOCKED BY A2+A4d+A5a` | `ELIGIBLE` manifest、升级前可恢复快照、精确UAT窗口、迁移角色、观察人 | 真实数据迁移、跨岗写和员工试用仍未授权 |
+| `A7` | 当前源盘点、业务处置、试迁移、岗位批准、跨岗UAT写、员工试运行 | `BLOCKED BY BUSINESS INPUT AND PRECEDING EVIDENCE` | 逐检查点见第11节；不得以一次批准跨越 | 正式切换仍未授权 |
+| `A8` | 正式切换与上线观察 | `BLOCKED BY A2—A7 EVIDENCE` | 全部门禁、停写点、执行/回滚责任人、正式窗口 | 无；但上线后G10观察仍须完成 |
+
+首次晋升的正确主链是：仓库先修复正式门对旧Worker无healthcheck的自锁 → A1 → A3不可变源码/镜像引用 → A2正式证据与19步门 → A4b—A4d升级前真实恢复链 → A5a监控/投递能力 → A6技术晋升 → A4e对新runtime identity重新备份恢复 → A5b绿色窗口 → A7跨岗/员工 → A8。A4a策略设计、A7岗位审批等非重任务可提前并行准备，但本机重任务仍串行。
+
+上述顺序源自两个实际合同约束：正式gate当前要求现行Worker为`healthy`，但旧UAT Worker的health为`none`，会在19步执行前以`GATE_REQUIRED_RUNTIME_UNHEALTHY`阻断；正式镜像证据/manifest又绑定完整registry digest引用，TASK51删除后的loopback引用不能作为异机恢复锚点。因此在仓库闭合首次晋升模式及A3外部引用之前，不应请求或运行A2。
+
+## 5. A1：host supervisor 安装
+
+### 5.1 允许影响
+
+A1只允许：
+
+- 由root先只创建`/var/lib/chenyida-erp/release-supervisor-install-authorizations`及其`pending`子目录，固定root:root `0700`，再放置一份短时 canonical `0400`授权；installer在读取授权前要求这两个bootstrap目录已经存在且可信；
+- installer通过预检后创建`consumed`及其余安装状态根，不允许operator预建bundle、launcher、receipt或journal正文；
+- 由固定installer创建或验证`/usr/local/libexec/chenyida-erp-release-supervisor/{bundles,launchers,installers}`、`/usr/local/sbin/chenyida-erp-release-supervisor-v1`、install receipt/journal及release authorization `{pending,consumed}`根；
+- 创建固定安装锁`/var/lock/chenyida-erp-release-supervisor-install-v1.lock`，写入内容寻址bundle、launcher、installer、PREPARED/COMMITTED journal和install receipt；
+- 使用`/tmp`中的installer预检/staging并由工具在正常路径精确清理。
+
+A1不允许运行四个发布动作，不创建release manifest，不访问Docker/UAT/数据库/四卷，不安装systemd服务，不改网络、账号、权限模型、Docker daemon或应用配置。
+
+### 5.2 授权绑定
+
+root operator必须从批准的本机安全输入生成授权；聊天只确认范围。授权固定字段包括：
+
+- contract `chenyida-erp-release-supervisor-install-authorization/v1`；
+- 唯一authorization ID、UTC created/expires（最长24小时）、64位随机nonce；
+- repository root `/opt/erp`；
+- 本文件第2节的source/manifest commit/tree、bundle、launcher和installer SHA-256；
+- confirmation `INSTALL_EXACT_RELEASE_SUPERVISOR_BUNDLE`。
+
+授权文件必须位于固定pending根、文件名与authorization ID一致、canonical JSON、root:root `0400`、单硬链接。项目负责人不在聊天中提供nonce或文件正文。
+
+### 5.3 执行检查点与验收
+
+1. 只读复核安装路径仍全部不存在或属于同一已知未完成journal；未知已有文件立即停止。新装时只允许root bootstrap install authorization根和`pending`，两者均为`0700`且不使用符号链接。
+2. 核对repository、commit/tree关系和三个SHA；记录installer文件的owner/mode/hash，不从可写临时checkout启动。
+3. 执行固定installer CLI；只保存去敏状态码、receipt摘要和创建路径metadata。
+4. 验证launcher为root-owned单硬链接`0555`且摘要匹配；bundle目录/文件集合、mode、bytes和摘要完全匹配；install receipt/journal为root-only且phase为COMMITTED；pending授权已原子移入consumed。
+5. 再次确认没有进程、systemd unit、网络监听、Docker/UAT/Volume变化，四服务restart/OOM仍为0/false。
+
+安装过程中如出现PREPARED但未COMMITTED，禁止删除journal、bundle或consumed授权；只能在身份完全闭合时用同一内容寻址installer恢复同一事务。身份歧义时保全现场并停止。
+
+### 5.4 回退边界
+
+supervisor本身没有后台进程；没有pending release authorization时保持惰性。因此首要功能回退是停止签发`A2`授权并保留安装回执/审计字节。若必须恢复为安装前物理文件集合，须另行批准`A1-R`精确host清理或切换任务；首次安装没有previous launcher可自动切回，禁止在失败处理中临时`rm -rf`。已有版本升级时只允许通过新的内容寻址安装授权切到已验前一版本，保留journal和receipt。
+
+### 5.5 最小确认句
+
+项目负责人只有在愿意承担上述host文件变化时，才使用不含秘密的确认：
+
+> 我专项授权`A1 HOST_SUPERVISOR_INSTALL`，仅安装当次执行单固定且在TASK52后重新验证的source/manifest/bundle/installer/launcher；允许创建列明的root-owned路径和安装回执，不授权`A2`—`A8`、systemd、UAT、数据库、账号、网络或业务数据动作。
+
+## 6. A2：正式本机发布证据与19步门
+
+### 6.1 前置与影响
+
+A2必须等首次晋升gate仓库修复、A1安装回执和A3不可变外部镜像引用全部通过。当前gate把现行Worker `health=none`判为失败，导致所有19步在运行前BLOCKED；这不是A1或项目负责人授权能够解决的现场问题，必须先由独立仓库任务建立“保持旧运行面不退化，同时在隔离候选验证新Worker health”的失败关闭合同和负向测试。
+
+治理文档提交已使`/opt/erp` HEAD晚于镜像绑定的`8084d6c3`，正式动作不得把当前HEAD冒充候选，也不得回退或切换共享主工作区。A2应在仓库外准备root-owned、不可组/全局写的独立detached Git worktree，HEAD/tree精确为当时重新构建候选所绑定的commit/tree；完成后只精确清理该任务worktree登记，不触碰主工作区或用户未跟踪文件。任何新的`chenyida_erp_site`修复都会使TASK51候选过期，必须先重建并刷新A3锚点。
+
+A2允许在仓库外唯一artifact root生成正式镜像provenance、SBOM/security evidence、19步gate report和条件式UAT-class manifest；镜像参数必须使用A3批准私有registry的完整`repository@sha256:digest`引用，不能使用已删除loopback registry留下的`127.0.0.1:32776/...`引用。它允许按计划串行启动隔离测试容器和数据库，但不修改UAT/生产、不push外部registry、不读真实业务数据或四卷。
+
+### 6.2 三个一次性动作
+
+1. `A2-EVIDENCE / CREATE_IMAGE_EVIDENCE`：绑定独立候选worktree、Web/Worker digest引用、artifact root、run ID和不超过72小时且扫描前后不变的固定Trivy数据库。失败时不进入下一步。
+2. `A2-GATE / RUN_RELEASE_GATE`：绑定同一worktree、镜像及上一步正式SBOM/security文件；执行全部19步，任何fail/skip/todo、超时、资源阈值或临时资源残留都拒绝。
+3. `A2-MANIFEST / CREATE_RELEASE_MANIFEST`：只有gate为PASS且所有证据仍新鲜才执行；deployment class固定为UAT，绑定同一commit/tree、镜像、Migration、plan/report及SBOM/security。不得预先创建或把失败候选标为ELIGIBLE。
+
+三个动作各使用一份不同的root-only短时一次性authorization，并在执行前原子消费；项目负责人分别确认`A2-EVIDENCE`、`A2-GATE`和`A2-MANIFEST`，不得预签三份或在上一检查点尚未验收时自动生成下一份。任一检查点失败即停止，不向A6扩权；A3必须已经独立完成。
+
+### 6.3 验收与回退
+
+- 正式证据必须带bundle和authorization摘要，artifact为root-owned、无覆盖、单硬链接、只读合同；报告输入全部指向同一候选。
+- 19步包含release/supervisor/credentials、完整Node/PostgreSQL/Browser/POSIX/typecheck/lint/Migration/backup-recovery/Python/Compose/source diff、镜像安全和六服务runtime policy；不得并行重任务。
+- manifest只有`promotion_status=ELIGIBLE`且验证器复核通过才算A2成功。失败/REJECTED报告照常保留，不能改名或重跑覆盖。
+- A2不改变运行面，因此回退是停止晋升、精确清理任务临时worktree/容器/测试库，保留镜像与不可变证据。删除失败报告或候选镜像不是自动回退。
+
+最小确认句：
+
+> 我专项授权`A2 FORMAL_LOCAL_RELEASE_EVIDENCE`，仅针对当次执行单固定且已由A3锚定的候选，允许installed supervisor按三检查点生成正式镜像证据、运行19步门并在全PASS时创建UAT-class manifest；不授权新的外部push、UAT/生产Migration/deploy、真实数据、账号或员工动作。
+
+## 7. A3：外部源码与镜像恢复锚点
+
+A3在A2之前执行，需要项目负责人指定：批准的私有Git目标、私有OCI registry/repository、数据驻留/访问责任人、保留策略和root-only短时凭据文件。公开origin继续禁止接收内部历史；不得使用`latest`或可变tag作为唯一身份。
+
+执行范围应分成源码与镜像两条可核验链：
+
+- 源码：普通fast-forward push完整当前内部历史到批准私有远端；从第二受控上下文fetch并验证目标commit/tree及bundle source/manifest两提交关系。
+- 镜像：只push后续A2将消费的同一Web/Worker对象，以版本+完整commit的私有tag和registry digest固定；认证返回、registry查询和重新按digest pull三方一致，匿名读取拒绝，凭据随后logout/撤销。
+
+A3只建立私有恢复锚点，不得称为发布晋升；随后A2必须使用该外部完整引用重新生成正式镜像证据、gate和manifest。若先用loopback引用运行A2，再把同一digest推到外部repository，既有证据仍绑定旧完整引用且不能改写，必须全部重新签发。外部对象默认保留；撤销凭据是执行收口，删除远端commit/tag/manifest需新的破坏性授权。
+
+最小确认句必须同时给出非秘密目标：
+
+> 我专项授权`A3 EXTERNAL_IMAGE_AND_SOURCE_ANCHOR`，目标为“<私有Git名称>”与“<私有registry/repository名称>”，仅锚定A2同一源码和Web/Worker对象；凭据由root-only文件提供，不授权真实数据上传、UAT/生产部署或删除远端对象。
+
+## 8. A4：真实四域异机备份与隔离恢复
+
+A4必须拆成五个独立检查点，不接受一次“同意备份恢复”跨越真实数据外传与第三域写入。批准前先由项目负责人提供非秘密决策：
+
+- 源deployment和维护窗口；与源主机不同故障域的接收位置；与源/接收方均不同的隔离恢复位置；
+- 加密传输协议、密钥保管责任人、RPO、RTO、保留代数/时长、不可变策略、容量和失败告警；
+- 允许读取的PostgreSQL、uploads、attachments、backup-status精确范围，以及执行人、观察人和恢复验收人；
+- 集群角色/ACL的独立备份恢复方案。现有V2 logical dump明确`--no-owner --no-acl`，不能单独证明角色/ACL可恢复。
+
+执行检查点：
+
+1. `A4a DESIGN_AND_EMPTY_TARGETS`：只固定三个故障域、传输/加密、密钥责任、RPO/RTO、保留/不可变、容量、责任人和空root-only边界；不复制数据。
+2. `A4b LOCAL_FOUR_DOMAIN_BACKUP`：只读固定实际数据库/容器/Migration/文件根身份和容量，建立root-only libpq service文件；在窗口内停止精确Web/Worker并确认没有替代writer，运行V2本机一致性备份，数据库guard、前后reconciliation及四域`LOCAL_VERIFIED`全部成功后才恢复writer。
+3. `A4c ENCRYPTED_OFFHOST_TRANSFER`：以批准加密通道传输完整不可变代次，在接收机运行offhost verifier并取得`OFFHOST_VERIFIED`；真实数据离开源主机必须单独批准。
+4. `A4d THIRD_DOMAIN_RESTORE`：从异机副本向第三故障域全新TEST目标恢复，核对Migration、表/记录、重复、孤儿、库存、关键金额、三个文件域摘要及RTO，取得`RESTORE_VERIFIED`；第三位置临时持有真实数据必须单独批准。
+5. `A4e CONTINUOUS_AND_POST_PROMOTION_REVALIDATION`：先补自动传输、调度、保留和角色/ACL重建的仓库合同；A6后必须针对新runtime/Migration身份再完成一代A4b—A4d并验证连续两代、过期/失败告警和RPO/RTO，不能复用升级前回执冒充当前可恢复。
+
+备份中断且guard存在时禁止手工删除fence或放开数据库；只在精确身份、零其他连接和原状态闭合后运行guard recovery。A4失败时不覆盖源、不把本机副本冒充异机、不删除成功/失败证据。
+
+最小确认句：
+
+最小确认必须分别使用`A4a`、`A4b`、`A4c`、`A4d`或`A4e`编号。例如当前最小的design-only确认是：
+
+> 我专项授权`A4a DESIGN_AND_EMPTY_TARGETS`，允许按执行单核验并准备三个不同故障域的空root-only边界、RPO/RTO、加密/密钥、保留和责任人；不授权读取、复制、传输或恢复任何真实数据，也不授权账号、网络、UAT/生产或删除动作。
+
+## 9. A5：host监控与真实告警
+
+A5当前不能直接批准执行。仓库已有严格采集、评估、FIRING/REMINDER/ESCALATED/RECOVERED、原子状态和pending delivery合同，但尚无：
+
+- 内容寻址host installer与安装回执；
+- 固定systemd service/timer、非特权通知器和root采集器权限边界；
+- 可测试的升级/卸载/回退命令；
+- 真实渠道adapter、root-only配置schema、值班人/升级表和保留策略。
+
+这些是仍可在仓库和隔离环境安全推进的高优先级缺口，应先由独立任务实现、测试、文档和提交；不因TASK49工具存在而要求项目负责人现在授权host安装。
+
+未来A5授权还需要项目负责人指定渠道类型/非秘密目标、值班主责/备份、确认时限、升级路径、演练窗口和凭据root-only路径，并拆成：
+
+- `A5a DELIVERY_CAPABILITY`：在A6前安装monitor/timer/notifier并证明60秒采集、重启持续、逐类合成故障、真实测试/恢复通知、重复event幂等、pending重放及资源开销。旧alpha.42/0040、Worker health none、缺release/restore identity时应如实CRITICAL；A5a成功只证明告警能送达，不要求旧UAT绿色。
+- `A5b CURRENT_IDENTITY_GREEN_WINDOW`：A6部署及A4e当前身份恢复后，重新绑定runtime/Migration/backup证据，确认健康窗口、恢复告警、ack与值班升级均匹配。旧备份回执因identity漂移不能用于A5b。
+
+回退只停止/禁用精确monitor版本并恢复前一已验版本，状态和pending默认保留。
+
+## 10. A6：同候选UAT晋升与回滚演练
+
+A6只有A2同候选`ELIGIBLE`、A3可拉取镜像、A4d升级前当前数据恢复回执、A5a告警交付能力及专用Migration角色合同均通过后才可批准。授权必须固定UAT deployment/database稳定身份、0040 current head、候选target head、维护窗口、执行/观察/业务验收人和rollback restore point。
+
+受控检查点：
+
+1. 只读预检并新建同窗口可恢复快照；验证从异机副本恢复仍可执行。
+2. 停止精确旧Web/Worker，保留原镜像digest、Compose配置和运行metadata；确认无writer。
+3. 使用manifest同一Worker镜像、专用Migration角色和release overlay执行0040→当次候选Migration head；任何身份或checksum漂移在SQL前拒绝。
+4. 按digest部署Web/Worker及当次批准的release overlay。若本窗口不重建PostgreSQL或Caddy，就只能声明Web/Worker已晋升，不能宣称TASK50六服务运行时加固已全部部署；若要重建PostgreSQL或Caddy，执行单必须分别列明连接/证书影响、精确Compose动作、健康门和回滚，并由项目负责人明确包含在A6授权中。Worker租约必须自然切换，禁止手工改租约。
+5. 验证PostgreSQL、Web、Worker为healthy，Caddy满足已批准入口合同，完整Migration、双卷探针、六服务`read_only`/capability/security-option实际metadata、restart/OOM、资源和告警全部符合本次声明范围；随后以独立一次性授权发布runtime identity。
+6. 运行匿名、权限负向和核心只读技术验收；登录式UAT只允许当次授权的固定测试账号/范围。跨岗位业务写必须等待A7岗位批准和独立`A7e`写授权，不得把页面打开视为业务验收。
+7. 明确协调现有`chenyida-erp.service`：默认保持其启停/enable状态不变；任何stop/start/restart/disable/enable均属于执行单显式影响，不能由Compose动作隐含取得。
+8. A6技术验收后立刻进入A4e当前候选身份备份/异机恢复和A5b绿色窗口；在两者通过前，UAT候选不得进入员工试用。
+
+Migration提交后不能靠down SQL原地降级。触发条件包括Migration/health/租约/数据核对/资源/告警失败；回滚必须停止新容器，从已验证快照恢复PostgreSQL与三个文件域，恢复原镜像/Compose并复核原head/身份。若恢复身份有歧义，保持隔离和停写，不猜测重启接流。
+
+最小确认句：
+
+> 我专项授权`A6 UAT_CANDIDATE_PROMOTION`，仅在A2、A4d与A5a证据仍有效时，对执行单固定的UAT、窗口和`ELIGIBLE`manifest完成快照、0040→当次候选head、列明范围的按digest部署、runtime identity、验收及触发式快照回滚演练；PostgreSQL/Caddy重建和`chenyida-erp.service`动作仅在执行单逐项列明时授权，不授权真实旧数据迁入、正式员工业务写或生产切换。
+
+## 11. A7：真实数据、岗位权限与员工试运行
+
+A7不是一个可一次打包批准的写动作，固定拆成六个独立检查点：
+
+### A7a CURRENT_SOURCE_READONLY_INVENTORY
+
+项目负责人先提供批准的SQLite/D1/附件快照、只读截止时点、数据责任人及snapshot/archive-only/post-cutover分类责任。只读分析必须输出逐行结果、重复、孤儿、单位、编码、库存、金额和文件摘要；业务冲突未人工处置前不得物化。随后在隔离目标做幂等试迁移、重复执行、全量核对和回滚演练；真实UAT迁入另开写授权。
+
+### A7b BUSINESS_DISPOSITION
+
+业务负责人逐项批准映射、archive-only、单位、库存/财务期初、附件和冲突处置；未决项继续失败关闭，历史处置只可用新记录supersede，不能静默改写。
+
+### A7c REAL_TRIAL_MIGRATION
+
+只向新建隔离PostgreSQL/文件目标物化。当前工具固定历史0017导入基线，仓库尚无“0017物化后连续升级到当前0045、重复执行、失败回滚并重新全量reconciliation”的证据；必须先由独立合成/隔离任务闭合。真实演练验收包括逐行结果、断点续跑、重复执行无重复、全量核对及快照回滚。
+
+### A7d ROLE_MATRIX_APPROVAL
+
+岗位负责人批准用户/岗位、最小权限、职责分离、财务可见域、管理员/break-glass、账号创建/首改/重置/停用、会话撤销和审计责任。当前服务端财务域事实为：admin/manager/finance/operations/warehouse可读AR+AP，sales只读AR，purchase只读AP；engineering/planning/production/quality虽有`finance.read`但普通列表为空，engineering另有本人负责项目财务摘要。上述范围未被业务负责人批准前不得启用真实员工账号；若批准结果不同，先改源码和负向测试。
+
+### A7e CROSS_ROLE_UAT_WRITES
+
+只允许命名合成对象、固定测试账号和明确业务写范围执行同候选跨岗正常/异常E2E；验收必须覆盖403、CAS冲突、幂等重放、重复提交、冲销、审计/request ID和预期数据库增量。清理使用业务冲销或已验快照，不直接删表/改已过账记录。
+
+### A7f EMPLOYEE_PILOT
+
+在同候选、同数据、恢复和监控均有效后，指定少量真实员工、业务样本、允许写范围、窗口和验收人。按脚本覆盖采购→收货/IQC→库存/AP、生产领退/报工/IPQC/完工、销售/FQC/出货/AR、付款/冲销及异常/越权/重复提交；每天复核备份、告警、审计、资源和问题清单。任何高风险问题停止试用并按已验方案恢复。
+
+六类最小确认必须分别给出；不得用“同意A7”自动创建账号或允许业务写，也不得把密码发到聊天。
+
+## 12. A8：正式切换与上线观察
+
+A8只有A2—A7全部有当期证据、所有关键差异已修复/接受/指定责任人，且项目负责人批准正式窗口后才可执行。执行单至少固定：
+
+- 旧系统停写/只读时点、最终增量边界、数据/附件责任人；
+- 最终备份、异机接收与隔离恢复回执；
+- 精确production deployment/database/manifest/images/Migration；
+- DNS/入口、监控、值班、业务负责人、执行人、观察人和回滚指挥；
+- 表/记录、重复/孤儿、库存、金额、文件、health、租约、审计、备份和关键业务验证；
+- 可量化回滚触发器、最晚回滚时点和旧系统恢复写入条件。
+
+正式切换是新的专项授权，不因UAT或试运行通过自动开始。上线后G10至少再次完成健康/告警、数据汇总、备份传输、恢复抽检和资源观察；触发器命中时按已验方案降级或回滚，保全全部审计。
+
+## 13. 仍可安全推进的仓库任务
+
+在等待任何外部授权期间，以下事项仍可在仓库/隔离环境推进，因此TASK52完成后不应直接宣布“只剩用户授权”：
+
+1. 修复首次晋升release gate自锁：当前runner要求现行Worker `healthy`而旧UAT为`none`，所有19步会在执行前BLOCKED；新合同必须允许受控legacy基线保持不退化，同时仍由候选隔离runtime步骤强制新Worker health，并补齐错误服务集、状态变化、restart/OOM和候选health负向测试。
+2. 固定A2独立detached candidate worktree的准备、验证和精确清理合同，防止共享主工作区切换或晚于镜像的治理提交冒充候选；任何`chenyida_erp_site`改动后重建当前候选。
+3. 为TASK49监控工具建立内容寻址host delivery包：installer、service/timer、非特权notifier边界、配置schema、receipt/journal、升级/惰性回退和隔离测试；不得实际安装。
+4. 以机器源生成11角色→permission→API/data domain矩阵和路由覆盖负向合同，附业务批准状态；现有若干手写角色测试遗漏planning，不能替代完整漂移检测。
+5. 以合成隔离数据证明历史导入基线0017物化后连续升级至当前0045，覆盖重复执行、失败回滚和升级后全量reconciliation。该任务改动候选输入后必须重建镜像/证据。
+6. 为PostgreSQL cluster roles/ACL/default privileges及tablespace建立独立、去秘密、可核对的备份或确定性重建合同和隔离测试，补齐V2 logical dump的明确排除项；不得连接真实数据库。
+7. 编制统一跨岗位UAT脚本、预期数据库增量、审计证据、冲销/快照回滚和员工签字模板；不创建账号或执行写操作。
+8. 复核UAT晋升/快照回滚的逐检查点执行器是否存在失败关闭缺口；仅对合成Compose/隔离PostgreSQL实现测试，不部署UAT。
+
+后续调度按对A1/A2、恢复和运行安全的影响选择最高优先级，保持一次一个正式任务编号。
+
+## 14. 当前最小外部请求
+
+当前不需要项目负责人立即批准host或数据动作：A2仍被首次晋升gate仓库自锁阻断，A5也缺host delivery实现。持续交付负责人将先从第13节第1项自动推进。项目负责人若愿意并行准备非秘密外部信息，最小输入是A4a的三个故障域/RPO/RTO/加密/保留/责任人，或A3的私有Git/registry目标名称；密码、Token和密钥仍只放root-only文件，不发聊天。
+
+仓库阻断闭合后，第一个host变更请求才是A1；未获A1时系统可安全保持：UAT继续alpha.42/0040、当前候选和诊断证据只读保留、正式入口失败关闭、无真实员工使用。
+
+无论等待多久，以下结论不变：没有真实异机恢复、正式同候选门、host监控投递、UAT对齐、真实迁移和员工签字前，晨亿达ERP不能宣布可落地投入使用。

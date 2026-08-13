@@ -2,14 +2,18 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
-## SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52（执行中；只读授权控制面）
+## SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52（完成；授权控制面闭合，仓库前置仍开放）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / READ-ONLY CONTROL PLANE / PRODUCTION NO-GO | 唯一active task；主智能体唯一写入，数据迁移/应用测试/运维安全三线只读审计 |
+| 最终状态 | DONE / AUTHORIZATION CONTROL PLANE COMPLETE / REPOSITORY PREREQUISITES OPEN / PRODUCTION NO-GO | active slot已释放；主智能体唯一写入，数据迁移/应用测试/运维安全三线完成只读审计 |
 | 严格起点 | PASS / CONTROLLED | `main@cbc219490fd88eda4edb6f0e54ad0ba933438ab4`、tree`216e08ee…ab5de`；未跟踪状态报告不读不改不提交 |
-| supervisor现场 | BLOCKED / ABSENT | bundle`f4481316…5ce6`、installer`f7ace184…ba0`、launcher`3e72a81d…c4e0`已固定；installed路径及授权/回执/journal根均不存在 |
-| 当前范围 | DOCS / READ ONLY | 编制`A1`—`A8`逐项授权、依赖、影响、停止、验收、失败和回滚执行包；不生成真实授权或执行下游动作 |
+| 执行包 | PASS / D-129 | [权威执行包](../self-hosting/production-authorization-packet.md)固定`A1`—`A8`及子检查点、root-only输入、资源停止、验收、失败和回退；上游成功不自动授权下游 |
+| supervisor现场 | BLOCKED / ABSENT / OLD HASH NOT AUTHORIZABLE | TASK51 bundle`f4481316…5ce6`仅作审计快照；installed路径及授权/回执/journal根均不存在，TASK53修复后必须重新生成摘要才可请求A1 |
+| 关键发现 | FAIL CLOSED / NEXT TASK SELECTED | 旧Worker health none使正式gate在19步前自锁；loopback完整引用不可异机恢复；监控host delivery、真实恢复、0017→current、岗位/员工证据均未闭合 |
+| 自动验证 | PASS / DOCS ONLY | Markdown 389文件/222本地链接、JSON211、credentials1,591和`git diff --check`通过；未运行build、全量测试、Migration、备份或恢复 |
+| 资源/运行不变 | PASS / BELOW STOP LINES | 收口available约2.0GiB、Swap724MiB/1GiB、根盘16GiB、Load低于1、内核OOM0；四服务restart0/OOM false，受保护Volume集合不变，临时扫描容器/清单已清理 |
+| 下一安全任务 | SELFHOST-RELEASE-GATE-LIFECYCLE-53 | 先闭合部署前legacy稳定门与部署后current runtime严格门；不等待A1/A2或修改UAT |
 | 系统是否可用 | NO | 正式门、异机恢复、监控投递、UAT对齐、真实迁移、员工试用和切换仍未完成 |
 
 ## SELFHOST-RELEASE-CANDIDATE-REFRESH-51（完成；当前精确本机候选零发现，正式门阻塞）
