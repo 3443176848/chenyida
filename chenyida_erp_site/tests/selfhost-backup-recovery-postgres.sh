@@ -195,7 +195,10 @@ NODE_ENV=test FAKE_WRITER_CLASS=test FAKE_WRITER_DEPLOYMENT_ID=guard-source SELF
   --location-id source-host --policy-id daily-rpo-v1 --rpo-hours 24 --machine-identity-file "$SOURCE_MACHINE_ID" --confirm TEST_BACKUP_V2 >"$TASK_ROOT/guard-kill.log" 2>&1 &
 GUARD_PID=$!
 attempt=0
-while [ ! -f "$BACKUP_ROOT/.backup-fence-v2.json" ]; do
+while :; do
+  guard_read_only=$(psql -d guard_test -Atc 'show default_transaction_read_only' 2>/dev/null || true)
+  guard_connection_limit=$(psql -d postgres -Atc "select datconnlimit from pg_database where datname='guard_test'" 2>/dev/null || true)
+  [ -f "$BACKUP_ROOT/.backup-fence-v2.json" ] && [ "$guard_read_only" = on ] && [ "$guard_connection_limit" = 0 ] && break
   attempt=$((attempt + 1)); [ "$attempt" -le 100 ] || { echo "backup guard intent was not published" >&2; exit 1; }
   sleep 0.1
 done
