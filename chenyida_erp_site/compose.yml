@@ -35,22 +35,35 @@ x-app-environment: &app-environment
   DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
 
 x-app-volumes: &app-volumes
-  - erp_uploads:/data/chenyida-erp/uploads
-  - erp_attachments:/data/chenyida-erp/attachments
+  - type: volume
+    source: erp_uploads
+    target: /data/chenyida-erp/uploads
+  - type: volume
+    source: erp_attachments
+    target: /data/chenyida-erp/attachments
 
 services:
   postgres:
-    image: postgres:17-bookworm
+    image: postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394
+    user: "999:999"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     cpus: "0.75"
     mem_limit: 768m
     memswap_limit: 1g
     pids_limit: 128
+    shm_size: 64m
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=32m,mode=1777
+      - /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m,uid=999,gid=999,mode=3775
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
       - erp_postgres:/var/lib/postgresql/data
+    networks: [backend]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -58,11 +71,12 @@ services:
       retries: 20
     restart: unless-stopped
     logging:
+      driver: local
       options: { max-size: "10m", max-file: "5" }
 
   migrate:
     build: { context: ., target: worker, args: *release-build-args }
-    user: "0:0"
+    user: "65532:0"
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -71,7 +85,7 @@ services:
     memswap_limit: 1g
     pids_limit: 128
     tmpfs:
-      - /tmp:rw,nosuid,nodev,noexec,size=64m
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
     command: ["node", "--experimental-strip-types", "scripts/migrate-postgres.ts"]
     environment:
       <<: *app-environment
@@ -89,31 +103,55 @@ services:
       ERP_MIGRATION_EXPECTED_TARGET_HEAD: ${ERP_MIGRATION_EXPECTED_TARGET_HEAD:-}
     volumes:
       - type: bind
-        source: ${ERP_RELEASE_ARTIFACT_HOST_ROOT:-/var/lib/chenyida-erp/release-candidate}
+        source: /var/lib/chenyida-erp/release-candidate
         target: /run/chenyida-erp-release-candidate
         read_only: true
         bind:
           create_host_path: false
+    networks: [backend]
     depends_on:
       postgres: { condition: service_healthy }
     restart: "no"
+    logging:
+      driver: local
+      options: { max-size: "10m", max-file: "2" }
 
   web:
     build: { context: ., target: web, args: *release-build-args }
+    user: "65532:65532"
+    group_add: ["${ERP_RELEASE_IDENTITY_READER_GID:?ERP_RELEASE_IDENTITY_READER_GID is required}"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     cpus: "0.75"
     mem_limit: 512m
     memswap_limit: 768m
     pids_limit: 128
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
     environment:
       <<: *app-environment
       ERP_PROCESS_NAME: chenyida-erp-web
       NODE_OPTIONS: --max-old-space-size=384
       PORT: 3000
     volumes:
-      - erp_uploads:/data/chenyida-erp/uploads
-      - erp_attachments:/data/chenyida-erp/attachments
-      - erp_backup_status:/data/chenyida-erp/backup-status:ro
-      - ${ERP_RELEASE_IDENTITY_HOST_ROOT:-/var/lib/chenyida-erp/release-identity}:/run/chenyida-erp-release:ro
+      - type: volume
+        source: erp_uploads
+        target: /data/chenyida-erp/uploads
+      - type: volume
+        source: erp_attachments
+        target: /data/chenyida-erp/attachments
+      - type: volume
+        source: erp_backup_status
+        target: /data/chenyida-erp/backup-status
+        read_only: true
+      - type: bind
+        source: /var/lib/chenyida-erp/release-identity
+        target: /run/chenyida-erp-release
+        read_only: true
+        bind:
+          create_host_path: false
+    networks: [backend, edge]
     depends_on:
       migrate: { condition: service_completed_successfully }
     healthcheck:
@@ -123,24 +161,32 @@ services:
       retries: 12
       start_period: 15s
     ports:
-      - "${ERP_HTTP_BIND:-127.0.0.1}:${ERP_HTTP_PORT:-3000}:3000"
+      - "127.0.0.1:${ERP_HTTP_PORT:-3000}:3000"
     restart: unless-stopped
     init: true
     logging:
+      driver: local
       options: { max-size: "10m", max-file: "5" }
 
   worker:
     build: { context: ., target: worker, args: *release-build-args }
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     cpus: "0.50"
     mem_limit: 512m
     memswap_limit: 768m
     pids_limit: 128
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
     environment:
       <<: *app-environment
       ERP_PROCESS_NAME: chenyida-erp-worker
       ERP_WORKER_INSTANCE_FILE: /tmp/chenyida-erp-worker-instance-id
       NODE_OPTIONS: --max-old-space-size=384
     volumes: *app-volumes
+    networks: [backend]
     depends_on:
       migrate: { condition: service_completed_successfully }
     healthcheck:
@@ -153,14 +199,21 @@ services:
     init: true
     stop_grace_period: 30s
     logging:
+      driver: local
       options: { max-size: "10m", max-file: "5" }
 
   admin:
     build: { context: ., target: worker, args: *release-build-args }
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     cpus: "0.50"
     mem_limit: 512m
     memswap_limit: 768m
     pids_limit: 128
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
     command: ["node", "--experimental-strip-types", "scripts/init-admin.ts"]
     environment:
       <<: *app-environment
@@ -169,32 +222,53 @@ services:
       ERP_ADMIN_PASSWORD: ${ERP_ADMIN_PASSWORD:-}
     depends_on:
       migrate: { condition: service_completed_successfully }
+    networks: [backend]
     profiles: ["tools"]
     restart: "no"
+    logging:
+      driver: local
+      options: { max-size: "10m", max-file: "2" }
 
   caddy:
-    image: caddy:2.10-alpine
+    image: caddy@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
     cpus: "0.25"
     mem_limit: 128m
     memswap_limit: 192m
     pids_limit: 64
     environment:
       ERP_DOMAIN: ${ERP_DOMAIN:-erp.invalid}
-      ERP_HTTPS_PORT: ${ERP_HTTPS_PORT:-443}
+      ERP_HTTPS_PORT: 443
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - type: bind
+        source: ./deploy/Caddyfile
+        target: /etc/caddy/Caddyfile
+        read_only: true
+        bind:
+          create_host_path: false
       - caddy_data:/data
       - caddy_config:/config
+    networks: [edge]
     ports:
-      - "${ERP_PUBLIC_HTTP_BIND:-0.0.0.0}:${ERP_PUBLIC_HTTP_PORT:-80}:80"
-      - "${ERP_PUBLIC_HTTPS_BIND:-0.0.0.0}:${ERP_PUBLIC_HTTPS_PORT:-443}:${ERP_HTTPS_PORT:-443}"
-      - "${ERP_PUBLIC_HTTPS_BIND:-0.0.0.0}:${ERP_PUBLIC_HTTPS_PORT:-443}:${ERP_HTTPS_PORT:-443}/udp"
+      - "0.0.0.0:${ERP_PUBLIC_HTTP_PORT:-80}:80"
+      - "0.0.0.0:${ERP_PUBLIC_HTTPS_PORT:-443}:443"
+      - "0.0.0.0:${ERP_PUBLIC_HTTPS_PORT:-443}:443/udp"
     depends_on:
       web: { condition: service_healthy }
     profiles: ["production"]
     restart: unless-stopped
     logging:
+      driver: local
       options: { max-size: "10m", max-file: "5" }
+
+networks:
+  backend:
+    internal: true
+  edge:
 
 volumes:
   erp_postgres:

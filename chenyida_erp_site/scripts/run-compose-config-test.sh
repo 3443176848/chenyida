@@ -18,6 +18,9 @@ git_candidate() { /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/nu
 [ "$(git_candidate rev-parse --show-toplevel)" = "$REPOSITORY_ROOT" ] || { echo "release repository root is invalid" >&2; exit 1; }
 [ "$(id -u)" = 0 ] || { echo "release Compose sandbox requires root" >&2; exit 1; }
 [ -x /usr/bin/bwrap ] || { echo "bubblewrap is unavailable" >&2; exit 1; }
+DOCKER_COMPOSE_VERSION=$(/usr/bin/docker compose version --short)
+DOCKER_ENGINE_VERSION=$(/usr/bin/docker version --format '{{.Server.Version}}')
+[ -n "$DOCKER_COMPOSE_VERSION" ] && [ -n "$DOCKER_ENGINE_VERSION" ] || { echo "container runtime version discovery failed" >&2; exit 1; }
 
 GIT_COMMIT=$(git_candidate rev-parse --verify HEAD^{commit})
 GIT_TREE=$(git_candidate rev-parse --verify HEAD^{tree})
@@ -42,7 +45,7 @@ git_candidate archive --format=tar "$GIT_COMMIT" chenyida_erp_site | /usr/bin/ta
   --die-with-parent --new-session --unshare-all --cap-drop ALL --clearenv --uid 65534 --gid 65534 \
   --ro-bind /usr /usr --ro-bind /bin /bin --ro-bind /lib /lib --ro-bind /lib64 /lib64 \
   --proc /proc --dev /dev --tmpfs /tmp --dir /home/release \
-  --ro-bind "$TEMP_ROOT/source/chenyida_erp_site" /workspace --chdir /workspace \
+  --ro-bind "$TEMP_ROOT/source/chenyida_erp_site" /workspace --ro-bind "$SUPERVISOR_SITE_ROOT" /supervisor --chdir /workspace \
   --setenv PATH /usr/bin:/bin --setenv HOME /home/release --setenv LC_ALL C --setenv LANG C --setenv TZ UTC \
   --setenv COMPOSE_PARALLEL_LIMIT 1 --setenv COMPOSE_DISABLE_ENV_FILE 1 \
   --setenv ERP_ENV test --setenv ERP_DEPLOYMENT_CLASS test \
@@ -50,6 +53,7 @@ git_candidate archive --format=tar "$GIT_COMMIT" chenyida_erp_site | /usr/bin/ta
   --setenv DATABASE_URL postgresql://release_config:release_config@127.0.0.1/release_config \
   --setenv ERP_MIGRATION_DATABASE_URL postgresql://release_migrator:release_config@127.0.0.1/release_config \
   --setenv ERP_MIGRATION_EXPECTED_ROLE release_migrator \
+  --setenv ERP_RELEASE_IDENTITY_READER_GID 1000 \
   --setenv POSTGRES_DB release_config --setenv POSTGRES_USER release_config --setenv POSTGRES_PASSWORD release-config-not-a-runtime-secret \
   --setenv ERP_BUILD_VERSION "${ERP_BUILD_VERSION:?ERP_BUILD_VERSION is required}" \
   --setenv ERP_BUILD_REVISION "${ERP_BUILD_REVISION:?ERP_BUILD_REVISION is required}" \
@@ -57,4 +61,20 @@ git_candidate archive --format=tar "$GIT_COMMIT" chenyida_erp_site | /usr/bin/ta
   --setenv ERP_WORKER_IMAGE "${ERP_WORKER_IMAGE:?ERP_WORKER_IMAGE is required}" \
   --setenv ERP_WEB_IMAGE_CONFIG_DIGEST "${ERP_WEB_IMAGE_CONFIG_DIGEST:?ERP_WEB_IMAGE_CONFIG_DIGEST is required}" \
   --setenv ERP_WORKER_IMAGE_CONFIG_DIGEST "${ERP_WORKER_IMAGE_CONFIG_DIGEST:?ERP_WORKER_IMAGE_CONFIG_DIGEST is required}" \
-  -- /usr/bin/docker compose --env-file /dev/null -f compose.yml -f compose.release.yml config --quiet
+  --setenv ERP_CONTAINER_RUNTIME_COMPOSE_VERSION "$DOCKER_COMPOSE_VERSION" \
+  --setenv ERP_CONTAINER_RUNTIME_ENGINE_VERSION "$DOCKER_ENGINE_VERSION" \
+  -- /bin/sh -c '
+    set -eu
+    set -f
+    /usr/bin/docker compose --env-file /dev/null --profile "*" -f compose.yml -f compose.release.yml config --format json |
+      /usr/bin/python3.11 -B /supervisor/scripts/container-runtime-policy.py validate \
+        --policy /supervisor/operations/container-runtime-policy-v1.json \
+        --project-root /workspace \
+        --compose-version "$ERP_CONTAINER_RUNTIME_COMPOSE_VERSION" \
+        --engine-version "$ERP_CONTAINER_RUNTIME_ENGINE_VERSION" \
+        --web-image "$ERP_WEB_IMAGE" \
+        --worker-image "$ERP_WORKER_IMAGE" \
+        --web-config-digest "$ERP_WEB_IMAGE_CONFIG_DIGEST" \
+        --worker-config-digest "$ERP_WORKER_IMAGE_CONFIG_DIGEST" \
+        --reader-gid "$ERP_RELEASE_IDENTITY_READER_GID"
+  '

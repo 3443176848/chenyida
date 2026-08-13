@@ -62,6 +62,21 @@ TASK42已形成release manifest、Migration allowlist、content-addressed superv
 - UAT/PRODUCTION Migration必须通过只读挂载的`release-manifest.json`及其SHA，显式确认精确deployment、数据库名、system identifier、OID、database comment marker、当前head和目标head。不得把秘密放入manifest或命令行。
 - Migration前必须另行取得专项授权和可恢复快照；工具通过并不授权连接数据库、替换镜像、重启服务或发布runtime identity。
 
+## 容器运行时最小权限门
+
+TASK50已经在仓库和任务私有隔离容器中验证[D-127](../project/DECISIONS.md#d-127-容器运行合同采用完整服务集合精确写路径和内核态最小权限复核)，但没有修改现行UAT。未来候选只有同时通过release gate的`compose-config`和`container-runtime-policy`两步，才证明候选配置与固定镜像兼容；这两步通过仍不授权部署。
+
+- `operations/container-runtime-policy-v1.json`内容寻址绑定Dockerfile、Compose release overlay、Caddyfile、Engine 29.5.2和Compose 5.1.4。任何版本、源摘要或策略漂移都会失败；升级Engine/Compose或基础镜像前先另立审阅任务，不能改成宽松版本范围。
+- `compose-config`必须解析`--profile '*'`的六个服务，并在隔离bwrap中把JSON直接通过stdin交给策略解析器。解析结果可能含凭据，禁止写临时文件、执行`tee`、复制到工单/聊天或在失败时打印；合法输出只有`CONTAINER_RUNTIME_POLICY_OK ...`，失败只有`CONTAINER_RUNTIME_POLICY_FAILED:<CODE>`。
+- `container-runtime-policy`使用精确候选Web/Worker digest及config digest，串行演练Admin、Migrate、Web、Worker、PostgreSQL、Caddy；每次最多一个临时容器，不发布宿主端口。合法输出为`CONTAINER_RUNTIME_POLICY_TEST_OK services=6 ... max_containers=1`。任何失败、超时、中断或残留都阻止后续gate步骤。
+- 运行合同要求全部服务只读rootfs、drop ALL和`NoNewPrivs=1`。Caddy只允许`0:0 + NET_BIND_SERVICE`，Migrate只允许`65532:0`读取root-owned制品，Web只允许一个发布身份reader GID；其他额外group、capability或root身份都不是排障手段。
+- PostgreSQL只写`erp_postgres`、`/tmp`和`/var/run/postgresql`；Caddy只写`caddy_data`/`caddy_config`；Web/Worker只写uploads/attachments，backup/release挂载只读。不得通过增加rootfs写权限、bind宿主目录、关闭`noexec`或挂Docker socket修复启动失败。
+- Backend网络必须为internal；PostgreSQL、Migrate、Worker、Admin只接backend，Caddy只接edge，Web接两者。Web宿主IP固定loopback，Caddy宿主IP固定公开入口，容器目标端口固定3000/80/443。端口或网络变化必须更新策略并重做隔离证据。
+
+未来获准部署前，先从可恢复快照开始，并在不读取卷正文的授权检查中核对现有PostgreSQL数据目录为UID/GID 999可写、uploads/attachments为65532可写、release identity为root:`reader_gid`且目录/文件分别0750/0440、Caddy两卷可由其受控root进程写入。若owner/mode不符，停止部署并提交精确路径、当前/目标metadata、影响、备份和回滚方案；禁止在Compose入口中递归`chown`，也禁止先重建服务“试试看”。
+
+运行门失败时只保留稳定code、候选digest、gate run ID、资源快照和任务资源清理状态。先核对是否为策略/源/Engine版本漂移、镜像声明卷、用户/GID、只读挂载、tmpfs、能力、listener、PostgreSQL热重启或残留资源；不得收集/粘贴Compose JSON、环境、数据库连接串或容器日志来绕过此门。本地出现`chenyida.erp.container-runtime-policy-test`标签残留时，停止新gate并按精确ID升级事故处置；不按前缀批量删除，更不得触碰四个受保护卷。
+
 ## 备份、恢复与故障处理
 
 - V2 已用合成数据和双独立 PostgreSQL 测试集群证明四域 manifest、数据库守卫、不可变本机/异机/恢复回执、故障注入清理及 prepared receipt 补发；没有读取当前四卷或生成真实备份。

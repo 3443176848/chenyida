@@ -24,16 +24,18 @@ test("versioned repository release plan is the exact fail-closed official plan",
   const value = validateOfficialReleaseGatePlan(JSON.parse(raw));
   assert.equal(value.resource_policy.compose_parallel_limit, 1);
   assert.equal(value.resource_policy.max_temporary_containers, 1);
-  assert.equal(value.steps.length, 18);
+  assert.equal(value.steps.length, 19);
   assert.ok(value.steps.every((step) => step.applicability === "REQUIRED" && step.timeout_seconds <= 14400));
   assert.equal(value.steps.find((step) => step.id === "supervisor-python-contracts").executor_id, "PYTHON_CANDIDATE_TEST");
   assert.ok(["release-contracts", "credential-scan", "build-and-node-source-tests", "browser-end-to-end-tests", "special-posix-tests", "all-typescript-configs", "eslint"].every((id) => value.steps.find((step) => step.id === id)?.executor_id === "NODE_CANDIDATE_TEST"));
   assert.equal(value.steps.find((step) => step.id === "postgres-regression-tests")?.executor_id, "POSTGRES_CANDIDATE_TEST");
+  assert.equal(value.steps.find((step) => step.id === "container-runtime-policy")?.executor_id, "CONTAINER_RUNTIME_TEST");
   assert.ok(value.steps.filter((step) => step.id.startsWith("python-")).every((step) => step.executor_id === "PYTHON_CANDIDATE_TEST"));
   assert.ok(value.steps.every((step) => !("command" in step)));
   assert.equal(officialExecutorCommand(value.steps[0], "/trusted/supervisor")[0], "/trusted/supervisor/scripts/run-release-node-sandbox.sh");
   assert.equal(officialExecutorCommand(value.steps[4], "/trusted/supervisor")[0], "/trusted/supervisor/scripts/run-release-postgres-regression-tests.sh");
   assert.deepEqual(officialExecutorCommand(value.steps[6], "/trusted/supervisor"), ["/trusted/supervisor/scripts/run-release-node-sandbox.sh", "special-posix"]);
+  assert.deepEqual(officialExecutorCommand(value.steps[15], "/trusted/supervisor"), ["/trusted/supervisor/scripts/run-container-runtime-policy-test.sh"]);
   assert.throws(() => officialExecutorCommand({ executor_id: "PATH", action: "../../bin/sh" }, "/trusted/supervisor"), (error) => error.code === "GATE_EXECUTOR_ACTION_INVALID");
 });
 
@@ -89,6 +91,8 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   const recoverySandbox = await readFile(new URL("../scripts/run-backup-recovery-postgres-test.sh", import.meta.url), "utf8");
   const postgresRunner = await readFile(new URL("../scripts/release-postgres-regression-runner.mjs", import.meta.url), "utf8");
   const pythonSandbox = await readFile(new URL("../scripts/run-python-baseline-test.sh", import.meta.url), "utf8");
+  const composeSandbox = await readFile(new URL("../scripts/run-compose-config-test.sh", import.meta.url), "utf8");
+  const runtimePolicyTest = await readFile(new URL("../scripts/container-runtime-policy-test.py", import.meta.url), "utf8");
   for (const script of [wrapper, creator]) {
     assert.match(script, /LOCK_FILE=\/var\/lock\/chenyida-erp-release-gate-v1\.lock/);
     assert.match(script, /flock -n 9/);
@@ -129,6 +133,15 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.match(pythonSandbox, /--ro-bind "\$SUPERVISOR_SITE_ROOT" \/supervisor/);
   assert.match(pythonSandbox, /git_candidate archive --format=tar/);
   assert.match(pythonSandbox, /--ro-bind \/lib64 \/lib64/);
+  assert.match(composeSandbox, /--profile "\*"/);
+  assert.match(composeSandbox, /container-runtime-policy\.py validate/);
+  assert.match(composeSandbox, /--ro-bind "\$SUPERVISOR_SITE_ROOT" \/supervisor/);
+  assert.match(runtimePolicyTest, /chenyida\.erp\.container-runtime-policy-test/);
+  assert.match(runtimePolicyTest, /max_containers=1/);
+  assert.match(runtimePolicyTest, /TASK_VOLUME_INVENTORY_FAILED/);
+  assert.match(runtimePolicyTest, /POSTGRES_WARM_DATA_COUNT_MISMATCH/);
+  assert.match(runtimePolicyTest, /CADDY_WARM_LISTENER_POLICY_MISMATCH/);
+  assert.doesNotMatch(runtimePolicyTest, /"--privileged"/);
   assert.match(nodeSandbox, /-v "\$NODE_MODULES:\/workspace\/chenyida_erp_site\/node_modules:ro"/);
   assert.doesNotMatch(nodeSandbox, /\$NODE_MODULES:\/supervisor\/node_modules/);
   assert.match(nodeSandbox, /--user "\$container_user"/);
@@ -241,6 +254,7 @@ test("release shell wrappers reject replace refs and normalize Git archive modes
     "create-release-manifest.sh",
     "run-backup-recovery-postgres-test.sh",
     "run-compose-config-test.sh",
+    "run-container-runtime-policy-test.sh",
     "run-python-baseline-test.sh",
     "run-release-gate.sh",
     "run-release-migration-postgres-test.sh",

@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 SITE_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_POLICY_SHA256 = "51f6fdfdcda83e637f71af076c395f4ad66c4a2fac2ded8b0cb460cc3e99556c"
+EXPECTED_POLICY_SHA256 = "0919d50a7c2bbb2888bd25b126b8aefa115f2f28d1b4944e40eaff2e0cf98c2f"
 EXPECTED_BROWSER_IMAGE = "mcr.microsoft.com/playwright@sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961"
 EXPECTED_EXECUTABLE_SHA256 = "efb2bece6f2f5bc00dc270162d2241c86d509ca4f4297b1eb0f5cd8894d050be"
 

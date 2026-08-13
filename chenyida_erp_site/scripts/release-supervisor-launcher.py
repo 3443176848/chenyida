@@ -34,11 +34,14 @@ IMAGE_REFERENCE = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[0-9]+)?(?:/[a-z
 ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 
 BUNDLE_FILES: dict[str, str] = {
+    "chenyida_erp_site/operations/container-runtime-policy-v1.json": "0444",
     "chenyida_erp_site/release/release-gate-plan-v1.json": "0444",
     "chenyida_erp_site/release/release-test-inventory-v1.json": "0444",
     "chenyida_erp_site/release/test-runtime-policy-v1.json": "0444",
     "chenyida_erp_site/release/vulnerability-policy-v1.json": "0444",
     "chenyida_erp_site/scripts/check-credentials.mjs": "0444",
+    "chenyida_erp_site/scripts/container-runtime-policy-test.py": "0444",
+    "chenyida_erp_site/scripts/container-runtime-policy.py": "0444",
     "chenyida_erp_site/scripts/create-release-image-evidence.sh": "0555",
     "chenyida_erp_site/scripts/create-release-manifest.sh": "0555",
     "chenyida_erp_site/scripts/create-release-supervisor-bundle-manifest.py": "0555",
@@ -56,6 +59,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/release-test-inventory.mjs": "0444",
     "chenyida_erp_site/scripts/run-backup-recovery-postgres-test.sh": "0555",
     "chenyida_erp_site/scripts/run-compose-config-test.sh": "0555",
+    "chenyida_erp_site/scripts/run-container-runtime-policy-test.sh": "0555",
     "chenyida_erp_site/scripts/run-python-baseline-test.sh": "0555",
     "chenyida_erp_site/scripts/run-release-browser-tests.sh": "0555",
     "chenyida_erp_site/scripts/run-release-gate.sh": "0555",
@@ -71,6 +75,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-release-manifest-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-release-migration-allowlist.test.mjs": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_browser.py": "0444",
+    "chenyida_erp_site/tests/test_release_supervisor_container_runtime.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_installer.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_launcher.py": "0444",
 }

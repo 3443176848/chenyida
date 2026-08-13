@@ -43,7 +43,7 @@ const EMPTY_SHA256 = sha256("");
 const DEFAULT_SUPERVISOR_SITE_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const RELEASE_GATE_LOCK_FILE = "/var/lock/chenyida-erp-release-gate-v1.lock";
 const SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
-const RELEASE_TEMPORARY_LABELS = ["chenyida.erp.release-node-bootstrap", "chenyida.erp.release-manifest-node-bootstrap", "chenyida.erp.release-node-test", "chenyida.erp.release-browser-test", "chenyida.erp.release-postgres-regression", "chenyida.erp.release-migration-test", "chenyida.erp.backup-recovery-test", "chenyida.erp.release-identity-publisher", "chenyida.erp.release-image-evidence"];
+const RELEASE_TEMPORARY_LABELS = ["chenyida.erp.release-node-bootstrap", "chenyida.erp.release-manifest-node-bootstrap", "chenyida.erp.release-node-test", "chenyida.erp.release-browser-test", "chenyida.erp.release-postgres-regression", "chenyida.erp.release-migration-test", "chenyida.erp.backup-recovery-test", "chenyida.erp.container-runtime-policy-test", "chenyida.erp.release-identity-publisher", "chenyida.erp.release-image-evidence"];
 const REQUIRED_RUNTIME_SERVICES = new Map([["caddy", new Set(["none", "healthy"])], ["postgres", new Set(["healthy"])], ["web", new Set(["healthy"])], ["worker", new Set(["healthy"])]]);
 const TREE_DIGEST_COMMAND = "{ /usr/bin/find -P . -xdev -printf '%y|%m|%P|%l\\n' | LC_ALL=C /usr/bin/sort; /usr/bin/find -P . -xdev -type f -print0 | LC_ALL=C /usr/bin/sort -z | /usr/bin/xargs -0 /usr/bin/sha256sum; } | /usr/bin/sha256sum";
 const OFFICIAL_EXECUTOR_COMMANDS = new Map([
@@ -62,6 +62,7 @@ const OFFICIAL_EXECUTOR_COMMANDS = new Map([
   ["PYTHON_CANDIDATE_TEST:SMOKE", ["scripts/run-python-baseline-test.sh", "smoke"]],
   ["PYTHON_CANDIDATE_TEST:GO_LIVE", ["scripts/run-python-baseline-test.sh", "go-live"]],
   ["COMPOSE_CONFIG_TEST:VALIDATE", ["scripts/run-compose-config-test.sh"]],
+  ["CONTAINER_RUNTIME_TEST:RUNTIME_POLICY", ["scripts/run-container-runtime-policy-test.sh"]],
   ["SOURCE_CHECK:DIFF_CHECK", ["scripts/run-source-diff-check.sh"]],
 ]);
 
@@ -256,6 +257,7 @@ function safeCommandEnvironment(candidate, runId, heapMib, imageReferences, repo
     ERP_WORKER_IMAGE: imageReferences.worker,
     ERP_WEB_IMAGE_CONFIG_DIGEST: candidate.web_image_digest,
     ERP_WORKER_IMAGE_CONFIG_DIGEST: candidate.worker_image_digest,
+    ERP_RELEASE_IDENTITY_READER_GID: "1000",
     ERP_RELEASE_GATE_RUN_ID: runId,
     ERP_RELEASE_GATE_GIT_COMMIT: candidate.git_commit,
     ERP_RELEASE_GATE_GIT_TREE: candidate.git_tree,

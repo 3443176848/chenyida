@@ -197,6 +197,18 @@
     },
     {
       "ordinal": 16,
+      "id": "container-runtime-policy",
+      "kind": "COMMAND",
+      "resource_class": "HEAVY",
+      "applicability": "REQUIRED",
+      "reason": null,
+      "timeout_seconds": 600,
+      "executor_id": "CONTAINER_RUNTIME_TEST",
+      "action": "RUNTIME_POLICY",
+      "forbid_output_patterns": []
+    },
+    {
+      "ordinal": 17,
       "id": "git-diff-check",
       "kind": "COMMAND",
       "resource_class": "LIGHT",
@@ -208,7 +220,7 @@
       "forbid_output_patterns": []
     },
     {
-      "ordinal": 17,
+      "ordinal": 18,
       "id": "image-sbom-evidence",
       "kind": "EVIDENCE",
       "resource_class": "LIGHT",
@@ -220,7 +232,7 @@
       "forbid_output_patterns": []
     },
     {
-      "ordinal": 18,
+      "ordinal": 19,
       "id": "vulnerability-assessment-evidence",
       "kind": "EVIDENCE",
       "resource_class": "LIGHT",

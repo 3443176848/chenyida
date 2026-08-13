@@ -2098,6 +2098,46 @@
 - 拒绝仅靠HTTP readiness推导完整release/Migration身份，或把Caddy与alpha.46 Worker的health要求混为同一规则。
 - 拒绝把写到stdout或本机文件等同于外部通知成功，拒绝无界重试/无界队列，也拒绝状态损坏后自动清空并恢复绿色。
 
+## D-127 容器运行合同采用完整服务集合、精确写路径和内核态最小权限复核
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / REPOSITORY AND ISOLATED RUNTIME VERIFIED / UAT NOT DEPLOYED / PRODUCTION NO-GO`
+- 提案与实施：Codex 持续交付负责人，依据 TASK50 三路只读审计、Docker 29.5.2 / Compose 5.1.4 实际解析结果及六服务隔离运行证据
+- 确认边界：只授权仓库 Compose、策略、发布门和任务私有隔离容器；不授权修改现行 UAT、受保护卷、账号、网络、宿主服务、真实数据或正式部署
+
+### Context
+
+- 现行 UAT PostgreSQL、Web、Worker、Caddy 的实际 metadata 均为可写 rootfs，且没有显式 capability drop 或 `no-new-privileges`；仓库原 Compose 也只对 Migrate 形成了部分最小权限约束。页面与应用权限并不能限制容器逃逸后的宿主攻击面。
+- Web/Worker 必须写 uploads/attachments，Web 还要只读 backup/release identity；PostgreSQL 入口需要数据目录与 Unix socket，Caddy 需要证书/配置持久化并绑定 80/443。把所有服务机械改为同一用户或零写路径会造成不可用或把写权限重新扩散到 rootfs。
+- Compose 的 profile、锚点、环境替换、长短挂载语法和规范化默认值会隐藏实际服务字段。只对 YAML 文本做正则检查无法证明 Admin/Caddy 等 profile 服务、最终端口、顶层卷/网络或恶意 host namespace 没有漂移。
+- 现有发布门只执行 `compose config --quiet`，能发现语法错误但不能证明最小权限字段完整，更不能证明固定镜像在当前内核/Engine 下能以这些约束启动和持久化。
+
+### Decision
+
+1. `operations/container-runtime-policy-v1.json`作为唯一版本化运行合同，按精确 SHA-256 绑定 Dockerfile、基础 Compose、release overlay 和 Caddyfile，并固定 linux/amd64、Docker Engine 29.5.2、Compose 5.1.4。解析器或任一源文件变化必须显式刷新策略与 supervisor，不能静默兼容。
+2. 发布解析必须带 `--profile '*'`并得到恰好 Admin、Caddy、Migrate、PostgreSQL、Web、Worker 六服务；顶层服务、卷、网络和扩展字段以及每个服务的最终字段集合全部精确匹配。未知字段、额外服务、privileged、host PID/IPC/network、device、Docker/Podman socket、host root bind、外部卷/驱动选项和不受控 security option 一律失败关闭。
+3. 六服务统一使用只读 rootfs、`cap_drop: [ALL]`和`no-new-privileges:true`。Admin、Web、Worker 固定`65532:65532`；Migrate 固定`65532:0`只读 root-owned release candidate；Web 仅通过受控 supplementary GID读取 release identity。不得保留通用 root shell 或额外 capability。
+4. PostgreSQL 固定官方内容摘要、`999:999`、零 capability、64 MiB shm，并只允许数据库卷、32 MiB `/tmp`和16 MiB socket tmpfs写入。隔离首次初始化、SQL写入和同卷热重启均必须成功，rootfs写入必须失败。
+5. Caddy 固定官方内容摘要，保留经实测所需的`0:0 + NET_BIND_SERVICE`唯一例外；其 rootfs仍只读，只允许`/data`和`/config`卷以及只读 Caddyfile。进程有效 capability 必须恰为 bit 10、`NoNewPrivs=1`，并实际监听 TCP 80/443和UDP 443且热重启成功。未来若改用高端口或具备等价非 root 入口，应另立策略版本移除此例外。
+6. Web/Worker 只允许 uploads/attachments业务卷写入；Web 的 backup status和release identity必须只读。所有应用/工具服务只获得有界`rw,nosuid,nodev,noexec` `/tmp`；Worker实例文件留在该 tmpfs。后端网络设为 internal，只有Web同时连接backend/edge，Caddy只连接edge；宿主绑定IP和容器目标端口不允许环境变量改写。
+7. `container-runtime-policy.py`只从stdin内存读取已解析Compose JSON，不落盘、不回显环境值，只输出成功摘要或稳定错误码；策略/JSON重复键、大小、类型、源摘要、镜像/config摘要、用户/GID、能力、tmpfs、挂载、端口、依赖、资源、restart、日志、health和环境键均严格验证。
+8. 正式 release gate新增必需的`CONTAINER_RUNTIME_TEST/RUNTIME_POLICY`重步骤。隔离探针使用任务标签与随机精确名称，每次最多一个临时容器，不发布宿主端口、不连接现行 UAT或受保护卷；它核对镜像声明卷、Docker inspect、`/proc/<pid>/status`、写入/拒写、tmpfs不可执行、PostgreSQL数据热重启和Caddy监听/热重启，并在成功、失败或信号路径核对容器、网络、卷和目录清零。
+9. 本决定不自动迁移现有卷所有权或重建 UAT。未来部署前必须在专项授权下只读核对 PostgreSQL/Caddy及uploads/attachments/release路径的实际owner/mode，先形成可恢复快照和精确变更/回滚方案；不得让Compose启动时递归chown生产卷。现行 UAT保持旧运行事实并继续失败关闭。
+
+### Consequences
+
+- 仓库候选现在具有机器可执行的最小权限合同和内核态兼容证据；`compose config`语法成功不再足以通过发布门。策略包含三个有界例外（Caddy低端口、Migrate root group读取、Web release supplementary GID），其余服务无 capability。
+- Docker/Compose升级、基础镜像digest、Caddy端口、挂载、网络、用户或资源策略变化会主动阻断发布，需要重新审计、更新内容寻址策略并重复六服务隔离演练。这是预期的可追溯升级成本。
+- TASK50没有重建当前 alpha.46镜像，没有安装更新后的 supervisor，也没有修改 UAT alpha.42/0040。现有受保护卷owner/mode、正式同候选gate、UAT部署和长时稳定性仍是后续授权门，系统继续`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝只运行`compose config --quiet`、只用正则扫描YAML、遗漏profile服务，或把静态字段存在当作内核实际生效。
+- 拒绝保留镜像默认root/默认capability、使用`privileged`、host namespace、Docker socket、任意host bind或为了排障扩大写路径。
+- 拒绝为了形式上的全非root让Caddy使用未经验证的入口/端口，也拒绝给它保留默认capability集合；当前只接受实测的单一`NET_BIND_SERVICE`例外。
+- 拒绝在隔离测试中挂载现行四个持久卷、读取业务数据/日志/环境，或在未来部署时用启动脚本自动递归chown生产数据。
+- 拒绝把本次隔离成功写成UAT已加固、正式发布门已PASS或系统可供员工使用。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
