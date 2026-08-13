@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-backup-operations-policy/v1",
+  "policy_id": "synthetic-offhost-daily-v1",
+  "scope": "SYNTHETIC_TEST_ONLY",
+  "source_location_id": "source-host",
+  "receiver_location_id": "offhost-a",
+  "inner_policy_id": "daily-rpo-v1",
+  "schedule_anchor_at": "2026-01-01T00:00:00.000Z",
+  "cadence_minutes": 1440,
+  "rpo_minutes": 1440,
+  "grace_minutes": 60,
+  "max_run_minutes": 180,
+  "max_clock_skew_seconds": 60,
+  "retention_days": 30,
+  "min_verified_generations": 2,
+  "min_restore_verified_generations": 1,
+  "key_allowlist": {
+    "source_signing": [
+      {
+        "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "ACTIVE",
+        "not_before": "2026-01-01T00:00:00.000Z",
+        "not_after": "2027-01-01T00:00:00.000Z"
+      }
+    ],
+    "receiver_encryption": [
+      {
+        "fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "status": "ACTIVE",
+        "not_before": "2026-01-01T00:00:00.000Z",
+        "not_after": "2027-01-01T00:00:00.000Z"
+      }
+    ],
+    "receiver_receipt": [
+      {
+        "fingerprint": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "status": "ACTIVE",
+        "not_before": "2026-01-01T00:00:00.000Z",
+        "not_after": "2027-01-01T00:00:00.000Z"
+      }
+    ]
+  }
+}

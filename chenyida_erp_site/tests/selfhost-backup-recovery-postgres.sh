@@ -8,6 +8,9 @@ SITE_ROOT=/workspace
 cd "$SITE_ROOT"
 TASK_ROOT=$(mktemp -d /tmp/cyd-backup-v2-postgres.XXXXXX)
 chmod 0711 "$TASK_ROOT"
+NODE_ENV=test
+ERP_RELEASE_GATE_LOCK_FILE="$TASK_ROOT/release-gate.lock"
+export NODE_ENV ERP_RELEASE_GATE_LOCK_FILE
 SOURCE_PGDATA="$TASK_ROOT/source-pgdata"; SOURCE_SOCKET="$TASK_ROOT/source-socket"; SOURCE_LOG="$SOURCE_PGDATA/postgres.log"
 TARGET_PGDATA="$TASK_ROOT/target-pgdata"; TARGET_SOCKET="$TASK_ROOT/target-socket"; TARGET_LOG="$TARGET_PGDATA/postgres.log"
 SOURCE_RUNNING=0; TARGET_RUNNING=0; GUARD_PID=""
@@ -55,7 +58,7 @@ SOURCE_RUNNING=1
 export PGHOST="$SOURCE_SOCKET" PGUSER=postgres
 
 createdb source_test
-psql -d postgres -v ON_ERROR_STOP=1 -c "comment on database source_test is 'chenyida-erp-deployment/v2:UAT:erp-uat-source'" >/dev/null
+psql -d postgres -v ON_ERROR_STOP=1 -c "comment on database source_test is 'chenyida-erp-deployment/v2:TEST:erp-test-source'" >/dev/null
 createdb guard_test
 psql -d postgres -v ON_ERROR_STOP=1 -c "comment on database guard_test is 'chenyida-erp-deployment/v2:TEST:guard-source'" >/dev/null
 GUARD_DATABASE_OID=$(psql -d postgres -Atc "select oid from pg_database where datname='guard_test'")
@@ -95,19 +98,75 @@ UPLOADS="$TASK_ROOT/uploads"; ATTACHMENTS="$TASK_ROOT/attachments"
 mkdir -m 0700 "$UPLOADS" "$ATTACHMENTS"
 printf 'synthetic upload\n' > "$UPLOADS/upload.txt"; : > "$UPLOADS/zero-byte.txt"; printf 'synthetic attachment\n' > "$ATTACHMENTS/attachment.txt"
 BACKUP_ROOT="$TASK_ROOT/backup-root"; RECEIPT_ROOT="$TASK_ROOT/receipt-root"; OFFHOST_ROOT="$TASK_ROOT/offhost-root"; RESTORE_ROOT="$TASK_ROOT/restore-root"; CREDENTIAL_ROOT="$TASK_ROOT/credentials"; RECEIPT_GID=$(id -g)
+OUTBOX_ROOT="$TASK_ROOT/transfer-outbox"; RECEIVER_ROOT="$TASK_ROOT/transfer-receiver"; SOURCE_KEY_ROOT="$TASK_ROOT/source-keys"; RECEIVER_KEY_ROOT="$TASK_ROOT/receiver-keys"; OPERATIONS_POLICY="$TASK_ROOT/offhost-policy.json"
 marker_root "$BACKUP_ROOT" .chenyida-erp-backup-root-v2 chenyida-erp-backup-root/v2
 marker_root "$RECEIPT_ROOT" .chenyida-erp-receipt-root-v2 chenyida-erp-receipt-root/v2 2750
 chgrp "$RECEIPT_GID" "$RECEIPT_ROOT"
 marker_root "$OFFHOST_ROOT" .chenyida-erp-offhost-root-v2 chenyida-erp-offhost-root/v2
 marker_root "$RESTORE_ROOT" .chenyida-erp-restore-root-v2 chenyida-erp-restore-root/v2
 marker_root "$CREDENTIAL_ROOT" .chenyida-erp-credential-root-v2 chenyida-erp-credential-root/v2
+marker_root "$OUTBOX_ROOT" .chenyida-erp-transfer-outbox-v1 chenyida-erp-transfer-outbox/v1
+marker_root "$RECEIVER_ROOT" .chenyida-erp-transfer-receiver-v1 chenyida-erp-transfer-receiver/v1
+marker_root "$SOURCE_KEY_ROOT" .chenyida-erp-offhost-key-root-v1 chenyida-erp-offhost-key-root/v1
+marker_root "$RECEIVER_KEY_ROOT" .chenyida-erp-offhost-key-root-v1 chenyida-erp-offhost-key-root/v1
 SERVICE_FILE="$CREDENTIAL_ROOT/pg_service.conf"
 printf '[backup]\nhost=%s\ndbname=source_test\nuser=postgres\n[guard]\nhost=%s\ndbname=guard_test\nuser=postgres\n[restore_admin]\nhost=%s\ndbname=postgres\nuser=postgres\n' "$SOURCE_SOCKET" "$SOURCE_SOCKET" "$TARGET_SOCKET" > "$SERVICE_FILE"
 chmod 0600 "$SERVICE_FILE"
-SOURCE_MACHINE_ID="$TASK_ROOT/source-machine-id"; RECEIVER_MACHINE_ID="$TASK_ROOT/receiver-machine-id"
+SOURCE_MACHINE_ID="$TASK_ROOT/source-machine-id"
 printf '11111111111111111111111111111111\n' > "$SOURCE_MACHINE_ID"
-printf '22222222222222222222222222222222\n' > "$RECEIVER_MACHINE_ID"
-chmod 0400 "$SOURCE_MACHINE_ID" "$RECEIVER_MACHINE_ID"
+chmod 0400 "$SOURCE_MACHINE_ID"
+
+SOURCE_KEY_ROOT="$SOURCE_KEY_ROOT" RECEIVER_KEY_ROOT="$RECEIVER_KEY_ROOT" OPERATIONS_POLICY="$OPERATIONS_POLICY" node <<'NODE'
+const { createHash, generateKeyPairSync } = require("node:crypto");
+const { writeFileSync } = require("node:fs");
+const { join } = require("node:path");
+const source = generateKeyPairSync("ed25519");
+const encryption = generateKeyPairSync("x25519");
+const receipt = generateKeyPairSync("ed25519");
+const privatePem = (key) => key.export({ format: "pem", type: "pkcs8" });
+const publicPem = (key) => key.export({ format: "pem", type: "spki" });
+const fingerprint = (key) => createHash("sha256").update(key.export({ format: "der", type: "spki" })).digest("hex");
+const writeKey = (root, name, value) => writeFileSync(join(root, name), value, { flag: "wx", mode: 0o400 });
+writeKey(process.env.SOURCE_KEY_ROOT, "source-signing-private.pem", privatePem(source.privateKey));
+writeKey(process.env.SOURCE_KEY_ROOT, "receiver-encryption-public.pem", publicPem(encryption.publicKey));
+writeKey(process.env.SOURCE_KEY_ROOT, "receiver-receipt-public.pem", publicPem(receipt.publicKey));
+writeKey(process.env.RECEIVER_KEY_ROOT, "receiver-encryption-private.pem", privatePem(encryption.privateKey));
+writeKey(process.env.RECEIVER_KEY_ROOT, "trusted-source-signing-public.pem", publicPem(source.publicKey));
+writeKey(process.env.RECEIVER_KEY_ROOT, "receiver-receipt-private.pem", privatePem(receipt.privateKey));
+writeKey(process.env.RECEIVER_KEY_ROOT, "receiver-receipt-public.pem", publicPem(receipt.publicKey));
+const key = (value) => ({ fingerprint: value, status: "ACTIVE", not_before: "2026-01-01T00:00:00.000Z", not_after: "2027-01-01T00:00:00.000Z" });
+const policy = {
+  schema_version: 1,
+  contract: "chenyida-erp-backup-operations-policy/v1",
+  policy_id: "synthetic-offhost-daily-v1",
+  scope: "SYNTHETIC_TEST_ONLY",
+  source_location_id: "source-host",
+  receiver_location_id: "offhost-a",
+  inner_policy_id: "daily-rpo-v1",
+  schedule_anchor_at: "2026-01-01T00:00:00.000Z",
+  cadence_minutes: 1440,
+  rpo_minutes: 1440,
+  grace_minutes: 60,
+  max_run_minutes: 180,
+  max_clock_skew_seconds: 60,
+  retention_days: 30,
+  min_verified_generations: 2,
+  min_restore_verified_generations: 1,
+  key_allowlist: {
+    source_signing: [key(fingerprint(source.publicKey))],
+    receiver_encryption: [key(fingerprint(encryption.publicKey))],
+    receiver_receipt: [key(fingerprint(receipt.publicKey))],
+  },
+};
+writeFileSync(process.env.OPERATIONS_POLICY, `${JSON.stringify(policy)}\n`, { flag: "wx", mode: 0o400 });
+NODE
+SOURCE_SIGNING_PRIVATE_KEY="$SOURCE_KEY_ROOT/source-signing-private.pem"
+SOURCE_RECEIVER_ENCRYPTION_PUBLIC_KEY="$SOURCE_KEY_ROOT/receiver-encryption-public.pem"
+SOURCE_RECEIVER_RECEIPT_PUBLIC_KEY="$SOURCE_KEY_ROOT/receiver-receipt-public.pem"
+RECEIVER_ENCRYPTION_PRIVATE_KEY="$RECEIVER_KEY_ROOT/receiver-encryption-private.pem"
+TRUSTED_SOURCE_SIGNING_PUBLIC_KEY="$RECEIVER_KEY_ROOT/trusted-source-signing-public.pem"
+RECEIVER_RECEIPT_PRIVATE_KEY="$RECEIVER_KEY_ROOT/receiver-receipt-private.pem"
+RECEIVER_RECEIPT_PUBLIC_KEY="$RECEIVER_KEY_ROOT/receiver-receipt-public.pem"
 
 FAKE_BIN="$TASK_ROOT/fake-bin"; mkdir -m 0700 "$FAKE_BIN"
 cat > "$FAKE_BIN/docker" <<'SH'
@@ -118,8 +177,8 @@ worker_id=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
 web_image=sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 worker_image=sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
 revision=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-writer_class=${FAKE_WRITER_CLASS:-uat}
-writer_project=${FAKE_WRITER_DEPLOYMENT_ID:-erp-uat-source}
+writer_class=${FAKE_WRITER_CLASS:-test}
+writer_project=${FAKE_WRITER_DEPLOYMENT_ID:-erp-test-source}
 case "${1:-}" in
   ps) case "$*" in *com.docker.compose.service=web*) printf '%s\n' "$web_id" ;; *com.docker.compose.service=worker*) printf '%s\n' "$worker_id" ;; *) exit 0 ;; esac ;;
   inspect) case "$*" in *'range .Config.Env'*) printf 'ERP_DEPLOYMENT_CLASS=%s\n' "$writer_class" ;; *) if [ "$last" = web-test ]; then printf '%s\n' "$web_id|false|false|0|2026-08-12T00:00:00Z|2026-08-12T00:01:00Z|$web_image|$writer_project|web|0.1.0-alpha.46|$revision"; else printf '%s\n' "$worker_id|false|false|0|2026-08-12T00:00:00Z|2026-08-12T00:01:00Z|$worker_image|$writer_project|worker|0.1.0-alpha.46|$revision"; fi ;; esac ;;
@@ -153,9 +212,9 @@ done
 [ "$(psql -d postgres -Atc "select datconnlimit from pg_database where datname='guard_test'")" = -1 ]
 [ ! -e "$BACKUP_ROOT/.backup-fence-v2.json" ]
 
-NODE_ENV=test "$SITE_ROOT/scripts/backup-selfhost.sh" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$SERVICE_FILE" --db-service backup --deployment-class UAT --deployment-id erp-uat-source --expected-database source_test \
+NODE_ENV=test "$SITE_ROOT/scripts/backup-selfhost.sh" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$SERVICE_FILE" --db-service backup --deployment-class TEST --deployment-id erp-test-source --expected-database source_test \
   --uploads "$UPLOADS" --attachments "$ATTACHMENTS" --backup-status "$RECEIPT_ROOT" --migrations "$MIGRATIONS" --backup-root "$BACKUP_ROOT" --receipt-root "$RECEIPT_ROOT" --receipt-reader-gid "$RECEIPT_GID" --web-container web-test --worker-container worker-test \
-  --location-id source-host --policy-id daily-rpo-v1 --rpo-hours 24 --machine-identity-file "$SOURCE_MACHINE_ID" --confirm UAT_BACKUP_V2_AUTHORIZED >/dev/null
+  --location-id source-host --policy-id daily-rpo-v1 --rpo-hours 24 --machine-identity-file "$SOURCE_MACHINE_ID" --confirm TEST_BACKUP_V2 >/dev/null
 [ "$(psql -d source_test -Atc 'show default_transaction_read_only')" = off ]
 [ "$(psql -d source_test -Atc "select count(*) from pg_db_role_setting s join pg_database d on d.oid=s.setdatabase where d.datname=current_database() and exists(select 1 from unnest(s.setconfig) v where v like 'default_transaction_read_only=%')")" = 0 ]
 [ "$(psql -d postgres -Atc "select datconnlimit from pg_database where datname='source_test'")" = -1 ]
@@ -165,16 +224,22 @@ BACKUP_ID=$(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name 'backup-*'
 node -e 'const fs=require("fs"),m=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(m.consistency.method!=="QUIESCED_APPLICATION_AND_SNAPSHOT_WITH_CONTENT_RECONCILIATION"||m.consistency.dump_scope!=="COMPLETE_APPLICATION_DATABASE_LOGICAL_DUMP_NO_OWNER_OR_ACL"||!Number.isSafeInteger(m.deployment.database_bytes)||m.deployment.database_bytes<1||m.deployment.database_system_identifier!==process.argv[2]||m.deployment.database_locale_provider!=="libc"||m.application.web_image_digest===m.application.worker_image_digest||m.reconciliation.contract!=="chenyida-erp-backup-reconciliation/v1")process.exit(1)' "$BACKUP_ROOT/$BACKUP_ID/manifest.json" "$SOURCE_SYSTEM_ID"
 SOURCE_DATABASE_BYTES=$(node -e 'const fs=require("fs"),m=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(m.deployment.database_bytes))' "$BACKUP_ROOT/$BACKUP_ID/manifest.json")
 
-cp -a -- "$BACKUP_ROOT/$BACKUP_ID" "$OFFHOST_ROOT/$BACKUP_ID"
-cp -- "$RECEIPT_ROOT/$BACKUP_ID.local.json" "$OFFHOST_ROOT/$BACKUP_ID.local.json"
-chmod -R go-w -- "$OFFHOST_ROOT/$BACKUP_ID" "$OFFHOST_ROOT/$BACKUP_ID.local.json"
-NODE_ENV=test "$SITE_ROOT/scripts/verify-backup-selfhost.sh" --offhost-root "$OFFHOST_ROOT" --backup-id "$BACKUP_ID" --migrations "$MIGRATIONS" --receipt-root "$RECEIPT_ROOT" --receipt-reader-gid "$RECEIPT_GID" --location-id offhost-a --transfer-id transfer-postgres-1 --machine-identity-file "$RECEIVER_MACHINE_ID" \
-  --expected-deployment-class UAT --expected-deployment-id erp-uat-source --expected-database-name source_test --expected-database-system-identifier "$SOURCE_SYSTEM_ID" --expected-database-oid "$SOURCE_DATABASE_OID" --expected-database-marker UAT.erp-uat-source \
-  --expected-database-bytes "$SOURCE_DATABASE_BYTES" \
-  --expected-database-server-major "$SOURCE_SERVER_MAJOR" --expected-database-encoding "$SOURCE_ENCODING" --expected-database-collate "$SOURCE_COLLATE" --expected-database-ctype "$SOURCE_CTYPE" --expected-database-locale-provider "$SOURCE_LOCALE_PROVIDER" --expected-database-collation-version "$SOURCE_COLLATION_VERSION" \
-  --expected-app-version 0.1.0-alpha.46 --expected-git-commit bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb --expected-web-image-digest sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc --expected-worker-image-digest sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
-  --expected-migration-head 0001_test.sql --expected-policy-id daily-rpo-v1 --expected-rpo-hours 24 --confirm OFFHOST_COPY_RECEIVED_AND_IMMUTABLE >/dev/null
-OFFHOST_RECEIVER_HASH=$(node -e 'const fs=require("fs"),r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(r.evidence.receiver_identity_sha256)' "$RECEIPT_ROOT/$BACKUP_ID.offhost.json")
+TRANSFER_ID=transfer-postgres-1
+SEALED_AT=$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')
+node "$SITE_ROOT/scripts/offhost-transfer-contract.mjs" seal \
+  --backup "$BACKUP_ROOT/$BACKUP_ID" --local-receipt "$RECEIPT_ROOT/$BACKUP_ID.local.json" --outbox-root "$OUTBOX_ROOT" --source-key-root "$SOURCE_KEY_ROOT" \
+  --source-signing-private-key "$SOURCE_SIGNING_PRIVATE_KEY" --receiver-encryption-public-key "$SOURCE_RECEIVER_ENCRYPTION_PUBLIC_KEY" --receiver-receipt-public-key "$SOURCE_RECEIVER_RECEIPT_PUBLIC_KEY" \
+  --receiver-location-id offhost-a --created-at "$SEALED_AT" --transfer-id "$TRANSFER_ID" --policy "$OPERATIONS_POLICY" >/dev/null
+node "$SITE_ROOT/scripts/offhost-transfer-contract.mjs" receive \
+  --incoming-package "$OUTBOX_ROOT/$TRANSFER_ID" --receiver-root "$RECEIVER_ROOT" --receiver-key-root "$RECEIVER_KEY_ROOT" --receiver-encryption-private-key "$RECEIVER_ENCRYPTION_PRIVATE_KEY" \
+  --trusted-source-signing-public-key "$TRUSTED_SOURCE_SIGNING_PUBLIC_KEY" --receiver-receipt-private-key "$RECEIVER_RECEIPT_PRIVATE_KEY" --migrations "$MIGRATIONS" \
+  --receiver-location-id offhost-a --retention-policy-id synthetic-retention-v1 --policy "$OPERATIONS_POLICY" >/dev/null
+ACCEPTED_AT=$(node -e 'const fs=require("fs"),r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(r.received_at)' "$RECEIVER_ROOT/$TRANSFER_ID/receiver-receipt.json")
+node "$SITE_ROOT/scripts/offhost-transfer-contract.mjs" accept-receipt \
+  --source-package "$OUTBOX_ROOT/$TRANSFER_ID" --receiver-receipt "$RECEIVER_ROOT/$TRANSFER_ID/receiver-receipt.json" --source-key-root "$SOURCE_KEY_ROOT" \
+  --source-signing-private-key "$SOURCE_SIGNING_PRIVATE_KEY" --receiver-receipt-public-key "$SOURCE_RECEIVER_RECEIPT_PUBLIC_KEY" --accepted-at "$ACCEPTED_AT" --policy "$OPERATIONS_POLICY" >/dev/null
+SOURCE_ACCEPTANCE="$OUTBOX_ROOT/$TRANSFER_ID.accepted.json"
+OFFHOST_RECEIVER_HASH=$(node -e 'const fs=require("fs"),r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(r.evidence.receiver_identity_sha256)' "$RECEIVER_ROOT/$TRANSFER_ID/offhost-receipt.json")
 
 stop_cluster "$SOURCE_PGDATA"; SOURCE_RUNNING=0
 unset PGHOST
@@ -189,24 +254,30 @@ psql -d postgres -v ON_ERROR_STOP=1 -c "alter role postgres set timezone='Asia/S
 
 restore_once() {
   target_database=$1; run_id=$2
-  "$SITE_ROOT/scripts/restore-selfhost.sh" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$SERVICE_FILE" --db-admin-service restore_admin --source-deployment-class UAT --source-deployment-id erp-uat-source --source-database-name source_test \
-    --source-database-system-identifier "$SOURCE_SYSTEM_ID" --source-database-oid "$SOURCE_DATABASE_OID" --source-database-marker UAT.erp-uat-source --source-database-bytes "$SOURCE_DATABASE_BYTES" --source-database-server-major "$SOURCE_SERVER_MAJOR" --source-database-encoding "$SOURCE_ENCODING" --source-database-collate "$SOURCE_COLLATE" --source-database-ctype "$SOURCE_CTYPE" --source-database-locale-provider "$SOURCE_LOCALE_PROVIDER" --source-database-collation-version "$SOURCE_COLLATION_VERSION" \
-    --offhost-root "$OFFHOST_ROOT" --backup-id "$BACKUP_ID" --migrations "$MIGRATIONS" --receipt-root "$RECEIPT_ROOT" --restore-root "$RESTORE_ROOT" --target-database-capacity-path "$TARGET_PGDATA" --receipt-reader-gid "$RECEIPT_GID" \
+  "$SITE_ROOT/scripts/restore-selfhost.sh" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$SERVICE_FILE" --db-admin-service restore_admin --source-deployment-class TEST --source-deployment-id erp-test-source --source-database-name source_test \
+    --source-database-system-identifier "$SOURCE_SYSTEM_ID" --source-database-oid "$SOURCE_DATABASE_OID" --source-database-marker TEST.erp-test-source --source-database-bytes "$SOURCE_DATABASE_BYTES" --source-database-server-major "$SOURCE_SERVER_MAJOR" --source-database-encoding "$SOURCE_ENCODING" --source-database-collate "$SOURCE_COLLATE" --source-database-ctype "$SOURCE_CTYPE" --source-database-locale-provider "$SOURCE_LOCALE_PROVIDER" --source-database-collation-version "$SOURCE_COLLATION_VERSION" \
+    --offhost-root "$OFFHOST_ROOT" --receiver-package "$RECEIVER_ROOT/$TRANSFER_ID" --source-acceptance "$SOURCE_ACCEPTANCE" --receiver-key-root "$RECEIVER_KEY_ROOT" --receiver-encryption-private-key "$RECEIVER_ENCRYPTION_PRIVATE_KEY" --trusted-source-signing-public-key "$TRUSTED_SOURCE_SIGNING_PUBLIC_KEY" --receiver-receipt-public-key "$RECEIVER_RECEIPT_PUBLIC_KEY" --operations-policy "$OPERATIONS_POLICY" --transfer-id "$TRANSFER_ID" \
+    --backup-id "$BACKUP_ID" --migrations "$MIGRATIONS" --receipt-root "$RECEIPT_ROOT" --restore-root "$RESTORE_ROOT" --target-database-capacity-path "$TARGET_PGDATA" --receipt-reader-gid "$RECEIPT_GID" \
     --target-deployment-class TEST --target-deployment-id isolated-test --target-admin-database postgres --target-database-name "$target_database" --target-marker-id target-marker --target-cluster-marker-id target-cluster --expected-target-system-identifier "$TARGET_SYSTEM_ID" --restore-run-id "$run_id" --location-id restore-host \
     --expected-app-version 0.1.0-alpha.46 --expected-git-commit bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb --expected-web-image-digest sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc --expected-worker-image-digest sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee \
-    --expected-migration-head 0001_test.sql --expected-policy-id daily-rpo-v1 --expected-rpo-hours 24 --confirm RESTORE_TO_MARKED_DISPOSABLE_TEST_TARGET
+    --expected-migration-head 0001_test.sql --expected-policy-id daily-rpo-v1 --expected-rpo-hours 24 --confirm RESTORE_SIGNED_ENCRYPTED_OFFHOST_TO_MARKED_DISPOSABLE_TEST_TARGET
+}
+assert_transient_materialization_removed() {
+  [ ! -e "$OFFHOST_ROOT/$BACKUP_ID" ] && [ ! -e "$OFFHOST_ROOT/$BACKUP_ID.$TRANSFER_ID.materialization.json" ] || { echo "transient plaintext materialization was not removed" >&2; exit 1; }
 }
 
 MARKER_GAP_DATABASE=cyd_marker_gap_restore_test
 if ERP_RESTORE_TEST_FAIL_AT=AFTER_DATABASE_CREATE restore_once "$MARKER_GAP_DATABASE" marker-gap >"$TASK_ROOT/marker-gap.log" 2>&1; then echo "marker-gap failure injection unexpectedly succeeded" >&2; exit 1; fi
 [ ! -e "$RESTORE_ROOT/marker-gap_restore_test" ]
-[ "$(receipt_result "$RECEIPT_ROOT/latest.json")" = OFFHOST_VERIFIED ]
+[ "$(receipt_result "$RECEIPT_ROOT/latest.json")" = LOCAL_VERIFIED ]
+[ ! -e "$OFFHOST_ROOT/$BACKUP_ID" ]
 [ "$(psql -d postgres -Atc "select count(*) from pg_database where datname='$MARKER_GAP_DATABASE'")" = 0 ]
 
 AMBIGUOUS_CREATE_DATABASE=cyd_create_response_restore_test
 if ERP_RESTORE_TEST_FAIL_AT=DURING_DATABASE_CREATE_RESPONSE restore_once "$AMBIGUOUS_CREATE_DATABASE" create-response >"$TASK_ROOT/create-response.log" 2>&1; then echo "ambiguous create response failure injection unexpectedly succeeded" >&2; exit 1; fi
 [ ! -e "$RESTORE_ROOT/create-response_restore_test" ]
-[ "$(receipt_result "$RECEIPT_ROOT/latest.json")" = OFFHOST_VERIFIED ]
+[ "$(receipt_result "$RECEIPT_ROOT/latest.json")" = LOCAL_VERIFIED ]
+assert_transient_materialization_removed
 [ "$(psql -d postgres -Atc "select count(*) from pg_database where datname='$AMBIGUOUS_CREATE_DATABASE'")" = 0 ]
 
 for failure in DURING_DATABASE AFTER_DATABASE AFTER_FILE_PROMOTION FINAL_VERIFICATION; do
@@ -214,7 +285,8 @@ for failure in DURING_DATABASE AFTER_DATABASE AFTER_FILE_PROMOTION FINAL_VERIFIC
   if ERP_RESTORE_TEST_FAIL_AT="$failure" restore_once "$target_database" "$run_id" >"$log" 2>&1; then echo "failure injection unexpectedly succeeded: $failure" >&2; exit 1; fi
   [ "$(psql -d postgres -Atc "select count(*) from pg_database where datname='$target_database'")" = 0 ] || { echo "database was not deleted after $failure" >&2; exit 1; }
   [ ! -e "$RESTORE_ROOT/${run_id}_restore_test" ] || { echo "file target was not deleted after $failure" >&2; exit 1; }
-  [ "$(receipt_result "$RECEIPT_ROOT/latest.json")" = OFFHOST_VERIFIED ]
+  [ "$(receipt_result "$RECEIPT_ROOT/latest.json")" = LOCAL_VERIFIED ]
+  assert_transient_materialization_removed
 done
 grep -Eq 'pg_restore: error|restore_fault_probe|check constraint' "$TASK_ROOT/during_database.log"
 
@@ -224,7 +296,8 @@ if ERP_RESTORE_TEST_FAIL_AT=RECEIPT_PUBLICATION restore_once "$AMBIGUOUS_DATABAS
 [ -d "$RESTORE_ROOT/receipt-publication_restore_test" ]
 [ -f "$RESTORE_ROOT/.prepared-$BACKUP_ID-receipt-publication.json" ]
 [ ! -e "$RECEIPT_ROOT/$BACKUP_ID.receipt-publication.restore.json" ]
-[ "$(receipt_result "$RECEIPT_ROOT/latest.json")" = OFFHOST_VERIFIED ]
+[ "$(receipt_result "$RECEIPT_ROOT/latest.json")" = LOCAL_VERIFIED ]
+assert_transient_materialization_removed
 "$SITE_ROOT/scripts/publish-restore-receipt-selfhost.sh" --restore-root "$RESTORE_ROOT" --receipt-root "$RECEIPT_ROOT" --receipt-reader-gid "$RECEIPT_GID" --backup-id "$BACKUP_ID" --restore-run-id receipt-publication --confirm PUBLISH_PREPARED_RESTORE_RECEIPT >/dev/null
 [ -f "$RECEIPT_ROOT/$BACKUP_ID.receipt-publication.restore.json" ]
 [ "$(receipt_result "$RECEIPT_ROOT/latest.json")" = RESTORE_VERIFIED ]
@@ -247,7 +320,8 @@ cmp "$ATTACHMENTS/attachment.txt" "$RESTORE_ROOT/success_restore_test/attachment
 [ "$(stat -c %a "$RESTORE_ROOT/success_restore_test/backup_status")" = 2750 ]
 [ "$(stat -c %g "$RESTORE_ROOT/success_restore_test/backup_status")" = "$RECEIPT_GID" ]
 [ "$(stat -c %a "$RESTORE_ROOT/success_restore_test/backup_status/.chenyida-erp-receipt-root-v2")" = 400 ]
-node -e 'const fs=require("fs"),r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(r.result!=="RESTORE_VERIFIED"||r.deployment.class!=="UAT"||r.evidence.target.deployment_class!=="TEST"||r.evidence.target.database_system_identifier!==process.argv[2]||r.evidence.target.cluster_marker_id!=="target-cluster"||r.evidence.reconciliation.result!=="MATCHED"||r.evidence.offhost_receiver_identity_sha256!==process.argv[3])process.exit(1)' "$RECEIPT_ROOT/latest.json" "$TARGET_SYSTEM_ID" "$OFFHOST_RECEIVER_HASH"
+node -e 'const fs=require("fs"),r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(r.result!=="RESTORE_VERIFIED"||r.deployment.class!=="TEST"||r.evidence.target.deployment_class!=="TEST"||r.evidence.target.database_system_identifier!==process.argv[2]||r.evidence.target.cluster_marker_id!=="target-cluster"||r.evidence.reconciliation.result!=="MATCHED"||r.evidence.offhost_receiver_identity_sha256!==process.argv[3])process.exit(1)' "$RECEIPT_ROOT/latest.json" "$TARGET_SYSTEM_ID" "$OFFHOST_RECEIVER_HASH"
+assert_transient_materialization_removed
 [ -f "$RECEIPT_ROOT/$BACKUP_ID.success.restore.json" ]
 [ -f "$RECEIPT_ROOT/restore.json" ]
 if restore_once "$SUCCESS_DATABASE" success >/dev/null 2>&1; then echo "restore replay unexpectedly succeeded" >&2; exit 1; fi
@@ -259,9 +333,14 @@ PREPARED_SUCCESS="$RESTORE_ROOT/.prepared-$BACKUP_ID-success.json"
 # prove both its rejection and corrected re-preparation paths.
 rm -- "$PREPARED_SUCCESS"; sync -f "$RESTORE_ROOT"
 
+node "$SITE_ROOT/scripts/offhost-transfer-contract.mjs" materialize-for-restore \
+  --receiver-package "$RECEIVER_ROOT/$TRANSFER_ID" --acceptance "$SOURCE_ACCEPTANCE" --receiver-key-root "$RECEIVER_KEY_ROOT" --receiver-encryption-private-key "$RECEIVER_ENCRYPTION_PRIVATE_KEY" \
+  --trusted-source-signing-public-key "$TRUSTED_SOURCE_SIGNING_PUBLIC_KEY" --receiver-receipt-public-key "$RECEIVER_RECEIPT_PUBLIC_KEY" --destination-root "$OFFHOST_ROOT" \
+  --transfer-id "$TRANSFER_ID" --backup-id "$BACKUP_ID" --policy "$OPERATIONS_POLICY" >/dev/null
+
 prepare_success() {
-  NODE_OPTIONS=--max-old-space-size=384 node "$SITE_ROOT/scripts/backup-recovery-contract.mjs" prepare-restore --backup "$OFFHOST_ROOT/$BACKUP_ID" --migrations "$MIGRATIONS" --offhost-receipt "$RECEIPT_ROOT/$BACKUP_ID.offhost.json" --prepared-receipt "$RESTORE_ROOT/.prepared-$BACKUP_ID-success.json" --location-id restore-host --restore-run-id success --target-deployment-id isolated-test --target-admin-database postgres --target-database-name "$SUCCESS_DATABASE" --target-marker-id target-marker --target-cluster-marker-id target-cluster --expected-target-system-identifier "$TARGET_SYSTEM_ID" --file-root "$RESTORE_ROOT/success_restore_test" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$SERVICE_FILE" --db-service restore_admin \
-    --expected-deployment-class UAT --expected-deployment-id erp-uat-source --expected-database-name source_test --expected-database-system-identifier "$SOURCE_SYSTEM_ID" --expected-database-oid "$SOURCE_DATABASE_OID" --expected-database-marker UAT.erp-uat-source --expected-database-bytes "$SOURCE_DATABASE_BYTES" --expected-database-server-major "$SOURCE_SERVER_MAJOR" --expected-database-encoding "$SOURCE_ENCODING" --expected-database-collate "$SOURCE_COLLATE" --expected-database-ctype "$SOURCE_CTYPE" --expected-database-locale-provider "$SOURCE_LOCALE_PROVIDER" --expected-database-collation-version "$SOURCE_COLLATION_VERSION" \
+  NODE_OPTIONS=--max-old-space-size=384 node "$SITE_ROOT/scripts/backup-recovery-contract.mjs" prepare-restore --backup "$OFFHOST_ROOT/$BACKUP_ID" --migrations "$MIGRATIONS" --offhost-receipt "$RECEIVER_ROOT/$TRANSFER_ID/offhost-receipt.json" --prepared-receipt "$RESTORE_ROOT/.prepared-$BACKUP_ID-success.json" --location-id restore-host --restore-run-id success --target-deployment-id isolated-test --target-admin-database postgres --target-database-name "$SUCCESS_DATABASE" --target-marker-id target-marker --target-cluster-marker-id target-cluster --expected-target-system-identifier "$TARGET_SYSTEM_ID" --file-root "$RESTORE_ROOT/success_restore_test" --credential-root "$CREDENTIAL_ROOT" --db-service-file "$SERVICE_FILE" --db-service restore_admin \
+    --expected-deployment-class TEST --expected-deployment-id erp-test-source --expected-database-name source_test --expected-database-system-identifier "$SOURCE_SYSTEM_ID" --expected-database-oid "$SOURCE_DATABASE_OID" --expected-database-marker TEST.erp-test-source --expected-database-bytes "$SOURCE_DATABASE_BYTES" --expected-database-server-major "$SOURCE_SERVER_MAJOR" --expected-database-encoding "$SOURCE_ENCODING" --expected-database-collate "$SOURCE_COLLATE" --expected-database-ctype "$SOURCE_CTYPE" --expected-database-locale-provider "$SOURCE_LOCALE_PROVIDER" --expected-database-collation-version "$SOURCE_COLLATION_VERSION" \
     --expected-app-version 0.1.0-alpha.46 --expected-git-commit bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb --expected-web-image-digest sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc --expected-worker-image-digest sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee --expected-migration-head 0001_test.sql --expected-policy-id daily-rpo-v1 --expected-rpo-hours 24
 }
 psql -d "$SUCCESS_DATABASE" -v ON_ERROR_STOP=1 -c "update restored_probe set payload='synthetic-restore-proog' where id=1" >/dev/null
@@ -269,6 +348,11 @@ if prepare_success >"$TASK_ROOT/content-drift.log" 2>&1; then echo "same-count c
 grep -q RESTORE_DATABASE_RECONCILIATION_MISMATCH "$TASK_ROOT/content-drift.log"
 psql -d "$SUCCESS_DATABASE" -v ON_ERROR_STOP=1 -c "update restored_probe set payload='synthetic-restore-proof' where id=1" >/dev/null
 prepare_success >/dev/null
+node "$SITE_ROOT/scripts/offhost-transfer-contract.mjs" cleanup-materialized-for-restore \
+  --receiver-package "$RECEIVER_ROOT/$TRANSFER_ID" --acceptance "$SOURCE_ACCEPTANCE" --receiver-key-root "$RECEIVER_KEY_ROOT" --receiver-encryption-private-key "$RECEIVER_ENCRYPTION_PRIVATE_KEY" \
+  --trusted-source-signing-public-key "$TRUSTED_SOURCE_SIGNING_PUBLIC_KEY" --receiver-receipt-public-key "$RECEIVER_RECEIPT_PUBLIC_KEY" --destination-root "$OFFHOST_ROOT" \
+  --transfer-id "$TRANSFER_ID" --backup-id "$BACKUP_ID" --policy "$OPERATIONS_POLICY" --confirm REMOVE_EXACT_VERIFIED_MATERIALIZATION >/dev/null
+assert_transient_materialization_removed
 
 dropdb "$SUCCESS_DATABASE"
 rm -rf -- "$RESTORE_ROOT/success_restore_test"

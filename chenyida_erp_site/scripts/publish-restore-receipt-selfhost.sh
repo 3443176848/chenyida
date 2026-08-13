@@ -50,6 +50,11 @@ PREPARED_RECEIPT="$RESTORE_ROOT/.prepared-$BACKUP_ID-$RESTORE_RUN_ID.json"
   || { echo "prepared restore receipt is missing or unsafe" >&2; exit 1; }
 
 umask 077
+RELEASE_GATE_LOCK_HELPER=$(dirname "$0")/release-gate-lock.sh
+[ -f "$RELEASE_GATE_LOCK_HELPER" ] && [ ! -L "$RELEASE_GATE_LOCK_HELPER" ] && [ "$(stat -c %h "$RELEASE_GATE_LOCK_HELPER")" = 1 ] && [ "$(stat -c %u "$RELEASE_GATE_LOCK_HELPER")" = "$(id -u)" ] && [ $((0$(stat -c %a "$RELEASE_GATE_LOCK_HELPER") & 0022)) -eq 0 ] || { echo "release gate lock helper is unsafe" >&2; exit 1; }
+# shellcheck source=release-gate-lock.sh
+. "$RELEASE_GATE_LOCK_HELPER"
+acquire_chenyida_release_gate_lock
 for lock_file in "$RESTORE_ROOT/.restore-v2.lock" "$RECEIPT_ROOT/.receipt-v2.lock"; do [ ! -L "$lock_file" ] || { echo "receipt publication lock path is unsafe" >&2; exit 1; }; done
 exec 9>"$RESTORE_ROOT/.restore-v2.lock"; flock -n 9 || { echo "restore root is busy" >&2; exit 1; }
 exec 6>"$RECEIPT_ROOT/.receipt-v2.lock"; flock -n 6 || { echo "verification receipt root is busy" >&2; exit 1; }

@@ -69,6 +69,11 @@ done
 if grep -Eiq '^[[:space:]]*(passfile|sslkey)[[:space:]]*=' "$SERVICE_FILE"; then echo "external libpq secret references are not accepted" >&2; exit 1; fi
 
 umask 077
+RELEASE_GATE_LOCK_HELPER=$(dirname "$0")/release-gate-lock.sh
+[ -f "$RELEASE_GATE_LOCK_HELPER" ] && [ ! -L "$RELEASE_GATE_LOCK_HELPER" ] && [ "$(stat -c %h "$RELEASE_GATE_LOCK_HELPER")" = 1 ] && [ "$(stat -c %u "$RELEASE_GATE_LOCK_HELPER")" = "$(id -u)" ] && [ $((0$(stat -c %a "$RELEASE_GATE_LOCK_HELPER") & 0022)) -eq 0 ] || { echo "release gate lock helper is unsafe" >&2; exit 1; }
+# shellcheck source=release-gate-lock.sh
+. "$RELEASE_GATE_LOCK_HELPER"
+acquire_chenyida_release_gate_lock
 for lock_file in "$BACKUP_ROOT/.selfhost-ops-v2.lock" "$BACKUP_ROOT/.backup-v2.lock"; do [ ! -L "$lock_file" ] || { echo "backup operations lock path is unsafe" >&2; exit 1; }; done
 exec 9>"$BACKUP_ROOT/.selfhost-ops-v2.lock"; flock -n 9 || { echo "global self-host database operations lock is busy for this backup root" >&2; exit 1; }
 exec 5>"$BACKUP_ROOT/.backup-v2.lock"; flock -n 5 || { echo "another backup or guard recovery is active for this root" >&2; exit 1; }

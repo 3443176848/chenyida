@@ -46,6 +46,11 @@ BACKUP="$OFFHOST_ROOT/$BACKUP_ID"; LOCAL_RECEIPT="$OFFHOST_ROOT/$BACKUP_ID.local
 [ -d "$BACKUP" ] && [ ! -L "$BACKUP" ] && [ -f "$LOCAL_RECEIPT" ] && [ ! -L "$LOCAL_RECEIPT" ] || { echo "offhost transfer is incomplete" >&2; exit 1; }
 
 umask 077
+RELEASE_GATE_LOCK_HELPER=$(dirname "$0")/release-gate-lock.sh
+[ -f "$RELEASE_GATE_LOCK_HELPER" ] && [ ! -L "$RELEASE_GATE_LOCK_HELPER" ] && [ "$(stat -c %h "$RELEASE_GATE_LOCK_HELPER")" = 1 ] && [ "$(stat -c %u "$RELEASE_GATE_LOCK_HELPER")" = "$(id -u)" ] && [ $((0$(stat -c %a "$RELEASE_GATE_LOCK_HELPER") & 0022)) -eq 0 ] || { echo "release gate lock helper is unsafe" >&2; exit 1; }
+# shellcheck source=release-gate-lock.sh
+. "$RELEASE_GATE_LOCK_HELPER"
+acquire_chenyida_release_gate_lock
 exec 9>"$OFFHOST_ROOT/.offhost-v2.lock"; flock -n 9 || { echo "offhost backup root is busy" >&2; exit 1; }
 exec 6>"$RECEIPT_ROOT/.receipt-v2.lock"; flock -n 6 || { echo "verification receipt root is busy" >&2; exit 1; }
 CONTRACT="$(dirname "$0")/backup-recovery-contract.mjs"

@@ -5,14 +5,14 @@ LC_ALL=C
 export LC_ALL
 
 usage() {
-  echo "usage: $0 --credential-root DIR --db-service-file FILE --db-admin-service NAME --source-deployment-class TEST|UAT|PRODUCTION --source-deployment-id ID --source-database-name NAME --source-database-system-identifier ID --source-database-oid OID --source-database-marker ID --source-database-bytes BYTES --source-database-server-major N --source-database-encoding ID --source-database-collate ID --source-database-ctype ID --source-database-locale-provider libc --source-database-collation-version ID --offhost-root DIR --backup-id ID --migrations DIR --receipt-root DIR --restore-root DIR --target-database-capacity-path DIR --receipt-reader-gid GID --target-deployment-class TEST --target-deployment-id ID --target-admin-database NAME --target-database-name NAME_restore_test --target-marker-id ID --target-cluster-marker-id ID --expected-target-system-identifier ID --restore-run-id ID --location-id ID --expected-app-version VERSION --expected-git-commit SHA --expected-web-image-digest sha256:SHA --expected-worker-image-digest sha256:SHA --expected-migration-head FILE --expected-policy-id ID --expected-rpo-hours 1..168 --confirm RESTORE_TO_MARKED_DISPOSABLE_TEST_TARGET" >&2
+  echo "usage: $0 --credential-root DIR --db-service-file FILE --db-admin-service NAME --source-deployment-class TEST|UAT|PRODUCTION --source-deployment-id ID --source-database-name NAME --source-database-system-identifier ID --source-database-oid OID --source-database-marker ID --source-database-bytes BYTES --source-database-server-major N --source-database-encoding ID --source-database-collate ID --source-database-ctype ID --source-database-locale-provider libc --source-database-collation-version ID --offhost-root TRANSIENT_DIR --receiver-package DIR --source-acceptance FILE --receiver-key-root DIR --receiver-encryption-private-key FILE --trusted-source-signing-public-key FILE --receiver-receipt-public-key FILE --operations-policy FILE --transfer-id ID --backup-id ID --migrations DIR --receipt-root DIR --restore-root DIR --target-database-capacity-path DIR --receipt-reader-gid GID --target-deployment-class TEST --target-deployment-id ID --target-admin-database NAME --target-database-name NAME_restore_test --target-marker-id ID --target-cluster-marker-id ID --expected-target-system-identifier ID --restore-run-id ID --location-id ID --expected-app-version VERSION --expected-git-commit SHA --expected-web-image-digest sha256:SHA --expected-worker-image-digest sha256:SHA --expected-migration-head FILE --expected-policy-id ID --expected-rpo-hours 1..168 --confirm RESTORE_SIGNED_ENCRYPTED_OFFHOST_TO_MARKED_DISPOSABLE_TEST_TARGET" >&2
   exit 2
 }
 
 CREDENTIAL_ROOT=""; SERVICE_FILE=""; DB_SERVICE=""
 SOURCE_CLASS=""; SOURCE_ID=""; SOURCE_DATABASE=""; SOURCE_SYSTEM_ID=""; SOURCE_DATABASE_OID=""; SOURCE_DATABASE_MARKER=""; SOURCE_DATABASE_BYTES=""
 SOURCE_DATABASE_SERVER_MAJOR=""; SOURCE_DATABASE_ENCODING=""; SOURCE_DATABASE_COLLATE=""; SOURCE_DATABASE_CTYPE=""; SOURCE_DATABASE_LOCALE_PROVIDER=""; SOURCE_DATABASE_COLLATION_VERSION=""
-OFFHOST_ROOT=""; BACKUP_ID=""; MIGRATIONS=""; RECEIPT_ROOT=""; RESTORE_ROOT=""; TARGET_DATABASE_CAPACITY_PATH=""; RECEIPT_READER_GID=""
+OFFHOST_ROOT=""; RECEIVER_PACKAGE=""; SOURCE_ACCEPTANCE=""; RECEIVER_KEY_ROOT=""; RECEIVER_ENCRYPTION_PRIVATE_KEY=""; TRUSTED_SOURCE_SIGNING_PUBLIC_KEY=""; RECEIVER_RECEIPT_PUBLIC_KEY=""; OPERATIONS_POLICY=""; TRANSFER_ID=""; BACKUP_ID=""; MIGRATIONS=""; RECEIPT_ROOT=""; RESTORE_ROOT=""; TARGET_DATABASE_CAPACITY_PATH=""; RECEIPT_READER_GID=""
 TARGET_CLASS=""; TARGET_ID=""; TARGET_ADMIN_DATABASE=""; TARGET_DATABASE=""; TARGET_MARKER_ID=""; TARGET_CLUSTER_MARKER_ID=""; EXPECTED_TARGET_SYSTEM_ID=""
 RESTORE_RUN_ID=""; LOCATION_ID=""; EXPECTED_VERSION=""; EXPECTED_GIT=""; EXPECTED_WEB_IMAGE=""; EXPECTED_WORKER_IMAGE=""; EXPECTED_MIGRATION=""; EXPECTED_POLICY=""; EXPECTED_RPO=""; CONFIRM=""
 
@@ -24,7 +24,7 @@ while [ "$#" -gt 0 ]; do
     --source-database-server-major) SOURCE_DATABASE_SERVER_MAJOR=${2:-}; shift 2 ;; --source-database-encoding) SOURCE_DATABASE_ENCODING=${2:-}; shift 2 ;;
     --source-database-collate) SOURCE_DATABASE_COLLATE=${2:-}; shift 2 ;; --source-database-ctype) SOURCE_DATABASE_CTYPE=${2:-}; shift 2 ;;
     --source-database-locale-provider) SOURCE_DATABASE_LOCALE_PROVIDER=${2:-}; shift 2 ;; --source-database-collation-version) SOURCE_DATABASE_COLLATION_VERSION=${2:-}; shift 2 ;;
-    --offhost-root) OFFHOST_ROOT=${2:-}; shift 2 ;; --backup-id) BACKUP_ID=${2:-}; shift 2 ;; --migrations) MIGRATIONS=${2:-}; shift 2 ;; --receipt-root) RECEIPT_ROOT=${2:-}; shift 2 ;; --restore-root) RESTORE_ROOT=${2:-}; shift 2 ;; --target-database-capacity-path) TARGET_DATABASE_CAPACITY_PATH=${2:-}; shift 2 ;; --receipt-reader-gid) RECEIPT_READER_GID=${2:-}; shift 2 ;;
+    --offhost-root) OFFHOST_ROOT=${2:-}; shift 2 ;; --receiver-package) RECEIVER_PACKAGE=${2:-}; shift 2 ;; --source-acceptance) SOURCE_ACCEPTANCE=${2:-}; shift 2 ;; --receiver-key-root) RECEIVER_KEY_ROOT=${2:-}; shift 2 ;; --receiver-encryption-private-key) RECEIVER_ENCRYPTION_PRIVATE_KEY=${2:-}; shift 2 ;; --trusted-source-signing-public-key) TRUSTED_SOURCE_SIGNING_PUBLIC_KEY=${2:-}; shift 2 ;; --receiver-receipt-public-key) RECEIVER_RECEIPT_PUBLIC_KEY=${2:-}; shift 2 ;; --operations-policy) OPERATIONS_POLICY=${2:-}; shift 2 ;; --transfer-id) TRANSFER_ID=${2:-}; shift 2 ;; --backup-id) BACKUP_ID=${2:-}; shift 2 ;; --migrations) MIGRATIONS=${2:-}; shift 2 ;; --receipt-root) RECEIPT_ROOT=${2:-}; shift 2 ;; --restore-root) RESTORE_ROOT=${2:-}; shift 2 ;; --target-database-capacity-path) TARGET_DATABASE_CAPACITY_PATH=${2:-}; shift 2 ;; --receipt-reader-gid) RECEIPT_READER_GID=${2:-}; shift 2 ;;
     --target-deployment-class) TARGET_CLASS=${2:-}; shift 2 ;; --target-deployment-id) TARGET_ID=${2:-}; shift 2 ;; --target-admin-database) TARGET_ADMIN_DATABASE=${2:-}; shift 2 ;;
     --target-database-name) TARGET_DATABASE=${2:-}; shift 2 ;; --target-marker-id) TARGET_MARKER_ID=${2:-}; shift 2 ;; --target-cluster-marker-id) TARGET_CLUSTER_MARKER_ID=${2:-}; shift 2 ;; --expected-target-system-identifier) EXPECTED_TARGET_SYSTEM_ID=${2:-}; shift 2 ;;
     --restore-run-id) RESTORE_RUN_ID=${2:-}; shift 2 ;; --location-id) LOCATION_ID=${2:-}; shift 2 ;;
@@ -33,9 +33,9 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-for value in "$CREDENTIAL_ROOT" "$SERVICE_FILE" "$DB_SERVICE" "$SOURCE_CLASS" "$SOURCE_ID" "$SOURCE_DATABASE" "$SOURCE_SYSTEM_ID" "$SOURCE_DATABASE_OID" "$SOURCE_DATABASE_MARKER" "$SOURCE_DATABASE_BYTES" "$SOURCE_DATABASE_SERVER_MAJOR" "$SOURCE_DATABASE_ENCODING" "$SOURCE_DATABASE_COLLATE" "$SOURCE_DATABASE_CTYPE" "$SOURCE_DATABASE_LOCALE_PROVIDER" "$SOURCE_DATABASE_COLLATION_VERSION" "$OFFHOST_ROOT" "$BACKUP_ID" "$MIGRATIONS" "$RECEIPT_ROOT" "$RESTORE_ROOT" "$TARGET_DATABASE_CAPACITY_PATH" "$RECEIPT_READER_GID" "$TARGET_CLASS" "$TARGET_ID" "$TARGET_ADMIN_DATABASE" "$TARGET_DATABASE" "$TARGET_MARKER_ID" "$TARGET_CLUSTER_MARKER_ID" "$EXPECTED_TARGET_SYSTEM_ID" "$RESTORE_RUN_ID" "$LOCATION_ID" "$EXPECTED_VERSION" "$EXPECTED_GIT" "$EXPECTED_WEB_IMAGE" "$EXPECTED_WORKER_IMAGE" "$EXPECTED_MIGRATION" "$EXPECTED_POLICY" "$EXPECTED_RPO" "$CONFIRM"; do [ -n "$value" ] || usage; done
+for value in "$CREDENTIAL_ROOT" "$SERVICE_FILE" "$DB_SERVICE" "$SOURCE_CLASS" "$SOURCE_ID" "$SOURCE_DATABASE" "$SOURCE_SYSTEM_ID" "$SOURCE_DATABASE_OID" "$SOURCE_DATABASE_MARKER" "$SOURCE_DATABASE_BYTES" "$SOURCE_DATABASE_SERVER_MAJOR" "$SOURCE_DATABASE_ENCODING" "$SOURCE_DATABASE_COLLATE" "$SOURCE_DATABASE_CTYPE" "$SOURCE_DATABASE_LOCALE_PROVIDER" "$SOURCE_DATABASE_COLLATION_VERSION" "$OFFHOST_ROOT" "$RECEIVER_PACKAGE" "$SOURCE_ACCEPTANCE" "$RECEIVER_KEY_ROOT" "$RECEIVER_ENCRYPTION_PRIVATE_KEY" "$TRUSTED_SOURCE_SIGNING_PUBLIC_KEY" "$RECEIVER_RECEIPT_PUBLIC_KEY" "$OPERATIONS_POLICY" "$TRANSFER_ID" "$BACKUP_ID" "$MIGRATIONS" "$RECEIPT_ROOT" "$RESTORE_ROOT" "$TARGET_DATABASE_CAPACITY_PATH" "$RECEIPT_READER_GID" "$TARGET_CLASS" "$TARGET_ID" "$TARGET_ADMIN_DATABASE" "$TARGET_DATABASE" "$TARGET_MARKER_ID" "$TARGET_CLUSTER_MARKER_ID" "$EXPECTED_TARGET_SYSTEM_ID" "$RESTORE_RUN_ID" "$LOCATION_ID" "$EXPECTED_VERSION" "$EXPECTED_GIT" "$EXPECTED_WEB_IMAGE" "$EXPECTED_WORKER_IMAGE" "$EXPECTED_MIGRATION" "$EXPECTED_POLICY" "$EXPECTED_RPO" "$CONFIRM"; do [ -n "$value" ] || usage; done
 case "$SOURCE_CLASS" in TEST|UAT|PRODUCTION) : ;; *) echo "invalid source deployment class" >&2; exit 1 ;; esac
-[ "$TARGET_CLASS" = TEST ] && [ "$CONFIRM" = RESTORE_TO_MARKED_DISPOSABLE_TEST_TARGET ] || { echo "restore is restricted to marked disposable TEST targets" >&2; exit 1; }
+[ "$TARGET_CLASS" = TEST ] && [ "$CONFIRM" = RESTORE_SIGNED_ENCRYPTED_OFFHOST_TO_MARKED_DISPOSABLE_TEST_TARGET ] || { echo "restore is restricted to signed encrypted offhost evidence and marked disposable TEST targets" >&2; exit 1; }
 case "$TARGET_DATABASE" in *_restore_test) : ;; *) echo "target database name must end with _restore_test" >&2; exit 1 ;; esac
 [ "$TARGET_ADMIN_DATABASE" != "$TARGET_DATABASE" ] || { echo "target admin database must be distinct from the restore database" >&2; exit 1; }
 [ "$SOURCE_DATABASE_LOCALE_PROVIDER" = libc ] || { echo "backup recovery v2 currently supports only an explicitly bound libc database locale" >&2; exit 1; }
@@ -43,7 +43,7 @@ case "$EXPECTED_RPO:$SOURCE_SYSTEM_ID:$SOURCE_DATABASE_OID:$SOURCE_DATABASE_BYTE
 [ "$SOURCE_DATABASE_BYTES" -ge 1 ] || { echo "source database bytes must be positive" >&2; exit 1; }
 [ "$SOURCE_SYSTEM_ID" != "$EXPECTED_TARGET_SYSTEM_ID" ] || { echo "restore target PostgreSQL cluster must be distinct from the source cluster" >&2; exit 1; }
 [ "$EXPECTED_RPO" -ge 1 ] && [ "$EXPECTED_RPO" -le 168 ] || { echo "RPO must be between 1 and 168 hours" >&2; exit 1; }
-for value in "$DB_SERVICE" "$SOURCE_ID" "$SOURCE_DATABASE" "$SOURCE_DATABASE_MARKER" "$SOURCE_DATABASE_ENCODING" "$SOURCE_DATABASE_COLLATE" "$SOURCE_DATABASE_CTYPE" "$SOURCE_DATABASE_LOCALE_PROVIDER" "$SOURCE_DATABASE_COLLATION_VERSION" "$BACKUP_ID" "$TARGET_ID" "$TARGET_ADMIN_DATABASE" "$TARGET_DATABASE" "$TARGET_MARKER_ID" "$TARGET_CLUSTER_MARKER_ID" "$RESTORE_RUN_ID" "$LOCATION_ID" "$EXPECTED_MIGRATION" "$EXPECTED_POLICY"; do
+for value in "$DB_SERVICE" "$SOURCE_ID" "$SOURCE_DATABASE" "$SOURCE_DATABASE_MARKER" "$SOURCE_DATABASE_ENCODING" "$SOURCE_DATABASE_COLLATE" "$SOURCE_DATABASE_CTYPE" "$SOURCE_DATABASE_LOCALE_PROVIDER" "$SOURCE_DATABASE_COLLATION_VERSION" "$TRANSFER_ID" "$BACKUP_ID" "$TARGET_ID" "$TARGET_ADMIN_DATABASE" "$TARGET_DATABASE" "$TARGET_MARKER_ID" "$TARGET_CLUSTER_MARKER_ID" "$RESTORE_RUN_ID" "$LOCATION_ID" "$EXPECTED_MIGRATION" "$EXPECTED_POLICY"; do
   case "$value" in *[!A-Za-z0-9_.-]*|'') echo "invalid bounded identifier" >&2; exit 1 ;; esac
   [ "${#value}" -le 120 ] || { echo "identifier is too long" >&2; exit 1; }
 done
@@ -71,13 +71,27 @@ OFFHOST_ROOT=$(validate_root "$OFFHOST_ROOT" .chenyida-erp-offhost-root-v2 cheny
 RECEIPT_ROOT=$(validate_root "$RECEIPT_ROOT" .chenyida-erp-receipt-root-v2 chenyida-erp-receipt-root/v2)
 RESTORE_ROOT=$(validate_root "$RESTORE_ROOT" .chenyida-erp-restore-root-v2 chenyida-erp-restore-root/v2)
 CREDENTIAL_ROOT=$(validate_root "$CREDENTIAL_ROOT" .chenyida-erp-credential-root-v2 chenyida-erp-credential-root/v2)
+[ -d "$RECEIVER_PACKAGE" ] && [ ! -L "$RECEIVER_PACKAGE" ] && [ "$(stat -c %u "$RECEIVER_PACKAGE")" = "$(id -u)" ] && [ $((0$(stat -c %a "$RECEIVER_PACKAGE") & 0022)) -eq 0 ] || { echo "receiver package directory is unsafe" >&2; exit 1; }
+RECEIVER_PACKAGE=$(readlink -f "$RECEIVER_PACKAGE")
+[ -d "$RECEIVER_KEY_ROOT" ] && [ ! -L "$RECEIVER_KEY_ROOT" ] && [ "$(stat -c %u "$RECEIVER_KEY_ROOT")" = "$(id -u)" ] && [ $((0$(stat -c %a "$RECEIVER_KEY_ROOT") & 0022)) -eq 0 ] || { echo "receiver key root is unsafe" >&2; exit 1; }
+RECEIVER_KEY_ROOT=$(readlink -f "$RECEIVER_KEY_ROOT")
+validate_evidence_file() {
+  evidence_file=$1
+  [ -f "$evidence_file" ] && [ ! -L "$evidence_file" ] && [ "$(stat -c %h "$evidence_file")" = 1 ] && [ "$(stat -c %u "$evidence_file")" = "$(id -u)" ] && [ $((0$(stat -c %a "$evidence_file") & 0022)) -eq 0 ] || { echo "offhost evidence or key file is unsafe" >&2; exit 1; }
+  readlink -f "$evidence_file"
+}
+SOURCE_ACCEPTANCE=$(validate_evidence_file "$SOURCE_ACCEPTANCE")
+RECEIVER_ENCRYPTION_PRIVATE_KEY=$(validate_evidence_file "$RECEIVER_ENCRYPTION_PRIVATE_KEY")
+TRUSTED_SOURCE_SIGNING_PUBLIC_KEY=$(validate_evidence_file "$TRUSTED_SOURCE_SIGNING_PUBLIC_KEY")
+RECEIVER_RECEIPT_PUBLIC_KEY=$(validate_evidence_file "$RECEIVER_RECEIPT_PUBLIC_KEY")
+OPERATIONS_POLICY=$(validate_evidence_file "$OPERATIONS_POLICY")
 [ -d "$TARGET_DATABASE_CAPACITY_PATH" ] && [ ! -L "$TARGET_DATABASE_CAPACITY_PATH" ] || { echo "target database capacity path is missing or unsafe" >&2; exit 1; }
 TARGET_DATABASE_CAPACITY_PATH=$(readlink -f "$TARGET_DATABASE_CAPACITY_PATH")
 [ "$(stat -c %a "$RECEIPT_ROOT")" = 2750 ] && [ "$(stat -c %g "$RECEIPT_ROOT")" = "$RECEIPT_READER_GID" ] || { echo "receipt root reader mode or group is invalid" >&2; exit 1; }
 [ -d "$MIGRATIONS" ] && [ ! -L "$MIGRATIONS" ] || { echo "migrations directory is unsafe" >&2; exit 1; }
 MIGRATIONS=$(readlink -f "$MIGRATIONS")
 REPO_ROOT=$(readlink -f "$(dirname "$0")/..")
-for pair in "$OFFHOST_ROOT|$RECEIPT_ROOT" "$OFFHOST_ROOT|$RESTORE_ROOT" "$OFFHOST_ROOT|$CREDENTIAL_ROOT" "$RECEIPT_ROOT|$RESTORE_ROOT" "$RECEIPT_ROOT|$CREDENTIAL_ROOT" "$RESTORE_ROOT|$CREDENTIAL_ROOT" "$OFFHOST_ROOT|$MIGRATIONS" "$RECEIPT_ROOT|$MIGRATIONS" "$RESTORE_ROOT|$MIGRATIONS" "$OFFHOST_ROOT|$REPO_ROOT" "$RECEIPT_ROOT|$REPO_ROOT" "$RESTORE_ROOT|$REPO_ROOT" "$CREDENTIAL_ROOT|$REPO_ROOT"; do
+for pair in "$OFFHOST_ROOT|$RECEIPT_ROOT" "$OFFHOST_ROOT|$RESTORE_ROOT" "$OFFHOST_ROOT|$CREDENTIAL_ROOT" "$OFFHOST_ROOT|$RECEIVER_PACKAGE" "$OFFHOST_ROOT|$RECEIVER_KEY_ROOT" "$RECEIPT_ROOT|$RESTORE_ROOT" "$RECEIPT_ROOT|$CREDENTIAL_ROOT" "$RECEIPT_ROOT|$RECEIVER_PACKAGE" "$RECEIPT_ROOT|$RECEIVER_KEY_ROOT" "$RESTORE_ROOT|$CREDENTIAL_ROOT" "$RESTORE_ROOT|$RECEIVER_PACKAGE" "$RESTORE_ROOT|$RECEIVER_KEY_ROOT" "$RECEIVER_PACKAGE|$RECEIVER_KEY_ROOT" "$OFFHOST_ROOT|$MIGRATIONS" "$RECEIPT_ROOT|$MIGRATIONS" "$RESTORE_ROOT|$MIGRATIONS" "$OFFHOST_ROOT|$REPO_ROOT" "$RECEIPT_ROOT|$REPO_ROOT" "$RESTORE_ROOT|$REPO_ROOT" "$CREDENTIAL_ROOT|$REPO_ROOT" "$RECEIVER_PACKAGE|$REPO_ROOT" "$RECEIVER_KEY_ROOT|$REPO_ROOT"; do
   left=${pair%%|*}; right=${pair#*|}; overlap "$left" "$right" && { echo "restore roots overlap protected paths" >&2; exit 1; }
 done
 
@@ -95,8 +109,13 @@ done
 if grep -Eiq '^[[:space:]]*(passfile|sslkey)[[:space:]]*=' "$SERVICE_FILE"; then echo "external libpq secret references are not accepted" >&2; exit 1; fi
 
 umask 077
+RELEASE_GATE_LOCK_HELPER=$(dirname "$0")/release-gate-lock.sh
+[ -f "$RELEASE_GATE_LOCK_HELPER" ] && [ ! -L "$RELEASE_GATE_LOCK_HELPER" ] && [ "$(stat -c %h "$RELEASE_GATE_LOCK_HELPER")" = 1 ] && [ "$(stat -c %u "$RELEASE_GATE_LOCK_HELPER")" = "$(id -u)" ] && [ $((0$(stat -c %a "$RELEASE_GATE_LOCK_HELPER") & 0022)) -eq 0 ] || { echo "release gate lock helper is unsafe" >&2; exit 1; }
+# shellcheck source=release-gate-lock.sh
+. "$RELEASE_GATE_LOCK_HELPER"
+acquire_chenyida_release_gate_lock
 exec 9>"$RESTORE_ROOT/.restore-v2.lock"; flock -n 9 || { echo "another restore is active for this root" >&2; exit 1; }
-exec 7>"$OFFHOST_ROOT/.offhost-v2.lock"; flock -s -n 7 || { echo "offhost backup root is being modified" >&2; exit 1; }
+exec 7>"$OFFHOST_ROOT/.offhost-v2.lock"; flock -n 7 || { echo "transient offhost materialization root is busy" >&2; exit 1; }
 exec 6>"$RECEIPT_ROOT/.receipt-v2.lock"; flock -n 6 || { echo "verification receipt root is busy" >&2; exit 1; }
 exec 8<"$SERVICE_FILE"; flock -s -n 8 || { echo "database credential file is being modified" >&2; exit 1; }
 SERVICE_FILE_IDENTITY=$(stat -Lc '%d:%i:%s:%Y:%u:%g:%a' "$SERVICE_FILE")
@@ -105,8 +124,43 @@ credential_unchanged() {
   [ "$(stat -Lc '%d:%i:%s:%Y:%u:%g:%a' "$SERVICE_FILE" 2>/dev/null)" = "$SERVICE_FILE_IDENTITY" ] && [ "$(sha256sum "$SERVICE_FILE" 2>/dev/null | awk '{print $1}')" = "$SERVICE_FILE_SHA256" ] || { echo "database credential file changed during restore" >&2; return 1; }
 }
 
-BACKUP="$OFFHOST_ROOT/$BACKUP_ID"; OFFHOST_RECEIPT="$RECEIPT_ROOT/$BACKUP_ID.offhost.json"
-[ -d "$BACKUP" ] && [ ! -L "$BACKUP" ] && [ -f "$OFFHOST_RECEIPT" ] && [ ! -L "$OFFHOST_RECEIPT" ] || { echo "offhost backup or receipt is missing" >&2; exit 1; }
+BACKUP="$OFFHOST_ROOT/$BACKUP_ID"
+MATERIALIZATION_RECEIPT="$OFFHOST_ROOT/$BACKUP_ID.$TRANSFER_ID.materialization.json"
+OFFHOST_RECEIPT="$RECEIVER_PACKAGE/offhost-receipt.json"
+OFFHOST_CONTRACT="$(dirname "$0")/offhost-transfer-contract.mjs"
+offhost_contract() { NODE_OPTIONS=--max-old-space-size=384 node "$OFFHOST_CONTRACT" "$@"; }
+offhost_materialization_args() {
+  materialization_command=$1
+  shift
+  offhost_contract "$materialization_command" \
+    --receiver-package "$RECEIVER_PACKAGE" \
+    --acceptance "$SOURCE_ACCEPTANCE" \
+    --receiver-key-root "$RECEIVER_KEY_ROOT" \
+    --receiver-encryption-private-key "$RECEIVER_ENCRYPTION_PRIVATE_KEY" \
+    --trusted-source-signing-public-key "$TRUSTED_SOURCE_SIGNING_PUBLIC_KEY" \
+    --receiver-receipt-public-key "$RECEIVER_RECEIPT_PUBLIC_KEY" \
+    --destination-root "$OFFHOST_ROOT" \
+    --transfer-id "$TRANSFER_ID" \
+    --backup-id "$BACKUP_ID" \
+    --policy "$OPERATIONS_POLICY" "$@"
+}
+MATERIALIZATION_REQUESTED=1
+cleanup_materialization() {
+  [ "$MATERIALIZATION_REQUESTED" = 1 ] || return 0
+  if [ ! -e "$BACKUP" ] && [ ! -e "$MATERIALIZATION_RECEIPT" ]; then MATERIALIZATION_REQUESTED=0; return 0; fi
+  offhost_materialization_args cleanup-materialized-for-restore --confirm REMOVE_EXACT_VERIFIED_MATERIALIZATION >/dev/null || return 1
+  [ ! -e "$BACKUP" ] && [ ! -e "$MATERIALIZATION_RECEIPT" ] || return 1
+  MATERIALIZATION_REQUESTED=0
+}
+early_cleanup() {
+  result=$?; trap - EXIT
+  cleanup_materialization || { echo "transient offhost materialization cleanup failed; exact paths are quarantined" >&2; exit 1; }
+  exit "$result"
+}
+trap early_cleanup EXIT; trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
+offhost_materialization_args materialize-for-restore >/dev/null
+offhost_materialization_args verify-materialized-for-restore >/dev/null
+[ -d "$BACKUP" ] && [ ! -L "$BACKUP" ] && [ -f "$OFFHOST_RECEIPT" ] && [ ! -L "$OFFHOST_RECEIPT" ] || { echo "verified transient offhost materialization is incomplete" >&2; exit 1; }
 FILE_ROOT_NAME="${RESTORE_RUN_ID}_restore_test"; FILE_ROOT="$RESTORE_ROOT/$FILE_ROOT_NAME"
 [ ! -e "$FILE_ROOT" ] || { echo "restore file target already exists" >&2; exit 1; }
 CONTRACT="$(dirname "$0")/backup-recovery-contract.mjs"
@@ -199,6 +253,7 @@ cleanup() {
     [ "$DATABASE_CREATED_BY_RUN" = 0 ] || drop_target || cleanup_failed=1
   fi
   safe_remove_stage "${SOURCE_STAGE:-}" .erp-restore-source-v2. || cleanup_failed=1
+  cleanup_materialization || cleanup_failed=1
   if [ "$SUCCESS" = 1 ]; then
     [ "$cleanup_failed" = 0 ] || { echo "restore source staging cleanup failed" >&2; exit 1; }
     exit 0
