@@ -61,7 +61,15 @@ function json(data: unknown, status = 200, requestId: string = randomUUID(), hea
   return Response.json(data, { status, headers: responseHeaders });
 }
 function failure(error: unknown, requestId: string) { const known = error instanceof ApiError ? error : new ApiError("INTERNAL_ERROR", "服务器暂时无法处理请求", 500); return json({ error: { code: known.code, message: known.message, request_id: requestId }, code: known.code, message: known.message, request_id: requestId }, known.status, requestId); }
-function logFailure(error: unknown, requestId: string, event = "api_request_failed") { console.error(JSON.stringify({ level: "error", event, request_id: requestId, code: error instanceof ApiError ? error.code : "INTERNAL_ERROR", message: error instanceof Error ? error.message : "unknown" })); }
+function logFailure(error: unknown, requestId: string, event = "api_request_failed") {
+  const candidate = error && typeof error === "object" && "code" in error ? String(error.code || "") : "";
+  const code = error instanceof ApiError
+    ? error.code
+    : /^(?:CONTROLLED|DATABASE_RUNTIME|RUNTIME_SECRET)_[A-Z0-9_]{1,96}$/.test(candidate)
+      ? candidate
+      : "INTERNAL_ERROR";
+  console.error(JSON.stringify({ level: "error", event, request_id: requestId, code }));
+}
 function requirePermission(user: IdentityActor, permission: string) { if (!user.permissions.includes("*") && !user.permissions.includes(permission)) throw new ApiError("PERMISSION_DENIED", "没有权限执行此操作", 403); }
 function requireCsrf(request: Request) { const config = runtimeConfig(); if (!requestOriginMatches(request, config.publicOrigin, config.allowUatLoopbackOrigin)) throw new ApiError("CSRF_INVALID", "请求来源校验失败", 403); const token = request.headers.get("x-csrf-token") || ""; const cookie = cookies(request)[CSRF_COOKIE] || ""; if (!token || !cookie || !constantEqual(token, cookie)) throw new ApiError("CSRF_INVALID", "CSRF Token 无效", 403); }
 
@@ -180,8 +188,8 @@ export async function handleSelfhostApi(
 ): Promise<Response> {
   const suppliedRequestId = request.headers.get("x-request-id") || ""; const requestId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(suppliedRequestId) ? suppliedRequestId : randomUUID(); const url = new URL(request.url); const path = url.pathname;
   if (path === "/api/live") return handleSelfhostLive({ requestId });
-  const pool = (dependencies.poolFactory || getPool)();
   try {
+    const pool = (dependencies.poolFactory || getPool)();
     if (path === "/api/health") return handleSelfhostHealth({ database: pool, requestId });
     const identityResponse = await handleSelfhostIdentityApi(request, { pool, requestId });
     if (identityResponse) return identityResponse;

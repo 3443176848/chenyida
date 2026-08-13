@@ -1,6 +1,13 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool, type PoolClient, type PoolConfig } from "pg";
+import { runtimeConfig } from "../app/lib/infrastructure/config.ts";
 import * as schema from "./schema.ts";
+import {
+  assertDatabaseRuntimeIdentity,
+  databasePoolConfiguration,
+  DatabaseRuntimeError,
+  type DatabaseRuntimePolicy,
+} from "./runtime-connection.ts";
 
 let sharedPool: Pool | undefined;
 
@@ -22,16 +29,31 @@ export function attachPostgresPoolErrorHandler(
   });
 }
 
-function connectionConfig(): PoolConfig {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) throw new Error("DATABASE_URL is required");
-  return {
-    connectionString,
-    max: Number(process.env.DATABASE_POOL_MAX || 10),
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 10_000,
-    application_name: process.env.ERP_PROCESS_NAME || "chenyida-erp-web",
+type VerifiedPoolConfig = PoolConfig & {
+  verify?: (client: PoolClient, callback: (error?: Error) => void) => void;
+};
+
+export function createRuntimeVerifier(policy: DatabaseRuntimePolicy): NonNullable<VerifiedPoolConfig["verify"]> {
+  const verified = new WeakSet<PoolClient>();
+  return (client, callback) => {
+    if (verified.has(client)) {
+      callback();
+      return;
+    }
+    assertDatabaseRuntimeIdentity(client, policy)
+      .then(() => {
+        verified.add(client);
+        callback();
+      })
+      .catch(() => callback(new DatabaseRuntimeError("DATABASE_RUNTIME_IDENTITY_INVALID")));
   };
+}
+
+function connectionConfig(): VerifiedPoolConfig {
+  const resolved = databasePoolConfiguration(runtimeConfig());
+  return resolved.policy
+    ? { ...resolved.pool, verify: createRuntimeVerifier(resolved.policy) }
+    : { ...resolved.pool };
 }
 
 export function getPool(): Pool {

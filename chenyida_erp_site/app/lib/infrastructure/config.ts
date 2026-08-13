@@ -1,11 +1,15 @@
 import { isAbsolute, relative, resolve } from "node:path";
 import { normalizePublicOrigin } from "./request-origin.ts";
+import {
+  assertControlledSecretsAbsent,
+  isControlledDeployment,
+  isolatedEnvironmentSecret,
+  RuntimeSecretError,
+} from "./runtime-secret.ts";
 
 export type RuntimeConfig = {
   environment: "development" | "test" | "production";
   deploymentClass: "development" | "test" | "uat" | "production";
-  databaseUrl: string;
-  setupToken: string;
   publicOrigin: string | null;
   allowUatLoopbackOrigin: boolean;
   uploadRoot: string;
@@ -49,16 +53,16 @@ export function resolveOriginPolicy(
 export function runtimeConfig(): RuntimeConfig {
   const environment = (process.env.ERP_ENV || "development") as RuntimeConfig["environment"];
   if (!["development", "test", "production"].includes(environment)) throw new Error("ERP_ENV must be development, test, or production");
-  const databaseUrl = process.env.DATABASE_URL || "";
-  if (!databaseUrl) throw new Error("DATABASE_URL is required");
-  if (environment === "test" && !/(test|localhost|127\.0\.0\.1)/i.test(databaseUrl)) {
-    throw new Error("Test DATABASE_URL must identify an isolated test database or localhost");
-  }
-  const setupToken = process.env.ERP_SETUP_TOKEN || "";
-  if (environment === "production" && setupToken.length < 24) throw new Error("ERP_SETUP_TOKEN must be at least 24 characters in production");
   const publicOrigin = normalizePublicOrigin(process.env.ERP_PUBLIC_ORIGIN);
   if (environment === "production" && publicOrigin?.startsWith("http://")) throw new Error("ERP_PUBLIC_ORIGIN must use HTTPS in production");
   const originPolicy = resolveOriginPolicy(environment, process.env.ERP_DEPLOYMENT_CLASS, process.env.ERP_UAT_ALLOW_LOOPBACK_ORIGIN);
+  if (environment === "production" && !isControlledDeployment(originPolicy.deploymentClass)) {
+    throw new RuntimeSecretError("CONTROLLED_DEPLOYMENT_CLASS_REQUIRED");
+  }
+  if (isControlledDeployment(originPolicy.deploymentClass) && environment !== "production") {
+    throw new RuntimeSecretError("CONTROLLED_ENVIRONMENT_REQUIRED");
+  }
+  assertControlledSecretsAbsent(originPolicy.deploymentClass);
   const uploadRoot = resolve(process.env.ERP_UPLOAD_ROOT || "/data/chenyida-erp/uploads");
   const attachmentRoot = resolve(process.env.ERP_ATTACHMENT_ROOT || "/data/chenyida-erp/attachments");
   const uploadToAttachment = relative(uploadRoot, attachmentRoot);
@@ -71,8 +75,6 @@ export function runtimeConfig(): RuntimeConfig {
   return {
     environment,
     ...originPolicy,
-    databaseUrl,
-    setupToken,
     publicOrigin,
     uploadRoot,
     attachmentRoot,
@@ -81,4 +83,13 @@ export function runtimeConfig(): RuntimeConfig {
     workerPollMs: positiveInteger("ERP_WORKER_POLL_MS", 1_000),
     workerLeaseSeconds: workerLeaseSeconds(),
   };
+}
+
+export function browserSetupAllowed(config: Pick<RuntimeConfig, "deploymentClass">): boolean {
+  return !isControlledDeployment(config.deploymentClass);
+}
+
+export function runtimeSetupToken(config: Pick<RuntimeConfig, "deploymentClass">): string {
+  if (!browserSetupAllowed(config)) throw new Error("CONTROLLED_BROWSER_SETUP_DISABLED");
+  return isolatedEnvironmentSecret(config.deploymentClass, "ERP_SETUP_TOKEN");
 }

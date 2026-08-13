@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { IdentityError } from "../app/lib/identity-selfhost/errors.ts";
-import { assertProtectedIdentityGate, buildAuthCookieHeaders, buildClearCookieHeaders, buildCsrfCookieHeader, identityFailureResponse } from "../app/lib/identity-selfhost/handler.ts";
+import { assertProtectedIdentityGate, buildAuthCookieHeaders, buildClearCookieHeaders, buildCsrfCookieHeader, handleSelfhostIdentityApi, identityFailureResponse } from "../app/lib/identity-selfhost/handler.ts";
 import { assertPasswordChanged, hashPassword, validateDisplayName, validatePassword, validateUsername, verifyPassword } from "../app/lib/identity-selfhost/password.ts";
 import { permissionsForRole, validateRole } from "../app/lib/identity-selfhost/permissions.ts";
 import { assertResetAllowed, assertStatusChangeAllowed } from "../app/lib/identity-selfhost/service.ts";
@@ -118,6 +118,37 @@ test("stable error mapping never exposes internal exceptions", async () => {
   assert.equal(known.status, 409); assert.equal((await known.json()).code, "VERSION_CONFLICT");
   const unknown = identityFailureResponse(new Error("select secret from app_users"), "11111111-1111-4111-8111-111111111111");
   const body = await unknown.text(); assert.equal(unknown.status, 500); assert.doesNotMatch(body, /select secret|app_users|stack/i);
+});
+
+test("controlled deployments reject browser setup before reading supplied secrets", async () => {
+  const saved = { ...process.env };
+  try {
+    Object.assign(process.env, {
+      ERP_ENV: "production",
+      ERP_DEPLOYMENT_CLASS: "production",
+      ERP_PUBLIC_ORIGIN: "https://erp.example.invalid",
+    });
+    for (const name of ["DATABASE_URL", "ERP_MIGRATION_DATABASE_URL", "POSTGRES_PASSWORD", "ERP_ADMIN_PASSWORD", "ERP_SETUP_TOKEN"]) delete process.env[name];
+    const response = await handleSelfhostIdentityApi(new Request("https://erp.example.invalid/api/setup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        setup_token: "browser-supplied-secret-value",
+        username: "admin01",
+        display_name: "系统管理员",
+        password: "Browser!SuppliedSecret9",
+      }),
+    }), {
+      pool: { async connect() { throw new Error("audit unavailable"); } },
+      requestId: "11111111-1111-4111-8111-111111111111",
+    });
+    const body = await response.text();
+    assert.equal(response.status, 403);
+    assert.match(body, /SETUP_DISABLED/);
+    assert.doesNotMatch(body, /browser-supplied|Browser!|audit unavailable/i);
+  } finally {
+    process.env = saved;
+  }
 });
 
 test("identity failures preserve retry metadata and both invalid-session cookie clears", async () => {

@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
-import { runtimeConfig } from "../infrastructure/config.ts";
+import { browserSetupAllowed, runtimeConfig, runtimeSetupToken } from "../infrastructure/config.ts";
 import { requestOriginMatches } from "../infrastructure/request-origin.ts";
 import { IdentityError, identityErrorBody, internalIdentityError } from "./errors.ts";
 import { constantTimeTextEqual, normalizeUsername } from "./password.ts";
@@ -162,10 +162,12 @@ export async function handleSelfhostIdentityApi(request: Request, dependencies: 
   try {
     if (path === "/api/setup") {
       if (request.method !== "POST") throw new IdentityError("METHOD_NOT_ALLOWED", "请求方法不允许", 405);
+      const config = runtimeConfig();
+      if (!browserSetupAllowed(config)) throw new IdentityError("SETUP_DISABLED", "受控环境仅允许运维工具初始化", 403);
       parsedBody = await readBody(request);
       assertKeys(parsedBody, ["setup_token", "username", "display_name", "password"]);
-      const config = runtimeConfig();
-      if (!config.setupToken || !constantTimeTextEqual(String(parsedBody.setup_token || ""), config.setupToken)) throw new IdentityError("SETUP_TOKEN_INVALID", "初始化凭证不正确", 403);
+      const setupToken = runtimeSetupToken(config);
+      if (!constantTimeTextEqual(String(parsedBody.setup_token || ""), setupToken)) throw new IdentityError("SETUP_TOKEN_INVALID", "初始化凭证不正确", 403);
       const result = await service.setup({ username: parsedBody.username, displayName: parsedBody.display_name, password: parsedBody.password, requestId });
       const csrf = randomBytes(32).toString("base64url");
       return jsonResponse({ ok: true, user: result.user, setup_required: false, csrf_token: csrf }, 201, requestId, buildAuthCookieHeaders(request, result.token, csrf, config.environment));
@@ -181,7 +183,7 @@ export async function handleSelfhostIdentityApi(request: Request, dependencies: 
     context = await resolveIdentitySession(request, repository, requestId);
     if (path === "/api/session") {
       if (request.method !== "GET") throw new IdentityError("METHOD_NOT_ALLOWED", "请求方法不允许", 405);
-      const setupRequired = await repository.setupRequired();
+      const setupRequired = browserSetupAllowed(runtimeConfig()) && await repository.setupRequired();
       if (context.state !== "AUTHENTICATED" || !context.actor) {
         const headers = context.token_hash ? buildClearCookieHeaders(request) : undefined;
         return jsonResponse({ authenticated: false, user: null, setup_required: setupRequired, session_state: context.state }, 200, requestId, headers);

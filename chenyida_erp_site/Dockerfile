@@ -27,7 +27,9 @@ COPY --from=builder --chown=65532:65532 /app/dist/standalone ./
 COPY --from=dependencies --chown=65532:65532 /tmp/chenyida-runtime-package.json ./package.json
 COPY --from=builder --chown=root:root /app/drizzle-postgres ./drizzle-postgres
 RUN find ./drizzle-postgres -type d -exec chmod 0555 {} + && find ./drizzle-postgres -type f -exec chmod 0444 {} +
-RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments && chown -R 65532:65532 /data/chenyida-erp
+RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments /run/chenyida-erp-secrets \
+    && chown -R 65532:65532 /data/chenyida-erp \
+    && chown 0:0 /run/chenyida-erp-secrets && chmod 0555 /run/chenyida-erp-secrets
 USER 65532:65532
 EXPOSE 3000
 CMD ["node", "server.js"]
@@ -51,6 +53,8 @@ COPY --chown=65532:65532 seeds ./seeds
 COPY --chown=65532:65532 tests ./tests
 COPY --chown=65532:65532 worker ./worker
 RUN find ./drizzle-postgres -type d -exec chmod 0555 {} + && find ./drizzle-postgres -type f -exec chmod 0444 {} +
-RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments && chown -R 65532:65532 /data/chenyida-erp
+RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments /run/chenyida-erp-secrets \
+    && chown -R 65532:65532 /data/chenyida-erp \
+    && chown 0:0 /run/chenyida-erp-secrets && chmod 0555 /run/chenyida-erp-secrets
 USER 65532:65532
 CMD ["node", "--experimental-strip-types", "worker/selfhost.ts"]

@@ -24,7 +24,6 @@ const OID = /^\d{1,10}$/;
 export type MigrationRuntimeConfig = {
   environment: string;
   deploymentClass: string;
-  databaseUrl: string;
 };
 
 export type ReleaseAuthorization = {
@@ -109,7 +108,7 @@ export async function loadReleaseAuthorization(config: MigrationRuntimeConfig, d
   return { manifest, expectedCurrentHead, target: { deploymentClass: deploymentClass as "UAT" | "PRODUCTION", deploymentId, databaseName, systemIdentifier, databaseOid, marker, migrationRole } };
 }
 
-export function loadIsolatedAuthorization(config: MigrationRuntimeConfig): IsolatedAuthorization {
+export function loadIsolatedAuthorization(config: MigrationRuntimeConfig, databaseUrlValue: string): IsolatedAuthorization {
   if (config.environment !== "test" || config.deploymentClass !== "test") reject("MIGRATION_RELEASE_AUTHORIZATION_REQUIRED");
   if (process.env.ERP_ALLOW_ISOLATED_MIGRATION !== "YES") reject("MIGRATION_ISOLATED_PERMISSION_REQUIRED");
   if (process.env.ERP_RELEASE_TEST_MODE !== "YES") reject("MIGRATION_ISOLATED_TEST_MODE_REQUIRED");
@@ -123,7 +122,7 @@ export function loadIsolatedAuthorization(config: MigrationRuntimeConfig): Isola
   const socketPattern = releaseHarness
     ? "/tmp/cyd-release-migration-postgres\\.[A-Za-z0-9]+/socket"
     : "/tmp/cyd-backup-v2-postgres\\.[A-Za-z0-9]+/target-socket";
-  const databaseUrl = config.databaseUrl.match(new RegExp(`^postgresql://postgres@/([A-Za-z_][A-Za-z0-9_$-]{0,62})\\?host=(${socketPattern})$`));
+  const databaseUrl = databaseUrlValue.match(new RegExp(`^postgresql://postgres@/([A-Za-z_][A-Za-z0-9_$-]{0,62})\\?host=(${socketPattern})$`));
   if (!databaseUrl || databaseUrl[1] !== databaseName) reject("MIGRATION_DATABASE_URL_TARGET_MISMATCH");
   const systemIdentifier = required("ERP_MIGRATION_EXPECTED_SYSTEM_IDENTIFIER", SYSTEM_IDENTIFIER, "MIGRATION_SYSTEM_IDENTIFIER_INVALID");
   const databaseOid = required("ERP_MIGRATION_EXPECTED_DATABASE_OID", OID, "MIGRATION_DATABASE_OID_INVALID");

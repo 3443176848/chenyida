@@ -42,7 +42,7 @@ export async function runMigrations(): Promise<void> {
   const releaseAuthorization = await loadReleaseAuthorization(config, directory);
   const authorization: { kind: "RELEASE"; value: ReleaseAuthorization } | { kind: "ISOLATED"; value: IsolatedAuthorization } = releaseAuthorization
     ? { kind: "RELEASE", value: releaseAuthorization }
-    : { kind: "ISOLATED", value: loadIsolatedAuthorization(config) };
+    : { kind: "ISOLATED", value: loadIsolatedAuthorization(config, process.env.DATABASE_URL || "") };
   if (authorization.kind === "RELEASE" && (files.length !== authorization.value.manifest.migrations.entries.length || files.some((file, index) => file !== authorization.value.manifest.migrations.entries[index].filename))) reject("MIGRATION_DIRECTORY_NOT_EXACT_RELEASE_ALLOWLIST");
   const pool = getPool();
   let client: PoolClient | undefined;
