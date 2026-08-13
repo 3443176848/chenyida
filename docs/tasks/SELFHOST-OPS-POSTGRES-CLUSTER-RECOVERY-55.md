@@ -72,8 +72,8 @@
 
 ## 6. 验收标准
 
-- [ ] 三条智能体线完成只读审计，主智能体复核实际 backup/restore、catalog、Dashboard/monitor、release inventory 和安全边界。
-- [ ] 记录单一架构决策：稳定 V2 数据核心与签名密文外层继续保留，cluster security/tablespace 和新的恢复就绪证据采用独立版本；明确秘密分离与旧证据降级语义。
+- [x] 三条智能体线完成只读审计，主智能体复核实际 backup/restore、catalog、Dashboard/monitor、release inventory 和安全边界。
+- [x] 记录单一架构决策：稳定 V2 数据核心与签名密文外层继续保留，cluster security/tablespace 和新的恢复就绪证据采用独立版本；明确秘密分离与旧证据降级语义。
 - [ ] 严格快照覆盖 allowlisted roles、memberships/options、四种role/database settings、数据库属性、owner、对象/列 ACL、default privileges、large object、extension/publication owner、parameter ACL门禁和tablespace owner/CREATE privilege；危险属性、非法内置引用、未知/重复/漂移及未支持对象类全部负测失败。
 - [ ] 恢复角色骨架默认 NOLOGIN；root-only 合成凭据绑定、错误权限/symlink/hardlink/缺角色/重复秘密和输出泄漏负测通过，秘密/verifier 不进入制品或日志。
 - [ ] 数据恢复后 owner/ACL/default privileges 与源一致；运行角色、迁移角色和未授权角色的正/负权限探针通过，未知 privilege escalation 为零。
@@ -104,3 +104,14 @@
 - 应用与测试线确认现有V3、Dashboard和monitor均没有cluster/credential/tablespace维度；旧V3必须显示`LEGACY_V3_NO_CLUSTER_SECURITY`且永不ready，浏览器只能收到状态与时间枚举。
 - 运维与安全线确认当前恢复在首次`CREATE DATABASE`前没有durable intent，trap清理不能覆盖SIGKILL；tablespace目录namespace、凭据FD身份、响应丢失reconciliation、最终激活containment和root边界必须进入协议。
 - 三线均未修改共享工作区，未访问数据库、容器环境、凭据、日志、备份正文、业务数据或受保护Volume；主智能体复核后形成D-132。
+
+## 10. 第一批实现证据
+
+- 新增严格 chenyida-erp-postgresql-cluster-recovery-policy/v1 生产基线与 postgresql-cluster-recovery-contract.mjs。合同已实现 canonical JSON、策略摘要、catalog 规范化、前后 capture 漂移拒绝、V2 恢复身份绑定和去敏 cluster receipt；危险角色属性、未知角色端点、PUBLIC 越权、runtime owner、pg_database_owner 语义滥用、未知对象类、非零 unsupported counter 和 parameter ACL 全部失败关闭。
+- catalog 合同已覆盖角色及 PG16+ membership options、四种 setting scope 门禁、数据库属性、Schema/普通对象/列/routine/type/large object ACL、default privileges、extension/publication owner、custom tablespace owner/ACL/location 摘要；ACL 同时保留 NULL/EMPTY/EXPLICIT 和 explicit/effective tuple，不读取 pg_authid 或 verifier。
+- 新增 custom tablespace map 校验：源 logical name exact-set、一对一 direct child、approved root、prohibited root、空目录、no-follow、owner/group/mode、realpath alias 和 dev/ino 身份检查。当前只是合成 namespace 合同，尚未证明 Compose 提供实际持久 mount。
+- 新增 root-owned 凭据读取边界与去敏回执：专用 marker、逐级目录 owner/write 检查、O_NOFOLLOW、0400/0600、uid0、nlink1、打开 FD 前后及路径身份复核、exact login role set、口令长度/复用门禁；公开 binding/receipt 不含角色名、路径、口令、verifier 或文件 hash。合成测试使用临时假口令，未读取任何真实凭据。
+- 新增不可变 intent 和 hash-chain 恢复状态：INTENT_DURABLE 先行，tablespace/database 分别要求 COMMAND_DISPATCHED → RECONCILED_APPLIED → VERIFIED，同输入幂等、冲突输入拒绝、缺失前序持久状态拒绝，之后才能进入 data/security/credential/activation/prepared/published；uncertain 状态只允许 quarantine/compensation。
+- 单个断网、只读源码、drop-all、512 MiB Node 临时容器内，专项 7 个测试全部通过；targeted ESLint 零 error/零 warning；credential scan 通过 CREDENTIAL_CHECK_OK（1608 repository files scanned）。加入既有 backup/offhost/Dashboard/release identity 回归后共 65/65 通过。回归前两次因临时 tmpfs 未显式允许执行 fixture 自建的假 pg_restore/psql/docker 而分别出现相同 8 个环境失败；没有降低断言，明确使用 rw,exec,nosuid,nodev 临时 tmpfs 后原样全过。
+- 测试后 available memory 约 1.8 GiB、Swap 520 MiB、根盘可用 16 GiB、Load 0.90/0.43/0.22；四服务 restart 0、OOM false，PostgreSQL/Web healthy、Worker/Caddy health none。测试容器均 --rm 清理，无 Node 临时容器遗留；未连接数据库、未读取环境或受保护 Volume 正文。
+- 本批尚未实现 catalog SQL capture/apply、cluster capsule/joint transfer v2、实际双 cluster 恢复、readiness v4、Dashboard/monitor 和 release inventory；因此不勾选对应完成项，不改变 PRODUCTION NO-GO。
