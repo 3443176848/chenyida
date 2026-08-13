@@ -4,6 +4,15 @@
 
 ## 2026-08-13
 
+### SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 - `docs: start PostgreSQL runtime privilege closure`
+
+- 调度/范围：从TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`启动TASK56为唯一`DOING`；主智能体唯一写入，数据迁移、应用测试、运维安全三线只读审计。
+- 起点事实：只读UAT catalog摘要确认PostgreSQL 17当前只有1个非内置LOGIN，且该角色同时为superuser、数据库owner和全部433个public relation owner；Web/Worker活动连接共用1个数据库角色。源码为45/head`0045_runtime_worker_readiness.sql`，UAT仍为40/head`0040_warehouse_receipt_readiness.sql`。
+- 目标：在仓库和合成隔离环境固定owner/migration、Web、Worker、backup capture与受控operator的精确角色、ACL、default privileges、连接身份/上限和正负权限探针；以root控制的文件秘密替代UAT/生产环境变量秘密，并为未来custom tablespace声明独立持久mount。
+- 验收：D-133、版本化角色/权限引导、应用安全secret-file加载、Compose/runtime/release合同、单容器PostgreSQL 17全量Migration及角色正反向测试、适用回归和新内容寻址bundle全部通过；不得降低现有D-132恢复合同。
+- 启动验证：394个Markdown/229个本地链接、214个JSON、38个Shell、1618文件凭据扫描、release contract 51/51及Python三基线通过；固定Node镜像断网/只读/零capability运行，临时容器与SQLite自动清理。宿主工具/依赖缺失在业务断言前如实失败，改用项目既有隔离运行时后通过，未安装依赖或降低断言。
+- 边界：不创建或修改真实角色、凭据、Volume，不读取`.env`、真实秘密、业务行、备份/卷正文或未跟踪状态报告，不修改/重启UAT/生产，不执行真实Migration、备份、恢复、host安装、部署或网络动作。系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 - `docs: start PostgreSQL cluster recovery closure` / `docs: record PostgreSQL cluster recovery decision` / `feat: add PostgreSQL cluster recovery contract` / `feat: capture PostgreSQL cluster recovery catalog` / `feat: secure PostgreSQL cluster restore` / `feat: encrypt PostgreSQL cluster transfer` / `feat: enforce PostgreSQL cluster recovery readiness` / `feat: expose cluster recovery operations status` / `feat: execute crash-safe PostgreSQL cluster recovery` / `test: bind cluster recovery release gate` / `test: execute trusted recovery fixtures` / `build: bind exact release dependencies` / `test: make recovery gate deterministic and trusted` / `release: bind task55 supervisor bundle` / `docs: close PostgreSQL cluster recovery`
 
 - 调度/范围：TASK54收口文档提交`812ec2f0a5c2710c73e7c0e3cbd207f977e6256b`/tree`f4cc747a63ad9979e85ca91e407b3854f56e5149`后的零`DOING`自动切换为TASK55唯一active task；主智能体唯一写入，数据迁移/应用测试/运维安全三线只读审计。

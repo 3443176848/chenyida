@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前没有`DOING`。`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`已完成仓库与合成隔离集群恢复闭环并释放active slot；下一安全任务固定为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`，须以独立任务文档和启动提交切换为唯一`DOING`。真实数据库、真实凭据、UAT/生产、host安装、数据恢复及WAL/PITR继续阻塞，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`。严格起点为TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`；范围仅为仓库和合成隔离环境中的最小数据库角色/ACL、secret-file delivery、受控operator与custom tablespace持久mount合同。真实角色/凭据/Volume、UAT/生产、host安装、Migration/deploy、备份恢复及WAL/PITR继续阻塞，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -77,6 +77,8 @@
 
 2026-08-13第三十二次调度事件：`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 DOING → DONE`。D-132下的catalog/策略、NOLOGIN骨架、owner/ACL/default privileges、root-only凭据重新绑定、custom tablespace显式映射、加密cluster capsule/joint transfer v2、readiness v4、Dashboard/监控和崩溃安全executor全部在合成双PostgreSQL cluster闭合。冻结源码`b93d838067f3a463f80de04811a11a1dbb5e1848`与manifest-only直接子提交`2136aa3c4178135a834b5a6e003e64948f78b5d3`形成49文件bundle，SHA-256为`699cdd2a55058a38152718a09036255373757191b83d143bd501f995e6d47dd6`；完整适用回归通过。未生成真实角色/凭据、真实恢复、源码匹配镜像、正式19步PASS或部署；active slot释放，下一安全任务为TASK56，系统继续`PRODUCTION NO-GO`。
 
+2026-08-13第三十三次调度事件：主智能体从TASK55收口后的零`DOING`自动选择其明确保留的运行权限P0，状态按`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 TODO → DOING`切换唯一active slot。只读UAT catalog确认单一非内置LOGIN同时为superuser、数据库owner和全部public relation owner，Web/Worker连接共用该角色；Compose的数据库/初始化/Setup/Admin秘密仍在环境且没有custom tablespace持久mount。任务只实现未来仓库/合成隔离合同，不创建或修改真实角色、凭据、Volume、UAT/生产、host或业务数据。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -93,7 +95,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| — | 当前无执行中任务；TASK56尚未正式启动 | — | — | — | — | TASK55收口后active slot为空；下一启动提交将建立唯一`DOING`。 |
+| SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 | PostgreSQL运行时最小权限与凭据边界闭环 | DOING | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50、SELFHOST-OPS-RELEASE-GATE-42、D-132 | `READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`。拆分owner/migration、Web、Worker、backup capture与受控operator，移除生产秘密环境交付并声明custom tablespace持久mount。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56.md)。 |
 
 ## 已完成任务
 

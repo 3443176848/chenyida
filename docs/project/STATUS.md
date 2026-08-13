@@ -2,6 +2,23 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
+## SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56（执行中；只限仓库与合成隔离环境）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / ISOLATED-ONLY / PRODUCTION NO-GO | 当前唯一active slot；主智能体唯一写入，三条智能体线只读审计 |
+| 严格起点 | PASS / CONTROLLED | `main@fb1f7e8893b2affba0ca07ecd9629ae2726adca9`、tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`；未跟踪状态报告不读不改不提交 |
+| UAT catalog | VERIFIED READ ONLY / HIGH RISK OPEN | PostgreSQL 17只有1个非内置LOGIN且为superuser、数据库owner和全部433个public relation owner；Web/Worker活动连接共用1个角色；未输出角色名、连接串或密码，未读业务行或写入 |
+| 源码/运行差距 | OPEN / UNCHANGED | 源码45/head`0045_runtime_worker_readiness.sql`，UAT仍40/head`0040_warehouse_receipt_readiness.sql`；本任务不授权Migration或部署 |
+| 秘密边界 | OPEN / REPOSITORY TARGET DEFINED | Compose仍通过环境交付数据库、初始化、Setup和Admin秘密；目标为UAT/生产只接受root控制的独立文件并严格校验路径、owner、mode、大小和换行 |
+| 角色边界 | OPEN / REPOSITORY TARGET DEFINED | 分离非superuser owner/migration、Web、Worker、backup capture及离线受控operator；运行身份不得拥有DDL、owner、SET ROLE或跨服务凭据 |
+| Tablespace | OPEN / REPOSITORY TARGET DEFINED | 当前PostgreSQL仅有PGDATA持久卷；未来声明独立`erp_postgres_tablespaces`固定mount，不创建或改动真实Volume |
+| 验收范围 | PENDING | D-133、版本化角色/ACL、secret-file loader、Compose/runtime/release合同、PostgreSQL 17全量Migration及正负权限、回归与新bundle |
+| 启动验证 | PASS / LIGHTWEIGHT | Markdown394/229链接、JSON214、Shell38、credentials1618、release contract51/51及Python三基线通过；宿主工具缺失改用既有隔离运行时，不安装依赖或降低断言 |
+| 起点资源 | PASS / BELOW STOP LINES | available约2.0GiB、Swap603MiB/1.0GiB、根盘16GiB、Load`0.10/0.17/0.52`，内核`oom_kill=0`；四服务restart0/OOM false |
+| 外部边界 | BLOCKED / NOT AUTHORIZED | 无真实角色/凭据/Volume、UAT/生产变更、host安装、Migration/deploy、备份恢复、数据读取或账号/网络动作 |
+| 系统是否可用 | NO | 当前高权限共享数据库身份和环境变量秘密尚未改变，且异机恢复、候选门、真实迁移、岗位/员工验收与切换仍缺证据 |
+
 ## SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55（完成；仓库与合成隔离集群恢复，真实恢复仍阻塞）
 
 | 验证项 | 结果 | 说明 |
