@@ -2293,6 +2293,52 @@
 - 拒绝把 synthetic receipt、仓库 evaluator、逻辑 no-clobber 或 dry-run retention 写成真实异机、已安装 timer、WORM、执行过删除或达到 RPO/RTO。
 - 拒绝为了兼容旧 Dashboard 继续让 V2 `RESTORE_VERIFIED`直接 ready，或在缺少任一 transfer/encryption/schedule/retention 维度时合并成笼统绿色状态。
 
+## D-132 PostgreSQL 集群安全恢复采用独立加密 capsule、联合 transfer v2 与 readiness v4
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / DESIGN FIXED / REPOSITORY IMPLEMENTATION IN PROGRESS / SYNTHETIC-ISOLATED ONLY / PRODUCTION NO-GO`
+- 提案与实施：Codex 持续交付负责人，依据 TASK55 数据迁移、应用测试、运维安全三线只读审计及 PostgreSQL 17 catalog/恢复行为复核
+- 确认边界：只授权仓库合同、合成 fixture、最多一个临时 PostgreSQL 容器、Dashboard/监控和release inventory；不授权真实数据库/凭据、当前卷、异机传输、host路径、账号、UAT/生产、部署或切换
+
+### Context
+
+- TASK41 的V2数据核心是精确七文件集合，TASK54的outer v1也拒绝额外文件；向任一已发布集合直接加入cluster sidecar会破坏D-115/D-131兼容性。
+- 当前backup仅`pg_dump --no-owner --no-acl`且无globals，restore同样排除owner/ACL；数据库、Schema、对象、large object、default privileges、角色、membership、GUC和custom tablespace都不能被完整重建。现有V3因此可能在缺少最小权限安全状态时显示ready。
+- `pg_dumpall --globals-only`包含可执行SQL并需要高权限，且不能自然表达allowlist、秘密排除、策略不变量、grantor/options、对象级闭包或目标tablespace映射；它不作为本项目唯一权威。
+- 当前restore在首次`CREATE DATABASE`前没有durable intent，trap清理不能覆盖SIGKILL。custom tablespace与数据库创建又不能置于transaction block；响应丢失后若只依赖进程内状态会使操作员只能猜测删除。
+- 当前Compose仍共享初始化superuser式身份、通过环境传秘密，也没有PGDATA外custom tablespace持久mount。忠实复制这一现状不能证明最小权限，也不能由TASK55合成测试冒充实际运行面闭合。
+
+### Decision
+
+1. 保持`chenyida-erp-backup/v2`七文件和`chenyida-erp-offhost-transfer/v1`完全稳定。cluster snapshot位于独立私有根，经独立签名密文capsule异机传输；联合transfer v2只交叉绑定data envelope v1与cluster capsule链，不改写两者payload。
+2. `chenyida-erp-backup-verification/v4`是唯一未来current-ready合同。V1—V3继续可解析，但V3固定显示`LEGACY_V3_NO_CLUSTER_SECURITY`且永不ready；synthetic V4也永不ready。V4必须绑定data restore、joint transfer、cluster、credential、tablespace和operations policy同一代次。
+3. canonical cluster snapshot只读取非秘密catalog，禁止`pg_authid`和密码/verifier。它覆盖批准角色属性、membership及PG16+ options、四种role/database GUC scope、database属性、对象/列ACL、default privileges、large object、extension/publication owner、parameter ACL门禁及custom tablespace owner/CREATE privilege。
+4. ACL以`aclexplode()`tuple和NULL/empty/effective语义表达；overloaded routine使用identity arguments。`PUBLIC`与`pg_database_owner`仅作为固定语义引用，其他系统角色端点拒绝。FDW/user mapping/subscription及未知用户对象类失败关闭，不把可能含秘密的catalog写入capsule。
+5. 快照先通过独立最小权限policy，再验证源目标等价。runtime不得为owner或拥有DDL/SET ROLE；migration owner必须保持release gate不变量；PUBLIC不得拥有业务Schema CREATE或敏感CONNECT。源越权时capture失败，不能把越权状态忠实复制后称为安全。
+6. source capture在同一全局运维锁和V2 fence内前后各执行一次；临时`datconnlimit=0`与`default_transaction_read_only=on`按durable intent原值精确剔除，两次canonical digest必须相等并绑定V2 recovery point、source system ID/OID/marker和Migration身份。
+7. 恢复在任何mutation前fsync immutable intent。角色骨架与可事务化安全状态单事务应用且全为`NOLOGIN/PASSWORD NULL`；custom tablespace和database按非事务逐步dispatch/reconcile/verify；数据库保持connlimit0，archive由批准migration owner以`--no-owner --no-acl --single-transaction`恢复，再单事务应用owner/ACL/default privileges/membership/settings并独立重捕获比较。
+8. custom tablespace保留源logical name，目标map必须exact 1:1到数据库服务器同一已证明namespace内的新空批准持久路径。逐组件no-follow、inode/owner/mode/capacity和禁止重叠强制执行；location内不放marker。Compose缺批准mount时custom tablespace实际恢复保持NO-GO。
+9. actual/controlled credential binding与receipt发布强制UID0；秘密只从root-only、no-follow、单硬链接文件经FD/stdin/进程内存处理，不进argv、环境、输出、日志、hash或回执。公开证据只绑定非秘密generation与role-set指纹；全部角色保持NOLOGIN直到最终激活事务与正/负权限探针完成。
+10. 每个非事务步骤固定`INTENT_DURABLE → COMMAND_DISPATCHED → RECONCILED_APPLIED → VERIFIED`。相同run/payload可resume，冲突拒绝；补偿只删除本任务精确身份且无依赖的对象，任何歧义只quarantine并保持NOLOGIN/connlimit0，禁止trap-only或递归猜删。
+11. Dashboard只投影cluster/credential/tablespace状态枚举和必要时间。monitor通过可信adapter读取root发布的V4而非调用者自报，并分别产生三个CRITICAL条件。发布inventory、runtime policy与supervisor bundle必须随新增测试和源码摘要刷新。
+12. TASK55只关闭仓库与合成隔离协议。实际高权限共享角色、环境变量秘密、superuser operator、custom tablespace mount、真实异机/密钥/恢复、WAL/PITR/HA/RPO/RTO继续作为独立P0，不因TASK55通过而解除。
+
+### Consequences
+
+- V2数据核心和既有outer v1仍可审计/恢复，但不再足以宣称当前灾备ready；cluster capsule若没有进入加密异机链也不能由摘要伪装成ready。
+- 恢复实现会增加显式policy、catalog闭包、状态机、路径映射和凭据输入，复杂度高于`pg_dumpall`；换来的边界是秘密不进入制品、越权源失败关闭、非事务崩溃可判断且可精确补偿。
+- PostgreSQL major、支持对象类、role职责或Compose tablespace namespace变化均需新合同版本和重新演练，不能静默兼容。
+- 当前系统继续`PRODUCTION NO-GO`；真实A4、runtime role拆分与secret delivery修复前，不请求或生成实际cluster-ready证据。
+
+### Rejected alternatives
+
+- 拒绝向V2七文件或outer v1精确集合追加sidecar，也拒绝只把本机cluster文件摘要写入V4而不异机传输其正文。
+- 拒绝以`pg_dumpall --globals-only`可执行SQL、`aclitem::text`或源目标摘要相等作为唯一安全权威。
+- 拒绝保存密码/SCRAM verifier、credential文件SHA、连接串、角色清单或tablespace路径到公开回执/浏览器。
+- 拒绝遇到custom tablespace自动创建host目录/chown、在location放marker、跨namespace猜测路径或递归删除失败目标。
+- 拒绝在SIGKILL后依赖trap清理、手工DROP提示或把不确定对象当作本任务创建；恢复必须resume/inspect/compensate且歧义隔离。
+- 拒绝为了让当前Compose通过而接受superuser runtime、环境秘密或PUBLIC越权，也拒绝把合成角色fixture写成真实最小权限已完成。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

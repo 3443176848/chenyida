@@ -12,7 +12,7 @@
 1. 版本化捕获并严格验证允许的数据库角色属性、角色成员关系、角色/数据库设置、数据库/Schema/对象所有权与 ACL、default privileges，以及 tablespace 身份和显式映射需求。
 2. 恢复必须先在隔离目标建立无秘密、最小权限的角色骨架，再恢复数据与对象权限；登录凭据只能从 root-only 独立输入重新绑定，密码或 verifier 不得进入 Git、manifest、回执、argv、环境或输出。
 3. 自定义 tablespace 必须显式映射到已批准的新空路径；缺映射、路径重叠、指向 PGDATA/文件卷、symlink、复用非空目录或目标身份漂移全部失败关闭。
-4. 恢复后以独立、去敏、不可变回执证明角色/成员关系/设置/所有权/ACL/default privileges/tablespace 与源快照一致，并把该证据纳入当前恢复就绪、Dashboard、监控和发布 inventory。
+4. 恢复后以独立、去敏、不可变回执证明角色/成员关系/设置/所有权/ACL/default privileges/tablespace 与批准的安全策略及源快照一致，并把该证据纳入当前恢复就绪、Dashboard、监控和发布 inventory；仅证明“源=目标”不能替代最小权限校验。
 
 ## 2. 起点事实
 
@@ -29,7 +29,7 @@
 - 仅对显式 allowlist 的合成角色、数据库和 tablespace 执行恢复；系统/内置角色、未知角色、SUPERUSER/BYPASSRLS/REPLICATION/CREATEDB/CREATEROLE 等越权属性必须失败关闭；
 - 使用 root-only 合成凭据文件验证安全 owner/mode/no-follow/单硬链接边界，并在隔离目标完成凭据重新绑定；测试不得打印秘密或 verifier；
 - 使用合成 fixture、临时目录以及最多一个临时 PostgreSQL 容器完成源/目标双 cluster 的正负向恢复、崩溃续跑、幂等和清理验证；所有重任务串行；
-- 保持 TASK41 内层 V2 数据核心和 TASK54 签名密文外层兼容，采用新版本证据闭合 cluster recovery，不追改已发布合同；
+- 保持 TASK41 内层 V2 七文件数据核心和 TASK54 签名密文外层 v1 兼容；新增独立加密 cluster capsule、联合 transfer v2 与 readiness v4，不追改已发布合同；
 - 更新 Dashboard、监控、恢复手册、release inventory/contract 和 content-addressed supervisor bundle。
 
 ## 4. 禁止范围
@@ -45,27 +45,36 @@
 
 ### 5.1 安全快照与秘密分离
 
-- 快照只覆盖明确业务数据库和批准角色集合，使用稳定排序、规范 JSON 和 SHA-256；未知字段、重复对象、名称混淆、系统角色、危险属性或 catalog 漂移拒绝。
-- 角色属性、membership options、role/database settings、owner、ACL/default ACL 和 tablespace logical identity 必须关系化表达，不依赖可执行 SQL 文本作为唯一权威。
+- 快照只覆盖明确业务数据库和批准角色集合，使用稳定排序、规范 JSON 和 SHA-256；未知字段、重复对象、名称混淆、危险属性或 catalog 漂移拒绝。`PUBLIC`和`pg_database_owner`只允许作为策略中固定语义引用，不创建、快照或修改其角色属性；其余`pg_*`角色 owner、membership 或授权端点一律拒绝。
+- 角色属性、membership options、四种 role/database setting scope、数据库属性、owner、对象/列 ACL、default ACL、large object、extension/publication owner、parameter ACL 门禁与 tablespace logical identity/`CREATE` privileges 必须关系化表达，不依赖可执行 SQL 文本或`aclitem::text`作为唯一权威。FDW/user mapping/subscription 等可能含秘密或未支持对象类必须失败关闭。
+- 源安全快照必须在同一全局运维锁与备份 fence 内前后各捕获一次且规范摘要完全一致；临时`datconnlimit=0`和`default_transaction_read_only=on` guard overlay 必须按 durable intent 精确还原/剔除，不能污染快照。
+- 独立安全策略固定 migration owner/runtime/NOLOGIN privilege group/unauthorized probe 的职责不变量、允许设置、grantor闭包、PUBLIC权限及支持对象类；源不满足最小权限时禁止生成可恢复 capsule，不能忠实复制越权状态。
 - LOGIN 角色在恢复骨架阶段必须 `NOLOGIN` 且无密码；凭据绑定使用独立 root-only 输入和单独 receipt，只记录 key/role 指纹和结果，不记录密码、verifier 或连接字符串。
 
 ### 5.2 恢复顺序与事务边界
 
-- preflight 固定源快照、目标 cluster/database identity、空目标边界、角色 allowlist 和 tablespace map；任何目标既有冲突或额外权限失败关闭。
-- 恢复顺序固定为安全角色骨架与 tablespace → 数据库/Schema/对象数据 → owner/ACL/default privileges/role settings → 凭据重新绑定 → runtime 连接与最小权限验证。
-- 可事务化步骤必须单事务；cluster-global 非事务步骤使用 durable intent、prepared/applied/verified 状态和精确补偿。相同输入幂等续跑，不同输入冲突拒绝，不得留下可登录的半恢复角色。
+- preflight 固定源快照、V2/outer/cluster capsule摘要、目标 cluster/database identity、空目标边界、角色 allowlist 和 tablespace map；任何目标既有冲突或额外权限失败关闭。实际/受控回执发布与凭据绑定必须强制 UID 0；非 root TEST 只能形成 synthetic-only 结果。
+- 恢复顺序固定为 durable intent → 单事务安全`NOLOGIN/PASSWORD NULL`角色骨架 → 逐个 custom tablespace → `CONNECTION LIMIT 0`数据库 → `pg_restore --role=<approved migration owner> --no-owner --no-acl --single-transaction` → 单事务 owner/ACL/default privileges/membership/settings → 精确再捕获比较 → root-only 凭据重新绑定 → 激活前后最小权限探针 → prepared/public receipt。
+- 可事务化角色、membership与授权步骤必须单事务；`CREATE/DROP TABLESPACE`与`CREATE/DROP DATABASE`等非事务步骤使用`INTENT_DURABLE → COMMAND_DISPATCHED → RECONCILED_APPLIED → VERIFIED`状态、响应丢失 reconciliation 和精确补偿。相同输入幂等续跑，不同输入冲突拒绝；不确定状态只隔离并保持全部登录角色`NOLOGIN`、数据库`CONNECTION LIMIT 0`，不得 trap-only 清理、猜测删除或留下可登录半恢复角色。
 
 ### 5.3 Tablespace、验证与恢复就绪
 
-- `pg_default`/`pg_global`以固定内置身份处理；自定义 tablespace 需要源 logical identity 与目标绝对路径的显式一对一映射，路径必须新建、空、no-follow、远离 PGDATA 与应用文件卷并受 owner/mode 检查。
-- 验证必须覆盖角色属性、grantor/member/admin/inherit/set option、role/database settings、数据库/Schema/表/序列/函数 owner/ACL、default privileges、tablespace owner/ACL/location identity及应用/迁移角色的允许和拒绝操作。
+- `pg_default`/`pg_global`以固定内置身份处理且禁止映射；自定义 tablespace 需要源 logical name 与目标新空路径的显式一对一映射，并保留源 logical name。路径必须在数据库服务器同一已证明 namespace 内逐组件 no-follow、固定 dev/ino/uid/gid/mode、远离 PGDATA、仓库、凭据/密钥/备份/恢复根与三个应用文件卷；Compose 未提供批准的持久共享 mount 时实际 custom tablespace 必须 NO-GO。
+- PostgreSQL tablespace ACL 从`pg_tablespace.spcacl`关系化展开为`CREATE` privilege/grantor/grantee/grantable，并保留NULL、显式空ACL与effective ACL差异；不能用字符串ACL或仅用`has_tablespace_privilege`代替。目标 location 必须由获准运维预建为空目录，不能在其中放 marker；任务身份保存在 restore-root durable intent，并与 catalog OID/comment/location及 inode 交叉绑定。
+- 验证必须覆盖角色属性、grantor/member/admin/inherit/set option、role/database settings、数据库/Schema/表/分区表/视图/物化视图/序列/列/重载 routine/type/default privileges/large object、extension/publication owner、tablespace owner/CREATE权限/location identity及应用/迁移/未授权角色的允许和拒绝操作。
 - 当前恢复就绪证据必须版本化升级并要求 cluster receipt、credential binding receipt 与现有内外层恢复链交叉绑定；旧 V1—V3 和 synthetic evidence 保持可解析但不能成为真实 ready。
+
+### 5.4 秘密、传输与当前运行面限制
+
+- 凭据输入必须位于 root-only 专用根，逐组件 no-follow，文件`0400/0600`、uid 0、单硬链接，并以打开 FD 的前后身份核对防并发替换。密码只经受控 stdin/进程内存进入 PostgreSQL，不进入 argv、环境、stdout/stderr、manifest、intent、哈希或回执；文件摘要也不得成为离线猜测 oracle。
+- cluster snapshot 不得只留本机 sidecar。独立 cluster capsule 必须签名、客户端加密并由异机接收方确认；联合 transfer v2 只引用并交叉绑定稳定 data envelope v1 与 cluster capsule链。V4 actual readiness 必须证明恢复机实际消费两条链，synthetic结果永远不能 ready。
+- 当前 Compose 仍使用初始化 superuser式`POSTGRES_USER`并把数据库/管理员秘密放入环境，Web/Worker还未拆为独立最小 runtime role；当前 backup/restore operator也依赖superuser。TASK55必须将这些事实保持为后续 P0，不得把合成角色恢复通过写成实际运行权限或 secret delivery 已闭合。
 
 ## 6. 验收标准
 
 - [ ] 三条智能体线完成只读审计，主智能体复核实际 backup/restore、catalog、Dashboard/monitor、release inventory 和安全边界。
 - [ ] 记录单一架构决策：稳定 V2 数据核心与签名密文外层继续保留，cluster security/tablespace 和新的恢复就绪证据采用独立版本；明确秘密分离与旧证据降级语义。
-- [ ] 严格快照覆盖 allowlisted roles、memberships/options、role/database settings、owners、ACL/default privileges 和 tablespace；危险属性、系统角色、未知/重复/漂移全部负测失败。
+- [ ] 严格快照覆盖 allowlisted roles、memberships/options、四种role/database settings、数据库属性、owner、对象/列 ACL、default privileges、large object、extension/publication owner、parameter ACL门禁和tablespace owner/CREATE privilege；危险属性、非法内置引用、未知/重复/漂移及未支持对象类全部负测失败。
 - [ ] 恢复角色骨架默认 NOLOGIN；root-only 合成凭据绑定、错误权限/symlink/hardlink/缺角色/重复秘密和输出泄漏负测通过，秘密/verifier 不进入制品或日志。
 - [ ] 数据恢复后 owner/ACL/default privileges 与源一致；运行角色、迁移角色和未授权角色的正/负权限探针通过，未知 privilege escalation 为零。
 - [ ] `pg_default`与显式 custom tablespace map 通过；缺失/重复/非空/越界/PGDATA重叠/symlink/错误 owner-mode/崩溃负测不改变受信目标。
@@ -75,6 +84,7 @@
 - [ ] 既有 backup/offhost/readiness、Dashboard/monitor、release inventory/contract、typecheck/lint 不降级；新增测试进入正式 inventory，所有重型验证串行且最多一个临时容器。
 - [ ] 源码提交后重建 canonical manifest-only 直接子提交，TASK54 bundle 与全部旧候选标记`STALE / NOT AUTHORIZABLE`。
 - [ ] 不产生真实角色/凭据、真实 cluster receipt、host 安装、外部 push、UAT/生产/真实数据动作，不声称 WAL/PITR/HA/RPO/RTO 已完成。
+- [ ] 当前高权限共享角色、环境变量秘密、superuser operator与custom tablespace持久mount缺口形成明确后续P0；TASK55完成不解除这些实际运行面阻断。
 - [ ] 同步`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`和`PRODUCTION_READINESS.md`，通过凭据/JSON/Shell/Markdown/差异检查并创建独立 Git 提交。
 
 ## 7. 启动登记验证
@@ -87,3 +97,10 @@
 ## 8. 当前判定
 
 `DOING / READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / SYNTHETIC-ISOLATED ONLY / PRODUCTION NO-GO`。TASK55只关闭仓库和合成隔离层的 PostgreSQL logical cluster security/tablespace 恢复缺口；真实目标、真实凭据、当前数据恢复、host 安装、WAL/PITR、RPO/RTO、UAT/生产与切换继续需要独立资源及专项明确授权。
+
+## 9. 三线只读审计收敛
+
+- 数据与迁移线确认V2七文件、outer v1均为exact-set合同；cluster状态必须进入独立加密异机链。catalog最小闭包还包括列ACL、large object、parameter ACL、extension/publication owner及四种GUC scope，未知外部对象失败关闭。
+- 应用与测试线确认现有V3、Dashboard和monitor均没有cluster/credential/tablespace维度；旧V3必须显示`LEGACY_V3_NO_CLUSTER_SECURITY`且永不ready，浏览器只能收到状态与时间枚举。
+- 运维与安全线确认当前恢复在首次`CREATE DATABASE`前没有durable intent，trap清理不能覆盖SIGKILL；tablespace目录namespace、凭据FD身份、响应丢失reconciliation、最终激活containment和root边界必须进入协议。
+- 三线均未修改共享工作区，未访问数据库、容器环境、凭据、日志、备份正文、业务数据或受保护Volume；主智能体复核后形成D-132。
