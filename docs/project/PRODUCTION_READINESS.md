@@ -55,6 +55,8 @@
 
 2026-08-13 第二十二次增量：TASK54已完成。D-131固定稳定内层V2、Ed25519/X25519/HKDF-SHA256/AES-256-GCM外层、双向回执、恢复强绑定、UTC单飞、dry-run retention和root发布V3 readiness；旧V2及synthetic均不能ready。源码`fd0a9cff`与manifest-only直接子提交`315b1f3d`形成47文件bundle；合成密文双集群恢复和适用回归通过。没有真实密钥/异机目标、timer/WORM、数据外传/恢复或RPO/RTO，因此G2仍阻塞，整体继续`PRODUCTION NO-GO`。
 
+2026-08-13 第二十三次增量：`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`已从TASK54收口提交`812ec2f0a5c2710c73e7c0e3cbd207f977e6256b`启动为唯一`DOING`。只读核验确认现有logical backup/restore同时排除owner与ACL且未捕获cluster globals，roles/memberships/settings、owner/ACL/default privileges和custom tablespace没有可恢复证据。任务将在仓库与合成隔离环境实现allowlist快照、NOLOGIN角色骨架、root-only凭据重新绑定、显式tablespace map、精确权限验证和新的恢复就绪证据；不接触真实数据库、凭据、UAT/生产或host，整体继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。

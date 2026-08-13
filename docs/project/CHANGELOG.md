@@ -4,6 +4,14 @@
 
 ## 2026-08-13
 
+### SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 - `docs: start PostgreSQL cluster recovery closure`
+
+- 调度/范围：TASK54收口文档提交`812ec2f0a5c2710c73e7c0e3cbd207f977e6256b`/tree`f4cc747a63ad9979e85ca91e407b3854f56e5149`后的零`DOING`自动切换为TASK55唯一active task；主智能体唯一写入，数据迁移/应用测试/运维安全三线只读审计。
+- 起点事实：`backup-selfhost.sh`使用`pg_dump --no-owner --no-acl`且未捕获cluster globals，`restore-selfhost.sh`又以`pg_restore --no-owner --no-acl`恢复；现有证据因此不能证明roles/memberships/settings、owner/ACL/default privileges或custom tablespace可恢复。
+- 目标：保持TASK41内层V2和TASK54签名密文外层稳定，新增规范化、去敏、allowlist驱动的cluster security/tablespace快照、preflight、apply/verify与不可变回执；角色骨架默认`NOLOGIN`，登录秘密只从独立root-only输入重新绑定。
+- 验收：危险角色属性/系统角色/未知或重复对象失败关闭；owner/ACL/default privileges、membership options、settings与显式tablespace map在单容器双PostgreSQL cluster中通过正负向、崩溃续跑、幂等和最小权限验证；新证据进入Dashboard、监控、readiness与release inventory/bundle。
+- 边界：只做仓库与合成隔离实施，不读取真实凭据、业务行、备份或受保护Volume正文，不连接或修改UAT/生产，不创建真实角色/密码，不安装host组件、不build/deploy、不执行真实恢复或数据外传；WAL/PITR、HA、跨版本与RPO/RTO不在本任务范围。系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54 - `docs: start offhost backup provenance closure` / `feat: add signed encrypted offhost backup provenance` / `test: stabilize backup guard crash rehearsal` / `test: bind synthetic offhost receiver identity` / `feat: enforce encrypted offhost recovery readiness` / `chore: refresh release supervisor bundle` / `docs: close offhost backup provenance`
 
 - 调度/范围：TASK53收口`61b752e2ad05e2b2a273a01ffba6a87cc77e6a4c`/tree`800bd1f3caa0c43695008c044e507ac17c582884`后的零`DOING`自动切换为TASK54唯一active task；主智能体唯一写入，数据迁移/应用测试/运维安全三线完成只读审计。

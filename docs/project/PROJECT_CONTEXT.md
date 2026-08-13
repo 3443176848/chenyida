@@ -28,6 +28,8 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 `SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`已完成并释放active slot。D-131保留TASK41内层四域V2，新增Ed25519源/接收签名、X25519/HKDF-SHA256/AES-256-GCM envelope、receiver receipt/source acceptance、私有staging/no-clobber恢复、UTC单飞状态、dry-run retention和root发布V3 readiness；旧V2及synthetic证据均不能使Dashboard ready，监控分别告警transfer/encryption/schedule/retention。源码`fd0a9cff751ad3e6619600066693403b7ace0655`/tree`b7c3849d…b520`与manifest-only直接子提交`315b1f3dac21a9d8cd634ba9d3dcdcbff4fe0806`/tree`2031fcf5…5c72`形成47文件bundle，manifest SHA-256为`ae6e2bd7…82b8`。合成密文链到双PostgreSQL cluster恢复和适用回归通过；没有创建真实密钥/异机目标、读取或外传当前数据、安装timer或执行删除，真实G2继续阻塞。
 
+`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`现为唯一`DOING`，严格起点为TASK54收口文档提交`812ec2f0a5c2710c73e7c0e3cbd207f977e6256b`/tree`f4cc747a63ad9979e85ca91e407b3854f56e5149`。实际核验显示备份使用`pg_dump --no-owner --no-acl`且没有cluster globals，恢复又使用`pg_restore --no-owner --no-acl`，所以现有恢复链不保留roles/memberships/settings、owner/ACL/default privileges或custom tablespace。TASK55只在仓库和合成隔离双cluster中实现allowlist快照、NOLOGIN骨架、root-only秘密重新绑定、显式tablespace mapping、精确权限验证和新readiness证据；不连接或修改UAT/生产、真实数据库、真实凭据、host或受保护Volume，系统继续`PRODUCTION NO-GO`。
+
 ## 系统组成
 
 ### 本地 ERP

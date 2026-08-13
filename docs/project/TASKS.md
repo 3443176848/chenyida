@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前为零`DOING`的安全换挡点。`SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`已完成仓库与合成隔离闭环并释放 active slot；真实异机目标、密钥托管、timer/WORM、真实数据外传/第三域恢复及 RPO/RTO 继续阻塞。下一正式任务必须从仍可安全推进的投产缺口中单独登记，系统继续`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`。严格起点为TASK54收口文档提交`812ec2f0a5c2710c73e7c0e3cbd207f977e6256b`/tree`f4cc747a63ad9979e85ca91e407b3854f56e5149`；范围仅为仓库和合成隔离环境中的PostgreSQL roles/memberships/settings、owner/ACL/default privileges、tablespace与凭据分离恢复合同。真实数据库、真实凭据、UAT/生产、host安装、数据恢复及WAL/PITR继续阻塞，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -73,6 +73,8 @@
 
 2026-08-13第三十次调度事件：`SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54 DOING → DONE`。D-131固定稳定内层V2、签名密文外层v1和root发布恢复就绪v3；源码`fd0a9cff`与manifest-only直接子提交`315b1f3d`形成47文件bundle。合成密文链、调度/保留、Dashboard/监控、release及单容器双PostgreSQL cluster恢复全部通过；未创建真实密钥/目标、读取或外传真实数据、安装timer或执行删除。真实G2仍阻塞，active slot释放且系统继续`PRODUCTION NO-GO`。
 
+2026-08-13第三十一次调度事件：主智能体从TASK54收口后的零`DOING`自动选择其明确排除的最高优先级恢复缺口，状态按`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 TODO → DOING`切换唯一active slot。只读核验确认backup/restore都使用`--no-owner --no-acl`且没有cluster globals；任务只实现allowlist快照、NOLOGIN骨架、秘密分离、owner/ACL/default privileges、显式tablespace map和新readiness证据，不连接或修改UAT/生产、真实数据、账号、host或受保护Volume。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -89,7 +91,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| — | — | — | — | — | — | 当前无执行中任务；TASK54收口后等待下一任务独立登记。 |
+| SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 | PostgreSQL集群安全状态与Tablespace恢复闭环 | DOING | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-OPS-RELEASE-GATE-42、D-115、D-131 | `READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / SYNTHETIC-ISOLATED ONLY / NO DATA ACTION / PRODUCTION NO-GO`。规范化恢复roles/memberships/settings、owners/ACL/default privileges与tablespace；登录秘密独立root-only重新绑定。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55.md)。 |
 
 ## 已完成任务
 

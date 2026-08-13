@@ -2,6 +2,20 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
+## SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55（执行中；仓库与合成隔离集群恢复）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / SYNTHETIC-ISOLATED ONLY / PRODUCTION NO-GO | TASK55为唯一active slot；主智能体唯一写入，三条智能体线只读审计 |
+| 严格起点 | PASS / CONTROLLED | `main@812ec2f0a5c2710c73e7c0e3cbd207f977e6256b`、tree`f4cc747a63ad9979e85ca91e407b3854f56e5149`；未跟踪状态报告不读不改不提交 |
+| 精确缺口 | CONFIRMED / FAIL CLOSED | backup为`pg_dump --no-owner --no-acl`且没有cluster globals，restore为`pg_restore --no-owner --no-acl`；当前链不恢复roles/memberships/settings、owner/ACL/default privileges或custom tablespace |
+| 目标合同 | IN PROGRESS | 版本化规范快照、严格allowlist、NOLOGIN骨架、owner/ACL/default privileges应用与验证、不可变cluster receipt及当前readiness升级 |
+| 秘密边界 | SYNTHETIC ROOT-ONLY ONLY | 登录密码只允许由独立root-only合成输入重新绑定，不读取`pg_authid.rolpassword`，秘密/verifier不进入Git、manifest、回执、argv、环境或输出 |
+| Tablespace边界 | EXPLICIT MAP / FAIL CLOSED | custom tablespace必须一对一映射至已批准的新空no-follow路径；缺失、重复、重叠、symlink、非空或目标身份漂移均拒绝 |
+| 运行面 | VERIFIED READ ONLY / UNCHANGED | 起点available约1.9GiB、Swap541MiB、根盘16GiB、Load低于1；四服务restart0/OOM false，PostgreSQL/Web healthy，Worker/Caddy health none |
+| 外部边界 | NOT AUTHORIZED / NOT EXECUTED | 不连接UAT/生产或真实数据库，不创建真实角色/凭据，不读取备份/四卷正文，不安装host、不build/deploy、不执行真实恢复或外传 |
+| 系统是否可用 | NO | 正式异机恢复、当前候选/门、监控投递、UAT对齐、真实迁移、岗位/员工验收和切换仍未完成 |
+
 ## SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54（完成；仓库与合成隔离密文链，真实异机仍阻塞）
 
 | 验证项 | 结果 | 说明 |
