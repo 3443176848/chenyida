@@ -86,7 +86,7 @@
     ],
     "public_allowed_privileges": {
       "DATABASE": [],
-      "SCHEMA": [],
+      "SCHEMA": ["USAGE"],
       "TABLE": [],
       "PARTITIONED_TABLE": [],
       "VIEW": [],
@@ -127,10 +127,39 @@
     "TYPE",
     "VIEW"
   ],
+  "extensions": {
+    "allowed": [
+      {
+        "name": "btree_gist",
+        "schema": "public",
+        "owner": "chenyida_erp_owner",
+        "kind": "APPLICATION"
+      },
+      {
+        "name": "pgcrypto",
+        "schema": "public",
+        "owner": "chenyida_erp_owner",
+        "kind": "APPLICATION"
+      },
+      {
+        "name": "plpgsql",
+        "schema": "pg_catalog",
+        "owner": "RESTORE_ADMIN",
+        "kind": "PLATFORM"
+      }
+    ],
+    "required": [
+      "plpgsql"
+    ]
+  },
   "unsupported_catalog_counters": [
+    "access_methods",
+    "capture_role_conflicts",
+    "casts",
     "collations",
     "conversions",
     "event_triggers",
+    "external_database_settings",
     "foreign_data_wrappers",
     "foreign_servers",
     "foreign_tables",
@@ -138,10 +167,17 @@
     "operator_families",
     "operators",
     "parameter_acl_entries",
+    "policy_role_endpoints",
+    "replication_origins",
+    "row_security_policies",
+    "security_labels",
     "statistics_extensions",
     "subscriptions",
     "text_search_objects",
+    "transforms",
     "unapproved_languages",
+    "unapproved_settings",
+    "unsupported_relations",
     "user_mappings"
   ],
   "tablespaces": {

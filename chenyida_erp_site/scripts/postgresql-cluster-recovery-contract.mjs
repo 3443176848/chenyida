@@ -32,6 +32,7 @@ const ACL_STATES = new Set(["NULL", "EMPTY", "EXPLICIT"]);
 const POLICY_SCOPES = new Set(["PRODUCTION_BASELINE", "UAT_BASELINE", "SYNTHETIC_TEST_ONLY"]);
 const EVIDENCE_SCOPES = new Set(["ACTUAL_CONTROLLED", "SYNTHETIC_TEST_ONLY"]);
 const ROLE_PURPOSES = new Set(["MIGRATION_OWNER", "RUNTIME", "PRIVILEGE_GROUP"]);
+const EXTENSION_KINDS = new Set(["APPLICATION", "PLATFORM"]);
 const FIXED_REFERENCES = new Set(["PUBLIC", "pg_database_owner"]);
 const INDEX_KINDS = new Set(["INDEX_PLACEMENT", "PARTITIONED_INDEX_PLACEMENT"]);
 const ACL_KINDS = Object.freeze([
@@ -41,10 +42,10 @@ const ACL_KINDS = Object.freeze([
 const KNOWN_PRIVILEGES = Object.freeze({
   DATABASE: new Set(["CONNECT", "CREATE", "TEMPORARY"]),
   SCHEMA: new Set(["CREATE", "USAGE"]),
-  TABLE: new Set(["DELETE", "INSERT", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"]),
-  PARTITIONED_TABLE: new Set(["DELETE", "INSERT", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"]),
-  VIEW: new Set(["DELETE", "INSERT", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"]),
-  MATERIALIZED_VIEW: new Set(["DELETE", "INSERT", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"]),
+  TABLE: new Set(["DELETE", "INSERT", "MAINTAIN", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"]),
+  PARTITIONED_TABLE: new Set(["DELETE", "INSERT", "MAINTAIN", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"]),
+  VIEW: new Set(["DELETE", "INSERT", "MAINTAIN", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"]),
+  MATERIALIZED_VIEW: new Set(["DELETE", "INSERT", "MAINTAIN", "REFERENCES", "SELECT", "TRIGGER", "TRUNCATE", "UPDATE"]),
   SEQUENCE: new Set(["SELECT", "UPDATE", "USAGE"]),
   COLUMN: new Set(["INSERT", "REFERENCES", "SELECT", "UPDATE"]),
   ROUTINE: new Set(["EXECUTE"]),
@@ -53,9 +54,10 @@ const KNOWN_PRIVILEGES = Object.freeze({
   TABLESPACE: new Set(["CREATE"]),
 });
 const UNSUPPORTED_COUNTERS = Object.freeze([
-  "collations", "conversions", "event_triggers", "foreign_data_wrappers", "foreign_servers",
+  "access_methods", "capture_role_conflicts", "casts", "collations", "conversions", "event_triggers", "external_database_settings", "foreign_data_wrappers", "foreign_servers",
   "foreign_tables", "operator_classes", "operator_families", "operators", "parameter_acl_entries",
-  "statistics_extensions", "subscriptions", "text_search_objects", "unapproved_languages", "user_mappings",
+  "policy_role_endpoints", "replication_origins", "row_security_policies", "security_labels", "statistics_extensions",
+  "subscriptions", "text_search_objects", "transforms", "unapproved_languages", "unapproved_settings", "unsupported_relations", "user_mappings",
 ]);
 const SECRET_BINDINGS = new WeakMap();
 
@@ -169,7 +171,10 @@ function orderedUnique(values, code, key = (item) => canonicalClusterJson(item))
 }
 
 function normalizeArray(values) {
-  return [...values].map(canonicalClone).sort((left, right) => canonicalClusterJson(left).localeCompare(canonicalClusterJson(right)));
+  return [...values].map(canonicalClone).sort((left, right) => {
+    const leftText = canonicalClusterJson(left), rightText = canonicalClusterJson(right);
+    return leftText < rightText ? -1 : leftText > rightText ? 1 : 0;
+  });
 }
 
 function validateStringList(value, code, { exact = null, pattern = null } = {}) {
@@ -228,7 +233,7 @@ function validateAclRuleMap(value, code) {
 export function validateClusterRecoveryPolicy(value) {
   exactKeys(value, [
     "schema_version", "contract", "policy_id", "scope", "postgresql_major", "database", "identities",
-    "roles", "memberships", "settings", "acl", "supported_object_kinds", "unsupported_catalog_counters",
+    "roles", "memberships", "settings", "acl", "supported_object_kinds", "extensions", "unsupported_catalog_counters",
     "tablespaces", "credential_binding",
   ], "CLUSTER_POLICY_INVALID");
   if (value.schema_version !== 1 || value.contract !== CLUSTER_POLICY_CONTRACT) reject("CLUSTER_POLICY_CONTRACT_INVALID");
@@ -292,6 +297,19 @@ export function validateClusterRecoveryPolicy(value) {
   validateStringList(value.supported_object_kinds, "CLUSTER_POLICY_OBJECT_KINDS_INVALID");
   const requiredKinds = ["SCHEMA", "TABLE", "PARTITIONED_TABLE", "VIEW", "MATERIALIZED_VIEW", "SEQUENCE", "INDEX_PLACEMENT", "PARTITIONED_INDEX_PLACEMENT", "COLUMN", "ROUTINE", "TYPE", "LARGE_OBJECT"].sort();
   if (value.supported_object_kinds.length !== requiredKinds.length || value.supported_object_kinds.some((kind, index) => kind !== requiredKinds[index])) reject("CLUSTER_POLICY_OBJECT_KINDS_INVALID");
+  exactKeys(value.extensions, ["allowed", "required"], "CLUSTER_POLICY_EXTENSIONS_INVALID");
+  for (const extension of array(value.extensions.allowed, "CLUSTER_POLICY_EXTENSIONS_INVALID")) {
+    exactKeys(extension, ["name", "schema", "owner", "kind"], "CLUSTER_POLICY_EXTENSION_INVALID");
+    pgText(extension.name, "CLUSTER_POLICY_EXTENSION_INVALID");
+    pgText(extension.schema, "CLUSTER_POLICY_EXTENSION_INVALID");
+    pgText(extension.owner, "CLUSTER_POLICY_EXTENSION_INVALID");
+    enumValue(extension.kind, EXTENSION_KINDS, "CLUSTER_POLICY_EXTENSION_INVALID");
+    if (extension.kind === "APPLICATION" && extension.owner !== value.identities.migration_owner
+      || extension.kind === "PLATFORM" && extension.owner !== value.identities.restore_admin) reject("CLUSTER_POLICY_EXTENSION_OWNER_INVALID");
+  }
+  orderedUnique(value.extensions.allowed, "CLUSTER_POLICY_EXTENSIONS_NOT_CANONICAL", (extension) => extension.name);
+  validateStringList(value.extensions.required, "CLUSTER_POLICY_REQUIRED_EXTENSIONS_INVALID");
+  if (value.extensions.required.some((name) => !value.extensions.allowed.some((extension) => extension.name === name))) reject("CLUSTER_POLICY_REQUIRED_EXTENSION_NOT_ALLOWED");
   validateStringList(value.unsupported_catalog_counters, "CLUSTER_POLICY_UNSUPPORTED_COUNTERS_INVALID", { exact: [...UNSUPPORTED_COUNTERS] });
 
   exactKeys(value.tablespaces, ["allow_custom", "maximum_custom", "owner"], "CLUSTER_POLICY_TABLESPACES_INVALID");
@@ -422,7 +440,8 @@ function validateExtension(value, policy) {
   pgText(value.name, "CLUSTER_EXTENSION_INVALID");
   pgText(value.version, "CLUSTER_EXTENSION_INVALID");
   pgText(value.schema, "CLUSTER_EXTENSION_INVALID");
-  if (value.owner !== policy.identities.migration_owner) reject("CLUSTER_EXTENSION_OWNER_INVALID");
+  const expected = policy.extensions.allowed.find((extension) => extension.name === value.name);
+  if (!expected || value.owner !== expected.owner || value.schema !== expected.schema) reject("CLUSTER_EXTENSION_POLICY_MISMATCH");
   string(value.member_fingerprint, SHA256, "CLUSTER_EXTENSION_FINGERPRINT_INVALID");
   return value;
 }
@@ -457,14 +476,15 @@ export function normalizeClusterCatalog(value) {
   for (const key of ["roles", "memberships", "settings", "objects", "default_privileges", "tablespaces", "extensions", "publications", "parameter_privileges"]) {
     if (!Array.isArray(source[key])) reject("CLUSTER_CATALOG_INVALID");
   }
-  source.roles = [...source.roles].sort((left, right) => left.name.localeCompare(right.name));
+  const compareName = (left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0;
+  source.roles = [...source.roles].sort(compareName);
   source.memberships = normalizeArray(source.memberships);
   source.settings = normalizeArray(source.settings);
   source.objects = normalizeArray(source.objects);
   source.default_privileges = normalizeArray(source.default_privileges);
-  source.tablespaces = [...source.tablespaces].sort((left, right) => left.name.localeCompare(right.name));
-  source.extensions = [...source.extensions].sort((left, right) => left.name.localeCompare(right.name));
-  source.publications = [...source.publications].sort((left, right) => left.name.localeCompare(right.name));
+  source.tablespaces = [...source.tablespaces].sort(compareName);
+  source.extensions = [...source.extensions].sort(compareName);
+  source.publications = [...source.publications].sort(compareName);
   source.parameter_privileges = normalizeArray(source.parameter_privileges);
   return source;
 }
@@ -492,6 +512,7 @@ export function validateClusterCatalog(value, policyInput) {
   if (value.tablespaces.length > policy.tablespaces.maximum_custom) reject("CLUSTER_TABLESPACE_LIMIT_EXCEEDED");
   for (const extension of array(value.extensions, "CLUSTER_EXTENSIONS_INVALID")) validateExtension(extension, policy);
   orderedUnique(value.extensions, "CLUSTER_EXTENSIONS_NOT_CANONICAL", (item) => item.name);
+  if (policy.extensions.required.some((name) => !value.extensions.some((extension) => extension.name === name))) reject("CLUSTER_REQUIRED_EXTENSION_MISSING");
   for (const publication of array(value.publications, "CLUSTER_PUBLICATIONS_INVALID")) validatePublication(publication, policy);
   orderedUnique(value.publications, "CLUSTER_PUBLICATIONS_NOT_CANONICAL", (item) => item.name);
   for (const parameterPrivilege of array(value.parameter_privileges, "CLUSTER_PARAMETER_ACL_INVALID")) validateParameterPrivilege(parameterPrivilege, policy);

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { parseClusterCatalogReport } from "../scripts/postgresql-cluster-catalog-contract.mjs";
 import {
   CLUSTER_POLICY_CONTRACT,
   CREDENTIAL_FILE_CONTRACT,
@@ -84,8 +85,8 @@ function catalogFixture() {
       { kind: "SCHEMA", schema: null, name: "app", identity_arguments: null, parent_identity: null, owner, tablespace: null, extension: null, ...acl([privilege(owner, group, "USAGE")], [privilege(owner, group, "USAGE")]) },
       { kind: "SCHEMA", schema: null, name: "public", identity_arguments: null, parent_identity: null, owner: "pg_database_owner", tablespace: null, extension: null, ...acl([], [privilege("pg_database_owner", "pg_database_owner", "USAGE", true)]) },
       { kind: "TABLE", schema: "app", name: "materials", identity_arguments: null, parent_identity: null, owner, tablespace: "erp_ts", extension: null, ...acl([privilege(owner, group, "SELECT"), privilege(owner, group, "INSERT"), privilege(owner, group, "UPDATE"), privilege(owner, group, "DELETE")], [privilege(owner, group, "SELECT"), privilege(owner, group, "INSERT"), privilege(owner, group, "UPDATE"), privilege(owner, group, "DELETE"), ownerTable]) },
-      { kind: "COLUMN", schema: "app", name: "materials.internal_code", identity_arguments: null, parent_identity: "app.materials", owner, tablespace: null, extension: null, ...acl([privilege(owner, group, "SELECT")], [privilege(owner, group, "SELECT")]) },
-      { kind: "INDEX_PLACEMENT", schema: "app", name: "materials_pkey", identity_arguments: null, parent_identity: "app.materials", owner, tablespace: "erp_ts", extension: null, ...acl([], [], "NULL") },
+      { kind: "COLUMN", schema: "app", name: "internal_code", identity_arguments: null, parent_identity: "materials", owner, tablespace: null, extension: null, ...acl([privilege(owner, group, "SELECT")], [privilege(owner, group, "SELECT")]) },
+      { kind: "INDEX_PLACEMENT", schema: "app", name: "materials_pkey", identity_arguments: null, parent_identity: "materials", owner, tablespace: "erp_ts", extension: null, ...acl([], [], "NULL") },
       { kind: "ROUTINE", schema: "app", name: "find_material", identity_arguments: "text", parent_identity: null, owner, tablespace: null, extension: null, ...acl([privilege(owner, group, "EXECUTE")], [privilege(owner, group, "EXECUTE")]) },
       { kind: "TYPE", schema: "app", name: "material_state", identity_arguments: null, parent_identity: null, owner, tablespace: null, extension: null, ...acl([privilege(owner, group, "USAGE")], [privilege(owner, group, "USAGE")]) },
       { kind: "LARGE_OBJECT", schema: null, name: "lo:16400", identity_arguments: null, parent_identity: null, owner, tablespace: null, extension: null, ...acl([privilege(owner, group, "SELECT")], [privilege(owner, group, "SELECT")]) },
@@ -96,13 +97,17 @@ function catalogFixture() {
     tablespaces: [
       { name: "erp_ts", owner, options: [], source_location_sha256: zero, ...acl([], [privilege(owner, owner, "CREATE", true)]) },
     ],
-    extensions: [{ name: "pgcrypto", version: "1.3", schema: "public", owner, member_fingerprint: one }],
+    extensions: [
+      { name: "pgcrypto", version: "1.3", schema: "public", owner, member_fingerprint: one },
+      { name: "plpgsql", version: "1.0", schema: "pg_catalog", owner: "RESTORE_ADMIN", member_fingerprint: "f".repeat(64) },
+    ],
     publications: [{ name: "erp_publication", owner, all_tables: false, publish_insert: true, publish_update: true, publish_delete: true, publish_truncate: true, publish_via_partition_root: false, table_fingerprint: two }],
     parameter_privileges: [],
     unsupported: {
-      collations: 0, conversions: 0, event_triggers: 0, foreign_data_wrappers: 0, foreign_servers: 0,
+      access_methods: 0, casts: 0, capture_role_conflicts: 0, collations: 0, conversions: 0, event_triggers: 0, external_database_settings: 0, foreign_data_wrappers: 0, foreign_servers: 0,
       foreign_tables: 0, operator_classes: 0, operator_families: 0, operators: 0, parameter_acl_entries: 0,
-      statistics_extensions: 0, subscriptions: 0, text_search_objects: 0, unapproved_languages: 0, user_mappings: 0,
+      policy_role_endpoints: 0, replication_origins: 0, row_security_policies: 0, security_labels: 0, statistics_extensions: 0,
+      subscriptions: 0, text_search_objects: 0, transforms: 0, unapproved_languages: 0, unapproved_settings: 0, unsupported_relations: 0, user_mappings: 0,
     },
   });
 }
@@ -123,6 +128,17 @@ async function snapshotFixture() {
 }
 
 function expectCode(code) { return (error) => error?.code === code; }
+
+function catalogReport(catalog) {
+  const lines = [["DATABASE", catalog.database]];
+  for (const [type, key] of [
+    ["ROLE", "roles"], ["MEMBERSHIP", "memberships"], ["SETTING", "settings"], ["OBJECT", "objects"],
+    ["DEFAULT_PRIVILEGE", "default_privileges"], ["TABLESPACE", "tablespaces"], ["EXTENSION", "extensions"],
+    ["PUBLICATION", "publications"], ["PARAMETER_PRIVILEGE", "parameter_privileges"],
+  ]) for (const value of catalog[key]) lines.push([type, value]);
+  lines.push(["UNSUPPORTED", catalog.unsupported]);
+  return `${lines.map(([type, value]) => `${type}\t${JSON.stringify(value)}`).join("\n")}\n`;
+}
 
 test("strict production policy is canonical and dangerous policy mutations fail closed", async () => {
   const value = await policy();
@@ -147,8 +163,8 @@ test("catalog normalization is stable while unsafe roles, ACLs and unsupported c
   assert.throws(() => validateClusterCatalog(superuser, recoveryPolicy), expectCode("CLUSTER_ROLE_DANGEROUS_ATTRIBUTE"));
   const runtimeOwner = clone(catalog); runtimeOwner.objects[0].owner = "chenyida_erp_runtime";
   assert.throws(() => validateClusterCatalog(runtimeOwner, recoveryPolicy), expectCode("CLUSTER_OBJECT_OWNER_POLICY_MISMATCH"));
-  const publicCreate = clone(catalog); const appSchema = publicCreate.objects.find((item) => item.kind === "SCHEMA" && item.name === "app"); appSchema.explicit_privileges.push(privilege("chenyida_erp_owner", "PUBLIC", "CREATE")); appSchema.explicit_privileges.sort((a, b) => canonicalClusterJson(a).localeCompare(canonicalClusterJson(b)));
-  assert.throws(() => validateClusterCatalog(publicCreate, recoveryPolicy), expectCode("CLUSTER_ACL_PUBLIC_PRIVILEGE_FORBIDDEN"));
+  const publicCreate = clone(catalog); const appSchema = publicCreate.objects.find((item) => item.kind === "SCHEMA" && item.name === "app"); appSchema.explicit_privileges.push(privilege("chenyida_erp_owner", "PUBLIC", "CREATE"));
+  assert.throws(() => validateClusterCatalog(normalizeClusterCatalog(publicCreate), recoveryPolicy), expectCode("CLUSTER_ACL_PUBLIC_PRIVILEGE_FORBIDDEN"));
   const foreign = clone(catalog); foreign.unsupported.foreign_tables = 1;
   assert.throws(() => validateClusterCatalog(foreign, recoveryPolicy), expectCode("CLUSTER_UNSUPPORTED_CATALOG_PRESENT"));
   const parameterAcl = clone(catalog); parameterAcl.parameter_privileges.push({ parameter: "statement_timeout", grantor: "chenyida_erp_owner", grantee: "chenyida_erp_rw", privilege_type: "SET", is_grantable: false });
@@ -163,6 +179,18 @@ test("snapshot binds V2 recovery identity and refuses source drift or tampering"
   assert.throws(() => compareClusterCatalogCaptures(catalog, drift, recoveryPolicy), expectCode("CLUSTER_CATALOG_DRIFT"));
   const tampered = clone(snapshot); tampered.binding.manifest_sha256 = zero;
   assert.throws(() => validateClusterSnapshot(tampered, recoveryPolicy), expectCode("CLUSTER_SNAPSHOT_SHA256_MISMATCH"));
+});
+
+test("catalog adapter accepts only ordered typed JSON records and SQL never reads credential catalogs", async () => {
+  const recoveryPolicy = await policy(), catalog = catalogFixture(), report = catalogReport(catalog);
+  assert.deepEqual(parseClusterCatalogReport(report, recoveryPolicy), catalog);
+  assert.throws(() => parseClusterCatalogReport(report.replace("DATABASE\t", "UNKNOWN\t"), recoveryPolicy), expectCode("CLUSTER_CATALOG_REPORT_TYPE_INVALID"));
+  const firstRole = `ROLE\t${JSON.stringify(catalog.roles[0])}\n`;
+  assert.throws(() => parseClusterCatalogReport(report.replace(firstRole, `${firstRole}${firstRole}`), recoveryPolicy), expectCode("CLUSTER_ROLES_NOT_CANONICAL"));
+  assert.throws(() => parseClusterCatalogReport(report.replace(/\nUNSUPPORTED\t/, "\nDATABASE\t{}\nUNSUPPORTED\t"), recoveryPolicy), expectCode("CLUSTER_CATALOG_REPORT_ORDER_INVALID"));
+  const sql = await readFile(path.join(siteRoot, "scripts", "postgresql-cluster-catalog.sql"), "utf8");
+  assert.doesNotMatch(sql, /pg_authid|rolpassword|aclitem::text/i);
+  for (const required of ["pg_roles", "pg_auth_members", "inherit_option", "set_option", "pg_db_role_setting", "aclexplode", "pg_tablespace", "spcacl", "pg_parameter_acl", "pg_default_acl", "pg_largeobject_metadata", "pg_identify_object_as_address"]) assert.ok(sql.includes(required), required);
 });
 
 test("tablespace map requires exact names, private empty direct children and stable identities", async () => withRoot(async (root) => {
