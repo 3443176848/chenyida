@@ -29,12 +29,17 @@ INSTALL_CONSUMED_ROOT = Path("/var/lib/chenyida-erp/release-supervisor-install-a
 INSTALL_RECEIPT_ROOT = Path("/var/lib/chenyida-erp/release-supervisor-install-receipts")
 INSTALL_JOURNAL_ROOT = Path("/var/lib/chenyida-erp/release-supervisor-install-journal")
 INSTALL_LOCK_FILE = Path("/var/lock/chenyida-erp-release-supervisor-install-v1.lock")
+GLOBAL_RELEASE_LOCK = Path("/run/lock/chenyida-erp-release-gate-v1.lock")
 RELEASE_AUTHORIZATION_ROOT = Path("/var/lib/chenyida-erp/release-authorizations")
 RELEASE_AUTHORIZATION_PENDING_ROOT = RELEASE_AUTHORIZATION_ROOT / "pending"
 RELEASE_AUTHORIZATION_CONSUMED_ROOT = RELEASE_AUTHORIZATION_ROOT / "consumed"
 RUNTIME_PROBE_ROOT = Path("/var/lib/chenyida-erp/runtime-probes")
 RUNTIME_PROBE_MARKER = RUNTIME_PROBE_ROOT / ".chenyida-erp-runtime-probe-root-v1"
 RUNTIME_PROBE_MARKER_VALUE = b"chenyida-erp-runtime-probe-root/v1\n"
+RUNTIME_PRIVILEGE_STATE_ROOT = Path("/var/lib/chenyida-erp/postgresql-runtime-privilege-operator")
+RUNTIME_PRIVILEGE_STATE_MARKER = RUNTIME_PRIVILEGE_STATE_ROOT / ".chenyida-erp-postgresql-runtime-privilege-operator-v1"
+RUNTIME_PRIVILEGE_STATE_MARKER_VALUE = b"chenyida-erp-postgresql-runtime-privilege-operator/v1\n"
+RUNTIME_PRIVILEGE_STATE_DIRECTORIES = ("active", "completed", "preparing", "quarantine", "receipts")
 SUPERVISOR_BASE = Path("/usr/local/libexec/chenyida-erp-release-supervisor")
 BUNDLES_ROOT = SUPERVISOR_BASE / "bundles"
 LAUNCHERS_ROOT = SUPERVISOR_BASE / "launchers"
@@ -271,6 +276,37 @@ def ensure_root_marker(path: Path, expected: bytes) -> None:
             reject("SUPERVISOR_INSTALL_MARKER_INVALID")
 
 
+def assert_no_runtime_privilege_operator_interlock(state_root: Path | None = None) -> None:
+    state_root = state_root or RUNTIME_PRIVILEGE_STATE_ROOT
+    try:
+        os.lstat(state_root)
+    except FileNotFoundError:
+        return
+    except OSError:
+        reject("SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID")
+    trusted_directory(state_root, 0o700, "SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID")
+    marker = state_root / RUNTIME_PRIVILEGE_STATE_MARKER.name
+    if trusted_file(marker, 0o400, 256, "SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID") != RUNTIME_PRIVILEGE_STATE_MARKER_VALUE:
+        reject("SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID")
+    try:
+        entries = sorted(item.name for item in os.scandir(state_root))
+    except OSError:
+        reject("SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID")
+    expected = sorted((RUNTIME_PRIVILEGE_STATE_MARKER.name, *RUNTIME_PRIVILEGE_STATE_DIRECTORIES))
+    if entries != expected:
+        reject("SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID")
+    for name in RUNTIME_PRIVILEGE_STATE_DIRECTORIES:
+        directory = state_root / name
+        trusted_directory(directory, 0o700, "SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID")
+        if name in {"active", "preparing", "quarantine"}:
+            try:
+                with os.scandir(directory) as iterator:
+                    if next(iterator, None) is not None:
+                        reject("SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_RECOVERY_REQUIRED")
+            except OSError:
+                reject("SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID")
+
+
 def acquire_install_lock(path: Path = INSTALL_LOCK_FILE) -> int:
     flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
     try:
@@ -288,6 +324,35 @@ def acquire_install_lock(path: Path = INSTALL_LOCK_FILE) -> int:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             reject("SUPERVISOR_INSTALL_LOCK_BUSY")
+        return descriptor
+    except Exception:
+        os.close(descriptor)
+        raise
+
+
+def acquire_global_release_lock(path: Path = GLOBAL_RELEASE_LOCK) -> int:
+    try:
+        parent = os.lstat(path.parent)
+    except OSError:
+        reject("SUPERVISOR_INSTALL_GLOBAL_LOCK_INVALID")
+    if not stat.S_ISDIR(parent.st_mode) or stat.S_ISLNK(parent.st_mode) or parent.st_uid != 0 or parent.st_gid != 0 or stat.S_IMODE(parent.st_mode) & 0o022:
+        reject("SUPERVISOR_INSTALL_GLOBAL_LOCK_INVALID")
+    flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except OSError:
+        reject("SUPERVISOR_INSTALL_GLOBAL_LOCK_INVALID")
+    try:
+        os.fchown(descriptor, 0, 0)
+        os.fchmod(descriptor, 0o600)
+        value = os.fstat(descriptor)
+        current = os.lstat(path)
+        if not stat.S_ISREG(value.st_mode) or value.st_uid != 0 or value.st_gid != 0 or value.st_nlink != 1 or stat.S_IMODE(value.st_mode) != 0o600 or current.st_dev != value.st_dev or current.st_ino != value.st_ino or stat.S_ISLNK(current.st_mode):
+            reject("SUPERVISOR_INSTALL_GLOBAL_LOCK_INVALID")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            reject("SUPERVISOR_INSTALL_GLOBAL_LOCK_BUSY")
         return descriptor
     except Exception:
         os.close(descriptor)
@@ -590,6 +655,7 @@ def install(repository: Path, authorization: dict[str, Any], authorization_path:
         reject("SUPERVISOR_INSTALL_MANIFEST_DIGEST_MISMATCH")
     _, payloads = validate_bundle_payload(repository, authorization, manifest_raw)
     preflight_bundle(manifest_raw, payloads, launcher_raw, authorization["bundle_manifest_sha256"])
+    assert_no_runtime_privilege_operator_interlock()
 
     ensure_directory(Path("/usr/local/libexec"), 0o755)
     ensure_directory(SUPERVISOR_BASE, 0o755)
@@ -604,6 +670,10 @@ def install(repository: Path, authorization: dict[str, Any], authorization_path:
     ensure_directory(RELEASE_AUTHORIZATION_CONSUMED_ROOT, 0o700)
     ensure_directory(RUNTIME_PROBE_ROOT, 0o700)
     ensure_root_marker(RUNTIME_PROBE_MARKER, RUNTIME_PROBE_MARKER_VALUE)
+    ensure_directory(RUNTIME_PRIVILEGE_STATE_ROOT, 0o700)
+    ensure_root_marker(RUNTIME_PRIVILEGE_STATE_MARKER, RUNTIME_PRIVILEGE_STATE_MARKER_VALUE)
+    for directory in RUNTIME_PRIVILEGE_STATE_DIRECTORIES:
+        ensure_directory(RUNTIME_PRIVILEGE_STATE_ROOT / directory, 0o700)
     trusted_directory(Path("/usr/local/sbin"), 0o755, "SUPERVISOR_INSTALL_DIRECTORY_INVALID")
 
     prepared_file, committed_file, receipt_file, destination = install_record_paths(authorization, authorization_digest)
@@ -732,33 +802,37 @@ def main() -> None:
     repository, authorization_path = parse_cli(sys.argv[1:])
     lock_descriptor = acquire_install_lock()
     try:
-        unresolved = unresolved_prepared_install()
-        if unresolved is not None:
-            _, _, authorization, authorization_digest = unresolved
-            repository = Path(authorization["repository_root"])
-            pending_path = INSTALL_PENDING_ROOT / f"{authorization['authorization_id']}.json"
-            authorization_path = pending_path if pending_path.exists() else None
-            current_installer = Path(os.path.realpath(sys.argv[0]))
-            current_raw = trusted_file(current_installer, None, 4 * 1024 * 1024, "SUPERVISOR_INSTALLER_FILE_INVALID")
-            if sha256(current_raw) == authorization["installer_sha256"]:
-                receipt = install(repository, authorization, authorization_path, authorization_digest, current_installer)
+        global_lock_descriptor = acquire_global_release_lock()
+        try:
+            unresolved = unresolved_prepared_install()
+            if unresolved is not None:
+                _, _, authorization, authorization_digest = unresolved
+                repository = Path(authorization["repository_root"])
+                pending_path = INSTALL_PENDING_ROOT / f"{authorization['authorization_id']}.json"
+                authorization_path = pending_path if pending_path.exists() else None
+                current_installer = Path(os.path.realpath(sys.argv[0]))
+                current_raw = trusted_file(current_installer, None, 4 * 1024 * 1024, "SUPERVISOR_INSTALLER_FILE_INVALID")
+                if sha256(current_raw) == authorization["installer_sha256"]:
+                    receipt = install(repository, authorization, authorization_path, authorization_digest, current_installer)
+                else:
+                    stored_installer = INSTALLERS_ROOT / authorization["installer_sha256"]
+                    stored_raw = trusted_file(stored_installer, 0o555, 4 * 1024 * 1024, "SUPERVISOR_INSTALL_RECOVERY_INSTALLER_INVALID")
+                    if sha256(stored_raw) != authorization["installer_sha256"]:
+                        reject("SUPERVISOR_INSTALL_RECOVERY_INSTALLER_INVALID")
+                    authorized_installer = load_installer_module(stored_installer)
+                    try:
+                        receipt = authorized_installer.install(repository, authorization, authorization_path, authorization_digest, stored_installer)
+                    except Exception as error:
+                        code = getattr(error, "code", None)
+                        if isinstance(code, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", code):
+                            reject(code)
+                        raise
             else:
-                stored_installer = INSTALLERS_ROOT / authorization["installer_sha256"]
-                stored_raw = trusted_file(stored_installer, 0o555, 4 * 1024 * 1024, "SUPERVISOR_INSTALL_RECOVERY_INSTALLER_INVALID")
-                if sha256(stored_raw) != authorization["installer_sha256"]:
-                    reject("SUPERVISOR_INSTALL_RECOVERY_INSTALLER_INVALID")
-                authorized_installer = load_installer_module(stored_installer)
-                try:
-                    receipt = authorized_installer.install(repository, authorization, authorization_path, authorization_digest, stored_installer)
-                except Exception as error:
-                    code = getattr(error, "code", None)
-                    if isinstance(code, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", code):
-                        reject(code)
-                    raise
-        else:
-            authorization, authorization_digest = load_authorization(authorization_path, datetime.now(timezone.utc))
-            receipt = install(repository, authorization, authorization_path, authorization_digest, Path(os.path.realpath(sys.argv[0])))
-        print(json.dumps(receipt, ensure_ascii=False, separators=(",", ":")))
+                authorization, authorization_digest = load_authorization(authorization_path, datetime.now(timezone.utc))
+                receipt = install(repository, authorization, authorization_path, authorization_digest, Path(os.path.realpath(sys.argv[0])))
+            print(json.dumps(receipt, ensure_ascii=False, separators=(",", ":")))
+        finally:
+            os.close(global_lock_descriptor)
     finally:
         os.close(lock_descriptor)
 

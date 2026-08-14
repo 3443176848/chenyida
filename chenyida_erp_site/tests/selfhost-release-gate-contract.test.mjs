@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -77,7 +77,7 @@ test("versioned test inventory accounts for every top-level test and only exclud
   assert.equal(inventory.total_tests, RELEASE_TEST_INVENTORY_TOTAL);
   assert.equal(inventory.required_tests, RELEASE_TEST_INVENTORY_REQUIRED);
   assert.equal(inventory.not_applicable_tests, RELEASE_TEST_INVENTORY_NOT_APPLICABLE);
-  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 84, POSTGRES_ALIAS: 2, PURE_NODE: 120, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 7 });
+  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 84, POSTGRES_ALIAS: 2, PURE_NODE: 121, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 7 });
   assert.deepEqual(inventory.tests.filter((entry) => entry.category === "RELEASE_CONTRACT").map((entry) => entry.path), [
     "tests/selfhost-file-storage.test.mjs",
     "tests/selfhost-release-gate-contract.test.mjs",
@@ -137,6 +137,9 @@ test("release typecheck inventory pins all 38 top-level configs and rejects set 
 test("operator wrappers use a fixed real lock, trusted artifact root and sanitized child environment", async () => {
   const wrapper = await readFile(new URL("../scripts/run-release-gate.sh", import.meta.url), "utf8");
   const creator = await readFile(new URL("../scripts/create-release-manifest.sh", import.meta.url), "utf8");
+  const imageEvidence = await readFile(new URL("../scripts/create-release-image-evidence.sh", import.meta.url), "utf8");
+  const identity = await readFile(new URL("../scripts/write-release-identity.sh", import.meta.url), "utf8");
+  const lockHelper = await readFile(new URL("../scripts/release-gate-lock.sh", import.meta.url), "utf8");
   const runner = await readFile(new URL("../scripts/release-gate-runner.mjs", import.meta.url), "utf8");
   const nodeSandbox = await readFile(new URL("../scripts/run-release-node-sandbox.sh", import.meta.url), "utf8");
   const postgresSandbox = await readFile(new URL("../scripts/run-release-postgres-regression-tests.sh", import.meta.url), "utf8");
@@ -148,11 +151,14 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   const runtimePolicyTest = await readFile(new URL("../scripts/container-runtime-policy-test.py", import.meta.url), "utf8");
   const releaseMigrationTest = await readFile(new URL("./selfhost-release-migration-postgres.sh", import.meta.url), "utf8");
   const controlledMigrationDriver = await readFile(new URL("./selfhost-release-migration-controlled-driver.ts", import.meta.url), "utf8");
-  for (const script of [wrapper, creator]) {
-    assert.match(script, /LOCK_FILE=\/run\/lock\/chenyida-erp-release-gate-v1\.lock/);
-    assert.match(script, /flock -n 9/);
+  for (const script of [wrapper, creator, imageEvidence, identity]) {
+    assert.match(script, /release-gate-lock\.sh/);
+    assert.match(script, /acquire_chenyida_release_gate_lock/);
     assert.match(script, /0:0:440:1/);
   }
+  assert.match(lockHelper, /ERP_RELEASE_GATE_LOCK_FD/);
+  assert.match(lockHelper, /inherited global release gate lock is not held/);
+  assert.match(lockHelper, /flock -n -E 75/);
   assert.match(wrapper, /release gate must be launched by the installed supervisor/);
   assert.match(creator, /release manifest creation must be launched by the installed supervisor/);
   assert.match(wrapper, /env -i PATH=/);
@@ -281,6 +287,41 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.doesNotMatch(creator, /--output "\$ARTIFACT_ROOT\/release-manifest\.json"/);
   const launcher = await readFile(new URL("../scripts/release-supervisor-launcher.py", import.meta.url), "utf8");
   assert.equal((launcher.match(/--no-textconv/g) || []).length, 2);
+});
+
+test("release lock helper rejects an inherited but unlocked descriptor and accepts an inherited held lock", async () => {
+  const fixture = await mkdtemp(path.join(os.tmpdir(), "cyd-release-inherited-lock-"));
+  const lock = path.join(fixture, "release-gate.lock");
+  const stateRoot = path.join(fixture, "postgresql-runtime-privilege-operator");
+  const scripts = path.resolve(new URL("../scripts", import.meta.url).pathname);
+  let handle;
+  try {
+    await writeFile(lock, "", { mode: 0o600 });
+    await chmod(lock, 0o600);
+    handle = await open(lock, "r+");
+    const environment = {
+      PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      LC_ALL: "C",
+      NODE_ENV: "test",
+      ERP_RELEASE_GATE_LOCK_FILE: lock,
+      ERP_RUNTIME_PRIVILEGE_OPERATOR_STATE_ROOT: stateRoot,
+      ERP_RELEASE_SUPERVISOR_LAUNCHED: "YES",
+      ERP_RELEASE_GATE_LOCK_HELD: "YES",
+      ERP_RELEASE_GATE_LOCK_FD: "9",
+    };
+    const stdio = ["ignore", "pipe", "pipe", "ignore", "ignore", "ignore", "ignore", "ignore", "ignore", handle.fd];
+    const unlocked = spawnSync("/bin/sh", ["-ceu", 'cd "$1"; . ./release-gate-lock.sh; acquire_chenyida_release_gate_lock', "sh", scripts], { env: environment, stdio, encoding: "utf8" });
+    assert.notEqual(unlocked.status, 0);
+    assert.match(unlocked.stderr, /inherited global release gate lock is not held/);
+    await handle.close();
+    handle = null;
+
+    const held = spawnSync("/bin/sh", ["-ceu", 'exec 9<>"$1"; flock -n 9; cd "$2"; . ./release-gate-lock.sh; acquire_chenyida_release_gate_lock', "sh", lock, scripts], { env: environment, encoding: "utf8" });
+    assert.equal(held.status, 0, held.stderr);
+  } finally {
+    await handle?.close();
+    await rm(fixture, { recursive: true, force: true });
+  }
 });
 
 test("installed supervisor layout loads trusted code while hashing the explicit candidate migration directory", async () => {

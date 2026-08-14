@@ -25,6 +25,7 @@ export const RUNTIME_PRIVILEGE_COMPILER_PATHS = Object.freeze([
   "scripts/release-gate-lock.sh",
   "scripts/run-runtime-privilege-catalog-postgres-test.sh",
   "tests/selfhost-postgresql-runtime-privilege-catalog-postgres.sh",
+  "tests/runtime-privilege-operator-postgres-fixture.mjs",
   "scripts/backup-recovery-contract.mjs",
   "scripts/postgresql-cluster-recovery-contract.mjs",
   "scripts/postgresql-runtime-privilege-source.mjs",
@@ -73,8 +74,8 @@ const SAFE_ROUTINE_CONFIGURATIONS = Object.freeze([
   Object.freeze(["search_path=pg_catalog, public, pg_temp"]),
 ]);
 const EXPECTED_EXTENSION_BASELINES = Object.freeze({
-  btree_gist: Object.freeze({ version: "1.7", schema: "public", owner: "MIGRATION_OWNER", member_count: 264, member_fingerprint: "4a26469a33ed80ccbde3fe6a4ff2ceda1378dc6334791652c6f7cb24206aadd3" }),
-  pgcrypto: Object.freeze({ version: "1.3", schema: "public", owner: "MIGRATION_OWNER", member_count: 36, member_fingerprint: "d955c85a06a23f83029f5e33403a5635154f29e21ec05b203947200eb761a6fc" }),
+  btree_gist: Object.freeze({ version: "1.7", schema: "public", owner: "PLATFORM_OWNER", member_count: 264, member_fingerprint: "4a26469a33ed80ccbde3fe6a4ff2ceda1378dc6334791652c6f7cb24206aadd3" }),
+  pgcrypto: Object.freeze({ version: "1.3", schema: "public", owner: "PLATFORM_OWNER", member_count: 36, member_fingerprint: "d955c85a06a23f83029f5e33403a5635154f29e21ec05b203947200eb761a6fc" }),
   plpgsql: Object.freeze({ version: "1.0", schema: "pg_catalog", owner: "PLATFORM_OWNER", member_count: 4, member_fingerprint: "84a784513dcf2b75afdb490ff4ab424391db1a751cd85ff43ea4f28d1918bddf" }),
 });
 const EXPECTED_EXTENSION_ROUTINE_COUNTS = Object.freeze({ btree_gist: 188, pgcrypto: 36 });
@@ -207,7 +208,8 @@ function validateMeta(value) {
   if (value.contract !== RUNTIME_PRIVILEGE_CATALOG_REPORT_CONTRACT || value.schema !== "public"
     || value.server_major !== "17" || value.server_version_num !== "170010"
     || value.encoding !== "UTF8" || value.locale_provider !== "libc" || value.collate !== "C" || value.ctype !== "C"
-    || value.collation_version !== null || value.database_owner !== "MIGRATION_OWNER" || value.schema_owner !== "pg_database_owner") {
+    || value.collation_version !== null || !["MIGRATION_OWNER", "PLATFORM_OWNER"].includes(value.database_owner)
+    || value.schema_owner !== "pg_database_owner") {
     reject("RUNTIME_PRIVILEGE_CATALOG_META_INVALID");
   }
   text(value.database, "RUNTIME_PRIVILEGE_CATALOG_META_INVALID", { pattern: IDENTIFIER });
@@ -536,7 +538,7 @@ function validateStructuralSurfaces(report, code) {
 }
 
 function validateReportAgainstAccess(report, access, expectedDatabase) {
-  if (report.meta.database !== expectedDatabase) reject("RUNTIME_PRIVILEGE_CATALOG_DATABASE_IDENTITY_MISMATCH");
+  if (report.meta.database !== expectedDatabase || report.meta.database_owner !== "MIGRATION_OWNER") reject("RUNTIME_PRIVILEGE_CATALOG_DATABASE_IDENTITY_MISMATCH");
   if (Object.values(report.unsupported).some((count) => count !== 0)) reject("RUNTIME_PRIVILEGE_CATALOG_UNSUPPORTED_PRESENT");
   if (report.tables.some((item) => item.kind !== "TABLE" || item.owner !== "MIGRATION_OWNER" || item.persistence !== "PERMANENT"
     || item.row_security || item.force_row_security || item.replica_identity !== "DEFAULT" || item.access_method !== "heap"

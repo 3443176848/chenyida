@@ -2391,6 +2391,51 @@
 - 拒绝把环境fallback、Compose渲染值、argv、日志、回执或浏览器当作秘密交付渠道，也拒绝把bind file或Compose secret描述为静态加密保险库。
 - 拒绝在本任务自动创建host secret目录、tablespace Volume/子目录、修改当前角色/ACL、升级UAT Migration或触发任何真实数据动作。
 
+## D-134 PostgreSQL 运行权限变更采用直接消费者凭据、全局锁与崩溃可恢复日志
+
+- 日期：2026-08-13
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / SYNTHETIC-ISOLATED VERIFIED / ACTUAL ACTIVATION NOT AUTHORIZED / PRODUCTION NO-GO`
+- 提案与实施：Codex 持续交付负责人，依据 TASK56 三线只读审计、D-133边界、Release Supervisor生命周期和真实PostgreSQL 17 system adapter故障注入
+- 确认边界：只授权仓库实现、合成凭据、一次一个临时PostgreSQL容器、故障恢复及发布合同测试；不授权host安装、真实角色/口令/ACL、当前Volume、UAT/生产Migration/deploy、备份恢复或切换
+
+### Context
+
+- D-133已经固定五个数据库LOGIN、六个runtime secret文件和独立backup capture service，但此前只有静态consumer/reconciler；没有生产root入口、跨发布/备份的全局互斥、authorization消费前durable intent或进程被SIGKILL后的确定恢复。
+- 把五个数据库口令再次汇总到operator专属文件会新增一个拥有全部登录秘密的长期副本，并可能使真实消费者文件与operator输入漂移；同一口令复制到不同文件也不能证明职责分离。
+- `BOOTSTRAP`发生在新Web/Worker成为current runtime之前，不能要求一个尚未存在的postdeploy四服务严格回执；`RECONCILE`发生在current runtime上，又不能退回仅凭调用者参数的predeploy判断。
+- PostgreSQL事务可能已提交但client在收到结果前退出。只用trap、单一“正在执行”文件或重复执行命令无法区分未dispatch、未知提交、已提交待捕获和回执双写中断。
+- 发布、备份、Migration和权限变更都会消费同一数据库/运行身份。如果各自只持局部锁，存在release换bundle、backup启fence与operator变ACL交叉执行的窗口。
+
+### Decision
+
+1. 实际权限变更只能由安装后的content-addressed Release Supervisor执行。launcher在验证bundle、authorization、target、secret和runtime probe之前取得`/run/lock/chenyida-erp-release-gate-v1.lock`，并将同一已核验FD继承给runner，直到事务、独立核验、journal和receipt完成；独立contender必须证明锁处于busy。发布和backup入口复用同一锁与operator interlock。
+2. Operator只读取直接消费者的最终来源：runtime secret根中的Admin DB、Migration、Web、Worker口令，以及物理独立backup credential根中的libpq capture service。Admin应用口令与PostgreSQL bootstrap口令只参与七值不复用检查。禁止aggregate password file、operator专属provisioner、外部`passfile`或把消费者口令复制到journal/authorization。
+3. 七值都必须满足D-133的规范32-byte/43字符base64url、至少16个不同字符和两两不同；文件执行root/owner/mode/nlink/no-follow与打开前后metadata核对。跨崩溃只记录路径和稳定metadata identity，不记录秘密或秘密摘要。Backup service解析后的口令buffer在任一后续语法/字段/语义错误时立即清零。
+4. `BOOTSTRAP`和`RECONCILE`使用不同信任时点。BOOTSTRAP只接受`PRE_DEPLOY_POSTGRESQL_BOOTSTRAP_BOUND`，由精确manifest、runtime configuration、目标container/database/system identity生成确定binding，不伪造postdeploy receipt；RECONCILE只接受`POST_DEPLOY_CURRENT_RUNTIME_STRICT`的同bundle新鲜probe receipt。RECOVER必须继承原操作的guard和精确identity。
+5. Runner在authorization从pending移动到consumed之前，先以内容寻址pending写、原子发布、文件及父目录fsync完成`PREPARED` intent。状态采用append-only摘要链：`PREPARED → AUTHORIZATION_CONSUMED → TRANSACTION_DISPATCHED → POSTCOMMIT_CAPTURED → VERIFIED → COMMITTED`；完成证据归档而不删除。未知第三状态、冲突记录、backup fence并存或目标漂移只进入`QUARANTINED`。
+6. role/owner/membership/ACL/default privilege/setting和五LOGIN口令在一个PostgreSQL事务内执行。口令仅经受控进程内buffer和`psql` stdin，事务内抑制statement/duration日志并在使用后清零。即使结构计划是no-op，RECONCILE也必须重置并用正确/错误凭据核验五个LOGIN，不能把结构相等解释为凭据已同步。
+7. 原进程中断后禁止重复投递原authorization。新的RECOVER v3 authorization必须精确绑定原operation ID、原authorization SHA和active intent SHA；受信判断只允许resume authorization、dispatch/retry transaction、postcommit capture/verify、finish publication、archive committed或quarantine。事务已提交但进程立即SIGKILL的路径必须能从实际catalog和持久journal完成`CAPTURE_AND_VERIFY`。
+8. intent、authorization、runtime probe、manifest、runtime policy、operator policy、数据库OID/system identifier/marker、container ID、credential generation及backup root身份形成同一证据闭包。正常执行要求当前受信release artifact仍合格；恢复可以使用过期但内容与来源精确匹配的原artifact解释已发生状态，不允许换新bundle或policy续跑旧intent。
+9. Active/preparing/quarantine operator证据阻断release和backup；固定backup根上的`.backup-fence-v2.json`阻断operator。两者并存不是可自动选择先后顺序的状态，只能quarantine。任何入口不得删除对方的锁、fence、intent或receipt来恢复可用性。
+10. 公开结果只允许稳定状态、operation ID和内容摘要，不输出角色清单、对象清单、口令、SCRAM verifier、DSN、service正文、SQL、堆栈或敏感路径正文。固定PG17 system adapter测试必须覆盖真实事务、提交后立即杀进程、journal恢复、结构no-op口令轮换、正确/错误口令探针以及stdout/stderr/PostgreSQL日志秘密扫描。
+
+### Consequences
+
+- Operator不再制造第八份秘密副本；五个数据库口令若与实际消费者不一致会在变更前或登录探针中失败，而不是留下“数据库已改、服务文件未改”的虚假成功。
+- BOOTSTRAP可在服务切换前建立最小角色而不弱化postdeploy门，RECONCILE则不能脱离当前严格runtime证据运行。两种操作都需要独立专项授权，成功也不自动授权部署或切换。
+- 崩溃后可能需要一份新的RECOVER authorization和人工判断；这是区分未知提交与确定回执所需的安全成本。Quarantine优先于自动可用性，禁止基于名称猜测反向SQL。
+- 共享全局锁降低并发吞吐，但本项目本就要求低资源串行执行；换来的边界是release、backup与权限变更不能在相互不知情时改变同一证据。
+- 仓库和隔离测试通过只证明实现可执行。当前UAT共享superuser、环境变量秘密和旧运行配置不因此改变；安装Supervisor、生成真实凭据、创建角色/ACL及激活仍须专项授权和同候选运行复核。
+
+### Rejected alternatives
+
+- 拒绝aggregate password JSON、operator专属secret root、从环境变量/argv读取口令，或以口令hash作为跨崩溃身份。
+- 拒绝BOOTSTRAP伪造postdeploy四服务receipt，也拒绝RECONCILE复用predeploy稳定门或调用者自报`runtime_configuration_sha256`。
+- 拒绝在authorization消费后仅靠trap删除intent、无journal重跑事务、把client断连当作回滚，或手工检查一张表后宣布已提交。
+- 拒绝结构no-op时跳过五口令重置/探针、让正确口令失败仍发布receipt，或为方便调试打开SQL/口令日志。
+- 拒绝release、backup和operator各持独立锁，也拒绝删除backup fence、active intent或quarantine证据来绕过联锁。
+- 拒绝用新bundle、新policy、新credential generation继续旧intent；任何代次变化都必须先隔离原状态，再形成新的审阅和授权。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

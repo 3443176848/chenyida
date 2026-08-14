@@ -6,12 +6,13 @@
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / ISOLATED-ONLY / PRODUCTION NO-GO | 当前唯一active slot；主智能体唯一写入，三条智能体线只读审计 |
+| 当前状态 | DOING / CONTROLLED OPERATOR REPOSITORY VERIFIED / FINAL BUNDLE AND ACTUAL ACTIVATION OPEN / ISOLATED-ONLY / PRODUCTION NO-GO | 当前唯一active slot；主智能体唯一写入，三条智能体线只读审计 |
 | 严格起点 | PASS / CONTROLLED | `main@fb1f7e8893b2affba0ca07ecd9629ae2726adca9`、tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`；未跟踪状态报告不读不改不提交 |
 | UAT catalog | VERIFIED READ ONLY / HIGH RISK OPEN | PostgreSQL 17只有1个非内置LOGIN且为superuser、数据库owner和全部433个public relation owner；Web/Worker活动连接共用1个角色；未输出角色名、连接串或密码，未读业务行或写入 |
 | 源码/运行差距 | OPEN / SOURCE ADVANCED | 源码alpha.47、46/head`0046_runtime_lock_privilege_boundary.sql`，UAT仍alpha.42、40/head`0040_warehouse_receipt_readiness.sql`；本任务不授权Migration或部署 |
 | 秘密边界 | PASS / STATIC REPOSITORY CONTRACT / RUNTIME NOT DEPLOYED | UAT/production拒绝数据库、PostgreSQL初始化、Setup与Admin秘密环境变量；六份独立secret固定32-byte base64url、唯一inode/value、root-only host root、逐服务gid/mode、no-follow与单硬链接，缺失/复用/权限/替换/泄漏负测通过。当前运行面仍使用环境秘密，未创建真实secret文件 |
-| 角色边界 | PARTIAL / STATIC ROLE, ACL AND SESSION CONTRACT PASS / CONTROLLED PRODUCTION OPERATOR OPEN | 9角色/5 LOGIN/4 NOLOGIN、1261条非owner ACL、849个物理对象、2条global default ACL及五身份探针已闭合；runtime/migration精确search_path、连接后身份/setting核对和失败client销毁已集成。生产root operator、host lock、持久intent/backup fence、可信预授权运行配置摘要及真实secret绑定仍开放，UAT角色/ACL未改变 |
+| 角色边界 | PARTIAL / STATIC ROLE, ACL, SESSION AND CONTROLLED OPERATOR REPOSITORY PASS / ACTUAL ACTIVATION OPEN | 9角色/5 LOGIN/4 NOLOGIN、1261条非owner ACL、849个物理对象、2条global default ACL、五身份探针及runtime/migration session已闭合；D-134又实现installed Supervisor唯一入口、direct consumer secret、global lock、durable journal/fence和精确恢复。真实secret绑定、角色/ACL激活与UAT运行复核未授权，当前UAT未改变 |
+| 受控Operator | PASS / REPOSITORY AND REAL ISOLATED PG17 SYSTEM ADAPTER | BOOTSTRAP使用predeploy target binding，RECONCILE要求strict postdeploy probe且结构no-op仍重置五口令；authorization消费前fsync intent，事务提交后立即SIGKILL可由journal执行`CAPTURE_AND_VERIFY`。七秘密/完整SCRAM未进入stdout/stderr/PG日志，operator16/16和真实适配器通过；未host安装或实际执行 |
 | v2角色/ACL | PASS / SYNTHETIC-ISOLATED / EXACT SET | 状态捕获绑定PG17/数据库OID/marker/system identifier摘要并拒绝未知角色、membership、ACL端点、LOGIN直授、grant option、危险settings、列/参数ACL、custom tablespace、large object和结构漂移；role bootstrap与常规reconcile分离，单事务Migration advisory lock收敛后重复执行为no-op |
 | Web权限意图 | PASS / STRUCTURAL SOURCE BOUNDARIES | 共享Parser错误合同及四类Worker-only写实现已与Web模块结构分离；raw candidate为`9/191/205/79`且reviewed exclusion只剩`app_meta INSERT`，最终表操作`18/201/211/82`→`9/190/209/79`、sequence USAGE 182→173。Web不可达五个Worker-only模块，25个表操作/9个序列有精确拒绝断言 |
 | Web锁权限 | PASS / ISOLATED CURRENT HEAD | 19个锁目标经16个owner控制窄函数访问，Web保持零table/column UPDATE；20个locking trigger固定安全owner路径，PG17专项5/5及完整回归84文件/401项通过 |
@@ -20,14 +21,14 @@
 | D-132 v1实际readiness | PASS / FAIL CLOSED | V4 validate/create/publish与Dashboard均拒绝legacy v1 `ACTUAL_OFFHOST/RECOVERY_READY`，稳定错误为`READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN`；v1 synthetic只作历史解析且永不ready，十份v1核心文件摘要冻结 |
 | PG17编译catalog | PASS / SYNTHETIC-ISOLATED / CONTENT ADDRESSED | 固定PG17.10/libc C/UTF8、46个Migration及access intent v2；234表、211序列、394 routine、6独立type、3 extension，3132列/1709约束/957索引/285非内部trigger，31类unsupported全零。角色探针扩展后catalog文件/制品/逻辑SHA-256为`146b3cd0…896`/`c35f4920…4e6`/`40c8c620…7f8f` |
 | 五身份PG17探针 | PASS / SYNTHETIC-ISOLATED | Migration、Web、Worker、Admin、Backup分别通过实际身份及允许/拒绝操作；只有Migration可DDL，Backup可完整custom-format dump但不能写；table高危、sequence UPDATE、column REFERENCES、type、tablespace CREATE、数据库TEMP、Schema CREATE及superuser参数权限8类精确为零 |
-| Git/bundle检查点 | PASS / LATEST STATIC TWO-COMMIT CONTENT ADDRESSED | 源码`6ddfae92bf3ed95314944e95043240fbe26fdee3`/tree`73bafe754b07bc99d5f2268daf2a1b1d001405c9`；manifest-only直接子提交`ef409bbb8d8cefe0ce596759fc57b3d222bd6ea2`/tree`018fb3f8cc47b9c96296f53576e6aee6450fae83`，53文件bundle SHA-256为`bac5e882b6a698fe496fbf1b8d6d5e4ea3f206081ab27d12f9ee19af615dcd9e`。该清单只冻结当前静态边界，生产operator后续源码会要求最终bundle重建 |
+| Git/bundle检查点 | IN PROGRESS / OLD STATIC BUNDLE STALE | 旧源码`6ddfae92…`/manifest-only`ef409bbb…`的53文件bundle`bac5e882…cd9e`已被operator源码变化失效；当前将先冻结源码/文档提交，在干净快照完成完整回归，再生成只改canonical manifest的直接子提交 |
 | 依赖provenance | PASS / EXACT LOCK, TREE AND TEST MOUNTPOINT | `package-lock.json`为`9c3949bf…eb5`，508包依赖树含root:root`0755`空`.vite-temp`且SHA-256为`e3b36304…659`；`npm ls --all`通过。首次Browser因只读树缺该嵌套tmpfs mountpoint在测试前失败，补回精确空目录并重绑摘要后6文件/11项通过 |
-| 当前测试绑定 | PASS / CLEAN SOURCE COMMIT / FULL APPLICABLE REGRESSION | inventory为`246/222/24`、逻辑SHA-256`5a5444ab…c5dd`，test/container/secret runtime policy SHA-256为`e2b50ea2…d2b`/`e4920820…f00`/`8dd07c6a…7c5`；Node119/1005、PostgreSQL84/401及catalog、Browser6/11、POSIX7/57、typecheck38/38、release56+53、Supervisor40/40、Migration/恢复/Compose和credentials1653通过，lint 0 error/26 warning |
+| 当前测试绑定 | PARTIAL / NEW INVENTORY BOUND / FINAL FULL REGRESSION RUNNING | inventory为`248/224/24`、SHA-256`c2a3daa8…7d27`，test runtime policy为`923da508…4bb7`，catalog文件/artifact为`87596b31…fb4cf`/`694daeb7…30b`；operator16/16、Supervisor定向29/29、release/catalog34/34和真实PG17 system adapter已通过。上一静态检查点的全套回归不能替代本次源码冻结后的最终全套 |
 | Tablespace | PASS / STATIC REPOSITORY CONTRACT / RUNTIME VOLUME ABSENT | Compose声明独立`erp_postgres_tablespaces`固定namespace，runtime/release/recovery精确验证mount、owner/mode、PG17 child`PG_17_202406281`及不与PGDATA/应用卷重叠；未创建或挂载真实Volume，当前PostgreSQL仍只有PGDATA持久卷 |
-| 验收范围 | IN PROGRESS | Web锁、Backup、源码图、v1实际恢复门禁、PG17 catalog、v2角色/ACL、session、secret、container和tablespace静态合同已闭合；生产受控operator、可信预授权运行配置摘要探针、实际角色/secret/Volume、源码匹配候选及正式门仍待完成 |
+| 验收范围 | IN PROGRESS | Web锁、Backup、源码图、v1实际恢复门禁、PG17 catalog、v2角色/ACL、session、secret、container、tablespace和生产受控operator仓库合同已闭合；最终bundle、实际角色/secret/Volume激活、源码匹配候选及正式门仍待完成 |
 | 启动验证 | PASS / LIGHTWEIGHT | Markdown394/229链接、JSON214、Shell38、credentials1618、release contract51/51及Python三基线通过；宿主工具缺失改用既有隔离运行时，不安装依赖或降低断言 |
 | 起点资源 | PASS / BELOW STOP LINES | available约2.0GiB、Swap603MiB/1.0GiB、根盘16GiB、Load`0.10/0.17/0.52`，内核`oom_kill=0`；四服务restart0/OOM false |
-| 当前资源/清理 | RECOVERED / BELOW STOP LINES / THRESHOLD EVENT RECORDED | PG首跑在Swap越过80%时中断并清理；稳定回落后串行重跑，单一既有任务曾短暂81.07%，期间未启动新重任务，随后自然回落。最新available约1.84GiB、Swap765,530,112/1,074,786,304 bytes（约71.23%）、根盘16GiB、Load`1.11/0.96/1.21`、`oom_kill=0`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false，无遗留PG测试容器 |
+| 当前资源/清理 | PASS / BELOW STOP LINES / FINAL REGRESSION OPEN | 最新operator真实PG17演练后available约1.7GiB、Swap539MiB/1.0GiB、根盘15GiB、Load`1.33/0.73/0.72`、`oom_kill=0`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false，operator测试容器和临时source/credential/state目录清零。最终全套回归继续串行执行 |
 | 外部边界 | BLOCKED / NOT AUTHORIZED | 无真实角色/凭据/Volume、UAT/生产变更、host安装、Migration/deploy、备份恢复、数据读取或账号/网络动作 |
 | 系统是否可用 | NO | 当前高权限共享数据库身份和环境变量秘密尚未改变，且异机恢复、候选门、真实迁移、岗位/员工验收与切换仍缺证据 |
 

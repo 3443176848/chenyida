@@ -33,25 +33,48 @@ SET statement_timeout = '60s';
   \quit 3
 \endif
 
-SELECT (
-  current_database()=:'expected_database'
-  AND shobj_description(database.oid,'pg_database')=:'expected_marker'
-  AND control.system_identifier::text=:'expected_system_identifier'
-  AND current_user=session_user
-  AND current_user='postgres'
-  AND current_setting('server_version_num')='170010'
-  AND NOT pg_is_in_recovery()
-  AND current_setting('listen_addresses')=''
-  AND pg_get_userbyid(database.datdba)=:'migration_owner'
-) AS synthetic_target_valid
-FROM pg_database database
-CROSS JOIN pg_control_system() control
-WHERE database.datname=current_database()
-\gset
-\if :synthetic_target_valid
+\if :{?controlled_runtime_mode}
+  SELECT (
+    current_database()=:'expected_database'
+    AND shobj_description(database.oid,'pg_database')=:'expected_marker'
+    AND control.system_identifier::text=:'expected_system_identifier'
+    AND current_user=session_user
+    AND EXISTS (SELECT 1 FROM pg_roles role WHERE role.rolname=current_user AND role.rolsuper)
+    AND current_setting('server_version_num')='170010'
+    AND NOT pg_is_in_recovery()
+    AND current_setting('listen_addresses')='*'
+    AND pg_get_userbyid(database.datdba) IN (:'migration_owner',current_user)
+  ) AS controlled_target_valid
+  FROM pg_database database
+  CROSS JOIN pg_control_system() control
+  WHERE database.datname=current_database()
+  \gset
+  \if :controlled_target_valid
+  \else
+    \echo 'RUNTIME_PRIVILEGE_CATALOG_CONTROLLED_TARGET_INVALID'
+    \quit 3
+  \endif
 \else
-  \echo 'RUNTIME_PRIVILEGE_CATALOG_SYNTHETIC_TARGET_INVALID'
-  \quit 3
+  SELECT (
+    current_database()=:'expected_database'
+    AND shobj_description(database.oid,'pg_database')=:'expected_marker'
+    AND control.system_identifier::text=:'expected_system_identifier'
+    AND current_user=session_user
+    AND current_user='postgres'
+    AND current_setting('server_version_num')='170010'
+    AND NOT pg_is_in_recovery()
+    AND current_setting('listen_addresses')=''
+    AND pg_get_userbyid(database.datdba)=:'migration_owner'
+  ) AS synthetic_target_valid
+  FROM pg_database database
+  CROSS JOIN pg_control_system() control
+  WHERE database.datname=current_database()
+  \gset
+  \if :synthetic_target_valid
+  \else
+    \echo 'RUNTIME_PRIVILEGE_CATALOG_SYNTHETIC_TARGET_INVALID'
+    \quit 3
+  \endif
 \endif
 
 CREATE TEMP TABLE cyd_role_semantics ON COMMIT PRESERVE ROWS AS

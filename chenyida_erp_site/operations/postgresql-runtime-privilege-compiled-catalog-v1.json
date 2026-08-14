@@ -33,23 +33,27 @@
     "compiler": [
       {
         "path": "scripts/postgresql-runtime-privilege-catalog.mjs",
-        "sha256": "8ed388a0c00ce324a03d1bf9a51ccc98e61cf6393e3be7541bf2f605f8151a2f"
+        "sha256": "0752e8eadacf796b06b24f602b0feb61e8302f797a6237572ea1d48b7debda2e"
       },
       {
         "path": "scripts/postgresql-runtime-privilege-catalog.sql",
-        "sha256": "e7e14ff872f9f8f3ab3a70b5107dd070f3eb5399fb54db7a00cbbe7b0ce851fe"
+        "sha256": "ca59a9322b15f305eac540fc7ec3fc7cfb6134ab36aa5fb02197b9d203f61b32"
       },
       {
         "path": "scripts/release-gate-lock.sh",
-        "sha256": "34280ff378c45a36a11a4eb424317420da4c6be703a4727801b6e1702e8fb77c"
+        "sha256": "8f3c249331abe7ee240e2df51a6371e88491478785316226d7a315b5fbea1a92"
       },
       {
         "path": "scripts/run-runtime-privilege-catalog-postgres-test.sh",
-        "sha256": "c4ebe4ac0fe0867d91cda24ef4706ccedec9a51544d63ee062b1ed7703aac8a9"
+        "sha256": "74b331d8a8a58a375b75c376b0924bb6c3aa8f8ca02b6a284f7e0c3f4e7fcd22"
       },
       {
         "path": "tests/selfhost-postgresql-runtime-privilege-catalog-postgres.sh",
-        "sha256": "b6622bac3e90800faa5a8627fab2562ceae262196d8a23894407ce1d4637c859"
+        "sha256": "05d4f437250fbf8c2210c53c47954208ef1f3635d4875cbcfd195d2cf55f6914"
+      },
+      {
+        "path": "tests/runtime-privilege-operator-postgres-fixture.mjs",
+        "sha256": "08e706538e086f1d5e7852df14844a3322a8848ddde7f7b1aaca472285ada09d"
       },
       {
         "path": "scripts/backup-recovery-contract.mjs",
@@ -13612,7 +13616,7 @@
     "extensions": [
       {
         "name": "btree_gist",
-        "owner": "MIGRATION_OWNER",
+        "owner": "PLATFORM_OWNER",
         "schema": "public",
         "version": "1.7",
         "member_count": 264,
@@ -13620,7 +13624,7 @@
       },
       {
         "name": "pgcrypto",
-        "owner": "MIGRATION_OWNER",
+        "owner": "PLATFORM_OWNER",
         "schema": "public",
         "version": "1.3",
         "member_count": 36,
@@ -13687,6 +13691,6 @@
       "unsupported_extension_member_class_count": 0
     }
   },
-  "catalog_sha256": "40c8c620dc8b434798716270d5aecbfedb19499618a2fc792c31e529f63c7f8f",
-  "artifact_sha256": "c462641dd48fc4c22836e88a28acf63a50a89652a6bbe8efc2ce1b8058b2d4cd"
+  "catalog_sha256": "e0070514bdaaa998f114583ed820047688ef8945aa5ea3cafdfb873e3df02e8c",
+  "artifact_sha256": "694daeb7d309cc1f0eb923158769daf936fd01cf4deac1cfde176af03f26c30b"
 }

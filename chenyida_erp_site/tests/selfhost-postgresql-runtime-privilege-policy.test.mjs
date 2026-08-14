@@ -9,11 +9,13 @@ import {
   verifyRuntimePrivilegePolicySources,
 } from "../scripts/postgresql-runtime-privilege-policy.mjs";
 import {
+  createControlledRuntimePrivilegeBootstrapPlan,
   createRuntimePrivilegeBootstrapPlan,
   createRuntimePrivilegeDesiredState,
   createRuntimePrivilegeReconciliationIntent,
   createRuntimePrivilegeReconciliationPlan,
   decideRuntimePrivilegeInterruptedRecovery,
+  runtimePrivilegeControlledBaselineNeedsOwnershipBootstrap,
   transitionRuntimePrivilegeIntent,
   validateRuntimePrivilegeState,
 } from "../scripts/postgresql-runtime-privilege-reconciler.mjs";
@@ -74,6 +76,19 @@ function initialBaseline() {
     default_privileges: [],
     default_privilege_row_count: 0,
   };
+}
+
+function controlledLegacyBaseline() {
+  const baseline = structuredClone(initialBaseline());
+  baseline.database.owner = policy.identities.platform_owner;
+  baseline.roles = [];
+  baseline.object_acl = baseline.object_acl.map((record) => record.owner === policy.identities.migration_owner
+    ? { ...record, owner: policy.identities.platform_owner, grantor: policy.identities.platform_owner }
+    : record);
+  baseline.object_acl_storage = baseline.object_acl_storage.map((record) => record.owner === policy.identities.migration_owner
+    ? { ...record, owner: policy.identities.platform_owner }
+    : record);
+  return baseline;
 }
 
 function sortedAcl(records) {
@@ -171,18 +186,51 @@ test("planner separates role bootstrap, emits migration lock and exact default s
   assert.deepEqual(noOp.statements, []);
 });
 
+test("controlled bootstrap accepts only an exact all-platform legacy owner class and enumerates every transfer", () => {
+  const baseline = controlledLegacyBaseline();
+  assert.equal(validateRuntimePrivilegeState(baseline, { ...sources, mode: "controlled" }), baseline);
+  assert.throws(() => validateRuntimePrivilegeState(baseline, { ...sources, mode: "baseline" }), /RUNTIME_PRIVILEGE_STATE_DATABASE_DRIFT/);
+  assert.equal(runtimePrivilegeControlledBaselineNeedsOwnershipBootstrap(baseline, sources), true);
+
+  const plan = createControlledRuntimePrivilegeBootstrapPlan(baseline, sources);
+  assert.equal(plan.no_op, false);
+  assert.equal(plan.role_bootstrap, true);
+  assert.equal(validateRuntimePrivilegeState(plan.desired, { ...sources, mode: "final", expectedFinal: plan.desired }), plan.desired);
+  assert.ok(plan.statements.some((statement) => statement === 'ALTER DATABASE "chenyida_erp" OWNER TO "chenyida_erp_owner"'));
+  assert.ok(plan.statements.some((statement) => statement === 'ALTER TABLE "public"."app_meta" OWNER TO "chenyida_erp_owner"'));
+  assert.ok(plan.statements.some((statement) => statement.startsWith('ALTER SEQUENCE "public".')));
+  assert.ok(plan.statements.some((statement) => statement.startsWith('ALTER ROUTINE public.')));
+  assert.ok(plan.statements.every((statement) => !statement.includes("REASSIGN OWNED")));
+  assert.ok(plan.statements.every((statement) => !statement.startsWith("ALTER ROUTINE public.digest(")));
+  const lastCreate = plan.statements.reduce((index, statement, current) => statement.startsWith("CREATE ROLE ") ? current : index, -1);
+  const firstTransfer = plan.statements.findIndex((statement) => /^ALTER (DATABASE|TABLE|SEQUENCE|ROUTINE) /.test(statement));
+  assert.ok(lastCreate >= 0 && firstTransfer > lastCreate);
+
+  const mixed = structuredClone(baseline);
+  mixed.object_acl_storage.find((record) => record.owner === policy.identities.platform_owner && record.kind === "TABLE").owner = policy.identities.migration_owner;
+  assert.throws(() => createControlledRuntimePrivilegeBootstrapPlan(mixed, sources), /RUNTIME_PRIVILEGE_CONTROLLED_OWNER_CLASS_INVALID/);
+
+  const partialRoles = structuredClone(baseline);
+  partialRoles.roles = [plan.desired.roles.find((role) => role.name === "chenyida_erp_web")];
+  assert.throws(() => createControlledRuntimePrivilegeBootstrapPlan(partialRoles, sources), /RUNTIME_PRIVILEGE_CONTROLLED_ROLE_CLASS_INVALID/);
+});
+
 test("durable v2 intent has monotonic transitions and ambiguous result recovery quarantines third states", () => {
   const baseline = initialBaseline();
   const plan = createRuntimePrivilegeBootstrapPlan(baseline, sources);
   const intent = createRuntimePrivilegeReconciliationIntent(plan, "2026-08-13T00:00:00.000Z");
   assert.equal(intent.state, "INTENT_DURABLE");
   const dispatched = transitionRuntimePrivilegeIntent(intent, "TRANSACTION_DISPATCHED");
+  assert.equal(decideRuntimePrivilegeInterruptedRecovery(intent, baseline), "RETRY_TRANSACTION");
+  assert.equal(decideRuntimePrivilegeInterruptedRecovery(intent, plan.desired), "QUARANTINE");
   assert.equal(decideRuntimePrivilegeInterruptedRecovery(dispatched, baseline), "RETRY_TRANSACTION");
   assert.equal(decideRuntimePrivilegeInterruptedRecovery(dispatched, plan.desired), "FINISH_VERIFICATION");
   const third = structuredClone(baseline);
   third.database.connection_limit = 1;
   assert.equal(decideRuntimePrivilegeInterruptedRecovery(dispatched, third), "QUARANTINE");
   const captured = transitionRuntimePrivilegeIntent(dispatched, "POSTCOMMIT_CAPTURED");
+  assert.equal(decideRuntimePrivilegeInterruptedRecovery(captured, baseline), "QUARANTINE");
+  assert.equal(decideRuntimePrivilegeInterruptedRecovery(captured, plan.desired), "FINISH_VERIFICATION");
   const verified = transitionRuntimePrivilegeIntent(captured, "VERIFIED");
   assert.equal(verified.state, "VERIFIED");
   assert.throws(() => transitionRuntimePrivilegeIntent(verified, "TRANSACTION_DISPATCHED"), /RUNTIME_PRIVILEGE_INTENT_TRANSITION_INVALID/);

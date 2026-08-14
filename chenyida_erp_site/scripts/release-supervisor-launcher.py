@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 import hashlib
+import fcntl
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -27,13 +30,20 @@ RELEASE_IDENTITY_ROOT = Path("/var/lib/chenyida-erp/release-identity")
 RUNTIME_PROBE_ROOT = Path("/var/lib/chenyida-erp/runtime-probes")
 BUNDLE_CONTRACT = "chenyida-erp-release-supervisor-bundle/v1"
 AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v2"
+RUNTIME_PRIVILEGE_AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v3"
 RUNTIME_GUARD_CONTRACT = "chenyida-erp-release-runtime-guard/v1"
 PRE_DEPLOY_RUNTIME_GUARD_MODE = "PRE_DEPLOY_EXISTING_RUNTIME_STABILITY"
 POST_DEPLOY_RUNTIME_GUARD_MODE = "POST_DEPLOY_CURRENT_RUNTIME_STRICT"
+PRE_DEPLOY_POSTGRESQL_BOOTSTRAP_GUARD_MODE = "PRE_DEPLOY_POSTGRESQL_BOOTSTRAP_BOUND"
 RUNTIME_COMPOSE_PROJECT = "chenyida-erp"
 RUNTIME_POLICY_SHA256 = "e4920820ed954c2689e3de53dea9b7f36945969c8287b06d87a3871e7d3ecf00"
 RUNTIME_SECRET_POLICY_SHA256 = "8dd07c6acd6e857a0b29b14e2b6d5b60ad919cf54aac9b552ce11672eb45b7c5"
 RUNTIME_PROBE_CONTRACT = "chenyida-erp-postdeploy-runtime-configuration-probe/v1"
+RUNTIME_PRIVILEGE_STATE_ROOT = Path("/var/lib/chenyida-erp/postgresql-runtime-privilege-operator")
+RUNTIME_SECRET_ROOT = Path("/etc/chenyida-erp/runtime-secrets")
+RUNTIME_PRIVILEGE_BACKUP_ROOT = Path("/var/backups/chenyida-erp-v2")
+RUNTIME_PRIVILEGE_NODE_IMAGE = "node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3"
+GLOBAL_RELEASE_LOCK = Path("/run/lock/chenyida-erp-release-gate-v1.lock")
 SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 MAX_JSON_BYTES = 1024 * 1024
 MAX_BUNDLE_FILE_BYTES = 8 * 1024 * 1024
@@ -46,12 +56,17 @@ ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 
 BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/operations/container-runtime-policy-v1.json": "0444",
+    "chenyida_erp_site/operations/postgresql-runtime-privilege-access-v2.json": "0444",
+    "chenyida_erp_site/operations/postgresql-runtime-privilege-compiled-catalog-v1.json": "0444",
+    "chenyida_erp_site/operations/postgresql-runtime-privilege-operator-policy-v1.json": "0444",
+    "chenyida_erp_site/operations/postgresql-runtime-privilege-policy-v2.json": "0444",
     "chenyida_erp_site/operations/runtime-secret-file-policy-v1.json": "0444",
     "chenyida_erp_site/release/release-gate-plan-v2.json": "0444",
     "chenyida_erp_site/release/release-test-inventory-v1.json": "0444",
     "chenyida_erp_site/release/test-runtime-policy-v1.json": "0444",
     "chenyida_erp_site/release/vulnerability-policy-v1.json": "0444",
     "chenyida_erp_site/scripts/check-credentials.mjs": "0444",
+    "chenyida_erp_site/scripts/backup-recovery-contract.mjs": "0444",
     "chenyida_erp_site/scripts/container-runtime-policy-test.py": "0444",
     "chenyida_erp_site/scripts/container-runtime-policy.py": "0444",
     "chenyida_erp_site/scripts/create-release-image-evidence.sh": "0555",
@@ -61,6 +76,17 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/postdeploy-release-contract.mjs": "0444",
     "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs": "0444",
     "chenyida_erp_site/scripts/postdeploy-runtime-configuration-probe.mjs": "0444",
+    "chenyida_erp_site/scripts/postgresql-cluster-recovery-contract.mjs": "0444",
+    "chenyida_erp_site/scripts/postgresql-runtime-privilege-catalog.mjs": "0444",
+    "chenyida_erp_site/scripts/postgresql-runtime-privilege-catalog.sql": "0444",
+    "chenyida_erp_site/scripts/postgresql-runtime-privilege-interlock.sh": "0444",
+    "chenyida_erp_site/scripts/postgresql-runtime-privilege-journal.mjs": "0444",
+    "chenyida_erp_site/scripts/postgresql-runtime-privilege-operator.mjs": "0444",
+    "chenyida_erp_site/scripts/postgresql-runtime-privilege-policy.mjs": "0444",
+    "chenyida_erp_site/scripts/postgresql-runtime-privilege-reconciler.mjs": "0444",
+    "chenyida_erp_site/scripts/postgresql-runtime-privilege-runner.mjs": "0444",
+    "chenyida_erp_site/scripts/postgresql-runtime-privilege-source.mjs": "0444",
+    "chenyida_erp_site/scripts/postgresql-runtime-privilege-state.sql": "0444",
     "chenyida_erp_site/scripts/probe-postdeploy-runtime-configuration.sh": "0555",
     "chenyida_erp_site/scripts/publish-release-identity-from-manifest.mjs": "0444",
     "chenyida_erp_site/scripts/release-browser-e2e-runner.mjs": "0444",
@@ -88,6 +114,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/run-source-diff-check.sh": "0555",
     "chenyida_erp_site/scripts/write-release-identity.sh": "0555",
     "chenyida_erp_site/tests/release-gate-fixture.mjs": "0444",
+    "chenyida_erp_site/tests/runtime-privilege-operator-postgres-fixture.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-release-gate-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-release-identity-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-release-image-evidence-producer.test.mjs": "0444",
@@ -97,6 +124,8 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-backup-recovery-postgres.sh": "0555",
     "chenyida_erp_site/tests/selfhost-postgresql-cluster-recovery-postgres.sh": "0555",
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-catalog-postgres.sh": "0555",
+    "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-operator.test.mjs": "0444",
+    "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-policy.test.mjs": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_browser.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_container_runtime.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_installer.py": "0444",
@@ -118,6 +147,34 @@ CONFIRMATIONS = {
     "CREATE_RELEASE_MANIFEST": "AUTHORIZE_CREATE_IMMUTABLE_RELEASE_MANIFEST",
     "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION": "AUTHORIZE_PROBE_EXACT_POST_DEPLOY_RUNTIME_CONFIGURATION",
     "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY": "AUTHORIZE_VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY",
+}
+
+RUNTIME_PRIVILEGE_OPERATIONS = {
+    "BOOTSTRAP_POSTGRESQL_RUNTIME_PRIVILEGES": "BOOTSTRAP",
+    "RECONCILE_POSTGRESQL_RUNTIME_PRIVILEGES": "RECONCILE",
+    "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT": "RECOVER",
+}
+
+RUNTIME_PRIVILEGE_CONFIRMATIONS = {
+    "BOOTSTRAP_POSTGRESQL_RUNTIME_PRIVILEGES": "AUTHORIZE_BOOTSTRAP_EXACT_POSTGRESQL_RUNTIME_PRIVILEGES",
+    "RECONCILE_POSTGRESQL_RUNTIME_PRIVILEGES": "AUTHORIZE_RECONCILE_EXACT_POSTGRESQL_RUNTIME_PRIVILEGES",
+    "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT": "AUTHORIZE_RECOVER_EXACT_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT",
+}
+
+RUNTIME_PRIVILEGE_BASE_PARAMETER_FIELDS = {
+    "backup_root", "backup_credential_root", "backup_capture_service_file", "backup_capture_service",
+    "compose_project_root", "credential_generation_id", "deployment_class", "deployment_id",
+    "expected_database", "expected_database_marker", "expected_database_oid", "expected_system_identifier",
+    "postgres_container", "postgres_container_id", "release_manifest", "release_manifest_sha256", "runtime_configuration_sha256",
+    "runtime_guard_mode", "runtime_policy_sha256",
+}
+
+RUNTIME_PRIVILEGE_POSTDEPLOY_PARAMETER_FIELDS = RUNTIME_PRIVILEGE_BASE_PARAMETER_FIELDS | {
+    "runtime_probe_receipt", "runtime_probe_receipt_sha256",
+}
+
+RUNTIME_PRIVILEGE_RECOVERY_PARAMETER_FIELDS = {
+    "expected_intent_sha256", "original_authorization_sha256", "original_operation", "original_operation_id",
 }
 
 PARAMETER_FIELDS = {
@@ -385,16 +442,87 @@ def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
     return parameters
 
 
+def validate_runtime_privilege_parameters(parameters: Any, operation: str | None = None) -> dict[str, Any]:
+    recovery = operation == "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT"
+    if recovery:
+        if not isinstance(parameters, dict) or parameters.get("original_operation") not in ("BOOTSTRAP", "RECONCILE"):
+            reject("SUPERVISOR_RUNTIME_PRIVILEGE_OPERATION_INVALID")
+        effective_operation = parameters["original_operation"]
+    else:
+        effective_operation = RUNTIME_PRIVILEGE_OPERATIONS.get(operation or "")
+    if effective_operation not in ("BOOTSTRAP", "RECONCILE"):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_OPERATION_INVALID")
+    expected_fields = set(RUNTIME_PRIVILEGE_BASE_PARAMETER_FIELDS)
+    if effective_operation == "RECONCILE":
+        expected_fields |= RUNTIME_PRIVILEGE_POSTDEPLOY_PARAMETER_FIELDS - RUNTIME_PRIVILEGE_BASE_PARAMETER_FIELDS
+    if recovery:
+        expected_fields |= RUNTIME_PRIVILEGE_RECOVERY_PARAMETER_FIELDS
+    parameters = exact_fields(parameters, expected_fields, "SUPERVISOR_RUNTIME_PRIVILEGE_PARAMETERS_INVALID")
+    path_fields = ["backup_root", "backup_credential_root", "backup_capture_service_file", "compose_project_root", "release_manifest"]
+    if effective_operation == "RECONCILE":
+        path_fields.append("runtime_probe_receipt")
+    for field in path_fields:
+        absolute_path(parameters[field], "SUPERVISOR_RUNTIME_PRIVILEGE_PATH_INVALID")
+    for field in ("backup_capture_service", "credential_generation_id", "deployment_id", "postgres_container"):
+        if not isinstance(parameters[field], str) or not IDENTIFIER.fullmatch(parameters[field]):
+            reject("SUPERVISOR_RUNTIME_PRIVILEGE_IDENTIFIER_INVALID")
+    digest_fields = ["postgres_container_id", "release_manifest_sha256", "runtime_configuration_sha256", "runtime_policy_sha256"]
+    if effective_operation == "RECONCILE":
+        digest_fields.append("runtime_probe_receipt_sha256")
+    for field in digest_fields:
+        if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]):
+            reject("SUPERVISOR_RUNTIME_PRIVILEGE_DIGEST_INVALID")
+    if parameters["deployment_class"] not in ("UAT", "PRODUCTION") or parameters["deployment_id"] != RUNTIME_COMPOSE_PROJECT:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_DEPLOYMENT_INVALID")
+    if recovery:
+        if not isinstance(parameters["original_operation_id"], str) or not IDENTIFIER.fullmatch(parameters["original_operation_id"]):
+            reject("SUPERVISOR_RUNTIME_PRIVILEGE_IDENTIFIER_INVALID")
+        for field in ("expected_intent_sha256", "original_authorization_sha256"):
+            if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]):
+                reject("SUPERVISOR_RUNTIME_PRIVILEGE_DIGEST_INVALID")
+    if parameters["runtime_policy_sha256"] != RUNTIME_POLICY_SHA256 or parameters["expected_database"] != "chenyida_erp":
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_TARGET_INVALID")
+    expected_guard_mode = PRE_DEPLOY_POSTGRESQL_BOOTSTRAP_GUARD_MODE if effective_operation == "BOOTSTRAP" else POST_DEPLOY_RUNTIME_GUARD_MODE
+    if parameters["runtime_guard_mode"] != expected_guard_mode:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_RUNTIME_GUARD_INVALID")
+    if Path(parameters["backup_root"]) != RUNTIME_PRIVILEGE_BACKUP_ROOT:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_BACKUP_ROOT_INVALID")
+    backup_credential_root = Path(parameters["backup_credential_root"])
+    backup_capture_file = Path(parameters["backup_capture_service_file"])
+    if backup_capture_file.parent != backup_credential_root or backup_capture_file.name == ".chenyida-erp-credential-root-v2":
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_BACKUP_CREDENTIAL_INVALID")
+    manifest = Path(parameters["release_manifest"])
+    if manifest.name != "release-manifest.json" or manifest.parent.parent != RELEASE_ARTIFACT_ROOT_BASE:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_RELEASE_MANIFEST_INVALID")
+    if not isinstance(parameters["expected_database_oid"], str) or not re.fullmatch(r"[1-9][0-9]{0,9}", parameters["expected_database_oid"]):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_TARGET_INVALID")
+    if not isinstance(parameters["expected_system_identifier"], str) or not re.fullmatch(r"[1-9][0-9]{9,29}", parameters["expected_system_identifier"]):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_TARGET_INVALID")
+    expected_marker = f"chenyida-erp-deployment/v2:{parameters['deployment_class']}:{parameters['deployment_id']}"
+    if parameters["expected_database_marker"] != expected_marker:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_TARGET_INVALID")
+    if effective_operation == "RECONCILE":
+        receipt = Path(parameters["runtime_probe_receipt"])
+        if receipt.parent != RUNTIME_PROBE_ROOT or not receipt.name.endswith(".runtime-configuration-probe.json"):
+            reject("SUPERVISOR_RUNTIME_PRIVILEGE_PATH_INVALID")
+    return parameters
+
+
 def validate_authorization(value: Any, expected_bundle_digest: str, now: datetime) -> dict[str, Any]:
     value = exact_fields(value, {"schema_version", "contract", "authorization_id", "created_at", "expires_at", "supervisor_bundle_sha256", "operation", "parameters", "nonce", "confirmation"}, "SUPERVISOR_AUTHORIZATION_FIELDS_INVALID")
-    if value["schema_version"] != 2 or value["contract"] != AUTHORIZATION_CONTRACT:
+    is_v2 = value["schema_version"] == 2 and value["contract"] == AUTHORIZATION_CONTRACT
+    is_v3 = value["schema_version"] == 3 and value["contract"] == RUNTIME_PRIVILEGE_AUTHORIZATION_CONTRACT
+    if not is_v2 and not is_v3:
         reject("SUPERVISOR_AUTHORIZATION_VERSION_INVALID")
     if not isinstance(value["authorization_id"], str) or not IDENTIFIER.fullmatch(value["authorization_id"]):
         reject("SUPERVISOR_AUTHORIZATION_ID_INVALID")
     if not isinstance(value["supervisor_bundle_sha256"], str) or value["supervisor_bundle_sha256"] != expected_bundle_digest:
         reject("SUPERVISOR_AUTHORIZATION_BUNDLE_MISMATCH")
     operation = value["operation"]
-    if operation not in ENTRYPOINTS or value["confirmation"] != CONFIRMATIONS[operation]:
+    if is_v2:
+        if operation not in ENTRYPOINTS or value["confirmation"] != CONFIRMATIONS[operation]:
+            reject("SUPERVISOR_AUTHORIZATION_OPERATION_INVALID")
+    elif operation not in RUNTIME_PRIVILEGE_OPERATIONS or value["confirmation"] != RUNTIME_PRIVILEGE_CONFIRMATIONS[operation]:
         reject("SUPERVISOR_AUTHORIZATION_OPERATION_INVALID")
     if not isinstance(value["nonce"], str) or not SHA256.fullmatch(value["nonce"]):
         reject("SUPERVISOR_AUTHORIZATION_NONCE_INVALID")
@@ -405,7 +533,12 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
     now = now.astimezone(timezone.utc)
     if created > now + timedelta(minutes=5) or now >= expires or expires <= created or expires - created > timedelta(hours=24) or now - created > timedelta(hours=24):
         reject("SUPERVISOR_AUTHORIZATION_TIME_INVALID")
-    validate_parameters(operation, value["parameters"])
+    if is_v2:
+        validate_parameters(operation, value["parameters"])
+    else:
+        validate_runtime_privilege_parameters(value["parameters"], operation)
+        if operation == "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT" and value["authorization_id"] == value["parameters"]["original_operation_id"]:
+            reject("SUPERVISOR_RUNTIME_PRIVILEGE_IDENTIFIER_INVALID")
     return value
 
 
@@ -469,7 +602,7 @@ def command_for(bundle_root: Path, authorization: dict[str, Any]) -> list[str]:
 
 
 def validate_runtime_secret_boundary(bundle_root: Path, operation: str) -> None:
-    if operation not in ("PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"):
+    if operation not in ("PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", *RUNTIME_PRIVILEGE_OPERATIONS):
         return
     validator = bundle_root / "chenyida_erp_site/scripts/runtime-secret-file-policy.py"
     policy = bundle_root / "chenyida_erp_site/operations/runtime-secret-file-policy-v1.json"
@@ -568,6 +701,391 @@ def validate_runtime_probe_receipt(parameters: dict[str, Any], expected_bundle_d
     return value
 
 
+def validate_runtime_privilege_release_manifest(parameters: dict[str, Any], expected_bundle_digest: str,
+                                                *, require_fresh: bool, now: datetime | None = None) -> dict[str, Any]:
+    manifest_path = Path(parameters["release_manifest"])
+    raw, _ = trusted_regular_file(manifest_path, 0o440, maximum=MAX_JSON_BYTES, code="SUPERVISOR_RUNTIME_PRIVILEGE_RELEASE_MANIFEST_INVALID")
+    if sha256(raw) != parameters["release_manifest_sha256"]:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_RELEASE_MANIFEST_INVALID")
+    value = strict_json(raw, "SUPERVISOR_RUNTIME_PRIVILEGE_RELEASE_MANIFEST_INVALID")
+    if (
+        raw != canonical_json(value)
+        or not isinstance(value, dict)
+        or value.get("schema_version") != 2
+        or value.get("contract") != "chenyida-erp-release-manifest/v2"
+        or value.get("promotion_status") != "ELIGIBLE"
+        or value.get("allowed_deployment_classes") != [parameters["deployment_class"]]
+    ):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_RELEASE_MANIFEST_INVALID")
+    control = exact_fields(value.get("control"), {
+        "supervisor_bundle_sha256", "image_evidence_authorization_sha256",
+        "release_gate_authorization_sha256", "manifest_authorization_sha256",
+    }, "SUPERVISOR_RUNTIME_PRIVILEGE_RELEASE_MANIFEST_INVALID")
+    if control["supervisor_bundle_sha256"] != expected_bundle_digest:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_RELEASE_MANIFEST_INVALID")
+    generated = parse_time(value.get("generated_at"), "SUPERVISOR_RUNTIME_PRIVILEGE_RELEASE_MANIFEST_INVALID")
+    expires = parse_time(value.get("expires_at"), "SUPERVISOR_RUNTIME_PRIVILEGE_RELEASE_MANIFEST_INVALID")
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    if (
+        expires <= generated
+        or expires - generated > timedelta(days=7)
+        or generated > current + timedelta(minutes=5)
+        or (require_fresh and current >= expires)
+    ):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_RELEASE_MANIFEST_INVALID")
+    return value
+
+
+def validate_runtime_privilege_probe_receipt(parameters: dict[str, Any], expected_bundle_digest: str, now: datetime | None = None,
+                                             operation: str | None = None, probe_root: Path = RUNTIME_PROBE_ROOT) -> dict[str, Any]:
+    validate_runtime_privilege_parameters(parameters, operation)
+    recovery = operation == "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT"
+    effective_operation = parameters["original_operation"] if recovery else RUNTIME_PRIVILEGE_OPERATIONS[operation]
+    manifest = validate_runtime_privilege_release_manifest(
+        parameters, expected_bundle_digest, require_fresh=not recovery, now=now,
+    )
+    if effective_operation == "BOOTSTRAP":
+        return manifest
+    receipt_path = Path(parameters["runtime_probe_receipt"])
+    raw, _ = trusted_regular_file(receipt_path, 0o400, maximum=64 * 1024, code="SUPERVISOR_RUNTIME_PROBE_FILE_INVALID")
+    if sha256(raw) != parameters["runtime_probe_receipt_sha256"]:
+        reject("SUPERVISOR_RUNTIME_PROBE_DIGEST_MISMATCH")
+    preview = strict_json(raw, "SUPERVISOR_RUNTIME_PROBE_JSON_INVALID")
+    if not isinstance(preview, dict):
+        reject("SUPERVISOR_RUNTIME_PROBE_JSON_INVALID")
+    selectors = exact_fields(preview.get("selectors"), {"caddy", "postgres", "web", "worker"}, "SUPERVISOR_RUNTIME_PROBE_SELECTORS_INVALID")
+    synthetic_parameters = {
+        "release_manifest": "/unused/release-manifest.json",
+        "release_manifest_sha256": parameters["release_manifest_sha256"],
+        "postdeploy_root": "/unused/postdeploy",
+        "identity_root": "/unused/identity",
+        "reader_gid": 1,
+        "run_id": "runtime-privilege-probe-validation",
+        "runtime_guard_contract": RUNTIME_GUARD_CONTRACT,
+        "runtime_guard_mode": POST_DEPLOY_RUNTIME_GUARD_MODE,
+        "runtime_policy_sha256": parameters["runtime_policy_sha256"],
+        "deployment_class": parameters["deployment_class"],
+        "deployment_id": parameters["deployment_id"],
+        "compose_project": RUNTIME_COMPOSE_PROJECT,
+        "runtime_configuration_sha256": parameters["runtime_configuration_sha256"],
+        "runtime_probe_receipt": parameters["runtime_probe_receipt"],
+        "runtime_probe_receipt_sha256": parameters["runtime_probe_receipt_sha256"],
+        "compose_project_root": parameters["compose_project_root"],
+        "caddy_container": selectors["caddy"],
+        "postgres_container": parameters["postgres_container"],
+        "web_container": selectors["web"],
+        "worker_container": selectors["worker"],
+    }
+    value = validate_runtime_probe_receipt(synthetic_parameters, expected_bundle_digest, now, probe_root)
+    postgres = value["services"][1]
+    if postgres["service"] != "postgres" or postgres["container_id"] != parameters["postgres_container_id"]:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_CONTAINER_MISMATCH")
+    return value
+
+
+def validate_original_runtime_privilege_authorization_consumed(parameters: dict[str, Any], expected_bundle_digest: str,
+                                                                 consumed_root: Path = AUTHORIZATION_CONSUMED_ROOT) -> dict[str, Any]:
+    validate_runtime_privilege_parameters(parameters, "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT")
+    if consumed_root == AUTHORIZATION_CONSUMED_ROOT:
+        trusted_directory(AUTHORIZATION_ROOT, {0o700}, "SUPERVISOR_AUTHORIZATION_ROOT_INVALID")
+    trusted_directory(consumed_root, {0o700}, "SUPERVISOR_AUTHORIZATION_ROOT_INVALID")
+    original_id = parameters["original_operation_id"]
+    original_digest = parameters["original_authorization_sha256"]
+    file = consumed_root / f"{original_id}.{original_digest}.json"
+    raw, _ = trusted_regular_file(file, 0o400, code="SUPERVISOR_RUNTIME_PRIVILEGE_ORIGINAL_AUTHORIZATION_INVALID")
+    if sha256(raw) != original_digest:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_ORIGINAL_AUTHORIZATION_INVALID")
+    preview = strict_json(raw, "SUPERVISOR_RUNTIME_PRIVILEGE_ORIGINAL_AUTHORIZATION_INVALID")
+    try:
+        created = parse_time(preview["created_at"], "SUPERVISOR_RUNTIME_PRIVILEGE_ORIGINAL_AUTHORIZATION_INVALID")
+        expires = parse_time(preview["expires_at"], "SUPERVISOR_RUNTIME_PRIVILEGE_ORIGINAL_AUTHORIZATION_INVALID")
+    except (KeyError, TypeError):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_ORIGINAL_AUTHORIZATION_INVALID")
+    validation_time = created + (expires - created) / 2
+    try:
+        value = validate_authorization(preview, expected_bundle_digest, validation_time)
+    except SupervisorError:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_ORIGINAL_AUTHORIZATION_INVALID")
+    if raw != canonical_json(value) or value["authorization_id"] != original_id \
+        or value["operation"] == "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT" \
+        or RUNTIME_PRIVILEGE_OPERATIONS.get(value["operation"]) != parameters["original_operation"]:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_ORIGINAL_AUTHORIZATION_INVALID")
+    original_parameters = value["parameters"]
+    stable_fields = RUNTIME_PRIVILEGE_BASE_PARAMETER_FIELDS
+    if any(original_parameters[field] != parameters[field] for field in stable_fields):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_ORIGINAL_AUTHORIZATION_INVALID")
+    return value
+
+
+def acquire_global_release_lock(path: Path = GLOBAL_RELEASE_LOCK) -> int:
+    try:
+        parent = os.lstat(path.parent)
+    except OSError:
+        reject("SUPERVISOR_GLOBAL_RELEASE_LOCK_INVALID")
+    if not stat.S_ISDIR(parent.st_mode) or stat.S_ISLNK(parent.st_mode) or parent.st_uid != 0 or parent.st_gid != 0 or stat.S_IMODE(parent.st_mode) & 0o022:
+        reject("SUPERVISOR_GLOBAL_RELEASE_LOCK_INVALID")
+    try:
+        descriptor = os.open(path, os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    except OSError:
+        reject("SUPERVISOR_GLOBAL_RELEASE_LOCK_INVALID")
+    try:
+        os.fchown(descriptor, 0, 0)
+        os.fchmod(descriptor, 0o600)
+        opened = os.fstat(descriptor)
+        pointed = os.lstat(path)
+        if not stat.S_ISREG(opened.st_mode) or opened.st_uid != 0 or opened.st_gid != 0 or opened.st_nlink != 1 or stat.S_IMODE(opened.st_mode) != 0o600 \
+            or pointed.st_dev != opened.st_dev or pointed.st_ino != opened.st_ino or stat.S_ISLNK(pointed.st_mode):
+            reject("SUPERVISOR_GLOBAL_RELEASE_LOCK_INVALID")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            reject("SUPERVISOR_GLOBAL_RELEASE_LOCK_BUSY")
+        os.set_inheritable(descriptor, True)
+        return descriptor
+    except Exception:
+        os.close(descriptor)
+        raise
+
+
+def assert_no_runtime_privilege_interlock(bundle_root: Path) -> None:
+    helper = bundle_root / "chenyida_erp_site/scripts/postgresql-runtime-privilege-interlock.sh"
+    environment = {"PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent"}
+    try:
+        result = subprocess.run(
+            ["/bin/sh", "-c", '. "$1"; assert_no_chenyida_postgresql_runtime_privilege_interlock', "sh", str(helper)],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_INTERLOCK_INVALID")
+    if result.returncode != 0:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_RECOVERY_REQUIRED")
+
+
+def _docker(arguments: list[str], *, timeout: int, stdout: int = subprocess.PIPE) -> subprocess.CompletedProcess[bytes]:
+    environment = {"PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent"}
+    try:
+        return subprocess.run(["/usr/bin/docker", *arguments], env=environment, stdin=subprocess.DEVNULL, stdout=stdout, stderr=subprocess.DEVNULL, check=False, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_NODE_RUNTIME_FAILED")
+
+
+def prepare_runtime_privilege_node(authorization_digest: str) -> tuple[Path, Path]:
+    if not SHA256.fullmatch(authorization_digest):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_NODE_RUNTIME_FAILED")
+    inspected = _docker(["image", "inspect", RUNTIME_PRIVILEGE_NODE_IMAGE], timeout=15, stdout=subprocess.DEVNULL)
+    if inspected.returncode != 0:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_NODE_IMAGE_UNAVAILABLE")
+    runtime_root = Path(tempfile.mkdtemp(prefix="chenyida-erp-runtime-privilege-node.", dir="/tmp"))
+    os.chown(runtime_root, 0, 0)
+    os.chmod(runtime_root, 0o700)
+    container_name = f"cyd-runtime-privilege-node-{authorization_digest}"
+    container_id: str | None = None
+    try:
+        try:
+            created = _docker([
+                "create", "--pull=never", "--name", container_name,
+                "--label", f"chenyida.erp.runtime-privilege-node={authorization_digest}",
+                "--network", "none", "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+                "--memory", "64m", "--memory-swap", "64m", "--cpus", "0.25", "--pids-limit", "16",
+                RUNTIME_PRIVILEGE_NODE_IMAGE, "true",
+            ], timeout=30)
+            candidate = created.stdout.decode("ascii", errors="strict").strip() if created.returncode == 0 else ""
+            if not re.fullmatch(r"[0-9a-f]{64}", candidate):
+                reject("SUPERVISOR_RUNTIME_PRIVILEGE_NODE_RUNTIME_FAILED")
+            container_id = candidate
+            copied = _docker(["cp", f"{container_id}:/usr/local/bin/node", str(runtime_root / "node")], timeout=30)
+            if copied.returncode != 0:
+                reject("SUPERVISOR_RUNTIME_PRIVILEGE_NODE_RUNTIME_FAILED")
+            node_path = runtime_root / "node"
+            node_metadata = os.lstat(node_path)
+            if not stat.S_ISREG(node_metadata.st_mode) or stat.S_ISLNK(node_metadata.st_mode) or node_metadata.st_nlink != 1:
+                reject("SUPERVISOR_RUNTIME_PRIVILEGE_NODE_RUNTIME_FAILED")
+            os.chown(node_path, 0, 0)
+            os.chmod(node_path, 0o555)
+            node_metadata = os.lstat(node_path)
+            if node_metadata.st_uid != 0 or node_metadata.st_gid != 0 or stat.S_IMODE(node_metadata.st_mode) != 0o555 or node_metadata.st_nlink != 1:
+                reject("SUPERVISOR_RUNTIME_PRIVILEGE_NODE_RUNTIME_FAILED")
+            with open(node_path, "rb") as handle:
+                os.fsync(handle.fileno())
+        finally:
+            if container_id is not None:
+                ownership = _docker(["inspect", "--format", '{{index .Config.Labels "chenyida.erp.runtime-privilege-node"}}|{{.Name}}', container_id], timeout=15)
+                expected = f"{authorization_digest}|/{container_name}\n".encode("ascii")
+                if ownership.returncode != 0 or ownership.stdout != expected:
+                    reject("SUPERVISOR_RUNTIME_PRIVILEGE_NODE_OWNERSHIP_INVALID")
+                removed = _docker(["rm", "-f", container_id], timeout=30, stdout=subprocess.DEVNULL)
+                if removed.returncode != 0:
+                    reject("SUPERVISOR_RUNTIME_PRIVILEGE_NODE_CLEANUP_FAILED")
+    except Exception:
+        cleanup_runtime_privilege_node(runtime_root)
+        raise
+    return runtime_root, node_path
+
+
+def cleanup_runtime_privilege_node(runtime_root: Path | None) -> None:
+    if runtime_root is None:
+        return
+    try:
+        resolved = runtime_root.resolve(strict=True)
+    except OSError:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_NODE_CLEANUP_FAILED")
+    if resolved.parent != Path("/tmp") or not resolved.name.startswith("chenyida-erp-runtime-privilege-node.") or resolved == Path("/tmp"):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_NODE_CLEANUP_FAILED")
+    shutil.rmtree(resolved)
+
+
+def runtime_privilege_probe_binding(parameters: dict[str, Any], operation: str) -> str:
+    if operation == "RECONCILE":
+        return parameters["runtime_probe_receipt_sha256"]
+    body = {
+        "schema_version": 1,
+        "contract": "chenyida-erp-postgresql-bootstrap-runtime-binding/v1",
+        "runtime_guard_mode": parameters["runtime_guard_mode"],
+        "release_manifest_sha256": parameters["release_manifest_sha256"],
+        "runtime_configuration_sha256": parameters["runtime_configuration_sha256"],
+        "deployment_class": parameters["deployment_class"],
+        "deployment_id": parameters["deployment_id"],
+        "postgres_container": parameters["postgres_container"],
+        "postgres_container_id": parameters["postgres_container_id"],
+        "expected_database": parameters["expected_database"],
+        "expected_database_oid": parameters["expected_database_oid"],
+        "expected_system_identifier": parameters["expected_system_identifier"],
+        "expected_database_marker": parameters["expected_database_marker"],
+    }
+    return sha256(canonical_json(body))
+
+
+def runtime_privilege_context(authorization: dict[str, Any], authorization_digest: str) -> dict[str, Any]:
+    parameters = authorization["parameters"]
+    recovery = authorization["operation"] == "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT"
+    operation = parameters["original_operation"] if recovery else RUNTIME_PRIVILEGE_OPERATIONS[authorization["operation"]]
+    return {
+        "schema_version": 2,
+        "contract": "chenyida-erp-postgresql-runtime-privilege-control-context/v2",
+        "evidence_scope": "ACTUAL_CONTROLLED",
+        "operation_id": parameters["original_operation_id"] if recovery else authorization["authorization_id"],
+        "operation": operation,
+        "execution_mode": "RECOVERY" if recovery else "ORIGINAL",
+        "execution_authorization_id": authorization["authorization_id"],
+        "execution_authorization_sha256": authorization_digest,
+        "expected_intent_sha256": parameters["expected_intent_sha256"] if recovery else None,
+        "deployment_class": parameters["deployment_class"],
+        "deployment_id": parameters["deployment_id"],
+        "state_root": str(RUNTIME_PRIVILEGE_STATE_ROOT),
+        "runtime_secret_root": str(RUNTIME_SECRET_ROOT),
+        "backup_credential_root": parameters["backup_credential_root"],
+        "backup_capture_service_file": parameters["backup_capture_service_file"],
+        "backup_capture_service": parameters["backup_capture_service"],
+        "credential_generation_id": parameters["credential_generation_id"],
+        "backup_root": parameters["backup_root"],
+        "release_manifest": parameters["release_manifest"],
+        "release_manifest_sha256": parameters["release_manifest_sha256"],
+        "runtime_guard_mode": parameters["runtime_guard_mode"],
+        "postgres_container_name": parameters["postgres_container"],
+        "postgres_container_id": parameters["postgres_container_id"],
+        "expected_database": parameters["expected_database"],
+        "expected_database_oid": parameters["expected_database_oid"],
+        "expected_system_identifier": parameters["expected_system_identifier"],
+        "expected_database_marker": parameters["expected_database_marker"],
+        "supervisor_bundle_sha256": authorization["supervisor_bundle_sha256"],
+        "authorization_sha256": parameters["original_authorization_sha256"] if recovery else authorization_digest,
+        "runtime_configuration_sha256": parameters["runtime_configuration_sha256"],
+        "runtime_probe_binding_sha256": runtime_privilege_probe_binding(parameters, operation),
+    }
+
+
+def run_runtime_privilege_runner(node_path: Path, bundle_root: Path, context: dict[str, Any], phase: str, lock_descriptor: int) -> dict[str, Any]:
+    confirmations = {
+        "prepare": "PREPARE_DURABLE_INTENT_BEFORE_AUTHORIZATION",
+        "execute": "EXECUTE_EXACT_PREPARED_RUNTIME_PRIVILEGE_INTENT",
+        "recover-prepare": "PREPARE_DURABLE_RECOVERY_AUTHORIZATION",
+        "recover-execute": "EXECUTE_EXACT_PREPARED_RUNTIME_PRIVILEGE_RECOVERY",
+    }
+    if phase not in confirmations:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_RUNNER_PHASE_INVALID")
+    confirmation = confirmations[phase]
+    runner = bundle_root / "chenyida_erp_site/scripts/postgresql-runtime-privilege-runner.mjs"
+    environment = {
+        "PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent",
+        "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES", "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+        "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+        "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(bundle_root / "chenyida_erp_site"),
+        "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": context["supervisor_bundle_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": context["execution_authorization_sha256"],
+        "ERP_RELEASE_SUPERVISOR_ORIGINAL_AUTHORIZATION_CONSUMED": "YES" if context["execution_mode"] == "RECOVERY" else "NO",
+    }
+    try:
+        result = subprocess.run(
+            [str(node_path), str(runner), phase, confirmation],
+            env=environment,
+            input=canonical_json(context),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=900,
+            pass_fds=(lock_descriptor,),
+        )
+    except (OSError, subprocess.SubprocessError):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_RUNNER_FAILED")
+    if result.returncode != 0 or result.stderr != b"" or len(result.stdout) < 2 or len(result.stdout) > 64 * 1024:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_RUNNER_FAILED")
+    value = strict_json(result.stdout, "SUPERVISOR_RUNTIME_PRIVILEGE_RUNNER_RESPONSE_INVALID")
+    if result.stdout != canonical_json(value) or not isinstance(value, dict) or value.get("operation_id") != context["operation_id"]:
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_RUNNER_RESPONSE_INVALID")
+    if phase == "prepare":
+        expected_result = {"PREPARED", "ALREADY_PREPARED"}
+        expected_fields = {"result", "operation_id", "intent_sha256", "plan_sha256"}
+        digest_fields = {"intent_sha256", "plan_sha256"}
+    elif phase == "execute":
+        expected_result = {"VERIFIED"}
+        expected_fields = {"result", "operation_id", "intent_sha256", "receipt_sha256"}
+        digest_fields = {"intent_sha256", "receipt_sha256"}
+    elif phase == "recover-prepare":
+        expected_result = {"RECOVERY_PREPARED"}
+        expected_fields = {"result", "operation_id", "intent_sha256", "recovery_record_sha256", "decision"}
+        digest_fields = {"intent_sha256", "recovery_record_sha256"}
+        if value.get("decision") not in {"ARCHIVE_COMMITTED", "CAPTURE_AND_VERIFY", "DISPATCH_TRANSACTION", "FINISH_PUBLICATION", "QUARANTINE", "RESUME_AUTHORIZATION", "RETRY_TRANSACTION"}:
+            reject("SUPERVISOR_RUNTIME_PRIVILEGE_RUNNER_RESPONSE_INVALID")
+    elif value.get("result") == "VERIFIED":
+        expected_result = {"VERIFIED"}
+        expected_fields = {"result", "operation_id", "intent_sha256", "recovery_record_sha256", "receipt_sha256"}
+        digest_fields = {"intent_sha256", "recovery_record_sha256", "receipt_sha256"}
+    else:
+        expected_result = {"QUARANTINED"}
+        expected_fields = {"result", "operation_id", "intent_sha256", "recovery_record_sha256", "quarantine_state_sha256"}
+        digest_fields = {"intent_sha256", "recovery_record_sha256", "quarantine_state_sha256"}
+    if set(value) != expected_fields or value.get("result") not in expected_result or any(not isinstance(value.get(field), str) or not SHA256.fullmatch(value[field]) for field in digest_fields):
+        reject("SUPERVISOR_RUNTIME_PRIVILEGE_RUNNER_RESPONSE_INVALID")
+    return value
+
+
+def run_runtime_privilege_authorization(bundle_root: Path, authorization_path: Path, authorization: dict[str, Any], authorization_digest: str, lock_descriptor: int | None = None) -> dict[str, Any]:
+    owns_lock = lock_descriptor is None
+    if lock_descriptor is None:
+        lock_descriptor = acquire_global_release_lock()
+    runtime_root: Path | None = None
+    try:
+        recovery = authorization["operation"] == "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT"
+        if recovery:
+            validate_original_runtime_privilege_authorization_consumed(authorization["parameters"], authorization["supervisor_bundle_sha256"])
+        runtime_root, node_path = prepare_runtime_privilege_node(authorization_digest)
+        context = runtime_privilege_context(authorization, authorization_digest)
+        run_runtime_privilege_runner(node_path, bundle_root, context, "recover-prepare" if recovery else "prepare", lock_descriptor)
+        consume_authorization(authorization_path, authorization, authorization_digest)
+        return run_runtime_privilege_runner(node_path, bundle_root, context, "recover-execute" if recovery else "execute", lock_descriptor)
+    finally:
+        try:
+            cleanup_runtime_privilege_node(runtime_root)
+        finally:
+            if owns_lock:
+                os.close(lock_descriptor)
+
+
 def consume_authorization(path: Path, authorization: dict[str, Any], digest: str, pending_root: Path = AUTHORIZATION_PENDING_ROOT, consumed_root: Path = AUTHORIZATION_CONSUMED_ROOT) -> Path:
     if pending_root == AUTHORIZATION_PENDING_ROOT and consumed_root == AUTHORIZATION_CONSUMED_ROOT:
         trusted_directory(AUTHORIZATION_ROOT, {0o700}, "SUPERVISOR_AUTHORIZATION_ROOT_INVALID")
@@ -605,26 +1123,40 @@ def main() -> None:
     verify_bundle(bundle_root, bundle_digest)
     authorization, authorization_digest, _ = load_authorization(authorization_path, bundle_digest)
     verify_candidate(authorization["parameters"])
-    validate_runtime_secret_boundary(bundle_root, authorization["operation"])
-    if authorization["operation"] == "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY":
-        validate_runtime_probe_receipt(authorization["parameters"], bundle_digest)
-    consume_authorization(authorization_path, authorization, authorization_digest)
-    site_root = bundle_root / "chenyida_erp_site"
-    command = command_for(bundle_root, authorization)
-    environment = {
-        "PATH": SAFE_PATH,
-        "LC_ALL": "C",
-        "LANG": "C",
-        "TZ": "UTC",
-        "HOME": "/nonexistent",
-        "GIT_CONFIG_NOSYSTEM": "1",
-        "GIT_CONFIG_GLOBAL": "/dev/null",
-        "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES",
-        "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(site_root),
-        "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": bundle_digest,
-        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": authorization_digest,
-    }
-    os.execve(command[0], command, environment)
+    lock_descriptor = acquire_global_release_lock()
+    try:
+        validate_runtime_secret_boundary(bundle_root, authorization["operation"])
+        if authorization["contract"] == RUNTIME_PRIVILEGE_AUTHORIZATION_CONTRACT:
+            validate_runtime_privilege_probe_receipt(authorization["parameters"], bundle_digest, operation=authorization["operation"])
+            result = run_runtime_privilege_authorization(
+                bundle_root, authorization_path, authorization, authorization_digest, lock_descriptor,
+            )
+            sys.stdout.buffer.write(canonical_json(result))
+            return
+        if authorization["operation"] == "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY":
+            validate_runtime_probe_receipt(authorization["parameters"], bundle_digest)
+        assert_no_runtime_privilege_interlock(bundle_root)
+        consume_authorization(authorization_path, authorization, authorization_digest)
+        site_root = bundle_root / "chenyida_erp_site"
+        command = command_for(bundle_root, authorization)
+        environment = {
+            "PATH": SAFE_PATH,
+            "LC_ALL": "C",
+            "LANG": "C",
+            "TZ": "UTC",
+            "HOME": "/nonexistent",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES",
+            "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+            "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+            "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(site_root),
+            "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": bundle_digest,
+            "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": authorization_digest,
+        }
+        os.execve(command[0], command, environment)
+    finally:
+        os.close(lock_descriptor)
 
 
 if __name__ == "__main__":

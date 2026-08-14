@@ -33,33 +33,64 @@ SET statement_timeout = '60s';
   \quit 3
 \endif
 
-SELECT (
-  current_database()=:'expected_database'
-  AND shobj_description(database.oid,'pg_database')=:'expected_marker'
-  AND control.system_identifier::text=:'expected_system_identifier'
-  AND current_user=session_user
-  AND current_user='postgres'
-  AND current_setting('server_version_num')='170010'
-  AND current_setting('default_transaction_read_only')='off'
-  AND NOT EXISTS (
-    SELECT 1 FROM pg_db_role_setting setting
-    CROSS JOIN LATERAL unnest(setting.setconfig) item
-    WHERE (setting.setrole=0 OR setting.setrole IN (SELECT oid FROM pg_roles WHERE rolname LIKE 'chenyida\_erp\_%' ESCAPE '\'))
-      AND (setting.setdatabase=0 OR setting.setdatabase=database.oid)
-      AND item='default_transaction_read_only=on'
-  )
-  AND NOT pg_is_in_recovery()
-  AND current_setting('listen_addresses')=''
-  AND pg_get_userbyid(database.datdba)=:'migration_owner'
-) AS synthetic_target_valid
-FROM pg_database database
-CROSS JOIN pg_control_system() control
-WHERE database.datname=current_database()
-\gset
-\if :synthetic_target_valid
+\if :{?controlled_runtime_mode}
+  SELECT (
+    current_database()=:'expected_database'
+    AND shobj_description(database.oid,'pg_database')=:'expected_marker'
+    AND control.system_identifier::text=:'expected_system_identifier'
+    AND current_user=session_user
+    AND EXISTS (SELECT 1 FROM pg_roles role WHERE role.rolname=current_user AND role.rolsuper)
+    AND current_setting('server_version_num')='170010'
+    AND current_setting('default_transaction_read_only')='off'
+    AND NOT EXISTS (
+      SELECT 1 FROM pg_db_role_setting setting
+      CROSS JOIN LATERAL unnest(setting.setconfig) item
+      WHERE (setting.setrole=0 OR setting.setrole IN (SELECT oid FROM pg_roles WHERE rolname LIKE 'chenyida\_erp\_%' ESCAPE '\'))
+        AND (setting.setdatabase=0 OR setting.setdatabase=database.oid)
+        AND item='default_transaction_read_only=on'
+    )
+    AND NOT pg_is_in_recovery()
+    AND current_setting('listen_addresses')='*'
+    AND pg_get_userbyid(database.datdba) IN (:'migration_owner',current_user)
+  ) AS controlled_target_valid
+  FROM pg_database database
+  CROSS JOIN pg_control_system() control
+  WHERE database.datname=current_database()
+  \gset
+  \if :controlled_target_valid
+  \else
+    \echo 'RUNTIME_PRIVILEGE_STATE_CONTROLLED_TARGET_INVALID'
+    \quit 3
+  \endif
 \else
-  \echo 'RUNTIME_PRIVILEGE_STATE_SYNTHETIC_TARGET_INVALID'
-  \quit 3
+  SELECT (
+    current_database()=:'expected_database'
+    AND shobj_description(database.oid,'pg_database')=:'expected_marker'
+    AND control.system_identifier::text=:'expected_system_identifier'
+    AND current_user=session_user
+    AND current_user='postgres'
+    AND current_setting('server_version_num')='170010'
+    AND current_setting('default_transaction_read_only')='off'
+    AND NOT EXISTS (
+      SELECT 1 FROM pg_db_role_setting setting
+      CROSS JOIN LATERAL unnest(setting.setconfig) item
+      WHERE (setting.setrole=0 OR setting.setrole IN (SELECT oid FROM pg_roles WHERE rolname LIKE 'chenyida\_erp\_%' ESCAPE '\'))
+        AND (setting.setdatabase=0 OR setting.setdatabase=database.oid)
+        AND item='default_transaction_read_only=on'
+    )
+    AND NOT pg_is_in_recovery()
+    AND current_setting('listen_addresses')=''
+    AND pg_get_userbyid(database.datdba)=:'migration_owner'
+  ) AS synthetic_target_valid
+  FROM pg_database database
+  CROSS JOIN pg_control_system() control
+  WHERE database.datname=current_database()
+  \gset
+  \if :synthetic_target_valid
+  \else
+    \echo 'RUNTIME_PRIVILEGE_STATE_SYNTHETIC_TARGET_INVALID'
+    \quit 3
+  \endif
 \endif
 
 CREATE TEMP TABLE cyd_runtime_role_semantics ON COMMIT PRESERVE ROWS AS

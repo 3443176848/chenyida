@@ -133,14 +133,11 @@ PREPARED_REPORT="$ARTIFACT_ROOT/.$RUN_ID.release-gate-report.prepared.json"
 [ ! -e "$PREPARED_PLAN" ] && [ ! -L "$PREPARED_PLAN" ] || { echo "prepared release gate plan already exists" >&2; PREPARED_PLAN=""; PREPARED_REPORT=""; exit 1; }
 [ ! -e "$PREPARED_REPORT" ] && [ ! -L "$PREPARED_REPORT" ] || { echo "prepared release gate report already exists" >&2; PREPARED_PLAN=""; PREPARED_REPORT=""; exit 1; }
 
-LOCK_FILE=/run/lock/chenyida-erp-release-gate-v1.lock
-if [ ! -e "$LOCK_FILE" ]; then
-  (umask 077; set -C; : > "$LOCK_FILE") || { echo "release gate lock creation failed" >&2; exit 1; }
-fi
-[ -f "$LOCK_FILE" ] && [ ! -L "$LOCK_FILE" ] && [ "$(stat -c '%u:%g:%a:%h' "$LOCK_FILE")" = "0:0:600:1" ] || { echo "release gate lock is untrusted" >&2; exit 1; }
-exec 9<>"$LOCK_FILE"
-flock -n 9 || { echo "another release gate is active" >&2; exit 1; }
-[ "$(stat -c '%u:%g:%a:%h' "$LOCK_FILE")" = "0:0:600:1" ] || { echo "release gate lock ownership or mode is invalid" >&2; exit 1; }
+LOCK_HELPER="$SCRIPT_DIR/release-gate-lock.sh"
+[ -f "$LOCK_HELPER" ] && [ ! -L "$LOCK_HELPER" ] || { echo "release gate lock helper is untrusted" >&2; exit 1; }
+# shellcheck source=release-gate-lock.sh
+. "$LOCK_HELPER"
+acquire_chenyida_release_gate_lock || exit 1
 ERP_RELEASE_GATE_LOCK_HELD=YES; export ERP_RELEASE_GATE_LOCK_HELD
 NODE_BOOTSTRAP_NAME="cyd-release-gate-node-$AUTHORIZATION_SHA256"
 

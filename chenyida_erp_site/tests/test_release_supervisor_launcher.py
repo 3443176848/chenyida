@@ -105,6 +105,61 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         file.chmod(0o400)
         return file, value
 
+    def runtime_privilege_parameters(self, recovery=False, original_operation="BOOTSTRAP"):
+        parameters = {
+            "backup_root": str(supervisor.RUNTIME_PRIVILEGE_BACKUP_ROOT),
+            "backup_credential_root": "/run/chenyida-erp/credentials",
+            "backup_capture_service_file": "/run/chenyida-erp/credentials/pg_backup_capture_service.conf",
+            "backup_capture_service": "erp_backup_capture",
+            "compose_project_root": "/opt/erp/chenyida_erp_site",
+            "credential_generation_id": "credential-generation-001",
+            "deployment_class": "UAT",
+            "deployment_id": "chenyida-erp",
+            "expected_database": "chenyida_erp",
+            "expected_database_marker": "chenyida-erp-deployment/v2:UAT:chenyida-erp",
+            "expected_database_oid": "16384",
+            "expected_system_identifier": "1234567890123456789",
+            "postgres_container": "chenyida-erp-parallel-postgres-1",
+            "postgres_container_id": "2" * 64,
+            "release_manifest": "/var/lib/chenyida-erp/release-artifacts/fixture/release-manifest.json",
+            "release_manifest_sha256": "3" * 64,
+            "runtime_configuration_sha256": "4" * 64,
+            "runtime_guard_mode": (
+                supervisor.PRE_DEPLOY_POSTGRESQL_BOOTSTRAP_GUARD_MODE
+                if original_operation == "BOOTSTRAP"
+                else supervisor.POST_DEPLOY_RUNTIME_GUARD_MODE
+            ),
+            "runtime_policy_sha256": supervisor.RUNTIME_POLICY_SHA256,
+        }
+        if original_operation == "RECONCILE":
+            parameters.update({
+                "runtime_probe_receipt": "/var/lib/chenyida-erp/runtime-probes/runtime-privilege.runtime-configuration-probe.json",
+                "runtime_probe_receipt_sha256": "5" * 64,
+            })
+        if recovery:
+            parameters.update({
+                "expected_intent_sha256": "6" * 64,
+                "original_authorization_sha256": "7" * 64,
+                "original_operation": original_operation,
+                "original_operation_id": "runtime-privilege-original-001",
+            })
+        return parameters
+
+    def runtime_privilege_authorization(self, digest, now, recovery=False):
+        operation = "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT" if recovery else "BOOTSTRAP_POSTGRESQL_RUNTIME_PRIVILEGES"
+        return {
+            "schema_version": 3,
+            "contract": supervisor.RUNTIME_PRIVILEGE_AUTHORIZATION_CONTRACT,
+            "authorization_id": "runtime-privilege-recovery-001" if recovery else "runtime-privilege-original-001",
+            "created_at": utc(now - timedelta(minutes=1)),
+            "expires_at": utc(now + timedelta(minutes=10)),
+            "supervisor_bundle_sha256": digest,
+            "operation": operation,
+            "parameters": self.runtime_privilege_parameters(recovery),
+            "nonce": "8" * 64,
+            "confirmation": supervisor.RUNTIME_PRIVILEGE_CONFIRMATIONS[operation],
+        }
+
     def test_content_addressed_bundle_rejects_tampering_and_extra_files(self):
         root, digest, launcher, manifest = self.bundle()
         self.assertEqual(supervisor.verify_bundle(root, digest, launcher), manifest)
@@ -249,13 +304,165 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_NOT_CANONICAL"):
             supervisor.load_authorization(file, digest, pending, now)
 
+    def test_runtime_privilege_v3_authorization_is_exact_and_recovery_binds_the_original_intent(self):
+        now = datetime(2026, 8, 13, 1, 0, tzinfo=timezone.utc)
+        digest = "f" * 64
+        original = self.runtime_privilege_authorization(digest, now)
+        self.assertEqual(supervisor.validate_authorization(original, digest, now), original)
+        original_context = supervisor.runtime_privilege_context(original, "9" * 64)
+        self.assertEqual(original_context["schema_version"], 2)
+        self.assertEqual(original_context["execution_mode"], "ORIGINAL")
+        self.assertEqual(original_context["operation"], "BOOTSTRAP")
+        self.assertEqual(original_context["execution_authorization_sha256"], "9" * 64)
+        self.assertIsNone(original_context["expected_intent_sha256"])
+
+        recovery = self.runtime_privilege_authorization(digest, now, recovery=True)
+        self.assertEqual(supervisor.validate_authorization(recovery, digest, now), recovery)
+        recovery_context = supervisor.runtime_privilege_context(recovery, "a" * 64)
+        self.assertEqual(recovery_context["execution_mode"], "RECOVERY")
+        self.assertEqual(recovery_context["operation_id"], recovery["parameters"]["original_operation_id"])
+        self.assertEqual(recovery_context["authorization_sha256"], "7" * 64)
+        self.assertEqual(recovery_context["execution_authorization_sha256"], "a" * 64)
+        self.assertEqual(recovery_context["expected_intent_sha256"], "6" * 64)
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_RUNTIME_PRIVILEGE_PARAMETERS_INVALID"):
+            supervisor.validate_authorization({**recovery, "parameters": {key: value for key, value in recovery["parameters"].items() if key != "expected_intent_sha256"}}, digest, now)
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_RUNTIME_PRIVILEGE_IDENTIFIER_INVALID"):
+            supervisor.validate_authorization({**recovery, "authorization_id": recovery["parameters"]["original_operation_id"]}, digest, now)
+
+    def test_bootstrap_uses_a_database_bound_predeploy_guard_and_reconcile_requires_postdeploy_evidence(self):
+        now = datetime(2026, 8, 13, 1, 0, tzinfo=timezone.utc)
+        bootstrap = self.runtime_privilege_parameters()
+        self.assertNotIn("runtime_probe_receipt", bootstrap)
+        self.assertEqual(
+            supervisor.validate_runtime_privilege_parameters(
+                bootstrap, "BOOTSTRAP_POSTGRESQL_RUNTIME_PRIVILEGES",
+            ),
+            bootstrap,
+        )
+        first = supervisor.runtime_privilege_probe_binding(bootstrap, "BOOTSTRAP")
+        second = supervisor.runtime_privilege_probe_binding(dict(bootstrap), "BOOTSTRAP")
+        self.assertRegex(first, r"^[0-9a-f]{64}$")
+        self.assertEqual(first, second)
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_RUNTIME_PRIVILEGE_BACKUP_ROOT_INVALID"):
+            supervisor.validate_runtime_privilege_parameters(
+                {**bootstrap, "backup_root": "/var/backups/another-root"},
+                "BOOTSTRAP_POSTGRESQL_RUNTIME_PRIVILEGES",
+            )
+        with patch.object(
+            supervisor,
+            "validate_runtime_privilege_release_manifest",
+            return_value={"promotion_status": "ELIGIBLE"},
+        ):
+            self.assertEqual(
+                supervisor.validate_runtime_privilege_probe_receipt(
+                    bootstrap, "f" * 64, now,
+                    operation="BOOTSTRAP_POSTGRESQL_RUNTIME_PRIVILEGES",
+                ),
+                {"promotion_status": "ELIGIBLE"},
+            )
+        reconcile = self.runtime_privilege_parameters(original_operation="RECONCILE")
+        self.assertEqual(
+            supervisor.validate_runtime_privilege_parameters(
+                reconcile, "RECONCILE_POSTGRESQL_RUNTIME_PRIVILEGES",
+            ),
+            reconcile,
+        )
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_RUNTIME_PRIVILEGE_PARAMETERS_INVALID"):
+            supervisor.validate_runtime_privilege_parameters(
+                {key: value for key, value in reconcile.items() if key != "runtime_probe_receipt"},
+                "RECONCILE_POSTGRESQL_RUNTIME_PRIVILEGES",
+            )
+
+    def test_recovery_requires_the_exact_consumed_original_authorization(self):
+        now = datetime(2026, 8, 13, 1, 0, tzinfo=timezone.utc)
+        digest = "f" * 64
+        consumed = self.temporary / "consumed"
+        consumed.mkdir(mode=0o700)
+        original = self.runtime_privilege_authorization(digest, now)
+        original_raw = supervisor.canonical_json(original)
+        original_digest = supervisor.sha256(original_raw)
+        file = consumed / f"{original['authorization_id']}.{original_digest}.json"
+        file.write_bytes(original_raw)
+        file.chmod(0o400)
+        recovery_parameters = self.runtime_privilege_parameters(recovery=True)
+        recovery_parameters["original_authorization_sha256"] = original_digest
+        self.assertEqual(
+            supervisor.validate_original_runtime_privilege_authorization_consumed(recovery_parameters, digest, consumed),
+            original,
+        )
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_RUNTIME_PRIVILEGE_ORIGINAL_AUTHORIZATION_INVALID"):
+            supervisor.validate_original_runtime_privilege_authorization_consumed({**recovery_parameters, "postgres_container_id": "a" * 64}, digest, consumed)
+
+    def test_runtime_privilege_supervisor_prepares_before_consumption_for_original_and_recovery(self):
+        now = datetime(2026, 8, 13, 1, 0, tzinfo=timezone.utc)
+        digest = "f" * 64
+        authorization_path = Path("/trusted/pending/runtime-privilege.json")
+        for recovery in (False, True):
+            authorization = self.runtime_privilege_authorization(digest, now, recovery=recovery)
+            authorization_digest = "a" * 64 if recovery else "9" * 64
+            events = []
+            context = supervisor.runtime_privilege_context(authorization, authorization_digest)
+
+            def run_runner(_node, _bundle, actual_context, phase, descriptor):
+                self.assertEqual(actual_context, context)
+                self.assertEqual(descriptor, 23)
+                events.append(phase)
+                if phase.endswith("prepare"):
+                    return {"result": "RECOVERY_PREPARED" if recovery else "PREPARED"}
+                return {"result": "VERIFIED"}
+
+            with patch.object(supervisor, "acquire_global_release_lock", return_value=23), \
+                patch.object(supervisor, "validate_original_runtime_privilege_authorization_consumed", side_effect=lambda *_: events.append("original-consumed")), \
+                patch.object(supervisor, "prepare_runtime_privilege_node", return_value=(Path("/tmp/runtime-node"), Path("/tmp/runtime-node/node"))), \
+                patch.object(supervisor, "runtime_privilege_context", return_value=context), \
+                patch.object(supervisor, "run_runtime_privilege_runner", side_effect=run_runner), \
+                patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("authorization-consumed")), \
+                patch.object(supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("node-cleaned")), \
+                patch.object(supervisor.os, "close", side_effect=lambda descriptor: events.append(f"lock-closed-{descriptor}")):
+                result = supervisor.run_runtime_privilege_authorization(Path("/trusted/bundle"), authorization_path, authorization, authorization_digest)
+            self.assertEqual(result, {"result": "VERIFIED"})
+            expected = (["original-consumed"] if recovery else []) + [
+                "recover-prepare" if recovery else "prepare",
+                "authorization-consumed",
+                "recover-execute" if recovery else "execute",
+                "node-cleaned",
+                "lock-closed-23",
+            ]
+            self.assertEqual(events, expected)
+
+    def test_runtime_privilege_supervisor_reuses_caller_global_lock_without_closing_it(self):
+        now = datetime(2026, 8, 13, 1, 0, tzinfo=timezone.utc)
+        digest = "f" * 64
+        authorization = self.runtime_privilege_authorization(digest, now)
+        authorization_path = Path("/trusted/pending/runtime-privilege.json")
+        authorization_digest = "9" * 64
+        phases = []
+        with patch.object(supervisor, "acquire_global_release_lock", side_effect=AssertionError("caller lock must be reused")), \
+            patch.object(supervisor, "prepare_runtime_privilege_node", return_value=(Path("/tmp/runtime-node"), Path("/tmp/runtime-node/node"))), \
+            patch.object(supervisor, "runtime_privilege_context", return_value={"operation_id": authorization["authorization_id"]}), \
+            patch.object(supervisor, "run_runtime_privilege_runner", side_effect=lambda *_args: phases.append(_args[3]) or {"result": "VERIFIED"}), \
+            patch.object(supervisor, "consume_authorization"), \
+            patch.object(supervisor, "cleanup_runtime_privilege_node"), \
+            patch.object(supervisor.os, "close") as close:
+            result = supervisor.run_runtime_privilege_authorization(
+                Path("/trusted/bundle"), authorization_path, authorization, authorization_digest, 23,
+            )
+        self.assertEqual(result, {"result": "VERIFIED"})
+        self.assertEqual(phases, ["prepare", "execute"])
+        close.assert_not_called()
+
     def test_postdeploy_authorization_validates_runtime_secret_files_before_consumption(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
+        main_source = source[source.index("def main() -> None:"):]
+        global_lock = main_source.index("lock_descriptor = acquire_global_release_lock()")
         validation = source.index('validate_runtime_secret_boundary(bundle_root, authorization["operation"])')
         probe_validation = source.index('validate_runtime_probe_receipt(authorization["parameters"], bundle_digest)', validation)
         consumption = source.index("consume_authorization(authorization_path, authorization, authorization_digest)", validation)
+        self.assertLess(global_lock, main_source.index('validate_runtime_secret_boundary(bundle_root, authorization["operation"])'))
         self.assertLess(validation, consumption)
         self.assertLess(probe_validation, consumption)
+        self.assertIn('"ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor)', main_source)
+        self.assertLess(main_source.index("consume_authorization(authorization_path, authorization, authorization_digest)"), main_source.index("os.execve(command[0], command, environment)"))
         bundle = Path("/trusted/bundle")
         expected = f"RUNTIME_SECRET_FILES_VERIFIED entries=6 policy_sha256={supervisor.RUNTIME_SECRET_POLICY_SHA256}\n"
         completed = supervisor.subprocess.CompletedProcess([], 0, expected, "")
@@ -341,6 +548,29 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         file.chmod(0o400)
         parameters["runtime_probe_receipt_sha256"] = supervisor.sha256(raw)
         self.assertEqual(supervisor.validate_runtime_probe_receipt(parameters, "f" * 64, now, root), receipt)
+        runtime_parameters = self.runtime_privilege_parameters(original_operation="RECONCILE")
+        runtime_parameters.update({
+            "compose_project_root": parameters["compose_project_root"],
+            "deployment_class": parameters["deployment_class"],
+            "deployment_id": parameters["deployment_id"],
+            "postgres_container": parameters["postgres_container"],
+            "postgres_container_id": services[1]["container_id"],
+            "release_manifest_sha256": parameters["release_manifest_sha256"],
+            "runtime_configuration_sha256": parameters["runtime_configuration_sha256"],
+            "runtime_probe_receipt": parameters["runtime_probe_receipt"],
+            "runtime_probe_receipt_sha256": parameters["runtime_probe_receipt_sha256"],
+        })
+        with patch.object(supervisor, "RUNTIME_PROBE_ROOT", root), \
+            patch.object(supervisor, "validate_runtime_privilege_release_manifest", return_value={"promotion_status": "ELIGIBLE"}):
+            self.assertEqual(supervisor.validate_runtime_privilege_probe_receipt(
+                runtime_parameters, "f" * 64, now,
+                operation="RECONCILE_POSTGRESQL_RUNTIME_PRIVILEGES", probe_root=root,
+            ), receipt)
+            with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_RUNTIME_PRIVILEGE_CONTAINER_MISMATCH"):
+                supervisor.validate_runtime_privilege_probe_receipt(
+                    {**runtime_parameters, "postgres_container_id": "a" * 64}, "f" * 64, now,
+                    operation="RECONCILE_POSTGRESQL_RUNTIME_PRIVILEGES", probe_root=root,
+                )
         with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_RUNTIME_PROBE_TIME_INVALID"):
             supervisor.validate_runtime_probe_receipt(parameters, "f" * 64, now + timedelta(hours=2), root)
         parameters["runtime_configuration_sha256"] = "9" * 64

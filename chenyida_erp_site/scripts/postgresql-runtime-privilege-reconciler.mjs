@@ -26,6 +26,7 @@ const SITE_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const SHA256 = /^[0-9a-f]{64}$/;
 const OID = /^[1-9][0-9]{0,9}$/;
 const IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/;
+const ROUTINE_ARGUMENT = /^(?:public\.[a-z_][a-z0-9_]*|[a-z_][a-z0-9_]*(?: [a-z_][a-z0-9_]*)*)(?:\[\])?$/;
 const MANAGED_ROLE = /^chenyida_erp_[a-z0-9_]{1,50}$/;
 const ACCESS_SERVICES = Object.freeze(["ADMIN", "BACKUP", "WEB", "WORKER"]);
 const ROLE_STATE_FIELDS = Object.freeze(["name", "superuser", "inherit", "create_role", "create_database", "can_login", "replication", "connection_limit", "valid_until", "bypass_rls"]);
@@ -184,6 +185,10 @@ function validateMembershipRecords(records, policy, mode) {
   if (mode === "final") exact(records, policy.memberships, "RUNTIME_PRIVILEGE_STATE_MEMBERSHIP_SET_MISMATCH");
 }
 
+function controlledOwner(actual, expected, policy, mode) {
+  return actual === expected || (mode === "controlled" && expected === policy.identities.migration_owner && actual === policy.identities.platform_owner);
+}
+
 function validateAclRecords(records, policy, catalog, mode, expectedFinal) {
   orderedUnique(records, aclKey, "RUNTIME_PRIVILEGE_STATE_ACL_ORDER_INVALID");
   const owners = objectOwners(policy, catalog);
@@ -193,7 +198,7 @@ function validateAclRecords(records, policy, catalog, mode, expectedFinal) {
     exactKeys(record, ACL_FIELDS, "RUNTIME_PRIVILEGE_STATE_ACL_INVALID");
     const owner = owners.get(`${record.kind}\u0001${record.identity}`);
     if (!owner) reject(`RUNTIME_PRIVILEGE_STATE_UNKNOWN_ACL_OBJECT_${record.kind}_${runtimePrivilegeRawSha256(record.identity).slice(0, 12).toUpperCase()}`);
-    if (record.owner !== owner || record.grantor !== owner) reject("RUNTIME_PRIVILEGE_STATE_ACL_OWNER_DRIFT");
+    if (!controlledOwner(record.owner, owner, policy, mode) || record.grantor !== record.owner) reject("RUNTIME_PRIVILEGE_STATE_ACL_OWNER_DRIFT");
     if (forbiddenLogins.has(record.grantee)) reject("RUNTIME_PRIVILEGE_STATE_DIRECT_LOGIN_ACL");
     if (!allowedGrantees.has(record.grantee)) reject("RUNTIME_PRIVILEGE_STATE_UNKNOWN_ACL_ENDPOINT");
     if (!ACL_PRIVILEGES[record.kind]?.includes(record.privilege_type)) reject("RUNTIME_PRIVILEGE_STATE_ACL_PRIVILEGE_INVALID");
@@ -233,7 +238,7 @@ function validateAclStorage(records, policy, catalog, mode, expectedFinal) {
   for (const record of records) {
     exactKeys(record, ["kind", "identity", "owner", "acl_state", "acl_item_count", "owner_privileges"], "RUNTIME_PRIVILEGE_STATE_ACL_STORAGE_INVALID");
     const owner = owners.get(storageKey(record));
-    if (!owner || record.owner !== owner || !["NULL", "EMPTY", "EXPLICIT"].includes(record.acl_state)) reject("RUNTIME_PRIVILEGE_STATE_ACL_STORAGE_DRIFT");
+    if (!owner || !controlledOwner(record.owner, owner, policy, mode) || !["NULL", "EMPTY", "EXPLICIT"].includes(record.acl_state)) reject("RUNTIME_PRIVILEGE_STATE_ACL_STORAGE_DRIFT");
     integer(record.acl_item_count, 0, 16, "RUNTIME_PRIVILEGE_STATE_ACL_STORAGE_INVALID");
     const allowedOwner = new Set(ACL_PRIVILEGES[record.kind] || []);
     orderedUnique(record.owner_privileges, (item) => item?.privilege_type, "RUNTIME_PRIVILEGE_STATE_OWNER_ACL_ORDER_INVALID");
@@ -311,7 +316,7 @@ export function parseRuntimePrivilegeState(source) {
 
 export function validateRuntimePrivilegeState(value, { policy, access, catalog, expectedTarget = null, mode = "baseline", expectedFinal = null } = {}) {
   const sources = validateSources(policy, access, catalog);
-  if (!["baseline", "final"].includes(mode)) reject("RUNTIME_PRIVILEGE_STATE_MODE_INVALID");
+  if (!["baseline", "controlled", "final"].includes(mode)) reject("RUNTIME_PRIVILEGE_STATE_MODE_INVALID");
   exactKeys(value, [
     "schema_version", "contract", "target", "engine", "database", "schema", "roles", "memberships", "role_settings",
     "object_acl", "object_acl_storage", "column_acl", "column_acl_object_count", "default_privilege_scopes", "default_privileges",
@@ -337,8 +342,8 @@ export function validateRuntimePrivilegeState(value, { policy, access, catalog, 
     default_tablespace: sources.policy.database.default_tablespace,
   };
   exactKeys(value.database, Object.keys(expectedDatabase), "RUNTIME_PRIVILEGE_STATE_DATABASE_INVALID");
-  if (mode === "baseline") {
-    if (value.database.name !== expectedDatabase.name || value.database.owner !== expectedDatabase.owner || value.database.allow_connect !== true
+  if (mode !== "final") {
+    if (value.database.name !== expectedDatabase.name || !controlledOwner(value.database.owner, expectedDatabase.owner, sources.policy, mode) || value.database.allow_connect !== true
       || value.database.default_tablespace !== expectedDatabase.default_tablespace || !Number.isSafeInteger(value.database.connection_limit)
       || value.database.connection_limit < -1 || value.database.connection_limit > expectedDatabase.connection_limit) reject("RUNTIME_PRIVILEGE_STATE_DATABASE_DRIFT");
   } else exact(value.database, expectedDatabase, "RUNTIME_PRIVILEGE_STATE_DATABASE_DRIFT");
@@ -439,7 +444,33 @@ function surface(records) {
   return Object.freeze({ count: records.length, sha256: clusterSha256(records.map((record) => canonicalClusterJson(record)).join("")) });
 }
 
-export function validateRuntimePrivilegeStructuralReport(reportSource, { policy, access, catalog, expectedDefaultPrivilegeCount = 2 } = {}) {
+function controlledStructuralOwner(actual, expected, allowPlatformOwnership) {
+  return actual === expected || (allowPlatformOwnership && expected === "MIGRATION_OWNER" && actual === "PLATFORM_OWNER");
+}
+
+function normalizeControlledStructuralRecords(actual, expected, allowPlatformOwnership, code) {
+  if (!Array.isArray(actual) || actual.length !== expected.length) reject(code);
+  return actual.map((record, index) => {
+    const wanted = expected[index];
+    const identityKey = Object.hasOwn(wanted || {}, "identity") ? "identity" : "name";
+    if (record?.[identityKey] !== wanted?.[identityKey]) reject(code);
+    if (!controlledStructuralOwner(record?.owner, wanted?.owner, allowPlatformOwnership)) reject(code);
+    return record.owner === wanted.owner ? record : { ...record, owner: wanted.owner };
+  });
+}
+
+function normalizeControlledIndexRecords(records, catalog, allowPlatformOwnership) {
+  if (!allowPlatformOwnership) return records;
+  const applicationTables = new Set(catalog.catalog.tables.filter((item) => item.owner === "MIGRATION_OWNER").map((item) => item.name));
+  return records.map((record) => {
+    if (!applicationTables.has(record?.table) || !controlledStructuralOwner(record?.owner, "MIGRATION_OWNER", true)) {
+      reject("RUNTIME_PRIVILEGE_STRUCTURE_SURFACE_MISMATCH");
+    }
+    return record.owner === "MIGRATION_OWNER" ? record : { ...record, owner: "MIGRATION_OWNER" };
+  });
+}
+
+export function validateRuntimePrivilegeStructuralReport(reportSource, { policy, access, catalog, expectedDefaultPrivilegeCount = 2, allowPlatformOwnership = false } = {}) {
   const sources = validateSources(policy, access, catalog);
   let report;
   try { report = parseRuntimePrivilegeCatalogReport(reportSource); }
@@ -455,15 +486,19 @@ export function validateRuntimePrivilegeStructuralReport(reportSource, { policy,
     collate: sources.catalog.engine_binding.collate,
     ctype: sources.catalog.engine_binding.ctype,
     collation_version: sources.catalog.engine_binding.collation_version,
-    database_owner: "MIGRATION_OWNER",
+    database_owner: report.meta.database_owner,
     schema_owner: sources.policy.schema.owner,
   }, "RUNTIME_PRIVILEGE_STRUCTURE_META_MISMATCH");
-  exact(report.tables, sources.catalog.catalog.tables, "RUNTIME_PRIVILEGE_STRUCTURE_TABLE_MISMATCH");
-  exact(report.sequences, sources.catalog.catalog.sequences, "RUNTIME_PRIVILEGE_STRUCTURE_SEQUENCE_MISMATCH");
-  exact(report.routines, sources.catalog.catalog.routines, "RUNTIME_PRIVILEGE_STRUCTURE_ROUTINE_MISMATCH");
-  exact(report.types, sources.catalog.catalog.standalone_types, "RUNTIME_PRIVILEGE_STRUCTURE_TYPE_MISMATCH");
+  if (!controlledStructuralOwner(report.meta.database_owner, "MIGRATION_OWNER", allowPlatformOwnership)) reject("RUNTIME_PRIVILEGE_STRUCTURE_META_MISMATCH");
+  exact(normalizeControlledStructuralRecords(report.tables, sources.catalog.catalog.tables, allowPlatformOwnership, "RUNTIME_PRIVILEGE_STRUCTURE_TABLE_MISMATCH"), sources.catalog.catalog.tables, "RUNTIME_PRIVILEGE_STRUCTURE_TABLE_MISMATCH");
+  exact(normalizeControlledStructuralRecords(report.sequences, sources.catalog.catalog.sequences, allowPlatformOwnership, "RUNTIME_PRIVILEGE_STRUCTURE_SEQUENCE_MISMATCH"), sources.catalog.catalog.sequences, "RUNTIME_PRIVILEGE_STRUCTURE_SEQUENCE_MISMATCH");
+  exact(normalizeControlledStructuralRecords(report.routines, sources.catalog.catalog.routines, allowPlatformOwnership, "RUNTIME_PRIVILEGE_STRUCTURE_ROUTINE_MISMATCH"), sources.catalog.catalog.routines, "RUNTIME_PRIVILEGE_STRUCTURE_ROUTINE_MISMATCH");
+  exact(normalizeControlledStructuralRecords(report.types, sources.catalog.catalog.standalone_types, allowPlatformOwnership, "RUNTIME_PRIVILEGE_STRUCTURE_TYPE_MISMATCH"), sources.catalog.catalog.standalone_types, "RUNTIME_PRIVILEGE_STRUCTURE_TYPE_MISMATCH");
   exact(report.extensions, sources.catalog.catalog.extensions, "RUNTIME_PRIVILEGE_STRUCTURE_EXTENSION_MISMATCH");
-  for (const field of ["columns", "constraints", "indexes", "triggers"]) exact(surface(report[field]), sources.catalog.catalog.structural_surfaces[field], "RUNTIME_PRIVILEGE_STRUCTURE_SURFACE_MISMATCH");
+  for (const field of ["columns", "constraints", "indexes", "triggers"]) {
+    const records = field === "indexes" ? normalizeControlledIndexRecords(report[field], sources.catalog, allowPlatformOwnership) : report[field];
+    exact(surface(records), sources.catalog.catalog.structural_surfaces[field], "RUNTIME_PRIVILEGE_STRUCTURE_SURFACE_MISMATCH");
+  }
   if (surface(report.migrations).sha256 !== sources.catalog.source_binding.migrations.applied_ledger_sha256
     || report.migrations.length !== sources.catalog.source_binding.migrations.count
     || report.migrations.at(-1)?.version !== sources.catalog.source_binding.migrations.head) reject("RUNTIME_PRIVILEGE_STRUCTURE_MIGRATION_MISMATCH");
@@ -486,6 +521,13 @@ function quoteQualified(identity) {
   return `${quoteIdentifier(parts[0])}.${quoteIdentifier(parts[1])}`;
 }
 
+function quoteRoutineIdentity(identity) {
+  text(identity, "RUNTIME_PRIVILEGE_PLAN_ROUTINE_IDENTITY_INVALID");
+  const matched = identity.match(/^public\.([a-z_][a-z0-9_]*)\((.*)\)$/);
+  if (!matched || (matched[2] !== "" && matched[2].split(",").some((argument) => !ROUTINE_ARGUMENT.test(argument)))) reject("RUNTIME_PRIVILEGE_PLAN_ROUTINE_IDENTITY_INVALID");
+  return identity;
+}
+
 function roleCreateStatement(role) {
   return `CREATE ROLE ${quoteIdentifier(role.name)} WITH ${role.can_login ? "LOGIN" : "NOLOGIN"} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS ${role.inherit ? "INHERIT" : "NOINHERIT"} CONNECTION LIMIT ${role.connection_limit}`;
 }
@@ -502,9 +544,56 @@ function groupedAclStatements(desired, kind, objectKeyword, quoteObject) {
     `GRANT ${item.privileges.sort().join(", ")} ON ${objectKeyword} ${quoteObject(item.identity)} TO ${quoteIdentifier(item.grantee)}`);
 }
 
-export function createRuntimePrivilegeReconciliationPlan(baseline, { policy, access, catalog, allowRoleBootstrap = false } = {}) {
+function controlledOwnershipStatements(baseline, sources) {
+  const statements = [];
+  const owner = sources.policy.identities.migration_owner;
+  if (baseline.database.owner === sources.policy.identities.platform_owner) {
+    statements.push(`ALTER DATABASE ${quoteIdentifier(sources.policy.database.name)} OWNER TO ${quoteIdentifier(owner)}`);
+  }
+  const storage = new Map(baseline.object_acl_storage.map((record) => [storageKey(record), record]));
+  const transfer = (kind, identity, keyword, quoteObject) => {
+    const record = storage.get(`${kind}\u0001${identity}`);
+    if (!record) reject("RUNTIME_PRIVILEGE_CONTROLLED_OWNER_OBJECT_MISSING");
+    if (record.owner === sources.policy.identities.platform_owner) statements.push(`ALTER ${keyword} ${quoteObject(identity)} OWNER TO ${quoteIdentifier(owner)}`);
+  };
+  for (const table of sources.catalog.catalog.tables.filter((item) => item.owner === "MIGRATION_OWNER")) transfer("TABLE", `public.${table.name}`, "TABLE", quoteQualified);
+  for (const sequence of sources.catalog.catalog.sequences.filter((item) => item.owner === "MIGRATION_OWNER")) transfer("SEQUENCE", `public.${sequence.name}`, "SEQUENCE", quoteQualified);
+  for (const routine of sources.catalog.catalog.routines.filter((item) => item.owner === "MIGRATION_OWNER")) transfer("ROUTINE", routine.identity, "ROUTINE", quoteRoutineIdentity);
+  return statements;
+}
+
+function validateControlledOwnershipClass(baseline, sources) {
+  const expectedOwners = objectOwners(sources.policy, sources.catalog);
+  const applicationOwners = [
+    baseline.database.owner,
+    ...baseline.object_acl_storage
+      .filter((record) => expectedOwners.get(storageKey(record)) === sources.policy.identities.migration_owner)
+      .map((record) => record.owner),
+  ];
+  const allMigration = applicationOwners.every((owner) => owner === sources.policy.identities.migration_owner);
+  const allPlatform = applicationOwners.every((owner) => owner === sources.policy.identities.platform_owner);
+  if (!allMigration && !allPlatform) reject("RUNTIME_PRIVILEGE_CONTROLLED_OWNER_CLASS_INVALID");
+  return allPlatform;
+}
+
+function validateControlledBootstrapRoleClass(baseline, sources) {
+  if (baseline.memberships.length !== 0) reject("RUNTIME_PRIVILEGE_CONTROLLED_ROLE_CLASS_INVALID");
+  if (baseline.roles.length === 0) return;
+  const owner = expectedRoles(sources.policy).find((role) => role.name === sources.policy.identities.migration_owner);
+  if (baseline.roles.length !== 1 || !owner || !same(baseline.roles[0], owner)) reject("RUNTIME_PRIVILEGE_CONTROLLED_ROLE_CLASS_INVALID");
+}
+
+export function runtimePrivilegeControlledBaselineNeedsOwnershipBootstrap(baseline, { policy, access, catalog } = {}) {
   const sources = validateSources(policy, access, catalog);
-  validateRuntimePrivilegeState(baseline, { ...sources, mode: "baseline" });
+  validateRuntimePrivilegeState(baseline, { ...sources, mode: "controlled" });
+  return validateControlledOwnershipClass(baseline, sources);
+}
+
+export function createRuntimePrivilegeReconciliationPlan(baseline, { policy, access, catalog, allowRoleBootstrap = false, controlledOwnershipBootstrap = false } = {}) {
+  const sources = validateSources(policy, access, catalog);
+  if (controlledOwnershipBootstrap && !allowRoleBootstrap) reject("RUNTIME_PRIVILEGE_CONTROLLED_BOOTSTRAP_MODE_INVALID");
+  validateRuntimePrivilegeState(baseline, { ...sources, mode: controlledOwnershipBootstrap ? "controlled" : "baseline" });
+  if (controlledOwnershipBootstrap) validateControlledOwnershipClass(baseline, sources);
   const desired = createRuntimePrivilegeDesiredState(baseline, sources);
   const statements = [];
   const present = new Set(baseline.roles.map((role) => role.name));
@@ -514,6 +603,7 @@ export function createRuntimePrivilegeReconciliationPlan(baseline, { policy, acc
   if (!noOp) {
     statements.push("SELECT pg_catalog.pg_try_advisory_xact_lock(pg_catalog.hashtext('chenyida_erp_schema_migration')::bigint)");
     for (const role of missingRoles) statements.push(roleCreateStatement(role));
+    if (controlledOwnershipBootstrap) statements.push(...controlledOwnershipStatements(baseline, sources));
     statements.push(`ALTER DATABASE ${quoteIdentifier(sources.policy.database.name)} CONNECTION LIMIT ${sources.policy.database.connection_limit}`);
     for (const membership of sources.policy.memberships) {
       if (!baseline.memberships.some((item) => membershipKey(item) === membershipKey(membership))) {
@@ -527,7 +617,7 @@ export function createRuntimePrivilegeReconciliationPlan(baseline, { policy, acc
     statements.push(`REVOKE ALL PRIVILEGES ON SCHEMA ${quoteIdentifier(sources.policy.schema.name)} FROM ${objectEndpointSql}`);
     statements.push(`REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA ${quoteIdentifier(sources.policy.schema.name)} FROM ${objectEndpointSql}`);
     statements.push(`REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA ${quoteIdentifier(sources.policy.schema.name)} FROM ${objectEndpointSql}`);
-    for (const routine of sources.catalog.catalog.routines) statements.push(`REVOKE ALL PRIVILEGES ON ROUTINE ${routine.identity} FROM ${objectEndpointSql}`);
+    for (const routine of sources.catalog.catalog.routines) statements.push(`REVOKE ALL PRIVILEGES ON ROUTINE ${quoteRoutineIdentity(routine.identity)} FROM ${objectEndpointSql}`);
     for (const type of sources.catalog.catalog.standalone_types) statements.push(`REVOKE ALL PRIVILEGES ON TYPE ${quoteQualified(type.identity)} FROM ${objectEndpointSql}`);
     for (const tablespace of sources.policy.tablespaces.built_in) statements.push(`REVOKE ALL PRIVILEGES ON TABLESPACE ${quoteIdentifier(tablespace)} FROM ${objectEndpointSql}`);
     for (const item of sources.policy.default_privileges) {
@@ -541,7 +631,7 @@ export function createRuntimePrivilegeReconciliationPlan(baseline, { policy, acc
     statements.push(`GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA ${quoteIdentifier(sources.policy.schema.name)} TO ${quoteIdentifier(sources.policy.identities.migration_owner)}`);
     for (const routine of sources.catalog.catalog.routines) {
       const ownerSql = routine.owner === "MIGRATION_OWNER" ? quoteIdentifier(sources.policy.identities.migration_owner) : "CURRENT_USER";
-      statements.push(`GRANT ALL PRIVILEGES ON ROUTINE ${routine.identity} TO ${ownerSql}`);
+      statements.push(`GRANT ALL PRIVILEGES ON ROUTINE ${quoteRoutineIdentity(routine.identity)} TO ${ownerSql}`);
     }
     for (const type of sources.catalog.catalog.standalone_types) statements.push(`GRANT ALL PRIVILEGES ON TYPE ${quoteQualified(type.identity)} TO CURRENT_USER`);
     for (const tablespace of sources.policy.tablespaces.built_in) statements.push(`GRANT ALL PRIVILEGES ON TABLESPACE ${quoteIdentifier(tablespace)} TO CURRENT_USER`);
@@ -549,7 +639,7 @@ export function createRuntimePrivilegeReconciliationPlan(baseline, { policy, acc
     statements.push(...groupedAclStatements(desired, "SCHEMA", "SCHEMA", quoteIdentifier));
     statements.push(...groupedAclStatements(desired, "TABLE", "TABLE", quoteQualified));
     statements.push(...groupedAclStatements(desired, "SEQUENCE", "SEQUENCE", quoteQualified));
-    statements.push(...groupedAclStatements(desired, "ROUTINE", "ROUTINE", (value) => value));
+    statements.push(...groupedAclStatements(desired, "ROUTINE", "ROUTINE", quoteRoutineIdentity));
   }
   const body = Object.freeze({
     schema_version: 2,
@@ -567,6 +657,13 @@ export function createRuntimePrivilegeReconciliationPlan(baseline, { policy, acc
 
 export function createRuntimePrivilegeBootstrapPlan(baseline, sources = {}) {
   return createRuntimePrivilegeReconciliationPlan(baseline, { ...sources, allowRoleBootstrap: true });
+}
+
+export function createControlledRuntimePrivilegeBootstrapPlan(baseline, sources = {}) {
+  const validated = validateSources(sources.policy, sources.access, sources.catalog);
+  validateRuntimePrivilegeState(baseline, { ...validated, mode: "controlled" });
+  validateControlledBootstrapRoleClass(baseline, validated);
+  return createRuntimePrivilegeReconciliationPlan(baseline, { ...validated, allowRoleBootstrap: true, controlledOwnershipBootstrap: true });
 }
 
 export function createRuntimePrivilegeReconciliationIntent(plan, createdAt) {
@@ -608,8 +705,13 @@ export function transitionRuntimePrivilegeIntent(intent, nextState) {
 export function decideRuntimePrivilegeInterruptedRecovery(intent, currentState) {
   if (!["INTENT_DURABLE", "TRANSACTION_DISPATCHED", "POSTCOMMIT_CAPTURED"].includes(intent.state)) reject("RUNTIME_PRIVILEGE_INTENT_RECOVERY_STATE_INVALID");
   const digest = clusterSha256(currentState);
+  if (intent.state === "INTENT_DURABLE") return digest === intent.baseline_state_sha256 ? "RETRY_TRANSACTION" : "QUARANTINE";
+  if (intent.state === "TRANSACTION_DISPATCHED") {
+    if (digest === intent.desired_state_sha256) return "FINISH_VERIFICATION";
+    if (digest === intent.baseline_state_sha256) return "RETRY_TRANSACTION";
+    return "QUARANTINE";
+  }
   if (digest === intent.desired_state_sha256) return "FINISH_VERIFICATION";
-  if (digest === intent.baseline_state_sha256) return "RETRY_TRANSACTION";
   return "QUARANTINE";
 }
 

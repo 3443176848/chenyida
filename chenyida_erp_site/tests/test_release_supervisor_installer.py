@@ -115,6 +115,39 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
             second = installer.acquire_install_lock(lock)
             installer.os.close(second)
 
+    def test_global_release_lock_rejects_concurrent_bundle_switch(self):
+        with tempfile.TemporaryDirectory(prefix="cyd-supervisor-global-lock-") as directory:
+            lock = Path(directory) / "release.lock"
+            first = installer.acquire_global_release_lock(lock)
+            try:
+                with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_GLOBAL_LOCK_BUSY"):
+                    installer.acquire_global_release_lock(lock)
+            finally:
+                installer.os.close(first)
+            second = installer.acquire_global_release_lock(lock)
+            installer.os.close(second)
+
+    def test_operator_interlock_blocks_bundle_switch_until_active_or_quarantined_intents_are_resolved(self):
+        with tempfile.TemporaryDirectory(prefix="cyd-supervisor-operator-interlock-") as directory:
+            root = Path(directory) / "postgresql-runtime-privilege-operator"
+            root.mkdir(mode=0o700)
+            marker = root / installer.RUNTIME_PRIVILEGE_STATE_MARKER.name
+            marker.write_bytes(installer.RUNTIME_PRIVILEGE_STATE_MARKER_VALUE)
+            marker.chmod(0o400)
+            for name in installer.RUNTIME_PRIVILEGE_STATE_DIRECTORIES:
+                (root / name).mkdir(mode=0o700)
+            installer.assert_no_runtime_privilege_operator_interlock(root)
+            (root / "active" / "operation.intent").mkdir(mode=0o700)
+            with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_RECOVERY_REQUIRED"):
+                installer.assert_no_runtime_privilege_operator_interlock(root)
+            (root / "active" / "operation.intent").rmdir()
+            extra = root / "unexpected"
+            extra.mkdir(mode=0o700)
+            with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID"):
+                installer.assert_no_runtime_privilege_operator_interlock(root)
+            extra.rmdir()
+            installer.assert_no_runtime_privilege_operator_interlock(root)
+
     def test_bundle_manifest_generator_uses_literal_allowlist_and_exact_blob_bytes(self):
         launcher_raw = (Path(__file__).resolve().parents[1] / "scripts" / "release-supervisor-launcher.py").read_bytes()
         files = generator.parse_bundle_files(launcher_raw)
@@ -264,9 +297,10 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
             recovered = SimpleNamespace(install=Mock(return_value={"result": "INSTALLED"}))
             arguments = [str(current_installer), "--repository-root", "/ignored", "--authorization-file", "/ignored/install.json", "--confirm", installer.INSTALL_CONFIRMATION]
             output = StringIO()
-            with patch.object(installer, "INSTALLERS_ROOT", installers_root), patch.object(installer, "INSTALL_PENDING_ROOT", pending_root), patch.object(installer, "unresolved_prepared_install", return_value=(root / "prepared.json", {}, authorization, authorization_digest)), patch.object(installer, "acquire_install_lock", return_value=19), patch.object(installer.os, "close"), patch.object(installer.os, "getuid", return_value=0), patch.object(installer, "load_installer_module", return_value=recovered), patch.object(sys, "argv", arguments), redirect_stdout(output):
+            with patch.object(installer, "INSTALLERS_ROOT", installers_root), patch.object(installer, "INSTALL_PENDING_ROOT", pending_root), patch.object(installer, "unresolved_prepared_install", return_value=(root / "prepared.json", {}, authorization, authorization_digest)), patch.object(installer, "acquire_install_lock", return_value=19), patch.object(installer, "acquire_global_release_lock", return_value=23), patch.object(installer.os, "close") as close, patch.object(installer.os, "getuid", return_value=0), patch.object(installer, "load_installer_module", return_value=recovered), patch.object(sys, "argv", arguments), redirect_stdout(output):
                 installer.main()
             recovered.install.assert_called_once_with(Path(authorization["repository_root"]), authorization, None, authorization_digest, stored_installer)
+            self.assertEqual([call.args[0] for call in close.call_args_list][-2:], [23, 19])
             self.assertEqual(json.loads(output.getvalue()), {"result": "INSTALLED"})
 
     def test_install_resumes_exact_prepared_transaction_after_authorization_is_consumed_and_expired(self):
@@ -299,7 +333,7 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
             manifest_tree = subprocess.check_output(["git", "-C", str(repository), "rev-parse", "HEAD^{tree}"], text=True).strip()
 
             state = root / "state"; libexec = root / "usr" / "local" / "libexec"; sbin = root / "usr" / "local" / "sbin"
-            libexec.mkdir(parents=True, mode=0o755); sbin.mkdir(parents=True, mode=0o755)
+            libexec.mkdir(parents=True, mode=0o755); sbin.mkdir(parents=True, mode=0o755); (root / "etc").mkdir(mode=0o755)
             install_authorizations = state / "install-authorizations"
             pending = install_authorizations / "pending"; pending.mkdir(parents=True, mode=0o700)
             release_authorizations = state / "release-authorizations"
@@ -328,6 +362,8 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
                 "RELEASE_AUTHORIZATION_CONSUMED_ROOT": release_authorizations / "consumed",
                 "RUNTIME_PROBE_ROOT": state / "runtime-probes",
                 "RUNTIME_PROBE_MARKER": state / "runtime-probes" / ".chenyida-erp-runtime-probe-root-v1",
+                "RUNTIME_PRIVILEGE_STATE_ROOT": state / "postgresql-runtime-privilege-operator",
+                "RUNTIME_PRIVILEGE_STATE_MARKER": state / "postgresql-runtime-privilege-operator" / ".chenyida-erp-postgresql-runtime-privilege-operator-v1",
                 "SUPERVISOR_BASE": libexec / "supervisor",
                 "BUNDLES_ROOT": libexec / "supervisor" / "bundles",
                 "LAUNCHERS_ROOT": libexec / "supervisor" / "launchers",
@@ -368,6 +404,9 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
                 self.assertEqual(stored_installer.stat().st_mode & 0o777, 0o555)
                 self.assertEqual((patches["RUNTIME_PROBE_ROOT"] / ".chenyida-erp-runtime-probe-root-v1").read_bytes(), installer.RUNTIME_PROBE_MARKER_VALUE)
                 self.assertEqual((patches["RUNTIME_PROBE_ROOT"] / ".chenyida-erp-runtime-probe-root-v1").stat().st_mode & 0o777, 0o400)
+                self.assertEqual((patches["RUNTIME_PRIVILEGE_STATE_MARKER"]).read_bytes(), installer.RUNTIME_PRIVILEGE_STATE_MARKER_VALUE)
+                for directory in installer.RUNTIME_PRIVILEGE_STATE_DIRECTORIES:
+                    self.assertEqual((patches["RUNTIME_PRIVILEGE_STATE_ROOT"] / directory).stat().st_mode & 0o777, 0o700)
                 committed.chmod(0o600); committed.write_bytes(b'{"truncated":'); committed.chmod(0o400)
                 with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_JOURNAL_INVALID"):
                     installer.unresolved_prepared_install()

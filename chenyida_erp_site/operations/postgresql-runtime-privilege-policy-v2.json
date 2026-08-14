@@ -10,8 +10,8 @@
     {
       "code": "POSTGRESQL17_COMPILED_CATALOG_REQUIRED",
       "evidence_contract": "chenyida-erp-postgresql-runtime-compiled-catalog/v1",
-      "evidence_catalog_sha256": "40c8c620dc8b434798716270d5aecbfedb19499618a2fc792c31e529f63c7f8f",
-      "evidence_artifact_sha256": "c462641dd48fc4c22836e88a28acf63a50a89652a6bbe8efc2ce1b8058b2d4cd"
+      "evidence_catalog_sha256": "e0070514bdaaa998f114583ed820047688ef8945aa5ea3cafdfb873e3df02e8c",
+      "evidence_artifact_sha256": "694daeb7d309cc1f0eb923158769daf936fd01cf4deac1cfde176af03f26c30b"
     }
   ],
   "source_binding": {
@@ -24,9 +24,9 @@
     "compiled_catalog": {
       "path": "operations/postgresql-runtime-privilege-compiled-catalog-v1.json",
       "contract": "chenyida-erp-postgresql-runtime-compiled-catalog/v1",
-      "catalog_sha256": "40c8c620dc8b434798716270d5aecbfedb19499618a2fc792c31e529f63c7f8f",
-      "artifact_sha256": "c462641dd48fc4c22836e88a28acf63a50a89652a6bbe8efc2ce1b8058b2d4cd",
-      "file_sha256": "e014b0c5969af047c2abe7e6ee92410d99ca9f5756163763ea5bdc0cd658fff6"
+      "catalog_sha256": "e0070514bdaaa998f114583ed820047688ef8945aa5ea3cafdfb873e3df02e8c",
+      "artifact_sha256": "694daeb7d309cc1f0eb923158769daf936fd01cf4deac1cfde176af03f26c30b",
+      "file_sha256": "87596b3183f274ff9834c04e483da5b3c07ac3c1dfc7d4b9d6123037d49fb4cf"
     },
     "migrations": {
       "count": 46,
@@ -52,11 +52,11 @@
       },
       {
         "path": "scripts/postgresql-runtime-privilege-reconciler.mjs",
-        "sha256": "e4cf0603237e99a923407b402039d35064fa56417a14fc42fa4633793a58449a"
+        "sha256": "2ae2050324ab685ef143ac7cdf4719708651beef1c5eb84affd69f72cd14f948"
       },
       {
         "path": "scripts/postgresql-runtime-privilege-state.sql",
-        "sha256": "9c3137e272412c019dcabdbec037af4dc64681c71fae2f821720f447f72c578c"
+        "sha256": "d155ca04fea4728ae2bdf6481e043dc243b20a0b15e6e396affe9a99587ab6f4"
       }
     ]
   },
@@ -414,7 +414,7 @@
   "extensions": [
     {
       "name": "btree_gist",
-      "owner": "MIGRATION_OWNER",
+      "owner": "PLATFORM_OWNER",
       "schema": "public",
       "version": "1.7",
       "member_count": 264,
@@ -422,7 +422,7 @@
     },
     {
       "name": "pgcrypto",
-      "owner": "MIGRATION_OWNER",
+      "owner": "PLATFORM_OWNER",
       "schema": "public",
       "version": "1.3",
       "member_count": 36,
@@ -520,5 +520,5 @@
     "owner": "PLATFORM_OWNER",
     "privileges": []
   },
-  "policy_sha256": "7fc442781161a74d30bb2f3a098a9d31032244ba90c5eb0400e509beb6bc017e"
+  "policy_sha256": "fefebac3c5acce167a9e189f40cbaa27e072b7b02867505842de4779fad68cd0"
 }

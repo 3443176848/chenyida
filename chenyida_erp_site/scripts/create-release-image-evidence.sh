@@ -119,11 +119,11 @@ done
 BUILD_PROVENANCE="$ARTIFACT_ROOT/$RUN_ID.build-provenance.json"
 [ -f "$BUILD_PROVENANCE" ] && [ ! -L "$BUILD_PROVENANCE" ] && [ "$(readlink -f "$(dirname -- "$BUILD_PROVENANCE")")" = "$ARTIFACT_ROOT" ] && [ "$(readlink -f "$BUILD_PROVENANCE")" = "$BUILD_PROVENANCE" ] && [ "$(stat -c '%u:%g:%a:%h' "$BUILD_PROVENANCE")" = "0:0:440:1" ] || { echo "candidate build provenance is missing or untrusted" >&2; exit 1; }
 
-LOCK_FILE=/run/lock/chenyida-erp-release-gate-v1.lock
-if [ ! -e "$LOCK_FILE" ]; then (umask 077; set -C; : > "$LOCK_FILE"); fi
-[ -f "$LOCK_FILE" ] && [ ! -L "$LOCK_FILE" ] && [ "$(stat -c '%u:%g:%a:%h' "$LOCK_FILE")" = "0:0:600:1" ] || { echo "release operation lock is untrusted" >&2; exit 1; }
-exec 9<>"$LOCK_FILE"
-flock -n 9 || { echo "another release operation is active" >&2; exit 1; }
+LOCK_HELPER="$SCRIPT_DIR/release-gate-lock.sh"
+[ -f "$LOCK_HELPER" ] && [ ! -L "$LOCK_HELPER" ] || { echo "release operation lock helper is untrusted" >&2; exit 1; }
+# shellcheck source=release-gate-lock.sh
+. "$LOCK_HELPER"
+acquire_chenyida_release_gate_lock || exit 1
 CONTAINER_NAME="cyd-release-image-evidence-$AUTHORIZATION_SHA256"
 
 /usr/bin/docker image inspect "$NODE_IMAGE" >/dev/null 2>&1 || { echo "pinned Node tooling image is unavailable; pulling is forbidden" >&2; exit 1; }

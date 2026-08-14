@@ -116,11 +116,11 @@ if [ ! -e "$POSTDEPLOY_ROOT" ]; then install -d -m 0750 -o root -g root "$POSTDE
 MARKER="$POSTDEPLOY_ROOT/.chenyida-erp-release-artifact-root-v1"
 if [ ! -e "$MARKER" ]; then (umask 337; set -C; printf '%s\n' chenyida-erp-release-artifact-root/v1 > "$MARKER"); chown root:root "$MARKER"; chmod 0440 "$MARKER"; sync -f "$POSTDEPLOY_ROOT"; fi
 [ -f "$MARKER" ] && [ ! -L "$MARKER" ] && [ "$(stat -c '%u:%g:%a:%h' "$MARKER")" = "0:0:440:1" ] && [ "$(cat "$MARKER")" = chenyida-erp-release-artifact-root/v1 ] || { echo "postdeploy artifact marker is invalid" >&2; exit 1; }
-LOCK_FILE=/run/lock/chenyida-erp-release-gate-v1.lock
-if [ ! -e "$LOCK_FILE" ]; then (umask 077; set -C; : > "$LOCK_FILE") || { echo "release lock creation failed" >&2; exit 1; }; fi
-[ -f "$LOCK_FILE" ] && [ ! -L "$LOCK_FILE" ] && [ "$(stat -c '%u:%g:%a:%h' "$LOCK_FILE")" = "0:0:600:1" ] || { echo "release lock is untrusted" >&2; exit 1; }
-exec 9<>"$LOCK_FILE"
-flock -n 9 || { echo "another release or deployment operation is active" >&2; exit 1; }
+LOCK_HELPER="$SCRIPT_DIR/release-gate-lock.sh"
+[ -f "$LOCK_HELPER" ] && [ ! -L "$LOCK_HELPER" ] || { echo "release lock helper is untrusted" >&2; exit 1; }
+# shellcheck source=release-gate-lock.sh
+. "$LOCK_HELPER"
+acquire_chenyida_release_gate_lock || exit 1
 ERP_RELEASE_GATE_LOCK_HELD=YES; export ERP_RELEASE_GATE_LOCK_HELD
 
 NODE_IMAGE='node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3'

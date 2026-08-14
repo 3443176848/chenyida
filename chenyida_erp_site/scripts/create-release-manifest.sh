@@ -127,10 +127,11 @@ done
 PREPARED_MANIFEST="$ARTIFACT_ROOT/.release-manifest.$AUTHORIZATION_SHA256.prepared.json"
 [ ! -e "$PREPARED_MANIFEST" ] || { echo "prepared release manifest already exists" >&2; PREPARED_MANIFEST=""; exit 1; }
 
-LOCK_FILE=/run/lock/chenyida-erp-release-gate-v1.lock
-[ -f "$LOCK_FILE" ] && [ ! -L "$LOCK_FILE" ] && [ "$(stat -c '%u:%g:%a:%h' "$LOCK_FILE")" = "0:0:600:1" ] || { echo "release gate lock is untrusted" >&2; exit 1; }
-exec 9<>"$LOCK_FILE"
-flock -n 9 || { echo "another release operation is active" >&2; exit 1; }
+LOCK_HELPER="$SCRIPT_DIR/release-gate-lock.sh"
+[ -f "$LOCK_HELPER" ] && [ ! -L "$LOCK_HELPER" ] || { echo "release gate lock helper is untrusted" >&2; exit 1; }
+# shellcheck source=release-gate-lock.sh
+. "$LOCK_HELPER"
+acquire_chenyida_release_gate_lock || exit 1
 ERP_RELEASE_GATE_LOCK_HELD=YES; export ERP_RELEASE_GATE_LOCK_HELD
 NODE_BOOTSTRAP_NAME="cyd-release-manifest-node-$AUTHORIZATION_SHA256"
 

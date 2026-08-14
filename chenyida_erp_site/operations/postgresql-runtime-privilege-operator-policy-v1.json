@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-postgresql-runtime-privilege-operator-policy/v1",
+  "policy_id": "chenyida-erp-postgresql-runtime-privilege-operator-v1",
+  "evidence_scope": "CONTROLLED_RUNTIME_ONLY",
+  "deployment_authorized": false,
+  "authorization": {
+    "supervisor_contract": "chenyida-erp-release-supervisor-authorization/v3",
+    "operations": [
+      "BOOTSTRAP",
+      "RECONCILE",
+      "RECOVER"
+    ],
+    "confirmations": {
+      "BOOTSTRAP": "AUTHORIZE_BOOTSTRAP_EXACT_POSTGRESQL_RUNTIME_PRIVILEGES",
+      "RECONCILE": "AUTHORIZE_RECONCILE_EXACT_POSTGRESQL_RUNTIME_PRIVILEGES",
+      "RECOVER": "AUTHORIZE_RECOVER_EXACT_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT"
+    },
+    "runtime_guard_modes": {
+      "BOOTSTRAP": "PRE_DEPLOY_POSTGRESQL_BOOTSTRAP_BOUND",
+      "RECONCILE": "POST_DEPLOY_CURRENT_RUNTIME_STRICT",
+      "RECOVER": "MATCH_ORIGINAL_OPERATION"
+    },
+    "intent_before_authorization_consumption": true
+  },
+  "target": {
+    "database": "chenyida_erp",
+    "server_version_num": "170010",
+    "listen_addresses": "*",
+    "control_identity": "CURRENT_SESSION_SUPERUSER",
+    "migration_owner": "chenyida_erp_owner"
+  },
+  "execution": {
+    "docker_cli": "/usr/bin/docker",
+    "node_tooling_image": "node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3",
+    "postgres_image": "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394",
+    "control_transport": "EXACT_CONTAINER_LOCAL_SOCKET_BOOTSTRAP_IDENTITY",
+    "control_user_source": "CONTAINER_POSTGRES_USER",
+    "control_database_source": "CONTAINER_POSTGRES_DB",
+    "password_verification_transport": "EXACT_CONTAINER_TCP_LOOPBACK_PSQL_FORCED_STDIN_PROMPT",
+    "global_lock_verification": "INHERITED_FD_IDENTITY_AND_INDEPENDENT_CONTENDER_BUSY",
+    "host_psql_required": false,
+    "wrong_password_must_fail": true,
+    "correct_password_must_succeed": true
+  },
+  "roots": {
+    "global_lock": "/run/lock/chenyida-erp-release-gate-v1.lock",
+    "state_root": "/var/lib/chenyida-erp/postgresql-runtime-privilege-operator",
+    "state_root_marker": ".chenyida-erp-postgresql-runtime-privilege-operator-v1",
+    "runtime_secret_root": "/etc/chenyida-erp/runtime-secrets",
+    "backup_root": "/var/backups/chenyida-erp-v2",
+    "backup_credential_root_marker": ".chenyida-erp-credential-root-v2"
+  },
+  "interlocks": {
+    "active_intent_blocks_release_and_backup": true,
+    "backup_root_fixed": true,
+    "backup_fence_filename": ".backup-fence-v2.json",
+    "mixed_backup_and_operator_intent": "QUARANTINE",
+    "stale_intent": "RECOVERY_REQUIRED"
+  },
+  "credentials": {
+    "contract": "chenyida-erp-postgresql-runtime-privilege-consumer-credentials/v1",
+    "source": "EXACT_RUNTIME_SECRET_FILES_AND_BACKUP_CAPTURE_LIBPQ_SERVICE",
+    "login_roles": [
+      "chenyida_erp_admin",
+      "chenyida_erp_backup",
+      "chenyida_erp_owner",
+      "chenyida_erp_web",
+      "chenyida_erp_worker"
+    ],
+    "runtime_secret_role_bindings": [
+      {
+        "role": "chenyida_erp_admin",
+        "source_name": "admin-database-password"
+      },
+      {
+        "role": null,
+        "source_name": "admin-password"
+      },
+      {
+        "role": "chenyida_erp_owner",
+        "source_name": "migration-database-password"
+      },
+      {
+        "role": null,
+        "source_name": "postgres-bootstrap-password"
+      },
+      {
+        "role": "chenyida_erp_web",
+        "source_name": "web-database-password"
+      },
+      {
+        "role": "chenyida_erp_worker",
+        "source_name": "worker-database-password"
+      }
+    ],
+    "backup_capture_login": "chenyida_erp_backup",
+    "backup_capture_external_secret_references": "FORBIDDEN",
+    "source_identity_binding": "PATH_AND_STABLE_METADATA_WITHOUT_SECRET_DIGEST",
+    "exact_password_bytes": 43,
+    "decoded_password_bytes": 32,
+    "encoding": "CANONICAL_BASE64URL_NO_PADDING",
+    "minimum_distinct_characters": 16,
+    "all_values_distinct": true,
+    "transport": "ONE_PSQL_STDIN_BUFFER_ONE_TRANSACTION",
+    "password_encryption": "scram-sha-256",
+    "structural_noop_reconcile": "RESET_AND_VERIFY_ALL_LOGIN_PASSWORDS",
+    "server_log_suppression": [
+      "log_statement=none",
+      "log_min_error_statement=panic",
+      "log_duration=off",
+      "log_min_duration_statement=-1"
+    ]
+  },
+  "state_machine": {
+    "phases": [
+      "PREPARED",
+      "AUTHORIZATION_CONSUMED",
+      "TRANSACTION_DISPATCHED",
+      "POSTCOMMIT_CAPTURED",
+      "VERIFIED",
+      "COMMITTED",
+      "QUARANTINED"
+    ],
+    "append_only_digest_chain": true,
+    "fsync_each_record_and_parent": true,
+    "ambiguous_state": "QUARANTINE",
+    "postcommit_baseline": "QUARANTINE"
+  },
+  "source_binding": [
+    {
+      "path": "operations/postgresql-runtime-privilege-access-v2.json",
+      "sha256": "2ab41ef7cd693f241400755bdec908e616cdd9c1fd7d024c2818e5c4ed65f9d4"
+    },
+    {
+      "path": "operations/postgresql-runtime-privilege-compiled-catalog-v1.json",
+      "sha256": "87596b3183f274ff9834c04e483da5b3c07ac3c1dfc7d4b9d6123037d49fb4cf"
+    },
+    {
+      "path": "operations/postgresql-runtime-privilege-policy-v2.json",
+      "sha256": "fc24dd008e41fe44ec60c0111a67ff1249be710c08a7b71457626737ec8627c5"
+    },
+    {
+      "path": "operations/runtime-secret-file-policy-v1.json",
+      "sha256": "8dd07c6acd6e857a0b29b14e2b6d5b60ad919cf54aac9b552ce11672eb45b7c5"
+    },
+    {
+      "path": "scripts/postgresql-runtime-privilege-catalog.sql",
+      "sha256": "ca59a9322b15f305eac540fc7ec3fc7cfb6134ab36aa5fb02197b9d203f61b32"
+    },
+    {
+      "path": "scripts/postgresql-runtime-privilege-interlock.sh",
+      "sha256": "c7baa2d5b30a86d4f7fb2a1c8200f1ede9075c7518f2f006dfb3562cd24bb052"
+    },
+    {
+      "path": "scripts/postgresql-runtime-privilege-journal.mjs",
+      "sha256": "16d8a311181874f4e6ed49c2251581df0777f038f7d3b10e7a4e7a88f6ef1bfc"
+    },
+    {
+      "path": "scripts/postgresql-runtime-privilege-operator.mjs",
+      "sha256": "c93e5388f842ff71eae689296116592bb1b41c60020d2f298531d06f1dff3674"
+    },
+    {
+      "path": "scripts/postgresql-runtime-privilege-reconciler.mjs",
+      "sha256": "2ae2050324ab685ef143ac7cdf4719708651beef1c5eb84affd69f72cd14f948"
+    },
+    {
+      "path": "scripts/postgresql-runtime-privilege-runner.mjs",
+      "sha256": "6a75d49c6d63f75a05073fd1305853f7bd60090ce010edf2630b9fe930720b75"
+    },
+    {
+      "path": "scripts/postgresql-runtime-privilege-state.sql",
+      "sha256": "d155ca04fea4728ae2bdf6481e043dc243b20a0b15e6e396affe9a99587ab6f4"
+    }
+  ],
+  "runtime_privilege_policy_sha256": "fefebac3c5acce167a9e189f40cbaa27e072b7b02867505842de4779fad68cd0",
+  "policy_sha256": "b2e5cc0ff9a6febc8427a84286ef76f56bb3bd6de81f579ecc9ee7e00a1c7f65"
+}

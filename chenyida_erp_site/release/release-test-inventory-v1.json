@@ -4,15 +4,15 @@
   "root": "chenyida_erp_site",
   "test_pattern": "tests/*.test.mjs",
   "max_test_bytes": 1048576,
-  "total_tests": 247,
-  "required_tests": 223,
+  "total_tests": 248,
+  "required_tests": 224,
   "not_applicable_tests": 24,
   "category_counts": {
     "BROWSER": 6,
     "HISTORICAL_D1_SITES": 22,
     "POSTGRES": 84,
     "POSTGRES_ALIAS": 2,
-    "PURE_NODE": 120,
+    "PURE_NODE": 121,
     "RELEASE_CONTRACT": 6,
     "SPECIAL_HARNESS": 7
   },
@@ -1198,7 +1198,16 @@
     },
     {
       "path": "tests/selfhost-postgresql-runtime-privilege-catalog.test.mjs",
-      "sha256": "254db68c9a538a09dd1e93e491499d9c05f2482799c055b10ce7ce975c9906f6",
+      "sha256": "9e6fa82928315aea4ddeb0baca9e18c2fdeedcce9841d4e6159b270ad4d6437d",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-postgresql-runtime-privilege-operator.test.mjs",
+      "sha256": "abc9870eda41341ea761ba087ed7aab4703b3910b062b388b1701942c8f031e9",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1207,7 +1216,7 @@
     },
     {
       "path": "tests/selfhost-postgresql-runtime-privilege-policy.test.mjs",
-      "sha256": "34456cde2a24231f6eb81ac0529fcd8de3ea10e1d39216575ae56c3b057c9790",
+      "sha256": "45cc46c2b6e1bb09875e4358909dc74e4aabc125b6371f5c9ee7747c77d3c3ea",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1819,7 +1828,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "62eea6d547d7454972277f1e5817acd6f2be5f610fe9b7220b3c4d1e6f1f3e90",
+      "sha256": "e1d036b42477f379e36e2d2b4e077e9e3808a956f92d691393892aa580510904",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",

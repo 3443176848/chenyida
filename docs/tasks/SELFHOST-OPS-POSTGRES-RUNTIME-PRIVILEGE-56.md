@@ -1,6 +1,6 @@
 # SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 PostgreSQL 运行时最小权限与凭据边界闭环
 
-> 状态：`DOING / STATIC RUNTIME BOUNDARY CHECKPOINT VERIFIED / CONTROLLED PRODUCTION OPERATOR OPEN / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`
+> 状态：`DOING / CONTROLLED OPERATOR REPOSITORY VERIFIED / FINAL BUNDLE AND ACTUAL ACTIVATION OPEN / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`
 > 日期：2026-08-13（Asia/Shanghai）
 > 严格起点：`main@fb1f7e8893b2affba0ca07ecd9629ae2726adca9` / tree `13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`
 > 责任：Codex 主智能体为唯一写者、测试调度者和 Git 提交者；数据迁移、应用测试、运维安全智能体只读审计；项目负责人继续保留真实数据库/凭据、账号权限、host、UAT/生产 Migration 与部署、Volume、备份恢复和切换的专项授权权力
@@ -73,7 +73,7 @@
 
 ## 7. 当前判定
 
-`DOING / READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`。当前系统仍由单一superuser承担数据库owner、全部对象owner和Web/Worker连接，且秘密通过环境变量交付；在TASK56仓库闭环、源码匹配候选、正式门、专项授权部署与运行复核完成前，不得投入真实员工使用。
+`DOING / CONTROLLED OPERATOR REPOSITORY VERIFIED / FINAL BUNDLE AND ACTUAL ACTIVATION OPEN / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`。仓库已闭合生产受控operator、直接消费者凭据、全局锁、durable journal、backup fence联锁及BOOTSTRAP/RECONCILE可信运行守卫，并在真实隔离PG17 system adapter中完成提交后SIGKILL恢复；最终canonical bundle仍待源码冻结后重建，真实角色/secret/ACL与UAT运行面未改变。当前系统仍由单一superuser承担数据库owner、全部对象owner和Web/Worker连接，且秘密通过环境变量交付；在专项授权激活、同候选运行复核及其余投产门完成前，不得投入真实员工使用。
 
 ## 8. 三线审计结论与 D-133
 
@@ -158,3 +158,15 @@
 - 源码提交`6ddfae92bf3ed95314944e95043240fbe26fdee3`/tree`73bafe754b07bc99d5f2268daf2a1b1d001405c9`与只修改canonical manifest的直接子提交`ef409bbb8d8cefe0ce596759fc57b3d222bd6ea2`/tree`018fb3f8cc47b9c96296f53576e6aee6450fae83`形成53文件静态bundle；manifest SHA-256和生成器复跑stdout SHA-256均为`bac5e882b6a698fe496fbf1b8d6d5e4ea3f206081ab27d12f9ee19af615dcd9e`。TASK55、旧TASK56检查点和TASK51候选均为`STALE / NOT AUTHORIZABLE`。
 - 资源门如实执行：PG全量首跑在Swap越过80%时中断并由trap清理；稳定低于80%超过60秒后才串行重跑。既有单任务曾短暂达到81.07%，期间没有启动新重任务，随后自然回落。最新只读快照available约1.84GiB、Swap765,530,112/1,074,786,304 bytes（约71.23%）、根盘16GiB、Load`1.11/0.96/1.21`、`oom_kill=0`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false，无遗留PG测试容器，依赖临时目录和旧树备份按精确路径清理。
 - 本检查点只证明仓库/合成隔离静态边界，不证明当前UAT已切换角色、secret、mount或容器策略。TASK56仍为唯一`DOING`；生产root受控operator、全局host lock、持久intent、backup fence联锁及可信预授权`runtime_configuration_sha256`探针仍为下一P0，后续源码会使当前bundle失效。没有真实角色、凭据、secret、Volume、host安装、外部push、Migration/deploy、备份恢复、UAT/生产或业务数据动作，系统继续`PRODUCTION NO-GO`。
+
+## 17. 生产受控 Operator 仓库闭环检查点
+
+- D-134固定唯一执行入口为安装后的content-addressed Release Supervisor。launcher在验证bundle、authorization、target、secret和probe前取得`/run/lock/chenyida-erp-release-gate-v1.lock`，同一FD贯穿intent准备、authorization消费、事务、独立核验和receipt；独立contender会证明锁真实busy。release和backup入口复用该锁及operator interlock，active/preparing/quarantine证据阻断两者，固定backup根上的`.backup-fence-v2.json`反向阻断operator。
+- 凭据不再经过aggregate password file或operator provisioner。五个数据库LOGIN直接绑定`admin-database-password`、`migration-database-password`、`web-database-password`、`worker-database-password`和物理独立backup libpq service；`admin-password`与`postgres-bootstrap-password`只参与七值不复用检查。七值必须分别为规范32-byte/43字符base64url、至少16个不同字符且两两不同；公开证据只绑定路径和稳定metadata identity，不保存secret digest。Backup service在已分配口令buffer后遇到重复/未知/错字段也会先清零再失败关闭。
+- `BOOTSTRAP`只接受`PRE_DEPLOY_POSTGRESQL_BOOTSTRAP_BOUND`，由精确manifest、runtime configuration、PostgreSQL container/database/system identity生成确定binding，不伪造尚不存在的postdeploy四服务回执；`RECONCILE`只接受同bundle的`POST_DEPLOY_CURRENT_RUNTIME_STRICT` probe receipt。即使角色/ACL结构已经完全一致，RECONCILE仍在一个事务内重置并验证全部五个LOGIN口令。
+- authorization v3在消费前先持久发布`PREPARED` intent。append-only/fsync journal固定`PREPARED → AUTHORIZATION_CONSUMED → TRANSACTION_DISPATCHED → POSTCOMMIT_CAPTURED → VERIFIED → COMMITTED`；中断准备、内容寻址pending写、postcommit capture/receipt双写和已提交待发布均有精确恢复。RECOVER必须用新的authorization绑定原operation ID、原authorization SHA和active intent SHA；冲突、backup fence并存或未知第三态只quarantine，不猜测反向SQL或删除证据。
+- 角色、owner、membership、1261条非owner ACL、default privileges、setting及五LOGIN口令通过一个事务收敛。口令只经受控内存buffer和`psql` stdin，事务内关闭statement/duration日志，使用后清零；正确口令必须成功、错误口令必须失败。完整操作绑定operator/runtime policy、catalog、manifest、runtime configuration、container/database identity、credential generation和固定backup root；正常执行要求当前合格artifact，恢复只允许读取过期但精确同内容/来源的原artifact解释已发生状态。
+- 真实system adapter故障演练在固定PG17新空cluster应用46个Migration后执行：host侧实际adapter经container本地socket提交角色/ACL/五口令事务，事务返回后立即SIGKILL进程；新进程从durable journal选择`CAPTURE_AND_VERIFY`并完成归档，随后结构no-op RECONCILE再次重置五口令并由实际TCP loopback登录探针验证。外层对七个精确fixture口令和完整SCRAM verifier扫描stdout/stderr与PostgreSQL日志均为零；容器、source snapshot和credential/state目录全部清理。
+- operator policy文件/逻辑SHA-256为`e92f6d217dd9481a266258850698bc154ba0966613d8b33e7e426fd3730cdf74`/`b2e5cc0ff9a6febc8427a84286ef76f56bb3bd6de81f579ecc9ee7e00a1c7f65`；PG17 catalog文件/artifact为`87596b3183f274ff9834c04e483da5b3c07ac3c1dfc7d4b9d6123037d49fb4cf`/`694daeb7d309cc1f0eb923158769daf936fd01cf4deac1cfde176af03f26c30b`。正式inventory更新为`248/224/24`、SHA-256`c2a3daa8f803f46b3de7d03fd18a1ace13b8eb649b419ba78008b9be24bd7d27`，test runtime policy SHA-256为`923da508df03654bedc504752605ccafb2b1fed85494af4afcb5862ca5894bb7`。
+- 定向验证已通过operator 16/16、Supervisor launcher/installer/browser 29/29、catalog/release manifest/release gate 34/34以及真实PG17 system adapter；最终完整适用回归、凭据/文档/JSON/Shell/diff门和源码冻结后的canonical manifest-only直接子提交仍须完成。本任务因此保持唯一`DOING`，旧`bac5e882…cd9e`静态bundle及此前全部候选均为`STALE / NOT AUTHORIZABLE`。
+- 新增[受控Operator手册](../self-hosting/postgresql-runtime-privilege-operator.md)，明确直接消费者、三种operation、授权字段、唯一入口、停止线、SIGKILL恢复、quarantine和回退边界。仓库实现没有安装到host、创建真实secret或修改任何角色/ACL/Volume/UAT/生产；当前UAT仍是alpha.42/0040共享superuser与环境秘密，系统继续`PRODUCTION NO-GO`。

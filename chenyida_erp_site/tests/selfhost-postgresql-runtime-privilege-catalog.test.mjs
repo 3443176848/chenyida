@@ -50,8 +50,8 @@ const extensionRoutines = [
   ...Array.from({ length: 36 }, (_, index) => extensionRoutine(`public.pgcrypto_fixture_${String(index).padStart(3, "0")}()`, "pgcrypto")),
 ];
 const extensions = [
-  { name: "btree_gist", version: "1.7", schema: "public", owner: "MIGRATION_OWNER", member_count: 264, member_fingerprint: "4a26469a33ed80ccbde3fe6a4ff2ceda1378dc6334791652c6f7cb24206aadd3" },
-  { name: "pgcrypto", version: "1.3", schema: "public", owner: "MIGRATION_OWNER", member_count: 36, member_fingerprint: "d955c85a06a23f83029f5e33403a5635154f29e21ec05b203947200eb761a6fc" },
+  { name: "btree_gist", version: "1.7", schema: "public", owner: "PLATFORM_OWNER", member_count: 264, member_fingerprint: "4a26469a33ed80ccbde3fe6a4ff2ceda1378dc6334791652c6f7cb24206aadd3" },
+  { name: "pgcrypto", version: "1.3", schema: "public", owner: "PLATFORM_OWNER", member_count: 36, member_fingerprint: "d955c85a06a23f83029f5e33403a5635154f29e21ec05b203947200eb761a6fc" },
   { name: "plpgsql", version: "1.0", schema: "pg_catalog", owner: "PLATFORM_OWNER", member_count: 4, member_fingerprint: "84a784513dcf2b75afdb490ff4ab424391db1a751cd85ff43ea4f28d1918bddf" },
 ];
 const unsupported = Object.fromEntries([

@@ -14,8 +14,8 @@
   },
   "postgres_runtime_catalog": {
     "path": "operations/postgresql-runtime-privilege-compiled-catalog-v1.json",
-    "file_sha256": "e014b0c5969af047c2abe7e6ee92410d99ca9f5756163763ea5bdc0cd658fff6",
-    "artifact_sha256": "c462641dd48fc4c22836e88a28acf63a50a89652a6bbe8efc2ce1b8058b2d4cd",
+    "file_sha256": "87596b3183f274ff9834c04e483da5b3c07ac3c1dfc7d4b9d6123037d49fb4cf",
+    "artifact_sha256": "694daeb7d309cc1f0eb923158769daf936fd01cf4deac1cfde176af03f26c30b",
     "image_reference": "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394"
   },
   "posix_image": {
@@ -52,16 +52,16 @@
   },
   "test_inventory": {
     "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-    "sha256": "2e24b63bcdba87ca514134399335109eaf0828ae502f2a6ac14dcbe2467dcc8e",
-    "total_tests": 247,
-    "required_tests": 223,
+    "sha256": "c2a3daa8f803f46b3de7d03fd18a1ace13b8eb649b419ba78008b9be24bd7d27",
+    "total_tests": 248,
+    "required_tests": 224,
     "not_applicable_tests": 24,
     "category_counts": {
       "BROWSER": 6,
       "HISTORICAL_D1_SITES": 22,
       "POSTGRES": 84,
       "POSTGRES_ALIAS": 2,
-      "PURE_NODE": 120,
+      "PURE_NODE": 121,
       "RELEASE_CONTRACT": 6,
       "SPECIAL_HARNESS": 7
     }

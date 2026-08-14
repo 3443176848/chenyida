@@ -17,10 +17,16 @@ OWNER=chenyida_erp_owner
 RUNNING=0
 STAGE=INITIALIZE
 
+run_postgres() {
+  if [ "$(id -u)" = 0 ]; then gosu postgres "$@"
+  else "$@"
+  fi
+}
+
 cleanup() {
   status=0
   if [ "$RUNNING" = 1 ] && [ -s "$PGDATA/postmaster.pid" ]; then
-    gosu postgres pg_ctl -D "$PGDATA" -m fast -w stop >/dev/null 2>&1 || status=1
+    run_postgres pg_ctl -D "$PGDATA" -m fast -w stop >/dev/null 2>&1 || status=1
   fi
   case "${TASK_ROOT:-}" in
     /tmp/cyd-runtime-privilege-catalog-postgres.*) rm -rf -- "$TASK_ROOT" || status=1 ;;
@@ -51,17 +57,23 @@ trap 'on_signal 130' INT
 trap 'on_signal 143' TERM
 
 TASK_ROOT=$(mktemp -d /tmp/cyd-runtime-privilege-catalog-postgres.XXXXXX)
-chown postgres:postgres "$TASK_ROOT"
+if [ "$(id -u)" = 0 ]; then chown postgres:postgres "$TASK_ROOT"
+else [ "$(id -u):$(id -g)" = 999:999 ] || exit 1
+fi
 chmod 0700 "$TASK_ROOT"
 PGDATA="$TASK_ROOT/pgdata"
 PGSOCKET="$TASK_ROOT/socket"
+if [ "${ERP_RUNTIME_PRIVILEGE_CATALOG_REPOSITORY_MODE:-test}" = system-adapter ]; then PGSOCKET=/var/run/postgresql; fi
 PGLOG="$PGDATA/postgres.log"
+PG_OPTIONS_COMMON="-k $PGSOCKET -c max_connections=16 -c max_locks_per_transaction=1024 -c shared_buffers=48MB -c work_mem=2MB -c maintenance_work_mem=24MB -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c lock_timeout=5s -c statement_timeout=120s -c idle_in_transaction_session_timeout=120s"
 
-install -d -m 0700 -o postgres -g postgres "$PGDATA" "$PGSOCKET"
+if [ "$(id -u)" = 0 ]; then install -d -m 0700 -o postgres -g postgres "$PGDATA" "$PGSOCKET"
+else install -d -m 0700 "$PGDATA" "$PGSOCKET"
+fi
 STAGE=INITDB
-gosu postgres initdb -D "$PGDATA" --auth-local=trust --auth-host=trust --locale=C --encoding=UTF8 >/dev/null 2>&1
+run_postgres initdb -D "$PGDATA" --auth-local=trust --auth-host=trust --locale=C --encoding=UTF8 >/dev/null 2>&1
 STAGE=CLUSTER_START
-if ! gosu postgres pg_ctl -D "$PGDATA" -l "$PGLOG" -o "-k $PGSOCKET -c listen_addresses='' -c max_connections=16 -c max_locks_per_transaction=1024 -c shared_buffers=48MB -c work_mem=2MB -c maintenance_work_mem=24MB -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c lock_timeout=5s -c statement_timeout=120s -c idle_in_transaction_session_timeout=120s" -w start >/dev/null; then exit 1; fi
+if ! run_postgres pg_ctl -D "$PGDATA" -l "$PGLOG" -o "$PG_OPTIONS_COMMON -c listen_addresses=''" -w start >/dev/null; then exit 1; fi
 RUNNING=1
 export PGHOST="$PGSOCKET" PGUSER=postgres
 
@@ -83,6 +95,8 @@ export PGDATABASE="$DATABASE"
 STAGE=SCHEMA_SETUP
 psql -X -v ON_ERROR_STOP=1 <<SQL >/dev/null
 ALTER SCHEMA public OWNER TO pg_database_owner;
+CREATE EXTENSION btree_gist WITH SCHEMA public;
+CREATE EXTENSION pgcrypto WITH SCHEMA public;
 SQL
 PGUSER=$OWNER psql -X -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
 SELECT current_user=session_user AND current_user='chenyida_erp_owner' AS migration_identity_valid
@@ -119,9 +133,16 @@ REPORT_ONE="$TASK_ROOT/catalog-one.tsv"
 REPORT_TWO="$TASK_ROOT/catalog-two.tsv"
 capture() {
   output=$1
-  psql -X -A -t -F "$(printf '\t')" -v ON_ERROR_STOP=1 \
-    -v expected_database="$DATABASE" -v migration_owner="$OWNER" -v expected_marker="$MARKER" -v expected_system_identifier="$SYSTEM_IDENTIFIER" \
-    -o "$output" -f "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.sql"
+  controlled=${2:-NO}
+  if [ "$controlled" = YES ]; then
+    psql -X -A -t -F "$(printf '\t')" -v ON_ERROR_STOP=1 \
+      -v expected_database="$DATABASE" -v migration_owner="$OWNER" -v expected_marker="$MARKER" -v expected_system_identifier="$SYSTEM_IDENTIFIER" \
+      -v controlled_runtime_mode=1 -o "$output" -f "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.sql"
+  else
+    psql -X -A -t -F "$(printf '\t')" -v ON_ERROR_STOP=1 \
+      -v expected_database="$DATABASE" -v migration_owner="$OWNER" -v expected_marker="$MARKER" -v expected_system_identifier="$SYSTEM_IDENTIFIER" \
+      -o "$output" -f "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.sql"
+  fi
   chmod 0600 "$output"
 }
 
@@ -135,9 +156,18 @@ cmp -s "$REPORT_ONE" "$REPORT_TWO"
 CATALOG_ONE="$TASK_ROOT/catalog-one.json"
 CATALOG_TWO="$TASK_ROOT/catalog-two.json"
 STAGE=BASELINE_COMPILE_ONE
-node "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.mjs" compile \
+if ! node "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.mjs" compile \
   --access "$SITE_ROOT/operations/postgresql-runtime-privilege-access-v2.json" \
-  --expected-database "$DATABASE" --output "$CATALOG_ONE" --report "$REPORT_ONE" >/dev/null
+  --expected-database "$DATABASE" --output "$CATALOG_ONE" --report "$REPORT_ONE" >/dev/null; then
+  if [ ! -f "$REPORT_ONE" ] || [ -L "$REPORT_ONE" ]; then echo RUNTIME_PRIVILEGE_CATALOG_REPORT_METADATA_TYPE_INVALID >&2
+  elif [ "$(stat -c %h "$REPORT_ONE")" != 1 ]; then echo RUNTIME_PRIVILEGE_CATALOG_REPORT_METADATA_LINK_INVALID >&2
+  elif [ "$(stat -c %s "$REPORT_ONE")" -lt 1 ]; then echo RUNTIME_PRIVILEGE_CATALOG_REPORT_METADATA_SIZE_EMPTY >&2
+  elif [ "$(stat -c %s "$REPORT_ONE")" -gt 67108864 ]; then echo RUNTIME_PRIVILEGE_CATALOG_REPORT_METADATA_SIZE_TOO_LARGE >&2
+  elif [ $((0$(stat -c %a "$REPORT_ONE") & 022)) -ne 0 ]; then echo RUNTIME_PRIVILEGE_CATALOG_REPORT_METADATA_MODE_INVALID >&2
+  else echo RUNTIME_PRIVILEGE_CATALOG_REPORT_METADATA_STATIC_VALID >&2
+  fi
+  exit 1
+fi
 STAGE=BASELINE_COMPILE_TWO
 node "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.mjs" compile \
   --access "$SITE_ROOT/operations/postgresql-runtime-privilege-access-v2.json" \
@@ -285,7 +315,8 @@ node "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.mjs" verify \
   --access "$SITE_ROOT/operations/postgresql-runtime-privilege-access-v2.json" \
   --catalog "$CATALOG_ONE" --expected-database "$DATABASE" --report "$TASK_ROOT/catalog-final.tsv" >/dev/null
 
-if [ "${ERP_RUNTIME_PRIVILEGE_CATALOG_REPOSITORY_MODE:-test}" = test ]; then
+if [ "${ERP_RUNTIME_PRIVILEGE_CATALOG_REPOSITORY_MODE:-test}" = test ] \
+  || [ "${ERP_RUNTIME_PRIVILEGE_CATALOG_REPOSITORY_MODE:-test}" = system-adapter ]; then
 STAGE=RUNTIME_PRIVILEGE_DATABASE_RENAME
 PGDATABASE=postgres psql -X -v ON_ERROR_STOP=1 -v old_database="$DATABASE" -v new_database=chenyida_erp <<'SQL' >/dev/null
 SELECT format('ALTER DATABASE %I RENAME TO %I', :'old_database', :'new_database')
@@ -293,6 +324,12 @@ SELECT format('ALTER DATABASE %I RENAME TO %I', :'old_database', :'new_database'
 SQL
 DATABASE=chenyida_erp
 export PGDATABASE="$DATABASE"
+if [ "${ERP_RUNTIME_PRIVILEGE_CATALOG_REPOSITORY_MODE:-test}" = system-adapter ]; then
+  DEPLOYMENT_ID=${ERP_RUNTIME_PRIVILEGE_SYSTEM_ADAPTER_DEPLOYMENT_ID:-}
+  case "$DEPLOYMENT_ID" in ""|*[!A-Za-z0-9._-]*) exit 1 ;; esac
+  [ "${#DEPLOYMENT_ID}" -le 120 ] || exit 1
+  MARKER="chenyida-erp-deployment/v2:TEST:$DEPLOYMENT_ID"
+fi
 STAGE=RUNTIME_PRIVILEGE_DATABASE_MARKER
 psql -X -v ON_ERROR_STOP=1 -v database_name="$DATABASE" -v marker="$MARKER" <<'SQL' >/dev/null
 COMMENT ON DATABASE :"database_name" IS :'marker';
@@ -307,9 +344,18 @@ NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
 capture_state() {
   output=$1
   error_log=$2
-  if ! psql -X -A -t -v ON_ERROR_STOP=1 \
-    -v expected_database="$DATABASE" -v migration_owner="$OWNER" -v expected_marker="$MARKER" -v expected_system_identifier="$SYSTEM_IDENTIFIER" \
-    -f "$SITE_ROOT/scripts/postgresql-runtime-privilege-state.sql" >"$output" 2>"$error_log"; then
+  controlled=${3:-NO}
+  status=0
+  if [ "$controlled" = YES ]; then
+    psql -X -A -t -v ON_ERROR_STOP=1 \
+      -v expected_database="$DATABASE" -v migration_owner="$OWNER" -v expected_marker="$MARKER" -v expected_system_identifier="$SYSTEM_IDENTIFIER" \
+      -v controlled_runtime_mode=1 -f "$SITE_ROOT/scripts/postgresql-runtime-privilege-state.sql" >"$output" 2>"$error_log" || status=$?
+  else
+    psql -X -A -t -v ON_ERROR_STOP=1 \
+      -v expected_database="$DATABASE" -v migration_owner="$OWNER" -v expected_marker="$MARKER" -v expected_system_identifier="$SYSTEM_IDENTIFIER" \
+      -f "$SITE_ROOT/scripts/postgresql-runtime-privilege-state.sql" >"$output" 2>"$error_log" || status=$?
+  fi
+  if [ "${status:-0}" -ne 0 ]; then
     chmod 0600 "$output" "$error_log"
     return 1
   fi
@@ -325,25 +371,179 @@ capture_state "$PRIVILEGE_BASELINE" "$PRIVILEGE_BASELINE_ERROR" || {
   exit 1
 }
 
+if [ "${ERP_RUNTIME_PRIVILEGE_CATALOG_REPOSITORY_MODE:-test}" = system-adapter ]; then
+  STAGE=RUNTIME_PRIVILEGE_SYSTEM_ADAPTER_AUTH_POLICY
+  sed -i -E 's/^(host[[:space:]]+all[[:space:]]+all[[:space:]]+127\.0\.0\.1\/32[[:space:]]+)[^[:space:]]+$/\1scram-sha-256/' "$PGDATA/pg_hba.conf"
+  grep -Eq '^host[[:space:]]+all[[:space:]]+all[[:space:]]+127\.0\.0\.1\/32[[:space:]]+scram-sha-256$' "$PGDATA/pg_hba.conf" || exit 1
+  STAGE=RUNTIME_PRIVILEGE_SYSTEM_ADAPTER_AUTH_RESTART
+  run_postgres pg_ctl -D "$PGDATA" -l "$PGLOG" -o "$PG_OPTIONS_COMMON -c listen_addresses='*'" -w restart >/dev/null
+  STAGE=RUNTIME_PRIVILEGE_SYSTEM_ADAPTER_LOG_AUDIT
+  psql -X -d postgres -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET log_statement='all'" >/dev/null
+  psql -X -d postgres -v ON_ERROR_STOP=1 -c 'SELECT pg_reload_conf()' >/dev/null
+  STAGE=RUNTIME_PRIVILEGE_SYSTEM_ADAPTER_LOG_RESET
+  : >"$PGLOG"
+  STAGE=RUNTIME_PRIVILEGE_SYSTEM_ADAPTER_DATABASE_OID
+  DATABASE_OID=$(psql -X -q -A -t -v ON_ERROR_STOP=1 -d postgres -c "SELECT oid::text FROM pg_database WHERE datname='chenyida_erp'")
+  case "$DATABASE_OID" in ""|*[!0-9]*) exit 1 ;; esac
+  STAGE=RUNTIME_PRIVILEGE_SYSTEM_ADAPTER_CONTEXT_PUBLISH
+  SYSTEM_CONTEXT_TEMP="$EXPORT_ROOT/.system-adapter-context.pending"
+  {
+    printf 'SYSTEM_IDENTIFIER=%s\n' "$SYSTEM_IDENTIFIER"
+    printf 'DATABASE_OID=%s\n' "$DATABASE_OID"
+    printf 'DATABASE_MARKER=%s\n' "$MARKER"
+    printf 'PGLOG=%s\n' "$PGLOG"
+  } >"$SYSTEM_CONTEXT_TEMP"
+  chmod 0600 "$SYSTEM_CONTEXT_TEMP"
+  mv "$SYSTEM_CONTEXT_TEMP" "$EXPORT_ROOT/system-adapter-context"
+  : >"$EXPORT_ROOT/system-adapter-ready"
+  STAGE=RUNTIME_PRIVILEGE_SYSTEM_ADAPTER_WAIT
+  WAIT_COUNT=0
+  while [ ! -e "$EXPORT_ROOT/system-adapter-done" ]; do
+    [ ! -e "$EXPORT_ROOT/system-adapter-abort" ] || exit 1
+    WAIT_COUNT=$((WAIT_COUNT+1))
+    [ "$WAIT_COUNT" -le 1800 ] || exit 1
+    sleep 1
+  done
+  STAGE=RUNTIME_PRIVILEGE_SYSTEM_ADAPTER_FINAL_STATE
+  SYSTEM_FINAL="$TASK_ROOT/runtime-privilege-system-adapter-final.json"
+  capture_state "$SYSTEM_FINAL" "$TASK_ROOT/runtime-privilege-system-adapter-final.error" YES
+  NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
+    node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" verify-isolated-state "$SYSTEM_FINAL" >/dev/null
+  NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
+    node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" assert-isolated-noop "$SYSTEM_FINAL" >/dev/null
+  STAGE=RUNTIME_PRIVILEGE_SYSTEM_ADAPTER_FINAL_STRUCTURE
+  SYSTEM_STRUCTURE="$TASK_ROOT/runtime-privilege-system-adapter-final.tsv"
+  capture "$SYSTEM_STRUCTURE" YES
+  NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
+    node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" verify-isolated-structure "$SYSTEM_STRUCTURE" >/dev/null
+  STAGE=COMPLETE
+  printf 'runtime privilege PG17 compiled catalog integration passed\n'
+  exit 0
+fi
+
 STAGE=RUNTIME_PRIVILEGE_PLAN
 PRIVILEGE_PLAN="$TASK_ROOT/runtime-privilege-bootstrap.sql"
 PRIVILEGE_PLAN_ERROR="$TASK_ROOT/runtime-privilege-plan.error"
-if ! NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
-  node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" render-isolated-bootstrap-psql "$PRIVILEGE_BASELINE" > "$PRIVILEGE_PLAN" 2>"$PRIVILEGE_PLAN_ERROR"; then
+PRIVILEGE_CREDENTIAL_ROOT="$TASK_ROOT/runtime-privilege-credentials"
+if ! NODE_ENV=test ERP_RUNTIME_PRIVILEGE_CATALOG_POSTGRES_CONTAINER_MODE=YES \
+  node "$SITE_ROOT/tests/runtime-privilege-operator-postgres-fixture.mjs" create-transaction \
+    "$PRIVILEGE_BASELINE" "$PRIVILEGE_CREDENTIAL_ROOT" "$PRIVILEGE_PLAN" >/dev/null 2>"$PRIVILEGE_PLAN_ERROR"; then
   sed -n '1p' "$PRIVILEGE_PLAN_ERROR" | sed 's/[^A-Za-z0-9_:. -]/_/g' >&2
   exit 1
 fi
 chmod 0600 "$PRIVILEGE_PLAN"
 chmod 0600 "$PRIVILEGE_PLAN_ERROR"
 
+enable_transaction_log_audit() {
+  psql -X -d postgres -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET log_statement='all'" >/dev/null
+  psql -X -d postgres -v ON_ERROR_STOP=1 -c 'SELECT pg_reload_conf()' >/dev/null
+  : >"$PGLOG"
+  psql -X -d postgres -v ON_ERROR_STOP=1 -c 'SELECT 424242' >/dev/null
+  grep -Fq 'statement: SELECT 424242' "$PGLOG"
+}
+
+disable_transaction_log_audit() {
+  psql -X -d postgres -v ON_ERROR_STOP=1 -c 'ALTER SYSTEM RESET log_statement' >/dev/null
+  psql -X -d postgres -v ON_ERROR_STOP=1 -c 'SELECT pg_reload_conf()' >/dev/null
+}
+
+assert_transaction_log_secret_free() {
+  credential_root=$1
+  if grep -Fq 'SCRAM-SHA-256$' "$PGLOG"; then return 1; fi
+  patterns=$TASK_ROOT/runtime-privilege-log-patterns
+  {
+    sed -n '1p' "$credential_root/runtime-secrets/admin-database-password"
+    sed -n '1p' "$credential_root/runtime-secrets/admin-password"
+    sed -n '1p' "$credential_root/runtime-secrets/migration-database-password"
+    sed -n '1p' "$credential_root/runtime-secrets/postgres-bootstrap-password"
+    sed -n '1p' "$credential_root/runtime-secrets/web-database-password"
+    sed -n '1p' "$credential_root/runtime-secrets/worker-database-password"
+    sed -n 's/^password=//p' "$credential_root/backup-credentials/pg_capture_service.conf"
+  } >"$patterns"
+  chmod 0600 "$patterns"
+  [ "$(wc -l <"$patterns" | tr -d ' ')" = 7 ] || return 1
+  if grep -Fq -f "$patterns" "$PGLOG"; then return 1; fi
+  rm -f -- "$patterns"
+}
+
 STAGE=RUNTIME_PRIVILEGE_RECONCILE
 PRIVILEGE_RECONCILE_ERROR="$TASK_ROOT/runtime-privilege-reconcile.error"
+enable_transaction_log_audit
 if ! psql -X -v ON_ERROR_STOP=1 -f "$PRIVILEGE_PLAN" >/dev/null 2>"$PRIVILEGE_RECONCILE_ERROR"; then
   chmod 0600 "$PRIVILEGE_RECONCILE_ERROR"
   sed -n '1p' "$PRIVILEGE_RECONCILE_ERROR" | sed 's/[^A-Za-z0-9_:. -]/_/g' >&2
   exit 1
 fi
 chmod 0600 "$PRIVILEGE_RECONCILE_ERROR"
+assert_transaction_log_secret_free "$PRIVILEGE_CREDENTIAL_ROOT"
+disable_transaction_log_audit
+rm -f -- "$PRIVILEGE_PLAN"
+
+STAGE=RUNTIME_PRIVILEGE_PASSWORD_AUTH_ENABLE
+sed -i -E 's/^(host[[:space:]]+all[[:space:]]+all[[:space:]]+127\.0\.0\.1\/32[[:space:]]+)[^[:space:]]+$/\1scram-sha-256/' "$PGDATA/pg_hba.conf"
+grep -Eq '^host[[:space:]]+all[[:space:]]+all[[:space:]]+127\.0\.0\.1\/32[[:space:]]+scram-sha-256$' "$PGDATA/pg_hba.conf" || exit 1
+run_postgres pg_ctl -D "$PGDATA" -l "$PGLOG" -o "$PG_OPTIONS_COMMON -c listen_addresses='127.0.0.1'" -w restart >/dev/null
+
+credential_value() {
+  role=$1
+  credential_root=${2:-$PRIVILEGE_CREDENTIAL_ROOT}
+  case "$role" in
+    chenyida_erp_admin) file=$credential_root/runtime-secrets/admin-database-password ;;
+    chenyida_erp_backup) file=$credential_root/backup-credentials/pg_capture_service.conf ;;
+    chenyida_erp_owner) file=$credential_root/runtime-secrets/migration-database-password ;;
+    chenyida_erp_web) file=$credential_root/runtime-secrets/web-database-password ;;
+    chenyida_erp_worker) file=$credential_root/runtime-secrets/worker-database-password ;;
+    *) return 1 ;;
+  esac
+  if [ "$role" = chenyida_erp_backup ]; then value=$(sed -n 's/^password=//p' "$file")
+  else value=$(sed -n '1p' "$file")
+  fi
+  [ "${#value}" = 43 ] || return 1
+  printf '%s' "$value"
+}
+
+password_probe() {
+  role=$1
+  password=$2
+  expected=$3
+  if [ "$expected" = reject ]; then
+    if printf '%s\n' "$password" | PGCONNECT_TIMEOUT=5 psql -X -q -A -t --password -h 127.0.0.1 -p 5432 -U "$role" -d "$DATABASE" -c 'SELECT true' >/dev/null 2>&1; then
+      unset password
+      return 1
+    fi
+  else
+    observed=$(printf '%s\n' "$password" | PGCONNECT_TIMEOUT=5 psql -X -q -A -t --password -h 127.0.0.1 -p 5432 -U "$role" -d "$DATABASE" \
+      -c "SELECT (session_user=current_user)::text||'|'||(current_database()='$DATABASE')::text||'|'||(SELECT (rolcanlogin AND NOT rolsuper AND NOT rolcreaterole AND NOT rolcreatedb AND NOT rolreplication AND NOT rolbypassrls)::text FROM pg_catalog.pg_roles WHERE rolname=current_user)" 2>/dev/null)
+    [ "$observed" = 'true|true|true' ] || { unset password; return 1; }
+  fi
+  unset password
+}
+
+STAGE=RUNTIME_PRIVILEGE_PASSWORD_PROBES
+HASH_STATE=$(psql -X -q -A -t -v ON_ERROR_STOP=1 -c "SELECT count(*) FILTER (WHERE rolpassword LIKE 'SCRAM-SHA-256$%')::text||':'||current_setting('password_encryption') FROM pg_catalog.pg_authid WHERE rolcanlogin AND rolname IN ('chenyida_erp_admin','chenyida_erp_backup','chenyida_erp_owner','chenyida_erp_web','chenyida_erp_worker')")
+[ "$HASH_STATE" = '5:scram-sha-256' ] || exit 1
+for role in chenyida_erp_admin chenyida_erp_backup chenyida_erp_owner chenyida_erp_web chenyida_erp_worker; do
+  password_probe "$role" AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA reject
+  correct_password=$(credential_value "$role")
+  password_probe "$role" "$correct_password" accept
+  unset correct_password
+done
+
+STAGE=RUNTIME_PRIVILEGE_PASSWORD_ROLLBACK
+ROLLBACK_PASSWORD=$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))")
+[ "${#ROLLBACK_PASSWORD}" = 43 ] || exit 1
+if {
+  printf '%s\n' '\set ON_ERROR_STOP on' 'BEGIN;' "SET LOCAL password_encryption='scram-sha-256';" '\password "chenyida_erp_owner"'
+  printf '%s\n%s\n' "$ROLLBACK_PASSWORD" "$ROLLBACK_PASSWORD"
+  printf '%s\n' 'SELECT 1/0;' 'COMMIT;'
+} | psql -X -q >/dev/null 2>&1; then exit 1; fi
+correct_password=$(credential_value chenyida_erp_owner)
+password_probe chenyida_erp_owner "$correct_password" accept
+password_probe chenyida_erp_owner "$ROLLBACK_PASSWORD" reject
+unset correct_password ROLLBACK_PASSWORD
+
+STAGE=RUNTIME_PRIVILEGE_PASSWORD_AUTH_DISABLE
+run_postgres pg_ctl -D "$PGDATA" -l "$PGLOG" -o "$PG_OPTIONS_COMMON -c listen_addresses=''" -w restart >/dev/null
 
 STAGE=RUNTIME_PRIVILEGE_POST_CAPTURE
 PRIVILEGE_FINAL="$TASK_ROOT/runtime-privilege-final.json"
@@ -356,6 +556,59 @@ NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
   node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" verify-isolated-state "$PRIVILEGE_FINAL" >/dev/null
 NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
   node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" assert-isolated-noop "$PRIVILEGE_FINAL" >/dev/null
+
+STAGE=RUNTIME_PRIVILEGE_PASSWORD_ONLY_RECONCILE_DRIFT
+OLD_WEB_PASSWORD=$(credential_value chenyida_erp_web)
+DRIFT_PASSWORD=$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))")
+[ "${#DRIFT_PASSWORD}" = 43 ] || exit 1
+if ! {
+  printf '%s\n' '\password "chenyida_erp_web"'
+  printf '%s\n%s\n' "$DRIFT_PASSWORD" "$DRIFT_PASSWORD"
+} | psql -X -q -v ON_ERROR_STOP=1 >/dev/null 2>&1; then exit 1; fi
+unset DRIFT_PASSWORD
+
+STAGE=RUNTIME_PRIVILEGE_PASSWORD_ONLY_RECONCILE_PLAN
+PASSWORD_RECONCILE_PLAN="$TASK_ROOT/runtime-privilege-password-reconcile.sql"
+PASSWORD_RECONCILE_ERROR="$TASK_ROOT/runtime-privilege-password-reconcile.error"
+PASSWORD_RECONCILE_CREDENTIAL_ROOT="$TASK_ROOT/runtime-privilege-reconcile-credentials"
+if ! NODE_ENV=test ERP_RUNTIME_PRIVILEGE_CATALOG_POSTGRES_CONTAINER_MODE=YES \
+  node "$SITE_ROOT/tests/runtime-privilege-operator-postgres-fixture.mjs" create-reconcile-transaction \
+    "$PRIVILEGE_FINAL" "$PASSWORD_RECONCILE_CREDENTIAL_ROOT" "$PASSWORD_RECONCILE_PLAN" >/dev/null 2>"$PASSWORD_RECONCILE_ERROR"; then
+  sed -n '1p' "$PASSWORD_RECONCILE_ERROR" | sed 's/[^A-Za-z0-9_:. -]/_/g' >&2
+  exit 1
+fi
+chmod 0600 "$PASSWORD_RECONCILE_PLAN" "$PASSWORD_RECONCILE_ERROR"
+STAGE=RUNTIME_PRIVILEGE_PASSWORD_ONLY_RECONCILE
+enable_transaction_log_audit
+if ! psql -X -v ON_ERROR_STOP=1 -f "$PASSWORD_RECONCILE_PLAN" >/dev/null 2>"$PASSWORD_RECONCILE_ERROR"; then
+  sed -n '1p' "$PASSWORD_RECONCILE_ERROR" | sed 's/[^A-Za-z0-9_:. -]/_/g' >&2
+  exit 1
+fi
+assert_transaction_log_secret_free "$PASSWORD_RECONCILE_CREDENTIAL_ROOT"
+disable_transaction_log_audit
+rm -f -- "$PASSWORD_RECONCILE_PLAN"
+PRIVILEGE_CREDENTIAL_ROOT="$PASSWORD_RECONCILE_CREDENTIAL_ROOT"
+
+STAGE=RUNTIME_PRIVILEGE_PASSWORD_ONLY_RECONCILE_AUTH_ENABLE
+run_postgres pg_ctl -D "$PGDATA" -l "$PGLOG" -o "$PG_OPTIONS_COMMON -c listen_addresses='127.0.0.1'" -w restart >/dev/null
+password_probe chenyida_erp_web "$OLD_WEB_PASSWORD" reject
+for role in chenyida_erp_admin chenyida_erp_backup chenyida_erp_owner chenyida_erp_web chenyida_erp_worker; do
+  password_probe "$role" AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA reject
+  correct_password=$(credential_value "$role")
+  password_probe "$role" "$correct_password" accept
+  unset correct_password
+done
+unset OLD_WEB_PASSWORD
+STAGE=RUNTIME_PRIVILEGE_PASSWORD_ONLY_RECONCILE_AUTH_DISABLE
+run_postgres pg_ctl -D "$PGDATA" -l "$PGLOG" -o "$PG_OPTIONS_COMMON -c listen_addresses=''" -w restart >/dev/null
+
+STAGE=RUNTIME_PRIVILEGE_PASSWORD_ONLY_RECONCILE_STATE
+PRIVILEGE_PASSWORD_RECONCILED="$TASK_ROOT/runtime-privilege-password-reconciled.json"
+PRIVILEGE_PASSWORD_RECONCILED_ERROR="$TASK_ROOT/runtime-privilege-password-reconciled.error"
+capture_state "$PRIVILEGE_PASSWORD_RECONCILED" "$PRIVILEGE_PASSWORD_RECONCILED_ERROR"
+cmp -s "$PRIVILEGE_FINAL" "$PRIVILEGE_PASSWORD_RECONCILED"
+NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
+  node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" assert-isolated-noop "$PRIVILEGE_PASSWORD_RECONCILED" >/dev/null
 
 expect_role_success() {
   role=$1
