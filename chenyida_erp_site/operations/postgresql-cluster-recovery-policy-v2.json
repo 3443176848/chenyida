@@ -1,0 +1,631 @@
+{
+  "schema_version": 2,
+  "contract": "chenyida-erp-postgresql-cluster-recovery-policy/v2",
+  "policy_id": "chenyida-erp-postgresql-cluster-recovery-v2",
+  "policy_generation": 1,
+  "scope": "PRODUCTION_BASELINE",
+  "postgresql_major": "17",
+  "base_cluster_policy_binding": {
+    "path": "operations/postgresql-cluster-recovery-policy-v1.json",
+    "contract": "chenyida-erp-postgresql-cluster-recovery-policy/v1",
+    "policy_id": "chenyida-erp-postgresql-cluster-recovery-v1",
+    "policy_sha256": "305100a52110dd8a9b3232a44eebf33d8c522e3e4be5f247b0252918f15cb143",
+    "file_sha256": "7e24d900b3445ca6b4f406b7330919cc1269f34fdf6bef193eedacf0d2e5bd13",
+    "policy": {
+      "schema_version": 1,
+      "contract": "chenyida-erp-postgresql-cluster-recovery-policy/v1",
+      "policy_id": "chenyida-erp-postgresql-cluster-recovery-v1",
+      "scope": "PRODUCTION_BASELINE",
+      "postgresql_major": "17",
+      "database": {
+        "name": "chenyida_erp",
+        "owner": "chenyida_erp_owner",
+        "default_tablespace": "pg_default",
+        "allow_connect": true,
+        "connection_limit": 64,
+        "public_connect": false
+      },
+      "identities": {
+        "migration_owner": "chenyida_erp_owner",
+        "runtime_login": "chenyida_erp_runtime",
+        "privilege_group": "chenyida_erp_rw",
+        "backup_capture": "BACKUP_CAPTURE",
+        "restore_admin": "RESTORE_ADMIN",
+        "unauthorized_probe": "UNAUTHORIZED_PROBE"
+      },
+      "roles": [
+        {
+          "name": "chenyida_erp_owner",
+          "purpose": "MIGRATION_OWNER",
+          "intended_login": true,
+          "inherit": true,
+          "connection_limit": 2,
+          "valid_until": null
+        },
+        {
+          "name": "chenyida_erp_runtime",
+          "purpose": "RUNTIME",
+          "intended_login": true,
+          "inherit": true,
+          "connection_limit": 32,
+          "valid_until": null
+        },
+        {
+          "name": "chenyida_erp_rw",
+          "purpose": "PRIVILEGE_GROUP",
+          "intended_login": false,
+          "inherit": true,
+          "connection_limit": -1,
+          "valid_until": null
+        }
+      ],
+      "memberships": [
+        {
+          "role": "chenyida_erp_rw",
+          "member": "chenyida_erp_runtime",
+          "grantor": "RESTORE_ADMIN",
+          "admin_option": false,
+          "inherit_option": true,
+          "set_option": false
+        }
+      ],
+      "settings": {
+        "allowed_keys": [
+          "application_name",
+          "idle_in_transaction_session_timeout",
+          "lock_timeout",
+          "statement_timeout"
+        ],
+        "required": []
+      },
+      "acl": {
+        "fixed_semantic_references": [
+          "PUBLIC",
+          "pg_database_owner"
+        ],
+        "allowed_grantors": [
+          "chenyida_erp_owner",
+          "pg_database_owner"
+        ],
+        "allowed_grantees": [
+          "PUBLIC",
+          "chenyida_erp_owner",
+          "chenyida_erp_rw",
+          "pg_database_owner"
+        ],
+        "grantable_roles": [
+          "chenyida_erp_owner"
+        ],
+        "public_allowed_privileges": {
+          "DATABASE": [],
+          "SCHEMA": [
+            "USAGE"
+          ],
+          "TABLE": [],
+          "PARTITIONED_TABLE": [],
+          "VIEW": [],
+          "MATERIALIZED_VIEW": [],
+          "SEQUENCE": [],
+          "COLUMN": [],
+          "ROUTINE": [],
+          "TYPE": [],
+          "LARGE_OBJECT": [],
+          "TABLESPACE": []
+        },
+        "non_owner_allowed_privileges": {
+          "DATABASE": [
+            "CONNECT",
+            "TEMPORARY"
+          ],
+          "SCHEMA": [
+            "USAGE"
+          ],
+          "TABLE": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "PARTITIONED_TABLE": [
+            "DELETE",
+            "INSERT",
+            "SELECT",
+            "UPDATE"
+          ],
+          "VIEW": [
+            "SELECT"
+          ],
+          "MATERIALIZED_VIEW": [
+            "SELECT"
+          ],
+          "SEQUENCE": [
+            "SELECT",
+            "UPDATE",
+            "USAGE"
+          ],
+          "COLUMN": [
+            "INSERT",
+            "REFERENCES",
+            "SELECT",
+            "UPDATE"
+          ],
+          "ROUTINE": [
+            "EXECUTE"
+          ],
+          "TYPE": [
+            "USAGE"
+          ],
+          "LARGE_OBJECT": [
+            "SELECT",
+            "UPDATE"
+          ],
+          "TABLESPACE": []
+        }
+      },
+      "supported_object_kinds": [
+        "COLUMN",
+        "INDEX_PLACEMENT",
+        "LARGE_OBJECT",
+        "MATERIALIZED_VIEW",
+        "PARTITIONED_INDEX_PLACEMENT",
+        "PARTITIONED_TABLE",
+        "ROUTINE",
+        "SCHEMA",
+        "SEQUENCE",
+        "TABLE",
+        "TYPE",
+        "VIEW"
+      ],
+      "extensions": {
+        "allowed": [
+          {
+            "name": "btree_gist",
+            "schema": "public",
+            "owner": "chenyida_erp_owner",
+            "kind": "APPLICATION"
+          },
+          {
+            "name": "pgcrypto",
+            "schema": "public",
+            "owner": "chenyida_erp_owner",
+            "kind": "APPLICATION"
+          },
+          {
+            "name": "plpgsql",
+            "schema": "pg_catalog",
+            "owner": "RESTORE_ADMIN",
+            "kind": "PLATFORM"
+          }
+        ],
+        "required": [
+          "plpgsql"
+        ]
+      },
+      "unsupported_catalog_counters": [
+        "access_methods",
+        "capture_role_conflicts",
+        "casts",
+        "collations",
+        "conversions",
+        "event_triggers",
+        "external_database_settings",
+        "foreign_data_wrappers",
+        "foreign_servers",
+        "foreign_tables",
+        "operator_classes",
+        "operator_families",
+        "operators",
+        "parameter_acl_entries",
+        "policy_role_endpoints",
+        "replication_origins",
+        "row_security_policies",
+        "security_labels",
+        "statistics_extensions",
+        "subscriptions",
+        "text_search_objects",
+        "transforms",
+        "unapproved_languages",
+        "unapproved_settings",
+        "unsupported_relations",
+        "user_mappings"
+      ],
+      "tablespaces": {
+        "allow_custom": true,
+        "maximum_custom": 8,
+        "owner": "chenyida_erp_owner"
+      },
+      "credential_binding": {
+        "login_roles": [
+          "chenyida_erp_owner",
+          "chenyida_erp_runtime"
+        ],
+        "minimum_password_bytes": 24,
+        "maximum_password_bytes": 256
+      }
+    }
+  },
+  "database": {
+    "name": "chenyida_erp",
+    "owner": "chenyida_erp_owner",
+    "default_tablespace": "pg_default",
+    "allow_connect": true,
+    "connection_limit": 64,
+    "public_connect": false
+  },
+  "identities": {
+    "migration_owner": "chenyida_erp_owner",
+    "platform_owner": "PLATFORM_OWNER",
+    "admin_login": "chenyida_erp_admin",
+    "admin_privilege_group": "chenyida_erp_admin_priv",
+    "backup_login": "chenyida_erp_backup",
+    "backup_privilege_group": "chenyida_erp_backup_priv",
+    "web_login": "chenyida_erp_web",
+    "web_privilege_group": "chenyida_erp_web_priv",
+    "worker_login": "chenyida_erp_worker",
+    "worker_privilege_group": "chenyida_erp_worker_priv",
+    "backup_control": "BACKUP_CONTROL",
+    "restore_bootstrap": "RESTORE_BOOTSTRAP",
+    "unauthorized_probe": "UNAUTHORIZED_PROBE"
+  },
+  "roles": [
+    {
+      "name": "chenyida_erp_admin",
+      "purpose": "ADMIN_LOGIN",
+      "intended_login": true,
+      "inherit": true,
+      "connection_limit": 1,
+      "valid_until": null
+    },
+    {
+      "name": "chenyida_erp_admin_priv",
+      "purpose": "ADMIN_PRIVILEGE_GROUP",
+      "intended_login": false,
+      "inherit": true,
+      "connection_limit": -1,
+      "valid_until": null
+    },
+    {
+      "name": "chenyida_erp_backup",
+      "purpose": "BACKUP_LOGIN",
+      "intended_login": true,
+      "inherit": true,
+      "connection_limit": 2,
+      "valid_until": null
+    },
+    {
+      "name": "chenyida_erp_backup_priv",
+      "purpose": "BACKUP_PRIVILEGE_GROUP",
+      "intended_login": false,
+      "inherit": true,
+      "connection_limit": -1,
+      "valid_until": null
+    },
+    {
+      "name": "chenyida_erp_owner",
+      "purpose": "MIGRATION_OWNER",
+      "intended_login": true,
+      "inherit": false,
+      "connection_limit": 1,
+      "valid_until": null
+    },
+    {
+      "name": "chenyida_erp_web",
+      "purpose": "WEB_LOGIN",
+      "intended_login": true,
+      "inherit": true,
+      "connection_limit": 12,
+      "valid_until": null
+    },
+    {
+      "name": "chenyida_erp_web_priv",
+      "purpose": "WEB_PRIVILEGE_GROUP",
+      "intended_login": false,
+      "inherit": true,
+      "connection_limit": -1,
+      "valid_until": null
+    },
+    {
+      "name": "chenyida_erp_worker",
+      "purpose": "WORKER_LOGIN",
+      "intended_login": true,
+      "inherit": true,
+      "connection_limit": 6,
+      "valid_until": null
+    },
+    {
+      "name": "chenyida_erp_worker_priv",
+      "purpose": "WORKER_PRIVILEGE_GROUP",
+      "intended_login": false,
+      "inherit": true,
+      "connection_limit": -1,
+      "valid_until": null
+    }
+  ],
+  "memberships": [
+    {
+      "role": "chenyida_erp_admin_priv",
+      "member": "chenyida_erp_admin",
+      "grantor": "PLATFORM_OWNER",
+      "admin_option": false,
+      "inherit_option": true,
+      "set_option": false
+    },
+    {
+      "role": "chenyida_erp_backup_priv",
+      "member": "chenyida_erp_backup",
+      "grantor": "PLATFORM_OWNER",
+      "admin_option": false,
+      "inherit_option": true,
+      "set_option": false
+    },
+    {
+      "role": "chenyida_erp_web_priv",
+      "member": "chenyida_erp_web",
+      "grantor": "PLATFORM_OWNER",
+      "admin_option": false,
+      "inherit_option": true,
+      "set_option": false
+    },
+    {
+      "role": "chenyida_erp_worker_priv",
+      "member": "chenyida_erp_worker",
+      "grantor": "PLATFORM_OWNER",
+      "admin_option": false,
+      "inherit_option": true,
+      "set_option": false
+    }
+  ],
+  "settings": {
+    "allowed_keys": [
+      "application_name",
+      "idle_in_transaction_session_timeout",
+      "lock_timeout",
+      "statement_timeout"
+    ],
+    "required": []
+  },
+  "acl": {
+    "fixed_semantic_references": [
+      "PUBLIC",
+      "pg_database_owner"
+    ],
+    "allowed_grantors": [
+      "chenyida_erp_owner",
+      "pg_database_owner"
+    ],
+    "allowed_grantees": [
+      "PUBLIC",
+      "chenyida_erp_admin_priv",
+      "chenyida_erp_backup_priv",
+      "chenyida_erp_owner",
+      "chenyida_erp_web_priv",
+      "chenyida_erp_worker_priv",
+      "pg_database_owner"
+    ],
+    "grantable_roles": [
+      "chenyida_erp_owner"
+    ],
+    "public_allowed_privileges": {
+      "DATABASE": [],
+      "SCHEMA": [],
+      "TABLE": [],
+      "PARTITIONED_TABLE": [],
+      "VIEW": [],
+      "MATERIALIZED_VIEW": [],
+      "SEQUENCE": [],
+      "COLUMN": [],
+      "ROUTINE": [],
+      "TYPE": [],
+      "LARGE_OBJECT": [],
+      "TABLESPACE": []
+    },
+    "non_owner_allowed_privileges": {
+      "DATABASE": [
+        "CONNECT",
+        "TEMPORARY"
+      ],
+      "SCHEMA": [
+        "USAGE"
+      ],
+      "TABLE": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "PARTITIONED_TABLE": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "VIEW": [
+        "SELECT"
+      ],
+      "MATERIALIZED_VIEW": [
+        "SELECT"
+      ],
+      "SEQUENCE": [
+        "SELECT",
+        "UPDATE",
+        "USAGE"
+      ],
+      "COLUMN": [
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "UPDATE"
+      ],
+      "ROUTINE": [
+        "EXECUTE"
+      ],
+      "TYPE": [
+        "USAGE"
+      ],
+      "LARGE_OBJECT": [],
+      "TABLESPACE": []
+    }
+  },
+  "supported_object_kinds": [
+    "COLUMN",
+    "INDEX_PLACEMENT",
+    "LARGE_OBJECT",
+    "MATERIALIZED_VIEW",
+    "PARTITIONED_INDEX_PLACEMENT",
+    "PARTITIONED_TABLE",
+    "ROUTINE",
+    "SCHEMA",
+    "SEQUENCE",
+    "TABLE",
+    "TYPE",
+    "VIEW"
+  ],
+  "extensions": {
+    "allowed": [
+      {
+        "name": "btree_gist",
+        "schema": "public",
+        "owner": "PLATFORM_OWNER",
+        "kind": "PLATFORM"
+      },
+      {
+        "name": "pgcrypto",
+        "schema": "public",
+        "owner": "PLATFORM_OWNER",
+        "kind": "PLATFORM"
+      },
+      {
+        "name": "plpgsql",
+        "schema": "pg_catalog",
+        "owner": "PLATFORM_OWNER",
+        "kind": "PLATFORM"
+      }
+    ],
+    "required": [
+      "btree_gist",
+      "pgcrypto",
+      "plpgsql"
+    ]
+  },
+  "unsupported_catalog_counters": [
+    "access_methods",
+    "capture_role_conflicts",
+    "casts",
+    "collations",
+    "conversions",
+    "event_triggers",
+    "external_database_settings",
+    "foreign_data_wrappers",
+    "foreign_servers",
+    "foreign_tables",
+    "operator_classes",
+    "operator_families",
+    "operators",
+    "parameter_acl_entries",
+    "policy_role_endpoints",
+    "replication_origins",
+    "row_security_policies",
+    "security_labels",
+    "statistics_extensions",
+    "subscriptions",
+    "text_search_objects",
+    "transforms",
+    "unapproved_languages",
+    "unapproved_settings",
+    "unsupported_relations",
+    "user_mappings"
+  ],
+  "tablespaces": {
+    "allow_custom": false,
+    "maximum_custom": 0,
+    "owner": "PLATFORM_OWNER"
+  },
+  "credential_binding": {
+    "login_roles": [
+      "chenyida_erp_admin",
+      "chenyida_erp_backup",
+      "chenyida_erp_owner",
+      "chenyida_erp_web",
+      "chenyida_erp_worker"
+    ],
+    "minimum_password_bytes": 32,
+    "maximum_password_bytes": 64
+  },
+  "runtime_privilege_binding": {
+    "path": "operations/postgresql-runtime-privilege-policy-v2.json",
+    "contract": "chenyida-erp-postgresql-runtime-privilege-policy/v2",
+    "policy_id": "chenyida-erp-postgresql-runtime-privilege-v2",
+    "policy_sha256": "e31413ae3b8fe8ef4c119e043db8d7777524ac5ad4515936727aab57dbd66ddf",
+    "file_sha256": "9870daab872a0e4df4958bce98f26ffef2ed2bdfc94047974e64a0cd49d3ef3c",
+    "access_sha256": "8eece185f306dc3d1c54275329068c16620b3ffbd5c8d703849166fb07f6fc76",
+    "compiled_catalog_sha256": "e0070514bdaaa998f114583ed820047688ef8945aa5ea3cafdfb873e3df02e8c",
+    "compiled_catalog_artifact_sha256": "b8536bc18531a819e8baa77012f9ef91e67241cc769978df482b81aa6a869beb",
+    "migration_head": "0046_runtime_lock_privilege_boundary.sql",
+    "migration_count": 46,
+    "migration_source_set_sha256": "c3392d8d8e8a0e63acead47c7a4b48b305c7eba456fa7511851494312d255a8f",
+    "migration_allowlist_sha256": "8bb2b2d662df03e397d49c4ed5d11f1af1a9406ecbaff37aee8fc0d2d7388eed",
+    "engine_image_reference": "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394",
+    "engine_server_version_num": "170010",
+    "role_set_sha256": "6b333ec626bb5c4d42a03a5151680cbfa4ed9b184c7c3ee27525af60ca7e86bf",
+    "membership_set_sha256": "7e779d56353829a28afebf8f19c0cb63a7623fbb02d60dd1bcc6c5c2e437a1d9",
+    "login_role_set_sha256": "2e4ff6593cf7b4fad5c90d25963b3ffb0c98dae71eb9ee666053e3638811fc41",
+    "service_bindings_sha256": "ae391904417222768554b9d0a7d63d83f374e5fefe9d6908536299f68e8cac58",
+    "default_privileges_sha256": "032febe601992c7a9c23c39a6ab2111a8e8c1104c3aa0d494f87430fe00ba316",
+    "extensions_sha256": "edf551a0dbcaf4d46f594604efcf3239584bd4d5e11e1e55281e1218d86ac787",
+    "acl_summary_sha256": "790766547eac4331fe46bc513316a1e8a1744dc939ef34966b46839ce4ee0a3c",
+    "object_constraints_sha256": "cf70c5c3921bace138f43b476bd777e20c45470bd394b174a3b4b244ea5532d4",
+    "tablespaces_sha256": "1a0db725c894f23de99fb5c7ccb907fcd0452e20da494aee092753b0b16ae738",
+    "operator_policy_path": "operations/postgresql-runtime-privilege-operator-policy-v1.json",
+    "operator_policy_contract": "chenyida-erp-postgresql-runtime-privilege-operator-policy/v1",
+    "operator_policy_sha256": "85c7d2ea7b075d9ffd20a8a1962648fdaeba63509b2a7af59cb671e4c9f17acc",
+    "operator_policy_file_sha256": "53b502fd1da16de49fee333709b408504313bd2bffe902a99df7e83d6211d163"
+  },
+  "actual_recovery_controls": {
+    "required_recovery_control_intent_contract": "chenyida-erp-postgresql-recovery-control-intent/v2",
+    "required_runtime_privilege_receipt_contract": "chenyida-erp-postgresql-runtime-privilege-operator-receipt/v1",
+    "required_runtime_privilege_operation": "BOOTSTRAP",
+    "required_runtime_guard_mode": "PRE_DEPLOY_POSTGRESQL_BOOTSTRAP_BOUND",
+    "allowed_deployment_classes": [
+      "PRODUCTION",
+      "UAT"
+    ],
+    "required_isolated_target_deployment_class": "TEST",
+    "required_data_domains": [
+      "POSTGRESQL",
+      "attachments",
+      "backup_status",
+      "uploads"
+    ],
+    "required_target_bootstrap_state": "EMPTY_NEW_CLUSTER",
+    "required_prepublication_connection_state": "NETWORK_FENCED_NO_APPLICATION_WRITERS",
+    "source_overwrite_forbidden": true,
+    "large_object_verification_required": true,
+    "secret_rebinding_required": true,
+    "target_disposition_required": true,
+    "rpo_rto_activation_binding_required": true,
+    "one_time_authorization_required": true,
+    "approval_reference_sha256_required": true,
+    "distinct_source_target_system_identifier_required": true,
+    "distinct_source_target_machine_identity_required": true,
+    "distinct_source_target_location_required": true,
+    "root_credential_binding_required": true,
+    "operations_policy_match_required": true,
+    "runtime_release_identity_match_required": true
+  },
+  "activation": {
+    "status": "REPOSITORY_TEMPLATE",
+    "environment": null,
+    "generation": 0,
+    "previous_policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "supervisor_bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "authorization_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "approval_reference_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "responsible_operator_identity_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "approver_identity_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "rpo_hours": null,
+    "rto_minutes": null,
+    "target_disposition": null,
+    "activated_at": null,
+    "expires_at": null
+  }
+}

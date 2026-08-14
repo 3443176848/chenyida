@@ -10,11 +10,29 @@ import { handleDashboardApi } from "../app/lib/dashboard-selfhost/handler.ts";
 import { DashboardService } from "../app/lib/dashboard-selfhost/service.ts";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
 import {
+  BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION,
   createBackupRecoveryReadinessV4,
   publishBackupRecoveryReadinessV4,
   validateBackupRecoveryReadinessV4,
 } from "../scripts/backup-recovery-readiness-v4.mjs";
-import { createInitialRecoveryState, createRecoveryIntent, transitionRecoveryState } from "../scripts/postgresql-cluster-recovery-contract.mjs";
+import {
+  clusterPolicySha256,
+  clusterSha256,
+  createInitialRecoveryState,
+  createRecoveryIntent,
+  transitionRecoveryState,
+} from "../scripts/postgresql-cluster-recovery-contract.mjs";
+import {
+  clusterRecoveryPolicyV2Sha256,
+  createRecoveryControlIntentV2,
+} from "../scripts/postgresql-cluster-recovery-policy-v2-contract.mjs";
+import { activateClusterRecoveryPolicyV2 } from "../scripts/postgresql-cluster-recovery-policy-v2.mjs";
+import {
+  createInitialRuntimePrivilegeOperatorState,
+  createRuntimePrivilegeOperatorIntent,
+  createRuntimePrivilegeOperatorReceipt,
+  transitionRuntimePrivilegeOperatorState,
+} from "../scripts/postgresql-runtime-privilege-operator.mjs";
 
 const actor=(role)=>({username:`${role}01`,role,permissions:permissionsForRole(role)});
 const hash="a".repeat(64),receiverHash="d".repeat(64),targetSystemIdentifier="8612345678901234567";
@@ -34,6 +52,128 @@ const legacyReadinessV3=recoveryReadiness(),readiness=recoveryReadinessV4(legacy
 const syntheticRestore={...valid,deployment:{...valid.deployment,class:"TEST",database_marker:"TEST.erp-uat"}};
 const syntheticReadinessV3=recoveryReadiness(syntheticRestore,false),syntheticReadiness=recoveryReadinessV4(syntheticReadinessV3);
 const clusterRecoveryPolicy=JSON.parse(await readFile(new URL("../operations/postgresql-cluster-recovery-policy-v1.json",import.meta.url),"utf8"));
+const clusterRecoveryPolicyV2Template=JSON.parse(await readFile(new URL("../operations/postgresql-cluster-recovery-policy-v2.json",import.meta.url),"utf8"));
+const activateV2Policy=(overrides={})=>activateClusterRecoveryPolicyV2(clusterRecoveryPolicyV2Template,{environment:"UAT",generation:1,previous_policy_sha256:"0".repeat(64),supervisor_bundle_sha256:"1".repeat(64),authorization_sha256:"2".repeat(64),approval_reference_sha256:"3".repeat(64),responsible_operator_identity_sha256:"4".repeat(64),approver_identity_sha256:"5".repeat(64),rpo_hours:24,rto_minutes:120,target_disposition:"DESTROY_AFTER_EVIDENCE",activated_at:"2026-07-25T01:00:00.000Z",expires_at:"2026-07-26T01:00:00.000Z",...overrides});
+const clusterRecoveryPolicyV2=activateV2Policy();
+
+const recoveryReadinessV4PolicyV2=(legacy,policy=clusterRecoveryPolicyV2,{runtimeTarget={},runtimeAuthorization="e".repeat(64)}={})=>{
+  const value=structuredClone(legacy),restore=value.data_readiness.receipt.inner_restore.receipt;
+  const tablespaceBody={...value.tablespace.receipt};
+  delete tablespaceBody.receipt_sha256;
+  tablespaceBody.custom_tablespace_count=0;
+  const tablespace={...tablespaceBody,receipt_sha256:canonicalSha(tablespaceBody)};
+  value.tablespace={receipt_sha256:tablespace.receipt_sha256,custom_tablespace_count:0,status:"VERIFIED",receipt:tablespace};
+
+  const clusterBody={...value.cluster_security.receipt};
+  delete clusterBody.receipt_sha256;
+  clusterBody.tablespace_receipt_sha256=tablespace.receipt_sha256;
+  const cluster={...clusterBody,receipt_sha256:canonicalSha(clusterBody)};
+  value.cluster_security={receipt_sha256:cluster.receipt_sha256,snapshot_sha256:cluster.snapshot_sha256,policy_id:cluster.policy_id,policy_sha256:cluster.policy_sha256,target_system_identifier_sha256:cluster.target_system_identifier_sha256,status:"VERIFIED",receipt:cluster};
+
+  const previousIntent=value.recovery_execution.intent;
+  const intent=createRecoveryIntent({
+    restore_run_id:previousIntent.restore_run_id,
+    backup_id:previousIntent.backup_id,
+    created_at:previousIntent.created_at,
+    evidence_scope:previousIntent.evidence_scope,
+    policy_sha256:previousIntent.policy_sha256,
+    snapshot_sha256:previousIntent.snapshot_sha256,
+    data_transfer_acceptance_sha256:previousIntent.data_transfer_acceptance_sha256,
+    cluster_transfer_acceptance_sha256:previousIntent.cluster_transfer_acceptance_sha256,
+    joint_transfer_sha256:previousIntent.joint_transfer_sha256,
+    target_system_identifier_sha256:previousIntent.target_system_identifier_sha256,
+    target_empty_state_sha256:previousIntent.target_empty_state_sha256,
+    credential_generation_id:previousIntent.credential_generation_id,
+    credential_role_set_sha256:previousIntent.credential_role_set_sha256,
+    tablespace_map_sha256:tablespace.map_sha256,
+    custom_tablespace_identity_sha256:[],
+  });
+  const oldStates=value.recovery_execution.states,states=[createInitialRecoveryState(intent,oldStates[0].recorded_at)];
+  for(const state of oldStates.slice(1).filter((entry)=>!entry.phase.startsWith("TABLESPACE_"))){
+    states.push(transitionRecoveryState(states.at(-1),intent,{phase:state.phase,operation:state.operation,recordedAt:state.recorded_at}));
+  }
+  value.recovery_execution={intent_sha256:intent.intent_sha256,state_chain_sha256:canonicalSha(states.map((state)=>state.state_sha256)),state_count:states.length,intent,states};
+
+  const control=createRecoveryControlIntentV2({
+    restore_run_id:intent.restore_run_id,
+    backup_id:intent.backup_id,
+    created_at:"2026-07-25T02:42:20.000Z",
+    evidence_scope:intent.evidence_scope,
+    policy_sha256:clusterRecoveryPolicyV2Sha256(policy),
+    base_policy_sha256:intent.policy_sha256,
+    base_recovery_intent_sha256:intent.intent_sha256,
+    deployment_class:restore.deployment.class,
+    target_deployment_class:restore.evidence.target.deployment_class,
+    source_location_id:value.data_readiness.receipt.transfer.source_location_id,
+    target_location_id:restore.location_id,
+    target_disposition:policy.activation.target_disposition,
+    rpo_hours:policy.activation.rpo_hours,
+    rto_minutes:policy.activation.rto_minutes,
+    recovery_operator_identity_sha256:"d".repeat(64),
+    recovery_approver_identity_sha256:"e".repeat(64),
+    source_system_identifier_sha256:clusterSha256(restore.deployment.database_system_identifier),
+    target_system_identifier_sha256:intent.target_system_identifier_sha256,
+    source_machine_identity_sha256:value.data_readiness.receipt.transfer.source_machine_identity_sha256,
+    target_machine_identity_sha256:"b".repeat(64),
+    supervisor_bundle_sha256:policy.activation.supervisor_bundle_sha256,
+    authorization_sha256:"6".repeat(64),
+    approval_reference_sha256:"7".repeat(64),
+    release_manifest_sha256:restore.manifest_sha256,
+    runtime_configuration_sha256:"9".repeat(64),
+    runtime_privilege_policy_sha256:policy.runtime_privilege_binding.policy_sha256,
+    operations_policy_sha256:value.data_readiness.receipt.operations.policy_sha256,
+    runtime_credential_generation_id:"runtime-generation-v2-1",
+    runtime_credential_role_set_sha256:policy.runtime_privilege_binding.login_role_set_sha256,
+  });
+  value.recovery_control={intent_sha256:control.intent_sha256,status:"VERIFIED",intent:control};
+
+  const operatorIntent=createRuntimePrivilegeOperatorIntent({
+    operation_id:"runtime-bootstrap-v2-1",
+    operation:"BOOTSTRAP",
+    created_at:"2026-07-25T02:42:30.000Z",
+    supervisor_bundle_sha256:control.supervisor_bundle_sha256,
+    authorization_sha256:runtimeAuthorization,
+    release_manifest_sha256:control.release_manifest_sha256,
+    runtime_configuration_sha256:control.runtime_configuration_sha256,
+    runtime_guard_mode:"PRE_DEPLOY_POSTGRESQL_BOOTSTRAP_BOUND",
+    runtime_probe_binding_sha256:"a".repeat(64),
+    operator_policy_sha256:policy.runtime_privilege_binding.operator_policy_sha256,
+    runtime_privilege_policy_sha256:policy.runtime_privilege_binding.policy_sha256,
+    target:{
+      database_oid:restore.evidence.target.database_oid,
+      system_identifier_sha256:cluster.target_system_identifier_sha256,
+      marker_sha256:rawSha("chenyida-erp-deployment/v2:"+restore.evidence.target.deployment_class+":"+restore.evidence.target.deployment_id),
+      ...runtimeTarget,
+    },
+    postgres_container_id:"c".repeat(64),
+    postgres_container_name:"postgres-restore-v2",
+    backup_root_identity_sha256:"d".repeat(64),
+    baseline_state_sha256:"e".repeat(64),
+    baseline_structure_sha256:"f".repeat(64),
+    desired_state_sha256:"a".repeat(64),
+    plan_sha256:"b".repeat(64),
+    credential_generation_id:control.runtime_credential_generation_id,
+    credential_role_set_sha256:control.runtime_credential_role_set_sha256,
+    credential_source_identity_sha256:"c".repeat(64),
+  });
+  let operatorState=createInitialRuntimePrivilegeOperatorState(operatorIntent,operatorIntent.created_at);
+  for(const [phase,time,observation] of [
+    ["AUTHORIZATION_CONSUMED","2026-07-25T02:42:40.000Z",null],
+    ["TRANSACTION_DISPATCHED","2026-07-25T02:42:50.000Z",null],
+    ["POSTCOMMIT_CAPTURED","2026-07-25T02:43:00.000Z",operatorIntent.desired_state_sha256],
+    ["VERIFIED","2026-07-25T02:43:10.000Z",operatorIntent.desired_state_sha256],
+    ["COMMITTED","2026-07-25T02:43:20.000Z",operatorIntent.desired_state_sha256],
+  ])operatorState=transitionRuntimePrivilegeOperatorState(operatorState,operatorIntent,phase,time,observation);
+  const operatorReceipt=createRuntimePrivilegeOperatorReceipt({intent:operatorIntent,state:operatorState,completedAt:"2026-07-25T02:44:00.000Z",finalStructureSha256:"d".repeat(64),credentialVerificationSha256:"e".repeat(64)});
+  value.runtime_privilege={intent_sha256:operatorIntent.intent_sha256,final_state_sha256:operatorState.state_sha256,receipt_sha256:operatorReceipt.receipt_sha256,status:"VERIFIED",intent:operatorIntent,final_state:operatorState,receipt:operatorReceipt};
+  value.status.runtime_privilege="VERIFIED";
+  value.attestation=BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION;
+  const body={...value};
+  delete body.readiness_sha256;
+  value.readiness_sha256=canonicalSha(body);
+  return value;
+};
+const readinessV2=recoveryReadinessV4PolicyV2(readiness);
 const snapshot={active_materials:1,total_mappings:2,pending_materials:3,pending_material_reviews:0,auto_count:4,suspect_count:5,new_count:6,active_customers:2,active_suppliers:3,released_products:4,valid_boms:5,inventory_material_kinds:6,inventory_zero_available_kinds:1,inventory_quantities:[{unit:"PCS",on_hand:"9007199254740993.000001",available:"9007199254740992.000001",frozen:"1.000000"}],total_purchase_orders:8,open_purchase_orders:7,pending_receipt_qty:"8.000001",total_work_orders:10,active_work_orders:9,pending_issue_qty:"10.000001",pending_completion_qty:"11.000001",shortage_requirement_count:1,pending_production_accept:0,production_kitting_shortage:0,released_waiting_issue:0,partial_issue_work_orders:0,pending_reporting_work_orders:0,reported_waiting_receipt_qty:"0",partial_completion_work_orders:0,completed_waiting_quality_qty:"0",pending_ipqc_reports:0,completed_waiting_allocation_qty:"0",pending_fqc_finished_qty:"0",quality_hold_qty:"0",released_waiting_shipment_qty:"10",total_quotations:11,open_quotations:2,total_sales_orders:13,open_sales_orders:12,pending_shipment_qty:"13.000001",pending_delivery_instructions:2,partial_sales_orders:1,pending_sales_ar_count:2,pending_sales_ar_amount:"200",total_quality_inspections:10,pending_iqc:1,pending_ipqc:2,pending_fqc:3,open_quality_exceptions:4,ar_total:"100.000001",ar_settled:"20.000001",ar_balance:"80.000000",ap_total:"50.000001",ap_settled:"10.000001",ap_balance:"40.000000",pending_purchase_ap_count:0,pending_purchase_ap_amount:"0",generated_purchase_ap_count:0,generated_purchase_ap_amount:"0",pending_planning_handoffs:0,accepted_planning_packages:0,pending_purchase_requests:0,pending_sourcing_requests:0,pending_quote_rfqs:0,pending_award_rfqs:0,pending_award_conversion:0,pending_receiving_plans:0,net_receipts:"20.000001",net_payments:"10.000001",finance_by_currency:[],pending_jobs:1,failed_jobs:2,migrations:[{version:"0023_sales_delivery_receivable.sql",checksum:hash,applied_at:"2026-07-26T00:00:00Z"}],recent_events:[{domain:"finance",action:"SETTLED",object_code:"AR-1",actor:"finance01",request_id:"00000000-0000-4000-8000-000000000001",created_at:"2026-07-25T00:00:00Z"}],recent_audits:[{action:"LOGIN",result:"success",username:"admin01",route_code:"IDENTITY",request_id:"00000000-0000-4000-8000-000000000002",created_at:"2026-07-25T00:00:00Z"}],generated_at:"2026-07-25T00:00:00Z"};
 const repository={readSnapshot:async()=>structuredClone(snapshot)};
 
@@ -73,6 +213,28 @@ test("D-132 v1 remains synthetic-only and every actual V4 entry point fails clos
   for(const [file,expected] of frozen){const source=await readFile(new URL(`../${file}`,import.meta.url));assert.equal(createHash("sha256").update(source).digest("hex"),expected,file);}
   const publicationSource=await readFile(new URL("../scripts/backup-recovery-readiness-v4.mjs",import.meta.url),"utf8"),publishStart=publicationSource.indexOf("export async function publishBackupRecoveryReadinessV4"),aliasValidation=publicationSource.indexOf("readPublishedReadiness(aliasFile",publishStart),historyWrite=publicationSource.indexOf("writeReadinessFile(immutableFile",publishStart);
   assert.ok(publishStart>=0&&aliasValidation>publishStart&&historyWrite>aliasValidation,"existing alias must be validated before immutable history is written");
+});
+
+test("cluster policy V2 accepts only a complete activated actual chain",()=>{
+  assert.deepEqual(validateBackupRecoveryReadinessV4(readinessV2,clusterRecoveryPolicyV2),readinessV2);
+  assert.throws(()=>validateBackupRecoveryReadinessV4(readinessV2,clusterRecoveryPolicyV2Template),(error)=>error?.code==="READINESS_V4_POLICY_V2_ACTIVATION_REQUIRED");
+  const withoutRuntime=structuredClone(readinessV2);delete withoutRuntime.runtime_privilege;
+  assert.throws(()=>validateBackupRecoveryReadinessV4(withoutRuntime,clusterRecoveryPolicyV2),(error)=>error?.code==="READINESS_V4_FIELDS_INVALID");
+  const withoutControl=structuredClone(readinessV2);delete withoutControl.recovery_control;
+  assert.throws(()=>validateBackupRecoveryReadinessV4(withoutControl,clusterRecoveryPolicyV2),(error)=>error?.code==="READINESS_V4_FIELDS_INVALID");
+  const replaced=activateV2Policy({authorization_sha256:"f".repeat(64)});
+  assert.throws(()=>validateBackupRecoveryReadinessV4(readinessV2,replaced));
+  const expired=activateV2Policy({expires_at:"2026-07-25T02:49:00.000Z"});
+  assert.throws(()=>validateBackupRecoveryReadinessV4(recoveryReadinessV4PolicyV2(readiness,expired),expired),(error)=>error?.code==="READINESS_V4_POLICY_V2_ACTIVATION_EXPIRED");
+  const future=activateV2Policy({activated_at:"2026-07-25T02:51:00.000Z",expires_at:"2026-07-26T02:51:00.000Z"});
+  assert.throws(()=>validateBackupRecoveryReadinessV4(readinessV2,future),(error)=>error?.code==="READINESS_V4_POLICY_V2_ACTIVATION_EXPIRED");
+  const rtoExceeded=activateV2Policy({rto_minutes:60});
+  assert.throws(()=>validateBackupRecoveryReadinessV4(recoveryReadinessV4PolicyV2(readiness,rtoExceeded),rtoExceeded),(error)=>error?.code==="READINESS_V4_RTO_EXCEEDED");
+  assert.throws(()=>validateBackupRecoveryReadinessV4(recoveryReadinessV4PolicyV2(readiness,clusterRecoveryPolicyV2,{runtimeTarget:{database_oid:"16386"}}),clusterRecoveryPolicyV2),(error)=>error?.code==="READINESS_V4_POLICY_V2_INTENT_BINDING_MISMATCH");
+  assert.throws(()=>validateBackupRecoveryReadinessV4(recoveryReadinessV4PolicyV2(readiness,clusterRecoveryPolicyV2,{runtimeTarget:{marker_sha256:"f".repeat(64)}}),clusterRecoveryPolicyV2),(error)=>error?.code==="READINESS_V4_POLICY_V2_INTENT_BINDING_MISMATCH");
+  assert.throws(()=>validateBackupRecoveryReadinessV4(recoveryReadinessV4PolicyV2(readiness,clusterRecoveryPolicyV2,{runtimeAuthorization:"6".repeat(64)}),clusterRecoveryPolicyV2),(error)=>error?.code==="READINESS_V4_RUNTIME_PRIVILEGE_BINDING_MISMATCH");
+  const forgedRuntime=structuredClone(readinessV2);forgedRuntime.runtime_privilege.receipt.runtime_privilege_policy_sha256="f".repeat(64);
+  assert.throws(()=>validateBackupRecoveryReadinessV4(forgedRuntime,clusterRecoveryPolicyV2),(error)=>error?.code==="READINESS_V4_RUNTIME_PRIVILEGE_INVALID");
 });
 
 test("backup status separates evidence validity, runtime identity, policy, and assurance",async()=>{

@@ -5,13 +5,21 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  BACKUP_RECOVERY_READINESS_V4_ATTESTATION,
+  BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION,
   BACKUP_RECOVERY_READINESS_V4_CONTRACT,
   validateBackupRecoveryReadinessV4,
 } from "../../scripts/backup-recovery-readiness-v4.mjs";
 import { canonicalTransferJson } from "../../scripts/offhost-transfer-contract.mjs";
 import { buildReleaseIdentityFromPostDeployReceipt, validatePostDeployReceipt } from "../../scripts/postdeploy-release-contract.mjs";
-import { canonicalClusterJson, clusterPolicySha256, validateClusterRecoveryPolicy } from "../../scripts/postgresql-cluster-recovery-contract.mjs";
+import {
+  canonicalClusterJson,
+} from "../../scripts/postgresql-cluster-recovery-contract.mjs";
+import {
+  baseClusterRecoveryPolicy,
+  isClusterRecoveryPolicyV2,
+  readinessPolicySha256,
+  validateClusterRecoveryPolicyForReadiness,
+} from "../../scripts/postgresql-cluster-recovery-policy-v2-contract.mjs";
 import { parseStrictJson, validateReleaseIdentity } from "../../scripts/release-identity-contract.mjs";
 import { canonicalJson } from "../../scripts/release-manifest-contract.mjs";
 import {
@@ -282,9 +290,17 @@ function componentsProjection(context, common) {
 }
 
 function backupProjectionFromValidatedReadiness(context, common, readiness, policy, readinessSource, now) {
+  if (!isClusterRecoveryPolicyV2(policy) || policy.activation.status !== "ACTIVATED") {
+    reject("MONITOR_BACKUP_POLICY_V2_ACTIVATION_REQUIRED");
+  }
   if (readiness.schema_version !== 4 || readiness.contract !== BACKUP_RECOVERY_READINESS_V4_CONTRACT
     || readiness.result !== "RECOVERY_READY" || readiness.evidence_scope !== "ACTUAL_OFFHOST"
-    || readiness.attestation !== BACKUP_RECOVERY_READINESS_V4_ATTESTATION) reject("MONITOR_BACKUP_ACTUAL_V4_REQUIRED");
+    || readiness.attestation !== BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION
+    || readiness.recovery_control?.status !== "VERIFIED"
+    || readiness.recovery_control?.intent?.policy_sha256 !== readinessPolicySha256(policy)
+    || readiness.runtime_privilege?.status !== "VERIFIED" || readiness.status?.runtime_privilege !== "VERIFIED") {
+    reject("MONITOR_BACKUP_ACTUAL_V4_POLICY_V2_REQUIRED");
+  }
   if (readiness.readiness_sha256 !== context.projection.expected_source_sha256) reject("MONITOR_BACKUP_SOURCE_SHA256_MISMATCH");
   const publicationTime = Date.parse(context.projection.published_at);
   if (Date.parse(readiness.verified_at) > publicationTime || Date.parse(readiness.expires_at) <= publicationTime
@@ -296,9 +312,15 @@ function backupProjectionFromValidatedReadiness(context, common, readiness, poli
     || restore.application.version !== common.identity.application_version || restore.application.git_commit !== common.identity.git_commit
     || restore.application.web_image_digest !== common.identity.web_image_digest || restore.application.worker_image_digest !== common.identity.worker_image_digest
     || restore.migration.head !== common.identity.migration_head || restore.migration.manifest_sha256 !== common.identity.migration_manifest_sha256) reject("MONITOR_BACKUP_RUNTIME_IDENTITY_MISMATCH");
+  if (policy.activation.environment !== restore.deployment.class || policy.activation.rpo_hours !== restore.policy.rpo_hours
+    || Date.parse(policy.activation.activated_at) > Date.parse(readiness.verified_at)
+    || Date.parse(policy.activation.expires_at) <= Date.parse(readiness.verified_at)) reject("MONITOR_BACKUP_POLICY_V2_ACTIVATION_MISMATCH");
   const expectation = common.hostConfig.monitoring.backup_expectation;
+  const basePolicy = baseClusterRecoveryPolicy(policy);
   if (restore.policy.id !== expectation.policy_id || restore.policy.rpo_hours !== expectation.rpo_hours
-    || operations.policy_id !== expectation.policy_id || readiness.cluster_security?.policy_sha256 !== clusterPolicySha256(policy)) reject("MONITOR_BACKUP_POLICY_MISMATCH");
+    || operations.policy_id !== expectation.policy_id
+    || readiness.cluster_security?.policy_sha256 !== policy.base_cluster_policy_binding.policy_sha256
+    || readiness.cluster_security?.policy_id !== basePolicy.policy_id) reject("MONITOR_BACKUP_POLICY_MISMATCH");
   const projection = createBackupProjection({
     schema_version: 1,
     contract: MONITORING_BACKUP_PROJECTION_CONTRACT,
@@ -339,7 +361,7 @@ async function backupProjection(context, common, validator, now) {
   let readiness;
   try {
     readinessInput = parseStrictJson(readinessSource.text, MAX_SOURCE_BYTES);
-    policy = validateClusterRecoveryPolicy(parseStrictJson(policySource.text, MAX_SOURCE_BYTES));
+    policy = validateClusterRecoveryPolicyForReadiness(parseStrictJson(policySource.text, MAX_SOURCE_BYTES));
     readiness = validator(readinessInput, policy);
   } catch (error) {
     reject(typeof error?.code === "string" ? `MONITOR_BACKUP_SOURCE_${error.code}` : "MONITOR_BACKUP_SOURCE_INVALID");

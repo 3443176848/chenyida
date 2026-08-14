@@ -5,9 +5,10 @@ import path from "node:path";
 import test from "node:test";
 
 import {
-  BACKUP_RECOVERY_READINESS_V4_ATTESTATION,
+  BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION,
   BACKUP_RECOVERY_READINESS_V4_CONTRACT,
 } from "../scripts/backup-recovery-readiness-v4.mjs";
+import { activateClusterRecoveryPolicyV2 } from "../scripts/postgresql-cluster-recovery-policy-v2.mjs";
 import { canonicalTransferJson } from "../scripts/offhost-transfer-contract.mjs";
 import { RELEASE_RUNTIME_POLICY_SHA256 } from "../scripts/release-lifecycle-contract.mjs";
 import { canonicalJson, sha256 as releaseSha256 } from "../scripts/release-manifest-contract.mjs";
@@ -18,8 +19,12 @@ import {
 import {
   canonicalClusterJson,
   clusterPolicySha256,
-  validateClusterRecoveryPolicy,
 } from "../scripts/postgresql-cluster-recovery-contract.mjs";
+import {
+  baseClusterRecoveryPolicy,
+  readinessPolicySha256,
+  validateClusterRecoveryPolicyForReadiness,
+} from "../scripts/postgresql-cluster-recovery-policy-v2-contract.mjs";
 import {
   MONITORING_BACKUP_PROJECTION_CONTRACT,
   createBackupProjection,
@@ -389,8 +394,15 @@ test("future publication and generation jumps are rejected", { skip: !rootCapabl
   } finally { await rm(fixture.parent, { recursive: true, force: true }); }
 });
 
-async function backupFixture(fixture, overrides = {}) {
-  const policy = validateClusterRecoveryPolicy(JSON.parse(await readFile(new URL("../operations/postgresql-cluster-recovery-policy-v1.json", import.meta.url), "utf8")));
+async function backupFixture(fixture, overrides = {}, { legacyPolicy = false, templatePolicy = false } = {}) {
+  const policySource = JSON.parse(await readFile(new URL(legacyPolicy ? "../operations/postgresql-cluster-recovery-policy-v1.json" : "../operations/postgresql-cluster-recovery-policy-v2.json", import.meta.url), "utf8"));
+  const policy = validateClusterRecoveryPolicyForReadiness(legacyPolicy || templatePolicy ? policySource : activateClusterRecoveryPolicyV2(policySource, {
+    environment: "UAT", generation: 1, previous_policy_sha256: zero, supervisor_bundle_sha256: fixture.identity.supervisor_bundle_sha256,
+    authorization_sha256: digest("4"), approval_reference_sha256: digest("5"), responsible_operator_identity_sha256: digest("6"),
+    approver_identity_sha256: digest("7"), rpo_hours: 24, rto_minutes: 120, target_disposition: "DESTROY_AFTER_EVIDENCE",
+    activated_at: "2026-08-12T01:00:00.000Z", expires_at: "2026-08-13T01:00:00.000Z",
+  }));
+  const basePolicy = baseClusterRecoveryPolicy(policy);
   const policyFile = path.join(fixture.parent, "sources", "postgresql-cluster-recovery-policy.json");
   await writeTrusted(policyFile, canonicalClusterJson(policy), 0o440);
   const readiness = {
@@ -411,9 +423,11 @@ async function backupFixture(fixture, overrides = {}) {
       },
     },
     joint_transfer: {}, recovery_execution: {},
-    cluster_security: { policy_sha256: clusterPolicySha256(policy) },
-    credential_binding: {}, tablespace: {}, status: {},
-    attestation: BACKUP_RECOVERY_READINESS_V4_ATTESTATION,
+    cluster_security: { policy_id: basePolicy.policy_id, policy_sha256: clusterPolicySha256(basePolicy) },
+    credential_binding: {}, tablespace: {},
+    recovery_control: { status: "VERIFIED", intent: { policy_sha256: readinessPolicySha256(policy) } },
+    runtime_privilege: { status: "VERIFIED" }, status: { runtime_privilege: "VERIFIED" },
+    attestation: BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION,
     readiness_sha256: digest("3"),
     ...overrides,
   };
@@ -455,27 +469,52 @@ function backupContext(fixture, readiness, { publishedAt = "2026-08-12T02:31:00.
   };
 }
 
-test("backup publication accepts only an unexpired actual V4 identity chain", { skip: !rootCapable }, async () => {
+test("backup publication accepts only an activated V2 actual identity chain", { skip: !rootCapable }, async () => {
   const fixture = await makeFixture();
   try {
     const { readiness } = await backupFixture(fixture);
     const context = backupContext(fixture, readiness);
-    await expectCode(
-      publishMonitoringProjection(context, { production: false, now: new Date(context.projection.published_at) }),
-      "MONITOR_BACKUP_SOURCE_READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN",
-    );
     const actual = await publishMonitoringProjection(context, { production: false, now: new Date(context.projection.published_at), backupValidator: (value) => value });
     assert.equal(actual.result, "PUBLISHED");
     assert.equal(actual.source_sha256, readiness.readiness_sha256);
+
+    const legacyFixture = await makeFixture();
+    try {
+      const legacy = await backupFixture(legacyFixture, {}, { legacyPolicy: true });
+      await expectCode(
+        publishMonitoringProjection(backupContext(legacyFixture, legacy.readiness), { production: false, now: new Date(context.projection.published_at), backupValidator: (value) => value }),
+        "MONITOR_BACKUP_POLICY_V2_ACTIVATION_REQUIRED",
+      );
+    } finally { await rm(legacyFixture.parent, { recursive: true, force: true }); }
+
+    const templateFixture = await makeFixture();
+    try {
+      const template = await backupFixture(templateFixture, {}, { templatePolicy: true });
+      await expectCode(
+        publishMonitoringProjection(backupContext(templateFixture, template.readiness), { production: false, now: new Date(context.projection.published_at), backupValidator: (value) => value }),
+        "MONITOR_BACKUP_POLICY_V2_ACTIVATION_REQUIRED",
+      );
+    } finally { await rm(templateFixture.parent, { recursive: true, force: true }); }
 
     const syntheticFixture = await makeFixture();
     try {
       const synthetic = await backupFixture(syntheticFixture, { result: "SYNTHETIC_ISOLATED_VERIFIED", evidence_scope: "SYNTHETIC_ISOLATED", readiness_sha256: digest("4") });
       await expectCode(
         publishMonitoringProjection(backupContext(syntheticFixture, synthetic.readiness), { production: false, now: new Date(context.projection.published_at), backupValidator: (value) => value }),
-        "MONITOR_BACKUP_ACTUAL_V4_REQUIRED",
+        "MONITOR_BACKUP_ACTUAL_V4_POLICY_V2_REQUIRED",
       );
     } finally { await rm(syntheticFixture.parent, { recursive: true, force: true }); }
+
+    const wrongControlFixture = await makeFixture();
+    try {
+      const wrongControl = await backupFixture(wrongControlFixture, {
+        recovery_control: { status: "VERIFIED", intent: { policy_sha256: digest("f") } },
+      });
+      await expectCode(
+        publishMonitoringProjection(backupContext(wrongControlFixture, wrongControl.readiness), { production: false, now: new Date(context.projection.published_at), backupValidator: (value) => value }),
+        "MONITOR_BACKUP_ACTUAL_V4_POLICY_V2_REQUIRED",
+      );
+    } finally { await rm(wrongControlFixture.parent, { recursive: true, force: true }); }
 
     const expiredFixture = await makeFixture();
     try {

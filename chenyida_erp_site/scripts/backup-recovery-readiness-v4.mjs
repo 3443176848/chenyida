@@ -18,7 +18,6 @@ import {
   CLUSTER_POLICY_CONTRACT,
   clusterPolicySha256,
   clusterSha256,
-  validateClusterRecoveryPolicy,
   validateClusterSecurityReceipt,
   validateCredentialBindingReceipt,
   validateRecoveryIntent,
@@ -27,12 +26,25 @@ import {
   transitionRecoveryState,
 } from "./postgresql-cluster-recovery-contract.mjs";
 import {
+  baseClusterRecoveryPolicy,
+  isClusterRecoveryPolicyV2,
+  validateClusterRecoveryPolicyForReadiness,
+  validateRecoveryControlIntentForPolicy,
+} from "./postgresql-cluster-recovery-policy-v2-contract.mjs";
+import {
+  RUNTIME_PRIVILEGE_OPERATOR_RECEIPT_CONTRACT,
+  validateRuntimePrivilegeOperatorIntent,
+  validateRuntimePrivilegeOperatorReceipt,
+  validateRuntimePrivilegeOperatorState,
+} from "./postgresql-runtime-privilege-operator.mjs";
+import {
   validateJointTransferV2,
   verifyJointTransferV2,
 } from "./postgresql-cluster-transfer-contract.mjs";
 
 export const BACKUP_RECOVERY_READINESS_V4_CONTRACT = "chenyida-erp-backup-verification/v4";
 export const BACKUP_RECOVERY_READINESS_V4_ATTESTATION = "ROOT_PUBLISHED_DATA_V3_JOINT_TRANSFER_V2_CLUSTER_SECURITY_CREDENTIAL_TABLESPACE_AND_RECOVERY_STATE_VERIFIED";
+export const BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION = "ROOT_PUBLISHED_DATA_V3_JOINT_TRANSFER_V2_CLUSTER_SECURITY_CREDENTIAL_TABLESPACE_RECOVERY_STATE_AND_RUNTIME_PRIVILEGE_VERIFIED";
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -136,13 +148,67 @@ function rejectLegacyPolicyActual(policy, evidence) {
   }
 }
 
+function requireActualPolicyActivation(policy, evidence) {
+  const actual = evidence?.result === BACKUP_RECOVERY_READY_RESULT && evidence?.evidence_scope === "ACTUAL_OFFHOST";
+  if (!actual) return;
+  rejectLegacyPolicyActual(policy, evidence);
+  if (!isClusterRecoveryPolicyV2(policy) || policy.activation.status !== "ACTIVATED") reject("READINESS_V4_POLICY_V2_ACTIVATION_REQUIRED");
+  iso(policy.activation.activated_at, "READINESS_V4_POLICY_V2_ACTIVATION_TIME_INVALID");
+  iso(policy.activation.expires_at, "READINESS_V4_POLICY_V2_ACTIVATION_TIME_INVALID");
+  if (Date.parse(evidence.verified_at) < Date.parse(policy.activation.activated_at)
+    || Date.parse(evidence.verified_at) >= Date.parse(policy.activation.expires_at)) reject("READINESS_V4_POLICY_V2_ACTIVATION_EXPIRED");
+}
+
+function validateRecoveryControlEvidence(value, { policy, baseIntent }) {
+  exactKeys(value, ["intent_sha256", "status", "intent"], "READINESS_V4_RECOVERY_CONTROL_INVALID");
+  text(value.intent_sha256, SHA256, "READINESS_V4_RECOVERY_CONTROL_INVALID");
+  if (value.status !== "VERIFIED") reject("READINESS_V4_RECOVERY_CONTROL_INVALID");
+  let control;
+  try { ({ control } = validateRecoveryControlIntentForPolicy(value.intent, policy, baseIntent)); }
+  catch { reject("READINESS_V4_RECOVERY_CONTROL_INVALID"); }
+  if (value.intent_sha256 !== control.intent_sha256) reject("READINESS_V4_RECOVERY_CONTROL_INVALID");
+  return control;
+}
+
+function validateRuntimePrivilegeEvidence(value, { policy, control, cluster }) {
+  exactKeys(value, ["intent_sha256", "final_state_sha256", "receipt_sha256", "status", "intent", "final_state", "receipt"], "READINESS_V4_RUNTIME_PRIVILEGE_INVALID");
+  for (const key of ["intent_sha256", "final_state_sha256", "receipt_sha256"]) text(value[key], SHA256, "READINESS_V4_RUNTIME_PRIVILEGE_INVALID");
+  if (value.status !== "VERIFIED") reject("READINESS_V4_RUNTIME_PRIVILEGE_INVALID");
+  let intent, finalState, receipt;
+  try {
+    intent = validateRuntimePrivilegeOperatorIntent(value.intent);
+    finalState = validateRuntimePrivilegeOperatorState(value.final_state, intent);
+    receipt = validateRuntimePrivilegeOperatorReceipt(value.receipt, intent, finalState);
+  } catch { reject("READINESS_V4_RUNTIME_PRIVILEGE_INVALID"); }
+  if (value.intent_sha256 !== intent.intent_sha256 || value.final_state_sha256 !== finalState.state_sha256
+    || value.receipt_sha256 !== receipt.receipt_sha256 || receipt.contract !== RUNTIME_PRIVILEGE_OPERATOR_RECEIPT_CONTRACT
+    || receipt.operation !== policy.actual_recovery_controls.required_runtime_privilege_operation
+    || receipt.runtime_guard_mode !== policy.actual_recovery_controls.required_runtime_guard_mode
+    || receipt.runtime_privilege_policy_sha256 !== policy.runtime_privilege_binding.policy_sha256
+    || receipt.operator_policy_sha256 !== policy.runtime_privilege_binding.operator_policy_sha256
+    || receipt.target.system_identifier_sha256 !== cluster.target_system_identifier_sha256
+    || receipt.credential_generation_id !== control.runtime_credential_generation_id
+    || receipt.credential_role_set_sha256 !== control.runtime_credential_role_set_sha256
+    || receipt.credential_role_count !== policy.credential_binding.login_roles.length
+    || receipt.supervisor_bundle_sha256 !== control.supervisor_bundle_sha256
+    || receipt.release_manifest_sha256 !== control.release_manifest_sha256
+    || receipt.runtime_configuration_sha256 !== control.runtime_configuration_sha256
+    || receipt.authorization_sha256 === control.authorization_sha256
+    || receipt.authorization_sha256 === policy.activation.authorization_sha256) reject("READINESS_V4_RUNTIME_PRIVILEGE_BINDING_MISMATCH");
+  return { intent, finalState, receipt };
+}
+
 export function validateBackupRecoveryReadinessV4(value, policyInput) {
-  const policy = validateClusterRecoveryPolicy(policyInput);
-  exactKeys(value, [
+  const policy = validateClusterRecoveryPolicyForReadiness(policyInput);
+  const basePolicy = baseClusterRecoveryPolicy(policy);
+  const policyV2 = isClusterRecoveryPolicyV2(policy);
+  const expectedFields = [
     "schema_version", "contract", "result", "evidence_scope", "backup_id", "restore_run_id", "created_at",
     "verified_at", "expires_at", "data_readiness", "joint_transfer", "recovery_execution", "cluster_security",
     "credential_binding", "tablespace", "status", "attestation", "readiness_sha256",
-  ], "READINESS_V4_FIELDS_INVALID");
+  ];
+  if (policyV2) expectedFields.push("recovery_control", "runtime_privilege");
+  exactKeys(value, expectedFields, "READINESS_V4_FIELDS_INVALID");
   if (value.schema_version !== 4 || value.contract !== BACKUP_RECOVERY_READINESS_V4_CONTRACT
     || !new Set([BACKUP_RECOVERY_READY_RESULT, BACKUP_RECOVERY_SYNTHETIC_RESULT]).has(value.result)
     || !new Set(["ACTUAL_OFFHOST", "SYNTHETIC_ISOLATED"]).has(value.evidence_scope)) reject("READINESS_V4_VERSION_INVALID");
@@ -154,6 +220,7 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
   iso(value.verified_at, "READINESS_V4_TIME_INVALID");
   iso(value.expires_at, "READINESS_V4_TIME_INVALID");
   if (Date.parse(value.created_at) > Date.parse(value.verified_at) || Date.parse(value.verified_at) > Date.parse(value.expires_at)) reject("READINESS_V4_TIME_INVALID");
+  requireActualPolicyActivation(policy, value);
 
   exactKeys(value.data_readiness, ["readiness_v3_sha256", "receipt"], "READINESS_V4_DATA_INVALID");
   text(value.data_readiness.readiness_v3_sha256, SHA256, "READINESS_V4_DATA_INVALID");
@@ -175,12 +242,13 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
     || intent.restore_run_id !== value.restore_run_id) reject("READINESS_V4_INTENT_MISMATCH");
   const { states, finalState } = validateRecoveryStateChain(value.recovery_execution.states, intent);
   if (states.length !== value.recovery_execution.state_count || stateChainSha256(states) !== value.recovery_execution.state_chain_sha256) reject("READINESS_V4_STATE_CHAIN_INVALID");
+  const control = policyV2 ? validateRecoveryControlEvidence(value.recovery_control, { policy, baseIntent: intent }) : null;
 
   exactKeys(value.cluster_security, ["receipt_sha256", "snapshot_sha256", "policy_id", "policy_sha256", "target_system_identifier_sha256", "status", "receipt"], "READINESS_V4_CLUSTER_INVALID");
   for (const key of ["receipt_sha256", "snapshot_sha256", "policy_sha256", "target_system_identifier_sha256"]) text(value.cluster_security[key], SHA256, "READINESS_V4_CLUSTER_INVALID");
-  if (value.cluster_security.policy_id !== policy.policy_id || value.cluster_security.policy_sha256 !== clusterPolicySha256(policy)
+  if (value.cluster_security.policy_id !== basePolicy.policy_id || value.cluster_security.policy_sha256 !== clusterPolicySha256(basePolicy)
     || value.cluster_security.status !== "VERIFIED") reject("READINESS_V4_CLUSTER_INVALID");
-  const cluster = validateClusterSecurityReceipt(value.cluster_security.receipt, policy);
+  const cluster = validateClusterSecurityReceipt(value.cluster_security.receipt, basePolicy);
   if (cluster.receipt_sha256 !== value.cluster_security.receipt_sha256 || cluster.snapshot_sha256 !== value.cluster_security.snapshot_sha256
     || cluster.policy_id !== value.cluster_security.policy_id || cluster.policy_sha256 !== value.cluster_security.policy_sha256
     || cluster.target_system_identifier_sha256 !== value.cluster_security.target_system_identifier_sha256
@@ -204,7 +272,12 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
   if (tablespace.receipt_sha256 !== value.tablespace.receipt_sha256 || tablespace.custom_tablespace_count !== value.tablespace.custom_tablespace_count
     || tablespace.backup_id !== value.backup_id || tablespace.restore_run_id !== value.restore_run_id) reject("READINESS_V4_TABLESPACE_MISMATCH");
 
-  exactKeys(value.status, ["data_restore", "data_transfer", "cluster_transfer", "cluster_security", "credential_binding", "tablespace", "recovery_execution", "schedule", "retention"], "READINESS_V4_STATUS_INVALID");
+  const runtimePrivilege = policyV2
+    ? validateRuntimePrivilegeEvidence(value.runtime_privilege, { policy, control, cluster })
+    : null;
+  const statusKeys = ["data_restore", "data_transfer", "cluster_transfer", "cluster_security", "credential_binding", "tablespace", "recovery_execution", "schedule", "retention"];
+  if (policyV2) statusKeys.push("runtime_privilege");
+  exactKeys(value.status, statusKeys, "READINESS_V4_STATUS_INVALID");
   const expectedStatus = {
     data_restore: "VERIFIED",
     data_transfer: "VERIFIED",
@@ -216,6 +289,7 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
     schedule: "ON_TIME",
     retention: "POLICY_VALID_DRY_RUN",
   };
+  if (policyV2) expectedStatus.runtime_privilege = "VERIFIED";
   if (canonicalTransferJson(value.status) !== canonicalTransferJson(expectedStatus)) reject("READINESS_V4_STATUS_INVALID");
 
   const restore = data.inner_restore.receipt;
@@ -238,18 +312,51 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
     || cluster.target_system_identifier_sha256 !== targetSystemIdentifierSha256
     || intent.credential_generation_id !== credential.credential_generation_id
     || intent.credential_role_set_sha256 !== credential.role_set_sha256
-    || credential.role_count !== policy.credential_binding.login_roles.length
+    || credential.role_count !== basePolicy.credential_binding.login_roles.length
     || intent.tablespace_map_sha256 !== tablespace.map_sha256
     || intent.custom_tablespace_identity_sha256.length !== tablespace.custom_tablespace_count
+    || tablespace.custom_tablespace_count > (policyV2 ? policy.tablespaces.maximum_custom : basePolicy.tablespaces.maximum_custom)
     || cluster.tablespace_map_sha256 !== tablespace.map_sha256
     || cluster.tablespace_receipt_sha256 !== tablespace.receipt_sha256
     || cluster.credential_receipt_sha256 !== credential.receipt_sha256
     || cluster.credential_role_set_sha256 !== credential.role_set_sha256
     || joint.cluster.snapshot_sha256 !== cluster.snapshot_sha256 || joint.cluster.policy_sha256 !== cluster.policy_sha256) reject("READINESS_V4_CLUSTER_CHAIN_MISMATCH");
 
+  if (policyV2) {
+    const sourceSystemIdentifierSha256 = clusterSha256(restore.deployment.database_system_identifier);
+    const targetMarkerSha256 = createHash("sha256")
+      .update(`chenyida-erp-deployment/v2:${restore.evidence.target.deployment_class}:${restore.evidence.target.deployment_id}`)
+      .digest("hex");
+    if (control.deployment_class !== restore.deployment.class
+      || control.target_deployment_class !== restore.evidence.target.deployment_class
+      || control.target_deployment_class !== policy.actual_recovery_controls.required_isolated_target_deployment_class
+      || control.source_location_id !== data.transfer.source_location_id
+      || control.target_location_id !== restore.location_id
+      || control.source_system_identifier_sha256 !== sourceSystemIdentifierSha256
+      || control.source_machine_identity_sha256 !== data.transfer.source_machine_identity_sha256
+      || control.release_manifest_sha256 !== restore.manifest_sha256
+      || control.operations_policy_sha256 !== data.operations.policy_sha256
+      || control.rpo_hours !== restore.policy.rpo_hours
+      || control.runtime_privilege_policy_sha256 !== policy.runtime_privilege_binding.policy_sha256
+      || runtimePrivilege.intent.target.database_oid !== restore.evidence.target.database_oid
+      || runtimePrivilege.intent.target.marker_sha256 !== targetMarkerSha256
+      || control.source_system_identifier_sha256 === control.target_system_identifier_sha256
+      || control.source_machine_identity_sha256 === control.target_machine_identity_sha256
+      || control.source_location_id === control.target_location_id) reject("READINESS_V4_POLICY_V2_INTENT_BINDING_MISMATCH");
+    if (value.evidence_scope === "ACTUAL_OFFHOST"
+      && (policy.activation.environment !== control.deployment_class
+        || policy.activation.rpo_hours !== control.rpo_hours
+        || policy.activation.rto_minutes !== control.rto_minutes
+        || policy.activation.target_disposition !== control.target_disposition
+        || policy.activation.approval_reference_sha256 === control.approval_reference_sha256)) {
+      reject("READINESS_V4_POLICY_V2_AUTHORIZATION_MISMATCH");
+    }
+  }
+
   const actual = value.evidence_scope === "ACTUAL_OFFHOST", clusterScope = actual ? "ACTUAL_CONTROLLED" : "SYNTHETIC_TEST_ONLY";
   if ((actual ? data.result !== BACKUP_RECOVERY_READY_RESULT : data.result !== BACKUP_RECOVERY_SYNTHETIC_RESULT)
     || joint.evidence_scope !== clusterScope || intent.evidence_scope !== clusterScope || cluster.evidence_scope !== clusterScope
+    || policyV2 && control.evidence_scope !== clusterScope
     || credential.evidence_scope !== clusterScope || tablespace.evidence_scope !== clusterScope
     || credential.root_enforced !== actual || value.credential_binding.root_enforced !== actual) reject("READINESS_V4_SCOPE_CHAIN_MISMATCH");
 
@@ -259,16 +366,26 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
     && intentCreated <= tablespaceVerified && intentCreated <= credentialBound
     && Math.max(tablespaceVerified, credentialBound) <= clusterVerified
     && Math.max(dataVerified, clusterVerified) <= finalRecorded && finalRecorded <= verified)) reject("READINESS_V4_TIME_CHAIN_INVALID");
+  if (policyV2) {
+    const controlCreated = Date.parse(control.created_at), operatorIntentCreated = Date.parse(runtimePrivilege.intent.created_at), operatorCompleted = Date.parse(runtimePrivilege.receipt.completed_at);
+    if (!(intentCreated <= controlCreated && controlCreated <= operatorIntentCreated && operatorIntentCreated <= operatorCompleted
+      && Math.max(clusterVerified, credentialBound) <= operatorCompleted && operatorCompleted <= finalRecorded)) {
+      reject("READINESS_V4_RUNTIME_PRIVILEGE_TIME_INVALID");
+    }
+    if (finalRecorded - intentCreated > control.rto_minutes * 60_000) reject("READINESS_V4_RTO_EXCEEDED");
+  }
 
-  if (value.attestation !== BACKUP_RECOVERY_READINESS_V4_ATTESTATION) reject("READINESS_V4_ATTESTATION_INVALID");
+  const expectedAttestation = policyV2 ? BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION : BACKUP_RECOVERY_READINESS_V4_ATTESTATION;
+  if (value.attestation !== expectedAttestation) reject("READINESS_V4_ATTESTATION_INVALID");
   text(value.readiness_sha256, SHA256, "READINESS_V4_INTEGRITY_INVALID");
   if (clusterSha256(readinessBody(value)) !== value.readiness_sha256) reject("READINESS_V4_INTEGRITY_INVALID");
   return value;
 }
 
 export function createBackupRecoveryReadinessV4(options) {
-  const policy = validateClusterRecoveryPolicy(options.policy);
-  rejectLegacyPolicyActual(policy, options.dataReadiness);
+  const policy = validateClusterRecoveryPolicyForReadiness(options.policy);
+  const basePolicy = baseClusterRecoveryPolicy(policy);
+  requireActualPolicyActivation(policy, options.dataReadiness);
   const data = validateBackupRecoveryReadiness(options.dataReadiness);
   const joint = verifyJointTransferV2({
     joint: options.jointTransfer,
@@ -279,9 +396,14 @@ export function createBackupRecoveryReadinessV4(options) {
   });
   const intent = validateRecoveryIntent(options.recoveryIntent);
   const { states } = validateRecoveryStateChain(options.recoveryStates, intent);
-  const cluster = validateClusterSecurityReceipt(options.clusterSecurityReceipt, policy);
+  const cluster = validateClusterSecurityReceipt(options.clusterSecurityReceipt, basePolicy);
   const credential = validateCredentialBindingReceipt(options.credentialBindingReceipt);
   const tablespace = validateTablespaceReceipt(options.tablespaceReceipt);
+  const policyV2 = isClusterRecoveryPolicyV2(policy);
+  const control = policyV2 ? validateRecoveryControlEvidence(options.recoveryControl, { policy, baseIntent: intent }) : null;
+  const runtimePrivilege = policyV2
+    ? validateRuntimePrivilegeEvidence(options.runtimePrivilege, { policy, control, cluster })
+    : null;
   const verifiedDate = options.verifiedAt instanceof Date ? options.verifiedAt : new Date(options.verifiedAt || Date.now());
   if (Number.isNaN(verifiedDate.getTime())) reject("READINESS_V4_TIME_INVALID");
   const verifiedAt = verifiedDate.toISOString();
@@ -340,8 +462,25 @@ export function createBackupRecoveryReadinessV4(options) {
       schedule: "ON_TIME",
       retention: "POLICY_VALID_DRY_RUN",
     },
-    attestation: BACKUP_RECOVERY_READINESS_V4_ATTESTATION,
+    attestation: policyV2 ? BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION : BACKUP_RECOVERY_READINESS_V4_ATTESTATION,
   };
+  if (policyV2) {
+    body.recovery_control = {
+      intent_sha256: control.intent_sha256,
+      status: "VERIFIED",
+      intent: control,
+    };
+    body.runtime_privilege = {
+      intent_sha256: runtimePrivilege.intent.intent_sha256,
+      final_state_sha256: runtimePrivilege.finalState.state_sha256,
+      receipt_sha256: runtimePrivilege.receipt.receipt_sha256,
+      status: "VERIFIED",
+      intent: runtimePrivilege.intent,
+      final_state: runtimePrivilege.finalState,
+      receipt: runtimePrivilege.receipt,
+    };
+    body.status.runtime_privilege = "VERIFIED";
+  }
   const readiness = { ...body, readiness_sha256: clusterSha256(body) };
   validateBackupRecoveryReadinessV4(readiness, policy);
   assertJointEvidence(readiness, {
@@ -448,7 +587,7 @@ async function readPublishedReadiness(file, readerGid, policy) {
 }
 
 export async function publishBackupRecoveryReadinessV4({ readiness, policy, verification, receiptRoot, receiptReaderGid, confirm }) {
-  const validatedPolicy = validateClusterRecoveryPolicy(policy);
+  const validatedPolicy = validateClusterRecoveryPolicyForReadiness(policy);
   rejectLegacyPolicyActual(validatedPolicy, readiness);
   const validated = validateBackupRecoveryReadinessV4(readiness, validatedPolicy);
   assertJointEvidence(validated, verification);
