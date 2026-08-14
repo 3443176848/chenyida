@@ -47,6 +47,16 @@ CLUSTER_POLICY_STATE_DIRECTORIES = ("history", "intents", "quarantine", "receipt
 CLUSTER_POLICY_TARGET_FILE = Path("/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json")
 CLUSTER_POLICY_TEMPLATE_FILE_SHA256 = "1a092993b1dda00bd8a2aac0899cb4e1eee83e9b336022bdb72f3e4d23e317aa"
 CLUSTER_POLICY_TEMPLATE_POLICY_SHA256 = "c30951ad74a827c06e8256cfc124f61bd5672bca9daa7abda21c0896523378b8"
+NOTIFIER_EGRESS_STATE_ROOT = Path("/var/lib/chenyida-erp/monitoring-notifier-egress-v1")
+NOTIFIER_EGRESS_STATE_MARKER = NOTIFIER_EGRESS_STATE_ROOT / ".chenyida-erp-monitoring-notifier-egress-v1"
+NOTIFIER_EGRESS_STATE_MARKER_VALUE = b"chenyida-erp-monitoring-notifier-egress-activation/v1\n"
+NOTIFIER_EGRESS_STATE_DIRECTORIES = ("history", "intents", "quarantine", "receipts", "recoveries")
+NOTIFIER_EGRESS_POLICY_FILE = Path("/etc/chenyida-erp/monitoring-v1/views/notifier-egress-policy.json")
+NOTIFIER_EGRESS_ACTIVATION_VIEW = Path("/etc/chenyida-erp/monitoring-v1/views/notifier-egress-activation.json")
+NOTIFIER_EGRESS_BASE_UNIT = Path("/etc/systemd/system/chenyida-erp-monitor-notifier.service")
+NOTIFIER_EGRESS_DROPIN = Path("/etc/systemd/system/chenyida-erp-monitor-notifier.service.d/50-chenyida-erp-notifier-egress.conf")
+NOTIFIER_EGRESS_TEMPLATE_FILE_SHA256 = "ebb318471ef96a9d91e78c72d81802aa193480befe36017c43b74277eb0c4617"
+NOTIFIER_EGRESS_TEMPLATE_POLICY_SHA256 = "abaf585ec2c5c735e18418265a688f01f2b4d1e0b26b2125432cde860f222b20"
 SUPERVISOR_BASE = Path("/usr/local/libexec/chenyida-erp-release-supervisor")
 BUNDLES_ROOT = SUPERVISOR_BASE / "bundles"
 LAUNCHERS_ROOT = SUPERVISOR_BASE / "launchers"
@@ -118,7 +128,7 @@ def parse_time(value: Any) -> datetime:
         reject("SUPERVISOR_INSTALL_AUTHORIZATION_TIME_INVALID")
 
 
-def trusted_file(path: Path, expected_mode: int | None, maximum: int, code: str) -> bytes:
+def trusted_file(path: Path, expected_mode: int | None, maximum: int, code: str, expected_gid: int = 0) -> bytes:
     try:
         descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     except OSError:
@@ -126,7 +136,7 @@ def trusted_file(path: Path, expected_mode: int | None, maximum: int, code: str)
     try:
         before = os.fstat(descriptor)
         mode = stat.S_IMODE(before.st_mode)
-        if not stat.S_ISREG(before.st_mode) or before.st_uid != 0 or before.st_gid != 0 or before.st_nlink != 1 or (expected_mode is not None and mode != expected_mode) or (expected_mode is None and mode & 0o022) or before.st_size < 1 or before.st_size > maximum:
+        if not stat.S_ISREG(before.st_mode) or before.st_uid != 0 or before.st_gid != expected_gid or before.st_nlink != 1 or (expected_mode is not None and mode != expected_mode) or (expected_mode is None and mode & 0o022) or before.st_size < 1 or before.st_size > maximum:
             reject(code)
         raw = bytearray()
         while len(raw) < before.st_size:
@@ -136,7 +146,7 @@ def trusted_file(path: Path, expected_mode: int | None, maximum: int, code: str)
             raw.extend(chunk)
         after = os.fstat(descriptor)
         current = os.lstat(path)
-        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns) or current.st_dev != before.st_dev or current.st_ino != before.st_ino or current.st_nlink != 1 or stat.S_ISLNK(current.st_mode):
+        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns) or current.st_dev != before.st_dev or current.st_ino != before.st_ino or current.st_nlink != 1 or current.st_uid != 0 or current.st_gid != expected_gid or stat.S_ISLNK(current.st_mode):
             reject(code)
         return bytes(raw)
     finally:
@@ -532,6 +542,193 @@ def assert_no_cluster_policy_activation_interlock(state_root: Path | None = None
                 reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
 
 
+def assert_no_notifier_egress_activation_interlock(
+    state_root: Path | None = None,
+    policy_file: Path | None = None,
+    activation_view: Path | None = None,
+    base_unit: Path | None = None,
+    dropin: Path | None = None,
+) -> None:
+    state_root = state_root or NOTIFIER_EGRESS_STATE_ROOT
+    policy_file = policy_file or NOTIFIER_EGRESS_POLICY_FILE
+    activation_view = activation_view or NOTIFIER_EGRESS_ACTIVATION_VIEW
+    base_unit = base_unit or NOTIFIER_EGRESS_BASE_UNIT
+    dropin = dropin or NOTIFIER_EGRESS_DROPIN
+    try:
+        os.lstat(state_root)
+    except FileNotFoundError:
+        return
+    except OSError:
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+    trusted_directory(state_root, 0o700, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+    marker = state_root / NOTIFIER_EGRESS_STATE_MARKER.name
+    if trusted_file(marker, 0o400, 256, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID") != NOTIFIER_EGRESS_STATE_MARKER_VALUE:
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+    current_file = state_root / "current.json"
+    current_exists = current_file.exists()
+    expected_entries = sorted((NOTIFIER_EGRESS_STATE_MARKER.name, *NOTIFIER_EGRESS_STATE_DIRECTORIES, *(("current.json",) if current_exists else ())))
+    try:
+        with os.scandir(state_root) as iterator:
+            if sorted(item.name for item in iterator) != expected_entries:
+                reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+    except OSError:
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+    for name in NOTIFIER_EGRESS_STATE_DIRECTORIES:
+        trusted_directory(state_root / name, 0o700, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+    try:
+        with os.scandir(state_root / "quarantine") as iterator:
+            if next(iterator, None) is not None:
+                reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED")
+    except OSError:
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+
+    generation = 0
+    current_raw: bytes | None = None
+    current: dict[str, Any] | None = None
+    if current_exists:
+        current_raw = trusted_file(current_file, 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        current = strict_json(current_raw, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        if not isinstance(current, dict) or current_raw != canonical_json(current) \
+            or current.get("contract") != "chenyida-erp-monitoring-notifier-egress-activation-receipt/v1" \
+            or not isinstance(current.get("generation"), int) or isinstance(current.get("generation"), bool) \
+            or not 1 <= current["generation"] <= 1_000_000:
+            reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        generation = current["generation"]
+
+    file_pattern = re.compile(r"^[0-9]{16}\.([0-9a-f]{64})\.json$")
+    intent_pattern = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$")
+    try:
+        with os.scandir(state_root / "history") as iterator:
+            history_names = sorted(item.name for item in iterator)
+        with os.scandir(state_root / "receipts") as iterator:
+            receipt_names = sorted(item.name for item in iterator)
+        with os.scandir(state_root / "intents") as iterator:
+            intent_names = sorted(item.name for item in iterator)
+        with os.scandir(state_root / "recoveries") as iterator:
+            recovery_names = sorted(item.name for item in iterator)
+    except OSError:
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+    if len(history_names) != generation or len(receipt_names) != generation or len(intent_names) != generation \
+        or any(not file_pattern.fullmatch(name) for name in (*history_names, *receipt_names)) \
+        or any(not intent_pattern.fullmatch(name) for name in (*intent_names, *recovery_names)):
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED")
+
+    receipt_fields = {
+        "schema_version", "contract", "activation_id", "operation", "status", "committed_at", "environment", "generation",
+        "policy_id", "policy_sha256", "policy_file_sha256", "previous_policy_sha256", "previous_activation_receipt_sha256",
+        "rollback_target_activation_receipt_sha256", "deployment_id", "target_id", "target_generation", "endpoint_sha256",
+        "address_set_sha256", "monitoring_bundle_sha256", "supervisor_bundle_sha256", "notifier_config_sha256",
+        "adapter_id", "adapter_sha256", "credential_sha256", "credential_generation", "oncall_roster_generation",
+        "escalation_table_sha256", "base_unit_sha256", "dropin_sha256", "effective_unit_sha256", "template_file_sha256",
+        "template_policy_sha256", "authorization_sha256", "approval_reference_sha256", "responsible_operator_identity_sha256",
+        "approver_identity_sha256", "activated_at", "expires_at", "state_root", "policy_target", "activation_view",
+        "dropin_target", "history_file", "receipt_sha256",
+    }
+    previous_policy = "0" * 64
+    previous_receipt = "0" * 64
+    latest_policy_raw: bytes | None = None
+    latest_receipt_raw: bytes | None = None
+    latest_policy: dict[str, Any] | None = None
+    committed_receipts: dict[str, dict[str, Any]] = {}
+    for index in range(generation):
+        expected_prefix = f"{index + 1:016d}."
+        history_match = file_pattern.fullmatch(history_names[index])
+        receipt_match = file_pattern.fullmatch(receipt_names[index])
+        if history_match is None or receipt_match is None or not history_names[index].startswith(expected_prefix) or not receipt_names[index].startswith(expected_prefix):
+            reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        policy_raw = trusted_file(state_root / "history" / history_names[index], 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        receipt_raw = trusted_file(state_root / "receipts" / receipt_names[index], 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        policy = strict_json(policy_raw, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        receipt = strict_json(receipt_raw, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        if not isinstance(policy, dict) or policy_raw != canonical_json(policy) or sha256(policy_raw) != history_match.group(1) \
+            or policy.get("contract") != "chenyida-erp-monitoring-notifier-egress-policy/v1" or policy.get("generation") != index + 1 \
+            or not isinstance(receipt, dict) or set(receipt) != receipt_fields or receipt_raw != canonical_json(receipt) \
+            or receipt.get("schema_version") != 1 or receipt.get("contract") != "chenyida-erp-monitoring-notifier-egress-activation-receipt/v1" \
+            or receipt.get("status") != "COMMITTED" or receipt.get("operation") not in ("ACTIVATE", "ROLLBACK") \
+            or receipt.get("generation") != index + 1 or receipt.get("receipt_sha256") != receipt_match.group(1) \
+            or sha256(canonical_json({key: value for key, value in receipt.items() if key != "receipt_sha256"})) != receipt["receipt_sha256"] \
+            or receipt.get("policy_sha256") != history_match.group(1) or receipt.get("policy_file_sha256") != sha256(policy_raw) \
+            or receipt.get("previous_policy_sha256") != previous_policy or receipt.get("previous_activation_receipt_sha256") != previous_receipt \
+            or receipt.get("template_file_sha256") != NOTIFIER_EGRESS_TEMPLATE_FILE_SHA256 \
+            or receipt.get("template_policy_sha256") != NOTIFIER_EGRESS_TEMPLATE_POLICY_SHA256 \
+            or receipt.get("state_root") != str(state_root) or receipt.get("policy_target") != str(policy_file) \
+            or receipt.get("activation_view") != str(activation_view) or receipt.get("dropin_target") != str(dropin) \
+            or receipt.get("history_file") != str(state_root / "history" / history_names[index]) \
+            or receipt.get("adapter_id") != "HTTPS_JSON_ACK_V1" \
+            or any(not isinstance(receipt.get(field), str) or not SHA256.fullmatch(receipt[field]) for field in receipt_fields if field.endswith("_sha256")):
+            reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        if receipt["operation"] == "ACTIVATE" and receipt["rollback_target_activation_receipt_sha256"] != "0" * 64 \
+            or receipt["operation"] == "ROLLBACK" and (index < 2 or receipt["rollback_target_activation_receipt_sha256"] == "0" * 64):
+            reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        if receipt["operation"] == "ROLLBACK":
+            target = committed_receipts.get(receipt["rollback_target_activation_receipt_sha256"])
+            if target is None or target["generation"] != index - 1:
+                reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        previous_policy, previous_receipt = receipt["policy_sha256"], receipt["receipt_sha256"]
+        latest_policy_raw, latest_receipt_raw, latest_policy = policy_raw, receipt_raw, policy
+        committed_receipts[receipt["receipt_sha256"]] = receipt
+    if generation and (current_raw != latest_receipt_raw or current is None or current.get("receipt_sha256") != previous_receipt):
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED")
+
+    for name in intent_names:
+        raw = trusted_file(state_root / "intents" / name, 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        value = strict_json(raw, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        if not isinstance(value, dict) or raw != canonical_json(value) \
+            or value.get("contract") != "chenyida-erp-monitoring-notifier-egress-activation-intent/v1" \
+            or name != f"{value.get('operation_id')}.{value.get('intent_sha256')}.json" \
+            or not isinstance(value.get("receipt"), dict) or value["receipt"].get("receipt_sha256") not in committed_receipts:
+            reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED")
+    for name in recovery_names:
+        raw = trusted_file(state_root / "recoveries" / name, 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        value = strict_json(raw, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+        if not isinstance(value, dict) or raw != canonical_json(value) \
+            or value.get("contract") != "chenyida-erp-monitoring-notifier-egress-activation-recovery/v1" \
+            or name != f"{value.get('execution_authorization_id')}.{value.get('recovery_sha256')}.json":
+            reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+
+    def optional_lstat(file: Path) -> os.stat_result | None:
+        try:
+            return os.lstat(file)
+        except FileNotFoundError:
+            return None
+        except OSError:
+            reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+
+    policy_metadata, activation_metadata = optional_lstat(policy_file), optional_lstat(activation_view)
+    if generation == 0:
+        if policy_metadata is not None or activation_metadata is not None or optional_lstat(dropin.parent) is not None:
+            reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED")
+        return
+    if policy_metadata is None or activation_metadata is None or policy_metadata.st_uid != 0 or activation_metadata.st_uid != 0 \
+        or policy_metadata.st_gid <= 0 or policy_metadata.st_gid != activation_metadata.st_gid \
+        or stat.S_IMODE(policy_metadata.st_mode) != 0o440 or stat.S_IMODE(activation_metadata.st_mode) != 0o440:
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED")
+    policy_view_raw = trusted_file(policy_file, 0o440, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID", policy_metadata.st_gid)
+    activation_raw = trusted_file(activation_view, 0o440, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID", policy_metadata.st_gid)
+    if policy_view_raw != latest_policy_raw or activation_raw != latest_receipt_raw or latest_policy is None or current is None:
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED")
+    if sha256(trusted_file(base_unit, 0o444, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")) != current["base_unit_sha256"]:
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED")
+    trusted_directory(dropin.parent, 0o755, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+    try:
+        with os.scandir(dropin.parent) as iterator:
+            dropin_names = [item.name for item in iterator]
+    except OSError:
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+    if dropin_names != [dropin.name]:
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED")
+    dropin_raw = trusted_file(dropin, 0o444, 64 * 1024, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+    addresses = latest_policy.get("network", {}).get("allowed_addresses")
+    if not isinstance(addresses, list) or any(not isinstance(item, dict) or not isinstance(item.get("systemd_prefix"), str) for item in addresses):
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_STATE_INVALID")
+    expected_dropin = ("\n".join([
+        "# Managed by chenyida-erp release supervisor; manual edits are forbidden.", "[Service]", "IPAddressAllow=",
+        *[f"IPAddressAllow={item['systemd_prefix']}" for item in addresses], "",
+    ])).encode("utf-8")
+    if dropin_raw != expected_dropin or sha256(dropin_raw) != current["dropin_sha256"]:
+        reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED")
+
+
 def acquire_install_lock(path: Path = INSTALL_LOCK_FILE) -> int:
     flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
     try:
@@ -882,6 +1079,7 @@ def install(repository: Path, authorization: dict[str, Any], authorization_path:
     preflight_bundle(manifest_raw, payloads, launcher_raw, authorization["bundle_manifest_sha256"])
     assert_no_runtime_privilege_operator_interlock()
     assert_no_cluster_policy_activation_interlock()
+    assert_no_notifier_egress_activation_interlock()
 
     ensure_directory(Path("/usr/local/libexec"), 0o755)
     ensure_directory(SUPERVISOR_BASE, 0o755)

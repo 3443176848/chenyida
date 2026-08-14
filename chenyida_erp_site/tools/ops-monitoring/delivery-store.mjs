@@ -37,6 +37,17 @@ function reject(code) {
   throw new OpsMonitoringError(code);
 }
 
+function validateEgressBinding(value, adapterId) {
+  if (adapterId === "SYNTHETIC_FAKE_ACK_V1") {
+    if (value !== null) reject("MONITOR_DELIVERY_EGRESS_BINDING_INVALID");
+    return null;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || Object.keys(value).sort().join(",") !== "activation_receipt_sha256,effective_unit_sha256,policy_sha256"
+    || Object.values(value).some((entry) => typeof entry !== "string" || !SHA256.test(entry) || entry === ZERO_SHA256)) reject("MONITOR_DELIVERY_EGRESS_BINDING_INVALID");
+  return value;
+}
+
 function owner() {
   const uid = process.getuid?.();
   const gid = process.getgid?.();
@@ -274,9 +285,10 @@ async function readLedger(root, type, options = {}) {
   return { resolved, values: await readJsonDirectory(path.join(resolved, type), { pattern, mode: options.fileMode ?? 0o400, expectedOwner: options.fileOwner ?? owner(), validator, code: `MONITOR_DELIVERY_${type.toUpperCase()}` }) };
 }
 
-export async function prepareDeliveryAttempt({ root, envelope, notifierConfig, now = new Date(), options = {} }) {
+export async function prepareDeliveryAttempt({ root, envelope, notifierConfig, egressBinding = null, now = new Date(), options = {} }) {
   validateDeliveryEnvelope(envelope);
   const config = validateMonitoringNotifierConfig(notifierConfig);
+  validateEgressBinding(egressBinding, config.notification.adapter.id);
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) reject("MONITOR_DELIVERY_TIME_INVALID");
   const configSha = monitoringSha256(config);
   if (envelope.target_id !== config.notification.target_id || envelope.target_generation !== config.notification.target_generation) reject("MONITOR_DELIVERY_TARGET_MIGRATION_REQUIRED");
@@ -330,6 +342,9 @@ export async function prepareDeliveryAttempt({ root, envelope, notifierConfig, n
     adapter_id: config.notification.adapter.id,
     adapter_version: config.notification.adapter.version,
     adapter_sha256: config.notification.adapter.source_sha256,
+    egress_policy_sha256: egressBinding?.policy_sha256 ?? ZERO_SHA256,
+    egress_activation_receipt_sha256: egressBinding?.activation_receipt_sha256 ?? ZERO_SHA256,
+    egress_effective_unit_sha256: egressBinding?.effective_unit_sha256 ?? ZERO_SHA256,
   };
   attempt.attempt_id = monitoringSha256({ ...attempt, attempt_id: undefined });
   validateDeliveryAttempt(attempt);

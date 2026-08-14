@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-monitoring-notifier-egress-template/v1",
+  "policy_id": "chenyida-erp-monitoring-notifier-egress-v1",
+  "scope": "UAT_AND_PRODUCTION",
+  "network": {
+    "scheme": "https",
+    "port": 443,
+    "ip_address_deny": "any",
+    "maximum_exact_addresses": 8,
+    "ipv4_prefix_length": 32,
+    "ipv6_prefix_length": 128,
+    "runtime_dns": "FORBIDDEN",
+    "proxy_environment": "FORBIDDEN",
+    "redirects": "FORBIDDEN",
+    "remote_address_verification": "REQUIRED"
+  },
+  "systemd": {
+    "unit": "chenyida-erp-monitor-notifier.service",
+    "fragment_path": "/etc/systemd/system/chenyida-erp-monitor-notifier.service",
+    "dropin_path": "/etc/systemd/system/chenyida-erp-monitor-notifier.service.d/50-chenyida-erp-notifier-egress.conf",
+    "transient": "no",
+    "user": "chenyida-monitor-notify",
+    "group": "chenyida-monitor-notify"
+  },
+  "paths": {
+    "state_root": "/var/lib/chenyida-erp/monitoring-notifier-egress-v1",
+    "policy_target": "/etc/chenyida-erp/monitoring-v1/views/notifier-egress-policy.json",
+    "activation_view": "/etc/chenyida-erp/monitoring-v1/views/notifier-egress-activation.json"
+  },
+  "activation": {
+    "maximum_validity_hours": 24,
+    "generation_step": 1,
+    "authorization": "RELEASE_SUPERVISOR_ONE_TIME_V5",
+    "rollback": "EXACT_COMMITTED_RECEIPT_ONLY",
+    "recovery": "NEW_AUTHORIZATION_AND_PRESERVE_UNKNOWN"
+  }
+}

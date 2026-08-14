@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import hashlib
 import fcntl
+import ipaddress
 import json
 import os
 import re
 import shutil
+import shlex
 import stat
 import subprocess
 import sys
@@ -32,6 +34,7 @@ BUNDLE_CONTRACT = "chenyida-erp-release-supervisor-bundle/v1"
 AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v2"
 RUNTIME_PRIVILEGE_AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v3"
 CLUSTER_POLICY_AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v4"
+NOTIFIER_EGRESS_AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v5"
 RUNTIME_GUARD_CONTRACT = "chenyida-erp-release-runtime-guard/v1"
 PRE_DEPLOY_RUNTIME_GUARD_MODE = "PRE_DEPLOY_EXISTING_RUNTIME_STABILITY"
 POST_DEPLOY_RUNTIME_GUARD_MODE = "POST_DEPLOY_CURRENT_RUNTIME_STRICT"
@@ -57,6 +60,16 @@ CLUSTER_POLICY_STATE_MARKER = ".chenyida-erp-postgresql-cluster-recovery-policy-
 CLUSTER_POLICY_STATE_MARKER_VALUE = b"chenyida-erp-postgresql-cluster-recovery-policy-activation/v1\n"
 CLUSTER_POLICY_TEMPLATE_FILE_SHA256 = "1a092993b1dda00bd8a2aac0899cb4e1eee83e9b336022bdb72f3e4d23e317aa"
 CLUSTER_POLICY_TEMPLATE_POLICY_SHA256 = "c30951ad74a827c06e8256cfc124f61bd5672bca9daa7abda21c0896523378b8"
+NOTIFIER_EGRESS_STATE_ROOT = Path("/var/lib/chenyida-erp/monitoring-notifier-egress-v1")
+NOTIFIER_EGRESS_CURRENT_FILE = NOTIFIER_EGRESS_STATE_ROOT / "current.json"
+NOTIFIER_EGRESS_POLICY_FILE = Path("/etc/chenyida-erp/monitoring-v1/views/notifier-egress-policy.json")
+NOTIFIER_EGRESS_ACTIVATION_VIEW = Path("/etc/chenyida-erp/monitoring-v1/views/notifier-egress-activation.json")
+NOTIFIER_EGRESS_UNIT = "chenyida-erp-monitor-notifier.service"
+NOTIFIER_EGRESS_BASE_UNIT = Path(f"/etc/systemd/system/{NOTIFIER_EGRESS_UNIT}")
+NOTIFIER_EGRESS_DROPIN = Path(f"/etc/systemd/system/{NOTIFIER_EGRESS_UNIT}.d/50-chenyida-erp-notifier-egress.conf")
+NOTIFIER_EGRESS_TEMPLATE_FILE_SHA256 = "ebb318471ef96a9d91e78c72d81802aa193480befe36017c43b74277eb0c4617"
+NOTIFIER_EGRESS_TEMPLATE_POLICY_SHA256 = "abaf585ec2c5c735e18418265a688f01f2b4d1e0b26b2125432cde860f222b20"
+NOTIFIER_EGRESS_BASE_UNIT_SHA256 = "22d8b4cfaf48821e5b2d2f28ad285cf549b207c30b13f9b4a50f202a031e3812"
 RELEASE_IDENTITY_FILE = RELEASE_IDENTITY_ROOT / "release-identity.json"
 MONITORING_PROJECTION_CONTRACT = "chenyida-erp-monitoring-projection-publication/v1"
 MONITORING_PROJECTION_MARKER = ".chenyida-erp-monitoring-projection-v1"
@@ -90,6 +103,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/operations/container-runtime-policy-v1.json": "0444",
     "chenyida_erp_site/operations/monitoring-host-config-schema-v1.json": "0444",
     "chenyida_erp_site/operations/monitoring-host-delivery-policy-v1.json": "0444",
+    "chenyida_erp_site/operations/monitoring-notifier-egress-policy-v1.json": "0444",
     "chenyida_erp_site/operations/monitoring-policy-v1.json": "0444",
     "chenyida_erp_site/operations/postgresql-cluster-recovery-policy-v1.json": "0444",
     "chenyida_erp_site/operations/postgresql-cluster-recovery-policy-v2.json": "0444",
@@ -117,6 +131,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/install-release-supervisor.py": "0444",
     "chenyida_erp_site/scripts/install-monitoring-host-delivery.py": "0444",
     "chenyida_erp_site/scripts/monitoring-host-launcher.py": "0444",
+    "chenyida_erp_site/scripts/monitoring-notifier-egress-publisher.mjs": "0444",
     "chenyida_erp_site/scripts/offhost-transfer-contract.mjs": "0444",
     "chenyida_erp_site/scripts/postdeploy-release-contract.mjs": "0444",
     "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs": "0444",
@@ -173,6 +188,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tools/ops-monitoring/host-runner.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/host-store.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/notifier.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/notifier-egress-contract.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/projection-publisher.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/resource-policy.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/strict-json.mjs": "0444",
@@ -191,6 +207,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-operator.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-policy.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-ops-monitoring-host-delivery.test.mjs": "0444",
+    "chenyida_erp_site/tests/selfhost-ops-monitoring-notifier-egress.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-ops-monitoring-projection-publisher.test.mjs": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_browser.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_candidate_snapshot.py": "0444",
@@ -198,6 +215,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/test_release_supervisor_installer.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_launcher.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_monitoring_host_delivery.py": "0444",
+    "chenyida_erp_site/tests/test_release_supervisor_monitoring_notifier_egress.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_monitoring_projection.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_cluster_policy_activation.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_runtime_secret_file.py": "0444",
@@ -262,6 +280,34 @@ CLUSTER_POLICY_BASE_PARAMETER_FIELDS = {
 }
 
 CLUSTER_POLICY_RECOVERY_PARAMETER_FIELDS = {
+    "expected_intent_sha256", "original_authorization_sha256", "original_operation", "original_operation_id",
+}
+
+NOTIFIER_EGRESS_OPERATIONS = {
+    "ACTIVATE_MONITORING_NOTIFIER_EGRESS_V1": "ACTIVATE",
+    "ROLLBACK_MONITORING_NOTIFIER_EGRESS_V1": "ROLLBACK",
+    "RECOVER_MONITORING_NOTIFIER_EGRESS_V1_ACTIVATION": "RECOVER",
+}
+
+NOTIFIER_EGRESS_CONFIRMATIONS = {
+    "ACTIVATE_MONITORING_NOTIFIER_EGRESS_V1": "AUTHORIZE_ACTIVATE_EXACT_MONITORING_NOTIFIER_EGRESS_V1",
+    "ROLLBACK_MONITORING_NOTIFIER_EGRESS_V1": "AUTHORIZE_ROLLBACK_EXACT_MONITORING_NOTIFIER_EGRESS_V1",
+    "RECOVER_MONITORING_NOTIFIER_EGRESS_V1_ACTIVATION": "AUTHORIZE_RECOVER_EXACT_MONITORING_NOTIFIER_EGRESS_V1_ACTIVATION",
+}
+
+NOTIFIER_EGRESS_BASE_PARAMETER_FIELDS = {
+    "policy_state_root", "policy_target", "activation_view", "dropin_target", "activation_id", "environment",
+    "egress_generation", "previous_policy_sha256", "previous_activation_receipt_sha256",
+    "rollback_target_activation_receipt_sha256", "deployment_id", "target_id", "target_generation", "endpoint",
+    "allowed_addresses", "monitoring_bundle_sha256", "adapter_id", "adapter_sha256", "credential_sha256",
+    "credential_generation", "oncall_roster_generation", "escalation_table_sha256", "notifier_gid",
+    "template_file_sha256", "template_policy_sha256", "approval_reference_sha256",
+    "responsible_operator_identity_sha256", "approver_identity_sha256", "activated_at", "expires_at",
+    "notifier_config_source", "base_unit_source", "current_policy_source", "current_activation_source",
+    "rollback_policy_source", "rollback_activation_source",
+}
+
+NOTIFIER_EGRESS_RECOVERY_PARAMETER_FIELDS = {
     "expected_intent_sha256", "original_authorization_sha256", "original_operation", "original_operation_id",
 }
 
@@ -566,6 +612,23 @@ def verify_cluster_policy_sources(parameters: dict[str, Any], *, recovery: bool 
         verify_authorized_projection_source(source, "SUPERVISOR_CLUSTER_POLICY_SOURCE_CHANGED")
 
 
+def verify_notifier_egress_sources(parameters: dict[str, Any], *, recovery: bool = False) -> None:
+    trusted_owned_directory(NOTIFIER_EGRESS_POLICY_FILE.parent, 0, 0, {0o755}, "SUPERVISOR_NOTIFIER_EGRESS_VIEW_ROOT_INVALID")
+    trusted_owned_directory(NOTIFIER_EGRESS_BASE_UNIT.parent, 0, 0, {0o755}, "SUPERVISOR_NOTIFIER_EGRESS_SYSTEMD_ROOT_INVALID")
+    sources = [parameters["notifier_config_source"], parameters["base_unit_source"]]
+    if not recovery:
+        sources += [source for source in (
+            parameters["current_policy_source"], parameters["current_activation_source"],
+            parameters["rollback_policy_source"], parameters["rollback_activation_source"],
+        ) if source is not None]
+    if parameters["rollback_policy_source"] is not None:
+        trusted_owned_directory(NOTIFIER_EGRESS_STATE_ROOT, 0, 0, {0o700}, "SUPERVISOR_NOTIFIER_EGRESS_STATE_ROOT_INVALID")
+        trusted_owned_directory(NOTIFIER_EGRESS_STATE_ROOT / "history", 0, 0, {0o700}, "SUPERVISOR_NOTIFIER_EGRESS_STATE_ROOT_INVALID")
+        trusted_owned_directory(NOTIFIER_EGRESS_STATE_ROOT / "receipts", 0, 0, {0o700}, "SUPERVISOR_NOTIFIER_EGRESS_STATE_ROOT_INVALID")
+    for source in sources:
+        verify_authorized_projection_source(source, "SUPERVISOR_NOTIFIER_EGRESS_SOURCE_CHANGED")
+
+
 def trusted_directory(path: Path, allowed_modes: set[int], code: str) -> os.stat_result:
     try:
         value = os.lstat(path)
@@ -799,6 +862,149 @@ def validate_cluster_policy_parameters(parameters: Any, operation: str | None = 
     return parameters
 
 
+def validate_notifier_egress_source(value: Any, expected_path: Path | None, expected_mode: str,
+                                     expected_gid: int, code: str) -> dict[str, Any]:
+    value = exact_fields(value, MONITORING_PROJECTION_SOURCE_FIELDS, code)
+    if not isinstance(value["path"], str):
+        reject(code)
+    source_path = Path(value["path"])
+    if not source_path.is_absolute() or source_path != Path(os.path.normpath(value["path"])) \
+        or expected_path is not None and source_path != expected_path:
+        reject(code)
+    if not isinstance(value["sha256"], str) or not SHA256.fullmatch(value["sha256"]) or value["sha256"] == "0" * 64:
+        reject(code)
+    if not isinstance(value["bytes"], int) or isinstance(value["bytes"], bool) or not 2 <= value["bytes"] <= MAX_JSON_BYTES:
+        reject(code)
+    for field, pattern in (("device", r"(?:0|[1-9][0-9]*)"), ("inode", r"[1-9][0-9]*")):
+        if not isinstance(value[field], str) or not re.fullmatch(pattern, value[field]):
+            reject(code)
+    for field in ("uid", "gid", "nlink"):
+        if not isinstance(value[field], int) or isinstance(value[field], bool) or not 0 <= value[field] <= 2**31 - 1:
+            reject(code)
+    if not isinstance(value["mode"], str) or value["uid"] != 0 or value["gid"] != expected_gid \
+        or value["mode"] != expected_mode or value["nlink"] != 1:
+        reject(code)
+    return value
+
+
+def validate_notifier_egress_parameters(parameters: Any, operation: str | None = None) -> dict[str, Any]:
+    recovery = operation == "RECOVER_MONITORING_NOTIFIER_EGRESS_V1_ACTIVATION"
+    if recovery:
+        if not isinstance(parameters, dict) or parameters.get("original_operation") not in ("ACTIVATE", "ROLLBACK"):
+            reject("SUPERVISOR_NOTIFIER_EGRESS_OPERATION_INVALID")
+        effective_operation = parameters["original_operation"]
+    else:
+        effective_operation = NOTIFIER_EGRESS_OPERATIONS.get(operation or "")
+    if effective_operation not in ("ACTIVATE", "ROLLBACK"):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_OPERATION_INVALID")
+    expected_fields = set(NOTIFIER_EGRESS_BASE_PARAMETER_FIELDS)
+    if recovery:
+        expected_fields |= NOTIFIER_EGRESS_RECOVERY_PARAMETER_FIELDS
+    parameters = exact_fields(parameters, expected_fields, "SUPERVISOR_NOTIFIER_EGRESS_PARAMETERS_INVALID")
+    if parameters["policy_state_root"] != str(NOTIFIER_EGRESS_STATE_ROOT) \
+        or parameters["policy_target"] != str(NOTIFIER_EGRESS_POLICY_FILE) \
+        or parameters["activation_view"] != str(NOTIFIER_EGRESS_ACTIVATION_VIEW) \
+        or parameters["dropin_target"] != str(NOTIFIER_EGRESS_DROPIN):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_PATH_INVALID")
+    for field in ("activation_id", "deployment_id", "target_id"):
+        if not isinstance(parameters[field], str) or not IDENTIFIER.fullmatch(parameters[field]):
+            reject("SUPERVISOR_NOTIFIER_EGRESS_IDENTIFIER_INVALID")
+    if parameters["environment"] not in ("UAT", "PRODUCTION") or parameters["adapter_id"] != "HTTPS_JSON_ACK_V1":
+        reject("SUPERVISOR_NOTIFIER_EGRESS_ENVIRONMENT_INVALID")
+    for field in ("egress_generation", "target_generation", "credential_generation", "oncall_roster_generation", "notifier_gid"):
+        if not isinstance(parameters[field], int) or isinstance(parameters[field], bool) or not 1 <= parameters[field] <= 2**31 - 1:
+            reject("SUPERVISOR_NOTIFIER_EGRESS_INTEGER_INVALID")
+    digest_fields = (
+        "previous_policy_sha256", "previous_activation_receipt_sha256", "rollback_target_activation_receipt_sha256",
+        "monitoring_bundle_sha256", "adapter_sha256", "credential_sha256", "escalation_table_sha256",
+        "template_file_sha256", "template_policy_sha256", "approval_reference_sha256",
+        "responsible_operator_identity_sha256", "approver_identity_sha256",
+    )
+    zero_allowed = {
+        "previous_policy_sha256", "previous_activation_receipt_sha256", "rollback_target_activation_receipt_sha256",
+        "template_file_sha256", "template_policy_sha256",
+    }
+    for field in digest_fields:
+        if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]) \
+            or field not in zero_allowed and parameters[field] == "0" * 64:
+            reject("SUPERVISOR_NOTIFIER_EGRESS_DIGEST_INVALID")
+    if parameters["template_file_sha256"] != NOTIFIER_EGRESS_TEMPLATE_FILE_SHA256 \
+        or parameters["template_policy_sha256"] != NOTIFIER_EGRESS_TEMPLATE_POLICY_SHA256:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_TEMPLATE_INVALID")
+    actors = {parameters["approval_reference_sha256"], parameters["responsible_operator_identity_sha256"], parameters["approver_identity_sha256"]}
+    if len(actors) != 3 or "0" * 64 in actors:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_ACTORS_INVALID")
+    activated = parse_time(parameters["activated_at"], "SUPERVISOR_NOTIFIER_EGRESS_TIME_INVALID")
+    expires = parse_time(parameters["expires_at"], "SUPERVISOR_NOTIFIER_EGRESS_TIME_INVALID")
+    if expires <= activated or expires - activated > timedelta(hours=24):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_TIME_INVALID")
+    endpoint = exact_fields(parameters["endpoint"], {"scheme", "host", "port", "path", "tls_server_name"}, "SUPERVISOR_NOTIFIER_EGRESS_ENDPOINT_INVALID")
+    host = endpoint["host"]
+    if endpoint["scheme"] != "https" or endpoint["port"] != 443 or not isinstance(host, str) \
+        or host != host.lower() or "." not in host or host.endswith(".local") \
+        or not re.fullmatch(r"(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", host) \
+        or endpoint["tls_server_name"] != host or not isinstance(endpoint["path"], str) \
+        or not re.fullmatch(r"/[A-Za-z0-9._~!$&'()*+,;=:@%/\-]{0,1023}", endpoint["path"]):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_ENDPOINT_INVALID")
+    addresses = parameters["allowed_addresses"]
+    if not isinstance(addresses, list) or not 1 <= len(addresses) <= 8 or any(not isinstance(item, str) for item in addresses):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_ADDRESS_INVALID")
+    normalized: list[tuple[str, str]] = []
+    try:
+        for item in addresses:
+            address = ipaddress.ip_address(item)
+            canonical = address.compressed.lower()
+            if canonical != item or not address.is_global or getattr(address, "ipv4_mapped", None) is not None:
+                reject("SUPERVISOR_NOTIFIER_EGRESS_ADDRESS_INVALID")
+            normalized.append((f"{canonical}/{32 if address.version == 4 else 128}", canonical))
+    except ValueError:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_ADDRESS_INVALID")
+    if len(set(normalized)) != len(normalized) or [item[1] for item in sorted(normalized)] != addresses:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_ADDRESS_INVALID")
+    notifier_gid = parameters["notifier_gid"]
+    notifier_source = validate_notifier_egress_source(parameters["notifier_config_source"], None, "0440", notifier_gid, "SUPERVISOR_NOTIFIER_EGRESS_NOTIFIER_SOURCE_INVALID")
+    notifier_path = Path(notifier_source["path"])
+    if notifier_path.parent != NOTIFIER_EGRESS_POLICY_FILE.parent or not re.fullmatch(r"[0-9a-f]{64}\.notifier\.json", notifier_path.name):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_NOTIFIER_SOURCE_INVALID")
+    base_source = validate_notifier_egress_source(parameters["base_unit_source"], NOTIFIER_EGRESS_BASE_UNIT, "0444", 0, "SUPERVISOR_NOTIFIER_EGRESS_BASE_UNIT_INVALID")
+    if base_source["sha256"] != NOTIFIER_EGRESS_BASE_UNIT_SHA256:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_BASE_UNIT_INVALID")
+    if parameters["egress_generation"] == 1:
+        if parameters["previous_policy_sha256"] != "0" * 64 or parameters["previous_activation_receipt_sha256"] != "0" * 64 \
+            or parameters["current_policy_source"] is not None or parameters["current_activation_source"] is not None:
+            reject("SUPERVISOR_NOTIFIER_EGRESS_GENERATION_INVALID")
+    else:
+        if parameters["previous_policy_sha256"] == "0" * 64 or parameters["previous_activation_receipt_sha256"] == "0" * 64 \
+            or parameters["current_policy_source"] is None or parameters["current_activation_source"] is None:
+            reject("SUPERVISOR_NOTIFIER_EGRESS_GENERATION_INVALID")
+        current_policy = validate_notifier_egress_source(parameters["current_policy_source"], NOTIFIER_EGRESS_POLICY_FILE, "0440", notifier_gid, "SUPERVISOR_NOTIFIER_EGRESS_CURRENT_SOURCE_INVALID")
+        validate_notifier_egress_source(parameters["current_activation_source"], NOTIFIER_EGRESS_ACTIVATION_VIEW, "0440", notifier_gid, "SUPERVISOR_NOTIFIER_EGRESS_CURRENT_SOURCE_INVALID")
+        if current_policy["sha256"] != parameters["previous_policy_sha256"]:
+            reject("SUPERVISOR_NOTIFIER_EGRESS_CURRENT_SOURCE_INVALID")
+    if effective_operation == "ACTIVATE":
+        if parameters["rollback_target_activation_receipt_sha256"] != "0" * 64 \
+            or parameters["rollback_policy_source"] is not None or parameters["rollback_activation_source"] is not None:
+            reject("SUPERVISOR_NOTIFIER_EGRESS_ROLLBACK_INVALID")
+    else:
+        rollback_policy, rollback_activation = parameters["rollback_policy_source"], parameters["rollback_activation_source"]
+        if parameters["egress_generation"] < 3 or parameters["rollback_target_activation_receipt_sha256"] == "0" * 64 \
+            or not isinstance(rollback_policy, dict) or not isinstance(rollback_activation, dict):
+            reject("SUPERVISOR_NOTIFIER_EGRESS_ROLLBACK_INVALID")
+        for source, parent in ((rollback_policy, NOTIFIER_EGRESS_STATE_ROOT / "history"), (rollback_activation, NOTIFIER_EGRESS_STATE_ROOT / "receipts")):
+            source_path = Path(source.get("path", ""))
+            if source_path.parent != parent or not re.fullmatch(r"[0-9]{16}\.[0-9a-f]{64}\.json", source_path.name):
+                reject("SUPERVISOR_NOTIFIER_EGRESS_ROLLBACK_INVALID")
+            validate_notifier_egress_source(source, source_path, "0400", 0, "SUPERVISOR_NOTIFIER_EGRESS_ROLLBACK_INVALID")
+    if recovery:
+        if not isinstance(parameters["original_operation_id"], str) or not IDENTIFIER.fullmatch(parameters["original_operation_id"]) \
+            or parameters["activation_id"] != parameters["original_operation_id"]:
+            reject("SUPERVISOR_NOTIFIER_EGRESS_IDENTIFIER_INVALID")
+        for field in ("expected_intent_sha256", "original_authorization_sha256"):
+            if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]) or parameters[field] == "0" * 64:
+                reject("SUPERVISOR_NOTIFIER_EGRESS_DIGEST_INVALID")
+    return parameters
+
+
 def validate_monitoring_projection_parameters(operation: str, parameters: dict[str, Any]) -> None:
     if absolute_path(parameters["projection_root"], "SUPERVISOR_MONITORING_PROJECTION_PATH_INVALID") != str(MONITORING_PROJECTION_ROOT):
         reject("SUPERVISOR_MONITORING_PROJECTION_PATH_INVALID")
@@ -974,7 +1180,8 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
     is_v2 = value["schema_version"] == 2 and value["contract"] == AUTHORIZATION_CONTRACT
     is_v3 = value["schema_version"] == 3 and value["contract"] == RUNTIME_PRIVILEGE_AUTHORIZATION_CONTRACT
     is_v4 = value["schema_version"] == 4 and value["contract"] == CLUSTER_POLICY_AUTHORIZATION_CONTRACT
-    if not is_v2 and not is_v3 and not is_v4:
+    is_v5 = value["schema_version"] == 5 and value["contract"] == NOTIFIER_EGRESS_AUTHORIZATION_CONTRACT
+    if not is_v2 and not is_v3 and not is_v4 and not is_v5:
         reject("SUPERVISOR_AUTHORIZATION_VERSION_INVALID")
     if not isinstance(value["authorization_id"], str) or not IDENTIFIER.fullmatch(value["authorization_id"]):
         reject("SUPERVISOR_AUTHORIZATION_ID_INVALID")
@@ -987,6 +1194,8 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
     elif is_v3 and (operation not in RUNTIME_PRIVILEGE_OPERATIONS or value["confirmation"] != RUNTIME_PRIVILEGE_CONFIRMATIONS[operation]):
         reject("SUPERVISOR_AUTHORIZATION_OPERATION_INVALID")
     elif is_v4 and (operation not in CLUSTER_POLICY_OPERATIONS or value["confirmation"] != CLUSTER_POLICY_CONFIRMATIONS[operation]):
+        reject("SUPERVISOR_AUTHORIZATION_OPERATION_INVALID")
+    elif is_v5 and (operation not in NOTIFIER_EGRESS_OPERATIONS or value["confirmation"] != NOTIFIER_EGRESS_CONFIRMATIONS[operation]):
         reject("SUPERVISOR_AUTHORIZATION_OPERATION_INVALID")
     if not isinstance(value["nonce"], str) or not SHA256.fullmatch(value["nonce"]):
         reject("SUPERVISOR_AUTHORIZATION_NONCE_INVALID")
@@ -1007,7 +1216,7 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
         validate_runtime_privilege_parameters(value["parameters"], operation)
         if operation == "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT" and value["authorization_id"] == value["parameters"]["original_operation_id"]:
             reject("SUPERVISOR_RUNTIME_PRIVILEGE_IDENTIFIER_INVALID")
-    else:
+    elif is_v4:
         parameters = validate_cluster_policy_parameters(value["parameters"], operation)
         recovery = operation == "RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION"
         activated = parse_time(parameters["activated_at"], "SUPERVISOR_CLUSTER_POLICY_TIME_INVALID")
@@ -1020,6 +1229,18 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
             or abs(activated - created) > timedelta(minutes=5) or activated > now + timedelta(minutes=5) \
             or policy_expires > expires:
             reject("SUPERVISOR_CLUSTER_POLICY_TIME_INVALID")
+    else:
+        parameters = validate_notifier_egress_parameters(value["parameters"], operation)
+        recovery = operation == "RECOVER_MONITORING_NOTIFIER_EGRESS_V1_ACTIVATION"
+        activated = parse_time(parameters["activated_at"], "SUPERVISOR_NOTIFIER_EGRESS_TIME_INVALID")
+        policy_expires = parse_time(parameters["expires_at"], "SUPERVISOR_NOTIFIER_EGRESS_TIME_INVALID")
+        if recovery:
+            if value["authorization_id"] in (parameters["activation_id"], parameters["original_operation_id"]) or created < activated:
+                reject("SUPERVISOR_NOTIFIER_EGRESS_TIME_INVALID")
+        elif value["authorization_id"] != parameters["activation_id"] \
+            or abs(activated - created) > timedelta(minutes=5) or activated > now + timedelta(minutes=5) \
+            or policy_expires > expires:
+            reject("SUPERVISOR_NOTIFIER_EGRESS_TIME_INVALID")
     return value
 
 
@@ -1387,6 +1608,38 @@ def validate_original_cluster_policy_authorization_consumed(parameters: dict[str
     return value
 
 
+def validate_original_notifier_egress_authorization_consumed(parameters: dict[str, Any], expected_bundle_digest: str,
+                                                              consumed_root: Path = AUTHORIZATION_CONSUMED_ROOT) -> dict[str, Any]:
+    validate_notifier_egress_parameters(parameters, "RECOVER_MONITORING_NOTIFIER_EGRESS_V1_ACTIVATION")
+    if consumed_root == AUTHORIZATION_CONSUMED_ROOT:
+        trusted_directory(AUTHORIZATION_ROOT, {0o700}, "SUPERVISOR_AUTHORIZATION_ROOT_INVALID")
+    trusted_directory(consumed_root, {0o700}, "SUPERVISOR_AUTHORIZATION_ROOT_INVALID")
+    original_id = parameters["original_operation_id"]
+    original_digest = parameters["original_authorization_sha256"]
+    file = consumed_root / f"{original_id}.{original_digest}.json"
+    raw, _ = trusted_regular_file(file, 0o400, code="SUPERVISOR_NOTIFIER_EGRESS_ORIGINAL_AUTHORIZATION_INVALID")
+    if sha256(raw) != original_digest:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_ORIGINAL_AUTHORIZATION_INVALID")
+    preview = strict_json(raw, "SUPERVISOR_NOTIFIER_EGRESS_ORIGINAL_AUTHORIZATION_INVALID")
+    try:
+        created = parse_time(preview["created_at"], "SUPERVISOR_NOTIFIER_EGRESS_ORIGINAL_AUTHORIZATION_INVALID")
+        expires = parse_time(preview["expires_at"], "SUPERVISOR_NOTIFIER_EGRESS_ORIGINAL_AUTHORIZATION_INVALID")
+        value = validate_authorization(preview, expected_bundle_digest, created + (expires - created) / 2)
+    except (KeyError, TypeError, SupervisorError):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_ORIGINAL_AUTHORIZATION_INVALID")
+    expected_operation = {
+        "ACTIVATE": "ACTIVATE_MONITORING_NOTIFIER_EGRESS_V1",
+        "ROLLBACK": "ROLLBACK_MONITORING_NOTIFIER_EGRESS_V1",
+    }[parameters["original_operation"]]
+    if raw != canonical_json(value) or value["contract"] != NOTIFIER_EGRESS_AUTHORIZATION_CONTRACT \
+        or value["authorization_id"] != original_id or value["operation"] != expected_operation:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_ORIGINAL_AUTHORIZATION_INVALID")
+    original_parameters = value["parameters"]
+    if any(original_parameters[field] != parameters[field] for field in NOTIFIER_EGRESS_BASE_PARAMETER_FIELDS):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_ORIGINAL_AUTHORIZATION_INVALID")
+    return value
+
+
 def acquire_global_release_lock(path: Path = GLOBAL_RELEASE_LOCK) -> int:
     try:
         parent = os.lstat(path.parent)
@@ -1701,6 +1954,230 @@ def run_cluster_policy_authorization(bundle_root: Path, authorization_path: Path
                 os.close(lock_descriptor)
 
 
+def notifier_egress_context(authorization: dict[str, Any], authorization_digest: str) -> dict[str, Any]:
+    parameters = authorization["parameters"]
+    recovery = authorization["operation"] == "RECOVER_MONITORING_NOTIFIER_EGRESS_V1_ACTIVATION"
+    operation = parameters["original_operation"] if recovery else NOTIFIER_EGRESS_OPERATIONS[authorization["operation"]]
+    policy_parameters = {field: parameters[field] for field in NOTIFIER_EGRESS_BASE_PARAMETER_FIELDS}
+    return {
+        "schema_version": 1,
+        "contract": "chenyida-erp-monitoring-notifier-egress-activation-context/v1",
+        "operation_id": parameters["original_operation_id"] if recovery else authorization["authorization_id"],
+        "operation": operation,
+        "execution_mode": "RECOVERY" if recovery else "ORIGINAL",
+        "execution_authorization_id": authorization["authorization_id"],
+        "execution_authorization_sha256": authorization_digest,
+        "execution_created_at": authorization["created_at"],
+        "original_authorization_sha256": parameters["original_authorization_sha256"] if recovery else authorization_digest,
+        "supervisor_bundle_sha256": authorization["supervisor_bundle_sha256"],
+        "expected_intent_sha256": parameters["expected_intent_sha256"] if recovery else None,
+        "parameters": policy_parameters,
+    }
+
+
+def run_notifier_egress_runner(node_path: Path, bundle_root: Path, context: dict[str, Any], phase: str,
+                               lock_descriptor: int, effective_unit_sha256: str | None = None) -> dict[str, Any]:
+    confirmations = {
+        "prepare": "PREPARE_NOTIFIER_EGRESS_ACTIVATION_INTENT",
+        "apply": "APPLY_NOTIFIER_EGRESS_AFTER_AUTHORIZATION",
+        "finalize": "FINALIZE_NOTIFIER_EGRESS_AFTER_EFFECTIVE_VERIFICATION",
+        "recover-prepare": "PREPARE_NOTIFIER_EGRESS_ACTIVATION_RECOVERY",
+        "recover-apply": "APPLY_NOTIFIER_EGRESS_ACTIVATION_RECOVERY_AFTER_AUTHORIZATION",
+        "recover-finalize": "FINALIZE_NOTIFIER_EGRESS_ACTIVATION_RECOVERY_AFTER_EFFECTIVE_VERIFICATION",
+    }
+    if phase not in confirmations or (phase in ("finalize", "recover-finalize")) != (effective_unit_sha256 is not None):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_RUNNER_PHASE_INVALID")
+    publisher = bundle_root / "chenyida_erp_site/scripts/monitoring-notifier-egress-publisher.mjs"
+    consumed = phase in ("apply", "finalize", "recover-apply", "recover-finalize")
+    environment = {
+        "PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent",
+        "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES", "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+        "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+        "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(bundle_root / "chenyida_erp_site"),
+        "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": context["supervisor_bundle_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": context["execution_authorization_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED": "YES" if consumed else "NO",
+        "ERP_RELEASE_SUPERVISOR_ORIGINAL_AUTHORIZATION_CONSUMED": "YES" if context["execution_mode"] == "RECOVERY" else "NO",
+    }
+    if effective_unit_sha256 is not None:
+        environment["ERP_MONITORING_NOTIFIER_EGRESS_EFFECTIVE_UNIT_SHA256"] = effective_unit_sha256
+    try:
+        result = subprocess.run(
+            [str(node_path), "--max-old-space-size=64", "--disable-proto=throw", str(publisher), phase, confirmations[phase]],
+            env=environment, input=canonical_json(context), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            check=False, timeout=120, pass_fds=(lock_descriptor,),
+        )
+    except (OSError, subprocess.SubprocessError):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_RUNNER_FAILED")
+    if result.returncode != 0 or result.stderr != b"" or not 2 <= len(result.stdout) <= 64 * 1024:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_RUNNER_FAILED")
+    value = strict_json(result.stdout, "SUPERVISOR_NOTIFIER_EGRESS_RESPONSE_INVALID")
+    if result.stdout != canonical_json(value) or not isinstance(value, dict) or value.get("operation_id") != context["operation_id"]:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_RESPONSE_INVALID")
+    standard_fields = {"result", "operation_id", "intent_sha256", "policy_sha256", "receipt_sha256", "dropin_sha256", "effective_unit_sha256"}
+    if phase == "prepare":
+        expected_fields, expected_results = standard_fields, {"PREPARED"}
+    elif phase == "apply":
+        expected_fields, expected_results = standard_fields, {"APPLIED", "ALREADY_COMMITTED"}
+    elif phase == "finalize":
+        expected_fields, expected_results = standard_fields, {"COMMITTED", "ALREADY_COMMITTED"}
+    elif phase == "recover-prepare":
+        expected_fields = {"result", "operation_id", "intent_sha256", "recovery_sha256", "decision"}
+        expected_results = {"RECOVERY_PREPARED"}
+        if value.get("decision") not in {"RESUME_PUBLICATION", "ALREADY_COMMITTED", "QUARANTINE"}:
+            reject("SUPERVISOR_NOTIFIER_EGRESS_RESPONSE_INVALID")
+    elif value.get("result") == "QUARANTINED":
+        expected_fields = {"result", "operation_id", "intent_sha256", "recovery_sha256", "quarantine_sha256"}
+        expected_results = {"QUARANTINED"}
+    else:
+        expected_fields = standard_fields | {"recovery_sha256"}
+        expected_results = {"APPLIED", "COMMITTED", "ALREADY_COMMITTED"}
+    digest_fields = {field for field in expected_fields if field.endswith("_sha256")}
+    if set(value) != expected_fields or value.get("result") not in expected_results \
+        or any(not isinstance(value.get(field), str) or not SHA256.fullmatch(value[field]) or value[field] == "0" * 64 for field in digest_fields):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_RESPONSE_INVALID")
+    return value
+
+
+def expected_notifier_egress_effective_unit(parameters: dict[str, Any]) -> dict[str, Any]:
+    allowed = []
+    for item in parameters["allowed_addresses"]:
+        address = ipaddress.ip_address(item)
+        allowed.append(f"{address.compressed.lower()}/{32 if address.version == 4 else 128}")
+    return {
+        "schema_version": 1,
+        "contract": "chenyida-erp-monitoring-notifier-egress-effective-unit/v1",
+        "unit": NOTIFIER_EGRESS_UNIT,
+        "load_state": "loaded",
+        "fragment_path": str(NOTIFIER_EGRESS_BASE_UNIT),
+        "dropin_paths": [str(NOTIFIER_EGRESS_DROPIN)],
+        "transient": "no",
+        "user": "chenyida-monitor-notify",
+        "group": "chenyida-monitor-notify",
+        "private_network": "no",
+        "no_new_privileges": "yes",
+        "protect_system": "strict",
+        "memory_deny_write_execute": "yes",
+        "ip_address_deny": "any",
+        "ip_address_allow": allowed,
+        "proxy_environment": [],
+    }
+
+
+def notifier_egress_systemctl(arguments: list[str]) -> subprocess.CompletedProcess[bytes]:
+    environment = {"PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent"}
+    try:
+        return subprocess.run(
+            ["/usr/bin/systemctl", *arguments], env=environment, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_SYSTEMCTL_FAILED")
+
+
+def activate_and_verify_notifier_egress_systemd(parameters: dict[str, Any], expected_sha256: str,
+                                                 command: Any = notifier_egress_systemctl) -> str:
+    expected = expected_notifier_egress_effective_unit(parameters)
+    if sha256(canonical_json(expected)) != expected_sha256:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_EFFECTIVE_DIGEST_INVALID")
+    reload_result = command(["daemon-reload"])
+    if reload_result.returncode != 0 or reload_result.stdout not in (b"", None) or getattr(reload_result, "stderr", None) not in (b"", None):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_SYSTEMD_RELOAD_FAILED")
+    properties = [
+        "LoadState", "FragmentPath", "DropInPaths", "Transient", "User", "Group", "PrivateNetwork",
+        "NoNewPrivileges", "ProtectSystem", "MemoryDenyWriteExecute", "IPAddressDeny", "IPAddressAllow", "Environment",
+    ]
+    show = command(["show", NOTIFIER_EGRESS_UNIT, "--no-pager", *[f"--property={name}" for name in properties]])
+    if show.returncode != 0 or getattr(show, "stderr", None) not in (b"", None) or not isinstance(show.stdout, bytes) or len(show.stdout) > 64 * 1024:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_SYSTEMD_SHOW_FAILED")
+    values: dict[str, str] = {}
+    try:
+        text = show.stdout.decode("utf-8")
+        for line in text.splitlines():
+            key, separator, value = line.partition("=")
+            if separator != "=" or key not in properties or key in values:
+                reject("SUPERVISOR_NOTIFIER_EGRESS_EFFECTIVE_UNIT_INVALID")
+            values[key] = value
+    except UnicodeDecodeError:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_EFFECTIVE_UNIT_INVALID")
+    if set(values) != set(properties):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_EFFECTIVE_UNIT_INVALID")
+    try:
+        dropins = shlex.split(values["DropInPaths"], posix=True)
+        address_allow = shlex.split(values["IPAddressAllow"], posix=True)
+        environment = shlex.split(values["Environment"], posix=True)
+    except ValueError:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_EFFECTIVE_UNIT_INVALID")
+    proxy_names = {"http_proxy", "https_proxy", "all_proxy", "no_proxy"}
+    if any(item.partition("=")[0].lower() in proxy_names for item in environment):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_PROXY_ENVIRONMENT_FORBIDDEN")
+    if environment:
+        reject("SUPERVISOR_NOTIFIER_EGRESS_ENVIRONMENT_FORBIDDEN")
+    observed = {
+        "schema_version": 1,
+        "contract": "chenyida-erp-monitoring-notifier-egress-effective-unit/v1",
+        "unit": NOTIFIER_EGRESS_UNIT,
+        "load_state": values["LoadState"],
+        "fragment_path": values["FragmentPath"],
+        "dropin_paths": dropins,
+        "transient": values["Transient"],
+        "user": values["User"],
+        "group": values["Group"],
+        "private_network": values["PrivateNetwork"],
+        "no_new_privileges": values["NoNewPrivileges"],
+        "protect_system": values["ProtectSystem"],
+        "memory_deny_write_execute": values["MemoryDenyWriteExecute"],
+        "ip_address_deny": values["IPAddressDeny"],
+        "ip_address_allow": address_allow,
+        "proxy_environment": [],
+    }
+    if canonical_json(observed) != canonical_json(expected):
+        reject("SUPERVISOR_NOTIFIER_EGRESS_EFFECTIVE_UNIT_INVALID")
+    return expected_sha256
+
+
+def run_notifier_egress_authorization(bundle_root: Path, authorization_path: Path, authorization: dict[str, Any],
+                                       authorization_digest: str, lock_descriptor: int | None = None,
+                                       systemctl_command: Any = notifier_egress_systemctl) -> dict[str, Any]:
+    owns_lock = lock_descriptor is None
+    if lock_descriptor is None:
+        lock_descriptor = acquire_global_release_lock()
+    runtime_root: Path | None = None
+    try:
+        recovery = authorization["operation"] == "RECOVER_MONITORING_NOTIFIER_EGRESS_V1_ACTIVATION"
+        if recovery:
+            validate_original_notifier_egress_authorization_consumed(authorization["parameters"], authorization["supervisor_bundle_sha256"])
+        else:
+            verify_notifier_egress_sources(authorization["parameters"])
+        runtime_root, node_path = prepare_runtime_privilege_node(authorization_digest)
+        context = notifier_egress_context(authorization, authorization_digest)
+        prepared = run_notifier_egress_runner(node_path, bundle_root, context, "recover-prepare" if recovery else "prepare", lock_descriptor)
+        if not recovery:
+            verify_notifier_egress_sources(authorization["parameters"])
+        consume_authorization(authorization_path, authorization, authorization_digest)
+        if not recovery:
+            verify_notifier_egress_sources(authorization["parameters"])
+        applied = run_notifier_egress_runner(node_path, bundle_root, context, "recover-apply" if recovery else "apply", lock_descriptor)
+        if applied["result"] == "QUARANTINED":
+            return applied
+        if prepared.get("decision") == "QUARANTINE":
+            reject("SUPERVISOR_NOTIFIER_EGRESS_RECOVERY_DECISION_INVALID")
+        effective = activate_and_verify_notifier_egress_systemd(
+            authorization["parameters"], applied["effective_unit_sha256"], systemctl_command,
+        )
+        if applied["result"] == "ALREADY_COMMITTED":
+            return applied
+        return run_notifier_egress_runner(
+            node_path, bundle_root, context, "recover-finalize" if recovery else "finalize", lock_descriptor, effective,
+        )
+    finally:
+        try:
+            cleanup_runtime_privilege_node(runtime_root)
+        finally:
+            if owns_lock:
+                os.close(lock_descriptor)
+
+
 def runtime_privilege_probe_binding(parameters: dict[str, Any], operation: str) -> str:
     if operation == "RECONCILE":
         return parameters["runtime_probe_receipt_sha256"]
@@ -1898,6 +2375,13 @@ def main() -> None:
         if authorization["contract"] == CLUSTER_POLICY_AUTHORIZATION_CONTRACT:
             assert_no_runtime_privilege_interlock(bundle_root)
             result = run_cluster_policy_authorization(
+                bundle_root, authorization_path, authorization, authorization_digest, lock_descriptor,
+            )
+            sys.stdout.buffer.write(canonical_json(result))
+            return
+        if authorization["contract"] == NOTIFIER_EGRESS_AUTHORIZATION_CONTRACT:
+            assert_no_runtime_privilege_interlock(bundle_root)
+            result = run_notifier_egress_authorization(
                 bundle_root, authorization_path, authorization, authorization_digest, lock_descriptor,
             )
             sys.stdout.buffer.write(canonical_json(result))

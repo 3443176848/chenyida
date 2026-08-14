@@ -55,6 +55,7 @@ import {
   writeMonitoringHostState,
 } from "./host-store.mjs";
 import { deliverPendingEvent } from "./notifier.mjs";
+import { validateCommittedNotifierEgressActivation } from "./notifier-egress-contract.mjs";
 
 const REQUIRED_ENVIRONMENT = Object.freeze([
   "ERP_MONITORING_POLICY",
@@ -66,7 +67,12 @@ const REQUIRED_ENVIRONMENT = Object.freeze([
   "ERP_MONITORING_STATE_ROOT",
   "ERP_MONITORING_OUTBOX_ROOT",
   "ERP_MONITORING_DELIVERY_ROOT",
+  "ERP_MONITORING_NOTIFIER_EGRESS_POLICY",
+  "ERP_MONITORING_NOTIFIER_EGRESS_ACTIVATION",
 ]);
+
+const SHA256 = /^[0-9a-f]{64}$/;
+const ZERO_SHA256 = "0".repeat(64);
 
 function reject(code) {
   throw new OpsMonitoringError(code);
@@ -78,9 +84,18 @@ function absoluteEnvironment(name) {
   return value;
 }
 
+function digestEnvironment(name) {
+  const value = process.env[name];
+  if (typeof value !== "string" || !SHA256.test(value)) reject("MONITOR_HOST_ENVIRONMENT_INVALID");
+  return value;
+}
+
 function runtimePaths() {
   if (process.env.ERP_MONITORING_HOST_LAUNCHED !== "YES") reject("MONITOR_HOST_LAUNCH_CONTEXT_INVALID");
-  return Object.fromEntries(REQUIRED_ENVIRONMENT.map((name) => [name, absoluteEnvironment(name)]));
+  return {
+    ...Object.fromEntries(REQUIRED_ENVIRONMENT.map((name) => [name, absoluteEnvironment(name)])),
+    ERP_MONITORING_NOTIFIER_EGRESS_EFFECTIVE_UNIT_SHA256: digestEnvironment("ERP_MONITORING_NOTIFIER_EGRESS_EFFECTIVE_UNIT_SHA256"),
+  };
 }
 
 async function safeBytes(file, { modes, owners, minimum = 2, maximum = 2 * 1024 * 1024, code }) {
@@ -118,6 +133,18 @@ async function commonInputs(paths) {
   const policy = validateMonitoringPolicy(await safeJson(paths.ERP_MONITORING_POLICY, { modes: [0o444], owners: [root], maximum: 256 * 1024, code: "MONITOR_HOST_POLICY_INVALID" }));
   const resourcePlan = await safeJson(paths.ERP_MONITORING_RESOURCE_PLAN, { modes: [0o444], owners: [root], maximum: 1024 * 1024, code: "MONITOR_HOST_RESOURCE_PLAN_INVALID" });
   return { policy, resourcePlan };
+}
+
+async function optionalNotifierEgressActivation(paths, notifierConfig, expectedOwner, now) {
+  if (notifierConfig.notification.adapter.id === "SYNTHETIC_FAKE_ACK_V1") return null;
+  const files = [paths.ERP_MONITORING_NOTIFIER_EGRESS_POLICY, paths.ERP_MONITORING_NOTIFIER_EGRESS_ACTIVATION];
+  const metadata = await Promise.all(files.map((file) => lstat(file).catch((error) => error?.code === "ENOENT" ? null : reject("MONITOR_NOTIFICATION_EGRESS_FILE_INVALID"))));
+  if (metadata.some((entry) => entry === null)) {
+    if (metadata.some((entry) => entry !== null)) reject("MONITOR_NOTIFICATION_EGRESS_PARTIAL");
+    return null;
+  }
+  const [policy, receipt] = await Promise.all(files.map((file) => safeJson(file, { modes: [0o440], owners: [expectedOwner], maximum: 256 * 1024, code: "MONITOR_NOTIFICATION_EGRESS_FILE_INVALID" })));
+  return validateCommittedNotifierEgressActivation({ policy, receipt, notifierConfig, now });
 }
 
 async function optionalBackupProjection(evaluatorConfig, previousWatermark, expectedOwner, evaluationTime) {
@@ -192,11 +219,15 @@ async function collector(paths) {
   if (componentsProjection !== null) Object.assign(components, componentsProjectionObservation(componentsProjection));
   if (backupProjection !== null) components.backup = backupProjectionObservation(backupProjection, observedAt, policy.max_clock_skew_seconds);
   const notifierSha = monitoringSha256(views.notifier);
+  const egressActivation = await optionalNotifierEgressActivation(paths, views.notifier, { uid: 0, gid: views.notifier.identity.gid }, new Date(observedAt));
   const ownership = storeOwnership(views.evaluator);
   const deliveryExists = await lstat(paths.ERP_MONITORING_DELIVERY_ROOT).then(() => true).catch(() => false);
   if (deliveryExists) {
     const readiness = await readDeliveryReadiness(paths.ERP_MONITORING_DELIVERY_ROOT, notifierSha, ownership.delivery);
-    if (readiness && readiness.target_id === views.notifier.notification.target_id && readiness.target_generation === views.notifier.notification.target_generation && readiness.credential_sha256 === views.notifier.notification.credential.sha256 && Date.parse(readiness.verified_at) <= Date.parse(observedAt) && Date.parse(readiness.expires_at) >= Date.parse(observedAt)) components.notification = { status: "READY", target_id: readiness.target_id };
+    const egressReady = views.notifier.notification.adapter.id === "SYNTHETIC_FAKE_ACK_V1"
+      ? paths.ERP_MONITORING_NOTIFIER_EGRESS_EFFECTIVE_UNIT_SHA256 === ZERO_SHA256 && readiness?.egress_policy_sha256 === ZERO_SHA256 && readiness?.egress_activation_receipt_sha256 === ZERO_SHA256 && readiness?.egress_effective_unit_sha256 === ZERO_SHA256
+      : egressActivation !== null && paths.ERP_MONITORING_NOTIFIER_EGRESS_EFFECTIVE_UNIT_SHA256 === egressActivation.policy.systemd.effective_unit_sha256 && readiness?.egress_policy_sha256 === monitoringSha256(egressActivation.policy) && readiness?.egress_activation_receipt_sha256 === egressActivation.receipt.receipt_sha256 && readiness?.egress_effective_unit_sha256 === egressActivation.policy.systemd.effective_unit_sha256;
+    if (readiness && egressReady && readiness.target_id === views.notifier.notification.target_id && readiness.target_generation === views.notifier.notification.target_generation && readiness.credential_sha256 === views.notifier.notification.credential.sha256 && Date.parse(readiness.verified_at) <= Date.parse(observedAt) && Date.parse(readiness.expires_at) >= Date.parse(observedAt)) components.notification = { status: "READY", target_id: readiness.target_id };
   }
   const observation = await collectMonitoringObservation({ policy, resourcePlan, config: views.evaluator.monitoring, components, source: "HOST_PROJECTIONS", clock: () => new Date(observedAt) });
   await publishMonitoringObservation(paths.ERP_MONITORING_OBSERVATION_ROOT, observation, ownership.observation);
@@ -278,12 +309,15 @@ async function notifier(paths) {
   if (config.notification.adapter.id !== "HTTPS_JSON_ACK_V1") reject("MONITOR_FAKE_ADAPTER_RUNTIME_FORBIDDEN");
   const credentialDirectory = absoluteEnvironment("CREDENTIALS_DIRECTORY");
   const credential = await safeBytes(path.join(credentialDirectory, "notification"), { modes: [0o400, 0o440], owners: [{ uid: 0, gid: 0 }, identity], minimum: 16, maximum: 4096, code: "MONITOR_NOTIFICATION_CREDENTIAL_FILE_INVALID" });
+  const egressPolicy = await safeJson(paths.ERP_MONITORING_NOTIFIER_EGRESS_POLICY, { modes: [0o440], owners: [{ uid: 0, gid: identity.gid }], maximum: 256 * 1024, code: "MONITOR_NOTIFICATION_EGRESS_POLICY_FILE_INVALID" });
+  const egressReceipt = await safeJson(paths.ERP_MONITORING_NOTIFIER_EGRESS_ACTIVATION, { modes: [0o440], owners: [{ uid: 0, gid: identity.gid }], maximum: 256 * 1024, code: "MONITOR_NOTIFICATION_EGRESS_ACTIVATION_FILE_INVALID" });
+  if (paths.ERP_MONITORING_NOTIFIER_EGRESS_EFFECTIVE_UNIT_SHA256 !== egressPolicy?.systemd?.effective_unit_sha256) reject("MONITOR_NOTIFICATION_EGRESS_EFFECTIVE_UNIT_INVALID");
   const evaluatorConfig = {
     identity: config.evaluator_identity,
     notifier_identity: config.identity,
   };
   const ownership = storeOwnership(evaluatorConfig);
-  const result = await deliverPendingEvent({ outboxRoot: paths.ERP_MONITORING_OUTBOX_ROOT, deliveryRoot: paths.ERP_MONITORING_DELIVERY_ROOT, notifierConfig: config, credential, storeOptions: { outbox: ownership.outbox, delivery: ownership.delivery } });
+  const result = await deliverPendingEvent({ outboxRoot: paths.ERP_MONITORING_OUTBOX_ROOT, deliveryRoot: paths.ERP_MONITORING_DELIVERY_ROOT, notifierConfig: config, credential, egressActivation: { policy: egressPolicy, receipt: egressReceipt }, storeOptions: { outbox: ownership.outbox, delivery: ownership.delivery } });
   return { output: { schema_version: 1, contract: "chenyida-erp-monitoring-notifier-result/v1", ...result }, exitCode: ["IDLE", "ACKNOWLEDGED"].includes(result.status) ? 0 : 2 };
 }
 

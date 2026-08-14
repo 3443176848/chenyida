@@ -19,9 +19,14 @@ import {
   recordDeliveryReadiness,
   recordDeliveryResult,
 } from "./delivery-store.mjs";
+import {
+  canonicalNotifierEgressAddress,
+  validateCommittedNotifierEgressActivation,
+} from "./notifier-egress-contract.mjs";
 
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const REMOTE_ACK_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/;
+const PROXY_ENVIRONMENT = Object.freeze(["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "all_proxy", "no_proxy"]);
 
 function reject(code) {
   throw new OpsMonitoringError(code);
@@ -60,18 +65,22 @@ function adapterPayload(envelope, attempt) {
   };
 }
 
-export function createHttpsAckAdapter({ request = https.request } = {}) {
+export function createHttpsAckAdapter({ request = https.request, proxyEnvironment = process.env } = {}) {
   return Object.freeze({
     id: "HTTPS_JSON_ACK_V1",
-    async send({ envelope, attempt, notifierConfig, credential }) {
+    async send({ envelope, attempt, notifierConfig, credential, egressActivation }) {
       const config = validateMonitoringNotifierConfig(notifierConfig);
       if (config.notification.adapter.id !== "HTTPS_JSON_ACK_V1") reject("MONITOR_NOTIFICATION_ADAPTER_MISMATCH");
+      const committed = validateCommittedNotifierEgressActivation({ policy: egressActivation?.policy, receipt: egressActivation?.receipt, notifierConfig: config, now: new Date(attempt.prepared_at) });
+      if (PROXY_ENVIRONMENT.some((name) => typeof proxyEnvironment?.[name] === "string" && proxyEnvironment[name] !== "")) reject("MONITOR_NOTIFICATION_PROXY_ENVIRONMENT_FORBIDDEN");
       const body = Buffer.from(`${JSON.stringify(adapterPayload(envelope, attempt))}\n`, "utf8");
       if (body.length > 64 * 1024) reject("MONITOR_NOTIFICATION_REQUEST_TOO_LARGE");
       return new Promise((resolve) => {
         let settled = false;
         const finish = (value) => { if (!settled) { settled = true; resolve(value); } };
         const endpoint = config.notification.endpoint;
+        const allowed = committed.policy.network.allowed_addresses;
+        const selected = allowed[(attempt.attempt_no - 1) % allowed.length];
         let call;
         try {
           call = request({
@@ -81,16 +90,28 @@ export function createHttpsAckAdapter({ request = https.request } = {}) {
             port: endpoint.port,
             path: endpoint.path,
             method: "POST",
+            agent: false,
             timeout: config.notification.ack.timeout_milliseconds,
             maxRedirects: 0,
+            lookup(hostname, _options, callback) {
+              if (hostname !== endpoint.host) { callback(new Error("MONITOR_NOTIFICATION_LOOKUP_HOST_INVALID")); return; }
+              callback(null, selected.address, selected.family === "AF_INET" ? 4 : 6);
+            },
             headers: {
               "content-type": "application/json",
               "content-length": String(body.length),
               "idempotency-key": envelope.event_id,
               authorization: `Bearer ${credential}`,
+              host: endpoint.host,
               "user-agent": "chenyida-erp-monitoring-host-v1",
             },
           }, (response) => {
+            let remote;
+            try { remote = canonicalNotifierEgressAddress(response.socket?.remoteAddress); }
+            catch { response.destroy(); finish({ kind: "AMBIGUOUS", code: "REMOTE_ADDRESS_UNVERIFIED", raw: null }); return; }
+            if (!allowed.some((entry) => entry.family === remote.family && entry.address === remote.address)) {
+              response.destroy(); finish({ kind: "AMBIGUOUS", code: "REMOTE_ADDRESS_MISMATCH", raw: null }); return;
+            }
             const chunks = [];
             let bytes = 0;
             let ended = false;
@@ -163,11 +184,15 @@ function createAck({ envelope, attempt, result, remoteAck }) {
   return value;
 }
 
-export function createDeliveryReadiness({ notifierConfig, credential, envelope, grant, claim, attempt, result, ack }) {
+export function createDeliveryReadiness({ notifierConfig, credential, envelope, grant, claim, attempt, result, ack, egressActivation = null }) {
   const config = validateMonitoringNotifierConfig(notifierConfig);
   credentialBytes(credential, config.notification.credential.sha256);
   const chain = validateDeliveryAckChain({ envelope, grant, claim, attempt, result, ack });
   if (chain.attempt.notifier_config_sha256 !== monitoringSha256(config) || chain.attempt.target_id !== config.notification.target_id || chain.attempt.target_generation !== config.notification.target_generation || chain.attempt.credential_sha256 !== config.notification.credential.sha256 || chain.attempt.credential_generation !== config.notification.credential.generation || chain.attempt.adapter_id !== config.notification.adapter.id || chain.attempt.adapter_sha256 !== config.notification.adapter.source_sha256) reject("MONITOR_DELIVERY_READINESS_BINDING_INVALID");
+  if (config.notification.adapter.id === "HTTPS_JSON_ACK_V1") {
+    const committed = validateCommittedNotifierEgressActivation({ policy: egressActivation?.policy, receipt: egressActivation?.receipt, notifierConfig: config, now: new Date(chain.result.recorded_at) });
+    if (chain.attempt.egress_policy_sha256 !== monitoringSha256(committed.policy) || chain.attempt.egress_activation_receipt_sha256 !== committed.receipt.receipt_sha256 || chain.attempt.egress_effective_unit_sha256 !== committed.policy.systemd.effective_unit_sha256) reject("MONITOR_DELIVERY_READINESS_EGRESS_BINDING_INVALID");
+  } else if (egressActivation !== null || chain.attempt.egress_policy_sha256 !== "0".repeat(64) || chain.attempt.egress_activation_receipt_sha256 !== "0".repeat(64) || chain.attempt.egress_effective_unit_sha256 !== "0".repeat(64)) reject("MONITOR_DELIVERY_READINESS_EGRESS_BINDING_INVALID");
   const verifiedAt = chain.result.recorded_at;
   const value = {
     schema_version: 1,
@@ -189,6 +214,9 @@ export function createDeliveryReadiness({ notifierConfig, credential, envelope, 
     credential_generation: config.notification.credential.generation,
     adapter_id: config.notification.adapter.id,
     adapter_sha256: config.notification.adapter.source_sha256,
+    egress_policy_sha256: chain.attempt.egress_policy_sha256,
+    egress_activation_receipt_sha256: chain.attempt.egress_activation_receipt_sha256,
+    egress_effective_unit_sha256: chain.attempt.egress_effective_unit_sha256,
     verified_at: verifiedAt,
     expires_at: new Date(Date.parse(verifiedAt) + 120_000).toISOString(),
   };
@@ -196,9 +224,19 @@ export function createDeliveryReadiness({ notifierConfig, credential, envelope, 
   return value;
 }
 
-export async function deliverPendingEvent({ outboxRoot, deliveryRoot, notifierConfig, credential, pendingEventIds = null, adapter = null, now = new Date(), storeOptions = {}, hooks = {} }) {
+export async function deliverPendingEvent({ outboxRoot, deliveryRoot, notifierConfig, credential, egressActivation = null, pendingEventIds = null, adapter = null, now = new Date(), storeOptions = {}, hooks = {} }) {
   const config = validateMonitoringNotifierConfig(notifierConfig);
   const secret = credentialBytes(credential, config.notification.credential.sha256);
+  let committedEgress = null;
+  let egressBinding = null;
+  if (config.notification.adapter.id === "HTTPS_JSON_ACK_V1") {
+    committedEgress = validateCommittedNotifierEgressActivation({ policy: egressActivation?.policy, receipt: egressActivation?.receipt, notifierConfig: config, now });
+    egressBinding = {
+      policy_sha256: monitoringSha256(committedEgress.policy),
+      activation_receipt_sha256: committedEgress.receipt.receipt_sha256,
+      effective_unit_sha256: committedEgress.policy.systemd.effective_unit_sha256,
+    };
+  } else if (egressActivation !== null) reject("MONITOR_NOTIFICATION_SYNTHETIC_EGRESS_FORBIDDEN");
   if (pendingEventIds !== null && (!(pendingEventIds instanceof Set) || [...pendingEventIds].some((eventId) => typeof eventId !== "string" || !/^[0-9a-f]{64}$/.test(eventId)))) reject("MONITOR_DELIVERY_PENDING_SET_INVALID");
   const [envelopes, grants, acknowledgements] = await Promise.all([readDeliveryEnvelopes(outboxRoot, storeOptions.outbox || {}), readDeliveryGrants(outboxRoot, storeOptions.outbox || {}), readDeliveryAcks(deliveryRoot, storeOptions.delivery || storeOptions)]);
   const acknowledged = new Set(acknowledgements.map((entry) => entry.event_id));
@@ -209,7 +247,7 @@ export async function deliverPendingEvent({ outboxRoot, deliveryRoot, notifierCo
   let exhausted = false;
   for (const candidate of candidates) {
     try {
-      prepared = await prepareDeliveryAttempt({ root: deliveryRoot, envelope: candidate, notifierConfig: config, now, options: storeOptions.delivery || storeOptions });
+      prepared = await prepareDeliveryAttempt({ root: deliveryRoot, envelope: candidate, notifierConfig: config, egressBinding, now, options: storeOptions.delivery || storeOptions });
       envelope = candidate;
       break;
     } catch (error) {
@@ -224,7 +262,7 @@ export async function deliverPendingEvent({ outboxRoot, deliveryRoot, notifierCo
   let selected = adapter;
   if (selected === null) selected = createHttpsAckAdapter();
   if (!selected || typeof selected.send !== "function" || selected.id !== config.notification.adapter.id) reject("MONITOR_NOTIFICATION_ADAPTER_INVALID");
-  const response = await selected.send({ envelope, attempt: prepared.attempt, notifierConfig: config, credential: secret });
+  const response = await selected.send({ envelope, attempt: prepared.attempt, notifierConfig: config, credential: secret, egressActivation: committedEgress });
   await hooks.afterSend?.({ response, prepared });
   let result;
   let remoteAck = null;
@@ -244,7 +282,7 @@ export async function deliverPendingEvent({ outboxRoot, deliveryRoot, notifierCo
   if (remoteAck === null) return Object.freeze({ status: result.status, event_id: envelope.event_id, attempt_no: prepared.attempt.attempt_no, acknowledged: false });
   const ack = createAck({ envelope, attempt: prepared.attempt, result, remoteAck });
   await recordDeliveryAck(deliveryRoot, ack, storeOptions.delivery || storeOptions);
-  const readiness = createDeliveryReadiness({ notifierConfig: config, credential, envelope, grant: granted.get(envelope.event_id), claim: prepared.claim, attempt: prepared.attempt, result, ack });
+  const readiness = createDeliveryReadiness({ notifierConfig: config, credential, envelope, grant: granted.get(envelope.event_id), claim: prepared.claim, attempt: prepared.attempt, result, ack, egressActivation: committedEgress });
   await recordDeliveryReadiness(deliveryRoot, readiness, storeOptions.delivery || storeOptions);
   return Object.freeze({ status: "ACKNOWLEDGED", event_id: envelope.event_id, attempt_no: prepared.attempt.attempt_no, acknowledged: true });
 }

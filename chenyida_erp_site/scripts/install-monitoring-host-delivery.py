@@ -487,12 +487,15 @@ def validate_rotation_ack(value: Any, filename: str, envelope: dict[str, Any]) -
 
 
 def validate_rotation_attempt(value: Any, filename: str) -> dict[str, Any]:
-    fields = {"schema_version", "contract", "attempt_id", "claim_id", "event_id", "envelope_id", "attempt_no", "prepared_at", "previous_attempt_sha256", "target_id", "target_generation", "notifier_config_sha256", "credential_sha256", "credential_generation", "adapter_id", "adapter_version", "adapter_sha256", "idempotency_key"}
+    base_fields = {"schema_version", "contract", "attempt_id", "claim_id", "event_id", "envelope_id", "attempt_no", "prepared_at", "previous_attempt_sha256", "target_id", "target_generation", "notifier_config_sha256", "credential_sha256", "credential_generation", "adapter_id", "adapter_version", "adapter_sha256", "idempotency_key"}
+    legacy = isinstance(value, dict) and value.get("contract") == "chenyida-erp-monitoring-delivery-attempt/v1"
+    fields = base_fields if legacy else base_fields | {"egress_policy_sha256", "egress_activation_receipt_sha256", "egress_effective_unit_sha256"}
     value = exact_fields(value, fields, "MONITOR_INSTALL_DELIVERY_ATTEMPT_INVALID")
     match = re.fullmatch(r"([0-9a-f]{64})\.([1-9]|[12][0-9]|3[0-2])\.json", filename)
-    if match is None or value["schema_version"] != 1 or value["contract"] != "chenyida-erp-monitoring-delivery-attempt/v1" or value["event_id"] != match.group(1) or value["attempt_no"] != int(match.group(2)) or value["idempotency_key"] != value["event_id"]:
+    if match is None or value["schema_version"] != 1 or value["contract"] not in ("chenyida-erp-monitoring-delivery-attempt/v1", "chenyida-erp-monitoring-delivery-attempt/v2") or value["event_id"] != match.group(1) or value["attempt_no"] != int(match.group(2)) or value["idempotency_key"] != value["event_id"]:
         reject("MONITOR_INSTALL_DELIVERY_ATTEMPT_INVALID")
-    for field in ("attempt_id", "claim_id", "event_id", "envelope_id", "previous_attempt_sha256", "notifier_config_sha256", "credential_sha256", "adapter_sha256"):
+    digest_fields = ("attempt_id", "claim_id", "event_id", "envelope_id", "previous_attempt_sha256", "notifier_config_sha256", "credential_sha256", "adapter_sha256")
+    for field in digest_fields if legacy else (*digest_fields, "egress_policy_sha256", "egress_activation_receipt_sha256", "egress_effective_unit_sha256"):
         if not isinstance(value[field], str) or not SHA256.fullmatch(value[field]):
             reject("MONITOR_INSTALL_DELIVERY_ATTEMPT_INVALID")
     for field in ("attempt_no", "target_generation", "credential_generation"):
@@ -500,6 +503,13 @@ def validate_rotation_attempt(value: Any, filename: str) -> dict[str, Any]:
             reject("MONITOR_INSTALL_DELIVERY_ATTEMPT_INVALID")
     if not isinstance(value["target_id"], str) or not IDENTIFIER.fullmatch(value["target_id"]) or value["adapter_id"] not in ("HTTPS_JSON_ACK_V1", "SYNTHETIC_FAKE_ACK_V1") or value["adapter_version"] != 1 or not isinstance(value["prepared_at"], str) or not ISO_UTC.fullmatch(value["prepared_at"]):
         reject("MONITOR_INSTALL_DELIVERY_ATTEMPT_INVALID")
+    if not legacy:
+        egress_fields = ("egress_policy_sha256", "egress_activation_receipt_sha256", "egress_effective_unit_sha256")
+        all_zero = all(value[field] == "0" * 64 for field in egress_fields)
+        all_nonzero = all(value[field] != "0" * 64 for field in egress_fields)
+        if value["adapter_id"] == "SYNTHETIC_FAKE_ACK_V1" and not all_zero \
+            or value["adapter_id"] == "HTTPS_JSON_ACK_V1" and not all_nonzero:
+            reject("MONITOR_INSTALL_DELIVERY_ATTEMPT_INVALID")
     body = dict(value)
     body.pop("attempt_id")
     if value["attempt_id"] != sha256(canonical_json(body)):

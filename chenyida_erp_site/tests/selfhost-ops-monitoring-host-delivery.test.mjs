@@ -28,7 +28,9 @@ import {
   createDeliveryGrant,
   deriveMonitoringHostConfigViews,
   validateDeliveryAckChain,
+  validateDeliveryAttempt,
   validateDeliveryEnvelope,
+  validateDeliveryReadiness,
   validateMonitoringHostConfig,
 } from "../tools/ops-monitoring/delivery-contract.mjs";
 import {
@@ -60,6 +62,11 @@ import {
   deliverPendingEvent,
 } from "../tools/ops-monitoring/notifier.mjs";
 import {
+  createNotifierEgressActivationReceipt,
+  createNotifierEgressPolicy,
+  notifierEgressTemplateLogicalSha256,
+} from "../tools/ops-monitoring/notifier-egress-contract.mjs";
+import {
   MONITORING_HOST_STATE_LOCK,
   assertInheritedMonitoringLock,
   createMonitoringHostState,
@@ -74,6 +81,29 @@ const activatedAt = "2026-08-13T00:00:00.000Z";
 const credential = Buffer.from("synthetic-monitoring-secret-0001\n", "utf8");
 const sha = (character) => character.repeat(64);
 const digest = (character) => `sha256:${sha(character)}`;
+const egressTemplateRaw = await readFile(new URL("../operations/monitoring-notifier-egress-policy-v1.json", import.meta.url));
+const egressTemplate = JSON.parse(egressTemplateRaw);
+
+function committedEgress(config) {
+  const policy = createNotifierEgressPolicy({
+    template: egressTemplate,
+    parameters: {
+      operation: "ACTIVATE", environment: "UAT", egress_generation: 1, previous_policy_sha256: sha("0"),
+      previous_activation_receipt_sha256: sha("0"), rollback_target_activation_receipt_sha256: sha("0"),
+      deployment_id: config.deployment.id, target_id: config.notification.target_id, target_generation: config.notification.target_generation,
+      endpoint: config.notification.endpoint, allowed_addresses: ["1.1.1.1"], monitoring_bundle_sha256: config.installation.monitoring_bundle_sha256,
+      supervisor_bundle_sha256: config.installation.supervisor_bundle_sha256, notifier_config_sha256: monitoringSha256(config),
+      adapter_id: config.notification.adapter.id, adapter_sha256: config.notification.adapter.source_sha256,
+      credential_sha256: config.notification.credential.sha256, credential_generation: config.notification.credential.generation,
+      oncall_roster_generation: config.notification.oncall_roster_generation, escalation_table_sha256: config.notification.escalation_table_sha256,
+      base_unit_sha256: sha("1"), template_file_sha256: monitoringSha256(egressTemplateRaw),
+      template_policy_sha256: notifierEgressTemplateLogicalSha256(egressTemplate), authorization_sha256: sha("2"),
+      approval_reference_sha256: sha("3"), responsible_operator_identity_sha256: sha("4"), approver_identity_sha256: sha("5"),
+      activated_at: "2026-08-13T00:00:00.000Z", expires_at: "2026-08-14T00:00:00.000Z",
+    },
+  });
+  return { policy, receipt: createNotifierEgressActivationReceipt({ policy, activationId: "host-delivery-egress-v1" }) };
+}
 
 function monitoringConfig(targetId = "primary-oncall") {
   return validateMonitoringConfig({
@@ -326,11 +356,12 @@ test("content-derived observation identity covers every sanitized component", ()
 });
 
 test("HTTPS adapter settles fail-closed when a response aborts before end", async () => {
-  const views = deriveMonitoringHostConfigViews(hostConfig({ adapterId: "HTTPS_JSON_ACK_V1" }));
+  const views = deriveMonitoringHostConfigViews(hostConfig({ adapterId: "HTTPS_JSON_ACK_V1", deploymentClass: "UAT" }));
   const envelope = createDeliveryEnvelope({ event: evaluatedFixture().result.report.events[0], evaluatorConfig: views.evaluator });
   const response = new EventEmitter();
   response.statusCode = 200;
   response.complete = false;
+  response.socket = { remoteAddress: "1.1.1.1" };
   response.destroy = () => undefined;
   const request = (_options, callback) => {
     const call = new EventEmitter();
@@ -341,7 +372,13 @@ test("HTTPS adapter settles fail-closed when a response aborts before end", asyn
     };
     return call;
   };
-  const result = await createHttpsAckAdapter({ request }).send({ envelope, attempt: { attempt_id: sha("a") }, notifierConfig: views.notifier, credential: credential.toString("utf8").trimEnd() });
+  const result = await createHttpsAckAdapter({ request, proxyEnvironment: {} }).send({
+    envelope,
+    attempt: { attempt_id: sha("a"), attempt_no: 1, prepared_at: observedAt },
+    notifierConfig: views.notifier,
+    credential: credential.toString("utf8").trimEnd(),
+    egressActivation: committedEgress(views.notifier),
+  });
   assert.equal(result.kind, "AMBIGUOUS");
   assert.equal(result.code, "REMOTE_RESPONSE_ABORTED");
 });
@@ -451,6 +488,22 @@ test("notifier persists claim and attempt before send and only exact remote ackn
   assert.equal(chain.result.status, "ACKNOWLEDGED");
   const readiness = await readDeliveryReadiness(roots.delivery, chain.attempt.notifier_config_sha256);
   assert.equal(readiness.ack_id, chain.ack.ack_id);
+  const mixedAttempt = {
+    ...chain.attempt,
+    attempt_id: "",
+    adapter_id: "HTTPS_JSON_ACK_V1",
+    egress_policy_sha256: sha("1"),
+  };
+  mixedAttempt.attempt_id = monitoringSha256({ ...mixedAttempt, attempt_id: undefined });
+  assert.throws(() => validateDeliveryAttempt(mixedAttempt), (error) => error.code === "MONITOR_DELIVERY_ATTEMPT_EGRESS_INVALID");
+  const mixedReadiness = {
+    ...readiness,
+    readiness_id: "",
+    adapter_id: "HTTPS_JSON_ACK_V1",
+    egress_policy_sha256: sha("1"),
+  };
+  mixedReadiness.readiness_id = monitoringSha256({ ...mixedReadiness, readiness_id: undefined });
+  assert.throws(() => validateDeliveryReadiness(mixedReadiness), (error) => error.code === "MONITOR_DELIVERY_READINESS_EGRESS_INVALID");
   const forgedAmbiguous = { ...chain.result, result_id: "", status: "AMBIGUOUS", detail_code: "REMOTE_ACK_BINDING_INVALID" };
   forgedAmbiguous.result_id = monitoringSha256({ ...forgedAmbiguous, result_id: undefined });
   assert.throws(() => validateDeliveryAckChain({ ...chain, result: forgedAmbiguous }), (error) => error.code === "MONITOR_DELIVERY_ACK_CHAIN_INVALID");

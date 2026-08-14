@@ -12,10 +12,10 @@ export const MONITORING_NOTIFIER_CONFIG_CONTRACT = "chenyida-erp-monitoring-noti
 export const MONITORING_DELIVERY_ENVELOPE_CONTRACT = "chenyida-erp-monitoring-delivery-envelope/v1";
 export const MONITORING_DELIVERY_GRANT_CONTRACT = "chenyida-erp-monitoring-delivery-grant/v1";
 export const MONITORING_DELIVERY_CLAIM_CONTRACT = "chenyida-erp-monitoring-delivery-claim/v1";
-export const MONITORING_DELIVERY_ATTEMPT_CONTRACT = "chenyida-erp-monitoring-delivery-attempt/v1";
+export const MONITORING_DELIVERY_ATTEMPT_CONTRACT = "chenyida-erp-monitoring-delivery-attempt/v2";
 export const MONITORING_DELIVERY_RESULT_CONTRACT = "chenyida-erp-monitoring-delivery-result/v1";
 export const MONITORING_DELIVERY_ACK_CONTRACT = "chenyida-erp-monitoring-delivery-ack/v1";
-export const MONITORING_DELIVERY_READINESS_CONTRACT = "chenyida-erp-monitoring-delivery-readiness/v1";
+export const MONITORING_DELIVERY_READINESS_CONTRACT = "chenyida-erp-monitoring-delivery-readiness/v2";
 export const MONITORING_REMOTE_ACK_CONTRACT = "chenyida-erp-monitoring-remote-ack/v1";
 
 export const MONITORING_PRIVATE_CONFIG_PATH = "/etc/chenyida-erp/monitoring-v1/private/host-config.json";
@@ -334,14 +334,23 @@ export function validateDeliveryClaim(value) {
 }
 
 export function validateDeliveryAttempt(value) {
-  exactKeys(value, ["schema_version", "contract", "attempt_id", "claim_id", "event_id", "envelope_id", "attempt_no", "prepared_at", "previous_attempt_sha256", "target_id", "target_generation", "notifier_config_sha256", "credential_sha256", "credential_generation", "adapter_id", "adapter_version", "adapter_sha256", "idempotency_key"], "MONITOR_DELIVERY_ATTEMPT_FIELDS_INVALID");
-  if (value.schema_version !== 1 || value.contract !== MONITORING_DELIVERY_ATTEMPT_CONTRACT) reject("MONITOR_DELIVERY_ATTEMPT_VERSION_INVALID");
+  const legacy = value?.contract === "chenyida-erp-monitoring-delivery-attempt/v1";
+  const fields = ["schema_version", "contract", "attempt_id", "claim_id", "event_id", "envelope_id", "attempt_no", "prepared_at", "previous_attempt_sha256", "target_id", "target_generation", "notifier_config_sha256", "credential_sha256", "credential_generation", "adapter_id", "adapter_version", "adapter_sha256", "idempotency_key"];
+  exactKeys(value, legacy ? fields : [...fields.slice(0, -1), "egress_policy_sha256", "egress_activation_receipt_sha256", "egress_effective_unit_sha256", "idempotency_key"], "MONITOR_DELIVERY_ATTEMPT_FIELDS_INVALID");
+  if (value.schema_version !== 1 || !new Set([MONITORING_DELIVERY_ATTEMPT_CONTRACT, "chenyida-erp-monitoring-delivery-attempt/v1"]).has(value.contract)) reject("MONITOR_DELIVERY_ATTEMPT_VERSION_INVALID");
   digest(value.attempt_id, "MONITOR_DELIVERY_ATTEMPT_INVALID");
   digest(value.claim_id, "MONITOR_DELIVERY_ATTEMPT_INVALID");
   validateAttemptBinding(value, "MONITOR_DELIVERY_ATTEMPT_INVALID");
   iso(value.prepared_at, "MONITOR_DELIVERY_ATTEMPT_INVALID");
   digest(value.previous_attempt_sha256, "MONITOR_DELIVERY_ATTEMPT_INVALID");
   if (!new Set(["HTTPS_JSON_ACK_V1", "SYNTHETIC_FAKE_ACK_V1"]).has(value.adapter_id) || value.adapter_version !== 1) reject("MONITOR_DELIVERY_ATTEMPT_INVALID");
+  if (!legacy) {
+    const egressFields = ["egress_policy_sha256", "egress_activation_receipt_sha256", "egress_effective_unit_sha256"];
+    for (const field of egressFields) digest(value[field], "MONITOR_DELIVERY_ATTEMPT_INVALID");
+    const allZero = egressFields.every((field) => value[field] === ZERO_SHA256);
+    const allNonzero = egressFields.every((field) => value[field] !== ZERO_SHA256);
+    if (value.adapter_id === "SYNTHETIC_FAKE_ACK_V1" ? !allZero : !allNonzero) reject("MONITOR_DELIVERY_ATTEMPT_EGRESS_INVALID");
+  }
   digest(value.adapter_sha256, "MONITOR_DELIVERY_ATTEMPT_INVALID");
   hashIdentity(value, "attempt_id", "MONITOR_DELIVERY_ATTEMPT_INTEGRITY_INVALID");
   return value;
@@ -393,13 +402,22 @@ export function validateDeliveryAckChain({ ack, envelope, grant, claim, attempt,
 }
 
 export function validateDeliveryReadiness(value) {
-  exactKeys(value, ["schema_version", "contract", "readiness_id", "status", "event_id", "envelope_id", "grant_id", "claim_id", "attempt_id", "result_id", "ack_id", "remote_ack_id_sha256", "target_id", "target_generation", "notifier_config_sha256", "credential_sha256", "credential_generation", "adapter_id", "adapter_sha256", "verified_at", "expires_at"], "MONITOR_DELIVERY_READINESS_FIELDS_INVALID");
-  if (value.schema_version !== 1 || value.contract !== MONITORING_DELIVERY_READINESS_CONTRACT || value.status !== "READY") reject("MONITOR_DELIVERY_READINESS_VERSION_INVALID");
-  for (const field of ["readiness_id", "event_id", "envelope_id", "grant_id", "claim_id", "attempt_id", "result_id", "ack_id", "remote_ack_id_sha256", "notifier_config_sha256", "credential_sha256", "adapter_sha256"]) digest(value[field], "MONITOR_DELIVERY_READINESS_INVALID");
+  const legacy = value?.contract === "chenyida-erp-monitoring-delivery-readiness/v1";
+  const fields = ["schema_version", "contract", "readiness_id", "status", "event_id", "envelope_id", "grant_id", "claim_id", "attempt_id", "result_id", "ack_id", "remote_ack_id_sha256", "target_id", "target_generation", "notifier_config_sha256", "credential_sha256", "credential_generation", "adapter_id", "adapter_sha256", "verified_at", "expires_at"];
+  exactKeys(value, legacy ? fields : [...fields.slice(0, -2), "egress_policy_sha256", "egress_activation_receipt_sha256", "egress_effective_unit_sha256", "verified_at", "expires_at"], "MONITOR_DELIVERY_READINESS_FIELDS_INVALID");
+  if (value.schema_version !== 1 || !new Set([MONITORING_DELIVERY_READINESS_CONTRACT, "chenyida-erp-monitoring-delivery-readiness/v1"]).has(value.contract) || value.status !== "READY") reject("MONITOR_DELIVERY_READINESS_VERSION_INVALID");
+  const digests = ["readiness_id", "event_id", "envelope_id", "grant_id", "claim_id", "attempt_id", "result_id", "ack_id", "remote_ack_id_sha256", "notifier_config_sha256", "credential_sha256", "adapter_sha256"];
+  for (const field of legacy ? digests : [...digests, "egress_policy_sha256", "egress_activation_receipt_sha256", "egress_effective_unit_sha256"]) digest(value[field], "MONITOR_DELIVERY_READINESS_INVALID");
   identifier(value.target_id, "MONITOR_DELIVERY_READINESS_INVALID");
   integer(value.target_generation, 1, Number.MAX_SAFE_INTEGER, "MONITOR_DELIVERY_READINESS_INVALID");
   integer(value.credential_generation, 1, Number.MAX_SAFE_INTEGER, "MONITOR_DELIVERY_READINESS_INVALID");
   if (!new Set(["HTTPS_JSON_ACK_V1", "SYNTHETIC_FAKE_ACK_V1"]).has(value.adapter_id)) reject("MONITOR_DELIVERY_READINESS_INVALID");
+  if (!legacy) {
+    const egressFields = ["egress_policy_sha256", "egress_activation_receipt_sha256", "egress_effective_unit_sha256"];
+    const allZero = egressFields.every((field) => value[field] === ZERO_SHA256);
+    const allNonzero = egressFields.every((field) => value[field] !== ZERO_SHA256);
+    if (value.adapter_id === "SYNTHETIC_FAKE_ACK_V1" ? !allZero : !allNonzero) reject("MONITOR_DELIVERY_READINESS_EGRESS_INVALID");
+  }
   iso(value.verified_at, "MONITOR_DELIVERY_READINESS_INVALID");
   iso(value.expires_at, "MONITOR_DELIVERY_READINESS_INVALID");
   if (Date.parse(value.expires_at) <= Date.parse(value.verified_at)) reject("MONITOR_DELIVERY_READINESS_INVALID");

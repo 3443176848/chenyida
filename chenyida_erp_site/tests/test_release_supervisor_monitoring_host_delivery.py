@@ -571,6 +571,139 @@ class MonitoringHostDeliveryTest(unittest.TestCase):
         with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_MONITORING_INPUT_PATH_INVALID"):
             supervisor.validate_parameters("INSTALL_MONITORING_HOST_DELIVERY", {**common, "runtime_path": "/tmp/node"})
 
+    def test_monitor_launcher_binds_runtime_to_exact_effective_notifier_egress(self):
+        view_root = self.root / "egress-views"
+        view_root.mkdir(mode=0o755)
+        policy_path = view_root / "notifier-egress-policy.json"
+        activation_path = view_root / "notifier-egress-activation.json"
+        systemd_root = self.root / "egress-systemd"
+        systemd_root.mkdir(mode=0o755)
+        systemd_root.chmod(0o755)
+        base_unit_path = systemd_root / monitor_launcher.NOTIFIER_EGRESS_UNIT
+        base_unit_raw = b"[Service]\nIPAddressDeny=any\n"
+        base_unit_path.write_bytes(base_unit_raw)
+        base_unit_path.chmod(0o444)
+        dropin_root = systemd_root / f"{monitor_launcher.NOTIFIER_EGRESS_UNIT}.d"
+        dropin_root.mkdir(mode=0o755)
+        dropin_root.chmod(0o755)
+        dropin_path = dropin_root / monitor_launcher.NOTIFIER_EGRESS_DROPIN.name
+        allowed = [{"family": "AF_INET", "address": "1.1.1.1", "prefix_length": 32, "systemd_prefix": "1.1.1.1/32"}]
+        dropin_raw = b"# Managed by chenyida-erp release supervisor; manual edits are forbidden.\n[Service]\nIPAddressAllow=\nIPAddressAllow=1.1.1.1/32\n"
+        dropin_path.write_bytes(dropin_raw)
+        dropin_path.chmod(0o444)
+        effective = {
+            "schema_version": 1,
+            "contract": "chenyida-erp-monitoring-notifier-egress-effective-unit/v1",
+            "unit": monitor_launcher.NOTIFIER_EGRESS_UNIT,
+            "load_state": "loaded",
+            "fragment_path": str(monitor_launcher.NOTIFIER_EGRESS_BASE_UNIT),
+            "dropin_paths": [str(monitor_launcher.NOTIFIER_EGRESS_DROPIN)],
+            "transient": "no",
+            "user": "chenyida-monitor-notify",
+            "group": "chenyida-monitor-notify",
+            "private_network": "no",
+            "no_new_privileges": "yes",
+            "protect_system": "strict",
+            "memory_deny_write_execute": "yes",
+            "ip_address_deny": "any",
+            "ip_address_allow": ["1.1.1.1/32"],
+            "proxy_environment": [],
+        }
+        policy = {
+            "contract": "chenyida-erp-monitoring-notifier-egress-policy/v1",
+            "binding": {"base_unit_sha256": monitor_launcher.sha256(base_unit_raw)},
+            "network": {"allowed_addresses": allowed},
+            "systemd": {
+                "unit": monitor_launcher.NOTIFIER_EGRESS_UNIT,
+                "fragment_path": str(monitor_launcher.NOTIFIER_EGRESS_BASE_UNIT),
+                "dropin_path": str(monitor_launcher.NOTIFIER_EGRESS_DROPIN),
+                "dropin_sha256": monitor_launcher.sha256(dropin_raw),
+                "effective_unit_sha256": monitor_launcher.sha256(monitor_launcher.canonical_json(effective)),
+            },
+        }
+        policy_raw = monitor_launcher.canonical_json(policy)
+        receipt_body = {
+            "contract": "chenyida-erp-monitoring-notifier-egress-activation-receipt/v1",
+            "policy_sha256": monitor_launcher.sha256(policy_raw),
+        }
+        receipt = {**receipt_body, "receipt_sha256": monitor_launcher.sha256(monitor_launcher.canonical_json(receipt_body))}
+        for file, raw in ((policy_path, policy_raw), (activation_path, monitor_launcher.canonical_json(receipt))):
+            file.write_bytes(raw)
+            file.chmod(0o440)
+            os.chown(file, 0, 0)
+        launch_layout = monitor_launcher.Layout(
+            notifier_egress_policy=policy_path,
+            notifier_egress_activation=activation_path,
+            notifier_egress_base_unit=base_unit_path,
+            notifier_egress_dropin=dropin_path,
+        )
+        values = {
+            "LoadState": "loaded", "FragmentPath": str(monitor_launcher.NOTIFIER_EGRESS_BASE_UNIT),
+            "DropInPaths": str(monitor_launcher.NOTIFIER_EGRESS_DROPIN), "Transient": "no",
+            "User": "chenyida-monitor-notify", "Group": "chenyida-monitor-notify", "PrivateNetwork": "no",
+            "NoNewPrivileges": "yes", "ProtectSystem": "strict", "MemoryDenyWriteExecute": "yes",
+            "IPAddressDeny": "any", "IPAddressAllow": "1.1.1.1/32", "Environment": "",
+        }
+
+        def command(overrides=None):
+            current = {**values, **(overrides or {})}
+            return lambda arguments: SimpleNamespace(
+                returncode=0,
+                stdout="".join(f"{name}={current[name]}\n" for name in [argument.removeprefix("--property=") for argument in arguments if argument.startswith("--property=")]).encode(),
+                stderr=b"",
+            )
+
+        active = {"notifier_gid": 0}
+        self.assertEqual(monitor_launcher.current_notifier_egress_effective_sha256(launch_layout, active, command()), policy["systemd"]["effective_unit_sha256"])
+        with self.assertRaisesRegex(monitor_launcher.MonitoringLauncherError, "MONITOR_NOTIFIER_EGRESS_EFFECTIVE_UNIT_INVALID"):
+            monitor_launcher.current_notifier_egress_effective_sha256(launch_layout, active, command({"DropInPaths": f"{monitor_launcher.NOTIFIER_EGRESS_DROPIN} /etc/systemd/system/unknown.conf"}))
+        with self.assertRaisesRegex(monitor_launcher.MonitoringLauncherError, "MONITOR_NOTIFIER_EGRESS_PROXY_ENVIRONMENT_FORBIDDEN"):
+            monitor_launcher.current_notifier_egress_effective_sha256(launch_layout, active, command({"Environment": "HTTPS_PROXY=http://proxy.invalid"}))
+        with self.assertRaisesRegex(monitor_launcher.MonitoringLauncherError, "MONITOR_NOTIFIER_EGRESS_ENVIRONMENT_FORBIDDEN"):
+            monitor_launcher.current_notifier_egress_effective_sha256(launch_layout, active, command({"Environment": "NODE_TLS_REJECT_UNAUTHORIZED=0"}))
+        unknown_dropin = dropin_root / "99-unknown.conf"
+        unknown_dropin.write_text("[Service]\n", encoding="utf-8")
+        unknown_dropin.chmod(0o444)
+        with self.assertRaisesRegex(monitor_launcher.MonitoringLauncherError, "MONITOR_NOTIFIER_EGRESS_UNKNOWN_DROPIN_PRESENT"):
+            monitor_launcher.current_notifier_egress_effective_sha256(launch_layout, active, command())
+        unknown_dropin.unlink()
+        dropin_path.chmod(0o644)
+        dropin_path.write_bytes(dropin_raw + b"# drift\n")
+        dropin_path.chmod(0o444)
+        with self.assertRaisesRegex(monitor_launcher.MonitoringLauncherError, "MONITOR_NOTIFIER_EGRESS_DROPIN_INVALID"):
+            monitor_launcher.current_notifier_egress_effective_sha256(launch_layout, active, command())
+
+    def test_rotation_attempt_requires_a_complete_egress_binding(self):
+        event_id = "1" * 64
+        attempt = {
+            "schema_version": 1,
+            "contract": "chenyida-erp-monitoring-delivery-attempt/v2",
+            "attempt_id": "",
+            "claim_id": "2" * 64,
+            "event_id": event_id,
+            "envelope_id": "3" * 64,
+            "attempt_no": 1,
+            "prepared_at": "2026-08-15T00:00:00.000Z",
+            "previous_attempt_sha256": "0" * 64,
+            "target_id": "primary-oncall",
+            "target_generation": 1,
+            "notifier_config_sha256": "4" * 64,
+            "credential_sha256": "5" * 64,
+            "credential_generation": 1,
+            "adapter_id": "HTTPS_JSON_ACK_V1",
+            "adapter_version": 1,
+            "adapter_sha256": "6" * 64,
+            "egress_policy_sha256": "7" * 64,
+            "egress_activation_receipt_sha256": "0" * 64,
+            "egress_effective_unit_sha256": "8" * 64,
+            "idempotency_key": event_id,
+        }
+        body = dict(attempt)
+        body.pop("attempt_id")
+        attempt["attempt_id"] = installer.sha256(installer.canonical_json(body))
+        with self.assertRaisesRegex(installer.MonitoringInstallError, "MONITOR_INSTALL_DELIVERY_ATTEMPT_INVALID"):
+            installer.validate_rotation_attempt(attempt, f"{event_id}.1.json")
+
     def test_systemd_units_enforce_three_identities_single_flight_and_default_closed_egress(self):
         unit_root = SITE_ROOT / "deployment/systemd"
         collector = (unit_root / "chenyida-erp-monitor-collector.service").read_text(encoding="utf-8")

@@ -247,6 +247,113 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
             with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_CLUSTER_POLICY_RECOVERY_REQUIRED"):
                 installer.assert_no_cluster_policy_activation_interlock(root, target)
 
+    def test_notifier_egress_interlock_blocks_uncommitted_intent_and_quarantine(self):
+        with tempfile.TemporaryDirectory(prefix="cyd-supervisor-notifier-egress-interlock-") as directory:
+            base = Path(directory)
+            root = base / "monitoring-notifier-egress-v1"
+            policy = base / "views/notifier-egress-policy.json"
+            activation = base / "views/notifier-egress-activation.json"
+            unit = base / "systemd/chenyida-erp-monitor-notifier.service"
+            dropin = base / "systemd/chenyida-erp-monitor-notifier.service.d/50-chenyida-erp-notifier-egress.conf"
+            root.mkdir(mode=0o700)
+            marker = root / installer.NOTIFIER_EGRESS_STATE_MARKER.name
+            marker.write_bytes(installer.NOTIFIER_EGRESS_STATE_MARKER_VALUE)
+            marker.chmod(0o400)
+            for name in installer.NOTIFIER_EGRESS_STATE_DIRECTORIES:
+                (root / name).mkdir(mode=0o700)
+            installer.assert_no_notifier_egress_activation_interlock(root, policy, activation, unit, dropin)
+
+            intent = root / "intents" / f"notifier-egress-1.{'a' * 64}.json"
+            intent.write_bytes(b"{}\n")
+            intent.chmod(0o400)
+            with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED"):
+                installer.assert_no_notifier_egress_activation_interlock(root, policy, activation, unit, dropin)
+            intent.unlink()
+
+            quarantine = root / "quarantine" / f"notifier-egress-1.{'b' * 64}.json"
+            quarantine.write_bytes(b"{}\n")
+            quarantine.chmod(0o400)
+            with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED"):
+                installer.assert_no_notifier_egress_activation_interlock(root, policy, activation, unit, dropin)
+
+    def test_notifier_egress_interlock_accepts_only_a_fully_published_committed_generation(self):
+        with tempfile.TemporaryDirectory(prefix="cyd-supervisor-notifier-egress-committed-") as directory:
+            base = Path(directory)
+            root = base / "monitoring-notifier-egress-v1"
+            policy_view = base / "views/notifier-egress-policy.json"
+            activation_view = base / "views/notifier-egress-activation.json"
+            unit = base / "systemd/chenyida-erp-monitor-notifier.service"
+            dropin = base / "systemd/chenyida-erp-monitor-notifier.service.d/50-chenyida-erp-notifier-egress.conf"
+            root.mkdir(mode=0o700)
+            marker = root / installer.NOTIFIER_EGRESS_STATE_MARKER.name
+            marker.write_bytes(installer.NOTIFIER_EGRESS_STATE_MARKER_VALUE)
+            marker.chmod(0o400)
+            for name in installer.NOTIFIER_EGRESS_STATE_DIRECTORIES:
+                (root / name).mkdir(mode=0o700)
+            policy = {
+                "contract": "chenyida-erp-monitoring-notifier-egress-policy/v1",
+                "generation": 1,
+                "network": {"allowed_addresses": [{"systemd_prefix": "1.1.1.1/32"}]},
+            }
+            policy_raw = installer.canonical_json(policy)
+            policy_sha = installer.sha256(policy_raw)
+            history_name = f"0000000000000001.{policy_sha}.json"
+            unit.parent.mkdir(parents=True, mode=0o755)
+            unit.write_bytes(b"[Unit]\nDescription=fixture\n")
+            unit.chmod(0o444)
+            dropin.parent.mkdir(mode=0o755)
+            dropin.parent.chmod(0o755)
+            os.chown(dropin.parent, 0, 0)
+            dropin_raw = b"# Managed by chenyida-erp release supervisor; manual edits are forbidden.\n[Service]\nIPAddressAllow=\nIPAddressAllow=1.1.1.1/32\n"
+            dropin.write_bytes(dropin_raw)
+            dropin.chmod(0o444)
+            receipt_body = {
+                "schema_version": 1, "contract": "chenyida-erp-monitoring-notifier-egress-activation-receipt/v1",
+                "activation_id": "notifier-egress-1", "operation": "ACTIVATE", "status": "COMMITTED",
+                "committed_at": "2026-08-13T00:00:00.000Z", "environment": "UAT", "generation": 1,
+                "policy_id": "chenyida-erp-monitoring-notifier-egress-v1", "policy_sha256": policy_sha,
+                "policy_file_sha256": policy_sha, "previous_policy_sha256": "0" * 64,
+                "previous_activation_receipt_sha256": "0" * 64, "rollback_target_activation_receipt_sha256": "0" * 64,
+                "deployment_id": "erp-uat-fixture", "target_id": "primary-oncall", "target_generation": 1,
+                "endpoint_sha256": "1" * 64, "address_set_sha256": "2" * 64, "monitoring_bundle_sha256": "3" * 64,
+                "supervisor_bundle_sha256": "4" * 64, "notifier_config_sha256": "5" * 64,
+                "adapter_id": "HTTPS_JSON_ACK_V1", "adapter_sha256": "6" * 64, "credential_sha256": "7" * 64,
+                "credential_generation": 1, "oncall_roster_generation": 1, "escalation_table_sha256": "8" * 64,
+                "base_unit_sha256": installer.sha256(unit.read_bytes()), "dropin_sha256": installer.sha256(dropin_raw),
+                "effective_unit_sha256": "9" * 64, "template_file_sha256": installer.NOTIFIER_EGRESS_TEMPLATE_FILE_SHA256,
+                "template_policy_sha256": installer.NOTIFIER_EGRESS_TEMPLATE_POLICY_SHA256, "authorization_sha256": "a" * 64,
+                "approval_reference_sha256": "b" * 64, "responsible_operator_identity_sha256": "c" * 64,
+                "approver_identity_sha256": "d" * 64, "activated_at": "2026-08-13T00:00:00.000Z",
+                "expires_at": "2026-08-14T00:00:00.000Z", "state_root": str(root), "policy_target": str(policy_view),
+                "activation_view": str(activation_view), "dropin_target": str(dropin),
+                "history_file": str(root / "history" / history_name),
+            }
+            receipt = {**receipt_body, "receipt_sha256": installer.sha256(installer.canonical_json(receipt_body))}
+            receipt_raw = installer.canonical_json(receipt)
+            receipt_name = f"0000000000000001.{receipt['receipt_sha256']}.json"
+            intent = {
+                "contract": "chenyida-erp-monitoring-notifier-egress-activation-intent/v1",
+                "operation_id": "notifier-egress-1", "receipt": receipt, "intent_sha256": "e" * 64,
+            }
+            files = {
+                root / "history" / history_name: (policy_raw, 0o400, 0),
+                root / "receipts" / receipt_name: (receipt_raw, 0o400, 0),
+                root / "current.json": (receipt_raw, 0o400, 0),
+                root / "intents" / f"notifier-egress-1.{'e' * 64}.json": (installer.canonical_json(intent), 0o400, 0),
+                policy_view: (policy_raw, 0o440, 1),
+                activation_view: (receipt_raw, 0o440, 1),
+            }
+            for file, (raw, mode, gid) in files.items():
+                file.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+                file.write_bytes(raw)
+                file.chmod(mode)
+                os.chown(file, 0, gid)
+            installer.assert_no_notifier_egress_activation_interlock(root, policy_view, activation_view, unit, dropin)
+            dropin.write_bytes(b"[Service]\nIPAddressAllow=0.0.0.0/0\n")
+            dropin.chmod(0o444)
+            with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED"):
+                installer.assert_no_notifier_egress_activation_interlock(root, policy_view, activation_view, unit, dropin)
+
     def test_bundle_manifest_generator_uses_literal_allowlist_and_exact_blob_bytes(self):
         launcher_raw = (Path(__file__).resolve().parents[1] / "scripts" / "release-supervisor-launcher.py").read_bytes()
         files = generator.parse_bundle_files(launcher_raw)

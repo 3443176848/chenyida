@@ -8,7 +8,9 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import stat
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +33,11 @@ STATE_ROOT = Path("/var/lib/chenyida-erp/monitoring-v1/state")
 OUTBOX_ROOT = Path("/var/lib/chenyida-erp/monitoring-v1/outbox")
 DELIVERY_ROOT = Path("/var/lib/chenyida-erp/monitoring-v1/delivery")
 LOCK_ROOT = Path("/var/lib/chenyida-erp/monitoring-v1/locks")
+NOTIFIER_EGRESS_POLICY = Path("/etc/chenyida-erp/monitoring-v1/views/notifier-egress-policy.json")
+NOTIFIER_EGRESS_ACTIVATION = Path("/etc/chenyida-erp/monitoring-v1/views/notifier-egress-activation.json")
+NOTIFIER_EGRESS_UNIT = "chenyida-erp-monitor-notifier.service"
+NOTIFIER_EGRESS_BASE_UNIT = Path(f"/etc/systemd/system/{NOTIFIER_EGRESS_UNIT}")
+NOTIFIER_EGRESS_DROPIN = Path(f"/etc/systemd/system/{NOTIFIER_EGRESS_UNIT}.d/50-chenyida-erp-notifier-egress.conf")
 POLICY_PATH = "chenyida_erp_site/operations/monitoring-policy-v1.json"
 RESOURCE_PLAN_PATH = "chenyida_erp_site/release/release-gate-plan-v2.json"
 HOST_RUNNER_PATH = "chenyida_erp_site/tools/ops-monitoring/host-runner.mjs"
@@ -38,6 +45,7 @@ HOST_RUNNER_PATH = "chenyida_erp_site/tools/ops-monitoring/host-runner.mjs"
 BUNDLE_CONTRACT = "chenyida-erp-monitoring-host-bundle/v1"
 ACTIVATION_CONTRACT = "chenyida-erp-monitoring-host-activation/v1"
 SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ZERO_SHA256 = "0" * 64
 MAX_JSON_BYTES = 2 * 1024 * 1024
 MAX_BUNDLE_FILE_BYTES = 8 * 1024 * 1024
 MAX_BUNDLE_BYTES = 32 * 1024 * 1024
@@ -57,12 +65,14 @@ MONITOR_BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/deployment/systemd/chenyida-erp-monitor-notifier.timer": "0444",
     "chenyida_erp_site/operations/monitoring-host-config-schema-v1.json": "0444",
     "chenyida_erp_site/operations/monitoring-host-delivery-policy-v1.json": "0444",
+    "chenyida_erp_site/operations/monitoring-notifier-egress-policy-v1.json": "0444",
     "chenyida_erp_site/operations/monitoring-policy-v1.json": "0444",
     "chenyida_erp_site/release/release-gate-plan-v2.json": "0444",
     "chenyida_erp_site/scripts/create-monitoring-host-bundle-manifest.py": "0555",
     "chenyida_erp_site/scripts/install-monitoring-host-delivery.py": "0444",
     "chenyida_erp_site/scripts/monitoring-host-launcher.py": "0444",
     "chenyida_erp_site/tests/selfhost-ops-monitoring-host-delivery.test.mjs": "0444",
+    "chenyida_erp_site/tests/selfhost-ops-monitoring-notifier-egress.test.mjs": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_monitoring_host_delivery.py": "0444",
     "chenyida_erp_site/tools/ops-monitoring/backup-projection.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/collector.mjs": "0444",
@@ -73,6 +83,7 @@ MONITOR_BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tools/ops-monitoring/host-runner.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/host-store.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/notifier.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/notifier-egress-contract.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/resource-policy.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/strict-json.mjs": "0444",
 }
@@ -211,6 +222,10 @@ class Layout:
     outbox_root: Path = OUTBOX_ROOT
     delivery_root: Path = DELIVERY_ROOT
     lock_root: Path = LOCK_ROOT
+    notifier_egress_policy: Path = NOTIFIER_EGRESS_POLICY
+    notifier_egress_activation: Path = NOTIFIER_EGRESS_ACTIVATION
+    notifier_egress_base_unit: Path = NOTIFIER_EGRESS_BASE_UNIT
+    notifier_egress_dropin: Path = NOTIFIER_EGRESS_DROPIN
 
 
 def validate_manifest(value: Any) -> dict[str, Any]:
@@ -354,6 +369,144 @@ def acquire_lock(layout: Layout, active: dict[str, Any], phase: str) -> int:
         reject("MONITOR_PHASE_LOCK_INVALID")
 
 
+def notifier_egress_systemctl(arguments: list[str]) -> subprocess.CompletedProcess[bytes]:
+    environment = {"PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent"}
+    try:
+        return subprocess.run(
+            ["/usr/bin/systemctl", *arguments], env=environment, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        reject("MONITOR_NOTIFIER_EGRESS_SYSTEMCTL_FAILED")
+
+
+def current_notifier_egress_effective_sha256(layout: Layout, active: dict[str, Any],
+                                             command: Any = notifier_egress_systemctl) -> str:
+    present = []
+    for file in (layout.notifier_egress_policy, layout.notifier_egress_activation):
+        try:
+            os.lstat(file)
+            present.append(True)
+        except FileNotFoundError:
+            present.append(False)
+        except OSError:
+            reject("MONITOR_NOTIFIER_EGRESS_FILE_INVALID")
+    if not any(present):
+        return ZERO_SHA256
+    if not all(present):
+        reject("MONITOR_NOTIFIER_EGRESS_PARTIAL")
+    policy_raw, _ = trusted_file(layout.notifier_egress_policy, {0o440}, 0, active["notifier_gid"], "MONITOR_NOTIFIER_EGRESS_POLICY_INVALID", 256 * 1024)
+    activation_raw, _ = trusted_file(layout.notifier_egress_activation, {0o440}, 0, active["notifier_gid"], "MONITOR_NOTIFIER_EGRESS_ACTIVATION_INVALID", 256 * 1024)
+    policy = strict_json(policy_raw, "MONITOR_NOTIFIER_EGRESS_POLICY_INVALID", 256 * 1024)
+    activation = strict_json(activation_raw, "MONITOR_NOTIFIER_EGRESS_ACTIVATION_INVALID", 256 * 1024)
+    if canonical_json(policy) != policy_raw or canonical_json(activation) != activation_raw \
+        or not isinstance(policy, dict) or policy.get("contract") != "chenyida-erp-monitoring-notifier-egress-policy/v1" \
+        or not isinstance(activation, dict) or activation.get("contract") != "chenyida-erp-monitoring-notifier-egress-activation-receipt/v1" \
+        or activation.get("policy_sha256") != sha256(policy_raw) or activation.get("receipt_sha256") != sha256(canonical_json({key: value for key, value in activation.items() if key != "receipt_sha256"})):
+        reject("MONITOR_NOTIFIER_EGRESS_ACTIVATION_INVALID")
+    systemd = policy.get("systemd")
+    network = policy.get("network")
+    binding = policy.get("binding")
+    if not isinstance(systemd, dict) or set(systemd) != {"unit", "fragment_path", "dropin_path", "dropin_sha256", "effective_unit_sha256"} \
+        or systemd.get("unit") != NOTIFIER_EGRESS_UNIT or systemd.get("fragment_path") != str(NOTIFIER_EGRESS_BASE_UNIT) \
+        or systemd.get("dropin_path") != str(NOTIFIER_EGRESS_DROPIN) or not isinstance(systemd.get("dropin_sha256"), str) \
+        or not SHA256.fullmatch(systemd["dropin_sha256"]) or systemd["dropin_sha256"] == ZERO_SHA256 \
+        or not isinstance(systemd.get("effective_unit_sha256"), str) or not SHA256.fullmatch(systemd["effective_unit_sha256"]) \
+        or systemd["effective_unit_sha256"] == ZERO_SHA256 or not isinstance(binding, dict) \
+        or not isinstance(binding.get("base_unit_sha256"), str) or not SHA256.fullmatch(binding["base_unit_sha256"]) \
+        or binding["base_unit_sha256"] == ZERO_SHA256 or not isinstance(network, dict) \
+        or not isinstance(network.get("allowed_addresses"), list):
+        reject("MONITOR_NOTIFIER_EGRESS_POLICY_INVALID")
+    allowed = []
+    for item in network["allowed_addresses"]:
+        if not isinstance(item, dict) or set(item) != {"family", "address", "prefix_length", "systemd_prefix"} \
+            or not isinstance(item["systemd_prefix"], str) or not item["systemd_prefix"] \
+            or "\n" in item["systemd_prefix"] or "\r" in item["systemd_prefix"]:
+            reject("MONITOR_NOTIFIER_EGRESS_POLICY_INVALID")
+        allowed.append(item["systemd_prefix"])
+    base_unit_raw, _ = trusted_file(
+        layout.notifier_egress_base_unit, {0o444}, 0, 0,
+        "MONITOR_NOTIFIER_EGRESS_BASE_UNIT_INVALID", 256 * 1024,
+    )
+    if sha256(base_unit_raw) != binding["base_unit_sha256"]:
+        reject("MONITOR_NOTIFIER_EGRESS_BASE_UNIT_INVALID")
+    dropin_root = layout.notifier_egress_dropin.parent
+    trusted_directory(dropin_root, {0o755}, 0, 0, "MONITOR_NOTIFIER_EGRESS_DROPIN_ROOT_INVALID")
+    try:
+        if set(os.listdir(dropin_root)) != {layout.notifier_egress_dropin.name}:
+            reject("MONITOR_NOTIFIER_EGRESS_UNKNOWN_DROPIN_PRESENT")
+    except OSError:
+        reject("MONITOR_NOTIFIER_EGRESS_DROPIN_ROOT_INVALID")
+    dropin_raw, _ = trusted_file(
+        layout.notifier_egress_dropin, {0o444}, 0, 0,
+        "MONITOR_NOTIFIER_EGRESS_DROPIN_INVALID", 64 * 1024,
+    )
+    expected_dropin = ("\n".join([
+        "# Managed by chenyida-erp release supervisor; manual edits are forbidden.",
+        "[Service]", "IPAddressAllow=", *[f"IPAddressAllow={prefix}" for prefix in allowed], "",
+    ])).encode("utf-8")
+    if dropin_raw != expected_dropin or sha256(dropin_raw) != systemd["dropin_sha256"]:
+        reject("MONITOR_NOTIFIER_EGRESS_DROPIN_INVALID")
+    trusted_directory(dropin_root, {0o755}, 0, 0, "MONITOR_NOTIFIER_EGRESS_DROPIN_ROOT_INVALID")
+    try:
+        if set(os.listdir(dropin_root)) != {layout.notifier_egress_dropin.name}:
+            reject("MONITOR_NOTIFIER_EGRESS_UNKNOWN_DROPIN_PRESENT")
+    except OSError:
+        reject("MONITOR_NOTIFIER_EGRESS_DROPIN_ROOT_INVALID")
+    properties = [
+        "LoadState", "FragmentPath", "DropInPaths", "Transient", "User", "Group", "PrivateNetwork",
+        "NoNewPrivileges", "ProtectSystem", "MemoryDenyWriteExecute", "IPAddressDeny", "IPAddressAllow", "Environment",
+    ]
+    result = command(["show", NOTIFIER_EGRESS_UNIT, "--no-pager", *[f"--property={name}" for name in properties]])
+    if result.returncode != 0 or getattr(result, "stderr", None) not in (b"", None) or not isinstance(result.stdout, bytes) or len(result.stdout) > 64 * 1024:
+        reject("MONITOR_NOTIFIER_EGRESS_SYSTEMD_SHOW_FAILED")
+    values: dict[str, str] = {}
+    try:
+        for line in result.stdout.decode("utf-8").splitlines():
+            key, separator, value = line.partition("=")
+            if separator != "=" or key not in properties or key in values:
+                reject("MONITOR_NOTIFIER_EGRESS_EFFECTIVE_UNIT_INVALID")
+            values[key] = value
+        dropins = shlex.split(values["DropInPaths"], posix=True)
+        address_allow = shlex.split(values["IPAddressAllow"], posix=True)
+        environment = shlex.split(values["Environment"], posix=True)
+    except (KeyError, UnicodeDecodeError, ValueError):
+        reject("MONITOR_NOTIFIER_EGRESS_EFFECTIVE_UNIT_INVALID")
+    proxy_names = {"http_proxy", "https_proxy", "all_proxy", "no_proxy"}
+    if any(item.partition("=")[0].lower() in proxy_names for item in environment):
+        reject("MONITOR_NOTIFIER_EGRESS_PROXY_ENVIRONMENT_FORBIDDEN")
+    if environment:
+        reject("MONITOR_NOTIFIER_EGRESS_ENVIRONMENT_FORBIDDEN")
+    observed = {
+        "schema_version": 1,
+        "contract": "chenyida-erp-monitoring-notifier-egress-effective-unit/v1",
+        "unit": NOTIFIER_EGRESS_UNIT,
+        "load_state": values["LoadState"],
+        "fragment_path": values["FragmentPath"],
+        "dropin_paths": dropins,
+        "transient": values["Transient"],
+        "user": values["User"],
+        "group": values["Group"],
+        "private_network": values["PrivateNetwork"],
+        "no_new_privileges": values["NoNewPrivileges"],
+        "protect_system": values["ProtectSystem"],
+        "memory_deny_write_execute": values["MemoryDenyWriteExecute"],
+        "ip_address_deny": values["IPAddressDeny"],
+        "ip_address_allow": address_allow,
+        "proxy_environment": [],
+    }
+    expected = {
+        **observed,
+        "load_state": "loaded", "fragment_path": str(NOTIFIER_EGRESS_BASE_UNIT), "dropin_paths": [str(NOTIFIER_EGRESS_DROPIN)],
+        "transient": "no", "user": "chenyida-monitor-notify", "group": "chenyida-monitor-notify", "private_network": "no",
+        "no_new_privileges": "yes", "protect_system": "strict", "memory_deny_write_execute": "yes",
+        "ip_address_deny": "any", "ip_address_allow": allowed,
+    }
+    if canonical_json(observed) != canonical_json(expected) or sha256(canonical_json(expected)) != systemd["effective_unit_sha256"]:
+        reject("MONITOR_NOTIFIER_EGRESS_EFFECTIVE_UNIT_INVALID")
+    return systemd["effective_unit_sha256"]
+
+
 def launcher_environment(layout: Layout, active: dict[str, Any], bundle: Path, descriptor: int, phase: str) -> dict[str, str]:
     environment = {
         "PATH": SAFE_PATH,
@@ -372,8 +525,13 @@ def launcher_environment(layout: Layout, active: dict[str, Any], bundle: Path, d
         "ERP_MONITORING_STATE_ROOT": str(layout.state_root),
         "ERP_MONITORING_OUTBOX_ROOT": str(layout.outbox_root),
         "ERP_MONITORING_DELIVERY_ROOT": str(layout.delivery_root),
+        "ERP_MONITORING_NOTIFIER_EGRESS_POLICY": str(layout.notifier_egress_policy),
+        "ERP_MONITORING_NOTIFIER_EGRESS_ACTIVATION": str(layout.notifier_egress_activation),
+        "ERP_MONITORING_NOTIFIER_EGRESS_EFFECTIVE_UNIT_SHA256": current_notifier_egress_effective_sha256(layout, active) if phase in ("collector", "notifier") else ZERO_SHA256,
     }
     if phase == "notifier":
+        trusted_file(layout.notifier_egress_policy, {0o440}, 0, active["notifier_gid"], "MONITOR_NOTIFIER_EGRESS_POLICY_INVALID", 256 * 1024)
+        trusted_file(layout.notifier_egress_activation, {0o440}, 0, active["notifier_gid"], "MONITOR_NOTIFIER_EGRESS_ACTIVATION_INVALID", 256 * 1024)
         credential_directory = os.environ.get("CREDENTIALS_DIRECTORY", "")
         if not credential_directory.startswith("/run/credentials/") or os.path.normpath(credential_directory) != credential_directory:
             reject("MONITOR_CREDENTIAL_DIRECTORY_INVALID")
