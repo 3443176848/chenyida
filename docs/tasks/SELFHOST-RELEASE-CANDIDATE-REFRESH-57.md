@@ -1,7 +1,7 @@
 # SELFHOST-RELEASE-CANDIDATE-REFRESH-57 当前权限边界候选重建与发布证据复核
 
-> 状态：`DOING / STARTUP AUDIT / LOCAL ISOLATED BUILD ONLY / NO DEPLOYMENT / PRODUCTION NO-GO`
-> 日期：2026-08-13（Asia/Shanghai）
+> 状态：`DONE / CURRENT EXACT LOCAL CANDIDATE BUILT / ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / PRODUCTION NO-GO`
+> 日期：2026-08-13—2026-08-14（Asia/Shanghai）
 > 严格起点：`main@e34a861f168ef8afb71a812d186099c33d952902` / tree `66e7d001c90f0e8beeb41fed2a55755efb1c37e4`
 > 责任：Codex主智能体为唯一写者、重任务调度者、证据集成者和Git提交者；沿用持续交付总目标中数据迁移、应用测试、运维安全三条只读审计结论并由主智能体复核；项目负责人保留host安装、外部push、真实数据、UAT/生产Migration/deploy、账号权限、员工试用和切换的专项授权权力
 
@@ -38,17 +38,17 @@ TASK51的alpha.46候选仍可作历史审计证据，但已经被TASK53—TASK56
 ## 5. 验收标准
 
 - [x] 当前任务文档、依赖、范围和唯一`DOING`已登记，主智能体复核Git/Migration/Docker/资源/旧候选和Supervisor事实。
-- [ ] 构建输入先形成当前任务源码检查点及唯一manifest-only直接子提交；候选只从该精确clean commit/tree的Git archive生成。
-- [ ] Web/Worker version、OCI revision/version、baked runtime身份、Migration allowlist、manifest digest与config digest分别精确一致；不存在`latest`或外部tag晋升。
-- [ ] 构建、loopback registry、digest解析和按digest本机引用全程串行，最多一个任务临时容器，不挂载任何受保护Volume；任务临时资源清零。
-- [ ] 当前UAT/production Compose策略和六服务候选runtime probe通过；Admin/Migrate/Web/Worker secret目录/文件uid/gid/mode、只读rootfs、capability/NNP、用户/组、唯一写路径、PostgreSQL tablespace namespace及Caddy例外均保持。
-- [ ] 固定Trivy及不超过72小时、前后payload tree相同的数据库覆盖Web/Worker原生报告与CycloneDX；Wolfi+Node包集合完整，全部severity和unknown为0，未使用ignore或降级。
-- [ ] 构建与诊断证据位于仓库外任务专属root-owned、无覆盖目录；明确标注`LOCAL_DIAGNOSTIC / NOT FORMAL / NOT EXTERNAL ANCHOR`。
-- [ ] 正式镜像证据与19步门只经installed content-addressed Supervisor入口；缺少A1授权/安装时必须在制品变化前失败关闭，不旁路或伪造PASS。
-- [ ] 适用release/supervisor/runtime/credential/lint/JSON/Shell/Python/Markdown/diff门通过；若发现实现缺口，保留失败证据、修复根因并从新canonical链重建，不降低断言。
-- [ ] UAT四服务和受保护Volume前后一致，未发生Migration/deploy、业务/账号写、真实角色/secret/ACL/Volume或外部push。
-- [ ] 每个重任务前后记录memory、Swap、disk、Load、OOM/restart；触发停止线立即停止新重任务，TASK57临时资源精确清理。
-- [ ] 更新`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`和`PRODUCTION_READINESS.md`，形成独立Git提交并自动转入下一未阻塞任务。
+- [x] 构建输入先形成当前任务源码检查点及唯一manifest-only直接子提交；候选只从该精确clean commit/tree的Git archive生成。
+- [x] Web/Worker version、OCI revision/version、baked runtime身份、Migration allowlist、manifest digest与config digest分别精确一致；不存在`latest`或外部tag晋升。
+- [x] 构建、loopback registry、digest解析和按digest本机引用全程串行，最多一个任务临时容器，不挂载任何受保护Volume；任务临时资源清零。
+- [x] 当前UAT/production Compose策略和六服务候选runtime probe通过；Admin/Migrate/Web/Worker secret目录/文件uid/gid/mode、只读rootfs、capability/NNP、用户/组、唯一写路径、PostgreSQL tablespace namespace及Caddy例外均保持。
+- [x] 固定Trivy及不超过72小时、前后payload tree相同的数据库覆盖Web/Worker原生报告与CycloneDX；Wolfi+Node包集合完整，全部severity和unknown为0，未使用ignore或降级。
+- [x] 构建与诊断证据位于仓库外任务专属root-owned、无覆盖目录；明确标注`LOCAL_DIAGNOSTIC / NOT FORMAL / NOT EXTERNAL ANCHOR`。
+- [x] 正式镜像证据与19步门只经installed content-addressed Supervisor入口；缺少A1授权/安装时必须在制品变化前失败关闭，不旁路或伪造PASS。
+- [x] 适用release/supervisor/runtime/credential/lint/JSON/Shell/Python/Markdown/diff门通过；若发现实现缺口，保留失败证据、修复根因并从新canonical链重建，不降低断言。
+- [x] UAT四服务和受保护Volume前后一致，未发生Migration/deploy、业务/账号写、真实角色/secret/ACL/Volume或外部push。
+- [x] 每个重任务前后记录memory、Swap、disk、Load、OOM/restart；触发停止线立即停止新重任务，TASK57临时资源精确清理。
+- [x] 更新`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`和`PRODUCTION_READINESS.md`，形成独立Git提交并自动转入下一未阻塞任务。
 
 ## 6. 执行顺序
 
@@ -59,6 +59,31 @@ TASK51的alpha.46候选仍可作历史审计证据，但已经被TASK53—TASK56
 5. 串行执行固定Trivy断网诊断，核对包覆盖、全部severity和数据库tree。
 6. 从正式入口验证host未授权时的失败关闭，复核UAT/资源/清理，更新文档并独立提交。
 
-## 7. 当前判定
+## 7. 实施与证据
 
-`DOING / STARTUP AUDIT / LOCAL ISOLATED BUILD ONLY / NO DEPLOYMENT / PRODUCTION NO-GO`。TASK57尚未建立当前源码匹配镜像；TASK56 canonical bundle只证明仓库与合成隔离权限实现。现行UAT共享superuser、环境秘密、alpha.42/0040和旧容器策略均未改变，系统不能投入真实员工使用。
+### 7.1 精确源码链与候选身份
+
+- 启动文档源码提交`4d4586b1086470d32ce19a7f4eabbc2d2a33fa74`/tree`a551144e032f80f50fbd6c432059c97afbff7ece`后，唯一manifest-only直接子提交`78d96c6198ab4b7255572186ea580c463b5eeba3`/tree`3dbd20dd6803d485fca17f72f7ee90de277c3b9d`只更新canonical Supervisor manifest。manifest绑定76个文件，SHA-256为`631d76e650082de299fe836f1216b057d1ca7deabe29bd5e11e1a071a21ae763`，生成器逐字节重放一致。
+- 候选只从clean `78d96c6198ab4b7255572186ea580c463b5eeba3` Git archive串行构建。root-only构建回执位于`/var/lib/chenyida-erp/release-artifacts/task57-alpha47-78d96c6198ab/`，回执SHA-256为`33b1b9219c17ac3000b058a2cf16ab25ccdd2d859a09039e58abc074f2107a9a`；源码archive为65,034,240 bytes、SHA-256`2a6bce2e3b0cc4d00beecf0611bac06a88a7792158b314100238dec55c34dcfd`，Migration allowlist摘要为`8bb2b2d662df03e397d49c4ed5d11f1af1a9406ecbaff37aee8fc0d2d7388eed`。
+- Web manifest/config为`sha256:b7b21508a69a2bfed86ebb204adc16eab0df6839f04f0ebe00e5d6d151458a30`/`sha256:3c83d60f50ee13f582794d5e3f0346de79a942110e9cc9377206b300dadbf56e`；Worker为`sha256:c5bf9d5c95e266d025ea048575b69c14e52462934789c206ebfda423d6b0b113`/`sha256:3bebff1637cc36455bc28cedcb101d65759b1315b6f70ae3ac642b6d13b5f971`。两者均为linux/amd64、alpha.47、revision`78d96c6…eba3`、UID/GID`65532:65532`，OCI label、baked runtime值和CMD逐项一致。
+
+### 7.2 Compose与六服务实际运行策略
+
+- UAT与production静态Compose均通过六服务策略，策略SHA-256为`e4920820ed954c2689e3de53dea9b7f36945969c8287b06d87a3871e7d3ecf00`。
+- 当前候选实际runtime probe依次验证Admin、Migrate、Web、Worker、PostgreSQL custom tablespace和Caddy，覆盖secret目录/文件owner、group、mode、同级秘密不可见、只读rootfs、NNP/capability、用户/附加组、唯一写路径、warm restart和tablespace namespace；结果为`services=6 / max_containers=1`。任务container/network/Volume和临时目录全部清零，未挂载受保护Volume。
+
+### 7.3 固定Trivy本地诊断
+
+- 固定Trivy 0.70.0使用schema 2数据库，UpdatedAt`2026-08-12T13:01:58.90781992Z`，扫描开始时距今约46.6小时；payload tree前后均为`def6b0231ddeedfecbeff0d8d9ce2d1663905f722189915fbd3e8fead254986b`。逐archive扫描全程断网、无Docker socket、只读rootfs、无capability；未更新数据库，未使用ignore，也未降低severity。
+- Web覆盖Wolfi25+npm63，Worker覆盖Wolfi25+npm60；CRITICAL/HIGH/MEDIUM/LOW/UNKNOWN全部为0，两个CycloneDX的漏洞数组均为0。严格仓库合同逐份复核原生报告和CycloneDX身份、config digest、Wolfi/Node包集合并通过。
+- 四份原生诊断文件SHA-256依次为Web Trivy`d414e4e58c9098b0ebc402dd8b897ce83dfe58eeef5ea83f396d7d86d2f503ac`、Web CycloneDX`6f5a010baf729efd7a2aa567ae824d767922ef486757b338309f3913bd6e1cbb`、Worker Trivy`5d65c21dd4f4a23f6c7bd0e47712f09ea5e0bbfabb0f5a85ab16dca06b945859`、Worker CycloneDX`6ac069e015a33dd3b73d4969fe9f8099a08655d69fb0e62930cbac28b69cf01e`。诊断目录另保存version、数据库metadata、合同摘要和前后tree摘要；全部为root:root `0440`、单硬链接，并以`local-diagnostic`命名，明确不是正式证据或外部镜像锚点。
+
+### 7.4 正式边界、回归与资源
+
+- installed路径`/usr/local/sbin/chenyida-erp-release-supervisor-v1`及其base均不存在。正式镜像证据与19步门分别以`release image evidence must be launched by the installed supervisor`和`release gate must be launched by the installed supervisor`退出1；任务制品11文件内容/metadata指纹前后均为`ed7ef44745c8962f55b8c5f2c90858cb1fb68d6185e94dfc2dc78487a76e137f`，没有旁路、伪造授权或正式PASS。
+- 干净候选提交通过release inventory 6文件/57项及直接54/54、Supervisor host与官方Python sandbox各48/48、Python self-test/smoke/go-live、Compose与实际runtime；lint为0 error/28项既有warning，credentials扫描1666个提交树文件，JSON220、Shell44、Python50、Markdown396/本地链接238及source/diff门通过。
+- 起点/收口available约1.9/1.8GiB，Swap722/770MiB，根盘15/13GiB，Load始终低于4；任务窗口未观察到宿主或容器OOM，四个UAT服务restart0/OOM false，Web/PostgreSQL healthy、Worker/Caddy running。构建、runtime、扫描和测试临时container/network/Volume/tar/目录全部清零；没有prune、部署、Migration、外部push、账号/角色/secret/ACL/Volume或业务数据写入。
+
+## 8. 完成判定
+
+`DONE / CURRENT EXACT LOCAL CANDIDATE BUILT / ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / PRODUCTION NO-GO`。TASK57已关闭全部当前授权内的候选刷新工作并释放active slot。该候选只在当前Docker engine可解析，不是外部恢复锚点；正式SBOM/security evidence、19步PASS、实际角色/secret/ACL/Volume、真实异机恢复、UAT晋升、真实数据迁移、岗位/员工验收和切换仍需专项授权或外部资源。现行UAT继续是alpha.42/0040、共享superuser和环境秘密，系统不能投入真实员工使用。

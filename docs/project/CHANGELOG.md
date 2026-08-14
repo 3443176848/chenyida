@@ -2,6 +2,17 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-14
+
+### SELFHOST-RELEASE-CANDIDATE-REFRESH-57 - `release: bind task57 candidate refresh input` / `docs: close current privilege candidate refresh`
+
+- 源码链：启动文档源码`4d4586b1086470d32ce19a7f4eabbc2d2a33fa74`/tree`a551144e032f80f50fbd6c432059c97afbff7ece`与manifest-only直接子提交`78d96c6198ab4b7255572186ea580c463b5eeba3`/tree`3dbd20dd6803d485fca17f72f7ee90de277c3b9d`形成76文件canonical链，manifest SHA-256为`631d76e650082de299fe836f1216b057d1ca7deabe29bd5e11e1a071a21ae763`且生成器逐字节重放一致。
+- 候选构建：clean `78d96c61` Git archive串行生成alpha.47/0046 Web/Worker。Web manifest/config为`sha256:b7b21508…8a30`/`sha256:3c83d60f…f56e`，Worker为`sha256:c5bf9d5c…b113`/`sha256:3bebff16…f971`；OCI/baked version/revision、UID/GID、CMD和Migration allowlist逐项一致。root-only构建回执SHA-256为`33b1b921…a9a`。
+- Runtime：UAT/production静态Compose与六服务实际runtime均通过策略`e4920820…f00`；Admin/Migrate/Web/Worker secret、只读rootfs、NNP/capability、用户/组/写路径、PostgreSQL custom tablespace、Caddy例外和warm restart均验证，`max_containers=1`。
+- 安全诊断：固定Trivy0.70.0使用46.6小时内schema2数据库，payload tree前后同为`def6b023…986b`。Web覆盖Wolfi25+npm63、Worker覆盖25+60，CRITICAL/HIGH/MEDIUM/LOW/UNKNOWN及CycloneDX漏洞全部为0；九份`local-diagnostic`文件均root:root`0440`、单硬链接，明确不是正式证据或外部锚点。
+- 正式边界：installed Supervisor不存在，正式镜像证据和19步门分别以受信入口错误退出1；11文件制品指纹前后均为`ed7ef447…137f`，未旁路、伪造授权或生成正式PASS。UAT继续alpha.42/0040、共享superuser和环境秘密，四服务restart0/OOM false。
+- 验证/资源：release inventory57及直接54、Supervisor host/官方sandbox各48、Python三基线、Compose/runtime、lint0 error/28 warning、credentials1666、JSON220、Shell44、Python50、Markdown396/238和source/diff门通过。起点/收口available约1.9/1.8GiB、Swap722/770MiB、根盘15/13GiB，任务窗口未观察到宿主或容器OOM；任务registry、container/network/Volume/tar/目录清零，未prune或执行外部push、host/UAT/生产/真实数据动作。TASK57完成但整体继续`PRODUCTION NO-GO`。
+
 ## 2026-08-13
 
 ### SELFHOST-RELEASE-CANDIDATE-REFRESH-57 - `docs: start current privilege candidate refresh`

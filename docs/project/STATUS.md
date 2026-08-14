@@ -1,20 +1,23 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-13（Asia/Shanghai）
+最后更新时间：2026-08-14（Asia/Shanghai）
 
-## SELFHOST-RELEASE-CANDIDATE-REFRESH-57（执行中；当前本机隔离候选重建）
+## SELFHOST-RELEASE-CANDIDATE-REFRESH-57（完成；当前本机精确候选与零发现诊断通过，正式门阻塞）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / STARTUP AUDIT / LOCAL ISOLATED BUILD ONLY / PRODUCTION NO-GO | 当前唯一active slot；主智能体唯一写入和重任务调度，沿用三条智能体线只读审计结论 |
+| 当前状态 | DONE / CURRENT EXACT LOCAL CANDIDATE BUILT / ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / PRODUCTION NO-GO | TASK57已释放active slot，当前无DOING；主智能体唯一写入和重任务调度 |
 | 严格起点 | PASS / CONTROLLED | TASK56 manifest-only `e34a861f168ef8afb71a812d186099c33d952902`、tree`66e7d001c90f0e8beeb41fed2a55755efb1c37e4`；未跟踪状态报告不读不改不提交 |
-| 源码/Migration | PASS / BUILD INPUT NOT YET FROZEN | alpha.47、46/head`0046_runtime_lock_privilege_boundary.sql`；TASK57启动文档提交后须生成新的唯一manifest-only直接子提交再build |
+| 源码/Migration | PASS / EXACT CANDIDATE INPUT | alpha.47、46/head`0046_runtime_lock_privilege_boundary.sql`；`4d4586b1`/tree`a551144e`与manifest-only `78d96c61`/tree`3dbd20dd`形成76文件canonical链，manifest SHA-256`631d76e6…e763` |
 | 历史候选 | STALE / FAILED CLOSED | TASK51 alpha.46镜像已被TASK53—TASK56失效；按当前runtime secret合同实测为`ADMIN_READ_ONLY_FIXTURE_GROUP_MISMATCH`，不得复用或授权 |
-| Docker/容量 | PASS / WATCH | Engine29.5.2、Compose5.1.4；73 images约25.27GB、Build Cache约8.726GB且无active build。起点available约1.9GiB、Swap722MiB、根盘15GiB、Load低于1、`oom_kill=0` |
-| UAT | VERIFIED METADATA / UNCHANGED | alpha.42/0040；Web/PostgreSQL healthy，Worker/Caddy running/health none，四服务restart0/OOM false；不读取环境、日志、业务行或Volume正文 |
-| 允许动作 | LOCAL ISOLATED ONLY | exact Git archive、串行Web/Worker build、task loopback registry、六服务runtime、固定Trivy断网诊断及正式入口失败关闭复核 |
-| 外部边界 | BLOCKED / NOT AUTHORIZED | 无host安装/授权、外部push、UAT/生产Migration/deploy、真实角色/secret/ACL/Volume、账号、数据或网络动作 |
-| 系统是否可用 | NO | 当前候选尚未构建，运行UAT仍共享superuser和环境秘密；异机恢复、正式门、真实迁移、岗位/员工验收与切换均缺失 |
+| 候选镜像 | PASS / LOCAL ENGINE ONLY | Web manifest/config`b7b21508…8a30`/`3c83d60f…f56e`，Worker`c5bf9d5c…b113`/`3bebff16…f971`；alpha.47、revision`78d96c61…eba3`、UID/GID65532、baked身份与CMD一致。构建回执SHA-256`33b1b921…a9a`，无外部registry锚点 |
+| Compose/runtime | PASS / ISOLATED SIX SERVICES | UAT/production静态策略及实际Admin/Migrate/Web/Worker/PostgreSQL tablespace/Caddy通过，policy`e4920820…f00`、`max_containers=1`；任务container/network/Volume清零 |
+| Trivy诊断 | PASS / LOCAL DIAGNOSTIC / NOT FORMAL | Trivy0.70.0、schema2数据库age约46.6h，tree前后`def6b023…986b`；Web25+63、Worker25+60，五级severity和CycloneDX漏洞均0；九份root-only制品明确非正式证据 |
+| 正式Supervisor门 | BLOCKED / FAIL CLOSED | installed入口/base不存在；正式镜像证据和19步门退出1，11文件制品指纹`ed7ef447…137f`前后不变。A1安装/授权和A2外部锚点尚未获批 |
+| 自动验证 | PASS / FULL APPLICABLE | release57+54、Supervisor host/sandbox各48、Python三基线、Compose/runtime、lint0 error/28 warning、credentials1666、JSON220、Shell44、Python50、Markdown396/238及source/diff门通过 |
+| Docker/容量 | PASS / WATCH | Engine29.5.2、Compose5.1.4；收口images75约28.07GB、Build Cache约10.79GB且无active build。起点/收口available约1.9/1.8GiB、Swap722/770MiB、根盘15/13GiB、Load低于4；任务窗口未观察到宿主或容器OOM |
+| UAT | VERIFIED METADATA / UNCHANGED | alpha.42/0040；Web/PostgreSQL healthy，Worker/Caddy running/health none，四服务restart0/OOM false；未读取环境、日志、业务行或Volume正文，未执行Migration/deploy |
+| 系统是否可用 | NO | 本机候选已验证但UAT仍共享superuser和环境秘密；外部镜像锚点、正式门、真实异机恢复/迁移、岗位/员工验收与切换均缺失 |
 
 ## SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56（完成；仓库与合成隔离通过，实际激活/当前候选仍阻塞）
 

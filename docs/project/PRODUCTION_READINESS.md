@@ -1,13 +1,13 @@
 # 晨亿达 ERP 投产准入基线
 
 > 基线任务：`SELFHOST-PRODUCTION-READINESS-40`
-> 核验时间：2026-08-13（Asia/Shanghai）
+> 核验时间：2026-08-14（Asia/Shanghai）
 > 当前判定：`PRODUCTION NO-GO / NOT READY FOR REAL EMPLOYEES`
 > 唯一未来生产权威：自托管 Node.js、PostgreSQL、本地持久化文件与独立 Worker
 
 ## 1. 判定
 
-当前系统不能投入真实员工使用。公开非生产 UAT 在空闲状态健康，已有较完整的服务端权限、CSRF、幂等、审计和业务状态机基础，但尚未形成可恢复的数据锚点、同一候选版本身份、可信发布测试门、真实数据迁移演练、完整跨岗位验收或正式切换回滚证据。
+当前系统不能投入真实员工使用。公开非生产 UAT 在空闲状态健康，已有较完整的服务端权限、CSRF、幂等、审计和业务状态机基础，当前alpha.47本机候选身份、六服务隔离runtime和零发现诊断也已闭合；但仍没有真实异机可恢复数据锚点、外部不可变候选镜像锚点、installed Supervisor签发的正式发布门、真实数据迁移演练、完整跨岗位验收或正式切换回滚证据。
 
 本文件是失败关闭的准入基线，不是上线批准。只有对应证据实际完成后，单项状态才能从`FAIL`或`PARTIAL`更新；文档完成、页面可访问或历史测试通过不会自动解除任何门禁。
 
@@ -77,6 +77,8 @@
 
 2026-08-13 第三十三次增量：`SELFHOST-RELEASE-CANDIDATE-REFRESH-57`从TASK56 manifest-only提交`e34a861f168ef8afb71a812d186099c33d952902`启动为唯一`DOING`。任务只在本机隔离环境建立新canonical构建输入，串行构建alpha.47/0046 Web/Worker并复核manifest/config/baked身份、六服务secret/container/tablespace和固定Trivy诊断；TASK51历史镜像不得复用。不安装host、不外部push、不修改UAT/生产、真实角色/secret/ACL/Volume、账号或数据，任务启动不改变整体`PRODUCTION NO-GO`。
 
+2026-08-14 第三十四次增量：TASK57已完成并释放active slot。`4d4586b1086470d32ce19a7f4eabbc2d2a33fa74`与manifest-only `78d96c6198ab4b7255572186ea580c463b5eeba3`形成76文件canonical链；精确alpha.47/0046 Web/Worker候选的manifest/config/baked身份、Migration allowlist、UAT/production Compose及六服务实际runtime均通过。固定Trivy0.70.0使用46.6小时内数据库覆盖Web25+63、Worker25+60包，五级severity和CycloneDX漏洞全零，数据库tree前后一致。installed Supervisor缺失使正式镜像证据和19步门在11文件制品指纹变化前失败关闭；候选没有外部锚点，UAT仍alpha.42/0040、共享superuser与环境秘密。下一动作依赖A1/A2专项授权，整体继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -93,6 +95,7 @@
 - TASK56启动审计只读取去敏的UAT PostgreSQL角色属性、对象owner计数、Migration元数据和活动连接角色去重计数，以及Docker/Compose mount与服务状态metadata；没有输出角色名/连接串/密码，没有读取`.env`、业务行、日志、备份/卷正文或未跟踪状态报告，也没有执行写入、重启或创建资源。
 - TASK56 Backup检查点只在仓库和一个临时PostgreSQL 17容器的合成双cluster中验证独立control/capture、CONNECT围栏、零large-object及恢复；没有读取当前数据库/卷/备份/凭据，没有创建或修改UAT角色/ACL，临时容器、cluster和目录全部清理。
 - TASK56 catalog检查点只在仓库和一次一个临时PostgreSQL 17容器的新空合成cluster中应用46个Migration、捕获只读结构并执行负测；没有连接UAT数据库、读取业务行/秘密/日志/备份/卷正文、创建真实角色/ACL或修改运行面，临时容器、cluster和目录全部清理。
+- TASK57只从clean Git archive在本机串行构建Web/Worker，使用任务loopback registry、随机前缀runtime资源及固定Trivy断网逐archive诊断；没有外部push、host安装、UAT/生产连接、Migration/deploy、真实角色/secret/ACL/Volume、账号或业务写。构建registry、runtime/扫描/测试容器、网络、Volume、tar和临时目录全部清零；root-only本地构建/诊断制品按审计需要保留，四个UAT服务restart0/OOM false且镜像未变。
 - TASK56 D-132兼容检查点只在固定Node断网/只读临时容器与合成fixture中验证v1 actual失败关闭、v1 synthetic兼容、alias写入顺序及摘要冻结；没有访问PostgreSQL、创建真实readiness文件或触碰当前运行面。
 - TASK56最新静态检查点只在仓库、固定断网Node/Browser环境和一次一个临时PostgreSQL 17容器中验证session、secret、container、tablespace与恢复合同；真实UAT角色、secret、Volume、环境和服务未改变。依赖重建临时目录和旧依赖备份已按精确路径清理，无测试容器遗留。
 - TASK56受控operator检查点只在仓库、合成consumer凭据和一个临时PostgreSQL 17容器中验证真实system adapter、事务提交后SIGKILL、durable journal恢复、五口令探针和秘密日志扫描；没有读取真实凭据、UAT数据库/日志/环境、业务行、备份或卷正文，没有安装Supervisor或修改真实角色/ACL。测试container、source snapshot、credential/state目录已清理。
