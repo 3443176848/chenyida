@@ -2,6 +2,25 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-15
+
+### SELFHOST-OPS-MONITORING-HOST-DELIVERY-61 - `feat: add crash-safe monitoring host delivery` / `build: pin monitoring host delivery bundle` / `build: refresh release supervisor bundle` / `docs: close monitoring host delivery`
+
+- 交付：新增27文件内容寻址monitor bundle、Node 22.13—24内容寻址runtime、root collector/非特权evaluator/notifier、七个固定systemd unit/timer、严格private/evaluator/notifier配置view以及Release Supervisor的install/rollback/disable三项一次性授权入口。
+- 事务：installer要求同一inode的全局Supervisor FLOCK及独立install锁，materialize后冻结三phase，按active switch→effective systemd verify→durable COMMITTED journal/receipt→activation publication收口；稳定重试、显式已提交rollback及disable-and-preserve均失败关闭，物理删除不在范围。
+- 监控/投递：补齐root components/backup投影解析与单调watermark、future-time/回退拒绝、完整内容observation ID、崩溃安全state/outbox、grant/claim/attempt/result/ACK链、HTTPS断连失败关闭、至少一次语义和原子delivery readiness；HTTP 2xx或send返回不能单独成为delivered。
+- 安全：notifier默认`IPAddressDeny=any`，真实出口必须另获内容寻址策略与专项网络授权；没有安装host、创建账号、写systemd、读取真实渠道凭据或发送通知。权威postdeploy/V4 recovery投影producer转交TASK62，缺失继续`NOT_COLLECTED`。
+- 不可变链：source`b057f81b989eab07a4a40603c6a2a4486f326ee1`/tree`a571800f83d38209603e2bfe2a3e35b71bd2eb2b`→monitor manifest-only`3327be43d026d83477fff9e79a0eb0f090902e86`/tree`23da2f11b1ae9f6612063c0b8b4634cbf2ac11b7`→Supervisor manifest-only`222584c03cd016c69daa96013c6420dfcbfc5647`/tree`2286082369969dd6c8b94df2aeb227dbac2f3e72`；27/105文件manifest为`6782ec58…aea07`/`56157a68…efcb`且逐字节重放一致。
+- 验证：固定断网只读Node 22容器通过monitor+delivery`30/30`和release contract`20/20`；Python Supervisor launcher+delivery`23/23`；Python AST5、JSON4、inventory摘要、双manifest replay、敏感模式与diff门通过。Swap持续超过80%，未运行build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像任务。
+- 数据库/API：无Schema、Migration或业务API变化；未连接UAT/生产数据库，未读业务行、备份/Volume正文、日志、`.env`或用户未跟踪状态报告。
+- 治理：新增D-137，TASK61转`DONE`；自动启动`SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62`为唯一`DOING`。系统仍`PRODUCTION NO-GO`。
+
+### SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62 - `docs: start authoritative monitoring projections`
+
+- 调度：从TASK61最终Supervisor manifest-only提交`222584c03cd016c69daa96013c6420dfcbfc5647`/tree`2286082369969dd6c8b94df2aeb227dbac2f3e72`启动唯一active task。
+- 目标：只在仓库和合成隔离环境从installed Supervisor/postdeploy与V4 recovery权威回执生成root-only、最小去敏、单调、崩溃安全的components/backup投影，禁止调用者自报摘要或旧证据冒充当前健康。
+- 边界：不读取真实回执/业务数据，不安装host、创建账号、写systemd、开放网络、发送通知或执行备份恢复/Migration/deploy；资源停止线继续有效。
+
 ## 2026-08-14
 
 ### SELFHOST-OPS-MONITORING-HOST-DELIVERY-61 - `docs: start monitoring host delivery closure`

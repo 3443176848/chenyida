@@ -33,16 +33,16 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-08-14（Asia/Shanghai）
+快照时间：2026-08-15（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
 | 多智能体研发治理 | `PM-001`、D-113、`AGENT-R1`、`PM-002`及D-114限定的`AGENT-R1-5`均已完成；持续交付总目标启动时数据迁移、应用测试、运维安全三条智能体线完成只读审计，TASK52、TASK54和TASK55又分别完成授权依赖、异机备份及集群恢复边界复核，主智能体始终保持唯一写者并形成D-129、D-131和D-132。OS级Agent身份、Control Store、强制租约、Policy/Capability Broker、daemon、UAT/生产能力及R2—R5仍为`NOT_IMPLEMENTED / NOT AUTHORIZED` |
-| 当前版本 | 自托管源码为`0.1.0-alpha.47`，源码Migration为46/head `0046_runtime_lock_privilege_boundary.sql`。TASK56已按D-133/D-134完成权限/恢复/受控operator仓库闭环，TASK59按D-135完成独立detached候选生命周期，TASK60再按D-136完成创建前reservation、同inode提升和target-only逐代恢复。TASK57的Web/Worker本机候选及TASK59 bundle均因后续Site变化成为`STALE / NOT AUTHORIZABLE`；当前没有与最终源码匹配的可授权镜像或正式19步门。并行非生产UAT仍为Web alpha.42/source`569aa954d764309e239d1f6c174e582596d33a24`与PostgreSQL 40/head`0040_warehouse_receipt_readiness.sql`；0041—0046未应用，真实角色/secret/Volume、外部锚点、UAT晋升和正式门均未执行 |
+| 当前版本 | 自托管源码为`0.1.0-alpha.47`，源码Migration为46/head `0046_runtime_lock_privilege_boundary.sql`。TASK56已按D-133/D-134完成权限/恢复/受控operator仓库闭环，TASK59—TASK60按D-135/D-136完成独立detached候选和创建前reservation，TASK61再按D-137完成内容寻址monitor host delivery仓库链。TASK57的Web/Worker本机候选以及TASK60及更早bundle均因后续Site变化成为`STALE / NOT AUTHORIZABLE`；当前没有与最终源码匹配的可授权镜像或正式19步门。并行非生产UAT仍为Web alpha.42/source`569aa954d764309e239d1f6c174e582596d33a24`与PostgreSQL 40/head`0040_warehouse_receipt_readiness.sql`；0041—0046未应用，真实角色/secret/Volume、外部锚点、UAT晋升和正式门均未执行 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
 | 当前根仓库运维基线 | `SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`已在不停止或重建服务的前提下清理10.92 GB BuildKit cache和四个精确核准的无引用测试/旧任务镜像，根盘可用17→30.34 GiB（`df -h`为31G）；Build Cache为0B，四服务restart0/OOM false，当前/alpha.41回滚/FIX38被拒证据镜像、private GHCR本地锚点、Trae/MySQL、备份和四卷保持。运行面继续沿用`SELFHOST-UAT-FIX-38`的alpha.42/0040非生产UAT基线，未执行build、Migration、部署或业务写 |
-| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。TASK60源码`15501787f5cd304dfe5f8c75fb5df15d4e9a2258`/tree`3718593b8b6d362922bc4e84be6b6cf4adbd00a6`与manifest-only直接子提交`ffaaa9091cf09afa80918e87664ed6660f0556cf`/tree`9d42de1626ed6f8cf13308c7bbc2e83685f7341e`形成78文件canonical链，manifest SHA-256为`17fb9f99af2aae24390d060344114d1d1089c1fb19a87280c83161e277fab5b8`。TASK59、TASK57及更早bundle/镜像只保留历史审计价值并为`STALE / NOT AUTHORIZABLE`。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；未fetch/push或改动远端，公开origin继续禁止接收内部历史 |
+| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。TASK61源码`b057f81b989eab07a4a40603c6a2a4486f326ee1`/tree`a571800f83d38209603e2bfe2a3e35b71bd2eb2b`、monitor manifest-only`3327be43d026d83477fff9e79a0eb0f090902e86`/tree`23da2f11b1ae9f6612063c0b8b4634cbf2ac11b7`和Supervisor manifest-only`222584c03cd016c69daa96013c6420dfcbfc5647`/tree`2286082369969dd6c8b94df2aeb227dbac2f3e72`形成canonical链；27文件monitor/105文件Supervisor manifest SHA-256分别为`6782ec58536826e76e3954e73fb24d5f3b9ee9a8d720f1b1515435d4fa5aea07`/`56157a6878e7e0b2c405185ac0845922cd953fcb317f6df3449f2e486976efcb`。TASK60及更早bundle/镜像只保留历史审计价值并为`STALE / NOT AUTHORIZABLE`。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；未fetch/push或改动远端，公开origin继续禁止接收内部历史 |
 | 镜像恢复锚点 | D-109的private GHCR镜像恢复锚点已建立：唯一目标/tag为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，一次push返回、认证registry与唯一tag package version三方digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association、无`latest`/额外tag；linux/amd64 child、attestation、config和9层均匹配预检，一次按digest pull完全匹配，匿名读取返回401。一次性本机凭据已logout并清理；项目负责人证明已通过GitHub网页撤销一次性PAT，本项目未读取或技术验证PAT正文/远端状态 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
@@ -51,13 +51,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0046`，46/head`0046_runtime_lock_privilege_boundary.sql`，0046 SQL/Snapshot SHA-256分别为`ad68aaa4f20d16324fcdc7b234928ac363ecb73313921970d3b4840f4db6d66b`/`c8fe259a7838475bc41ffaf0e843ba9ca69a8ca0c5688d42275a81ea8b21f60d`；0001—0045未修改，Schema/233表snapshot/journal/allowlist一致。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0046只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / MONITORING HOST DELIVERY CLOSURE / LOCAL IMAGE CANDIDATE STALE / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。TASK60已关闭创建前target所有权；TASK61正在关闭A5a前的仓库交付缺口，未实际安装host或投递 |
-| 当前任务 | 唯一`DOING`为`SELFHOST-OPS-MONITORING-HOST-DELIVERY-61`：内容寻址installer、service/timer、root collector/非特权notifier、配置/回执、升级/回退和隔离测试。Swap高于80%，新的重任务继续禁止 |
-| 下一任务 | TASK61完成且适用门通过后，继续11角色机器矩阵、0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器；最终安全仓库变化收口后统一重建alpha.47镜像和授权包。host安装/账号/systemd/真实告警、A1/A3及真实异机恢复/UAT/数据/员工/切换仍须专项授权 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / MONITORING AUTHORITATIVE PROJECTION CLOSURE / LOCAL IMAGE CANDIDATE STALE / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。TASK61已关闭内容寻址host delivery仓库合同；TASK62正在关闭权威release/backup投影生产缺口，未实际安装host或投递 |
+| 当前任务 | 唯一`DOING`为`SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62`：从installed Supervisor/postdeploy与V4 recovery权威回执生成root-only、单调、崩溃安全的去敏投影。Swap高于80%，新的重任务继续禁止 |
+| 下一任务 | TASK62完成且适用门通过后，处理notifier目标绑定出口合同、11角色机器矩阵、0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器；最终安全仓库变化收口后统一重建alpha.47镜像和授权包。host安装/账号/systemd/网络/真实告警、A1/A3及真实异机恢复/UAT/数据/员工/切换仍须专项授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- SELFHOST-OPS-MONITORING-HOST-DELIVERY-61已按D-137完成内容寻址host delivery仓库闭环：27文件monitor bundle、Node内容寻址runtime、root collector/非特权evaluator/notifier、七个固定unit/timer、严格配置view、单调投影watermark、原子state/outbox/delivery、远端精确ACK和Supervisor install/rollback/disable均在合成隔离通过。源码`b057f81`→monitor manifest-only`3327be4`→Supervisor manifest-only`222584c`形成canonical链，manifest分别为`6782ec58…aea07`和`56157a68…efcb`；Node30/30、Supervisor23/23及release20/20通过。未安装host、账号/systemd或真实渠道，默认notifier仍deny-all且权威投影producer开放，整体仍production no-go
 
 - SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60已按D-136完成创建前target所有权闭环：root-owned私有staging先发布0400 canonical reservation，以固定父目录FD执行NOREPLACE同inode提升，Git前后持有并复核root FD；receipt/prepare/remove/recovery和previous terminal audit形成逐代链。源码`15501787`与manifest-only`ffaaa909`形成78文件bundle`17fb9f99…fb5b8`；专项23/23、Supervisor72/72和credentials1671通过。无host、A1—A3、镜像、外部、UAT或数据动作，整体仍production no-go
 
@@ -369,7 +371,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 当前唯一`DOING`为`SELFHOST-OPS-MONITORING-HOST-DELIVERY-61`：在仓库和合成隔离环境把TASK49工具整理为内容寻址host delivery与权限分离通知合同，不实际安装、建账号、写systemd或发送真实通知。TASK60已释放active slot，Swap停止线有效，系统继续`PRODUCTION NO-GO`。
+- 当前唯一`DOING`为`SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62`：在仓库和合成隔离环境把权威postdeploy/runtime identity及V4 recovery证据转换为root-only单调投影，不实际安装host、读取真实回执、执行备份恢复或发送通知。TASK61已释放active slot，Swap停止线有效，系统继续`PRODUCTION NO-GO`。
 - `SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`已按D-132完成并释放active slot：冻结源码`b93d838`/tree`269165d4`与manifest-only直接子提交`2136aa3`/tree`c5b78dab`形成49文件bundle，manifest SHA-256`699cdd2a…7dd6`。cluster catalog/security/tablespace、秘密分离、加密传输、V4 readiness、Dashboard/monitor与崩溃安全executor均通过合成双PostgreSQL cluster及完整适用回归；没有真实恢复或部署。
 - `SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`已按D-131完成并释放active slot：源码`fd0a9cff`与manifest-only直接子提交`315b1f3d`形成47文件bundle；签名密文来源、双向ACK、恢复强绑定、调度/保留和V3 readiness通过合成密文双集群恢复及适用回归。真实异机、密钥托管、timer/WORM、真实数据与RPO/RTO均未执行。
 - `SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已按D-120完成并释放active slot：精确38配置、ES2022合同和只读干净快照执行器已在两个提交快照38/38通过；一次错误纳入`.wrangler/work`的直接lint发生V8 heap OOM，正式干净快照lint随后0 error通过，宿主/容器OOM与restart均为0。
@@ -380,7 +382,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 - `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`内层四域工具由TASK54/TASK55继续复用；TASK56已替代其单一superuser/connection-limit guard为双身份零large-object与CONNECT围栏合同，并以D-134让active operator intent和backup fence双向失败关闭。D-115/D-131/D-132的合成隔离链保持，G2真实异机备份/恢复仍因目标、密钥、RPO/RTO与专项授权阻塞；TASK56最终bundle与实际激活也仍开放，不build/deploy或读取当前卷。
 - 真实异机备份与恢复、UAT build/Migration/deploy、旧数据读取、员工试用、账号/权限、网络/systemd和正式切换仍须专项明确授权；持续交付授权不改变这些边界。
 
-- 项目负责人已接受D-113与D-114；`AGENT-R1`只读控制器、`PM-002`执行设计和`AGENT-R1-5`合成docs/test协议MVP均已完成。该治理任务链收口时回到`IDLE`，未自动启动R2或恢复TASK03；TASK60收口后当前正式active slot为空，下一项是无需实际host安装的监控host delivery仓库合同。
+- 项目负责人已接受D-113与D-114；`AGENT-R1`只读控制器、`PM-002`执行设计和`AGENT-R1-5`合成docs/test协议MVP均已完成。该治理任务链收口时回到`IDLE`，未自动启动R2或恢复TASK03；TASK61已收口并自动进入TASK62权威监控投影仓库合同。
 - `PHASE4-TASK03`的D-112五表及确定性候选Service/API仍是0041引入的源码就绪模块；仓库总head现为alpha.47/0046。TASK03状态保持`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。外部AI禁用，正式holdout未重跑，源码未build/deploy，UAT仍alpha.42/0040，`PHASE4-TASK04`—`TASK05`保持`TODO`且不得自动开始。
 - `SELFHOST-UAT-FIX-37`已完成：功能提交`a6fc8b33af73d5ffd0da03566ef1f28d4207722b`及语义修正`20a9123741862d81ac18af9e6bdee896674fe95c`；alpha.41/0040关系化收货证据、最小权限谱系、权威GET预览、最终POST事务门禁、提前到货保护和按inspection mode分流已Web-only部署为`sha256:0cf98937…5f19`。正式备份/第二库恢复/0039→0040及warehouse-only桌面/390×844取消UAT通过；business POST0、Session0，PO/Line/Plan/queue `1/4/4/4`，Receipt/Evidence/Lot/IQC/Ledger/AP/付款/生产全0。这是FIX38前置历史；真实收货及后续部门动作均须另获授权。
 - `SELFHOST-UAT-FIX-36`已完成：功能提交`bdb4fd07e76e405f418833aeaf5b0c9c4b5e5ae7`；通用受限读模型、数据域403、PO聚合及完整上游谱系、四Line、四Plan/queue、Event/Audit/Idempotency最小投影和响应式只读详情已Web-only部署为`sha256:664e0ac6…a4ec89`。正式备份恢复、purchase-only桌面/390×844刷新重开和Session失效通过；business POST0，PO/Line/Plan/queue `1/4/4/4`及下游全0。这是FIX37的前置历史，不是当前执行指令。

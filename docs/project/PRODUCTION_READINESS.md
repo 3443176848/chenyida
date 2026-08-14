@@ -89,6 +89,10 @@
 
 2026-08-14 第三十九次增量：`SELFHOST-OPS-MONITORING-HOST-DELIVERY-61`从TASK60收口提交`08483c04231961ba5ac25757391793bfe208f926`/tree`c18d4f49d5ca9b491529c64ecd3f715ab9e53688`启动为唯一`DOING`。范围固定为TASK49/D-126的内容寻址host installer/bundle、service/timer、root采集与非特权通知边界、配置/pending/ack回执、升级/惰性回退/卸载及合成隔离测试；不实际安装host、建账号、写systemd或发送通知。起点Swap约873MiB/1GiB仍超过80%，先只做轻量工作，整体继续`PRODUCTION NO-GO`。
 
+2026-08-15 第四十次增量：TASK61按D-137完成内容寻址monitor host delivery仓库合同。source`b057f81b989eab07a4a40603c6a2a4486f326ee1`/tree`a571800f83d38209603e2bfe2a3e35b71bd2eb2b`→monitor manifest-only`3327be43d026d83477fff9e79a0eb0f090902e86`/tree`23da2f11b1ae9f6612063c0b8b4634cbf2ac11b7`→Supervisor manifest-only`222584c03cd016c69daa96013c6420dfcbfc5647`/tree`2286082369969dd6c8b94df2aeb227dbac2f3e72`固定27/105文件，manifest SHA-256为`6782ec58…aea07`/`56157a68…efcb`。三身份、七unit/timer、内容寻址runtime、安装/回退/停用事务、单调投影消费、崩溃安全state/outbox及远端精确ACK通过Node30/30、Supervisor23/23、release20/20；未安装host、建账号、写systemd、开放网络或发送通知。默认notifier deny-all且权威投影producer开放，因此A5a仍未执行，整体继续`PRODUCTION NO-GO`。
+
+2026-08-15 第四十一次增量：`SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62`从`222584c0`/tree`22860823`启动为唯一`DOING`。范围固定为从installed Supervisor/postdeploy及V4 recovery权威回执生成root-only、最小去敏、单调、崩溃安全投影和合成隔离测试；不读取真实回执/业务数据、不安装host、不执行备份恢复或开放网络。Swap仍超过80%停止线，只执行轻量工作，整体继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -118,7 +122,7 @@
 
 | 证据项 | 当前事实 | 判定 |
 | --- | --- | --- |
-| 根仓库 | TASK60 source`15501787f5cd304dfe5f8c75fb5df15d4e9a2258`/tree`3718593b8b6d362922bc4e84be6b6cf4adbd00a6`与manifest-only直接子提交`ffaaa9091cf09afa80918e87664ed6660f0556cf`/tree`9d42de1626ed6f8cf13308c7bbc2e83685f7341e`形成78文件canonical链，manifest SHA-256`17fb9f99…b5b8`；未fetch/push | 本机内容寻址链`PASS`；异机源码锚点仍缺失 |
+| 根仓库 | TASK61 source`b057f81b989eab07a4a40603c6a2a4486f326ee1`/tree`a571800f83d38209603e2bfe2a3e35b71bd2eb2b`、monitor manifest-only`3327be43d026d83477fff9e79a0eb0f090902e86`和Supervisor manifest-only`222584c03cd016c69daa96013c6420dfcbfc5647`形成27/105文件canonical链，manifest SHA-256`6782ec58…aea07`/`56157a68…efcb`；未fetch/push | 本机内容寻址链`PASS`；异机源码锚点仍缺失 |
 | 私有源码锚点 | 本机最后已知跟踪引用为`recovery-private/main@1dcbf8d`；本任务未fetch、调用远端API或push，因此未声称其为远端实时状态，也未用本地提交差值冒充异机证明 | `FAIL`，当前完整历史未证明异机存在 |
 | 源码 | `0.1.0-alpha.47`，Migration46/head`0046_runtime_lock_privilege_boundary.sql`；0046 SQL/Snapshot SHA-256为`ad68aaa4…6d66b`/`c8fe259a…1f60d`，0001—0045未修改；D-134受控operator、D-135快照生命周期与D-136创建前reservation、适用回归及canonical bundle已完成 | 仓库/合成隔离`PASS`；源码匹配镜像、外部锚点、正式证据、可消费授权及运行激活仍缺 |
 | 源码 Schema | 46 个 SQL、journal 和 snapshot 顺序一致；`db/schema.ts`与 0046 snapshot 为 233 张 public 表且列集合一致 | 静态及隔离Migration一致性`PASS` |
@@ -176,7 +180,7 @@
 
 - TASK42已实现严格release manifest、content-addressed supervisor两提交链及精确Migration allowlist/目标数据库身份，仓库工具不再允许靠tag或目录排序冒充候选。
 - TASK53已按D-130闭合部署前/隔离候选/部署后三阶段身份，并使runtime identity v3只能来自独立严格postdeploy回执；但这只关闭仓库生命周期缺口。
-- TASK51与TASK57本机候选都已是`STALE / NOT AUTHORIZABLE`；TASK60已把最终source`15501787`→manifest`ffaaa909`的detached snapshot生命周期与创建前reservation闭合，但没有为该最终输入重建Web/Worker。UAT仍alpha.42/0040、当前GHCR锚点仍alpha.42；当前没有源码匹配镜像、外部恢复锚点、installed Supervisor正式安全证据或`ELIGIBLE`manifest。
+- TASK51与TASK57本机候选都已是`STALE / NOT AUTHORIZABLE`；TASK59—TASK61已把detached snapshot、创建前reservation和monitor host delivery闭合，当前仓库输入为`222584c`/105文件bundle，但没有为该输入重建Web/Worker。UAT仍alpha.42/0040、当前GHCR锚点仍alpha.42；当前没有源码匹配镜像、外部恢复锚点、installed Supervisor正式安全证据或`ELIGIBLE`manifest。
 - D-136已用同设备私有staging、创建前0400 receipt和同inode no-clobber提升关闭D-135的PREPARE target-only所有权歧义；foreign、替换、非空、跨设备或证据缺失继续失败关闭。该合同尚未在host正式A2候选上执行。
 - 当前不能证明“拟投产代码＝已验收代码＝运行镜像＝数据库版本”。
 
@@ -262,8 +266,8 @@
 2. G3仓库工具已由TASK42完成，完整typecheck和Browser分别由TASK46/TASK47关闭，TASK50把六服务runtime policy加入第19步；TASK53关闭首次晋升自锁，TASK59—TASK60按D-135/D-136关闭A2 detached snapshot及创建前reservation并形成78文件bundle。TASK57镜像已失效；须在剩余安全仓库变化收口后统一重建源码匹配镜像、刷新A1/A3输入并获得专项授权，才可进入正式A2。
 3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
 4. TASK44/TASK45已完成会话绝对时限和health/Worker/storage/Migration真实性仓库修复；运行面验证等待同候选完整gate及专项部署授权。
-5. `SELFHOST-OPS-MONITORING-ALERTING-49`已完成仓库级监控、容量阈值、备份/恢复证据新鲜度、告警状态和排障合同；TASK61正在补齐内容寻址host delivery、权限分离notifier、配置/回执及升级回退，实际安装、真实外部投递、值班责任人和演练仍需专项授权/资源。
-6. TASK50、TASK53—TASK60已完成容器策略、发布生命周期、异机provenance、集群/运行权限、历史候选、授权输入刷新、detached snapshot及创建前reservation合同。当前唯一`DOING`为TASK61 monitoring host delivery；之后仍有11角色机器矩阵、0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器。候选须在最终相关源码变化后统一重建，完成前不能声称只剩外部授权。
+5. `SELFHOST-OPS-MONITORING-ALERTING-49`和TASK61/D-137已完成监控评估、内容寻址host delivery、三身份notifier、配置/回执、安装/回退/停用及远端ACK仓库合同；实际安装、目标绑定出口、真实外部投递、值班责任人和演练仍需后续合同与专项授权。
+6. TASK50、TASK53—TASK61已完成容器策略、发布生命周期、异机provenance、集群/运行权限、历史候选、授权输入刷新、detached snapshot、创建前reservation和monitor host delivery合同。当前唯一`DOING`为TASK62权威监控投影producer；之后仍有notifier出口、11角色机器矩阵、0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器。候选须在最终相关源码变化后统一重建，完成前不能声称只剩外部授权。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。
 

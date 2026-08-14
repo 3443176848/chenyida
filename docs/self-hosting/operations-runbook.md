@@ -129,7 +129,7 @@ alpha.46/0045源码已按D-119实现下列合同，但当前alpha.42/0040 UAT仍
 
 ## 监控、告警与值班处置
 
-TASK49提供仓库级`chenyida-erp-operations-monitoring/v1`合同、去敏采集器、纯函数评估器、原子状态存储和CLI。当前状态仅为`REPOSITORY MONITORING CONTRACT VERIFIED`：没有在宿主安装服务或定时器，没有真实通知target、凭据、值班表、外送确认或演练记录。以下是未来获专项授权后的安装/运行合同，不是当前已经启用的生产监控。
+TASK49提供`chenyida-erp-operations-monitoring/v1`评估合同，TASK61/D-137又把它封装为27文件内容寻址host bundle及105文件Release Supervisor bundle，包含三身份launcher、七个固定unit/timer、安装/回退/停用事务和精确远端ACK。当前状态为`REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED`：没有在宿主创建账号、安装service/timer、开放notifier出口、配置真实target/凭据/值班表或取得外送确认。以下是未来获专项授权后的运行合同，不是当前已经启用的生产监控。
 
 ### 信任边界与输入
 
@@ -138,41 +138,30 @@ TASK49提供仓库级`chenyida-erp-operations-monitoring/v1`合同、去敏采�
 - Docker health取值固定使用`{{with (index .State "Health")}}{{.Status}}{{else}}none{{end}}`语义；直接读取`.State.Health.Status`或`.Config.Healthcheck`会在现行Docker上因缺失key失败。Caddy允许`none`，部署后/常态监控的PostgreSQL/Web/Worker必须`healthy`；部署前旧运行面稳定门的Worker例外不能复用于监控绿色判断。
 - `operations/monitoring-policy-v1.json`只定义时间窗、服务健康和恢复要求；资源阈值唯一来自`release/release-gate-plan-v2.json.resource_policy`并由SHA-256绑定：available memory `<768 MiB`、Swap使用率`>80%`、60秒Swap增长`>256 MiB`、根盘可用`<10 GiB`、Load1连续3分钟`>4`。等于边界不触发，越过边界才触发。
 - root受控配置必须从同一未过期`ELIGIBLE`release manifest及已发布runtime/backup身份生成，固定deployment/project、四个精确容器名、四个digest引用、版本、40位Git commit、release/supervisor/Migration manifest摘要、Migration head、backup policy/RPO和通知target。UAT/PRODUCTION的`notification.required`必须为true；不得使用tag或手填另一套摘要。
-- 应用、release、backup和notification组件通过独立root控制的去敏JSON适配层交给`--components`。readiness只提供version/revision/head，完整Migration manifest摘要来自release evidence；backup只提供scope、transfer/encryption/schedule/retention/identity/policy/assurance状态、恢复点/过期时间和`recovery_ready`。省略组件文件会明确生成`NOT_COLLECTED`并告警，不能得到绿色结果。
+- 应用/release与backup必须分别由root控制的`components.json`和`backup.json`最小投影提供，绑定producer bundle、release activation/postdeploy receipt、generation、previous SHA和发布时间；backup还绑定真实V4 policy/runtime identity、恢复点和验证时间。TASK61只实现严格消费和watermark，TASK62负责从权威回执生成producer；producer完成并实际安装前，缺失投影必须明确`NOT_COLLECTED`，不能手填JSON或得到绿色结果。
 
 ### 初始化与周期执行
 
-安装时应把精确候选中的`tools/ops-monitoring/`、policy和release resource plan复制到root-owned只读版本目录，把配置放入root-only配置目录；运行时状态根建议为`/var/lib/chenyida-erp/monitoring-v1`。以下占位路径必须替换为安装回执中的绝对固定路径，不能直接让定时任务跟随可变Git checkout：
+禁止把可变Git checkout、宿主`node`搜索结果或手工复制目录作为安装源。未来A5a只能由已安装的content-addressed Release Supervisor在同一全局FLOCK下消费一次性root-only authorization并执行下列受控operation：
 
-```bash
-sudo <installed-node> <installed-cli> init \
-  --state-root /var/lib/chenyida-erp/monitoring-v1
+- `INSTALL_MONITORING_HOST_DELIVERY`：绑定27文件monitor manifest SHA、105文件Supervisor bundle SHA、root-owned Node路径/dev/inode/bytes/SHA和22.13—24版本、private config SHA、两个非特权uid/gid、activation/generation及前一activation；
+- `ROLLBACK_MONITORING_HOST_DELIVERY`：除完整安装输入外，必须绑定唯一已有COMMITTED目标activation；不能按目录名或“上一版”猜测；
+- `DISABLE_MONITORING_HOST_DELIVERY`：只停止/禁用精确unit并记录保全摘要，不删除bundle、runtime、config、state、outbox、delivery、journal或receipt。
 
-sudo <installed-node> <installed-cli> run \
-  --policy <installed-monitoring-policy-v1.json> \
-  --resource-plan <installed-release-gate-plan-v2.json> \
-  --config <root-only-monitoring-config-v1.json> \
-  --components <root-generated-safe-components-v1.json> \
-  --state-root /var/lib/chenyida-erp/monitoring-v1
+固定launcher是`/usr/local/sbin/chenyida-erp-monitoring-host-v1`，只从`/usr/local/libexec/chenyida-erp-monitoring-host-v1/bundles/<manifest-sha>`和`runtimes/<node-sha>`加载已验字节。private config位于`/etc/chenyida-erp/monitoring-v1/private/host-config.json`，evaluator/notifier只读各自group view。安装器先物化候选，再停止timer/service并取得collector/evaluator/notifier phase lock，随后按active switch、effective systemd复核、durable COMMITTED journal/receipt、activation receipt顺序提交；activation receipt缺失时launcher拒绝运行。
 
-sudo <installed-node> <installed-cli> status \
-  --policy <installed-monitoring-policy-v1.json> \
-  --config <root-only-monitoring-config-v1.json> \
-  --state-root /var/lib/chenyida-erp/monitoring-v1
-```
+collector timer每分钟执行root metadata采集并在成功后触发evaluator；continuity与notifier retry timer也每分钟执行。四phase exit code为：`0`健康/idle/已ACK；evaluator `1`表示仍有活动告警、`2`表示有pending并按unit合同继续触发notifier；notifier非ACK/非idle返回`2`且不是成功状态；`3`输入/合同/采集错误，`4`continuity stale，`5`锁竞争。任何未列入对应unit成功集合的非零都必须由systemd记录为失败，不能吞掉。
 
-`collect`只生成严格observation，`evaluate`只评估一个已落盘observation，`run`串行完成两者和状态提交，`status`只返回去敏活动告警。常规调度为每60秒一个前台、非重入任务；不得后台重叠。exit code固定为：`0`无活动/待投递；`1`有活动告警但无pending；`2`存在未配置或待投递事件；`3`未初始化、输入/采集/合同错误；`4`状态、hash或回退错误；`5`已有锁。任何非零都必须由外层supervisor记录为失败并升级，不能用shell的`|| true`吞掉。
+运行数据拆为`observations/`、`state/`、`outbox/`、`delivery/`和`projections/`，分别使用root、evaluator或notifier精确owner/group/mode；launcher还要求每个phase持有同一inode的继承FLOCK。State wrapper以PREPARED transaction journal、canonical JSON、单调sequence、previous/integrity SHA-256、temp fsync、原子rename和目录fsync提交；outbox/delivery immutable文件以prepare temp加hard-link no-clobber发布。识别出的完整prepare crash point可恢复，未知条目、链接、owner/mode/nlink漂移、断链、sequence/时间回退或超限队列失败关闭。
 
-状态根必须与运行CLI的同一uid/gid一致并精确`0700`，marker`.chenyida-erp-monitoring-state-root-v1`为`0400`，`current.json`为`0600`。每次写入用非阻塞`0700`目录锁、单调sequence、previous/integrity SHA-256、`O_EXCL`临时文件、fsync、原子rename和目录fsync把样本、活动告警及pending事件一起提交。目录出现任何未知条目、链接、owner/mode漂移、hash断链、sequence/时间倒退或超限队列都会失败关闭。
-
-进程异常后遗留`.monitor.lock`或临时项时，先停止调度、保全整个状态根及supervisor evidence，确认没有存活/卡住任务，再由受控事故任务核对owner、pid上下文、最后完整state和文件身份。当前实现不会自动清理未知项；不得在timer里`rm -rf`、重建状态或修改JSON来恢复绿色。若确需新基线，必须记录旧状态摘要、原因、责任人和时间，并先解决OOM/restart/通知积压等原始问题。
+进程异常后先停止精确timer、保全activation/journal/receipt及全部运行根，确认没有存活/卡住phase，再按稳定错误核对最后完整state、prepared temp和投递链。实现只自动恢复合同内可证明的完整prepare点；不得在timer里递归删除、重建状态、手改JSON或清空pending来恢复绿色。若确需新基线，必须记录旧状态摘要、原因、责任人和时间，并先解决OOM/restart/通知积压等原始问题。
 
 ### 告警生命周期与投递
 
 - 新问题产生`FIRING`；相同dedupe key持续期间不重复刷屏，满3600秒才产生`REMINDER`；严重性提高产生`ESCALATED`；只有有效新快照证明问题消失才产生`RECOVERED`。
 - 快照过期、时钟偏差、采样间隔超过90秒、重启、boot变化或持续窗口未形成均显式告警/重建窗口。UNKNOWN、NOT_COLLECTED、损坏输入和状态错误不能恢复旧告警。首次60秒Swap窗口和3分钟Load窗口预热期间出现warning属于预期，但在窗口完整且其余证据健康前不得宣布监控绿色。
-- TEST可明确使用`EVENT_FILE_ONLY`；它只证明事件进入本地状态。UAT/PRODUCTION事件必须为`NOT_CONFIGURED`或`PENDING`直到未来最小权限通知器按event ID至少一次、幂等送达并留下受控确认。当前仓库没有真实通知器/ack通道，任何人不得手改pending或写成delivered。
-- pending上限1024、活动告警上限128；达到上限会拒绝覆盖旧状态并要求人工升级。通知器不得读取Docker socket、root配置或完整状态之外的敏感源；渠道凭据只放root-only文件，不进入参数、环境输出、Git或聊天。
+- TEST合成adapter只允许fixture，UAT/PRODUCTION固定`HTTPS_JSON_ACK_V1`。Notifier在网络前依次持久化grant/claim/attempt；HTTP 2xx、send返回、exit 0或本机文件都不是成功，只有远端canonical body精确绑定event/target generation/idempotency/attempt才发布result/ack及原子`delivery/readiness/current.json`。当前unit固定`IPAddressDeny=any`，未获后续目标绑定出口合同与专项网络授权时真实事件只会保留pending，任何人不得手改成delivered。
+- pending上限1024、活动告警上限128，投递各类不可变文件也有固定上限；达到上限会失败关闭并要求人工升级。旧耗尽事件继续可审计但不得饿死后续事件。通知器不得读取Docker socket、root private config、observation、projection或完整state；渠道凭据只通过systemd credential文件读取，不进入参数、普通环境、Git、事件或聊天。
 
 ### 告警处置矩阵
 
@@ -189,9 +178,9 @@ sudo <installed-node> <installed-cli> status \
 
 ### 安装、验证与回滚门
 
-host安装必须另立专项任务并获项目负责人授权，至少固定：源commit/tree和bundle摘要、Node绝对路径及版本、运行uid/gid、root采集器与非特权通知器边界、配置/状态/事件目录、60秒timer、真实渠道target与root-only凭据、值班/升级责任人、保留周期、安装journal和卸载/回滚命令。不得把应用账号加入Docker组，也不得给Web挂Docker socket。
+host安装必须另立专项任务并获项目负责人授权，至少固定：TASK61 source/monitor/Supervisor三提交及两个manifest摘要、Node绝对路径/dev/inode/bytes/SHA/版本、两个已预建非特权uid/gid、root采集边界、private config与三view摘要、状态/事件目录、七个unit/timer、真实渠道target与root-only凭据、值班/升级责任人、保留周期、安装journal和精确rollback/disable输入。账号创建、网络出口和systemd写入必须逐项列明；不得把应用账号加入Docker组，也不得给Web挂Docker socket。
 
-安装验收需依次证明：配置与`ELIGIBLE`manifest闭合；权限和内容摘要无漂移；四服务和完整组件形成健康窗口；逐类合成故障产生预期FIRING/REMINDER/ESCALATED/RECOVERED；真实渠道收到测试事件且重复event ID幂等；停止/重启monitor不会丢状态；损坏/锁/时间倒退失败关闭；重启宿主后timer恢复；资源开销符合低资源门限。回滚只停止/禁用精确monitor单元并恢复前一已验版本；状态和pending事件默认保留，不删除Docker服务、卷、备份或业务数据。
+安装验收需依次证明：Supervisor/monitor/runtime/config/账号与authorization完全闭合；effective `FragmentPath`、无drop-in/transient、User/Group/ExecStart/hardening/credential/读写路径精确；权威projection producer已发布当前身份；四服务和完整组件形成健康窗口；逐类合成故障产生预期FIRING/REMINDER/ESCALATED/RECOVERED；经单独批准的出口让真实渠道收到测试与恢复事件且重复event ID幂等；停止/重启monitor不丢状态；损坏/锁/时间倒退失败关闭；重启宿主后timer恢复；资源开销符合低资源门限。回滚只恢复唯一已提交activation，停用默认保全全部证据；不删除Docker服务、卷、备份或业务数据。
 
 2026-08-13只读宿主metadata诊断使用修正后的安全health模板，结果为`CRITICAL`且没有读取API、数据库、日志、环境或卷：available memory约2214 MiB、Swap约715.8 MiB/69.8%、根盘约17.3 GiB、Load1约0.25、宿主OOM计数0；四服务restart 0/OOM false，PostgreSQL/Web healthy，Caddy/Worker health `none`，四个运行镜像均与候选digest配置不一致；应用、release和backup组件未采集也被明确告警。一次性诊断容器和临时目录已精确清理，现行四服务未修改。这是“旧UAT正确失败关闭”的证据，不是生产监控绿色证据。
 

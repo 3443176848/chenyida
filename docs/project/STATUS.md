@@ -1,17 +1,30 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-14（Asia/Shanghai）
+最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-OPS-MONITORING-HOST-DELIVERY-61（执行中；只做仓库交付合同，资源停止线有效）
+## SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62（执行中；只做权威投影仓库合同，资源停止线有效）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / READ-ONLY AUDIT AND LIGHTWEIGHT DESIGN / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；关闭A5a前的monitor host delivery仓库缺口 |
-| 严格起点 | PASS / CONTROLLED | `08483c04231961ba5ac25757391793bfe208f926`/tree`c18d4f49d5ca9b491529c64ecd3f715ab9e53688`；工作区仅既有受保护未跟踪报告 |
-| 目标合同 | IN PROGRESS | 内容寻址installer/bundle、service/timer、root collector与非特权notifier、root-only配置、pending/ack回执、升级/回退/卸载和合成隔离攻击测试 |
-| 资源 | STOP LINE ACTIVE | available约2.0GiB、Swap873MiB/1GiB（超过80%）、根盘13GiB、Load`0.19/0.16/0.20`、`oom_kill=0`；禁止新重任务，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无host安装、账号/systemd、真实渠道/凭据、通知、A1—A8、外部、UAT/生产、数据库、Volume或网络动作 |
+| 当前状态 | DOING / READ-ONLY AUDIT AND LIGHTWEIGHT DESIGN / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；关闭monitor权威release/backup投影producer缺口 |
+| 严格起点 | PASS / CONTROLLED | `222584c03cd016c69daa96013c6420dfcbfc5647`/tree`2286082369969dd6c8b94df2aeb227dbac2f3e72`；工作区仅治理文档与既有受保护未跟踪报告 |
+| 目标合同 | IN PROGRESS | 从installed Supervisor/postdeploy与V4 recovery权威回执生成root-only、最小去敏、单调、崩溃安全投影；调用者自报/legacy/synthetic失败关闭 |
+| 资源 | STOP LINE ACTIVE | Swap仍约870MiB/1GiB（超过80%）、根盘13GiB、Load低于1；禁止新重任务，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无真实回执读取、host安装、账号/systemd、notifier出口、通知、备份恢复、A1—A8、外部、UAT/生产、数据库或Volume动作 |
 | 系统是否可用 | NO | 当前无真实监控投递、源码匹配镜像、正式门、真实异机恢复/迁移、岗位/员工签字或切换 |
+
+## SELFHOST-OPS-MONITORING-HOST-DELIVERY-61（完成；仓库与合成隔离通过，host/出口未授权）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / EGRESS AND PROJECTION PUBLISHERS OPEN / PRODUCTION NO-GO | TASK61已释放active slot；下一安全任务为权威投影producer |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`b057f81`→monitor manifest-only`3327be4`→Supervisor manifest-only`222584c`；27/105文件manifest为`6782ec58…aea07`/`56157a68…efcb` |
+| 权限/安装 | PASS / REPOSITORY CONTRACT | root collector、独立evaluator/notifier、七unit/timer、Node内容寻址runtime、双锁、phase freeze、COMMITTED先于activation、已提交rollback和disable-preserve已验证 |
+| 投递 | PASS / SYNTHETIC ACK ONLY | grant/claim/attempt/result/精确ACK、至少一次重试、防target重解释、防队列饥饿及原子readiness通过；HTTP 2xx/exit0不能单独delivered |
+| 自动验证 | PASS / SCOPED APPLICABLE | monitor+delivery30/30、Supervisor launcher+delivery23/23、release contract20/20、Python AST5、JSON4、inventory和双manifest replay通过 |
+| 资源 | STOP LINE ACTIVE / NO NEW HEAVY WORK | 收口available约2.0GiB、Swap约870MiB/1GiB且超过80%、根盘13GiB、Load低于1；未build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无host、账号、systemd、网络、真实渠道/凭据、通知、UAT/生产、数据库或Volume动作；notifier默认deny-all，projection producer未完成 |
+| 系统是否可用 | NO | 仓库合同不等于真实持续监控；仍无真实异机恢复、正式同候选门、UAT对齐、岗位/员工验收或切换 |
 
 ## SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60（完成；仓库所有权闭环已验证，资源停止线仍有效）
 

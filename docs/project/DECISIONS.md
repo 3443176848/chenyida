@@ -2510,6 +2510,48 @@
 - 拒绝让Git创建可跟随的任意路径，或在Git后才发现target/ancestor symlink；拒绝0755根、非空根、未知mount、父inode漂移和跨设备copy。
 - 拒绝覆盖foreign target、递归删除、force/prune、回收quarantine、删除最新失败证据或用旧代audit授权新代对象。
 
+## D-137 监控宿主交付采用三身份内容寻址事务与远端精确 ACK
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / SYNTHETIC-ISOLATED VERIFIED / HOST, EGRESS AND REAL DELIVERY NOT AUTHORIZED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK61三条只读审计、崩溃/并发攻击复核和低资源串行测试
+- 确认边界：只授权仓库工具、内容寻址bundle、固定unit/timer和合成fake-root/fake-systemd/fake-channel测试；不授权host安装、账号、systemd、网络出口、真实渠道/凭据、UAT/生产、备份恢复或数据动作
+
+### Context
+
+- TASK49/D-126已有严格去敏观察、统一资源阈值、状态机和本地pending，但依赖可变Git checkout，没有host installer、运行身份隔离、固定unit/timer、真实adapter的ACK证据或可验证升级/回退事务。
+- root采集需要有限`/proc`和Docker socket metadata；评估只需要去敏observation与root发布的组件/恢复投影；通知只需要不可变event和单独凭据。让三者共用root或Docker组会把日志、环境、卷、网络和凭据边界混在一起。
+- HTTP 2xx、进程exit 0、本机文件和“send后崩溃”均不能证明远端按同一event/target确认；先标记delivered再发网络会在崩溃时制造永久假成功。
+- 安装active指针、systemd启动、COMMITTED journal和activation receipt若顺序错误，会出现未提交版本开始运行、失败后又写冲突回退终态，或同一授权重试覆盖证据。
+- 当前真实通知target、值班人和出口均未获授权；安全默认必须能安装后保留pending并显式失败，而不是为演示开放任意网络。
+
+### Decision
+
+1. Monitor bundle、Node runtime和activation全部内容寻址。源码提交只包含业务字节，紧随的monitor manifest-only提交固定27文件，随后Supervisor manifest-only提交把monitor manifest和三项受控操作纳入一个105文件bundle；任一缺失、额外文件或摘要/模式漂移在执行前拒绝。
+2. 固定三身份：collector为root且只读有界host/Docker metadata；evaluator使用独立非特权uid/gid且无网络；notifier使用另一非特权uid/gid且无Docker、`/proc`、完整状态或root配置。跨边界只允许canonical observation、最小投影、immutable event和delivery回执。
+3. 七个固定systemd unit/timer使用绝对launcher、单飞继承FLOCK、60秒采集/90秒最大间隔、超时、资源限额、`NoNewPrivileges`、strict文件系统与精确读写路径。运行Node使用`--jitless`以保持`MemoryDenyWriteExecute=true`；effective `FragmentPath`、无drop-in/transient、User/Group/ExecStart/credential/hardening均须复核。
+4. Installer只能从installed Release Supervisor在同一已核验全局锁FD下运行，并再取得独立install锁。候选bundle/runtime/config、uid/gid、前一activation及authorization全绑定；先物化不可变内容，再冻结timer/service与三phase lock，随后切换active、验证effective systemd、发布durable COMMITTED journal/receipt，最后发布activation receipt使launcher可运行。
+5. 失败只恢复切换前精确文件和unit状态；durable COMMITTED后不再写冲突rollback。稳定重试只能补齐同一commit的缺失activation receipt。显式rollback必须指向唯一已验证COMMITTED activation；disable只停止并禁用精确unit，重复验证inactive/disabled并记录bundle/runtime/config/state/outbox/delivery/journal保全摘要，物理删除始终需要新的专项授权。
+6. 状态和投递发布采用canonical JSON、精确owner/mode/nlink、no-follow、临时文件fsync、no-clobber hard-link或原子rename和父目录fsync。识别出的完整prepare crash point可恢复；未知临时项、断链、回退、跳代、路径或inode漂移失败关闭，不递归猜删。
+7. Evaluator先原子提交状态，再确保由该状态确定生成的event envelope/grant；下次运行可修复“state已提交、outbox未发布”崩溃窗口。Notifier依次发布claim、attempt、result；只有远端返回严格canonical ACK且精确匹配event、target generation、idempotency key与attempt，才发布ack和原子`readiness/current.json`。超时/断连/响应歧义保留至少一次重试，同一event不能被新target重新解释，耗尽旧事件仍保持可见但不饿死后续事件。
+8. Components/backup输入只接受独立root投影及单调watermark；首次必须generation 1/零前驱，未来时间、旧activation、producer/policy/identity漂移和generation回退拒绝。TASK61只实现解析/消费边界，权威postdeploy/V4 recovery producer转交TASK62，缺失时保持`NOT_COLLECTED`。
+9. 当前notifier unit固定`IPAddressDeny=any`。HTTPS adapter及精确ACK语义可以在合成fixture验证，但真实出口必须由后续内容寻址目标绑定策略和项目负责人专项网络授权显式开放；不得以drop-in、手工unit编辑或放宽effective验证绕过。
+
+### Consequences
+
+- TASK61源码`b057f81b989eab07a4a40603c6a2a4486f326ee1`/tree`a571800f83d38209603e2bfe2a3e35b71bd2eb2b`、monitor manifest-only`3327be43d026d83477fff9e79a0eb0f090902e86`/tree`23da2f11b1ae9f6612063c0b8b4634cbf2ac11b7`和Supervisor manifest-only`222584c03cd016c69daa96013c6420dfcbfc5647`/tree`2286082369969dd6c8b94df2aeb227dbac2f3e72`形成canonical链；两个manifest SHA-256为`6782ec58536826e76e3954e73fb24d5f3b9ee9a8d720f1b1515435d4fa5aea07`和`56157a6878e7e0b2c405185ac0845922cd953fcb317f6df3449f2e486976efcb`。
+- Node监控/交付30/30、Supervisor launcher/delivery23/23、release contract20/20及Python AST、JSON、inventory和双manifest重放通过。实际host `systemd-analyze`、重启持续、真实渠道ACK和资源开销仍须A5a授权后重新验证。
+- TASK60 bundle及所有既有Web/Worker镜像因Site输入变化为`STALE / NOT AUTHORIZABLE`；最终安全仓库输入收口后必须统一重建候选、外部锚点和正式证据。
+- 系统继续`PRODUCTION NO-GO`。没有host安装、网络出口、权威投影producer、真实异机恢复、同候选UAT、岗位/员工验收和切换，不得宣称持续监控或真实告警可用。
+
+### Rejected alternatives
+
+- 拒绝root一体进程、把应用账号加入Docker组、给Web/Worker挂Docker socket，或让notifier读取完整root配置、状态、日志、数据库、备份/Volume正文。
+- 拒绝可变Git checkout、系统Node路径、tag、手填摘要、可覆盖active/receipt、无fsync JSON和在启动时自动迁移/清空状态。
+- 拒绝把HTTP 2xx、exit 0、stdout、本机文件、人工口头确认或send调用返回当作`DELIVERED`，也拒绝在网络前发布readiness。
+- 拒绝自动删除unknown/foreign对象、旧版本、state/pending/journal/receipt，拒绝用旧COMMITTED或跳代配置冒充安全rollback。
+- 拒绝默认开放网络、接受任意drop-in或以“未来会配置渠道”为由把当前deny-all写成A5a已就绪。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

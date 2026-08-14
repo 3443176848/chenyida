@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-OPS-MONITORING-HOST-DELIVERY-61`。TASK61只在仓库和合成隔离环境建立TASK49监控的内容寻址installer、service/timer、root collector/非特权notifier、配置、回执、升级与回退合同。Swap高于80%期间禁止新重任务；host安装、账号/systemd、真实告警投递、A1—A3、镜像、外部锚点、UAT/生产、真实角色/secret/ACL/Volume和数据均未授权，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62`。TASK62只在仓库和合成隔离环境从installed Supervisor/postdeploy与V4 recovery权威回执生成root-only、单调、崩溃安全的最小去敏投影。Swap高于80%期间禁止新重任务；host安装、账号/systemd、notifier网络出口、真实告警投递、A1—A3、镜像、外部锚点、备份恢复、UAT/生产、真实角色/secret/ACL/Volume和数据均未授权，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -123,6 +123,10 @@
 
 2026-08-14第五十五次调度事件：主智能体从零`DOING`自动选择授权包第13节第4项，状态按`SELFHOST-OPS-MONITORING-HOST-DELIVERY-61 TODO → DOING`切换唯一active slot。严格起点为`08483c04`/tree`c18d4f49`；范围固定为仓库内容寻址安装/升级/回退包、root采集与非特权通知边界、systemd模板、配置/回执及合成隔离测试，不实际安装host、建账号、写systemd或发送通知。Swap约873MiB/1GiB并超过80%，先限制为轻量工作。
 
+2026-08-15第五十六次调度事件：`SELFHOST-OPS-MONITORING-HOST-DELIVERY-61 DOING → DONE`。D-137固定27文件monitor bundle、Node内容寻址runtime、root collector/非特权evaluator/notifier、七个unit/timer、严格配置view、投影watermark、崩溃安全state/outbox/delivery、远端精确ACK以及Supervisor install/rollback/disable。源码`b057f81`→monitor manifest-only`3327be4`→Supervisor manifest-only`222584c`形成canonical链，manifest为`6782ec58…aea07`/`56157a68…efcb`；Node30/30、Supervisor23/23、release20/20及静态/重放门通过。没有host、账号、systemd、网络、真实渠道、UAT或数据动作；默认notifier deny-all与权威投影producer仍开放，系统继续`PRODUCTION NO-GO`。
+
+2026-08-15第五十七次调度事件：主智能体从零`DOING`自动选择TASK61审计暴露的权威投影生产缺口，状态按`SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62 TODO → DOING`切换唯一active slot。严格起点为`222584c0`/tree`22860823`；范围固定为从installed Supervisor/postdeploy与V4 recovery权威回执生成最小去敏、单调、原子投影及合成隔离测试，不读取真实回执/业务数据、不安装host、不执行备份恢复或开放网络。Swap仍超过80%，继续限制为轻量工作。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -139,12 +143,13 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-OPS-MONITORING-HOST-DELIVERY-61 | 监控宿主交付与通知权限边界 | DOING | Codex主智能体（唯一写入、轻量测试串行、证据集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-14 | SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52、SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60、D-126、D-129 | `DOING / READ-ONLY AUDIT AND LIGHTWEIGHT DESIGN / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。实现内容寻址installer、service/timer、权限分离notifier、配置/回执、升级/回退与隔离合同；无host、账号、systemd、真实渠道、UAT或数据授权。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-HOST-DELIVERY-61.md)。 |
+| SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62 | 权威运行与恢复投影发布闭环 | DOING | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-15 | SELFHOST-OPS-MONITORING-HOST-DELIVERY-61、SELFHOST-RELEASE-GATE-LIFECYCLE-53、SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54、SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、D-130—D-132、D-137 | `DOING / READ-ONLY AUDIT AND LIGHTWEIGHT DESIGN / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。从权威postdeploy/runtime identity和V4 recovery证据发布root-only最小去敏投影；无host、网络、真实回执、备份恢复、UAT或数据授权。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62.md)。 |
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-OPS-MONITORING-HOST-DELIVERY-61 | 监控宿主交付与通知权限边界 | DONE | Codex主智能体（唯一写入、轻量测试串行、证据集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-14 | 2026-08-15 | SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52、SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60、D-126、D-129、D-137 | `DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / EGRESS AND PROJECTION PUBLISHERS OPEN / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。source`b057f81`、monitor manifest-only`3327be4`和Supervisor manifest-only`222584c`固定27/105文件；Node30/30、Supervisor23/23、release20/20通过。未安装host/systemd、开放网络或发送真实通知。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-HOST-DELIVERY-61.md)及[D-137](DECISIONS.md#d-137-监控宿主交付采用三身份内容寻址事务与远端精确-ack)。 |
 | SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60 | 创建前候选target所有权闭环 | DONE | Codex主智能体（唯一写入、轻量测试串行、证据集成）、智能体团队（只读复核） | 2026-08-14 | 2026-08-14 | SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59、D-135、D-136 | `DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。创建前reservation、FD-relative NOREPLACE、Git前后同inode和逐代target-only恢复已闭合；`15501787`/`ffaaa909`形成78文件bundle`17fb9f99…fb5b8`，专项23/23、Supervisor72/72通过。无host、A1—A3、镜像、外部、UAT或数据动作。见[任务文档](../tasks/SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60.md)及[D-136](DECISIONS.md#d-136-发布候选target以创建前reservation同inode提升和逐代终态链证明所有权)。 |
 | SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59 | A2独立候选快照生命周期闭环 | DONE | Codex主智能体（唯一写入、测试串行、证据集成）、数据依赖/应用测试/运维安全智能体（只读审计与攻击复核） | 2026-08-14 | 2026-08-14 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-GATE-LIFECYCLE-53、SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56、SELFHOST-RELEASE-CANDIDATE-REFRESH-57、SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58、D-135 | `DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / A2 STILL BLOCKED / PRODUCTION NO-GO`。detached snapshot、不可变回执、借用runtime、锁内VERIFY、精确REMOVE及守恒式恢复已闭合；`7b9abec4`/`89504045`形成78文件bundle`7927bb24…e5855`。无reservation的PREPARE target-only仍失败关闭，TASK57镜像已失效；未执行host、外部、UAT或真实A2。见[任务文档](../tasks/SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59.md)及[D-135](DECISIONS.md#d-135-正式发布候选采用独立detached快照不可变回执和守恒式恢复)。 |
 | SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58 | 当前候选授权包不可变身份刷新 | DONE | Codex主智能体（唯一写入、轻量验证、证据集成） | 2026-08-14 | 2026-08-14 | SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52、SELFHOST-RELEASE-GATE-LIFECYCLE-53、SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54、SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56、SELFHOST-RELEASE-CANDIDATE-REFRESH-57 | `DONE / CURRENT AUTHORIZATION INPUTS VERIFIED / NO AUTHORIZATION GRANTED / PRODUCTION NO-GO`。A1—A3已绑定TASK57当前source/manifest/bundle、Web/Worker及精确候选快照；开放仓库前置重新排队，未执行任何host、外部、UAT或数据动作。见[任务文档](../tasks/SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58.md)。 |
