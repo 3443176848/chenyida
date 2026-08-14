@@ -2662,6 +2662,41 @@
 - 拒绝仅保留latest、原地改写receipt/history、对unknown partial执行递归清理、从任意旧代回滚或允许cross-environment chain。
 - 拒绝让V4、monitor和installer分别接受不同宽松证据，也拒绝把fake-root测试或仓库publisher描述为真实host可恢复性。
 
+## D-141 监控通知出口采用目标绑定内容寻址政策与effective systemd双重证明
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / SYNTHETIC FAKE-ROOT VERIFIED / REAL TARGET AND HOST ACTIVATION NOT AUTHORIZED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK65对notifier配置、HTTPS adapter、Supervisor、launcher、systemd unit和delivery readiness的只读审计及受限Node25/25、Python36/36、release20/20验证
+- 确认边界：只授权仓库policy/publisher、Supervisor操作、合成effective-unit和断网adapter合同；不授权真实target/DNS、凭据、账号、systemd、网络、通知、host安装、UAT/生产或数据动作
+
+### Context
+
+- TASK61/D-137的notifier已要求HTTPS、结构化远端ACK并以`IPAddressDeny=any`默认失败关闭，但private config中的endpoint不能证明对应出口由当前installed Supervisor逐项审阅和激活。
+- 运行时DNS、代理、redirect、宽CIDR、调用者自报remote address或未知systemd drop-in都可能让“配置目标”和实际连接目标分离；仅校验policy JSON也不能证明systemd真正加载了同一政策。
+- policy、drop-in、activation receipt、effective-unit和delivery readiness跨多个持久对象。崩溃、回退、credential rotation和target rebind必须保持一条逐代可恢复权威链。
+
+### Decision
+
+1. V1 egress policy绑定deployment/environment、target ID/generation、固定HTTPS Host/SNI/path、端口443、最多8个精确公网IPv4/IPv6地址、adapter、credential metadata、on-call/escalation摘要、monitor/Supervisor bundle及最长24小时有效期；拒绝通配CIDR、私网/保留地址、HTTP、proxy和redirect。
+2. base notifier unit保持`IPAddressDeny=any`。每代只允许由policy生成的内容寻址专用drop-in增加精确`IPAddressAllow`；launcher必须同时核验root-owned物理base unit、专用drop-in目录唯一成员及内容、systemd loaded properties、unit身份和零环境覆盖。
+3. Supervisor authorization V5只允许ACTIVATE/ROLLBACK/RECOVER，绑定source metadata、current/previous、高水位generation、policy/drop-in/effective摘要和最长24小时；先持久化intent，再消费授权，再apply并核验effective systemd，最后发布receipt/current。已提交恢复也必须重验effective状态。
+4. publisher使用可信祖先、no-follow、canonical JSON、content-addressed history/intents/receipts/recoveries、atomic no-clobber和file/directory fsync。相同intent可幂等继续；不同intent即使复用activation ID也拒绝。未知drop-in、partial或替换对象只保全并quarantine，不自动删除。
+5. target rebind必须新generation和新授权；credential rotation只有在目标身份不变时才可保留目标，仍须新generation。下一代由历史高水位决定，rollback只允许精确当前前代，不能在回退后复用旧generation。
+6. HTTPS adapter把连接固定到批准地址同时保持Host/TLS server name，禁用agent、proxy、redirect和运行时DNS，并核对socket remote address。delivery readiness V2同时绑定当前policy、activation receipt和effective-unit摘要；legacy V1仅可读，不能形成READY。
+7. TASK65仓库合同不表示真实渠道可达或A5a已获授权。真实target、固定IP、root-only credential、值班责任人、host账号/systemd/网络及每次ACTIVATE/ROLLBACK/RECOVER均须项目负责人专项明确授权。
+
+### Consequences
+
+- source`05502fda0bcac7952d12374dfab78cccf8284bb3`→monitor manifest-only`013e61fd16f679f453ab0a1abfeade65dbd9de7d`→Supervisor manifest-only`7c69385c5ee35d517e9611fe04f55ae17be4f194`形成30/126文件canonical链，manifest raw SHA-256为`8260bed4…302`/`aab36e62…53a3`且逐字节重放一致。
+- 受限断网Node25/25、Python Supervisor36/36、release20/20、inventory253/229/24及适用静态/敏感/diff门通过。完全cap-drop初跑的7个`chown EPERM`是fake-root fixture能力不足，以最小`CHOWN/FOWNER/DAC_OVERRIDE`重跑后原断言通过。
+- 当前host未安装该bundle、未激活policy、未配置真实target/credential或发送通知；A5a、真实异机恢复、同候选UAT、真实迁移和员工验收仍未完成，系统继续`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝全网放行、域名运行时解析、代理环境、HTTP/redirect、任意CIDR、只按Host字符串判断或信任调用者自报remote address。
+- 拒绝手工编辑unit/drop-in、只检查仓库模板、不核对loaded systemd、overwrite current、复用授权/activation ID或回退后复用generation。
+- 拒绝把HTTP 2xx、send返回、stdout/本机文件或legacy readiness当成远端已送达，也拒绝把合成fake-root结果描述为真实host/渠道已就绪。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

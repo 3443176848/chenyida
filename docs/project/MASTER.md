@@ -42,7 +42,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
 | 当前根仓库运维基线 | `SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`已在不停止或重建服务的前提下清理10.92 GB BuildKit cache和四个精确核准的无引用测试/旧任务镜像，根盘可用17→30.34 GiB（`df -h`为31G）；Build Cache为0B，四服务restart0/OOM false，当前/alpha.41回滚/FIX38被拒证据镜像、private GHCR本地锚点、Trae/MySQL、备份和四卷保持。运行面继续沿用`SELFHOST-UAT-FIX-38`的alpha.42/0040非生产UAT基线，未执行build、Migration、部署或业务写 |
-| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。TASK64源码`83d920b1ac017370270452d334e44fa36a6b3978`/tree`83084e980d794a37bfeb835fcbf89e7c5210fee7`与Supervisor manifest-only`0e2328b58bc68cf09dc6b0638bb5ded82b0cf347`/tree`585b3c8d1d38f695422c5378eaa24691627de932`形成当前121文件canonical链，manifest raw SHA-256为`728f9a5f321c03c4a9b089ca4c3091c04273e6b7427f1df610c6756fa0735db9`；TASK62的27文件monitor manifest`d1b0239f…8790`保持未变并由当前Supervisor bundle继续固定。TASK63及更早Supervisor bundle/镜像只保留历史审计价值并为`STALE / NOT AUTHORIZABLE`。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；未fetch/push或改动远端，公开origin继续禁止接收内部历史 |
+| Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。TASK65 source`05502fda0bcac7952d12374dfab78cccf8284bb3`/tree`3dcb05738561e16d866675f1349a9ba5d2cd7832`→monitor manifest-only`013e61fd16f679f453ab0a1abfeade65dbd9de7d`/tree`d9dbf8ebef7edbe3b84b61a75f862c16256719c4`→Supervisor manifest-only`7c69385c5ee35d517e9611fe04f55ae17be4f194`/tree`7d19d1d9fa161dc273652ce21f1478708035d507`形成当前30/126文件canonical链，manifest raw SHA-256为`8260bed4…302`/`aab36e62…53a3`；TASK64及更早清单/镜像只保留历史审计价值并为`STALE / NOT AUTHORIZABLE`。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；未fetch/push或改动远端，公开origin继续禁止接收内部历史 |
 | 镜像恢复锚点 | D-109的private GHCR镜像恢复锚点已建立：唯一目标/tag为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，一次push返回、认证registry与唯一tag package version三方digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association、无`latest`/额外tag；linux/amd64 child、attestation、config和9层均匹配预检，一次按digest pull完全匹配，匿名读取返回401。一次性本机凭据已logout并清理；项目负责人证明已通过GitHub网页撤销一次性PAT，本项目未读取或技术验证PAT正文/远端状态 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
 | 历史 Sites 版本 | 历史记录为 `v3` / `2b4f178`；本任务未访问公开 Site，未重新确认在线状态；Sites/D1 不是未来生产权威方向 |
@@ -51,14 +51,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0046`，46/head`0046_runtime_lock_privilege_boundary.sql`，0046 SQL/Snapshot SHA-256分别为`ad68aaa4f20d16324fcdc7b234928ac363ecb73313921970d3b4840f4db6d66b`/`c8fe259a7838475bc41ffaf0e843ba9ca69a8ca0c5688d42275a81ea8b21f60d`；0001—0045未修改，Schema/233表snapshot/journal/allowlist一致。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0046只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / MONITORING TARGET-BOUND EGRESS / LOCAL IMAGE CANDIDATE STALE / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。TASK64已关闭V2 actual政策内容寻址激活仓库合同，但真实host未激活；notifier仍以`IPAddressDeny=any`失败关闭且没有可审阅的目标绑定出口链 |
-| 当前任务 | 唯一`DOING`为`SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65`：只读审计notification config、HTTPS adapter、Supervisor与effective unit，在仓库与合成fake-root中实现内容寻址target-bound egress activation。Swap高于80%，新的重任务继续禁止 |
-| 下一任务 | TASK65完成且适用门通过后，按依赖处理11角色机器矩阵、0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器；最终安全仓库变化收口后统一重建alpha.47镜像和授权包。真实target/凭据、host安装/政策激活、账号/systemd/网络/告警、A1/A3及真实异机恢复/UAT/数据/员工/切换仍须专项授权 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / AUTHORIZATION ROLE MATRIX / BUSINESS APPROVAL PENDING / LOCAL IMAGE CANDIDATE STALE / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。TASK65已关闭目标绑定notifier出口仓库合同，但真实host未安装或激活；当前转入11角色服务端权限矩阵和漂移门 |
+| 当前任务 | 唯一`DOING`为`SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66`：只读审计11角色、动态permission、Dashboard domain和全部self-hosted API调用链，在仓库生成canonical ALLOW/DENY/data-domain矩阵。业务批准保持pending；不创建账号或连接数据库。Swap高于80%，新的重任务继续禁止 |
+| 下一任务 | TASK66完成且适用门通过后，按依赖处理0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器；最终安全仓库变化收口后统一重建alpha.47镜像和授权包。真实target/凭据、host安装/政策激活、账号/systemd/网络/告警、A1/A3及真实异机恢复/UAT/数据/员工/切换仍须专项授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
+- SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65已按D-141完成目标绑定出口仓库闭环：最多8个精确公网地址、HTTPS443/Host/SNI/path、deny-all+内容寻址drop-in、Supervisor V5逐代ACTIVATE/ROLLBACK/RECOVER、effective systemd双重证明、固定地址HTTPS adapter及policy/receipt/effective同代readiness均在fake-root/断网fixture通过。source`05502fda`→monitor`013e61fd`→Supervisor`7c69385c`形成30/126文件链；Node25/25、Python36/36、release20/20、inventory253/229/24通过。未访问真实target、凭据或网络，未安装host或发送通知，整体仍production no-go
 - SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64已按D-140完成受控激活仓库闭环：固定host target/state root、Supervisor v4一次性ACTIVATE/ROLLBACK/RECOVER、durable intent→history→target→receipt→current、逐代一对一证据、精确回退、过期partial只quarantine、bundle切换联锁及V4/monitor committed-current消费均在fake-root通过。源码`83d920b1`与manifest-only`0e2328b5`形成121文件bundle`728f9a5f…35db9`；Python37/37、Node52/52、manifest9/9和inventory252/228/24通过。未安装或激活host policy、连接数据库或执行真实恢复，整体仍production no-go
 
 - SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63已按D-139完成双层恢复证据仓库闭环：冻结V1 policy/contract/executor不变，以V2 generation 1嵌入V1身份并固定当前9角色、5 LOGIN、4 membership、1261 ACL及runtime/operator/catalog/Migration/镜像/四域摘要；V1基础回执、V2 control和runtime `BOOTSTRAP` receipt共同形成actual链。源码`de993c0`与Supervisor manifest-only`e527fcf`形成117文件bundle`4c3b801f…5582`；V2/V1/Dashboard/monitor 41/41、release29/29及适用Supervisor/inventory/credentials通过。repository template不能成为actual，host publisher/激活与真实恢复未执行，整体仍production no-go
@@ -314,7 +315,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前风险
 
-- `SELFHOST-PRODUCTION-READINESS-40`确认的首要风险继续开放。TASK41/TASK54/TASK55已关闭四域内层、签名密文外层及cluster security/tablespace恢复的仓库/合成隔离缺口，TASK56又闭合未来受控PostgreSQL权限operator的仓库与隔离执行链；但PostgreSQL及三个文件数据域仍没有真实异机当前锚点、真实恢复或RTO，当前Compose仍以共享初始化superuser、环境变量秘密和superuser备份/恢复operator运行，且没有获批custom tablespace持久mount。源码alpha.47/0046与UAT alpha.42/0040仍未闭合。最终TASK56 bundle、当前源码匹配候选镜像、正式Supervisor镜像证据/19步同候选release gate、host告警投递、UAT部署和真实数据门仍阻止发布。详见[投产准入基线](PRODUCTION_READINESS.md)
+- `SELFHOST-PRODUCTION-READINESS-40`确认的首要风险继续开放。TASK41/TASK54/TASK55已关闭四域内层、签名密文外层及cluster security/tablespace恢复的仓库/合成隔离缺口，TASK56又闭合未来受控PostgreSQL权限operator的仓库与隔离执行链，TASK61—TASK65关闭monitor/projection/recovery policy/target-bound egress仓库合同；但PostgreSQL及三个文件数据域仍没有真实异机当前锚点、真实恢复或RTO，当前Compose仍以共享初始化superuser、环境变量秘密和superuser备份/恢复operator运行，且没有获批custom tablespace持久mount。源码alpha.47/0046与UAT alpha.42/0040仍未闭合。当前TASK65双bundle、源码匹配候选镜像、正式Supervisor镜像证据/19步同候选release gate、真实host告警投递、业务批准权限矩阵、UAT部署和真实数据门仍阻止发布。详见[投产准入基线](PRODUCTION_READINESS.md)
 - Docker构建缓存不会自动受控清理，连续候选构建和保留回滚镜像仍会再次消耗根盘；本次只恢复到精确30.34 GiB并保留5.942 GB Docker标记的未用镜像空间，不授权自动prune。未来重任务仍须先检查根盘，清理必须另按精确对象和保护清单执行
 
 - D-113与D-114均已由项目负责人接受，`AGENT-R1`、PM-002与`AGENT-R1-5`均已完成；这些仍不提供R2运行时强制力。直到R2/R3以后通过越权、脑裂、租约失效、资源和恢复负测，角色权限仍依赖现有仓库规则与人工流程，不能宣称已由OS、容器、命令代理或短时凭据技术强制
@@ -377,12 +378,12 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 当前唯一`DOING`为`SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65`：TASK64/D-140已完成V2 policy内容寻址逐代激活、回退、保全恢复和V4/monitor/installer联锁；当前只在仓库和合成fake-root/effective-unit/offline adapter实现target/generation绑定的notifier HTTPS出口，不选择或访问真实目标，不读取凭据，不创建账号或修改systemd/网络。Swap停止线有效，系统继续`PRODUCTION NO-GO`。
+- 当前唯一`DOING`为`SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66`：TASK65/D-141已完成target/generation绑定notifier HTTPS出口、逐代激活/回退/恢复、effective-unit和delivery readiness联锁；当前只在仓库审计11角色、动态permission、Dashboard domain及服务端API调用链并生成机器矩阵。业务批准仍pending，不创建账号、修改Session/ACL或连接数据库。Swap停止线有效，系统继续`PRODUCTION NO-GO`。
 - `SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`已按D-132完成并释放active slot：冻结源码`b93d838`/tree`269165d4`与manifest-only直接子提交`2136aa3`/tree`c5b78dab`形成49文件bundle，manifest SHA-256`699cdd2a…7dd6`。cluster catalog/security/tablespace、秘密分离、加密传输、V4 readiness、Dashboard/monitor与崩溃安全executor均通过合成双PostgreSQL cluster及完整适用回归；没有真实恢复或部署。
 - `SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`已按D-131完成并释放active slot：源码`fd0a9cff`与manifest-only直接子提交`315b1f3d`形成47文件bundle；签名密文来源、双向ACK、恢复强绑定、调度/保留和V3 readiness通过合成密文双集群恢复及适用回归。真实异机、密钥托管、timer/WORM、真实数据与RPO/RTO均未执行。
 - `SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已按D-120完成并释放active slot：精确38配置、ES2022合同和只读干净快照执行器已在两个提交快照38/38通过；一次错误纳入`.wrangler/work`的直接lint发生V8 heap OOM，正式干净快照lint随后0 error通过，宿主/容器OOM与restart均为0。
 - `SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50`已完成并释放active slot：D-127、六服务严格策略、未来Compose加固和隔离运行验证均通过，现行UAT仍为旧的可写rootfs运行配置且未改变。
-- `SELFHOST-RELEASE-CANDIDATE-REFRESH-51`已完成并释放active slot：当前本机候选精确绑定`8084d6c3`/tree`a54473f6`，六服务runtime policy与固定Trivy零发现诊断通过；正式镜像证据和19步门因installed supervisor缺失在写入前失败关闭，UAT未改变。岗位权限矩阵须业务负责人批准后另立任务，host supervisor安装、真实异机备份/恢复、真实告警、账号变化、员工试用和切换仍须专项明确授权。
+- `SELFHOST-RELEASE-CANDIDATE-REFRESH-51`已完成并释放active slot：当前本机候选精确绑定`8084d6c3`/tree`a54473f6`，六服务runtime policy与固定Trivy零发现诊断通过；正式镜像证据和19步门因installed supervisor缺失在写入前失败关闭，UAT未改变。TASK66正在生成技术权限矩阵但业务批准保持pending；host supervisor安装、真实异机备份/恢复、真实告警、账号变化、员工试用和切换仍须专项明确授权。
 
 
 - `SELFHOST-OPS-BACKUP-RECOVERY-V2-41`内层四域工具由TASK54/TASK55继续复用；TASK56已替代其单一superuser/connection-limit guard为双身份零large-object与CONNECT围栏合同，并以D-134让active operator intent和backup fence双向失败关闭。D-115/D-131/D-132的合成隔离链保持，G2真实异机备份/恢复仍因目标、密钥、RPO/RTO与专项授权阻塞；TASK56最终bundle与实际激活也仍开放，不build/deploy或读取当前卷。

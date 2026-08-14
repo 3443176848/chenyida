@@ -133,7 +133,7 @@ alpha.46/0045源码已按D-119实现下列合同，但当前alpha.42/0040 UAT仍
 
 ## 监控、告警与值班处置
 
-TASK49提供`chenyida-erp-operations-monitoring/v1`评估合同，TASK61/D-137把它封装为内容寻址host delivery，TASK62/D-138加入权威components/backup投影producer，TASK63/D-139补齐V2 actual recovery验证边界，TASK64/D-140再加入installed policy逐代激活、回退与保全式恢复。当前canonical链为27文件monitor bundle及121文件Release Supervisor bundle，包含三身份launcher、七个固定unit/timer、安装/回退/停用事务、精确远端ACK、两项root-only投影操作及V2 recovery policy激活合同。当前状态为`REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / POLICY NOT ACTIVATED / NOTIFIER EGRESS NOT AUTHORIZED`：没有在宿主创建账号、安装service/timer、激活实际policy、发布真实projection、开放notifier出口、配置真实target/凭据/值班表或取得外送确认。TASK65正在仓库与合成环境闭合目标绑定出口；以下是未来获专项授权后的运行合同，不是当前已经启用的生产监控。
+TASK49提供`chenyida-erp-operations-monitoring/v1`评估合同，TASK61/D-137把它封装为内容寻址host delivery，TASK62/D-138加入权威components/backup投影producer，TASK63/D-139与TASK64/D-140补齐V2 actual recovery及逐代激活，TASK65/D-141再加入target-bound notifier egress和effective systemd证明。当前canonical链为30文件monitor bundle`8260bed4…302`及126文件Release Supervisor bundle`aab36e62…53a3`，包含三身份launcher、七个固定unit/timer、安装/回退/停用事务、精确远端ACK、两项root-only投影、V2 recovery policy及notifier egress逐代激活合同。当前状态为`REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / POLICIES NOT ACTIVATED / REAL NOTIFIER EGRESS NOT AUTHORIZED`：没有在宿主创建账号、安装service/timer、激活实际policy、发布真实projection、开放notifier出口、配置真实target/凭据/值班表或取得外送确认。以下是未来获专项授权后的运行合同，不是当前已经启用的生产监控。
 
 ### 信任边界与输入
 
@@ -148,15 +148,18 @@ TASK49提供`chenyida-erp-operations-monitoring/v1`评估合同，TASK61/D-137�
 
 禁止把可变Git checkout、宿主`node`搜索结果或手工复制目录作为安装源。未来A5a只能由已安装的content-addressed Release Supervisor在同一全局FLOCK下消费一次性root-only authorization并执行下列受控operation：
 
-- `INSTALL_MONITORING_HOST_DELIVERY`：绑定27文件monitor manifest SHA、121文件Supervisor bundle SHA、root-owned Node路径/dev/inode/bytes/SHA和22.13—24版本、private config SHA、两个非特权uid/gid、activation/generation及前一activation；
+- `INSTALL_MONITORING_HOST_DELIVERY`：绑定30文件monitor manifest SHA、126文件Supervisor bundle SHA、root-owned Node路径/dev/inode/bytes/SHA和22.13—24版本、private config SHA、两个非特权uid/gid、activation/generation及前一activation；
 - `ROLLBACK_MONITORING_HOST_DELIVERY`：除完整安装输入外，必须绑定唯一已有COMMITTED目标activation；不能按目录名或“上一版”猜测；
 - `DISABLE_MONITORING_HOST_DELIVERY`：只停止/禁用精确unit并记录保全摘要，不删除bundle、runtime、config、state、outbox、delivery、journal或receipt。
 - `PUBLISH_MONITORING_COMPONENTS_PROJECTION`：固定current activation、private config、current release identity和canonical postdeploy receipt的路径与完整metadata，重构deployment/Git/Migration/四服务/镜像/producer身份后发布；
 - `PUBLISH_MONITORING_BACKUP_PROJECTION`：固定current V4 readiness、cluster recovery policy及TASK64 current activation链，只有当前identity、已受控激活且未过期的V2 actual链与`ACTUAL_OFFHOST + RECOVERY_READY`才能发布。D-132 V1、repository template、synthetic和无activation receipt均按设计失败关闭；TASK64已完成仓库publisher与消费者联锁，仍须专项授权才可在host实际激活和恢复。
+- `ACTIVATE_MONITORING_NOTIFIER_EGRESS_V1`：绑定当前monitor/Supervisor bundle、root-owned base unit、notifier配置view、deployment/target generation、最多8个精确公网地址、HTTPS443/Host/SNI/path、credential/on-call/escalation摘要及最长24小时有效期；prepare后消费一次性授权，发布policy/drop-in并执行daemon-reload和effective验证后才提交receipt/current。
+- `ROLLBACK_MONITORING_NOTIFIER_EGRESS_V1`：只能回到当前精确前代已提交receipt，使用历史高水位的新generation；不得按目录名、target ID或“上一版”猜测，也不得在回退后复用旧generation。
+- `RECOVER_MONITORING_NOTIFIER_EGRESS_V1_ACTIVATION`：使用新授权绑定原已消费授权和相同intent；可证明partial可继续，未知/替换/矛盾对象或drop-in只保全并quarantine。即使原链已COMMITTED也必须重新核验loaded systemd effective摘要。
 
 上述源路径不可配置替换：monitor active、private config和release identity分别是`/var/lib/chenyida-erp/monitoring-v1/active.json`、`/etc/chenyida-erp/monitoring-v1/private/host-config.json`和`/var/lib/chenyida-erp/release-identity/release-identity.json`；postdeploy receipt必须位于`/var/lib/chenyida-erp/postdeploy/<run-id>/<run-id>.postdeploy-receipt.json`；backup readiness/policy固定为`/var/lib/chenyida-erp/backup-status/recovery-readiness.json`和`/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json`。这些路径当前并未由本任务在host创建或写入。
 
-固定launcher是`/usr/local/sbin/chenyida-erp-monitoring-host-v1`，只从`/usr/local/libexec/chenyida-erp-monitoring-host-v1/bundles/<manifest-sha>`和`runtimes/<node-sha>`加载已验字节。private config位于`/etc/chenyida-erp/monitoring-v1/private/host-config.json`，evaluator/notifier只读各自group view。安装器先物化候选，再停止timer/service并取得collector/evaluator/notifier phase lock，随后按active switch、effective systemd复核、durable COMMITTED journal/receipt、activation receipt顺序提交；activation receipt缺失时launcher拒绝运行。
+固定launcher是`/usr/local/sbin/chenyida-erp-monitoring-host-v1`，只从`/usr/local/libexec/chenyida-erp-monitoring-host-v1/bundles/<manifest-sha>`和`runtimes/<node-sha>`加载已验字节。private config位于`/etc/chenyida-erp/monitoring-v1/private/host-config.json`，evaluator/notifier只读各自group view。安装器先物化候选，再停止timer/service并取得collector/evaluator/notifier phase lock，随后按active switch、effective systemd复核、durable COMMITTED journal/receipt、activation receipt顺序提交；activation receipt缺失时launcher拒绝运行。若host已有notifier egress状态，安装/切换还必须核验`/var/lib/chenyida-erp/monitoring-notifier-egress-v1/current.json`、policy/receipt/intent/history/recovery链、`/etc/chenyida-erp/monitoring-v1/views/notifier-egress-{policy,activation}.json`和唯一`50-chenyida-erp-notifier-egress.conf`，存在partial/quarantine/未知drop-in时失败关闭。
 
 collector timer每分钟执行root metadata采集并在成功后触发evaluator；continuity与notifier retry timer也每分钟执行。四phase exit code为：`0`健康/idle/已ACK；evaluator `1`表示仍有活动告警、`2`表示有pending并按unit合同继续触发notifier；notifier非ACK/非idle返回`2`且不是成功状态；`3`输入/合同/采集错误，`4`continuity stale，`5`锁竞争。任何未列入对应unit成功集合的非零都必须由systemd记录为失败，不能吞掉。
 
@@ -170,7 +173,7 @@ Projection根固定为`/var/lib/chenyida-erp/monitoring-v1/projections`：marker
 
 - 新问题产生`FIRING`；相同dedupe key持续期间不重复刷屏，满3600秒才产生`REMINDER`；严重性提高产生`ESCALATED`；只有有效新快照证明问题消失才产生`RECOVERED`。
 - 快照过期、时钟偏差、采样间隔超过90秒、重启、boot变化或持续窗口未形成均显式告警/重建窗口。UNKNOWN、NOT_COLLECTED、损坏输入和状态错误不能恢复旧告警。首次60秒Swap窗口和3分钟Load窗口预热期间出现warning属于预期，但在窗口完整且其余证据健康前不得宣布监控绿色。
-- TEST合成adapter只允许fixture，UAT/PRODUCTION固定`HTTPS_JSON_ACK_V1`。Notifier在网络前依次持久化grant/claim/attempt；HTTP 2xx、send返回、exit 0或本机文件都不是成功，只有远端canonical body精确绑定event/target generation/idempotency/attempt才发布result/ack及原子`delivery/readiness/current.json`。当前unit固定`IPAddressDeny=any`，未获后续目标绑定出口合同与专项网络授权时真实事件只会保留pending，任何人不得手改成delivered。
+- TEST合成adapter只允许fixture，UAT/PRODUCTION固定`HTTPS_JSON_ACK_V1`。Notifier在网络前依次持久化grant/claim/attempt；HTTP 2xx、send返回、exit 0或本机文件都不是成功，只有远端canonical body精确绑定event/target generation/idempotency/attempt才发布result/ack及原子`delivery/readiness/current.json`。base unit永久固定`IPAddressDeny=any`；只有当前已提交egress policy生成的唯一内容寻址drop-in可开放精确`IPAddressAllow`。adapter直接连接批准IP同时保持Host/TLS server name，禁止运行时DNS、proxy、redirect并核对实际remote address。readiness必须同时绑定current policy、activation receipt及effective-unit SHA；legacy readiness或三摘要混合零/非零均不能READY。未获A5a专项授权时真实事件继续保留pending，任何人不得手改成delivered。
 - pending上限1024、活动告警上限128，投递各类不可变文件也有固定上限；达到上限会失败关闭并要求人工升级。旧耗尽事件继续可审计但不得饿死后续事件。通知器不得读取Docker socket、root private config、observation、projection或完整state；渠道凭据只通过systemd credential文件读取，不进入参数、普通环境、Git、事件或聊天。
 
 ### 告警处置矩阵
@@ -188,7 +191,7 @@ Projection根固定为`/var/lib/chenyida-erp/monitoring-v1/projections`：marker
 
 ### 安装、验证与回滚门
 
-host安装必须另立专项任务并获项目负责人授权，至少固定：TASK62 source`0e38ac2e…`、monitor manifest-only`9d0eeb7b…`、Supervisor manifest-only`672a0695…`及两个manifest摘要`d1b0239f…8790`/`9d653c63…96f1`、Node绝对路径/dev/inode/bytes/SHA/版本、两个已预建非特权uid/gid、root采集边界、private config与三view摘要、projection根和两个未来权威源、状态/事件目录、七个unit/timer、真实渠道target与root-only凭据、值班/升级责任人、保留周期、安装journal和精确rollback/disable输入。账号创建、网络出口和systemd写入必须逐项列明；不得把应用账号加入Docker组，也不得给Web挂Docker socket。
+host安装必须另立专项任务并获项目负责人授权，至少固定：TASK65 source`05502fda…`、monitor manifest-only`013e61fd…`、Supervisor manifest-only`7c69385c…`及两个manifest摘要`8260bed4…302`/`aab36e62…53a3`、Node绝对路径/dev/inode/bytes/SHA/版本、两个已预建非特权uid/gid、root采集边界、private config与各view摘要、projection/egress状态根和权威源、状态/事件目录、七个unit/timer、真实渠道target/固定地址/Host/SNI/path与root-only凭据、值班/升级责任人、保留周期、安装/egress journal和精确rollback/disable输入。账号创建、网络出口和systemd写入必须逐项列明；不得把应用账号加入Docker组，也不得给Web挂Docker socket。
 
 安装验收需依次证明：Supervisor/monitor/runtime/config/账号与authorization完全闭合；effective `FragmentPath`、无drop-in/transient、User/Group/ExecStart/hardening/credential/读写路径精确；权威projection producer已发布当前身份；四服务和完整组件形成健康窗口；逐类合成故障产生预期FIRING/REMINDER/ESCALATED/RECOVERED；经单独批准的出口让真实渠道收到测试与恢复事件且重复event ID幂等；停止/重启monitor不丢状态；损坏/锁/时间倒退失败关闭；重启宿主后timer恢复；资源开销符合低资源门限。回滚只恢复唯一已提交activation，停用默认保全全部证据；不删除Docker服务、卷、备份或业务数据。
 

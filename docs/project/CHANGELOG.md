@@ -51,12 +51,19 @@
 - 资源/边界：收口available约2.0GiB、Swap约861MiB/1GiB且超过80%、根盘13GiB、Load低于1、`oom_kill=0`；四服务restart0/OOM false，Web/PostgreSQL healthy，Worker/Caddy无healthcheck。没有build、全量Node/PostgreSQL、Docker数据库、typecheck、真实host/policy/备份/恢复、数据库、凭据、账号、systemd、网络、UAT/生产或数据动作；临时文件/容器清零。
 - 数据库/API：无Schema、Migration或业务API变化；新增的是运维政策激活、回退、恢复及消费证明。TASK64转`DONE`，系统保持`PRODUCTION NO-GO`。
 
-### SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65 - `docs: close policy activation and start notifier egress`
+### SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65 - `docs: close policy activation and start notifier egress` / `feat: bind monitoring notifier egress` / `build: refresh monitoring host bundle` / `build: refresh release supervisor bundle` / `docs: close notifier egress and start role matrix`
 
 - 调度：从TASK64最终Supervisor manifest-only提交`0e2328b58bc68cf09dc6b0638bb5ded82b0cf347`/tree`585b3c8d1d38f695422c5378eaa24691627de932`启动唯一active task。
 - 目标：在仓库与合成fake-root/effective-unit/offline adapter中建立内容寻址、target/generation绑定的notifier出口政策，固定HTTPS host/SNI/path、端口、精确IP集合、adapter/credential/config/bundle和值班升级来源，并由Supervisor一次性授权控制activate/rollback/recover。
 - 失败关闭：现有`IPAddressDeny=any`在没有有效current egress activation时保持；运行时不得依赖未绑定DNS、代理、redirect或手工drop-in，delivery readiness必须同时证明同代target与effective unit。真实目标、DNS、凭据、账号、systemd、网络和通知均不在本任务授权范围。
-- 资源/结论：Swap超过80%停止线，任务只执行轻量源码、合成fixture和范围测试，不启动build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像；任务启动不改变`PRODUCTION NO-GO`。
+- policy/事务：V1 canonical policy/template/receipt只接受最多8个精确公网`/32`或`/128`地址、HTTPS443和最长24小时；Supervisor authorization V5以intent→consume→apply→effective verify→finalize执行ACTIVATE/ROLLBACK/RECOVER，使用历史高水位generation、精确前代回退、相同intent幂等和unknown/partial quarantine。
+- 运行核验：base unit继续deny-all，只有内容寻址专用drop-in可增加精确allow；launcher核对root-owned物理unit、专用drop-in唯一成员/内容、loaded systemd属性和零环境。HTTPS adapter固定批准IP并保持Host/SNI，禁用runtime DNS/proxy/redirect并核对remote address；collector/notifier/readiness绑定current policy、receipt和effective摘要。
+- 不可变链：source`05502fda0bcac7952d12374dfab78cccf8284bb3`/tree`3dcb05738561e16d866675f1349a9ba5d2cd7832`→monitor manifest-only`013e61fd16f679f453ab0a1abfeade65dbd9de7d`/tree`d9dbf8ebef7edbe3b84b61a75f862c16256719c4`→Supervisor manifest-only`7c69385c5ee35d517e9611fe04f55ae17be4f194`/tree`7d19d1d9fa161dc273652ce21f1478708035d507`；30/126文件manifest为`8260bed4…302`/`aab36e62…53a3`且逐字节重放一致。
+- 验证：受限断网Node25/25、Python Supervisor36/36、release gate20/20、inventory253/229/24、Python AST7、JSON4、bundle计数、模板logical摘要、敏感模式和diff门通过。完全cap-drop初跑有7个fixture `chown EPERM`，按fake-root最小`CHOWN/FOWNER/DAC_OVERRIDE`能力重跑后原断言全部通过，未降低断言。
+- 治理收口偏差：首次从仓库根调用宿主`node`和Site Python模块分别因宿主无`node`、工作目录错误失败；改用显式11文件Python链接校验并从Site目录重跑Python36/36后通过。没有修改断言、代码或运行面。
+- 资源/边界：测试前后available约2.0→1.9GiB、Swap858→860MiB/1GiB且超过80%、根盘13GiB、Load低于1；四服务restart0/OOM false，临时容器清零。没有build、全量Node/PostgreSQL、Docker数据库、typecheck、镜像、真实网络/target/credential、host/systemd、通知、数据库、备份、Volume、UAT/生产或数据动作。
+- 数据库/API：无Schema、Migration或业务API变化；新增运维出口政策、激活/恢复、HTTPS adapter和监控readiness合同。TASK65转`DONE`，新增D-141；系统保持`PRODUCTION NO-GO`。
+- 调度：自动启动`SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66`为唯一`DOING`，只在仓库生成11角色→permission→API/data-domain机器矩阵与负向漂移合同；业务批准保持pending，不创建账号、Session或数据库角色/ACL。
 
 ## 2026-08-14
 

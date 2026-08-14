@@ -2,16 +2,30 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65（执行中；只做仓库与合成目标绑定出口合同）
+## SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66（执行中；只做仓库机器权限矩阵）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / READ-ONLY AUDIT AND LIGHTWEIGHT REPOSITORY IMPLEMENTATION / RESOURCE STOP LINE ACTIVE / NO REAL NETWORK OR HOST ACTION / PRODUCTION NO-GO | 唯一active task；为notifier建立内容寻址target-bound egress activation和effective-unit合同，不访问真实渠道 |
-| 严格起点 | PASS / CONTROLLED | `0e2328b58bc68cf09dc6b0638bb5ded82b0cf347`/tree`585b3c8d1d38f695422c5378eaa24691627de932`；用户未跟踪报告继续不读不改不提交 |
-| 目标合同 | IN PROGRESS | 审计notification config/HTTPS adapter/Supervisor/systemd，只在fake-root和断网fixture实现精确地址、SNI、generation、rollback/quarantine与ACK同代绑定 |
-| 资源 | STOP LINE ACTIVE | available约2.0GiB、Swap861MiB/1GiB（超过80%）、根盘13GiB、Load低于1；禁止新重任务，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无真实target/DNS/凭据、账号、systemd、网络、通知、host policy激活、数据库、备份恢复、A1—A8、UAT/生产或Volume动作 |
-| 系统是否可用 | NO | 当前notifier仍deny-all，且无实际policy、源码匹配镜像、正式门、真实异机恢复/迁移、岗位/员工签字或切换 |
+| 当前状态 | DOING / READ-ONLY AUTHORIZATION AUDIT AND LIGHTWEIGHT REPOSITORY IMPLEMENTATION / BUSINESS APPROVAL PENDING / RESOURCE STOP LINE ACTIVE / NO ACCOUNT OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；生成11角色→permission→API/data-domain矩阵和负向漂移合同，不把当前代码事实冒充业务批准 |
+| 严格起点 | PASS / CONTROLLED | `7c69385c5ee35d517e9611fe04f55ae17be4f194`/tree`7d19d1d9fa161dc273652ce21f1478708035d507`；用户未跟踪报告继续不读不改不提交 |
+| 起点审计 | IN PROGRESS | 源码固定11个员工角色，权限由静态基表和动态组合生成，Dashboard另有domain裁剪；约175处服务端permission调用尚无统一机器路由矩阵 |
+| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap860MiB/1GiB（超过80%）、根盘13GiB、Load低于1；禁止新重任务，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不创建/修改账号、Session、PostgreSQL角色/ACL，不连接数据库；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
+| 系统是否可用 | NO | 岗位职责尚未获业务批准，且无源码匹配镜像、正式门、真实异机恢复/迁移、员工签字或切换 |
+
+## SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65（完成；仓库与合成fake-root通过，真实出口未激活）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY AND SYNTHETIC FAKE-ROOT VERIFIED / REAL TARGET AND HOST ACTIVATION NOT AUTHORIZED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | TASK65已释放active slot；下一安全任务为11角色机器权限矩阵 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`05502fda`/tree`3dcb0573`→monitor manifest-only`013e61fd`/tree`d9dbf8eb`→Supervisor manifest-only`7c69385c`/tree`7d19d1d9`；30/126文件manifest为`8260bed4…302`/`aab36e62…53a3`且重放一致 |
+| 出口政策 | PASS / TARGET BOUND | 最多8个精确公网地址、HTTPS443/Host/SNI/path、deny-all+专用drop-in、最长24小时、无DNS/proxy/redirect；credential rotation与target rebind严格分代 |
+| 激活/恢复 | PASS / CRASH SAFE | Supervisor V5执行intent→consume→apply→effective verify→finalize；高水位generation、精确前代rollback、相同intent幂等和unknown/partial quarantine通过 |
+| 运行核验 | PASS / EFFECTIVE BOUND | launcher核对root-owned base unit、专用drop-in唯一成员/内容、loaded systemd属性和零环境；adapter固定IP并保持Host/SNI、核对remote address，readiness绑定policy/receipt/effective摘要 |
+| 自动验证 | PASS / SCOPED APPLICABLE | 受限断网Node25/25、Python36/36、release20/20、inventory253/229/24、AST/JSON/bundle/模板/敏感/diff门通过；最小fake-root capabilities重跑解决fixture `chown EPERM`，断言未降低 |
+| 资源/清理 | STOP LINE ACTIVE / NO OOM | 测试前后available约2.0→1.9GiB、Swap858→860MiB/1GiB、根盘13GiB、Load低于1；四服务restart0/OOM false，临时容器清零 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 未访问真实target/DNS/凭据或网络，未发送通知、安装host、创建账号、写systemd、连接数据库或修改UAT/生产 |
+| 系统是否可用 | NO | 仓库/fake-root证明不等于真实渠道；A5a、异机恢复、同候选UAT、真实迁移、岗位批准和员工验收仍缺 |
 
 ## SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64（完成；仓库与合成fake-root通过，host未激活）
 
@@ -60,7 +74,7 @@
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / EGRESS NOT AUTHORIZED / PROJECTION PUBLISHERS CLOSED BY TASK62 / PRODUCTION NO-GO | TASK61历史合同保持；权威投影仓库缺口已由TASK62关闭，目标绑定出口由TASK65实施 |
+| 当前状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / REAL EGRESS NOT AUTHORIZED / PROJECTION AND EGRESS REPOSITORY CONTRACTS CLOSED / PRODUCTION NO-GO | TASK61历史合同保持；权威投影与目标绑定出口仓库缺口已由TASK62—TASK65关闭，真实host/A5a仍未执行 |
 | 不可变链 | PASS / CONTENT ADDRESSED | source`b057f81`→monitor manifest-only`3327be4`→Supervisor manifest-only`222584c`；27/105文件manifest为`6782ec58…aea07`/`56157a68…efcb` |
 | 权限/安装 | PASS / REPOSITORY CONTRACT | root collector、独立evaluator/notifier、七unit/timer、Node内容寻址runtime、双锁、phase freeze、COMMITTED先于activation、已提交rollback和disable-preserve已验证 |
 | 投递 | PASS / SYNTHETIC ACK ONLY | grant/claim/attempt/result/精确ACK、至少一次重试、防target重解释、防队列饥饿及原子readiness通过；HTTP 2xx/exit0不能单独delivered |
@@ -112,7 +126,7 @@
 | A1输入 | STALE / SUPERSEDED / NOT AUTHORIZED | TASK58当时核对的source`4d4586b1`、manifest`78d96c61`和76文件bundle现只保留历史审计价值；A1待审设计输入已转为TASK60的78文件bundle，host路径仍未安装且未授权 |
 | A3输入 | STALE / LOCAL HISTORICAL OBJECTS ONLY | TASK58当时登记的Web/Worker manifest/config已被TASK59—TASK60 Site变化失效；仍无重建的当前镜像、批准私有Git/registry目标、root-only凭据或外部完整digest |
 | A2输入 | BLOCKED / SUPERSEDED / FAIL CLOSED | TASK59/TASK60已闭合detached snapshot及创建前所有权，但A2仍受A1、源码匹配A3镜像和外部完整引用阻断；不得使用`78d96c61…eba3`旧候选 |
-| 仓库路线 | PASS / HISTORICAL SIX-ITEM SPLIT | TASK58当时拆出的detached snapshot已由TASK59—TASK60关闭；monitor delivery、11角色矩阵、0017→0046、跨岗UAT模板和晋升/回滚执行器仍开放 |
+| 仓库路线 | PASS / HISTORICAL SIX-ITEM SPLIT | TASK58当时拆出的detached snapshot已由TASK59—TASK60关闭，monitor delivery/projection/policy/egress已由TASK61—TASK65关闭；11角色矩阵由TASK66执行，0017→0046、跨岗UAT模板和晋升/回滚执行器仍开放 |
 | 自动验证 | PASS / DOCS-ONLY | 授权包身份合同、Markdown397/240、JSON220、Shell44、Python AST50、credentials1667及diff门通过；范围精确八份治理Markdown |
 | 资源/清理 | PASS / NO THRESHOLD BREACH | 起点/收口available约1.9GiB、Swap765/764MiB、根盘13GiB、Load低于1、`oom_kill=0`；扫描容器/目录清零，未build、Migration、prune或创建Volume |
 | 运行面 | VERIFIED METADATA / UNCHANGED | UAT仍alpha.42/0040、四服务restart0/OOM false；未访问业务行、凭据、日志或Volume正文，无host/外部/UAT/数据动作 |
