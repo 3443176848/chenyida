@@ -85,9 +85,11 @@ TASK50已经在仓库和任务私有隔离容器中验证[D-127](../project/DECI
 ## 备份、恢复与故障处理
 
 - V2已用合成数据和双独立PostgreSQL测试集群证明四域manifest、数据库守卫、内层回执、故障注入清理及prepared receipt补发；TASK54又以合成密文链证明Ed25519/X25519/HKDF/AES-GCM、双向ACK、恢复强绑定、调度评估和dry-run保留。两者都没有读取当前四卷或生成真实备份。
-- TASK55/TASK56已在仓库和隔离PostgreSQL闭合cluster roles/ACL/default privileges/tablespace及当前9角色/5 LOGIN权限重建；TASK63又保持冻结V1执行引擎不变，以V2 policy把V1基础receipt、V2 recovery control和当前runtime privilege `BOOTSTRAP` receipt组合为actual证据。V2 raw/logical SHA-256为`1a092993…7aa`/`c30951ad…8b8`，但这仍只是repository template与合成验证。
+- TASK55/TASK56已在仓库和隔离PostgreSQL闭合cluster roles/ACL/default privileges/tablespace及当前9角色/5 LOGIN权限重建；TASK63又保持冻结V1执行引擎不变，以V2 policy把V1基础receipt、V2 recovery control和当前runtime privilege `BOOTSTRAP` receipt组合为actual证据。V2 raw/logical SHA-256为`1a092993…7aa`/`c30951ad…8b8`；TASK64进一步完成内容寻址逐代激活、回退与保全式恢复合同，但这些仍只是repository与合成验证。
 - 当前仍没有真实异故障域副本、真实密钥托管/WORM/timer/保留删除、告警责任人、已激活actual policy、真实恢复或真实RTO；Dashboard不得把本机、旧V2、V1 policy、repository template或synthetic回执冒充灾备。
-- actual policy固定host路径为`/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json`。当前没有获授权的publisher或activation receipt，禁止手工复制、编辑、替换或自洽重签名该文件；缺失必须失败关闭。TASK64只建立未来installed Supervisor使用的内容寻址发布合同，实际host激活仍须专项授权。
+- actual policy固定host路径为`/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json`，激活状态根固定为`/var/lib/chenyida-erp/postgresql-cluster-recovery-policy-v2`。TASK64已建立未来installed Supervisor使用的内容寻址发布合同，但当前host没有publisher、current或activation receipt。禁止手工复制、编辑、替换或自洽重签名policy/current/history/intent/receipt；缺失或不一致必须失败关闭，实际host激活仍须专项授权。
+- 获专项授权后也必须先由installed Supervisor在全局release锁内prepare，逐字节复核template、bundle、environment/generation/previous、actor/approver、时效和固定路径，再消费对应一次性`ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2`授权；提交只允许intent→history→target→receipt→current顺序。操作后必须让V4、monitor backup publisher和installer interlock复核同一current链，任一消费者不一致即停止后续恢复或升级。
+- 回退只能使用`ROLLBACK_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2`精确绑定一个历史已提交代次，不能按文件名或“上一版”猜测。崩溃后保全全部现场，使用引用原已消费授权的新`RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION`授权；可证明partial才继续，过期或矛盾状态只隔离并升级事故，禁止删除后重试或手改current。
 - 若备份进程中断且 `.backup-fence-v2.json`存在，数据库保持安全只读，且`CONNECT`只保留给固定的非superuser `chenyida_erp_backup`采集身份和当前一次性control身份；Web、Worker、Admin与Migration owner均被数据库级deny。禁止手工删除intent、手工补GRANT或直接重跑；只能由root调度的同一control service使用`recover-backup-guard.sh`核对v3 intent、稳定数据库/部署身份和精确ACL后，在一个事务中恢复默认读写与固定四个在线/owner角色的`CONNECT`。capture service不能执行恢复。
 - TASK56之后，`backup-selfhost.sh`必须同时收到物理文件、libpq service名和登录角色都相互独立的control/capture凭据。control只做fence、backend终止、身份核验和恢复控制；所有业务relation reconciliation、Migration只读核对和`pg_dump --no-large-objects --no-owner --no-acl`都由`chenyida_erp_backup`执行。当前应用数据模型声明零large object，control在写入WORK/发布制品前按metadata强制计数为零；发现任一large object即失败关闭并精确解除本次fence，禁止临时给capture读取`pg_largeobject`正文的能力。
 - 若隔离恢复在 prepared receipt 后发布失败，保留精确 TEST 数据库、文件目标和 prepared evidence；使用 `publish-restore-receipt-selfhost.sh`补发，不重跑恢复。
@@ -131,7 +133,7 @@ alpha.46/0045源码已按D-119实现下列合同，但当前alpha.42/0040 UAT仍
 
 ## 监控、告警与值班处置
 
-TASK49提供`chenyida-erp-operations-monitoring/v1`评估合同，TASK61/D-137把它封装为内容寻址host delivery，TASK62/D-138再加入权威components/backup投影producer，TASK63/D-139补齐V2 actual recovery验证边界。当前canonical链为27文件monitor bundle及117文件Release Supervisor bundle，包含三身份launcher、七个固定unit/timer、安装/回退/停用事务、精确远端ACK、两项root-only投影操作和V2 recovery policy合同。当前状态为`REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / POLICY NOT ACTIVATED`：没有在宿主创建账号、安装service/timer、激活实际policy、发布真实projection、开放notifier出口、配置真实target/凭据/值班表或取得外送确认。以下是未来获专项授权后的运行合同，不是当前已经启用的生产监控。
+TASK49提供`chenyida-erp-operations-monitoring/v1`评估合同，TASK61/D-137把它封装为内容寻址host delivery，TASK62/D-138加入权威components/backup投影producer，TASK63/D-139补齐V2 actual recovery验证边界，TASK64/D-140再加入installed policy逐代激活、回退与保全式恢复。当前canonical链为27文件monitor bundle及121文件Release Supervisor bundle，包含三身份launcher、七个固定unit/timer、安装/回退/停用事务、精确远端ACK、两项root-only投影操作及V2 recovery policy激活合同。当前状态为`REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / POLICY NOT ACTIVATED / NOTIFIER EGRESS NOT AUTHORIZED`：没有在宿主创建账号、安装service/timer、激活实际policy、发布真实projection、开放notifier出口、配置真实target/凭据/值班表或取得外送确认。TASK65正在仓库与合成环境闭合目标绑定出口；以下是未来获专项授权后的运行合同，不是当前已经启用的生产监控。
 
 ### 信任边界与输入
 
@@ -146,11 +148,11 @@ TASK49提供`chenyida-erp-operations-monitoring/v1`评估合同，TASK61/D-137�
 
 禁止把可变Git checkout、宿主`node`搜索结果或手工复制目录作为安装源。未来A5a只能由已安装的content-addressed Release Supervisor在同一全局FLOCK下消费一次性root-only authorization并执行下列受控operation：
 
-- `INSTALL_MONITORING_HOST_DELIVERY`：绑定27文件monitor manifest SHA、117文件Supervisor bundle SHA、root-owned Node路径/dev/inode/bytes/SHA和22.13—24版本、private config SHA、两个非特权uid/gid、activation/generation及前一activation；
+- `INSTALL_MONITORING_HOST_DELIVERY`：绑定27文件monitor manifest SHA、121文件Supervisor bundle SHA、root-owned Node路径/dev/inode/bytes/SHA和22.13—24版本、private config SHA、两个非特权uid/gid、activation/generation及前一activation；
 - `ROLLBACK_MONITORING_HOST_DELIVERY`：除完整安装输入外，必须绑定唯一已有COMMITTED目标activation；不能按目录名或“上一版”猜测；
 - `DISABLE_MONITORING_HOST_DELIVERY`：只停止/禁用精确unit并记录保全摘要，不删除bundle、runtime、config、state、outbox、delivery、journal或receipt。
 - `PUBLISH_MONITORING_COMPONENTS_PROJECTION`：固定current activation、private config、current release identity和canonical postdeploy receipt的路径与完整metadata，重构deployment/Git/Migration/四服务/镜像/producer身份后发布；
-- `PUBLISH_MONITORING_BACKUP_PROJECTION`：固定current V4 readiness及cluster recovery policy，只有当前identity、已受控激活且未过期的V2 actual链与`ACTUAL_OFFHOST + RECOVERY_READY`才能发布。D-132 V1、repository template、synthetic和无activation receipt均按设计失败关闭；TASK63已完成验证合同，TASK64完成仓库publisher前不得手工创建host policy，之后仍须专项授权实际激活和恢复。
+- `PUBLISH_MONITORING_BACKUP_PROJECTION`：固定current V4 readiness、cluster recovery policy及TASK64 current activation链，只有当前identity、已受控激活且未过期的V2 actual链与`ACTUAL_OFFHOST + RECOVERY_READY`才能发布。D-132 V1、repository template、synthetic和无activation receipt均按设计失败关闭；TASK64已完成仓库publisher与消费者联锁，仍须专项授权才可在host实际激活和恢复。
 
 上述源路径不可配置替换：monitor active、private config和release identity分别是`/var/lib/chenyida-erp/monitoring-v1/active.json`、`/etc/chenyida-erp/monitoring-v1/private/host-config.json`和`/var/lib/chenyida-erp/release-identity/release-identity.json`；postdeploy receipt必须位于`/var/lib/chenyida-erp/postdeploy/<run-id>/<run-id>.postdeploy-receipt.json`；backup readiness/policy固定为`/var/lib/chenyida-erp/backup-status/recovery-readiness.json`和`/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json`。这些路径当前并未由本任务在host创建或写入。
 

@@ -2,16 +2,31 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64（执行中；只做仓库与合成fake-root激活合同）
+## SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65（执行中；只做仓库与合成目标绑定出口合同）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / READ-ONLY AUDIT AND LIGHTWEIGHT REPOSITORY IMPLEMENTATION / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；为V2 actual policy建立内容寻址、一次性授权、逐代发布/回退/quarantine，不在真实host激活 |
-| 严格起点 | PASS / CONTROLLED | `e527fcfe5fa0f779cbe4514ffa82376e1d0f3462`/tree`778b24a550215271bba248ea6367adc8d1b3fb92`；用户未跟踪报告继续不读不改不提交 |
-| 目标合同 | IN PROGRESS | 审计Supervisor授权消费与固定policy消费者，只在fake-root实现root-only/no-follow、canonical、崩溃安全和精确rollback/quarantine |
-| 资源 | STOP LINE ACTIVE | available约2.0GiB、Swap约870MiB/1GiB（超过80%）、根盘13GiB、Load低于1；禁止新重任务，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无真实host路径、政策激活、数据库连接、备份/回执读取、恢复、凭据/账号/ACL、A1—A8、外部、UAT/生产或Volume动作 |
-| 系统是否可用 | NO | 当前无已激活actual policy、真实监控投递、源码匹配镜像、正式门、真实异机恢复/迁移、岗位/员工签字或切换 |
+| 当前状态 | DOING / READ-ONLY AUDIT AND LIGHTWEIGHT REPOSITORY IMPLEMENTATION / RESOURCE STOP LINE ACTIVE / NO REAL NETWORK OR HOST ACTION / PRODUCTION NO-GO | 唯一active task；为notifier建立内容寻址target-bound egress activation和effective-unit合同，不访问真实渠道 |
+| 严格起点 | PASS / CONTROLLED | `0e2328b58bc68cf09dc6b0638bb5ded82b0cf347`/tree`585b3c8d1d38f695422c5378eaa24691627de932`；用户未跟踪报告继续不读不改不提交 |
+| 目标合同 | IN PROGRESS | 审计notification config/HTTPS adapter/Supervisor/systemd，只在fake-root和断网fixture实现精确地址、SNI、generation、rollback/quarantine与ACK同代绑定 |
+| 资源 | STOP LINE ACTIVE | available约2.0GiB、Swap861MiB/1GiB（超过80%）、根盘13GiB、Load低于1；禁止新重任务，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无真实target/DNS/凭据、账号、systemd、网络、通知、host policy激活、数据库、备份恢复、A1—A8、UAT/生产或Volume动作 |
+| 系统是否可用 | NO | 当前notifier仍deny-all，且无实际policy、源码匹配镜像、正式门、真实异机恢复/迁移、岗位/员工签字或切换 |
+
+## SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64（完成；仓库与合成fake-root通过，host未激活）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY AND SYNTHETIC FAKE-ROOT VERIFIED / HOST ACTIVATION NOT EXECUTED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | TASK64已释放active slot；下一安全任务为target-bound notifier egress仓库合同 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`83d920b1`/tree`83084e98`→Supervisor manifest-only`0e2328b5`/tree`585b3c8d`；121文件manifest raw SHA-256为`728f9a5f…35db9`且重放一致 |
+| 激活事务 | PASS / CRASH SAFE | durable intent→authorization consume→history→target→receipt→current；每代policy/receipt/intent一对一，canonical/no-follow/no-clobber/file+directory fsync和幂等完成通过 |
+| 回退/恢复 | PASS / PRESERVE EVIDENCE | rollback只引用精确已提交前代；RECOVER使用新授权绑定原已消费授权。可证明未过期partial续发，不一致或过期partial只保全/quarantine，不自动删除 |
+| 消费/切换 | PASS / SINGLE CURRENT AUTHORITY | V4与monitor只接受固定状态根完整committed-current及当前release identity；缺intent、手工policy/receipt、断链或quarantine阻断readiness和Supervisor bundle切换 |
+| 自动验证 | PASS / SCOPED APPLICABLE | Python37/37（ResourceWarning为错误）、正式Debian Node52/52、manifest9/9、cluster transfer4/4、inventory252/228/24、敏感模式和diff门通过 |
+| 诚实失败 | RECORDED / RESOLVED | 误写本机image tag的pull探测被403拒绝且未拉取；非root祖先权限和Worker BusyBox `flock -E`均为fixture/runtime不匹配，固定`--pull never`和正式Debian Node后原断言通过 |
+| 资源/清理 | STOP LINE ACTIVE / NO OOM | 收口available约2.0GiB、Swap861MiB/1GiB、根盘13GiB、Load`0.05/0.16/0.16`；四服务restart0/OOM false，测试容器与manifest临时文件清零，无数据库/网络/Volume/镜像创建 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | UAT仍alpha.42/0040；未安装host Supervisor、创建/激活/回退真实policy、读取凭据/备份/Volume、连接数据库或执行恢复/Migration/deploy |
+| 系统是否可用 | NO | 仓库publisher不等于真实恢复；仍无实际异机恢复、正式同候选门、UAT对齐、岗位/员工验收或切换 |
 
 ## SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63（完成；仓库与合成隔离通过，host激活未实现）
 
@@ -45,7 +60,7 @@
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / EGRESS OPEN / PROJECTION PUBLISHERS CLOSED BY TASK62 / PRODUCTION NO-GO | TASK61历史合同保持；权威投影仓库缺口已由TASK62关闭 |
+| 当前状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / EGRESS NOT AUTHORIZED / PROJECTION PUBLISHERS CLOSED BY TASK62 / PRODUCTION NO-GO | TASK61历史合同保持；权威投影仓库缺口已由TASK62关闭，目标绑定出口由TASK65实施 |
 | 不可变链 | PASS / CONTENT ADDRESSED | source`b057f81`→monitor manifest-only`3327be4`→Supervisor manifest-only`222584c`；27/105文件manifest为`6782ec58…aea07`/`56157a68…efcb` |
 | 权限/安装 | PASS / REPOSITORY CONTRACT | root collector、独立evaluator/notifier、七unit/timer、Node内容寻址runtime、双锁、phase freeze、COMMITTED先于activation、已提交rollback和disable-preserve已验证 |
 | 投递 | PASS / SYNTHETIC ACK ONLY | grant/claim/attempt/result/精确ACK、至少一次重试、防target重解释、防队列饥饿及原子readiness通过；HTTP 2xx/exit0不能单独delivered |

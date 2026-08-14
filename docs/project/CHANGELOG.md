@@ -40,11 +40,23 @@
 - 数据库/API：无Schema、Migration或业务API变化；新增运维V2 policy、contract/builder及V4/Dashboard/monitor验证边界。repository template不等于host active policy或真实恢复ready。
 - 治理：新增D-139，TASK63转`DONE`；自动启动`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64`为唯一`DOING`。系统保持`PRODUCTION NO-GO`。
 
-### SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64 - `docs: close recovery policy v2 and start policy activation`
+### SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64 - `docs: close recovery policy v2 and start policy activation` / `feat: activate PostgreSQL cluster recovery policy` / `build: refresh release supervisor bundle` / `docs: close policy activation and start notifier egress`
 
-- 调度：从TASK63最终Supervisor manifest-only提交`e527fcfe5fa0f779cbe4514ffa82376e1d0f3462`/tree`778b24a550215271bba248ea6367adc8d1b3fb92`启动唯一active task。
-- 目标：只在仓库与合成fake-root实现installed Supervisor控制的V2政策内容寻址prepare/activate/rollback/quarantine，一次性授权固定template raw/logical SHA、bundle、逐代前驱、actor/approver及时效，并让V4/monitor只接受已提交current activation。
-- 边界：不在真实host创建或读取固定路径，不发布/激活政策，不连接数据库或读取真实凭据/备份/回执，不执行恢复、Migration、build、deploy、restart、网络、UAT/生产或数据动作；Swap停止线继续有效。
+- 调度：从TASK63最终Supervisor manifest-only提交`e527fcfe5fa0f779cbe4514ffa82376e1d0f3462`/tree`778b24a550215271bba248ea6367adc8d1b3fb92`启动唯一active task；仅在仓库与合成fake-root实施。
+- 激活合同：新增固定内容寻址policy state/target与Supervisor authorization v4的`ACTIVATE`、`ROLLBACK`、`RECOVER`操作；prepare先于一次性授权消费，授权绑定template raw/logical SHA、Supervisor bundle、environment/generation/previous、actor/approver和24小时有效期，任何固定源身份漂移均失败关闭。
+- 事务/恢复：提交顺序固定为intent→history→target→receipt→current，全部canonical JSON、no-clobber、file/directory fsync；每个已提交receipt必须且只能对应一个intent。回退必须精确指向历史已提交代次；partial recovery必须使用引用原已消费授权的新授权，过期partial只能保全隔离，未知/矛盾状态永不自动删除。
+- 消费边界：V4 recovery、monitor backup publisher及installer bundle切换只接受同一固定current activation、完整receipt/intent/history链和精确release identity；未解决或无效链阻断运行、投影及升级，repository template不能冒充host active policy。
+- 不可变链：source`83d920b1ac017370270452d334e44fa36a6b3978`/tree`83084e980d794a37bfeb835fcbf89e7c5210fee7`→Supervisor manifest-only直接子提交`0e2328b58bc68cf09dc6b0638bb5ded82b0cf347`/tree`585b3c8d1d38f695422c5378eaa24691627de932`；121文件manifest raw SHA-256为`728f9a5f321c03c4a9b089ca4c3091c04273e6b7427f1df610c6756fa0735db9`，逐字节重放一致。
+- 验证：Python policy/monitor/installer/launcher `37/37`；固定Debian Node环境Dashboard/monitor/activation/release gate `52/52`；inventory `252/228/24`、manifest contract `9/9`及cluster transfer `4/4`通过。一次Worker BusyBox `flock`不支持GNU `-E`导致组合夹具`51/52`，随后在正式固定Debian环境重跑相关release gate `20/20`；未降低断言。首次Compose只读状态命令因缺必需变量失败，补入非秘密dummy值后成功且未改变运行面。
+- 资源/边界：收口available约2.0GiB、Swap约861MiB/1GiB且超过80%、根盘13GiB、Load低于1、`oom_kill=0`；四服务restart0/OOM false，Web/PostgreSQL healthy，Worker/Caddy无healthcheck。没有build、全量Node/PostgreSQL、Docker数据库、typecheck、真实host/policy/备份/恢复、数据库、凭据、账号、systemd、网络、UAT/生产或数据动作；临时文件/容器清零。
+- 数据库/API：无Schema、Migration或业务API变化；新增的是运维政策激活、回退、恢复及消费证明。TASK64转`DONE`，系统保持`PRODUCTION NO-GO`。
+
+### SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65 - `docs: close policy activation and start notifier egress`
+
+- 调度：从TASK64最终Supervisor manifest-only提交`0e2328b58bc68cf09dc6b0638bb5ded82b0cf347`/tree`585b3c8d1d38f695422c5378eaa24691627de932`启动唯一active task。
+- 目标：在仓库与合成fake-root/effective-unit/offline adapter中建立内容寻址、target/generation绑定的notifier出口政策，固定HTTPS host/SNI/path、端口、精确IP集合、adapter/credential/config/bundle和值班升级来源，并由Supervisor一次性授权控制activate/rollback/recover。
+- 失败关闭：现有`IPAddressDeny=any`在没有有效current egress activation时保持；运行时不得依赖未绑定DNS、代理、redirect或手工drop-in，delivery readiness必须同时证明同代target与effective unit。真实目标、DNS、凭据、账号、systemd、网络和通知均不在本任务授权范围。
+- 资源/结论：Swap超过80%停止线，任务只执行轻量源码、合成fixture和范围测试，不启动build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像；任务启动不改变`PRODUCTION NO-GO`。
 
 ## 2026-08-14
 

@@ -2626,6 +2626,42 @@
 - 拒绝信任自描述且可整体重签名的替换政策、手工JSON、路径名、调用者自报摘要、synthetic/同机副本或测试validator形成真实ready。
 - 拒绝在没有内容寻址publisher、一次性授权、逐代current和activation receipt时手工复制政策到host固定路径。
 
+## D-140 PostgreSQL集群恢复策略采用内容寻址逐代激活与保全式恢复
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / SYNTHETIC FAKE-ROOT VERIFIED / HOST ACTIVATION AND ACTUAL RECOVERY NOT AUTHORIZED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK64对Supervisor、固定policy消费者、崩溃边界和bundle切换联锁的实现及Python37/37、Node52/52合成验证
+- 确认边界：只授权仓库activation contract/publisher、Supervisor操作、安装联锁、V4/monitor消费和fake-root测试；不授权真实host路径、policy激活/回退、凭据、数据库、备份恢复、UAT/生产或数据动作
+
+### Context
+
+- D-139已经固定V2 repository template与actual验证语义，但模板正文和内部摘要不能证明它由当前installed Supervisor审阅、授权并发布到host固定路径。
+- policy正文、activation receipt和current alias跨多个持久对象。若先消费一次性授权后进程中断，简单重试可能复用授权、覆盖前代或把不完整文件误判为current；若自动删除未知partial，又会破坏取证和恢复决策。
+- V4 readiness、monitor backup projection和Supervisor bundle切换必须看到同一条已提交链。只检查目标JSON、只检查receipt或允许手工补current都会形成不同权威源。
+
+### Decision
+
+1. actual目标固定为`/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json`，私有状态根固定为`/var/lib/chenyida-erp/postgresql-cluster-recovery-policy-v2`；目录、marker、history、receipts、intents、recoveries、quarantine和current均使用可信祖先、root-only/no-follow、单硬链接、canonical JSON及精确metadata。
+2. Supervisor authorization v4只允许`ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2`、`ROLLBACK_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2`和`RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION`；原操作绑定template raw/logical SHA、release identity、current bundle、environment、generation/previous、固定源metadata、三方actor、RPO/RTO、处置及最长24小时，恢复另用新授权绑定原已消费授权和intent。
+3. 原操作必须在消费authorization前持久化完整intent并重复核验所有来源；发布durable顺序固定为content-addressed history→0440 target→content-addressed receipt→0400 current，每步执行file/directory fsync、no-clobber或同字节幂等验证。
+4. 每个generation必须有且只有一个同自哈希intent、policy和receipt；current精确等于末代receipt，target精确等于末代history。generation连续、previous policy/receipt和environment一致；rollback从generation 3起只能引用当前前一代之前的精确已提交receipt，并继承其environment、RPO/RTO和处置。
+5. 中断后只有新RECOVER授权可续发。已完整提交返回幂等终态；可证明且政策未过期的partial可继续；不一致、替换、断链或过期partial一律保全原对象并发布quarantine/recovery证据，不自动删除，也不允许过期政策被恢复为active。
+6. V4 actual readiness与monitor backup projection必须读取固定状态根的完整committed chain，且输入activation receipt必须逐字节等于current并绑定当前release identity和不可变history；repository template、V1、synthetic、手工JSON、policy-only或receipt-only均失败关闭。
+7. 安装或切换Release Supervisor bundle前必须复核完整policy/history/receipt/intent/recovery链；存在partial、quarantine、目标漂移、缺intent或无效rollback时阻断切换，避免新代码接管无法证明的旧事务。
+8. TASK64交付的是未来专项授权可执行的仓库合同，不表示当前host已安装Supervisor、存在actual policy或完成真实恢复；实际ACTIVATE/ROLLBACK/RECOVER仍须逐次专项明确授权。
+
+### Consequences
+
+- TASK64源码`83d920b1ac017370270452d334e44fa36a6b3978`/tree`83084e980d794a37bfeb835fcbf89e7c5210fee7`与manifest-only直接子提交`0e2328b58bc68cf09dc6b0638bb5ded82b0cf347`/tree`585b3c8d1d38f695422c5378eaa24691627de932`形成121文件canonical链；manifest raw SHA-256为`728f9a5f…35db9`。
+- Python Supervisor专项37/37、正式Debian Node合同52/52、manifest合同9/9、cluster transfer4/4和inventory252/228/24通过；没有运行build、全量Node/PostgreSQL、数据库或真实网络测试。
+- 真实A4恢复链仍缺异机目标、密钥/凭据、实际policy activation、当前数据备份/恢复与RPO/RTO；系统继续`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝手工复制模板、环境变量指定policy路径、只校验内部摘要、overwrite current、复用已消费授权或在启动时自动迁移/激活政策。
+- 拒绝仅保留latest、原地改写receipt/history、对unknown partial执行递归清理、从任意旧代回滚或允许cross-environment chain。
+- 拒绝让V4、monitor和installer分别接受不同宽松证据，也拒绝把fake-root测试或仓库publisher描述为真实host可恢复性。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

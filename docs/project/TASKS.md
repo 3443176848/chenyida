@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64`。TASK63/D-139已用冻结V1执行引擎与V2运行权限编排双层证据关闭actual验证合同；TASK64只在仓库和合成fake-root实现内容寻址、一次性授权、逐代发布/回退/quarantine，不在host激活政策。Swap高于80%期间禁止新重任务；host安装/政策激活、凭据/账号/ACL、真实备份恢复、A1—A8、镜像、外部锚点、UAT/生产、Volume和数据均未授权，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65`。TASK64/D-140已在仓库和合成fake-root关闭V2政策内容寻址激活、回退、恢复、quarantine及V4/monitor committed-current消费；TASK65只实现目标绑定notifier出口政策和合成effective-unit/HTTPS适配器合同，不访问真实渠道或修改host网络。Swap高于80%期间禁止新重任务；host安装/政策激活、真实target/凭据/账号/systemd/网络、真实备份恢复、A1—A8、镜像、外部锚点、UAT/生产、Volume和数据均未授权，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -135,6 +135,10 @@
 
 2026-08-15第六十一次调度事件：主智能体从TASK63收口后的零`DOING`自动选择其明确保留的policy activation缺口，状态按`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64 TODO → DOING`切换唯一active slot。严格起点为`e527fcfe`/tree`778b24a5`；范围固定为仓库内容寻址publisher、一次性Supervisor授权、逐代激活/回退/quarantine和合成fake-root测试，不在真实host创建路径或激活政策，不读取凭据/备份/数据库、不执行恢复。Swap停止线继续有效。
 
+2026-08-15第六十二次调度事件：`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64 DOING → DONE`。D-140固定durable intent→授权消费→history→target→receipt→current发布、逐代一对一intent/receipt、精确rollback、新授权恢复及过期partial只quarantine；V4/monitor只接受同一已提交current。源码`83d920b1`与manifest-only直接子提交`0e2328b5`形成121文件bundle`728f9a5f…35db9`；Python37/37、Node52/52、manifest9/9、inventory252/228/24通过。未安装或激活host政策、连接数据库或执行真实恢复，系统继续`PRODUCTION NO-GO`。
+
+2026-08-15第六十三次调度事件：主智能体从TASK64收口后的零`DOING`自动选择A5a最高优先级未阻塞仓库缺口，状态按`SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65 TODO → DOING`切换唯一active slot。严格起点为`0e2328b5`/tree`585b3c8d`；范围固定为内容寻址target-bound egress policy、一次性Supervisor activation、合成effective systemd与断网HTTPS adapter负测，不选择/访问真实target、不创建凭据、不安装host或修改systemd/网络。Swap停止线继续有效。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -151,12 +155,13 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64 | PostgreSQL集群恢复策略受控激活 | DOING | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-15 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63、SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60、SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62、D-136、D-138—D-139 | `DOING / READ-ONLY AUDIT AND LIGHTWEIGHT REPOSITORY IMPLEMENTATION / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。只在仓库/fake-root实现固定路径政策的内容寻址、一次性授权、逐代发布/回退/quarantine；无真实host、数据库、备份恢复、凭据、UAT或数据授权。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64.md)。 |
+| SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65 | 监控通知目标绑定与出口策略闭环 | DOING | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-15 | SELFHOST-OPS-MONITORING-HOST-DELIVERY-61、SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62、SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64、D-137—D-140 | `DOING / READ-ONLY AUDIT AND LIGHTWEIGHT REPOSITORY IMPLEMENTATION / RESOURCE STOP LINE ACTIVE / NO REAL NETWORK OR HOST ACTION / PRODUCTION NO-GO`。只在仓库/fake-root实现目标绑定egress activation、effective unit和断网adapter合同；无真实target、凭据、账号、systemd、网络或通知授权。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65.md)。 |
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64 | PostgreSQL集群恢复策略受控激活 | DONE | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-15 | 2026-08-15 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63、SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60、SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62、D-136、D-138—D-140 | `DONE / REPOSITORY AND SYNTHETIC FAKE-ROOT VERIFIED / HOST ACTIVATION NOT EXECUTED / PRODUCTION NO-GO`。source`83d920b1`与manifest-only`0e2328b5`固定121文件bundle`728f9a5f…35db9`；Python37/37、Node52/52、manifest9/9、inventory252/228/24通过。真实host policy、数据库、备份恢复、凭据和UAT/生产均未触碰。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64.md)及[D-140](DECISIONS.md#d-140-postgresql集群恢复策略采用内容寻址逐代激活与保全式恢复)。 |
 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63 | PostgreSQL集群恢复策略V2闭环 | DONE | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-15 | 2026-08-15 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56、SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62、D-132—D-134、D-138—D-139 | `DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST ACTIVATION NOT IMPLEMENTED / PRODUCTION NO-GO`。source`de993c0`与Supervisor manifest-only`e527fcf`固定117文件bundle`4c3b801f…5582`；V2/V1/Dashboard/monitor41/41、release29/29通过。repository template不能成为actual，未执行host激活或真实恢复。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63.md)及[D-139](DECISIONS.md#d-139-postgresql实际恢复采用冻结v1执行引擎与v2运行权限编排双层证据)。 |
 | SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62 | 权威运行与恢复投影发布闭环 | DONE | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-15 | 2026-08-15 | SELFHOST-OPS-MONITORING-HOST-DELIVERY-61、SELFHOST-RELEASE-GATE-LIFECYCLE-53、SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54、SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、D-130—D-132、D-137—D-138 | `DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / LEGACY POLICY ACTUAL BLOCKED / PRODUCTION NO-GO`。源码`0e38ac2`、monitor manifest-only`9d0eeb7`和Supervisor manifest-only`672a069`固定27/113文件；Python28/28、Node6/6、release20/20通过。未安装host或执行真实恢复。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62.md)及[D-138](DECISIONS.md#d-138-监控权威投影只由installed-supervisor发布且legacy集群策略不能证明实际恢复)。 |
 | SELFHOST-OPS-MONITORING-HOST-DELIVERY-61 | 监控宿主交付与通知权限边界 | DONE | Codex主智能体（唯一写入、轻量测试串行、证据集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-14 | 2026-08-15 | SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52、SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60、D-126、D-129、D-137 | `DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / EGRESS AND PROJECTION PUBLISHERS OPEN / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。source`b057f81`、monitor manifest-only`3327be4`和Supervisor manifest-only`222584c`固定27/105文件；Node30/30、Supervisor23/23、release20/20通过。未安装host/systemd、开放网络或发送真实通知。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-HOST-DELIVERY-61.md)及[D-137](DECISIONS.md#d-137-监控宿主交付采用三身份内容寻址事务与远端精确-ack)。 |
