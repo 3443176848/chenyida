@@ -32,6 +32,8 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 `SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`已按`DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL ACTIVATION AND CURRENT CANDIDATE BLOCKED`释放active slot，严格起点为`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`。只读UAT摘要仍确认唯一非内置LOGIN为共享superuser、数据库及433个public relation owner，Web/Worker共用该身份；运行面仍通过环境交付秘密且无custom tablespace持久mount。仓库侧固定Web最终表权限`9/190/209/79`与sequence USAGE173、9角色/5 LOGIN/4 NOLOGIN、1261条非owner ACL、849个物理ACL对象、2条global default ACL及五身份正反探针；runtime/migration session、六份runtime secret、独立backup libpq service、container/tablespace及D-134 installed Supervisor唯一入口、七值、全局锁、durable journal/fence、分时守卫和RECOVER均闭合。功能基线`076b840`通过Node121/1026、PG84/401加catalog、Browser6/11、POSIX7/57、typecheck38/38、release57+54、Supervisor48、Python三基线、Migration和备份/恢复；最终canonical manifest绑定文档源码检查点。TASK51旧镜像以`ADMIN_READ_ONLY_FIXTURE_GROUP_MISMATCH`失败关闭且资源清零，未冒充当前候选。没有真实角色、凭据、secret、Volume、UAT/生产或业务数据变更；下一安全任务为当前精确候选刷新，系统继续`PRODUCTION NO-GO`。
 
+`SELFHOST-RELEASE-CANDIDATE-REFRESH-57`现为唯一`DOING`，严格起点为TASK56 manifest-only提交`e34a861f168ef8afb71a812d186099c33d952902`/tree`66e7d001c90f0e8beeb41fed2a55755efb1c37e4`。任务先从启动文档源码检查点生成新的canonical manifest-only构建输入，再串行构建当前alpha.47/0046 Web/Worker，验证OCI manifest/config、baked runtime、Migration、六服务secret/container/tablespace和固定Trivy诊断。只允许本机loopback与任务专属资源；不安装host、不外部push、不修改UAT/生产、角色/secret/ACL/Volume、账号或真实数据。
+
 ## 系统组成
 
 ### 本地 ERP

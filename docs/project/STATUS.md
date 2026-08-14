@@ -2,6 +2,20 @@
 
 最后更新时间：2026-08-13（Asia/Shanghai）
 
+## SELFHOST-RELEASE-CANDIDATE-REFRESH-57（执行中；当前本机隔离候选重建）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / STARTUP AUDIT / LOCAL ISOLATED BUILD ONLY / PRODUCTION NO-GO | 当前唯一active slot；主智能体唯一写入和重任务调度，沿用三条智能体线只读审计结论 |
+| 严格起点 | PASS / CONTROLLED | TASK56 manifest-only `e34a861f168ef8afb71a812d186099c33d952902`、tree`66e7d001c90f0e8beeb41fed2a55755efb1c37e4`；未跟踪状态报告不读不改不提交 |
+| 源码/Migration | PASS / BUILD INPUT NOT YET FROZEN | alpha.47、46/head`0046_runtime_lock_privilege_boundary.sql`；TASK57启动文档提交后须生成新的唯一manifest-only直接子提交再build |
+| 历史候选 | STALE / FAILED CLOSED | TASK51 alpha.46镜像已被TASK53—TASK56失效；按当前runtime secret合同实测为`ADMIN_READ_ONLY_FIXTURE_GROUP_MISMATCH`，不得复用或授权 |
+| Docker/容量 | PASS / WATCH | Engine29.5.2、Compose5.1.4；73 images约25.27GB、Build Cache约8.726GB且无active build。起点available约1.9GiB、Swap722MiB、根盘15GiB、Load低于1、`oom_kill=0` |
+| UAT | VERIFIED METADATA / UNCHANGED | alpha.42/0040；Web/PostgreSQL healthy，Worker/Caddy running/health none，四服务restart0/OOM false；不读取环境、日志、业务行或Volume正文 |
+| 允许动作 | LOCAL ISOLATED ONLY | exact Git archive、串行Web/Worker build、task loopback registry、六服务runtime、固定Trivy断网诊断及正式入口失败关闭复核 |
+| 外部边界 | BLOCKED / NOT AUTHORIZED | 无host安装/授权、外部push、UAT/生产Migration/deploy、真实角色/secret/ACL/Volume、账号、数据或网络动作 |
+| 系统是否可用 | NO | 当前候选尚未构建，运行UAT仍共享superuser和环境秘密；异机恢复、正式门、真实迁移、岗位/员工验收与切换均缺失 |
+
 ## SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56（完成；仓库与合成隔离通过，实际激活/当前候选仍阻塞）
 
 | 验证项 | 结果 | 说明 |

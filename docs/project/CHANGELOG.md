@@ -4,6 +4,13 @@
 
 ## 2026-08-13
 
+### SELFHOST-RELEASE-CANDIDATE-REFRESH-57 - `docs: start current privilege candidate refresh`
+
+- 调度：TASK56收口后从零`DOING`自动选择当前候选身份缺口，登记TASK57为唯一`DOING`；严格起点为TASK56 manifest-only提交`e34a861f168ef8afb71a812d186099c33d952902`/tree`66e7d001c90f0e8beeb41fed2a55755efb1c37e4`。
+- 目标：从新的TASK57 canonical manifest提交串行构建alpha.47/0046 Web/Worker，分别核对OCI manifest/config、baked runtime和Migration allowlist，并重新执行当前六服务secret/container/tablespace策略与固定Trivy镜像诊断。
+- 起点：Docker Engine29.5.2、Compose5.1.4；73个image约25.27GB、Build Cache约8.726GB且无active build。available约1.9GiB、Swap722MiB/1.0GiB、根盘15GiB、`oom_kill=0`，四服务restart0/OOM false。
+- 边界：不复用TASK51历史镜像，不安装host Supervisor、不外部push、不修改UAT/生产、真实角色/secret/ACL/Volume、账号或数据；不prune既有image/cache/Volume，只清理TASK57精确创建的临时资源。系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 - `docs: start PostgreSQL runtime privilege closure` / `feat: close Web runtime lock privilege boundary` / `feat: split backup control and capture privileges` / `fix: align runtime privilege source boundaries` / `fix: reject legacy actual recovery readiness` / `feat: compile PostgreSQL runtime catalog` / `release: bind task56 catalog bundle` / `docs: record PostgreSQL catalog checkpoint` / `feat: reconcile PostgreSQL runtime privileges` / `release: bind task56 privilege checkpoint` / `docs: record PostgreSQL privilege checkpoint` / `feat: harden controlled runtime identity` / `fix: align release browser dependency provenance` / `fix: bind release test temp mountpoint provenance` / `release: bind task56 hardened runtime checkpoint` / `feat: harden PostgreSQL runtime privilege operator` / `test: bind centralized release lock contract` / `fix: feed runtime privilege transactions through stdin` / `docs: close PostgreSQL runtime privilege closure` / `release: bind task56 runtime privilege operator`
 
 - 调度/范围：从TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`启动TASK56为唯一`DOING`；主智能体唯一写入，数据迁移、应用测试、运维安全三线只读审计。
