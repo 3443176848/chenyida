@@ -145,6 +145,7 @@ test("pinned build and runtime bases keep migrations root-owned and final proces
   assert.match(workerStage, /^USER 65532:65532$/m);
   assert.match(workerStage, /^CMD \["node", "--experimental-strip-types", "worker\/selfhost\.ts"\]$/m);
   assert.doesNotMatch(workerStage, /^COPY package(?:-lock)?\.json/m);
+  assert.doesNotMatch(workerStage, /^COPY .*tests/m);
   assert.doesNotMatch(workerStage, /\bnpm\b/);
   assert.match(workerStage, /COPY --chown=root:root drizzle-postgres \.\/drizzle-postgres/);
   assert.match(workerStage, /find \.\/drizzle-postgres -type d -exec chmod 0555/);

@@ -51,6 +51,8 @@ def compose_mount(mount, project_root):
 def resolved_fixture(policy, project_root):
     app_environment = {key: "fixture" for key in policy["app_environment_keys"]}
     app_environment.update(runtime_policy.ENVIRONMENT_CONSTANTS)
+    app_environment["ERP_DEPLOYMENT_CLASS"] = "uat"
+    app_environment["ERP_RELEASE_EXPECTED_DEPLOYMENT_ID"] = "chenyida-erp"
     compose = {
         "name": "chenyida-erp",
         "networks": {
@@ -68,6 +70,13 @@ def resolved_fixture(policy, project_root):
                 "type": "volume",
                 "source": "erp_attachments",
                 "target": "/data/chenyida-erp/attachments",
+            },
+            {
+                "type": "bind",
+                "source": "/etc/chenyida-erp/runtime-secrets/worker-database-password",
+                "target": "/run/chenyida-erp-secrets/worker-database-password",
+                "read_only": True,
+                "bind": {"create_host_path": False},
             },
         ],
         "x-release-build-args": {
@@ -214,6 +223,14 @@ class ContainerRuntimePolicyTest(unittest.TestCase):
             lambda value: value["volumes"]["erp_postgres"].__setitem__("driver_opts", {"type": "none"}),
         )
         self.rejects(
+            "MOUNTS_POLICY_MISMATCH",
+            lambda value: value["services"]["web"]["volumes"][4].__setitem__("source", "/etc/chenyida-erp/runtime-secrets/worker-database-password"),
+        )
+        self.rejects(
+            "MOUNTS_POLICY_MISMATCH",
+            lambda value: value["services"]["postgres"]["volumes"][1].__setitem__("read_only", True),
+        )
+        self.rejects(
             "PORTS_POLICY_MISMATCH",
             lambda value: value["services"]["web"]["ports"][0].__setitem__("host_ip", "0.0.0.0"),
         )
@@ -237,6 +254,38 @@ class ContainerRuntimePolicyTest(unittest.TestCase):
             lambda value: value["services"]["worker"]["environment"].__setitem__(
                 "ERP_RUNTIME_IMAGE_CONFIG_DIGEST", WEB_CONFIG
             ),
+        )
+        self.rejects(
+            "ENVIRONMENT_KEYS_POLICY_MISMATCH",
+            lambda value: value["services"]["worker"]["environment"].__setitem__("DATABASE_URL", "forbidden"),
+        )
+        self.rejects(
+            "ENVIRONMENT_CONSTANT_POLICY_MISMATCH",
+            lambda value: value["services"]["worker"]["environment"].__setitem__("ERP_SERVICE_KIND", "WEB"),
+        )
+        self.rejects(
+            "ENVIRONMENT_CONTROLLED_DEPLOYMENT_CLASS_INVALID",
+            lambda value: value["services"]["web"]["environment"].__setitem__("ERP_DEPLOYMENT_CLASS", "test"),
+        )
+        self.rejects(
+            "ENVIRONMENT_DEPLOYMENT_ID_INVALID",
+            lambda value: value["services"]["web"]["environment"].__setitem__("ERP_RELEASE_EXPECTED_DEPLOYMENT_ID", ""),
+        )
+        self.rejects(
+            "APP_ENVIRONMENT_DEPLOYMENT_ID_INVALID",
+            lambda value: value["x-app-environment"].__setitem__("ERP_RELEASE_EXPECTED_DEPLOYMENT_ID", "invalid/id"),
+        )
+        self.rejects(
+            "APP_ENVIRONMENT_DEPLOYMENT_ID_MISMATCH",
+            lambda value: value["x-app-environment"].__setitem__("ERP_RELEASE_EXPECTED_DEPLOYMENT_ID", "other-project"),
+        )
+        self.rejects(
+            "ENVIRONMENT_CONSTANT_POLICY_MISMATCH",
+            lambda value: value["services"]["migrate"]["environment"].__setitem__("ERP_MIGRATION_EXPECTED_DATABASE", "fixture"),
+        )
+        self.rejects(
+            "ENVIRONMENT_CONSTANT_POLICY_MISMATCH",
+            lambda value: value["services"]["migrate"]["environment"].__setitem__("ERP_MIGRATION_EXPECTED_ROLE", "release_migrator"),
         )
         self.rejects(
             "DEPENDENCIES_POLICY_MISMATCH",
@@ -307,19 +356,25 @@ class ContainerRuntimeProbeContractTest(unittest.TestCase):
             "Config": {"Volumes": {}},
         }
         with mock.patch.object(runtime_probe, "docker_json", return_value=[image]):
-            runtime_probe.inspect_image(reference, config, [])
+            runtime_probe.inspect_image(reference, config, [], [])
 
         wrong_config = copy.deepcopy(image)
         wrong_config["Descriptor"]["annotations"]["config.digest"] = f"sha256:{'c' * 64}"
         with mock.patch.object(runtime_probe, "docker_json", return_value=[wrong_config]):
             with self.assertRaisesRegex(runtime_probe.RuntimeTestError, "^IMAGE_CONFIG_DIGEST_MISMATCH$"):
-                runtime_probe.inspect_image(reference, config, [])
+                runtime_probe.inspect_image(reference, config, [], [])
 
         wrong_manifest = copy.deepcopy(image)
         wrong_manifest["Descriptor"]["digest"] = f"sha256:{'d' * 64}"
         with mock.patch.object(runtime_probe, "docker_json", return_value=[wrong_manifest]):
             with self.assertRaisesRegex(runtime_probe.RuntimeTestError, "^IMAGE_MANIFEST_DIGEST_MISMATCH$"):
-                runtime_probe.inspect_image(reference, config, [])
+                runtime_probe.inspect_image(reference, config, [], [])
+
+        unexpected_environment = copy.deepcopy(image)
+        unexpected_environment["Config"]["Env"] = ["DATABASE_URL=synthetic"]
+        with mock.patch.object(runtime_probe, "docker_json", return_value=[unexpected_environment]):
+            with self.assertRaisesRegex(runtime_probe.RuntimeTestError, "^IMAGE_ENVIRONMENT_KEYS_MISMATCH$"):
+                runtime_probe.inspect_image(reference, config, [], [])
 
     def test_proc_status_parser_requires_complete_numeric_security_state(self):
         value = runtime_probe.parse_status(
@@ -349,6 +404,7 @@ class ContainerRuntimeProbeContractTest(unittest.TestCase):
             runtime_probe.PROTECTED_VOLUMES,
             {
                 "chenyida-erp-parallel_erp_postgres",
+                "chenyida-erp-parallel_erp_postgres_tablespaces",
                 "chenyida-erp-parallel_erp_uploads",
                 "chenyida-erp-parallel_erp_attachments",
                 "chenyida-erp-parallel_erp_backup_status",
@@ -357,6 +413,10 @@ class ContainerRuntimeProbeContractTest(unittest.TestCase):
         self.assertEqual(runtime_probe.LABEL, "chenyida.erp.container-runtime-policy-test")
         source = PROBE_MODULE_PATH.read_text(encoding="utf-8")
         self.assertIn("max_containers=1", source)
+        self.assertIn("POSTGRES_PASSWORD_FILE", source)
+        self.assertIn("POSTGRES_TABLESPACE_NAMESPACE_WRITE_SUCCEEDED", source)
+        self.assertIn("SIBLING_SECRET_VISIBLE", source)
+        self.assertIn("READ_ONLY_FIXTURE_WRITE_SUCCEEDED", source)
         self.assertIn("--pull", source)
         self.assertIn("never", source)
         self.assertNotIn('"--privileged"', source)

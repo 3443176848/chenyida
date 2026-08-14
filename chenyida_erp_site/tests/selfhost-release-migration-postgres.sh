@@ -28,9 +28,9 @@ gosu postgres pg_ctl -D "$PGDATA" -l "$PGLOG" -o "-k $PGSOCKET -c listen_address
 RUNNING=1
 export PGHOST="$PGSOCKET" PGUSER=postgres
 SYSTEM_IDENTIFIER=$(psql -d postgres -Atc 'select system_identifier from pg_control_system()')
-psql -d postgres -v ON_ERROR_STOP=1 -c "create role cyd_release_migrator login" >/dev/null
-ROLE_PROFILE=$(psql -d postgres -At -F '|' -c "select rolsuper,rolcreaterole,rolcreatedb,rolreplication,rolbypassrls,pg_has_role('cyd_release_migrator','pg_monitor','MEMBER'),rolcanlogin from pg_roles where rolname='cyd_release_migrator'")
-[ "$ROLE_PROFILE" = 'f|f|f|f|f|f|t' ] || { echo "release migrator privilege fixture is invalid" >&2; exit 1; }
+psql -d postgres -v ON_ERROR_STOP=1 -c "create role cyd_release_migrator login noinherit connection limit 1" >/dev/null
+ROLE_PROFILE=$(psql -d postgres -At -F '|' -c "select rolsuper,rolcreaterole,rolcreatedb,rolreplication,rolbypassrls,pg_has_role('cyd_release_migrator','pg_monitor','MEMBER'),rolcanlogin,rolinherit,rolconnlimit,rolvaliduntil is null from pg_roles where rolname='cyd_release_migrator'")
+[ "$ROLE_PROFILE" = 'f|f|f|f|f|f|t|f|1|t' ] || { echo "release migrator privilege fixture is invalid" >&2; exit 1; }
 
 create_target() {
   database=$1; deployment=$2
@@ -61,12 +61,12 @@ run_controlled() {
   worker_reference=$1; worker_digest=$2
   runtime_image_digest=${image_override:-$worker_digest}
   (cd "$workdir" && \
-    DATABASE_URL="postgresql://${MIGRATION_DB_USER:-cyd_release_migrator}@/$database?host=$PGSOCKET" DATABASE_POOL_MAX=2 ERP_ENV=production ERP_DEPLOYMENT_CLASS=uat ERP_SETUP_TOKEN=synthetic-release-migration-token ERP_ALLOW_PRODUCTION_MIGRATION=YES \
+    TEST_RELEASE_MIGRATION_DATABASE_URL="postgresql://${MIGRATION_DB_USER:-cyd_release_migrator}@/$database?host=$PGSOCKET" ERP_ENV=test ERP_DEPLOYMENT_CLASS=test ERP_RELEASE_TEST_MODE=YES ERP_MIGRATION_TEST_HARNESS=CONTROLLED_RELEASE_MIGRATION ERP_SERVICE_KIND=MIGRATION ERP_ALLOW_PRODUCTION_MIGRATION=YES \
     ERP_MIGRATION_CONFIRM=MIGRATE_EXACT_RELEASE_MANIFEST ERP_RELEASE_MANIFEST_FILE="$manifest" ERP_RELEASE_MANIFEST_SHA256="$manifest_sha" \
     ERP_RELEASE_EXPECTED_DEPLOYMENT_ID="$deployment" ERP_MIGRATION_EXPECTED_DATABASE="$database" ERP_MIGRATION_EXPECTED_SYSTEM_IDENTIFIER="$SYSTEM_IDENTIFIER" ERP_MIGRATION_EXPECTED_DATABASE_OID="$oid" ERP_MIGRATION_EXPECTED_DATABASE_MARKER="chenyida-erp-deployment/v2:UAT:$deployment" ERP_MIGRATION_EXPECTED_ROLE=cyd_release_migrator \
     ERP_MIGRATION_EXPECTED_CURRENT_HEAD="$expected_current" ERP_MIGRATION_EXPECTED_TARGET_HEAD="$expected_target" ERP_RELEASE_EXPECTED_VERSION=0.1.0-alpha.47 ERP_RUNTIME_BUILD_VERSION=0.1.0-alpha.47 ERP_RELEASE_EXPECTED_GIT_COMMIT=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ERP_RUNTIME_GIT_COMMIT=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
     ERP_RUNTIME_IMAGE_REFERENCE="$worker_reference" ERP_RUNTIME_IMAGE_CONFIG_DIGEST="$runtime_image_digest" \
-    NODE_OPTIONS=--max-old-space-size=384 node --experimental-strip-types "$SITE_ROOT/scripts/migrate-postgres.ts")
+    NODE_OPTIONS=--max-old-space-size=384 node --experimental-strip-types "$SITE_ROOT/tests/selfhost-release-migration-controlled-driver.ts")
 }
 
 # Empty controlled target applies exactly the approved allowlist.
@@ -77,6 +77,14 @@ EMPTY_ARTIFACTS="$TASK_ROOT/empty-artifacts"; generate_manifest "$SITE_ROOT/driz
 if MIGRATION_DB_USER=cyd_release_migrator run_controlled "$EMPTY_DB" "$EMPTY_DEPLOYMENT" "$EMPTY_ARTIFACTS" EMPTY 0046_runtime_lock_privilege_boundary.sql "$SITE_ROOT" "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" > "$TASK_ROOT/image-mismatch.log" 2>&1; then echo "wrong runtime image digest unexpectedly reached migration" >&2; exit 1; fi
 grep -q '^MIGRATION_RELEASE_IMAGE_MISMATCH$' "$TASK_ROOT/image-mismatch.log"
 [ "$(psql -d "$EMPTY_DB" -Atc "select pg_catalog.to_regclass('public.schema_migrations') is null")" = t ]
+if MIGRATION_DB_USER=cyd_release_migrator run_controlled "$EMPTY_DB" "$EMPTY_DEPLOYMENT" "$EMPTY_ARTIFACTS" EMPTY 0046_runtime_lock_privilege_boundary.sql "$SITE_ROOT" > "$TASK_ROOT/database-setting.log" 2>&1; then echo "database search_path setting unexpectedly passed" >&2; exit 1; fi
+grep -q '^MIGRATION_DATABASE_SETTINGS_INVALID$' "$TASK_ROOT/database-setting.log"
+[ "$(psql -d "$EMPTY_DB" -Atc "select pg_catalog.to_regclass('public.schema_migrations') is null")" = t ]
+psql -d postgres -v ON_ERROR_STOP=1 -c "alter database $EMPTY_DB reset search_path" >/dev/null
+if MIGRATION_DB_USER=cyd_release_migrator run_controlled "$EMPTY_DB" "$EMPTY_DEPLOYMENT" "$EMPTY_ARTIFACTS" EMPTY 0046_runtime_lock_privilege_boundary.sql "$SITE_ROOT" > "$TASK_ROOT/non-public-schema.log" 2>&1; then echo "untracked non-public schema unexpectedly migrated" >&2; exit 1; fi
+grep -q '^MIGRATION_EMPTY_TARGET_HAS_UNTRACKED_OBJECTS$' "$TASK_ROOT/non-public-schema.log"
+[ "$(psql -d "$EMPTY_DB" -Atc "select pg_catalog.to_regclass('public.schema_migrations') is null")" = t ]
+psql -d "$EMPTY_DB" -v ON_ERROR_STOP=1 -c "drop schema spoof cascade" >/dev/null
 if MIGRATION_DB_USER=postgres run_controlled "$EMPTY_DB" "$EMPTY_DEPLOYMENT" "$EMPTY_ARTIFACTS" EMPTY 0046_runtime_lock_privilege_boundary.sql "$SITE_ROOT" > "$TASK_ROOT/superuser.log" 2>&1; then echo "superuser migration connection unexpectedly passed" >&2; exit 1; fi
 grep -q '^MIGRATION_ROLE_IDENTITY_INVALID$' "$TASK_ROOT/superuser.log"
 [ "$(psql -d "$EMPTY_DB" -Atc "select pg_catalog.to_regclass('public.schema_migrations') is null")" = t ]
@@ -125,7 +133,6 @@ psql -d "$EMPTY_DB" -v ON_ERROR_STOP=1 -c "drop collation public.untracked_relea
 MIGRATION_DB_USER=cyd_release_migrator run_controlled "$EMPTY_DB" "$EMPTY_DEPLOYMENT" "$EMPTY_ARTIFACTS" EMPTY 0046_runtime_lock_privilege_boundary.sql "$SITE_ROOT" > "$TASK_ROOT/empty.log"
 [ "$(psql -d "$EMPTY_DB" -Atc 'select count(*) from public.schema_migrations')" = 46 ]
 [ "$(psql -d "$EMPTY_DB" -Atc 'select version from public.schema_migrations order by version desc limit 1')" = 0046_runtime_lock_privilege_boundary.sql ]
-[ "$(psql -d "$EMPTY_DB" -Atc 'select count(*) from spoof.schema_migrations')" = 1 ]
 
 # History must be permanent, side-effect-free, owned by the exact migrator, and unshared.
 FIRST_MIGRATION_SHA=$(sha256sum "$SITE_ROOT/drizzle-postgres/0001_selfhost_baseline.sql" | awk '{print $1}')

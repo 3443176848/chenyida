@@ -14,8 +14,8 @@
   },
   "postgres_runtime_catalog": {
     "path": "operations/postgresql-runtime-privilege-compiled-catalog-v1.json",
-    "file_sha256": "146b3cd074fc44def7a4a05d0980d5c42212fdd03d5bef55903fc05bb5f37896",
-    "artifact_sha256": "c35f4920b05c17901cb45e431980d494f18764ad7241d62f4f72aedcef8cd4e6",
+    "file_sha256": "e014b0c5969af047c2abe7e6ee92410d99ca9f5756163763ea5bdc0cd658fff6",
+    "artifact_sha256": "c462641dd48fc4c22836e88a28acf63a50a89652a6bbe8efc2ce1b8058b2d4cd",
     "image_reference": "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394"
   },
   "posix_image": {
@@ -52,7 +52,7 @@
   },
   "test_inventory": {
     "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-    "sha256": "5c631c1d518076d23668b080254a488d8d472fbdc9a3a5bd2dc667c3262086cb",
+    "sha256": "5a5444ab25aed9f2f2bb92cce2b686ef015e81da50b7db0d58b0f44eb8d1c5dd",
     "total_tests": 246,
     "required_tests": 222,
     "not_applicable_tests": 24,

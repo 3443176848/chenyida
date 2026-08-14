@@ -8,6 +8,8 @@ runtime volume and never prints container configuration, environment, or logs.
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
 import importlib.util
 import json
 import os
@@ -36,9 +38,18 @@ NAME_PREFIX = "cyd-runtime-policy-"
 MAX_DOCKER_OUTPUT = 1_048_576
 PROTECTED_VOLUMES = {
     "chenyida-erp-parallel_erp_postgres",
+    "chenyida-erp-parallel_erp_postgres_tablespaces",
     "chenyida-erp-parallel_erp_uploads",
     "chenyida-erp-parallel_erp_attachments",
     "chenyida-erp-parallel_erp_backup_status",
+}
+SECRET_TARGETS = {
+    "/run/chenyida-erp-secrets/admin-database-password",
+    "/run/chenyida-erp-secrets/admin-password",
+    "/run/chenyida-erp-secrets/migration-database-password",
+    "/run/chenyida-erp-secrets/postgres-bootstrap-password",
+    "/run/chenyida-erp-secrets/web-database-password",
+    "/run/chenyida-erp-secrets/worker-database-password",
 }
 NODE_HOLD = "setInterval(() => {}, 60000)"
 NODE_PROBE = r"""
@@ -66,15 +77,20 @@ for (const directory of spec.writable) {
   catch { process.exit(44); }
 }
 for (const directory of spec.readonly) mustFail(`${directory}/.chenyida-runtime-policy-probe`, 45);
-for (const file of spec.readable) {
+for (const fixture of spec.readable) {
+  const file = fixture.path;
   let directoryStat;
   let fileStat;
-  try { directoryStat = fs.statSync(require('node:path').dirname(file)); }
+  try { directoryStat = fs.lstatSync(require('node:path').dirname(file)); }
   catch { process.exit(52); }
-  try { fileStat = fs.statSync(file); }
+  try { fileStat = fs.lstatSync(file); }
   catch { process.exit(53); }
-  if (directoryStat.gid !== spec.fixture_gid || fileStat.gid !== spec.fixture_gid) process.exit(54);
-  if ((fileStat.mode & 0o777) !== 0o440) process.exit(55);
+  if (!directoryStat.isDirectory() || directoryStat.isSymbolicLink()
+    || directoryStat.uid !== fixture.directory_uid || directoryStat.gid !== fixture.directory_gid
+    || (directoryStat.mode & 0o7777) !== fixture.directory_mode
+    || !fileStat.isFile() || fileStat.isSymbolicLink() || fileStat.nlink !== 1
+    || fileStat.uid !== fixture.uid || fileStat.gid !== fixture.gid) process.exit(54);
+  if ((fileStat.mode & 0o7777) !== fixture.mode || fs.realpathSync(file) !== file) process.exit(55);
   let content;
   try { content = fs.readFileSync(file, 'utf8'); }
   catch (error) {
@@ -82,8 +98,12 @@ for (const file of spec.readable) {
     if (error && error.code === 'ENOENT') process.exit(48);
     process.exit(49);
   }
-  if (content !== 'runtime-policy-fixture\n') process.exit(47);
+  if (content !== fixture.content) process.exit(47);
+  try { fs.writeFileSync(file, 'forbidden'); }
+  catch { continue; }
+  process.exit(57);
 }
+for (const file of spec.absent) if (fs.existsSync(file)) process.exit(56);
 """.strip()
 
 
@@ -95,6 +115,48 @@ class RuntimeTestError(Exception):
 
 def fail(code: str) -> None:
     raise RuntimeTestError(code)
+
+
+def synthetic_secret(label: str) -> str:
+    return base64.urlsafe_b64encode(hashlib.sha256(f"task56:{label}".encode("ascii")).digest()).rstrip(b"=").decode("ascii")
+
+
+def directory_identity(path: Path, code: str) -> tuple[int, int, int, int, int]:
+    try:
+        value = path.lstat()
+    except OSError:
+        fail(code)
+    if not stat.S_ISDIR(value.st_mode) or stat.S_ISLNK(value.st_mode):
+        fail(code)
+    return value.st_dev, value.st_ino, value.st_uid, value.st_gid, stat.S_IMODE(value.st_mode)
+
+
+def task_volume_mountpoint(name: str) -> Path:
+    if name in PROTECTED_VOLUMES or not re.fullmatch(r"cyd-runtime-policy-([0-9a-f]{16})-[a-z0-9-]+", name):
+        fail("VOLUME_IDENTITY_INVALID")
+    token = name.split("-", 3)[3].split("-", 1)[0]
+    value = docker_json(["volume", "inspect", "--", name], "VOLUME_INSPECT_FAILED")
+    if not isinstance(value, list) or len(value) != 1 or not isinstance(value[0], dict):
+        fail("VOLUME_INSPECT_INVALID")
+    item = value[0]
+    mountpoint = item.get("Mountpoint")
+    if (
+        item.get("Name") != name
+        or item.get("Driver") != "local"
+        or (item.get("Labels") or {}).get(LABEL) != token
+        or not isinstance(mountpoint, str)
+        or not os.path.isabs(mountpoint)
+        or os.path.normpath(mountpoint) != mountpoint
+        or mountpoint == "/"
+    ):
+        fail("VOLUME_MOUNTPOINT_INVALID")
+    path = Path(mountpoint)
+    try:
+        if path.is_symlink() or path.resolve(strict=True) != path or not path.is_dir():
+            fail("VOLUME_MOUNTPOINT_INVALID")
+    except OSError:
+        fail("VOLUME_MOUNTPOINT_INVALID")
+    return path
 
 
 def safe_environment() -> dict[str, str]:
@@ -207,7 +269,12 @@ def inspect_container(name: str) -> dict[str, Any]:
     return value[0]
 
 
-def inspect_image(reference: str, expected_config: str | None, declared_volumes: list[str]) -> None:
+def inspect_image(
+    reference: str,
+    expected_config: str | None,
+    declared_volumes: list[str],
+    environment_keys: list[str],
+) -> None:
     value = docker_json(["image", "inspect", "--", reference], "IMAGE_INSPECT_FAILED")
     if not isinstance(value, list) or len(value) != 1 or not isinstance(value[0], dict):
         fail("IMAGE_INSPECT_INVALID")
@@ -235,6 +302,12 @@ def inspect_image(reference: str, expected_config: str | None, declared_volumes:
     volumes = image.get("Config", {}).get("Volumes") or {}
     if not isinstance(volumes, dict) or sorted(volumes) != declared_volumes or any(value != {} for value in volumes.values()):
         fail("IMAGE_DECLARED_VOLUMES_MISMATCH")
+    environment = image.get("Config", {}).get("Env") or []
+    if not isinstance(environment, list) or any(not isinstance(item, str) or "=" not in item for item in environment):
+        fail("IMAGE_ENVIRONMENT_INVALID")
+    actual_environment_keys = [item.split("=", 1)[0] for item in environment]
+    if len(actual_environment_keys) != len(set(actual_environment_keys)) or sorted(actual_environment_keys) != environment_keys:
+        fail("IMAGE_ENVIRONMENT_KEYS_MISMATCH")
 
 
 def required_tmpfs_targets(contract: dict[str, Any]) -> set[str]:
@@ -505,10 +578,12 @@ def candidate_mount_arguments(
         "uid": uid,
         "gid": gid,
         "groups": groups,
-        "fixture_gid": 0 if service == "migrate" else resources.reader_gid,
         "writable": [],
         "readonly": [],
         "readable": [],
+        "absent": sorted(SECRET_TARGETS - {
+            mount["target"] for mount in contract["mounts"] if mount["target"] in SECRET_TARGETS
+        }),
     }
     volume_index = 0
     for mount in contract["mounts"]:
@@ -525,6 +600,24 @@ def candidate_mount_arguments(
             arguments.extend(["--mount", specification])
             continue
 
+        if mount["source"].startswith("/etc/chenyida-erp/runtime-secrets/"):
+            source = resources.temporary / "runtime-secrets"
+            source.mkdir(mode=0o700, exist_ok=True)
+            os.chown(source, 0, 0)
+            source.chmod(0o700)
+            filename = source / Path(mount["source"]).name
+            content = f"{synthetic_secret(f'{service}:{filename.name}')}\n"
+            filename.write_text(content, encoding="ascii")
+            fixture_gid = 0 if service == "migrate" else 65_532
+            os.chown(filename, 0, fixture_gid)
+            filename.chmod(0o440)
+            arguments.extend(["--mount", f"type=bind,source={filename},target={target},readonly"])
+            probe["readonly"].append(target)
+            probe["readable"].append({
+                "path": target, "directory_uid": 0, "directory_gid": 0, "directory_mode": 0o555,
+                "uid": 0, "gid": fixture_gid, "mode": 0o440, "content": content,
+            })
+            continue
         if service == "migrate":
             source = resources.temporary / "release-candidate"
             filename = source / "release-manifest.json"
@@ -534,12 +627,17 @@ def candidate_mount_arguments(
         source.mkdir(mode=0o750, exist_ok=True)
         os.chown(source, 0, 0 if service == "migrate" else resources.reader_gid)
         source.chmod(0o750)
-        filename.write_text("runtime-policy-fixture\n", encoding="utf-8")
+        content = "runtime-policy-fixture\n"
+        filename.write_text(content, encoding="utf-8")
         os.chown(filename, 0, 0 if service == "migrate" else resources.reader_gid)
         filename.chmod(0o440)
         arguments.extend(["--mount", f"type=bind,source={source},target={target},readonly"])
         probe["readonly"].append(target)
-        probe["readable"].append(str(Path(target) / filename.name))
+        fixture_gid = 0 if service == "migrate" else resources.reader_gid
+        probe["readable"].append({
+            "path": str(Path(target) / filename.name), "directory_uid": 0, "directory_gid": fixture_gid,
+            "directory_mode": 0o750, "uid": 0, "gid": fixture_gid, "mode": 0o440, "content": content,
+        })
     return arguments, probe
 
 
@@ -579,6 +677,8 @@ def run_candidate_service(
             53: f"{service.upper()}_READ_ONLY_FILE_STAT_FAILED",
             54: f"{service.upper()}_READ_ONLY_FIXTURE_GROUP_MISMATCH",
             55: f"{service.upper()}_READ_ONLY_FIXTURE_MODE_MISMATCH",
+            56: f"{service.upper()}_SIBLING_SECRET_VISIBLE",
+            57: f"{service.upper()}_READ_ONLY_FIXTURE_WRITE_SUCCEEDED",
         },
     )
     docker(["container", "stop", "--time", "5", name], "CANDIDATE_CONTAINER_STOP_FAILED")
@@ -607,17 +707,40 @@ def postgres_health_arguments(contract: dict[str, Any]) -> list[str]:
 def run_postgres(resources: IsolatedResources, contract: dict[str, Any], image: str) -> None:
     name, arguments, networks = common_create_arguments(resources, contract, "postgres")
     volume = resources.create_volume("postgres-data")
+    tablespace_volume = resources.create_volume("postgres-tablespaces")
+    tablespace_root = task_volume_mountpoint(tablespace_volume)
+    approved_tablespace = tablespace_root / "runtime_policy_ts"
+    os.chown(tablespace_root, 0, 999)
+    tablespace_root.chmod(0o750)
+    approved_tablespace.mkdir(mode=0o700)
+    os.chown(approved_tablespace, 999, 999)
+    approved_tablespace.chmod(0o700)
+    tablespace_root_identity = directory_identity(tablespace_root, "TABLESPACE_NAMESPACE_METADATA_INVALID")
+    approved_tablespace_identity = directory_identity(approved_tablespace, "TABLESPACE_ENTRY_METADATA_INVALID")
+    if tablespace_root_identity[2:] != (0, 999, 0o750) or approved_tablespace_identity[2:] != (999, 999, 0o700):
+        fail("TABLESPACE_METADATA_INVALID")
+    secret_root = resources.temporary / "postgres-secrets"
+    secret_root.mkdir(mode=0o700)
+    os.chown(secret_root, 0, 0)
+    bootstrap_secret = secret_root / "postgres-bootstrap-password"
+    bootstrap_secret.write_text(f"{synthetic_secret('postgres:bootstrap')}\n", encoding="ascii")
+    os.chown(bootstrap_secret, 0, 999)
+    bootstrap_secret.chmod(0o440)
     arguments.extend(postgres_health_arguments(contract))
     arguments.extend(
         [
             "--env",
-            "POSTGRES_DB=runtime_policy_test",
+            "POSTGRES_DB=chenyida_erp",
             "--env",
-            "POSTGRES_USER=runtime_policy_test",
+            "POSTGRES_USER=postgres",
             "--env",
-            "POSTGRES_PASSWORD=runtime-policy-isolated-password",
+            "POSTGRES_PASSWORD_FILE=/run/chenyida-erp-secrets/postgres-bootstrap-password",
             "--mount",
             f"type=volume,source={volume},target=/var/lib/postgresql/data",
+            "--mount",
+            f"type=volume,source={tablespace_volume},target=/var/lib/postgresql/tablespaces",
+            "--mount",
+            f"type=bind,source={bootstrap_secret},target=/run/chenyida-erp-secrets/postgres-bootstrap-password,readonly",
             image,
         ]
     )
@@ -634,16 +757,36 @@ def run_postgres(resources: IsolatedResources, contract: dict[str, Any], image: 
             name,
             "psql",
             "-U",
-            "runtime_policy_test",
+            "postgres",
             "-d",
-            "runtime_policy_test",
+            "chenyida_erp",
             "-v",
             "ON_ERROR_STOP=1",
             "-c",
-            "create table runtime_policy_probe(id integer primary key); insert into runtime_policy_probe values (1);",
+            "create tablespace runtime_policy_ts location '/var/lib/postgresql/tablespaces/runtime_policy_ts'",
+            "-c",
+            "create table runtime_policy_probe(id integer primary key) tablespace runtime_policy_ts; insert into runtime_policy_probe values (1);",
         ],
         "POSTGRES_SQL_PROBE_FAILED",
     )
+    try:
+        tablespace_children = list(approved_tablespace.iterdir())
+    except OSError:
+        fail("POSTGRES_TABLESPACE_CHILD_INSPECTION_FAILED")
+    if (
+        len(tablespace_children) != 1
+        or not tablespace_children[0].is_dir()
+        or not re.fullmatch(r"PG_[0-9]+_[0-9]+", tablespace_children[0].name)
+    ):
+        fail("POSTGRES_TABLESPACE_CHILD_NOT_USED")
+    tablespace_child = tablespace_children[0]
+    child_identity = directory_identity(tablespace_child, "POSTGRES_TABLESPACE_CHILD_METADATA_INVALID")
+    if (
+        directory_identity(tablespace_root, "TABLESPACE_NAMESPACE_METADATA_INVALID") != tablespace_root_identity
+        or directory_identity(approved_tablespace, "TABLESPACE_ENTRY_METADATA_INVALID") != approved_tablespace_identity
+        or child_identity[2:] != (999, 999, 0o700)
+    ):
+        fail("POSTGRES_TABLESPACE_METADATA_INVALID")
     docker(
         [
             "container",
@@ -656,13 +799,25 @@ def run_postgres(resources: IsolatedResources, contract: dict[str, Any], image: 
             "if ! touch /tmp/chenyida-runtime-policy-probe; then exit 42; fi; "
             "rm /tmp/chenyida-runtime-policy-probe; "
             "if ! touch /var/lib/postgresql/data/.chenyida-runtime-policy-probe; then exit 43; fi; "
-            "rm /var/lib/postgresql/data/.chenyida-runtime-policy-probe",
+            "rm /var/lib/postgresql/data/.chenyida-runtime-policy-probe; "
+            "if touch /var/lib/postgresql/tablespaces/.chenyida-runtime-policy-probe 2>/dev/null; then rm /var/lib/postgresql/tablespaces/.chenyida-runtime-policy-probe; exit 44; fi; "
+            "test -r /run/chenyida-erp-secrets/postgres-bootstrap-password || exit 45; "
+            "for sibling in admin-database-password admin-password migration-database-password web-database-password worker-database-password; do test ! -e /run/chenyida-erp-secrets/$sibling || exit 46; done; "
+            "test \"$(stat -c '%u:%g:%a' /run/chenyida-erp-secrets)\" = '0:0:555' || exit 47; "
+            "test \"$(stat -c '%u:%g:%a' /run/chenyida-erp-secrets/postgres-bootstrap-password)\" = '0:999:440' || exit 48; "
+            "if { printf x >> /run/chenyida-erp-secrets/postgres-bootstrap-password; } 2>/dev/null; then exit 49; fi",
         ],
         "POSTGRES_FILESYSTEM_PROBE_FAILED",
         exit_codes={
             41: "POSTGRES_ROOTFS_WRITE_SUCCEEDED",
             42: "POSTGRES_TMPFS_WRITE_FAILED",
             43: "POSTGRES_DATA_VOLUME_WRITE_FAILED",
+            44: "POSTGRES_TABLESPACE_NAMESPACE_WRITE_SUCCEEDED",
+            45: "POSTGRES_BOOTSTRAP_SECRET_UNREADABLE",
+            46: "POSTGRES_SIBLING_SECRET_VISIBLE",
+            47: "POSTGRES_SECRET_DIRECTORY_METADATA_MISMATCH",
+            48: "POSTGRES_BOOTSTRAP_SECRET_METADATA_MISMATCH",
+            49: "POSTGRES_BOOTSTRAP_SECRET_WRITE_SUCCEEDED",
         },
     )
     docker(["container", "restart", "--time", "5", name], "POSTGRES_WARM_RESTART_FAILED")
@@ -675,9 +830,9 @@ def run_postgres(resources: IsolatedResources, contract: dict[str, Any], image: 
             name,
             "psql",
             "-U",
-            "runtime_policy_test",
+            "postgres",
             "-d",
-            "runtime_policy_test",
+            "chenyida_erp",
             "-Atqc",
             "select count(*) from runtime_policy_probe",
         ],
@@ -685,17 +840,18 @@ def run_postgres(resources: IsolatedResources, contract: dict[str, Any], image: 
     )
     if count != "1":
         fail("POSTGRES_WARM_DATA_COUNT_MISMATCH")
+    if (
+        directory_identity(tablespace_root, "POSTGRES_WARM_TABLESPACE_MISSING") != tablespace_root_identity
+        or directory_identity(approved_tablespace, "POSTGRES_WARM_TABLESPACE_MISSING") != approved_tablespace_identity
+        or directory_identity(tablespace_child, "POSTGRES_WARM_TABLESPACE_MISSING") != child_identity
+    ):
+        fail("POSTGRES_WARM_TABLESPACE_IDENTITY_CHANGED")
     docker(["container", "stop", "--time", "5", name], "POSTGRES_CONTAINER_STOP_FAILED")
     resources.remove_container()
 
 
 def volume_nonempty(name: str) -> bool:
-    value = docker_json(["volume", "inspect", "--", name], "VOLUME_INSPECT_FAILED")
-    if not isinstance(value, list) or len(value) != 1 or not isinstance(value[0], dict):
-        fail("VOLUME_INSPECT_INVALID")
-    mountpoint = value[0].get("Mountpoint")
-    if not isinstance(mountpoint, str) or not mountpoint.startswith("/var/lib/docker/volumes/"):
-        fail("VOLUME_MOUNTPOINT_INVALID")
+    mountpoint = task_volume_mountpoint(name)
     try:
         with os.scandir(mountpoint) as entries:
             return next(entries, None) is not None
@@ -760,10 +916,10 @@ def preflight(policy: dict[str, Any], web_image: str, worker_image: str, web_con
     if version != policy["parser"]["docker_engine_version"]:
         fail("ENGINE_VERSION_MISMATCH")
     contracts = {service["service"]: service for service in policy["services"]}
-    inspect_image(web_image, web_config, contracts["web"]["image_declared_volumes"])
-    inspect_image(worker_image, worker_config, contracts["worker"]["image_declared_volumes"])
-    inspect_image(contracts["postgres"]["image"]["reference"], None, contracts["postgres"]["image_declared_volumes"])
-    inspect_image(contracts["caddy"]["image"]["reference"], None, contracts["caddy"]["image_declared_volumes"])
+    inspect_image(web_image, web_config, contracts["web"]["image_declared_volumes"], contracts["web"]["image_environment_keys"])
+    inspect_image(worker_image, worker_config, contracts["worker"]["image_declared_volumes"], contracts["worker"]["image_environment_keys"])
+    inspect_image(contracts["postgres"]["image"]["reference"], None, contracts["postgres"]["image_declared_volumes"], contracts["postgres"]["image_environment_keys"])
+    inspect_image(contracts["caddy"]["image"]["reference"], None, contracts["caddy"]["image_declared_volumes"], contracts["caddy"]["image_environment_keys"])
 
 
 def parse_arguments(argv: list[str]) -> argparse.Namespace:

@@ -16,6 +16,7 @@ import { executeDryRun, executionInputDigest } from "../tools/selfhost-migration
 import { buildSafeReport } from "../tools/selfhost-migration/report.mjs";
 import {
   closeMigrationRuntime,
+  runMigrationWorkflow,
   runMigrationTransaction,
   safeMigrationErrorCode,
 } from "../scripts/migrate-postgres.ts";
@@ -140,6 +141,7 @@ test("migration transaction and cleanup preserve the primary failure without lea
   );
   assert.deepEqual(queries, ["BEGIN", "ROLLBACK"]);
   assert.equal(safeMigrationErrorCode(primary), "MIGRATION_INTERNAL_ERROR");
+  assert.equal(safeMigrationErrorCode({ code: "22012", detail: sentinel }), "MIGRATION_DATABASE_22012");
   assert.equal(safeMigrationErrorCode({ code: "57P03", detail: sentinel }), "MIGRATION_DATABASE_SERVER_UNAVAILABLE");
   assert.doesNotMatch(`${safeMigrationErrorCode(primary)}\n${safeMigrationErrorCode({ code: "57P03", detail: sentinel })}`, new RegExp(sentinel, "i"));
 
@@ -151,4 +153,28 @@ test("migration transaction and cleanup preserve the primary failure without lea
   }, true, async () => { closed += 1; throw Object.assign(new Error(sentinel), { password: sentinel }); }));
   assert.equal(released, 1);
   assert.equal(closed, 1);
+});
+
+test("controlled migration workflow rejects environment secrets before opening a pool", async () => {
+  const previous = process.env.DATABASE_URL;
+  let opened = 0;
+  try {
+    process.env.DATABASE_URL = "synthetic-forbidden-controlled-secret";
+    await assert.rejects(
+      runMigrationWorkflow({
+        config: { environment: "production", deploymentClass: "uat" },
+        isolatedDatabaseUrl: "",
+        poolFactory: () => {
+          opened += 1;
+          throw new Error("pool must not be opened");
+        },
+        close: async () => undefined,
+      }),
+      (error) => error?.code === "CONTROLLED_SECRET_ENVIRONMENT_FORBIDDEN",
+    );
+    assert.equal(opened, 0);
+  } finally {
+    if (previous === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = previous;
+  }
 });

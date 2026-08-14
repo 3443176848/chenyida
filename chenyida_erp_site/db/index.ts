@@ -43,36 +43,71 @@ export function attachPostgresPoolErrorHandler(
   });
 }
 
-type VerifiedPoolConfig = PoolConfig & {
-  verify?: (client: PoolClient, callback: (error?: Error) => void) => void;
-};
+type RuntimeVerifier = (client: PoolClient, callback: (error?: Error) => void) => void;
+type PoolConnectCallback = (
+  error: Error | undefined,
+  client: PoolClient | undefined,
+  done: (release?: unknown) => void,
+) => void;
 
-export function createRuntimeVerifier(policy: DatabaseRuntimePolicy): NonNullable<VerifiedPoolConfig["verify"]> {
-  const verified = new WeakSet<PoolClient>();
+export function createRuntimeVerifier(policy: DatabaseRuntimePolicy): RuntimeVerifier {
   return (client, callback) => {
-    if (verified.has(client)) {
-      callback();
-      return;
-    }
     assertDatabaseRuntimeIdentity(client, policy)
-      .then(() => {
-        verified.add(client);
-        callback();
-      })
+      .then(() => callback())
       .catch(() => callback(new DatabaseRuntimeError("DATABASE_RUNTIME_IDENTITY_INVALID")));
   };
 }
 
-function connectionConfig(): VerifiedPoolConfig {
+export function installRuntimeCheckoutVerification(pool: Pool, policy: DatabaseRuntimePolicy): Pool {
+  const acquire = pool.connect.bind(pool);
+  const verify = createRuntimeVerifier(policy);
+  const guardedConnect = (callback?: PoolConnectCallback): Promise<PoolClient> | void => {
+    if (callback) {
+      acquire((error, client, done) => {
+        if (error || !client) {
+          callback(error, client, done);
+          return;
+        }
+        verify(client, (verificationError) => {
+          if (!verificationError) {
+            callback(undefined, client, done);
+            return;
+          }
+          done(verificationError);
+          callback(verificationError, undefined, () => undefined);
+        });
+      });
+      return;
+    }
+    return acquire().then((client) => new Promise<PoolClient>((resolve, reject) => {
+      verify(client, (verificationError) => {
+        if (!verificationError) {
+          resolve(client);
+          return;
+        }
+        client.release(verificationError);
+        reject(verificationError);
+      });
+    }));
+  };
+  Object.defineProperty(pool, "connect", {
+    configurable: false,
+    enumerable: false,
+    writable: false,
+    value: guardedConnect,
+  });
+  return pool;
+}
+
+function createPool(): Pool {
   const resolved = databasePoolConfiguration(runtimeConfig());
-  return resolved.policy
-    ? { ...resolved.pool, verify: createRuntimeVerifier(resolved.policy) }
-    : { ...resolved.pool };
+  const pool = new Pool({ ...resolved.pool } satisfies PoolConfig);
+  return resolved.policy ? installRuntimeCheckoutVerification(pool, resolved.policy) : pool;
 }
 
 export function getPool(): Pool {
   if (!sharedPool) {
-    sharedPool = new Pool(connectionConfig());
+    sharedPool = createPool();
     attachPostgresPoolErrorHandler(sharedPool);
   }
   return sharedPool;

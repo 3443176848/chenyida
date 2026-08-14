@@ -19,7 +19,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 
-EXPECTED_POLICY_SHA256 = "74d3f8d24e7b15f0cc5ce4e0e21c963b0e95735c502a471666c02165c7e53c1b"
+EXPECTED_POLICY_SHA256 = "e4920820ed954c2689e3de53dea9b7f36945969c8287b06d87a3871e7d3ecf00"
 POLICY_CONTRACT = "chenyida-erp-container-runtime-policy/v1"
 MAX_POLICY_BYTES = 131_072
 MAX_COMPOSE_BYTES = 2_097_152
@@ -27,6 +27,7 @@ MAX_ENVIRONMENT_VALUE_BYTES = 16_384
 SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 IMAGE_DIGEST_RE = re.compile(r"^[^@\s]+@sha256:[0-9a-f]{64}$")
 GIT_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
+DEPLOYMENT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 
 POLICY_TOP_KEYS = {
     "schema_version",
@@ -45,6 +46,7 @@ SERVICE_POLICY_KEYS = {
     "allowed_compose_fields",
     "image",
     "image_declared_volumes",
+    "image_environment_keys",
     "user",
     "groups",
     "read_only_rootfs",
@@ -76,22 +78,34 @@ COMPOSE_TOP_KEYS = {
 }
 
 ENVIRONMENT_CONSTANTS = {
+    "ERP_ENV": "production",
     "ERP_UPLOAD_ROOT": "/data/chenyida-erp/uploads",
     "ERP_ATTACHMENT_ROOT": "/data/chenyida-erp/attachments",
     "ERP_BACKUP_STATUS_FILE": "/data/chenyida-erp/backup-status/recovery-readiness.json",
 }
 SERVICE_ENVIRONMENT_CONSTANTS = {
+    "admin": {"ERP_SERVICE_KIND": "ADMIN"},
     "caddy": {"ERP_HTTPS_PORT": "443"},
     "migrate": {
-        "ERP_RELEASE_MANIFEST_FILE": "/run/chenyida-erp-release-candidate/release-manifest.json"
+        "ERP_MIGRATION_EXPECTED_DATABASE": "chenyida_erp",
+        "ERP_MIGRATION_EXPECTED_ROLE": "chenyida_erp_owner",
+        "ERP_RELEASE_MANIFEST_FILE": "/run/chenyida-erp-release-candidate/release-manifest.json",
+        "ERP_SERVICE_KIND": "MIGRATION",
+    },
+    "postgres": {
+        "POSTGRES_DB": "chenyida_erp",
+        "POSTGRES_PASSWORD_FILE": "/run/chenyida-erp-secrets/postgres-bootstrap-password",
+        "POSTGRES_USER": "postgres",
     },
     "web": {
         "ERP_PROCESS_NAME": "chenyida-erp-web",
+        "ERP_SERVICE_KIND": "WEB",
         "NODE_OPTIONS": "--max-old-space-size=384",
         "PORT": "3000",
     },
     "worker": {
         "ERP_PROCESS_NAME": "chenyida-erp-worker",
+        "ERP_SERVICE_KIND": "WORKER",
         "ERP_WORKER_INSTANCE_FILE": "/tmp/chenyida-erp-worker-instance-id",
         "NODE_OPTIONS": "--max-old-space-size=384",
     },
@@ -294,6 +308,14 @@ def validate_policy_shape(policy: Any) -> dict[str, Any]:
             fail("POLICY_SERVICES_INVALID")
         exact_list(service["allowed_compose_fields"], "POLICY_SERVICE_FIELDS_INVALID", sorted_unique=True)
         exact_list(service["image_declared_volumes"], "POLICY_IMAGE_INVALID", sorted_unique=True)
+        image_environment_keys = exact_list(
+            service["image_environment_keys"], "POLICY_IMAGE_INVALID", sorted_unique=True
+        )
+        if not image_environment_keys or not all(
+            isinstance(key, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{0,127}", key)
+            for key in image_environment_keys
+        ):
+            fail("POLICY_IMAGE_INVALID")
         exact_list(service["groups"], "POLICY_USER_INVALID")
         exact_list(service["cap_drop"], "POLICY_CAPABILITIES_INVALID", sorted_unique=True)
         exact_list(service["cap_add"], "POLICY_CAPABILITIES_INVALID", sorted_unique=True)
@@ -607,6 +629,10 @@ def validate_service(
         expected_environment = set(service["environment_additions"])
     if set(environment) != expected_environment:
         fail("ENVIRONMENT_KEYS_POLICY_MISMATCH")
+    if "ERP_DEPLOYMENT_CLASS" in environment and environment["ERP_DEPLOYMENT_CLASS"].lower() not in {"uat", "production"}:
+        fail("ENVIRONMENT_CONTROLLED_DEPLOYMENT_CLASS_INVALID")
+    if "ERP_RELEASE_EXPECTED_DEPLOYMENT_ID" in environment and not DEPLOYMENT_ID_RE.fullmatch(environment["ERP_RELEASE_EXPECTED_DEPLOYMENT_ID"]):
+        fail("ENVIRONMENT_DEPLOYMENT_ID_INVALID")
     for key, value in ENVIRONMENT_CONSTANTS.items():
         if key in environment and environment[key] != value:
             fail("ENVIRONMENT_CONSTANT_POLICY_MISMATCH")
@@ -652,6 +678,12 @@ def validate_compose(
     app_environment = validate_environment_values(compose["x-app-environment"])
     if sorted(app_environment) != policy["app_environment_keys"]:
         fail("APP_ENVIRONMENT_POLICY_MISMATCH")
+    if app_environment.get("ERP_DEPLOYMENT_CLASS", "").lower() not in {"uat", "production"}:
+        fail("APP_ENVIRONMENT_CONTROLLED_DEPLOYMENT_CLASS_INVALID")
+    if not DEPLOYMENT_ID_RE.fullmatch(app_environment.get("ERP_RELEASE_EXPECTED_DEPLOYMENT_ID", "")):
+        fail("APP_ENVIRONMENT_DEPLOYMENT_ID_INVALID")
+    if app_environment["ERP_RELEASE_EXPECTED_DEPLOYMENT_ID"] != compose["name"]:
+        fail("APP_ENVIRONMENT_DEPLOYMENT_ID_MISMATCH")
     for key, value in ENVIRONMENT_CONSTANTS.items():
         if app_environment.get(key) != value:
             fail("APP_ENVIRONMENT_POLICY_MISMATCH")

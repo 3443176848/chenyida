@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getPool, closeDb } from "../db/index.ts";
 import { runtimeConfig } from "../app/lib/infrastructure/config.ts";
+import { assertControlledRuntimeServiceKind } from "../app/lib/infrastructure/runtime-secret.ts";
 import { LocalFileStorage } from "../app/lib/infrastructure/file-storage.ts";
 import { PostgresBackgroundJobQueue } from "../app/lib/infrastructure/background-jobs.ts";
 import { systemClock, uuidGenerator } from "../app/lib/infrastructure/primitives.ts";
@@ -34,6 +35,7 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 
 async function main(): Promise<void> {
   const config = runtimeConfig();
+  assertControlledRuntimeServiceKind(config.deploymentClass, "WORKER");
   const pool = getPool();
   const instanceId = randomUUID();
   let instanceFileWritten = false;

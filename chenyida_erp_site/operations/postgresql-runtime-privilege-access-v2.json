@@ -1710,7 +1710,7 @@
   "services": {
     "ADMIN": {
       "derivation": "REVIEWED_ONE_SHOT_ADMIN_PATH",
-      "source_evidence_sha256": "aa57e3ecfce0b6e4a8136ab491be823b70d59294c3c0a710ee029e2628ce03e4",
+      "source_evidence_sha256": "86e6923288ad03f0852ff90c5a4e6b6d0e0fd56a706c57aca47663127b58b8aa",
       "source_files": [
         "app/lib/identity-selfhost/service.ts",
         "scripts/init-admin.ts"
@@ -2508,7 +2508,7 @@
     },
     "WEB": {
       "derivation": "SOURCE_GRAPH_CANDIDATE_REVIEWED",
-      "source_evidence_sha256": "db67860f8ff036d5a6ad6added17a8dbb8b1017007e1c07fb833dacbb6641aa8",
+      "source_evidence_sha256": "90a5ffe22458e3a9ff9d73f85e792b575bf7431227eb30961104a35b6e9fa7bf",
       "source_files": [
         "app/lib/ai-governance-suggestion-selfhost/adapter.ts",
         "app/lib/ai-governance-suggestion-selfhost/canonical.ts",
@@ -2680,7 +2680,8 @@
         "app/lib/supplier-mapping-selfhost/validation.ts",
         "db/index.ts",
         "db/runtime-connection.ts",
-        "db/schema.ts"
+        "db/schema.ts",
+        "scripts/postgresql-session-profile.ts"
       ],
       "source_candidate_table_privileges": {
         "DELETE": [
@@ -3908,7 +3909,7 @@
     },
     "WORKER": {
       "derivation": "REVIEWED_WORKER_CALL_GRAPH",
-      "source_evidence_sha256": "407412aa293efb4f9caae9eb6647f4887bbb85d63d48b83a32bd85b188500a2d",
+      "source_evidence_sha256": "069aeca2fcc4a8939bbbc17ea3d63738dc1d1426f4579a53eef995750e2a4a6b",
       "source_files": [
         "app/lib/application-version.ts",
         "app/lib/exact-decimal.ts",
@@ -3967,6 +3968,7 @@
         "db/index.ts",
         "db/runtime-connection.ts",
         "db/schema.ts",
+        "scripts/postgresql-session-profile.ts",
         "worker/selfhost.ts"
       ],
       "source_candidate_table_privileges": {
@@ -4221,5 +4223,5 @@
       }
     }
   },
-  "access_sha256": "b2defe953c59a6b37858ee90af1ae08fbd444486a814ebb1c10f7f0f4ee83aa1"
+  "access_sha256": "8eece185f306dc3d1c54275329068c16620b3ffbd5c8d703849166fb07f6fc76"
 }

@@ -146,6 +146,8 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   const pythonSandbox = await readFile(new URL("../scripts/run-python-baseline-test.sh", import.meta.url), "utf8");
   const composeSandbox = await readFile(new URL("../scripts/run-compose-config-test.sh", import.meta.url), "utf8");
   const runtimePolicyTest = await readFile(new URL("../scripts/container-runtime-policy-test.py", import.meta.url), "utf8");
+  const releaseMigrationTest = await readFile(new URL("./selfhost-release-migration-postgres.sh", import.meta.url), "utf8");
+  const controlledMigrationDriver = await readFile(new URL("./selfhost-release-migration-controlled-driver.ts", import.meta.url), "utf8");
   for (const script of [wrapper, creator]) {
     assert.match(script, /LOCK_FILE=\/var\/lock\/chenyida-erp-release-gate-v1\.lock/);
     assert.match(script, /flock -n 9/);
@@ -189,14 +191,36 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.match(pythonSandbox, /git_candidate archive --format=tar/);
   assert.match(pythonSandbox, /--ro-bind \/lib64 \/lib64/);
   assert.match(composeSandbox, /--profile "\*"/);
+  assert.match(composeSandbox, /for deployment_class in uat production/);
   assert.match(composeSandbox, /container-runtime-policy\.py validate/);
   assert.match(composeSandbox, /--ro-bind "\$SUPERVISOR_SITE_ROOT" \/supervisor/);
+  for (const forbidden of ["DATABASE_URL", "ERP_MIGRATION_DATABASE_URL", "ERP_SETUP_TOKEN", "POSTGRES_PASSWORD", "ERP_ADMIN_PASSWORD"]) {
+    assert.doesNotMatch(composeSandbox, new RegExp(forbidden));
+  }
   assert.match(runtimePolicyTest, /chenyida\.erp\.container-runtime-policy-test/);
   assert.match(runtimePolicyTest, /max_containers=1/);
   assert.match(runtimePolicyTest, /TASK_VOLUME_INVENTORY_FAILED/);
+  assert.match(runtimePolicyTest, /POSTGRES_PASSWORD_FILE/);
+  assert.match(runtimePolicyTest, /POSTGRES_TABLESPACE_NAMESPACE_WRITE_SUCCEEDED/);
+  assert.match(runtimePolicyTest, /SIBLING_SECRET_VISIBLE/);
   assert.match(runtimePolicyTest, /POSTGRES_WARM_DATA_COUNT_MISMATCH/);
   assert.match(runtimePolicyTest, /CADDY_WARM_LISTENER_POLICY_MISMATCH/);
   assert.doesNotMatch(runtimePolicyTest, /"--privileged"/);
+  const controlledMigrationFunction = releaseMigrationTest.match(/run_controlled\(\) \{[\s\S]*?\n\}\n\n# Empty controlled target/)?.[0] || "";
+  assert.notEqual(controlledMigrationFunction, "");
+  assert.match(controlledMigrationFunction, /TEST_RELEASE_MIGRATION_DATABASE_URL=/);
+  assert.match(controlledMigrationFunction, /ERP_ENV=test ERP_DEPLOYMENT_CLASS=test/);
+  assert.match(controlledMigrationFunction, /ERP_MIGRATION_TEST_HARNESS=CONTROLLED_RELEASE_MIGRATION/);
+  assert.match(controlledMigrationFunction, /selfhost-release-migration-controlled-driver\.ts/);
+  for (const forbidden of ["DATABASE_URL", "ERP_MIGRATION_DATABASE_URL", "ERP_SETUP_TOKEN", "POSTGRES_PASSWORD", "ERP_ADMIN_PASSWORD"]) {
+    assert.doesNotMatch(controlledMigrationFunction, new RegExp(`(?:^|[ \\t])${forbidden}=`, "m"));
+  }
+  assert.match(controlledMigrationDriver, /ERP_ENV !== "test"/);
+  assert.match(controlledMigrationDriver, /ERP_DEPLOYMENT_CLASS !== "test"/);
+  assert.match(controlledMigrationDriver, /assertIsolatedDatabaseTarget/);
+  assert.match(controlledMigrationDriver, /cyd-release-migration-postgres/);
+  assert.match(controlledMigrationDriver, /runMigrationWorkflow/);
+  assert.doesNotMatch(controlledMigrationDriver, /runtimeConfig\(|getPool\(/);
   assert.match(nodeSandbox, /-v "\$NODE_MODULES:\/workspace\/chenyida_erp_site\/node_modules:ro"/);
   assert.doesNotMatch(nodeSandbox, /\$NODE_MODULES:\/supervisor\/node_modules/);
   assert.match(nodeSandbox, /--user "\$container_user"/);

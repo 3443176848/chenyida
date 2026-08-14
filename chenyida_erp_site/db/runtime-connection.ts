@@ -1,4 +1,5 @@
 import type { PoolClient, PoolConfig } from "pg";
+import { lstatSync, realpathSync, type Stats } from "node:fs";
 
 import type { RuntimeConfig } from "../app/lib/infrastructure/config.ts";
 import {
@@ -9,9 +10,15 @@ import {
   type ControlledDeploymentClass,
   type RuntimeServiceKind,
 } from "../app/lib/infrastructure/runtime-secret.ts";
+import {
+  CONTROLLED_SEARCH_PATH,
+  CONTROLLED_STARTUP_OPTIONS,
+} from "../scripts/postgresql-session-profile.ts";
 
 const IDENTIFIER = /^[a-z_][a-z0-9_$-]{0,62}$/;
 const DEPLOYMENT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
+const ISOLATED_DATABASE = /^[A-Za-z_][A-Za-z0-9_$-]{0,62}$/;
+const ISOLATED_SOCKET = /^\/tmp\/cyd-[A-Za-z0-9][A-Za-z0-9._-]{0,95}\/[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/;
 
 export type DatabaseRuntimePolicy = Readonly<{
   service: RuntimeServiceKind;
@@ -65,6 +72,81 @@ function reject(code: string): never {
   throw new DatabaseRuntimeError(code);
 }
 
+function sameFilesystemIdentity(left: Stats, right: Stats): boolean {
+  return left.dev === right.dev
+    && left.ino === right.ino
+    && left.mode === right.mode
+    && left.nlink === right.nlink
+    && left.uid === right.uid
+    && left.gid === right.gid
+    && left.mtimeMs === right.mtimeMs
+    && left.ctimeMs === right.ctimeMs;
+}
+
+function assertIsolatedSocketDirectory(socket: string): void {
+  const taskRoot = socket.slice(0, socket.lastIndexOf("/"));
+  try {
+    const taskBefore = lstatSync(taskRoot);
+    const socketBefore = lstatSync(socket);
+    const effectiveUid = typeof process.getuid === "function" ? process.getuid() : -1;
+    if (effectiveUid < 0
+      || realpathSync(taskRoot) !== taskRoot
+      || realpathSync(socket) !== socket
+      || !taskBefore.isDirectory() || taskBefore.isSymbolicLink()
+      || taskBefore.uid !== effectiveUid || (taskBefore.mode & 0o022) !== 0
+      || !socketBefore.isDirectory() || socketBefore.isSymbolicLink()
+      || (socketBefore.mode & 0o777) !== 0o700
+      || (socketBefore.uid !== effectiveUid && !(effectiveUid === 0 && socketBefore.uid === 999))) {
+      reject("ISOLATED_DATABASE_SOCKET_INVALID");
+    }
+    const taskAfter = lstatSync(taskRoot);
+    const socketAfter = lstatSync(socket);
+    if (!sameFilesystemIdentity(taskBefore, taskAfter) || !sameFilesystemIdentity(socketBefore, socketAfter)) {
+      reject("ISOLATED_DATABASE_SOCKET_INVALID");
+    }
+  } catch (error) {
+    if (error instanceof DatabaseRuntimeError) throw error;
+    reject("ISOLATED_DATABASE_SOCKET_INVALID");
+  }
+}
+
+export function assertIsolatedDatabaseTarget(
+  config: Pick<RuntimeConfig, "environment" | "deploymentClass">,
+  connectionString: string,
+): void {
+  if (!(["development", "test"] as const).includes(config.environment as "development" | "test")
+    || config.deploymentClass !== config.environment) reject("ISOLATED_DATABASE_DEPLOYMENT_INVALID");
+  const socketNotation = connectionString.match(/^(postgres(?:ql)?:\/\/)([^/?#@]+@)?\//);
+  const parseableConnectionString = socketNotation
+    ? `${socketNotation[1]}${socketNotation[2] || ""}localhost/${connectionString.slice(socketNotation[0].length)}`
+    : connectionString;
+  let target: URL;
+  try { target = new URL(parseableConnectionString); }
+  catch { reject("ISOLATED_DATABASE_TARGET_INVALID"); }
+  if (!(["postgres:", "postgresql:"] as const).includes(target.protocol as "postgres:" | "postgresql:")
+    || target.hash || target.pathname === "/") reject("ISOLATED_DATABASE_TARGET_INVALID");
+  let database: string;
+  try { database = decodeURIComponent(target.pathname.slice(1)); }
+  catch { reject("ISOLATED_DATABASE_TARGET_INVALID"); }
+  if (!ISOLATED_DATABASE.test(database)
+    || !(/(?:^|[_-])test(?:[_-]|$)/i.test(database) || /(?:^|[_-])dev(?:elopment)?(?:[_-]|$)/i.test(database))) {
+    reject("ISOLATED_DATABASE_NAME_INVALID");
+  }
+  const parameters = [...target.searchParams.keys()];
+  if (parameters.some((name) => name !== "host") || target.searchParams.getAll("host").length > 1) {
+    reject("ISOLATED_DATABASE_OPTIONS_INVALID");
+  }
+  const socket = target.searchParams.get("host");
+  if (socket !== null) {
+    if (!socketNotation || target.hostname !== "localhost" || target.port || !ISOLATED_SOCKET.test(socket)) reject("ISOLATED_DATABASE_SOCKET_INVALID");
+    assertIsolatedSocketDirectory(socket);
+    return;
+  }
+  const hostname = target.hostname.toLowerCase();
+  const loopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  if (!loopback) reject("ISOLATED_DATABASE_HOST_INVALID");
+}
+
 function controlledPolicy(deploymentClass: ControlledDeploymentClass): DatabaseRuntimePolicy {
   const service = runtimeServiceKind(deploymentClass);
   if (!service) reject("DATABASE_RUNTIME_SERVICE_INVALID");
@@ -89,9 +171,7 @@ export function databasePoolConfiguration(
   const policy = databaseRuntimePolicy(config);
   if (!policy) {
     const connectionString = isolatedEnvironmentSecret(config.deploymentClass, "DATABASE_URL");
-    if (config.environment === "test" && !/(test|localhost|127\.0\.0\.1)/i.test(connectionString)) {
-      reject("TEST_DATABASE_TARGET_INVALID");
-    }
+    assertIsolatedDatabaseTarget(config, connectionString);
     const maximum = Number(process.env.DATABASE_POOL_MAX || 10);
     if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 32) reject("DATABASE_POOL_MAX_INVALID");
     return Object.freeze({
@@ -120,6 +200,7 @@ export function databasePoolConfiguration(
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,
       application_name: policy.applicationName,
+      options: CONTROLLED_STARTUP_OPTIONS,
     }),
   });
 }
@@ -141,7 +222,10 @@ type IdentityRow = {
   role_bypass_rls: boolean;
   role_inherit: boolean;
   role_connection_limit: number;
+  role_valid_until_absent: boolean;
+  search_path_exact: boolean;
   role_settings_absent: boolean;
+  database_settings_absent: boolean;
   membership_valid: boolean;
   dangerous_membership_absent: boolean;
   owner_membership_absent: boolean;
@@ -191,6 +275,14 @@ export async function assertDatabaseRuntimeIdentity(
     reject("DATABASE_RUNTIME_POLICY_INVALID");
   }
   try {
+    await client.query("ROLLBACK");
+    const configured = await client.query<{ search_path: string }>(
+      "select pg_catalog.set_config('search_path',$1,false)::text as search_path",
+      [CONTROLLED_SEARCH_PATH],
+    );
+    if (configured.rows.length !== 1 || configured.rows[0].search_path !== CONTROLLED_SEARCH_PATH) {
+      reject("DATABASE_RUNTIME_IDENTITY_INVALID");
+    }
     const result = await client.query<IdentityRow>(`
       select pg_catalog.current_database()::text as database_name,
              pg_catalog.shobj_description(d.oid,'pg_database') as database_marker,
@@ -206,9 +298,15 @@ export async function assertDatabaseRuntimeIdentity(
              r.rolbypassrls as role_bypass_rls,
              r.rolinherit as role_inherit,
              r.rolconnlimit as role_connection_limit,
+             r.rolvaliduntil is null as role_valid_until_absent,
+             pg_catalog.current_setting('search_path')=$4 as search_path_exact,
              r.rolconfig is null and not exists (
                select 1 from pg_catalog.pg_db_role_setting s where s.setrole=r.oid
              ) as role_settings_absent,
+             not exists (
+               select 1 from pg_catalog.pg_db_role_setting s
+                where s.setdatabase=d.oid and s.setrole in (0,r.oid)
+             ) as database_settings_absent,
              case when $2::text is null then
                not exists (select 1 from pg_catalog.pg_auth_members m where m.member=r.oid or m.roleid=r.oid)
              else
@@ -257,7 +355,7 @@ export async function assertDatabaseRuntimeIdentity(
         from pg_catalog.pg_database d
         join pg_catalog.pg_roles r on r.rolname=current_user
        where d.datname=pg_catalog.current_database() and r.rolname=$1
-    `, [policy.role, policy.privilegeGroup, policy.ownerRole]);
+    `, [policy.role, policy.privilegeGroup, policy.ownerRole, CONTROLLED_SEARCH_PATH]);
     if (result.rows.length !== 1) reject("DATABASE_RUNTIME_IDENTITY_INVALID");
     const row = result.rows[0];
     if (row.database_name !== policy.database || row.database_marker !== policy.marker
@@ -266,7 +364,9 @@ export async function assertDatabaseRuntimeIdentity(
       || row.role_login !== true || row.role_superuser !== false || row.role_create_role !== false
       || row.role_create_database !== false || row.role_replication !== false || row.role_bypass_rls !== false
       || row.role_inherit !== policy.roleInherit || row.role_connection_limit !== policy.roleConnectionLimit
-      || row.role_settings_absent !== true || row.membership_valid !== true
+      || row.role_valid_until_absent !== true
+      || row.search_path_exact !== true || row.role_settings_absent !== true || row.database_settings_absent !== true
+      || row.membership_valid !== true
       || row.dangerous_membership_absent !== true || row.owner_membership_absent !== true
       || row.database_connect !== true || row.schema_usage !== true
       || (policy.service === "MIGRATION"

@@ -78,6 +78,17 @@ export function runtimeServiceKind(
   return candidate as RuntimeServiceKind;
 }
 
+export function assertControlledRuntimeServiceKind(
+  deploymentClass: string,
+  expected: RuntimeServiceKind,
+  value: string | undefined = process.env.ERP_SERVICE_KIND,
+): void {
+  if (!isControlledDeployment(deploymentClass)) return;
+  if (runtimeServiceKind(deploymentClass, value) !== expected) {
+    reject("CONTROLLED_SERVICE_KIND_MISMATCH");
+  }
+}
+
 function sameIdentity(left: BigIntStats, right: BigIntStats): boolean {
   return left.dev === right.dev
     && left.ino === right.ino
@@ -269,6 +280,17 @@ export function readSecureSingleValueFile(input: Readonly<{
   }
 }
 
+export function validateControlledRuntimeSecretValue(value: string): string {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(value) || new Set(value).size < 16) {
+    reject("RUNTIME_SECRET_CONTENT_INVALID");
+  }
+  const decoded = Buffer.from(value, "base64url");
+  if (decoded.byteLength !== 32 || decoded.toString("base64url") !== value) {
+    reject("RUNTIME_SECRET_CONTENT_INVALID");
+  }
+  return value;
+}
+
 export function readControlledRuntimeSecret(
   deploymentClass: ControlledDeploymentClass,
   service: RuntimeServiceKind,
@@ -278,7 +300,7 @@ export function readControlledRuntimeSecret(
   if (kind === "ADMIN_PASSWORD" && service !== "ADMIN") reject("CONTROLLED_SECRET_SCOPE_INVALID");
   const secretPath = SECRET_PATHS[service][kind];
   if (!secretPath) reject("CONTROLLED_SECRET_SCOPE_INVALID");
-  return readSecureSingleValueFile({
+  return validateControlledRuntimeSecretValue(readSecureSingleValueFile({
     path: secretPath,
     expectedParent: SECRET_ROOT,
     trustedAncestor: "/",
@@ -288,9 +310,9 @@ export function readControlledRuntimeSecret(
     expectedUid: 0,
     expectedGid: SERVICE_SECRET_GIDS[service],
     expectedMode: 0o440,
-    minimumBytes: 24,
-    maximumBytes: 256,
-  });
+    minimumBytes: 43,
+    maximumBytes: 43,
+  }));
 }
 
 export function isolatedEnvironmentSecret(

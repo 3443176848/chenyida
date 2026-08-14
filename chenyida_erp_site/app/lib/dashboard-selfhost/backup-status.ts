@@ -15,7 +15,7 @@ const LEVELS=new Set(["LOCAL_VERIFIED","OFFHOST_VERIFIED","RESTORE_VERIFIED"]),C
 const FILES={postgresql_dump:"postgresql.dump",uploads:"uploads.tar.gz",attachments:"attachments.tar.gz",backup_status:"backup-status.tar.gz"} as const;
 const LEGACY_FILES={postgresql_dump:"postgresql.dump",uploads:"uploads.tar.gz",attachments:"attachments.tar.gz"} as const;
 export const RUNTIME_RELEASE_IDENTITY_FILE="/run/chenyida-erp-release/release-identity.json";
-const RELEASE_IDENTITY_CONTRACT="chenyida-erp-runtime-release-identity/v3",RELEASE_RUNTIME_GUARD_CONTRACT="chenyida-erp-release-runtime-guard/v1",POST_DEPLOY_RUNTIME_GUARD_MODE="POST_DEPLOY_CURRENT_RUNTIME_STRICT",RELEASE_RUNTIME_POLICY_SHA256="74d3f8d24e7b15f0cc5ce4e0e21c963b0e95735c502a471666c02165c7e53c1b",RELEASE_ROOT_MARKER=".chenyida-erp-release-identity-root-v1",RELEASE_ROOT_MARKER_VALUE="chenyida-erp-release-identity-root/v1\n";
+const RELEASE_IDENTITY_CONTRACT="chenyida-erp-runtime-release-identity/v3",RELEASE_RUNTIME_GUARD_CONTRACT="chenyida-erp-release-runtime-guard/v1",POST_DEPLOY_RUNTIME_GUARD_MODE="POST_DEPLOY_CURRENT_RUNTIME_STRICT",RELEASE_RUNTIME_POLICY_SHA256="e4920820ed954c2689e3de53dea9b7f36945969c8287b06d87a3871e7d3ecf00",RELEASE_ROOT_MARKER=".chenyida-erp-release-identity-root-v1",RELEASE_ROOT_MARKER_VALUE="chenyida-erp-release-identity-root/v1\n";
 const RECEIPT_ROOT_MARKER=".chenyida-erp-receipt-root-v2",RECEIPT_ROOT_MARKER_VALUE="chenyida-erp-receipt-root/v2\n";
 
 const iso=(value:unknown)=>typeof value==="string"&&ISO_UTC.test(value)&&!Number.isNaN(Date.parse(value));

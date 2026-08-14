@@ -8,7 +8,8 @@ import { parseStrictJson } from "./backup-recovery-contract.mjs";
 
 export const CLUSTER_POLICY_CONTRACT = "chenyida-erp-postgresql-cluster-recovery-policy/v1";
 export const CLUSTER_SNAPSHOT_CONTRACT = "chenyida-erp-postgresql-cluster-snapshot/v1";
-export const TABLESPACE_MAP_CONTRACT = "chenyida-erp-postgresql-tablespace-map/v1";
+export const LEGACY_TABLESPACE_MAP_CONTRACT = "chenyida-erp-postgresql-tablespace-map/v1";
+export const TABLESPACE_MAP_CONTRACT = "chenyida-erp-postgresql-tablespace-map/v2";
 export const CREDENTIAL_FILE_CONTRACT = "chenyida-erp-postgresql-credential-binding/v1";
 export const CLUSTER_SECURITY_RECEIPT_CONTRACT = "chenyida-erp-postgresql-cluster-security-receipt/v1";
 export const TABLESPACE_RECEIPT_CONTRACT = "chenyida-erp-postgresql-tablespace-receipt/v1";
@@ -24,6 +25,7 @@ const SHA256 = /^[0-9a-f]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 const PG_MAJOR = /^(?:1[0-9]|[2-9][0-9])$/;
 const DECIMAL = /^(?:0|[1-9][0-9]*)$/;
+const FILESYSTEM_MODE = /^0[0-7]{3}$/;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const GIT_SHA = /^[0-9a-f]{40}$/;
 const VERSION = /^0\.1\.0-alpha\.\d+$/;
@@ -31,6 +33,9 @@ const MIGRATION = /^\d{4}_[a-z0-9_]+\.sql$/;
 const ACL_STATES = new Set(["NULL", "EMPTY", "EXPLICIT"]);
 const POLICY_SCOPES = new Set(["PRODUCTION_BASELINE", "UAT_BASELINE", "SYNTHETIC_TEST_ONLY"]);
 const EVIDENCE_SCOPES = new Set(["ACTUAL_CONTROLLED", "SYNTHETIC_TEST_ONLY"]);
+const TABLESPACE_VERSION_DIRECTORIES = Object.freeze({
+  "17": "PG_17_202406281",
+});
 const ROLE_PURPOSES = new Set(["MIGRATION_OWNER", "RUNTIME", "PRIVILEGE_GROUP"]);
 const EXTENSION_KINDS = new Set(["APPLICATION", "PLATFORM"]);
 const FIXED_REFERENCES = new Set(["PUBLIC", "pg_database_owner"]);
@@ -646,22 +651,99 @@ function pathIdentity(metadata) {
   return `${metadata.dev}:${metadata.ino}:${metadata.uid}:${metadata.gid}:${metadata.mode & 0o7777}`;
 }
 
+function validateTablespaceFilesystemMetadata(value, code) {
+  exactKeys(value, ["uid", "gid", "mode"], code);
+  integer(value.uid, 0, 2 ** 31 - 1, code);
+  integer(value.gid, 0, 2 ** 31 - 1, code);
+  string(value.mode, FILESYSTEM_MODE, code);
+  return Object.freeze({ uid: value.uid, gid: value.gid, mode: Number.parseInt(value.mode, 8) });
+}
+
+function tablespaceFilesystemPolicy(map, evidenceScope, expectedUid, expectedGid) {
+  const namespace = validateTablespaceFilesystemMetadata(map.namespace_metadata, "TABLESPACE_MAP_NAMESPACE_METADATA_INVALID");
+  const entry = validateTablespaceFilesystemMetadata(map.path_metadata, "TABLESPACE_MAP_PATH_METADATA_INVALID");
+  if (entry.uid !== expectedUid || entry.gid !== expectedGid) reject("TABLESPACE_EXPECTED_IDENTITY_MISMATCH");
+  if (evidenceScope === "ACTUAL_CONTROLLED"
+    && (namespace.uid !== 0 || namespace.gid !== 999 || namespace.mode !== 0o750
+      || entry.uid !== 999 || entry.gid !== 999 || entry.mode !== 0o700)) {
+    reject("TABLESPACE_ACTUAL_FILESYSTEM_POLICY_INVALID");
+  }
+  return Object.freeze({ namespace, entry });
+}
+
+async function validateTablespaceVersionDirectory(hostPath, filesystem, policy) {
+  const expectedName = TABLESPACE_VERSION_DIRECTORIES[policy.postgresql_major];
+  if (!expectedName) reject("TABLESPACE_POST_CREATE_IDENTITY_MISMATCH");
+  const children = await readdir(hostPath).catch(() => reject("TABLESPACE_POST_CREATE_IDENTITY_MISMATCH"));
+  if (children.length !== 1 || children[0] !== expectedName) reject("TABLESPACE_POST_CREATE_IDENTITY_MISMATCH");
+  const childPath = path.join(hostPath, expectedName);
+  const before = await lstat(childPath).catch(() => reject("TABLESPACE_POST_CREATE_IDENTITY_MISMATCH"));
+  if (!before.isDirectory() || before.isSymbolicLink() || before.uid !== filesystem.uid || before.gid !== filesystem.gid
+    || (before.mode & 0o7777) !== filesystem.mode || await realpath(childPath) !== childPath) {
+    reject("TABLESPACE_POST_CREATE_IDENTITY_MISMATCH");
+  }
+  const after = await lstat(childPath).catch(() => reject("TABLESPACE_POST_CREATE_IDENTITY_MISMATCH"));
+  for (const key of ["dev", "ino", "uid", "gid", "mode", "nlink", "mtimeMs", "ctimeMs"]) {
+    if (before[key] !== after[key]) reject("TABLESPACE_POST_CREATE_IDENTITY_MISMATCH");
+  }
+  return Object.freeze({
+    name_sha256: clusterSha256(expectedName),
+    identity_sha256: clusterSha256(pathIdentity(after)),
+  });
+}
+
 function validateMapDocument(value, snapshot, expectedScope) {
-  exactKeys(value, ["schema_version", "contract", "map_id", "snapshot_sha256", "evidence_scope", "approved_host_root", "approved_server_root", "namespace_identity_sha256", "entries"], "TABLESPACE_MAP_INVALID");
-  if (value.schema_version !== 1 || value.contract !== TABLESPACE_MAP_CONTRACT) reject("TABLESPACE_MAP_CONTRACT_INVALID");
+  exactKeys(value, ["schema_version", "contract", "map_id", "snapshot_sha256", "evidence_scope", "approved_host_root", "approved_server_root", "namespace_identity_sha256", "namespace_metadata", "path_metadata", "entries"], "TABLESPACE_MAP_INVALID");
+  if (value.schema_version !== 2 || value.contract !== TABLESPACE_MAP_CONTRACT) reject("TABLESPACE_MAP_CONTRACT_INVALID");
   string(value.map_id, IDENTIFIER, "TABLESPACE_MAP_ID_INVALID");
   if (value.snapshot_sha256 !== snapshot.snapshot_sha256) reject("TABLESPACE_MAP_SNAPSHOT_MISMATCH");
   if (value.evidence_scope !== expectedScope) reject("TABLESPACE_MAP_SCOPE_MISMATCH");
   enumValue(value.evidence_scope, EVIDENCE_SCOPES, "TABLESPACE_MAP_SCOPE_INVALID");
+  pgText(value.approved_host_root, "TABLESPACE_MAP_ROOT_INVALID");
+  pgText(value.approved_server_root, "TABLESPACE_MAP_ROOT_INVALID");
+  if (!path.isAbsolute(value.approved_host_root) || !path.isAbsolute(value.approved_server_root)) reject("TABLESPACE_MAP_ROOT_INVALID");
+  string(value.namespace_identity_sha256, SHA256, "TABLESPACE_NAMESPACE_IDENTITY_INVALID");
+  validateTablespaceFilesystemMetadata(value.namespace_metadata, "TABLESPACE_MAP_NAMESPACE_METADATA_INVALID");
+  validateTablespaceFilesystemMetadata(value.path_metadata, "TABLESPACE_MAP_PATH_METADATA_INVALID");
+  for (const entry of array(value.entries, "TABLESPACE_MAP_ENTRIES_INVALID")) {
+    exactKeys(entry, ["name", "host_path", "server_path"], "TABLESPACE_MAP_ENTRY_INVALID");
+    pgText(entry.name, "TABLESPACE_MAP_ENTRY_INVALID");
+    pgText(entry.host_path, "TABLESPACE_MAP_ENTRY_PATH_INVALID");
+    pgText(entry.server_path, "TABLESPACE_MAP_ENTRY_PATH_INVALID");
+    if (!path.isAbsolute(entry.host_path) || !path.isAbsolute(entry.server_path)) reject("TABLESPACE_MAP_ENTRY_PATH_INVALID");
+  }
+  orderedUnique(value.entries, "TABLESPACE_MAP_ENTRIES_NOT_CANONICAL", (entry) => entry.name);
+  return value;
+}
+
+function validateLegacyMapDocument(value, snapshot, expectedScope) {
+  exactKeys(value, ["schema_version", "contract", "map_id", "snapshot_sha256", "evidence_scope", "approved_host_root", "approved_server_root", "namespace_identity_sha256", "entries"], "TABLESPACE_MAP_INVALID");
+  if (value.schema_version !== 1 || value.contract !== LEGACY_TABLESPACE_MAP_CONTRACT) reject("TABLESPACE_MAP_CONTRACT_INVALID");
+  if (expectedScope !== "SYNTHETIC_TEST_ONLY" || value.evidence_scope !== "SYNTHETIC_TEST_ONLY") reject("TABLESPACE_LEGACY_MAP_READ_ONLY");
+  string(value.map_id, IDENTIFIER, "TABLESPACE_MAP_ID_INVALID");
+  if (value.snapshot_sha256 !== snapshot.snapshot_sha256) reject("TABLESPACE_MAP_SNAPSHOT_MISMATCH");
+  pgText(value.approved_host_root, "TABLESPACE_MAP_ROOT_INVALID");
+  pgText(value.approved_server_root, "TABLESPACE_MAP_ROOT_INVALID");
   if (!path.isAbsolute(value.approved_host_root) || !path.isAbsolute(value.approved_server_root)) reject("TABLESPACE_MAP_ROOT_INVALID");
   string(value.namespace_identity_sha256, SHA256, "TABLESPACE_NAMESPACE_IDENTITY_INVALID");
   for (const entry of array(value.entries, "TABLESPACE_MAP_ENTRIES_INVALID")) {
     exactKeys(entry, ["name", "host_path", "server_path"], "TABLESPACE_MAP_ENTRY_INVALID");
     pgText(entry.name, "TABLESPACE_MAP_ENTRY_INVALID");
+    pgText(entry.host_path, "TABLESPACE_MAP_ENTRY_PATH_INVALID");
+    pgText(entry.server_path, "TABLESPACE_MAP_ENTRY_PATH_INVALID");
     if (!path.isAbsolute(entry.host_path) || !path.isAbsolute(entry.server_path)) reject("TABLESPACE_MAP_ENTRY_PATH_INVALID");
   }
   orderedUnique(value.entries, "TABLESPACE_MAP_ENTRIES_NOT_CANONICAL", (entry) => entry.name);
   return value;
+}
+
+export function validateLegacyTablespaceMapDocument({ map: mapInput, snapshot: snapshotInput, policy: policyInput, evidenceScope = "SYNTHETIC_TEST_ONLY" }) {
+  const policy = validateClusterRecoveryPolicy(policyInput);
+  const snapshot = validateClusterSnapshot(snapshotInput, policy);
+  const map = validateLegacyMapDocument(mapInput, snapshot, evidenceScope);
+  const expectedNames = snapshot.catalog.tablespaces.map((item) => item.name);
+  if (map.entries.length !== expectedNames.length || map.entries.some((entry, index) => entry.name !== expectedNames[index])) reject("TABLESPACE_MAP_NAME_SET_MISMATCH");
+  return map;
 }
 
 export function validateTablespaceMapDocument({ map: mapInput, snapshot: snapshotInput, policy: policyInput, evidenceScope = "SYNTHETIC_TEST_ONLY" }) {
@@ -688,6 +770,7 @@ export async function validateTablespaceMap({
   const map = validateTablespaceMapDocument({ map: mapInput, snapshot, policy, evidenceScope });
   integer(expectedUid, 0, 2 ** 31 - 1, "TABLESPACE_EXPECTED_UID_INVALID");
   integer(expectedGid, 0, 2 ** 31 - 1, "TABLESPACE_EXPECTED_GID_INVALID");
+  const filesystem = tablespaceFilesystemPolicy(map, evidenceScope, expectedUid, expectedGid);
   if (!Array.isArray(prohibitedRoots) || prohibitedRoots.some((root) => typeof root !== "string" || !path.isAbsolute(root))) reject("TABLESPACE_PROHIBITED_ROOT_INVALID");
   string(expectedNamespaceIdentitySha256, SHA256, "TABLESPACE_NAMESPACE_IDENTITY_INVALID");
   if (map.namespace_identity_sha256 !== expectedNamespaceIdentitySha256) reject("TABLESPACE_NAMESPACE_IDENTITY_MISMATCH");
@@ -698,7 +781,8 @@ export async function validateTablespaceMap({
   const serverRoot = path.resolve(map.approved_server_root);
   const rootComponents = await noFollowPathComponents(hostRoot, { syntheticTmpAllowed: synthetic, code: "TABLESPACE_ROOT_UNSAFE" });
   const rootMetadata = rootComponents.at(-1).metadata;
-  if (rootMetadata.uid !== expectedUid || rootMetadata.gid !== expectedGid || (rootMetadata.mode & 0o777) !== 0o700) reject("TABLESPACE_ROOT_IDENTITY_MISMATCH");
+  if (rootMetadata.uid !== filesystem.namespace.uid || rootMetadata.gid !== filesystem.namespace.gid
+    || (rootMetadata.mode & 0o7777) !== filesystem.namespace.mode) reject("TABLESPACE_ROOT_IDENTITY_MISMATCH");
   if (await realpath(hostRoot) !== hostRoot) reject("TABLESPACE_ROOT_REALPATH_MISMATCH");
   for (const prohibitedRoot of prohibitedRoots.map((item) => path.resolve(item))) if (pathsOverlap(hostRoot, prohibitedRoot)) reject("TABLESPACE_ROOT_PROHIBITED");
 
@@ -712,7 +796,8 @@ export async function validateTablespaceMap({
     for (const prohibitedRoot of prohibitedRoots.map((item) => path.resolve(item))) if (pathsOverlap(hostPath, prohibitedRoot)) reject("TABLESPACE_PATH_PROHIBITED");
     const components = await noFollowPathComponents(hostPath, { syntheticTmpAllowed: synthetic, code: "TABLESPACE_PATH_UNSAFE" });
     const metadata = components.at(-1).metadata;
-    if (metadata.uid !== expectedUid || metadata.gid !== expectedGid || (metadata.mode & 0o777) !== 0o700) reject("TABLESPACE_PATH_IDENTITY_MISMATCH");
+    if (metadata.uid !== filesystem.entry.uid || metadata.gid !== filesystem.entry.gid
+      || (metadata.mode & 0o7777) !== filesystem.entry.mode) reject("TABLESPACE_PATH_IDENTITY_MISMATCH");
     if ((await readdir(hostPath)).length !== 0) reject("TABLESPACE_PATH_NOT_EMPTY");
     const resolvedRealpath = await realpath(hostPath);
     if (resolvedRealpath !== hostPath || seenRealpaths.has(resolvedRealpath)) reject("TABLESPACE_PATH_ALIAS");
@@ -802,6 +887,10 @@ async function verifyTablespacePathPhase({
     || clusterSha256(pathIdentity(metadata)) !== identity.host_identity_sha256
     || clusterSha256(serverPath) !== identity.server_path_sha256 || clusterSha256(serverPath) !== targetLocationSha256
     || empty !== expectedEmpty) reject(expectedEmpty ? "TABLESPACE_POST_DROP_IDENTITY_MISMATCH" : "TABLESPACE_POST_CREATE_IDENTITY_MISMATCH");
+  if (!expectedEmpty) {
+    const filesystem = validateTablespaceFilesystemMetadata(map.path_metadata, "TABLESPACE_MAP_PATH_METADATA_INVALID");
+    await validateTablespaceVersionDirectory(hostPath, filesystem, policy);
+  }
   await revalidatePathComponents(pathComponents, "TABLESPACE_PATH_CHANGED");
   await revalidatePathComponents(rootComponents, "TABLESPACE_ROOT_CHANGED");
   return true;
@@ -832,6 +921,7 @@ export async function verifyTablespaceMapAfterCreate({
   const map = validateTablespaceMapDocument({ map: mapInput, snapshot, policy, evidenceScope });
   integer(expectedUid, 0, 2 ** 31 - 1, "TABLESPACE_EXPECTED_UID_INVALID");
   integer(expectedGid, 0, 2 ** 31 - 1, "TABLESPACE_EXPECTED_GID_INVALID");
+  const filesystem = tablespaceFilesystemPolicy(map, evidenceScope, expectedUid, expectedGid);
   if (!Array.isArray(prohibitedRoots) || prohibitedRoots.some((root) => typeof root !== "string" || !path.isAbsolute(root))) reject("TABLESPACE_PROHIBITED_ROOT_INVALID");
   string(expectedNamespaceIdentitySha256, SHA256, "TABLESPACE_NAMESPACE_IDENTITY_INVALID");
   const preflight = validateTablespacePreflightEvidence({ preflightValidation, map, snapshot, policy, evidenceScope });
@@ -846,7 +936,8 @@ export async function verifyTablespaceMapAfterCreate({
   const prohibited = prohibitedRoots.map((item) => path.resolve(item));
   const rootComponents = await noFollowPathComponents(hostRoot, { syntheticTmpAllowed: synthetic, code: "TABLESPACE_ROOT_UNSAFE" });
   const rootMetadata = rootComponents.at(-1).metadata;
-  if (rootMetadata.uid !== expectedUid || rootMetadata.gid !== expectedGid || (rootMetadata.mode & 0o777) !== 0o700
+  if (rootMetadata.uid !== filesystem.namespace.uid || rootMetadata.gid !== filesystem.namespace.gid
+    || (rootMetadata.mode & 0o7777) !== filesystem.namespace.mode
     || clusterSha256(pathIdentity(rootMetadata)) !== preflight.rootIdentitySha256 || await realpath(hostRoot) !== hostRoot) reject("TABLESPACE_ROOT_CHANGED");
   for (const prohibitedRoot of prohibited) if (pathsOverlap(hostRoot, prohibitedRoot)) reject("TABLESPACE_ROOT_PROHIBITED");
   const postCreateIdentities = [];
@@ -859,13 +950,22 @@ export async function verifyTablespaceMapAfterCreate({
     const metadata = components.at(-1).metadata;
     const identity = preflight.identities[index];
     const targetTablespace = targetCatalog.tablespaces[index];
-    if (metadata.uid !== expectedUid || metadata.gid !== expectedGid || (metadata.mode & 0o777) !== 0o700
+    if (metadata.uid !== filesystem.entry.uid || metadata.gid !== filesystem.entry.gid
+      || (metadata.mode & 0o7777) !== filesystem.entry.mode
       || await realpath(hostPath) !== hostPath || (await readdir(hostPath)).length === 0
       || identity.name !== entry.name || identity.host_identity_sha256 !== clusterSha256(pathIdentity(metadata))
       || identity.server_path_sha256 !== clusterSha256(serverPath) || targetTablespace.name !== entry.name
       || targetTablespace.source_location_sha256 !== clusterSha256(serverPath)) reject("TABLESPACE_POST_CREATE_IDENTITY_MISMATCH");
+    const versionDirectory = await validateTablespaceVersionDirectory(hostPath, filesystem.entry, policy);
     await revalidatePathComponents(components, "TABLESPACE_PATH_CHANGED");
-    postCreateIdentities.push({ name: entry.name, host_identity_sha256: identity.host_identity_sha256, server_path_sha256: identity.server_path_sha256, target_location_sha256: targetTablespace.source_location_sha256 });
+    postCreateIdentities.push({
+      name: entry.name,
+      host_identity_sha256: identity.host_identity_sha256,
+      server_path_sha256: identity.server_path_sha256,
+      target_location_sha256: targetTablespace.source_location_sha256,
+      version_directory_name_sha256: versionDirectory.name_sha256,
+      version_directory_identity_sha256: versionDirectory.identity_sha256,
+    });
   }
   await revalidatePathComponents(rootComponents, "TABLESPACE_ROOT_CHANGED");
   return Object.freeze({
@@ -880,7 +980,7 @@ async function readStableFile(file, { maxBytes, expectedUid, allowedModes, code 
   const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => reject(code));
   try {
     const before = await handle.stat();
-    if (!before.isFile() || before.nlink !== 1 || before.uid !== expectedUid || !allowedModes.includes(before.mode & 0o777)
+    if (!before.isFile() || before.nlink !== 1 || before.uid !== expectedUid || !allowedModes.includes(before.mode & 0o7777)
       || before.size <= 0 || before.size > maxBytes) reject(code);
     const bytes = await handle.readFile();
     const after = await handle.stat();
@@ -899,7 +999,7 @@ async function validatePrivateRoot(rootInput, markerName, markerValue, { synthet
   if (!syntheticTmpAllowed && isInside(root, os.tmpdir())) reject(code);
   const components = await noFollowPathComponents(root, { syntheticTmpAllowed, code });
   const metadata = components.at(-1).metadata;
-  if (metadata.uid !== expectedUid || (metadata.mode & 0o777) !== 0o700 || await realpath(root) !== root) reject(code);
+  if (metadata.uid !== expectedUid || (metadata.mode & 0o7777) !== 0o700 || await realpath(root) !== root) reject(code);
   if (components.some((component) => component.metadata.uid !== 0 && component.metadata.uid !== expectedUid)) reject(code);
   const marker = path.join(root, markerName);
   const markerRecord = await readStableFile(marker, { maxBytes: 256, expectedUid, allowedModes: [0o400], code });
@@ -1195,7 +1295,7 @@ async function reconcileCommittedRecoveryLink(file, code) {
   const target = await lstat(file).catch((error) => error?.code === "ENOENT" ? null : reject(code));
   if (target === null || target.nlink === 1) return;
   if (!target.isFile() || target.isSymbolicLink() || target.nlink !== 2 || target.uid !== (process.getuid?.() ?? 0)
-    || (target.mode & 0o777) !== 0o400) reject(code);
+    || (target.mode & 0o7777) !== 0o400) reject(code);
   const directory = path.dirname(file), basename = path.basename(file);
   const escaped = basename.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   const pattern = new RegExp(`^\\.${escaped}\\.[0-9]+\\.[0-9]+\\.tmp$`, "u"), candidates = [];

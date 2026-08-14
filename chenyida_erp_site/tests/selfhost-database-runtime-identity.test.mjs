@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { Pool } from "pg";
 
-import { createRuntimeVerifier } from "../db/index.ts";
+import { installRuntimeCheckoutVerification } from "../db/index.ts";
+import { CONTROLLED_SEARCH_PATH, CONTROLLED_STARTUP_OPTIONS } from "../scripts/postgresql-session-profile.ts";
 import {
   assertDatabaseRuntimeIdentity,
+  assertIsolatedDatabaseTarget,
   databasePoolConfiguration,
   databaseRuntimePolicy,
   DatabaseRuntimeError,
@@ -46,7 +51,10 @@ function validWebRow(policy) {
     role_bypass_rls: false,
     role_inherit: true,
     role_connection_limit: 12,
+    role_valid_until_absent: true,
+    search_path_exact: true,
     role_settings_absent: true,
+    database_settings_absent: true,
     membership_valid: true,
     dangerous_membership_absent: true,
     owner_membership_absent: true,
@@ -70,14 +78,30 @@ function validWebRow(policy) {
   };
 }
 
+function identityClient(row) {
+  return {
+    async query(sql) {
+      if (sql === "ROLLBACK") return { rows: [] };
+      return sql.includes("set_config")
+        ? { rows: [{ search_path: CONTROLLED_SEARCH_PATH }] }
+        : { rows: [row] };
+    },
+  };
+}
+
 test("runtime database identity accepts the exact web role and canary boundary", async () => {
   const policy = webPolicy();
   assert.ok(policy);
   assert.equal(policy.privilegeGroup, "chenyida_erp_web_priv");
   const client = {
     async query(sql, values) {
+      if (sql === "ROLLBACK") return { rows: [] };
+      if (sql.includes("set_config")) {
+        assert.deepEqual(values, [CONTROLLED_SEARCH_PATH]);
+        return { rows: [{ search_path: CONTROLLED_SEARCH_PATH }] };
+      }
       assert.match(sql, /pg_catalog\.pg_auth_members/);
-      assert.deepEqual(values, [policy.role, policy.privilegeGroup, policy.ownerRole]);
+      assert.deepEqual(values, [policy.role, policy.privilegeGroup, policy.ownerRole, CONTROLLED_SEARCH_PATH]);
       return { rows: [validWebRow(policy)] };
     },
   };
@@ -101,10 +125,9 @@ test("runtime database identity keeps the one-shot admin away from migration his
     lease_select: false,
     users_update: false,
   };
-  const client = { async query() { return { rows: [row] }; } };
-  await assert.doesNotReject(assertDatabaseRuntimeIdentity(client, policy));
+  await assert.doesNotReject(assertDatabaseRuntimeIdentity(identityClient(row), policy));
   await assert.rejects(
-    assertDatabaseRuntimeIdentity({ async query() { return { rows: [{ ...row, migration_select: true }] }; } }, policy),
+    assertDatabaseRuntimeIdentity(identityClient({ ...row, migration_select: true }), policy),
     runtimeError,
   );
 });
@@ -113,7 +136,10 @@ test("runtime database identity rejects role swaps, dangerous capabilities and c
   const policy = webPolicy();
   for (const mutation of [
     { current_role_name: "chenyida_erp_worker" },
+    { search_path_exact: false },
+    { database_settings_absent: false },
     { role_superuser: true },
+    { role_valid_until_absent: false },
     { dangerous_membership_absent: false },
     { owner_membership_absent: false },
     { membership_valid: false },
@@ -122,7 +148,7 @@ test("runtime database identity rejects role swaps, dangerous capabilities and c
     { lease_update: true },
     { users_delete: true },
   ]) {
-    const client = { async query() { return { rows: [{ ...validWebRow(policy), ...mutation }] }; } };
+    const client = identityClient({ ...validWebRow(policy), ...mutation });
     await assert.rejects(assertDatabaseRuntimeIdentity(client, policy), runtimeError);
   }
 });
@@ -138,7 +164,7 @@ test("runtime database identity converts database errors to a stable non-leaking
   });
 });
 
-test("pg pool blocks first physical connection delivery until runtime verification completes", async () => {
+test("pg pool blocks every checkout until runtime verification completes", async () => {
   const policy = webPolicy();
   let resolveIdentity;
   let connectDelivered = false;
@@ -146,18 +172,21 @@ test("pg pool blocks first physical connection delivery until runtime verificati
     _queryable = true;
     _ending = false;
     connect(callback) { callback(); }
-    query() { return new Promise((resolve) => { resolveIdentity = resolve; }); }
+    query(sql) {
+      if (sql === "ROLLBACK") return Promise.resolve({ rows: [] });
+      if (sql.includes("set_config")) return Promise.resolve({ rows: [{ search_path: CONTROLLED_SEARCH_PATH }] });
+      return new Promise((resolve) => { resolveIdentity = resolve; });
+    }
     end(callback) { this._ending = true; callback?.(); }
     ref() {}
     unref() {}
   }
   // A fake Client keeps this a pure in-process pg-pool contract test; no database is contacted.
-  const pool = Reflect.construct(Pool, [{
+  const pool = installRuntimeCheckoutVerification(Reflect.construct(Pool, [{
     Client: FakeClient,
     max: 1,
     connectionTimeoutMillis: 1_000,
-    verify: createRuntimeVerifier(policy),
-  }]);
+  }]), policy);
   const pending = pool.connect().then((client) => {
     connectDelivered = true;
     return client;
@@ -168,6 +197,48 @@ test("pg pool blocks first physical connection delivery until runtime verificati
   const client = await pending;
   assert.equal(connectDelivered, true);
   client.release();
+  await pool.end();
+});
+
+test("pg pool revalidates an idle client and destroys role-contaminated sessions", async () => {
+  const policy = webPolicy();
+  let roleContaminated = false;
+  let inTransaction = true;
+  let identityChecks = 0;
+  class FakeClient extends EventEmitter {
+    _queryable = true;
+    _ending = false;
+    connect(callback) { callback(); }
+    query(sql) {
+      if (sql === "ROLLBACK") {
+        inTransaction = false;
+        return Promise.resolve({ rows: [] });
+      }
+      if (sql.includes("set_config")) return Promise.resolve({ rows: [{ search_path: CONTROLLED_SEARCH_PATH }] });
+      identityChecks += 1;
+      return Promise.resolve({ rows: [{
+        ...validWebRow(policy),
+        ...(roleContaminated ? { current_role_name: "chenyida_erp_worker" } : {}),
+      }] });
+    }
+    end(callback) { this._ending = true; callback?.(); }
+    ref() {}
+    unref() {}
+  }
+  const pool = installRuntimeCheckoutVerification(Reflect.construct(Pool, [{
+    Client: FakeClient,
+    max: 1,
+    connectionTimeoutMillis: 1_000,
+  }]), policy);
+  const first = await pool.connect();
+  assert.equal(inTransaction, false);
+  first.release();
+  inTransaction = true;
+  roleContaminated = true;
+  await assert.rejects(pool.connect(), runtimeError);
+  assert.equal(inTransaction, false);
+  assert.equal(identityChecks, 2);
+  assert.equal(pool.totalCount, 0);
   await pool.end();
 });
 
@@ -183,12 +254,53 @@ test("isolated test pool keeps guarded environment compatibility", () => {
     assert.equal(resolved.policy, null);
     assert.equal(resolved.pool.max, 2);
     assert.equal(resolved.pool.application_name, "runtime-identity-isolated-test");
-    process.env.DATABASE_URL = "postgresql://postgres@example.invalid/production";
+    assert.equal(resolved.pool.options, undefined);
+    assert.equal(CONTROLLED_STARTUP_OPTIONS, "-c search_path=pg_catalog,public,pg_temp");
+    process.env.DATABASE_URL = "postgresql://postgres@example.invalid/runtime_identity_test";
     assert.throws(
       () => databasePoolConfiguration({ environment: "test", deploymentClass: "test" }),
-      (error) => error instanceof DatabaseRuntimeError && error.code === "TEST_DATABASE_TARGET_INVALID",
+      (error) => error instanceof DatabaseRuntimeError && error.code === "ISOLATED_DATABASE_HOST_INVALID",
     );
   } finally {
     process.env = saved;
+  }
+});
+
+test("isolated database target parsing rejects remote, option and deployment downgrades", () => {
+  const isolated = { environment: "test", deploymentClass: "test" };
+  const root = mkdtempSync(path.join(tmpdir(), "cyd-runtime-identity-"));
+  const socket = path.join(root, "socket");
+  mkdirSync(socket, { mode: 0o700 });
+  try {
+    assert.doesNotThrow(() => assertIsolatedDatabaseTarget(isolated, "postgresql://postgres@localhost/runtime_identity_test"));
+    assert.doesNotThrow(() => assertIsolatedDatabaseTarget(isolated, `postgresql://postgres@/runtime_identity_test?host=${socket}`));
+    for (const [url, code] of [
+      ["postgresql://test-user@example.invalid/runtime_identity_test", "ISOLATED_DATABASE_HOST_INVALID"],
+      ["postgresql://postgres@erp-task-test-pg/runtime_identity_test", "ISOLATED_DATABASE_HOST_INVALID"],
+      ["postgresql://postgres@localhost/runtime_identity_test?sslmode=disable", "ISOLATED_DATABASE_OPTIONS_INVALID"],
+      ["postgresql://postgres@localhost/chenyida_erp", "ISOLATED_DATABASE_NAME_INVALID"],
+      ["postgresql://postgres@/runtime_identity_test?host=/var/run/postgresql", "ISOLATED_DATABASE_SOCKET_INVALID"],
+    ]) {
+      assert.throws(
+        () => assertIsolatedDatabaseTarget(isolated, url),
+        (error) => error instanceof DatabaseRuntimeError && error.code === code && !error.message.includes(url),
+      );
+    }
+    const linkedRoot = mkdtempSync(path.join(tmpdir(), "cyd-runtime-identity-link-"));
+    try {
+      symlinkSync(socket, path.join(linkedRoot, "socket"));
+      assert.throws(
+        () => assertIsolatedDatabaseTarget(isolated, `postgresql://postgres@/runtime_identity_test?host=${linkedRoot}/socket`),
+        (error) => error instanceof DatabaseRuntimeError && error.code === "ISOLATED_DATABASE_SOCKET_INVALID",
+      );
+    } finally {
+      rmSync(linkedRoot, { recursive: true, force: true });
+    }
+    assert.throws(
+      () => assertIsolatedDatabaseTarget({ environment: "development", deploymentClass: "test" }, "postgresql://postgres@localhost/runtime_identity_test"),
+      (error) => error instanceof DatabaseRuntimeError && error.code === "ISOLATED_DATABASE_DEPLOYMENT_INVALID",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

@@ -1,5 +1,6 @@
 import { closeDb, getPool } from "../db/index.ts";
 import { runtimeConfig } from "../app/lib/infrastructure/config.ts";
+import { assertControlledRuntimeServiceKind } from "../app/lib/infrastructure/runtime-secret.ts";
 import { resolveRuntimeIdentity, runtimeReadinessErrorCode } from "../app/lib/runtime-readiness/identity.ts";
 import { loadRuntimeMigrationManifest } from "../app/lib/runtime-readiness/migration.ts";
 import {
@@ -10,6 +11,7 @@ import {
 
 async function main(): Promise<void> {
   const config = runtimeConfig();
+  assertControlledRuntimeServiceKind(config.deploymentClass, "WORKER");
   const identity = resolveRuntimeIdentity({ config });
   const migrations = await loadRuntimeMigrationManifest();
   const instanceId = await readWorkerInstanceFile();

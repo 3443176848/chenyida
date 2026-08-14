@@ -16,8 +16,8 @@ const siteRoot = path.resolve(import.meta.dirname, "..");
 const expectedServiceCounts = Object.freeze({
   ADMIN: Object.freeze({ files: 2, table: [0, 6, 4, 1], sequence: [0, 4, 0], routine: [0, 0] }),
   BACKUP: Object.freeze({ files: 3, table: [0, 0, 234, 0], sequence: [211, 0, 0], routine: [0, 1] }),
-  WEB: Object.freeze({ files: 171, table: [9, 190, 209, 79], sequence: [0, 173, 0], routine: [27, 1] }),
-  WORKER: Object.freeze({ files: 58, table: [7, 25, 33, 16], sequence: [0, 23, 0], routine: [0, 0] }),
+  WEB: Object.freeze({ files: 172, table: [9, 190, 209, 79], sequence: [0, 173, 0], routine: [27, 1] }),
+  WORKER: Object.freeze({ files: 59, table: [7, 25, 33, 16], sequence: [0, 23, 0], routine: [0, 0] }),
 });
 
 function counts(service) {

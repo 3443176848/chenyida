@@ -10,7 +10,7 @@
   "sources": [
     {
       "path": "Dockerfile",
-      "sha256": "e60cb1fdf47be48303a9f4c89a36257cd424aa36829d86f51c3df2b6b38195a1"
+      "sha256": "6e3e6f470d2783256d8453bfa21cda438fcac72100f18aaaa5bd2788eef18014"
     },
     {
       "path": "compose.release.yml",
@@ -18,17 +18,21 @@
     },
     {
       "path": "compose.yml",
-      "sha256": "d78bf5b62305dc65e5fe775c7ae4bdd8378db5ac9364c8a2272f2e6a8e32124c"
+      "sha256": "2f4b8aad65bcefb4d603825543ebd6ec09674f9e5cfef7b30e88afa5944a0bfa"
     },
     {
       "path": "deploy/Caddyfile",
       "sha256": "9302c1191d1460dcb34ecceef841100bef97fd8800676a6ddc899cd65ddfc9e9"
+    },
+    {
+      "path": "operations/runtime-secret-file-policy-v1.json",
+      "sha256": "8dd07c6acd6e857a0b29b14e2b6d5b60ad919cf54aac9b552ce11672eb45b7c5"
     }
   ],
   "project": {
     "name": "chenyida-erp",
     "services": ["admin", "caddy", "migrate", "postgres", "web", "worker"],
-    "volumes": ["caddy_config", "caddy_data", "erp_attachments", "erp_backup_status", "erp_postgres", "erp_uploads"],
+    "volumes": ["caddy_config", "caddy_data", "erp_attachments", "erp_backup_status", "erp_postgres", "erp_postgres_tablespaces", "erp_uploads"],
     "networks": ["backend", "edge"]
   },
   "global_forbidden": {
@@ -84,8 +88,6 @@
     ]
   },
   "app_environment_keys": [
-    "DATABASE_POOL_MAX",
-    "DATABASE_URL",
     "ERP_ATTACHMENT_ROOT",
     "ERP_BACKUP_EVIDENCE_TRUST_MODE",
     "ERP_BACKUP_EXPECTED_OFFHOST_LOCATION_ID",
@@ -110,7 +112,6 @@
     "ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256",
     "ERP_RELEASE_EXPECTED_VERSION",
     "ERP_RELEASE_IDENTITY_MAX_AGE_SECONDS",
-    "ERP_SETUP_TOKEN",
     "ERP_UAT_ALLOW_LOOPBACK_ORIGIN",
     "ERP_UPLOAD_ROOT",
     "ERP_WORKER_LEASE_SECONDS",
@@ -119,9 +120,10 @@
   "services": [
     {
       "service": "admin",
-      "allowed_compose_fields": ["cap_drop", "command", "cpus", "depends_on", "entrypoint", "environment", "image", "logging", "mem_limit", "memswap_limit", "networks", "pids_limit", "profiles", "read_only", "restart", "security_opt", "tmpfs", "user"],
+      "allowed_compose_fields": ["cap_drop", "command", "cpus", "depends_on", "entrypoint", "environment", "image", "logging", "mem_limit", "memswap_limit", "networks", "pids_limit", "profiles", "read_only", "restart", "security_opt", "tmpfs", "user", "volumes"],
       "image": { "kind": "worker_candidate", "reference": null },
       "image_declared_volumes": [],
+      "image_environment_keys": ["ERP_RUNTIME_BUILD_VERSION", "ERP_RUNTIME_GIT_COMMIT", "NODE_ENV", "PATH", "SSL_CERT_FILE"],
       "user": "65532:65532",
       "groups": [],
       "read_only_rootfs": true,
@@ -129,7 +131,10 @@
       "cap_add": [],
       "security_options": ["no-new-privileges:true"],
       "tmpfs": ["/tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777"],
-      "mounts": [],
+      "mounts": [
+        { "type": "bind", "source": "/etc/chenyida-erp/runtime-secrets/admin-database-password", "target": "/run/chenyida-erp-secrets/admin-database-password", "read_only": true, "create_host_path": false },
+        { "type": "bind", "source": "/etc/chenyida-erp/runtime-secrets/admin-password", "target": "/run/chenyida-erp-secrets/admin-password", "read_only": true, "create_host_path": false }
+      ],
       "ports": [],
       "networks": ["backend"],
       "dependencies": { "migrate": "service_completed_successfully" },
@@ -139,7 +144,7 @@
       "process": { "entrypoint": null, "command": ["node", "--experimental-strip-types", "scripts/init-admin.ts"] },
       "healthcheck": null,
       "environment_profile": "app_release",
-      "environment_additions": ["ERP_ADMIN_DISPLAY_NAME", "ERP_ADMIN_PASSWORD", "ERP_ADMIN_USERNAME"],
+      "environment_additions": ["ERP_ADMIN_DISPLAY_NAME", "ERP_ADMIN_USERNAME", "ERP_SERVICE_KIND"],
       "exception": null
     },
     {
@@ -147,6 +152,7 @@
       "allowed_compose_fields": ["cap_add", "cap_drop", "command", "cpus", "depends_on", "entrypoint", "environment", "image", "logging", "mem_limit", "memswap_limit", "networks", "pids_limit", "ports", "profiles", "read_only", "restart", "security_opt", "user", "volumes"],
       "image": { "kind": "fixed", "reference": "caddy@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d" },
       "image_declared_volumes": [],
+      "image_environment_keys": ["CADDY_VERSION", "PATH", "XDG_CONFIG_HOME", "XDG_DATA_HOME"],
       "user": "0:0",
       "groups": [],
       "read_only_rootfs": true,
@@ -180,6 +186,7 @@
       "allowed_compose_fields": ["cap_drop", "command", "cpus", "depends_on", "entrypoint", "environment", "image", "logging", "mem_limit", "memswap_limit", "networks", "pids_limit", "read_only", "restart", "security_opt", "tmpfs", "user", "volumes"],
       "image": { "kind": "worker_candidate", "reference": null },
       "image_declared_volumes": [],
+      "image_environment_keys": ["ERP_RUNTIME_BUILD_VERSION", "ERP_RUNTIME_GIT_COMMIT", "NODE_ENV", "PATH", "SSL_CERT_FILE"],
       "user": "65532:0",
       "groups": [],
       "read_only_rootfs": true,
@@ -188,7 +195,8 @@
       "security_options": ["no-new-privileges:true"],
       "tmpfs": ["/tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777"],
       "mounts": [
-        { "type": "bind", "source": "/var/lib/chenyida-erp/release-candidate", "target": "/run/chenyida-erp-release-candidate", "read_only": true, "create_host_path": false }
+        { "type": "bind", "source": "/var/lib/chenyida-erp/release-candidate", "target": "/run/chenyida-erp-release-candidate", "read_only": true, "create_host_path": false },
+        { "type": "bind", "source": "/etc/chenyida-erp/runtime-secrets/migration-database-password", "target": "/run/chenyida-erp-secrets/migration-database-password", "read_only": true, "create_host_path": false }
       ],
       "ports": [],
       "networks": ["backend"],
@@ -199,7 +207,7 @@
       "process": { "entrypoint": null, "command": ["node", "--experimental-strip-types", "scripts/migrate-postgres.ts"] },
       "healthcheck": null,
       "environment_profile": "app_release",
-      "environment_additions": ["ERP_ALLOW_PRODUCTION_MIGRATION", "ERP_MIGRATION_CONFIRM", "ERP_MIGRATION_EXPECTED_CURRENT_HEAD", "ERP_MIGRATION_EXPECTED_DATABASE", "ERP_MIGRATION_EXPECTED_DATABASE_MARKER", "ERP_MIGRATION_EXPECTED_DATABASE_OID", "ERP_MIGRATION_EXPECTED_ROLE", "ERP_MIGRATION_EXPECTED_SYSTEM_IDENTIFIER", "ERP_MIGRATION_EXPECTED_TARGET_HEAD", "ERP_RELEASE_MANIFEST_FILE", "ERP_RELEASE_MANIFEST_SHA256"],
+      "environment_additions": ["ERP_ALLOW_PRODUCTION_MIGRATION", "ERP_MIGRATION_CONFIRM", "ERP_MIGRATION_EXPECTED_CURRENT_HEAD", "ERP_MIGRATION_EXPECTED_DATABASE", "ERP_MIGRATION_EXPECTED_DATABASE_MARKER", "ERP_MIGRATION_EXPECTED_DATABASE_OID", "ERP_MIGRATION_EXPECTED_ROLE", "ERP_MIGRATION_EXPECTED_SYSTEM_IDENTIFIER", "ERP_MIGRATION_EXPECTED_TARGET_HEAD", "ERP_RELEASE_MANIFEST_FILE", "ERP_RELEASE_MANIFEST_SHA256", "ERP_SERVICE_KIND"],
       "exception": "MIGRATE_ROOT_GROUP_RELEASE_READER_V1"
     },
     {
@@ -207,6 +215,7 @@
       "allowed_compose_fields": ["cap_drop", "command", "cpus", "entrypoint", "environment", "healthcheck", "image", "logging", "mem_limit", "memswap_limit", "networks", "pids_limit", "read_only", "restart", "security_opt", "shm_size", "tmpfs", "user", "volumes"],
       "image": { "kind": "fixed", "reference": "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394" },
       "image_declared_volumes": ["/var/lib/postgresql/data"],
+      "image_environment_keys": ["GOSU_VERSION", "LANG", "PATH", "PGDATA", "PG_MAJOR", "PG_VERSION"],
       "user": "999:999",
       "groups": [],
       "read_only_rootfs": true,
@@ -215,10 +224,13 @@
       "security_options": ["no-new-privileges:true"],
       "tmpfs": [
         "/tmp:rw,nosuid,nodev,noexec,size=32m,mode=1777",
+        "/run/chenyida-erp-secrets:rw,nosuid,nodev,noexec,size=1m,uid=0,gid=0,mode=0555",
         "/var/run/postgresql:rw,nosuid,nodev,noexec,size=16m,uid=999,gid=999,mode=3775"
       ],
       "mounts": [
-        { "type": "volume", "source": "erp_postgres", "target": "/var/lib/postgresql/data", "read_only": false, "create_host_path": null }
+        { "type": "volume", "source": "erp_postgres", "target": "/var/lib/postgresql/data", "read_only": false, "create_host_path": null },
+        { "type": "volume", "source": "erp_postgres_tablespaces", "target": "/var/lib/postgresql/tablespaces", "read_only": false, "create_host_path": null },
+        { "type": "bind", "source": "/etc/chenyida-erp/runtime-secrets/postgres-bootstrap-password", "target": "/run/chenyida-erp-secrets/postgres-bootstrap-password", "read_only": true, "create_host_path": false }
       ],
       "ports": [],
       "networks": ["backend"],
@@ -229,7 +241,7 @@
       "process": { "entrypoint": null, "command": null },
       "healthcheck": { "test": ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], "interval": "5s", "timeout": "5s", "retries": 20, "start_period": null },
       "environment_profile": "direct",
-      "environment_additions": ["POSTGRES_DB", "POSTGRES_PASSWORD", "POSTGRES_USER"],
+      "environment_additions": ["POSTGRES_DB", "POSTGRES_PASSWORD_FILE", "POSTGRES_USER"],
       "exception": null
     },
     {
@@ -237,6 +249,7 @@
       "allowed_compose_fields": ["cap_drop", "command", "cpus", "depends_on", "entrypoint", "environment", "group_add", "healthcheck", "image", "init", "logging", "mem_limit", "memswap_limit", "networks", "pids_limit", "ports", "read_only", "restart", "security_opt", "tmpfs", "user", "volumes"],
       "image": { "kind": "web_candidate", "reference": null },
       "image_declared_volumes": [],
+      "image_environment_keys": ["ERP_RUNTIME_BUILD_VERSION", "ERP_RUNTIME_GIT_COMMIT", "HOSTNAME", "NODE_ENV", "PATH", "PORT", "SSL_CERT_FILE"],
       "user": "65532:65532",
       "groups": ["$RELEASE_IDENTITY_READER_GID"],
       "read_only_rootfs": true,
@@ -248,7 +261,8 @@
         { "type": "volume", "source": "erp_uploads", "target": "/data/chenyida-erp/uploads", "read_only": false, "create_host_path": null },
         { "type": "volume", "source": "erp_attachments", "target": "/data/chenyida-erp/attachments", "read_only": false, "create_host_path": null },
         { "type": "volume", "source": "erp_backup_status", "target": "/data/chenyida-erp/backup-status", "read_only": true, "create_host_path": null },
-        { "type": "bind", "source": "/var/lib/chenyida-erp/release-identity", "target": "/run/chenyida-erp-release", "read_only": true, "create_host_path": false }
+        { "type": "bind", "source": "/var/lib/chenyida-erp/release-identity", "target": "/run/chenyida-erp-release", "read_only": true, "create_host_path": false },
+        { "type": "bind", "source": "/etc/chenyida-erp/runtime-secrets/web-database-password", "target": "/run/chenyida-erp-secrets/web-database-password", "read_only": true, "create_host_path": false }
       ],
       "ports": [
         { "host_ip": "127.0.0.1", "target": 3000, "protocol": "tcp", "published_environment": "ERP_HTTP_PORT", "published_default": "3000" }
@@ -261,7 +275,7 @@
       "process": { "entrypoint": null, "command": null },
       "healthcheck": { "test": ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"], "interval": "10s", "timeout": "5s", "retries": 12, "start_period": "15s" },
       "environment_profile": "app_release",
-      "environment_additions": ["ERP_PROCESS_NAME", "NODE_OPTIONS", "PORT"],
+      "environment_additions": ["ERP_PROCESS_NAME", "ERP_SERVICE_KIND", "NODE_OPTIONS", "PORT"],
       "exception": "WEB_RELEASE_IDENTITY_READER_GROUP_V1"
     },
     {
@@ -269,6 +283,7 @@
       "allowed_compose_fields": ["cap_drop", "command", "cpus", "depends_on", "entrypoint", "environment", "healthcheck", "image", "init", "logging", "mem_limit", "memswap_limit", "networks", "pids_limit", "read_only", "restart", "security_opt", "stop_grace_period", "tmpfs", "user", "volumes"],
       "image": { "kind": "worker_candidate", "reference": null },
       "image_declared_volumes": [],
+      "image_environment_keys": ["ERP_RUNTIME_BUILD_VERSION", "ERP_RUNTIME_GIT_COMMIT", "NODE_ENV", "PATH", "SSL_CERT_FILE"],
       "user": "65532:65532",
       "groups": [],
       "read_only_rootfs": true,
@@ -278,7 +293,8 @@
       "tmpfs": ["/tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777"],
       "mounts": [
         { "type": "volume", "source": "erp_uploads", "target": "/data/chenyida-erp/uploads", "read_only": false, "create_host_path": null },
-        { "type": "volume", "source": "erp_attachments", "target": "/data/chenyida-erp/attachments", "read_only": false, "create_host_path": null }
+        { "type": "volume", "source": "erp_attachments", "target": "/data/chenyida-erp/attachments", "read_only": false, "create_host_path": null },
+        { "type": "bind", "source": "/etc/chenyida-erp/runtime-secrets/worker-database-password", "target": "/run/chenyida-erp-secrets/worker-database-password", "read_only": true, "create_host_path": false }
       ],
       "ports": [],
       "networks": ["backend"],
@@ -289,7 +305,7 @@
       "process": { "entrypoint": null, "command": null },
       "healthcheck": { "test": ["CMD", "node", "--experimental-strip-types", "scripts/worker-readiness-check.ts"], "interval": "10s", "timeout": "5s", "retries": 6, "start_period": "15s" },
       "environment_profile": "app_release",
-      "environment_additions": ["ERP_PROCESS_NAME", "ERP_WORKER_INSTANCE_FILE", "NODE_OPTIONS"],
+      "environment_additions": ["ERP_PROCESS_NAME", "ERP_SERVICE_KIND", "ERP_WORKER_INSTANCE_FILE", "NODE_OPTIONS"],
       "exception": null
     }
   ]

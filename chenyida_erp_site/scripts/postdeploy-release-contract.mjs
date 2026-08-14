@@ -94,7 +94,7 @@ export function validatePostDeployReadiness(value) {
 }
 
 export function validatePostDeployReceipt(value) {
-  exactKeys(value, ["schema_version", "contract", "run_id", "generated_at", "result", "runtime_guard", "control", "deployment", "release", "source", "migrations", "runtime_policy_sha256", "services", "readiness"], "POSTDEPLOY_RECEIPT_FIELDS_INVALID");
+  exactKeys(value, ["schema_version", "contract", "run_id", "generated_at", "result", "runtime_guard", "control", "deployment", "release", "source", "migrations", "runtime_policy_sha256", "runtime_configuration_sha256", "services", "readiness"], "POSTDEPLOY_RECEIPT_FIELDS_INVALID");
   if (value.schema_version !== 1 || value.contract !== POSTDEPLOY_RECEIPT_CONTRACT || value.result !== "PASS") reject("POSTDEPLOY_RECEIPT_VERSION_INVALID");
   string(value.run_id, RUN_IDENTIFIER, "POSTDEPLOY_RUN_ID_INVALID", 101); iso(value.generated_at, "POSTDEPLOY_TIME_INVALID");
   try { validateRuntimeGuardBinding(value.runtime_guard, POST_DEPLOY_RUNTIME_GUARD_MODE, "POSTDEPLOY_RUNTIME_GUARD_INVALID"); } catch (error) { reject(error?.code || "POSTDEPLOY_RUNTIME_GUARD_INVALID"); }
@@ -112,13 +112,14 @@ export function validatePostDeployReceipt(value) {
   exactKeys(value.migrations, ["head", "manifest_sha256"], "POSTDEPLOY_MIGRATION_FIELDS_INVALID");
   string(value.migrations.head, MIGRATION, "POSTDEPLOY_MIGRATION_INVALID", 160); string(value.migrations.manifest_sha256, SHA256, "POSTDEPLOY_MIGRATION_INVALID", 64);
   if (value.runtime_policy_sha256 !== RELEASE_RUNTIME_POLICY_SHA256) reject("POSTDEPLOY_RUNTIME_POLICY_INVALID");
+  string(value.runtime_configuration_sha256, SHA256, "POSTDEPLOY_RUNTIME_CONFIGURATION_INVALID", 64);
   validatePostDeployRuntimeServices(value.services); validatePostDeployReadiness(value.readiness);
   if (Math.abs(Date.parse(value.readiness.database_time) - Date.parse(value.generated_at)) > MAX_CLOCK_SKEW_MS) reject("POSTDEPLOY_CLOCK_SKEW_INVALID");
   if (value.readiness.deployment_class !== value.deployment.class || value.readiness.deployment_id !== value.deployment.id || value.readiness.version !== value.source.application_version || value.readiness.revision !== value.source.git_commit.slice(0, 12) || value.readiness.migration_head !== value.migrations.head || value.readiness.migration_manifest_sha256 !== value.migrations.manifest_sha256) reject("POSTDEPLOY_READINESS_IDENTITY_MISMATCH");
   return value;
 }
 
-export function buildPostDeployReceipt({ runId, generatedAt, deploymentClass, deploymentId, composeProject, manifest, manifestSha256, supervisorBundleSha256, authorizationSha256, runtimePolicySha256, services, readiness }) {
+export function buildPostDeployReceipt({ runId, generatedAt, deploymentClass, deploymentId, composeProject, manifest, manifestSha256, supervisorBundleSha256, authorizationSha256, runtimePolicySha256, runtimeConfigurationSha256, services, readiness }) {
   validateReleaseManifest(manifest, { now: new Date(generatedAt), requireEligible: true });
   string(manifestSha256, SHA256, "POSTDEPLOY_MANIFEST_SHA256_INVALID", 64);
   if (sha256(canonicalJson(manifest)) !== manifestSha256) reject("POSTDEPLOY_MANIFEST_SHA256_MISMATCH");
@@ -145,6 +146,7 @@ export function buildPostDeployReceipt({ runId, generatedAt, deploymentClass, de
     source: { application_version: manifest.source.package_version, git_commit: manifest.source.git_commit, git_tree: manifest.source.git_tree },
     migrations: { head: manifest.migrations.head, manifest_sha256: manifest.migrations.allowlist_sha256 },
     runtime_policy_sha256: runtimePolicySha256,
+    runtime_configuration_sha256: runtimeConfigurationSha256,
     services,
     readiness,
   });

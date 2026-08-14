@@ -204,14 +204,16 @@ const binding = {
 const snapshot = createClusterSnapshot({ snapshotId: "cluster-snapshot-synthetic-1", capturedAt: "2026-08-13T08:01:00.000Z", binding, policy, beforeCatalog: before, afterCatalog: after });
 const namespace = clusterSha256("single-container-dual-cluster-namespace");
 const tablespaceMap = {
-  schema_version: 1,
-  contract: "chenyida-erp-postgresql-tablespace-map/v1",
+  schema_version: 2,
+  contract: "chenyida-erp-postgresql-tablespace-map/v2",
   map_id: "cluster-map-synthetic-1",
   snapshot_sha256: snapshot.snapshot_sha256,
   evidence_scope: "SYNTHETIC_TEST_ONLY",
   approved_host_root: env.TARGET_TABLESPACE_ROOT,
   approved_server_root: env.TARGET_TABLESPACE_ROOT,
   namespace_identity_sha256: namespace,
+  namespace_metadata: { uid: 999, gid: 999, mode: "0700" },
+  path_metadata: { uid: 999, gid: 999, mode: "0700" },
   entries: [{ name: "erp_ts", host_path: env.TARGET_TABLESPACE, server_path: env.TARGET_TABLESPACE }],
 };
 const missingMap = structuredClone(tablespaceMap);
@@ -563,6 +565,9 @@ psql -X -v ON_ERROR_STOP=1 -c 'DROP ROLE unauthorized_probe' >/dev/null
 
 TARGET_REPORT="$TASK_ROOT/target.tsv"
 capture_catalog "$TARGET_SOCKET" "$TARGET_REPORT"
+TABLESPACE_CHILD=$(find "$TARGET_TABLESPACE" -mindepth 1 -maxdepth 1 -printf '%f\n')
+[ "$TABLESPACE_CHILD" = PG_17_202406281 ] || { echo "target tablespace version directory is invalid" >&2; exit 1; }
+[ "$(stat -c '%F|%u|%g|%a' "$TARGET_TABLESPACE/$TABLESPACE_CHILD")" = 'directory|999|999|700' ] || { echo "target tablespace version directory identity is invalid" >&2; exit 1; }
 TASK_ROOT="$TASK_ROOT" TARGET_REPORT="$TARGET_REPORT" POLICY_FILE="$POLICY_FILE" TARGET_TABLESPACE="$TARGET_TABLESPACE" TARGET_SYSTEM_ID="$TARGET_SYSTEM_ID" \
 node --input-type=module <<'NODE'
 import { readFileSync, writeFileSync } from "node:fs";

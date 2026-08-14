@@ -412,6 +412,7 @@ test("signed encrypted transfer, receiver acknowledgement, and transient restore
       transferId: "transfer-one",
       backupId: built.backupId,
       policy: operationsPolicy,
+      now: acceptedAt,
     });
     const chain = await verifyOffhostChain({
       backupDirectory: materialized.backupDirectory,

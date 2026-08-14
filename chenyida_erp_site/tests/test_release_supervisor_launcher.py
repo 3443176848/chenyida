@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "release-supervisor-launcher.py"
@@ -186,9 +187,11 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
             "runtime_guard_contract": supervisor.RUNTIME_GUARD_CONTRACT,
             "runtime_guard_mode": supervisor.POST_DEPLOY_RUNTIME_GUARD_MODE,
             "runtime_policy_sha256": supervisor.RUNTIME_POLICY_SHA256,
+            "runtime_configuration_sha256": "3" * 64,
             "deployment_class": "UAT",
-            "deployment_id": "erp-uat",
-            "compose_project": "erp-uat",
+            "deployment_id": "chenyida-erp",
+            "compose_project": "chenyida-erp",
+            "compose_project_root": "/opt/erp/chenyida_erp_site",
             "caddy_container": "erp-uat-caddy-1",
             "postgres_container": "erp-uat-postgres-1",
             "web_container": "erp-uat-web-1",
@@ -198,10 +201,16 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         postdeploy_command = supervisor.command_for(Path("/trusted/bundle"), {"operation": "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", "parameters": postdeploy_parameters})
         self.assertEqual(postdeploy_command[0], "/trusted/bundle/chenyida_erp_site/scripts/write-release-identity.sh")
         self.assertEqual(postdeploy_command[postdeploy_command.index("--runtime-guard-mode") + 1], supervisor.POST_DEPLOY_RUNTIME_GUARD_MODE)
+        self.assertEqual(postdeploy_command[postdeploy_command.index("--runtime-configuration-sha256") + 1], "3" * 64)
+        self.assertEqual(postdeploy_command[postdeploy_command.index("--compose-project-root") + 1], "/opt/erp/chenyida_erp_site")
         with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_RUNTIME_GUARD_INVALID"):
             supervisor.validate_parameters("VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", {**postdeploy_parameters, "runtime_guard_mode": supervisor.PRE_DEPLOY_RUNTIME_GUARD_MODE})
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_DIGEST_INVALID"):
+            supervisor.validate_parameters("VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", {**postdeploy_parameters, "runtime_configuration_sha256": "short"})
         with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_IDENTIFIER_INVALID"):
             supervisor.validate_parameters("VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", {**postdeploy_parameters, "run_id": "r" * 102})
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_DEPLOYMENT_IDENTITY_INVALID"):
+            supervisor.validate_parameters("VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", {**postdeploy_parameters, "deployment_id": "other", "compose_project": "other"})
         with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_POSTDEPLOY_PATH_INVALID"):
             supervisor.validate_parameters("VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", {**postdeploy_parameters, "identity_root": "/tmp/release-identity"})
         with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_POSTDEPLOY_PATH_INVALID"):
@@ -227,6 +236,28 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         file.chmod(0o400)
         with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_NOT_CANONICAL"):
             supervisor.load_authorization(file, digest, pending, now)
+
+    def test_postdeploy_authorization_validates_runtime_secret_files_before_consumption(self):
+        source = MODULE_PATH.read_text(encoding="utf-8")
+        validation = source.index('validate_runtime_secret_boundary(bundle_root, authorization["operation"])')
+        consumption = source.index("consume_authorization(authorization_path, authorization, authorization_digest)", validation)
+        self.assertLess(validation, consumption)
+        bundle = Path("/trusted/bundle")
+        expected = f"RUNTIME_SECRET_FILES_VERIFIED entries=6 policy_sha256={supervisor.RUNTIME_SECRET_POLICY_SHA256}\n"
+        completed = supervisor.subprocess.CompletedProcess([], 0, expected, "")
+        with patch.object(supervisor.subprocess, "run", return_value=completed) as run:
+            supervisor.validate_runtime_secret_boundary(bundle, "RUN_RELEASE_GATE")
+            run.assert_not_called()
+            supervisor.validate_runtime_secret_boundary(bundle, "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY")
+            arguments = run.call_args.args[0]
+            self.assertEqual(arguments[0], "/usr/bin/python3")
+            self.assertEqual(arguments[1], "/trusted/bundle/chenyida_erp_site/scripts/runtime-secret-file-policy.py")
+            self.assertEqual(arguments[-1], "/trusted/bundle/chenyida_erp_site/operations/runtime-secret-file-policy-v1.json")
+            self.assertFalse({"DATABASE_URL", "ERP_ADMIN_PASSWORD", "ERP_SETUP_TOKEN", "POSTGRES_PASSWORD"}.intersection(run.call_args.kwargs["env"]))
+        failed = supervisor.subprocess.CompletedProcess([], 1, "", "RUNTIME_SECRET_FILE_UNAVAILABLE\n")
+        with patch.object(supervisor.subprocess, "run", return_value=failed):
+            with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_RUNTIME_SECRET_FILES_INVALID"):
+                supervisor.validate_runtime_secret_boundary(bundle, "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY")
 
 
 if __name__ == "__main__":

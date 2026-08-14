@@ -48,13 +48,9 @@ git_candidate archive --format=tar "$GIT_COMMIT" chenyida_erp_site | /usr/bin/ta
   --ro-bind "$TEMP_ROOT/source/chenyida_erp_site" /workspace --ro-bind "$SUPERVISOR_SITE_ROOT" /supervisor --chdir /workspace \
   --setenv PATH /usr/bin:/bin --setenv HOME /home/release --setenv LC_ALL C --setenv LANG C --setenv TZ UTC \
   --setenv COMPOSE_PARALLEL_LIMIT 1 --setenv COMPOSE_DISABLE_ENV_FILE 1 \
-  --setenv ERP_ENV test --setenv ERP_DEPLOYMENT_CLASS test \
-  --setenv ERP_SETUP_TOKEN release-config-only-token-00000000 \
-  --setenv DATABASE_URL postgresql://release_config:release_config@127.0.0.1/release_config \
-  --setenv ERP_MIGRATION_DATABASE_URL postgresql://release_migrator:release_config@127.0.0.1/release_config \
-  --setenv ERP_MIGRATION_EXPECTED_ROLE release_migrator \
+  --setenv ERP_ENV production --setenv ERP_DEPLOYMENT_CLASS uat \
+  --setenv ERP_RELEASE_EXPECTED_DEPLOYMENT_ID chenyida-erp \
   --setenv ERP_RELEASE_IDENTITY_READER_GID 1000 \
-  --setenv POSTGRES_DB release_config --setenv POSTGRES_USER release_config --setenv POSTGRES_PASSWORD release-config-not-a-runtime-secret \
   --setenv ERP_BUILD_VERSION "${ERP_BUILD_VERSION:?ERP_BUILD_VERSION is required}" \
   --setenv ERP_BUILD_REVISION "${ERP_BUILD_REVISION:?ERP_BUILD_REVISION is required}" \
   --setenv ERP_WEB_IMAGE "${ERP_WEB_IMAGE:?ERP_WEB_IMAGE is required}" \
@@ -66,15 +62,17 @@ git_candidate archive --format=tar "$GIT_COMMIT" chenyida_erp_site | /usr/bin/ta
   -- /bin/sh -c '
     set -eu
     set -f
-    /usr/bin/docker compose --env-file /dev/null --profile "*" -f compose.yml -f compose.release.yml config --format json |
-      /usr/bin/python3.11 -B /supervisor/scripts/container-runtime-policy.py validate \
-        --policy /supervisor/operations/container-runtime-policy-v1.json \
-        --project-root /workspace \
-        --compose-version "$ERP_CONTAINER_RUNTIME_COMPOSE_VERSION" \
-        --engine-version "$ERP_CONTAINER_RUNTIME_ENGINE_VERSION" \
-        --web-image "$ERP_WEB_IMAGE" \
-        --worker-image "$ERP_WORKER_IMAGE" \
-        --web-config-digest "$ERP_WEB_IMAGE_CONFIG_DIGEST" \
-        --worker-config-digest "$ERP_WORKER_IMAGE_CONFIG_DIGEST" \
-        --reader-gid "$ERP_RELEASE_IDENTITY_READER_GID"
+    for deployment_class in uat production; do
+      ERP_DEPLOYMENT_CLASS=$deployment_class /usr/bin/docker compose --env-file /dev/null --profile "*" -f compose.yml -f compose.release.yml config --format json |
+        /usr/bin/python3.11 -B /supervisor/scripts/container-runtime-policy.py validate \
+          --policy /supervisor/operations/container-runtime-policy-v1.json \
+          --project-root /workspace \
+          --compose-version "$ERP_CONTAINER_RUNTIME_COMPOSE_VERSION" \
+          --engine-version "$ERP_CONTAINER_RUNTIME_ENGINE_VERSION" \
+          --web-image "$ERP_WEB_IMAGE" \
+          --worker-image "$ERP_WORKER_IMAGE" \
+          --web-config-digest "$ERP_WEB_IMAGE_CONFIG_DIGEST" \
+          --worker-config-digest "$ERP_WORKER_IMAGE_CONFIG_DIGEST" \
+          --reader-gid "$ERP_RELEASE_IDENTITY_READER_GID"
+    done
   '

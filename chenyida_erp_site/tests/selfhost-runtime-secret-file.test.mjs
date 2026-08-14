@@ -7,9 +7,11 @@ import test from "node:test";
 import { browserSetupAllowed, runtimeConfig } from "../app/lib/infrastructure/config.ts";
 import {
   assertControlledSecretsAbsent,
+  assertControlledRuntimeServiceKind,
   readSecureSingleValueFile,
   RuntimeSecretError,
   runtimeServiceKind,
+  validateControlledRuntimeSecretValue,
 } from "../app/lib/infrastructure/runtime-secret.ts";
 
 const roots = [];
@@ -110,6 +112,15 @@ test("secure secret reader rejects malformed content", async () => {
   }
 });
 
+test("controlled runtime values require canonical 32-byte base64url with nontrivial diversity", () => {
+  const valid=Buffer.from(Array.from({length:32},(_,index)=>index)).toString("base64url");
+  assert.equal(valid.length,43);
+  assert.equal(validateControlledRuntimeSecretValue(valid),valid);
+  for(const value of ["a".repeat(43),`${valid.slice(0,-1)}B`,`${valid.slice(0,-1)}+`,valid.slice(0,-1)]) {
+    assert.throws(()=>validateControlledRuntimeSecretValue(value),secretError("RUNTIME_SECRET_CONTENT_INVALID"));
+  }
+});
+
 test("controlled deployments reject secret environment keys even when empty", () => {
   for (const name of ["DATABASE_URL", "ERP_MIGRATION_DATABASE_URL", "POSTGRES_PASSWORD", "ERP_ADMIN_PASSWORD", "ERP_SETUP_TOKEN"]) {
     assert.throws(
@@ -123,6 +134,11 @@ test("controlled deployments reject secret environment keys even when empty", ()
 test("controlled service kind is explicit and browser setup is disabled", () => {
   assert.equal(runtimeServiceKind("production", "web"), "WEB");
   assert.throws(() => runtimeServiceKind("uat", ""), secretError("CONTROLLED_SERVICE_KIND_INVALID"));
+  assert.doesNotThrow(() => assertControlledRuntimeServiceKind("production", "WORKER", "worker"));
+  assert.throws(
+    () => assertControlledRuntimeServiceKind("production", "WORKER", "web"),
+    secretError("CONTROLLED_SERVICE_KIND_MISMATCH"),
+  );
   assert.equal(browserSetupAllowed({ deploymentClass: "production" }), false);
   assert.equal(browserSetupAllowed({ deploymentClass: "uat" }), false);
   assert.equal(browserSetupAllowed({ deploymentClass: "test" }), true);

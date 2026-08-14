@@ -442,7 +442,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-postgres.test.mjs",
-      "sha256": "eedd0ff205c87cec7edf36e19f1cf9e45509ac977c737814f085dd1495f148f1",
+      "sha256": "0d35589283382422be1e58115aaf6e8e2f3348d73294ac34b4f25e9775cdcc58",
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",
@@ -460,7 +460,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-unit.test.mjs",
-      "sha256": "6df56344232272ba0b864a32674630d599d7b32eb60310f68c535edd9f1a6645",
+      "sha256": "1239dd9c83d5c40d395a7030ed3e23bd463f191a8ade3fd3708d7b0e4cd6ee4d",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -469,7 +469,7 @@
     },
     {
       "path": "tests/selfhost-database-runtime-identity.test.mjs",
-      "sha256": "e927b72bde4bebd86ab11aab5b513329a4b37cc3825e0b4ac2e0e0225cf0ea7c",
+      "sha256": "f356fd3fe66570c6c5303d247bf73c93759108fec1253d1a97242da31d9e4406",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -478,7 +478,7 @@
     },
     {
       "path": "tests/selfhost-dockerfile-version-contract.test.mjs",
-      "sha256": "058a14d01fd0eb6765fa40504ee910e2156012690489e21cf378107e7de1e303",
+      "sha256": "452e3bce471c73e35012e4da386d6619f38ebeb1edc58ae919afe95887c692f1",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1018,7 +1018,7 @@
     },
     {
       "path": "tests/selfhost-migration-tool.test.mjs",
-      "sha256": "e6b856e2ab240ce5194f9d56a84b06ac74ea89c3e756af8dac050f19ede743af",
+      "sha256": "1a904ea58d34099dca36a50d117451c0c9344d03185e1dc8216e7a2804d4ee5d",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1063,7 +1063,7 @@
     },
     {
       "path": "tests/selfhost-offhost-transfer-v1.test.mjs",
-      "sha256": "ecd8758c5158d6e4588e1dea089ec5a5c073ccf6fc413749250a9d5aeeacb540",
+      "sha256": "f3654c7fef50a23cff3b5833b04117682fa06b17ae3b1ba4e7da3f3d0e4e9b21",
       "category": "SPECIAL_HARNESS",
       "applicability": "REQUIRED",
       "harness": "SPECIAL_POSIX",
@@ -1171,7 +1171,7 @@
     },
     {
       "path": "tests/selfhost-postgresql-cluster-recovery-v1.test.mjs",
-      "sha256": "de9ce130bb7b8c1b8650a1e62886656cab1a7c41eeebee0cb0650bbfc77f7f3a",
+      "sha256": "9aa17d3393891b691380650fb579bbdd83d7896ceb58c93eb728bf0e1f3d16c7",
       "category": "SPECIAL_HARNESS",
       "applicability": "REQUIRED",
       "harness": "SPECIAL_POSIX",
@@ -1207,7 +1207,7 @@
     },
     {
       "path": "tests/selfhost-postgresql-runtime-privilege-source.test.mjs",
-      "sha256": "d8ed28767d04c7f7972cd33dc5cb1cc3d8cd4cf1e034ffce8fcfb14f794d3216",
+      "sha256": "4ea2be36205382bcae20046183bd8016d2d7bea4b676e09e3ade90e4a1e592da",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1810,7 +1810,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "d7c59cbf3d12884126b1d8e56b347bab62a4ec7c1e15d05e0786142c3c80d15f",
+      "sha256": "5bbda7d1d3f2cbec9ec044ec5cf3c9e304a17c80c7dffb3009978a92ace5556b",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -1819,7 +1819,7 @@
     },
     {
       "path": "tests/selfhost-release-identity-contract.test.mjs",
-      "sha256": "f0a285e07cfdf2be86a28aa023ee74fd150e49067934956155ee8b0c97a44af2",
+      "sha256": "09091cf4ce41d9894716bdeb65b41376f1eab71145c84298f0e5e5c4b38a514e",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -1846,7 +1846,7 @@
     },
     {
       "path": "tests/selfhost-release-migration-allowlist.test.mjs",
-      "sha256": "2ad8afe593aaf12b666e9db736a4088268bd6ed4be2eb57c674eda958144bd48",
+      "sha256": "0029349dd08621d73e955f7c37d99c74b30c3447792a21425f95b7ed60fc06cd",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -1999,7 +1999,7 @@
     },
     {
       "path": "tests/selfhost-runtime-secret-file.test.mjs",
-      "sha256": "92b9c288b2045b2862d6c661909a9f934c8b72528ff2d121d52c2426bd4dc736",
+      "sha256": "4ab1b209168be1ad4757c96e6a07d8dd251018be1baccd2b8e99f88a5b1740e1",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",

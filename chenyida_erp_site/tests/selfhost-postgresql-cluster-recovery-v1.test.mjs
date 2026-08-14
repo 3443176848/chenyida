@@ -19,6 +19,7 @@ import {
   CREDENTIAL_ROOT_MARKER_VALUE,
   RECOVERY_STATE_ROOT_MARKER,
   RECOVERY_STATE_ROOT_MARKER_VALUE,
+  LEGACY_TABLESPACE_MAP_CONTRACT,
   TABLESPACE_MAP_CONTRACT,
   assertCredentialBindingUnchanged,
   canonicalClusterJson,
@@ -41,8 +42,10 @@ import {
   validateClusterSecurityReceipt,
   validateClusterSnapshot,
   validateCredentialBindingReceipt,
+  validateLegacyTablespaceMapDocument,
   validateRecoveryIntent,
   validateTablespaceMap,
+  validateTablespaceMapDocument,
   validateTablespacePreflightEvidence,
   validateTablespaceReceipt,
   verifyTablespaceMapAfterCreate,
@@ -67,6 +70,12 @@ const zero = "0".repeat(64), one = "1".repeat(64), two = "2".repeat(64), three =
 const now = "2026-08-13T06:00:00.000Z";
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
+function syntheticTablespaceMetadata() {
+  return {
+    namespace_metadata: { uid: process.getuid(), gid: process.getgid(), mode: "0700" },
+    path_metadata: { uid: process.getuid(), gid: process.getgid(), mode: "0700" },
+  };
+}
 async function policy() { return JSON.parse(await readFile(policyFile, "utf8")); }
 async function withRoot(callback) {
   const root = await mkdtemp(path.join(os.tmpdir(), "cyd-cluster-v1-"));
@@ -211,7 +220,7 @@ async function recoveryExecutorFixture(root) {
   const targetPath = path.join(approvedRoot, "erp_ts"); await mkdir(targetPath, { mode: 0o700 }); await chmod(targetPath, 0o700);
   const namespaceIdentitySha256 = clusterSha256("executor-namespace");
   const tablespaceMap = {
-    schema_version: 1,
+    schema_version: 2,
     contract: TABLESPACE_MAP_CONTRACT,
     map_id: "executor-map-1",
     snapshot_sha256: snapshot.snapshot_sha256,
@@ -219,6 +228,7 @@ async function recoveryExecutorFixture(root) {
     approved_host_root: approvedRoot,
     approved_server_root: approvedRoot,
     namespace_identity_sha256: namespaceIdentitySha256,
+    ...syntheticTablespaceMetadata(),
     entries: [{ name: "erp_ts", host_path: targetPath, server_path: targetPath }],
   };
   const tablespacePreflight = await validateTablespaceMap({
@@ -340,7 +350,7 @@ test("snapshot binds V2 recovery identity and refuses source drift or tampering"
 test("restore plan is derived, secret-free and keeps roles contained until atomic activation", async () => {
   const { recoveryPolicy, snapshot } = await snapshotFixture();
   const tablespaceMap = {
-    schema_version: 1,
+    schema_version: 2,
     contract: TABLESPACE_MAP_CONTRACT,
     map_id: "restore-plan-map",
     snapshot_sha256: snapshot.snapshot_sha256,
@@ -348,6 +358,7 @@ test("restore plan is derived, secret-free and keeps roles contained until atomi
     approved_host_root: "/synthetic/host/tablespaces",
     approved_server_root: "/synthetic/server/tablespaces",
     namespace_identity_sha256: zero,
+    ...syntheticTablespaceMetadata(),
     entries: [{ name: "erp_ts", host_path: "/synthetic/host/tablespaces/erp_ts", server_path: "/synthetic/server/tablespaces/erp_ts" }],
   };
   const databaseProfile = { server_major: "17", encoding: "UTF8", locale_provider: "libc", collate: "C", ctype: "C", collation_version: null };
@@ -383,9 +394,28 @@ test("tablespace map requires exact names, private empty direct children and sta
   const approvedRoot = path.join(root, "tablespaces"); await mkdir(approvedRoot, { mode: 0o700 }); await chmod(approvedRoot, 0o700);
   const target = path.join(approvedRoot, "erp_ts"); await mkdir(target, { mode: 0o700 }); await chmod(target, 0o700);
   const namespace = clusterSha256("synthetic-shared-namespace");
-  const map = { schema_version: 1, contract: TABLESPACE_MAP_CONTRACT, map_id: "map-1", snapshot_sha256: snapshot.snapshot_sha256, evidence_scope: "SYNTHETIC_TEST_ONLY", approved_host_root: approvedRoot, approved_server_root: approvedRoot, namespace_identity_sha256: namespace, entries: [{ name: "erp_ts", host_path: target, server_path: target }] };
+  const map = { schema_version: 2, contract: TABLESPACE_MAP_CONTRACT, map_id: "map-1", snapshot_sha256: snapshot.snapshot_sha256, evidence_scope: "SYNTHETIC_TEST_ONLY", approved_host_root: approvedRoot, approved_server_root: approvedRoot, namespace_identity_sha256: namespace, ...syntheticTablespaceMetadata(), entries: [{ name: "erp_ts", host_path: target, server_path: target }] };
+  const legacyMap = { schema_version: 1, contract: LEGACY_TABLESPACE_MAP_CONTRACT, map_id: "legacy-map-1", snapshot_sha256: snapshot.snapshot_sha256, evidence_scope: "SYNTHETIC_TEST_ONLY", approved_host_root: approvedRoot, approved_server_root: approvedRoot, namespace_identity_sha256: namespace, entries: [{ name: "erp_ts", host_path: target, server_path: target }] };
+  assert.equal(validateLegacyTablespaceMapDocument({ map: legacyMap, snapshot, policy: recoveryPolicy }).contract, LEGACY_TABLESPACE_MAP_CONTRACT);
+  assert.throws(()=>validateLegacyTablespaceMapDocument({ map: {...legacyMap,evidence_scope:"ACTUAL_CONTROLLED"}, snapshot, policy: recoveryPolicy, evidenceScope:"ACTUAL_CONTROLLED" }),expectCode("TABLESPACE_LEGACY_MAP_READ_ONLY"));
+  assert.throws(()=>validateTablespaceMapDocument({ map: legacyMap, snapshot, policy: recoveryPolicy }),expectCode("TABLESPACE_MAP_INVALID"));
+  assert.throws(()=>validateTablespaceMapDocument({ map: {...map,approved_host_root:null}, snapshot, policy: recoveryPolicy }),expectCode("TABLESPACE_MAP_ROOT_INVALID"));
+  assert.throws(()=>validateTablespaceMapDocument({ map: {...map,entries:[{...map.entries[0],host_path:null}]}, snapshot, policy: recoveryPolicy }),expectCode("TABLESPACE_MAP_ENTRY_PATH_INVALID"));
   const validation = await validateTablespaceMap({ map, snapshot, policy: recoveryPolicy, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace, prohibitedRoots: [path.join(root, "pgdata")] });
   assert.equal(validation.entryCount, 1);
+  await chmod(approvedRoot, 0o2700);
+  await assert.rejects(validateTablespaceMap({ map, snapshot, policy: recoveryPolicy, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace }), expectCode("TABLESPACE_ROOT_IDENTITY_MISMATCH"));
+  await chmod(approvedRoot, 0o700);
+  await chmod(target, 0o1700);
+  await assert.rejects(validateTablespaceMap({ map, snapshot, policy: recoveryPolicy, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace }), expectCode("TABLESPACE_PATH_IDENTITY_MISMATCH"));
+  await chmod(target, 0o700);
+  const controlled = clone(map);
+  controlled.evidence_scope = "ACTUAL_CONTROLLED";
+  controlled.namespace_metadata = { uid: 0, gid: 999, mode: "0750" };
+  controlled.path_metadata = { uid: 999, gid: 999, mode: "0700" };
+  assert.equal(validateTablespaceMapDocument({ map: controlled, snapshot, policy: recoveryPolicy, evidenceScope: "ACTUAL_CONTROLLED" }).namespace_metadata.mode, "0750");
+  const invalidControlled = clone(controlled); invalidControlled.namespace_metadata = { uid: 999, gid: 999, mode: "0700" };
+  await assert.rejects(validateTablespaceMap({ map: invalidControlled, snapshot, policy: recoveryPolicy, expectedUid: 999, expectedGid: 999, expectedNamespaceIdentitySha256: namespace, evidenceScope: "ACTUAL_CONTROLLED" }), expectCode("TABLESPACE_ACTUAL_FILESYSTEM_POLICY_INVALID"));
   assert.equal(validateTablespacePreflightEvidence({ preflightValidation: validation, map, snapshot, policy: recoveryPolicy }).mapSha256, clusterSha256(map));
   const forgedPreflight = clone(validation); forgedPreflight.rootIdentitySha256 = zero;
   await assert.rejects(verifyTablespacePathAfterDrop({ preflightValidation: forgedPreflight, map, snapshot, policy: recoveryPolicy, entryName: "erp_ts", targetLocationSha256: clusterSha256(target) }), expectCode("TABLESPACE_POST_DROP_IDENTITY_MISMATCH"));
@@ -400,19 +430,29 @@ test("tablespace map requires exact names, private empty direct children and sta
   await assert.rejects(validateTablespaceMap({ map, snapshot, policy: recoveryPolicy, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace }), expectCode("TABLESPACE_PATH_IDENTITY_MISMATCH"));
   await chmod(target, 0o700);
   await assert.rejects(validateTablespaceMap({ map, snapshot, policy: recoveryPolicy, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace, prohibitedRoots: [target] }), expectCode("TABLESPACE_ROOT_PROHIBITED"));
-  await assert.rejects(validateTablespaceMap({ map, snapshot, policy: recoveryPolicy, expectedUid: process.getuid(), expectedGid: process.getgid() + 1, expectedNamespaceIdentitySha256: namespace }), expectCode("TABLESPACE_ROOT_IDENTITY_MISMATCH"));
+  await assert.rejects(validateTablespaceMap({ map, snapshot, policy: recoveryPolicy, expectedUid: process.getuid(), expectedGid: process.getgid() + 1, expectedNamespaceIdentitySha256: namespace }), expectCode("TABLESPACE_EXPECTED_IDENTITY_MISMATCH"));
   const aliasPath = path.join(approvedRoot, "alias"); await symlink(target, aliasPath);
   const alias = clone(map); alias.entries[0].host_path = aliasPath;
   await assert.rejects(validateTablespaceMap({ map: alias, snapshot, policy: recoveryPolicy, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace }), (error) => ["TABLESPACE_MAP_ENTRY_BOUNDARY_INVALID", "TABLESPACE_PATH_UNSAFE"].includes(error?.code));
-  await mkdir(path.join(target, "PG_17_fixture"), { mode: 0o700 });
+  const versionDirectory = path.join(target, "PG_17_202406281");
+  await mkdir(path.join(target, "PG_17_wrong"), { mode: 0o700 });
   const targetCatalog = clone(snapshot.catalog); targetCatalog.tablespaces[0].source_location_sha256 = clusterSha256(target);
+  await assert.rejects(verifyTablespaceMapAfterCreate({ map, snapshot, policy: recoveryPolicy, preflightValidation: validation, targetCatalog, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace }), expectCode("TABLESPACE_POST_CREATE_IDENTITY_MISMATCH"));
+  await rmdir(path.join(target, "PG_17_wrong"));
+  await mkdir(versionDirectory, { mode: 0o700 });
   const postCreate = await verifyTablespaceMapAfterCreate({ map, snapshot, policy: recoveryPolicy, preflightValidation: validation, targetCatalog, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace, prohibitedRoots: [path.join(root, "pgdata")] });
   validateTablespaceReceipt(createTablespaceReceipt({ validation: postCreate, backupId: snapshot.binding.backup_id, restoreRunId: "restore-1", verifiedAt: now }));
   assert.equal(await verifyTablespacePathAfterCreate({ preflightValidation: validation, map, snapshot, policy: recoveryPolicy, entryName: "erp_ts", targetLocationSha256: clusterSha256(target) }), true);
+  await writeFile(path.join(target, "rogue-sibling"), "x");
+  await assert.rejects(verifyTablespaceMapAfterCreate({ map, snapshot, policy: recoveryPolicy, preflightValidation: validation, targetCatalog, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace }), expectCode("TABLESPACE_POST_CREATE_IDENTITY_MISMATCH"));
+  await rm(path.join(target, "rogue-sibling"));
+  await chmod(versionDirectory, 0o1700);
+  await assert.rejects(verifyTablespacePathAfterCreate({ preflightValidation: validation, map, snapshot, policy: recoveryPolicy, entryName: "erp_ts", targetLocationSha256: clusterSha256(target) }), expectCode("TABLESPACE_POST_CREATE_IDENTITY_MISMATCH"));
+  await chmod(versionDirectory, 0o700);
   await chmod(target, 0o755);
   await assert.rejects(verifyTablespaceMapAfterCreate({ map, snapshot, policy: recoveryPolicy, preflightValidation: validation, targetCatalog, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace }), (error) => ["TABLESPACE_POST_CREATE_IDENTITY_MISMATCH", "TABLESPACE_PATH_CHANGED"].includes(error?.code));
   await chmod(target, 0o700);
-  await rmdir(path.join(target, "PG_17_fixture"));
+  await rmdir(versionDirectory);
   assert.equal(await verifyTablespacePathAfterDrop({ preflightValidation: validation, map, snapshot, policy: recoveryPolicy, entryName: "erp_ts", targetLocationSha256: clusterSha256(target) }), true);
 }));
 
@@ -438,6 +478,11 @@ test("root-owned credential binding keeps secrets private and detects unsafe fil
   assert.equal(await readFile(bindMarker, "utf8"), "xx");
   await chmod(credentialFile, 0o644);
   await assert.rejects(readCredentialBindingFile({ credentialRoot, credentialFile, policy: recoveryPolicy }), expectCode("CREDENTIAL_FILE_UNSAFE"));
+  await chmod(credentialFile, 0o4400);
+  await assert.rejects(readCredentialBindingFile({ credentialRoot, credentialFile, policy: recoveryPolicy }), expectCode("CREDENTIAL_FILE_UNSAFE"));
+  await chmod(credentialFile, 0o400); await chmod(credentialRoot, 0o2700);
+  await assert.rejects(readCredentialBindingFile({ credentialRoot, credentialFile, policy: recoveryPolicy }), expectCode("CREDENTIAL_ROOT_UNSAFE"));
+  await chmod(credentialRoot, 0o700);
   await chmod(credentialFile, 0o600);
   const reused = clone(document); reused.roles[1].password = reused.roles[0].password;
   await writeFile(credentialFile, canonicalClusterJson(reused), { mode: 0o600 }); await chmod(credentialFile, 0o400);
@@ -491,7 +536,7 @@ test("durable recovery state enforces intent-first dispatch, reconciliation and 
 test("restore plan binds every created cluster resource to a content-addressed recovery marker", async () => {
   const { recoveryPolicy, snapshot } = await snapshotFixture();
   const tablespaceMap = {
-    schema_version: 1,
+    schema_version: 2,
     contract: TABLESPACE_MAP_CONTRACT,
     map_id: "marked-plan-map",
     snapshot_sha256: snapshot.snapshot_sha256,
@@ -499,6 +544,7 @@ test("restore plan binds every created cluster resource to a content-addressed r
     approved_host_root: "/synthetic/host/tablespaces",
     approved_server_root: "/synthetic/server/tablespaces",
     namespace_identity_sha256: zero,
+    ...syntheticTablespaceMetadata(),
     entries: [{ name: "erp_ts", host_path: "/synthetic/host/tablespaces/erp_ts", server_path: "/synthetic/server/tablespaces/erp_ts" }],
   };
   const databaseProfile = { server_major: "17", encoding: "UTF8", locale_provider: "libc", collate: "C", ctype: "C", collation_version: null };
@@ -654,9 +700,9 @@ test("cluster receipt cross-binds mapped tablespace and credential evidence befo
   const approvedRoot = path.join(root, "receipt-tablespaces"); await mkdir(approvedRoot, { mode: 0o700 }); await chmod(approvedRoot, 0o700);
   const targetPath = path.join(approvedRoot, "erp_ts"); await mkdir(targetPath, { mode: 0o700 }); await chmod(targetPath, 0o700);
   const namespace = clusterSha256("receipt-namespace");
-  const tablespaceMap = { schema_version: 1, contract: TABLESPACE_MAP_CONTRACT, map_id: "receipt-map", snapshot_sha256: snapshot.snapshot_sha256, evidence_scope: "SYNTHETIC_TEST_ONLY", approved_host_root: approvedRoot, approved_server_root: approvedRoot, namespace_identity_sha256: namespace, entries: [{ name: "erp_ts", host_path: targetPath, server_path: targetPath }] };
+  const tablespaceMap = { schema_version: 2, contract: TABLESPACE_MAP_CONTRACT, map_id: "receipt-map", snapshot_sha256: snapshot.snapshot_sha256, evidence_scope: "SYNTHETIC_TEST_ONLY", approved_host_root: approvedRoot, approved_server_root: approvedRoot, namespace_identity_sha256: namespace, ...syntheticTablespaceMetadata(), entries: [{ name: "erp_ts", host_path: targetPath, server_path: targetPath }] };
   const tablespaceValidation = await validateTablespaceMap({ map: tablespaceMap, snapshot, policy: recoveryPolicy, expectedUid: process.getuid(), expectedGid: process.getgid(), expectedNamespaceIdentitySha256: namespace });
-  await mkdir(path.join(targetPath, "PG_17_fixture"), { mode: 0o700 });
+  await mkdir(path.join(targetPath, "PG_17_202406281"), { mode: 0o700 });
   const credentialRoot = await privateRoot(root, "receipt-credentials", CREDENTIAL_ROOT_MARKER, CREDENTIAL_ROOT_MARKER_VALUE);
   const credentialFile = path.join(credentialRoot, "binding.json");
   await writeFile(credentialFile, canonicalClusterJson({ schema_version: 1, contract: CREDENTIAL_FILE_CONTRACT, credential_generation_id: "receipt-generation", roles: [{ role: "chenyida_erp_owner", password: "receipt-owner-secret-material-001" }, { role: "chenyida_erp_runtime", password: "receipt-runtime-secret-material-1" }] }), { mode: 0o400 }); await chmod(credentialFile, 0o400);

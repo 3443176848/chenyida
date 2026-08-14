@@ -12,6 +12,7 @@ import {
   validateOfficialVulnerabilityPolicy,
   verifyMigrationFilesAgainstManifest,
 } from "./release-manifest-contract.mjs";
+import { CONTROLLED_MIGRATION_SEARCH_PATH } from "./postgresql-session-profile.ts";
 
 const MIGRATION_FILE = /^\d{4}_[a-z0-9_]+\.sql$/;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -141,6 +142,8 @@ export async function assertTargetIdentity(client: MigrationQueryClient, authori
     current_role_name: string; session_role_name: string; database_owner_matches: boolean; role_login: boolean;
     role_superuser: boolean; role_create_role: boolean; role_create_database: boolean; role_replication: boolean;
     role_bypass_rls: boolean; role_pg_monitor: boolean; role_memberships_absent: boolean; role_settings_absent: boolean;
+    role_inherit: boolean; role_connection_limit: number; role_valid_until_absent: boolean;
+    database_settings_absent: boolean; search_path_exact: boolean;
     public_schema_owner_valid: boolean; public_schema_create_acl_valid: boolean;
   }>(`
     select pg_catalog.current_database()::text as database_name,
@@ -156,9 +159,14 @@ export async function assertTargetIdentity(client: MigrationQueryClient, authori
            r.rolcreatedb as role_create_database,
            r.rolreplication as role_replication,
            r.rolbypassrls as role_bypass_rls,
+           r.rolinherit as role_inherit,
+           r.rolconnlimit as role_connection_limit,
+           r.rolvaliduntil is null as role_valid_until_absent,
            pg_catalog.pg_has_role(r.rolname, 'pg_monitor', 'MEMBER') as role_pg_monitor,
            not exists (select 1 from pg_catalog.pg_auth_members m where m.member=r.oid or m.roleid=r.oid) as role_memberships_absent,
            r.rolconfig is null and not exists (select 1 from pg_catalog.pg_db_role_setting s where s.setrole=r.oid) as role_settings_absent,
+           not exists (select 1 from pg_catalog.pg_db_role_setting s where s.setdatabase=d.oid and s.setrole in (0,r.oid)) as database_settings_absent,
+           pg_catalog.current_setting('search_path')=$1 as search_path_exact,
            exists (select 1 from pg_catalog.pg_namespace n where n.nspname='public' and n.nspowner=(select owner_role.oid from pg_catalog.pg_roles owner_role where owner_role.rolname='pg_database_owner')) as public_schema_owner_valid,
            not exists (
              select 1
@@ -170,13 +178,15 @@ export async function assertTargetIdentity(client: MigrationQueryClient, authori
       from pg_catalog.pg_database d
       join pg_catalog.pg_roles r on r.rolname=current_user
      where d.datname=pg_catalog.current_database()
-  `);
+  `, [CONTROLLED_MIGRATION_SEARCH_PATH]);
   if (result.rows.length !== 1) reject("MIGRATION_TARGET_IDENTITY_INCOMPLETE");
   const actual = result.rows[0]; const expected = authorization.target;
   if (actual.database_name !== expected.databaseName || actual.system_identifier !== expected.systemIdentifier || actual.database_oid !== expected.databaseOid || actual.marker !== expected.marker) reject("MIGRATION_TARGET_IDENTITY_MISMATCH");
   if (actual.current_role_name !== expected.migrationRole || actual.session_role_name !== expected.migrationRole || actual.database_owner_matches !== true || actual.role_login !== true
     || actual.role_superuser !== false || actual.role_create_role !== false || actual.role_create_database !== false || actual.role_replication !== false || actual.role_bypass_rls !== false || actual.role_pg_monitor !== false
+    || actual.role_inherit !== false || actual.role_connection_limit !== 1 || actual.role_valid_until_absent !== true
     || actual.role_memberships_absent !== true || actual.role_settings_absent !== true) reject("MIGRATION_ROLE_IDENTITY_INVALID");
+  if (actual.database_settings_absent !== true || actual.search_path_exact !== true) reject("MIGRATION_DATABASE_SETTINGS_INVALID");
   if (actual.public_schema_owner_valid !== true || actual.public_schema_create_acl_valid !== true) reject("MIGRATION_PUBLIC_SCHEMA_PRIVILEGE_INVALID");
 }
 
@@ -238,7 +248,7 @@ export async function readAppliedMigrations(client: MigrationQueryClient): Promi
   return (await readMigrationHistory(client)).rows;
 }
 
-async function assertNoUntrackedPublicObjects(client: MigrationQueryClient): Promise<void> {
+async function assertNoUntrackedEmptyTargetState(client: MigrationQueryClient): Promise<void> {
   const result = await client.query<{ present: boolean }>(`
     select exists (
       select 1 from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace
@@ -269,6 +279,30 @@ async function assertNoUntrackedPublicObjects(client: MigrationQueryClient): Pro
       select 1 from pg_catalog.pg_ts_template o join pg_catalog.pg_namespace n on n.oid=o.tmplnamespace where n.nspname='public'
       union all
       select 1 from pg_catalog.pg_extension o join pg_catalog.pg_namespace n on n.oid=o.extnamespace where n.nspname='public'
+      union all
+      select 1 from pg_catalog.pg_namespace n where n.nspname not in ('information_schema','pg_catalog','pg_toast','public')
+      union all
+      select 1 from pg_catalog.pg_event_trigger
+      union all
+      select 1 from pg_catalog.pg_default_acl
+      union all
+      select 1 from pg_catalog.pg_largeobject_metadata
+      union all
+      select 1 from pg_catalog.pg_foreign_data_wrapper
+      union all
+      select 1 from pg_catalog.pg_foreign_server
+      union all
+      select 1 from pg_catalog.pg_user_mappings
+      union all
+      select 1 from pg_catalog.pg_publication
+      union all
+      select 1 from pg_catalog.pg_subscription
+      union all
+      select 1 where (select pg_catalog.array_agg(e.extname order by e.extname) from pg_catalog.pg_extension e) is distinct from ARRAY['plpgsql']::pg_catalog.name[]
+      union all
+      select 1 from pg_catalog.pg_language l where l.lanname not in ('c','internal','plpgsql','sql')
+      union all
+      select 1 from pg_catalog.pg_db_role_setting s where s.setdatabase=(select d.oid from pg_catalog.pg_database d where d.datname=pg_catalog.current_database())
     ) as present
   `);
   if (result.rows.length !== 1) reject("MIGRATION_EMPTY_TARGET_PROBE_FAILED");
@@ -281,7 +315,7 @@ export async function assertReleaseDatabasePreflight(client: MigrationQueryClien
   let rows: Array<{ version: string; checksum: string }> = [];
   if (authorization.expectedCurrentHead === "EMPTY") {
     if (present) reject("MIGRATION_EMPTY_TARGET_HISTORY_PRESENT");
-    await assertNoUntrackedPublicObjects(client);
+    await assertNoUntrackedEmptyTargetState(client);
   } else if (present) rows = await readPresentMigrationHistory(client);
   validateAppliedMigrationRows(rows, authorization.manifest.migrations.entries, authorization.expectedCurrentHead);
 }

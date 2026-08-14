@@ -7,9 +7,9 @@ import { initializeAdmin } from "../app/lib/selfhost-api.ts";
 import { runtimeConfig } from "../app/lib/infrastructure/config.ts";
 import {
   isControlledDeployment,
+  assertControlledRuntimeServiceKind,
   isolatedEnvironmentSecret,
   readControlledRuntimeSecret,
-  runtimeServiceKind,
 } from "../app/lib/infrastructure/runtime-secret.ts";
 import {
   MATERIAL_ATTRIBUTES,
@@ -60,8 +60,7 @@ export async function runAdminInitialization(): Promise<void> {
   try {
     validateMaterialCategorySeed();
     const config = runtimeConfig();
-    const service = runtimeServiceKind(config.deploymentClass);
-    if (isControlledDeployment(config.deploymentClass) && service !== "ADMIN") throw new AdminInitializationError();
+    assertControlledRuntimeServiceKind(config.deploymentClass, "ADMIN");
     const username = get("ERP_ADMIN_USERNAME"); const displayName = get("ERP_ADMIN_DISPLAY_NAME");
     const password = isControlledDeployment(config.deploymentClass)
       ? readControlledRuntimeSecret(config.deploymentClass, "ADMIN", "ADMIN_PASSWORD")

@@ -5,7 +5,11 @@ import { fileURLToPath } from "node:url";
 import type { PoolClient } from "pg";
 
 import { getPool, closeDb } from "../db/index.ts";
-import { runtimeConfig } from "../app/lib/infrastructure/config.ts";
+import { runtimeConfig, type RuntimeConfig } from "../app/lib/infrastructure/config.ts";
+import {
+  assertControlledRuntimeServiceKind,
+  assertControlledSecretsAbsent,
+} from "../app/lib/infrastructure/runtime-secret.ts";
 import {
   ReleaseManifestError,
   validateAppliedMigrationRows,
@@ -21,11 +25,20 @@ import {
   loadReleaseAuthorization,
   readAppliedMigrations,
 } from "./release-migration-authorization.ts";
+import { CONTROLLED_MIGRATION_SEARCH_PATH } from "./postgresql-session-profile.ts";
 
 const MIGRATION_FILE = /^\d{4}_[a-z0-9_]+\.sql$/;
 
 type MigrationTransactionClient = Pick<PoolClient, "query">;
 type MigrationLifecycleClient = Pick<PoolClient, "query" | "release">;
+type MigrationPool = Readonly<{ connect(): Promise<PoolClient> }>;
+
+export type MigrationWorkflowInput = Readonly<{
+  config: Pick<RuntimeConfig, "environment" | "deploymentClass">;
+  poolFactory: () => MigrationPool;
+  close: () => Promise<void>;
+  isolatedDatabaseUrl: string;
+}>;
 
 function reject(code: string): never {
   throw new MigrationGuardError(code);
@@ -64,22 +77,28 @@ export async function closeMigrationRuntime(
   await close().catch(() => undefined);
 }
 
-export async function runMigrations(): Promise<void> {
-  const config = runtimeConfig();
+export async function runMigrationWorkflow(input: MigrationWorkflowInput): Promise<void> {
+  const { config } = input;
+  assertControlledSecretsAbsent(config.deploymentClass);
+  assertControlledRuntimeServiceKind(config.deploymentClass, "MIGRATION");
   if (config.environment === "production" && process.env.ERP_ALLOW_PRODUCTION_MIGRATION !== "YES") reject("MIGRATION_EXPLICIT_PRODUCTION_PERMISSION_REQUIRED");
   const directory = resolve(process.cwd(), "drizzle-postgres");
   const files = await migrationFiles(directory);
   const releaseAuthorization = await loadReleaseAuthorization(config, directory);
   const authorization: { kind: "RELEASE"; value: ReleaseAuthorization } | { kind: "ISOLATED"; value: IsolatedAuthorization } = releaseAuthorization
     ? { kind: "RELEASE", value: releaseAuthorization }
-    : { kind: "ISOLATED", value: loadIsolatedAuthorization(config, process.env.DATABASE_URL || "") };
+    : { kind: "ISOLATED", value: loadIsolatedAuthorization(config, input.isolatedDatabaseUrl) };
   if (authorization.kind === "RELEASE" && (files.length !== authorization.value.manifest.migrations.entries.length || files.some((file, index) => file !== authorization.value.manifest.migrations.entries[index].filename))) reject("MIGRATION_DIRECTORY_NOT_EXACT_RELEASE_ALLOWLIST");
-  const pool = getPool();
+  const pool = input.poolFactory();
   let client: PoolClient | undefined;
   let locked = false;
   try {
     client = await pool.connect();
-    await client.query("select pg_catalog.set_config('search_path','public',false)");
+    const configured = await client.query<{ search_path: string }>(
+      "select pg_catalog.set_config('search_path',$1,false)::text as search_path",
+      [CONTROLLED_MIGRATION_SEARCH_PATH],
+    );
+    if (configured.rows.length !== 1 || configured.rows[0].search_path !== CONTROLLED_MIGRATION_SEARCH_PATH) reject("MIGRATION_SEARCH_PATH_INVALID");
     if (authorization.kind === "RELEASE") await assertReleaseDatabasePreflight(client, authorization.value);
     else await assertIsolatedTargetIdentity(client, authorization.value);
     const lock = await client.query<{ acquired: boolean }>("select pg_catalog.pg_try_advisory_lock(pg_catalog.hashtext('chenyida_erp_schema_migration')::bigint) as acquired");
@@ -94,7 +113,11 @@ export async function runMigrations(): Promise<void> {
         if (!approved || approved.sha256 !== checksum) reject("MIGRATION_FILE_NOT_APPROVED");
       }
       const applied = await runMigrationTransaction(client, async (transaction) => {
-        await transaction.query("select pg_catalog.set_config('search_path','public',true)");
+        const localPath = await transaction.query<{ search_path: string }>(
+          "select pg_catalog.set_config('search_path',$1,true)::text as search_path",
+          [CONTROLLED_MIGRATION_SEARCH_PATH],
+        );
+        if (localPath.rows.length !== 1 || localPath.rows[0].search_path !== CONTROLLED_MIGRATION_SEARCH_PATH) reject("MIGRATION_SEARCH_PATH_INVALID");
         await transaction.query("create table if not exists public.schema_migrations (version text primary key, checksum text not null, applied_at timestamptz not null default pg_catalog.now())");
         const existing = await transaction.query<{ checksum: string }>("select checksum from only public.schema_migrations where version=$1", [file]);
         if (existing.rows[0]) {
@@ -115,8 +138,18 @@ export async function runMigrations(): Promise<void> {
       validateAppliedMigrationRows(applied, authorization.value.manifest.migrations.entries, authorization.value.manifest.migrations.head);
     } else await assertIsolatedTargetIdentity(client, authorization.value);
   } finally {
-    await closeMigrationRuntime(client, locked);
+    await closeMigrationRuntime(client, locked, input.close);
   }
+}
+
+export async function runMigrations(): Promise<void> {
+  const config = runtimeConfig();
+  return runMigrationWorkflow({
+    config,
+    poolFactory: getPool,
+    close: closeDb,
+    isolatedDatabaseUrl: process.env.DATABASE_URL || "",
+  });
 }
 
 export function safeMigrationErrorCode(error: unknown): string {
@@ -136,7 +169,8 @@ export function safeMigrationErrorCode(error: unknown): string {
     "57P03": "MIGRATION_DATABASE_SERVER_UNAVAILABLE",
     "57P04": "MIGRATION_DATABASE_SERVER_UNAVAILABLE",
   });
-  return known[candidate] || "MIGRATION_INTERNAL_ERROR";
+  if (known[candidate]) return known[candidate];
+  return /^[0-9A-Z]{5}$/.test(candidate) ? `MIGRATION_DATABASE_${candidate}` : "MIGRATION_INTERNAL_ERROR";
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
