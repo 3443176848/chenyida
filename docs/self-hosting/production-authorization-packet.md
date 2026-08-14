@@ -125,7 +125,7 @@ supervisor本身没有后台进程；没有pending release authorization时保�
 
 A2必须等TASK53生命周期合同、TASK59—TASK60/D-135—D-136快照及创建前target reservation合同、A1安装回执、最终源码匹配Web/Worker和A3不可变外部镜像引用全部通过。TASK53已建立“旧运行面保持不退化、隔离候选严格验证Worker health、部署后再独立严格验证”的失败关闭合同，TASK59—TASK60已建立独立detached快照、reservation/receipt/runtime绑定及锁内双重验证；当前阻断为当前镜像不存在、A1未安装且A3外部完整引用不存在。
 
-TASK61当前快照输入为`222584c03cd016c69daa96013c6420dfcbfc5647`/tree`2286082369969dd6c8b94df2aeb227dbac2f3e72`，reservation、monitor及105文件Supervisor bundle合同已逐字节复核，但TASK62及剩余安全仓库变化仍会使它成为历史输入，故不得预签正式A2授权。最终A2必须由D-135/D-136工具在仓库外root-owned、不可组/全局写的固定根，以同设备私有staging和创建前0400 reservation建立locked detached worktree，并以不可变prepared receipt、receipt SHA-256和canonical借用runtime root绑定authorization；launcher先取得全局锁再VERIFY，wrapper在制品发布前复核。不得回退或切换共享主工作区，不得把更晚治理HEAD、branch、foreign target、旧audit或路径名冒充候选所有权；REMOVE只处理reservation/receipt证明的对象，quarantine默认永久保留。
+TASK62当前快照输入为`672a0695b761a50093c15401cf8d9e39951ced36`/tree`2d5b30bf72a5b1b08ad9ccdb35cf16008c376e76`，reservation、monitor projection及113文件Supervisor bundle合同已逐字节复核，但TASK63及剩余安全仓库变化仍会使它成为历史输入，故不得预签正式A2授权。最终A2必须由D-135/D-136工具在仓库外root-owned、不可组/全局写的固定根，以同设备私有staging和创建前0400 reservation建立locked detached worktree，并以不可变prepared receipt、receipt SHA-256和canonical借用runtime root绑定authorization；launcher先取得全局锁再VERIFY，wrapper在制品发布前复核。不得回退或切换共享主工作区，不得把更晚治理HEAD、branch、foreign target、旧audit或路径名冒充候选所有权；REMOVE只处理reservation/receipt证明的对象，quarantine默认永久保留。
 
 A2允许在仓库外唯一artifact root生成正式镜像provenance、SBOM/security evidence、19步gate report和条件式UAT-class manifest；镜像参数必须使用A3批准私有registry的完整`repository@sha256:digest`引用，不能使用已删除loopback registry留下的`127.0.0.1:32776/...`引用。它允许按计划串行启动隔离测试容器和数据库，但不修改UAT/生产、不push外部registry、不读真实业务数据或四卷。
 
@@ -272,24 +272,25 @@ A8只有A2—A7全部有当期证据、所有关键差异已修复/接受/指定
 
 ## 13. 仍可安全推进的仓库任务
 
-TASK53已完成首次晋升自锁修复，TASK54关闭原异机传输合同，TASK55—TASK56关闭cluster/runtime权限与恢复合同，TASK59—TASK60关闭detached snapshot及创建前reservation主合同，TASK61关闭内容寻址monitor host delivery；TASK57镜像已因后续Site变化失效。在等待任何外部授权期间，以下台账仍必须区分已完成与开放项，不能直接宣布“只剩用户授权”：
+TASK53已完成首次晋升自锁修复，TASK54关闭原异机传输合同，TASK55—TASK56关闭cluster/runtime权限与恢复合同，TASK59—TASK60关闭detached snapshot及创建前reservation主合同，TASK61—TASK62关闭内容寻址monitor host delivery及权威projection producer；TASK57镜像已因后续Site变化失效。在等待任何外部授权期间，以下台账仍必须区分已完成与开放项，不能直接宣布“只剩用户授权”：
 
 1. `DONE / TASK54`：四域V2异机传输provenance、客户端加密、不可变接收/保留、非重入调度和失败恢复合同已在合成fixture与本机隔离目标完成；真实异机和当前数据仍未授权。
 2. `DONE / TASK59`：A2独立detached candidate worktree的PREPARE/VERIFY/REMOVE、不可变回执、借用runtime、锁内多次验证和跨代quarantine守恒已在合成隔离Git中闭合；没有实际创建host候选或运行A2。
 3. `DONE / TASK60`：同设备私有staging、创建前0400 reservation receipt、target root dev/inode/mode绑定、NOREPLACE同inode提升、Git前后验证和target-only精确恢复已在合成隔离Git中闭合；receipt前崩溃、inode替换、非空、跨设备或Git未保留inode均失败关闭。新78文件bundle已重建，镜像仍待全部安全仓库变化收口后统一重建。
-4. `DONE / TASK61`：27文件monitor与105文件Supervisor bundle、三身份、七unit/timer、内容寻址runtime、配置view、安装/回退/停用事务和精确ACK已在仓库/合成隔离闭合；未实际安装，notifier默认deny-all。
-5. `DOING / TASK62`：从installed Supervisor/postdeploy与真实V4 recovery权威回执生成root-only、最小去敏、单调、崩溃安全投影；不得读取真实回执、安装host或执行备份恢复。
-6. `OPEN`：以机器源生成11角色→permission→API/data domain矩阵和路由覆盖负向合同，附业务批准状态；现有若干手写角色测试遗漏planning，不能替代完整漂移检测。
-7. `OPEN`：以合成隔离数据证明历史导入基线0017物化后连续升级至当前0046，覆盖重复执行、失败回滚和升级后全量reconciliation。该任务改动候选输入后必须重建镜像/证据。
-8. `DONE / TASK55—TASK56`：PostgreSQL cluster roles/ACL/default privileges、tablespace及运行角色确定性重建合同和隔离测试已闭合；真实数据库恢复/激活仍未授权。
-9. `OPEN`：编制统一跨岗位UAT脚本、预期数据库增量、审计证据、冲销/快照回滚和员工签字模板；不创建账号或执行写操作。
-10. `OPEN`：复核UAT晋升/快照回滚的逐检查点执行器是否存在失败关闭缺口；仅对合成Compose/隔离PostgreSQL实现测试，不部署UAT。
+4. `DONE / TASK61`：三身份、七unit/timer、内容寻址runtime、配置view、安装/回退/停用事务和精确ACK已在仓库/合成隔离闭合；未实际安装，notifier默认deny-all。其27/105文件历史bundle已由TASK62新链替代。
+5. `DONE / TASK62`：installed Supervisor双入口从postdeploy与V4 recovery权威链生成root-only、最小去敏、单调、崩溃安全投影；当前27/113文件bundle已闭合但未安装，V1 policy actual按设计拒绝。
+6. `DOING / TASK63`：新增不可变cluster recovery policy V2及V1/V4/runtime privilege兼容门，使actual不能由legacy或synthetic降级形成；不得连接真实数据库、读取备份或执行恢复。
+7. `OPEN`：以机器源生成11角色→permission→API/data domain矩阵和路由覆盖负向合同，附业务批准状态；现有若干手写角色测试遗漏planning，不能替代完整漂移检测。
+8. `OPEN`：以合成隔离数据证明历史导入基线0017物化后连续升级至当前0046，覆盖重复执行、失败回滚和升级后全量reconciliation。该任务改动候选输入后必须重建镜像/证据。
+9. `DONE / TASK55—TASK56`：PostgreSQL cluster roles/ACL/default privileges、tablespace及运行角色确定性重建合同和隔离测试已闭合；真实数据库恢复/激活仍未授权。
+10. `OPEN`：编制统一跨岗位UAT脚本、预期数据库增量、审计证据、冲销/快照回滚和员工签字模板；不创建账号或执行写操作。
+11. `OPEN`：复核UAT晋升/快照回滚的逐检查点执行器是否存在失败关闭缺口；仅对合成Compose/隔离PostgreSQL实现测试，不部署UAT。
 
 后续调度按对A1/A2、恢复和运行安全的影响选择最高优先级，保持一次一个正式任务编号。
 
 ## 14. 当前最小外部请求
 
-当前不需要项目负责人立即批准host或数据动作：D-135—D-137快照、reservation与monitor host delivery仓库合同已完成，但当前镜像已失效，A2仍被最终镜像、A1和A3阻断；A4真实链缺目标/策略，A5a还缺TASK62权威投影、目标绑定出口、账号/systemd/网络授权和值班输入。持续交付负责人已按第13节第5项启动TASK62，再按依赖处理其余开放仓库任务。项目负责人若愿意并行准备非秘密外部信息，最小输入仍是A4a的三个故障域/RPO/RTO/加密/保留/责任人，未来A3的私有Git/registry目标名称，或A5a渠道类型/非秘密目标与值班责任人；密码、Token和密钥仍只放root-only文件，不发聊天。
+当前不需要项目负责人立即批准host或数据动作：D-135—D-138快照、reservation、monitor host delivery与权威projection仓库合同已完成，但当前镜像已失效，A2仍被最终镜像、A1和A3阻断；A4真实链缺目标/策略且V2 cluster policy尚未完成，A5a还缺实际安装、目标绑定出口、账号/systemd/网络授权和值班输入。持续交付负责人已按第13节第6项启动TASK63，再按依赖处理其余开放仓库任务。项目负责人若愿意并行准备非秘密外部信息，最小输入仍是A4a的三个故障域/RPO/RTO/加密/保留/责任人，未来A3的私有Git/registry目标名称，或A5a渠道类型/非秘密目标与值班责任人；密码、Token和密钥仍只放root-only文件，不发聊天。
 
 第一个host变更请求最终仍是A1，但须等全部安全仓库变化收口并重建最终bundle/镜像后才请求；在此之前系统安全保持：UAT继续alpha.42/0040、历史候选和诊断证据只读保留但不可授权、正式入口失败关闭、无真实员工使用。
 

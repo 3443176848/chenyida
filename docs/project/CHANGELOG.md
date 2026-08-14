@@ -15,11 +15,24 @@
 - 数据库/API：无Schema、Migration或业务API变化；未连接UAT/生产数据库，未读业务行、备份/Volume正文、日志、`.env`或用户未跟踪状态报告。
 - 治理：新增D-137，TASK61转`DONE`；自动启动`SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62`为唯一`DOING`。系统仍`PRODUCTION NO-GO`。
 
-### SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62 - `docs: start authoritative monitoring projections`
+### SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62 - `docs: start authoritative monitoring projections` / `feat: publish authoritative monitoring projections` / `release: bind monitoring projection layout bundle` / `build: pin monitoring projection supervisor bundle` / `docs: close authoritative projections and start recovery policy v2`
 
 - 调度：从TASK61最终Supervisor manifest-only提交`222584c03cd016c69daa96013c6420dfcbfc5647`/tree`2286082369969dd6c8b94df2aeb227dbac2f3e72`启动唯一active task。
 - 目标：只在仓库和合成隔离环境从installed Supervisor/postdeploy与V4 recovery权威回执生成root-only、最小去敏、单调、崩溃安全的components/backup投影，禁止调用者自报摘要或旧证据冒充当前健康。
-- 边界：不读取真实回执/业务数据，不安装host、创建账号、写systemd、开放网络、发送通知或执行备份恢复/Migration/deploy；资源停止线继续有效。
+- 发布器：新增Supervisor专用components/backup双入口和内容寻址Node发布器；授权消费前后多次固定源路径/SHA/bytes/dev/inode/uid/gid/mode/nlink，components重构current release identity，backup默认只接受当前且未过期的V4 `ACTUAL_OFFHOST + RECOVERY_READY`。
+- 事务：两类投影均从generation 1/零前驱启动，完整不可变history、previous/source SHA和精确current alias采用canonical JSON、确定性temp、file/directory fsync及原子rename；可证明partial幂等恢复，未知/被引用差异/未来/回退/跳代失败关闭。
+- legacy边界：D-132 V1 cluster recovery policy不能证明actual，默认V4以`READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN`拒绝。正向存储fixture只能显式注入test validator，生产路径没有兼容旁路；V2政策转交TASK63。
+- 不可变链：source`0e38ac2e286abf4f9b95b46258448df5f9bc67cd`/tree`f48b5b08c043119db56421562490db8f5a8dda25`→monitor manifest-only`9d0eeb7b3f67855c8e2af57c3296a5c9b9b57a2f`/tree`8585afce3631f5a0cffe93186f1e175d3f27642b`→Supervisor manifest-only`672a0695b761a50093c15401cf8d9e39951ced36`/tree`2d5b30bf72a5b1b08ad9ccdb35cf16008c376e76`；27/113文件manifest为`d1b0239f…8790`/`9d653c63…96f1`且逐字节重放一致。
+- 验证：Python专项`28/28`、固定断网只读受限Node投影`6/6`、release contract`20/20`、inventory`250/226/24`、JSON/Python静态、敏感模式和diff门通过。首次fixture在最小capability下改写`0440`文件得到`EACCES`，修复测试helper后完整重跑通过，断言未降低。
+- 资源/边界：available约1.9—2.0GiB，Swap约870—871MiB/1GiB且超过80%，根盘13GiB，Load低于1，`oom_kill=0`；未运行build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像。未读取真实回执/业务数据、`.env`、日志、备份/Volume正文，未安装host、创建账号、写systemd、开放网络、发送通知或执行备份恢复/Migration/deploy。
+- 数据库/API：无Schema、Migration或业务API变化；只新增运维发布器与Supervisor受控操作。系统保持`PRODUCTION NO-GO`。
+- 治理：新增D-138，TASK62转`DONE`；自动启动`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63`为唯一`DOING`。
+
+### SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63 - `docs: close authoritative projections and start recovery policy v2`
+
+- 调度：从TASK62最终Supervisor manifest-only提交`672a0695b761a50093c15401cf8d9e39951ced36`/tree`2d5b30bf72a5b1b08ad9ccdb35cf16008c376e76`启动唯一active task。
+- 目标：审计V1 policy、V4 readiness和runtime privilege完整链，新增不可变V2政策，使actual只由独立目标、当前身份、四域及角色/ACL/tablespace/secret/RPO-RTO等完整证据形成；V1保持失败关闭。
+- 边界：只做仓库和合成隔离工作；不连接数据库，不读取真实备份/回执，不执行恢复、host配置、凭据/账号/ACL、网络、UAT/生产或数据动作。Swap停止线继续有效。
 
 ## 2026-08-14
 

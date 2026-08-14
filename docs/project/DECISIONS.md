@@ -2552,6 +2552,44 @@
 - 拒绝自动删除unknown/foreign对象、旧版本、state/pending/journal/receipt，拒绝用旧COMMITTED或跳代配置冒充安全rollback。
 - 拒绝默认开放网络、接受任意drop-in或以“未来会配置渠道”为由把当前deny-all写成A5a已就绪。
 
+## D-138 监控权威投影只由installed Supervisor发布且legacy集群策略不能证明实际恢复
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / SYNTHETIC-ISOLATED VERIFIED / HOST AND ACTUAL RECOVERY NOT AUTHORIZED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK62对postdeploy、V4 recovery、monitor watermark和崩溃恢复边界的只读审计与合成攻击测试
+- 确认边界：只授权仓库发布器、一次性授权入口、内容寻址bundle和合成fake-root/fake-receipt测试；不授权host安装、读取真实回执、备份/恢复、网络、UAT/生产或数据动作
+
+### Context
+
+- TASK61只消费root控制的`components.json`与`backup.json`，若允许调用者手填摘要、在可变checkout运行或复用旧release/恢复证据，monitor可以把错误身份显示为当前健康。
+- Release健康必须同时闭合当前monitor activation、private host config、current release identity和canonical postdeploy receipt；只核对一个Git SHA、镜像tag或API health不足以证明四服务、Migration和deployment同源。
+- V4实际恢复必须由当前runtime identity、真实异机传输及恢复证据和集群政策共同证明。D-132的V1政策只在合成边界建立，缺少真实恢复批准、独立目标和完整runtime privilege合同；将其兼容映射成actual会把“测试通过”误写为“真实可恢复”。
+- 投影current alias、history和source receipt跨崩溃存在部分发布窗口。覆盖写、只保留current、按路径名清理temp或允许跳代会破坏回退检测和审计链。
+
+### Decision
+
+1. 只允许installed Release Supervisor在同一全局release FLOCK内通过`PUBLISH_MONITORING_COMPONENTS_PROJECTION`和`PUBLISH_MONITORING_BACKUP_PROJECTION`消费V2一次性root授权；专用操作不得落入通用命令执行路径。
+2. 授权固定每个权威源的路径、SHA-256、bytes、dev/inode、uid/gid、mode和nlink。Supervisor在Node准备前、授权消费前后重复核验；bundle内Node发布器再次no-follow读取精确授权源。
+3. components必须同时验证当前monitor activation、private config、release identity和postdeploy receipt，并重新构造完整runtime identity及四服务严格回执。调用者自报deployment、Git、Migration、镜像、producer或时间不能替代权威源。
+4. backup默认只接受当前identity匹配、未过期的V4 `ACTUAL_OFFHOST + RECOVERY_READY`及canonical policy/RPO。V1集群恢复政策始终返回`READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN`；测试注入validator只能验证发布存储，不得进入生产默认路径。
+5. 两类投影各自从generation 1/零前驱开始，完整history不可变并绑定previous/source SHA。current alias必须逐字节等于精确history对象；canonical JSON、确定性temp、file/directory fsync和原子rename形成崩溃安全提交。
+6. 只允许恢复未被alias引用、与当前候选canonical bytes及全部metadata完全一致的已识别partial；alias引用差异、history替换、未知temp、未来时间、回退、跳代或source漂移保持证据并失败关闭。
+7. root投影根marker为root-only `0400`，根/history为root:monitor-evaluator group `0750`，投影为`0440`；发布内容仅含monitor需要的最小去敏字段，不读取或投影API正文、环境、日志、数据库、业务行、凭据或备份位置。
+
+### Consequences
+
+- TASK62源码`0e38ac2e286abf4f9b95b46258448df5f9bc67cd`、monitor manifest-only`9d0eeb7b3f67855c8e2af57c3296a5c9b9b57a2f`和Supervisor manifest-only`672a0695b761a50093c15401cf8d9e39951ced36`形成27/113文件canonical链；两个manifest SHA-256为`d1b0239f…8790`和`9d653c63…96f1`。
+- Python专项28/28、受限Node投影6/6、release contract20/20和inventory 250/226/24通过。仓库可确定性地产生并恢复投影，但当前host未安装、没有真实权威源，因此不能宣称持续监控或备份ready。
+- V1政策的actual正向路径仍故意阻断。TASK63必须新增不可变V2政策和兼容测试，不能修改V1或删除拒绝；真实异机恢复、凭据、目标和批准仍须专项授权。
+- TASK61/TASK60及更早bundle、现有Web/Worker候选继续为`STALE / NOT AUTHORIZABLE`；最终安全仓库输入稳定后必须重新生成镜像、外部锚点和正式授权输入。
+
+### Rejected alternatives
+
+- 拒绝浏览器/API、普通调用者、monitor evaluator或手工JSON直接发布root投影，拒绝依赖可变Git checkout、系统Node、tag或单一摘要。
+- 拒绝用V1、V2/V3旧readiness、synthetic、同机副本、未过期但旧runtime identity或测试注入validator生成实际backup绿色结果。
+- 拒绝覆盖history/current、只保留最新代、从旧代回退、跳过fsync、递归清理未知temp或用路径名代替inode/owner/mode/nlink验证。
+- 拒绝为形成正向fixture而降低V4生产默认断言；实际正向能力必须由后续V2政策合同和真实授权证据获得。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

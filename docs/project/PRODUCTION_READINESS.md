@@ -7,7 +7,7 @@
 
 ## 1. 判定
 
-当前系统不能投入真实员工使用。公开非生产 UAT 在空闲状态健康，已有较完整的服务端权限、CSRF、幂等、审计和业务状态机基础，TASK59—TASK60也已闭合A2独立detached候选快照及创建前target reservation的仓库生命周期；但TASK57镜像已因后续Site变化失效，当前没有源码匹配候选，更没有真实异机可恢复数据锚点、外部不可变镜像锚点、installed Supervisor签发的正式发布门、真实数据迁移演练、完整跨岗位验收或正式切换回滚证据。
+当前系统不能投入真实员工使用。公开非生产 UAT 在空闲状态健康，已有较完整的服务端权限、CSRF、幂等、审计和业务状态机基础，TASK59—TASK60已闭合A2独立detached候选快照及创建前target reservation，TASK61—TASK62也已闭合monitor host delivery与权威投影的仓库生命周期；但TASK57镜像已因后续Site变化失效，当前没有源码匹配候选，现有V1 cluster policy又不能证明actual，更没有真实异机可恢复数据锚点、外部不可变镜像锚点、installed Supervisor签发的正式发布门、真实数据迁移演练、完整跨岗位验收或正式切换回滚证据。
 
 本文件是失败关闭的准入基线，不是上线批准。只有对应证据实际完成后，单项状态才能从`FAIL`或`PARTIAL`更新；文档完成、页面可访问或历史测试通过不会自动解除任何门禁。
 
@@ -92,6 +92,10 @@
 2026-08-15 第四十次增量：TASK61按D-137完成内容寻址monitor host delivery仓库合同。source`b057f81b989eab07a4a40603c6a2a4486f326ee1`/tree`a571800f83d38209603e2bfe2a3e35b71bd2eb2b`→monitor manifest-only`3327be43d026d83477fff9e79a0eb0f090902e86`/tree`23da2f11b1ae9f6612063c0b8b4634cbf2ac11b7`→Supervisor manifest-only`222584c03cd016c69daa96013c6420dfcbfc5647`/tree`2286082369969dd6c8b94df2aeb227dbac2f3e72`固定27/105文件，manifest SHA-256为`6782ec58…aea07`/`56157a68…efcb`。三身份、七unit/timer、内容寻址runtime、安装/回退/停用事务、单调投影消费、崩溃安全state/outbox及远端精确ACK通过Node30/30、Supervisor23/23、release20/20；未安装host、建账号、写systemd、开放网络或发送通知。默认notifier deny-all且权威投影producer开放，因此A5a仍未执行，整体继续`PRODUCTION NO-GO`。
 
 2026-08-15 第四十一次增量：`SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62`从`222584c0`/tree`22860823`启动为唯一`DOING`。范围固定为从installed Supervisor/postdeploy及V4 recovery权威回执生成root-only、最小去敏、单调、崩溃安全投影和合成隔离测试；不读取真实回执/业务数据、不安装host、不执行备份恢复或开放网络。Swap仍超过80%停止线，只执行轻量工作，整体继续`PRODUCTION NO-GO`。
+
+2026-08-15 第四十二次增量：TASK62按D-138完成权威投影仓库合同。source`0e38ac2e286abf4f9b95b46258448df5f9bc67cd`→monitor manifest-only`9d0eeb7b3f67855c8e2af57c3296a5c9b9b57a2f`→Supervisor manifest-only`672a0695b761a50093c15401cf8d9e39951ced36`固定27/113文件，manifest SHA-256为`d1b0239f…8790`/`9d653c63…96f1`。installed Supervisor双入口、权威components/V4 backup源、输入metadata三重验证、root-only不可变history/current及崩溃恢复通过Python28/28、受限Node6/6、release20/20和inventory250/226/24。D-132 V1 policy actual继续由`READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN`拒绝；未安装host或执行真实恢复，整体继续`PRODUCTION NO-GO`。
+
+2026-08-15 第四十三次增量：`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63`从`672a0695`/tree`2d5b30bf`启动为唯一`DOING`。范围固定为V1 policy、V4 readiness及runtime privilege只读调用链审计、新增不可变V2政策和合成兼容测试；不连接数据库，不读取真实备份/回执，不执行恢复、host、凭据/账号/ACL、网络、UAT/生产或数据动作。Swap停止线继续有效，整体仍`PRODUCTION NO-GO`。
 
 ## 2. 证据范围与未执行事项
 

@@ -2,28 +2,42 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62（执行中；只做权威投影仓库合同，资源停止线有效）
+## SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63（执行中；只做V2政策仓库合同，资源停止线有效）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / READ-ONLY AUDIT AND LIGHTWEIGHT DESIGN / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；关闭monitor权威release/backup投影producer缺口 |
-| 严格起点 | PASS / CONTROLLED | `222584c03cd016c69daa96013c6420dfcbfc5647`/tree`2286082369969dd6c8b94df2aeb227dbac2f3e72`；工作区仅治理文档与既有受保护未跟踪报告 |
-| 目标合同 | IN PROGRESS | 从installed Supervisor/postdeploy与V4 recovery权威回执生成root-only、最小去敏、单调、崩溃安全投影；调用者自报/legacy/synthetic失败关闭 |
-| 资源 | STOP LINE ACTIVE | Swap仍约870MiB/1GiB（超过80%）、根盘13GiB、Load低于1；禁止新重任务，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无真实回执读取、host安装、账号/systemd、notifier出口、通知、备份恢复、A1—A8、外部、UAT/生产、数据库或Volume动作 |
+| 当前状态 | DOING / READ-ONLY AUDIT AND LIGHTWEIGHT DESIGN / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；为V4 actual新增不可变cluster recovery policy V2，V1继续失败关闭 |
+| 严格起点 | PASS / CONTROLLED | `672a0695b761a50093c15401cf8d9e39951ced36`/tree`2d5b30bf72a5b1b08ad9ccdb35cf16008c376e76`；用户未跟踪报告继续不读不改不提交 |
+| 目标合同 | IN PROGRESS | 审计V1/V4/runtime privilege完整链，新增V2环境/目标/集群/四域/角色ACL/tablespace/secret/RPO-RTO/批准与时效边界及兼容测试 |
+| 资源 | STOP LINE ACTIVE | Swap约871MiB/1GiB（超过80%）、根盘13GiB、Load低于1；禁止新重任务，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无数据库连接、真实备份/回执读取、恢复、host、凭据/账号/ACL、A1—A8、外部、UAT/生产或Volume动作 |
 | 系统是否可用 | NO | 当前无真实监控投递、源码匹配镜像、正式门、真实异机恢复/迁移、岗位/员工签字或切换 |
+
+## SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62（完成；仓库与合成隔离通过，host/真实恢复未授权）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / LEGACY POLICY ACTUAL BLOCKED / PRODUCTION NO-GO | TASK62已释放active slot；下一安全任务为cluster recovery policy V2 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`0e38ac2`→monitor manifest-only`9d0eeb7`→Supervisor manifest-only`672a069`；27/113文件manifest为`d1b0239f…8790`/`9d653c63…96f1`，生成器逐字节重放一致 |
+| components | PASS / AUTHORITATIVE | current monitor activation、private config、postdeploy/runtime identity、四服务、deployment、Git/Migration、镜像与producer完整闭合；调用者自报拒绝 |
+| backup | PASS / FAIL CLOSED | 默认只接受当前identity、未过期的V4 `ACTUAL_OFFHOST + RECOVERY_READY`；D-132 V1政策以`READINESS_V4_LEGACY_POLICY_ACTUAL_FORBIDDEN`拒绝，测试validator未进入生产路径 |
+| 发布事务 | PASS / CRASH SAFE | Supervisor三次source metadata核验和Node no-follow读取；generation/previous/source SHA、不可变history、精确current alias、canonical/fsync/atomic及可证明partial恢复通过 |
+| 自动验证 | PASS / SCOPED APPLICABLE | Python28/28、断网只读受限Node6/6、release contract20/20、inventory250/226/24、JSON/Python静态、敏感模式及diff门通过 |
+| 资源/清理 | STOP LINE ACTIVE / NO OOM | available约1.9—2.0GiB、Swap870—871MiB/1GiB且超过80%、根盘13GiB、Load低于1、`oom_kill=0`；任务容器无残留，未启动重任务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | UAT仍alpha.42/0040、四服务restart0/OOM false；无真实回执、host/systemd、网络、通知、备份恢复、数据库或Volume动作 |
+| 系统是否可用 | NO | 仓库producer不等于真实projection或可恢复性；仍无真实异机恢复、正式同候选门、UAT对齐、岗位/员工验收或切换 |
 
 ## SELFHOST-OPS-MONITORING-HOST-DELIVERY-61（完成；仓库与合成隔离通过，host/出口未授权）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / EGRESS AND PROJECTION PUBLISHERS OPEN / PRODUCTION NO-GO | TASK61已释放active slot；下一安全任务为权威投影producer |
+| 当前状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / EGRESS OPEN / PROJECTION PUBLISHERS CLOSED BY TASK62 / PRODUCTION NO-GO | TASK61历史合同保持；权威投影仓库缺口已由TASK62关闭 |
 | 不可变链 | PASS / CONTENT ADDRESSED | source`b057f81`→monitor manifest-only`3327be4`→Supervisor manifest-only`222584c`；27/105文件manifest为`6782ec58…aea07`/`56157a68…efcb` |
 | 权限/安装 | PASS / REPOSITORY CONTRACT | root collector、独立evaluator/notifier、七unit/timer、Node内容寻址runtime、双锁、phase freeze、COMMITTED先于activation、已提交rollback和disable-preserve已验证 |
 | 投递 | PASS / SYNTHETIC ACK ONLY | grant/claim/attempt/result/精确ACK、至少一次重试、防target重解释、防队列饥饿及原子readiness通过；HTTP 2xx/exit0不能单独delivered |
 | 自动验证 | PASS / SCOPED APPLICABLE | monitor+delivery30/30、Supervisor launcher+delivery23/23、release contract20/20、Python AST5、JSON4、inventory和双manifest replay通过 |
 | 资源 | STOP LINE ACTIVE / NO NEW HEAVY WORK | 收口available约2.0GiB、Swap约870MiB/1GiB且超过80%、根盘13GiB、Load低于1；未build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无host、账号、systemd、网络、真实渠道/凭据、通知、UAT/生产、数据库或Volume动作；notifier默认deny-all，projection producer未完成 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无host、账号、systemd、网络、真实渠道/凭据、通知、UAT/生产、数据库或Volume动作；notifier默认deny-all，producer虽已由TASK62实现但未安装 |
 | 系统是否可用 | NO | 仓库合同不等于真实持续监控；仍无真实异机恢复、正式同候选门、UAT对齐、岗位/员工验收或切换 |
 
 ## SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60（完成；仓库所有权闭环已验证，资源停止线仍有效）
