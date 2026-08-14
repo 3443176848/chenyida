@@ -53,7 +53,7 @@ export const RELEASE_GATE_PLAN_REPOSITORY_PATH = "chenyida_erp_site/release/rele
 export const RELEASE_VULNERABILITY_POLICY_ID = "chenyida-erp-zero-known-vulnerabilities-v1";
 export const RELEASE_VULNERABILITY_POLICY_SHA256 = "042cd1bb1185923a8f186319d90194911beba78f761938f42937c5fd0e463ab9";
 export const RELEASE_TEST_RUNTIME_POLICY_CONTRACT = "chenyida-erp-release-test-runtime-policy/v1";
-export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "611202d33c6923f6d8f41cd85abef2c96df3fdd7ebb41bfd1aed7e62b8b4ea72";
+export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "e2b50ea20362226eea9abd31a17fbfa809ea67fed0e60aa856a2900857dcbd2b";
 export const RELEASE_TEST_INVENTORY_SHA256 = "5a5444ab25aed9f2f2bb92cce2b686ef015e81da50b7db0d58b0f44eb8d1c5dd";
 export const RELEASE_GATE_REQUIRED_STEP_IDS = [
   "release-contracts",
@@ -311,7 +311,7 @@ export function validateOfficialTestRuntimePolicy(value, raw = null) {
   exactKeys(value.browser_runtime, ["package_name", "package_version", "browser_name", "browser_revision", "browser_version", "executable_path", "executable_sha256"], "TEST_RUNTIME_BROWSER_FIELDS_INVALID");
   if (value.browser_runtime.package_name !== "playwright-core" || value.browser_runtime.package_version !== "1.51.1" || value.browser_runtime.browser_name !== "chromium" || value.browser_runtime.browser_revision !== "1161" || value.browser_runtime.browser_version !== "134.0.6998.35" || value.browser_runtime.executable_path !== "/ms-playwright/chromium-1161/chrome-linux/chrome" || value.browser_runtime.executable_sha256 !== "efb2bece6f2f5bc00dc270162d2241c86d509ca4f4297b1eb0f5cd8894d050be") reject("TEST_RUNTIME_BROWSER_INVALID");
   exactKeys(value.node_dependencies, ["path", "tree_sha256", "package_lock_sha256"], "TEST_RUNTIME_NODE_FIELDS_INVALID");
-  if (value.node_dependencies.path !== "chenyida_erp_site/node_modules" || value.node_dependencies.tree_sha256 !== "2b8223f9c604300ac18f2996cb93e404b2c27897945c143626a3cfedee4209fd" || value.node_dependencies.package_lock_sha256 !== "9c3949bfdce05d355287550bdc7981a0e4cc455e99ae1735e39ee0b4c9252eb5") reject("TEST_RUNTIME_NODE_INVALID");
+  if (value.node_dependencies.path !== "chenyida_erp_site/node_modules" || value.node_dependencies.tree_sha256 !== "e3b363049ea538e0a95c9984d73719c1402c645cd37250f8cca947affea01659" || value.node_dependencies.package_lock_sha256 !== "9c3949bfdce05d355287550bdc7981a0e4cc455e99ae1735e39ee0b4c9252eb5") reject("TEST_RUNTIME_NODE_INVALID");
   exactKeys(value.python_runtime, ["venv_path", "venv_tree_sha256", "interpreter_path", "interpreter_sha256", "requirements_sha256", "requirements_dev_sha256"], "TEST_RUNTIME_PYTHON_FIELDS_INVALID");
   if (value.python_runtime.venv_path !== ".venv" || value.python_runtime.venv_tree_sha256 !== "c67b68ec9436f4a13f41df0eff9b552ca3f1d8b9e759113ebd23eefbe9419041" || value.python_runtime.interpreter_path !== "/usr/bin/python3.11" || value.python_runtime.interpreter_sha256 !== "c3d7aaf77a0fe9486380e2b551b9aa7c37f76f46ebe627d4dcad0c38e6485d98" || value.python_runtime.requirements_sha256 !== "702687ef5d857d239673a911520c2cbe805fd2578b7708b16a547234a8274d5d" || value.python_runtime.requirements_dev_sha256 !== "2fa82fddabeb9ed6fb4390790479a81d9affeb5533a79e658cec4c44e5d1270b") reject("TEST_RUNTIME_PYTHON_INVALID");
   exactKeys(value.test_inventory, ["path", "sha256", "total_tests", "required_tests", "not_applicable_tests", "category_counts"], "TEST_RUNTIME_INVENTORY_FIELDS_INVALID");

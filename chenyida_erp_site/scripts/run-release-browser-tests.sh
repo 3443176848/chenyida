@@ -17,7 +17,7 @@ BROWSER_EXECUTABLE='/ms-playwright/chromium-1161/chrome-linux/chrome'
 BROWSER_EXECUTABLE_SHA256='efb2bece6f2f5bc00dc270162d2241c86d509ca4f4297b1eb0f5cd8894d050be'
 BROWSER_VERSION='Chromium 134.0.6998.35'
 PACKAGE_LOCK_SHA256='9c3949bfdce05d355287550bdc7981a0e4cc455e99ae1735e39ee0b4c9252eb5'
-NODE_MODULES_TREE_SHA256='2b8223f9c604300ac18f2996cb93e404b2c27897945c143626a3cfedee4209fd'
+NODE_MODULES_TREE_SHA256='e3b363049ea538e0a95c9984d73719c1402c645cd37250f8cca947affea01659'
 TREE_DIGEST_COMMAND="{ /usr/bin/find -P . -xdev -printf '%y|%m|%P|%l\\n' | LC_ALL=C /usr/bin/sort; /usr/bin/find -P . -xdev -type f -print0 | LC_ALL=C /usr/bin/sort -z | /usr/bin/xargs -0 /usr/bin/sha256sum; } | /usr/bin/sha256sum"
 
 container_main() {
