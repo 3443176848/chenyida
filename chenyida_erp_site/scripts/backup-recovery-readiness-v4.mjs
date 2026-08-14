@@ -32,6 +32,11 @@ import {
   validateRecoveryControlIntentForPolicy,
 } from "./postgresql-cluster-recovery-policy-v2-contract.mjs";
 import {
+  createClusterRecoveryPolicyActivationEvidence,
+  validateClusterRecoveryPolicyActivationEvidence,
+} from "./postgresql-cluster-recovery-policy-v2-activation-contract.mjs";
+import { readCommittedClusterPolicyActivation } from "./postgresql-cluster-recovery-policy-v2-publisher.mjs";
+import {
   RUNTIME_PRIVILEGE_OPERATOR_RECEIPT_CONTRACT,
   validateRuntimePrivilegeOperatorIntent,
   validateRuntimePrivilegeOperatorReceipt,
@@ -45,6 +50,7 @@ import {
 export const BACKUP_RECOVERY_READINESS_V4_CONTRACT = "chenyida-erp-backup-verification/v4";
 export const BACKUP_RECOVERY_READINESS_V4_ATTESTATION = "ROOT_PUBLISHED_DATA_V3_JOINT_TRANSFER_V2_CLUSTER_SECURITY_CREDENTIAL_TABLESPACE_AND_RECOVERY_STATE_VERIFIED";
 export const BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION = "ROOT_PUBLISHED_DATA_V3_JOINT_TRANSFER_V2_CLUSTER_SECURITY_CREDENTIAL_TABLESPACE_RECOVERY_STATE_AND_RUNTIME_PRIVILEGE_VERIFIED";
+export const BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ACTIVATED_ATTESTATION = "ROOT_PUBLISHED_DATA_V3_JOINT_TRANSFER_V2_CLUSTER_SECURITY_CREDENTIAL_TABLESPACE_RECOVERY_STATE_RUNTIME_PRIVILEGE_AND_COMMITTED_POLICY_ACTIVATION_VERIFIED";
 
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -198,16 +204,28 @@ function validateRuntimePrivilegeEvidence(value, { policy, control, cluster }) {
   return { intent, finalState, receipt };
 }
 
+function validatePolicyActivationEvidence(value, policy) {
+  try { return validateClusterRecoveryPolicyActivationEvidence(value, policy); }
+  catch { reject("READINESS_V4_POLICY_ACTIVATION_EVIDENCE_INVALID"); }
+}
+
+function createPolicyActivationEvidence(receipt, policy) {
+  try { return createClusterRecoveryPolicyActivationEvidence(receipt, policy); }
+  catch { reject("READINESS_V4_POLICY_ACTIVATION_EVIDENCE_INVALID"); }
+}
+
 export function validateBackupRecoveryReadinessV4(value, policyInput) {
   const policy = validateClusterRecoveryPolicyForReadiness(policyInput);
   const basePolicy = baseClusterRecoveryPolicy(policy);
   const policyV2 = isClusterRecoveryPolicyV2(policy);
+  const actualPolicyV2 = policyV2 && value?.result === BACKUP_RECOVERY_READY_RESULT && value?.evidence_scope === "ACTUAL_OFFHOST";
   const expectedFields = [
     "schema_version", "contract", "result", "evidence_scope", "backup_id", "restore_run_id", "created_at",
     "verified_at", "expires_at", "data_readiness", "joint_transfer", "recovery_execution", "cluster_security",
     "credential_binding", "tablespace", "status", "attestation", "readiness_sha256",
   ];
   if (policyV2) expectedFields.push("recovery_control", "runtime_privilege");
+  if (actualPolicyV2) expectedFields.push("policy_activation");
   exactKeys(value, expectedFields, "READINESS_V4_FIELDS_INVALID");
   if (value.schema_version !== 4 || value.contract !== BACKUP_RECOVERY_READINESS_V4_CONTRACT
     || !new Set([BACKUP_RECOVERY_READY_RESULT, BACKUP_RECOVERY_SYNTHETIC_RESULT]).has(value.result)
@@ -221,6 +239,7 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
   iso(value.expires_at, "READINESS_V4_TIME_INVALID");
   if (Date.parse(value.created_at) > Date.parse(value.verified_at) || Date.parse(value.verified_at) > Date.parse(value.expires_at)) reject("READINESS_V4_TIME_INVALID");
   requireActualPolicyActivation(policy, value);
+  const policyActivation = actualPolicyV2 ? validatePolicyActivationEvidence(value.policy_activation, policy) : null;
 
   exactKeys(value.data_readiness, ["readiness_v3_sha256", "receipt"], "READINESS_V4_DATA_INVALID");
   text(value.data_readiness.readiness_v3_sha256, SHA256, "READINESS_V4_DATA_INVALID");
@@ -277,6 +296,7 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
     : null;
   const statusKeys = ["data_restore", "data_transfer", "cluster_transfer", "cluster_security", "credential_binding", "tablespace", "recovery_execution", "schedule", "retention"];
   if (policyV2) statusKeys.push("runtime_privilege");
+  if (actualPolicyV2) statusKeys.push("policy_activation");
   exactKeys(value.status, statusKeys, "READINESS_V4_STATUS_INVALID");
   const expectedStatus = {
     data_restore: "VERIFIED",
@@ -290,6 +310,7 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
     retention: "POLICY_VALID_DRY_RUN",
   };
   if (policyV2) expectedStatus.runtime_privilege = "VERIFIED";
+  if (actualPolicyV2) expectedStatus.policy_activation = "VERIFIED";
   if (canonicalTransferJson(value.status) !== canonicalTransferJson(expectedStatus)) reject("READINESS_V4_STATUS_INVALID");
 
   const restore = data.inner_restore.receipt;
@@ -373,9 +394,12 @@ export function validateBackupRecoveryReadinessV4(value, policyInput) {
       reject("READINESS_V4_RUNTIME_PRIVILEGE_TIME_INVALID");
     }
     if (finalRecorded - intentCreated > control.rto_minutes * 60_000) reject("READINESS_V4_RTO_EXCEEDED");
+    if (actualPolicyV2 && Date.parse(policyActivation.receipt.committed_at) > controlCreated) reject("READINESS_V4_POLICY_ACTIVATION_TIME_INVALID");
   }
 
-  const expectedAttestation = policyV2 ? BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION : BACKUP_RECOVERY_READINESS_V4_ATTESTATION;
+  const expectedAttestation = actualPolicyV2
+    ? BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ACTIVATED_ATTESTATION
+    : policyV2 ? BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION : BACKUP_RECOVERY_READINESS_V4_ATTESTATION;
   if (value.attestation !== expectedAttestation) reject("READINESS_V4_ATTESTATION_INVALID");
   text(value.readiness_sha256, SHA256, "READINESS_V4_INTEGRITY_INVALID");
   if (clusterSha256(readinessBody(value)) !== value.readiness_sha256) reject("READINESS_V4_INTEGRITY_INVALID");
@@ -408,6 +432,10 @@ export function createBackupRecoveryReadinessV4(options) {
   if (Number.isNaN(verifiedDate.getTime())) reject("READINESS_V4_TIME_INVALID");
   const verifiedAt = verifiedDate.toISOString();
   const actual = data.result === BACKUP_RECOVERY_READY_RESULT;
+  const actualPolicyV2 = policyV2 && actual;
+  const policyActivation = actualPolicyV2
+    ? validatePolicyActivationEvidence(createPolicyActivationEvidence(options.policyActivationReceipt, policy), policy)
+    : null;
   if (actual && process.getuid?.() !== 0) reject("READINESS_V4_ACTUAL_ROOT_REQUIRED");
   const body = {
     schema_version: 4,
@@ -462,7 +490,9 @@ export function createBackupRecoveryReadinessV4(options) {
       schedule: "ON_TIME",
       retention: "POLICY_VALID_DRY_RUN",
     },
-    attestation: policyV2 ? BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION : BACKUP_RECOVERY_READINESS_V4_ATTESTATION,
+    attestation: actualPolicyV2
+      ? BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ACTIVATED_ATTESTATION
+      : policyV2 ? BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION : BACKUP_RECOVERY_READINESS_V4_ATTESTATION,
   };
   if (policyV2) {
     body.recovery_control = {
@@ -480,6 +510,10 @@ export function createBackupRecoveryReadinessV4(options) {
       receipt: runtimePrivilege.receipt,
     };
     body.status.runtime_privilege = "VERIFIED";
+  }
+  if (actualPolicyV2) {
+    body.policy_activation = policyActivation;
+    body.status.policy_activation = "VERIFIED";
   }
   const readiness = { ...body, readiness_sha256: clusterSha256(body) };
   validateBackupRecoveryReadinessV4(readiness, policy);
@@ -590,6 +624,14 @@ export async function publishBackupRecoveryReadinessV4({ readiness, policy, veri
   const validatedPolicy = validateClusterRecoveryPolicyForReadiness(policy);
   rejectLegacyPolicyActual(validatedPolicy, readiness);
   const validated = validateBackupRecoveryReadinessV4(readiness, validatedPolicy);
+  if (isClusterRecoveryPolicyV2(validatedPolicy) && validated.result === BACKUP_RECOVERY_READY_RESULT) {
+    let committed;
+    try { committed = await readCommittedClusterPolicyActivation(validatedPolicy); }
+    catch { reject("READINESS_V4_POLICY_ACTIVATION_NOT_COMMITTED"); }
+    if (canonicalTransferJson(committed.receipt) !== canonicalTransferJson(validated.policy_activation.receipt)) {
+      reject("READINESS_V4_POLICY_ACTIVATION_NOT_CURRENT");
+    }
+  }
   assertJointEvidence(validated, verification);
   if (validated.result === BACKUP_RECOVERY_READY_RESULT && process.getuid?.() !== 0) reject("READINESS_V4_ACTUAL_ROOT_REQUIRED");
   const requiredConfirmation = validated.result === BACKUP_RECOVERY_READY_RESULT

@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {
-  BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION,
+  BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ACTIVATED_ATTESTATION,
   BACKUP_RECOVERY_READINESS_V4_CONTRACT,
 } from "../scripts/backup-recovery-readiness-v4.mjs";
 import { activateClusterRecoveryPolicyV2 } from "../scripts/postgresql-cluster-recovery-policy-v2.mjs";
@@ -25,6 +25,10 @@ import {
   readinessPolicySha256,
   validateClusterRecoveryPolicyForReadiness,
 } from "../scripts/postgresql-cluster-recovery-policy-v2-contract.mjs";
+import {
+  createClusterRecoveryPolicyActivationEvidence,
+  createClusterRecoveryPolicyActivationReceipt,
+} from "../scripts/postgresql-cluster-recovery-policy-v2-activation-contract.mjs";
 import {
   MONITORING_BACKUP_PROJECTION_CONTRACT,
   createBackupProjection,
@@ -405,6 +409,13 @@ async function backupFixture(fixture, overrides = {}, { legacyPolicy = false, te
   const basePolicy = baseClusterRecoveryPolicy(policy);
   const policyFile = path.join(fixture.parent, "sources", "postgresql-cluster-recovery-policy.json");
   await writeTrusted(policyFile, canonicalClusterJson(policy), 0o440);
+  const activationReceipt = legacyPolicy || templatePolicy ? null : createClusterRecoveryPolicyActivationReceipt({
+    policy,
+    activationId: "monitoring-policy-activation-v2-1",
+    operation: "ACTIVATE",
+    previousActivationReceiptSha256: zero,
+    releaseIdentitySha256: fixture.sources.release_identity.sha256,
+  });
   const readiness = {
     schema_version: 4, contract: BACKUP_RECOVERY_READINESS_V4_CONTRACT,
     result: "RECOVERY_READY", evidence_scope: "ACTUAL_OFFHOST", backup_id: "backup-authoritative-v1", restore_run_id: "restore-authoritative-v1",
@@ -426,16 +437,30 @@ async function backupFixture(fixture, overrides = {}, { legacyPolicy = false, te
     cluster_security: { policy_id: basePolicy.policy_id, policy_sha256: clusterPolicySha256(basePolicy) },
     credential_binding: {}, tablespace: {},
     recovery_control: { status: "VERIFIED", intent: { policy_sha256: readinessPolicySha256(policy) } },
-    runtime_privilege: { status: "VERIFIED" }, status: { runtime_privilege: "VERIFIED" },
-    attestation: BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION,
+    runtime_privilege: { status: "VERIFIED" },
+    ...(activationReceipt ? { policy_activation: createClusterRecoveryPolicyActivationEvidence(activationReceipt, policy) } : {}),
+    status: { runtime_privilege: "VERIFIED", ...(activationReceipt ? { policy_activation: "VERIFIED" } : {}) },
+    attestation: activationReceipt ? BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ACTIVATED_ATTESTATION : "INVALID_POLICY_ACTIVATION",
     readiness_sha256: digest("3"),
     ...overrides,
   };
   const readinessFile = path.join(fixture.parent, "sources", "recovery-readiness.json");
+  const activationStateRoot = path.join(fixture.parent, "policy-state");
+  const activationFile = path.join(activationStateRoot, "current.json");
+  const historyName = activationReceipt ? path.basename(activationReceipt.history_file) : `0000000000000001.${digest("8")}.json`;
+  const receiptName = activationReceipt ? `0000000000000001.${activationReceipt.receipt_sha256}.json` : `0000000000000001.${digest("9")}.json`;
+  const historyFile = path.join(activationStateRoot, "history", historyName);
+  const receiptFile = path.join(activationStateRoot, "receipts", receiptName);
   await writeTrusted(readinessFile, canonicalTransferJson(readiness), 0o640, readerGid);
+  await writeTrusted(activationFile, activationReceipt ? canonicalClusterJson(activationReceipt) : "{}\n", 0o400);
+  await writeTrusted(historyFile, canonicalClusterJson(policy), 0o400);
+  await writeTrusted(receiptFile, activationReceipt ? canonicalClusterJson(activationReceipt) : "{}\n", 0o400);
   fixture.sources.backup_readiness = await sourceSpec(readinessFile);
   fixture.sources.cluster_policy = await sourceSpec(policyFile);
-  return { readiness };
+  fixture.sources.cluster_policy_activation = await sourceSpec(activationFile);
+  fixture.sources.cluster_policy_history = await sourceSpec(historyFile);
+  fixture.sources.cluster_policy_receipt = await sourceSpec(receiptFile);
+  return { readiness, activationReceipt, activationFile, historyFile, receiptFile, policy, readinessFile };
 }
 
 function backupContext(fixture, readiness, { publishedAt = "2026-08-12T02:31:00.000Z", authorization = digest("d") } = {}) {
@@ -477,6 +502,42 @@ test("backup publication accepts only an activated V2 actual identity chain", { 
     const actual = await publishMonitoringProjection(context, { production: false, now: new Date(context.projection.published_at), backupValidator: (value) => value });
     assert.equal(actual.result, "PUBLISHED");
     assert.equal(actual.source_sha256, readiness.readiness_sha256);
+
+    const wrongActivationFixture = await makeFixture();
+    try {
+      const activation = await backupFixture(wrongActivationFixture);
+      const wrongReceipt = createClusterRecoveryPolicyActivationReceipt({
+        policy: activation.policy,
+        activationId: "monitoring-policy-activation-wrong-release",
+        operation: "ACTIVATE",
+        previousActivationReceiptSha256: zero,
+        releaseIdentitySha256: digest("f"),
+      });
+      const wrongReadiness = structuredClone(activation.readiness);
+      wrongReadiness.policy_activation = createClusterRecoveryPolicyActivationEvidence(wrongReceipt, activation.policy);
+      const wrongReceiptFile = path.join(path.dirname(activation.receiptFile), `0000000000000001.${wrongReceipt.receipt_sha256}.json`);
+      await writeTrusted(activation.readinessFile, canonicalTransferJson(wrongReadiness), 0o640, readerGid);
+      await writeTrusted(activation.activationFile, canonicalClusterJson(wrongReceipt), 0o400);
+      await writeTrusted(wrongReceiptFile, canonicalClusterJson(wrongReceipt), 0o400);
+      wrongActivationFixture.sources.backup_readiness = await sourceSpec(activation.readinessFile);
+      wrongActivationFixture.sources.cluster_policy_activation = await sourceSpec(activation.activationFile);
+      wrongActivationFixture.sources.cluster_policy_receipt = await sourceSpec(wrongReceiptFile);
+      await expectCode(
+        publishMonitoringProjection(backupContext(wrongActivationFixture, wrongReadiness), { production: false, now: new Date(context.projection.published_at), backupValidator: (value) => value }),
+        "MONITOR_BACKUP_POLICY_V2_ACTIVATION_MISMATCH",
+      );
+    } finally { await rm(wrongActivationFixture.parent, { recursive: true, force: true }); }
+
+    const currentOnlyFixture = await makeFixture();
+    try {
+      const activation = await backupFixture(currentOnlyFixture);
+      await writeTrusted(activation.receiptFile, "{}\n", 0o400);
+      currentOnlyFixture.sources.cluster_policy_receipt = await sourceSpec(activation.receiptFile);
+      await expectCode(
+        publishMonitoringProjection(backupContext(currentOnlyFixture, activation.readiness), { production: false, now: new Date(context.projection.published_at), backupValidator: (value) => value }),
+        "MONITOR_BACKUP_POLICY_ACTIVATION_COMMIT_CHAIN_INVALID",
+      );
+    } finally { await rm(currentOnlyFixture.parent, { recursive: true, force: true }); }
 
     const legacyFixture = await makeFixture();
     try {

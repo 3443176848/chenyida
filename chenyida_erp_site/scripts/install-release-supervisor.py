@@ -40,6 +40,13 @@ RUNTIME_PRIVILEGE_STATE_ROOT = Path("/var/lib/chenyida-erp/postgresql-runtime-pr
 RUNTIME_PRIVILEGE_STATE_MARKER = RUNTIME_PRIVILEGE_STATE_ROOT / ".chenyida-erp-postgresql-runtime-privilege-operator-v1"
 RUNTIME_PRIVILEGE_STATE_MARKER_VALUE = b"chenyida-erp-postgresql-runtime-privilege-operator/v1\n"
 RUNTIME_PRIVILEGE_STATE_DIRECTORIES = ("active", "completed", "preparing", "quarantine", "receipts")
+CLUSTER_POLICY_STATE_ROOT = Path("/var/lib/chenyida-erp/postgresql-cluster-recovery-policy-v2")
+CLUSTER_POLICY_STATE_MARKER = CLUSTER_POLICY_STATE_ROOT / ".chenyida-erp-postgresql-cluster-recovery-policy-v2"
+CLUSTER_POLICY_STATE_MARKER_VALUE = b"chenyida-erp-postgresql-cluster-recovery-policy-activation/v1\n"
+CLUSTER_POLICY_STATE_DIRECTORIES = ("history", "intents", "quarantine", "receipts", "recoveries")
+CLUSTER_POLICY_TARGET_FILE = Path("/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json")
+CLUSTER_POLICY_TEMPLATE_FILE_SHA256 = "1a092993b1dda00bd8a2aac0899cb4e1eee83e9b336022bdb72f3e4d23e317aa"
+CLUSTER_POLICY_TEMPLATE_POLICY_SHA256 = "c30951ad74a827c06e8256cfc124f61bd5672bca9daa7abda21c0896523378b8"
 SUPERVISOR_BASE = Path("/usr/local/libexec/chenyida-erp-release-supervisor")
 BUNDLES_ROOT = SUPERVISOR_BASE / "bundles"
 LAUNCHERS_ROOT = SUPERVISOR_BASE / "launchers"
@@ -289,7 +296,8 @@ def assert_no_runtime_privilege_operator_interlock(state_root: Path | None = Non
     if trusted_file(marker, 0o400, 256, "SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID") != RUNTIME_PRIVILEGE_STATE_MARKER_VALUE:
         reject("SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID")
     try:
-        entries = sorted(item.name for item in os.scandir(state_root))
+        with os.scandir(state_root) as iterator:
+            entries = sorted(item.name for item in iterator)
     except OSError:
         reject("SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID")
     expected = sorted((RUNTIME_PRIVILEGE_STATE_MARKER.name, *RUNTIME_PRIVILEGE_STATE_DIRECTORIES))
@@ -305,6 +313,223 @@ def assert_no_runtime_privilege_operator_interlock(state_root: Path | None = Non
                         reject("SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_RECOVERY_REQUIRED")
             except OSError:
                 reject("SUPERVISOR_INSTALL_RUNTIME_PRIVILEGE_STATE_INVALID")
+
+
+def assert_no_cluster_policy_activation_interlock(state_root: Path | None = None, target_file: Path | None = None) -> None:
+    state_root = state_root or CLUSTER_POLICY_STATE_ROOT
+    target_file = target_file or CLUSTER_POLICY_TARGET_FILE
+    try:
+        os.lstat(state_root)
+    except FileNotFoundError:
+        return
+    except OSError:
+        reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+    trusted_directory(state_root, 0o700, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+    marker = state_root / CLUSTER_POLICY_STATE_MARKER.name
+    if trusted_file(marker, 0o400, 256, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID") != CLUSTER_POLICY_STATE_MARKER_VALUE:
+        reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+    try:
+        with os.scandir(state_root) as iterator:
+            entries = sorted(item.name for item in iterator)
+    except OSError:
+        reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+    current_file = state_root / "current.json"
+    expected = sorted((CLUSTER_POLICY_STATE_MARKER.name, *CLUSTER_POLICY_STATE_DIRECTORIES, *(('current.json',) if current_file.exists() else ())))
+    if entries != expected:
+        reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+    for name in CLUSTER_POLICY_STATE_DIRECTORIES:
+        trusted_directory(state_root / name, 0o700, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+    try:
+        with os.scandir(state_root / "quarantine") as iterator:
+            quarantine_entries = list(iterator)
+    except OSError:
+        reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+    if quarantine_entries:
+        reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_RECOVERY_REQUIRED")
+
+    generation = 0
+    current_raw: bytes | None = None
+    if current_file.exists():
+        current_raw = trusted_file(current_file, 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        current = strict_json(current_raw, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        if not isinstance(current, dict) or current_raw != canonical_json(current) \
+            or current.get("contract") != "chenyida-erp-postgresql-cluster-recovery-policy-activation-receipt/v1" \
+            or not isinstance(current.get("generation"), int) or isinstance(current.get("generation"), bool) \
+            or not 1 <= current["generation"] <= 1_000_000 \
+            or not isinstance(current.get("receipt_sha256"), str) or not SHA256.fullmatch(current["receipt_sha256"]):
+            reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        generation = current["generation"]
+
+    history_pattern = re.compile(r"^[0-9]{16}\.([0-9a-f]{64})\.json$")
+    intent_pattern = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$")
+    with os.scandir(state_root / "history") as iterator:
+        history_names = sorted(item.name for item in iterator)
+    with os.scandir(state_root / "receipts") as iterator:
+        receipt_names = sorted(item.name for item in iterator)
+    if len(history_names) != generation or len(receipt_names) != generation \
+        or any(not history_pattern.fullmatch(name) for name in (*history_names, *receipt_names)):
+        reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_RECOVERY_REQUIRED")
+    receipt_fields = {
+        "schema_version", "contract", "activation_id", "operation", "status", "committed_at", "environment",
+        "generation", "policy_id", "policy_sha256", "policy_file_sha256", "previous_policy_sha256",
+        "previous_activation_receipt_sha256", "rollback_target_activation_receipt_sha256",
+        "template_file_sha256", "template_policy_sha256", "supervisor_bundle_sha256", "authorization_sha256",
+        "release_identity_sha256", "approval_reference_sha256", "responsible_operator_identity_sha256", "approver_identity_sha256",
+        "rpo_hours", "rto_minutes", "target_disposition", "activated_at", "expires_at",
+        "state_root", "policy_target", "history_file", "receipt_sha256",
+    }
+    history_raw_by_generation: dict[int, bytes] = {}
+    receipt_by_name: dict[str, dict[str, Any]] = {}
+    receipts_by_generation: list[dict[str, Any]] = []
+    previous_policy_sha256 = "0" * 64
+    previous_receipt_sha256 = "0" * 64
+    environment: str | None = None
+    for index in range(generation):
+        prefix = f"{index + 1:016d}."
+        if not history_names[index].startswith(prefix) or not receipt_names[index].startswith(prefix):
+            reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        history_match = history_pattern.fullmatch(history_names[index])
+        history_raw = trusted_file(state_root / "history" / history_names[index], 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        history_value = strict_json(history_raw, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        if history_match is None or not isinstance(history_value, dict) or history_raw != canonical_json(history_value) \
+            or sha256(history_raw) != history_match.group(1):
+            reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        receipt_raw = trusted_file(state_root / "receipts" / receipt_names[index], 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        receipt = strict_json(receipt_raw, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        receipt_match = history_pattern.fullmatch(receipt_names[index])
+        if not isinstance(receipt, dict) or set(receipt) != receipt_fields or receipt_raw != canonical_json(receipt) \
+            or receipt.get("schema_version") != 1 \
+            or receipt.get("contract") != "chenyida-erp-postgresql-cluster-recovery-policy-activation-receipt/v1" \
+            or receipt.get("status") != "COMMITTED" or receipt.get("operation") not in ("ACTIVATE", "ROLLBACK") \
+            or receipt.get("generation") != index + 1 or receipt_match is None \
+            or receipt.get("receipt_sha256") != receipt_match.group(1) \
+            or sha256(canonical_json({key: value for key, value in receipt.items() if key != "receipt_sha256"})) != receipt["receipt_sha256"] \
+            or receipt.get("policy_sha256") != history_match.group(1) or receipt.get("policy_file_sha256") != sha256(history_raw) \
+            or receipt.get("previous_policy_sha256") != previous_policy_sha256 \
+            or receipt.get("previous_activation_receipt_sha256") != previous_receipt_sha256 \
+            or receipt.get("template_file_sha256") != CLUSTER_POLICY_TEMPLATE_FILE_SHA256 \
+            or receipt.get("template_policy_sha256") != CLUSTER_POLICY_TEMPLATE_POLICY_SHA256 \
+            or receipt.get("state_root") != str(CLUSTER_POLICY_STATE_ROOT) \
+            or receipt.get("policy_target") != str(CLUSTER_POLICY_TARGET_FILE) \
+            or receipt.get("history_file") != str(CLUSTER_POLICY_STATE_ROOT / "history" / history_names[index]) \
+            or not isinstance(receipt.get("activation_id"), str) or not IDENTIFIER.fullmatch(receipt["activation_id"]) \
+            or not isinstance(receipt.get("policy_id"), str) or not IDENTIFIER.fullmatch(receipt["policy_id"]) \
+            or receipt.get("environment") not in ("UAT", "PRODUCTION") \
+            or environment is not None and receipt["environment"] != environment \
+            or not isinstance(receipt.get("rpo_hours"), int) or isinstance(receipt.get("rpo_hours"), bool) or not 1 <= receipt["rpo_hours"] <= 168 \
+            or not isinstance(receipt.get("rto_minutes"), int) or isinstance(receipt.get("rto_minutes"), bool) or not 1 <= receipt["rto_minutes"] <= 10_080 \
+            or receipt.get("target_disposition") not in ("DESTROY_AFTER_EVIDENCE", "RETAIN_QUARANTINED_FOR_APPROVED_INCIDENT") \
+            or any(not isinstance(receipt.get(field), str) or not SHA256.fullmatch(receipt[field]) for field in receipt_fields if field.endswith("_sha256")) \
+            or any(receipt[field] == "0" * 64 for field in receipt_fields if field.endswith("_sha256") and field not in {"previous_policy_sha256", "previous_activation_receipt_sha256", "rollback_target_activation_receipt_sha256"}) \
+            or any(not isinstance(receipt.get(field), str) or not ISO_UTC.fullmatch(receipt[field]) for field in ("committed_at", "activated_at", "expires_at")) \
+            or receipt.get("committed_at") != receipt.get("activated_at"):
+            reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        if receipt["operation"] == "ACTIVATE" and receipt["rollback_target_activation_receipt_sha256"] != "0" * 64 \
+            or receipt["operation"] == "ROLLBACK" and (index < 2 or receipt["rollback_target_activation_receipt_sha256"] == "0" * 64):
+            reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        try:
+            activated_at = datetime.strptime(receipt["activated_at"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+            expires_at = datetime.strptime(receipt["expires_at"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+        except ValueError:
+            reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        if expires_at <= activated_at or expires_at - activated_at > timedelta(hours=24):
+            reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        if receipt["operation"] == "ROLLBACK":
+            rollback_target = receipts_by_generation[index - 2]
+            if receipt["rollback_target_activation_receipt_sha256"] != rollback_target["receipt_sha256"] \
+                or receipt["environment"] != rollback_target["environment"] \
+                or receipt["rpo_hours"] != rollback_target["rpo_hours"] \
+                or receipt["rto_minutes"] != rollback_target["rto_minutes"] \
+                or receipt["target_disposition"] != rollback_target["target_disposition"]:
+                reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        actors = {receipt["approval_reference_sha256"], receipt["responsible_operator_identity_sha256"], receipt["approver_identity_sha256"]}
+        if len(actors) != 3 or "0" * 64 in actors:
+            reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        history_raw_by_generation[index + 1] = history_raw
+        receipt_by_name[receipt_names[index]] = receipt
+        receipts_by_generation.append(receipt)
+        previous_policy_sha256 = receipt["policy_sha256"]
+        previous_receipt_sha256 = receipt["receipt_sha256"]
+        environment = receipt["environment"]
+        if index == generation - 1 and current_raw != receipt_raw:
+            reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_RECOVERY_REQUIRED")
+
+    try:
+        os.lstat(target_file)
+    except FileNotFoundError:
+        if generation != 0:
+            reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_RECOVERY_REQUIRED")
+    except OSError:
+        reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+    else:
+        target_raw = trusted_file(target_file, 0o440, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+        if generation == 0 or target_raw != history_raw_by_generation[generation]:
+            reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_RECOVERY_REQUIRED")
+
+    intent_by_sha256: dict[str, dict[str, Any]] = {}
+    intent_receipt_sha256: set[str] = set()
+    with os.scandir(state_root / "intents") as iterator:
+        for item in iterator:
+            if not intent_pattern.fullmatch(item.name):
+                reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+            raw = trusted_file(Path(item.path), 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+            intent = strict_json(raw, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+            fields = {
+                "schema_version", "contract", "operation_id", "operation", "created_at", "original_authorization_sha256",
+                "supervisor_bundle_sha256", "parameters", "policy", "receipt", "intent_sha256",
+            }
+            if not isinstance(intent, dict) or set(intent) != fields or raw != canonical_json(intent) \
+                or intent.get("contract") != "chenyida-erp-postgresql-cluster-recovery-policy-activation-intent/v1" \
+                or not isinstance(intent.get("operation_id"), str) or not IDENTIFIER.fullmatch(intent["operation_id"]) \
+                or intent.get("operation") not in ("ACTIVATE", "ROLLBACK") \
+                or item.name != f"{intent.get('operation_id')}.{intent.get('intent_sha256')}.json" \
+                or not isinstance(intent.get("intent_sha256"), str) or not SHA256.fullmatch(intent["intent_sha256"]) \
+                or sha256(canonical_json({key: value for key, value in intent.items() if key != "intent_sha256"})) != intent["intent_sha256"]:
+                reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+            receipt = intent.get("receipt")
+            if not isinstance(receipt, dict) or not isinstance(receipt.get("generation"), int) or isinstance(receipt.get("generation"), bool) \
+                or not 1 <= receipt["generation"] <= 1_000_000 \
+                or not isinstance(receipt.get("receipt_sha256"), str) or not SHA256.fullmatch(receipt["receipt_sha256"]):
+                reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+            candidate = f"{receipt['generation']:016d}.{receipt['receipt_sha256']}.json"
+            stored_receipt = receipt_by_name.get(candidate)
+            if stored_receipt is None:
+                reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_RECOVERY_REQUIRED")
+            if intent["receipt"] != stored_receipt or canonical_json(intent["policy"]) != history_raw_by_generation[receipt["generation"]] \
+                or intent["operation_id"] != receipt["activation_id"] or intent["operation"] != receipt["operation"] \
+                or intent["original_authorization_sha256"] != receipt["authorization_sha256"] \
+                or intent["supervisor_bundle_sha256"] != receipt["supervisor_bundle_sha256"] \
+                or receipt["receipt_sha256"] in intent_receipt_sha256:
+                reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+            intent_by_sha256[intent["intent_sha256"]] = intent
+            intent_receipt_sha256.add(receipt["receipt_sha256"])
+    if intent_receipt_sha256 != {receipt["receipt_sha256"] for receipt in receipts_by_generation}:
+        reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_RECOVERY_REQUIRED")
+
+    with os.scandir(state_root / "recoveries") as iterator:
+        for item in iterator:
+            if not intent_pattern.fullmatch(item.name):
+                reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+            raw = trusted_file(Path(item.path), 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+            value = strict_json(raw, "SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
+            fields = {
+                "schema_version", "contract", "execution_authorization_id", "execution_authorization_sha256", "prepared_at",
+                "original_operation_id", "original_authorization_sha256", "intent_sha256", "decision", "reason", "recovery_sha256",
+            }
+            if not isinstance(value, dict) or set(value) != fields or raw != canonical_json(value) \
+                or value.get("schema_version") != 1 \
+                or value.get("contract") != "chenyida-erp-postgresql-cluster-recovery-policy-activation-recovery/v1" \
+                or value.get("decision") not in ("RESUME_PUBLICATION", "ALREADY_COMMITTED", "QUARANTINE") \
+                or (value.get("decision") == "QUARANTINE") != isinstance(value.get("reason"), str) \
+                or not isinstance(value.get("execution_authorization_id"), str) or not IDENTIFIER.fullmatch(value["execution_authorization_id"]) \
+                or not isinstance(value.get("original_operation_id"), str) or not IDENTIFIER.fullmatch(value["original_operation_id"]) \
+                or any(not isinstance(value.get(field), str) or not SHA256.fullmatch(value[field]) for field in ("execution_authorization_sha256", "original_authorization_sha256", "intent_sha256", "recovery_sha256")) \
+                or not isinstance(value.get("prepared_at"), str) or not ISO_UTC.fullmatch(value["prepared_at"]) \
+                or sha256(canonical_json({key: field_value for key, field_value in value.items() if key != "recovery_sha256"})) != value["recovery_sha256"] \
+                or item.name != f"{value.get('execution_authorization_id')}.{value.get('recovery_sha256')}.json" \
+                or value["intent_sha256"] not in intent_by_sha256 \
+                or intent_by_sha256[value["intent_sha256"]]["operation_id"] != value["original_operation_id"]:
+                reject("SUPERVISOR_INSTALL_CLUSTER_POLICY_STATE_INVALID")
 
 
 def acquire_install_lock(path: Path = INSTALL_LOCK_FILE) -> int:
@@ -656,6 +881,7 @@ def install(repository: Path, authorization: dict[str, Any], authorization_path:
     _, payloads = validate_bundle_payload(repository, authorization, manifest_raw)
     preflight_bundle(manifest_raw, payloads, launcher_raw, authorization["bundle_manifest_sha256"])
     assert_no_runtime_privilege_operator_interlock()
+    assert_no_cluster_policy_activation_interlock()
 
     ensure_directory(Path("/usr/local/libexec"), 0o755)
     ensure_directory(SUPERVISOR_BASE, 0o755)

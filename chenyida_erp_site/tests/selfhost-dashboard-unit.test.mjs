@@ -10,7 +10,7 @@ import { handleDashboardApi } from "../app/lib/dashboard-selfhost/handler.ts";
 import { DashboardService } from "../app/lib/dashboard-selfhost/service.ts";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
 import {
-  BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION,
+  BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ACTIVATED_ATTESTATION,
   createBackupRecoveryReadinessV4,
   publishBackupRecoveryReadinessV4,
   validateBackupRecoveryReadinessV4,
@@ -26,6 +26,10 @@ import {
   clusterRecoveryPolicyV2Sha256,
   createRecoveryControlIntentV2,
 } from "../scripts/postgresql-cluster-recovery-policy-v2-contract.mjs";
+import {
+  createClusterRecoveryPolicyActivationEvidence,
+  createClusterRecoveryPolicyActivationReceipt,
+} from "../scripts/postgresql-cluster-recovery-policy-v2-activation-contract.mjs";
 import { activateClusterRecoveryPolicyV2 } from "../scripts/postgresql-cluster-recovery-policy-v2.mjs";
 import {
   createInitialRuntimePrivilegeOperatorState,
@@ -167,7 +171,10 @@ const recoveryReadinessV4PolicyV2=(legacy,policy=clusterRecoveryPolicyV2,{runtim
   const operatorReceipt=createRuntimePrivilegeOperatorReceipt({intent:operatorIntent,state:operatorState,completedAt:"2026-07-25T02:44:00.000Z",finalStructureSha256:"d".repeat(64),credentialVerificationSha256:"e".repeat(64)});
   value.runtime_privilege={intent_sha256:operatorIntent.intent_sha256,final_state_sha256:operatorState.state_sha256,receipt_sha256:operatorReceipt.receipt_sha256,status:"VERIFIED",intent:operatorIntent,final_state:operatorState,receipt:operatorReceipt};
   value.status.runtime_privilege="VERIFIED";
-  value.attestation=BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION;
+  const policyActivationReceipt=createClusterRecoveryPolicyActivationReceipt({policy,activationId:"dashboard-policy-activation-v2-1",operation:"ACTIVATE",previousActivationReceiptSha256:"0".repeat(64),releaseIdentitySha256:"8".repeat(64)});
+  value.policy_activation=createClusterRecoveryPolicyActivationEvidence(policyActivationReceipt,policy);
+  value.status.policy_activation="VERIFIED";
+  value.attestation=BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ACTIVATED_ATTESTATION;
   const body={...value};
   delete body.readiness_sha256;
   value.readiness_sha256=canonicalSha(body);
@@ -222,6 +229,10 @@ test("cluster policy V2 accepts only a complete activated actual chain",()=>{
   assert.throws(()=>validateBackupRecoveryReadinessV4(withoutRuntime,clusterRecoveryPolicyV2),(error)=>error?.code==="READINESS_V4_FIELDS_INVALID");
   const withoutControl=structuredClone(readinessV2);delete withoutControl.recovery_control;
   assert.throws(()=>validateBackupRecoveryReadinessV4(withoutControl,clusterRecoveryPolicyV2),(error)=>error?.code==="READINESS_V4_FIELDS_INVALID");
+  const withoutActivation=structuredClone(readinessV2);delete withoutActivation.policy_activation;
+  assert.throws(()=>validateBackupRecoveryReadinessV4(withoutActivation,clusterRecoveryPolicyV2),(error)=>error?.code==="READINESS_V4_FIELDS_INVALID");
+  const tamperedActivation=structuredClone(readinessV2);tamperedActivation.policy_activation.receipt.release_identity_sha256="f".repeat(64);
+  assert.throws(()=>validateBackupRecoveryReadinessV4(tamperedActivation,clusterRecoveryPolicyV2),(error)=>error?.code==="READINESS_V4_POLICY_ACTIVATION_EVIDENCE_INVALID");
   const replaced=activateV2Policy({authorization_sha256:"f".repeat(64)});
   assert.throws(()=>validateBackupRecoveryReadinessV4(readinessV2,replaced));
   const expired=activateV2Policy({expires_at:"2026-07-25T02:49:00.000Z"});

@@ -148,6 +148,105 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
             extra.rmdir()
             installer.assert_no_runtime_privilege_operator_interlock(root)
 
+    def test_cluster_policy_interlock_blocks_bundle_switch_until_intent_is_committed_or_quarantined(self):
+        with tempfile.TemporaryDirectory(prefix="cyd-supervisor-cluster-policy-interlock-") as directory:
+            root = Path(directory) / "postgresql-cluster-recovery-policy-v2"
+            target = Path(directory) / "postgresql-cluster-recovery-policy.json"
+            root.mkdir(mode=0o700)
+            marker = root / installer.CLUSTER_POLICY_STATE_MARKER.name
+            marker.write_bytes(installer.CLUSTER_POLICY_STATE_MARKER_VALUE)
+            marker.chmod(0o400)
+            for name in installer.CLUSTER_POLICY_STATE_DIRECTORIES:
+                (root / name).mkdir(mode=0o700)
+            installer.assert_no_cluster_policy_activation_interlock(root, target)
+
+            policy = {"fixture": "policy"}
+            policy_sha = installer.sha256(installer.canonical_json(policy))
+            receipt_body = {
+                "schema_version": 1,
+                "contract": "chenyida-erp-postgresql-cluster-recovery-policy-activation-receipt/v1",
+                "activation_id": "cluster-policy-fixture",
+                "operation": "ACTIVATE",
+                "status": "COMMITTED",
+                "committed_at": "2026-08-15T01:00:00.000Z",
+                "environment": "UAT",
+                "generation": 1,
+                "policy_id": "chenyida-erp-postgresql-cluster-recovery-v2",
+                "policy_sha256": policy_sha,
+                "policy_file_sha256": policy_sha,
+                "previous_policy_sha256": "0" * 64,
+                "previous_activation_receipt_sha256": "0" * 64,
+                "rollback_target_activation_receipt_sha256": "0" * 64,
+                "template_file_sha256": installer.CLUSTER_POLICY_TEMPLATE_FILE_SHA256,
+                "template_policy_sha256": installer.CLUSTER_POLICY_TEMPLATE_POLICY_SHA256,
+                "supervisor_bundle_sha256": "c" * 64,
+                "authorization_sha256": "b" * 64,
+                "release_identity_sha256": "d" * 64,
+                "approval_reference_sha256": "e" * 64,
+                "responsible_operator_identity_sha256": "f" * 64,
+                "approver_identity_sha256": "1" * 64,
+                "rpo_hours": 24,
+                "rto_minutes": 120,
+                "target_disposition": "DESTROY_AFTER_EVIDENCE",
+                "activated_at": "2026-08-15T01:00:00.000Z",
+                "expires_at": "2026-08-16T01:00:00.000Z",
+                "state_root": str(installer.CLUSTER_POLICY_STATE_ROOT),
+                "policy_target": str(installer.CLUSTER_POLICY_TARGET_FILE),
+                "history_file": str(installer.CLUSTER_POLICY_STATE_ROOT / "history" / f"0000000000000001.{policy_sha}.json"),
+            }
+            receipt = {**receipt_body, "receipt_sha256": installer.sha256(installer.canonical_json(receipt_body))}
+            operation_id = "cluster-policy-fixture"
+            intent_body = {
+                "schema_version": 1,
+                "contract": "chenyida-erp-postgresql-cluster-recovery-policy-activation-intent/v1",
+                "operation_id": operation_id,
+                "operation": "ACTIVATE",
+                "created_at": "2026-08-15T01:00:00.000Z",
+                "original_authorization_sha256": "b" * 64,
+                "supervisor_bundle_sha256": "c" * 64,
+                "parameters": {"fixture": True},
+                "policy": policy,
+                "receipt": receipt,
+            }
+            intent = {**intent_body, "intent_sha256": installer.sha256(installer.canonical_json(intent_body))}
+            intent_file = root / "intents" / f"{operation_id}.{intent['intent_sha256']}.json"
+            intent_file.write_bytes(installer.canonical_json(intent))
+            intent_file.chmod(0o400)
+            with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_CLUSTER_POLICY_RECOVERY_REQUIRED"):
+                installer.assert_no_cluster_policy_activation_interlock(root, target)
+
+            history_file = root / "history" / f"0000000000000001.{policy_sha}.json"
+            history_file.write_bytes(installer.canonical_json(policy))
+            history_file.chmod(0o400)
+            receipt_file = root / "receipts" / f"0000000000000001.{receipt['receipt_sha256']}.json"
+            receipt_file.write_bytes(installer.canonical_json(receipt))
+            receipt_file.chmod(0o400)
+            current_file = root / "current.json"
+            current_file.write_bytes(installer.canonical_json(receipt))
+            current_file.chmod(0o400)
+            target.write_bytes(installer.canonical_json(policy))
+            target.chmod(0o440)
+            installer.assert_no_cluster_policy_activation_interlock(root, target)
+
+            detached_intent = Path(directory) / "cluster-policy-intent.detached"
+            intent_file.rename(detached_intent)
+            with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_CLUSTER_POLICY_RECOVERY_REQUIRED"):
+                installer.assert_no_cluster_policy_activation_interlock(root, target)
+            detached_intent.rename(intent_file)
+            installer.assert_no_cluster_policy_activation_interlock(root, target)
+
+            target.write_bytes(b'{"fixture":"replaced"}\n')
+            with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_CLUSTER_POLICY_RECOVERY_REQUIRED"):
+                installer.assert_no_cluster_policy_activation_interlock(root, target)
+            target.write_bytes(installer.canonical_json(policy))
+            target.chmod(0o440)
+
+            quarantine = root / "quarantine" / "cluster-policy-fixture.quarantine.json"
+            quarantine.write_bytes(b"{}\n")
+            quarantine.chmod(0o400)
+            with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_CLUSTER_POLICY_RECOVERY_REQUIRED"):
+                installer.assert_no_cluster_policy_activation_interlock(root, target)
+
     def test_bundle_manifest_generator_uses_literal_allowlist_and_exact_blob_bytes(self):
         launcher_raw = (Path(__file__).resolve().parents[1] / "scripts" / "release-supervisor-launcher.py").read_bytes()
         files = generator.parse_bundle_files(launcher_raw)

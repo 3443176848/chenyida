@@ -31,6 +31,7 @@ RUNTIME_PROBE_ROOT = Path("/var/lib/chenyida-erp/runtime-probes")
 BUNDLE_CONTRACT = "chenyida-erp-release-supervisor-bundle/v1"
 AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v2"
 RUNTIME_PRIVILEGE_AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v3"
+CLUSTER_POLICY_AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v4"
 RUNTIME_GUARD_CONTRACT = "chenyida-erp-release-runtime-guard/v1"
 PRE_DEPLOY_RUNTIME_GUARD_MODE = "PRE_DEPLOY_EXISTING_RUNTIME_STABILITY"
 POST_DEPLOY_RUNTIME_GUARD_MODE = "POST_DEPLOY_CURRENT_RUNTIME_STRICT"
@@ -50,6 +51,12 @@ MONITORING_ACTIVE_FILE = Path("/var/lib/chenyida-erp/monitoring-v1/active.json")
 MONITORING_PRIVATE_CONFIG = Path("/etc/chenyida-erp/monitoring-v1/private/host-config.json")
 MONITORING_BACKUP_READINESS_FILE = Path("/var/lib/chenyida-erp/backup-status/recovery-readiness.json")
 MONITORING_CLUSTER_POLICY_FILE = Path("/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json")
+CLUSTER_POLICY_STATE_ROOT = Path("/var/lib/chenyida-erp/postgresql-cluster-recovery-policy-v2")
+CLUSTER_POLICY_CURRENT_FILE = CLUSTER_POLICY_STATE_ROOT / "current.json"
+CLUSTER_POLICY_STATE_MARKER = ".chenyida-erp-postgresql-cluster-recovery-policy-v2"
+CLUSTER_POLICY_STATE_MARKER_VALUE = b"chenyida-erp-postgresql-cluster-recovery-policy-activation/v1\n"
+CLUSTER_POLICY_TEMPLATE_FILE_SHA256 = "1a092993b1dda00bd8a2aac0899cb4e1eee83e9b336022bdb72f3e4d23e317aa"
+CLUSTER_POLICY_TEMPLATE_POLICY_SHA256 = "c30951ad74a827c06e8256cfc124f61bd5672bca9daa7abda21c0896523378b8"
 RELEASE_IDENTITY_FILE = RELEASE_IDENTITY_ROOT / "release-identity.json"
 MONITORING_PROJECTION_CONTRACT = "chenyida-erp-monitoring-projection-publication/v1"
 MONITORING_PROJECTION_MARKER = ".chenyida-erp-monitoring-projection-v1"
@@ -116,6 +123,8 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/postdeploy-runtime-configuration-probe.mjs": "0444",
     "chenyida_erp_site/scripts/postgresql-cluster-recovery-contract.mjs": "0444",
     "chenyida_erp_site/scripts/postgresql-cluster-recovery-policy-v2-contract.mjs": "0444",
+    "chenyida_erp_site/scripts/postgresql-cluster-recovery-policy-v2-activation-contract.mjs": "0444",
+    "chenyida_erp_site/scripts/postgresql-cluster-recovery-policy-v2-publisher.mjs": "0444",
     "chenyida_erp_site/scripts/postgresql-cluster-recovery-policy-v2.mjs": "0444",
     "chenyida_erp_site/scripts/postgresql-cluster-transfer-contract.mjs": "0444",
     "chenyida_erp_site/scripts/postgresql-runtime-privilege-catalog.mjs": "0444",
@@ -177,6 +186,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-postdeploy-runtime-configuration-probe.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-backup-recovery-postgres.sh": "0555",
     "chenyida_erp_site/tests/selfhost-postgresql-cluster-recovery-postgres.sh": "0555",
+    "chenyida_erp_site/tests/selfhost-postgresql-cluster-recovery-policy-v2-activation.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-catalog-postgres.sh": "0555",
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-operator.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-policy.test.mjs": "0444",
@@ -189,6 +199,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/test_release_supervisor_launcher.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_monitoring_host_delivery.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_monitoring_projection.py": "0444",
+    "chenyida_erp_site/tests/test_release_supervisor_cluster_policy_activation.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_runtime_secret_file.py": "0444",
 }
 
@@ -228,6 +239,30 @@ RUNTIME_PRIVILEGE_CONFIRMATIONS = {
     "BOOTSTRAP_POSTGRESQL_RUNTIME_PRIVILEGES": "AUTHORIZE_BOOTSTRAP_EXACT_POSTGRESQL_RUNTIME_PRIVILEGES",
     "RECONCILE_POSTGRESQL_RUNTIME_PRIVILEGES": "AUTHORIZE_RECONCILE_EXACT_POSTGRESQL_RUNTIME_PRIVILEGES",
     "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT": "AUTHORIZE_RECOVER_EXACT_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT",
+}
+
+CLUSTER_POLICY_OPERATIONS = {
+    "ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2": "ACTIVATE",
+    "ROLLBACK_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2": "ROLLBACK",
+    "RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION": "RECOVER",
+}
+
+CLUSTER_POLICY_CONFIRMATIONS = {
+    "ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2": "AUTHORIZE_ACTIVATE_EXACT_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
+    "ROLLBACK_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2": "AUTHORIZE_ROLLBACK_EXACT_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
+    "RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION": "AUTHORIZE_RECOVER_EXACT_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION",
+}
+
+CLUSTER_POLICY_BASE_PARAMETER_FIELDS = {
+    "policy_state_root", "policy_target", "activation_id", "environment", "policy_generation",
+    "previous_policy_sha256", "previous_activation_receipt_sha256", "template_file_sha256", "template_policy_sha256",
+    "approval_reference_sha256", "responsible_operator_identity_sha256", "approver_identity_sha256",
+    "rpo_hours", "rto_minutes", "target_disposition", "activated_at", "policy_expires_at",
+    "release_identity_source", "current_policy_source", "current_activation_source", "rollback_target_source",
+}
+
+CLUSTER_POLICY_RECOVERY_PARAMETER_FIELDS = {
+    "expected_intent_sha256", "original_authorization_sha256", "original_operation", "original_operation_id",
 }
 
 RUNTIME_PRIVILEGE_BASE_PARAMETER_FIELDS = {
@@ -302,7 +337,8 @@ PARAMETER_FIELDS = {
     },
     "PUBLISH_MONITORING_COMPONENTS_PROJECTION": MONITORING_PROJECTION_COMMON_PARAMETER_FIELDS,
     "PUBLISH_MONITORING_BACKUP_PROJECTION": MONITORING_PROJECTION_COMMON_PARAMETER_FIELDS | {
-        "backup_readiness_source", "cluster_policy_source",
+        "backup_readiness_source", "cluster_policy_source", "cluster_policy_activation_source",
+        "cluster_policy_history_source", "cluster_policy_receipt_source",
     },
 }
 
@@ -427,8 +463,7 @@ def projection_source_metadata_matches(metadata: os.stat_result, spec: dict[str,
         and metadata.st_uid == spec["uid"] and metadata.st_gid == spec["gid"] and f"{stat.S_IMODE(metadata.st_mode):04o}" == spec["mode"]
 
 
-def verify_authorized_projection_source(spec: dict[str, Any]) -> None:
-    code = "SUPERVISOR_MONITORING_PROJECTION_SOURCE_CHANGED"
+def verify_authorized_projection_source(spec: dict[str, Any], code: str = "SUPERVISOR_MONITORING_PROJECTION_SOURCE_CHANGED") -> None:
     source = Path(spec["path"])
     descriptor: int | None = None
     try:
@@ -500,9 +535,35 @@ def verify_monitoring_projection_sources(parameters: dict[str, Any], operation: 
             0, readiness_gid, {0o400, 0o440}, "SUPERVISOR_MONITORING_PROJECTION_BACKUP_ROOT_INVALID",
         )
         trusted_owned_directory(MONITORING_CLUSTER_POLICY_FILE.parent, 0, 0, {0o700, 0o750, 0o755}, "SUPERVISOR_MONITORING_PROJECTION_POLICY_ROOT_INVALID")
-        sources += [parameters["backup_readiness_source"], parameters["cluster_policy_source"]]
+        trusted_owned_directory(CLUSTER_POLICY_STATE_ROOT, 0, 0, {0o700}, "SUPERVISOR_MONITORING_PROJECTION_POLICY_ACTIVATION_ROOT_INVALID")
+        trusted_owned_directory(CLUSTER_POLICY_STATE_ROOT / "history", 0, 0, {0o700}, "SUPERVISOR_MONITORING_PROJECTION_POLICY_ACTIVATION_ROOT_INVALID")
+        trusted_owned_directory(CLUSTER_POLICY_STATE_ROOT / "receipts", 0, 0, {0o700}, "SUPERVISOR_MONITORING_PROJECTION_POLICY_ACTIVATION_ROOT_INVALID")
+        trusted_owned_marker(
+            CLUSTER_POLICY_STATE_ROOT / CLUSTER_POLICY_STATE_MARKER, CLUSTER_POLICY_STATE_MARKER_VALUE,
+            0, 0, {0o400}, "SUPERVISOR_MONITORING_PROJECTION_POLICY_ACTIVATION_ROOT_INVALID",
+        )
+        sources += [
+            parameters["backup_readiness_source"], parameters["cluster_policy_source"], parameters["cluster_policy_activation_source"],
+            parameters["cluster_policy_history_source"], parameters["cluster_policy_receipt_source"],
+        ]
     for source in sources:
         verify_authorized_projection_source(source)
+
+
+def verify_cluster_policy_sources(parameters: dict[str, Any], *, recovery: bool = False) -> None:
+    identity_gid = parameters["release_identity_source"]["gid"]
+    trusted_owned_directory(RELEASE_IDENTITY_ROOT, 0, identity_gid, {0o750}, "SUPERVISOR_CLUSTER_POLICY_RELEASE_IDENTITY_ROOT_INVALID")
+    trusted_owned_marker(
+        RELEASE_IDENTITY_ROOT / RELEASE_IDENTITY_MARKER, RELEASE_IDENTITY_MARKER_VALUE,
+        0, identity_gid, {0o440}, "SUPERVISOR_CLUSTER_POLICY_RELEASE_IDENTITY_ROOT_INVALID",
+    )
+    sources = [parameters["release_identity_source"]]
+    if not recovery:
+        sources += [source for source in (
+            parameters["current_policy_source"], parameters["current_activation_source"], parameters["rollback_target_source"],
+        ) if source is not None]
+    for source in sources:
+        verify_authorized_projection_source(source, "SUPERVISOR_CLUSTER_POLICY_SOURCE_CHANGED")
 
 
 def trusted_directory(path: Path, allowed_modes: set[int], code: str) -> os.stat_result:
@@ -637,6 +698,107 @@ def validate_monitoring_projection_source(value: Any, expected_path: Path, expec
     return value
 
 
+def validate_cluster_policy_source(value: Any, expected_path: Path, expected_mode: str, expected_gid: int | None = 0) -> dict[str, Any]:
+    value = exact_fields(value, MONITORING_PROJECTION_SOURCE_FIELDS, "SUPERVISOR_CLUSTER_POLICY_SOURCE_INVALID")
+    if absolute_path(value["path"], "SUPERVISOR_CLUSTER_POLICY_SOURCE_INVALID") != str(expected_path):
+        reject("SUPERVISOR_CLUSTER_POLICY_SOURCE_PATH_INVALID")
+    if not isinstance(value["sha256"], str) or not SHA256.fullmatch(value["sha256"]):
+        reject("SUPERVISOR_CLUSTER_POLICY_SOURCE_INVALID")
+    if not isinstance(value["bytes"], int) or isinstance(value["bytes"], bool) or not 2 <= value["bytes"] <= MAX_JSON_BYTES:
+        reject("SUPERVISOR_CLUSTER_POLICY_SOURCE_INVALID")
+    for field, allow_zero in (("device", True), ("inode", False)):
+        pattern = r"(?:0|[1-9][0-9]*)" if allow_zero else r"[1-9][0-9]*"
+        if not isinstance(value[field], str) or not re.fullmatch(pattern, value[field]):
+            reject("SUPERVISOR_CLUSTER_POLICY_SOURCE_INVALID")
+    for field in ("uid", "gid"):
+        if not isinstance(value[field], int) or isinstance(value[field], bool) or not 0 <= value[field] <= 2**31 - 1:
+            reject("SUPERVISOR_CLUSTER_POLICY_SOURCE_INVALID")
+    if value["uid"] != 0 or expected_gid is not None and value["gid"] != expected_gid \
+        or value["mode"] != expected_mode or value["nlink"] != 1:
+        reject("SUPERVISOR_CLUSTER_POLICY_SOURCE_INVALID")
+    return value
+
+
+def validate_cluster_policy_parameters(parameters: Any, operation: str | None = None) -> dict[str, Any]:
+    recovery = operation == "RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION"
+    if recovery:
+        if not isinstance(parameters, dict) or parameters.get("original_operation") not in ("ACTIVATE", "ROLLBACK"):
+            reject("SUPERVISOR_CLUSTER_POLICY_OPERATION_INVALID")
+        effective_operation = parameters["original_operation"]
+    else:
+        effective_operation = CLUSTER_POLICY_OPERATIONS.get(operation or "")
+    if effective_operation not in ("ACTIVATE", "ROLLBACK"):
+        reject("SUPERVISOR_CLUSTER_POLICY_OPERATION_INVALID")
+    expected_fields = set(CLUSTER_POLICY_BASE_PARAMETER_FIELDS)
+    if recovery:
+        expected_fields |= CLUSTER_POLICY_RECOVERY_PARAMETER_FIELDS
+    parameters = exact_fields(parameters, expected_fields, "SUPERVISOR_CLUSTER_POLICY_PARAMETERS_INVALID")
+    if parameters["policy_state_root"] != str(CLUSTER_POLICY_STATE_ROOT) or parameters["policy_target"] != str(MONITORING_CLUSTER_POLICY_FILE):
+        reject("SUPERVISOR_CLUSTER_POLICY_PATH_INVALID")
+    if not isinstance(parameters["activation_id"], str) or not IDENTIFIER.fullmatch(parameters["activation_id"]):
+        reject("SUPERVISOR_CLUSTER_POLICY_IDENTIFIER_INVALID")
+    if parameters["environment"] not in ("UAT", "PRODUCTION"):
+        reject("SUPERVISOR_CLUSTER_POLICY_ENVIRONMENT_INVALID")
+    for field, minimum, maximum in (("policy_generation", 1, 1_000_000), ("rpo_hours", 1, 168), ("rto_minutes", 1, 10_080)):
+        if not isinstance(parameters[field], int) or isinstance(parameters[field], bool) or not minimum <= parameters[field] <= maximum:
+            reject("SUPERVISOR_CLUSTER_POLICY_INTEGER_INVALID")
+    digest_fields = (
+        "previous_policy_sha256", "previous_activation_receipt_sha256", "template_file_sha256", "template_policy_sha256",
+        "approval_reference_sha256", "responsible_operator_identity_sha256", "approver_identity_sha256",
+    )
+    for field in digest_fields:
+        if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]):
+            reject("SUPERVISOR_CLUSTER_POLICY_DIGEST_INVALID")
+    if parameters["template_file_sha256"] != CLUSTER_POLICY_TEMPLATE_FILE_SHA256 \
+        or parameters["template_policy_sha256"] != CLUSTER_POLICY_TEMPLATE_POLICY_SHA256:
+        reject("SUPERVISOR_CLUSTER_POLICY_TEMPLATE_INVALID")
+    actors = {
+        parameters["approval_reference_sha256"], parameters["responsible_operator_identity_sha256"],
+        parameters["approver_identity_sha256"],
+    }
+    if len(actors) != 3 or "0" * 64 in actors:
+        reject("SUPERVISOR_CLUSTER_POLICY_ACTORS_INVALID")
+    activated = parse_time(parameters["activated_at"], "SUPERVISOR_CLUSTER_POLICY_TIME_INVALID")
+    policy_expires = parse_time(parameters["policy_expires_at"], "SUPERVISOR_CLUSTER_POLICY_TIME_INVALID")
+    if policy_expires <= activated or policy_expires - activated > timedelta(hours=24):
+        reject("SUPERVISOR_CLUSTER_POLICY_TIME_INVALID")
+    if parameters["target_disposition"] not in ("DESTROY_AFTER_EVIDENCE", "RETAIN_QUARANTINED_FOR_APPROVED_INCIDENT"):
+        reject("SUPERVISOR_CLUSTER_POLICY_DISPOSITION_INVALID")
+    validate_cluster_policy_source(parameters["release_identity_source"], RELEASE_IDENTITY_FILE, "0440", None)
+    if parameters["policy_generation"] == 1:
+        if parameters["previous_policy_sha256"] != "0" * 64 or parameters["previous_activation_receipt_sha256"] != "0" * 64 \
+            or parameters["current_policy_source"] is not None or parameters["current_activation_source"] is not None:
+            reject("SUPERVISOR_CLUSTER_POLICY_GENERATION_INVALID")
+    else:
+        if parameters["previous_policy_sha256"] == "0" * 64 or parameters["previous_activation_receipt_sha256"] == "0" * 64 \
+            or parameters["current_policy_source"] is None or parameters["current_activation_source"] is None:
+            reject("SUPERVISOR_CLUSTER_POLICY_GENERATION_INVALID")
+        current_policy = validate_cluster_policy_source(parameters["current_policy_source"], MONITORING_CLUSTER_POLICY_FILE, "0440", 0)
+        validate_cluster_policy_source(parameters["current_activation_source"], CLUSTER_POLICY_CURRENT_FILE, "0400", 0)
+        if current_policy["sha256"] != parameters["previous_policy_sha256"]:
+            reject("SUPERVISOR_CLUSTER_POLICY_SOURCE_INVALID")
+    if effective_operation == "ACTIVATE":
+        if parameters["rollback_target_source"] is not None:
+            reject("SUPERVISOR_CLUSTER_POLICY_ROLLBACK_INVALID")
+    else:
+        rollback = parameters["rollback_target_source"]
+        if parameters["policy_generation"] < 3 or not isinstance(rollback, dict) or not isinstance(rollback.get("path"), str):
+            reject("SUPERVISOR_CLUSTER_POLICY_ROLLBACK_INVALID")
+        rollback_path = Path(rollback["path"])
+        if rollback_path.parent != CLUSTER_POLICY_STATE_ROOT / "receipts" \
+            or not re.fullmatch(r"[0-9]{16}\.[0-9a-f]{64}\.json", rollback_path.name):
+            reject("SUPERVISOR_CLUSTER_POLICY_ROLLBACK_INVALID")
+        validate_cluster_policy_source(rollback, rollback_path, "0400", 0)
+    if recovery:
+        if not isinstance(parameters["original_operation_id"], str) or not IDENTIFIER.fullmatch(parameters["original_operation_id"]) \
+            or parameters["activation_id"] != parameters["original_operation_id"]:
+            reject("SUPERVISOR_CLUSTER_POLICY_IDENTIFIER_INVALID")
+        for field in ("expected_intent_sha256", "original_authorization_sha256"):
+            if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]) or parameters[field] == "0" * 64:
+                reject("SUPERVISOR_CLUSTER_POLICY_DIGEST_INVALID")
+    return parameters
+
+
 def validate_monitoring_projection_parameters(operation: str, parameters: dict[str, Any]) -> None:
     if absolute_path(parameters["projection_root"], "SUPERVISOR_MONITORING_PROJECTION_PATH_INVALID") != str(MONITORING_PROJECTION_ROOT):
         reject("SUPERVISOR_MONITORING_PROJECTION_PATH_INVALID")
@@ -662,6 +824,15 @@ def validate_monitoring_projection_parameters(operation: str, parameters: dict[s
     if operation == "PUBLISH_MONITORING_BACKUP_PROJECTION":
         validate_monitoring_projection_source(parameters["backup_readiness_source"], MONITORING_BACKUP_READINESS_FILE, {"0640"})
         validate_monitoring_projection_source(parameters["cluster_policy_source"], MONITORING_CLUSTER_POLICY_FILE, {"0440"}, 0)
+        validate_monitoring_projection_source(parameters["cluster_policy_activation_source"], CLUSTER_POLICY_CURRENT_FILE, {"0400"}, 0)
+        for field, parent in (("cluster_policy_history_source", CLUSTER_POLICY_STATE_ROOT / "history"), ("cluster_policy_receipt_source", CLUSTER_POLICY_STATE_ROOT / "receipts")):
+            source = parameters[field]
+            if not isinstance(source, dict) or not isinstance(source.get("path"), str):
+                reject("SUPERVISOR_MONITORING_PROJECTION_SOURCE_INVALID")
+            source_path = Path(source["path"])
+            if source_path.parent != parent or not re.fullmatch(r"[0-9]{16}\.[0-9a-f]{64}\.json", source_path.name):
+                reject("SUPERVISOR_MONITORING_PROJECTION_SOURCE_PATH_INVALID")
+            validate_monitoring_projection_source(source, source_path, {"0400"}, 0)
 
 
 def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
@@ -802,7 +973,8 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
     value = exact_fields(value, {"schema_version", "contract", "authorization_id", "created_at", "expires_at", "supervisor_bundle_sha256", "operation", "parameters", "nonce", "confirmation"}, "SUPERVISOR_AUTHORIZATION_FIELDS_INVALID")
     is_v2 = value["schema_version"] == 2 and value["contract"] == AUTHORIZATION_CONTRACT
     is_v3 = value["schema_version"] == 3 and value["contract"] == RUNTIME_PRIVILEGE_AUTHORIZATION_CONTRACT
-    if not is_v2 and not is_v3:
+    is_v4 = value["schema_version"] == 4 and value["contract"] == CLUSTER_POLICY_AUTHORIZATION_CONTRACT
+    if not is_v2 and not is_v3 and not is_v4:
         reject("SUPERVISOR_AUTHORIZATION_VERSION_INVALID")
     if not isinstance(value["authorization_id"], str) or not IDENTIFIER.fullmatch(value["authorization_id"]):
         reject("SUPERVISOR_AUTHORIZATION_ID_INVALID")
@@ -812,7 +984,9 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
     if is_v2:
         if operation not in ENTRYPOINTS or value["confirmation"] != CONFIRMATIONS[operation]:
             reject("SUPERVISOR_AUTHORIZATION_OPERATION_INVALID")
-    elif operation not in RUNTIME_PRIVILEGE_OPERATIONS or value["confirmation"] != RUNTIME_PRIVILEGE_CONFIRMATIONS[operation]:
+    elif is_v3 and (operation not in RUNTIME_PRIVILEGE_OPERATIONS or value["confirmation"] != RUNTIME_PRIVILEGE_CONFIRMATIONS[operation]):
+        reject("SUPERVISOR_AUTHORIZATION_OPERATION_INVALID")
+    elif is_v4 and (operation not in CLUSTER_POLICY_OPERATIONS or value["confirmation"] != CLUSTER_POLICY_CONFIRMATIONS[operation]):
         reject("SUPERVISOR_AUTHORIZATION_OPERATION_INVALID")
     if not isinstance(value["nonce"], str) or not SHA256.fullmatch(value["nonce"]):
         reject("SUPERVISOR_AUTHORIZATION_NONCE_INVALID")
@@ -829,10 +1003,23 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
             published = parse_time(value["parameters"]["projection_published_at"], "SUPERVISOR_MONITORING_PROJECTION_TIME_INVALID")
             if published >= expires or published > now + timedelta(minutes=5):
                 reject("SUPERVISOR_MONITORING_PROJECTION_TIME_INVALID")
-    else:
+    elif is_v3:
         validate_runtime_privilege_parameters(value["parameters"], operation)
         if operation == "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT" and value["authorization_id"] == value["parameters"]["original_operation_id"]:
             reject("SUPERVISOR_RUNTIME_PRIVILEGE_IDENTIFIER_INVALID")
+    else:
+        parameters = validate_cluster_policy_parameters(value["parameters"], operation)
+        recovery = operation == "RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION"
+        activated = parse_time(parameters["activated_at"], "SUPERVISOR_CLUSTER_POLICY_TIME_INVALID")
+        policy_expires = parse_time(parameters["policy_expires_at"], "SUPERVISOR_CLUSTER_POLICY_TIME_INVALID")
+        if recovery:
+            if value["authorization_id"] in (parameters["activation_id"], parameters["original_operation_id"]) \
+                or created < activated:
+                reject("SUPERVISOR_CLUSTER_POLICY_TIME_INVALID")
+        elif value["authorization_id"] != parameters["activation_id"] \
+            or abs(activated - created) > timedelta(minutes=5) or activated > now + timedelta(minutes=5) \
+            or policy_expires > expires:
+            reject("SUPERVISOR_CLUSTER_POLICY_TIME_INVALID")
     return value
 
 
@@ -1165,6 +1352,41 @@ def validate_original_runtime_privilege_authorization_consumed(parameters: dict[
     return value
 
 
+def validate_original_cluster_policy_authorization_consumed(parameters: dict[str, Any], expected_bundle_digest: str,
+                                                             consumed_root: Path = AUTHORIZATION_CONSUMED_ROOT) -> dict[str, Any]:
+    validate_cluster_policy_parameters(parameters, "RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION")
+    if consumed_root == AUTHORIZATION_CONSUMED_ROOT:
+        trusted_directory(AUTHORIZATION_ROOT, {0o700}, "SUPERVISOR_AUTHORIZATION_ROOT_INVALID")
+    trusted_directory(consumed_root, {0o700}, "SUPERVISOR_AUTHORIZATION_ROOT_INVALID")
+    original_id = parameters["original_operation_id"]
+    original_digest = parameters["original_authorization_sha256"]
+    file = consumed_root / f"{original_id}.{original_digest}.json"
+    raw, _ = trusted_regular_file(file, 0o400, code="SUPERVISOR_CLUSTER_POLICY_ORIGINAL_AUTHORIZATION_INVALID")
+    if sha256(raw) != original_digest:
+        reject("SUPERVISOR_CLUSTER_POLICY_ORIGINAL_AUTHORIZATION_INVALID")
+    preview = strict_json(raw, "SUPERVISOR_CLUSTER_POLICY_ORIGINAL_AUTHORIZATION_INVALID")
+    try:
+        created = parse_time(preview["created_at"], "SUPERVISOR_CLUSTER_POLICY_ORIGINAL_AUTHORIZATION_INVALID")
+        expires = parse_time(preview["expires_at"], "SUPERVISOR_CLUSTER_POLICY_ORIGINAL_AUTHORIZATION_INVALID")
+    except (KeyError, TypeError):
+        reject("SUPERVISOR_CLUSTER_POLICY_ORIGINAL_AUTHORIZATION_INVALID")
+    try:
+        value = validate_authorization(preview, expected_bundle_digest, created + (expires - created) / 2)
+    except SupervisorError:
+        reject("SUPERVISOR_CLUSTER_POLICY_ORIGINAL_AUTHORIZATION_INVALID")
+    expected_operation = {
+        "ACTIVATE": "ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
+        "ROLLBACK": "ROLLBACK_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
+    }[parameters["original_operation"]]
+    if raw != canonical_json(value) or value["contract"] != CLUSTER_POLICY_AUTHORIZATION_CONTRACT \
+        or value["authorization_id"] != original_id or value["operation"] != expected_operation:
+        reject("SUPERVISOR_CLUSTER_POLICY_ORIGINAL_AUTHORIZATION_INVALID")
+    original_parameters = value["parameters"]
+    if any(original_parameters[field] != parameters[field] for field in CLUSTER_POLICY_BASE_PARAMETER_FIELDS):
+        reject("SUPERVISOR_CLUSTER_POLICY_ORIGINAL_AUTHORIZATION_INVALID")
+    return value
+
+
 def acquire_global_release_lock(path: Path = GLOBAL_RELEASE_LOCK) -> int:
     try:
         parent = os.lstat(path.parent)
@@ -1300,6 +1522,9 @@ def monitoring_projection_context(authorization: dict[str, Any], authorization_d
         sources.update({
             "backup_readiness": parameters["backup_readiness_source"],
             "cluster_policy": parameters["cluster_policy_source"],
+            "cluster_policy_activation": parameters["cluster_policy_activation_source"],
+            "cluster_policy_history": parameters["cluster_policy_history_source"],
+            "cluster_policy_receipt": parameters["cluster_policy_receipt_source"],
         })
     return {
         "schema_version": 1,
@@ -1362,6 +1587,118 @@ def run_monitoring_projection_authorization(bundle_root: Path, authorization_pat
         return value
     finally:
         cleanup_runtime_privilege_node(runtime_root)
+
+
+def cluster_policy_context(authorization: dict[str, Any], authorization_digest: str) -> dict[str, Any]:
+    parameters = authorization["parameters"]
+    recovery = authorization["operation"] == "RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION"
+    operation = parameters["original_operation"] if recovery else CLUSTER_POLICY_OPERATIONS[authorization["operation"]]
+    policy_parameters = {field: parameters[field] for field in CLUSTER_POLICY_BASE_PARAMETER_FIELDS}
+    return {
+        "schema_version": 1,
+        "contract": "chenyida-erp-postgresql-cluster-recovery-policy-activation-context/v1",
+        "operation_id": parameters["original_operation_id"] if recovery else authorization["authorization_id"],
+        "operation": operation,
+        "execution_mode": "RECOVERY" if recovery else "ORIGINAL",
+        "execution_authorization_id": authorization["authorization_id"],
+        "execution_authorization_sha256": authorization_digest,
+        "execution_created_at": authorization["created_at"],
+        "original_authorization_sha256": parameters["original_authorization_sha256"] if recovery else authorization_digest,
+        "supervisor_bundle_sha256": authorization["supervisor_bundle_sha256"],
+        "expected_intent_sha256": parameters["expected_intent_sha256"] if recovery else None,
+        "parameters": policy_parameters,
+    }
+
+
+def run_cluster_policy_runner(node_path: Path, bundle_root: Path, context: dict[str, Any], phase: str, lock_descriptor: int) -> dict[str, Any]:
+    confirmations = {
+        "prepare": "PREPARE_CLUSTER_POLICY_ACTIVATION_INTENT",
+        "execute": "COMMIT_CLUSTER_POLICY_ACTIVATION_AFTER_AUTHORIZATION",
+        "recover-prepare": "PREPARE_CLUSTER_POLICY_ACTIVATION_RECOVERY",
+        "recover-execute": "EXECUTE_CLUSTER_POLICY_ACTIVATION_RECOVERY_AFTER_AUTHORIZATION",
+    }
+    if phase not in confirmations:
+        reject("SUPERVISOR_CLUSTER_POLICY_RUNNER_PHASE_INVALID")
+    publisher = bundle_root / "chenyida_erp_site/scripts/postgresql-cluster-recovery-policy-v2-publisher.mjs"
+    consumed = phase in ("execute", "recover-execute")
+    environment = {
+        "PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent",
+        "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES", "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+        "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+        "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(bundle_root / "chenyida_erp_site"),
+        "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": context["supervisor_bundle_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": context["execution_authorization_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED": "YES" if consumed else "NO",
+        "ERP_RELEASE_SUPERVISOR_ORIGINAL_AUTHORIZATION_CONSUMED": "YES" if context["execution_mode"] == "RECOVERY" else "NO",
+    }
+    try:
+        result = subprocess.run(
+            [str(node_path), "--max-old-space-size=64", "--disable-proto=throw", str(publisher), phase, confirmations[phase]],
+            env=environment, input=canonical_json(context), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            check=False, timeout=120, pass_fds=(lock_descriptor,),
+        )
+    except (OSError, subprocess.SubprocessError):
+        reject("SUPERVISOR_CLUSTER_POLICY_RUNNER_FAILED")
+    if result.returncode != 0 or result.stderr != b"" or len(result.stdout) < 2 or len(result.stdout) > 64 * 1024:
+        reject("SUPERVISOR_CLUSTER_POLICY_RUNNER_FAILED")
+    value = strict_json(result.stdout, "SUPERVISOR_CLUSTER_POLICY_RUNNER_RESPONSE_INVALID")
+    if result.stdout != canonical_json(value) or not isinstance(value, dict) or value.get("operation_id") != context["operation_id"]:
+        reject("SUPERVISOR_CLUSTER_POLICY_RUNNER_RESPONSE_INVALID")
+    if phase == "prepare":
+        expected_results = {"PREPARED"}
+        expected_fields = {"result", "operation_id", "intent_sha256", "policy_sha256", "receipt_sha256"}
+        digest_fields = {"intent_sha256", "policy_sha256", "receipt_sha256"}
+    elif phase == "execute":
+        expected_results = {"COMMITTED", "ALREADY_COMMITTED"}
+        expected_fields = {"result", "operation_id", "intent_sha256", "policy_sha256", "receipt_sha256"}
+        digest_fields = {"intent_sha256", "policy_sha256", "receipt_sha256"}
+    elif phase == "recover-prepare":
+        expected_results = {"RECOVERY_PREPARED"}
+        expected_fields = {"result", "operation_id", "intent_sha256", "recovery_sha256", "decision"}
+        digest_fields = {"intent_sha256", "recovery_sha256"}
+        if value.get("decision") not in {"RESUME_PUBLICATION", "ALREADY_COMMITTED", "QUARANTINE"}:
+            reject("SUPERVISOR_CLUSTER_POLICY_RUNNER_RESPONSE_INVALID")
+    elif value.get("result") in {"COMMITTED", "ALREADY_COMMITTED"}:
+        expected_results = {"COMMITTED", "ALREADY_COMMITTED"}
+        expected_fields = {"result", "operation_id", "intent_sha256", "policy_sha256", "receipt_sha256", "recovery_sha256"}
+        digest_fields = {"intent_sha256", "policy_sha256", "receipt_sha256", "recovery_sha256"}
+    else:
+        expected_results = {"QUARANTINED"}
+        expected_fields = {"result", "operation_id", "intent_sha256", "recovery_sha256", "quarantine_sha256"}
+        digest_fields = {"intent_sha256", "recovery_sha256", "quarantine_sha256"}
+    if set(value) != expected_fields or value.get("result") not in expected_results \
+        or any(not isinstance(value.get(field), str) or not SHA256.fullmatch(value[field]) or value[field] == "0" * 64 for field in digest_fields):
+        reject("SUPERVISOR_CLUSTER_POLICY_RUNNER_RESPONSE_INVALID")
+    return value
+
+
+def run_cluster_policy_authorization(bundle_root: Path, authorization_path: Path, authorization: dict[str, Any],
+                                     authorization_digest: str, lock_descriptor: int | None = None) -> dict[str, Any]:
+    owns_lock = lock_descriptor is None
+    if lock_descriptor is None:
+        lock_descriptor = acquire_global_release_lock()
+    runtime_root: Path | None = None
+    try:
+        recovery = authorization["operation"] == "RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION"
+        if recovery:
+            validate_original_cluster_policy_authorization_consumed(authorization["parameters"], authorization["supervisor_bundle_sha256"])
+        else:
+            verify_cluster_policy_sources(authorization["parameters"])
+        runtime_root, node_path = prepare_runtime_privilege_node(authorization_digest)
+        context = cluster_policy_context(authorization, authorization_digest)
+        run_cluster_policy_runner(node_path, bundle_root, context, "recover-prepare" if recovery else "prepare", lock_descriptor)
+        if not recovery:
+            verify_cluster_policy_sources(authorization["parameters"])
+        consume_authorization(authorization_path, authorization, authorization_digest)
+        if not recovery:
+            verify_cluster_policy_sources(authorization["parameters"])
+        return run_cluster_policy_runner(node_path, bundle_root, context, "recover-execute" if recovery else "execute", lock_descriptor)
+    finally:
+        try:
+            cleanup_runtime_privilege_node(runtime_root)
+        finally:
+            if owns_lock:
+                os.close(lock_descriptor)
 
 
 def runtime_privilege_probe_binding(parameters: dict[str, Any], operation: str) -> str:
@@ -1554,6 +1891,13 @@ def main() -> None:
         if authorization["contract"] == RUNTIME_PRIVILEGE_AUTHORIZATION_CONTRACT:
             validate_runtime_privilege_probe_receipt(authorization["parameters"], bundle_digest, operation=authorization["operation"])
             result = run_runtime_privilege_authorization(
+                bundle_root, authorization_path, authorization, authorization_digest, lock_descriptor,
+            )
+            sys.stdout.buffer.write(canonical_json(result))
+            return
+        if authorization["contract"] == CLUSTER_POLICY_AUTHORIZATION_CONTRACT:
+            assert_no_runtime_privilege_interlock(bundle_root)
+            result = run_cluster_policy_authorization(
                 bundle_root, authorization_path, authorization, authorization_digest, lock_descriptor,
             )
             sys.stdout.buffer.write(canonical_json(result))

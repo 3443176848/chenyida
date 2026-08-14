@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION,
+  BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ACTIVATED_ATTESTATION,
   BACKUP_RECOVERY_READINESS_V4_CONTRACT,
   validateBackupRecoveryReadinessV4,
 } from "../../scripts/backup-recovery-readiness-v4.mjs";
@@ -20,6 +20,11 @@ import {
   readinessPolicySha256,
   validateClusterRecoveryPolicyForReadiness,
 } from "../../scripts/postgresql-cluster-recovery-policy-v2-contract.mjs";
+import {
+  CLUSTER_POLICY_ACTIVATION_CURRENT_FILE,
+  CLUSTER_POLICY_ACTIVATION_STATE_ROOT,
+  validateClusterRecoveryPolicyActivationReceipt,
+} from "../../scripts/postgresql-cluster-recovery-policy-v2-activation-contract.mjs";
 import { parseStrictJson, validateReleaseIdentity } from "../../scripts/release-identity-contract.mjs";
 import { canonicalJson } from "../../scripts/release-manifest-contract.mjs";
 import {
@@ -190,7 +195,7 @@ function validateContext(value) {
   digest(value.projection.expected_projection_sha256, "MONITOR_PROJECTION_PARAMETERS_INVALID");
   iso(value.projection.published_at, "MONITOR_PROJECTION_PARAMETERS_INVALID");
   if ((value.projection.generation === 1) !== (value.projection.previous_projection_sha256 === ZERO_SHA256)) reject("MONITOR_PROJECTION_PARAMETERS_INVALID");
-  const sourceKeys = ["active", "host_config", "release_identity", "postdeploy_receipt", ...(value.operation === "BACKUP" ? ["backup_readiness", "cluster_policy"] : [])];
+  const sourceKeys = ["active", "host_config", "release_identity", "postdeploy_receipt", ...(value.operation === "BACKUP" ? ["backup_readiness", "cluster_policy", "cluster_policy_activation", "cluster_policy_history", "cluster_policy_receipt"] : [])];
   exactKeys(value.sources, sourceKeys, "MONITOR_PROJECTION_SOURCE_SET_INVALID");
   for (const source of Object.values(value.sources)) validateSourceSpec(source, "MONITOR_PROJECTION_SOURCE_SPEC_INVALID");
   return value;
@@ -289,16 +294,20 @@ function componentsProjection(context, common) {
   return Object.freeze({ projection, sourceSha256 });
 }
 
-function backupProjectionFromValidatedReadiness(context, common, readiness, policy, readinessSource, now) {
+function backupProjectionFromValidatedReadiness(context, common, readiness, policy, activationReceipt, readinessSource, now) {
   if (!isClusterRecoveryPolicyV2(policy) || policy.activation.status !== "ACTIVATED") {
     reject("MONITOR_BACKUP_POLICY_V2_ACTIVATION_REQUIRED");
   }
   if (readiness.schema_version !== 4 || readiness.contract !== BACKUP_RECOVERY_READINESS_V4_CONTRACT
     || readiness.result !== "RECOVERY_READY" || readiness.evidence_scope !== "ACTUAL_OFFHOST"
-    || readiness.attestation !== BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ATTESTATION
+    || readiness.attestation !== BACKUP_RECOVERY_READINESS_V4_POLICY_V2_ACTIVATED_ATTESTATION
     || readiness.recovery_control?.status !== "VERIFIED"
     || readiness.recovery_control?.intent?.policy_sha256 !== readinessPolicySha256(policy)
-    || readiness.runtime_privilege?.status !== "VERIFIED" || readiness.status?.runtime_privilege !== "VERIFIED") {
+    || readiness.runtime_privilege?.status !== "VERIFIED" || readiness.status?.runtime_privilege !== "VERIFIED"
+    || readiness.policy_activation?.status !== "VERIFIED" || readiness.status?.policy_activation !== "VERIFIED"
+    || !readiness.policy_activation?.receipt
+    || readiness.policy_activation?.receipt_sha256 !== activationReceipt.receipt_sha256
+    || canonicalClusterJson(readiness.policy_activation?.receipt) !== canonicalClusterJson(activationReceipt)) {
     reject("MONITOR_BACKUP_ACTUAL_V4_POLICY_V2_REQUIRED");
   }
   if (readiness.readiness_sha256 !== context.projection.expected_source_sha256) reject("MONITOR_BACKUP_SOURCE_SHA256_MISMATCH");
@@ -314,7 +323,9 @@ function backupProjectionFromValidatedReadiness(context, common, readiness, poli
     || restore.migration.head !== common.identity.migration_head || restore.migration.manifest_sha256 !== common.identity.migration_manifest_sha256) reject("MONITOR_BACKUP_RUNTIME_IDENTITY_MISMATCH");
   if (policy.activation.environment !== restore.deployment.class || policy.activation.rpo_hours !== restore.policy.rpo_hours
     || Date.parse(policy.activation.activated_at) > Date.parse(readiness.verified_at)
-    || Date.parse(policy.activation.expires_at) <= Date.parse(readiness.verified_at)) reject("MONITOR_BACKUP_POLICY_V2_ACTIVATION_MISMATCH");
+    || Date.parse(policy.activation.expires_at) <= Date.parse(readiness.verified_at)
+    || activationReceipt.release_identity_sha256 !== common.sources.identitySource.spec.sha256
+    || activationReceipt.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256) reject("MONITOR_BACKUP_POLICY_V2_ACTIVATION_MISMATCH");
   const expectation = common.hostConfig.monitoring.backup_expectation;
   const basePolicy = baseClusterRecoveryPolicy(policy);
   if (restore.policy.id !== expectation.policy_id || restore.policy.rpo_hours !== expectation.rpo_hours
@@ -352,22 +363,41 @@ function backupProjectionFromValidatedReadiness(context, common, readiness, poli
 }
 
 async function backupProjection(context, common, validator, now) {
-  const [readinessSource, policySource] = await Promise.all([
+  const [readinessSource, policySource, activationSource, historySource, receiptSource] = await Promise.all([
     readAuthorizedSource(context.sources.backup_readiness, "MONITOR_BACKUP_READINESS_SOURCE_INVALID"),
     readAuthorizedSource(context.sources.cluster_policy, "MONITOR_BACKUP_POLICY_SOURCE_INVALID"),
+    readAuthorizedSource(context.sources.cluster_policy_activation, "MONITOR_BACKUP_POLICY_ACTIVATION_SOURCE_INVALID"),
+    readAuthorizedSource(context.sources.cluster_policy_history, "MONITOR_BACKUP_POLICY_HISTORY_SOURCE_INVALID"),
+    readAuthorizedSource(context.sources.cluster_policy_receipt, "MONITOR_BACKUP_POLICY_RECEIPT_SOURCE_INVALID"),
   ]);
   let readinessInput;
   let policy;
+  let activationReceipt;
   let readiness;
   try {
     readinessInput = parseStrictJson(readinessSource.text, MAX_SOURCE_BYTES);
     policy = validateClusterRecoveryPolicyForReadiness(parseStrictJson(policySource.text, MAX_SOURCE_BYTES));
+  } catch (error) {
+    reject(typeof error?.code === "string" ? `MONITOR_BACKUP_SOURCE_${error.code}` : "MONITOR_BACKUP_SOURCE_INVALID");
+  }
+  if (!isClusterRecoveryPolicyV2(policy) || policy.activation.status !== "ACTIVATED") reject("MONITOR_BACKUP_POLICY_V2_ACTIVATION_REQUIRED");
+  try {
+    activationReceipt = validateClusterRecoveryPolicyActivationReceipt(parseStrictJson(activationSource.text, MAX_SOURCE_BYTES), policy);
     readiness = validator(readinessInput, policy);
   } catch (error) {
     reject(typeof error?.code === "string" ? `MONITOR_BACKUP_SOURCE_${error.code}` : "MONITOR_BACKUP_SOURCE_INVALID");
   }
   if (policySource.text !== canonicalClusterJson(policy) || policySource.spec.sha256 !== sha256(policySource.raw)) reject("MONITOR_BACKUP_POLICY_SHA256_MISMATCH");
-  return backupProjectionFromValidatedReadiness(context, common, readiness, policy, readinessSource, now);
+  if (activationSource.text !== canonicalClusterJson(activationReceipt) || activationSource.spec.sha256 !== sha256(activationSource.raw)) reject("MONITOR_BACKUP_POLICY_ACTIVATION_SHA256_MISMATCH");
+  const expectedHistoryName = path.basename(activationReceipt.history_file);
+  const expectedReceiptName = `${String(activationReceipt.generation).padStart(16, "0")}.${activationReceipt.receipt_sha256}.json`;
+  if (path.dirname(historySource.spec.path) !== path.join(path.dirname(activationSource.spec.path), "history")
+    || path.dirname(receiptSource.spec.path) !== path.join(path.dirname(activationSource.spec.path), "receipts")
+    || path.basename(historySource.spec.path) !== expectedHistoryName || path.basename(receiptSource.spec.path) !== expectedReceiptName
+    || !historySource.raw.equals(policySource.raw) || !receiptSource.raw.equals(activationSource.raw)) {
+    reject("MONITOR_BACKUP_POLICY_ACTIVATION_COMMIT_CHAIN_INVALID");
+  }
+  return backupProjectionFromValidatedReadiness(context, common, readiness, policy, activationReceipt, readinessSource, now);
 }
 
 async function syncDirectory(directory, code) {
@@ -584,7 +614,12 @@ function productionPaths(context) {
   if (path.dirname(path.dirname(receipt)) !== POSTDEPLOY_ROOT || !IDENTIFIER.test(path.basename(path.dirname(receipt)))
     || path.basename(receipt) !== `${path.basename(path.dirname(receipt))}.postdeploy-receipt.json`) reject("MONITOR_PROJECTION_PRODUCTION_PATH_INVALID");
   if (context.operation === "BACKUP") {
-    if (context.sources.backup_readiness.path !== BACKUP_READINESS_FILE || context.sources.cluster_policy.path !== CLUSTER_POLICY_FILE) reject("MONITOR_PROJECTION_PRODUCTION_PATH_INVALID");
+    if (context.sources.backup_readiness.path !== BACKUP_READINESS_FILE || context.sources.cluster_policy.path !== CLUSTER_POLICY_FILE
+      || context.sources.cluster_policy_activation.path !== CLUSTER_POLICY_ACTIVATION_CURRENT_FILE) reject("MONITOR_PROJECTION_PRODUCTION_PATH_INVALID");
+    for (const [source, directory] of [[context.sources.cluster_policy_history, "history"], [context.sources.cluster_policy_receipt, "receipts"]]) {
+      if (path.dirname(source.path) !== path.join(CLUSTER_POLICY_ACTIVATION_STATE_ROOT, directory)
+        || !/^[0-9]{16}\.[0-9a-f]{64}\.json$/u.test(path.basename(source.path))) reject("MONITOR_PROJECTION_PRODUCTION_PATH_INVALID");
+    }
   }
 }
 

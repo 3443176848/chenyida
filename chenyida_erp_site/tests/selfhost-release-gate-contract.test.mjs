@@ -77,7 +77,7 @@ test("versioned test inventory accounts for every top-level test and only exclud
   assert.equal(inventory.total_tests, RELEASE_TEST_INVENTORY_TOTAL);
   assert.equal(inventory.required_tests, RELEASE_TEST_INVENTORY_REQUIRED);
   assert.equal(inventory.not_applicable_tests, RELEASE_TEST_INVENTORY_NOT_APPLICABLE);
-  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 84, POSTGRES_ALIAS: 2, PURE_NODE: 124, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 7 });
+  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 84, POSTGRES_ALIAS: 2, PURE_NODE: 125, RELEASE_CONTRACT: 6, SPECIAL_HARNESS: 7 });
   assert.deepEqual(inventory.tests.filter((entry) => entry.category === "RELEASE_CONTRACT").map((entry) => entry.path), [
     "tests/selfhost-file-storage.test.mjs",
     "tests/selfhost-release-gate-contract.test.mjs",

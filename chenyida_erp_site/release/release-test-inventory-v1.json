@@ -4,15 +4,15 @@
   "root": "chenyida_erp_site",
   "test_pattern": "tests/*.test.mjs",
   "max_test_bytes": 1048576,
-  "total_tests": 251,
-  "required_tests": 227,
+  "total_tests": 252,
+  "required_tests": 228,
   "not_applicable_tests": 24,
   "category_counts": {
     "BROWSER": 6,
     "HISTORICAL_D1_SITES": 22,
     "POSTGRES": 84,
     "POSTGRES_ALIAS": 2,
-    "PURE_NODE": 124,
+    "PURE_NODE": 125,
     "RELEASE_CONTRACT": 6,
     "SPECIAL_HARNESS": 7
   },
@@ -460,7 +460,7 @@
     },
     {
       "path": "tests/selfhost-dashboard-unit.test.mjs",
-      "sha256": "853c2c94f7e8b7dc6c1cbddf641066c0680b21525dce9cfc59c9f9717a88c831",
+      "sha256": "b6d8dda5deb5d095dce8d0ad3bbd5372a213a8c895d0ff2f1bc7f92a7d56ec1d",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1108,7 +1108,7 @@
     },
     {
       "path": "tests/selfhost-ops-monitoring-projection-publisher.test.mjs",
-      "sha256": "f7f7607f9bda51093de04772e7e8c33ff2b20be640a1fb00ac4faa67936f4fb4",
+      "sha256": "b779470dae2ed1d4f1d78663abe6fa854e534ebb701afc8fac8989ba1e56dc9a",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1193,6 +1193,15 @@
       "category": "POSTGRES",
       "applicability": "REQUIRED",
       "harness": "POSTGRES_REGRESSION",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-postgresql-cluster-recovery-policy-v2-activation.test.mjs",
+      "sha256": "3600cdf61f02e3d01fe618ba34f60f94114ca0e01cde5cb330f1f3c2a41bda18",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
       "reason": null,
       "canonical_path": null
     },
@@ -1855,7 +1864,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "be9774c3d68f8e0e1053132e99ff417f4ab3c0ce2a43225e89ef8d6101d80f40",
+      "sha256": "02b3877a2a62db98f7ed92a841198bec925b83d3bbdd224e8e2949b1fab62895",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",

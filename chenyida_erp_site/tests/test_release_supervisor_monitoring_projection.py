@@ -38,6 +38,10 @@ class ReleaseSupervisorMonitoringProjectionTest(unittest.TestCase):
         self.receipt_file = self.receipt_root / "postdeploy-fixture.postdeploy-receipt.json"
         self.backup_file = self.root / "var/lib/chenyida-erp/backup-status/recovery-readiness.json"
         self.policy_file = self.root / "etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json"
+        self.policy_state_root = self.root / "var/lib/chenyida-erp/postgresql-cluster-recovery-policy-v2"
+        self.policy_activation_file = self.policy_state_root / "current.json"
+        self.policy_history_file = self.policy_state_root / "history" / f"0000000000000001.{'a' * 64}.json"
+        self.policy_receipt_file = self.policy_state_root / "receipts" / f"0000000000000001.{'b' * 64}.json"
         self.constants = patch.multiple(
             supervisor,
             MONITORING_PROJECTION_ROOT=self.projection_root,
@@ -45,6 +49,8 @@ class ReleaseSupervisorMonitoringProjectionTest(unittest.TestCase):
             MONITORING_PRIVATE_CONFIG=self.private_config,
             MONITORING_BACKUP_READINESS_FILE=self.backup_file,
             MONITORING_CLUSTER_POLICY_FILE=self.policy_file,
+            CLUSTER_POLICY_STATE_ROOT=self.policy_state_root,
+            CLUSTER_POLICY_CURRENT_FILE=self.policy_activation_file,
             RELEASE_IDENTITY_ROOT=self.identity_root,
             RELEASE_IDENTITY_FILE=self.identity_file,
             POSTDEPLOY_ROOT_BASE=self.postdeploy_base,
@@ -112,12 +118,22 @@ class ReleaseSupervisorMonitoringProjectionTest(unittest.TestCase):
             supervisor.BACKUP_STATUS_MARKER_VALUE, 0o400, self.backup_gid,
         )
         self.owned_directory(self.policy_file.parent, 0o750)
+        self.owned_directory(self.policy_state_root, 0o700)
+        self.owned_directory(self.policy_state_root / "history", 0o700)
+        self.owned_directory(self.policy_state_root / "receipts", 0o700)
+        self.owned_file(
+            self.policy_state_root / supervisor.CLUSTER_POLICY_STATE_MARKER,
+            supervisor.CLUSTER_POLICY_STATE_MARKER_VALUE, 0o400,
+        )
         self.owned_file(self.active_file, b'{"active":true}\n', 0o444)
         self.owned_file(self.private_config, b'{"config":true}\n', 0o400)
         self.owned_file(self.identity_file, b'{"identity":true}\n', 0o440, self.identity_gid)
         self.owned_file(self.receipt_file, b'{"receipt":true}\n', 0o440)
         self.owned_file(self.backup_file, b'{"readiness":true}\n', 0o640, self.backup_gid)
         self.owned_file(self.policy_file, b'{"policy":true}\n', 0o440)
+        self.owned_file(self.policy_activation_file, b'{"activation":true}\n', 0o400)
+        self.owned_file(self.policy_history_file, b'{"policy-history":true}\n', 0o400)
+        self.owned_file(self.policy_receipt_file, b'{"receipt-history":true}\n', 0o400)
 
     @staticmethod
     def source_spec(path):
@@ -148,6 +164,9 @@ class ReleaseSupervisorMonitoringProjectionTest(unittest.TestCase):
             value.update({
                 "backup_readiness_source": self.source_spec(self.backup_file),
                 "cluster_policy_source": self.source_spec(self.policy_file),
+                "cluster_policy_activation_source": self.source_spec(self.policy_activation_file),
+                "cluster_policy_history_source": self.source_spec(self.policy_history_file),
+                "cluster_policy_receipt_source": self.source_spec(self.policy_receipt_file),
             })
         return value
 
@@ -193,6 +212,11 @@ class ReleaseSupervisorMonitoringProjectionTest(unittest.TestCase):
 
     def test_backup_source_root_marker_and_link_count_are_enforced(self):
         parameters = self.parameters(backup=True)
+        authorization, now = self.authorization(backup=True)
+        validated = supervisor.validate_authorization(authorization, "a" * 64, now)
+        context = supervisor.monitoring_projection_context(validated, "c" * 64)
+        self.assertEqual(context["sources"]["cluster_policy_activation"]["path"], str(self.policy_activation_file))
+        self.assertEqual(context["sources"]["cluster_policy_receipt"]["path"], str(self.policy_receipt_file))
         supervisor.verify_monitoring_projection_sources(parameters, "PUBLISH_MONITORING_BACKUP_PROJECTION")
         hardlink = self.backup_file.with_suffix(".hardlink")
         os.link(self.backup_file, hardlink)
@@ -202,6 +226,11 @@ class ReleaseSupervisorMonitoringProjectionTest(unittest.TestCase):
         marker = self.backup_file.parent / supervisor.BACKUP_STATUS_MARKER
         marker.chmod(0o600)
         with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_MONITORING_PROJECTION_BACKUP_ROOT_INVALID"):
+            supervisor.verify_monitoring_projection_sources(self.parameters(backup=True), "PUBLISH_MONITORING_BACKUP_PROJECTION")
+        marker.chmod(0o400)
+        activation_marker = self.policy_state_root / supervisor.CLUSTER_POLICY_STATE_MARKER
+        activation_marker.chmod(0o600)
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_MONITORING_PROJECTION_POLICY_ACTIVATION_ROOT_INVALID"):
             supervisor.verify_monitoring_projection_sources(self.parameters(backup=True), "PUBLISH_MONITORING_BACKUP_PROJECTION")
 
     def test_runner_rechecks_before_and_after_consumption_and_validates_exact_response(self):
