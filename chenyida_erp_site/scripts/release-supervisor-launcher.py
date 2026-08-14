@@ -89,6 +89,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/postgresql-runtime-privilege-state.sql": "0444",
     "chenyida_erp_site/scripts/probe-postdeploy-runtime-configuration.sh": "0555",
     "chenyida_erp_site/scripts/publish-release-identity-from-manifest.mjs": "0444",
+    "chenyida_erp_site/scripts/release-candidate-snapshot.py": "0555",
     "chenyida_erp_site/scripts/release-browser-e2e-runner.mjs": "0444",
     "chenyida_erp_site/scripts/release-gate-runner.mjs": "0444",
     "chenyida_erp_site/scripts/release-gate-lock.sh": "0444",
@@ -127,6 +128,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-operator.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-policy.test.mjs": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_browser.py": "0444",
+    "chenyida_erp_site/tests/test_release_supervisor_candidate_snapshot.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_container_runtime.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_installer.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_launcher.py": "0444",
@@ -177,22 +179,26 @@ RUNTIME_PRIVILEGE_RECOVERY_PARAMETER_FIELDS = {
     "expected_intent_sha256", "original_authorization_sha256", "original_operation", "original_operation_id",
 }
 
+SNAPSHOT_PARAMETER_FIELDS = {
+    "candidate_snapshot_receipt", "candidate_snapshot_receipt_sha256", "test_runtime_root",
+}
+
 PARAMETER_FIELDS = {
     "CREATE_IMAGE_EVIDENCE": {
         "repository_root", "git_commit", "git_tree", "artifact_root", "run_id",
         "web_image", "worker_image", "trivy_db_directory",
-    },
+    } | SNAPSHOT_PARAMETER_FIELDS,
     "RUN_RELEASE_GATE": {
         "repository_root", "git_commit", "git_tree", "artifact_root", "run_id",
         "runtime_guard_contract", "runtime_guard_mode", "gate_plan_sha256",
         "web_image", "worker_image", "sbom_evidence", "security_evidence",
-    },
+    } | SNAPSHOT_PARAMETER_FIELDS,
     "CREATE_RELEASE_MANIFEST": {
         "repository_root", "git_commit", "git_tree", "artifact_root", "release_id",
         "deployment_class", "web_image", "worker_image", "gate_plan", "gate_report",
         "sbom_evidence", "security_evidence", "expires_at", "runtime_guard_contract",
         "runtime_guard_mode", "gate_plan_sha256",
-    },
+    } | SNAPSHOT_PARAMETER_FIELDS,
     "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION": {
         "release_manifest", "release_manifest_sha256", "probe_root", "probe_id", "reader_gid",
         "runtime_guard_contract", "runtime_guard_mode", "runtime_policy_sha256", "deployment_class", "deployment_id", "compose_project",
@@ -392,7 +398,7 @@ def absolute_path(value: Any, code: str) -> str:
 
 def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
     parameters = exact_fields(parameters, PARAMETER_FIELDS[operation], "SUPERVISOR_AUTHORIZATION_PARAMETERS_INVALID")
-    for key in ("artifact_root", "postdeploy_root", "identity_root", "release_manifest", "probe_root", "runtime_probe_receipt", "gate_plan", "gate_report", "sbom_evidence", "security_evidence", "trivy_db_directory", "repository_root", "compose_project_root"):
+    for key in ("artifact_root", "postdeploy_root", "identity_root", "release_manifest", "probe_root", "runtime_probe_receipt", "candidate_snapshot_receipt", "gate_plan", "gate_report", "sbom_evidence", "security_evidence", "trivy_db_directory", "repository_root", "test_runtime_root", "compose_project_root"):
         if key in parameters:
             absolute_path(parameters[key], "SUPERVISOR_AUTHORIZATION_PATH_INVALID")
     for key in ("run_id", "probe_id", "release_id", "deployment_id", "compose_project", "caddy_container", "postgres_container", "web_container", "worker_container"):
@@ -406,7 +412,7 @@ def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
     for key in ("git_commit", "git_tree"):
         if key in parameters and (not isinstance(parameters[key], str) or not GIT_OBJECT.fullmatch(parameters[key])):
             reject("SUPERVISOR_AUTHORIZATION_GIT_INVALID")
-    for key in ("release_manifest_sha256", "runtime_probe_receipt_sha256", "gate_plan_sha256", "runtime_policy_sha256", "runtime_configuration_sha256"):
+    for key in ("release_manifest_sha256", "runtime_probe_receipt_sha256", "candidate_snapshot_receipt_sha256", "gate_plan_sha256", "runtime_policy_sha256", "runtime_configuration_sha256"):
         if key in parameters and (not isinstance(parameters[key], str) or not SHA256.fullmatch(parameters[key])):
             reject("SUPERVISOR_AUTHORIZATION_DIGEST_INVALID")
     if "reader_gid" in parameters and (not isinstance(parameters["reader_gid"], int) or isinstance(parameters["reader_gid"], bool) or parameters["reader_gid"] < 1 or parameters["reader_gid"] > 2**31 - 1):
@@ -555,7 +561,35 @@ def load_authorization(path: Path, expected_bundle_digest: str, pending_root: Pa
     return value, sha256(raw), raw
 
 
-def verify_candidate(parameters: dict[str, Any]) -> None:
+def verify_candidate_snapshot(parameters: dict[str, Any], bundle_root: Path, lock_descriptor: int) -> None:
+    verifier = bundle_root / "chenyida_erp_site/scripts/release-candidate-snapshot.py"
+    environment = {
+        "PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent",
+        "PYTHONDONTWRITEBYTECODE": "1", "PYTHONHASHSEED": "0",
+        "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES", "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+        "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+    }
+    command = [
+        "/usr/bin/python3", str(verifier), "verify",
+        "--receipt", parameters["candidate_snapshot_receipt"],
+        "--receipt-sha256", parameters["candidate_snapshot_receipt_sha256"],
+        "--repository-root", parameters["repository_root"],
+        "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"],
+        "--test-runtime-root", parameters["test_runtime_root"], "--bundle-root", str(bundle_root),
+        "--confirm", "VERIFY_EXACT_RELEASE_CANDIDATE_SNAPSHOT",
+    ]
+    try:
+        result = subprocess.run(command, env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=900, pass_fds=(lock_descriptor,))
+    except (OSError, subprocess.SubprocessError):
+        reject("SUPERVISOR_CANDIDATE_SNAPSHOT_INVALID")
+    if result.returncode != 0 or result.stderr != b"" or len(result.stdout) < 2 or len(result.stdout) > 4096:
+        reject("SUPERVISOR_CANDIDATE_SNAPSHOT_INVALID")
+    response = strict_json(result.stdout, "SUPERVISOR_CANDIDATE_SNAPSHOT_INVALID")
+    if result.stdout != canonical_json(response) or set(response) != {"result", "snapshot_id", "receipt_sha256"} or response.get("result") != "VERIFIED" or response.get("receipt_sha256") != parameters["candidate_snapshot_receipt_sha256"] or not isinstance(response.get("snapshot_id"), str) or not IDENTIFIER.fullmatch(response["snapshot_id"]):
+        reject("SUPERVISOR_CANDIDATE_SNAPSHOT_INVALID")
+
+
+def verify_candidate(parameters: dict[str, Any], bundle_root: Path, lock_descriptor: int) -> None:
     if "repository_root" not in parameters:
         return
     repository = Path(parameters["repository_root"])
@@ -565,7 +599,7 @@ def verify_candidate(parameters: dict[str, Any]) -> None:
         value = os.lstat(candidate)
         if stat.S_ISLNK(value.st_mode) or value.st_uid != 0 or value.st_gid != 0 or stat.S_IMODE(value.st_mode) & 0o022:
             reject("SUPERVISOR_CANDIDATE_OWNERSHIP_INVALID")
-    environment = {"PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_NO_REPLACE_OBJECTS": "1"}
+    environment = {"PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_NO_REPLACE_OBJECTS": "1", "GIT_OPTIONAL_LOCKS": "0"}
     git_prefix = ["/usr/bin/git", "-c", "core.useReplaceRefs=false", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", f"safe.directory={repository}", "-C", str(repository)]
 
     def git(*arguments: str) -> str:
@@ -582,6 +616,7 @@ def verify_candidate(parameters: dict[str, Any]) -> None:
         reject("SUPERVISOR_CANDIDATE_DIRTY")
     if git("ls-files", "--others", "--exclude-standard", "--", "chenyida_erp_site"):
         reject("SUPERVISOR_CANDIDATE_DIRTY")
+    verify_candidate_snapshot(parameters, bundle_root, lock_descriptor)
 
 
 def command_for(bundle_root: Path, authorization: dict[str, Any]) -> list[str]:
@@ -589,11 +624,11 @@ def command_for(bundle_root: Path, authorization: dict[str, Any]) -> list[str]:
     parameters = authorization["parameters"]
     command = [str(bundle_root / ENTRYPOINTS[operation])]
     if operation == "CREATE_IMAGE_EVIDENCE":
-        command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--trivy-db-directory", parameters["trivy_db_directory"], "--confirm", "CREATE_TRIVY_IMAGE_EVIDENCE"]
+        command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--candidate-snapshot-receipt", parameters["candidate_snapshot_receipt"], "--candidate-snapshot-receipt-sha256", parameters["candidate_snapshot_receipt_sha256"], "--test-runtime-root", parameters["test_runtime_root"], "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--trivy-db-directory", parameters["trivy_db_directory"], "--confirm", "CREATE_TRIVY_IMAGE_EVIDENCE"]
     elif operation == "RUN_RELEASE_GATE":
-        command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--gate-plan-sha256", parameters["gate_plan_sha256"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--confirm", "RUN_EXACT_RELEASE_GATE"]
+        command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--candidate-snapshot-receipt", parameters["candidate_snapshot_receipt"], "--candidate-snapshot-receipt-sha256", parameters["candidate_snapshot_receipt_sha256"], "--test-runtime-root", parameters["test_runtime_root"], "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--gate-plan-sha256", parameters["gate_plan_sha256"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--confirm", "RUN_EXACT_RELEASE_GATE"]
     elif operation == "CREATE_RELEASE_MANIFEST":
-        command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--artifact-root", parameters["artifact_root"], "--release-id", parameters["release_id"], "--deployment-class", parameters["deployment_class"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--gate-plan-sha256", parameters["gate_plan_sha256"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--gate-plan", parameters["gate_plan"], "--gate-report", parameters["gate_report"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--expires-at", parameters["expires_at"], "--confirm", "CREATE_IMMUTABLE_RELEASE_MANIFEST"]
+        command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--candidate-snapshot-receipt", parameters["candidate_snapshot_receipt"], "--candidate-snapshot-receipt-sha256", parameters["candidate_snapshot_receipt_sha256"], "--test-runtime-root", parameters["test_runtime_root"], "--artifact-root", parameters["artifact_root"], "--release-id", parameters["release_id"], "--deployment-class", parameters["deployment_class"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--gate-plan-sha256", parameters["gate_plan_sha256"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--gate-plan", parameters["gate_plan"], "--gate-report", parameters["gate_report"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--expires-at", parameters["expires_at"], "--confirm", "CREATE_IMMUTABLE_RELEASE_MANIFEST"]
     elif operation == "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION":
         command += ["--release-manifest", parameters["release_manifest"], "--release-manifest-sha256", parameters["release_manifest_sha256"], "--probe-root", parameters["probe_root"], "--probe-id", parameters["probe_id"], "--reader-gid", str(parameters["reader_gid"]), "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--runtime-policy-sha256", parameters["runtime_policy_sha256"], "--deployment-class", parameters["deployment_class"], "--deployment-id", parameters["deployment_id"], "--compose-project", parameters["compose_project"], "--compose-project-root", parameters["compose_project_root"], "--caddy-container", parameters["caddy_container"], "--postgres-container", parameters["postgres_container"], "--web-container", parameters["web_container"], "--worker-container", parameters["worker_container"], "--confirm", "PROBE_EXACT_POSTDEPLOY_RUNTIME_CONFIGURATION"]
     else:
@@ -1122,9 +1157,9 @@ def main() -> None:
     bundle_root = BUNDLES_ROOT / bundle_digest
     verify_bundle(bundle_root, bundle_digest)
     authorization, authorization_digest, _ = load_authorization(authorization_path, bundle_digest)
-    verify_candidate(authorization["parameters"])
     lock_descriptor = acquire_global_release_lock()
     try:
+        verify_candidate(authorization["parameters"], bundle_root, lock_descriptor)
         validate_runtime_secret_boundary(bundle_root, authorization["operation"])
         if authorization["contract"] == RUNTIME_PRIVILEGE_AUTHORIZATION_CONTRACT:
             validate_runtime_privilege_probe_receipt(authorization["parameters"], bundle_digest, operation=authorization["operation"])

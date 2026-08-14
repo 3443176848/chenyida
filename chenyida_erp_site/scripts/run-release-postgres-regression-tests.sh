@@ -62,9 +62,13 @@ SUPERVISOR_SITE_ROOT=$(readlink -f "$(dirname "$0")/..")
 [ "${ERP_RELEASE_SUPERVISOR_SITE_ROOT:-$SUPERVISOR_SITE_ROOT}" = "$SUPERVISOR_SITE_ROOT" ] || { echo "release supervisor root mismatch" >&2; exit 1; }
 REPOSITORY_ROOT=${ERP_RELEASE_REPOSITORY_ROOT:-$(readlink -f "$SUPERVISOR_SITE_ROOT/..")}
 REPOSITORY_ROOT=$(readlink -f "$REPOSITORY_ROOT")
+[ -z "${ERP_RELEASE_GATE_RUN_ID:-}" ] || [ -n "${ERP_RELEASE_TEST_RUNTIME_ROOT:-}" ] || { echo "release test runtime root is required" >&2; exit 1; }
+AUTHORIZED_TEST_RUNTIME_ROOT=${ERP_RELEASE_TEST_RUNTIME_ROOT:-$REPOSITORY_ROOT}
+TEST_RUNTIME_ROOT=$(readlink -f "$AUTHORIZED_TEST_RUNTIME_ROOT") || { echo "release test runtime root is invalid" >&2; exit 1; }
+[ "$TEST_RUNTIME_ROOT" = "$AUTHORIZED_TEST_RUNTIME_ROOT" ] || { echo "release test runtime root is not canonical" >&2; exit 1; }
 git_candidate() { /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.useReplaceRefs=false -c tar.umask=0022 -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" "$@"; }
 [ "$(git_candidate rev-parse --show-toplevel)" = "$REPOSITORY_ROOT" ] || { echo "release repository root is invalid" >&2; exit 1; }
-NODE_MODULES="$REPOSITORY_ROOT/chenyida_erp_site/node_modules"
+NODE_MODULES="$TEST_RUNTIME_ROOT/chenyida_erp_site/node_modules"
 NODE_IMAGE='node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3'
 POSTGRES_IMAGE='postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394'
 TEMP_ROOT=$(mktemp -d /tmp/cyd-release-postgres-regression-runtime.XXXXXX)

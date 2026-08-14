@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前无`DOING`。`SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58`已把A1—A3从TASK53/TASK51历史身份刷新到TASK57当前source/manifest/bundle、Web/Worker和精确`78d96c61…eba3`候选快照；没有生成授权或外部锚点。下一安全仓库任务为A2独立detached candidate snapshot的准备、验证和精确清理合同；未获专项授权前不得外部push、修改host、UAT/生产、真实角色/secret/ACL/Volume、账号或数据，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59`。TASK58已把授权包刷新到TASK57当前身份；TASK59只在仓库和合成隔离临时Git仓库闭合A2 detached candidate snapshot的PREPARE/VERIFY/REMOVE、回执和失败关闭合同，不安装host、不生成授权、不外部push、不修改UAT/生产、真实角色/secret/ACL/Volume、账号或数据。任何候选输入变化会把TASK57本机镜像标为`STALE / NOT AUTHORIZABLE`，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -113,6 +113,8 @@
 
 2026-08-14第五十次调度事件：TASK58按`DOING → DONE`释放active slot。授权包现固定TASK57的76文件bundle、installer/launcher、Web/Worker及目标候选身份，并把A2阻断明确为A1+A3+detached snapshot合同；TASK54、TASK55—TASK56和TASK57关闭项与六个开放安全仓库项已区分。没有生成授权或修改外部/host/UAT/数据，下一安全任务为A2 detached candidate snapshot合同。
 
+2026-08-14第五十一次调度事件：主智能体从零`DOING`自动选择授权包第13节第2项，状态按`SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59 TODO → DOING`切换唯一active slot。范围固定为仓库实现、合成隔离Git测试和文档；共享主工作区不切换、不清理，host/A1—A3/外部/UAT/数据均未授权。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -129,6 +131,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59 | A2独立候选快照生命周期闭环 | DOING | Codex主智能体（唯一写入、测试串行、证据集成） | 2026-08-14 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-GATE-LIFECYCLE-53、SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56、SELFHOST-RELEASE-CANDIDATE-REFRESH-57、SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58 | `DOING / IMPLEMENTED / PRE-COMMIT VALIDATION / PRODUCTION NO-GO`。可证明snapshot合同与多轮P1修补已通过合成17、Supervisor66、release54及独立攻击复核；待canonical提交链、完整门和治理收口。无reservation的PREPARE target-only自动处置保持失败关闭，不执行真实A2或host/外部/UAT动作。见[任务文档](../tasks/SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59.md)。 |
 
 ## 已完成任务
 

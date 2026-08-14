@@ -10,11 +10,11 @@ GIT_NO_REPLACE_OBJECTS=1
 export LC_ALL PATH HOME GIT_CONFIG_NOSYSTEM GIT_CONFIG_GLOBAL GIT_NO_REPLACE_OBJECTS
 
 usage() {
-  echo "usage: $0 --repository-root DIR --git-commit COMMIT --git-tree TREE --artifact-root DIR --run-id ID --runtime-guard-contract chenyida-erp-release-runtime-guard/v1 --runtime-guard-mode PRE_DEPLOY_EXISTING_RUNTIME_STABILITY --gate-plan-sha256 SHA256 --web-image REF --worker-image REF --sbom-evidence FILE --security-evidence FILE --confirm RUN_EXACT_RELEASE_GATE" >&2
+  echo "usage: $0 --repository-root DIR --git-commit COMMIT --git-tree TREE --candidate-snapshot-receipt FILE --candidate-snapshot-receipt-sha256 SHA256 --test-runtime-root DIR --artifact-root DIR --run-id ID --runtime-guard-contract chenyida-erp-release-runtime-guard/v1 --runtime-guard-mode PRE_DEPLOY_EXISTING_RUNTIME_STABILITY --gate-plan-sha256 SHA256 --web-image REF --worker-image REF --sbom-evidence FILE --security-evidence FILE --confirm RUN_EXACT_RELEASE_GATE" >&2
   exit 2
 }
 
-REPOSITORY_ROOT=""; GIT_COMMIT=""; GIT_TREE=""; ARTIFACT_ROOT=""; RUN_ID=""; RUNTIME_GUARD_CONTRACT=""; RUNTIME_GUARD_MODE=""; GATE_PLAN_SHA256=""; WEB_IMAGE=""; WORKER_IMAGE=""; SBOM_EVIDENCE=""; SECURITY_EVIDENCE=""; CONFIRM=""
+REPOSITORY_ROOT=""; GIT_COMMIT=""; GIT_TREE=""; CANDIDATE_SNAPSHOT_RECEIPT=""; CANDIDATE_SNAPSHOT_RECEIPT_SHA256=""; TEST_RUNTIME_ROOT=""; ARTIFACT_ROOT=""; RUN_ID=""; RUNTIME_GUARD_CONTRACT=""; RUNTIME_GUARD_MODE=""; GATE_PLAN_SHA256=""; WEB_IMAGE=""; WORKER_IMAGE=""; SBOM_EVIDENCE=""; SECURITY_EVIDENCE=""; CONFIRM=""
 NODE_RUNTIME_ROOT=""; NODE_BOOTSTRAP_ID=""; NODE_BOOTSTRAP_NAME=""; NODE_RUNTIME=""
 PREPARED_PLAN=""; PREPARED_REPORT=""; GATE_STAGE_CREATION_STARTED=NO
 
@@ -58,6 +58,9 @@ while [ "$#" -gt 0 ]; do
     --repository-root) REPOSITORY_ROOT=${2:-}; shift 2 ;;
     --git-commit) GIT_COMMIT=${2:-}; shift 2 ;;
     --git-tree) GIT_TREE=${2:-}; shift 2 ;;
+    --candidate-snapshot-receipt) CANDIDATE_SNAPSHOT_RECEIPT=${2:-}; shift 2 ;;
+    --candidate-snapshot-receipt-sha256) CANDIDATE_SNAPSHOT_RECEIPT_SHA256=${2:-}; shift 2 ;;
+    --test-runtime-root) TEST_RUNTIME_ROOT=${2:-}; shift 2 ;;
     --artifact-root) ARTIFACT_ROOT=${2:-}; shift 2 ;;
     --run-id) RUN_ID=${2:-}; shift 2 ;;
     --runtime-guard-contract) RUNTIME_GUARD_CONTRACT=${2:-}; shift 2 ;;
@@ -71,7 +74,7 @@ while [ "$#" -gt 0 ]; do
     *) usage ;;
   esac
 done
-for value in "$REPOSITORY_ROOT" "$GIT_COMMIT" "$GIT_TREE" "$ARTIFACT_ROOT" "$RUN_ID" "$RUNTIME_GUARD_CONTRACT" "$RUNTIME_GUARD_MODE" "$GATE_PLAN_SHA256" "$WEB_IMAGE" "$WORKER_IMAGE" "$SBOM_EVIDENCE" "$SECURITY_EVIDENCE" "$CONFIRM"; do [ -n "$value" ] || usage; done
+for value in "$REPOSITORY_ROOT" "$GIT_COMMIT" "$GIT_TREE" "$CANDIDATE_SNAPSHOT_RECEIPT" "$CANDIDATE_SNAPSHOT_RECEIPT_SHA256" "$TEST_RUNTIME_ROOT" "$ARTIFACT_ROOT" "$RUN_ID" "$RUNTIME_GUARD_CONTRACT" "$RUNTIME_GUARD_MODE" "$GATE_PLAN_SHA256" "$WEB_IMAGE" "$WORKER_IMAGE" "$SBOM_EVIDENCE" "$SECURITY_EVIDENCE" "$CONFIRM"; do [ -n "$value" ] || usage; done
 [ "$(id -u)" = 0 ] || { echo "release gate requires root" >&2; exit 1; }
 [ "${ERP_RELEASE_SUPERVISOR_LAUNCHED:-}" = YES ] || { echo "release gate must be launched by the installed supervisor" >&2; exit 1; }
 [ "$CONFIRM" = RUN_EXACT_RELEASE_GATE ] || { echo "release gate confirmation is invalid" >&2; exit 1; }
@@ -100,6 +103,15 @@ AUTHORIZATION_SHA256=${ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256:-}
 for digest in "$SUPERVISOR_BUNDLE_SHA256" "$AUTHORIZATION_SHA256"; do case "$digest" in *[!0-9a-f]*|'') echo "release supervisor digest is invalid" >&2; exit 1 ;; esac; [ "${#digest}" -eq 64 ] || { echo "release supervisor digest is invalid" >&2; exit 1; }; done
 [ "$(basename "$BUNDLE_ROOT")" = "$SUPERVISOR_BUNDLE_SHA256" ] || { echo "release supervisor bundle path is invalid" >&2; exit 1; }
 case "$BUNDLE_ROOT" in /usr/local/libexec/chenyida-erp-release-supervisor/bundles/*) : ;; *) echo "release supervisor is not installed in the trusted root" >&2; exit 1 ;; esac
+verify_candidate_snapshot() {
+  output=$(env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC HOME=/nonexistent PYTHONDONTWRITEBYTECODE=1 PYTHONHASHSEED=0 \
+    ERP_RELEASE_SUPERVISOR_LAUNCHED=YES ERP_RELEASE_GATE_LOCK_HELD=YES ERP_RELEASE_GATE_LOCK_FD="${ERP_RELEASE_GATE_LOCK_FD:-}" \
+    /usr/bin/python3 "$SCRIPT_DIR/release-candidate-snapshot.py" verify \
+    --receipt "$CANDIDATE_SNAPSHOT_RECEIPT" --receipt-sha256 "$CANDIDATE_SNAPSHOT_RECEIPT_SHA256" \
+    --repository-root "$REPOSITORY_ROOT" --git-commit "$GIT_COMMIT" --git-tree "$GIT_TREE" \
+    --test-runtime-root "$TEST_RUNTIME_ROOT" --bundle-root "$BUNDLE_ROOT" --confirm VERIFY_EXACT_RELEASE_CANDIDATE_SNAPSHOT) || return 1
+  case "$output" in *"\"receipt_sha256\":\"$CANDIDATE_SNAPSHOT_RECEIPT_SHA256\""*"\"result\":\"VERIFIED\""*"\"snapshot_id\":\""*) return 0 ;; *) return 1 ;; esac
+}
 REPOSITORY_ROOT=$(readlink -f "$REPOSITORY_ROOT")
 [ "$(/usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.useReplaceRefs=false -c tar.umask=0022 -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" rev-parse --show-toplevel)" = "$REPOSITORY_ROOT" ] || { echo "release repository root is ambiguous" >&2; exit 1; }
 PLAN="$SCRIPT_DIR/../release/release-gate-plan-v2.json"
@@ -112,6 +124,7 @@ git_candidate() { /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/nu
 git_candidate diff --quiet --no-ext-diff --no-textconv -- || { echo "tracked worktree changes block release gate" >&2; exit 1; }
 git_candidate diff --cached --quiet --no-ext-diff --no-textconv -- || { echo "staged changes block release gate" >&2; exit 1; }
 [ -z "$(git_candidate ls-files --others --exclude-standard -- chenyida_erp_site)" ] || { echo "untracked build-context files block release gate" >&2; exit 1; }
+verify_candidate_snapshot || { echo "release candidate snapshot verification failed" >&2; exit 1; }
 case "$ARTIFACT_ROOT/" in "$REPOSITORY_ROOT/"*) echo "release artifacts must be outside the repository" >&2; exit 1 ;; esac
 
 if [ ! -e "$ARTIFACT_ROOT" ]; then install -d -m 0750 -o root -g root "$ARTIFACT_ROOT"; fi
@@ -163,7 +176,7 @@ MIGRATION_ALLOWLIST_SHA256=$(CDPATH= cd -- "$SUPERVISOR_SITE_ROOT" && env -i PAT
 
 GATE_STAGE_CREATION_STARTED=YES
 set +e
-RUNNER_OUTPUT=$(env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC ERP_RELEASE_GATE_LOCK_HELD=YES ERP_RELEASE_SUPERVISOR_LAUNCHED=YES ERP_RELEASE_SUPERVISOR_SITE_ROOT="$SUPERVISOR_SITE_ROOT" ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256="$SUPERVISOR_BUNDLE_SHA256" ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256="$AUTHORIZATION_SHA256" "$NODE_RUNTIME" "$SCRIPT_DIR/release-gate-runner.mjs" run --plan "$PLAN" --repository-root "$REPOSITORY_ROOT" --artifact-root "$ARTIFACT_ROOT" --run-id "$RUN_ID" --runtime-guard-mode "$RUNTIME_GUARD_MODE" \
+RUNNER_OUTPUT=$(env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC ERP_RELEASE_GATE_LOCK_HELD=YES ERP_RELEASE_SUPERVISOR_LAUNCHED=YES ERP_RELEASE_SUPERVISOR_SITE_ROOT="$SUPERVISOR_SITE_ROOT" ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256="$SUPERVISOR_BUNDLE_SHA256" ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256="$AUTHORIZATION_SHA256" "$NODE_RUNTIME" "$SCRIPT_DIR/release-gate-runner.mjs" run --plan "$PLAN" --repository-root "$REPOSITORY_ROOT" --test-runtime-root "$TEST_RUNTIME_ROOT" --artifact-root "$ARTIFACT_ROOT" --run-id "$RUN_ID" --runtime-guard-mode "$RUNTIME_GUARD_MODE" \
   --git-commit "$GIT_COMMIT" --git-tree "$GIT_TREE" --package-version "$PACKAGE_VERSION" --web-image-digest "$WEB_DIGEST" --worker-image-digest "$WORKER_DIGEST" --migration-allowlist-sha256 "$MIGRATION_ALLOWLIST_SHA256" \
   --web-image-reference "$WEB_IMAGE" --worker-image-reference "$WORKER_IMAGE" \
   --sbom-evidence "$SBOM_EVIDENCE" --security-evidence "$SECURITY_EVIDENCE" --confirm RUN_EXACT_RELEASE_GATE)
@@ -186,6 +199,7 @@ git_candidate diff --quiet --no-ext-diff --no-textconv -- && git_candidate diff 
 [ "$(git_candidate rev-parse --verify HEAD^{commit})" = "$GIT_COMMIT" ] && [ "$(git_candidate rev-parse --verify HEAD^{tree})" = "$GIT_TREE" ] || { echo "release source identity changed during gate" >&2; exit 1; }
 [ -z "$(git_candidate ls-files --others --exclude-standard -- chenyida_erp_site)" ] || { echo "untracked build-context files appeared during release gate" >&2; exit 1; }
 [ "$(verify_image "$WEB_IMAGE" "$PACKAGE_VERSION" "$GIT_COMMIT")" = "$WEB_DIGEST" ] && [ "$(verify_image "$WORKER_IMAGE" "$PACKAGE_VERSION" "$GIT_COMMIT")" = "$WORKER_DIGEST" ] || { echo "candidate image changed during release gate" >&2; exit 1; }
+verify_candidate_snapshot || { echo "release candidate snapshot changed during release gate" >&2; exit 1; }
 
 if [ "$GATE_STAGE_CREATION_STARTED" = YES ]; then
   set +e

@@ -220,13 +220,14 @@ function inspectPinnedRuntimeImage(reference, expectedRepoDigest, expectedConfig
   return expectedConfigDigest;
 }
 
-export async function verifyTestRuntimePolicy(repositoryRoot, environment = process.env, supervisorSiteRoot = DEFAULT_SUPERVISOR_SITE_ROOT) {
+export async function verifyTestRuntimePolicy(repositoryRoot, environment = process.env, supervisorSiteRoot = DEFAULT_SUPERVISOR_SITE_ROOT, testRuntimeRoot = repositoryRoot) {
   const root = path.resolve(repositoryRoot);
+  const runtimeRoot = path.resolve(testRuntimeRoot);
   const policyPath = path.join(path.resolve(supervisorSiteRoot), "release", "test-runtime-policy-v1.json");
   const raw = await readFile(policyPath, "utf8");
   const policy = validateOfficialTestRuntimePolicy(parseStrictJson(raw), raw);
-  const nodeModules = path.join(root, policy.node_dependencies.path);
-  const pythonVenv = path.join(root, policy.python_runtime.venv_path);
+  const nodeModules = path.join(runtimeRoot, policy.node_dependencies.path);
+  const pythonVenv = path.join(runtimeRoot, policy.python_runtime.venv_path);
   if (sha256(await readFile(path.join(root, "chenyida_erp_site", "package-lock.json"))) !== policy.node_dependencies.package_lock_sha256) fail("GATE_TEST_RUNTIME_LOCKFILE_MISMATCH");
   if (sha256(await readFile(path.join(root, "chenyida_erp_app", "requirements.txt"))) !== policy.python_runtime.requirements_sha256 || sha256(await readFile(path.join(root, "chenyida_erp_app", "requirements-dev.txt"))) !== policy.python_runtime.requirements_dev_sha256) fail("GATE_TEST_RUNTIME_REQUIREMENTS_MISMATCH");
   if (sha256(await readFile(policy.python_runtime.interpreter_path)) !== policy.python_runtime.interpreter_sha256) fail("GATE_TEST_RUNTIME_INTERPRETER_MISMATCH");
@@ -246,7 +247,7 @@ export async function verifyTestRuntimePolicy(repositoryRoot, environment = proc
   };
 }
 
-function safeCommandEnvironment(candidate, runId, heapMib, imageReferences, repositoryRoot, supervisorSiteRoot) {
+function safeCommandEnvironment(candidate, runId, heapMib, imageReferences, repositoryRoot, supervisorSiteRoot, testRuntimeRoot) {
   return {
     PATH: SAFE_PATH,
     HOME: "/nonexistent",
@@ -277,6 +278,7 @@ function safeCommandEnvironment(candidate, runId, heapMib, imageReferences, repo
     ERP_RELEASE_GATE_GIT_TREE: candidate.git_tree,
     ERP_RELEASE_NODE_HEAP_MIB: String(heapMib),
     ERP_RELEASE_REPOSITORY_ROOT: path.resolve(repositoryRoot),
+    ERP_RELEASE_TEST_RUNTIME_ROOT: path.resolve(testRuntimeRoot),
     ERP_RELEASE_SUPERVISOR_SITE_ROOT: path.resolve(supervisorSiteRoot),
   };
 }
@@ -454,7 +456,7 @@ function assertCandidateMatches(expected, actual, code) {
   if (canonicalJson(expected) !== canonicalJson(actual)) fail(code);
 }
 
-export async function runReleaseGate({ planPath, repositoryRoot, artifactRoot, runId, runtimeGuardMode, candidate, webImageReference, workerImageReference, sbomEvidencePath, securityEvidencePath, environment = process.env, clock = () => new Date(), requireOfficialPlan = true, lockVerifier = verifyGlobalLock, supervisorSiteRoot = DEFAULT_SUPERVISOR_SITE_ROOT, control = null }) {
+export async function runReleaseGate({ planPath, repositoryRoot, testRuntimeRoot = repositoryRoot, artifactRoot, runId, runtimeGuardMode, candidate, webImageReference, workerImageReference, sbomEvidencePath, securityEvidencePath, environment = process.env, clock = () => new Date(), requireOfficialPlan = true, lockVerifier = verifyGlobalLock, supervisorSiteRoot = DEFAULT_SUPERVISOR_SITE_ROOT, control = null }) {
   if (typeof runId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(runId)) fail("GATE_RUN_ID_INVALID");
   try { validateRuntimeGuardBinding(runtimeGuardBinding(runtimeGuardMode), PRE_DEPLOY_RUNTIME_GUARD_MODE, "GATE_RUNTIME_GUARD_MODE_INVALID"); } catch (error) { fail(error?.code || "GATE_RUNTIME_GUARD_MODE_INVALID"); }
   const trustedControl = control || supervisorControl(environment);
@@ -474,7 +476,7 @@ export async function runReleaseGate({ planPath, repositoryRoot, artifactRoot, r
     const policyRaw = await readFile(path.join(trustedSupervisorSiteRoot, "release", "vulnerability-policy-v1.json"), "utf8");
     validateOfficialVulnerabilityPolicy(parseStrictJson(policyRaw), policyRaw);
   }
-  const testRuntime = await verifyTestRuntimePolicy(repositoryRoot, environment, trustedSupervisorSiteRoot);
+  const testRuntime = await verifyTestRuntimePolicy(repositoryRoot, environment, trustedSupervisorSiteRoot, testRuntimeRoot);
   const planRaw = canonicalJson(plan);
   const planFilename = `${runId}.release-gate-plan.json`;
   const evidenceNames = [path.basename(sbomEvidencePath || ""), path.basename(securityEvidencePath || ""), planFilename, `${runId}.release-gate-report.json`, `${runId}.release-gate-attempt.json`];
@@ -493,7 +495,7 @@ export async function runReleaseGate({ planPath, repositoryRoot, artifactRoot, r
   if (packageValue.version !== candidate.package_version) fail("GATE_PACKAGE_VERSION_MISMATCH");
   const migrations = await buildMigrationAllowlist(path.join(siteRoot, "drizzle-postgres"));
   if (migrationAllowlistDigest(migrations) !== candidate.migration_allowlist_sha256) fail("GATE_MIGRATION_ALLOWLIST_MISMATCH");
-  const runEnvironment = safeCommandEnvironment(candidate, runId, plan.resource_policy.node_max_old_space_size_mib, { web: webImageReference, worker: workerImageReference }, repositoryRoot, trustedSupervisorSiteRoot);
+  const runEnvironment = safeCommandEnvironment(candidate, runId, plan.resource_policy.node_max_old_space_size_mib, { web: webImageReference, worker: workerImageReference }, repositoryRoot, trustedSupervisorSiteRoot, testRuntimeRoot);
   const baselineContainers = dockerContainerIds(runEnvironment); const baselineStates = dockerStates(baselineContainers, runEnvironment); const baselineRuntime = runtimeServiceInventory(runEnvironment, plan.runtime_guard);
   const preexistingTemporaryContainerIds = releaseTemporaryContainerIds(runEnvironment);
   const baselineRuntimeFailure = preexistingTemporaryContainerIds.length > 0 ? "GATE_PREEXISTING_TASK_CONTAINER" : baselineRuntime.failure;
@@ -539,7 +541,7 @@ export async function runReleaseGate({ planPath, repositoryRoot, artifactRoot, r
     catch (error) { finalRuntimeFailure = error?.code || "GATE_REQUIRED_RUNTIME_CHANGED"; }
   }
   try {
-    const finalTestRuntime = await verifyTestRuntimePolicy(repositoryRoot, runEnvironment, trustedSupervisorSiteRoot);
+    const finalTestRuntime = await verifyTestRuntimePolicy(repositoryRoot, runEnvironment, trustedSupervisorSiteRoot, testRuntimeRoot);
     if (canonicalJson(finalTestRuntime) !== canonicalJson(testRuntime)) finalRuntimeFailure = "GATE_TEST_RUNTIME_CHANGED";
   } catch (error) {
     finalRuntimeFailure = typeof error?.code === "string" ? error.code : "GATE_TEST_RUNTIME_RECHECK_FAILED";
@@ -596,14 +598,14 @@ async function main() {
     return;
   }
   if (command !== "run") fail("GATE_CLI_COMMAND_INVALID");
-  exactKeys(options, ["--plan", "--repository-root", "--artifact-root", "--run-id", "--runtime-guard-mode", "--git-commit", "--git-tree", "--package-version", "--web-image-reference", "--worker-image-reference", "--web-image-digest", "--worker-image-digest", "--migration-allowlist-sha256", "--sbom-evidence", "--security-evidence", "--confirm"], "GATE_CLI_ARGUMENT_INVALID");
+  exactKeys(options, ["--plan", "--repository-root", "--test-runtime-root", "--artifact-root", "--run-id", "--runtime-guard-mode", "--git-commit", "--git-tree", "--package-version", "--web-image-reference", "--worker-image-reference", "--web-image-digest", "--worker-image-digest", "--migration-allowlist-sha256", "--sbom-evidence", "--security-evidence", "--confirm"], "GATE_CLI_ARGUMENT_INVALID");
   if (options["--confirm"] !== "RUN_EXACT_RELEASE_GATE") fail("GATE_CLI_CONFIRMATION_INVALID");
   const candidate = { git_commit: options["--git-commit"], git_tree: options["--git-tree"], package_version: options["--package-version"], web_image_digest: options["--web-image-digest"], worker_image_digest: options["--worker-image-digest"], migration_allowlist_sha256: options["--migration-allowlist-sha256"] };
   const startedAt = new Date().toISOString();
   const control = supervisorControl(process.env);
   let outcome;
   try {
-    outcome = await runReleaseGate({ planPath: options["--plan"], repositoryRoot: options["--repository-root"], artifactRoot: options["--artifact-root"], runId: options["--run-id"], runtimeGuardMode: options["--runtime-guard-mode"], candidate, webImageReference: options["--web-image-reference"], workerImageReference: options["--worker-image-reference"], sbomEvidencePath: options["--sbom-evidence"], securityEvidencePath: options["--security-evidence"], control });
+    outcome = await runReleaseGate({ planPath: options["--plan"], repositoryRoot: options["--repository-root"], testRuntimeRoot: options["--test-runtime-root"], artifactRoot: options["--artifact-root"], runId: options["--run-id"], runtimeGuardMode: options["--runtime-guard-mode"], candidate, webImageReference: options["--web-image-reference"], workerImageReference: options["--worker-image-reference"], sbomEvidencePath: options["--sbom-evidence"], securityEvidencePath: options["--security-evidence"], control });
   } catch (error) {
     const failureCode = typeof error?.code === "string" ? error.code : "RELEASE_GATE_INTERNAL_ERROR";
     let runtimeGuard;

@@ -167,6 +167,8 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.doesNotMatch(wrapper, /buildMigrationAllowlist\("\.\/drizzle-postgres"\)/);
   assert.match(runner, /GATE_GLOBAL_LOCK_NOT_HELD/);
   assert.match(runner, /safeCommandEnvironment/);
+  assert.match(runner, /ERP_RELEASE_TEST_RUNTIME_ROOT: path\.resolve\(testRuntimeRoot\)/);
+  assert.match(runner, /verifyTestRuntimePolicy\(repositoryRoot, environment, trustedSupervisorSiteRoot, testRuntimeRoot\)/);
   assert.match(runner, /OFFICIAL_EXECUTOR_COMMANDS/);
   assert.match(runner, /\.RepoDigests/);
   assert.match(runner, /expectedRepoDigest/);
@@ -189,6 +191,12 @@ test("operator wrappers use a fixed real lock, trusted artifact root and sanitiz
   assert.match(nodeSandbox, /NODE_IMAGE='node@sha256:[0-9a-f]{64}'/);
   assert.match(nodeSandbox, /POSIX_IMAGE='node@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37'/);
   assert.match(nodeSandbox, /ERP_CREDENTIAL_SCAN_FILE_LIST=\/workspace\/\.release-tracked-files\.nul/);
+  for (const sandbox of [nodeSandbox, postgresSandbox, migrationSandbox, recoverySandbox, pythonSandbox]) {
+    assert.match(sandbox, /ERP_RELEASE_TEST_RUNTIME_ROOT/);
+    assert.match(sandbox, /ERP_RELEASE_GATE_RUN_ID/);
+    assert.match(sandbox, /AUTHORIZED_TEST_RUNTIME_ROOT/);
+    assert.match(sandbox, /TEST_RUNTIME_ROOT" = "\$AUTHORIZED_TEST_RUNTIME_ROOT/);
+  }
   assert.match(pythonSandbox, /--unshare-all/);
   assert.match(pythonSandbox, /--cap-drop ALL/);
   assert.match(pythonSandbox, /--clearenv/);

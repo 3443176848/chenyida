@@ -73,10 +73,14 @@ SUPERVISOR_SITE_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 [ "${ERP_RELEASE_SUPERVISOR_SITE_ROOT:-$SUPERVISOR_SITE_ROOT}" = "$SUPERVISOR_SITE_ROOT" ] || { echo "release supervisor root mismatch" >&2; exit 1; }
 REPOSITORY_ROOT=${ERP_RELEASE_REPOSITORY_ROOT:-$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd -P)}
 REPOSITORY_ROOT=$(readlink -f "$REPOSITORY_ROOT")
+[ -z "${ERP_RELEASE_GATE_RUN_ID:-}" ] || [ -n "${ERP_RELEASE_TEST_RUNTIME_ROOT:-}" ] || { echo "release test runtime root is required" >&2; exit 1; }
+AUTHORIZED_TEST_RUNTIME_ROOT=${ERP_RELEASE_TEST_RUNTIME_ROOT:-$REPOSITORY_ROOT}
+TEST_RUNTIME_ROOT=$(readlink -f "$AUTHORIZED_TEST_RUNTIME_ROOT") || { echo "release test runtime root is invalid" >&2; exit 1; }
+[ "$TEST_RUNTIME_ROOT" = "$AUTHORIZED_TEST_RUNTIME_ROOT" ] || { echo "release test runtime root is not canonical" >&2; exit 1; }
 git_candidate() { /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.useReplaceRefs=false -c tar.umask=0022 -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" "$@"; }
 [ "$(git_candidate rev-parse --show-toplevel)" = "$REPOSITORY_ROOT" ] || { echo "release repository root is invalid" >&2; exit 1; }
 SITE_ROOT="$REPOSITORY_ROOT/chenyida_erp_site"
-NODE_MODULES="$SITE_ROOT/node_modules"
+NODE_MODULES="$TEST_RUNTIME_ROOT/chenyida_erp_site/node_modules"
 TEMP_ROOT=""; CURRENT_CONTAINER_ID=""; CURRENT_CONTAINER_NAME=""; RUN_ID=${ERP_RELEASE_GATE_RUN_ID:-}
 
 remove_task_container() {

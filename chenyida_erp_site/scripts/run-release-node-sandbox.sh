@@ -24,13 +24,17 @@ SUPERVISOR_SITE_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd -P)
 [ "${ERP_RELEASE_SUPERVISOR_SITE_ROOT:-$SUPERVISOR_SITE_ROOT}" = "$SUPERVISOR_SITE_ROOT" ] || { echo "release supervisor root mismatch" >&2; exit 1; }
 REPOSITORY_ROOT=${ERP_RELEASE_REPOSITORY_ROOT:-$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd -P)}
 REPOSITORY_ROOT=$(readlink -f "$REPOSITORY_ROOT")
+[ -z "${ERP_RELEASE_GATE_RUN_ID:-}" ] || [ -n "${ERP_RELEASE_TEST_RUNTIME_ROOT:-}" ] || { echo "release test runtime root is required" >&2; exit 1; }
+AUTHORIZED_TEST_RUNTIME_ROOT=${ERP_RELEASE_TEST_RUNTIME_ROOT:-$REPOSITORY_ROOT}
+TEST_RUNTIME_ROOT=$(readlink -f "$AUTHORIZED_TEST_RUNTIME_ROOT") || { echo "release test runtime root is invalid" >&2; exit 1; }
+[ "$TEST_RUNTIME_ROOT" = "$AUTHORIZED_TEST_RUNTIME_ROOT" ] || { echo "release test runtime root is not canonical" >&2; exit 1; }
 if [ "$ACTION" = browser-e2e ]; then
   exec "$SCRIPT_DIR/run-release-browser-tests.sh"
 fi
 git_candidate() { /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null -c core.useReplaceRefs=false -c tar.umask=0022 -c "safe.directory=$REPOSITORY_ROOT" -C "$REPOSITORY_ROOT" "$@"; }
 [ "$(git_candidate rev-parse --show-toplevel)" = "$REPOSITORY_ROOT" ] || { echo "release repository root is invalid" >&2; exit 1; }
 SITE_ROOT="$REPOSITORY_ROOT/chenyida_erp_site"
-NODE_MODULES="$SITE_ROOT/node_modules"
+NODE_MODULES="$TEST_RUNTIME_ROOT/chenyida_erp_site/node_modules"
 NODE_IMAGE='node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3'
 POSIX_IMAGE='node@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37'
 TEMP_ROOT=""; CONTAINER_ID=""; CONTAINER_NAME=""; RUN_ID=${ERP_RELEASE_GATE_RUN_ID:-}

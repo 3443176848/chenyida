@@ -76,6 +76,9 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
             "repository_root": "/opt/erp",
             "git_commit": "a" * 40,
             "git_tree": "b" * 40,
+            "candidate_snapshot_receipt": "/var/lib/chenyida-erp/release-candidate-snapshots/receipts/fixture.prepared.json",
+            "candidate_snapshot_receipt_sha256": "0" * 64,
+            "test_runtime_root": "/opt/erp",
             "artifact_root": "/var/lib/chenyida-erp/releases/fixture",
             "run_id": "fixture-alpha45",
             "runtime_guard_contract": supervisor.RUNTIME_GUARD_CONTRACT,
@@ -206,10 +209,14 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         self.assertEqual(command[0], "/trusted/bundle/chenyida_erp_site/scripts/run-release-gate.sh")
         self.assertEqual(command[command.index("--git-commit") + 1], "a" * 40)
         self.assertEqual(command[command.index("--git-tree") + 1], "b" * 40)
+        self.assertEqual(command[command.index("--candidate-snapshot-receipt-sha256") + 1], "0" * 64)
+        self.assertEqual(command[command.index("--test-runtime-root") + 1], "/opt/erp")
         self.assertNotIn("/bin/sh", command)
         for operation, parameters in (
             ("CREATE_IMAGE_EVIDENCE", {
                 "repository_root": "/opt/erp", "git_commit": "a" * 40, "git_tree": "b" * 40,
+                "candidate_snapshot_receipt": "/var/lib/chenyida-erp/release-candidate-snapshots/receipts/fixture.prepared.json",
+                "candidate_snapshot_receipt_sha256": "0" * 64, "test_runtime_root": "/opt/erp",
                 "artifact_root": "/var/lib/chenyida-erp/releases/fixture", "run_id": "fixture-alpha45",
                 "web_image": f"registry.example.invalid/chenyida/web@sha256:{'c' * 64}",
                 "worker_image": f"registry.example.invalid/chenyida/worker@sha256:{'d' * 64}",
@@ -217,6 +224,8 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
             }),
             ("CREATE_RELEASE_MANIFEST", {
                 "repository_root": "/opt/erp", "git_commit": "a" * 40, "git_tree": "b" * 40,
+                "candidate_snapshot_receipt": "/var/lib/chenyida-erp/release-candidate-snapshots/receipts/fixture.prepared.json",
+                "candidate_snapshot_receipt_sha256": "0" * 64, "test_runtime_root": "/opt/erp",
                 "artifact_root": "/var/lib/chenyida-erp/releases/fixture", "release_id": "fixture-alpha45",
                 "deployment_class": "UAT",
                 "web_image": f"registry.example.invalid/chenyida/web@sha256:{'c' * 64}",
@@ -232,6 +241,8 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
             operation_command = supervisor.command_for(Path("/trusted/bundle"), {"operation": operation, "parameters": parameters})
             self.assertEqual(operation_command[operation_command.index("--git-commit") + 1], "a" * 40)
             self.assertEqual(operation_command[operation_command.index("--git-tree") + 1], "b" * 40)
+            self.assertEqual(operation_command[operation_command.index("--candidate-snapshot-receipt-sha256") + 1], "0" * 64)
+            self.assertEqual(operation_command[operation_command.index("--test-runtime-root") + 1], "/opt/erp")
         postdeploy_parameters = {
             "release_manifest": "/var/lib/chenyida-erp/release-artifacts/fixture/release-manifest.json",
             "release_manifest_sha256": "2" * 64,
@@ -287,6 +298,39 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         self.assertFalse(file.exists())
         with self.assertRaises(supervisor.SupervisorError):
             supervisor.load_authorization(file, digest, pending, now)
+
+    def test_candidate_snapshot_verifier_uses_exact_lock_fd_environment_and_response(self):
+        parameters = {
+            "repository_root": "/var/lib/chenyida-erp/release-candidate-snapshots/worktrees/fixture",
+            "git_commit": "a" * 40,
+            "git_tree": "b" * 40,
+            "candidate_snapshot_receipt": "/var/lib/chenyida-erp/release-candidate-snapshots/receipts/fixture.prepared.json",
+            "candidate_snapshot_receipt_sha256": "c" * 64,
+            "test_runtime_root": "/opt/erp",
+        }
+        bundle_root = Path("/usr/local/libexec/chenyida-erp-release-supervisor/bundles") / ("d" * 64)
+        response = supervisor.canonical_json({
+            "result": "VERIFIED",
+            "snapshot_id": "fixture",
+            "receipt_sha256": "c" * 64,
+        })
+        completed = supervisor.subprocess.CompletedProcess([], 0, response, b"")
+        with patch.object(supervisor.subprocess, "run", return_value=completed) as run:
+            supervisor.verify_candidate_snapshot(parameters, bundle_root, 9)
+        command = run.call_args.args[0]
+        self.assertEqual(command[0:3], ["/usr/bin/python3", str(bundle_root / "chenyida_erp_site/scripts/release-candidate-snapshot.py"), "verify"])
+        self.assertEqual(command[command.index("--receipt") + 1], parameters["candidate_snapshot_receipt"])
+        self.assertEqual(command[command.index("--receipt-sha256") + 1], "c" * 64)
+        self.assertEqual(command[command.index("--test-runtime-root") + 1], "/opt/erp")
+        self.assertEqual(command[command.index("--bundle-root") + 1], str(bundle_root))
+        self.assertEqual(run.call_args.kwargs["pass_fds"], (9,))
+        self.assertEqual(run.call_args.kwargs["env"]["ERP_RELEASE_GATE_LOCK_FD"], "9")
+        self.assertEqual(run.call_args.kwargs["env"]["ERP_RELEASE_GATE_LOCK_HELD"], "YES")
+
+        bad = supervisor.subprocess.CompletedProcess([], 0, response.replace(b"c" * 64, b"e" * 64), b"")
+        with patch.object(supervisor.subprocess, "run", return_value=bad):
+            with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_CANDIDATE_SNAPSHOT_INVALID"):
+                supervisor.verify_candidate_snapshot(parameters, bundle_root, 9)
 
     def test_authorization_rejects_extra_command_field_and_noncanonical_json(self):
         pending = self.temporary / "pending"

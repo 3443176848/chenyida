@@ -14,11 +14,11 @@ TRIVY_IMAGE='ghcr.io/aquasecurity/trivy@sha256:85e87be1a96459c38a4eea47dc64eb2d3
 NODE_IMAGE='node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3'
 
 usage() {
-  echo "usage: $0 --repository-root DIR --git-commit COMMIT --git-tree TREE --artifact-root DIR --run-id ID --web-image REF --worker-image REF --trivy-db-directory DIR --confirm CREATE_TRIVY_IMAGE_EVIDENCE" >&2
+  echo "usage: $0 --repository-root DIR --git-commit COMMIT --git-tree TREE --candidate-snapshot-receipt FILE --candidate-snapshot-receipt-sha256 SHA256 --test-runtime-root DIR --artifact-root DIR --run-id ID --web-image REF --worker-image REF --trivy-db-directory DIR --confirm CREATE_TRIVY_IMAGE_EVIDENCE" >&2
   exit 2
 }
 
-REPOSITORY_ROOT=""; GIT_COMMIT=""; GIT_TREE=""; ARTIFACT_ROOT=""; RUN_ID=""; WEB_IMAGE=""; WORKER_IMAGE=""; TRIVY_DB_DIRECTORY=""; CONFIRM=""
+REPOSITORY_ROOT=""; GIT_COMMIT=""; GIT_TREE=""; CANDIDATE_SNAPSHOT_RECEIPT=""; CANDIDATE_SNAPSHOT_RECEIPT_SHA256=""; TEST_RUNTIME_ROOT=""; ARTIFACT_ROOT=""; RUN_ID=""; WEB_IMAGE=""; WORKER_IMAGE=""; TRIVY_DB_DIRECTORY=""; CONFIRM=""
 TEMP_ROOT=""; CONTAINER_ID=""; CONTAINER_NAME=""; NODE_RUNTIME=""
 
 remove_container() {
@@ -48,6 +48,9 @@ while [ "$#" -gt 0 ]; do
     --repository-root) REPOSITORY_ROOT=${2:-}; shift 2 ;;
     --git-commit) GIT_COMMIT=${2:-}; shift 2 ;;
     --git-tree) GIT_TREE=${2:-}; shift 2 ;;
+    --candidate-snapshot-receipt) CANDIDATE_SNAPSHOT_RECEIPT=${2:-}; shift 2 ;;
+    --candidate-snapshot-receipt-sha256) CANDIDATE_SNAPSHOT_RECEIPT_SHA256=${2:-}; shift 2 ;;
+    --test-runtime-root) TEST_RUNTIME_ROOT=${2:-}; shift 2 ;;
     --artifact-root) ARTIFACT_ROOT=${2:-}; shift 2 ;;
     --run-id) RUN_ID=${2:-}; shift 2 ;;
     --web-image) WEB_IMAGE=${2:-}; shift 2 ;;
@@ -57,7 +60,7 @@ while [ "$#" -gt 0 ]; do
     *) usage ;;
   esac
 done
-for value in "$REPOSITORY_ROOT" "$GIT_COMMIT" "$GIT_TREE" "$ARTIFACT_ROOT" "$RUN_ID" "$WEB_IMAGE" "$WORKER_IMAGE" "$TRIVY_DB_DIRECTORY" "$CONFIRM"; do [ -n "$value" ] || usage; done
+for value in "$REPOSITORY_ROOT" "$GIT_COMMIT" "$GIT_TREE" "$CANDIDATE_SNAPSHOT_RECEIPT" "$CANDIDATE_SNAPSHOT_RECEIPT_SHA256" "$TEST_RUNTIME_ROOT" "$ARTIFACT_ROOT" "$RUN_ID" "$WEB_IMAGE" "$WORKER_IMAGE" "$TRIVY_DB_DIRECTORY" "$CONFIRM"; do [ -n "$value" ] || usage; done
 
 [ "$(id -u)" = 0 ] || { echo "release image evidence creation requires root" >&2; exit 1; }
 [ "${ERP_RELEASE_SUPERVISOR_LAUNCHED:-}" = YES ] || { echo "release image evidence must be launched by the installed supervisor" >&2; exit 1; }
@@ -77,6 +80,16 @@ for digest in "$SUPERVISOR_BUNDLE_SHA256" "$AUTHORIZATION_SHA256"; do
 done
 [ "$(basename "$BUNDLE_ROOT")" = "$SUPERVISOR_BUNDLE_SHA256" ] || { echo "release supervisor bundle path is invalid" >&2; exit 1; }
 case "$BUNDLE_ROOT" in /usr/local/libexec/chenyida-erp-release-supervisor/bundles/*) : ;; *) echo "release supervisor is not installed in the trusted root" >&2; exit 1 ;; esac
+
+verify_candidate_snapshot() {
+  output=$(env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC HOME=/nonexistent PYTHONDONTWRITEBYTECODE=1 PYTHONHASHSEED=0 \
+    ERP_RELEASE_SUPERVISOR_LAUNCHED=YES ERP_RELEASE_GATE_LOCK_HELD=YES ERP_RELEASE_GATE_LOCK_FD="${ERP_RELEASE_GATE_LOCK_FD:-}" \
+    /usr/bin/python3 "$SCRIPT_DIR/release-candidate-snapshot.py" verify \
+    --receipt "$CANDIDATE_SNAPSHOT_RECEIPT" --receipt-sha256 "$CANDIDATE_SNAPSHOT_RECEIPT_SHA256" \
+    --repository-root "$REPOSITORY_ROOT" --git-commit "$GIT_COMMIT" --git-tree "$GIT_TREE" \
+    --test-runtime-root "$TEST_RUNTIME_ROOT" --bundle-root "$BUNDLE_ROOT" --confirm VERIFY_EXACT_RELEASE_CANDIDATE_SNAPSHOT) || return 1
+  case "$output" in *"\"receipt_sha256\":\"$CANDIDATE_SNAPSHOT_RECEIPT_SHA256\""*"\"result\":\"VERIFIED\""*"\"snapshot_id\":\""*) return 0 ;; *) return 1 ;; esac
+}
 
 REPOSITORY_ROOT=$(readlink -f "$REPOSITORY_ROOT")
 ARTIFACT_PARENT=$(readlink -f "$(dirname -- "$ARTIFACT_ROOT")")
@@ -104,6 +117,7 @@ git_candidate() { /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/nu
 git_candidate diff --quiet --no-ext-diff --no-textconv --
 git_candidate diff --cached --quiet --no-ext-diff --no-textconv --
 [ -z "$(git_candidate ls-files --others --exclude-standard -- chenyida_erp_site)" ] || { echo "untracked candidate files block image evidence creation" >&2; exit 1; }
+verify_candidate_snapshot || { echo "release candidate snapshot verification failed" >&2; exit 1; }
 
 if [ ! -e "$ARTIFACT_ROOT" ]; then install -d -m 0750 -o root -g root "$ARTIFACT_ROOT"; fi
 [ -d "$ARTIFACT_ROOT" ] && [ ! -L "$ARTIFACT_ROOT" ] && [ "$(readlink -f "$ARTIFACT_ROOT")" = "$ARTIFACT_ROOT" ] && [ "$(stat -c '%u:%g:%a' "$ARTIFACT_ROOT")" = "0:0:750" ] || { echo "artifact root is invalid" >&2; exit 1; }
@@ -241,6 +255,7 @@ git_candidate diff --quiet --no-ext-diff --no-textconv --
 git_candidate diff --cached --quiet --no-ext-diff --no-textconv --
 [ "$(git_candidate rev-parse --verify HEAD^{commit})" = "$GIT_COMMIT" ] && [ "$(git_candidate rev-parse --verify HEAD^{tree})" = "$GIT_TREE" ] || { echo "release source identity changed during the scan" >&2; exit 1; }
 [ -z "$(git_candidate ls-files --others --exclude-standard -- chenyida_erp_site)" ] || { echo "untracked candidate files appeared during the scan" >&2; exit 1; }
+verify_candidate_snapshot || { echo "release candidate snapshot changed during the scan" >&2; exit 1; }
 
 env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC "$NODE_RUNTIME" "$SCRIPT_DIR/release-image-evidence-producer.mjs" create \
   --artifact-root "$ARTIFACT_ROOT" --run-id "$RUN_ID" --git-commit "$GIT_COMMIT" --git-tree "$GIT_TREE" --package-version "$PACKAGE_VERSION" --migration-allowlist-sha256 "$MIGRATION_ALLOWLIST_SHA256" \
