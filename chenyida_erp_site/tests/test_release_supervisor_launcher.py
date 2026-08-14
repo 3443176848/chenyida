@@ -188,6 +188,8 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
             "runtime_guard_mode": supervisor.POST_DEPLOY_RUNTIME_GUARD_MODE,
             "runtime_policy_sha256": supervisor.RUNTIME_POLICY_SHA256,
             "runtime_configuration_sha256": "3" * 64,
+            "runtime_probe_receipt": "/var/lib/chenyida-erp/runtime-probes/probe-fixture.runtime-configuration-probe.json",
+            "runtime_probe_receipt_sha256": "4" * 64,
             "deployment_class": "UAT",
             "deployment_id": "chenyida-erp",
             "compose_project": "chenyida-erp",
@@ -203,6 +205,16 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         self.assertEqual(postdeploy_command[postdeploy_command.index("--runtime-guard-mode") + 1], supervisor.POST_DEPLOY_RUNTIME_GUARD_MODE)
         self.assertEqual(postdeploy_command[postdeploy_command.index("--runtime-configuration-sha256") + 1], "3" * 64)
         self.assertEqual(postdeploy_command[postdeploy_command.index("--compose-project-root") + 1], "/opt/erp/chenyida_erp_site")
+        self.assertNotIn(postdeploy_parameters["runtime_probe_receipt"], postdeploy_command)
+        probe_parameters = {
+            key: value for key, value in postdeploy_parameters.items()
+            if key not in {"postdeploy_root", "identity_root", "run_id", "runtime_configuration_sha256", "runtime_probe_receipt", "runtime_probe_receipt_sha256"}
+        }
+        probe_parameters.update({"probe_root": "/var/lib/chenyida-erp/runtime-probes", "probe_id": "probe-fixture"})
+        supervisor.validate_parameters("PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", probe_parameters)
+        probe_command = supervisor.command_for(Path("/trusted/bundle"), {"operation": "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "parameters": probe_parameters})
+        self.assertEqual(probe_command[0], "/trusted/bundle/chenyida_erp_site/scripts/probe-postdeploy-runtime-configuration.sh")
+        self.assertEqual(probe_command[probe_command.index("--probe-id") + 1], "probe-fixture")
         with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_RUNTIME_GUARD_INVALID"):
             supervisor.validate_parameters("VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", {**postdeploy_parameters, "runtime_guard_mode": supervisor.PRE_DEPLOY_RUNTIME_GUARD_MODE})
         with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_AUTHORIZATION_DIGEST_INVALID"):
@@ -240,14 +252,18 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
     def test_postdeploy_authorization_validates_runtime_secret_files_before_consumption(self):
         source = MODULE_PATH.read_text(encoding="utf-8")
         validation = source.index('validate_runtime_secret_boundary(bundle_root, authorization["operation"])')
+        probe_validation = source.index('validate_runtime_probe_receipt(authorization["parameters"], bundle_digest)', validation)
         consumption = source.index("consume_authorization(authorization_path, authorization, authorization_digest)", validation)
         self.assertLess(validation, consumption)
+        self.assertLess(probe_validation, consumption)
         bundle = Path("/trusted/bundle")
         expected = f"RUNTIME_SECRET_FILES_VERIFIED entries=6 policy_sha256={supervisor.RUNTIME_SECRET_POLICY_SHA256}\n"
         completed = supervisor.subprocess.CompletedProcess([], 0, expected, "")
         with patch.object(supervisor.subprocess, "run", return_value=completed) as run:
             supervisor.validate_runtime_secret_boundary(bundle, "RUN_RELEASE_GATE")
             run.assert_not_called()
+            supervisor.validate_runtime_secret_boundary(bundle, "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION")
+            self.assertEqual(run.call_count, 1)
             supervisor.validate_runtime_secret_boundary(bundle, "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY")
             arguments = run.call_args.args[0]
             self.assertEqual(arguments[0], "/usr/bin/python3")
@@ -258,6 +274,78 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         with patch.object(supervisor.subprocess, "run", return_value=failed):
             with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_RUNTIME_SECRET_FILES_INVALID"):
                 supervisor.validate_runtime_secret_boundary(bundle, "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY")
+
+    def test_postdeploy_runtime_digest_requires_an_unexpired_root_owned_probe_receipt(self):
+        root = self.temporary / "runtime-probes"
+        root.mkdir(mode=0o700)
+        now = datetime(2026, 8, 12, 1, 0, tzinfo=timezone.utc)
+        parameters = {
+            "release_manifest": "/var/lib/chenyida-erp/release-artifacts/fixture/release-manifest.json",
+            "release_manifest_sha256": "2" * 64,
+            "postdeploy_root": "/var/lib/chenyida-erp/postdeploy/postdeploy-fixture",
+            "identity_root": "/var/lib/chenyida-erp/release-identity",
+            "reader_gid": 1234,
+            "run_id": "postdeploy-fixture",
+            "runtime_guard_contract": supervisor.RUNTIME_GUARD_CONTRACT,
+            "runtime_guard_mode": supervisor.POST_DEPLOY_RUNTIME_GUARD_MODE,
+            "runtime_policy_sha256": supervisor.RUNTIME_POLICY_SHA256,
+            "runtime_configuration_sha256": "3" * 64,
+            "runtime_probe_receipt": str(root / "probe-fixture.runtime-configuration-probe.json"),
+            "runtime_probe_receipt_sha256": "0" * 64,
+            "deployment_class": "UAT",
+            "deployment_id": "chenyida-erp",
+            "compose_project": "chenyida-erp",
+            "compose_project_root": "/opt/erp/chenyida_erp_site",
+            "caddy_container": "erp-uat-caddy-1",
+            "postgres_container": "erp-uat-postgres-1",
+            "web_container": "erp-uat-web-1",
+            "worker_container": "erp-uat-worker-1",
+        }
+        services = []
+        for index, service in enumerate(("caddy", "postgres", "web", "worker")):
+            services.append({
+                "service": service,
+                "container_id": str(index + 1) * 64,
+                "image_id": f"sha256:{str(index + 5) * 64}",
+                "image_reference": f"registry.example.invalid/chenyida/{service}@sha256:{str(index + 5) * 64}",
+                "restart_count": 0,
+                "oom_killed": False,
+                "running": True,
+                "restarting": False,
+                "paused": False,
+                "dead": False,
+                "status": "running",
+                "health": "none" if service == "caddy" else "healthy",
+                "healthcheck_present": service != "caddy",
+            })
+        receipt = {
+            "schema_version": 1,
+            "contract": supervisor.RUNTIME_PROBE_CONTRACT,
+            "probe_id": "probe-fixture",
+            "probed_at": utc(now),
+            "expires_at": utc(now + timedelta(hours=1)),
+            "control": {"supervisor_bundle_sha256": "f" * 64, "authorization_sha256": "a" * 64},
+            "deployment": {"class": "UAT", "id": "chenyida-erp", "compose_project": "chenyida-erp"},
+            "release": {"manifest_sha256": "2" * 64, "git_commit": "b" * 40, "package_version": "0.1.0-alpha.47"},
+            "runtime_guard": {"contract": supervisor.RUNTIME_GUARD_CONTRACT, "mode": supervisor.POST_DEPLOY_RUNTIME_GUARD_MODE},
+            "runtime_policy_sha256": supervisor.RUNTIME_POLICY_SHA256,
+            "runtime_secret_policy_sha256": supervisor.RUNTIME_SECRET_POLICY_SHA256,
+            "runtime_configuration_sha256": "3" * 64,
+            "compose_project_root_sha256": supervisor.sha256(parameters["compose_project_root"].encode("utf-8")),
+            "selectors": {service: parameters[f"{service}_container"] for service in ("caddy", "postgres", "web", "worker")},
+            "services": services,
+        }
+        raw = supervisor.canonical_json(receipt)
+        file = Path(parameters["runtime_probe_receipt"])
+        file.write_bytes(raw)
+        file.chmod(0o400)
+        parameters["runtime_probe_receipt_sha256"] = supervisor.sha256(raw)
+        self.assertEqual(supervisor.validate_runtime_probe_receipt(parameters, "f" * 64, now, root), receipt)
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_RUNTIME_PROBE_TIME_INVALID"):
+            supervisor.validate_runtime_probe_receipt(parameters, "f" * 64, now + timedelta(hours=2), root)
+        parameters["runtime_configuration_sha256"] = "9" * 64
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_RUNTIME_PROBE_BINDING_INVALID"):
+            supervisor.validate_runtime_probe_receipt(parameters, "f" * 64, now, root)
 
 
 if __name__ == "__main__":

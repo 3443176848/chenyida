@@ -133,7 +133,7 @@ PREPARED_REPORT="$ARTIFACT_ROOT/.$RUN_ID.release-gate-report.prepared.json"
 [ ! -e "$PREPARED_PLAN" ] && [ ! -L "$PREPARED_PLAN" ] || { echo "prepared release gate plan already exists" >&2; PREPARED_PLAN=""; PREPARED_REPORT=""; exit 1; }
 [ ! -e "$PREPARED_REPORT" ] && [ ! -L "$PREPARED_REPORT" ] || { echo "prepared release gate report already exists" >&2; PREPARED_PLAN=""; PREPARED_REPORT=""; exit 1; }
 
-LOCK_FILE=/var/lock/chenyida-erp-release-gate-v1.lock
+LOCK_FILE=/run/lock/chenyida-erp-release-gate-v1.lock
 if [ ! -e "$LOCK_FILE" ]; then
   (umask 077; set -C; : > "$LOCK_FILE") || { echo "release gate lock creation failed" >&2; exit 1; }
 fi

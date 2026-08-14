@@ -32,6 +32,9 @@ INSTALL_LOCK_FILE = Path("/var/lock/chenyida-erp-release-supervisor-install-v1.l
 RELEASE_AUTHORIZATION_ROOT = Path("/var/lib/chenyida-erp/release-authorizations")
 RELEASE_AUTHORIZATION_PENDING_ROOT = RELEASE_AUTHORIZATION_ROOT / "pending"
 RELEASE_AUTHORIZATION_CONSUMED_ROOT = RELEASE_AUTHORIZATION_ROOT / "consumed"
+RUNTIME_PROBE_ROOT = Path("/var/lib/chenyida-erp/runtime-probes")
+RUNTIME_PROBE_MARKER = RUNTIME_PROBE_ROOT / ".chenyida-erp-runtime-probe-root-v1"
+RUNTIME_PROBE_MARKER_VALUE = b"chenyida-erp-runtime-probe-root/v1\n"
 SUPERVISOR_BASE = Path("/usr/local/libexec/chenyida-erp-release-supervisor")
 BUNDLES_ROOT = SUPERVISOR_BASE / "bundles"
 LAUNCHERS_ROOT = SUPERVISOR_BASE / "launchers"
@@ -254,6 +257,18 @@ def write_root_file(path: Path, raw: bytes, mode: int) -> None:
                 temporary.unlink()
             except FileNotFoundError:
                 pass
+
+
+def ensure_root_marker(path: Path, expected: bytes) -> None:
+    if path.exists():
+        if trusted_file(path, 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_MARKER_INVALID") != expected:
+            reject("SUPERVISOR_INSTALL_MARKER_INVALID")
+        return
+    try:
+        write_root_file(path, expected, 0o400)
+    except FileExistsError:
+        if trusted_file(path, 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_MARKER_INVALID") != expected:
+            reject("SUPERVISOR_INSTALL_MARKER_INVALID")
 
 
 def acquire_install_lock(path: Path = INSTALL_LOCK_FILE) -> int:
@@ -587,6 +602,8 @@ def install(repository: Path, authorization: dict[str, Any], authorization_path:
     ensure_directory(RELEASE_AUTHORIZATION_ROOT, 0o700)
     ensure_directory(RELEASE_AUTHORIZATION_PENDING_ROOT, 0o700)
     ensure_directory(RELEASE_AUTHORIZATION_CONSUMED_ROOT, 0o700)
+    ensure_directory(RUNTIME_PROBE_ROOT, 0o700)
+    ensure_root_marker(RUNTIME_PROBE_MARKER, RUNTIME_PROBE_MARKER_VALUE)
     trusted_directory(Path("/usr/local/sbin"), 0o755, "SUPERVISOR_INSTALL_DIRECTORY_INVALID")
 
     prepared_file, committed_file, receipt_file, destination = install_record_paths(authorization, authorization_digest)

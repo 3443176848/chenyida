@@ -4,15 +4,15 @@
   "root": "chenyida_erp_site",
   "test_pattern": "tests/*.test.mjs",
   "max_test_bytes": 1048576,
-  "total_tests": 246,
-  "required_tests": 222,
+  "total_tests": 247,
+  "required_tests": 223,
   "not_applicable_tests": 24,
   "category_counts": {
     "BROWSER": 6,
     "HISTORICAL_D1_SITES": 22,
     "POSTGRES": 84,
     "POSTGRES_ALIAS": 2,
-    "PURE_NODE": 119,
+    "PURE_NODE": 120,
     "RELEASE_CONTRACT": 6,
     "SPECIAL_HARNESS": 7
   },
@@ -1161,6 +1161,15 @@
       "canonical_path": null
     },
     {
+      "path": "tests/selfhost-postdeploy-runtime-configuration-probe.test.mjs",
+      "sha256": "1933d247ec056f50a5e855e0e9562a90a8ff77f819904cc7708fe388a495000f",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
       "path": "tests/selfhost-postgres.test.mjs",
       "sha256": "9e6d6739faf393a1451115e2851458d066a41852e3d14f6e7a22043cb5a2487d",
       "category": "POSTGRES",
@@ -1810,7 +1819,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "5bbda7d1d3f2cbec9ec044ec5cf3c9e304a17c80c7dffb3009978a92ace5556b",
+      "sha256": "62eea6d547d7454972277f1e5817acd6f2be5f610fe9b7220b3c4d1e6f1f3e90",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",

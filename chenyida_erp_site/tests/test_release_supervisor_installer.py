@@ -326,6 +326,8 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
                 "RELEASE_AUTHORIZATION_ROOT": release_authorizations,
                 "RELEASE_AUTHORIZATION_PENDING_ROOT": release_authorizations / "pending",
                 "RELEASE_AUTHORIZATION_CONSUMED_ROOT": release_authorizations / "consumed",
+                "RUNTIME_PROBE_ROOT": state / "runtime-probes",
+                "RUNTIME_PROBE_MARKER": state / "runtime-probes" / ".chenyida-erp-runtime-probe-root-v1",
                 "SUPERVISOR_BASE": libexec / "supervisor",
                 "BUNDLES_ROOT": libexec / "supervisor" / "bundles",
                 "LAUNCHERS_ROOT": libexec / "supervisor" / "launchers",
@@ -364,6 +366,8 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
                 stored_installer = patches["INSTALLERS_ROOT"] / installer.sha256(MODULE_PATH.read_bytes())
                 self.assertTrue(stored_installer.is_file())
                 self.assertEqual(stored_installer.stat().st_mode & 0o777, 0o555)
+                self.assertEqual((patches["RUNTIME_PROBE_ROOT"] / ".chenyida-erp-runtime-probe-root-v1").read_bytes(), installer.RUNTIME_PROBE_MARKER_VALUE)
+                self.assertEqual((patches["RUNTIME_PROBE_ROOT"] / ".chenyida-erp-runtime-probe-root-v1").stat().st_mode & 0o777, 0o400)
                 committed.chmod(0o600); committed.write_bytes(b'{"truncated":'); committed.chmod(0o400)
                 with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_JOURNAL_INVALID"):
                     installer.unresolved_prepared_install()

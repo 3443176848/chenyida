@@ -119,7 +119,7 @@ done
 BUILD_PROVENANCE="$ARTIFACT_ROOT/$RUN_ID.build-provenance.json"
 [ -f "$BUILD_PROVENANCE" ] && [ ! -L "$BUILD_PROVENANCE" ] && [ "$(readlink -f "$(dirname -- "$BUILD_PROVENANCE")")" = "$ARTIFACT_ROOT" ] && [ "$(readlink -f "$BUILD_PROVENANCE")" = "$BUILD_PROVENANCE" ] && [ "$(stat -c '%u:%g:%a:%h' "$BUILD_PROVENANCE")" = "0:0:440:1" ] || { echo "candidate build provenance is missing or untrusted" >&2; exit 1; }
 
-LOCK_FILE=/var/lock/chenyida-erp-release-gate-v1.lock
+LOCK_FILE=/run/lock/chenyida-erp-release-gate-v1.lock
 if [ ! -e "$LOCK_FILE" ]; then (umask 077; set -C; : > "$LOCK_FILE"); fi
 [ -f "$LOCK_FILE" ] && [ ! -L "$LOCK_FILE" ] && [ "$(stat -c '%u:%g:%a:%h' "$LOCK_FILE")" = "0:0:600:1" ] || { echo "release operation lock is untrusted" >&2; exit 1; }
 exec 9<>"$LOCK_FILE"

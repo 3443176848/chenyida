@@ -49,7 +49,7 @@ import {
 
 const EMPTY_SHA256 = sha256("");
 const DEFAULT_SUPERVISOR_SITE_ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const RELEASE_GATE_LOCK_FILE = "/var/lock/chenyida-erp-release-gate-v1.lock";
+const RELEASE_GATE_LOCK_FILE = "/run/lock/chenyida-erp-release-gate-v1.lock";
 const SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const RELEASE_TEMPORARY_LABELS = ["chenyida.erp.release-node-bootstrap", "chenyida.erp.release-manifest-node-bootstrap", "chenyida.erp.release-node-test", "chenyida.erp.release-browser-test", "chenyida.erp.release-postgres-regression", "chenyida.erp.release-migration-test", "chenyida.erp.backup-recovery-test", "chenyida.erp.container-runtime-policy-test", "chenyida.erp.release-identity-publisher", "chenyida.erp.postdeploy-verifier", "chenyida.erp.release-image-evidence"];
 const TREE_DIGEST_COMMAND = "{ /usr/bin/find -P . -xdev -printf '%y|%m|%P|%l\\n' | LC_ALL=C /usr/bin/sort; /usr/bin/find -P . -xdev -type f -print0 | LC_ALL=C /usr/bin/sort -z | /usr/bin/xargs -0 /usr/bin/sha256sum; } | /usr/bin/sha256sum";

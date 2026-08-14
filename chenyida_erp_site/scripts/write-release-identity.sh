@@ -116,7 +116,7 @@ if [ ! -e "$POSTDEPLOY_ROOT" ]; then install -d -m 0750 -o root -g root "$POSTDE
 MARKER="$POSTDEPLOY_ROOT/.chenyida-erp-release-artifact-root-v1"
 if [ ! -e "$MARKER" ]; then (umask 337; set -C; printf '%s\n' chenyida-erp-release-artifact-root/v1 > "$MARKER"); chown root:root "$MARKER"; chmod 0440 "$MARKER"; sync -f "$POSTDEPLOY_ROOT"; fi
 [ -f "$MARKER" ] && [ ! -L "$MARKER" ] && [ "$(stat -c '%u:%g:%a:%h' "$MARKER")" = "0:0:440:1" ] && [ "$(cat "$MARKER")" = chenyida-erp-release-artifact-root/v1 ] || { echo "postdeploy artifact marker is invalid" >&2; exit 1; }
-LOCK_FILE=/var/lock/chenyida-erp-release-gate-v1.lock
+LOCK_FILE=/run/lock/chenyida-erp-release-gate-v1.lock
 if [ ! -e "$LOCK_FILE" ]; then (umask 077; set -C; : > "$LOCK_FILE") || { echo "release lock creation failed" >&2; exit 1; }; fi
 [ -f "$LOCK_FILE" ] && [ ! -L "$LOCK_FILE" ] && [ "$(stat -c '%u:%g:%a:%h' "$LOCK_FILE")" = "0:0:600:1" ] || { echo "release lock is untrusted" >&2; exit 1; }
 exec 9<>"$LOCK_FILE"

@@ -24,6 +24,7 @@ AUTHORIZATION_CONSUMED_ROOT = AUTHORIZATION_ROOT / "consumed"
 RELEASE_ARTIFACT_ROOT_BASE = Path("/var/lib/chenyida-erp/release-artifacts")
 POSTDEPLOY_ROOT_BASE = Path("/var/lib/chenyida-erp/postdeploy")
 RELEASE_IDENTITY_ROOT = Path("/var/lib/chenyida-erp/release-identity")
+RUNTIME_PROBE_ROOT = Path("/var/lib/chenyida-erp/runtime-probes")
 BUNDLE_CONTRACT = "chenyida-erp-release-supervisor-bundle/v1"
 AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v2"
 RUNTIME_GUARD_CONTRACT = "chenyida-erp-release-runtime-guard/v1"
@@ -32,6 +33,7 @@ POST_DEPLOY_RUNTIME_GUARD_MODE = "POST_DEPLOY_CURRENT_RUNTIME_STRICT"
 RUNTIME_COMPOSE_PROJECT = "chenyida-erp"
 RUNTIME_POLICY_SHA256 = "e4920820ed954c2689e3de53dea9b7f36945969c8287b06d87a3871e7d3ecf00"
 RUNTIME_SECRET_POLICY_SHA256 = "8dd07c6acd6e857a0b29b14e2b6d5b60ad919cf54aac9b552ce11672eb45b7c5"
+RUNTIME_PROBE_CONTRACT = "chenyida-erp-postdeploy-runtime-configuration-probe/v1"
 SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 MAX_JSON_BYTES = 1024 * 1024
 MAX_BUNDLE_FILE_BYTES = 8 * 1024 * 1024
@@ -58,9 +60,12 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/install-release-supervisor.py": "0444",
     "chenyida_erp_site/scripts/postdeploy-release-contract.mjs": "0444",
     "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs": "0444",
+    "chenyida_erp_site/scripts/postdeploy-runtime-configuration-probe.mjs": "0444",
+    "chenyida_erp_site/scripts/probe-postdeploy-runtime-configuration.sh": "0555",
     "chenyida_erp_site/scripts/publish-release-identity-from-manifest.mjs": "0444",
     "chenyida_erp_site/scripts/release-browser-e2e-runner.mjs": "0444",
     "chenyida_erp_site/scripts/release-gate-runner.mjs": "0444",
+    "chenyida_erp_site/scripts/release-gate-lock.sh": "0444",
     "chenyida_erp_site/scripts/release-identity-contract.mjs": "0444",
     "chenyida_erp_site/scripts/release-image-evidence-contract.mjs": "0444",
     "chenyida_erp_site/scripts/release-image-evidence-producer.mjs": "0444",
@@ -88,6 +93,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-release-image-evidence-producer.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-release-manifest-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-release-migration-allowlist.test.mjs": "0444",
+    "chenyida_erp_site/tests/selfhost-postdeploy-runtime-configuration-probe.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-backup-recovery-postgres.sh": "0555",
     "chenyida_erp_site/tests/selfhost-postgresql-cluster-recovery-postgres.sh": "0555",
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-catalog-postgres.sh": "0555",
@@ -102,6 +108,7 @@ ENTRYPOINTS = {
     "CREATE_IMAGE_EVIDENCE": "chenyida_erp_site/scripts/create-release-image-evidence.sh",
     "RUN_RELEASE_GATE": "chenyida_erp_site/scripts/run-release-gate.sh",
     "CREATE_RELEASE_MANIFEST": "chenyida_erp_site/scripts/create-release-manifest.sh",
+    "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION": "chenyida_erp_site/scripts/probe-postdeploy-runtime-configuration.sh",
     "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY": "chenyida_erp_site/scripts/write-release-identity.sh",
 }
 
@@ -109,6 +116,7 @@ CONFIRMATIONS = {
     "CREATE_IMAGE_EVIDENCE": "AUTHORIZE_CREATE_TRIVY_IMAGE_EVIDENCE",
     "RUN_RELEASE_GATE": "AUTHORIZE_RUN_EXACT_RELEASE_GATE",
     "CREATE_RELEASE_MANIFEST": "AUTHORIZE_CREATE_IMMUTABLE_RELEASE_MANIFEST",
+    "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION": "AUTHORIZE_PROBE_EXACT_POST_DEPLOY_RUNTIME_CONFIGURATION",
     "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY": "AUTHORIZE_VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY",
 }
 
@@ -128,10 +136,16 @@ PARAMETER_FIELDS = {
         "sbom_evidence", "security_evidence", "expires_at", "runtime_guard_contract",
         "runtime_guard_mode", "gate_plan_sha256",
     },
+    "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION": {
+        "release_manifest", "release_manifest_sha256", "probe_root", "probe_id", "reader_gid",
+        "runtime_guard_contract", "runtime_guard_mode", "runtime_policy_sha256", "deployment_class", "deployment_id", "compose_project",
+        "compose_project_root", "caddy_container", "postgres_container", "web_container", "worker_container",
+    },
     "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY": {
         "release_manifest", "release_manifest_sha256", "postdeploy_root", "identity_root", "reader_gid", "run_id",
         "runtime_guard_contract", "runtime_guard_mode", "runtime_policy_sha256", "deployment_class", "deployment_id", "compose_project",
-        "runtime_configuration_sha256", "compose_project_root", "caddy_container", "postgres_container", "web_container", "worker_container",
+        "runtime_configuration_sha256", "runtime_probe_receipt", "runtime_probe_receipt_sha256", "compose_project_root",
+        "caddy_container", "postgres_container", "web_container", "worker_container",
     },
 }
 
@@ -321,10 +335,10 @@ def absolute_path(value: Any, code: str) -> str:
 
 def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
     parameters = exact_fields(parameters, PARAMETER_FIELDS[operation], "SUPERVISOR_AUTHORIZATION_PARAMETERS_INVALID")
-    for key in ("artifact_root", "postdeploy_root", "identity_root", "release_manifest", "gate_plan", "gate_report", "sbom_evidence", "security_evidence", "trivy_db_directory", "repository_root", "compose_project_root"):
+    for key in ("artifact_root", "postdeploy_root", "identity_root", "release_manifest", "probe_root", "runtime_probe_receipt", "gate_plan", "gate_report", "sbom_evidence", "security_evidence", "trivy_db_directory", "repository_root", "compose_project_root"):
         if key in parameters:
             absolute_path(parameters[key], "SUPERVISOR_AUTHORIZATION_PATH_INVALID")
-    for key in ("run_id", "release_id", "deployment_id", "compose_project", "caddy_container", "postgres_container", "web_container", "worker_container"):
+    for key in ("run_id", "probe_id", "release_id", "deployment_id", "compose_project", "caddy_container", "postgres_container", "web_container", "worker_container"):
         if key in parameters and (not isinstance(parameters[key], str) or not IDENTIFIER.fullmatch(parameters[key])):
             reject("SUPERVISOR_AUTHORIZATION_IDENTIFIER_INVALID")
     for key in ("web_image", "worker_image"):
@@ -335,7 +349,7 @@ def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
     for key in ("git_commit", "git_tree"):
         if key in parameters and (not isinstance(parameters[key], str) or not GIT_OBJECT.fullmatch(parameters[key])):
             reject("SUPERVISOR_AUTHORIZATION_GIT_INVALID")
-    for key in ("release_manifest_sha256", "gate_plan_sha256", "runtime_policy_sha256", "runtime_configuration_sha256"):
+    for key in ("release_manifest_sha256", "runtime_probe_receipt_sha256", "gate_plan_sha256", "runtime_policy_sha256", "runtime_configuration_sha256"):
         if key in parameters and (not isinstance(parameters[key], str) or not SHA256.fullmatch(parameters[key])):
             reject("SUPERVISOR_AUTHORIZATION_DIGEST_INVALID")
     if "reader_gid" in parameters and (not isinstance(parameters["reader_gid"], int) or isinstance(parameters["reader_gid"], bool) or parameters["reader_gid"] < 1 or parameters["reader_gid"] > 2**31 - 1):
@@ -348,16 +362,25 @@ def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
         reject("SUPERVISOR_AUTHORIZATION_RUNTIME_GUARD_INVALID")
     if operation in ("RUN_RELEASE_GATE", "CREATE_RELEASE_MANIFEST") and parameters.get("runtime_guard_mode") != PRE_DEPLOY_RUNTIME_GUARD_MODE:
         reject("SUPERVISOR_AUTHORIZATION_RUNTIME_GUARD_INVALID")
-    if operation == "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY":
-        if len(parameters["run_id"]) > 101:
+    if operation in ("PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"):
+        identifier_field = "probe_id" if operation == "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION" else "run_id"
+        if len(parameters[identifier_field]) > 101:
             reject("SUPERVISOR_AUTHORIZATION_IDENTIFIER_INVALID")
         if parameters.get("runtime_guard_mode") != POST_DEPLOY_RUNTIME_GUARD_MODE or parameters.get("runtime_policy_sha256") != RUNTIME_POLICY_SHA256:
             reject("SUPERVISOR_AUTHORIZATION_RUNTIME_GUARD_INVALID")
         if parameters["deployment_id"] != RUNTIME_COMPOSE_PROJECT or parameters["compose_project"] != RUNTIME_COMPOSE_PROJECT or len({parameters["caddy_container"], parameters["postgres_container"], parameters["web_container"], parameters["worker_container"]}) != 4:
             reject("SUPERVISOR_AUTHORIZATION_DEPLOYMENT_IDENTITY_INVALID")
         manifest = Path(parameters["release_manifest"])
+        if manifest.parent.parent != RELEASE_ARTIFACT_ROOT_BASE:
+            reject("SUPERVISOR_AUTHORIZATION_POSTDEPLOY_PATH_INVALID")
+    if operation == "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION":
+        if Path(parameters["probe_root"]) != RUNTIME_PROBE_ROOT:
+            reject("SUPERVISOR_AUTHORIZATION_POSTDEPLOY_PATH_INVALID")
+    if operation == "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY":
         postdeploy = Path(parameters["postdeploy_root"])
-        if manifest.parent.parent != RELEASE_ARTIFACT_ROOT_BASE or postdeploy.parent != POSTDEPLOY_ROOT_BASE or postdeploy.name != parameters["run_id"] or Path(parameters["identity_root"]) != RELEASE_IDENTITY_ROOT:
+        probe_receipt = Path(parameters["runtime_probe_receipt"])
+        if postdeploy.parent != POSTDEPLOY_ROOT_BASE or postdeploy.name != parameters["run_id"] or Path(parameters["identity_root"]) != RELEASE_IDENTITY_ROOT \
+            or probe_receipt.parent != RUNTIME_PROBE_ROOT or not probe_receipt.name.endswith(".runtime-configuration-probe.json"):
             reject("SUPERVISOR_AUTHORIZATION_POSTDEPLOY_PATH_INVALID")
     return parameters
 
@@ -438,13 +461,15 @@ def command_for(bundle_root: Path, authorization: dict[str, Any]) -> list[str]:
         command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--gate-plan-sha256", parameters["gate_plan_sha256"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--confirm", "RUN_EXACT_RELEASE_GATE"]
     elif operation == "CREATE_RELEASE_MANIFEST":
         command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--artifact-root", parameters["artifact_root"], "--release-id", parameters["release_id"], "--deployment-class", parameters["deployment_class"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--gate-plan-sha256", parameters["gate_plan_sha256"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--gate-plan", parameters["gate_plan"], "--gate-report", parameters["gate_report"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--expires-at", parameters["expires_at"], "--confirm", "CREATE_IMMUTABLE_RELEASE_MANIFEST"]
+    elif operation == "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION":
+        command += ["--release-manifest", parameters["release_manifest"], "--release-manifest-sha256", parameters["release_manifest_sha256"], "--probe-root", parameters["probe_root"], "--probe-id", parameters["probe_id"], "--reader-gid", str(parameters["reader_gid"]), "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--runtime-policy-sha256", parameters["runtime_policy_sha256"], "--deployment-class", parameters["deployment_class"], "--deployment-id", parameters["deployment_id"], "--compose-project", parameters["compose_project"], "--compose-project-root", parameters["compose_project_root"], "--caddy-container", parameters["caddy_container"], "--postgres-container", parameters["postgres_container"], "--web-container", parameters["web_container"], "--worker-container", parameters["worker_container"], "--confirm", "PROBE_EXACT_POSTDEPLOY_RUNTIME_CONFIGURATION"]
     else:
         command += ["--release-manifest", parameters["release_manifest"], "--release-manifest-sha256", parameters["release_manifest_sha256"], "--postdeploy-root", parameters["postdeploy_root"], "--identity-root", parameters["identity_root"], "--reader-gid", str(parameters["reader_gid"]), "--run-id", parameters["run_id"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--runtime-policy-sha256", parameters["runtime_policy_sha256"], "--runtime-configuration-sha256", parameters["runtime_configuration_sha256"], "--deployment-class", parameters["deployment_class"], "--deployment-id", parameters["deployment_id"], "--compose-project", parameters["compose_project"], "--compose-project-root", parameters["compose_project_root"], "--caddy-container", parameters["caddy_container"], "--postgres-container", parameters["postgres_container"], "--web-container", parameters["web_container"], "--worker-container", parameters["worker_container"], "--confirm", "VERIFY_AND_PUBLISH_EXACT_POSTDEPLOY_IDENTITY"]
     return command
 
 
 def validate_runtime_secret_boundary(bundle_root: Path, operation: str) -> None:
-    if operation != "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY":
+    if operation not in ("PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"):
         return
     validator = bundle_root / "chenyida_erp_site/scripts/runtime-secret-file-policy.py"
     policy = bundle_root / "chenyida_erp_site/operations/runtime-secret-file-policy-v1.json"
@@ -473,6 +498,74 @@ def validate_runtime_secret_boundary(bundle_root: Path, operation: str) -> None:
     expected = f"RUNTIME_SECRET_FILES_VERIFIED entries=6 policy_sha256={RUNTIME_SECRET_POLICY_SHA256}\n"
     if result.returncode != 0 or result.stdout != expected or result.stderr != "":
         reject("SUPERVISOR_RUNTIME_SECRET_FILES_INVALID")
+
+
+def validate_runtime_probe_receipt(parameters: dict[str, Any], expected_bundle_digest: str, now: datetime | None = None, probe_root: Path = RUNTIME_PROBE_ROOT) -> dict[str, Any]:
+    if set(PARAMETER_FIELDS["VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"]) != set(parameters):
+        reject("SUPERVISOR_RUNTIME_PROBE_BINDING_INVALID")
+    trusted_directory(probe_root, {0o700}, "SUPERVISOR_RUNTIME_PROBE_ROOT_INVALID")
+    receipt_path = Path(parameters["runtime_probe_receipt"])
+    if not receipt_path.is_absolute() or receipt_path.parent != probe_root:
+        reject("SUPERVISOR_RUNTIME_PROBE_PATH_INVALID")
+    raw, _ = trusted_regular_file(receipt_path, 0o400, maximum=64 * 1024, code="SUPERVISOR_RUNTIME_PROBE_FILE_INVALID")
+    if sha256(raw) != parameters["runtime_probe_receipt_sha256"]:
+        reject("SUPERVISOR_RUNTIME_PROBE_DIGEST_MISMATCH")
+    value = strict_json(raw, "SUPERVISOR_RUNTIME_PROBE_JSON_INVALID")
+    fields = {"schema_version", "contract", "probe_id", "probed_at", "expires_at", "control", "deployment", "release", "runtime_guard", "runtime_policy_sha256", "runtime_secret_policy_sha256", "runtime_configuration_sha256", "compose_project_root_sha256", "selectors", "services"}
+    value = exact_fields(value, fields, "SUPERVISOR_RUNTIME_PROBE_FIELDS_INVALID")
+    if raw != canonical_json(value) or value["schema_version"] != 1 or value["contract"] != RUNTIME_PROBE_CONTRACT:
+        reject("SUPERVISOR_RUNTIME_PROBE_NOT_CANONICAL")
+    probe_id = value["probe_id"]
+    if not isinstance(probe_id, str) or not IDENTIFIER.fullmatch(probe_id) or len(probe_id) > 101 or receipt_path.name != f"{probe_id}.runtime-configuration-probe.json":
+        reject("SUPERVISOR_RUNTIME_PROBE_ID_INVALID")
+    probed = parse_time(value["probed_at"], "SUPERVISOR_RUNTIME_PROBE_TIME_INVALID")
+    expires = parse_time(value["expires_at"], "SUPERVISOR_RUNTIME_PROBE_TIME_INVALID")
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    if expires - probed != timedelta(hours=1) or probed > current + timedelta(minutes=5) or current >= expires:
+        reject("SUPERVISOR_RUNTIME_PROBE_TIME_INVALID")
+    control = exact_fields(value["control"], {"supervisor_bundle_sha256", "authorization_sha256"}, "SUPERVISOR_RUNTIME_PROBE_CONTROL_INVALID")
+    if control["supervisor_bundle_sha256"] != expected_bundle_digest or not isinstance(control["authorization_sha256"], str) or not SHA256.fullmatch(control["authorization_sha256"]):
+        reject("SUPERVISOR_RUNTIME_PROBE_CONTROL_INVALID")
+    deployment = exact_fields(value["deployment"], {"class", "id", "compose_project"}, "SUPERVISOR_RUNTIME_PROBE_DEPLOYMENT_INVALID")
+    if deployment != {"class": parameters["deployment_class"], "id": parameters["deployment_id"], "compose_project": parameters["compose_project"]}:
+        reject("SUPERVISOR_RUNTIME_PROBE_DEPLOYMENT_INVALID")
+    release = exact_fields(value["release"], {"manifest_sha256", "git_commit", "package_version"}, "SUPERVISOR_RUNTIME_PROBE_RELEASE_INVALID")
+    if release["manifest_sha256"] != parameters["release_manifest_sha256"] or not isinstance(release["git_commit"], str) or not GIT_OBJECT.fullmatch(release["git_commit"]) or not isinstance(release["package_version"], str) or not 1 <= len(release["package_version"]) <= 120:
+        reject("SUPERVISOR_RUNTIME_PROBE_RELEASE_INVALID")
+    runtime_guard = exact_fields(value["runtime_guard"], {"contract", "mode"}, "SUPERVISOR_RUNTIME_PROBE_GUARD_INVALID")
+    if runtime_guard != {"contract": parameters["runtime_guard_contract"], "mode": parameters["runtime_guard_mode"]} \
+        or value["runtime_policy_sha256"] != parameters["runtime_policy_sha256"] or value["runtime_secret_policy_sha256"] != RUNTIME_SECRET_POLICY_SHA256 \
+        or value["runtime_configuration_sha256"] != parameters["runtime_configuration_sha256"] \
+        or value["compose_project_root_sha256"] != sha256(parameters["compose_project_root"].encode("utf-8")):
+        reject("SUPERVISOR_RUNTIME_PROBE_BINDING_INVALID")
+    selectors = exact_fields(value["selectors"], {"caddy", "postgres", "web", "worker"}, "SUPERVISOR_RUNTIME_PROBE_SELECTORS_INVALID")
+    expected_selectors = {service: parameters[f"{service}_container"] for service in ("caddy", "postgres", "web", "worker")}
+    if selectors != expected_selectors:
+        reject("SUPERVISOR_RUNTIME_PROBE_SELECTORS_INVALID")
+    services = value["services"]
+    service_fields = {"service", "container_id", "image_id", "image_reference", "restart_count", "oom_killed", "running", "restarting", "paused", "dead", "status", "health", "healthcheck_present"}
+    if not isinstance(services, list) or len(services) != 4:
+        reject("SUPERVISOR_RUNTIME_PROBE_SERVICES_INVALID")
+    container_ids: set[str] = set()
+    image_ids: set[str] = set()
+    for index, service in enumerate(("caddy", "postgres", "web", "worker")):
+        state = exact_fields(services[index], service_fields, "SUPERVISOR_RUNTIME_PROBE_SERVICES_INVALID")
+        if state["service"] != service or not isinstance(state["container_id"], str) or not re.fullmatch(r"[0-9a-f]{64}", state["container_id"]) \
+            or not isinstance(state["image_id"], str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", state["image_id"]) \
+            or not isinstance(state["image_reference"], str) or not IMAGE_REFERENCE.fullmatch(state["image_reference"]) \
+            or state["restart_count"] != 0 or state["oom_killed"] is not False or state["running"] is not True or state["restarting"] is not False \
+            or state["paused"] is not False or state["dead"] is not False or state["status"] != "running" or not isinstance(state["healthcheck_present"], bool):
+            reject("SUPERVISOR_RUNTIME_PROBE_SERVICES_INVALID")
+        if service == "caddy":
+            if state["health"] != "none" or state["healthcheck_present"] is not False:
+                reject("SUPERVISOR_RUNTIME_PROBE_SERVICES_INVALID")
+        elif state["health"] != "healthy" or state["healthcheck_present"] is not True:
+            reject("SUPERVISOR_RUNTIME_PROBE_SERVICES_INVALID")
+        if state["container_id"] in container_ids or state["image_id"] in image_ids:
+            reject("SUPERVISOR_RUNTIME_PROBE_SERVICES_INVALID")
+        container_ids.add(state["container_id"])
+        image_ids.add(state["image_id"])
+    return value
 
 
 def consume_authorization(path: Path, authorization: dict[str, Any], digest: str, pending_root: Path = AUTHORIZATION_PENDING_ROOT, consumed_root: Path = AUTHORIZATION_CONSUMED_ROOT) -> Path:
@@ -513,6 +606,8 @@ def main() -> None:
     authorization, authorization_digest, _ = load_authorization(authorization_path, bundle_digest)
     verify_candidate(authorization["parameters"])
     validate_runtime_secret_boundary(bundle_root, authorization["operation"])
+    if authorization["operation"] == "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY":
+        validate_runtime_probe_receipt(authorization["parameters"], bundle_digest)
     consume_authorization(authorization_path, authorization, authorization_digest)
     site_root = bundle_root / "chenyida_erp_site"
     command = command_for(bundle_root, authorization)
