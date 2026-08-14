@@ -1,0 +1,44 @@
+[Unit]
+Description=Chenyida ERP non-network monitoring evaluator
+After=chenyida-erp-monitor-collector.service
+OnSuccess=chenyida-erp-monitor-notifier.service
+
+[Service]
+Type=oneshot
+User=chenyida-monitor-eval
+Group=chenyida-monitor-eval
+ExecStart=/usr/local/sbin/chenyida-erp-monitoring-host-v1 evaluator
+TimeoutStartSec=30s
+SuccessExitStatus=1 2
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadOnlyPaths=/usr/local/libexec/chenyida-erp-monitoring-host-v1 /etc/chenyida-erp/monitoring-v1/views /var/lib/chenyida-erp/monitoring-v1/observations /var/lib/chenyida-erp/monitoring-v1/projections /var/lib/chenyida-erp/monitoring-v1/delivery
+ReadWritePaths=/var/lib/chenyida-erp/monitoring-v1/state /var/lib/chenyida-erp/monitoring-v1/outbox
+InaccessiblePaths=/var/run/docker.sock /etc/chenyida-erp/monitoring-v1/private
+IPAddressDeny=any
+CPUQuota=25%
+MemoryMax=160M
+TasksMax=32
+LimitNOFILE=256

@@ -1,0 +1,42 @@
+[Unit]
+Description=Chenyida ERP restricted outbound alert notifier
+After=chenyida-erp-monitor-evaluator.service network-online.target
+
+[Service]
+Type=oneshot
+User=chenyida-monitor-notify
+Group=chenyida-monitor-notify
+ExecStart=/usr/local/sbin/chenyida-erp-monitoring-host-v1 notifier
+LoadCredential=notification:/etc/chenyida-erp/monitoring-v1/private/notification.credential
+TimeoutStartSec=25s
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadOnlyPaths=/usr/local/libexec/chenyida-erp-monitoring-host-v1 /etc/chenyida-erp/monitoring-v1/views /var/lib/chenyida-erp/monitoring-v1/outbox
+ReadWritePaths=/var/lib/chenyida-erp/monitoring-v1/delivery
+InaccessiblePaths=/var/run/docker.sock /var/lib/chenyida-erp/monitoring-v1/state /var/lib/chenyida-erp/monitoring-v1/observations /var/lib/chenyida-erp/monitoring-v1/projections /etc/chenyida-erp/monitoring-v1/private/host-config.json
+IPAddressDeny=any
+CPUQuota=20%
+MemoryMax=128M
+TasksMax=24
+LimitNOFILE=128

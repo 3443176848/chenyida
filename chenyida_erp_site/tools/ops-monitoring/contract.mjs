@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
-import { parseStrictJson } from "../../scripts/release-identity-contract.mjs";
-import { validateOfficialReleaseGatePlan } from "../../scripts/release-manifest-contract.mjs";
+import { validateMonitoringResourcePlan } from "./resource-policy.mjs";
+import { parseStrictMonitoringJson } from "./strict-json.mjs";
 
 export const MONITORING_POLICY_CONTRACT = "chenyida-erp-operations-monitoring-policy/v1";
 export const MONITORING_CONFIG_CONTRACT = "chenyida-erp-operations-monitoring-config/v1";
@@ -179,9 +179,16 @@ export function monitoringSha256(value) {
   return createHash("sha256").update(raw).digest("hex");
 }
 
+export function monitoringObservationId(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) reject("MONITOR_OBSERVATION_FIELDS_INVALID");
+  const body = { ...value };
+  delete body.observation_id;
+  return `obs-${monitoringSha256(body).slice(0, 32)}`;
+}
+
 export function parseMonitoringJson(raw, maximumBytes = 1024 * 1024) {
   try {
-    return parseStrictJson(raw, maximumBytes);
+    return parseStrictMonitoringJson(raw, maximumBytes);
   } catch {
     reject("MONITOR_JSON_INVALID");
   }
@@ -214,7 +221,7 @@ export function validateMonitoringPolicy(value) {
 export function monitoringResourcePolicy(resourcePlan, policy) {
   validateMonitoringPolicy(policy);
   try {
-    validateOfficialReleaseGatePlan(resourcePlan);
+    validateMonitoringResourcePlan(resourcePlan);
   } catch {
     reject("MONITOR_RESOURCE_PLAN_INVALID");
   }
@@ -319,7 +326,7 @@ function validateNotificationObservation(value) {
 
 export function validateMonitoringObservation(value) {
   exactKeys(value, ["schema_version", "contract", "observation_id", "observed_at", "source", "policy_sha256", "resource_policy_sha256", "host", "services", "application", "release", "backup", "notification"], "MONITOR_OBSERVATION_FIELDS_INVALID");
-  if (value.schema_version !== 1 || value.contract !== MONITORING_OBSERVATION_CONTRACT || !IDENTIFIER.test(value.observation_id || "") || !new Set(["HOST_METADATA_ONLY", "FULL", "SYNTHETIC_TEST"]).has(value.source) || !SHA256.test(value.policy_sha256 || "") || !SHA256.test(value.resource_policy_sha256 || "")) reject("MONITOR_OBSERVATION_IDENTITY_INVALID");
+  if (value.schema_version !== 1 || value.contract !== MONITORING_OBSERVATION_CONTRACT || !IDENTIFIER.test(value.observation_id || "") || !new Set(["HOST_METADATA_ONLY", "HOST_PROJECTIONS", "FULL", "SYNTHETIC_TEST"]).has(value.source) || !SHA256.test(value.policy_sha256 || "") || !SHA256.test(value.resource_policy_sha256 || "")) reject("MONITOR_OBSERVATION_IDENTITY_INVALID");
   iso(value.observed_at, "MONITOR_OBSERVATION_TIME_INVALID");
   exactKeys(value.host, ["boot_id_sha256", "monotonic_milliseconds", "available_memory_bytes", "swap_total_bytes", "swap_free_bytes", "root_free_bytes", "load_1m", "oom_kill_count"], "MONITOR_OBSERVATION_HOST_FIELDS_INVALID");
   bounded(value.host.boot_id_sha256, SHA256, "MONITOR_OBSERVATION_HOST_INVALID");
@@ -343,6 +350,7 @@ export function validateMonitoringObservation(value) {
   validateReleaseObservation(value.release);
   validateBackupObservation(value.backup);
   validateNotificationObservation(value.notification);
+  if (value.observation_id.startsWith("obs-") && monitoringObservationId(value) !== value.observation_id) reject("MONITOR_OBSERVATION_INTEGRITY_INVALID");
   if (value.source === "HOST_METADATA_ONLY") {
     if (value.application.live.status !== "NOT_COLLECTED" || value.application.readiness.status !== "NOT_COLLECTED" || value.release.status !== "NOT_COLLECTED" || value.backup.status !== "NOT_COLLECTED" || value.notification.status !== "UNCONFIGURED") reject("MONITOR_OBSERVATION_SOURCE_INVALID");
   }
@@ -356,7 +364,7 @@ function eventBody(value) {
   return body;
 }
 
-function validateMonitoringEvent(value, config) {
+export function validateMonitoringEvent(value) {
   exactKeys(value, ["schema_version", "contract", "event_id", "sequence", "event_type", "dedupe_key", "code", "severity", "message_zh", "runbook_ref", "first_observed_at", "observed_at", "delivery"], "MONITOR_EVENT_FIELDS_INVALID");
   if (value.schema_version !== 1 || value.contract !== MONITORING_EVENT_CONTRACT || !SHA256.test(value.event_id || "") || monitoringSha256(eventBody(value)) !== value.event_id) reject("MONITOR_EVENT_INTEGRITY_INVALID");
   integer(value.sequence, 1, Number.MAX_SAFE_INTEGER, "MONITOR_EVENT_SEQUENCE_INVALID");
@@ -372,8 +380,8 @@ function validateMonitoringEvent(value, config) {
   exactKeys(value.delivery, ["status", "target_id"], "MONITOR_EVENT_DELIVERY_FIELDS_INVALID");
   oneOf(value.delivery.status, new Set(["EVENT_FILE_ONLY", "NOT_CONFIGURED", "PENDING"]), "MONITOR_EVENT_DELIVERY_INVALID");
   if (value.delivery.status === "EVENT_FILE_ONLY") {
-    if (config.notification.required || value.delivery.target_id !== null) reject("MONITOR_EVENT_DELIVERY_INVALID");
-  } else if (!config.notification.required || value.delivery.target_id !== config.notification.target_id) reject("MONITOR_EVENT_DELIVERY_INVALID");
+    if (value.delivery.target_id !== null) reject("MONITOR_EVENT_DELIVERY_INVALID");
+  } else if (!IDENTIFIER.test(value.delivery.target_id || "")) reject("MONITOR_EVENT_DELIVERY_INVALID");
   return value;
 }
 
@@ -429,11 +437,30 @@ export function validateMonitoringState(value, config, policy) {
   if (!Array.isArray(value.pending_events) || value.pending_events.length > policy.max_pending_events) reject("MONITOR_STATE_EVENT_INVALID");
   const eventIds = new Set();
   for (const event of value.pending_events) {
-    validateMonitoringEvent(event, config);
+    validateMonitoringEvent(event);
     if (event.delivery.status === "EVENT_FILE_ONLY" || eventIds.has(event.event_id) || event.sequence > value.sequence) reject("MONITOR_STATE_EVENT_INVALID");
     eventIds.add(event.event_id);
   }
   return value;
+}
+
+export function acknowledgeMonitoringEvents({ state, eventIds, config, policy }) {
+  validateMonitoringConfig(config);
+  validateMonitoringState(state, config, policy);
+  if (!Array.isArray(eventIds) || eventIds.length < 1 || eventIds.length > policy.max_pending_events) reject("MONITOR_ACK_EVENT_SET_INVALID");
+  const unique = new Set(eventIds);
+  if (unique.size !== eventIds.length || eventIds.some((eventId) => !SHA256.test(eventId || ""))) reject("MONITOR_ACK_EVENT_SET_INVALID");
+  const pending = new Set(state.pending_events.map((event) => event.event_id));
+  if (eventIds.some((eventId) => !pending.has(eventId))) reject("MONITOR_ACK_EVENT_NOT_PENDING");
+  const next = {
+    ...state,
+    sequence: state.sequence + 1,
+    previous_state_sha256: state.integrity_sha256,
+    pending_events: state.pending_events.filter((event) => !unique.has(event.event_id)),
+    integrity_sha256: "",
+  };
+  next.integrity_sha256 = monitoringSha256(stateBody(next));
+  return Object.freeze(validateMonitoringState(next, config, policy));
 }
 
 function addIssue(target, code, dedupeKey, scope = null) {
@@ -480,7 +507,7 @@ function eventFor(type, issue, active, observedAt, config, notification, sequenc
     delivery,
   };
   body.event_id = monitoringSha256(eventBody(body));
-  validateMonitoringEvent(body, config);
+  validateMonitoringEvent(body);
   return Object.freeze(body);
 }
 

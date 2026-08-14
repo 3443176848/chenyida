@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-monitoring-host-delivery-policy/v1",
+  "policy_id": "chenyida-erp-monitoring-host-delivery-v1",
+  "runtime": {
+    "source": "EXTERNAL_ROOT_OWNED_AUTHORIZATION_BOUND",
+    "minimum_node_version": "22.13.0",
+    "maximum_node_major": 24,
+    "install_executes_runtime_as_root": false,
+    "content_addressed": true
+  },
+  "identities": {
+    "collector": {"user": "root", "network": "AF_UNIX_ONLY"},
+    "evaluator": {"user": "chenyida-monitor-eval", "network": "NONE"},
+    "notifier": {"user": "chenyida-monitor-notify", "network": "DENY_ALL_UNTIL_SEPARATELY_AUTHORIZED_EGRESS"},
+    "installer_creates_accounts": false
+  },
+  "paths": {
+    "install_root": "/usr/local/libexec/chenyida-erp-monitoring-host-v1",
+    "launcher": "/usr/local/sbin/chenyida-erp-monitoring-host-v1",
+    "private_config_root": "/etc/chenyida-erp/monitoring-v1/private",
+    "public_config_root": "/etc/chenyida-erp/monitoring-v1/views",
+    "observation_root": "/var/lib/chenyida-erp/monitoring-v1/observations",
+    "state_root": "/var/lib/chenyida-erp/monitoring-v1/state",
+    "outbox_root": "/var/lib/chenyida-erp/monitoring-v1/outbox",
+    "delivery_root": "/var/lib/chenyida-erp/monitoring-v1/delivery",
+    "projection_root": "/var/lib/chenyida-erp/monitoring-v1/projections",
+    "receipt_root": "/var/lib/chenyida-erp/monitoring-v1/install-receipts",
+    "journal_root": "/var/lib/chenyida-erp/monitoring-v1/install-journal"
+  },
+  "cycle": {
+    "interval_seconds": 60,
+    "maximum_sample_gap_seconds": 90,
+    "collector_timeout_seconds": 25,
+    "evaluator_timeout_seconds": 30,
+    "notifier_timeout_seconds": 25,
+    "continuity_timeout_seconds": 10,
+    "single_flight": "INHERITED_FLOCK_FD"
+  },
+  "delivery": {
+    "semantics": "AT_LEAST_ONCE",
+    "idempotency_key": "event_id",
+    "remote_ack_required": true,
+    "http_2xx_alone_is_ack": false,
+    "event_mutation": false,
+    "target_rebind_requires_separate_authorization": true,
+    "credential_rotation_same_target_allowed": true,
+    "readiness": "EXACT_ACK_CHAIN_BOUND_ATOMIC_CURRENT"
+  },
+  "evidence": {
+    "components_projection": "ACTIVATION_BOUND_MONOTONIC_CHAIN",
+    "backup_projection": "PRODUCER_AND_ACTIVATION_BOUND_MONOTONIC_CHAIN",
+    "collector_reads_private_business_data": false,
+    "projection_replacement": "ATOMIC_ROOT_OWNED",
+    "rollback_detection": "PERSISTED_EVALUATOR_WATERMARK"
+  },
+  "installation": {
+    "root_authorization": "RELEASE_SUPERVISOR_ONE_TIME_V2",
+    "stages": ["SUPERVISOR_PRECHECK", "AUTH_CONSUMED", "MATERIALIZED", "PREPARED", "PHASES_FROZEN", "ACTIVE_SWITCH", "SYSTEMD_EFFECTIVE_VERIFIED", "COMMIT_PROOF", "ACTIVATION_PUBLISHED"],
+    "active_pointer": "CANONICAL_REGULAR_RECEIPT",
+    "default_uninstall": "DISABLE_AND_PRESERVE",
+    "physical_purge_authorized": false,
+    "state_schema_min": 1,
+    "state_schema_max": 1
+  },
+  "limits": {
+    "maximum_bundle_file_bytes": 8388608,
+    "maximum_bundle_bytes": 33554432,
+    "maximum_runtime_bytes": 268435456,
+    "maximum_config_bytes": 262144,
+    "maximum_event_bytes": 65536,
+    "maximum_delivery_files_per_kind": 4096
+  }
+}

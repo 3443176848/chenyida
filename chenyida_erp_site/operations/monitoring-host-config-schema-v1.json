@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:chenyida-erp:monitoring-host-config:v1",
+  "title": "Chenyida ERP monitoring host private configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract", "config_id", "config_generation", "previous_config_sha256", "deployment", "installation", "identities", "monitoring", "evidence", "notification"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "contract": {"const": "chenyida-erp-monitoring-host-config/v1"},
+    "config_id": {"$ref": "#/$defs/identifier"},
+    "config_generation": {"type": "integer", "minimum": 1},
+    "previous_config_sha256": {"$ref": "#/$defs/sha256"},
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "id", "compose_project"],
+      "properties": {
+        "class": {"enum": ["TEST", "UAT", "PRODUCTION"]},
+        "id": {"$ref": "#/$defs/identifier"},
+        "compose_project": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["activation_id", "installation_generation", "monitoring_bundle_sha256", "supervisor_bundle_sha256", "state_schema_min", "state_schema_max"],
+      "properties": {
+        "activation_id": {"$ref": "#/$defs/identifier"},
+        "installation_generation": {"type": "integer", "minimum": 1},
+        "monitoring_bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "supervisor_bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "state_schema_min": {"const": 1},
+        "state_schema_max": {"const": 1}
+      }
+    },
+    "identities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evaluator", "notifier"],
+      "properties": {
+        "evaluator": {"$ref": "#/$defs/identity"},
+        "notifier": {"$ref": "#/$defs/identity"}
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "contract", "config_id", "deployment_class", "deployment_id", "compose_project", "service_expectations", "release_expectation", "backup_expectation", "notification"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "contract": {"const": "chenyida-erp-operations-monitoring-config/v1"},
+        "config_id": {"$ref": "#/$defs/identifier"},
+        "deployment_class": {"enum": ["TEST", "UAT", "PRODUCTION"]},
+        "deployment_id": {"$ref": "#/$defs/identifier"},
+        "compose_project": {"$ref": "#/$defs/identifier"},
+        "service_expectations": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"$ref": "#/$defs/service_expectation"}},
+        "release_expectation": {"$ref": "#/$defs/release_expectation"},
+        "backup_expectation": {"$ref": "#/$defs/backup_expectation"},
+        "notification": {"$ref": "#/$defs/monitoring_notification"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["components_projection_path", "backup_projection_path", "release_activation_id", "release_activated_at", "postdeploy_receipt_sha256", "components_producer_bundle_sha256", "backup_producer_bundle_sha256", "minimum_components_projection_generation", "minimum_backup_projection_generation"],
+      "properties": {
+        "components_projection_path": {"const": "/var/lib/chenyida-erp/monitoring-v1/projections/components.json"},
+        "backup_projection_path": {"const": "/var/lib/chenyida-erp/monitoring-v1/projections/backup.json"},
+        "release_activation_id": {"$ref": "#/$defs/identifier"},
+        "release_activated_at": {"type": "string", "format": "date-time"},
+        "postdeploy_receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "components_producer_bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "backup_producer_bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "minimum_components_projection_generation": {"type": "integer", "minimum": 1},
+        "minimum_backup_projection_generation": {"type": "integer", "minimum": 1}
+      }
+    },
+    "notification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "target_id", "target_generation", "adapter", "endpoint", "credential", "ack", "oncall_roster_generation", "escalation_table_sha256"],
+      "properties": {
+        "required": {"const": true},
+        "target_id": {"$ref": "#/$defs/identifier"},
+        "target_generation": {"type": "integer", "minimum": 1},
+        "adapter": {"$ref": "#/$defs/adapter"},
+        "endpoint": {"$ref": "#/$defs/endpoint"},
+        "credential": {"$ref": "#/$defs/credential"},
+        "ack": {"$ref": "#/$defs/ack"},
+        "oncall_roster_generation": {"type": "integer", "minimum": 1},
+        "escalation_table_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "image_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "image_reference": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,190}@sha256:[0-9a-f]{64}$"},
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user", "uid", "gid"],
+      "properties": {
+        "user": {"type": "string", "pattern": "^[a-z_][a-z0-9_-]{0,30}$"},
+        "uid": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "gid": {"type": "integer", "minimum": 1, "maximum": 2147483647}
+      }
+    },
+    "service_expectation": {
+      "type": "object", "additionalProperties": false, "required": ["service", "container_name", "image_reference"],
+      "properties": {"service": {"enum": ["caddy", "postgres", "web", "worker"]}, "container_name": {"$ref": "#/$defs/identifier"}, "image_reference": {"$ref": "#/$defs/image_reference"}}
+    },
+    "release_expectation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["application_version", "git_commit", "release_manifest_sha256", "supervisor_bundle_sha256", "migration_head", "migration_manifest_sha256", "web_image_digest", "worker_image_digest"],
+      "properties": {
+        "application_version": {"type": "string", "pattern": "^0\\.1\\.0-alpha\\.[0-9]+$"},
+        "git_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "release_manifest_sha256": {"$ref": "#/$defs/sha256"}, "supervisor_bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "migration_head": {"type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+\\.sql$"}, "migration_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "web_image_digest": {"$ref": "#/$defs/image_digest"}, "worker_image_digest": {"$ref": "#/$defs/image_digest"}
+      }
+    },
+    "backup_expectation": {
+      "type": "object", "additionalProperties": false, "required": ["policy_id", "rpo_hours"],
+      "properties": {"policy_id": {"$ref": "#/$defs/identifier"}, "rpo_hours": {"type": "integer", "minimum": 1, "maximum": 168}}
+    },
+    "monitoring_notification": {
+      "type": "object", "additionalProperties": false, "required": ["required", "target_id"],
+      "properties": {"required": {"const": true}, "target_id": {"$ref": "#/$defs/identifier"}}
+    },
+    "adapter": {
+      "type": "object", "additionalProperties": false, "required": ["id", "version", "source_sha256"],
+      "properties": {"id": {"enum": ["HTTPS_JSON_ACK_V1", "SYNTHETIC_FAKE_ACK_V1"]}, "version": {"const": 1}, "source_sha256": {"$ref": "#/$defs/sha256"}}
+    },
+    "endpoint": {
+      "type": "object", "additionalProperties": false, "required": ["scheme", "host", "port", "path", "tls_server_name"],
+      "properties": {
+        "scheme": {"type": ["string", "null"], "enum": ["https", null]}, "host": {"type": ["string", "null"], "maxLength": 253},
+        "port": {"type": ["integer", "null"], "minimum": 1, "maximum": 65535}, "path": {"type": ["string", "null"], "pattern": "^/"},
+        "tls_server_name": {"type": ["string", "null"], "maxLength": 253}
+      }
+    },
+    "credential": {
+      "type": "object", "additionalProperties": false, "required": ["source_file", "sha256", "generation"],
+      "properties": {"source_file": {"const": "/etc/chenyida-erp/monitoring-v1/private/notification.credential"}, "sha256": {"$ref": "#/$defs/sha256"}, "generation": {"type": "integer", "minimum": 1}}
+    },
+    "ack": {
+      "type": "object", "additionalProperties": false, "required": ["contract", "timeout_milliseconds", "claim_ttl_seconds", "retry_backoff_seconds", "max_attempts"],
+      "properties": {
+        "contract": {"const": "chenyida-erp-monitoring-remote-ack/v1"}, "timeout_milliseconds": {"type": "integer", "minimum": 500, "maximum": 15000},
+        "claim_ttl_seconds": {"type": "integer", "minimum": 15, "maximum": 300}, "retry_backoff_seconds": {"type": "integer", "minimum": 15, "maximum": 3600},
+        "max_attempts": {"type": "integer", "minimum": 1, "maximum": 32}
+      }
+    }
+  }
+}

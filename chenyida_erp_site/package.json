@@ -61,6 +61,7 @@
     "typecheck:identity-session-safety": "tsc -p tsconfig.task44.json --pretty false",
     "test:runtime-readiness": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-runtime-readiness-unit.test.mjs tests/selfhost-health-contract.test.mjs tests/selfhost-runtime-readiness-migration.test.mjs tests/selfhost-worker-resilience.test.mjs tests/selfhost-dockerfile-version-contract.test.mjs tests/selfhost-release-identity-contract.test.mjs",
     "test:ops-monitoring": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-ops-monitoring.test.mjs tests/selfhost-dashboard-unit.test.mjs tests/selfhost-release-gate-contract.test.mjs",
+    "test:ops-monitoring-host-delivery": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-ops-monitoring-host-delivery.test.mjs && python3 -B -m unittest tests/test_release_supervisor_monitoring_host_delivery.py",
     "test:runtime-readiness:postgres": "scripts/run-runtime-readiness-postgres-test.sh",
     "test:runtime-lock-privilege:postgres": "scripts/run-runtime-lock-privilege-postgres-test.sh",
     "test:runtime-privilege-policy": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-postgresql-runtime-privilege-policy.test.mjs",

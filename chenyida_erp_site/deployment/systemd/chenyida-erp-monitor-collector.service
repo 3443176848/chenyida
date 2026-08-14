@@ -1,0 +1,42 @@
+[Unit]
+Description=Chenyida ERP root metadata collector
+After=docker.service
+OnSuccess=chenyida-erp-monitor-evaluator.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/sbin/chenyida-erp-monitoring-host-v1 collector
+TimeoutStartSec=25s
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=all
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadOnlyPaths=/proc /sys /usr/local/libexec/chenyida-erp-monitoring-host-v1 /etc/chenyida-erp/monitoring-v1 /var/lib/chenyida-erp/monitoring-v1/projections /var/run/docker.sock
+ReadWritePaths=/var/lib/chenyida-erp/monitoring-v1/observations
+InaccessiblePaths=/etc/chenyida-erp/monitoring-v1/private/notification.credential /var/lib/chenyida-erp/monitoring-v1/state /var/lib/chenyida-erp/monitoring-v1/outbox
+CPUQuota=25%
+MemoryMax=128M
+TasksMax=32
+LimitNOFILE=256

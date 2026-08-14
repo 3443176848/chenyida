@@ -6,6 +6,7 @@ import {
   OpsMonitoringError,
   emptyComponentObservation,
   monitoringResourcePolicy,
+  monitoringObservationId,
   monitoringSha256,
   parseMonitoringJson,
   validateMonitoringConfig,
@@ -173,6 +174,7 @@ export async function collectMonitoringObservation({
   resourcePlan,
   config,
   components = null,
+  source = null,
   clock = () => new Date(),
   readText = defaultReadText,
   statfsImpl = statfs,
@@ -187,14 +189,13 @@ export async function collectMonitoringObservation({
   const host = await collectHostObservation({ readText, statfsImpl });
   const services = collectDockerServices({ composeProject: config.compose_project, spawn });
   const componentObservation = components === null ? emptyComponentObservation() : components;
-  const source = components === null ? "HOST_METADATA_ONLY" : "FULL";
-  const identityBody = { observed_at: observedAt, host, services };
+  const resolvedSource = source === null ? components === null ? "HOST_METADATA_ONLY" : "FULL" : source;
   const observation = {
     schema_version: 1,
     contract: MONITORING_OBSERVATION_CONTRACT,
-    observation_id: `obs-${monitoringSha256(identityBody).slice(0, 32)}`,
+    observation_id: "",
     observed_at: observedAt,
-    source,
+    source: resolvedSource,
     policy_sha256: monitoringSha256(policy),
     resource_policy_sha256: policy.resource_policy_source.sha256,
     host,
@@ -204,5 +205,6 @@ export async function collectMonitoringObservation({
     backup: componentObservation.backup,
     notification: componentObservation.notification,
   };
+  observation.observation_id = monitoringObservationId(observation);
   return Object.freeze(validateMonitoringObservation(observation));
 }

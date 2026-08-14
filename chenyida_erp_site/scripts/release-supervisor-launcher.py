@@ -43,11 +43,14 @@ RUNTIME_PRIVILEGE_STATE_ROOT = Path("/var/lib/chenyida-erp/postgresql-runtime-pr
 RUNTIME_SECRET_ROOT = Path("/etc/chenyida-erp/runtime-secrets")
 RUNTIME_PRIVILEGE_BACKUP_ROOT = Path("/var/backups/chenyida-erp-v2")
 RUNTIME_PRIVILEGE_NODE_IMAGE = "node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3"
+MONITORING_HOST_CONFIG_INPUT_ROOT = AUTHORIZATION_PENDING_ROOT
+MONITORING_HOST_RUNTIME_INPUT_ROOT = Path("/var/lib/chenyida-erp/monitoring-runtime-inputs")
 GLOBAL_RELEASE_LOCK = Path("/run/lock/chenyida-erp-release-gate-v1.lock")
 SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 MAX_JSON_BYTES = 1024 * 1024
 MAX_BUNDLE_FILE_BYTES = 8 * 1024 * 1024
 MAX_BUNDLE_BYTES = 32 * 1024 * 1024
+MAX_MONITOR_RUNTIME_BYTES = 256 * 1024 * 1024
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 GIT_OBJECT = re.compile(r"^[0-9a-f]{40}$")
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
@@ -55,13 +58,24 @@ IMAGE_REFERENCE = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[0-9]+)?(?:/[a-z
 ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 
 BUNDLE_FILES: dict[str, str] = {
+    "chenyida_erp_site/deployment/systemd/chenyida-erp-monitor-collector.service": "0444",
+    "chenyida_erp_site/deployment/systemd/chenyida-erp-monitor-collector.timer": "0444",
+    "chenyida_erp_site/deployment/systemd/chenyida-erp-monitor-continuity.service": "0444",
+    "chenyida_erp_site/deployment/systemd/chenyida-erp-monitor-continuity.timer": "0444",
+    "chenyida_erp_site/deployment/systemd/chenyida-erp-monitor-evaluator.service": "0444",
+    "chenyida_erp_site/deployment/systemd/chenyida-erp-monitor-notifier.service": "0444",
+    "chenyida_erp_site/deployment/systemd/chenyida-erp-monitor-notifier.timer": "0444",
     "chenyida_erp_site/operations/container-runtime-policy-v1.json": "0444",
+    "chenyida_erp_site/operations/monitoring-host-config-schema-v1.json": "0444",
+    "chenyida_erp_site/operations/monitoring-host-delivery-policy-v1.json": "0444",
+    "chenyida_erp_site/operations/monitoring-policy-v1.json": "0444",
     "chenyida_erp_site/operations/postgresql-runtime-privilege-access-v2.json": "0444",
     "chenyida_erp_site/operations/postgresql-runtime-privilege-compiled-catalog-v1.json": "0444",
     "chenyida_erp_site/operations/postgresql-runtime-privilege-operator-policy-v1.json": "0444",
     "chenyida_erp_site/operations/postgresql-runtime-privilege-policy-v2.json": "0444",
     "chenyida_erp_site/operations/runtime-secret-file-policy-v1.json": "0444",
     "chenyida_erp_site/release/release-gate-plan-v2.json": "0444",
+    "chenyida_erp_site/release/monitoring-host-delivery-bundle-v1.json": "0444",
     "chenyida_erp_site/release/release-test-inventory-v1.json": "0444",
     "chenyida_erp_site/release/test-runtime-policy-v1.json": "0444",
     "chenyida_erp_site/release/vulnerability-policy-v1.json": "0444",
@@ -69,10 +83,13 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/backup-recovery-contract.mjs": "0444",
     "chenyida_erp_site/scripts/container-runtime-policy-test.py": "0444",
     "chenyida_erp_site/scripts/container-runtime-policy.py": "0444",
+    "chenyida_erp_site/scripts/create-monitoring-host-bundle-manifest.py": "0555",
     "chenyida_erp_site/scripts/create-release-image-evidence.sh": "0555",
     "chenyida_erp_site/scripts/create-release-manifest.sh": "0555",
     "chenyida_erp_site/scripts/create-release-supervisor-bundle-manifest.py": "0555",
     "chenyida_erp_site/scripts/install-release-supervisor.py": "0444",
+    "chenyida_erp_site/scripts/install-monitoring-host-delivery.py": "0444",
+    "chenyida_erp_site/scripts/monitoring-host-launcher.py": "0444",
     "chenyida_erp_site/scripts/postdeploy-release-contract.mjs": "0444",
     "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs": "0444",
     "chenyida_erp_site/scripts/postdeploy-runtime-configuration-probe.mjs": "0444",
@@ -114,6 +131,17 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/run-release-postgres-regression-tests.sh": "0555",
     "chenyida_erp_site/scripts/run-source-diff-check.sh": "0555",
     "chenyida_erp_site/scripts/write-release-identity.sh": "0555",
+    "chenyida_erp_site/tools/ops-monitoring/backup-projection.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/collector.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/components-projection.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/contract.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/delivery-contract.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/delivery-store.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/host-runner.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/host-store.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/notifier.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/resource-policy.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/strict-json.mjs": "0444",
     "chenyida_erp_site/tests/release-gate-fixture.mjs": "0444",
     "chenyida_erp_site/tests/runtime-privilege-operator-postgres-fixture.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-release-gate-contract.test.mjs": "0444",
@@ -127,11 +155,13 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-catalog-postgres.sh": "0555",
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-operator.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-policy.test.mjs": "0444",
+    "chenyida_erp_site/tests/selfhost-ops-monitoring-host-delivery.test.mjs": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_browser.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_candidate_snapshot.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_container_runtime.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_installer.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_launcher.py": "0444",
+    "chenyida_erp_site/tests/test_release_supervisor_monitoring_host_delivery.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_runtime_secret_file.py": "0444",
 }
 
@@ -141,6 +171,9 @@ ENTRYPOINTS = {
     "CREATE_RELEASE_MANIFEST": "chenyida_erp_site/scripts/create-release-manifest.sh",
     "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION": "chenyida_erp_site/scripts/probe-postdeploy-runtime-configuration.sh",
     "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY": "chenyida_erp_site/scripts/write-release-identity.sh",
+    "INSTALL_MONITORING_HOST_DELIVERY": "chenyida_erp_site/scripts/install-monitoring-host-delivery.py",
+    "ROLLBACK_MONITORING_HOST_DELIVERY": "chenyida_erp_site/scripts/install-monitoring-host-delivery.py",
+    "DISABLE_MONITORING_HOST_DELIVERY": "chenyida_erp_site/scripts/install-monitoring-host-delivery.py",
 }
 
 CONFIRMATIONS = {
@@ -149,6 +182,9 @@ CONFIRMATIONS = {
     "CREATE_RELEASE_MANIFEST": "AUTHORIZE_CREATE_IMMUTABLE_RELEASE_MANIFEST",
     "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION": "AUTHORIZE_PROBE_EXACT_POST_DEPLOY_RUNTIME_CONFIGURATION",
     "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY": "AUTHORIZE_VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY",
+    "INSTALL_MONITORING_HOST_DELIVERY": "AUTHORIZE_INSTALL_EXACT_MONITORING_HOST_DELIVERY",
+    "ROLLBACK_MONITORING_HOST_DELIVERY": "AUTHORIZE_ROLLBACK_EXACT_MONITORING_HOST_DELIVERY",
+    "DISABLE_MONITORING_HOST_DELIVERY": "AUTHORIZE_DISABLE_EXACT_MONITORING_HOST_DELIVERY",
 }
 
 RUNTIME_PRIVILEGE_OPERATIONS = {
@@ -209,6 +245,19 @@ PARAMETER_FIELDS = {
         "runtime_guard_contract", "runtime_guard_mode", "runtime_policy_sha256", "deployment_class", "deployment_id", "compose_project",
         "runtime_configuration_sha256", "runtime_probe_receipt", "runtime_probe_receipt_sha256", "compose_project_root",
         "caddy_container", "postgres_container", "web_container", "worker_container",
+    },
+    "INSTALL_MONITORING_HOST_DELIVERY": {
+        "monitoring_bundle_sha256", "host_config", "host_config_sha256", "runtime_path", "runtime_sha256",
+        "runtime_bytes", "runtime_dev", "runtime_ino", "evaluator_uid", "evaluator_gid", "notifier_uid", "notifier_gid",
+        "activation_id", "installation_generation", "previous_activation_sha256", "supervisor_bundle_sha256",
+    },
+    "ROLLBACK_MONITORING_HOST_DELIVERY": {
+        "monitoring_bundle_sha256", "host_config", "host_config_sha256", "runtime_path", "runtime_sha256",
+        "runtime_bytes", "runtime_dev", "runtime_ino", "evaluator_uid", "evaluator_gid", "notifier_uid", "notifier_gid",
+        "activation_id", "installation_generation", "previous_activation_sha256", "supervisor_bundle_sha256", "rollback_target_activation_sha256",
+    },
+    "DISABLE_MONITORING_HOST_DELIVERY": {
+        "expected_active_sha256", "disable_id",
     },
 }
 
@@ -398,10 +447,10 @@ def absolute_path(value: Any, code: str) -> str:
 
 def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
     parameters = exact_fields(parameters, PARAMETER_FIELDS[operation], "SUPERVISOR_AUTHORIZATION_PARAMETERS_INVALID")
-    for key in ("artifact_root", "postdeploy_root", "identity_root", "release_manifest", "probe_root", "runtime_probe_receipt", "candidate_snapshot_receipt", "gate_plan", "gate_report", "sbom_evidence", "security_evidence", "trivy_db_directory", "repository_root", "test_runtime_root", "compose_project_root"):
+    for key in ("artifact_root", "postdeploy_root", "identity_root", "release_manifest", "probe_root", "runtime_probe_receipt", "candidate_snapshot_receipt", "gate_plan", "gate_report", "sbom_evidence", "security_evidence", "trivy_db_directory", "repository_root", "test_runtime_root", "compose_project_root", "host_config", "runtime_path"):
         if key in parameters:
             absolute_path(parameters[key], "SUPERVISOR_AUTHORIZATION_PATH_INVALID")
-    for key in ("run_id", "probe_id", "release_id", "deployment_id", "compose_project", "caddy_container", "postgres_container", "web_container", "worker_container"):
+    for key in ("run_id", "probe_id", "release_id", "deployment_id", "compose_project", "caddy_container", "postgres_container", "web_container", "worker_container", "activation_id", "disable_id"):
         if key in parameters and (not isinstance(parameters[key], str) or not IDENTIFIER.fullmatch(parameters[key])):
             reject("SUPERVISOR_AUTHORIZATION_IDENTIFIER_INVALID")
     for key in ("web_image", "worker_image"):
@@ -412,11 +461,25 @@ def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
     for key in ("git_commit", "git_tree"):
         if key in parameters and (not isinstance(parameters[key], str) or not GIT_OBJECT.fullmatch(parameters[key])):
             reject("SUPERVISOR_AUTHORIZATION_GIT_INVALID")
-    for key in ("release_manifest_sha256", "runtime_probe_receipt_sha256", "candidate_snapshot_receipt_sha256", "gate_plan_sha256", "runtime_policy_sha256", "runtime_configuration_sha256"):
+    for key in ("release_manifest_sha256", "runtime_probe_receipt_sha256", "candidate_snapshot_receipt_sha256", "gate_plan_sha256", "runtime_policy_sha256", "runtime_configuration_sha256", "monitoring_bundle_sha256", "host_config_sha256", "runtime_sha256", "previous_activation_sha256", "supervisor_bundle_sha256", "rollback_target_activation_sha256", "expected_active_sha256"):
         if key in parameters and (not isinstance(parameters[key], str) or not SHA256.fullmatch(parameters[key])):
             reject("SUPERVISOR_AUTHORIZATION_DIGEST_INVALID")
     if "reader_gid" in parameters and (not isinstance(parameters["reader_gid"], int) or isinstance(parameters["reader_gid"], bool) or parameters["reader_gid"] < 1 or parameters["reader_gid"] > 2**31 - 1):
         reject("SUPERVISOR_AUTHORIZATION_GID_INVALID")
+    for key in ("runtime_bytes", "runtime_dev", "runtime_ino", "evaluator_uid", "evaluator_gid", "notifier_uid", "notifier_gid", "installation_generation"):
+        if key in parameters and (not isinstance(parameters[key], int) or isinstance(parameters[key], bool) or parameters[key] < 1 or parameters[key] > 2**63 - 1):
+            reject("SUPERVISOR_AUTHORIZATION_INTEGER_INVALID")
+    if "runtime_bytes" in parameters and parameters["runtime_bytes"] > MAX_MONITOR_RUNTIME_BYTES:
+        reject("SUPERVISOR_MONITORING_RUNTIME_SIZE_INVALID")
+    if operation in ("INSTALL_MONITORING_HOST_DELIVERY", "ROLLBACK_MONITORING_HOST_DELIVERY"):
+        if parameters["evaluator_uid"] == parameters["notifier_uid"] or parameters["evaluator_gid"] == parameters["notifier_gid"] or parameters["supervisor_bundle_sha256"] == parameters["monitoring_bundle_sha256"]:
+            reject("SUPERVISOR_MONITORING_IDENTITY_INVALID")
+        config = Path(parameters["host_config"])
+        runtime = Path(parameters["runtime_path"])
+        if config.parent != MONITORING_HOST_CONFIG_INPUT_ROOT or not config.name.endswith(".monitoring-host-config.json") or runtime.parent != MONITORING_HOST_RUNTIME_INPUT_ROOT or runtime.name != f"node.{parameters['runtime_sha256']}":
+            reject("SUPERVISOR_MONITORING_INPUT_PATH_INVALID")
+        if operation == "ROLLBACK_MONITORING_HOST_DELIVERY" and parameters["rollback_target_activation_sha256"] in (parameters["previous_activation_sha256"], "0" * 64):
+            reject("SUPERVISOR_MONITORING_ROLLBACK_INVALID")
     if "deployment_class" in parameters and parameters["deployment_class"] not in ("UAT", "PRODUCTION"):
         reject("SUPERVISOR_AUTHORIZATION_DEPLOYMENT_CLASS_INVALID")
     if "expires_at" in parameters:
@@ -622,8 +685,31 @@ def verify_candidate(parameters: dict[str, Any], bundle_root: Path, lock_descrip
 def command_for(bundle_root: Path, authorization: dict[str, Any]) -> list[str]:
     operation = authorization["operation"]
     parameters = authorization["parameters"]
-    command = [str(bundle_root / ENTRYPOINTS[operation])]
-    if operation == "CREATE_IMAGE_EVIDENCE":
+    entrypoint = str(bundle_root / ENTRYPOINTS[operation])
+    command = [entrypoint]
+    if operation in ("INSTALL_MONITORING_HOST_DELIVERY", "ROLLBACK_MONITORING_HOST_DELIVERY"):
+        command = ["/usr/bin/python3", entrypoint, "rollback" if operation == "ROLLBACK_MONITORING_HOST_DELIVERY" else "install"]
+        for name in (
+            "monitoring_bundle_sha256", "host_config", "host_config_sha256", "runtime_path", "runtime_sha256",
+            "runtime_bytes", "runtime_dev", "runtime_ino", "evaluator_uid", "evaluator_gid", "notifier_uid",
+            "notifier_gid", "activation_id", "installation_generation", "previous_activation_sha256",
+            "supervisor_bundle_sha256",
+        ):
+            command += [f"--{name.replace('_', '-')}", str(parameters[name])]
+        if operation == "ROLLBACK_MONITORING_HOST_DELIVERY":
+            command += ["--rollback-target-activation-sha256", parameters["rollback_target_activation_sha256"]]
+        command += [
+            "--confirm",
+            "ROLLBACK_EXACT_MONITORING_HOST_DELIVERY" if operation == "ROLLBACK_MONITORING_HOST_DELIVERY" else "INSTALL_EXACT_MONITORING_HOST_DELIVERY",
+        ]
+    elif operation == "DISABLE_MONITORING_HOST_DELIVERY":
+        command = [
+            "/usr/bin/python3", entrypoint, "disable",
+            "--expected-active-sha256", parameters["expected_active_sha256"],
+            "--disable-id", parameters["disable_id"],
+            "--confirm", "DISABLE_EXACT_MONITORING_HOST_DELIVERY",
+        ]
+    elif operation == "CREATE_IMAGE_EVIDENCE":
         command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--candidate-snapshot-receipt", parameters["candidate_snapshot_receipt"], "--candidate-snapshot-receipt-sha256", parameters["candidate_snapshot_receipt_sha256"], "--test-runtime-root", parameters["test_runtime_root"], "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--trivy-db-directory", parameters["trivy_db_directory"], "--confirm", "CREATE_TRIVY_IMAGE_EVIDENCE"]
     elif operation == "RUN_RELEASE_GATE":
         command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--candidate-snapshot-receipt", parameters["candidate_snapshot_receipt"], "--candidate-snapshot-receipt-sha256", parameters["candidate_snapshot_receipt_sha256"], "--test-runtime-root", parameters["test_runtime_root"], "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--gate-plan-sha256", parameters["gate_plan_sha256"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--confirm", "RUN_EXACT_RELEASE_GATE"]

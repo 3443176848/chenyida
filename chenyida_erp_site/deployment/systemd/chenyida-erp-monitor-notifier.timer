@@ -1,0 +1,13 @@
+[Unit]
+Description=Chenyida ERP pending alert retry cadence
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=60s
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=true
+Unit=chenyida-erp-monitor-notifier.service
+
+[Install]
+WantedBy=timers.target

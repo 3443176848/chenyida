@@ -1,0 +1,13 @@
+[Unit]
+Description=Chenyida ERP monitoring continuity check cadence
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=60s
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=true
+Unit=chenyida-erp-monitor-continuity.service
+
+[Install]
+WantedBy=timers.target
