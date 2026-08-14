@@ -39,8 +39,8 @@
   },
   "node_dependencies": {
     "path": "chenyida_erp_site/node_modules",
-    "tree_sha256": "3d727122206562df4ebfe24139bfd7b2ae16a299ef2e62b6d55b19e61c2db819",
-    "package_lock_sha256": "ac79bbe843ca56ac756ffc80f723691b193dbb6a8cbb2b2ccc9d48470a63a68b"
+    "tree_sha256": "2b8223f9c604300ac18f2996cb93e404b2c27897945c143626a3cfedee4209fd",
+    "package_lock_sha256": "9c3949bfdce05d355287550bdc7981a0e4cc455e99ae1735e39ee0b4c9252eb5"
   },
   "python_runtime": {
     "venv_path": ".venv",
