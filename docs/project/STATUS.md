@@ -2,27 +2,31 @@
 
 最后更新时间：2026-08-14（Asia/Shanghai）
 
-## SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60（执行中；资源停止线有效）
+## SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60（完成；仓库所有权闭环已验证，资源停止线仍有效）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / DESIGN AND LIGHTWEIGHT IMPLEMENTATION / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；关闭D-135创建前target所有权歧义 |
+| 当前状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | TASK60已释放active slot；下一安全任务为监控host delivery仓库包 |
 | 严格起点 | PASS / CONTROLLED | `d7780864eb239cbeadf4aa84e92a3a6bb62016c1`/tree`2a9ecd452ca53cb7691ad58ce0dc3082a7aa4d84`；工作区仅既有受保护未跟踪报告 |
-| 目标合同 | IN PROGRESS | 同设备私有staging、0400 reservation receipt、NOREPLACE同inode提升、Git前后核验与target-only恢复；foreign/替换/非空/跨设备失败关闭 |
-| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap887MiB/1GiB（超过80%）、根盘13GiB、Load`0.09/0.19/0.47`、`oom_kill=0`；禁止新重任务，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无host、A1—A3、镜像、外部、UAT/生产、数据库、Volume、账号或网络动作 |
+| D-136 reservation | PASS / FAIL CLOSED | 创建前0400 receipt直接绑定source/candidate/bundle/runtime、可信祖先/mount、父目录和root dev/inode/mode/uid/gid；完整temp publication可恢复，无receipt/partial保持原样 |
+| 提升/Git | PASS / SAME INODE | 固定父目录FD上的`renameat2(RENAME_NOREPLACE)`无copy fallback；Git 2.43.7标准detach+lock+reason前后持有并复核同一0700 root inode |
+| 恢复/foreign | PASS / CONSERVATION | 精确reservation target-only可由显式RECOVER永久隔离；foreign/replaced inode、symlink、mount、非空、跨设备、最新receipt/audit/quarantine缺失全部不改对象失败关闭，逐代绑定previous terminal audit |
+| Git/bundle | PASS / CONTENT ADDRESSED | source`15501787f5cd304dfe5f8c75fb5df15d4e9a2258`/tree`3718593b…00a6`与manifest-only`ffaaa9091cf09afa80918e87664ed6660f0556cf`/tree`9d42de16…341e`形成78文件bundle`17fb9f99…fb5b8`；脚本`296f61ef…fe98d` |
+| 自动验证 | PASS / SCOPED APPLICABLE | snapshot23/23、Supervisor72/72、bundle逐字节重放、credentials1671、Python compile与diff门通过；release inventory无Node测试变化并保持`4dbf7776…8551a` |
+| 资源 | STOP LINE ACTIVE / NO OOM | available约2.0GiB、Swap873MiB/1GiB（超过80%）、根盘13GiB、Load`0.40/0.44/0.40`、`oom_kill=0`；未启动build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像任务 |
+| 清理/运行面 | PASS / UNCHANGED / NOT AUTHORIZED | 凭据扫描容器自动删除、临时fixture自动清理；四服务running/restart0/OOM false，Web/PostgreSQL healthy、Worker/Caddy health none，四个受保护Volume未读正文。无host、A1—A3、镜像、外部、UAT/生产、数据库、账号或网络动作 |
 | 系统是否可用 | NO | 当前无源码匹配镜像、正式门、真实异机恢复/迁移、岗位/员工签字或切换 |
 
 ## SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59（完成；独立候选快照合同已验证，正式A2仍阻塞）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / A2 STILL BLOCKED / PRODUCTION NO-GO | TASK59已释放active slot；下一安全仓库任务为创建前target reservation所有权闭环 |
+| 当前状态 | DONE / HISTORICAL SNAPSHOT CONTRACT / SUPERSEDED BY TASK60 / PRODUCTION NO-GO | TASK59主合同保持；创建前缺口由TASK60关闭，其bundle不可再授权 |
 | 严格起点 | PASS / CONTROLLED | `ad87edc45a32521cfcec36b6214f4d510d750e54`/tree`5831507e94a40641dab9a630ce3a95620c037689`；用户未跟踪状态报告不读不改不提交 |
 | D-135快照合同 | PASS / FAIL CLOSED | 独立detached/locked worktree、source→manifest-only直接子关系、canonical intent/receipt、全局+lifecycle锁、锁内VERIFY、精确REMOVE和稳定错误代码已闭合；共享主工作区不切换或清理 |
 | 借用runtime | PASS / BORROWED NEVER REMOVE | Node/Python依赖、lock/requirements、解释器身份与可信祖先完整绑定；六个消费者只读借用，REMOVE不得变更或删除运行时 |
 | 恢复与攻击面 | PASS / CONSERVATION VERIFIED | generation、intent/audit/quarantine跨代守恒，`renameat2(RENAME_NOREPLACE)`无覆盖；跨代旧audit、foreign target和最新quarantine缺失攻击探针均失败关闭，保留quarantine不得自动删除 |
-| 已知操作阻断 | OPEN / FAIL CLOSED | 没有创建前reservation时，PREPARE target-only无法证明Task59所有权并返回`SNAPSHOT_PREPARE_TARGET_PROVENANCE_UNPROVEN`；后续须以同设备私有staging和0400 receipt绑定root dev/inode/mode |
+| 已知操作阻断 | CLOSED BY TASK60 / D-136 | 创建前reservation、同inode提升及精确target-only恢复已闭合；TASK59旧工具仍按原合同失败关闭，不得单独复用 |
 | Git/bundle | PASS / CONTENT ADDRESSED | source`7b9abec45a50da5655a2e78a0f42647536321290`/tree`0ae35f87…13689`与manifest-only `89504045e4066bbe5236b19cf1a8bfa09701d508`/tree`13809b3b…5a7`形成78文件bundle；manifest SHA-256`7927bb242cad9784a48ebaa8269ac9cc53cf56808c7dffc8f3d148111c7e5855`，脚本SHA-256`71361ac9…d9add8a` |
 | 候选影响 | STALE / NOT AUTHORIZABLE | TASK57的76文件bundle及Web/Worker本机镜像因Site输入变化失效；当前没有与最终源码匹配的可授权镜像，A3必须后续重建并锚定 |
 | 自动验证 | PASS / SCOPED FULL APPLICABLE | snapshot17/17、Supervisor66/66、release inventory 6文件/57项、直接54/54、SPECIAL POSIX 7文件/57项、隔离Python三基线、browser policy5/5、credentials1670、JSON220、Shell44、Python AST52、Markdown398/242及source/diff门通过；lint0 error/28 warning |
@@ -38,10 +42,10 @@
 | --- | --- | --- |
 | 当前状态 | DONE / HISTORICAL INPUT REFRESH / SUPERSEDED BY TASK59 / NO AUTHORIZATION GRANTED / PRODUCTION NO-GO | TASK58已释放active slot；当时的TASK57输入已被TASK59 Site变化失效，不能继续授权 |
 | 严格起点 | PASS / CONTROLLED | `04619b8a6a89cb410d8464751c733d472d7007cc`/tree`05ef60ac2f517e158778446437cb0c3f8bdba6f7`；用户未跟踪状态报告不读不改不提交 |
-| A1输入 | STALE / SUPERSEDED / NOT AUTHORIZED | TASK58当时核对的source`4d4586b1`、manifest`78d96c61`和76文件bundle现只保留历史审计价值；A1待审输入已转为TASK59的78文件bundle，host路径仍未安装 |
-| A3输入 | STALE / LOCAL HISTORICAL OBJECTS ONLY | TASK58当时登记的Web/Worker manifest/config已被TASK59 Site变化失效；仍无重建的当前镜像、批准私有Git/registry目标、root-only凭据或外部完整digest |
-| A2输入 | BLOCKED / SUPERSEDED / FAIL CLOSED | TASK59已闭合detached snapshot主合同，但A2仍受A1、源码匹配A3镜像和创建前target reservation阻断；不得使用`78d96c61…eba3`旧候选 |
-| 仓库路线 | PASS / SIX OPEN | TASK54、TASK55—TASK56、TASK57关闭项已标明；detached snapshot、monitor delivery、11角色矩阵、0017→0046、跨岗UAT模板、晋升/回滚执行器仍开放 |
+| A1输入 | STALE / SUPERSEDED / NOT AUTHORIZED | TASK58当时核对的source`4d4586b1`、manifest`78d96c61`和76文件bundle现只保留历史审计价值；A1待审设计输入已转为TASK60的78文件bundle，host路径仍未安装且未授权 |
+| A3输入 | STALE / LOCAL HISTORICAL OBJECTS ONLY | TASK58当时登记的Web/Worker manifest/config已被TASK59—TASK60 Site变化失效；仍无重建的当前镜像、批准私有Git/registry目标、root-only凭据或外部完整digest |
+| A2输入 | BLOCKED / SUPERSEDED / FAIL CLOSED | TASK59/TASK60已闭合detached snapshot及创建前所有权，但A2仍受A1、源码匹配A3镜像和外部完整引用阻断；不得使用`78d96c61…eba3`旧候选 |
+| 仓库路线 | PASS / HISTORICAL SIX-ITEM SPLIT | TASK58当时拆出的detached snapshot已由TASK59—TASK60关闭；monitor delivery、11角色矩阵、0017→0046、跨岗UAT模板和晋升/回滚执行器仍开放 |
 | 自动验证 | PASS / DOCS-ONLY | 授权包身份合同、Markdown397/240、JSON220、Shell44、Python AST50、credentials1667及diff门通过；范围精确八份治理Markdown |
 | 资源/清理 | PASS / NO THRESHOLD BREACH | 起点/收口available约1.9GiB、Swap765/764MiB、根盘13GiB、Load低于1、`oom_kill=0`；扫描容器/目录清零，未build、Migration、prune或创建Volume |
 | 运行面 | VERIFIED METADATA / UNCHANGED | UAT仍alpha.42/0040、四服务restart0/OOM false；未访问业务行、凭据、日志或Volume正文，无host/外部/UAT/数据动作 |

@@ -4,12 +4,17 @@
 
 ## 2026-08-14
 
-### SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60 - `docs: start release snapshot reservation closure`
+### SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60 - `docs: start release snapshot reservation closure` / `feat: reserve release snapshot targets` / `build: refresh release supervisor bundle` / `docs: close release snapshot reservation`
 
 - 调度：TASK59收口提交`d7780864eb239cbeadf4aa84e92a3a6bb62016c1`/tree`2a9ecd452ca53cb7691ad58ce0dc3082a7aa4d84`后从零`DOING`自动登记TASK60为唯一active task。
 - 目标：以同设备私有staging和创建前0400 canonical reservation receipt绑定target root dev/inode/mode，再以NOREPLACE提升同一inode，并在Git add前后与target-only崩溃恢复中保持所有权证明；foreign、替换、非空、跨设备或证据缺失一律失败关闭。
+- D-136实现：新增私有`staging/`与`reservations/`状态根；在target出现前发布root-owned `0400` reservation，绑定intent/source/state/candidate/bundle/runtime/lock/admin/generation、target/staging、可信父链、mount及root dev/inode/mode/uid/gid。固定父目录fd并用`renameat2(RENAME_NOREPLACE)`提升同一inode，Git `worktree add --detach --lock --reason`前后持续核对；没有copy或覆盖回退。
+- 恢复边界：仅完整temp receipt可补发canonical reservation；部分、缺失或篡改证据保持现场并失败关闭。只有与reservation完全相同的reserved target可经显式`RECOVER`隔离，foreign inode保持不变；后续代次必须绑定上一代终态恢复审计和永久保留quarantine。
+- 不可变链：source提交`15501787f5cd304dfe5f8c75fb5df15d4e9a2258`/tree`3718593b8b6d362922bc4e84be6b6cf4adbd00a6`与manifest-only直接子提交`ffaaa9091cf09afa80918e87664ed6660f0556cf`/tree`9d42de1626ed6f8cf13308c7bbc2e83685f7341e`形成78文件bundle；manifest SHA-256`17fb9f99af2aae24390d060344114d1d1089c1fb19a87280c83161e277fab5b8`逐字节重放一致。TASK59的`7927bb24…e5855`因此为`STALE / NOT AUTHORIZABLE`。
+- 验证：candidate snapshot 23/23、六个Supervisor Python模块72/72、Python compile、bundle replay、`git diff --check`及1671个跟踪仓库文件凭据扫描通过；替换inode、symlink/mount/非空/权限/父目录漂移、EXDEV/EEXIST、receipt缺失或篡改、最新证据缺失和并发均有负测。
 - 资源边界：起点available约1.9GiB、Swap887MiB/1GiB并超过80%停止线、根盘13GiB、Load`0.09/0.19/0.47`、`oom_kill=0`。先只执行轻量文档、源码、纯Git/Python fixture和只读审计，不启动build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像任务。
-- 授权边界：不安装host、不生成A1/A2授权、不外部push、不build/deploy、不修改UAT/生产、账号、角色、secret、ACL、Volume、网络、systemd、Swap、Docker daemon或数据；系统继续`PRODUCTION NO-GO`。
+- 收口资源：available约2.0GiB、Swap873MiB/1GiB、根盘13GiB、Load低于1、`oom_kill=0`；四服务running、restart0/OOM false，Web/PostgreSQL healthy，Worker/Caddy无healthcheck，任务扫描容器已自动删除且无任务临时资源遗留。Swap仍超过80%停止线。
+- 授权边界：未安装host、未生成A1/A2授权、未外部push、未build/deploy，未修改UAT/生产、账号、角色、secret、ACL、Volume、网络、systemd、Swap、Docker daemon或数据。reservation仓库缺口已闭合，但当前源码匹配Web/Worker镜像、A1、A3和正式A2证据仍不存在；系统继续`PRODUCTION NO-GO`，下一安全项为TASK49监控能力的内容寻址host delivery包。
 
 ### SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59 - `feat: add release candidate snapshot lifecycle` / `test: stabilize snapshot cap-drop fixture` / `release: synchronize snapshot contract inventory` / `release: bind final task59 snapshot input` / `docs: close release candidate snapshot lifecycle`
 

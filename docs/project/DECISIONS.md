@@ -2474,6 +2474,42 @@
 - 拒绝`git worktree remove --force`、`prune`、递归猜删、覆盖最终回执，或在最新quarantine/audit证据缺失时退回旧代成功。
 - 拒绝在没有创建前reservation的情况下自动隔离PREPARE target-only；安全失败和单独人工处置优先于误删foreign worktree。
 
+## D-136 发布候选target以创建前reservation、同inode提升和逐代终态链证明所有权
+
+- 日期：2026-08-14
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / SYNTHETIC-ISOLATED VERIFIED / HOST AND A2 NOT AUTHORIZED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK60只读攻击审计、Git 2.43.7/POSIX探针和23项合成隔离fixture
+- 确认边界：只授权仓库实现、内容寻址bundle与隔离测试；不授权host安装、A1—A3、外部传输、镜像重建、UAT/生产、真实数据、账号、网络、systemd、Swap或Docker daemon动作
+
+### Context
+
+- D-135能证明完整worktree、admin-only和REMOVE单边状态，却无法仅凭target路径判断PREPARE target-only是否由本任务创建。路径名、`.git`内容或旧audit都不是所有权证明。
+- Git会跟随target或祖先symlink并写入referent；但Git 2.43.7使用标准`worktree add --detach --lock --reason`时，会保留预建root-owned `0700`空目录的dev/inode/mode。`renameat2(RENAME_NOREPLACE)`同设备提升也保留inode，EEXIST/EXDEV不会改写两侧对象。
+- staging mkdir与最终receipt之间存在不可消除的未回执窗口。没有更早不可变创建意图时，该对象不能按名称猜测处置；完整`.publishing`则已经包含可验证的canonical所有权字节，可以完成no-clobber发布。
+
+### Decision
+
+1. 每代PREPARE先在固定root-owned `0700` staging根创建空普通目录，再发布`chenyida-erp-release-candidate-snapshot-target-reservation/v1` canonical `0400`单链接receipt，最后才允许target出现。
+2. receipt直接绑定prepare intent路径/摘要、source repository/state、candidate、Supervisor bundle、借用runtime、lock reason、expected admin、generation、上一代terminal recovery、staging/target及可信祖先、父目录、mount identity和root dev/inode/mode/uid/gid；prepared/remove/recovery回执继续引用其路径与摘要。
+3. 提升只使用已打开并fstat固定的两侧父目录FD执行`renameat2(RENAME_NOREPLACE)`，要求同设备并fsync两侧目录；禁止copy fallback、覆盖、删除、自动清理或跨设备退化。EEXIST时staging和foreign target保持原样。
+4. Git派发前以`O_DIRECTORY|O_NOFOLLOW`持有reserved root FD，验证空目录、`0700`、可信祖先、无nested/bind mount及精确inode；Git后再次要求路径和持有FD仍指向receipt inode。只允许标准detach+lock+reason，不使用force/no-checkout/prune。
+5. receipt后未提升、已提升空target和完整Git状态可幂等续跑；完整temp-only publication只在canonical bytes、单链接、精确binding和reserved inode都匹配时完成。mkdir后无receipt、partial temp、双方均缺失或证据漂移保持原样并失败关闭。
+6. PREPARE target-only只有root inode与最新reservation精确匹配时才允许显式RECOVER移入永久quarantine；foreign/replaced inode、symlink、mount、非空、错误admin/backlink/lock或两侧不安全组合不得隔离或删除。admin-only继续要求D-135 Git身份。
+7. 新reservation代次只有在上一代recovery intent、audit及永久quarantine全部验证后才能创建，并在新receipt中绑定上一代terminal audit路径/摘要；缺失、篡改或pending最新receipt/audit/quarantine不得回退复用旧代成功。
+8. root-owned私有祖先是Git路径调用的信任边界；本合同防止非特权替换和误处置，不宣称能抵御已取得root并可同时改写所有受信状态的攻击者。
+
+### Consequences
+
+- TASK60源码`15501787f5cd304dfe5f8c75fb5df15d4e9a2258`/tree`3718593b8b6d362922bc4e84be6b6cf4adbd00a6`与manifest-only直接子提交`ffaaa9091cf09afa80918e87664ed6660f0556cf`/tree`9d42de1626ed6f8cf13308c7bbc2e83685f7341e`形成78文件bundle，manifest SHA-256为`17fb9f99af2aae24390d060344114d1d1089c1fb19a87280c83161e277fab5b8`；专项23/23、Supervisor72/72及credentials1671通过。
+- D-135的target-only操作阻断已在仓库合同层关闭；TASK59 bundle立即成为`STALE / NOT AUTHORIZABLE`。当前仍没有源码匹配Web/Worker镜像、installed Supervisor、A1/A3或正式A2，不得把本任务fixture写成host快照或19步PASS。
+- Swap仍超过80%停止线，本任务没有build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像重建。下一安全任务为TASK49监控的内容寻址host delivery包；真实安装和外部投递仍需专项授权。
+
+### Rejected alternatives
+
+- 拒绝用路径名、空目录、`.git`正文、candidate HEAD、旧audit或目录link count代替创建前receipt，拒绝自动处置unreceipted staging。
+- 拒绝让Git创建可跟随的任意路径，或在Git后才发现target/ancestor symlink；拒绝0755根、非空根、未知mount、父inode漂移和跨设备copy。
+- 拒绝覆盖foreign target、递归删除、force/prune、回收quarantine、删除最新失败证据或用旧代audit授权新代对象。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

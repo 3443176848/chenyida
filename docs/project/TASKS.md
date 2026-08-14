@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60`。TASK59已关闭detached snapshot主合同；TASK60只在仓库和合成隔离Git中建立创建前同设备staging、0400 reservation receipt、NOREPLACE同inode提升及target-only恢复。Swap高于80%期间禁止新重任务；host、A1—A3、镜像、外部锚点、UAT/生产、真实角色/secret/ACL/Volume、账号和数据均未授权，系统保持`PRODUCTION NO-GO`。
+当前无`DOING`。TASK60已按D-136关闭创建前reservation、同inode提升和target-only所有权恢复；下一安全任务固定为TASK49监控的内容寻址host delivery包，待独立登记后再开始。Swap高于80%期间禁止新重任务；host安装、真实告警投递、A1—A3、镜像、外部锚点、UAT/生产、真实角色/secret/ACL/Volume、账号和数据均未授权，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -119,6 +119,8 @@
 
 2026-08-14第五十三次调度事件：主智能体从零`DOING`自动选择D-135明确的创建前reservation缺口，状态按`SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60 TODO → DOING`切换唯一active slot。严格起点为`d7780864`/tree`2a9ecd45`；Swap约887MiB/1GiB并超过80%，因此先限制为文档、源码、纯Git/Python轻量fixture和只读审计，不启动build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像任务。
 
+2026-08-14第五十四次调度事件：`SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60 DOING → DONE`。D-136以创建前`0400` reservation、固定父目录FD上的NOREPLACE、Git前后同inode核验和逐代terminal audit关闭target-only所有权；源码`15501787`与manifest-only `ffaaa909`形成78文件bundle`17fb9f99…fb5b8`。专项23/23、Supervisor72/72、credentials1671及静态门通过；Swap仍约873MiB/1GiB而未启动重任务。active slot释放，下一安全任务为监控host delivery仓库包，系统继续`PRODUCTION NO-GO`。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -135,12 +137,14 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60 | 创建前候选target所有权闭环 | DOING | Codex主智能体（唯一写入、轻量测试串行、证据集成）、智能体团队（只读复核） | 2026-08-14 | SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59、D-135 | `DOING / DESIGN AND LIGHTWEIGHT IMPLEMENTATION / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。实现同设备私有staging、0400 reservation、NOREPLACE同inode提升和target-only崩溃恢复；Swap高于80%时不启动新重任务。无host、A1—A3、外部、UAT或数据授权。见[任务文档](../tasks/SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60.md)。 |
+
+当前无执行中任务；下一任务须先完成独立登记提交。
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60 | 创建前候选target所有权闭环 | DONE | Codex主智能体（唯一写入、轻量测试串行、证据集成）、智能体团队（只读复核） | 2026-08-14 | 2026-08-14 | SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59、D-135、D-136 | `DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。创建前reservation、FD-relative NOREPLACE、Git前后同inode和逐代target-only恢复已闭合；`15501787`/`ffaaa909`形成78文件bundle`17fb9f99…fb5b8`，专项23/23、Supervisor72/72通过。无host、A1—A3、镜像、外部、UAT或数据动作。见[任务文档](../tasks/SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60.md)及[D-136](DECISIONS.md#d-136-发布候选target以创建前reservation同inode提升和逐代终态链证明所有权)。 |
 | SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59 | A2独立候选快照生命周期闭环 | DONE | Codex主智能体（唯一写入、测试串行、证据集成）、数据依赖/应用测试/运维安全智能体（只读审计与攻击复核） | 2026-08-14 | 2026-08-14 | SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-RELEASE-GATE-LIFECYCLE-53、SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56、SELFHOST-RELEASE-CANDIDATE-REFRESH-57、SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58、D-135 | `DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / A2 STILL BLOCKED / PRODUCTION NO-GO`。detached snapshot、不可变回执、借用runtime、锁内VERIFY、精确REMOVE及守恒式恢复已闭合；`7b9abec4`/`89504045`形成78文件bundle`7927bb24…e5855`。无reservation的PREPARE target-only仍失败关闭，TASK57镜像已失效；未执行host、外部、UAT或真实A2。见[任务文档](../tasks/SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59.md)及[D-135](DECISIONS.md#d-135-正式发布候选采用独立detached快照不可变回执和守恒式恢复)。 |
 | SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58 | 当前候选授权包不可变身份刷新 | DONE | Codex主智能体（唯一写入、轻量验证、证据集成） | 2026-08-14 | 2026-08-14 | SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52、SELFHOST-RELEASE-GATE-LIFECYCLE-53、SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54、SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56、SELFHOST-RELEASE-CANDIDATE-REFRESH-57 | `DONE / CURRENT AUTHORIZATION INPUTS VERIFIED / NO AUTHORIZATION GRANTED / PRODUCTION NO-GO`。A1—A3已绑定TASK57当前source/manifest/bundle、Web/Worker及精确候选快照；开放仓库前置重新排队，未执行任何host、外部、UAT或数据动作。见[任务文档](../tasks/SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58.md)。 |
 | SELFHOST-RELEASE-CANDIDATE-REFRESH-57 | 当前权限边界候选重建与发布证据复核 | DONE | Codex主智能体（唯一写入、重任务串行、证据集成）、既有数据迁移/应用测试/运维安全只读审计输入、项目负责人（未来A1—A8专项授权） | 2026-08-13 | 2026-08-14 | SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56、SELFHOST-RELEASE-CANDIDATE-REFRESH-51、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50、D-128、D-133、D-134 | `DONE / HISTORICAL EXACT LOCAL CANDIDATE / NOW STALE / PRODUCTION NO-GO`。`4d4586b1`与manifest-only `78d96c61`形成76文件bundle；Web/Worker身份、六服务runtime和固定Trivy零发现诊断当时通过。正式证据/19步门因installed Supervisor缺失在写入前失败关闭，TASK59 Site变化后该候选已不可授权。见[任务文档](../tasks/SELFHOST-RELEASE-CANDIDATE-REFRESH-57.md)。 |
