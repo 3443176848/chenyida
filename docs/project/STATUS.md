@@ -2,6 +2,21 @@
 
 最后更新时间：2026-08-14（Asia/Shanghai）
 
+## SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58（完成；当前授权输入已核验，未授予任何执行权）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / CURRENT AUTHORIZATION INPUTS VERIFIED / NO AUTHORIZATION GRANTED / PRODUCTION NO-GO | TASK58已释放active slot，当前无DOING；变更仅为治理文档 |
+| 严格起点 | PASS / CONTROLLED | `04619b8a6a89cb410d8464751c733d472d7007cc`/tree`05ef60ac2f517e158778446437cb0c3f8bdba6f7`；用户未跟踪状态报告不读不改不提交 |
+| A1输入 | PASS / CURRENT / NOT AUTHORIZED | source`4d4586b1`、manifest`78d96c61`、76文件bundle`631d76e6…e763`、installer`f12e5250…7cb3`、launcher`92cabc07…68c6`逐项核对；host路径仍未安装 |
+| A3输入 | PASS / LOCAL OBJECTS ONLY / EXTERNAL TARGET OPEN | 当前Web/Worker manifest/config已登记；仍无批准私有Git/registry目标、root-only凭据或外部完整digest |
+| A2输入 | BLOCKED / FAIL CLOSED | 受A1+A3+detached snapshot合同阻断；只接受精确`78d96c61…eba3`快照，本机engine引用和更晚治理提交不得冒充 |
+| 仓库路线 | PASS / SIX OPEN | TASK54、TASK55—TASK56、TASK57关闭项已标明；detached snapshot、monitor delivery、11角色矩阵、0017→0046、跨岗UAT模板、晋升/回滚执行器仍开放 |
+| 自动验证 | PASS / DOCS-ONLY | 授权包身份合同、Markdown397/240、JSON220、Shell44、Python AST50、credentials1667及diff门通过；范围精确八份治理Markdown |
+| 资源/清理 | PASS / NO THRESHOLD BREACH | 起点/收口available约1.9GiB、Swap765/764MiB、根盘13GiB、Load低于1、`oom_kill=0`；扫描容器/目录清零，未build、Migration、prune或创建Volume |
+| 运行面 | VERIFIED METADATA / UNCHANGED | UAT仍alpha.42/0040、四服务restart0/OOM false；未访问业务行、凭据、日志或Volume正文，无host/外部/UAT/数据动作 |
+| 系统是否可用 | NO | 无真实异机恢复、正式同候选门、host监控投递、UAT对齐、真实迁移和员工签字 |
+
 ## SELFHOST-RELEASE-CANDIDATE-REFRESH-57（完成；当前本机精确候选与零发现诊断通过，正式门阻塞）
 
 | 验证项 | 结果 | 说明 |

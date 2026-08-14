@@ -4,6 +4,15 @@
 
 ## 2026-08-14
 
+### SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58 - `docs: refresh current release authorization inputs`
+
+- 触发：TASK57收口后复核发现投产专项授权执行包仍把TASK53/TASK51的47文件bundle、历史候选和0045描述为当前输入；直接照旧包请求A1会安装过期Supervisor，故从零`DOING`自动建立TASK58 docs-only失败关闭任务。
+- 不可变身份：授权包现固定source`4d4586b1`/tree`a551144e`、manifest-only `78d96c61`/tree`3dbd20dd`、76文件bundle`631d76e6…e763`、installer`f12e5250…7cb3`、launcher`92cabc07…68c6`，并记录当前Web/Worker manifest/config及root-only本机构建回执。
+- 授权依赖：A1为“当前bundle就绪但未授权”；A3为“当前本机候选就绪但缺目标/凭据授权”；A2由A1+A3+detached snapshot合同阻断，且必须使用A3外部完整digest和精确`78d96c61…eba3`快照，不得把更晚治理提交或本机engine引用冒充候选/外部锚点。
+- 路线：TASK54、TASK55—TASK56及TASK57已关闭项与六个开放安全仓库项逐项区分；下一项为A2独立candidate snapshot准备/验证/清理合同，随后还有监控host delivery、11角色矩阵、0017→0046合成升级、跨岗UAT模板及晋升/回滚执行器复核。
+- 边界：仅治理文档和轻量只读验证；未生成可消费授权、创建凭据、安装host、push外部对象、连接UAT/数据库或修改账号、网络、Volume、镜像和业务数据。系统继续`PRODUCTION NO-GO`。
+- 验证/资源：专项授权包身份合同、Markdown397/240、JSON220、Shell44、Python AST50、credentials1667、范围和diff门通过。起点/收口available约1.9GiB、Swap765/764MiB、根盘13GiB、Load低于1、`oom_kill=0`；四服务restart0/OOM false，扫描容器/目录清零，未运行重任务或prune。
+
 ### SELFHOST-RELEASE-CANDIDATE-REFRESH-57 - `release: bind task57 candidate refresh input` / `docs: close current privilege candidate refresh`
 
 - 源码链：启动文档源码`4d4586b1086470d32ce19a7f4eabbc2d2a33fa74`/tree`a551144e032f80f50fbd6c432059c97afbff7ece`与manifest-only直接子提交`78d96c6198ab4b7255572186ea580c463b5eeba3`/tree`3dbd20dd6803d485fca17f72f7ee90de277c3b9d`形成76文件canonical链，manifest SHA-256为`631d76e650082de299fe836f1216b057d1ca7deabe29bd5e11e1a071a21ae763`且生成器逐字节重放一致。

@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前无`DOING`。`SELFHOST-RELEASE-CANDIDATE-REFRESH-57`已完成当前alpha.47/0046本机候选、六服务实际runtime和固定Trivy零发现诊断，并在installed Supervisor缺失时验证正式证据与19步门于制品变化前失败关闭。下一依赖为A1 host Supervisor安装/授权和A2外部不可变镜像锚点，均属于专项授权或外部资源；未获授权前不得外部push、修改host、UAT/生产、真实角色/secret/ACL/Volume、账号或数据，系统保持`PRODUCTION NO-GO`。
+当前无`DOING`。`SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58`已把A1—A3从TASK53/TASK51历史身份刷新到TASK57当前source/manifest/bundle、Web/Worker和精确`78d96c61…eba3`候选快照；没有生成授权或外部锚点。下一安全仓库任务为A2独立detached candidate snapshot的准备、验证和精确清理合同；未获专项授权前不得外部push、修改host、UAT/生产、真实角色/secret/ACL/Volume、账号或数据，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -109,6 +109,10 @@
 
 2026-08-14第四十八次调度事件：TASK57按`DOING → DONE`释放唯一active slot。源码检查点`4d4586b1`与manifest-only `78d96c61`形成76文件canonical链；精确候选Web/Worker完成manifest/config/baked身份、Migration allowlist、UAT/production Compose、六服务实际runtime及固定Trivy零发现诊断。installed Supervisor缺失使正式镜像证据与19步门在11文件制品指纹变化前退出1；UAT四服务restart0/OOM false且未改变。当前回到零`DOING`，下一安全动作依赖A1/A2专项授权，不旁路外部边界。
 
+2026-08-14第四十九次调度事件：A1授权包复核发现其“当前不可变事实”仍指向TASK53/TASK51历史身份，直接请求会安装过期bundle。主智能体从零`DOING`自动登记`SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58 TODO → DOING`，范围仅为治理文档和轻量验证；先刷新TASK57 source/manifest/bundle/installer/launcher、当前候选及A1—A3依赖，再选择第13节下一项未阻塞仓库前置。
+
+2026-08-14第五十次调度事件：TASK58按`DOING → DONE`释放active slot。授权包现固定TASK57的76文件bundle、installer/launcher、Web/Worker及目标候选身份，并把A2阻断明确为A1+A3+detached snapshot合同；TASK54、TASK55—TASK56和TASK57关闭项与六个开放安全仓库项已区分。没有生成授权或修改外部/host/UAT/数据，下一安全任务为A2 detached candidate snapshot合同。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -130,6 +134,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58 | 当前候选授权包不可变身份刷新 | DONE | Codex主智能体（唯一写入、轻量验证、证据集成） | 2026-08-14 | 2026-08-14 | SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52、SELFHOST-RELEASE-GATE-LIFECYCLE-53、SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54、SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56、SELFHOST-RELEASE-CANDIDATE-REFRESH-57 | `DONE / CURRENT AUTHORIZATION INPUTS VERIFIED / NO AUTHORIZATION GRANTED / PRODUCTION NO-GO`。A1—A3已绑定TASK57当前source/manifest/bundle、Web/Worker及精确候选快照；开放仓库前置重新排队，未执行任何host、外部、UAT或数据动作。见[任务文档](../tasks/SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58.md)。 |
 | SELFHOST-RELEASE-CANDIDATE-REFRESH-57 | 当前权限边界候选重建与发布证据复核 | DONE | Codex主智能体（唯一写入、重任务串行、证据集成）、既有数据迁移/应用测试/运维安全只读审计输入、项目负责人（未来A1—A8专项授权） | 2026-08-13 | 2026-08-14 | SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56、SELFHOST-RELEASE-CANDIDATE-REFRESH-51、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50、D-128、D-133、D-134 | `DONE / CURRENT EXACT LOCAL CANDIDATE BUILT / ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / PRODUCTION NO-GO`。`4d4586b1`与manifest-only `78d96c61`形成76文件bundle；当前Web/Worker身份、六服务runtime和固定Trivy零发现诊断通过。正式证据/19步门因installed Supervisor缺失在写入前失败关闭，UAT未变且候选无外部锚点。见[任务文档](../tasks/SELFHOST-RELEASE-CANDIDATE-REFRESH-57.md)。 |
 | SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 | PostgreSQL运行时最小权限与凭据边界闭环 | DONE | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | 2026-08-13 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50、SELFHOST-OPS-RELEASE-GATE-42、D-132、D-133、D-134 | `DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL ACTIVATION AND CURRENT CANDIDATE BLOCKED / PRODUCTION NO-GO`。Web锁、Backup、PG17 catalog、v2角色/ACL、session/secret/container/tablespace及D-134受控operator闭合，完整适用回归与canonical manifest完成；现行UAT仍共享superuser和环境秘密，历史镜像不满足当前secret合同且不可授权。真实激活与当前候选须另行任务/专项授权。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56.md)和[Operator手册](../self-hosting/postgresql-runtime-privilege-operator.md)。 |
 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55 | PostgreSQL集群安全状态与Tablespace恢复闭环 | DONE | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | 2026-08-13 | SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54、SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-OPS-RELEASE-GATE-42、D-115、D-131、D-132 | `DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL RECOVERY AND RUNTIME PRIVILEGE BLOCKED / PRODUCTION NO-GO`。严格cluster catalog/恢复、secret分离、custom tablespace、crash-safe executor、加密联合传输、V4 readiness及Dashboard/监控通过；源码`b93d838`与manifest-only `2136aa3`形成49文件bundle。真实异机/凭据/数据恢复、最小运行角色、源码匹配候选与正式门未执行。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55.md)及[D-132](DECISIONS.md#d-132-postgresql-集群安全恢复采用独立加密-capsule联合-transfer-v2-与-readiness-v4)。 |

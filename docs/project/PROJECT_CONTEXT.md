@@ -34,6 +34,8 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 `SELFHOST-RELEASE-CANDIDATE-REFRESH-57`已完成并释放active slot，当前无`DOING`。源码检查点`4d4586b1086470d32ce19a7f4eabbc2d2a33fa74`与manifest-only直接子提交`78d96c6198ab4b7255572186ea580c463b5eeba3`形成76文件canonical链；精确alpha.47/0046 Web/Worker本机候选通过manifest/config/baked身份、Migration allowlist、UAT/production Compose、六服务secret/container/tablespace实际runtime和固定Trivy零发现诊断。installed Supervisor缺失使正式镜像证据与19步门在制品变化前失败关闭；候选没有外部不可变锚点，UAT仍为alpha.42/0040、共享superuser和环境秘密。下一动作依赖A1/A2专项授权，系统继续`PRODUCTION NO-GO`。
 
+`SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58`已完成并释放active slot，当前无`DOING`。投产专项授权执行包已从TASK53/TASK51历史身份刷新到TASK57当前链：A1固定76文件bundle/installer/launcher，A3固定当前Web/Worker对象但仍缺批准的私有目标与root-only凭据，A2只能使用A3外部完整digest和精确`78d96c61…eba3`detached snapshot。TASK54、TASK55—TASK56和TASK57已关闭项与六个开放安全仓库前置已重新区分；没有生成授权、外部锚点或运行面变化，下一任务为A2独立候选快照合同，系统继续`PRODUCTION NO-GO`。
+
 ## 系统组成
 
 ### 本地 ERP
@@ -128,6 +130,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 - 所有 build、全量测试、Migration、备份恢复和 Compose 重启必须串行，固定 `COMPOSE_PARALLEL_LIMIT=1`；停止阈值、禁用清理命令和验证记录见 `docs/self-hosting/low-resource-server.md`。
 - TASK54所有重任务串行，合成密文双集群恢复只使用一个临时PostgreSQL容器，六服务runtime probe实测`max_containers=1`。收口窗口available约1.8GiB、Swap`543→545MiB`、根盘16GiB、Load低于1；四服务restart0/OOM false，Web/PostgreSQL healthy。任务临时容器、数据库、网络和Volume清零；未读取或修改受保护卷、真实备份或UAT数据。
 - TASK56受控operator真实system adapter演练串行使用一个临时PostgreSQL 17容器，Node单测与PG演练不并行。最新定向演练后available约1.7GiB、Swap539MiB/1.0GiB、根盘15GiB、Load`1.33/0.73/0.72`、`oom_kill=0`；四服务restart0/OOM false，Web/PostgreSQL healthy，operator测试容器和临时source/credential/state目录清零。最终完整回归仍须继续记录收口资源。
+- TASK58只运行轻量文档/hash检查及一个断网256MiB凭据扫描容器。起点/收口available约1.9GiB、Swap765/764MiB、根盘13GiB、Load低于1、`oom_kill=0`；四服务restart0/OOM false，扫描容器/目录清零，没有build、Migration、数据库、Volume、镜像或prune。
 - TASK57构建、六服务runtime、固定Trivy诊断及回归全部串行，实测最多一个任务临时容器。起点/收口available约1.9/1.8GiB、Swap722/770MiB、根盘15/13GiB、Load低于4；任务窗口未观察到宿主或容器OOM，四服务restart0/OOM false，Web/PostgreSQL healthy。任务registry、container/network/Volume、tar和临时目录清零，root-only本地构建/诊断制品保留；未prune或修改UAT、受保护Volume、真实数据、host或外部系统。
 - AGENT-R1-5仅运行轻量Python协议测试及一个串行、断网、256 MiB的合成黑盒容器。起点/最终available约`2.2/2.2 GiB`、Swap`354/357 MiB`、根盘`17/17 GiB`、Load`0.07/0.16/0.24`→`0.05/0.13/0.20`；内核OOM0，四服务restart0/OOM false，四个受保护Volume保持。首个黑盒容器因fixture权限在执行前失败关闭，第二个PASS，两者及任务期Python缓存均精确清理；没有build、Migration、数据库、部署或prune。
 - DECISION-35只执行文档处理、Python临时SQLite和断网只读自动删除Node容器，未运行build、Migration、PostgreSQL测试、部署或重启。起点/收口available约1.9/1.9GiB，Swap`238/238MiB`，根盘18GiB，最终Load`0.01/0.10/0.10`；内核OOM0，四服务restart0/OOM false。任务临时目录、容器、网络和Volume清零，四个受保护Volume保留。
