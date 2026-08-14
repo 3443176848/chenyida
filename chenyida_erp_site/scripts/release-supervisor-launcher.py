@@ -45,6 +45,21 @@ RUNTIME_PRIVILEGE_BACKUP_ROOT = Path("/var/backups/chenyida-erp-v2")
 RUNTIME_PRIVILEGE_NODE_IMAGE = "node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3"
 MONITORING_HOST_CONFIG_INPUT_ROOT = AUTHORIZATION_PENDING_ROOT
 MONITORING_HOST_RUNTIME_INPUT_ROOT = Path("/var/lib/chenyida-erp/monitoring-runtime-inputs")
+MONITORING_PROJECTION_ROOT = Path("/var/lib/chenyida-erp/monitoring-v1/projections")
+MONITORING_ACTIVE_FILE = Path("/var/lib/chenyida-erp/monitoring-v1/active.json")
+MONITORING_PRIVATE_CONFIG = Path("/etc/chenyida-erp/monitoring-v1/private/host-config.json")
+MONITORING_BACKUP_READINESS_FILE = Path("/var/lib/chenyida-erp/backup-status/recovery-readiness.json")
+MONITORING_CLUSTER_POLICY_FILE = Path("/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json")
+RELEASE_IDENTITY_FILE = RELEASE_IDENTITY_ROOT / "release-identity.json"
+MONITORING_PROJECTION_CONTRACT = "chenyida-erp-monitoring-projection-publication/v1"
+MONITORING_PROJECTION_MARKER = ".chenyida-erp-monitoring-projection-v1"
+MONITORING_PROJECTION_MARKER_VALUE = b"chenyida-erp-monitoring-projection/v1\n"
+RELEASE_IDENTITY_MARKER = ".chenyida-erp-release-identity-root-v1"
+RELEASE_IDENTITY_MARKER_VALUE = b"chenyida-erp-release-identity-root/v1\n"
+RELEASE_ARTIFACT_MARKER = ".chenyida-erp-release-artifact-root-v1"
+RELEASE_ARTIFACT_MARKER_VALUE = b"chenyida-erp-release-artifact-root/v1\n"
+BACKUP_STATUS_MARKER = ".chenyida-erp-receipt-root-v2"
+BACKUP_STATUS_MARKER_VALUE = b"chenyida-erp-receipt-root/v2\n"
 GLOBAL_RELEASE_LOCK = Path("/run/lock/chenyida-erp-release-gate-v1.lock")
 SAFE_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 MAX_JSON_BYTES = 1024 * 1024
@@ -79,8 +94,11 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/release/release-test-inventory-v1.json": "0444",
     "chenyida_erp_site/release/test-runtime-policy-v1.json": "0444",
     "chenyida_erp_site/release/vulnerability-policy-v1.json": "0444",
-    "chenyida_erp_site/scripts/check-credentials.mjs": "0444",
+    "chenyida_erp_site/scripts/backup-operations-policy.mjs": "0444",
     "chenyida_erp_site/scripts/backup-recovery-contract.mjs": "0444",
+    "chenyida_erp_site/scripts/backup-recovery-readiness-v3.mjs": "0444",
+    "chenyida_erp_site/scripts/backup-recovery-readiness-v4.mjs": "0444",
+    "chenyida_erp_site/scripts/check-credentials.mjs": "0444",
     "chenyida_erp_site/scripts/container-runtime-policy-test.py": "0444",
     "chenyida_erp_site/scripts/container-runtime-policy.py": "0444",
     "chenyida_erp_site/scripts/create-monitoring-host-bundle-manifest.py": "0555",
@@ -90,10 +108,12 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/install-release-supervisor.py": "0444",
     "chenyida_erp_site/scripts/install-monitoring-host-delivery.py": "0444",
     "chenyida_erp_site/scripts/monitoring-host-launcher.py": "0444",
+    "chenyida_erp_site/scripts/offhost-transfer-contract.mjs": "0444",
     "chenyida_erp_site/scripts/postdeploy-release-contract.mjs": "0444",
     "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs": "0444",
     "chenyida_erp_site/scripts/postdeploy-runtime-configuration-probe.mjs": "0444",
     "chenyida_erp_site/scripts/postgresql-cluster-recovery-contract.mjs": "0444",
+    "chenyida_erp_site/scripts/postgresql-cluster-transfer-contract.mjs": "0444",
     "chenyida_erp_site/scripts/postgresql-runtime-privilege-catalog.mjs": "0444",
     "chenyida_erp_site/scripts/postgresql-runtime-privilege-catalog.sql": "0444",
     "chenyida_erp_site/scripts/postgresql-runtime-privilege-interlock.sh": "0444",
@@ -140,6 +160,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tools/ops-monitoring/host-runner.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/host-store.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/notifier.mjs": "0444",
+    "chenyida_erp_site/tools/ops-monitoring/projection-publisher.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/resource-policy.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/strict-json.mjs": "0444",
     "chenyida_erp_site/tests/release-gate-fixture.mjs": "0444",
@@ -156,12 +177,14 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-operator.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-policy.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-ops-monitoring-host-delivery.test.mjs": "0444",
+    "chenyida_erp_site/tests/selfhost-ops-monitoring-projection-publisher.test.mjs": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_browser.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_candidate_snapshot.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_container_runtime.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_installer.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_launcher.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_monitoring_host_delivery.py": "0444",
+    "chenyida_erp_site/tests/test_release_supervisor_monitoring_projection.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_runtime_secret_file.py": "0444",
 }
 
@@ -174,6 +197,8 @@ ENTRYPOINTS = {
     "INSTALL_MONITORING_HOST_DELIVERY": "chenyida_erp_site/scripts/install-monitoring-host-delivery.py",
     "ROLLBACK_MONITORING_HOST_DELIVERY": "chenyida_erp_site/scripts/install-monitoring-host-delivery.py",
     "DISABLE_MONITORING_HOST_DELIVERY": "chenyida_erp_site/scripts/install-monitoring-host-delivery.py",
+    "PUBLISH_MONITORING_COMPONENTS_PROJECTION": "chenyida_erp_site/tools/ops-monitoring/projection-publisher.mjs",
+    "PUBLISH_MONITORING_BACKUP_PROJECTION": "chenyida_erp_site/tools/ops-monitoring/projection-publisher.mjs",
 }
 
 CONFIRMATIONS = {
@@ -185,6 +210,8 @@ CONFIRMATIONS = {
     "INSTALL_MONITORING_HOST_DELIVERY": "AUTHORIZE_INSTALL_EXACT_MONITORING_HOST_DELIVERY",
     "ROLLBACK_MONITORING_HOST_DELIVERY": "AUTHORIZE_ROLLBACK_EXACT_MONITORING_HOST_DELIVERY",
     "DISABLE_MONITORING_HOST_DELIVERY": "AUTHORIZE_DISABLE_EXACT_MONITORING_HOST_DELIVERY",
+    "PUBLISH_MONITORING_COMPONENTS_PROJECTION": "AUTHORIZE_PUBLISH_EXACT_MONITORING_COMPONENTS_PROJECTION",
+    "PUBLISH_MONITORING_BACKUP_PROJECTION": "AUTHORIZE_PUBLISH_EXACT_MONITORING_BACKUP_PROJECTION",
 }
 
 RUNTIME_PRIVILEGE_OPERATIONS = {
@@ -217,6 +244,16 @@ RUNTIME_PRIVILEGE_RECOVERY_PARAMETER_FIELDS = {
 
 SNAPSHOT_PARAMETER_FIELDS = {
     "candidate_snapshot_receipt", "candidate_snapshot_receipt_sha256", "test_runtime_root",
+}
+
+MONITORING_PROJECTION_COMMON_PARAMETER_FIELDS = {
+    "projection_root", "projection_reader_gid", "projection_generation", "previous_projection_sha256",
+    "projection_published_at", "expected_source_sha256", "expected_projection_sha256",
+    "active_source", "host_config_source", "release_identity_source", "postdeploy_receipt_source",
+}
+
+MONITORING_PROJECTION_SOURCE_FIELDS = {
+    "path", "sha256", "bytes", "device", "inode", "uid", "gid", "mode", "nlink",
 }
 
 PARAMETER_FIELDS = {
@@ -258,6 +295,10 @@ PARAMETER_FIELDS = {
     },
     "DISABLE_MONITORING_HOST_DELIVERY": {
         "expected_active_sha256", "disable_id",
+    },
+    "PUBLISH_MONITORING_COMPONENTS_PROJECTION": MONITORING_PROJECTION_COMMON_PARAMETER_FIELDS,
+    "PUBLISH_MONITORING_BACKUP_PROJECTION": MONITORING_PROJECTION_COMMON_PARAMETER_FIELDS | {
+        "backup_readiness_source", "cluster_policy_source",
     },
 }
 
@@ -330,6 +371,134 @@ def trusted_regular_file(path: Path, mode: int, maximum: int = MAX_JSON_BYTES, c
         return raw, before
     finally:
         os.close(descriptor)
+
+
+def trusted_owned_directory(path: Path, uid: int, gid: int, modes: set[int], code: str) -> os.stat_result:
+    try:
+        metadata = os.lstat(path)
+        resolved = Path(os.path.realpath(path))
+    except OSError:
+        reject(code)
+    if not path.is_absolute() or path == Path("/") or resolved != path or not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode) \
+        or metadata.st_uid != uid or metadata.st_gid != gid or stat.S_IMODE(metadata.st_mode) not in modes:
+        reject(code)
+    return metadata
+
+
+def trusted_owned_marker(path: Path, raw_expected: bytes, uid: int, gid: int, modes: set[int], code: str) -> None:
+    descriptor: int | None = None
+    try:
+        before = os.lstat(path)
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or stat.S_ISLNK(before.st_mode) or before.st_nlink != 1 \
+            or before.st_uid != uid or before.st_gid != gid or stat.S_IMODE(before.st_mode) not in modes \
+            or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) \
+            != (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns):
+            reject(code)
+        value = b""
+        while len(value) < opened.st_size:
+            chunk = os.read(descriptor, opened.st_size - len(value))
+            if not chunk:
+                reject(code)
+            value += chunk
+        after = os.fstat(descriptor)
+        named = os.lstat(path)
+        if value != raw_expected or (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns) \
+            != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns) \
+            or (named.st_dev, named.st_ino, named.st_size, named.st_mtime_ns, named.st_ctime_ns) \
+            != (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns) \
+            or named.st_nlink != 1 or named.st_uid != uid or named.st_gid != gid or stat.S_IMODE(named.st_mode) not in modes:
+            reject(code)
+    except OSError:
+        reject(code)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def projection_source_metadata_matches(metadata: os.stat_result, spec: dict[str, Any]) -> bool:
+    return stat.S_ISREG(metadata.st_mode) and not stat.S_ISLNK(metadata.st_mode) and metadata.st_nlink == spec["nlink"] \
+        and str(metadata.st_dev) == spec["device"] and str(metadata.st_ino) == spec["inode"] and metadata.st_size == spec["bytes"] \
+        and metadata.st_uid == spec["uid"] and metadata.st_gid == spec["gid"] and f"{stat.S_IMODE(metadata.st_mode):04o}" == spec["mode"]
+
+
+def verify_authorized_projection_source(spec: dict[str, Any]) -> None:
+    code = "SUPERVISOR_MONITORING_PROJECTION_SOURCE_CHANGED"
+    source = Path(spec["path"])
+    descriptor: int | None = None
+    try:
+        before = os.lstat(source)
+        if not projection_source_metadata_matches(before, spec):
+            reject(code)
+        descriptor = os.open(source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        opened = os.fstat(descriptor)
+        if not projection_source_metadata_matches(opened, spec) or (before.st_dev, before.st_ino, before.st_mtime_ns, before.st_ctime_ns) \
+            != (opened.st_dev, opened.st_ino, opened.st_mtime_ns, opened.st_ctime_ns):
+            reject(code)
+        chunks: list[bytes] = []
+        remaining = opened.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining))
+            if not chunk:
+                reject(code)
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        raw = b"".join(chunks)
+        after = os.fstat(descriptor)
+        named = os.lstat(source)
+        identity = (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns)
+        if sha256(raw) != spec["sha256"] or identity != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns) \
+            or identity != (named.st_dev, named.st_ino, named.st_size, named.st_mtime_ns, named.st_ctime_ns) \
+            or not projection_source_metadata_matches(after, spec) or not projection_source_metadata_matches(named, spec):
+            reject(code)
+    except OSError:
+        reject(code)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def verify_monitoring_projection_sources(parameters: dict[str, Any], operation: str) -> None:
+    gid = parameters["projection_reader_gid"]
+    trusted_owned_directory(MONITORING_PROJECTION_ROOT.parent, 0, 0, {0o755}, "SUPERVISOR_MONITORING_PROJECTION_ROOT_INVALID")
+    trusted_owned_directory(MONITORING_PROJECTION_ROOT, 0, gid, {0o750}, "SUPERVISOR_MONITORING_PROJECTION_ROOT_INVALID")
+    for kind in ("components", "backup"):
+        trusted_owned_directory(MONITORING_PROJECTION_ROOT / kind, 0, gid, {0o750}, "SUPERVISOR_MONITORING_PROJECTION_ROOT_INVALID")
+    trusted_owned_marker(
+        MONITORING_PROJECTION_ROOT / MONITORING_PROJECTION_MARKER,
+        MONITORING_PROJECTION_MARKER_VALUE, 0, gid, {0o400}, "SUPERVISOR_MONITORING_PROJECTION_ROOT_INVALID",
+    )
+
+    identity_gid = parameters["release_identity_source"]["gid"]
+    trusted_owned_directory(RELEASE_IDENTITY_ROOT, 0, identity_gid, {0o750}, "SUPERVISOR_MONITORING_PROJECTION_IDENTITY_ROOT_INVALID")
+    trusted_owned_marker(
+        RELEASE_IDENTITY_ROOT / RELEASE_IDENTITY_MARKER, RELEASE_IDENTITY_MARKER_VALUE,
+        0, identity_gid, {0o440}, "SUPERVISOR_MONITORING_PROJECTION_IDENTITY_ROOT_INVALID",
+    )
+    receipt_root = Path(parameters["postdeploy_receipt_source"]["path"]).parent
+    trusted_owned_directory(receipt_root, 0, 0, {0o750}, "SUPERVISOR_MONITORING_PROJECTION_POSTDEPLOY_ROOT_INVALID")
+    trusted_owned_marker(
+        receipt_root / RELEASE_ARTIFACT_MARKER, RELEASE_ARTIFACT_MARKER_VALUE,
+        0, 0, {0o440}, "SUPERVISOR_MONITORING_PROJECTION_POSTDEPLOY_ROOT_INVALID",
+    )
+    trusted_owned_directory(MONITORING_PRIVATE_CONFIG.parent, 0, 0, {0o700}, "SUPERVISOR_MONITORING_PROJECTION_CONFIG_ROOT_INVALID")
+
+    sources = [
+        parameters["active_source"], parameters["host_config_source"], parameters["release_identity_source"],
+        parameters["postdeploy_receipt_source"],
+    ]
+    if operation == "PUBLISH_MONITORING_BACKUP_PROJECTION":
+        readiness_gid = parameters["backup_readiness_source"]["gid"]
+        trusted_owned_directory(MONITORING_BACKUP_READINESS_FILE.parent, 0, readiness_gid, {0o2750}, "SUPERVISOR_MONITORING_PROJECTION_BACKUP_ROOT_INVALID")
+        trusted_owned_marker(
+            MONITORING_BACKUP_READINESS_FILE.parent / BACKUP_STATUS_MARKER, BACKUP_STATUS_MARKER_VALUE,
+            0, readiness_gid, {0o400, 0o440}, "SUPERVISOR_MONITORING_PROJECTION_BACKUP_ROOT_INVALID",
+        )
+        trusted_owned_directory(MONITORING_CLUSTER_POLICY_FILE.parent, 0, 0, {0o700, 0o750, 0o755}, "SUPERVISOR_MONITORING_PROJECTION_POLICY_ROOT_INVALID")
+        sources += [parameters["backup_readiness_source"], parameters["cluster_policy_source"]]
+    for source in sources:
+        verify_authorized_projection_source(source)
 
 
 def trusted_directory(path: Path, allowed_modes: set[int], code: str) -> os.stat_result:
@@ -445,6 +614,52 @@ def absolute_path(value: Any, code: str) -> str:
     return value
 
 
+def validate_monitoring_projection_source(value: Any, expected_path: Path, expected_modes: set[str], expected_gid: int | None = None) -> dict[str, Any]:
+    value = exact_fields(value, MONITORING_PROJECTION_SOURCE_FIELDS, "SUPERVISOR_MONITORING_PROJECTION_SOURCE_INVALID")
+    if absolute_path(value["path"], "SUPERVISOR_MONITORING_PROJECTION_SOURCE_INVALID") != str(expected_path):
+        reject("SUPERVISOR_MONITORING_PROJECTION_SOURCE_PATH_INVALID")
+    if not isinstance(value["sha256"], str) or not SHA256.fullmatch(value["sha256"]):
+        reject("SUPERVISOR_MONITORING_PROJECTION_SOURCE_INVALID")
+    if not isinstance(value["bytes"], int) or isinstance(value["bytes"], bool) or not 1 <= value["bytes"] <= MAX_JSON_BYTES:
+        reject("SUPERVISOR_MONITORING_PROJECTION_SOURCE_INVALID")
+    for field, allow_zero in (("device", True), ("inode", False)):
+        if not isinstance(value[field], str) or not re.fullmatch(r"(?:0|[1-9][0-9]*)" if allow_zero else r"[1-9][0-9]*", value[field]):
+            reject("SUPERVISOR_MONITORING_PROJECTION_SOURCE_INVALID")
+    for field in ("uid", "gid"):
+        if not isinstance(value[field], int) or isinstance(value[field], bool) or not 0 <= value[field] <= 2**31 - 1:
+            reject("SUPERVISOR_MONITORING_PROJECTION_SOURCE_INVALID")
+    if value["uid"] != 0 or expected_gid is not None and value["gid"] != expected_gid or value["mode"] not in expected_modes or value["nlink"] != 1:
+        reject("SUPERVISOR_MONITORING_PROJECTION_SOURCE_INVALID")
+    return value
+
+
+def validate_monitoring_projection_parameters(operation: str, parameters: dict[str, Any]) -> None:
+    if absolute_path(parameters["projection_root"], "SUPERVISOR_MONITORING_PROJECTION_PATH_INVALID") != str(MONITORING_PROJECTION_ROOT):
+        reject("SUPERVISOR_MONITORING_PROJECTION_PATH_INVALID")
+    for field in ("projection_reader_gid", "projection_generation"):
+        if not isinstance(parameters[field], int) or isinstance(parameters[field], bool) or not 1 <= parameters[field] <= 2**31 - 1:
+            reject("SUPERVISOR_MONITORING_PROJECTION_INTEGER_INVALID")
+    for field in ("previous_projection_sha256", "expected_source_sha256", "expected_projection_sha256"):
+        if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]):
+            reject("SUPERVISOR_MONITORING_PROJECTION_DIGEST_INVALID")
+    if (parameters["projection_generation"] == 1) != (parameters["previous_projection_sha256"] == "0" * 64):
+        reject("SUPERVISOR_MONITORING_PROJECTION_GENERATION_INVALID")
+    parse_time(parameters["projection_published_at"], "SUPERVISOR_MONITORING_PROJECTION_TIME_INVALID")
+    validate_monitoring_projection_source(parameters["active_source"], MONITORING_ACTIVE_FILE, {"0444"}, 0)
+    validate_monitoring_projection_source(parameters["host_config_source"], MONITORING_PRIVATE_CONFIG, {"0400"}, 0)
+    validate_monitoring_projection_source(parameters["release_identity_source"], RELEASE_IDENTITY_FILE, {"0440"})
+    receipt_source = parameters["postdeploy_receipt_source"]
+    if not isinstance(receipt_source, dict) or not isinstance(receipt_source.get("path"), str):
+        reject("SUPERVISOR_MONITORING_PROJECTION_SOURCE_INVALID")
+    receipt_path = Path(receipt_source["path"])
+    if receipt_path.parent.parent != POSTDEPLOY_ROOT_BASE or not IDENTIFIER.fullmatch(receipt_path.parent.name) or receipt_path.name != f"{receipt_path.parent.name}.postdeploy-receipt.json":
+        reject("SUPERVISOR_MONITORING_PROJECTION_SOURCE_PATH_INVALID")
+    validate_monitoring_projection_source(receipt_source, receipt_path, {"0440"}, 0)
+    if operation == "PUBLISH_MONITORING_BACKUP_PROJECTION":
+        validate_monitoring_projection_source(parameters["backup_readiness_source"], MONITORING_BACKUP_READINESS_FILE, {"0640"})
+        validate_monitoring_projection_source(parameters["cluster_policy_source"], MONITORING_CLUSTER_POLICY_FILE, {"0440"}, 0)
+
+
 def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
     parameters = exact_fields(parameters, PARAMETER_FIELDS[operation], "SUPERVISOR_AUTHORIZATION_PARAMETERS_INVALID")
     for key in ("artifact_root", "postdeploy_root", "identity_root", "release_manifest", "probe_root", "runtime_probe_receipt", "candidate_snapshot_receipt", "gate_plan", "gate_report", "sbom_evidence", "security_evidence", "trivy_db_directory", "repository_root", "test_runtime_root", "compose_project_root", "host_config", "runtime_path"):
@@ -508,6 +723,8 @@ def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
         if postdeploy.parent != POSTDEPLOY_ROOT_BASE or postdeploy.name != parameters["run_id"] or Path(parameters["identity_root"]) != RELEASE_IDENTITY_ROOT \
             or probe_receipt.parent != RUNTIME_PROBE_ROOT or not probe_receipt.name.endswith(".runtime-configuration-probe.json"):
             reject("SUPERVISOR_AUTHORIZATION_POSTDEPLOY_PATH_INVALID")
+    if operation in ("PUBLISH_MONITORING_COMPONENTS_PROJECTION", "PUBLISH_MONITORING_BACKUP_PROJECTION"):
+        validate_monitoring_projection_parameters(operation, parameters)
     return parameters
 
 
@@ -604,6 +821,10 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
         reject("SUPERVISOR_AUTHORIZATION_TIME_INVALID")
     if is_v2:
         validate_parameters(operation, value["parameters"])
+        if operation in ("PUBLISH_MONITORING_COMPONENTS_PROJECTION", "PUBLISH_MONITORING_BACKUP_PROJECTION"):
+            published = parse_time(value["parameters"]["projection_published_at"], "SUPERVISOR_MONITORING_PROJECTION_TIME_INVALID")
+            if published >= expires or published > now + timedelta(minutes=5):
+                reject("SUPERVISOR_MONITORING_PROJECTION_TIME_INVALID")
     else:
         validate_runtime_privilege_parameters(value["parameters"], operation)
         if operation == "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT" and value["authorization_id"] == value["parameters"]["original_operation_id"]:
@@ -717,8 +938,10 @@ def command_for(bundle_root: Path, authorization: dict[str, Any]) -> list[str]:
         command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--candidate-snapshot-receipt", parameters["candidate_snapshot_receipt"], "--candidate-snapshot-receipt-sha256", parameters["candidate_snapshot_receipt_sha256"], "--test-runtime-root", parameters["test_runtime_root"], "--artifact-root", parameters["artifact_root"], "--release-id", parameters["release_id"], "--deployment-class", parameters["deployment_class"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--gate-plan-sha256", parameters["gate_plan_sha256"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--gate-plan", parameters["gate_plan"], "--gate-report", parameters["gate_report"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--expires-at", parameters["expires_at"], "--confirm", "CREATE_IMMUTABLE_RELEASE_MANIFEST"]
     elif operation == "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION":
         command += ["--release-manifest", parameters["release_manifest"], "--release-manifest-sha256", parameters["release_manifest_sha256"], "--probe-root", parameters["probe_root"], "--probe-id", parameters["probe_id"], "--reader-gid", str(parameters["reader_gid"]), "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--runtime-policy-sha256", parameters["runtime_policy_sha256"], "--deployment-class", parameters["deployment_class"], "--deployment-id", parameters["deployment_id"], "--compose-project", parameters["compose_project"], "--compose-project-root", parameters["compose_project_root"], "--caddy-container", parameters["caddy_container"], "--postgres-container", parameters["postgres_container"], "--web-container", parameters["web_container"], "--worker-container", parameters["worker_container"], "--confirm", "PROBE_EXACT_POSTDEPLOY_RUNTIME_CONFIGURATION"]
-    else:
+    elif operation == "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY":
         command += ["--release-manifest", parameters["release_manifest"], "--release-manifest-sha256", parameters["release_manifest_sha256"], "--postdeploy-root", parameters["postdeploy_root"], "--identity-root", parameters["identity_root"], "--reader-gid", str(parameters["reader_gid"]), "--run-id", parameters["run_id"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--runtime-policy-sha256", parameters["runtime_policy_sha256"], "--runtime-configuration-sha256", parameters["runtime_configuration_sha256"], "--deployment-class", parameters["deployment_class"], "--deployment-id", parameters["deployment_id"], "--compose-project", parameters["compose_project"], "--compose-project-root", parameters["compose_project_root"], "--caddy-container", parameters["caddy_container"], "--postgres-container", parameters["postgres_container"], "--web-container", parameters["web_container"], "--worker-container", parameters["worker_container"], "--confirm", "VERIFY_AND_PUBLISH_EXACT_POSTDEPLOY_IDENTITY"]
+    else:
+        reject("SUPERVISOR_COMMAND_OPERATION_INVALID")
     return command
 
 
@@ -1060,6 +1283,83 @@ def cleanup_runtime_privilege_node(runtime_root: Path | None) -> None:
     shutil.rmtree(resolved)
 
 
+def monitoring_projection_context(authorization: dict[str, Any], authorization_digest: str) -> dict[str, Any]:
+    parameters = authorization["parameters"]
+    backup = authorization["operation"] == "PUBLISH_MONITORING_BACKUP_PROJECTION"
+    sources = {
+        "active": parameters["active_source"],
+        "host_config": parameters["host_config_source"],
+        "release_identity": parameters["release_identity_source"],
+        "postdeploy_receipt": parameters["postdeploy_receipt_source"],
+    }
+    if backup:
+        sources.update({
+            "backup_readiness": parameters["backup_readiness_source"],
+            "cluster_policy": parameters["cluster_policy_source"],
+        })
+    return {
+        "schema_version": 1,
+        "contract": MONITORING_PROJECTION_CONTRACT,
+        "operation": "BACKUP" if backup else "COMPONENTS",
+        "authorization_sha256": authorization_digest,
+        "supervisor_bundle_sha256": authorization["supervisor_bundle_sha256"],
+        "projection_root": parameters["projection_root"],
+        "projection": {
+            "reader_gid": parameters["projection_reader_gid"],
+            "generation": parameters["projection_generation"],
+            "previous_projection_sha256": parameters["previous_projection_sha256"],
+            "published_at": parameters["projection_published_at"],
+            "expected_source_sha256": parameters["expected_source_sha256"],
+            "expected_projection_sha256": parameters["expected_projection_sha256"],
+        },
+        "sources": sources,
+    }
+
+
+def run_monitoring_projection_authorization(bundle_root: Path, authorization_path: Path, authorization: dict[str, Any],
+                                            authorization_digest: str, lock_descriptor: int) -> dict[str, Any]:
+    runtime_root: Path | None = None
+    operation = authorization["operation"]
+    try:
+        verify_monitoring_projection_sources(authorization["parameters"], operation)
+        runtime_root, node_path = prepare_runtime_privilege_node(authorization_digest)
+        verify_monitoring_projection_sources(authorization["parameters"], operation)
+        context = monitoring_projection_context(authorization, authorization_digest)
+        consume_authorization(authorization_path, authorization, authorization_digest)
+        verify_monitoring_projection_sources(authorization["parameters"], operation)
+        publisher = bundle_root / "chenyida_erp_site/tools/ops-monitoring/projection-publisher.mjs"
+        environment = {
+            "PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent",
+            "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES", "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+            "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+            "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(bundle_root / "chenyida_erp_site"),
+            "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": authorization["supervisor_bundle_sha256"],
+            "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": authorization_digest,
+            "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED": "YES",
+        }
+        try:
+            result = subprocess.run(
+                [str(node_path), "--max-old-space-size=64", "--disable-proto=throw", str(publisher)],
+                env=environment, input=canonical_json(context), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                check=False, timeout=120, pass_fds=(lock_descriptor,),
+            )
+        except (OSError, subprocess.SubprocessError):
+            reject("SUPERVISOR_MONITORING_PROJECTION_RUNNER_FAILED")
+        if result.returncode != 0 or result.stderr != b"" or len(result.stdout) < 2 or len(result.stdout) > 64 * 1024:
+            reject("SUPERVISOR_MONITORING_PROJECTION_RUNNER_FAILED")
+        value = strict_json(result.stdout, "SUPERVISOR_MONITORING_PROJECTION_RESPONSE_INVALID")
+        expected_kind = "backup" if operation == "PUBLISH_MONITORING_BACKUP_PROJECTION" else "components"
+        expected = authorization["parameters"]
+        if result.stdout != canonical_json(value) or not isinstance(value, dict) or set(value) != {"result", "kind", "generation", "projection_sha256", "source_sha256"} \
+            or value.get("result") not in {"PUBLISHED", "ALREADY_PUBLISHED"} or value.get("kind") != expected_kind \
+            or value.get("generation") != expected["projection_generation"] or value.get("projection_sha256") != expected["expected_projection_sha256"] \
+            or value.get("source_sha256") != expected["expected_source_sha256"]:
+            reject("SUPERVISOR_MONITORING_PROJECTION_RESPONSE_INVALID")
+        return value
+    finally:
+        cleanup_runtime_privilege_node(runtime_root)
+
+
 def runtime_privilege_probe_binding(parameters: dict[str, Any], operation: str) -> str:
     if operation == "RECONCILE":
         return parameters["runtime_probe_receipt_sha256"]
@@ -1250,6 +1550,13 @@ def main() -> None:
         if authorization["contract"] == RUNTIME_PRIVILEGE_AUTHORIZATION_CONTRACT:
             validate_runtime_privilege_probe_receipt(authorization["parameters"], bundle_digest, operation=authorization["operation"])
             result = run_runtime_privilege_authorization(
+                bundle_root, authorization_path, authorization, authorization_digest, lock_descriptor,
+            )
+            sys.stdout.buffer.write(canonical_json(result))
+            return
+        if authorization["operation"] in ("PUBLISH_MONITORING_COMPONENTS_PROJECTION", "PUBLISH_MONITORING_BACKUP_PROJECTION"):
+            assert_no_runtime_privilege_interlock(bundle_root)
+            result = run_monitoring_projection_authorization(
                 bundle_root, authorization_path, authorization, authorization_digest, lock_descriptor,
             )
             sys.stdout.buffer.write(canonical_json(result))

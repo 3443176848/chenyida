@@ -1099,6 +1099,8 @@ def initialize_layout(layout: Layout, expected: dict[str, Any]) -> None:
     ensure_directory(layout.outbox_root, 0o2750, evaluator_uid, notifier_gid)
     ensure_directory(layout.delivery_root, 0o2750, notifier_uid, evaluator_gid)
     ensure_directory(layout.projection_root, 0o750, 0, evaluator_gid)
+    ensure_directory(layout.projection_root / "components", 0o750, 0, evaluator_gid)
+    ensure_directory(layout.projection_root / "backup", 0o750, 0, evaluator_gid)
     for directory in ("events", "grants"):
         ensure_directory(layout.outbox_root / directory, 0o2750, evaluator_uid, notifier_gid)
     for directory in ("claims", "attempts", "results", "acks", "readiness"):
@@ -1108,6 +1110,7 @@ def initialize_layout(layout: Layout, expected: dict[str, Any]) -> None:
         (layout.state_root / ".chenyida-erp-monitoring-host-state-v1", b"chenyida-erp-monitoring-host-state/v1\n", evaluator_uid, evaluator_gid),
         (layout.outbox_root / ".chenyida-erp-monitoring-outbox-v1", b"chenyida-erp-monitoring-outbox/v1\n", evaluator_uid, notifier_gid),
         (layout.delivery_root / ".chenyida-erp-monitoring-delivery-v1", b"chenyida-erp-monitoring-delivery/v1\n", notifier_uid, evaluator_gid),
+        (layout.projection_root / ".chenyida-erp-monitoring-projection-v1", b"chenyida-erp-monitoring-projection/v1\n", 0, evaluator_gid),
     )
     for path, raw, uid, gid in markers:
         write_new_file(path, raw, 0o400, uid, gid, "MONITOR_INSTALL_MARKER_INVALID")

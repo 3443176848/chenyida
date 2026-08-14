@@ -366,6 +366,13 @@ class MonitoringHostDeliveryTest(unittest.TestCase):
                 for directory in (root, *[candidate for candidate in root.iterdir() if candidate.is_dir()]):
                     metadata = directory.stat()
                     self.assertEqual((stat.S_IMODE(metadata.st_mode), metadata.st_uid, metadata.st_gid), (0o2750, expected_uid, expected_gid))
+            for directory in (layout.projection_root, layout.projection_root / "components", layout.projection_root / "backup"):
+                metadata = directory.stat()
+                self.assertEqual((stat.S_IMODE(metadata.st_mode), metadata.st_uid, metadata.st_gid), (0o750, 0, expected["evaluator_gid"]))
+            projection_marker = layout.projection_root / ".chenyida-erp-monitoring-projection-v1"
+            marker_metadata = projection_marker.stat()
+            self.assertEqual(projection_marker.read_bytes(), b"chenyida-erp-monitoring-projection/v1\n")
+            self.assertEqual((stat.S_IMODE(marker_metadata.st_mode), marker_metadata.st_uid, marker_metadata.st_gid), (0o400, 0, expected["evaluator_gid"]))
             launch_layout = monitor_launcher.Layout(
                 install_root=layout.install_root,
                 bundles_root=layout.bundles_root,
