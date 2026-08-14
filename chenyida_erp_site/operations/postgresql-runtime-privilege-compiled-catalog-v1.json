@@ -49,7 +49,7 @@
       },
       {
         "path": "tests/selfhost-postgresql-runtime-privilege-catalog-postgres.sh",
-        "sha256": "05d4f437250fbf8c2210c53c47954208ef1f3635d4875cbcfd195d2cf55f6914"
+        "sha256": "fffa2d06eae5666a4b4c38d45be4cdf57d4e1ba1ae82e419aad734a1723b7006"
       },
       {
         "path": "tests/runtime-privilege-operator-postgres-fixture.mjs",
@@ -13692,5 +13692,5 @@
     }
   },
   "catalog_sha256": "e0070514bdaaa998f114583ed820047688ef8945aa5ea3cafdfb873e3df02e8c",
-  "artifact_sha256": "694daeb7d309cc1f0eb923158769daf936fd01cf4deac1cfde176af03f26c30b"
+  "artifact_sha256": "b8536bc18531a819e8baa77012f9ef91e67241cc769978df482b81aa6a869beb"
 }

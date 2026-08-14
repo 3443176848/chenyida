@@ -1198,7 +1198,7 @@
     },
     {
       "path": "tests/selfhost-postgresql-runtime-privilege-catalog.test.mjs",
-      "sha256": "9e6fa82928315aea4ddeb0baca9e18c2fdeedcce9841d4e6159b270ad4d6437d",
+      "sha256": "3f3e88befbba1a95070809773380b51d6a550bcd72c7ad7d5f348cdd8701eebc",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1837,7 +1837,7 @@
     },
     {
       "path": "tests/selfhost-release-identity-contract.test.mjs",
-      "sha256": "09091cf4ce41d9894716bdeb65b41376f1eab71145c84298f0e5e5c4b38a514e",
+      "sha256": "f8490372d3fcd46b464e4659aeb72e122195081a6291d9402353264c9c9a4fa5",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",

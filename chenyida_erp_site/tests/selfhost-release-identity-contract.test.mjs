@@ -426,7 +426,11 @@ test("writer pins trusted tools and publishes only after strict four-service rei
   assert.match(writer,/--network none --read-only --cap-drop ALL --security-opt no-new-privileges/);
   assert.match(writer,/--memory 64m --memory-swap 64m --cpus 0\.25 --pids-limit 16/);
   assert.match(writer,/chenyida\.erp\.postdeploy-verifier/);
-  assert.match(writer,/flock -n 9/);
+  assert.match(writer,/LOCK_HELPER="\$SCRIPT_DIR\/release-gate-lock\.sh"/);
+  assert.match(writer,/\. "\$LOCK_HELPER"/);
+  assert.match(writer,/acquire_chenyida_release_gate_lock/);
+  assert.doesNotMatch(writer,/flock -n 9/);
+  assert.ok(writer.indexOf("acquire_chenyida_release_gate_lock") < writer.indexOf("NODE_IMAGE='node@sha256:"));
   assert.match(writer,/--pull=never/);
   assert.match(writer,/refusing to remove an unowned postdeploy bootstrap container/);
   assert.match(writer,/POST_DEPLOY_CURRENT_RUNTIME_STRICT/);

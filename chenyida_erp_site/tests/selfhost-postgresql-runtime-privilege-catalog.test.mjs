@@ -143,6 +143,14 @@ test("repository compiled catalog is current, source-bound and below the fixed s
   }, { tables: 234, sequences: 211, routines: 394, types: 6, extensions: 3, columns: 3132, constraints: 1709, indexes: 957, triggers: 285 });
 });
 
+test("PG integration sends secret-bearing operator transactions through psql stdin", async () => {
+  const shell = await readFile(new URL("./selfhost-postgresql-runtime-privilege-catalog-postgres.sh", import.meta.url), "utf8");
+  const transactionInputs = [...shell.matchAll(/psql -X -v ON_ERROR_STOP=1 < "\$(PRIVILEGE_PLAN|PASSWORD_RECONCILE_PLAN)"/g)]
+    .map((match) => match[1]);
+  assert.deepEqual(transactionInputs, ["PRIVILEGE_PLAN", "PASSWORD_RECONCILE_PLAN"]);
+  assert.doesNotMatch(shell, /psql[^\n]*\s-f "\$(?:PRIVILEGE_PLAN|PASSWORD_RECONCILE_PLAN)"/);
+});
+
 test("compiled catalog rejects unknown fields, source drift, object drift, unsupported surfaces and stale hashes", () => {
   const mutations = [
     (value) => { value.extra = true; },

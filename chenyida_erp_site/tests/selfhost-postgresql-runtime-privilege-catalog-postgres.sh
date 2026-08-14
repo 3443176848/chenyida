@@ -469,7 +469,7 @@ assert_transaction_log_secret_free() {
 STAGE=RUNTIME_PRIVILEGE_RECONCILE
 PRIVILEGE_RECONCILE_ERROR="$TASK_ROOT/runtime-privilege-reconcile.error"
 enable_transaction_log_audit
-if ! psql -X -v ON_ERROR_STOP=1 -f "$PRIVILEGE_PLAN" >/dev/null 2>"$PRIVILEGE_RECONCILE_ERROR"; then
+if ! psql -X -v ON_ERROR_STOP=1 < "$PRIVILEGE_PLAN" >/dev/null 2>"$PRIVILEGE_RECONCILE_ERROR"; then
   chmod 0600 "$PRIVILEGE_RECONCILE_ERROR"
   sed -n '1p' "$PRIVILEGE_RECONCILE_ERROR" | sed 's/[^A-Za-z0-9_:. -]/_/g' >&2
   exit 1
@@ -580,7 +580,7 @@ fi
 chmod 0600 "$PASSWORD_RECONCILE_PLAN" "$PASSWORD_RECONCILE_ERROR"
 STAGE=RUNTIME_PRIVILEGE_PASSWORD_ONLY_RECONCILE
 enable_transaction_log_audit
-if ! psql -X -v ON_ERROR_STOP=1 -f "$PASSWORD_RECONCILE_PLAN" >/dev/null 2>"$PASSWORD_RECONCILE_ERROR"; then
+if ! psql -X -v ON_ERROR_STOP=1 < "$PASSWORD_RECONCILE_PLAN" >/dev/null 2>"$PASSWORD_RECONCILE_ERROR"; then
   sed -n '1p' "$PASSWORD_RECONCILE_ERROR" | sed 's/[^A-Za-z0-9_:. -]/_/g' >&2
   exit 1
 fi

@@ -134,11 +134,11 @@
     },
     {
       "path": "operations/postgresql-runtime-privilege-compiled-catalog-v1.json",
-      "sha256": "87596b3183f274ff9834c04e483da5b3c07ac3c1dfc7d4b9d6123037d49fb4cf"
+      "sha256": "e5f3c321e78a938ae8c1fb2dec3cba6d0ea7202d9c71fcddc9ea5b87fa1c71e3"
     },
     {
       "path": "operations/postgresql-runtime-privilege-policy-v2.json",
-      "sha256": "fc24dd008e41fe44ec60c0111a67ff1249be710c08a7b71457626737ec8627c5"
+      "sha256": "9870daab872a0e4df4958bce98f26ffef2ed2bdfc94047974e64a0cd49d3ef3c"
     },
     {
       "path": "operations/runtime-secret-file-policy-v1.json",
@@ -173,6 +173,6 @@
       "sha256": "d155ca04fea4728ae2bdf6481e043dc243b20a0b15e6e396affe9a99587ab6f4"
     }
   ],
-  "runtime_privilege_policy_sha256": "fefebac3c5acce167a9e189f40cbaa27e072b7b02867505842de4779fad68cd0",
-  "policy_sha256": "b2e5cc0ff9a6febc8427a84286ef76f56bb3bd6de81f579ecc9ee7e00a1c7f65"
+  "runtime_privilege_policy_sha256": "e31413ae3b8fe8ef4c119e043db8d7777524ac5ad4515936727aab57dbd66ddf",
+  "policy_sha256": "85c7d2ea7b075d9ffd20a8a1962648fdaeba63509b2a7af59cb671e4c9f17acc"
 }

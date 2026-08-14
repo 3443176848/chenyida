@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`。严格起点为TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`；Web锁、Backup、PG17 catalog、v2角色/ACL、逐服务session/secret、container/tablespace静态合同以及D-134受控operator均已在仓库/隔离环境闭合。真实PG17 system adapter已证明单事务提交后SIGKILL、durable journal `CAPTURE_AND_VERIFY`、结构no-op五口令重置及秘密日志零泄漏。旧静态bundle`bac5e882…cd9e`已失效，当前自动执行最终完整回归、源码冻结和canonical manifest-only直接子提交。真实角色/凭据/Volume、UAT/生产、host安装、Migration/deploy、真实备份恢复及WAL/PITR继续阻塞，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56`。严格起点为TASK55收口提交`fb1f7e8893b2affba0ca07ecd9629ae2726adca9`/tree`13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`；Web锁、Backup、PG17 catalog、v2角色/ACL、逐服务session/secret、container/tablespace静态合同以及D-134受控operator均已在仓库/隔离环境闭合。真实PG17 system adapter已证明单事务提交后SIGKILL、durable journal `CAPTURE_AND_VERIFY`、结构no-op五口令重置及秘密日志零泄漏。干净Node 121/1025和PG inventory 84/401通过；PG包装器随后发现catalog测试的旧`psql -f`调用不能消费新stdin口令事务并失败关闭，现已修复、刷新内容寻址链且独立catalog test通过，等待从修复提交重跑全套。旧静态bundle`bac5e882…cd9e`已失效。真实角色/凭据/Volume、UAT/生产、host安装、Migration/deploy、真实备份恢复及WAL/PITR继续阻塞，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -101,6 +101,8 @@
 
 2026-08-13第四十四次调度事件：TASK56保持唯一`DOING`。D-134受控operator已闭合直接消费者七值凭据、共享全局release锁、authorization消费前durable intent、append-only/fsync journal、backup fence双向联锁、BOOTSTRAP predeploy binding、RECONCILE strict postdeploy probe、单事务五LOGIN口令轮换和精确RECOVER/quarantine；结构no-op仍重置及核验全部五口令。固定PG17真实system adapter在46个Migration后执行事务并于提交返回后立即SIGKILL，随后从journal完成`CAPTURE_AND_VERIFY`和归档；七个fixture秘密与完整SCRAM verifier在stdout/stderr/PostgreSQL日志中均未出现。operator16/16、Supervisor29/29、release/catalog34/34和真实适配器通过，临时容器/目录清理，UAT四服务restart0/OOM false。旧静态bundle已失效，当前继续最终完整回归与canonical bundle；未安装host、创建真实secret或修改角色/ACL/Volume/UAT/生产。
 
+2026-08-13第四十五次调度事件：TASK56保持唯一`DOING`。集中式release lock契约重绑后，干净提交完成Vinext构建及Node 121文件/1025项；固定PG17 inventory 84文件/401项全部通过，但包装器随后在`RUNTIME_PRIVILEGE_RECONCILE`失败关闭。独立阶段重放确认旧catalog集成脚本仍以`psql -f`执行已改为`\password`加同一stdin buffer的新事务，因而等待交互口令。两处BOOTSTRAP/结构no-op RECONCILE现均改为stdin重定向并新增静态禁止`-f`断言；隔离refresh和完整catalog test通过。随后82项受影响合同以81/82暴露release identity writer仍要求内联`flock -n 9`的旧断言，现改为验证集中helper、调用顺序并禁止重复锁实现，更新后的identity/manifest/gate合同43/43通过。catalog文件/artifact为`e5f3c321…c71e3`/`b8536bc1…9beb`，operator policy文件/逻辑为`53b502fd…d163`/`85c7d2ea…7acc`，最终inventory/test policy更新为`1112404d…5ab5`/`df82237b…36e7`。当前从修复提交重跑全部门；无秘密输出、UAT/生产或运行面变化。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -117,7 +119,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 | PostgreSQL运行时最小权限与凭据边界闭环 | DOING | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50、SELFHOST-OPS-RELEASE-GATE-42、D-132、D-133、D-134 | `CONTROLLED OPERATOR REPOSITORY VERIFIED / FINAL BUNDLE AND ACTUAL ACTIVATION OPEN / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`。直接消费者、global lock、durable journal/fence、BOOTSTRAP/RECONCILE guard和RECOVER已通过真实隔离PG17提交后SIGKILL恢复；当前执行最终完整回归和canonical bundle。现有UAT共享superuser及环境秘密未改变。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56.md)和[Operator手册](../self-hosting/postgresql-runtime-privilege-operator.md)。 |
+| SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 | PostgreSQL运行时最小权限与凭据边界闭环 | DOING | Codex主智能体（唯一写入、测试调度与集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-13 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、SELFHOST-OPS-CONTAINER-RUNTIME-HARDENING-50、SELFHOST-OPS-RELEASE-GATE-42、D-132、D-133、D-134 | `CONTROLLED OPERATOR REPOSITORY VERIFIED / FINAL BUNDLE AND ACTUAL ACTIVATION OPEN / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`。直接消费者、global lock、durable journal/fence、BOOTSTRAP/RECONCILE guard和RECOVER已通过真实隔离PG17提交后SIGKILL恢复；旧catalog测试的stdin调用差异已由正式PG包装器发现并修复，独立完整catalog test通过，当前从修复提交重跑最终全套并生成canonical bundle。现有UAT共享superuser及环境秘密未改变。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56.md)和[Operator手册](../self-hosting/postgresql-runtime-privilege-operator.md)。 |
 
 ## 已完成任务
 
