@@ -4,6 +4,13 @@
 
 ## 2026-08-14
 
+### SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60 - `docs: start release snapshot reservation closure`
+
+- 调度：TASK59收口提交`d7780864eb239cbeadf4aa84e92a3a6bb62016c1`/tree`2a9ecd452ca53cb7691ad58ce0dc3082a7aa4d84`后从零`DOING`自动登记TASK60为唯一active task。
+- 目标：以同设备私有staging和创建前0400 canonical reservation receipt绑定target root dev/inode/mode，再以NOREPLACE提升同一inode，并在Git add前后与target-only崩溃恢复中保持所有权证明；foreign、替换、非空、跨设备或证据缺失一律失败关闭。
+- 资源边界：起点available约1.9GiB、Swap887MiB/1GiB并超过80%停止线、根盘13GiB、Load`0.09/0.19/0.47`、`oom_kill=0`。先只执行轻量文档、源码、纯Git/Python fixture和只读审计，不启动build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像任务。
+- 授权边界：不安装host、不生成A1/A2授权、不外部push、不build/deploy、不修改UAT/生产、账号、角色、secret、ACL、Volume、网络、systemd、Swap、Docker daemon或数据；系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59 - `feat: add release candidate snapshot lifecycle` / `test: stabilize snapshot cap-drop fixture` / `release: synchronize snapshot contract inventory` / `release: bind final task59 snapshot input` / `docs: close release candidate snapshot lifecycle`
 
 - 调度/范围：从clean `ad87edc45a32521cfcec36b6214f4d510d750e54`/tree`5831507e94a40641dab9a630ce3a95620c037689`启动唯一`DOING`。只实施仓库工具、合成隔离Git fixture、发布合同与治理文档；共享主工作区不切换/清理，不安装host、不生成正式授权、不外部push、不修改UAT/生产、账号、角色、secret、ACL、Volume或真实数据。

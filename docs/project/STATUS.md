@@ -2,6 +2,17 @@
 
 最后更新时间：2026-08-14（Asia/Shanghai）
 
+## SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60（执行中；资源停止线有效）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / DESIGN AND LIGHTWEIGHT IMPLEMENTATION / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；关闭D-135创建前target所有权歧义 |
+| 严格起点 | PASS / CONTROLLED | `d7780864eb239cbeadf4aa84e92a3a6bb62016c1`/tree`2a9ecd452ca53cb7691ad58ce0dc3082a7aa4d84`；工作区仅既有受保护未跟踪报告 |
+| 目标合同 | IN PROGRESS | 同设备私有staging、0400 reservation receipt、NOREPLACE同inode提升、Git前后核验与target-only恢复；foreign/替换/非空/跨设备失败关闭 |
+| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap887MiB/1GiB（超过80%）、根盘13GiB、Load`0.09/0.19/0.47`、`oom_kill=0`；禁止新重任务，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无host、A1—A3、镜像、外部、UAT/生产、数据库、Volume、账号或网络动作 |
+| 系统是否可用 | NO | 当前无源码匹配镜像、正式门、真实异机恢复/迁移、岗位/员工签字或切换 |
+
 ## SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59（完成；独立候选快照合同已验证，正式A2仍阻塞）
 
 | 验证项 | 结果 | 说明 |

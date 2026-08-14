@@ -275,7 +275,7 @@ TASK53已完成首次晋升自锁修复，TASK54关闭原异机传输合同，TA
 
 1. `DONE / TASK54`：四域V2异机传输provenance、客户端加密、不可变接收/保留、非重入调度和失败恢复合同已在合成fixture与本机隔离目标完成；真实异机和当前数据仍未授权。
 2. `DONE / TASK59`：A2独立detached candidate worktree的PREPARE/VERIFY/REMOVE、不可变回执、借用runtime、锁内多次验证和跨代quarantine守恒已在合成隔离Git中闭合；没有实际创建host候选或运行A2。
-3. `OPEN / NEXT`：在同设备私有staging创建空目录与0400 reservation receipt，绑定target root dev/inode/mode，并贯穿Git add前后和target-only恢复；receipt前崩溃、inode替换、非空、跨设备或Git未保留inode必须失败关闭。完成后统一重建bundle及镜像。
+3. `DOING / TASK60`：在同设备私有staging创建空目录与0400 reservation receipt，绑定target root dev/inode/mode，并贯穿Git add前后和target-only恢复；receipt前崩溃、inode替换、非空、跨设备或Git未保留inode必须失败关闭。完成后统一重建bundle及镜像。
 4. `OPEN`：为TASK49监控工具建立内容寻址host delivery包：installer、service/timer、非特权notifier边界、配置schema、receipt/journal、升级/惰性回退和隔离测试；不得实际安装。
 5. `OPEN`：以机器源生成11角色→permission→API/data domain矩阵和路由覆盖负向合同，附业务批准状态；现有若干手写角色测试遗漏planning，不能替代完整漂移检测。
 6. `OPEN`：以合成隔离数据证明历史导入基线0017物化后连续升级至当前0046，覆盖重复执行、失败回滚和升级后全量reconciliation。该任务改动候选输入后必须重建镜像/证据。
@@ -287,7 +287,7 @@ TASK53已完成首次晋升自锁修复，TASK54关闭原异机传输合同，TA
 
 ## 14. 当前最小外部请求
 
-当前不需要项目负责人立即批准host或数据动作：D-135快照主合同已完成，但当前镜像已失效，A2仍被target reservation、最终镜像、A1和A3阻断；A4真实链缺目标/策略，A5也缺host delivery实现。持续交付负责人将先从第13节第3项自动推进，再按依赖处理其余开放仓库任务。项目负责人若愿意并行准备非秘密外部信息，最小输入是A4a的三个故障域/RPO/RTO/加密/保留/责任人，或未来A3的私有Git/registry目标名称；密码、Token和密钥仍只放root-only文件，不发聊天。
+当前不需要项目负责人立即批准host或数据动作：D-135快照主合同已完成，但当前镜像已失效，A2仍被target reservation、最终镜像、A1和A3阻断；A4真实链缺目标/策略，A5也缺host delivery实现。持续交付负责人已按第13节第3项启动TASK60，再按依赖处理其余开放仓库任务。项目负责人若愿意并行准备非秘密外部信息，最小输入是A4a的三个故障域/RPO/RTO/加密/保留/责任人，或未来A3的私有Git/registry目标名称；密码、Token和密钥仍只放root-only文件，不发聊天。
 
 第一个host变更请求最终仍是A1，但须等reservation收口并重建最终bundle后才请求；在此之前系统安全保持：UAT继续alpha.42/0040、历史候选和诊断证据只读保留但不可授权、正式入口失败关闭、无真实员工使用。
 

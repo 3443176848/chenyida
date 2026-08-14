@@ -83,6 +83,8 @@
 
 2026-08-14 第三十六次增量：TASK59按D-135完成A2独立detached候选快照仓库合同。最终source`7b9abec45a50da5655a2e78a0f42647536321290`与manifest-only直接子提交`89504045e4066bbe5236b19cf1a8bfa09701d508`形成78文件bundle`7927bb24…e5855`；PREPARE/VERIFY/REMOVE、不可变回执、借用runtime、全局锁后验证、三包装器双重验证及跨代quarantine守恒通过17项和三条独立攻击探针。无创建前reservation的PREPARE target-only继续失败关闭；TASK57本机镜像因Site输入变化失效，A1/A3/正式A2均未执行。lint后Swap超过80%而停止新重任务；一次旧Python go-live误用造成的本机SQLite初始化检查和root-only备份已如实保留，未触碰Node/PostgreSQL UAT或受保护Volume。整体继续`PRODUCTION NO-GO`。
 
+2026-08-14 第三十七次增量：`SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60`从TASK59收口提交`d7780864eb239cbeadf4aa84e92a3a6bb62016c1`/tree`2a9ecd452ca53cb7691ad58ce0dc3082a7aa4d84`启动为唯一`DOING`。范围固定为同设备私有staging、创建前0400 reservation、NOREPLACE同inode提升、Git前后验证和target-only恢复；不处置foreign target。起点Swap约887MiB/1GiB且超过80%停止线，因此只执行轻量文档、源码、纯Git/Python fixture和只读审计，不启动build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像任务；整体继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -251,11 +253,11 @@
 ## 8. 当前安全执行序列
 
 1. TASK41/TASK54/TASK55已完成G1内层恢复、外层签名密文来源和集群安全恢复的合成/隔离证据；真实G2被异机目标、密钥托管、RPO/RTO、WORM/timer、真实凭据绑定与专项授权阻塞。
-2. G3仓库工具已由TASK42完成，完整typecheck和Browser分别由TASK46/TASK47关闭，TASK50把六服务runtime policy加入第19步；TASK53关闭首次晋升自锁，TASK59按D-135关闭A2 detached snapshot主合同并形成78文件bundle。TASK57镜像已失效；下一安全仓库任务是创建前target reservation，之后须重建源码匹配镜像、刷新A1/A3输入并获得专项授权，才可进入正式A2。
+2. G3仓库工具已由TASK42完成，完整typecheck和Browser分别由TASK46/TASK47关闭，TASK50把六服务runtime policy加入第19步；TASK53关闭首次晋升自锁，TASK59按D-135关闭A2 detached snapshot主合同并形成78文件bundle。TASK57镜像已失效；TASK60正在关闭创建前target reservation，之后须重建源码匹配镜像、刷新A1/A3输入并获得专项授权，才可进入正式A2。
 3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
 4. TASK44/TASK45已完成会话绝对时限和health/Worker/storage/Migration真实性仓库修复；运行面验证等待同候选完整gate及专项部署授权。
 5. `SELFHOST-OPS-MONITORING-ALERTING-49`已完成仓库级监控、容量阈值、备份/恢复证据新鲜度、告警状态和排障合同；host安装、真实外部投递、值班责任人和演练仍需专项授权/资源。
-6. TASK50、TASK53—TASK59已完成容器策略、发布生命周期、异机provenance、集群/运行权限、历史候选、授权输入刷新和detached snapshot主合同。当前无`DOING`，但仍有target reservation、监控host delivery、11角色机器矩阵、0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器六项安全仓库前置；候选须在最终相关源码变化后统一重建，完成前不能声称只剩外部授权。
+6. TASK50、TASK53—TASK59已完成容器策略、发布生命周期、异机provenance、集群/运行权限、历史候选、授权输入刷新和detached snapshot主合同。当前唯一`DOING`为TASK60 target reservation；监控host delivery、11角色机器矩阵、0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器仍开放。候选须在最终相关源码变化后统一重建，完成前不能声称只剩外部授权。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。
 

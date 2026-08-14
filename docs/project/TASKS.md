@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前无`DOING`。`SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59`已按`DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / A2 STILL BLOCKED`释放active slot；TASK57本机镜像因Site变化已为`STALE / NOT AUTHORIZABLE`。下一安全仓库任务固定为PREPARE target reservation所有权闭环；host、A1—A3、外部锚点、UAT/生产、真实角色/secret/ACL/Volume、账号和数据均未授权，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60`。TASK59已关闭detached snapshot主合同；TASK60只在仓库和合成隔离Git中建立创建前同设备staging、0400 reservation receipt、NOREPLACE同inode提升及target-only恢复。Swap高于80%期间禁止新重任务；host、A1—A3、镜像、外部锚点、UAT/生产、真实角色/secret/ACL/Volume、账号和数据均未授权，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -117,6 +117,8 @@
 
 2026-08-14第五十二次调度事件：`SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59 DOING → DONE`。D-135固定detached候选、不可变回执、借用只读runtime、锁内多次VERIFY及守恒式跨代恢复；最终source`7b9abec4`与manifest-only `89504045`形成78文件bundle`7927bb24…e5855`。合成17项、Supervisor66、release inventory57、直接54、POSIX57、凭据与静态门通过；PREPARE target-only因尚无创建前reservation继续失败关闭，TASK57镜像失效。lint后Swap超过80%，没有继续启动新重任务；旧Python go-live误用造成的本机SQLite初始化检查和新备份已记录且未擅自删除。active slot释放，系统继续`PRODUCTION NO-GO`。
 
+2026-08-14第五十三次调度事件：主智能体从零`DOING`自动选择D-135明确的创建前reservation缺口，状态按`SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60 TODO → DOING`切换唯一active slot。严格起点为`d7780864`/tree`2a9ecd45`；Swap约887MiB/1GiB并超过80%，因此先限制为文档、源码、纯Git/Python轻量fixture和只读审计，不启动build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像任务。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -133,6 +135,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60 | 创建前候选target所有权闭环 | DOING | Codex主智能体（唯一写入、轻量测试串行、证据集成）、智能体团队（只读复核） | 2026-08-14 | SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59、D-135 | `DOING / DESIGN AND LIGHTWEIGHT IMPLEMENTATION / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。实现同设备私有staging、0400 reservation、NOREPLACE同inode提升和target-only崩溃恢复；Swap高于80%时不启动新重任务。无host、A1—A3、外部、UAT或数据授权。见[任务文档](../tasks/SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60.md)。 |
 
 ## 已完成任务
 
