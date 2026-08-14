@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前无`DOING`。TASK60已按D-136关闭创建前reservation、同inode提升和target-only所有权恢复；下一安全任务固定为TASK49监控的内容寻址host delivery包，待独立登记后再开始。Swap高于80%期间禁止新重任务；host安装、真实告警投递、A1—A3、镜像、外部锚点、UAT/生产、真实角色/secret/ACL/Volume、账号和数据均未授权，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-OPS-MONITORING-HOST-DELIVERY-61`。TASK61只在仓库和合成隔离环境建立TASK49监控的内容寻址installer、service/timer、root collector/非特权notifier、配置、回执、升级与回退合同。Swap高于80%期间禁止新重任务；host安装、账号/systemd、真实告警投递、A1—A3、镜像、外部锚点、UAT/生产、真实角色/secret/ACL/Volume和数据均未授权，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -121,6 +121,8 @@
 
 2026-08-14第五十四次调度事件：`SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60 DOING → DONE`。D-136以创建前`0400` reservation、固定父目录FD上的NOREPLACE、Git前后同inode核验和逐代terminal audit关闭target-only所有权；源码`15501787`与manifest-only `ffaaa909`形成78文件bundle`17fb9f99…fb5b8`。专项23/23、Supervisor72/72、credentials1671及静态门通过；Swap仍约873MiB/1GiB而未启动重任务。active slot释放，下一安全任务为监控host delivery仓库包，系统继续`PRODUCTION NO-GO`。
 
+2026-08-14第五十五次调度事件：主智能体从零`DOING`自动选择授权包第13节第4项，状态按`SELFHOST-OPS-MONITORING-HOST-DELIVERY-61 TODO → DOING`切换唯一active slot。严格起点为`08483c04`/tree`c18d4f49`；范围固定为仓库内容寻址安装/升级/回退包、root采集与非特权通知边界、systemd模板、配置/回执及合成隔离测试，不实际安装host、建账号、写systemd或发送通知。Swap约873MiB/1GiB并超过80%，先限制为轻量工作。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -137,8 +139,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-
-当前无执行中任务；下一任务须先完成独立登记提交。
+| SELFHOST-OPS-MONITORING-HOST-DELIVERY-61 | 监控宿主交付与通知权限边界 | DOING | Codex主智能体（唯一写入、轻量测试串行、证据集成）、数据迁移/应用测试/运维安全智能体（只读审计） | 2026-08-14 | SELFHOST-OPS-MONITORING-ALERTING-49、SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52、SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60、D-126、D-129 | `DOING / READ-ONLY AUDIT AND LIGHTWEIGHT DESIGN / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。实现内容寻址installer、service/timer、权限分离notifier、配置/回执、升级/回退与隔离合同；无host、账号、systemd、真实渠道、UAT或数据授权。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-HOST-DELIVERY-61.md)。 |
 
 ## 已完成任务
 

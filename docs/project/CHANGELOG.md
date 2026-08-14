@@ -4,6 +4,13 @@
 
 ## 2026-08-14
 
+### SELFHOST-OPS-MONITORING-HOST-DELIVERY-61 - `docs: start monitoring host delivery closure`
+
+- 调度：TASK60收口提交`08483c04231961ba5ac25757391793bfe208f926`/tree`c18d4f49d5ca9b491529c64ecd3f715ab9e53688`后从零`DOING`自动登记TASK61为唯一active task。
+- 目标：为TASK49/D-126建立内容寻址monitor host delivery：一次性授权installer、固定service/timer、root collector与非特权evaluator/notifier边界、root-only配置schema、pending/ack回执、升级/惰性回退/卸载事务和隔离攻击测试。
+- 资源边界：起点available约2.0GiB、Swap873MiB/1GiB并超过80%停止线、根盘13GiB、Load`0.19/0.16/0.20`、`oom_kill=0`。先只执行文档、只读审计、轻量源码与合成fixture，不启动build、全量Node/PostgreSQL、Docker数据库、typecheck或镜像任务。
+- 授权边界：不实际安装host、不创建账号或写systemd，不配置/读取真实渠道凭据、不发送通知，不修改网络、Docker daemon、UAT/生产、数据库、Volume或业务数据；系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60 - `docs: start release snapshot reservation closure` / `feat: reserve release snapshot targets` / `build: refresh release supervisor bundle` / `docs: close release snapshot reservation`
 
 - 调度：TASK59收口提交`d7780864eb239cbeadf4aa84e92a3a6bb62016c1`/tree`2a9ecd452ca53cb7691ad58ce0dc3082a7aa4d84`后从零`DOING`自动登记TASK60为唯一active task。

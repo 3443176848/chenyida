@@ -2,6 +2,17 @@
 
 最后更新时间：2026-08-14（Asia/Shanghai）
 
+## SELFHOST-OPS-MONITORING-HOST-DELIVERY-61（执行中；只做仓库交付合同，资源停止线有效）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / READ-ONLY AUDIT AND LIGHTWEIGHT DESIGN / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；关闭A5a前的monitor host delivery仓库缺口 |
+| 严格起点 | PASS / CONTROLLED | `08483c04231961ba5ac25757391793bfe208f926`/tree`c18d4f49d5ca9b491529c64ecd3f715ab9e53688`；工作区仅既有受保护未跟踪报告 |
+| 目标合同 | IN PROGRESS | 内容寻址installer/bundle、service/timer、root collector与非特权notifier、root-only配置、pending/ack回执、升级/回退/卸载和合成隔离攻击测试 |
+| 资源 | STOP LINE ACTIVE | available约2.0GiB、Swap873MiB/1GiB（超过80%）、根盘13GiB、Load`0.19/0.16/0.20`、`oom_kill=0`；禁止新重任务，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无host安装、账号/systemd、真实渠道/凭据、通知、A1—A8、外部、UAT/生产、数据库、Volume或网络动作 |
+| 系统是否可用 | NO | 当前无真实监控投递、源码匹配镜像、正式门、真实异机恢复/迁移、岗位/员工签字或切换 |
+
 ## SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60（完成；仓库所有权闭环已验证，资源停止线仍有效）
 
 | 验证项 | 结果 | 说明 |

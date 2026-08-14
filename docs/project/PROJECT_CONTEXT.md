@@ -40,6 +40,8 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 `SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60`已按D-136完成并释放active slot。源码`15501787f5cd304dfe5f8c75fb5df15d4e9a2258`/tree`3718593b8b6d362922bc4e84be6b6cf4adbd00a6`与manifest-only直接子提交`ffaaa9091cf09afa80918e87664ed6660f0556cf`/tree`9d42de1626ed6f8cf13308c7bbc2e83685f7341e`形成78文件bundle`17fb9f99…fb5b8`。创建前0400 reservation、固定父目录FD上的NOREPLACE、Git前后同inode、完整publication恢复、foreign保持和previous terminal代际链通过23项/72项Supervisor；Swap约873MiB/1GiB仍超过80%停止线，未启动build、全量Node/PostgreSQL、Docker数据库、typecheck或候选镜像任务。下一安全任务为TASK49监控host delivery仓库包；无host、A1—A3、外部、UAT/生产或数据授权。
 
+`SELFHOST-OPS-MONITORING-HOST-DELIVERY-61`已从`08483c04`/tree`c18d4f49`启动为唯一`DOING`。范围固定为TASK49/D-126的内容寻址host installer、service/timer、root collector与非特权evaluator/notifier、root-only配置、pending/ack回执、升级/惰性回退/卸载事务和合成隔离攻击测试；不实际安装host、创建账号、写systemd、读取真实渠道凭据或发送通知。Swap约873MiB/1GiB仍超过80%停止线，先执行只读审计和轻量工作，系统继续`PRODUCTION NO-GO`。
+
 ## 系统组成
 
 ### 本地 ERP
@@ -336,7 +338,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 ## 当前路线
 
-`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭；TASK41/TASK54/TASK55已完成D-115/D-131/D-132的四域、签名密文与cluster security合成隔离恢复工具，但真实数据锚点延期风险继续开放。TASK42已完成D-116/G3仓库工具；TASK46/TASK47分别按D-120/D-121关闭完整typecheck与Browser门，TASK49/TASK50关闭监控及容器运行时仓库合同，TASK53按D-130关闭三阶段发布生命周期自锁，TASK56完成权限与受控operator边界，TASK59/D-135与TASK60/D-136依次完成A2独立候选快照生命周期和创建前所有权。TASK57本机镜像及TASK59以前bundle现已失效；host Supervisor未安装，正式镜像证据/19步PASS仍不存在。当前无`DOING`，下一安全任务为TASK49监控的内容寻址host delivery包，之后再按候选输入稳定性推进其余仓库前置并统一重建源码匹配镜像和授权输入。TASK43—TASK45已分别完成导入fallback、会话和运行健康仓库加固，当前源码alpha.47/0046，运行UAT仍未部署。权限矩阵等待业务批准，系统继续production no-go。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API是0041引入且已通过隔离验证。项目负责人已接受D-113和D-114，`AGENT-R1`、PM-002及`AGENT-R1-5`均已完成。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，TASK04—TASK05保持TODO；正式holdout未重跑，0041—0046未部署或应用UAT。外部AI禁用，UAT继续alpha.42/0040且没有真实V4回执；任何R2、模型/真实数据、真实收货、迁移、部署、生产或切流仍须独立授权。
+`SELFHOST-OPS-RECOVERY-FOUNDATION-39`已在Git与镜像锚点完成后按项目负责人决定行政关闭；TASK41/TASK54/TASK55已完成D-115/D-131/D-132的四域、签名密文与cluster security合成隔离恢复工具，但真实数据锚点延期风险继续开放。TASK42已完成D-116/G3仓库工具；TASK46/TASK47分别按D-120/D-121关闭完整typecheck与Browser门，TASK49/TASK50关闭监控及容器运行时仓库合同，TASK53按D-130关闭三阶段发布生命周期自锁，TASK56完成权限与受控operator边界，TASK59/D-135与TASK60/D-136依次完成A2独立候选快照生命周期和创建前所有权。TASK57本机镜像及TASK59以前bundle现已失效；host Supervisor未安装，正式镜像证据/19步PASS仍不存在。当前唯一`DOING` TASK61正在建立监控内容寻址host delivery与通知权限边界；之后再按候选输入稳定性推进其余仓库前置并统一重建源码匹配镜像和授权输入。TASK43—TASK45已分别完成导入fallback、会话和运行健康仓库加固，当前源码alpha.47/0046，运行UAT仍未部署。权限矩阵等待业务批准，系统继续production no-go。`PHASE4-TASK01`已完成D-110治理基线，`PHASE4-TASK02`已交付冻结离线Evaluator/合成数据集并由D-111批准当前确定性阈值；D-112五表及确定性候选Service/API是0041引入且已通过隔离验证。项目负责人已接受D-113和D-114，`AGENT-R1`、PM-002及`AGENT-R1-5`均已完成。`PHASE4-TASK03`继续`BLOCKED / OWNER_PRIORITY_HOLD / SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`，TASK04—TASK05保持TODO；正式holdout未重跑，0041—0046未部署或应用UAT。外部AI禁用，UAT继续alpha.42/0040且没有真实V4回执；任何R2、模型/真实数据、真实收货、迁移、部署、生产或切流仍须独立授权。
 
 ## 恢复上下文检查清单
 

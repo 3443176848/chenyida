@@ -51,9 +51,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0046`，46/head`0046_runtime_lock_privilege_boundary.sql`，0046 SQL/Snapshot SHA-256分别为`ad68aaa4f20d16324fcdc7b234928ac363ecb73313921970d3b4840f4db6d66b`/`c8fe259a7838475bc41ffaf0e843ba9ca69a8ca0c5688d42275a81ea8b21f60d`；0001—0045未修改，Schema/233表snapshot/journal/allowlist一致。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0046只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / SNAPSHOT RESERVATION CLOSED / LOCAL IMAGE CANDIDATE STALE / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。TASK60已关闭创建前target所有权；未安装host、运行A2或建立源码匹配镜像 |
-| 当前任务 | 当前无`DOING`；TASK60完成并释放active slot。Swap高于80%，新的重任务继续禁止 |
-| 下一任务 | 下一安全任务固定为TASK49监控的内容寻址host delivery包，只实现installer/service/timer/notifier/config/receipt/journal和隔离合同，不实际安装或投递；之后继续11角色机器矩阵、0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器。最终安全仓库变化收口后统一重建alpha.47镜像和授权包；A1/A3及真实异机恢复/UAT/数据/员工/切换仍须专项授权 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / MONITORING HOST DELIVERY CLOSURE / LOCAL IMAGE CANDIDATE STALE / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`。TASK60已关闭创建前target所有权；TASK61正在关闭A5a前的仓库交付缺口，未实际安装host或投递 |
+| 当前任务 | 唯一`DOING`为`SELFHOST-OPS-MONITORING-HOST-DELIVERY-61`：内容寻址installer、service/timer、root collector/非特权notifier、配置/回执、升级/回退和隔离测试。Swap高于80%，新的重任务继续禁止 |
+| 下一任务 | TASK61完成且适用门通过后，继续11角色机器矩阵、0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器；最终安全仓库变化收口后统一重建alpha.47镜像和授权包。host安装/账号/systemd/真实告警、A1/A3及真实异机恢复/UAT/数据/员工/切换仍须专项授权 |
 
 ## 当前完成模块
 
@@ -369,7 +369,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- TASK60已按D-136完成创建前reservation与同inode target-only恢复并释放active slot。TASK57镜像和TASK59 bundle已失效，Swap停止线有效；下一安全任务为监控host delivery仓库包，系统继续`PRODUCTION NO-GO`。
+- 当前唯一`DOING`为`SELFHOST-OPS-MONITORING-HOST-DELIVERY-61`：在仓库和合成隔离环境把TASK49工具整理为内容寻址host delivery与权限分离通知合同，不实际安装、建账号、写systemd或发送真实通知。TASK60已释放active slot，Swap停止线有效，系统继续`PRODUCTION NO-GO`。
 - `SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`已按D-132完成并释放active slot：冻结源码`b93d838`/tree`269165d4`与manifest-only直接子提交`2136aa3`/tree`c5b78dab`形成49文件bundle，manifest SHA-256`699cdd2a…7dd6`。cluster catalog/security/tablespace、秘密分离、加密传输、V4 readiness、Dashboard/monitor与崩溃安全executor均通过合成双PostgreSQL cluster及完整适用回归；没有真实恢复或部署。
 - `SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`已按D-131完成并释放active slot：源码`fd0a9cff`与manifest-only直接子提交`315b1f3d`形成47文件bundle；签名密文来源、双向ACK、恢复强绑定、调度/保留和V3 readiness通过合成密文双集群恢复及适用回归。真实异机、密钥托管、timer/WORM、真实数据与RPO/RTO均未执行。
 - `SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已按D-120完成并释放active slot：精确38配置、ES2022合同和只读干净快照执行器已在两个提交快照38/38通过；一次错误纳入`.wrangler/work`的直接lint发生V8 heap OOM，正式干净快照lint随后0 error通过，宿主/容器OOM与restart均为0。

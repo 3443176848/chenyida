@@ -87,6 +87,8 @@
 
 2026-08-14 第三十八次增量：TASK60按D-136完成创建前target reservation仓库合同。source`15501787f5cd304dfe5f8c75fb5df15d4e9a2258`与manifest-only直接子提交`ffaaa9091cf09afa80918e87664ed6660f0556cf`形成78文件bundle`17fb9f99…b5b8`；私有同设备staging、0400 no-clobber receipt、固定父fd、`renameat2(RENAME_NOREPLACE)`同inode提升、Git前后身份验证、target-only精确恢复及跨代审计通过snapshot23/23与Supervisor72/72。TASK59 bundle和TASK57镜像均为`STALE / NOT AUTHORIZABLE`；未安装host、build/push镜像、生成授权或修改UAT/数据。收口Swap约873MiB/1GiB仍超过80%停止线，整体继续`PRODUCTION NO-GO`。
 
+2026-08-14 第三十九次增量：`SELFHOST-OPS-MONITORING-HOST-DELIVERY-61`从TASK60收口提交`08483c04231961ba5ac25757391793bfe208f926`/tree`c18d4f49d5ca9b491529c64ecd3f715ab9e53688`启动为唯一`DOING`。范围固定为TASK49/D-126的内容寻址host installer/bundle、service/timer、root采集与非特权通知边界、配置/pending/ack回执、升级/惰性回退/卸载及合成隔离测试；不实际安装host、建账号、写systemd或发送通知。起点Swap约873MiB/1GiB仍超过80%，先只做轻量工作，整体继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -260,8 +262,8 @@
 2. G3仓库工具已由TASK42完成，完整typecheck和Browser分别由TASK46/TASK47关闭，TASK50把六服务runtime policy加入第19步；TASK53关闭首次晋升自锁，TASK59—TASK60按D-135/D-136关闭A2 detached snapshot及创建前reservation并形成78文件bundle。TASK57镜像已失效；须在剩余安全仓库变化收口后统一重建源码匹配镜像、刷新A1/A3输入并获得专项授权，才可进入正式A2。
 3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
 4. TASK44/TASK45已完成会话绝对时限和health/Worker/storage/Migration真实性仓库修复；运行面验证等待同候选完整gate及专项部署授权。
-5. `SELFHOST-OPS-MONITORING-ALERTING-49`已完成仓库级监控、容量阈值、备份/恢复证据新鲜度、告警状态和排障合同；host安装、真实外部投递、值班责任人和演练仍需专项授权/资源。
-6. TASK50、TASK53—TASK60已完成容器策略、发布生命周期、异机provenance、集群/运行权限、历史候选、授权输入刷新、detached snapshot及创建前reservation合同。TASK60收口后正式任务槽为空；下一安全项为监控host delivery，之后仍有11角色机器矩阵、0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器。候选须在最终相关源码变化后统一重建，完成前不能声称只剩外部授权。
+5. `SELFHOST-OPS-MONITORING-ALERTING-49`已完成仓库级监控、容量阈值、备份/恢复证据新鲜度、告警状态和排障合同；TASK61正在补齐内容寻址host delivery、权限分离notifier、配置/回执及升级回退，实际安装、真实外部投递、值班责任人和演练仍需专项授权/资源。
+6. TASK50、TASK53—TASK60已完成容器策略、发布生命周期、异机provenance、集群/运行权限、历史候选、授权输入刷新、detached snapshot及创建前reservation合同。当前唯一`DOING`为TASK61 monitoring host delivery；之后仍有11角色机器矩阵、0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器。候选须在最终相关源码变化后统一重建，完成前不能声称只剩外部授权。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。
 
