@@ -1828,7 +1828,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "e1d036b42477f379e36e2d2b4e077e9e3808a956f92d691393892aa580510904",
+      "sha256": "36420520d3a5c1a76dfa94c6dc468c6a567cd51df2d68bc023630d26d005b9f9",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
