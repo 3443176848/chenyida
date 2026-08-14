@@ -26,6 +26,7 @@ REMOVE_INTENT_CONTRACT = "chenyida-erp-release-candidate-snapshot-remove-intent/
 REMOVAL_CONTRACT = "chenyida-erp-release-candidate-snapshot-removal/v1"
 RECOVERY_INTENT_CONTRACT = "chenyida-erp-release-candidate-snapshot-recovery-intent/v1"
 RECOVERY_CONTRACT = "chenyida-erp-release-candidate-snapshot-recovery/v1"
+RESERVATION_CONTRACT = "chenyida-erp-release-candidate-snapshot-target-reservation/v1"
 BUNDLE_CONTRACT = "chenyida-erp-release-supervisor-bundle/v1"
 BUNDLE_MANIFEST_PATH = "chenyida_erp_site/release/release-supervisor-bundle-v1.json"
 TEST_RUNTIME_POLICY_PATH = "chenyida_erp_site/release/test-runtime-policy-v1.json"
@@ -38,6 +39,7 @@ VERIFY_CONFIRMATION = "VERIFY_EXACT_RELEASE_CANDIDATE_SNAPSHOT"
 REMOVE_CONFIRMATION = "REMOVE_EXACT_RELEASE_CANDIDATE_SNAPSHOT"
 RECOVER_PREPARE_CONFIRMATION = "RECOVER_EXACT_RELEASE_CANDIDATE_PREPARE"
 RECOVER_REMOVE_CONFIRMATION = "RECOVER_EXACT_RELEASE_CANDIDATE_REMOVE"
+RESERVATION_CONFIRMATION = "RESERVE_EXACT_RELEASE_CANDIDATE_SNAPSHOT_TARGET"
 LOCK_REASON_PREFIX = f"{CONTRACT}:"
 MAX_JSON_BYTES = 1024 * 1024
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -45,7 +47,6 @@ GIT_OBJECT = re.compile(r"^[0-9a-f]{40}$")
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
 SAFE_RELATIVE = re.compile(r"^[A-Za-z0-9._/-]{1,240}$")
 TREE_DIGEST_COMMAND = "{ /usr/bin/find -P . -xdev -printf '%y|%m|%P|%l\\n' | LC_ALL=C /usr/bin/sort; /usr/bin/find -P . -xdev -type f -print0 | LC_ALL=C /usr/bin/sort -z | /usr/bin/xargs -0 /usr/bin/sha256sum; } | /usr/bin/sha256sum"
-AT_FDCWD = -100
 RENAME_NOREPLACE = 1
 
 
@@ -165,27 +166,103 @@ def fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
-def rename_no_replace(source: Path, destination: Path) -> None:
-    source_parent = trusted_directory(source.parent, "SNAPSHOT_RECOVERY_RENAME_INVALID")
-    destination_parent = trusted_directory(destination.parent, "SNAPSHOT_RECOVERY_RENAME_INVALID", {0o700})
+def atomic_rename_no_replace(
+    source: Path,
+    destination: Path,
+    *,
+    uid: int,
+    parent_code: str,
+    source_parent_modes: set[int] | None,
+    destination_parent_modes: set[int] | None,
+    cross_device_code: str,
+    unavailable_code: str,
+    occupied_code: str,
+    failed_code: str,
+) -> None:
+    source_parent = trusted_directory(source.parent, parent_code, source_parent_modes, uid)
+    destination_parent = trusted_directory(destination.parent, parent_code, destination_parent_modes, uid)
+    if source.name != Path(source.name).name or destination.name != Path(destination.name).name:
+        reject(parent_code)
     if source_parent.st_dev != destination_parent.st_dev:
-        reject("SNAPSHOT_RECOVERY_CROSS_DEVICE")
+        reject(cross_device_code)
     libc = ctypes.CDLL(None, use_errno=True)
     function = getattr(libc, "renameat2", None)
     if function is None:
-        reject("SNAPSHOT_RECOVERY_NOREPLACE_UNAVAILABLE")
+        reject(unavailable_code)
     function.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
     function.restype = ctypes.c_int
-    if function(AT_FDCWD, os.fsencode(source), AT_FDCWD, os.fsencode(destination), RENAME_NOREPLACE) != 0:
-        error = ctypes.get_errno()
-        if error == errno.EEXIST:
-            reject("SNAPSHOT_RECOVERY_QUARANTINE_EXISTS")
-        if error == errno.EXDEV:
-            reject("SNAPSHOT_RECOVERY_CROSS_DEVICE")
-        reject("SNAPSHOT_RECOVERY_RENAME_FAILED")
-    fsync_directory(source.parent)
-    if destination.parent != source.parent:
-        fsync_directory(destination.parent)
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    source_descriptor: int | None = None
+    destination_descriptor: int | None = None
+    try:
+        source_descriptor = os.open(source.parent, flags)
+        destination_descriptor = os.open(destination.parent, flags)
+    except OSError:
+        if destination_descriptor is not None:
+            os.close(destination_descriptor)
+        if source_descriptor is not None:
+            os.close(source_descriptor)
+        reject(parent_code)
+    assert source_descriptor is not None and destination_descriptor is not None
+    try:
+        opened_source = os.fstat(source_descriptor)
+        opened_destination = os.fstat(destination_descriptor)
+        if (
+            opened_source.st_dev != source_parent.st_dev
+            or opened_source.st_ino != source_parent.st_ino
+            or opened_destination.st_dev != destination_parent.st_dev
+            or opened_destination.st_ino != destination_parent.st_ino
+        ):
+            reject(parent_code)
+        if function(
+            source_descriptor,
+            os.fsencode(source.name),
+            destination_descriptor,
+            os.fsencode(destination.name),
+            RENAME_NOREPLACE,
+        ) != 0:
+            error = ctypes.get_errno()
+            if error == errno.EEXIST:
+                reject(occupied_code)
+            if error == errno.EXDEV:
+                reject(cross_device_code)
+            reject(failed_code)
+        os.fsync(source_descriptor)
+        if destination_descriptor != source_descriptor:
+            os.fsync(destination_descriptor)
+    finally:
+        os.close(destination_descriptor)
+        os.close(source_descriptor)
+
+
+def rename_no_replace(source: Path, destination: Path, uid: int = 0) -> None:
+    atomic_rename_no_replace(
+        source,
+        destination,
+        uid=uid,
+        parent_code="SNAPSHOT_RECOVERY_RENAME_INVALID",
+        source_parent_modes=None,
+        destination_parent_modes={0o700},
+        cross_device_code="SNAPSHOT_RECOVERY_CROSS_DEVICE",
+        unavailable_code="SNAPSHOT_RECOVERY_NOREPLACE_UNAVAILABLE",
+        occupied_code="SNAPSHOT_RECOVERY_QUARANTINE_EXISTS",
+        failed_code="SNAPSHOT_RECOVERY_RENAME_FAILED",
+    )
+
+
+def promote_reservation_no_replace(source: Path, destination: Path, uid: int) -> None:
+    atomic_rename_no_replace(
+        source,
+        destination,
+        uid=uid,
+        parent_code="SNAPSHOT_RESERVATION_PARENT_INVALID",
+        source_parent_modes={0o700},
+        destination_parent_modes={0o700},
+        cross_device_code="SNAPSHOT_RESERVATION_CROSS_DEVICE",
+        unavailable_code="SNAPSHOT_RESERVATION_NOREPLACE_UNAVAILABLE",
+        occupied_code="SNAPSHOT_RESERVATION_TARGET_OCCUPIED",
+        failed_code="SNAPSHOT_RESERVATION_PROMOTION_FAILED",
+    )
 
 
 def write_no_clobber(path: Path, raw: bytes, mode: int = 0o400, uid: int = 0) -> None:
@@ -304,6 +381,14 @@ class SnapshotPaths:
         return self.base / "worktrees"
 
     @property
+    def staging(self) -> Path:
+        return self.base / "staging"
+
+    @property
+    def reservations(self) -> Path:
+        return self.base / "reservations"
+
+    @property
     def receipts(self) -> Path:
         return self.base / "receipts"
 
@@ -334,7 +419,7 @@ def ensure_storage(paths: SnapshotPaths, create: bool) -> None:
         except OSError:
             reject("SNAPSHOT_STATE_ROOT_INVALID")
     trusted_directory(paths.base, "SNAPSHOT_STATE_ROOT_INVALID", {0o700}, paths.uid)
-    for directory in (paths.worktrees, paths.receipts, paths.state, paths.audit, paths.quarantine):
+    for directory in (paths.worktrees, paths.staging, paths.reservations, paths.receipts, paths.state, paths.audit, paths.quarantine):
         if create and not path_exists(directory):
             try:
                 directory.mkdir(mode=0o700)
@@ -621,6 +706,32 @@ def assert_no_nested_mount(path: Path, mountinfo: str | None = None) -> None:
         mount = decode_mount_path(fields[4])
         if mount == target or mount.startswith(f"{target}/"):
             reject("SNAPSHOT_NESTED_MOUNT")
+
+
+def containing_mount_identity(path: Path, mountinfo: str | None = None) -> dict[str, Any]:
+    try:
+        text = mountinfo if mountinfo is not None else Path("/proc/self/mountinfo").read_text(encoding="utf-8")
+    except OSError:
+        reject("SNAPSHOT_MOUNTINFO_UNAVAILABLE")
+    target = str(path)
+    matches: list[tuple[int, dict[str, Any]]] = []
+    for line in text.splitlines():
+        fields = line.split(" ")
+        if len(fields) < 10 or "-" not in fields:
+            reject("SNAPSHOT_MOUNTINFO_INVALID")
+        mount = decode_mount_path(fields[4])
+        if mount == "/" or target == mount or target.startswith(f"{mount}/"):
+            matches.append((len(mount), {
+                "mount_id": fields[0],
+                "parent_id": fields[1],
+                "major_minor": fields[2],
+                "root": decode_mount_path(fields[3]),
+                "mount_point": mount,
+                "mount_options": fields[5],
+            }))
+    if not matches:
+        reject("SNAPSHOT_MOUNTINFO_INVALID")
+    return max(matches, key=lambda item: item[0])[1]
 
 
 def trusted_directory_chain(path: Path, trust_root: Path, code: str, uid: int = 0) -> list[dict[str, Any]]:
@@ -1153,7 +1264,655 @@ def contains(parent: Path, child: Path) -> bool:
     return child == parent or str(child).startswith(f"{parent}/")
 
 
-def prepare_snapshot(source: Path, candidate_commit: str, candidate_tree: str, runtime_root: Path, bundle_root: Path, snapshot_id: str, paths: SnapshotPaths = SnapshotPaths(), clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc), failpoint: Callable[[str], None] | None = None) -> tuple[Path, str, dict[str, Any]]:
+RESERVATION_FIELDS = {
+    "schema_version", "contract", "state", "reservation_id", "generation", "snapshot_id",
+    "request_id", "reserved_at", "confirmation", "prepare_intent", "prepare_intent_sha256",
+    "source_repository", "candidate", "supervisor_bundle", "test_runtime",
+    "source_state_before", "lock_reason", "expected_admin_dir", "previous_terminal_recovery",
+    "git_worktrees_parent_before_dispatch",
+    "staging_root", "snapshot_root", "staging_parent", "snapshot_parent",
+    "staging_path_chain", "snapshot_path_chain", "reserved_root",
+    "target_absent_at_publication", "promotion", "retention",
+}
+RESERVATION_REFERENCE_FIELDS = {
+    "receipt", "receipt_sha256", "reservation_id", "generation",
+    "root_device", "root_inode", "root_mode",
+}
+
+
+def reservation_parent_identity(path: Path, uid: int, mountinfo: str | None = None) -> dict[str, Any]:
+    value = trusted_directory(path, "SNAPSHOT_RESERVATION_PARENT_INVALID", {0o700}, uid)
+    assert_no_nested_mount(path, mountinfo)
+    return {
+        "path": str(path),
+        "device": value.st_dev,
+        "inode": value.st_ino,
+        "mode": f"{stat.S_IMODE(value.st_mode):04o}",
+        "uid": value.st_uid,
+        "gid": value.st_gid,
+        "mount": containing_mount_identity(path, mountinfo),
+    }
+
+
+def reservation_root_identity(
+    path: Path,
+    uid: int,
+    *,
+    require_empty: bool,
+    mountinfo: str | None = None,
+) -> dict[str, Any]:
+    value = trusted_directory(path, "SNAPSHOT_RESERVATION_ROOT_INVALID", {0o700}, uid)
+    assert_no_nested_mount(path, mountinfo)
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError:
+        reject("SNAPSHOT_RESERVATION_ROOT_INVALID")
+    try:
+        opened = os.fstat(descriptor)
+        pointed = os.lstat(path)
+        if (
+            opened.st_dev != value.st_dev
+            or opened.st_ino != value.st_ino
+            or pointed.st_dev != value.st_dev
+            or pointed.st_ino != value.st_ino
+        ):
+            reject("SNAPSHOT_RESERVATION_ROOT_INVALID")
+        if require_empty:
+            try:
+                with os.scandir(descriptor) as entries:
+                    if next(entries, None) is not None:
+                        reject("SNAPSHOT_RESERVATION_ROOT_NOT_EMPTY")
+            except OSError:
+                reject("SNAPSHOT_RESERVATION_ROOT_INVALID")
+    finally:
+        os.close(descriptor)
+    return {
+        "device": value.st_dev,
+        "inode": value.st_ino,
+        "mode": f"{stat.S_IMODE(value.st_mode):04o}",
+        "uid": value.st_uid,
+        "gid": value.st_gid,
+        "empty": True,
+        "mount": containing_mount_identity(path, mountinfo),
+    }
+
+
+def reservation_receipt_path(paths: SnapshotPaths, snapshot_id: str, intent_digest: str, generation: int) -> Path:
+    return paths.reservations / f"{snapshot_id}.{intent_digest}.g{generation:06d}.reserved.json"
+
+
+def reservation_staging_path(paths: SnapshotPaths, snapshot_id: str, intent_digest: str, generation: int) -> Path:
+    return paths.staging / f"{snapshot_id}.{intent_digest}.g{generation:06d}.reserved"
+
+
+def reservation_identifier(value: dict[str, Any]) -> str:
+    identity = {key: value[key] for key in RESERVATION_FIELDS - {"reservation_id", "reserved_at"}}
+    return sha256(canonical_json(identity))
+
+
+def current_git_worktrees_parent_identity(
+    source_repository: dict[str, Any],
+    uid: int,
+    mountinfo: str | None = None,
+) -> dict[str, Any]:
+    common = canonical_path(Path(source_repository["common_git_dir"]), "SNAPSHOT_WORKTREE_PARENT_CHANGED")
+    parent = common / "worktrees"
+    if not path_exists(parent):
+        common_stat = trusted_directory(common, "SNAPSHOT_WORKTREE_PARENT_CHANGED", uid=uid)
+        return {
+            "path": str(parent),
+            "exists": False,
+            "parent_device": common_stat.st_dev,
+            "parent_inode": common_stat.st_ino,
+        }
+    value = trusted_directory(parent, "SNAPSHOT_WORKTREE_PARENT_CHANGED", uid=uid)
+    assert_no_nested_mount(parent, mountinfo)
+    return {
+        "path": str(parent),
+        "exists": True,
+        "device": value.st_dev,
+        "inode": value.st_ino,
+        "mode": f"{stat.S_IMODE(value.st_mode):04o}",
+        "uid": value.st_uid,
+        "gid": value.st_gid,
+        "mount": containing_mount_identity(parent, mountinfo),
+    }
+
+
+def load_target_reservation(path: Path, paths: SnapshotPaths) -> tuple[dict[str, Any], bytes]:
+    if path.parent != paths.reservations or path.name != Path(path.name).name:
+        reject("SNAPSHOT_RESERVATION_RECEIPT_PATH_INVALID")
+    value, raw = load_canonical_record(
+        path,
+        RESERVATION_FIELDS,
+        RESERVATION_CONTRACT,
+        "SNAPSHOT_RESERVATION_RECEIPT_INVALID",
+        paths,
+    )
+    snapshot_id = validate_identifier(value.get("snapshot_id"))
+    generation = value.get("generation")
+    intent_digest = value.get("prepare_intent_sha256")
+    root = value.get("reserved_root")
+    staging_parent = value.get("staging_parent")
+    snapshot_parent = value.get("snapshot_parent")
+    git_parent = value.get("git_worktrees_parent_before_dispatch")
+    if (
+        value.get("state") != "RESERVED"
+        or value.get("confirmation") != RESERVATION_CONFIRMATION
+        or not isinstance(generation, int)
+        or isinstance(generation, bool)
+        or not 1 <= generation <= 999999
+        or value.get("request_id") != f"{snapshot_id}:g{generation:06d}"
+        or not isinstance(intent_digest, str)
+        or not SHA256.fullmatch(intent_digest)
+        or value.get("prepare_intent") != str(paths.state / f"{snapshot_id}.prepare-intent.json")
+        or value.get("snapshot_root") != str(paths.worktrees / snapshot_id)
+        or value.get("staging_root") != str(reservation_staging_path(paths, snapshot_id, intent_digest, generation))
+        or path != reservation_receipt_path(paths, snapshot_id, intent_digest, generation)
+        or value.get("promotion") != "ATOMIC_RENAME_NOREPLACE_SAME_INODE"
+        or value.get("retention") != "BOUND_UNTIL_PREPARED_OR_RECOVERED"
+        or not isinstance(value.get("reserved_at"), str)
+        or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z", value["reserved_at"])
+        or not isinstance(value.get("source_repository"), dict)
+        or not isinstance(value["source_repository"].get("common_git_dir"), str)
+        or not isinstance(value.get("candidate"), dict)
+        or not isinstance(value.get("supervisor_bundle"), dict)
+        or not isinstance(value.get("test_runtime"), dict)
+        or not isinstance(root, dict)
+        or set(root) != {"device", "inode", "mode", "uid", "gid", "empty", "mount"}
+        or not isinstance(root.get("device"), int)
+        or not isinstance(root.get("inode"), int)
+        or root.get("mode") != "0700"
+        or root.get("uid") != paths.uid
+        or root.get("gid") != 0
+        or root.get("empty") is not True
+        or not isinstance(staging_parent, dict)
+        or set(staging_parent) != {"path", "device", "inode", "mode", "uid", "gid", "mount"}
+        or not isinstance(snapshot_parent, dict)
+        or set(snapshot_parent) != {"path", "device", "inode", "mode", "uid", "gid", "mount"}
+        or staging_parent.get("path") != str(paths.staging)
+        or snapshot_parent.get("path") != str(paths.worktrees)
+        or staging_parent.get("mode") != "0700"
+        or snapshot_parent.get("mode") != "0700"
+        or staging_parent.get("uid") != paths.uid
+        or snapshot_parent.get("uid") != paths.uid
+        or staging_parent.get("gid") != 0
+        or snapshot_parent.get("gid") != 0
+        or root.get("device") != staging_parent.get("device")
+        or root.get("device") != snapshot_parent.get("device")
+        or not isinstance(value.get("staging_path_chain"), list)
+        or not isinstance(value.get("snapshot_path_chain"), list)
+        or value.get("reservation_id") != reservation_identifier(value)
+        or value.get("target_absent_at_publication") is not True
+        or not isinstance(value.get("source_state_before"), dict)
+        or value.get("lock_reason") != f"{LOCK_REASON_PREFIX}{snapshot_id}"
+        or not isinstance(value.get("expected_admin_dir"), str)
+        or value.get("expected_admin_dir")
+        != str(Path(value["source_repository"].get("common_git_dir", "/invalid")) / "worktrees" / snapshot_id)
+        or (generation == 1 and value.get("previous_terminal_recovery") is not None)
+        or not isinstance(git_parent, dict)
+        or not isinstance(git_parent.get("exists"), bool)
+        or git_parent.get("path")
+        != str(Path(value["source_repository"]["common_git_dir"]) / "worktrees")
+        or set(git_parent)
+        != (
+            {"path", "exists", "device", "inode", "mode", "uid", "gid", "mount"}
+            if git_parent["exists"]
+            else {"path", "exists", "parent_device", "parent_inode"}
+        )
+        or (
+            generation > 1
+            and (
+                not isinstance(value.get("previous_terminal_recovery"), dict)
+                or set(value["previous_terminal_recovery"]) != {"audit", "audit_sha256"}
+                or not isinstance(value["previous_terminal_recovery"].get("audit"), str)
+                or not isinstance(value["previous_terminal_recovery"].get("audit_sha256"), str)
+                or not SHA256.fullmatch(value["previous_terminal_recovery"]["audit_sha256"])
+            )
+        )
+    ):
+        reject("SNAPSHOT_RESERVATION_RECEIPT_INVALID")
+    if generation > 1:
+        terminal = value["previous_terminal_recovery"]
+        audit_path = canonical_path(Path(terminal["audit"]), "SNAPSHOT_RESERVATION_RECEIPT_INVALID")
+        if audit_path.parent != paths.audit:
+            reject("SNAPSHOT_RESERVATION_RECEIPT_INVALID")
+        audit_raw, _ = trusted_regular_file(
+            audit_path, 0o400, "SNAPSHOT_RESERVATION_RECEIPT_INVALID", paths.uid,
+        )
+        if sha256(audit_raw) != terminal["audit_sha256"]:
+            reject("SNAPSHOT_RESERVATION_RECEIPT_INVALID")
+    current_staging_parent = reservation_parent_identity(paths.staging, paths.uid)
+    current_snapshot_parent = reservation_parent_identity(paths.worktrees, paths.uid)
+    current_staging_chain = trusted_directory_chain(
+        paths.staging, paths.trust_root, "SNAPSHOT_RESERVATION_PATH_UNTRUSTED", paths.uid,
+    )
+    current_snapshot_chain = trusted_directory_chain(
+        paths.worktrees, paths.trust_root, "SNAPSHOT_RESERVATION_PATH_UNTRUSTED", paths.uid,
+    )
+    if (
+        staging_parent != current_staging_parent
+        or snapshot_parent != current_snapshot_parent
+        or value["staging_path_chain"] != current_staging_chain
+        or value["snapshot_path_chain"] != current_snapshot_chain
+    ):
+        reject("SNAPSHOT_RESERVATION_PARENT_CHANGED")
+    return value, raw
+
+
+def target_reservation_reference(path: Path, raw: bytes, value: dict[str, Any]) -> dict[str, Any]:
+    root = value["reserved_root"]
+    return {
+        "receipt": str(path),
+        "receipt_sha256": sha256(raw),
+        "reservation_id": value["reservation_id"],
+        "generation": value["generation"],
+        "root_device": root["device"],
+        "root_inode": root["inode"],
+        "root_mode": root["mode"],
+    }
+
+
+def load_target_reservation_reference(
+    reference: Any,
+    paths: SnapshotPaths,
+) -> tuple[Path, dict[str, Any], bytes]:
+    value = exact_fields(reference, RESERVATION_REFERENCE_FIELDS, "SNAPSHOT_RESERVATION_REFERENCE_INVALID")
+    if (
+        not isinstance(value.get("receipt"), str)
+        or not isinstance(value.get("receipt_sha256"), str)
+        or not SHA256.fullmatch(value["receipt_sha256"])
+    ):
+        reject("SNAPSHOT_RESERVATION_REFERENCE_INVALID")
+    receipt_path = canonical_path(Path(value["receipt"]), "SNAPSHOT_RESERVATION_REFERENCE_INVALID")
+    receipt, raw = load_target_reservation(receipt_path, paths)
+    if sha256(raw) != value["receipt_sha256"] or value != target_reservation_reference(receipt_path, raw, receipt):
+        reject("SNAPSHOT_RESERVATION_REFERENCE_INVALID")
+    return receipt_path, receipt, raw
+
+
+def assert_reserved_root(
+    path: Path,
+    reservation: dict[str, Any],
+    uid: int,
+    *,
+    require_empty: bool,
+    mountinfo: str | None = None,
+) -> None:
+    if reservation_root_identity(path, uid, require_empty=require_empty, mountinfo=mountinfo) != reservation["reserved_root"]:
+        reject("SNAPSHOT_RESERVATION_ROOT_REPLACED")
+
+
+@contextmanager
+def held_reserved_root(
+    path: Path,
+    reservation: dict[str, Any],
+    uid: int,
+    mountinfo: str | None = None,
+) -> Iterator[None]:
+    assert_reserved_root(path, reservation, uid, require_empty=True, mountinfo=mountinfo)
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError:
+        reject("SNAPSHOT_RESERVATION_ROOT_INVALID")
+    try:
+        opened = os.fstat(descriptor)
+        root = reservation["reserved_root"]
+        if opened.st_dev != root["device"] or opened.st_ino != root["inode"]:
+            reject("SNAPSHOT_RESERVATION_ROOT_REPLACED")
+        yield
+        pointed = os.lstat(path)
+        held = os.fstat(descriptor)
+        if (
+            pointed.st_dev != root["device"]
+            or pointed.st_ino != root["inode"]
+            or held.st_dev != root["device"]
+            or held.st_ino != root["inode"]
+        ):
+            reject("SNAPSHOT_RESERVATION_ROOT_REPLACED")
+    except OSError:
+        reject("SNAPSHOT_RESERVATION_ROOT_REPLACED")
+    finally:
+        os.close(descriptor)
+
+
+def prepare_recovery_terminal(
+    reference: dict[str, Any],
+    snapshot_id: str,
+    intent_digest: str,
+    paths: SnapshotPaths,
+) -> dict[str, Any] | None:
+    prefix = f"{snapshot_id}.{intent_digest}.prepare.g"
+    suffix = ".recovery-intent.json"
+    matches: list[dict[str, Any] | None] = []
+    for item in sorted(paths.state.iterdir(), key=lambda value: os.fsencode(value.name)):
+        if not item.name.startswith(prefix) or not item.name.endswith(suffix):
+            continue
+        plan, plan_raw = load_recovery_intent(item, paths)
+        if plan.get("target_reservation") != reference:
+            continue
+        expected_intent, expected_audit = recovery_paths(
+            paths,
+            snapshot_id,
+            intent_digest,
+            "PREPARE",
+            plan["generation"],
+            plan["object_identity_sha256"],
+        )
+        if item != expected_intent:
+            reject("SNAPSHOT_RECOVERY_INTENT_CONFLICT")
+        if path_exists(expected_audit):
+            _, audit_raw = validate_completed_recovery(plan, plan_raw, item, expected_audit, paths)
+            matches.append({"audit": str(expected_audit), "audit_sha256": sha256(audit_raw)})
+        else:
+            matches.append(None)
+    if len(matches) > 1:
+        reject("SNAPSHOT_RESERVATION_RECOVERY_AMBIGUOUS")
+    return matches[0] if matches else None
+
+
+def reservation_closed_by_prepare_recovery(
+    reference: dict[str, Any],
+    snapshot_id: str,
+    intent_digest: str,
+    paths: SnapshotPaths,
+) -> bool:
+    return prepare_recovery_terminal(reference, snapshot_id, intent_digest, paths) is not None
+
+
+def validated_target_reservation_catalog(
+    snapshot_id: str,
+    intent_raw: bytes,
+    source_identity: dict[str, Any],
+    candidate: dict[str, Any],
+    bundle: dict[str, Any],
+    runtime: dict[str, Any],
+    paths: SnapshotPaths,
+) -> list[tuple[Path, bytes, dict[str, Any], dict[str, Any]]]:
+    intent_digest = sha256(intent_raw)
+    prefix = f"{snapshot_id}.{intent_digest}.g"
+    suffix = ".reserved.json"
+    catalog: list[tuple[Path, bytes, dict[str, Any], dict[str, Any]]] = []
+    for item in sorted(paths.reservations.iterdir(), key=lambda value: os.fsencode(value.name)):
+        if not item.name.startswith(prefix) or not item.name.endswith(suffix):
+            continue
+        value, raw = load_target_reservation(item, paths)
+        reference = target_reservation_reference(item, raw, value)
+        if (
+            value.get("prepare_intent_sha256") != intent_digest
+            or value.get("source_repository") != source_identity
+            or value.get("candidate") != candidate
+            or value.get("supervisor_bundle") != bundle
+            or value.get("test_runtime") != runtime
+            or value.get("snapshot_root") != str(paths.worktrees / snapshot_id)
+            or value.get("source_state_before")
+            != load_prepare_intent(snapshot_id, paths)[0].get("source_state_before")
+            or value.get("lock_reason") != f"{LOCK_REASON_PREFIX}{snapshot_id}"
+            or value.get("expected_admin_dir")
+            != str(Path(source_identity["common_git_dir"]) / "worktrees" / snapshot_id)
+        ):
+            reject("SNAPSHOT_RESERVATION_BINDING_INVALID")
+        catalog.append((item, raw, value, reference))
+    generations = [entry[2]["generation"] for entry in catalog]
+    if generations and (len(set(generations)) != len(generations) or sorted(generations) != list(range(1, max(generations) + 1))):
+        reject("SNAPSHOT_RESERVATION_GENERATION_CHAIN_INVALID")
+    for index, (_, _, value, _) in enumerate(catalog):
+        if index == 0:
+            continue
+        terminal = prepare_recovery_terminal(catalog[index - 1][3], snapshot_id, intent_digest, paths)
+        if terminal is None or value.get("previous_terminal_recovery") != terminal:
+            reject("SNAPSHOT_RESERVATION_GENERATION_STATE_CONFLICT")
+    return catalog
+
+
+def latest_target_reservation(
+    snapshot_id: str,
+    intent_raw: bytes,
+    source_identity: dict[str, Any],
+    candidate: dict[str, Any],
+    bundle: dict[str, Any],
+    runtime: dict[str, Any],
+    paths: SnapshotPaths,
+) -> tuple[Path, bytes, dict[str, Any], dict[str, Any]]:
+    catalog = validated_target_reservation_catalog(
+        snapshot_id, intent_raw, source_identity, candidate, bundle, runtime, paths,
+    )
+    if not catalog:
+        reject("SNAPSHOT_RESERVATION_RECEIPT_MISSING")
+    return catalog[-1]
+
+
+def resume_target_reservation_publication(
+    receipt_path: Path,
+    snapshot_id: str,
+    generation: int,
+    intent: dict[str, Any],
+    intent_raw: bytes,
+    source_identity: dict[str, Any],
+    candidate: dict[str, Any],
+    bundle: dict[str, Any],
+    runtime: dict[str, Any],
+    paths: SnapshotPaths,
+    mountinfo: str | None = None,
+) -> tuple[Path, bytes, dict[str, Any], dict[str, Any]] | None:
+    temporary = receipt_path.parent / f".{receipt_path.name}.publishing"
+    if path_exists(receipt_path) or not path_exists(temporary):
+        return None
+    raw, _ = trusted_regular_file(
+        temporary,
+        0o400,
+        "SNAPSHOT_RESERVATION_PUBLICATION_INVALID",
+        paths.uid,
+        MAX_JSON_BYTES,
+        {1},
+    )
+    value = exact_fields(
+        strict_json(raw, "SNAPSHOT_RESERVATION_PUBLICATION_INVALID"),
+        RESERVATION_FIELDS,
+        "SNAPSHOT_RESERVATION_PUBLICATION_INVALID",
+    )
+    staging_root = reservation_staging_path(paths, snapshot_id, sha256(intent_raw), generation)
+    if (
+        raw != canonical_json(value)
+        or value.get("schema_version") != 1
+        or value.get("contract") != RESERVATION_CONTRACT
+        or value.get("state") != "RESERVED"
+        or value.get("snapshot_id") != snapshot_id
+        or value.get("generation") != generation
+        or value.get("prepare_intent_sha256") != sha256(intent_raw)
+        or value.get("source_repository") != source_identity
+        or value.get("candidate") != candidate
+        or value.get("supervisor_bundle") != bundle
+        or value.get("test_runtime") != runtime
+        or value.get("staging_root") != str(staging_root)
+        or value.get("snapshot_root") != str(paths.worktrees / snapshot_id)
+        or value.get("expected_admin_dir") != intent.get("expected_admin_dir")
+        or not isinstance(value.get("reserved_root"), dict)
+        or not path_exists(staging_root)
+        or path_exists(paths.worktrees / snapshot_id)
+        or path_exists(Path(intent["expected_admin_dir"]))
+        or any(
+            entry.get("worktree") == str(paths.worktrees / snapshot_id)
+            for entry in parse_worktrees(Path(source_identity["root"]))
+        )
+    ):
+        reject("SNAPSHOT_RESERVATION_PUBLICATION_INVALID")
+    if reservation_root_identity(
+        staging_root, paths.uid, require_empty=True, mountinfo=mountinfo,
+    ) != value["reserved_root"]:
+        reject("SNAPSHOT_RESERVATION_PUBLICATION_INVALID")
+    write_no_clobber(receipt_path, raw, uid=paths.uid)
+    loaded, loaded_raw = load_target_reservation(receipt_path, paths)
+    reference = target_reservation_reference(receipt_path, loaded_raw, loaded)
+    return receipt_path, loaded_raw, loaded, reference
+
+
+def build_or_load_target_reservation(
+    snapshot_id: str,
+    intent: dict[str, Any],
+    intent_raw: bytes,
+    source_identity: dict[str, Any],
+    candidate: dict[str, Any],
+    bundle: dict[str, Any],
+    runtime: dict[str, Any],
+    paths: SnapshotPaths,
+    clock: Callable[[], datetime],
+    failpoint: Callable[[str], None] | None,
+    allow_create: bool,
+    mountinfo: str | None = None,
+) -> tuple[Path, bytes, dict[str, Any], dict[str, Any]]:
+    intent_digest = sha256(intent_raw)
+    catalog = validated_target_reservation_catalog(
+        snapshot_id, intent_raw, source_identity, candidate, bundle, runtime, paths,
+    )
+    previous_terminal_recovery: dict[str, Any] | None = None
+    if catalog:
+        latest = catalog[-1]
+        previous_terminal_recovery = prepare_recovery_terminal(
+            latest[3], snapshot_id, intent_digest, paths,
+        )
+        if previous_terminal_recovery is None:
+            return latest
+        generation = latest[2]["generation"] + 1
+    else:
+        generation = 1
+    receipt_path = reservation_receipt_path(paths, snapshot_id, intent_digest, generation)
+    resumed_publication = resume_target_reservation_publication(
+        receipt_path,
+        snapshot_id,
+        generation,
+        intent,
+        intent_raw,
+        source_identity,
+        candidate,
+        bundle,
+        runtime,
+        paths,
+        mountinfo,
+    )
+    if resumed_publication is not None:
+        return resumed_publication
+    if not allow_create:
+        reject("SNAPSHOT_RESERVATION_RECEIPT_MISSING")
+    if generation > 999999:
+        reject("SNAPSHOT_RESERVATION_GENERATION_EXHAUSTED")
+    if path_exists(paths.worktrees / snapshot_id):
+        reject("SNAPSHOT_RESERVATION_TARGET_OCCUPIED")
+    staging_parent = reservation_parent_identity(paths.staging, paths.uid, mountinfo)
+    snapshot_parent = reservation_parent_identity(paths.worktrees, paths.uid, mountinfo)
+    staging_path_chain = trusted_directory_chain(
+        paths.staging, paths.trust_root, "SNAPSHOT_RESERVATION_PATH_UNTRUSTED", paths.uid,
+    )
+    snapshot_path_chain = trusted_directory_chain(
+        paths.worktrees, paths.trust_root, "SNAPSHOT_RESERVATION_PATH_UNTRUSTED", paths.uid,
+    )
+    if staging_parent["device"] != snapshot_parent["device"]:
+        reject("SNAPSHOT_RESERVATION_CROSS_DEVICE")
+    staging_root = reservation_staging_path(paths, snapshot_id, intent_digest, generation)
+    if path_exists(staging_root):
+        reject("SNAPSHOT_RESERVATION_PROVENANCE_UNPROVEN")
+    try:
+        staging_root.mkdir(mode=0o700)
+        os.chown(staging_root, paths.uid, 0)
+        os.chmod(staging_root, 0o700)
+        fsync_directory(paths.staging)
+    except OSError:
+        reject("SNAPSHOT_RESERVATION_CREATE_FAILED")
+    reserved_root = reservation_root_identity(staging_root, paths.uid, require_empty=True, mountinfo=mountinfo)
+    if failpoint:
+        failpoint("RESERVATION_ROOT_CREATED")
+    source = Path(source_identity["root"])
+    target = paths.worktrees / snapshot_id
+    expected_admin = Path(intent["expected_admin_dir"])
+    registrations = [entry for entry in parse_worktrees(source) if entry.get("worktree") == str(target)]
+    if path_exists(target) or path_exists(expected_admin) or registrations:
+        reject("SNAPSHOT_RESERVATION_TARGET_OCCUPIED")
+    git_worktrees_parent = current_git_worktrees_parent_identity(source_identity, paths.uid, mountinfo)
+    reservation = {
+        "schema_version": 1,
+        "contract": RESERVATION_CONTRACT,
+        "state": "RESERVED",
+        "reservation_id": "",
+        "generation": generation,
+        "snapshot_id": snapshot_id,
+        "request_id": f"{snapshot_id}:g{generation:06d}",
+        "reserved_at": now_iso(clock),
+        "confirmation": RESERVATION_CONFIRMATION,
+        "prepare_intent": str(paths.state / f"{snapshot_id}.prepare-intent.json"),
+        "prepare_intent_sha256": intent_digest,
+        "source_repository": source_identity,
+        "candidate": candidate,
+        "supervisor_bundle": bundle,
+        "test_runtime": runtime,
+        "source_state_before": intent["source_state_before"],
+        "lock_reason": intent["lock_reason"],
+        "expected_admin_dir": intent["expected_admin_dir"],
+        "previous_terminal_recovery": previous_terminal_recovery,
+        "git_worktrees_parent_before_dispatch": git_worktrees_parent,
+        "staging_root": str(staging_root),
+        "snapshot_root": str(paths.worktrees / snapshot_id),
+        "staging_parent": staging_parent,
+        "snapshot_parent": snapshot_parent,
+        "staging_path_chain": staging_path_chain,
+        "snapshot_path_chain": snapshot_path_chain,
+        "reserved_root": reserved_root,
+        "target_absent_at_publication": True,
+        "promotion": "ATOMIC_RENAME_NOREPLACE_SAME_INODE",
+        "retention": "BOUND_UNTIL_PREPARED_OR_RECOVERED",
+    }
+    reservation["reservation_id"] = reservation_identifier(reservation)
+    raw = canonical_json(reservation)
+    write_no_clobber(receipt_path, raw, uid=paths.uid)
+    if failpoint:
+        failpoint("RESERVATION_RECEIPT_WRITTEN")
+    loaded, loaded_raw = load_target_reservation(receipt_path, paths)
+    reference = target_reservation_reference(receipt_path, loaded_raw, loaded)
+    return receipt_path, loaded_raw, loaded, reference
+
+
+def promote_target_reservation(
+    reservation: dict[str, Any],
+    paths: SnapshotPaths,
+    failpoint: Callable[[str], None] | None,
+    mountinfo: str | None = None,
+) -> None:
+    staging_root = Path(reservation["staging_root"])
+    target = Path(reservation["snapshot_root"])
+    staging_exists = path_exists(staging_root)
+    target_exists = path_exists(target)
+    if staging_exists and target_exists:
+        reject("SNAPSHOT_RESERVATION_TARGET_OCCUPIED")
+    if staging_exists:
+        assert_reserved_root(staging_root, reservation, paths.uid, require_empty=True, mountinfo=mountinfo)
+        if reservation_parent_identity(paths.staging, paths.uid, mountinfo) != reservation["staging_parent"]:
+            reject("SNAPSHOT_RESERVATION_PARENT_CHANGED")
+        if reservation_parent_identity(paths.worktrees, paths.uid, mountinfo) != reservation["snapshot_parent"]:
+            reject("SNAPSHOT_RESERVATION_PARENT_CHANGED")
+        promote_reservation_no_replace(staging_root, target, paths.uid)
+        if failpoint:
+            failpoint("RESERVATION_PROMOTED")
+        target_exists = True
+    if not target_exists:
+        reject("SNAPSHOT_RESERVATION_OBJECT_MISSING")
+    if path_exists(staging_root):
+        reject("SNAPSHOT_RESERVATION_PROMOTION_FAILED")
+    assert_reserved_root(target, reservation, paths.uid, require_empty=True, mountinfo=mountinfo)
+
+
+def prepare_snapshot(
+    source: Path,
+    candidate_commit: str,
+    candidate_tree: str,
+    runtime_root: Path,
+    bundle_root: Path,
+    snapshot_id: str,
+    paths: SnapshotPaths = SnapshotPaths(),
+    clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+    failpoint: Callable[[str], None] | None = None,
+    mountinfo: str | None = None,
+) -> tuple[Path, str, dict[str, Any]]:
     validate_identifier(snapshot_id)
     canonical_path(source, "SNAPSHOT_SOURCE_REPOSITORY_INVALID")
     canonical_path(runtime_root, "SNAPSHOT_TEST_RUNTIME_ROOT_INVALID")
@@ -1242,27 +2001,93 @@ def prepare_snapshot(source: Path, candidate_commit: str, candidate_tree: str, r
             }
             intent_raw = canonical_json(intent)
             write_no_clobber(intent_path, intent_raw, uid=paths.uid)
-        assert_prepare_worktrees_parent(intent, source, paths.uid)
+        registrations_before_reservation = [
+            entry for entry in parse_worktrees(source) if entry.get("worktree") == str(target)
+        ]
+        existing_reservations = validated_target_reservation_catalog(
+            snapshot_id, intent_raw, source_identity, candidate, bundle, runtime, paths,
+        )
+        prior_generation_terminal = bool(
+            existing_reservations
+            and reservation_closed_by_prepare_recovery(
+                existing_reservations[-1][3], snapshot_id, sha256(intent_raw), paths,
+            )
+        )
+        assert_prepare_worktrees_parent(
+            intent,
+            source,
+            paths.uid,
+            path_exists(target)
+            or path_exists(expected_admin)
+            or bool(registrations_before_reservation)
+            or prior_generation_terminal,
+        )
         if failpoint:
             failpoint("INTENT_WRITTEN")
+        allow_reservation_create = not (
+            path_exists(target) or path_exists(expected_admin) or registrations_before_reservation
+        )
+        _, _, reservation, reservation_reference = build_or_load_target_reservation(
+            snapshot_id,
+            intent,
+            intent_raw,
+            source_identity,
+            candidate,
+            bundle,
+            runtime,
+            paths,
+            clock,
+            failpoint,
+            allow_reservation_create,
+            mountinfo,
+        )
         registrations = [entry for entry in parse_worktrees(source) if entry.get("worktree") == str(target)]
+        target_exists = path_exists(target)
+        admin_exists = path_exists(expected_admin)
+        staging_exists = path_exists(Path(reservation["staging_root"]))
+        if target_exists:
+            assert_reserved_root(target, reservation, paths.uid, require_empty=False, mountinfo=mountinfo)
         if (
-            (path_exists(target) and len(registrations) != 1)
-            or (not path_exists(target) and registrations)
-            or (path_exists(expected_admin) != bool(registrations))
+            (not target_exists and (registrations or admin_exists))
+            or (target_exists and ((len(registrations) == 1) != admin_exists))
+            or len(registrations) > 1
+            or (target_exists and staging_exists)
         ):
             reject("SNAPSHOT_PREPARE_RECOVERY_REQUIRED")
-        if not path_exists(target):
-            previous_umask = os.umask(0o022)
+        add_worktree = False
+        if not target_exists:
+            if not staging_exists:
+                reject("SNAPSHOT_RESERVATION_OBJECT_MISSING")
+            promote_target_reservation(reservation, paths, failpoint, mountinfo)
+            add_worktree = True
+        elif not registrations and not admin_exists:
             try:
-                result = git_result(source, "worktree", "add", "--detach", "--lock", "--reason", lock_reason, "--", str(target), candidate_commit, timeout=300)
-            finally:
-                os.umask(previous_umask)
+                with os.scandir(target) as entries:
+                    target_empty = next(entries, None) is None
+            except OSError:
+                reject("SNAPSHOT_RESERVATION_ROOT_INVALID")
+            if not target_empty:
+                reject("SNAPSHOT_PREPARE_RECOVERY_REQUIRED")
+            add_worktree = True
+        elif len(registrations) != 1 or not admin_exists:
+            reject("SNAPSHOT_PREPARE_RECOVERY_REQUIRED")
+        if add_worktree:
+            if current_git_worktrees_parent_identity(source_identity, paths.uid, mountinfo) != reservation[
+                "git_worktrees_parent_before_dispatch"
+            ]:
+                reject("SNAPSHOT_WORKTREE_PARENT_CHANGED")
+            with held_reserved_root(target, reservation, paths.uid, mountinfo):
+                previous_umask = os.umask(0o022)
+                try:
+                    result = git_result(source, "worktree", "add", "--detach", "--lock", "--reason", lock_reason, "--", str(target), candidate_commit, timeout=300)
+                finally:
+                    os.umask(previous_umask)
             if result.returncode != 0:
                 reject("SNAPSHOT_WORKTREE_ADD_FAILED")
+        assert_reserved_root(target, reservation, paths.uid, require_empty=False, mountinfo=mountinfo)
         if failpoint:
             failpoint("WORKTREE_ADDED")
-        snapshot = snapshot_identity(source, target, candidate, lock_reason, True, paths.uid)
+        snapshot = snapshot_identity(source, target, candidate, lock_reason, True, paths.uid, mountinfo)
         if snapshot.get("admin_dir") != str(expected_admin):
             reject("SNAPSHOT_WORKTREE_ADMIN_INVALID")
         invocation_after = source_worktree_state(source)
@@ -1279,7 +2104,8 @@ def prepare_snapshot(source: Path, candidate_commit: str, candidate_tree: str, r
                 "invocation_state_after": invocation_after,
                 "resumed": resumed,
             },
-            "candidate": candidate, "snapshot": snapshot, "supervisor_bundle": bundle, "test_runtime": runtime,
+            "candidate": candidate, "snapshot": snapshot, "target_reservation": reservation_reference,
+            "supervisor_bundle": bundle, "test_runtime": runtime,
         }
         raw = canonical_json(receipt)
         if failpoint:
@@ -1295,7 +2121,15 @@ def load_prepared_receipt(receipt_path: Path, expected_sha256: str, paths: Snaps
     raw, _ = trusted_regular_file(receipt_path, 0o400, "SNAPSHOT_RECEIPT_INVALID", paths.uid)
     if sha256(raw) != expected_sha256:
         reject("SNAPSHOT_RECEIPT_DIGEST_MISMATCH")
-    value = exact_fields(strict_json(raw, "SNAPSHOT_RECEIPT_INVALID"), {"schema_version", "contract", "state", "snapshot_id", "prepared_at", "confirmation", "prepare_intent", "prepare_intent_sha256", "source_repository", "candidate", "snapshot", "supervisor_bundle", "test_runtime"}, "SNAPSHOT_RECEIPT_INVALID")
+    value = exact_fields(
+        strict_json(raw, "SNAPSHOT_RECEIPT_INVALID"),
+        {
+            "schema_version", "contract", "state", "snapshot_id", "prepared_at", "confirmation",
+            "prepare_intent", "prepare_intent_sha256", "source_repository", "candidate", "snapshot",
+            "target_reservation", "supervisor_bundle", "test_runtime",
+        },
+        "SNAPSHOT_RECEIPT_INVALID",
+    )
     if raw != canonical_json(value) or value["schema_version"] != 1 or value["contract"] != CONTRACT or value["state"] != "PREPARED" or value["confirmation"] != PREPARE_CONFIRMATION:
         reject("SNAPSHOT_RECEIPT_INVALID")
     snapshot_id = validate_identifier(value["snapshot_id"])
@@ -1304,6 +2138,7 @@ def load_prepared_receipt(receipt_path: Path, expected_sha256: str, paths: Snaps
         or value.get("prepare_intent") != str(paths.state / f"{snapshot_id}.prepare-intent.json")
         or not isinstance(value.get("prepare_intent_sha256"), str)
         or not SHA256.fullmatch(value["prepare_intent_sha256"])
+        or not isinstance(value.get("target_reservation"), dict)
     ):
         reject("SNAPSHOT_RECEIPT_PATH_INVALID")
     return value, raw
@@ -1365,7 +2200,12 @@ def load_prepare_intent(snapshot_id: str, paths: SnapshotPaths) -> tuple[dict[st
     return value, raw, path
 
 
-def assert_prepare_worktrees_parent(intent: dict[str, Any], source: Path, uid: int) -> None:
+def assert_prepare_worktrees_parent(
+    intent: dict[str, Any],
+    source: Path,
+    uid: int,
+    allow_created: bool = False,
+) -> None:
     common = common_git_directory(source)
     parent = common / "worktrees"
     before = intent["worktrees_parent_before"]
@@ -1374,6 +2214,8 @@ def assert_prepare_worktrees_parent(intent: dict[str, Any], source: Path, uid: i
             reject("SNAPSHOT_WORKTREE_PARENT_CHANGED")
         return
     current = trusted_directory(parent, "SNAPSHOT_WORKTREE_PARENT_CHANGED", uid=uid)
+    if not before["exists"] and not allow_created:
+        reject("SNAPSHOT_WORKTREE_PARENT_CHANGED")
     if before["exists"] and before != {
         "path": str(parent), "exists": True,
         "device": current.st_dev, "inode": current.st_ino,
@@ -1389,7 +2231,8 @@ def load_remove_intent(snapshot_id: str, receipt_path: Path, receipt_sha256: str
         {
             "schema_version", "contract", "snapshot_id", "request_id", "requested_at", "confirmation",
             "prepared_receipt", "prepared_receipt_sha256", "snapshot_root",
-            "expected_admin_dir", "candidate_commit", "candidate_tree", "source_state_before",
+            "expected_admin_dir", "candidate_commit", "candidate_tree", "target_reservation",
+            "source_state_before",
         },
         REMOVE_INTENT_CONTRACT,
         "SNAPSHOT_REMOVE_INTENT_INVALID",
@@ -1401,8 +2244,10 @@ def load_remove_intent(snapshot_id: str, receipt_path: Path, receipt_sha256: str
         or value.get("confirmation") != REMOVE_CONFIRMATION
         or value.get("prepared_receipt") != str(receipt_path)
         or value.get("prepared_receipt_sha256") != receipt_sha256
+        or not isinstance(value.get("target_reservation"), dict)
     ):
         reject("SNAPSHOT_REMOVE_INTENT_INVALID")
+    load_target_reservation_reference(value["target_reservation"], paths)
     return value, raw, path
 
 
@@ -1455,6 +2300,8 @@ def persistent_receipt_identities(
     )
     assert_mapping_equal(runtime, runtime_value, "SNAPSHOT_TEST_RUNTIME_CHANGED")
     prepare_intent, prepare_intent_raw, prepare_intent_path = load_prepare_intent(receipt["snapshot_id"], paths)
+    _, reservation, _ = load_target_reservation_reference(receipt.get("target_reservation"), paths)
+    snapshot_value = receipt.get("snapshot")
     if (
         receipt.get("prepare_intent") != str(prepare_intent_path)
         or receipt.get("prepare_intent_sha256") != sha256(prepare_intent_raw)
@@ -1464,6 +2311,20 @@ def persistent_receipt_identities(
         or prepare_intent.get("test_runtime") != runtime
         or prepare_intent.get("snapshot_root") != receipt.get("snapshot", {}).get("root")
         or prepare_intent.get("expected_admin_dir") != receipt.get("snapshot", {}).get("admin_dir")
+        or reservation.get("prepare_intent") != str(prepare_intent_path)
+        or reservation.get("prepare_intent_sha256") != sha256(prepare_intent_raw)
+        or reservation.get("source_repository") != current_source
+        or reservation.get("candidate") != candidate
+        or reservation.get("supervisor_bundle") != bundle
+        or reservation.get("test_runtime") != runtime
+        or reservation.get("source_state_before") != prepare_intent.get("source_state_before")
+        or reservation.get("lock_reason") != prepare_intent.get("lock_reason")
+        or reservation.get("expected_admin_dir") != prepare_intent.get("expected_admin_dir")
+        or not isinstance(snapshot_value, dict)
+        or reservation.get("snapshot_root") != snapshot_value.get("root")
+        or reservation.get("reserved_root", {}).get("device") != snapshot_value.get("root_device")
+        or reservation.get("reserved_root", {}).get("inode") != snapshot_value.get("root_inode")
+        or reservation.get("reserved_root", {}).get("mode") != snapshot_value.get("root_mode")
     ):
         reject("SNAPSHOT_PREPARE_INTENT_CHANGED")
     return source, candidate, bundle, runtime
@@ -1497,7 +2358,7 @@ def ensure_removal_receipt(
             {
                 "schema_version", "contract", "state", "snapshot_id", "removed_at", "confirmation",
                 "prepared_receipt", "prepared_receipt_sha256", "source_repository", "candidate",
-                "removed_snapshot_root", "test_runtime_mode",
+                "removed_snapshot_root", "target_reservation", "test_runtime_mode",
             },
             REMOVAL_CONTRACT,
             "SNAPSHOT_REMOVAL_RECEIPT_INVALID",
@@ -1512,6 +2373,7 @@ def ensure_removal_receipt(
             or value.get("source_repository") != source_repository_identity(source)
             or value.get("candidate") != candidate
             or value.get("removed_snapshot_root") != receipt["snapshot"]["root"]
+            or value.get("target_reservation") != receipt["target_reservation"]
             or value.get("test_runtime_mode") != "BORROWED_NEVER_REMOVE"
         ):
             reject("SNAPSHOT_REMOVAL_RECEIPT_INVALID")
@@ -1523,7 +2385,9 @@ def ensure_removal_receipt(
         "removed_at": now_iso(clock), "confirmation": REMOVE_CONFIRMATION,
         "prepared_receipt": str(receipt_path), "prepared_receipt_sha256": receipt_sha256,
         "source_repository": source_repository_identity(source), "candidate": candidate,
-        "removed_snapshot_root": receipt["snapshot"]["root"], "test_runtime_mode": "BORROWED_NEVER_REMOVE",
+        "removed_snapshot_root": receipt["snapshot"]["root"],
+        "target_reservation": receipt["target_reservation"],
+        "test_runtime_mode": "BORROWED_NEVER_REMOVE",
     }
     raw = canonical_json(removal)
     write_no_clobber(removal_path, raw, uid=paths.uid)
@@ -1583,6 +2447,7 @@ def remove_snapshot(
             "prepared_receipt": str(receipt_path), "prepared_receipt_sha256": receipt_sha256,
             "snapshot_root": str(target), "expected_admin_dir": receipt["snapshot"]["admin_dir"],
             "candidate_commit": candidate["commit"], "candidate_tree": candidate["tree"],
+            "target_reservation": receipt["target_reservation"],
             "source_state_before": source_worktree_state(source),
         }
         if path_exists(intent_path):
@@ -1593,7 +2458,8 @@ def remove_snapshot(
                 {
                     "schema_version", "contract", "snapshot_id", "request_id", "requested_at", "confirmation",
                     "prepared_receipt", "prepared_receipt_sha256", "snapshot_root",
-                    "expected_admin_dir", "candidate_commit", "candidate_tree", "source_state_before",
+                    "expected_admin_dir", "candidate_commit", "candidate_tree", "target_reservation",
+                    "source_state_before",
                 },
                 "SNAPSHOT_REMOVE_INTENT_INVALID",
             )
@@ -1639,7 +2505,7 @@ RECOVERY_INTENT_FIELDS = {
     "schema_version", "contract", "recovery_id", "generation", "object_identity_sha256", "snapshot_id", "phase", "observed_state",
     "requested_at", "confirmation", "lifecycle_intent", "lifecycle_intent_sha256",
     "prepared_receipt", "prepared_receipt_sha256", "source_repository", "candidate",
-    "snapshot_root", "admin_dir", "action", "source_object_identity", "validated_identity",
+    "snapshot_root", "admin_dir", "target_reservation", "action", "source_object_identity", "validated_identity",
     "registration_before", "quarantine_path", "retention",
 }
 RECOVERY_FIELDS = {
@@ -1647,7 +2513,7 @@ RECOVERY_FIELDS = {
     "observed_state", "recovered_at", "confirmation", "recovery_intent",
     "recovery_intent_sha256", "lifecycle_intent", "lifecycle_intent_sha256",
     "prepared_receipt", "prepared_receipt_sha256", "source_repository", "candidate",
-    "snapshot_root", "admin_dir", "action", "source_state_before", "source_state_after",
+    "snapshot_root", "admin_dir", "target_reservation", "action", "source_state_before", "source_state_after",
     "source_state_unchanged", "registration_before", "registration_after", "quarantine",
     "git_command", "retention", "outcome", "tombstone_verified",
 }
@@ -1662,6 +2528,16 @@ def assert_remove_target_recovery_identity(identity: dict[str, Any], receipt: di
         "filesystem": expected.get("filesystem"),
     }:
         reject("SNAPSHOT_RECOVERY_TARGET_IDENTITY_CHANGED")
+
+
+def assert_reservation_target_recovery_identity(identity: dict[str, Any], reservation: dict[str, Any]) -> None:
+    expected = reservation["reserved_root"]
+    if (
+        identity.get("root_device") != expected.get("device")
+        or identity.get("root_inode") != expected.get("inode")
+        or identity.get("root_mode") != expected.get("mode")
+    ):
+        reject("SNAPSHOT_PREPARE_TARGET_PROVENANCE_UNPROVEN")
 
 
 def assert_remove_admin_recovery_identity(identity: dict[str, Any], receipt: dict[str, Any]) -> None:
@@ -1703,9 +2579,11 @@ def load_recovery_intent(path: Path, paths: SnapshotPaths) -> tuple[dict[str, An
         or (value.get("observed_state") == "ADMIN_ONLY") != (value.get("action") == "QUARANTINE_ADMIN")
         or not isinstance(value.get("source_object_identity"), dict)
         or not isinstance(value.get("validated_identity"), dict)
+        or not isinstance(value.get("target_reservation"), dict)
         or not isinstance(value.get("quarantine_path"), str)
     ):
         reject("SNAPSHOT_RECOVERY_INTENT_INVALID")
+    load_target_reservation_reference(value["target_reservation"], paths)
     canonical_path(Path(value["quarantine_path"]), "SNAPSHOT_RECOVERY_INTENT_INVALID")
     if value["phase"] == "PREPARE":
         if value.get("prepared_receipt") is not None or value.get("prepared_receipt_sha256") is not None or value.get("confirmation") != RECOVER_PREPARE_CONFIRMATION:
@@ -1741,8 +2619,10 @@ def load_recovery_receipt(path: Path, paths: SnapshotPaths) -> tuple[dict[str, A
         or not isinstance(value.get("quarantine"), dict)
         or not isinstance(value["quarantine"].get("identity"), dict)
         or not isinstance(value.get("git_command"), dict)
+        or not isinstance(value.get("target_reservation"), dict)
     ):
         reject("SNAPSHOT_RECOVERY_RECEIPT_INVALID")
+    load_target_reservation_reference(value["target_reservation"], paths)
     if value["object_identity_sha256"] != sha256(canonical_json(value["quarantine"]["identity"])):
         reject("SNAPSHOT_RECOVERY_RECEIPT_INVALID")
     return value, raw
@@ -1782,6 +2662,7 @@ def validate_completed_recovery(
         or value.get("candidate") != plan["candidate"]
         or value.get("snapshot_root") != plan["snapshot_root"]
         or value.get("admin_dir") != plan["admin_dir"]
+        or value.get("target_reservation") != plan["target_reservation"]
         or value.get("action") != plan["action"]
         or value.get("registration_before") != plan["registration_before"]
         or value.get("registration_after") != []
@@ -1808,6 +2689,7 @@ def build_or_load_recovery_intent(
     expected_admin: Path,
     paths: SnapshotPaths,
     clock: Callable[[], datetime],
+    target_reservation: dict[str, Any],
     prepared_receipt: Path | None = None,
     prepared_receipt_sha256: str | None = None,
     receipt: dict[str, Any] | None = None,
@@ -1815,6 +2697,16 @@ def build_or_load_recovery_intent(
     lifecycle_digest = sha256(lifecycle_intent_raw)
     target = paths.worktrees / snapshot_id
     source_identity = source_repository_identity(source)
+    _, current_reservation, _ = load_target_reservation_reference(target_reservation, paths)
+    if (
+        current_reservation.get("snapshot_id") != snapshot_id
+        or current_reservation.get("source_repository") != source_identity
+        or current_reservation.get("candidate") != candidate
+        or current_reservation.get("snapshot_root") != str(target)
+        or (phase == "PREPARE" and current_reservation.get("prepare_intent_sha256") != lifecycle_digest)
+        or (phase == "REMOVE" and (receipt is None or receipt.get("target_reservation") != target_reservation))
+    ):
+        reject("SNAPSHOT_RECOVERY_RESERVATION_BINDING_INVALID")
     prefix = f"{snapshot_id}.{lifecycle_digest}.{phase.lower()}.g"
     suffix = ".recovery-intent.json"
     catalog: list[tuple[dict[str, Any], bytes, Path, Path]] = []
@@ -1838,6 +2730,7 @@ def build_or_load_recovery_intent(
             if value["action"] == "QUARANTINE_TARGET"
             else common_git_directory(source) / "chenyida-erp-snapshot-quarantine-v1" / f"{snapshot_id}.{expected_recovery_id}.admin"
         )
+        _, recorded_reservation, _ = load_target_reservation_reference(value.get("target_reservation"), paths)
         if (
             item != expected_path
             or value.get("recovery_id") != expected_recovery_id
@@ -1853,6 +2746,13 @@ def build_or_load_recovery_intent(
             or value.get("snapshot_root") != str(target)
             or value.get("admin_dir") != str(expected_admin)
             or value.get("quarantine_path") != str(expected_quarantine)
+            or recorded_reservation.get("snapshot_id") != snapshot_id
+            or recorded_reservation.get("source_repository") != source_identity
+            or recorded_reservation.get("candidate") != candidate
+            or recorded_reservation.get("snapshot_root") != str(target)
+            or (phase == "PREPARE" and recorded_reservation.get("prepare_intent_sha256") != lifecycle_digest)
+            or (phase == "PREPARE" and recorded_reservation.get("generation") != value.get("generation"))
+            or (phase == "REMOVE" and value.get("target_reservation") != target_reservation)
         ):
             reject("SNAPSHOT_RECOVERY_INTENT_CONFLICT")
         catalog.append((value, raw, item, expected_audit))
@@ -1870,11 +2770,13 @@ def build_or_load_recovery_intent(
 
     registrations = [entry for entry in parse_worktrees(source) if entry.get("worktree") == str(target)]
     if path_exists(target) and not registrations and not path_exists(expected_admin):
-        if phase == "PREPARE":
-            reject("SNAPSHOT_PREPARE_TARGET_PROVENANCE_UNPROVEN")
         admin, target_identity = target_only_recovery_identity(source, target, paths.uid)
         if admin != expected_admin:
             reject("SNAPSHOT_RECOVERY_TARGET_INVALID")
+        if phase == "PREPARE":
+            if path_exists(Path(current_reservation["staging_root"])):
+                reject("SNAPSHOT_PREPARE_TARGET_PROVENANCE_UNPROVEN")
+            assert_reservation_target_recovery_identity(target_identity, current_reservation)
         if phase == "REMOVE":
             if receipt is None:
                 reject("SNAPSHOT_RECOVERY_RECEIPT_INVALID")
@@ -1943,6 +2845,8 @@ def build_or_load_recovery_intent(
     generation = max((entry[0]["generation"] for entry in catalog), default=0) + 1
     if generation > 999999:
         reject("SNAPSHOT_RECOVERY_GENERATION_EXHAUSTED")
+    if phase == "PREPARE" and target_reservation.get("generation") != generation:
+        reject("SNAPSHOT_RESERVATION_GENERATION_STATE_CONFLICT")
     recovery_id = sha256(f"{phase}:{snapshot_id}:{lifecycle_digest}:{generation}:{object_digest}".encode("ascii"))
     if action == "QUARANTINE_TARGET":
         quarantine_parent = paths.quarantine / "worktrees"
@@ -1963,7 +2867,8 @@ def build_or_load_recovery_intent(
         "prepared_receipt": str(prepared_receipt) if prepared_receipt else None,
         "prepared_receipt_sha256": prepared_receipt_sha256,
         "source_repository": source_identity, "candidate": candidate,
-        "snapshot_root": str(target), "admin_dir": str(expected_admin), "action": action,
+        "snapshot_root": str(target), "admin_dir": str(expected_admin),
+        "target_reservation": target_reservation, "action": action,
         "source_object_identity": object_identity, "validated_identity": validated_identity,
         "registration_before": registration_before, "quarantine_path": str(quarantine_path),
         "retention": "RETAINED_REQUIRES_SEPARATE_AUTHORIZATION",
@@ -2019,7 +2924,7 @@ def execute_recovery_intent(
                 reject("SNAPSHOT_RECOVERY_TARGET_INVALID")
         if current_object != plan["source_object_identity"]:
             reject("SNAPSHOT_RECOVERY_OBJECT_CHANGED")
-        rename_no_replace(source_path, destination)
+        rename_no_replace(source_path, destination, paths.uid)
         if failpoint:
             failpoint("RECOVERY_OBJECT_QUARANTINED")
     quarantine_identity = recovery_tree_identity(destination, paths.uid, "SNAPSHOT_RECOVERY_QUARANTINE_CHANGED")
@@ -2044,7 +2949,8 @@ def execute_recovery_intent(
         "lifecycle_intent": plan["lifecycle_intent"], "lifecycle_intent_sha256": plan["lifecycle_intent_sha256"],
         "prepared_receipt": plan["prepared_receipt"], "prepared_receipt_sha256": plan["prepared_receipt_sha256"],
         "source_repository": plan["source_repository"], "candidate": plan["candidate"],
-        "snapshot_root": plan["snapshot_root"], "admin_dir": plan["admin_dir"], "action": plan["action"],
+        "snapshot_root": plan["snapshot_root"], "admin_dir": plan["admin_dir"],
+        "target_reservation": plan["target_reservation"], "action": plan["action"],
         "source_state_before": source_before, "source_state_after": source_after, "source_state_unchanged": True,
         "registration_before": plan["registration_before"], "registration_after": registration_after,
         "quarantine": {"path": str(destination), "identity": quarantine_identity},
@@ -2077,7 +2983,7 @@ def recover_prepare_snapshot(
         canonical_path(value, code)
     with lifecycle_locks(paths, False):
         intent, intent_raw, intent_path = load_prepare_intent(snapshot_id, paths)
-        assert_prepare_worktrees_parent(intent, source, paths.uid)
+        assert_prepare_worktrees_parent(intent, source, paths.uid, True)
         source_identity = source_repository_identity(source)
         candidate, bundle = bundle_candidate_identity(source, candidate_commit, candidate_tree, bundle_root)
         runtime = test_runtime_identity(source, candidate_commit, runtime_root, bundle_root, paths.uid, paths.trust_root)
@@ -2092,9 +2998,18 @@ def recover_prepare_snapshot(
             or path_exists(paths.receipts / f"{snapshot_id}.prepared.json")
         ):
             reject("SNAPSHOT_PREPARE_RECOVERY_BINDING_INVALID")
+        _, _, _, reservation_reference = latest_target_reservation(
+            snapshot_id,
+            intent_raw,
+            source_identity,
+            candidate,
+            bundle,
+            runtime,
+            paths,
+        )
         plan, plan_raw, plan_path, audit_path = build_or_load_recovery_intent(
             source, candidate, snapshot_id, "PREPARE", RECOVER_PREPARE_CONFIRMATION,
-            intent_path, intent_raw, expected_admin, paths, clock,
+            intent_path, intent_raw, expected_admin, paths, clock, reservation_reference,
         )
         return execute_recovery_intent(plan, plan_raw, plan_path, audit_path, source, paths, clock, failpoint)
 
@@ -2124,11 +3039,13 @@ def recover_remove_snapshot(
             or intent.get("expected_admin_dir") != str(expected_admin)
             or intent.get("candidate_commit") != candidate["commit"]
             or intent.get("candidate_tree") != candidate["tree"]
+            or intent.get("target_reservation") != receipt["target_reservation"]
         ):
             reject("SNAPSHOT_REMOVE_RECOVERY_BINDING_INVALID")
         plan, plan_raw, plan_path, audit_path = build_or_load_recovery_intent(
             source, candidate, snapshot_id, "REMOVE", RECOVER_REMOVE_CONFIRMATION,
             intent_path, intent_raw, expected_admin, paths, clock,
+            receipt["target_reservation"],
             receipt_path, receipt_sha256, receipt,
         )
         recovery = execute_recovery_intent(plan, plan_raw, plan_path, audit_path, source, paths, clock, failpoint)

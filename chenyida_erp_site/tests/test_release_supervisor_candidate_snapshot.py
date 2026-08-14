@@ -218,6 +218,16 @@ class ReleaseCandidateSnapshotTest(unittest.TestCase):
         receipt, receipt_digest, value = self.prepare()
         self.assertEqual(value["state"], "PREPARED")
         self.assertEqual(value["test_runtime"]["mode"], "BORROWED_NEVER_REMOVE")
+        reservation_path = Path(value["target_reservation"]["receipt"])
+        reservation, reservation_raw = snapshot.load_target_reservation(reservation_path, self.paths)
+        self.assertEqual(digest(reservation_raw), value["target_reservation"]["receipt_sha256"])
+        self.assertEqual(reservation_path.stat().st_mode & 0o777, 0o400)
+        self.assertEqual(reservation_path.stat().st_nlink, 1)
+        self.assertEqual(reservation["source_state_before"], value["source_repository"]["initial_state_before"])
+        self.assertTrue(reservation["target_absent_at_publication"])
+        self.assertFalse(Path(reservation["staging_root"]).exists())
+        self.assertEqual(reservation["reserved_root"]["inode"], (self.paths.worktrees / "fixture").stat().st_ino)
+        self.assertEqual(reservation["reserved_root"]["mode"], "0700")
         self.assertEqual(self.verify(receipt, receipt_digest)["snapshot_id"], "fixture")
         self.assertEqual(self.git("rev-parse", "HEAD", repository=self.paths.worktrees / "fixture"), self.candidate_commit)
         self.assertNotEqual(self.git("symbolic-ref", "-q", "HEAD", repository=self.paths.worktrees / "fixture", check=False), "refs/heads/main")
@@ -250,6 +260,22 @@ class ReleaseCandidateSnapshotTest(unittest.TestCase):
         later_tree = self.git("rev-parse", "HEAD^{tree}")
         with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_CANDIDATE_RELATIONSHIP_INVALID"):
             snapshot.prepare_snapshot(self.source, later, later_tree, self.runtime, self.bundle, "wrong-parent", self.paths)
+
+    def test_unexpected_git_worktrees_parent_before_dispatch_fails_closed(self):
+        def interrupt_intent(phase):
+            if phase == "INTENT_WRITTEN":
+                raise InjectedInterruption()
+
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments("foreign-worktrees-parent"), failpoint=interrupt_intent)
+        worktrees_parent = self.source / ".git/worktrees"
+        worktrees_parent.mkdir(mode=0o700)
+        parent_inode = worktrees_parent.stat().st_ino
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_WORKTREE_PARENT_CHANGED"):
+            snapshot.prepare_snapshot(*self.arguments("foreign-worktrees-parent"))
+        self.assertEqual(worktrees_parent.stat().st_ino, parent_inode)
+        self.assertFalse((self.paths.worktrees / "foreign-worktrees-parent").exists())
+        self.assertFalse(any(self.paths.reservations.glob("foreign-worktrees-parent.*.reserved.json")))
 
     def test_duplicate_id_and_lock_contention_are_no_clobber(self):
         receipt, receipt_digest, _ = self.prepare()
@@ -324,6 +350,26 @@ class ReleaseCandidateSnapshotTest(unittest.TestCase):
         receipt.chmod(0o600)
         receipt.write_bytes(original)
         receipt.chmod(0o400)
+
+        reservation_path = Path(json.loads(original)["target_reservation"]["receipt"])
+        reservation_original = reservation_path.read_bytes()
+        reservation_path.chmod(0o600)
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_RECEIPT_INVALID"):
+            self.verify(receipt, receipt_digest)
+        reservation_path.chmod(0o400)
+        reservation_link = self.paths.reservations / "fixture.reservation-hardlink.json"
+        os.link(reservation_path, reservation_link)
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_RECEIPT_INVALID"):
+            self.verify(receipt, receipt_digest)
+        reservation_link.unlink()
+        reservation_path.chmod(0o600)
+        reservation_path.write_bytes(reservation_original + b" ")
+        reservation_path.chmod(0o400)
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_RECEIPT_INVALID"):
+            self.verify(receipt, receipt_digest)
+        reservation_path.chmod(0o600)
+        reservation_path.write_bytes(reservation_original)
+        reservation_path.chmod(0o400)
 
         target = self.paths.worktrees / "fixture"
         mountinfo = f"1 0 0:1 / {target} rw - ext4 /dev/test rw\n"
@@ -511,6 +557,200 @@ class ReleaseCandidateSnapshotTest(unittest.TestCase):
         self.assertEqual(second.read_bytes(), second_raw)
         self.assertEqual(second.stat().st_nlink, 1)
 
+    def test_reservation_receipt_and_promotion_crash_windows_resume_exact_inode(self):
+        def interrupt_receipt(phase):
+            if phase == "RESERVATION_RECEIPT_WRITTEN":
+                raise InjectedInterruption()
+
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments("reservation-receipt-window"), failpoint=interrupt_receipt)
+        receipt_files = list(self.paths.reservations.glob("reservation-receipt-window.*.reserved.json"))
+        self.assertEqual(len(receipt_files), 1)
+        reservation, _ = snapshot.load_target_reservation(receipt_files[0], self.paths)
+        staging = Path(reservation["staging_root"])
+        reserved_inode = staging.stat().st_ino
+        self.assertFalse((self.paths.worktrees / "reservation-receipt-window").exists())
+        publishing = receipt_files[0].parent / f".{receipt_files[0].name}.publishing"
+        receipt_files[0].rename(publishing)
+        self.assertFalse(receipt_files[0].exists())
+        receipt, receipt_digest, prepared = snapshot.prepare_snapshot(*self.arguments("reservation-receipt-window"))
+        self.assertFalse(publishing.exists())
+        self.assertTrue(receipt_files[0].is_file())
+        self.assertEqual(prepared["target_reservation"]["receipt"], str(receipt_files[0]))
+        self.assertEqual((self.paths.worktrees / "reservation-receipt-window").stat().st_ino, reserved_inode)
+        snapshot.remove_snapshot(receipt, receipt_digest, "reservation-receipt-window", self.paths)
+
+        def interrupt_promoted(phase):
+            if phase == "RESERVATION_PROMOTED":
+                raise InjectedInterruption()
+
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments("reservation-promoted-window"), failpoint=interrupt_promoted)
+        target = self.paths.worktrees / "reservation-promoted-window"
+        promoted_inode = target.stat().st_ino
+        self.assertEqual(list(target.iterdir()), [])
+        receipt, receipt_digest, prepared = snapshot.prepare_snapshot(*self.arguments("reservation-promoted-window"))
+        self.assertEqual(prepared["target_reservation"]["root_inode"], promoted_inode)
+        self.assertEqual(target.stat().st_ino, promoted_inode)
+        snapshot.remove_snapshot(receipt, receipt_digest, "reservation-promoted-window", self.paths)
+
+        def interrupt_unreceipted(phase):
+            if phase == "RESERVATION_ROOT_CREATED":
+                raise InjectedInterruption()
+
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments("reservation-unreceipted"), failpoint=interrupt_unreceipted)
+        orphan = next(self.paths.staging.glob("reservation-unreceipted.*.reserved"))
+        orphan_inode = orphan.stat().st_ino
+        self.assertFalse(any(self.paths.reservations.glob("reservation-unreceipted.*.reserved.json")))
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_PROVENANCE_UNPROVEN"):
+            snapshot.prepare_snapshot(*self.arguments("reservation-unreceipted"))
+        self.assertEqual(orphan.stat().st_ino, orphan_inode)
+        expected_receipt = self.paths.reservations / f"{orphan.name}.json"
+        partial = expected_receipt.parent / f".{expected_receipt.name}.publishing"
+        partial.write_bytes(b'{"partial":')
+        partial.chmod(0o400)
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_PUBLICATION_INVALID"):
+            snapshot.prepare_snapshot(*self.arguments("reservation-unreceipted"))
+        self.assertEqual(partial.read_bytes(), b'{"partial":')
+        self.assertEqual(orphan.stat().st_ino, orphan_inode)
+
+    def test_reservation_rejects_foreign_symlink_nonempty_and_missing_receipt_without_mutation(self):
+        def interrupt_receipt(phase):
+            if phase == "RESERVATION_RECEIPT_WRITTEN":
+                raise InjectedInterruption()
+
+        foreign_id = "reservation-foreign"
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments(foreign_id), failpoint=interrupt_receipt)
+        reservation_path = next(self.paths.reservations.glob(f"{foreign_id}.*.reserved.json"))
+        reservation, _ = snapshot.load_target_reservation(reservation_path, self.paths)
+        staging = Path(reservation["staging_root"])
+        staging_inode = staging.stat().st_ino
+        foreign_target = self.paths.worktrees / foreign_id
+        foreign_target.mkdir(mode=0o700)
+        foreign_payload = self.write("foreign.txt", b"foreign-bytes\n", foreign_target, 0o600)
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_ROOT_REPLACED"):
+            snapshot.prepare_snapshot(*self.arguments(foreign_id))
+        self.assertEqual(foreign_payload.read_bytes(), b"foreign-bytes\n")
+        self.assertEqual(staging.stat().st_ino, staging_inode)
+
+        symlink_id = "reservation-symlink"
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments(symlink_id), failpoint=interrupt_receipt)
+        referent = self.temporary / "foreign-referent"
+        referent.mkdir(mode=0o700)
+        (self.paths.worktrees / symlink_id).symlink_to(referent, target_is_directory=True)
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_ROOT_INVALID"):
+            snapshot.prepare_snapshot(*self.arguments(symlink_id))
+        self.assertEqual(list(referent.iterdir()), [])
+
+        nonempty_id = "reservation-nonempty"
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments(nonempty_id), failpoint=interrupt_receipt)
+        nonempty_reservation = next(self.paths.reservations.glob(f"{nonempty_id}.*.reserved.json"))
+        nonempty_value, _ = snapshot.load_target_reservation(nonempty_reservation, self.paths)
+        unexpected = self.write("unexpected.txt", b"keep\n", Path(nonempty_value["staging_root"]), 0o600)
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_ROOT_NOT_EMPTY"):
+            snapshot.prepare_snapshot(*self.arguments(nonempty_id))
+        self.assertEqual(unexpected.read_bytes(), b"keep\n")
+
+        missing_id = "reservation-missing-receipt"
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments(missing_id), failpoint=interrupt_receipt)
+        missing_receipt = next(self.paths.reservations.glob(f"{missing_id}.*.reserved.json"))
+        displaced_receipt = self.temporary / missing_receipt.name
+        missing_receipt.rename(displaced_receipt)
+        missing_staging = next(self.paths.staging.glob(f"{missing_id}.*.reserved"))
+        missing_inode = missing_staging.stat().st_ino
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_PROVENANCE_UNPROVEN"):
+            snapshot.prepare_snapshot(*self.arguments(missing_id))
+        self.assertEqual(missing_staging.stat().st_ino, missing_inode)
+        displaced_receipt.rename(missing_receipt)
+
+    def test_reservation_rejects_parent_root_mount_and_cross_device_drift(self):
+        def interrupt_receipt(phase):
+            if phase == "RESERVATION_RECEIPT_WRITTEN":
+                raise InjectedInterruption()
+
+        parent_id = "reservation-parent-replaced"
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments(parent_id), failpoint=interrupt_receipt)
+        original_parent = self.temporary / "original-worktrees-parent"
+        self.paths.worktrees.rename(original_parent)
+        self.paths.worktrees.mkdir(mode=0o700)
+        replacement_inode = self.paths.worktrees.stat().st_ino
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_PARENT_CHANGED"):
+            snapshot.prepare_snapshot(*self.arguments(parent_id))
+        self.assertEqual(self.paths.worktrees.stat().st_ino, replacement_inode)
+        self.paths.worktrees.rmdir()
+        original_parent.rename(self.paths.worktrees)
+
+        ancestor_id = "reservation-ancestor-symlink"
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments(ancestor_id), failpoint=interrupt_receipt)
+        original_parent = self.temporary / "worktrees-before-symlink"
+        ancestor_referent = self.temporary / "ancestor-symlink-referent"
+        ancestor_referent.mkdir(mode=0o700)
+        self.paths.worktrees.rename(original_parent)
+        self.paths.worktrees.symlink_to(ancestor_referent, target_is_directory=True)
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_STATE_ROOT_INVALID"):
+            snapshot.prepare_snapshot(*self.arguments(ancestor_id))
+        self.assertEqual(list(ancestor_referent.iterdir()), [])
+        self.paths.worktrees.unlink()
+        original_parent.rename(self.paths.worktrees)
+
+        def interrupt_promoted(phase):
+            if phase == "RESERVATION_PROMOTED":
+                raise InjectedInterruption()
+
+        mode_id = "reservation-root-mode"
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments(mode_id), failpoint=interrupt_promoted)
+        mode_target = self.paths.worktrees / mode_id
+        mode_target.chmod(0o755)
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_ROOT_INVALID"):
+            snapshot.prepare_snapshot(*self.arguments(mode_id))
+        mode_target.chmod(0o700)
+        receipt, receipt_digest, _ = snapshot.prepare_snapshot(*self.arguments(mode_id))
+        snapshot.remove_snapshot(receipt, receipt_digest, mode_id, self.paths)
+
+        mount_id = "reservation-root-mount"
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments(mount_id), failpoint=interrupt_promoted)
+        mount_target = self.paths.worktrees / mount_id
+        mountinfo = (
+            "1 0 0:1 / / rw - ext4 /dev/root rw\n"
+            f"2 1 0:1 / {mount_target} rw - ext4 /dev/test rw\n"
+        )
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_NESTED_MOUNT"):
+            snapshot.prepare_snapshot(*self.arguments(mount_id), mountinfo=mountinfo)
+        self.assertEqual(list(mount_target.iterdir()), [])
+
+        if Path("/dev/shm").is_dir() and self.temporary.stat().st_dev != Path("/dev/shm").stat().st_dev:
+            source_parent = self.temporary / "cross-device-source"
+            source_parent.mkdir(mode=0o700)
+            source_root = source_parent / "reserved"
+            source_root.mkdir(mode=0o700)
+            occupied_parent = self.temporary / "occupied-destination"
+            occupied_parent.mkdir(mode=0o700)
+            occupied = occupied_parent / "target"
+            occupied.mkdir(mode=0o700)
+            source_inode = source_root.stat().st_ino
+            occupied_inode = occupied.stat().st_ino
+            with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_TARGET_OCCUPIED"):
+                snapshot.promote_reservation_no_replace(source_root, occupied, self.paths.uid)
+            self.assertEqual(source_root.stat().st_ino, source_inode)
+            self.assertEqual(occupied.stat().st_ino, occupied_inode)
+            with tempfile.TemporaryDirectory(prefix="cyd-reservation-cross-device-", dir="/dev/shm") as raw_destination:
+                destination_parent = Path(raw_destination)
+                destination_parent.chmod(0o700)
+                destination = destination_parent / "target"
+                with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_CROSS_DEVICE"):
+                    snapshot.promote_reservation_no_replace(source_root, destination, self.paths.uid)
+                self.assertTrue(source_root.is_dir())
+                self.assertFalse(destination.exists())
+
     def test_prepare_admin_only_recovery_quarantines_and_retries(self):
         def interrupt_after_add(phase):
             if phase == "WORKTREE_ADDED":
@@ -539,7 +779,7 @@ class ReleaseCandidateSnapshotTest(unittest.TestCase):
         receipt, receipt_digest, _ = snapshot.prepare_snapshot(*self.arguments("prepare-admin-only"))
         snapshot.remove_snapshot(receipt, receipt_digest, "prepare-admin-only", self.paths)
 
-    def test_prepare_target_only_recovery_requires_separate_provenance(self):
+    def test_prepare_target_only_recovery_uses_exact_reservation_provenance(self):
         def interrupt_after_add(phase):
             if phase == "WORKTREE_ADDED":
                 raise InjectedInterruption()
@@ -553,13 +793,41 @@ class ReleaseCandidateSnapshotTest(unittest.TestCase):
         admin.rename(moved_admin)
         with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_PREPARE_RECOVERY_REQUIRED"):
             snapshot.prepare_snapshot(*self.arguments("prepare-target-only"))
-        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_PREPARE_TARGET_PROVENANCE_UNPROVEN"):
-            snapshot.recover_prepare_snapshot(*self.arguments("prepare-target-only"))
-        self.assertTrue(target.is_dir())
-        self.assertFalse(any(self.paths.quarantine.iterdir()))
-        moved_admin.rename(admin)
+        recovery = snapshot.recover_prepare_snapshot(*self.arguments("prepare-target-only"))
+        self.assertEqual(recovery[2]["action"], "QUARANTINE_TARGET")
+        self.assertEqual(recovery[2]["target_reservation"]["generation"], 1)
+        self.assertFalse(target.exists())
+        quarantine = Path(recovery[2]["quarantine"]["path"])
+        self.assertTrue(quarantine.is_dir())
+        self.assertEqual(quarantine.stat().st_ino, recovery[2]["target_reservation"]["root_inode"])
         receipt, receipt_digest, _ = snapshot.prepare_snapshot(*self.arguments("prepare-target-only"))
         snapshot.remove_snapshot(receipt, receipt_digest, "prepare-target-only", self.paths)
+
+    def test_prepare_target_only_recovery_leaves_foreign_inode_unchanged(self):
+        snapshot_id = "prepare-target-only-foreign"
+
+        def interrupt_after_add(phase):
+            if phase == "WORKTREE_ADDED":
+                raise InjectedInterruption()
+
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments(snapshot_id), failpoint=interrupt_after_add)
+        target = self.paths.worktrees / snapshot_id
+        admin = Path((target / ".git").read_text(encoding="utf-8").removeprefix("gitdir: ").strip())
+        moved_admin = self.temporary / f"{snapshot_id}-admin"
+        admin.rename(moved_admin)
+        owned_target = self.temporary / f"{snapshot_id}-owned"
+        target.rename(owned_target)
+        shutil.copytree(owned_target, target, symlinks=True)
+        target.chmod(0o700)
+        foreign_inode = target.stat().st_ino
+        foreign_git = (target / ".git").read_bytes()
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_PREPARE_TARGET_PROVENANCE_UNPROVEN"):
+            snapshot.recover_prepare_snapshot(*self.arguments(snapshot_id))
+        self.assertEqual(target.stat().st_ino, foreign_inode)
+        self.assertEqual((target / ".git").read_bytes(), foreign_git)
+        quarantine_root = self.paths.quarantine / "worktrees"
+        self.assertFalse(quarantine_root.exists() and any(quarantine_root.iterdir()))
 
     def test_prepare_recovery_generation_does_not_reuse_stale_audit(self):
         snapshot_id = "prepare-generation"
@@ -576,11 +844,18 @@ class ReleaseCandidateSnapshotTest(unittest.TestCase):
             target.rename(self.paths.worktrees / f"{snapshot_id}-moved-{generation}")
             recovery = snapshot.recover_prepare_snapshot(*self.arguments(snapshot_id))
             self.assertEqual(recovery[2]["generation"], generation)
+            self.assertEqual(recovery[2]["target_reservation"]["generation"], generation)
             self.assertFalse(target.exists())
             recoveries.append(recovery)
         self.assertNotEqual(recoveries[0][0], recoveries[1][0])
         self.assertNotEqual(recoveries[0][2]["recovery_id"], recoveries[1][2]["recovery_id"])
         self.assertNotEqual(recoveries[0][2]["quarantine"]["path"], recoveries[1][2]["quarantine"]["path"])
+        reservations = sorted(self.paths.reservations.glob(f"{snapshot_id}.*.reserved.json"))
+        self.assertEqual(len(reservations), 2)
+        second_reservation, _ = snapshot.load_target_reservation(reservations[1], self.paths)
+        self.assertEqual(second_reservation["generation"], 2)
+        self.assertEqual(second_reservation["previous_terminal_recovery"]["audit"], str(recoveries[0][0]))
+        self.assertEqual(second_reservation["previous_terminal_recovery"]["audit_sha256"], recoveries[0][1])
         receipt, receipt_digest, _ = snapshot.prepare_snapshot(*self.arguments(snapshot_id))
         snapshot.remove_snapshot(receipt, receipt_digest, snapshot_id, self.paths)
 
@@ -607,6 +882,40 @@ class ReleaseCandidateSnapshotTest(unittest.TestCase):
             snapshot.recover_prepare_snapshot(*self.arguments(snapshot_id))
         self.assertTrue(displaced_quarantine.is_dir())
         self.assertEqual(recoveries[0][2]["generation"], 1)
+
+    def test_recovery_rejects_missing_or_tampered_newest_reservation_without_old_generation_fallback(self):
+        snapshot_id = "prepare-reservation-loss"
+
+        def interrupt_after_add(phase):
+            if phase == "WORKTREE_ADDED":
+                raise InjectedInterruption()
+
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments(snapshot_id), failpoint=interrupt_after_add)
+        first_target = self.paths.worktrees / snapshot_id
+        first_target.rename(self.paths.worktrees / f"{snapshot_id}-moved-1")
+        first_recovery = snapshot.recover_prepare_snapshot(*self.arguments(snapshot_id))
+        self.assertEqual(first_recovery[2]["generation"], 1)
+
+        with self.assertRaises(InjectedInterruption):
+            snapshot.prepare_snapshot(*self.arguments(snapshot_id), failpoint=interrupt_after_add)
+        second_target = self.paths.worktrees / snapshot_id
+        second_target.rename(self.paths.worktrees / f"{snapshot_id}-moved-2")
+        reservations = sorted(self.paths.reservations.glob(f"{snapshot_id}.*.reserved.json"))
+        self.assertEqual(len(reservations), 2)
+        newest = reservations[-1]
+        newest_raw = newest.read_bytes()
+        displaced = self.temporary / newest.name
+        newest.rename(displaced)
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_GENERATION_STATE_CONFLICT"):
+            snapshot.recover_prepare_snapshot(*self.arguments(snapshot_id))
+        displaced.rename(newest)
+
+        newest.chmod(0o600)
+        newest.write_bytes(newest_raw + b" ")
+        newest.chmod(0o400)
+        with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_RESERVATION_RECEIPT_INVALID"):
+            snapshot.recover_prepare_snapshot(*self.arguments(snapshot_id))
 
     def test_remove_admin_only_recovery_quarantines_and_publishes_tombstone(self):
         receipt, receipt_digest, _ = snapshot.prepare_snapshot(*self.arguments("remove-admin-only"))
@@ -689,6 +998,16 @@ class ReleaseCandidateSnapshotTest(unittest.TestCase):
             self.assertLess(source.index("verify_candidate_snapshot ||"), source.index('if [ ! -e "$ARTIFACT_ROOT" ]'), name)
             self.assertLess(source.rindex("verify_candidate_snapshot ||"), source.index(publish_marker), name)
         implementation = MODULE_PATH.read_text(encoding="utf-8")
+        prepare = implementation[implementation.index("def prepare_snapshot("):implementation.index("def load_prepared_receipt(")]
+        self.assertNotIn("--force", prepare)
+        self.assertNotIn("--no-checkout", prepare)
+        self.assertNotIn("prune", prepare)
+        self.assertIn('"worktree", "add", "--detach", "--lock", "--reason"', prepare)
+        promotion = implementation[implementation.index("def atomic_rename_no_replace("):implementation.index("def write_no_clobber(")]
+        self.assertIn("source_descriptor", promotion)
+        self.assertIn("destination_descriptor", promotion)
+        self.assertIn("RENAME_NOREPLACE", promotion)
+        self.assertNotIn("copy", promotion)
         removal = implementation[implementation.index("def remove_snapshot("):implementation.index("def cli_options(")]
         self.assertNotIn("--force", removal)
         self.assertNotIn("prune", removal)
