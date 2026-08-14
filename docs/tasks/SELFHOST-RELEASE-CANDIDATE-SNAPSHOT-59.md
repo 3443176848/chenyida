@@ -1,6 +1,6 @@
 # SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59 A2独立候选快照生命周期闭环
 
-> 状态：`DOING / IMPLEMENTED / PRE-COMMIT VALIDATION / NO HOST INSTALL / PRODUCTION NO-GO`
+> 状态：`DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / A2 STILL BLOCKED / NO HOST INSTALL / PRODUCTION NO-GO`
 > 日期：2026-08-14（Asia/Shanghai）
 > 严格起点：`main@ad87edc45a32521cfcec36b6214f4d510d750e54` / tree `5831507e94a40641dab9a630ce3a95620c037689`
 > 责任：Codex主智能体唯一写入、测试调度、证据集成和Git提交；项目负责人保留host安装、外部push、真实数据、UAT/生产、账号、员工试用和切换的专项授权权力
@@ -19,9 +19,9 @@
 - [x] VERIFY在任何正式动作前重新核对candidate、bundle、主仓库/快照身份和receipt，拒绝治理HEAD冒充、branch、dirty、symlink/path replacement、receipt tamper及错误repository。
 - [x] REMOVE只清理同一receipt绑定且仍安全的任务快照；dirty、identity drift、未知mount/管理状态时失败关闭，不使用`--force`，保留去敏审计回执。
 - [x] 合成隔离测试覆盖正常prepare→verify→remove、主工作区有既有未跟踪文件、并发/no-clobber、错误commit/tree、dirty snapshot、路径替换、receipt篡改、错误清理目标和中断恢复。
-- [ ] release inventory/Supervisor bundle按实际调用边界纳入新工具和测试；若修改候选输入，明确TASK57候选失效并在后续最终安全仓库变化后统一重建。
-- [ ] 适用Node/Python/POSIX/release/supervisor/凭据/静态门通过，重任务串行且临时资源清零。
-- [ ] 更新`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`、`PRODUCTION_READINESS.md`与授权包，形成独立提交并自动进入下一安全任务。
+- [x] release inventory/Supervisor bundle按实际调用边界纳入新工具和测试；TASK57候选已明确失效，后续只从最终安全仓库链重建。
+- [x] 适用Node/Python/POSIX/release/supervisor/凭据/静态门通过，重任务串行且临时资源清零；Swap越过80%后未再启动新重任务。
+- [x] 更新`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`、`PRODUCTION_READINESS.md`与授权包，形成独立提交并自动进入下一安全任务。
 
 ## 3. 禁止事项
 
@@ -56,8 +56,13 @@
 - Supervisor Python全套`66/66 PASS`；动态测试核对snapshot verifier的精确argv、清洗环境、继承lock FD及严格canonical响应。
 - 九个受影响shell脚本`sh -n 9/9 PASS`，Python AST`4/4 PASS`，`git diff --check`通过。
 - 单一受限离线Node容器中release合同`54/54 PASS`；临时容器自动删除。真实依赖只读元数据检查通过：Node 32,098项、Python 2,195项。
-- 最终安全复核脚本SHA-256为`71361ac9f2ab8ddb1cfe591fef674340462c552678174cd80ca51893cd9add8a`，三条独立攻击探针及完整17项测试通过，未发现提交阻断。复核窗口available约1.7GiB、Swap 768→769MiB/1GiB、根盘13GiB、Load 0.40→0.57；`oom_kill=0`。UAT Web/PostgreSQL healthy、Worker/Caddy running，四服务未见重启或OOM；没有数据库、Volume、host安装、部署或真实A2动作。
+- 最终安全复核脚本SHA-256为`71361ac9f2ab8ddb1cfe591fef674340462c552678174cd80ca51893cd9add8a`，三条独立攻击探针及完整17项测试通过，未发现提交阻断。复核窗口available约1.7GiB、Swap 768→769MiB/1GiB、根盘13GiB、Load 0.40→0.57；`oom_kill=0`。UAT Web/PostgreSQL healthy、Worker/Caddy running，四服务未见重启或OOM；没有Node/PostgreSQL UAT、Volume、host安装、部署或真实A2动作，旧Python SQLite偏差另见下文。
+- 最终source`7b9abec45a50da5655a2e78a0f42647536321290`/tree`0ae35f87cf2e14279f9e93f581557ce17f8e13a4`与唯一manifest-only直接子提交`89504045e4066bbe5236b19cf1a8bfa09701d508`/tree`13809b3b46f46f375b3af6a0c0874d9af5bff5a7`形成78文件bundle，manifest SHA-256为`7927bb242cad9784a48ebaa8269ac9cc53cf56808c7dffc8f3d148111c7e5855`，生成器逐字节重放一致。release inventory/test runtime policy摘要为`4dbf77767cef5896a5dd0eb2a0db676709e9fa6f4335fac0cf823b901d33c4ed`/`443d6a5a108541485334af3144000b1a5407ec97f63dce8b809fda1e6899561a`。
+- 正式提交快照验证通过release inventory 6文件/57项、直接release 54/54、SPECIAL POSIX 7文件/57项、凭据1,670文件、隔离Python self-test/smoke/go-live及Supervisor 66/66；最终绑定增量又通过受影响browser policy 5/5。lint为0 error/28 warning；JSON220、Shell44、Python AST52、Markdown398/本地链接242、source diff和`git diff --check`通过。无UI、Schema/Migration或业务逻辑变化，Browser E2E、PostgreSQL及Node source/typecheck不属于本任务受影响门；Swap超过80%后未为重复全量门冒险启动新重任务。
+- 两个诚实失败均已修复且未降低断言：cap-drop sandbox首先暴露合成解释器0555文件篡改夹具依赖root capability，现显式短暂恢复owner-write并复跑通过；正式inventory随后在测试执行前发现release合同文件SHA未同步，已重绑inventory、runtime policy及固定摘要后由官方harness通过。
+- 验证偏差：一次直接运行旧Python `go_live_check.py`未使用隔离入口，对`chenyida_erp_app/data/erp.sqlite3`执行了初始化检查并创建`data/backups/erp-backup-20260814-222753.sqlite3`。未读取业务行、未删除或回滚该数据库/备份；因删除备份和改写旧运行数据需要专项授权，二者原样保留。随后全部Python基线改由bubblewrap、`/state`临时SQLite和`--no-backup`入口复跑通过。该偏差不涉及Node/PostgreSQL UAT或四个受保护Volume，但必须保留为运行纪律问题。
+- lint窗口Swap从约769MiB升至889MiB/1GiB并越过80%，因此立即停止启动新的typecheck/Node source等重任务；收口available约1.9GiB、根盘13GiB、Load回落至0.41、`oom_kill=0`。四服务running/restart0/OOM false，Web/PostgreSQL healthy、Worker/Caddy health none；任务container和临时目录清零。高Swap仍是下一任务启动重门前的资源阻断，不修改Swap或系统配置。
 
 ## 7. 当前判定
 
-`DOING / IMPLEMENTED / PRE-COMMIT VALIDATION / REPOSITORY AND SYNTHETIC-ISOLATED ONLY / PRODUCTION NO-GO`。TASK59的可证明snapshot生命周期已通过最终只读复核，尚须完成source commit、唯一manifest-only直接子提交、完整门和治理文档收口；无创建前reservation凭据的PREPARE target-only自动处置仍失败关闭，必须后续闭合或另行人工授权。TASK57的76文件bundle及本机镜像已因Site变化成为`STALE / NOT AUTHORIZABLE`；A1、A3、host安装和真实A2仍未授权。
+`DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / A2 STILL BLOCKED / PRODUCTION NO-GO`。TASK59已关闭可证明的detached snapshot准备、验证、删除、跨代审计和保留隔离合同；无创建前reservation凭据的PREPARE target-only自动处置仍安全失败关闭，下一仓库任务必须增加不可变reservation后才能解除该操作阻断。TASK57的76文件bundle及本机镜像已因Site变化成为`STALE / NOT AUTHORIZABLE`；A1、A3、host安装、真实A2、外部锚点及UAT/数据动作均未授权。

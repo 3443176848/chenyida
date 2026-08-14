@@ -1,7 +1,7 @@
 # 晨亿达 ERP 投产专项授权执行包
 
 > 权威基线任务：`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52`
-> 当前事实刷新：`SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58`
+> 当前事实刷新：`SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59` / D-135
 > 事实快照：2026-08-14（Asia/Shanghai）
 > 当前结论：`PRODUCTION NO-GO / CONTROL PLANE ONLY / NO AUTHORIZATION GRANTED`
 
@@ -22,24 +22,24 @@
 
 | 项目 | 当前事实 | 含义 |
 | --- | --- | --- |
-| TASK58严格起点 | `04619b8a6a89cb410d8464751c733d472d7007cc` / tree `05ef60ac2f517e158778446437cb0c3f8bdba6f7` | TASK57纯文档收口；其直接父提交是候选输入，`chenyida_erp_site`字节未改变；TASK58最终文档提交以`git log`为准 |
-| 当前候选输入 | `78d96c6198ab4b7255572186ea580c463b5eeba3` / tree `3dbd20dd6803d485fca17f72f7ee90de277c3b9d` | alpha.47 / Migration 46/head `0046_runtime_lock_privilege_boundary.sql`；当前本机精确候选revision |
-| 当前Web | manifest `sha256:b7b21508a69a2bfed86ebb204adc16eab0df6839f04f0ebe00e5d6d151458a30`；config `sha256:3c83d60f50ee13f582794d5e3f0346de79a942110e9cc9377206b300dadbf56e` | TASK57本机engine候选；零发现诊断通过，但不是外部registry锚点 |
-| 当前Worker | manifest `sha256:c5bf9d5c95e266d025ea048575b69c14e52462934789c206ebfda423d6b0b113`；config `sha256:3bebff1637cc36455bc28cedcb101d65759b1315b6f70ae3ac642b6d13b5f971` | TASK57本机engine候选；零发现诊断通过，但不是外部registry锚点 |
-| supervisor source | `4d4586b1086470d32ce19a7f4eabbc2d2a33fa74` / tree `a551144e032f80f50fbd6c432059c97afbff7ece` | installer、launcher和76个固定文件的权威源码提交 |
-| supervisor manifest | `78d96c6198ab4b7255572186ea580c463b5eeba3` / tree `3dbd20dd6803d485fca17f72f7ee90de277c3b9d` | source 的直接子提交，只更新 canonical bundle manifest |
-| bundle | `631d76e650082de299fe836f1216b057d1ca7deabe29bd5e11e1a071a21ae763` | 76文件，生成器逐字节重放一致；本值是manifest文件SHA-256 |
+| TASK59严格起点 | `ad87edc45a32521cfcec36b6214f4d510d750e54` / tree `5831507e94a40641dab9a630ce3a95620c037689` | TASK59从该clean根启动；最终提交链如下，治理收口提交以`git log`为准 |
+| 当前快照输入 | `89504045e4066bbe5236b19cf1a8bfa09701d508` / tree `13809b3b46f46f375b3af6a0c0874d9af5bff5a7` | alpha.47 / Migration 46/head；只表示D-135快照和bundle输入，不表示存在源码匹配Web/Worker镜像 |
+| Web/Worker镜像 | TASK57 Web manifest/config `b7b21508…8a30`/`3c83d60f…f56e`、Worker `c5bf9d5c…b113`/`3bebff16…f971` | `STALE / NOT AUTHORIZABLE`；TASK59改变Site输入后当前没有源码匹配镜像，A3不得使用这些历史对象 |
+| supervisor source | `7b9abec45a50da5655a2e78a0f42647536321290` / tree `0ae35f87cf2e14279f9e93f581557ce17f8e13a4` | installer、launcher、snapshot工具和78个固定文件的权威源码提交 |
+| supervisor manifest | `89504045e4066bbe5236b19cf1a8bfa09701d508` / tree `13809b3b46f46f375b3af6a0c0874d9af5bff5a7` | source 的直接子提交，只更新 canonical bundle manifest |
+| bundle | `7927bb242cad9784a48ebaa8269ac9cc53cf56808c7dffc8f3d148111c7e5855` | 78文件，生成器逐字节重放一致；本值是manifest文件SHA-256 |
 | installer | `f12e52500540da4f17cbb7f021397cb50c2cf0b7bf18f037e6f31e56072d7cb3` | 只接受固定安装动作和短时 root-only 授权 |
-| launcher | `92cabc075208b05d529f883e3fad4cd9951cb417308c262203985ae9383e68c6` | 只映射受控发布/运行权限动作，部署后仅允许严格验证并发布identity |
-| 当前构建回执 | `33b1b9219c17ac3000b058a2cf16ab25ccdd2d859a09039e58abc074f2107a9a` | TASK57 root-only local diagnostic来源；不是正式release evidence |
+| launcher | `2bf5656e04d82b1df488563c44510a7e3561e6a0fa83cd9ca957ee64215e441f` | 先取得全局锁、验证候选快照和runtime，再消费授权；正式wrapper在最终发布前再次验证 |
+| snapshot工具 | `release-candidate-snapshot.py` SHA-256 `71361ac9f2ab8ddb1cfe591fef674340462c552678174cd80ca51893cd9add8a` | PREPARE/VERIFY/REMOVE与守恒恢复已验；无创建前reservation的PREPARE target-only仍失败关闭，不能实际进入A2 |
+| 历史构建回执 | `33b1b9219c17ac3000b058a2cf16ab25ccdd2d859a09039e58abc074f2107a9a` | 仅解释TASK57旧本机诊断来源；已失效，不是正式release evidence或当前A3输入 |
 | UAT | Web alpha.42 / source `569aa954…d33a24`；PostgreSQL 0040；四服务旧运行配置 | 与候选不一致，且现行容器仍非只读 rootfs |
 | installed supervisor | launcher、bundle根、install/release authorization、receipt、journal 路径全部不存在 | 正式镜像证据和19步门按设计失败关闭 |
 | 恢复能力 | V2 合成/双集群隔离合同已通过；真实异机目标、当前四域副本和真实恢复回执不存在 | 不能宣称故障后可恢复 |
 | 监控 | 仓库采集/评估/状态工具存在；无host installer/unit/timer、真实通知渠道和值班演练 | 不能宣称持续监控或告警已启用 |
 
-TASK57收口只读资源快照：available memory约1.8 GiB、Swap约770 MiB/1 GiB、根盘可用13 GiB、Load低于4；任务窗口未观察到宿主或容器OOM，四个UAT容器restart 0/OOM false。该快照只证明当时未触发停止线，不替代未来执行窗口预检。
+TASK59收口只读资源快照：available memory约1.9 GiB、Swap约889 MiB/1 GiB、根盘可用13 GiB、Load约0.41，`oom_kill=0`；四个UAT容器restart 0/OOM false。Swap已超过80%停止线，当前不得启动新的build、全量测试或数据库重任务；未来执行仍须重新预检。
 
-本节已由TASK58刷新到TASK57不可变链，但仍不是可消费授权。`631d76e6…e763`只能作为未来A1执行单的待审输入；A1仍未请求或授予。A3必须把当前Web/Worker对象锚定为批准私有registry的完整digest引用，A2再使用精确`78d96c61…eba3`候选快照与新鲜正式安全证据；本机engine引用不得冒充外部锚点。
+本节已由TASK59刷新到D-135不可变链，但仍不是可消费授权。`7927bb24…e5855`可作A1设计复核输入；由于下一reservation任务会再次改变bundle，当前不应请求安装，A1仍未授予。A3必须在reservation及其他候选输入变化收口后重建Web/Worker，并把最终同一对象锚定为批准私有registry完整digest；A2再使用对应精确快照、receipt摘要、借用runtime和新鲜正式安全证据。TASK57本机对象不得冒充当前候选或外部锚点。
 
 ## 3. 全局执行前门禁
 
@@ -56,9 +56,9 @@ TASK57收口只读资源快照：available memory约1.8 GiB、Swap约770 MiB/1 G
 
 | 授权域 | 动作 | 当前状态 | 关键依赖 | 成功后仍未获权 |
 | --- | --- | --- | --- | --- |
-| `A1` | 安装 content-addressed host supervisor | `TASK57 CURRENT BUNDLE READY / EXPLICIT HOST AUTHORIZATION NOT GRANTED` | TASK57精确source/manifest/bundle/installer/launcher；执行前仍须独立任务、root bootstrap路径和项目负责人专项授权 | `A2`—`A8`全部仍未授权 |
-| `A2` | 正式镜像证据、19步门、UAT-class manifest | `BLOCKED BY A1 + A3 + DETACHED SNAPSHOT CONTRACT` | A1回执、A3不可变registry完整引用、已验的精确`78d96c61…eba3`候选快照工具、新鲜Trivy DB | UAT部署、真实数据仍未授权 |
-| `A3` | 私有异机源码与镜像锚点 | `LOCAL CANDIDATE READY / TARGET AND CREDENTIAL AUTHORIZATION REQUIRED` | TASK57同一源码与Web/Worker对象、批准的私有Git/registry、root-only短时凭据 | 正式门、数据备份、UAT部署仍未授权 |
+| `A1` | 安装 content-addressed host supervisor | `TASK59 BUNDLE REVIEWABLE / INSTALL DEFERRED UNTIL RESERVATION FINAL BUNDLE / AUTHORIZATION NOT GRANTED` | 最终reservation后重新固定精确source/manifest/bundle/installer/launcher；执行前仍须独立任务、root bootstrap路径和项目负责人专项授权 | `A2`—`A8`全部仍未授权 |
+| `A2` | 正式镜像证据、19步门、UAT-class manifest | `BLOCKED BY RESERVATION + CURRENT IMAGES + A1 + A3` | 创建前target reservation、最终snapshot receipt+digest+runtime root、A1回执、A3不可变registry完整引用、新鲜Trivy DB | UAT部署、真实数据仍未授权 |
+| `A3` | 私有异机源码与镜像锚点 | `CURRENT IMAGE CANDIDATE ABSENT / TARGET AND CREDENTIAL AUTHORIZATION REQUIRED` | reservation等最终源码收口后的同一源码与重建Web/Worker对象、批准私有Git/registry、root-only短时凭据 | 正式门、数据备份、UAT部署仍未授权 |
 | `A4a` | 三故障域/RPO/RTO/加密/保留设计与空目标准备 | `READY FOR NON-SECRET OWNER INPUT` | source/offhost/restore位置、责任人和策略；不复制数据 | A4b—A4e及UAT动作仍未授权 |
 | `A4b`—`A4d` | 当前四域本机备份、异机接收、第三域恢复 | `BLOCKED BY A4a AND DATA AUTHORIZATION` | 精确数据源/窗口、root-only凭据、三个故障域 | UAT Migration/deploy仍未授权 |
 | `A4e` | 部署后同身份恢复再验证与常态调度 | `NOT EXECUTION READY` | 先补调度/保留/角色ACL合同；A6后需新备份/恢复身份 | 生产切换仍未授权 |
@@ -68,9 +68,9 @@ TASK57收口只读资源快照：available memory约1.8 GiB、Swap约770 MiB/1 G
 | `A7` | 当前源盘点、业务处置、试迁移、岗位批准、跨岗UAT写、员工试运行 | `BLOCKED BY BUSINESS INPUT AND PRECEDING EVIDENCE` | 逐检查点见第11节；不得以一次批准跨越 | 正式切换仍未授权 |
 | `A8` | 正式切换与上线观察 | `BLOCKED BY A2—A7 EVIDENCE` | 全部门禁、停写点、执行/回滚责任人、正式窗口 | 无；但上线后G10观察仍须完成 |
 
-首次晋升的正确主链是：TASK53生命周期修复、TASK54—TASK56恢复/权限闭环、TASK57当前候选（均已完成）→ A1 → A3不可变源码/镜像引用 → A2正式证据与19步门 → A4b—A4d升级前真实恢复链 → A5a监控/投递能力 → A6技术晋升及部署后严格回执/identity → A4e对新runtime identity重新备份恢复 → A5b绿色窗口 → A7跨岗/员工 → A8。A4a策略设计、A7岗位审批等非重任务可提前准备，但本机重任务仍串行。
+首次晋升的正确主链是：TASK53生命周期、TASK54—TASK56恢复/权限、TASK59快照主合同（均已完成）→ 创建前target reservation → 最终bundle及Web/Worker重建 → A1 → A3不可变源码/镜像引用 → A2正式证据与19步门 → A4b—A4d升级前真实恢复链 → A5a监控/投递能力 → A6技术晋升及部署后严格回执/identity → A4e对新runtime identity重新备份恢复 → A5b绿色窗口 → A7跨岗/员工 → A8。A4a策略设计、A7岗位审批等非重任务可提前准备，但本机重任务仍串行。
 
-TASK53已把旧UAT Worker的`health=none`限制在`PRE_DEPLOY_EXISTING_RUNTIME_STABILITY`的不退化比较中，TASK57隔离候选已通过严格Worker runtime，仓库自锁与当前候选缺口均已关闭。剩余约束是正式镜像证据/manifest必须绑定A3可异机解析的完整registry digest、A1尚未安装，且第13节第2项detached snapshot合同仍开放；三者闭合前不得请求或运行A2。
+TASK53已把旧UAT Worker的`health=none`限制在`PRE_DEPLOY_EXISTING_RUNTIME_STABILITY`的不退化比较中，TASK59又把独立detached snapshot、receipt、runtime和锁内验证闭合。当前仍缺创建前target reservation，且TASK57镜像已失效；只有reservation、最终镜像、A1安装回执和A3完整外部digest全部闭合，才可请求或运行A2。
 
 ## 5. A1：host supervisor 安装
 
@@ -116,21 +116,21 @@ supervisor本身没有后台进程；没有pending release authorization时保�
 
 项目负责人只有在愿意承担上述host文件变化时，才使用不含秘密的确认：
 
-> 我专项授权`A1 HOST_SUPERVISOR_INSTALL`，仅安装当次执行单固定且与TASK57当前链重新验证一致的source/manifest/bundle/installer/launcher；允许创建列明的root-owned路径和安装回执，不授权`A2`—`A8`、systemd、UAT、数据库、账号、网络或业务数据动作。
+> 我专项授权`A1 HOST_SUPERVISOR_INSTALL`，仅安装当次执行单固定且在reservation收口后重新验证一致的最终source/manifest/bundle/installer/launcher；允许创建列明的root-owned路径和安装回执，不授权`A2`—`A8`、systemd、UAT、数据库、账号、网络或业务数据动作。
 
 ## 6. A2：正式本机发布证据与19步门
 
 ### 6.1 前置与影响
 
-A2必须等TASK53生命周期合同、A1安装回执、A3不可变外部镜像引用、TASK57当前精确候选和第13节第2项detached snapshot合同全部通过。TASK53已建立“旧运行面保持不退化、隔离候选严格验证Worker health、部署后再独立严格验证”的失败关闭合同，TASK57候选也已在本机隔离环境通过；当前阻断为A1未安装、A3外部完整引用不存在且snapshot工具合同尚未闭合。
+A2必须等TASK53生命周期合同、TASK59/D-135快照合同、创建前target reservation、A1安装回执、最终源码匹配Web/Worker和A3不可变外部镜像引用全部通过。TASK53已建立“旧运行面保持不退化、隔离候选严格验证Worker health、部署后再独立严格验证”的失败关闭合同，TASK59已建立独立detached快照、receipt/runtime绑定及锁内双重验证；当前阻断为reservation未闭合、当前镜像不存在、A1未安装且A3外部完整引用不存在。
 
-TASK58严格起点`04619b8a…07cc`是候选输入`78d96c6198ab4b7255572186ea580c463b5eeba3`的纯文档直接子提交，TASK58也只改治理文档，`chenyida_erp_site`字节未改变；正式动作仍不得把更晚的治理HEAD冒充镜像revision，也不得回退或切换共享主工作区。A2应在仓库外准备root-owned、不可组/全局写的独立detached Git worktree，HEAD/tree精确为`78d96c6198ab4b7255572186ea580c463b5eeba3`/`3dbd20dd6803d485fca17f72f7ee90de277c3b9d`；完成后只精确清理该任务worktree登记，不触碰主工作区或用户未跟踪文件。任何新的`chenyida_erp_site`变化都会再次使候选过期，必须刷新A3锚点。
+TASK59当前快照输入为`89504045e4066bbe5236b19cf1a8bfa09701d508`/tree`13809b3b46f46f375b3af6a0c0874d9af5bff5a7`，但下一reservation实现会改变Site与bundle，故它不能预先成为正式A2执行输入。最终A2必须由D-135工具在仓库外root-owned、不可组/全局写的固定根创建locked detached worktree，并以不可变prepared receipt、receipt SHA-256和canonical借用runtime root绑定authorization；launcher先取得全局锁再VERIFY，wrapper在制品发布前复核。不得回退或切换共享主工作区，不得把更晚治理HEAD、branch、foreign target、旧audit或路径名冒充候选所有权；REMOVE只处理receipt证明的对象，quarantine默认永久保留。
 
 A2允许在仓库外唯一artifact root生成正式镜像provenance、SBOM/security evidence、19步gate report和条件式UAT-class manifest；镜像参数必须使用A3批准私有registry的完整`repository@sha256:digest`引用，不能使用已删除loopback registry留下的`127.0.0.1:32776/...`引用。它允许按计划串行启动隔离测试容器和数据库，但不修改UAT/生产、不push外部registry、不读真实业务数据或四卷。
 
 ### 6.2 三个一次性动作
 
-1. `A2-EVIDENCE / CREATE_IMAGE_EVIDENCE`：绑定独立候选worktree、Web/Worker digest引用、artifact root、run ID和不超过72小时且扫描前后不变的固定Trivy数据库。失败时不进入下一步。
+1. `A2-EVIDENCE / CREATE_IMAGE_EVIDENCE`：绑定独立候选worktree、snapshot receipt及其SHA-256、canonical借用runtime root、Web/Worker digest引用、artifact root、run ID和不超过72小时且扫描前后不变的固定Trivy数据库。失败时不进入下一步。
 2. `A2-GATE / RUN_RELEASE_GATE`：绑定同一worktree、镜像及上一步正式SBOM/security文件；执行全部19步，任何fail/skip/todo、超时、资源阈值或临时资源残留都拒绝。
 3. `A2-MANIFEST / CREATE_RELEASE_MANIFEST`：只有gate为PASS且所有证据仍新鲜才执行；deployment class固定为UAT，绑定同一commit/tree、镜像、Migration、plan/report及SBOM/security。不得预先创建或把失败候选标为ELIGIBLE。
 
@@ -149,7 +149,7 @@ A2允许在仓库外唯一artifact root生成正式镜像provenance、SBOM/secur
 
 ## 7. A3：外部源码与镜像恢复锚点
 
-A3在A2之前执行，需要项目负责人指定：批准的私有Git目标、私有OCI registry/repository、数据驻留/访问责任人、保留策略和root-only短时凭据文件。对象必须是TASK57精确`78d96c61…eba3`源码与当前Web/Worker manifest；公开origin继续禁止接收内部历史，不得使用`latest`或可变tag作为唯一身份。
+A3在A2之前执行，需要项目负责人指定：批准的私有Git目标、私有OCI registry/repository、数据驻留/访问责任人、保留策略和root-only短时凭据文件。TASK57对象已失效；必须先完成reservation等安全仓库变化，再从最终source/manifest精确重建Web/Worker，并只锚定该同一源码和镜像对象。公开origin继续禁止接收内部历史，不得使用`latest`或可变tag作为唯一身份。
 
 执行范围应分成源码与镜像两条可核验链：
 
@@ -271,23 +271,24 @@ A8只有A2—A7全部有当期证据、所有关键差异已修复/接受/指定
 
 ## 13. 仍可安全推进的仓库任务
 
-TASK53已完成首次晋升自锁修复，TASK54关闭原异机传输合同，TASK55关闭cluster roles/ACL/tablespace恢复合同，TASK57重建当前候选。在等待任何外部授权期间，以下台账仍必须区分已完成与开放项，不能直接宣布“只剩用户授权”：
+TASK53已完成首次晋升自锁修复，TASK54关闭原异机传输合同，TASK55—TASK56关闭cluster/runtime权限与恢复合同，TASK59关闭detached snapshot主合同；TASK57镜像已因后续Site变化失效。在等待任何外部授权期间，以下台账仍必须区分已完成与开放项，不能直接宣布“只剩用户授权”：
 
 1. `DONE / TASK54`：四域V2异机传输provenance、客户端加密、不可变接收/保留、非重入调度和失败恢复合同已在合成fixture与本机隔离目标完成；真实异机和当前数据仍未授权。
-2. `OPEN / NEXT`：固定A2独立detached candidate worktree的准备、验证和精确清理合同，防止共享主工作区切换或晚于镜像的治理提交冒充候选；任何`chenyida_erp_site`改动后重建当前候选。
-3. `OPEN`：为TASK49监控工具建立内容寻址host delivery包：installer、service/timer、非特权notifier边界、配置schema、receipt/journal、升级/惰性回退和隔离测试；不得实际安装。
-4. `OPEN`：以机器源生成11角色→permission→API/data domain矩阵和路由覆盖负向合同，附业务批准状态；现有若干手写角色测试遗漏planning，不能替代完整漂移检测。
-5. `OPEN`：以合成隔离数据证明历史导入基线0017物化后连续升级至当前0046，覆盖重复执行、失败回滚和升级后全量reconciliation。该任务改动候选输入后必须重建镜像/证据。
-6. `DONE / TASK55—TASK56`：PostgreSQL cluster roles/ACL/default privileges、tablespace及运行角色确定性重建合同和隔离测试已闭合；真实数据库恢复/激活仍未授权。
-7. `OPEN`：编制统一跨岗位UAT脚本、预期数据库增量、审计证据、冲销/快照回滚和员工签字模板；不创建账号或执行写操作。
-8. `OPEN`：复核UAT晋升/快照回滚的逐检查点执行器是否存在失败关闭缺口；仅对合成Compose/隔离PostgreSQL实现测试，不部署UAT。
+2. `DONE / TASK59`：A2独立detached candidate worktree的PREPARE/VERIFY/REMOVE、不可变回执、借用runtime、锁内多次验证和跨代quarantine守恒已在合成隔离Git中闭合；没有实际创建host候选或运行A2。
+3. `OPEN / NEXT`：在同设备私有staging创建空目录与0400 reservation receipt，绑定target root dev/inode/mode，并贯穿Git add前后和target-only恢复；receipt前崩溃、inode替换、非空、跨设备或Git未保留inode必须失败关闭。完成后统一重建bundle及镜像。
+4. `OPEN`：为TASK49监控工具建立内容寻址host delivery包：installer、service/timer、非特权notifier边界、配置schema、receipt/journal、升级/惰性回退和隔离测试；不得实际安装。
+5. `OPEN`：以机器源生成11角色→permission→API/data domain矩阵和路由覆盖负向合同，附业务批准状态；现有若干手写角色测试遗漏planning，不能替代完整漂移检测。
+6. `OPEN`：以合成隔离数据证明历史导入基线0017物化后连续升级至当前0046，覆盖重复执行、失败回滚和升级后全量reconciliation。该任务改动候选输入后必须重建镜像/证据。
+7. `DONE / TASK55—TASK56`：PostgreSQL cluster roles/ACL/default privileges、tablespace及运行角色确定性重建合同和隔离测试已闭合；真实数据库恢复/激活仍未授权。
+8. `OPEN`：编制统一跨岗位UAT脚本、预期数据库增量、审计证据、冲销/快照回滚和员工签字模板；不创建账号或执行写操作。
+9. `OPEN`：复核UAT晋升/快照回滚的逐检查点执行器是否存在失败关闭缺口；仅对合成Compose/隔离PostgreSQL实现测试，不部署UAT。
 
 后续调度按对A1/A2、恢复和运行安全的影响选择最高优先级，保持一次一个正式任务编号。
 
 ## 14. 当前最小外部请求
 
-当前不需要项目负责人立即批准host或数据动作：当前候选已完成，但A2仍被A1、A3和detached snapshot合同阻断，A4真实链缺目标/策略，A5也缺host delivery实现。持续交付负责人将先从第13节第2项自动推进，再按依赖处理其余开放仓库任务。项目负责人若愿意并行准备非秘密外部信息，最小输入是A4a的三个故障域/RPO/RTO/加密/保留/责任人，或A3的私有Git/registry目标名称；密码、Token和密钥仍只放root-only文件，不发聊天。
+当前不需要项目负责人立即批准host或数据动作：D-135快照主合同已完成，但当前镜像已失效，A2仍被target reservation、最终镜像、A1和A3阻断；A4真实链缺目标/策略，A5也缺host delivery实现。持续交付负责人将先从第13节第3项自动推进，再按依赖处理其余开放仓库任务。项目负责人若愿意并行准备非秘密外部信息，最小输入是A4a的三个故障域/RPO/RTO/加密/保留/责任人，或未来A3的私有Git/registry目标名称；密码、Token和密钥仍只放root-only文件，不发聊天。
 
-第一个host变更请求仍是A1；未获A1时系统可安全保持：UAT继续alpha.42/0040、历史候选和诊断证据只读保留但不可授权、正式入口失败关闭、无真实员工使用。
+第一个host变更请求最终仍是A1，但须等reservation收口并重建最终bundle后才请求；在此之前系统安全保持：UAT继续alpha.42/0040、历史候选和诊断证据只读保留但不可授权、正式入口失败关闭、无真实员工使用。
 
 无论等待多久，以下结论不变：没有真实异机恢复、正式同候选门、host监控投递、UAT对齐、真实迁移和员工签字前，晨亿达ERP不能宣布可落地投入使用。

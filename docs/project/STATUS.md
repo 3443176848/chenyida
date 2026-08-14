@@ -2,30 +2,49 @@
 
 最后更新时间：2026-08-14（Asia/Shanghai）
 
+## SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59（完成；独立候选快照合同已验证，正式A2仍阻塞）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / A2 STILL BLOCKED / PRODUCTION NO-GO | TASK59已释放active slot；下一安全仓库任务为创建前target reservation所有权闭环 |
+| 严格起点 | PASS / CONTROLLED | `ad87edc45a32521cfcec36b6214f4d510d750e54`/tree`5831507e94a40641dab9a630ce3a95620c037689`；用户未跟踪状态报告不读不改不提交 |
+| D-135快照合同 | PASS / FAIL CLOSED | 独立detached/locked worktree、source→manifest-only直接子关系、canonical intent/receipt、全局+lifecycle锁、锁内VERIFY、精确REMOVE和稳定错误代码已闭合；共享主工作区不切换或清理 |
+| 借用runtime | PASS / BORROWED NEVER REMOVE | Node/Python依赖、lock/requirements、解释器身份与可信祖先完整绑定；六个消费者只读借用，REMOVE不得变更或删除运行时 |
+| 恢复与攻击面 | PASS / CONSERVATION VERIFIED | generation、intent/audit/quarantine跨代守恒，`renameat2(RENAME_NOREPLACE)`无覆盖；跨代旧audit、foreign target和最新quarantine缺失攻击探针均失败关闭，保留quarantine不得自动删除 |
+| 已知操作阻断 | OPEN / FAIL CLOSED | 没有创建前reservation时，PREPARE target-only无法证明Task59所有权并返回`SNAPSHOT_PREPARE_TARGET_PROVENANCE_UNPROVEN`；后续须以同设备私有staging和0400 receipt绑定root dev/inode/mode |
+| Git/bundle | PASS / CONTENT ADDRESSED | source`7b9abec45a50da5655a2e78a0f42647536321290`/tree`0ae35f87…13689`与manifest-only `89504045e4066bbe5236b19cf1a8bfa09701d508`/tree`13809b3b…5a7`形成78文件bundle；manifest SHA-256`7927bb242cad9784a48ebaa8269ac9cc53cf56808c7dffc8f3d148111c7e5855`，脚本SHA-256`71361ac9…d9add8a` |
+| 候选影响 | STALE / NOT AUTHORIZABLE | TASK57的76文件bundle及Web/Worker本机镜像因Site输入变化失效；当前没有与最终源码匹配的可授权镜像，A3必须后续重建并锚定 |
+| 自动验证 | PASS / SCOPED FULL APPLICABLE | snapshot17/17、Supervisor66/66、release inventory 6文件/57项、直接54/54、SPECIAL POSIX 7文件/57项、隔离Python三基线、browser policy5/5、credentials1670、JSON220、Shell44、Python AST52、Markdown398/242及source/diff门通过；lint0 error/28 warning |
+| 诚实失败 | RESOLVED / ASSERTIONS PRESERVED | cap-drop夹具暴露0555解释器篡改依赖root capability，现只在fixture变异窗口恢复owner-write；正式inventory先因release合同SHA漂移在测试前拒绝，重绑inventory/policy/manifest后官方harness通过，均未跳过或降低断言 |
+| 验证偏差 | RECORDED / LEGACY SQLITE LEFT UNCHANGED | 一次非隔离旧Python go-live对忽略的`chenyida_erp_app/data/erp.sqlite3`执行初始化检查并创建root-only备份`erp-backup-20260814-222753.sqlite3`；未读业务行、未删除/回滚，随后在临时`/state`与`--no-backup`边界复跑通过。删除或改写仍需专项授权 |
+| 资源/清理 | STOP LINE ACTIVE / NO OOM | lint后Swap约769→889MiB/1GiB并超过80%，已停止新重任务；收口available约1.9GiB、根盘13GiB、Load约0.41、`oom_kill=0`。任务container/临时目录清零，未修改Swap、daemon或受保护Volume |
+| 运行面 | VERIFIED METADATA / UNCHANGED | UAT仍alpha.42/0040；四服务running/restart0/OOM false，Web/PostgreSQL healthy、Worker/Caddy health none。未执行Node/PostgreSQL UAT、Migration、deploy、host安装、外部push或真实A2 |
+| 系统是否可用 | NO | 无源码匹配镜像/正式19步门、真实异机恢复、host监控投递、UAT对齐、真实迁移、岗位/员工签字和正式切换 |
+
 ## SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58（完成；当前授权输入已核验，未授予任何执行权）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / CURRENT AUTHORIZATION INPUTS VERIFIED / NO AUTHORIZATION GRANTED / PRODUCTION NO-GO | TASK58已释放active slot，当前无DOING；变更仅为治理文档 |
+| 当前状态 | DONE / HISTORICAL INPUT REFRESH / SUPERSEDED BY TASK59 / NO AUTHORIZATION GRANTED / PRODUCTION NO-GO | TASK58已释放active slot；当时的TASK57输入已被TASK59 Site变化失效，不能继续授权 |
 | 严格起点 | PASS / CONTROLLED | `04619b8a6a89cb410d8464751c733d472d7007cc`/tree`05ef60ac2f517e158778446437cb0c3f8bdba6f7`；用户未跟踪状态报告不读不改不提交 |
-| A1输入 | PASS / CURRENT / NOT AUTHORIZED | source`4d4586b1`、manifest`78d96c61`、76文件bundle`631d76e6…e763`、installer`f12e5250…7cb3`、launcher`92cabc07…68c6`逐项核对；host路径仍未安装 |
-| A3输入 | PASS / LOCAL OBJECTS ONLY / EXTERNAL TARGET OPEN | 当前Web/Worker manifest/config已登记；仍无批准私有Git/registry目标、root-only凭据或外部完整digest |
-| A2输入 | BLOCKED / FAIL CLOSED | 受A1+A3+detached snapshot合同阻断；只接受精确`78d96c61…eba3`快照，本机engine引用和更晚治理提交不得冒充 |
+| A1输入 | STALE / SUPERSEDED / NOT AUTHORIZED | TASK58当时核对的source`4d4586b1`、manifest`78d96c61`和76文件bundle现只保留历史审计价值；A1待审输入已转为TASK59的78文件bundle，host路径仍未安装 |
+| A3输入 | STALE / LOCAL HISTORICAL OBJECTS ONLY | TASK58当时登记的Web/Worker manifest/config已被TASK59 Site变化失效；仍无重建的当前镜像、批准私有Git/registry目标、root-only凭据或外部完整digest |
+| A2输入 | BLOCKED / SUPERSEDED / FAIL CLOSED | TASK59已闭合detached snapshot主合同，但A2仍受A1、源码匹配A3镜像和创建前target reservation阻断；不得使用`78d96c61…eba3`旧候选 |
 | 仓库路线 | PASS / SIX OPEN | TASK54、TASK55—TASK56、TASK57关闭项已标明；detached snapshot、monitor delivery、11角色矩阵、0017→0046、跨岗UAT模板、晋升/回滚执行器仍开放 |
 | 自动验证 | PASS / DOCS-ONLY | 授权包身份合同、Markdown397/240、JSON220、Shell44、Python AST50、credentials1667及diff门通过；范围精确八份治理Markdown |
 | 资源/清理 | PASS / NO THRESHOLD BREACH | 起点/收口available约1.9GiB、Swap765/764MiB、根盘13GiB、Load低于1、`oom_kill=0`；扫描容器/目录清零，未build、Migration、prune或创建Volume |
 | 运行面 | VERIFIED METADATA / UNCHANGED | UAT仍alpha.42/0040、四服务restart0/OOM false；未访问业务行、凭据、日志或Volume正文，无host/外部/UAT/数据动作 |
 | 系统是否可用 | NO | 无真实异机恢复、正式同候选门、host监控投递、UAT对齐、真实迁移和员工签字 |
 
-## SELFHOST-RELEASE-CANDIDATE-REFRESH-57（完成；当前本机精确候选与零发现诊断通过，正式门阻塞）
+## SELFHOST-RELEASE-CANDIDATE-REFRESH-57（历史完成；本机候选曾通过零发现诊断，现已失效）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / CURRENT EXACT LOCAL CANDIDATE BUILT / ZERO-FINDING DIAGNOSTIC VERIFIED / FORMAL SUPERVISOR GATE BLOCKED / PRODUCTION NO-GO | TASK57已释放active slot，当前无DOING；主智能体唯一写入和重任务调度 |
+| 当前状态 | DONE / HISTORICAL EXACT LOCAL CANDIDATE / NOW STALE / PRODUCTION NO-GO | TASK57当时完成候选和诊断；TASK59 Site变化后该镜像不可授权，当前无源码匹配候选 |
 | 严格起点 | PASS / CONTROLLED | TASK56 manifest-only `e34a861f168ef8afb71a812d186099c33d952902`、tree`66e7d001c90f0e8beeb41fed2a55755efb1c37e4`；未跟踪状态报告不读不改不提交 |
 | 源码/Migration | PASS / EXACT CANDIDATE INPUT | alpha.47、46/head`0046_runtime_lock_privilege_boundary.sql`；`4d4586b1`/tree`a551144e`与manifest-only `78d96c61`/tree`3dbd20dd`形成76文件canonical链，manifest SHA-256`631d76e6…e763` |
 | 历史候选 | STALE / FAILED CLOSED | TASK51 alpha.46镜像已被TASK53—TASK56失效；按当前runtime secret合同实测为`ADMIN_READ_ONLY_FIXTURE_GROUP_MISMATCH`，不得复用或授权 |
-| 候选镜像 | PASS / LOCAL ENGINE ONLY | Web manifest/config`b7b21508…8a30`/`3c83d60f…f56e`，Worker`c5bf9d5c…b113`/`3bebff16…f971`；alpha.47、revision`78d96c61…eba3`、UID/GID65532、baked身份与CMD一致。构建回执SHA-256`33b1b921…a9a`，无外部registry锚点 |
+| 候选镜像 | HISTORICAL PASS / NOW STALE | Web manifest/config`b7b21508…8a30`/`3c83d60f…f56e`，Worker`c5bf9d5c…b113`/`3bebff16…f971`曾与`78d96c61…eba3`一致；TASK59后只保留历史审计价值，构建回执`33b1b921…a9a`不得用于A3/A2 |
 | Compose/runtime | PASS / ISOLATED SIX SERVICES | UAT/production静态策略及实际Admin/Migrate/Web/Worker/PostgreSQL tablespace/Caddy通过，policy`e4920820…f00`、`max_containers=1`；任务container/network/Volume清零 |
 | Trivy诊断 | PASS / LOCAL DIAGNOSTIC / NOT FORMAL | Trivy0.70.0、schema2数据库age约46.6h，tree前后`def6b023…986b`；Web25+63、Worker25+60，五级severity和CycloneDX漏洞均0；九份root-only制品明确非正式证据 |
 | 正式Supervisor门 | BLOCKED / FAIL CLOSED | installed入口/base不存在；正式镜像证据和19步门退出1，11文件制品指纹`ed7ef447…137f`前后不变。A1安装/授权和A2外部锚点尚未获批 |

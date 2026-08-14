@@ -4,6 +4,17 @@
 
 ## 2026-08-14
 
+### SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59 - `feat: add release candidate snapshot lifecycle` / `test: stabilize snapshot cap-drop fixture` / `release: synchronize snapshot contract inventory` / `release: bind final task59 snapshot input` / `docs: close release candidate snapshot lifecycle`
+
+- 调度/范围：从clean `ad87edc45a32521cfcec36b6214f4d510d750e54`/tree`5831507e94a40641dab9a630ce3a95620c037689`启动唯一`DOING`。只实施仓库工具、合成隔离Git fixture、发布合同与治理文档；共享主工作区不切换/清理，不安装host、不生成正式授权、不外部push、不修改UAT/生产、账号、角色、secret、ACL、Volume或真实数据。
+- D-135实现：新增`release-candidate-snapshot.py`，以全局release锁和lifecycle锁串行PREPARE/VERIFY/REMOVE；固定唯一manifest-only父子链、detached locked worktree、canonical 0400 intent/receipt、file+directory fsync、no-clobber发布、Git admin/target/index/HEAD/clean/inode/mount/权限及runtime全身份验证。A2 launcher先锁后验再消费授权，三个正式wrapper在制品变化前和最终发布前复核。
+- 借用运行时：detached worktree只读借用既有Node/Python runtime，不复制约806MiB依赖；回执绑定可信祖先、完整依赖树、lock/requirements、解释器dev/inode/mode/bytes/digest及source policy，六个消费者只读挂载，REMOVE永不删除或更改借用根。
+- 崩溃/所有权：恢复代次、intent/audit/quarantine逐代守恒，split-brain只用同设备`renameat2(RENAME_NOREPLACE)`移入root-only永久保留区。admin-only/REMOVE单边状态有精确所有权证明；PREPARE target-only在缺少创建前reservation时返回`SNAPSHOT_PREPARE_TARGET_PROVENANCE_UNPROVEN`并保持foreign对象不变，后续任务须用同设备私有staging和0400 reservation绑定root dev/inode/mode。
+- Git/发布：最终source`7b9abec45a50da5655a2e78a0f42647536321290`/tree`0ae35f87cf2e14279f9e93f581557ce17f8e13a4`与唯一manifest-only直接子提交`89504045e4066bbe5236b19cf1a8bfa09701d508`/tree`13809b3b46f46f375b3af6a0c0874d9af5bff5a7`形成78文件bundle；manifest SHA-256`7927bb242cad9784a48ebaa8269ac9cc53cf56808c7dffc8f3d148111c7e5855`逐字节重放一致，脚本SHA-256为`71361ac9…d9add8a`。TASK57的76文件bundle及本机Web/Worker镜像因此成为`STALE / NOT AUTHORIZABLE`。
+- 验证：snapshot17/17、三条独立攻击探针、Supervisor66/66、release inventory 6文件/57项与直接54/54、SPECIAL POSIX 7文件/57项、隔离Python self-test/smoke/go-live、browser policy5/5、credentials1670、JSON220、Shell44、Python AST52、Markdown398/242、source/diff门通过；lint0 error/28 warning。cap-drop夹具和release合同SHA漂移两个真实失败均修复并重跑，未跳过或降低断言。
+- 验证偏差：一次误用非隔离旧Python go-live，对Git忽略的`chenyida_erp_app/data/erp.sqlite3`执行初始化检查并创建root-only备份`data/backups/erp-backup-20260814-222753.sqlite3`。未读取业务行、未删除/回滚，随后改由bubblewrap、临时`/state`和`--no-backup`完整复跑通过；删除或改写仍需专项授权，该偏差不涉及Node/PostgreSQL UAT或四个受保护Volume。
+- 资源/结论：全部重任务串行且一次最多一个临时容器；lint后Swap约769→889MiB/1GiB并超过80%，立即停止启动新的typecheck/Node source等重任务。收口available约1.9GiB、根盘13GiB、Load约0.41、`oom_kill=0`，四服务running/restart0/OOM false，任务container/临时目录清零。A1、源码匹配A3镜像、reservation和正式A2均未完成，系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-EXTERNAL-AUTHORIZATION-PACKET-REFRESH-58 - `docs: refresh current release authorization inputs`
 
 - 触发：TASK57收口后复核发现投产专项授权执行包仍把TASK53/TASK51的47文件bundle、历史候选和0045描述为当前输入；直接照旧包请求A1会安装过期Supervisor，故从零`DOING`自动建立TASK58 docs-only失败关闭任务。

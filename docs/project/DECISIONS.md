@@ -2436,6 +2436,44 @@
 - 拒绝release、backup和operator各持独立锁，也拒绝删除backup fence、active intent或quarantine证据来绕过联锁。
 - 拒绝用新bundle、新policy、新credential generation继续旧intent；任何代次变化都必须先隔离原状态，再形成新的审阅和授权。
 
+## D-135 正式发布候选采用独立detached快照、不可变回执和守恒式恢复
+
+- 日期：2026-08-14
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / SYNTHETIC-ISOLATED VERIFIED / HOST AND A2 NOT AUTHORIZED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK59三轮独立安全攻击复核、Release Supervisor调用链和低资源运行约束
+- 确认边界：只授权仓库工具、合成Git fixture、内容寻址bundle及测试；不授权host安装、外部push、正式A2、UAT/生产、真实数据、账号、网络或受保护Volume动作
+
+### Context
+
+- 原A2允许调用者给出任意Git根。它只能核对HEAD/tree和局部clean，不能证明该根是本任务独立detached worktree；launcher又在取得全局release锁前验证候选，存在验证后替换窗口。
+- manifest-only候选必须绑定唯一source parent。更晚治理HEAD、共享主工作区、branch worktree或本机可变镜像引用都不能冒充同一候选。
+- detached worktree不包含被Git忽略的`node_modules`和`.venv`。复制约806MiB依赖会扩大低资源风险，因此测试运行时必须作为只读借用对象另行绑定，且生命周期工具永不删除它。
+- Git worktree命令可能在中断后留下target/admin一侧残留。强制remove/prune、根据名称猜测所有权或删除未知对象会破坏用户仓库；旧恢复audit跨代复用和quarantine丢失后回退旧成功也会掩盖证据损失。
+
+### Decision
+
+1. 正式候选只允许由`chenyida-erp-release-candidate-snapshot/v1`在全局release锁和snapshot lifecycle锁内创建，使用固定状态根、精确source commit/tree、唯一manifest-only父子关系以及`git worktree add --detach --lock --reason`；共享主工作区不得switch/reset/stash/clean。
+2. PREPARE intent、prepared receipt、REMOVE intent、removal receipt及recovery intent/audit均采用canonical JSON、0400、file+directory fsync和no-clobber原子发布。VERIFY必须重核source、candidate、bundle、runtime、target、gitfile/admin/index、detached HEAD、tracked clean、未知Git状态和inode/mount/权限。
+3. A2授权固定`candidate_snapshot_receipt`、其SHA-256和canonical `test_runtime_root`。launcher先取得全局锁，再调用bundle内snapshot verifier，随后才消费authorization；image evidence、release gate和manifest包装器在首次制品变化前及最终发布前各复核一次。
+4. 借用运行时为`BORROWED_NEVER_REMOVE`。回执绑定从`/`开始的可信祖先、Node/Python依赖完整树、lock/requirements、固定解释器路径/dev/inode/mode/bytes/digest及source policy；六个消费者只读挂载该根，REMOVE不得清理或变更它。
+5. 可证明split-brain恢复只能以同设备`renameat2(RENAME_NOREPLACE)`移动到root-only quarantine，永久标记`RETAINED_REQUIRES_SEPARATE_AUTHORIZATION`。每一代绑定lifecycle digest、generation、对象完整身份和固定Git运行时；全代必须连续唯一并逐代验证intent-audit-quarantine守恒，任何缺失、替换、pending冲突或旧tombstone漂移失败关闭。
+6. PREPARE admin-only只有精确Task59 lock reason存在才可自动隔离；REMOVE target/admin-only还必须匹配prepared receipt中的root inode或完整admin tree。PREPARE target-only在没有创建前reservation receipt时无法区分Task59对象与foreign worktree，必须返回`SNAPSHOT_PREPARE_TARGET_PROVENANCE_UNPROVEN`且保持对象原样。
+7. 要解除target-only操作阻断，后续版本必须先在同设备私有staging创建空目录，发布0400 reservation receipt并绑定root dev/inode/mode，再以NOREPLACE把同一inode提升为target；Git add前后和恢复时都必须验证同一inode。receipt前崩溃、inode替换、非空、跨设备或Git未保留root inode一律失败关闭。
+
+### Consequences
+
+- TASK59的最终source`7b9abec45a50da5655a2e78a0f42647536321290`与manifest-only直接子提交`89504045e4066bbe5236b19cf1a8bfa09701d508`形成78文件bundle，manifest SHA-256为`7927bb242cad9784a48ebaa8269ac9cc53cf56808c7dffc8f3d148111c7e5855`；脚本SHA-256为`71361ac9…d9add8a`。
+- TASK57的76文件bundle及Web/Worker本机镜像因Site输入变化立即成为`STALE / NOT AUTHORIZABLE`。A1只能审阅新的TASK59 bundle；A3必须在后续最终源码上重建并锚定镜像，A2仍受A1、A3和target reservation阻断。
+- 仓库测试通过不代表host已安装、快照已实际创建或正式19步门已运行。Quarantine内容不得由自动清理、任务trap或无专项授权命令删除。
+- 系统继续`PRODUCTION NO-GO`；下一安全仓库任务为reservation所有权闭环，真实外部锚点、异机恢复、UAT晋升、真实迁移、员工试用和切换仍需各自证据与专项授权。
+
+### Rejected alternatives
+
+- 拒绝在共享主工作区切换到候选、把更晚治理HEAD写成镜像revision、接受branch/dirty snapshot，或仅靠路径名和HEAD摘要证明所有权。
+- 拒绝复制或在REMOVE中删除借用依赖，拒绝在浏览器、授权参数或环境中把依赖路径当作未经核验的可信事实。
+- 拒绝`git worktree remove --force`、`prune`、递归猜删、覆盖最终回执，或在最新quarantine/audit证据缺失时退回旧代成功。
+- 拒绝在没有创建前reservation的情况下自动隔离PREPARE target-only；安全失败和单独人工处置优先于误删foreign worktree。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
