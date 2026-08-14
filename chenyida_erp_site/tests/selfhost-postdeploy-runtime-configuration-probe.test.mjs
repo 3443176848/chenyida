@@ -81,17 +81,26 @@ test("probe wrapper takes the canonical global lock and validates secret files o
   const secondSecret = wrapper.indexOf("verify_runtime_secret_boundary", probe);
   assert.ok(lock >= 0 && firstSecret > lock && probe > firstSecret && secondSecret > probe);
   assert.match(wrapper, /release-gate-lock\.sh/);
-  const lockUsers = await Promise.all([
+  const canonicalLockSources = await Promise.all([
     "../scripts/release-gate-lock.sh",
     "../scripts/postdeploy-release-verifier.mjs",
     "../scripts/release-gate-runner.mjs",
+  ].map((relative) => readFile(new URL(relative, import.meta.url), "utf8")));
+  for (const source of canonicalLockSources) {
+    assert.match(source, /\/run\/lock\/chenyida-erp-release-gate-v1\.lock/);
+    assert.doesNotMatch(source, /\/var\/lock\/chenyida-erp-release-gate-v1\.lock/);
+  }
+  const shellLockUsers = await Promise.all([
     "../scripts/create-release-image-evidence.sh",
     "../scripts/create-release-manifest.sh",
     "../scripts/run-release-gate.sh",
     "../scripts/write-release-identity.sh",
   ].map((relative) => readFile(new URL(relative, import.meta.url), "utf8")));
-  for (const source of lockUsers) {
-    assert.match(source, /\/run\/lock\/chenyida-erp-release-gate-v1\.lock/);
+  for (const source of shellLockUsers) {
+    assert.match(source, /LOCK_HELPER="\$SCRIPT_DIR\/release-gate-lock\.sh"/);
+    assert.match(source, /\. "\$LOCK_HELPER"/);
+    assert.match(source, /acquire_chenyida_release_gate_lock/);
+    assert.doesNotMatch(source, /\/run\/lock\/chenyida-erp-release-gate-v1\.lock/);
     assert.doesNotMatch(source, /\/var\/lock\/chenyida-erp-release-gate-v1\.lock/);
   }
 });

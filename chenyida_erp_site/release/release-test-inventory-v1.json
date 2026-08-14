@@ -1162,7 +1162,7 @@
     },
     {
       "path": "tests/selfhost-postdeploy-runtime-configuration-probe.test.mjs",
-      "sha256": "1933d247ec056f50a5e855e0e9562a90a8ff77f819904cc7708fe388a495000f",
+      "sha256": "95cfcdea03d9a812e1935182187c3ae7febc49664e231122d9804687f001430f",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
