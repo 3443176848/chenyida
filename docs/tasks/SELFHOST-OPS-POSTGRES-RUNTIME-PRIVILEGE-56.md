@@ -1,6 +1,6 @@
 # SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 PostgreSQL 运行时最小权限与凭据边界闭环
 
-> 状态：`DOING / READ-ONLY AUDIT AND REPOSITORY IMPLEMENTATION / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`
+> 状态：`DOING / STATIC RUNTIME BOUNDARY CHECKPOINT VERIFIED / CONTROLLED PRODUCTION OPERATOR OPEN / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`
 > 日期：2026-08-13（Asia/Shanghai）
 > 严格起点：`main@fb1f7e8893b2affba0ca07ecd9629ae2726adca9` / tree `13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`
 > 责任：Codex 主智能体为唯一写者、测试调度者和 Git 提交者；数据迁移、应用测试、运维安全智能体只读审计；项目负责人继续保留真实数据库/凭据、账号权限、host、UAT/生产 Migration 与部署、Volume、备份恢复和切换的专项授权权力
@@ -53,14 +53,14 @@
 - [ ] 在线Web/Worker使用不同LOGIN和不同凭据，均非owner/non-superuser且不能DDL、SET ROLE owner、创建角色/数据库、绕过RLS、读取系统秘密或访问对方未获准对象；连接后实际身份断言与正反权限测试通过。
 - [x] Migration使用独立、非superuser、低连接数身份并满足精确数据库owner/对象owner合同；只有Migration可执行版本化DDL，应用与backup身份不能写Migration历史或改变owner/ACL/default privileges。
 - [x] Backup capture不再依赖superuser且只获得当前零large-object完整逻辑备份所需的精确读取权限；ALTER DATABASE/terminate backend控制动作与常驻读取身份分离，并由root-only双service、固定目标、v3 intent和去敏输出约束。CREATE TABLESPACE/CREATEROLE仍只属于后续离线bootstrap/restore控制面，不进入本备份入口。
-- [ ] UAT/PRODUCTION配置拒绝`DATABASE_URL`、`ERP_MIGRATION_DATABASE_URL`、`POSTGRES_PASSWORD`、`ERP_ADMIN_PASSWORD`、`ERP_SETUP_TOKEN`等秘密环境值；每服务secret文件具有独立路径、owner/group/mode/no-follow/单硬链接和内容边界，缺失、复用、错权限、symlink、hardlink、替换或泄漏负测通过。
-- [ ] 开发/测试兼容入口只接受显式隔离身份，不能在UAT/PRODUCTION或release candidate中降级；错误不得回显连接串、口令、文件路径或角色清单。
-- [ ] Compose声明独立`erp_postgres_tablespaces`持久Volume和固定容器namespace；runtime policy、恢复map与release gate验证精确mount、只读/读写边界、owner/mode和禁止与PGDATA/应用卷重叠，当前运行面未创建该Volume。
-- [ ] 单容器隔离PostgreSQL 17完成空cluster bootstrap、46个Migration、角色/ACL reconcile、Web与Worker允许操作、备份dump、未授权拒绝、重复执行、故障回滚和新空目标权限复核；临时数据库、秘密、容器、网络、Volume和目录全部清理。
-- [ ] 现有Node/PostgreSQL/Browser/POSIX、Migration、backup/restore、Dashboard/monitor、Compose/runtime和release合同不降级；新增测试进入正式inventory，所有重任务串行且最多一个临时容器。
+- [x] UAT/PRODUCTION仓库配置拒绝`DATABASE_URL`、`ERP_MIGRATION_DATABASE_URL`、`POSTGRES_PASSWORD`、`ERP_ADMIN_PASSWORD`、`ERP_SETUP_TOKEN`等秘密环境值；每服务secret文件具有独立路径、owner/group/mode/no-follow/单硬链接和内容边界，缺失、复用、错权限、symlink、hardlink、替换或泄漏负测通过。当前运行面未部署该合同，也未创建真实secret文件。
+- [x] 开发/测试兼容入口只接受显式隔离身份，不能在UAT/PRODUCTION或release candidate中降级；错误不得回显连接串、口令、文件路径或角色清单。
+- [x] Compose声明独立`erp_postgres_tablespaces`持久Volume和固定容器namespace；runtime policy、恢复map与release gate验证精确mount、只读/读写边界、owner/mode和禁止与PGDATA/应用卷重叠，当前运行面未创建该Volume。
+- [x] 单容器隔离PostgreSQL 17完成空cluster bootstrap、46个Migration、角色/ACL reconcile、Web与Worker允许操作、备份dump、未授权拒绝、重复执行、故障回滚和新空目标权限复核；临时数据库、秘密、容器、网络、Volume和目录全部清理。
+- [x] 现有Node/PostgreSQL/Browser/POSIX、Migration、backup/restore、Dashboard/monitor、Compose/runtime和release合同不降级；新增测试进入正式inventory，所有重任务串行且最多一个临时容器。
 - [ ] 源码冻结后重建canonical manifest-only直接子提交，TASK55 bundle和全部旧候选标记`STALE / NOT AUTHORIZABLE`；不把历史TASK51镜像当作新源码候选。
-- [ ] 不产生真实角色/密码、可消费授权、真实secret文件、真实tablespace、host安装、外部push、UAT/生产/真实数据动作；系统保持`PRODUCTION NO-GO`。
-- [ ] 同步`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`和`PRODUCTION_READINESS.md`，通过凭据/JSON/Shell/Markdown/差异检查并创建独立Git提交。
+- [x] 不产生真实角色/密码、可消费授权、真实secret文件、真实tablespace、host安装、外部push、UAT/生产/真实数据动作；系统保持`PRODUCTION NO-GO`。
+- [x] 同步`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`和`PRODUCTION_READINESS.md`，通过凭据/JSON/Shell/Markdown/差异检查并创建独立Git提交。
 
 ## 6. 启动核验
 
@@ -147,3 +147,14 @@
 - 源码提交`88c9f1d25ee08debdf3ef06a533f0596a9047074`/tree`044bf539b0174b93229162c158a5d89c3290bcf3`与manifest-only直接子提交`1bc4ed5a8574c710aacd6e94f2f1ae67bd6ea440`/tree`accfcdc6774e3c3f4cc8ac4f82b192ad37e51c83`形成50文件检查点，bundle SHA-256为`2fadb84c18fcb6c82fe561d7ea8b973c51b55a6d395a2bc9480f954ffafd0edb`。catalog文件/artifact更新为`146b3cd…896`/`c35f4920…4e6`且逻辑catalog保持`40c8c620…7f8f`。
 - 策略artifact verify与单测5/5、固定PG17完整角色/ACL演练、Node inventory 119文件/1001项、release contracts 6文件/52项、Supervisor Python31/31、inventory `246/222/24`、credentials1649及JSON/Shell/diff门通过。Node全量前两次只因隔离容器缺少仓库同级治理模板和`docs/`只读挂载而停止；补入测试既有路径的只读挂载后原用例及全套1001项通过，没有改测试或降低断言。
 - 收口available约1.7GiB、Swap526MiB/1.0GiB、根盘16GiB、Load`0.20/0.86/0.89`、内核`oom_kill=0`；四服务restart0/OOM false，Web/PostgreSQL healthy，任务容器和临时清单清零。`docker compose ps`仍因缺少必需秘密在插值阶段失败关闭，随后只以精确容器metadata核验。没有真实角色/ACL/凭据、Volume、Migration、备份恢复、UAT/生产或服务变更；TASK56保持唯一`DOING`，下一步闭合secret-file delivery、生产受控operator和custom tablespace持久mount合同。
+
+## 16. 最新静态运行边界与发布检查点
+
+- runtime连接固定`options=-c search_path=pg_catalog,public,pg_temp`，migration固定`public,pg_temp`；连接建立和pool checkout逐次核对`session_user/current_user`、数据库、`search_path`、只读与禁止参数，任何漂移都会销毁client而不是归还池。角色/数据库setting exact-set核对同步失败关闭。
+- UAT/production不再接受数据库、PostgreSQL初始化、Setup或Admin秘密环境值；六个服务文件各自要求43字符base64url/32 bytes、唯一inode/value、root-only host root、逐服务gid/mode、no-follow、单硬链接及打开后身份复核。开发/测试fallback只能在显式隔离边界使用，公开错误与回执不包含连接串、口令、角色清单或真实路径。
+- Compose、runtime policy和release合同精确绑定容器user/group、只读rootfs、mount/tmpfs、network、resource、security/process及secret bind inode投影；`erp_postgres_tablespaces`独立于PGDATA/uploads/attachments/backup-status，恢复map v2固定PG17 child `PG_17_202406281`、owner/mode/dev/inode/location。`runtime_configuration_sha256`已贯穿authorization、receipt、prepare/recovery与commit静态合同。
+- 依赖复核发现旧browser lock/tree摘要与当前Next16.3.0、React/DOM/RSC19.2.8和eslint-config-next16.3.0漂移。固定Node容器串行执行`npm ci --ignore-scripts --no-audit --no-fund`重建508包，`npm ls --all`通过；首次Browser在测试前因只读依赖树缺`.vite-temp`嵌套tmpfs mountpoint失败，恢复精确root:root`0755`空目录后原6文件/11项全部通过。最终lock/tree SHA-256为`9c3949bfdce05d355287550bdc7981a0e4cc455e99ae1735e39ee0b4c9252eb5`/`e3b363049ea538e0a95c9984d73719c1402c645cd37250f8cca947affea01659`。
+- 最终静态源码检查点通过Node119文件/1005项、PostgreSQL84文件/401项及runtime privilege catalog、Browser6/11、SPECIAL POSIX7/57、typecheck38/38、release inventory6文件/56项、直接合同53/53、Supervisor40/40、Migration allowlist、不同cluster数据库/文件恢复、单容器双cluster安全恢复、Dashboard PostgreSQL2/2、UAT/production Compose policy和inventory `246/222/24`；lint为0 error/26 warning，credentials扫描1653文件。test/container/secret policy SHA-256为`e2b50ea20362226eea9abd31a17fbfa809ea67fed0e60aa856a2900857dcbd2b`/`e4920820ed954c2689e3de53dea9b7f36945969c8287b06d87a3871e7d3ecf00`/`8dd07c6acd6e857a0b29b14e2b6d5b60ad919cf54aac9b552ce11672eb45b7c5`，inventory逻辑摘要为`5a5444ab25aed9f2f2bb92cce2b686ef015e81da50b7db0d58b0f44eb8d1c5dd`。
+- 源码提交`6ddfae92bf3ed95314944e95043240fbe26fdee3`/tree`73bafe754b07bc99d5f2268daf2a1b1d001405c9`与只修改canonical manifest的直接子提交`ef409bbb8d8cefe0ce596759fc57b3d222bd6ea2`/tree`018fb3f8cc47b9c96296f53576e6aee6450fae83`形成53文件静态bundle；manifest SHA-256和生成器复跑stdout SHA-256均为`bac5e882b6a698fe496fbf1b8d6d5e4ea3f206081ab27d12f9ee19af615dcd9e`。TASK55、旧TASK56检查点和TASK51候选均为`STALE / NOT AUTHORIZABLE`。
+- 资源门如实执行：PG全量首跑在Swap越过80%时中断并由trap清理；稳定低于80%超过60秒后才串行重跑。既有单任务曾短暂达到81.07%，期间没有启动新重任务，随后自然回落。最新只读快照available约1.84GiB、Swap765,530,112/1,074,786,304 bytes（约71.23%）、根盘16GiB、Load`1.11/0.96/1.21`、`oom_kill=0`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false，无遗留PG测试容器，依赖临时目录和旧树备份按精确路径清理。
+- 本检查点只证明仓库/合成隔离静态边界，不证明当前UAT已切换角色、secret、mount或容器策略。TASK56仍为唯一`DOING`；生产root受控operator、全局host lock、持久intent、backup fence联锁及可信预授权`runtime_configuration_sha256`探针仍为下一P0，后续源码会使当前bundle失效。没有真实角色、凭据、secret、Volume、host安装、外部push、Migration/deploy、备份恢复、UAT/生产或业务数据动作，系统继续`PRODUCTION NO-GO`。
