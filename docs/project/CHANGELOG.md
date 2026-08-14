@@ -28,11 +28,23 @@
 - 数据库/API：无Schema、Migration或业务API变化；只新增运维发布器与Supervisor受控操作。系统保持`PRODUCTION NO-GO`。
 - 治理：新增D-138，TASK62转`DONE`；自动启动`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63`为唯一`DOING`。
 
-### SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63 - `docs: close authoritative projections and start recovery policy v2`
+### SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63 - `docs: close authoritative projections and start recovery policy v2` / `feat: add PostgreSQL cluster recovery policy V2` / `build: refresh release supervisor bundle` / `docs: close recovery policy v2 and start policy activation`
 
-- 调度：从TASK62最终Supervisor manifest-only提交`672a0695b761a50093c15401cf8d9e39951ced36`/tree`2d5b30bf72a5b1b08ad9ccdb35cf16008c376e76`启动唯一active task。
-- 目标：审计V1 policy、V4 readiness和runtime privilege完整链，新增不可变V2政策，使actual只由独立目标、当前身份、四域及角色/ACL/tablespace/secret/RPO-RTO等完整证据形成；V1保持失败关闭。
-- 边界：只做仓库和合成隔离工作；不连接数据库，不读取真实备份/回执，不执行恢复、host配置、凭据/账号/ACL、网络、UAT/生产或数据动作。Swap停止线继续有效。
+- 调度：从TASK62最终Supervisor manifest-only提交`672a0695b761a50093c15401cf8d9e39951ced36`/tree`2d5b30bf72a5b1b08ad9ccdb35cf16008c376e76`启动唯一active task；只审计V1/V4/runtime privilege并在仓库和合成隔离中实现V2。
+- 架构纠正：冻结D-132 V1 policy/contract/executor字节和语义，拒绝把其3个legacy角色/2份LOGIN credential receipt伪装成TASK56当前9角色/5 LOGIN/4 membership/1261 ACL来源。V2作为独立编排层嵌入精确V1 policy和当前runtime/operator/catalog/Migration/镜像/四域摘要。
+- actual合同：V1基础恢复receipt、V2 recovery control和当前runtime privilege `BOOTSTRAP` receipt共同证明完整恢复；actual policy绑定environment/generation/previous、当前Supervisor bundle、分离authorization/approval/operator/approver、独立TEST目标、源/目标location/system/machine、RPO/RTO、最长24小时及销毁/保全决定。
+- 失败关闭：repository template只允许synthetic TEST；V1 actual、模板actual、synthetic冒充、同机/同源、空目标/围栏不符、跨环境、过期/未来、旧代/跳代、身份/摘要漂移及连同摘要一起重签名的替换政策均有稳定拒绝。Dashboard、V4和monitor backup publisher使用同一默认V2边界，测试validator没有生产旁路。
+- 不可变链：source`de993c0326b959f7f7c451504a6ef3a753e09c11`/tree`5d427f26eeafec4fbaf7c4faa6abf9516d0a8921`→Supervisor manifest-only`e527fcfe5fa0f779cbe4514ffa82376e1d0f3462`/tree`778b24a550215271bba248ea6367adc8d1b3fb92`；117文件manifest raw SHA-256为`4c3b801fc2fa33f3f047bc8a40dabf003376c079187a576a5c3108cf7f665582`。V2 raw/logical SHA为`1a092993…7aa`/`c30951ad…8b8`，V1 contract/executor SHA不变。
+- 验证：V2/V1/Dashboard/monitor`41/41`、release contracts`29/29`，同任务此前Supervisor launcher/monitoring`28/28`及manifest后installer+launcher`25/25`；inventory`251/227/24`、policy/manifest重放、JSON/JS静态、1,705文件credentials和diff门通过。
+- 资源/边界：available约2.0GiB、Swap约870MiB/1GiB且超过80%、根盘13GiB、Load低于1、`oom_kill=0`；四服务restart0/OOM false且任务临时资源清零。没有build、全量Node/PostgreSQL、Docker数据库、typecheck、镜像、数据库连接、真实备份恢复、host、凭据/账号/ACL、UAT/生产或数据动作。
+- 数据库/API：无Schema、Migration或业务API变化；新增运维V2 policy、contract/builder及V4/Dashboard/monitor验证边界。repository template不等于host active policy或真实恢复ready。
+- 治理：新增D-139，TASK63转`DONE`；自动启动`SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64`为唯一`DOING`。系统保持`PRODUCTION NO-GO`。
+
+### SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64 - `docs: close recovery policy v2 and start policy activation`
+
+- 调度：从TASK63最终Supervisor manifest-only提交`e527fcfe5fa0f779cbe4514ffa82376e1d0f3462`/tree`778b24a550215271bba248ea6367adc8d1b3fb92`启动唯一active task。
+- 目标：只在仓库与合成fake-root实现installed Supervisor控制的V2政策内容寻址prepare/activate/rollback/quarantine，一次性授权固定template raw/logical SHA、bundle、逐代前驱、actor/approver及时效，并让V4/monitor只接受已提交current activation。
+- 边界：不在真实host创建或读取固定路径，不发布/激活政策，不连接数据库或读取真实凭据/备份/回执，不执行恢复、Migration、build、deploy、restart、网络、UAT/生产或数据动作；Swap停止线继续有效。
 
 ## 2026-08-14
 

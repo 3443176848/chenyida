@@ -2590,6 +2590,42 @@
 - 拒绝覆盖history/current、只保留最新代、从旧代回退、跳过fsync、递归清理未知temp或用路径名代替inode/owner/mode/nlink验证。
 - 拒绝为形成正向fixture而降低V4生产默认断言；实际正向能力必须由后续V2政策合同和真实授权证据获得。
 
+## D-139 PostgreSQL实际恢复采用冻结V1执行引擎与V2运行权限编排双层证据
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / SYNTHETIC-ISOLATED VERIFIED / HOST ACTIVATION AND ACTUAL RECOVERY NOT AUTHORIZED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK63对冻结V1、V4 readiness、TASK56 runtime privilege和monitor projection的只读审计与41项合成攻击测试
+- 确认边界：只授权仓库V2政策、validator/builder、V4/Dashboard/monitor兼容链和合成fixture；不授权host发布/激活、真实凭据、备份/恢复、数据库、UAT/生产或数据动作
+
+### Context
+
+- D-132的V1恢复合同与执行器已经形成不可变证据，只认识3个legacy角色和2份LOGIN凭据回执；D-133/D-134当前运行权限基线则是9角色、5 LOGIN、4条membership和1261条ACL。修改V1会破坏旧证据，宣称V1已经证明当前权限则会伪造来源。
+- V4 actual既要证明基础cluster恢复，也要证明当前发布/运行身份、全部角色/ACL/default privileges、五份LOGIN secret、四域、tablespace、extension、large object和连接围栏。任何单一“成功”字段或同机合成恢复都不足以形成真实就绪。
+- 单纯验证政策正文内部摘要不能阻止攻击者替换正文并重新计算全部自描述摘要。政策必须外部固定已审阅模板、源码及Supervisor bundle，并通过受控逐代激活形成权威current。
+
+### Decision
+
+1. 冻结V1 policy、contract和executor字节及语义；V2不得修改其回执格式或用兼容映射把V1升级为actual。
+2. V2 generation 1作为独立编排/控制政策，嵌入精确V1 policy原始SHA和文件身份，并固定当前runtime privilege/operator来源及roles、identities、extensions、ACL/default privileges、Migration、镜像与四域摘要。
+3. 基础恢复继续产生V1 recovery/2-login credential证据；V2 recovery control intent和当前runtime privilege `BOOTSTRAP` receipt作为分离证据，共同证明5个当前LOGIN凭据、9角色和完整权限重建。两层证据不得相互冒充。
+4. actual policy必须绑定environment、policy generation及previous policy、当前Supervisor bundle、分离的authorization/approval/operator/approver、RPO/RTO、激活/过期且最长24小时、恢复后销毁或保全决定；repository template只允许合成TEST。
+5. actual recovery必须使用独立TEST目标，并绑定不同的source/target location、system identifier和machine、release/runtime/operations身份、四域及runtime credential generation/role set；目标必须为空或已围栏，禁止覆盖源cluster。
+6. V4 actual链由V1基础回执、V2 recovery control和当前runtime privilege receipt共同形成；V1 actual、template actual、synthetic、同源/同机、过期/未来、旧代/跳代、跨环境、身份/摘要漂移及连同摘要一起重签名的替换政策全部以稳定代码失败关闭。
+7. Dashboard与monitor backup projection使用同一默认V2验证器，不允许测试validator或调用者参数进入生产路径。仓库template本身不构成host active policy或恢复ready。
+8. TASK63不实现host publisher。固定路径只能由后续installed Supervisor内容寻址、一次性授权、root-only/no-follow和崩溃安全激活合同发布；在TASK64及专项授权完成前保持缺失并失败关闭。
+
+### Consequences
+
+- TASK63源码`de993c0326b959f7f7c451504a6ef3a753e09c11`/tree`5d427f26eeafec4fbaf7c4faa6abf9516d0a8921`与Supervisor manifest-only`e527fcfe5fa0f779cbe4514ffa82376e1d0f3462`/tree`778b24a550215271bba248ea6367adc8d1b3fb92`形成117文件canonical链；manifest raw SHA-256为`4c3b801f…5582`。
+- V2 policy raw/logical SHA-256为`1a092993…7aa`/`c30951ad…8b8`；冻结V1 contract/executor SHA保持`d11ba513…cfa`/`b555d4c9…a4be`。V2/V1/Dashboard/monitor 41/41、release29/29及适用Supervisor、inventory、凭据与静态门通过。
+- 该实现只证明仓库能够严格验证完整actual证据，不证明当前存在actual policy、异机副本、凭据、恢复目标或真实RPO/RTO。系统继续`PRODUCTION NO-GO`，TASK64负责仓库级受控激活合同。
+
+### Rejected alternatives
+
+- 拒绝修改冻结V1、把V1 actual映射为V2、把2份legacy credential receipt解释为5份当前LOGIN secret，或只看roles名称近似相等。
+- 拒绝信任自描述且可整体重签名的替换政策、手工JSON、路径名、调用者自报摘要、synthetic/同机副本或测试validator形成真实ready。
+- 拒绝在没有内容寻址publisher、一次性授权、逐代current和activation receipt时手工复制政策到host固定路径。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

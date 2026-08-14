@@ -2,16 +2,30 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63（执行中；只做V2政策仓库合同，资源停止线有效）
+## SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64（执行中；只做仓库与合成fake-root激活合同）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / READ-ONLY AUDIT AND LIGHTWEIGHT DESIGN / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；为V4 actual新增不可变cluster recovery policy V2，V1继续失败关闭 |
-| 严格起点 | PASS / CONTROLLED | `672a0695b761a50093c15401cf8d9e39951ced36`/tree`2d5b30bf72a5b1b08ad9ccdb35cf16008c376e76`；用户未跟踪报告继续不读不改不提交 |
-| 目标合同 | IN PROGRESS | 审计V1/V4/runtime privilege完整链，新增V2环境/目标/集群/四域/角色ACL/tablespace/secret/RPO-RTO/批准与时效边界及兼容测试 |
-| 资源 | STOP LINE ACTIVE | Swap约871MiB/1GiB（超过80%）、根盘13GiB、Load低于1；禁止新重任务，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无数据库连接、真实备份/回执读取、恢复、host、凭据/账号/ACL、A1—A8、外部、UAT/生产或Volume动作 |
-| 系统是否可用 | NO | 当前无真实监控投递、源码匹配镜像、正式门、真实异机恢复/迁移、岗位/员工签字或切换 |
+| 当前状态 | DOING / READ-ONLY AUDIT AND LIGHTWEIGHT REPOSITORY IMPLEMENTATION / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；为V2 actual policy建立内容寻址、一次性授权、逐代发布/回退/quarantine，不在真实host激活 |
+| 严格起点 | PASS / CONTROLLED | `e527fcfe5fa0f779cbe4514ffa82376e1d0f3462`/tree`778b24a550215271bba248ea6367adc8d1b3fb92`；用户未跟踪报告继续不读不改不提交 |
+| 目标合同 | IN PROGRESS | 审计Supervisor授权消费与固定policy消费者，只在fake-root实现root-only/no-follow、canonical、崩溃安全和精确rollback/quarantine |
+| 资源 | STOP LINE ACTIVE | available约2.0GiB、Swap约870MiB/1GiB（超过80%）、根盘13GiB、Load低于1；禁止新重任务，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无真实host路径、政策激活、数据库连接、备份/回执读取、恢复、凭据/账号/ACL、A1—A8、外部、UAT/生产或Volume动作 |
+| 系统是否可用 | NO | 当前无已激活actual policy、真实监控投递、源码匹配镜像、正式门、真实异机恢复/迁移、岗位/员工签字或切换 |
+
+## SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63（完成；仓库与合成隔离通过，host激活未实现）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST ACTIVATION NOT IMPLEMENTED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | TASK63已释放active slot；下一安全任务为受控policy activation仓库合同 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`de993c0`/tree`5d427f26`→Supervisor manifest-only`e527fcf`/tree`778b24a5`；117文件manifest raw SHA-256为`4c3b801f…5582` |
+| 双层证据 | PASS / V1 FROZEN | V1 contract/executor SHA保持`d11ba513…cfa`/`b555d4c9…a4be`；V2嵌入精确V1并固定当前9角色、5 LOGIN、4 membership、1261 ACL及runtime/operator/catalog身份 |
+| V2政策 | PASS / FAIL CLOSED | raw/logical SHA为`1a092993…7aa`/`c30951ad…8b8`；actual绑定独立TEST目标、源/目标身份、四域、RPO/RTO、分离批准、最长24小时和处置决定，template/V1/synthetic/替换均拒绝 |
+| V4/投影 | PASS / SHARED BOUNDARY | V1基础receipt、V2 control和runtime `BOOTSTRAP` receipt共同形成actual；Dashboard与monitor默认使用同一验证器，无test-validator生产旁路 |
+| 自动验证 | PASS / SCOPED APPLICABLE | V2/V1/Dashboard/monitor41/41、release29/29、此前Supervisor28/28及manifest后25/25、inventory251/227/24、credentials1705、JSON/JS/manifest/diff门通过 |
+| 资源/清理 | STOP LINE ACTIVE / NO OOM | available约2.0GiB、Swap870MiB/1GiB且超过80%、根盘13GiB、Load低于1、`oom_kill=0`；任务临时资源清零，未启动重任务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | UAT仍alpha.42/0040、四服务restart0/OOM false；无host policy publisher/activation、真实目标/凭据、数据库、备份恢复、UAT/生产或Volume动作 |
+| 系统是否可用 | NO | repository template与合成actual不能证明真实可恢复；仍无实际异机恢复、正式同候选门、UAT对齐、岗位/员工验收或切换 |
 
 ## SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62（完成；仓库与合成隔离通过，host/真实恢复未授权）
 
