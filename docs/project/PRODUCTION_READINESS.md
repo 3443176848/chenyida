@@ -73,6 +73,8 @@
 
 2026-08-13 第三十一次增量：TASK56受控PostgreSQL权限operator仓库链已形成。D-134固定installed content-addressed Supervisor唯一入口、七个直接消费者值、共享全局release锁、authorization消费前durable intent、append-only/fsync journal、backup fence双向联锁、BOOTSTRAP predeploy target binding、RECONCILE strict postdeploy probe以及精确RECOVER/quarantine；一个事务同时收敛角色/ACL和五LOGIN口令，结构no-op也必须重置及核验五口令。固定PG17真实system adapter在46个Migration后提交事务并立即SIGKILL执行进程，随后由journal选择`CAPTURE_AND_VERIFY`完成恢复；stdout/stderr/PostgreSQL日志对七个fixture口令和完整SCRAM verifier扫描为零。operator16/16、Supervisor29/29、release/catalog34/34及真实适配器通过，临时容器/目录清理。旧静态bundle`bac5e882…cd9e`已失效，最终完整回归和新canonical bundle仍在执行；未安装host、创建真实secret或修改角色/ACL/Volume/UAT/生产，整体继续`PRODUCTION NO-GO`。
 
+2026-08-13 第三十二次增量：TASK56仓库与合成隔离范围已完成。功能修复基线`076b840`通过Node121/1026、PG84/401加catalog、Browser6/11、POSIX7/57、typecheck38/38、release inventory57及直接54、Supervisor48、Python三基线、隔离Migration和备份/恢复；lint0 error/28 warning、credentials1665、JSON220、Shell44、Python50及Markdown395/237通过。TASK51历史镜像仅作当前runtime离线夹具时以`ADMIN_READ_ONLY_FIXTURE_GROUP_MISMATCH`失败关闭并清理任务container/Volume/network，没有被冒充为当前候选；TASK56按范围禁止build。最终文档源码检查点与唯一manifest-only直接子提交形成canonical bundle。实际角色/secret/ACL/Volume、host、同源码镜像、正式19步门、UAT/生产均未改变，整体继续`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -92,24 +94,25 @@
 - TASK56 D-132兼容检查点只在固定Node断网/只读临时容器与合成fixture中验证v1 actual失败关闭、v1 synthetic兼容、alias写入顺序及摘要冻结；没有访问PostgreSQL、创建真实readiness文件或触碰当前运行面。
 - TASK56最新静态检查点只在仓库、固定断网Node/Browser环境和一次一个临时PostgreSQL 17容器中验证session、secret、container、tablespace与恢复合同；真实UAT角色、secret、Volume、环境和服务未改变。依赖重建临时目录和旧依赖备份已按精确路径清理，无测试容器遗留。
 - TASK56受控operator检查点只在仓库、合成consumer凭据和一个临时PostgreSQL 17容器中验证真实system adapter、事务提交后SIGKILL、durable journal恢复、五口令探针和秘密日志扫描；没有读取真实凭据、UAT数据库/日志/环境、业务行、备份或卷正文，没有安装Supervisor或修改真实角色/ACL。测试container、source snapshot、credential/state目录已清理。
+- TASK56最终回归只使用提交快照、合成数据库/文件和一次一个任务容器；Migration、备份/恢复与历史runtime夹具资源全部清零。旧TASK51镜像因当前secret-file属组合同失败关闭，没有被视为当前候选或修改。最终资源低于停止线，未读取未跟踪报告、`.env`、真实秘密/业务行/日志/备份/卷正文，也未执行build、push、UAT/生产或账号动作。
 
 ## 3. 当前身份与运行事实
 
 | 证据项 | 当前事实 | 判定 |
 | --- | --- | --- |
-| 根仓库 | TASK56旧静态源码`6ddfae92…5e3`与manifest-only`ef409bbb…6ea2`的53文件bundle`bac5e882…cd9e`已被D-134 operator源码失效，未fetch/push；当前正执行源码冻结、干净回归和新canonical bundle | 新链尚未收口；异机源码锚点仍缺失 |
+| 根仓库 | TASK56最终文档源码检查点与紧随其后的唯一manifest-only直接子提交形成canonical链，精确身份由manifest的`source_commit/source_tree`自证；旧`bac5e882…cd9e`失效，未fetch/push | 本机内容寻址链`PASS`；异机源码锚点仍缺失 |
 | 私有源码锚点 | 本机最后已知跟踪引用为`recovery-private/main@1dcbf8d`；本任务未fetch、调用远端API或push，因此未声称其为远端实时状态，也未用本地提交差值冒充异机证明 | `FAIL`，当前完整历史未证明异机存在 |
-| 源码 | `0.1.0-alpha.47`，Migration46/head`0046_runtime_lock_privilege_boundary.sql`；0046 SQL/Snapshot SHA-256为`ad68aaa4…6d66b`/`c8fe259a…1f60d`，0001—0045未修改；受控operator源码与D-134已实现，最终bundle未冻结 | 仓库operator定向验证`PASS`；完整干净回归、新bundle、同源码候选镜像和可消费授权仍缺 |
+| 源码 | `0.1.0-alpha.47`，Migration46/head`0046_runtime_lock_privilege_boundary.sql`；0046 SQL/Snapshot SHA-256为`ad68aaa4…6d66b`/`c8fe259a…1f60d`，0001—0045未修改；D-134受控operator、完整适用回归和最终canonical bundle已完成 | 仓库/合成隔离`PASS`；同源码候选镜像、可消费授权及运行激活仍缺 |
 | 源码 Schema | 46 个 SQL、journal 和 snapshot 顺序一致；`db/schema.ts`与 0046 snapshot 为 233 张 public 表且列集合一致 | 静态及隔离Migration一致性`PASS` |
 | UAT Web | `0.1.0-alpha.42`，revision `569aa954…d33a24`，Image ID `sha256:e7761e2c…f94964` | 与源码不一致 |
 | UAT PostgreSQL | PostgreSQL 17，40/head `0040_warehouse_receipt_readiness.sql`，0040 checksum `b6781c94…a5a93`，227张public表；仅1个非内置LOGIN且为superuser、数据库owner及全部433个public relation owner，Web/Worker活动连接共用1个角色 | 与源码不一致；运行时最小权限`FAIL`，TASK56只修仓库候选 |
-| 隔离候选 | TASK51的`8084d6c3` Web/Worker镜像、六服务runtime及零发现诊断仍可作历史审计证据，但TASK53—TASK55改变了发布源码与合同输入 | `STALE / NOT AUTHORIZABLE`；须从新精确链重建并取得外部锚点 |
+| 隔离候选 | TASK51的`8084d6c3` Web/Worker镜像仍可作历史审计证据，但TASK53—TASK56改变了发布源码与secret/runtime合同；以旧镜像执行当前策略已失败关闭并清理 | `STALE / NOT AUTHORIZABLE`；须从TASK56最终链重建并取得外部锚点 |
 | 发布台账 | `RELEASES.md`记录alpha.46本机隔离候选但明确`NOT_RELEASED/NOT_ELIGIBLE`；没有正式gate report或`ELIGIBLE`manifest | `FAIL` |
 | 运行健康 | Web/PostgreSQL healthy，Worker/Caddy running，restart 0、OOMKilled false；回环与公开 health仍来自alpha.42旧实现，Worker health为none | 仅证明当前空闲存活；TASK45源码真实性未部署 |
 | Python 旧运行面 | `chenyida-erp.service` enabled/active、restart 0，当前监听`127.0.0.1:18889` | 开发/迁移来源；正式切换前须明确处置 |
 | 数据卷 | PostgreSQL、uploads、attachments、backup-status 四卷存在 | 单机持久化，不是灾备 |
 | 本机备份 | `/var/backups/chenyida-erp`存在 root-only 历史文件；与运行卷同在`/dev/vda1`，未发现自动 backup timer | `FAIL`，同一故障域 |
-| 当前资源 | 最新operator PG演练后available约1.7GiB，Swap539MiB/1.0GiB，根分区可用15GiB，Load`1.33/0.73/0.72`，`oom_kill=0`；四服务restart0/OOM false | 低于停止线且任务容器清零；最终回归与容量/soak仍未完成 |
+| 当前资源 | TASK56收口available约1.8GiB，Swap约723MiB/1.0GiB，根分区可用15GiB，Load低于4，`oom_kill=0`；四服务restart0/OOM false | 低于停止线且任务container/Volume/network清零；长期容量/soak仍未完成 |
 
 本地远端跟踪引用只证明最后一次本地已知状态；在没有受控 fetch/远端 API 核验时，不把它表述为远端实时状态。
 
@@ -123,8 +126,8 @@
 | 隔离恢复 | `PARTIAL / DATA + CLUSTER SECURITY SYNTHETIC-ISOLATED PASS` | 从真实异机副本在新空隔离目标恢复四类数据及集群级对象，完成Migration、角色/ACL/默认权限/表空间/凭据正反权限、数量、摘要、库存和关键金额核对并记录真实RTO；现有合成密文双集群证据不替代真实数据 |
 | 真实数据试迁移 | `FAIL` | 只读源快照、逐行结果、重复/孤儿/单位/文件处置、库存/金额核对和可重跑报告通过 |
 | 核心服务端规则 | `PARTIAL` | 物料/BOM/采购/收货/IQC/库存/生产/销售/财务关键链及异常路径在同一候选通过自动与人工验收 |
-| 权限/会话/安全/审计 | `PARTIAL / TASK56 CONTROLLED OPERATOR REPOSITORY PASS / CURRENT UAT SUPERUSER` | Web锁、Backup、PG17 catalog、v2角色/ACL、五身份探针、session、secret、container、tablespace及受控operator仓库链已闭合；仍须最终bundle、实际角色/secret/Volume部署及同候选运行复核。随后还需批准岗位矩阵、职责分离与最小数据域；当前UAT共享superuser和环境秘密不满足投产要求 |
-| 强制发布测试门 | `PARTIAL / TASK56 OPERATOR TARGETED TESTS PASS / FINAL BUNDLE AND CURRENT CANDIDATE ABSENT` | 新inventory为248/224/24；operator16、Supervisor定向29、release/catalog34和真实PG17 adapter已通过，但最终完整干净快照回归与canonical bundle仍在执行。TASK51候选失效，host supervisor未安装，正式provenance/SBOM/security evidence和同候选19步报告不存在 |
+| 权限/会话/安全/审计 | `PARTIAL / TASK56 REPOSITORY COMPLETE / CURRENT UAT SUPERUSER` | Web锁、Backup、PG17 catalog、v2角色/ACL、五身份探针、session、secret、container、tablespace、受控operator及最终bundle已闭合；仍须实际角色/secret/Volume部署及同候选运行复核。随后还需批准岗位矩阵、职责分离与最小数据域；当前UAT共享superuser和环境秘密不满足投产要求 |
+| 强制发布测试门 | `PARTIAL / TASK56 FULL APPLICABLE REPOSITORY REGRESSION PASS / CURRENT CANDIDATE ABSENT` | inventory为248/224/24；Node121/1026、PG84/401加catalog、Browser6/11、POSIX7/57、typecheck38/38、release57+54、Supervisor48、Migration/恢复及Python三基线通过，canonical bundle已完成。TASK51镜像按当前runtime合同失败关闭，host supervisor未安装，正式provenance/SBOM/security evidence和同候选19步报告不存在 |
 | 监控/容量/告警/手册 | `PARTIAL / REPOSITORY CONTRACT VERIFIED / HOST DELIVERY NOT CONFIGURED` | TASK49已验证严格快照、阈值、状态机、pending delivery及排障合同；仍须host安装/调度、真实渠道和值班升级演练，以及低资源负载/备份/恢复soak和升级/回滚演练 |
 | 真实员工受控试用 | `FAIL` | 少量真实岗位用户按脚本完成跨岗正常/异常流程并签字，问题闭环后重验 |
 | 正式切换与回滚授权 | `FAIL` | 明确窗口、冻结点、负责人、验证清单、回滚触发器与项目负责人专项授权 |
@@ -174,7 +177,7 @@
 
 ### PR-005 强制发布测试门工具已建立，但没有候选PASS
 
-- 当前机器清单为239文件（215 REQUIRED、24有明确别名/历史N/A）、19步`test:release`、固定执行器、资源/timeout/无skip、机器报告及候选manifest绑定；其中Pure Node113、PostgreSQL83、Browser6、历史D1 22、PG alias2、release contract6、SPECIAL harness7，TASK55已把cluster security与受信组合恢复fixture纳入正式inventory。TASK45—TASK54历史记录中的旧计数保持其当时快照语义，不能当作当前机器合同。
+- 当前机器清单为248文件（224 REQUIRED、24有明确别名/历史N/A）、19步`test:release`、固定执行器、资源/timeout/无skip、机器报告及候选manifest绑定；当前执行集合含Pure Node121、PostgreSQL84、Browser6、release contract6与SPECIAL harness7。TASK45—TASK55历史记录中的旧计数保持其当时快照语义，不能当作当前机器合同。
 - TASK42最终源码快照曾通过Node 107文件/886、PostgreSQL 80文件/367等完整仓库门；TASK43—TASK45随后通过各自定向、隔离PostgreSQL、release contract及supervisor验证；TASK49最后一次重跑完整Node/PostgreSQL/typecheck。TASK50没有改业务/Schema/TypeScript，只运行适用release/runtime门；当前源码仍没有同候选19步正式报告。
 - TASK46已按D-120修复真实类型债，固定精确38配置集合/摘要合同，并在源码与bundle两个连续干净快照38/38通过；该子门不再是仓库候选阻断。
 - TASK47已按D-121固定Playwright 1.51.1/Chromium 134内容寻址运行时，并在源码`9a18a0f…`干净快照完成Browser 6文件/11项；该子门不再是仓库候选阻断。
@@ -182,7 +185,7 @@
 - TASK53又在最新内容寻址链重跑release候选侧51/51、supervisor侧48/48、Node113/964、PostgreSQL83/396及typecheck38/38，并关闭首次晋升自锁；这些是仓库回归，不是正式19步候选报告。
 - TASK54在新内容寻址链重跑release contract51/51、supervisor31/31、inventory237/213/24、typecheck及Compose/runtime，并完成签名密文双集群恢复；这些仍是仓库/合成隔离回归，不是正式19步同候选报告。
 - TASK55在源码`b93d8380`与bundle`2136aa3c`上完成inventory239/215/24、release inventory51/51、直接合同48/48、supervisor31/31、Node113/965、PostgreSQL83/396、Browser6/11、SPECIAL POSIX7/57、typecheck38/38和组合恢复；这些仍是仓库/合成隔离回归，不是正式19步同候选报告。
-- TASK56最新operator检查点把inventory扩展为248/224/24，并通过operator16/16、Supervisor定向29/29、release/catalog34/34及真实隔离PG17提交后SIGKILL恢复；最终完整干净快照回归和canonical bundle仍未收口，这些也不是正式19步同候选报告。
+- TASK56最终把inventory固定为248/224/24，并完成Node121/1026、PostgreSQL84/401加catalog、Browser6/11、SPECIAL POSIX7/57、typecheck38/38、release inventory57/直接54、Supervisor48、Migration/恢复及Python三基线；canonical manifest也已闭合。历史TASK51镜像按当前runtime secret合同失败关闭，未冒充新候选；这些仍是仓库/合成隔离回归，不是正式19步同候选报告。
 - 同一候选19步全门仍未执行：TASK51的两个正式入口都在6个制品变化前因host supervisor未安装退出1，且该候选现已失效。因此完整候选门按设计保持阻断，不能把历史诊断零发现、runtime隔离或分项全回归解释为候选PASS。
 
 解除条件：专项授权安装精确content-addressed supervisor，分别签发root-only一次性授权，在当前或后续精确候选上生成正式镜像provenance/SBOM/security evidence并运行完整19步门；任何缺失、跳过或失败继续阻止候选晋升。

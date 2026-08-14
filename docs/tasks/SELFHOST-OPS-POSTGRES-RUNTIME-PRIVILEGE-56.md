@@ -1,6 +1,6 @@
 # SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56 PostgreSQL 运行时最小权限与凭据边界闭环
 
-> 状态：`DOING / CONTROLLED OPERATOR REPOSITORY VERIFIED / FINAL BUNDLE AND ACTUAL ACTIVATION OPEN / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`
+> 状态：`DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL ACTIVATION AND CURRENT CANDIDATE BLOCKED / NO RUNTIME CHANGE / PRODUCTION NO-GO`
 > 日期：2026-08-13（Asia/Shanghai）
 > 严格起点：`main@fb1f7e8893b2affba0ca07ecd9629ae2726adca9` / tree `13fe6ce3d04b60bbc724f63b9fa7b5bdc5d16d3e`
 > 责任：Codex 主智能体为唯一写者、测试调度者和 Git 提交者；数据迁移、应用测试、运维安全智能体只读审计；项目负责人继续保留真实数据库/凭据、账号权限、host、UAT/生产 Migration 与部署、Volume、备份恢复和切换的专项授权权力
@@ -58,7 +58,7 @@
 - [x] Compose声明独立`erp_postgres_tablespaces`持久Volume和固定容器namespace；runtime policy、恢复map与release gate验证精确mount、只读/读写边界、owner/mode和禁止与PGDATA/应用卷重叠，当前运行面未创建该Volume。
 - [x] 单容器隔离PostgreSQL 17完成空cluster bootstrap、46个Migration、角色/ACL reconcile、Web与Worker允许操作、备份dump、未授权拒绝、重复执行、故障回滚和新空目标权限复核；临时数据库、秘密、容器、网络、Volume和目录全部清理。
 - [x] 现有Node/PostgreSQL/Browser/POSIX、Migration、backup/restore、Dashboard/monitor、Compose/runtime和release合同不降级；新增测试进入正式inventory，所有重任务串行且最多一个临时容器。
-- [ ] 源码冻结后重建canonical manifest-only直接子提交，TASK55 bundle和全部旧候选标记`STALE / NOT AUTHORIZABLE`；不把历史TASK51镜像当作新源码候选。
+- [x] 源码冻结后重建canonical manifest-only直接子提交，TASK55 bundle和全部旧候选标记`STALE / NOT AUTHORIZABLE`；不把历史TASK51镜像当作新源码候选。
 - [x] 不产生真实角色/密码、可消费授权、真实secret文件、真实tablespace、host安装、外部push、UAT/生产/真实数据动作；系统保持`PRODUCTION NO-GO`。
 - [x] 同步`MASTER.md`、`TASKS.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`、`STATUS.md`和`PRODUCTION_READINESS.md`，通过凭据/JSON/Shell/Markdown/差异检查并创建独立Git提交。
 
@@ -73,7 +73,7 @@
 
 ## 7. 当前判定
 
-`DOING / CONTROLLED OPERATOR REPOSITORY VERIFIED / FINAL BUNDLE AND ACTUAL ACTIVATION OPEN / ISOLATED-ONLY / NO RUNTIME CHANGE / PRODUCTION NO-GO`。仓库已闭合生产受控operator、直接消费者凭据、全局锁、durable journal、backup fence联锁及BOOTSTRAP/RECONCILE可信运行守卫，并在真实隔离PG17 system adapter中完成提交后SIGKILL恢复；最终canonical bundle仍待源码冻结后重建，真实角色/secret/ACL与UAT运行面未改变。当前系统仍由单一superuser承担数据库owner、全部对象owner和Web/Worker连接，且秘密通过环境变量交付；在专项授权激活、同候选运行复核及其余投产门完成前，不得投入真实员工使用。
+`DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL ACTIVATION AND CURRENT CANDIDATE BLOCKED / NO RUNTIME CHANGE / PRODUCTION NO-GO`。仓库已闭合生产受控operator、直接消费者凭据、全局锁、durable journal、backup fence联锁及BOOTSTRAP/RECONCILE可信运行守卫，并在真实隔离PG17 system adapter中完成提交后SIGKILL恢复；最终canonical manifest由本文档收口源码检查点的唯一manifest-only直接子提交生成并以其中的`source_commit/source_tree`为权威。真实角色/secret/ACL与UAT运行面没有改变，当前系统仍由单一superuser承担数据库owner、全部对象owner和Web/Worker连接，且秘密通过环境变量交付；在专项授权激活、当前源码候选重建、同候选正式门及其余投产门完成前，不得投入真实员工使用。
 
 ## 8. 三线审计结论与 D-133
 
@@ -172,3 +172,13 @@
 - catalog修复后的82项受影响定向合同以81/82失败关闭，唯一失败为release identity旧测试仍要求writer内联`flock -n 9`。实际writer已经source集中式受信helper；断言现验证helper路径/source/调用顺序并禁止wrapper重复实现锁。该测试与inventory/policy摘要已再次重绑，更新后的identity/manifest/gate合同43/43、browser policy 5/5及inventory 248/248内容核对通过，未改动运行实现或放宽持锁语义。
 - 定向验证已通过operator 16/16、Supervisor launcher/installer/browser 29/29、catalog/release manifest/release gate 34/34、postdeploy probe 3/3、真实PG17 system adapter和修复后的完整catalog test；最终完整适用回归、凭据/文档/JSON/Shell/diff门和源码冻结后的canonical manifest-only直接子提交仍须完成。本任务因此保持唯一`DOING`，旧`bac5e882…cd9e`静态bundle及此前全部候选均为`STALE / NOT AUTHORIZABLE`。
 - 新增[受控Operator手册](../self-hosting/postgresql-runtime-privilege-operator.md)，明确直接消费者、三种operation、授权字段、唯一入口、停止线、SIGKILL恢复、quarantine和回退边界。仓库实现没有安装到host、创建真实secret或修改任何角色/ACL/Volume/UAT/生产；当前UAT仍是alpha.42/0040共享superuser与环境秘密，系统继续`PRODUCTION NO-GO`。
+
+## 18. 最终仓库收口与完整适用回归
+
+- 功能修复基线`076b84083c04b1618ea9f94ca5e4ef0f675ec5f3`/tree`d3a7783316e502375ee6d96a31ccda101c545f8f`完成最终干净快照回归：Node源码121文件/1026项、固定PG17 inventory 84文件/401项加runtime privilege catalog、Browser 6/11、SPECIAL POSIX 7/57、typecheck 38/38、release inventory合同6文件/57项及直接合同54/54全部通过；Supervisor五模块48/48，Python隔离Supervisor 48/48、`SELF_TEST_OK`、`SMOKE_TEST_OK`和`GO_LIVE_CHECK_OK`全部通过。
+- 隔离数据库与恢复门通过：Migration allowlist PostgreSQL集成退出0；备份/恢复完成只读快照业务子测2/2、异cluster PostgreSQL恢复和单容器双cluster安全恢复。UAT/production Compose六服务策略分别通过，policy SHA-256均为`e4920820ed954c2689e3de53dea9b7f36945969c8287b06d87a3871e7d3ecf00`。
+- 六服务运行策略没有被历史镜像冒充为当前候选。TASK51的`8084d6c3`镜像仅作为旧离线夹具尝试时，以`ADMIN_READ_ONLY_FIXTURE_GROUP_MISMATCH`失败关闭并自动清理全部任务container/Volume/network；这证明旧镜像不满足当前secret-file合同。TASK56明确禁止构建当前候选，因此同源码镜像、六服务当前runtime、正式SBOM/漏洞证据和19步报告转交下一候选刷新任务，历史镜像继续`STALE / NOT AUTHORIZABLE`。
+- lint退出0并报告28条既有warning、0 error；凭据扫描覆盖1665个提交树文件。静态门通过JSON 220、Shell 44、Python 50、Markdown 395/本地链接237及官方source diff；没有跳过测试、降低断言或读取未跟踪状态报告。
+- 最终资源检查保持低于停止线：available约1.8GiB、Swap约723MiB/1.0GiB、根盘可用15GiB、Load低于4、内核`oom_kill=0`；Web/PostgreSQL healthy，Worker/Caddy running，四服务restart0/OOM false。Migration、backup/recovery及runtime失败夹具的任务container/Volume/network均清零，未清理任何受保护资源。
+- 本文档收口提交是最终canonical manifest的`source_commit/source_tree`；紧随其后的唯一manifest-only直接子提交只更新`chenyida_erp_site/release/release-supervisor-bundle-v1.json`，生成器复跑必须逐字节一致。该链只证明仓库和合成隔离实现，不建立可消费授权、真实角色/ACL/secret/Volume或当前候选资格。
+- TASK56因此按`DONE / REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / ACTUAL ACTIVATION AND CURRENT CANDIDATE BLOCKED`释放执行槽。两个实际运行验收项仍保持未勾选：在线Web/Worker尚未采用不同LOGIN/凭据，真实角色/secret/tablespace/host Supervisor也未激活；这些动作及UAT Migration/deploy仍需A1/A6专项授权。当前UAT继续alpha.42/0040、共享superuser和环境秘密，系统继续`PRODUCTION NO-GO`。
