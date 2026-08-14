@@ -343,10 +343,15 @@ class ReleaseCandidateSnapshotTest(unittest.TestCase):
                 expected_bundle_root=self.bundle_parent / ("0" * 64),
             )
 
+        interpreter_mode = self.interpreter.stat().st_mode & 0o7777
+        self.interpreter.chmod(interpreter_mode | 0o200)
         self.interpreter.write_bytes(b"different-interpreter\n")
+        self.interpreter.chmod(interpreter_mode)
         with self.assertRaisesRegex(snapshot.SnapshotError, "SNAPSHOT_TEST_RUNTIME_INTERPRETER_DIGEST_MISMATCH"):
             self.verify(receipt, receipt_digest)
+        self.interpreter.chmod(interpreter_mode | 0o200)
         self.interpreter.write_bytes(self.runtime_files[self.interpreter])
+        self.interpreter.chmod(interpreter_mode)
 
         runtime_intermediate = self.runtime / "chenyida_erp_site"
         runtime_intermediate_mode = runtime_intermediate.stat().st_mode & 0o7777
