@@ -28,7 +28,7 @@ const REQUIRED_STATUS = Object.freeze({
   COMPOSE_DEPLOYMENT_RECEIPT: "SUPPORTED",
   POST_DEPLOY_RUNTIME_CONFIGURATION: "SUPPORTED",
   POST_DEPLOY_IDENTITY: "SUPPORTED",
-  CROSS_ROLE_UAT_EXECUTION: "CONTRACT_ONLY",
+  CROSS_ROLE_UAT_EXECUTION: "SUPPORTED",
   PROMOTION_FINAL_RECEIPT: "MISSING",
   ROLLBACK_TO_UAT_EXECUTOR: "MISSING",
   ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT: "MISSING",
@@ -156,6 +156,8 @@ function inspectRepository(policy, sourceBodies, errors) {
   const deploymentContract = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-compose-deployment-contract.mjs") ?? "";
   const deploymentControl = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-compose-deployment-control.mjs") ?? "";
   const promotionJournal = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs") ?? "";
+  const promotionPolicy = sourceBodies.get("chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json") ?? "";
+  const crossRoleResultContract = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-cross-role-evidence-contract.mjs") ?? "";
   const compose = sourceBodies.get("chenyida_erp_site/compose.release.yml") ?? "";
   const crossRole = JSON.parse(sourceBodies.get("chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json") ?? "null");
   const observations = {
@@ -200,6 +202,18 @@ function inspectRepository(policy, sourceBodies, errors) {
       && promotionJournal.includes("AFTER_POSTDEPLOY_RUNTIME_CURRENT")
       && promotionJournal.includes("AFTER_POSTDEPLOY_IDENTITY_CURRENT")
       ? "SUPERVISOR_CHECKPOINT_10_11_CONTENT_ADDRESSED_AND_RECOVERABLE" : "UNKNOWN",
+    cross_role_uat_transaction_binding: launcher.includes('"VERIFY_UAT_CROSS_ROLE_EXECUTION": "CROSS_ROLE_UAT"')
+      && launcher.includes("SUPERVISOR_UAT_PROMOTION_CROSS_ROLE_RECOVERY_REQUIRED")
+      && promotionPolicy.includes('"operation": "VERIFY_UAT_CROSS_ROLE_EXECUTION", "status": "IMPLEMENTED"')
+      && promotionJournal.includes("UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT")
+      && promotionJournal.includes("loadDurableCrossRoleResult")
+      && promotionJournal.includes("AFTER_CROSS_ROLE_CURRENT")
+      && promotionJournal.includes('checkpoint_id: "CROSS_ROLE_UAT_EXECUTION"')
+      && crossRoleResultContract.includes("UAT_PROMOTION_CROSS_ROLE_RESULT_CONTRACT")
+      && crossRoleResultContract.includes("human_execution_authorization_sha256")
+      && crossRoleResultContract.includes("evidence_subject_sha256")
+      && crossRoleResultContract.includes("approval_subject_sha256")
+      ? "SUPERVISOR_CHECKPOINT_12_CONTENT_ADDRESSED_AND_RECOVERABLE" : "UNKNOWN",
     cross_role_uat_readiness: crossRole?.readiness?.status ?? "UNKNOWN",
   };
   if (!Array.isArray(expectedImplemented) || expectedImplemented.some((item) => !IDENTIFIER.test(item))
@@ -208,6 +222,7 @@ function inspectRepository(policy, sourceBodies, errors) {
   if (observations.migration_authorization !== "SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED") error(errors, "AUDIT_MIGRATION_AUTHORIZATION_DRIFT");
   if (observations.compose_release_image_binding !== "SUPERVISOR_CHECKPOINT_9_FENCED_WEB_WORKER_REPLACEMENT") error(errors, "AUDIT_COMPOSE_BINDING_DRIFT");
   if (observations.postdeploy_transaction_binding !== "SUPERVISOR_CHECKPOINT_10_11_CONTENT_ADDRESSED_AND_RECOVERABLE") error(errors, "AUDIT_POSTDEPLOY_TRANSACTION_BINDING_DRIFT");
+  if (observations.cross_role_uat_transaction_binding !== "SUPERVISOR_CHECKPOINT_12_CONTENT_ADDRESSED_AND_RECOVERABLE") error(errors, "AUDIT_CROSS_ROLE_UAT_TRANSACTION_BINDING_DRIFT");
   if (observations.cross_role_uat_readiness !== "BLOCKED") error(errors, "AUDIT_CROSS_ROLE_UAT_BOUNDARY_DRIFT");
   return observations;
 }
@@ -297,7 +312,7 @@ export function renderMarkdown(artifact) {
     `- 执行判定：\`${artifact.execution_readiness.code}\`；P0=${artifact.execution_readiness.p0_blocker_count}，P1=${artifact.execution_readiness.p1_blocker_count}，may_start=\`${artifact.execution_readiness.may_start}\`。`,
     `- ${artifact.execution_readiness.statement}`,
     "",
-    "仓库已有候选source snapshot、ELIGIBLE manifest、pre-deploy runtime guard、promotion intent/journal、promotion-bound actual-offhost snapshot验收、同一Compose Web/Worker持续静默回执、一次性Migration数据库围栏与提交回执、checkpoint 9受控Compose部署回执，以及checkpoint 10/11内容寻址且可恢复的postdeploy配置与身份回执；业务UAT、终态提交和回退适配器仍未闭合。",
+    "仓库已有候选source snapshot、ELIGIBLE manifest、pre-deploy runtime guard、promotion intent/journal、promotion-bound actual-offhost snapshot验收、同一Compose Web/Worker持续静默回执、一次性Migration数据库围栏与提交回执、checkpoint 9受控Compose部署回执、checkpoint 10/11 postdeploy回执，以及checkpoint 12内容寻址且可恢复的人工UAT证据摄取链；人工UAT尚未获批或执行，终态提交和回退适配器仍未闭合。",
     "",
     "## 2. Supervisor操作面",
     "",
@@ -319,6 +334,7 @@ export function renderMarkdown(artifact) {
     `- Migration授权：\`${artifact.observations.migration_authorization}\`；checkpoint 7与独立checkpoint 8授权、数据库围栏、逐文件事务、最终核对和不可覆盖提交回执已形成同一内容寻址链。`,
     `- Compose发布：\`${artifact.observations.compose_release_image_binding}\`；checkpoint 9绑定精确digest、受保护资源身份、数据库围栏交接和unknown/partial保全，但不代表后续postdeploy与业务UAT检查点已提交。`,
     `- Postdeploy事务：\`${artifact.observations.postdeploy_transaction_binding}\`；checkpoint 10/11使用彼此独立的一次性授权，绑定checkpoint 9结果、围栏交接、manifest、四服务运行身份；Supervisor外部控制摘要先形成不可变binding，journal核对后才按history→receipt→current单调提交。`,
+    `- 跨岗位UAT事务：\`${artifact.observations.cross_role_uat_transaction_binding}\`；checkpoint 12只摄取已由事前人工授权、精确账号/人员映射、结构化步骤与控制、共同证据主题及三方签字闭合的结果；人工执行授权与后续Supervisor摄取授权必须不同，恢复只续写journal且不重跑人工步骤。`,
     "- Writer静默回执只覆盖精确Compose项目与working directory；checkpoint 8在SQL前重验静默并以数据库级围栏拒绝未标记或外部业务客户端，围栏保持至后续部署或保全恢复接管。",
     `- TASK67人工UAT状态：\`${artifact.observations.cross_role_uat_readiness}\`。`,
     "",
@@ -326,7 +342,7 @@ export function renderMarkdown(artifact) {
     "",
     "任何工具、手册或operator在本artifact仍为BLOCKED时调用晋升断言，必须得到`UAT_PROMOTION_EXECUTOR_NOT_READY`。不得用root手工Compose、可重复环境变量、TEST恢复回执、旧postdeploy receipt或最终health页面绕过缺失检查点。",
     "",
-    "下一实现必须补齐checkpoint 12人工UAT受控执行证据、checkpoint 13 promotion终态提交和checkpoint 14/15精确前代回退；执行器完整后才可在合成Compose和隔离PostgreSQL做动态验证。",
+    "下一实现必须补齐checkpoint 13 promotion终态提交和checkpoint 14/15精确前代回退；checkpoint 12的摄取适配器已闭合，但实际人工UAT仍需独立事前授权、UAT资源、人员映射和签字，不能由仓库测试替代。",
     "",
     "## 6. 源码manifest",
     "",

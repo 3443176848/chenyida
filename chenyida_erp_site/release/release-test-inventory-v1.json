@@ -4,8 +4,8 @@
   "root": "chenyida_erp_site",
   "test_pattern": "tests/*.test.mjs",
   "max_test_bytes": 1048576,
-  "total_tests": 258,
-  "required_tests": 234,
+  "total_tests": 259,
+  "required_tests": 235,
   "not_applicable_tests": 24,
   "category_counts": {
     "BROWSER": 6,
@@ -13,7 +13,7 @@
     "POSTGRES": 84,
     "POSTGRES_ALIAS": 2,
     "PURE_NODE": 130,
-    "RELEASE_CONTRACT": 7,
+    "RELEASE_CONTRACT": 8,
     "SPECIAL_HARNESS": 7
   },
   "tests": [
@@ -1891,7 +1891,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "eaf2c7e6522ba1eb53fbf39ad3a203fbd659ceba90298708f7c8322ee8567c3c",
+      "sha256": "722f31ad08c7dc6a45d42ce14d23b5e4e27cd20370915a1ffc5b91d22c193f3f",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -2295,6 +2295,15 @@
       "canonical_path": null
     },
     {
+      "path": "tests/selfhost-uat-promotion-cross-role-evidence-contract.test.mjs",
+      "sha256": "85cb3c1804beaeea2636c6c3f8177de916123bc8483baeb46233ff2afdc2c9bf",
+      "category": "RELEASE_CONTRACT",
+      "applicability": "REQUIRED",
+      "harness": "NODE_RELEASE_CONTRACT",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
       "path": "tests/selfhost-uat-promotion-migration-execution-contract.test.mjs",
       "sha256": "ce529f23e7a3f82cdeaa482e0576d1fc1303fd802abd7d9d5c3acced8f5ad4c8",
       "category": "RELEASE_CONTRACT",
@@ -2305,7 +2314,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-rollback-audit.test.mjs",
-      "sha256": "d516a17952f10b62810fb6185065a984c6cad42606e77b697caa63d261bd0ba9",
+      "sha256": "9da197b5ed315acbd5d3f8389a8e4e9bb2b95fd4cf5f64f8166ff066d174b798",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -2314,7 +2323,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-transaction-journal.test.mjs",
-      "sha256": "d53a1cc843e7fdcd4e1ed38f2f0bd38b9cea9cd1f6a0a34e2788816373f56d03",
+      "sha256": "1da7b1ecf36412cca5a2ce6e791fb3275a72e3fdc4285002e59033428a5f2c1b",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",

@@ -47,6 +47,14 @@ import {
   buildReleaseIdentityFromPostDeployReceipt,
   validatePostDeployReceipt,
 } from "./postdeploy-release-contract.mjs";
+import {
+  UAT_PROMOTION_CROSS_ROLE_RESULT_MARKER,
+  UAT_PROMOTION_CROSS_ROLE_RESULT_MARKER_VALUE,
+  UAT_PROMOTION_CROSS_ROLE_RESULT_ROOT,
+  canonicalUatPromotionCrossRoleResultJson,
+  validateCrossRoleUatTemplate,
+  validateUatPromotionCrossRoleResult,
+} from "./uat-promotion-cross-role-evidence-contract.mjs";
 import { canonicalJson as canonicalReleaseJson } from "./release-manifest-contract.mjs";
 
 export const UAT_PROMOTION_POLICY_CONTRACT = "chenyida-erp-uat-promotion-transaction-policy/v1";
@@ -59,6 +67,7 @@ export const UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT = "chenyida-erp-u
 export const UAT_PROMOTION_COMPOSE_DEPLOYMENT_INTENT_CONTRACT = "chenyida-erp-uat-promotion-compose-deployment-intent/v1";
 export const UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-runtime-intent/v1";
 export const UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-identity-intent/v1";
+export const UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT = "chenyida-erp-uat-promotion-cross-role-intent/v1";
 export const UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-identity-evidence/v1";
 export const UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-containment/v1";
 export const UAT_PROMOTION_RECEIPT_CONTRACT = "chenyida-erp-uat-promotion-checkpoint-receipt/v1";
@@ -69,8 +78,8 @@ export const UAT_PROMOTION_CURRENT_FILE = `${UAT_PROMOTION_STATE_ROOT}/current.j
 export const UAT_PROMOTION_STATE_MARKER = ".chenyida-erp-uat-promotion-transactions-v1";
 export const UAT_PROMOTION_STATE_MARKER_VALUE = "chenyida-erp-uat-promotion-transactions/v1\n";
 export const UAT_PROMOTION_POLICY_RELATIVE = "operations/uat-promotion-transaction-policy-v1.json";
-export const UAT_PROMOTION_POLICY_FILE_SHA256 = "e25ffc7b9176b2cc94c0d0bb87ced077671a1cd5481ce7f2c9c8f44ad442b4d0";
-export const UAT_PROMOTION_POLICY_SHA256 = "b82f0181a7d016560f580e769fc10e8e9c2acf3a3224c11f7336ddb99c564a44";
+export const UAT_PROMOTION_POLICY_FILE_SHA256 = "a78d551ffe8496d31ef3cfb6c961c464748ec0b6badf733951bf57194a4b2bae";
+export const UAT_PROMOTION_POLICY_SHA256 = "5ade8772ad9dd4961c128c8eca1bdeec7b4909f79a5b275b6be14ab4961caf37";
 export const ZERO_SHA256 = "0".repeat(64);
 
 const SITE_ROOT = path.resolve(fileURLToPath(new URL("../", import.meta.url)));
@@ -93,6 +102,7 @@ const RUNTIME_PROBE_ROOT = "/var/lib/chenyida-erp/runtime-probes";
 const RUNTIME_PROBE_MARKER = ".chenyida-erp-runtime-probe-root-v1";
 const RUNTIME_PROBE_MARKER_VALUE = "chenyida-erp-runtime-probe-root/v1\n";
 const POSTDEPLOY_ROOT = "/var/lib/chenyida-erp/postdeploy";
+const CROSS_ROLE_UAT_CONTRACT_RELATIVE = "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json";
 const UAT_PROMOTION_POSTDEPLOY_CONTROL_BINDING_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-control-binding/v1";
 const POSTDEPLOY_RUNTIME_GUARD_CONTRACT = "chenyida-erp-release-runtime-guard/v1";
 const POSTDEPLOY_RUNTIME_GUARD_MODE = "POST_DEPLOY_CURRENT_RUNTIME_STRICT";
@@ -256,6 +266,24 @@ const POSTDEPLOY_IDENTITY_PARAMETER_FIELDS = Object.freeze([
   "runtime_probe_receipt", "runtime_probe_receipt_sha256", "runtime_probe_receipt_source",
   "runtime_configuration_sha256", "postdeploy_root", "identity_root", "run_id",
 ]);
+const CROSS_ROLE_UAT_PARAMETER_FIELDS = Object.freeze([
+  "promotion_state_root", "promotion_id", "promotion_generation", "previous_checkpoint_receipt_sha256",
+  "promotion_intent_sha256", "promotion_original_authorization_sha256", "candidate_binding_sha256",
+  "database_binding_sha256", "runtime_binding_sha256", "preupgrade_recovery_binding_sha256",
+  "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+  "migration_authorization_binding_sha256", "migration_fence_binding_sha256",
+  "migration_result_binding_sha256", "compose_deployment_binding_sha256", "current_checkpoint_source",
+  "postdeploy_identity_operation_id", "postdeploy_identity_intent_sha256",
+  "postdeploy_identity_intent_source", "postdeploy_identity_evidence_sha256",
+  "postdeploy_identity_evidence_source", "release_identity_sha256", "release_identity_source",
+  "cross_role_contract", "cross_role_contract_file_sha256", "cross_role_contract_artifact_sha256",
+  "cross_role_contract_source", "authorization_matrix_artifact_sha256",
+  "authorization_matrix_source_manifest_sha256", "cross_role_result_root", "result_id",
+  "cross_role_result", "cross_role_result_file_sha256", "cross_role_result_sha256",
+  "cross_role_result_source", "verification_created_at", "verification_expires_at",
+  "requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256",
+  "policy_file_sha256", "policy_sha256",
+]);
 const WRITER_CAPTURE_FIELDS = Object.freeze([
   "deployment_class", "deployment_id", "compose_project", "snapshot_recovery_point_at", "snapshot_writer_verified_at",
   "application_version", "git_commit", "migration_head", "migration_manifest_sha256", "web", "worker",
@@ -317,7 +345,7 @@ function validatePolicy(value) {
   if (!same(value.deployment, { class: "UAT", id: "chenyida-erp", database: "chenyida_erp", database_marker: "chenyida-erp-deployment/v2:UAT:chenyida-erp" })) reject("UAT_PROMOTION_POLICY_INVALID");
   exactKeys(value.state, ["root", "marker", "marker_value", "directory_mode", "file_mode", "owner_uid", "owner_gid"], "UAT_PROMOTION_POLICY_INVALID");
   if (!same(value.state, { root: UAT_PROMOTION_STATE_ROOT, marker: UAT_PROMOTION_STATE_MARKER, marker_value: UAT_PROMOTION_STATE_MARKER_VALUE, directory_mode: "0700", file_mode: "0400", owner_uid: 0, owner_gid: 0 })) reject("UAT_PROMOTION_POLICY_INVALID");
-  exactKeys(value.authorization, ["contract", "maximum_window_minutes", "required_distinct_actors", "begin_operation", "snapshot_operation", "quiesce_operation", "migration_authorization_operation", "migration_execution_operation", "compose_deployment_operation", "postdeploy_runtime_configuration_operation", "postdeploy_identity_operation", "recovery_operation"], "UAT_PROMOTION_POLICY_INVALID");
+  exactKeys(value.authorization, ["contract", "maximum_window_minutes", "required_distinct_actors", "begin_operation", "snapshot_operation", "quiesce_operation", "migration_authorization_operation", "migration_execution_operation", "compose_deployment_operation", "postdeploy_runtime_configuration_operation", "postdeploy_identity_operation", "cross_role_uat_operation", "recovery_operation"], "UAT_PROMOTION_POLICY_INVALID");
   if (value.authorization.contract !== "chenyida-erp-release-supervisor-authorization/v6"
     || value.authorization.maximum_window_minutes !== 60 || value.authorization.begin_operation !== "BEGIN_UAT_PROMOTION"
     || value.authorization.snapshot_operation !== "CAPTURE_UAT_PROMOTION_SNAPSHOT"
@@ -327,6 +355,7 @@ function validatePolicy(value) {
     || value.authorization.compose_deployment_operation !== "DEPLOY_UAT_RELEASE"
     || value.authorization.postdeploy_runtime_configuration_operation !== "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION"
     || value.authorization.postdeploy_identity_operation !== "VERIFY_UAT_POSTDEPLOY_IDENTITY"
+    || value.authorization.cross_role_uat_operation !== "VERIFY_UAT_CROSS_ROLE_EXECUTION"
     || value.authorization.recovery_operation !== "RECOVER_UAT_PROMOTION"
     || !same(value.authorization.required_distinct_actors, ["requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256"])) reject("UAT_PROMOTION_POLICY_INVALID");
   exactKeys(value.snapshot_writer_dependency, [
@@ -345,7 +374,7 @@ function validatePolicy(value) {
   if (!same(value.checkpoint_order, CHECKPOINT_ORDER) || value.initial_checkpoint !== CHECKPOINT_ORDER[3]) reject("UAT_PROMOTION_POLICY_INVALID");
   if (!Array.isArray(value.required_intent_bindings) || value.required_intent_bindings.length !== 16
     || new Set(value.required_intent_bindings).size !== value.required_intent_bindings.length) reject("UAT_PROMOTION_POLICY_INVALID");
-  if (!Array.isArray(value.adapters) || value.adapters.length !== 10) reject("UAT_PROMOTION_POLICY_INVALID");
+  if (!Array.isArray(value.adapters) || value.adapters.length !== 11) reject("UAT_PROMOTION_POLICY_INVALID");
   const expectedAdapters = new Map([
     ["BEGIN_UAT_PROMOTION", "IMPLEMENTED"], ["CAPTURE_UAT_PROMOTION_SNAPSHOT", "IMPLEMENTED"],
     ["QUIESCE_UAT_WRITERS", "IMPLEMENTED"], ["RUN_UAT_PROMOTION_MIGRATION", "IMPLEMENTED"],
@@ -353,6 +382,7 @@ function validatePolicy(value) {
     ["DEPLOY_UAT_RELEASE", "IMPLEMENTED"],
     ["VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "IMPLEMENTED"],
     ["VERIFY_UAT_POSTDEPLOY_IDENTITY", "IMPLEMENTED"],
+    ["VERIFY_UAT_CROSS_ROLE_EXECUTION", "IMPLEMENTED"],
     ["ROLLBACK_UAT_RELEASE", "NOT_IMPLEMENTED"],
     ["RECOVER_UAT_PROMOTION", "IMPLEMENTED"],
   ]);
@@ -847,9 +877,72 @@ export function validateUatPromotionPostdeployIdentityParameters(value) {
   return value;
 }
 
+export function validateUatPromotionCrossRoleParameters(value) {
+  const code = "UAT_PROMOTION_CROSS_ROLE_PARAMETERS_INVALID";
+  exactKeys(value, CROSS_ROLE_UAT_PARAMETER_FIELDS, code);
+  if (value.promotion_state_root !== UAT_PROMOTION_STATE_ROOT
+    || value.cross_role_result_root !== UAT_PROMOTION_CROSS_ROLE_RESULT_ROOT) {
+    reject("UAT_PROMOTION_STATE_PATH_INVALID");
+  }
+  for (const field of ["promotion_id", "postdeploy_identity_operation_id", "result_id"]) {
+    identifier(value[field], code);
+  }
+  if (new Set([value.promotion_id, value.postdeploy_identity_operation_id, value.result_id]).size !== 3) reject(code);
+  integer(value.promotion_generation, 1, 1_000_000, code);
+  for (const field of [
+    "previous_checkpoint_receipt_sha256", "promotion_intent_sha256",
+    "promotion_original_authorization_sha256", "candidate_binding_sha256", "database_binding_sha256",
+    "runtime_binding_sha256", "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "postdeploy_identity_intent_sha256",
+    "postdeploy_identity_evidence_sha256", "release_identity_sha256",
+    "cross_role_contract_file_sha256", "cross_role_contract_artifact_sha256",
+    "authorization_matrix_artifact_sha256", "authorization_matrix_source_manifest_sha256",
+    "cross_role_result_file_sha256", "cross_role_result_sha256", "requester_identity_sha256",
+    "approver_identity_sha256", "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+  ]) digest(value[field], code);
+  if (value.policy_file_sha256 !== UAT_PROMOTION_POLICY_FILE_SHA256
+    || value.policy_sha256 !== UAT_PROMOTION_POLICY_SHA256) reject("UAT_PROMOTION_POLICY_BINDING_INVALID");
+  if (new Set([
+    value.requester_identity_sha256, value.approver_identity_sha256, value.executor_identity_sha256,
+  ]).size !== 3) reject("UAT_PROMOTION_ACTORS_INVALID");
+  for (const field of ["cross_role_contract", "cross_role_result"]) {
+    if (typeof value[field] !== "string" || !path.isAbsolute(value[field])
+      || path.normalize(value[field]) !== value[field] || value[field] === "/") reject(code);
+  }
+  const contractRelative = path.relative(SUPERVISOR_BUNDLE_ROOT, value.cross_role_contract);
+  const contractParts = contractRelative.split(path.sep);
+  if (contractParts.length !== 4 || !SHA256.test(contractParts[0])
+    || contractParts.slice(1).join("/") !== CROSS_ROLE_UAT_CONTRACT_RELATIVE
+    || value.cross_role_result !== `${UAT_PROMOTION_CROSS_ROLE_RESULT_ROOT}/${value.result_id}.cross-role-uat-result.json`) {
+    reject(code);
+  }
+  const created = Date.parse(iso(value.verification_created_at, code));
+  const expires = Date.parse(iso(value.verification_expires_at, code));
+  if (expires <= created || expires - created > 15 * 60 * 1000) reject(code);
+  const identityIntentPath = `${UAT_PROMOTION_STATE_ROOT}/intents/${value.postdeploy_identity_operation_id}.${value.postdeploy_identity_intent_sha256}.json`;
+  const identityEvidencePath = `${UAT_PROMOTION_STATE_ROOT}/results/${value.postdeploy_identity_operation_id}.${value.postdeploy_identity_evidence_sha256}.json`;
+  validateSourceSpec(value.current_checkpoint_source, UAT_PROMOTION_CURRENT_FILE, new Set(["0400"]), `${code}_CURRENT_SOURCE_INVALID`, 0);
+  validateSourceSpec(value.postdeploy_identity_intent_source, identityIntentPath, new Set(["0400"]), `${code}_IDENTITY_INTENT_SOURCE_INVALID`, 0);
+  validateSourceSpec(value.postdeploy_identity_evidence_source, identityEvidencePath, new Set(["0400"]), `${code}_IDENTITY_EVIDENCE_SOURCE_INVALID`, 0);
+  validateSourceSpec(value.release_identity_source, RELEASE_IDENTITY_FILE, new Set(["0440"]), `${code}_RELEASE_IDENTITY_SOURCE_INVALID`);
+  validateSourceSpec(value.cross_role_contract_source, value.cross_role_contract, new Set(["0444"]), `${code}_CONTRACT_SOURCE_INVALID`, 0);
+  validateSourceSpec(value.cross_role_result_source, value.cross_role_result, new Set(["0400"]), `${code}_RESULT_SOURCE_INVALID`, 0);
+  if (value.release_identity_source.sha256 !== value.release_identity_sha256
+    || value.cross_role_contract_source.sha256 !== value.cross_role_contract_file_sha256
+    || value.cross_role_result_source.sha256 !== value.cross_role_result_file_sha256
+    || new Set([
+      value.current_checkpoint_source.path, value.postdeploy_identity_intent_source.path,
+      value.postdeploy_identity_evidence_source.path, value.release_identity_source.path,
+      value.cross_role_contract_source.path, value.cross_role_result_source.path,
+    ]).size !== 6) reject("UAT_PROMOTION_CROSS_ROLE_SOURCE_BINDING_INVALID");
+  return value;
+}
+
 export function validateUatPromotionContext(value) {
   exactKeys(value, CONTEXT_FIELDS, "UAT_PROMOTION_CONTEXT_INVALID");
-  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_CONTEXT_CONTRACT || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(value.operation)
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_CONTEXT_CONTRACT || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT"]).has(value.operation)
     || !new Set(["ORIGINAL", "RECOVERY"]).has(value.execution_mode)) reject("UAT_PROMOTION_CONTEXT_INVALID");
   identifier(value.operation_id, "UAT_PROMOTION_CONTEXT_ID_INVALID");
   identifier(value.execution_authorization_id, "UAT_PROMOTION_CONTEXT_ID_INVALID");
@@ -862,7 +955,8 @@ export function validateUatPromotionContext(value) {
   else if (value.operation === "MIGRATION_EXECUTION") validateUatPromotionMigrationExecutionParameters(value.parameters);
   else if (value.operation === "COMPOSE_DEPLOYMENT") validateUatPromotionComposeDeploymentParameters(value.parameters);
   else if (value.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION") validateUatPromotionPostdeployRuntimeParameters(value.parameters);
-  else validateUatPromotionPostdeployIdentityParameters(value.parameters);
+  else if (value.operation === "POSTDEPLOY_IDENTITY") validateUatPromotionPostdeployIdentityParameters(value.parameters);
+  else validateUatPromotionCrossRoleParameters(value.parameters);
   const operationCreatedAt = value.operation === "BEGIN" ? value.parameters.promotion_created_at
     : value.operation === "CAPTURE_SNAPSHOT" ? value.parameters.snapshot_created_at
       : value.operation === "QUIESCE_WRITERS" ? value.parameters.quiesce_created_at
@@ -884,7 +978,9 @@ export function validateUatPromotionContext(value) {
         || value.operation_id === value.parameters.deployment_operation_id)
       || value.operation === "POSTDEPLOY_IDENTITY" && (value.operation_id !== value.parameters.run_id
         || value.operation_id === value.parameters.deployment_operation_id
-        || value.operation_id === value.parameters.runtime_probe_operation_id)) {
+        || value.operation_id === value.parameters.runtime_probe_operation_id)
+      || value.operation === "CROSS_ROLE_UAT" && (value.operation_id !== value.parameters.result_id
+        || value.operation_id === value.parameters.postdeploy_identity_operation_id)) {
       reject("UAT_PROMOTION_CONTEXT_BINDING_INVALID");
     }
   } else {
@@ -2378,6 +2474,140 @@ async function verifyPostdeployIdentitySources(context, filesystemRoot) {
   return Object.freeze({ ...sources, runtimeIntent: runtimeIntent.value, runtimeProbe: runtimeResult.value });
 }
 
+async function verifyCrossRoleSources(context, filesystemRoot, options = {}) {
+  const parameters = context.parameters;
+  const observedAt = options.now ?? new Date();
+  if (!(observedAt instanceof Date) || Number.isNaN(observedAt.getTime())) {
+    reject("UAT_PROMOTION_CROSS_ROLE_TIME_INVALID");
+  }
+  const current = await readAuthorizedSource(
+    parameters.current_checkpoint_source, filesystemRoot, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_CROSS_ROLE_CURRENT_SOURCE_INVALID",
+  );
+  const identityIntent = await readAuthorizedSource(
+    parameters.postdeploy_identity_intent_source, filesystemRoot,
+    validateUatPromotionPostdeployIdentityIntent,
+    "UAT_PROMOTION_CROSS_ROLE_IDENTITY_INTENT_SOURCE_INVALID",
+  );
+  const identityEvidence = await readAuthorizedSource(
+    parameters.postdeploy_identity_evidence_source, filesystemRoot,
+    validatePostdeployIdentityEvidence,
+    "UAT_PROMOTION_CROSS_ROLE_IDENTITY_EVIDENCE_SOURCE_INVALID",
+  );
+  const releaseIdentity = await readAuthorizedRootSource(
+    parameters.release_identity_source, path.dirname(RELEASE_IDENTITY_FILE), new Set([0o750]),
+    RELEASE_IDENTITY_ROOT_MARKER, RELEASE_IDENTITY_ROOT_MARKER_VALUE, 0o440,
+    validateReleaseIdentity, filesystemRoot, "UAT_PROMOTION_CROSS_ROLE_RELEASE_IDENTITY_SOURCE_INVALID",
+  );
+  const contract = await readAuthorizedSource(
+    parameters.cross_role_contract_source, filesystemRoot, validateCrossRoleUatTemplate,
+    "UAT_PROMOTION_CROSS_ROLE_CONTRACT_SOURCE_INVALID",
+  );
+  const result = await readAuthorizedRootSource(
+    parameters.cross_role_result_source, UAT_PROMOTION_CROSS_ROLE_RESULT_ROOT, new Set([0o700]),
+    UAT_PROMOTION_CROSS_ROLE_RESULT_MARKER, UAT_PROMOTION_CROSS_ROLE_RESULT_MARKER_VALUE, 0o400,
+    (value) => validateUatPromotionCrossRoleResult(value, { template: contract.value, now: observedAt }),
+    filesystemRoot, "UAT_PROMOTION_CROSS_ROLE_RESULT_SOURCE_INVALID",
+  );
+  if (current.raw.toString("utf8") !== canonicalClusterJson(current.value)
+    || identityIntent.raw.toString("utf8") !== canonicalClusterJson(identityIntent.value)
+    || identityEvidence.raw.toString("utf8") !== canonicalPostdeployIdentityEvidenceJson(identityEvidence.value)
+    || releaseIdentity.raw.toString("utf8") !== canonicalReleaseJson(releaseIdentity.value)
+    || result.raw.toString("utf8") !== canonicalUatPromotionCrossRoleResultJson(result.value)) {
+    reject("UAT_PROMOTION_CROSS_ROLE_SOURCE_CANONICAL_INVALID");
+  }
+  const previous = current.value;
+  if (previous.promotion_id !== parameters.promotion_id
+    || previous.promotion_generation !== parameters.promotion_generation
+    || previous.checkpoint_id !== "POST_DEPLOY_IDENTITY" || previous.checkpoint_ordinal !== 11
+    || previous.checkpoint_status !== "COMMITTED" || previous.journal_status !== "IN_PROGRESS"
+    || previous.receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256
+    || previous.intent_sha256 !== parameters.promotion_intent_sha256
+    || previous.original_authorization_sha256 !== parameters.promotion_original_authorization_sha256
+    || previous.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || previous.database_binding_sha256 !== parameters.database_binding_sha256
+    || previous.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || previous.recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || previous.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || previous.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256
+    || previous.migration_authorization_binding_sha256 !== parameters.migration_authorization_binding_sha256
+    || previous.migration_fence_binding_sha256 !== parameters.migration_fence_binding_sha256
+    || previous.migration_result_binding_sha256 !== parameters.migration_result_binding_sha256
+    || previous.compose_deployment_binding_sha256 !== parameters.compose_deployment_binding_sha256
+    || previous.authorization_sha256_chain.includes(context.original_authorization_sha256)
+    || Date.parse(parameters.verification_created_at) < Date.parse(previous.recorded_at)
+    || Date.parse(parameters.verification_expires_at) > Date.parse(previous.promotion_expires_at)
+    || context.execution_mode === "ORIGINAL"
+      && (observedAt.getTime() < Date.parse(parameters.verification_created_at)
+        || observedAt.getTime() >= Date.parse(parameters.verification_expires_at))) {
+    reject("UAT_PROMOTION_CROSS_ROLE_CURRENT_MISMATCH");
+  }
+  const upstreamIntent = identityIntent.value;
+  if (upstreamIntent.verification_operation_id !== parameters.postdeploy_identity_operation_id
+    || upstreamIntent.postdeploy_identity_intent_sha256 !== parameters.postdeploy_identity_intent_sha256
+    || upstreamIntent.execution_authorization_sha256 !== previous.checkpoint_authorization_sha256
+    || upstreamIntent.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256
+    || upstreamIntent.promotion_id !== parameters.promotion_id
+    || upstreamIntent.promotion_generation !== parameters.promotion_generation
+    || upstreamIntent.promotion_intent_sha256 !== parameters.promotion_intent_sha256
+    || upstreamIntent.previous_checkpoint_receipt_sha256 !== previous.previous_checkpoint_receipt_sha256
+    || upstreamIntent.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || upstreamIntent.database_binding_sha256 !== parameters.database_binding_sha256
+    || upstreamIntent.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || upstreamIntent.preupgrade_recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || upstreamIntent.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || upstreamIntent.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256
+    || upstreamIntent.migration_authorization_binding_sha256 !== parameters.migration_authorization_binding_sha256
+    || upstreamIntent.migration_fence_binding_sha256 !== parameters.migration_fence_binding_sha256
+    || upstreamIntent.migration_result_binding_sha256 !== parameters.migration_result_binding_sha256
+    || upstreamIntent.compose_deployment_binding_sha256 !== parameters.compose_deployment_binding_sha256) {
+    reject("UAT_PROMOTION_CROSS_ROLE_IDENTITY_INTENT_BINDING_INVALID");
+  }
+  const upstreamEvidence = identityEvidence.value;
+  if (upstreamEvidence.promotion_id !== parameters.promotion_id
+    || upstreamEvidence.verification_operation_id !== parameters.postdeploy_identity_operation_id
+    || upstreamEvidence.execution_authorization_sha256 !== previous.checkpoint_authorization_sha256
+    || upstreamEvidence.evidence_sha256 !== parameters.postdeploy_identity_evidence_sha256
+    || previous.checkpoint_evidence_sha256 !== upstreamEvidence.evidence_sha256
+    || previous.recorded_at !== upstreamEvidence.postdeploy_receipt.generated_at
+    || upstreamEvidence.release_identity_sha256 !== parameters.release_identity_sha256
+    || sha256(releaseIdentity.raw) !== parameters.release_identity_sha256
+    || !same(upstreamEvidence.release_identity, releaseIdentity.value)) {
+    reject("UAT_PROMOTION_CROSS_ROLE_IDENTITY_EVIDENCE_BINDING_INVALID");
+  }
+  const evidence = result.value;
+  if (parameters.cross_role_contract
+      !== `${SUPERVISOR_BUNDLE_ROOT}/${context.supervisor_bundle_sha256}/${CROSS_ROLE_UAT_CONTRACT_RELATIVE}`
+    || contract.value.artifact_sha256 !== parameters.cross_role_contract_artifact_sha256
+    || sha256(contract.raw) !== parameters.cross_role_contract_file_sha256
+    || sha256(result.raw) !== parameters.cross_role_result_file_sha256
+    || evidence.result_sha256 !== parameters.cross_role_result_sha256
+    || evidence.result_id !== parameters.result_id
+    || evidence.verification_operation_id !== context.operation_id
+    || evidence.promotion_id !== parameters.promotion_id
+    || evidence.promotion_generation !== parameters.promotion_generation
+    || evidence.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256
+    || evidence.previous_checkpoint_receipt_sha256 !== previous.receipt_sha256
+    || evidence.postdeploy_identity_evidence_sha256 !== upstreamEvidence.evidence_sha256
+    || evidence.release_identity_sha256 !== parameters.release_identity_sha256
+    || evidence.cross_role_contract_artifact_sha256 !== parameters.cross_role_contract_artifact_sha256
+    || evidence.authorization_matrix_artifact_sha256 !== parameters.authorization_matrix_artifact_sha256
+    || evidence.authorization_matrix_source_manifest_sha256
+      !== parameters.authorization_matrix_source_manifest_sha256
+    || evidence.human_execution_authorization_sha256 === context.original_authorization_sha256
+    || previous.authorization_sha256_chain.includes(evidence.human_execution_authorization_sha256)
+    || Date.parse(evidence.execution_started_at) < Date.parse(previous.recorded_at)
+    || Date.parse(evidence.signoff_completed_at) > Date.parse(parameters.verification_created_at)
+    || Date.parse(evidence.signoff_completed_at) >= Date.parse(previous.promotion_expires_at)) {
+    reject("UAT_PROMOTION_CROSS_ROLE_RESULT_BINDING_INVALID");
+  }
+  return Object.freeze({
+    previous, identityIntent: upstreamIntent, identityEvidence: upstreamEvidence,
+    releaseIdentity: releaseIdentity.value, contract: contract.value, result: evidence,
+    resultRaw: result.raw,
+  });
+}
+
 async function ensureDirectory(directory, parent, mode, code) {
   await trustedDirectory(parent, new Set([0o700, 0o750, 0o755]), code);
   let created = false;
@@ -2702,6 +2932,7 @@ function createIntent(context) {
       DEPLOY_UAT_RELEASE: "IMPLEMENTED",
       VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION: "IMPLEMENTED",
       VERIFY_UAT_POSTDEPLOY_IDENTITY: "IMPLEMENTED",
+      VERIFY_UAT_CROSS_ROLE_EXECUTION: "IMPLEMENTED",
       ROLLBACK_UAT_RELEASE: "NOT_IMPLEMENTED",
       RECOVER_UAT_PROMOTION: "IMPLEMENTED",
     },
@@ -2738,6 +2969,7 @@ export function validateUatPromotionIntent(value) {
       DEPLOY_UAT_RELEASE: "IMPLEMENTED",
       VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION: "IMPLEMENTED",
       VERIFY_UAT_POSTDEPLOY_IDENTITY: "IMPLEMENTED",
+      VERIFY_UAT_CROSS_ROLE_EXECUTION: "IMPLEMENTED",
       ROLLBACK_UAT_RELEASE: "NOT_IMPLEMENTED",
       RECOVER_UAT_PROMOTION: "IMPLEMENTED",
     })
@@ -3435,6 +3667,146 @@ export function validateUatPromotionPostdeployIdentityIntent(value) {
   return value;
 }
 
+function crossRolePlanBinding(parameters, result) {
+  return clusterSha256({
+    operation: "CROSS_ROLE_UAT",
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    previous_checkpoint_receipt_sha256: parameters.previous_checkpoint_receipt_sha256,
+    postdeploy_identity_operation_id: parameters.postdeploy_identity_operation_id,
+    postdeploy_identity_intent_sha256: parameters.postdeploy_identity_intent_sha256,
+    postdeploy_identity_evidence_sha256: parameters.postdeploy_identity_evidence_sha256,
+    release_identity_sha256: parameters.release_identity_sha256,
+    cross_role_contract_file_sha256: parameters.cross_role_contract_file_sha256,
+    cross_role_contract_artifact_sha256: parameters.cross_role_contract_artifact_sha256,
+    authorization_matrix_artifact_sha256: parameters.authorization_matrix_artifact_sha256,
+    authorization_matrix_source_manifest_sha256: parameters.authorization_matrix_source_manifest_sha256,
+    cross_role_result_file_sha256: parameters.cross_role_result_file_sha256,
+    cross_role_result_sha256: result.result_sha256,
+    result_id: result.result_id,
+  });
+}
+
+function createCrossRoleIntent(context, sources) {
+  const parameters = context.parameters;
+  const result = sources.result;
+  const body = {
+    schema_version: 1,
+    contract: UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT,
+    execution_scope: "PREEXISTING_HUMAN_UAT_EVIDENCE_INGEST_ONLY",
+    verification_operation_id: context.operation_id,
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    created_at: parameters.verification_created_at,
+    expires_at: parameters.verification_expires_at,
+    execution_authorization_sha256: context.original_authorization_sha256,
+    supervisor_bundle_sha256: context.supervisor_bundle_sha256,
+    parameters,
+    promotion_intent_sha256: parameters.promotion_intent_sha256,
+    previous_checkpoint_receipt_sha256: parameters.previous_checkpoint_receipt_sha256,
+    postdeploy_identity_operation_id: parameters.postdeploy_identity_operation_id,
+    postdeploy_identity_intent_sha256: parameters.postdeploy_identity_intent_sha256,
+    postdeploy_identity_evidence_sha256: parameters.postdeploy_identity_evidence_sha256,
+    release_identity_sha256: parameters.release_identity_sha256,
+    candidate_binding_sha256: parameters.candidate_binding_sha256,
+    database_binding_sha256: parameters.database_binding_sha256,
+    runtime_binding_sha256: parameters.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: parameters.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: parameters.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: parameters.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: parameters.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: parameters.migration_fence_binding_sha256,
+    migration_result_binding_sha256: parameters.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: parameters.compose_deployment_binding_sha256,
+    cross_role_contract_file_sha256: parameters.cross_role_contract_file_sha256,
+    cross_role_contract_artifact_sha256: parameters.cross_role_contract_artifact_sha256,
+    authorization_matrix_artifact_sha256: parameters.authorization_matrix_artifact_sha256,
+    authorization_matrix_source_manifest_sha256: parameters.authorization_matrix_source_manifest_sha256,
+    cross_role_result_file_sha256: parameters.cross_role_result_file_sha256,
+    cross_role_result_sha256: result.result_sha256,
+    verification_plan_sha256: crossRolePlanBinding(parameters, result),
+  };
+  return Object.freeze(validateUatPromotionCrossRoleIntent({
+    ...body, cross_role_intent_sha256: clusterSha256(body),
+  }));
+}
+
+export function validateUatPromotionCrossRoleIntent(value) {
+  const code = "UAT_PROMOTION_CROSS_ROLE_INTENT_INVALID";
+  exactKeys(value, [
+    "schema_version", "contract", "execution_scope", "verification_operation_id", "promotion_id",
+    "promotion_generation", "created_at", "expires_at", "execution_authorization_sha256",
+    "supervisor_bundle_sha256", "parameters", "promotion_intent_sha256",
+    "previous_checkpoint_receipt_sha256", "postdeploy_identity_operation_id",
+    "postdeploy_identity_intent_sha256", "postdeploy_identity_evidence_sha256",
+    "release_identity_sha256", "candidate_binding_sha256", "database_binding_sha256",
+    "runtime_binding_sha256", "preupgrade_recovery_binding_sha256",
+    "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+    "migration_authorization_binding_sha256", "migration_fence_binding_sha256",
+    "migration_result_binding_sha256", "compose_deployment_binding_sha256",
+    "cross_role_contract_file_sha256", "cross_role_contract_artifact_sha256",
+    "authorization_matrix_artifact_sha256", "authorization_matrix_source_manifest_sha256",
+    "cross_role_result_file_sha256", "cross_role_result_sha256", "verification_plan_sha256",
+    "cross_role_intent_sha256",
+  ], code);
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT
+    || value.execution_scope !== "PREEXISTING_HUMAN_UAT_EVIDENCE_INGEST_ONLY") reject(code);
+  validateUatPromotionCrossRoleParameters(value.parameters);
+  for (const field of ["verification_operation_id", "promotion_id", "postdeploy_identity_operation_id"]) {
+    identifier(value[field], code);
+  }
+  integer(value.promotion_generation, 1, 1_000_000, code);
+  iso(value.created_at, code); iso(value.expires_at, code);
+  for (const field of [
+    "execution_authorization_sha256", "supervisor_bundle_sha256", "promotion_intent_sha256",
+    "previous_checkpoint_receipt_sha256", "postdeploy_identity_intent_sha256",
+    "postdeploy_identity_evidence_sha256", "release_identity_sha256", "candidate_binding_sha256",
+    "database_binding_sha256", "runtime_binding_sha256", "preupgrade_recovery_binding_sha256",
+    "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+    "migration_authorization_binding_sha256", "migration_fence_binding_sha256",
+    "migration_result_binding_sha256", "compose_deployment_binding_sha256",
+    "cross_role_contract_file_sha256", "cross_role_contract_artifact_sha256",
+    "authorization_matrix_artifact_sha256", "authorization_matrix_source_manifest_sha256",
+    "cross_role_result_file_sha256", "cross_role_result_sha256", "verification_plan_sha256",
+    "cross_role_intent_sha256",
+  ]) digest(value[field], code);
+  const parameters = value.parameters;
+  if (value.verification_operation_id !== parameters.result_id
+    || value.promotion_id !== parameters.promotion_id
+    || value.promotion_generation !== parameters.promotion_generation
+    || value.created_at !== parameters.verification_created_at
+    || value.expires_at !== parameters.verification_expires_at
+    || value.promotion_intent_sha256 !== parameters.promotion_intent_sha256
+    || value.previous_checkpoint_receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256
+    || value.postdeploy_identity_operation_id !== parameters.postdeploy_identity_operation_id
+    || value.postdeploy_identity_intent_sha256 !== parameters.postdeploy_identity_intent_sha256
+    || value.postdeploy_identity_evidence_sha256 !== parameters.postdeploy_identity_evidence_sha256
+    || value.release_identity_sha256 !== parameters.release_identity_sha256
+    || value.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || value.database_binding_sha256 !== parameters.database_binding_sha256
+    || value.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || value.preupgrade_recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || value.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || value.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256
+    || value.migration_authorization_binding_sha256 !== parameters.migration_authorization_binding_sha256
+    || value.migration_fence_binding_sha256 !== parameters.migration_fence_binding_sha256
+    || value.migration_result_binding_sha256 !== parameters.migration_result_binding_sha256
+    || value.compose_deployment_binding_sha256 !== parameters.compose_deployment_binding_sha256
+    || value.cross_role_contract_file_sha256 !== parameters.cross_role_contract_file_sha256
+    || value.cross_role_contract_artifact_sha256 !== parameters.cross_role_contract_artifact_sha256
+    || value.authorization_matrix_artifact_sha256 !== parameters.authorization_matrix_artifact_sha256
+    || value.authorization_matrix_source_manifest_sha256 !== parameters.authorization_matrix_source_manifest_sha256
+    || value.cross_role_result_file_sha256 !== parameters.cross_role_result_file_sha256
+    || value.cross_role_result_sha256 !== parameters.cross_role_result_sha256
+    || value.verification_plan_sha256 !== crossRolePlanBinding(parameters, {
+      result_sha256: value.cross_role_result_sha256, result_id: parameters.result_id,
+    })
+    || clusterSha256(bodyWithout(value, "cross_role_intent_sha256")) !== value.cross_role_intent_sha256) {
+    reject("UAT_PROMOTION_CROSS_ROLE_INTENT_BINDING_INVALID");
+  }
+  return value;
+}
+
 function intentFile(paths, intent) { return path.join(paths.intents, `${intent.promotion_id}.${intent.intent_sha256}.json`); }
 function snapshotIntentFile(paths, intent) { return path.join(paths.intents, `${intent.snapshot_operation_id}.${intent.snapshot_intent_sha256}.json`); }
 function quiesceIntentFile(paths, intent) { return path.join(paths.intents, `${intent.quiesce_operation_id}.${intent.quiesce_intent_sha256}.json`); }
@@ -3452,6 +3824,9 @@ function postdeployRuntimeIntentFile(paths, intent) {
 }
 function postdeployIdentityIntentFile(paths, intent) {
   return path.join(paths.intents, `${intent.verification_operation_id}.${intent.postdeploy_identity_intent_sha256}.json`);
+}
+function crossRoleIntentFile(paths, intent) {
+  return path.join(paths.intents, `${intent.verification_operation_id}.${intent.cross_role_intent_sha256}.json`);
 }
 function migrationGrantFile(paths, operationId, grantSha256) {
   return path.join(paths.grants, `${operationId}.${grantSha256}.json`);
@@ -4579,6 +4954,7 @@ function validateAnyUatPromotionIntent(value) {
     [UAT_PROMOTION_COMPOSE_DEPLOYMENT_INTENT_CONTRACT, validateUatPromotionComposeDeploymentIntent],
     [UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT, validateUatPromotionPostdeployRuntimeIntent],
     [UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT, validateUatPromotionPostdeployIdentityIntent],
+    [UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT, validateUatPromotionCrossRoleIntent],
   ]);
   const validator = validators.get(value?.contract);
   if (!validator) reject("UAT_PROMOTION_INTENT_INVALID");
@@ -4702,6 +5078,105 @@ async function loadPostdeployIntent(context, paths, sources) {
   const stored = await loadStoredPostdeployIntent(context, paths);
   if (postdeployIntentDigest(stored) !== postdeployIntentDigest(expected)
     || !same(stored, expected)) reject("UAT_PROMOTION_POSTDEPLOY_INTENT_BINDING_INVALID");
+  return stored;
+}
+
+async function assertNoOtherPendingCrossRoleIntent(paths, current, context) {
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  for (const name of names) {
+    const stored = await trustedJsonFile(
+      path.join(paths.intents, name), 0o400, validateAnyUatPromotionIntent,
+      "UAT_PROMOTION_INTENT_INVALID",
+    );
+    const intent = stored.value;
+    if (intent.contract === UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT
+      && intent.promotion_id === current.promotion_id
+      && intent.promotion_generation === current.promotion_generation
+      && intent.previous_checkpoint_receipt_sha256 === current.receipt_sha256
+      && intent.verification_operation_id !== context.operation_id) {
+      reject("UAT_PROMOTION_CROSS_ROLE_RECOVERY_REQUIRED");
+    }
+  }
+}
+
+async function prepareCrossRoleCheckpoint(context, options) {
+  await repositoryPolicy(options.siteRoot);
+  const paths = await layout(options.filesystemRoot, false);
+  if ((await readdir(paths.quarantine)).length !== 0) reject("UAT_PROMOTION_QUARANTINE_PRESENT");
+  await assertNoCommittedPostdeployAnomaly(paths);
+  const sources = await verifyCrossRoleSources(context, options.filesystemRoot, options);
+  await assertNoOtherPendingCrossRoleIntent(paths, sources.previous, context);
+  const intent = createCrossRoleIntent(context, sources);
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => operationArtifactMatches(name, context.operation_id));
+  if (matches.length > 1 || matches.length === 1
+    && matches[0] !== path.basename(crossRoleIntentFile(paths, intent))) {
+    reject("UAT_PROMOTION_CROSS_ROLE_OPERATION_ID_REUSED");
+  }
+  const chain = await committedChain(paths);
+  if (chain.current?.value.receipt_sha256 !== sources.previous.receipt_sha256) {
+    reject("UAT_PROMOTION_CROSS_ROLE_PREVIOUS_CHANGED");
+  }
+  const raw = Buffer.from(canonicalClusterJson(intent));
+  if (matches.length === 1) {
+    const existing = await trustedJsonFile(
+      crossRoleIntentFile(paths, intent), 0o400, validateUatPromotionCrossRoleIntent,
+      "UAT_PROMOTION_CROSS_ROLE_INTENT_INVALID",
+    );
+    if (!existing?.raw.equals(raw)) reject("UAT_PROMOTION_CROSS_ROLE_INTENT_CONFLICT");
+    return Object.freeze({
+      result: "ALREADY_PREPARED", promotion_id: intent.promotion_id,
+      intent_sha256: intent.cross_role_intent_sha256,
+      verification_plan_sha256: intent.verification_plan_sha256,
+      cross_role_result_sha256: intent.cross_role_result_sha256,
+    });
+  }
+  await ensureRawFile(
+    crossRoleIntentFile(paths, intent), raw, 0o400, validateUatPromotionCrossRoleIntent,
+    "UAT_PROMOTION_CROSS_ROLE_INTENT_CONFLICT",
+  );
+  await syncDirectory(paths.intents, "UAT_PROMOTION_INTENT_SYNC_FAILED");
+  return Object.freeze({
+    result: "PREPARED", promotion_id: intent.promotion_id,
+    intent_sha256: intent.cross_role_intent_sha256,
+    verification_plan_sha256: intent.verification_plan_sha256,
+    cross_role_result_sha256: intent.cross_role_result_sha256,
+  });
+}
+
+async function loadStoredCrossRoleIntent(context, paths) {
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => operationArtifactMatches(name, context.operation_id));
+  if (matches.length !== 1) reject("UAT_PROMOTION_CROSS_ROLE_INTENT_MISSING");
+  const stored = await trustedJsonFile(
+    path.join(paths.intents, matches[0]), 0o400, validateUatPromotionCrossRoleIntent,
+    "UAT_PROMOTION_CROSS_ROLE_INTENT_INVALID",
+  );
+  if (!stored || matches[0] !== `${context.operation_id}.${stored.value.cross_role_intent_sha256}.json`
+    || stored.value.cross_role_intent_sha256 !== (context.expected_intent_sha256
+      ?? stored.value.cross_role_intent_sha256)
+    || stored.value.execution_authorization_sha256 !== context.original_authorization_sha256
+    || stored.value.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256
+    || !same(stored.value.parameters, context.parameters)) {
+    reject("UAT_PROMOTION_CROSS_ROLE_INTENT_BINDING_INVALID");
+  }
+  return stored.value;
+}
+
+async function loadCrossRoleIntent(context, paths, sources) {
+  const expected = createCrossRoleIntent(context, sources);
+  const stored = await loadStoredCrossRoleIntent(context, paths);
+  if (stored.cross_role_intent_sha256 !== expected.cross_role_intent_sha256
+    || !same(stored, expected)) reject("UAT_PROMOTION_CROSS_ROLE_INTENT_BINDING_INVALID");
   return stored;
 }
 
@@ -5078,6 +5553,121 @@ async function executePostdeployCheckpoint(context, options) {
   return commitPostdeployCheckpoint(context, intent, sources, evidence, paths, options);
 }
 
+function createCrossRoleCheckpointReceipt(context, intent, result, previous) {
+  return createNextUatPromotionCheckpointReceipt(previous, {
+    checkpoint_id: "CROSS_ROLE_UAT_EXECUTION",
+    checkpoint_status: "COMMITTED",
+    journal_status: "IN_PROGRESS",
+    recorded_at: result.signoff_completed_at,
+    checkpoint_evidence_sha256: result.result_sha256,
+    checkpoint_authorization_sha256: context.original_authorization_sha256,
+    intent_sha256: intent.promotion_intent_sha256,
+    candidate_binding_sha256: intent.candidate_binding_sha256,
+    database_binding_sha256: intent.database_binding_sha256,
+    runtime_binding_sha256: intent.runtime_binding_sha256,
+    recovery_binding_sha256: intent.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: intent.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: intent.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: intent.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: intent.migration_fence_binding_sha256,
+    migration_result_binding_sha256: intent.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: intent.compose_deployment_binding_sha256,
+  });
+}
+
+async function crossRoleCheckpointCandidateState(paths, intent, previous, receipt) {
+  const name = receiptName(receipt);
+  const receiptRaw = Buffer.from(canonicalClusterJson(receipt));
+  const current = await trustedJsonFile(
+    paths.current, 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_CURRENT_INVALID",
+  );
+  if (current?.value.receipt_sha256 === receipt.receipt_sha256) {
+    const chain = await committedChain(paths);
+    if (chain.current?.value.receipt_sha256 !== receipt.receipt_sha256) {
+      reject("UAT_PROMOTION_CROSS_ROLE_COMMITTED_STATE_MISMATCH");
+    }
+    return Object.freeze({ committed: true, history: true, receipt: true, current: true, receiptRaw, chain });
+  }
+  const chain = await committedChain(paths, { history: new Set([name]), receipts: new Set([name]) });
+  if (chain.current?.value.receipt_sha256 !== previous.receipt_sha256
+    || chain.current.value.intent_sha256 !== intent.promotion_intent_sha256
+    || chain.current.value.checkpoint_ordinal !== 11) {
+    reject("UAT_PROMOTION_CROSS_ROLE_PREVIOUS_CHANGED");
+  }
+  const history = await trustedJsonFile(
+    historyFile(paths, receipt), 0o400, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_HISTORY_INVALID",
+  );
+  const storedReceipt = await trustedJsonFile(
+    receiptFile(paths, receipt), 0o400, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_RECEIPT_INVALID",
+  );
+  const historyDone = history?.raw.equals(receiptRaw) ?? false;
+  const receiptDone = storedReceipt?.raw.equals(receiptRaw) ?? false;
+  if (history !== null && !historyDone || storedReceipt !== null && !receiptDone) {
+    reject("UAT_PROMOTION_CROSS_ROLE_PUBLICATION_CONFLICT");
+  }
+  if (receiptDone && !historyDone) reject("UAT_PROMOTION_CROSS_ROLE_PUBLICATION_STAGE_ORDER_INVALID");
+  return Object.freeze({ committed: false, history: historyDone, receipt: receiptDone, current: false, receiptRaw, chain });
+}
+
+async function commitCrossRoleCheckpoint(context, intent, sources, paths, options) {
+  const result = sources.result;
+  const resultFile = path.join(paths.results, `${context.operation_id}.${result.result_sha256}.json`);
+  await ensureRawFile(
+    resultFile, sources.resultRaw, 0o400,
+    (value) => validateUatPromotionCrossRoleResult(value, { template: sources.contract }),
+    "UAT_PROMOTION_CROSS_ROLE_RESULT_CONFLICT", canonicalUatPromotionCrossRoleResultJson,
+  );
+  await syncDirectory(paths.results, "UAT_PROMOTION_CROSS_ROLE_RESULT_SYNC_FAILED");
+  await options.fault?.("AFTER_CROSS_ROLE_RESULT");
+  const receipt = createCrossRoleCheckpointReceipt(context, intent, result, sources.previous);
+  let state = await crossRoleCheckpointCandidateState(paths, intent, sources.previous, receipt);
+  if (!state.history) {
+    await ensureRawFile(
+      historyFile(paths, receipt), state.receiptRaw, 0o400, validateUatPromotionCheckpointReceipt,
+      "UAT_PROMOTION_HISTORY_CONFLICT",
+    );
+    await syncDirectory(paths.history, "UAT_PROMOTION_HISTORY_SYNC_FAILED");
+    await options.fault?.("AFTER_CROSS_ROLE_HISTORY");
+  }
+  state = await crossRoleCheckpointCandidateState(paths, intent, sources.previous, receipt);
+  if (!state.receipt) {
+    await ensureRawFile(
+      receiptFile(paths, receipt), state.receiptRaw, 0o400, validateUatPromotionCheckpointReceipt,
+      "UAT_PROMOTION_RECEIPT_CONFLICT",
+    );
+    await syncDirectory(paths.receipts, "UAT_PROMOTION_RECEIPT_SYNC_FAILED");
+    await options.fault?.("AFTER_CROSS_ROLE_RECEIPT");
+  }
+  state = await crossRoleCheckpointCandidateState(paths, intent, sources.previous, receipt);
+  if (!state.current) {
+    const temporary = path.join(paths.stateRoot, `.current.${context.operation_id}.${receipt.receipt_sha256}.tmp`);
+    await atomicAlias(
+      paths.current, temporary, state.receiptRaw, 0o400, validateUatPromotionCheckpointReceipt,
+      state.chain.current?.raw ?? null, "UAT_PROMOTION_CURRENT_PUBLICATION",
+    );
+    await options.fault?.("AFTER_CROSS_ROLE_CURRENT");
+  }
+  state = await crossRoleCheckpointCandidateState(paths, intent, sources.previous, receipt);
+  if (!state.committed) reject("UAT_PROMOTION_CROSS_ROLE_COMMIT_INCOMPLETE");
+  return Object.freeze({
+    result: "COMMITTED", promotion_id: intent.promotion_id,
+    intent_sha256: intent.cross_role_intent_sha256,
+    receipt_sha256: receipt.receipt_sha256,
+    cross_role_result_sha256: result.result_sha256,
+    evidence_subject_sha256: result.evidence_subject_sha256,
+    approval_subject_sha256: result.approval.approval_subject_sha256,
+  });
+}
+
+async function executeCrossRoleCheckpoint(context, options) {
+  const paths = await layout(options.filesystemRoot, false);
+  const sources = await verifyCrossRoleSources(context, options.filesystemRoot, options);
+  const intent = await loadCrossRoleIntent(context, paths, sources);
+  return commitCrossRoleCheckpoint(context, intent, sources, paths, options);
+}
+
 function recoveryPlan(context, decision, reason) {
   const body = {
     schema_version: 3,
@@ -5103,7 +5693,7 @@ function validateRecoveryPlan(value) {
     "decision", "reason", "recovery_sha256",
   ], "UAT_PROMOTION_RECOVERY_INVALID");
   if (value.schema_version !== 3 || value.contract !== UAT_PROMOTION_RECOVERY_CONTRACT
-    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(value.original_operation)
+    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT"]).has(value.original_operation)
     || !new Set(["RESUME_PUBLICATION", "ALREADY_COMMITTED", "QUARANTINE"]).has(value.decision)
     || (value.decision === "QUARANTINE") !== (typeof value.reason === "string")) reject("UAT_PROMOTION_RECOVERY_INVALID");
   identifier(value.execution_authorization_id, "UAT_PROMOTION_RECOVERY_INVALID");
@@ -5131,6 +5721,7 @@ function recoverableStateFailure(error) {
     "UAT_PROMOTION_MIGRATION_EXECUTION_", "UAT_PROMOTION_MIGRATION_GRANT_", "UAT_PROMOTION_MIGRATION_RESULT_",
     "UAT_PROMOTION_COMPOSE_DEPLOYMENT_", "UAT_PROMOTION_ACTIVE_FENCE_TRANSFER_",
     "UAT_PROMOTION_POSTDEPLOY_", "RUNTIME_CONFIGURATION_PROBE_", "POSTDEPLOY_", "RELEASE_",
+    "UAT_PROMOTION_CROSS_ROLE_",
   ].some((prefix) => error.code.startsWith(prefix));
 }
 
@@ -5224,6 +5815,133 @@ async function assessPostdeployRecovery(context, paths, options) {
     ? evidence.value.probed_at : evidence.postdeploy_receipt.generated_at;
   const receipt = createPostdeployCheckpointReceipt(context, intent, evidenceSha256, recordedAt, sources.previous);
   const state = await postdeployCheckpointCandidateState(paths, intent, sources.previous, receipt);
+  return state.committed ? "ALREADY_COMMITTED" : "RESUME_PUBLICATION";
+}
+
+async function loadDurableCrossRoleResult(intent, paths, filesystemRoot) {
+  const contract = await readAuthorizedSource(
+    intent.parameters.cross_role_contract_source, filesystemRoot,
+    validateCrossRoleUatTemplate, "UAT_PROMOTION_CROSS_ROLE_CONTRACT_SOURCE_INVALID",
+  );
+  if (sha256(contract.raw) !== intent.cross_role_contract_file_sha256
+    || contract.value.artifact_sha256 !== intent.cross_role_contract_artifact_sha256) {
+    reject("UAT_PROMOTION_CROSS_ROLE_STORED_RESULT_MISMATCH");
+  }
+  const resultFile = path.join(
+    paths.results, `${intent.verification_operation_id}.${intent.cross_role_result_sha256}.json`,
+  );
+  const stored = await trustedJsonFile(
+    resultFile, 0o400,
+    (value) => validateUatPromotionCrossRoleResult(value, { template: contract.value }),
+    "UAT_PROMOTION_CROSS_ROLE_RESULT_INVALID", 0, true,
+    canonicalUatPromotionCrossRoleResultJson,
+  );
+  if (stored === null) return null;
+  const result = stored.value;
+  if (sha256(stored.raw) !== intent.cross_role_result_file_sha256
+    || stored.value.result_sha256 !== intent.cross_role_result_sha256
+    || result.result_id !== intent.parameters.result_id
+    || result.verification_operation_id !== intent.verification_operation_id
+    || result.promotion_id !== intent.promotion_id
+    || result.promotion_generation !== intent.promotion_generation
+    || result.supervisor_bundle_sha256 !== intent.supervisor_bundle_sha256
+    || result.previous_checkpoint_receipt_sha256 !== intent.previous_checkpoint_receipt_sha256
+    || result.postdeploy_identity_evidence_sha256 !== intent.postdeploy_identity_evidence_sha256
+    || result.release_identity_sha256 !== intent.release_identity_sha256
+    || result.cross_role_contract_artifact_sha256 !== intent.cross_role_contract_artifact_sha256
+    || result.authorization_matrix_artifact_sha256 !== intent.authorization_matrix_artifact_sha256
+    || result.authorization_matrix_source_manifest_sha256
+      !== intent.authorization_matrix_source_manifest_sha256
+    || result.human_execution_authorization_sha256 === intent.execution_authorization_sha256
+    || result.evidence_subject_sha256 === ZERO_SHA256
+    || result.approval.approval_subject_sha256 === ZERO_SHA256) {
+    reject("UAT_PROMOTION_CROSS_ROLE_STORED_RESULT_MISMATCH");
+  }
+  return Object.freeze({ contract: contract.value, result, resultRaw: stored.raw });
+}
+
+async function loadCrossRolePreviousCheckpoint(intent, paths) {
+  const stored = await trustedJsonFile(
+    paths.current, 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_CURRENT_INVALID",
+  );
+  const previous = stored?.value;
+  if (!stored || stored.raw.toString("utf8") !== canonicalClusterJson(previous)
+    || previous.promotion_id !== intent.promotion_id
+    || previous.promotion_generation !== intent.promotion_generation
+    || previous.checkpoint_id !== "POST_DEPLOY_IDENTITY" || previous.checkpoint_ordinal !== 11
+    || previous.checkpoint_status !== "COMMITTED" || previous.journal_status !== "IN_PROGRESS"
+    || previous.receipt_sha256 !== intent.previous_checkpoint_receipt_sha256
+    || previous.intent_sha256 !== intent.promotion_intent_sha256
+    || previous.original_authorization_sha256 !== intent.parameters.promotion_original_authorization_sha256
+    || previous.checkpoint_evidence_sha256 !== intent.postdeploy_identity_evidence_sha256
+    || previous.candidate_binding_sha256 !== intent.candidate_binding_sha256
+    || previous.database_binding_sha256 !== intent.database_binding_sha256
+    || previous.runtime_binding_sha256 !== intent.runtime_binding_sha256
+    || previous.recovery_binding_sha256 !== intent.preupgrade_recovery_binding_sha256
+    || previous.promotion_snapshot_binding_sha256 !== intent.promotion_snapshot_binding_sha256
+    || previous.writer_quiesce_binding_sha256 !== intent.writer_quiesce_binding_sha256
+    || previous.migration_authorization_binding_sha256 !== intent.migration_authorization_binding_sha256
+    || previous.migration_fence_binding_sha256 !== intent.migration_fence_binding_sha256
+    || previous.migration_result_binding_sha256 !== intent.migration_result_binding_sha256
+    || previous.compose_deployment_binding_sha256 !== intent.compose_deployment_binding_sha256
+    || previous.authorization_sha256_chain.includes(intent.execution_authorization_sha256)
+    || Date.parse(intent.created_at) < Date.parse(previous.recorded_at)
+    || Date.parse(intent.expires_at) > Date.parse(previous.promotion_expires_at)) {
+    reject("UAT_PROMOTION_CROSS_ROLE_PREVIOUS_CHANGED");
+  }
+  return previous;
+}
+
+async function alreadyCommittedCrossRoleResult(context, paths, intent, filesystemRoot) {
+  const chain = await committedChain(paths);
+  const current = chain.current?.value;
+  if (current?.checkpoint_id !== "CROSS_ROLE_UAT_EXECUTION" || current.checkpoint_ordinal !== 12
+    || current.journal_status !== "IN_PROGRESS"
+    || current.previous_checkpoint_receipt_sha256 !== intent.previous_checkpoint_receipt_sha256
+    || current.checkpoint_authorization_sha256 !== intent.execution_authorization_sha256
+    || current.checkpoint_evidence_sha256 !== intent.cross_role_result_sha256
+    || current.compose_deployment_binding_sha256 !== intent.compose_deployment_binding_sha256) {
+    reject("UAT_PROMOTION_CROSS_ROLE_COMMITTED_STATE_MISMATCH");
+  }
+  const durable = await loadDurableCrossRoleResult(intent, paths, filesystemRoot);
+  if (durable === null || durable.result.signoff_completed_at !== current.recorded_at) {
+    reject("UAT_PROMOTION_CROSS_ROLE_COMMITTED_RESULT_MISMATCH");
+  }
+  return Object.freeze({
+    result: "ALREADY_COMMITTED", promotion_id: intent.promotion_id,
+    intent_sha256: intent.cross_role_intent_sha256, receipt_sha256: current.receipt_sha256,
+    cross_role_result_sha256: durable.result.result_sha256,
+    evidence_subject_sha256: durable.result.evidence_subject_sha256,
+    approval_subject_sha256: durable.result.approval.approval_subject_sha256,
+  });
+}
+
+async function assessCrossRoleRecovery(context, paths, options) {
+  const storedIntent = await loadStoredCrossRoleIntent(context, paths);
+  const current = await trustedJsonFile(
+    paths.current, 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_CURRENT_INVALID",
+  );
+  if (current?.value.checkpoint_id === "CROSS_ROLE_UAT_EXECUTION"
+    && current.value.previous_checkpoint_receipt_sha256
+      === storedIntent.previous_checkpoint_receipt_sha256
+    && current.value.checkpoint_authorization_sha256 === storedIntent.execution_authorization_sha256
+    && current.value.checkpoint_evidence_sha256 === storedIntent.cross_role_result_sha256) {
+    await alreadyCommittedCrossRoleResult(context, paths, storedIntent, options.filesystemRoot);
+    return "ALREADY_COMMITTED";
+  }
+  const durable = await loadDurableCrossRoleResult(
+    storedIntent, paths, options.filesystemRoot,
+  );
+  if (durable !== null) {
+    const previous = await loadCrossRolePreviousCheckpoint(storedIntent, paths);
+    const receipt = createCrossRoleCheckpointReceipt(context, storedIntent, durable.result, previous);
+    const state = await crossRoleCheckpointCandidateState(paths, storedIntent, previous, receipt);
+    return state.committed ? "ALREADY_COMMITTED" : "RESUME_PUBLICATION";
+  }
+  const sources = await verifyCrossRoleSources(context, options.filesystemRoot, options);
+  const intent = await loadCrossRoleIntent(context, paths, sources);
+  const receipt = createCrossRoleCheckpointReceipt(context, intent, sources.result, sources.previous);
+  const state = await crossRoleCheckpointCandidateState(paths, intent, sources.previous, receipt);
   return state.committed ? "ALREADY_COMMITTED" : "RESUME_PUBLICATION";
 }
 
@@ -5339,6 +6057,8 @@ async function prepareRecovery(context, options) {
         );
         if (state.committed) decision = "ALREADY_COMMITTED";
       }
+    } else if (context.operation === "CROSS_ROLE_UAT") {
+      decision = await assessCrossRoleRecovery(context, paths, options);
     } else if (new Set(["POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(context.operation)) {
       decision = await assessPostdeployRecovery(context, paths, options);
     } else {
@@ -5400,7 +6120,7 @@ function validateQuarantine(value) {
     "intent_sha256", "recovery_sha256", "reason", "preservation", "quarantine_sha256",
   ], "UAT_PROMOTION_QUARANTINE_INVALID");
   if (value.schema_version !== 3 || value.contract !== UAT_PROMOTION_QUARANTINE_CONTRACT || value.status !== "QUARANTINED"
-    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(value.operation)
+    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT"]).has(value.operation)
     || value.preservation !== "FILES_LEFT_IN_PLACE_NO_AUTOMATIC_DELETE" || typeof value.reason !== "string" || value.reason.length < 4) reject("UAT_PROMOTION_QUARANTINE_INVALID");
   identifier(value.operation_id, "UAT_PROMOTION_QUARANTINE_INVALID");
   identifier(value.promotion_id, "UAT_PROMOTION_QUARANTINE_INVALID");
@@ -5504,6 +6224,22 @@ async function executeRecovery(context, options) {
       result = await commitMigrationExecution(
         context, artifacts.intent, migrationResult, sources, paths, options,
       );
+    } else if (context.operation === "CROSS_ROLE_UAT" && plan.decision === "ALREADY_COMMITTED") {
+      const intent = await loadStoredCrossRoleIntent(context, paths);
+      result = await alreadyCommittedCrossRoleResult(
+        context, paths, intent, options.filesystemRoot,
+      );
+    } else if (context.operation === "CROSS_ROLE_UAT") {
+      const storedIntent = await loadStoredCrossRoleIntent(context, paths);
+      const durable = await loadDurableCrossRoleResult(
+        storedIntent, paths, options.filesystemRoot,
+      );
+      const sources = durable === null
+        ? await verifyCrossRoleSources(context, options.filesystemRoot, options)
+        : Object.freeze({ ...durable, previous: await loadCrossRolePreviousCheckpoint(storedIntent, paths) });
+      const intent = durable === null
+        ? await loadCrossRoleIntent(context, paths, sources) : storedIntent;
+      result = await commitCrossRoleCheckpoint(context, intent, sources, paths, options);
     } else if (new Set(["POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(context.operation)
       && plan.decision === "ALREADY_COMMITTED") {
       const intent = await loadStoredPostdeployIntent(context, paths);
@@ -5797,6 +6533,7 @@ export async function runUatPromotionTransactionPhase(contextInput, phase, optio
     if (context.operation === "MIGRATION_AUTHORIZATION") return prepareMigrationAuthorization(context, resolved);
     if (context.operation === "MIGRATION_EXECUTION") return prepareMigrationExecution(context, resolved);
     if (context.operation === "COMPOSE_DEPLOYMENT") return prepareComposeDeployment(context, resolved);
+    if (context.operation === "CROSS_ROLE_UAT") return prepareCrossRoleCheckpoint(context, resolved);
     return preparePostdeployCheckpoint(context, resolved);
   }
   const paths = await layout(filesystemRoot, false);
@@ -5833,6 +6570,7 @@ export async function runUatPromotionTransactionPhase(contextInput, phase, optio
     if (new Set(["POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(context.operation)) {
       return executePostdeployCheckpoint(context, resolved);
     }
+    if (context.operation === "CROSS_ROLE_UAT") return executeCrossRoleCheckpoint(context, resolved);
     const sources = await verifyComposeDeploymentSources(context, filesystemRoot);
     const intent = await loadComposeDeploymentIntent(context, paths, sources);
     const result = await loadComposeDeploymentResult(paths, intent);

@@ -73,7 +73,7 @@ ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 MAX_JSON_BYTES = 1024 * 1024
 MAX_BUNDLE_FILE_BYTES = 8 * 1024 * 1024
 MAX_BUNDLE_BYTES = 32 * 1024 * 1024
-MAX_BUNDLE_FILES = 134
+MAX_BUNDLE_FILES = 138
 RECEIPT_CONTRACT = "chenyida-erp-release-supervisor-install-receipt/v2"
 JOURNAL_CONTRACT = "chenyida-erp-release-supervisor-install-journal/v2"
 

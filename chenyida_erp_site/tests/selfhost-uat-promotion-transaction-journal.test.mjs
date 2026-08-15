@@ -41,6 +41,15 @@ import {
   buildReleaseIdentityFromPostDeployReceipt,
 } from "../scripts/postdeploy-release-contract.mjs";
 import {
+  UAT_PROMOTION_CROSS_ROLE_RESULT_CONTRACT,
+  UAT_PROMOTION_CROSS_ROLE_RESULT_ROOT,
+  canonicalUatPromotionCrossRoleResultJson,
+  createUatPromotionCrossRoleResult,
+  uatPromotionCrossRoleControlObservations,
+  uatPromotionCrossRoleSanitization,
+} from "../scripts/uat-promotion-cross-role-evidence-contract.mjs";
+import { canonicalJson as crossRoleCanonicalJson } from "../scripts/cross-role-uat-evidence-contract.mjs";
+import {
   UAT_PROMOTION_CURRENT_FILE,
   UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT,
   UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT,
@@ -72,6 +81,8 @@ const readinessPath = "/var/lib/chenyida-erp/backup-status/recovery-readiness.js
 const clusterPolicyPath = "/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json";
 const clusterActivationPath = "/var/lib/chenyida-erp/postgresql-cluster-recovery-policy-v2/current.json";
 const clusterPolicyTemplate = JSON.parse(await readFile(new URL("../operations/postgresql-cluster-recovery-policy-v2.json", import.meta.url), "utf8"));
+const crossRoleTemplateRaw = await readFile(new URL("../operations/cross-role-uat-evidence-contract-v1.json", import.meta.url), "utf8");
+const crossRoleTemplate = JSON.parse(crossRoleTemplateRaw);
 const composeRaw = "services:\n  web:\n    image: fixture\n";
 const releaseComposeRaw = "services:\n  web:\n    image: ${ERP_WEB_IMAGE}\n";
 const deploymentEnvironmentRaw = "ERP_DEPLOYMENT_CLASS=uat\n";
@@ -1452,6 +1463,325 @@ async function postdeployExpectedResultSha256(context, root) {
   return (await source(root, logical)).sha256;
 }
 
+const crossRoleInstant = (second) => new Date(
+  Date.parse("2026-08-15T01:44:00.000Z") + second * 1000,
+).toISOString();
+
+function crossRoleActors() {
+  return Object.entries(crossRoleTemplate.actor_slots)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([slot, actor]) => ({
+      slot,
+      role: actor.role,
+      person_identity_sha256: digest(`cross-role-person:${slot}`),
+      account_identity_sha256: digest(`cross-role-account:${slot}`),
+    }));
+}
+
+function crossRoleActor(actors, slot) {
+  return actors.find((actor) => actor.slot === slot);
+}
+
+function crossRoleSignoff(slot, actor, signedAt, result = "PASS", timeField = "signed_at") {
+  return {
+    actor_slot: slot,
+    person_identity_sha256: actor.person_identity_sha256,
+    account_identity_sha256: actor.account_identity_sha256,
+    [timeField]: signedAt,
+    evidence_sha256: digest(`cross-role-signoff:${slot}:${signedAt}`),
+    result,
+  };
+}
+
+function crossRoleWorkflowEvidence(actors) {
+  let cursor = 5;
+  let first = null;
+  let executionCompleted = null;
+  let signoffCompleted = null;
+  const workflows = crossRoleTemplate.workflows.map((workflow) => {
+    const steps = workflow.steps.map((step) => {
+      const startedAt = crossRoleInstant(cursor);
+      const completedAt = crossRoleInstant(cursor + 1);
+      cursor += 2;
+      first ??= startedAt;
+      const requestId = `UAT77:${workflow.id}:${step.id}:REQUEST`;
+      return {
+        step_id: step.id,
+        actor_slot: step.actor_slot,
+        operation_id: step.operation_id,
+        expected_contract_sha256: digest(crossRoleCanonicalJson(step)),
+        started_at: startedAt,
+        completed_at: completedAt,
+        request: {
+          request_id: requestId,
+          metadata_evidence_sha256: digest(`cross-role-request-metadata:${workflow.id}:${step.id}`),
+          body_digest_sha256: digest(`cross-role-request-body:${workflow.id}:${step.id}`),
+          origin_check: "APPROVED",
+          content_type_check: "APPLICATION_JSON",
+          csrf_check: "PRESENT_AND_ACCEPTED",
+          idempotency_key_digest_sha256: digest(`cross-role-idempotency-key:${workflow.id}:${step.id}`),
+        },
+        response: {
+          http_status: step.expected_status,
+          header_request_id: requestId,
+          body_request_id: requestId,
+          body_digest_sha256: digest(`cross-role-response-body:${workflow.id}:${step.id}`),
+          evidence_sha256: digest(`cross-role-response-evidence:${workflow.id}:${step.id}`),
+        },
+        database: {
+          expected_delta_contract_sha256: digest(crossRoleCanonicalJson(step.expected_db_delta)),
+          observed_delta_sha256: digest(`cross-role-database:${workflow.id}:${step.id}`),
+          matches_expected: true,
+          half_record_count: 0,
+        },
+        audit: {
+          request_id: requestId,
+          evidence_sha256: digest(`cross-role-audit:${workflow.id}:${step.id}`),
+          transactionally_committed: true,
+        },
+        idempotency: {
+          request_digest_sha256: digest(`cross-role-idempotency-request:${workflow.id}:${step.id}`),
+          result_digest_sha256: digest(`cross-role-idempotency-result:${workflow.id}:${step.id}`),
+          state: "ORIGINAL_COMMITTED",
+        },
+        result: "PASS",
+      };
+    });
+    const controls = workflow.controls.map((control) => {
+      const observedAt = crossRoleInstant(cursor++);
+      executionCompleted = observedAt;
+      return {
+        kind: control.kind,
+        target_step: control.target_step,
+        expected_contract_sha256: digest(crossRoleCanonicalJson(control)),
+        observed_at: observedAt,
+        observation: structuredClone(uatPromotionCrossRoleControlObservations[control.kind]),
+        evidence_sha256: digest(`cross-role-control:${workflow.id}:${control.kind}`),
+        result: "PASS",
+      };
+    });
+    const reversals = workflow.steps
+      .filter((step) => step.branch_from_checkpoint !== undefined)
+      .map((step) => {
+        const recordedAt = crossRoleInstant(cursor++);
+        executionCompleted = recordedAt;
+        return {
+          step_id: step.id,
+          branch_from_checkpoint: step.branch_from_checkpoint,
+          mode: "APPEND_ONLY_REVERSAL",
+          original_fact_preserved: true,
+          recorded_at: recordedAt,
+          source_fact_sha256: digest(`cross-role-source-fact:${workflow.id}:${step.id}`),
+          reversal_fact_sha256: digest(`cross-role-reversal-fact:${workflow.id}:${step.id}`),
+          ledger_delta_sha256: digest(`cross-role-reversal-ledger:${workflow.id}:${step.id}`),
+          audit_evidence_sha256: digest(`cross-role-reversal-audit:${workflow.id}:${step.id}`),
+          result: "PASS",
+          evidence_sha256: digest(`cross-role-reversal:${workflow.id}:${step.id}`),
+        };
+      });
+    return {
+      workflow_id: workflow.id,
+      status: "PASS",
+      steps,
+      controls,
+      reversals,
+    };
+  });
+  for (const [index, workflowEvidence] of workflows.entries()) {
+    const workflow = crossRoleTemplate.workflows[index];
+    const signoffStart = cursor;
+    const executorSignoffs = workflow.signoff.executor_slots.map((slot, index) => crossRoleSignoff(
+      slot, crossRoleActor(actors, slot), crossRoleInstant(signoffStart + index),
+    ));
+    const observerSecond = signoffStart + executorSignoffs.length;
+    const businessSecond = observerSecond + 1;
+    cursor = businessSecond + 2;
+    signoffCompleted = crossRoleInstant(businessSecond);
+    workflowEvidence.signoff = {
+      executor_signoffs: executorSignoffs,
+      observer_signoff: crossRoleSignoff(
+        workflow.signoff.observer_slot,
+        crossRoleActor(actors, workflow.signoff.observer_slot),
+        crossRoleInstant(observerSecond),
+      ),
+      business_acceptance: crossRoleSignoff(
+        workflow.signoff.business_acceptor_slot,
+        crossRoleActor(actors, workflow.signoff.business_acceptor_slot),
+        crossRoleInstant(businessSecond), "ACCEPTED", "accepted_at",
+      ),
+    };
+  }
+  return { workflows, first, executionCompleted, signoffCompleted };
+}
+
+function createCrossRoleFixtureResult({
+  current, resultId, promotionId, humanAuthorizationSha256, releaseIdentitySha256,
+}) {
+  const actors = crossRoleActors();
+  const evidence = crossRoleWorkflowEvidence(actors);
+  return createUatPromotionCrossRoleResult({
+    schema_version: 1,
+    contract: UAT_PROMOTION_CROSS_ROLE_RESULT_CONTRACT,
+    status: "PASS",
+    evidence_class: "HUMAN_EXECUTED_UAT",
+    result_id: resultId,
+    promotion_id: promotionId,
+    promotion_generation: current.promotion_generation,
+    verification_operation_id: resultId,
+    human_execution_authorization_sha256: humanAuthorizationSha256,
+    supervisor_bundle_sha256: supervisorBundleSha256,
+    previous_checkpoint_receipt_sha256: current.receipt_sha256,
+    postdeploy_identity_evidence_sha256: current.checkpoint_evidence_sha256,
+    release_identity_sha256: releaseIdentitySha256,
+    cross_role_contract_artifact_sha256: crossRoleTemplate.artifact_sha256,
+    authorization_matrix_artifact_sha256:
+      crossRoleTemplate.generated_from.authorization_matrix.artifact_sha256,
+    authorization_matrix_source_manifest_sha256:
+      crossRoleTemplate.generated_from.authorization_matrix.source_manifest_sha256,
+    fixture_id: crossRoleTemplate.synthetic_fixture.fixture_id,
+    data_class: "SYNTHETIC_ONLY",
+    approval: {
+      status: "APPROVED",
+      business_role_matrix_approval_id: "BRM-20260815-077",
+      uat_account_mapping_approval_id: "UAM-20260815-077",
+      allowed_write_scope: `SYNTHETIC_ONLY:${crossRoleTemplate.synthetic_fixture.fixture_id}`,
+      execution_window_start: crossRoleInstant(0),
+      execution_window_end: crossRoleInstant(290),
+      stop_authority_identity_sha256: digest("cross-role-stop-authority"),
+      rollback_owner_identity_sha256:
+        crossRoleActor(actors, "rollback_owner").person_identity_sha256,
+      approval_evidence_sha256: digest("cross-role-approval-evidence"),
+    },
+    actors,
+    workflows: evidence.workflows,
+    execution_started_at: evidence.first,
+    execution_completed_at: evidence.executionCompleted,
+    signoff_completed_at: evidence.signoffCompleted,
+    evidence_expires_at: "2026-08-15T01:49:30.000Z",
+    sanitization: uatPromotionCrossRoleSanitization,
+  }, { template: crossRoleTemplate, now: new Date("2026-08-15T01:48:30.000Z") });
+}
+
+async function crossRoleFixture({
+  promotionId = "promotion-cross-role-001", conflateHumanAndIngestAuthorization = false,
+} = {}) {
+  const identity = await postdeployIdentityFixture({ promotionId });
+  const identityPrepared = await run(identity.context, "prepare", identity.root);
+  await writePostdeployIdentityEvidence(
+    identity.root, identity.context, identity.runtimeProbe,
+  );
+  await run(identity.context, "execute", identity.root, {
+    now: new Date("2026-08-15T01:43:31.000Z"),
+  });
+  const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(identity.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  const resultId = `${promotionId}-cross-role`;
+  const ingestAuthorization = digest(`cross-role-ingest-authorization:${resultId}`);
+  const contractLogical = `/usr/local/libexec/chenyida-erp-release-supervisor/bundles/${supervisorBundleSha256}/chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json`;
+  await rawFile(identity.root, contractLogical, crossRoleTemplateRaw, 0o444);
+  const releaseIdentitySource = await source(identity.root, identityPath);
+  const result = createCrossRoleFixtureResult({
+    current,
+    resultId,
+    promotionId,
+    humanAuthorizationSha256: conflateHumanAndIngestAuthorization
+      ? ingestAuthorization : digest(`human-execution-authorization:${resultId}`),
+    releaseIdentitySha256: releaseIdentitySource.sha256,
+  });
+  await directory(identity.root, UAT_PROMOTION_CROSS_ROLE_RESULT_ROOT, 0o700);
+  await rawFile(
+    identity.root,
+    `${UAT_PROMOTION_CROSS_ROLE_RESULT_ROOT}/.chenyida-erp-uat-cross-role-results-v1`,
+    "chenyida-erp-uat-cross-role-results/v1\n", 0o400,
+  );
+  const resultLogical = `${UAT_PROMOTION_CROSS_ROLE_RESULT_ROOT}/${resultId}.cross-role-uat-result.json`;
+  await rawFile(
+    identity.root, resultLogical, canonicalUatPromotionCrossRoleResultJson(result), 0o400,
+  );
+  const identityIntentLogical = `${UAT_PROMOTION_STATE_ROOT}/intents/${identity.context.operation_id}.${identityPrepared.intent_sha256}.json`;
+  const identityEvidenceLogical = `${UAT_PROMOTION_STATE_ROOT}/results/${identity.context.operation_id}.${current.checkpoint_evidence_sha256}.json`;
+  const contractSource = await source(identity.root, contractLogical);
+  const resultSource = await source(identity.root, resultLogical);
+  const parameters = {
+    promotion_state_root: UAT_PROMOTION_STATE_ROOT,
+    promotion_id: current.promotion_id,
+    promotion_generation: current.promotion_generation,
+    previous_checkpoint_receipt_sha256: current.receipt_sha256,
+    promotion_intent_sha256: current.intent_sha256,
+    promotion_original_authorization_sha256: current.original_authorization_sha256,
+    candidate_binding_sha256: current.candidate_binding_sha256,
+    database_binding_sha256: current.database_binding_sha256,
+    runtime_binding_sha256: current.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: current.recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: current.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: current.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: current.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: current.migration_fence_binding_sha256,
+    migration_result_binding_sha256: current.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: current.compose_deployment_binding_sha256,
+    current_checkpoint_source: await source(identity.root, UAT_PROMOTION_CURRENT_FILE),
+    postdeploy_identity_operation_id: identity.context.operation_id,
+    postdeploy_identity_intent_sha256: identityPrepared.intent_sha256,
+    postdeploy_identity_intent_source: await source(identity.root, identityIntentLogical),
+    postdeploy_identity_evidence_sha256: current.checkpoint_evidence_sha256,
+    postdeploy_identity_evidence_source: await source(identity.root, identityEvidenceLogical),
+    release_identity_sha256: releaseIdentitySource.sha256,
+    release_identity_source: releaseIdentitySource,
+    cross_role_contract: contractLogical,
+    cross_role_contract_file_sha256: contractSource.sha256,
+    cross_role_contract_artifact_sha256: crossRoleTemplate.artifact_sha256,
+    cross_role_contract_source: contractSource,
+    authorization_matrix_artifact_sha256:
+      crossRoleTemplate.generated_from.authorization_matrix.artifact_sha256,
+    authorization_matrix_source_manifest_sha256:
+      crossRoleTemplate.generated_from.authorization_matrix.source_manifest_sha256,
+    cross_role_result_root: UAT_PROMOTION_CROSS_ROLE_RESULT_ROOT,
+    result_id: resultId,
+    cross_role_result: resultLogical,
+    cross_role_result_file_sha256: resultSource.sha256,
+    cross_role_result_sha256: result.result_sha256,
+    cross_role_result_source: resultSource,
+    verification_created_at: "2026-08-15T01:48:30.000Z",
+    verification_expires_at: "2026-08-15T01:49:00.000Z",
+    requester_identity_sha256: digest(`cross-role-requester:${resultId}`),
+    approver_identity_sha256: digest(`cross-role-approver:${resultId}`),
+    executor_identity_sha256: digest(`cross-role-executor:${resultId}`),
+    policy_file_sha256: UAT_PROMOTION_POLICY_FILE_SHA256,
+    policy_sha256: UAT_PROMOTION_POLICY_SHA256,
+  };
+  const context = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-transaction-context/v1",
+    operation_id: resultId,
+    operation: "CROSS_ROLE_UAT",
+    execution_mode: "ORIGINAL",
+    execution_authorization_id: resultId,
+    execution_authorization_sha256: ingestAuthorization,
+    execution_created_at: parameters.verification_created_at,
+    original_authorization_sha256: ingestAuthorization,
+    supervisor_bundle_sha256: supervisorBundleSha256,
+    expected_intent_sha256: null,
+    parameters,
+  };
+  return {
+    ...identity, context, identityContext: identity.context, identityPrepared,
+    current, result, resultLogical, contractLogical,
+  };
+}
+
+function crossRoleRecoveryContext(original, intentSha256, suffix = "recovery") {
+  const executionId = `${original.operation_id}-${suffix}`;
+  return {
+    ...original,
+    execution_mode: "RECOVERY",
+    execution_authorization_id: executionId,
+    execution_authorization_sha256: digest(`cross-role-recovery-authorization:${executionId}`),
+    execution_created_at: "2026-08-15T01:48:40.000Z",
+    expected_intent_sha256: intentSha256,
+  };
+}
+
 async function run(context, phase, root, options = {}) {
   const resolved = { ...options };
   if (phase === "execute"
@@ -2674,6 +3004,155 @@ test("linked postdeploy intent and cross-operation identity receipt are preserve
     run(crossOperation.context, "execute", crossOperation.root, { now: new Date("2026-08-15T01:43:31.000Z") }),
     (error) => error.code === "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RESULT_BINDING_INVALID",
   );
+});
+
+test("cross-role evidence is durably ingested as checkpoint 12 without publishing final receipt", async (t) => {
+  const fixtureValue = await crossRoleFixture();
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root, {
+    now: new Date("2026-08-15T01:48:31.000Z"),
+  });
+  assert.equal(prepared.result, "PREPARED");
+  assert.equal(prepared.cross_role_result_sha256, fixtureValue.result.result_sha256);
+  assert.equal((await run(fixtureValue.context, "prepare", fixtureValue.root, {
+    now: new Date("2026-08-15T01:48:31.000Z"),
+  })).result, "ALREADY_PREPARED");
+  const committed = await run(fixtureValue.context, "execute", fixtureValue.root, {
+    now: new Date("2026-08-15T01:48:32.000Z"),
+  });
+  assert.equal(committed.result, "COMMITTED");
+  assert.equal(committed.cross_role_result_sha256, fixtureValue.result.result_sha256);
+  assert.equal(committed.evidence_subject_sha256, fixtureValue.result.evidence_subject_sha256);
+  assert.equal(
+    committed.approval_subject_sha256,
+    fixtureValue.result.approval.approval_subject_sha256,
+  );
+  const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  assert.equal(current.checkpoint_id, "CROSS_ROLE_UAT_EXECUTION");
+  assert.equal(current.checkpoint_ordinal, 12);
+  assert.equal(current.journal_status, "IN_PROGRESS");
+  assert.equal(current.checkpoint_evidence_sha256, fixtureValue.result.result_sha256);
+  assert.equal(current.checkpoint_authorization_sha256, fixtureValue.context.original_authorization_sha256);
+  assert.equal(current.authorization_sha256_chain.includes(
+    fixtureValue.result.human_execution_authorization_sha256,
+  ), false);
+  const internalResult = physical(
+    fixtureValue.root,
+    `${UAT_PROMOTION_STATE_ROOT}/results/${fixtureValue.context.operation_id}.${fixtureValue.result.result_sha256}.json`,
+  );
+  assert.equal((await lstat(internalResult)).mode & 0o7777, 0o400);
+  assert.equal(await readFile(internalResult, "utf8"), canonicalUatPromotionCrossRoleResultJson(
+    fixtureValue.result,
+  ));
+});
+
+test("cross-role human execution approval cannot be conflated with Supervisor ingest authorization", async (t) => {
+  const fixtureValue = await crossRoleFixture({
+    promotionId: "promotion-cross-role-auth-split",
+    conflateHumanAndIngestAuthorization: true,
+  });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  await assert.rejects(
+    run(fixtureValue.context, "prepare", fixtureValue.root, {
+      now: new Date("2026-08-15T01:48:31.000Z"),
+    }),
+    (error) => error.code === "UAT_PROMOTION_CROSS_ROLE_RESULT_BINDING_INVALID",
+  );
+});
+
+test("cross-role result root marker, one-link source and post-prepare source identity fail closed", async (t) => {
+  const linked = await crossRoleFixture({ promotionId: "promotion-cross-role-linked-result" });
+  t.after(() => rm(linked.root, { recursive: true, force: true }));
+  await link(physical(linked.root, linked.resultLogical), path.join(linked.root, "linked-cross-role-result.json"));
+  await assert.rejects(
+    run(linked.context, "prepare", linked.root, { now: new Date("2026-08-15T01:48:31.000Z") }),
+    (error) => error.code === "UAT_PROMOTION_CROSS_ROLE_RESULT_SOURCE_INVALID",
+  );
+
+  const marker = await crossRoleFixture({ promotionId: "promotion-cross-role-marker" });
+  t.after(() => rm(marker.root, { recursive: true, force: true }));
+  await writeFile(physical(
+    marker.root,
+    `${UAT_PROMOTION_CROSS_ROLE_RESULT_ROOT}/.chenyida-erp-uat-cross-role-results-v1`,
+  ), "wrong-marker\n");
+  await assert.rejects(
+    run(marker.context, "prepare", marker.root, { now: new Date("2026-08-15T01:48:31.000Z") }),
+    (error) => error.code === "UAT_PROMOTION_CROSS_ROLE_RESULT_SOURCE_INVALID",
+  );
+
+  const replaced = await crossRoleFixture({ promotionId: "promotion-cross-role-replaced-result" });
+  t.after(() => rm(replaced.root, { recursive: true, force: true }));
+  const prepared = await run(replaced.context, "prepare", replaced.root, {
+    now: new Date("2026-08-15T01:48:31.000Z"),
+  });
+  await writeFile(physical(replaced.root, replaced.resultLogical), "{}\n");
+  await assert.rejects(
+    run(replaced.context, "execute", replaced.root, {
+      now: new Date("2026-08-15T01:48:32.000Z"),
+    }),
+    (error) => error.code === "UAT_PROMOTION_CROSS_ROLE_RESULT_SOURCE_INVALID",
+  );
+  const recovery = crossRoleRecoveryContext(replaced.context, prepared.intent_sha256, "replaced");
+  assert.equal((await run(recovery, "recover-prepare", replaced.root, {
+    now: new Date("2026-08-15T01:48:41.000Z"),
+  })).decision, "QUARANTINE");
+  assert.equal((await run(recovery, "recover-execute", replaced.root, {
+    now: new Date("2026-08-15T01:48:42.000Z"),
+  })).result, "QUARANTINED");
+});
+
+test("cross-role publication crash recovery resumes journal only and never reruns human UAT", async (t) => {
+  const cases = [
+    ["AFTER_CROSS_ROLE_RESULT", "RESUME_PUBLICATION", "REMOVE_EXTERNAL"],
+    ["AFTER_CROSS_ROLE_HISTORY", "RESUME_PUBLICATION", "REPLACE_EXTERNAL"],
+    ["AFTER_CROSS_ROLE_RECEIPT", "RESUME_PUBLICATION", null],
+    ["AFTER_CROSS_ROLE_CURRENT", "ALREADY_COMMITTED", null],
+  ];
+  for (const [index, [failpoint, expectedDecision, externalMutation]] of cases.entries()) {
+    const fixtureValue = await crossRoleFixture({
+      promotionId: `promotion-cross-role-crash-${index}`,
+    });
+    t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+    const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root, {
+      now: new Date("2026-08-15T01:48:31.000Z"),
+    });
+    await assert.rejects(
+      run(fixtureValue.context, "execute", fixtureValue.root, {
+        now: new Date("2026-08-15T01:48:32.000Z"),
+        fault: async (stage) => {
+          if (stage === failpoint) throw new Error(`injected:${stage}`);
+        },
+      }),
+      new RegExp(`injected:${failpoint}`),
+    );
+    const externalResult = physical(fixtureValue.root, fixtureValue.resultLogical);
+    if (externalMutation === "REMOVE_EXTERNAL") await rm(externalResult);
+    if (externalMutation === "REPLACE_EXTERNAL") await writeFile(externalResult, "{}\n");
+    const recovery = crossRoleRecoveryContext(
+      fixtureValue.context, prepared.intent_sha256, `recovery-${index}`,
+    );
+    const recoveryPrepared = await run(recovery, "recover-prepare", fixtureValue.root, {
+      now: new Date("2026-08-15T02:00:00.000Z"),
+    });
+    assert.equal(recoveryPrepared.decision, expectedDecision);
+    const recovered = await run(recovery, "recover-execute", fixtureValue.root, {
+      now: new Date("2026-08-15T02:00:01.000Z"),
+    });
+    assert.equal(
+      recovered.result,
+      expectedDecision === "ALREADY_COMMITTED" ? "ALREADY_COMMITTED" : "COMMITTED",
+    );
+    const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+      physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+    )));
+    assert.equal(current.checkpoint_id, "CROSS_ROLE_UAT_EXECUTION");
+    assert.equal(current.checkpoint_evidence_sha256, fixtureValue.result.result_sha256);
+    assert.equal((await readdir(physical(
+      fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/results`,
+    ))).filter((name) => artifactMatches(name, fixtureValue.context.operation_id)).length, 1);
+  }
 });
 
 test("fake root requires an explicit test-only option and a symlinked state root fails closed", async (t) => {

@@ -618,6 +618,245 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS[operation],
         }
 
+    def cross_role_parameters(self, bundle_digest, recovery=False):
+        promotion_id = "promotion-supervisor-fixture"
+        identity_id = "promotion-supervisor-postdeploy-identity"
+        result_id = "promotion-supervisor-cross-role"
+        identity_intent_sha256 = "1" * 64
+        identity_evidence_sha256 = "3" * 64
+        contract = supervisor.BUNDLES_ROOT / bundle_digest \
+            / supervisor.UAT_PROMOTION_CROSS_ROLE_CONTRACT_RELATIVE
+        result = supervisor.UAT_PROMOTION_CROSS_ROLE_RESULT_ROOT \
+            / f"{result_id}.cross-role-uat-result.json"
+        value = {
+            "promotion_state_root": str(supervisor.UAT_PROMOTION_STATE_ROOT),
+            "promotion_id": promotion_id,
+            "promotion_generation": 1,
+            "previous_checkpoint_receipt_sha256": "c" * 64,
+            "promotion_intent_sha256": "d" * 64,
+            "promotion_original_authorization_sha256": "e" * 64,
+            "candidate_binding_sha256": "f" * 64,
+            "database_binding_sha256": "1" * 64,
+            "runtime_binding_sha256": "2" * 64,
+            "preupgrade_recovery_binding_sha256": "3" * 64,
+            "promotion_snapshot_binding_sha256": "4" * 64,
+            "writer_quiesce_binding_sha256": "5" * 64,
+            "migration_authorization_binding_sha256": "6" * 64,
+            "migration_fence_binding_sha256": "7" * 64,
+            "migration_result_binding_sha256": "8" * 64,
+            "compose_deployment_binding_sha256": "9" * 64,
+            "current_checkpoint_source": self.source(
+                str(supervisor.UAT_PROMOTION_CURRENT_FILE), seed="a",
+            ),
+            "postdeploy_identity_operation_id": identity_id,
+            "postdeploy_identity_intent_sha256": identity_intent_sha256,
+            "postdeploy_identity_intent_source": self.source(
+                f"{supervisor.UAT_PROMOTION_STATE_ROOT}/intents/"
+                f"{identity_id}.{identity_intent_sha256}.json", seed="2",
+            ),
+            "postdeploy_identity_evidence_sha256": identity_evidence_sha256,
+            "postdeploy_identity_evidence_source": self.source(
+                f"{supervisor.UAT_PROMOTION_STATE_ROOT}/results/"
+                f"{identity_id}.{identity_evidence_sha256}.json", seed="4",
+            ),
+            "release_identity_sha256": "5" * 64,
+            "release_identity_source": self.source(
+                str(supervisor.RELEASE_IDENTITY_FILE), mode="0440", gid=1234, seed="5",
+            ),
+            "cross_role_contract": str(contract),
+            "cross_role_contract_file_sha256": "6" * 64,
+            "cross_role_contract_artifact_sha256": "7" * 64,
+            "cross_role_contract_source": self.source(str(contract), mode="0444", seed="6"),
+            "authorization_matrix_artifact_sha256": "8" * 64,
+            "authorization_matrix_source_manifest_sha256": "9" * 64,
+            "cross_role_result_root": str(supervisor.UAT_PROMOTION_CROSS_ROLE_RESULT_ROOT),
+            "result_id": result_id,
+            "cross_role_result": str(result),
+            "cross_role_result_file_sha256": "a" * 64,
+            "cross_role_result_sha256": "b" * 64,
+            "cross_role_result_source": self.source(str(result), seed="a"),
+            "verification_created_at": "2026-08-15T01:48:00.000Z",
+            "verification_expires_at": "2026-08-15T01:49:00.000Z",
+            "requester_identity_sha256": "c" * 64,
+            "approver_identity_sha256": "d" * 64,
+            "executor_identity_sha256": "e" * 64,
+            "policy_file_sha256": supervisor.UAT_PROMOTION_POLICY_FILE_SHA256,
+            "policy_sha256": supervisor.UAT_PROMOTION_POLICY_SHA256,
+        }
+        if recovery:
+            value.update({
+                "expected_intent_sha256": "f" * 64,
+                "original_authorization_sha256": "a" * 64,
+                "original_operation": "CROSS_ROLE_UAT",
+                "original_operation_id": result_id,
+            })
+        return value
+
+    def cross_role_authorization(self, bundle_digest, recovery=False):
+        operation = "RECOVER_UAT_PROMOTION" if recovery else "VERIFY_UAT_CROSS_ROLE_EXECUTION"
+        created = datetime(2026, 8, 15, 1, 48, tzinfo=timezone.utc)
+        return {
+            "schema_version": 6,
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "authorization_id": "promotion-supervisor-cross-role-recovery" if recovery
+            else "promotion-supervisor-cross-role",
+            "created_at": utc(created + (timedelta(seconds=30) if recovery else timedelta())),
+            "expires_at": utc(created + timedelta(minutes=2)),
+            "supervisor_bundle_sha256": bundle_digest,
+            "operation": operation,
+            "parameters": self.cross_role_parameters(bundle_digest, recovery),
+            "nonce": "f" * 64,
+            "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS[operation],
+        }
+
+    def test_cross_role_authorization_binds_exact_bundle_result_and_independent_ingest_context(self):
+        bundle = "f" * 64
+        now = datetime(2026, 8, 15, 1, 48, tzinfo=timezone.utc)
+        authorization = self.cross_role_authorization(bundle)
+        self.assertEqual(supervisor.validate_authorization(authorization, bundle, now), authorization)
+        context = supervisor.uat_promotion_context(authorization, "c" * 64)
+        self.assertEqual(context["operation"], "CROSS_ROLE_UAT")
+        self.assertEqual(context["operation_id"], authorization["parameters"]["result_id"])
+        self.assertNotEqual(
+            authorization["parameters"]["postdeploy_identity_intent_sha256"],
+            authorization["parameters"]["postdeploy_identity_intent_source"]["sha256"],
+        )
+        self.assertEqual(
+            Path(authorization["parameters"]["cross_role_contract"]),
+            supervisor.BUNDLES_ROOT / bundle / supervisor.UAT_PROMOTION_CROSS_ROLE_CONTRACT_RELATIVE,
+        )
+
+        wrong_bundle = self.cross_role_authorization(bundle)
+        wrong_bundle["parameters"]["cross_role_contract"] = str(
+            supervisor.BUNDLES_ROOT / ("e" * 64)
+            / supervisor.UAT_PROMOTION_CROSS_ROLE_CONTRACT_RELATIVE
+        )
+        wrong_bundle["parameters"]["cross_role_contract_source"] = self.source(
+            wrong_bundle["parameters"]["cross_role_contract"], mode="0444", seed="6",
+        )
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_TIME_INVALID"):
+            supervisor.validate_authorization(wrong_bundle, bundle, now)
+
+        wrong_result = self.cross_role_authorization(bundle)
+        wrong_result["parameters"]["cross_role_result_source"]["sha256"] = "9" * 64
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError,
+                "SUPERVISOR_UAT_PROMOTION_CROSS_ROLE_SOURCE_BINDING_INVALID"):
+            supervisor.validate_authorization(wrong_result, bundle, now)
+
+    def test_cross_role_recovery_binds_the_exact_consumed_ingest_authorization(self):
+        bundle = "f" * 64
+        original = self.cross_role_authorization(bundle)
+        original_raw = supervisor.canonical_json(original)
+        original_digest = supervisor.sha256(original_raw)
+        recovery = self.cross_role_authorization(bundle, recovery=True)
+        recovery["parameters"]["original_authorization_sha256"] = original_digest
+        recovery_now = datetime(2026, 8, 15, 1, 48, 30, tzinfo=timezone.utc)
+
+        self.assertEqual(
+            supervisor.validate_authorization(recovery, bundle, recovery_now), recovery,
+        )
+        context = supervisor.uat_promotion_context(recovery, "c" * 64)
+        self.assertEqual(context["operation"], "CROSS_ROLE_UAT")
+        self.assertEqual(context["execution_mode"], "RECOVERY")
+        self.assertEqual(context["operation_id"], original["authorization_id"])
+        self.assertEqual(
+            context["parameters"]["cross_role_result_sha256"],
+            original["parameters"]["cross_role_result_sha256"],
+        )
+
+        with tempfile.TemporaryDirectory(prefix="cyd-uat-cross-role-consumed-") as temporary:
+            consumed = Path(temporary)
+            consumed.chmod(0o700)
+            consumed_file = consumed / f"{original['authorization_id']}.{original_digest}.json"
+            consumed_file.write_bytes(original_raw)
+            consumed_file.chmod(0o400)
+            self.assertEqual(
+                supervisor.validate_original_uat_promotion_authorization_consumed(
+                    recovery["parameters"], bundle, consumed,
+                ),
+                original,
+            )
+            changed = {
+                **recovery["parameters"],
+                "cross_role_result_file_sha256": "9" * 64,
+            }
+            with self.assertRaisesRegex(
+                    supervisor.SupervisorError,
+                    "SUPERVISOR_UAT_PROMOTION_CROSS_ROLE_SOURCE_BINDING_INVALID"):
+                supervisor.validate_original_uat_promotion_authorization_consumed(
+                    changed, bundle, consumed,
+                )
+
+    def test_cross_role_runner_response_exposes_result_subject_and_approval_subject(self):
+        authorization = self.cross_role_authorization("f" * 64)
+        context = supervisor.uat_promotion_context(authorization, "c" * 64)
+        prepared = {
+            "result": "PREPARED",
+            "promotion_id": context["parameters"]["promotion_id"],
+            "intent_sha256": "1" * 64,
+            "verification_plan_sha256": "2" * 64,
+            "cross_role_result_sha256": context["parameters"]["cross_role_result_sha256"],
+        }
+        committed = {
+            "result": "COMMITTED",
+            "promotion_id": context["parameters"]["promotion_id"],
+            "intent_sha256": "1" * 64,
+            "receipt_sha256": "3" * 64,
+            "cross_role_result_sha256": context["parameters"]["cross_role_result_sha256"],
+            "evidence_subject_sha256": "4" * 64,
+            "approval_subject_sha256": "5" * 64,
+        }
+        for phase, response in (("prepare", prepared), ("execute", committed)):
+            with patch.object(supervisor.subprocess, "run", return_value=supervisor.subprocess.CompletedProcess(
+                    [], 0, stdout=supervisor.canonical_json(response), stderr=b"")):
+                self.assertEqual(supervisor.run_uat_promotion_runner(
+                    Path("/tmp/runtime/node"), Path("/trusted/bundle"), context, phase, 51,
+                ), response)
+
+    def test_cross_role_sources_are_rechecked_before_prepare_consumption_and_publication(self):
+        authorization = self.cross_role_authorization("f" * 64)
+        result_sha256 = authorization["parameters"]["cross_role_result_sha256"]
+        events = []
+
+        def runner(_node, _bundle, _context, phase, _lock, **kwargs):
+            self.assertEqual(kwargs, {})
+            events.append(phase)
+            if phase == "prepare":
+                return {
+                    "result": "PREPARED", "promotion_id": authorization["parameters"]["promotion_id"],
+                    "intent_sha256": "1" * 64, "verification_plan_sha256": "2" * 64,
+                    "cross_role_result_sha256": result_sha256,
+                }
+            return {
+                "result": "COMMITTED", "promotion_id": authorization["parameters"]["promotion_id"],
+                "intent_sha256": "1" * 64, "receipt_sha256": "3" * 64,
+                "cross_role_result_sha256": result_sha256,
+                "evidence_subject_sha256": "4" * 64, "approval_subject_sha256": "5" * 64,
+            }
+
+        with patch.object(
+                supervisor, "verify_uat_promotion_cross_role_sources",
+                side_effect=lambda *_: events.append("cross-role-sources")), \
+                patch.object(supervisor, "prepare_runtime_privilege_node", side_effect=lambda *_: (
+                    events.append("node") or (Path("/tmp/runtime"), Path("/tmp/runtime/node"))
+                )), \
+                patch.object(supervisor, "run_uat_promotion_runner", side_effect=runner), \
+                patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")), \
+                patch.object(supervisor, "run_uat_promotion_postdeploy_control") as postdeploy_control, \
+                patch.object(supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup")):
+            result = supervisor.run_uat_promotion_authorization(
+                Path("/trusted/bundle"), Path("/trusted/pending/cross-role.json"),
+                authorization, "c" * 64, lock_descriptor=51,
+            )
+        postdeploy_control.assert_not_called()
+        self.assertEqual(result["cross_role_result_sha256"], result_sha256)
+        self.assertEqual(events, [
+            "cross-role-sources", "node", "prepare", "cross-role-sources", "consume",
+            "cross-role-sources", "execute", "cleanup",
+        ])
+
     def test_postdeploy_authorizations_accept_distinct_contract_and_raw_source_digests(self):
         bundle = "f" * 64
         now = datetime(2026, 8, 15, 1, 43, tzinfo=timezone.utc)
@@ -1540,6 +1779,70 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
                     supervisor.assert_no_uat_migration_execution_interlock(unrelated)
                 supervisor.assert_no_uat_migration_execution_interlock(exact, original_authorization)
                 supervisor.assert_no_uat_migration_execution_interlock(recovery, "f" * 64)
+
+    def test_pending_cross_role_intent_requires_exact_original_or_recovery_until_committed(self):
+        original_authorization = "d" * 64
+        operation_id = "promotion-supervisor-cross-role"
+        intent_sha256 = "e" * 64
+        unrelated = self.authorization(
+            "f" * 64, datetime(2026, 8, 15, 1, 1, tzinfo=timezone.utc),
+        )
+        exact = {
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "operation": "VERIFY_UAT_CROSS_ROLE_EXECUTION",
+            "authorization_id": operation_id,
+            "parameters": {},
+        }
+        recovery = {
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "operation": "RECOVER_UAT_PROMOTION",
+            "authorization_id": "promotion-supervisor-cross-role-recovery",
+            "parameters": {
+                "original_operation": "CROSS_ROLE_UAT",
+                "original_operation_id": operation_id,
+                "original_authorization_sha256": original_authorization,
+            },
+        }
+        with tempfile.TemporaryDirectory(prefix="cyd-uat-cross-role-interlock-") as temporary:
+            root = Path(temporary) / "state"
+            intents = root / "intents"
+            active = root / "active-fences"
+            transfers = root / "fence-transfers"
+            intents.mkdir(parents=True, mode=0o700)
+            root.chmod(0o700)
+            intents.chmod(0o700)
+            marker = root / supervisor.UAT_PROMOTION_STATE_MARKER
+            marker.write_bytes(supervisor.UAT_PROMOTION_STATE_MARKER_VALUE)
+            marker.chmod(0o400)
+            intent = {
+                "schema_version": 1,
+                "contract": "chenyida-erp-uat-promotion-cross-role-intent/v1",
+                "verification_operation_id": operation_id,
+                "execution_authorization_sha256": original_authorization,
+                "cross_role_intent_sha256": intent_sha256,
+            }
+            intent_file = intents / f"{operation_id}.{intent_sha256}.json"
+            intent_file.write_bytes(supervisor.canonical_json(intent))
+            intent_file.chmod(0o400)
+            current = root / "current.json"
+            current.write_bytes(supervisor.canonical_json({"authorization_sha256_chain": ["c" * 64]}))
+            current.chmod(0o400)
+            with patch.object(supervisor, "UAT_PROMOTION_STATE_ROOT", root), \
+                    patch.object(supervisor, "UAT_PROMOTION_CURRENT_FILE", current), \
+                    patch.object(supervisor, "UAT_PROMOTION_ACTIVE_FENCES_ROOT", active), \
+                    patch.object(supervisor, "UAT_PROMOTION_FENCE_TRANSFERS_ROOT", transfers):
+                with self.assertRaisesRegex(
+                        supervisor.SupervisorError,
+                        "SUPERVISOR_UAT_PROMOTION_CROSS_ROLE_RECOVERY_REQUIRED"):
+                    supervisor.assert_no_uat_migration_execution_interlock(unrelated)
+                supervisor.assert_no_uat_migration_execution_interlock(exact, original_authorization)
+                supervisor.assert_no_uat_migration_execution_interlock(recovery, "f" * 64)
+                current.chmod(0o600)
+                current.write_bytes(supervisor.canonical_json({
+                    "authorization_sha256_chain": [original_authorization],
+                }))
+                current.chmod(0o400)
+                supervisor.assert_no_uat_migration_execution_interlock(unrelated)
 
     def test_migration_recovery_contains_after_consumption_before_journal_execution(self):
         bundle = "f" * 64

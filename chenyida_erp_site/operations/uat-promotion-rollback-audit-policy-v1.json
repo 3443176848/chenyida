@@ -13,6 +13,7 @@
     "DEPLOY_UAT_RELEASE",
     "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
     "VERIFY_UAT_POSTDEPLOY_IDENTITY",
+    "VERIFY_UAT_CROSS_ROLE_EXECUTION",
     "ROLLBACK_UAT_RELEASE",
     "RECOVER_UAT_PROMOTION"
   ],
@@ -25,6 +26,7 @@
     "DEPLOY_UAT_RELEASE",
     "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
     "VERIFY_UAT_POSTDEPLOY_IDENTITY",
+    "VERIFY_UAT_CROSS_ROLE_EXECUTION",
     "RECOVER_UAT_PROMOTION"
   ],
   "required_checkpoint_order": [
@@ -124,10 +126,10 @@
     },
     {
       "id": "CROSS_ROLE_UAT_EXECUTION",
-      "status": "CONTRACT_ONLY",
+      "status": "SUPPORTED",
       "severity_if_incomplete": "P1",
-      "evidence": ["cross-role-uat-evidence-contract-v1.json:HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED"],
-      "finding": "TASK67只提供BLOCKED合成合同；没有事前批准、账号映射、真实执行回执或三方签字。"
+      "evidence": ["release-supervisor-launcher.py:VERIFY_UAT_CROSS_ROLE_EXECUTION", "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT", "uat-promotion-transaction-journal.mjs:AFTER_CROSS_ROLE_CURRENT", "uat-promotion-cross-role-evidence-contract.mjs:UAT_PROMOTION_CROSS_ROLE_RESULT_CONTRACT"],
+      "finding": null
     },
     {
       "id": "PROMOTION_FINAL_RECEIPT",
@@ -152,7 +154,7 @@
     }
   ],
   "source_files": [
-    {"path": "chenyida_erp_site/scripts/release-supervisor-launcher.py", "markers": ["ENTRYPOINTS = {", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION", "DEPLOY_UAT_RELEASE", "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "VERIFY_UAT_POSTDEPLOY_IDENTITY", "ERP_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_SHA256", "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"]},
+    {"path": "chenyida_erp_site/scripts/release-supervisor-launcher.py", "markers": ["ENTRYPOINTS = {", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION", "DEPLOY_UAT_RELEASE", "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "VERIFY_UAT_POSTDEPLOY_IDENTITY", "VERIFY_UAT_CROSS_ROLE_EXECUTION", "SUPERVISOR_UAT_PROMOTION_CROSS_ROLE_RECOVERY_REQUIRED", "ERP_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_SHA256", "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"]},
     {"path": "chenyida_erp_site/scripts/release-candidate-snapshot.py", "markers": ["VERIFY_EXACT_RELEASE_CANDIDATE_SNAPSHOT", "receipt_sha256"]},
     {"path": "chenyida_erp_site/scripts/release-manifest-contract.mjs", "markers": ["promotion_status", "RELEASE_NOT_ELIGIBLE"]},
     {"path": "chenyida_erp_site/scripts/release-lifecycle-contract.mjs", "markers": ["PRE_DEPLOY_EXISTING_RUNTIME_STABILITY", "POST_DEPLOY_CURRENT_RUNTIME_STRICT"]},
@@ -174,7 +176,8 @@
     {"path": "chenyida_erp_site/scripts/postdeploy-release-contract.mjs", "markers": ["POSTDEPLOY_RECEIPT_CONTRACT", "buildReleaseIdentityFromPostDeployReceipt"]},
     {"path": "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs", "markers": ["buildReleaseIdentityFromPostDeployReceipt", "assertPostDeployReadinessStable"]},
     {"path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json", "markers": ["HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED", "\"status\": \"BLOCKED\""]},
-    {"path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json", "markers": ["chenyida-erp-uat-promotion-transaction-policy/v1", "\"operation\": \"DEPLOY_UAT_RELEASE\", \"status\": \"IMPLEMENTED\"", "\"operation\": \"VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION\", \"status\": \"IMPLEMENTED\"", "\"operation\": \"VERIFY_UAT_POSTDEPLOY_IDENTITY\", \"status\": \"IMPLEMENTED\""]},
-    {"path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs", "markers": ["UAT_PROMOTION_INTENT_CONTRACT", "UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT", "UAT_PROMOTION_QUIESCE_INTENT_CONTRACT", "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT", "UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT", "UAT_PROMOTION_COMPOSE_DEPLOYMENT_INTENT_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_CONTROL_BINDING_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_MISMATCH", "UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT", "MIGRATION_COMMIT_RECEIPT", "COMPOSE_DEPLOYMENT_RECEIPT", "probeDockerWriterQuiesce", "validateBackupRecoveryReadinessV4", "AFTER_COMPOSE_DEPLOYMENT_CURRENT", "AFTER_POSTDEPLOY_RUNTIME_CURRENT", "AFTER_POSTDEPLOY_IDENTITY_CURRENT", "runUatPromotionTransactionPhase"]}
+    {"path": "chenyida_erp_site/scripts/uat-promotion-cross-role-evidence-contract.mjs", "markers": ["UAT_PROMOTION_CROSS_ROLE_RESULT_CONTRACT", "human_execution_authorization_sha256", "evidence_subject_sha256", "approval_subject_sha256"]},
+    {"path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json", "markers": ["chenyida-erp-uat-promotion-transaction-policy/v1", "\"operation\": \"DEPLOY_UAT_RELEASE\", \"status\": \"IMPLEMENTED\"", "\"operation\": \"VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION\", \"status\": \"IMPLEMENTED\"", "\"operation\": \"VERIFY_UAT_POSTDEPLOY_IDENTITY\", \"status\": \"IMPLEMENTED\"", "\"operation\": \"VERIFY_UAT_CROSS_ROLE_EXECUTION\", \"status\": \"IMPLEMENTED\""]},
+    {"path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs", "markers": ["UAT_PROMOTION_INTENT_CONTRACT", "UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT", "UAT_PROMOTION_QUIESCE_INTENT_CONTRACT", "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT", "UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT", "UAT_PROMOTION_COMPOSE_DEPLOYMENT_INTENT_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_CONTROL_BINDING_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_MISMATCH", "UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT", "UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT", "loadDurableCrossRoleResult", "MIGRATION_COMMIT_RECEIPT", "COMPOSE_DEPLOYMENT_RECEIPT", "probeDockerWriterQuiesce", "validateBackupRecoveryReadinessV4", "AFTER_COMPOSE_DEPLOYMENT_CURRENT", "AFTER_POSTDEPLOY_RUNTIME_CURRENT", "AFTER_POSTDEPLOY_IDENTITY_CURRENT", "AFTER_CROSS_ROLE_CURRENT", "runUatPromotionTransactionPhase"]}
   ]
 }
