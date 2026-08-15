@@ -2907,6 +2907,41 @@
 - 拒绝把同project容器检查扩写成对未标注容器、其他Docker daemon、主机进程或数据库client的全局证明。
 - 拒绝用Migration advisory lock或可重复环境变量补写checkpoint 6范围；外部writer与一次性执行必须由后续数据库围栏和promotion-bound Migration回执独立证明。
 
+## D-148 Migration批准与数据库执行使用独立一次性授权且批准检查点禁止SQL
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY APPROVAL CHECKPOINT VERIFIED / SQL EXECUTION FAILS CLOSED / DATABASE FENCE DEFERRED TO TASK74 / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK73对Migration runtime、release authorization、角色/secret、`schema_migrations`、数据库围栏和promotion journal的源码核对及Node37/37、Supervisor9/9验证
+- 确认边界：只接受仓库内批准intent、一次性授权、内容寻址checkpoint 7回执和fake-root证据；不授权数据库连接/围栏、Migration SQL、CONNECT/role/ACL、Compose、host或UAT/生产动作
+
+### Context
+
+- TASK72只证明精确Compose Web/Worker自snapshot后持续静默；未标注容器、其他主机和直接数据库client仍须数据库级围栏。该围栏只能在精确Migration session存在的执行窗口建立和重验，批准时无法诚实证明。
+- promotion journal要求每个检查点的授权SHA唯一且完整保留授权摘要链。若checkpoint 7批准和checkpoint 8执行共用一份授权，既违反防重放不变量，也无法区分“同意执行”与“已经建立围栏并执行SQL”。
+- 旧`release-migration-authorization.ts`的环境变量确认可重复，不能形成一次性promotion执行权；现有advisory lock只能串行Migration实例，不能排除业务writer或证明提交回执。
+
+### Decision
+
+1. 原TASK73的checkpoint 7/8范围拆分。TASK73只关闭`ONE_TIME_MIGRATION_AUTHORIZATION`；checkpoint 8 `MIGRATION_COMMIT_RECEIPT`由TASK74使用新的独立执行授权完成。
+2. `AUTHORIZE_UAT_PROMOTION_MIGRATION`使用Supervisor authorization v6，最长60分钟且requester/approver/executor摘要互异。批准intent必须先于授权消费持久化，并精确绑定ordinal-6、promotion/quiesce/candidate/runtime/database、current/target head、allowlist、Migration角色及四个权威source。
+3. checkpoint 7只发布`execution_scope: APPROVAL_ONLY_NO_SQL_NO_DATABASE_FENCE`及非零`migration_authorization_binding_sha256`。history/receipt/current保持内容寻址、单调、无覆盖；授权SHA不得被后续检查点复用。
+4. 受控release evidence存在时，Migration入口必须在创建数据库pool和运行任何SQL前调用执行adapter；adapter未实现或证据不完整时固定返回`MIGRATION_SUPERVISOR_EXECUTION_ADAPTER_NOT_IMPLEMENTED`。可重复环境变量和测试client不得旁路该门。
+5. TASK74必须使用独立`RUN_UAT_PROMOTION_MIGRATION`授权，持久化执行intent，证明精确数据库client/session/role与CONNECT/read-only围栏、逐文件提交、最终reconciliation和不可覆盖checkpoint 8回执。
+6. checkpoint 7恢复只收敛可证明的history/receipt/current发布partial；source替换、过期、冲突、hardlink/symlink或未知状态保全/quarantine，不连接数据库、不执行SQL、不释放writer。
+
+### Consequences
+
+- 机器审计由8项SUPPORTED/7项阻断收敛为9项SUPPORTED/6项阻断（P0=5、P1=1）；五个必需Supervisor操作实现，artifact self SHA-256为`ed37e980…e520`，`assert-ready`继续返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。
+- source`32860b86be13cab880b5cf0cd8e9cfb255956809`/tree`b950a29944c48a73be78bab730f252b6f5ccf9c4`→monitor`18b93e90ecd8f90b084d82596f847e7651aec6ee`/tree`a5967c5bfbe853bb322bb77a11eadecd6a495f33`→Supervisor`302661c5d49722c6c4b4bcfe18749417e3688e52`/tree`0a05618b217878c9dd71bb0226bebfb16f5e4a78`形成30/128文件canonical链；manifest raw SHA-256为`59ea1084…7c0`/`090c3a23…800`。
+- 受限Node37/37、Supervisor9/9、monitor14/14、installer17/17及targeted lint/compile/syntax/credentials/diff门通过；未执行真实数据库、Migration、writer、Compose、镜像、部署、回滚或UAT写。
+- 下一P0为TASK74 checkpoint 8数据库执行与提交回执；TASK70继续等待执行器完整和Swap停止线解除。系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝让批准与执行共用授权SHA、让批准adapter隐式连接数据库，或把operator声明/环境变量/advisory lock视为数据库围栏。
+- 拒绝因为执行adapter未实现就让legacy production路径继续创建pool；受控证据存在时必须在SQL和连接之前失败关闭。
+- 拒绝把fake-root、测试client、checkpoint 7回执或Migration最终head描述为真实数据库围栏、提交回执、A6通过或UAT已迁移。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

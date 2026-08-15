@@ -2,17 +2,33 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-UAT-MIGRATION-TRANSACTION-73（执行中；接入一次性Migration与提交回执）
+## SELFHOST-UAT-MIGRATION-COMMIT-74（执行中；接入数据库执行围栏与Migration提交回执）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / REPOSITORY MIGRATION AUTHORIZATION AND COMMIT RECEIPT / RESOURCE STOP LINE ACTIVE / NO REAL DATABASE OR UAT ACTION / PRODUCTION NO-GO | 唯一active task；接入promotion checkpoint 7/8一次性Migration授权、数据库连接围栏、提交回执和保全式恢复 |
-| 严格起点 | PASS / CONTROLLED | `ad98661b78e5f9fb989a7d56d78992c24592b27d`/tree`8912ce1005ebd22982fc65e0a1169ed68c4769a1`；用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / QUIESCE CHECKPOINT READY WITH EXPLICIT SCOPE | TASK72/D-147固定精确Compose writer持续停止，但明确不证明未标注容器或外部数据库client；TASK73必须用数据库级围栏关闭该边界 |
+| 当前状态 | DOING / REPOSITORY DATABASE FENCE AND MIGRATION COMMIT RECEIPT / RESOURCE STOP LINE ACTIVE / NO REAL DATABASE OR UAT ACTION / PRODUCTION NO-GO | 唯一active task；以独立执行授权接入promotion checkpoint 8数据库client/session/role围栏、逐文件结果、提交回执和保全式恢复 |
+| 严格起点 | PASS / CONTROLLED | `302661c5d49722c6c4b4bcfe18749417e3688e52`/tree`0a05618b217878c9dd71bb0226bebfb16f5e4a78`；用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / APPROVAL CHECKPOINT READY WITHOUT SQL AUTHORITY | TASK73/D-148固定checkpoint 7批准为`APPROVAL_ONLY_NO_SQL_NO_DATABASE_FENCE`；TASK74必须使用另一份一次性授权证明数据库执行围栏与结果 |
 | 动态验收 | BLOCKED / TASK70 | Swap超过80%且执行器未完整；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
 | 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap868MiB/1GiB（超过80%）、根盘13GiB、Load低；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不停止/启动容器，不启动backup/Compose/PostgreSQL，不连接数据库、修改CONNECT/role/ACL或执行Migration/UAT写；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
 | 系统是否可用 | NO | 无完整晋升执行器、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行或正式切换 |
+
+## SELFHOST-UAT-MIGRATION-TRANSACTION-73（完成；一次性Migration批准通过且SQL失败关闭）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY ONE-TIME MIGRATION APPROVAL VERIFIED / SQL EXECUTION FAILS CLOSED / NO REAL DATABASE OR UAT ACTION / PRODUCTION NO-GO | TASK73已释放active slot；TASK74接入数据库执行与提交回执，TASK70保持受阻 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`32860b8`/tree`b950a299`→monitor`18b93e9`/tree`a5967c5b`→Supervisor`302661c`/tree`0a05618b`；30/128文件manifest为`59ea1084…7c0`/`090c3a23…800`且重放一致 |
+| 依赖决策 | PASS / D-148 | checkpoint 7批准与checkpoint 8执行必须使用不同授权SHA；批准范围固定为`APPROVAL_ONLY_NO_SQL_NO_DATABASE_FENCE` |
+| 授权合同 | PASS / FAIL CLOSED | 一次性AUTHORIZE、授权消费前intent、ordinal-6/promotion/quiesce/candidate/runtime/database/head/allowlist/role/三方actor绑定及非零binding完整 |
+| SQL门 | PASS / BEFORE DATABASE POOL | 受控release evidence存在时在数据库pool创建前返回`MIGRATION_SUPERVISOR_EXECUTION_ADAPTER_NOT_IMPLEMENTED`；legacy环境变量和测试client不能获得执行权 |
+| 恢复 | PASS / PRESERVATION FIRST | 三个发布崩溃点可由新恢复授权收敛；source替换、冲突、过期、hardlink/symlink和未知状态保全并quarantine，不执行SQL或释放writer |
+| 审计 | PASS / EXECUTOR STILL BLOCKED | artifact self SHA-256为`ed37e980…e520`；9项SUPPORTED、6项阻断（P0=5、P1=1），5/8必需Supervisor operation实现，`assert-ready`继续精确拒绝 |
+| 自动验证 | PASS / SCOPED APPLICABLE | 受限Node37/37、Supervisor9/9、monitor14/14、installer17/17、targeted ESLint、compile/syntax、凭据、生成物重放及diff门通过 |
+| 资源/清理 | STOP LINE ACTIVE / NO OOM | 起点/收口available约1.9GiB、Swap868MiB/1GiB、根盘13GiB、Load低；四个项目容器restart0/OOM false，临时Node容器与审计输出精确清理 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 当前四个UAT容器仍running；未运行build、backup、writer stop/start、Compose/PostgreSQL、Migration、镜像、部署、回滚或业务写 |
+| 系统是否可用 | NO | checkpoint 7批准不是数据库围栏或执行回执；仍缺6项adapter、真实恢复、正式门、业务批准、人工UAT和切换 |
 
 ## SELFHOST-UAT-WRITER-QUIESCE-72（完成；精确Compose writer持续静默适配器通过）
 

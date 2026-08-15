@@ -4,6 +4,18 @@
 
 ## 2026-08-15
 
+### SELFHOST-UAT-MIGRATION-TRANSACTION-73 - `feat: add UAT migration approval checkpoint` / `chore: refresh monitoring delivery manifest` / `chore: refresh release supervisor manifest` / `docs: close migration approval and start commit receipt`
+
+- 调度/范围：从TASK72最终Supervisor提交`ad98661`/tree`8912ce10`启动唯一active task；原计划覆盖checkpoint 7/8，只在仓库/fake-root/可注入client中核对与实现，不连接数据库、不运行Migration或修改UAT/生产。
+- 边界决策：D-148确认授权SHA不得跨检查点复用，数据库client/session/role围栏只能在执行窗口证明，因此TASK73收敛为checkpoint 7批准，checkpoint 8独立为TASK74。批准intent固定`APPROVAL_ONLY_NO_SQL_NO_DATABASE_FENCE`，不得把批准回执冒充执行权。
+- Supervisor/事务：authorization v6新增`AUTHORIZE_UAT_PROMOTION_MIGRATION`；短时三方授权精确绑定ordinal-6、promotion/quiesce/candidate/runtime/database、current/target head、allowlist、Migration角色与四个权威source。intent先于授权消费，checkpoint 7通过history→receipt→current发布非零binding，RECOVER覆盖三个发布崩溃点并对替换、链接、冲突和未知状态保全/quarantine。
+- SQL失败关闭：受控release evidence存在时，`migrate-postgres.ts`在数据库pool创建前调用执行adapter门并返回`MIGRATION_SUPERVISOR_EXECUTION_ADAPTER_NOT_IMPLEMENTED`。旧`ERP_ALLOW_PRODUCTION_MIGRATION`/`ERP_MIGRATION_CONFIRM`可参与legacy证据验证，但不能授权受控SQL；隔离测试入口保持独立。
+- 审计/发布链：机器审计收敛为9项SUPPORTED、6项阻断（P0=5、P1=1），artifact self SHA-256为`ed37e980…e520`且`assert-ready`继续拒绝。source`32860b8`/tree`b950a299`→monitor`18b93e9`/tree`a5967c5b`→Supervisor`302661c`/tree`0a05618b`形成30/128文件链，manifest raw SHA-256为`59ea1084…7c0`/`090c3a23…800`。
+- 验证：Supervisor专项9/9、受限Node三个专项37/37、monitor host delivery14/14、installer17/17、targeted ESLint、Python compile、Node syntax、凭据扫描、生成物重放和diff检查通过；未跳过或降低断言。
+- 资源/边界：起点/收口available约1.9GiB、Swap868MiB/1GiB、根盘13GiB、Load低且未持续越线；四个项目容器restart0/OOM false。只运行192MiB/0.5 CPU断网只读Node临时容器和轻量Python，未运行build、全量Node/PostgreSQL、Docker数据库、typecheck、backup/restore、Migration、镜像、Compose、部署、回滚或业务写。
+- 数据库/API：无Schema、Migration文件或业务API变化；仅扩展root Supervisor、promotion journal和Migration执行前门。真实A4/A6、数据库围栏、账号、UAT/生产和数据动作均未授权。
+- 治理：新增D-148，TASK73转`DONE`；自动启动`SELFHOST-UAT-MIGRATION-COMMIT-74`为唯一`DOING`，以独立执行授权关闭checkpoint 8，TASK70继续等待资源与执行器依赖。
+
 ### SELFHOST-UAT-WRITER-QUIESCE-72 - `feat: add UAT writer quiesce checkpoint` / `chore: refresh monitoring delivery manifest` / `chore: refresh release supervisor manifest` / `docs: close writer quiesce and start migration transaction`
 
 - 调度/范围：从TASK71最终Supervisor提交`bc339b6`/tree`f7fd37bd`启动唯一active task；只实现仓库quiesce adapter和fake-root恢复，不停止/启动容器、不连接数据库、不读取备份/Volume或修改UAT/生产。
