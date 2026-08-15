@@ -35,6 +35,8 @@
     "postdeploy_identity_operation": "VERIFY_UAT_POSTDEPLOY_IDENTITY",
     "cross_role_uat_operation": "VERIFY_UAT_CROSS_ROLE_EXECUTION",
     "finalization_operation": "FINALIZE_UAT_PROMOTION",
+    "rollback_operation": "ROLLBACK_UAT_RELEASE",
+    "rollback_postverify_operation": "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
     "recovery_operation": "RECOVER_UAT_PROMOTION"
   },
   "required_intent_bindings": [
@@ -93,7 +95,8 @@
     {"operation": "VERIFY_UAT_POSTDEPLOY_IDENTITY", "status": "IMPLEMENTED", "checkpoints": ["POST_DEPLOY_IDENTITY"]},
     {"operation": "VERIFY_UAT_CROSS_ROLE_EXECUTION", "status": "IMPLEMENTED", "checkpoints": ["CROSS_ROLE_UAT_EXECUTION"]},
     {"operation": "FINALIZE_UAT_PROMOTION", "status": "IMPLEMENTED", "checkpoints": ["PROMOTION_FINAL_RECEIPT"]},
-    {"operation": "ROLLBACK_UAT_RELEASE", "status": "NOT_IMPLEMENTED", "checkpoints": ["ROLLBACK_TO_UAT_EXECUTOR", "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT"]},
+    {"operation": "ROLLBACK_UAT_RELEASE", "status": "IMPLEMENTED", "checkpoints": ["ROLLBACK_TO_UAT_EXECUTOR"]},
+    {"operation": "VERIFY_AND_FINALIZE_UAT_ROLLBACK", "status": "IMPLEMENTED", "checkpoints": ["ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT"]},
     {"operation": "RECOVER_UAT_PROMOTION", "status": "IMPLEMENTED", "checkpoints": []}
   ],
   "journal": {

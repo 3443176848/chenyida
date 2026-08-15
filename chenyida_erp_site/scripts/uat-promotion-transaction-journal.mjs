@@ -55,6 +55,18 @@ import {
   validateCrossRoleUatTemplate,
   validateUatPromotionCrossRoleResult,
 } from "./uat-promotion-cross-role-evidence-contract.mjs";
+import {
+  assertUatPromotionRollbackExecutionPackageMatchesParameters,
+  assertUatPromotionRollbackPostverifyResultMatchesIntent,
+  assertUatPromotionRollbackResultMatchesIntent,
+  validateUatPromotionRollbackBoundary,
+  validateUatPromotionRollbackDatabase,
+  validateUatPromotionRollbackExecutionPackage,
+  validateUatPromotionRollbackPostverifyResult,
+  validateUatPromotionRollbackPredecessor,
+  validateUatPromotionRollbackResult,
+  validateUatPromotionRollbackSnapshotObjects,
+} from "./uat-promotion-rollback-contract.mjs";
 import { canonicalJson as canonicalReleaseJson } from "./release-manifest-contract.mjs";
 
 export const UAT_PROMOTION_POLICY_CONTRACT = "chenyida-erp-uat-promotion-transaction-policy/v1";
@@ -69,6 +81,8 @@ export const UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT = "chenyida-erp-ua
 export const UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-identity-intent/v1";
 export const UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT = "chenyida-erp-uat-promotion-cross-role-intent/v1";
 export const UAT_PROMOTION_FINALIZATION_INTENT_CONTRACT = "chenyida-erp-uat-promotion-finalization-intent/v1";
+export const UAT_PROMOTION_ROLLBACK_INTENT_CONTRACT = "chenyida-erp-uat-promotion-rollback-intent/v1";
+export const UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_CONTRACT = "chenyida-erp-uat-promotion-rollback-postverify-intent/v1";
 export const UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-identity-evidence/v1";
 export const UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-containment/v1";
 export const UAT_PROMOTION_RECEIPT_CONTRACT = "chenyida-erp-uat-promotion-checkpoint-receipt/v1";
@@ -79,8 +93,8 @@ export const UAT_PROMOTION_CURRENT_FILE = `${UAT_PROMOTION_STATE_ROOT}/current.j
 export const UAT_PROMOTION_STATE_MARKER = ".chenyida-erp-uat-promotion-transactions-v1";
 export const UAT_PROMOTION_STATE_MARKER_VALUE = "chenyida-erp-uat-promotion-transactions/v1\n";
 export const UAT_PROMOTION_POLICY_RELATIVE = "operations/uat-promotion-transaction-policy-v1.json";
-export const UAT_PROMOTION_POLICY_FILE_SHA256 = "8b41e61e1e53a4c60833eb0f25cdca8d55c13b01142ab59dea956cd62e45f558";
-export const UAT_PROMOTION_POLICY_SHA256 = "70a999c4a5be491be1a20ad4697eaf65453463a71c6abaeb3df4b5ce24fce73f";
+export const UAT_PROMOTION_POLICY_FILE_SHA256 = "c1fe967ab455af92ee385925dab53fcfa59ad6db97ca266d4971fbd632eb8075";
+export const UAT_PROMOTION_POLICY_SHA256 = "7a0a408e1fa252460a87603534f1c48633d6343987ee607bcbcb384897720f30";
 export const ZERO_SHA256 = "0".repeat(64);
 
 const SITE_ROOT = path.resolve(fileURLToPath(new URL("../", import.meta.url)));
@@ -301,6 +315,39 @@ const FINALIZATION_PARAMETER_FIELDS = Object.freeze([
   "finalization_expires_at", "requester_identity_sha256", "approver_identity_sha256",
   "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
 ]);
+const ROLLBACK_EXECUTION_PARAMETER_FIELDS = Object.freeze([
+  "promotion_state_root", "promotion_id", "promotion_generation", "previous_checkpoint_receipt_sha256",
+  "promotion_intent_sha256", "promotion_original_authorization_sha256", "candidate_binding_sha256",
+  "database_binding_sha256", "runtime_binding_sha256", "preupgrade_recovery_binding_sha256",
+  "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+  "migration_authorization_binding_sha256", "migration_fence_binding_sha256",
+  "migration_result_binding_sha256", "compose_deployment_binding_sha256", "current_checkpoint_source",
+  "rollback_id", "finalization_operation_id", "finalization_intent_sha256",
+  "finalization_intent_source", "snapshot_operation_id", "snapshot_intent_sha256",
+  "snapshot_intent_source", "snapshot_readiness_sha256", "snapshot_backup_id",
+  "snapshot_restore_run_id", "snapshot_objects", "predecessor_postdeploy_receipt_sha256",
+  "predecessor_postdeploy_receipt_source", "predecessor_release_manifest_sha256",
+  "predecessor_release_manifest_source", "predecessor", "database", "compose_project",
+  "compose_project_root", "execution_package_sha256", "execution_package_source",
+  "execution_deadline", "boundary", "rollback_created_at", "rollback_expires_at",
+  "requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256",
+  "policy_file_sha256", "policy_sha256",
+]);
+const ROLLBACK_POSTVERIFY_PARAMETER_FIELDS = Object.freeze([
+  "promotion_state_root", "promotion_id", "promotion_generation", "previous_checkpoint_receipt_sha256",
+  "promotion_intent_sha256", "promotion_original_authorization_sha256", "candidate_binding_sha256",
+  "database_binding_sha256", "runtime_binding_sha256", "preupgrade_recovery_binding_sha256",
+  "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+  "migration_authorization_binding_sha256", "migration_fence_binding_sha256",
+  "migration_result_binding_sha256", "compose_deployment_binding_sha256", "current_checkpoint_source",
+  "postverify_id", "rollback_operation_id", "rollback_intent_sha256", "rollback_intent_source",
+  "rollback_execution_authorization_sha256", "rollback_result_sha256", "rollback_result_source",
+  "predecessor_postdeploy_receipt_sha256",
+  "predecessor_postdeploy_receipt_source", "predecessor_release_manifest_sha256",
+  "predecessor_release_manifest_source", "postverify_created_at", "postverify_expires_at",
+  "requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256",
+  "policy_file_sha256", "policy_sha256",
+]);
 const WRITER_CAPTURE_FIELDS = Object.freeze([
   "deployment_class", "deployment_id", "compose_project", "snapshot_recovery_point_at", "snapshot_writer_verified_at",
   "application_version", "git_commit", "migration_head", "migration_manifest_sha256", "web", "worker",
@@ -362,7 +409,7 @@ function validatePolicy(value) {
   if (!same(value.deployment, { class: "UAT", id: "chenyida-erp", database: "chenyida_erp", database_marker: "chenyida-erp-deployment/v2:UAT:chenyida-erp" })) reject("UAT_PROMOTION_POLICY_INVALID");
   exactKeys(value.state, ["root", "marker", "marker_value", "directory_mode", "file_mode", "owner_uid", "owner_gid"], "UAT_PROMOTION_POLICY_INVALID");
   if (!same(value.state, { root: UAT_PROMOTION_STATE_ROOT, marker: UAT_PROMOTION_STATE_MARKER, marker_value: UAT_PROMOTION_STATE_MARKER_VALUE, directory_mode: "0700", file_mode: "0400", owner_uid: 0, owner_gid: 0 })) reject("UAT_PROMOTION_POLICY_INVALID");
-  exactKeys(value.authorization, ["contract", "maximum_window_minutes", "required_distinct_actors", "begin_operation", "snapshot_operation", "quiesce_operation", "migration_authorization_operation", "migration_execution_operation", "compose_deployment_operation", "postdeploy_runtime_configuration_operation", "postdeploy_identity_operation", "cross_role_uat_operation", "finalization_operation", "recovery_operation"], "UAT_PROMOTION_POLICY_INVALID");
+  exactKeys(value.authorization, ["contract", "maximum_window_minutes", "required_distinct_actors", "begin_operation", "snapshot_operation", "quiesce_operation", "migration_authorization_operation", "migration_execution_operation", "compose_deployment_operation", "postdeploy_runtime_configuration_operation", "postdeploy_identity_operation", "cross_role_uat_operation", "finalization_operation", "rollback_operation", "rollback_postverify_operation", "recovery_operation"], "UAT_PROMOTION_POLICY_INVALID");
   if (value.authorization.contract !== "chenyida-erp-release-supervisor-authorization/v6"
     || value.authorization.maximum_window_minutes !== 60 || value.authorization.begin_operation !== "BEGIN_UAT_PROMOTION"
     || value.authorization.snapshot_operation !== "CAPTURE_UAT_PROMOTION_SNAPSHOT"
@@ -374,6 +421,8 @@ function validatePolicy(value) {
     || value.authorization.postdeploy_identity_operation !== "VERIFY_UAT_POSTDEPLOY_IDENTITY"
     || value.authorization.cross_role_uat_operation !== "VERIFY_UAT_CROSS_ROLE_EXECUTION"
     || value.authorization.finalization_operation !== "FINALIZE_UAT_PROMOTION"
+    || value.authorization.rollback_operation !== "ROLLBACK_UAT_RELEASE"
+    || value.authorization.rollback_postverify_operation !== "VERIFY_AND_FINALIZE_UAT_ROLLBACK"
     || value.authorization.recovery_operation !== "RECOVER_UAT_PROMOTION"
     || !same(value.authorization.required_distinct_actors, ["requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256"])) reject("UAT_PROMOTION_POLICY_INVALID");
   exactKeys(value.snapshot_writer_dependency, [
@@ -392,7 +441,7 @@ function validatePolicy(value) {
   if (!same(value.checkpoint_order, CHECKPOINT_ORDER) || value.initial_checkpoint !== CHECKPOINT_ORDER[3]) reject("UAT_PROMOTION_POLICY_INVALID");
   if (!Array.isArray(value.required_intent_bindings) || value.required_intent_bindings.length !== 16
     || new Set(value.required_intent_bindings).size !== value.required_intent_bindings.length) reject("UAT_PROMOTION_POLICY_INVALID");
-  if (!Array.isArray(value.adapters) || value.adapters.length !== 12) reject("UAT_PROMOTION_POLICY_INVALID");
+  if (!Array.isArray(value.adapters) || value.adapters.length !== 13) reject("UAT_PROMOTION_POLICY_INVALID");
   const expectedAdapters = new Map([
     ["BEGIN_UAT_PROMOTION", "IMPLEMENTED"], ["CAPTURE_UAT_PROMOTION_SNAPSHOT", "IMPLEMENTED"],
     ["QUIESCE_UAT_WRITERS", "IMPLEMENTED"], ["RUN_UAT_PROMOTION_MIGRATION", "IMPLEMENTED"],
@@ -402,7 +451,8 @@ function validatePolicy(value) {
     ["VERIFY_UAT_POSTDEPLOY_IDENTITY", "IMPLEMENTED"],
     ["VERIFY_UAT_CROSS_ROLE_EXECUTION", "IMPLEMENTED"],
     ["FINALIZE_UAT_PROMOTION", "IMPLEMENTED"],
-    ["ROLLBACK_UAT_RELEASE", "NOT_IMPLEMENTED"],
+    ["ROLLBACK_UAT_RELEASE", "IMPLEMENTED"],
+    ["VERIFY_AND_FINALIZE_UAT_ROLLBACK", "IMPLEMENTED"],
     ["RECOVER_UAT_PROMOTION", "IMPLEMENTED"],
   ]);
   for (const adapter of value.adapters) {
@@ -1040,9 +1090,135 @@ export function validateUatPromotionFinalizationParameters(value) {
   return value;
 }
 
+function validateRollbackCommonParameters(value, fields, code, createdField, expiresField) {
+  exactKeys(value, fields, code);
+  if (value.promotion_state_root !== UAT_PROMOTION_STATE_ROOT) reject("UAT_PROMOTION_STATE_PATH_INVALID");
+  identifier(value.promotion_id, code);
+  integer(value.promotion_generation, 1, 1_000_000, code);
+  for (const field of [
+    "previous_checkpoint_receipt_sha256", "promotion_intent_sha256",
+    "promotion_original_authorization_sha256", "candidate_binding_sha256", "database_binding_sha256",
+    "runtime_binding_sha256", "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "requester_identity_sha256",
+    "approver_identity_sha256", "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+  ]) digest(value[field], code);
+  if (value.policy_file_sha256 !== UAT_PROMOTION_POLICY_FILE_SHA256
+    || value.policy_sha256 !== UAT_PROMOTION_POLICY_SHA256) reject("UAT_PROMOTION_POLICY_BINDING_INVALID");
+  if (new Set([
+    value.requester_identity_sha256, value.approver_identity_sha256, value.executor_identity_sha256,
+  ]).size !== 3) reject("UAT_PROMOTION_ACTORS_INVALID");
+  const created = Date.parse(iso(value[createdField], code));
+  const expires = Date.parse(iso(value[expiresField], code));
+  if (expires <= created || expires - created > 15 * 60 * 1000) reject(code);
+  validateSourceSpec(
+    value.current_checkpoint_source, UAT_PROMOTION_CURRENT_FILE, new Set(["0400"]),
+    `${code}_CURRENT_SOURCE_INVALID`, 0,
+  );
+  return { created, expires };
+}
+
+export function validateUatPromotionRollbackExecutionParameters(value) {
+  const code = "UAT_PROMOTION_ROLLBACK_PARAMETERS_INVALID";
+  validateRollbackCommonParameters(
+    value, ROLLBACK_EXECUTION_PARAMETER_FIELDS, code, "rollback_created_at", "rollback_expires_at",
+  );
+  for (const field of [
+    "rollback_id", "finalization_operation_id", "snapshot_operation_id", "snapshot_backup_id",
+    "snapshot_restore_run_id",
+  ]) identifier(value[field], code);
+  if (new Set([
+    value.promotion_id, value.rollback_id, value.finalization_operation_id, value.snapshot_operation_id,
+  ]).size !== 4) reject(code);
+  for (const field of [
+    "finalization_intent_sha256", "snapshot_intent_sha256", "snapshot_readiness_sha256",
+    "predecessor_postdeploy_receipt_sha256", "predecessor_release_manifest_sha256",
+    "execution_package_sha256",
+  ]) digest(value[field], code);
+  const executionDeadline = Date.parse(iso(value.execution_deadline, code));
+  const rollbackCreated = Date.parse(value.rollback_created_at);
+  if (executionDeadline <= rollbackCreated
+    || executionDeadline - rollbackCreated > 2 * 60 * 60 * 1000) reject(code);
+  validateUatPromotionRollbackSnapshotObjects(value.snapshot_objects, code);
+  validateUatPromotionRollbackPredecessor(value.predecessor, code);
+  validateUatPromotionRollbackDatabase(value.database, code);
+  validateUatPromotionRollbackBoundary(value.boundary, code);
+  if (value.compose_project !== "chenyida-erp" || typeof value.compose_project_root !== "string"
+    || !path.isAbsolute(value.compose_project_root) || path.normalize(value.compose_project_root) !== value.compose_project_root
+    || value.compose_project_root === "/") reject(code);
+  // The immutable receipt and manifest are the authorities. The outer context
+  // carries only their byte sources plus a compact semantic target because
+  // release artifacts use insertion-order JSON while Supervisor contexts use
+  // recursively sorted cluster JSON.
+  if (value.predecessor.release_manifest_sha256 !== value.predecessor_release_manifest_sha256
+    || databaseBinding({
+      database_name: value.database.name, database_oid: value.database.oid,
+      database_system_identifier: value.database.system_identifier, database_marker: value.database.marker,
+    }) !== value.database_binding_sha256) reject("UAT_PROMOTION_ROLLBACK_PREDECESSOR_EVIDENCE_INVALID");
+  const finalizationPath = `${UAT_PROMOTION_STATE_ROOT}/intents/${value.finalization_operation_id}.${value.finalization_intent_sha256}.json`;
+  const snapshotPath = `${UAT_PROMOTION_STATE_ROOT}/intents/${value.snapshot_operation_id}.${value.snapshot_intent_sha256}.json`;
+  const executionPackagePath = `${UAT_PROMOTION_STATE_ROOT}/packages/${value.rollback_id}.${value.execution_package_sha256}.json`;
+  validateSourceSpec(value.finalization_intent_source, finalizationPath, new Set(["0400"]), `${code}_FINALIZATION_SOURCE_INVALID`, 0);
+  validateSourceSpec(value.snapshot_intent_source, snapshotPath, new Set(["0400"]), `${code}_SNAPSHOT_SOURCE_INVALID`, 0);
+  validateSourceSpec(
+    value.predecessor_postdeploy_receipt_source, null, new Set(["0400", "0440"]),
+    `${code}_PREDECESSOR_RECEIPT_SOURCE_INVALID`, 0,
+  );
+  validateSourceSpec(
+    value.predecessor_release_manifest_source, null, new Set(["0440"]),
+    `${code}_PREDECESSOR_MANIFEST_SOURCE_INVALID`, 0,
+  );
+  validateSourceSpec(
+    value.execution_package_source, executionPackagePath, new Set(["0400"]),
+    `${code}_EXECUTION_PACKAGE_SOURCE_INVALID`, 0,
+  );
+  if (value.predecessor_postdeploy_receipt_source.sha256 !== value.predecessor_postdeploy_receipt_sha256
+    || value.predecessor_release_manifest_source.sha256 !== value.predecessor_release_manifest_sha256
+    || new Set([
+      value.current_checkpoint_source.path, value.finalization_intent_source.path,
+      value.snapshot_intent_source.path, value.predecessor_postdeploy_receipt_source.path,
+      value.predecessor_release_manifest_source.path, value.execution_package_source.path,
+    ]).size !== 6) reject("UAT_PROMOTION_ROLLBACK_SOURCE_BINDING_INVALID");
+  return value;
+}
+
+export function validateUatPromotionRollbackPostverifyParameters(value) {
+  const code = "UAT_PROMOTION_ROLLBACK_POSTVERIFY_PARAMETERS_INVALID";
+  validateRollbackCommonParameters(
+    value, ROLLBACK_POSTVERIFY_PARAMETER_FIELDS, code, "postverify_created_at", "postverify_expires_at",
+  );
+  for (const field of ["postverify_id", "rollback_operation_id"]) identifier(value[field], code);
+  if (new Set([value.promotion_id, value.postverify_id, value.rollback_operation_id]).size !== 3) reject(code);
+  for (const field of [
+    "rollback_intent_sha256", "rollback_execution_authorization_sha256", "rollback_result_sha256",
+    "predecessor_postdeploy_receipt_sha256", "predecessor_release_manifest_sha256",
+  ]) digest(value[field], code);
+  const rollbackIntentPath = `${UAT_PROMOTION_STATE_ROOT}/intents/${value.rollback_operation_id}.${value.rollback_intent_sha256}.json`;
+  const rollbackResultPath = `${UAT_PROMOTION_STATE_ROOT}/results/${value.rollback_operation_id}.${value.rollback_result_sha256}.json`;
+  validateSourceSpec(value.rollback_intent_source, rollbackIntentPath, new Set(["0400"]), `${code}_ROLLBACK_INTENT_SOURCE_INVALID`, 0);
+  validateSourceSpec(value.rollback_result_source, rollbackResultPath, new Set(["0400"]), `${code}_ROLLBACK_RESULT_SOURCE_INVALID`, 0);
+  validateSourceSpec(
+    value.predecessor_postdeploy_receipt_source, null, new Set(["0400", "0440"]),
+    `${code}_PREDECESSOR_RECEIPT_SOURCE_INVALID`, 0,
+  );
+  validateSourceSpec(
+    value.predecessor_release_manifest_source, null, new Set(["0440"]),
+    `${code}_PREDECESSOR_MANIFEST_SOURCE_INVALID`, 0,
+  );
+  if (value.predecessor_postdeploy_receipt_source.sha256 !== value.predecessor_postdeploy_receipt_sha256
+    || value.predecessor_release_manifest_source.sha256 !== value.predecessor_release_manifest_sha256
+    || new Set([
+      value.current_checkpoint_source.path, value.rollback_intent_source.path,
+      value.rollback_result_source.path, value.predecessor_postdeploy_receipt_source.path,
+      value.predecessor_release_manifest_source.path,
+    ]).size !== 5) reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_SOURCE_BINDING_INVALID");
+  return value;
+}
+
 export function validateUatPromotionContext(value) {
   exactKeys(value, CONTEXT_FIELDS, "UAT_PROMOTION_CONTEXT_INVALID");
-  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_CONTEXT_CONTRACT || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT", "FINALIZATION"]).has(value.operation)
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_CONTEXT_CONTRACT || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT", "FINALIZATION", "ROLLBACK_EXECUTION", "ROLLBACK_POSTVERIFY"]).has(value.operation)
     || !new Set(["ORIGINAL", "RECOVERY"]).has(value.execution_mode)) reject("UAT_PROMOTION_CONTEXT_INVALID");
   identifier(value.operation_id, "UAT_PROMOTION_CONTEXT_ID_INVALID");
   identifier(value.execution_authorization_id, "UAT_PROMOTION_CONTEXT_ID_INVALID");
@@ -1057,7 +1233,9 @@ export function validateUatPromotionContext(value) {
   else if (value.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION") validateUatPromotionPostdeployRuntimeParameters(value.parameters);
   else if (value.operation === "POSTDEPLOY_IDENTITY") validateUatPromotionPostdeployIdentityParameters(value.parameters);
   else if (value.operation === "CROSS_ROLE_UAT") validateUatPromotionCrossRoleParameters(value.parameters);
-  else validateUatPromotionFinalizationParameters(value.parameters);
+  else if (value.operation === "FINALIZATION") validateUatPromotionFinalizationParameters(value.parameters);
+  else if (value.operation === "ROLLBACK_EXECUTION") validateUatPromotionRollbackExecutionParameters(value.parameters);
+  else validateUatPromotionRollbackPostverifyParameters(value.parameters);
   const operationCreatedAt = value.operation === "BEGIN" ? value.parameters.promotion_created_at
     : value.operation === "CAPTURE_SNAPSHOT" ? value.parameters.snapshot_created_at
       : value.operation === "QUIESCE_WRITERS" ? value.parameters.quiesce_created_at
@@ -1065,7 +1243,9 @@ export function validateUatPromotionContext(value) {
           : value.operation === "MIGRATION_EXECUTION" ? value.parameters.execution_created_at
             : value.operation === "COMPOSE_DEPLOYMENT" ? value.parameters.deployment_created_at
               : value.operation === "FINALIZATION" ? value.parameters.finalization_created_at
-                : value.parameters.verification_created_at;
+                : value.operation === "ROLLBACK_EXECUTION" ? value.parameters.rollback_created_at
+                  : value.operation === "ROLLBACK_POSTVERIFY" ? value.parameters.postverify_created_at
+                    : value.parameters.verification_created_at;
   if (value.execution_mode === "ORIGINAL") {
     if (value.execution_authorization_id !== value.operation_id || value.execution_authorization_sha256 !== value.original_authorization_sha256
       || value.expected_intent_sha256 !== null || Math.abs(Date.parse(value.execution_created_at) - Date.parse(operationCreatedAt)) > 5 * 60 * 1000
@@ -1084,7 +1264,13 @@ export function validateUatPromotionContext(value) {
       || value.operation === "CROSS_ROLE_UAT" && (value.operation_id !== value.parameters.result_id
         || value.operation_id === value.parameters.postdeploy_identity_operation_id)
       || value.operation === "FINALIZATION" && (value.operation_id !== value.parameters.finalization_id
-        || value.operation_id === value.parameters.cross_role_operation_id)) {
+        || value.operation_id === value.parameters.cross_role_operation_id)
+      || value.operation === "ROLLBACK_EXECUTION" && (value.operation_id !== value.parameters.rollback_id
+        || value.operation_id === value.parameters.finalization_operation_id
+        || value.operation_id === value.parameters.snapshot_operation_id)
+      || value.operation === "ROLLBACK_POSTVERIFY" && (value.operation_id !== value.parameters.postverify_id
+        || value.operation_id === value.parameters.rollback_operation_id
+        || value.execution_authorization_sha256 === value.parameters.rollback_execution_authorization_sha256)) {
       reject("UAT_PROMOTION_CONTEXT_BINDING_INVALID");
     }
   } else {
@@ -2809,6 +2995,225 @@ async function verifyFinalizationSources(context, filesystemRoot, options = {}) 
   return Object.freeze({ previous, crossRoleIntent: evidence.intent, result: evidence.result });
 }
 
+function assertRollbackPredecessorEvidence(
+  parameters, receiptSource, manifestSource, predecessor, inlineReceipt = null, inlineManifest = null,
+) {
+  const code = "UAT_PROMOTION_ROLLBACK_PREDECESSOR_EVIDENCE_INVALID";
+  const receipt = receiptSource.value;
+  const manifest = manifestSource.value;
+  const receiptRaw = receiptSource.raw.toString("utf8");
+  const manifestRaw = manifestSource.raw.toString("utf8");
+  const receiptSha256 = sha256(receiptSource.raw);
+  const manifestSha256 = sha256(manifestSource.raw);
+  const web = receipt.services.find((service) => service.service === "web");
+  const worker = receipt.services.find((service) => service.service === "worker");
+  let identity;
+  try {
+    identity = buildReleaseIdentityFromPostDeployReceipt({ receipt, receiptSha256 });
+  } catch { reject(code); }
+  if (receiptRaw !== canonicalReleaseJson(receipt)
+    || manifestRaw !== canonicalReleaseJson(manifest)
+    || receiptSha256 !== parameters.predecessor_postdeploy_receipt_sha256
+    || manifestSha256 !== parameters.predecessor_release_manifest_sha256
+    || inlineReceipt !== null && !same(receipt, inlineReceipt)
+    || inlineManifest !== null && !same(manifest, inlineManifest)
+    || sha256(Buffer.from(canonicalReleaseJson(identity))) !== parameters.runtime_binding_sha256
+    || receipt.release.manifest_sha256 !== manifestSha256
+    || receipt.deployment.class !== "UAT" || receipt.deployment.id !== "chenyida-erp"
+    || receipt.deployment.compose_project !== parameters.compose_project
+    || receipt.source.git_commit !== predecessor.git_commit
+    || receipt.source.git_tree !== predecessor.git_tree
+    || receipt.source.application_version !== predecessor.application_version
+    || receipt.migrations.head !== predecessor.migration_head
+    || receipt.migrations.manifest_sha256 !== predecessor.migration_manifest_sha256
+    || receipt.runtime_configuration_sha256 !== predecessor.runtime_configuration_sha256
+    || web?.image_reference !== predecessor.web_image
+    || worker?.image_reference !== predecessor.worker_image
+    || predecessor.release_manifest_sha256 !== manifestSha256
+    || manifest.source.git_commit !== predecessor.git_commit
+    || manifest.source.git_tree !== predecessor.git_tree
+    || manifest.source.package_version !== predecessor.application_version
+    || manifest.images.web.image_reference !== predecessor.web_image
+    || manifest.images.worker.image_reference !== predecessor.worker_image
+    || manifest.migrations.head !== predecessor.migration_head
+    || manifest.migrations.allowlist_sha256 !== predecessor.migration_manifest_sha256) reject(code);
+  return Object.freeze({ receipt, manifest, identity, receiptSha256, manifestSha256 });
+}
+
+async function verifyRollbackExecutionSources(context, filesystemRoot, options = {}) {
+  const parameters = context.parameters;
+  const observedAt = options.now ?? new Date();
+  if (!(observedAt instanceof Date) || Number.isNaN(observedAt.getTime())) {
+    reject("UAT_PROMOTION_ROLLBACK_TIME_INVALID");
+  }
+  const current = await readAuthorizedSource(
+    parameters.current_checkpoint_source, filesystemRoot, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_ROLLBACK_CURRENT_SOURCE_INVALID",
+  );
+  const finalizationIntent = await readAuthorizedSource(
+    parameters.finalization_intent_source, filesystemRoot, validateUatPromotionFinalizationIntent,
+    "UAT_PROMOTION_ROLLBACK_FINALIZATION_SOURCE_INVALID",
+  );
+  const snapshotIntent = await readAuthorizedSource(
+    parameters.snapshot_intent_source, filesystemRoot, validateUatPromotionSnapshotIntent,
+    "UAT_PROMOTION_ROLLBACK_SNAPSHOT_SOURCE_INVALID",
+  );
+  const predecessorReceipt = await readAuthorizedSource(
+    parameters.predecessor_postdeploy_receipt_source, filesystemRoot, validatePostDeployReceipt,
+    "UAT_PROMOTION_ROLLBACK_PREDECESSOR_RECEIPT_SOURCE_INVALID",
+  );
+  const predecessorManifest = await readAuthorizedSource(
+    parameters.predecessor_release_manifest_source, filesystemRoot,
+    (value) => validateReleaseManifest(value, { now: new Date(parameters.rollback_created_at), requireEligible: false }),
+    "UAT_PROMOTION_ROLLBACK_PREDECESSOR_MANIFEST_SOURCE_INVALID",
+  );
+  const executionPackage = await readAuthorizedSource(
+    parameters.execution_package_source, filesystemRoot,
+    validateUatPromotionRollbackExecutionPackage,
+    "UAT_PROMOTION_ROLLBACK_EXECUTION_PACKAGE_SOURCE_INVALID",
+  );
+  const previous = current.value;
+  const finalization = finalizationIntent.value;
+  const snapshot = snapshotIntent.value;
+  assertRollbackPredecessorEvidence(
+    parameters, predecessorReceipt, predecessorManifest, parameters.predecessor,
+  );
+  assertUatPromotionRollbackExecutionPackageMatchesParameters(
+    executionPackage.value, parameters,
+  );
+  if (current.raw.toString("utf8") !== canonicalClusterJson(previous)
+    || finalizationIntent.raw.toString("utf8") !== canonicalClusterJson(finalization)
+    || snapshotIntent.raw.toString("utf8") !== canonicalClusterJson(snapshot)
+    || previous.promotion_id !== parameters.promotion_id
+    || previous.promotion_generation !== parameters.promotion_generation
+    || previous.checkpoint_id !== "PROMOTION_FINAL_RECEIPT" || previous.checkpoint_ordinal !== 13
+    || previous.checkpoint_status !== "COMMITTED" || previous.journal_status !== "COMMITTED"
+    || previous.receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256
+    || previous.intent_sha256 !== parameters.promotion_intent_sha256
+    || previous.original_authorization_sha256 !== parameters.promotion_original_authorization_sha256
+    || previous.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || previous.database_binding_sha256 !== parameters.database_binding_sha256
+    || previous.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || previous.recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || previous.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || previous.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256
+    || previous.migration_authorization_binding_sha256 !== parameters.migration_authorization_binding_sha256
+    || previous.migration_fence_binding_sha256 !== parameters.migration_fence_binding_sha256
+    || previous.migration_result_binding_sha256 !== parameters.migration_result_binding_sha256
+    || previous.compose_deployment_binding_sha256 !== parameters.compose_deployment_binding_sha256
+    || previous.authorization_sha256_chain.includes(context.original_authorization_sha256)
+    || finalization.finalization_operation_id !== parameters.finalization_operation_id
+    || finalization.finalization_intent_sha256 !== parameters.finalization_intent_sha256
+    || finalization.promotion_id !== parameters.promotion_id
+    || finalization.promotion_generation !== parameters.promotion_generation
+    || finalization.promotion_intent_sha256 !== parameters.promotion_intent_sha256
+    || previous.checkpoint_authorization_sha256 !== finalization.execution_authorization_sha256
+    || previous.checkpoint_evidence_sha256 !== finalization.finalization_intent_sha256
+    || snapshot.snapshot_operation_id !== parameters.snapshot_operation_id
+    || snapshot.snapshot_intent_sha256 !== parameters.snapshot_intent_sha256
+    || snapshot.promotion_id !== parameters.promotion_id
+    || snapshot.promotion_generation !== parameters.promotion_generation
+    || snapshot.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || snapshot.parameters.snapshot_readiness_sha256 !== parameters.snapshot_readiness_sha256
+    || snapshot.parameters.snapshot_backup_id !== parameters.snapshot_backup_id
+    || snapshot.parameters.snapshot_restore_run_id !== parameters.snapshot_restore_run_id
+    || !same(snapshot.parameters.snapshot_objects, parameters.snapshot_objects)
+    || sha256(predecessorReceipt.raw) !== parameters.predecessor_postdeploy_receipt_sha256
+    || sha256(predecessorManifest.raw) !== parameters.predecessor_release_manifest_sha256
+    || sha256(executionPackage.raw) !== parameters.execution_package_source.sha256
+    || Date.parse(parameters.rollback_created_at) < Date.parse(previous.recorded_at)
+    || context.execution_mode === "ORIGINAL"
+      && (observedAt.getTime() < Date.parse(parameters.rollback_created_at)
+        || observedAt.getTime() >= Date.parse(parameters.rollback_expires_at))) {
+    reject("UAT_PROMOTION_ROLLBACK_SOURCE_BINDING_INVALID");
+  }
+  return Object.freeze({
+    previous, finalizationIntent: finalization, snapshotIntent: snapshot,
+    predecessorReceipt: predecessorReceipt.value, predecessorManifest: predecessorManifest.value,
+    executionPackage: executionPackage.value,
+  });
+}
+
+async function verifyRollbackPostverifySources(context, filesystemRoot, options = {}) {
+  const parameters = context.parameters;
+  const observedAt = options.now ?? new Date();
+  if (!(observedAt instanceof Date) || Number.isNaN(observedAt.getTime())) {
+    reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_TIME_INVALID");
+  }
+  const current = await readAuthorizedSource(
+    parameters.current_checkpoint_source, filesystemRoot, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_ROLLBACK_POSTVERIFY_CURRENT_SOURCE_INVALID",
+  );
+  const rollbackIntent = await readAuthorizedSource(
+    parameters.rollback_intent_source, filesystemRoot, validateUatPromotionRollbackIntent,
+    "UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_SOURCE_INVALID",
+  );
+  const rollbackResult = await readAuthorizedSource(
+    parameters.rollback_result_source, filesystemRoot, validateUatPromotionRollbackResult,
+    "UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_SOURCE_INVALID",
+  );
+  const predecessorReceipt = await readAuthorizedSource(
+    parameters.predecessor_postdeploy_receipt_source, filesystemRoot, validatePostDeployReceipt,
+    "UAT_PROMOTION_ROLLBACK_POSTVERIFY_PREDECESSOR_RECEIPT_SOURCE_INVALID",
+  );
+  const predecessorManifest = await readAuthorizedSource(
+    parameters.predecessor_release_manifest_source, filesystemRoot,
+    (value) => validateReleaseManifest(value, { now: new Date(parameters.postverify_created_at), requireEligible: false }),
+    "UAT_PROMOTION_ROLLBACK_POSTVERIFY_PREDECESSOR_MANIFEST_SOURCE_INVALID",
+  );
+  const previous = current.value;
+  const intent = rollbackIntent.value;
+  const result = rollbackResult.value;
+  assertUatPromotionRollbackResultMatchesIntent(result, intent);
+  assertRollbackPredecessorEvidence(
+    { ...parameters, compose_project: result.compose_project },
+    predecessorReceipt, predecessorManifest, result.predecessor,
+  );
+  if (current.raw.toString("utf8") !== canonicalClusterJson(previous)
+    || rollbackIntent.raw.toString("utf8") !== canonicalClusterJson(intent)
+    || rollbackResult.raw.toString("utf8") !== canonicalClusterJson(result)
+    || previous.promotion_id !== parameters.promotion_id
+    || previous.promotion_generation !== parameters.promotion_generation
+    || previous.checkpoint_id !== "ROLLBACK_TO_UAT_EXECUTOR" || previous.checkpoint_ordinal !== 14
+    || previous.checkpoint_status !== "COMMITTED" || previous.journal_status !== "ROLLBACK_IN_PROGRESS"
+    || previous.receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256
+    || previous.intent_sha256 !== parameters.promotion_intent_sha256
+    || previous.original_authorization_sha256 !== parameters.promotion_original_authorization_sha256
+    || previous.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || previous.database_binding_sha256 !== parameters.database_binding_sha256
+    || previous.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || previous.recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || previous.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || previous.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256
+    || previous.migration_authorization_binding_sha256 !== parameters.migration_authorization_binding_sha256
+    || previous.migration_fence_binding_sha256 !== parameters.migration_fence_binding_sha256
+    || previous.migration_result_binding_sha256 !== parameters.migration_result_binding_sha256
+    || previous.compose_deployment_binding_sha256 !== parameters.compose_deployment_binding_sha256
+    || previous.checkpoint_authorization_sha256 !== parameters.rollback_execution_authorization_sha256
+    || previous.checkpoint_evidence_sha256 !== parameters.rollback_result_sha256
+    || previous.authorization_sha256_chain.includes(context.original_authorization_sha256)
+    || intent.rollback_operation_id !== parameters.rollback_operation_id
+    || intent.rollback_intent_sha256 !== parameters.rollback_intent_sha256
+    || intent.execution_authorization_sha256 !== parameters.rollback_execution_authorization_sha256
+    || result.result_sha256 !== parameters.rollback_result_sha256
+    || sha256(predecessorReceipt.raw) !== parameters.predecessor_postdeploy_receipt_sha256
+    || sha256(predecessorManifest.raw) !== parameters.predecessor_release_manifest_sha256
+    || parameters.predecessor_postdeploy_receipt_sha256
+      !== intent.predecessor_postdeploy_receipt_sha256
+    || parameters.predecessor_release_manifest_sha256
+      !== intent.predecessor_release_manifest_sha256
+    || Date.parse(parameters.postverify_created_at) < Date.parse(previous.recorded_at)
+    || context.execution_mode === "ORIGINAL"
+      && (observedAt.getTime() < Date.parse(parameters.postverify_created_at)
+        || observedAt.getTime() >= Date.parse(parameters.postverify_expires_at))) {
+    reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_SOURCE_BINDING_INVALID");
+  }
+  return Object.freeze({
+    previous, rollbackIntent: intent, rollbackResult: result,
+    predecessorReceipt: predecessorReceipt.value, predecessorManifest: predecessorManifest.value,
+  });
+}
+
 async function ensureDirectory(directory, parent, mode, code) {
   await trustedDirectory(parent, new Set([0o700, 0o750, 0o755]), code);
   let created = false;
@@ -2884,12 +3289,12 @@ async function layout(filesystemRoot, initialize) {
   if (initialize) {
     const state = await ensureDirectory(stateRoot, stateParent, 0o700, "UAT_PROMOTION_STATE_ROOT_INVALID");
     await ensureMarker(path.join(stateRoot, UAT_PROMOTION_STATE_MARKER), Buffer.from(UAT_PROMOTION_STATE_MARKER_VALUE), state.created, "UAT_PROMOTION_STATE_MARKER_INVALID");
-    for (const name of ["generations", "history", "receipts", "intents", "grants", "results", "executions", "active-fences", "fence-transfers", "recoveries", "postdeploy-control-bindings", "containments", "quarantine"]) {
+    for (const name of ["generations", "history", "receipts", "intents", "packages", "grants", "results", "executions", "active-fences", "fence-transfers", "recoveries", "postdeploy-control-bindings", "containments", "quarantine"]) {
       await ensureDirectory(path.join(stateRoot, name), stateRoot, 0o700, "UAT_PROMOTION_STATE_ROOT_INVALID");
     }
   } else {
     await trustedDirectory(stateRoot, new Set([0o700]), "UAT_PROMOTION_STATE_ROOT_INVALID");
-    for (const name of ["generations", "history", "receipts", "intents", "recoveries", "quarantine"]) {
+    for (const name of ["generations", "history", "receipts", "intents", "packages", "recoveries", "quarantine"]) {
       await trustedDirectory(path.join(stateRoot, name), new Set([0o700]), "UAT_PROMOTION_STATE_ROOT_INVALID");
     }
     for (const name of ["grants", "results", "executions", "active-fences", "fence-transfers", "postdeploy-control-bindings", "containments"]) {
@@ -2901,6 +3306,7 @@ async function layout(filesystemRoot, initialize) {
     stateRoot,
     generations: path.join(stateRoot, "generations"), history: path.join(stateRoot, "history"),
     receipts: path.join(stateRoot, "receipts"), intents: path.join(stateRoot, "intents"),
+    packages: path.join(stateRoot, "packages"),
     grants: path.join(stateRoot, "grants"), results: path.join(stateRoot, "results"),
     executions: path.join(stateRoot, "executions"), activeFences: path.join(stateRoot, "active-fences"),
     fenceTransfers: path.join(stateRoot, "fence-transfers"),
@@ -2946,7 +3352,13 @@ export function validateUatPromotionCheckpointReceipt(value) {
     || value.checkpoint_status === "COMMITTED" && value.checkpoint_ordinal === 15 && value.journal_status !== "ROLLED_BACK") reject("UAT_PROMOTION_RECEIPT_STATUS_INVALID");
   iso(value.recorded_at, "UAT_PROMOTION_RECEIPT_TIME_INVALID");
   iso(value.promotion_expires_at, "UAT_PROMOTION_RECEIPT_TIME_INVALID");
-  if (Date.parse(value.recorded_at) >= Date.parse(value.promotion_expires_at)) reject("UAT_PROMOTION_RECEIPT_TIME_INVALID");
+  // `promotion_expires_at` is the immutable checkpoint 4-13 promotion window.  A later
+  // rollback is authorized by its own short-lived checkpoint 14/15 windows and must not
+  // rewrite the historical promotion expiry carried by the v1 receipt chain.
+  if (value.checkpoint_ordinal <= 13
+    && Date.parse(value.recorded_at) >= Date.parse(value.promotion_expires_at)) {
+    reject("UAT_PROMOTION_RECEIPT_TIME_INVALID");
+  }
   for (const field of [
     "intent_sha256", "candidate_binding_sha256", "database_binding_sha256", "runtime_binding_sha256",
     "recovery_binding_sha256", "original_authorization_sha256", "checkpoint_authorization_sha256",
@@ -3033,8 +3445,9 @@ export function createNextUatPromotionCheckpointReceipt(previousInput, input) {
   ], "UAT_PROMOTION_CHECKPOINT_INPUT_INVALID");
   const nextOrdinal = previous.checkpoint_ordinal + 1;
   if (nextOrdinal > CHECKPOINT_ORDER.length || input.checkpoint_id !== CHECKPOINT_ORDER[nextOrdinal - 1]) reject("UAT_PROMOTION_CHECKPOINT_SKIP_FORBIDDEN");
-  if (!new Set(["IN_PROGRESS", "COMMITTED"]).has(previous.journal_status)
+  if (!new Set(["IN_PROGRESS", "COMMITTED", "ROLLBACK_IN_PROGRESS"]).has(previous.journal_status)
     || previous.journal_status === "COMMITTED" && nextOrdinal !== 14
+    || previous.journal_status === "ROLLBACK_IN_PROGRESS" && nextOrdinal !== 15
     || previous.checkpoint_status !== "COMMITTED") reject("UAT_PROMOTION_CHECKPOINT_PREVIOUS_BLOCKED");
   for (const field of ["intent_sha256", "candidate_binding_sha256", "database_binding_sha256", "runtime_binding_sha256", "recovery_binding_sha256"]) {
     digest(input[field], "UAT_PROMOTION_CHECKPOINT_BINDING_INVALID");
@@ -3082,7 +3495,10 @@ export function createNextUatPromotionCheckpointReceipt(previousInput, input) {
     reject("UAT_PROMOTION_CHECKPOINT_COMPOSE_DEPLOYMENT_INVALID");
   }
   iso(input.recorded_at, "UAT_PROMOTION_CHECKPOINT_TIME_INVALID");
-  if (Date.parse(input.recorded_at) < Date.parse(previous.recorded_at) || Date.parse(input.recorded_at) >= Date.parse(previous.promotion_expires_at)) reject("UAT_PROMOTION_CHECKPOINT_TIME_INVALID");
+  if (Date.parse(input.recorded_at) < Date.parse(previous.recorded_at)
+    || nextOrdinal <= 13 && Date.parse(input.recorded_at) >= Date.parse(previous.promotion_expires_at)) {
+    reject("UAT_PROMOTION_CHECKPOINT_TIME_INVALID");
+  }
   const body = {
     ...bodyWithout(previous, "receipt_sha256"),
     journal_sequence: previous.journal_sequence + 1,
@@ -3135,7 +3551,8 @@ function createIntent(context) {
       VERIFY_UAT_POSTDEPLOY_IDENTITY: "IMPLEMENTED",
       VERIFY_UAT_CROSS_ROLE_EXECUTION: "IMPLEMENTED",
       FINALIZE_UAT_PROMOTION: "IMPLEMENTED",
-      ROLLBACK_UAT_RELEASE: "NOT_IMPLEMENTED",
+      ROLLBACK_UAT_RELEASE: "IMPLEMENTED",
+      VERIFY_AND_FINALIZE_UAT_ROLLBACK: "IMPLEMENTED",
       RECOVER_UAT_PROMOTION: "IMPLEMENTED",
     },
   };
@@ -3173,7 +3590,8 @@ export function validateUatPromotionIntent(value) {
       VERIFY_UAT_POSTDEPLOY_IDENTITY: "IMPLEMENTED",
       VERIFY_UAT_CROSS_ROLE_EXECUTION: "IMPLEMENTED",
       FINALIZE_UAT_PROMOTION: "IMPLEMENTED",
-      ROLLBACK_UAT_RELEASE: "NOT_IMPLEMENTED",
+      ROLLBACK_UAT_RELEASE: "IMPLEMENTED",
+      VERIFY_AND_FINALIZE_UAT_ROLLBACK: "IMPLEMENTED",
       RECOVER_UAT_PROMOTION: "IMPLEMENTED",
     })
     || clusterSha256(bodyWithout(value, "intent_sha256")) !== value.intent_sha256) reject("UAT_PROMOTION_INTENT_BINDING_INVALID");
@@ -4012,8 +4430,8 @@ export function validateUatPromotionCrossRoleIntent(value) {
 
 function finalizationRollbackBoundary() {
   return Object.freeze({
-    checkpoint_14: "NOT_IMPLEMENTED_NOT_AUTHORIZED",
-    checkpoint_15: "NOT_IMPLEMENTED_NOT_AUTHORIZED",
+    checkpoint_14: "SEPARATE_ROLLBACK_AUTHORIZATION_AND_RUNTIME_PREFLIGHT_REQUIRED",
+    checkpoint_15: "SEPARATE_POSTVERIFY_AUTHORIZATION_AND_EXACT_RESULT_REQUIRED",
     rollback_ready: false,
     database_protection_release: false,
     backup_protection_release: false,
@@ -4234,6 +4652,268 @@ export function validateUatPromotionFinalizationIntent(value) {
   return value;
 }
 
+function rollbackPlanBinding(parameters) {
+  return clusterSha256({
+    operation: "ROLLBACK_EXECUTION",
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    checkpoint_13_receipt_sha256: parameters.previous_checkpoint_receipt_sha256,
+    finalization_intent_sha256: parameters.finalization_intent_sha256,
+    promotion_snapshot_binding_sha256: parameters.promotion_snapshot_binding_sha256,
+    snapshot_intent_sha256: parameters.snapshot_intent_sha256,
+    snapshot_readiness_sha256: parameters.snapshot_readiness_sha256,
+    snapshot_backup_id: parameters.snapshot_backup_id,
+    snapshot_restore_run_id: parameters.snapshot_restore_run_id,
+    snapshot_objects: parameters.snapshot_objects,
+    predecessor_postdeploy_receipt_sha256: parameters.predecessor_postdeploy_receipt_sha256,
+    predecessor_release_manifest_sha256: parameters.predecessor_release_manifest_sha256,
+    execution_package_sha256: parameters.execution_package_sha256,
+    execution_package_source: parameters.execution_package_source,
+    execution_deadline: parameters.execution_deadline,
+    predecessor: parameters.predecessor,
+    database: parameters.database,
+    compose_project: parameters.compose_project,
+    compose_project_root: parameters.compose_project_root,
+    boundary: parameters.boundary,
+  });
+}
+
+function createRollbackIntent(context) {
+  const parameters = context.parameters;
+  const body = {
+    schema_version: 1,
+    contract: UAT_PROMOTION_ROLLBACK_INTENT_CONTRACT,
+    execution_scope: "EXACT_PREUPGRADE_FOUR_DOMAIN_SNAPSHOT_AND_PREDECESSOR_RUNTIME_ONLY",
+    rollback_operation_id: context.operation_id,
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    created_at: parameters.rollback_created_at,
+    expires_at: parameters.rollback_expires_at,
+    execution_authorization_sha256: context.original_authorization_sha256,
+    supervisor_bundle_sha256: context.supervisor_bundle_sha256,
+    parameters,
+    promotion_intent_sha256: parameters.promotion_intent_sha256,
+    checkpoint_13_receipt_sha256: parameters.previous_checkpoint_receipt_sha256,
+    finalization_operation_id: parameters.finalization_operation_id,
+    finalization_intent_sha256: parameters.finalization_intent_sha256,
+    snapshot_operation_id: parameters.snapshot_operation_id,
+    snapshot_intent_sha256: parameters.snapshot_intent_sha256,
+    snapshot_readiness_sha256: parameters.snapshot_readiness_sha256,
+    candidate_binding_sha256: parameters.candidate_binding_sha256,
+    database_binding_sha256: parameters.database_binding_sha256,
+    runtime_binding_sha256: parameters.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: parameters.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: parameters.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: parameters.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: parameters.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: parameters.migration_fence_binding_sha256,
+    migration_result_binding_sha256: parameters.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: parameters.compose_deployment_binding_sha256,
+    predecessor_postdeploy_receipt_sha256: parameters.predecessor_postdeploy_receipt_sha256,
+    predecessor_release_manifest_sha256: parameters.predecessor_release_manifest_sha256,
+    execution_package_sha256: parameters.execution_package_sha256,
+    execution_deadline: parameters.execution_deadline,
+    boundary: parameters.boundary,
+    rollback_plan_sha256: rollbackPlanBinding(parameters),
+  };
+  return Object.freeze(validateUatPromotionRollbackIntent({
+    ...body, rollback_intent_sha256: clusterSha256(body),
+  }));
+}
+
+export function validateUatPromotionRollbackIntent(value) {
+  const code = "UAT_PROMOTION_ROLLBACK_INTENT_INVALID";
+  exactKeys(value, [
+    "schema_version", "contract", "execution_scope", "rollback_operation_id", "promotion_id",
+    "promotion_generation", "created_at", "expires_at", "execution_authorization_sha256",
+    "supervisor_bundle_sha256", "parameters", "promotion_intent_sha256",
+    "checkpoint_13_receipt_sha256", "finalization_operation_id", "finalization_intent_sha256",
+    "snapshot_operation_id", "snapshot_intent_sha256", "snapshot_readiness_sha256",
+    "candidate_binding_sha256", "database_binding_sha256", "runtime_binding_sha256",
+    "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "predecessor_postdeploy_receipt_sha256",
+    "predecessor_release_manifest_sha256", "execution_package_sha256", "execution_deadline",
+    "boundary", "rollback_plan_sha256",
+    "rollback_intent_sha256",
+  ], code);
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_ROLLBACK_INTENT_CONTRACT
+    || value.execution_scope !== "EXACT_PREUPGRADE_FOUR_DOMAIN_SNAPSHOT_AND_PREDECESSOR_RUNTIME_ONLY") reject(code);
+  validateUatPromotionRollbackExecutionParameters(value.parameters);
+  for (const field of [
+    "rollback_operation_id", "promotion_id", "finalization_operation_id", "snapshot_operation_id",
+  ]) identifier(value[field], code);
+  integer(value.promotion_generation, 1, 1_000_000, code);
+  iso(value.created_at, code); iso(value.expires_at, code); iso(value.execution_deadline, code);
+  for (const field of [
+    "execution_authorization_sha256", "supervisor_bundle_sha256", "promotion_intent_sha256",
+    "checkpoint_13_receipt_sha256", "finalization_intent_sha256", "snapshot_intent_sha256",
+    "snapshot_readiness_sha256", "candidate_binding_sha256", "database_binding_sha256",
+    "runtime_binding_sha256", "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "predecessor_postdeploy_receipt_sha256",
+    "predecessor_release_manifest_sha256", "execution_package_sha256",
+    "rollback_plan_sha256", "rollback_intent_sha256",
+  ]) digest(value[field], code);
+  validateUatPromotionRollbackBoundary(value.boundary, code);
+  const parameters = value.parameters;
+  if (value.rollback_operation_id !== parameters.rollback_id
+    || value.promotion_id !== parameters.promotion_id
+    || value.promotion_generation !== parameters.promotion_generation
+    || value.created_at !== parameters.rollback_created_at || value.expires_at !== parameters.rollback_expires_at
+    || value.promotion_intent_sha256 !== parameters.promotion_intent_sha256
+    || value.checkpoint_13_receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256
+    || value.finalization_operation_id !== parameters.finalization_operation_id
+    || value.finalization_intent_sha256 !== parameters.finalization_intent_sha256
+    || value.snapshot_operation_id !== parameters.snapshot_operation_id
+    || value.snapshot_intent_sha256 !== parameters.snapshot_intent_sha256
+    || value.snapshot_readiness_sha256 !== parameters.snapshot_readiness_sha256
+    || value.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || value.database_binding_sha256 !== parameters.database_binding_sha256
+    || value.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || value.preupgrade_recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || value.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || value.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256
+    || value.migration_authorization_binding_sha256 !== parameters.migration_authorization_binding_sha256
+    || value.migration_fence_binding_sha256 !== parameters.migration_fence_binding_sha256
+    || value.migration_result_binding_sha256 !== parameters.migration_result_binding_sha256
+    || value.compose_deployment_binding_sha256 !== parameters.compose_deployment_binding_sha256
+    || value.predecessor_postdeploy_receipt_sha256 !== parameters.predecessor_postdeploy_receipt_sha256
+    || value.predecessor_release_manifest_sha256 !== parameters.predecessor_release_manifest_sha256
+    || value.execution_package_sha256 !== parameters.execution_package_sha256
+    || value.execution_deadline !== parameters.execution_deadline
+    || !same(value.boundary, parameters.boundary)
+    || value.rollback_plan_sha256 !== rollbackPlanBinding(parameters)
+    || clusterSha256(bodyWithout(value, "rollback_intent_sha256")) !== value.rollback_intent_sha256) {
+    reject("UAT_PROMOTION_ROLLBACK_INTENT_BINDING_INVALID");
+  }
+  return value;
+}
+
+function rollbackPostverifyPlanBinding(parameters, rollbackResult) {
+  return clusterSha256({
+    operation: "ROLLBACK_POSTVERIFY",
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    checkpoint_14_receipt_sha256: parameters.previous_checkpoint_receipt_sha256,
+    rollback_operation_id: parameters.rollback_operation_id,
+    rollback_intent_sha256: parameters.rollback_intent_sha256,
+    rollback_execution_authorization_sha256: parameters.rollback_execution_authorization_sha256,
+    rollback_result_sha256: rollbackResult.result_sha256,
+    rollback_plan_sha256: rollbackResult.rollback_plan_sha256,
+    execution_package_sha256: rollbackResult.execution_package_sha256,
+    stage_result_sha256_chain: rollbackResult.stage_result_sha256_chain,
+    predecessor_postdeploy_receipt_sha256: parameters.predecessor_postdeploy_receipt_sha256,
+    predecessor_release_manifest_sha256: parameters.predecessor_release_manifest_sha256,
+    snapshot_objects: rollbackResult.snapshot_objects,
+    predecessor: rollbackResult.predecessor,
+    database: rollbackResult.database,
+    restored_database: rollbackResult.restored_database,
+    boundary: rollbackResult.boundary,
+  });
+}
+
+function createRollbackPostverifyIntent(context, rollbackResult) {
+  const parameters = context.parameters;
+  const body = {
+    schema_version: 1,
+    contract: UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_CONTRACT,
+    execution_scope: "VERIFY_EXACT_ROLLBACK_RESULT_AND_PUBLISH_ROLLED_BACK_RECEIPT_ONLY",
+    postverify_operation_id: context.operation_id,
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    created_at: parameters.postverify_created_at,
+    expires_at: parameters.postverify_expires_at,
+    execution_authorization_sha256: context.original_authorization_sha256,
+    supervisor_bundle_sha256: context.supervisor_bundle_sha256,
+    parameters,
+    promotion_intent_sha256: parameters.promotion_intent_sha256,
+    checkpoint_14_receipt_sha256: parameters.previous_checkpoint_receipt_sha256,
+    rollback_operation_id: parameters.rollback_operation_id,
+    rollback_intent_sha256: parameters.rollback_intent_sha256,
+    rollback_execution_authorization_sha256: parameters.rollback_execution_authorization_sha256,
+    rollback_result_sha256: rollbackResult.result_sha256,
+    rollback_plan_sha256: rollbackResult.rollback_plan_sha256,
+    candidate_binding_sha256: parameters.candidate_binding_sha256,
+    database_binding_sha256: parameters.database_binding_sha256,
+    runtime_binding_sha256: parameters.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: parameters.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: parameters.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: parameters.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: parameters.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: parameters.migration_fence_binding_sha256,
+    migration_result_binding_sha256: parameters.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: parameters.compose_deployment_binding_sha256,
+    postverify_plan_sha256: rollbackPostverifyPlanBinding(parameters, rollbackResult),
+  };
+  return Object.freeze(validateUatPromotionRollbackPostverifyIntent({
+    ...body, postverify_intent_sha256: clusterSha256(body),
+  }));
+}
+
+export function validateUatPromotionRollbackPostverifyIntent(value) {
+  const code = "UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_INVALID";
+  exactKeys(value, [
+    "schema_version", "contract", "execution_scope", "postverify_operation_id", "promotion_id",
+    "promotion_generation", "created_at", "expires_at", "execution_authorization_sha256",
+    "supervisor_bundle_sha256", "parameters", "promotion_intent_sha256",
+    "checkpoint_14_receipt_sha256", "rollback_operation_id", "rollback_intent_sha256",
+    "rollback_execution_authorization_sha256", "rollback_result_sha256", "rollback_plan_sha256",
+    "candidate_binding_sha256", "database_binding_sha256", "runtime_binding_sha256",
+    "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "postverify_plan_sha256", "postverify_intent_sha256",
+  ], code);
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_CONTRACT
+    || value.execution_scope !== "VERIFY_EXACT_ROLLBACK_RESULT_AND_PUBLISH_ROLLED_BACK_RECEIPT_ONLY") reject(code);
+  validateUatPromotionRollbackPostverifyParameters(value.parameters);
+  for (const field of ["postverify_operation_id", "promotion_id", "rollback_operation_id"]) {
+    identifier(value[field], code);
+  }
+  integer(value.promotion_generation, 1, 1_000_000, code);
+  iso(value.created_at, code); iso(value.expires_at, code);
+  for (const field of [
+    "execution_authorization_sha256", "supervisor_bundle_sha256", "promotion_intent_sha256",
+    "checkpoint_14_receipt_sha256", "rollback_intent_sha256",
+    "rollback_execution_authorization_sha256", "rollback_result_sha256", "rollback_plan_sha256",
+    "candidate_binding_sha256", "database_binding_sha256", "runtime_binding_sha256",
+    "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "postverify_plan_sha256", "postverify_intent_sha256",
+  ]) digest(value[field], code);
+  const parameters = value.parameters;
+  // The non-parameter rollback target fields are checked again against the durable result
+  // when the intent is loaded; they are deliberately not accepted from authorization JSON.
+  if (value.postverify_operation_id !== parameters.postverify_id
+    || value.promotion_id !== parameters.promotion_id
+    || value.promotion_generation !== parameters.promotion_generation
+    || value.created_at !== parameters.postverify_created_at || value.expires_at !== parameters.postverify_expires_at
+    || value.promotion_intent_sha256 !== parameters.promotion_intent_sha256
+    || value.checkpoint_14_receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256
+    || value.rollback_operation_id !== parameters.rollback_operation_id
+    || value.rollback_intent_sha256 !== parameters.rollback_intent_sha256
+    || value.rollback_execution_authorization_sha256 !== parameters.rollback_execution_authorization_sha256
+    || value.rollback_result_sha256 !== parameters.rollback_result_sha256
+    || value.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || value.database_binding_sha256 !== parameters.database_binding_sha256
+    || value.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || value.preupgrade_recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || value.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || value.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256
+    || value.migration_authorization_binding_sha256 !== parameters.migration_authorization_binding_sha256
+    || value.migration_fence_binding_sha256 !== parameters.migration_fence_binding_sha256
+    || value.migration_result_binding_sha256 !== parameters.migration_result_binding_sha256
+    || value.compose_deployment_binding_sha256 !== parameters.compose_deployment_binding_sha256
+    || clusterSha256(bodyWithout(value, "postverify_intent_sha256")) !== value.postverify_intent_sha256) {
+    reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_BINDING_INVALID");
+  }
+  return value;
+}
+
 function intentFile(paths, intent) { return path.join(paths.intents, `${intent.promotion_id}.${intent.intent_sha256}.json`); }
 function snapshotIntentFile(paths, intent) { return path.join(paths.intents, `${intent.snapshot_operation_id}.${intent.snapshot_intent_sha256}.json`); }
 function quiesceIntentFile(paths, intent) { return path.join(paths.intents, `${intent.quiesce_operation_id}.${intent.quiesce_intent_sha256}.json`); }
@@ -4257,6 +4937,12 @@ function crossRoleIntentFile(paths, intent) {
 }
 function finalizationIntentFile(paths, intent) {
   return path.join(paths.intents, `${intent.finalization_operation_id}.${intent.finalization_intent_sha256}.json`);
+}
+function rollbackIntentFile(paths, intent) {
+  return path.join(paths.intents, `${intent.rollback_operation_id}.${intent.rollback_intent_sha256}.json`);
+}
+function rollbackPostverifyIntentFile(paths, intent) {
+  return path.join(paths.intents, `${intent.postverify_operation_id}.${intent.postverify_intent_sha256}.json`);
 }
 function migrationGrantFile(paths, operationId, grantSha256) {
   return path.join(paths.grants, `${operationId}.${grantSha256}.json`);
@@ -5540,6 +6226,8 @@ function validateAnyUatPromotionIntent(value) {
     [UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT, validateUatPromotionPostdeployIdentityIntent],
     [UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT, validateUatPromotionCrossRoleIntent],
     [UAT_PROMOTION_FINALIZATION_INTENT_CONTRACT, validateUatPromotionFinalizationIntent],
+    [UAT_PROMOTION_ROLLBACK_INTENT_CONTRACT, validateUatPromotionRollbackIntent],
+    [UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_CONTRACT, validateUatPromotionRollbackPostverifyIntent],
   ]);
   const validator = validators.get(value?.contract);
   if (!validator) reject("UAT_PROMOTION_INTENT_INVALID");
@@ -6467,6 +7155,357 @@ async function executeFinalization(context, options) {
   return commitFinalization(context, intent, sources.previous, paths, options);
 }
 
+async function assertNoOtherPendingRollbackIntent(paths, previous, context) {
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  for (const name of names) {
+    const stored = await trustedJsonFile(
+      path.join(paths.intents, name), 0o400, validateAnyUatPromotionIntent,
+      "UAT_PROMOTION_INTENT_INVALID",
+    );
+    const intent = stored.value;
+    const rollback = intent.contract === UAT_PROMOTION_ROLLBACK_INTENT_CONTRACT;
+    const postverify = intent.contract === UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_CONTRACT;
+    if (!rollback && !postverify) continue;
+    const operationId = rollback ? intent.rollback_operation_id : intent.postverify_operation_id;
+    const predecessor = rollback ? intent.checkpoint_13_receipt_sha256 : intent.checkpoint_14_receipt_sha256;
+    if (intent.promotion_id === previous.promotion_id
+      && intent.promotion_generation === previous.promotion_generation
+      && predecessor === previous.receipt_sha256 && operationId !== context.operation_id) {
+      reject("UAT_PROMOTION_ROLLBACK_RECOVERY_REQUIRED");
+    }
+  }
+}
+
+async function prepareRollbackExecution(context, options) {
+  await repositoryPolicy(options.siteRoot);
+  const paths = await layout(options.filesystemRoot, false);
+  if ((await readdir(paths.quarantine)).length !== 0) reject("UAT_PROMOTION_QUARANTINE_PRESENT");
+  await assertNoCommittedPostdeployAnomaly(paths);
+  const sources = await verifyRollbackExecutionSources(context, options.filesystemRoot, options);
+  await assertNoOtherPendingRollbackIntent(paths, sources.previous, context);
+  const intent = createRollbackIntent(context);
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => operationArtifactMatches(name, context.operation_id));
+  if (matches.length > 1 || matches.length === 1
+    && matches[0] !== path.basename(rollbackIntentFile(paths, intent))) {
+    reject("UAT_PROMOTION_ROLLBACK_OPERATION_ID_REUSED");
+  }
+  const resultNames = await strictNames(
+    paths.results, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_ROLLBACK_RESULT_ROOT_INVALID",
+  );
+  if (resultNames.some((name) => operationArtifactMatches(name, context.operation_id))) {
+    reject("UAT_PROMOTION_ROLLBACK_RESULT_PREEXISTS");
+  }
+  const raw = Buffer.from(canonicalClusterJson(intent));
+  if (matches.length === 1) {
+    const existing = await trustedJsonFile(
+      rollbackIntentFile(paths, intent), 0o400, validateUatPromotionRollbackIntent,
+      "UAT_PROMOTION_ROLLBACK_INTENT_INVALID",
+    );
+    if (!existing?.raw.equals(raw)) reject("UAT_PROMOTION_ROLLBACK_INTENT_CONFLICT");
+    return Object.freeze({
+      result: "ALREADY_PREPARED", promotion_id: intent.promotion_id,
+      intent_sha256: intent.rollback_intent_sha256,
+      rollback_plan_sha256: intent.rollback_plan_sha256,
+    });
+  }
+  await ensureRawFile(
+    rollbackIntentFile(paths, intent), raw, 0o400, validateUatPromotionRollbackIntent,
+    "UAT_PROMOTION_ROLLBACK_INTENT_CONFLICT",
+  );
+  await syncDirectory(paths.intents, "UAT_PROMOTION_INTENT_SYNC_FAILED");
+  return Object.freeze({
+    result: "PREPARED", promotion_id: intent.promotion_id,
+    intent_sha256: intent.rollback_intent_sha256,
+    rollback_plan_sha256: intent.rollback_plan_sha256,
+  });
+}
+
+async function loadStoredRollbackIntent(context, paths) {
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => operationArtifactMatches(name, context.operation_id));
+  if (matches.length !== 1) reject("UAT_PROMOTION_ROLLBACK_INTENT_MISSING");
+  const stored = await trustedJsonFile(
+    path.join(paths.intents, matches[0]), 0o400, validateUatPromotionRollbackIntent,
+    "UAT_PROMOTION_ROLLBACK_INTENT_INVALID",
+  );
+  if (!stored || matches[0] !== `${context.operation_id}.${stored.value.rollback_intent_sha256}.json`
+    || stored.value.rollback_intent_sha256 !== (context.expected_intent_sha256
+      ?? stored.value.rollback_intent_sha256)
+    || stored.value.execution_authorization_sha256 !== context.original_authorization_sha256
+    || stored.value.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256
+    || !same(stored.value.parameters, context.parameters)) {
+    reject("UAT_PROMOTION_ROLLBACK_INTENT_BINDING_INVALID");
+  }
+  return stored.value;
+}
+
+async function loadRollbackResult(paths, intent) {
+  const names = await strictNames(
+    paths.results, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_ROLLBACK_RESULT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => operationArtifactMatches(name, intent.rollback_operation_id));
+  if (matches.length !== 1) reject("UAT_PROMOTION_ROLLBACK_RESULT_MISSING_OR_PARTIAL");
+  const stored = await trustedJsonFile(
+    path.join(paths.results, matches[0]), 0o400, validateUatPromotionRollbackResult,
+    "UAT_PROMOTION_ROLLBACK_RESULT_INVALID",
+  );
+  if (!stored || matches[0] !== `${intent.rollback_operation_id}.${stored.value.result_sha256}.json`
+    || stored.raw.toString("utf8") !== canonicalClusterJson(stored.value)) {
+    reject("UAT_PROMOTION_ROLLBACK_RESULT_INVALID");
+  }
+  assertUatPromotionRollbackResultMatchesIntent(stored.value, intent);
+  return stored.value;
+}
+
+async function prepareRollbackPostverify(context, options) {
+  await repositoryPolicy(options.siteRoot);
+  const paths = await layout(options.filesystemRoot, false);
+  if ((await readdir(paths.quarantine)).length !== 0) reject("UAT_PROMOTION_QUARANTINE_PRESENT");
+  const sources = await verifyRollbackPostverifySources(context, options.filesystemRoot, options);
+  await assertNoOtherPendingRollbackIntent(paths, sources.previous, context);
+  const intent = createRollbackPostverifyIntent(context, sources.rollbackResult);
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => operationArtifactMatches(name, context.operation_id));
+  if (matches.length > 1 || matches.length === 1
+    && matches[0] !== path.basename(rollbackPostverifyIntentFile(paths, intent))) {
+    reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_OPERATION_ID_REUSED");
+  }
+  const resultNames = await strictNames(
+    paths.results, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_ROOT_INVALID",
+  );
+  if (resultNames.some((name) => operationArtifactMatches(name, context.operation_id))) {
+    reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_PREEXISTS");
+  }
+  const raw = Buffer.from(canonicalClusterJson(intent));
+  if (matches.length === 1) {
+    const existing = await trustedJsonFile(
+      rollbackPostverifyIntentFile(paths, intent), 0o400,
+      validateUatPromotionRollbackPostverifyIntent,
+      "UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_INVALID",
+    );
+    if (!existing?.raw.equals(raw)) reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_CONFLICT");
+    return Object.freeze({
+      result: "ALREADY_PREPARED", promotion_id: intent.promotion_id,
+      intent_sha256: intent.postverify_intent_sha256,
+      postverify_plan_sha256: intent.postverify_plan_sha256,
+      rollback_result_sha256: intent.rollback_result_sha256,
+    });
+  }
+  await ensureRawFile(
+    rollbackPostverifyIntentFile(paths, intent), raw, 0o400,
+    validateUatPromotionRollbackPostverifyIntent,
+    "UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_CONFLICT",
+  );
+  await syncDirectory(paths.intents, "UAT_PROMOTION_INTENT_SYNC_FAILED");
+  return Object.freeze({
+    result: "PREPARED", promotion_id: intent.promotion_id,
+    intent_sha256: intent.postverify_intent_sha256,
+    postverify_plan_sha256: intent.postverify_plan_sha256,
+    rollback_result_sha256: intent.rollback_result_sha256,
+  });
+}
+
+async function loadStoredRollbackPostverifyIntent(context, paths) {
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => operationArtifactMatches(name, context.operation_id));
+  if (matches.length !== 1) reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_MISSING");
+  const stored = await trustedJsonFile(
+    path.join(paths.intents, matches[0]), 0o400, validateUatPromotionRollbackPostverifyIntent,
+    "UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_INVALID",
+  );
+  if (!stored || matches[0] !== `${context.operation_id}.${stored.value.postverify_intent_sha256}.json`
+    || stored.value.postverify_intent_sha256 !== (context.expected_intent_sha256
+      ?? stored.value.postverify_intent_sha256)
+    || stored.value.execution_authorization_sha256 !== context.original_authorization_sha256
+    || stored.value.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256
+    || !same(stored.value.parameters, context.parameters)) {
+    reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_BINDING_INVALID");
+  }
+  return stored.value;
+}
+
+async function loadRollbackPostverifyResult(paths, intent, rollbackResult) {
+  const names = await strictNames(
+    paths.results, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => operationArtifactMatches(name, intent.postverify_operation_id));
+  if (matches.length !== 1) reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_MISSING_OR_PARTIAL");
+  const stored = await trustedJsonFile(
+    path.join(paths.results, matches[0]), 0o400, validateUatPromotionRollbackPostverifyResult,
+    "UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_INVALID",
+  );
+  if (!stored || matches[0] !== `${intent.postverify_operation_id}.${stored.value.result_sha256}.json`
+    || stored.raw.toString("utf8") !== canonicalClusterJson(stored.value)) {
+    reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_INVALID");
+  }
+  assertUatPromotionRollbackPostverifyResultMatchesIntent(stored.value, intent, rollbackResult);
+  if (intent.postverify_plan_sha256 !== rollbackPostverifyPlanBinding(intent.parameters, rollbackResult)) {
+    reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_BINDING_INVALID");
+  }
+  return stored.value;
+}
+
+function createRollbackCheckpointReceipt(context, intent, result, previous, postverify) {
+  return createNextUatPromotionCheckpointReceipt(previous, {
+    checkpoint_id: postverify ? "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT" : "ROLLBACK_TO_UAT_EXECUTOR",
+    checkpoint_status: "COMMITTED",
+    journal_status: postverify ? "ROLLED_BACK" : "ROLLBACK_IN_PROGRESS",
+    recorded_at: postverify ? result.verified_at : result.completed_at,
+    checkpoint_evidence_sha256: result.result_sha256,
+    checkpoint_authorization_sha256: context.original_authorization_sha256,
+    intent_sha256: intent.promotion_intent_sha256,
+    candidate_binding_sha256: intent.candidate_binding_sha256,
+    database_binding_sha256: intent.database_binding_sha256,
+    runtime_binding_sha256: intent.runtime_binding_sha256,
+    recovery_binding_sha256: intent.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: intent.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: intent.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: intent.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: intent.migration_fence_binding_sha256,
+    migration_result_binding_sha256: intent.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: intent.compose_deployment_binding_sha256,
+  });
+}
+
+async function rollbackCheckpointCandidateState(paths, intent, previous, receipt, postverify) {
+  const name = receiptName(receipt);
+  const receiptRaw = Buffer.from(canonicalClusterJson(receipt));
+  const current = await trustedJsonFile(
+    paths.current, 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_CURRENT_INVALID",
+  );
+  const expectedOrdinal = postverify ? 15 : 14;
+  const expectedStatus = postverify ? "ROLLED_BACK" : "ROLLBACK_IN_PROGRESS";
+  if (current?.value.receipt_sha256 === receipt.receipt_sha256) {
+    const chain = await committedChain(paths);
+    if (chain.current?.value.receipt_sha256 !== receipt.receipt_sha256
+      || chain.current.value.checkpoint_ordinal !== expectedOrdinal
+      || chain.current.value.journal_status !== expectedStatus) {
+      reject("UAT_PROMOTION_ROLLBACK_COMMITTED_STATE_MISMATCH");
+    }
+    return Object.freeze({ committed: true, history: true, receipt: true, current: true, receiptRaw, chain });
+  }
+  const chain = await committedChain(paths, { history: new Set([name]), receipts: new Set([name]) });
+  const expectedPreviousOrdinal = postverify ? 14 : 13;
+  const expectedPreviousStatus = postverify ? "ROLLBACK_IN_PROGRESS" : "COMMITTED";
+  if (chain.current?.value.receipt_sha256 !== previous.receipt_sha256
+    || chain.current.value.intent_sha256 !== intent.promotion_intent_sha256
+    || chain.current.value.checkpoint_ordinal !== expectedPreviousOrdinal
+    || chain.current.value.journal_status !== expectedPreviousStatus) {
+    reject("UAT_PROMOTION_ROLLBACK_PREVIOUS_CHANGED");
+  }
+  const history = await trustedJsonFile(
+    historyFile(paths, receipt), 0o400, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_HISTORY_INVALID",
+  );
+  const storedReceipt = await trustedJsonFile(
+    receiptFile(paths, receipt), 0o400, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_RECEIPT_INVALID",
+  );
+  const historyDone = history?.raw.equals(receiptRaw) ?? false;
+  const receiptDone = storedReceipt?.raw.equals(receiptRaw) ?? false;
+  if (history !== null && !historyDone || storedReceipt !== null && !receiptDone) {
+    reject("UAT_PROMOTION_ROLLBACK_PUBLICATION_CONFLICT");
+  }
+  if (receiptDone && !historyDone) reject("UAT_PROMOTION_ROLLBACK_PUBLICATION_STAGE_ORDER_INVALID");
+  return Object.freeze({ committed: false, history: historyDone, receipt: receiptDone, current: false, receiptRaw, chain });
+}
+
+async function commitRollbackCheckpoint(context, intent, result, previous, paths, options, postverify) {
+  const receipt = createRollbackCheckpointReceipt(context, intent, result, previous, postverify);
+  let state = await rollbackCheckpointCandidateState(paths, intent, previous, receipt, postverify);
+  const prefix = postverify ? "AFTER_ROLLBACK_POSTVERIFY" : "AFTER_ROLLBACK_EXECUTION";
+  if (!state.history) {
+    await ensureRawFile(
+      historyFile(paths, receipt), state.receiptRaw, 0o400,
+      validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_HISTORY_CONFLICT",
+    );
+    await syncDirectory(paths.history, "UAT_PROMOTION_HISTORY_SYNC_FAILED");
+    await options.fault?.(`${prefix}_HISTORY`);
+  }
+  state = await rollbackCheckpointCandidateState(paths, intent, previous, receipt, postverify);
+  if (!state.receipt) {
+    await ensureRawFile(
+      receiptFile(paths, receipt), state.receiptRaw, 0o400,
+      validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_RECEIPT_CONFLICT",
+    );
+    await syncDirectory(paths.receipts, "UAT_PROMOTION_RECEIPT_SYNC_FAILED");
+    await options.fault?.(`${prefix}_RECEIPT`);
+  }
+  state = await rollbackCheckpointCandidateState(paths, intent, previous, receipt, postverify);
+  if (!state.current) {
+    const temporary = path.join(
+      paths.stateRoot, `.current.${context.operation_id}.${receipt.receipt_sha256}.tmp`,
+    );
+    await atomicAlias(
+      paths.current, temporary, state.receiptRaw, 0o400,
+      validateUatPromotionCheckpointReceipt, state.chain.current?.raw ?? null,
+      "UAT_PROMOTION_CURRENT_PUBLICATION",
+    );
+    await options.fault?.(`${prefix}_CURRENT`);
+  }
+  state = await rollbackCheckpointCandidateState(paths, intent, previous, receipt, postverify);
+  if (!state.committed) reject("UAT_PROMOTION_ROLLBACK_COMMIT_INCOMPLETE");
+  const common = {
+    result: "COMMITTED", promotion_id: intent.promotion_id,
+    intent_sha256: postverify ? intent.postverify_intent_sha256 : intent.rollback_intent_sha256,
+    receipt_sha256: receipt.receipt_sha256,
+  };
+  return postverify ? Object.freeze({
+    ...common, postverify_plan_sha256: intent.postverify_plan_sha256,
+    rollback_result_sha256: intent.rollback_result_sha256,
+    postverify_result_sha256: result.result_sha256,
+  }) : Object.freeze({
+    ...common, rollback_plan_sha256: intent.rollback_plan_sha256,
+    rollback_result_sha256: result.result_sha256,
+  });
+}
+
+async function executeRollbackExecution(context, options) {
+  const paths = await layout(options.filesystemRoot, false);
+  const sources = await verifyRollbackExecutionSources(context, options.filesystemRoot, options);
+  const expected = createRollbackIntent(context);
+  const intent = await loadStoredRollbackIntent(context, paths);
+  if (!same(intent, expected)) reject("UAT_PROMOTION_ROLLBACK_INTENT_BINDING_INVALID");
+  const result = await loadRollbackResult(paths, intent);
+  if (options.expectedRollbackResultSha256 !== result.result_sha256) {
+    reject("UAT_PROMOTION_ROLLBACK_EXPECTED_RESULT_MISMATCH");
+  }
+  return commitRollbackCheckpoint(context, intent, result, sources.previous, paths, options, false);
+}
+
+async function executeRollbackPostverify(context, options) {
+  const paths = await layout(options.filesystemRoot, false);
+  const sources = await verifyRollbackPostverifySources(context, options.filesystemRoot, options);
+  const expected = createRollbackPostverifyIntent(context, sources.rollbackResult);
+  const intent = await loadStoredRollbackPostverifyIntent(context, paths);
+  if (!same(intent, expected)) reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_BINDING_INVALID");
+  const result = await loadRollbackPostverifyResult(paths, intent, sources.rollbackResult);
+  if (options.expectedRollbackResultSha256 !== result.result_sha256) {
+    reject("UAT_PROMOTION_ROLLBACK_EXPECTED_RESULT_MISMATCH");
+  }
+  return commitRollbackCheckpoint(context, intent, result, sources.previous, paths, options, true);
+}
+
 function recoveryPlan(context, decision, reason) {
   const body = {
     schema_version: 3,
@@ -6492,7 +7531,7 @@ function validateRecoveryPlan(value) {
     "decision", "reason", "recovery_sha256",
   ], "UAT_PROMOTION_RECOVERY_INVALID");
   if (value.schema_version !== 3 || value.contract !== UAT_PROMOTION_RECOVERY_CONTRACT
-    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT", "FINALIZATION"]).has(value.original_operation)
+    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT", "FINALIZATION", "ROLLBACK_EXECUTION", "ROLLBACK_POSTVERIFY"]).has(value.original_operation)
     || !new Set(["RESUME_PUBLICATION", "ALREADY_COMMITTED", "QUARANTINE"]).has(value.decision)
     || (value.decision === "QUARANTINE") !== (typeof value.reason === "string")) reject("UAT_PROMOTION_RECOVERY_INVALID");
   identifier(value.execution_authorization_id, "UAT_PROMOTION_RECOVERY_INVALID");
@@ -6522,6 +7561,7 @@ function recoverableStateFailure(error) {
     "UAT_PROMOTION_POSTDEPLOY_", "RUNTIME_CONFIGURATION_PROBE_", "POSTDEPLOY_", "RELEASE_",
     "UAT_PROMOTION_CROSS_ROLE_",
     "UAT_PROMOTION_FINALIZATION_",
+    "UAT_PROMOTION_ROLLBACK_",
   ].some((prefix) => error.code.startsWith(prefix));
 }
 
@@ -6848,6 +7888,126 @@ async function assessFinalizationRecovery(context, paths, options) {
   return state.committed ? "ALREADY_COMMITTED" : "RESUME_PUBLICATION";
 }
 
+async function loadRollbackPostverifyRecoveryArtifacts(context, paths, options) {
+  const intent = await loadStoredRollbackPostverifyIntent(context, paths);
+  const rollbackIntentSource = await readAuthorizedSource(
+    intent.parameters.rollback_intent_source, options.filesystemRoot,
+    validateUatPromotionRollbackIntent, "UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_SOURCE_INVALID",
+  );
+  if (rollbackIntentSource.raw.toString("utf8") !== canonicalClusterJson(rollbackIntentSource.value)
+    || rollbackIntentSource.value.rollback_operation_id !== intent.rollback_operation_id
+    || rollbackIntentSource.value.rollback_intent_sha256 !== intent.rollback_intent_sha256
+    || rollbackIntentSource.value.execution_authorization_sha256
+      !== intent.rollback_execution_authorization_sha256) {
+    reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_BINDING_INVALID");
+  }
+  const rollbackResult = await loadRollbackResult(paths, rollbackIntentSource.value);
+  const rollbackResultSource = await readAuthorizedSource(
+    intent.parameters.rollback_result_source, options.filesystemRoot,
+    validateUatPromotionRollbackResult, "UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_SOURCE_INVALID",
+  );
+  if (rollbackResultSource.raw.toString("utf8") !== canonicalClusterJson(rollbackResultSource.value)
+    || !same(rollbackResultSource.value, rollbackResult)
+    || rollbackResult.result_sha256 !== intent.rollback_result_sha256
+    || intent.postverify_plan_sha256
+      !== rollbackPostverifyPlanBinding(intent.parameters, rollbackResult)) {
+    reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_BINDING_INVALID");
+  }
+  const result = await loadRollbackPostverifyResult(paths, intent, rollbackResult);
+  return Object.freeze({ intent, rollbackIntent: rollbackIntentSource.value, rollbackResult, result });
+}
+
+async function alreadyCommittedRollback(context, paths, intent, result, postverify) {
+  const chain = await committedChain(paths);
+  const ordinal = postverify ? 15 : 14;
+  const checkpointId = postverify
+    ? "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT" : "ROLLBACK_TO_UAT_EXECUTOR";
+  const journalStatus = postverify ? "ROLLED_BACK" : "ROLLBACK_IN_PROGRESS";
+  const receiptEntry = chain.receipts.find((entry) => (
+    entry.value.promotion_id === intent.promotion_id
+    && entry.value.promotion_generation === intent.promotion_generation
+    && entry.value.checkpoint_ordinal === ordinal
+  ));
+  const receipt = receiptEntry?.value;
+  const intentSha256 = postverify
+    ? intent.postverify_intent_sha256 : intent.rollback_intent_sha256;
+  const recordedAt = postverify ? result.verified_at : result.completed_at;
+  const bindings = {
+    candidate_binding_sha256: intent.candidate_binding_sha256,
+    database_binding_sha256: intent.database_binding_sha256,
+    runtime_binding_sha256: intent.runtime_binding_sha256,
+    recovery_binding_sha256: intent.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: intent.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: intent.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: intent.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: intent.migration_fence_binding_sha256,
+    migration_result_binding_sha256: intent.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: intent.compose_deployment_binding_sha256,
+  };
+  if (!receipt || chain.current.value.checkpoint_ordinal < ordinal
+    || receipt.checkpoint_id !== checkpointId || receipt.checkpoint_status !== "COMMITTED"
+    || receipt.journal_status !== journalStatus
+    || receipt.previous_checkpoint_receipt_sha256 !== intent.parameters.previous_checkpoint_receipt_sha256
+    || receipt.checkpoint_authorization_sha256 !== intent.execution_authorization_sha256
+    || receipt.checkpoint_evidence_sha256 !== result.result_sha256
+    || receipt.recorded_at !== recordedAt || receipt.intent_sha256 !== intent.promotion_intent_sha256
+    || receipt.original_authorization_sha256 !== intent.parameters.promotion_original_authorization_sha256
+    || Object.entries(bindings).some(([field, expected]) => receipt[field] !== expected)
+    || postverify && chain.current.value.receipt_sha256 !== receipt.receipt_sha256) {
+    reject("UAT_PROMOTION_ROLLBACK_COMMITTED_STATE_MISMATCH");
+  }
+  const common = {
+    result: "ALREADY_COMMITTED", promotion_id: intent.promotion_id,
+    intent_sha256: intentSha256, receipt_sha256: receipt.receipt_sha256,
+  };
+  return postverify ? Object.freeze({
+    ...common, rollback_result_sha256: intent.rollback_result_sha256,
+    postverify_plan_sha256: intent.postverify_plan_sha256,
+    postverify_result_sha256: result.result_sha256,
+  }) : Object.freeze({
+    ...common, rollback_plan_sha256: intent.rollback_plan_sha256,
+    rollback_result_sha256: result.result_sha256,
+  });
+}
+
+async function assessRollbackRecovery(context, paths, options, postverify) {
+  let intent; let result;
+  if (postverify) {
+    ({ intent, result } = await loadRollbackPostverifyRecoveryArtifacts(context, paths, options));
+  } else {
+    intent = await loadStoredRollbackIntent(context, paths);
+    result = await loadRollbackResult(paths, intent);
+  }
+  const current = await trustedJsonFile(
+    paths.current, 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_CURRENT_INVALID",
+  );
+  const ordinal = postverify ? 15 : 14;
+  if (current?.value.promotion_id === intent.promotion_id
+    && current.value.promotion_generation === intent.promotion_generation
+    && current.value.checkpoint_ordinal >= ordinal) {
+    await alreadyCommittedRollback(context, paths, intent, result, postverify);
+    return "ALREADY_COMMITTED";
+  }
+  const sources = postverify
+    ? await verifyRollbackPostverifySources(context, options.filesystemRoot, options)
+    : await verifyRollbackExecutionSources(context, options.filesystemRoot, options);
+  const expected = postverify
+    ? createRollbackPostverifyIntent(context, sources.rollbackResult)
+    : createRollbackIntent(context);
+  if (!same(expected, intent)) {
+    reject(postverify
+      ? "UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_BINDING_INVALID"
+      : "UAT_PROMOTION_ROLLBACK_INTENT_BINDING_INVALID");
+  }
+  const receipt = createRollbackCheckpointReceipt(
+    context, intent, result, sources.previous, postverify,
+  );
+  const state = await rollbackCheckpointCandidateState(
+    paths, intent, sources.previous, receipt, postverify,
+  );
+  return state.committed ? "ALREADY_COMMITTED" : "RESUME_PUBLICATION";
+}
+
 async function prepareRecovery(context, options) {
   await repositoryPolicy(options.siteRoot);
   const paths = await layout(options.filesystemRoot, false);
@@ -6960,6 +8120,10 @@ async function prepareRecovery(context, options) {
         );
         if (state.committed) decision = "ALREADY_COMMITTED";
       }
+    } else if (context.operation === "ROLLBACK_EXECUTION") {
+      decision = await assessRollbackRecovery(context, paths, options, false);
+    } else if (context.operation === "ROLLBACK_POSTVERIFY") {
+      decision = await assessRollbackRecovery(context, paths, options, true);
     } else if (context.operation === "FINALIZATION") {
       decision = await assessFinalizationRecovery(context, paths, options);
     } else if (context.operation === "CROSS_ROLE_UAT") {
@@ -7025,7 +8189,7 @@ function validateQuarantine(value) {
     "intent_sha256", "recovery_sha256", "reason", "preservation", "quarantine_sha256",
   ], "UAT_PROMOTION_QUARANTINE_INVALID");
   if (value.schema_version !== 3 || value.contract !== UAT_PROMOTION_QUARANTINE_CONTRACT || value.status !== "QUARANTINED"
-    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT", "FINALIZATION"]).has(value.operation)
+    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT", "FINALIZATION", "ROLLBACK_EXECUTION", "ROLLBACK_POSTVERIFY"]).has(value.operation)
     || value.preservation !== "FILES_LEFT_IN_PLACE_NO_AUTOMATIC_DELETE" || typeof value.reason !== "string" || value.reason.length < 4) reject("UAT_PROMOTION_QUARANTINE_INVALID");
   identifier(value.operation_id, "UAT_PROMOTION_QUARANTINE_INVALID");
   identifier(value.promotion_id, "UAT_PROMOTION_QUARANTINE_INVALID");
@@ -7129,6 +8293,42 @@ async function executeRecovery(context, options) {
       result = await commitMigrationExecution(
         context, artifacts.intent, migrationResult, sources, paths, options,
       );
+    } else if (context.operation === "ROLLBACK_EXECUTION") {
+      const intent = await loadStoredRollbackIntent(context, paths);
+      const rollbackResult = await loadRollbackResult(paths, intent);
+      if (plan.decision === "ALREADY_COMMITTED") {
+        result = await alreadyCommittedRollback(context, paths, intent, rollbackResult, false);
+      } else {
+        const sources = await verifyRollbackExecutionSources(
+          context, options.filesystemRoot, options,
+        );
+        if (!same(createRollbackIntent(context), intent)) {
+          reject("UAT_PROMOTION_ROLLBACK_INTENT_BINDING_INVALID");
+        }
+        result = await commitRollbackCheckpoint(
+          context, intent, rollbackResult, sources.previous, paths, options, false,
+        );
+      }
+    } else if (context.operation === "ROLLBACK_POSTVERIFY") {
+      const artifacts = await loadRollbackPostverifyRecoveryArtifacts(context, paths, options);
+      if (plan.decision === "ALREADY_COMMITTED") {
+        result = await alreadyCommittedRollback(
+          context, paths, artifacts.intent, artifacts.result, true,
+        );
+      } else {
+        const sources = await verifyRollbackPostverifySources(
+          context, options.filesystemRoot, options,
+        );
+        const expected = createRollbackPostverifyIntent(context, sources.rollbackResult);
+        if (!same(expected, artifacts.intent)
+          || !same(sources.rollbackResult, artifacts.rollbackResult)) {
+          reject("UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_BINDING_INVALID");
+        }
+        result = await commitRollbackCheckpoint(
+          context, artifacts.intent, artifacts.result, sources.previous,
+          paths, options, true,
+        );
+      }
     } else if (context.operation === "FINALIZATION" && plan.decision === "ALREADY_COMMITTED") {
       const intent = await loadStoredFinalizationIntent(context, paths);
       result = await alreadyCommittedFinalization(
@@ -7436,6 +8636,13 @@ export async function runUatPromotionTransactionPhase(contextInput, phase, optio
   } else if (options.expectedPostdeployResultSha256 !== undefined) {
     reject("UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_INVALID");
   }
+  const rollback = new Set(["ROLLBACK_EXECUTION", "ROLLBACK_POSTVERIFY"]).has(context.operation);
+  if (phase === "execute" && rollback) {
+    digest(options.expectedRollbackResultSha256, "UAT_PROMOTION_ROLLBACK_EXPECTED_RESULT_INVALID");
+    resolved.expectedRollbackResultSha256 = options.expectedRollbackResultSha256;
+  } else if (options.expectedRollbackResultSha256 !== undefined) {
+    reject("UAT_PROMOTION_ROLLBACK_EXPECTED_RESULT_INVALID");
+  }
   if (options.now !== undefined) {
     if (options.allowTestRoot !== true || filesystemRoot === "/" || !(options.now instanceof Date)
       || Number.isNaN(options.now.getTime())) reject("UAT_PROMOTION_TEST_TIME_NOT_EXPLICIT");
@@ -7461,6 +8668,8 @@ export async function runUatPromotionTransactionPhase(contextInput, phase, optio
     if (context.operation === "COMPOSE_DEPLOYMENT") return prepareComposeDeployment(context, resolved);
     if (context.operation === "CROSS_ROLE_UAT") return prepareCrossRoleCheckpoint(context, resolved);
     if (context.operation === "FINALIZATION") return prepareFinalization(context, resolved);
+    if (context.operation === "ROLLBACK_EXECUTION") return prepareRollbackExecution(context, resolved);
+    if (context.operation === "ROLLBACK_POSTVERIFY") return prepareRollbackPostverify(context, resolved);
     return preparePostdeployCheckpoint(context, resolved);
   }
   const paths = await layout(filesystemRoot, false);
@@ -7499,6 +8708,8 @@ export async function runUatPromotionTransactionPhase(contextInput, phase, optio
     }
     if (context.operation === "CROSS_ROLE_UAT") return executeCrossRoleCheckpoint(context, resolved);
     if (context.operation === "FINALIZATION") return executeFinalization(context, resolved);
+    if (context.operation === "ROLLBACK_EXECUTION") return executeRollbackExecution(context, resolved);
+    if (context.operation === "ROLLBACK_POSTVERIFY") return executeRollbackPostverify(context, resolved);
     const sources = await verifyComposeDeploymentSources(context, filesystemRoot);
     const intent = await loadComposeDeploymentIntent(context, paths, sources);
     const result = await loadComposeDeploymentResult(paths, intent);
@@ -7580,6 +8791,14 @@ async function main(argumentsList) {
       process.env.ERP_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_SHA256;
   } else if (process.env.ERP_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_SHA256 !== undefined) {
     reject("UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_INVALID");
+  }
+  if (argumentsList[0] === "execute" && new Set([
+    "ROLLBACK_EXECUTION", "ROLLBACK_POSTVERIFY",
+  ]).has(context.operation)) {
+    options.expectedRollbackResultSha256 =
+      process.env.ERP_UAT_PROMOTION_ROLLBACK_EXPECTED_RESULT_SHA256;
+  } else if (process.env.ERP_UAT_PROMOTION_ROLLBACK_EXPECTED_RESULT_SHA256 !== undefined) {
+    reject("UAT_PROMOTION_ROLLBACK_EXPECTED_RESULT_INVALID");
   }
   process.stdout.write(canonicalClusterJson(await runUatPromotionTransactionPhase(context, argumentsList[0], options)));
 }

@@ -33,6 +33,17 @@ import {
 } from "../scripts/uat-promotion-compose-deployment-contract.mjs";
 import { runUatPromotionComposeDeploymentControl } from "../scripts/uat-promotion-compose-deployment-control.mjs";
 import {
+  UAT_PROMOTION_ROLLBACK_STAGES,
+  createUatPromotionRollbackExecutionPackage,
+  createUatPromotionRollbackResult,
+  createUatPromotionRollbackStageIntent,
+  createUatPromotionRollbackStageResult,
+} from "../scripts/uat-promotion-rollback-contract.mjs";
+import {
+  preflightUatPromotionRollbackControl,
+  runUatPromotionRollbackControl,
+} from "../scripts/uat-promotion-rollback-control.mjs";
+import {
   canonicalRuntimeConfigurationProbeJson,
   createRuntimeConfigurationProbeReceipt,
 } from "../scripts/postdeploy-runtime-configuration-probe.mjs";
@@ -78,6 +89,8 @@ const supervisorBundleSha256 = digest("supervisor-bundle");
 const candidatePath = "/var/lib/chenyida-erp/release-candidate-snapshots/receipts/promotion-fixture.prepared.json";
 const manifestPath = "/var/lib/chenyida-erp/release-artifacts/promotion-alpha47/release-manifest.json";
 const identityPath = "/var/lib/chenyida-erp/release-identity/release-identity.json";
+const predecessorManifestPath = "/var/lib/chenyida-erp/release-artifacts/predecessor-alpha46/release-manifest.json";
+const predecessorReceiptPath = "/var/lib/chenyida-erp/postdeploy/predecessor-alpha46/predecessor-alpha46.postdeploy-receipt.json";
 const readinessPath = "/var/lib/chenyida-erp/backup-status/recovery-readiness.json";
 const clusterPolicyPath = "/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json";
 const clusterActivationPath = "/var/lib/chenyida-erp/postgresql-cluster-recovery-policy-v2/current.json";
@@ -189,34 +202,90 @@ function manifest(entries) {
   };
 }
 
-function releaseIdentity(migrationDigest) {
-  return {
-    schema_version: 3,
-    contract: "chenyida-erp-runtime-release-identity/v3",
-    deployment_class: "UAT",
-    deployment_id: "chenyida-erp",
-    release_id: "current-alpha47",
-    release_manifest_sha256: digest("current-release-manifest"),
-    postdeploy_receipt_sha256: digest("current-postdeploy"),
-    supervisor_bundle_sha256: digest("current-supervisor"),
-    authorization_sha256: digest("current-authorization"),
-    runtime_guard: runtimeGuardBinding(POST_DEPLOY_RUNTIME_GUARD_MODE),
-    runtime_policy_sha256: RELEASE_RUNTIME_POLICY_SHA256,
-    application_version: version,
-    git_commit: "e".repeat(40),
-    git_tree: "f".repeat(40),
-    migration_head: "0046_runtime_lock_privilege_boundary.sql",
-    migration_manifest_sha256: migrationDigest,
-    caddy_container_id: "1".repeat(64),
-    caddy_image_digest: `sha256:${"1".repeat(64)}`,
-    postgres_container_id: "2".repeat(64),
-    postgres_image_digest: `sha256:${"2".repeat(64)}`,
-    web_container_id: "3".repeat(64),
-    web_image_digest: `sha256:${"3".repeat(64)}`,
-    worker_container_id: "4".repeat(64),
-    worker_image_digest: `sha256:${"4".repeat(64)}`,
-    generated_at: "2026-08-15T00:50:00.000Z",
-  };
+function predecessorRelease(entries = migrations()) {
+  const release = structuredClone(manifest(entries));
+  const predecessorVersion = "0.1.0-alpha.46";
+  const predecessorCommit = "e".repeat(40);
+  const predecessorTree = "f".repeat(40);
+  const predecessorWebImage = `registry.example.com/chenyida-erp/web@sha256:${"3".repeat(64)}`;
+  const predecessorWorkerImage = `registry.example.com/chenyida-erp/worker@sha256:${"4".repeat(64)}`;
+  const predecessorSupervisor = digest("current-supervisor");
+  release.release_id = "predecessor-alpha46";
+  release.generated_at = "2026-08-15T00:30:00.000Z";
+  release.source.git_commit = predecessorCommit;
+  release.source.git_tree = predecessorTree;
+  release.source.package_version = predecessorVersion;
+  release.control.supervisor_bundle_sha256 = predecessorSupervisor;
+  for (const [service, reference, imageDigest] of [
+    ["web", predecessorWebImage, `sha256:${"3".repeat(64)}`],
+    ["worker", predecessorWorkerImage, `sha256:${"4".repeat(64)}`],
+  ]) {
+    release.images[service] = {
+      ...release.images[service], image_reference: reference, image_digest: imageDigest,
+      oci_version: predecessorVersion, oci_revision: predecessorCommit,
+      baked_version: predecessorVersion, baked_revision: predecessorCommit,
+    };
+  }
+  const service = (name, containerId, imageId, imageReference, health) => ({
+    service: name,
+    container_id: containerId,
+    image_id: imageId,
+    image_reference: imageReference,
+    restart_count: 0,
+    oom_killed: false,
+    running: true,
+    restarting: false,
+    paused: false,
+    dead: false,
+    status: "running",
+    health,
+    healthcheck_present: name !== "caddy",
+  });
+  const services = [
+    service("caddy", "1".repeat(64), `sha256:${"1".repeat(64)}`,
+      `docker.io/library/caddy@sha256:${"1".repeat(64)}`, "none"),
+    service("postgres", "2".repeat(64), `sha256:${"2".repeat(64)}`,
+      `docker.io/library/postgres@sha256:${"2".repeat(64)}`, "healthy"),
+    service("web", "3".repeat(64), `sha256:${"3".repeat(64)}`,
+      predecessorWebImage, "healthy"),
+    service("worker", "4".repeat(64), `sha256:${"4".repeat(64)}`,
+      predecessorWorkerImage, "healthy"),
+  ];
+  const receipt = buildPostDeployReceipt({
+    runId: "predecessor-alpha46",
+    generatedAt: "2026-08-15T00:50:00.000Z",
+    deploymentClass: "UAT",
+    deploymentId: "chenyida-erp",
+    composeProject: "chenyida-erp",
+    manifest: release,
+    manifestSha256: createHash("sha256").update(releaseCanonicalJson(release)).digest("hex"),
+    supervisorBundleSha256: predecessorSupervisor,
+    authorizationSha256: digest("current-authorization"),
+    runtimePolicySha256: RELEASE_RUNTIME_POLICY_SHA256,
+    runtimeConfigurationSha256: digest("predecessor-runtime-configuration"),
+    services,
+    readiness: {
+      deployment_class: "UAT",
+      deployment_id: "chenyida-erp",
+      version: predecessorVersion,
+      revision: predecessorCommit.slice(0, 12),
+      migration_head: release.migrations.head,
+      migration_manifest_sha256: release.migrations.allowlist_sha256,
+      database_time: "2026-08-15T00:50:00.000Z",
+      components: {
+        postgresql: "READY", migration: "READY", worker: "READY",
+        uploads: "READY", attachments: "READY", runtime: "READY",
+      },
+    },
+  });
+  const receiptSha256 = createHash("sha256")
+    .update(releaseCanonicalJson(receipt)).digest("hex");
+  const identity = buildReleaseIdentityFromPostDeployReceipt({ receipt, receiptSha256 });
+  return Object.freeze({ release, receipt, identity });
+}
+
+function releaseIdentity() {
+  return predecessorRelease().identity;
 }
 
 function readiness(snapshotSha256) {
@@ -264,7 +333,13 @@ async function fixture({ promotionId = "promotion-fixture-001" } = {}) {
   await rawFile(root, manifestPath, releaseCanonicalJson(release), 0o440);
   await directory(root, "/var/lib/chenyida-erp/release-identity", 0o750);
   await rawFile(root, "/var/lib/chenyida-erp/release-identity/.chenyida-erp-release-identity-root-v1", "chenyida-erp-release-identity-root/v1\n", 0o440);
-  await canonicalFile(root, identityPath, releaseIdentity(migrationAllowlistDigest(entries)), 0o440);
+  const predecessor = predecessorRelease(entries);
+  await directory(root, "/var/lib/chenyida-erp/release-artifacts/predecessor-alpha46", 0o755);
+  await rawFile(root, predecessorManifestPath, releaseCanonicalJson(predecessor.release), 0o440);
+  await directory(root, "/var/lib/chenyida-erp/postdeploy", 0o755);
+  await directory(root, "/var/lib/chenyida-erp/postdeploy/predecessor-alpha46", 0o750);
+  await rawFile(root, predecessorReceiptPath, releaseCanonicalJson(predecessor.receipt), 0o440);
+  await rawFile(root, identityPath, releaseCanonicalJson(predecessor.identity), 0o440);
   await directory(root, "/var/lib/chenyida-erp/backup-status", 0o750);
   await rawFile(root, "/var/lib/chenyida-erp/backup-status/.chenyida-erp-receipt-root-v2", "chenyida-erp-receipt-root/v2\n", 0o440);
   const snapshotSha256 = digest("preupgrade-snapshot");
@@ -339,10 +414,10 @@ function recoveryContext(original, intentSha256, suffix = "recovery") {
 
 function snapshotObjects() {
   return {
-    postgresql: { file: "postgresql.dump", sha256: digest("snapshot-postgresql"), bytes: 101, entries: null },
-    uploads: { file: "uploads.tar.gz", sha256: digest("snapshot-uploads"), bytes: 102, entries: 2 },
-    attachments: { file: "attachments.tar.gz", sha256: digest("snapshot-attachments"), bytes: 103, entries: 3 },
-    backup_status: { file: "backup-status.tar.gz", sha256: digest("snapshot-backup-status"), bytes: 104, entries: 4 },
+    postgresql: { file: "postgresql.dump", sha256: digest("snapshot-postgresql"), bytes: Buffer.byteLength("snapshot-postgresql"), entries: null },
+    uploads: { file: "uploads.tar.gz", sha256: digest("snapshot-uploads"), bytes: Buffer.byteLength("snapshot-uploads"), entries: 2 },
+    attachments: { file: "attachments.tar.gz", sha256: digest("snapshot-attachments"), bytes: Buffer.byteLength("snapshot-attachments"), entries: 3 },
+    backup_status: { file: "backup-status.tar.gz", sha256: digest("snapshot-backup-status"), bytes: Buffer.byteLength("snapshot-backup-status"), entries: 4 },
   };
 }
 
@@ -1884,6 +1959,648 @@ function finalizationRecoveryContext(original, intentSha256, suffix = "recovery"
   };
 }
 
+function rollbackBoundary() {
+  return {
+    environment_restore: "EXACT_PREUPGRADE_SNAPSHOT_AND_PREDECESSOR_RUNTIME_ONLY",
+    posted_business_reversal: "NOT_PERFORMED_REQUIRES_SEPARATE_BUSINESS_AUTHORIZATION",
+    down_migration: false,
+    direct_sql_correction: false,
+    business_fact_deletion: false,
+    automatic_business_compensation: false,
+  };
+}
+
+function rollbackRecoveryContext(original, intentSha256, suffix = "recovery") {
+  const executionId = `${original.operation_id}-${suffix}`;
+  return {
+    ...original,
+    execution_mode: "RECOVERY",
+    execution_authorization_id: executionId,
+    execution_authorization_sha256: digest(`rollback-recovery-authorization:${executionId}`),
+    execution_created_at: "2026-08-15T02:01:00.000Z",
+    expected_intent_sha256: intentSha256,
+  };
+}
+
+async function rollbackPackageSources(root, parameters) {
+  const rootLogical = "/var/lib/chenyida-erp/rollback-package-inputs";
+  await directory(root, rootLogical, 0o700);
+  const contents = {
+    snapshot_readiness: "rollback-package-source:snapshot-readiness.json",
+    snapshot_manifest: "rollback-package-source:snapshot-manifest.json",
+    snapshot_migrations: "rollback-package-source:snapshot-migrations.json",
+    snapshot_reconciliation: "rollback-package-source:snapshot-reconciliation.json",
+    snapshot_postgresql: "snapshot-postgresql",
+    snapshot_uploads: "snapshot-uploads",
+    snapshot_attachments: "snapshot-attachments",
+    snapshot_backup_status: "snapshot-backup-status",
+    snapshot_policy: "rollback-package-source:snapshot-policy.json",
+    snapshot_policy_activation: "rollback-package-source:snapshot-policy-activation.json",
+    candidate_deployment_result: "rollback-package-source:candidate-deployment-result.json",
+    candidate_postdeploy_identity: "rollback-package-source:candidate-postdeploy-identity.json",
+    compose_file: "rollback-package-source:compose.yaml",
+    compose_release_file: "rollback-package-source:compose.release.yaml",
+    deployment_environment: "rollback-package-source:deployment.env",
+    runtime_policy: "rollback-package-source:runtime-policy.json",
+  };
+  const files = {
+    snapshot_readiness: "snapshot-readiness.json",
+    snapshot_manifest: "snapshot-manifest.json",
+    snapshot_migrations: "snapshot-migrations.json",
+    snapshot_reconciliation: "snapshot-reconciliation.json",
+    snapshot_postgresql: "postgresql.dump",
+    snapshot_uploads: "uploads.tar.gz",
+    snapshot_attachments: "attachments.tar.gz",
+    snapshot_backup_status: "backup-status.tar.gz",
+    snapshot_policy: "snapshot-policy.json",
+    snapshot_policy_activation: "snapshot-policy-activation.json",
+    candidate_deployment_result: "candidate-deployment-result.json",
+    candidate_postdeploy_identity: "candidate-postdeploy-identity.json",
+    compose_file: "compose.yaml",
+    compose_release_file: "compose.release.yaml",
+    deployment_environment: "deployment.env",
+    runtime_policy: "runtime-policy.json",
+  };
+  const sources = {};
+  for (const [role, file] of Object.entries(files)) {
+    const logical = `${rootLogical}/${file}`;
+    await rawFile(root, logical, contents[role], 0o400);
+    sources[role] = await source(root, logical);
+  }
+  sources.predecessor_postdeploy_receipt = parameters.predecessor_postdeploy_receipt_source;
+  sources.predecessor_release_manifest = parameters.predecessor_release_manifest_source;
+  return sources;
+}
+
+async function rollbackExecutionFixture({ promotionId = "promotion-rollback-001" } = {}) {
+  const fixtureValue = await finalizationFixture({ promotionId });
+  const finalizationPrepared = await run(
+    fixtureValue.context, "prepare", fixtureValue.root,
+    { now: new Date("2026-08-15T01:48:41.000Z") },
+  );
+  await run(fixtureValue.context, "execute", fixtureValue.root, {
+    now: new Date("2026-08-15T01:48:42.000Z"),
+  });
+  const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  const predecessorReceipt = JSON.parse(await readFile(
+    physical(fixtureValue.root, predecessorReceiptPath), "utf8",
+  ));
+  const predecessorManifest = JSON.parse(await readFile(
+    physical(fixtureValue.root, predecessorManifestPath), "utf8",
+  ));
+  const finalizationIntentLogical = `${UAT_PROMOTION_STATE_ROOT}/intents/${fixtureValue.context.operation_id}.${finalizationPrepared.intent_sha256}.json`;
+  const snapshotIntentLogical = `${UAT_PROMOTION_STATE_ROOT}/intents/${fixtureValue.snapshotIntent.snapshot_operation_id}.${fixtureValue.snapshotIntent.snapshot_intent_sha256}.json`;
+  const rollbackId = `${promotionId}-rollback`;
+  const receiptSource = await source(fixtureValue.root, predecessorReceiptPath);
+  const manifestSource = await source(fixtureValue.root, predecessorManifestPath);
+  const identity = buildReleaseIdentityFromPostDeployReceipt({
+    receipt: predecessorReceipt,
+    receiptSha256: receiptSource.sha256,
+  });
+  const parameters = {
+    promotion_state_root: UAT_PROMOTION_STATE_ROOT,
+    promotion_id: current.promotion_id,
+    promotion_generation: current.promotion_generation,
+    previous_checkpoint_receipt_sha256: current.receipt_sha256,
+    promotion_intent_sha256: current.intent_sha256,
+    promotion_original_authorization_sha256: current.original_authorization_sha256,
+    candidate_binding_sha256: current.candidate_binding_sha256,
+    database_binding_sha256: current.database_binding_sha256,
+    runtime_binding_sha256: current.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: current.recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: current.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: current.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: current.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: current.migration_fence_binding_sha256,
+    migration_result_binding_sha256: current.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: current.compose_deployment_binding_sha256,
+    current_checkpoint_source: await source(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE),
+    rollback_id: rollbackId,
+    finalization_operation_id: fixtureValue.context.operation_id,
+    finalization_intent_sha256: finalizationPrepared.intent_sha256,
+    finalization_intent_source: await source(fixtureValue.root, finalizationIntentLogical),
+    snapshot_operation_id: fixtureValue.snapshotIntent.snapshot_operation_id,
+    snapshot_intent_sha256: fixtureValue.snapshotIntent.snapshot_intent_sha256,
+    snapshot_intent_source: await source(fixtureValue.root, snapshotIntentLogical),
+    snapshot_readiness_sha256: fixtureValue.snapshotIntent.parameters.snapshot_readiness_sha256,
+    snapshot_backup_id: fixtureValue.snapshotIntent.parameters.snapshot_backup_id,
+    snapshot_restore_run_id: fixtureValue.snapshotIntent.parameters.snapshot_restore_run_id,
+    snapshot_objects: fixtureValue.snapshotIntent.snapshot_objects,
+    predecessor_postdeploy_receipt_sha256: receiptSource.sha256,
+    predecessor_postdeploy_receipt_source: receiptSource,
+    predecessor_release_manifest_sha256: manifestSource.sha256,
+    predecessor_release_manifest_source: manifestSource,
+    predecessor: {
+      git_commit: identity.git_commit,
+      git_tree: identity.git_tree,
+      application_version: identity.application_version,
+      release_manifest_sha256: identity.release_manifest_sha256,
+      web_image: predecessorReceipt.services.find((item) => item.service === "web").image_reference,
+      worker_image: predecessorReceipt.services.find((item) => item.service === "worker").image_reference,
+      migration_head: identity.migration_head,
+      migration_manifest_sha256: identity.migration_manifest_sha256,
+      runtime_configuration_sha256: predecessorReceipt.runtime_configuration_sha256,
+    },
+    database: {
+      name: "chenyida_erp",
+      system_identifier: databaseSystemIdentifier,
+      oid: databaseOid,
+      marker: databaseMarker,
+    },
+    compose_project: "chenyida-erp",
+    compose_project_root: "/opt/erp/chenyida_erp_site",
+    boundary: rollbackBoundary(),
+    rollback_created_at: "2026-08-15T01:49:00.000Z",
+    rollback_expires_at: "2026-08-15T01:59:00.000Z",
+    requester_identity_sha256: digest(`rollback-requester:${rollbackId}`),
+    approver_identity_sha256: digest(`rollback-approver:${rollbackId}`),
+    executor_identity_sha256: digest(`rollback-executor:${rollbackId}`),
+    policy_file_sha256: UAT_PROMOTION_POLICY_FILE_SHA256,
+    policy_sha256: UAT_PROMOTION_POLICY_SHA256,
+  };
+  const packageSources = await rollbackPackageSources(fixtureValue.root, parameters);
+  const executionPackage = createUatPromotionRollbackExecutionPackage({
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    rollback_operation_id: parameters.rollback_id,
+    created_at: parameters.rollback_created_at,
+    execution_deadline: "2026-08-15T02:49:00.000Z",
+    snapshot_readiness_sha256: parameters.snapshot_readiness_sha256,
+    snapshot_objects_sha256: clusterSha256(parameters.snapshot_objects),
+    predecessor_sha256: clusterSha256(parameters.predecessor),
+    database_snapshot_sha256: clusterSha256(parameters.database),
+    protected_resources_sha256: digest(`rollback-protected:${rollbackId}`),
+    compose_project: parameters.compose_project,
+    compose_project_root: parameters.compose_project_root,
+    restore_strategies: {
+      database: "RESTORE_TO_STAGING_DATABASE_ATOMIC_RENAME_RETAIN_CANDIDATE_QUARANTINED",
+      file_domains: "RESTORE_TO_NEW_NAMED_VOLUMES_RECREATE_WRITERS_RETAIN_CANDIDATE_VOLUMES",
+      runtime: "RECREATE_WEB_WORKER_FROM_PREDECESSOR_PINNED_DIGESTS",
+    },
+    sources: packageSources,
+    source_set_sha256: clusterSha256(packageSources),
+  });
+  const executionPackageLogical = `${UAT_PROMOTION_STATE_ROOT}/packages/${rollbackId}.${executionPackage.package_sha256}.json`;
+  await canonicalFile(fixtureValue.root, executionPackageLogical, executionPackage, 0o400);
+  parameters.execution_package_sha256 = executionPackage.package_sha256;
+  parameters.execution_package_source = await source(fixtureValue.root, executionPackageLogical);
+  parameters.execution_deadline = executionPackage.execution_deadline;
+  assert.deepEqual({
+    receiptManifest: predecessorReceipt.release.manifest_sha256,
+    sourceManifest: manifestSource.sha256,
+    identityManifest: identity.release_manifest_sha256,
+    parameterManifest: parameters.predecessor_release_manifest_sha256,
+    databaseBinding: clusterSha256({
+      deployment_class: "UAT",
+      deployment_id: "chenyida-erp",
+      database_name: parameters.database.name,
+      database_oid: parameters.database.oid,
+      database_system_identifier: parameters.database.system_identifier,
+      database_marker: parameters.database.marker,
+    }),
+    parameterDatabaseBinding: parameters.database_binding_sha256,
+  }, {
+    receiptManifest: manifestSource.sha256,
+    sourceManifest: manifestSource.sha256,
+    identityManifest: manifestSource.sha256,
+    parameterManifest: manifestSource.sha256,
+    databaseBinding: parameters.database_binding_sha256,
+    parameterDatabaseBinding: parameters.database_binding_sha256,
+  });
+  const finalizationIntent = JSON.parse(await readFile(
+    physical(fixtureValue.root, finalizationIntentLogical), "utf8",
+  ));
+  const snapshotIntent = JSON.parse(await readFile(
+    physical(fixtureValue.root, snapshotIntentLogical), "utf8",
+  ));
+  const authorization = digest(`rollback-authorization:${rollbackId}`);
+  const invariantFailures = Object.entries({
+    checkpoint: current.checkpoint_id === "PROMOTION_FINAL_RECEIPT"
+      && current.checkpoint_ordinal === 13 && current.journal_status === "COMMITTED",
+    finalizationIdentity: finalizationIntent.finalization_operation_id
+      === parameters.finalization_operation_id
+      && finalizationIntent.finalization_intent_sha256 === parameters.finalization_intent_sha256,
+    finalizationEvidence: current.checkpoint_authorization_sha256
+      === finalizationIntent.execution_authorization_sha256
+      && current.checkpoint_evidence_sha256 === finalizationIntent.finalization_intent_sha256,
+    snapshotIdentity: snapshotIntent.snapshot_operation_id === parameters.snapshot_operation_id
+      && snapshotIntent.snapshot_intent_sha256 === parameters.snapshot_intent_sha256,
+    snapshotEvidence: snapshotIntent.parameters.snapshot_readiness_sha256
+      === parameters.snapshot_readiness_sha256
+      && snapshotIntent.parameters.snapshot_backup_id === parameters.snapshot_backup_id
+      && snapshotIntent.parameters.snapshot_restore_run_id === parameters.snapshot_restore_run_id
+      && canonicalClusterJson(snapshotIntent.parameters.snapshot_objects)
+        === canonicalClusterJson(parameters.snapshot_objects),
+    rollbackTime: Date.parse(parameters.rollback_created_at) >= Date.parse(current.recorded_at),
+    promotion: current.promotion_id === parameters.promotion_id
+      && current.promotion_generation === parameters.promotion_generation
+      && current.receipt_sha256 === parameters.previous_checkpoint_receipt_sha256
+      && current.intent_sha256 === parameters.promotion_intent_sha256
+      && current.original_authorization_sha256
+        === parameters.promotion_original_authorization_sha256,
+    bindings: current.candidate_binding_sha256 === parameters.candidate_binding_sha256
+      && current.database_binding_sha256 === parameters.database_binding_sha256
+      && current.runtime_binding_sha256 === parameters.runtime_binding_sha256
+      && current.recovery_binding_sha256 === parameters.preupgrade_recovery_binding_sha256
+      && current.promotion_snapshot_binding_sha256
+        === parameters.promotion_snapshot_binding_sha256
+      && current.writer_quiesce_binding_sha256 === parameters.writer_quiesce_binding_sha256
+      && current.migration_authorization_binding_sha256
+        === parameters.migration_authorization_binding_sha256
+      && current.migration_fence_binding_sha256 === parameters.migration_fence_binding_sha256
+      && current.migration_result_binding_sha256 === parameters.migration_result_binding_sha256
+      && current.compose_deployment_binding_sha256
+        === parameters.compose_deployment_binding_sha256,
+    finalizationPromotion: finalizationIntent.promotion_id === parameters.promotion_id
+      && finalizationIntent.promotion_generation === parameters.promotion_generation
+      && finalizationIntent.promotion_intent_sha256 === parameters.promotion_intent_sha256,
+    snapshotPromotion: snapshotIntent.promotion_id === parameters.promotion_id
+      && snapshotIntent.promotion_generation === parameters.promotion_generation
+      && snapshotIntent.promotion_snapshot_binding_sha256
+        === parameters.promotion_snapshot_binding_sha256,
+    receiptDigest: receiptSource.sha256
+      === parameters.predecessor_postdeploy_receipt_sha256,
+    manifestDigest: manifestSource.sha256 === parameters.predecessor_release_manifest_sha256,
+    authorizationFresh: !current.authorization_sha256_chain.includes(authorization),
+  }).filter(([, passed]) => !passed).map(([name]) => name);
+  assert.deepEqual(invariantFailures, []);
+  const context = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-transaction-context/v1",
+    operation_id: rollbackId,
+    operation: "ROLLBACK_EXECUTION",
+    execution_mode: "ORIGINAL",
+    execution_authorization_id: rollbackId,
+    execution_authorization_sha256: authorization,
+    execution_created_at: parameters.rollback_created_at,
+    original_authorization_sha256: authorization,
+    supervisor_bundle_sha256: supervisorBundleSha256,
+    expected_intent_sha256: null,
+    parameters,
+  };
+  return {
+    ...fixtureValue,
+    context,
+    finalizationContext: fixtureValue.context,
+    finalizationPrepared,
+    current,
+    executionPackage,
+  };
+}
+
+function rollbackService(name, imageField, imageValue) {
+  return {
+    container_id: digest(`rollback-container:${name}`),
+    [imageField]: imageValue,
+    running: true,
+    healthy: true,
+    restart_count: 0,
+    oom_killed: false,
+  };
+}
+
+function rollbackStageEvidence(stage, intent, executionPackage) {
+  const volume = (domain) => ({
+    strategy: executionPackage.restore_strategies.file_domains,
+    source_sha256: executionPackage.sources[`snapshot_${domain}`].sha256,
+    source_bytes: intent.parameters.snapshot_objects[domain].bytes,
+    source_entries: intent.parameters.snapshot_objects[domain].entries,
+    target_volume: `rollback_${domain}_001`,
+    retained_candidate_volume: `candidate_${domain}_001`,
+    content_sha256: intent.parameters.snapshot_objects[domain].sha256,
+  });
+  return {
+    PRECONDITION_RECHECK: {
+      execution_package_sha256: executionPackage.package_sha256,
+      source_set_sha256: executionPackage.source_set_sha256,
+      checkpoint_receipt_sha256: intent.parameters.previous_checkpoint_receipt_sha256,
+      snapshot_intent_sha256: intent.parameters.snapshot_intent_sha256,
+      finalization_intent_sha256: intent.parameters.finalization_intent_sha256,
+    },
+    WRITER_CONTAINMENT: {
+      database_fence_sha256: digest("rollback-database-fence"),
+      candidate_service_set_sha256: digest("rollback-candidate-services"),
+      web_container_id: digest("rollback-candidate-web"),
+      worker_container_id: digest("rollback-candidate-worker"),
+      stopped: true,
+    },
+    POSTGRESQL_RESTORE: {
+      strategy: executionPackage.restore_strategies.database,
+      source_sha256: executionPackage.sources.snapshot_postgresql.sha256,
+      source_bytes: intent.parameters.snapshot_objects.postgresql.bytes,
+      snapshot_database_oid: intent.parameters.database.oid,
+      restored_database_oid: "17384",
+      restored_database_name: intent.parameters.database.name,
+      system_identifier: intent.parameters.database.system_identifier,
+      migration_head: intent.parameters.predecessor.migration_head,
+      content_sha256: intent.parameters.snapshot_objects.postgresql.sha256,
+      candidate_database_quarantine_name: "chenyida_erp_candidate_001",
+    },
+    UPLOADS_RESTORE: volume("uploads"),
+    ATTACHMENTS_RESTORE: volume("attachments"),
+    BACKUP_STATUS_RESTORE: volume("backup_status"),
+    RUNTIME_CONFIGURATION_RESTORE: {
+      compose_file_sha256: executionPackage.sources.compose_file.sha256,
+      compose_release_file_sha256: executionPackage.sources.compose_release_file.sha256,
+      deployment_environment_sha256: executionPackage.sources.deployment_environment.sha256,
+      runtime_policy_sha256: executionPackage.sources.runtime_policy.sha256,
+      runtime_configuration_sha256: intent.parameters.predecessor.runtime_configuration_sha256,
+    },
+    WEB_WORKER_PREDECESSOR_ACTIVATION: {
+      strategy: executionPackage.restore_strategies.runtime,
+      web: rollbackService("web", "image_reference", intent.parameters.predecessor.web_image),
+      worker: rollbackService("worker", "image_reference", intent.parameters.predecessor.worker_image),
+      caddy: rollbackService("caddy", "image_digest", `sha256:${digest("rollback-caddy-image")}`),
+      postgres: rollbackService("postgres", "image_digest", `sha256:${digest("rollback-postgres-image")}`),
+      release_identity_sha256: digest("rollback-release-identity"),
+    },
+    PROTECTED_RESOURCE_RECHECK: {
+      before_sha256: executionPackage.protected_resources_sha256,
+      after_sha256: executionPackage.protected_resources_sha256,
+    },
+  }[stage];
+}
+
+function rollbackControlAdapter(executionPackage, { failStage = null, counters = null } = {}) {
+  return {
+    async preflight() {
+      counters && (counters.preflight += 1);
+      return {
+        result: "ROLLBACK_RUNTIME_PREFLIGHT_PASSED",
+        execution_package_sha256: executionPackage.package_sha256,
+        source_set_sha256: executionPackage.source_set_sha256,
+      };
+    },
+    async executeStage({ intent, stage, stageIntent }) {
+      counters && (counters.execute += 1);
+      if (stage === failStage) throw Object.assign(new Error("synthetic rollback stage failure"), {
+        code: "SYNTHETIC_ROLLBACK_STAGE_FAILURE",
+      });
+      const started = Date.parse("2026-08-15T01:49:01.000Z") + (stageIntent.ordinal - 1) * 2_000;
+      return {
+        evidence: rollbackStageEvidence(stage, intent, executionPackage),
+        started_at: new Date(started).toISOString(),
+        completed_at: new Date(started + 1_000).toISOString(),
+      };
+    },
+    async verifyCheck({ check, checkIntent, rollbackResult }) {
+      counters && (counters.verify += 1);
+      const started = Date.parse("2026-08-15T01:49:21.000Z") + (checkIntent.ordinal - 1) * 500;
+      return {
+        evidence: rollbackCheckEvidence(check, rollbackResult, executionPackage),
+        started_at: new Date(started).toISOString(),
+        completed_at: new Date(started + 250).toISOString(),
+      };
+    },
+    async contain({ containmentIntent }) {
+      counters && (counters.contain += 1);
+      return {
+        contained_at: "2026-08-15T02:01:00.000Z",
+        database: { name: "chenyida_erp", oid: databaseOid, sealed: true },
+        stopped_services: [
+          { service: "web", container_id: digest("contained-web") },
+          { service: "worker", container_id: digest("contained-worker") },
+        ],
+        protected_resources_sha256: executionPackage.protected_resources_sha256,
+        last_committed_record_sha256: containmentIntent.last_committed_record_sha256,
+      };
+    },
+  };
+}
+
+function rollbackResultForIntent(
+  intent, executionPackage, start = "2026-08-15T01:49:01.000Z",
+) {
+  const first = Date.parse(start);
+  const stages = [];
+  let previous = ZERO_SHA256;
+  for (const [index, stage] of UAT_PROMOTION_ROLLBACK_STAGES.entries()) {
+    const common = {
+      promotion_id: intent.promotion_id,
+      promotion_generation: intent.promotion_generation,
+      operation_id: intent.rollback_operation_id,
+      execution_authorization_sha256: intent.execution_authorization_sha256,
+      rollback_plan_sha256: intent.rollback_plan_sha256,
+      execution_package_sha256: executionPackage.package_sha256,
+      ordinal: index + 1,
+      stage,
+      previous_result_sha256: previous,
+      input_sha256: digest(`rollback-stage-input:${intent.rollback_operation_id}:${stage}`),
+      prepared_at: new Date(first + index * 2_000).toISOString(),
+    };
+    const recordIntent = createUatPromotionRollbackStageIntent(common);
+    const record = createUatPromotionRollbackStageResult({
+      promotion_id: common.promotion_id,
+      promotion_generation: common.promotion_generation,
+      operation_id: common.operation_id,
+      execution_authorization_sha256: common.execution_authorization_sha256,
+      rollback_plan_sha256: common.rollback_plan_sha256,
+      execution_package_sha256: common.execution_package_sha256,
+      ordinal: common.ordinal,
+      stage,
+      previous_result_sha256: previous,
+      stage_intent_sha256: recordIntent.stage_intent_sha256,
+      evidence: rollbackStageEvidence(stage, intent, executionPackage),
+      started_at: common.prepared_at,
+      completed_at: new Date(first + index * 2_000 + 1_000).toISOString(),
+    });
+    stages.push(record);
+    previous = record.stage_result_sha256;
+  }
+  return createUatPromotionRollbackResult({
+    promotion_id: intent.promotion_id,
+    promotion_generation: intent.promotion_generation,
+    rollback_operation_id: intent.rollback_operation_id,
+    execution_authorization_sha256: intent.execution_authorization_sha256,
+    supervisor_bundle_sha256: intent.supervisor_bundle_sha256,
+    checkpoint_13_receipt_sha256: intent.parameters.previous_checkpoint_receipt_sha256,
+    rollback_intent_sha256: intent.rollback_intent_sha256,
+    rollback_plan_sha256: intent.rollback_plan_sha256,
+    execution_package_sha256: executionPackage.package_sha256,
+    source_set_sha256: executionPackage.source_set_sha256,
+    promotion_snapshot_binding_sha256: intent.promotion_snapshot_binding_sha256,
+    snapshot_readiness_sha256: intent.snapshot_readiness_sha256,
+    snapshot_backup_id: intent.parameters.snapshot_backup_id,
+    snapshot_restore_run_id: intent.parameters.snapshot_restore_run_id,
+    snapshot_objects: intent.parameters.snapshot_objects,
+    predecessor: intent.parameters.predecessor,
+    database: intent.parameters.database,
+    restored_database: { ...intent.parameters.database, oid: "17384" },
+    compose_project: intent.parameters.compose_project,
+    compose_project_root: intent.parameters.compose_project_root,
+    boundary: intent.boundary,
+    protected_resources_before_sha256: executionPackage.protected_resources_sha256,
+    protected_resources_after_sha256: executionPackage.protected_resources_sha256,
+    stage_result_sha256_chain: previous,
+    stages,
+    started_at: stages[0].started_at,
+    completed_at: stages.at(-1).completed_at,
+  });
+}
+
+async function writeRollbackResult(root, context, intent, executionPackage, result = null) {
+  const resolved = result ?? rollbackResultForIntent(intent, executionPackage);
+  const logical = `${UAT_PROMOTION_STATE_ROOT}/results/${context.operation_id}.${resolved.result_sha256}.json`;
+  await canonicalFile(root, logical, resolved, 0o400);
+  return { result: resolved, logical };
+}
+
+async function rollbackPostverifyFixture({ promotionId = "promotion-rollback-postverify-001" } = {}) {
+  const fixtureValue = await rollbackExecutionFixture({ promotionId });
+  const rollbackPrepared = await run(fixtureValue.context, "prepare", fixtureValue.root, {
+    now: new Date("2026-08-15T01:49:00.000Z"),
+  });
+  const rollbackIntent = JSON.parse(await readFile(
+    await intentPath(fixtureValue.root, fixtureValue.context.operation_id), "utf8",
+  ));
+  const written = await writeRollbackResult(
+    fixtureValue.root, fixtureValue.context, rollbackIntent, fixtureValue.executionPackage,
+  );
+  await run(fixtureValue.context, "execute", fixtureValue.root, {
+    now: new Date("2026-08-15T01:49:18.500Z"),
+    expectedRollbackResultSha256: written.result.result_sha256,
+  });
+  const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  const postverifyId = `${promotionId}-rollback-postverify`;
+  const rollbackIntentLogical = `${UAT_PROMOTION_STATE_ROOT}/intents/${fixtureValue.context.operation_id}.${rollbackPrepared.intent_sha256}.json`;
+  const parameters = {
+    promotion_state_root: UAT_PROMOTION_STATE_ROOT,
+    promotion_id: current.promotion_id,
+    promotion_generation: current.promotion_generation,
+    previous_checkpoint_receipt_sha256: current.receipt_sha256,
+    promotion_intent_sha256: current.intent_sha256,
+    promotion_original_authorization_sha256: current.original_authorization_sha256,
+    candidate_binding_sha256: current.candidate_binding_sha256,
+    database_binding_sha256: current.database_binding_sha256,
+    runtime_binding_sha256: current.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: current.recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: current.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: current.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: current.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: current.migration_fence_binding_sha256,
+    migration_result_binding_sha256: current.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: current.compose_deployment_binding_sha256,
+    current_checkpoint_source: await source(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE),
+    postverify_id: postverifyId,
+    rollback_operation_id: fixtureValue.context.operation_id,
+    rollback_intent_sha256: rollbackPrepared.intent_sha256,
+    rollback_intent_source: await source(fixtureValue.root, rollbackIntentLogical),
+    rollback_execution_authorization_sha256: fixtureValue.context.original_authorization_sha256,
+    rollback_result_sha256: written.result.result_sha256,
+    rollback_result_source: await source(fixtureValue.root, written.logical),
+    predecessor_postdeploy_receipt_sha256:
+      fixtureValue.context.parameters.predecessor_postdeploy_receipt_sha256,
+    predecessor_postdeploy_receipt_source:
+      fixtureValue.context.parameters.predecessor_postdeploy_receipt_source,
+    predecessor_release_manifest_sha256:
+      fixtureValue.context.parameters.predecessor_release_manifest_sha256,
+    predecessor_release_manifest_source:
+      fixtureValue.context.parameters.predecessor_release_manifest_source,
+    postverify_created_at: "2026-08-15T01:49:20.000Z",
+    postverify_expires_at: "2026-08-15T01:59:20.000Z",
+    requester_identity_sha256: digest(`rollback-postverify-requester:${postverifyId}`),
+    approver_identity_sha256: digest(`rollback-postverify-approver:${postverifyId}`),
+    executor_identity_sha256: digest(`rollback-postverify-executor:${postverifyId}`),
+    policy_file_sha256: UAT_PROMOTION_POLICY_FILE_SHA256,
+    policy_sha256: UAT_PROMOTION_POLICY_SHA256,
+  };
+  assert.equal(
+    parameters.predecessor_postdeploy_receipt_source.sha256,
+    parameters.predecessor_postdeploy_receipt_sha256,
+  );
+  assert.equal(
+    parameters.predecessor_release_manifest_source.sha256,
+    parameters.predecessor_release_manifest_sha256,
+  );
+  assert.equal(new Set([
+    parameters.current_checkpoint_source.path,
+    parameters.rollback_intent_source.path,
+    parameters.rollback_result_source.path,
+    parameters.predecessor_postdeploy_receipt_source.path,
+    parameters.predecessor_release_manifest_source.path,
+  ]).size, 5);
+  const authorization = digest(`rollback-postverify-authorization:${postverifyId}`);
+  const context = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-transaction-context/v1",
+    operation_id: postverifyId,
+    operation: "ROLLBACK_POSTVERIFY",
+    execution_mode: "ORIGINAL",
+    execution_authorization_id: postverifyId,
+    execution_authorization_sha256: authorization,
+    execution_created_at: parameters.postverify_created_at,
+    original_authorization_sha256: authorization,
+    supervisor_bundle_sha256: supervisorBundleSha256,
+    expected_intent_sha256: null,
+    parameters,
+  };
+  return {
+    ...fixtureValue,
+    context,
+    rollbackContext: fixtureValue.context,
+    rollbackPrepared,
+    rollbackIntent,
+    rollbackResult: written.result,
+    rollbackResultLogical: written.logical,
+    current,
+  };
+}
+
+function rollbackCheckEvidence(check, rollbackResult, executionPackage) {
+  const domains = {
+    POSTGRESQL_CONTENT: "postgresql",
+    UPLOADS_CONTENT: "uploads",
+    ATTACHMENTS_CONTENT: "attachments",
+    BACKUP_STATUS_CONTENT: "backup_status",
+  };
+  if (Object.hasOwn(domains, check)) {
+    const domain = domains[check];
+    return {
+      content_sha256: rollbackResult.snapshot_objects[domain].sha256,
+      source_sha256: executionPackage.sources[`snapshot_${domain}`].sha256,
+      bytes: rollbackResult.snapshot_objects[domain].bytes,
+      entries: rollbackResult.snapshot_objects[domain].entries,
+    };
+  }
+  const activation = rollbackResult.stages[7].evidence;
+  return {
+    MIGRATION_HEAD: {
+      migration_head: rollbackResult.predecessor.migration_head,
+      migration_manifest_sha256: rollbackResult.predecessor.migration_manifest_sha256,
+    },
+    CADDY_IDENTITY: activation.caddy,
+    POSTGRES_IDENTITY: activation.postgres,
+    WEB_IDENTITY: {
+      ...activation.web,
+      application_version: rollbackResult.predecessor.application_version,
+      git_commit: rollbackResult.predecessor.git_commit,
+    },
+    WORKER_IDENTITY: {
+      ...activation.worker,
+      application_version: rollbackResult.predecessor.application_version,
+      git_commit: rollbackResult.predecessor.git_commit,
+    },
+    RUNTIME_CONFIGURATION: {
+      runtime_configuration_sha256: rollbackResult.predecessor.runtime_configuration_sha256,
+      deployment_environment_sha256: executionPackage.sources.deployment_environment.sha256,
+    },
+    STRICT_RELEASE_IDENTITY: {
+      release_identity_sha256: activation.release_identity_sha256,
+      release_manifest_sha256: rollbackResult.predecessor.release_manifest_sha256,
+      postdeploy_receipt_sha256: executionPackage.sources.predecessor_postdeploy_receipt.sha256,
+    },
+    HEALTH: { status: "HEALTHY", health_sha256: digest("rollback-health") },
+    PROTECTED_RESOURCES: {
+      before_sha256: executionPackage.protected_resources_sha256,
+      after_sha256: executionPackage.protected_resources_sha256,
+    },
+  }[check];
+}
+
 async function run(context, phase, root, options = {}) {
   const resolved = { ...options };
   if (phase === "execute"
@@ -3281,8 +3998,8 @@ test("finalization persists an aggregate intent before publishing checkpoint 13 
   assert.equal(storedIntent.checkpoint_evidence_sha256_by_id.CROSS_ROLE_UAT_EXECUTION,
     fixtureValue.result.result_sha256);
   assert.deepEqual(storedIntent.rollback, {
-    checkpoint_14: "NOT_IMPLEMENTED_NOT_AUTHORIZED",
-    checkpoint_15: "NOT_IMPLEMENTED_NOT_AUTHORIZED",
+    checkpoint_14: "SEPARATE_ROLLBACK_AUTHORIZATION_AND_RUNTIME_PREFLIGHT_REQUIRED",
+    checkpoint_15: "SEPARATE_POSTVERIFY_AUTHORIZATION_AND_EXACT_RESULT_REQUIRED",
     rollback_ready: false,
     database_protection_release: false,
     backup_protection_release: false,
@@ -3415,6 +4132,177 @@ test("finalization source replacement is preserved and a fresh recovery authoriz
   });
   assert.equal(quarantined.result, "QUARANTINED");
   assert.equal(await readFile(resultFile, "utf8"), "{}\n");
+});
+
+test("rollback checkpoints 14 and 15 publish only exact predecessor results under distinct authorizations", async (t) => {
+  const fixtureValue = await rollbackPostverifyFixture();
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root, {
+    now: new Date("2026-08-15T01:49:20.000Z"),
+  });
+  const intent = JSON.parse(await readFile(
+    await intentPath(fixtureValue.root, fixtureValue.context.operation_id), "utf8",
+  ));
+  const adapter = rollbackControlAdapter(fixtureValue.executionPackage);
+  const controlOptions = {
+    filesystemRoot: fixtureValue.root,
+    allowTestRoot: true,
+    expectedIntentSha256: prepared.intent_sha256,
+    adapter,
+    clock: () => new Date("2026-08-15T01:49:20.000Z"),
+  };
+  await preflightUatPromotionRollbackControl(fixtureValue.context, controlOptions);
+  const controlled = await runUatPromotionRollbackControl(
+    fixtureValue.context, "execute", controlOptions,
+  );
+  const committed = await run(fixtureValue.context, "execute", fixtureValue.root, {
+    now: new Date("2026-08-15T01:49:31.000Z"),
+    expectedRollbackResultSha256: controlled.result_sha256,
+  });
+  assert.equal(committed.result, "COMMITTED");
+  assert.equal(committed.intent_sha256, prepared.intent_sha256);
+  assert.equal(committed.rollback_result_sha256, fixtureValue.rollbackResult.result_sha256);
+  assert.notEqual(
+    fixtureValue.context.original_authorization_sha256,
+    fixtureValue.rollbackContext.original_authorization_sha256,
+  );
+  assert.notEqual(
+    fixtureValue.rollbackContext.original_authorization_sha256,
+    fixtureValue.finalizationContext.original_authorization_sha256,
+  );
+  const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  assert.equal(current.checkpoint_id, "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT");
+  assert.equal(current.checkpoint_ordinal, 15);
+  assert.equal(current.journal_status, "ROLLED_BACK");
+  assert.equal(current.checkpoint_evidence_sha256, controlled.result_sha256);
+  assert.deepEqual(current.authorization_sha256_chain.slice(-2), [
+    fixtureValue.rollbackContext.original_authorization_sha256,
+    fixtureValue.context.original_authorization_sha256,
+  ]);
+});
+
+test("rollback control persists each stage intent before its typed result and checkpoint 14 consumes only the exact final digest", async (t) => {
+  const fixtureValue = await rollbackExecutionFixture({ promotionId: "promotion-rollback-control-001" });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root, {
+    now: new Date("2026-08-15T01:49:00.000Z"),
+  });
+  const intent = JSON.parse(await readFile(
+    await intentPath(fixtureValue.root, fixtureValue.context.operation_id), "utf8",
+  ));
+  const counters = { preflight: 0, execute: 0, verify: 0, contain: 0 };
+  const adapter = rollbackControlAdapter(fixtureValue.executionPackage, { counters });
+  const options = {
+    filesystemRoot: fixtureValue.root,
+    allowTestRoot: true,
+    expectedIntentSha256: prepared.intent_sha256,
+    adapter,
+    clock: () => new Date("2026-08-15T01:49:00.000Z"),
+  };
+  const preflight = await preflightUatPromotionRollbackControl(fixtureValue.context, options);
+  assert.equal(preflight.result, "ROLLBACK_CONTROL_PREFLIGHT_PASSED");
+  const controlled = await runUatPromotionRollbackControl(fixtureValue.context, "execute", options);
+  assert.equal(controlled.result, "ROLLBACK_EXECUTION_RESULT_PERSISTED");
+  assert.deepEqual(counters, { preflight: 1, execute: 9, verify: 0, contain: 0 });
+  const executionDirectory = physical(
+    fixtureValue.root,
+    `${UAT_PROMOTION_STATE_ROOT}/executions/${fixtureValue.context.operation_id}.${prepared.intent_sha256}`,
+  );
+  const recordNames = (await readdir(executionDirectory)).sort();
+  assert.equal(recordNames.length, UAT_PROMOTION_ROLLBACK_STAGES.length * 2);
+  assert.ok(recordNames.some((name) => name.startsWith("01.PRECONDITION_RECHECK.intent.")));
+  assert.ok(recordNames.some((name) => name.startsWith("09.PROTECTED_RESOURCE_RECHECK.result.")));
+  const committed = await run(fixtureValue.context, "execute", fixtureValue.root, {
+    now: new Date("2026-08-15T01:49:18.500Z"),
+    expectedRollbackResultSha256: controlled.result_sha256,
+  });
+  assert.equal(committed.result, "COMMITTED");
+  assert.equal(committed.rollback_result_sha256, controlled.result_sha256);
+});
+
+test("rollback control never reruns a partial stage during recovery and records exact containment", async (t) => {
+  const fixtureValue = await rollbackExecutionFixture({ promotionId: "promotion-rollback-partial-001" });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root, {
+    now: new Date("2026-08-15T01:49:00.000Z"),
+  });
+  const firstCounters = { preflight: 0, execute: 0, verify: 0, contain: 0 };
+  const firstAdapter = rollbackControlAdapter(fixtureValue.executionPackage, {
+    failStage: "POSTGRESQL_RESTORE", counters: firstCounters,
+  });
+  const originalOptions = {
+    filesystemRoot: fixtureValue.root,
+    allowTestRoot: true,
+    expectedIntentSha256: prepared.intent_sha256,
+    adapter: firstAdapter,
+    clock: () => new Date("2026-08-15T01:49:00.000Z"),
+  };
+  await preflightUatPromotionRollbackControl(fixtureValue.context, originalOptions);
+  await assert.rejects(
+    runUatPromotionRollbackControl(fixtureValue.context, "execute", originalOptions),
+    (error) => error.code === "SYNTHETIC_ROLLBACK_STAGE_FAILURE",
+  );
+  assert.deepEqual(firstCounters, { preflight: 1, execute: 3, verify: 0, contain: 1 });
+  const recovery = rollbackRecoveryContext(fixtureValue.context, prepared.intent_sha256, "partial");
+  const recoveryCounters = { preflight: 0, execute: 0, verify: 0, contain: 0 };
+  const recoveryAdapter = rollbackControlAdapter(fixtureValue.executionPackage, { counters: recoveryCounters });
+  const recoveryOptions = {
+    filesystemRoot: fixtureValue.root,
+    allowTestRoot: true,
+    expectedIntentSha256: prepared.intent_sha256,
+    adapter: recoveryAdapter,
+    clock: () => new Date("2026-08-15T02:01:00.000Z"),
+  };
+  await preflightUatPromotionRollbackControl(recovery, recoveryOptions);
+  const recovered = await runUatPromotionRollbackControl(recovery, "recover", recoveryOptions);
+  assert.equal(recovered.result, "CONTAINED_FOR_JOURNAL_QUARANTINE");
+  assert.deepEqual(recoveryCounters, { preflight: 1, execute: 0, verify: 0, contain: 1 });
+  const executionDirectory = physical(
+    fixtureValue.root,
+    `${UAT_PROMOTION_STATE_ROOT}/executions/${fixtureValue.context.operation_id}.${prepared.intent_sha256}`,
+  );
+  const names = await readdir(executionDirectory);
+  assert.equal(names.filter((name) => name.startsWith("03.POSTGRESQL_RESTORE.intent.")).length, 1);
+  assert.equal(names.filter((name) => name.startsWith("03.POSTGRESQL_RESTORE.result.")).length, 0);
+  assert.equal(names.filter((name) => name.startsWith("containment.result.")).length, 2);
+});
+
+test("rollback recovery honors journal quarantine even when the typed result is complete", async (t) => {
+  const fixtureValue = await rollbackExecutionFixture({ promotionId: "promotion-rollback-force-contain-001" });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root, {
+    now: new Date("2026-08-15T01:49:00.000Z"),
+  });
+  const originalCounters = { preflight: 0, execute: 0, verify: 0, contain: 0 };
+  const originalOptions = {
+    filesystemRoot: fixtureValue.root,
+    allowTestRoot: true,
+    expectedIntentSha256: prepared.intent_sha256,
+    adapter: rollbackControlAdapter(fixtureValue.executionPackage, { counters: originalCounters }),
+    clock: () => new Date("2026-08-15T01:49:00.000Z"),
+  };
+  await preflightUatPromotionRollbackControl(fixtureValue.context, originalOptions);
+  await runUatPromotionRollbackControl(fixtureValue.context, "execute", originalOptions);
+  assert.deepEqual(originalCounters, { preflight: 1, execute: 9, verify: 0, contain: 0 });
+
+  const recovery = rollbackRecoveryContext(fixtureValue.context, prepared.intent_sha256, "force-contain");
+  const recoveryCounters = { preflight: 0, execute: 0, verify: 0, contain: 0 };
+  const recoveryOptions = {
+    filesystemRoot: fixtureValue.root,
+    allowTestRoot: true,
+    expectedIntentSha256: prepared.intent_sha256,
+    recoveryDecision: "QUARANTINE",
+    adapter: rollbackControlAdapter(fixtureValue.executionPackage, { counters: recoveryCounters }),
+    clock: () => new Date("2026-08-15T02:01:00.000Z"),
+  };
+  await preflightUatPromotionRollbackControl(recovery, {
+    ...recoveryOptions, recoveryDecision: undefined,
+  });
+  const recovered = await runUatPromotionRollbackControl(recovery, "recover", recoveryOptions);
+  assert.equal(recovered.result, "CONTAINED_FOR_JOURNAL_QUARANTINE");
+  assert.deepEqual(recoveryCounters, { preflight: 1, execute: 0, verify: 0, contain: 1 });
 });
 
 test("fake root requires an explicit test-only option and a symlinked state root fails closed", async (t) => {

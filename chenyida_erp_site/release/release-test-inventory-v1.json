@@ -4,8 +4,8 @@
   "root": "chenyida_erp_site",
   "test_pattern": "tests/*.test.mjs",
   "max_test_bytes": 1048576,
-  "total_tests": 259,
-  "required_tests": 235,
+  "total_tests": 260,
+  "required_tests": 236,
   "not_applicable_tests": 24,
   "category_counts": {
     "BROWSER": 6,
@@ -13,7 +13,7 @@
     "POSTGRES": 84,
     "POSTGRES_ALIAS": 2,
     "PURE_NODE": 130,
-    "RELEASE_CONTRACT": 8,
+    "RELEASE_CONTRACT": 9,
     "SPECIAL_HARNESS": 7
   },
   "tests": [
@@ -1891,7 +1891,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "722f31ad08c7dc6a45d42ce14d23b5e4e27cd20370915a1ffc5b91d22c193f3f",
+      "sha256": "f50b57e9e6698b77a66212c75c7d308150d8051030f4a9968c5412327289b1af",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -2314,7 +2314,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-rollback-audit.test.mjs",
-      "sha256": "8bc3d82e5acc671cc610365c108a412440d31d1811deba7afbee7c3584aa3bc7",
+      "sha256": "c54065c617b48d4ab775b6d1f3fd41c5a916f7a08ce1db064ee8e09f0371fca8",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -2322,8 +2322,17 @@
       "canonical_path": null
     },
     {
+      "path": "tests/selfhost-uat-promotion-rollback-contract.test.mjs",
+      "sha256": "1dbc54d3b72029273d657d90b01a8f27a0c85b1aefee7cdb851310fe84197d35",
+      "category": "RELEASE_CONTRACT",
+      "applicability": "REQUIRED",
+      "harness": "NODE_RELEASE_CONTRACT",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
       "path": "tests/selfhost-uat-promotion-transaction-journal.test.mjs",
-      "sha256": "2987e315d5da6111313711dfdb5b6f9152c2462c80490c5a427f0dab70a19c99",
+      "sha256": "ee7bf7f5e2d3940bac98dc5de29228d01cacb40bffdbb325234454a5deaaed80",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",

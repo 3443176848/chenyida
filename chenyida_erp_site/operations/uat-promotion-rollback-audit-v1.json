@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "5a5c78e3773e12629c3dd71fdc607543b6ebcf3dd1ef579c797add2235094a6d",
+  "artifact_sha256": "cc12d6135cb8b45816aa9e36123f396a34512d330df637ab02b6f0d6fac56187",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -170,66 +170,77 @@
     },
     {
       "evidence": [
-        "restore-selfhost.sh:RESTORE_SIGNED_ENCRYPTED_OFFHOST_TO_MARKED_DISPOSABLE_TEST_TARGET"
+        "release-supervisor-launcher.py:ROLLBACK_UAT_RELEASE",
+        "uat-promotion-rollback-contract.mjs:UAT_PROMOTION_ROLLBACK_STAGE_INTENT_CONTRACT",
+        "uat-promotion-rollback-control.mjs:runUatPromotionRollbackControl",
+        "uat-promotion-transaction-journal.mjs:ROLLBACK_TO_UAT_EXECUTOR"
       ],
-      "finding": "当前恢复器显式拒绝UAT目标；没有恢复精确数据库/三文件域、前代镜像和运行配置的UAT回退执行器。",
+      "finding": null,
       "id": "ROLLBACK_TO_UAT_EXECUTOR",
       "ordinal": 14,
       "severity_if_incomplete": "P0",
-      "status": "MISSING"
+      "status": "SUPPORTED"
     },
     {
       "evidence": [
-        "postdeploy-release-verifier.mjs:assertPostDeployReadinessStable"
+        "release-supervisor-launcher.py:VERIFY_AND_FINALIZE_UAT_ROLLBACK",
+        "uat-promotion-rollback-contract.mjs:UAT_PROMOTION_ROLLBACK_CHECK_INTENT_CONTRACT",
+        "uat-promotion-rollback-control.mjs:preflightUatPromotionRollbackControl",
+        "uat-promotion-transaction-journal.mjs:ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT"
       ],
-      "finding": "严格postdeploy验证可复用设计，但当前没有绑定rollback intent/target generation的回退后核验及终态回执。",
+      "finding": null,
       "id": "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT",
       "ordinal": 15,
       "severity_if_incomplete": "P0",
-      "status": "MISSING"
+      "status": "SUPPORTED"
     }
   ],
   "contract": "chenyida-erp-uat-promotion-rollback-audit/v1",
   "deployment_class": "UAT",
+  "execution_blockers": [
+    {
+      "finding": "checkpoint 14/15控制链已闭合，但真实数据库、卷与Web/Worker物化适配器未进入受信Supervisor bundle；预检必须在授权消耗前失败。",
+      "id": "ROLLBACK_RUNTIME_ADAPTER_NOT_BUNDLED",
+      "severity": "P0"
+    },
+    {
+      "finding": "尚无受信UAT隔离回退演练回执，不能把仓库fake-root测试解释为真实恢复或回滚。",
+      "id": "UAT_ROLLBACK_REHEARSAL_NOT_EXECUTED",
+      "severity": "P0"
+    },
+    {
+      "finding": "真实岗位人员、账号映射、事前授权、步骤证据与签字尚未闭合。",
+      "id": "HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED",
+      "severity": "P1"
+    }
+  ],
   "execution_class": "AUDIT_ONLY_NOT_AUTHORIZED",
   "execution_readiness": {
-    "blocking_checkpoint_count": 2,
+    "blocking_checkpoint_count": 0,
+    "blocking_condition_count": 3,
     "code": "UAT_PROMOTION_EXECUTOR_NOT_READY",
     "may_start": false,
     "p0_blocker_count": 2,
-    "p1_blocker_count": 0,
-    "statement": "当前只允许继续仓库实施和隔离验证；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
+    "p1_blocker_count": 1,
+    "statement": "仓库检查点控制链已闭合，但真实运行时适配器、隔离回退演练和人工UAT证据尚未闭合；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
     "status": "BLOCKED"
   },
-  "findings": [
-    {
-      "finding": "当前恢复器显式拒绝UAT目标；没有恢复精确数据库/三文件域、前代镜像和运行配置的UAT回退执行器。",
-      "id": "ROLLBACK_TO_UAT_EXECUTOR",
-      "severity": "P0",
-      "status": "MISSING"
-    },
-    {
-      "finding": "严格postdeploy验证可复用设计，但当前没有绑定rollback intent/target generation的回退后核验及终态回执。",
-      "id": "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT",
-      "severity": "P0",
-      "status": "MISSING"
-    }
-  ],
+  "findings": [],
   "generated_from": {
     "generator": {
       "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
-      "sha256": "35eeccb62d67431d8fd158bf02c24c113c18a75e85af183250e2d44bcdf08c6c"
+      "sha256": "7599284665c27a7d3982ac1afe3aca20f6eb9bfe1d7cb5adc617f4777c17aaba"
     },
     "policy": {
       "path": "chenyida_erp_site/operations/uat-promotion-rollback-audit-policy-v1.json",
-      "sha256": "6ed9cfff92fac02f29eaeb47a1bc4d3e81daa9f08aa2eb58895e2130adacd3d1"
+      "sha256": "b8ac1489b5636c4d26fa29f2d7b489915d9f517bf5acb09aa275681e8da82d69"
     },
     "release_test_inventory": {
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-      "required_tests": 235,
-      "sha256": "cad3d2b37666aa3e68e02fb770042216577909305a836f1d5c01355b3c630ecd",
-      "total_tests": 259
+      "required_tests": 236,
+      "sha256": "d5be6d6d082812ac0077ca0b1f5563ee372cdd133aa2f98e0b2bb303da8b8af4",
+      "total_tests": 260
     },
     "source_manifest": {
       "files": [
@@ -273,7 +284,7 @@
             "\"status\": \"BLOCKED\""
           ],
           "path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json",
-          "sha256": "a3d58180cd8d7f731a6e8978a20629fce92048f715b27e6e3532444f426455a3"
+          "sha256": "66e3996cdc6d41f48288089eb47dd44e713ccc11688dd111be20a16eea4d7a2e"
         },
         {
           "markers": [
@@ -282,10 +293,12 @@
             "\"operation\": \"VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION\", \"status\": \"IMPLEMENTED\"",
             "\"operation\": \"VERIFY_UAT_POSTDEPLOY_IDENTITY\", \"status\": \"IMPLEMENTED\"",
             "\"operation\": \"VERIFY_UAT_CROSS_ROLE_EXECUTION\", \"status\": \"IMPLEMENTED\"",
-            "\"operation\": \"FINALIZE_UAT_PROMOTION\", \"status\": \"IMPLEMENTED\""
+            "\"operation\": \"FINALIZE_UAT_PROMOTION\", \"status\": \"IMPLEMENTED\"",
+            "\"operation\": \"ROLLBACK_UAT_RELEASE\", \"status\": \"IMPLEMENTED\"",
+            "\"operation\": \"VERIFY_AND_FINALIZE_UAT_ROLLBACK\", \"status\": \"IMPLEMENTED\""
           ],
           "path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json",
-          "sha256": "8b41e61e1e53a4c60833eb0f25cdca8d55c13b01142ab59dea956cd62e45f558"
+          "sha256": "c1fe967ab455af92ee385925dab53fcfa59ad6db97ca266d4971fbd632eb8075"
         },
         {
           "markers": [
@@ -307,10 +320,12 @@
         {
           "markers": [
             "assert_no_uat_promotion_finalization_interlock",
-            "SUPERVISOR_INSTALL_UAT_PROMOTION_FINALIZATION_RECOVERY_REQUIRED"
+            "SUPERVISOR_INSTALL_UAT_PROMOTION_FINALIZATION_RECOVERY_REQUIRED",
+            "SUPERVISOR_INSTALL_UAT_PROMOTION_ROLLBACK_RECOVERY_REQUIRED",
+            "SUPERVISOR_INSTALL_UAT_PROMOTION_ROLLBACK_POSTVERIFY_REQUIRED"
           ],
           "path": "chenyida_erp_site/scripts/install-release-supervisor.py",
-          "sha256": "bd51e0bf39f0094d48ab3199328c363cc895fd3b33bce6ca25cf02ae6066190d"
+          "sha256": "fc15cc4fdd0671c643cdf95174cc268e009a6263fa9af4b1f48a4f237f887e19"
         },
         {
           "markers": [
@@ -328,7 +343,7 @@
             "buildReleaseIdentityFromPostDeployReceipt"
           ],
           "path": "chenyida_erp_site/scripts/postdeploy-release-contract.mjs",
-          "sha256": "5f8c2e7e97707161cc6e473a9437fd1c7a6273a2d58f411c26fa95cbe1b221a7"
+          "sha256": "45ae8b59ee0cce8d8a48d673e8b4dc36868b7a068d2b0982e9c711951b47098c"
         },
         {
           "markers": [
@@ -376,7 +391,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "b299a4fdeef5190dc8a4ad0d5b98916bea54d0c57d186bd3edc0540e75ef80ee"
+          "sha256": "52994e70af023cce7b38d777f42f8d11b0fb99fa6f3fbce7726d667b9846c6bc"
         },
         {
           "markers": [
@@ -398,14 +413,18 @@
             "VERIFY_UAT_POSTDEPLOY_IDENTITY",
             "VERIFY_UAT_CROSS_ROLE_EXECUTION",
             "FINALIZE_UAT_PROMOTION",
+            "ROLLBACK_UAT_RELEASE",
+            "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
             "SUPERVISOR_UAT_PROMOTION_CROSS_ROLE_RECOVERY_REQUIRED",
             "SUPERVISOR_UAT_PROMOTION_FINALIZATION_RECOVERY_REQUIRED",
+            "SUPERVISOR_UAT_PROMOTION_ROLLBACK_RECOVERY_REQUIRED",
             "ERP_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_SHA256",
+            "ERP_UAT_PROMOTION_ROLLBACK_EXPECTED_RESULT_SHA256",
             "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION",
             "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"
           ],
           "path": "chenyida_erp_site/scripts/release-supervisor-launcher.py",
-          "sha256": "9e040adc28ca6e380e18db382ed85a22d600e89f6917571b519654871fb7237c"
+          "sha256": "37cd44a975bfcb0ad09e8c3d69637dd1d429dcca0d43b73c15afaa63dfc474fe"
         },
         {
           "markers": [
@@ -463,6 +482,27 @@
         },
         {
           "markers": [
+            "UAT_PROMOTION_ROLLBACK_EXECUTION_PACKAGE_CONTRACT",
+            "UAT_PROMOTION_ROLLBACK_STAGE_INTENT_CONTRACT",
+            "UAT_PROMOTION_ROLLBACK_CHECK_INTENT_CONTRACT",
+            "UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_CONTRACT"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-rollback-contract.mjs",
+          "sha256": "0c42f9d36cc56eb921e1141948d895203e381d3fc37b5aaa947106de365c8705"
+        },
+        {
+          "markers": [
+            "preflightUatPromotionRollbackControl",
+            "runUatPromotionRollbackControl",
+            "ROLLBACK_CONTROL_PREFLIGHT_PASSED",
+            "CONTAINED_FOR_JOURNAL_QUARANTINE",
+            "uat-promotion-rollback-runtime-adapter.py"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs",
+          "sha256": "882db264dc73a48a4bc94074f3f5e6cf3c64da19eae051fe4eea95ea5cd90110"
+        },
+        {
+          "markers": [
             "UAT_PROMOTION_INTENT_CONTRACT",
             "UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT",
             "UAT_PROMOTION_QUIESCE_INTENT_CONTRACT",
@@ -477,10 +517,15 @@
             "UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT",
             "UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT",
             "UAT_PROMOTION_FINALIZATION_INTENT_CONTRACT",
+            "UAT_PROMOTION_ROLLBACK_INTENT_CONTRACT",
+            "UAT_PROMOTION_ROLLBACK_POSTVERIFY_INTENT_CONTRACT",
+            "UAT_PROMOTION_ROLLBACK_EXPECTED_RESULT_MISMATCH",
             "loadDurableCrossRoleResult",
             "MIGRATION_COMMIT_RECEIPT",
             "COMPOSE_DEPLOYMENT_RECEIPT",
             "PROMOTION_FINAL_RECEIPT",
+            "ROLLBACK_TO_UAT_EXECUTOR",
+            "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT",
             "probeDockerWriterQuiesce",
             "validateBackupRecoveryReadinessV4",
             "AFTER_COMPOSE_DEPLOYMENT_CURRENT",
@@ -491,10 +536,10 @@
             "runUatPromotionTransactionPhase"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs",
-          "sha256": "831ffb2b38613793747984cd457f4acd2e75f92c034f8eeb5fc44238e1524e6b"
+          "sha256": "c9b2e2b152fa856f31470cb5611b3b7fa55764225011d566748eb44cc2378494"
         }
       ],
-      "sha256": "0c19ca77fe6e5beb056ec14adc12e2c22d3211d67f07e5217125ad6c1e313abe"
+      "sha256": "74893a7616343434f71fcecd94cf0d97a8f4d3a96aa568c1d97225c8bfc39605"
     }
   },
   "observations": {
@@ -513,16 +558,19 @@
       "VERIFY_UAT_POSTDEPLOY_IDENTITY",
       "VERIFY_UAT_CROSS_ROLE_EXECUTION",
       "FINALIZE_UAT_PROMOTION",
+      "ROLLBACK_UAT_RELEASE",
+      "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
       "RECOVER_UAT_PROMOTION"
     ],
     "migration_authorization": "SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED",
-    "missing_required_promotion_operations": [
-      "ROLLBACK_UAT_RELEASE"
-    ],
+    "missing_required_promotion_operations": [],
     "postdeploy_transaction_binding": "SUPERVISOR_CHECKPOINT_10_11_CONTENT_ADDRESSED_AND_RECOVERABLE",
-    "required_promotion_operation_count": 12,
+    "required_promotion_operation_count": 13,
     "restore_target_policy": "TEST_ONLY",
-    "supervisor_operation_count": 30,
+    "rollback_rehearsal_evidence": "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT",
+    "rollback_runtime_adapter": "MISSING_BUNDLED_RUNTIME_ADAPTER_FAIL_CLOSED",
+    "rollback_transaction_binding": "SUPERVISOR_CHECKPOINT_14_15_CONTENT_ADDRESSED_AND_RECOVERABLE",
+    "supervisor_operation_count": 32,
     "supervisor_operations": [
       "ACTIVATE_MONITORING_NOTIFIER_EGRESS_V1",
       "ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
@@ -548,8 +596,10 @@
       "ROLLBACK_MONITORING_HOST_DELIVERY",
       "ROLLBACK_MONITORING_NOTIFIER_EGRESS_V1",
       "ROLLBACK_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
+      "ROLLBACK_UAT_RELEASE",
       "RUN_RELEASE_GATE",
       "RUN_UAT_PROMOTION_MIGRATION",
+      "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
       "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY",
       "VERIFY_UAT_CROSS_ROLE_EXECUTION",
       "VERIFY_UAT_POSTDEPLOY_IDENTITY",

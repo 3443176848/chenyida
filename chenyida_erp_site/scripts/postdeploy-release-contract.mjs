@@ -89,7 +89,9 @@ export function validatePostDeployReadiness(value) {
   string(value.migration_manifest_sha256, SHA256, "POSTDEPLOY_READINESS_MIGRATION_INVALID", 64);
   iso(value.database_time, "POSTDEPLOY_READINESS_TIME_INVALID");
   exactKeys(value.components, Object.keys(READY_COMPONENTS), "POSTDEPLOY_READINESS_COMPONENTS_INVALID");
-  if (canonicalJson(value.components) !== canonicalJson(READY_COMPONENTS)) reject("POSTDEPLOY_READINESS_COMPONENTS_INVALID");
+  if (Object.entries(READY_COMPONENTS).some(([key, expected]) => (
+    value.components[key] !== expected
+  ))) reject("POSTDEPLOY_READINESS_COMPONENTS_INVALID");
   return value;
 }
 

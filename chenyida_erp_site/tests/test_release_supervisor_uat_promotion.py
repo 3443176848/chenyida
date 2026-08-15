@@ -806,6 +806,45 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS[operation],
         }
 
+    def rollback_authorization(self, bundle_digest, recovery=False, postverify=False):
+        parameter_fields = supervisor.UAT_PROMOTION_ROLLBACK_POSTVERIFY_PARAMETER_FIELDS \
+            if postverify else supervisor.UAT_PROMOTION_ROLLBACK_EXECUTION_PARAMETER_FIELDS
+        parameters = {field: "1" * 64 for field in parameter_fields}
+        parameters.update({
+            "promotion_state_root": str(supervisor.UAT_PROMOTION_STATE_ROOT),
+            "promotion_id": "promotion-supervisor-fixture",
+            "promotion_generation": 1,
+            "rollback_id": "promotion-supervisor-rollback",
+            "postverify_id": "promotion-supervisor-rollback-postverify",
+            "rollback_operation_id": "promotion-supervisor-rollback",
+            "execution_package_sha256": "a" * 64,
+            "rollback_result_sha256": "b" * 64,
+        })
+        original_operation = "ROLLBACK_POSTVERIFY" if postverify else "ROLLBACK_EXECUTION"
+        original_operation_id = parameters["postverify_id" if postverify else "rollback_id"]
+        if recovery:
+            parameters.update({
+                "expected_intent_sha256": "c" * 64,
+                "original_authorization_sha256": "d" * 64,
+                "original_operation": original_operation,
+                "original_operation_id": original_operation_id,
+            })
+        operation = "RECOVER_UAT_PROMOTION" if recovery else (
+            "VERIFY_AND_FINALIZE_UAT_ROLLBACK" if postverify else "ROLLBACK_UAT_RELEASE"
+        )
+        return {
+            "schema_version": 6,
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "authorization_id": "promotion-supervisor-rollback-recovery" if recovery else original_operation_id,
+            "created_at": "2026-08-15T01:50:00.000Z",
+            "expires_at": "2026-08-15T01:55:00.000Z",
+            "supervisor_bundle_sha256": bundle_digest,
+            "operation": operation,
+            "parameters": parameters,
+            "nonce": "e" * 64,
+            "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS[operation],
+        }
+
     def test_cross_role_authorization_binds_exact_bundle_result_and_independent_ingest_context(self):
         bundle = "f" * 64
         now = datetime(2026, 8, 15, 1, 48, tzinfo=timezone.utc)
@@ -2126,6 +2165,247 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
                 }))
                 current.chmod(0o400)
                 supervisor.assert_no_uat_migration_execution_interlock(unrelated)
+
+    def test_pending_rollback_intent_requires_exact_original_or_recovery_until_committed(self):
+        original_authorization = "d" * 64
+        operation_id = "promotion-supervisor-rollback"
+        intent_sha256 = "e" * 64
+        unrelated = self.authorization(
+            "f" * 64, datetime(2026, 8, 15, 1, 1, tzinfo=timezone.utc),
+        )
+        exact = {
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "operation": "ROLLBACK_UAT_RELEASE",
+            "authorization_id": operation_id,
+            "parameters": {},
+        }
+        recovery = {
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "operation": "RECOVER_UAT_PROMOTION",
+            "authorization_id": "promotion-supervisor-rollback-recovery",
+            "parameters": {
+                "original_operation": "ROLLBACK_EXECUTION",
+                "original_operation_id": operation_id,
+                "original_authorization_sha256": original_authorization,
+            },
+        }
+        with tempfile.TemporaryDirectory(prefix="cyd-uat-rollback-interlock-") as temporary:
+            root = Path(temporary) / "state"
+            intents = root / "intents"
+            intents.mkdir(parents=True, mode=0o700)
+            root.chmod(0o700)
+            intents.chmod(0o700)
+            marker = root / supervisor.UAT_PROMOTION_STATE_MARKER
+            marker.write_bytes(supervisor.UAT_PROMOTION_STATE_MARKER_VALUE)
+            marker.chmod(0o400)
+            intent = {
+                "schema_version": 1,
+                "contract": "chenyida-erp-uat-promotion-rollback-intent/v1",
+                "rollback_operation_id": operation_id,
+                "execution_authorization_sha256": original_authorization,
+                "rollback_intent_sha256": intent_sha256,
+            }
+            intent_file = intents / f"{operation_id}.{intent_sha256}.json"
+            intent_file.write_bytes(supervisor.canonical_json(intent))
+            intent_file.chmod(0o400)
+            current = root / "current.json"
+            current.write_bytes(supervisor.canonical_json({"authorization_sha256_chain": ["c" * 64]}))
+            current.chmod(0o400)
+            with patch.object(supervisor, "UAT_PROMOTION_STATE_ROOT", root), \
+                    patch.object(supervisor, "UAT_PROMOTION_CURRENT_FILE", current), \
+                    patch.object(supervisor, "UAT_PROMOTION_ACTIVE_FENCES_ROOT", root / "active-fences"), \
+                    patch.object(supervisor, "UAT_PROMOTION_FENCE_TRANSFERS_ROOT", root / "fence-transfers"):
+                with self.assertRaisesRegex(
+                        supervisor.SupervisorError,
+                        "SUPERVISOR_UAT_PROMOTION_ROLLBACK_RECOVERY_REQUIRED"):
+                    supervisor.assert_no_uat_migration_execution_interlock(unrelated)
+                supervisor.assert_no_uat_migration_execution_interlock(exact, original_authorization)
+                supervisor.assert_no_uat_migration_execution_interlock(recovery, "f" * 64)
+                current.chmod(0o600)
+                current.write_bytes(supervisor.canonical_json({
+                    "authorization_sha256_chain": [original_authorization],
+                }))
+                current.chmod(0o400)
+                supervisor.assert_no_uat_migration_execution_interlock(unrelated)
+
+    def test_rollback_preflight_passes_before_authorization_consumption_and_result_binding(self):
+        authorization = self.rollback_authorization("f" * 64)
+        events = []
+
+        def runner(_node, _bundle, _context, phase, _lock, **keywords):
+            events.append(f"journal:{phase}")
+            if phase == "prepare":
+                return {
+                    "intent_sha256": "2" * 64,
+                    "rollback_plan_sha256": "3" * 64,
+                }
+            self.assertEqual(keywords["expected_rollback_result_sha256"], "4" * 64)
+            return {
+                "result": "COMMITTED",
+                "rollback_plan_sha256": "3" * 64,
+                "rollback_result_sha256": "4" * 64,
+            }
+
+        def control(_node, _bundle, _context, phase, _intent, _lock, *extra):
+            events.append(f"control:{phase}")
+            self.assertEqual(extra, ())
+            if phase == "preflight":
+                self.assertNotIn("consume", events)
+                return {
+                    "result": "ROLLBACK_CONTROL_PREFLIGHT_PASSED",
+                    "execution_package_sha256": "a" * 64,
+                }
+            return {"result": "ROLLBACK_EXECUTION_RESULT_PERSISTED", "result_sha256": "4" * 64}
+
+        patches = [
+            patch.object(
+                supervisor, "verify_uat_promotion_rollback_sources",
+                side_effect=lambda *_: events.append("verify"),
+            ),
+            patch.object(
+                supervisor, "prepare_runtime_privilege_node",
+                side_effect=lambda *_: (events.append("node") or (Path("/tmp/runtime"), Path("/tmp/node"))),
+            ),
+            patch.object(supervisor, "run_uat_promotion_runner", side_effect=runner),
+            patch.object(supervisor, "run_uat_promotion_rollback_control", side_effect=control),
+            patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")),
+            patch.object(
+                supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup"),
+            ),
+        ]
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            result = supervisor.run_uat_promotion_authorization(
+                Path("/trusted/bundle"), Path("/trusted/pending/rollback.json"),
+                authorization, "1" * 64, lock_descriptor=51,
+            )
+        self.assertEqual(result["rollback_result_sha256"], "4" * 64)
+        self.assertEqual(events, [
+            "verify", "node", "journal:prepare", "verify", "control:preflight", "verify",
+            "consume", "verify", "control:execute", "journal:execute", "cleanup",
+        ])
+
+    def test_rollback_preflight_failure_leaves_authorization_unconsumed(self):
+        authorization = self.rollback_authorization("f" * 64)
+        events = []
+
+        def control(*_arguments, **_keywords):
+            events.append("preflight-failed")
+            raise supervisor.SupervisorError("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_FAILED")
+
+        with patch.object(supervisor, "verify_uat_promotion_rollback_sources", return_value={}), \
+                patch.object(
+                    supervisor, "prepare_runtime_privilege_node",
+                    return_value=(Path("/tmp/runtime"), Path("/tmp/node")),
+                ), \
+                patch.object(
+                    supervisor, "run_uat_promotion_runner",
+                    return_value={"intent_sha256": "2" * 64, "rollback_plan_sha256": "3" * 64},
+                ), \
+                patch.object(supervisor, "run_uat_promotion_rollback_control", side_effect=control), \
+                patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")), \
+                patch.object(supervisor, "cleanup_runtime_privilege_node", return_value=None):
+            with self.assertRaisesRegex(
+                    supervisor.SupervisorError,
+                    "SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_FAILED"):
+                supervisor.run_uat_promotion_authorization(
+                    Path("/trusted/bundle"), Path("/trusted/pending/rollback.json"),
+                    authorization, "1" * 64, lock_descriptor=51,
+                )
+        self.assertEqual(events, ["preflight-failed"])
+
+    def test_rollback_control_wrapper_marks_preflight_unconsumed_and_binds_recovery_decision(self):
+        bundle = "f" * 64
+        original = self.rollback_authorization(bundle)
+        original_context = supervisor.uat_promotion_context(original, "1" * 64)
+        preflight = {
+            "result": "ROLLBACK_CONTROL_PREFLIGHT_PASSED",
+            "promotion_id": original_context["parameters"]["promotion_id"],
+            "intent_sha256": "2" * 64,
+            "execution_package_sha256": "a" * 64,
+            "source_set_sha256": "3" * 64,
+        }
+
+        class ProcessResult:
+            returncode = 0
+            stderr = b""
+            stdout = supervisor.canonical_json(preflight)
+
+        with patch.object(supervisor.subprocess, "run", return_value=ProcessResult()) as command:
+            result = supervisor.run_uat_promotion_rollback_control(
+                Path("/tmp/node"), Path("/trusted/bundle"), original_context,
+                "preflight", "2" * 64, 51,
+            )
+        self.assertEqual(result, preflight)
+        arguments = command.call_args.args[0]
+        environment = command.call_args.kwargs["env"]
+        self.assertEqual(arguments[-2:], ["preflight", "2" * 64])
+        self.assertEqual(environment["ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED"], "NO")
+
+        recovery = self.rollback_authorization(bundle, recovery=True)
+        recovery_context = supervisor.uat_promotion_context(recovery, "4" * 64)
+        contained = {
+            "result": "CONTAINED_FOR_JOURNAL_QUARANTINE",
+            "promotion_id": recovery_context["parameters"]["promotion_id"],
+            "containment_sha256": "5" * 64,
+        }
+        ProcessResult.stdout = supervisor.canonical_json(contained)
+        with patch.object(supervisor.subprocess, "run", return_value=ProcessResult()) as command:
+            result = supervisor.run_uat_promotion_rollback_control(
+                Path("/tmp/node"), Path("/trusted/bundle"), recovery_context,
+                "recover", "c" * 64, 51, "QUARANTINE",
+            )
+        self.assertEqual(result, contained)
+        arguments = command.call_args.args[0]
+        environment = command.call_args.kwargs["env"]
+        self.assertEqual(arguments[-3:], ["recover", "c" * 64, "QUARANTINE"])
+        self.assertEqual(environment["ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED"], "YES")
+        self.assertEqual(environment["ERP_RELEASE_SUPERVISOR_ORIGINAL_AUTHORIZATION_CONSUMED"], "YES")
+
+    def test_rollback_recovery_contains_before_journal_quarantine(self):
+        authorization = self.rollback_authorization("f" * 64, recovery=True)
+        events = []
+
+        def runner(_node, _bundle, _context, phase, _lock, **_keywords):
+            events.append(f"journal:{phase}")
+            if phase == "recover-prepare":
+                return {"intent_sha256": "c" * 64, "decision": "QUARANTINE"}
+            return {"result": "QUARANTINED"}
+
+        def control(_node, _bundle, _context, phase, _intent, _lock, *extra):
+            events.append(f"control:{phase}")
+            if phase == "preflight":
+                return {"result": "ROLLBACK_CONTROL_PREFLIGHT_PASSED"}
+            self.assertEqual(extra, ("QUARANTINE",))
+            return {"result": "CONTAINED_FOR_JOURNAL_QUARANTINE"}
+
+        patches = [
+            patch.object(
+                supervisor, "validate_original_uat_promotion_authorization_consumed",
+                side_effect=lambda *_: events.append("original"),
+            ),
+            patch.object(
+                supervisor, "verify_uat_promotion_rollback_sources",
+                side_effect=lambda *_: events.append("verify"),
+            ),
+            patch.object(
+                supervisor, "prepare_runtime_privilege_node",
+                side_effect=lambda *_: (events.append("node") or (Path("/tmp/runtime"), Path("/tmp/node"))),
+            ),
+            patch.object(supervisor, "run_uat_promotion_runner", side_effect=runner),
+            patch.object(supervisor, "run_uat_promotion_rollback_control", side_effect=control),
+            patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")),
+            patch.object(
+                supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup"),
+            ),
+        ]
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6]:
+            result = supervisor.run_uat_promotion_authorization(
+                Path("/trusted/bundle"), Path("/trusted/pending/recovery.json"),
+                authorization, "1" * 64, lock_descriptor=51,
+            )
+        self.assertEqual(result["result"], "QUARANTINED")
+        self.assertLess(events.index("control:recover"), events.index("journal:recover-execute"))
+        self.assertEqual(events.count("consume"), 1)
 
     def test_migration_recovery_contains_after_consumption_before_journal_execution(self):
         bundle = "f" * 64

@@ -76,7 +76,7 @@ ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 MAX_JSON_BYTES = 1024 * 1024
 MAX_BUNDLE_FILE_BYTES = 8 * 1024 * 1024
 MAX_BUNDLE_BYTES = 32 * 1024 * 1024
-MAX_BUNDLE_FILES = 138
+MAX_BUNDLE_FILES = 141
 RECEIPT_CONTRACT = "chenyida-erp-release-supervisor-install-receipt/v2"
 JOURNAL_CONTRACT = "chenyida-erp-release-supervisor-install-journal/v2"
 
@@ -321,32 +321,51 @@ def assert_no_uat_promotion_finalization_interlock(state_root: Path | None = Non
             not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json", name)
             for name in names):
         reject(code)
-    finalization_intents: list[dict[str, Any]] = []
+    intent_bindings = {
+        "chenyida-erp-uat-promotion-finalization-intent/v1": (
+            "FINALIZATION", "finalization_operation_id", "finalization_intent_sha256",
+        ),
+        "chenyida-erp-uat-promotion-rollback-intent/v1": (
+            "ROLLBACK_EXECUTION", "rollback_operation_id", "rollback_intent_sha256",
+        ),
+        "chenyida-erp-uat-promotion-rollback-postverify-intent/v1": (
+            "ROLLBACK_POSTVERIFY", "postverify_operation_id", "postverify_intent_sha256",
+        ),
+    }
+    tracked_intents: list[dict[str, str]] = []
     for name in names:
         raw = trusted_file(intents_root / name, 0o400, MAX_JSON_BYTES, code)
         value = strict_json(raw, code)
-        if not isinstance(value, dict) \
-                or value.get("contract") != "chenyida-erp-uat-promotion-finalization-intent/v1":
+        if not isinstance(value, dict):
             continue
+        binding = intent_bindings.get(value.get("contract"))
+        if binding is None:
+            continue
+        operation, operation_id_field, digest_field = binding
         required = {
-            "schema_version", "contract", "finalization_operation_id",
-            "execution_authorization_sha256", "finalization_intent_sha256",
+            "schema_version", "contract", operation_id_field,
+            "execution_authorization_sha256", digest_field,
         }
-        body = {key: item for key, item in value.items() if key != "finalization_intent_sha256"}
+        body = {key: item for key, item in value.items() if key != digest_field}
         if not required <= set(value) or raw != canonical_json(value) \
                 or value.get("schema_version") != 1 \
-                or not isinstance(value.get("finalization_operation_id"), str) \
-                or not IDENTIFIER.fullmatch(value["finalization_operation_id"]) \
+                or not isinstance(value.get(operation_id_field), str) \
+                or not IDENTIFIER.fullmatch(value[operation_id_field]) \
                 or not isinstance(value.get("execution_authorization_sha256"), str) \
                 or not SHA256.fullmatch(value["execution_authorization_sha256"]) \
                 or value["execution_authorization_sha256"] == "0" * 64 \
-                or not isinstance(value.get("finalization_intent_sha256"), str) \
-                or not SHA256.fullmatch(value["finalization_intent_sha256"]) \
-                or sha256(canonical_json(body)) != value["finalization_intent_sha256"] \
-                or name != f"{value['finalization_operation_id']}.{value['finalization_intent_sha256']}.json":
+                or not isinstance(value.get(digest_field), str) \
+                or not SHA256.fullmatch(value[digest_field]) \
+                or value[digest_field] == "0" * 64 \
+                or sha256(canonical_json(body)) != value[digest_field] \
+                or name != f"{value[operation_id_field]}.{value[digest_field]}.json":
             reject(code)
-        finalization_intents.append(value)
-    if not finalization_intents:
+        tracked_intents.append({
+            "operation": operation,
+            "operation_id": value[operation_id_field],
+            "execution_authorization_sha256": value["execution_authorization_sha256"],
+        })
+    if not tracked_intents:
         return
     current_raw = trusted_file(state_root / "current.json", 0o400, MAX_JSON_BYTES, code)
     current = strict_json(current_raw, code)
@@ -358,11 +377,16 @@ def assert_no_uat_promotion_finalization_interlock(state_root: Path | None = Non
                    for item in authorization_chain):
         reject(code)
     pending = [
-        intent for intent in finalization_intents
+        intent for intent in tracked_intents
         if intent["execution_authorization_sha256"] not in authorization_chain
     ]
     if pending:
+        if {intent["operation"] for intent in pending} <= {
+                "ROLLBACK_EXECUTION", "ROLLBACK_POSTVERIFY"}:
+            reject("SUPERVISOR_INSTALL_UAT_PROMOTION_ROLLBACK_RECOVERY_REQUIRED")
         reject("SUPERVISOR_INSTALL_UAT_PROMOTION_FINALIZATION_RECOVERY_REQUIRED")
+    if current.get("journal_status") == "ROLLBACK_IN_PROGRESS":
+        reject("SUPERVISOR_INSTALL_UAT_PROMOTION_ROLLBACK_POSTVERIFY_REQUIRED")
 
 
 def assert_no_runtime_privilege_operator_interlock(state_root: Path | None = None) -> None:

@@ -178,6 +178,60 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
                     "SUPERVISOR_INSTALL_UAT_PROMOTION_FINALIZATION_STATE_INVALID"):
                 installer.assert_no_uat_promotion_finalization_interlock(root)
 
+    def test_rollback_interlock_blocks_bundle_switch_until_checkpoint_15_commits(self):
+        with tempfile.TemporaryDirectory(prefix="cyd-supervisor-rollback-interlock-") as directory:
+            root = Path(directory) / "uat-promotion-transactions-v1"
+            intents = root / "intents"
+            intents.mkdir(parents=True, mode=0o700)
+            root.chmod(0o700)
+            intents.chmod(0o700)
+            marker = root / installer.UAT_PROMOTION_STATE_MARKER
+            marker.write_bytes(installer.UAT_PROMOTION_STATE_MARKER_VALUE)
+            marker.chmod(0o400)
+            operation_id = "promotion-rollback-fixture"
+            authorization_sha256 = "d" * 64
+            body = {
+                "schema_version": 1,
+                "contract": "chenyida-erp-uat-promotion-rollback-intent/v1",
+                "rollback_operation_id": operation_id,
+                "execution_authorization_sha256": authorization_sha256,
+                "promotion_id": "promotion-fixture",
+            }
+            intent = {
+                **body,
+                "rollback_intent_sha256": installer.sha256(installer.canonical_json(body)),
+            }
+            intent_file = intents / f"{operation_id}.{intent['rollback_intent_sha256']}.json"
+            intent_file.write_bytes(installer.canonical_json(intent))
+            intent_file.chmod(0o400)
+            current = root / "current.json"
+            current.write_bytes(installer.canonical_json({
+                "authorization_sha256_chain": ["c" * 64],
+                "journal_status": "FINALIZED",
+            }))
+            current.chmod(0o400)
+            with self.assertRaisesRegex(
+                    installer.InstallError,
+                    "SUPERVISOR_INSTALL_UAT_PROMOTION_ROLLBACK_RECOVERY_REQUIRED"):
+                installer.assert_no_uat_promotion_finalization_interlock(root)
+            current.chmod(0o600)
+            current.write_bytes(installer.canonical_json({
+                "authorization_sha256_chain": ["c" * 64, authorization_sha256],
+                "journal_status": "ROLLBACK_IN_PROGRESS",
+            }))
+            current.chmod(0o400)
+            with self.assertRaisesRegex(
+                    installer.InstallError,
+                    "SUPERVISOR_INSTALL_UAT_PROMOTION_ROLLBACK_POSTVERIFY_REQUIRED"):
+                installer.assert_no_uat_promotion_finalization_interlock(root)
+            current.chmod(0o600)
+            current.write_bytes(installer.canonical_json({
+                "authorization_sha256_chain": ["c" * 64, authorization_sha256],
+                "journal_status": "ROLLED_BACK",
+            }))
+            current.chmod(0o400)
+            installer.assert_no_uat_promotion_finalization_interlock(root)
+
     def test_operator_interlock_blocks_bundle_switch_until_active_or_quarantined_intents_are_resolved(self):
         with tempfile.TemporaryDirectory(prefix="cyd-supervisor-operator-interlock-") as directory:
             root = Path(directory) / "postgresql-runtime-privilege-operator"

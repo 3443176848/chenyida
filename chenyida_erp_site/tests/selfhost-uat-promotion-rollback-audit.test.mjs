@@ -29,30 +29,41 @@ test("current repository audit is valid but UAT promotion remains blocked", () =
   assert.equal(result.artifact.audit_validation.result, "PASS");
   assert.equal(result.artifact.execution_readiness.status, "BLOCKED");
   assert.equal(result.artifact.execution_readiness.may_start, false);
-  assert.equal(result.artifact.execution_readiness.blocking_checkpoint_count, 2);
+  assert.equal(result.artifact.execution_readiness.blocking_checkpoint_count, 0);
+  assert.equal(result.artifact.execution_readiness.blocking_condition_count, 3);
   assert.equal(result.artifact.execution_readiness.p0_blocker_count, 2);
-  assert.equal(result.artifact.execution_readiness.p1_blocker_count, 0);
+  assert.equal(result.artifact.execution_readiness.p1_blocker_count, 1);
   assert.equal(result.artifact.capabilities.find((entry) => entry.id === "MIGRATION_COMMIT_RECEIPT").status, "SUPPORTED");
   assert.equal(result.artifact.capabilities.find((entry) => entry.id === "COMPOSE_DEPLOYMENT_RECEIPT").status, "SUPPORTED");
   assert.equal(result.artifact.capabilities.find((entry) => entry.id === "POST_DEPLOY_RUNTIME_CONFIGURATION").status, "SUPPORTED");
   assert.equal(result.artifact.capabilities.find((entry) => entry.id === "POST_DEPLOY_IDENTITY").status, "SUPPORTED");
   assert.equal(result.artifact.capabilities.find((entry) => entry.id === "CROSS_ROLE_UAT_EXECUTION").status, "SUPPORTED");
   assert.equal(result.artifact.capabilities.find((entry) => entry.id === "PROMOTION_FINAL_RECEIPT").status, "SUPPORTED");
+  assert.equal(result.artifact.capabilities.find((entry) => entry.id === "ROLLBACK_TO_UAT_EXECUTOR").status, "SUPPORTED");
+  assert.equal(result.artifact.capabilities.find((entry) => entry.id === "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT").status, "SUPPORTED");
+  assert.deepEqual(result.artifact.execution_blockers.map((entry) => entry.id), [
+    "ROLLBACK_RUNTIME_ADAPTER_NOT_BUNDLED",
+    "UAT_ROLLBACK_REHEARSAL_NOT_EXECUTED",
+    "HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED",
+  ]);
 });
 
-test("audit observes the exact Supervisor gap and TEST-only restore boundary", () => {
+test("audit observes the complete repository control plane and the fail-closed runtime boundary", () => {
   const { artifact, errors } = buildUatPromotionRollbackAudit(inputs());
   assert.deepEqual(errors, []);
-  assert.equal(artifact.observations.supervisor_operation_count, 30);
-  assert.equal(artifact.observations.required_promotion_operation_count, 12);
-  assert.deepEqual(artifact.observations.implemented_required_promotion_operations, ["BEGIN_UAT_PROMOTION", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION", "DEPLOY_UAT_RELEASE", "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "VERIFY_UAT_POSTDEPLOY_IDENTITY", "VERIFY_UAT_CROSS_ROLE_EXECUTION", "FINALIZE_UAT_PROMOTION", "RECOVER_UAT_PROMOTION"]);
-  assert.deepEqual(artifact.observations.missing_required_promotion_operations, ["ROLLBACK_UAT_RELEASE"]);
+  assert.equal(artifact.observations.supervisor_operation_count, 32);
+  assert.equal(artifact.observations.required_promotion_operation_count, 13);
+  assert.deepEqual(artifact.observations.implemented_required_promotion_operations, ["BEGIN_UAT_PROMOTION", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION", "DEPLOY_UAT_RELEASE", "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "VERIFY_UAT_POSTDEPLOY_IDENTITY", "VERIFY_UAT_CROSS_ROLE_EXECUTION", "FINALIZE_UAT_PROMOTION", "ROLLBACK_UAT_RELEASE", "VERIFY_AND_FINALIZE_UAT_ROLLBACK", "RECOVER_UAT_PROMOTION"]);
+  assert.deepEqual(artifact.observations.missing_required_promotion_operations, []);
   assert.equal(artifact.observations.restore_target_policy, "TEST_ONLY");
   assert.equal(artifact.observations.migration_authorization, "SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED");
   assert.equal(artifact.observations.compose_release_image_binding, "SUPERVISOR_CHECKPOINT_9_FENCED_WEB_WORKER_REPLACEMENT");
   assert.equal(artifact.observations.postdeploy_transaction_binding, "SUPERVISOR_CHECKPOINT_10_11_CONTENT_ADDRESSED_AND_RECOVERABLE");
   assert.equal(artifact.observations.cross_role_uat_transaction_binding, "SUPERVISOR_CHECKPOINT_12_CONTENT_ADDRESSED_AND_RECOVERABLE");
   assert.equal(artifact.observations.finalization_transaction_binding, "SUPERVISOR_CHECKPOINT_13_AGGREGATED_AND_RECOVERABLE");
+  assert.equal(artifact.observations.rollback_transaction_binding, "SUPERVISOR_CHECKPOINT_14_15_CONTENT_ADDRESSED_AND_RECOVERABLE");
+  assert.equal(artifact.observations.rollback_runtime_adapter, "MISSING_BUNDLED_RUNTIME_ADAPTER_FAIL_CLOSED");
+  assert.equal(artifact.observations.rollback_rehearsal_evidence, "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT");
   assert.equal(artifact.observations.cross_role_uat_readiness, "BLOCKED");
 });
 
@@ -169,6 +180,33 @@ test("final receipt cannot regress without both journal and bundle-switch recove
   assert.ok(result.errors.includes("AUDIT_FINALIZATION_TRANSACTION_BINDING_DRIFT"));
 });
 
+test("rollback checkpoints cannot regress to unbound stages or lose bundle-switch interlocks", () => {
+  const controlFixture = inputs();
+  const controlPath = "chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs";
+  controlFixture.sourceBodies.set(
+    controlPath,
+    controlFixture.sourceBodies.get(controlPath).replaceAll(
+      "runUatPromotionRollbackControl", "REMOVED_ROLLBACK_CONTROL",
+    ),
+  );
+  const controlResult = buildUatPromotionRollbackAudit(controlFixture);
+  assert.ok(controlResult.errors.some((entry) => entry.startsWith("AUDIT_SOURCE_MARKER_DRIFT:")));
+  assert.ok(controlResult.errors.includes("AUDIT_ROLLBACK_TRANSACTION_BINDING_DRIFT"));
+
+  const installerFixture = inputs();
+  const installerPath = "chenyida_erp_site/scripts/install-release-supervisor.py";
+  installerFixture.sourceBodies.set(
+    installerPath,
+    installerFixture.sourceBodies.get(installerPath).replaceAll(
+      "SUPERVISOR_INSTALL_UAT_PROMOTION_ROLLBACK_POSTVERIFY_REQUIRED",
+      "REMOVED_ROLLBACK_INSTALL_INTERLOCK",
+    ),
+  );
+  const installerResult = buildUatPromotionRollbackAudit(installerFixture);
+  assert.ok(installerResult.errors.some((entry) => entry.startsWith("AUDIT_SOURCE_MARKER_DRIFT:")));
+  assert.ok(installerResult.errors.includes("AUDIT_ROLLBACK_TRANSACTION_BINDING_DRIFT"));
+});
+
 test("a declared promotion operation cannot disappear from the audited implementation", () => {
   const fixture = inputs();
   const launcherPath = "chenyida_erp_site/scripts/release-supervisor-launcher.py";
@@ -177,7 +215,8 @@ test("a declared promotion operation cannot disappear from the audited implement
     "",
   ));
   const result = buildUatPromotionRollbackAudit(fixture);
-  assert.ok(result.errors.includes("AUDIT_IMPLEMENTED_OPERATION_DRIFT:BEGIN_UAT_PROMOTION,CAPTURE_UAT_PROMOTION_SNAPSHOT,AUTHORIZE_UAT_PROMOTION_MIGRATION,RUN_UAT_PROMOTION_MIGRATION,DEPLOY_UAT_RELEASE,VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION,VERIFY_UAT_POSTDEPLOY_IDENTITY,VERIFY_UAT_CROSS_ROLE_EXECUTION,FINALIZE_UAT_PROMOTION,RECOVER_UAT_PROMOTION"));
+  assert.ok(result.errors.some((entry) => entry.startsWith("AUDIT_IMPLEMENTED_OPERATION_DRIFT:")
+    && entry.includes("ROLLBACK_UAT_RELEASE") && entry.includes("VERIFY_AND_FINALIZE_UAT_ROLLBACK")));
 });
 
 test("artifact is deterministic and self-digested", () => {

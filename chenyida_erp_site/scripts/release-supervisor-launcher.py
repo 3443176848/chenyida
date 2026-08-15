@@ -84,8 +84,8 @@ UAT_PROMOTION_CROSS_ROLE_RESULT_MARKER_VALUE = b"chenyida-erp-uat-cross-role-res
 UAT_PROMOTION_CROSS_ROLE_CONTRACT_RELATIVE = Path(
     "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json"
 )
-UAT_PROMOTION_POLICY_FILE_SHA256 = "8b41e61e1e53a4c60833eb0f25cdca8d55c13b01142ab59dea956cd62e45f558"
-UAT_PROMOTION_POLICY_SHA256 = "70a999c4a5be491be1a20ad4697eaf65453463a71c6abaeb3df4b5ce24fce73f"
+UAT_PROMOTION_POLICY_FILE_SHA256 = "c1fe967ab455af92ee385925dab53fcfa59ad6db97ca266d4971fbd632eb8075"
+UAT_PROMOTION_POLICY_SHA256 = "7a0a408e1fa252460a87603534f1c48633d6343987ee607bcbcb384897720f30"
 UAT_PROMOTION_RECOVERY_READINESS_FILE = Path("/var/lib/chenyida-erp/backup-status/recovery-readiness.json")
 UAT_PROMOTION_CANDIDATE_RECEIPTS_ROOT = Path("/var/lib/chenyida-erp/release-candidate-snapshots/receipts")
 UAT_PROMOTION_STATE_MARKER = ".chenyida-erp-uat-promotion-transactions-v1"
@@ -208,6 +208,8 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/uat-promotion-migration-control.py": "0555",
     "chenyida_erp_site/scripts/uat-promotion-compose-deployment-contract.mjs": "0444",
     "chenyida_erp_site/scripts/uat-promotion-compose-deployment-control.mjs": "0444",
+    "chenyida_erp_site/scripts/uat-promotion-rollback-contract.mjs": "0444",
+    "chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/backup-projection.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/collector.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/components-projection.mjs": "0444",
@@ -230,6 +232,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-release-migration-allowlist.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-postdeploy-runtime-configuration-probe.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-uat-promotion-transaction-journal.test.mjs": "0444",
+    "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-uat-promotion-cross-role-evidence-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-backup-recovery-postgres.sh": "0555",
     "chenyida_erp_site/tests/selfhost-postgresql-cluster-recovery-postgres.sh": "0555",
@@ -354,6 +357,8 @@ UAT_PROMOTION_OPERATIONS = {
     "VERIFY_UAT_POSTDEPLOY_IDENTITY": "POSTDEPLOY_IDENTITY",
     "VERIFY_UAT_CROSS_ROLE_EXECUTION": "CROSS_ROLE_UAT",
     "FINALIZE_UAT_PROMOTION": "FINALIZATION",
+    "ROLLBACK_UAT_RELEASE": "ROLLBACK_EXECUTION",
+    "VERIFY_AND_FINALIZE_UAT_ROLLBACK": "ROLLBACK_POSTVERIFY",
     "RECOVER_UAT_PROMOTION": "RECOVER",
 }
 
@@ -368,6 +373,8 @@ UAT_PROMOTION_CONFIRMATIONS = {
     "VERIFY_UAT_POSTDEPLOY_IDENTITY": "AUTHORIZE_VERIFY_EXACT_UAT_POSTDEPLOY_IDENTITY",
     "VERIFY_UAT_CROSS_ROLE_EXECUTION": "AUTHORIZE_INGEST_EXACT_UAT_CROSS_ROLE_EXECUTION_EVIDENCE",
     "FINALIZE_UAT_PROMOTION": "AUTHORIZE_FINALIZE_EXACT_UAT_PROMOTION_RECEIPT_ONLY",
+    "ROLLBACK_UAT_RELEASE": "AUTHORIZE_EXACT_UAT_PREDECESSOR_ROLLBACK",
+    "VERIFY_AND_FINALIZE_UAT_ROLLBACK": "AUTHORIZE_VERIFY_AND_FINALIZE_EXACT_UAT_ROLLBACK",
     "RECOVER_UAT_PROMOTION": "AUTHORIZE_RECOVER_EXACT_UAT_PROMOTION",
 }
 
@@ -534,6 +541,40 @@ UAT_PROMOTION_FINALIZATION_PARAMETER_FIELDS = {
     "approval_subject_sha256", "finalization_created_at", "finalization_expires_at",
     "requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256",
     "policy_file_sha256", "policy_sha256",
+}
+
+UAT_PROMOTION_ROLLBACK_EXECUTION_PARAMETER_FIELDS = {
+    "promotion_state_root", "promotion_id", "promotion_generation", "previous_checkpoint_receipt_sha256",
+    "promotion_intent_sha256", "promotion_original_authorization_sha256", "candidate_binding_sha256",
+    "database_binding_sha256", "runtime_binding_sha256", "preupgrade_recovery_binding_sha256",
+    "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+    "migration_authorization_binding_sha256", "migration_fence_binding_sha256",
+    "migration_result_binding_sha256", "compose_deployment_binding_sha256", "current_checkpoint_source",
+    "rollback_id", "finalization_operation_id", "finalization_intent_sha256",
+    "finalization_intent_source", "snapshot_operation_id", "snapshot_intent_sha256",
+    "snapshot_intent_source", "snapshot_readiness_sha256", "snapshot_backup_id",
+    "snapshot_restore_run_id", "snapshot_objects", "predecessor_postdeploy_receipt_sha256",
+    "predecessor_postdeploy_receipt_source", "predecessor_release_manifest_sha256",
+    "predecessor_release_manifest_source", "predecessor", "database", "compose_project",
+    "compose_project_root", "execution_package_sha256", "execution_package_source",
+    "execution_deadline", "boundary", "rollback_created_at", "rollback_expires_at",
+    "requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256",
+    "policy_file_sha256", "policy_sha256",
+}
+
+UAT_PROMOTION_ROLLBACK_POSTVERIFY_PARAMETER_FIELDS = {
+    "promotion_state_root", "promotion_id", "promotion_generation", "previous_checkpoint_receipt_sha256",
+    "promotion_intent_sha256", "promotion_original_authorization_sha256", "candidate_binding_sha256",
+    "database_binding_sha256", "runtime_binding_sha256", "preupgrade_recovery_binding_sha256",
+    "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+    "migration_authorization_binding_sha256", "migration_fence_binding_sha256",
+    "migration_result_binding_sha256", "compose_deployment_binding_sha256", "current_checkpoint_source",
+    "postverify_id", "rollback_operation_id", "rollback_intent_sha256", "rollback_intent_source",
+    "rollback_execution_authorization_sha256", "rollback_result_sha256", "rollback_result_source",
+    "predecessor_postdeploy_receipt_sha256", "predecessor_postdeploy_receipt_source",
+    "predecessor_release_manifest_sha256", "predecessor_release_manifest_source",
+    "postverify_created_at", "postverify_expires_at", "requester_identity_sha256",
+    "approver_identity_sha256", "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
 }
 
 RUNTIME_PRIVILEGE_BASE_PARAMETER_FIELDS = {
@@ -1202,6 +1243,45 @@ def verify_uat_promotion_finalization_sources(parameters: dict[str, Any]) -> dic
     return {
         name: verify_authorized_projection_source(
             source, "SUPERVISOR_UAT_PROMOTION_FINALIZATION_SOURCE_CHANGED",
+        )
+        for name, source in sources.items()
+    }
+
+
+def verify_uat_promotion_rollback_sources(
+        parameters: dict[str, Any], operation: str) -> dict[str, bytes]:
+    trusted_owned_directory(
+        UAT_PROMOTION_STATE_ROOT, 0, 0, {0o700}, "SUPERVISOR_UAT_PROMOTION_STATE_ROOT_INVALID",
+    )
+    trusted_owned_marker(
+        UAT_PROMOTION_STATE_ROOT / UAT_PROMOTION_STATE_MARKER, UAT_PROMOTION_STATE_MARKER_VALUE,
+        0, 0, {0o400}, "SUPERVISOR_UAT_PROMOTION_STATE_ROOT_INVALID",
+    )
+    for name in ("intents", "packages", "results", "executions"):
+        trusted_owned_directory(
+            UAT_PROMOTION_STATE_ROOT / name, 0, 0, {0o700},
+            "SUPERVISOR_UAT_PROMOTION_STATE_ROOT_INVALID",
+        )
+    if operation == "ROLLBACK_UAT_RELEASE":
+        sources = {
+            "current": parameters["current_checkpoint_source"],
+            "finalization_intent": parameters["finalization_intent_source"],
+            "snapshot_intent": parameters["snapshot_intent_source"],
+            "predecessor_receipt": parameters["predecessor_postdeploy_receipt_source"],
+            "predecessor_manifest": parameters["predecessor_release_manifest_source"],
+            "execution_package": parameters["execution_package_source"],
+        }
+    else:
+        sources = {
+            "current": parameters["current_checkpoint_source"],
+            "rollback_intent": parameters["rollback_intent_source"],
+            "rollback_result": parameters["rollback_result_source"],
+            "predecessor_receipt": parameters["predecessor_postdeploy_receipt_source"],
+            "predecessor_manifest": parameters["predecessor_release_manifest_source"],
+        }
+    return {
+        name: verify_authorized_projection_source(
+            source, "SUPERVISOR_UAT_PROMOTION_ROLLBACK_SOURCE_CHANGED",
         )
         for name, source in sources.items()
     }
@@ -2623,7 +2703,204 @@ def validate_uat_promotion_finalization_parameters(
     return parameters
 
 
+def validate_uat_promotion_rollback_common(
+        parameters: Any, operation: str | None, expected_operation: str,
+        original_operation: str, fields: set[str], created_field: str,
+        expires_field: str, code: str) -> tuple[dict[str, Any], bool]:
+    recovery = operation == "RECOVER_UAT_PROMOTION"
+    observed_original = parameters.get("original_operation") if isinstance(parameters, dict) else None
+    if operation != expected_operation and not (recovery and observed_original == original_operation):
+        reject("SUPERVISOR_UAT_PROMOTION_OPERATION_INVALID")
+    expected_fields = set(fields)
+    if recovery:
+        expected_fields |= UAT_PROMOTION_RECOVERY_PARAMETER_FIELDS
+    parameters = exact_fields(parameters, expected_fields, code)
+    if parameters["promotion_state_root"] != str(UAT_PROMOTION_STATE_ROOT):
+        reject("SUPERVISOR_UAT_PROMOTION_STATE_PATH_INVALID")
+    if not isinstance(parameters["promotion_id"], str) or not IDENTIFIER.fullmatch(parameters["promotion_id"]) \
+            or not isinstance(parameters["promotion_generation"], int) \
+            or isinstance(parameters["promotion_generation"], bool) \
+            or not 1 <= parameters["promotion_generation"] <= 1_000_000:
+        reject(f"{code}_IDENTITY")
+    common_digests = {
+        "previous_checkpoint_receipt_sha256", "promotion_intent_sha256",
+        "promotion_original_authorization_sha256", "candidate_binding_sha256",
+        "database_binding_sha256", "runtime_binding_sha256",
+        "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+        "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+        "migration_fence_binding_sha256", "migration_result_binding_sha256",
+        "compose_deployment_binding_sha256", "requester_identity_sha256",
+        "approver_identity_sha256", "executor_identity_sha256", "policy_file_sha256",
+        "policy_sha256",
+    }
+    if recovery:
+        common_digests |= {"expected_intent_sha256", "original_authorization_sha256"}
+    if any(not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field])
+           or parameters[field] == "0" * 64 for field in common_digests):
+        reject(f"{code}_DIGEST")
+    if parameters["policy_file_sha256"] != UAT_PROMOTION_POLICY_FILE_SHA256 \
+            or parameters["policy_sha256"] != UAT_PROMOTION_POLICY_SHA256:
+        reject(f"{code}_POLICY")
+    if len({parameters["requester_identity_sha256"], parameters["approver_identity_sha256"],
+            parameters["executor_identity_sha256"]}) != 3:
+        reject("SUPERVISOR_UAT_PROMOTION_ACTORS_INVALID")
+    created = parse_time(parameters[created_field], f"{code}_TIME")
+    expires = parse_time(parameters[expires_field], f"{code}_TIME")
+    if expires <= created or expires - created > timedelta(minutes=15):
+        reject(f"{code}_TIME")
+    validate_uat_promotion_source(
+        parameters["current_checkpoint_source"], UAT_PROMOTION_CURRENT_FILE, {"0400"}, 0,
+        f"{code}_CURRENT_SOURCE",
+    )
+    return parameters, recovery
+
+
+def validate_uat_promotion_rollback_execution_parameters(
+        parameters: Any, operation: str | None = None) -> dict[str, Any]:
+    code = "SUPERVISOR_UAT_PROMOTION_ROLLBACK_PARAMETERS_INVALID"
+    parameters, recovery = validate_uat_promotion_rollback_common(
+        parameters, operation, "ROLLBACK_UAT_RELEASE", "ROLLBACK_EXECUTION",
+        UAT_PROMOTION_ROLLBACK_EXECUTION_PARAMETER_FIELDS,
+        "rollback_created_at", "rollback_expires_at", code,
+    )
+    identifiers = (
+        "rollback_id", "finalization_operation_id", "snapshot_operation_id",
+        "snapshot_backup_id", "snapshot_restore_run_id",
+    )
+    if any(not isinstance(parameters[field], str) or not IDENTIFIER.fullmatch(parameters[field])
+           for field in identifiers) \
+            or len({parameters["promotion_id"], parameters["rollback_id"],
+                    parameters["finalization_operation_id"], parameters["snapshot_operation_id"]}) != 4:
+        reject(f"{code}_IDENTIFIER")
+    digest_fields = {
+        "finalization_intent_sha256", "snapshot_intent_sha256", "snapshot_readiness_sha256",
+        "predecessor_postdeploy_receipt_sha256", "predecessor_release_manifest_sha256",
+        "execution_package_sha256",
+    }
+    if any(not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field])
+           or parameters[field] == "0" * 64 for field in digest_fields):
+        reject(f"{code}_DIGEST")
+    deadline = parse_time(parameters["execution_deadline"], f"{code}_TIME")
+    created = parse_time(parameters["rollback_created_at"], f"{code}_TIME")
+    if deadline <= created or deadline - created > timedelta(hours=2):
+        reject(f"{code}_TIME")
+    validate_uat_promotion_snapshot_objects(parameters["snapshot_objects"])
+    predecessor = exact_fields(parameters["predecessor"], {
+        "git_commit", "git_tree", "application_version", "release_manifest_sha256",
+        "web_image", "worker_image", "migration_head", "migration_manifest_sha256",
+        "runtime_configuration_sha256",
+    }, f"{code}_PREDECESSOR")
+    if not GIT_OBJECT.fullmatch(predecessor["git_commit"]) or not GIT_OBJECT.fullmatch(predecessor["git_tree"]) \
+            or not re.fullmatch(r"0\.1\.0-alpha\.\d+", predecessor["application_version"]) \
+            or not IMAGE_REFERENCE.fullmatch(predecessor["web_image"]) \
+            or not IMAGE_REFERENCE.fullmatch(predecessor["worker_image"]) \
+            or not re.fullmatch(r"\d{4}_[a-z0-9_]+\.sql", predecessor["migration_head"]) \
+            or any(not isinstance(predecessor[field], str) or not SHA256.fullmatch(predecessor[field])
+                   for field in ("release_manifest_sha256", "migration_manifest_sha256",
+                                 "runtime_configuration_sha256")):
+        reject(f"{code}_PREDECESSOR")
+    database = exact_fields(parameters["database"], {"name", "system_identifier", "oid", "marker"}, f"{code}_DATABASE")
+    if database["name"] != "chenyida_erp" \
+            or database["marker"] != "chenyida-erp-deployment/v2:UAT:chenyida-erp" \
+            or not isinstance(database["system_identifier"], str) \
+            or not re.fullmatch(r"[1-9][0-9]{9,29}", database["system_identifier"]) \
+            or not isinstance(database["oid"], str) or not re.fullmatch(r"[1-9][0-9]{0,9}", database["oid"]):
+        reject(f"{code}_DATABASE")
+    boundary = exact_fields(parameters["boundary"], {
+        "environment_restore", "posted_business_reversal", "down_migration",
+        "direct_sql_correction", "business_fact_deletion", "automatic_business_compensation",
+    }, f"{code}_BOUNDARY")
+    if boundary != {
+        "environment_restore": "EXACT_PREUPGRADE_SNAPSHOT_AND_PREDECESSOR_RUNTIME_ONLY",
+        "posted_business_reversal": "NOT_PERFORMED_REQUIRES_SEPARATE_BUSINESS_AUTHORIZATION",
+        "down_migration": False, "direct_sql_correction": False,
+        "business_fact_deletion": False, "automatic_business_compensation": False,
+    } or parameters["compose_project"] != "chenyida-erp" \
+            or absolute_path(parameters["compose_project_root"], f"{code}_PATH") == "/":
+        reject(f"{code}_BOUNDARY")
+    expected_sources = {
+        "finalization_intent_source": UAT_PROMOTION_STATE_ROOT / "intents"
+        / f"{parameters['finalization_operation_id']}.{parameters['finalization_intent_sha256']}.json",
+        "snapshot_intent_source": UAT_PROMOTION_STATE_ROOT / "intents"
+        / f"{parameters['snapshot_operation_id']}.{parameters['snapshot_intent_sha256']}.json",
+        "execution_package_source": UAT_PROMOTION_STATE_ROOT / "packages"
+        / f"{parameters['rollback_id']}.{parameters['execution_package_sha256']}.json",
+    }
+    validated_sources = [parameters["current_checkpoint_source"]]
+    for field, expected in expected_sources.items():
+        validated_sources.append(validate_uat_promotion_source(
+            parameters[field], expected, {"0400"}, 0, f"{code}_SOURCE",
+        ))
+    validated_sources.append(validate_uat_promotion_source(
+        parameters["predecessor_postdeploy_receipt_source"], None, {"0400", "0440"}, 0,
+        f"{code}_SOURCE",
+    ))
+    validated_sources.append(validate_uat_promotion_source(
+        parameters["predecessor_release_manifest_source"], None, {"0440"}, 0,
+        f"{code}_SOURCE",
+    ))
+    if parameters["predecessor_postdeploy_receipt_source"]["sha256"] \
+            != parameters["predecessor_postdeploy_receipt_sha256"] \
+            or parameters["predecessor_release_manifest_source"]["sha256"] \
+            != parameters["predecessor_release_manifest_sha256"] \
+            or len({item["path"] for item in validated_sources}) != len(validated_sources):
+        reject(f"{code}_SOURCE_BINDING")
+    if recovery and parameters["original_operation_id"] != parameters["rollback_id"]:
+        reject(f"{code}_IDENTIFIER")
+    return parameters
+
+
+def validate_uat_promotion_rollback_postverify_parameters(
+        parameters: Any, operation: str | None = None) -> dict[str, Any]:
+    code = "SUPERVISOR_UAT_PROMOTION_ROLLBACK_POSTVERIFY_PARAMETERS_INVALID"
+    parameters, recovery = validate_uat_promotion_rollback_common(
+        parameters, operation, "VERIFY_AND_FINALIZE_UAT_ROLLBACK", "ROLLBACK_POSTVERIFY",
+        UAT_PROMOTION_ROLLBACK_POSTVERIFY_PARAMETER_FIELDS,
+        "postverify_created_at", "postverify_expires_at", code,
+    )
+    if any(not isinstance(parameters[field], str) or not IDENTIFIER.fullmatch(parameters[field])
+           for field in ("postverify_id", "rollback_operation_id")) \
+            or len({parameters["promotion_id"], parameters["postverify_id"],
+                    parameters["rollback_operation_id"]}) != 3:
+        reject(f"{code}_IDENTIFIER")
+    for field in (
+            "rollback_intent_sha256", "rollback_execution_authorization_sha256",
+            "rollback_result_sha256", "predecessor_postdeploy_receipt_sha256",
+            "predecessor_release_manifest_sha256"):
+        if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]) \
+                or parameters[field] == "0" * 64:
+            reject(f"{code}_DIGEST")
+    sources = [parameters["current_checkpoint_source"]]
+    source_expectations = (
+        ("rollback_intent_source", UAT_PROMOTION_STATE_ROOT / "intents"
+         / f"{parameters['rollback_operation_id']}.{parameters['rollback_intent_sha256']}.json", {"0400"}),
+        ("rollback_result_source", UAT_PROMOTION_STATE_ROOT / "results"
+         / f"{parameters['rollback_operation_id']}.{parameters['rollback_result_sha256']}.json", {"0400"}),
+        ("predecessor_postdeploy_receipt_source", None, {"0400", "0440"}),
+        ("predecessor_release_manifest_source", None, {"0440"}),
+    )
+    for field, expected, modes in source_expectations:
+        sources.append(validate_uat_promotion_source(parameters[field], expected, modes, 0, f"{code}_SOURCE"))
+    if parameters["predecessor_postdeploy_receipt_source"]["sha256"] \
+            != parameters["predecessor_postdeploy_receipt_sha256"] \
+            or parameters["predecessor_release_manifest_source"]["sha256"] \
+            != parameters["predecessor_release_manifest_sha256"] \
+            or len({item["path"] for item in sources}) != len(sources):
+        reject(f"{code}_SOURCE_BINDING")
+    if recovery and parameters["original_operation_id"] != parameters["postverify_id"]:
+        reject(f"{code}_IDENTIFIER")
+    return parameters
+
+
 def validate_uat_promotion_parameters(parameters: Any, operation: str | None = None) -> dict[str, Any]:
+    if operation == "ROLLBACK_UAT_RELEASE" \
+            or operation == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) \
+            and parameters.get("original_operation") == "ROLLBACK_EXECUTION":
+        return validate_uat_promotion_rollback_execution_parameters(parameters, operation)
+    if operation == "VERIFY_AND_FINALIZE_UAT_ROLLBACK" \
+            or operation == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) \
+            and parameters.get("original_operation") == "ROLLBACK_POSTVERIFY":
+        return validate_uat_promotion_rollback_postverify_parameters(parameters, operation)
     if operation == "FINALIZE_UAT_PROMOTION" \
             or operation == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) \
             and parameters.get("original_operation") == "FINALIZATION":
@@ -2914,11 +3191,17 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
             or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "CROSS_ROLE_UAT"
         finalization_operation = operation == "FINALIZE_UAT_PROMOTION" \
             or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "FINALIZATION"
+        rollback_operation = operation == "ROLLBACK_UAT_RELEASE" \
+            or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "ROLLBACK_EXECUTION"
+        rollback_postverify_operation = operation == "VERIFY_AND_FINALIZE_UAT_ROLLBACK" \
+            or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "ROLLBACK_POSTVERIFY"
         window_created = parse_time(
             parameters["snapshot_created_at"] if snapshot_operation else parameters["quiesce_created_at"] if quiesce_operation
             else parameters["authorization_created_at"] if migration_authorization_operation
             else parameters["execution_created_at"] if migration_execution_operation
             else parameters["deployment_created_at"] if compose_deployment_operation
+            else parameters["rollback_created_at"] if rollback_operation
+            else parameters["postverify_created_at"] if rollback_postverify_operation
             else parameters["finalization_created_at"] if finalization_operation
             else parameters["verification_created_at"] if postdeploy_runtime_operation \
             or postdeploy_identity_operation or cross_role_operation
@@ -2930,6 +3213,8 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
             else parameters["authorization_expires_at"] if migration_authorization_operation
             else parameters["execution_expires_at"] if migration_execution_operation
             else parameters["deployment_expires_at"] if compose_deployment_operation
+            else parameters["rollback_expires_at"] if rollback_operation
+            else parameters["postverify_expires_at"] if rollback_postverify_operation
             else parameters["finalization_expires_at"] if finalization_operation
             else parameters["verification_expires_at"] if postdeploy_runtime_operation \
             or postdeploy_identity_operation or cross_role_operation
@@ -3003,6 +3288,23 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
                 ) or sha256(canonical_json(value)) in parameters["authorization_sha256_chain"]
                 or sha256(canonical_json(value))
                 == parameters["cross_role_human_execution_authorization_sha256"]
+                or abs(window_created - created) > timedelta(minutes=5)
+                or window_created > now + timedelta(minutes=5) or window_expires > expires):
+            reject("SUPERVISOR_UAT_PROMOTION_TIME_INVALID")
+        elif operation == "ROLLBACK_UAT_RELEASE" and (
+                value["authorization_id"] != parameters["rollback_id"]
+                or value["authorization_id"] in (
+                    parameters["promotion_id"], parameters["finalization_operation_id"],
+                    parameters["snapshot_operation_id"],
+                ) or abs(window_created - created) > timedelta(minutes=5)
+                or window_created > now + timedelta(minutes=5) or window_expires > expires):
+            reject("SUPERVISOR_UAT_PROMOTION_TIME_INVALID")
+        elif operation == "VERIFY_AND_FINALIZE_UAT_ROLLBACK" and (
+                value["authorization_id"] != parameters["postverify_id"]
+                or value["authorization_id"] in (
+                    parameters["promotion_id"], parameters["rollback_operation_id"],
+                ) or sha256(canonical_json(value))
+                == parameters["rollback_execution_authorization_sha256"]
                 or abs(window_created - created) > timedelta(minutes=5)
                 or window_created > now + timedelta(minutes=5) or window_expires > expires):
             reject("SUPERVISOR_UAT_PROMOTION_TIME_INVALID")
@@ -3531,6 +3833,8 @@ def validate_original_uat_promotion_authorization_consumed(parameters: dict[str,
         "POSTDEPLOY_IDENTITY": "VERIFY_UAT_POSTDEPLOY_IDENTITY",
         "CROSS_ROLE_UAT": "VERIFY_UAT_CROSS_ROLE_EXECUTION",
         "FINALIZATION": "FINALIZE_UAT_PROMOTION",
+        "ROLLBACK_EXECUTION": "ROLLBACK_UAT_RELEASE",
+        "ROLLBACK_POSTVERIFY": "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
     }.get(parameters["original_operation"])
     if raw != canonical_json(value) or value["contract"] != UAT_PROMOTION_AUTHORIZATION_CONTRACT \
         or value["authorization_id"] != original_id or value["operation"] != expected_operation:
@@ -3545,6 +3849,8 @@ def validate_original_uat_promotion_authorization_consumed(parameters: dict[str,
         else UAT_PROMOTION_POSTDEPLOY_IDENTITY_PARAMETER_FIELDS if parameters["original_operation"] == "POSTDEPLOY_IDENTITY" \
         else UAT_PROMOTION_CROSS_ROLE_PARAMETER_FIELDS if parameters["original_operation"] == "CROSS_ROLE_UAT" \
         else UAT_PROMOTION_FINALIZATION_PARAMETER_FIELDS if parameters["original_operation"] == "FINALIZATION" \
+        else UAT_PROMOTION_ROLLBACK_EXECUTION_PARAMETER_FIELDS if parameters["original_operation"] == "ROLLBACK_EXECUTION" \
+        else UAT_PROMOTION_ROLLBACK_POSTVERIFY_PARAMETER_FIELDS if parameters["original_operation"] == "ROLLBACK_POSTVERIFY" \
         else UAT_PROMOTION_BASE_PARAMETER_FIELDS
     if any(original_parameters[field] != parameters[field] for field in fields):
         reject("SUPERVISOR_UAT_PROMOTION_ORIGINAL_AUTHORIZATION_INVALID")
@@ -3910,6 +4216,12 @@ def assert_no_uat_migration_execution_interlock(
             "chenyida-erp-uat-promotion-finalization-intent/v1": (
                 "FINALIZATION", "finalization_operation_id", "finalization_intent_sha256",
             ),
+            "chenyida-erp-uat-promotion-rollback-intent/v1": (
+                "ROLLBACK_EXECUTION", "rollback_operation_id", "rollback_intent_sha256",
+            ),
+            "chenyida-erp-uat-promotion-rollback-postverify-intent/v1": (
+                "ROLLBACK_POSTVERIFY", "postverify_operation_id", "postverify_intent_sha256",
+            ),
         }
         binding = verification_contracts.get(value.get("contract"))
         if binding is None:
@@ -3969,6 +4281,8 @@ def assert_no_uat_migration_execution_interlock(
         "POSTDEPLOY_IDENTITY": "VERIFY_UAT_POSTDEPLOY_IDENTITY",
         "CROSS_ROLE_UAT": "VERIFY_UAT_CROSS_ROLE_EXECUTION",
         "FINALIZATION": "FINALIZE_UAT_PROMOTION",
+        "ROLLBACK_EXECUTION": "ROLLBACK_UAT_RELEASE",
+        "ROLLBACK_POSTVERIFY": "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
     }
     same_pending_verification = authorization.get("contract") == UAT_PROMOTION_AUTHORIZATION_CONTRACT \
         and len(pending_verification) == 1 \
@@ -3987,6 +4301,8 @@ def assert_no_uat_migration_execution_interlock(
             reject("SUPERVISOR_UAT_PROMOTION_CROSS_ROLE_RECOVERY_REQUIRED")
         if operations == {"FINALIZATION"}:
             reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_RECOVERY_REQUIRED")
+        if operations <= {"ROLLBACK_EXECUTION", "ROLLBACK_POSTVERIFY"}:
+            reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_RECOVERY_REQUIRED")
         if operations <= {"POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"}:
             reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_RECOVERY_REQUIRED")
         reject("SUPERVISOR_UAT_PROMOTION_CHECKPOINT_RECOVERY_REQUIRED")
@@ -4278,6 +4594,10 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
         or recovery and parameters.get("original_operation") == "CROSS_ROLE_UAT"
     finalization = authorization["operation"] == "FINALIZE_UAT_PROMOTION" \
         or recovery and parameters.get("original_operation") == "FINALIZATION"
+    rollback = authorization["operation"] == "ROLLBACK_UAT_RELEASE" \
+        or recovery and parameters.get("original_operation") == "ROLLBACK_EXECUTION"
+    rollback_postverify = authorization["operation"] == "VERIFY_AND_FINALIZE_UAT_ROLLBACK" \
+        or recovery and parameters.get("original_operation") == "ROLLBACK_POSTVERIFY"
     parameter_fields = UAT_PROMOTION_SNAPSHOT_PARAMETER_FIELDS if snapshot \
         else UAT_PROMOTION_QUIESCE_PARAMETER_FIELDS if quiesce \
         else UAT_PROMOTION_MIGRATION_AUTHORIZATION_PARAMETER_FIELDS if migration_authorization \
@@ -4287,6 +4607,8 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
         else UAT_PROMOTION_POSTDEPLOY_IDENTITY_PARAMETER_FIELDS if postdeploy_identity \
         else UAT_PROMOTION_CROSS_ROLE_PARAMETER_FIELDS if cross_role \
         else UAT_PROMOTION_FINALIZATION_PARAMETER_FIELDS if finalization \
+        else UAT_PROMOTION_ROLLBACK_EXECUTION_PARAMETER_FIELDS if rollback \
+        else UAT_PROMOTION_ROLLBACK_POSTVERIFY_PARAMETER_FIELDS if rollback_postverify \
         else UAT_PROMOTION_BASE_PARAMETER_FIELDS
     promotion_parameters = {field: parameters[field] for field in parameter_fields}
     return {
@@ -4300,7 +4622,9 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
             else "POSTDEPLOY_RUNTIME_CONFIGURATION" if postdeploy_runtime \
             else "POSTDEPLOY_IDENTITY" if postdeploy_identity \
             else "CROSS_ROLE_UAT" if cross_role \
-            else "FINALIZATION" if finalization else "BEGIN",
+            else "FINALIZATION" if finalization \
+            else "ROLLBACK_EXECUTION" if rollback \
+            else "ROLLBACK_POSTVERIFY" if rollback_postverify else "BEGIN",
         "execution_mode": "RECOVERY" if recovery else "ORIGINAL",
         "execution_authorization_id": authorization["authorization_id"],
         "execution_authorization_sha256": authorization_digest,
@@ -4315,7 +4639,8 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
 def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[str, Any], phase: str,
                              lock_descriptor: int, *, failure_stage: str | None = None,
                              failure_code: str | None = None,
-                             expected_postdeploy_result_sha256: str | None = None) -> dict[str, Any]:
+                             expected_postdeploy_result_sha256: str | None = None,
+                             expected_rollback_result_sha256: str | None = None) -> dict[str, Any]:
     confirmations = {
         "prepare": "PREPARE_UAT_PROMOTION_DURABLE_INTENT",
         "execute": "COMMIT_UAT_PROMOTION_JOURNAL_AFTER_AUTHORIZATION",
@@ -4339,6 +4664,16 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
             reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_INVALID")
     elif expected_postdeploy_result_sha256 is not None:
         reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_INVALID")
+    rollback_execute = phase == "execute" and context.get("operation") in {
+        "ROLLBACK_EXECUTION", "ROLLBACK_POSTVERIFY",
+    }
+    if rollback_execute:
+        if not isinstance(expected_rollback_result_sha256, str) \
+                or not SHA256.fullmatch(expected_rollback_result_sha256) \
+                or expected_rollback_result_sha256 == "0" * 64:
+            reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_EXPECTED_RESULT_INVALID")
+    elif expected_rollback_result_sha256 is not None:
+        reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_EXPECTED_RESULT_INVALID")
     publisher = bundle_root / "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs"
     consumed = phase in ("execute", "recover-execute", "contain")
     environment = {
@@ -4357,6 +4692,9 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
     if postdeploy_execute:
         environment["ERP_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_SHA256"] = \
             expected_postdeploy_result_sha256
+    if rollback_execute:
+        environment["ERP_UAT_PROMOTION_ROLLBACK_EXPECTED_RESULT_SHA256"] = \
+            expected_rollback_result_sha256
     try:
         result = subprocess.run(
             [str(node_path), "--max-old-space-size=64", "--disable-proto=throw", str(publisher), phase, confirmations[phase]],
@@ -4397,6 +4735,19 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
             digest_fields = {
                 "intent_sha256", "finalization_plan_sha256", "cross_role_result_sha256",
             }
+        elif context["operation"] == "ROLLBACK_EXECUTION":
+            expected_fields = {
+                "result", "promotion_id", "intent_sha256", "rollback_plan_sha256",
+            }
+            digest_fields = {"intent_sha256", "rollback_plan_sha256"}
+        elif context["operation"] == "ROLLBACK_POSTVERIFY":
+            expected_fields = {
+                "result", "promotion_id", "intent_sha256", "postverify_plan_sha256",
+                "rollback_result_sha256",
+            }
+            digest_fields = {
+                "intent_sha256", "postverify_plan_sha256", "rollback_result_sha256",
+            }
         else:
             expected_fields = {"result", "promotion_id", "intent_sha256", "receipt_sha256"}
             digest_fields = {"intent_sha256", "receipt_sha256"}
@@ -4430,6 +4781,16 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
         elif context["operation"] == "FINALIZATION":
             expected_fields |= {"finalization_plan_sha256", "cross_role_result_sha256"}
             digest_fields |= {"finalization_plan_sha256", "cross_role_result_sha256"}
+        elif context["operation"] == "ROLLBACK_EXECUTION":
+            expected_fields |= {"rollback_plan_sha256", "rollback_result_sha256"}
+            digest_fields |= {"rollback_plan_sha256", "rollback_result_sha256"}
+        elif context["operation"] == "ROLLBACK_POSTVERIFY":
+            expected_fields |= {
+                "postverify_plan_sha256", "rollback_result_sha256", "postverify_result_sha256",
+            }
+            digest_fields |= {
+                "postverify_plan_sha256", "rollback_result_sha256", "postverify_result_sha256",
+            }
     elif phase == "recover-prepare":
         expected_results = {"RECOVERY_PREPARED"}
         expected_fields = {"result", "promotion_id", "intent_sha256", "recovery_sha256", "decision"}
@@ -4470,6 +4831,16 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
         elif context["operation"] == "FINALIZATION":
             expected_fields |= {"finalization_plan_sha256", "cross_role_result_sha256"}
             digest_fields |= {"finalization_plan_sha256", "cross_role_result_sha256"}
+        elif context["operation"] == "ROLLBACK_EXECUTION":
+            expected_fields |= {"rollback_plan_sha256", "rollback_result_sha256"}
+            digest_fields |= {"rollback_plan_sha256", "rollback_result_sha256"}
+        elif context["operation"] == "ROLLBACK_POSTVERIFY":
+            expected_fields |= {
+                "postverify_plan_sha256", "rollback_result_sha256", "postverify_result_sha256",
+            }
+            digest_fields |= {
+                "postverify_plan_sha256", "rollback_result_sha256", "postverify_result_sha256",
+            }
     else:
         expected_results = {"QUARANTINED"}
         expected_fields = {"result", "promotion_id", "intent_sha256", "recovery_sha256", "quarantine_sha256"}
@@ -4477,6 +4848,92 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
     if set(value) != expected_fields or value.get("result") not in expected_results \
         or any(not isinstance(value.get(field), str) or not SHA256.fullmatch(value[field]) or value[field] == "0" * 64 for field in digest_fields):
         reject("SUPERVISOR_UAT_PROMOTION_RUNNER_RESPONSE_INVALID")
+    return value
+
+
+def run_uat_promotion_rollback_control(
+        node_path: Path, bundle_root: Path, context: dict[str, Any], phase: str,
+        expected_intent_sha256: str, lock_descriptor: int,
+        recovery_decision: str | None = None) -> dict[str, Any]:
+    if context.get("operation") not in {"ROLLBACK_EXECUTION", "ROLLBACK_POSTVERIFY"} \
+            or phase not in {"preflight", "execute", "recover"} \
+            or phase == "execute" and context.get("execution_mode") != "ORIGINAL" \
+            or phase == "recover" and context.get("execution_mode") != "RECOVERY" \
+            or not isinstance(expected_intent_sha256, str) \
+            or not SHA256.fullmatch(expected_intent_sha256) \
+            or expected_intent_sha256 == "0" * 64:
+        reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_INVALID")
+    decisions = {"RESUME_PUBLICATION", "ALREADY_COMMITTED", "QUARANTINE"}
+    if phase == "recover":
+        if recovery_decision not in decisions:
+            reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_INVALID")
+    elif recovery_decision is not None:
+        reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_INVALID")
+    controller = bundle_root / "chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs"
+    consumed = phase != "preflight"
+    environment = {
+        "PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent",
+        "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES", "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+        "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+        "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(bundle_root / "chenyida_erp_site"),
+        "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": context["supervisor_bundle_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": context["execution_authorization_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED": "YES" if consumed else "NO",
+        "ERP_RELEASE_SUPERVISOR_ORIGINAL_AUTHORIZATION_CONSUMED":
+            "YES" if context["execution_mode"] == "RECOVERY" else "NO",
+    }
+    arguments = [
+        str(node_path), "--max-old-space-size=64", "--disable-proto=throw",
+        str(controller), phase, expected_intent_sha256,
+    ]
+    if recovery_decision is not None:
+        arguments.append(recovery_decision)
+    try:
+        result = subprocess.run(
+            arguments, env=environment, input=canonical_json(context), stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, check=False, timeout=120 if phase == "preflight" else 7500,
+            pass_fds=(lock_descriptor,),
+        )
+    except (OSError, subprocess.SubprocessError):
+        reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_FAILED")
+    if result.returncode != 0 or result.stderr != b"" or not 2 <= len(result.stdout) <= 64 * 1024:
+        reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_FAILED")
+    value = strict_json(result.stdout, "SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_RESPONSE_INVALID")
+    if result.stdout != canonical_json(value) or not isinstance(value, dict) \
+            or value.get("promotion_id") != context["parameters"]["promotion_id"]:
+        reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_RESPONSE_INVALID")
+    if phase == "preflight":
+        expected_fields = {
+            "result", "promotion_id", "intent_sha256", "execution_package_sha256", "source_set_sha256",
+        }
+        expected_result = "ROLLBACK_CONTROL_PREFLIGHT_PASSED"
+        digest_fields = {
+            "intent_sha256", "execution_package_sha256", "source_set_sha256",
+        }
+        if value.get("intent_sha256") != expected_intent_sha256:
+            reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_RESPONSE_INVALID")
+        if context["operation"] == "ROLLBACK_EXECUTION" \
+                and value.get("execution_package_sha256") \
+                != context["parameters"]["execution_package_sha256"]:
+            reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_RESPONSE_INVALID")
+    elif phase == "execute":
+        expected_fields = {"result", "promotion_id", "result_sha256"}
+        expected_result = "ROLLBACK_POSTVERIFY_RESULT_PERSISTED" \
+            if context["operation"] == "ROLLBACK_POSTVERIFY" else "ROLLBACK_EXECUTION_RESULT_PERSISTED"
+        digest_fields = {"result_sha256"}
+    elif recovery_decision == "QUARANTINE":
+        expected_fields = {"result", "promotion_id", "containment_sha256"}
+        expected_result = "CONTAINED_FOR_JOURNAL_QUARANTINE"
+        digest_fields = {"containment_sha256"}
+    else:
+        expected_fields = {"result", "promotion_id", "result_sha256"}
+        expected_result = "ROLLBACK_POSTVERIFY_ALREADY_COMPLETED" \
+            if context["operation"] == "ROLLBACK_POSTVERIFY" else "ROLLBACK_EXECUTION_ALREADY_COMPLETED"
+        digest_fields = {"result_sha256"}
+    if set(value) != expected_fields or value.get("result") != expected_result \
+            or any(not isinstance(value.get(field), str) or not SHA256.fullmatch(value[field])
+                   or value[field] == "0" * 64 for field in digest_fields):
+        reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_RESPONSE_INVALID")
     return value
 
 
@@ -4784,10 +5241,19 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
         postdeploy_identity = authorization["operation"] == "VERIFY_UAT_POSTDEPLOY_IDENTITY"
         cross_role = authorization["operation"] == "VERIFY_UAT_CROSS_ROLE_EXECUTION"
         finalization = authorization["operation"] == "FINALIZE_UAT_PROMOTION"
+        rollback = authorization["operation"] == "ROLLBACK_UAT_RELEASE" \
+            or recovery and authorization["parameters"].get("original_operation") == "ROLLBACK_EXECUTION"
+        rollback_postverify = authorization["operation"] == "VERIFY_AND_FINALIZE_UAT_ROLLBACK" \
+            or recovery and authorization["parameters"].get("original_operation") == "ROLLBACK_POSTVERIFY"
         if recovery:
             validate_original_uat_promotion_authorization_consumed(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
             )
+            if rollback or rollback_postverify:
+                verify_uat_promotion_rollback_sources(
+                    authorization["parameters"],
+                    "ROLLBACK_UAT_RELEASE" if rollback else "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
+                )
         elif snapshot:
             verify_uat_promotion_snapshot_sources(authorization["parameters"])
         elif quiesce:
@@ -4804,6 +5270,11 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             verify_uat_promotion_cross_role_sources(authorization["parameters"])
         elif finalization:
             verify_uat_promotion_finalization_sources(authorization["parameters"])
+        elif rollback or rollback_postverify:
+            verify_uat_promotion_rollback_sources(
+                authorization["parameters"],
+                "ROLLBACK_UAT_RELEASE" if rollback else "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
+            )
         else:
             validate_uat_promotion_source_documents(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
@@ -4829,9 +5300,23 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             verify_uat_promotion_cross_role_sources(authorization["parameters"])
         elif finalization:
             verify_uat_promotion_finalization_sources(authorization["parameters"])
+        elif rollback or rollback_postverify:
+            verify_uat_promotion_rollback_sources(
+                authorization["parameters"],
+                "ROLLBACK_UAT_RELEASE" if rollback else "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
+            )
         elif not recovery:
             validate_uat_promotion_source_documents(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
+            )
+        rollback_preflight: dict[str, Any] | None = None
+        if rollback or rollback_postverify:
+            rollback_preflight = run_uat_promotion_rollback_control(
+                node_path, bundle_root, context, "preflight", prepared["intent_sha256"], lock_descriptor,
+            )
+            verify_uat_promotion_rollback_sources(
+                authorization["parameters"],
+                "ROLLBACK_UAT_RELEASE" if rollback else "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
             )
         consume_authorization(authorization_path, authorization, authorization_digest)
         if snapshot:
@@ -4857,10 +5342,57 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             verify_uat_promotion_cross_role_sources(authorization["parameters"])
         elif finalization:
             verify_uat_promotion_finalization_sources(authorization["parameters"])
+        elif rollback or rollback_postverify:
+            verify_uat_promotion_rollback_sources(
+                authorization["parameters"],
+                "ROLLBACK_UAT_RELEASE" if rollback else "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
+            )
         elif not recovery:
             validate_uat_promotion_source_documents(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
             )
+        if rollback or rollback_postverify:
+            if rollback_preflight is None:
+                reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_PREFLIGHT_MISSING")
+            if recovery:
+                control = run_uat_promotion_rollback_control(
+                    node_path, bundle_root, context, "recover", prepared["intent_sha256"],
+                    lock_descriptor, prepared["decision"],
+                )
+                committed = run_uat_promotion_runner(
+                    node_path, bundle_root, context, "recover-execute", lock_descriptor,
+                )
+                if prepared["decision"] == "QUARANTINE":
+                    if control.get("result") != "CONTAINED_FOR_JOURNAL_QUARANTINE" \
+                            or committed.get("result") != "QUARANTINED":
+                        reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_RECOVERY_BINDING_INVALID")
+                    return committed
+                result_field = "rollback_result_sha256" if rollback else "postverify_result_sha256"
+                plan_field = "rollback_plan_sha256" if rollback else "postverify_plan_sha256"
+                if committed.get("result") not in {"COMMITTED", "ALREADY_COMMITTED"} \
+                        or committed.get(result_field) != control.get("result_sha256") \
+                        or committed.get(plan_field) != prepared.get(plan_field):
+                    reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_RECOVERY_BINDING_INVALID")
+                if rollback_postverify and committed.get("rollback_result_sha256") \
+                        != context["parameters"]["rollback_result_sha256"]:
+                    reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_RECOVERY_BINDING_INVALID")
+                return committed
+            control = run_uat_promotion_rollback_control(
+                node_path, bundle_root, context, "execute", prepared["intent_sha256"], lock_descriptor,
+            )
+            committed = run_uat_promotion_runner(
+                node_path, bundle_root, context, "execute", lock_descriptor,
+                expected_rollback_result_sha256=control["result_sha256"],
+            )
+            result_field = "rollback_result_sha256" if rollback else "postverify_result_sha256"
+            plan_field = "rollback_plan_sha256" if rollback else "postverify_plan_sha256"
+            if committed.get(result_field) != control["result_sha256"] \
+                    or committed.get(plan_field) != prepared.get(plan_field):
+                reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_RESULT_BINDING_INVALID")
+            if rollback_postverify and committed.get("rollback_result_sha256") \
+                    != context["parameters"]["rollback_result_sha256"]:
+                reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_RESULT_BINDING_INVALID")
+            return committed
         if recovery and context["operation"] == "MIGRATION_EXECUTION":
             run_uat_promotion_migration_recovery_control(bundle_root, context, lock_descriptor)
         if recovery and context["operation"] == "COMPOSE_DEPLOYMENT":
