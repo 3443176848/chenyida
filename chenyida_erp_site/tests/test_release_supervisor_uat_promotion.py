@@ -647,6 +647,38 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
                 supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_SOURCE_BINDING_INVALID"):
             supervisor.validate_authorization(changed_manifest, bundle, now)
 
+    def test_postdeploy_runner_requires_and_forwards_the_prepublication_control_digest(self):
+        authorization = self.postdeploy_authorization("f" * 64)
+        context = supervisor.uat_promotion_context(authorization, "8" * 64)
+        expected = "6" * 64
+        response = {
+            "result": "COMMITTED",
+            "promotion_id": context["parameters"]["promotion_id"],
+            "intent_sha256": "1" * 64,
+            "receipt_sha256": "2" * 64,
+            "runtime_probe_result_sha256": expected,
+        }
+
+        def invoke(*args, **kwargs):
+            self.assertEqual(
+                kwargs["env"]["ERP_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_SHA256"], expected,
+            )
+            return supervisor.subprocess.CompletedProcess(
+                args[0], 0, stdout=supervisor.canonical_json(response), stderr=b"",
+            )
+
+        with patch.object(supervisor.subprocess, "run", side_effect=invoke):
+            self.assertEqual(supervisor.run_uat_promotion_runner(
+                Path("/tmp/runtime/node"), Path("/trusted/bundle"), context, "execute", 51,
+                expected_postdeploy_result_sha256=expected,
+            ), response)
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError,
+                "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_INVALID"):
+            supervisor.run_uat_promotion_runner(
+                Path("/tmp/runtime/node"), Path("/trusted/bundle"), context, "execute", 51,
+            )
+
     def test_postdeploy_journal_failure_attempts_containment_after_authorization_consumption(self):
         bundle = "f" * 64
         authorization = self.postdeploy_authorization(bundle)
@@ -657,6 +689,9 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             if phase == "prepare":
                 return {"result": "PREPARED", "intent_sha256": "7" * 64}
             if phase == "execute":
+                self.assertEqual(kwargs, {
+                    "expected_postdeploy_result_sha256": "6" * 64,
+                })
                 raise supervisor.SupervisorError("JOURNAL_EXECUTION_FAILED")
             self.assertEqual(kwargs, {
                 "failure_stage": "JOURNAL_EXECUTION",
@@ -750,6 +785,9 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             if phase == "prepare":
                 return {"result": "PREPARED", "intent_sha256": "7" * 64}
             if phase == "execute":
+                self.assertEqual(kwargs, {
+                    "expected_postdeploy_result_sha256": "6" * 64,
+                })
                 return {"runtime_probe_result_sha256": "5" * 64}
             self.assertEqual(kwargs, {
                 "failure_stage": "RESULT_CROSSCHECK",

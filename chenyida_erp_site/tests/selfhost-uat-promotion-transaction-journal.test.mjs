@@ -1445,8 +1445,23 @@ function postdeployRecoveryContext(original, intentSha256, suffix = "recovery") 
   };
 }
 
+async function postdeployExpectedResultSha256(context, root) {
+  const logical = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    ? `${context.parameters.probe_root}/${context.parameters.probe_id}.runtime-configuration-probe.json`
+    : `${context.parameters.postdeploy_root}/${context.parameters.run_id}.postdeploy-receipt.json`;
+  return (await source(root, logical)).sha256;
+}
+
 async function run(context, phase, root, options = {}) {
-  return runUatPromotionTransactionPhase(context, phase, { filesystemRoot: root, siteRoot, allowTestRoot: true, ...options });
+  const resolved = { ...options };
+  if (phase === "execute"
+    && new Set(["POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(context.operation)
+    && resolved.expectedPostdeployResultSha256 === undefined) {
+    resolved.expectedPostdeployResultSha256 = await postdeployExpectedResultSha256(context, root);
+  }
+  return runUatPromotionTransactionPhase(context, phase, {
+    filesystemRoot: root, siteRoot, allowTestRoot: true, ...resolved,
+  });
 }
 
 async function intentPath(root, promotionId) {
@@ -2367,6 +2382,60 @@ test("postdeploy runtime and identity publication crashes resume without rerunni
   }
 });
 
+test("postdeploy control digest is durably bound before publication and mismatch can only quarantine", async (t) => {
+  const operations = [
+    {
+      name: "runtime",
+      fixture: () => postdeployRuntimeFixture({ promotionId: "promotion-postdeploy-runtime-control-mismatch" }),
+      write: (value) => writeRuntimeProbe(value.root, value.context, value.completion),
+      now: new Date("2026-08-15T01:42:31.000Z"),
+    },
+    {
+      name: "identity",
+      fixture: () => postdeployIdentityFixture({ promotionId: "promotion-postdeploy-identity-control-mismatch" }),
+      write: (value) => writePostdeployIdentityEvidence(value.root, value.context, value.runtimeProbe),
+      now: new Date("2026-08-15T01:43:31.000Z"),
+    },
+  ];
+  for (const operation of operations) {
+    const fixtureValue = await operation.fixture();
+    t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+    const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+    await operation.write(fixtureValue);
+    const currentFile = physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE);
+    const before = await readFile(currentFile);
+    await assert.rejects(
+      run(fixtureValue.context, "execute", fixtureValue.root, {
+        now: operation.now,
+        expectedPostdeployResultSha256: digest(`${operation.name}-wrong-control-result`),
+      }),
+      (error) => error.code === "UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_MISMATCH",
+    );
+    assert.deepEqual(await readFile(currentFile), before);
+    assert.equal((await readdir(physical(
+      fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/postdeploy-control-bindings`,
+    ))).filter((name) => artifactMatches(name, fixtureValue.context.operation_id)).length, 1);
+    await assert.rejects(
+      run(fixtureValue.context, "execute", fixtureValue.root, { now: operation.now }),
+      (error) => error.code === "UAT_PROMOTION_POSTDEPLOY_CONTROL_BINDING_CONFLICT",
+    );
+    assert.deepEqual(await readFile(currentFile), before);
+    assert.equal((await readdir(physical(
+      fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/postdeploy-control-bindings`,
+    ))).filter((name) => artifactMatches(name, fixtureValue.context.operation_id)).length, 1);
+    const recovery = postdeployRecoveryContext(
+      fixtureValue.context, prepared.intent_sha256, `${operation.name}-control-mismatch`,
+    );
+    assert.equal((await run(recovery, "recover-prepare", fixtureValue.root, {
+      now: operation.now,
+    })).decision, "QUARANTINE");
+    assert.equal((await run(recovery, "recover-execute", fixtureValue.root, {
+      now: operation.now,
+    })).result, "QUARANTINED");
+    assert.deepEqual(await readFile(currentFile), before);
+  }
+});
+
 test("postdeploy external failure records containment without changing checkpoint 9 and missing evidence quarantines", async (t) => {
   const fixtureValue = await postdeployRuntimeFixture({ promotionId: "promotion-postdeploy-contained" });
   t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
@@ -2414,6 +2483,35 @@ test("identity containment reports prepared receipt state as partial instead of 
   await rawFile(
     fixtureValue.root,
     `${fixtureValue.context.parameters.postdeploy_root}/.${fixtureValue.context.parameters.run_id}.postdeploy-receipt.prepared.json`,
+    "{}\n", 0o400,
+  );
+  await run(fixtureValue.context, "contain", fixtureValue.root, {
+    now: new Date("2026-08-15T01:43:31.000Z"),
+    failureStage: "EXTERNAL_CONTROL",
+    failureCode: "UAT_PROMOTION_POSTDEPLOY_EXTERNAL_CONTROL_FAILED",
+  });
+  const containmentDirectory = physical(
+    fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/containments`,
+  );
+  const [name] = await readdir(containmentDirectory);
+  const containment = JSON.parse(await readFile(path.join(containmentDirectory, name), "utf8"));
+  assert.equal(containment.external_artifact_state, "UNTRUSTED_OR_PARTIAL");
+});
+
+test("identity containment detects a trusted prepared-publication temporary artifact", async (t) => {
+  const fixtureValue = await postdeployIdentityFixture({ promotionId: "promotion-postdeploy-publish-temp" });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  await run(fixtureValue.context, "prepare", fixtureValue.root);
+  await directory(fixtureValue.root, "/var/lib/chenyida-erp/postdeploy", 0o755);
+  await directory(fixtureValue.root, fixtureValue.context.parameters.postdeploy_root, 0o750);
+  await rawFile(
+    fixtureValue.root,
+    `${fixtureValue.context.parameters.postdeploy_root}/.chenyida-erp-release-artifact-root-v1`,
+    "chenyida-erp-release-artifact-root/v1\n", 0o440,
+  );
+  await rawFile(
+    fixtureValue.root,
+    `${fixtureValue.context.parameters.postdeploy_root}/.${fixtureValue.context.parameters.run_id}.postdeploy-receipt.prepared.json.1234.fixture.publish.tmp`,
     "{}\n", 0o400,
   );
   await run(fixtureValue.context, "contain", fixtureValue.root, {

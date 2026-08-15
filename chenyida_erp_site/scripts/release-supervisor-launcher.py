@@ -3888,7 +3888,8 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
 
 def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[str, Any], phase: str,
                              lock_descriptor: int, *, failure_stage: str | None = None,
-                             failure_code: str | None = None) -> dict[str, Any]:
+                             failure_code: str | None = None,
+                             expected_postdeploy_result_sha256: str | None = None) -> dict[str, Any]:
     confirmations = {
         "prepare": "PREPARE_UAT_PROMOTION_DURABLE_INTENT",
         "execute": "COMMIT_UAT_PROMOTION_JOURNAL_AFTER_AUTHORIZATION",
@@ -3903,6 +3904,15 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
             reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_FAILURE_CLASSIFICATION_INVALID")
     elif failure_stage is not None or failure_code is not None:
         reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_FAILURE_CLASSIFICATION_INVALID")
+    postdeploy_execute = phase == "execute" and context.get("operation") in {
+        "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY",
+    }
+    if postdeploy_execute:
+        if not isinstance(expected_postdeploy_result_sha256, str) \
+                or not SHA256.fullmatch(expected_postdeploy_result_sha256):
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_INVALID")
+    elif expected_postdeploy_result_sha256 is not None:
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_INVALID")
     publisher = bundle_root / "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs"
     consumed = phase in ("execute", "recover-execute", "contain")
     environment = {
@@ -3918,6 +3928,9 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
     if phase == "contain":
         environment["ERP_UAT_PROMOTION_POSTDEPLOY_FAILURE_STAGE"] = failure_stage
         environment["ERP_UAT_PROMOTION_POSTDEPLOY_FAILURE_CODE"] = failure_code
+    if postdeploy_execute:
+        environment["ERP_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_SHA256"] = \
+            expected_postdeploy_result_sha256
     try:
         result = subprocess.run(
             [str(node_path), "--max-old-space-size=64", "--disable-proto=throw", str(publisher), phase, confirmations[phase]],
@@ -4401,7 +4414,12 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             try:
                 control = run_uat_promotion_postdeploy_control(node_path, bundle_root, context, lock_descriptor)
                 failure_stage = "JOURNAL_EXECUTION"
-                committed = run_uat_promotion_runner(node_path, bundle_root, context, "execute", lock_descriptor)
+                expected_result_sha256 = control["probe_sha256"] if postdeploy_runtime \
+                    else control["receipt_sha256"]
+                committed = run_uat_promotion_runner(
+                    node_path, bundle_root, context, "execute", lock_descriptor,
+                    expected_postdeploy_result_sha256=expected_result_sha256,
+                )
                 failure_stage = "RESULT_CROSSCHECK"
                 if postdeploy_runtime and committed.get("runtime_probe_result_sha256") != control["probe_sha256"]:
                     reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_RESULT_BINDING_INVALID")

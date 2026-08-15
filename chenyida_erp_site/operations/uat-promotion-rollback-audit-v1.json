@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "eb55211835c90a7537c19375c088e84327a75eee0ec63a30418e28db6aedfffe",
+  "artifact_sha256": "50f6063eb7a9908ab2931bbc2514cab463ca5ae6cd51fefff581b4d3e4229d1d",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -114,7 +114,9 @@
     {
       "evidence": [
         "release-supervisor-launcher.py:VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
+        "release-supervisor-launcher.py:ERP_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_SHA256",
         "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT",
+        "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_POSTDEPLOY_CONTROL_BINDING_CONTRACT",
         "uat-promotion-transaction-journal.mjs:AFTER_POSTDEPLOY_RUNTIME_CURRENT",
         "postdeploy-runtime-configuration-probe.mjs:POSTDEPLOY_RUNTIME_CONFIGURATION_PROBE_CONTRACT"
       ],
@@ -127,7 +129,9 @@
     {
       "evidence": [
         "release-supervisor-launcher.py:VERIFY_UAT_POSTDEPLOY_IDENTITY",
+        "release-supervisor-launcher.py:ERP_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_SHA256",
         "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT",
+        "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_POSTDEPLOY_CONTROL_BINDING_CONTRACT",
         "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT",
         "postdeploy-release-contract.mjs:POSTDEPLOY_RECEIPT_CONTRACT"
       ],
@@ -217,17 +221,17 @@
   "generated_from": {
     "generator": {
       "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
-      "sha256": "a370b1490652f8a5da0aa0b2eeb28885545dc6b5b99491484667e4172c40c2f7"
+      "sha256": "dc71aef51ebb9b5ba7dd931940ed1129ac7aae680cd18dd91c7efc715e30a204"
     },
     "policy": {
       "path": "chenyida_erp_site/operations/uat-promotion-rollback-audit-policy-v1.json",
-      "sha256": "931e69cfa6f3f1e9189a19199a9b20ab732c1a2eae2ff606f674433e0cad7940"
+      "sha256": "9d664552aeed1565e04ae694fec04d35dac0213fa31733c73e800812d456561c"
     },
     "release_test_inventory": {
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
       "required_tests": 234,
-      "sha256": "0c6a49b6749fe1950f333886d8a236bb5a0a44c40b6aec6d6859f9c32cbbef04",
+      "sha256": "7be6e3f64a1ad784039b4c136824f9ad885a869f7a164eed4b7d940cfdc78608",
       "total_tests": 258
     },
     "source_manifest": {
@@ -272,7 +276,7 @@
             "\"status\": \"BLOCKED\""
           ],
           "path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json",
-          "sha256": "412ae6f55633f8d08a1cc48a6b47c85916f95c9dbc2fcc5295682309de0dd2a1"
+          "sha256": "add9ded64c36c0cfb1ff7627a61ca75083d775886247e8ff978f8954b13d66a7"
         },
         {
           "markers": [
@@ -365,7 +369,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "abcca6426e9aca3453df6809b8b80667782b7c70bad0d14558272cecb194dac9"
+          "sha256": "04afbcc47a77589061e0b9472253eebe31c31111b2be438560ba7f00886e8c0a"
         },
         {
           "markers": [
@@ -385,11 +389,12 @@
             "DEPLOY_UAT_RELEASE",
             "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
             "VERIFY_UAT_POSTDEPLOY_IDENTITY",
+            "ERP_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_SHA256",
             "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION",
             "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"
           ],
           "path": "chenyida_erp_site/scripts/release-supervisor-launcher.py",
-          "sha256": "58f75624c1b7b4547160dd97b193a966a809a0d858dca2f4c7f3932afd8f45c7"
+          "sha256": "0ad45eb10893f1f857ffc842f99680f2f1a09d81736ef6b6a1611b0760731f84"
         },
         {
           "markers": [
@@ -445,6 +450,8 @@
             "UAT_PROMOTION_COMPOSE_DEPLOYMENT_INTENT_CONTRACT",
             "UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT",
             "UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT",
+            "UAT_PROMOTION_POSTDEPLOY_CONTROL_BINDING_CONTRACT",
+            "UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_MISMATCH",
             "UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT",
             "UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT",
             "MIGRATION_COMMIT_RECEIPT",
@@ -457,10 +464,10 @@
             "runUatPromotionTransactionPhase"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs",
-          "sha256": "0b6d5d7b42727fa2dfa1ec64fcce1db72d1a2cde12417e5875dcbded3ec8115a"
+          "sha256": "38614c02745026334e2e350f16824f35cfca22a407101092b7b2792fd9de30f2"
         }
       ],
-      "sha256": "9c56ea31e593544d22a6d0a899f265c383b458399eae87c51949be7568bcb5f6"
+      "sha256": "20e934638b7355cde6e4e4a71f882e73407d1a6e7103d8279e6eeebe48c5c5aa"
     }
   },
   "observations": {

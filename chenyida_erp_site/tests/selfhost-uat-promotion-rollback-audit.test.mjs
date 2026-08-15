@@ -87,6 +87,17 @@ test("postdeploy transaction evidence cannot regress to standalone probes", () =
   const result = buildUatPromotionRollbackAudit(fixture);
   assert.ok(result.errors.some((entry) => entry.startsWith("AUDIT_SOURCE_MARKER_DRIFT:")));
   assert.ok(result.errors.includes("AUDIT_POSTDEPLOY_TRANSACTION_BINDING_DRIFT"));
+
+  const bindingFixture = inputs();
+  bindingFixture.sourceBodies.set(
+    journalPath,
+    bindingFixture.sourceBodies.get(journalPath).replaceAll(
+      "UAT_PROMOTION_POSTDEPLOY_CONTROL_BINDING_CONTRACT", "REMOVED_POSTDEPLOY_CONTROL_BINDING",
+    ),
+  );
+  const bindingResult = buildUatPromotionRollbackAudit(bindingFixture);
+  assert.ok(bindingResult.errors.some((entry) => entry.startsWith("AUDIT_SOURCE_MARKER_DRIFT:")));
+  assert.ok(bindingResult.errors.includes("AUDIT_POSTDEPLOY_TRANSACTION_BINDING_DRIFT"));
 });
 
 test("a declared promotion operation cannot disappear from the audited implementation", () => {

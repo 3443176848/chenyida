@@ -4,9 +4,9 @@
 
 ## 1. 审计结论
 
-- artifact SHA-256：`eb55211835c90a7537c19375c088e84327a75eee0ec63a30418e28db6aedfffe`
-- source manifest SHA-256：`9c56ea31e593544d22a6d0a899f265c383b458399eae87c51949be7568bcb5f6`（24文件）
-- release inventory SHA-256：`0c6a49b6749fe1950f333886d8a236bb5a0a44c40b6aec6d6859f9c32cbbef04`（258项）
+- artifact SHA-256：`50f6063eb7a9908ab2931bbc2514cab463ca5ae6cd51fefff581b4d3e4229d1d`
+- source manifest SHA-256：`20e934638b7355cde6e4e4a71f882e73407d1a6e7103d8279e6eeebe48c5c5aa`（24文件）
+- release inventory SHA-256：`7be6e3f64a1ad784039b4c136824f9ad885a869f7a164eed4b7d940cfdc78608`（258项）
 - 执行判定：`UAT_PROMOTION_EXECUTOR_NOT_READY`；P0=3，P1=1，may_start=`false`。
 - 当前只允许继续仓库实施和隔离验证；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。
 
@@ -45,7 +45,7 @@
 - UAT恢复目标：`TEST_ONLY`；当前恢复器只能写不同cluster上的可丢弃TEST目标。
 - Migration授权：`SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED`；checkpoint 7与独立checkpoint 8授权、数据库围栏、逐文件事务、最终核对和不可覆盖提交回执已形成同一内容寻址链。
 - Compose发布：`SUPERVISOR_CHECKPOINT_9_FENCED_WEB_WORKER_REPLACEMENT`；checkpoint 9绑定精确digest、受保护资源身份、数据库围栏交接和unknown/partial保全，但不代表后续postdeploy与业务UAT检查点已提交。
-- Postdeploy事务：`SUPERVISOR_CHECKPOINT_10_11_CONTENT_ADDRESSED_AND_RECOVERABLE`；checkpoint 10/11使用彼此独立的一次性授权，绑定checkpoint 9结果、围栏交接、manifest、四服务运行身份，并按history→receipt→current单调提交。
+- Postdeploy事务：`SUPERVISOR_CHECKPOINT_10_11_CONTENT_ADDRESSED_AND_RECOVERABLE`；checkpoint 10/11使用彼此独立的一次性授权，绑定checkpoint 9结果、围栏交接、manifest、四服务运行身份；Supervisor外部控制摘要先形成不可变binding，journal核对后才按history→receipt→current单调提交。
 - Writer静默回执只覆盖精确Compose项目与working directory；checkpoint 8在SQL前重验静默并以数据库级围栏拒绝未标记或外部业务客户端，围栏保持至后续部署或保全恢复接管。
 - TASK67人工UAT状态：`BLOCKED`。
 
@@ -63,7 +63,7 @@
 | `chenyida_erp_site/compose.yml` | `2f4b8aad65bcefb4d603825543ebd6ec09674f9e5cfef7b30e88afa5944a0bfa` |
 | `chenyida_erp_site/db/index.ts` | `918aa029fbd9bb5532d2be60e848b0517a43bf783d2bdc1e88a880f02effb4dd` |
 | `chenyida_erp_site/db/runtime-connection.ts` | `c2ee0b707a25719e5b7280e762a7e89a147d50e37d5531c9d22534a4656f8cd7` |
-| `chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json` | `412ae6f55633f8d08a1cc48a6b47c85916f95c9dbc2fcc5295682309de0dd2a1` |
+| `chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json` | `add9ded64c36c0cfb1ff7627a61ca75083d775886247e8ff978f8954b13d66a7` |
 | `chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json` | `e25ffc7b9176b2cc94c0d0bb87ced077671a1cd5481ce7f2c9c8f44ad442b4d0` |
 | `chenyida_erp_site/scripts/backup-recovery-readiness-v4.mjs` | `a0bf58d1f0afa7b5d5b98caf239f034bad910cfa2023fdc8b62b22630e45adda` |
 | `chenyida_erp_site/scripts/backup-selfhost.sh` | `adb7047631660c20a01c56d6c0393c08e67db5502a3eeeb64f2eaf392daf902a` |
@@ -74,12 +74,12 @@
 | `chenyida_erp_site/scripts/release-candidate-snapshot.py` | `296f61efb552a5fdd327e7b60b567a4dc2a569f9ec1c93bd57ef4dfe0f4fe98d` |
 | `chenyida_erp_site/scripts/release-gate-runner.mjs` | `172c99a33bac72f78b58453e11cca1632e2ad4f461b42f40ff264e11dc92077d` |
 | `chenyida_erp_site/scripts/release-lifecycle-contract.mjs` | `3b6945a9b7374abf3f892492bf3811b7b105e435ca4ab43020d53bba0d0e8f1e` |
-| `chenyida_erp_site/scripts/release-manifest-contract.mjs` | `abcca6426e9aca3453df6809b8b80667782b7c70bad0d14558272cecb194dac9` |
+| `chenyida_erp_site/scripts/release-manifest-contract.mjs` | `04afbcc47a77589061e0b9472253eebe31c31111b2be438560ba7f00886e8c0a` |
 | `chenyida_erp_site/scripts/release-migration-authorization.ts` | `ee700cb7e1ce438f06114c54d8d4d17be9c630003307df7140932d86bce54f4e` |
-| `chenyida_erp_site/scripts/release-supervisor-launcher.py` | `58f75624c1b7b4547160dd97b193a966a809a0d858dca2f4c7f3932afd8f45c7` |
+| `chenyida_erp_site/scripts/release-supervisor-launcher.py` | `0ad45eb10893f1f857ffc842f99680f2f1a09d81736ef6b6a1611b0760731f84` |
 | `chenyida_erp_site/scripts/restore-selfhost.sh` | `c648db054afdcec661ffc293eec71f3087315412aa222078aabea3a4de102b22` |
 | `chenyida_erp_site/scripts/uat-promotion-compose-deployment-contract.mjs` | `7769e7a3cc7009c3268f4edc0ccd1258ddf5fa2ebc6843512d90153b35365094` |
 | `chenyida_erp_site/scripts/uat-promotion-compose-deployment-control.mjs` | `d61a94e0413eb8738f6f90a34aee3af2334fa16f14f49cb43b16c045a15aac5d` |
 | `chenyida_erp_site/scripts/uat-promotion-migration-control.py` | `16f5eb7fa1e8639056af8cceb51aac54ec1f55f8d299cc1807c30057b9e13f73` |
 | `chenyida_erp_site/scripts/uat-promotion-migration-execution-contract.mjs` | `c859a89c79f81c51f8f75d2c61b7ed2ee1884a8868b1349d0b99f7973d176ac2` |
-| `chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs` | `0b6d5d7b42727fa2dfa1ec64fcce1db72d1a2cde12417e5875dcbded3ec8115a` |
+| `chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs` | `38614c02745026334e2e350f16824f35cfca22a407101092b7b2792fd9de30f2` |

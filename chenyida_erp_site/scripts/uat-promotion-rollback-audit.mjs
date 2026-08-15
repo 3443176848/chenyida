@@ -190,8 +190,11 @@ function inspectRepository(policy, sourceBodies, errors) {
       ? "SUPERVISOR_CHECKPOINT_9_FENCED_WEB_WORKER_REPLACEMENT" : "UNKNOWN",
     postdeploy_transaction_binding: launcher.includes('"VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION": "POSTDEPLOY_RUNTIME_CONFIGURATION"')
       && launcher.includes('"VERIFY_UAT_POSTDEPLOY_IDENTITY": "POSTDEPLOY_IDENTITY"')
+      && launcher.includes("ERP_UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_SHA256")
       && promotionJournal.includes("UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT")
       && promotionJournal.includes("UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT")
+      && promotionJournal.includes("UAT_PROMOTION_POSTDEPLOY_CONTROL_BINDING_CONTRACT")
+      && promotionJournal.includes("UAT_PROMOTION_POSTDEPLOY_EXPECTED_RESULT_MISMATCH")
       && promotionJournal.includes("UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT")
       && promotionJournal.includes("UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT")
       && promotionJournal.includes("AFTER_POSTDEPLOY_RUNTIME_CURRENT")
@@ -315,7 +318,7 @@ export function renderMarkdown(artifact) {
     `- UAT恢复目标：\`${artifact.observations.restore_target_policy}\`；当前恢复器只能写不同cluster上的可丢弃TEST目标。`,
     `- Migration授权：\`${artifact.observations.migration_authorization}\`；checkpoint 7与独立checkpoint 8授权、数据库围栏、逐文件事务、最终核对和不可覆盖提交回执已形成同一内容寻址链。`,
     `- Compose发布：\`${artifact.observations.compose_release_image_binding}\`；checkpoint 9绑定精确digest、受保护资源身份、数据库围栏交接和unknown/partial保全，但不代表后续postdeploy与业务UAT检查点已提交。`,
-    `- Postdeploy事务：\`${artifact.observations.postdeploy_transaction_binding}\`；checkpoint 10/11使用彼此独立的一次性授权，绑定checkpoint 9结果、围栏交接、manifest、四服务运行身份，并按history→receipt→current单调提交。`,
+    `- Postdeploy事务：\`${artifact.observations.postdeploy_transaction_binding}\`；checkpoint 10/11使用彼此独立的一次性授权，绑定checkpoint 9结果、围栏交接、manifest、四服务运行身份；Supervisor外部控制摘要先形成不可变binding，journal核对后才按history→receipt→current单调提交。`,
     "- Writer静默回执只覆盖精确Compose项目与working directory；checkpoint 8在SQL前重验静默并以数据库级围栏拒绝未标记或外部业务客户端，围栏保持至后续部署或保全恢复接管。",
     `- TASK67人工UAT状态：\`${artifact.observations.cross_role_uat_readiness}\`。`,
     "",
