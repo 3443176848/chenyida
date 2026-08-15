@@ -4,6 +4,19 @@
 
 ## 2026-08-15
 
+### SELFHOST-UAT-COMPOSE-DEPLOY-75 - `feat: add fenced UAT compose deployment checkpoint` / `fix: expand supervisor bundle for deployment controls` / `build: bind compose deployment supervisor bundle` / `docs: close compose deployment and start postdeploy transaction`
+
+- 调度/范围：从TASK74最终Supervisor提交`52242f8`/tree`6a20ec8f`启动唯一active task；只在仓库、fake-root、可注入Compose/database adapter和当前daemon只读metadata中实现checkpoint 9，不运行真实Compose、连接数据库或修改UAT/生产。
+- 边界决策：D-150固定checkpoint 9使用独立最长15分钟deployment authorization；只替换精确Web/Worker，PostgreSQL、Caddy、Compose project/working directory、网络和四个受保护Volume必须不变。数据库handoff只在新两服务身份、digest、启动、health及runtime configuration全部验证后发生。
+- Supervisor/事务：新增`DEPLOY_UAT_RELEASE`与精确RECOVER路径，deployment intent及旧/新容器计划先于授权消费；ordinal-8前代、promotion/candidate/runtime/database/snapshot、Migration result/active fence、manifest、Web/Worker digest、Compose source和三方actor完整绑定。checkpoint 9按history→receipt→current无覆盖发布。
+- 部署控制：新增deployment contract/control；production adapter固定`create --no-build --pull never --force-recreate --no-deps`且只接受Supervisor派生输入。完整四服务/保护面before-after校验、新Web/Worker health/runtime验证及单一database handoff形成不可变deployment result与active-fence transfer双结果。
+- 恢复/联锁：checkpoint 8 active fence只允许精确checkpoint 9部署或对应恢复接管。完整result+transfer只重放journal发布；malformed/partial/漂移先emergency seal数据库并只停止精确operation+authorization候选，随后保全/quarantine，不猜测重跑或删除未知容器/证据。
+- 审计/发布链：机器审计收敛为11项SUPPORTED、4项阻断（P0=3、P1=1），artifact/source-manifest为`881ca1cf…c7119`/`b6f01c11…a98c`且`assert-ready`继续拒绝。source`d383c10`/tree`d900fd6b`→cap fix`c6c4864`/tree`2627d383`→Supervisor`86be6d4`/tree`006c2309`形成132文件链，manifest raw SHA-256为`249d28fe…3071`。
+- 验证：受限Node事务/部署35/35、跨岗/manifest/审计26/26，Python Supervisor50/50，inventory258/234/24、bundle逐字节重放、7文件内存编译、凭据扫描1,751文件及diff检查通过；未跳过或降低断言。
+- 资源/边界：Swap持续高于80%，未运行typecheck、全量测试、Docker build、Compose/PostgreSQL动态测试、backup/restore、Migration、镜像、部署、回滚或业务写。收口available约1.9GiB、Swap881/1024MiB、根盘约13GiB、Load低；四服务restart0/OOM false，宿主`oom_kill=2`不作新OOM归因；任务临时Node目录已清理。
+- 数据库/API：无Schema或Migration文件变化，不改变普通业务API；只扩展root Supervisor、promotion journal与部署控制器。真实A4/A6、数据库围栏交接、账号、UAT/生产和数据动作均未授权。
+- 治理：新增D-150，TASK75转`DONE`；只读核对确认既有postdeploy工具尚未进入promotion journal，自动启动`SELFHOST-UAT-POSTDEPLOY-TRANSACTION-76`为唯一`DOING`，先事务化checkpoint 10/11，TASK70继续等待资源与执行器依赖。
+
 ### SELFHOST-UAT-MIGRATION-COMMIT-74 - `feat: add fenced UAT migration commit adapter` / `fix: bound expanded supervisor bundle` / `chore: publish UAT migration supervisor bundle` / `docs: close migration commit and start compose deployment`
 
 - 调度/范围：从TASK73最终Supervisor提交`302661c`/tree`0a05618b`启动唯一active task；只在仓库、fake-root、模拟数据库与只读Docker metadata中实现checkpoint 8，不连接真实数据库、不执行Migration、不修改UAT/生产。

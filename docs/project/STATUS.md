@@ -2,17 +2,32 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-UAT-COMPOSE-DEPLOY-75（执行中；接入一次性Compose部署与checkpoint 9回执）
+## SELFHOST-UAT-POSTDEPLOY-TRANSACTION-76（执行中；把checkpoint 10/11接入promotion不可变事务）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / REPOSITORY COMPOSE DEPLOYMENT RECEIPT / RESOURCE STOP LINE ACTIVE / NO REAL DEPLOYMENT OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；以独立部署授权接入promotion checkpoint 9精确Web/Worker替换、active database fence交接、部署回执和保全式恢复 |
-| 严格起点 | PASS / CONTROLLED | `52242f826b542456ee22bae55dcc0b83c746dfea`/tree`6a20ec8fe44238a438401bdf15f777b22df6f47b`；用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / CHECKPOINT 8 REPOSITORY ADAPTER READY WITHOUT ACTUAL DATABASE RECEIPT | TASK74/D-149固定成功后的数据库active fence保持到checkpoint 9精确接管；TASK75必须使用另一份一次性授权证明容器替换与围栏交接 |
+| 当前状态 | DOING / POSTDEPLOY TRANSACTION INTEGRATION / RESOURCE STOP LINE ACTIVE / NO REAL DEPLOYMENT OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；把runtime configuration与strict postdeploy identity分别接入promotion checkpoint 10/11独立授权、不可变journal和保全式恢复 |
+| 严格代码起点 | PASS / CONTROLLED | `86be6d4b139e6626067a6a1782a3636d076f058a`/tree`006c230976d8dd985394b59a7b0965f90b2e1a51`；用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / CHECKPOINT 9 REPOSITORY ADAPTER READY WITHOUT ACTUAL DEPLOYMENT | TASK75/D-150已固定deployment result+active-fence transfer；现有postdeploy工具虽被静态审计列为SUPPORTED，但promotion journal尚不能由Supervisor推进checkpoint 10/11 |
 | 动态验收 | BLOCKED / TASK70 | Swap超过80%且执行器未完整；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
-| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap879MiB/1GiB（超过80%）、根盘约13GiB、Load低；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不运行Compose、pull/build/recreate/start/stop，不连接数据库或释放active fence，不读取env/log/Volume；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
-| 系统是否可用 | NO | 无完整晋升执行器、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行或正式切换 |
+| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap881MiB/1GiB（超过80%）、根盘约13GiB、Load低；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不运行postdeploy/Compose、pull/build/recreate/start/stop，不连接数据库或读取active fence/env/log/Volume；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
+| 系统是否可用 | NO | 无完整晋升/rollback执行器、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行或正式切换 |
+
+## SELFHOST-UAT-COMPOSE-DEPLOY-75（完成；checkpoint 9精确Compose部署回执仓库适配器通过）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY COMPOSE DEPLOYMENT RECEIPT VERIFIED / DYNAMIC VALIDATION DEFERRED / NO REAL DEPLOYMENT OR DATABASE ACTION / PRODUCTION NO-GO | TASK75已释放active slot；TASK76接入postdeploy checkpoint 10/11，TASK70保持受阻 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`d383c10`/tree`d900fd6b`→cap fix`c6c4864`/tree`2627d383`→Supervisor`86be6d4`/tree`006c2309`；132文件manifest raw SHA-256为`249d28fe…3071`且重放一致 |
+| 依赖决策 | PASS / D-150 | checkpoint 9只替换精确Web/Worker；数据库handoff只有在两服务身份、digest、启动、health及runtime configuration通过后发生，unknown/partial保持seal并保全 |
+| 执行合同 | PASS / FAIL CLOSED | deployment intent与计划先于授权消费；production固定`--no-build --pull never --force-recreate --no-deps`，Caddy/PostgreSQL/网络/四卷及Compose身份必须不变 |
+| 回执/恢复 | PASS / PRESERVATION FIRST | result+active-fence transfer分别不可覆盖并由history→receipt→current提交；恢复只重放完整结果，malformed/partial先emergency seal并只停止精确候选后quarantine |
+| 审计 | PASS / EXECUTOR STILL BLOCKED | artifact/source-manifest SHA-256为`881ca1cf…c7119`/`b6f01c11…a98c`；11项SUPPORTED、4项阻断（P0=3、P1=1），7/8必需operation实现，`assert-ready`继续精确拒绝 |
+| 自动验证 | PASS / SCOPED APPLICABLE | 受限Node61/61、Python50/50、inventory258/234/24、bundle replay、内存编译、凭据1,751文件及diff门通过；全量/PG/Docker动态验证因资源停止线未运行并登记TASK70 |
+| 资源/清理 | STOP LINE ACTIVE / CONTAINER OOM NONE | 收口available约1.9GiB、Swap881/1024MiB、根盘约13GiB、Load低；四服务restart0/OOM false，任务临时Node目录已清理。宿主`oom_kill=2`缺同窗口增量归因，不作新OOM结论 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 当前四个UAT容器仍running；未运行build、backup、Compose/PostgreSQL、Migration、镜像、部署、回滚或业务写 |
+| 系统是否可用 | NO | 仓库checkpoint 9不等于actual部署；仍缺事务化postdeploy/final/UAT/rollback、真实恢复、正式门、业务批准和切换 |
 
 ## SELFHOST-UAT-MIGRATION-COMMIT-74（完成；数据库围栏与Migration提交回执仓库适配器通过）
 

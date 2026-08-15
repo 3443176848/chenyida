@@ -2978,6 +2978,41 @@
 - 拒绝把多文件Migration包进一个不可恢复大事务、允许迁移文件自行控制事务，或对未知部分提交自动重跑/down。
 - 拒绝在checkpoint 8成功后立即恢复CONNECT、启动writer或删除Migration容器/证据；围栏必须由checkpoint 9或同一operation恢复路径显式接管。
 
+## D-150 checkpoint 9只替换精确Web/Worker并以数据库围栏交接和双结果回执提交
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY COMPOSE DEPLOYMENT RECEIPT VERIFIED / DYNAMIC VALIDATION DEFERRED / NO REAL DEPLOYMENT OR DATABASE ACTION / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK75对release Compose、checkpoint 8 active fence、旧/新四服务身份、数据库handoff、postdeploy合同及partial恢复的源码核对，以及Node61/61、Python50/50验证
+- 确认边界：只接受仓库内deployment intent、一次性授权、可注入Compose/database adapter、内容寻址result/transfer/checkpoint 9回执和fake-root证据；不授权真实Compose、数据库围栏交接、容器、镜像、网络、Volume、host或UAT/生产动作
+
+### Context
+
+- checkpoint 8成功后数据库保持主动围栏；仅有Migration完成和新镜像digest不能证明新Web/Worker已按精确Compose身份启动、健康且可安全取得writer责任。
+- Compose project可能同时包含PostgreSQL、Caddy、网络和四个持久Volume。允许root手工`up`、隐式build/pull或整项目recreate会扩大影响范围，也无法把实际替换对象绑定到promotion授权。
+- 部署可能在单服务创建、启动、health、数据库handoff、result、transfer或journal发布之间崩溃。仅看当前容器或退出码会把未知partial误判为成功并可能错误释放数据库。
+
+### Decision
+
+1. checkpoint 9使用独立最长15分钟的`DEPLOY_UAT_RELEASE` Supervisor v6授权；requester/approver/executor互异，精确绑定ordinal-8、promotion/candidate/runtime/database/snapshot、Migration receipt/result/active fence、eligible manifest、Web/Worker digest、Compose project/working directory和三份权威部署source。
+2. deployment intent及精确旧/新容器计划必须先于授权消费和任何Docker变化落盘。production只接受Supervisor派生的单次消费输入；环境变量、手工Compose、旧授权SHA或测试注入不能形成实际回执。
+3. adapter只允许精确Web/Worker执行`create --no-build --pull never --force-recreate --no-deps`。PostgreSQL、Caddy、project/network、四个受保护Volume及其完整inspect基线必须前后相同；镜像、labels、mount、network、user和runtime配置全部来自manifest/合同。
+4. checkpoint 8 active fence在两个新容器都通过身份、digest、启动、health及runtime configuration独立验证前不得交接。database handoff是显式单一阶段；失败必须先emergency seal且不得留下未知writer窗口。
+5. deployment result与active-fence transfer分别内容寻址、不可覆盖并互相绑定；journal随后按history→receipt→current发布checkpoint 9。回执绑定旧/新容器、保护面、数据库交接、执行授权和完整前代链。
+6. 恢复只从精确result+transfer继续发布；malformed/partial/漂移先seal数据库并只停止精确operation+authorization候选，随后保全/quarantine。不得猜测重跑、删除未知容器/证据或自行恢复数据库writer。
+
+### Consequences
+
+- 机器审计由10项SUPPORTED/5项阻断收敛为11项SUPPORTED/4项阻断（P0=3、P1=1）；7/8必需promotion operation已实现，artifact/source-manifest SHA-256为`881ca1cf…c7119`/`b6f01c11…a98c`，`assert-ready`继续拒绝。
+- feature source`d383c105eef1b3f718105faa7a9d1fa6516ebd4e`/tree`d900fd6b849a3c254209cc93865cabe82b72c7af`→bundle cap fix`c6c4864dc99afb9c2bbb2c4b164e1f1e2beff5ee`/tree`2627d383699005e58c58b4dae6c8880e11fa84e7`→manifest-only`86be6d4b139e6626067a6a1782a3636d076f058a`/tree`006c230976d8dd985394b59a7b0965f90b2e1a51`形成132文件canonical链；manifest raw SHA-256为`249d28fe…3071`。
+- 受限Node事务/部署35/35、跨岗/manifest/审计26/26、Python50/50及inventory258/234/24通过；Swap停止线下未运行Compose、PostgreSQL、build或全量测试，动态范围仍归TASK70。
+- 下一前置任务TASK76把现有postdeploy runtime configuration和identity工具接入promotion checkpoint 10/11的逐授权不可变事务链；final receipt、人工UAT和rollback仍阻断。系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝整项目`compose up`、隐式pull/build、按容器名猜测替换或把Caddy/PostgreSQL/Volume一起纳入部署授权。
+- 拒绝在任一新服务身份/health未知时释放数据库、把一次health或退出0当作checkpoint 9，或在partial后盲目重跑Compose。
+- 拒绝把fake-root回执描述为实际UAT已部署、数据库已交接或回滚能力已存在。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
