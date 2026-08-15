@@ -4,6 +4,17 @@
 
 ## 2026-08-15
 
+### SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67 - `test: lock cross-role UAT evidence contract` / `test: refresh supervisor runtime policy anchor` / `build: refresh monitoring host bundle` / `build: refresh release supervisor bundle` / `docs: close cross-role UAT evidence and start promotion rollback audit`
+
+- 调度/范围：从TASK66最终Supervisor提交`9b657f24`/tree`2f104665`启动唯一active task；只在仓库审计核心业务链、授权矩阵和既有测试，不创建/登录账号，不连接数据库或修改UAT/生产。
+- 合同：新增canonical policy、确定性generator、artifact与人读执行/签字文档，固定4条核心链、32步骤、6检查点/冲销分支、32控制项和16类证据源。artifact/证据manifest SHA-256为`0068b8aa…6f5`/`a7900553…0fc`。
+- 失败关闭：每条链逐步绑定TASK66角色、permission、method/path、data domain与源码摘要，并覆盖403、CSRF、幂等重放/冲突、CAS、事务失败零半记录、追加式冲销及audit/request ID；批准、账号/角色映射、范围、窗口、停止条件、回退责任和三方签字为空时整体保持`BLOCKED`。
+- 发布链：最终source`ac4f294d`/tree`8ae8a12a`→monitor manifest-only`c70b6bfc`/tree`3b09213f`→Supervisor manifest-only`186e117c`/tree`c36d57a9`形成30/126文件chain，manifest raw SHA-256为`f90a6609…eee3`/`5e2f8ba7…7254`且逐字节重放一致。旧`b8495dc→bb1da17→7b7bbd1`链仅保留历史审计价值。
+- 验证：专项9/9、release gate20/20、授权矩阵10/10、release manifest9/9、Supervisor Python105/105、inventory255/231/24、credentials1728及diff门通过。第一次bundle后完整Supervisor回归诚实发现旧runtime-policy摘要锚点1/105失败，精确修正后原断言全通过，未跳过或降低断言。
+- 资源/边界：available约1.9GiB、Swap约860MiB/1GiB且超过80%、根盘约13GiB、Load低；四服务restart0/OOM false，临时资源清零。未运行build、全量Node/PostgreSQL、Docker数据库、typecheck、Migration、镜像、真实快照/恢复或业务写。
+- 数据库/API：无Schema/Migration或业务API行为变化；只增加合成证据合同与release门。真实A7d—A7f仍未授权，系统保持`PRODUCTION NO-GO`。
+- 治理：新增D-143，TASK67转`DONE`；自动启动`SELFHOST-UAT-PROMOTION-ROLLBACK-CHECKPOINT-AUDIT-68`为唯一`DOING`，停止线解除前先做逐检查点仓库静态/轻量合成审计，不以此冒充Compose/PostgreSQL动态验收。
+
 ### SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66 - `feat: lock application authorization matrix` / `build: refresh monitoring host bundle` / `build: refresh release supervisor bundle` / `docs: close role matrix and start cross-role UAT evidence`
 
 - 调度/范围：从TASK65最终Supervisor提交`7c69385c`/tree`7d19d1d9`启动唯一active task；只在仓库审计11角色、动态permission、Dashboard domain及全部self-hosted handler，不创建账号、连接数据库或修改UAT/生产。

@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66`。TASK65/D-141已形成source→monitor→Supervisor的30/126文件canonical目标绑定出口链；真实target、凭据、host安装/政策激活和网络仍未授权。TASK66只在仓库审计并生成11角色→permission→API/data-domain机器矩阵、业务批准状态和负向漂移合同，不创建账号、不连接数据库。Swap高于80%期间禁止新重任务；真实备份恢复、A1—A8、镜像、外部锚点、UAT/生产、Volume和数据均未授权，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-UAT-PROMOTION-ROLLBACK-CHECKPOINT-AUDIT-68`。TASK67/D-143已形成4条核心链、32步骤、逐步数据库增量、异常/冲销和三方空签字失败关闭合同；人工UAT仍未授权。TASK68从最终`186e117c`链审计candidate→预部署→快照/备份→Migration→部署→postdeploy→业务UAT→回退后复核的权威状态机；Swap高于80%期间只做仓库静态与轻量合成验证，禁止Compose/PostgreSQL、build、Migration、镜像或部署。真实备份恢复、A1—A8、外部锚点、UAT/生产、Volume和数据均未授权，系统保持`PRODUCTION NO-GO`。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -147,6 +147,10 @@
 
 2026-08-15第六十七次调度事件：主智能体从TASK66技术收口后的零`DOING`选择授权包第13节可断网推进项，状态按`SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67 TODO → DOING`切换唯一active slot。0017→0046合成升级因Swap超过80%不得启动PostgreSQL/Migration重任务，故先建立引用TASK66矩阵的跨岗位合成场景、预期数据库增量、审计、异常、回退和签字合同；不创建账号、不登录UAT、不连接数据库或执行业务写。
 
+2026-08-15第六十八次调度事件：`SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67 DOING → DONE`。D-143固定4条核心链、32步骤、6个检查点/冲销分支、32控制项及16类证据源；每条链覆盖403、CSRF、幂等、CAS、零半记录、追加式冲销与audit/request ID，批准/账号/范围/窗口/回退/三方签字为空时保持`BLOCKED`。source`ac4f294d`→monitor`c70b6bfc`→Supervisor`186e117c`形成30/126文件链；专项9/9、release20/20、矩阵10/10、manifest9/9、Supervisor105/105及inventory255/231/24通过。完整Supervisor首次诚实发现旧摘要锚点1/105失败并已精确修复；未创建账号、连接数据库或执行UAT写，系统继续`PRODUCTION NO-GO`。
+
+2026-08-15第六十九次调度事件：主智能体从TASK67收口后的零`DOING`选择授权包第13节第13项，状态按`SELFHOST-UAT-PROMOTION-ROLLBACK-CHECKPOINT-AUDIT-68 TODO → DOING`切换唯一active slot。严格起点为`186e117c`/tree`c36d57a9`；先只读审计晋升、快照/备份、Migration、部署、postdeploy、业务UAT与回退后复核的逐检查点状态机。Swap停止线继续有效，不启动Compose/PostgreSQL或触碰UAT；动态隔离验收不得以静态测试冒充。
+
 2026-08-11调度事件：项目负责人直接要求优先完成`PM-001`，因此按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`PM-001 TODO → DOING → DONE`、`PHASE4-TASK03 BLOCKED → DOING`顺序执行。TASK03期间未运行任何产品工作项；恢复后阶段和qualifier仍为`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`。这是现有控制面尚未实现时由同一治理Commit收口的顺序记录，不是并行DOING例外。
 
 2026-08-11第二次调度事件：项目负责人接受D-113，并明确要求暂停`PHASE4-TASK03`、新建并启动`AGENT-R1`。状态按`PHASE4-TASK03 DOING → BLOCKED / OWNER_PRIORITY_HOLD`、`AGENT-R1 TODO → DOING → DONE`顺序切换；TASK03的`SOURCE_READY / HOLDOUT_REVALIDATION_REQUIRED / RELEASE_NOT_AUTHORIZED`事实原样保留，解除hold只允许项目负责人另行指示。R1完成后没有自动启动R2—R5或恢复TASK03；holdout、UAT/生产、Migration、build、部署和ERP业务变化均未执行。
@@ -163,12 +167,13 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67 | 跨岗位UAT证据与签字合同 | DOING | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-15 | SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、D-129、D-142 | `DOING / REPOSITORY AND SYNTHETIC EVIDENCE CONTRACT ONLY / BUSINESS APPROVAL PENDING / RESOURCE STOP LINE ACTIVE / NO ACCOUNT OR UAT WRITE / PRODUCTION NO-GO`。建立跨岗位合成场景、预期增量、审计/异常/回退和签字模板，不创建账号或执行UAT写。见[任务文档](../tasks/SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67.md)。 |
+| SELFHOST-UAT-PROMOTION-ROLLBACK-CHECKPOINT-AUDIT-68 | UAT晋升与快照回滚逐检查点失败关闭审计 | DOING | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-15 | SELFHOST-RELEASE-GATE-LIFECYCLE-53、SELFHOST-RELEASE-CANDIDATE-SNAPSHOT-59、SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60、SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67、D-130、D-135—D-136、D-143 | `DOING / REPOSITORY STATIC AUDIT FIRST / RESOURCE STOP LINE ACTIVE / NO UAT OR DATABASE ACTION / PRODUCTION NO-GO`。审计candidate至回退后复核的逐检查点状态机；停止线解除前不运行Compose/PostgreSQL动态验收。见[任务文档](../tasks/SELFHOST-UAT-PROMOTION-ROLLBACK-CHECKPOINT-AUDIT-68.md)。 |
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67 | 跨岗位UAT证据与签字合同 | DONE | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-15 | 2026-08-15 | SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66、SELFHOST-OPS-RELEASE-GATE-42、SELFHOST-OPS-BACKUP-RECOVERY-V2-41、D-129、D-142—D-143 | `DONE / REPOSITORY AND SYNTHETIC EVIDENCE CONTRACT VERIFIED / BUSINESS APPROVAL AND HUMAN UAT PENDING / PRODUCTION NO-GO`。4链/32步骤/6分支/32控制/16证据源绑定TASK66并覆盖403、CSRF、幂等、CAS、零半记录、冲销及审计；空授权和空签字保持BLOCKED。source`ac4f294d`→monitor`c70b6bfc`→Supervisor`186e117c`形成30/126文件链；专项9/9、Supervisor105/105、inventory255/231/24通过。见[任务文档](../tasks/SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67.md)及[D-143](DECISIONS.md#d-143-跨岗位uat采用事前授权逐步数据库增量与三方签字的失败关闭合同)。 |
 | SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66 | 11角色机器权限矩阵与路由漂移门 | DONE | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-15 | 2026-08-15 | SELFHOST-IDENTITY-SESSION-SAFETY-44、SELFHOST-OPS-POSTGRES-RUNTIME-PRIVILEGE-56、SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65、D-118、D-133—D-134、D-141—D-142 | `DONE / TECHNICAL MATRIX AND DRIFT GATE VERIFIED / BUSINESS APPROVAL PENDING / PRODUCTION NO-GO`。固定11角色、158 permission、186操作、175受保护及110受保护写；154条有明确拒绝，21条全员只读和2个legacy grant失败关闭待业务处置。source`925f8a45`→monitor`c1f1d526`→Supervisor`9b657f24`形成30/126文件链；矩阵10/10、release20/20、manifest9/9、Supervisor36/36通过。见[任务文档](../tasks/SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66.md)及[D-142](DECISIONS.md#d-142-应用授权采用源码摘要机器矩阵且全员可读范围必须业务批准)。 |
 | SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65 | 监控通知目标绑定与出口策略闭环 | DONE | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-15 | 2026-08-15 | SELFHOST-OPS-MONITORING-HOST-DELIVERY-61、SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62、SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64、D-137—D-141 | `DONE / REPOSITORY AND SYNTHETIC FAKE-ROOT VERIFIED / REAL TARGET AND HOST ACTIVATION NOT AUTHORIZED / PRODUCTION NO-GO`。source`05502fda`→monitor manifest-only`013e61fd`→Supervisor manifest-only`7c69385c`固定30/126文件；Node25/25、Python36/36、release20/20、inventory253/229/24通过。无真实target、凭据、账号、systemd、网络或通知动作。见[任务文档](../tasks/SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65.md)及[D-141](DECISIONS.md#d-141-监控通知出口采用目标绑定内容寻址政策与effective-systemd双重证明)。 |
 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64 | PostgreSQL集群恢复策略受控激活 | DONE | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-15 | 2026-08-15 | SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-V2-63、SELFHOST-RELEASE-SNAPSHOT-RESERVATION-60、SELFHOST-OPS-MONITORING-PROJECTION-PUBLISHERS-62、D-136、D-138—D-140 | `DONE / REPOSITORY AND SYNTHETIC FAKE-ROOT VERIFIED / HOST ACTIVATION NOT EXECUTED / PRODUCTION NO-GO`。source`83d920b1`与manifest-only`0e2328b5`固定121文件bundle`728f9a5f…35db9`；Python37/37、Node52/52、manifest9/9、inventory252/228/24通过。真实host policy、数据库、备份恢复、凭据和UAT/生产均未触碰。见[任务文档](../tasks/SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-POLICY-ACTIVATION-64.md)及[D-140](DECISIONS.md#d-140-postgresql集群恢复策略采用内容寻址逐代激活与保全式恢复)。 |

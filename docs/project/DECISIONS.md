@@ -2732,6 +2732,41 @@
 - 拒绝让admin通配成为唯一正向证据、让写操作对所有角色开放、用虚构拒绝角色掩盖全员读取，或把业务待批准字段改成`APPROVED`以通过测试。
 - 拒绝忽略未使用permission、动态字符串、prefix route、dispatcher前置权限或新增handler，也拒绝在候选构建时临时生成未提交矩阵。
 
+## D-143 跨岗位UAT采用事前授权、逐步数据库增量与三方签字的失败关闭合同
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / SYNTHETIC CONTRACT VERIFIED / BUSINESS APPROVAL AND HUMAN UAT NOT AUTHORIZED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK67对核心业务链、TASK66授权矩阵和既有服务端/浏览器测试的只读审计及专项9/9、Supervisor105/105验证
+- 确认边界：只接受仓库内合成场景、预期增量、异常/冲销证据与空签字模板；不批准岗位、账号、UAT业务写、真实数据、快照恢复、员工试运行或部署
+
+### Context
+
+- TASK66证明当前源码中11角色对186项操作的技术授权结果，但技术授权不等于业务负责人批准，也不能证明多个真实员工按职责分离完成端到端流程。
+- 既有专项测试分别覆盖服务端规则，缺少统一合同把角色、API、数据域、预期数据库增量、审计/request ID、异常和回退逐步绑定。只汇总“测试通过”会掩盖跨岗handoff和半记录风险。
+- UAT执行涉及账号、业务写、快照与恢复等专项授权。若允许事后补批、空字段继续或用直接SQL清理，证据将不可审计且可能改写已过账事实。
+
+### Decision
+
+1. canonical UAT合同固定采购→收货/IQC→库存/AP、生产领退→工序/IPQC→完工、销售→FQC→出货/AR、付款/冲销四条链，共32个逐步动作、6个检查点/冲销分支、32个控制项和16类证据源；每步绑定TASK66角色、permission、method/path、data domain及源码摘要。
+2. 每条链必须同时证明未授权403、CSRF、Idempotency-Key重放/冲突、CAS冲突、事务失败零半记录、追加式业务冲销及audit/request ID；禁止用UI隐藏、HTTP成功或最终余额单点代替中间数据库增量和审计证据。
+3. 执行人、观察人和业务验收人必须分离。业务批准、账号/角色映射、命名合成对象、允许写范围、时间窗、停止条件、回退责任、逐步结果与三方签字任一为空，整体只能为`BLOCKED`，不能事后回填为事前批准。
+4. 业务更正优先使用系统定义的追加式冲销/反向记录；不得直接删表、改账或覆写已过账记录。环境级快照恢复须另有已验证快照、逐检查点执行器和专项授权，不能与业务冲销混为一谈。
+5. policy、生成器、artifact和人读文档必须确定性一致，并在release inventory及runtime policy中固定；TASK66 artifact/source摘要、角色、permission、route、步骤、控制、证据或签字政策漂移均失败关闭。
+6. 合成合同与自动测试只证明执行包结构和当前源码绑定，不证明岗位已批准、人工UAT已执行或员工试运行已完成；A7d、A7e、A7f保持独立外部门。
+
+### Consequences
+
+- TASK67最终source`ac4f294d110c2189fe363eadb41e73e9184fb656`→monitor manifest-only`c70b6bfc65f32f9e94badb2f3f2ac159130697fe`→Supervisor manifest-only`186e117cdebf2076619c75379edf4e36a1f7394a`形成30/126文件canonical链；manifest raw SHA-256为`f90a6609…eee3`/`5e2f8ba7…7254`并逐字节重放一致。
+- 合同artifact/证据manifest SHA-256为`0068b8aa…6f5`/`a7900553…0fc`；专项9/9、release20/20、矩阵10/10、manifest9/9、Supervisor105/105及inventory255/231/24通过。
+- 完整Supervisor初跑诚实发现旧runtime policy摘要锚点1/105失败；精确更新锚点后原断言105/105通过，旧中间bundle只保留历史价值。
+- 未创建或登录账号，未连接数据库、执行UAT写、快照恢复、Migration、build或部署。业务批准与真实验收仍缺，系统继续`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝把自动测试或合成fixture标记为人工UAT PASS，拒绝事后授权、默认账号映射、空签字继续、执行人与验收人合一或把密码/Token写入证据。
+- 拒绝用直接SQL删除/改写清理业务记录，用最终余额代替逐步增量，或只验证正常路径而跳过403、CSRF、幂等、CAS、半记录和审计。
+- 拒绝从HEAD临时生成未提交场景、容忍TASK66摘要漂移，或让旧候选/旧bundle的证据为当前源码背书。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

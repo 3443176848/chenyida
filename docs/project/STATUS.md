@@ -2,16 +2,30 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67（执行中；只做仓库合成证据合同）
+## SELFHOST-UAT-PROMOTION-ROLLBACK-CHECKPOINT-AUDIT-68（执行中；先做仓库静态失败关闭审计）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / REPOSITORY AND SYNTHETIC EVIDENCE CONTRACT ONLY / BUSINESS APPROVAL PENDING / RESOURCE STOP LINE ACTIVE / NO ACCOUNT OR UAT WRITE / PRODUCTION NO-GO | 唯一active task；建立引用TASK66矩阵的跨岗位合成场景、预期增量、审计/异常/回退和签字合同 |
-| 严格起点 | PASS / CONTROLLED | `9b657f2458427482f6ed28c0178999d3d62877f2`/tree`2f1046654d710d2af0bdba8abbef7601676a3f97`；用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / TECHNICAL SOURCE READY | TASK66矩阵固定11角色、158 permission、186操作和源码摘要；A7d业务批准仍pending，合成模板不得冒充批准或实际UAT |
-| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap860MiB/1GiB（超过80%）、根盘13GiB、Load低于1；0017→0046 PostgreSQL/Migration重任务延后，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不创建/登录账号，不连接数据库或执行UAT写；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
-| 系统是否可用 | NO | 无业务批准、源码匹配镜像、正式门、真实异机恢复/迁移、跨岗签字、员工试运行或切换 |
+| 当前状态 | DOING / REPOSITORY STATIC AUDIT FIRST / RESOURCE STOP LINE ACTIVE / NO UAT OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；审计candidate、预部署、快照/备份、Migration、部署、postdeploy、业务UAT和回退后复核的逐检查点状态机 |
+| 严格起点 | PASS / CONTROLLED | `186e117cdebf2076619c75379edf4e36a1f7394a`/tree`c36d57a969afc720cf12ed032ffb025933617b50`；用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / REPOSITORY INPUTS READY | TASK53、TASK59—TASK60和TASK67分别固定release lifecycle、snapshot/reservation与跨岗证据合同；动态Compose/PostgreSQL验收尚未执行 |
+| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap约860MiB/1GiB（超过80%）、根盘约13GiB、Load低；仅运行静态/轻量合成验证，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不启动Compose/PostgreSQL，不连接数据库或执行UAT写/回滚；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
+| 系统是否可用 | NO | 无源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行或正式切换 |
+
+## SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67（完成；仓库合成合同通过，人工UAT待办）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY AND SYNTHETIC EVIDENCE CONTRACT VERIFIED / BUSINESS APPROVAL AND HUMAN UAT PENDING / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | TASK67技术范围已释放active slot；A7d岗位批准、A7e真实跨岗写和A7f员工试运行保持开放 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`ac4f294d`/tree`8ae8a12a`→monitor manifest-only`c70b6bfc`/tree`3b09213f`→Supervisor manifest-only`186e117c`/tree`c36d57a9`；30/126文件manifest为`f90a6609…eee3`/`5e2f8ba7…7254`且重放一致 |
+| 合同 | PASS / SOURCE BOUND | 4条核心链、32步骤、6检查点/冲销分支、32控制项、16证据源；artifact/证据manifest SHA-256为`0068b8aa…6f5`/`a7900553…0fc` |
+| 失败关闭 | PASS / HUMAN APPROVAL PRESERVED | 每链覆盖403、CSRF、幂等、CAS、零半记录、追加式冲销及audit/request ID；批准、账号、范围、窗口、停止/回退和三方签字为空时保持BLOCKED |
+| 自动验证 | PASS / SCOPED APPLICABLE | 专项9/9、release20/20、矩阵10/10、manifest9/9、Supervisor105/105、inventory255/231/24、credentials1728及diff门通过 |
+| 诚实失败 | RECORDED / RESOLVED | 第一次bundle后完整Supervisor回归发现旧runtime-policy摘要锚点1/105失败；精确修正后原断言105/105通过，旧中间链不可授权 |
+| 资源/清理 | STOP LINE ACTIVE / NO OOM | available约1.9GiB、Swap约860MiB/1GiB、根盘约13GiB、Load低；四服务restart0/OOM false，任务临时资源清零 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无账号、Session、数据库、UAT写、业务数据、快照恢复、Migration、build、部署或Volume动作 |
+| 系统是否可用 | NO | 合成合同不等于人工UAT；仍无业务批准、真实异机恢复/迁移、同候选正式门、员工验收或切换 |
 
 ## SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66（完成；技术矩阵通过，业务批准待办）
 
