@@ -2234,10 +2234,15 @@ async function rollbackExecutionFixture({ promotionId = "promotion-rollback-001"
   }
   const runtimeActivation = createUatPromotionRollbackRuntimeActivation({
     activation_id: `${rollbackId}-runtime`,
+    generation: 1,
+    operation: "INSTALL",
     approved_at: "2026-08-15T01:48:50.000Z",
     expires_at: "2026-08-15T02:58:50.000Z",
+    supervisor_bundle_sha256: supervisorBundleSha256,
+    authorization_sha256: digest(`runtime-activation-authorization:${rollbackId}`),
     requester_identity_sha256: digest(`runtime-requester:${rollbackId}`),
     approver_identity_sha256: digest(`runtime-approver:${rollbackId}`),
+    executor_source_sha256: runtimePlan.toolchain.executor.sha256,
     plan: runtimePlan,
   });
   await directory(fixtureValue.root, path.posix.dirname(UAT_PROMOTION_ROLLBACK_RUNTIME_ACTIVATION_FILE), 0o700);

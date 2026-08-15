@@ -37,6 +37,8 @@ RUNTIME_PRIVILEGE_AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-auth
 CLUSTER_POLICY_AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v4"
 NOTIFIER_EGRESS_AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v5"
 UAT_PROMOTION_AUTHORIZATION_CONTRACT = "chenyida-erp-release-supervisor-authorization/v6"
+UAT_ROLLBACK_RUNTIME_ACTIVATION_AUTHORIZATION_CONTRACT = \
+    "chenyida-erp-release-supervisor-authorization/v7"
 RUNTIME_GUARD_CONTRACT = "chenyida-erp-release-runtime-guard/v1"
 PRE_DEPLOY_RUNTIME_GUARD_MODE = "PRE_DEPLOY_EXISTING_RUNTIME_STABILITY"
 POST_DEPLOY_RUNTIME_GUARD_MODE = "POST_DEPLOY_CURRENT_RUNTIME_STRICT"
@@ -90,6 +92,17 @@ UAT_PROMOTION_RECOVERY_READINESS_FILE = Path("/var/lib/chenyida-erp/backup-statu
 UAT_PROMOTION_CANDIDATE_RECEIPTS_ROOT = Path("/var/lib/chenyida-erp/release-candidate-snapshots/receipts")
 UAT_PROMOTION_STATE_MARKER = ".chenyida-erp-uat-promotion-transactions-v1"
 UAT_PROMOTION_STATE_MARKER_VALUE = b"chenyida-erp-uat-promotion-transactions/v1\n"
+UAT_ROLLBACK_RUNTIME_STATE_ROOT = Path(
+    "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter"
+)
+UAT_ROLLBACK_RUNTIME_ACTIVATION_FILE = UAT_ROLLBACK_RUNTIME_STATE_ROOT / "activation-v2.json"
+UAT_ROLLBACK_RUNTIME_CURRENT_FILE = UAT_ROLLBACK_RUNTIME_STATE_ROOT / "current-v2.json"
+UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE = Path("/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1")
+UAT_ROLLBACK_RUNTIME_EXECUTOR_SOURCE = Path(
+    "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py"
+)
+UAT_ROLLBACK_RUNTIME_EXECUTOR_CATALOG_SHA256 = \
+    "1089c159743a1480c28af322c83b295ead42c8555f6320911f1102115b494b04"
 RELEASE_IDENTITY_FILE = RELEASE_IDENTITY_ROOT / "release-identity.json"
 MONITORING_PROJECTION_CONTRACT = "chenyida-erp-monitoring-projection-publication/v1"
 MONITORING_PROJECTION_MARKER = ".chenyida-erp-monitoring-projection-v1"
@@ -210,7 +223,10 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/uat-promotion-compose-deployment-control.mjs": "0444",
     "chenyida_erp_site/scripts/uat-promotion-rollback-contract.mjs": "0444",
     "chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs": "0444",
+    "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor-contract.mjs": "0444",
+    "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py": "0555",
     "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py": "0444",
+    "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-activation-publisher.mjs": "0444",
     "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/backup-projection.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/collector.mjs": "0444",
@@ -235,6 +251,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-postdeploy-runtime-configuration-probe.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-uat-promotion-transaction-journal.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-contract.test.mjs": "0444",
+    "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-fixed-executor.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-runtime-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-uat-promotion-cross-role-evidence-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-backup-recovery-postgres.sh": "0555",
@@ -380,6 +397,33 @@ UAT_PROMOTION_CONFIRMATIONS = {
     "ROLLBACK_UAT_RELEASE": "AUTHORIZE_EXACT_UAT_PREDECESSOR_ROLLBACK",
     "VERIFY_AND_FINALIZE_UAT_ROLLBACK": "AUTHORIZE_VERIFY_AND_FINALIZE_EXACT_UAT_ROLLBACK",
     "RECOVER_UAT_PROMOTION": "AUTHORIZE_RECOVER_EXACT_UAT_PROMOTION",
+}
+
+UAT_ROLLBACK_RUNTIME_ACTIVATION_OPERATIONS = {
+    "ACTIVATE_UAT_ROLLBACK_RUNTIME_V2": {"INSTALL", "UPGRADE"},
+    "ROLLBACK_UAT_ROLLBACK_RUNTIME_V2": {"ROLLBACK"},
+    "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION": {"INSTALL", "UPGRADE", "ROLLBACK"},
+}
+
+UAT_ROLLBACK_RUNTIME_ACTIVATION_CONFIRMATIONS = {
+    "ACTIVATE_UAT_ROLLBACK_RUNTIME_V2":
+        "AUTHORIZE_ACTIVATE_EXACT_UAT_ROLLBACK_RUNTIME_V2",
+    "ROLLBACK_UAT_ROLLBACK_RUNTIME_V2":
+        "AUTHORIZE_ROLLBACK_EXACT_UAT_ROLLBACK_RUNTIME_V2",
+    "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION":
+        "AUTHORIZE_RECOVER_EXACT_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION",
+}
+
+UAT_ROLLBACK_RUNTIME_ACTIVATION_BASE_PARAMETER_FIELDS = {
+    "state_root", "activation_file", "current_file", "executor_file", "activation_id",
+    "generation", "operation", "approved_at", "expires_at", "requester_identity_sha256",
+    "approver_identity_sha256", "previous_activation_receipt_sha256",
+    "rollback_target_activation_receipt_sha256", "executor_source", "plan",
+}
+
+UAT_ROLLBACK_RUNTIME_ACTIVATION_RECOVERY_PARAMETER_FIELDS = {
+    "expected_intent_sha256", "original_authorization_sha256", "original_operation",
+    "original_operation_id",
 }
 
 UAT_PROMOTION_POSTDEPLOY_FAILURE_CODES = {
@@ -3105,6 +3149,110 @@ def validate_runtime_privilege_parameters(parameters: Any, operation: str | None
     return parameters
 
 
+def validate_uat_rollback_runtime_activation_parameters(
+        parameters: Any, operation: str, expected_bundle_digest: str) -> dict[str, Any]:
+    code = "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PARAMETERS_INVALID"
+    recovery = operation == "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION"
+    expected_fields = set(UAT_ROLLBACK_RUNTIME_ACTIVATION_BASE_PARAMETER_FIELDS)
+    if recovery:
+        expected_fields |= UAT_ROLLBACK_RUNTIME_ACTIVATION_RECOVERY_PARAMETER_FIELDS
+    parameters = exact_fields(parameters, expected_fields, code)
+    if parameters["state_root"] != str(UAT_ROLLBACK_RUNTIME_STATE_ROOT) \
+            or parameters["activation_file"] != str(UAT_ROLLBACK_RUNTIME_ACTIVATION_FILE) \
+            or parameters["current_file"] != str(UAT_ROLLBACK_RUNTIME_CURRENT_FILE) \
+            or parameters["executor_file"] != str(UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE):
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PATH_INVALID")
+    if not isinstance(parameters["activation_id"], str) \
+            or not IDENTIFIER.fullmatch(parameters["activation_id"]):
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_IDENTIFIER_INVALID")
+    if not isinstance(parameters["generation"], int) or isinstance(parameters["generation"], bool) \
+            or not 1 <= parameters["generation"] <= 1_000_000 \
+            or parameters["operation"] not in UAT_ROLLBACK_RUNTIME_ACTIVATION_OPERATIONS[operation]:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_GENERATION_INVALID")
+    zero = "0" * 64
+    digest_fields = (
+        "requester_identity_sha256", "approver_identity_sha256",
+        "previous_activation_receipt_sha256", "rollback_target_activation_receipt_sha256",
+    )
+    for field in digest_fields:
+        if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]):
+            reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_DIGEST_INVALID")
+    if parameters["requester_identity_sha256"] == parameters["approver_identity_sha256"] \
+            or zero in (parameters["requester_identity_sha256"], parameters["approver_identity_sha256"]):
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_ACTORS_INVALID")
+    if parameters["generation"] == 1 and (
+            parameters["operation"] != "INSTALL"
+            or parameters["previous_activation_receipt_sha256"] != zero) \
+            or parameters["generation"] > 1 and (
+                parameters["operation"] == "INSTALL"
+                or parameters["previous_activation_receipt_sha256"] == zero) \
+            or parameters["operation"] == "ROLLBACK" and (
+                parameters["generation"] < 3
+                or parameters["rollback_target_activation_receipt_sha256"] == zero) \
+            or parameters["operation"] != "ROLLBACK" \
+                and parameters["rollback_target_activation_receipt_sha256"] != zero:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_GENERATION_INVALID")
+    approved = parse_time(
+        parameters["approved_at"], "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_TIME_INVALID",
+    )
+    expires = parse_time(
+        parameters["expires_at"], "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_TIME_INVALID",
+    )
+    if expires <= approved or expires - approved > timedelta(hours=1):
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_TIME_INVALID")
+
+    source = exact_fields(parameters["executor_source"], {
+        "path", "sha256", "bytes", "uid", "gid", "mode", "nlink",
+    }, "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_EXECUTOR_SOURCE_INVALID")
+    expected_source = BUNDLES_ROOT / expected_bundle_digest / UAT_ROLLBACK_RUNTIME_EXECUTOR_SOURCE
+    if source["path"] != str(expected_source) \
+            or not isinstance(source["sha256"], str) or not SHA256.fullmatch(source["sha256"]) \
+            or not isinstance(source["bytes"], int) or isinstance(source["bytes"], bool) \
+            or not 2 <= source["bytes"] <= 2 * 1024 * 1024 \
+            or source["uid"] != 0 or source["gid"] != 0 or source["mode"] != "0555" \
+            or source["nlink"] != 1:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_EXECUTOR_SOURCE_INVALID")
+
+    plan = exact_fields(parameters["plan"], {
+        "schema_version", "contract", "promotion_id", "promotion_generation",
+        "rollback_operation_id", "deployment", "candidate", "predecessor", "targets",
+        "toolchain", "timeouts", "max_output_bytes", "source_bindings", "action_matrix",
+        "runtime_plan_sha256",
+    }, "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PLAN_INVALID")
+    if plan["schema_version"] != 1 \
+            or plan["contract"] != "chenyida-erp-uat-promotion-rollback-runtime-plan/v1" \
+            or not isinstance(plan["runtime_plan_sha256"], str) \
+            or not SHA256.fullmatch(plan["runtime_plan_sha256"]) \
+            or sha256(canonical_json({key: item for key, item in plan.items()
+                                      if key != "runtime_plan_sha256"})) != plan["runtime_plan_sha256"]:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PLAN_INVALID")
+    toolchain = exact_fields(plan["toolchain"], {"executor", "docker"},
+                             "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PLAN_INVALID")
+    for name, expected_path in (
+            ("executor", str(UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE)), ("docker", "/usr/bin/docker")):
+        tool = exact_fields(toolchain[name], {"path", "sha256", "uid", "gid", "mode"},
+                            "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PLAN_INVALID")
+        if tool["path"] != expected_path or tool["uid"] != 0 or tool["gid"] != 0 \
+                or tool["mode"] != "0555" or not isinstance(tool["sha256"], str) \
+                or not SHA256.fullmatch(tool["sha256"]):
+            reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PLAN_INVALID")
+    if toolchain["executor"]["sha256"] != source["sha256"]:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_EXECUTOR_SOURCE_INVALID")
+    if recovery:
+        for field in ("expected_intent_sha256", "original_authorization_sha256"):
+            if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]) \
+                    or parameters[field] == zero:
+                reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_DIGEST_INVALID")
+        if parameters["original_operation"] not in {
+                "ACTIVATE_UAT_ROLLBACK_RUNTIME_V2", "ROLLBACK_UAT_ROLLBACK_RUNTIME_V2"} \
+                or parameters["operation"] not in UAT_ROLLBACK_RUNTIME_ACTIVATION_OPERATIONS[
+                    parameters["original_operation"]
+                ] \
+                or parameters["original_operation_id"] != parameters["activation_id"]:
+            reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_RECOVERY_INVALID")
+    return parameters
+
+
 def validate_authorization(value: Any, expected_bundle_digest: str, now: datetime) -> dict[str, Any]:
     value = exact_fields(value, {"schema_version", "contract", "authorization_id", "created_at", "expires_at", "supervisor_bundle_sha256", "operation", "parameters", "nonce", "confirmation"}, "SUPERVISOR_AUTHORIZATION_FIELDS_INVALID")
     is_v2 = value["schema_version"] == 2 and value["contract"] == AUTHORIZATION_CONTRACT
@@ -3112,7 +3260,9 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
     is_v4 = value["schema_version"] == 4 and value["contract"] == CLUSTER_POLICY_AUTHORIZATION_CONTRACT
     is_v5 = value["schema_version"] == 5 and value["contract"] == NOTIFIER_EGRESS_AUTHORIZATION_CONTRACT
     is_v6 = value["schema_version"] == 6 and value["contract"] == UAT_PROMOTION_AUTHORIZATION_CONTRACT
-    if not is_v2 and not is_v3 and not is_v4 and not is_v5 and not is_v6:
+    is_v7 = value["schema_version"] == 7 \
+        and value["contract"] == UAT_ROLLBACK_RUNTIME_ACTIVATION_AUTHORIZATION_CONTRACT
+    if not is_v2 and not is_v3 and not is_v4 and not is_v5 and not is_v6 and not is_v7:
         reject("SUPERVISOR_AUTHORIZATION_VERSION_INVALID")
     if not isinstance(value["authorization_id"], str) or not IDENTIFIER.fullmatch(value["authorization_id"]):
         reject("SUPERVISOR_AUTHORIZATION_ID_INVALID")
@@ -3129,6 +3279,9 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
     elif is_v5 and (operation not in NOTIFIER_EGRESS_OPERATIONS or value["confirmation"] != NOTIFIER_EGRESS_CONFIRMATIONS[operation]):
         reject("SUPERVISOR_AUTHORIZATION_OPERATION_INVALID")
     elif is_v6 and (operation not in UAT_PROMOTION_OPERATIONS or value["confirmation"] != UAT_PROMOTION_CONFIRMATIONS[operation]):
+        reject("SUPERVISOR_AUTHORIZATION_OPERATION_INVALID")
+    elif is_v7 and (operation not in UAT_ROLLBACK_RUNTIME_ACTIVATION_OPERATIONS
+                    or value["confirmation"] != UAT_ROLLBACK_RUNTIME_ACTIVATION_CONFIRMATIONS[operation]):
         reject("SUPERVISOR_AUTHORIZATION_OPERATION_INVALID")
     if not isinstance(value["nonce"], str) or not SHA256.fullmatch(value["nonce"]):
         reject("SUPERVISOR_AUTHORIZATION_NONCE_INVALID")
@@ -3174,7 +3327,7 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
             or abs(activated - created) > timedelta(minutes=5) or activated > now + timedelta(minutes=5) \
             or policy_expires > expires:
             reject("SUPERVISOR_NOTIFIER_EGRESS_TIME_INVALID")
-    else:
+    elif is_v6:
         parameters = validate_uat_promotion_parameters(value["parameters"], operation)
         snapshot_operation = operation == "CAPTURE_UAT_PROMOTION_SNAPSHOT" \
             or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "CAPTURE_SNAPSHOT"
@@ -3312,6 +3465,27 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
                 or abs(window_created - created) > timedelta(minutes=5)
                 or window_created > now + timedelta(minutes=5) or window_expires > expires):
             reject("SUPERVISOR_UAT_PROMOTION_TIME_INVALID")
+    else:
+        parameters = validate_uat_rollback_runtime_activation_parameters(
+            value["parameters"], operation, expected_bundle_digest,
+        )
+        approved = parse_time(
+            parameters["approved_at"], "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_TIME_INVALID",
+        )
+        activation_expires = parse_time(
+            parameters["expires_at"], "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_TIME_INVALID",
+        )
+        recovery = operation == "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION"
+        if expires - created > timedelta(hours=1):
+            reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_TIME_INVALID")
+        if recovery:
+            if value["authorization_id"] == parameters["activation_id"] or created < approved:
+                reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_TIME_INVALID")
+        elif value["authorization_id"] != parameters["activation_id"] \
+                or abs(approved - created) > timedelta(minutes=5) \
+                or approved > now + timedelta(minutes=5) \
+                or activation_expires > expires or now >= activation_expires:
+            reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_TIME_INVALID")
     return value
 
 
@@ -3804,6 +3978,68 @@ def validate_original_notifier_egress_authorization_consumed(parameters: dict[st
     original_parameters = value["parameters"]
     if any(original_parameters[field] != parameters[field] for field in NOTIFIER_EGRESS_BASE_PARAMETER_FIELDS):
         reject("SUPERVISOR_NOTIFIER_EGRESS_ORIGINAL_AUTHORIZATION_INVALID")
+    return value
+
+
+def verify_uat_rollback_runtime_activation_executor_source(
+        parameters: dict[str, Any], expected_bundle_digest: str) -> None:
+    source = parameters["executor_source"]
+    expected = BUNDLES_ROOT / expected_bundle_digest / UAT_ROLLBACK_RUNTIME_EXECUTOR_SOURCE
+    if Path(source["path"]) != expected:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_EXECUTOR_SOURCE_INVALID")
+    raw, metadata = trusted_regular_file(
+        expected, 0o555, 2 * 1024 * 1024,
+        "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_EXECUTOR_SOURCE_INVALID",
+    )
+    if len(raw) != source["bytes"] or sha256(raw) != source["sha256"] \
+            or metadata.st_uid != source["uid"] or metadata.st_gid != source["gid"] \
+            or stat.S_IMODE(metadata.st_mode) != int(source["mode"], 8) \
+            or metadata.st_nlink != source["nlink"]:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_EXECUTOR_SOURCE_INVALID")
+
+
+def validate_original_uat_rollback_runtime_activation_authorization_consumed(
+        parameters: dict[str, Any], expected_bundle_digest: str,
+        consumed_root: Path = AUTHORIZATION_CONSUMED_ROOT) -> dict[str, Any]:
+    try:
+        validate_uat_rollback_runtime_activation_parameters(
+            parameters, "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION", expected_bundle_digest,
+        )
+    except SupervisorError:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ORIGINAL_AUTHORIZATION_INVALID")
+    if consumed_root == AUTHORIZATION_CONSUMED_ROOT:
+        trusted_directory(AUTHORIZATION_ROOT, {0o700}, "SUPERVISOR_AUTHORIZATION_ROOT_INVALID")
+    trusted_directory(consumed_root, {0o700}, "SUPERVISOR_AUTHORIZATION_ROOT_INVALID")
+    original_id = parameters["original_operation_id"]
+    original_digest = parameters["original_authorization_sha256"]
+    file = consumed_root / f"{original_id}.{original_digest}.json"
+    raw, _ = trusted_regular_file(
+        file, 0o400, code="SUPERVISOR_UAT_ROLLBACK_RUNTIME_ORIGINAL_AUTHORIZATION_INVALID",
+    )
+    if sha256(raw) != original_digest:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ORIGINAL_AUTHORIZATION_INVALID")
+    preview = strict_json(raw, "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ORIGINAL_AUTHORIZATION_INVALID")
+    try:
+        created = parse_time(
+            preview["created_at"], "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ORIGINAL_AUTHORIZATION_INVALID",
+        )
+        expires = parse_time(
+            preview["expires_at"], "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ORIGINAL_AUTHORIZATION_INVALID",
+        )
+        value = validate_authorization(
+            preview, expected_bundle_digest, created + (expires - created) / 2,
+        )
+    except (KeyError, TypeError, SupervisorError):
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ORIGINAL_AUTHORIZATION_INVALID")
+    if raw != canonical_json(value) \
+            or value["contract"] != UAT_ROLLBACK_RUNTIME_ACTIVATION_AUTHORIZATION_CONTRACT \
+            or value["authorization_id"] != original_id \
+            or value["operation"] != parameters["original_operation"]:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ORIGINAL_AUTHORIZATION_INVALID")
+    original_parameters = value["parameters"]
+    if any(original_parameters[field] != parameters[field]
+           for field in UAT_ROLLBACK_RUNTIME_ACTIVATION_BASE_PARAMETER_FIELDS):
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ORIGINAL_AUTHORIZATION_INVALID")
     return value
 
 
@@ -4569,6 +4805,150 @@ def run_cluster_policy_authorization(bundle_root: Path, authorization_path: Path
         if not recovery:
             verify_cluster_policy_sources(authorization["parameters"])
         return run_cluster_policy_runner(node_path, bundle_root, context, "recover-execute" if recovery else "execute", lock_descriptor)
+    finally:
+        try:
+            cleanup_runtime_privilege_node(runtime_root)
+        finally:
+            if owns_lock:
+                os.close(lock_descriptor)
+
+
+def uat_rollback_runtime_activation_context(
+        authorization: dict[str, Any], authorization_digest: str) -> dict[str, Any]:
+    parameters = authorization["parameters"]
+    recovery = authorization["operation"] == "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION"
+    activation_parameters = {
+        field: parameters[field] for field in UAT_ROLLBACK_RUNTIME_ACTIVATION_BASE_PARAMETER_FIELDS
+    }
+    return {
+        "schema_version": 2,
+        "contract": "chenyida-erp-uat-promotion-rollback-runtime-activation-context/v2",
+        "operation_id": parameters["activation_id"],
+        "execution_mode": "RECOVERY" if recovery else "ORIGINAL",
+        "execution_authorization_id": authorization["authorization_id"],
+        "execution_created_at": authorization["created_at"],
+        "execution_authorization_sha256": authorization_digest,
+        "original_authorization_sha256": parameters["original_authorization_sha256"]
+            if recovery else authorization_digest,
+        "supervisor_bundle_sha256": authorization["supervisor_bundle_sha256"],
+        "expected_intent_sha256": parameters["expected_intent_sha256"] if recovery else None,
+        "parameters": activation_parameters,
+    }
+
+
+def run_uat_rollback_runtime_activation_publisher(
+        node_path: Path, bundle_root: Path, context: dict[str, Any], phase: str,
+        lock_descriptor: int) -> dict[str, Any]:
+    confirmations = {
+        "prepare": "PREPARE_UAT_ROLLBACK_RUNTIME_ACTIVATION_INTENT",
+        "execute": "COMMIT_UAT_ROLLBACK_RUNTIME_ACTIVATION_AFTER_AUTHORIZATION",
+        "recover-prepare": "PREPARE_UAT_ROLLBACK_RUNTIME_ACTIVATION_RECOVERY",
+        "recover-execute": "EXECUTE_UAT_ROLLBACK_RUNTIME_ACTIVATION_RECOVERY_AFTER_AUTHORIZATION",
+    }
+    if phase not in confirmations:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PHASE_INVALID")
+    publisher = bundle_root \
+        / "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-activation-publisher.mjs"
+    consumed = phase in {"execute", "recover-execute"}
+    environment = {
+        "PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent",
+        "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES", "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+        "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+        "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(bundle_root / "chenyida_erp_site"),
+        "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": context["supervisor_bundle_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": context["execution_authorization_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED": "YES" if consumed else "NO",
+        "ERP_RELEASE_SUPERVISOR_ORIGINAL_AUTHORIZATION_CONSUMED":
+            "YES" if context["execution_mode"] == "RECOVERY" else "NO",
+    }
+    try:
+        result = subprocess.run(
+            [str(node_path), "--max-old-space-size=64", "--disable-proto=throw", str(publisher),
+             phase, confirmations[phase]],
+            env=environment, input=canonical_json(context), stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, check=False, timeout=120, pass_fds=(lock_descriptor,),
+        )
+    except (OSError, subprocess.SubprocessError):
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_RUNNER_FAILED")
+    if result.returncode != 0 or result.stderr != b"" \
+            or not 2 <= len(result.stdout) <= 256 * 1024:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_RUNNER_FAILED")
+    value = strict_json(
+        result.stdout, "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_RESPONSE_INVALID",
+    )
+    if result.stdout != canonical_json(value) or not isinstance(value, dict) \
+            or value.get("operation_id") != context["operation_id"]:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_RESPONSE_INVALID")
+    if value.get("result") == "BLOCKED_CAPABILITY_UNAVAILABLE":
+        if phase not in {"prepare", "recover-prepare"} \
+                or set(value) != {
+                    "result", "operation_id", "catalog_sha256", "unavailable_capabilities",
+                } \
+                or value.get("catalog_sha256") != UAT_ROLLBACK_RUNTIME_EXECUTOR_CATALOG_SHA256 \
+                or not isinstance(value.get("unavailable_capabilities"), list) \
+                or value["unavailable_capabilities"] != sorted(set(value["unavailable_capabilities"])) \
+                or not value["unavailable_capabilities"] \
+                or any(not isinstance(item, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]{1,79}", item)
+                       for item in value["unavailable_capabilities"]):
+            reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_RESPONSE_INVALID")
+        return value
+    if phase in {"prepare", "recover-prepare"}:
+        expected_result = "RECOVERY_PREPARED" if phase == "recover-prepare" else "PREPARED"
+        fields = {"result", "operation_id", "intent_sha256"} \
+            | ({"recovery_sha256"} if phase == "recover-prepare" else set())
+        digests = {"intent_sha256"} \
+            | ({"recovery_sha256"} if phase == "recover-prepare" else set())
+    else:
+        expected_result = {"COMMITTED", "ALREADY_COMMITTED"}
+        fields = {
+            "result", "operation_id", "intent_sha256", "activation_sha256", "receipt_sha256",
+        } | ({"recovery_sha256"} if phase == "recover-execute" else set())
+        digests = {"intent_sha256", "activation_sha256", "receipt_sha256"} \
+            | ({"recovery_sha256"} if phase == "recover-execute" else set())
+    if set(value) != fields \
+            or value["result"] not in (expected_result if isinstance(expected_result, set)
+                                       else {expected_result}) \
+            or any(not isinstance(value.get(field), str) or not SHA256.fullmatch(value[field])
+                   or value[field] == "0" * 64 for field in digests):
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_RESPONSE_INVALID")
+    return value
+
+
+def run_uat_rollback_runtime_activation_authorization(
+        bundle_root: Path, authorization_path: Path, authorization: dict[str, Any],
+        authorization_digest: str, lock_descriptor: int | None = None) -> dict[str, Any]:
+    owns_lock = lock_descriptor is None
+    if lock_descriptor is None:
+        lock_descriptor = acquire_global_release_lock()
+    runtime_root: Path | None = None
+    try:
+        recovery = authorization["operation"] == "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION"
+        if recovery:
+            validate_original_uat_rollback_runtime_activation_authorization_consumed(
+                authorization["parameters"], authorization["supervisor_bundle_sha256"],
+            )
+        verify_uat_rollback_runtime_activation_executor_source(
+            authorization["parameters"], authorization["supervisor_bundle_sha256"],
+        )
+        runtime_root, node_path = prepare_runtime_privilege_node(authorization_digest)
+        context = uat_rollback_runtime_activation_context(authorization, authorization_digest)
+        prepared = run_uat_rollback_runtime_activation_publisher(
+            node_path, bundle_root, context, "recover-prepare" if recovery else "prepare",
+            lock_descriptor,
+        )
+        if prepared["result"] == "BLOCKED_CAPABILITY_UNAVAILABLE":
+            return prepared
+        verify_uat_rollback_runtime_activation_executor_source(
+            authorization["parameters"], authorization["supervisor_bundle_sha256"],
+        )
+        consume_authorization(authorization_path, authorization, authorization_digest)
+        verify_uat_rollback_runtime_activation_executor_source(
+            authorization["parameters"], authorization["supervisor_bundle_sha256"],
+        )
+        return run_uat_rollback_runtime_activation_publisher(
+            node_path, bundle_root, context, "recover-execute" if recovery else "execute",
+            lock_descriptor,
+        )
     finally:
         try:
             cleanup_runtime_privilege_node(runtime_root)
@@ -6011,6 +6391,13 @@ def main() -> None:
         if authorization["contract"] == NOTIFIER_EGRESS_AUTHORIZATION_CONTRACT:
             assert_no_runtime_privilege_interlock(bundle_root)
             result = run_notifier_egress_authorization(
+                bundle_root, authorization_path, authorization, authorization_digest, lock_descriptor,
+            )
+            sys.stdout.buffer.write(canonical_json(result))
+            return
+        if authorization["contract"] == UAT_ROLLBACK_RUNTIME_ACTIVATION_AUTHORIZATION_CONTRACT:
+            assert_no_runtime_privilege_interlock(bundle_root)
+            result = run_uat_rollback_runtime_activation_authorization(
                 bundle_root, authorization_path, authorization, authorization_digest, lock_descriptor,
             )
             sys.stdout.buffer.write(canonical_json(result))

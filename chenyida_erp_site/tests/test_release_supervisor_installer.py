@@ -38,6 +38,16 @@ def utc(value):
     return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
 
+def self_hashed(body, field):
+    return {**body, field: installer.sha256(installer.canonical_json(body))}
+
+
+def write_mode(file, value, mode):
+    raw = value if isinstance(value, bytes) else installer.canonical_json(value)
+    file.write_bytes(raw)
+    file.chmod(mode)
+
+
 class ReleaseSupervisorInstallerTest(unittest.TestCase):
     def authorization(self, now):
         return {
@@ -126,6 +136,171 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
                 installer.os.close(first)
             second = installer.acquire_global_release_lock(lock)
             installer.os.close(second)
+
+    def test_uat_rollback_runtime_bundle_switch_interlock_rejects_partial_and_accepts_exact_chain(self):
+        with tempfile.TemporaryDirectory(prefix="cyd-uat-rollback-activation-") as directory:
+            root = Path(directory)
+            state = root / "state"
+            executor = root / "executor"
+            state.mkdir(mode=0o700)
+            write_mode(
+                state / installer.UAT_ROLLBACK_RUNTIME_STATE_MARKER,
+                installer.UAT_ROLLBACK_RUNTIME_STATE_MARKER_VALUE, 0o400,
+            )
+            for name in installer.UAT_ROLLBACK_RUNTIME_STATE_DIRECTORIES:
+                (state / name).mkdir(mode=0o700)
+            with self.assertRaisesRegex(
+                    installer.InstallError,
+                    "SUPERVISOR_INSTALL_UAT_ROLLBACK_RUNTIME_RECOVERY_REQUIRED"):
+                installer.assert_no_uat_rollback_runtime_activation_interlock(state, executor)
+
+            executor_raw = b"#!/usr/bin/python3\nraise SystemExit(1)\n"
+            executor_sha = installer.sha256(executor_raw)
+            write_mode(executor, executor_raw, 0o555)
+            plan = self_hashed({
+                "schema_version": 1,
+                "contract": "chenyida-erp-uat-promotion-rollback-runtime-plan/v1",
+                "toolchain": {"executor": {"sha256": executor_sha}},
+            }, "runtime_plan_sha256")
+            zero = "0" * 64
+            activation_id = "uat-runtime-generation-1"
+            approved_at = "2026-08-16T01:00:00.000Z"
+            expires_at = "2026-08-16T02:00:00.000Z"
+            committed_at = approved_at
+            bundle_sha = "1" * 64
+            authorization_sha = "2" * 64
+            requester_sha = "4" * 64
+            approver_sha = "5" * 64
+            common = {
+                "activation_id": activation_id,
+                "generation": 1,
+                "operation": "INSTALL",
+                "previous_activation_receipt_sha256": zero,
+                "rollback_target_activation_receipt_sha256": zero,
+                "supervisor_bundle_sha256": bundle_sha,
+                "authorization_sha256": authorization_sha,
+                "executor_catalog_sha256":
+                    installer.UAT_ROLLBACK_RUNTIME_EXECUTOR_CATALOG_SHA256,
+                "installed_executor_sha256": executor_sha,
+                "runtime_plan_sha256": plan["runtime_plan_sha256"],
+                "expires_at": expires_at,
+            }
+            intent = self_hashed({
+                "schema_version": 2,
+                "contract": "chenyida-erp-uat-promotion-rollback-runtime-activation-intent/v2",
+                "status": "PREPARED", **common,
+                "approved_at": approved_at,
+                "requester_identity_sha256": requester_sha,
+                "approver_identity_sha256": approver_sha,
+                "capability_status": installer.UAT_ROLLBACK_RUNTIME_CAPABILITY_STATUS,
+                "unavailable_capabilities":
+                    installer.UAT_ROLLBACK_RUNTIME_UNAVAILABLE_CAPABILITIES,
+                "executor_source_sha256": executor_sha,
+                "plan": plan,
+            }, "intent_sha256")
+            history = self_hashed({
+                "schema_version": 2,
+                "contract": "chenyida-erp-uat-promotion-rollback-runtime-activation-history/v2",
+                "status": "COMMITTED", "activation_status": "BLOCKED_CAPABILITY_UNAVAILABLE",
+                **common, "committed_at": committed_at,
+                "intent_sha256": intent["intent_sha256"],
+                "capability_status": installer.UAT_ROLLBACK_RUNTIME_CAPABILITY_STATUS,
+                "unavailable_capabilities":
+                    installer.UAT_ROLLBACK_RUNTIME_UNAVAILABLE_CAPABILITIES,
+                "approved_at": approved_at,
+                "requester_identity_sha256": requester_sha,
+                "approver_identity_sha256": approver_sha,
+                "plan": plan,
+            }, "history_sha256")
+            receipt = self_hashed({
+                "schema_version": 2,
+                "contract": "chenyida-erp-uat-promotion-rollback-runtime-activation-receipt/v2",
+                "status": "COMMITTED", "activation_status": "BLOCKED_CAPABILITY_UNAVAILABLE",
+                **common, "committed_at": committed_at,
+                "intent_sha256": intent["intent_sha256"],
+                "history_sha256": history["history_sha256"],
+            }, "receipt_sha256")
+            current = self_hashed({
+                "schema_version": 2,
+                "contract": "chenyida-erp-uat-promotion-rollback-runtime-activation-current/v2",
+                "status": "BLOCKED_CAPABILITY_UNAVAILABLE",
+                "activation_id": activation_id, "generation": 1,
+                "history_sha256": history["history_sha256"],
+                "receipt_sha256": receipt["receipt_sha256"],
+                "executor_catalog_sha256":
+                    installer.UAT_ROLLBACK_RUNTIME_EXECUTOR_CATALOG_SHA256,
+                "installed_executor_sha256": executor_sha,
+                "runtime_plan_sha256": plan["runtime_plan_sha256"],
+                "expires_at": expires_at,
+            }, "current_sha256")
+            ordinal = "0000000000000001"
+            activation = self_hashed({
+                "schema_version": 2,
+                "contract": "chenyida-erp-uat-promotion-rollback-runtime-activation/v2",
+                "status": "BLOCKED_CAPABILITY_UNAVAILABLE", "activation_id": activation_id,
+                "generation": 1, "operation": "INSTALL", "approved_at": approved_at,
+                "expires_at": expires_at, "requester_identity_sha256": requester_sha,
+                "approver_identity_sha256": approver_sha,
+                "intent_sha256": intent["intent_sha256"],
+                "history_sha256": history["history_sha256"],
+                "receipt_sha256": receipt["receipt_sha256"],
+                "current_sha256": current["current_sha256"],
+                "supervisor_bundle_sha256": bundle_sha,
+                "authorization_sha256": authorization_sha,
+                "previous_activation_receipt_sha256": zero,
+                "rollback_target_activation_receipt_sha256": zero,
+                "executor_catalog_sha256":
+                    installer.UAT_ROLLBACK_RUNTIME_EXECUTOR_CATALOG_SHA256,
+                "capability_status": installer.UAT_ROLLBACK_RUNTIME_CAPABILITY_STATUS,
+                "unavailable_capabilities":
+                    installer.UAT_ROLLBACK_RUNTIME_UNAVAILABLE_CAPABILITIES,
+                "executor_source_sha256": executor_sha,
+                "installed_executor_sha256": executor_sha,
+                "runtime_plan_sha256": plan["runtime_plan_sha256"],
+                "history_file": str(installer.UAT_ROLLBACK_RUNTIME_STATE_ROOT / "history"
+                                    / f"{ordinal}.{history['history_sha256']}.json"),
+                "receipt_file": str(installer.UAT_ROLLBACK_RUNTIME_STATE_ROOT / "receipts"
+                                    / f"{ordinal}.{receipt['receipt_sha256']}.json"),
+                "current_file": str(installer.UAT_ROLLBACK_RUNTIME_CURRENT_FILE),
+                "executor_file": str(installer.UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE),
+                "plan": plan,
+            }, "activation_sha256")
+            write_mode(state / "activation-v2.json", activation, 0o400)
+            write_mode(state / "current-v2.json", current, 0o400)
+            write_mode(state / "intents" / f"{ordinal}.{intent['intent_sha256']}.json", intent, 0o400)
+            write_mode(state / "history" / f"{ordinal}.{history['history_sha256']}.json", history, 0o400)
+            write_mode(state / "receipts" / f"{ordinal}.{receipt['receipt_sha256']}.json", receipt, 0o400)
+            write_mode(state / "executors" / f"{executor_sha}.py", executor_raw, 0o555)
+            write_mode(state / "plans" / f"{plan['runtime_plan_sha256']}.json", plan, 0o400)
+            installer.assert_no_uat_rollback_runtime_activation_interlock(state, executor)
+
+            activation_body = {
+                key: value for key, value in activation.items() if key != "activation_sha256"
+            }
+            write_mode(state / "activation-v2.json", self_hashed({
+                **activation_body, "intent_sha256": "6" * 64,
+            }, "activation_sha256"), 0o400)
+            with self.assertRaisesRegex(
+                    installer.InstallError,
+                    "SUPERVISOR_INSTALL_UAT_ROLLBACK_RUNTIME_RECOVERY_REQUIRED"):
+                installer.assert_no_uat_rollback_runtime_activation_interlock(state, executor)
+            write_mode(state / "activation-v2.json", activation, 0o400)
+
+            current_body = {key: value for key, value in current.items() if key != "current_sha256"}
+            write_mode(state / "current-v2.json", self_hashed({
+                **current_body, "unexpected": True,
+            }, "current_sha256"), 0o400)
+            with self.assertRaisesRegex(
+                    installer.InstallError,
+                    "SUPERVISOR_INSTALL_UAT_ROLLBACK_RUNTIME_STATE_INVALID"):
+                installer.assert_no_uat_rollback_runtime_activation_interlock(state, executor)
+            write_mode(state / "current-v2.json", current, 0o400)
+
+            write_mode(state / "intents" / f"{'2':0>16}.{'6' * 64}.json", {"partial": True}, 0o400)
+            with self.assertRaisesRegex(
+                    installer.InstallError,
+                    "SUPERVISOR_INSTALL_UAT_ROLLBACK_RUNTIME_RECOVERY_REQUIRED"):
+                installer.assert_no_uat_rollback_runtime_activation_interlock(state, executor)
 
     def test_finalization_interlock_blocks_bundle_switch_until_checkpoint_13_commits(self):
         with tempfile.TemporaryDirectory(prefix="cyd-supervisor-finalization-interlock-") as directory:

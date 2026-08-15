@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "ee87cbf9512017062d563e1712817df7091d0b3183e7f4ea4d87b3c56c75cc94",
+  "artifact_sha256": "6c3cdcebeb023db9c6bd405e68a70243a843de8c3e56a331c13fec02728c29b5",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -199,8 +199,8 @@
   "deployment_class": "UAT",
   "execution_blockers": [
     {
-      "finding": "checkpoint 14/15控制链与受信网关已进入Supervisor bundle，但固定数据库、卷与Web/Worker物化执行器尚未实现或激活；预检必须在授权消耗前失败。",
-      "id": "ROLLBACK_RUNTIME_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED",
+      "finding": "固定执行器、v2内容寻址激活协议、Supervisor v7一次性授权和安装互锁已进入bundle；但UAT数据库、四数据域及Web/Worker回退处理器仍显式不可用，且没有受信主机激活证据，预检会在授权消耗前失败。",
+      "id": "ROLLBACK_RUNTIME_CAPABILITIES_NOT_IMPLEMENTED_OR_HOST_NOT_ACTIVATED",
       "severity": "P0"
     },
     {
@@ -229,18 +229,18 @@
   "generated_from": {
     "generator": {
       "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
-      "sha256": "829b534d38b3ac2917e59becce487fe914cd4a009f85d64e02cf61505512b6d8"
+      "sha256": "30d69ec3d295c50770445049f2b63715f2f5e5ea0e796d21523667dec3b08672"
     },
     "policy": {
       "path": "chenyida_erp_site/operations/uat-promotion-rollback-audit-policy-v1.json",
-      "sha256": "2eb86830362ead5f3c7c2cd200dc0d192300a2ca900755d4b4c04d060e064a4c"
+      "sha256": "fae69252f52518e4801e91e024ccb2b3f667e109038f9eca5e485024e1c6e7a4"
     },
     "release_test_inventory": {
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-      "required_tests": 237,
-      "sha256": "502e36cb0b2eba814d3b690f1c64b88bc44b63cea2b9146689898395b172f35a",
-      "total_tests": 261
+      "required_tests": 238,
+      "sha256": "a5fa5cfdd6e3bd7dff6fb5a5b60588189af81445064ddc09add4a95d243c69b3",
+      "total_tests": 262
     },
     "source_manifest": {
       "files": [
@@ -284,7 +284,7 @@
             "\"status\": \"BLOCKED\""
           ],
           "path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json",
-          "sha256": "d26372abb586da46e4d7fb8affa36e737d49cd92e33d85ffe310139ff09e780b"
+          "sha256": "5f75fccbe26d836acec9d27f4243d9c079327881448fbc9210709974c96b6668"
         },
         {
           "markers": [
@@ -320,12 +320,14 @@
         {
           "markers": [
             "assert_no_uat_promotion_finalization_interlock",
+            "assert_no_uat_rollback_runtime_activation_interlock",
             "SUPERVISOR_INSTALL_UAT_PROMOTION_FINALIZATION_RECOVERY_REQUIRED",
             "SUPERVISOR_INSTALL_UAT_PROMOTION_ROLLBACK_RECOVERY_REQUIRED",
-            "SUPERVISOR_INSTALL_UAT_PROMOTION_ROLLBACK_POSTVERIFY_REQUIRED"
+            "SUPERVISOR_INSTALL_UAT_PROMOTION_ROLLBACK_POSTVERIFY_REQUIRED",
+            "SUPERVISOR_INSTALL_UAT_ROLLBACK_RUNTIME_RECOVERY_REQUIRED"
           ],
           "path": "chenyida_erp_site/scripts/install-release-supervisor.py",
-          "sha256": "2d1bbea3a99e17dc8cb416b2305e441174e8c8616b284c1247e0af1f3b0ddca4"
+          "sha256": "e28634660b5707a678f30516250e82247baa9fc527c1035e64a8831b0814f26b"
         },
         {
           "markers": [
@@ -391,7 +393,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "7899672d4b0e07e44f6f6d1a713a4f00ed88d7f5e65d9e4d2e676cec050fde15"
+          "sha256": "87849ca1a1a4b5de4dfa1794c66503145385cf00a71f0bbc54401e9b132e7129"
         },
         {
           "markers": [
@@ -415,6 +417,12 @@
             "FINALIZE_UAT_PROMOTION",
             "ROLLBACK_UAT_RELEASE",
             "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
+            "ACTIVATE_UAT_ROLLBACK_RUNTIME_V2",
+            "ROLLBACK_UAT_ROLLBACK_RUNTIME_V2",
+            "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION",
+            "chenyida-erp-release-supervisor-authorization/v7",
+            "uat-promotion-rollback-fixed-executor.py",
+            "uat-promotion-rollback-runtime-activation-publisher.mjs",
             "SUPERVISOR_UAT_PROMOTION_CROSS_ROLE_RECOVERY_REQUIRED",
             "SUPERVISOR_UAT_PROMOTION_FINALIZATION_RECOVERY_REQUIRED",
             "SUPERVISOR_UAT_PROMOTION_ROLLBACK_RECOVERY_REQUIRED",
@@ -424,7 +432,7 @@
             "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"
           ],
           "path": "chenyida_erp_site/scripts/release-supervisor-launcher.py",
-          "sha256": "15e75b55dae989628d7ec829ff665e51811e6f28b2d9a5108d209fde681c2585"
+          "sha256": "119cf364d6dcdec6800763827fc102f9573a20b31d465a6806312a79ff6b6753"
         },
         {
           "markers": [
@@ -509,6 +517,42 @@
         },
         {
           "markers": [
+            "UAT_ROLLBACK_FIXED_EXECUTOR_CATALOG_CONTRACT",
+            "UAT_ROLLBACK_EXECUTION_STAGES",
+            "UAT_ROLLBACK_POSTVERIFY_CHECKS",
+            "BLOCKED_MISSING_UAT_CAPABLE_HANDLERS",
+            "PROBE_THEN_CONTAIN_NEVER_BLINDLY_REEXECUTE",
+            "chenyida-erp-uat-promotion-rollback-runtime-activation-intent/v2",
+            "chenyida-erp-uat-promotion-rollback-runtime-activation-receipt/v2"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor-contract.mjs",
+          "sha256": "fc2bdbcbaa8b5299a96b0d77df578b9d1a71af7fccdb41728523562013de97ca"
+        },
+        {
+          "markers": [
+            "CAPABILITY_STATUS = \"BLOCKED_MISSING_UAT_CAPABLE_HANDLERS\"",
+            "ROLLBACK_FIXED_EXECUTOR_FD_MANIFEST_INVALID",
+            "ROLLBACK_FIXED_EXECUTOR_UAT_CAPABILITY_UNAVAILABLE",
+            "inherited_fds",
+            "runtime_plan_sha256"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py",
+          "sha256": "0cbdd508589902a782a23e7b11b20eacd5a07ef04e6b2f3f2a51a8f9cf574c03"
+        },
+        {
+          "markers": [
+            "chenyida-erp-uat-promotion-rollback-runtime-activation-context/v2",
+            "chenyida-erp-uat-promotion-rollback-runtime-activation-recovery/v2",
+            "prepareUatRollbackRuntimeActivation",
+            "executeUatRollbackRuntimeActivation",
+            "UAT_ROLLBACK_RUNTIME_ACTIVATION_PARTIAL_UNKNOWN",
+            "BLOCKED_CAPABILITY_UNAVAILABLE"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-activation-publisher.mjs",
+          "sha256": "0efff23ad47431090a01be9a543ab9de2a5c7e59f1d94bcba59c041d79d80f74"
+        },
+        {
+          "markers": [
             "EXECUTOR_FILE = Path",
             "ROLLBACK_RUNTIME_ACTIVATION_SOURCE_INVALID",
             "CHENYIDA_ERP_ROLLBACK_TRUSTED_FD_MANIFEST",
@@ -521,7 +565,7 @@
             "contain database, volume, or Compose mutation logic itself"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py",
-          "sha256": "6ff55a12e8cb1ac00e9df97e613d446243123ca8498d5e6a75f22805c7ad4edb"
+          "sha256": "453c45cbfd8546789dc4e18d848ceb87a3f2b7daf33b97b9dae9e7762ca79745"
         },
         {
           "markers": [
@@ -535,7 +579,7 @@
             "knownServiceContainerIds"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs",
-          "sha256": "029218aac986e968cbb8aaad3ed69ab526bf0ada91bb3a303bc672d37e2df2e0"
+          "sha256": "94fe427e08e84c605850963203a40e59544f505eb30ea7e4909adfba1705ff92"
         },
         {
           "markers": [
@@ -573,9 +617,20 @@
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs",
           "sha256": "bf192c88b674cebaa780c96883948d1e8616e443a732a2d4e8ee05176bb78766"
+        },
+        {
+          "markers": [
+            "fixed catalog is an exact 9-stage/13-check closed set",
+            "production prepare fails before creating activation state",
+            "fake-root install, upgrade, and rollback append generations",
+            "AFTER_EXECUTOR_CONTENT",
+            "foreign executor alias is preserved"
+          ],
+          "path": "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-fixed-executor.test.mjs",
+          "sha256": "0f67c939fd713712a8f8ce0c31c695c21855c49805ebd0bf155849ecf5f68b0e"
         }
       ],
-      "sha256": "cca6644c56592e34fc43a231e3c47c44c080f342edf2c4b7ad803a25610f9843"
+      "sha256": "9057cf5678f5f103231c04dcfb195452ae7b0cc0d7782ef16f0b205e1db04faa"
     }
   },
   "observations": {
@@ -596,20 +651,24 @@
       "FINALIZE_UAT_PROMOTION",
       "ROLLBACK_UAT_RELEASE",
       "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
-      "RECOVER_UAT_PROMOTION"
+      "RECOVER_UAT_PROMOTION",
+      "ACTIVATE_UAT_ROLLBACK_RUNTIME_V2",
+      "ROLLBACK_UAT_ROLLBACK_RUNTIME_V2",
+      "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION"
     ],
     "migration_authorization": "SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED",
     "missing_required_promotion_operations": [],
     "postdeploy_transaction_binding": "SUPERVISOR_CHECKPOINT_10_11_CONTENT_ADDRESSED_AND_RECOVERABLE",
-    "required_promotion_operation_count": 13,
+    "required_promotion_operation_count": 16,
     "restore_target_policy": "TEST_ONLY",
     "rollback_rehearsal_evidence": "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT",
-    "rollback_runtime_adapter": "BUNDLED_TRUSTED_GATEWAY_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED_FAIL_CLOSED",
+    "rollback_runtime_adapter": "BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_CAPABILITIES_BLOCKED_HOST_NOT_ACTIVATED",
     "rollback_transaction_binding": "SUPERVISOR_CHECKPOINT_14_15_CONTENT_ADDRESSED_AND_RECOVERABLE",
-    "supervisor_operation_count": 32,
+    "supervisor_operation_count": 35,
     "supervisor_operations": [
       "ACTIVATE_MONITORING_NOTIFIER_EGRESS_V1",
       "ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
+      "ACTIVATE_UAT_ROLLBACK_RUNTIME_V2",
       "AUTHORIZE_UAT_PROMOTION_MIGRATION",
       "BEGIN_UAT_PROMOTION",
       "BOOTSTRAP_POSTGRESQL_RUNTIME_PRIVILEGES",
@@ -629,10 +688,12 @@
       "RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION",
       "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT",
       "RECOVER_UAT_PROMOTION",
+      "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION",
       "ROLLBACK_MONITORING_HOST_DELIVERY",
       "ROLLBACK_MONITORING_NOTIFIER_EGRESS_V1",
       "ROLLBACK_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
       "ROLLBACK_UAT_RELEASE",
+      "ROLLBACK_UAT_ROLLBACK_RUNTIME_V2",
       "RUN_RELEASE_GATE",
       "RUN_UAT_PROMOTION_MIGRATION",
       "VERIFY_AND_FINALIZE_UAT_ROLLBACK",

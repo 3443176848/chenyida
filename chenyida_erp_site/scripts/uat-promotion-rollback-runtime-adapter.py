@@ -27,7 +27,7 @@ from typing import Any
 
 
 ACTIVATION_FILE = Path(
-    "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/activation-v1.json"
+    "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/activation-v2.json"
 )
 EXECUTOR_FILE = Path("/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1")
 DOCKER_FILE = Path("/usr/bin/docker")
@@ -35,7 +35,16 @@ GLOBAL_LOCK = Path("/run/lock/chenyida-erp-release-gate-v1.lock")
 SUPERVISOR_BUNDLE_ROOT = Path("/usr/local/libexec/chenyida-erp-release-supervisor/bundles")
 REQUEST_CONTRACT = "chenyida-erp-uat-promotion-rollback-runtime-request/v1"
 RESPONSE_CONTRACT = "chenyida-erp-uat-promotion-rollback-runtime-response/v1"
-ACTIVATION_CONTRACT = "chenyida-erp-uat-promotion-rollback-runtime-activation/v1"
+ACTIVATION_CONTRACT = "chenyida-erp-uat-promotion-rollback-runtime-activation/v2"
+ACTIVATION_CURRENT_CONTRACT = \
+    "chenyida-erp-uat-promotion-rollback-runtime-activation-current/v2"
+ACTIVATION_RECEIPT_CONTRACT = \
+    "chenyida-erp-uat-promotion-rollback-runtime-activation-receipt/v2"
+ACTIVATION_HISTORY_CONTRACT = \
+    "chenyida-erp-uat-promotion-rollback-runtime-activation-history/v2"
+FD_MANIFEST_CONTRACT = "chenyida-erp-uat-promotion-rollback-trusted-fd-manifest/v2"
+EXECUTOR_CATALOG_SHA256 = "1089c159743a1480c28af322c83b295ead42c8555f6320911f1102115b494b04"
+EXECUTOR_CAPABILITY_STATUS = "BLOCKED_MISSING_UAT_CAPABLE_HANDLERS"
 PLAN_CONTRACT = "chenyida-erp-uat-promotion-rollback-runtime-plan/v1"
 PACKAGE_CONTRACT = "chenyida-erp-uat-promotion-rollback-execution-package/v2"
 MAX_BYTES = 4 * 1024 * 1024
@@ -1041,9 +1050,57 @@ def trusted_parent_chain(target: Path, root: Path | None, code: str) -> None:
         current = current.parent
 
 
+def trusted_chain_json(
+        logical: Path, root: Path | None, expected_mode: str, code: str,
+) -> tuple[dict[str, Any], bytes, tuple[Path, tuple[Any, ...], int]]:
+    if not logical.is_absolute() or logical == Path("/") or ".." in logical.parts:
+        reject(code)
+    target = physical(logical, root)
+    trusted_parent_chain(target, root, code)
+    descriptor = -1
+    try:
+        before = target.lstat()
+        descriptor = os.open(target, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or stat.S_ISLNK(before.st_mode) \
+                or before.st_uid != 0 or before.st_gid != 0 or before.st_nlink != 1 \
+                or mode_text(before) != expected_mode or opened.st_dev != before.st_dev \
+                or opened.st_ino != before.st_ino or not 2 <= opened.st_size <= MAX_BYTES:
+            reject(code)
+        raw = bytearray()
+        hashed = hashlib.sha256()
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            raw.extend(chunk)
+            hashed.update(chunk)
+        after_fd = os.fstat(descriptor)
+        after_path = target.lstat()
+        identity = (
+            opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns,
+            opened.st_ctime_ns, stat.S_IMODE(opened.st_mode), hashed.hexdigest(),
+        )
+        if after_fd.st_dev != opened.st_dev or after_fd.st_ino != opened.st_ino \
+                or after_fd.st_size != opened.st_size or after_fd.st_mtime_ns != opened.st_mtime_ns \
+                or after_fd.st_ctime_ns != opened.st_ctime_ns or after_path.st_dev != opened.st_dev \
+                or after_path.st_ino != opened.st_ino:
+            reject(f"{code}_CHANGED")
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        raw_bytes = bytes(raw)
+        return parse_json(raw_bytes, code), raw_bytes, (target, identity, descriptor)
+    except Exception:
+        if descriptor >= 0:
+            os.close(descriptor)
+        raise
+
+
 def load_activation(
     package: dict[str, Any], request: dict[str, Any], root: Path | None,
-) -> tuple[dict[str, Any], str, tuple[Path, tuple[Any, ...], int]]:
+) -> tuple[
+    dict[str, Any], str, tuple[Path, tuple[Any, ...], int],
+    dict[str, tuple[Path, tuple[Any, ...], int]],
+]:
     spec = package["sources"]["runtime_adapter_activation"]
     if spec.get("path") != str(ACTIVATION_FILE) or spec.get("uid") != 0 \
             or spec.get("gid") != 0 or spec.get("mode") != "0400":
@@ -1052,8 +1109,14 @@ def load_activation(
     try:
         activation = parse_json(raw, "ROLLBACK_RUNTIME_ACTIVATION_INVALID")
         fields = {
-            "schema_version", "contract", "status", "activation_id", "approved_at", "expires_at",
-            "requester_identity_sha256", "approver_identity_sha256", "plan", "activation_sha256",
+            "schema_version", "contract", "status", "activation_id", "generation", "operation",
+            "approved_at", "expires_at", "requester_identity_sha256", "approver_identity_sha256",
+            "supervisor_bundle_sha256", "authorization_sha256",
+            "previous_activation_receipt_sha256", "rollback_target_activation_receipt_sha256",
+            "executor_catalog_sha256", "capability_status", "unavailable_capabilities",
+            "executor_source_sha256", "installed_executor_sha256", "runtime_plan_sha256",
+            "intent_sha256", "history_sha256", "history_file", "receipt_sha256", "receipt_file",
+            "current_sha256", "current_file", "executor_file", "plan", "activation_sha256",
         }
         activation = exact(activation, fields, "ROLLBACK_RUNTIME_ACTIVATION_INVALID")
         now = datetime.now(timezone.utc)
@@ -1062,23 +1125,172 @@ def load_activation(
         package_deadline = instant(package.get("execution_deadline"), "ROLLBACK_RUNTIME_ACTIVATION_INVALID")
         action_deadline = instant(request.get("action_deadline"), "ROLLBACK_RUNTIME_ACTIVATION_INVALID")
         identifier(activation.get("activation_id"), "ROLLBACK_RUNTIME_ACTIVATION_INVALID")
-        if activation.get("schema_version") != 1 or activation.get("contract") != ACTIVATION_CONTRACT \
-                or activation.get("status") != "ACTIVE" or approved > now + timedelta(minutes=5) \
-                or expires <= approved or expires - approved > timedelta(hours=24) \
+        permitted_status = {"ACTIVE"} if root is None else {"ACTIVE", "BLOCKED_CAPABILITY_UNAVAILABLE"}
+        unavailable = activation.get("unavailable_capabilities")
+        if activation.get("schema_version") != 2 or activation.get("contract") != ACTIVATION_CONTRACT \
+                or activation.get("status") not in permitted_status or approved > now + timedelta(minutes=5) \
+                or expires <= approved or expires - approved > timedelta(hours=2) \
                 or request["execution_mode"] == "ORIGINAL" and (
                     now >= expires or expires < package_deadline or expires < action_deadline
                 ) \
                 or request["execution_mode"] == "RECOVERY" and approved >= package_deadline \
                 or digest(activation.get("requester_identity_sha256"), "ROLLBACK_RUNTIME_ACTIVATION_INVALID") \
                 == digest(activation.get("approver_identity_sha256"), "ROLLBACK_RUNTIME_ACTIVATION_INVALID") \
+                or not isinstance(activation.get("generation"), int) \
+                or not 1 <= activation["generation"] <= 1_000_000 \
+                or activation.get("operation") not in {"INSTALL", "UPGRADE", "ROLLBACK"} \
+                or activation.get("supervisor_bundle_sha256") \
+                    != request["payload"]["context"].get("supervisor_bundle_sha256") \
+                or any(digest(activation.get(field), "ROLLBACK_RUNTIME_ACTIVATION_INVALID") is None
+                       for field in (
+                           "supervisor_bundle_sha256", "authorization_sha256",
+                           "executor_catalog_sha256", "executor_source_sha256",
+                           "installed_executor_sha256", "runtime_plan_sha256", "intent_sha256",
+                           "history_sha256", "receipt_sha256", "current_sha256",
+                       )) \
+                or activation.get("executor_catalog_sha256") != EXECUTOR_CATALOG_SHA256 \
+                or activation.get("executor_source_sha256") != activation.get("installed_executor_sha256") \
+                or activation.get("runtime_plan_sha256") != activation.get("plan", {}).get("runtime_plan_sha256") \
+                or not isinstance(unavailable, list) or unavailable != sorted(set(unavailable)) \
+                or any(not isinstance(label, str) or label not in set((*STAGES, *CHECKS))
+                       for label in unavailable) \
+                or activation.get("status") == "ACTIVE" and (
+                    activation.get("capability_status") != "SUPPORTED" or unavailable
+                ) \
+                or activation.get("status") != "ACTIVE" and (
+                    activation.get("capability_status") != EXECUTOR_CAPABILITY_STATUS or not unavailable
+                ) \
+                or activation.get("executor_file") != str(EXECUTOR_FILE) \
+                or activation.get("current_file") \
+                    != "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/current-v2.json" \
                 or sha256_value(without(activation, "activation_sha256")) \
                 != activation.get("activation_sha256") \
                 or canonical(activation) != raw:
             reject("ROLLBACK_RUNTIME_ACTIVATION_INVALID")
-        validate_plan(activation.get("plan"), package)
-        return activation, sha256_bytes(raw), handle
+        previous_receipt = digest(
+            activation.get("previous_activation_receipt_sha256"),
+            "ROLLBACK_RUNTIME_ACTIVATION_INVALID", allow_zero=True,
+        )
+        rollback_target = digest(
+            activation.get("rollback_target_activation_receipt_sha256"),
+            "ROLLBACK_RUNTIME_ACTIVATION_INVALID", allow_zero=True,
+        )
+        if activation["generation"] == 1 and (
+                activation["operation"] != "INSTALL" or previous_receipt != ZERO_SHA256) \
+                or activation["generation"] > 1 and (
+                    activation["operation"] == "INSTALL" or previous_receipt == ZERO_SHA256) \
+                or activation["operation"] == "ROLLBACK" and (
+                    activation["generation"] < 3 or rollback_target == ZERO_SHA256) \
+                or activation["operation"] != "ROLLBACK" and rollback_target != ZERO_SHA256:
+            reject("ROLLBACK_RUNTIME_ACTIVATION_INVALID")
+        plan = validate_plan(activation.get("plan"), package)
+        if plan["toolchain"]["executor"]["sha256"] != activation["installed_executor_sha256"]:
+            reject("ROLLBACK_RUNTIME_ACTIVATION_INVALID")
+        ordinal = str(activation["generation"]).zfill(16)
+        expected_history = Path(
+            "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/history"
+        ) / f"{ordinal}.{activation['history_sha256']}.json"
+        expected_receipt = Path(
+            "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/receipts"
+        ) / f"{ordinal}.{activation['receipt_sha256']}.json"
+        if activation.get("history_file") != str(expected_history) \
+                or activation.get("receipt_file") != str(expected_receipt):
+            reject("ROLLBACK_RUNTIME_ACTIVATION_INVALID")
+        chain_handles: dict[str, tuple[Path, tuple[Any, ...], int]] = {}
+        current, current_raw, current_handle = trusted_chain_json(
+            Path(activation["current_file"]), root, "0400", "ROLLBACK_RUNTIME_ACTIVATION_CURRENT_INVALID",
+        )
+        chain_handles["current"] = current_handle
+        receipt, receipt_raw, receipt_handle = trusted_chain_json(
+            Path(activation["receipt_file"]), root, "0400", "ROLLBACK_RUNTIME_ACTIVATION_RECEIPT_INVALID",
+        )
+        chain_handles["receipt"] = receipt_handle
+        history, history_raw, history_handle = trusted_chain_json(
+            Path(activation["history_file"]), root, "0400", "ROLLBACK_RUNTIME_ACTIVATION_HISTORY_INVALID",
+        )
+        chain_handles["history"] = history_handle
+        current = exact(current, {
+            "schema_version", "contract", "status", "activation_id", "generation", "history_sha256",
+            "receipt_sha256", "executor_catalog_sha256", "installed_executor_sha256",
+            "runtime_plan_sha256", "expires_at", "current_sha256",
+        }, "ROLLBACK_RUNTIME_ACTIVATION_CURRENT_INVALID")
+        receipt = exact(receipt, {
+            "schema_version", "contract", "status", "activation_status", "activation_id", "generation",
+            "operation", "committed_at", "intent_sha256", "history_sha256",
+            "previous_activation_receipt_sha256", "rollback_target_activation_receipt_sha256",
+            "supervisor_bundle_sha256", "authorization_sha256", "executor_catalog_sha256",
+            "installed_executor_sha256", "runtime_plan_sha256", "expires_at", "receipt_sha256",
+        }, "ROLLBACK_RUNTIME_ACTIVATION_RECEIPT_INVALID")
+        history = exact(history, {
+            "schema_version", "contract", "status", "activation_status", "activation_id", "generation",
+            "operation", "committed_at", "intent_sha256", "previous_activation_receipt_sha256",
+            "rollback_target_activation_receipt_sha256", "supervisor_bundle_sha256",
+            "authorization_sha256", "executor_catalog_sha256", "capability_status",
+            "unavailable_capabilities", "installed_executor_sha256", "runtime_plan_sha256",
+            "approved_at", "expires_at", "requester_identity_sha256", "approver_identity_sha256",
+            "plan", "history_sha256",
+        }, "ROLLBACK_RUNTIME_ACTIVATION_HISTORY_INVALID")
+        status = activation["status"]
+        common = {
+            "activation_id": activation["activation_id"], "generation": activation["generation"],
+            "executor_catalog_sha256": activation["executor_catalog_sha256"],
+            "installed_executor_sha256": activation["installed_executor_sha256"],
+            "runtime_plan_sha256": activation["runtime_plan_sha256"], "expires_at": activation["expires_at"],
+        }
+        if current.get("schema_version") != 2 or current.get("contract") != ACTIVATION_CURRENT_CONTRACT \
+                or current.get("status") != status or any(current.get(key) != value for key, value in common.items()) \
+                or current.get("history_sha256") != activation["history_sha256"] \
+                or current.get("receipt_sha256") != activation["receipt_sha256"] \
+                or sha256_value(without(current, "current_sha256")) != current.get("current_sha256") \
+                or current.get("current_sha256") != activation["current_sha256"] \
+                or canonical(current) != current_raw:
+            reject("ROLLBACK_RUNTIME_ACTIVATION_CURRENT_INVALID")
+        if receipt.get("schema_version") != 2 or receipt.get("contract") != ACTIVATION_RECEIPT_CONTRACT \
+                or receipt.get("status") != "COMMITTED" or receipt.get("activation_status") != status \
+                or any(receipt.get(key) != value for key, value in common.items()) \
+                or receipt.get("operation") != activation["operation"] \
+                or receipt.get("committed_at") != activation["approved_at"] \
+                or receipt.get("intent_sha256") != activation["intent_sha256"] \
+                or receipt.get("history_sha256") != activation["history_sha256"] \
+                or receipt.get("previous_activation_receipt_sha256") \
+                    != activation["previous_activation_receipt_sha256"] \
+                or receipt.get("rollback_target_activation_receipt_sha256") \
+                    != activation["rollback_target_activation_receipt_sha256"] \
+                or receipt.get("supervisor_bundle_sha256") != activation["supervisor_bundle_sha256"] \
+                or receipt.get("authorization_sha256") != activation["authorization_sha256"] \
+                or sha256_value(without(receipt, "receipt_sha256")) != receipt.get("receipt_sha256") \
+                or receipt.get("receipt_sha256") != activation["receipt_sha256"] \
+                or canonical(receipt) != receipt_raw:
+            reject("ROLLBACK_RUNTIME_ACTIVATION_RECEIPT_INVALID")
+        if history.get("schema_version") != 2 or history.get("contract") != ACTIVATION_HISTORY_CONTRACT \
+                or history.get("status") != "COMMITTED" or history.get("activation_status") != status \
+                or any(history.get(key) != value for key, value in common.items()) \
+                or history.get("operation") != activation["operation"] \
+                or history.get("committed_at") != activation["approved_at"] \
+                or history.get("intent_sha256") != activation["intent_sha256"] \
+                or history.get("previous_activation_receipt_sha256") \
+                    != activation["previous_activation_receipt_sha256"] \
+                or history.get("rollback_target_activation_receipt_sha256") \
+                    != activation["rollback_target_activation_receipt_sha256"] \
+                or history.get("supervisor_bundle_sha256") != activation["supervisor_bundle_sha256"] \
+                or history.get("authorization_sha256") != activation["authorization_sha256"] \
+                or history.get("capability_status") != activation["capability_status"] \
+                or history.get("unavailable_capabilities") != unavailable \
+                or history.get("approved_at") != activation["approved_at"] \
+                or history.get("requester_identity_sha256") \
+                    != activation["requester_identity_sha256"] \
+                or history.get("approver_identity_sha256") \
+                    != activation["approver_identity_sha256"] \
+                or history.get("plan") != plan \
+                or sha256_value(without(history, "history_sha256")) != history.get("history_sha256") \
+                or history.get("history_sha256") != activation["history_sha256"] \
+                or canonical(history) != history_raw:
+            reject("ROLLBACK_RUNTIME_ACTIVATION_HISTORY_INVALID")
+        return activation, sha256_bytes(raw), handle, chain_handles
     except Exception:
         os.close(handle[2])
+        for opened in locals().get("chain_handles", {}).values():
+            os.close(opened[2])
         raise
 
 
@@ -1244,15 +1456,66 @@ def stop_executor_group(process: subprocess.Popen[bytes]) -> bool:
     return not process_group_exists(process) and not executor_descendants(process)
 
 
+def descriptor_record(
+        handle: tuple[Path, tuple[Any, ...], int], logical_path: str,
+) -> dict[str, Any]:
+    _target, identity, descriptor = handle
+    metadata = os.fstat(descriptor)
+    return {
+        "fd": descriptor,
+        "path": f"/proc/self/fd/{descriptor}",
+        "logical_path": logical_path,
+        "sha256": identity[6],
+        "uid": metadata.st_uid,
+        "gid": metadata.st_gid,
+        "mode": mode_text(metadata),
+        "device": str(metadata.st_dev),
+        "inode": str(metadata.st_ino),
+        "nlink": metadata.st_nlink,
+    }
+
+
+def fixed_handler_id(request: dict[str, Any]) -> str:
+    if request["label"] is None:
+        return "chenyida-erp.rollback.runtime-observation.v1"
+    return f"chenyida-erp.rollback.{request['label'].lower().replace('_', '-')}.v1"
+
+
+def fixed_argv_template(request: dict[str, Any]) -> list[str]:
+    internal = {
+        "PRECONDITION_RECHECK", "RUNTIME_CONFIGURATION_RESTORE",
+        "PROTECTED_RESOURCE_RECHECK", "PROTECTED_RESOURCES",
+    }
+    if request["label"] is None:
+        return ["EXECUTOR_INTERNAL", "RUNTIME_OBSERVATION"]
+    if request["label"] in internal:
+        return ["EXECUTOR_INTERNAL", request["label"]]
+    return ["/proc/self/fd/{docker_fd}", "FIXED_HANDLER", request["label"]]
+
+
+def fixed_idempotency_key(request: dict[str, Any]) -> str:
+    return sha256_value({
+        "contract": "chenyida-erp-uat-promotion-rollback-idempotency-key/v1",
+        "operation_id": request["operation_id"], "label": request["label"],
+        "record_intent_sha256": request["record_intent_sha256"],
+        "runtime_plan_sha256": request["runtime_plan_sha256"],
+        "previous_result_sha256": request["previous_result_sha256"],
+    })
+
+
 def run_executor(
-    executable_descriptor: int,
-    docker_descriptor: int,
+    executable_handle: tuple[Path, tuple[Any, ...], int],
+    docker_handle: tuple[Path, tuple[Any, ...], int],
     source_handles: dict[str, tuple[Path, tuple[Any, ...], int]],
+    activation: dict[str, Any],
+    activation_chain_handles: dict[str, tuple[Path, tuple[Any, ...], int]],
     request: dict[str, Any],
     descriptor: int,
     timeout_seconds: float,
-) -> bytes:
+) -> tuple[bytes, str]:
     deadline = time.monotonic() + timeout_seconds
+    executable_descriptor = executable_handle[2]
+    docker_descriptor = docker_handle[2]
     executable_path = f"/proc/self/fd/{executable_descriptor}"
     arguments = [executable_path, request["action"].lower(), request["operation_id"]]
     if request["label"] is not None:
@@ -1280,36 +1543,70 @@ def run_executor(
     package = request["payload"]["execution_package"]
     if _CURRENT_PLAN is None:
         reject("ROLLBACK_RUNTIME_PLAN_INVALID")
+    manifest_read, manifest_write = os.pipe2(getattr(os, "O_CLOEXEC", 0))
+    handler_id = fixed_handler_id(request)
     descriptor_manifest_body = {
-        "schema_version": 1,
-        "contract": "chenyida-erp-uat-promotion-rollback-trusted-fd-manifest/v1",
-        "executor": {
-            "path": executable_path,
-            "sha256": _CURRENT_PLAN["toolchain"]["executor"]["sha256"],
+        "schema_version": 2,
+        "contract": FD_MANIFEST_CONTRACT,
+        "request_sha256": request["request_sha256"],
+        "action": request["action"], "operation": request["operation"],
+        "operation_id": request["operation_id"], "execution_mode": request["execution_mode"],
+        "label": request["label"], "runtime_plan_sha256": request["runtime_plan_sha256"],
+        "execution_package_sha256": request["execution_package_sha256"],
+        "transaction_intent_sha256": request["transaction_intent_sha256"],
+        "record_intent_sha256": request["record_intent_sha256"],
+        "source_set_sha256": request["source_set_sha256"],
+        "previous_result_sha256": request["previous_result_sha256"],
+        "action_deadline": request["action_deadline"], "handler_id": handler_id,
+        "argv_template_sha256": sha256_value(fixed_argv_template(request)),
+        "idempotency_key": fixed_idempotency_key(request),
+        "activation": {
+            "contract": activation["contract"], "activation_id": activation["activation_id"],
+            "generation": activation["generation"],
+            "activation_sha256": activation["activation_sha256"],
+            "history_sha256": activation["history_sha256"],
+            "receipt_sha256": activation["receipt_sha256"],
+            "current_sha256": activation["current_sha256"],
+            "executor_catalog_sha256": activation["executor_catalog_sha256"],
+            "capability_status": activation["capability_status"],
+            "supervisor_bundle_sha256": activation["supervisor_bundle_sha256"],
+            "installed_executor_sha256": activation["installed_executor_sha256"],
+            "runtime_plan_sha256": activation["runtime_plan_sha256"],
+            "docker_sha256": _CURRENT_PLAN["toolchain"]["docker"]["sha256"],
         },
-        "docker": {
-            "path": f"/proc/self/fd/{docker_descriptor}",
-            "sha256": _CURRENT_PLAN["toolchain"]["docker"]["sha256"],
+        "executor": descriptor_record(executable_handle, str(EXECUTOR_FILE)),
+        "docker": descriptor_record(docker_handle, str(DOCKER_FILE)),
+        "activation_chain": {
+            "alias": descriptor_record(source_handles["runtime_adapter_activation"], str(ACTIVATION_FILE)),
+            **{
+                name: descriptor_record(activation_chain_handles[name], activation[f"{name}_file"])
+                for name in ("history", "receipt", "current")
+            },
         },
         "sources": {
-            role: {
-                "path": f"/proc/self/fd/{source_handles[role][2]}",
-                "logical_path": package["sources"][role]["path"],
-                "sha256": package["sources"][role]["sha256"],
-            }
+            role: descriptor_record(source_handles[role], package["sources"][role]["path"])
             for role in request["source_roles"]
         },
+        "inherited_fds": sorted({
+            descriptor, manifest_read, executable_descriptor, docker_descriptor,
+            *(handle[2] for handle in source_handles.values()),
+            *(handle[2] for handle in activation_chain_handles.values()),
+        }),
     }
-    descriptor_manifest = {
-        **descriptor_manifest_body,
-        "manifest_sha256": sha256_value(descriptor_manifest_body),
-    }
-    environment["CHENYIDA_ERP_ROLLBACK_TRUSTED_FD_MANIFEST"] = \
-        canonical(descriptor_manifest).decode("utf-8").removesuffix("\n")
-    inherited_descriptors = tuple(sorted({
-        descriptor, executable_descriptor, docker_descriptor,
-        *(handle[2] for handle in source_handles.values()),
-    }))
+    descriptor_manifest = {**descriptor_manifest_body,
+                           "manifest_sha256": sha256_value(descriptor_manifest_body)}
+    manifest_raw = canonical(descriptor_manifest)
+    try:
+        written = 0
+        while written < len(manifest_raw):
+            written += os.write(manifest_write, manifest_raw[written:])
+    except OSError:
+        os.close(manifest_read)
+        os.close(manifest_write)
+        reject("ROLLBACK_RUNTIME_FD_MANIFEST_FAILED")
+    os.close(manifest_write)
+    environment["CHENYIDA_ERP_ROLLBACK_TRUSTED_FD_MANIFEST_FD"] = str(manifest_read)
+    inherited_descriptors = tuple(descriptor_manifest_body["inherited_fds"])
     enable_child_subreaper()
     try:
         process = subprocess.Popen(
@@ -1323,6 +1620,7 @@ def run_executor(
             start_new_session=True,
         )
     except OSError:
+        os.close(manifest_read)
         reject("ROLLBACK_RUNTIME_EXECUTOR_FAILED")
     assert process.stdin is not None and process.stdout is not None and process.stderr is not None
     selector: selectors.BaseSelector | None = None
@@ -1388,11 +1686,16 @@ def run_executor(
         except subprocess.TimeoutExpired:
             reject("ROLLBACK_RUNTIME_EXECUTOR_TIMEOUT_OR_OUTPUT_LIMIT")
         reap_executor_children(process)
+        if returncode != 0 and bytes(streams["stderr"]) \
+                == b"ROLLBACK_FIXED_EXECUTOR_UAT_CAPABILITY_UNAVAILABLE\n" \
+                and not streams["stdout"] and not process_group_exists(process) \
+                and not executor_descendants(process):
+            reject("ROLLBACK_RUNTIME_UAT_CAPABILITY_UNAVAILABLE")
         if returncode != 0 or streams["stderr"] or not 2 <= len(streams["stdout"]) <= MAX_BYTES \
                 or process_group_exists(process) or executor_descendants(process):
             reject("ROLLBACK_RUNTIME_EXECUTOR_FAILED")
         success = True
-        return bytes(streams["stdout"])
+        return bytes(streams["stdout"]), descriptor_manifest["manifest_sha256"]
     except ExecutorInterrupted:
         reject("ROLLBACK_RUNTIME_EXECUTOR_INTERRUPTED")
     except AdapterError:
@@ -1412,6 +1715,10 @@ def run_executor(
                 pipe.close()
             except OSError:
                 pass
+        try:
+            os.close(manifest_read)
+        except OSError:
+            pass
         if (not success or process_group_exists(process) or executor_descendants(process)) \
                 and not stop_executor_group(process):
             reject("ROLLBACK_RUNTIME_EXECUTOR_CLEANUP_FAILED")
@@ -1635,11 +1942,16 @@ def original_observation(plan: dict[str, Any]) -> dict[str, Any]:
     return {**body, "observation_sha256": sha256_value(body)}
 
 
-def validate_response(raw: bytes, request: dict[str, Any], activation_sha: str, executor_sha: str) -> dict[str, Any]:
+def validate_response(
+        raw: bytes, request: dict[str, Any], activation_sha: str, executor_sha: str,
+        activation: dict[str, Any], descriptor_manifest_sha: str,
+) -> dict[str, Any]:
     response = parse_json(raw, "ROLLBACK_RUNTIME_RESPONSE_INVALID")
     fields = {
         "schema_version", "contract", "action", "operation", "operation_id", "label", "request_sha256",
-        "runtime_plan_sha256", "status", "started_at", "completed_at", "output", "response_sha256",
+        "runtime_plan_sha256", "activation_receipt_sha256", "descriptor_manifest_sha256",
+        "handler_id", "idempotency_key", "status", "started_at", "completed_at", "output",
+        "output_sha256", "response_sha256",
     }
     response = exact(response, fields, "ROLLBACK_RUNTIME_RESPONSE_INVALID")
     if response.get("schema_version") != 1 or response.get("contract") != RESPONSE_CONTRACT \
@@ -1648,7 +1960,12 @@ def validate_response(raw: bytes, request: dict[str, Any], activation_sha: str, 
             or response.get("label") != request["label"] \
             or response.get("request_sha256") != request["request_sha256"] \
             or response.get("runtime_plan_sha256") != request["runtime_plan_sha256"] \
+            or response.get("activation_receipt_sha256") != activation["receipt_sha256"] \
+            or response.get("descriptor_manifest_sha256") != descriptor_manifest_sha \
+            or response.get("handler_id") != fixed_handler_id(request) \
+            or response.get("idempotency_key") != fixed_idempotency_key(request) \
             or not isinstance(response.get("output"), dict) \
+            or response.get("output_sha256") != sha256_value(response["output"]) \
             or sha256_value(without(response, "response_sha256")) != response.get("response_sha256") \
             or canonical(response) != raw:
         reject("ROLLBACK_RUNTIME_RESPONSE_INVALID")
@@ -1755,6 +2072,45 @@ def validate_response(raw: bytes, request: dict[str, Any], activation_sha: str, 
                         or observed["retained_candidate_volumes"][domain]["identity_sha256"] \
                         != plan["candidate"]["volumes"][domain]["identity_sha256"]:
                     reject("ROLLBACK_RUNTIME_PREFLIGHT_RESPONSE_INVALID")
+    elif request["action"] == "PREPARE":
+        output = exact(response["output"], {"record_intent"},
+                       "ROLLBACK_RUNTIME_RECORD_RESPONSE_INVALID")
+        if output["record_intent"] != request["payload"].get("record_intent"):
+            reject("ROLLBACK_RUNTIME_RECORD_RESPONSE_INVALID")
+    elif request["action"] in {"EXECUTE", "PROBE"} and request["label"] is not None:
+        output = exact(response["output"], {"record"},
+                       "ROLLBACK_RUNTIME_RECORD_RESPONSE_INVALID")
+        result = output["record"]
+        label_field = "stage" if request["operation"] == "ROLLBACK_EXECUTION" else "check"
+        intent_field = f"{label_field}_intent_sha256"
+        result_field = f"{label_field}_result_sha256"
+        contract = f"chenyida-erp-uat-promotion-rollback-{label_field}-result/v2"
+        expected_status = "COMMITTED" if label_field == "stage" else "VERIFIED"
+        fields = {
+            "schema_version", "contract", "status", "promotion_id", "promotion_generation",
+            "operation_id", "execution_authorization_sha256", "rollback_plan_sha256",
+            "execution_package_sha256", "runtime_plan_sha256", "ordinal", label_field,
+            "previous_result_sha256", intent_field, "evidence", "started_at", "completed_at",
+            result_field,
+        }
+        result = exact(result, fields, "ROLLBACK_RUNTIME_RECORD_RESPONSE_INVALID")
+        if result.get("schema_version") != 2 or result.get("contract") != contract \
+                or result.get("status") != expected_status \
+                or result.get("operation_id") != request["operation_id"] \
+                or result.get(label_field) != request["label"] \
+                or result.get("runtime_plan_sha256") != request["runtime_plan_sha256"] \
+                or result.get("previous_result_sha256") != request["previous_result_sha256"] \
+                or result.get(intent_field) != request["record_intent_sha256"] \
+                or not isinstance(result.get("evidence"), dict) \
+                or sha256_value(without(result, result_field)) != result.get(result_field):
+            reject("ROLLBACK_RUNTIME_RECORD_RESPONSE_INVALID")
+    elif (request["action"] == "PROBE" and request["label"] is None
+          or request["action"] == "CONTAIN" and status == "CONTAINED"):
+        output = exact(response["output"], {"containment", "observed"},
+                       "ROLLBACK_RUNTIME_CONTAINMENT_RESPONSE_INVALID")
+        if not isinstance(output["containment"], dict):
+            reject("ROLLBACK_RUNTIME_CONTAINMENT_RESPONSE_INVALID")
+        validate_observation(output.get("observed"), activation_plan(request))
     elif request["action"] == "CONTAIN" and status == "STALE_INTENT":
         output = exact(response["output"], {"observed"}, "ROLLBACK_RUNTIME_CONTAINMENT_RESPONSE_INVALID")
         observed = validate_observation(output.get("observed"), activation_plan(request))
@@ -1800,8 +2156,10 @@ def main(arguments: list[str]) -> None:
     descriptor = verify_supervisor(request, root)
     opened_handles: list[tuple[Path, tuple[Any, ...], int]] = []
     try:
-        activation, activation_source_sha, activation_handle = load_activation(package, request, root)
+        activation, activation_source_sha, activation_handle, activation_chain_handles = \
+            load_activation(package, request, root)
         opened_handles.append(activation_handle)
+        opened_handles.extend(activation_chain_handles.values())
         global _CURRENT_PLAN
         _CURRENT_PLAN = activation["plan"]
         plan = validate_plan(_CURRENT_PLAN, package)
@@ -1834,8 +2192,8 @@ def main(arguments: list[str]) -> None:
                 if re.fullmatch(r"[1-9][0-9]{1,4}", test_timeout) is None:
                     reject("ROLLBACK_RUNTIME_TEST_TIMEOUT_INVALID")
                 action_timeout = min(action_timeout, int(test_timeout) / 1000)
-        raw = run_executor(
-            executor_handle[2], docker_handle[2], source_handles,
+        raw, descriptor_manifest_sha = run_executor(
+            executor_handle, docker_handle, source_handles, activation, activation_chain_handles,
             request, descriptor, max(0.001, min(action_timeout, remaining)),
         )
         recheck_open_file(*executor_handle, "ROLLBACK_RUNTIME_EXECUTOR_CHANGED")
@@ -1844,8 +2202,11 @@ def main(arguments: list[str]) -> None:
             recheck_open_file(
                 *handle, f"ROLLBACK_RUNTIME_SOURCE_{role.upper()}_CHANGED",
             )
+        for name, handle in activation_chain_handles.items():
+            recheck_open_file(*handle, f"ROLLBACK_RUNTIME_ACTIVATION_{name.upper()}_CHANGED")
         response = validate_response(
-            raw, request, activation_source_sha, plan["toolchain"]["executor"]["sha256"]
+            raw, request, activation_source_sha, plan["toolchain"]["executor"]["sha256"],
+            activation, descriptor_manifest_sha,
         )
         sys.stdout.buffer.write(canonical(response))
     finally:

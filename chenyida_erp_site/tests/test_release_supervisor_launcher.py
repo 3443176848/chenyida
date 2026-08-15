@@ -20,6 +20,82 @@ def utc(value):
     return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
 
+def uat_rollback_activation_authorization(bundle_digest, now, *, recovery=False):
+    activation_id = "uat-rollback-runtime-activation-001"
+    source_sha256 = "1" * 64
+    plan = {
+        "schema_version": 1,
+        "contract": "chenyida-erp-uat-promotion-rollback-runtime-plan/v1",
+        "promotion_id": "promotion-001",
+        "promotion_generation": 1,
+        "rollback_operation_id": "rollback-001",
+        "deployment": {},
+        "candidate": {},
+        "predecessor": {},
+        "targets": {},
+        "toolchain": {
+            "executor": {
+                "path": str(supervisor.UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE),
+                "sha256": source_sha256, "uid": 0, "gid": 0, "mode": "0555",
+            },
+            "docker": {
+                "path": "/usr/bin/docker", "sha256": "2" * 64,
+                "uid": 0, "gid": 0, "mode": "0555",
+            },
+        },
+        "timeouts": {},
+        "max_output_bytes": 4 * 1024 * 1024,
+        "source_bindings": {},
+        "action_matrix": {},
+    }
+    plan["runtime_plan_sha256"] = supervisor.sha256(supervisor.canonical_json(plan))
+    parameters = {
+        "state_root": str(supervisor.UAT_ROLLBACK_RUNTIME_STATE_ROOT),
+        "activation_file": str(supervisor.UAT_ROLLBACK_RUNTIME_ACTIVATION_FILE),
+        "current_file": str(supervisor.UAT_ROLLBACK_RUNTIME_CURRENT_FILE),
+        "executor_file": str(supervisor.UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE),
+        "activation_id": activation_id,
+        "generation": 1,
+        "operation": "INSTALL",
+        "approved_at": utc(now - timedelta(minutes=1)),
+        "expires_at": utc(now + timedelta(minutes=10)),
+        "requester_identity_sha256": "3" * 64,
+        "approver_identity_sha256": "4" * 64,
+        "previous_activation_receipt_sha256": "0" * 64,
+        "rollback_target_activation_receipt_sha256": "0" * 64,
+        "executor_source": {
+            "path": str(supervisor.BUNDLES_ROOT / bundle_digest
+                        / supervisor.UAT_ROLLBACK_RUNTIME_EXECUTOR_SOURCE),
+            "sha256": source_sha256, "bytes": 4096, "uid": 0, "gid": 0,
+            "mode": "0555", "nlink": 1,
+        },
+        "plan": plan,
+    }
+    operation = "ACTIVATE_UAT_ROLLBACK_RUNTIME_V2"
+    authorization_id = activation_id
+    if recovery:
+        operation = "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION"
+        authorization_id = "uat-rollback-runtime-recovery-001"
+        parameters.update({
+            "expected_intent_sha256": "5" * 64,
+            "original_authorization_sha256": "6" * 64,
+            "original_operation": "ACTIVATE_UAT_ROLLBACK_RUNTIME_V2",
+            "original_operation_id": activation_id,
+        })
+    return {
+        "schema_version": 7,
+        "contract": supervisor.UAT_ROLLBACK_RUNTIME_ACTIVATION_AUTHORIZATION_CONTRACT,
+        "authorization_id": authorization_id,
+        "created_at": utc(now - timedelta(minutes=1) if not recovery else now),
+        "expires_at": utc(now + timedelta(minutes=10)),
+        "supervisor_bundle_sha256": bundle_digest,
+        "operation": operation,
+        "parameters": parameters,
+        "nonce": "7" * 64,
+        "confirmation": supervisor.UAT_ROLLBACK_RUNTIME_ACTIVATION_CONFIRMATIONS[operation],
+    }
+
+
 class ReleaseSupervisorLauncherTest(unittest.TestCase):
     def setUp(self):
         self.temporary = Path(tempfile.mkdtemp(prefix="cyd-release-supervisor-"))
@@ -709,6 +785,132 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
                     authorization, "a" * 64, 51,
                 )
         self.assertEqual(events, ["wait-900", f"signal-54321-{supervisor.signal.SIGTERM}", "wait-30", "cleanup"])
+
+    def test_uat_rollback_runtime_v7_authorization_is_closed_and_bundle_bound(self):
+        now = datetime(2026, 8, 15, 3, 0, tzinfo=timezone.utc)
+        bundle_digest = "a" * 64
+        authorization = uat_rollback_activation_authorization(bundle_digest, now)
+        self.assertEqual(
+            supervisor.validate_authorization(authorization, bundle_digest, now), authorization,
+        )
+        context = supervisor.uat_rollback_runtime_activation_context(
+            authorization, "8" * 64,
+        )
+        self.assertEqual(context["execution_mode"], "ORIGINAL")
+        self.assertEqual(context["operation_id"], authorization["authorization_id"])
+        self.assertEqual(set(context["parameters"]),
+                         supervisor.UAT_ROLLBACK_RUNTIME_ACTIVATION_BASE_PARAMETER_FIELDS)
+
+        tampered = uat_rollback_activation_authorization(bundle_digest, now)
+        tampered["parameters"]["executor_source"]["path"] = "/tmp/operator-selected.py"
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError,
+                "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_EXECUTOR_SOURCE_INVALID"):
+            supervisor.validate_authorization(tampered, bundle_digest, now)
+
+        tampered = uat_rollback_activation_authorization(bundle_digest, now)
+        tampered["parameters"]["plan"]["operator_argv"] = ["/bin/sh"]
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError,
+                "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PLAN_INVALID"):
+            supervisor.validate_authorization(tampered, bundle_digest, now)
+
+    def test_uat_rollback_runtime_capability_blocker_preserves_authorization(self):
+        now = datetime(2026, 8, 15, 3, 0, tzinfo=timezone.utc)
+        authorization = uat_rollback_activation_authorization("a" * 64, now)
+        events = []
+        blocked = {
+            "result": "BLOCKED_CAPABILITY_UNAVAILABLE",
+            "operation_id": authorization["authorization_id"],
+            "catalog_sha256": supervisor.UAT_ROLLBACK_RUNTIME_EXECUTOR_CATALOG_SHA256,
+            "unavailable_capabilities": ["POSTGRESQL_RESTORE"],
+        }
+        with patch.object(
+                supervisor, "verify_uat_rollback_runtime_activation_executor_source",
+                side_effect=lambda *_: events.append("source"),
+            ), patch.object(
+                supervisor, "prepare_runtime_privilege_node",
+                side_effect=lambda *_: (
+                    events.append("node") or (Path("/tmp/runtime"), Path("/tmp/runtime/node"))
+                ),
+            ), patch.object(
+                supervisor, "run_uat_rollback_runtime_activation_publisher",
+                side_effect=lambda *_: (events.append("prepare") or blocked),
+            ), patch.object(
+                supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume"),
+            ), patch.object(
+                supervisor, "cleanup_runtime_privilege_node",
+                side_effect=lambda *_: events.append("cleanup"),
+            ):
+            result = supervisor.run_uat_rollback_runtime_activation_authorization(
+                Path("/trusted/bundle"), Path("/trusted/pending/activation.json"),
+                authorization, "8" * 64, 51,
+            )
+        self.assertEqual(result, blocked)
+        self.assertEqual(events, ["source", "node", "prepare", "cleanup"])
+
+    def test_uat_rollback_runtime_recovery_binds_exact_consumed_original_authorization(self):
+        now = datetime(2026, 8, 15, 3, 0, tzinfo=timezone.utc)
+        bundle_digest = "a" * 64
+        original = uat_rollback_activation_authorization(bundle_digest, now)
+        original_raw = supervisor.canonical_json(original)
+        original_digest = supervisor.sha256(original_raw)
+        consumed = self.temporary / "consumed-v7"
+        consumed.mkdir(mode=0o700)
+        original_file = consumed / f"{original['authorization_id']}.{original_digest}.json"
+        original_file.write_bytes(original_raw)
+        original_file.chmod(0o400)
+        recovery = uat_rollback_activation_authorization(bundle_digest, now, recovery=True)
+        recovery["parameters"]["original_authorization_sha256"] = original_digest
+        self.assertEqual(
+            supervisor.validate_original_uat_rollback_runtime_activation_authorization_consumed(
+                recovery["parameters"], bundle_digest, consumed,
+            ),
+            original,
+        )
+        recovery["parameters"]["plan"]["promotion_id"] = "substituted-promotion"
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError,
+                "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ORIGINAL_AUTHORIZATION_INVALID"):
+            supervisor.validate_original_uat_rollback_runtime_activation_authorization_consumed(
+                recovery["parameters"], bundle_digest, consumed,
+            )
+
+    def test_uat_rollback_runtime_supported_path_consumes_between_prepare_and_commit(self):
+        now = datetime(2026, 8, 15, 3, 0, tzinfo=timezone.utc)
+        authorization = uat_rollback_activation_authorization("a" * 64, now)
+        events = []
+
+        def publisher(_node, _bundle, context, phase, _lock):
+            events.append(phase)
+            if phase == "prepare":
+                return {
+                    "result": "PREPARED", "operation_id": context["operation_id"],
+                    "intent_sha256": "9" * 64,
+                }
+            return {
+                "result": "COMMITTED", "operation_id": context["operation_id"],
+                "intent_sha256": "9" * 64, "activation_sha256": "b" * 64,
+                "receipt_sha256": "c" * 64,
+            }
+
+        with patch.object(
+                supervisor, "verify_uat_rollback_runtime_activation_executor_source",
+                side_effect=lambda *_: events.append("source"),
+            ), patch.object(
+                supervisor, "prepare_runtime_privilege_node",
+                return_value=(Path("/tmp/runtime"), Path("/tmp/runtime/node")),
+            ), patch.object(
+                supervisor, "run_uat_rollback_runtime_activation_publisher", side_effect=publisher,
+            ), patch.object(
+                supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume"),
+            ), patch.object(supervisor, "cleanup_runtime_privilege_node"):
+            result = supervisor.run_uat_rollback_runtime_activation_authorization(
+                Path("/trusted/bundle"), Path("/trusted/pending/activation.json"),
+                authorization, "8" * 64, 51,
+            )
+        self.assertEqual(result["result"], "COMMITTED")
+        self.assertEqual(events, ["source", "prepare", "source", "consume", "source", "execute"])
 
 
 if __name__ == "__main__":

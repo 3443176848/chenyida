@@ -1,11 +1,26 @@
 import path from "node:path";
 
 import { canonicalClusterJson, clusterSha256 } from "./postgresql-cluster-recovery-contract.mjs";
+import {
+  UAT_ROLLBACK_RUNTIME_ACTIVATION_ALIAS_CONTRACT,
+  UAT_ROLLBACK_RUNTIME_ACTIVATION_FILE,
+  UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE,
+  UAT_ROLLBACK_ZERO_SHA256,
+  createUatRollbackRuntimeActivationIntent,
+  createUatRollbackRuntimeActivationObjects,
+  validateUatRollbackRuntimeActivationAlias,
+} from "./uat-promotion-rollback-fixed-executor-contract.mjs";
+import {
+  validateUatPromotionRollbackCheckIntent,
+  validateUatPromotionRollbackCheckResult,
+  validateUatPromotionRollbackStageIntent,
+  validateUatPromotionRollbackStageResult,
+} from "./uat-promotion-rollback-contract.mjs";
 
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_PLAN_CONTRACT =
   "chenyida-erp-uat-promotion-rollback-runtime-plan/v1";
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_ACTIVATION_CONTRACT =
-  "chenyida-erp-uat-promotion-rollback-runtime-activation/v1";
+  UAT_ROLLBACK_RUNTIME_ACTIVATION_ALIAS_CONTRACT;
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_REQUEST_CONTRACT =
   "chenyida-erp-uat-promotion-rollback-runtime-request/v1";
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_RESPONSE_CONTRACT =
@@ -14,9 +29,9 @@ export const UAT_PROMOTION_ROLLBACK_RUNTIME_OBSERVATION_CONTRACT =
   "chenyida-erp-uat-promotion-rollback-runtime-observation/v1";
 
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_ACTIVATION_FILE =
-  "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/activation-v1.json";
+  UAT_ROLLBACK_RUNTIME_ACTIVATION_FILE;
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_EXECUTOR =
-  "/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1";
+  UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE;
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_DOCKER = "/usr/bin/docker";
 
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_TIMEOUTS = Object.freeze({
@@ -554,16 +569,8 @@ export function validateUatPromotionRollbackRuntimeActivation(
   value, { now = new Date(), allowExpired = false, executionDeadline = null } = {},
 ) {
   const code = "UAT_PROMOTION_ROLLBACK_RUNTIME_ACTIVATION_INVALID";
-  exactKeys(value, [
-    "schema_version", "contract", "status", "activation_id", "approved_at", "expires_at",
-    "requester_identity_sha256", "approver_identity_sha256", "plan", "activation_sha256",
-  ], code);
-  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_ROLLBACK_RUNTIME_ACTIVATION_CONTRACT
-    || value.status !== "ACTIVE") reject(code);
-  string(value.activation_id, IDENTIFIER, code);
-  digest(value.requester_identity_sha256, code);
-  digest(value.approver_identity_sha256, code);
-  if (value.requester_identity_sha256 === value.approver_identity_sha256) reject(code);
+  try { validateUatRollbackRuntimeActivationAlias(value); }
+  catch { reject(code); }
   const approved = Date.parse(instant(value.approved_at, code));
   const expires = Date.parse(instant(value.expires_at, code));
   const observed = now instanceof Date ? now.getTime() : new Date(now).getTime();
@@ -578,16 +585,22 @@ export function validateUatPromotionRollbackRuntimeActivation(
 }
 
 export function createUatPromotionRollbackRuntimeActivation(input) {
-  const body = {
-    schema_version: 1,
-    contract: UAT_PROMOTION_ROLLBACK_RUNTIME_ACTIVATION_CONTRACT,
-    status: "ACTIVE",
+  const intent = createUatRollbackRuntimeActivationIntent({
+    generation: input.generation,
+    operation: input.operation,
+    previous_activation_receipt_sha256:
+      input.previous_activation_receipt_sha256 ?? UAT_ROLLBACK_ZERO_SHA256,
+    rollback_target_activation_receipt_sha256:
+      input.rollback_target_activation_receipt_sha256 ?? UAT_ROLLBACK_ZERO_SHA256,
+    supervisor_bundle_sha256: input.supervisor_bundle_sha256,
+    authorization_sha256: input.authorization_sha256,
+    executor_source_sha256: input.executor_source_sha256,
     ...input,
-  };
-  return Object.freeze(validateUatPromotionRollbackRuntimeActivation({
-    ...body,
-    activation_sha256: clusterSha256(body),
-  }, { now: new Date(input.approved_at) }));
+  });
+  const { alias } = createUatRollbackRuntimeActivationObjects(intent, input.approved_at);
+  return Object.freeze(validateUatPromotionRollbackRuntimeActivation(
+    alias, { now: new Date(input.approved_at) },
+  ));
 }
 
 function validateRuntimeAction(value, operation, executionMode, label, code) {
@@ -674,19 +687,26 @@ export function validateUatPromotionRollbackRuntimeResponse(value, request = nul
   };
   exactKeys(value, [
     "schema_version", "contract", "action", "operation", "operation_id", "label", "request_sha256",
-    "runtime_plan_sha256", "status", "started_at", "completed_at", "output", "response_sha256",
+    "runtime_plan_sha256", "activation_receipt_sha256", "descriptor_manifest_sha256",
+    "handler_id", "idempotency_key", "status", "started_at", "completed_at", "output",
+    "output_sha256", "response_sha256",
   ], code);
   if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_ROLLBACK_RUNTIME_RESPONSE_CONTRACT
     || !new Set(["PREFLIGHT", "RECHECK", "PREPARE", "EXECUTE", "PROBE", "CONTAIN"]).has(value.action)
     || !new Set(["ROLLBACK_EXECUTION", "ROLLBACK_POSTVERIFY"]).has(value.operation)) reject(code);
   string(value.operation_id, IDENTIFIER, code);
   if (value.label !== null) string(value.label, /^[A-Z][A-Z0-9_]{1,79}$/u, code);
-  for (const field of ["request_sha256", "runtime_plan_sha256", "response_sha256"]) digest(value[field], code);
+  for (const field of [
+    "request_sha256", "runtime_plan_sha256", "activation_receipt_sha256",
+    "descriptor_manifest_sha256", "idempotency_key", "output_sha256", "response_sha256",
+  ]) digest(value[field], code);
+  string(value.handler_id, /^[a-z0-9][a-z0-9.-]{2,159}$/u, code);
   string(value.status, /^[A-Z][A-Z0-9_]{1,79}$/u, code);
   if (!allowedStatuses[value.action].has(value.status)) reject(code);
   const started = Date.parse(instant(value.started_at, code));
   const completed = Date.parse(instant(value.completed_at, code));
   record(value.output, code);
+  if (clusterSha256(value.output) !== value.output_sha256) reject(code);
   if (new Set(["PREFLIGHT", "RECHECK"]).has(value.action)) {
     exactKeys(value.output, [
       "result", "execution_package_sha256", "source_set_sha256", "runtime_plan_sha256",
@@ -696,6 +716,34 @@ export function validateUatPromotionRollbackRuntimeResponse(value, request = nul
     if (value.output.result !== (value.action === "PREFLIGHT"
       ? "ROLLBACK_RUNTIME_PREFLIGHT_PASSED" : "ROLLBACK_RUNTIME_RECHECK_PASSED")
       || value.output.target_state !== value.status) reject(code);
+    validateUatPromotionRollbackRuntimeObservation(value.output.observed);
+  }
+  if (value.action === "PREPARE") {
+    exactKeys(value.output, ["record_intent"], code);
+    const intent = value.operation === "ROLLBACK_EXECUTION"
+      ? validateUatPromotionRollbackStageIntent(value.output.record_intent)
+      : validateUatPromotionRollbackCheckIntent(value.output.record_intent);
+    if (request !== null && !same(intent, request.payload.record_intent)) reject(code);
+  }
+  if (value.action === "EXECUTE" || value.action === "PROBE" && value.label !== null) {
+    exactKeys(value.output, ["record"], code);
+    const result = value.operation === "ROLLBACK_EXECUTION"
+      ? validateUatPromotionRollbackStageResult(value.output.record)
+      : validateUatPromotionRollbackCheckResult(value.output.record);
+    const resultStatus = value.operation === "ROLLBACK_EXECUTION" ? "COMMITTED" : "VERIFIED";
+    const intentField = value.operation === "ROLLBACK_EXECUTION"
+      ? "stage_intent_sha256" : "check_intent_sha256";
+    if (value.status !== (value.action === "EXECUTE" && value.status === "ALREADY_COMMITTED"
+      ? "ALREADY_COMMITTED" : resultStatus)
+      || request !== null && (result.operation_id !== request.operation_id
+        || result.runtime_plan_sha256 !== request.runtime_plan_sha256
+        || result.previous_result_sha256 !== request.previous_result_sha256
+        || result[intentField] !== request.record_intent_sha256)) reject(code);
+  }
+  if ((value.action === "PROBE" && value.label === null
+      || value.action === "CONTAIN" && value.status === "CONTAINED")) {
+    exactKeys(value.output, ["containment", "observed"], code);
+    record(value.output.containment, code);
     validateUatPromotionRollbackRuntimeObservation(value.output.observed);
   }
   if (value.action === "CONTAIN" && value.status === "STALE_INTENT") {
@@ -710,6 +758,18 @@ export function validateUatPromotionRollbackRuntimeResponse(value, request = nul
       || value.request_sha256 !== request.request_sha256
       || request.runtime_plan_sha256 !== ZERO_SHA256
         && value.runtime_plan_sha256 !== request.runtime_plan_sha256) reject(code);
+    const expectedHandler = request.label === null
+      ? "chenyida-erp.rollback.runtime-observation.v1"
+      : `chenyida-erp.rollback.${request.label.toLowerCase().replaceAll("_", "-")}.v1`;
+    const expectedIdempotencyKey = clusterSha256({
+      contract: "chenyida-erp-uat-promotion-rollback-idempotency-key/v1",
+      operation_id: request.operation_id,
+      label: request.label,
+      record_intent_sha256: request.record_intent_sha256,
+      runtime_plan_sha256: request.runtime_plan_sha256,
+      previous_result_sha256: request.previous_result_sha256,
+    });
+    if (value.handler_id !== expectedHandler || value.idempotency_key !== expectedIdempotencyKey) reject(code);
     if (value.action === "CONTAIN" && value.status === "STALE_INTENT"
       && value.output.observed.observation_sha256
         === request.payload?.record_intent?.runtime_observation_sha256) reject(code);
@@ -725,6 +785,7 @@ export function createUatPromotionRollbackRuntimeResponse(input) {
     schema_version: 1,
     contract: UAT_PROMOTION_ROLLBACK_RUNTIME_RESPONSE_CONTRACT,
     ...input,
+    output_sha256: clusterSha256(input.output),
   };
   return Object.freeze(validateUatPromotionRollbackRuntimeResponse({
     ...body,

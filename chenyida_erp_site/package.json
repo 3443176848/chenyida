@@ -15,7 +15,7 @@
     "admin:init": "node --experimental-strip-types scripts/init-admin.ts",
     "test": "npm run test:release:contracts",
     "test:release": "scripts/run-release-gate.sh",
-    "test:release:contracts": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-file-storage.test.mjs tests/selfhost-release-identity-contract.test.mjs tests/selfhost-release-image-evidence-producer.test.mjs tests/selfhost-release-manifest-contract.test.mjs tests/selfhost-release-gate-contract.test.mjs tests/selfhost-release-migration-allowlist.test.mjs tests/selfhost-uat-promotion-migration-execution-contract.test.mjs",
+    "test:release:contracts": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-file-storage.test.mjs tests/selfhost-release-identity-contract.test.mjs tests/selfhost-release-image-evidence-producer.test.mjs tests/selfhost-release-manifest-contract.test.mjs tests/selfhost-release-gate-contract.test.mjs tests/selfhost-release-migration-allowlist.test.mjs tests/selfhost-uat-promotion-migration-execution-contract.test.mjs tests/selfhost-uat-promotion-rollback-fixed-executor.test.mjs",
     "test:release:supervisor-python": "python3 -B -m unittest discover -s tests -p 'test_release_supervisor_*.py' && python3 -B -m unittest -v tests.test_uat_promotion_migration_control",
     "test:release:migration-postgres": "scripts/run-release-migration-postgres-test.sh",
     "test:release:postgres-regression": "scripts/run-release-postgres-regression-tests.sh",

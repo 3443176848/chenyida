@@ -10,6 +10,8 @@ export const UAT_PROMOTION_AUDIT_ARTIFACT_PATH = "chenyida_erp_site/operations/u
 export const UAT_PROMOTION_AUDIT_MARKDOWN_PATH = "docs/testing/selfhost-uat-promotion-rollback-audit-v1.md";
 export const UAT_PROMOTION_AUDIT_GENERATOR_PATH = "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs";
 export const UAT_PROMOTION_AUDIT_INVENTORY_PATH = "chenyida_erp_site/release/release-test-inventory-v1.json";
+export const UAT_PROMOTION_AUDIT_FIXED_EXECUTOR_TEST_PATH =
+  "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-fixed-executor.test.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const SAFE_PATH = /^(?:chenyida_erp_site|docs)\/[A-Za-z0-9._/-]+$/;
@@ -140,7 +142,11 @@ function validateCapabilities(policy, sourceBodies, errors) {
 
 function inspectRepository(policy, sourceBodies, errors) {
   const launcher = sourceBodies.get("chenyida_erp_site/scripts/release-supervisor-launcher.py") ?? "";
-  const mappings = ["ENTRYPOINTS", "RUNTIME_PRIVILEGE_OPERATIONS", "CLUSTER_POLICY_OPERATIONS", "NOTIFIER_EGRESS_OPERATIONS", "UAT_PROMOTION_OPERATIONS"];
+  const mappings = [
+    "ENTRYPOINTS", "RUNTIME_PRIVILEGE_OPERATIONS", "CLUSTER_POLICY_OPERATIONS",
+    "NOTIFIER_EGRESS_OPERATIONS", "UAT_PROMOTION_OPERATIONS",
+    "UAT_ROLLBACK_RUNTIME_ACTIVATION_OPERATIONS",
+  ];
   const supervisorOperations = [...new Set(mappings.flatMap((name) => extractPythonMappingKeys(launcher, name, errors)))].sort();
   const required = policy.required_supervisor_operations ?? [];
   if (!Array.isArray(required) || required.length < 7 || required.some((item) => !IDENTIFIER.test(item))) error(errors, "AUDIT_REQUIRED_SUPERVISOR_OPERATIONS_INVALID");
@@ -159,6 +165,9 @@ function inspectRepository(policy, sourceBodies, errors) {
   const rollbackControl = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs") ?? "";
   const rollbackRuntimeContract = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs") ?? "";
   const rollbackRuntimeAdapter = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py") ?? "";
+  const rollbackFixedExecutorContract = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor-contract.mjs") ?? "";
+  const rollbackFixedExecutor = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py") ?? "";
+  const rollbackActivationPublisher = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-rollback-runtime-activation-publisher.mjs") ?? "";
   const promotionJournal = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs") ?? "";
   const promotionPolicy = sourceBodies.get("chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json") ?? "";
   const crossRoleResultContract = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-cross-role-evidence-contract.mjs") ?? "";
@@ -252,9 +261,17 @@ function inspectRepository(policy, sourceBodies, errors) {
     rollback_runtime_adapter: rollbackControl.includes('path.join(SITE_ROOT, "scripts/uat-promotion-rollback-runtime-adapter.py")')
       && launcher.includes('"chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py"')
       && launcher.includes('"chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs"')
+      && launcher.includes('"chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor-contract.mjs"')
+      && launcher.includes('"chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py": "0555"')
+      && launcher.includes('"chenyida_erp_site/scripts/uat-promotion-rollback-runtime-activation-publisher.mjs"')
+      && launcher.includes("chenyida-erp-release-supervisor-authorization/v7")
+      && launcher.includes('"ACTIVATE_UAT_ROLLBACK_RUNTIME_V2"')
+      && launcher.includes('"ROLLBACK_UAT_ROLLBACK_RUNTIME_V2"')
+      && launcher.includes('"RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION"')
       && rollbackRuntimeContract.includes("UAT_PROMOTION_ROLLBACK_RUNTIME_ACTION_MATRIX")
       && rollbackRuntimeContract.includes('RECOVERY: Object.freeze(["PREFLIGHT", "RECHECK", "PROBE", "CONTAIN"])')
       && rollbackRuntimeAdapter.includes("EXECUTOR_FILE = Path(\"/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1\")")
+      && rollbackRuntimeAdapter.includes("/activation-v2.json")
       && rollbackRuntimeContract.includes("COMPOSE_PROJECT_COMPLETE_WRITER_SET")
       && rollbackRuntimeContract.includes("retained_candidate_volumes")
       && rollbackRuntimeContract.includes("STALE_INTENT")
@@ -272,7 +289,22 @@ function inspectRepository(policy, sourceBodies, errors) {
       && rollbackRuntimeAdapter.includes("STALE_INTENT")
       && rollbackRuntimeAdapter.includes("known_service_container_ids")
       && rollbackRuntimeAdapter.includes("contain database, volume, or Compose mutation logic itself")
-      ? "BUNDLED_TRUSTED_GATEWAY_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED_FAIL_CLOSED" : "UNKNOWN",
+      && rollbackFixedExecutorContract.includes("UAT_ROLLBACK_FIXED_EXECUTOR_CATALOG_CONTRACT")
+      && rollbackFixedExecutorContract.includes("UAT_ROLLBACK_EXECUTION_STAGES")
+      && rollbackFixedExecutorContract.includes("UAT_ROLLBACK_POSTVERIFY_CHECKS")
+      && rollbackFixedExecutorContract.includes("BLOCKED_MISSING_UAT_CAPABLE_HANDLERS")
+      && rollbackFixedExecutorContract.includes("PROBE_THEN_CONTAIN_NEVER_BLINDLY_REEXECUTE")
+      && rollbackFixedExecutor.includes('CAPABILITY_STATUS = "BLOCKED_MISSING_UAT_CAPABLE_HANDLERS"')
+      && rollbackFixedExecutor.includes("ROLLBACK_FIXED_EXECUTOR_UAT_CAPABILITY_UNAVAILABLE")
+      && rollbackFixedExecutor.includes("ROLLBACK_FIXED_EXECUTOR_FD_MANIFEST_INVALID")
+      && rollbackActivationPublisher.includes("chenyida-erp-uat-promotion-rollback-runtime-activation-context/v2")
+      && rollbackActivationPublisher.includes("chenyida-erp-uat-promotion-rollback-runtime-activation-recovery/v2")
+      && rollbackActivationPublisher.includes("prepareUatRollbackRuntimeActivation")
+      && rollbackActivationPublisher.includes("executeUatRollbackRuntimeActivation")
+      && rollbackActivationPublisher.includes("UAT_ROLLBACK_RUNTIME_ACTIVATION_PARTIAL_UNKNOWN")
+      && installer.includes("assert_no_uat_rollback_runtime_activation_interlock")
+      && installer.includes("SUPERVISOR_INSTALL_UAT_ROLLBACK_RUNTIME_RECOVERY_REQUIRED")
+      ? "BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_CAPABILITIES_BLOCKED_HOST_NOT_ACTIVATED" : "UNKNOWN",
     rollback_rehearsal_evidence: "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT",
     cross_role_uat_readiness: crossRole?.readiness?.status ?? "UNKNOWN",
   };
@@ -285,7 +317,7 @@ function inspectRepository(policy, sourceBodies, errors) {
   if (observations.cross_role_uat_transaction_binding !== "SUPERVISOR_CHECKPOINT_12_CONTENT_ADDRESSED_AND_RECOVERABLE") error(errors, "AUDIT_CROSS_ROLE_UAT_TRANSACTION_BINDING_DRIFT");
   if (observations.finalization_transaction_binding !== "SUPERVISOR_CHECKPOINT_13_AGGREGATED_AND_RECOVERABLE") error(errors, "AUDIT_FINALIZATION_TRANSACTION_BINDING_DRIFT");
   if (observations.rollback_transaction_binding !== "SUPERVISOR_CHECKPOINT_14_15_CONTENT_ADDRESSED_AND_RECOVERABLE") error(errors, "AUDIT_ROLLBACK_TRANSACTION_BINDING_DRIFT");
-  if (observations.rollback_runtime_adapter !== "BUNDLED_TRUSTED_GATEWAY_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED_FAIL_CLOSED") error(errors, "AUDIT_ROLLBACK_RUNTIME_BOUNDARY_DRIFT");
+  if (observations.rollback_runtime_adapter !== "BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_CAPABILITIES_BLOCKED_HOST_NOT_ACTIVATED") error(errors, "AUDIT_ROLLBACK_RUNTIME_BOUNDARY_DRIFT");
   if (observations.rollback_rehearsal_evidence !== "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT") error(errors, "AUDIT_ROLLBACK_REHEARSAL_BOUNDARY_DRIFT");
   if (observations.cross_role_uat_readiness !== "BLOCKED") error(errors, "AUDIT_CROSS_ROLE_UAT_BOUNDARY_DRIFT");
   return observations;
@@ -307,14 +339,23 @@ export function buildUatPromotionRollbackAudit(inputs) {
   if (policy.schema_version !== 1 || policy.contract !== UAT_PROMOTION_AUDIT_POLICY_CONTRACT || policy.authority !== "SELFHOSTED_NODE_POSTGRESQL_REPOSITORY_SOURCE" || policy.execution_class !== "AUDIT_ONLY_NOT_AUTHORIZED" || policy.deployment_class !== "UAT") error(errors, "AUDIT_POLICY_CONTRACT_INVALID");
   for (const [name, digest] of Object.entries(rawDigests ?? {})) if (!SHA256.test(digest ?? "")) error(errors, "AUDIT_INPUT_DIGEST_INVALID", name);
   if (inventory?.contract !== "chenyida-erp-release-test-inventory/v1" || inventory?.schema_version !== 1 || inventory?.total_tests !== inventory?.tests?.length) error(errors, "AUDIT_RELEASE_INVENTORY_INVALID");
+  const fixedExecutorTest = inventory?.tests?.find((entry) =>
+    entry.path === UAT_PROMOTION_AUDIT_FIXED_EXECUTOR_TEST_PATH.replace("chenyida_erp_site/", ""));
+  const fixedExecutorTestBody = sourceBodies.get(UAT_PROMOTION_AUDIT_FIXED_EXECUTOR_TEST_PATH);
+  if (!fixedExecutorTest || fixedExecutorTest.category !== "RELEASE_CONTRACT"
+    || fixedExecutorTest.applicability !== "REQUIRED"
+    || fixedExecutorTest.harness !== "NODE_RELEASE_CONTRACT"
+    || fixedExecutorTest.sha256 !== sha256(fixedExecutorTestBody ?? "")) {
+    error(errors, "AUDIT_FIXED_EXECUTOR_RELEASE_TEST_INVALID");
+  }
   const manifest = validateSourceFiles(policy, sourceBodies, errors);
   const capabilities = validateCapabilities(policy, sourceBodies, errors);
   const observations = inspectRepository(policy, sourceBodies, errors);
   const incomplete = capabilities.filter((entry) => entry.status !== "SUPPORTED");
   const executionBlockers = [
-    ...(observations.rollback_runtime_adapter === "BUNDLED_TRUSTED_GATEWAY_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED_FAIL_CLOSED" ? [{
-      id: "ROLLBACK_RUNTIME_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED", severity: "P0",
-      finding: "checkpoint 14/15控制链与受信网关已进入Supervisor bundle，但固定数据库、卷与Web/Worker物化执行器尚未实现或激活；预检必须在授权消耗前失败。",
+    ...(observations.rollback_runtime_adapter === "BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_CAPABILITIES_BLOCKED_HOST_NOT_ACTIVATED" ? [{
+      id: "ROLLBACK_RUNTIME_CAPABILITIES_NOT_IMPLEMENTED_OR_HOST_NOT_ACTIVATED", severity: "P0",
+      finding: "固定执行器、v2内容寻址激活协议、Supervisor v7一次性授权和安装互锁已进入bundle；但UAT数据库、四数据域及Web/Worker回退处理器仍显式不可用，且没有受信主机激活证据，预检会在授权消耗前失败。",
     }] : []),
     ...(observations.rollback_rehearsal_evidence === "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT" ? [{
       id: "UAT_ROLLBACK_REHEARSAL_NOT_EXECUTED", severity: "P0",
@@ -421,7 +462,7 @@ export function renderMarkdown(artifact) {
     `- 跨岗位UAT事务：\`${artifact.observations.cross_role_uat_transaction_binding}\`；checkpoint 12只摄取已由事前人工授权、精确账号/人员映射、结构化步骤与控制、共同证据主题及三方签字闭合的结果；人工执行授权与后续Supervisor摄取授权必须不同，恢复只续写journal且不重跑人工步骤。`,
     `- 晋升终态事务：\`${artifact.observations.finalization_transaction_binding}\`；checkpoint 13以独立一次性授权聚合checkpoint 4—12 receipt、evidence、intent和authorization链，最终证据绑定checkpoint 12完整result摘要；不释放数据库或备份保护，也不声明checkpoint 14/15回退就绪。`,
     `- 回退事务：\`${artifact.observations.rollback_transaction_binding}\`；checkpoint 14逐阶段先写intent再调用适配器并绑定精确前代，checkpoint 15用独立授权逐项核验后只允许写入ROLLED_BACK；partial/unknown只能隔离，恢复不得重跑阶段。`,
-    `- 回退运行时：\`${artifact.observations.rollback_runtime_adapter}\`；受信网关会核对固定activation、plan、工具身份、process-group与响应，但固定执行器或激活缺失仍会在授权消耗前失败，当前没有真实数据库、四数据域、Web/Worker切换权限。`,
+    `- 回退运行时：\`${artifact.observations.rollback_runtime_adapter}\`；固定执行器、v2内容寻址激活/恢复、Supervisor v7一次性授权和bundle切换互锁均已纳入受信链，但生产catalog仍显式拒绝缺失的UAT数据库、四数据域及Web/Worker处理器，且没有主机激活证据。`,
     `- 回退演练：\`${artifact.observations.rollback_rehearsal_evidence}\`；fake-root自动测试不是UAT恢复或回退证据。`,
     "- Writer静默回执只覆盖精确Compose项目与working directory；checkpoint 8在SQL前重验静默并以数据库级围栏拒绝未标记或外部业务客户端，围栏保持至后续部署或保全恢复接管。",
     `- TASK67人工UAT状态：\`${artifact.observations.cross_role_uat_readiness}\`。`,
@@ -430,7 +471,7 @@ export function renderMarkdown(artifact) {
     "",
     "任何工具、手册或operator在本artifact仍为BLOCKED时调用晋升断言，必须得到`UAT_PROMOTION_EXECUTOR_NOT_READY`。不得用root手工Compose、可重复环境变量、TEST恢复回执、旧postdeploy receipt或最终health页面绕过缺失检查点。",
     "",
-    "下一实现必须补齐受信、最小权限且可隔离测试的固定rollback executor及独立激活，再形成真实UAT回退演练回执；实际人工UAT仍需独立事前授权、UAT资源、人员映射和签字，不能由仓库测试替代。",
+    "下一实现必须补齐受信、最小权限且可隔离测试的UAT数据库、四数据域及Web/Worker固定处理器，再经专项授权执行主机激活并形成真实UAT回退演练回执；实际人工UAT仍需独立事前授权、UAT资源、人员映射和签字，不能由仓库测试替代。",
     "",
     "## 6. 源码manifest",
     "",

@@ -60,6 +60,29 @@ NOTIFIER_EGRESS_TEMPLATE_POLICY_SHA256 = "abaf585ec2c5c735e18418265a688f01f2b4d1
 UAT_PROMOTION_STATE_ROOT = Path("/var/lib/chenyida-erp/uat-promotion-transactions-v1")
 UAT_PROMOTION_STATE_MARKER = ".chenyida-erp-uat-promotion-transactions-v1"
 UAT_PROMOTION_STATE_MARKER_VALUE = b"chenyida-erp-uat-promotion-transactions/v1\n"
+UAT_ROLLBACK_RUNTIME_STATE_ROOT = Path(
+    "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter"
+)
+UAT_ROLLBACK_RUNTIME_STATE_MARKER = ".chenyida-erp-uat-rollback-runtime-activation-v2"
+UAT_ROLLBACK_RUNTIME_STATE_MARKER_VALUE = \
+    b"chenyida-erp-uat-promotion-rollback-runtime-activation-state/v2\n"
+UAT_ROLLBACK_RUNTIME_STATE_DIRECTORIES = (
+    "intents", "executors", "plans", "history", "receipts", "recoveries", "quarantine",
+)
+UAT_ROLLBACK_RUNTIME_ACTIVATION_FILE = UAT_ROLLBACK_RUNTIME_STATE_ROOT / "activation-v2.json"
+UAT_ROLLBACK_RUNTIME_CURRENT_FILE = UAT_ROLLBACK_RUNTIME_STATE_ROOT / "current-v2.json"
+UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE = Path("/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1")
+UAT_ROLLBACK_RUNTIME_EXECUTOR_CATALOG_SHA256 = \
+    "1089c159743a1480c28af322c83b295ead42c8555f6320911f1102115b494b04"
+UAT_ROLLBACK_RUNTIME_CAPABILITY_STATUS = "BLOCKED_MISSING_UAT_CAPABLE_HANDLERS"
+UAT_ROLLBACK_RUNTIME_UNAVAILABLE_CAPABILITIES = [
+    "ATTACHMENTS_CONTENT", "ATTACHMENTS_RESTORE", "BACKUP_STATUS_CONTENT",
+    "BACKUP_STATUS_RESTORE", "CADDY_IDENTITY", "HEALTH", "MIGRATION_HEAD",
+    "POSTGRESQL_CONTENT", "POSTGRESQL_RESTORE", "POSTGRES_IDENTITY",
+    "RUNTIME_CONFIGURATION", "STRICT_RELEASE_IDENTITY", "UPLOADS_CONTENT",
+    "UPLOADS_RESTORE", "WEB_IDENTITY", "WEB_WORKER_PREDECESSOR_ACTIVATION",
+    "WORKER_IDENTITY", "WRITER_CONTAINMENT",
+]
 SUPERVISOR_BASE = Path("/usr/local/libexec/chenyida-erp-release-supervisor")
 BUNDLES_ROOT = SUPERVISOR_BASE / "bundles"
 LAUNCHERS_ROOT = SUPERVISOR_BASE / "launchers"
@@ -76,7 +99,7 @@ ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 MAX_JSON_BYTES = 1024 * 1024
 MAX_BUNDLE_FILE_BYTES = 8 * 1024 * 1024
 MAX_BUNDLE_BYTES = 32 * 1024 * 1024
-MAX_BUNDLE_FILES = 145
+MAX_BUNDLE_FILES = 149
 RECEIPT_CONTRACT = "chenyida-erp-release-supervisor-install-receipt/v2"
 JOURNAL_CONTRACT = "chenyida-erp-release-supervisor-install-journal/v2"
 
@@ -825,6 +848,379 @@ def assert_no_notifier_egress_activation_interlock(
         reject("SUPERVISOR_INSTALL_NOTIFIER_EGRESS_RECOVERY_REQUIRED")
 
 
+def assert_no_uat_rollback_runtime_activation_interlock(
+        state_root: Path | None = None, executor_file: Path | None = None) -> None:
+    state_root = state_root or UAT_ROLLBACK_RUNTIME_STATE_ROOT
+    executor_file = executor_file or UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE
+    invalid = "SUPERVISOR_INSTALL_UAT_ROLLBACK_RUNTIME_STATE_INVALID"
+    recovery = "SUPERVISOR_INSTALL_UAT_ROLLBACK_RUNTIME_RECOVERY_REQUIRED"
+
+    def optional_lstat(file: Path) -> os.stat_result | None:
+        try:
+            return os.lstat(file)
+        except FileNotFoundError:
+            return None
+        except OSError:
+            reject(invalid)
+
+    def self_hashed(file: Path, field: str, mode: int = 0o400) -> tuple[dict[str, Any], bytes]:
+        raw = trusted_file(file, mode, MAX_JSON_BYTES, invalid)
+        value = strict_json(raw, invalid)
+        if not isinstance(value, dict) or raw != canonical_json(value) \
+                or not isinstance(value.get(field), str) or not SHA256.fullmatch(value[field]) \
+                or sha256(canonical_json({key: item for key, item in value.items() if key != field})) \
+                    != value[field]:
+            reject(invalid)
+        return value, raw
+
+    def exact_object(value: Any, fields: set[str]) -> dict[str, Any]:
+        if not isinstance(value, dict) or set(value) != fields:
+            reject(invalid)
+        return value
+
+    intent_fields = {
+        "schema_version", "contract", "status", "activation_id", "generation", "operation",
+        "approved_at", "expires_at", "supervisor_bundle_sha256", "authorization_sha256",
+        "requester_identity_sha256", "approver_identity_sha256",
+        "previous_activation_receipt_sha256", "rollback_target_activation_receipt_sha256",
+        "executor_catalog_sha256", "capability_status", "unavailable_capabilities",
+        "executor_source_sha256", "installed_executor_sha256", "runtime_plan_sha256", "plan",
+        "intent_sha256",
+    }
+    history_fields = {
+        "schema_version", "contract", "status", "activation_status", "activation_id",
+        "generation", "operation", "committed_at", "intent_sha256",
+        "previous_activation_receipt_sha256", "rollback_target_activation_receipt_sha256",
+        "supervisor_bundle_sha256", "authorization_sha256", "executor_catalog_sha256",
+        "capability_status", "unavailable_capabilities", "installed_executor_sha256",
+        "runtime_plan_sha256", "approved_at", "expires_at", "requester_identity_sha256",
+        "approver_identity_sha256", "plan", "history_sha256",
+    }
+    receipt_fields = {
+        "schema_version", "contract", "status", "activation_status", "activation_id",
+        "generation", "operation", "committed_at", "intent_sha256", "history_sha256",
+        "previous_activation_receipt_sha256", "rollback_target_activation_receipt_sha256",
+        "supervisor_bundle_sha256", "authorization_sha256", "executor_catalog_sha256",
+        "installed_executor_sha256", "runtime_plan_sha256", "expires_at", "receipt_sha256",
+    }
+    current_fields = {
+        "schema_version", "contract", "status", "activation_id", "generation",
+        "history_sha256", "receipt_sha256", "executor_catalog_sha256",
+        "installed_executor_sha256", "runtime_plan_sha256", "expires_at", "current_sha256",
+    }
+    activation_fields = {
+        "schema_version", "contract", "status", "activation_id", "generation", "operation",
+        "approved_at", "expires_at", "requester_identity_sha256", "approver_identity_sha256",
+        "supervisor_bundle_sha256", "authorization_sha256",
+        "previous_activation_receipt_sha256", "rollback_target_activation_receipt_sha256",
+        "executor_catalog_sha256", "capability_status", "unavailable_capabilities",
+        "executor_source_sha256", "installed_executor_sha256", "runtime_plan_sha256",
+        "intent_sha256", "history_sha256", "history_file", "receipt_sha256", "receipt_file",
+        "current_sha256", "current_file", "executor_file", "plan", "activation_sha256",
+    }
+    recovery_fields = {
+        "schema_version", "contract", "status", "activation_id", "generation",
+        "recovery_authorization_id", "recovery_authorization_sha256",
+        "original_authorization_sha256", "intent_sha256", "prepared_at", "decision",
+        "recovery_sha256",
+    }
+
+    root_metadata = optional_lstat(state_root)
+    executor_metadata = optional_lstat(executor_file)
+    if root_metadata is None:
+        if executor_metadata is not None:
+            reject(recovery)
+        return
+    trusted_directory(state_root, 0o700, invalid)
+    marker = state_root / UAT_ROLLBACK_RUNTIME_STATE_MARKER
+    if trusted_file(marker, 0o400, 256, invalid) != UAT_ROLLBACK_RUNTIME_STATE_MARKER_VALUE:
+        reject(invalid)
+    expected_entries = sorted((
+        UAT_ROLLBACK_RUNTIME_STATE_MARKER, *UAT_ROLLBACK_RUNTIME_STATE_DIRECTORIES,
+        "activation-v2.json", "current-v2.json",
+    ))
+    try:
+        with os.scandir(state_root) as iterator:
+            if sorted(item.name for item in iterator) != expected_entries:
+                reject(recovery)
+    except OSError:
+        reject(invalid)
+    for name in UAT_ROLLBACK_RUNTIME_STATE_DIRECTORIES:
+        trusted_directory(state_root / name, 0o700, invalid)
+    try:
+        with os.scandir(state_root / "quarantine") as iterator:
+            if next(iterator, None) is not None:
+                reject(recovery)
+    except OSError:
+        reject(invalid)
+    if executor_metadata is None:
+        reject(recovery)
+
+    activation, _ = self_hashed(state_root / "activation-v2.json", "activation_sha256")
+    current, _ = self_hashed(state_root / "current-v2.json", "current_sha256")
+    exact_object(activation, activation_fields)
+    exact_object(current, current_fields)
+    generation = activation.get("generation")
+    if activation.get("schema_version") != 2 \
+            or activation.get("contract") \
+                != "chenyida-erp-uat-promotion-rollback-runtime-activation/v2" \
+            or activation.get("status") != "BLOCKED_CAPABILITY_UNAVAILABLE" \
+            or not isinstance(generation, int) or isinstance(generation, bool) \
+            or not 1 <= generation <= 1_000_000 \
+            or activation.get("operation") not in {"INSTALL", "UPGRADE", "ROLLBACK"} \
+            or activation.get("current_file") != str(UAT_ROLLBACK_RUNTIME_CURRENT_FILE) \
+            or activation.get("executor_file") != str(UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE) \
+            or activation.get("executor_catalog_sha256") \
+                != UAT_ROLLBACK_RUNTIME_EXECUTOR_CATALOG_SHA256 \
+            or activation.get("capability_status") != UAT_ROLLBACK_RUNTIME_CAPABILITY_STATUS \
+            or activation.get("unavailable_capabilities") \
+                != UAT_ROLLBACK_RUNTIME_UNAVAILABLE_CAPABILITIES:
+        reject(invalid)
+    digest_fields = {
+        "activation_sha256", "intent_sha256", "history_sha256", "receipt_sha256",
+        "current_sha256", "supervisor_bundle_sha256", "authorization_sha256",
+        "previous_activation_receipt_sha256", "rollback_target_activation_receipt_sha256",
+        "executor_catalog_sha256", "executor_source_sha256", "installed_executor_sha256",
+        "runtime_plan_sha256", "requester_identity_sha256", "approver_identity_sha256",
+    }
+    if any(not isinstance(activation.get(field), str) or not SHA256.fullmatch(activation[field])
+           for field in digest_fields) \
+            or activation["requester_identity_sha256"] == activation["approver_identity_sha256"] \
+            or activation["executor_source_sha256"] != activation["installed_executor_sha256"]:
+        reject(invalid)
+    zero = "0" * 64
+    if generation == 1 and (
+            activation["operation"] != "INSTALL"
+            or activation["previous_activation_receipt_sha256"] != zero) \
+            or generation > 1 and (
+                activation["operation"] == "INSTALL"
+                or activation["previous_activation_receipt_sha256"] == zero) \
+            or activation["operation"] == "ROLLBACK" and (
+                generation < 3 or activation["rollback_target_activation_receipt_sha256"] == zero) \
+            or activation["operation"] != "ROLLBACK" \
+                and activation["rollback_target_activation_receipt_sha256"] != zero:
+        reject(invalid)
+    executor_raw = trusted_file(executor_file, 0o555, 2 * 1024 * 1024, invalid)
+    if sha256(executor_raw) != activation["installed_executor_sha256"]:
+        reject(recovery)
+
+    file_pattern = re.compile(r"^([0-9]{16})\.([0-9a-f]{64})\.json$")
+    try:
+        names = {
+            name: sorted(item.name for item in os.scandir(state_root / name))
+            for name in ("intents", "history", "receipts", "executors", "plans", "recoveries")
+        }
+    except OSError:
+        reject(invalid)
+    if any(len(names[name]) != generation for name in ("intents", "history", "receipts")):
+        reject(recovery)
+    previous_receipt = zero
+    intents_by_hash: dict[str, dict[str, Any]] = {}
+    executor_digests: set[str] = set()
+    plan_digests: set[str] = set()
+    receipt_chain: list[str] = []
+    plan_values: dict[str, dict[str, Any]] = {}
+    latest_intent: dict[str, Any] | None = None
+    latest_history: dict[str, Any] | None = None
+    latest_receipt: dict[str, Any] | None = None
+    for index in range(generation):
+        ordinal = f"{index + 1:016d}"
+        intent_match = file_pattern.fullmatch(names["intents"][index])
+        history_match = file_pattern.fullmatch(names["history"][index])
+        receipt_match = file_pattern.fullmatch(names["receipts"][index])
+        if intent_match is None or history_match is None or receipt_match is None \
+                or any(match.group(1) != ordinal
+                       for match in (intent_match, history_match, receipt_match)):
+            reject(recovery)
+        intent, _ = self_hashed(state_root / "intents" / names["intents"][index], "intent_sha256")
+        history, _ = self_hashed(state_root / "history" / names["history"][index], "history_sha256")
+        receipt, _ = self_hashed(state_root / "receipts" / names["receipts"][index], "receipt_sha256")
+        exact_object(intent, intent_fields)
+        exact_object(history, history_fields)
+        exact_object(receipt, receipt_fields)
+        activation_status = "BLOCKED_CAPABILITY_UNAVAILABLE"
+        digest_names = {
+            "supervisor_bundle_sha256", "authorization_sha256", "requester_identity_sha256",
+            "approver_identity_sha256", "previous_activation_receipt_sha256",
+            "rollback_target_activation_receipt_sha256", "executor_catalog_sha256",
+            "executor_source_sha256", "installed_executor_sha256", "runtime_plan_sha256",
+            "intent_sha256",
+        }
+        if any(not isinstance(intent.get(field), str) or not SHA256.fullmatch(intent[field])
+               for field in digest_names):
+            reject(invalid)
+        try:
+            approved = datetime.strptime(
+                intent["approved_at"], "%Y-%m-%dT%H:%M:%S.%fZ",
+            ).replace(tzinfo=timezone.utc)
+            expires = datetime.strptime(
+                intent["expires_at"], "%Y-%m-%dT%H:%M:%S.%fZ",
+            ).replace(tzinfo=timezone.utc)
+            committed = datetime.strptime(
+                history["committed_at"], "%Y-%m-%dT%H:%M:%S.%fZ",
+            ).replace(tzinfo=timezone.utc)
+        except (KeyError, TypeError, ValueError):
+            reject(invalid)
+        if expires <= approved or expires - approved > timedelta(hours=2) \
+                or committed < approved or committed >= expires:
+            reject(invalid)
+        intent_common = {
+            "activation_id", "generation", "operation", "previous_activation_receipt_sha256",
+            "rollback_target_activation_receipt_sha256", "supervisor_bundle_sha256",
+            "authorization_sha256", "executor_catalog_sha256", "installed_executor_sha256",
+            "runtime_plan_sha256", "expires_at",
+        }
+        history_common = intent_common | {
+            "capability_status", "unavailable_capabilities", "approved_at",
+            "requester_identity_sha256", "approver_identity_sha256", "plan",
+        }
+        receipt_common = intent_common
+        if intent_match.group(2) != intent["intent_sha256"] \
+                or history_match.group(2) != history["history_sha256"] \
+                or receipt_match.group(2) != receipt["receipt_sha256"] \
+                or intent.get("schema_version") != 2 \
+                or intent.get("contract") \
+                    != "chenyida-erp-uat-promotion-rollback-runtime-activation-intent/v2" \
+                or intent.get("status") != "PREPARED" or intent.get("generation") != index + 1 \
+                or intent.get("operation") not in {"INSTALL", "UPGRADE", "ROLLBACK"} \
+                or intent.get("executor_catalog_sha256") \
+                    != UAT_ROLLBACK_RUNTIME_EXECUTOR_CATALOG_SHA256 \
+                or intent.get("capability_status") != UAT_ROLLBACK_RUNTIME_CAPABILITY_STATUS \
+                or intent.get("unavailable_capabilities") \
+                    != UAT_ROLLBACK_RUNTIME_UNAVAILABLE_CAPABILITIES \
+                or intent.get("executor_source_sha256") \
+                    != intent.get("installed_executor_sha256") \
+                or intent.get("requester_identity_sha256") \
+                    == intent.get("approver_identity_sha256") \
+                or not isinstance(intent.get("plan"), dict) \
+                or intent["plan"].get("runtime_plan_sha256") != intent.get("runtime_plan_sha256") \
+                or intent["plan"].get("toolchain", {}).get("executor", {}).get("sha256") \
+                    != intent.get("installed_executor_sha256") \
+                or history.get("schema_version") != 2 \
+                or history.get("contract") \
+                    != "chenyida-erp-uat-promotion-rollback-runtime-activation-history/v2" \
+                or history.get("status") != "COMMITTED" or history.get("generation") != index + 1 \
+                or history.get("activation_status") != activation_status \
+                or any(history.get(field) != intent.get(field) for field in history_common) \
+                or receipt.get("schema_version") != 2 \
+                or receipt.get("contract") \
+                    != "chenyida-erp-uat-promotion-rollback-runtime-activation-receipt/v2" \
+                or receipt.get("status") != "COMMITTED" or receipt.get("generation") != index + 1 \
+                or receipt.get("activation_status") != activation_status \
+                or any(receipt.get(field) != intent.get(field) for field in receipt_common) \
+                or history.get("intent_sha256") != intent["intent_sha256"] \
+                or receipt.get("intent_sha256") != intent["intent_sha256"] \
+                or receipt.get("history_sha256") != history["history_sha256"] \
+                or receipt.get("committed_at") != history.get("committed_at") \
+                or intent.get("previous_activation_receipt_sha256") != previous_receipt \
+                or history.get("previous_activation_receipt_sha256") != previous_receipt \
+                or receipt.get("previous_activation_receipt_sha256") != previous_receipt:
+            reject(invalid)
+        if index == 0 and intent["operation"] != "INSTALL" \
+                or index > 0 and intent["operation"] == "INSTALL" \
+                or intent["operation"] == "ROLLBACK" and (
+                    index < 2
+                    or intent["rollback_target_activation_receipt_sha256"]
+                        != receipt_chain[index - 2]) \
+                or intent["operation"] != "ROLLBACK" \
+                    and intent["rollback_target_activation_receipt_sha256"] != zero:
+            reject(invalid)
+        intents_by_hash[intent["intent_sha256"]] = intent
+        executor_digests.add(intent.get("installed_executor_sha256"))
+        plan_digests.add(intent.get("runtime_plan_sha256"))
+        prior_plan = plan_values.get(intent["runtime_plan_sha256"])
+        if prior_plan is not None and canonical_json(prior_plan) != canonical_json(intent["plan"]):
+            reject(invalid)
+        plan_values[intent["runtime_plan_sha256"]] = intent["plan"]
+        previous_receipt = receipt["receipt_sha256"]
+        receipt_chain.append(previous_receipt)
+        latest_intent, latest_history, latest_receipt = intent, history, receipt
+
+    if names["executors"] != sorted(f"{item}.py" for item in executor_digests) \
+            or names["plans"] != sorted(f"{item}.json" for item in plan_digests):
+        reject(recovery)
+    for item in executor_digests:
+        if not isinstance(item, str) or not SHA256.fullmatch(item) \
+                or sha256(trusted_file(state_root / "executors" / f"{item}.py", 0o555,
+                                       2 * 1024 * 1024, invalid)) != item:
+            reject(invalid)
+    for item in plan_digests:
+        if not isinstance(item, str) or not SHA256.fullmatch(item):
+            reject(invalid)
+        plan, _ = self_hashed(state_root / "plans" / f"{item}.json", "runtime_plan_sha256")
+        if plan["runtime_plan_sha256"] != item \
+                or plan.get("schema_version") != 1 \
+                or plan.get("contract") \
+                    != "chenyida-erp-uat-promotion-rollback-runtime-plan/v1" \
+                or plan.get("toolchain", {}).get("executor", {}).get("sha256") \
+                    not in executor_digests \
+                or canonical_json(plan) != canonical_json(plan_values[item]):
+            reject(invalid)
+    alias_intent_fields = {
+        "activation_id", "generation", "operation", "approved_at", "expires_at",
+        "requester_identity_sha256", "approver_identity_sha256", "supervisor_bundle_sha256",
+        "authorization_sha256", "previous_activation_receipt_sha256",
+        "rollback_target_activation_receipt_sha256", "executor_catalog_sha256",
+        "capability_status", "unavailable_capabilities", "executor_source_sha256",
+        "installed_executor_sha256", "runtime_plan_sha256", "plan",
+    }
+    if latest_intent is None or latest_history is None or latest_receipt is None \
+            or activation["intent_sha256"] != latest_intent["intent_sha256"] \
+            or any(activation.get(field) != latest_intent.get(field)
+                   for field in alias_intent_fields) \
+            or activation["history_sha256"] != latest_history["history_sha256"] \
+            or activation["receipt_sha256"] != latest_receipt["receipt_sha256"] \
+            or activation["previous_activation_receipt_sha256"] \
+                != latest_receipt["previous_activation_receipt_sha256"] \
+            or activation["status"] != latest_history["activation_status"] \
+            or current.get("contract") \
+                != "chenyida-erp-uat-promotion-rollback-runtime-activation-current/v2" \
+            or current.get("schema_version") != 2 \
+            or current.get("activation_id") != activation["activation_id"] \
+            or current.get("generation") != generation \
+            or current.get("status") != activation["status"] \
+            or current.get("history_sha256") != activation["history_sha256"] \
+            or current.get("receipt_sha256") != activation["receipt_sha256"] \
+            or current.get("current_sha256") != activation["current_sha256"] \
+            or current.get("executor_catalog_sha256") != activation["executor_catalog_sha256"] \
+            or current.get("installed_executor_sha256") != activation["installed_executor_sha256"] \
+            or current.get("runtime_plan_sha256") != activation["runtime_plan_sha256"] \
+            or current.get("expires_at") != activation["expires_at"]:
+        reject(recovery)
+    ordinal = f"{generation:016d}"
+    if activation.get("history_file") \
+            != str(UAT_ROLLBACK_RUNTIME_STATE_ROOT / "history"
+                   / f"{ordinal}.{activation['history_sha256']}.json") \
+            or activation.get("receipt_file") \
+            != str(UAT_ROLLBACK_RUNTIME_STATE_ROOT / "receipts"
+                   / f"{ordinal}.{activation['receipt_sha256']}.json"):
+        reject(invalid)
+    for name in names["recoveries"]:
+        match = re.fullmatch(r"([A-Za-z0-9][A-Za-z0-9._-]{0,119})\.([0-9a-f]{64})\.json", name)
+        if match is None:
+            reject(invalid)
+        value, _ = self_hashed(state_root / "recoveries" / name, "recovery_sha256")
+        exact_object(value, recovery_fields)
+        recovery_intent = intents_by_hash.get(value.get("intent_sha256"))
+        if value.get("schema_version") != 2 \
+                or value.get("contract") \
+                != "chenyida-erp-uat-promotion-rollback-runtime-activation-recovery/v2" \
+                or value.get("status") != "AUTHORIZED_RESUME" \
+                or value.get("decision") != "RESUME_EXACT_KNOWN_PUBLICATION_ONLY" \
+                or value.get("recovery_authorization_id") != match.group(1) \
+                or value.get("recovery_sha256") != match.group(2) \
+                or recovery_intent is None \
+                or value.get("activation_id") != recovery_intent["activation_id"] \
+                or value.get("generation") != recovery_intent["generation"] \
+                or value.get("original_authorization_sha256") \
+                    != recovery_intent["authorization_sha256"] \
+                or value.get("recovery_authorization_sha256") \
+                    == value.get("original_authorization_sha256") \
+                or not isinstance(value.get("prepared_at"), str) \
+                or not ISO_UTC.fullmatch(value["prepared_at"]):
+            reject(invalid)
+
+
 def acquire_install_lock(path: Path = INSTALL_LOCK_FILE) -> int:
     flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
     try:
@@ -1177,6 +1573,7 @@ def install(repository: Path, authorization: dict[str, Any], authorization_path:
     assert_no_runtime_privilege_operator_interlock()
     assert_no_cluster_policy_activation_interlock()
     assert_no_notifier_egress_activation_interlock()
+    assert_no_uat_rollback_runtime_activation_interlock()
 
     ensure_directory(Path("/usr/local/libexec"), 0o755)
     ensure_directory(SUPERVISOR_BASE, 0o755)

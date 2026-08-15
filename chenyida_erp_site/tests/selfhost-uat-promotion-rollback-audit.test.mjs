@@ -42,18 +42,18 @@ test("current repository audit is valid but UAT promotion remains blocked", () =
   assert.equal(result.artifact.capabilities.find((entry) => entry.id === "ROLLBACK_TO_UAT_EXECUTOR").status, "SUPPORTED");
   assert.equal(result.artifact.capabilities.find((entry) => entry.id === "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT").status, "SUPPORTED");
   assert.deepEqual(result.artifact.execution_blockers.map((entry) => entry.id), [
-    "ROLLBACK_RUNTIME_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED",
+    "ROLLBACK_RUNTIME_CAPABILITIES_NOT_IMPLEMENTED_OR_HOST_NOT_ACTIVATED",
     "UAT_ROLLBACK_REHEARSAL_NOT_EXECUTED",
     "HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED",
   ]);
 });
 
-test("audit observes the complete repository control plane and the fail-closed runtime boundary", () => {
+test("audit observes the complete repository control plane and recoverable fail-closed runtime boundary", () => {
   const { artifact, errors } = buildUatPromotionRollbackAudit(inputs());
   assert.deepEqual(errors, []);
-  assert.equal(artifact.observations.supervisor_operation_count, 32);
-  assert.equal(artifact.observations.required_promotion_operation_count, 13);
-  assert.deepEqual(artifact.observations.implemented_required_promotion_operations, ["BEGIN_UAT_PROMOTION", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION", "DEPLOY_UAT_RELEASE", "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "VERIFY_UAT_POSTDEPLOY_IDENTITY", "VERIFY_UAT_CROSS_ROLE_EXECUTION", "FINALIZE_UAT_PROMOTION", "ROLLBACK_UAT_RELEASE", "VERIFY_AND_FINALIZE_UAT_ROLLBACK", "RECOVER_UAT_PROMOTION"]);
+  assert.equal(artifact.observations.supervisor_operation_count, 35);
+  assert.equal(artifact.observations.required_promotion_operation_count, 16);
+  assert.deepEqual(artifact.observations.implemented_required_promotion_operations, ["BEGIN_UAT_PROMOTION", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION", "DEPLOY_UAT_RELEASE", "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "VERIFY_UAT_POSTDEPLOY_IDENTITY", "VERIFY_UAT_CROSS_ROLE_EXECUTION", "FINALIZE_UAT_PROMOTION", "ROLLBACK_UAT_RELEASE", "VERIFY_AND_FINALIZE_UAT_ROLLBACK", "RECOVER_UAT_PROMOTION", "ACTIVATE_UAT_ROLLBACK_RUNTIME_V2", "ROLLBACK_UAT_ROLLBACK_RUNTIME_V2", "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION"]);
   assert.deepEqual(artifact.observations.missing_required_promotion_operations, []);
   assert.equal(artifact.observations.restore_target_policy, "TEST_ONLY");
   assert.equal(artifact.observations.migration_authorization, "SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED");
@@ -62,7 +62,7 @@ test("audit observes the complete repository control plane and the fail-closed r
   assert.equal(artifact.observations.cross_role_uat_transaction_binding, "SUPERVISOR_CHECKPOINT_12_CONTENT_ADDRESSED_AND_RECOVERABLE");
   assert.equal(artifact.observations.finalization_transaction_binding, "SUPERVISOR_CHECKPOINT_13_AGGREGATED_AND_RECOVERABLE");
   assert.equal(artifact.observations.rollback_transaction_binding, "SUPERVISOR_CHECKPOINT_14_15_CONTENT_ADDRESSED_AND_RECOVERABLE");
-  assert.equal(artifact.observations.rollback_runtime_adapter, "BUNDLED_TRUSTED_GATEWAY_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED_FAIL_CLOSED");
+  assert.equal(artifact.observations.rollback_runtime_adapter, "BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_CAPABILITIES_BLOCKED_HOST_NOT_ACTIVATED");
   assert.equal(artifact.observations.rollback_rehearsal_evidence, "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT");
   assert.equal(artifact.observations.cross_role_uat_readiness, "BLOCKED");
 });
@@ -78,6 +78,17 @@ test("policy cannot relabel a supported capability as missing", () => {
   fixture.policy.capabilities.find((entry) => entry.id === "COMPOSE_DEPLOYMENT_RECEIPT").status = "MISSING";
   const result = buildUatPromotionRollbackAudit(fixture);
   assert.ok(result.errors.includes("AUDIT_CAPABILITY_STATUS_DRIFT:COMPOSE_DEPLOYMENT_RECEIPT"));
+});
+
+test("fixed executor fake-root fixture must remain required in the release inventory", () => {
+  const fixture = inputs();
+  const entry = fixture.inventory.tests.find((item) =>
+    item.path === "tests/selfhost-uat-promotion-rollback-fixed-executor.test.mjs");
+  assert.ok(entry);
+  entry.sha256 = "0".repeat(64);
+  assert.ok(buildUatPromotionRollbackAudit(fixture).errors.includes(
+    "AUDIT_FIXED_EXECUTOR_RELEASE_TEST_INVALID",
+  ));
 });
 
 test("source marker drift and cross-role readiness promotion are rejected", () => {
@@ -205,6 +216,41 @@ test("rollback checkpoints cannot regress to unbound stages or lose bundle-switc
   const installerResult = buildUatPromotionRollbackAudit(installerFixture);
   assert.ok(installerResult.errors.some((entry) => entry.startsWith("AUDIT_SOURCE_MARKER_DRIFT:")));
   assert.ok(installerResult.errors.includes("AUDIT_ROLLBACK_TRANSACTION_BINDING_DRIFT"));
+});
+
+test("fixed executor, v2 activation, Supervisor v7 and install interlock are all audited", () => {
+  const cases = [
+    [
+      "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py",
+      "ROLLBACK_FIXED_EXECUTOR_UAT_CAPABILITY_UNAVAILABLE",
+      "REMOVED_FIXED_EXECUTOR_CAPABILITY_GATE",
+    ],
+    [
+      "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-activation-publisher.mjs",
+      "UAT_ROLLBACK_RUNTIME_ACTIVATION_PARTIAL_UNKNOWN",
+      "REMOVED_ACTIVATION_PARTIAL_INTERLOCK",
+    ],
+    [
+      "chenyida_erp_site/scripts/release-supervisor-launcher.py",
+      "chenyida-erp-release-supervisor-authorization/v7",
+      "REMOVED_SUPERVISOR_V7_AUTHORIZATION",
+    ],
+    [
+      "chenyida_erp_site/scripts/install-release-supervisor.py",
+      "assert_no_uat_rollback_runtime_activation_interlock",
+      "REMOVED_INSTALL_ACTIVATION_INTERLOCK",
+    ],
+  ];
+  for (const [repositoryPath, marker, replacement] of cases) {
+    const fixture = inputs();
+    fixture.sourceBodies.set(
+      repositoryPath,
+      fixture.sourceBodies.get(repositoryPath).replaceAll(marker, replacement),
+    );
+    const result = buildUatPromotionRollbackAudit(fixture);
+    assert.ok(result.errors.some((entry) => entry.startsWith("AUDIT_SOURCE_MARKER_DRIFT:")));
+    assert.ok(result.errors.includes("AUDIT_ROLLBACK_RUNTIME_BOUNDARY_DRIFT"));
+  }
 });
 
 test("a declared promotion operation cannot disappear from the audited implementation", () => {

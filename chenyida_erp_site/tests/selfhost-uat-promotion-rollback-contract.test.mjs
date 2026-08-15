@@ -118,7 +118,7 @@ function executionPackage() {
     deployment_environment: source("deployment.env"),
     runtime_policy: source("runtime-policy.json"),
     runtime_adapter_activation: source("runtime-adapter-activation.json", {
-      path: "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/activation-v1.json",
+      path: "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/activation-v2.json",
     }),
   };
   const contentReconciliation = createUatPromotionRollbackContentReconciliation({

@@ -15,7 +15,9 @@ from pathlib import Path
 
 SITE_ROOT = Path(__file__).resolve().parents[1]
 ADAPTER_SOURCE = SITE_ROOT / "scripts/uat-promotion-rollback-runtime-adapter.py"
-ACTIVATION_PATH = "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/activation-v1.json"
+FIXED_EXECUTOR_SOURCE = SITE_ROOT / "scripts/uat-promotion-rollback-fixed-executor.py"
+ACTIVATION_PATH = "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/activation-v2.json"
+CURRENT_PATH = "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/current-v2.json"
 EXECUTOR_PATH = "/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1"
 DOCKER_PATH = "/usr/bin/docker"
 LOCK_PATH = "/run/lock/chenyida-erp-release-gate-v1.lock"
@@ -37,6 +39,15 @@ CHECKS = (
     "MIGRATION_HEAD", "CADDY_IDENTITY", "POSTGRES_IDENTITY", "WEB_IDENTITY", "WORKER_IDENTITY",
     "RUNTIME_CONFIGURATION", "STRICT_RELEASE_IDENTITY", "HEALTH", "PROTECTED_RESOURCES",
 )
+EXECUTOR_CATALOG_SHA256 = "1089c159743a1480c28af322c83b295ead42c8555f6320911f1102115b494b04"
+UNAVAILABLE_CAPABILITIES = sorted({
+    "WRITER_CONTAINMENT", "POSTGRESQL_RESTORE", "UPLOADS_RESTORE",
+    "ATTACHMENTS_RESTORE", "BACKUP_STATUS_RESTORE",
+    "WEB_WORKER_PREDECESSOR_ACTIVATION", "POSTGRESQL_CONTENT",
+    "UPLOADS_CONTENT", "ATTACHMENTS_CONTENT", "BACKUP_STATUS_CONTENT",
+    "MIGRATION_HEAD", "CADDY_IDENTITY", "POSTGRES_IDENTITY", "WEB_IDENTITY",
+    "WORKER_IDENTITY", "RUNTIME_CONFIGURATION", "STRICT_RELEASE_IDENTITY", "HEALTH",
+})
 
 
 def canonical(value):
@@ -113,14 +124,22 @@ if MODE == "NO_READ_TERM_RESISTANT":
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
     time.sleep(60)
 request = json.load(sys.stdin)
-fd_manifest = json.loads(os.environ["CHENYIDA_ERP_ROLLBACK_TRUSTED_FD_MANIFEST"])
+manifest_fd = int(os.environ["CHENYIDA_ERP_ROLLBACK_TRUSTED_FD_MANIFEST_FD"])
+manifest_raw = bytearray()
+while True:
+    chunk = os.read(manifest_fd, 65536)
+    if not chunk:
+        break
+    manifest_raw.extend(chunk)
+fd_manifest = json.loads(manifest_raw)
 manifest_body = {key: value for key, value in fd_manifest.items() if key != "manifest_sha256"}
-if fd_manifest.get("contract") != "chenyida-erp-uat-promotion-rollback-trusted-fd-manifest/v1" \
+if fd_manifest.get("contract") != "chenyida-erp-uat-promotion-rollback-trusted-fd-manifest/v2" \
         or fd_manifest.get("manifest_sha256") != sha(manifest_body) \
         or fd_manifest.get("executor", {}).get("path") != sys.argv[0] \
         or sorted(fd_manifest.get("sources", {})) != sorted(request["source_roles"]):
     raise SystemExit(90)
-for item in [fd_manifest["executor"], fd_manifest["docker"], *fd_manifest["sources"].values()]:
+for item in [fd_manifest["executor"], fd_manifest["docker"],
+             *fd_manifest["activation_chain"].values(), *fd_manifest["sources"].values()]:
     with open(item["path"], "rb") as trusted_handle:
         if hashlib.sha256(trusted_handle.read()).hexdigest() != item["sha256"]:
             raise SystemExit(91)
@@ -306,8 +325,13 @@ body = {
     "operation_id": request["operation_id"], "label": request["label"],
     "request_sha256": request["request_sha256"],
     "runtime_plan_sha256": request["runtime_plan_sha256"],
+    "activation_receipt_sha256": fd_manifest["activation"]["receipt_sha256"],
+    "descriptor_manifest_sha256": fd_manifest["manifest_sha256"],
+    "handler_id": fd_manifest["handler_id"],
+    "idempotency_key": fd_manifest["idempotency_key"],
     "status": status, "started_at": observed, "completed_at": observed, "output": output,
 }
+body["output_sha256"] = sha(output)
 body["response_sha256"] = sha(body)
 sys.stdout.buffer.write(canonical(body))
 '''
@@ -331,10 +355,13 @@ class RuntimeAdapterFixture:
         self.pid_file = self.root / "slow-grandchild.pid"
         self.executor = self.physical(EXECUTOR_PATH)
         self.executor.parent.mkdir(parents=True, exist_ok=True)
-        executor_text = EXECUTOR_TEMPLATE.replace("__MODE__", repr(mode)).replace(
-            "__PID_FILE__", repr(str(self.pid_file))
-        )
-        self.executor.write_text(executor_text, encoding="utf-8")
+        if mode == "ACTUAL_FIXED_EXECUTOR":
+            shutil.copyfile(FIXED_EXECUTOR_SOURCE, self.executor)
+        else:
+            executor_text = EXECUTOR_TEMPLATE.replace("__MODE__", repr(mode)).replace(
+                "__PID_FILE__", repr(str(self.pid_file))
+            )
+            self.executor.write_text(executor_text, encoding="utf-8")
         self.executor.chmod(0o555)
         self.docker = self.physical(DOCKER_PATH)
         self.docker.parent.mkdir(parents=True, exist_ok=True)
@@ -496,14 +523,98 @@ class RuntimeAdapterFixture:
             "action_matrix": action_matrix,
         }
         plan["runtime_plan_sha256"] = sha(plan)
-        activation = {
-            "schema_version": 1,
-            "contract": "chenyida-erp-uat-promotion-rollback-runtime-activation/v1",
-            "status": "ACTIVE", "activation_id": "runtime-adapter-activation-001",
-            "approved_at": timestamp(created), "expires_at": timestamp(deadline),
+        activation_id = "runtime-adapter-activation-001"
+        approved_at = timestamp(created)
+        expires_at = timestamp(deadline)
+        intent_sha256 = hashlib.sha256(b"runtime-activation-intent").hexdigest()
+        executor_sha256 = plan["toolchain"]["executor"]["sha256"]
+        common = {
+            "activation_id": activation_id, "generation": 1, "operation": "INSTALL",
+            "approved_at": approved_at, "expires_at": expires_at,
             "requester_identity_sha256": hashlib.sha256(b"requester").hexdigest(),
             "approver_identity_sha256": hashlib.sha256(b"approver").hexdigest(),
+            "supervisor_bundle_sha256": self.bundle_sha,
+            "authorization_sha256": self.authorization_sha,
+            "previous_activation_receipt_sha256": "0" * 64,
+            "rollback_target_activation_receipt_sha256": "0" * 64,
+            "executor_catalog_sha256": EXECUTOR_CATALOG_SHA256,
+            "capability_status": "BLOCKED_MISSING_UAT_CAPABLE_HANDLERS",
+            "unavailable_capabilities": UNAVAILABLE_CAPABILITIES,
+            "executor_source_sha256": executor_sha256,
+            "installed_executor_sha256": executor_sha256,
+            "runtime_plan_sha256": plan["runtime_plan_sha256"],
+        }
+        history = {
+            "schema_version": 2,
+            "contract": "chenyida-erp-uat-promotion-rollback-runtime-activation-history/v2",
+            "status": "COMMITTED", "activation_status": "BLOCKED_CAPABILITY_UNAVAILABLE",
+            "activation_id": activation_id, "generation": 1, "operation": "INSTALL",
+            "committed_at": approved_at, "intent_sha256": intent_sha256,
+            "previous_activation_receipt_sha256": "0" * 64,
+            "rollback_target_activation_receipt_sha256": "0" * 64,
+            "supervisor_bundle_sha256": self.bundle_sha,
+            "authorization_sha256": self.authorization_sha,
+            "executor_catalog_sha256": EXECUTOR_CATALOG_SHA256,
+            "capability_status": common["capability_status"],
+            "unavailable_capabilities": UNAVAILABLE_CAPABILITIES,
+            "installed_executor_sha256": executor_sha256,
+            "runtime_plan_sha256": plan["runtime_plan_sha256"],
+            "approved_at": approved_at, "expires_at": expires_at,
+            "requester_identity_sha256": common["requester_identity_sha256"],
+            "approver_identity_sha256": common["approver_identity_sha256"],
             "plan": plan,
+        }
+        history["history_sha256"] = sha(history)
+        receipt = {
+            "schema_version": 2,
+            "contract": "chenyida-erp-uat-promotion-rollback-runtime-activation-receipt/v2",
+            "status": "COMMITTED", "activation_status": "BLOCKED_CAPABILITY_UNAVAILABLE",
+            "activation_id": activation_id, "generation": 1, "operation": "INSTALL",
+            "committed_at": approved_at, "intent_sha256": intent_sha256,
+            "history_sha256": history["history_sha256"],
+            "previous_activation_receipt_sha256": "0" * 64,
+            "rollback_target_activation_receipt_sha256": "0" * 64,
+            "supervisor_bundle_sha256": self.bundle_sha,
+            "authorization_sha256": self.authorization_sha,
+            "executor_catalog_sha256": EXECUTOR_CATALOG_SHA256,
+            "installed_executor_sha256": executor_sha256,
+            "runtime_plan_sha256": plan["runtime_plan_sha256"],
+            "expires_at": expires_at,
+        }
+        receipt["receipt_sha256"] = sha(receipt)
+        current = {
+            "schema_version": 2,
+            "contract": "chenyida-erp-uat-promotion-rollback-runtime-activation-current/v2",
+            "status": "BLOCKED_CAPABILITY_UNAVAILABLE", "activation_id": activation_id,
+            "generation": 1, "history_sha256": history["history_sha256"],
+            "receipt_sha256": receipt["receipt_sha256"],
+            "executor_catalog_sha256": EXECUTOR_CATALOG_SHA256,
+            "installed_executor_sha256": executor_sha256,
+            "runtime_plan_sha256": plan["runtime_plan_sha256"], "expires_at": expires_at,
+        }
+        current["current_sha256"] = sha(current)
+        ordinal = "0000000000000001"
+        history_path = (
+            "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/history/"
+            f"{ordinal}.{history['history_sha256']}.json"
+        )
+        receipt_path = (
+            "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/receipts/"
+            f"{ordinal}.{receipt['receipt_sha256']}.json"
+        )
+        self.write_source(history_path, canonical(history))
+        self.write_source(receipt_path, canonical(receipt))
+        self.write_source(CURRENT_PATH, canonical(current))
+        activation = {
+            "schema_version": 2,
+            "contract": "chenyida-erp-uat-promotion-rollback-runtime-activation/v2",
+            "status": "BLOCKED_CAPABILITY_UNAVAILABLE",
+            **common,
+            "intent_sha256": intent_sha256,
+            "history_sha256": history["history_sha256"], "history_file": history_path,
+            "receipt_sha256": receipt["receipt_sha256"], "receipt_file": receipt_path,
+            "current_sha256": current["current_sha256"], "current_file": CURRENT_PATH,
+            "executor_file": EXECUTOR_PATH, "plan": plan,
         }
         activation["activation_sha256"] = sha(activation)
         sources["runtime_adapter_activation"] = self.write_source(ACTIVATION_PATH, canonical(activation))
@@ -672,6 +783,13 @@ class RuntimeAdapterFixture:
 
 
 class UatPromotionRollbackRuntimeAdapterTest(unittest.TestCase):
+    def test_actual_fixed_executor_validates_gateway_manifest_then_reports_capability_blocker(self):
+        fixture = RuntimeAdapterFixture(mode="ACTUAL_FIXED_EXECUTOR")
+        self.addCleanup(fixture.close)
+        result = fixture.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, b"ROLLBACK_RUNTIME_UAT_CAPABILITY_UNAVAILABLE\n")
+
     def test_fake_root_preflight_binds_activation_plan_tools_and_target(self):
         fixture = RuntimeAdapterFixture()
         self.addCleanup(fixture.close)

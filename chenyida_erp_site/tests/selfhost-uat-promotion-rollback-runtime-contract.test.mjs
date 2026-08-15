@@ -142,6 +142,24 @@ function requestInput(overrides = {}) {
   return body;
 }
 
+function responseBindings(request) {
+  return {
+    activation_receipt_sha256: digest("activation-receipt"),
+    descriptor_manifest_sha256: digest("descriptor-manifest"),
+    handler_id: request.label === null
+      ? "chenyida-erp.rollback.runtime-observation.v1"
+      : `chenyida-erp.rollback.${request.label.toLowerCase().replaceAll("_", "-")}.v1`,
+    idempotency_key: clusterSha256({
+      contract: "chenyida-erp-uat-promotion-rollback-idempotency-key/v1",
+      operation_id: request.operation_id,
+      label: request.label,
+      record_intent_sha256: request.record_intent_sha256,
+      runtime_plan_sha256: request.runtime_plan_sha256,
+      previous_result_sha256: request.previous_result_sha256,
+    }),
+  };
+}
+
 test("runtime plan derives deterministic staging database, volumes, and immutable action matrix", () => {
   const plan = runtimePlan();
   assert.deepEqual(plan.targets, deriveUatPromotionRollbackRuntimeTargets(operationId));
@@ -153,10 +171,15 @@ test("runtime plan derives deterministic staging database, volumes, and immutabl
 test("runtime activation requires distinct approver and an unmodified content-addressed plan", () => {
   const activation = createUatPromotionRollbackRuntimeActivation({
     activation_id: "rollback-runtime-activation-001",
+    generation: 1,
+    operation: "INSTALL",
     approved_at: "2026-08-15T02:00:00.000Z",
     expires_at: "2026-08-15T03:00:00.000Z",
+    supervisor_bundle_sha256: digest("activation-supervisor-bundle"),
+    authorization_sha256: digest("activation-authorization"),
     requester_identity_sha256: digest("requester"),
     approver_identity_sha256: digest("approver"),
+    executor_source_sha256: digest("executor"),
     plan: runtimePlan(),
   });
   assert.equal(validateUatPromotionRollbackRuntimeActivation(
@@ -226,6 +249,7 @@ test("runtime response is bound to the exact request and runtime plan", () => {
   const request = createUatPromotionRollbackRuntimeRequest(requestInput());
   const plan = runtimePlan();
   const response = createUatPromotionRollbackRuntimeResponse({
+    ...responseBindings(request),
     action: request.action, operation: request.operation, operation_id: request.operation_id,
     label: request.label, request_sha256: request.request_sha256,
     runtime_plan_sha256: request.runtime_plan_sha256, status: "SAFE_TO_EXECUTE",
@@ -260,6 +284,7 @@ test("containment can report a freshly observed stale intent without claiming co
   input.payload.record_intent = { runtime_observation_sha256: digest("prior-observation") };
   const request = createUatPromotionRollbackRuntimeRequest(input);
   const response = createUatPromotionRollbackRuntimeResponse({
+    ...responseBindings(request),
     action: request.action,
     operation: request.operation,
     operation_id: request.operation_id,
@@ -366,6 +391,7 @@ test("Node and Python share newline-terminated canonical request and response by
   assert.equal(validateUatPromotionRollbackRuntimeRequest(pythonRequest).request_sha256, request.request_sha256);
 
   const response = createUatPromotionRollbackRuntimeResponse({
+    ...responseBindings(request),
     action: request.action, operation: request.operation, operation_id: request.operation_id,
     label: request.label, request_sha256: request.request_sha256,
     runtime_plan_sha256: request.runtime_plan_sha256, status: "SAFE_TO_EXECUTE",
